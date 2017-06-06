@@ -257,4 +257,5 @@ message FlowPktHdrBatch {
     // 内存排布：header_0, ..., header_i, ..., header_n, 0xFF结束标记
     //   header_i排布：compressed_header_size_i(1B), compressed_header_i
     optional bytes compressed_headers = 5;
+    optional uint32 close_type = 6;
 }
