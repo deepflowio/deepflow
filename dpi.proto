@@ -1,0 +1,66 @@
+package DPI;
+option java_package = "cn.net.yunshan.message";
+option java_outer_classname = "DPIMessage";
+
+enum RequestType {
+    DPI_SEQ = 1;
+}
+
+message Request {
+    optional RequestType type = 1;
+}
+
+message Header {
+    required fixed64 sequence = 1; /* start from 1 */
+}
+
+message Dpi {
+    optional string host = 1;
+    optional uint64 start_time = 2;
+    optional uint64 end_time = 3;
+
+    optional uint32 vlan = 11;
+    optional uint32 ip_src = 12;
+    optional uint32 ip_dst = 13;
+    optional uint32 proto = 14;
+    optional uint32 port_src = 15;
+    optional uint32 port_dst = 16;
+
+    optional uint64 pkt_cnt = 21;
+    optional uint64 byte_cnt = 22;
+
+    optional string host_server_name = 31;
+
+    optional Http http = 101;
+    optional Dns dns = 102;
+}
+
+message Http {
+    optional string url = 1;
+    optional string method = 2;
+    optional string user_agent = 3;
+    optional string content_type = 4;
+    optional uint32 content_length = 5;
+
+    optional uint32 response_code = 101;
+}
+
+message Dns {
+    optional uint32 identifier = 1;
+    optional uint32 op_code = 2;
+
+    repeated Dnsquery dnsquery = 101;
+    repeated Dnsanswer dnsanswer = 102;
+}
+
+message Dnsquery {
+    optional string query_name = 1;
+}
+
+message Dnsanswer {
+    optional uint32 response_code = 1;
+    optional uint32 response_ttl = 2;
+    optional string response_name = 3;
+    optional string response_ipv4addr = 4;
+    optional string response_ipv6addr = 5;
+}
