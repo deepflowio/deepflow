@@ -1,0 +1,10 @@
+package Alarm;
+
+message Content {
+    optional string host = 1;
+}
+
+message AlarmContent {
+    optional string rule_id = 1;
+    optional Content content = 2;
+}
