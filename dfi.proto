@@ -155,11 +155,14 @@ message Flow {
     optional uint32 device_id_1 = 125;
     optional uint32 if_index_0 = 126;
     optional uint32 if_index_1 = 127;
+    optional uint32 if_type_0 = 128;
+    optional uint32 if_type_1 = 129;
 
-    optional bool is_l2_end_0 = 128;
-    optional bool is_l2_end_1 = 129;
-    optional bool is_l3_end_0 = 130;
-    optional bool is_l3_end_1 = 131;
+
+    optional bool is_l2_end_0 = 130;
+    optional bool is_l2_end_1 = 131;
+    optional bool is_l3_end_0 = 132;
+    optional bool is_l3_end_1 = 133;
 }
 
 /* 注意：message中的tag不要大于31，大于31以后key会多占用1个字节。
