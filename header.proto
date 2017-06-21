@@ -24,6 +24,7 @@ enum Module {
     MNTNCT             = 12;
     NOTIFICATIONCENTER = 13;
     STOREKEEPER        = 14;
+    ALARM              = 15;
 }
 
 enum Type {
