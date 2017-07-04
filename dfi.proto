@@ -143,26 +143,26 @@ message Flow {
     optional uint64 total_frag_pkt_cnt_1 = 98 [default = 0];  /* Received fragment packet cnt of this flow in
                                                                  backward direction */
 
-    optional uint32 subnet_id_0 = 100;
-    optional uint32 subnet_id_1 = 101;
+    optional uint32 subnet_id_0 = 100 [default = 0];
+    optional uint32 subnet_id_1 = 101 [default = 0];
 
-    optional uint32 epc_id_0 = 120;
-    optional uint32 epc_id_1 = 121;
+    optional uint32 epc_id_0 = 120 [default = 0];
+    optional uint32 epc_id_1 = 121 [default = 0];
 
-    optional uint32 device_type_0 = 122;
-    optional uint32 device_type_1 = 123;
-    optional uint32 device_id_0 = 124;
-    optional uint32 device_id_1 = 125;
-    optional uint32 if_index_0 = 126;
-    optional uint32 if_index_1 = 127;
-    optional uint32 if_type_0 = 128;
-    optional uint32 if_type_1 = 129;
+    optional uint32 device_type_0 = 122 [default = 0];
+    optional uint32 device_type_1 = 123 [default = 0];
+    optional uint32 device_id_0 = 124 [default = 0];
+    optional uint32 device_id_1 = 125 [default = 0];
+    optional uint32 if_index_0 = 126 [default = 0];
+    optional uint32 if_index_1 = 127 [default = 0];
+    optional uint32 if_type_0 = 128 [default = 0];
+    optional uint32 if_type_1 = 129 [default = 0];
 
 
-    optional bool is_l2_end_0 = 130;
-    optional bool is_l2_end_1 = 131;
-    optional bool is_l3_end_0 = 132;
-    optional bool is_l3_end_1 = 133;
+    optional bool is_l2_end_0 = 130 [default = false];
+    optional bool is_l2_end_1 = 131 [default = false];
+    optional bool is_l3_end_0 = 132 [default = false];
+    optional bool is_l3_end_1 = 133 [default = false];
 }
 
 /* 注意：message中的tag不要大于31，大于31以后key会多占用1个字节。
