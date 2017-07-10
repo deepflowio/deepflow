@@ -1,4 +1,6 @@
 package Alarm;
+option java_package = "cn.net.yunshan.message";
+option java_outer_classname = "AlarmMessage";
 
 message AlarmContent {
     optional int32 rule_id = 1;
