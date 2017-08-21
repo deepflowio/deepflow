@@ -45,7 +45,6 @@ message Flow {
     optional uint64 flow_id = 8;      /* The forcefully reported flow is still kept in
                                          agent and this tuple (host, thread_index, flow_id)
                                          can be used to identify the flow in analyzer */
-
     optional uint32 start_time = 11;  /* 1. first report: the time when the first packet arrives
                                          2. latter reports: equals to end_time in last report */
     optional uint32 end_time = 12;    /* The time when agent reports this flow (user time) */
@@ -81,6 +80,11 @@ message Flow {
     optional uint64 tun_id = 61;     /* VxLAN tunnel index, i.e., vl2_id */
     optional uint32 tun_ip_src = 62; /* VxLAN tunnel source vtep IP */
     optional uint32 tun_ip_dst = 63; /* VxLAN tunnel destination vtep IP */
+
+    /* Overlay */
+    optional uint64 overlay_tun_id = 66;    /* Overlay tunnel id */
+    optional uint32 overlay_tun_type = 67;  /* 1=VXLAN, 2=NVGRE, 3=GENEVE */
+
 
     /* L7 */
 
