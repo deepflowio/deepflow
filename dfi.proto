@@ -151,6 +151,11 @@ message Flow {
     optional uint32 subnet_id_0 = 100 [default = 0];          /* subnetid of mac_src, platform network ID */
     optional uint32 subnet_id_1 = 101 [default = 0];          /* subnetid of mac_dst, platform network ID */
 
+    optional uint32 l3_device_type_0 = 102 [default = 0];     /* devicetype of ip_src, platform VM/VGW/TPD instance */
+    optional uint32 l3_device_type_1 = 103 [default = 0];     /* devicetype of ip_dst, platform VM/VGW/TPD instance */
+    optional uint32 l3_device_id_0 = 104 [default = 0];       /* deviceid of ip_src, platform instance ID */
+    optional uint32 l3_device_id_1 = 105 [default = 0];       /* deviceid of ip_dst, platform instance ID */
+
     optional uint32 epc_id_0 = 120 [default = 0];             /* epc_id of device of mac_src, platform project ID */
     optional uint32 epc_id_1 = 121 [default = 0];             /* epc_id of device of mac_dst, platform project ID */
     optional uint32 device_type_0 = 122 [default = 0];        /* devicetype of mac_src, platform VM/VGW/TPD instance */
