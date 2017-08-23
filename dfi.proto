@@ -34,69 +34,76 @@ message Request {
     optional RequestType type = 1;
 }
 
+/*
+ * Evaluated in host byte order.
+ * If the value is the same as the default value, then the corresponding key
+ * is unnecessary to be evaluated, in other words, has_xxx = 0
+ */
 message Flow {
-    optional uint32 host = 1;         /* if probe is an analyzer, host = exporter;
-                                         elif probe is an exporter, host = the hypervisor
-                                         on which the data source of the exporter resides */
-    optional uint32 exporter = 2;     /* control ip for dfi-agent */
+    optional uint32 host = 1;         /* If exporter is in an Analyzer, host = exporter;
+                                         elif exporter is in an Exporter, host = the hypervisor
+                                         on which the data source of the Exporter resides */
+    optional uint32 exporter = 2;     /* Control IP for exporter */
     optional uint32 close_type = 7;   /* 0=unknown, 1=tcp-fin, 2=tcp-rst, 3=timeout,
                                          4=toomany, 5=forced-report, 6=forced-close,
                                          7=half-timeout */
     optional uint64 flow_id = 8;      /* The forcefully reported flow is still kept in
-                                         agent and this tuple (host, thread_index, flow_id)
-                                         can be used to identify the flow in analyzer */
-    optional uint32 start_time = 11;  /* 1. first report: the time when the first packet arrives
-                                         2. latter reports: equals to end_time in last report */
-    optional uint32 end_time = 12;    /* The time when agent reports this flow (user time) */
-    optional uint64 duration = 13;    /* 1. for flows !FIN && !RST, equals to
+                                         exporter and this tuple (host, thread_index, flow_id)
+                                         can be used to identify the flow in poseidon */
+    optional uint32 start_time = 11;  /* 1. First report: the time when the first packet arrives
+                                         2. Latter reports: equals to end_time in last report */
+    optional uint32 end_time = 12;    /* The time when exporter reports this flow */
+    optional uint64 duration = 13;    /* 1. For flows !FIN && !RST, equals to
                                              end_time - time_of_the_first_packet_in_the_flow
-                                         2. for others, equals to
+                                         2. For others, equals to
                                              max(arr_time_0_last, arr_time_1_last) -
                                                  time_of_the_first_packet_in_the_flow */
 
     /* L1 */
-    optional uint32 in_port_0 = 21;
-    optional uint32 in_port_1 = 22;
+    optional uint32 in_port_0 = 21 [default = 0];
+    optional uint32 in_port_1 = 22 [default = 0];   /* Deprecated due to always equal to in_port_0 */
 
     /* L2 */
-    optional uint32 vlan = 31;
-    optional uint32 eth_type = 32;
-    optional uint64 mac_src = 33;       /* 0x0000123456789abc == 12:34:56:78:9a:bc */
-    optional uint64 mac_dst = 34;       /* 0x0000123456789abc == 12:34:56:78:9a:bc */
+    optional uint32 vlan = 31 [default = 0];
+    optional uint32 eth_type = 32 [default = 0];
+    optional uint64 mac_src = 33 [default = 0];     /* 0x0000123456789abc == 12:34:56:78:9a:bc */
+    optional uint64 mac_dst = 34 [default = 0];     /* 0x0000123456789abc == 12:34:56:78:9a:bc */
 
     /* L3 */
-    optional uint32 ip_src = 41;        /* 0x01020304 == 1.2.3.4 */
-    optional uint32 ip_dst = 42;        /* 0x01020304 == 1.2.3.4 */
+    optional uint32 ip_src = 41 [default = 0];      /* 0x01020304 == 1.2.3.4 */
+    optional uint32 ip_dst = 42 [default = 0];      /* 0x01020304 == 1.2.3.4 */
 
     /* L4 */
-    optional uint32 proto = 51;
-    optional uint32 port_src = 52;
-    optional uint32 port_dst = 53;
-    optional uint32 tcp_flags_0 = 54;
-    optional uint32 tcp_flags_1 = 55;
-    optional uint32 tcp_syn_seq = 56;
+    optional uint32 proto = 51 [default = 0];
+    optional uint32 port_src = 52 [default = 0];
+    optional uint32 port_dst = 53 [default = 0];
+    optional uint32 tcp_flags_0 = 54 [default = 0];
+    optional uint32 tcp_flags_1 = 55 [default = 0];
+    optional uint32 tcp_syn_seq = 56 [default = 0];
 
     /* Tunnel */
-    optional uint64 tun_id = 61;     /* VxLAN tunnel index, i.e., vl2_id */
-    optional uint32 tun_ip_src = 62; /* VxLAN tunnel source vtep IP */
-    optional uint32 tun_ip_dst = 63; /* VxLAN tunnel destination vtep IP */
+    optional uint64 tun_id = 61 [default = 0];      /* Tunnel index where the flow is encapped, i.e., vl2_id */
+    optional uint32 tun_ip_src = 62 [default = 0];  /* Tunnel source vtep IP where the flow is encapped */
+    optional uint32 tun_ip_dst = 63 [default = 0];  /* Tunnel destination vtep IP where the flow is encapped */
+    optional uint64 tun_type = 64 [default = 0];    /* Tunnel type where the flow is encapped,
+                                                       1=VXLAN, 2=NVGRE, 3=GENEVE */
 
     /* Overlay */
-    optional uint64 overlay_tun_id = 66;    /* Overlay tunnel id */
-    optional uint32 overlay_tun_type = 67;  /* 1=VXLAN, 2=NVGRE, 3=GENEVE */
-
+    optional uint64 overlay_tun_id = 66 [default = 0];    /* Overlay tunnel index of the flow */
+    optional uint32 overlay_tun_type = 67 [default = 0];  /* Overlay tunnel type of the flow,
+                                                             1=VXLAN, 2=NVGRE, 3=GENEVE */
 
     /* L7 */
 
-    /* counters */
-    optional uint64 byte_cnt_0 = 71 [default = 0]; /* Received byte cnt in this report period in
-                                                      forward direction */
-    optional uint64 byte_cnt_1 = 72 [default = 0]; /* Received byte cnt in this report period in
-                                                      backward direction */
-    optional uint64 pkt_cnt_0 = 73 [default = 0];  /* Received packet cnt in this report period in
-                                                      forward direction */
-    optional uint64 pkt_cnt_1 = 74 [default = 0];  /* Received packet cnt in this report period in
-                                                      backward direction */
+    /* Packet Counters */
+    optional uint64 byte_cnt_0 = 71 [default = 0];  /* Received byte cnt in this report period in
+                                                       forward direction */
+    optional uint64 byte_cnt_1 = 72 [default = 0];  /* Received byte cnt in this report period in
+                                                       backward direction */
+    optional uint64 pkt_cnt_0 = 73 [default = 0];   /* Received packet cnt in this report period in
+                                                       forward direction */
+    optional uint64 pkt_cnt_1 = 74 [default = 0];   /* Received packet cnt in this report period in
+                                                       backward direction */
     optional uint64 total_byte_cnt_0 = 75 [default = 0]; /* Received byte cnt of this flow in
                                                             forward direction */
     optional uint64 total_byte_cnt_1 = 76 [default = 0]; /* Received byte cnt of this flow in
@@ -106,38 +113,39 @@ message Flow {
     optional uint64 total_pkt_cnt_1 = 78 [default = 0];  /* Received packet cnt of this flow in
                                                             backward direction */
 
-    /* kernel timers */
-    optional uint64 cur_start_time = 81 [default = 0];  /* The arr_time of the first packet of
-                                                           current report period, which is saved as
-                                                           the start time of current report period
-                                                           and will be used to calculate rate */
-    optional uint64 arr_time_0_0 = 82 [default = 0];    /* The microseconds from 1970.1.1 to
-                                                           the arriving time of the first packet of this
-                                                           flow in forward direction */
+    /* Timers */
+    optional uint64 cur_start_time = 81 [default = 0];   /* The arr_time of the first packet of
+                                                            current report period, which is saved as
+                                                            the start time of current report period
+                                                            and will be used to calculate rate */
+    optional uint64 arr_time_0_0 = 82 [default = 0];     /* The microseconds from 1970.1.1 to
+                                                            the arriving time of the first packet of this
+                                                            flow in forward direction */
+    optional uint64 rtt_0 = 83 [default = 0];            /* The RTT in the handshake phase of the flow.
+                                                            When pkt_cnt_0 >= 2 && pkt_cnt_1 >= 1,
+                                                            SYN -> SYN/ACK -> ACK,
+                                                            rtt_0 = arr_time_0_1 (ACK) - arr_time_0_0 (SYN) */
+    optional uint64 arr_time_0_last = 85 [default = 0];  /* The arriving offset of the last packet in
+                                                            forward direction */
+    optional uint64 arr_time_1_0 = 86 [default = 0];     /* The microseconds from 1970.1.1 to
+                                                            the arriving time of the first packet of this
+                                                            flow in backward direction */
+    optional uint64 rtt_1 = 87 [default = 0];            /* The average RTT in the data transmission phase of the flow.
+                                                            ... PSH/ACK_n-1 -> PSH/ACK_n -> ACK_n -> PSH/ACK_n+1 -> PSH/ACK_n+2 ...,
+                                                            rtt_Nth = tx_time_1 (PSH/ACK_n+1) - tx_time_0 (PSH/ACK_n),
+                                                            rtt_1 = (rtt_1st + rtt_2nd + ... + rtt_Nth) / N, or
+                                                            rtt_1 = (rtt_1 * (N - 1) + rtt_Nth) / N */
+    optional uint64 arr_time_1_last = 89 [default = 0];  /* The arriving offset of the last packet in
+                                                            backward direction */
 
-    optional uint64 rtt_0 = 83 [default = 0];           /* when pkt_cnt_0 > 0 && pkt_cnt_1 > 0,
-                                                           rtt_0 = arr_time_1_0 - arr_time_0_0 */
-
-    optional uint64 arr_time_0_last = 85 [default = 0]; /* The arriving offset of the last packet in
-                                                           forward direction */
-    optional uint64 arr_time_1_0 = 86 [default = 0];    /* The microseconds from 1970.1.1 to
-                                                           the arriving time of the first packet of this
-                                                           flow in backward direction */
-
-    optional uint64 rtt_1 = 87 [default = 0];           /* when pkt_cnt_0 > 0 && pkt_cnt_1 > 0,
-                                                           rtt_1 = arr_time_0_1 - arr_time_1_0 */
-
-    optional uint64 arr_time_1_last = 89 [default = 0]; /* The arriving offset of the last packet in
-                                                           backward direction */
-
-    // /* frag counters */
-    optional uint64 frag_byte_cnt_0 = 91 [default = 0]; /* Received fragment byte cnt in this report period in
-                                                           forward direction */
-    optional uint64 frag_byte_cnt_1 = 92 [default = 0]; /* Received fragment byte cnt in this report period in
-                                                           backward direction */
-    optional uint64 frag_pkt_cnt_0 = 93 [default = 0];  /* Received fragment packet cnt in this report period in
-                                                           forward direction */
-    optional uint64 frag_pkt_cnt_1 = 94 [default = 0];  /* Received fragment packet cnt in this report period in
+    /* Fragment Counters */
+    optional uint64 frag_byte_cnt_0 = 91 [default = 0];  /* Received fragment byte cnt in this report period in
+                                                            forward direction */
+    optional uint64 frag_byte_cnt_1 = 92 [default = 0];  /* Received fragment byte cnt in this report period in
+                                                            backward direction */
+    optional uint64 frag_pkt_cnt_0 = 93 [default = 0];   /* Received fragment packet cnt in this report period in
+                                                            forward direction */
+    optional uint64 frag_pkt_cnt_1 = 94 [default = 0];   /* Received fragment packet cnt in this report period in
                                                            backward direction */
     optional uint64 total_frag_byte_cnt_0 = 95 [default = 0]; /* Received fragment byte cnt of this flow in
                                                                  forward direction */
@@ -148,26 +156,25 @@ message Flow {
     optional uint64 total_frag_pkt_cnt_1 = 98 [default = 0];  /* Received fragment packet cnt of this flow in
                                                                  backward direction */
 
-    optional uint32 subnet_id_0 = 100 [default = 0];
-    optional uint32 subnet_id_1 = 101 [default = 0];
+    /* Platform Data */
+    optional uint32 subnet_id_0 = 100 [default = 0];          /* subnetid of mac_src, platform network ID */
+    optional uint32 subnet_id_1 = 101 [default = 0];          /* subnetid of mac_dst, platform network ID */
 
-    optional uint32 epc_id_0 = 120 [default = 0];
-    optional uint32 epc_id_1 = 121 [default = 0];
+    optional uint32 epc_id_0 = 120 [default = 0];             /* epc_id of device of mac_src, platform project ID */
+    optional uint32 epc_id_1 = 121 [default = 0];             /* epc_id of device of mac_dst, platform project ID */
+    optional uint32 device_type_0 = 122 [default = 0];        /* devicetype of mac_src, platform VM/VGW/TPD instance */
+    optional uint32 device_type_1 = 123 [default = 0];        /* devicetype of mac_dst, platform VM/VGW/TPD instance */
+    optional uint32 device_id_0 = 124 [default = 0];          /* deviceid of mac_src, platform instance ID */
+    optional uint32 device_id_1 = 125 [default = 0];          /* deviceid of mac_dst, platform instance ID */
+    optional uint32 if_index_0 = 126 [default = 0];           /* ifindex of mac_src, platform instance NIC index */
+    optional uint32 if_index_1 = 127 [default = 0];           /* ifindex of mac_dst, platform instance NIC index */
+    optional uint32 if_type_0 = 128 [default = 0];            /* iftype of mac_src, platform instance WAN/LAN/Ctrl NIC */
+    optional uint32 if_type_1 = 129 [default = 0];            /* iftype of mac_dst, platform instance WAN/LAN/Ctrl NIC */
 
-    optional uint32 device_type_0 = 122 [default = 0];
-    optional uint32 device_type_1 = 123 [default = 0];
-    optional uint32 device_id_0 = 124 [default = 0];
-    optional uint32 device_id_1 = 125 [default = 0];
-    optional uint32 if_index_0 = 126 [default = 0];
-    optional uint32 if_index_1 = 127 [default = 0];
-    optional uint32 if_type_0 = 128 [default = 0];
-    optional uint32 if_type_1 = 129 [default = 0];
-
-
-    optional bool is_l2_end_0 = 130 [default = false];
-    optional bool is_l2_end_1 = 131 [default = false];
-    optional bool is_l3_end_0 = 132 [default = false];
-    optional bool is_l3_end_1 = 133 [default = false];
+    optional bool is_l2_end_0 = 130 [default = false];        /* 网流mac_src对应的实例和网流被采集的Exporter是否在同一宿主机上 */
+    optional bool is_l2_end_1 = 131 [default = false];        /* 网流mac_dst对应的实例和网流被采集的Exporter是否在同一宿主机上 */
+    optional bool is_l3_end_0 = 132 [default = false];        /* 网流mac_src和ip_src对应的同一实例和网流被采集的Exporter是否在同一宿主机上 */
+    optional bool is_l3_end_1 = 133 [default = false];        /* 网流mac_dst和ip_dst对应的同一实例和网流被采集的Exporter是否在同一宿主机上 */
 }
 
 /* 注意：message中的tag不要大于31，大于31以后key会多占用1个字节。
@@ -266,4 +273,8 @@ message FlowPktHdrBatch {
     //   header_i排布：compressed_header_size_i(1B), compressed_header_i
     optional bytes compressed_headers = 5;
     optional uint32 close_type = 6;
+    /*
+    optional uint32 host = 1;
+    optional uint32 exporter = 7;
+    */
 }
