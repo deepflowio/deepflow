@@ -18,6 +18,10 @@ message Dpi {
     optional string host = 1;
     optional uint64 start_time = 2;
     optional uint64 end_time = 3;
+    /*
+    optional uint32 host = 1;
+    optional uint32 exporter = 4;
+    */
 
     optional uint32 vlan = 11;
     optional uint32 ip_src = 12;
