@@ -121,20 +121,19 @@ message Flow {
     optional uint64 arr_time_0_0 = 82 [default = 0];     /* The microseconds from 1970.1.1 to
                                                             the arriving time of the first packet of this
                                                             flow in forward direction */
-    optional uint64 rtt_0 = 83 [default = 0];            /* The RTT in the handshake phase of the flow.
-                                                            When pkt_cnt_0 >= 2 && pkt_cnt_1 >= 1,
-                                                            SYN -> SYN/ACK -> ACK,
-                                                            rtt_0 = arr_time_0_1 (ACK) - arr_time_0_0 (SYN) */
+    optional uint64 rtt_0 = 83 [default = 0];            /* The average RTT in the data transmission phase of the flow in forward direction
+                                                            in this report period
+                                                            ... PSH/ACK_n-1 -> PSH/ACK_n -> ACK_n -> PSH/ACK_n+1 -> PSH/ACK_n+2 ...,
+                                                            rtt_Nth = tx_time_1 (PSH/ACK_n+1) - tx_time_0 (PSH/ACK_n),
+                                                            rtt_0 = (rtt_1st + rtt_2nd + ... + rtt_Nth) / N, or
+                                                            rtt_0 = (rtt_0 * (N - 1) + rtt_Nth) / N */
     optional uint64 arr_time_0_last = 85 [default = 0];  /* The arriving offset of the last packet in
                                                             forward direction */
     optional uint64 arr_time_1_0 = 86 [default = 0];     /* The microseconds from 1970.1.1 to
                                                             the arriving time of the first packet of this
                                                             flow in backward direction */
-    optional uint64 rtt_1 = 87 [default = 0];            /* The average RTT in the data transmission phase of the flow.
-                                                            ... PSH/ACK_n-1 -> PSH/ACK_n -> ACK_n -> PSH/ACK_n+1 -> PSH/ACK_n+2 ...,
-                                                            rtt_Nth = tx_time_1 (PSH/ACK_n+1) - tx_time_0 (PSH/ACK_n),
-                                                            rtt_1 = (rtt_1st + rtt_2nd + ... + rtt_Nth) / N, or
-                                                            rtt_1 = (rtt_1 * (N - 1) + rtt_Nth) / N */
+    optional uint64 rtt_1 = 87 [default = 0];            /* The average RTT in the data transmission phase of the flow in backward direction
+                                                            in this report period. */
     optional uint64 arr_time_1_last = 89 [default = 0];  /* The arriving offset of the last packet in
                                                             backward direction */
 
@@ -175,6 +174,28 @@ message Flow {
     optional bool is_l2_end_1 = 131 [default = false];        /* 网流mac_dst对应的实例和网流被采集的Exporter是否在同一宿主机上 */
     optional bool is_l3_end_0 = 132 [default = false];        /* 网流mac_src和ip_src对应的同一实例和网流被采集的Exporter是否在同一宿主机上 */
     optional bool is_l3_end_1 = 133 [default = false];        /* 网流mac_dst和ip_dst对应的同一实例和网流被采集的Exporter是否在同一宿主机上 */
+
+    /* TCP Perf Data */
+    optional uint64 rtt_syn = 140 [default = 0];           /* The RTT in the handshake phase of the flow.
+                                                              When pkt_cnt_0 >= 2 && pkt_cnt_1 >= 1,
+                                                              SYN -> SYN/ACK -> ACK,
+                                                              rtt_syn = arr_time_0_1 (ACK) - arr_time_0_0 (SYN) */
+    optional uint64 retrans_cnt_0 = 141 [default = 0];     /* Times of packets retransmission in this report period
+                                                              in forward direction */
+    optional uint64 retrans_cnt_1 = 142 [default = 0];     /* Times of packets retransmission in this report period
+                                                              in backword direction */
+    optional uint64 zero_wnd_cnt_0 = 143 [default = 0];    /* Times of TCP connection window is set to zero in forward direction
+                                                              in this report period */
+    optional uint64 zero_wnd_cnt_1 = 144 [default = 0];    /* Times of TCP connection window is set to zero in backward direction
+                                                              in this report period */
+    optional uint64 slow_start_cnt_0 = 145 [default = 0];  /* Times of TCP connection slow start in forward direction
+                                                              in this report period */
+    optional uint64 slow_start_cnt_1 = 146 [default = 0];  /* Times of TCP connection slow start in backward direction
+                                                              in this report period */
+    optional uint64 psh_urg_cnt_0 = 147 [default = 0];     /* Times of TCP connection sending urgent data in forward direction
+                                                              in this report period */
+    optional uint64 psh_urg_cnt_1 = 148 [default = 0];     /* Times of TCP connection sending urgent data in backward direction
+                                                              in this report period */
 }
 
 /* 注意：message中的tag不要大于31，大于31以后key会多占用1个字节。
