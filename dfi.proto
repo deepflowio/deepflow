@@ -204,6 +204,10 @@ message Flow {
                                                                   in this report period */
     optional uint64 total_psh_urg_cnt = 154 [default = 0];     /* Times of TCP connection sending urgent data in flow life cycle
                                                                   including forward and backward direction */
+
+    repeated uint32 group_ids_0 = 155;                         /* 源端资源组ID */
+    repeated uint32 group_ids_1 = 156;                         /* 目的端资源组ID */
+    repeated uint32 whitelist_rule_ids = 157;                  /* 白名单策略ID */
 }
 
 /* 注意：message中的tag不要大于31，大于31以后key会多占用1个字节。
