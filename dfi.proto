@@ -178,31 +178,35 @@ message Flow {
                                                                   rtt_Nth = tx_time_1 (PSH/ACK_n+1) - tx_time_0 (PSH/ACK_n),
                                                                   rtt = (rtt_1st + rtt_2nd + ... + rtt_Nth) / N, or
                                                                   rtt = (rtt * (N - 1) + rtt_Nth) / N */
-    optional uint64 rtt_avg = 142 [default = 0];               /* The RTT in the data transmission phase of the flow
+    optional uint64 rtt_avg = 142 [default = 0];               /* The RTT in the session of the flow
                                                                   it's a average value in flow life cycle */
-    optional uint64 retrans_cnt_0 = 143 [default = 0];         /* Times of packets retransmission in this report period
+    optional uint64 syn_retrans_cnt_0 = 143 [default = 0];     /* Times of packets retransmission within connection establishment during this report period
                                                                   in forward direction */
-    optional uint64 retrans_cnt_1 = 144 [default = 0];         /* Times of packets retransmission in this report period
+    optional uint64 syn_retrans_cnt_1 = 144 [default = 0];     /* Times of packets retransmission within connection establishment during this report period
                                                                   in backword direction */
-    optional uint64 total_retrans_cnt = 145 [default = 0];     /* Times of packets retransmission in flow life cycle
+    optional uint64 retrans_cnt_0 = 145 [default = 0];         /* Times of packets retransmission during this report period
+                                                                  in forward direction */
+    optional uint64 retrans_cnt_1 = 146 [default = 0];         /* Times of packets retransmission during this report period
+                                                                  in backword direction */
+    optional uint64 total_retrans_cnt = 147 [default = 0];     /* Times of packets retransmission in flow life cycle
                                                                   including forward and backword direction */
-    optional uint64 zero_wnd_cnt_0 = 146 [default = 0];        /* Times of TCP connection window is set to zero in forward direction
-                                                                  in this report period */
-    optional uint64 zero_wnd_cnt_1 = 147 [default = 0];        /* Times of TCP connection window is set to zero in backward direction
-                                                                  in this report period */
-    optional uint64 total_zero_wnd_cnt = 148 [default = 0];    /* Times of TCP connection window is set to zero in flow life cycle
+    optional uint64 zero_wnd_cnt_0 = 148 [default = 0];        /* Times of TCP connection window is set to zero in forward direction
+                                                                  during this report period */
+    optional uint64 zero_wnd_cnt_1 = 149 [default = 0];        /* Times of TCP connection window is set to zero in backward direction
+                                                                  during this report period */
+    optional uint64 total_zero_wnd_cnt = 150 [default = 0];    /* Times of TCP connection window is set to zero in flow life cycle
                                                                   including forward and backword direction */
-    optional uint64 slow_start_cnt_0 = 149 [default = 0];      /* Times of TCP connection slow start in forward direction
-                                                                  in this report period */
-    optional uint64 slow_start_cnt_1 = 150 [default = 0];      /* Times of TCP connection slow start in backward direction
-                                                                  in this report period */
-    optional uint64 total_slow_start_cnt = 151 [default = 0];  /* Times of TCP connection slow start in flow life cycle
+    optional uint64 slow_start_cnt_0 = 151 [default = 0];      /* Times of TCP connection slow start in forward direction
+                                                                  during this report period */
+    optional uint64 slow_start_cnt_1 = 152 [default = 0];      /* Times of TCP connection slow start in backward direction
+                                                                  during this report period */
+    optional uint64 total_slow_start_cnt = 153 [default = 0];  /* Times of TCP connection slow start in flow life cycle
                                                                   including forward and backward direction */
-    optional uint64 psh_urg_cnt_0 = 152 [default = 0];         /* Times of TCP connection sending urgent data in forward direction
-                                                                  in this report period */
-    optional uint64 psh_urg_cnt_1 = 153 [default = 0];         /* Times of TCP connection sending urgent data in backward direction
-                                                                  in this report period */
-    optional uint64 total_psh_urg_cnt = 154 [default = 0];     /* Times of TCP connection sending urgent data in flow life cycle
+    optional uint64 psh_urg_cnt_0 = 154 [default = 0];         /* Times of TCP connection sending urgent data in forward direction
+                                                                  during this report period */
+    optional uint64 psh_urg_cnt_1 = 155 [default = 0];         /* Times of TCP connection sending urgent data in backward direction
+                                                                  during this report period */
+    optional uint64 total_psh_urg_cnt = 156 [default = 0];     /* Times of TCP connection sending urgent data in flow life cycle
                                                                   including forward and backward direction */
 
     repeated uint32 group_ids_0 = 155;                         /* 源端资源组ID */
