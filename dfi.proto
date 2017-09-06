@@ -167,6 +167,10 @@ message Flow {
     optional bool is_l3_end_0 = 132 [default = false];        /* 网流mac_src和ip_src对应的同一实例和网流被采集的Exporter是否在同一宿主机上 */
     optional bool is_l3_end_1 = 133 [default = false];        /* 网流mac_dst和ip_dst对应的同一实例和网流被采集的Exporter是否在同一宿主机上 */
 
+    repeated uint32 group_ids_0 = 134;                         /* 源端资源组ID */
+    repeated uint32 group_ids_1 = 135;                         /* 目的端资源组ID */
+    repeated uint32 whitelist_rule_ids = 136;                  /* 白名单策略ID */
+
     /* TCP Perf Data */
     optional uint64 rtt_syn = 140 [default = 0];               /* The RTT in the handshake phase of the flow.
                                                                   When pkt_cnt_0 >= 2 && pkt_cnt_1 >= 1,
@@ -208,10 +212,6 @@ message Flow {
                                                                   during this report period */
     optional uint64 total_psh_urg_cnt = 156 [default = 0];     /* Times of TCP connection sending urgent data in flow life cycle
                                                                   including forward and backward direction */
-
-    repeated uint32 group_ids_0 = 155;                         /* 源端资源组ID */
-    repeated uint32 group_ids_1 = 156;                         /* 目的端资源组ID */
-    repeated uint32 whitelist_rule_ids = 157;                  /* 白名单策略ID */
 }
 
 /* 注意：message中的tag不要大于31，大于31以后key会多占用1个字节。
