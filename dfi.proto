@@ -300,7 +300,7 @@ enum Direction
 
 /* protobuf-message format */
 message FlowPktHdrBatch {
-    optional string host = 1 [default = '0.0.0.0'];       // DFI所在节点的本地IP，无需填写，由控制器推断
+    optional uint32 host = 1;       // DFI所在节点的本地IP，无需填写，由控制器推断
     optional uint64 flow_id = 2;
     optional Direction direction = 3 [default = FORWARD];
     optional uint32 sequence = 4;
@@ -310,8 +310,5 @@ message FlowPktHdrBatch {
     //   header_i排布：compressed_header_size_i(1B), compressed_header_i
     optional bytes compressed_headers = 5;
     optional uint32 close_type = 6;
-    /*
-    optional uint32 host = 1;
     optional uint32 exporter = 7;
-    */
 }
