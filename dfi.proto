@@ -175,6 +175,8 @@ message Flow {
     repeated uint32 group_ids_0 = 134;                         /* 源端资源组ID */
     repeated uint32 group_ids_1 = 135;                         /* 目的端资源组ID */
     repeated uint32 whitelist_rule_ids = 136;                  /* 白名单策略ID */
+    repeated uint32 custom_tag_ids_0 = 137;                    /* 源端客户自定义标签ID */
+    repeated uint32 custom_tag_ids_1 = 138;                    /* 目的端客户自定义标签ID */
 
     /* TCP Perf Data */
     optional uint64 rtt_syn = 140 [default = 0];               /* The RTT in the handshake phase of the flow.
