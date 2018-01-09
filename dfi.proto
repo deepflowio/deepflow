@@ -155,6 +155,8 @@ message Flow {
     optional uint32 l3_device_type_1 = 103 [default = 0];     /* devicetype of ip_dst, platform VM/VGW/TPD instance */
     optional uint32 l3_device_id_0 = 104 [default = 0];       /* deviceid of ip_src, platform instance ID */
     optional uint32 l3_device_id_1 = 105 [default = 0];       /* deviceid of ip_dst, platform instance ID */
+    optional uint32 l3_epc_id_0 = 106 [default = 0];          /* epc_id of device of ip_src, platform project ID */
+    optional uint32 l3_epc_id_1 = 107 [default = 0];          /* epc_id of device of ip_dst, platform project ID */
 
     optional uint32 epc_id_0 = 120 [default = 0];             /* epc_id of device of mac_src, platform project ID */
     optional uint32 epc_id_1 = 121 [default = 0];             /* epc_id of device of mac_dst, platform project ID */
