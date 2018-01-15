@@ -80,6 +80,7 @@ message Flow {
     optional uint32 tcp_flags_0 = 54 [default = 0];
     optional uint32 tcp_flags_1 = 55 [default = 0];
     optional uint32 tcp_syn_seq = 56 [default = 0];
+    optional uint32 icmp_id = 57 [default = 0];
 
     /* Tunnel */
     optional uint64 tun_id = 61 [default = 0];      /* Tunnel index where the flow is encapped, i.e., vl2_id */
