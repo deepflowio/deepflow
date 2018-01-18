@@ -1,0 +1,41 @@
+syntax = "proto2";
+
+package message;
+
+service Listener {
+    rpc TapAclUpdate (TapAclUpdateReq) returns (TapAclUpdateRes) {}
+}
+
+enum Status {
+    FAILED = 1;
+    SUCCESS = 0;
+}
+
+enum Protocol {
+    ANY = 0;
+    TCP = 6;
+    UDP = 17;
+}
+
+message Acl {
+    optional uint32 id = 1;
+    optional uint32 ip = 2;
+    optional uint32 netmask = 3;
+    optional uint32 port = 4;
+    optional Protocol protocol = 5;
+}
+
+message TapMacAcl {
+    optional string mac = 1;
+    optional uint32 pps_max = 2;
+    repeated TapAcl acls = 3;
+}
+
+message TapAclUpdateReq {
+    optional uint32 total_pps_max = 1;
+    repeated TapMacAcl mac_acls = 2;
+}
+
+message TapAclUpdateRes {
+    optional Status status = 1;
+}
