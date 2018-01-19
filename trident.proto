@@ -28,7 +28,7 @@ message Acl {
 message TapMacAcl {
     optional string mac = 1;
     optional uint32 pps_max = 2;
-    repeated TapAcl acls = 3;
+    repeated Acl acls = 3;
 }
 
 message TapAclUpdateReq {
