@@ -2,13 +2,30 @@ syntax = "proto2";
 
 package message;
 
-service Listener {
-    rpc TapAclUpdate (TapAclUpdateReq) returns (TapAclUpdateRes) {}
+service Synchronizer {
+    rpc Sync (SyncRequest) returns (SyncResponse) {}
+}
+
+message AclStat {
+    optional uint32 id = 1 [default = 0];
+    optional uint64 packets = 2 [default = 0];
+    optional uint64 bytes = 3 [default = 0];
+}
+
+message InterfaceAclStat {
+    optional string mac = 1;
+    repeated AclStat header_acls = 2;
+    repeated AclStat packet_acls = 3;
+}
+
+message SyncRequest {
+    optional uint32 boot_time = 1;
+    repeated InterfaceAclStat interface_acls = 2;
 }
 
 enum Status {
-    FAILED = 1;
     SUCCESS = 0;
+    FAILED = 1;
 }
 
 enum Protocol {
@@ -18,24 +35,23 @@ enum Protocol {
 }
 
 message Acl {
-    optional uint32 id = 1;
-    optional uint32 ip = 2;
-    optional uint32 netmask = 3;
-    optional uint32 port = 4;
+    optional uint32 id = 1 [default = 0];
+    optional uint32 ip = 2 [default = 0];
+    optional uint32 netmask = 3 [default = 0];
+    optional uint32 port = 4 [default = 0];
     optional Protocol protocol = 5;
 }
 
-message TapMacAcl {
-    optional string mac = 1;
-    optional uint32 pps_max = 2;
-    repeated Acl acls = 3;
+message InterfaceAcl {
+    optional uint32 vni = 1;
+    optional string mac = 2;
+    optional uint32 pps_max = 3 [default = 0];
+    repeated Acl header_acls = 4;
+    repeated Acl packet_acls = 5;
 }
 
-message TapAclUpdateReq {
-    optional uint32 total_pps_max = 1;
-    repeated TapMacAcl mac_acls = 2;
-}
-
-message TapAclUpdateRes {
+message SyncResponse {
     optional Status status = 1;
+    optional uint32 total_pps_max = 2;
+    repeated InterfaceAcl interface_acls = 3;
 }
