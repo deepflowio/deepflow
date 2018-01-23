@@ -1,6 +1,6 @@
 syntax = "proto2";
 
-package message;
+package rpc;
 
 service Synchronizer {
     rpc Sync (SyncRequest) returns (SyncResponse) {}
