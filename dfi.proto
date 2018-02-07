@@ -45,8 +45,8 @@ message Flow {
                                          on which the data source of the Exporter resides */
     optional uint32 exporter = 2;     /* Control IP for exporter */
     optional uint32 close_type = 7;   /* 0=unknown, 1=tcp-fin, 2=tcp-rst, 3=timeout,
-                                         4=toomany, 5=forced-report, 6=forced-close,
-                                         7=half-timeout */
+                                         4=flood, 5=forced-report, 6=forced-close,
+                                         7=half-open-timeout, 8=half-close-timeout */
     optional uint64 flow_id = 8;      /* The forcefully reported flow is still kept in
                                          exporter and this tuple (host, thread_index, flow_id)
                                          can be used to identify the flow in poseidon */
