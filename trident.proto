@@ -50,8 +50,26 @@ message InterfaceAcl {
     repeated Acl packet_acls = 5;
 }
 
+message Config {
+    optional uint32 max_cpus = 1 [default = 2];
+    optional uint32 sync_interval = 2 [default = 10];
+    optional uint64 total_pps_max = 3 [default = 100000];
+
+    optional string output_interface = 5;
+    optional uint32 output_vlan = 6 [default = 0];
+
+    optional string source_interface = 10;
+    optional string source_mac = 11;
+    optional string source_ip = 12;
+
+    optional string analyzer_gw_mac = 15;
+    optional string analyzer_gw_ip = 16;
+    optional string vtep_gw_mac = 17;
+    optional string vtep_ip = 18;
+}
+
 message SyncResponse {
     optional Status status = 1;
-    optional uint64 total_pps_max = 2 [default = 100000];
+    optional Config config = 2;
     repeated InterfaceAcl interface_acls = 3;
 }
