@@ -1,6 +1,6 @@
 syntax = "proto2";
 
-package rpc;
+package trident;
 
 service Synchronizer {
     rpc Sync (SyncRequest) returns (SyncResponse) {}
