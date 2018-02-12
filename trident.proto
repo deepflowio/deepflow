@@ -63,7 +63,7 @@ message Config {
     optional string source_ip = 12;
 
     optional string analyzer_gw_mac = 15;
-    optional string analyzer_gw_ip = 16;
+    optional string analyzer_ip = 16;
     optional string vtep_gw_mac = 17;
     optional string vtep_ip = 18;
 }
