@@ -45,7 +45,7 @@ message Acl {
 message InterfaceAcl {
     optional uint32 vni = 1;
     optional string mac = 2;
-    optional uint64 pps_max = 3 [default = 0];
+    optional uint64 pps_threshold = 3 [default = 0];
     repeated Acl header_acls = 4;
     repeated Acl packet_acls = 5;
 }
@@ -53,7 +53,7 @@ message InterfaceAcl {
 message Config {
     optional uint32 max_cpus = 1 [default = 2];
     optional uint32 sync_interval = 2 [default = 10];
-    optional uint64 total_pps_max = 3 [default = 100000];
+    optional uint64 global_pps_threshold = 3 [default = 100000];
 
     optional string output_interface = 5;
     optional uint32 output_vlan = 6 [default = 0];
