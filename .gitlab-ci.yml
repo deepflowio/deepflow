@@ -1,0 +1,6 @@
+stages:
+  - verify
+
+verify:
+  stage: verify
+  script: make compile

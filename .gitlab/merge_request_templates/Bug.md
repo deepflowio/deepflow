@@ -20,7 +20,8 @@
 
 **检查项**
 
-N/A
+- [ ] 编译通过
 
 /assign @xiangyang
+
 /cc @all
