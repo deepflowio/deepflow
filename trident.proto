@@ -59,7 +59,6 @@ message Config {
     optional string output_interface = 5;
     optional uint32 output_vlan = 6 [default = 0];
 
-    optional string source_interface = 10;
     optional string source_mac = 11;
     optional string source_ip = 12;
 
