@@ -75,8 +75,8 @@ message Flow {
 
     /* L4 */
     optional uint32 proto = 51 [default = 0];
-    optional uint32 port_src = 52 [default = 0];
-    optional uint32 port_dst = 53 [default = 0];
+    optional uint32 port_src = 52;
+    optional uint32 port_dst = 53;
     optional uint32 tcp_flags_0 = 54 [default = 0];
     optional uint32 tcp_flags_1 = 55 [default = 0];
     optional uint32 tcp_syn_seq = 56 [default = 0];
