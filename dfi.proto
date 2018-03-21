@@ -70,8 +70,8 @@ message Flow {
     optional uint64 mac_dst = 34 [default = 0];     /* 0x0000123456789abc == 12:34:56:78:9a:bc */
 
     /* L3 */
-    optional uint32 ip_src = 41 [default = 0];      /* 0x01020304 == 1.2.3.4 */
-    optional uint32 ip_dst = 42 [default = 0];      /* 0x01020304 == 1.2.3.4 */
+    optional uint32 ip_src = 41;      /* 0x01020304 == 1.2.3.4 */
+    optional uint32 ip_dst = 42;      /* 0x01020304 == 1.2.3.4 */
 
     /* L4 */
     optional uint32 proto = 51 [default = 0];
