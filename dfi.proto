@@ -58,6 +58,10 @@ message Flow {
                                          2. For others, equals to
                                              max(arr_time_0_last, arr_time_1_last) -
                                                  time_of_the_first_packet_in_the_flow */
+    optional uint64 avg_pkt_interval = 14 [default = 0];         /* The average interval of all packets for
+                                                                    current flow */
+    optional uint64 pkt_interval_deviation = 15 [default = 0];   /* The deviation of all packet intervals for
+                                                                    current flow */
 
     /* L1 */
     optional uint32 in_port_0 = 21 [default = 0];
@@ -113,6 +117,7 @@ message Flow {
                                                             forward direction */
     optional uint64 total_pkt_cnt_1 = 78 [default = 0];  /* Received packet cnt of this flow in
                                                             backward direction */
+    optional uint64 pkt_size_deviation = 79 [default = 0];  /* Packet byte cnt deviation of this flow*/
 
     /* Timers */
     optional uint64 cur_start_time = 81 [default = 0];   /* The arr_time of the first packet of
