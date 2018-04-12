@@ -20,7 +20,9 @@ message InterfaceAclStat {
 
 message SyncRequest {
     optional uint32 boot_time = 1;
-    repeated InterfaceAclStat interface_acls = 2;
+    optional bool config_accepted = 2 [default = true];
+
+    repeated InterfaceAclStat interface_acls = 5;
 }
 
 enum Status {
