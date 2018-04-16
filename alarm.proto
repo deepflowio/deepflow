@@ -7,3 +7,29 @@ message AlarmContent {
     optional string content = 2;
     optional string target = 3;
 }
+
+message AlarmMessage {
+    optional uint64 timestamp = 1;
+    optional string target = 2;
+    optional string alarm_source = 3;
+    optional string type = 4;
+    optional string sub_type = 5;
+    optional uint32 level = 6;
+    optional uint32 rule_id = 7;
+    optional string rule_name = 8;
+    optional uint32 epc_id = 9;
+    optional string epc_name = 10;
+    optional string content = 11;
+}
+
+enum Status {
+    START = 0;
+    END = 1;
+}
+
+message AlarmEvent {
+    optional Status status = 1;
+    optional uint32 rule_id = 2;
+    optional string content = 3;
+    optional string target = 4;
+}
