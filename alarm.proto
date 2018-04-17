@@ -8,7 +8,7 @@ message AlarmContent {
     optional string target = 3;
 }
 
-message AlarmMessage {
+message AlarmInfo {
     optional uint64 timestamp = 1;
     optional string target = 2;
     optional string alarm_source = 3;
