@@ -17,7 +17,7 @@ message AlarmInfo {
     optional uint32 level = 6;
     optional uint32 rule_id = 7;
     optional string rule_name = 8;
-    optional uint32 epc_id = 9;
+    optional int32 epc_id = 9;
     optional string epc_name = 10;
     optional string content = 11;
 }
