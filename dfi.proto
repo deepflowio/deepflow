@@ -76,8 +76,6 @@ message Flow {
     optional uint32 port_dst = 53;
     optional uint32 tcp_flags_0 = 54 [default = 0];
     optional uint32 tcp_flags_1 = 55 [default = 0];
-    optional uint32 tcp_syn_seq = 56 [default = 0];
-    optional uint32 icmp_id = 57 [default = 0];
 
     /* Tunnel */
     optional uint64 tun_id = 61 [default = 0];      /* Tunnel index where the flow is encapped, i.e., vl2_id */
@@ -127,24 +125,6 @@ message Flow {
     optional uint64 arr_time_1_last = 89 [default = 0];  /* The arriving offset of the last packet in
                                                             backward direction */
 
-    /* Fragment Counters */
-    optional uint64 frag_byte_cnt_0 = 91 [default = 0];  /* Received fragment byte cnt in this report period in
-                                                            forward direction */
-    optional uint64 frag_byte_cnt_1 = 92 [default = 0];  /* Received fragment byte cnt in this report period in
-                                                            backward direction */
-    optional uint64 frag_pkt_cnt_0 = 93 [default = 0];   /* Received fragment packet cnt in this report period in
-                                                            forward direction */
-    optional uint64 frag_pkt_cnt_1 = 94 [default = 0];   /* Received fragment packet cnt in this report period in
-                                                           backward direction */
-    optional uint64 total_frag_byte_cnt_0 = 95 [default = 0]; /* Received fragment byte cnt of this flow in
-                                                                 forward direction */
-    optional uint64 total_frag_byte_cnt_1 = 96 [default = 0]; /* Received fragment byte cnt of this flow in
-                                                                 backward direction */
-    optional uint64 total_frag_pkt_cnt_0 = 97 [default = 0];  /* Received fragment packet cnt of this flow in
-                                                                 forward direction */
-    optional uint64 total_frag_pkt_cnt_1 = 98 [default = 0];  /* Received fragment packet cnt of this flow in
-                                                                 backward direction */
-
     /* Platform Data */
     optional uint32 subnet_id_0 = 100 [default = 0];          /* subnetid of mac_src, platform network ID */
     optional uint32 subnet_id_1 = 101 [default = 0];          /* subnetid of mac_dst, platform network ID */
@@ -155,7 +135,7 @@ message Flow {
     optional uint32 l3_device_id_1 = 105 [default = 0];       /* deviceid of ip_dst, platform instance ID */
     optional uint32 l3_epc_id_0 = 106 [default = 0];          /* epc_id of device of ip_src, platform project ID */
     optional uint32 l3_epc_id_1 = 107 [default = 0];          /* epc_id of device of ip_dst, platform project ID */
-    optional uint32 host_0 = 108;                             /* host of device of mac_src*/ 
+    optional uint32 host_0 = 108;                             /* host of device of mac_src*/
     optional uint32 host_1 = 109;                             /* host of device of mac_dst*/
 
     optional uint32 epc_id_0 = 120 [default = 0];             /* epc_id of device of mac_src, platform project ID */
@@ -164,8 +144,6 @@ message Flow {
     optional uint32 device_type_1 = 123 [default = 0];        /* devicetype of mac_dst, platform VM/VGW/TPD instance */
     optional uint32 device_id_0 = 124 [default = 0];          /* deviceid of mac_src, platform instance ID */
     optional uint32 device_id_1 = 125 [default = 0];          /* deviceid of mac_dst, platform instance ID */
-    optional uint32 if_index_0 = 126 [default = 0];           /* ifindex of mac_src, platform instance NIC index */
-    optional uint32 if_index_1 = 127 [default = 0];           /* ifindex of mac_dst, platform instance NIC index */
     optional uint32 if_type_0 = 128 [default = 0];            /* iftype of mac_src, platform instance WAN/LAN/Ctrl NIC */
     optional uint32 if_type_1 = 129 [default = 0];            /* iftype of mac_dst, platform instance WAN/LAN/Ctrl NIC */
 
