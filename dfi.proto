@@ -40,9 +40,6 @@ message Request {
  * is unnecessary to be evaluated, in other words, has_xxx = 0
  */
 message Flow {
-    optional uint32 host = 1;         /* If exporter is in an Analyzer, host = exporter;
-                                         elif exporter is in an Exporter, host = the hypervisor
-                                         on which the data source of the Exporter resides */
     optional uint32 exporter = 2;     /* Control IP for exporter */
     optional uint32 close_type = 7;   /* 0=unknown, 1=tcp-fin, 2=tcp-rst, 3=timeout,
                                          4=flood, 5=forced-report, 6=forced-close,
@@ -158,6 +155,8 @@ message Flow {
     optional uint32 l3_device_id_1 = 105 [default = 0];       /* deviceid of ip_dst, platform instance ID */
     optional uint32 l3_epc_id_0 = 106 [default = 0];          /* epc_id of device of ip_src, platform project ID */
     optional uint32 l3_epc_id_1 = 107 [default = 0];          /* epc_id of device of ip_dst, platform project ID */
+    optional uint32 host_0 = 108;                             /* host of device of mac_src*/ 
+    optional uint32 host_1 = 109;                             /* host of device of mac_dst*/
 
     optional uint32 epc_id_0 = 120 [default = 0];             /* epc_id of device of mac_src, platform project ID */
     optional uint32 epc_id_1 = 121 [default = 0];             /* epc_id of device of mac_dst, platform project ID */
