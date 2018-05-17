@@ -8,6 +8,12 @@ message AlarmContent {
     optional string target = 3;
 }
 
+enum Protocol {
+    ANY = 0;
+    TCP = 6;
+    UDP = 17;
+}
+
 message AlarmInfo {
     optional uint64 timestamp = 1;
     optional string target = 2;
@@ -20,6 +26,11 @@ message AlarmInfo {
     optional int32 epc_id = 9;
     optional string epc_name = 10;
     optional string content = 11;
+    optional uint32 resource_group_id = 12;
+    optional uint32 vm_id = 13;
+    optional string ip = 14;
+    optional uint32 port =15;
+    optional Protocol protocol = 16;
 }
 
 enum Status {
