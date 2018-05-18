@@ -81,6 +81,7 @@ message InterfaceAcl {
 message Segment { // e.g. single LAN area
     optional uint32 id = 1;
     repeated string mac = 2;
+    optional string tap_mac = 3;
 }
 
 message SyncResponse {
