@@ -67,6 +67,8 @@ message Acl {
     optional uint32 netmask = 3 [default = 0];
     optional uint32 port = 4 [default = 0];
     optional Protocol protocol = 5;
+
+    optional uint32 payload_slice = 10;
 }
 
 message InterfaceAcl {
