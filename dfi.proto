@@ -200,6 +200,8 @@ message Flow {
                                                                   during this report period */
     optional uint64 total_psh_urg_cnt = 156 [default = 0];     /* Times of TCP connection sending urgent data in flow life cycle
                                                                   including forward and backward direction */
+    optional uint64 art_avg = 157 [default = 0];               /* Application response time in the data transmission phase of the flow
+                                                                  it's a average value during this report period */
     optional uint64 avg_pkt_interval = 160 [default = 0];         /* The average interval of all packets for
                                                                     current flow */
     optional uint64 pkt_interval_variance =161 [default = 0];   /* The variance of all packet intervals for
