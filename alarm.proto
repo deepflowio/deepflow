@@ -31,10 +31,10 @@ message AlarmInfo {
     optional Protocol protocol = 9;
     optional uint64 meter_bit = 10;
     repeated RttVal rtt_values = 11;
-    repeated uint32 security_event_source_ips = 12;
+    repeated string security_event_source_ips = 12;
     optional uint64 total_flow_count = 13;
     optional uint64 whitelist_rule_id = 14;
-    optional uint32 whitelist_src_ip = 15;
+    optional string whitelist_src_ip = 15;
     optional uint32 whitelist_src_vm_id = 16;
     repeated uint64 whitelist_denied_groups = 17;
     optional uint64 whitelist_target_group_id = 18;
