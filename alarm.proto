@@ -9,7 +9,7 @@ message AlarmContent {
 }
 
 message RttVal {
-    optional uint32 ip = 1;
+    optional string ip = 1;
     optional uint64 rtt = 2;
 }
 
@@ -36,8 +36,8 @@ message AlarmInfo {
     optional uint64 whitelist_rule_id = 14;
     optional string whitelist_src_ip = 15;
     optional uint32 whitelist_src_vm_id = 16;
-    repeated uint64 whitelist_denied_groups = 17;
-    optional uint64 whitelist_target_group_id = 18;
+    repeated uint32 whitelist_denied_groups = 17;
+    optional uint32 whitelist_target_group_id = 18;
     optional bool whitelist_is_blocked = 19;
 }
 
