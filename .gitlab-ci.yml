@@ -1,0 +1,28 @@
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
+stages:
+  - verify
+  - package
+
+verify:
+  stage: verify
+  script:
+    - go fmt ./...; [[ -z $(git status -s --ignore-submodule) ]] || exit -1
+    - make clean
+    - make lint
+    - make test
+    - make
+  only:
+    - pushes
+
+package:
+  stage: package
+  script: rpmbuild -bb droplet.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
+  artifacts:
+    paths:
+    - x86_64/droplet*.rpm
+  only:
+    - master
+    - /B_LC_RELEASE_.*/
+    - /feature-.*/
