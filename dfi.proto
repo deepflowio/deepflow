@@ -28,6 +28,7 @@ enum RequestType {
     FLOW_HEADER = 1;
     OVS_TOPOLOGY = 2;
     PACKET_HEADER = 3;
+    METERING_HEADER = 4;
 }
 
 message Request {
@@ -207,6 +208,49 @@ message Flow {
     optional uint64 pkt_interval_variance =161 [default = 0];   /* The variance of all packet intervals for
                                                                     current flow */
     optional uint64 pkt_size_variance = 162 [default = 0];      /* Packet byte cnt variance of this flow*/
+}
+
+message Metering {
+        optional uint32 exporter = 1;
+        optional bool   is_minute = 2 [default = false];
+        optional uint32 timestamp = 11; 
+        optional uint32 in_port_0 = 21 [default = 0]; 
+        optional uint32 in_port_1 = 22 [default = 0]; 
+        optional uint32 eth_type = 32 [default = 0]; 
+        optional uint64 mac_src = 33 [default = 0]; 
+        optional uint64 mac_dst = 34 [default = 0]; 
+        optional uint32 ip_src = 41 [default = 0]; 
+        optional uint32 ip_dst = 42 [default = 0]; 
+        optional uint32 proto = 51 [default = 0]; 
+        optional uint32 port_src = 52 [default = 0]; 
+        optional uint32 port_dst = 53 [default = 0]; 
+        optional uint64 byte_cnt_0 = 71 [default = 0]; 
+        optional uint64 byte_cnt_1 = 72 [default = 0]; 
+        optional uint64 pkt_cnt_0 = 73 [default = 0]; 
+        optional uint64 pkt_cnt_1 = 74 [default = 0]; 
+        /* Platform Data */
+        optional uint32 subnet_id_0 = 100 [default = 0]; 
+        optional uint32 subnet_id_1 = 101 [default = 0]; 
+        optional uint32 l3_device_type_0 = 102 [default = 0]; 
+        optional uint32 l3_device_type_1 = 103 [default = 0]; 
+        optional uint32 l3_device_id_0 = 104 [default = 0]; 
+        optional uint32 l3_device_id_1 = 105 [default = 0]; 
+        optional uint32 l3_epc_id_0 = 106 [default = 0]; 
+        optional uint32 l3_epc_id_1 = 107 [default = 0];
+        
+        optional uint32 epc_id_0 = 120 [default = 0];
+        optional uint32 epc_id_1 = 121 [default = 0];
+        optional uint32 device_type_0 = 122 [default = 0];
+        optional uint32 device_type_1 = 123 [default = 0];
+        optional uint32 device_id_0 = 124 [default = 0];
+        optional uint32 device_id_1 = 125 [default = 0];
+        optional uint32 if_type_0 = 128 [default = 0];
+        optional uint32 if_type_1 = 129 [default = 0];
+            
+        optional bool is_l2_end_0 = 130 [default = false];
+        optional bool is_l2_end_1 = 131 [default = false];
+        optional bool is_l3_end_0 = 132 [default = false];
+        optional bool is_l3_end_1 = 133 [default = false];
 }
 
 /* 注意：message中的tag不要大于31，大于31以后key会多占用1个字节。
