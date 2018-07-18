@@ -24,6 +24,9 @@
 #   go-tests = true
 #   unused-packages = true
 
+[[constraint]]
+  name = "github.com/op/go-logging"
+  branch = "master"
 
 [prune]
   go-tests = true

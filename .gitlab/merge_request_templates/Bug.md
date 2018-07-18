@@ -28,6 +28,6 @@
 - [ ] 单元测试通过
 - [ ] 打包成功(如果有修改Makefile)
 
-/assign @xiangyang
+/assign @buyi
 
 /cc @all

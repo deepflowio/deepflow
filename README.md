@@ -12,7 +12,7 @@ Droplet工程开发指南
 * 曾经的C、Java和Python的技术栈将会被抛弃，需要尽快熟悉Golang的使用
 * 如何划分组件以实现组件隔离，以及设计调用接口来尽可能减少模块间耦合
 * 单个组件的缺陷可能会导致整个Droplet崩溃
-  
+
 组件依赖方式
 ------------
 
@@ -43,7 +43,7 @@ droplet应当使用dep
 
 ```
 GOPATH = $(shell go env GOPATH)
-DROPLET_ROOT = ${GOPATH}/src/gitlab.x.lan/droplet/
+DROPLET_ROOT = ${GOPATH}/src/gitlab.x.lan/yunshan/droplet/
 
 deps:
     [ -f ${GOPATH}/bin/dep ] || curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
@@ -60,6 +60,12 @@ deps:
 * cmd: main函数入口，比如droplet应当是cmd/droplet/main.go
 * bin: 二进制文件输出到bin目录下，并添加到.gitignore
 * vendor: dep ensure输出目录，建议添加到.gitignore
+
+二进制一致性
+------------
+
+相同的git revision在不同时间不同分支编译得到的二进制文件应当保持一致性，
+因此生成的二进制文件不允许带有可变内容，比如编译时间或者编译分支。
 
 Makefile
 --------

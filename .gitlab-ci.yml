@@ -1,6 +1,12 @@
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
 
+before_script:
+  - export GO_PROJECT_ROOT="$(go env GOPATH)/src/gitlab.x.lan/yunshan/droplet"
+  - mkdir -p $(dirname $GO_PROJECT_ROOT)
+  - ln -snf $(pwd) $GO_PROJECT_ROOT
+  - cd $GO_PROJECT_ROOT
+
 stages:
   - verify
   - package
@@ -8,10 +14,9 @@ stages:
 verify:
   stage: verify
   script:
-    - go fmt ./...; [[ -z $(git status -s --ignore-submodule) ]] || exit -1
     - make clean
-    - make lint
-    - make test
+    - make format; [[ -z $(git status -s --ignore-submodule) ]] || exit -1
+    - make lint && make test
     - make
   only:
     - pushes
