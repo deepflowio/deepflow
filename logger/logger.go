@@ -44,7 +44,7 @@ func InitLog(filePath string, levelString string) {
 	dir := path.Dir(filePath)
 	if _, err := os.Stat(dir); err != nil {
 		if os.IsNotExist(err) {
-			os.MkdirAll(dir, 0777)
+			os.MkdirAll(dir, 0755)
 		} else {
 			log.Error(err.Error())
 		}
