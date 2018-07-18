@@ -1,40 +1,37 @@
 GOPATH = $(shell go env GOPATH)
-DROPLET_ROOT = ${GOPATH}/src/gitlab.x.lan/droplet
+PROJECT_ROOT = ${GOPATH}/src/gitlab.x.lan/yunshan/droplet
 
-BRANCH = $(shell git rev-parse --abbrev-ref HEAD)
-COMMIT = $(shell git rev-list --count HEAD)-$(shell git rev-parse --short HEAD)
-FLAGS = -ldflags "-X main.Branch=${BRANCH} -X main.Commit=${COMMIT}"
-
-deps:
-	[ -f ${GOPATH}/bin/dep ] || curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-	go get github.com/derekparker/delve/cmd/dlv
-	go get github.com/golang/protobuf/protoc-gen-go
-	mkdir -p ${GOPATH}/src/gitlab.x.lan/
-	[ -d ${DROPLET_ROOT} ] || ln -snf ${CURDIR} ${DROPLET_ROOT}
-	(cd ${DROPLET_ROOT}; dep ensure)
+REV_COUNT = $(shell git rev-list --count HEAD)
+COMMIT_DATE = $(shell git show -s --format=%cd --date=short HEAD)
+REVISION = $(shell git rev-parse HEAD)
+FLAGS = -ldflags "-X main.RevCount=${REV_COUNT} -X main.Revision=${REVISION} -X main.CommitDate=${COMMIT_DATE}"
 
 lint:
 	go vet ./...
 
-test:
+format:
+	go fmt ./...
+
+vendor:
+	mkdir -p $(shell dirname ${PROJECT_ROOT})
+	[ -d ${PROJECT_ROOT} ] || ln -snf ${CURDIR} ${PROJECT_ROOT}
+	[ -f ${GOPATH}/bin/dep ] || curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+	(cd ${PROJECT_ROOT}; dep ensure)
+
+test: vendor
 	go test -short ./...
 
-bench:
-	go test -bench=. ./...
-
-debug:
+debug: vendor
 	go build ${FLAGS} -gcflags '-N -l' -o bin/droplet cmd/droplet/main.go
 
-droplet:
+droplet: vendor
 	go build ${FLAGS} -o bin/droplet cmd/droplet/main.go
 
-all: deps droplet
 
-release: deps droplet
 
 clean:
 	git clean -dfx
 
-.DEFAULT_GOAL := release
+.DEFAULT_GOAL := droplet
 
-.PHONY: deps lint test droplet all release clean
+.PHONY: lint test droplet clean
