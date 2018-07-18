@@ -1,0 +1,14 @@
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
+stages:
+  - verify
+
+verify:
+  stage: verify
+  script:
+    - make clean && make deps
+    - make format; [[ -z $(git status -s --ignore-submodule) ]] || exit -1
+    - make verify
+  only:
+    - pushes
