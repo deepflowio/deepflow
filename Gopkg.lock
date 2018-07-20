@@ -2,6 +2,15 @@
 
 
 [[projects]]
+  name = "github.com/google/gopacket"
+  packages = [
+    ".",
+    "layers"
+  ]
+  revision = "11c65f1ca9081dfea43b4f9643f5c155583b73ba"
+  version = "v1.1.14"
+
+[[projects]]
   branch = "master"
   name = "github.com/lestrrat/go-file-rotatelogs"
   packages = ["."]
@@ -34,6 +43,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "6b5b0fa076f24b69cc2c76eb8cd88d17f5295242603827bce7734af3159e3dfd"
+  inputs-digest = "d754a67b3ede10a931d3d415fc0f086e86e1dba797a50fd5eb9e3b9a151f6ab1"
   solver-name = "gps-cdcl"
   solver-version = 1
