@@ -73,3 +73,10 @@ func UInt32ToIP(uip uint32) net.IP {
 	binary.BigEndian.PutUint32(ip, uip)
 	return ip
 }
+
+func Bool2Int(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
