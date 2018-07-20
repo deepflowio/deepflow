@@ -16,4 +16,4 @@ verify:
 
 .DEFAULT_GOAL := verify
 
-.PHONY: deps format verify
+.PHONY: deps format verify clean
