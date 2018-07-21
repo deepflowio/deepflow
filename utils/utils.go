@@ -56,3 +56,20 @@ func Max(x, y int) int {
 	}
 	return y
 }
+
+// FIXME: net.IP和uint32的转换，需要寻找替代接口或优化性能
+func IPToUInt32(ip net.IP) uint32 {
+	if len(ip) == 0 {
+		return 0
+	}
+	if len(ip) == 16 {
+		return binary.BigEndian.Uint32(ip[12:16])
+	}
+	return binary.BigEndian.Uint32(ip)
+}
+
+func UInt32ToIP(uip uint32) net.IP {
+	ip := make(net.IP, 4)
+	binary.BigEndian.PutUint32(ip, uip)
+	return ip
+}

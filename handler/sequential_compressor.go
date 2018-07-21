@@ -57,7 +57,7 @@ var cflagCompressSize = [CFLAG_FULL + 1]int{
 	CFLAG_PORT0:             PORT_LEN,
 	CFLAG_PORT1:             PORT_LEN,
 	CFLAG_TTL:               1,
-	CFLAG_FLAGS_FRAG_OFFSET: FIELD_LEN[FIELD_FRAG],
+	CFLAG_FLAGS_FRAG_OFFSET: FIELD_FRAG_LEN,
 	CFLAG_DATAOFF_IHL:       1,
 	CFLAG_WIN:               TCP_WIN_LEN,
 	CFLAG_TCP_FLAGS:         1,
