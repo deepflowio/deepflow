@@ -91,6 +91,6 @@ message SyncResponse {
     optional Status status = 1;
     optional Config config = 2;
     repeated InterfaceAcl interface_acls = 3;
-    repeated Segment local_segments = 4; // segments下标代表segment id
+    repeated Segment local_segments = 4;
     repeated Segment remote_segments = 5;
 }
