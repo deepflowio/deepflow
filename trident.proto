@@ -31,8 +31,8 @@ enum Status {
 }
 
 enum TapMode {
-    PORT   = 0;
-    BRIDGE = 1;
+    LOCAL  = 0; // 部署在宿主机之上，抓取本地虚拟接口流量
+    MIRROR = 1; // 部署在虚拟机或分析器之上，抓取镜像而来的流量
 }
 
 message Config {
@@ -40,7 +40,7 @@ message Config {
     optional uint32 sync_interval = 2 [default = 10];
     optional uint64 global_pps_threshold = 3 [default = 100000];
     optional string tap_interface_regex = 4;
-    optional TapMode tap_mode = 5 [default = PORT];
+    optional TapMode tap_mode = 5 [default = LOCAL];
 
     optional string output_interface = 10;
     optional uint32 output_vlan = 11 [default = 0];
@@ -91,5 +91,6 @@ message SyncResponse {
     optional Status status = 1;
     optional Config config = 2;
     repeated InterfaceAcl interface_acls = 3;
-    repeated Segment local_segments = 4;
+    repeated Segment local_segments = 4; // segments下标代表segment id
+    repeated Segment remote_segments = 5;
 }
