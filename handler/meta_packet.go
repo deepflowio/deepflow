@@ -34,12 +34,12 @@ type MetaPacket struct {
 }
 
 var emptyMetaPacket = MetaPacket{
-	offsetMac0:           FIELD_OFFSET[FIELD_SA],
-	offsetMac1:           FIELD_OFFSET[FIELD_DA],
-	offsetIp0:            FIELD_OFFSET[FIELD_SIP],
-	offsetIp1:            FIELD_OFFSET[FIELD_DIP],
-	offsetPort0:          FIELD_OFFSET[FIELD_SPORT],
-	offsetPort1:          FIELD_OFFSET[FIELD_DPORT],
+	offsetMac0:           FIELD_SA_OFFSET,
+	offsetMac1:           FIELD_DA_OFFSET,
+	offsetIp0:            FIELD_SIP_OFFSET,
+	offsetIp1:            FIELD_DIP_OFFSET,
+	offsetPort0:          FIELD_SPORT_OFFSET,
+	offsetPort1:          FIELD_DPORT_OFFSET,
 	tcpOptWinScaleOffset: -1,
 	tcpOptMssOffset:      -1,
 	tcpOptSackOffset:     -1,
@@ -135,14 +135,14 @@ func (m *MetaPacket) Update(packet []byte, srcEndpoint, dstEndpoint bool, timest
 		return false
 	}
 	vlanTagSize := 0
-	ethType := EthernetType(BigEndian.Uint16(packet[FIELD_OFFSET[FIELD_ETH_TYPE]:]))
+	ethType := EthernetType(BigEndian.Uint16(packet[FIELD_ETH_TYPE_OFFSET:]))
 	if ethType == EthernetTypeDot1Q {
 		vlanTagSize = 4
 		sizeChecker -= vlanTagSize
 		if sizeChecker < 0 {
 			return false
 		}
-		ethType = EthernetType(BigEndian.Uint16(packet[FIELD_OFFSET[FIELD_ETH_TYPE]+vlanTagSize:]))
+		ethType = EthernetType(BigEndian.Uint16(packet[FIELD_ETH_TYPE_OFFSET+vlanTagSize:]))
 	}
 
 	m.headerType = HEADER_TYPE_ETH
@@ -171,7 +171,7 @@ func (m *MetaPacket) Update(packet []byte, srcEndpoint, dstEndpoint bool, timest
 
 	// IPv4
 	m.headerType = HEADER_TYPE_IPV4
-	ihl := int(packet[FIELD_OFFSET[FIELD_IHL]+vlanTagSize] & 0xF)
+	ihl := int(packet[FIELD_IHL_OFFSET+vlanTagSize] & 0xF)
 	m.dataOffsetIhl = uint8(ihl)
 
 	m.offsetIp0 += vlanTagSize
@@ -180,7 +180,7 @@ func (m *MetaPacket) Update(packet []byte, srcEndpoint, dstEndpoint bool, timest
 		m.offsetIp0, m.offsetIp1 = m.offsetIp1, m.offsetIp0
 	}
 
-	totalLength := int(BigEndian.Uint16(packet[FIELD_OFFSET[FIELD_TOTAL_LEN]+vlanTagSize:]))
+	totalLength := int(BigEndian.Uint16(packet[FIELD_TOTAL_LEN_OFFSET+vlanTagSize:]))
 	m.pktSize = totalLength + MIN_PACKET_SIZES[HEADER_TYPE_ETH] + vlanTagSize
 
 	l3OptSize := int(ihl)*4 - 20
@@ -190,19 +190,19 @@ func (m *MetaPacket) Update(packet []byte, srcEndpoint, dstEndpoint bool, timest
 	}
 	m.l2L3OptSize = vlanTagSize + l3OptSize
 
-	if BigEndian.Uint16(packet[FIELD_OFFSET[FIELD_FRAG]+vlanTagSize:])&0xFFF > 0 { // fragment
+	if BigEndian.Uint16(packet[FIELD_FRAG_OFFSET+vlanTagSize:])&0xFFF > 0 { // fragment
 		m.headerType = HEADER_TYPE_IPV4
 		return true
 	}
 
-	ipProtocol := IPProtocol(packet[FIELD_OFFSET[FIELD_PROTO]+vlanTagSize])
+	ipProtocol := IPProtocol(packet[FIELD_PROTO_OFFSET+vlanTagSize])
 	switch ipProtocol {
 	case IPProtocolICMPv4:
 		sizeChecker -= MIN_HEADER_SIZES[HEADER_TYPE_IPV4_ICMP]
 		if sizeChecker < 0 {
 			return true
 		}
-		switch packet[FIELD_OFFSET[FIELD_ICMP_TYPE_CODE]+m.l2L3OptSize] {
+		switch packet[FIELD_ICMP_TYPE_CODE_OFFSET+m.l2L3OptSize] {
 		case ICMPv4TypeDestinationUnreachable:
 			fallthrough
 		case ICMPv4TypeSourceQuench:
@@ -212,7 +212,7 @@ func (m *MetaPacket) Update(packet []byte, srcEndpoint, dstEndpoint bool, timest
 		case ICMPv4TypeTimeExceeded:
 			fallthrough
 		case ICMPv4TypeParameterProblem:
-			m.l4OptSize = FIELD_LEN[FIELD_ICMP_REST]
+			m.l4OptSize = FIELD_ICMP_REST_LEN
 			sizeChecker -= m.l4OptSize
 			if sizeChecker < 0 {
 				m.l4OptSize = 0
@@ -232,7 +232,7 @@ func (m *MetaPacket) Update(packet []byte, srcEndpoint, dstEndpoint bool, timest
 		if sizeChecker < 0 {
 			return true
 		}
-		dataOffset := packet[FIELD_OFFSET[FIELD_TCP_DATAOFF]+m.l2L3OptSize] >> 4
+		dataOffset := packet[FIELD_TCP_DATAOFF_OFFSET+m.l2L3OptSize] >> 4
 		m.dataOffsetIhl |= dataOffset << 4
 		m.l4OptSize = int(dataOffset*4) - 20
 		sizeChecker -= m.l4OptSize

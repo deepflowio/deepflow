@@ -106,7 +106,7 @@ func (b *CompressBuffer) compressPrepare(packet []byte, meta *MetaPacket) int {
 	}
 
 	if meta.vlanTagSize > 0 {
-		if c.vlanTag == uint32(Native.Uint16(packet[FIELD_OFFSET[FIELD_VLANTAG]:])) {
+		if c.vlanTag == uint32(Native.Uint16(packet[FIELD_VLANTAG_OFFSET:])) {
 			c.pflags |= CFLAG_VLANTAG
 		}
 	} else {
@@ -136,11 +136,11 @@ func (b *CompressBuffer) compressPrepare(packet []byte, meta *MetaPacket) int {
 		c.pflags |= CFLAG_DATAOFF_IHL
 	}
 
-	if c.ttl == uint16(packet[FIELD_OFFSET[FIELD_TTL]+meta.vlanTagSize]) {
+	if c.ttl == uint16(packet[FIELD_TTL_OFFSET+meta.vlanTagSize]) {
 		c.pflags |= CFLAG_TTL
 	}
 
-	if c.fragOffset == uint32(Native.Uint16(packet[FIELD_OFFSET[FIELD_FRAG]+meta.vlanTagSize:])) {
+	if c.fragOffset == uint32(Native.Uint16(packet[FIELD_FRAG_OFFSET+meta.vlanTagSize:])) {
 		c.pflags |= CFLAG_FLAGS_FRAG_OFFSET
 	}
 
@@ -158,11 +158,11 @@ func (b *CompressBuffer) compressPrepare(packet []byte, meta *MetaPacket) int {
 	}
 
 	if meta.headerType == HEADER_TYPE_IPV4_TCP {
-		if c.tcpWin == uint32(Native.Uint16(packet[FIELD_OFFSET[FIELD_TCP_WIN]+meta.l2L3OptSize:])) {
+		if c.tcpWin == uint32(Native.Uint16(packet[FIELD_TCP_WIN_OFFSET+meta.l2L3OptSize:])) {
 			c.pflags |= CFLAG_WIN
 		}
 
-		if c.tcpFlags == uint16(packet[FIELD_OFFSET[FIELD_TCP_FLAG]+meta.l2L3OptSize]) {
+		if c.tcpFlags == uint16(packet[FIELD_TCP_FLAG_OFFSET+meta.l2L3OptSize]) {
 			c.pflags |= CFLAG_TCP_FLAGS
 		}
 	}
@@ -234,8 +234,8 @@ func (b *CompressBuffer) appendPacket(packet []byte, meta *MetaPacket) {
 	}
 	if !c.pflags.IsSet(CFLAG_VLANTAG) {
 		if meta.vlanTagSize != 0 {
-			c.vlanTag = uint32(Native.Uint16(packet[FIELD_OFFSET[FIELD_VLANTAG]:]))
-			offset += CopyField(buffer[offset:], packet[FIELD_OFFSET[FIELD_VLANTAG]:], VLANTAG_LEN)
+			c.vlanTag = uint32(Native.Uint16(packet[FIELD_VLANTAG_OFFSET:]))
+			offset += CopyField(buffer[offset:], packet[FIELD_VLANTAG_OFFSET:], VLANTAG_LEN)
 		} else {
 			c.vlanTag = 0
 			*(*uint16)(unsafe.Pointer(&buffer[offset])) = 0
@@ -244,11 +244,11 @@ func (b *CompressBuffer) appendPacket(packet []byte, meta *MetaPacket) {
 	}
 
 	if meta.headerType == HEADER_TYPE_ARP {
-		offset += BytesCopy(buffer[offset:], packet[FIELD_OFFSET[FIELD_ARP]+meta.vlanTagSize:], ARP_HEADER_SIZE)
+		offset += BytesCopy(buffer[offset:], packet[FIELD_ARP_OFFSET+meta.vlanTagSize:], ARP_HEADER_SIZE)
 		b.offset = offset
 		return
 	} else if meta.headerType < HEADER_TYPE_L3 {
-		offset += CopyField(buffer[offset:], packet[FIELD_OFFSET[FIELD_ETH_TYPE]+meta.vlanTagSize:], ETH_TYPE_LEN)
+		offset += CopyField(buffer[offset:], packet[FIELD_ETH_TYPE_OFFSET+meta.vlanTagSize:], ETH_TYPE_LEN)
 		b.offset = offset
 		return
 	}
@@ -259,13 +259,13 @@ func (b *CompressBuffer) appendPacket(packet []byte, meta *MetaPacket) {
 		buffer[offset] = meta.dataOffsetIhl
 		offset++
 	}
-	offset += CopyField(buffer[offset:], packet[FIELD_OFFSET[FIELD_ID]+meta.vlanTagSize:], FIELD_LEN[FIELD_ID])
+	offset += CopyField(buffer[offset:], packet[FIELD_ID_OFFSET+meta.vlanTagSize:], FIELD_ID_LEN)
 	if !c.pflags.IsSet(CFLAG_FLAGS_FRAG_OFFSET) {
-		c.fragOffset = uint32(Native.Uint16(packet[FIELD_OFFSET[FIELD_FRAG]+meta.vlanTagSize:]))
-		offset += CopyField(buffer[offset:], packet[FIELD_OFFSET[FIELD_FRAG]+meta.vlanTagSize:], FIELD_LEN[FIELD_FRAG])
+		c.fragOffset = uint32(Native.Uint16(packet[FIELD_FRAG_OFFSET+meta.vlanTagSize:]))
+		offset += CopyField(buffer[offset:], packet[FIELD_FRAG_OFFSET+meta.vlanTagSize:], FIELD_FRAG_LEN)
 	}
 	if !c.pflags.IsSet(CFLAG_TTL) {
-		ttl := packet[FIELD_OFFSET[FIELD_TTL]+meta.vlanTagSize]
+		ttl := packet[FIELD_TTL_OFFSET+meta.vlanTagSize]
 		c.ttl = uint16(ttl)
 		buffer[offset] = ttl
 		offset++
@@ -279,13 +279,13 @@ func (b *CompressBuffer) appendPacket(packet []byte, meta *MetaPacket) {
 		offset += CopyField(buffer[offset:], packet[meta.offsetIp1:], IP_ADDR_LEN)
 	}
 	if meta.headerType == HEADER_TYPE_IPV4_ICMP {
-		offset += CopyField(buffer[offset:], packet[FIELD_OFFSET[FIELD_ICMP_TYPE_CODE]+meta.l2L3OptSize:],
-			FIELD_LEN[FIELD_ICMP_TYPE_CODE])
-		b.offset = offset + BytesCopy(buffer[offset:], packet[FIELD_OFFSET[FIELD_ICMP_ID_SEQ]+meta.l2L3OptSize:],
-			FIELD_LEN[FIELD_ICMP_ID_SEQ]+meta.l4OptSize)
+		offset += CopyField(buffer[offset:], packet[FIELD_ICMP_TYPE_CODE_OFFSET+meta.l2L3OptSize:],
+			FIELD_ICMP_TYPE_CODE_LEN)
+		b.offset = offset + BytesCopy(buffer[offset:], packet[FIELD_ICMP_ID_SEQ_OFFSET+meta.l2L3OptSize:],
+			FIELD_ICMP_ID_SEQ_LEN+meta.l4OptSize)
 		return
 	} else if meta.headerType < HEADER_TYPE_L4 {
-		b.offset = offset + CopyField(buffer[offset:], packet[FIELD_OFFSET[FIELD_PROTO]+meta.vlanTagSize:], IPV4_PROTO_LEN)
+		b.offset = offset + CopyField(buffer[offset:], packet[FIELD_PROTO_OFFSET+meta.vlanTagSize:], IPV4_PROTO_LEN)
 		return
 	}
 
@@ -299,17 +299,17 @@ func (b *CompressBuffer) appendPacket(packet []byte, meta *MetaPacket) {
 		offset += CopyField(buffer[offset:], packet[meta.offsetPort1:], PORT_LEN)
 	}
 	if meta.headerType == HEADER_TYPE_IPV4_TCP {
-		offset += CopyField(buffer[offset:], packet[FIELD_OFFSET[FIELD_TCP_SEQ]+meta.l2L3OptSize:], FIELD_LEN[FIELD_TCP_SEQ])
-		offset += CopyField(buffer[offset:], packet[FIELD_OFFSET[FIELD_TCP_ACK]+meta.l2L3OptSize:], FIELD_LEN[FIELD_TCP_ACK])
+		offset += CopyField(buffer[offset:], packet[FIELD_TCP_SEQ_OFFSET+meta.l2L3OptSize:], FIELD_TCP_SEQ_LEN)
+		offset += CopyField(buffer[offset:], packet[FIELD_TCP_ACK_OFFSET+meta.l2L3OptSize:], FIELD_TCP_ACK_LEN)
 		if !c.pflags.IsSet(CFLAG_TCP_FLAGS) {
-			tcpFlags := packet[FIELD_OFFSET[FIELD_TCP_FLAG]+meta.l2L3OptSize]
+			tcpFlags := packet[FIELD_TCP_FLAG_OFFSET+meta.l2L3OptSize]
 			c.tcpFlags = uint16(tcpFlags)
 			buffer[offset] = tcpFlags
 			offset++
 		}
 		if !c.pflags.IsSet(CFLAG_WIN) {
-			c.tcpWin = uint32(Native.Uint16(packet[FIELD_OFFSET[FIELD_TCP_WIN]+meta.l2L3OptSize:]))
-			offset += CopyField(buffer[offset:], packet[FIELD_OFFSET[FIELD_TCP_WIN]+meta.l2L3OptSize:], TCP_WIN_LEN)
+			c.tcpWin = uint32(Native.Uint16(packet[FIELD_TCP_WIN_OFFSET+meta.l2L3OptSize:]))
+			offset += CopyField(buffer[offset:], packet[FIELD_TCP_WIN_OFFSET+meta.l2L3OptSize:], TCP_WIN_LEN)
 		}
 		if meta.l4OptSize > 0 {
 			buffer[offset] = meta.tcpOptionsFlag

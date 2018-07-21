@@ -34,6 +34,7 @@ type Decoded struct {
 }
 
 type SequentialDecoder struct {
+	timestamp uint64
 	data      ByteStream
 	seq       uint32
 	pflags    PacketFlag
@@ -113,15 +114,19 @@ func (d *SequentialDecoder) Seq() uint32 {
 	return d.seq
 }
 
-func (d *SequentialDecoder) decodeTunnel() string {
+func (d *SequentialDecoder) decodeTunnel(meta *MetaPktHdr) string {
 	sip := net.IP(d.data.Field(IP_ADDR_LEN))
 	dip := net.IP(d.data.Field(IP_ADDR_LEN))
 	tunnelType := TunnelType(d.data.U8())
 	tunnelId := uint32((d.data.U8()))<<16 | uint32(d.data.U16())
+	meta.TnlData.IpDst = dip
+	meta.TnlData.IpSrc = sip
+	meta.TnlData.TunID = tunnelId
+	meta.TnlData.TunType = uint8(tunnelType)
 	return fmt.Sprintf(" %s %d %s:%s\n", tunnelType, tunnelId, sip, dip)
 }
 
-func (d *SequentialDecoder) decodeEthernet() {
+func (d *SequentialDecoder) decodeEthernet(meta *MetaPktHdr) {
 	x := d.x
 	sb := d.stringBuffer
 	if !d.pflags.IsSet(CFLAG_MAC0) {
@@ -133,20 +138,35 @@ func (d *SequentialDecoder) decodeEthernet() {
 	if !d.pflags.IsSet(CFLAG_VLANTAG) {
 		x.vlan = d.data.U16() & 0xFFF
 	}
+
+	meta.L2End0 = d.pflags.IsSet(PFLAG_SRC_ENDPOINT)
+	meta.L2End1 = d.pflags.IsSet(PFLAG_DST_ENDPOINT)
+	meta.Vlan = x.vlan
+	if d.direction == "->" {
+		meta.MacSrc = x.mac0
+		meta.MacDst = x.mac1
+	} else {
+		meta.MacSrc = x.mac1
+		meta.MacDst = x.mac0
+	}
 	sb.WriteString(fmt.Sprintf(" %s %s %s", x.mac0, d.direction, x.mac1))
 	if x.vlan > 0 {
 		sb.WriteString(fmt.Sprintf(" vid: %d", x.vlan))
 	}
 	if x.headerType == HEADER_TYPE_ARP {
+		meta.EthType = EthernetTypeARP
 		sb.WriteString(fmt.Sprintf(" arp: %s", hex.EncodeToString(d.data.Field(ARP_HEADER_SIZE))))
 	} else if x.headerType < HEADER_TYPE_IPV4 {
+		meta.EthType = EthernetTypeIPv4
+		sb.WriteString(fmt.Sprintf(" arp: %s", hex.EncodeToString(d.data.Field(ARP_HEADER_SIZE))))
 		sb.WriteString(fmt.Sprintf(" ethType: 0x%04x", d.data.U16()))
 	} else {
-		d.decodeIPv4()
+		meta.EthType = EthernetTypeIPv4
+		d.decodeIPv4(meta)
 	}
 }
 
-func (d *SequentialDecoder) decodeIPv4() {
+func (d *SequentialDecoder) decodeIPv4(meta *MetaPktHdr) {
 	x := d.x
 	sb := d.stringBuffer
 	if !d.pflags.IsSet(CFLAG_DATAOFF_IHL) {
@@ -178,7 +198,16 @@ func (d *SequentialDecoder) decodeIPv4() {
 	if !d.pflags.IsSet(CFLAG_IP1) {
 		x.ip1 = net.IP(d.data.Field(IP_ADDR_LEN))
 	}
+	meta.TTL = x.ttl
+	if d.direction == "->" {
+		meta.IpSrc = x.ip0
+		meta.IpDst = x.ip1
+	} else {
+		meta.IpSrc = x.ip1
+		meta.IpDst = x.ip0
+	}
 	if x.headerType == HEADER_TYPE_IPV4_ICMP {
+		meta.Proto = IPProtocolICMPv4
 		icmpType, code := d.data.U8(), d.data.U8()
 		sb.WriteString(fmt.Sprintf("\n\t%s %s %s", x.ip0, d.direction, x.ip1))
 		switch icmpType {
@@ -203,13 +232,14 @@ func (d *SequentialDecoder) decodeIPv4() {
 		}
 	} else if x.headerType == HEADER_TYPE_IPV4 {
 		proto := d.data.U8()
+		meta.Proto = IPProtocol(proto)
 		sb.WriteString(fmt.Sprintf("\n\t%s %s %s proto: %d", x.ip0, d.direction, x.ip1, proto))
 		return
 	}
-	d.decodeL4()
+	d.decodeL4(meta)
 }
 
-func (d *SequentialDecoder) decodeL4() {
+func (d *SequentialDecoder) decodeL4(meta *MetaPktHdr) {
 	x := d.x
 	sb := d.stringBuffer
 	if !d.pflags.IsSet(CFLAG_PORT0) {
@@ -218,12 +248,31 @@ func (d *SequentialDecoder) decodeL4() {
 	if !d.pflags.IsSet(CFLAG_PORT1) {
 		x.port1 = d.data.U16()
 	}
+
+	if d.direction == "->" {
+		meta.PortSrc = x.port0
+		meta.PortDst = x.port1
+	} else {
+		meta.PortSrc = x.port1
+		meta.PortDst = x.port0
+	}
+	if x.vlan == 0 {
+		meta.PayloadLen = meta.PktLen - 14 - uint16(x.ihl*4)
+	} else {
+		meta.PayloadLen = meta.PktLen - 14 - uint16(x.ihl*4) - 4
+	}
 	sb.WriteString(fmt.Sprintf("\n\t%s:%d %s %s:%d", x.ip0, x.port0, d.direction, x.ip1, x.port1))
 	if x.headerType == HEADER_TYPE_IPV4_UDP {
+		meta.Proto = IPProtocolUDP
+		meta.PayloadLen -= 8
 		return
 	}
+	meta.PayloadLen -= uint16(x.dataOffset * 4)
+	meta.Proto = IPProtocolTCP
 	seq := d.data.U32()
 	ack := d.data.U32()
+	meta.TcpData.Seq = seq
+	meta.TcpData.Ack = ack
 	if !d.pflags.IsSet(CFLAG_TCP_FLAGS) {
 		x.tcpFlags = d.data.U8()
 	}
@@ -234,11 +283,14 @@ func (d *SequentialDecoder) decodeL4() {
 	if x.dataOffset > 5 {
 		sb.WriteString(fmt.Sprintf(" data-offset: %d", x.dataOffset))
 	}
+	meta.TcpData.Flags = x.tcpFlags
+	meta.TcpData.WinSize = x.win
 	sb.WriteString(fmt.Sprintf(" flags: %x win: %d", x.tcpFlags, x.win))
 	if x.dataOffset > 5 {
 		optionFlag := d.data.U8()
 		if optionFlag&TCP_OPT_FLAG_WIN_SCALE > 0 {
-			sb.WriteString(fmt.Sprintf(" win-scale: %d", d.data.U8()))
+			meta.TcpData.WinScale = d.data.U8()
+			sb.WriteString(fmt.Sprintf(" win-scale: %d", meta.TcpData.WinScale))
 		}
 		if optionFlag&TCP_OPT_FLAG_MSS > 0 {
 			sb.WriteString(fmt.Sprintf(" MSS: %d", d.data.U16()))
@@ -246,6 +298,7 @@ func (d *SequentialDecoder) decodeL4() {
 		sackPermit := optionFlag&TCP_OPT_FLAG_SACK_PERMIT > 0
 		if sackPermit {
 			sb.WriteString(" sack-permit")
+			meta.TcpData.SACKPermitted = true
 		}
 		sackLength := int(optionFlag & TCP_OPT_FLAG_SACK)
 		if sackLength > 0 {
@@ -258,19 +311,19 @@ func (d *SequentialDecoder) decodeL4() {
 	}
 }
 
-func (d *SequentialDecoder) DecodeHeader() string {
+func (d *SequentialDecoder) DecodeHeader() (string, uint32) {
 	_ = d.data.U8()
 	version := d.data.U8()
 	d.seq = d.data.U32()
-	timestamp := d.data.U64()
+	d.timestamp = d.data.U64()
 	ifMacSuffix := d.data.U32()
 	return fmt.Sprintf(
 		"version: %d, seq: %d, timestamp: %d, ifMacSuffix: %x, size: %d",
-		version, d.seq, timestamp, ifMacSuffix, len(d.data),
-	)
+		version, d.seq, d.timestamp, ifMacSuffix, len(d.data),
+	), ifMacSuffix & 0xffff
 }
 
-func (d *SequentialDecoder) NextPacket() (string, int) {
+func (d *SequentialDecoder) NextPacket(meta *MetaPktHdr) (string, int) {
 	if d.stringBuffer == nil {
 		d.stringBuffer = bytes.NewBuffer(make([]byte, 1024))
 	}
@@ -293,10 +346,13 @@ func (d *SequentialDecoder) NextPacket() (string, int) {
 	if !d.pflags.IsSet(CFLAG_HEADER_TYPE) {
 		d.x.headerType = HeaderType(d.data.U8())
 	}
+	d.timestamp += uint64(delta)
 	sb.WriteString(fmt.Sprintf("delta: +%d flags: %s -%dB size: %d", delta, flagsString, compressedSize, totalSize))
 	if d.pflags.IsSet(PFLAG_TUNNEL) {
-		sb.WriteString(d.decodeTunnel())
+		sb.WriteString(d.decodeTunnel(meta))
 	}
-	d.decodeEthernet()
+	meta.PktLen = totalSize
+	meta.Timestamp = int64(d.timestamp)
+	d.decodeEthernet(meta)
 	return d.stringBuffer.String(), compressedSize
 }

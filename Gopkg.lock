@@ -5,9 +5,11 @@
   name = "github.com/google/gopacket"
   packages = [
     ".",
-    "layers"
+    "layers",
+    "pcapgo"
   ]
-  revision = "60ab61cd59496fcfa4d208b265ba79b1e37c1476"
+  revision = "11c65f1ca9081dfea43b4f9643f5c155583b73ba"
+  version = "v1.1.14"
 
 [[projects]]
   branch = "master"
@@ -42,12 +44,21 @@
 [[projects]]
   branch = "master"
   name = "gitlab.x.lan/yunshan/droplet-libs"
-  packages = ["logger"]
+  packages = [
+    "logger",
+    "stats"
+  ]
   revision = "a13cf6ab3ef7d4bed4d37b6ca57e20b2c0710182"
+
+[[projects]]
+  name = "gopkg.in/alexcesaro/statsd.v2"
+  packages = ["."]
+  revision = "7fea3f0d2fab1ad973e641e51dba45443a311a90"
+  version = "v2.0.0"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d8abd15abd80e1bdbcbdc7f0e2d23ebf84c369136516ff378543d01ff15583fe"
+  inputs-digest = "cda2f2a517564373f5848f813cfef380a36a1a83ce712293c6c8ff90e469c8d9"
   solver-name = "gps-cdcl"
   solver-version = 1
