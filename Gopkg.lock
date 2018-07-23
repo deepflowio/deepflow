@@ -113,9 +113,10 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:144242dbc0b686768c6e556fe53b3e0cb5a143acb05762a0bd96820460630d9f"
+  digest = "1:88167e01f5f42358bd71912e568766f1e411a15f6a4e074227bcf21af7753ee5"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
+    "datatype",
     "logger",
     "monitor",
     "queue",
@@ -123,7 +124,7 @@
     "utils",
   ]
   pruneopts = "UT"
-  revision = "00b3b1be00b4649f6dd743dfe1ad7e48dfdec270"
+  revision = "7dd6c739d06cc8fe39c2fb8d6257bfa1043ab76b"
 
 [[projects]]
   branch = "master"
@@ -153,6 +154,7 @@
     "github.com/google/gopacket/pcapgo",
     "github.com/op/go-logging",
     "github.com/spf13/cobra",
+    "gitlab.x.lan/yunshan/droplet-libs/datatype",
     "gitlab.x.lan/yunshan/droplet-libs/logger",
     "gitlab.x.lan/yunshan/droplet-libs/monitor",
     "gitlab.x.lan/yunshan/droplet-libs/queue",
