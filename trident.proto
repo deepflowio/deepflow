@@ -21,6 +21,7 @@ message InterfaceAclStat {
 message SyncRequest {
     optional uint32 boot_time = 1;
     optional bool config_accepted = 2 [default = true];
+    optional uint64 version = 3 [default = 0];
 
     repeated InterfaceAclStat interface_acls = 5;
 }
@@ -57,6 +58,7 @@ message Config {
 
 enum Protocol {
     ANY = 0;
+    ICMP = 1;
     TCP = 6;
     UDP = 17;
 }
@@ -87,10 +89,80 @@ message Segment { // e.g. single LAN area
     optional string tap_mac = 3;
 }
 
+message IpResource {
+    optional string ip = 1;
+    optional uint32 masklen = 2 [default = 32];
+    optional uint32 subnet_id = 3 [default = 0];
+}
+
+message Interface {
+    optional string mac = 1;
+    optional uint32 device_type = 2;
+    optional uint32 device_id = 3;
+    optional uint32 if_type = 4;
+    optional uint32 if_index = 5;
+    optional uint32 epc_id = 6;
+    optional string launch_server = 7;
+    repeated IpResource ip_resources = 8;
+}
+
+enum GroupType {
+    VM = 0;
+    PUBLIC_IP = 1;
+    INTERNAL_IP = 2;
+}
+
+message Group {
+    optional uint32 id = 1;
+    optional uint32 epc_id = 2 [default = 0];
+    optional GroupType type = 3;
+    repeated uint32 vm_ids = 4;
+    repeated string ips = 5;
+}
+
+enum RuleResourceType {
+    IP = 1;
+    RESOURCE_GROUP = 2;
+}
+
+message CustomTagRule {
+    optional uint32 epc_id = 1 [default = 0];
+    optional RuleResourceType resource_type = 2;
+    optional uint32 vlan = 3;
+    optional string src_ip_range = 4;
+    optional string dst_ip_range = 5;
+    repeated uint32 src_group_ids = 6;
+    repeated uint32 dst_group_ids = 7;
+    optional uint32 src_port = 8;
+    optional uint32 dst_port = 9;
+}
+
+message CustomTag {
+    optional uint32 id = 1;
+    repeated CustomTagRule rules = 2;
+}
+
+message WhiteListRule {
+    optional uint32 id = 1;
+    repeated uint32 sources = 2;
+    optional uint32 target = 3;
+    optional Protocol protocol = 4;
+    optional uint32 port = 5;
+}
+
+message PlatformData {
+    repeated Interface interfaces = 1;
+    repeated Group groups = 2;
+    repeated CustomTag custom_tags = 3;
+    repeated WhiteListRule whitelist_rules = 4;
+}
+
 message SyncResponse {
     optional Status status = 1;
     optional Config config = 2;
-    repeated InterfaceAcl interface_acls = 3;
-    repeated Segment local_segments = 4;
-    repeated Segment remote_segments = 5;
+    optional uint64 version = 3 [default = 0]; /* in addition to config field */
+
+    repeated InterfaceAcl interface_acls = 10;
+    repeated Segment local_segments = 11;
+    optional PlatformData platform_data = 12;
 }
