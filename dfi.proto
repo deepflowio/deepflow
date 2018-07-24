@@ -70,6 +70,8 @@ message Flow {
     /* L3 */
     optional uint32 ip_src = 41;      /* 0x01020304 == 1.2.3.4 */
     optional uint32 ip_dst = 42;      /* 0x01020304 == 1.2.3.4 */
+    optional uint32 ttl_0 = 43;
+    optional uint32 ttl_1 = 44;
 
     /* L4 */
     optional uint32 proto = 51 [default = 0];
