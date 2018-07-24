@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"gitlab.x.lan/yunshan/droplet-libs/policy"
 	. "gitlab.x.lan/yunshan/droplet/utils"
 )
 
@@ -50,6 +51,7 @@ type MetaPktHdr struct {
 
 	TcpData MetaPktTcpHdr
 	TnlData MetaPktTnlHdr
+	EpData  *policy.EndpointData
 }
 
 func get_tcp_flags(t *layers.TCP) uint8 {
