@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"sync"
@@ -13,20 +14,30 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 
 	"gitlab.x.lan/yunshan/droplet/adapt"
+	"gitlab.x.lan/yunshan/droplet/config"
 	"gitlab.x.lan/yunshan/droplet/flowgen"
+	"gitlab.x.lan/yunshan/droplet/labeler"
 )
 
 var log = logging.MustGetLogger(os.Args[0])
 
+var configFile = flag.String("f", "/etc/droplet.yaml", "Specify config file location")
+
 func main() {
 	InitConsoleLog()
-	queue := NewOverwriteQueue("AdaptToFilter", 1000)
-	trident_adapt := adapt.NewTridentAdapt(queue)
+	filterqueue := NewOverwriteQueue("AdaptToFilter", 1000)
+	trident_adapt := adapt.NewTridentAdapt(filterqueue)
 	if trident_adapt == nil {
 		return
 	}
+
+	flowqueue := NewOverwriteQueue("FilterToFlow", 1000)
+	cfg := config.Load(*configFile)
+	laber := labeler.NewLabelerManager(cfg, filterqueue, flowqueue)
+	laber.Start()
+
 	flowAppOutputQueue := NewOverwriteQueue("flowAppOutputQueue", 1000)
-	flowGenerator := flowgen.New(queue, flowAppOutputQueue, 60)
+	flowGenerator := flowgen.New(flowqueue, flowAppOutputQueue, 60)
 	if flowGenerator == nil {
 		return
 	}

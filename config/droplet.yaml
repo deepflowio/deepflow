@@ -1,0 +1,12 @@
+controller-ips:
+  - 127.0.0.1
+# controller listen port
+controller-port: 20035
+# logfile path
+log-file: /var/log/trident/trident.log
+# loglevel: "debug/info/warn/error"
+log-level: info
+# profiler
+profiler: false
+# DANGEROUS: possible flood when close
+close-flood-check: false
