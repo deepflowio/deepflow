@@ -1,19 +1,21 @@
 GOPATH = $(shell go env GOPATH)
-DROPLET_LIBS_ROOT = ${GOPATH}/src/gitlab.x.lan/yunshan/droplet-libs
+PROJECT_ROOT = ${GOPATH}/src/gitlab.x.lan/yunshan/droplet-libs
 
-deps:
+vendor:
+	mkdir -p $(shell dirname ${PROJECT_ROOT})
+	[ -d ${PROJECT_ROOT} ] || ln -snf ${CURDIR} ${PROJECT_ROOT}
 	[ -f ${GOPATH}/bin/dep ] || curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-	mkdir -p ${GOPATH}/src/gitlab.x.lan/yunshan/
-	[ -d ${DROPLET_LIBS_ROOT} ] || ln -snf ${CURDIR} ${DROPLET_LIBS_ROOT}
-	(cd ${DROPLET_LIBS_ROOT}; dep ensure)
+	(cd ${PROJECT_ROOT}; dep ensure)
 
-format:
-	(cd ${DROPLET_LIBS_ROOT}; go fmt ./...)
+test: vendor
+	go test -short ./...
 
-verify:
-	(cd ${DROPLET_LIBS_ROOT}; go vet ./...)
-	(cd ${DROPLET_LIBS_ROOT}; go test -short ./...)
+bench: vendor
+	go test -bench=. ./...
 
-.DEFAULT_GOAL := verify
+clean:
+	git clean -dfx
 
-.PHONY: deps format verify clean
+.DEFAULT_GOAL := test
+
+.PHONY: test bench clean
