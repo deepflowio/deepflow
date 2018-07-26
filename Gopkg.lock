@@ -17,6 +17,12 @@
   version = "v1.2.1"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/golang-collections/go-datastructures"
+  packages = ["bitarray"]
+  revision = "59788d5eb2591d3497ffb8fafed2f16fe00e7775"
+
+[[projects]]
   name = "github.com/google/gopacket"
   packages = [
     ".",
@@ -86,6 +92,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "da4e5e7e363473e3e52af9c186124ba3e0154c94334882ea539927a44cdfc012"
+  inputs-digest = "244153859a147b820b5853229d17e518351c7d1359ede62911bb89be951d5283"
   solver-name = "gps-cdcl"
   solver-version = 1
