@@ -157,6 +157,8 @@ message Flow {
 
     repeated uint32 group_ids_0 = 134;                         /* 源端资源组ID */
     repeated uint32 group_ids_1 = 135;                         /* 目的端资源组ID */
+    repeated uint32 lan_group_ids_0 = 200;                     /* FIXME：虚拟网络源端资源组ID，不受l3_end限制 */
+    repeated uint32 lan_group_ids_1 = 201;                     /* FIXME：虚拟网络目的端资源组ID，不受l3_end限制 */
     repeated uint32 whitelist_rule_ids_0 = 136;                /* 源端资源组Id匹配的白名单策略ID */
     repeated uint32 whitelist_rule_ids_1 = 137;                /* 目的端资源组Id匹配的白名单策略ID */
     repeated uint32 custom_tag_ids_0 = 138;                    /* 源端客户自定义标签ID */
@@ -210,6 +212,8 @@ message Flow {
     optional uint64 pkt_interval_variance =161 [default = 0];   /* The variance of all packet intervals for
                                                                     current flow */
     optional uint64 pkt_size_variance = 162 [default = 0];      /* Packet byte cnt variance of this flow*/
+
+    // FIXME: 200/201 ID已占用
 }
 
 message Metering {
