@@ -1,8 +1,9 @@
 package data
 
 import (
-	"github.com/google/gopacket/layers"
 	"time"
+
+	"github.com/google/gopacket/layers"
 )
 
 type CloseType uint8
@@ -19,18 +20,33 @@ const (
 	HalfCloseTimeout
 )
 
-type Flow struct {
-	Host     IP
+type FlowKey struct {
 	Exporter IP
+	/* L1 */
+	InPort0 uint32
+	/* L3 */
+	IPSrc IP
+	IPDst IP
+	/* L4 */
+	Proto   layers.IPProtocol
+	PortSrc uint16
+	PortDst uint16
+	/* Tunnel */
+	TunID    uint64
+	TunIPSrc uint32
+	TunIPDst uint32
+	TunType  uint64
+}
+
+type Flow struct {
+	FlowKey
 	CloseType
+
+	Host      IP
 	FlowID    uint64
 	StartTime time.Duration
 	EndTime   time.Duration
 	Duration  time.Duration
-
-	/* L1 */
-	InPort0 uint32
-	InPort1 uint32
 
 	/* L2 */
 	VLAN    uint16
@@ -38,24 +54,11 @@ type Flow struct {
 	MACSrc  MACAddr
 	MACDst  MACAddr
 
-	/* L3 */
-	IPSrc IP
-	IPDst IP
-
 	/* L4 */
-	Proto     layers.IPProtocol
-	PortSrc   uint16
-	PortDst   uint16
 	TCPFlags0 uint16
 	TCPFlags1 uint16
 	TCPSynSeq uint32
 	ICMPID    uint32
-
-	/* Tunnel */
-	TunID    uint64
-	TunIPSrc uint32
-	TunIPDst uint32
-	TunType  uint64
 
 	/* Overlay */
 	OverlayTunID   uint64
