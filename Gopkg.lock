@@ -2,6 +2,14 @@
 
 
 [[projects]]
+  name = "github.com/google/gopacket"
+  packages = [
+    ".",
+    "layers"
+  ]
+  revision = "60ab61cd59496fcfa4d208b265ba79b1e37c1476"
+
+[[projects]]
   branch = "master"
   name = "github.com/lestrrat/go-file-rotatelogs"
   packages = ["."]
@@ -26,6 +34,12 @@
   version = "v0.8.0"
 
 [[projects]]
+  name = "github.com/willf/bitset"
+  packages = ["."]
+  revision = "d860f346b89450988a379d7d705e83c58d1ea227"
+  version = "v1.1.3"
+
+[[projects]]
   branch = "master"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = ["logger"]
@@ -34,6 +48,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "178404e797794f6ea6f8b2b2dda6493ac2041110460772c1c9f2400677767972"
+  inputs-digest = "d8abd15abd80e1bdbcbdc7f0e2d23ebf84c369136516ff378543d01ff15583fe"
   solver-name = "gps-cdcl"
   solver-version = 1
