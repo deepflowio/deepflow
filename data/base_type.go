@@ -57,15 +57,14 @@ func NewMACAddrFromString(addrStr string) *MACAddr {
 func NewMACAddrFromInt(addrInt uint64) *MACAddr {
 	var b [8]byte
 	binary.BigEndian.PutUint64(b[:], addrInt&0xFFFFFFFFFFFF)
-	addr := make(net.HardwareAddr, MACLen)
-	copy(addr, b[2:])
+	addr := net.HardwareAddr(b[2:])
 	return &MACAddr{addr, addr.String(), addrInt}
 }
 
-func (mac *MACAddr) String() string {
-	return mac.addrStr
+func (m *MACAddr) String() string {
+	return m.addrStr
 }
 
-func (mac *MACAddr) Int() uint64 {
-	return mac.addrInt
+func (m *MACAddr) Int() uint64 {
+	return m.addrInt
 }
