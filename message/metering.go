@@ -1,4 +1,4 @@
-package data
+package message
 
 import (
 	"github.com/google/gopacket/layers"
