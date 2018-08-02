@@ -50,6 +50,12 @@
   revision = "970db520ece77730c7e4724c61121037378659d9"
 
 [[projects]]
+  name = "github.com/pebbe/zmq4"
+  packages = ["."]
+  revision = "5b443b6471cea4b4f9f85025530c04c93233f76a"
+  version = "v1.0.0"
+
+[[projects]]
   name = "github.com/pkg/errors"
   packages = ["."]
   revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
@@ -81,7 +87,7 @@
     "unix",
     "windows"
   ]
-  revision = "3dc4335d56c789b04b0ba99b7a37249d9b614314"
+  revision = "0ffbfd41fbef8ffcf9b62b0b0aa3a5873ed7a4fe"
 
 [[projects]]
   name = "gopkg.in/alexcesaro/statsd.v2"
@@ -92,6 +98,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "244153859a147b820b5853229d17e518351c7d1359ede62911bb89be951d5283"
+  inputs-digest = "df4355c28f07a17a53992264feecfb05444e8de4c9ac95ecfa45fc29c6e0cf93"
   solver-name = "gps-cdcl"
   solver-version = 1
