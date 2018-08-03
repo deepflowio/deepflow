@@ -103,14 +103,16 @@ func sendCounter(statSource *StatSource, counter interface{}) {
 
 	val := reflect.Indirect(reflect.ValueOf(counter))
 	for i := 0; i < val.Type().NumField(); i++ {
-		fieldName := val.Type().Field(i).Tag.Get("statsd")
-		if fieldName == "" {
-			fieldName = val.Type().Field(i).Name
-			if !isUpper(fieldName[0]) { // skip private field(starting with lower case letter)
-				continue
-			}
+		statsName := val.Type().Field(i).Tag.Get("statsd")
+		if statsName == "" {
+			continue
 		}
-		statSource.statsdClient.Count(fieldName, val.Field(i).Interface())
+		memberName := val.Type().Field(i).Name
+		if !isUpper(memberName[0]) { // skip private field(starting with lower case letter)
+			log.Warningf("Unexported field %s with stats tag", memberName)
+			continue
+		}
+		statSource.statsdClient.Count(statsName, val.Field(i).Interface())
 	}
 }
 
