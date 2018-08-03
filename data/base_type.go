@@ -3,9 +3,11 @@ package data
 import (
 	"encoding/binary"
 	"net"
+
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
-const MACLen = 6
+const MAC_ADDR_LEN = 6
 
 type IP struct {
 	ip    net.IP
@@ -28,6 +30,10 @@ func NewIPFromInt(ipInt uint32) *IP {
 	return &IP{ip, ip.String(), ipInt}
 }
 
+func (ip *IP) Equals(other *IP) bool {
+	return ip.ipInt == other.ipInt
+}
+
 func (ip *IP) String() string {
 	return ip.ipStr
 }
@@ -44,21 +50,17 @@ type MACAddr struct {
 
 func NewMACAddrFromString(addrStr string) *MACAddr {
 	if addr, err := net.ParseMAC(addrStr); err == nil {
-		if len(addr) != MACLen {
+		if len(addr) != MAC_ADDR_LEN {
 			return nil
 		}
-		var b [8]byte
-		copy(b[2:], addr)
-		return &MACAddr{addr, addrStr, binary.BigEndian.Uint64(b[:])}
+		return &MACAddr{addr, addrStr, Mac2Uint64(addr)}
 	}
 	return nil
 }
 
 func NewMACAddrFromInt(addrInt uint64) *MACAddr {
-	var b [8]byte
-	binary.BigEndian.PutUint64(b[:], addrInt&0xFFFFFFFFFFFF)
-	addr := net.HardwareAddr(b[2:])
-	return &MACAddr{addr, addr.String(), addrInt}
+	mac := Uint64ToMac(addrInt)
+	return &MACAddr{mac, mac.String(), addrInt}
 }
 
 func (m *MACAddr) String() string {
