@@ -57,7 +57,7 @@ type ImmutableSegmentTree struct {
 
 // 只是构造树，并不包含插入数据
 func (t *ImmutableSegmentTree) buildTree(sortedEndpoints []TypedEndpoint) {
-	endpointIndexMap := make(map[int64]int)
+	endpointIndexMap := make(map[Endpoint]int)
 	for i, typedEndpoint := range sortedEndpoints {
 		endpointIndexMap[typedEndpoint.endpoint] = i
 	}
@@ -157,24 +157,25 @@ func (t *ImmutableSegmentTree) insertIndex(interval IntegerRange, index uint) {
 }
 
 func toEndpoints(intervals []IntegerRange) []TypedEndpoint {
-	endpointTypeMap := make(map[int64]EndpointType)
+	endpointTypeMap := make(map[Endpoint]EndpointType)
 	for _, interval := range intervals {
-		if interval.hasLowerBound() {
-			lower := interval.lowerEndpoint()
-			if _, found := endpointTypeMap[lower]; !found {
-				if interval.lowerClosed() {
-					endpointTypeMap[lower] = RIGHT_CLOSED
-				} else {
-					endpointTypeMap[lower] = OPEN
-				}
-			}
-		}
 		if interval.hasUpperBound() {
 			upper := interval.upperEndpoint()
 			if interval.upperClosed() {
 				endpointTypeMap[upper] = LEFT_CLOSED
 			} else {
 				endpointTypeMap[upper] = RIGHT_CLOSED
+			}
+		}
+		if interval.hasLowerBound() {
+			lower := interval.lowerEndpoint()
+			if _, found := endpointTypeMap[lower]; found {
+				continue
+			}
+			if interval.lowerClosed() {
+				endpointTypeMap[lower] = RIGHT_CLOSED
+			} else {
+				endpointTypeMap[lower] = OPEN
 			}
 		}
 	}
