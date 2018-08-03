@@ -63,6 +63,10 @@ func NewMACAddrFromInt(addrInt uint64) *MACAddr {
 	return &MACAddr{mac, mac.String(), addrInt}
 }
 
+func (m *MACAddr) Equals(other *MACAddr) bool {
+	return m.addrInt == other.addrInt
+}
+
 func (m *MACAddr) String() string {
 	return m.addrStr
 }

@@ -13,8 +13,8 @@ import (
 var log = logging.MustGetLogger("monitor")
 
 type Counter struct {
-	cpuPercent float64 `statsd:"cpu-percent"`
-	memory     uint64  `statsd:"memory"` // physical + swap in bytes
+	CpuPercent float64 `statsd:"cpu-percent"`
+	Memory     uint64  `statsd:"memory"` // physical + swap in bytes
 }
 
 type Monitor struct {
@@ -27,12 +27,12 @@ func (m *Monitor) GetCounter() interface{} {
 	if err != nil {
 		return counter
 	}
-	counter.cpuPercent = percent
+	counter.CpuPercent = percent
 	mem, err := m.proc.MemoryInfo()
 	if err != nil {
 		return counter
 	}
-	counter.memory = mem.RSS + mem.Swap
+	counter.Memory = mem.RSS + mem.Swap
 	return counter
 }
 
