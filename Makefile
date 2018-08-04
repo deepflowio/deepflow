@@ -18,17 +18,17 @@ vendor:
 	[ -f ${GOPATH}/bin/dep ] || curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 	(cd ${PROJECT_ROOT}; dep ensure)
 
-protob/trident.pb.go:
-	(cd message; protoc --go_out=plugins=grpc:${CURDIR}/protob/ trident.proto)
-	sed -i 's/package trident/package protob/g' protob/trident.pb.go
+protobuf/trident.pb.go:
+	(cd message; protoc --go_out=plugins=grpc:${CURDIR}/protobuf/ trident.proto)
+	sed -i 's/package trident/package protobuf/g' protobuf/trident.pb.go
 
-test: vendor protob/trident.pb.go
+test: vendor protobuf/trident.pb.go
 	go test -short ./...
 
-debug: vendor protob/trident.pb.go
+debug: vendor protobuf/trident.pb.go
 	go build ${FLAGS} -gcflags '-N -l' -o bin/droplet cmd/droplet/main.go
 
-droplet: vendor protob/trident.pb.go
+droplet: vendor protobuf/trident.pb.go
 	go build ${FLAGS} -o bin/droplet cmd/droplet/main.go
 
 
