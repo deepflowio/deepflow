@@ -9,7 +9,7 @@ import (
 type CloseType uint8
 
 const (
-	Unknown CloseType = iota
+	unknownCloseType CloseType = iota
 	TCPFin
 	TCPRst
 	Timeout
@@ -18,6 +18,20 @@ const (
 	ForcedClose
 	HalfOpenTimeout
 	HalfCloseTimeout
+)
+
+type DeviceType uint8
+
+const (
+	unknownDeviceType DeviceType = iota
+	VM
+	VGw
+	ThirdPartyDevice
+	VMWAF
+	NSPVGateway
+	HostDevice
+	NetworkDevice
+	FloatingIP
 )
 
 type FlowKey struct {
@@ -118,17 +132,17 @@ type Flow struct {
 	SubnetID0 uint32
 	SubnetID1 uint32
 
-	L3DeviceType0 uint32
-	L3DeviceType1 uint32
+	L3DeviceType0 DeviceType
+	L3DeviceType1 DeviceType
 	L3DeviceID0   uint32
 	L3DeviceID1   uint32
-	L3EpcID0      uint32
-	L3EpcID1      uint32
+	L3EpcID0      int32
+	L3EpcID1      int32
 
-	EpcID0      uint32
-	EpcID1      uint32
-	DeviceType0 uint32
-	DeviceType1 uint32
+	EpcID0      int32
+	EpcID1      int32
+	DeviceType0 DeviceType
+	DeviceType1 DeviceType
 	DeviceID0   uint32
 	DeviceID1   uint32
 	IfIndex0    uint32
