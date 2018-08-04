@@ -9,10 +9,6 @@ var (
 	InsufficientIntervalLength = errors.New("Insufficient interval length")
 )
 
-type Value interface {
-	Id() uint64 // unique number for identification
-}
-
 type Endpoint = int64
 
 type Interval interface {
@@ -20,7 +16,16 @@ type Interval interface {
 	Upper() (Endpoint, bool)
 }
 
+type Value interface {
+	Id() uint64 // unique number for identification
+}
+
 type Intervals = []Interval
+
+type Entry struct {
+	Intervals Intervals
+	Value     Value
+}
 
 type Tree interface {
 	Query(...Interval) []Value
