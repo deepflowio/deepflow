@@ -121,37 +121,40 @@ func (t *ImmutableSegmentTree) insertIndex(interval IntegerRange, index uint) {
 				subtree.indexBitSet = bitarray.NewSparseBitArray()
 			}
 			subtree.indexBitSet.SetBit(uint64(index))
-		} else if subtree.isLeaf() { // 子树interval和interval部分重合但没有更多的子树，因此需要拆分interval再次构造左右子树
-			intersection := interval.intersection(curInterval)
-			if intersection.isEmpty() {
-				continue
-			}
-			if curInterval.hasLowerBound() && curInterval.lowerEndpoint() == intersection.lowerEndpoint() {
-				subtree.left = &SubTree{interval: intersection, indexBitSet: bitArrayOf(index)}
-				var upperInterval IntegerRange
-				if curInterval.hasUpperBound() {
-					upperInterval = IntegerRange{Cut{intersection.upperEndpoint(), false}, curInterval.upper}
-				} else {
-					upperInterval = downToRange(intersection.upperEndpoint(), false)
-				}
-				subtree.right = &SubTree{interval: upperInterval}
-			} else {
-				var lowerInterval IntegerRange
-				if curInterval.hasLowerBound() {
-					lowerInterval = IntegerRange{curInterval.lower, Cut{intersection.lowerEndpoint(), false}}
-				} else {
-					lowerInterval = upToRange(intersection.lowerEndpoint(), false)
-				}
-				subtree.left = &SubTree{interval: lowerInterval}
-				subtree.right = &SubTree{interval: intersection, indexBitSet: bitArrayOf(index)}
-			}
-		} else { // 子树interval在interval部分重合且有更多的子树，继续遍历
+			continue
+		} else if !subtree.isLeaf() { // 子树interval在interval部分重合且有更多的子树，继续遍历
 			if subtree.left != nil {
 				queue.PushBack(subtree.left)
 			}
 			if subtree.right != nil {
 				queue.PushBack(subtree.right)
 			}
+			continue
+		}
+
+		// 子树interval和interval部分重合但没有更多的子树，因此需要拆分interval再次构造左右子树
+		intersection := interval.intersection(curInterval)
+		if intersection.isEmpty() {
+			continue
+		}
+		if curInterval.hasLowerBound() && curInterval.lowerEndpoint() == intersection.lowerEndpoint() {
+			subtree.left = &SubTree{interval: intersection, indexBitSet: bitArrayOf(index)}
+			var upperInterval IntegerRange
+			if curInterval.hasUpperBound() {
+				upperInterval = IntegerRange{Cut{intersection.upperEndpoint(), false}, curInterval.upper}
+			} else {
+				upperInterval = downToRange(intersection.upperEndpoint(), false)
+			}
+			subtree.right = &SubTree{interval: upperInterval}
+		} else {
+			var lowerInterval IntegerRange
+			if curInterval.hasLowerBound() {
+				lowerInterval = IntegerRange{curInterval.lower, Cut{intersection.lowerEndpoint(), false}}
+			} else {
+				lowerInterval = upToRange(intersection.lowerEndpoint(), false)
+			}
+			subtree.left = &SubTree{interval: lowerInterval}
+			subtree.right = &SubTree{interval: intersection, indexBitSet: bitArrayOf(index)}
 		}
 	}
 }

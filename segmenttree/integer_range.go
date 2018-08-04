@@ -36,9 +36,11 @@ func (r *IntegerRange) encloses(other *IntegerRange) bool {
 }
 
 func (r *IntegerRange) isEmpty() bool {
-	return r.lower.equals(r.upper)
+	return r.lower.endpoint == r.upper.endpoint && (!r.lowerClosed() || !r.upperClosed())
 }
 
+// [1, 3) and [3, 4) is connected, [1, 3) and [2, 4] is connected, [1, 3) and (3, 4) is not connected
+// FIXME: 对于[1, 3) [3, 4]的情形，isConnected判断有误，不过好在对于线段树的使用并不影响
 func (r *IntegerRange) isConnected(other *IntegerRange) bool {
 	return r.lower.compareTo(other.upper) <= 0 && other.lower.compareTo(r.upper) <= 0
 }

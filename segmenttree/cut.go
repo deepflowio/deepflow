@@ -11,23 +11,19 @@ type Cut struct {
 }
 
 func (c *Cut) compareTo(o Cut) int {
-	if c.endpoint == o.endpoint {
-		if c.closed == o.closed {
-			return 0
-		} else if c.closed {
+	if c.endpoint > o.endpoint {
+		return 1
+	} else if c.endpoint < o.endpoint {
+		return -1
+	} else if c.closed != o.closed {
+		if c.closed {
 			return 1
 		} else {
 			return -1
 		}
-	} else if c.endpoint > o.endpoint {
-		return 1
 	} else {
 		return 0
 	}
-}
-
-func (c *Cut) equals(o Cut) bool {
-	return c.endpoint == o.endpoint && c.closed == o.closed
 }
 
 func (c *Cut) hasBound() bool {

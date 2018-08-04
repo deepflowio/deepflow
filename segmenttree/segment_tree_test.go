@@ -83,6 +83,16 @@ func TestIpSegmentTree(t *testing.T) {
 	}
 }
 
+func TestEndpoint(t *testing.T) {
+	tree, _ := New(1, asIntEntry(1, 1, 2))
+
+	var results []Value
+	results = tree.Query(&IntInterval{1, 1})
+	if !checkResult(results, 2) {
+		t.Errorf("Expected [2] but actually %s", results)
+	}
+}
+
 func TestDeduplication(t *testing.T) {
 	tree, _ := New(1,
 		*e("10.30.1.0/24").v(1),
