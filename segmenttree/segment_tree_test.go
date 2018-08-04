@@ -45,7 +45,7 @@ func (v *IntValue) Id() uint64 {
 }
 
 func (e *Entry) v(value uint64) *Entry {
-	e.value = &IntValue{value}
+	e.Value = &IntValue{value}
 	return e
 }
 

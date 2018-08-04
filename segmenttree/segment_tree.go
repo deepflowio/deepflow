@@ -58,11 +58,6 @@ func (t *SegmentTree) Query(intervals ...Interval) []Value {
 	return values
 }
 
-type Entry struct {
-	intervals []Interval
-	value     Value
-}
-
 func New(dimension int, entries ...Entry) (Tree, error) {
 	if dimension == 0 {
 		return nil, InvalidDimension
@@ -70,8 +65,8 @@ func New(dimension int, entries ...Entry) (Tree, error) {
 
 	values := make([]Value, len(entries))
 	for i, entry := range entries {
-		values[i] = entry.value
-		if len(entry.intervals) < dimension {
+		values[i] = entry.Value
+		if len(entry.Intervals) < dimension {
 			return nil, InsufficientIntervalLength
 		}
 	}
@@ -79,7 +74,7 @@ func New(dimension int, entries ...Entry) (Tree, error) {
 	for d := 0; d < dimension; d++ {
 		intervals := make([]IntegerRange, len(entries))
 		for i, entry := range entries {
-			intervals[i] = intervalToIntegerRange(entry.intervals[d])
+			intervals[i] = intervalToIntegerRange(entry.Intervals[d])
 		}
 		trees[d].init(intervals)
 	}
