@@ -65,6 +65,16 @@ func checkResult(results []Value, expect ...int) bool {
 	return true
 }
 
+func TestEmpty(t *testing.T) {
+	tree, _ := New(1)
+
+	var results []Value
+	results = tree.Query(&IntInterval{1, 1})
+	if !checkResult(results) {
+		t.Errorf("Expected [] but actually %s", results)
+	}
+}
+
 func TestIpSegmentTree(t *testing.T) {
 	tree, _ := New(2,
 		*e("10.30.1.0/24", "10.30.0.0/16").v(1),

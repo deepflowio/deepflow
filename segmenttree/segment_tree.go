@@ -19,7 +19,7 @@ type SegmentTree struct {
 
 func (t *SegmentTree) Query(intervals ...Interval) []Value {
 	dimension := len(t.trees)
-	if len(intervals) != dimension {
+	if len(intervals) != dimension || len(t.values) == 0 {
 		return nil
 	}
 
