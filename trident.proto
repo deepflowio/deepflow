@@ -104,6 +104,7 @@ message Interface {
     optional uint32 epc_id = 6;
     optional string launch_server = 7;
     repeated IpResource ip_resources = 8;
+    repeated uint32 group_ids = 9;
 }
 
 enum GroupType {
@@ -152,7 +153,7 @@ message WhiteListRule {
 
 message PlatformData {
     repeated Interface interfaces = 1;
-    repeated Group groups = 2;
+    repeated Group ip_groups = 2;
     repeated CustomTag custom_tags = 3;
     repeated WhiteListRule whitelist_rules = 4;
 }
