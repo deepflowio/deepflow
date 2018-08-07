@@ -18,7 +18,10 @@ var log = logging.MustGetLogger(os.Args[0])
 func main() {
 	InitConsoleLog()
 	queue := NewOverwriteQueue("AdaptToFilter", 1000)
-	trident_adapt := (&adapt.TridentAdapt{}).Init(queue)
+	trident_adapt := adapt.NewTridentAdapt(queue)
+	if trident_adapt == nil {
+		return
+	}
 	trident_adapt.Start(true)
 	stats.StartStatsd()
 	log.Info("It worked!")

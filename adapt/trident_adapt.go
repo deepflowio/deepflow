@@ -1,15 +1,20 @@
 package adapt
 
 import (
+	"bytes"
+	"encoding/gob"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"time"
 
 	"github.com/op/go-logging"
+	"github.com/spf13/cobra"
 
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.x.lan/yunshan/droplet/dpctl"
 	"gitlab.x.lan/yunshan/droplet/handler"
 	. "gitlab.x.lan/yunshan/droplet/utils"
 )
@@ -17,6 +22,10 @@ import (
 const (
 	LISTEN_PORT = 20033
 	CACHE_SIZE  = 16
+)
+
+const (
+	ADAPT_CMD_SHOW = iota
 )
 
 var log = logging.MustGetLogger(os.Args[0])
@@ -53,19 +62,21 @@ type TridentAdapt struct {
 	listener *net.UDPConn
 }
 
-func (a *TridentAdapt) Init(queues ...*queue.OverwriteQueue) *TridentAdapt {
-	a.counter = &PacketCounter{}
-	a.queues = queues
-	a.queueCount = len(queues)
-	a.tridents = make(map[TridentKey]*tridentInstance)
+func NewTridentAdapt(queues ...*queue.OverwriteQueue) *TridentAdapt {
+	adapt := &TridentAdapt{}
+	adapt.counter = &PacketCounter{}
+	adapt.queues = queues
+	adapt.queueCount = len(queues)
+	adapt.tridents = make(map[TridentKey]*tridentInstance)
 	listener, err := net.ListenUDP("udp4", &net.UDPAddr{Port: LISTEN_PORT})
 	if err != nil {
 		log.Error(err)
 		return nil
 	}
-	a.listener = listener
-	stats.RegisterCountable("trident_adapt", stats.EMPTY_TAG, a)
-	return a
+	adapt.listener = listener
+	stats.RegisterCountable("trident_adapt", stats.EMPTY_TAG, adapt)
+	dpctl.Register(dpctl.DPCTL_ADAPT, adapt)
+	return adapt
 }
 
 func (a *TridentAdapt) GetCounter() interface{} {
@@ -194,4 +205,85 @@ func (a *TridentAdapt) Stop(wait bool) error { // TODO: untested
 		return a.wait(false)
 	}
 	return nil
+}
+
+func (a *TridentAdapt) RecvCommand(conn *net.UDPConn, port int, operate uint16, arg *bytes.Buffer) {
+	buff := bytes.Buffer{}
+	switch operate {
+	case ADAPT_CMD_SHOW:
+		encoder := gob.NewEncoder(&buff)
+		if err := encoder.Encode(a.counter); err != nil {
+			log.Error(err)
+			return
+		}
+		dpctl.SendToDropletCtrl(conn, port, 0, &buff)
+		break
+	default:
+		log.Warningf("Trident Adapt recv unknown command(%v).", operate)
+	}
+}
+
+func CommmandGetCounter(count *PacketCounter) bool {
+	result, err := dpctl.SendToDroplet(dpctl.DPCTL_ADAPT, ADAPT_CMD_SHOW, nil)
+	if err != nil {
+		log.Warning(err)
+		return false
+	}
+	decoder := gob.NewDecoder(result)
+	if err = decoder.Decode(count); err != nil {
+		log.Error(err)
+		return false
+	}
+	return true
+}
+
+func RegisterCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "adapt",
+		Short: "config droplet adapt module",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("please run with arguments 'show'.\n")
+		},
+	}
+	show := &cobra.Command{
+		Use:   "show",
+		Short: "show module adapt infomation",
+		Run: func(cmd *cobra.Command, args []string) {
+			count := PacketCounter{}
+			if CommmandGetCounter(&count) {
+				fmt.Println("Trident-Adapt Module Running Status:")
+				fmt.Printf("\tRX_PKT: 		%v\n", count.RxPkt)
+				fmt.Printf("\tRX_DROP: 		%v\n", count.RxDrop)
+				fmt.Printf("\tRX_ERR: 		%v\n", count.RxErr)
+				fmt.Printf("\tTX_PKT: 		%v\n", count.TxPkt)
+				fmt.Printf("\tTX_DROP: 		%v\n", count.TxDrop)
+				fmt.Printf("\tTX_ERR: 		%v\n", count.TxErr)
+			}
+		},
+	}
+	showPerf := &cobra.Command{
+		Use:   "show-perf",
+		Short: "show adapt performance information",
+		Run: func(cmd *cobra.Command, args []string) {
+			last := PacketCounter{}
+			if !CommmandGetCounter(&last) {
+				return
+			}
+			time.Sleep(1 * time.Second)
+			now := PacketCounter{}
+			if !CommmandGetCounter(&now) {
+				return
+			}
+			fmt.Println("Trident-Adapt Module Performance:")
+			fmt.Printf("\tRX_PKT_PPS: 		%v\n", now.RxPkt-last.RxPkt)
+			fmt.Printf("\tRX_DROP_PPS: 		%v\n", now.RxDrop-last.RxDrop)
+			fmt.Printf("\tRX_ERR_PPS: 		%v\n", now.RxErr-last.RxErr)
+			fmt.Printf("\tTX_PKT_PPS: 		%v\n", now.TxPkt-last.TxPkt)
+			fmt.Printf("\tTX_DROP_PPS: 		%v\n", now.TxDrop-last.TxDrop)
+			fmt.Printf("\tTX_ERR_PPS: 		%v\n", now.TxErr-last.TxErr)
+		},
+	}
+	cmd.AddCommand(show)
+	cmd.AddCommand(showPerf)
+	return cmd
 }
