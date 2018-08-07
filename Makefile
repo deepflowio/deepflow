@@ -31,7 +31,8 @@ debug: vendor protobuf/trident.pb.go
 droplet: vendor protobuf/trident.pb.go
 	go build ${FLAGS} -o bin/droplet cmd/droplet/main.go
 
-
+droplet-ctl: vendor
+	go build ${FLAGS} -o bin/droplet-ctl cmd/droplet-ctl/main.go
 
 clean:
 	git clean -dfx
