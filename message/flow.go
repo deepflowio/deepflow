@@ -38,6 +38,27 @@ type FlowKey struct {
 	TunType  uint64
 }
 
+type TcpPerfStat struct {
+	ARTAvg            uint64
+	RTTSyn            uint64
+	RTT               uint64
+	RTTAvg            uint64
+	SynRetransCnt0    uint64
+	SynRetransCnt1    uint64
+	RetransCnt0       uint64
+	RetransCnt1       uint64
+	TotalRetransCnt   uint64
+	ZeroWndCnt0       uint64
+	ZeroWndCnt1       uint64
+	TotalZeroWndCnt   uint64
+	SlowStartCnt0     uint64
+	SlowStartCnt1     uint64
+	TotalSlowStartCnt uint64
+	PshUrgCnt0        uint64
+	PshUrgCnt1        uint64
+	TotalPshUrgCnt    uint64
+}
+
 type Flow struct {
 	FlowKey
 	CloseType
@@ -121,21 +142,5 @@ type Flow struct {
 	IsL3End1 bool
 
 	/* TCP Perf Data */
-	RTTSyn            uint64
-	RTT               uint64
-	RTTAvg            uint64
-	SynRetransCnt0    uint64
-	SynRetransCnt1    uint64
-	RetransCnt0       uint64
-	RetransCnt1       uint64
-	TotalRetransCnt   uint64
-	ZeroWndCnt0       uint64
-	ZeroWndCnt1       uint64
-	TotalZeroWndCnt   uint64
-	SlowStartCnt0     uint64
-	SlowStartCnt1     uint64
-	TotalSlowStartCnt uint64
-	PshUrgCnt0        uint64
-	PshUrgCnt1        uint64
-	TotalPshUrgCnt    uint64
+	*TcpPerfStat
 }
