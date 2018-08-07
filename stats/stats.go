@@ -26,6 +26,7 @@ type StatSource struct {
 }
 
 var (
+	processName  string
 	lock         sync.Mutex
 	statSources  map[Countable]*StatSource = make(map[Countable]*StatSource)
 	statsdClient *Client
@@ -117,8 +118,7 @@ func sendCounter(statSource *StatSource, counter interface{}) {
 }
 
 func initStatsdClient() *Client {
-	c, err := New(Address(fmt.Sprintf(":%d", STATSD_PORT)),
-		Prefix(os.Args[0]), TagsFormat(InfluxDB))
+	c, err := New(Address(fmt.Sprintf(":%d", STATSD_PORT)), Prefix(processName), TagsFormat(InfluxDB))
 	if err != nil {
 		return nil
 	}
@@ -146,5 +146,7 @@ func run() {
 }
 
 func StartStatsd() {
+	paths := strings.Split(os.Args[0], "/")
+	processName = paths[len(paths)-1]
 	go run()
 }
