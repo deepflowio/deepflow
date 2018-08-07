@@ -108,6 +108,7 @@ func sendCounter(statSource *StatSource, counter interface{}) {
 		if statsName == "" {
 			continue
 		}
+		statsName = strings.Replace(statsName, "-", "_", 0)
 		memberName := val.Type().Field(i).Name
 		if !isUpper(memberName[0]) { // skip private field(starting with lower case letter)
 			log.Warningf("Unexported field %s with stats tag", memberName)
