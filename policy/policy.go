@@ -1,8 +1,11 @@
 package policy
 
 import (
+	"github.com/op/go-logging"
 	"gitlab.x.lan/yunshan/droplet-libs/segmenttree"
 )
+
+var log = logging.MustGetLogger("policy")
 
 /*
 查询逻辑：160~640~920ns + 160ns*N_group
@@ -68,14 +71,21 @@ type EndpointInfo struct {
 
 	HostIp   uint32
 	SubnetId uint32
-	GroupIds []GroupId
+	GroupIds []uint32
 }
 
-type MacKey uint64     // u64(mac)
-type EpcIpKey uint64   // u32(epc_id) . u32(ip)
-type MacIpKey uint64   // u32(mac) . u32(ip)
-type ServiceKey uint64 // u20(group_id) . u8(proto) . u16(port)
-type PolicyKey uint64  // u20(group_id) . u20(service_id) . u12(vlan_id)
+type EndpointData struct {
+	SrcInfo *EndpointInfo
+	DstInfo *EndpointInfo
+}
+
+type MacKey uint64         // u64(mac)
+type IpKey uint32          // u32(ip)
+type EpcIpKey uint64       // u32(epc_id) . u32(ip)
+type MacIpKey uint64       // u32(mac) . u32(ip)
+type MacIpInportKey uint64 // u32(mac) . u32(ip)
+type ServiceKey uint64     // u20(group_id) . u8(proto) . u16(port)
+type PolicyKey uint64      // u20(group_id) . u20(service_id) . u12(vlan_id)
 
 type GroupId uint32
 type ServiceId uint32
@@ -88,9 +98,8 @@ const (
 )
 
 type PolicyTable struct {
-	macMap *map[MacKey]EndpointInfo // MAC字典
+	cpData *CloudPlatformData
 
-	epcIpMap     *map[EpcIpKey]EndpointInfo // EPC_ID + IP字典
 	ipGroupTree  segmenttree.SegmentTree    // IP资源组，key=EpcIpKey（0为任意，-1为其它），value=GroupIds
 	ipGroupCache *map[EpcIpKey]EndpointInfo // FIXME: 替换为LRU，限制大小1M和生存时间60s
 
@@ -99,6 +108,7 @@ type PolicyTable struct {
 	serviceMap *map[ServiceKey]ServiceId // 服务字典
 	policyMap  *map[PolicyKey]PolicyId   // 策略字典
 
+	serviceTable *ServiceTable
 	policyAction [MAX_POLICY_ID]*Action
 }
 
@@ -107,7 +117,10 @@ func NewPolicyTable( /* 传入Protobuf结构体指针 */ actionTypes ActionType)
 	 * Trident仅关心PACKET_BROKER和PACKET_STORE，
 	 * 那么就不要将EPC等云平台信息进行计算。
 	 * droplet关心**几乎**所有，对关心的信息进行计算*/
-	return &PolicyTable{}
+	return &PolicyTable{
+		cpData:       NewCloudPlatformData(),
+		serviceTable: NewSerivceTable(),
+	}
 }
 
 type LookupKey struct {
@@ -117,29 +130,39 @@ type LookupKey struct {
 	Vlan             uint16
 	Proto            uint8
 	Ttl              uint8
+	RxInterface      uint32
 	Tap              TapType
 }
 
 // Trident用于PACKET_BROKER、PACKET_STORE
-func LookupActionByKey(key *LookupKey) *Action {
+func (p *PolicyTable) LookupActionByKey(key *LookupKey) *Action {
 	// 将匹配策略的所有Action merge以后返回
 	// FIXME: 注意将查找过程中的性能监控数据发送到statsd
 	return nil
 }
 
 // River用于PACKET_BROKER，Stream用于FLOW_STORE
-func LookupActionByPolicyId(policyId PolicyId) *Action {
+func (p *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *Action {
 	// FIXME
 	return nil
 }
 
 // Droplet用于ANALYTIC_*、PACKET_BROKER、PACKET_STORE
-func LookupAllByKey(key *LookupKey) (endpointInfo *EndpointInfo, action *Action) {
+func (p *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *Action) {
 	// handler将结果赋值到
 	// FIXME: 注意利用TTL更新L3End（仅当用于ANALYTIC_*时）
-	return nil, nil
+	infos := p.cpData.GetEndPointData(key)
+	return infos, nil
 }
 
-func Update( /* 传入Protobuf结构体指针 */ ) {
-	// FIXME
+func (p *PolicyTable) UpdateServiceData(data []*ServiceData) {
+	if data != nil {
+		p.serviceTable.UpdateServiceTable(data)
+	}
+}
+
+func (p *PolicyTable) UpdateInterfaceData(data []*PlatformData) {
+	if data != nil {
+		p.cpData.UpdateInterfaceTable(data)
+	}
 }
