@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"os"
 
-	"gitlab.x.lan/yunshan/droplet/adapt"
-	"gitlab.x.lan/yunshan/droplet/handler"
-
 	"github.com/op/go-logging"
 	. "gitlab.x.lan/yunshan/droplet-libs/logger"
+	_ "gitlab.x.lan/yunshan/droplet-libs/monitor"
+
+	"gitlab.x.lan/yunshan/droplet/adapt"
+	"gitlab.x.lan/yunshan/droplet/handler"
 )
 
 var log = logging.MustGetLogger(os.Args[0])

@@ -2,63 +2,87 @@
 
 
 [[projects]]
+  digest = "1:f2a59262dcdf19b8a49351b562b4b274a935ea21932817126e6901ae516cde35"
   name = "github.com/google/gopacket"
   packages = [
     ".",
     "layers",
-    "pcapgo"
+    "pcapgo",
   ]
+  pruneopts = "UT"
   revision = "11c65f1ca9081dfea43b4f9643f5c155583b73ba"
   version = "v1.1.14"
 
 [[projects]]
   branch = "master"
+  digest = "1:f7d8e8432e355163397d2da1e17d0fb616d611db1360c43b1ac73e56f87038e2"
   name = "github.com/lestrrat/go-file-rotatelogs"
   packages = ["."]
+  pruneopts = "UT"
   revision = "d3151e2a480fdcd05fb97102f5310a47d96274c4"
 
 [[projects]]
   branch = "master"
+  digest = "1:b9f2e1d7b042e6fdb2aa1e3762afdb99e0c584f66a1a346b03cf8b4be203c694"
   name = "github.com/lestrrat/go-strftime"
   packages = ["."]
+  pruneopts = "UT"
   revision = "ba3bf9c1d0421aa146564a632931730344f1f9f1"
 
 [[projects]]
   branch = "master"
+  digest = "1:41f3b549dbb8216e490c27926c09dc055aa509b3476e7cbc3317103990b13aeb"
   name = "github.com/op/go-logging"
   packages = ["."]
+  pruneopts = "UT"
   revision = "970db520ece77730c7e4724c61121037378659d9"
 
 [[projects]]
+  digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
   name = "github.com/pkg/errors"
   packages = ["."]
+  pruneopts = "UT"
   revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
   version = "v0.8.0"
 
 [[projects]]
+  digest = "1:981fe66c332248711bafe3b5033e939cfd175e897e20a14905d4fcdc0fd68f59"
   name = "github.com/willf/bitset"
   packages = ["."]
+  pruneopts = "UT"
   revision = "d860f346b89450988a379d7d705e83c58d1ea227"
   version = "v1.1.3"
 
 [[projects]]
   branch = "master"
+  digest = "1:731bf64a6c620e8f69300cae10ac3d69e297175ca60636d6a7648d5b03fdd5cd"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "logger",
-    "stats"
+    "stats",
   ]
-  revision = "a13cf6ab3ef7d4bed4d37b6ca57e20b2c0710182"
+  pruneopts = "UT"
+  revision = "00b3b1be00b4649f6dd743dfe1ad7e48dfdec270"
 
 [[projects]]
+  digest = "1:38b469493eb173db9c03321d64adcad4c7991ea0a19b5edc5bdc094f0e8c7384"
   name = "gopkg.in/alexcesaro/statsd.v2"
   packages = ["."]
+  pruneopts = "UT"
   revision = "7fea3f0d2fab1ad973e641e51dba45443a311a90"
   version = "v2.0.0"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "cda2f2a517564373f5848f813cfef380a36a1a83ce712293c6c8ff90e469c8d9"
+  input-imports = [
+    "github.com/google/gopacket",
+    "github.com/google/gopacket/layers",
+    "github.com/google/gopacket/pcapgo",
+    "github.com/op/go-logging",
+    "github.com/willf/bitset",
+    "gitlab.x.lan/yunshan/droplet-libs/logger",
+    "gitlab.x.lan/yunshan/droplet-libs/stats",
+  ]
   solver-name = "gps-cdcl"
   solver-version = 1
