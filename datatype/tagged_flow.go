@@ -1,4 +1,4 @@
-package message
+package datatype
 
 type TaggedFlow struct {
 	Flow
