@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/op/go-logging"
+
+	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 	"gitlab.x.lan/yunshan/droplet/handler"
 	. "gitlab.x.lan/yunshan/droplet/utils"
@@ -18,8 +20,6 @@ const (
 )
 
 var log = logging.MustGetLogger(os.Args[0])
-
-type ErrorHandler func(*TridentAdapt, error)
 
 type PacketCounter struct {
 	RxPkt  uint64 `statsd:"rx_pkt"`
@@ -43,20 +43,27 @@ type tridentInstance struct {
 }
 
 type TridentAdapt struct {
-	errorHandler ErrorHandler
-	chs          []chan<- handler.MetaPktHdr
+	queues     []*queue.OverwriteQueue
+	queueCount int
 
 	tridents map[TridentKey]*tridentInstance
 	counter  *PacketCounter
 
-	running bool
+	running  bool
+	listener *net.UDPConn
 }
 
-func (a *TridentAdapt) Init(errorHandler ErrorHandler, chs ...chan<- handler.MetaPktHdr) *TridentAdapt {
+func (a *TridentAdapt) Init(queues ...*queue.OverwriteQueue) *TridentAdapt {
 	a.counter = &PacketCounter{}
-	a.errorHandler = errorHandler
-	a.chs = chs
+	a.queues = queues
+	a.queueCount = len(queues)
 	a.tridents = make(map[TridentKey]*tridentInstance)
+	listener, err := net.ListenUDP("udp4", &net.UDPAddr{Port: LISTEN_PORT})
+	if err != nil {
+		log.Error(err)
+		return nil
+	}
+	a.listener = listener
 	stats.RegisterCountable("trident_adapt", stats.EMPTY_TAG, a)
 	return a
 }
@@ -86,7 +93,7 @@ func (a *TridentAdapt) cacheClear(data []byte, key uint32, seq uint32) {
 		}
 	}
 	a.counter.RxPkt += 1
-	a.counter.RxDrop += uint64(seq - instance.seq)
+	a.counter.RxDrop += uint64(seq - instance.seq - 1)
 	a.decode(data, key)
 	instance.seq = seq
 	instance.cacheCnt = 0
@@ -106,7 +113,7 @@ func (a *TridentAdapt) cacheLookup(data []byte, key uint32, seq uint32) {
 			return
 		}
 		off := seq - instance.seq - 1
-		if off > CACHE_SIZE || instance.cacheCnt == CACHE_SIZE {
+		if off >= CACHE_SIZE || instance.cacheCnt == CACHE_SIZE {
 			a.cacheClear(data, key, seq)
 			return
 		}
@@ -125,32 +132,26 @@ func (a *TridentAdapt) findAndAdd(data []byte, key uint32, seq uint32) {
 
 func (a *TridentAdapt) decode(data []byte, ip uint32) {
 	decoder := handler.NewSequentialDecoder(data)
-	_, ifMacSuffix := decoder.DecodeHeader()
+	ifMacSuffix := decoder.DecodeHeader()
 
 	for {
 		meta := &(handler.MetaPktHdr{InPort: ifMacSuffix | handler.CAPTURE_REMOTE, Exporter: UInt32ToIP(ip)})
-		output, _ := decoder.NextPacket(meta)
-		if output == "" {
+		if decoder.NextPacket(meta) {
 			break
 		}
 
-		for _, ch := range a.chs {
-			ch <- *meta
-		}
+		a.counter.TxPkt++
+		hash := meta.InPort + IPToUInt32(meta.IpSrc) + IPToUInt32(meta.IpDst) +
+			uint32(meta.Proto) + uint32(meta.PortSrc) + uint32(meta.PortDst)
+		a.queues[hash%uint32(a.queueCount)].Put(meta)
 	}
 }
 
 func (a *TridentAdapt) run() {
-	listener, err := net.ListenUDP("udp4", &net.UDPAddr{Port: LISTEN_PORT})
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	log.Infof("Starting trident adapt Listenning <%s>", listener.LocalAddr().String())
-	a.running = true
+	log.Infof("Starting trident adapt Listenning <%s>", a.listener.LocalAddr())
 	for a.running {
 		data := make([]byte, 1500)
-		_, remote, err := listener.ReadFromUDP(data)
+		_, remote, err := a.listener.ReadFromUDP(data)
 		if err != nil {
 			log.Warningf("trident adapt listener.ReadFromUDP err: %s", err)
 		}
@@ -159,7 +160,7 @@ func (a *TridentAdapt) run() {
 		decoder.DecodeHeader()
 		a.findAndAdd(data, IPToUInt32(remote.IP), decoder.Seq())
 	}
-	listener.Close()
+	a.listener.Close()
 	log.Info("Stopped trident adapt")
 }
 
@@ -180,8 +181,8 @@ func (a *TridentAdapt) wait(running bool) error {
 func (a *TridentAdapt) Start(running bool) error {
 	if !a.running {
 		log.Info("Start trident adapt")
+		a.running = true
 		go a.run()
-		return a.wait(true)
 	}
 	return nil
 }
