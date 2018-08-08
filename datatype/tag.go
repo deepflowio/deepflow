@@ -1,4 +1,4 @@
-package message
+package datatype
 
 type Tag struct {
 	GroupIDs0         []uint32

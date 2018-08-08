@@ -1,4 +1,4 @@
-package message
+package datatype
 
 type TaggedMetering struct {
 	Metering
