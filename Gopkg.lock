@@ -2,6 +2,25 @@
 
 
 [[projects]]
+  digest = "1:e92f5581902c345eb4ceffdcd4a854fb8f73cf436d47d837d1ec98ef1fe0a214"
+  name = "github.com/StackExchange/wmi"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "5d049714c4a64225c3c79a7cf7d02f7fb5b96338"
+  version = "1.0.0"
+
+[[projects]]
+  digest = "1:64a5a67c69b70c2420e607a8545d674a23778ed9c3e80607bfd17b77c6c87f6a"
+  name = "github.com/go-ole/go-ole"
+  packages = [
+    ".",
+    "oleutil",
+  ]
+  pruneopts = "UT"
+  revision = "a41e3c4b706f6ae8dfbff342b06e40fa4d2d0506"
+  version = "v1.2.1"
+
+[[projects]]
   digest = "1:f2a59262dcdf19b8a49351b562b4b274a935ea21932817126e6901ae516cde35"
   name = "github.com/google/gopacket"
   packages = [
@@ -46,23 +65,52 @@
   version = "v0.8.0"
 
 [[projects]]
-  digest = "1:981fe66c332248711bafe3b5033e939cfd175e897e20a14905d4fcdc0fd68f59"
-  name = "github.com/willf/bitset"
-  packages = ["."]
+  digest = "1:7395b855a6078ad2e6c40311402a057a91125fb9f32cf228e1b32cdc57c33538"
+  name = "github.com/shirou/gopsutil"
+  packages = [
+    "cpu",
+    "host",
+    "internal/common",
+    "mem",
+    "net",
+    "process",
+  ]
   pruneopts = "UT"
-  revision = "d860f346b89450988a379d7d705e83c58d1ea227"
-  version = "v1.1.3"
+  revision = "8048a2e9c5773235122027dd585cf821b2af1249"
+  version = "v2.18.07"
 
 [[projects]]
   branch = "master"
-  digest = "1:731bf64a6c620e8f69300cae10ac3d69e297175ca60636d6a7648d5b03fdd5cd"
+  digest = "1:99c6a6dab47067c9b898e8c8b13d130c6ab4ffbcc4b7cc6236c2cd0b1e344f5b"
+  name = "github.com/shirou/w32"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "bb4de0191aa41b5507caa14b0650cdbddcd9280b"
+
+[[projects]]
+  branch = "master"
+  digest = "1:144242dbc0b686768c6e556fe53b3e0cb5a143acb05762a0bd96820460630d9f"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "logger",
+    "monitor",
+    "queue",
     "stats",
+    "utils",
   ]
   pruneopts = "UT"
   revision = "00b3b1be00b4649f6dd743dfe1ad7e48dfdec270"
+
+[[projects]]
+  branch = "master"
+  digest = "1:4d16433c0d2c24761b8a507e8c2e9c8cf9193b497d6b38aaeffca038070bc8f5"
+  name = "golang.org/x/sys"
+  packages = [
+    "unix",
+    "windows",
+  ]
+  pruneopts = "UT"
+  revision = "904bdc257025c7b3f43c19360ad3ab85783fad78"
 
 [[projects]]
   digest = "1:38b469493eb173db9c03321d64adcad4c7991ea0a19b5edc5bdc094f0e8c7384"
@@ -80,8 +128,9 @@
     "github.com/google/gopacket/layers",
     "github.com/google/gopacket/pcapgo",
     "github.com/op/go-logging",
-    "github.com/willf/bitset",
     "gitlab.x.lan/yunshan/droplet-libs/logger",
+    "gitlab.x.lan/yunshan/droplet-libs/monitor",
+    "gitlab.x.lan/yunshan/droplet-libs/queue",
     "gitlab.x.lan/yunshan/droplet-libs/stats",
   ]
   solver-name = "gps-cdcl"
