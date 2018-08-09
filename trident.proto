@@ -126,23 +126,6 @@ enum RuleResourceType {
     RESOURCE_GROUP = 2;
 }
 
-message CustomTagRule {
-    optional uint32 epc_id = 1 [default = 0];
-    optional RuleResourceType resource_type = 2;
-    optional uint32 vlan = 3;
-    optional string src_ip_range = 4;
-    optional string dst_ip_range = 5;
-    repeated uint32 src_group_ids = 6;
-    repeated uint32 dst_group_ids = 7;
-    optional uint32 src_port = 8;
-    optional uint32 dst_port = 9;
-}
-
-message CustomTag {
-    optional uint32 id = 1;
-    repeated CustomTagRule rules = 2;
-}
-
 message WhiteListRule {
     optional uint32 id = 1;
     repeated uint32 sources = 2;
@@ -151,11 +134,17 @@ message WhiteListRule {
     optional uint32 port = 5;
 }
 
+message Service {
+    optional uint32 id = 1;
+    optional uint32 group_id = 2;
+    optional Protocol protocol = 3;
+    optional string ports = 4;
+}
+
 message PlatformData {
     repeated Interface interfaces = 1;
     repeated Group ip_groups = 2;
-    repeated CustomTag custom_tags = 3;
-    repeated WhiteListRule whitelist_rules = 4;
+    repeated Service services = 3;
 }
 
 message SyncResponse {
