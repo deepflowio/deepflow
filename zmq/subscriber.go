@@ -13,7 +13,7 @@ type Subscriber struct {
 }
 
 // NewSubscriber returns ZeroMQ TCP subscribe on specified ip and port
-func NewSubscriber(ip string, port int, hwm int) (*Subscriber, error) {
+func NewSubscriber(ip string, port int, hwm int) (Receiver, error) {
 	s, err := zmq.NewSocket(zmq.SUB)
 	if err != nil {
 		return nil, err
@@ -37,6 +37,6 @@ func (s *Subscriber) RecvNoBlock() ([]byte, error) {
 }
 
 // Close socket
-func (s *Subscriber) Close() {
-	s.Socket.Close()
+func (s *Subscriber) Close() error {
+	return s.Socket.Close()
 }
