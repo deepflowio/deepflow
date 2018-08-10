@@ -7,6 +7,10 @@ import (
 	"github.com/google/gopacket/pcapgo"
 )
 
+const (
+	MIN_PPS = 5000000 // 5Mpps
+)
+
 func BenchmarkDecoder(b *testing.B) {
 	b.StopTimer()
 	f, _ := os.Open("sequential_decoder_test.pcap")
@@ -19,12 +23,15 @@ func BenchmarkDecoder(b *testing.B) {
 	packet = packet[42:]
 
 	b.StartTimer()
-	decoder := NewSequentialDecoder(packet)
-	decoder.DecodeHeader()
-	for {
-		meta := &MetaPktHdr{}
-		if decoder.NextPacket(meta) {
-			break
+	for i := 0; i < MIN_PPS; {
+		decoder := NewSequentialDecoder(packet)
+		decoder.DecodeHeader()
+		for {
+			meta := &MetaPktHdr{}
+			if decoder.NextPacket(meta) {
+				break
+			}
+			i++
 		}
 	}
 	f.Close()
