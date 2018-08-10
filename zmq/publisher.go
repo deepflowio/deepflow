@@ -13,7 +13,7 @@ type Publisher struct {
 }
 
 // NewPublisher returns ZeroMQ TCP publisher on specified port
-func NewPublisher(port int, hwm int) (*Publisher, error) {
+func NewPublisher(port int, hwm int) (Sender, error) {
 	s, err := zmq.NewSocket(zmq.PUB)
 	if err != nil {
 		return nil, err
@@ -36,6 +36,6 @@ func (p *Publisher) SendNoBlock(b []byte) (n int, err error) {
 }
 
 // Close socket
-func (p *Publisher) Close() {
-	p.Socket.Close()
+func (p *Publisher) Close() error {
+	return p.Socket.Close()
 }
