@@ -27,7 +27,7 @@ type Counter struct {
 	pending     uint   `statsd:"pending"`
 }
 
-type OverwriteQueue struct {
+type OverwriteQueue struct { // XXX: use circle array
 	sync.Mutex
 
 	items       []Item
