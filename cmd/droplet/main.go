@@ -8,6 +8,7 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/logger"
 	_ "gitlab.x.lan/yunshan/droplet-libs/monitor"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
+	"gitlab.x.lan/yunshan/droplet-libs/stats"
 
 	"gitlab.x.lan/yunshan/droplet/adapt"
 )
@@ -19,6 +20,7 @@ func main() {
 	queue := NewOverwriteQueue("AdaptToFilter", 1000)
 	trident_adapt := (&adapt.TridentAdapt{}).Init(queue)
 	trident_adapt.Start(true)
+	stats.StartStatsd()
 	log.Info("It worked!")
 	for {
 		pkt := queue.Get()
