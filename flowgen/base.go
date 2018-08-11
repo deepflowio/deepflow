@@ -8,6 +8,8 @@ import (
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
+
+	"gitlab.x.lan/yunshan/droplet/flowperf"
 )
 
 const (
@@ -61,6 +63,7 @@ const FLOW_LIMIT_NUM uint64 = 1024 * 1024
 
 type FlowExtra struct {
 	taggedFlow     *TaggedFlow
+	metaFlowPerf   *flowperf.MetaFlowPerf
 	flowState      FlowState
 	recentTimesSec time.Duration
 	timeoutSec     time.Duration
@@ -101,5 +104,5 @@ type FlowGenerator struct {
 }
 
 func TaggedFlowString(f *TaggedFlow) string {
-	return fmt.Sprintf("%+v", *f)
+	return fmt.Sprintf("%+v\n%+v", *f, *f.TcpPerfStat)
 }

@@ -316,6 +316,43 @@ func TestTCPStateMachine(t *testing.T) {
 	}
 }
 
+func TestHandshakePerf(t *testing.T) {
+	runtime.GOMAXPROCS(4)
+	flowGenerator := getDefaultFlowGenerator()
+	flowGenerator.forceReportIntervalSec = 15
+	metaPktHdrInQueue := flowGenerator.metaPktHdrInQueue
+	flowOutQueue := flowGenerator.flowOutQueue
+
+	flowGenerator.Start()
+
+	pkt0 := getDefaultPkt()
+	pkt0.TcpData.Flags = TCP_SYN
+	pkt0.TcpData.Seq = 111
+	pkt0.TcpData.Ack = 0
+	metaPktHdrInQueue.Put(pkt0)
+
+	pkt1 := getDefaultPkt()
+	pkt1.TcpData.Flags = TCP_SYN | TCP_ACK
+	pkt1.Timestamp += DEFAULT_DURATION_MSEC
+	reversePkt(pkt1)
+	pkt1.TcpData.Seq = 1111
+	pkt1.TcpData.Ack = 112
+	metaPktHdrInQueue.Put(pkt1)
+
+	pkt2 := getDefaultPkt()
+	pkt2.TcpData.Flags = TCP_ACK
+	pkt2.Timestamp += DEFAULT_DURATION_MSEC * 2
+	pkt2.TcpData.Seq = 112
+	pkt2.TcpData.Ack = 1112
+	metaPktHdrInQueue.Put(pkt2)
+
+	taggedFlow := flowOutQueue.Get().(*TaggedFlow)
+	if taggedFlow.CloseType != CLOSE_TYPE_FORCE_REPORT {
+		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_FORCE_REPORT)
+	}
+	t.Logf("\n" + TaggedFlowString(taggedFlow))
+}
+
 func TestTimeoutReport(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator := getDefaultFlowGenerator()
