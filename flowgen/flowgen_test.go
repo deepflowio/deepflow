@@ -74,7 +74,7 @@ func TestHandleSynRst(t *testing.T) {
 	flowOutQueue := flowGenerator.flowOutQueue
 
 	pkt0 := getDefaultPkt()
-	metaPktHdrInQueue.Put(pkt0)
+	metaPktHdrInQueue.(Queue).Put(pkt0)
 
 	go flowGenerator.handle()
 
@@ -82,10 +82,10 @@ func TestHandleSynRst(t *testing.T) {
 	pkt1.TcpData.Flags = TCP_RST
 	pkt1.Timestamp += DEFAULT_DURATION_MSEC
 	reversePkt(pkt1)
-	metaPktHdrInQueue.Put(pkt1)
+	metaPktHdrInQueue.(Queue).Put(pkt1)
 
 	var taggedFlow *TaggedFlow
-	taggedFlow = flowOutQueue.Get().(*TaggedFlow)
+	taggedFlow = flowOutQueue.(Queue).Get().(*TaggedFlow)
 	if taggedFlow == nil {
 		t.Error("flow is nil")
 	} else {
@@ -111,11 +111,11 @@ func TestHandleSynFin(t *testing.T) {
 
 	pkt0 := getDefaultPkt()
 	pkt0.TcpData.Flags = TCP_SYN | TCP_ACK | TCP_FIN
-	metaPktHdrInQueue.Put(pkt0)
+	metaPktHdrInQueue.(Queue).Put(pkt0)
 
 	pkt1 := getDefaultPkt()
 	pkt1.TcpData.Flags = TCP_PSH
-	metaPktHdrInQueue.Put(pkt1)
+	metaPktHdrInQueue.(Queue).Put(pkt1)
 
 	go flowGenerator.handle()
 
@@ -123,10 +123,10 @@ func TestHandleSynFin(t *testing.T) {
 	pkt2.TcpData.Flags = TCP_SYN | TCP_ACK | TCP_FIN
 	pkt2.Timestamp += DEFAULT_DURATION_MSEC
 	reversePkt(pkt2)
-	metaPktHdrInQueue.Put(pkt2)
+	metaPktHdrInQueue.(Queue).Put(pkt2)
 
 	var taggedFlow *TaggedFlow
-	taggedFlow = flowOutQueue.Get().(*TaggedFlow)
+	taggedFlow = flowOutQueue.(Queue).Get().(*TaggedFlow)
 	if taggedFlow == nil {
 		t.Error("flow is nil")
 	} else {
@@ -159,7 +159,7 @@ func TestHandleMultiPkt(t *testing.T) {
 		pkt = getDefaultPkt()
 		pkt.TcpData.Flags = TCP_SYN
 		pkt.PortDst = uint16(i)
-		metaPktHdrInQueue.Put(pkt)
+		metaPktHdrInQueue.(Queue).Put(pkt)
 	}
 
 	waitGroup.Add(1)
@@ -179,11 +179,11 @@ func TestHandleMultiPkt(t *testing.T) {
 		pkt.TcpData.Flags = TCP_RST
 		pkt.PortDst = uint16(i)
 		reversePkt(pkt)
-		metaPktHdrInQueue.Put(pkt)
+		metaPktHdrInQueue.(Queue).Put(pkt)
 	}
 
 	for i := 0; i < num; i++ {
-		taggedFlow = flowOutQueue.Get().(*TaggedFlow)
+		taggedFlow = flowOutQueue.(Queue).Get().(*TaggedFlow)
 		if taggedFlow == nil {
 			t.Errorf("taggedFlow is nil at i=%d", i)
 			break
@@ -329,7 +329,7 @@ func TestHandshakePerf(t *testing.T) {
 	pkt0.TcpData.Flags = TCP_SYN
 	pkt0.TcpData.Seq = 111
 	pkt0.TcpData.Ack = 0
-	metaPktHdrInQueue.Put(pkt0)
+	metaPktHdrInQueue.(Queue).Put(pkt0)
 
 	pkt1 := getDefaultPkt()
 	pkt1.TcpData.Flags = TCP_SYN | TCP_ACK
@@ -337,16 +337,16 @@ func TestHandshakePerf(t *testing.T) {
 	reversePkt(pkt1)
 	pkt1.TcpData.Seq = 1111
 	pkt1.TcpData.Ack = 112
-	metaPktHdrInQueue.Put(pkt1)
+	metaPktHdrInQueue.(Queue).Put(pkt1)
 
 	pkt2 := getDefaultPkt()
 	pkt2.TcpData.Flags = TCP_ACK
 	pkt2.Timestamp += DEFAULT_DURATION_MSEC * 2
 	pkt2.TcpData.Seq = 112
 	pkt2.TcpData.Ack = 1112
-	metaPktHdrInQueue.Put(pkt2)
+	metaPktHdrInQueue.(Queue).Put(pkt2)
 
-	taggedFlow := flowOutQueue.Get().(*TaggedFlow)
+	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
 	if taggedFlow.CloseType != CLOSE_TYPE_FORCE_REPORT {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_FORCE_REPORT)
 	}
@@ -362,9 +362,9 @@ func TestTimeoutReport(t *testing.T) {
 	flowGenerator.Start()
 
 	pkt := getDefaultPkt()
-	metaPktHdrInQueue.Put(pkt)
+	metaPktHdrInQueue.(Queue).Put(pkt)
 
-	taggedFlow := flowOutQueue.Get().(*TaggedFlow)
+	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
 
 	if taggedFlow.CloseType != CLOSE_TYPE_HALF_OPEN {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_HALF_OPEN)
@@ -387,19 +387,19 @@ func TestForceReport(t *testing.T) {
 
 	pkt0 := getDefaultPkt()
 	pkt0.TcpData.Flags = TCP_SYN | TCP_ACK
-	metaPktHdrInQueue.Put(pkt0)
+	metaPktHdrInQueue.(Queue).Put(pkt0)
 
 	pkt1 := getDefaultPkt()
 	pkt1.TcpData.Flags = TCP_PSH
-	metaPktHdrInQueue.Put(pkt1)
+	metaPktHdrInQueue.(Queue).Put(pkt1)
 
 	pkt2 := getDefaultPkt()
 	pkt2.TcpData.Flags = TCP_SYN | TCP_ACK
 	pkt2.Timestamp += DEFAULT_DURATION_MSEC
 	reversePkt(pkt2)
-	metaPktHdrInQueue.Put(pkt2)
+	metaPktHdrInQueue.(Queue).Put(pkt2)
 
-	taggedFlow := flowOutQueue.Get().(*TaggedFlow)
+	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
 
 	if taggedFlow.CloseType != CLOSE_TYPE_FORCE_REPORT {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_FORCE_REPORT)

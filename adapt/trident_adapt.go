@@ -52,7 +52,7 @@ type tridentInstance struct {
 }
 
 type TridentAdapt struct {
-	queues     []*queue.OverwriteQueue
+	queues     []queue.QueueWriter
 	queueCount int
 
 	tridents map[TridentKey]*tridentInstance
@@ -62,7 +62,7 @@ type TridentAdapt struct {
 	listener *net.UDPConn
 }
 
-func NewTridentAdapt(queues ...*queue.OverwriteQueue) *TridentAdapt {
+func NewTridentAdapt(queues ...queue.QueueWriter) *TridentAdapt {
 	adapt := &TridentAdapt{}
 	adapt.counter = &PacketCounter{}
 	adapt.queues = queues

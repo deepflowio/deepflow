@@ -22,18 +22,17 @@ var log = logging.MustGetLogger("labeler")
 
 type LabelerManager struct {
 	policyTable *policy.PolicyTable
-	readQueue   *queue.OverwriteQueue
-	appQueue    []*queue.OverwriteQueue
+	readQueue   queue.QueueReader
+	appQueue    []queue.QueueWriter
 	rpcWorker   *rpc.RpcWorker
 	running     bool
 }
 
-func NewLabelerManager(cfg config.Config, readqueue *queue.OverwriteQueue,
-	appqueue ...*queue.OverwriteQueue) *LabelerManager {
+func NewLabelerManager(cfg config.Config, readQueue queue.QueueReader, appQueue ...queue.QueueWriter) *LabelerManager {
 	lber := &LabelerManager{
 		policyTable: policy.NewPolicyTable(policy.ACTION_FLOW_STAT),
-		readQueue:   readqueue,
-		appQueue:    appqueue,
+		readQueue:   readQueue,
+		appQueue:    appQueue,
 	}
 
 	ctrips := make([]net.IP, len(cfg.ControllerIps))
