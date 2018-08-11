@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/gopacket/layers"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	. "gitlab.x.lan/yunshan/droplet-libs/policy"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
 
 	"gitlab.x.lan/yunshan/droplet/handler"
@@ -35,6 +36,19 @@ func getDefaultPkt() *handler.MetaPktHdr {
 	pkt.Exporter = net.ParseIP("192.168.1.1")
 	pkt.TcpData.Flags = TCP_SYN
 	pkt.Timestamp = time.Now().UnixNano() / int64(time.Microsecond)
+	pkt.EpData = &EndpointData{
+		SrcInfo: &EndpointInfo{
+			L2EpcId:  -1,
+			L3EpcId:  -1,
+			GroupIds: make([]uint32, 10),
+			HostIp:   0x01010101,
+		},
+		DstInfo: &EndpointInfo{
+			L2EpcId:  -1,
+			L3EpcId:  -1,
+			GroupIds: make([]uint32, 10),
+		},
+	}
 
 	return pkt
 }
@@ -268,6 +282,36 @@ func TestInitFlow(t *testing.T) {
 	}
 }
 
+func TestPlatformData(t *testing.T) {
+	runtime.GOMAXPROCS(4)
+	flowGenerator := getDefaultFlowGenerator()
+	flowGenerator.forceReportIntervalSec = 6
+	metaPktHdrInQueue := flowGenerator.metaPktHdrInQueue
+	flowOutQueue := flowGenerator.flowOutQueue
+
+	flowGenerator.Start()
+
+	pkt1 := getDefaultPkt()
+	//pkt1.TcpData.Flags = TCP_RST
+	pkt1.Timestamp += DEFAULT_DURATION_MSEC
+	pkt1.TcpData.Seq = 1111
+	pkt1.TcpData.Ack = 112
+	metaPktHdrInQueue.(Queue).Put(pkt1)
+
+	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
+	if taggedFlow.CloseType != CLOSE_TYPE_HALF_OPEN {
+		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_HALF_OPEN)
+	}
+	if taggedFlow.EpcID0 != -1 || taggedFlow.L3EpcID0 != -1 {
+		t.Errorf("taggedFlow.EpcID0 is %d, expect -1", taggedFlow.EpcID0)
+		t.Errorf("taggedFlow.L3EpcID0 is %d, expect -1", taggedFlow.L3EpcID0)
+	}
+	if taggedFlow.Host.Int() != 0x01010101 {
+		t.Errorf("taggedFlow.Host is %d, expect %d", taggedFlow.Host.Int(), 0x01010101)
+	}
+	t.Logf("\n" + TaggedFlowString(taggedFlow))
+}
+
 func TestTCPStateMachine(t *testing.T) {
 	flowExtra := &FlowExtra{}
 	taggedFlow := &TaggedFlow{}
@@ -319,7 +363,7 @@ func TestTCPStateMachine(t *testing.T) {
 func TestHandshakePerf(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator := getDefaultFlowGenerator()
-	flowGenerator.forceReportIntervalSec = 15
+	flowGenerator.forceReportIntervalSec = 6
 	metaPktHdrInQueue := flowGenerator.metaPktHdrInQueue
 	flowOutQueue := flowGenerator.flowOutQueue
 
@@ -379,7 +423,7 @@ func TestTimeoutReport(t *testing.T) {
 func TestForceReport(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator := getDefaultFlowGenerator()
-	flowGenerator.forceReportIntervalSec = 10
+	flowGenerator.forceReportIntervalSec = 6
 	metaPktHdrInQueue := flowGenerator.metaPktHdrInQueue
 	flowOutQueue := flowGenerator.flowOutQueue
 
