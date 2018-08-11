@@ -111,18 +111,18 @@ func TestQueueMultiThread(t *testing.T) {
 		wg.Done()
 	}()
 	go func() {
-		for len(queue.waiting) < 1 {
+		for len(queue.(*OverwriteQueue).waiting) < 1 {
 		}
 		if item := queue.Get(); item != 10086 {
 			t.Errorf("Expected 10086, actually %s", item)
 		}
 		wg.Done()
 	}()
-	for len(queue.waiting) < 2 {
+	for len(queue.(*OverwriteQueue).waiting) < 2 {
 	}
 	queue.Put(10086, 10087)
 	wg.Wait()
-	if len(queue.waiting) != 0 {
+	if len(queue.(*OverwriteQueue).waiting) != 0 {
 		t.Error("Should be no waiting")
 	}
 }
