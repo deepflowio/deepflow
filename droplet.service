@@ -1,0 +1,15 @@
+[Unit]
+Description=trident.service
+After=syslog.target network-online.target
+
+[Service]
+Environment=GOTRACEBACK=crash
+LimitCORE=infinity
+WorkingDirectory=/tmp/
+ExecStart=/usr/sbin/droplet
+Restart=on-failure
+RestartSec=10
+MemoryLimit=1G
+
+[Install]
+WantedBy=multi-user.target
