@@ -2,7 +2,6 @@ package policy
 
 import (
 	"encoding/binary"
-	"net"
 	"sync"
 	"time"
 
@@ -138,24 +137,8 @@ func (e *EndpointInfo) SetL3EndByMac(data *PlatformData, mac uint64) {
 	}
 }
 
-func PortInDeepflowExporter(InPort uint32) bool {
-	return DEEPFLOW_POSITION_EXPORTER == ((InPort) & DEEPFLOW_POSITION_EXPORTER)
-}
-
-func ip2uint(ip net.IP) uint32 {
-	if len(ip) == 0 {
-		return 0
-	}
-	if len(ip) == 16 {
-		return binary.BigEndian.Uint32(ip[12:16])
-	}
-	return binary.BigEndian.Uint32(ip)
-}
-
-func uint2ip(uip uint32) net.IP {
-	ip := make(net.IP, 4)
-	binary.BigEndian.PutUint32(ip, uip)
-	return ip
+func PortInDeepflowExporter(inPort uint32) bool {
+	return DEEPFLOW_POSITION_EXPORTER == ((inPort) & DEEPFLOW_POSITION_EXPORTER)
 }
 
 func calcHashKey(mac uint64, ip uint32, inport uint32) uint64 {
@@ -240,7 +223,7 @@ func (t *IpTable) UpdateIpMap(ipmap IpMapData) {
 }
 
 func (d *CloudPlatformData) GetDataByEpcIp(epc int32, ip uint32) *PlatformData {
-	key := EpcIpKey(uint64(epc)<<32 | uint64(ip))
+	key := EpcIpKey((uint64(epc) << 32) | uint64(ip))
 	if info, ok := d.epcIpTable.epcIpMap[key]; ok {
 		return info
 	}
@@ -252,7 +235,7 @@ func (d *CloudPlatformData) GenerateEpcIpData(vifdatas []*PlatformData) EpcIpMap
 	epcipmap := make(EpcIpMapData)
 	for _, vifdata := range vifdatas {
 		for _, ipdata := range vifdata.Ips {
-			key := EpcIpKey(uint64(vifdata.EpcId)<<32 | uint64(ipdata.Ip))
+			key := EpcIpKey((uint64(vifdata.EpcId) << 32) | uint64(ipdata.Ip))
 			epcipmap[key] = vifdata
 		}
 	}
