@@ -57,6 +57,14 @@
   name = "gopkg.in/yaml.v2"
   version = "2.2.1"
 
+[[constraint]]
+  branch = "master"
+  name = "gitlab.x.lan/platform/droplet-mapreduce"
+
+[[constraint]]
+  branch = "master"
+  name = "gitlab.x.lan/application/droplet-app"
+
 [prune]
   go-tests = true
   unused-packages = true
