@@ -19,6 +19,7 @@ vendor:
 	(cd ${PROJECT_ROOT}; dep ensure)
 
 protobuf/trident.pb.go:
+	mkdir -p ${CURDIR}/protobuf
 	(cd message; protoc --go_out=plugins=grpc:${CURDIR}/protobuf/ trident.proto)
 	sed -i 's/package trident/package protobuf/g' protobuf/trident.pb.go
 

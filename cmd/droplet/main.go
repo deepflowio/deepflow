@@ -51,7 +51,7 @@ func main() {
 		for {
 			taggedFlow := flowAppOutputQueue.(Queue).Get().(*TaggedFlow)
 			fmt.Println(flowgen.TaggedFlowString(taggedFlow))
-			mapreduce.MapProcessor{}.FlowHandler(taggedFlow)
+			(&mapreduce.MapProcessor{}).FlowHandler(taggedFlow)
 		}
 	}()
 	log.Info("It worked!")
