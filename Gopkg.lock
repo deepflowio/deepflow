@@ -143,7 +143,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:d1070d697c2ac5007a8f65907d95dbba173a16b243c62ba3643d6075bd865aca"
+  digest = "1:d817e6807d12ba9622202fc1c50117fe073b025ed35f66d92d6f058c1d847b12"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "datatype",
@@ -156,7 +156,7 @@
     "utils",
   ]
   pruneopts = "UT"
-  revision = "0f0f36243a57cbce9261f76ffe296bffb0b0a3f6"
+  revision = "36afb61967d6152644d1fb35495ccad6226f1024"
 
 [[projects]]
   branch = "release-branch.go1.10"

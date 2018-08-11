@@ -372,7 +372,7 @@ func (f *FlowGenerator) Start() {
 }
 
 // create a new flow generator
-func New(metaPktHdrInQueue *OverwriteQueue, flowOutQueue *OverwriteQueue, forceReportIntervalSec time.Duration) *FlowGenerator {
+func New(metaPktHdrInQueue QueueReader, flowOutQueue QueueWriter, forceReportIntervalSec time.Duration) *FlowGenerator {
 	if metaPktHdrInQueue == nil || flowOutQueue == nil {
 		log.Error("Create Flow Generator failed: metaPktHdrInQueue or flowOutQueue is nil")
 		return nil

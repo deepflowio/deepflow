@@ -95,8 +95,8 @@ type FlowGenerator struct {
 	sync.RWMutex
 
 	fastPath               FastPath
-	flowOutQueue           *OverwriteQueue
-	metaPktHdrInQueue      *OverwriteQueue
+	metaPktHdrInQueue      QueueReader
+	flowOutQueue           QueueWriter
 	stats                  FlowGeneratorStats
 	forceReportIntervalSec time.Duration
 	minLoopIntervalSec     time.Duration

@@ -26,8 +26,8 @@ var configFile = flag.String("f", "/etc/droplet.yaml", "Specify config file loca
 func main() {
 	InitConsoleLog()
 	filterqueue := NewOverwriteQueue("AdaptToFilter", 1000)
-	trident_adapt := adapt.NewTridentAdapt(filterqueue)
-	if trident_adapt == nil {
+	tridentAdapt := adapt.NewTridentAdapt(filterqueue)
+	if tridentAdapt == nil {
 		return
 	}
 
@@ -43,7 +43,7 @@ func main() {
 	}
 	stats.StartStatsd()
 	flowGenerator.Start()
-	trident_adapt.Start(true)
+	tridentAdapt.Start(true)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
