@@ -17,6 +17,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet/config"
 	"gitlab.x.lan/yunshan/droplet/flowgen"
 	"gitlab.x.lan/yunshan/droplet/labeler"
+	"gitlab.x.lan/yunshan/droplet/mapreduce"
 )
 
 var log = logging.MustGetLogger(os.Args[0])
@@ -50,6 +51,7 @@ func main() {
 		for {
 			taggedFlow := flowAppOutputQueue.(Queue).Get().(*TaggedFlow)
 			fmt.Println(flowgen.TaggedFlowString(taggedFlow))
+			mapreduce.MapProcessor{}.FlowHandler(taggedFlow)
 		}
 	}()
 	log.Info("It worked!")

@@ -95,6 +95,14 @@
   revision = "970db520ece77730c7e4724c61121037378659d9"
 
 [[projects]]
+  digest = "1:88996a6b70e2cc7044c25caecd49e4d09bbcdd03e508f65d366f600cfb506dd6"
+  name = "github.com/pebbe/zmq4"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "5b443b6471cea4b4f9f85025530c04c93233f76a"
+  version = "v1.0.0"
+
+[[projects]]
   digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
   name = "github.com/pkg/errors"
   packages = ["."]
@@ -140,6 +148,35 @@
   pruneopts = "UT"
   revision = "9a97c102cda95a86cec2345a6f09f55a939babf5"
   version = "v1.0.2"
+
+[[projects]]
+  branch = "master"
+  digest = "1:b298e1e4aafceca6479941984df868bdf3cc61b2bd03570ad3b83bed69fecb1c"
+  name = "gitlab.x.lan/application/droplet-app"
+  packages = [
+    "internal/pkg",
+    "pkg/common",
+    "pkg/flow/epc_flow_topo",
+    "pkg/metering/bw_usage_isp_usage",
+  ]
+  pruneopts = "UT"
+  revision = "8a7b554b5baf416be2b41e4a1ed388694751b1dd"
+
+[[projects]]
+  branch = "master"
+  digest = "1:25aae884519c43e55df004c33681962d485e515000dec0420840ebf92d43a7c5"
+  name = "gitlab.x.lan/platform/droplet-mapreduce"
+  packages = [
+    ".",
+    "internal/pkg/flowsender",
+    "internal/pkg/pb",
+    "internal/pkg/sizedmap",
+    "pkg/api",
+    "pkg/datatype",
+    "pkg/datatype/pb",
+  ]
+  pruneopts = "UT"
+  revision = "da2c25d14ded35846a87ee55398d7a13f4b88dec"
 
 [[projects]]
   branch = "master"
@@ -277,6 +314,10 @@
     "github.com/google/gopacket/pcapgo",
     "github.com/op/go-logging",
     "github.com/spf13/cobra",
+    "gitlab.x.lan/application/droplet-app/pkg/flow/epc_flow_topo",
+    "gitlab.x.lan/application/droplet-app/pkg/metering/bw_usage_isp_usage",
+    "gitlab.x.lan/platform/droplet-mapreduce",
+    "gitlab.x.lan/platform/droplet-mapreduce/pkg/api",
     "gitlab.x.lan/yunshan/droplet-libs/datatype",
     "gitlab.x.lan/yunshan/droplet-libs/logger",
     "gitlab.x.lan/yunshan/droplet-libs/monitor",
