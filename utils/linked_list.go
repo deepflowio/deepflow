@@ -1,5 +1,5 @@
 // Golang的list简直就是辣鸡
-package linkedlist
+package utils
 
 type Element struct {
 	value interface{}
@@ -10,10 +10,6 @@ type LinkedList struct {
 	head *Element
 	tail *Element
 	size int
-}
-
-func New() *LinkedList {
-	return &LinkedList{size: 0}
 }
 
 func (q *LinkedList) PushBack(v interface{}) {

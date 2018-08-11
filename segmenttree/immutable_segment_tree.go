@@ -8,7 +8,7 @@ import (
 
 	"github.com/golang-collections/go-datastructures/bitarray"
 
-	list "gitlab.x.lan/yunshan/droplet-libs/linkedlist"
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 type EndpointType = int
@@ -61,7 +61,7 @@ func (t *ImmutableSegmentTree) buildTree(sortedEndpoints []TypedEndpoint) {
 	for i, typedEndpoint := range sortedEndpoints {
 		endpointIndexMap[typedEndpoint.endpoint] = i
 	}
-	queue := list.New()
+	queue := &LinkedList{}
 	queue.PushBack(t.root)
 	for value := queue.PopFront(); value != nil; value = queue.PopFront() {
 		subtree := value.(*SubTree)
@@ -109,7 +109,7 @@ func bitArrayOf(value uint) bitarray.BitArray {
 }
 
 func (t *ImmutableSegmentTree) insertIndex(interval IntegerRange, index uint) {
-	queue := list.New()
+	queue := &LinkedList{}
 	queue.PushBack(t.root)
 	for value := queue.PopFront(); value != nil; value = queue.PopFront() {
 		subtree := value.(*SubTree)
@@ -210,7 +210,7 @@ func (t *ImmutableSegmentTree) query(interval IntegerRange) bitarray.BitArray {
 		return bitarray.NewSparseBitArray()
 	}
 	indexBitSet := bitarray.NewSparseBitArray()
-	queue := list.New()
+	queue := &LinkedList{}
 	queue.PushBack(t.root)
 	for value := queue.PopFront(); value != nil; value = queue.PopFront() {
 		subtree := value.(*SubTree)
