@@ -2,66 +2,93 @@
 
 
 [[projects]]
+  digest = "1:e92f5581902c345eb4ceffdcd4a854fb8f73cf436d47d837d1ec98ef1fe0a214"
   name = "github.com/StackExchange/wmi"
   packages = ["."]
+  pruneopts = "UT"
   revision = "5d049714c4a64225c3c79a7cf7d02f7fb5b96338"
   version = "1.0.0"
 
 [[projects]]
+  digest = "1:3535f00c607f3993a1a2f1cbb1b3faa3bf8903f9edc77c1386491882d3b2754c"
+  name = "github.com/cespare/xxhash"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "5c37fe3735342a2e0d01c87a907579987c8936cc"
+  version = "v1.0.0"
+
+[[projects]]
+  digest = "1:64a5a67c69b70c2420e607a8545d674a23778ed9c3e80607bfd17b77c6c87f6a"
   name = "github.com/go-ole/go-ole"
   packages = [
     ".",
-    "oleutil"
+    "oleutil",
   ]
+  pruneopts = "UT"
   revision = "a41e3c4b706f6ae8dfbff342b06e40fa4d2d0506"
   version = "v1.2.1"
 
 [[projects]]
   branch = "master"
+  digest = "1:d0019b96b284ac4c24be77891eca40dabdae8ccf168b6684350d15c13cb2aada"
   name = "github.com/golang-collections/go-datastructures"
   packages = ["bitarray"]
+  pruneopts = "UT"
   revision = "59788d5eb2591d3497ffb8fafed2f16fe00e7775"
 
 [[projects]]
+  digest = "1:f4a5cb1ae095b963754584170d952558d3d123f486405bad52d279daa417d67b"
   name = "github.com/google/gopacket"
   packages = [
     ".",
-    "layers"
+    "layers",
   ]
+  pruneopts = "UT"
   revision = "11c65f1ca9081dfea43b4f9643f5c155583b73ba"
   version = "v1.1.14"
 
 [[projects]]
   branch = "master"
+  digest = "1:f7d8e8432e355163397d2da1e17d0fb616d611db1360c43b1ac73e56f87038e2"
   name = "github.com/lestrrat/go-file-rotatelogs"
   packages = ["."]
+  pruneopts = "UT"
   revision = "d3151e2a480fdcd05fb97102f5310a47d96274c4"
 
 [[projects]]
   branch = "master"
+  digest = "1:b9f2e1d7b042e6fdb2aa1e3762afdb99e0c584f66a1a346b03cf8b4be203c694"
   name = "github.com/lestrrat/go-strftime"
   packages = ["."]
+  pruneopts = "UT"
   revision = "ba3bf9c1d0421aa146564a632931730344f1f9f1"
 
 [[projects]]
   branch = "master"
+  digest = "1:41f3b549dbb8216e490c27926c09dc055aa509b3476e7cbc3317103990b13aeb"
   name = "github.com/op/go-logging"
   packages = ["."]
+  pruneopts = "UT"
   revision = "970db520ece77730c7e4724c61121037378659d9"
 
 [[projects]]
+  digest = "1:88996a6b70e2cc7044c25caecd49e4d09bbcdd03e508f65d366f600cfb506dd6"
   name = "github.com/pebbe/zmq4"
   packages = ["."]
+  pruneopts = "UT"
   revision = "5b443b6471cea4b4f9f85025530c04c93233f76a"
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
   name = "github.com/pkg/errors"
   packages = ["."]
+  pruneopts = "UT"
   revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
   version = "v0.8.0"
 
 [[projects]]
+  digest = "1:7395b855a6078ad2e6c40311402a057a91125fb9f32cf228e1b32cdc57c33538"
   name = "github.com/shirou/gopsutil"
   packages = [
     "cpu",
@@ -69,35 +96,51 @@
     "internal/common",
     "mem",
     "net",
-    "process"
+    "process",
   ]
+  pruneopts = "UT"
   revision = "8048a2e9c5773235122027dd585cf821b2af1249"
   version = "v2.18.07"
 
 [[projects]]
   branch = "master"
+  digest = "1:99c6a6dab47067c9b898e8c8b13d130c6ab4ffbcc4b7cc6236c2cd0b1e344f5b"
   name = "github.com/shirou/w32"
   packages = ["."]
+  pruneopts = "UT"
   revision = "bb4de0191aa41b5507caa14b0650cdbddcd9280b"
 
 [[projects]]
   branch = "master"
+  digest = "1:bdd70b95d2f0faaad6d9e259aad84738c6bdeb8f45245be6487e88df45f5a0f1"
   name = "golang.org/x/sys"
   packages = [
     "unix",
-    "windows"
+    "windows",
   ]
+  pruneopts = "UT"
   revision = "0ffbfd41fbef8ffcf9b62b0b0aa3a5873ed7a4fe"
 
 [[projects]]
+  digest = "1:38b469493eb173db9c03321d64adcad4c7991ea0a19b5edc5bdc094f0e8c7384"
   name = "gopkg.in/alexcesaro/statsd.v2"
   packages = ["."]
+  pruneopts = "UT"
   revision = "7fea3f0d2fab1ad973e641e51dba45443a311a90"
   version = "v2.0.0"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "df4355c28f07a17a53992264feecfb05444e8de4c9ac95ecfa45fc29c6e0cf93"
+  input-imports = [
+    "github.com/cespare/xxhash",
+    "github.com/golang-collections/go-datastructures/bitarray",
+    "github.com/google/gopacket/layers",
+    "github.com/lestrrat/go-file-rotatelogs",
+    "github.com/op/go-logging",
+    "github.com/pebbe/zmq4",
+    "github.com/shirou/gopsutil/process",
+    "gopkg.in/alexcesaro/statsd.v2",
+  ]
   solver-name = "gps-cdcl"
   solver-version = 1
