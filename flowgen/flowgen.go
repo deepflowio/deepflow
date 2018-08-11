@@ -138,12 +138,17 @@ func (f *FlowGenerator) initFlow(pkt *handler.MetaPktHdr, key *FlowKey) (*FlowEx
 			IsL2End0:      pkt.L2End0,
 			IsL2End1:      pkt.L2End1,
 		},
+		Tag: Tag{
+			GroupIDs0: make([]uint32, 10),
+			GroupIDs1: make([]uint32, 10),
+		},
 	}
 	flowExtra := &FlowExtra{
 		taggedFlow:     taggedFlow,
 		flowState:      FLOW_STATE_EXCEPTION,
 		recentTimesSec: now / time.Millisecond,
 	}
+	flowExtra.updatePlatformData(pkt)
 
 	return flowExtra, flowExtra.updateTCPStateMachine(pkt.TcpData.Flags, false)
 }
@@ -159,7 +164,7 @@ func (f *FlowExtra) updateTCPStateMachine(flags uint8, reply bool) bool {
 	}
 
 	if flags&TCP_RST > 0 {
-		if f.flowState == FLOW_STATE_ESTABLISHED {
+		if f.flowState == FLOW_STATE_ESTABLISHED || taggedFlow.TotalPktCnt0 == 1 {
 			f.timeoutSec = TIMEOUT_ESTABLISHED_RST
 		}
 		f.flowState = FLOW_STATE_CLOSED
@@ -194,6 +199,42 @@ func (f *FlowExtra) updateTCPStateMachine(flags uint8, reply bool) bool {
 	return false
 }
 
+func (f *FlowExtra) updatePlatformData(pkt *handler.MetaPktHdr) {
+	epData := pkt.EpData
+	if epData == nil {
+		return
+	}
+	taggedFlow := f.taggedFlow
+	srcInfo := epData.SrcInfo
+	dstInfo := epData.DstInfo
+	if srcInfo != nil {
+		taggedFlow.EpcID0 = srcInfo.L2EpcId
+		taggedFlow.DeviceType0 = DeviceType(srcInfo.L2DeviceType)
+		taggedFlow.DeviceID0 = srcInfo.L2DeviceId
+		taggedFlow.IsL3End0 = srcInfo.L3End
+		taggedFlow.L3EpcID0 = srcInfo.L3EpcId
+		taggedFlow.L3DeviceType0 = DeviceType(srcInfo.L3DeviceType)
+		taggedFlow.L3DeviceID0 = srcInfo.L3DeviceId
+		taggedFlow.SubnetID0 = srcInfo.SubnetId
+		// FIXME: not to grow the size of GroupIDs
+		copy(taggedFlow.GroupIDs0, srcInfo.GroupIds)
+		// use src host ip as host of flow
+		taggedFlow.Host = *NewIPFromInt(srcInfo.HostIp)
+	}
+	if dstInfo != nil {
+		taggedFlow.EpcID1 = dstInfo.L2EpcId
+		taggedFlow.DeviceType1 = DeviceType(dstInfo.L2DeviceType)
+		taggedFlow.DeviceID1 = dstInfo.L2DeviceId
+		taggedFlow.IsL3End1 = dstInfo.L3End
+		taggedFlow.L3EpcID1 = dstInfo.L3EpcId
+		taggedFlow.L3DeviceType1 = DeviceType(dstInfo.L3DeviceType)
+		taggedFlow.L3DeviceID1 = dstInfo.L3DeviceId
+		taggedFlow.SubnetID1 = dstInfo.SubnetId
+		// FIXME: not to grow the size of GroupIDs
+		copy(taggedFlow.GroupIDs1, srcInfo.GroupIds)
+	}
+}
+
 // FIXME: should update more info
 func (f *FlowExtra) updateFlow(pkt *handler.MetaPktHdr, reply bool) bool {
 	taggedFlow := f.taggedFlow
@@ -222,6 +263,7 @@ func (f *FlowExtra) updateFlow(pkt *handler.MetaPktHdr, reply bool) bool {
 		taggedFlow.TotalByteCnt0 += bytes
 	}
 	f.recentTimesSec = pktTimestamp / time.Millisecond
+	f.updatePlatformData(pkt)
 
 	return f.updateTCPStateMachine(pkt.TcpData.Flags, reply)
 }
@@ -373,10 +415,6 @@ func (f *FlowGenerator) Start() {
 
 // create a new flow generator
 func New(metaPktHdrInQueue QueueReader, flowOutQueue QueueWriter, forceReportIntervalSec time.Duration) *FlowGenerator {
-	if metaPktHdrInQueue == nil || flowOutQueue == nil {
-		log.Error("Create Flow Generator failed: metaPktHdrInQueue or flowOutQueue is nil")
-		return nil
-	}
 	flowGenerator := &FlowGenerator{
 		metaPktHdrInQueue:      metaPktHdrInQueue,
 		flowOutQueue:           flowOutQueue,

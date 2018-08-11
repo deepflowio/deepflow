@@ -48,7 +48,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		for {
-			taggedFlow := flowAppOutputQueue.Get().(*TaggedFlow)
+			taggedFlow := flowAppOutputQueue.(Queue).Get().(*TaggedFlow)
 			fmt.Println(flowgen.TaggedFlowString(taggedFlow))
 		}
 	}()
