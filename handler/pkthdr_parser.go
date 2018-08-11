@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"net"
+	"reflect"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -34,24 +35,29 @@ const (
 
 type MetaPktHdr struct {
 	Timestamp      int64
-	InPort         uint32
+	InPort         uint32 `fmt:"hex"`
+	PktLen         uint16
 	Exporter       net.IP
 	L2End0, L2End1 bool
+	EpData         *policy.EndpointData `fmt:"pointer"`
+	Raw            RawPacket            `fmt:"pointer+enter"`
 
-	PayloadLen     uint16
-	PktLen         uint16
-	Vlan           uint16
-	EthType        layers.EthernetType
-	MacSrc, MacDst net.HardwareAddr
+	TnlData MetaPktTnlHdr `fmt:"tab+v+enter"`
 
-	IpSrc, IpDst     net.IP
-	Proto            layers.IPProtocol
-	TTL              uint8
-	PortSrc, PortDst uint16
+	MacSrc  net.HardwareAddr `fmt:"tab"`
+	MacDst  net.HardwareAddr
+	EthType layers.EthernetType
+	Vlan    uint16 `fmt:"enter"`
 
-	TcpData MetaPktTcpHdr
-	TnlData MetaPktTnlHdr
-	EpData  *policy.EndpointData
+	IpSrc net.IP `fmt:"tab"`
+	IpDst net.IP
+	Proto layers.IPProtocol
+	TTL   uint8 `fmt:"enter"`
+
+	PortSrc    uint16 `fmt:"tab"`
+	PortDst    uint16
+	PayloadLen uint16
+	TcpData    MetaPktTcpHdr `fmt:"+v"`
 }
 
 func get_tcp_flags(t *layers.TCP) uint8 {
@@ -84,17 +90,44 @@ func get_tcp_flags(t *layers.TCP) uint8 {
 }
 
 func (m *MetaPktHdr) String() string {
-	return fmt.Sprintf("TIME: %d INPORT: 0x%X EXPORTER: %v PKT_LEN: %d IS_L2_END: %v - %v\n"+
-		"    TUN_TYPE: %d TUN_ID: %d TUN_IP: %v -> %v\n"+
-		"    MAC: %s -> %s TYPE: %d VLAN: %d\n"+
-		"    IP: %v -> %v PROTO: %d TTL: %d\n"+
-		"    PORT: %d -> %d PAYLOAD_LEN: %d FLAGS: %d SEQ: %d - %d WIN: %d WIN_SCALE: %d SACK_PREMIT: %v",
-		m.Timestamp, m.InPort, m.Exporter, m.PktLen, m.L2End0, m.L2End1,
-		m.TnlData.TunType, m.TnlData.TunID, m.TnlData.IpSrc, m.TnlData.IpDst,
-		m.MacSrc, m.MacDst, m.EthType, m.Vlan,
-		m.IpSrc, m.IpDst, m.Proto, m.TTL,
-		m.PortSrc, m.PortDst, m.PayloadLen,
-		m.TcpData.Flags, m.TcpData.Seq, m.TcpData.Ack, m.TcpData.WinSize, m.TcpData.WinScale, m.TcpData.SACKPermitted)
+	s := reflect.ValueOf(m).Elem()
+	t := s.Type()
+	out := ""
+
+	for i := 0; i < s.NumField(); i++ {
+		f := s.Field(i)
+		name := t.Field(i).Tag.Get("fmt")
+		switch name {
+		case "tab+v+enter":
+			out += fmt.Sprintf("    %s: %+v\n", t.Field(i).Name, f.Interface())
+			break
+		case "pointer+enter":
+			out += fmt.Sprintf("%s: %p\n", t.Field(i).Name, f.Interface())
+			break
+		case "pointer":
+			out += fmt.Sprintf("%s: %p ", t.Field(i).Name, f.Interface())
+			break
+		case "":
+			out += fmt.Sprintf("%s: %v ", t.Field(i).Name, f.Interface())
+			break
+		case "tab":
+			out += fmt.Sprintf("    %s: %v ", t.Field(i).Name, f.Interface())
+			break
+		case "enter":
+			out += fmt.Sprintf("%s: %v\n", t.Field(i).Name, f.Interface())
+			break
+		case "+v":
+			out += fmt.Sprintf("%s: %+v", t.Field(i).Name, f.Interface())
+			break
+		case "enter++v":
+			out += fmt.Sprintf("%s: %+v\n", t.Field(i).Name, f.Interface())
+			break
+		case "hex":
+			out += fmt.Sprintf("%s: 0x%X ", t.Field(i).Name, f.Interface())
+			break
+		}
+	}
+	return out
 }
 
 func (m *MetaPktHdr) extractTcpOptions(rawPkt RawPacket, offset uint16, max uint16) {
@@ -120,12 +153,10 @@ func (m *MetaPktHdr) extractTcpOptions(rawPkt RawPacket, offset uint16, max uint
 	}
 }
 
-func (m *MetaPktHdr) Extract(rawPkt RawPacket, inPort uint32, timestamp int64, exporter net.IP) {
+func NewMetaPktHdr(rawPkt RawPacket, inPort uint32, timestamp int64, exporter net.IP) *MetaPktHdr {
+	m := &MetaPktHdr{InPort: inPort, Exporter: exporter, Timestamp: timestamp, Raw: rawPkt}
 	packet := gopacket.NewPacket(rawPkt, layers.LayerTypeEthernet,
 		gopacket.DecodeOptions{NoCopy: true, Lazy: true})
-	m.InPort = inPort
-	m.Timestamp = timestamp
-	m.Exporter = exporter
 	eth := packet.Layer(layers.LayerTypeEthernet).(*layers.Ethernet)
 	m.MacDst = eth.DstMAC
 	m.MacSrc = eth.SrcMAC
@@ -163,4 +194,5 @@ func (m *MetaPktHdr) Extract(rawPkt RawPacket, inPort uint32, timestamp int64, e
 			m.PayloadLen = udp.Length - 8
 		}
 	}
+	return m
 }

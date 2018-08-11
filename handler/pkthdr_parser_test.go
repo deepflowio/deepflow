@@ -26,21 +26,21 @@ func testPcapExtract(t *testing.T, file string, expect string) {
 		if packet == nil || err != nil {
 			break
 		}
-		meta := &MetaPktHdr{}
-		meta.Extract(packet, 0, 0, net.ParseIP("0.0.0.0"))
+		meta := NewMetaPktHdr(packet, 0, 0, net.ParseIP("0.0.0.0"))
+		meta.Raw = nil
 		if meta.String() != expect {
-			t.Error(fmt.Sprintf("\nExcept: %s\nActual: %s\n", expect, meta))
+			t.Error(fmt.Sprintf("\nExcept:\n%s\nActual:\n%s\n", expect, meta))
 			break
 		}
 	}
 }
 
 const (
-	NORMAL_EXPECT = "TIME: 0 INPORT: 0x0 EXPORTER: 0.0.0.0 PKT_LEN: 114 IS_L2_END: false - false\n" +
-		"    TUN_TYPE: 0 TUN_ID: 0 TUN_IP: <nil> -> <nil>\n" +
-		"    MAC: c8:8d:83:93:58:14 -> 00:1b:21:bb:22:42 TYPE: 2048 VLAN: 0\n" +
-		"    IP: 172.20.1.106 -> 172.18.0.4 PROTO: 17 TTL: 63\n" +
-		"    PORT: 20033 -> 20033 PAYLOAD_LEN: 72 FLAGS: 0 SEQ: 0 - 0 WIN: 0 WIN_SCALE: 0 SACK_PREMIT: false"
+	NORMAL_EXPECT = "Timestamp: 0 InPort: 0x0 PktLen: 114 Exporter: 0.0.0.0 L2End0: false L2End1: false EpData: 0x0 Raw: 0x0\n" +
+		"    TnlData: {TunType:0 TunID:0 IpSrc:<nil> IpDst:<nil>}\n" +
+		"    MacSrc: c8:8d:83:93:58:14 MacDst: 00:1b:21:bb:22:42 EthType: IPv4 Vlan: 0\n" +
+		"    IpSrc: 172.20.1.106 IpDst: 172.18.0.4 Proto: UDP TTL: 63\n" +
+		"    PortSrc: 20033 PortDst: 20033 PayloadLen: 72 TcpData: {Flags:0 Seq:0 Ack:0 WinSize:0 WinScale:0 SACKPermitted:false}"
 )
 
 func TestPktExtract(t *testing.T) {
