@@ -11,6 +11,7 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
 	. "gitlab.x.lan/yunshan/droplet-libs/stats"
 
+	"gitlab.x.lan/yunshan/droplet/flowperf"
 	"gitlab.x.lan/yunshan/droplet/handler"
 )
 
@@ -175,7 +176,7 @@ func (f *FlowExtra) updateTCPStateMachine(flags uint8, reply bool) bool {
 		f.timeoutSec = TIMEOUT_CLOSING
 		return false
 	}
-	if flags&TCP_SYN > 0 {
+	if flags&TCP_SYN > 0 || flags&TCP_ACK > 0 {
 		// FIXME: only with two syn flags and ack flags can this flow be established
 		if taggedFlow.TCPFlags0&taggedFlow.TCPFlags1&TCP_SYN > 0 &&
 			taggedFlow.TCPFlags0&taggedFlow.TCPFlags1&TCP_ACK > 0 {
@@ -263,11 +264,11 @@ func (f *FlowGenerator) processPkt(pkt *handler.MetaPktHdr) {
 	}
 	flowCache.Lock()
 	if flowExtra, reply = flowCache.keyMatch(flowKey); flowExtra != nil {
-		// flow perf
-		// perf.Update(pkt, reply)
+		flowExtra.metaFlowPerf.Update(pkt, reply)
 
 		if flowExtra.updateFlow(pkt, reply) {
 			f.stats.CurrNumFlows--
+			flowExtra.taggedFlow.TcpPerfStat = flowExtra.metaFlowPerf.Report()
 			flowExtra.calcCloseType()
 			f.flowOutQueue.Put(flowExtra.taggedFlow)
 			// delete front from this FlowCache because flowExtra is moved to front in keyMatch()
@@ -276,17 +277,17 @@ func (f *FlowGenerator) processPkt(pkt *handler.MetaPktHdr) {
 	} else {
 		var closed bool
 		flowExtra, closed = f.initFlow(pkt, flowKey)
-		// FIXME: if needed create flowperf
-		// perf := flowperf.NewFlowPerfMetadata()
-		// flowExtra.Flow.perf = perf
-		// perf.Update(pkt, reply)
+		flowExtra.metaFlowPerf = flowperf.NewMetaFlowPerf()
+		flowExtra.metaFlowPerf.Update(pkt, reply)
 		f.stats.TotalNumFlows++
 		if closed {
+			flowExtra.taggedFlow.TcpPerfStat = flowExtra.metaFlowPerf.Report()
 			flowExtra.calcCloseType()
 			f.flowOutQueue.Put(flowExtra.taggedFlow)
 		} else {
 			if flowExtra == f.addFlow(flowCache, flowExtra) {
 				// reach limit and output directly
+				flowExtra.taggedFlow.TcpPerfStat = flowExtra.metaFlowPerf.Report()
 				flowExtra.taggedFlow.CloseType = CLOSE_TYPE_FLOOD
 				f.flowOutQueue.Put(flowExtra.taggedFlow)
 			} else {
@@ -302,7 +303,6 @@ func (f *FlowGenerator) handle() {
 	log.Info("FlowGen handler is running")
 	for {
 		pkt := metaPktHdrInQueue.Get().(*handler.MetaPktHdr)
-		// FIXME: we do not porcess other protos? maybe rough
 		if pkt.Proto != layers.IPProtocolTCP {
 			continue
 		}
@@ -332,9 +332,11 @@ loop:
 			if flowExtra.recentTimesSec+flowExtra.timeoutSec <= nowSec {
 				del = e
 				f.stats.CurrNumFlows--
+				flowExtra.taggedFlow.TcpPerfStat = flowExtra.metaFlowPerf.Report()
 				flowExtra.calcCloseType()
 				flowOutQueue.Put(flowExtra.taggedFlow)
 			} else if flowExtra.recentTimesSec+forceReportIntervalSec < nowSec {
+				flowExtra.taggedFlow.TcpPerfStat = flowExtra.metaFlowPerf.Report()
 				flowExtra.calcCloseType()
 				taggedFlow := *flowExtra.taggedFlow
 				taggedFlow.EndTime = now
