@@ -285,8 +285,9 @@ func TestInitFlow(t *testing.T) {
 func TestPlatformData(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator := getDefaultFlowGenerator()
-	flowGenerator.forceReportIntervalSec = 6
 	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
+	SetTimeout(TimeoutConfig{0, 1800, 30, 30, 5, 0})
+	flowGenerator.minLoopIntervalSec = 0
 	flowOutQueue := flowGenerator.flowOutQueue
 
 	flowGenerator.Start()
@@ -363,7 +364,8 @@ func TestTCPStateMachine(t *testing.T) {
 func TestHandshakePerf(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator := getDefaultFlowGenerator()
-	flowGenerator.forceReportIntervalSec = 6
+	flowGenerator.forceReportIntervalSec = 0
+	flowGenerator.minLoopIntervalSec = 1
 	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
 	flowOutQueue := flowGenerator.flowOutQueue
 
@@ -390,6 +392,8 @@ func TestHandshakePerf(t *testing.T) {
 	packet2.TcpData.Ack = 1112
 	metaPacketHeaderInQueue.(Queue).Put(packet2)
 
+	flowGenerator.Start()
+
 	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
 	if taggedFlow.CloseType != CLOSE_TYPE_FORCE_REPORT {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_FORCE_REPORT)
@@ -401,6 +405,8 @@ func TestTimeoutReport(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator := getDefaultFlowGenerator()
 	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
+	flowGenerator.minLoopIntervalSec = 0
+	SetTimeout(TimeoutConfig{0, 1800, 30, 30, 5, 0})
 	flowOutQueue := flowGenerator.flowOutQueue
 
 	flowGenerator.Start()
@@ -423,11 +429,10 @@ func TestTimeoutReport(t *testing.T) {
 func TestForceReport(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator := getDefaultFlowGenerator()
-	flowGenerator.forceReportIntervalSec = 6
+	flowGenerator.forceReportIntervalSec = 0
+	flowGenerator.minLoopIntervalSec = 0
 	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
 	flowOutQueue := flowGenerator.flowOutQueue
-
-	flowGenerator.Start()
 
 	packet0 := getDefaultPacket()
 	packet0.TcpData.Flags = TCP_SYN | TCP_ACK
@@ -442,6 +447,8 @@ func TestForceReport(t *testing.T) {
 	packet2.Timestamp += DEFAULT_DURATION_MSEC
 	reversePacket(packet2)
 	metaPacketHeaderInQueue.(Queue).Put(packet2)
+
+	flowGenerator.Start()
 
 	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
 

@@ -10,6 +10,7 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
 	. "gitlab.x.lan/yunshan/droplet-libs/stats"
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 
 	"gitlab.x.lan/yunshan/droplet/flowperf"
 	"gitlab.x.lan/yunshan/droplet/handler"
@@ -64,8 +65,25 @@ func getQuinTupleHash(flowKey *FlowKey) uint64 {
 	return getKeyL3Hash(flowKey) ^ ((inPort0 << 32) | getKeyL4Hash(flowKey))
 }
 
+func isFromTrident(flowKey *FlowKey) bool {
+	return flowKey.InPort0&0x30000000 > 0
+}
+
+func (f *FlowExtra) MacEquals(header *handler.MetaPacketHeader) bool {
+	taggedFlow := f.taggedFlow
+	flowMacSrc, flowMacDst := taggedFlow.MACSrc.Int(), taggedFlow.MACDst.Int()
+	metaPktHdrMacSrc, metaPktHdrMacDst := Mac2Uint64(header.MacSrc), Mac2Uint64(header.MacDst)
+	if flowMacSrc == metaPktHdrMacSrc && flowMacDst == metaPktHdrMacDst {
+		return true
+	}
+	if flowMacSrc == metaPktHdrMacDst && flowMacDst == metaPktHdrMacSrc {
+		return true
+	}
+	return false
+}
+
 // FIXME: need a fast way to compare like memcmp
-func (f *FlowCache) keyMatch(key *FlowKey) (*FlowExtra, bool) {
+func (f *FlowCache) keyMatch(header *handler.MetaPacketHeader, key *FlowKey) (*FlowExtra, bool) {
 	for e := f.flowList.Front(); e != nil; e = e.Next() {
 		flowExtra := e.Value.(*FlowExtra)
 		flowKey := &flowExtra.taggedFlow.FlowKey
@@ -78,6 +96,9 @@ func (f *FlowCache) keyMatch(key *FlowKey) (*FlowExtra, bool) {
 		if !(flowKey.TunnelIPSrc == key.TunnelIPSrc && flowKey.TunnelIPDst == key.TunnelIPDst) {
 			continue
 		} else if !(flowKey.TunnelIPSrc == key.TunnelIPDst && flowKey.TunnelIPDst == key.TunnelIPSrc) {
+			continue
+		}
+		if isFromTrident(key) && !flowExtra.MacEquals(header) {
 			continue
 		}
 		if flowKey.IPSrc.Equals(&key.IPSrc) && flowKey.IPDst.Equals(&key.IPDst) {
@@ -102,11 +123,11 @@ func (f *FastPath) createFlowCache(cacheCap int, hash uint64) *FlowCache {
 	return newFlowCache
 }
 
-func (f *FlowGenerator) addFlow(flowCache *FlowCache, flow *FlowExtra) *FlowExtra {
+func (f *FlowGenerator) addFlow(flowCache *FlowCache, flowExtra *FlowExtra) *FlowExtra {
 	if f.stats.CurrNumFlows >= f.flowLimitNum {
-		return flow
+		return flowExtra
 	}
-	flowCache.flowList.PushFront(flow)
+	flowCache.flowList.PushFront(flowExtra)
 	return nil
 }
 
@@ -165,7 +186,7 @@ func (f *FlowExtra) updateTCPStateMachine(flags uint8, reply bool) bool {
 
 	if flags&TCP_RST > 0 {
 		if f.flowState == FLOW_STATE_ESTABLISHED || taggedFlow.TotalPacketCount0 == 1 {
-			f.timeoutSec = TIMEOUT_ESTABLISHED_RST
+			f.timeoutSec = innerTimeoutConfig.EstablishedRst
 		}
 		f.flowState = FLOW_STATE_CLOSED
 		return true
@@ -174,11 +195,11 @@ func (f *FlowExtra) updateTCPStateMachine(flags uint8, reply bool) bool {
 		// FIXME: only with two fin flags can this flow be closed
 		if taggedFlow.TCPFlags0&taggedFlow.TCPFlags1&TCP_FIN > 0 {
 			f.flowState = FLOW_STATE_CLOSED
-			f.timeoutSec = TIMEOUT_CLOSED_FIN
+			f.timeoutSec = innerTimeoutConfig.ClosedFin
 			return true
 		}
 		f.flowState = FLOW_STATE_CLOSING
-		f.timeoutSec = TIMEOUT_CLOSING
+		f.timeoutSec = innerTimeoutConfig.Closing
 		return false
 	}
 	if flags&TCP_SYN > 0 || flags&TCP_ACK > 0 {
@@ -186,12 +207,12 @@ func (f *FlowExtra) updateTCPStateMachine(flags uint8, reply bool) bool {
 		if taggedFlow.TCPFlags0&taggedFlow.TCPFlags1&TCP_SYN > 0 &&
 			taggedFlow.TCPFlags0&taggedFlow.TCPFlags1&TCP_ACK > 0 {
 			f.flowState = FLOW_STATE_ESTABLISHED
-			f.timeoutSec = TIMEOUT_ESTABLISHED
+			f.timeoutSec = innerTimeoutConfig.Established
 			return false
 		}
 		if f.flowState == FLOW_STATE_EXCEPTION || f.flowState == FLOW_STATE_OPENING {
 			f.flowState = FLOW_STATE_OPENING
-			f.timeoutSec = TIMEOUT_OPENING
+			f.timeoutSec = innerTimeoutConfig.Opening
 		}
 		return false
 	}
@@ -216,7 +237,7 @@ func (f *FlowExtra) updatePlatformData(header *handler.MetaPacketHeader) {
 		taggedFlow.L3DeviceType0 = DeviceType(srcInfo.L3DeviceType)
 		taggedFlow.L3DeviceID0 = srcInfo.L3DeviceId
 		taggedFlow.SubnetID0 = srcInfo.SubnetId
-		// FIXME: not to grow the size of GroupIDs
+		// FIXME: not to grow the cap of GroupIDs
 		copy(taggedFlow.GroupIDs0, srcInfo.GroupIds)
 		// use src host ip as host of flow
 		taggedFlow.Host = *NewIPFromInt(srcInfo.HostIp)
@@ -276,16 +297,16 @@ func (f *FlowExtra) checkTimeout(nowSec time.Duration) bool {
 }
 
 func (f *FlowExtra) calcCloseType() {
-	switch int(f.timeoutSec) + int(f.flowState) {
-	case TIMEOUT_OPENING + FLOW_STATE_OPENING:
+	switch f.timeoutSec + time.Duration(f.flowState) {
+	case innerTimeoutConfig.Opening + FLOW_STATE_OPENING:
 		f.taggedFlow.CloseType = CLOSE_TYPE_HALF_OPEN
-	case TIMEOUT_ESTABLISHED + FLOW_STATE_ESTABLISHED:
+	case innerTimeoutConfig.Established + FLOW_STATE_ESTABLISHED:
 		f.taggedFlow.CloseType = CLOSE_TYPE_FORCE_REPORT
-	case TIMEOUT_CLOSING + FLOW_STATE_CLOSING:
+	case innerTimeoutConfig.Closing + FLOW_STATE_CLOSING:
 		f.taggedFlow.CloseType = CLOSE_TYPE_HALF_CLOSE
-	case TIMEOUT_CLOSED_FIN + FLOW_STATE_CLOSED:
+	case innerTimeoutConfig.ClosedFin + FLOW_STATE_CLOSED:
 		f.taggedFlow.CloseType = CLOSE_TYPE_FIN
-	case TIMEOUT_ESTABLISHED_RST + FLOW_STATE_CLOSED:
+	case innerTimeoutConfig.EstablishedRst + FLOW_STATE_CLOSED:
 		f.taggedFlow.CloseType = CLOSE_TYPE_RST
 	default:
 		if f.taggedFlow.TCPFlags0|f.taggedFlow.TCPFlags1&TCP_RST > 0 {
@@ -305,7 +326,7 @@ func (f *FlowGenerator) processPacket(header *handler.MetaPacketHeader) {
 		flowCache = fastPath.createFlowCache(FLOW_CACHE_CAP, hash%HASH_MAP_SIZE)
 	}
 	flowCache.Lock()
-	if flowExtra, reply = flowCache.keyMatch(flowKey); flowExtra != nil {
+	if flowExtra, reply = flowCache.keyMatch(header, flowKey); flowExtra != nil {
 		flowExtra.metaFlowPerf.Update(header, reply)
 
 		if flowExtra.updateFlow(header, reply) {
@@ -400,11 +421,6 @@ func (f *FlowGenerator) timeoutReport() {
 	for i := uint64(0); i < fastPath.timeoutParallelNum; i += num {
 		go f.cleanTimeoutHashMap(fastPath.hashMap, i, i+num)
 	}
-}
-
-func (f *FlowGenerator) GetCounter() interface{} {
-	counter := f.stats
-	return &counter
 }
 
 // we need these goroutines are thread safe
