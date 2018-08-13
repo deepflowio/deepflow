@@ -53,10 +53,10 @@ type FlowKey struct {
 }
 
 type TcpPerfStat struct {
-	ARTAvg            uint64
-	RTTSyn            uint64
-	RTT               uint64
-	RTTAvg            uint64
+	ARTAvg            time.Duration
+	RTTSyn            time.Duration
+	RTT               time.Duration
+	RTTAvg            time.Duration
 	SynRetransCnt0    uint64
 	SynRetransCnt1    uint64
 	RetransCnt0       uint64
