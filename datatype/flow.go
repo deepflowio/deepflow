@@ -1,6 +1,8 @@
 package datatype
 
 import (
+	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/google/gopacket/layers"
@@ -147,4 +149,41 @@ type Flow struct {
 
 	/* TCP Perf Data */
 	*TcpPerfStats
+}
+
+func (t *TcpPerfStats) String() string {
+	var formatStr string
+	typeOf := reflect.TypeOf(*t)
+	valueOf := reflect.ValueOf(*t)
+	for i := 0; i < typeOf.NumField(); i++ {
+		formatStr += fmt.Sprintf("%v: %v ", typeOf.Field(i).Name, valueOf.Field(i))
+	}
+	return formatStr
+}
+
+func (f *FlowKey) String() string {
+	var formatStr string
+	typeOf := reflect.TypeOf(*f)
+	valueOf := reflect.ValueOf(*f)
+	for i := 0; i < typeOf.NumField(); i++ {
+		formatStr += fmt.Sprintf("%v: %v ", typeOf.Field(i).Name, valueOf.Field(i))
+	}
+	return formatStr
+}
+
+func (f *Flow) String() string {
+	formatted := ""
+	typeOf := reflect.TypeOf(*f)
+	valueOf := reflect.ValueOf(*f)
+	for i := 0; i < typeOf.NumField(); i++ {
+		field := typeOf.Field(i)
+		value := valueOf.Field(i)
+		if v := value.MethodByName("String"); v.IsValid() {
+			results := v.Call([]reflect.Value{})
+			formatted += results[0].String()
+		} else {
+			formatted += fmt.Sprintf("%v: %v ", field.Name, value)
+		}
+	}
+	return formatted
 }
