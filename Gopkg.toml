@@ -26,8 +26,16 @@
 
 
 [[constraint]]
+  name = "github.com/docker/go-units"
+  version = "0.3.3"
+
+[[constraint]]
   name = "github.com/golang/protobuf"
   version = "1.1.0"
+
+[[constraint]]
+  name = "github.com/google/go-cmp"
+  version = "0.2.0"
 
 [[constraint]]
   name = "github.com/google/gopacket"
@@ -40,6 +48,14 @@
 [[constraint]]
   name = "github.com/spf13/cobra"
   version = "0.0.3"
+
+[[constraint]]
+  branch = "master"
+  name = "gitlab.x.lan/application/droplet-app"
+
+[[constraint]]
+  branch = "master"
+  name = "gitlab.x.lan/platform/droplet-mapreduce"
 
 [[constraint]]
   branch = "master"
@@ -56,14 +72,6 @@
 [[constraint]]
   name = "gopkg.in/yaml.v2"
   version = "2.2.1"
-
-[[constraint]]
-  branch = "master"
-  name = "gitlab.x.lan/platform/droplet-mapreduce"
-
-[[constraint]]
-  branch = "master"
-  name = "gitlab.x.lan/application/droplet-app"
 
 [prune]
   go-tests = true

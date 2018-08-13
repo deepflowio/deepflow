@@ -38,11 +38,13 @@ func Start(configPath string) {
 	}
 
 	flowQueue := NewOverwriteQueue("FilterToFlow", 1000)
-	labelerManager := labeler.NewLabelerManager(filterQueue, flowQueue)
+	meteringQueue := NewOverwriteQueue("FilterToMetering", 1000)
+	labelerManager := labeler.NewLabelerManager(filterQueue, meteringQueue, flowQueue)
 	labelerManager.Start()
 	synchronizer.Register(func(response *protobuf.SyncResponse) {
 		labelerManager.OnPlatformDataChange(convert2PlatformData(response))
 		labelerManager.OnServiceDataChange(convert2ServiceData(response))
+		labelerManager.OnIpGroupDataChange(convert2IpGroupdata(response))
 	})
 
 	flowAppOutputQueue := NewOverwriteQueue("flowAppOutputQueue", 1000)
@@ -64,12 +66,14 @@ func Start(configPath string) {
 
 	stats.StartStatsd()
 	flowMapProcess := mapreduce.NewFlowMapProcess()
+	meteringProcess := mapreduce.NewMeteringMapProcess()
 	go func() {
 		for {
 			taggedFlow := flowAppOutputQueue.Get().(*TaggedFlow)
 			log.Info(flowgen.TaggedFlowString(taggedFlow))
 			flowMapProcess.Process(*taggedFlow)
-
+			taggedMetering := meteringQueue.Get().(*TaggedMetering)
+			meteringProcess.Process(*taggedMetering)
 		}
 	}()
 }
