@@ -85,6 +85,17 @@
   version = "v1.1.14"
 
 [[projects]]
+  branch = "master"
+  digest = "1:cf296baa185baae04a9a7004efee8511d08e2f5f51d4cbe5375da89722d681db"
+  name = "github.com/hashicorp/golang-lru"
+  packages = [
+    ".",
+    "simplelru",
+  ]
+  pruneopts = "UT"
+  revision = "0fb14efe8c47ae851c0034ed7a448854d3d34cf3"
+
+[[projects]]
   digest = "1:870d441fe217b8e689d7949fef6e43efbc787e50f200cb1e70dbca9204a1d6be"
   name = "github.com/inconshreveable/mousetrap"
   packages = ["."]
@@ -173,7 +184,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:7f5326767121eb250314768845d9936607e2becac6b3002da7b5f5da1fba2115"
+  digest = "1:67aacbd28bb8680fd29dd874b1986dae2c7b2019f04ccba3835e2507a87f48d2"
   name = "gitlab.x.lan/application/droplet-app"
   packages = [
     "internal/pkg",
@@ -182,11 +193,11 @@
     "pkg/metering/bw_usage_isp_usage",
   ]
   pruneopts = "UT"
-  revision = "690be6b1381b784c42ac0f9c842c9f0548213352"
+  revision = "13f169fa12ead8c5d9acddc5c94e69da570ca905"
 
 [[projects]]
   branch = "master"
-  digest = "1:9a657faf20dd8e567397cc52fc68121acf36401fb8747d3431a001c086b00fc9"
+  digest = "1:6ad28129bebbc3d53bf0e86de87158de7fdbe358607a5aa02235390359c2150e"
   name = "gitlab.x.lan/platform/droplet-mapreduce"
   packages = [
     "internal/pkg/flowsender",
@@ -194,13 +205,14 @@
     "pkg/api",
     "pkg/datatype",
     "pkg/handler",
+    "pkg/messenger",
   ]
   pruneopts = "UT"
-  revision = "2488b3a4263fb870bdb04cdc4dac192c5b9121f0"
+  revision = "24ee5d918dd0732a0f0aaaf1419cc36e2a073180"
 
 [[projects]]
   branch = "master"
-  digest = "1:9e4bad4018695fd8f0cdf04febcd48413a1bdb79af7f0245dc3b25658805544f"
+  digest = "1:7e4471f2f714c3fa58f12ac28d214a5c78638c0c54378a335a323ba56c00011a"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "datatype",
@@ -211,9 +223,10 @@
     "segmenttree",
     "stats",
     "utils",
+    "zmq",
   ]
   pruneopts = "UT"
-  revision = "f351cfa931036e723963d60fb4eb6321b5c22fc9"
+  revision = "2ff15ad416ece15537568da32240dc519f5d25dc"
 
 [[projects]]
   branch = "feature-os"
@@ -278,12 +291,12 @@
   version = "v0.3.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:077c1c599507b3b3e9156d17d36e1e61928ee9b53a5b420f10f28ebd4a0b275c"
+  branch = "jba-regen"
+  digest = "1:601e63e7d4577f907118bec825902505291918859d223bce015539e79f1160e3"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
   pruneopts = "UT"
-  revision = "d0a8f471bba2dbb160885b0000d814ee5d559bad"
+  revision = "af2e5e2b5d87da17f10febed626e553cad71cac7"
 
 [[projects]]
   digest = "1:3dd7996ce6bf52dec6a2f69fa43e7c4cefea1d4dfa3c8ab7a5f8a9f7434e239d"

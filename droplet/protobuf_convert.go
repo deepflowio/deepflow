@@ -16,12 +16,11 @@ func newServicedata(service *protobuf.Service) *policy.ServiceData {
 	if service == nil {
 		return nil
 	}
-	strPorts := service.GetPorts()
-	var ports []uint32
-	splitPorts := strings.Split(strPorts, ",")
+	splitPorts := strings.Split(service.GetPorts(), ",")
+	ports := make([]uint32, 0, len(splitPorts))
 	for _, port := range splitPorts {
 		portInt, err := strconv.Atoi(port)
-		if err != nil {
+		if err == nil {
 			ports = append(ports, uint32(portInt))
 		}
 	}
@@ -96,4 +95,28 @@ func convert2PlatformData(response *protobuf.SyncResponse) []*policy.PlatformDat
 		}
 	}
 	return platformDatas
+}
+
+func newIpGroupData(ipGroup *protobuf.Group) *policy.IpGroupData {
+	if ipGroup == nil || ipGroup.GetIps == nil {
+		return nil
+	}
+	return &policy.IpGroupData{
+		Id:    ipGroup.GetId(),
+		EpcId: int32(ipGroup.GetEpcId()),
+		Type:  uint8(ipGroup.GetType()),
+		Ips:   ipGroup.GetIps(),
+	}
+}
+
+func convert2IpGroupdata(response *protobuf.SyncResponse) []*policy.IpGroupData {
+	ipGroups := response.GetPlatformData().GetIpGroups()
+	ipGroupDatas := make([]*policy.IpGroupData, 0, len(ipGroups))
+	for _, group := range ipGroups {
+		if newData := newIpGroupData(group); newData != nil {
+			ipGroupDatas = append(ipGroupDatas, newData)
+		}
+	}
+
+	return ipGroupDatas
 }
