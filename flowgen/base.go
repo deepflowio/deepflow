@@ -61,6 +61,24 @@ const TOTAL_FLOWS_ID_MASK uint64 = 0x0FFFFFFF
 
 const FLOW_LIMIT_NUM uint64 = 1024 * 1024
 
+type TimeoutConfig struct {
+	Opening        time.Duration
+	Established    time.Duration
+	Closing        time.Duration
+	EstablishedRst time.Duration
+	Exception      time.Duration
+	ClosedFin      time.Duration
+}
+
+var innerTimeoutConfig = TimeoutConfig{
+	TIMEOUT_OPENING,
+	TIMEOUT_ESTABLISHED,
+	TIMEOUT_CLOSING,
+	TIMEOUT_ESTABLISHED_RST,
+	TIMEOUT_EXPCEPTION,
+	TIMEOUT_CLOSED_FIN,
+}
+
 type FlowExtra struct {
 	taggedFlow     *TaggedFlow
 	metaFlowPerf   *flowperf.MetaFlowPerf
@@ -105,4 +123,13 @@ type FlowGenerator struct {
 
 func TaggedFlowString(f *TaggedFlow) string {
 	return fmt.Sprintf("%+v\n%+v", *f, *f.TcpPerfStats)
+}
+
+func (f *FlowGenerator) GetCounter() interface{} {
+	counter := f.stats
+	return &counter
+}
+
+func SetTimeout(timeoutConfig TimeoutConfig) {
+	innerTimeoutConfig = timeoutConfig
 }
