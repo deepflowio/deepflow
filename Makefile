@@ -12,13 +12,16 @@ lint:
 format:
 	go fmt ./...
 
+submodule:
+	git submodule update --init --recursive
+
 vendor:
 	mkdir -p $(shell dirname ${PROJECT_ROOT})
 	[ -d ${PROJECT_ROOT} ] || ln -snf ${CURDIR} ${PROJECT_ROOT}
 	[ -f ${GOPATH}/bin/dep ] || curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 	(cd ${PROJECT_ROOT}; dep ensure)
 
-protobuf/trident.pb.go:
+protobuf/trident.pb.go: submodule
 	mkdir -p ${CURDIR}/protobuf
 	(cd message; protoc --go_out=plugins=grpc:${CURDIR}/protobuf/ trident.proto)
 	sed -i 's/package trident/package protobuf/g' protobuf/trident.pb.go
@@ -40,4 +43,4 @@ clean:
 
 .DEFAULT_GOAL := droplet
 
-.PHONY: lint test droplet clean
+.PHONY: lint test droplet clean submodule
