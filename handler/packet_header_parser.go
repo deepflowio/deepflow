@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -13,13 +14,7 @@ import (
 
 type RawPacket []byte
 
-type MetaPktTnlHdr struct {
-	TunType      uint8
-	TunID        uint32
-	IpSrc, IpDst net.IP
-}
-
-type MetaPktTcpHdr struct {
+type MetaPacketTcpHeader struct {
 	Flags         uint8
 	Seq           uint32
 	Ack           uint32
@@ -33,34 +28,34 @@ const (
 	CAPTURE_REMOTE = 0x30000
 )
 
-type MetaPktHdr struct {
-	Timestamp      int64
-	InPort         uint32 `fmt:"hex"`
+type MetaPacketHeader struct {
+	Timestamp      time.Duration
+	InPort         uint32
 	PktLen         uint16
 	Exporter       net.IP
 	L2End0, L2End1 bool
-	EpData         *policy.EndpointData `fmt:"pointer"`
-	Raw            RawPacket            `fmt:"pointer+enter"`
+	EpData         *policy.EndpointData
+	Raw            RawPacket
 
-	TnlData MetaPktTnlHdr `fmt:"tab+v+enter"`
+	TunnelData TunnelInfo
 
-	MacSrc  net.HardwareAddr `fmt:"tab"`
+	MacSrc  net.HardwareAddr
 	MacDst  net.HardwareAddr
 	EthType layers.EthernetType
-	Vlan    uint16 `fmt:"enter"`
+	Vlan    uint16
 
-	IpSrc net.IP `fmt:"tab"`
+	IpSrc net.IP
 	IpDst net.IP
 	Proto layers.IPProtocol
-	TTL   uint8 `fmt:"enter"`
+	TTL   uint8
 
-	PortSrc    uint16 `fmt:"tab"`
+	PortSrc    uint16
 	PortDst    uint16
 	PayloadLen uint16
-	TcpData    MetaPktTcpHdr `fmt:"+v"`
+	TcpData    MetaPacketTcpHeader
 }
 
-func get_tcp_flags(t *layers.TCP) uint8 {
+func getTcpFlags(t *layers.TCP) uint8 {
 	f := uint8(0)
 	if t.FIN {
 		f |= 0x01
@@ -89,7 +84,7 @@ func get_tcp_flags(t *layers.TCP) uint8 {
 	return f
 }
 
-func (m *MetaPktHdr) String() string {
+func (m *MetaPacketHeader) String() string {
 	s := reflect.ValueOf(m).Elem()
 	t := s.Type()
 	out := ""
@@ -130,10 +125,10 @@ func (m *MetaPktHdr) String() string {
 	return out
 }
 
-func (m *MetaPktHdr) extractTcpOptions(rawPkt RawPacket, offset uint16, max uint16) {
+func (m *MetaPacketHeader) extractTcpOptions(rawPacket RawPacket, offset uint16, max uint16) {
 	for offset+1 < max { // 如果不足2B，EOL和NOP都可以忽略
-		assumeLength := uint16(Max(int(rawPkt[offset+1]), 2))
-		switch rawPkt[offset] {
+		assumeLength := uint16(Max(int(rawPacket[offset+1]), 2))
+		switch rawPacket[offset] {
 		case layers.TCPOptionKindEndList:
 			return
 		case layers.TCPOptionKindNop:
@@ -142,7 +137,7 @@ func (m *MetaPktHdr) extractTcpOptions(rawPkt RawPacket, offset uint16, max uint
 			if offset+assumeLength > max {
 				return
 			}
-			m.TcpData.WinScale = byte(rawPkt[offset+2])
+			m.TcpData.WinScale = byte(rawPacket[offset+2])
 			offset += assumeLength
 		case layers.TCPOptionKindSACKPermitted:
 			m.TcpData.SACKPermitted = true
@@ -153,9 +148,9 @@ func (m *MetaPktHdr) extractTcpOptions(rawPkt RawPacket, offset uint16, max uint
 	}
 }
 
-func NewMetaPktHdr(rawPkt RawPacket, inPort uint32, timestamp int64, exporter net.IP) *MetaPktHdr {
-	m := &MetaPktHdr{InPort: inPort, Exporter: exporter, Timestamp: timestamp, Raw: rawPkt}
-	packet := gopacket.NewPacket(rawPkt, layers.LayerTypeEthernet,
+func NewMetaPacketHeader(rawPacket RawPacket, inPort uint32, timestamp time.Duration, exporter net.IP) *MetaPacketHeader {
+	m := &MetaPacketHeader{InPort: inPort, Exporter: exporter, Timestamp: timestamp, Raw: rawPacket}
+	packet := gopacket.NewPacket(rawPacket, layers.LayerTypeEthernet,
 		gopacket.DecodeOptions{NoCopy: true, Lazy: true})
 	eth := packet.Layer(layers.LayerTypeEthernet).(*layers.Ethernet)
 	m.MacDst = eth.DstMAC
@@ -182,11 +177,11 @@ func NewMetaPktHdr(rawPkt RawPacket, inPort uint32, timestamp int64, exporter ne
 			m.PortSrc = uint16(tcp.SrcPort)
 			m.PortDst = uint16(tcp.DstPort)
 			m.PayloadLen = ip.Length - uint16(tcp.DataOffset*4)
-			m.TcpData.Flags = get_tcp_flags(tcp)
+			m.TcpData.Flags = getTcpFlags(tcp)
 			m.TcpData.Seq = tcp.Seq
 			m.TcpData.Ack = tcp.Ack
 			m.TcpData.WinSize = tcp.Window
-			m.extractTcpOptions(rawPkt, m.PktLen-m.PayloadLen, m.PayloadLen)
+			m.extractTcpOptions(rawPacket, m.PktLen-m.PayloadLen, m.PayloadLen)
 		} else if m.Proto == layers.IPProtocolUDP {
 			udp := packet.Layer(layers.LayerTypeUDP).(*layers.UDP)
 			m.PortSrc = uint16(udp.SrcPort)

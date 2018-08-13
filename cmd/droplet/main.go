@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/op/go-logging"
@@ -20,7 +21,12 @@ import (
 	"gitlab.x.lan/yunshan/droplet/mapreduce"
 )
 
-var log = logging.MustGetLogger(os.Args[0])
+func execName() string {
+	splitted := strings.Split(os.Args[0], "/")
+	return splitted[len(splitted)-1]
+}
+
+var log = logging.MustGetLogger(execName())
 
 var configFile = flag.String("f", "/etc/droplet.yaml", "Specify config file location")
 

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"time"
 
 	"github.com/op/go-logging"
@@ -28,7 +27,7 @@ const (
 	ADAPT_CMD_SHOW = iota
 )
 
-var log = logging.MustGetLogger(os.Args[0])
+var log = logging.MustGetLogger("trident_adapt")
 
 type PacketCounter struct {
 	RxPkt  uint64 `statsd:"rx_pkt"`
@@ -146,7 +145,7 @@ func (a *TridentAdapt) decode(data []byte, ip uint32) {
 	ifMacSuffix := decoder.DecodeHeader()
 
 	for {
-		meta := &(handler.MetaPktHdr{InPort: ifMacSuffix | handler.CAPTURE_REMOTE, Exporter: UInt32ToIP(ip)})
+		meta := &(handler.MetaPacketHeader{InPort: ifMacSuffix | handler.CAPTURE_REMOTE, Exporter: UInt32ToIP(ip)})
 		if decoder.NextPacket(meta) {
 			break
 		}

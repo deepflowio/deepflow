@@ -27,7 +27,7 @@ func BenchmarkDecoder(b *testing.B) {
 		decoder := NewSequentialDecoder(packet)
 		decoder.DecodeHeader()
 		for {
-			meta := &MetaPktHdr{}
+			meta := &MetaPacketHeader{}
 			if decoder.NextPacket(meta) {
 				break
 			}

@@ -165,7 +165,7 @@ func (l *LabelerManager) GetData(key *policy.LookupKey) {
 	}
 }
 
-func (l *LabelerManager) GetPolicy(pkt *handler.MetaPktHdr) {
+func (l *LabelerManager) GetPolicy(pkt *handler.MetaPacketHeader) {
 	key := &policy.LookupKey{
 		SrcMac:      utils.Mac2Uint64(pkt.MacSrc),
 		DstMac:      utils.Mac2Uint64(pkt.MacDst),
@@ -190,7 +190,7 @@ func (l *LabelerManager) GetPolicy(pkt *handler.MetaPktHdr) {
 
 func (l *LabelerManager) run() {
 	for l.running {
-		pkt := l.readQueue.Get().(*handler.MetaPktHdr)
+		pkt := l.readQueue.Get().(*handler.MetaPacketHeader)
 		l.GetPolicy(pkt)
 
 		for _, queue := range l.appQueue {

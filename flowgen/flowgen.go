@@ -17,22 +17,22 @@ import (
 
 var log = logging.MustGetLogger("flowgen")
 
-func getFlowKey(pkt *handler.MetaPktHdr) *FlowKey {
+func getFlowKey(header *handler.MetaPacketHeader) *FlowKey {
 	flowKey := &FlowKey{
-		Exporter: *NewIPFromInt(binary.BigEndian.Uint32(pkt.Exporter.To4())),
-		IPSrc:    *NewIPFromInt(binary.BigEndian.Uint32(pkt.IpSrc.To4())),
-		IPDst:    *NewIPFromInt(binary.BigEndian.Uint32(pkt.IpDst.To4())),
-		Proto:    pkt.Proto,
-		PortSrc:  pkt.PortSrc,
-		PortDst:  pkt.PortDst,
-		InPort0:  pkt.InPort,
+		Exporter: *NewIPFromInt(binary.BigEndian.Uint32(header.Exporter.To4())),
+		IPSrc:    *NewIPFromInt(binary.BigEndian.Uint32(header.IpSrc.To4())),
+		IPDst:    *NewIPFromInt(binary.BigEndian.Uint32(header.IpDst.To4())),
+		Proto:    header.Proto,
+		PortSrc:  header.PortSrc,
+		PortDst:  header.PortDst,
+		InPort0:  header.InPort,
 	}
 
-	if pkt.TnlData.TunType != 0 {
-		flowKey.TunType = uint64(pkt.TnlData.TunType)
-		flowKey.TunID = uint64(pkt.TnlData.TunID)
-		flowKey.TunIPSrc = binary.BigEndian.Uint32(pkt.TnlData.IpSrc.To4())
-		flowKey.TunIPDst = binary.BigEndian.Uint32(pkt.TnlData.IpDst.To4())
+	if header.TunnelData.TunnelType != handler.TUNNEL_TYPE_NONE {
+		flowKey.TunType = uint64(header.TunnelData.TunnelType)
+		flowKey.TunID = uint64(header.TunnelData.TunnelId)
+		flowKey.TunIPSrc = binary.BigEndian.Uint32(header.TunnelData.TunnelSrc.To4())
+		flowKey.TunIPDst = binary.BigEndian.Uint32(header.TunnelData.TunnelDst.To4())
 	}
 
 	return flowKey
@@ -115,8 +115,8 @@ func (f *FlowGenerator) genFlowId(timestamp uint64, inPort uint64) uint64 {
 	return ((inPort & IN_PORT_FLOW_ID_MASK) << 32) | ((timestamp & TIMER_FLOW_ID_MASK) << 32) | (f.stats.TotalNumFlows & TOTAL_FLOWS_ID_MASK)
 }
 
-func (f *FlowGenerator) initFlow(pkt *handler.MetaPktHdr, key *FlowKey) (*FlowExtra, bool) {
-	now := time.Duration(pkt.Timestamp)
+func (f *FlowGenerator) initFlow(header *handler.MetaPacketHeader, key *FlowKey) (*FlowExtra, bool) {
+	now := time.Duration(header.Timestamp)
 	taggedFlow := &TaggedFlow{
 		Flow: Flow{
 			FlowKey:       *key,
@@ -126,17 +126,17 @@ func (f *FlowGenerator) initFlow(pkt *handler.MetaPktHdr, key *FlowKey) (*FlowEx
 			CurStartTime:  now,
 			ArrTime00:     now,
 			ArrTime0Last:  now,
-			MACSrc:        *NewMACAddrFromString(pkt.MacSrc.String()),
-			MACDst:        *NewMACAddrFromString(pkt.MacDst.String()),
-			VLAN:          pkt.Vlan,
-			EthType:       pkt.EthType,
+			MACSrc:        *NewMACAddrFromString(header.MacSrc.String()),
+			MACDst:        *NewMACAddrFromString(header.MacDst.String()),
+			VLAN:          header.Vlan,
+			EthType:       header.EthType,
 			CloseType:     CLOSE_TYPE_UNKNOWN,
 			TotalPktCnt0:  1,
 			PktCnt0:       1,
-			TotalByteCnt0: uint64(pkt.PktLen),
-			ByteCnt0:      uint64(pkt.PktLen),
-			IsL2End0:      pkt.L2End0,
-			IsL2End1:      pkt.L2End1,
+			TotalByteCnt0: uint64(header.PktLen),
+			ByteCnt0:      uint64(header.PktLen),
+			IsL2End0:      header.L2End0,
+			IsL2End1:      header.L2End1,
 		},
 		Tag: Tag{
 			GroupIDs0: make([]uint32, 10),
@@ -148,9 +148,9 @@ func (f *FlowGenerator) initFlow(pkt *handler.MetaPktHdr, key *FlowKey) (*FlowEx
 		flowState:      FLOW_STATE_EXCEPTION,
 		recentTimesSec: now / time.Millisecond,
 	}
-	flowExtra.updatePlatformData(pkt)
+	flowExtra.updatePlatformData(header)
 
-	return flowExtra, flowExtra.updateTCPStateMachine(pkt.TcpData.Flags, false)
+	return flowExtra, flowExtra.updateTCPStateMachine(header.TcpData.Flags, false)
 }
 
 // it is a very simple implementation of TCP State machine
@@ -199,8 +199,8 @@ func (f *FlowExtra) updateTCPStateMachine(flags uint8, reply bool) bool {
 	return false
 }
 
-func (f *FlowExtra) updatePlatformData(pkt *handler.MetaPktHdr) {
-	epData := pkt.EpData
+func (f *FlowExtra) updatePlatformData(header *handler.MetaPacketHeader) {
+	epData := header.EpData
 	if epData == nil {
 		return
 	}
@@ -236,10 +236,10 @@ func (f *FlowExtra) updatePlatformData(pkt *handler.MetaPktHdr) {
 }
 
 // FIXME: should update more info
-func (f *FlowExtra) updateFlow(pkt *handler.MetaPktHdr, reply bool) bool {
+func (f *FlowExtra) updateFlow(header *handler.MetaPacketHeader, reply bool) bool {
 	taggedFlow := f.taggedFlow
-	bytes := uint64(pkt.PktLen)
-	pktTimestamp := time.Duration(pkt.Timestamp)
+	bytes := uint64(header.PktLen)
+	pktTimestamp := time.Duration(header.Timestamp)
 	if taggedFlow.StartTime != 0 && pktTimestamp > taggedFlow.StartTime {
 		taggedFlow.EndTime = pktTimestamp
 		taggedFlow.Duration = pktTimestamp - taggedFlow.StartTime
@@ -263,9 +263,9 @@ func (f *FlowExtra) updateFlow(pkt *handler.MetaPktHdr, reply bool) bool {
 		taggedFlow.TotalByteCnt0 += bytes
 	}
 	f.recentTimesSec = pktTimestamp / time.Millisecond
-	f.updatePlatformData(pkt)
+	f.updatePlatformData(header)
 
-	return f.updateTCPStateMachine(pkt.TcpData.Flags, reply)
+	return f.updateTCPStateMachine(header.TcpData.Flags, reply)
 }
 
 func (f *FlowExtra) checkTimeout(nowSec time.Duration) bool {
@@ -294,11 +294,11 @@ func (f *FlowExtra) calcCloseType() {
 	}
 }
 
-func (f *FlowGenerator) processPkt(pkt *handler.MetaPktHdr) {
+func (f *FlowGenerator) processPkt(header *handler.MetaPacketHeader) {
 	reply := false
 	var flowExtra *FlowExtra
 	fastPath := &f.fastPath
-	flowKey := getFlowKey(pkt)
+	flowKey := getFlowKey(header)
 	hash := getQuinTupleHash(flowKey)
 	flowCache := fastPath.hashMap[hash%HASH_MAP_SIZE]
 	if flowCache == nil {
@@ -306,9 +306,9 @@ func (f *FlowGenerator) processPkt(pkt *handler.MetaPktHdr) {
 	}
 	flowCache.Lock()
 	if flowExtra, reply = flowCache.keyMatch(flowKey); flowExtra != nil {
-		flowExtra.metaFlowPerf.Update(pkt, reply)
+		flowExtra.metaFlowPerf.Update(header, reply)
 
-		if flowExtra.updateFlow(pkt, reply) {
+		if flowExtra.updateFlow(header, reply) {
 			f.stats.CurrNumFlows--
 			flowExtra.taggedFlow.TcpPerfStat = flowExtra.metaFlowPerf.Report()
 			flowExtra.calcCloseType()
@@ -318,9 +318,9 @@ func (f *FlowGenerator) processPkt(pkt *handler.MetaPktHdr) {
 		}
 	} else {
 		var closed bool
-		flowExtra, closed = f.initFlow(pkt, flowKey)
+		flowExtra, closed = f.initFlow(header, flowKey)
 		flowExtra.metaFlowPerf = flowperf.NewMetaFlowPerf()
-		flowExtra.metaFlowPerf.Update(pkt, reply)
+		flowExtra.metaFlowPerf.Update(header, reply)
 		f.stats.TotalNumFlows++
 		if closed {
 			flowExtra.taggedFlow.TcpPerfStat = flowExtra.metaFlowPerf.Report()
@@ -344,11 +344,11 @@ func (f *FlowGenerator) handle() {
 	metaPktHdrInQueue := f.metaPktHdrInQueue
 	log.Info("FlowGen handler is running")
 	for {
-		pkt := metaPktHdrInQueue.Get().(*handler.MetaPktHdr)
-		if pkt.Proto != layers.IPProtocolTCP {
+		header := metaPktHdrInQueue.Get().(*handler.MetaPacketHeader)
+		if header.Proto != layers.IPProtocolTCP {
 			continue
 		}
-		f.processPkt(pkt)
+		f.processPkt(header)
 	}
 }
 

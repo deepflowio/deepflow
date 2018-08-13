@@ -2,28 +2,9 @@ package handler
 
 import (
 	. "encoding/binary"
-	"net"
 
 	. "github.com/google/gopacket/layers"
 )
-
-type TunnelType uint8
-
-const (
-	TUNNEL_TYPE_NONE TunnelType = iota
-	TUNNEL_TYPE_VXLAN
-)
-
-func (t TunnelType) String() string {
-	return "vxlan"
-}
-
-type TunnelInfo struct {
-	TunnelSrc  net.IP
-	TunnelDst  net.IP
-	TunnelType TunnelType
-	TunnelId   uint32
-}
 
 func (i *TunnelInfo) Decapsulate(packet []byte) int {
 	i.TunnelType = TUNNEL_TYPE_NONE
