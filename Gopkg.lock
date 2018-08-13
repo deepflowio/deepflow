@@ -164,7 +164,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:25aae884519c43e55df004c33681962d485e515000dec0420840ebf92d43a7c5"
+  digest = "1:3c69fc48a5d42ef43d7cfe8b14c8c020c0133c663909bdba45034625bbb958bf"
   name = "gitlab.x.lan/platform/droplet-mapreduce"
   packages = [
     ".",
@@ -176,11 +176,11 @@
     "pkg/datatype/pb",
   ]
   pruneopts = "UT"
-  revision = "da2c25d14ded35846a87ee55398d7a13f4b88dec"
+  revision = "7aeafff6aa1d37efbc0ba904f16fef2198fa13fb"
 
 [[projects]]
   branch = "master"
-  digest = "1:d817e6807d12ba9622202fc1c50117fe073b025ed35f66d92d6f058c1d847b12"
+  digest = "1:c3bc03a66144fd50b5519124f8452110cfa7e0ab6e901c36b4be77edb4ef3d69"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "datatype",
@@ -193,7 +193,7 @@
     "utils",
   ]
   pruneopts = "UT"
-  revision = "36afb61967d6152644d1fb35495ccad6226f1024"
+  revision = "a989c9ddca5e06e94c4891d28f9b6edac319dabe"
 
 [[projects]]
   branch = "release-branch.go1.10"

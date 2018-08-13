@@ -22,8 +22,8 @@ const DEFAULT_INTERVAL_SEC_LOW = 10
 const DEFAULT_DURATION_MSEC = 123
 const DEFAULT_PKT_LEN = 128
 
-func getDefaultPkt() *handler.MetaPktHdr {
-	pkt := &handler.MetaPktHdr{}
+func getDefaultPkt() *handler.MetaPacketHeader {
+	pkt := &handler.MetaPacketHeader{}
 	pkt.MacSrc, _ = net.ParseMAC("12:34:56:78:9A:BC")
 	pkt.MacDst, _ = net.ParseMAC("21:43:65:87:A9:CB")
 	pkt.PktLen = DEFAULT_PKT_LEN
@@ -35,7 +35,7 @@ func getDefaultPkt() *handler.MetaPktHdr {
 	pkt.InPort = 65533
 	pkt.Exporter = net.ParseIP("192.168.1.1")
 	pkt.TcpData.Flags = TCP_SYN
-	pkt.Timestamp = time.Now().UnixNano() / int64(time.Microsecond)
+	pkt.Timestamp = time.Duration(time.Now().UnixNano()) / time.Microsecond
 	pkt.EpData = &EndpointData{
 		SrcInfo: &EndpointInfo{
 			L2EpcId:  -1,
@@ -53,7 +53,7 @@ func getDefaultPkt() *handler.MetaPktHdr {
 	return pkt
 }
 
-func reversePkt(pkt *handler.MetaPktHdr) {
+func reversePkt(pkt *handler.MetaPacketHeader) {
 	pkt.MacSrc, pkt.MacDst = pkt.MacDst, pkt.MacSrc
 	pkt.IpSrc, pkt.IpDst = pkt.IpDst, pkt.IpSrc
 	pkt.PortSrc, pkt.PortDst = pkt.PortDst, pkt.PortSrc
@@ -162,7 +162,7 @@ func TestHandleMultiPkt(t *testing.T) {
 	metaPktHdrInQueue := flowGenerator.metaPktHdrInQueue
 	flowOutQueue := flowGenerator.flowOutQueue
 	var waitGroup sync.WaitGroup
-	var pkt *handler.MetaPktHdr
+	var pkt *handler.MetaPacketHeader
 	var taggedFlow *TaggedFlow
 	num := DEFAULT_QUEUE_LEN / 2
 

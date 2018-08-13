@@ -3,6 +3,7 @@ package handler
 import (
 	"net"
 	"strings"
+	"time"
 
 	. "github.com/google/gopacket/layers"
 )
@@ -30,7 +31,7 @@ type Decoded struct {
 }
 
 type SequentialDecoder struct {
-	timestamp uint64
+	timestamp time.Duration
 	data      ByteStream
 	seq       uint32
 	pflags    PacketFlag
@@ -92,14 +93,14 @@ func (d *SequentialDecoder) Seq() uint32 {
 	return d.seq
 }
 
-func (d *SequentialDecoder) decodeTunnel(meta *MetaPktHdr) {
-	meta.TnlData.IpDst = net.IP(d.data.Field(IP_ADDR_LEN))
-	meta.TnlData.IpSrc = net.IP(d.data.Field(IP_ADDR_LEN))
-	meta.TnlData.TunID = uint32((d.data.U8()))<<16 | uint32(d.data.U16())
-	meta.TnlData.TunType = uint8(TunnelType(d.data.U8()))
+func (d *SequentialDecoder) decodeTunnel(meta *MetaPacketHeader) {
+	meta.TunnelData.TunnelDst = net.IP(d.data.Field(IP_ADDR_LEN))
+	meta.TunnelData.TunnelSrc = net.IP(d.data.Field(IP_ADDR_LEN))
+	meta.TunnelData.TunnelId = uint32((d.data.U8()))<<16 | uint32(d.data.U16())
+	meta.TunnelData.TunnelType = TunnelType(d.data.U8())
 }
 
-func (d *SequentialDecoder) decodeEthernet(meta *MetaPktHdr) {
+func (d *SequentialDecoder) decodeEthernet(meta *MetaPacketHeader) {
 	x := d.x
 	if !d.pflags.IsSet(CFLAG_MAC0) {
 		x.mac0 = net.HardwareAddr(d.data.Field(MAC_ADDR_LEN))
@@ -133,7 +134,7 @@ func (d *SequentialDecoder) decodeEthernet(meta *MetaPktHdr) {
 	}
 }
 
-func (d *SequentialDecoder) decodeIPv4(meta *MetaPktHdr) {
+func (d *SequentialDecoder) decodeIPv4(meta *MetaPacketHeader) {
 	x := d.x
 	if !d.pflags.IsSet(CFLAG_DATAOFF_IHL) {
 		b := d.data.U8()
@@ -192,7 +193,7 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPktHdr) {
 	d.decodeL4(meta)
 }
 
-func (d *SequentialDecoder) decodeL4(meta *MetaPktHdr) {
+func (d *SequentialDecoder) decodeL4(meta *MetaPacketHeader) {
 	x := d.x
 	if !d.pflags.IsSet(CFLAG_PORT0) {
 		x.port0 = d.data.U16()
@@ -257,12 +258,12 @@ func (d *SequentialDecoder) DecodeHeader() uint32 {
 	_ = d.data.U8()
 	_ = d.data.U8()
 	d.seq = d.data.U32()
-	d.timestamp = d.data.U64()
+	d.timestamp = time.Duration(d.data.U64())
 	ifMacSuffix := d.data.U32()
 	return ifMacSuffix & 0xffff
 }
 
-func (d *SequentialDecoder) NextPacket(meta *MetaPktHdr) bool {
+func (d *SequentialDecoder) NextPacket(meta *MetaPacketHeader) bool {
 	delta := d.data.U16()
 	if delta == PACKET_STREAM_END {
 		return true
@@ -279,12 +280,12 @@ func (d *SequentialDecoder) NextPacket(meta *MetaPktHdr) bool {
 	if !d.pflags.IsSet(CFLAG_HEADER_TYPE) {
 		d.x.headerType = HeaderType(d.data.U8())
 	}
-	d.timestamp += uint64(delta)
+	d.timestamp += time.Duration(delta)
 	if d.pflags.IsSet(PFLAG_TUNNEL) {
 		d.decodeTunnel(meta)
 	}
 	meta.PktLen = totalSize
-	meta.Timestamp = int64(d.timestamp)
+	meta.Timestamp = d.timestamp
 	d.decodeEthernet(meta)
 	return false
 }
