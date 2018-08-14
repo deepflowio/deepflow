@@ -18,6 +18,14 @@
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:6f82cacd0af5921e99bf3f46748705239b36489464f4529a1589bc895764fb18"
+  name = "github.com/docker/go-units"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "47565b4f722fb6ceae66b95f853feed578a4a51c"
+  version = "v0.3.3"
+
+[[projects]]
   digest = "1:64a5a67c69b70c2420e607a8545d674a23778ed9c3e80607bfd17b77c6c87f6a"
   name = "github.com/go-ole/go-ole"
   packages = [
@@ -64,10 +72,11 @@
   version = "v0.2.0"
 
 [[projects]]
-  digest = "1:f2a59262dcdf19b8a49351b562b4b274a935ea21932817126e6901ae516cde35"
+  digest = "1:52761683aac41e2edd5d2b195678ff30dcc1411353d3b461725c2f7f07d5d929"
   name = "github.com/google/gopacket"
   packages = [
     ".",
+    "afpacket",
     "layers",
     "pcapgo",
   ]
@@ -177,7 +186,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:3c69fc48a5d42ef43d7cfe8b14c8c020c0133c663909bdba45034625bbb958bf"
+  digest = "1:727c77afec9ea5a93ca5c215e1e63671a243033833a758bd61d634ec811e6b9b"
   name = "gitlab.x.lan/platform/droplet-mapreduce"
   packages = [
     ".",
@@ -189,11 +198,11 @@
     "pkg/datatype/pb",
   ]
   pruneopts = "UT"
-  revision = "7aeafff6aa1d37efbc0ba904f16fef2198fa13fb"
+  revision = "d391ac491b0432faba2eb145a60e1a0f04ea4f6d"
 
 [[projects]]
   branch = "master"
-  digest = "1:d60ac8bdcf755bc95337d0037778f7d8186c957704773bd87d68309441697d35"
+  digest = "1:9e4bad4018695fd8f0cdf04febcd48413a1bdb79af7f0245dc3b25658805544f"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "datatype",
@@ -206,13 +215,14 @@
     "utils",
   ]
   pruneopts = "UT"
-  revision = "870d1e5686d77788f6716c9e4547c8bddfebaffc"
+  revision = "f351cfa931036e723963d60fb4eb6321b5c22fc9"
 
 [[projects]]
   branch = "release-branch.go1.10"
-  digest = "1:677a5d026fcc0c1e764f2d688a363316e3b157cec39b8fbaa0c1a1796aac3643"
+  digest = "1:82b29273f56a317489552f1b38cec2081807f57e86f3fb7094d0383480fb8d07"
   name = "golang.org/x/net"
   packages = [
+    "bpf",
     "context",
     "http2",
     "http2/hpack",
@@ -226,14 +236,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:a60cae5be8993938498243605b120290533a5208fd5cac81c932afbad3642fb0"
+  digest = "1:2f71657f09ff05e4567909e9e0de7ad799828c96d402c540b41dc044a6590fb2"
   name = "golang.org/x/sys"
   packages = [
     "unix",
     "windows",
   ]
   pruneopts = "UT"
-  revision = "98c5dad5d1a0e8a73845ecc8897d0bd56586511d"
+  revision = "1c9583448a9c3aa0f9a6a5241bf73c0bd8aafded"
 
 [[projects]]
   digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"
@@ -264,7 +274,7 @@
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
   pruneopts = "UT"
-  revision = "383e8b2c3b9e36c4076b235b32537292176bae20"
+  revision = "d0a8f471bba2dbb160885b0000d814ee5d559bad"
 
 [[projects]]
   digest = "1:3dd7996ce6bf52dec6a2f69fa43e7c4cefea1d4dfa3c8ab7a5f8a9f7434e239d"
@@ -321,9 +331,11 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/docker/go-units",
     "github.com/golang/protobuf/proto",
     "github.com/google/go-cmp/cmp",
     "github.com/google/gopacket",
+    "github.com/google/gopacket/afpacket",
     "github.com/google/gopacket/layers",
     "github.com/google/gopacket/pcapgo",
     "github.com/op/go-logging",

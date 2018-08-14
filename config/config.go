@@ -20,6 +20,8 @@ type Config struct {
 	LogLevel        string   `yaml:"log-level"`
 	Profiler        bool     `yaml:"profiler"`
 	CloseFloodCheck bool     `yaml:"close-flood-check"`
+	DataInterfaces  []string `yaml:"data-interfaces,flow"`
+	TapInterfaces   []string `yaml:"tap-interfaces,flow"`
 }
 
 func (c *Config) Validate() error {
