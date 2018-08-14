@@ -1,258 +1,196 @@
 package handler
 
 import (
-	. "encoding/binary"
+	"fmt"
+	"net"
+	"reflect"
+	"time"
 
-	. "github.com/google/gopacket/layers"
-
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"gitlab.x.lan/yunshan/droplet-libs/policy"
 	. "gitlab.x.lan/yunshan/droplet/utils"
 )
 
-type MetaPacket struct {
-	timestamp int64 // unit Microsecond
+type RawPacket = []byte
 
+type IPv4Int = uint32
+
+type MetaPacketTcpHeader struct {
+	Flags         uint8
+	Seq           uint32
+	Ack           uint32
+	WinSize       uint16
+	WinScale      uint8
+	SACKPermitted bool
+}
+
+const (
+	CAPTURE_LOCAL  = 0x10000
+	CAPTURE_REMOTE = 0x30000
+)
+
+type MetaPacket struct {
 	TunnelInfo
 
-	headerType  HeaderType
-	packetSize  int
-	vlanTagSize int
-	l2L3OptSize int // 802.1Q + IPv4 Optional Fields
-	l4OptSize   int // ICMP Payload / TCP Optional Fields
+	Timestamp      time.Duration
+	InPort         uint32
+	PacketLen      uint16
+	Exporter       net.IP
+	L2End0, L2End1 bool
+	EndpointData   *policy.EndpointData
+	Raw            RawPacket
 
-	srcEndpoint, dstEndpoint bool
+	MacSrc  net.HardwareAddr
+	MacDst  net.HardwareAddr
+	EthType layers.EthernetType
+	Vlan    uint16
 
-	offsetMac0, offsetMac1   int
-	offsetIp0, offsetIp1     int
-	offsetPort0, offsetPort1 int
+	IpSrc, IpDst IPv4Int
+	Proto        layers.IPProtocol
+	TTL          uint8
 
-	dataOffsetIhl uint8
-
-	tcpOptionsFlag       uint8
-	tcpOptWinScaleOffset int
-	tcpOptMssOffset      int
-	tcpOptSackOffset     int
+	PortSrc    uint16
+	PortDst    uint16
+	PayloadLen uint16
+	TcpData    MetaPacketTcpHeader
 }
 
-var emptyMetaPacket = MetaPacket{
-	offsetMac0:           FIELD_SA_OFFSET,
-	offsetMac1:           FIELD_DA_OFFSET,
-	offsetIp0:            FIELD_SIP_OFFSET,
-	offsetIp1:            FIELD_DIP_OFFSET,
-	offsetPort0:          FIELD_SPORT_OFFSET,
-	offsetPort1:          FIELD_DPORT_OFFSET,
-	tcpOptWinScaleOffset: -1,
-	tcpOptMssOffset:      -1,
-	tcpOptSackOffset:     -1,
-}
-
-func NewMetaPacket() *MetaPacket {
-	m := emptyMetaPacket
-	return &m
-}
-
-func (m *MetaPacket) Reset() *MetaPacket {
-	*m = emptyMetaPacket
-	return m
-}
-
-func (m *MetaPacket) TcpOptionsSize() int {
-	if m.headerType != HEADER_TYPE_IPV4_TCP || m.l4OptSize == 0 {
-		return 0
+func getTcpFlags(t *layers.TCP) uint8 {
+	f := uint8(0)
+	if t.FIN {
+		f |= 0x01
 	}
-	size := 1
-	if m.tcpOptionsFlag&TCP_OPT_FLAG_MSS > 0 {
-		size += TCP_OPT_MSS_LEN - 2
+	if t.SYN {
+		f |= 0x02
 	}
-	if m.tcpOptionsFlag&TCP_OPT_FLAG_WIN_SCALE > 0 {
-		size += TCP_OPT_WIN_SCALE_LEN - 2
+	if t.RST {
+		f |= 0x04
 	}
-	return size + int(m.tcpOptionsFlag&TCP_OPT_FLAG_SACK)
+	if t.PSH {
+		f |= 0x08
+	}
+	if t.ACK {
+		f |= 0x10
+	}
+	if t.URG {
+		f |= 0x20
+	}
+	if t.ECE {
+		f |= 0x40
+	}
+	if t.CWR {
+		f |= 0x80
+	}
+	return f
 }
 
-func field(data []byte, offset int, len int) []byte { // inline
-	return data[offset : offset+len]
+func (m *MetaPacket) String() string {
+	s := reflect.ValueOf(m).Elem()
+	t := s.Type()
+	out := ""
+
+	for i := 0; i < s.NumField(); i++ {
+		f := s.Field(i)
+		name := t.Field(i).Tag.Get("fmt")
+		switch name {
+		case "tab+v+enter":
+			out += fmt.Sprintf("    %s: %+v\n", t.Field(i).Name, f.Interface())
+			break
+		case "pointer+enter":
+			out += fmt.Sprintf("%s: %p\n", t.Field(i).Name, f.Interface())
+			break
+		case "pointer":
+			out += fmt.Sprintf("%s: %p ", t.Field(i).Name, f.Interface())
+			break
+		case "":
+			out += fmt.Sprintf("%s: %v ", t.Field(i).Name, f.Interface())
+			break
+		case "tab":
+			out += fmt.Sprintf("    %s: %v ", t.Field(i).Name, f.Interface())
+			break
+		case "enter":
+			out += fmt.Sprintf("%s: %v\n", t.Field(i).Name, f.Interface())
+			break
+		case "+v":
+			out += fmt.Sprintf("%s: %+v", t.Field(i).Name, f.Interface())
+			break
+		case "enter++v":
+			out += fmt.Sprintf("%s: %+v\n", t.Field(i).Name, f.Interface())
+			break
+		case "hex":
+			out += fmt.Sprintf("%s: 0x%X ", t.Field(i).Name, f.Interface())
+			break
+		}
+	}
+	return out
 }
 
-func (m *MetaPacket) updateTcpOpt(packet []byte) {
-	offset := MIN_PACKET_SIZES[m.headerType] + m.l2L3OptSize
-	payloadOffset := offset + m.l4OptSize
-
-	for offset+1 < payloadOffset { // 如果不足2B，EOL和NOP都可以忽略
-		assumeLength := Max(int(packet[offset+1]), 2)
-		switch packet[offset] {
-		case TCPOptionKindEndList:
+func (m *MetaPacket) extractTcpOptions(rawPacket RawPacket, offset uint16, max uint16) {
+	for offset+1 < max { // 如果不足2B，EOL和NOP都可以忽略
+		assumeLength := uint16(Max(int(rawPacket[offset+1]), 2))
+		switch rawPacket[offset] {
+		case layers.TCPOptionKindEndList:
 			return
-		case TCPOptionKindNop:
+		case layers.TCPOptionKindNop:
 			offset++
-		case TCPOptionKindMSS:
-			if offset+TCP_OPT_MSS_LEN > payloadOffset {
+		case layers.TCPOptionKindWindowScale:
+			if offset+assumeLength > max {
 				return
 			}
-			m.tcpOptMssOffset = offset + 2
-			m.tcpOptionsFlag |= TCP_OPT_FLAG_MSS
-			offset += TCP_OPT_MSS_LEN
-		case TCPOptionKindWindowScale:
-			if offset+TCP_OPT_WIN_SCALE_LEN > payloadOffset {
-				return
-			}
-			m.tcpOptWinScaleOffset = offset + 2
-			m.tcpOptionsFlag |= TCP_OPT_FLAG_WIN_SCALE
-			offset += TCP_OPT_WIN_SCALE_LEN
-		case TCPOptionKindSACKPermitted:
-			m.tcpOptionsFlag |= TCP_OPT_FLAG_SACK_PERMIT
-			offset += 2
-		case TCPOptionKindSACK:
-			if offset+assumeLength > payloadOffset {
-				return
-			}
-			sackSize := assumeLength - 2
-			if sackSize > 32 {
-				return
-			}
-			m.tcpOptSackOffset = offset + 2
-			m.tcpOptionsFlag |= uint8(sackSize)
+			m.TcpData.WinScale = byte(rawPacket[offset+2])
 			offset += assumeLength
+		case layers.TCPOptionKindSACKPermitted:
+			m.TcpData.SACKPermitted = true
+			offset += 2
 		default: // others
 			offset += assumeLength
 		}
 	}
 }
 
-func (m *MetaPacket) SetTunnelInfo(tunnelInfo *TunnelInfo) *MetaPacket {
-	m.TunnelInfo = *tunnelInfo
+func NewMetaPacket(rawPacket RawPacket, inPort uint32, timestamp time.Duration, exporter net.IP) *MetaPacket {
+	m := &MetaPacket{InPort: inPort, Exporter: exporter, Timestamp: timestamp, Raw: rawPacket}
+	packet := gopacket.NewPacket(rawPacket, layers.LayerTypeEthernet,
+		gopacket.DecodeOptions{NoCopy: true, Lazy: true})
+	eth := packet.Layer(layers.LayerTypeEthernet).(*layers.Ethernet)
+	m.MacDst = eth.DstMAC
+	m.MacSrc = eth.SrcMAC
+	m.EthType = eth.EthernetType
+	if m.EthType == layers.EthernetTypeDot1Q {
+		vlan := packet.Layer(layers.LayerTypeDot1Q).(*layers.Dot1Q)
+		m.EthType = vlan.Type
+		m.Vlan = vlan.VLANIdentifier
+	}
+
+	if m.EthType != layers.EthernetTypeIPv4 {
+		return m
+	}
+
+	ip := packet.NetworkLayer().(*layers.IPv4)
+	m.IpSrc = IpToUint32(ip.SrcIP)
+	m.IpDst = IpToUint32(ip.DstIP)
+	m.TTL = ip.TTL
+	m.Proto = ip.Protocol
+	if m.Vlan > 0 {
+		m.PacketLen = 4
+	}
+	m.PacketLen += ip.Length + 14
+	if m.Proto == layers.IPProtocolTCP {
+		tcp := packet.Layer(layers.LayerTypeTCP).(*layers.TCP)
+		m.PortSrc = uint16(tcp.SrcPort)
+		m.PortDst = uint16(tcp.DstPort)
+		m.PayloadLen = ip.Length - uint16(tcp.DataOffset*4)
+		m.TcpData.Flags = getTcpFlags(tcp)
+		m.TcpData.Seq = tcp.Seq
+		m.TcpData.Ack = tcp.Ack
+		m.TcpData.WinSize = tcp.Window
+		m.extractTcpOptions(rawPacket, m.PacketLen-m.PayloadLen, m.PayloadLen)
+	} else if m.Proto == layers.IPProtocolUDP {
+		udp := packet.Layer(layers.LayerTypeUDP).(*layers.UDP)
+		m.PortSrc = uint16(udp.SrcPort)
+		m.PortDst = uint16(udp.DstPort)
+		m.PayloadLen = udp.Length - 8
+	}
 	return m
-}
-
-func (m *MetaPacket) Update(packet []byte, srcEndpoint, dstEndpoint bool, timestamp int64) bool {
-	m.timestamp = timestamp
-	m.srcEndpoint, m.dstEndpoint = srcEndpoint, dstEndpoint
-	m.packetSize = len(packet)
-	sizeChecker := len(packet)
-
-	// ETH
-	sizeChecker -= MIN_HEADER_SIZES[HEADER_TYPE_ETH]
-	if sizeChecker < 0 {
-		return false
-	}
-	vlanTagSize := 0
-	ethType := EthernetType(BigEndian.Uint16(packet[FIELD_ETH_TYPE_OFFSET:]))
-	if ethType == EthernetTypeDot1Q {
-		vlanTagSize = 4
-		sizeChecker -= vlanTagSize
-		if sizeChecker < 0 {
-			return false
-		}
-		ethType = EthernetType(BigEndian.Uint16(packet[FIELD_ETH_TYPE_OFFSET+vlanTagSize:]))
-	}
-
-	m.headerType = HEADER_TYPE_ETH
-	m.vlanTagSize = vlanTagSize
-	if dstEndpoint { // Inbound
-		m.offsetMac0, m.offsetMac1 = m.offsetMac1, m.offsetMac0
-	}
-
-	switch ethType {
-	case EthernetTypeARP:
-		sizeChecker -= MIN_HEADER_SIZES[HEADER_TYPE_ARP]
-		if sizeChecker < 0 {
-			return true
-		}
-		m.headerType = HEADER_TYPE_ARP
-		return true
-	case EthernetTypeIPv4:
-		sizeChecker -= MIN_HEADER_SIZES[HEADER_TYPE_IPV4]
-		if sizeChecker < 0 {
-			return true
-		}
-		break
-	default:
-		return true
-	}
-
-	// IPv4
-	m.headerType = HEADER_TYPE_IPV4
-	ihl := int(packet[FIELD_IHL_OFFSET+vlanTagSize] & 0xF)
-	m.dataOffsetIhl = uint8(ihl)
-
-	m.offsetIp0 += vlanTagSize
-	m.offsetIp1 += vlanTagSize
-	if m.dstEndpoint {
-		m.offsetIp0, m.offsetIp1 = m.offsetIp1, m.offsetIp0
-	}
-
-	totalLength := int(BigEndian.Uint16(packet[FIELD_TOTAL_LEN_OFFSET+vlanTagSize:]))
-	m.packetSize = totalLength + MIN_PACKET_SIZES[HEADER_TYPE_ETH] + vlanTagSize
-
-	l3OptSize := int(ihl)*4 - 20
-	sizeChecker -= l3OptSize
-	if sizeChecker < 0 {
-		return true
-	}
-	m.l2L3OptSize = vlanTagSize + l3OptSize
-
-	if BigEndian.Uint16(packet[FIELD_FRAG_OFFSET+vlanTagSize:])&0xFFF > 0 { // fragment
-		m.headerType = HEADER_TYPE_IPV4
-		return true
-	}
-
-	ipProtocol := IPProtocol(packet[FIELD_PROTO_OFFSET+vlanTagSize])
-	switch ipProtocol {
-	case IPProtocolICMPv4:
-		sizeChecker -= MIN_HEADER_SIZES[HEADER_TYPE_IPV4_ICMP]
-		if sizeChecker < 0 {
-			return true
-		}
-		switch packet[FIELD_ICMP_TYPE_CODE_OFFSET+m.l2L3OptSize] {
-		case ICMPv4TypeDestinationUnreachable:
-			fallthrough
-		case ICMPv4TypeSourceQuench:
-			fallthrough
-		case ICMPv4TypeRedirect:
-			fallthrough
-		case ICMPv4TypeTimeExceeded:
-			fallthrough
-		case ICMPv4TypeParameterProblem:
-			m.l4OptSize = FIELD_ICMP_REST_LEN
-			sizeChecker -= m.l4OptSize
-			if sizeChecker < 0 {
-				m.l4OptSize = 0
-				return true
-			}
-		}
-		m.headerType = HEADER_TYPE_IPV4_ICMP
-		return true
-	case IPProtocolUDP:
-		sizeChecker -= MIN_HEADER_SIZES[HEADER_TYPE_IPV4_UDP]
-		if sizeChecker < 0 {
-			return true
-		}
-		m.headerType = HEADER_TYPE_IPV4_UDP
-	case IPProtocolTCP:
-		sizeChecker -= MIN_HEADER_SIZES[HEADER_TYPE_IPV4_TCP]
-		if sizeChecker < 0 {
-			return true
-		}
-		dataOffset := packet[FIELD_TCP_DATAOFF_OFFSET+m.l2L3OptSize] >> 4
-		m.dataOffsetIhl |= dataOffset << 4
-		m.l4OptSize = int(dataOffset*4) - 20
-		sizeChecker -= m.l4OptSize
-		if sizeChecker < 0 {
-			return true
-		}
-		m.headerType = HEADER_TYPE_IPV4_TCP
-		if dataOffset > 5 {
-			m.updateTcpOpt(packet)
-		}
-	default:
-		return true
-	}
-
-	if m.headerType == HEADER_TYPE_IPV4_UDP || m.headerType == HEADER_TYPE_IPV4_TCP {
-		m.offsetPort0 += m.l2L3OptSize
-		m.offsetPort1 += m.l2L3OptSize
-		if m.dstEndpoint {
-			m.offsetPort0, m.offsetPort1 = m.offsetPort1, m.offsetPort0
-		}
-	}
-	return true
 }

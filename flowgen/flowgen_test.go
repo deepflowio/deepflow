@@ -14,6 +14,7 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
 
 	"gitlab.x.lan/yunshan/droplet/handler"
+	. "gitlab.x.lan/yunshan/droplet/utils"
 )
 
 const DEFAULT_QUEUE_LEN = 200
@@ -22,21 +23,21 @@ const DEFAULT_INTERVAL_SEC_LOW = 10
 const DEFAULT_DURATION_MSEC = time.Millisecond * 123
 const DEFAULT_PKT_LEN = 128
 
-func getDefaultPacket() *handler.MetaPacketHeader {
-	packet := &handler.MetaPacketHeader{}
+func getDefaultPacket() *handler.MetaPacket {
+	packet := &handler.MetaPacket{}
 	packet.MacSrc, _ = net.ParseMAC("12:34:56:78:9A:BC")
 	packet.MacDst, _ = net.ParseMAC("21:43:65:87:A9:CB")
 	packet.PacketLen = DEFAULT_PKT_LEN
 	packet.Proto = 6
-	packet.IpSrc = net.ParseIP("8.8.8.8")
-	packet.IpDst = net.ParseIP("114.114.114.114")
+	packet.IpSrc = IpToUint32(net.ParseIP("8.8.8.8").To4())
+	packet.IpDst = IpToUint32(net.ParseIP("114.114.114.114").To4())
 	packet.PortSrc = 12345
 	packet.PortDst = 22
 	packet.InPort = 65533
 	packet.Exporter = net.ParseIP("192.168.1.1")
 	packet.TcpData.Flags = TCP_SYN
 	packet.Timestamp = time.Duration(time.Now().UnixNano())
-	packet.EndPointData = &EndpointData{
+	packet.EndpointData = &EndpointData{
 		SrcInfo: &EndpointInfo{
 			L2EpcId:  -1,
 			L3EpcId:  -1,
@@ -53,7 +54,7 @@ func getDefaultPacket() *handler.MetaPacketHeader {
 	return packet
 }
 
-func reversePacket(packet *handler.MetaPacketHeader) {
+func reversePacket(packet *handler.MetaPacket) {
 	packet.MacSrc, packet.MacDst = packet.MacDst, packet.MacSrc
 	packet.IpSrc, packet.IpDst = packet.IpDst, packet.IpSrc
 	packet.PortSrc, packet.PortDst = packet.PortDst, packet.PortSrc
@@ -158,7 +159,7 @@ func TestHandleMultiPacket(t *testing.T) {
 	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
 	flowOutQueue := flowGenerator.flowOutQueue
 	var waitGroup sync.WaitGroup
-	var packet *handler.MetaPacketHeader
+	var packet *handler.MetaPacket
 	var taggedFlow *TaggedFlow
 	num := DEFAULT_QUEUE_LEN / 2
 
@@ -264,10 +265,9 @@ func TestInitFlow(t *testing.T) {
 		t.Errorf("taggedFlow.MacSrc is %s, packet.MacSrc is %s", taggedFlow.MACSrc.String(), packet.MacSrc.String())
 		t.Errorf("taggedFlow.MacDst is %s, packet.MacDst is %s", taggedFlow.MACDst.String(), packet.MacDst.String())
 	}
-	if strings.Compare(taggedFlow.IPSrc.String(), packet.IpSrc.String()) != 0 ||
-		strings.Compare(taggedFlow.IPDst.String(), packet.IpDst.String()) != 0 {
-		t.Errorf("taggedFlow.IpSrc is %s, packet.IpSrc is %s", taggedFlow.IPSrc.String(), packet.IpSrc.String())
-		t.Errorf("taggedFlow.IpDst is %s, packet.IpDst is %s", taggedFlow.IPDst.String(), packet.IpDst.String())
+	if taggedFlow.IPSrc.Int() != packet.IpSrc || taggedFlow.IPDst.Int() != packet.IpDst {
+		t.Errorf("taggedFlow.IpSrc is %s, packet.IpSrc is %s", taggedFlow.IPSrc.String(), IpFromUint32(packet.IpSrc).String())
+		t.Errorf("taggedFlow.IpDst is %s, packet.IpDst is %s", taggedFlow.IPDst.String(), IpFromUint32(packet.IpDst).String())
 	}
 	if flowKey.Proto != packet.Proto {
 		t.Errorf("flowKey.Proto is %d, packet.Proto is %d", taggedFlow.Proto, packet.Proto)

@@ -6,6 +6,13 @@ import (
 	"time"
 
 	. "github.com/google/gopacket/layers"
+
+	. "gitlab.x.lan/yunshan/droplet/utils"
+)
+
+const (
+	DELTA_TIMESTAMP_LEN = 2
+	PACKET_STREAM_END   = 1<<(DELTA_TIMESTAMP_LEN*8) - 1
 )
 
 type Decoded struct {
@@ -93,14 +100,14 @@ func (d *SequentialDecoder) Seq() uint32 {
 	return d.seq
 }
 
-func (d *SequentialDecoder) decodeTunnel(meta *MetaPacketHeader) {
-	meta.TunnelData.TunnelDst = net.IP(d.data.Field(IP_ADDR_LEN))
-	meta.TunnelData.TunnelSrc = net.IP(d.data.Field(IP_ADDR_LEN))
-	meta.TunnelData.TunnelId = uint32((d.data.U8()))<<16 | uint32(d.data.U16())
-	meta.TunnelData.TunnelType = TunnelType(d.data.U8())
+func (d *SequentialDecoder) decodeTunnel(meta *MetaPacket) {
+	meta.TunnelDst = net.IP(d.data.Field(IP_ADDR_LEN))
+	meta.TunnelSrc = net.IP(d.data.Field(IP_ADDR_LEN))
+	meta.TunnelId = uint32((d.data.U8()))<<16 | uint32(d.data.U16())
+	meta.TunnelType = TunnelType(d.data.U8())
 }
 
-func (d *SequentialDecoder) decodeEthernet(meta *MetaPacketHeader) {
+func (d *SequentialDecoder) decodeEthernet(meta *MetaPacket) {
 	x := d.x
 	if !d.pflags.IsSet(CFLAG_MAC0) {
 		x.mac0 = net.HardwareAddr(d.data.Field(MAC_ADDR_LEN))
@@ -134,7 +141,7 @@ func (d *SequentialDecoder) decodeEthernet(meta *MetaPacketHeader) {
 	}
 }
 
-func (d *SequentialDecoder) decodeIPv4(meta *MetaPacketHeader) {
+func (d *SequentialDecoder) decodeIPv4(meta *MetaPacket) {
 	x := d.x
 	if !d.pflags.IsSet(CFLAG_DATAOFF_IHL) {
 		b := d.data.U8()
@@ -159,11 +166,11 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPacketHeader) {
 	}
 	meta.TTL = x.ttl
 	if d.direction == "->" {
-		meta.IpSrc = x.ip0
-		meta.IpDst = x.ip1
+		meta.IpSrc = IpToUint32(x.ip0)
+		meta.IpDst = IpToUint32(x.ip1)
 	} else {
-		meta.IpSrc = x.ip1
-		meta.IpDst = x.ip0
+		meta.IpSrc = IpToUint32(x.ip1)
+		meta.IpDst = IpToUint32(x.ip0)
 	}
 	if x.headerType == HEADER_TYPE_IPV4_ICMP {
 		meta.Proto = IPProtocolICMPv4
@@ -193,7 +200,7 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPacketHeader) {
 	d.decodeL4(meta)
 }
 
-func (d *SequentialDecoder) decodeL4(meta *MetaPacketHeader) {
+func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 	x := d.x
 	if !d.pflags.IsSet(CFLAG_PORT0) {
 		x.port0 = d.data.U16()
@@ -263,7 +270,7 @@ func (d *SequentialDecoder) DecodeHeader() uint32 {
 	return ifMacSuffix & 0xffff
 }
 
-func (d *SequentialDecoder) NextPacket(meta *MetaPacketHeader) bool {
+func (d *SequentialDecoder) NextPacket(meta *MetaPacket) bool {
 	delta := d.data.U16()
 	if delta == PACKET_STREAM_END {
 		return true

@@ -281,7 +281,7 @@ func (p *TcpSessionPeer) assertSeqNumber(tcpHeader *handler.MetaPacketTcpHeader,
 }
 
 // 在TCP_STATE_ESTABLISHED阶段更新数据
-func (p *TcpSessionPeer) updateData(header *handler.MetaPacketHeader) {
+func (p *TcpSessionPeer) updateData(header *handler.MetaPacket) {
 	tcpHeader := header.TcpData
 	p.timestamp = time.Duration(header.Timestamp)
 	p.payloadLen = uint32(header.PayloadLen)
@@ -320,7 +320,7 @@ func (p *TcpSessionPeer) String() string {
 	return fmt.Sprintf("TcpSessionPeer: %s, seqList:[%s]", data, list)
 }
 
-func isAckPacket(header *handler.MetaPacketHeader) bool {
+func isAckPacket(header *handler.MetaPacket) bool {
 	tcpflag := header.TcpData.Flags
 	payloadLen := header.PayloadLen
 	if tcpflag == TCP_ACK && payloadLen == 0 {
@@ -340,7 +340,7 @@ func calcTimeInterval(currentTime, lastTime time.Duration) time.Duration {
 }
 
 // 用第一个包,构建初始状态
-func (f *FlowPerfCtrlInfo) firstPacket(header *handler.MetaPacketHeader) error {
+func (f *FlowPerfCtrlInfo) firstPacket(header *handler.MetaPacket) error {
 	tcpHeader := &header.TcpData
 	client := &f.tcpSession[utils.Bool2Int(TCP_DIR_CLIENT)]
 	server := &f.tcpSession[utils.Bool2Int(TCP_DIR_SERVER)]
@@ -374,7 +374,7 @@ func (f *FlowPerfCtrlInfo) firstPacket(header *handler.MetaPacketHeader) error {
 	return nil
 }
 
-func (m *MetaFlowPerf) fsmListen(sameDirection, oppositeDirection *TcpSessionPeer, header *handler.MetaPacketHeader, direction bool) error {
+func (m *MetaFlowPerf) fsmListen(sameDirection, oppositeDirection *TcpSessionPeer, header *handler.MetaPacket, direction bool) error {
 	var err FlowPerfError
 
 	tcpHeader := &header.TcpData
@@ -413,7 +413,7 @@ func (m *MetaFlowPerf) fsmListen(sameDirection, oppositeDirection *TcpSessionPee
 	return err.returnError()
 }
 
-func (m *MetaFlowPerf) fsmSynSent(sameDirection, oppositeDirection *TcpSessionPeer, header *handler.MetaPacketHeader, direction bool) error {
+func (m *MetaFlowPerf) fsmSynSent(sameDirection, oppositeDirection *TcpSessionPeer, header *handler.MetaPacket, direction bool) error {
 	var err FlowPerfError
 	perfData := m.perfData
 	tcpHeader := &header.TcpData
@@ -448,7 +448,7 @@ func (m *MetaFlowPerf) fsmSynSent(sameDirection, oppositeDirection *TcpSessionPe
 	return err.returnError()
 }
 
-func (m *MetaFlowPerf) fsmSynRecv(sameDirection, oppositeDirection *TcpSessionPeer, header *handler.MetaPacketHeader, direction bool) error {
+func (m *MetaFlowPerf) fsmSynRecv(sameDirection, oppositeDirection *TcpSessionPeer, header *handler.MetaPacket, direction bool) error {
 	var err FlowPerfError
 	perfData := m.perfData
 	tcpHeader := &header.TcpData
@@ -473,7 +473,7 @@ func (m *MetaFlowPerf) fsmSynRecv(sameDirection, oppositeDirection *TcpSessionPe
 // same.seq+len == opposite.seq
 // 反方向连续
 // same.Ack == oppositeDirection.Seq + len
-func (m *MetaFlowPerf) fsmEstablished(sameDirection, oppositeDirection *TcpSessionPeer, header *handler.MetaPacketHeader, direction bool) error {
+func (m *MetaFlowPerf) fsmEstablished(sameDirection, oppositeDirection *TcpSessionPeer, header *handler.MetaPacket, direction bool) error {
 	var err FlowPerfError
 	perfData := m.perfData
 	tcpHeader := &header.TcpData
@@ -552,7 +552,7 @@ func (m *MetaFlowPerf) fsmEstablished(sameDirection, oppositeDirection *TcpSessi
 
 // 根据flag, direction, payloadLen或PSH,seq,ack重建状态机
 // assume：包已经过预处理，无异常flag包，也没有与功能无关包（不关心报文）
-func (m *MetaFlowPerf) reestablishFsm(sameDirection, oppositeDirection *TcpSessionPeer, header *handler.MetaPacketHeader, direction bool) uint32 {
+func (m *MetaFlowPerf) reestablishFsm(sameDirection, oppositeDirection *TcpSessionPeer, header *handler.MetaPacket, direction bool) uint32 {
 	var err error
 	stateOppst := oppositeDirection.tcpState
 	state := sameDirection.tcpState
@@ -739,7 +739,7 @@ func NewMetaFlowPerf() *MetaFlowPerf {
 
 // 异常flag判断，方向识别，payloadLen计算等
 // 去除功能不相关报文
-func (m *MetaFlowPerf) preprocess(header *handler.MetaPacketHeader) bool {
+func (m *MetaFlowPerf) preprocess(header *handler.MetaPacket) bool {
 	if ok := checkTcpFlags(header.TcpData.Flags); !ok {
 		m.counter.invalidPacketCount += 1
 
@@ -751,7 +751,7 @@ func (m *MetaFlowPerf) preprocess(header *handler.MetaPacketHeader) bool {
 }
 
 // update flow performace quantify state and data
-func (m *MetaFlowPerf) Update(header *handler.MetaPacketHeader, direction bool) error {
+func (m *MetaFlowPerf) Update(header *handler.MetaPacket, direction bool) error {
 	var err FlowPerfError
 	var sameDirection, oppositeDirection *TcpSessionPeer
 

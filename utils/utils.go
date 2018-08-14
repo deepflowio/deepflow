@@ -6,20 +6,6 @@ import (
 	"strings"
 )
 
-func Mac2Uint32(mac net.HardwareAddr) uint32 {
-	return binary.BigEndian.Uint32(mac[2:])
-}
-
-func Mac2Uint64(mac net.HardwareAddr) uint64 {
-	return uint64(binary.BigEndian.Uint16(mac[:]))<<32 | uint64(binary.BigEndian.Uint32(mac[2:]))
-}
-
-func Uint64ToMac(v uint64) net.HardwareAddr {
-	bytes := [8]byte{}
-	binary.BigEndian.PutUint64(bytes[:], v)
-	return net.HardwareAddr(bytes[2:])
-}
-
 func FindInterfaceByIp(ip string) *net.Interface {
 	interfaces, err := net.Interfaces()
 	if err != nil {
@@ -57,20 +43,13 @@ func Max(x, y int) int {
 	return y
 }
 
-// FIXME: net.IP和uint32的转换，需要寻找替代接口或优化性能
-func IPToUInt32(ip net.IP) uint32 {
-	if len(ip) == 0 {
-		return 0
-	}
-	if len(ip) == 16 {
-		return binary.BigEndian.Uint32(ip[12:16])
-	}
-	return binary.BigEndian.Uint32(ip)
+func IpToUint32(ip net.IP) uint32 {
+	return binary.BigEndian.Uint32(ip.To4())
 }
 
-func UInt32ToIP(uip uint32) net.IP {
-	ip := make(net.IP, 4)
-	binary.BigEndian.PutUint32(ip, uip)
+func IpFromUint32(ipInt uint32) net.IP {
+	ip := make([]byte, net.IPv4len)
+	binary.BigEndian.PutUint32(ip, ipInt)
 	return ip
 }
 

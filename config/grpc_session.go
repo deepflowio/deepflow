@@ -1,4 +1,4 @@
-package rpc
+package config
 
 import (
 	"errors"
@@ -29,8 +29,8 @@ type GRpcInitiator struct {
 	synchronized bool
 }
 
-func NewGRpcInitiator(ips []net.IP, port uint16, timeout time.Duration) GRpcInitiator {
-	return GRpcInitiator{
+func NewGRpcInitiator(ips []net.IP, port uint16, timeout time.Duration) RpcSession {
+	return &GRpcInitiator{
 		ips:          ips,
 		port:         port,
 		timeout:      timeout,

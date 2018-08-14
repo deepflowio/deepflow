@@ -10,9 +10,9 @@ import (
 
 	"github.com/op/go-logging"
 	"github.com/spf13/cobra"
-
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
 	"gitlab.x.lan/yunshan/droplet/handler"
 	. "gitlab.x.lan/yunshan/droplet/utils"
@@ -145,13 +145,16 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) {
 	ifMacSuffix := decoder.DecodeHeader()
 
 	for {
-		meta := &(handler.MetaPacketHeader{InPort: ifMacSuffix | handler.CAPTURE_REMOTE, Exporter: UInt32ToIP(ip)})
+		meta := &handler.MetaPacket{
+			InPort:   ifMacSuffix | handler.CAPTURE_REMOTE,
+			Exporter: IpFromUint32(ip),
+		}
 		if decoder.NextPacket(meta) {
 			break
 		}
 
 		a.counter.TxPackets++
-		hash := meta.InPort + IPToUInt32(meta.IpSrc) + IPToUInt32(meta.IpDst) +
+		hash := meta.InPort + meta.IpSrc + meta.IpDst +
 			uint32(meta.Proto) + uint32(meta.PortSrc) + uint32(meta.PortDst)
 		a.queues[hash%uint32(a.queueCount)].Put(meta)
 	}
@@ -168,7 +171,7 @@ func (a *TridentAdapter) run() {
 
 		decoder := handler.NewSequentialDecoder(data)
 		decoder.DecodeHeader()
-		a.findAndAdd(data, IPToUInt32(remote.IP), decoder.Seq())
+		a.findAndAdd(data, IpToUint32(remote.IP), decoder.Seq())
 	}
 	a.listener.Close()
 	log.Info("Stopped trident adapter")
