@@ -4,7 +4,6 @@ import (
 	"net"
 	"runtime"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -48,6 +47,7 @@ func getDefaultPacket() *handler.MetaPacket {
 			L2EpcId:  -1,
 			L3EpcId:  -1,
 			GroupIds: make([]uint32, 10),
+			HostIp:   0x01010101,
 		},
 	}
 
@@ -87,11 +87,12 @@ func TestHandleSynRst(t *testing.T) {
 	flowGenerator := getDefaultFlowGenerator()
 	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
 	flowOutQueue := flowGenerator.flowOutQueue
-
+	SetTimeout(TimeoutConfig{0, 1800, 30, 30, 5, 0, 5})
+	flowGenerator.minLoopIntervalSec = 0
 	packet0 := getDefaultPacket()
 	metaPacketHeaderInQueue.(Queue).Put(packet0)
 
-	go flowGenerator.handle()
+	flowGenerator.Start()
 
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Flags = TCP_RST
@@ -119,51 +120,49 @@ func TestHandleSynFin(t *testing.T) {
 	flowGenerator := getDefaultFlowGenerator()
 	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
 	flowOutQueue := flowGenerator.flowOutQueue
+	SetTimeout(TimeoutConfig{5, 1800, 0, 30, 5, 0, 5})
+	flowGenerator.minLoopIntervalSec = 0
 
 	packet0 := getDefaultPacket()
-	packet0.TcpData.Flags = TCP_SYN | TCP_ACK | TCP_FIN
 	metaPacketHeaderInQueue.(Queue).Put(packet0)
 
 	packet1 := getDefaultPacket()
-	packet1.TcpData.Flags = TCP_PSH
+	packet1.TcpData.Flags = TCP_PSH | TCP_ACK
 	metaPacketHeaderInQueue.(Queue).Put(packet1)
 
-	go flowGenerator.handle()
+	go flowGenerator.Start()
 
 	packet2 := getDefaultPacket()
-	packet2.TcpData.Flags = TCP_SYN | TCP_ACK | TCP_FIN
+	packet2.TcpData.Flags = TCP_ACK | TCP_FIN
 	packet2.Timestamp += DEFAULT_DURATION_MSEC
 	reversePacket(packet2)
 	metaPacketHeaderInQueue.(Queue).Put(packet2)
 
 	var taggedFlow *TaggedFlow
 	taggedFlow = flowOutQueue.(Queue).Get().(*TaggedFlow)
-	if taggedFlow == nil {
-		t.Error("flow is nil")
-	} else {
-		if taggedFlow.CloseType != CLOSE_TYPE_FIN {
-			t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_FIN)
-		}
-		if taggedFlow.TCPFlags0 != TCP_SYN|TCP_ACK|TCP_FIN|TCP_PSH ||
-			taggedFlow.TCPFlags1 != TCP_SYN|TCP_ACK|TCP_FIN {
-			t.Errorf("taggedFlow.TCPFlags0 is %d, expect %d", taggedFlow.TCPFlags0, TCP_SYN|TCP_ACK|TCP_FIN)
-			t.Errorf("taggedFlow.TCPFlags1 is %d, expect %d", taggedFlow.TCPFlags1, TCP_SYN|TCP_ACK|TCP_FIN)
-		}
-		t.Logf("\n" + TaggedFlowString(taggedFlow))
+	if taggedFlow.CloseType != CLOSE_TYPE_HALF_CLOSE {
+		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_HALF_CLOSE)
 	}
+	if taggedFlow.TCPFlags0 != TCP_SYN|TCP_PSH|TCP_ACK ||
+		taggedFlow.TCPFlags1 != TCP_ACK|TCP_FIN {
+		t.Errorf("taggedFlow.TCPFlags0 is %x, expect %x", taggedFlow.TCPFlags0, TCP_SYN|TCP_ACK|TCP_PSH)
+		t.Errorf("taggedFlow.TCPFlags1 is %x, expect %x", taggedFlow.TCPFlags1, TCP_ACK|TCP_FIN)
+	}
+	t.Logf("\n" + TaggedFlowString(taggedFlow))
 }
 
 func TestHandleMultiPacket(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator := getDefaultFlowGenerator()
+	SetTimeout(TimeoutConfig{0, 1800, 30, 30, 5, 0, 5})
+	flowGenerator.minLoopIntervalSec = 0
 	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
 	flowOutQueue := flowGenerator.flowOutQueue
-	var waitGroup sync.WaitGroup
 	var packet *handler.MetaPacket
 	var taggedFlow *TaggedFlow
 	num := DEFAULT_QUEUE_LEN / 2
 
-	go flowGenerator.handle()
+	go flowGenerator.Start()
 
 	// direct 0
 	for i := 0; i < num; i++ {
@@ -172,17 +171,6 @@ func TestHandleMultiPacket(t *testing.T) {
 		packet.PortDst = uint16(i)
 		metaPacketHeaderInQueue.(Queue).Put(packet)
 	}
-
-	waitGroup.Add(1)
-	go func() {
-		for flowGenerator.stats.CurrNumFlows != uint64(num) {
-			continue
-		}
-		t.Logf("flowGenerator.stats.CurrNumFlows is %d, expect %d", flowGenerator.stats.CurrNumFlows, num)
-		waitGroup.Done()
-	}()
-	// to wait for handler finish all packets
-	waitGroup.Wait()
 
 	// direct 1
 	for i := 0; i < num; i++ {
@@ -195,10 +183,7 @@ func TestHandleMultiPacket(t *testing.T) {
 
 	for i := 0; i < num; i++ {
 		taggedFlow = flowOutQueue.(Queue).Get().(*TaggedFlow)
-		if taggedFlow == nil {
-			t.Errorf("taggedFlow is nil at i=%d", i)
-			break
-		} else if taggedFlow.TotalPacketCount0 != 1 ||
+		if taggedFlow.TotalPacketCount0 != 1 ||
 			taggedFlow.TotalPacketCount1 != 1 {
 			t.Error("taggedFlow.TotalPacketCount0 and taggedFlow.TotalPacketCount1 are not 1")
 		}
@@ -282,18 +267,16 @@ func TestPlatformData(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator := getDefaultFlowGenerator()
 	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
-	SetTimeout(TimeoutConfig{0, 1800, 30, 30, 5, 0})
+	SetTimeout(TimeoutConfig{0, 1800, 0, 30, 5, 0, 0})
 	flowGenerator.minLoopIntervalSec = 0
 	flowOutQueue := flowGenerator.flowOutQueue
 
-	flowGenerator.Start()
-
 	packet1 := getDefaultPacket()
-	//packet1.TcpData.Flags = TCP_RST
-	packet1.Timestamp += DEFAULT_DURATION_MSEC
 	packet1.TcpData.Seq = 1111
 	packet1.TcpData.Ack = 112
 	metaPacketHeaderInQueue.(Queue).Put(packet1)
+
+	flowGenerator.Start()
 
 	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
 	if taggedFlow.CloseType != CLOSE_TYPE_HALF_OPEN {
@@ -316,43 +299,37 @@ func TestTCPStateMachine(t *testing.T) {
 	var packetFlags uint8
 
 	taggedFlow.CloseType = CLOSE_TYPE_UNKNOWN
-	flowExtra.flowState = FLOW_STATE_OPENING
+	flowExtra.flowState = FLOW_STATE_OPENING_1
 
 	// test handshake
-	taggedFlow.TCPFlags0 = TCP_SYN | TCP_ACK
-	flowExtra.timeoutSec = TIMEOUT_OPENING
+	taggedFlow.TCPFlags0 = TCP_SYN
 	packetFlags = TCP_SYN | TCP_ACK
 	flowExtra.updateTCPStateMachine(packetFlags, true)
-	flowExtra.calcCloseType()
-	if taggedFlow.CloseType != CLOSE_TYPE_FORCE_REPORT ||
-		flowExtra.flowState != FLOW_STATE_ESTABLISHED {
-		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_FORCE_REPORT)
-		t.Errorf("flowExtra.FlowState is %d, expecct %d", flowExtra.flowState, FLOW_STATE_ESTABLISHED)
+	if flowExtra.flowState != FLOW_STATE_OPENING_2 {
+		t.Errorf("flowExtra.FlowState is %d, expect %d", flowExtra.flowState, FLOW_STATE_OPENING_2)
+	}
+	packetFlags = TCP_ACK
+	flowExtra.updateTCPStateMachine(packetFlags, false)
+	if flowExtra.flowState != FLOW_STATE_ESTABLISHED {
+		t.Errorf("flowExtra.FlowState is %d, expect %d", flowExtra.flowState, FLOW_STATE_ESTABLISHED)
 	}
 
-	// test fin close
-	taggedFlow.TCPFlags0 = TCP_FIN | TCP_ACK | TCP_SYN
-	flowExtra.timeoutSec = TIMEOUT_CLOSING
-	flowExtra.flowState = FLOW_STATE_CLOSING
+	// test fin
+	taggedFlow.TCPFlags0 = TCP_FIN
+	flowExtra.flowState = FLOW_STATE_CLOSING_TX1
+	packetFlags = TCP_ACK
+	flowExtra.updateTCPStateMachine(packetFlags, true)
+	if flowExtra.flowState != FLOW_STATE_CLOSING_TX1 {
+		t.Errorf("flowExtra.FlowState is %d, expect %d", flowExtra.flowState, FLOW_STATE_CLOSING_TX1)
+	}
 	packetFlags = TCP_FIN | TCP_ACK
 	flowExtra.updateTCPStateMachine(packetFlags, true)
-	flowExtra.calcCloseType()
-	if taggedFlow.CloseType != CLOSE_TYPE_FIN ||
-		flowExtra.flowState != FLOW_STATE_CLOSED {
-		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_FIN)
-		t.Errorf("flowExtra.FlowState is %d, expect %d", flowExtra.flowState, FLOW_STATE_CLOSING)
+	if flowExtra.flowState != FLOW_STATE_CLOSING_TX2 {
+		t.Errorf("flowExtra.FlowState is %d, expect %d", flowExtra.flowState, FLOW_STATE_CLOSING_TX2)
 	}
-
-	// test rst close
-	taggedFlow.TCPFlags0 = TCP_SYN
-	flowExtra.timeoutSec = TIMEOUT_OPENING
-	flowExtra.flowState = FLOW_STATE_OPENING
-	packetFlags = TCP_RST | TCP_ACK | TCP_PSH
-	flowExtra.updateTCPStateMachine(packetFlags, true)
-	flowExtra.calcCloseType()
-	if taggedFlow.CloseType != CLOSE_TYPE_RST ||
-		flowExtra.flowState != FLOW_STATE_CLOSED {
-		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_RST)
+	packetFlags = TCP_ACK
+	flowExtra.updateTCPStateMachine(packetFlags, false)
+	if flowExtra.flowState != FLOW_STATE_CLOSED {
 		t.Errorf("flowExtra.FlowState is %d, expect %d", flowExtra.flowState, FLOW_STATE_CLOSED)
 	}
 }
@@ -397,31 +374,6 @@ func TestHandshakePerf(t *testing.T) {
 	t.Logf("\n" + TaggedFlowString(taggedFlow))
 }
 
-func TestTimeoutReport(t *testing.T) {
-	runtime.GOMAXPROCS(4)
-	flowGenerator := getDefaultFlowGenerator()
-	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
-	flowGenerator.minLoopIntervalSec = 0
-	SetTimeout(TimeoutConfig{0, 1800, 30, 30, 5, 0})
-	flowOutQueue := flowGenerator.flowOutQueue
-
-	flowGenerator.Start()
-
-	packet := getDefaultPacket()
-	metaPacketHeaderInQueue.(Queue).Put(packet)
-
-	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
-
-	if taggedFlow.CloseType != CLOSE_TYPE_HALF_OPEN {
-		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_HALF_OPEN)
-	}
-	t.Logf("\n" + TaggedFlowString(taggedFlow))
-	if flowGenerator.stats.CurrNumFlows != 0 || flowGenerator.stats.TotalNumFlows != 1 {
-		t.Errorf("flowGenerator.stats.CurrNumFlows is %d, expect 0", flowGenerator.stats.CurrNumFlows)
-		t.Errorf("flowGenerator.stats.TotalNumFlows is %d, expect 1", flowGenerator.stats.TotalNumFlows)
-	}
-}
-
 func TestForceReport(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator := getDefaultFlowGenerator()
@@ -429,15 +381,14 @@ func TestForceReport(t *testing.T) {
 	flowGenerator.minLoopIntervalSec = 0
 	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
 	flowOutQueue := flowGenerator.flowOutQueue
-
 	packet0 := getDefaultPacket()
 	packet0.TcpData.Flags = TCP_SYN | TCP_ACK
 	metaPacketHeaderInQueue.(Queue).Put(packet0)
-
-	packet1 := getDefaultPacket()
-	packet1.TcpData.Flags = TCP_PSH
-	metaPacketHeaderInQueue.(Queue).Put(packet1)
-
+	/*
+		packet1 := getDefaultPacket()
+		packet1.TcpData.Flags = TCP_PSH
+		metaPacketHeaderInQueue.(Queue).Put(packet1)
+	*/
 	packet2 := getDefaultPacket()
 	packet2.TcpData.Flags = TCP_SYN | TCP_ACK
 	packet2.Timestamp += DEFAULT_DURATION_MSEC

@@ -1,7 +1,6 @@
 package droplet
 
 import (
-	"fmt"
 	"net"
 	"time"
 
@@ -67,7 +66,7 @@ func Start(configPath string) {
 	go func() {
 		for {
 			taggedFlow := flowAppOutputQueue.Get().(*TaggedFlow)
-			fmt.Println(flowgen.TaggedFlowString(taggedFlow))
+			log.Info(flowgen.TaggedFlowString(taggedFlow))
 			(&mapreduce.MapProcessor{}).FlowHandler(taggedFlow)
 		}
 	}()

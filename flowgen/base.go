@@ -21,6 +21,8 @@ const (
 	TCP_URG
 )
 
+const TCP_FLAG_MASK = 0x3f
+
 const (
 	CLOSE_TYPE_UNKNOWN      = iota
 	CLOSE_TYPE_FIN                     // 基于TCP FIN判断连接已结束
@@ -34,22 +36,28 @@ const (
 
 type FlowState int
 
-// FIXME: need to add state of client and server
 const (
-	FLOW_STATE_EXCEPTION = iota
-	FLOW_STATE_OPENING
+	FLOW_STATE_RAW FlowState = iota
+	FLOW_STATE_OPENING_1
+	FLOW_STATE_OPENING_2
 	FLOW_STATE_ESTABLISHED
-	FLOW_STATE_CLOSING
+	FLOW_STATE_CLOSING_TX1
+	FLOW_STATE_CLOSING_TX2
+	FLOW_STATE_CLOSING_RX1
+	FLOW_STATE_CLOSING_RX2
 	FLOW_STATE_CLOSED
+	FLOW_STATE_RESET
+	FLOW_STATE_EXCEPTION
 )
 
 const (
-	TIMEOUT_OPENING         = 5
-	TIMEOUT_ESTABLISHED     = 30 * 60
-	TIMEOUT_CLOSING         = 30
-	TIMEOUT_ESTABLISHED_RST = 30
-	TIMEOUT_EXPCEPTION      = 5
-	TIMEOUT_CLOSED_FIN      = 0
+	TIMEOUT_OPENING          = 5
+	TIMEOUT_ESTABLISHED      = 300
+	TIMEOUT_CLOSING          = 35
+	TIMEOUT_ESTABLISHED_RST  = 35
+	TIMEOUT_EXPCEPTION       = 5
+	TIMEOUT_CLOSED_FIN       = 0
+	TIMEOUT_SINGLE_DIRECTION = 5
 )
 
 const FLOW_CACHE_CAP = 1024
@@ -63,12 +71,13 @@ const FLOW_LIMIT_NUM uint64 = 1024 * 1024
 
 // unit: second
 type TimeoutConfig struct {
-	Opening        time.Duration
-	Established    time.Duration
-	Closing        time.Duration
-	EstablishedRst time.Duration
-	Exception      time.Duration
-	ClosedFin      time.Duration
+	Opening         time.Duration
+	Established     time.Duration
+	Closing         time.Duration
+	EstablishedRst  time.Duration
+	Exception       time.Duration
+	ClosedFin       time.Duration
+	SingleDirection time.Duration
 }
 
 var innerTimeoutConfig = TimeoutConfig{
@@ -78,6 +87,7 @@ var innerTimeoutConfig = TimeoutConfig{
 	TIMEOUT_ESTABLISHED_RST,
 	TIMEOUT_EXPCEPTION,
 	TIMEOUT_CLOSED_FIN,
+	TIMEOUT_SINGLE_DIRECTION,
 }
 
 type FlowExtra struct {
@@ -120,6 +130,7 @@ type FlowGenerator struct {
 	forceReportIntervalSec  time.Duration
 	minLoopIntervalSec      time.Duration
 	flowLimitNum            uint64
+	running                 bool
 }
 
 func timeMax(a time.Duration, b time.Duration) time.Duration {
@@ -134,6 +145,14 @@ func timeMin(a time.Duration, b time.Duration) time.Duration {
 		return a
 	}
 	return b
+}
+
+func flagEqual(flags, target uint8) bool {
+	return flags == target
+}
+
+func flagContain(flags, target uint8) bool {
+	return flags&target > 0
 }
 
 func TaggedFlowString(f *TaggedFlow) string {
