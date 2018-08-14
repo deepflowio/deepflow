@@ -5,10 +5,10 @@ type TaggedMetering struct {
 	Tag
 }
 
-func (m *TaggedMetering) PktCnt() uint64 {
-	return m.PktCnt0 + m.PktCnt1
+func (m *TaggedMetering) PacketCount() uint64 {
+	return m.PacketCount0 + m.PacketCount1
 }
 
-func (m *TaggedMetering) BitCnt() uint64 {
-	return (m.ByteCnt0 + m.ByteCnt1) << 3
+func (m *TaggedMetering) BitCount() uint64 {
+	return (m.ByteCount0 + m.ByteCount1) << 3
 }

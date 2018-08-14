@@ -46,31 +46,31 @@ type FlowKey struct {
 	PortSrc uint16
 	PortDst uint16
 	/* Tunnel */
-	TunID    uint64
-	TunIPSrc uint32
-	TunIPDst uint32
-	TunType  uint64
+	TunnelIPSrc uint32
+	TunnelIPDst uint32
+	TunnelID    uint32
+	TunnelType  uint8
 }
 
-type TcpPerfStat struct {
-	ARTAvg            time.Duration
-	RTTSyn            time.Duration
-	RTT               time.Duration
-	RTTAvg            time.Duration
-	SynRetransCnt0    uint64
-	SynRetransCnt1    uint64
-	RetransCnt0       uint64
-	RetransCnt1       uint64
-	TotalRetransCnt   uint64
-	ZeroWndCnt0       uint64
-	ZeroWndCnt1       uint64
-	TotalZeroWndCnt   uint64
-	SlowStartCnt0     uint64
-	SlowStartCnt1     uint64
-	TotalSlowStartCnt uint64
-	PshUrgCnt0        uint64
-	PshUrgCnt1        uint64
-	TotalPshUrgCnt    uint64
+type TcpPerfStats struct {
+	ARTAvg                 time.Duration
+	RTTSyn                 time.Duration
+	RTT                    time.Duration
+	RTTAvg                 time.Duration
+	SynRetransCount0       uint32
+	SynRetransCount1       uint32
+	RetransCount0          uint32
+	RetransCount1          uint32
+	TotalRetransCount      uint32
+	ZeroWinCount0          uint32
+	ZeroWinCount1          uint32
+	TotalZeroWinCount      uint32
+	PshUrgCount0           uint32
+	PshUrgCount1           uint32
+	TotalPshUrgCount       uint32
+	PacketIntervalAvg      uint64
+	PacketIntervalVariance uint64
+	PacketSizeVariance     uint64
 }
 
 type Flow struct {
@@ -92,24 +92,22 @@ type Flow struct {
 	/* L4 */
 	TCPFlags0 uint16
 	TCPFlags1 uint16
-	TCPSynSeq uint32
-	ICMPID    uint32
 
 	/* Overlay */
-	OverlayTunID   uint64
-	OverlayTunType uint32
+	OverlayTunnelID   uint32
+	OverlayTunnelType uint8
 
 	/* L7 */
 
 	/* Packet Counters */
-	ByteCnt0      uint64
-	ByteCnt1      uint64
-	PktCnt0       uint64
-	PktCnt1       uint64
-	TotalByteCnt0 uint64
-	TotalByteCnt1 uint64
-	TotalPktCnt0  uint64
-	TotalPktCnt1  uint64
+	ByteCount0        uint64
+	ByteCount1        uint64
+	PacketCount0      uint64
+	PacketCount1      uint64
+	TotalByteCount0   uint64
+	TotalByteCount1   uint64
+	TotalPacketCount0 uint64
+	TotalPacketCount1 uint64
 
 	/* Timers */
 	CurStartTime time.Duration
@@ -117,16 +115,6 @@ type Flow struct {
 	ArrTime0Last time.Duration
 	ArrTime10    time.Duration
 	ArrTime1Last time.Duration
-
-	/* Fragment Counters */
-	FragByteCnt0      uint64
-	FragByteCnt1      uint64
-	FragPktCnt0       uint64
-	FragPktCnt1       uint64
-	TotalFragByteCnt0 uint64
-	TotalFragByteCnt1 uint64
-	TotalFragPktCnt0  uint64
-	TotalFragPktCnt1  uint64
 
 	/* Platform Data */
 	SubnetID0 uint32
@@ -138,6 +126,8 @@ type Flow struct {
 	L3DeviceID1   uint32
 	L3EpcID0      int32
 	L3EpcID1      int32
+	Host0         uint32
+	Host1         uint32
 
 	EpcID0      int32
 	EpcID1      int32
@@ -156,5 +146,5 @@ type Flow struct {
 	IsL3End1 bool
 
 	/* TCP Perf Data */
-	*TcpPerfStat
+	*TcpPerfStats
 }
