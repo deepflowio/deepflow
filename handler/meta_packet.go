@@ -14,7 +14,7 @@ type MetaPacket struct {
 	TunnelInfo
 
 	headerType  HeaderType
-	pktSize     int
+	packetSize  int
 	vlanTagSize int
 	l2L3OptSize int // 802.1Q + IPv4 Optional Fields
 	l4OptSize   int // ICMP Payload / TCP Optional Fields
@@ -126,7 +126,7 @@ func (m *MetaPacket) SetTunnelInfo(tunnelInfo *TunnelInfo) *MetaPacket {
 func (m *MetaPacket) Update(packet []byte, srcEndpoint, dstEndpoint bool, timestamp int64) bool {
 	m.timestamp = timestamp
 	m.srcEndpoint, m.dstEndpoint = srcEndpoint, dstEndpoint
-	m.pktSize = len(packet)
+	m.packetSize = len(packet)
 	sizeChecker := len(packet)
 
 	// ETH
@@ -181,7 +181,7 @@ func (m *MetaPacket) Update(packet []byte, srcEndpoint, dstEndpoint bool, timest
 	}
 
 	totalLength := int(BigEndian.Uint16(packet[FIELD_TOTAL_LEN_OFFSET+vlanTagSize:]))
-	m.pktSize = totalLength + MIN_PACKET_SIZES[HEADER_TYPE_ETH] + vlanTagSize
+	m.packetSize = totalLength + MIN_PACKET_SIZES[HEADER_TYPE_ETH] + vlanTagSize
 
 	l3OptSize := int(ihl)*4 - 20
 	sizeChecker -= l3OptSize

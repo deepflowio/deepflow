@@ -31,10 +31,10 @@ const (
 type MetaPacketHeader struct {
 	Timestamp      time.Duration
 	InPort         uint32
-	PktLen         uint16
+	PacketLen      uint16
 	Exporter       net.IP
 	L2End0, L2End1 bool
-	EpData         *policy.EndpointData
+	EndPointData   *policy.EndpointData
 	Raw            RawPacket
 
 	TunnelData TunnelInfo
@@ -169,9 +169,9 @@ func NewMetaPacketHeader(rawPacket RawPacket, inPort uint32, timestamp time.Dura
 		m.TTL = ip.TTL
 		m.Proto = ip.Protocol
 		if m.Vlan > 0 {
-			m.PktLen = 4
+			m.PacketLen = 4
 		}
-		m.PktLen += ip.Length + 14
+		m.PacketLen += ip.Length + 14
 		if m.Proto == layers.IPProtocolTCP {
 			tcp := packet.Layer(layers.LayerTypeTCP).(*layers.TCP)
 			m.PortSrc = uint16(tcp.SrcPort)
@@ -181,7 +181,7 @@ func NewMetaPacketHeader(rawPacket RawPacket, inPort uint32, timestamp time.Dura
 			m.TcpData.Seq = tcp.Seq
 			m.TcpData.Ack = tcp.Ack
 			m.TcpData.WinSize = tcp.Window
-			m.extractTcpOptions(rawPacket, m.PktLen-m.PayloadLen, m.PayloadLen)
+			m.extractTcpOptions(rawPacket, m.PacketLen-m.PayloadLen, m.PayloadLen)
 		} else if m.Proto == layers.IPProtocolUDP {
 			udp := packet.Layer(layers.LayerTypeUDP).(*layers.UDP)
 			m.PortSrc = uint16(udp.SrcPort)

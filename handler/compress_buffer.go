@@ -203,7 +203,7 @@ func (b *CompressBuffer) appendPacket(packet []byte, meta *MetaPacket) {
 
 	// meta
 	BigEndian.PutUint16(buffer[offset:], uint16(b.delta))
-	BigEndian.PutUint16(buffer[offset+2:], uint16(meta.pktSize))
+	BigEndian.PutUint16(buffer[offset+2:], uint16(meta.packetSize))
 	BigEndian.PutUint16(buffer[offset+4:], uint16(c.pflags))
 	offset += 6
 	if !c.pflags.IsSet(CFLAG_HEADER_TYPE) {

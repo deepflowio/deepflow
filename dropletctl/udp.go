@@ -1,4 +1,4 @@
-package dpctl
+package dropletctl
 
 import (
 	"bytes"
@@ -13,7 +13,7 @@ import (
 type DropletMessage struct {
 	Module, Operate uint16
 	Result          uint32
-	Arg             [1024]byte
+	Args            [1024]byte
 }
 
 var log = logging.MustGetLogger(os.Args[0])
@@ -27,51 +27,51 @@ func resultFromDroplet(conn *net.UDPConn) (*bytes.Buffer, error) {
 		return nil, err
 	}
 
-	buff := bytes.NewBuffer(data)
-	decoder := gob.NewDecoder(buff)
+	buffer := bytes.NewBuffer(data)
+	decoder := gob.NewDecoder(buffer)
 	if err := decoder.Decode(&msg); err != nil {
 		return nil, err
 	} else if msg.Result != 0 {
 		return nil, errors.New("msg.Result != 0")
 	}
-	return bytes.NewBuffer(msg.Arg[:]), nil
+	return bytes.NewBuffer(msg.Args[:]), nil
 }
 
-func SendToDroplet(module DropletCtrlModuleId, operate DropletCtrlModuleOperate, arg *bytes.Buffer) (*bytes.Buffer, error) {
-	dst := &net.UDPAddr{IP: net.ParseIP(DPCTL_IP), Port: DPCTL_PORT}
+func SendToDroplet(module DropletCtlModuleId, operate DropletCtlModuleOperate, args *bytes.Buffer) (*bytes.Buffer, error) {
+	dst := &net.UDPAddr{IP: net.ParseIP(DROPLETCTL_IP), Port: DROPLETCTL_PORT}
 
 	conn, err := net.DialUDP("udp4", nil, dst)
 	if err != nil {
 		return nil, err
 	}
-	sendBuff := bytes.Buffer{}
+	sendBuffer := bytes.Buffer{}
 
 	msg := DropletMessage{Module: uint16(module), Operate: uint16(operate), Result: 0}
-	if arg != nil {
-		arg.Read(msg.Arg[:])
+	if args != nil {
+		args.Read(msg.Args[:])
 	}
-	encoder := gob.NewEncoder(&sendBuff)
+	encoder := gob.NewEncoder(&sendBuffer)
 	if err := encoder.Encode(msg); err != nil {
 		return nil, err
 	}
 
-	conn.Write(sendBuff.Bytes())
+	conn.Write(sendBuffer.Bytes())
 	return resultFromDroplet(conn)
 }
 
-func SendToDropletCtrl(conn *net.UDPConn, port int, result uint32, arg *bytes.Buffer) {
-	dst := &net.UDPAddr{IP: net.ParseIP(DPCTL_IP), Port: port}
-	buff := bytes.Buffer{}
+func SendToDropletCtl(conn *net.UDPConn, port int, result uint32, args *bytes.Buffer) {
+	dst := &net.UDPAddr{IP: net.ParseIP(DROPLETCTL_IP), Port: port}
+	buffer := bytes.Buffer{}
 	msg := DropletMessage{Module: 0, Result: result, Operate: 11}
-	if arg != nil {
-		arg.Read(msg.Arg[:])
+	if args != nil {
+		args.Read(msg.Args[:])
 	}
-	encoder := gob.NewEncoder(&buff)
+	encoder := gob.NewEncoder(&buffer)
 	if err := encoder.Encode(msg); err != nil {
 		log.Error(err)
 		return
 	}
-	conn.WriteToUDP(buff.Bytes(), dst)
+	conn.WriteToUDP(buffer.Bytes(), dst)
 	return
 }
 
@@ -83,17 +83,17 @@ func process(conn *net.UDPConn) {
 	if err != nil {
 		return
 	}
-	buff := bytes.NewBuffer(data)
-	decoder := gob.NewDecoder(buff)
+	buffer := bytes.NewBuffer(data)
+	decoder := gob.NewDecoder(buffer)
 	if err := decoder.Decode(&msg); err != nil {
 		log.Error(err)
 		return
 	}
-	RecvHandlers[msg.Module].RecvCommand(conn, remote.Port, msg.Operate, bytes.NewBuffer(msg.Arg[:]))
+	RecvHandlers[msg.Module].RecvCommand(conn, remote.Port, msg.Operate, bytes.NewBuffer(msg.Args[:]))
 }
 
-func DropletCtrlListener() {
-	addr := &net.UDPAddr{IP: net.ParseIP(DPCTL_IP), Port: DPCTL_PORT}
+func DropletCtlListener() {
+	addr := &net.UDPAddr{IP: net.ParseIP(DROPLETCTL_IP), Port: DROPLETCTL_PORT}
 	go func() {
 		listener, err := net.ListenUDP("udp4", addr)
 		if err != nil {
@@ -101,21 +101,21 @@ func DropletCtrlListener() {
 			return
 		}
 		defer listener.Close()
-		log.Infof("DropletCtrlListener <%v:%v>", DPCTL_IP, DPCTL_PORT)
+		log.Infof("DropletCtlListener <%v:%v>", DROPLETCTL_IP, DROPLETCTL_PORT)
 		for {
 			process(listener)
 		}
 	}()
 }
 
-func Register(module DropletCtrlModuleId, process CommandLineProcess) {
+func Register(module DropletCtlModuleId, process CommandLineProcess) {
 	RecvHandlers[module] = process
 	if running == false {
-		DropletCtrlListener()
+		DropletCtlListener()
 		running = true
 	}
 }
 
-func RegisterCommand(module DropletCtrlModuleId, cmd RegisterCommmandLine) {
+func RegisterCommand(module DropletCtlModuleId, cmd RegisterCommmandLine) {
 	RegisterHandlers[module] = cmd
 }

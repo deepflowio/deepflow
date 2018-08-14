@@ -210,9 +210,9 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacketHeader) {
 		meta.PortDst = x.port0
 	}
 	if x.vlan == 0 {
-		meta.PayloadLen = meta.PktLen - 14 - uint16(x.ihl*4)
+		meta.PayloadLen = meta.PacketLen - 14 - uint16(x.ihl*4)
 	} else {
-		meta.PayloadLen = meta.PktLen - 14 - uint16(x.ihl*4) - 4
+		meta.PayloadLen = meta.PacketLen - 14 - uint16(x.ihl*4) - 4
 	}
 	if x.headerType == HEADER_TYPE_IPV4_UDP {
 		meta.Proto = IPProtocolUDP
@@ -284,7 +284,7 @@ func (d *SequentialDecoder) NextPacket(meta *MetaPacketHeader) bool {
 	if d.pflags.IsSet(PFLAG_TUNNEL) {
 		d.decodeTunnel(meta)
 	}
-	meta.PktLen = totalSize
+	meta.PacketLen = totalSize
 	meta.Timestamp = d.timestamp
 	d.decodeEthernet(meta)
 	return false

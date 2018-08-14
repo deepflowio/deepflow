@@ -18,6 +18,6 @@ func (t TunnelType) String() string {
 type TunnelInfo struct {
 	TunnelSrc  net.IP
 	TunnelDst  net.IP
-	TunnelType TunnelType
 	TunnelId   uint32
+	TunnelType TunnelType
 }

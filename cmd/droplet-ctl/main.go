@@ -5,12 +5,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"gitlab.x.lan/yunshan/droplet/adapt"
-	"gitlab.x.lan/yunshan/droplet/dpctl"
+	"gitlab.x.lan/yunshan/droplet/adapter"
+	"gitlab.x.lan/yunshan/droplet/dropletctl"
 )
 
 func regiterCommand() {
-	dpctl.RegisterCommand(dpctl.DPCTL_ADAPT, adapt.RegisterCommand)
+	dropletctl.RegisterCommand(dropletctl.DROPLETCTL_ADAPTER, adapter.RegisterCommand)
 }
 
 func main() {
@@ -19,7 +19,7 @@ func main() {
 		Use:   "droplet-ctl",
 		Short: "Droplet Config Tool",
 	}
-	for _, handler := range dpctl.RegisterHandlers {
+	for _, handler := range dropletctl.RegisterHandlers {
 		cmd := handler()
 		root.AddCommand(cmd)
 	}

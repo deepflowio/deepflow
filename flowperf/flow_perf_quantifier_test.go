@@ -215,7 +215,7 @@ func TestTcpSessionPeerSeqNoAssert(t *testing.T) {
 func TestFlowPerfCtrlInfoFirstPacket(t *testing.T) {
 	client := TcpSessionPeer{seqList: list.New()}
 	server := TcpSessionPeer{seqList: list.New()}
-	perfCtrl := &FlowPerfCtrlInfo{ /*isFirstPkt: true, */ tcpSession: TcpConnSession{client, server}}
+	perfCtrl := &FlowPerfCtrlInfo{ /*isFirstPacket: true, */ tcpSession: TcpConnSession{client, server}}
 
 	input, expected := make([]interface{}, 2), make([]interface{}, 2)
 	// output := expected //output， expected引用相同的底层，相当于指针指向同一地址
@@ -239,7 +239,7 @@ func TestFlowPerfCtrlInfoFirstPacket(t *testing.T) {
 	// SYN/ACK
 	client = TcpSessionPeer{seqList: list.New()}
 	server = TcpSessionPeer{seqList: list.New()}
-	perfCtrl = &FlowPerfCtrlInfo{ /*isFirstPkt: true, */ tcpSession: TcpConnSession{client, server}}
+	perfCtrl = &FlowPerfCtrlInfo{ /*isFirstPacket: true, */ tcpSession: TcpConnSession{client, server}}
 	tcpHeader = handler.MetaPacketTcpHeader{Flags: TCP_SYN | TCP_ACK, Seq: 124, Ack: 421}
 	packetHeader = &handler.MetaPacketHeader{TcpData: tcpHeader, Timestamp: 6678, PayloadLen: 0}
 	perfCtrl.firstPacket(packetHeader)
@@ -258,7 +258,7 @@ func TestFlowPerfCtrlInfoFirstPacket(t *testing.T) {
 	// ACK
 	client = TcpSessionPeer{seqList: list.New()}
 	server = TcpSessionPeer{seqList: list.New()}
-	perfCtrl = &FlowPerfCtrlInfo{ /*isFirstPkt: true, */ tcpSession: TcpConnSession{client, server}}
+	perfCtrl = &FlowPerfCtrlInfo{ /*isFirstPacket: true, */ tcpSession: TcpConnSession{client, server}}
 	tcpHeader = handler.MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 125, Ack: 521}
 	packetHeader = &handler.MetaPacketHeader{TcpData: tcpHeader, Timestamp: 7678, PayloadLen: 0}
 	perfCtrl.firstPacket(packetHeader)
@@ -348,25 +348,25 @@ func TestNewMetaFlowPerf(t *testing.T) {
 		flowPerf.ctrlInfo.tcpSession[0].seqList.PushFront(&SeqSegment{111, 11}))
 	/*
 		flow_perf_quantify_test.go:346: &{[{0xc42001f0e0 0 0 0 0 0 0 false false} {0xc42001f110 0 0 0 0 0 0 false false}]}
-		reportPerfStat:{
-			SynRetransCnt0: 0, SynRetransCnt1: 0;
+		reportPerfStats:{
+			SynRetransCount0: 0, SynRetransCount1: 0;
 			ARTAvg: 0, RTTSyn: 0, RTT: 0, RTTAvg: 0;
-			RetransCnt0: 0, RetransCnt1: 0, TotalRetransCnt: 0;
-			ZeroWndCnt0: 0; ZeroWndCnt1: 0, TotalZeroWndCnt: 0;
-			SlowStartCnt0: 0, SlowStartCnt1: 0, TotalSlowStartCnt: 0;
-			PshUrgCnt0: 0, PshUrgCnt1: 0, TotalPshUrgCnt: 0
+			RetransCount0: 0, RetransCount1: 0, TotalRetransCount: 0;
+			ZeroWinCount0: 0; ZeroWinCount1: 0, TotalZeroWinCount: 0;
+			SlowStartCount0: 0, SlowStartCount1: 0, TotalSlowStartCount: 0;
+			PshUrgCount0: 0, PshUrgCount1: 0, TotalPshUrgCount: 0
 		},
-		periodPerfStat:{
-			artSum: 0, artCnt: 0; rttSyn0: 0, rttSyn1: 0;
-			rtt0Sum: 0, rtt0Cnt: 0; rtt1Sum: 0, rtt1Cnt: 0;
+		periodPerfStats:{
+			artSum: 0, artCount: 0; rttSyn0: 0, rttSyn1: 0;
+			rtt0Sum: 0, rtt0Count: 0; rtt1Sum: 0, rtt1Count: 0;
 			retrans0: 0, retrans1: 0; retransSyn0: 0, retransSyn1: 0;
-			pshUrgCnt0: 0, pshUrgCnt1: 0; zeroWndCnt0: 0, zeroWndCnt1: 0
+			pshUrgCount0: 0, pshUrgCount1: 0; zeroWinCount0: 0, zeroWinCount1: 0
 		},
-		flowPerfStat:{
-			artSum: 0, artCnt: 0; rttSyn0: 0, rttSyn1: 0;
-			rtt0Sum: 0, rtt0Cnt: 0; rtt1Sum: 0, rtt1Cnt: 0;
+		flowPerfStats:{
+			artSum: 0, artCount: 0; rttSyn0: 0, rttSyn1: 0;
+			rtt0Sum: 0, rtt0Count: 0; rtt1Sum: 0, rtt1Count: 0;
 			retrans0: 0, retrans1: 0; retransSyn0: 0, retransSyn1: 0;
-			pshUrgCnt0: 0, pshUrgCnt1: 0; zeroWndCnt0: 0, zeroWndCnt1: 0
+			pshUrgCount0: 0, pshUrgCount1: 0; zeroWinCount0: 0, zeroWinCount1: 0
 		} &{0xc42001f0e0 0xc42001f0e0 0xc42001f0e0 0xc421228a30}
 	*/
 }
@@ -507,54 +507,54 @@ func testMetaFlowPerfUpdate() {
 func TestMetaFlowPerfUpdate(t *testing.T) {
 	testMetaFlowPerfUpdate()
 	/*
-		reportPerfStat:{
-			SynRetransCnt0: 0, SynRetransCnt1: 0;
+		reportPerfStats:{
+			SynRetransCount0: 0, SynRetransCount1: 0;
 			ARTAvg: 0, RTTSyn: 0, RTT: 0, RTTAvg: 0;
-			RetransCnt0: 0, RetransCnt1: 0, TotalRetransCnt: 0;
-			ZeroWndCnt0: 0; ZeroWndCnt1: 0, TotalZeroWndCnt: 0;
-			SlowStartCnt0: 0, SlowStartCnt1: 0, TotalSlowStartCnt: 0;
-			PshUrgCnt0: 0, PshUrgCnt1: 0, TotalPshUrgCnt: 0
+			RetransCount0: 0, RetransCount1: 0, TotalRetransCount: 0;
+			ZeroWinCount0: 0; ZeroWinCount1: 0, TotalZeroWinCount: 0;
+			SlowStartCount0: 0, SlowStartCount1: 0, TotalSlowStartCount: 0;
+			PshUrgCount0: 0, PshUrgCount1: 0, TotalPshUrgCount: 0
 		},
-		periodPerfStat:{
-			artSum: 6, artCnt: 1; rttSyn0: 0, rttSyn1: 0;
-			rtt0Sum: 16, rtt0Cnt: 1; rtt1Sum: 100, rtt1Cnt: 1;
+		periodPerfStats:{
+			artSum: 6, artCount: 1; rttSyn0: 0, rttSyn1: 0;
+			rtt0Sum: 16, rtt0Count: 1; rtt1Sum: 100, rtt1Count: 1;
 			retrans0: 0, retrans1: 0; retransSyn0: 0, retransSyn1: 0;
-			pshUrgCnt0: 0, pshUrgCnt1: 0; zeroWndCnt0: 3, zeroWndCnt1: 5
+			pshUrgCount0: 0, pshUrgCount1: 0; zeroWinCount0: 3, zeroWinCount1: 5
 		},
-		flowPerfStat:{
-			artSum: 6, artCnt: 1; rttSyn0: 10, rttSyn1: 1;
-			rtt0Sum: 26, rtt0Cnt: 2; rtt1Sum: 101, rtt1Cnt: 2;
+		flowPerfStats:{
+			artSum: 6, artCount: 1; rttSyn0: 10, rttSyn1: 1;
+			rtt0Sum: 26, rtt0Count: 2; rtt1Sum: 101, rtt1Count: 2;
 			retrans0: 0, retrans1: 0; retransSyn0: 0, retransSyn1: 0;
-			pshUrgCnt0: 0, pshUrgCnt1: 0; zeroWndCnt0: 3, zeroWndCnt1: 5
+			pshUrgCount0: 0, pshUrgCount1: 0; zeroWinCount0: 3, zeroWinCount1: 5
 		}
 	*/
 }
 
 func testReport(flowPerf *MetaFlowPerf, out bool) {
-	var report *TcpPerfStat
-	var periodData, flowData *MetaPerfStat
+	var report *TcpPerfStats
+	var periodData, flowData *MetaPerfStats
 
-	periodData = flowPerf.perfData.periodPerfStat
-	flowData = flowPerf.perfData.flowPerfStat
+	periodData = flowPerf.perfData.periodPerfStats
+	flowData = flowPerf.perfData.flowPerfStats
 	periodData.artSum = 100
 	flowData.artSum += periodData.artSum
-	periodData.artCnt = 1
-	flowData.artCnt += periodData.artCnt
+	periodData.artCount = 1
+	flowData.artCount += periodData.artCount
 	report = flowPerf.Report()
 	if out {
 		fmt.Printf("flowperf.perfData:%v\nreport:%v\n", flowPerf.perfData, report)
 	}
 
-	periodData = flowPerf.perfData.periodPerfStat
-	flowData = flowPerf.perfData.flowPerfStat
+	periodData = flowPerf.perfData.periodPerfStats
+	flowData = flowPerf.perfData.flowPerfStats
 	periodData.artSum = 200
 	flowData.artSum += periodData.artSum
-	periodData.artCnt = 1
-	flowData.artCnt += periodData.artCnt
+	periodData.artCount = 1
+	flowData.artCount += periodData.artCount
 	periodData.rtt0Sum = 1000
 	flowData.rtt0Sum += periodData.rtt0Sum
-	periodData.rtt0Cnt = 1
-	flowData.rtt0Cnt += periodData.rtt0Cnt
+	periodData.rtt0Count = 1
+	flowData.rtt0Count += periodData.rtt0Count
 	report = flowPerf.Report()
 	if out {
 		fmt.Printf("flowperf.perfData:%v\nreport:%v\n", flowPerf.perfData, report)
@@ -568,7 +568,7 @@ func TestReport(t *testing.T) {
 
 func testFlowPerfError(info string) error {
 	err := FlowPerfError{what: info}
-	return err.returnErr()
+	return err.returnError()
 }
 
 func TestFlowPerfError(t *testing.T) {
