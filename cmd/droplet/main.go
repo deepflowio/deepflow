@@ -14,7 +14,7 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 
-	"gitlab.x.lan/yunshan/droplet/adapt"
+	"gitlab.x.lan/yunshan/droplet/adapter"
 	"gitlab.x.lan/yunshan/droplet/config"
 	"gitlab.x.lan/yunshan/droplet/flowgen"
 	"gitlab.x.lan/yunshan/droplet/labeler"
@@ -32,9 +32,9 @@ var configFile = flag.String("f", "/etc/droplet.yaml", "Specify config file loca
 
 func main() {
 	InitConsoleLog()
-	filterqueue := NewOverwriteQueue("AdaptToFilter", 1000)
-	tridentAdapt := adapt.NewTridentAdapt(filterqueue)
-	if tridentAdapt == nil {
+	filterqueue := NewOverwriteQueue("AdapterToFilter", 1000)
+	tridentAdapter := adapter.NewTridentAdapter(filterqueue)
+	if tridentAdapter == nil {
 		return
 	}
 
@@ -50,7 +50,7 @@ func main() {
 	}
 	stats.StartStatsd()
 	flowGenerator.Start()
-	tridentAdapt.Start(true)
+	tridentAdapter.Start(true)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {

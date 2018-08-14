@@ -36,11 +36,11 @@ func testPcapExtract(file string, expect *MetaPacketHeader) string {
 	return ""
 }
 
-func TestPktExtract(t *testing.T) {
+func TestPacketExtract(t *testing.T) {
 	da, _ := net.ParseMAC("00:1b:21:bb:22:42")
 	sa, _ := net.ParseMAC("c8:8d:83:93:58:14")
 	expected := &MetaPacketHeader{
-		PktLen:     114,
+		PacketLen:  114,
 		Exporter:   net.ParseIP("0.0.0.0"),
 		MacSrc:     sa,
 		MacDst:     da,

@@ -105,22 +105,22 @@ type FlowPerfCtrlInfo struct {
 // art---Application Response Time
 // 现有3个连续包PSH/ACK--ACK--PSH/ACK,其中第一个包是client端的请求包，
 // 后2个包是server端的应答包，art表示后2个包之间的时间间隔
-type MetaPerfStat struct {
-	artCnt, rtt0Cnt, rtt1Cnt uint32
-	artSum, rtt0Sum, rtt1Sum time.Duration
-	rttSyn0, rttSyn1         time.Duration
+type MetaPerfStats struct {
+	artCount, rtt0Count, rtt1Count uint32
+	artSum, rtt0Sum, rtt1Sum       time.Duration
+	rttSyn0, rttSyn1               time.Duration
 
 	retrans0, retrans1       uint32
 	retransSyn0, retransSyn1 uint32
 
-	pshUrgCnt0, pshUrgCnt1   uint32
-	zeroWndCnt0, zeroWndCnt1 uint32
+	pshUrgCount0, pshUrgCount1   uint32
+	zeroWinCount0, zeroWinCount1 uint32
 }
 
 type FlowPerfDataInfo struct {
-	reportPerfStat *TcpPerfStat // OUT
-	periodPerfStat *MetaPerfStat
-	flowPerfStat   *MetaPerfStat
+	reportPerfStats *TcpPerfStats // OUT
+	periodPerfStats *MetaPerfStats
+	flowPerfStats   *MetaPerfStats
 }
 
 type FlowPerfCounter struct {
@@ -129,8 +129,8 @@ type FlowPerfCounter struct {
 	validArtTimes        uint32 `statsd:"art_times"`         // Flow中某个满足art计算的地方计数加1
 	validRetransTimes    uint32 `statsd:"retrans_times"`     // Flow中某个Packet发生多次重传计数加1
 	validSynRetransTimes uint32 `statsd:"syn_retrans_times"` // Flow中在连接建立阶段，某个Packet发生多次重传计数加1
-	invalidPktCnt        uint32 `statsd:"invalid_packet"`    // Flow中某个识别为异常包的地方计数加1
-	unknownPktCnt        uint32 `statsd:"unknown_packet"`    // Flow中某个识别为unknown包的地方计数加1
+	invalidPacketCount   uint32 `statsd:"invalid_packet"`    // Flow中某个识别为异常包的地方计数加1
+	unknownPacketCount   uint32 `statsd:"unknown_packet"`    // Flow中某个识别为unknown包的地方计数加1
 }
 
 type MetaFlowPerf struct {
@@ -193,7 +193,7 @@ func (p *TcpSessionPeer) isContinuousSeqSegment(left, right, node *SeqSegment) C
 // 根据seqNumber判断包重传,连续,不连续
 // 合并连续seqNumber
 // 不连续则添加新节点, 构建升序链表
-func (p *TcpSessionPeer) assertSeqNumber(tcphdr *handler.MetaPacketTcpHeader, payloadLen uint16) uint32 {
+func (p *TcpSessionPeer) assertSeqNumber(tcpHeader *handler.MetaPacketTcpHeader, payloadLen uint16) uint32 {
 	var flag uint32
 	var left, right *SeqSegment
 	var e *list.Element
@@ -203,7 +203,7 @@ func (p *TcpSessionPeer) assertSeqNumber(tcphdr *handler.MetaPacketTcpHeader, pa
 		return SEQ_ERROR
 	}
 
-	node := &SeqSegment{seqNumber: tcphdr.Seq, length: uint32(payloadLen)}
+	node := &SeqSegment{seqNumber: tcpHeader.Seq, length: uint32(payloadLen)}
 	log.Debugf("node: %v", node)
 
 	l := p.seqList
@@ -282,12 +282,12 @@ func (p *TcpSessionPeer) assertSeqNumber(tcphdr *handler.MetaPacketTcpHeader, pa
 
 // 在TCP_STATE_ESTABLISHED阶段更新数据
 func (p *TcpSessionPeer) updateData(header *handler.MetaPacketHeader) {
-	tcphdr := header.TcpData
+	tcpHeader := header.TcpData
 	p.timestamp = time.Duration(header.Timestamp)
 	p.payloadLen = uint32(header.PayloadLen)
-	p.seq = tcphdr.Seq
-	p.winSize = tcphdr.WinSize
-	// winScale不能在这里更新p.winScale = tcphdr.WinScale
+	p.seq = tcpHeader.Seq
+	p.winSize = tcpHeader.WinSize
+	// winScale不能在这里更新p.winScale = tcpHeader.WinScale
 }
 
 // 更新状态
@@ -320,7 +320,7 @@ func (p *TcpSessionPeer) String() string {
 	return fmt.Sprintf("TcpSessionPeer: %s, seqList:[%s]", data, list)
 }
 
-func isAckPkt(header *handler.MetaPacketHeader) bool {
+func isAckPacket(header *handler.MetaPacketHeader) bool {
 	tcpflag := header.TcpData.Flags
 	payloadLen := header.PayloadLen
 	if tcpflag == TCP_ACK && payloadLen == 0 {
@@ -341,31 +341,31 @@ func calcTimeInterval(currentTime, lastTime time.Duration) time.Duration {
 
 // 用第一个包,构建初始状态
 func (f *FlowPerfCtrlInfo) firstPacket(header *handler.MetaPacketHeader) error {
-	tcphdr := &header.TcpData
+	tcpHeader := &header.TcpData
 	client := &f.tcpSession[utils.Bool2Int(TCP_DIR_CLIENT)]
 	server := &f.tcpSession[utils.Bool2Int(TCP_DIR_SERVER)]
 
-	switch flag := tcphdr.Flags & (TCP_SYN | TCP_ACK); flag {
+	switch flag := tcpHeader.Flags & (TCP_SYN | TCP_ACK); flag {
 	case TCP_SYN: // SYN包
-		if tcphdr.WinScale > 0 {
-			client.winScale = WIN_SCALE_FLAG | uint8(utils.Min(WIN_SCALE_MAX, int(tcphdr.WinScale)))
+		if tcpHeader.WinScale > 0 {
+			client.winScale = WIN_SCALE_FLAG | uint8(utils.Min(WIN_SCALE_MAX, int(tcpHeader.WinScale)))
 		}
 		client.tcpState = TCP_STATE_SYN_SENT
 		// should regard package length as 1, but must client.payloadlen = 0
-		client.assertSeqNumber(tcphdr, 1)
+		client.assertSeqNumber(tcpHeader, 1)
 
 		server.tcpState = TCP_STATE_LISTEN
 	case TCP_SYN | TCP_ACK: // SYN/ACK包
 		// as NO SYN packet, do not calc winScale
 		client.tcpState = TCP_STATE_SYN_RECV
 		// should regard package length as 1, but must client.payloadlen = 0
-		client.assertSeqNumber(tcphdr, 1)
+		client.assertSeqNumber(tcpHeader, 1)
 
 		server.tcpState = TCP_STATE_SYN_SENT
 	default: // 流的第一个包非(SYN或SYN/ACK)
 		client.tcpState = TCP_STATE_ESTABLISHED
 		if header.PayloadLen > 0 {
-			client.assertSeqNumber(tcphdr, header.PayloadLen)
+			client.assertSeqNumber(tcpHeader, header.PayloadLen)
 		}
 
 		server.tcpState = TCP_STATE_ESTABLISHED
@@ -374,142 +374,142 @@ func (f *FlowPerfCtrlInfo) firstPacket(header *handler.MetaPacketHeader) error {
 	return nil
 }
 
-func (m *MetaFlowPerf) fsmListen(sameDir, oppositeDir *TcpSessionPeer, header *handler.MetaPacketHeader, direction bool) error {
+func (m *MetaFlowPerf) fsmListen(sameDirection, oppositeDirection *TcpSessionPeer, header *handler.MetaPacketHeader, direction bool) error {
 	var err FlowPerfError
 
-	tcphdr := &header.TcpData
+	tcpHeader := &header.TcpData
 	perfData := m.perfData
 
-	stateOk := (oppositeDir.tcpState == TCP_STATE_SYN_SENT)
+	stateOk := (oppositeDirection.tcpState == TCP_STATE_SYN_SENT)
 	flagOk := (header.TcpData.Flags == (TCP_SYN | TCP_ACK))
-	ackOk := (oppositeDir.seq+1 == header.TcpData.Ack)
+	ackOk := (oppositeDirection.seq+1 == header.TcpData.Ack)
 	log.Debugf("stateOk:%v,flagOk:%v,ackOk:%v", stateOk, flagOk, ackOk)
 	if stateOk && flagOk && ackOk {
 		// rttSyn1
-		rtt := calcTimeInterval(header.Timestamp, oppositeDir.timestamp)
+		rtt := calcTimeInterval(header.Timestamp, oppositeDirection.timestamp)
 		perfData.calcRttSyn(rtt, direction)
 		m.counter.validRttSynTimes += 1
 
 		// update data
 		if header.TcpData.WinScale > 0 {
-			if oppositeDir.winScale&WIN_SCALE_FLAG == WIN_SCALE_FLAG {
-				sameDir.winScale = WIN_SCALE_FLAG | uint8(utils.Min(int(WIN_SCALE_MAX), int(header.TcpData.WinScale)))
+			if oppositeDirection.winScale&WIN_SCALE_FLAG == WIN_SCALE_FLAG {
+				sameDirection.winScale = WIN_SCALE_FLAG | uint8(utils.Min(int(WIN_SCALE_MAX), int(header.TcpData.WinScale)))
 			}
 		} else {
-			oppositeDir.winScale = 0
+			oppositeDirection.winScale = 0
 		}
 
-		sameDir.assertSeqNumber(tcphdr, 1)
+		sameDirection.assertSeqNumber(tcpHeader, 1)
 
 		// update state
-		sameDir.updateState(TCP_STATE_SYN_RECV)
+		sameDirection.updateState(TCP_STATE_SYN_RECV)
 		log.Debugf("perfCtrl:%v,%v,perfData:%v", m.ctrlInfo.tcpSession[0], m.ctrlInfo.tcpSession[1], perfData)
 	} else {
-		m.counter.invalidPktCnt += 1
+		m.counter.invalidPacketCount += 1
 		err = FlowPerfError{where: "",
 			what: "invalid SYN/ACK packet"}
 	}
 
-	return err.returnErr()
+	return err.returnError()
 }
 
-func (m *MetaFlowPerf) fsmSynSent(sameDir, oppositeDir *TcpSessionPeer, header *handler.MetaPacketHeader, direction bool) error {
+func (m *MetaFlowPerf) fsmSynSent(sameDirection, oppositeDirection *TcpSessionPeer, header *handler.MetaPacketHeader, direction bool) error {
 	var err FlowPerfError
 	perfData := m.perfData
-	tcphdr := &header.TcpData
-	ackOk := (oppositeDir.seq+1 == tcphdr.Ack)
-	isAckPkt := isAckPkt(header)
+	tcpHeader := &header.TcpData
+	ackOk := (oppositeDirection.seq+1 == tcpHeader.Ack)
+	isAckPacket := isAckPacket(header)
 
-	if tcphdr.Flags == TCP_SYN && oppositeDir.tcpState == TCP_STATE_LISTEN { // 重传 SYN
-		seqState := sameDir.assertSeqNumber(tcphdr, 1)
+	if tcpHeader.Flags == TCP_SYN && oppositeDirection.tcpState == TCP_STATE_LISTEN { // 重传 SYN
+		seqState := sameDirection.assertSeqNumber(tcpHeader, 1)
 		if seqState == SEQ_RETRANS {
 			perfData.calcRetransSyn(direction)
 			m.counter.validSynRetransTimes += 1
 		} else {
-			m.counter.invalidPktCnt += 1
+			m.counter.invalidPacketCount += 1
 			err = FlowPerfError{where: "",
 				what: "invalid retrans SYN packet"}
 		}
-	} else if ackOk && isAckPkt && oppositeDir.tcpState == TCP_STATE_SYN_RECV { // ACK
+	} else if ackOk && isAckPacket && oppositeDirection.tcpState == TCP_STATE_SYN_RECV { // ACK
 		// rttSyn0
-		rtt := calcTimeInterval(header.Timestamp, oppositeDir.timestamp)
+		rtt := calcTimeInterval(header.Timestamp, oppositeDirection.timestamp)
 		perfData.calcRttSyn(rtt, direction)
 		m.counter.validRttSynTimes += 1
 
 		// update state
-		sameDir.updateState(TCP_STATE_ESTABLISHED)
-		oppositeDir.updateState(TCP_STATE_ESTABLISHED)
+		sameDirection.updateState(TCP_STATE_ESTABLISHED)
+		oppositeDirection.updateState(TCP_STATE_ESTABLISHED)
 	} else {
-		m.counter.unknownPktCnt += 1
+		m.counter.unknownPacketCount += 1
 		err = FlowPerfError{where: "", what: "unknown ACK packet"}
 		log.Info("unknown ACK packet")
 	}
 
-	return err.returnErr()
+	return err.returnError()
 }
 
-func (m *MetaFlowPerf) fsmSynRecv(sameDir, oppositeDir *TcpSessionPeer, header *handler.MetaPacketHeader, direction bool) error {
+func (m *MetaFlowPerf) fsmSynRecv(sameDirection, oppositeDirection *TcpSessionPeer, header *handler.MetaPacketHeader, direction bool) error {
 	var err FlowPerfError
 	perfData := m.perfData
-	tcphdr := &header.TcpData
-	if tcphdr.Flags == (TCP_SYN|TCP_ACK) && oppositeDir.tcpState == TCP_STATE_SYN_SENT {
-		seqState := sameDir.assertSeqNumber(tcphdr, 1)
+	tcpHeader := &header.TcpData
+	if tcpHeader.Flags == (TCP_SYN|TCP_ACK) && oppositeDirection.tcpState == TCP_STATE_SYN_SENT {
+		seqState := sameDirection.assertSeqNumber(tcpHeader, 1)
 		if seqState == SEQ_RETRANS {
 			perfData.calcRetransSyn(direction)
 			m.counter.validSynRetransTimes += 1
 		} else {
-			m.counter.invalidPktCnt += 1
+			m.counter.invalidPacketCount += 1
 			err = FlowPerfError{where: "", what: "invalid retrans SYN/ACK packet"}
 		}
 	} else {
-		m.counter.unknownPktCnt += 1
+		m.counter.unknownPacketCount += 1
 		err = FlowPerfError{where: "", what: "unknown retrans SYN/ACK packet"}
 	}
 
-	return err.returnErr()
+	return err.returnError()
 }
 
 // 同方向连续
 // same.seq+len == opposite.seq
 // 反方向连续
-// same.Ack == oppositeDir.Seq + len
-func (m *MetaFlowPerf) fsmEstablished(sameDir, oppositeDir *TcpSessionPeer, header *handler.MetaPacketHeader, direction bool) error {
+// same.Ack == oppositeDirection.Seq + len
+func (m *MetaFlowPerf) fsmEstablished(sameDirection, oppositeDirection *TcpSessionPeer, header *handler.MetaPacketHeader, direction bool) error {
 	var err FlowPerfError
 	perfData := m.perfData
-	tcphdr := &header.TcpData
+	tcpHeader := &header.TcpData
 
 	log.Debugf("TCP_STATE_ESTABLISHED--tcp payloadLen:%v --", header.PayloadLen)
 	if header.PayloadLen > 0 { // PSH/ACK(payloadLen>0)
-		seqState := sameDir.assertSeqNumber(tcphdr, header.PayloadLen)
+		seqState := sameDirection.assertSeqNumber(tcpHeader, header.PayloadLen)
 		switch seqState {
 		case SEQ_RETRANS:
 			// 重传数据包,认为ACK包不存在重传
 			perfData.calcRetrans(direction)
 			m.counter.validRetransTimes += 1
-			oppositeDir.setRttPrecondition()
-			sameDir.resetRttPrecondition()
+			oppositeDirection.setRttPrecondition()
+			sameDirection.resetRttPrecondition()
 		case SEQ_CONTINUOUS: // 非重传
-			oppositeDir.setRttPrecondition()
-			sameDir.resetRttPrecondition()
+			oppositeDirection.setRttPrecondition()
+			sameDirection.resetRttPrecondition()
 
 			// art--用连续的PSH/ACK(payloadLen>0)、ACK和PSH/ACK(payloadLen>0)计算服务端的art值，
 			//     且ACK包的payloadLen为0
-			seqContinusOk := (sameDir.seq == tcphdr.Seq) // 同方向，前一个ACK
+			seqContinusOk := (sameDirection.seq == tcpHeader.Seq) // 同方向，前一个ACK
 			// 反方向，前一个PSH/ACK(payloadLen>0)
-			ackOk := (tcphdr.Ack == oppositeDir.seq+oppositeDir.payloadLen)
-			precondition := sameDir.getArtPrecondition()
+			ackOk := (tcpHeader.Ack == oppositeDirection.seq+oppositeDirection.payloadLen)
+			precondition := sameDirection.getArtPrecondition()
 			directionOk := (direction == TCP_DIR_SERVER)
 			log.Debugf("art--seqContinusOk:%v, ackOk:%v, precondition:%v",
 				seqContinusOk, ackOk, precondition)
 			if seqContinusOk && ackOk && precondition && directionOk {
-				art := calcTimeInterval(header.Timestamp, sameDir.timestamp)
+				art := calcTimeInterval(header.Timestamp, sameDirection.timestamp)
 				perfData.calcArt(art, direction)
 				m.counter.validArtTimes += 1
 
-				sameDir.resetArtPrecondition()
+				sameDirection.resetArtPrecondition()
 			}
 		default:
-			m.counter.unknownPktCnt += 1
+			m.counter.unknownPacketCount += 1
 			err = FlowPerfError{where: "", what: "seqAssert DISCONTIOUS or ERROR"}
 			log.Debugf("seqAssert result:%v", seqState)
 		}
@@ -517,45 +517,45 @@ func (m *MetaFlowPerf) fsmEstablished(sameDir, oppositeDir *TcpSessionPeer, head
 		// rtt--用连续的PSH/ACK(payloadLen>0)和ACK计算从探针点到服务端的rtt值rtt_1，
 		//	   且ACK包的payloadLen长度为0
 		log.Debugf("----ACK, payloadLen == 0")
-		ackOk := (oppositeDir.seq+oppositeDir.payloadLen == tcphdr.Ack)
-		isAck := isAckPkt(header)
+		ackOk := (oppositeDirection.seq+oppositeDirection.payloadLen == tcpHeader.Ack)
+		isAck := isAckPacket(header)
 		if ackOk && isAck {
-			if ok := sameDir.getRttPrecondition(); ok {
-				rtt := calcTimeInterval(header.Timestamp, oppositeDir.timestamp)
+			if ok := sameDirection.getRttPrecondition(); ok {
+				rtt := calcTimeInterval(header.Timestamp, oppositeDirection.timestamp)
 				perfData.calcRtt(rtt, direction)
 				m.counter.validRttTimes += 1
 
-				sameDir.setArtPrecondition()
-				sameDir.resetRttPrecondition()
-				oppositeDir.resetRttPrecondition()
+				sameDirection.setArtPrecondition()
+				sameDirection.resetRttPrecondition()
+				oppositeDirection.resetRttPrecondition()
 			}
 		} else {
-			m.counter.unknownPktCnt += 1
+			m.counter.unknownPacketCount += 1
 			err = FlowPerfError{where: "", what: "discontinuous ACK packet"}
-			log.Debugf("=----discontinuous packet, ack:%v", tcphdr.Ack)
+			log.Debugf("=----discontinuous packet, ack:%v", tcpHeader.Ack)
 		}
 	}
 
-	winSize := tcphdr.WinSize << sameDir.winScale
+	winSize := tcpHeader.WinSize << sameDirection.winScale
 	// winSize == 0 or zero window
 	if winSize == 0 {
-		perfData.calcZeroWnd(direction)
+		perfData.calcZeroWin(direction)
 	}
 
 	// PSH/URG
-	if tcphdr.Flags&(TCP_PSH|TCP_URG) == (TCP_PSH | TCP_URG) {
+	if tcpHeader.Flags&(TCP_PSH|TCP_URG) == (TCP_PSH | TCP_URG) {
 		perfData.calcPshUrg(direction)
 	}
 
-	return err.returnErr()
+	return err.returnError()
 }
 
 // 根据flag, direction, payloadLen或PSH,seq,ack重建状态机
 // assume：包已经过预处理，无异常flag包，也没有与功能无关包（不关心报文）
-func (m *MetaFlowPerf) reestablishFsm(sameDir, oppositeDir *TcpSessionPeer, header *handler.MetaPacketHeader, direction bool) uint32 {
+func (m *MetaFlowPerf) reestablishFsm(sameDirection, oppositeDirection *TcpSessionPeer, header *handler.MetaPacketHeader, direction bool) uint32 {
 	var err error
-	stateOppst := oppositeDir.tcpState
-	state := sameDir.tcpState
+	stateOppst := oppositeDirection.tcpState
+	state := sameDirection.tcpState
 
 	log.Debugf("state:%v, stateOppst:%v", state, stateOppst)
 	switch state {
@@ -564,21 +564,21 @@ func (m *MetaFlowPerf) reestablishFsm(sameDir, oppositeDir *TcpSessionPeer, head
 			err = m.ctrlInfo.firstPacket(header)
 		}
 	case TCP_STATE_LISTEN: // SYN/ACK
-		err = m.fsmListen(sameDir, oppositeDir, header, direction)
+		err = m.fsmListen(sameDirection, oppositeDirection, header, direction)
 	case TCP_STATE_SYN_SENT: // ACK
-		err = m.fsmSynSent(sameDir, oppositeDir, header, direction)
+		err = m.fsmSynSent(sameDirection, oppositeDirection, header, direction)
 	case TCP_STATE_SYN_RECV: // 重传 SYN/ACK
-		err = m.fsmSynRecv(sameDir, oppositeDir, header, direction)
+		err = m.fsmSynRecv(sameDirection, oppositeDirection, header, direction)
 	case TCP_STATE_ESTABLISHED: // PSH/ACK || ACK
 		if header.TcpData.Flags&TCP_ACK > 0 {
-			if err = m.fsmEstablished(sameDir, oppositeDir, header, direction); err != nil {
-				sameDir.resetArtPrecondition()
-				sameDir.resetRttPrecondition()
-				oppositeDir.resetArtPrecondition()
-				oppositeDir.resetRttPrecondition()
+			if err = m.fsmEstablished(sameDirection, oppositeDirection, header, direction); err != nil {
+				sameDirection.resetArtPrecondition()
+				sameDirection.resetRttPrecondition()
+				oppositeDirection.resetArtPrecondition()
+				oppositeDirection.resetRttPrecondition()
 			}
 		} else {
-			m.counter.unknownPktCnt += 1
+			m.counter.unknownPacketCount += 1
 			log.Debugf("unknown packet")
 		}
 	default: // unlikely
@@ -596,10 +596,10 @@ func (m *MetaFlowPerf) reestablishFsm(sameDir, oppositeDir *TcpSessionPeer, head
 // 计算art值
 func (f *FlowPerfDataInfo) calcArt(art time.Duration, direction bool) {
 	if direction == TCP_DIR_SERVER {
-		f.periodPerfStat.artCnt += 1
-		f.periodPerfStat.artSum += art
-		f.flowPerfStat.artCnt += 1
-		f.flowPerfStat.artSum += art
+		f.periodPerfStats.artCount += 1
+		f.periodPerfStats.artSum += art
+		f.flowPerfStats.artCount += 1
+		f.flowPerfStats.artSum += art
 	}
 	log.Debugf("artCalc--art:%v, direction:%v", art, direction)
 }
@@ -607,15 +607,15 @@ func (f *FlowPerfDataInfo) calcArt(art time.Duration, direction bool) {
 // 计算rtt值
 func (f *FlowPerfDataInfo) calcRtt(rtt time.Duration, direction bool) {
 	if direction == TCP_DIR_CLIENT {
-		f.periodPerfStat.rtt0Sum += rtt
-		f.periodPerfStat.rtt0Cnt += 1
-		f.flowPerfStat.rtt0Sum += rtt
-		f.flowPerfStat.rtt0Cnt += 1
+		f.periodPerfStats.rtt0Sum += rtt
+		f.periodPerfStats.rtt0Count += 1
+		f.flowPerfStats.rtt0Sum += rtt
+		f.flowPerfStats.rtt0Count += 1
 	} else {
-		f.periodPerfStat.rtt1Sum += rtt
-		f.periodPerfStat.rtt1Cnt += 1
-		f.flowPerfStat.rtt1Sum += rtt
-		f.flowPerfStat.rtt1Cnt += 1
+		f.periodPerfStats.rtt1Sum += rtt
+		f.periodPerfStats.rtt1Count += 1
+		f.flowPerfStats.rtt1Sum += rtt
+		f.flowPerfStats.rtt1Count += 1
 	}
 
 	log.Debugf("rttCalc--rtt:%v, direction:%v", rtt, direction)
@@ -624,13 +624,13 @@ func (f *FlowPerfDataInfo) calcRtt(rtt time.Duration, direction bool) {
 // 计算rttSyn值
 func (f *FlowPerfDataInfo) calcRttSyn(rtt time.Duration, direction bool) {
 	if direction == TCP_DIR_CLIENT {
-		f.flowPerfStat.rttSyn0 += rtt
-		f.flowPerfStat.rtt0Sum += rtt
-		f.flowPerfStat.rtt0Cnt += 1
+		f.flowPerfStats.rttSyn0 += rtt
+		f.flowPerfStats.rtt0Sum += rtt
+		f.flowPerfStats.rtt0Count += 1
 	} else {
-		f.flowPerfStat.rttSyn1 += rtt
-		f.flowPerfStat.rtt1Sum += rtt
-		f.flowPerfStat.rtt1Cnt += 1
+		f.flowPerfStats.rttSyn1 += rtt
+		f.flowPerfStats.rtt1Sum += rtt
+		f.flowPerfStats.rtt1Count += 1
 	}
 
 	log.Debugf("rttSynCalc--rttsyn:%V, direction:%v", rtt, direction)
@@ -639,11 +639,11 @@ func (f *FlowPerfDataInfo) calcRttSyn(rtt time.Duration, direction bool) {
 // 计算连接建立syn retrans值
 func (f *FlowPerfDataInfo) calcRetransSyn(direction bool) {
 	if direction == TCP_DIR_CLIENT {
-		f.periodPerfStat.retransSyn0 += 1
-		f.flowPerfStat.retransSyn0 += 1
+		f.periodPerfStats.retransSyn0 += 1
+		f.flowPerfStats.retransSyn0 += 1
 	} else {
-		f.periodPerfStat.retransSyn1 += 1
-		f.flowPerfStat.retransSyn1 += 1
+		f.periodPerfStats.retransSyn1 += 1
+		f.flowPerfStats.retransSyn1 += 1
 	}
 
 	log.Debugf("retransSynCalc--direction:%v", direction)
@@ -652,44 +652,44 @@ func (f *FlowPerfDataInfo) calcRetransSyn(direction bool) {
 // 计算retrans值
 func (f *FlowPerfDataInfo) calcRetrans(direction bool) {
 	if direction == TCP_DIR_CLIENT {
-		f.periodPerfStat.retrans0 += 1
-		f.flowPerfStat.retrans0 += 1
+		f.periodPerfStats.retrans0 += 1
+		f.flowPerfStats.retrans0 += 1
 	} else {
-		f.periodPerfStat.retrans1 += 1
-		f.flowPerfStat.retrans1 += 1
+		f.periodPerfStats.retrans1 += 1
+		f.flowPerfStats.retrans1 += 1
 	}
 
 	log.Debugf("retransCalc--direction:%v", direction)
 }
 
 // 计算zero window包数量
-func (f *FlowPerfDataInfo) calcZeroWnd(direction bool) {
+func (f *FlowPerfDataInfo) calcZeroWin(direction bool) {
 	if direction == TCP_DIR_CLIENT {
-		f.periodPerfStat.zeroWndCnt0 += 1
-		f.flowPerfStat.zeroWndCnt0 += 1
+		f.periodPerfStats.zeroWinCount0 += 1
+		f.flowPerfStats.zeroWinCount0 += 1
 	} else {
-		f.periodPerfStat.zeroWndCnt1 += 1
-		f.flowPerfStat.zeroWndCnt1 += 1
+		f.periodPerfStats.zeroWinCount1 += 1
+		f.flowPerfStats.zeroWinCount1 += 1
 	}
 
-	log.Debugf("zeroWndCalc--direction:%v", direction)
+	log.Debugf("zeroWinCalc--direction:%v", direction)
 }
 
 // 计算PSH/URG包数量
 func (f *FlowPerfDataInfo) calcPshUrg(direction bool) {
 	if direction == TCP_DIR_CLIENT {
-		f.periodPerfStat.pshUrgCnt0 += 1
-		f.flowPerfStat.pshUrgCnt0 += 1
+		f.periodPerfStats.pshUrgCount0 += 1
+		f.flowPerfStats.pshUrgCount0 += 1
 
 	} else {
-		f.periodPerfStat.pshUrgCnt1 += 1
-		f.flowPerfStat.pshUrgCnt1 += 1
+		f.periodPerfStats.pshUrgCount1 += 1
+		f.flowPerfStats.pshUrgCount1 += 1
 	}
 
 	log.Debugf("pshUrgCalc--direction:%v", direction)
 }
 
-// check if tcphdr is valid
+// check if tcpHeader is valid
 func checkTcpFlags(tcpFlags uint8) bool {
 	log.Debugf("tcpflag:%x", tcpFlags)
 	if tcpFlags&TCP_SYN != 0 {
@@ -726,9 +726,9 @@ func NewMetaFlowPerf() *MetaFlowPerf {
 			tcpSession: TcpConnSession{client, server},
 		},
 		perfData: &FlowPerfDataInfo{
-			reportPerfStat: &TcpPerfStat{},
-			periodPerfStat: &MetaPerfStat{},
-			flowPerfStat:   &MetaPerfStat{},
+			reportPerfStats: &TcpPerfStats{},
+			periodPerfStats: &MetaPerfStats{},
+			flowPerfStats:   &MetaPerfStats{},
 		},
 		counter: &FlowPerfCounter{},
 	}
@@ -741,7 +741,7 @@ func NewMetaFlowPerf() *MetaFlowPerf {
 // 去除功能不相关报文
 func (m *MetaFlowPerf) preprocess(header *handler.MetaPacketHeader) bool {
 	if ok := checkTcpFlags(header.TcpData.Flags); !ok {
-		m.counter.invalidPktCnt += 1
+		m.counter.invalidPacketCount += 1
 
 		log.Debugf("invalid packet, err tcpflag:%x", header.TcpData.Flags)
 		return false
@@ -753,7 +753,7 @@ func (m *MetaFlowPerf) preprocess(header *handler.MetaPacketHeader) bool {
 // update flow performace quantify state and data
 func (m *MetaFlowPerf) Update(header *handler.MetaPacketHeader, direction bool) error {
 	var err FlowPerfError
-	var sameDir, oppositeDir *TcpSessionPeer
+	var sameDirection, oppositeDirection *TcpSessionPeer
 
 	if m.ctrlInfo == nil || m.perfData == nil || m.counter == nil {
 		err = FlowPerfError{what: "receiver(*MetaFlowPerf) error"}
@@ -762,44 +762,44 @@ func (m *MetaFlowPerf) Update(header *handler.MetaPacketHeader, direction bool) 
 	}
 
 	if direction == TCP_DIR_CLIENT {
-		sameDir = &m.ctrlInfo.tcpSession[utils.Bool2Int(TCP_DIR_CLIENT)]
-		oppositeDir = &m.ctrlInfo.tcpSession[utils.Bool2Int(TCP_DIR_SERVER)]
+		sameDirection = &m.ctrlInfo.tcpSession[utils.Bool2Int(TCP_DIR_CLIENT)]
+		oppositeDirection = &m.ctrlInfo.tcpSession[utils.Bool2Int(TCP_DIR_SERVER)]
 	} else {
-		sameDir = &m.ctrlInfo.tcpSession[utils.Bool2Int(TCP_DIR_SERVER)]
-		oppositeDir = &m.ctrlInfo.tcpSession[utils.Bool2Int(TCP_DIR_CLIENT)]
+		sameDirection = &m.ctrlInfo.tcpSession[utils.Bool2Int(TCP_DIR_SERVER)]
+		oppositeDirection = &m.ctrlInfo.tcpSession[utils.Bool2Int(TCP_DIR_CLIENT)]
 	}
 
 	if valid := m.preprocess(header); valid {
-		if time.Duration(header.Timestamp) < sameDir.timestamp || time.Duration(header.Timestamp) < oppositeDir.timestamp {
-			m.counter.invalidPktCnt += 1
+		if time.Duration(header.Timestamp) < sameDirection.timestamp || time.Duration(header.Timestamp) < oppositeDirection.timestamp {
+			m.counter.invalidPacketCount += 1
 			log.Debugf("packet timestamp error, same last:%v, opposite last:%v, packet:%v",
-				sameDir.timestamp, oppositeDir.timestamp, header.Timestamp)
+				sameDirection.timestamp, oppositeDirection.timestamp, header.Timestamp)
 			err = FlowPerfError{what: "packet timestamp error"}
 			return err
 		}
-		// 根据pkthdr, direction重建状态机
-		m.reestablishFsm(sameDir, oppositeDir, header, direction)
+		// 根据packetHeader, direction重建状态机
+		m.reestablishFsm(sameDirection, oppositeDirection, header, direction)
 		log.Debugf("flow data:%v", m.perfData)
 
-		sameDir.updateData(header)
+		sameDirection.updateData(header)
 	} else { // art, rtt控制字段置位
-		sameDir.resetRttPrecondition()
-		sameDir.resetArtPrecondition()
-		oppositeDir.resetArtPrecondition()
-		oppositeDir.resetRttPrecondition()
+		sameDirection.resetRttPrecondition()
+		sameDirection.resetArtPrecondition()
+		oppositeDirection.resetArtPrecondition()
+		oppositeDirection.resetRttPrecondition()
 	}
 
 	return nil
 }
 
-func (m *MetaFlowPerf) Report() *TcpPerfStat {
+func (m *MetaFlowPerf) Report() *TcpPerfStats {
 	if m.perfData != nil {
-		report := &TcpPerfStat{}
-		m.perfData.calcReportFlowPerfStat()
+		report := &TcpPerfStats{}
+		m.perfData.calcReportFlowPerfStats()
 
-		m.perfData.reportPerfStat, report = report, m.perfData.reportPerfStat
+		m.perfData.reportPerfStats, report = report, m.perfData.reportPerfStats
 
-		m.perfData.resetPeriodPerfStat()
+		m.perfData.resetPeriodPerfStats()
 		return report
 	}
 
@@ -808,56 +808,56 @@ func (m *MetaFlowPerf) Report() *TcpPerfStat {
 	return nil
 }
 
-func (f *FlowPerfDataInfo) calcReportFlowPerfStat() {
-	report := f.reportPerfStat
-	period := f.periodPerfStat
-	flow := f.flowPerfStat
+func (f *FlowPerfDataInfo) calcReportFlowPerfStats() {
+	report := f.reportPerfStats
+	period := f.periodPerfStats
+	flow := f.flowPerfStats
 
-	if period.artCnt > 0 {
-		report.ARTAvg = period.artSum / time.Duration(period.artCnt)
+	if period.artCount > 0 {
+		report.ARTAvg = period.artSum / time.Duration(period.artCount)
 	}
 	report.RTTSyn = flow.rttSyn0 + flow.rttSyn1
 
-	if flow.rtt0Cnt > 0 {
-		report.RTTAvg += flow.rtt0Sum / time.Duration(flow.rtt0Cnt)
+	if flow.rtt0Count > 0 {
+		report.RTTAvg += flow.rtt0Sum / time.Duration(flow.rtt0Count)
 	}
-	if flow.rtt1Cnt > 0 {
-		report.RTTAvg += flow.rtt1Sum / time.Duration(flow.rtt1Cnt)
+	if flow.rtt1Count > 0 {
+		report.RTTAvg += flow.rtt1Sum / time.Duration(flow.rtt1Count)
 	}
 
-	if period.rtt0Cnt == 0 {
-		period.rtt0Cnt = flow.rtt0Cnt
+	if period.rtt0Count == 0 {
+		period.rtt0Count = flow.rtt0Count
 		period.rtt0Sum = flow.rtt0Sum
 	}
-	if period.rtt0Cnt > 0 {
-		report.RTT += period.rtt0Sum / time.Duration(period.rtt0Cnt)
+	if period.rtt0Count > 0 {
+		report.RTT += period.rtt0Sum / time.Duration(period.rtt0Count)
 	}
-	if period.rtt1Cnt == 0 {
-		period.rtt1Cnt = flow.rtt1Cnt
+	if period.rtt1Count == 0 {
+		period.rtt1Count = flow.rtt1Count
 		period.rtt1Sum = flow.rtt1Sum
 	}
-	if period.rtt1Cnt > 0 {
-		report.RTT += period.rtt1Sum / time.Duration(period.rtt1Cnt)
+	if period.rtt1Count > 0 {
+		report.RTT += period.rtt1Sum / time.Duration(period.rtt1Count)
 	}
 
-	report.SynRetransCnt0 = uint64(period.retransSyn0)
-	report.SynRetransCnt1 = uint64(period.retransSyn1)
+	report.SynRetransCount0 = period.retransSyn0
+	report.SynRetransCount1 = period.retransSyn1
 
-	report.RetransCnt0 = uint64(period.retrans0)
-	report.RetransCnt1 = uint64(period.retrans1)
-	report.TotalRetransCnt = uint64(flow.retrans0 + flow.retrans1)
+	report.RetransCount0 = period.retrans0
+	report.RetransCount1 = period.retrans1
+	report.TotalRetransCount = flow.retrans0 + flow.retrans1
 
-	report.ZeroWndCnt0 = uint64(period.zeroWndCnt0)
-	report.ZeroWndCnt1 = uint64(period.zeroWndCnt1)
-	report.TotalZeroWndCnt = uint64(flow.zeroWndCnt1 + flow.zeroWndCnt1)
+	report.ZeroWinCount0 = period.zeroWinCount0
+	report.ZeroWinCount1 = period.zeroWinCount1
+	report.TotalZeroWinCount = flow.zeroWinCount0 + flow.zeroWinCount1
 
-	report.PshUrgCnt0 = uint64(period.pshUrgCnt0)
-	report.PshUrgCnt1 = uint64(period.pshUrgCnt1)
-	report.TotalPshUrgCnt = uint64(flow.pshUrgCnt0 + flow.pshUrgCnt1)
+	report.PshUrgCount0 = period.pshUrgCount0
+	report.PshUrgCount1 = period.pshUrgCount1
+	report.TotalPshUrgCount = flow.pshUrgCount0 + flow.pshUrgCount1
 }
 
-func (f *FlowPerfDataInfo) resetPeriodPerfStat() {
-	f.periodPerfStat = &MetaPerfStat{}
+func (f *FlowPerfDataInfo) resetPeriodPerfStats() {
+	f.periodPerfStats = &MetaPerfStats{}
 }
 
 func reflectFormat(valueVar interface{}) string {
@@ -873,27 +873,27 @@ func reflectFormat(valueVar interface{}) string {
 
 func (f *FlowPerfDataInfo) String() string {
 	var reportStr string
-	report := f.reportPerfStat
+	report := f.reportPerfStats
 	if report != nil {
 		reportStr = reflectFormat(*report)
 	} else {
 		reportStr = "nil"
 	}
 
-	return fmt.Sprintf("\nreportPerfStat:%v, \nperiodPerfStat:%v, \nflowPerfStat:%v",
-		reportStr, f.periodPerfStat, f.flowPerfStat)
+	return fmt.Sprintf("\nreportPerfStats:%v, \nperiodPerfStats:%v, \nflowPerfStats:%v",
+		reportStr, f.periodPerfStats, f.flowPerfStats)
 }
 
-func (f *MetaPerfStat) String() string {
+func (f *MetaPerfStats) String() string {
 	return reflectFormat(*f)
 }
 
 // implement stats/GetCounter interface
 func (m *MetaFlowPerf) GetCounter() interface{} {
-	c := &FlowPerfCounter{}
-	c, m.counter = m.counter, c
+	counter := &FlowPerfCounter{}
+	counter, m.counter = m.counter, counter
 
-	return c
+	return counter
 }
 
 type FlowPerfError struct {
@@ -915,7 +915,7 @@ func (e FlowPerfError) Error() string {
 	return ""
 }
 
-func (e FlowPerfError) returnErr() error {
+func (e FlowPerfError) returnError() error {
 	if len(e.what) > 0 {
 		return e
 	}

@@ -94,15 +94,15 @@ type FastPath struct {
 type FlowGenerator struct {
 	sync.RWMutex
 
-	fastPath               FastPath
-	metaPktHdrInQueue      QueueReader
-	flowOutQueue           QueueWriter
-	stats                  FlowGeneratorStats
-	forceReportIntervalSec time.Duration
-	minLoopIntervalSec     time.Duration
-	flowLimitNum           uint64
+	fastPath                FastPath
+	metaPacketHeaderInQueue QueueReader
+	flowOutQueue            QueueWriter
+	stats                   FlowGeneratorStats
+	forceReportIntervalSec  time.Duration
+	minLoopIntervalSec      time.Duration
+	flowLimitNum            uint64
 }
 
 func TaggedFlowString(f *TaggedFlow) string {
-	return fmt.Sprintf("%+v\n%+v", *f, *f.TcpPerfStat)
+	return fmt.Sprintf("%+v\n%+v", *f, *f.TcpPerfStats)
 }

@@ -51,6 +51,19 @@
   version = "v1.1.0"
 
 [[projects]]
+  digest = "1:2e3c336fc7fde5c984d2841455a658a6d626450b1754a854b3b32e7a8f49a07a"
+  name = "github.com/google/go-cmp"
+  packages = [
+    "cmp",
+    "cmp/internal/diff",
+    "cmp/internal/function",
+    "cmp/internal/value",
+  ]
+  pruneopts = "UT"
+  revision = "3af367b6b30c263d47e8895973edcca9a49cf029"
+  version = "v0.2.0"
+
+[[projects]]
   digest = "1:f2a59262dcdf19b8a49351b562b4b274a935ea21932817126e6901ae516cde35"
   name = "github.com/google/gopacket"
   packages = [
@@ -151,7 +164,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:b298e1e4aafceca6479941984df868bdf3cc61b2bd03570ad3b83bed69fecb1c"
+  digest = "1:7f5326767121eb250314768845d9936607e2becac6b3002da7b5f5da1fba2115"
   name = "gitlab.x.lan/application/droplet-app"
   packages = [
     "internal/pkg",
@@ -160,7 +173,7 @@
     "pkg/metering/bw_usage_isp_usage",
   ]
   pruneopts = "UT"
-  revision = "8a7b554b5baf416be2b41e4a1ed388694751b1dd"
+  revision = "690be6b1381b784c42ac0f9c842c9f0548213352"
 
 [[projects]]
   branch = "master"
@@ -180,7 +193,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:c3bc03a66144fd50b5519124f8452110cfa7e0ab6e901c36b4be77edb4ef3d69"
+  digest = "1:d60ac8bdcf755bc95337d0037778f7d8186c957704773bd87d68309441697d35"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "datatype",
@@ -193,7 +206,7 @@
     "utils",
   ]
   pruneopts = "UT"
-  revision = "a989c9ddca5e06e94c4891d28f9b6edac319dabe"
+  revision = "870d1e5686d77788f6716c9e4547c8bddfebaffc"
 
 [[projects]]
   branch = "release-branch.go1.10"
@@ -309,6 +322,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/golang/protobuf/proto",
+    "github.com/google/go-cmp/cmp",
     "github.com/google/gopacket",
     "github.com/google/gopacket/layers",
     "github.com/google/gopacket/pcapgo",
