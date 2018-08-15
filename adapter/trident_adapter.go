@@ -226,7 +226,7 @@ func (a *TridentAdapter) RecvCommand(conn *net.UDPConn, port int, operate uint16
 }
 
 func CommmandGetCounter(count *PacketCounter) bool {
-	result, err := dropletctl.SendToDroplet(dropletctl.DROPLETCTL_ADAPTER, ADAPTER_CMD_SHOW, nil)
+	_, result, err := dropletctl.SendToDroplet(dropletctl.DROPLETCTL_ADAPTER, ADAPTER_CMD_SHOW, nil)
 	if err != nil {
 		log.Warning(err)
 		return false

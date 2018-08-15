@@ -7,16 +7,17 @@ import (
 	"github.com/op/go-logging"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	_ "gitlab.x.lan/yunshan/droplet-libs/monitor"
-	. "gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 
 	"gitlab.x.lan/yunshan/droplet/adapter"
 	"gitlab.x.lan/yunshan/droplet/config"
 	"gitlab.x.lan/yunshan/droplet/flowgen"
+	"gitlab.x.lan/yunshan/droplet/handler"
 	"gitlab.x.lan/yunshan/droplet/labeler"
 	"gitlab.x.lan/yunshan/droplet/mapreduce"
 	"gitlab.x.lan/yunshan/droplet/packet"
 	"gitlab.x.lan/yunshan/droplet/protobuf"
+	"gitlab.x.lan/yunshan/droplet/queue"
 )
 
 var log = logging.MustGetLogger("droplet")
@@ -31,14 +32,16 @@ func Start(configPath string) {
 	synchronizer := config.NewRpcConfigSynchronizer(ips, cfg.ControllerPort, 10*time.Second)
 	synchronizer.Start()
 
-	filterQueue := NewOverwriteQueue("ToFilter", 1000)
+	manager := queue.NewManager()
+
+	filterQueue := manager.NewQueue("ToFilter", 1000, &handler.MetaPacket{})
 	tridentAdapter := adapter.NewTridentAdapter(filterQueue)
 	if tridentAdapter == nil {
 		return
 	}
 
-	flowQueue := NewOverwriteQueue("FilterToFlow", 1000)
-	meteringQueue := NewOverwriteQueue("FilterToMetering", 1000)
+	flowQueue := manager.NewQueue("FilterToFlow", 1000, &handler.MetaPacket{})
+	meteringQueue := manager.NewQueue("FilterToMetering", 1000, &TaggedMetering{})
 	labelerManager := labeler.NewLabelerManager(filterQueue, meteringQueue, flowQueue)
 	labelerManager.Start()
 	synchronizer.Register(func(response *protobuf.SyncResponse) {
@@ -47,7 +50,7 @@ func Start(configPath string) {
 		labelerManager.OnIpGroupDataChange(convert2IpGroupdata(response))
 	})
 
-	flowAppOutputQueue := NewOverwriteQueue("flowAppOutputQueue", 1000)
+	flowAppOutputQueue := manager.NewQueue("flowAppOutputQueue", 1000, &handler.MetaPacket{})
 	flowGenerator := flowgen.New(flowQueue, flowAppOutputQueue, 60)
 	if flowGenerator == nil {
 		return

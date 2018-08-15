@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -52,6 +53,19 @@ type MetaPacket struct {
 	PortDst    uint16
 	PayloadLen uint16
 	TcpData    MetaPacketTcpHeader
+}
+
+func (m *MetaPacket) String() string {
+	return fmt.Sprintf("TIMESTAMP: %d INPORT: 0x%X EXPORTER: %v PKT_LEN: %d IS_L2_END: %v - %v ENDPOINTDATA: %p RAW: %p\n"+
+		"    TUNNEL: %+v\n"+
+		"    MAC: %s -> %s TYPE: %d VLAN: %d\n"+
+		"    IP: %v -> %v PROTO: %d TTL: %d\n"+
+		"    PORT: %d -> %d PAYLOAD_LEN: %d TCP: %+v",
+		m.Timestamp, m.InPort, m.Exporter, m.PacketLen, m.L2End0, m.L2End1, m.EndpointData, m.Raw,
+		m.TunnelInfo,
+		m.MacSrc, m.MacDst, m.EthType, m.Vlan,
+		m.IpSrc, m.IpDst, m.Proto, m.TTL,
+		m.PortSrc, m.PortDst, m.PayloadLen, m.TcpData)
 }
 
 func getTcpFlags(t *layers.TCP) uint8 {

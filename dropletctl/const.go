@@ -14,6 +14,7 @@ type DropletCtlModuleOperate uint16
 
 const (
 	DROPLETCTL_ADAPTER DropletCtlModuleId = iota
+	DROPLETCTL_QUEUE
 	DROPLETCTL_MAX
 )
 

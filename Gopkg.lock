@@ -226,7 +226,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "2ff15ad416ece15537568da32240dc519f5d25dc"
+  revision = "4cf31f568e808a06c7e6b99a831d0091979bde5f"
 
 [[projects]]
   branch = "feature-os"
@@ -257,15 +257,15 @@
   revision = "0ed95abb35c445290478a5348a7b38bb154135fd"
 
 [[projects]]
-  branch = "master"
-  digest = "1:2f71657f09ff05e4567909e9e0de7ad799828c96d402c540b41dc044a6590fb2"
+  branch = "release-branch.go1.11"
+  digest = "1:a60cae5be8993938498243605b120290533a5208fd5cac81c932afbad3642fb0"
   name = "golang.org/x/sys"
   packages = [
     "unix",
     "windows",
   ]
   pruneopts = "UT"
-  revision = "1c9583448a9c3aa0f9a6a5241bf73c0bd8aafded"
+  revision = "98c5dad5d1a0e8a73845ecc8897d0bd56586511d"
 
 [[projects]]
   digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"
