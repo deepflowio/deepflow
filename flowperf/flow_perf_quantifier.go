@@ -70,6 +70,7 @@ const (
 	SEQ_CONTINUOUS
 	SEQ_DISCONTINUOUS
 	SEQ_RETRANS
+	SEQ_NOT_CARE
 )
 
 const (
@@ -78,6 +79,8 @@ const (
 	WIN_SCALE_FLAG    = 0x80
 	WIN_SCALE_UNKNOWN = 0x40
 )
+
+const SEQ_LIST_MAX_LEN = 16
 
 type SeqSegment struct { // 避免乱序，识别重传
 	seqNumber uint32
@@ -163,13 +166,8 @@ func (t *TcpSessionPeer) getRttPrecondition() bool {
 	return t.canCalcRtt
 }
 
-func (p *TcpSessionPeer) isContinuousSeqSegment(left, right, node *SeqSegment) ContinuousFlag {
+func isContinuousSeqSegment(left, right, node *SeqSegment) ContinuousFlag {
 	flag := SEQ_NODE_DISCONTINUOUS
-
-	if node == nil {
-		log.Errorf("node is nil")
-		return SEQ_NODE_DISCONTINUOUS
-	}
 
 	log.Debugf("node: {%v,%v}", node.seqNumber, node.length)
 	if left != nil && left.seqNumber+left.length == node.seqNumber {
@@ -190,13 +188,52 @@ func (p *TcpSessionPeer) isContinuousSeqSegment(left, right, node *SeqSegment) C
 	return flag
 }
 
+func (p *TcpSessionPeer) mergeSeqListNode() {
+	if p.seqList.Len() < SEQ_LIST_MAX_LEN {
+		return
+	}
+
+	first := p.seqList.Front().Value.(*SeqSegment)
+	second := p.seqList.Front().Next().Value.(*SeqSegment)
+	second.length = second.seqNumber - first.seqNumber + second.length
+	second.seqNumber = first.seqNumber
+
+	p.seqList.Remove(p.seqList.Front())
+}
+
+func isRetransSeqSegment(left, node *SeqSegment) bool {
+	if left == nil {
+		return false
+	}
+
+	if node.seqNumber >= left.seqNumber && left.seqNumber+left.length >= node.seqNumber+node.length {
+		return true
+	}
+
+	return false
+}
+
+func isErrorSeqSegment(left, right, node *SeqSegment) bool {
+	if left != nil &&
+		node.seqNumber < left.seqNumber+left.length &&
+		node.seqNumber+node.length > left.seqNumber+left.length {
+		return true
+	}
+
+	if right != nil && node.seqNumber+node.length > right.seqNumber {
+		return true
+	}
+
+	return false
+}
+
 // 根据seqNumber判断包重传,连续,不连续
 // 合并连续seqNumber
 // 不连续则添加新节点, 构建升序链表
 func (p *TcpSessionPeer) assertSeqNumber(tcpHeader *handler.MetaPacketTcpHeader, payloadLen uint16) uint32 {
 	var flag uint32
 	var left, right *SeqSegment
-	var e *list.Element
+	var rightElement, currentElement *list.Element
 
 	if payloadLen == 0 {
 		log.Infof("error input, payloadLen==0")
@@ -213,68 +250,46 @@ func (p *TcpSessionPeer) assertSeqNumber(tcpHeader *handler.MetaPacketTcpHeader,
 	}
 	if l.Len() == 0 {
 		l.PushFront(node)
-		return SEQ_DISCONTINUOUS
+		return SEQ_NOT_CARE
 	}
 
-	first := l.Front().Value.(*SeqSegment)
-	last := l.Back().Value.(*SeqSegment)
+	// 从后往前查找
+	for rightElement, currentElement = nil, l.Back(); currentElement != nil; rightElement, currentElement = currentElement, currentElement.Prev() {
+		left = currentElement.Value.(*SeqSegment)
+		if node.seqNumber >= left.seqNumber { // 查找node在list中的位置
+			break
+		}
+	}
 
-	if last.seqNumber <= node.seqNumber { // 正常情况，对于同向payloadLen>0包，均连续
-		if node.seqNumber > last.seqNumber+last.length { // 不连续, 添加新节点
-			l.InsertAfter(node, l.Back())
-			flag = SEQ_DISCONTINUOUS
-		} else if node.seqNumber+node.length <= last.seqNumber+last.length { // 重传
-			flag = SEQ_RETRANS
-		} else { // 连续
-			left = l.Back().Value.(*SeqSegment)
-			if ok := p.isContinuousSeqSegment(left, nil, node); ok > 0 {
-				flag = SEQ_CONTINUOUS
-			} else {
-				flag = SEQ_ERROR
-				log.Debugf("node.lengthgth error, node:%v", node)
-			}
-		}
-	} else if first.seqNumber <= node.seqNumber {
-		for e = l.Front(); e != l.Back(); e = e.Next() {
-			v := e.Value.(*SeqSegment)
-			if node.seqNumber < v.seqNumber { // 查找node在list中的位置
-				break
-			}
-		}
-		left = e.Prev().Value.(*SeqSegment)
-		right = e.Value.(*SeqSegment)
-		log.Debugf("left:%v, right:%v", left, right)
+	if currentElement == nil {
+		left = nil
+	}
+	if rightElement == nil {
+		right = nil
+	} else {
+		right = rightElement.Value.(*SeqSegment)
+	}
 
-		if node.seqNumber+node.length <= left.seqNumber+left.length { // 重传判断
-			flag = SEQ_RETRANS
-		} else if node.seqNumber > left.seqNumber+left.length && node.seqNumber+node.length < right.seqNumber { // 重传判断
-			// 不连续，处于left, right之间
-			l.InsertBefore(node, e)
-			flag = SEQ_DISCONTINUOUS
-		} else {
-			if ok := p.isContinuousSeqSegment(left, right, node); ok > 0 {
-				if ok == SEQ_NODE_BOTH_CONTINUOUS {
-					l.Remove(e)
-				}
-				flag = SEQ_CONTINUOUS
+	if e := isErrorSeqSegment(left, right, node); e {
+		flag = SEQ_ERROR
+	} else if r := isRetransSeqSegment(left, node); r {
+		flag = SEQ_RETRANS
+	} else {
+		if c := isContinuousSeqSegment(left, right, node); c == SEQ_NODE_DISCONTINUOUS {
+			if rightElement == nil {
+				l.InsertAfter(node, currentElement)
 			} else {
-				flag = SEQ_ERROR
-				log.Debugf("node:%v length error", node)
+				l.InsertBefore(node, rightElement)
 			}
+		} else if c == SEQ_NODE_BOTH_CONTINUOUS {
+			left.length = left.length - node.length + right.length
+			l.Remove(rightElement)
 		}
-	} else { // 乱序 first.seqNumber > node.seqNumber
-		if first.seqNumber > node.seqNumber+node.length { // new, 不连续
-			l.InsertBefore(node, l.Front())
-			flag = SEQ_DISCONTINUOUS
-		} else { // new, but continue, 合并连续
-			right = l.Front().Value.(*SeqSegment)
-			if ok := p.isContinuousSeqSegment(nil, right, node); ok > 0 {
-				flag = SEQ_CONTINUOUS
-			} else {
-				flag = SEQ_ERROR
-				log.Debugf("node:%v length error", node)
-			}
-		}
+		flag = SEQ_NOT_CARE
+	}
+
+	if p.seqList.Len() >= SEQ_LIST_MAX_LEN {
+		p.mergeSeqListNode()
 	}
 
 	return flag
@@ -733,8 +748,13 @@ func NewMetaFlowPerf() *MetaFlowPerf {
 		counter: &FlowPerfCounter{},
 	}
 	stats.RegisterCountable(FP_NAME, stats.EMPTY_TAG, meta)
+	runtime.SetFinalizer(meta, func(m *MetaFlowPerf) { m.Close() })
 
 	return meta
+}
+
+func (m *MetaFlowPerf) Close() {
+	stats.DeregisterCountable(m)
 }
 
 // 异常flag判断，方向识别，payloadLen计算等
