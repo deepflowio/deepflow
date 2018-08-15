@@ -13,6 +13,11 @@ type ServiceData struct {
 	Ports   []uint32
 }
 
+type ServiceIds struct {
+	SrcIds []uint32
+	DstIds []uint32
+}
+
 type ServiceTable struct {
 	serviceMap map[ServiceKey]*ServiceData
 }
@@ -52,4 +57,40 @@ func (s *ServiceTable) GenerateServiceTable(servicedatas []*ServiceData) map[Ser
 
 func (s *ServiceTable) UpdateServiceTable(servicedatas []*ServiceData) {
 	s.UpdateServiceMap(s.GenerateServiceTable(servicedatas))
+}
+
+func (s *ServiceTable) GetServiceId(endpointData *EndpointData, key *LookupKey) *ServiceIds {
+	if endpointData == nil || key == nil {
+		return nil
+	}
+	var srcServiceIds, dstServiceIds []uint32
+	if endpointData.SrcInfo != nil {
+		srcServiceIds = make([]uint32, 0, len(endpointData.SrcInfo.GroupIds))
+		for _, groupId := range endpointData.SrcInfo.GroupIds {
+			if data := s.GetServiceData(groupId, uint32(key.SrcPort), uint16(key.Proto)); data != nil {
+				srcServiceIds = append(srcServiceIds, data.Id)
+			}
+		}
+	}
+	if endpointData.DstInfo != nil {
+		dstServiceIds = make([]uint32, 0, len(endpointData.DstInfo.GroupIds))
+		for _, groupId := range endpointData.DstInfo.GroupIds {
+			if data := s.GetServiceData(groupId, uint32(key.DstPort), uint16(key.Proto)); data != nil {
+				dstServiceIds = append(dstServiceIds, data.Id)
+			}
+		}
+	}
+
+	return &ServiceIds{
+		SrcIds: srcServiceIds,
+		DstIds: dstServiceIds,
+	}
+}
+
+func (s *ServiceTable) GetServiceData(groupId uint32, port uint32, proto uint16) *ServiceData {
+	key := calcServiceHashKey(groupId, port, proto)
+	if data, ok := s.serviceMap[ServiceKey(key)]; ok {
+		return data
+	}
+	return nil
 }
