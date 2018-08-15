@@ -2,7 +2,6 @@ package policy
 
 import (
 	"github.com/op/go-logging"
-	"gitlab.x.lan/yunshan/droplet-libs/segmenttree"
 )
 
 var log = logging.MustGetLogger("policy")
@@ -82,8 +81,8 @@ type EndpointData struct {
 type MacKey uint64         // u64(mac)
 type IpKey uint32          // u32(ip)
 type EpcIpKey uint64       // u32(epc_id) . u32(ip)
-type MacIpKey uint64       // u32(mac) . u32(ip)
-type MacIpInportKey uint64 // u32(mac) . u32(ip)
+type MacIpKey uint64       // u64(mac) . u32(ip)
+type MacIpInportKey uint64 // u64(mac) . u32(ip) . u32(RxInterface)
 type ServiceKey uint64     // u20(group_id) . u8(proto) . u16(port)
 type PolicyKey uint64      // u20(group_id) . u20(service_id) . u12(vlan_id)
 
@@ -98,18 +97,10 @@ const (
 )
 
 type PolicyTable struct {
-	cpData *CloudPlatformData
-
-	ipGroupTree  segmenttree.SegmentTree    // IP资源组，key=EpcIpKey（0为任意，-1为其它），value=GroupIds
-	ipGroupCache *map[EpcIpKey]EndpointInfo // FIXME: 替换为LRU，限制大小1M和生存时间60s
-
-	endPointCache *map[MacIpKey]EndpointInfo // FIXME: 替换为LRU，限制大小1M和生存时间60s
-
-	serviceMap *map[ServiceKey]ServiceId // 服务字典
-	policyMap  *map[PolicyKey]PolicyId   // 策略字典
-
-	serviceTable *ServiceTable
-	policyAction [MAX_POLICY_ID]*Action
+	cloudPlatformData *CloudPlatformData
+	policyMap         map[PolicyKey]PolicyId // 策略字典
+	serviceTable      *ServiceTable
+	policyAction      [MAX_POLICY_ID]*Action
 }
 
 func NewPolicyTable( /* 传入Protobuf结构体指针 */ actionTypes ActionType) *PolicyTable {
@@ -118,8 +109,8 @@ func NewPolicyTable( /* 传入Protobuf结构体指针 */ actionTypes ActionType)
 	 * 那么就不要将EPC等云平台信息进行计算。
 	 * droplet关心**几乎**所有，对关心的信息进行计算*/
 	return &PolicyTable{
-		cpData:       NewCloudPlatformData(),
-		serviceTable: NewSerivceTable(),
+		cloudPlatformData: NewCloudPlatformData(),
+		serviceTable:      NewSerivceTable(),
 	}
 }
 
@@ -135,34 +126,44 @@ type LookupKey struct {
 }
 
 // Trident用于PACKET_BROKER、PACKET_STORE
-func (p *PolicyTable) LookupActionByKey(key *LookupKey) *Action {
+func (t *PolicyTable) LookupActionByKey(key *LookupKey) *Action {
 	// 将匹配策略的所有Action merge以后返回
 	// FIXME: 注意将查找过程中的性能监控数据发送到statsd
 	return nil
 }
 
 // River用于PACKET_BROKER，Stream用于FLOW_STORE
-func (p *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *Action {
+func (t *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *Action {
 	// FIXME
 	return nil
 }
 
 // Droplet用于ANALYTIC_*、PACKET_BROKER、PACKET_STORE
-func (p *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *Action) {
-	// handler将结果赋值到
+func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *Action) {
 	// FIXME: 注意利用TTL更新L3End（仅当用于ANALYTIC_*时）
-	infos := p.cpData.GetEndPointData(key)
-	return infos, nil
+	endpointData := t.cloudPlatformData.GetEndpointData(key)
+	serviceIds := t.serviceTable.GetServiceId(endpointData, key)
+	if serviceIds != nil {
+		//FIXME 添加policy实现
+		log.Debug("SERVICEIDS:", serviceIds)
+	}
+	return endpointData, nil
 }
 
-func (p *PolicyTable) UpdateServiceData(data []*ServiceData) {
+func (t *PolicyTable) UpdateServiceData(data []*ServiceData) {
 	if data != nil {
-		p.serviceTable.UpdateServiceTable(data)
+		t.serviceTable.UpdateServiceTable(data)
 	}
 }
 
-func (p *PolicyTable) UpdateInterfaceData(data []*PlatformData) {
+func (t *PolicyTable) UpdateInterfaceData(data []*PlatformData) {
 	if data != nil {
-		p.cpData.UpdateInterfaceTable(data)
+		t.cloudPlatformData.UpdateInterfaceTable(data)
+	}
+}
+
+func (t *PolicyTable) UpdateIpGroupData(data []*IpGroupData) {
+	if data != nil {
+		t.cloudPlatformData.ipGroup.Update(data)
 	}
 }
