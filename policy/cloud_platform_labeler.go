@@ -37,8 +37,8 @@ type PlatformData struct {
 }
 
 type FastPlatformData struct {
-	epInfo    *EndpointInfo
-	timestamp time.Time
+	endpointInfo *EndpointInfo
+	timestamp    time.Time
 }
 
 type IpMapDatas []map[IpKey]*PlatformData
@@ -68,6 +68,7 @@ type CloudPlatformData struct {
 	macTable      *MacTable
 	ipTables      [MASK_LEN]*IpTable
 	epcIpTable    *EpcIpTable
+	ipGroup       *IpResourceGroup
 	netmaskBitmap uint32
 	fastTable     *FastTable
 }
@@ -93,47 +94,54 @@ func NewCloudPlatformData() *CloudPlatformData {
 		macTable:      mactable,
 		ipTables:      iptables,
 		epcIpTable:    epciptable,
+		ipGroup:       NewIpResourceGroup(),
 		netmaskBitmap: uint32(0),
 		fastTable:     fasttable,
 	}
 }
 
-func (e *EndpointInfo) SetL2Data(data *PlatformData) {
-	e.L2EpcId = data.EpcId
-	e.L2DeviceType = data.DeviceType
-	e.L2DeviceId = data.DeviceId
-	e.HostIp = data.HostIp
-	e.GroupIds = append(e.GroupIds, data.GroupIds...)
+func (i *EndpointInfo) SetL2Data(data *PlatformData) {
+	i.L2EpcId = data.EpcId
+	i.L2DeviceType = data.DeviceType
+	i.L2DeviceId = data.DeviceId
+	i.HostIp = data.HostIp
+	i.GroupIds = append(i.GroupIds, data.GroupIds...)
 }
 
-func (e *EndpointInfo) SetL3Data(data *PlatformData, ip uint32) {
-	e.L3EpcId = -1
+func (i *EndpointInfo) SetL3Data(data *PlatformData, ip uint32) {
+	i.L3EpcId = -1
 	if data.EpcId != 0 {
-		e.L3EpcId = data.EpcId
+		i.L3EpcId = data.EpcId
 	}
-	e.L3DeviceType = data.DeviceType
-	e.L3DeviceId = data.DeviceId
+	i.L3DeviceType = data.DeviceType
+	i.L3DeviceId = data.DeviceId
 
-	for _, ipinfo := range data.Ips {
-		if ipinfo.Ip == (ip & (NETMASK << (MAX_MASK_LEN - ipinfo.Netmask))) {
-			e.SubnetId = ipinfo.SubnetId
+	for _, ipInfo := range data.Ips {
+		if ipInfo.Ip == (ip & (NETMASK << (MAX_MASK_LEN - ipInfo.Netmask))) {
+			i.SubnetId = ipInfo.SubnetId
 			break
 		}
 	}
 }
 
-func (e *EndpointInfo) SetL3EndByIp(data *PlatformData, ip uint32) {
-	for _, ipinfo := range data.Ips {
-		if ipinfo.Ip == (ip & (NETMASK << (MAX_MASK_LEN - ipinfo.Netmask))) {
-			e.L3End = true
+func (i *EndpointInfo) SetL3EndByTtl(data *PlatformData, ttl uint32) {
+	if ttl == 64 || ttl == 128 || ttl == 255 {
+		i.L3End = true
+	}
+}
+
+func (i *EndpointInfo) SetL3EndByIp(data *PlatformData, ip uint32) {
+	for _, ipInfo := range data.Ips {
+		if ipInfo.Ip == (ip & (NETMASK << (MAX_MASK_LEN - ipInfo.Netmask))) {
+			i.L3End = true
 			break
 		}
 	}
 }
 
-func (e *EndpointInfo) SetL3EndByMac(data *PlatformData, mac uint64) {
+func (i *EndpointInfo) SetL3EndByMac(data *PlatformData, mac uint64) {
 	if data.Mac == mac {
-		e.L3End = true
+		i.L3End = true
 	}
 }
 
@@ -260,15 +268,16 @@ func (d *CloudPlatformData) InsertInfoToFastPath(mac uint64, ip uint32, inport u
 func (d *CloudPlatformData) GetInfoByFastPath(mac uint64, ip uint32, inport uint32) *EndpointInfo {
 	hash := MacIpInportKey(calcHashKey(mac, ip, inport))
 	d.fastTable.RLock()
-	defer d.fastTable.RUnlock()
 	if data, ok := d.fastTable.fastMap[hash]; ok {
 		if DATA_VALID_TIME < time.Now().Sub(data.timestamp) {
 			delete(d.fastTable.fastMap, hash)
+			d.fastTable.RUnlock()
 			return nil
 		}
-		return data.epInfo
+		d.fastTable.RUnlock()
+		return data.endpointInfo
 	}
-
+	d.fastTable.RUnlock()
 	return nil
 }
 
@@ -306,28 +315,30 @@ func (d *CloudPlatformData) GetEndpointInfo(mac uint64, ip uint32, inport uint32
 		}
 	}
 	fastdata := &FastPlatformData{
-		epInfo: &data,
+		endpointInfo: &data,
 	}
 	d.InsertInfoToFastPath(mac, ip, inport, fastdata)
 
 	return &data
 }
 
-func (d *CloudPlatformData) GetEndPointData(key *LookupKey) *EndpointData {
-	SrcData := d.GetInfoByFastPath(key.SrcMac, key.SrcIp, key.RxInterface)
-	if SrcData == nil {
-		SrcData = d.GetEndpointInfo(key.SrcMac, key.SrcIp, key.RxInterface)
+func (d *CloudPlatformData) GetEndpointData(key *LookupKey) *EndpointData {
+	srcData := d.GetInfoByFastPath(key.SrcMac, key.SrcIp, key.RxInterface)
+	if srcData == nil {
+		srcData = d.GetEndpointInfo(key.SrcMac, key.SrcIp, key.RxInterface)
+		d.ipGroup.Populate(key.SrcIp, srcData)
 	}
 
-	DstData := d.GetInfoByFastPath(key.DstMac, key.DstIp, key.RxInterface)
-	if DstData == nil {
-		DstData = d.GetEndpointInfo(key.DstMac, key.DstIp, key.RxInterface)
+	dstData := d.GetInfoByFastPath(key.DstMac, key.DstIp, key.RxInterface)
+	if dstData == nil {
+		dstData = d.GetEndpointInfo(key.DstMac, key.DstIp, key.RxInterface)
+		d.ipGroup.Populate(key.DstIp, dstData)
 	}
 
-	if SrcData != nil || DstData != nil {
+	if srcData != nil || dstData != nil {
 		return &EndpointData{
-			SrcInfo: SrcData,
-			DstInfo: DstData,
+			SrcInfo: srcData,
+			DstInfo: dstData,
 		}
 	}
 
