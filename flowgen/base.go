@@ -61,6 +61,7 @@ const TOTAL_FLOWS_ID_MASK uint64 = 0x0FFFFFFF
 
 const FLOW_LIMIT_NUM uint64 = 1024 * 1024
 
+// unit: second
 type TimeoutConfig struct {
 	Opening        time.Duration
 	Established    time.Duration
@@ -119,6 +120,20 @@ type FlowGenerator struct {
 	forceReportIntervalSec  time.Duration
 	minLoopIntervalSec      time.Duration
 	flowLimitNum            uint64
+}
+
+func timeMax(a time.Duration, b time.Duration) time.Duration {
+	if a < b {
+		return b
+	}
+	return a
+}
+
+func timeMin(a time.Duration, b time.Duration) time.Duration {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func TaggedFlowString(f *TaggedFlow) string {
