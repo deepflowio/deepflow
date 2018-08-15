@@ -11,18 +11,18 @@ import (
 	"gitlab.x.lan/yunshan/droplet/handler"
 )
 
-func testTcpSessionPeerSeqNoMerge(peer TcpSessionPeer, left, right, node *SeqSegment, t *testing.T) {
+func testSeqSegmentIsContinuous(peer TcpSessionPeer, left, right, node *SeqSegment, t *testing.T) {
 	if left == nil || right == nil || node == nil || t == nil {
 		return
 	}
 
-	ret := peer.isContinuousSeqSegment(left, right, node)
+	ret := isContinuousSeqSegment(left, right, node)
 	if ret == SEQ_NODE_DISCONTINUOUS {
 		t.Logf("%s test faild\n", t.Name())
 	}
 }
 
-func TestTcpSessionPeerSeqNoMerge(t *testing.T) {
+func TestSeqSegmentIsContinuous(t *testing.T) {
 	var left, right, node *SeqSegment
 
 	peer := TcpSessionPeer{seqList: list.New()}
@@ -38,19 +38,19 @@ func TestTcpSessionPeerSeqNoMerge(t *testing.T) {
 	node = &SeqSegment{1, 4}
 	left = nil
 	right = e3.Value.(*SeqSegment)
-	testTcpSessionPeerSeqNoMerge(peer, left, right, node, t)
+	testSeqSegmentIsContinuous(peer, left, right, node, t)
 
 	//{51,5}, nil
 	node = &SeqSegment{56, 4}
 	left = e5.Value.(*SeqSegment)
 	right = nil
-	testTcpSessionPeerSeqNoMerge(peer, left, right, node, t)
+	testSeqSegmentIsContinuous(peer, left, right, node, t)
 
 	//{31,10},{51,5}
 	node = &SeqSegment{41, 10}
 	left = e4.Value.(*SeqSegment)
 	right = e5.Value.(*SeqSegment)
-	testTcpSessionPeerSeqNoMerge(peer, left, right, node, t)
+	testSeqSegmentIsContinuous(peer, left, right, node, t)
 	t.Log(peer.String())
 }
 
@@ -78,6 +78,58 @@ func assert2(t *testing.T, input []interface{}, expected []interface{}, output [
 	}
 }
 
+func testMergeSeqListNode(peer *TcpSessionPeer, node *SeqSegment, position int) {
+	switch position {
+	case -1:
+		peer.seqList.PushFront(node)
+	case 0:
+		peer.seqList.InsertAfter(node, peer.seqList.Front().Next())
+	case 1:
+		peer.seqList.PushBack(node)
+	default:
+	}
+
+	peer.mergeSeqListNode()
+}
+
+func TestMergeSeqListNode(t *testing.T) {
+	var tcpHeader *handler.MetaPacketTcpHeader
+	var payload uint16
+	var node *SeqSegment
+	peer := &TcpSessionPeer{}
+
+	// init list
+	if peer.seqList == nil {
+		peer.seqList = list.New()
+	}
+
+	// insert {100, 10}, {200,10}, ... , {(SEQ_LIST_MAX_LEN-1)*100, 10}
+	for i := 1; i < SEQ_LIST_MAX_LEN; i++ {
+		tcpHeader = &handler.MetaPacketTcpHeader{Seq: uint32(100 * i), Ack: 20}
+		payload = 10
+		peer.assertSeqNumber(tcpHeader, payload)
+	}
+	t.Log(peer.String())
+
+	// test case {10, 10}
+	node = &SeqSegment{seqNumber: 10, length: 10}
+	testMergeSeqListNode(peer, node, -1)
+	// {10, 100}
+	t.Log(peer.String())
+
+	// test case {320, 10}
+	node = &SeqSegment{seqNumber: 320, length: 10}
+	testMergeSeqListNode(peer, node, 0)
+	// {10, 200}
+	t.Log(peer.String())
+
+	// {SEQ_LIST_MAX_LEN*10+10, 10}
+	node = &SeqSegment{seqNumber: uint32(SEQ_LIST_MAX_LEN*10 + 10), length: 10}
+	testMergeSeqListNode(peer, node, 1)
+	// {10,320}
+	t.Log(peer.String())
+}
+
 func TestTcpSessionPeerSeqNoAssert(t *testing.T) {
 	var tcpHeader *handler.MetaPacketTcpHeader
 	var payload uint16
@@ -96,7 +148,7 @@ func TestTcpSessionPeerSeqNoAssert(t *testing.T) {
 		l = peer.seqList
 	}
 
-	// list is empty, insert {20, 10}
+	// list is empty, insert {10, 10}
 	if l.Len() == 0 {
 		tcpHeader = &handler.MetaPacketTcpHeader{Seq: 10, Ack: 20}
 		payload = 10
