@@ -19,7 +19,7 @@ import (
 const DEFAULT_QUEUE_LEN = 200
 const DEFAULT_INTERVAL_SEC_HIGH = 60
 const DEFAULT_INTERVAL_SEC_LOW = 10
-const DEFAULT_DURATION_MSEC = 123
+const DEFAULT_DURATION_MSEC = time.Millisecond * 123
 const DEFAULT_PKT_LEN = 128
 
 func getDefaultPacket() *handler.MetaPacketHeader {
@@ -35,7 +35,7 @@ func getDefaultPacket() *handler.MetaPacketHeader {
 	packet.InPort = 65533
 	packet.Exporter = net.ParseIP("192.168.1.1")
 	packet.TcpData.Flags = TCP_SYN
-	packet.Timestamp = time.Duration(time.Now().UnixNano()) / time.Microsecond
+	packet.Timestamp = time.Duration(time.Now().UnixNano())
 	packet.EndPointData = &EndpointData{
 		SrcInfo: &EndpointInfo{
 			L2EpcId:  -1,
@@ -100,21 +100,17 @@ func TestHandleSynRst(t *testing.T) {
 
 	var taggedFlow *TaggedFlow
 	taggedFlow = flowOutQueue.(Queue).Get().(*TaggedFlow)
-	if taggedFlow == nil {
-		t.Error("flow is nil")
-	} else {
-		if taggedFlow.CloseType != CLOSE_TYPE_RST {
-			t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_RST)
-		}
-		if taggedFlow.Duration <= DEFAULT_DURATION_MSEC {
-			t.Errorf("taggedFlow.Duration is %d, expect more than %d", taggedFlow.Duration, DEFAULT_DURATION_MSEC)
-		}
-		if taggedFlow.TCPFlags0 != TCP_SYN || taggedFlow.TCPFlags1 != TCP_RST {
-			t.Errorf("taggedFlow.TcpFlagsSrc is %d, expect %d", taggedFlow.TCPFlags0, TCP_SYN)
-			t.Errorf("taggedFlow.TcpFlagsDst is %d, expect %d", taggedFlow.TCPFlags1, TCP_RST)
-		}
-		t.Logf("\n" + TaggedFlowString(taggedFlow))
+	if taggedFlow.CloseType != CLOSE_TYPE_RST {
+		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_RST)
 	}
+	if taggedFlow.Duration <= DEFAULT_DURATION_MSEC {
+		t.Errorf("taggedFlow.Duration is %d, expect more than %d", taggedFlow.Duration, DEFAULT_DURATION_MSEC)
+	}
+	if taggedFlow.TCPFlags0 != TCP_SYN || taggedFlow.TCPFlags1 != TCP_RST {
+		t.Errorf("taggedFlow.TcpFlagsSrc is %d, expect %d", taggedFlow.TCPFlags0, TCP_SYN)
+		t.Errorf("taggedFlow.TcpFlagsDst is %d, expect %d", taggedFlow.TCPFlags1, TCP_RST)
+	}
+	t.Logf("\n" + TaggedFlowString(taggedFlow))
 }
 
 func TestHandleSynFin(t *testing.T) {

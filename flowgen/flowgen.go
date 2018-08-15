@@ -167,7 +167,7 @@ func (f *FlowGenerator) initFlow(header *handler.MetaPacketHeader, key *FlowKey)
 	flowExtra := &FlowExtra{
 		taggedFlow:     taggedFlow,
 		flowState:      FLOW_STATE_EXCEPTION,
-		recentTimesSec: now / time.Millisecond,
+		recentTimesSec: now / time.Second,
 	}
 	flowExtra.updatePlatformData(header)
 
@@ -261,12 +261,6 @@ func (f *FlowExtra) updateFlow(header *handler.MetaPacketHeader, reply bool) boo
 	taggedFlow := f.taggedFlow
 	bytes := uint64(header.PacketLen)
 	packetTimestamp := time.Duration(header.Timestamp)
-	if taggedFlow.StartTime != 0 && packetTimestamp > taggedFlow.StartTime {
-		taggedFlow.EndTime = packetTimestamp
-		taggedFlow.Duration = packetTimestamp - taggedFlow.StartTime
-	} else {
-		taggedFlow.Duration = 0
-	}
 	if reply {
 		if taggedFlow.TotalPacketCount1 == 0 {
 			taggedFlow.ArrTime10 = packetTimestamp
@@ -283,17 +277,32 @@ func (f *FlowExtra) updateFlow(header *handler.MetaPacketHeader, reply bool) boo
 		taggedFlow.ByteCount0 += bytes
 		taggedFlow.TotalByteCount0 += bytes
 	}
-	f.recentTimesSec = packetTimestamp / time.Millisecond
+	f.recentTimesSec = packetTimestamp / time.Second
 	f.updatePlatformData(header)
 
 	return f.updateTCPStateMachine(header.TcpData.Flags, reply)
 }
 
-func (f *FlowExtra) checkTimeout(nowSec time.Duration) bool {
-	if f.recentTimesSec+f.timeoutSec <= nowSec {
-		return true
+func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireIntervalSec time.Duration) {
+	taggedFlow := f.taggedFlow
+	// desireIntervalSec should not be too small
+	if now/time.Second-taggedFlow.StartTime/time.Second > desireIntervalSec+10 {
+		taggedFlow.EndTime = now - 10*time.Second
+	} else {
+		taggedFlow.EndTime = now
 	}
-	return false
+	taggedFlow.Duration = timeMax(taggedFlow.ArrTime0Last, taggedFlow.ArrTime1Last) - timeMin(taggedFlow.ArrTime00, taggedFlow.ArrTime10)
+}
+
+func (f *FlowExtra) resetCurFlowInfo(now time.Duration) {
+	taggedFlow := f.taggedFlow
+	taggedFlow.StartTime = now
+	taggedFlow.EndTime = now
+	taggedFlow.CurStartTime = 0
+	taggedFlow.PacketCount0 = 0
+	taggedFlow.PacketCount1 = 0
+	taggedFlow.ByteCount0 = 0
+	taggedFlow.ByteCount1 = 0
 }
 
 func (f *FlowExtra) calcCloseType() {
@@ -332,6 +341,7 @@ func (f *FlowGenerator) processPacket(header *handler.MetaPacketHeader) {
 		if flowExtra.updateFlow(header, reply) {
 			f.stats.CurrNumFlows--
 			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report()
+			flowExtra.setCurFlowInfo(header.Timestamp, f.forceReportIntervalSec)
 			flowExtra.calcCloseType()
 			f.flowOutQueue.Put(flowExtra.taggedFlow)
 			// delete front from this FlowCache because flowExtra is moved to front in keyMatch()
@@ -351,6 +361,7 @@ func (f *FlowGenerator) processPacket(header *handler.MetaPacketHeader) {
 			if flowExtra == f.addFlow(flowCache, flowExtra) {
 				// reach limit and output directly
 				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report()
+				flowExtra.setCurFlowInfo(header.Timestamp, f.forceReportIntervalSec)
 				flowExtra.taggedFlow.CloseType = CLOSE_TYPE_FLOOD
 				f.flowOutQueue.Put(flowExtra.taggedFlow)
 			} else {
@@ -376,12 +387,12 @@ func (f *FlowGenerator) handle() {
 func (f *FlowGenerator) cleanTimeoutHashMap(hashMap []*FlowCache, start, end uint64) {
 	flowOutQueue := f.flowOutQueue
 	forceReportIntervalSec := f.forceReportIntervalSec
-	minLoopIntervalSec := f.minLoopIntervalSec
+	sleepDuration := time.Duration(f.minLoopIntervalSec) * time.Second
 
 loop:
-	time.Sleep(minLoopIntervalSec * time.Second)
-	now := time.Duration(time.Now().UnixNano()) / time.Microsecond
-	nowSec := time.Duration(now / time.Millisecond)
+	time.Sleep(sleepDuration)
+	now := time.Duration(time.Now().UnixNano())
+	nowSec := now / time.Second
 	for _, flowCache := range hashMap[start:end] {
 		if flowCache == nil {
 			continue
@@ -396,14 +407,16 @@ loop:
 				del = e
 				f.stats.CurrNumFlows--
 				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report()
+				flowExtra.setCurFlowInfo(now, forceReportIntervalSec)
 				flowExtra.calcCloseType()
 				flowOutQueue.Put(flowExtra.taggedFlow)
 			} else if flowExtra.recentTimesSec+forceReportIntervalSec < nowSec {
 				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report()
+				flowExtra.setCurFlowInfo(now, forceReportIntervalSec)
 				flowExtra.calcCloseType()
 				taggedFlow := *flowExtra.taggedFlow
-				taggedFlow.EndTime = now
 				flowOutQueue.Put(&taggedFlow)
+				flowExtra.resetCurFlowInfo(now)
 			}
 			e = e.Next()
 			if del != nil {
