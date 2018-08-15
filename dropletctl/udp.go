@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/op/go-logging"
 )
@@ -19,11 +21,11 @@ type DropletMessage struct {
 var log = logging.MustGetLogger(os.Args[0])
 var running bool = false
 
-func resultFromDroplet(conn *net.UDPConn) (*bytes.Buffer, error) {
+func RecvFromDroplet(conn *net.UDPConn) (*bytes.Buffer, error) {
 	data := make([]byte, 1500)
 	msg := DropletMessage{}
 
-	if _, _, err := conn.ReadFromUDP(data); err != nil {
+	if _, _, err := conn.ReadFrom(data); err != nil {
 		return nil, err
 	}
 
@@ -37,26 +39,26 @@ func resultFromDroplet(conn *net.UDPConn) (*bytes.Buffer, error) {
 	return bytes.NewBuffer(msg.Args[:]), nil
 }
 
-func SendToDroplet(module DropletCtlModuleId, operate DropletCtlModuleOperate, args *bytes.Buffer) (*bytes.Buffer, error) {
-	dst := &net.UDPAddr{IP: net.ParseIP(DROPLETCTL_IP), Port: DROPLETCTL_PORT}
-
-	conn, err := net.DialUDP("udp4", nil, dst)
+func SendToDroplet(module DropletCtlModuleId, operate DropletCtlModuleOperate, args *bytes.Buffer) (*net.UDPConn, *bytes.Buffer, error) {
+	conn, err := net.Dial("udp4", DROPLETCTL_IP+":"+strconv.Itoa(DROPLETCTL_PORT))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	sendBuffer := bytes.Buffer{}
 
+	conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
 	msg := DropletMessage{Module: uint16(module), Operate: uint16(operate), Result: 0}
 	if args != nil {
 		args.Read(msg.Args[:])
 	}
 	encoder := gob.NewEncoder(&sendBuffer)
 	if err := encoder.Encode(msg); err != nil {
-		return nil, err
+		return conn.(*net.UDPConn), nil, err
 	}
 
 	conn.Write(sendBuffer.Bytes())
-	return resultFromDroplet(conn)
+	recv, err := RecvFromDroplet(conn.(*net.UDPConn))
+	return conn.(*net.UDPConn), recv, err
 }
 
 func SendToDropletCtl(conn *net.UDPConn, port int, result uint32, args *bytes.Buffer) {

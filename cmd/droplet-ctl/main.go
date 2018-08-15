@@ -7,10 +7,12 @@ import (
 
 	"gitlab.x.lan/yunshan/droplet/adapter"
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
+	"gitlab.x.lan/yunshan/droplet/queue"
 )
 
 func regiterCommand() {
 	dropletctl.RegisterCommand(dropletctl.DROPLETCTL_ADAPTER, adapter.RegisterCommand)
+	dropletctl.RegisterCommand(dropletctl.DROPLETCTL_QUEUE, queue.RegisterCommand)
 }
 
 func main() {
