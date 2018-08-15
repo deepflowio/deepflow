@@ -45,13 +45,14 @@ message Flow {
     optional uint32 close_type = 7;   /* 0=unknown, 1=tcp-fin, 2=tcp-rst, 3=timeout,
                                          4=flood, 5=forced-report, 6=forced-close,
                                          7=half-open-timeout, 8=half-close-timeout */
-    optional uint64 flow_id = 8;      /* The forcefully reported flow is still kept in
+    optional uint64 flow_id = 8;      /* 不存：The forcefully reported flow is still kept in
                                          exporter and this tuple (host, thread_index, flow_id)
                                          can be used to identify the flow in poseidon */
     optional uint32 start_time = 11;  /* 1. First report: the time when the first packet arrives
                                          2. Latter reports: equals to end_time in last report */
     optional uint32 end_time = 12;    /* The time when exporter reports this flow */
-    optional uint64 duration = 13;    /* 1. For flows !FIN && !RST, equals to
+    optional uint64 duration = 13;    /* 不存：
+                                         1. For flows !FIN && !RST, equals to
                                              end_time - time_of_the_first_packet_in_the_flow
                                          2. For others, equals to
                                              max(arr_time_0_last, arr_time_1_last) -
@@ -59,7 +60,6 @@ message Flow {
 
     /* L1 */
     optional uint32 in_port_0 = 21 [default = 0];
-    optional uint32 in_port_1 = 22 [default = 0];   /* Deprecated due to always equal to in_port_0 */
 
     /* L2 */
     optional uint32 vlan = 31 [default = 0];
@@ -87,11 +87,6 @@ message Flow {
     optional uint64 tun_type = 64 [default = 0];    /* Tunnel type where the flow is encapped,
                                                        1=VXLAN, 2=NVGRE, 3=GENEVE */
 
-    /* Overlay */
-    optional uint64 overlay_tun_id = 66 [default = 0];    /* Overlay tunnel index of the flow */
-    optional uint32 overlay_tun_type = 67 [default = 0];  /* Overlay tunnel type of the flow,
-                                                             1=VXLAN, 2=NVGRE, 3=GENEVE */
-
     /* L7 */
 
     /* Packet Counters */
@@ -112,22 +107,6 @@ message Flow {
     optional uint64 total_pkt_cnt_1 = 78 [default = 0];  /* Received packet cnt of this flow in
                                                             backward direction */
 
-    /* Timers */
-    optional uint64 cur_start_time = 81 [default = 0];   /* The arr_time of the first packet of
-                                                            current report period, which is saved as
-                                                            the start time of current report period
-                                                            and will be used to calculate rate */
-    optional uint64 arr_time_0_0 = 82 [default = 0];     /* The microseconds from 1970.1.1 to
-                                                            the arriving time of the first packet of this
-                                                            flow in forward direction */
-    optional uint64 arr_time_0_last = 85 [default = 0];  /* The arriving offset of the last packet in
-                                                            forward direction */
-    optional uint64 arr_time_1_0 = 86 [default = 0];     /* The microseconds from 1970.1.1 to
-                                                            the arriving time of the first packet of this
-                                                            flow in backward direction */
-    optional uint64 arr_time_1_last = 89 [default = 0];  /* The arriving offset of the last packet in
-                                                            backward direction */
-
     /* Platform Data */
     optional uint32 subnet_id_0 = 100 [default = 0];          /* subnetid of mac_src, platform network ID */
     optional uint32 subnet_id_1 = 101 [default = 0];          /* subnetid of mac_dst, platform network ID */
@@ -138,8 +117,8 @@ message Flow {
     optional uint32 l3_device_id_1 = 105 [default = 0];       /* deviceid of ip_dst, platform instance ID */
     optional uint32 l3_epc_id_0 = 106 [default = 0];          /* epc_id of device of ip_src, platform project ID */
     optional uint32 l3_epc_id_1 = 107 [default = 0];          /* epc_id of device of ip_dst, platform project ID */
-    optional uint32 host_0 = 108;                             /* host of device of mac_src*/
-    optional uint32 host_1 = 109;                             /* host of device of mac_dst*/
+    optional uint32 host_0 = 108;                             /* host of device of mac_src */
+    optional uint32 host_1 = 109;                             /* host of device of mac_dst */
 
     optional uint32 epc_id_0 = 120 [default = 0];             /* epc_id of device of mac_src, platform project ID */
     optional uint32 epc_id_1 = 121 [default = 0];             /* epc_id of device of mac_dst, platform project ID */
@@ -147,8 +126,8 @@ message Flow {
     optional uint32 device_type_1 = 123 [default = 0];        /* devicetype of mac_dst, platform VM/VGW/TPD instance */
     optional uint32 device_id_0 = 124 [default = 0];          /* deviceid of mac_src, platform instance ID */
     optional uint32 device_id_1 = 125 [default = 0];          /* deviceid of mac_dst, platform instance ID */
-    optional uint32 if_type_0 = 128 [default = 0];            /* iftype of mac_src, platform instance WAN/LAN/Ctrl NIC */
-    optional uint32 if_type_1 = 129 [default = 0];            /* iftype of mac_dst, platform instance WAN/LAN/Ctrl NIC */
+    optional uint32 if_type_0 = 128 [default = 0];            /* 不存：iftype of mac_src, platform instance WAN/LAN/Ctrl NIC */
+    optional uint32 if_type_1 = 129 [default = 0];            /* 不存：iftype of mac_dst, platform instance WAN/LAN/Ctrl NIC */
 
     optional bool is_l2_end_0 = 130 [default = false];        /* 网流mac_src对应的实例和网流被采集的Exporter是否在同一宿主机上 */
     optional bool is_l2_end_1 = 131 [default = false];        /* 网流mac_dst对应的实例和网流被采集的Exporter是否在同一宿主机上 */
@@ -175,7 +154,7 @@ message Flow {
                                                                   rtt_Nth = tx_time_1 (PSH/ACK_n+1) - tx_time_0 (PSH/ACK_n),
                                                                   rtt = (rtt_1st + rtt_2nd + ... + rtt_Nth) / N, or
                                                                   rtt = (rtt * (N - 1) + rtt_Nth) / N */
-    optional uint64 rtt_avg = 142 [default = 0];               /* The RTT in the session of the flow
+    optional uint64 rtt_avg = 142 [default = 0];               /* 不存：The RTT in the session of the flow
                                                                   it's a average value in flow life cycle */
     optional uint64 syn_retrans_cnt_0 = 143 [default = 0];     /* Times of packets retransmission within connection establishment during this report period
                                                                   in forward direction */
@@ -191,27 +170,17 @@ message Flow {
                                                                   during this report period */
     optional uint64 zero_wnd_cnt_1 = 149 [default = 0];        /* Times of TCP connection window is set to zero in backward direction
                                                                   during this report period */
-    optional uint64 total_zero_wnd_cnt = 150 [default = 0];    /* Times of TCP connection window is set to zero in flow life cycle
-                                                                  including forward and backword direction */
-    optional uint64 slow_start_cnt_0 = 151 [default = 0];      /* Times of TCP connection slow start in forward direction
-                                                                  during this report period */
-    optional uint64 slow_start_cnt_1 = 152 [default = 0];      /* Times of TCP connection slow start in backward direction
-                                                                  during this report period */
-    optional uint64 total_slow_start_cnt = 153 [default = 0];  /* Times of TCP connection slow start in flow life cycle
-                                                                  including forward and backward direction */
     optional uint64 psh_urg_cnt_0 = 154 [default = 0];         /* Times of TCP connection sending urgent data in forward direction
                                                                   during this report period */
     optional uint64 psh_urg_cnt_1 = 155 [default = 0];         /* Times of TCP connection sending urgent data in backward direction
                                                                   during this report period */
-    optional uint64 total_psh_urg_cnt = 156 [default = 0];     /* Times of TCP connection sending urgent data in flow life cycle
-                                                                  including forward and backward direction */
     optional uint64 art_avg = 157 [default = 0];               /* Application response time in the data transmission phase of the flow
                                                                   it's a average value during this report period */
-    optional uint64 avg_pkt_interval = 160 [default = 0];         /* The average interval of all packets for
-                                                                    current flow */
-    optional uint64 pkt_interval_variance =161 [default = 0];   /* The variance of all packet intervals for
-                                                                    current flow */
-    optional uint64 pkt_size_variance = 162 [default = 0];      /* Packet byte cnt variance of this flow*/
+    optional uint64 avg_pkt_interval = 160 [default = 0];      /* The average interval of all packets for
+                                                                  current flow */
+    optional uint64 pkt_interval_variance = 161 [default = 0]; /* The variance of all packet intervals for
+                                                                  current flow */
+    optional uint64 pkt_size_variance = 162 [default = 0];     /* Packet byte cnt variance of this flow */
 
     // FIXME: 200/201 ID已占用
 }
