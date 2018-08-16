@@ -258,7 +258,7 @@ func (d *SequentialDecoder) DecodeHeader() uint32 {
 	_ = d.data.U8()
 	_ = d.data.U8()
 	d.seq = d.data.U32()
-	d.timestamp = time.Duration(d.data.U64())
+	d.timestamp = time.Duration(d.data.U64()) * time.Microsecond // µs to ns
 	ifMacSuffix := d.data.U32()
 	return ifMacSuffix & 0xffff
 }
@@ -280,7 +280,7 @@ func (d *SequentialDecoder) NextPacket(meta *MetaPacketHeader) bool {
 	if !d.pflags.IsSet(CFLAG_HEADER_TYPE) {
 		d.x.headerType = HeaderType(d.data.U8())
 	}
-	d.timestamp += time.Duration(delta)
+	d.timestamp += time.Duration(delta) * time.Microsecond // µs to ns
 	if d.pflags.IsSet(PFLAG_TUNNEL) {
 		d.decodeTunnel(meta)
 	}
