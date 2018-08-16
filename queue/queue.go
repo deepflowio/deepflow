@@ -37,18 +37,27 @@ type OverwriteQueue struct { // XXX: use circle array
 }
 
 func NewOverwriteQueue(module string, size int) Queue {
+	queue := &OverwriteQueue{}
+	queue.Init(module, size)
+	return queue
+}
+
+func (q *OverwriteQueue) Init(module string, size int) {
+	if q.size != 0 {
+		return
+	}
+
 	for i := 0; i < 32; i++ {
 		if 1<<uint(i) >= size {
 			size = 1 << uint(i)
 			break
 		}
 	}
-	items := make([]interface{}, size)
-	waiting := make([]Transaction, 0, 10)
-	queue := &OverwriteQueue{items: items, waiting: waiting, size: uint(size)}
-	stats.RegisterCountable(module, stats.EMPTY_TAG, queue)
-	runtime.SetFinalizer(queue, func(q *OverwriteQueue) { q.Release() })
-	return queue
+	q.items = make([]interface{}, size)
+	q.waiting = make([]Transaction, 0, 10)
+	q.size = uint(size)
+	stats.RegisterCountable(module, stats.EMPTY_TAG, q)
+	runtime.SetFinalizer(q, func(q *OverwriteQueue) { q.Release() })
 }
 
 func (q *OverwriteQueue) GetCounter() interface{} {
