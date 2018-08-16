@@ -498,6 +498,20 @@ func (f *FlowExtra) tryForceReport(flowOutQueue QueueWriter) {
 	}
 }
 
+func (f *FlowExtra) initFlowInfo(flow *TaggedFlow, state FlowState, reply bool) *flowperf.FlowInfo {
+	return &flowperf.FlowInfo{
+		FlowState:         int(state),
+		Direction:         reply,
+		FlowID:            flow.FlowID,
+		TotalPacketCount0: flow.TotalPacketCount0,
+		TotalPacketCount1: flow.TotalPacketCount1,
+		ArrTime0Last:      flow.ArrTime0Last,
+		ArrTime1Last:      flow.ArrTime1Last,
+		TcpFlags0:         flow.TCPFlags0,
+		TcpFlags1:         flow.TCPFlags1,
+	}
+}
+
 func (f *FlowGenerator) processPacket(meta *handler.MetaPacket) {
 	reply := false
 	var flowExtra *FlowExtra
@@ -512,31 +526,32 @@ func (f *FlowGenerator) processPacket(meta *handler.MetaPacket) {
 	if flowExtra, reply = flowCache.keyMatch(meta, flowKey); flowExtra != nil {
 		if flowExtra.updateFlow(meta, reply) {
 			f.stats.CurrNumFlows--
-			flowExtra.metaFlowPerf.Update(meta, reply)
-			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report()
+			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false)
 			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportIntervalSec)
 			flowExtra.calcCloseType(false)
 			f.flowOutQueue.Put(flowExtra.taggedFlow)
 			// delete front from this FlowCache because flowExtra is moved to front in keyMatch()
 			flowCache.flowList.Remove(flowCache.flowList.Front())
-		} else {
-			flowExtra.metaFlowPerf.Update(meta, reply)
 		}
+		info := flowExtra.initFlowInfo(flowExtra.taggedFlow, flowExtra.flowState, reply)
+		flowExtra.metaFlowPerf.Update(meta, info)
 	} else {
 		var closed bool
 		flowExtra, closed = f.initFlow(meta, flowKey)
 		flowExtra.metaFlowPerf = flowperf.NewMetaFlowPerf()
-		flowExtra.metaFlowPerf.Update(meta, reply)
 		f.stats.TotalNumFlows++
 		if closed {
-			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report()
+			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false)
 			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportIntervalSec)
 			flowExtra.calcCloseType(false)
 			f.flowOutQueue.Put(flowExtra.taggedFlow)
 		} else {
+			info := flowExtra.initFlowInfo(flowExtra.taggedFlow, flowExtra.flowState, false)
+			flowExtra.metaFlowPerf.Update(meta, info)
+
 			if flowExtra == f.addFlow(flowCache, flowExtra) {
 				// reach limit and output directly
-				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report()
+				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false)
 				flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportIntervalSec)
 				flowExtra.taggedFlow.CloseType = CLOSE_TYPE_FLOOD
 				f.flowOutQueue.Put(flowExtra.taggedFlow)
@@ -582,12 +597,12 @@ loop:
 			if flowExtra.recentTimesSec+flowExtra.timeoutSec <= nowSec {
 				del = e
 				f.stats.CurrNumFlows--
-				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report()
+				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false)
 				flowExtra.setCurFlowInfo(now, forceReportIntervalSec)
 				flowExtra.calcCloseType(false)
 				flowOutQueue.Put(flowExtra.taggedFlow)
 			} else if flowExtra.taggedFlow.StartTime/time.Second+forceReportIntervalSec < nowSec {
-				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report()
+				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false)
 				flowExtra.setCurFlowInfo(now, forceReportIntervalSec)
 				flowExtra.calcCloseType(true)
 				flowExtra.tryForceReport(flowOutQueue)
