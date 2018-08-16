@@ -8,6 +8,7 @@
 package DFI;
 option java_package = "cn.net.yunshan.message";
 option java_outer_classname = "DFIMessage";
+option go_package = "gitlab.x.lan/yunshan/message/pbdfi";
 
 message FlowHeader {
     required fixed64 sequence = 1; /* start from 1 */
