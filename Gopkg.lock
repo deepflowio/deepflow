@@ -186,19 +186,17 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:727c77afec9ea5a93ca5c215e1e63671a243033833a758bd61d634ec811e6b9b"
+  digest = "1:9a657faf20dd8e567397cc52fc68121acf36401fb8747d3431a001c086b00fc9"
   name = "gitlab.x.lan/platform/droplet-mapreduce"
   packages = [
-    ".",
     "internal/pkg/flowsender",
-    "internal/pkg/pb",
     "internal/pkg/sizedmap",
     "pkg/api",
     "pkg/datatype",
-    "pkg/datatype/pb",
+    "pkg/handler",
   ]
   pruneopts = "UT"
-  revision = "d391ac491b0432faba2eb145a60e1a0f04ea4f6d"
+  revision = "2488b3a4263fb870bdb04cdc4dac192c5b9121f0"
 
 [[projects]]
   branch = "master"
@@ -216,6 +214,17 @@
   ]
   pruneopts = "UT"
   revision = "f351cfa931036e723963d60fb4eb6321b5c22fc9"
+
+[[projects]]
+  branch = "feature-os"
+  digest = "1:b6bb4c5b902d71007c5e6f86f3cc1300059e64daeabbb7d5008a40b068ca5750"
+  name = "gitlab.x.lan/yunshan/message"
+  packages = [
+    "pbdfi",
+    "pbzero",
+  ]
+  pruneopts = "UT"
+  revision = "a400dded549a765316161a8a5df75f92cc00eb37"
 
 [[projects]]
   branch = "release-branch.go1.10"
@@ -342,8 +351,8 @@
     "github.com/spf13/cobra",
     "gitlab.x.lan/application/droplet-app/pkg/flow/epc_flow_topo",
     "gitlab.x.lan/application/droplet-app/pkg/metering/bw_usage_isp_usage",
-    "gitlab.x.lan/platform/droplet-mapreduce",
     "gitlab.x.lan/platform/droplet-mapreduce/pkg/api",
+    "gitlab.x.lan/platform/droplet-mapreduce/pkg/handler",
     "gitlab.x.lan/yunshan/droplet-libs/datatype",
     "gitlab.x.lan/yunshan/droplet-libs/logger",
     "gitlab.x.lan/yunshan/droplet-libs/monitor",
