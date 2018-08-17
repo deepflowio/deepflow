@@ -1,9 +1,7 @@
 package handler
 
 import (
-	"fmt"
 	"net"
-	"reflect"
 	"time"
 
 	"github.com/google/gopacket"
@@ -83,47 +81,6 @@ func getTcpFlags(t *layers.TCP) uint8 {
 		f |= 0x80
 	}
 	return f
-}
-
-func (m *MetaPacket) String() string {
-	s := reflect.ValueOf(m).Elem()
-	t := s.Type()
-	out := ""
-
-	for i := 0; i < s.NumField(); i++ {
-		f := s.Field(i)
-		name := t.Field(i).Tag.Get("fmt")
-		switch name {
-		case "tab+v+enter":
-			out += fmt.Sprintf("    %s: %+v\n", t.Field(i).Name, f.Interface())
-			break
-		case "pointer+enter":
-			out += fmt.Sprintf("%s: %p\n", t.Field(i).Name, f.Interface())
-			break
-		case "pointer":
-			out += fmt.Sprintf("%s: %p ", t.Field(i).Name, f.Interface())
-			break
-		case "":
-			out += fmt.Sprintf("%s: %v ", t.Field(i).Name, f.Interface())
-			break
-		case "tab":
-			out += fmt.Sprintf("    %s: %v ", t.Field(i).Name, f.Interface())
-			break
-		case "enter":
-			out += fmt.Sprintf("%s: %v\n", t.Field(i).Name, f.Interface())
-			break
-		case "+v":
-			out += fmt.Sprintf("%s: %+v", t.Field(i).Name, f.Interface())
-			break
-		case "enter++v":
-			out += fmt.Sprintf("%s: %+v\n", t.Field(i).Name, f.Interface())
-			break
-		case "hex":
-			out += fmt.Sprintf("%s: 0x%X ", t.Field(i).Name, f.Interface())
-			break
-		}
-	}
-	return out
 }
 
 func (m *MetaPacket) extractTcpOptions(rawPacket RawPacket, offset uint16, max uint16) {
