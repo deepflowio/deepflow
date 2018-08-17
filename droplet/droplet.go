@@ -63,11 +63,13 @@ func Start(configPath string) {
 	tridentAdapter.Start(true)
 
 	stats.StartStatsd()
+	flowMapProcess := mapreduce.NewFlowMapProcess()
 	go func() {
 		for {
 			taggedFlow := flowAppOutputQueue.Get().(*TaggedFlow)
 			log.Info(flowgen.TaggedFlowString(taggedFlow))
-			(&mapreduce.MapProcessor{}).FlowHandler(taggedFlow)
+			flowMapProcess.Process(*taggedFlow)
+
 		}
 	}()
 }
