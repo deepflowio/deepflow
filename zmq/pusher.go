@@ -13,7 +13,7 @@ type Pusher struct {
 }
 
 // NewPusher returns ZeroMQ TCP publisher on specified port
-func NewPusher(port int, hwm int) (Sender, error) {
+func NewPusher(ip string, port int, hwm int, mode ClientOrServer) (Sender, error) {
 	s, err := zmq.NewSocket(zmq.PUSH)
 	if err != nil {
 		return nil, err
@@ -21,7 +21,11 @@ func NewPusher(port int, hwm int) (Sender, error) {
 	s.SetSndhwm(hwm)
 	s.SetSndtimeo(time.Minute * 5)
 	s.SetLinger(0)
-	s.Bind(fmt.Sprintf("tcp://*:%d", port))
+	if mode == CLIENT {
+		s.Connect(fmt.Sprintf("tcp://%s:%d", ip, port))
+	} else {
+		s.Bind(fmt.Sprintf("tcp://%s:%d", ip, port))
+	}
 	return &Pusher{Socket: s}, nil
 }
 
