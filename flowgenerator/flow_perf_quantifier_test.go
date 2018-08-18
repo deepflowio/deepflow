@@ -1,4 +1,4 @@
-package flowgen
+package flowgenerator
 
 import (
 	"container/list"
