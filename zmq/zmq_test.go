@@ -33,8 +33,8 @@ func TestPubSub(t *testing.T) {
 	s := [...]byte{1, 2, 3}
 	c := make(chan int)
 	out := make(chan []byte)
-	pub, _ := NewPublisher(12345, 10000)
-	sub, _ := NewSubscriber("127.0.0.1", 12345, 1000000)
+	pub, _ := NewPublisher("*", 12345, 10000, SERVER)
+	sub, _ := NewSubscriber("127.0.0.1", 12345, 1000000, CLIENT)
 	go senderRoutine(t, s[:], c, pub)
 	go receiverRoutine(t, c, out, sub)
 	s2 := <-out
@@ -50,8 +50,8 @@ func TestPushPull(t *testing.T) {
 	s := [...]byte{1, 2, 3}
 	c := make(chan int)
 	out := make(chan []byte)
-	push, _ := NewPusher(12345, 10000)
-	pull, _ := NewPuller("127.0.0.1", 12345, 1000000)
+	push, _ := NewPusher("*", 12345, 10000, SERVER)
+	pull, _ := NewPuller("127.0.0.1", 12345, 1000000, CLIENT)
 	go senderRoutine(t, s[:], c, push)
 	go receiverRoutine(t, c, out, pull)
 	s2 := <-out
