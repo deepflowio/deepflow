@@ -193,11 +193,11 @@
     "pkg/metering/bw_usage_isp_usage",
   ]
   pruneopts = "UT"
-  revision = "13f169fa12ead8c5d9acddc5c94e69da570ca905"
+  revision = "52d1ab122c7645f12e9b8bcfe333366c4ac3363a"
 
 [[projects]]
   branch = "master"
-  digest = "1:6ad28129bebbc3d53bf0e86de87158de7fdbe358607a5aa02235390359c2150e"
+  digest = "1:cec3afb11949ff695d34cfc817c9fa2a647a050429f057c49e1f6810a88068c9"
   name = "gitlab.x.lan/platform/droplet-mapreduce"
   packages = [
     "internal/pkg/flowsender",
@@ -208,7 +208,7 @@
     "pkg/messenger",
   ]
   pruneopts = "UT"
-  revision = "24ee5d918dd0732a0f0aaaf1419cc36e2a073180"
+  revision = "45dadac85b21cf7858edd090400a6f484ec47dfa"
 
 [[projects]]
   branch = "master"
@@ -291,12 +291,12 @@
   version = "v0.3.0"
 
 [[projects]]
-  branch = "jba-regen"
-  digest = "1:601e63e7d4577f907118bec825902505291918859d223bce015539e79f1160e3"
+  branch = "master"
+  digest = "1:077c1c599507b3b3e9156d17d36e1e61928ee9b53a5b420f10f28ebd4a0b275c"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
   pruneopts = "UT"
-  revision = "af2e5e2b5d87da17f10febed626e553cad71cac7"
+  revision = "c66870c02cf823ceb633bcd05be3c7cda29976f4"
 
 [[projects]]
   digest = "1:3dd7996ce6bf52dec6a2f69fa43e7c4cefea1d4dfa3c8ab7a5f8a9f7434e239d"
