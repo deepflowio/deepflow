@@ -72,6 +72,10 @@ func Start(configPath string) {
 			taggedFlow := flowAppOutputQueue.Get().(*TaggedFlow)
 			log.Info(flowgen.TaggedFlowString(taggedFlow))
 			flowMapProcess.Process(*taggedFlow)
+		}
+	}()
+	go func() {
+		for {
 			taggedMetering := meteringQueue.Get().(*TaggedMetering)
 			meteringProcess.Process(*taggedMetering)
 		}
