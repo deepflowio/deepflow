@@ -13,7 +13,7 @@ type Puller struct {
 }
 
 // NewPuller returns ZeroMQ TCP subscribe on specified ip and port
-func NewPuller(ip string, port int, hwm int) (Receiver, error) {
+func NewPuller(ip string, port int, hwm int, mode ClientOrServer) (Receiver, error) {
 	s, err := zmq.NewSocket(zmq.PULL)
 	if err != nil {
 		return nil, err
@@ -21,7 +21,11 @@ func NewPuller(ip string, port int, hwm int) (Receiver, error) {
 	s.SetRcvhwm(hwm)
 	s.SetRcvtimeo(time.Minute * 5)
 	s.SetLinger(0)
-	s.Connect(fmt.Sprintf("tcp://%s:%d", ip, port))
+	if mode == CLIENT {
+		s.Connect(fmt.Sprintf("tcp://%s:%d", ip, port))
+	} else {
+		s.Bind(fmt.Sprintf("tcp://%s:%d", ip, port))
+	}
 	return &Puller{Socket: s}, nil
 }
 
