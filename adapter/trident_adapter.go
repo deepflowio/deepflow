@@ -147,7 +147,7 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) {
 	for {
 		meta := &handler.MetaPacket{
 			InPort:   ifMacSuffix | handler.CAPTURE_REMOTE,
-			Exporter: IpFromUint32(ip),
+			Exporter: ip,
 		}
 		if decoder.NextPacket(meta) {
 			break
@@ -155,7 +155,7 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) {
 
 		a.counter.TxPackets++
 		hash := meta.InPort + meta.IpSrc + meta.IpDst +
-			uint32(meta.Proto) + uint32(meta.PortSrc) + uint32(meta.PortDst)
+			uint32(meta.Protocol) + uint32(meta.PortSrc) + uint32(meta.PortDst)
 		a.queues[hash%uint32(a.queueCount)].Put(meta)
 	}
 }

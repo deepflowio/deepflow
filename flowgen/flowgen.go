@@ -10,30 +10,28 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/policy"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
 	. "gitlab.x.lan/yunshan/droplet-libs/stats"
-	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 
 	"gitlab.x.lan/yunshan/droplet/handler"
-	. "gitlab.x.lan/yunshan/droplet/utils"
 )
 
 var log = logging.MustGetLogger("flowgen")
 
 func getFlowKey(meta *handler.MetaPacket) *FlowKey {
 	flowKey := &FlowKey{
-		Exporter: *NewIPFromInt(IpToUint32(meta.Exporter)),
+		Exporter: *NewIPFromInt(meta.Exporter),
 		IPSrc:    *NewIPFromInt(meta.IpSrc),
 		IPDst:    *NewIPFromInt(meta.IpDst),
-		Proto:    meta.Proto,
+		Proto:    meta.Protocol,
 		PortSrc:  meta.PortSrc,
 		PortDst:  meta.PortDst,
 		InPort0:  meta.InPort,
 	}
 
-	if meta.TunnelType != handler.TUNNEL_TYPE_NONE {
-		flowKey.TunnelType = uint8(meta.TunnelType)
-		flowKey.TunnelID = meta.TunnelId
-		flowKey.TunnelIPSrc = IpToUint32(meta.TunnelSrc)
-		flowKey.TunnelIPDst = IpToUint32(meta.TunnelDst)
+	if tunnel := meta.Tunnel; tunnel != nil {
+		flowKey.TunnelType = uint8(tunnel.Type)
+		flowKey.TunnelID = tunnel.Id
+		flowKey.TunnelIPSrc = tunnel.Src
+		flowKey.TunnelIPDst = tunnel.Dst
 	}
 
 	return flowKey
@@ -72,11 +70,10 @@ func isFromTrident(flowKey *FlowKey) bool {
 func (f *FlowExtra) MacEquals(meta *handler.MetaPacket) bool {
 	taggedFlow := f.taggedFlow
 	flowMacSrc, flowMacDst := taggedFlow.MACSrc.Int(), taggedFlow.MACDst.Int()
-	metaPktHdrMacSrc, metaPktHdrMacDst := Mac2Uint64(meta.MacSrc), Mac2Uint64(meta.MacDst)
-	if flowMacSrc == metaPktHdrMacSrc && flowMacDst == metaPktHdrMacDst {
+	if flowMacSrc == meta.MacSrc && flowMacDst == meta.MacDst {
 		return true
 	}
-	if flowMacSrc == metaPktHdrMacDst && flowMacDst == metaPktHdrMacSrc {
+	if flowMacSrc == meta.MacDst && flowMacDst == meta.MacSrc {
 		return true
 	}
 	return false
@@ -144,8 +141,8 @@ func (f *FlowGenerator) initFlow(meta *handler.MetaPacket, key *FlowKey) (*FlowE
 			StartTime:    now,
 			EndTime:      now,
 			CurStartTime: now,
-			MACSrc:       *NewMACAddrFromString(meta.MacSrc.String()),
-			MACDst:       *NewMACAddrFromString(meta.MacDst.String()),
+			MACSrc:       *NewMACAddrFromInt(meta.MacSrc),
+			MACDst:       *NewMACAddrFromInt(meta.MacDst),
 			VLAN:         meta.Vlan,
 			EthType:      meta.EthType,
 			CloseType:    CLOSE_TYPE_UNKNOWN,
@@ -166,8 +163,8 @@ func (f *FlowGenerator) initFlow(meta *handler.MetaPacket, key *FlowKey) (*FlowE
 		taggedFlow.IPSrc, taggedFlow.IPDst = taggedFlow.IPDst, taggedFlow.IPSrc
 		taggedFlow.PortSrc, taggedFlow.PortDst = taggedFlow.PortDst, taggedFlow.PortSrc
 		taggedFlow.TunnelIPSrc, taggedFlow.TunnelIPDst = taggedFlow.TunnelIPDst, taggedFlow.TunnelIPSrc
-		taggedFlow.MACSrc = *NewMACAddrFromString(meta.MacDst.String())
-		taggedFlow.MACDst = *NewMACAddrFromString(meta.MacSrc.String())
+		taggedFlow.MACSrc = *NewMACAddrFromInt(meta.MacDst)
+		taggedFlow.MACDst = *NewMACAddrFromInt(meta.MacSrc)
 		taggedFlow.ArrTime10 = now
 		taggedFlow.ArrTime1Last = now
 		taggedFlow.TotalPacketCount1 = 1
@@ -179,8 +176,8 @@ func (f *FlowGenerator) initFlow(meta *handler.MetaPacket, key *FlowKey) (*FlowE
 		flowExtra.updatePlatformData(meta, true)
 		return flowExtra, flowExtra.updateTCPStateMachine(meta.TcpData.Flags, true)
 	} else {
-		taggedFlow.MACSrc = *NewMACAddrFromString(meta.MacSrc.String())
-		taggedFlow.MACDst = *NewMACAddrFromString(meta.MacDst.String())
+		taggedFlow.MACSrc = *NewMACAddrFromInt(meta.MacSrc)
+		taggedFlow.MACDst = *NewMACAddrFromInt(meta.MacDst)
 		taggedFlow.ArrTime00 = now
 		taggedFlow.ArrTime0Last = now
 		taggedFlow.TotalPacketCount0 = 1
@@ -567,7 +564,7 @@ func (f *FlowGenerator) handle() {
 	log.Info("FlowGen handler is running")
 	for {
 		meta := metaPacketHeaderInQueue.Get().(*handler.MetaPacket)
-		if meta.Proto != layers.IPProtocolTCP {
+		if meta.Protocol != layers.IPProtocolTCP {
 			continue
 		}
 		f.processPacket(meta)

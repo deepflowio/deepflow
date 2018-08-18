@@ -5,7 +5,6 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/policy"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
-	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 
 	"gitlab.x.lan/yunshan/droplet/handler"
 )
@@ -50,14 +49,14 @@ func (l *LabelerManager) GetData(key *policy.LookupKey) {
 
 func (l *LabelerManager) GetPolicy(packet *handler.MetaPacket) {
 	key := &policy.LookupKey{
-		SrcMac:      Mac2Uint64(packet.MacSrc),
-		DstMac:      Mac2Uint64(packet.MacDst),
-		SrcIp:       packet.IpSrc,
-		DstIp:       packet.IpDst,
+		SrcMac:      uint64(packet.MacSrc),
+		DstMac:      uint64(packet.MacDst),
+		SrcIp:       uint32(packet.IpSrc),
+		DstIp:       uint32(packet.IpDst),
 		SrcPort:     packet.PortSrc,
 		DstPort:     packet.PortDst,
 		Vlan:        packet.Vlan,
-		Proto:       uint8(packet.Proto),
+		Proto:       uint8(packet.Protocol),
 		Ttl:         packet.TTL,
 		RxInterface: packet.InPort,
 	}
@@ -107,13 +106,13 @@ func convertMetaPacketToTaggedMetering(metaPacket *handler.MetaPacket) *datatype
 	}
 
 	metering := datatype.Metering{
-		Exporter:     *datatype.NewIPFromString(metaPacket.Exporter.String()),
+		Exporter:     *datatype.NewIPFromInt(uint32(metaPacket.Exporter)),
 		Timestamp:    metaPacket.Timestamp,
 		InPort0:      metaPacket.InPort,
 		VLAN:         metaPacket.Vlan,
-		IPSrc:        *datatype.NewIPFromInt(metaPacket.IpSrc),
-		IPDst:        *datatype.NewIPFromInt(metaPacket.IpDst),
-		Proto:        metaPacket.Proto,
+		IPSrc:        *datatype.NewIPFromInt(uint32(metaPacket.IpSrc)),
+		IPDst:        *datatype.NewIPFromInt(uint32(metaPacket.IpDst)),
+		Proto:        metaPacket.Protocol,
 		PortSrc:      metaPacket.PortSrc,
 		PortDst:      metaPacket.PortDst,
 		ByteCount0:   uint64(metaPacket.PacketLen),

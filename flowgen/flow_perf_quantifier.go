@@ -414,7 +414,7 @@ func (p *MetaFlowPerf) isInvalidRetransPacket(sameDirection, oppositeDirection *
 		return isInvalid
 	}
 
-	r := sameDirection.assertSeqNumber(&header.TcpData, payloadLen, flowInfo)
+	r := sameDirection.assertSeqNumber(header.TcpData, payloadLen, flowInfo)
 	if r == SEQ_RETRANS {
 		// established retrans
 		p.perfData.calcRetrans(flowInfo.Direction)

@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"encoding/binary"
+	. "encoding/binary"
 	"net"
 	"strings"
 )
@@ -44,12 +44,12 @@ func Max(x, y int) int {
 }
 
 func IpToUint32(ip net.IP) uint32 {
-	return binary.BigEndian.Uint32(ip.To4())
+	return BigEndian.Uint32(ip.To4())
 }
 
 func IpFromUint32(ipInt uint32) net.IP {
 	ip := make([]byte, net.IPv4len)
-	binary.BigEndian.PutUint32(ip, ipInt)
+	BigEndian.PutUint32(ip, ipInt)
 	return ip
 }
 

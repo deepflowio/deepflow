@@ -212,7 +212,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:7e4471f2f714c3fa58f12ac28d214a5c78638c0c54378a335a323ba56c00011a"
+  digest = "1:697e78a6c8fe3814e3e100fa454076479e41ba7c873758825a9a85ed1b66a698"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "datatype",
@@ -356,7 +356,6 @@
     "github.com/docker/go-units",
     "github.com/golang/protobuf/proto",
     "github.com/google/go-cmp/cmp",
-    "github.com/google/gopacket",
     "github.com/google/gopacket/afpacket",
     "github.com/google/gopacket/layers",
     "github.com/google/gopacket/pcapgo",
@@ -373,6 +372,7 @@
     "gitlab.x.lan/yunshan/droplet-libs/queue",
     "gitlab.x.lan/yunshan/droplet-libs/stats",
     "gitlab.x.lan/yunshan/droplet-libs/utils",
+    "golang.org/x/net/bpf",
     "golang.org/x/net/context",
     "google.golang.org/grpc",
     "gopkg.in/yaml.v2",

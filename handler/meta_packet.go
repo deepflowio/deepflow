@@ -2,18 +2,16 @@ package handler
 
 import (
 	"fmt"
-	"net"
 	"time"
 
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
+	. "github.com/google/gopacket/layers"
 	"gitlab.x.lan/yunshan/droplet-libs/policy"
-	. "gitlab.x.lan/yunshan/droplet/utils"
 )
 
-type RawPacket = []byte
+const VLAN_ID_MASK = uint16((1 << 12) - 1)
+const MIRRORED_TRAFFIC = 7
 
-type IPv4Int = uint32
+type RawPacket = []byte
 
 type MetaPacketTcpHeader struct {
 	Flags         uint8
@@ -24,35 +22,29 @@ type MetaPacketTcpHeader struct {
 	SACKPermitted bool
 }
 
-const (
-	CAPTURE_LOCAL  = 0x10000
-	CAPTURE_REMOTE = 0x30000
-)
-
 type MetaPacket struct {
-	TunnelInfo
-
 	Timestamp      time.Duration
 	InPort         uint32
 	PacketLen      uint16
-	Exporter       net.IP
+	Exporter       IPv4Int
 	L2End0, L2End1 bool
 	EndpointData   *policy.EndpointData
 	Raw            RawPacket
 
-	MacSrc  net.HardwareAddr
-	MacDst  net.HardwareAddr
-	EthType layers.EthernetType
-	Vlan    uint16
+	Tunnel *TunnelInfo
+
+	MacSrc, MacDst MacInt
+	EthType        EthernetType
+	Vlan           uint16
 
 	IpSrc, IpDst IPv4Int
-	Proto        layers.IPProtocol
+	Protocol     IPProtocol
 	TTL          uint8
 
 	PortSrc    uint16
 	PortDst    uint16
 	PayloadLen uint16
-	TcpData    MetaPacketTcpHeader
+	TcpData    *MetaPacketTcpHeader
 }
 
 func (m *MetaPacket) String() string {
@@ -62,106 +54,109 @@ func (m *MetaPacket) String() string {
 		"    IP: %v -> %v PROTO: %d TTL: %d\n"+
 		"    PORT: %d -> %d PAYLOAD_LEN: %d TCP: %+v",
 		m.Timestamp, m.InPort, m.Exporter, m.PacketLen, m.L2End0, m.L2End1, m.EndpointData, m.Raw,
-		m.TunnelInfo,
+		m.Tunnel,
 		m.MacSrc, m.MacDst, m.EthType, m.Vlan,
-		m.IpSrc, m.IpDst, m.Proto, m.TTL,
+		m.IpSrc, m.IpDst, m.Protocol, m.TTL,
 		m.PortSrc, m.PortDst, m.PayloadLen, m.TcpData)
 }
 
-func getTcpFlags(t *layers.TCP) uint8 {
-	f := uint8(0)
-	if t.FIN {
-		f |= 0x01
-	}
-	if t.SYN {
-		f |= 0x02
-	}
-	if t.RST {
-		f |= 0x04
-	}
-	if t.PSH {
-		f |= 0x08
-	}
-	if t.ACK {
-		f |= 0x10
-	}
-	if t.URG {
-		f |= 0x20
-	}
-	if t.ECE {
-		f |= 0x40
-	}
-	if t.CWR {
-		f |= 0x80
-	}
-	return f
-}
-
-func (m *MetaPacket) extractTcpOptions(rawPacket RawPacket, offset uint16, max uint16) {
-	for offset+1 < max { // 如果不足2B，EOL和NOP都可以忽略
-		assumeLength := uint16(Max(int(rawPacket[offset+1]), 2))
-		switch rawPacket[offset] {
-		case layers.TCPOptionKindEndList:
+func (h *MetaPacketTcpHeader) extractTcpOptions(stream *ByteStream) {
+	for stream.Len() >= 2 { // 如果不足2B，那么只可能是NOP或END
+		switch TCPOptionKind(stream.U8()) {
+		case TCPOptionKindEndList:
 			return
-		case layers.TCPOptionKindNop:
-			offset++
-		case layers.TCPOptionKindWindowScale:
-			if offset+assumeLength > max {
-				return
+		case TCPOptionKindNop:
+			continue
+		case TCPOptionKindWindowScale:
+			stream.U8() // skip length
+			if stream.Len() > 0 {
+				h.WinScale = stream.U8()
 			}
-			m.TcpData.WinScale = byte(rawPacket[offset+2])
-			offset += assumeLength
-		case layers.TCPOptionKindSACKPermitted:
-			m.TcpData.SACKPermitted = true
-			offset += 2
+		case TCPOptionKindSACKPermitted:
+			stream.U8() // skip length
+			h.SACKPermitted = true
 		default: // others
-			offset += assumeLength
+			stream.U8() // skip length
 		}
 	}
 }
 
-func NewMetaPacket(rawPacket RawPacket, inPort uint32, timestamp time.Duration, exporter net.IP) *MetaPacket {
-	m := &MetaPacket{InPort: inPort, Exporter: exporter, Timestamp: timestamp, Raw: rawPacket}
-	packet := gopacket.NewPacket(rawPacket, layers.LayerTypeEthernet,
-		gopacket.DecodeOptions{NoCopy: true, Lazy: true})
-	eth := packet.Layer(layers.LayerTypeEthernet).(*layers.Ethernet)
-	m.MacDst = eth.DstMAC
-	m.MacSrc = eth.SrcMAC
-	m.EthType = eth.EthernetType
-	if m.EthType == layers.EthernetTypeDot1Q {
-		vlan := packet.Layer(layers.LayerTypeDot1Q).(*layers.Dot1Q)
-		m.EthType = vlan.Type
-		m.Vlan = vlan.VLANIdentifier
+func isVlanTagged(ethType EthernetType) bool {
+	return ethType == EthernetTypeQinQ || ethType == EthernetTypeDot1Q
+}
+
+// TODO: 一个合法ip报文应当至少有30B的长度(不考虑非ip情形)
+//       因此如果我们能够减少长度的判断，想必能够提升不少的性能
+func (p *MetaPacket) Parse(packet RawPacket) bool {
+	tunnel := TunnelInfo{}
+	decapsulatedOffset := tunnel.Decapsulate(packet)
+	if tunnel.Valid() {
+		p.Tunnel = &tunnel
 	}
 
-	if m.EthType != layers.EthernetTypeIPv4 {
-		return m
+	stream := ByteStream{packet[decapsulatedOffset:], 0}
+
+	// L2
+	if stream.Len() < ETH_HEADER_SIZE {
+		return false
+	}
+	p.MacDst = MacIntFromBytes(stream.Field(MAC_ADDR_LEN))
+	p.MacSrc = MacIntFromBytes(stream.Field(MAC_ADDR_LEN))
+	p.EthType = EthernetType(stream.U16())
+	if isVlanTagged(p.EthType) && stream.Len() > VLANTAG_LEN {
+		vlanTag := stream.U16()
+		vid := vlanTag & VLAN_ID_MASK
+		if pcp := (vlanTag >> 12) & 0x3; pcp == MIRRORED_TRAFFIC {
+			p.InPort = uint32((vid&0xF00)<<8) | uint32(vid&0xFF)
+		}
+		p.EthType = EthernetType(stream.U16())
+	}
+	if p.EthType == EthernetTypeDot1Q && stream.Len() > VLANTAG_LEN {
+		p.Vlan = stream.U16() & VLAN_ID_MASK
+		p.EthType = EthernetType(stream.U16())
 	}
 
-	ip := packet.NetworkLayer().(*layers.IPv4)
-	m.IpSrc = IpToUint32(ip.SrcIP)
-	m.IpDst = IpToUint32(ip.DstIP)
-	m.TTL = ip.TTL
-	m.Proto = ip.Protocol
-	if m.Vlan > 0 {
-		m.PacketLen = 4
+	// L3
+	if p.EthType != EthernetTypeIPv4 || stream.Len() < MIN_IPV4_HEADER_SIZE {
+		return true
 	}
-	m.PacketLen += ip.Length + 14
-	if m.Proto == layers.IPProtocolTCP {
-		tcp := packet.Layer(layers.LayerTypeTCP).(*layers.TCP)
-		m.PortSrc = uint16(tcp.SrcPort)
-		m.PortDst = uint16(tcp.DstPort)
-		m.PayloadLen = ip.Length - uint16(tcp.DataOffset*4)
-		m.TcpData.Flags = getTcpFlags(tcp)
-		m.TcpData.Seq = tcp.Seq
-		m.TcpData.Ack = tcp.Ack
-		m.TcpData.WinSize = tcp.Window
-		m.extractTcpOptions(rawPacket, m.PacketLen-m.PayloadLen, m.PayloadLen)
-	} else if m.Proto == layers.IPProtocolUDP {
-		udp := packet.Layer(layers.LayerTypeUDP).(*layers.UDP)
-		m.PortSrc = uint16(udp.SrcPort)
-		m.PortDst = uint16(udp.DstPort)
-		m.PayloadLen = udp.Length - 8
+	ihl := (stream.U8() & 0xF)
+	stream.Field(5) // skip till TTL
+	fragmentOffset := stream.U16() & 0x1FFF
+	p.TTL = stream.U8()
+	p.Protocol = IPProtocol(stream.U8())
+	stream.U16() // skip checksum
+	p.IpSrc = stream.U32()
+	p.IpDst = stream.U32()
+	ipOptionsSize := int(ihl)*4 - MIN_IPV4_HEADER_SIZE
+	if stream.Len() <= ipOptionsSize || fragmentOffset > 0 { // no more header
+		return true
 	}
-	return m
+	stream.Field(ipOptionsSize) // skip options
+
+	// L4
+	isValidUDP := p.Protocol == IPProtocolUDP && stream.Len() >= UDP_HEADER_SIZE
+	isValidTCP := p.Protocol == IPProtocolTCP && stream.Len() >= MIN_TCP_HEADER_SIZE
+	if !isValidUDP && !isValidTCP {
+		return true
+	}
+	p.PortSrc = stream.U16()
+	p.PortDst = stream.U16()
+	if p.Protocol == IPProtocolUDP {
+		p.PayloadLen = stream.U16() - UDP_HEADER_SIZE
+		return true
+	} // else TCP
+
+	seq := stream.U32()
+	ack := stream.U32()
+	dataOffset := int(stream.U8() & 0xF0)
+	flags := stream.U8()
+	winSize := stream.U16()
+	stream.Field(4) // skip checksum and URG Pointer
+	optionsSize := dataOffset - MIN_TCP_HEADER_SIZE
+	p.PayloadLen = uint16(stream.Len() - optionsSize)
+	tcpHeader := &MetaPacketTcpHeader{flags, seq, ack, winSize, 0, false}
+	tcpHeader.extractTcpOptions(&stream)
+	p.TcpData = tcpHeader
+	return true
 }

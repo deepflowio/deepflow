@@ -1,26 +1,8 @@
 package handler
 
 import (
-	"net"
+	. "encoding/binary"
 )
-
-type TunnelType uint8
-
-const (
-	TUNNEL_TYPE_NONE TunnelType = iota
-	TUNNEL_TYPE_VXLAN
-)
-
-func (t TunnelType) String() string {
-	return "vxlan"
-}
-
-type TunnelInfo struct {
-	TunnelSrc  net.IP
-	TunnelDst  net.IP
-	TunnelId   uint32
-	TunnelType TunnelType
-}
 
 type PacketFlag uint16
 
@@ -52,3 +34,11 @@ const (
 	PFLAG_NONE PacketFlag = 0
 	CFLAG_FULL            = 0x1FFF
 )
+
+type IPv4Int = uint32 // not native byte order
+
+type MacInt = uint64 // not native byte order
+
+func MacIntFromBytes(bytes []byte) MacInt {
+	return uint64(BigEndian.Uint32(bytes))<<16 | uint64(BigEndian.Uint16(bytes[4:]))
+}

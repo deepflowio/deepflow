@@ -14,8 +14,10 @@ import (
 	"github.com/op/go-logging"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"golang.org/x/net/bpf"
 
 	"gitlab.x.lan/yunshan/droplet/handler"
+	. "gitlab.x.lan/yunshan/droplet/utils"
 )
 
 var log = logging.MustGetLogger("capture")
@@ -46,17 +48,16 @@ type PacketCounter struct {
 }
 
 type Capture struct {
-	tPacket       *afpacket.TPacket
-	ip            net.IP
-	outputQueue   queue.QueueWriter
-	tapInterfaces []net.Interface
-	tapRxOnly     bool
-	counter       *PacketCounter
-	enable        bool
-	issueStop     bool
-	running       bool
-	lastPollErr   error
-	lastIntrErr   error
+	tPacket     *afpacket.TPacket
+	ip          handler.IPv4Int
+	rxInterface uint32
+	outputQueue queue.QueueWriter
+
+	counter     *PacketCounter
+	issueStop   bool
+	running     bool
+	lastPollErr error
+	lastIntrErr error
 }
 
 func (c *Capture) GetCounter() interface{} {
@@ -140,8 +141,15 @@ func (c *Capture) run() (retErr error) {
 			prevTimestamp = timestamp
 		}
 		c.counter.Rx++
-
-		metaPacket := handler.NewMetaPacket(packet, uint32(ci.InterfaceIndex), timestamp, c.ip)
+		metaPacket := &handler.MetaPacket{
+			Timestamp: timestamp,
+			InPort:    c.rxInterface,
+			Exporter:  c.ip,
+			Raw:       packet,
+		}
+		if !metaPacket.Parse(packet) {
+			continue
+		}
 		c.outputQueue.Put(metaPacket)
 	}
 	c.running = false
@@ -190,7 +198,7 @@ func (c *Capture) Close() error {
 	return nil
 }
 
-func NewCapture(interfaceName string, ip net.IP, outputQueue queue.QueueWriter) (*Capture, error) {
+func NewCapture(interfaceName string, ip net.IP, isTap bool, outputQueue queue.QueueWriter) (*Capture, error) {
 	if _, err := net.InterfaceByName(interfaceName); err != nil {
 		return nil, err
 	}
@@ -205,9 +213,31 @@ func NewCapture(interfaceName string, ip net.IP, outputQueue queue.QueueWriter) 
 		log.Warning("AF_PACKET init error", err)
 		return nil, err
 	}
+
+	instructions := []bpf.Instruction{
+		bpf.LoadExtension{Num: bpf.ExtType},
+		bpf.JumpIf{Cond: bpf.JumpNotEqual, Val: uint32(LinuxSLLPacketTypeOutgoing), SkipTrue: 1},
+		bpf.RetConstant{Val: 0},
+		bpf.RetConstant{Val: 65535}, // default accept up to 64KB
+	}
+	rawInstructions, err := bpf.Assemble(instructions)
+	if err != nil {
+		log.Warning("Assemble bpf failed, bpf won't work")
+	}
+
+	if err := tPacket.SetBPF(rawInstructions); err != nil {
+		log.Warning("BPF inject failed:", err)
+	}
+
+	rxInterface := uint32(handler.CAPTURE_LOCAL)
+	if isTap {
+		rxInterface = uint32(handler.CAPTURE_REMOTE)
+	}
+
 	cap := &Capture{
 		tPacket:     tPacket,
-		ip:          ip,
+		ip:          IpToUint32(ip),
+		rxInterface: rxInterface,
 		counter:     &PacketCounter{},
 		outputQueue: outputQueue,
 	}
