@@ -1,4 +1,4 @@
-package flowgen
+package flowgenerator
 
 import (
 	"container/list"
@@ -9,7 +9,6 @@ import (
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
-
 	"gitlab.x.lan/yunshan/droplet/handler"
 	"gitlab.x.lan/yunshan/droplet/utils"
 )

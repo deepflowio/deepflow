@@ -1,8 +1,8 @@
-package flowgen
+package flowgenerator
 
 import (
 	"container/list"
-	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -119,8 +119,6 @@ type FastPath struct {
 }
 
 type FlowGenerator struct {
-	sync.RWMutex
-
 	fastPath                FastPath
 	metaPacketHeaderInQueue QueueReader
 	flowOutQueue            QueueWriter
@@ -128,7 +126,9 @@ type FlowGenerator struct {
 	forceReportIntervalSec  time.Duration
 	minLoopIntervalSec      time.Duration
 	flowLimitNum            uint64
-	running                 bool
+	handleRunning           bool
+	cleanRunning            bool
+	cleanWaitGroup          sync.WaitGroup
 }
 
 func timeMax(a time.Duration, b time.Duration) time.Duration {
@@ -153,10 +153,6 @@ func flagContain(flags, target uint8) bool {
 	return flags&target > 0
 }
 
-func TaggedFlowString(f *TaggedFlow) string {
-	return fmt.Sprintf("%+v\n%+v", *f, *f.TcpPerfStats)
-}
-
 func (f *FlowGenerator) GetCounter() interface{} {
 	counter := f.stats
 	return &counter
@@ -164,4 +160,16 @@ func (f *FlowGenerator) GetCounter() interface{} {
 
 func SetTimeout(timeoutConfig TimeoutConfig) {
 	innerTimeoutConfig = timeoutConfig
+}
+
+func (t TimeoutConfig) minTimeout() time.Duration {
+	valueOf := reflect.ValueOf(t)
+	var minSec time.Duration = 1 << 32 // not max, but enough
+	for i := 0; i < valueOf.NumField(); i++ {
+		value := valueOf.Field(i).Interface().(time.Duration)
+		if minSec > value && value != 0 {
+			minSec = value
+		}
+	}
+	return minSec
 }

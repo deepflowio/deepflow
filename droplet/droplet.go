@@ -10,7 +10,7 @@ import (
 
 	"gitlab.x.lan/yunshan/droplet/adapter"
 	"gitlab.x.lan/yunshan/droplet/config"
-	"gitlab.x.lan/yunshan/droplet/flowgen"
+	"gitlab.x.lan/yunshan/droplet/flowgenerator"
 	"gitlab.x.lan/yunshan/droplet/handler"
 	"gitlab.x.lan/yunshan/droplet/labeler"
 	"gitlab.x.lan/yunshan/droplet/mapreduce"
@@ -50,7 +50,7 @@ func Start(configPath string) {
 	})
 
 	flowAppOutputQueue := manager.NewQueue("flowAppOutputQueue", 1000, &handler.MetaPacket{})
-	flowGenerator := flowgen.New(flowQueue, flowAppOutputQueue, 60)
+	flowGenerator := flowgenerator.New(flowQueue, flowAppOutputQueue, 60)
 	if flowGenerator == nil {
 		return
 	}
@@ -81,7 +81,7 @@ func Start(configPath string) {
 	go func() {
 		for {
 			taggedFlow := flowAppOutputQueue.Get().(*TaggedFlow)
-			log.Info(flowgen.TaggedFlowString(taggedFlow))
+			log.Info(taggedFlow)
 			flowMapProcess.Process(*taggedFlow)
 		}
 	}()
