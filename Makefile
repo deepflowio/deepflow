@@ -29,6 +29,9 @@ protobuf/trident.pb.go: submodule
 test: vendor protobuf/trident.pb.go
 	go test -short ./...
 
+bench: vendor protobuf/trident.pb.go
+	go test -bench=. ./...
+
 debug: vendor protobuf/trident.pb.go
 	go build ${FLAGS} -gcflags '-N -l' -o bin/droplet cmd/droplet/main.go
 

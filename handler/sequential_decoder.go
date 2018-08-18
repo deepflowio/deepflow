@@ -48,7 +48,7 @@ type SequentialDecoder struct {
 }
 
 func NewSequentialDecoder(data []byte) *SequentialDecoder {
-	return &SequentialDecoder{data: ByteStream(data)}
+	return &SequentialDecoder{data: ByteStream{data, 0}}
 }
 
 var FLAGS_NAME = [...]string{
@@ -100,11 +100,12 @@ func (d *SequentialDecoder) Seq() uint32 {
 	return d.seq
 }
 
-func (d *SequentialDecoder) decodeTunnel(meta *MetaPacket) {
-	meta.TunnelDst = net.IP(d.data.Field(IP_ADDR_LEN))
-	meta.TunnelSrc = net.IP(d.data.Field(IP_ADDR_LEN))
-	meta.TunnelId = uint32((d.data.U8()))<<16 | uint32(d.data.U16())
-	meta.TunnelType = TunnelType(d.data.U8())
+func decodeTunnel(stream ByteStream) *TunnelInfo {
+	src := stream.U32()
+	dst := stream.U32()
+	id := uint32((stream.U8()))<<16 | uint32(stream.U16())
+	tunnelType := TunnelType(stream.U8())
+	return &TunnelInfo{tunnelType, src, dst, id}
 }
 
 func (d *SequentialDecoder) decodeEthernet(meta *MetaPacket) {
@@ -123,11 +124,11 @@ func (d *SequentialDecoder) decodeEthernet(meta *MetaPacket) {
 	meta.L2End1 = d.pflags.IsSet(PFLAG_DST_ENDPOINT)
 	meta.Vlan = x.vlan
 	if d.direction == "->" {
-		meta.MacSrc = x.mac0
-		meta.MacDst = x.mac1
+		meta.MacSrc = MacIntFromBytes(x.mac0)
+		meta.MacDst = MacIntFromBytes(x.mac1)
 	} else {
-		meta.MacSrc = x.mac1
-		meta.MacDst = x.mac0
+		meta.MacSrc = MacIntFromBytes(x.mac1)
+		meta.MacDst = MacIntFromBytes(x.mac0)
 	}
 	if x.headerType == HEADER_TYPE_ARP {
 		meta.EthType = EthernetTypeARP
@@ -173,7 +174,7 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPacket) {
 		meta.IpDst = IpToUint32(x.ip0)
 	}
 	if x.headerType == HEADER_TYPE_IPV4_ICMP {
-		meta.Proto = IPProtocolICMPv4
+		meta.Protocol = IPProtocolICMPv4
 		icmpType, _ := d.data.U8(), d.data.U8()
 		switch icmpType {
 		case ICMPv4TypeDestinationUnreachable:
@@ -194,7 +195,7 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPacket) {
 		}
 	} else if x.headerType == HEADER_TYPE_IPV4 {
 		proto := d.data.U8()
-		meta.Proto = IPProtocol(proto)
+		meta.Protocol = IPProtocol(proto)
 		return
 	}
 	d.decodeL4(meta)
@@ -222,12 +223,12 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 		meta.PayloadLen = meta.PacketLen - 14 - uint16(x.ihl*4) - 4
 	}
 	if x.headerType == HEADER_TYPE_IPV4_UDP {
-		meta.Proto = IPProtocolUDP
+		meta.Protocol = IPProtocolUDP
 		meta.PayloadLen -= 8
 		return
 	}
 	meta.PayloadLen -= uint16(x.dataOffset * 4)
-	meta.Proto = IPProtocolTCP
+	meta.Protocol = IPProtocolTCP
 	seq := d.data.U32()
 	ack := d.data.U32()
 	meta.TcpData.Seq = seq
@@ -289,7 +290,7 @@ func (d *SequentialDecoder) NextPacket(meta *MetaPacket) bool {
 	}
 	d.timestamp += time.Duration(delta) * time.Microsecond // µs to ns
 	if d.pflags.IsSet(PFLAG_TUNNEL) {
-		d.decodeTunnel(meta)
+		meta.Tunnel = decodeTunnel(d.data)
 	}
 	meta.PacketLen = totalSize
 	meta.Timestamp = d.timestamp

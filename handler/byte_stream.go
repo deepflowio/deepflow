@@ -4,34 +4,36 @@ import (
 	"encoding/binary"
 )
 
-type ByteStream []byte
+type ByteStream struct {
+	data   []byte
+	offset int
+}
+
+func (s *ByteStream) Len() int {
+	return len(s.data) - s.offset
+}
 
 func (s *ByteStream) Field(len int) []byte {
-	retval := (*s)[:len]
-	*s = (*s)[len:]
-	return retval
+	s.offset += len
+	return s.data[s.offset-len : s.offset]
 }
 
 func (s *ByteStream) U8() uint8 {
-	retval := uint8((*s)[0])
-	*s = (*s)[1:]
-	return retval
+	s.offset++
+	return uint8(s.data[s.offset-1])
 }
 
 func (s *ByteStream) U16() uint16 {
-	retval := binary.BigEndian.Uint16(*s)
-	*s = (*s)[2:]
-	return retval
+	s.offset += 2
+	return binary.BigEndian.Uint16(s.data[s.offset-2:])
 }
 
 func (s *ByteStream) U32() uint32 {
-	retval := binary.BigEndian.Uint32(*s)
-	*s = (*s)[4:]
-	return retval
+	s.offset += 4
+	return binary.BigEndian.Uint32(s.data[s.offset-4:])
 }
 
 func (s *ByteStream) U64() uint64 {
-	retval := binary.BigEndian.Uint64(*s)
-	*s = (*s)[8:]
-	return retval
+	s.offset += 8
+	return binary.BigEndian.Uint64(s.data[s.offset-8:])
 }

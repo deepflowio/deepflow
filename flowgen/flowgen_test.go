@@ -3,7 +3,6 @@ package flowgen
 import (
 	"net"
 	"runtime"
-	"strings"
 	"testing"
 	"time"
 
@@ -23,35 +22,36 @@ const DEFAULT_DURATION_MSEC = time.Millisecond * 123
 const DEFAULT_PKT_LEN = 128
 
 func getDefaultPacket() *handler.MetaPacket {
-	packet := &handler.MetaPacket{}
-	packet.MacSrc, _ = net.ParseMAC("12:34:56:78:9A:BC")
-	packet.MacDst, _ = net.ParseMAC("21:43:65:87:A9:CB")
-	packet.PacketLen = DEFAULT_PKT_LEN
-	packet.Proto = 6
-	packet.IpSrc = IpToUint32(net.ParseIP("8.8.8.8").To4())
-	packet.IpDst = IpToUint32(net.ParseIP("114.114.114.114").To4())
-	packet.PortSrc = 12345
-	packet.PortDst = 22
-	packet.InPort = 65533
-	packet.Exporter = net.ParseIP("192.168.1.1")
-	packet.TcpData.Flags = TCP_SYN
-	packet.Timestamp = time.Duration(time.Now().UnixNano())
-	packet.EndpointData = &EndpointData{
-		SrcInfo: &EndpointInfo{
-			L2EpcId:  -1,
-			L3EpcId:  -1,
-			GroupIds: make([]uint32, 10),
-			HostIp:   0x01010101,
-		},
-		DstInfo: &EndpointInfo{
-			L2EpcId:  -1,
-			L3EpcId:  -1,
-			GroupIds: make([]uint32, 10),
-			HostIp:   0x01010101,
+	src, _ := net.ParseMAC("12:34:56:78:9A:BC")
+	dst, _ := net.ParseMAC("21:43:65:87:A9:CB")
+	return &handler.MetaPacket{
+		Timestamp: time.Duration(time.Now().UnixNano()),
+		Exporter:  IpToUint32(net.ParseIP("192.168.1.1")),
+		InPort:    65533,
+		MacSrc:    handler.MacIntFromBytes(src),
+		MacDst:    handler.MacIntFromBytes(dst),
+		PacketLen: DEFAULT_PKT_LEN,
+		Protocol:  6,
+		IpSrc:     IpToUint32(net.ParseIP("8.8.8.8").To4()),
+		IpDst:     IpToUint32(net.ParseIP("114.114.114.114").To4()),
+		PortSrc:   12345,
+		PortDst:   22,
+		TcpData:   &handler.MetaPacketTcpHeader{Flags: TCP_SYN},
+		EndpointData: &EndpointData{
+			SrcInfo: &EndpointInfo{
+				L2EpcId:  -1,
+				L3EpcId:  -1,
+				GroupIds: make([]uint32, 10),
+				HostIp:   0x01010101,
+			},
+			DstInfo: &EndpointInfo{
+				L2EpcId:  -1,
+				L3EpcId:  -1,
+				GroupIds: make([]uint32, 10),
+				HostIp:   0x01010101,
+			},
 		},
 	}
-
-	return packet
 }
 
 func reversePacket(packet *handler.MetaPacket) {
@@ -245,17 +245,16 @@ func TestInitFlow(t *testing.T) {
 		t.Errorf("taggedFlow.TotalByteCount0 is %d, PacketLen is %d", taggedFlow.TotalByteCount0, packet.PacketLen)
 	}
 
-	if strings.Compare(taggedFlow.MACSrc.String(), packet.MacSrc.String()) != 0 ||
-		strings.Compare(taggedFlow.MACDst.String(), packet.MacDst.String()) != 0 {
-		t.Errorf("taggedFlow.MacSrc is %s, packet.MacSrc is %s", taggedFlow.MACSrc.String(), packet.MacSrc.String())
-		t.Errorf("taggedFlow.MacDst is %s, packet.MacDst is %s", taggedFlow.MACDst.String(), packet.MacDst.String())
+	if taggedFlow.MACSrc.Int() != packet.MacSrc || taggedFlow.MACDst.Int() != packet.MacDst {
+		t.Errorf("taggedFlow.MacSrc is %s, packet.MacSrc is %s", taggedFlow.MACSrc.Int(), packet.MacSrc)
+		t.Errorf("taggedFlow.MacDst is %s, packet.MacDst is %s", taggedFlow.MACDst.Int(), packet.MacDst)
 	}
 	if taggedFlow.IPSrc.Int() != packet.IpSrc || taggedFlow.IPDst.Int() != packet.IpDst {
-		t.Errorf("taggedFlow.IpSrc is %s, packet.IpSrc is %s", taggedFlow.IPSrc.String(), IpFromUint32(packet.IpSrc).String())
-		t.Errorf("taggedFlow.IpDst is %s, packet.IpDst is %s", taggedFlow.IPDst.String(), IpFromUint32(packet.IpDst).String())
+		t.Errorf("taggedFlow.IpSrc is %s, packet.IpSrc is %s", taggedFlow.IPSrc, IpFromUint32(packet.IpSrc))
+		t.Errorf("taggedFlow.IpDst is %s, packet.IpDst is %s", taggedFlow.IPDst, IpFromUint32(packet.IpDst))
 	}
-	if flowKey.Proto != packet.Proto {
-		t.Errorf("flowKey.Proto is %d, packet.Proto is %d", taggedFlow.Proto, packet.Proto)
+	if flowKey.Proto != packet.Protocol {
+		t.Errorf("flowKey.Proto is %d, packet.Protocol is %d", taggedFlow.Proto, packet.Protocol)
 	}
 	if taggedFlow.PortSrc != packet.PortSrc || taggedFlow.PortDst != packet.PortDst {
 		t.Errorf("taggedFlow.PortSrc is %d, packet.PortSrc is %d", taggedFlow.PortSrc, packet.PortSrc)

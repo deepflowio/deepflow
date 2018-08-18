@@ -22,23 +22,12 @@ const (
 	HEADER_TYPE_IPV4_UDP
 )
 
-var MIN_PACKET_SIZES = [...]int{
-	HEADER_TYPE_ETH:       14,           // 不包括DOT1Q
-	HEADER_TYPE_ARP:       14 + 28,      // 不包括DOT1Q
-	HEADER_TYPE_IPV4:      14 + 20,      // 不包括DOT1Q + IPv4 option
-	HEADER_TYPE_IPV4_ICMP: 14 + 20 + 8,  // 不包括DOT1Q + IPv4 option
-	HEADER_TYPE_IPV4_TCP:  14 + 20 + 20, // 不包括DOT1Q + IPv4 option
-	HEADER_TYPE_IPV4_UDP:  14 + 20 + 8,  // 不包括DOT1Q + IPv4 option
-}
+type CaptureType uint32
 
-var MIN_HEADER_SIZES = [...]int{
-	HEADER_TYPE_ETH:       14,
-	HEADER_TYPE_ARP:       28,
-	HEADER_TYPE_IPV4:      20,
-	HEADER_TYPE_IPV4_ICMP: 8,
-	HEADER_TYPE_IPV4_TCP:  20,
-	HEADER_TYPE_IPV4_UDP:  8,
-}
+const (
+	CAPTURE_LOCAL  CaptureType = 0x10000
+	CAPTURE_REMOTE             = 0x30000
+)
 
 const (
 	MAC_ADDR_LEN               = 6
@@ -59,6 +48,10 @@ const (
 	ETH_HEADER_SIZE   = MAC_ADDR_LEN*2 + ETH_TYPE_LEN
 	ARP_HEADER_SIZE   = 28
 	VXLAN_HEADER_SIZE = 8
+	UDP_HEADER_SIZE   = 8
+
+	MIN_IPV4_HEADER_SIZE = 20
+	MIN_TCP_HEADER_SIZE  = 20
 
 	TCP_OPT_WIN_SCALE_LEN = 3
 	TCP_OPT_MSS_LEN       = 4

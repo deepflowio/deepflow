@@ -2,7 +2,6 @@ package droplet
 
 import (
 	"net"
-	"time"
 
 	"github.com/op/go-logging"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -29,7 +28,7 @@ func Start(configPath string) {
 		ip := net.ParseIP(ipString)
 		ips = append(ips, ip)
 	}
-	synchronizer := config.NewRpcConfigSynchronizer(ips, cfg.ControllerPort, 10*time.Second)
+	synchronizer := config.NewRpcConfigSynchronizer(ips, cfg.ControllerPort)
 	synchronizer.Start()
 
 	manager := queue.NewManager()
@@ -55,8 +54,17 @@ func Start(configPath string) {
 	if flowGenerator == nil {
 		return
 	}
-	for _, iface := range append(cfg.DataInterfaces, cfg.TapInterfaces...) {
-		capture, err := packet.NewCapture(iface, ips[0], filterQueue)
+
+	for _, iface := range cfg.DataInterfaces {
+		capture, err := packet.NewCapture(iface, ips[0], false, filterQueue)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		capture.Start()
+	}
+	for _, iface := range cfg.TapInterfaces {
+		capture, err := packet.NewCapture(iface, ips[0], true, filterQueue)
 		if err != nil {
 			log.Error(err)
 			return

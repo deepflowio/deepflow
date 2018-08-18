@@ -11,8 +11,7 @@ import (
 )
 
 const (
-	NORMAL_EXIT_WITH_RESTART  = 2
-	DEFAULT_SYN_INTERVAL_TIME = 10
+	DEFAULT_SYNC_INTERVAL = 10 * time.Second
 )
 
 type RpcConfigSynchronizer struct {
@@ -80,11 +79,11 @@ func (s *RpcConfigSynchronizer) Stop() {
 	s.stop = true
 }
 
-func NewRpcConfigSynchronizer(ips []net.IP, port uint16, syncInterval time.Duration) ConfigSynchronizer {
+func NewRpcConfigSynchronizer(ips []net.IP, port uint16) ConfigSynchronizer {
 	return &RpcConfigSynchronizer{
 		bootTime:       time.Now(),
-		rpcSession:     NewGRpcInitiator(ips, port, syncInterval),
-		syncInterval:   syncInterval,
+		rpcSession:     NewGRpcInitiator(ips, port, DEFAULT_SYNC_INTERVAL),
+		syncInterval:   DEFAULT_SYNC_INTERVAL,
 		configAccepted: true,
 	}
 }
