@@ -12,7 +12,6 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/stats"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 
-	"gitlab.x.lan/yunshan/droplet/flowperf"
 	"gitlab.x.lan/yunshan/droplet/handler"
 	. "gitlab.x.lan/yunshan/droplet/utils"
 )
@@ -498,9 +497,9 @@ func (f *FlowExtra) tryForceReport(flowOutQueue QueueWriter) {
 	}
 }
 
-func (f *FlowExtra) initFlowInfo(flow *TaggedFlow, state FlowState, reply bool) *flowperf.FlowInfo {
-	return &flowperf.FlowInfo{
-		FlowState:         int(state),
+func (f *FlowExtra) initFlowInfo(flow *TaggedFlow, state FlowState, reply bool) *FlowInfo {
+	return &FlowInfo{
+		FlowState:         state,
 		Direction:         reply,
 		FlowID:            flow.FlowID,
 		TotalPacketCount0: flow.TotalPacketCount0,
@@ -538,7 +537,7 @@ func (f *FlowGenerator) processPacket(meta *handler.MetaPacket) {
 	} else {
 		var closed bool
 		flowExtra, closed = f.initFlow(meta, flowKey)
-		flowExtra.metaFlowPerf = flowperf.NewMetaFlowPerf()
+		flowExtra.metaFlowPerf = NewMetaFlowPerf()
 		f.stats.TotalNumFlows++
 		if closed {
 			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false)

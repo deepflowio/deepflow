@@ -1,4 +1,4 @@
-package flowperf
+package flowgen
 
 import (
 	"container/list"
@@ -7,15 +7,12 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/op/go-logging"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 
 	"gitlab.x.lan/yunshan/droplet/handler"
 	"gitlab.x.lan/yunshan/droplet/utils"
 )
-
-var log = logging.MustGetLogger(FP_NAME)
 
 type ContinuousFlag uint8
 type TcpConnSession [2]TcpSessionPeer
@@ -25,24 +22,8 @@ const (
 )
 
 const (
-	FLOW_STATE_OPENING     int = 1
-	FLOW_STATE_ESTABLISHED     = 2
-)
-
-const (
 	TCP_DIR_CLIENT bool = false
 	TCP_DIR_SERVER      = true
-)
-
-const (
-	TCP_FIN uint8 = 1 << iota //: 0x001
-	TCP_SYN                   //: 0x002
-	TCP_RST                   //: 0x004
-	TCP_PSH                   //: 0x008
-	TCP_ACK                   //: 0x010
-	TCP_URG                   //: 0x020
-	TCP_ECE                   //: 0x040
-	TCP_CWR                   //: 0x080
 )
 
 const (
@@ -77,7 +58,7 @@ type SeqSegment struct { // 避免乱序，识别重传
 type TcpSessionPeer struct {
 	seqList *list.List // 升序链表, 内容为SeqSegment
 
-	flowState  int
+	flowState  FlowState
 	timestamp  time.Duration
 	seq        uint32
 	payloadLen uint32
@@ -125,8 +106,8 @@ type FlowPerfCounter struct {
 }
 
 type FlowInfo struct {
-	FlowID            uint64
-	FlowState         int
+	FlowID uint64
+	FlowState
 	Direction         bool
 	TotalPacketCount0 uint64
 	TotalPacketCount1 uint64
@@ -309,7 +290,7 @@ func (p *TcpSessionPeer) updateData(header *handler.MetaPacket) {
 	tcpHeader := header.TcpData
 	p.timestamp = time.Duration(header.Timestamp)
 	p.payloadLen = uint32(header.PayloadLen)
-	if tcpHeader.Flags&0x3f&TCP_SYN > 0 {
+	if tcpHeader.Flags&TCP_SYN > 0 {
 		p.payloadLen = 1
 	}
 	p.seq = tcpHeader.Seq
@@ -318,7 +299,7 @@ func (p *TcpSessionPeer) updateData(header *handler.MetaPacket) {
 }
 
 // 更新状态
-func (p *TcpSessionPeer) updateState(state int) {
+func (p *TcpSessionPeer) updateState(state FlowState) {
 	p.flowState = state
 }
 
@@ -378,7 +359,7 @@ func isPshAckPacket(header *handler.MetaPacket) bool {
 // 判断是否重传或错误
 func isRetransPacket(sameDirection *TcpSessionPeer, header *handler.MetaPacket, flow *FlowInfo) bool {
 	payloadLen := header.PayloadLen
-	if flow.FlowState == FLOW_STATE_OPENING && header.TcpData.Flags&0x3f&TCP_SYN > 0 { // SYN包
+	if flow.FlowState == FLOW_STATE_OPENING_1 && header.TcpData.Flags&TCP_SYN > 0 { // SYN包
 		payloadLen = 1
 	}
 
@@ -493,7 +474,7 @@ func (p *MetaFlowPerf) update(sameDirection, oppositeDirection *TcpSessionPeer, 
 	}
 
 	// 计算RTT, ART
-	if flow.FlowState == FLOW_STATE_OPENING { // opening
+	if flow.FlowState == FLOW_STATE_OPENING_1 { // opening
 		p.whenFlowOpening(sameDirection, oppositeDirection, header, flow)
 	} else { // established
 		p.whenFlowEstablished(sameDirection, oppositeDirection, header, flow)
@@ -635,8 +616,8 @@ func checkTcpFlags(tcpFlags uint8) bool {
 func NewMetaFlowPerf() *MetaFlowPerf {
 	client := TcpSessionPeer{seqList: list.New()}
 	server := TcpSessionPeer{seqList: list.New()}
-	client.updateState(FLOW_STATE_OPENING)
-	server.updateState(FLOW_STATE_OPENING)
+	client.updateState(FLOW_STATE_OPENING_1)
+	server.updateState(FLOW_STATE_OPENING_1)
 
 	// 初始化MetaFlowPerf结构
 	meta := &MetaFlowPerf{
@@ -670,7 +651,7 @@ func (p *MetaFlowPerf) preprocess(header *handler.MetaPacket, flow *FlowInfo) bo
 		return false
 	}
 
-	if flow.FlowState != FLOW_STATE_OPENING && flow.FlowState != FLOW_STATE_ESTABLISHED {
+	if flow.FlowState != FLOW_STATE_OPENING_1 && flow.FlowState != FLOW_STATE_ESTABLISHED {
 		log.Debugf("flow info:%v, flow state error:%v", flow, flow.FlowState)
 		return false
 	}
