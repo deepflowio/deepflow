@@ -8,8 +8,6 @@ import (
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
-
-	"gitlab.x.lan/yunshan/droplet/flowperf"
 )
 
 const (
@@ -92,7 +90,7 @@ var innerTimeoutConfig = TimeoutConfig{
 
 type FlowExtra struct {
 	taggedFlow     *TaggedFlow
-	metaFlowPerf   *flowperf.MetaFlowPerf
+	metaFlowPerf   *MetaFlowPerf
 	flowState      FlowState
 	recentTimesSec time.Duration
 	timeoutSec     time.Duration

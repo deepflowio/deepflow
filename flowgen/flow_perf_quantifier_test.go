@@ -1,4 +1,4 @@
-package flowperf
+package flowgen
 
 import (
 	"container/list"
@@ -276,7 +276,7 @@ func TestReestablishFsm(t *testing.T) {
 	server := &perfCtrl.tcpSession[1]
 	// 1SYN -> 2SYN/ACK -> 1ACK -> 1ACK/LEN>0 -> 2ACK -> 2ACK/LEN>0 -> 1ACK -> 1ACK/LEN>0
 	// 1SYN
-	flowInfo = &FlowInfo{FlowState: FLOW_STATE_OPENING, Direction: false}
+	flowInfo = &FlowInfo{FlowState: FLOW_STATE_OPENING_1, Direction: false}
 	tcpHeader = handler.MetaPacketTcpHeader{Flags: TCP_SYN, Seq: 111, Ack: 0}
 	packetHeader = &handler.MetaPacket{TcpData: tcpHeader, Timestamp: 3333, PayloadLen: 0}
 	flowPerf.update(client, server, packetHeader, flowInfo)
@@ -284,7 +284,7 @@ func TestReestablishFsm(t *testing.T) {
 	client.updateData(packetHeader)
 
 	// 2SYN/ACK rttSyn1 = 1
-	flowInfo = &FlowInfo{FlowState: FLOW_STATE_OPENING, Direction: true}
+	flowInfo = &FlowInfo{FlowState: FLOW_STATE_OPENING_1, Direction: true}
 	tcpHeader = handler.MetaPacketTcpHeader{Flags: TCP_SYN | TCP_ACK, Seq: 1111, Ack: 112}
 	packetHeader = &handler.MetaPacket{TcpData: tcpHeader, Timestamp: 3334, PayloadLen: 0}
 	flowPerf.update(server, client, packetHeader, flowInfo)
@@ -292,7 +292,7 @@ func TestReestablishFsm(t *testing.T) {
 	server.updateData(packetHeader)
 
 	// 1ACK rttSyn0 = 10
-	flowInfo = &FlowInfo{FlowState: FLOW_STATE_OPENING, Direction: false}
+	flowInfo = &FlowInfo{FlowState: FLOW_STATE_OPENING_1, Direction: false}
 	tcpHeader = handler.MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 112, Ack: 1112}
 	packetHeader = &handler.MetaPacket{TcpData: tcpHeader, Timestamp: 3344, PayloadLen: 0}
 	flowPerf.update(client, server, packetHeader, flowInfo)
@@ -374,7 +374,7 @@ func TestPreprocess(t *testing.T) {
 	var packetHeader *handler.MetaPacket
 
 	flowPerf := NewMetaFlowPerf()
-	flowInfo := &FlowInfo{FlowState: FLOW_STATE_OPENING}
+	flowInfo := &FlowInfo{FlowState: FLOW_STATE_OPENING_1}
 
 	//  SYN组合
 	tcpHeader = handler.MetaPacketTcpHeader{Flags: TCP_SYN | TCP_ACK | TCP_PSH | TCP_URG}
@@ -437,19 +437,19 @@ func testMetaFlowPerfUpdate() {
 	 */
 
 	// 1SYN
-	flowInfo = &FlowInfo{FlowState: FLOW_STATE_OPENING, Direction: false}
+	flowInfo = &FlowInfo{FlowState: FLOW_STATE_OPENING_1, Direction: false}
 	tcpHeader = handler.MetaPacketTcpHeader{Flags: TCP_SYN, Seq: 111, Ack: 0}
 	packetHeader = &handler.MetaPacket{TcpData: tcpHeader, Timestamp: 3333, PayloadLen: 0}
 	flowPerf.Update(packetHeader, flowInfo)
 
 	// 2SYN/ACK rttSyn1=1
-	flowInfo = &FlowInfo{FlowState: FLOW_STATE_OPENING, Direction: true}
+	flowInfo = &FlowInfo{FlowState: FLOW_STATE_OPENING_1, Direction: true}
 	tcpHeader = handler.MetaPacketTcpHeader{Flags: TCP_SYN | TCP_ACK, Seq: 1111, Ack: 112}
 	packetHeader = &handler.MetaPacket{TcpData: tcpHeader, Timestamp: 3334, PayloadLen: 0}
 	flowPerf.Update(packetHeader, flowInfo)
 
 	// 1ACK rttSyn0=10
-	flowInfo = &FlowInfo{FlowState: FLOW_STATE_OPENING, Direction: false}
+	flowInfo = &FlowInfo{FlowState: FLOW_STATE_OPENING_1, Direction: false}
 	tcpHeader = handler.MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 112, Ack: 1112}
 	packetHeader = &handler.MetaPacket{TcpData: tcpHeader, Timestamp: 3344, PayloadLen: 0}
 	flowPerf.Update(packetHeader, flowInfo)
