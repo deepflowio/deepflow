@@ -16,7 +16,7 @@ func testSeqSegmentIsContinuous(peer TcpSessionPeer, left, right, node *SeqSegme
 		return
 	}
 
-	ret := isContinuousSeqSegment(left, right, node)
+	ret := isContinuousSeqSegment(left, right, node, nil)
 	if ret == SEQ_NODE_DISCONTINUOUS {
 		t.Logf("%s test faild\n", t.Name())
 	}
@@ -107,7 +107,7 @@ func TestMergeSeqListNode(t *testing.T) {
 	for i := 1; i < SEQ_LIST_MAX_LEN; i++ {
 		tcpHeader = &handler.MetaPacketTcpHeader{Seq: uint32(100 * i), Ack: 20}
 		payload = 10
-		peer.assertSeqNumber(tcpHeader, payload)
+		peer.assertSeqNumber(tcpHeader, payload, nil)
 	}
 	t.Log(peer.String())
 
@@ -138,9 +138,9 @@ func TestTcpSessionPeerSeqNoAssert(t *testing.T) {
 	peer := &TcpSessionPeer{}
 
 	// 测试例 payload == 0
-	peer.assertSeqNumber(&handler.MetaPacketTcpHeader{}, 0)
+	peer.assertSeqNumber(&handler.MetaPacketTcpHeader{}, 0, nil)
 
-	peer.assertSeqNumber(&handler.MetaPacketTcpHeader{}, 1)
+	peer.assertSeqNumber(&handler.MetaPacketTcpHeader{}, 1, nil)
 
 	// init list
 	if peer.seqList == nil {
@@ -152,13 +152,13 @@ func TestTcpSessionPeerSeqNoAssert(t *testing.T) {
 	if l.Len() == 0 {
 		tcpHeader = &handler.MetaPacketTcpHeader{Seq: 10, Ack: 20}
 		payload = 10
-		peer.assertSeqNumber(tcpHeader, payload)
+		peer.assertSeqNumber(tcpHeader, payload, nil)
 	}
 
 	// {20, 10}
 	tcpHeader = &handler.MetaPacketTcpHeader{Seq: 20}
 	payload = 10
-	peer.assertSeqNumber(tcpHeader, payload)
+	peer.assertSeqNumber(tcpHeader, payload, nil)
 	// {10,20}
 	t.Log(peer.String())
 
@@ -166,7 +166,7 @@ func TestTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// input test case {10, 10}
 	tcpHeader = &handler.MetaPacketTcpHeader{Seq: 10}
 	payload = 10
-	peer.assertSeqNumber(tcpHeader, payload)
+	peer.assertSeqNumber(tcpHeader, payload, nil)
 	// {10, 20}
 	t.Log(peer.String())
 
@@ -174,19 +174,19 @@ func TestTcpSessionPeerSeqNoAssert(t *testing.T) {
 	//  {40, 20}, 异常情况{10,21}, {29, 5}
 	tcpHeader = &handler.MetaPacketTcpHeader{Seq: 40}
 	payload = 20
-	peer.assertSeqNumber(tcpHeader, payload)
+	peer.assertSeqNumber(tcpHeader, payload, nil)
 	// {10,20}, {40,20}
 	t.Log(peer.String())
 
 	tcpHeader = &handler.MetaPacketTcpHeader{Seq: 10}
 	payload = 21
-	peer.assertSeqNumber(tcpHeader, payload)
+	peer.assertSeqNumber(tcpHeader, payload, nil)
 	// {10,20}, {40,20}
 	t.Log(peer.String())
 
 	tcpHeader = &handler.MetaPacketTcpHeader{Seq: 29}
 	payload = 5
-	peer.assertSeqNumber(tcpHeader, payload)
+	peer.assertSeqNumber(tcpHeader, payload, nil)
 	// {10,20}, {40,20}
 	t.Log(peer.String())
 
@@ -196,7 +196,7 @@ func TestTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// {10,20}
 	tcpHeader = &handler.MetaPacketTcpHeader{Seq: 10}
 	payload = 20
-	peer.assertSeqNumber(tcpHeader, payload)
+	peer.assertSeqNumber(tcpHeader, payload, nil)
 	// {10,20}, {40,20}
 	t.Log(peer.String())
 
@@ -204,7 +204,7 @@ func TestTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// {31,4}
 	tcpHeader = &handler.MetaPacketTcpHeader{Seq: 31}
 	payload = 4
-	peer.assertSeqNumber(tcpHeader, payload)
+	peer.assertSeqNumber(tcpHeader, payload, nil)
 	// {10,20}, {31,4}, {40,20}
 	t.Log(peer.String())
 
@@ -212,38 +212,38 @@ func TestTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// {30,1}, {35,2}, {39,1}/*异常情况{38, 7}, {10,28}, {35,5}*/
 	tcpHeader = &handler.MetaPacketTcpHeader{Seq: 30}
 	payload = 1
-	peer.assertSeqNumber(tcpHeader, payload)
+	peer.assertSeqNumber(tcpHeader, payload, nil)
 	// {10,25}, {40,20}
 	t.Log(peer.String())
 
 	tcpHeader = &handler.MetaPacketTcpHeader{Seq: 35}
 	payload = 2
-	peer.assertSeqNumber(tcpHeader, payload)
+	peer.assertSeqNumber(tcpHeader, payload, nil)
 	// {10,27}, {40,20}
 	t.Log(peer.String())
 
 	tcpHeader = &handler.MetaPacketTcpHeader{Seq: 39}
 	payload = 1
-	peer.assertSeqNumber(tcpHeader, payload)
+	peer.assertSeqNumber(tcpHeader, payload, nil)
 	// {10,27}, {39,21}
 	t.Log(peer.String())
 
 	// 异常情况{38, 7}, {10,28}, {35,5}
 	tcpHeader = &handler.MetaPacketTcpHeader{Seq: 38}
 	payload = 7
-	peer.assertSeqNumber(tcpHeader, payload)
+	peer.assertSeqNumber(tcpHeader, payload, nil)
 	// {10,27}, {39,21}
 	t.Log(peer.String())
 
 	tcpHeader = &handler.MetaPacketTcpHeader{Seq: 10}
 	payload = 28
-	peer.assertSeqNumber(tcpHeader, payload)
+	peer.assertSeqNumber(tcpHeader, payload, nil)
 	// {10,27}, {39,21}
 	t.Log(peer.String())
 
 	tcpHeader = &handler.MetaPacketTcpHeader{Seq: 35}
 	payload = 5
-	peer.assertSeqNumber(tcpHeader, payload)
+	peer.assertSeqNumber(tcpHeader, payload, nil)
 	// {10,27}, {39,21}
 	t.Log(peer.String())
 
@@ -252,14 +252,14 @@ func TestTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// {5,5}
 	tcpHeader = &handler.MetaPacketTcpHeader{Seq: 5}
 	payload = 5
-	peer.assertSeqNumber(tcpHeader, payload)
+	peer.assertSeqNumber(tcpHeader, payload, nil)
 	// {5,33}, {39,21}
 	t.Log(peer.String())
 
 	// {1,3}
 	tcpHeader = &handler.MetaPacketTcpHeader{Seq: 1}
 	payload = 3
-	peer.assertSeqNumber(tcpHeader, payload)
+	peer.assertSeqNumber(tcpHeader, payload, nil)
 	// {1,3}, {5,33}, {39,21}
 	t.Log(peer.String())
 }
@@ -276,7 +276,7 @@ func TestReestablishFsm(t *testing.T) {
 	server := &perfCtrl.tcpSession[1]
 	// 1SYN -> 2SYN/ACK -> 1ACK -> 1ACK/LEN>0 -> 2ACK -> 2ACK/LEN>0 -> 1ACK -> 1ACK/LEN>0
 	// 1SYN
-	flowInfo = &FlowInfo{FlowState: FLOW_STATE_OPENING_1, Direction: false}
+	flowInfo = &FlowInfo{Direction: false}
 	tcpHeader = handler.MetaPacketTcpHeader{Flags: TCP_SYN, Seq: 111, Ack: 0}
 	packetHeader = &handler.MetaPacket{TcpData: tcpHeader, Timestamp: 3333, PayloadLen: 0}
 	flowPerf.update(client, server, packetHeader, flowInfo)
@@ -284,7 +284,7 @@ func TestReestablishFsm(t *testing.T) {
 	client.updateData(packetHeader)
 
 	// 2SYN/ACK rttSyn1 = 1
-	flowInfo = &FlowInfo{FlowState: FLOW_STATE_OPENING_1, Direction: true}
+	flowInfo = &FlowInfo{Direction: true}
 	tcpHeader = handler.MetaPacketTcpHeader{Flags: TCP_SYN | TCP_ACK, Seq: 1111, Ack: 112}
 	packetHeader = &handler.MetaPacket{TcpData: tcpHeader, Timestamp: 3334, PayloadLen: 0}
 	flowPerf.update(server, client, packetHeader, flowInfo)
@@ -292,7 +292,7 @@ func TestReestablishFsm(t *testing.T) {
 	server.updateData(packetHeader)
 
 	// 1ACK rttSyn0 = 10
-	flowInfo = &FlowInfo{FlowState: FLOW_STATE_OPENING_1, Direction: false}
+	flowInfo = &FlowInfo{Direction: false}
 	tcpHeader = handler.MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 112, Ack: 1112}
 	packetHeader = &handler.MetaPacket{TcpData: tcpHeader, Timestamp: 3344, PayloadLen: 0}
 	flowPerf.update(client, server, packetHeader, flowInfo)
@@ -374,7 +374,7 @@ func TestPreprocess(t *testing.T) {
 	var packetHeader *handler.MetaPacket
 
 	flowPerf := NewMetaFlowPerf()
-	flowInfo := &FlowInfo{FlowState: FLOW_STATE_OPENING_1}
+	flowInfo := &FlowInfo{}
 
 	//  SYN组合
 	tcpHeader = handler.MetaPacketTcpHeader{Flags: TCP_SYN | TCP_ACK | TCP_PSH | TCP_URG}
@@ -427,29 +427,29 @@ func testMetaFlowPerfUpdate() {
 
 	/*
 	 * rttSyn1=1, rttSyn0=10: 1SYN -> 2SYN/ACK -> 1ACK ->
-	 * art1, not rtt=4: 1ACK/LEN>0 -> 2ACK/LEN>0 -> 2ACK ->
+	 * art1=4, not rtt: 1ACK/LEN>0 -> 2ACK/LEN>0 -> 2ACK ->
 	 * rtt0=16: 2ACK/LEN>0 -> 1ACK ->
-	 * art0=54: 1ACK/LEN>0 ->
+	 * art0=70: 1ACK/LEN>0 ->
 	 * rtt1=100: 2ACK ->
-	 * art1=6: 2ACK/LEN>0 ->
+	 * art1=106: 2ACK/LEN>0 ->
 	 * 非连续: 1ACK(重复) -> 1ACK ->
 	 * 非连续: 2ACK/LEN>0 -> 2ACK/LEN>0 -> 1ACK(确认前一个包) ->
 	 */
 
 	// 1SYN
-	flowInfo = &FlowInfo{FlowState: FLOW_STATE_OPENING_1, Direction: false}
+	flowInfo = &FlowInfo{Direction: false}
 	tcpHeader = handler.MetaPacketTcpHeader{Flags: TCP_SYN, Seq: 111, Ack: 0}
 	packetHeader = &handler.MetaPacket{TcpData: tcpHeader, Timestamp: 3333, PayloadLen: 0}
 	flowPerf.Update(packetHeader, flowInfo)
 
 	// 2SYN/ACK rttSyn1=1
-	flowInfo = &FlowInfo{FlowState: FLOW_STATE_OPENING_1, Direction: true}
+	flowInfo = &FlowInfo{Direction: true}
 	tcpHeader = handler.MetaPacketTcpHeader{Flags: TCP_SYN | TCP_ACK, Seq: 1111, Ack: 112}
 	packetHeader = &handler.MetaPacket{TcpData: tcpHeader, Timestamp: 3334, PayloadLen: 0}
 	flowPerf.Update(packetHeader, flowInfo)
 
 	// 1ACK rttSyn0=10
-	flowInfo = &FlowInfo{FlowState: FLOW_STATE_OPENING_1, Direction: false}
+	flowInfo = &FlowInfo{Direction: false}
 	tcpHeader = handler.MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 112, Ack: 1112}
 	packetHeader = &handler.MetaPacket{TcpData: tcpHeader, Timestamp: 3344, PayloadLen: 0}
 	flowPerf.Update(packetHeader, flowInfo)
@@ -484,7 +484,7 @@ func testMetaFlowPerfUpdate() {
 	packetHeader = &handler.MetaPacket{TcpData: tcpHeader, Timestamp: 3400, PayloadLen: 0}
 	flowPerf.Update(packetHeader, flowInfo)
 
-	// 1ACK/LEN>0 len=200 art0=54
+	// 1ACK/LEN>0 len=200 art0=70
 	flowInfo = &FlowInfo{FlowState: FLOW_STATE_ESTABLISHED, Direction: false}
 	tcpHeader = handler.MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 212, Ack: 1712}
 	packetHeader = &handler.MetaPacket{TcpData: tcpHeader, Timestamp: 3454, PayloadLen: 200}
@@ -496,12 +496,11 @@ func testMetaFlowPerfUpdate() {
 	packetHeader = &handler.MetaPacket{TcpData: tcpHeader, Timestamp: 3554, PayloadLen: 0}
 	flowPerf.Update(packetHeader, flowInfo)
 
-	// 2ACK/LEN>0 len=300 art1=6
+	// 2ACK/LEN>0 len=300 art1=106
 	flowInfo = &FlowInfo{FlowState: FLOW_STATE_ESTABLISHED, Direction: true}
 	tcpHeader = handler.MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 1712, Ack: 412}
 	packetHeader = &handler.MetaPacket{TcpData: tcpHeader, Timestamp: 3560, PayloadLen: 300}
 	flowPerf.Update(packetHeader, flowInfo)
-
 }
 
 func TestMetaFlowPerfUpdate(t *testing.T) {
@@ -514,12 +513,12 @@ func TestMetaFlowPerfUpdate(t *testing.T) {
 			{PshUrgCount1: 0},{TotalPshUrgCount: 0},{PacketIntervalAvg: 0},
 			{PacketIntervalVariance: 0},{PacketSizeVariance: 0},
 		periodPerfStats:{art0Count: 1},{art1Count: 2},{rtt0Count: 1},
-			{rtt1Count: 1},{art0Sum: 54},{art1Sum: 10},{rtt0Sum: 16},
+			{rtt1Count: 1},{art0Sum: 70},{art1Sum: 110},{rtt0Sum: 16},
 			{rtt1Sum: 100},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 0},
 			{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},
 			{pshUrgCount1: 0},{zeroWinCount0: 3},{zeroWinCount1: 5},,
 		flowPerfStats:{art0Count: 1},{art1Count: 2},{rtt0Count: 2},
-			{rtt1Count: 2},{art0Sum: 54},{art1Sum: 10},{rtt0Sum: 26},
+			{rtt1Count: 2},{art0Sum: 70},{art1Sum: 110},{rtt0Sum: 26},
 			{rtt1Sum: 101},{rttSyn0: 10},{rttSyn1: 1},{retrans0: 0},
 			{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},
 			{pshUrgCount1: 0},{zeroWinCount0: 3},{zeroWinCount1: 5},
