@@ -1,7 +1,9 @@
 package datatype
 
 import (
+	"bytes"
 	"encoding/binary"
+	"encoding/gob"
 	"net"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
@@ -40,6 +42,23 @@ func (ip *IP) String() string {
 
 func (ip *IP) Int() uint32 {
 	return ip.ipInt
+}
+
+func (ip *IP) GobDecode(buffer []byte) error {
+	decoder := gob.NewDecoder(bytes.NewBuffer(buffer))
+	if err := decoder.Decode(&ip.ipStr); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (ip *IP) GobEncode() ([]byte, error) {
+	buffer := bytes.Buffer{}
+	encoder := gob.NewEncoder(&buffer)
+	if err := encoder.Encode(ip.ipStr); err != nil {
+		return []byte{}, err
+	}
+	return buffer.Bytes(), nil
 }
 
 type MACAddr struct {
