@@ -1,3 +1,5 @@
+all: compile droplet
+
 compile:
 	ls *.proto | xargs protoc -o /dev/null
 
@@ -12,4 +14,4 @@ zero-go: zero.proto
 clean:
 	rm -rf *.c *.java
 
-.phony: clean
+.phony: all clean
