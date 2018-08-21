@@ -72,6 +72,7 @@ message Tag {
     optional string host = 46;
     optional string vtap = 47;
     optional TapType tap_type = 48;
+    optional uint32 subnet_id = 49;
 }
 
 message UsageMeterSum {
