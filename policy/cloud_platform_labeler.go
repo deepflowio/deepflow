@@ -290,7 +290,7 @@ func (d *CloudPlatformData) UpdateInterfaceTable(interfaces []*PlatformData) {
 }
 
 func (d *CloudPlatformData) GetEndpointInfo(mac uint64, ip uint32, inport uint32) *EndpointInfo {
-	var data EndpointInfo
+	data := &EndpointInfo{}
 	if PortInDeepflowExporter(inport) {
 		pfdata := d.GetDataByMac(MacKey(mac))
 		if pfdata != nil {
@@ -303,7 +303,7 @@ func (d *CloudPlatformData) GetEndpointInfo(mac uint64, ip uint32, inport uint32
 				data.SetL3Data(pfdata, ip)
 			}
 		} else {
-			return nil
+			return data
 		}
 	} else {
 		pfdata := d.GetDataByIp(ip)
@@ -311,15 +311,15 @@ func (d *CloudPlatformData) GetEndpointInfo(mac uint64, ip uint32, inport uint32
 			data.SetL3Data(pfdata, ip)
 			data.SetL3EndByMac(pfdata, mac)
 		} else {
-			return nil
+			return data
 		}
 	}
 	fastdata := &FastPlatformData{
-		endpointInfo: &data,
+		endpointInfo: data,
 	}
 	d.InsertInfoToFastPath(mac, ip, inport, fastdata)
 
-	return &data
+	return data
 }
 
 func (d *CloudPlatformData) GetEndpointData(key *LookupKey) *EndpointData {
@@ -335,12 +335,8 @@ func (d *CloudPlatformData) GetEndpointData(key *LookupKey) *EndpointData {
 		d.ipGroup.Populate(key.DstIp, dstData)
 	}
 
-	if srcData != nil || dstData != nil {
-		return &EndpointData{
-			SrcInfo: srcData,
-			DstInfo: dstData,
-		}
+	return &EndpointData{
+		SrcInfo: srcData,
+		DstInfo: dstData,
 	}
-
-	return nil
 }
