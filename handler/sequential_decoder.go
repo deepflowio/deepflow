@@ -231,16 +231,13 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 	meta.Protocol = IPProtocolTCP
 	seq := d.data.U32()
 	ack := d.data.U32()
-	meta.TcpData.Seq = seq
-	meta.TcpData.Ack = ack
 	if !d.pflags.IsSet(CFLAG_TCP_FLAGS) {
 		x.tcpFlags = d.data.U8()
 	}
 	if !d.pflags.IsSet(CFLAG_WIN) {
 		x.win = d.data.U16()
 	}
-	meta.TcpData.Flags = x.tcpFlags
-	meta.TcpData.WinSize = x.win
+	meta.TcpData = &MetaPacketTcpHeader{Seq: seq, Ack: ack, Flags: x.tcpFlags, WinSize: x.win}
 	if x.dataOffset > 5 {
 		optionFlag := d.data.U8()
 		if optionFlag&TCP_OPT_FLAG_WIN_SCALE > 0 {
