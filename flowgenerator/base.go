@@ -78,7 +78,7 @@ type TimeoutConfig struct {
 	SingleDirection time.Duration
 }
 
-var innerTimeoutConfig = TimeoutConfig{
+var defaultTimeoutConfig TimeoutConfig = TimeoutConfig{
 	TIMEOUT_OPENING,
 	TIMEOUT_ESTABLISHED,
 	TIMEOUT_CLOSING,
@@ -94,6 +94,7 @@ type FlowExtra struct {
 	flowState      FlowState
 	recentTimesSec time.Duration
 	timeoutSec     time.Duration
+	reversed       bool
 }
 
 type FlowGeneratorStats struct {
@@ -119,10 +120,15 @@ type FastPath struct {
 }
 
 type FlowGenerator struct {
+	sync.RWMutex
+	TimeoutConfig
+
 	fastPath                FastPath
 	metaPacketHeaderInQueue QueueReader
 	flowOutQueue            QueueWriter
 	stats                   FlowGeneratorStats
+	stateMachineMaster      []map[uint8]*StateValue
+	stateMachineSlave       []map[uint8]*StateValue
 	forceReportIntervalSec  time.Duration
 	minLoopIntervalSec      time.Duration
 	flowLimitNum            uint64
@@ -145,21 +151,21 @@ func timeMin(a time.Duration, b time.Duration) time.Duration {
 	return b
 }
 
-func flagEqual(flags, target uint8) bool {
-	return flags == target
-}
-
-func flagContain(flags, target uint8) bool {
-	return flags&target > 0
-}
-
 func (f *FlowGenerator) GetCounter() interface{} {
 	counter := f.stats
 	return &counter
 }
 
-func SetTimeout(timeoutConfig TimeoutConfig) {
-	innerTimeoutConfig = timeoutConfig
+func (f *FlowGenerator) SetTimeout(timeoutConfig TimeoutConfig) bool {
+	if f.handleRunning || f.cleanRunning {
+		log.Warning("flow generator is running, timeout info can not be configured")
+		return false
+	}
+	f.TimeoutConfig = timeoutConfig
+	f.minLoopIntervalSec = timeoutConfig.minTimeout()
+	f.initStateMachineMaster()
+	f.initStateMachineSlave()
+	return true
 }
 
 func (t TimeoutConfig) minTimeout() time.Duration {
