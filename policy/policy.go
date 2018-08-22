@@ -62,6 +62,7 @@ type EndpointInfo struct {
 	L2EpcId      int32 // -1表示其它项目
 	L2DeviceType uint32
 	L2DeviceId   uint32
+	L2End        bool
 
 	L3End        bool
 	L3EpcId      int32 // -1表示其它项目
@@ -122,6 +123,7 @@ type LookupKey struct {
 	Proto            uint8
 	Ttl              uint8
 	RxInterface      uint32
+	L2End0, L2End1   bool
 	Tap              TapType
 }
 
@@ -138,10 +140,18 @@ func (t *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *Action {
 	return nil
 }
 
+func (d *EndpointData) SetL2End(key *LookupKey) {
+	d.SrcInfo.L2End = key.L2End0
+	d.DstInfo.L2End = key.L2End1
+}
+
 // Droplet用于ANALYTIC_*、PACKET_BROKER、PACKET_STORE
 func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *Action) {
 	// FIXME: 注意利用TTL更新L3End（仅当用于ANALYTIC_*时）
 	endpointData := t.cloudPlatformData.GetEndpointData(key)
+	if PortInDeepflowExporter(key.RxInterface) {
+		endpointData.SetL2End(key)
+	}
 	serviceIds := t.serviceTable.GetServiceId(endpointData, key)
 	if serviceIds != nil {
 		//FIXME 添加policy实现

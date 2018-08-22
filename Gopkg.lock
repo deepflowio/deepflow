@@ -49,6 +49,17 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:cf296baa185baae04a9a7004efee8511d08e2f5f51d4cbe5375da89722d681db"
+  name = "github.com/hashicorp/golang-lru"
+  packages = [
+    ".",
+    "simplelru",
+  ]
+  pruneopts = "UT"
+  revision = "0fb14efe8c47ae851c0034ed7a448854d3d34cf3"
+
+[[projects]]
+  branch = "master"
   digest = "1:f7d8e8432e355163397d2da1e17d0fb616d611db1360c43b1ac73e56f87038e2"
   name = "github.com/lestrrat/go-file-rotatelogs"
   packages = ["."]
@@ -136,6 +147,7 @@
     "github.com/cespare/xxhash",
     "github.com/golang-collections/go-datastructures/bitarray",
     "github.com/google/gopacket/layers",
+    "github.com/hashicorp/golang-lru",
     "github.com/lestrrat/go-file-rotatelogs",
     "github.com/op/go-logging",
     "github.com/pebbe/zmq4",
