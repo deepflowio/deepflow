@@ -212,10 +212,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:697e78a6c8fe3814e3e100fa454076479e41ba7c873758825a9a85ed1b66a698"
+  digest = "1:bff40e5dd701354d8102144209c7723a91fa2360d9a5d72d2ba322b20c941ec7"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "datatype",
+    "grpc",
     "logger",
     "monitor",
     "policy",
@@ -226,7 +227,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "4cf31f568e808a06c7e6b99a831d0091979bde5f"
+  revision = "4c82b55e1186d34567bb23fddb6d3b6e2d4a3674"
 
 [[projects]]
   branch = "feature-os"
@@ -366,6 +367,7 @@
     "gitlab.x.lan/platform/droplet-mapreduce/pkg/api",
     "gitlab.x.lan/platform/droplet-mapreduce/pkg/handler",
     "gitlab.x.lan/yunshan/droplet-libs/datatype",
+    "gitlab.x.lan/yunshan/droplet-libs/grpc",
     "gitlab.x.lan/yunshan/droplet-libs/logger",
     "gitlab.x.lan/yunshan/droplet-libs/monitor",
     "gitlab.x.lan/yunshan/droplet-libs/policy",
@@ -374,7 +376,6 @@
     "gitlab.x.lan/yunshan/droplet-libs/utils",
     "golang.org/x/net/bpf",
     "golang.org/x/net/context",
-    "google.golang.org/grpc",
     "gopkg.in/yaml.v2",
   ]
   solver-name = "gps-cdcl"

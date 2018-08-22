@@ -1,11 +1,14 @@
 package config
 
 import (
+	"errors"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"gitlab.x.lan/yunshan/droplet-libs/grpc"
+	"golang.org/x/net/context"
 
 	"gitlab.x.lan/yunshan/droplet/protobuf"
 )
@@ -16,9 +19,9 @@ const (
 
 type RpcConfigSynchronizer struct {
 	sync.Mutex
+	grpc.GrpcSession
 
 	bootTime     time.Time
-	rpcSession   RpcSession
 	syncInterval time.Duration
 
 	handlers       []Handler
@@ -26,18 +29,23 @@ type RpcConfigSynchronizer struct {
 	configAccepted bool
 }
 
-func (s *RpcConfigSynchronizer) request() (*protobuf.SyncResponse, error) {
-	request := protobuf.SyncRequest{
-		BootTime:       proto.Uint32(uint32(s.bootTime.Unix())),
-		ConfigAccepted: proto.Bool(s.configAccepted),
+func (s *RpcConfigSynchronizer) sync() error {
+	var response *protobuf.SyncResponse
+	err := s.GrpcSession.Request(func(ctx context.Context) error {
+		var err error
+		request := protobuf.SyncRequest{
+			BootTime:       proto.Uint32(uint32(s.bootTime.Unix())),
+			ConfigAccepted: proto.Bool(s.configAccepted),
+		}
+		client := protobuf.NewSynchronizerClient(s.GrpcSession.GetClient())
+		response, err = client.Sync(ctx, &request)
+		return err
+	})
+	if err != nil {
+		return err
 	}
-	return s.rpcSession.Request(&request)
-}
-
-func (s *RpcConfigSynchronizer) onResponse(response *protobuf.SyncResponse) {
 	if status := response.GetStatus(); status != protobuf.Status_SUCCESS {
-		log.Warning("Unsuccessful status:", response)
-		return
+		return errors.New("Status Unsuccessful")
 	}
 	s.syncInterval = time.Duration(response.GetConfig().GetSyncInterval()) * time.Second
 	s.Lock()
@@ -45,24 +53,7 @@ func (s *RpcConfigSynchronizer) onResponse(response *protobuf.SyncResponse) {
 		handler(response)
 	}
 	s.Unlock()
-}
-
-func (s *RpcConfigSynchronizer) runOnce() {
-	response, err := s.request()
-	if err != nil {
-		log.Warning(err)
-		return
-	}
-	s.onResponse(response)
-}
-
-func (s *RpcConfigSynchronizer) run() {
-	s.stop = false
-	for !s.stop {
-		s.runOnce()
-		time.Sleep(s.syncInterval)
-	}
-	s.rpcSession.Close()
+	return nil
 }
 
 func (s *RpcConfigSynchronizer) Register(handler Handler) {
@@ -71,19 +62,18 @@ func (s *RpcConfigSynchronizer) Register(handler Handler) {
 	s.Unlock()
 }
 
-func (s *RpcConfigSynchronizer) Start() {
-	go s.run()
-}
-
-func (s *RpcConfigSynchronizer) Stop() {
-	s.stop = true
-}
-
 func NewRpcConfigSynchronizer(ips []net.IP, port uint16) ConfigSynchronizer {
-	return &RpcConfigSynchronizer{
+	s := &RpcConfigSynchronizer{
+		GrpcSession:    grpc.GrpcSession{},
 		bootTime:       time.Now(),
-		rpcSession:     NewGRpcInitiator(ips, port, DEFAULT_SYNC_INTERVAL),
-		syncInterval:   DEFAULT_SYNC_INTERVAL,
 		configAccepted: true,
 	}
+	runOnce := func() {
+		if err := s.sync(); err != nil {
+			log.Warning(err)
+			return
+		}
+	}
+	s.GrpcSession.Init(ips, port, DEFAULT_SYNC_INTERVAL, runOnce)
+	return s
 }
