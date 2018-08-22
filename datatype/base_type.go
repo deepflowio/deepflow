@@ -9,8 +9,6 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
-const MAC_ADDR_LEN = 6
-
 type IP struct {
 	ip    net.IP
 	ipStr string

@@ -2,6 +2,8 @@ package policy
 
 import (
 	"github.com/hashicorp/golang-lru"
+
+	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	tree "gitlab.x.lan/yunshan/droplet-libs/segmenttree"
 )
 

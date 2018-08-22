@@ -1,6 +1,6 @@
 # Gopkg.toml example
 #
-# Refer to https://github.com/golang/dep/blob/master/docs/Gopkg.toml.md
+# Refer to https://golang.github.io/dep/docs/Gopkg.toml.html
 # for detailed Gopkg.toml documentation.
 #
 # required = ["github.com/user/thing/cmd/thing"]
@@ -26,12 +26,52 @@
 
 
 [[constraint]]
+  name = "github.com/cespare/xxhash"
+  version = "1.0.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/golang-collections/go-datastructures"
+
+[[constraint]]
+  name = "github.com/google/go-cmp"
+  version = "0.2.0"
+
+[[constraint]]
+  name = "github.com/google/gopacket"
+  version = "1.1.14"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/hashicorp/golang-lru"
+
+[[constraint]]
   branch = "master"
   name = "github.com/lestrrat/go-file-rotatelogs"
 
 [[constraint]]
   name = "github.com/op/go-logging"
+  version = "1.0.0"
+
+[[constraint]]
+  name = "github.com/pebbe/zmq4"
+  version = "1.0.0"
+
+[[constraint]]
+  name = "github.com/shirou/gopsutil"
+  version = "2.18.7"
+
+[[constraint]]
   branch = "master"
+  name = "gitlab.x.lan/yunshan/droplet"
+
+[[constraint]]
+  branch = "master"
+  name = "golang.org/x/net"
+
+[[constraint]]
+  name = "google.golang.org/grpc"
+  version = "1.14.0"
 
 [[constraint]]
   name = "gopkg.in/alexcesaro/statsd.v2"
@@ -40,15 +80,3 @@
 [prune]
   go-tests = true
   unused-packages = true
-
-[[constraint]]
-  name = "github.com/google/gopacket"
-  version = "1.1.14"
-
-[[constraint]]
-  name = "github.com/pebbe/zmq4"
-  version = "1.0.0"
-
-[[constraint]]
-  name = "google.golang.org/grpc"
-  version = "1.14.0"

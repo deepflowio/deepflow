@@ -2,6 +2,8 @@ package policy
 
 import (
 	"github.com/op/go-logging"
+
+	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
 var log = logging.MustGetLogger("policy")
@@ -38,14 +40,6 @@ const (
 	ACTION_PACKET_BROKER
 )
 
-type TapType uint8
-
-const (
-	TAP_ISP TapType = 1 + iota
-	TAP_SPINE
-	TAP_TOR
-)
-
 type Action struct {
 	ActionTypes ActionType // bitwise OR
 	PolicyIds   []PolicyId
@@ -56,27 +50,6 @@ func (l *Action) merge(r *Action) {
 	l.ActionTypes |= r.ActionTypes
 	// FIXME: PolicyId merge
 	// FIXME: packet brocker list merge
-}
-
-type EndpointInfo struct {
-	L2EpcId      int32 // -1表示其它项目
-	L2DeviceType uint32
-	L2DeviceId   uint32
-	L2End        bool
-
-	L3End        bool
-	L3EpcId      int32 // -1表示其它项目
-	L3DeviceType uint32
-	L3DeviceId   uint32
-
-	HostIp   uint32
-	SubnetId uint32
-	GroupIds []uint32
-}
-
-type EndpointData struct {
-	SrcInfo *EndpointInfo
-	DstInfo *EndpointInfo
 }
 
 type MacKey uint64         // u64(mac)
@@ -115,18 +88,6 @@ func NewPolicyTable( /* 传入Protobuf结构体指针 */ actionTypes ActionType)
 	}
 }
 
-type LookupKey struct {
-	SrcMac, DstMac   uint64
-	SrcIp, DstIp     uint32
-	SrcPort, DstPort uint16
-	Vlan             uint16
-	Proto            uint8
-	Ttl              uint8
-	RxInterface      uint32
-	L2End0, L2End1   bool
-	Tap              TapType
-}
-
 // Trident用于PACKET_BROKER、PACKET_STORE
 func (t *PolicyTable) LookupActionByKey(key *LookupKey) *Action {
 	// 将匹配策略的所有Action merge以后返回
@@ -138,11 +99,6 @@ func (t *PolicyTable) LookupActionByKey(key *LookupKey) *Action {
 func (t *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *Action {
 	// FIXME
 	return nil
-}
-
-func (d *EndpointData) SetL2End(key *LookupKey) {
-	d.SrcInfo.L2End = key.L2End0
-	d.DstInfo.L2End = key.L2End1
 }
 
 // Droplet用于ANALYTIC_*、PACKET_BROKER、PACKET_STORE

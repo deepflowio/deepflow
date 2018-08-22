@@ -21,7 +21,7 @@ func newIpRange(ip uint32) *IpRange {
 func newIpRangeFromString(ipStr string) (*IpRange, error) {
 	_, r, err := net.ParseCIDR(ipStr)
 	if err != nil {
-		log.Warning(err)
+		log.Warning("%v", err)
 		return nil, err
 	}
 	ipInt := binary.BigEndian.Uint32(r.IP)

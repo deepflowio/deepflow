@@ -51,11 +51,25 @@
   version = "v1.2.0"
 
 [[projects]]
-  digest = "1:f4a5cb1ae095b963754584170d952558d3d123f486405bad52d279daa417d67b"
+  digest = "1:2e3c336fc7fde5c984d2841455a658a6d626450b1754a854b3b32e7a8f49a07a"
+  name = "github.com/google/go-cmp"
+  packages = [
+    "cmp",
+    "cmp/internal/diff",
+    "cmp/internal/function",
+    "cmp/internal/value",
+  ]
+  pruneopts = "UT"
+  revision = "3af367b6b30c263d47e8895973edcca9a49cf029"
+  version = "v0.2.0"
+
+[[projects]]
+  digest = "1:f2a59262dcdf19b8a49351b562b4b274a935ea21932817126e6901ae516cde35"
   name = "github.com/google/gopacket"
   packages = [
     ".",
     "layers",
+    "pcapgo",
   ]
   pruneopts = "UT"
   revision = "11c65f1ca9081dfea43b4f9643f5c155583b73ba"
@@ -89,12 +103,12 @@
   revision = "ba3bf9c1d0421aa146564a632931730344f1f9f1"
 
 [[projects]]
-  branch = "master"
-  digest = "1:41f3b549dbb8216e490c27926c09dc055aa509b3476e7cbc3317103990b13aeb"
+  digest = "1:5b3b29ce0e569f62935d9541dff2e16cc09df981ebde48e82259076a73a3d0c7"
   name = "github.com/op/go-logging"
   packages = ["."]
   pruneopts = "UT"
-  revision = "970db520ece77730c7e4724c61121037378659d9"
+  revision = "b2cb9fa56473e98db8caba80237377e83fe44db5"
+  version = "v1"
 
 [[projects]]
   digest = "1:88996a6b70e2cc7044c25caecd49e4d09bbcdd03e508f65d366f600cfb506dd6"
@@ -153,14 +167,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:bdd70b95d2f0faaad6d9e259aad84738c6bdeb8f45245be6487e88df45f5a0f1"
+  digest = "1:48774faa158e9eaee1ba45aad66434bb0345927b43756a24d4fe4c44ad79e307"
   name = "golang.org/x/sys"
   packages = [
     "unix",
     "windows",
   ]
   pruneopts = "UT"
-  revision = "0ffbfd41fbef8ffcf9b62b0b0aa3a5873ed7a4fe"
+  revision = "3b58ed4ad3395d483fc92d5d14123ce2c3581fec"
 
 [[projects]]
   digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"
@@ -242,7 +256,9 @@
   input-imports = [
     "github.com/cespare/xxhash",
     "github.com/golang-collections/go-datastructures/bitarray",
+    "github.com/google/go-cmp/cmp",
     "github.com/google/gopacket/layers",
+    "github.com/google/gopacket/pcapgo",
     "github.com/hashicorp/golang-lru",
     "github.com/lestrrat/go-file-rotatelogs",
     "github.com/op/go-logging",
