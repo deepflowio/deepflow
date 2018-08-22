@@ -22,7 +22,7 @@ var log = logging.MustGetLogger(execName())
 var configPath = flag.String("f", "/etc/droplet.yaml", "Specify config file location")
 
 func main() {
-	InitConsoleLog()
+	InitConsoleLog("info")
 
 	droplet.Start(*configPath)
 

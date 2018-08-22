@@ -66,10 +66,6 @@
   name = "golang.org/x/net"
 
 [[constraint]]
-  name = "google.golang.org/grpc"
-  version = "1.14.0"
-
-[[constraint]]
   name = "gopkg.in/yaml.v2"
   version = "2.2.1"
 
