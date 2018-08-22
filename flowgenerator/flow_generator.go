@@ -134,7 +134,7 @@ func (f *FlowGenerator) genFlowId(timestamp uint64, inPort uint64) uint64 {
 	return ((inPort & IN_PORT_FLOW_ID_MASK) << 32) | ((timestamp & TIMER_FLOW_ID_MASK) << 32) | (f.stats.TotalNumFlows & TOTAL_FLOWS_ID_MASK)
 }
 
-func (f *FlowGenerator) initFlow(meta *handler.MetaPacket, key *FlowKey) (*FlowExtra, bool) {
+func (f *FlowGenerator) initFlow(meta *handler.MetaPacket, key *FlowKey) (*FlowExtra, bool, bool) {
 	now := time.Duration(meta.Timestamp)
 	taggedFlow := &TaggedFlow{
 		Flow: Flow{
@@ -161,6 +161,7 @@ func (f *FlowGenerator) initFlow(meta *handler.MetaPacket, key *FlowKey) (*FlowE
 		metaFlowPerf:   NewMetaFlowPerf(),
 		flowState:      FLOW_STATE_RAW,
 		recentTimesSec: now / time.Second,
+		reversed:       false,
 	}
 	if flagEqual(meta.TcpData.Flags&TCP_FLAG_MASK, TCP_SYN|TCP_ACK) {
 		taggedFlow.IPSrc, taggedFlow.IPDst = taggedFlow.IPDst, taggedFlow.IPSrc
@@ -177,7 +178,7 @@ func (f *FlowGenerator) initFlow(meta *handler.MetaPacket, key *FlowKey) (*FlowE
 		taggedFlow.IsL2End0 = meta.L2End1
 		taggedFlow.IsL2End1 = meta.L2End0
 		flowExtra.updatePlatformData(meta, true)
-		return flowExtra, flowExtra.updateTCPStateMachine(meta.TcpData.Flags, true)
+		return flowExtra, f.updateFlowStateMachine(flowExtra, meta.TcpData.Flags, true), true
 	} else {
 		taggedFlow.MACSrc = *NewMACAddrFromInt(meta.MacSrc)
 		taggedFlow.MACDst = *NewMACAddrFromInt(meta.MacDst)
@@ -190,169 +191,47 @@ func (f *FlowGenerator) initFlow(meta *handler.MetaPacket, key *FlowKey) (*FlowE
 		taggedFlow.IsL2End0 = meta.L2End0
 		taggedFlow.IsL2End1 = meta.L2End1
 		flowExtra.updatePlatformData(meta, false)
-		return flowExtra, flowExtra.updateTCPStateMachine(meta.TcpData.Flags, false)
+		return flowExtra, f.updateFlowStateMachine(flowExtra, meta.TcpData.Flags, false), false
 	}
 }
 
-func isExceptionState(flags uint8, reply bool) bool {
-	switch flags & TCP_FLAG_MASK {
-	case TCP_SYN:
-		return false
-	case TCP_SYN | TCP_ACK:
-		return false
-	case TCP_FIN:
-		return false
-	case TCP_FIN | TCP_ACK:
-		return false
-	case TCP_FIN | TCP_PSH | TCP_ACK:
-		return false
-	case TCP_RST:
-		return false
-	case TCP_RST | TCP_ACK:
-		return false
-	case TCP_RST | TCP_PSH | TCP_ACK:
-		return false
-	case TCP_ACK:
-		return false
-	case TCP_PSH:
-		return false
-	case TCP_PSH | TCP_ACK:
-		return false
-	case TCP_PSH | TCP_ACK | TCP_URG:
-		return false
-	default:
-		return true
-	}
-}
-
-func (f *FlowExtra) updateTCPStateMachine(flags uint8, reply bool) bool {
-	taggedFlow := f.taggedFlow
+func (f *FlowGenerator) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8, reply bool) bool {
+	var timeoutSec time.Duration
+	var flowState FlowState
+	closed := false
+	taggedFlow := flowExtra.taggedFlow
 	if reply {
 		taggedFlow.TCPFlags1 |= uint16(flags)
 	} else {
 		taggedFlow.TCPFlags0 |= uint16(flags)
 	}
-	if isExceptionState(flags, reply) {
-		f.timeoutSec = innerTimeoutConfig.Exception
-		f.flowState = FLOW_STATE_EXCEPTION
+	if isExceptionFlags(flags, reply) {
+		flowExtra.timeoutSec = f.Exception
+		flowExtra.flowState = FLOW_STATE_EXCEPTION
 		return false
 	}
-	switch f.flowState {
-	case FLOW_STATE_RAW:
-		if flagContain(flags, TCP_RST) {
-			f.timeoutSec = innerTimeoutConfig.Opening
-			f.flowState = FLOW_STATE_RESET
-		} else if flagEqual(flags&TCP_FLAG_MASK, TCP_SYN) {
-			f.timeoutSec = innerTimeoutConfig.Opening
-			f.flowState = FLOW_STATE_OPENING_1
-		} else if flagEqual(flags&TCP_FLAG_MASK, TCP_SYN|TCP_ACK) {
-			f.timeoutSec = innerTimeoutConfig.Opening
-			f.flowState = FLOW_STATE_OPENING_2
-		} else if !reply && flagContain(flags, TCP_FIN) {
-			f.timeoutSec = innerTimeoutConfig.Closing
-			f.flowState = FLOW_STATE_CLOSING_TX1
-		} else if reply && flagContain(flags, TCP_FIN) {
-			f.timeoutSec = innerTimeoutConfig.Closing
-			f.flowState = FLOW_STATE_CLOSING_RX1
-		} else if flagContain(flags, TCP_PSH) || flagContain(flags, TCP_ACK) {
-			f.timeoutSec = innerTimeoutConfig.Established
-			f.flowState = FLOW_STATE_ESTABLISHED
-		}
-	case FLOW_STATE_OPENING_1:
-		if flagContain(flags, TCP_RST) {
-			f.timeoutSec = innerTimeoutConfig.Opening
-			f.flowState = FLOW_STATE_RESET
-		} else if reply && flagEqual(flags&TCP_FLAG_MASK, TCP_SYN|TCP_ACK) {
-			f.timeoutSec = innerTimeoutConfig.Opening
-			f.flowState = FLOW_STATE_OPENING_2
-		} else if reply && flagEqual(flags&TCP_FLAG_MASK, TCP_SYN) {
-			f.timeoutSec = innerTimeoutConfig.Exception
-			f.flowState = FLOW_STATE_EXCEPTION
-		} else if !reply && flagContain(flags, TCP_FIN) {
-			f.timeoutSec = innerTimeoutConfig.Closing
-			f.flowState = FLOW_STATE_CLOSING_TX1
-		} else if reply && flagContain(flags, TCP_FIN) {
-			f.timeoutSec = innerTimeoutConfig.Closing
-			f.flowState = FLOW_STATE_CLOSING_RX1
-		} else {
-			f.timeoutSec = innerTimeoutConfig.Established
-			f.flowState = FLOW_STATE_ESTABLISHED
-		}
-	case FLOW_STATE_OPENING_2:
-		if flagContain(flags, TCP_RST) {
-			f.timeoutSec = innerTimeoutConfig.Opening
-			f.flowState = FLOW_STATE_RESET
-		} else if flagContain(flags, TCP_ACK) {
-			f.timeoutSec = innerTimeoutConfig.Established
-			f.flowState = FLOW_STATE_ESTABLISHED
-		} else if !reply && flagContain(flags, TCP_FIN) {
-			f.timeoutSec = innerTimeoutConfig.Closing
-			f.flowState = FLOW_STATE_CLOSING_TX1
-		} else if reply && flagContain(flags, TCP_FIN) {
-			f.timeoutSec = innerTimeoutConfig.Closing
-			f.flowState = FLOW_STATE_CLOSING_RX1
-		} else {
-			f.timeoutSec = innerTimeoutConfig.Established
-			f.flowState = FLOW_STATE_ESTABLISHED
-		}
-	case FLOW_STATE_ESTABLISHED:
-		if flagContain(flags, TCP_RST) {
-			f.timeoutSec = innerTimeoutConfig.EstablishedRst
-			f.flowState = FLOW_STATE_RESET
-		} else if !reply && flagContain(flags, TCP_FIN) {
-			f.timeoutSec = innerTimeoutConfig.Closing
-			f.flowState = FLOW_STATE_CLOSING_TX1
-		} else if reply && flagContain(flags, TCP_FIN) {
-			f.timeoutSec = innerTimeoutConfig.Closing
-			f.flowState = FLOW_STATE_CLOSING_RX1
-		}
-	case FLOW_STATE_CLOSING_TX1:
-		if flagContain(flags, TCP_RST) {
-			f.timeoutSec = innerTimeoutConfig.Closing
-			f.flowState = FLOW_STATE_RESET
-		} else if reply && flagContain(flags, TCP_FIN) {
-			f.timeoutSec = innerTimeoutConfig.Closing
-			f.flowState = FLOW_STATE_CLOSING_TX2
-		}
-	case FLOW_STATE_CLOSING_RX1:
-		if flagContain(flags, TCP_RST) {
-			f.timeoutSec = innerTimeoutConfig.Closing
-			f.flowState = FLOW_STATE_RESET
-		} else if flagContain(flags, TCP_FIN) {
-			f.timeoutSec = innerTimeoutConfig.Closing
-			f.flowState = FLOW_STATE_CLOSING_RX2
-		}
-	case FLOW_STATE_CLOSING_TX2:
-		if flagContain(flags, TCP_RST) {
-			f.timeoutSec = innerTimeoutConfig.Closing
-			f.flowState = FLOW_STATE_RESET
-		} else if flagEqual(flags&TCP_FLAG_MASK, TCP_ACK) {
-			f.timeoutSec = innerTimeoutConfig.ClosedFin
-			f.flowState = FLOW_STATE_CLOSED
-			return true
-		}
-	case FLOW_STATE_CLOSING_RX2:
-		if flagContain(flags, TCP_RST) {
-			f.timeoutSec = innerTimeoutConfig.Closing
-			f.flowState = FLOW_STATE_RESET
-		} else if reply && flagEqual(flags&TCP_FLAG_MASK, TCP_ACK) {
-			f.timeoutSec = innerTimeoutConfig.ClosedFin
-			f.flowState = FLOW_STATE_CLOSED
-			return true
-		}
-	case FLOW_STATE_RESET:
-		return false
-	case FLOW_STATE_EXCEPTION:
-		return false
-	default:
-		log.Warningf("unexpected flow state: %d, set as exception state by force", f.flowState)
-		f.timeoutSec = innerTimeoutConfig.Exception
-		f.flowState = FLOW_STATE_EXCEPTION
+	if stateValue, ok := f.stateMachineMaster[flowExtra.flowState][flags&TCP_FLAG_MASK]; ok {
+		timeoutSec = stateValue.timeoutSec
+		flowState = stateValue.flowState
+		closed = stateValue.closed
+	} else {
+		timeoutSec = f.Exception
+		flowState = FLOW_STATE_EXCEPTION
+		closed = false
 	}
+	if reply {
+		if stateValue, ok := f.stateMachineSlave[flowExtra.flowState][flags&TCP_FLAG_MASK]; ok {
+			timeoutSec = stateValue.timeoutSec
+			flowState = stateValue.flowState
+			closed = stateValue.closed
+		}
+	}
+	flowExtra.timeoutSec = timeoutSec
+	flowExtra.flowState = flowState
 	if taggedFlow.TotalPacketCount0 == 0 || taggedFlow.TotalPacketCount1 == 0 {
-		f.timeoutSec = innerTimeoutConfig.SingleDirection
+		flowExtra.timeoutSec = f.SingleDirection
 	}
-	return false
+	return closed
 }
 
 func (f *FlowExtra) updatePlatformData(meta *handler.MetaPacket, reply bool) {
@@ -396,12 +275,61 @@ func (f *FlowExtra) updatePlatformData(meta *handler.MetaPacket, reply bool) {
 	}
 }
 
-func (f *FlowExtra) updateFlow(meta *handler.MetaPacket, reply bool) bool {
+func (f *FlowExtra) reverseFlow() {
 	taggedFlow := f.taggedFlow
+	taggedFlow.IPSrc, taggedFlow.IPDst = taggedFlow.IPDst, taggedFlow.IPSrc
+	taggedFlow.PortSrc, taggedFlow.PortDst = taggedFlow.PortDst, taggedFlow.PortSrc
+	taggedFlow.TunnelIPSrc, taggedFlow.TunnelIPDst = taggedFlow.TunnelIPDst, taggedFlow.TunnelIPSrc
+	taggedFlow.MACSrc, taggedFlow.MACDst = taggedFlow.MACDst, taggedFlow.MACSrc
+	taggedFlow.TCPFlags0, taggedFlow.TCPFlags1 = taggedFlow.TCPFlags1, taggedFlow.TCPFlags0
+	taggedFlow.ByteCount0, taggedFlow.ByteCount1 = taggedFlow.ByteCount1, taggedFlow.ByteCount0
+	taggedFlow.PacketCount0, taggedFlow.PacketCount1 = taggedFlow.PacketCount1, taggedFlow.PacketCount0
+	taggedFlow.TotalByteCount0, taggedFlow.TotalByteCount1 = taggedFlow.TotalByteCount1, taggedFlow.TotalByteCount0
+	taggedFlow.TotalPacketCount0, taggedFlow.TotalPacketCount1 = taggedFlow.TotalPacketCount1, taggedFlow.TotalPacketCount0
+	taggedFlow.ArrTime00, taggedFlow.ArrTime10 = taggedFlow.ArrTime10, taggedFlow.ArrTime00
+	taggedFlow.ArrTime0Last, taggedFlow.ArrTime1Last = taggedFlow.ArrTime1Last, taggedFlow.ArrTime0Last
+	taggedFlow.SubnetID0, taggedFlow.SubnetID1 = taggedFlow.SubnetID1, taggedFlow.SubnetID0
+	taggedFlow.L3DeviceType0, taggedFlow.L3DeviceType1 = taggedFlow.L3DeviceType1, taggedFlow.L3DeviceType0
+	taggedFlow.L3DeviceID0, taggedFlow.L3DeviceID1 = taggedFlow.L3DeviceID1, taggedFlow.L3DeviceID0
+	taggedFlow.L3EpcID0, taggedFlow.L3EpcID1 = taggedFlow.L3EpcID1, taggedFlow.L3EpcID0
+	taggedFlow.Host0, taggedFlow.Host1 = taggedFlow.Host1, taggedFlow.Host0
+	taggedFlow.EpcID0, taggedFlow.EpcID1 = taggedFlow.EpcID1, taggedFlow.EpcID0
+	taggedFlow.DeviceType0, taggedFlow.DeviceType1 = taggedFlow.DeviceType1, taggedFlow.DeviceType0
+	taggedFlow.DeviceID0, taggedFlow.DeviceID1 = taggedFlow.DeviceID1, taggedFlow.DeviceID0
+	taggedFlow.IfIndex0, taggedFlow.IfIndex1 = taggedFlow.IfIndex1, taggedFlow.IfIndex0
+	taggedFlow.IfType0, taggedFlow.IfType1 = taggedFlow.IfType1, taggedFlow.IfType0
+	taggedFlow.IsL2End0, taggedFlow.IsL2End1 = taggedFlow.IsL2End1, taggedFlow.IsL2End0
+	taggedFlow.IsL3End0, taggedFlow.IsL3End1 = taggedFlow.IsL3End1, taggedFlow.IsL3End0
+}
+
+func (f *FlowGenerator) tryReverseFlow(flowExtra *FlowExtra, meta *handler.MetaPacket, reply bool) bool {
+	taggedFlow := flowExtra.taggedFlow
+	if !flowExtra.reversed && flagContain(uint8(taggedFlow.TCPFlags0|taggedFlow.TCPFlags1)&TCP_FLAG_MASK, TCP_SYN) {
+		return false
+	}
+	if reply && flagEqual(meta.TcpData.Flags&TCP_FLAG_MASK, TCP_SYN) {
+		flowExtra.reverseFlow()
+		flowExtra.reversed = true
+		return true
+	} else if flagEqual(meta.TcpData.Flags&TCP_FLAG_MASK, TCP_SYN|TCP_ACK) {
+		flowExtra.reverseFlow()
+		flowExtra.reversed = true
+		return true
+	}
+	return false
+}
+
+func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *handler.MetaPacket, reply *bool) (bool, bool) {
+	taggedFlow := flowExtra.taggedFlow
 	bytes := uint64(meta.PacketLen)
 	packetTimestamp := meta.Timestamp
 	maxArrTime := timeMax(taggedFlow.ArrTime0Last, taggedFlow.ArrTime1Last)
-	if reply {
+	reversed := false
+	if f.tryReverseFlow(flowExtra, meta, *reply) {
+		*reply = !*reply
+		reversed = true
+	}
+	if *reply {
 		if taggedFlow.TotalPacketCount1 == 0 {
 			taggedFlow.ArrTime10 = packetTimestamp
 		}
@@ -430,10 +358,10 @@ func (f *FlowExtra) updateFlow(meta *handler.MetaPacket, reply bool) bool {
 		taggedFlow.ByteCount0 += bytes
 		taggedFlow.TotalByteCount0 += bytes
 	}
-	f.recentTimesSec = packetTimestamp / time.Second
-	f.updatePlatformData(meta, reply)
+	flowExtra.recentTimesSec = packetTimestamp / time.Second
+	flowExtra.updatePlatformData(meta, *reply)
 
-	return f.updateTCPStateMachine(meta.TcpData.Flags, reply)
+	return f.updateFlowStateMachine(flowExtra, meta.TcpData.Flags, *reply), reversed
 }
 
 func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireIntervalSec time.Duration) {
@@ -516,6 +444,7 @@ func (f *FlowGenerator) processPacket(meta *handler.MetaPacket) {
 	reply := false
 	var flowExtra *FlowExtra
 	fastPath := &f.fastPath
+	pktProcessStart := time.Duration(time.Now().UnixNano())
 	flowKey := getFlowKey(meta)
 	hash := getQuinTupleHash(flowKey)
 	flowCache := fastPath.hashMap[hash%HASH_MAP_SIZE]
@@ -524,9 +453,9 @@ func (f *FlowGenerator) processPacket(meta *handler.MetaPacket) {
 	}
 	flowCache.Lock()
 	if flowExtra, reply = flowCache.keyMatch(meta, flowKey); flowExtra != nil {
-		if flowExtra.updateFlow(meta, reply) {
+		if ok, reversed := f.updateFlow(flowExtra, meta, &reply); ok {
 			f.stats.CurrNumFlows--
-			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false)
+			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(reversed)
 			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportIntervalSec)
 			flowExtra.calcCloseType(false)
 			f.flowOutQueue.Put(flowExtra.taggedFlow)
@@ -535,9 +464,10 @@ func (f *FlowGenerator) processPacket(meta *handler.MetaPacket) {
 		}
 		info := flowExtra.initFlowInfoForPerf(reply)
 		flowExtra.metaFlowPerf.Update(meta, info)
+		log.Infof("packet update process duration is %d ns", time.Duration(time.Now().UnixNano())-pktProcessStart)
 	} else {
-		var closed bool
-		flowExtra, closed = f.initFlow(meta, flowKey)
+		closed := false
+		flowExtra, closed, reply = f.initFlow(meta, flowKey)
 		flowExtra.metaFlowPerf = NewMetaFlowPerf()
 		f.stats.TotalNumFlows++
 		if closed {
@@ -546,7 +476,7 @@ func (f *FlowGenerator) processPacket(meta *handler.MetaPacket) {
 			flowExtra.calcCloseType(false)
 			f.flowOutQueue.Put(flowExtra.taggedFlow)
 		} else {
-			info := flowExtra.initFlowInfoForPerf(false)
+			info := flowExtra.initFlowInfoForPerf(reply)
 			flowExtra.metaFlowPerf.Update(meta, info)
 			if flowExtra == f.addFlow(flowCache, flowExtra) {
 				// reach limit and output directly
@@ -558,6 +488,7 @@ func (f *FlowGenerator) processPacket(meta *handler.MetaPacket) {
 				f.stats.CurrNumFlows++
 			}
 		}
+		log.Infof("packet create-flow process duration is %d ns", time.Duration(time.Now().UnixNano())-pktProcessStart)
 	}
 	flowCache.Unlock()
 }
@@ -615,6 +546,7 @@ loop:
 		}
 		flowCache.Lock()
 		for e := flowCache.flowList.Back(); e != nil; {
+			flowOutputStart := time.Duration(time.Now().UnixNano())
 			var del *list.Element = nil
 			flowExtra := e.Value.(*FlowExtra)
 			// remaining flows are too new to output
@@ -629,12 +561,14 @@ loop:
 				flowExtra.setCurFlowInfo(now, forceReportIntervalSec)
 				flowExtra.calcCloseType(false)
 				flowOutQueue.Put(flowExtra.taggedFlow)
+				log.Infof("flow timeout output duration is %d ns", time.Duration(time.Now().UnixNano())-flowOutputStart)
 			} else if flowExtra.taggedFlow.StartTime/time.Second+forceReportIntervalSec < nowSec {
 				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false)
 				flowExtra.setCurFlowInfo(now, forceReportIntervalSec)
 				flowExtra.calcCloseType(true)
 				flowExtra.tryForceReport(flowOutQueue)
 				flowExtra.resetCurFlowInfo(now)
+				log.Infof("flow force report output duration is %d ns", time.Duration(time.Now().UnixNano())-flowOutputStart)
 			}
 			e = e.Prev()
 			if del != nil {
@@ -664,10 +598,10 @@ func (f *FlowGenerator) timeoutReport() {
 		end := start + num
 		if end <= fastPath.size {
 			go f.cleanTimeoutHashMap(fastPath.hashMap, start, end)
-			log.Debugf("clean goroutine %d (hashmap range %d to %d) created", i, start, end)
+			log.Infof("clean goroutine %d (hashmap range %d to %d) created", i, start, end)
 		} else {
 			go f.cleanTimeoutHashMap(fastPath.hashMap, start, fastPath.size)
-			log.Debugf("clean goroutine %d (hashmap range %d to %d) created", i, start, fastPath.size)
+			log.Infof("clean goroutine %d (hashmap range %d to %d) created", i, start, fastPath.size)
 			break
 		}
 	}
@@ -704,15 +638,20 @@ func (f *FlowGenerator) Stop() {
 // create a new flow generator
 func New(metaPacketHeaderInQueue QueueReader, flowOutQueue QueueWriter, forceReportIntervalSec time.Duration) *FlowGenerator {
 	flowGenerator := &FlowGenerator{
+		TimeoutConfig:           defaultTimeoutConfig,
 		metaPacketHeaderInQueue: metaPacketHeaderInQueue,
 		flowOutQueue:            flowOutQueue,
 		fastPath:                FastPath{FlowCacheHashMap: FlowCacheHashMap{make([]*FlowCache, HASH_MAP_SIZE), HASH_MAP_SIZE, 4}},
+		stateMachineMaster:      make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
+		stateMachineSlave:       make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
 		forceReportIntervalSec:  forceReportIntervalSec,
-		minLoopIntervalSec:      innerTimeoutConfig.minTimeout(),
+		minLoopIntervalSec:      defaultTimeoutConfig.minTimeout(),
 		flowLimitNum:            FLOW_LIMIT_NUM,
 		handleRunning:           false,
 		cleanRunning:            false,
 	}
+	flowGenerator.initStateMachineMaster()
+	flowGenerator.initStateMachineSlave()
 	RegisterCountable("flow_gen", EMPTY_TAG, flowGenerator)
 	log.Info("Flow Generator created")
 	return flowGenerator
