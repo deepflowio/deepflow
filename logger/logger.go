@@ -18,11 +18,19 @@ const (
 
 var log = logging.MustGetLogger(os.Args[0])
 
-func InitConsoleLog() {
-	stdout := logging.NewBackendFormatter(
-		logging.NewLogBackend(os.Stdout, "", 0),
-		logging.MustStringFormatter(LOG_COLOR_FORMAT),
+func InitConsoleLog(levelString string) {
+	level, err := logging.LogLevel(levelString)
+	if err != nil {
+		log.Error(err.Error())
+		os.Exit(-1)
+	}
+	stdout := logging.AddModuleLevel(
+		logging.NewBackendFormatter(
+			logging.NewLogBackend(os.Stdout, "", 0),
+			logging.MustStringFormatter(LOG_COLOR_FORMAT),
+		),
 	)
+	stdout.SetLevel(level, "")
 	logging.SetBackend(stdout)
 }
 
