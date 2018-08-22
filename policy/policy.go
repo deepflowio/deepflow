@@ -167,3 +167,7 @@ func (t *PolicyTable) UpdateIpGroupData(data []*IpGroupData) {
 		t.cloudPlatformData.ipGroup.Update(data)
 	}
 }
+
+func (t *PolicyTable) GetEndpointInfo(mac uint64, ip uint32, inPort uint32) *EndpointInfo {
+	return t.cloudPlatformData.GetEndpointInfo(mac, ip, inPort)
+}
