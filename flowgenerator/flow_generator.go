@@ -422,21 +422,6 @@ func (f *FlowExtra) tryForceReport(flowOutQueue QueueWriter) {
 	}
 }
 
-func (f *FlowExtra) initFlowInfoForPerf(reply bool) *FlowInfo {
-	taggedFlow := f.taggedFlow
-	return &FlowInfo{
-		FlowState:         f.flowState,
-		Direction:         reply,
-		FlowID:            taggedFlow.FlowID,
-		TotalPacketCount0: taggedFlow.TotalPacketCount0,
-		TotalPacketCount1: taggedFlow.TotalPacketCount1,
-		ArrTime0Last:      taggedFlow.ArrTime0Last,
-		ArrTime1Last:      taggedFlow.ArrTime1Last,
-		TcpFlags0:         taggedFlow.TCPFlags0,
-		TcpFlags1:         taggedFlow.TCPFlags1,
-	}
-}
-
 func (f *FlowGenerator) processPacket(meta *MetaPacket) {
 	reply := false
 	var flowExtra *FlowExtra
@@ -459,8 +444,7 @@ func (f *FlowGenerator) processPacket(meta *MetaPacket) {
 			// delete front from this FlowCache because flowExtra is moved to front in keyMatch()
 			flowCache.flowList.Remove(flowCache.flowList.Front())
 		}
-		info := flowExtra.initFlowInfoForPerf(reply)
-		flowExtra.metaFlowPerf.Update(meta, info)
+		flowExtra.metaFlowPerf.Update(meta, reply, flowExtra)
 		log.Infof("packet update process duration is %d ns", time.Duration(time.Now().UnixNano())-pktProcessStart)
 	} else {
 		closed := false
@@ -473,8 +457,8 @@ func (f *FlowGenerator) processPacket(meta *MetaPacket) {
 			flowExtra.calcCloseType(false)
 			f.flowOutQueue.Put(flowExtra.taggedFlow)
 		} else {
-			info := flowExtra.initFlowInfoForPerf(reply)
-			flowExtra.metaFlowPerf.Update(meta, info)
+			flowExtra.metaFlowPerf.Update(meta, reply, flowExtra)
+
 			if flowExtra == f.addFlow(flowCache, flowExtra) {
 				// reach limit and output directly
 				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false)
