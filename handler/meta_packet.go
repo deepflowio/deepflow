@@ -6,6 +6,9 @@ import (
 
 	. "github.com/google/gopacket/layers"
 	"gitlab.x.lan/yunshan/droplet-libs/policy"
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
+
+	. "gitlab.x.lan/yunshan/droplet/utils"
 )
 
 const VLAN_ID_MASK = uint16((1 << 12) - 1)
@@ -53,10 +56,10 @@ func (m *MetaPacket) String() string {
 		"    MAC: %s -> %s TYPE: %d VLAN: %d\n"+
 		"    IP: %v -> %v PROTO: %d TTL: %d\n"+
 		"    PORT: %d -> %d PAYLOAD_LEN: %d TCP: %+v",
-		m.Timestamp, m.InPort, m.Exporter, m.PacketLen, m.L2End0, m.L2End1, m.EndpointData, m.Raw,
+		m.Timestamp, m.InPort, IpFromUint32(m.Exporter), m.PacketLen, m.L2End0, m.L2End1, m.EndpointData, m.Raw,
 		m.Tunnel,
-		m.MacSrc, m.MacDst, m.EthType, m.Vlan,
-		m.IpSrc, m.IpDst, m.Protocol, m.TTL,
+		Uint64ToMac(m.MacSrc), Uint64ToMac(m.MacDst), m.EthType, m.Vlan,
+		IpFromUint32(m.IpSrc), IpFromUint32(m.IpDst), m.Protocol, m.TTL,
 		m.PortSrc, m.PortDst, m.PayloadLen, m.TcpData)
 }
 
