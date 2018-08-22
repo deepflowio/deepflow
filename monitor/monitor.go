@@ -39,7 +39,7 @@ func (m *Monitor) GetCounter() interface{} {
 func init() {
 	proc, err := process.NewProcess(int32(os.Getpid()))
 	if err != nil {
-		log.Error(err)
+		log.Errorf("%v", err)
 		return
 	}
 	m := &Monitor{proc}

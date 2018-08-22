@@ -3,15 +3,15 @@ package policy
 import (
 	"testing"
 
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
 func TestGetPlatformData(t *testing.T) {
 
 	ply := NewPolicyTable(ACTION_PACKET_STAT)
 
-	srcIp := datatype.NewIPFromString("192.168.2.12")
-	dstIp := datatype.NewIPFromString("192.168.0.11")
+	srcIp := NewIPFromString("192.168.2.12")
+	dstIp := NewIPFromString("192.168.0.11")
 	key := &LookupKey{
 		SrcIp:       srcIp.Int(),
 		SrcMac:      0x80027a42bfc,
@@ -19,22 +19,22 @@ func TestGetPlatformData(t *testing.T) {
 		DstIp:       dstIp.Int(),
 		RxInterface: 196610,
 	}
-	ip := datatype.NewIPFromString("192.168.0.11")
+	ip := NewIPFromString("192.168.0.11")
 	ipInfo := IpNet{
 		Ip:       ip.Int(),
 		SubnetId: 121,
 		Netmask:  24,
 	}
 
-	ip1 := datatype.NewIPFromString("192.168.0.12")
+	ip1 := NewIPFromString("192.168.0.12")
 	ipInfo1 := IpNet{
 		Ip:       ip1.Int(),
 		SubnetId: 122,
 		Netmask:  25,
 	}
 
-	mac := datatype.NewMACAddrFromString("08:00:27:a4:2b:fc")
-	launchServer := datatype.NewIPFromString("10.10.10.10")
+	mac := NewMACAddrFromString("08:00:27:a4:2b:fc")
+	launchServer := NewIPFromString("10.10.10.10")
 	vifData := PlatformData{
 		EpcId:      11,
 		DeviceType: 2,
@@ -48,14 +48,14 @@ func TestGetPlatformData(t *testing.T) {
 	vifData.Ips = append(vifData.Ips, &ipInfo)
 	vifData.Ips = append(vifData.Ips, &ipInfo1)
 
-	ip2 := datatype.NewIPFromString("192.168.2.0")
+	ip2 := NewIPFromString("192.168.2.0")
 	ipinfo2 := IpNet{
 		Ip:       ip2.Int(),
 		SubnetId: 125,
 		Netmask:  24,
 	}
 
-	ip3 := datatype.NewIPFromString("192.168.2.12")
+	ip3 := NewIPFromString("192.168.2.12")
 
 	ipInfo3 := IpNet{
 		Ip:       ip3.Int(),
@@ -63,8 +63,8 @@ func TestGetPlatformData(t *testing.T) {
 		Netmask:  32,
 	}
 
-	mac1 := datatype.NewMACAddrFromString("08:00:27:a4:2b:fa")
-	launchserver1 := datatype.NewIPFromString("10.10.10.10")
+	mac1 := NewMACAddrFromString("08:00:27:a4:2b:fa")
+	launchserver1 := NewIPFromString("10.10.10.10")
 
 	vifData1 := PlatformData{
 		EpcId:      0,

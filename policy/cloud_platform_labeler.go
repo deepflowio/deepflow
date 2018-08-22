@@ -6,35 +6,9 @@ import (
 	"time"
 
 	"github.com/cespare/xxhash"
+
+	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
-
-const (
-	MASK_LEN                   = 24
-	MIN_MASK_LEN               = 8
-	MAX_MASK_LEN               = 32
-	IF_TYPE_WAN                = 3
-	NETMASK                    = 0xFFFFFFFF
-	DEEPFLOW_POSITION_EXPORTER = 0x30000
-	DATA_VALID_TIME            = 60 * time.Second
-)
-
-type IpNet struct {
-	Ip       uint32
-	Netmask  uint32
-	SubnetId uint32
-}
-
-type PlatformData struct {
-	Mac        uint64
-	Ips        []*IpNet
-	EpcId      int32
-	DeviceType uint32
-	DeviceId   uint32
-	IfIndex    uint32
-	IfType     uint32
-	HostIp     uint32
-	GroupIds   []uint32
-}
 
 type FastPlatformData struct {
 	endpointInfo *EndpointInfo
@@ -97,51 +71,6 @@ func NewCloudPlatformData() *CloudPlatformData {
 		ipGroup:       NewIpResourceGroup(),
 		netmaskBitmap: uint32(0),
 		fastTable:     fasttable,
-	}
-}
-
-func (i *EndpointInfo) SetL2Data(data *PlatformData) {
-	i.L2EpcId = data.EpcId
-	i.L2DeviceType = data.DeviceType
-	i.L2DeviceId = data.DeviceId
-	i.HostIp = data.HostIp
-	i.GroupIds = append(i.GroupIds, data.GroupIds...)
-}
-
-func (i *EndpointInfo) SetL3Data(data *PlatformData, ip uint32) {
-	i.L3EpcId = -1
-	if data.EpcId != 0 {
-		i.L3EpcId = data.EpcId
-	}
-	i.L3DeviceType = data.DeviceType
-	i.L3DeviceId = data.DeviceId
-
-	for _, ipInfo := range data.Ips {
-		if ipInfo.Ip == (ip & (NETMASK << (MAX_MASK_LEN - ipInfo.Netmask))) {
-			i.SubnetId = ipInfo.SubnetId
-			break
-		}
-	}
-}
-
-func (i *EndpointInfo) SetL3EndByTtl(data *PlatformData, ttl uint32) {
-	if ttl == 64 || ttl == 128 || ttl == 255 {
-		i.L3End = true
-	}
-}
-
-func (i *EndpointInfo) SetL3EndByIp(data *PlatformData, ip uint32) {
-	for _, ipInfo := range data.Ips {
-		if ipInfo.Ip == (ip & (NETMASK << (MAX_MASK_LEN - ipInfo.Netmask))) {
-			i.L3End = true
-			break
-		}
-	}
-}
-
-func (i *EndpointInfo) SetL3EndByMac(data *PlatformData, mac uint64) {
-	if data.Mac == mac {
-		i.L3End = true
 	}
 }
 

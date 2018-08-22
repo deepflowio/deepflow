@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 
 	"github.com/cespare/xxhash"
+
+	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
 type ServiceData struct {

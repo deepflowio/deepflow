@@ -1,0 +1,33 @@
+package datatype
+
+import (
+	"time"
+)
+
+const (
+	MASK_LEN                   = 24
+	MIN_MASK_LEN               = 8
+	MAX_MASK_LEN               = 32
+	IF_TYPE_WAN                = 3
+	NETMASK                    = 0xFFFFFFFF
+	DEEPFLOW_POSITION_EXPORTER = 0x30000
+	DATA_VALID_TIME            = 60 * time.Second
+)
+
+type IpNet struct {
+	Ip       uint32
+	Netmask  uint32
+	SubnetId uint32
+}
+
+type PlatformData struct {
+	Mac        uint64
+	Ips        []*IpNet
+	EpcId      int32
+	DeviceType uint32
+	DeviceId   uint32
+	IfIndex    uint32
+	IfType     uint32
+	HostIp     uint32
+	GroupIds   []uint32
+}
