@@ -1,6 +1,7 @@
 syntax = "proto2";
 
 package trident;
+option go_package = "trident";
 
 service Synchronizer {
     rpc Sync (SyncRequest) returns (SyncResponse) {}
