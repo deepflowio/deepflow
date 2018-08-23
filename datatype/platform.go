@@ -5,14 +5,13 @@ import (
 )
 
 const (
-	MASK_LEN                   = 24
-	MIN_MASK_LEN               = 8
-	MAX_MASK_LEN               = 32
-	IF_TYPE_WAN                = 3
-	NETMASK                    = 0xFFFFFFFF
-	DEEPFLOW_POSITION_EXPORTER = 0x30000
-	DATA_VALID_TIME            = 60 * time.Second
-	ARP_VALID_TIME             = 60 * 60 * time.Second
+	MASK_LEN        = 24
+	MIN_MASK_LEN    = 8
+	MAX_MASK_LEN    = 32
+	IF_TYPE_WAN     = 3
+	NETMASK         = 0xFFFFFFFF
+	DATA_VALID_TIME = 60 * time.Second
+	ARP_VALID_TIME  = 60 * 60 * time.Second
 )
 
 type IpNet struct {
