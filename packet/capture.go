@@ -207,6 +207,7 @@ func NewCapture(interfaceName string, ip net.IP, isTap bool, outputQueue queue.Q
 		afpacket.OptBlockSize(DEFAULT_BLOCK_SIZE),
 		afpacket.OptFrameSize(DEFAULT_FRAME_SIZE),
 		afpacket.OptNumBlocks(afPacketBlocks),
+		afpacket.OptAddVLANHeader(true),
 	)
 	if err != nil {
 		log.Warning("AF_PACKET init error", err)
