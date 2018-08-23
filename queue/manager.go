@@ -209,7 +209,7 @@ func RegisterCommand() *cobra.Command {
 		Short: "monitor queue put data",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) != 1 {
-				fmt.Println("please run with '{queue-name}'.\n")
+				fmt.Println("please run with '{queue-name}'.")
 				return
 			}
 			conn := queueOperate(args[0], QUEUE_CMD_MONITOR_ON)
