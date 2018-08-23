@@ -27,8 +27,8 @@ type GrpcSession struct {
 	synchronized bool
 }
 
-func (s *GrpcSession) GetClient() *grpc.ClientConn {
-	return s.clientConn
+func (s *GrpcSession) SetSyncInterval(syncInterval time.Duration) {
+	s.syncInterval = syncInterval
 }
 
 func (s *GrpcSession) nextServer() error {
