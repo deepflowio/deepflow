@@ -95,8 +95,11 @@ func (s *GrpcSession) Close() {
 	}
 }
 
-func (s *GrpcSession) Init(runOnce func()) {
+func (s *GrpcSession) Init(ips []net.IP, port uint16, syncInterval time.Duration, runOnce func()) {
+	s.ips = ips
+	s.port = port
+	s.syncInterval = syncInterval
+	s.runOnce = runOnce
 	s.ipIndex = -1
 	s.synchronized = true // 避免启动后连接服务器失败时不打印
-	s.runOnce = runOnce
 }
