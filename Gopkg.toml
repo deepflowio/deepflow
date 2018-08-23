@@ -39,7 +39,7 @@
 
 [[constraint]]
   name = "github.com/google/gopacket"
-  version = "1.1.14"
+  revision = "d9ba49ce8619de3c5fbd2f58168903b35b2ed0e0"
 
 [[constraint]]
   branch = "master"
@@ -62,7 +62,7 @@
   version = "2.18.7"
 
 [[constraint]]
-  branch = "master"
+  branch = "release-branch.go1.9"
   name = "golang.org/x/net"
 
 [[constraint]]

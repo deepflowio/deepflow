@@ -64,7 +64,8 @@
   version = "v0.2.0"
 
 [[projects]]
-  digest = "1:f2a59262dcdf19b8a49351b562b4b274a935ea21932817126e6901ae516cde35"
+  branch = "master"
+  digest = "1:92f7df73c43ce74ec411c6720706d0157775e3524a692f0f770062d08582b410"
   name = "github.com/google/gopacket"
   packages = [
     ".",
@@ -72,8 +73,7 @@
     "pcapgo",
   ]
   pruneopts = "UT"
-  revision = "11c65f1ca9081dfea43b4f9643f5c155583b73ba"
-  version = "v1.1.14"
+  revision = "d9ba49ce8619de3c5fbd2f58168903b35b2ed0e0"
 
 [[projects]]
   branch = "master"
@@ -150,20 +150,20 @@
   revision = "bb4de0191aa41b5507caa14b0650cdbddcd9280b"
 
 [[projects]]
-  branch = "master"
-  digest = "1:deafe4ab271911fec7de5b693d7faae3f38796d9eb8622e2b9e7df42bb3dfea9"
+  branch = "release-branch.go1.9"
+  digest = "1:1604cdec55ab4b828b9e83af0e7f1bd0f954cc3ffab4231587f6f33e5db53e6c"
   name = "golang.org/x/net"
   packages = [
     "context",
-    "http/httpguts",
     "http2",
     "http2/hpack",
     "idna",
     "internal/timeseries",
+    "lex/httplex",
     "trace",
   ]
   pruneopts = "UT"
-  revision = "922f4815f713f213882e8ef45e0d315b164d705c"
+  revision = "44b7c21cbf19450f38b337eb6b6fe4f6496fb5b3"
 
 [[projects]]
   branch = "master"
