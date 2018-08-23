@@ -51,7 +51,7 @@
 
 [[constraint]]
   name = "github.com/op/go-logging"
-  version = "1.0.0"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/pebbe/zmq4"
@@ -60,10 +60,6 @@
 [[constraint]]
   name = "github.com/shirou/gopsutil"
   version = "2.18.7"
-
-[[constraint]]
-  branch = "master"
-  name = "gitlab.x.lan/yunshan/droplet"
 
 [[constraint]]
   branch = "master"
