@@ -6,12 +6,6 @@ COMMIT_DATE = $(shell git show -s --format=%cd --date=short HEAD)
 REVISION = $(shell git rev-parse HEAD)
 FLAGS = -ldflags "-X main.RevCount=${REV_COUNT} -X main.Revision=${REVISION} -X main.CommitDate=${COMMIT_DATE}"
 
-lint:
-	go vet ./...
-
-format:
-	go fmt ./...
-
 submodule:
 	git submodule update --init --recursive
 
