@@ -22,12 +22,10 @@ const (
 	HEADER_TYPE_IPV4_UDP
 )
 
-type PacketSource uint32
-
 const (
-	PACKET_SOURCE_ISP   PacketSource = 0x10000
-	PACKET_SOURCE_SPINE              = 0x20000
-	PACKET_SOURCE_TOR                = 0x30000
+	PACKET_SOURCE_ISP   uint32 = 0x10000
+	PACKET_SOURCE_SPINE        = 0x20000
+	PACKET_SOURCE_TOR          = 0x30000
 )
 
 const (

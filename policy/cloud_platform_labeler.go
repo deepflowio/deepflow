@@ -90,7 +90,7 @@ func NewCloudPlatformData() *CloudPlatformData {
 }
 
 func PortInDeepflowExporter(inPort uint32) bool {
-	return DEEPFLOW_POSITION_EXPORTER == ((inPort) & DEEPFLOW_POSITION_EXPORTER)
+	return PACKET_SOURCE_TOR == ((inPort) & PACKET_SOURCE_TOR)
 }
 
 // FIXME: 需要验证是否有冲突
