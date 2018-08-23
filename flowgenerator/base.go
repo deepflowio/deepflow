@@ -67,6 +67,8 @@ const TOTAL_FLOWS_ID_MASK uint64 = 0x0FFFFFFF
 
 const FLOW_LIMIT_NUM uint64 = 1024 * 1024
 
+const REPORT_TOLERANCE = 4
+
 // unit: second
 type TimeoutConfig struct {
 	Opening         time.Duration
@@ -86,6 +88,11 @@ var defaultTimeoutConfig TimeoutConfig = TimeoutConfig{
 	TIMEOUT_EXPCEPTION,
 	TIMEOUT_CLOSED_FIN,
 	TIMEOUT_SINGLE_DIRECTION,
+}
+
+type QuinHashValue struct {
+	hashHigh uint64
+	hashLow  uint64
 }
 
 type FlowExtra struct {
