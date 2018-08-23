@@ -122,30 +122,57 @@ message Group {
     repeated string ips = 5;
 }
 
-enum RuleResourceType {
-    IP = 1;
-    RESOURCE_GROUP = 2;
-}
-
-message WhiteListRule {
-    optional uint32 id = 1;
-    repeated uint32 sources = 2;
-    optional uint32 target = 3;
-    optional Protocol protocol = 4;
-    optional uint32 port = 5;
-}
-
-message Service {
-    optional uint32 id = 1;
-    optional uint32 group_id = 2;
-    optional Protocol protocol = 3;
-    optional string ports = 4;
-}
-
 message PlatformData {
     repeated Interface interfaces = 1;
     repeated Group ip_groups = 2;
-    repeated Service services = 3;
+}
+
+enum TapType {
+    ANY_TAP = 0;
+    ISP = 1;      // 接入网络
+    SPINE = 2;    // 物理网络
+    TOR = 3;      // 虚拟网络
+}
+
+enum PolicyType {
+    LABEL = 1;
+    REPORT_POLICY = 2;
+    ALARM_POLICY = 3;
+    WHITELIST = 4;
+}
+
+enum Action {
+    PACKECT_STATISTICS = 1;
+    FLOW_STATISTICS = 2;
+    FLOW_STORAGE = 3;
+    TCP_PERFORMANCE = 4;
+    PCAP = 5;
+    ALARM = 6;
+    MISC = 7;
+    POLICY = 8;
+}
+
+message Policy {
+    optional uint32 id = 1;
+    optional PolicyType type = 2;
+}
+
+message FlowAction {
+    optional Action action = 1;
+    repeated Policy policies = 2;
+}
+
+message FlowAcl {
+    optional uint32 id = 1;
+    optional TapType tap_type = 2;
+    optional uint32 tap_id = 3;
+    optional string src_group_ids = 4;
+    optional string dst_group_ids = 5;
+    optional Protocol protocol = 6;
+    optional string src_ports = 7;
+    optional string dst_ports = 8;
+    optional uint32 vlan = 9;
+    repeated FlowAction actions = 10;
 }
 
 message SyncResponse {
@@ -156,4 +183,5 @@ message SyncResponse {
     repeated InterfaceAcl interface_acls = 10;
     repeated Segment local_segments = 11;
     optional PlatformData platform_data = 12;
+    repeated FlowAcl flow_acls = 13;
 }
