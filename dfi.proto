@@ -8,7 +8,7 @@
 package DFI;
 option java_package = "cn.net.yunshan.message";
 option java_outer_classname = "DFIMessage";
-option go_package = "gitlab.x.lan/yunshan/message/pbdfi";
+option go_package = "dfi";
 
 message FlowHeader {
     required fixed64 sequence = 1; /* start from 1 */
@@ -189,19 +189,19 @@ message Flow {
 message Metering {
         optional uint32 exporter = 1;
         optional uint32 timestamp = 2;
-        optional uint32 in_port_0 = 3 [default = 0]; 
+        optional uint32 in_port_0 = 3 [default = 0];
         optional uint32 vlan = 11 [default = 0];
-        optional uint32 ip_src = 21 [default = 0]; 
-        optional uint32 ip_dst = 22 [default = 0]; 
-        optional uint32 proto = 31 [default = 0]; 
-        optional uint32 port_src = 32 [default = 0]; 
-        optional uint32 port_dst = 33 [default = 0]; 
-        optional uint64 byte_cnt_0 = 41 [default = 0]; 
-        optional uint64 byte_cnt_1 = 42 [default = 0]; 
-        optional uint64 pkt_cnt_0 = 43 [default = 0]; 
-        optional uint64 pkt_cnt_1 = 44 [default = 0]; 
+        optional uint32 ip_src = 21 [default = 0];
+        optional uint32 ip_dst = 22 [default = 0];
+        optional uint32 proto = 31 [default = 0];
+        optional uint32 port_src = 32 [default = 0];
+        optional uint32 port_dst = 33 [default = 0];
+        optional uint64 byte_cnt_0 = 41 [default = 0];
+        optional uint64 byte_cnt_1 = 42 [default = 0];
+        optional uint64 pkt_cnt_0 = 43 [default = 0];
+        optional uint64 pkt_cnt_1 = 44 [default = 0];
         /* Platform Data */
-        optional uint32 l3_epc_id_0 = 51 [default = 0]; 
+        optional uint32 l3_epc_id_0 = 51 [default = 0];
         optional uint32 l3_epc_id_1 = 52 [default = 0];
 }
 

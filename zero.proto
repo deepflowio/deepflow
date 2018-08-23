@@ -1,6 +1,6 @@
 syntax = "proto2";
 
-option go_package = "gitlab.x.lan/yunshan/message/pbzero";
+option go_package = "zero";
 
 enum DeviceType {
     VM = 1;
