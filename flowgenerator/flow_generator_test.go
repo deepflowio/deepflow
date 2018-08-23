@@ -455,21 +455,29 @@ func TestForceReport(t *testing.T) {
 }
 
 func BenchmarkCleanHashMap(b *testing.B) {
-	b.StopTimer()
 	runtime.GOMAXPROCS(4)
 	flowGenerator := getDefaultFlowGenerator()
 	flowGenerator.SetTimeout(TimeoutConfig{0, 300, 0, 30, 5, 0, 0})
 	flowGenerator.minLoopIntervalSec = 0
-	b.N = 1
 	flowCache := flowGenerator.fastPath.createFlowCache(b.N, 0)
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		meta := getDefaultPacket()
 		flowKey := getFlowKey(meta)
 		flowExtra, _, _ := flowGenerator.initFlow(meta, flowKey)
 		flowGenerator.addFlow(flowCache, flowExtra)
-	}
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
 		flowGenerator.cleanTimeoutHashMap(flowGenerator.fastPath.hashMap, 0, 1)
+	}
+}
+
+func BenchmarkProcessPacket(b *testing.B) {
+	runtime.GOMAXPROCS(4)
+	flowGenerator := getDefaultFlowGenerator()
+	flowGenerator.SetTimeout(TimeoutConfig{0, 300, 0, 30, 5, 0, 0})
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		meta := getDefaultPacket()
+		meta.PortDst += uint16(i)
+		flowGenerator.processPacket(meta)
 	}
 }
