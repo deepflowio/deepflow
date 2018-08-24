@@ -111,57 +111,14 @@ func cloneMetaPacket(src *datatype.MetaPacket) *datatype.MetaPacket {
 	return &newPacket
 }
 
-//FIXME:  临时方案后面这部分代码需要删除
-func convertMetaPacketToTaggedMetering(metaPacket *datatype.MetaPacket) *datatype.TaggedMetering {
-	var l3EpcId0, l3EpcId1 uint32
-	var groupIds0, groupIds1 []uint32
-	if metaPacket.EndpointData != nil {
-		if metaPacket.EndpointData.SrcInfo != nil {
-			groupIds0 = metaPacket.EndpointData.SrcInfo.GroupIds
-			l3EpcId0 = uint32(metaPacket.EndpointData.SrcInfo.L3EpcId)
-		}
-		if metaPacket.EndpointData.DstInfo != nil {
-			groupIds1 = metaPacket.EndpointData.DstInfo.GroupIds
-			l3EpcId1 = uint32(metaPacket.EndpointData.DstInfo.L3EpcId)
-		}
-	}
-
-	metering := datatype.Metering{
-		Exporter:     *datatype.NewIPFromInt(uint32(metaPacket.Exporter)),
-		Timestamp:    metaPacket.Timestamp,
-		InPort0:      metaPacket.InPort,
-		VLAN:         metaPacket.Vlan,
-		IPSrc:        *datatype.NewIPFromInt(uint32(metaPacket.IpSrc)),
-		IPDst:        *datatype.NewIPFromInt(uint32(metaPacket.IpDst)),
-		Proto:        metaPacket.Protocol,
-		PortSrc:      metaPacket.PortSrc,
-		PortDst:      metaPacket.PortDst,
-		ByteCount0:   uint64(metaPacket.PacketLen),
-		ByteCount1:   0,
-		PacketCount0: 1,
-		PacketCount1: 0,
-		L3EpcID0:     l3EpcId0,
-		L3EpcID1:     l3EpcId1,
-	}
-	tag := datatype.Tag{
-		GroupIDs0: groupIds0,
-		GroupIDs1: groupIds1,
-	}
-	return &datatype.TaggedMetering{
-		Metering: metering,
-		Tag:      tag,
-	}
-}
-
 func (l *LabelerManager) run() {
 	for l.running {
 		packet := l.readQueue.Get().(*datatype.MetaPacket)
 		l.GetPolicy(packet)
+		l.meteringQueue.Put(cloneMetaPacket(packet))
 		for _, queue := range l.appQueue {
-			newPacket := cloneMetaPacket(packet)
-			queue.Put(newPacket)
+			queue.Put(packet)
 		}
-		l.meteringQueue.Put(convertMetaPacketToTaggedMetering(packet))
 	}
 
 	log.Info("Labeler manager exit")

@@ -2,8 +2,6 @@ package droplet
 
 import (
 	"net"
-	"strconv"
-	"strings"
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/policy"
@@ -11,38 +9,6 @@ import (
 
 	"gitlab.x.lan/yunshan/droplet/protobuf"
 )
-
-func newServicedata(service *protobuf.Service) *policy.ServiceData {
-	if service == nil {
-		return nil
-	}
-	splitPorts := strings.Split(service.GetPorts(), ",")
-	ports := make([]uint32, 0, len(splitPorts))
-	for _, port := range splitPorts {
-		portInt, err := strconv.Atoi(port)
-		if err == nil {
-			ports = append(ports, uint32(portInt))
-		}
-	}
-
-	return &policy.ServiceData{
-		Id:      service.GetId(),
-		GroupId: service.GetGroupId(),
-		Proto:   uint16(service.GetProtocol()),
-		Ports:   ports,
-	}
-}
-
-func convert2ServiceData(response *protobuf.SyncResponse) []*policy.ServiceData {
-	services := response.GetPlatformData().GetServices()
-	serviceDatas := make([]*policy.ServiceData, 0, len(services))
-	for _, service := range response.GetPlatformData().GetServices() {
-		if newData := newServicedata(service); newData != nil {
-			serviceDatas = append(serviceDatas, newData)
-		}
-	}
-	return serviceDatas
-}
 
 func newPlatformData(vifData *protobuf.Interface) *datatype.PlatformData {
 	macInt := uint64(0)

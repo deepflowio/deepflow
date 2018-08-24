@@ -179,7 +179,7 @@
     "pkg/metering/bw_usage_isp_usage",
   ]
   pruneopts = "UT"
-  revision = "8b86d03a8e8e87fd7a4a97c5d15638d742717640"
+  revision = "13855d4ca47254514963a1de6dabc09a9ba1dfee"
 
 [[projects]]
   branch = "master"
@@ -194,7 +194,7 @@
     "pkg/messenger",
   ]
   pruneopts = "UT"
-  revision = "53048710767410bab25e463637c9b7f6af2d2854"
+  revision = "994dd7b9234ed85e0108fc2f2039fb56d330712e"
 
 [[projects]]
   branch = "master"
