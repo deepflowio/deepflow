@@ -8,10 +8,8 @@ import (
 
 	"github.com/google/gopacket/layers"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
-	. "gitlab.x.lan/yunshan/droplet-libs/policy"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
-
-	. "gitlab.x.lan/yunshan/droplet/utils"
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 const DEFAULT_QUEUE_LEN = 200
@@ -157,7 +155,7 @@ func TestHandleMultiPacket(t *testing.T) {
 	flowGenerator.minLoopIntervalSec = 0
 	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
 	flowOutQueue := flowGenerator.flowOutQueue
-	var packet *handler.MetaPacket
+	var packet *MetaPacket
 	var taggedFlow *TaggedFlow
 	num := DEFAULT_QUEUE_LEN / 2
 

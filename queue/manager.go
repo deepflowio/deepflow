@@ -18,7 +18,6 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
-	"gitlab.x.lan/yunshan/droplet/handler"
 )
 
 var log = logging.MustGetLogger("queue_manager")
@@ -182,7 +181,7 @@ func recvDebugMsg(conn *net.UDPConn, name string) {
 }
 
 func RegisterCommand() *cobra.Command {
-	gob.Register(&handler.MetaPacket{})
+	gob.Register(&datatype.MetaPacket{})
 	gob.Register(&datatype.TaggedMetering{})
 	queue := &cobra.Command{
 		Use:   "queue",

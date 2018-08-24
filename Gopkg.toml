@@ -34,12 +34,8 @@
   version = "1.1.0"
 
 [[constraint]]
-  name = "github.com/google/go-cmp"
-  version = "0.2.0"
-
-[[constraint]]
   name = "github.com/google/gopacket"
-  version = "1.1.14"
+  revision = "d9ba49ce8619de3c5fbd2f58168903b35b2ed0e0"
 
 [[constraint]]
   branch = "master"
@@ -58,17 +54,23 @@
   name = "gitlab.x.lan/platform/droplet-mapreduce"
 
 [[constraint]]
-  branch = "master"
   name = "gitlab.x.lan/yunshan/droplet-libs"
+  branch = "master"
 
 [[constraint]]
-  branch = "release-branch.go1.10"
   name = "golang.org/x/net"
+  branch = "release-branch.go1.9"
 
 [[constraint]]
   name = "gopkg.in/yaml.v2"
   version = "2.2.1"
 
+# TODO: unified message
+
 [prune]
   go-tests = true
   unused-packages = true
+
+  [[prune.project]]
+    name = "gitlab.x.lan/yunshan/message"
+    unused-packages = false

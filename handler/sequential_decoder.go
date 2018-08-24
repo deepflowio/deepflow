@@ -7,8 +7,7 @@ import (
 
 	. "github.com/google/gopacket/layers"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
-
-	. "gitlab.x.lan/yunshan/droplet/utils"
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 const (
@@ -49,7 +48,7 @@ type SequentialDecoder struct {
 }
 
 func NewSequentialDecoder(data []byte) *SequentialDecoder {
-	return &SequentialDecoder{data: ByteStream{data, 0}}
+	return &SequentialDecoder{data: NewByteStream(data)}
 }
 
 var FLAGS_NAME = [...]string{

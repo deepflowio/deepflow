@@ -15,9 +15,8 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 	"golang.org/x/net/bpf"
-
-	. "gitlab.x.lan/yunshan/droplet/utils"
 )
 
 var log = logging.MustGetLogger("capture")

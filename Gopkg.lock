@@ -45,7 +45,7 @@
   revision = "59788d5eb2591d3497ffb8fafed2f16fe00e7775"
 
 [[projects]]
-  digest = "1:17fe264ee908afc795734e8c4e63db2accabaf57326dbf21763a7d6b86096260"
+  digest = "1:4c0989ca0bcd10799064318923b9bc2db6b4d6338dd75f3f2d86c3511aaaf5cf"
   name = "github.com/golang/protobuf"
   packages = [
     "proto",
@@ -55,24 +55,11 @@
     "ptypes/timestamp",
   ]
   pruneopts = "UT"
-  revision = "b4deda0973fb4c70b50d226b1af49f3da59f5265"
-  version = "v1.1.0"
+  revision = "aa810b61a9c79d51363740d207bb46cf8e620ed5"
+  version = "v1.2.0"
 
 [[projects]]
-  digest = "1:2e3c336fc7fde5c984d2841455a658a6d626450b1754a854b3b32e7a8f49a07a"
-  name = "github.com/google/go-cmp"
-  packages = [
-    "cmp",
-    "cmp/internal/diff",
-    "cmp/internal/function",
-    "cmp/internal/value",
-  ]
-  pruneopts = "UT"
-  revision = "3af367b6b30c263d47e8895973edcca9a49cf029"
-  version = "v0.2.0"
-
-[[projects]]
-  digest = "1:52761683aac41e2edd5d2b195678ff30dcc1411353d3b461725c2f7f07d5d929"
+  digest = "1:f9d18fa71dcba6a66a37988ba01acc9d09f412c345a000eb591edb95cbf32b72"
   name = "github.com/google/gopacket"
   packages = [
     ".",
@@ -81,8 +68,7 @@
     "pcapgo",
   ]
   pruneopts = "UT"
-  revision = "11c65f1ca9081dfea43b4f9643f5c155583b73ba"
-  version = "v1.1.14"
+  revision = "d9ba49ce8619de3c5fbd2f58168903b35b2ed0e0"
 
 [[projects]]
   branch = "master"
@@ -193,11 +179,11 @@
     "pkg/metering/bw_usage_isp_usage",
   ]
   pruneopts = "UT"
-  revision = "52d1ab122c7645f12e9b8bcfe333366c4ac3363a"
+  revision = "8b86d03a8e8e87fd7a4a97c5d15638d742717640"
 
 [[projects]]
   branch = "master"
-  digest = "1:cec3afb11949ff695d34cfc817c9fa2a647a050429f057c49e1f6810a88068c9"
+  digest = "1:75a6863081ee25703d1af345396bbd4af2552d5bb18bc3db7c95ddfbda0d9aac"
   name = "gitlab.x.lan/platform/droplet-mapreduce"
   packages = [
     "internal/pkg/flowsender",
@@ -208,11 +194,11 @@
     "pkg/messenger",
   ]
   pruneopts = "UT"
-  revision = "45dadac85b21cf7858edd090400a6f484ec47dfa"
+  revision = "53048710767410bab25e463637c9b7f6af2d2854"
 
 [[projects]]
   branch = "master"
-  digest = "1:bff40e5dd701354d8102144209c7723a91fa2360d9a5d72d2ba322b20c941ec7"
+  digest = "1:10e90f104d92d6897a9447366f81e7f9274983220c1b05b1e876ff40cc04afe8"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "datatype",
@@ -227,22 +213,22 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "7a383bac829139faa1218cc1b36bdef7477103eb"
+  revision = "c59e56c32cc6a3a89b22c66184a4be48f4bc28aa"
 
 [[projects]]
   branch = "feature-os"
-  digest = "1:b6bb4c5b902d71007c5e6f86f3cc1300059e64daeabbb7d5008a40b068ca5750"
+  digest = "1:9964860c9b4285b151c614c2e7a5d100443b3ba57e2db5c22f3b14a883372cd6"
   name = "gitlab.x.lan/yunshan/message"
   packages = [
-    "pbdfi",
-    "pbzero",
+    "dfi",
+    "zero",
   ]
-  pruneopts = "UT"
-  revision = "a400dded549a765316161a8a5df75f92cc00eb37"
+  pruneopts = "T"
+  revision = "2fe28236a7e8dd81ac6df31bfb61be4d8a46d954"
 
 [[projects]]
-  branch = "release-branch.go1.10"
-  digest = "1:82b29273f56a317489552f1b38cec2081807f57e86f3fb7094d0383480fb8d07"
+  branch = "release-branch.go1.9"
+  digest = "1:480da6f1374fc58e5300f785f43f3398a2ae26b622491294ed44158adcdd6fff"
   name = "golang.org/x/net"
   packages = [
     "bpf",
@@ -255,18 +241,18 @@
     "trace",
   ]
   pruneopts = "UT"
-  revision = "0ed95abb35c445290478a5348a7b38bb154135fd"
+  revision = "44b7c21cbf19450f38b337eb6b6fe4f6496fb5b3"
 
 [[projects]]
-  branch = "release-branch.go1.11"
-  digest = "1:a60cae5be8993938498243605b120290533a5208fd5cac81c932afbad3642fb0"
+  branch = "master"
+  digest = "1:7710ea76bd73d3154e86eaf2db8b36a6dffbd6114e4e37b516f1d232c03ddd8d"
   name = "golang.org/x/sys"
   packages = [
     "unix",
     "windows",
   ]
   pruneopts = "UT"
-  revision = "98c5dad5d1a0e8a73845ecc8897d0bd56586511d"
+  revision = "11551d06cbcc94edc80a0facaccbda56473c19c1"
 
 [[projects]]
   digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"
@@ -356,7 +342,6 @@
   input-imports = [
     "github.com/docker/go-units",
     "github.com/golang/protobuf/proto",
-    "github.com/google/go-cmp/cmp",
     "github.com/google/gopacket/afpacket",
     "github.com/google/gopacket/layers",
     "github.com/google/gopacket/pcapgo",

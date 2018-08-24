@@ -6,16 +6,14 @@ import (
 
 	"github.com/google/gopacket/layers"
 	"github.com/op/go-logging"
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
-	. "gitlab.x.lan/yunshan/droplet-libs/policy"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
 	. "gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
 var log = logging.MustGetLogger("flowgenerator")
 
-func getFlowKey(meta *datatype.MetaPacket) *FlowKey {
+func getFlowKey(meta *MetaPacket) *FlowKey {
 	flowKey := &FlowKey{
 		Exporter: *NewIPFromInt(meta.Exporter),
 		IPSrc:    *NewIPFromInt(meta.IpSrc),
@@ -66,7 +64,7 @@ func isFromTrident(flowKey *FlowKey) bool {
 	return flowKey.InPort0&DEEPFLOW_POSITION_EXPORTER == DEEPFLOW_POSITION_EXPORTER
 }
 
-func (f *FlowExtra) MacEquals(meta *datatype.MetaPacket) bool {
+func (f *FlowExtra) MacEquals(meta *MetaPacket) bool {
 	taggedFlow := f.taggedFlow
 	flowMacSrc, flowMacDst := taggedFlow.MACSrc.Int(), taggedFlow.MACDst.Int()
 	if flowMacSrc == meta.MacSrc && flowMacDst == meta.MacDst {
@@ -79,7 +77,7 @@ func (f *FlowExtra) MacEquals(meta *datatype.MetaPacket) bool {
 }
 
 // FIXME: need a fast way to compare like memcmp
-func (f *FlowCache) keyMatch(meta *datatype.MetaPacket, key *FlowKey) (*FlowExtra, bool) {
+func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool) {
 	for e := f.flowList.Front(); e != nil; e = e.Next() {
 		flowExtra := e.Value.(*FlowExtra)
 		flowKey := &flowExtra.taggedFlow.FlowKey
@@ -133,7 +131,7 @@ func (f *FlowGenerator) genFlowId(timestamp uint64, inPort uint64) uint64 {
 	return ((inPort & IN_PORT_FLOW_ID_MASK) << 32) | ((timestamp & TIMER_FLOW_ID_MASK) << 32) | (f.stats.TotalNumFlows & TOTAL_FLOWS_ID_MASK)
 }
 
-func (f *FlowGenerator) initFlow(meta *datatype.MetaPacket, key *FlowKey) (*FlowExtra, bool, bool) {
+func (f *FlowGenerator) initFlow(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool, bool) {
 	now := time.Duration(meta.Timestamp)
 	taggedFlow := &TaggedFlow{
 		Flow: Flow{
@@ -233,7 +231,7 @@ func (f *FlowGenerator) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8
 	return closed
 }
 
-func (f *FlowExtra) updatePlatformData(meta *datatype.MetaPacket, reply bool) {
+func (f *FlowExtra) updatePlatformData(meta *MetaPacket, reply bool) {
 	endpointData := meta.EndpointData
 	var srcInfo, dstInfo *EndpointInfo
 	if endpointData == nil {
@@ -301,7 +299,7 @@ func (f *FlowExtra) reverseFlow() {
 	taggedFlow.IsL3End0, taggedFlow.IsL3End1 = taggedFlow.IsL3End1, taggedFlow.IsL3End0
 }
 
-func (f *FlowGenerator) tryReverseFlow(flowExtra *FlowExtra, meta *handler.MetaPacket, reply bool) bool {
+func (f *FlowGenerator) tryReverseFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) bool {
 	taggedFlow := flowExtra.taggedFlow
 	if !flowExtra.reversed && flagContain(uint8(taggedFlow.TCPFlags0|taggedFlow.TCPFlags1)&TCP_FLAG_MASK, TCP_SYN) {
 		return false
@@ -318,7 +316,7 @@ func (f *FlowGenerator) tryReverseFlow(flowExtra *FlowExtra, meta *handler.MetaP
 	return false
 }
 
-func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *handler.MetaPacket, reply *bool) (bool, bool) {
+func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply *bool) (bool, bool) {
 	taggedFlow := flowExtra.taggedFlow
 	bytes := uint64(meta.PacketLen)
 	packetTimestamp := meta.Timestamp
@@ -439,7 +437,7 @@ func (f *FlowExtra) initFlowInfoForPerf(reply bool) *FlowInfo {
 	}
 }
 
-func (f *FlowGenerator) processPacket(meta *datatype.MetaPacket) {
+func (f *FlowGenerator) processPacket(meta *MetaPacket) {
 	reply := false
 	var flowExtra *FlowExtra
 	fastPath := &f.fastPath
@@ -495,7 +493,7 @@ func (f *FlowGenerator) processPacket(meta *datatype.MetaPacket) {
 func (f *FlowGenerator) handle() {
 	metaPacketHeaderInQueue := f.metaPacketHeaderInQueue
 	for {
-		meta := metaPacketHeaderInQueue.Get().(*datatype.MetaPacket)
+		meta := metaPacketHeaderInQueue.Get().(*MetaPacket)
 		if !f.handleRunning {
 			break
 		}
