@@ -5,8 +5,6 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/policy"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
-
-	"gitlab.x.lan/yunshan/droplet/handler"
 )
 
 var log = logging.MustGetLogger("labeler")
@@ -47,7 +45,7 @@ func (l *LabelerManager) GetData(key *policy.LookupKey) {
 	}
 }
 
-func (l *LabelerManager) GetPolicy(packet *handler.MetaPacket) {
+func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket) {
 	key := &policy.LookupKey{
 		SrcMac:      uint64(packet.MacSrc),
 		DstMac:      uint64(packet.MacDst),
@@ -72,7 +70,7 @@ func (l *LabelerManager) GetPolicy(packet *handler.MetaPacket) {
 	}
 }
 
-func cloneMetaPacket(src *handler.MetaPacket) *handler.MetaPacket {
+func cloneMetaPacket(src *datatype.MetaPacket) *datatype.MetaPacket {
 	newPacket := *src
 	if src.EndpointData != nil {
 		endpointData := &policy.EndpointData{}
@@ -91,7 +89,7 @@ func cloneMetaPacket(src *handler.MetaPacket) *handler.MetaPacket {
 }
 
 //FIXME:  临时方案后面这部分代码需要删除
-func convertMetaPacketToTaggedMetering(metaPacket *handler.MetaPacket) *datatype.TaggedMetering {
+func convertMetaPacketToTaggedMetering(metaPacket *datatype.MetaPacket) *datatype.TaggedMetering {
 	var l3EpcId0, l3EpcId1 uint32
 	var groupIds0, groupIds1 []uint32
 	if metaPacket.EndpointData != nil {
@@ -134,7 +132,7 @@ func convertMetaPacketToTaggedMetering(metaPacket *handler.MetaPacket) *datatype
 
 func (l *LabelerManager) run() {
 	for l.running {
-		packet := l.readQueue.Get().(*handler.MetaPacket)
+		packet := l.readQueue.Get().(*datatype.MetaPacket)
 		l.GetPolicy(packet)
 		for _, queue := range l.appQueue {
 			newPacket := cloneMetaPacket(packet)

@@ -11,7 +11,6 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/policy"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
 
-	"gitlab.x.lan/yunshan/droplet/handler"
 	. "gitlab.x.lan/yunshan/droplet/utils"
 )
 
@@ -21,22 +20,22 @@ const DEFAULT_INTERVAL_SEC_LOW = 10
 const DEFAULT_DURATION_MSEC = time.Millisecond * 123
 const DEFAULT_PKT_LEN = 128
 
-func getDefaultPacket() *handler.MetaPacket {
+func getDefaultPacket() *MetaPacket {
 	src, _ := net.ParseMAC("12:34:56:78:9A:BC")
 	dst, _ := net.ParseMAC("21:43:65:87:A9:CB")
-	return &handler.MetaPacket{
+	return &MetaPacket{
 		Timestamp: time.Duration(time.Now().UnixNano()),
 		Exporter:  IpToUint32(net.ParseIP("192.168.1.1")),
 		InPort:    65533,
-		MacSrc:    handler.MacIntFromBytes(src),
-		MacDst:    handler.MacIntFromBytes(dst),
+		MacSrc:    MacIntFromBytes(src),
+		MacDst:    MacIntFromBytes(dst),
 		PacketLen: DEFAULT_PKT_LEN,
 		Protocol:  6,
 		IpSrc:     IpToUint32(net.ParseIP("8.8.8.8").To4()),
 		IpDst:     IpToUint32(net.ParseIP("114.114.114.114").To4()),
 		PortSrc:   12345,
 		PortDst:   22,
-		TcpData:   &handler.MetaPacketTcpHeader{Flags: TCP_SYN},
+		TcpData:   &MetaPacketTcpHeader{Flags: TCP_SYN},
 		EndpointData: &EndpointData{
 			SrcInfo: &EndpointInfo{
 				L2EpcId:  -1,
@@ -54,7 +53,7 @@ func getDefaultPacket() *handler.MetaPacket {
 	}
 }
 
-func reversePacket(packet *handler.MetaPacket) {
+func reversePacket(packet *MetaPacket) {
 	packet.MacSrc, packet.MacDst = packet.MacDst, packet.MacSrc
 	packet.IpSrc, packet.IpDst = packet.IpDst, packet.IpSrc
 	packet.PortSrc, packet.PortDst = packet.PortDst, packet.PortSrc

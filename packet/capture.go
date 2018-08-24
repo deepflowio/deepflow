@@ -12,11 +12,11 @@ import (
 	"github.com/google/gopacket/afpacket"
 	. "github.com/google/gopacket/layers"
 	"github.com/op/go-logging"
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 	"golang.org/x/net/bpf"
 
-	"gitlab.x.lan/yunshan/droplet/handler"
 	. "gitlab.x.lan/yunshan/droplet/utils"
 )
 
@@ -49,7 +49,7 @@ type PacketCounter struct {
 
 type Capture struct {
 	tPacket     *afpacket.TPacket
-	ip          handler.IPv4Int
+	ip          datatype.IPv4Int
 	rxInterface uint32
 	outputQueue queue.QueueWriter
 
@@ -141,7 +141,7 @@ func (c *Capture) run() (retErr error) {
 			prevTimestamp = timestamp
 		}
 		c.counter.Rx++
-		metaPacket := &handler.MetaPacket{
+		metaPacket := &datatype.MetaPacket{
 			Timestamp: timestamp,
 			InPort:    c.rxInterface,
 			Exporter:  c.ip,
@@ -229,9 +229,9 @@ func NewCapture(interfaceName string, ip net.IP, isTap bool, outputQueue queue.Q
 		log.Warning("BPF inject failed:", err)
 	}
 
-	rxInterface := uint32(handler.CAPTURE_LOCAL)
+	rxInterface := uint32(datatype.CAPTURE_LOCAL)
 	if isTap {
-		rxInterface = uint32(handler.CAPTURE_REMOTE)
+		rxInterface = uint32(datatype.CAPTURE_REMOTE)
 	}
 
 	cap := &Capture{
