@@ -44,7 +44,6 @@ func Start(configPath string) {
 	labelerManager.Start()
 	synchronizer.Register(func(response *protobuf.SyncResponse) {
 		labelerManager.OnPlatformDataChange(convert2PlatformData(response))
-		labelerManager.OnServiceDataChange(convert2ServiceData(response))
 		labelerManager.OnIpGroupDataChange(convert2IpGroupdata(response))
 	})
 
@@ -86,8 +85,8 @@ func Start(configPath string) {
 	}()
 	go func() {
 		for {
-			taggedMetering := meteringQueue.Get().(*TaggedMetering)
-			meteringProcess.Process(*taggedMetering)
+			metaPacket := meteringQueue.Get().(*MetaPacket)
+			meteringProcess.Process(*metaPacket)
 		}
 	}()
 }
