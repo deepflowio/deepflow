@@ -37,3 +37,7 @@ func (s *ByteStream) U64() uint64 {
 	s.offset += 8
 	return binary.BigEndian.Uint64(s.data[s.offset-8:])
 }
+
+func NewByteStream(data []byte) ByteStream {
+	return ByteStream{data, 0}
+}
