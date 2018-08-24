@@ -6,17 +6,16 @@ import (
 
 	"github.com/google/gopacket/layers"
 	"github.com/op/go-logging"
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/policy"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
 	. "gitlab.x.lan/yunshan/droplet-libs/stats"
-
-	"gitlab.x.lan/yunshan/droplet/handler"
 )
 
 var log = logging.MustGetLogger("flowgenerator")
 
-func getFlowKey(meta *handler.MetaPacket) *FlowKey {
+func getFlowKey(meta *datatype.MetaPacket) *FlowKey {
 	flowKey := &FlowKey{
 		Exporter: *NewIPFromInt(meta.Exporter),
 		IPSrc:    *NewIPFromInt(meta.IpSrc),
@@ -67,7 +66,7 @@ func isFromTrident(flowKey *FlowKey) bool {
 	return flowKey.InPort0&DEEPFLOW_POSITION_EXPORTER == DEEPFLOW_POSITION_EXPORTER
 }
 
-func (f *FlowExtra) MacEquals(meta *handler.MetaPacket) bool {
+func (f *FlowExtra) MacEquals(meta *datatype.MetaPacket) bool {
 	taggedFlow := f.taggedFlow
 	flowMacSrc, flowMacDst := taggedFlow.MACSrc.Int(), taggedFlow.MACDst.Int()
 	if flowMacSrc == meta.MacSrc && flowMacDst == meta.MacDst {
@@ -80,7 +79,7 @@ func (f *FlowExtra) MacEquals(meta *handler.MetaPacket) bool {
 }
 
 // FIXME: need a fast way to compare like memcmp
-func (f *FlowCache) keyMatch(meta *handler.MetaPacket, key *FlowKey) (*FlowExtra, bool) {
+func (f *FlowCache) keyMatch(meta *datatype.MetaPacket, key *FlowKey) (*FlowExtra, bool) {
 	for e := f.flowList.Front(); e != nil; e = e.Next() {
 		flowExtra := e.Value.(*FlowExtra)
 		flowKey := &flowExtra.taggedFlow.FlowKey
@@ -134,7 +133,7 @@ func (f *FlowGenerator) genFlowId(timestamp uint64, inPort uint64) uint64 {
 	return ((inPort & IN_PORT_FLOW_ID_MASK) << 32) | ((timestamp & TIMER_FLOW_ID_MASK) << 32) | (f.stats.TotalNumFlows & TOTAL_FLOWS_ID_MASK)
 }
 
-func (f *FlowGenerator) initFlow(meta *handler.MetaPacket, key *FlowKey) (*FlowExtra, bool, bool) {
+func (f *FlowGenerator) initFlow(meta *datatype.MetaPacket, key *FlowKey) (*FlowExtra, bool, bool) {
 	now := time.Duration(meta.Timestamp)
 	taggedFlow := &TaggedFlow{
 		Flow: Flow{
@@ -234,7 +233,7 @@ func (f *FlowGenerator) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8
 	return closed
 }
 
-func (f *FlowExtra) updatePlatformData(meta *handler.MetaPacket, reply bool) {
+func (f *FlowExtra) updatePlatformData(meta *datatype.MetaPacket, reply bool) {
 	endpointData := meta.EndpointData
 	var srcInfo, dstInfo *EndpointInfo
 	if endpointData == nil {
@@ -440,7 +439,7 @@ func (f *FlowExtra) initFlowInfoForPerf(reply bool) *FlowInfo {
 	}
 }
 
-func (f *FlowGenerator) processPacket(meta *handler.MetaPacket) {
+func (f *FlowGenerator) processPacket(meta *datatype.MetaPacket) {
 	reply := false
 	var flowExtra *FlowExtra
 	fastPath := &f.fastPath
@@ -496,7 +495,7 @@ func (f *FlowGenerator) processPacket(meta *handler.MetaPacket) {
 func (f *FlowGenerator) handle() {
 	metaPacketHeaderInQueue := f.metaPacketHeaderInQueue
 	for {
-		meta := metaPacketHeaderInQueue.Get().(*handler.MetaPacket)
+		meta := metaPacketHeaderInQueue.Get().(*datatype.MetaPacket)
 		if !f.handleRunning {
 			break
 		}

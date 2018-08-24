@@ -10,6 +10,7 @@ import (
 
 	"github.com/op/go-logging"
 	"github.com/spf13/cobra"
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 
@@ -145,8 +146,8 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) {
 	ifMacSuffix := decoder.DecodeHeader()
 
 	for {
-		meta := &handler.MetaPacket{
-			InPort:   ifMacSuffix | handler.CAPTURE_REMOTE,
+		meta := &datatype.MetaPacket{
+			InPort:   ifMacSuffix | datatype.CAPTURE_REMOTE,
 			Exporter: ip,
 		}
 		if decoder.NextPacket(meta) {
