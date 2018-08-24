@@ -26,7 +26,7 @@ func NewLabelerManager(readQueue queue.QueueReader, meteringQueue queue.QueueWri
 	}
 }
 
-func (l *LabelerManager) OnPlatformDataChange(data []*policy.PlatformData) {
+func (l *LabelerManager) OnPlatformDataChange(data []*datatype.PlatformData) {
 	l.policyTable.UpdateInterfaceData(data)
 }
 
@@ -38,7 +38,7 @@ func (l *LabelerManager) OnIpGroupDataChange(data []*policy.IpGroupData) {
 	l.policyTable.UpdateIpGroupData(data)
 }
 
-func (l *LabelerManager) GetData(key *policy.LookupKey) {
+func (l *LabelerManager) GetData(key *datatype.LookupKey) {
 	data, _ := l.policyTable.LookupAllByKey(key)
 	if data != nil {
 		log.Debug("QUERY KEY:", key, "SRC:", data.SrcInfo, "DST:", data.DstInfo)
@@ -46,7 +46,7 @@ func (l *LabelerManager) GetData(key *policy.LookupKey) {
 }
 
 func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket) {
-	key := &policy.LookupKey{
+	key := &datatype.LookupKey{
 		SrcMac:      uint64(packet.MacSrc),
 		DstMac:      uint64(packet.MacDst),
 		SrcIp:       uint32(packet.IpSrc),
@@ -73,13 +73,13 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket) {
 func cloneMetaPacket(src *datatype.MetaPacket) *datatype.MetaPacket {
 	newPacket := *src
 	if src.EndpointData != nil {
-		endpointData := &policy.EndpointData{}
+		endpointData := &datatype.EndpointData{}
 		if src.EndpointData.SrcInfo != nil {
-			endpointData.SrcInfo = &policy.EndpointInfo{}
+			endpointData.SrcInfo = &datatype.EndpointInfo{}
 			*endpointData.SrcInfo = *src.EndpointData.SrcInfo
 		}
 		if src.EndpointData.DstInfo != nil {
-			endpointData.DstInfo = &policy.EndpointInfo{}
+			endpointData.DstInfo = &datatype.EndpointInfo{}
 			*endpointData.DstInfo = *src.EndpointData.DstInfo
 		}
 		newPacket.EndpointData = endpointData

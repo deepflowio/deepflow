@@ -9,7 +9,7 @@ import (
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
-	"gitlab.x.lan/yunshan/droplet/utils"
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 type ContinuousFlag uint8
@@ -440,7 +440,7 @@ func (p *MetaFlowPerf) whenFlowOpening(sameDirection, oppositeDirection *TcpSess
 
 	if isSynPacket(header) || isSynAckPacket(header) {
 		if header.TcpData.WinScale > 0 {
-			sameDirection.winScale = WIN_SCALE_FLAG | uint8(utils.Min(int(WIN_SCALE_MAX), int(header.TcpData.WinScale)))
+			sameDirection.winScale = WIN_SCALE_FLAG | uint8(Min(int(WIN_SCALE_MAX), int(header.TcpData.WinScale)))
 		}
 
 		oppositeDirection.setRttPrecondition()
@@ -705,11 +705,11 @@ func (p *MetaFlowPerf) Update(header *MetaPacket, flowInfo *FlowInfo) error {
 
 	if valid := p.preprocess(header, flowInfo); valid {
 		if flowInfo.Direction == TCP_DIR_CLIENT {
-			sameDirection = &p.ctrlInfo.tcpSession[utils.Bool2Int(TCP_DIR_CLIENT)]
-			oppositeDirection = &p.ctrlInfo.tcpSession[utils.Bool2Int(TCP_DIR_SERVER)]
+			sameDirection = &p.ctrlInfo.tcpSession[Bool2Int(TCP_DIR_CLIENT)]
+			oppositeDirection = &p.ctrlInfo.tcpSession[Bool2Int(TCP_DIR_SERVER)]
 		} else {
-			sameDirection = &p.ctrlInfo.tcpSession[utils.Bool2Int(TCP_DIR_SERVER)]
-			oppositeDirection = &p.ctrlInfo.tcpSession[utils.Bool2Int(TCP_DIR_CLIENT)]
+			sameDirection = &p.ctrlInfo.tcpSession[Bool2Int(TCP_DIR_SERVER)]
+			oppositeDirection = &p.ctrlInfo.tcpSession[Bool2Int(TCP_DIR_CLIENT)]
 		}
 
 		if time.Duration(header.Timestamp) < sameDirection.timestamp || time.Duration(header.Timestamp) < oppositeDirection.timestamp {

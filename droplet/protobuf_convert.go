@@ -5,11 +5,11 @@ import (
 	"strconv"
 	"strings"
 
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/policy"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 
 	"gitlab.x.lan/yunshan/droplet/protobuf"
-	. "gitlab.x.lan/yunshan/droplet/utils"
 )
 
 func newServicedata(service *protobuf.Service) *policy.ServiceData {
@@ -44,7 +44,7 @@ func convert2ServiceData(response *protobuf.SyncResponse) []*policy.ServiceData 
 	return serviceDatas
 }
 
-func newPlatformData(vifData *protobuf.Interface) *policy.PlatformData {
+func newPlatformData(vifData *protobuf.Interface) *datatype.PlatformData {
 	macInt := uint64(0)
 	if mac, err := net.ParseMAC(vifData.GetMac()); err == nil {
 		macInt = Mac2Uint64(mac)
@@ -56,24 +56,24 @@ func newPlatformData(vifData *protobuf.Interface) *policy.PlatformData {
 		hostIp = IpToUint32(ip)
 	}
 
-	var ips []*policy.IpNet
+	var ips []*datatype.IpNet
 	for _, ipResource := range vifData.IpResources {
 		fixIp := net.ParseIP(ipResource.GetIp())
 		if fixIp == nil {
 			continue
 		}
 		netmask := ipResource.GetMasklen()
-		if netmask == 0 || netmask > policy.MAX_MASK_LEN || netmask < policy.MIN_MASK_LEN {
-			netmask = policy.MAX_MASK_LEN
+		if netmask == 0 || netmask > datatype.MAX_MASK_LEN || netmask < datatype.MIN_MASK_LEN {
+			netmask = datatype.MAX_MASK_LEN
 		}
-		var ipinfo = &policy.IpNet{
+		var ipinfo = &datatype.IpNet{
 			Ip:       IpToUint32(fixIp),
 			Netmask:  netmask,
 			SubnetId: ipResource.GetSubnetId(),
 		}
 		ips = append(ips, ipinfo)
 	}
-	return &policy.PlatformData{
+	return &datatype.PlatformData{
 		Mac:        macInt,
 		Ips:        ips,
 		EpcId:      int32(vifData.GetEpcId()),
@@ -86,9 +86,9 @@ func newPlatformData(vifData *protobuf.Interface) *policy.PlatformData {
 	}
 }
 
-func convert2PlatformData(response *protobuf.SyncResponse) []*policy.PlatformData {
+func convert2PlatformData(response *protobuf.SyncResponse) []*datatype.PlatformData {
 	interfaces := response.GetPlatformData().GetInterfaces()
-	platformDatas := make([]*policy.PlatformData, 0, len(interfaces))
+	platformDatas := make([]*datatype.PlatformData, 0, len(interfaces))
 	for _, data := range interfaces {
 		if newData := newPlatformData(data); newData != nil {
 			platformDatas = append(platformDatas, newData)

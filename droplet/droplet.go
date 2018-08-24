@@ -11,7 +11,6 @@ import (
 	"gitlab.x.lan/yunshan/droplet/adapter"
 	"gitlab.x.lan/yunshan/droplet/config"
 	"gitlab.x.lan/yunshan/droplet/flowgenerator"
-	"gitlab.x.lan/yunshan/droplet/handler"
 	"gitlab.x.lan/yunshan/droplet/labeler"
 	"gitlab.x.lan/yunshan/droplet/mapreduce"
 	"gitlab.x.lan/yunshan/droplet/packet"
@@ -33,13 +32,13 @@ func Start(configPath string) {
 
 	manager := queue.NewManager()
 
-	filterQueue := manager.NewQueue("ToFilter", 1000, &handler.MetaPacket{})
+	filterQueue := manager.NewQueue("ToFilter", 1000, &MetaPacket{})
 	tridentAdapter := adapter.NewTridentAdapter(filterQueue)
 	if tridentAdapter == nil {
 		return
 	}
 
-	flowQueue := manager.NewQueue("FilterToFlow", 1000, &handler.MetaPacket{})
+	flowQueue := manager.NewQueue("FilterToFlow", 1000, &MetaPacket{})
 	meteringQueue := manager.NewQueue("FilterToMetering", 1000, &TaggedMetering{})
 	labelerManager := labeler.NewLabelerManager(filterQueue, meteringQueue, flowQueue)
 	labelerManager.Start()
@@ -49,7 +48,7 @@ func Start(configPath string) {
 		labelerManager.OnIpGroupDataChange(convert2IpGroupdata(response))
 	})
 
-	flowAppOutputQueue := manager.NewQueue("flowAppOutputQueue", 1000, &handler.MetaPacket{})
+	flowAppOutputQueue := manager.NewQueue("flowAppOutputQueue", 1000, &MetaPacket{})
 	flowGenerator := flowgenerator.New(flowQueue, flowAppOutputQueue, 60)
 	if flowGenerator == nil {
 		return
