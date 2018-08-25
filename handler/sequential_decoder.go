@@ -13,6 +13,8 @@ import (
 const (
 	DELTA_TIMESTAMP_LEN = 2
 	PACKET_STREAM_END   = 1<<(DELTA_TIMESTAMP_LEN*8) - 1
+	UDP_BUFFER_SIZE     = 1800
+	PAYLOAD_MAX         = 1500
 )
 
 type Decoded struct {
@@ -186,6 +188,7 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPacket) {
 		case ICMPv4TypeTimeExceeded:
 			fallthrough
 		case ICMPv4TypeParameterProblem:
+			// TODO; decode udp/tcp header
 			d.data.U32() // skip 4B
 			d.data.Field(28)
 			return
@@ -259,18 +262,21 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 	}
 }
 
-func (d *SequentialDecoder) DecodeHeader() uint32 {
+func (d *SequentialDecoder) DecodeHeader() (uint32, bool) {
 	_ = d.data.U8()
-	_ = d.data.U8()
+	version := d.data.U8()
+	if version != 1 {
+		return 0, true
+	}
 	d.seq = d.data.U32()
 	d.timestamp = time.Duration(d.data.U64()) * time.Microsecond // µs to ns
 	ifMacSuffix := d.data.U32()
-	return ifMacSuffix & 0xffff
+	return ifMacSuffix & 0xffff, false
 }
 
 func (d *SequentialDecoder) NextPacket(meta *MetaPacket) bool {
 	delta := d.data.U16()
-	if delta == PACKET_STREAM_END {
+	if delta == PACKET_STREAM_END || UDP_BUFFER_SIZE-d.data.Len() > PAYLOAD_MAX {
 		return true
 	}
 	totalSize := d.data.U16()
