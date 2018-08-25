@@ -40,7 +40,9 @@ func Start(configPath string) {
 
 	flowQueue := manager.NewQueue("FilterToFlow", 1000, &MetaPacket{})
 	meteringQueue := manager.NewQueue("FilterToMetering", 1000, &TaggedMetering{})
-	labelerManager := labeler.NewLabelerManager(filterQueue, meteringQueue, flowQueue)
+	labelerManager := labeler.NewLabelerManager(filterQueue)
+	labelerManager.RegisterAppQueue(labeler.METERING_QUEUE, meteringQueue)
+	labelerManager.RegisterAppQueue(labeler.FLOW_QUEUE, flowQueue)
 	labelerManager.Start()
 	synchronizer.Register(func(response *protobuf.SyncResponse) {
 		labelerManager.OnPlatformDataChange(convert2PlatformData(response))
