@@ -16,7 +16,7 @@ var log = logging.MustGetLogger("config")
 type Config struct {
 	ControllerIps   []string `yaml:"controller-ips,flow"`
 	ControllerPort  uint16   `yaml:"controller-port"`
-	Logfile         string   `yaml:"log-file"`
+	LogFile         string   `yaml:"log-file"`
 	LogLevel        string   `yaml:"log-level"`
 	Profiler        bool     `yaml:"profiler"`
 	CloseFloodCheck bool     `yaml:"close-flood-check"`
@@ -35,8 +35,8 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if c.Logfile == "" {
-		c.Logfile = "/var/log/droplet/droplet.log"
+	if c.LogFile == "" {
+		c.LogFile = "/var/log/droplet/droplet.log"
 	}
 	level := strings.ToLower(c.LogLevel)
 	levels := map[string]interface{}{"error": nil, "warn": nil, "info": nil, "debug": nil}
