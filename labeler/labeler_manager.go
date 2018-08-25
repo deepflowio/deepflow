@@ -62,10 +62,6 @@ func (l *LabelerManager) OnPlatformDataChange(data []*datatype.PlatformData) {
 	l.policyTable.UpdateInterfaceData(data)
 }
 
-func (l *LabelerManager) OnServiceDataChange(data []*policy.ServiceData) {
-	l.policyTable.UpdateServiceData(data)
-}
-
 func (l *LabelerManager) OnIpGroupDataChange(data []*policy.IpGroupData) {
 	l.policyTable.UpdateIpGroupData(data)
 }
