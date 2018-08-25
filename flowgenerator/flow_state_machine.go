@@ -160,8 +160,8 @@ func (f *FlowGenerator) initStateMachineMaster() {
 	stateMachineMaster[FLOW_STATE_CLOSING_RX1][TCP_SYN|TCP_ACK] = stateMachineMaster[FLOW_STATE_CLOSING_RX1][TCP_SYN]
 
 	stateMachineMaster[FLOW_STATE_CLOSING_RX1][TCP_FIN] = &StateValue{timeoutConfig.Closing, FLOW_STATE_CLOSING_RX2, false}
-	stateMachineMaster[FLOW_STATE_CLOSING_RX1][TCP_FIN|TCP_ACK] = stateMachineMaster[FLOW_STATE_CLOSING_RX2][TCP_FIN]
-	stateMachineMaster[FLOW_STATE_CLOSING_RX1][TCP_FIN|TCP_PSH|TCP_ACK] = stateMachineMaster[FLOW_STATE_CLOSING_RX2][TCP_FIN]
+	stateMachineMaster[FLOW_STATE_CLOSING_RX1][TCP_FIN|TCP_ACK] = stateMachineMaster[FLOW_STATE_CLOSING_RX1][TCP_FIN]
+	stateMachineMaster[FLOW_STATE_CLOSING_RX1][TCP_FIN|TCP_PSH|TCP_ACK] = stateMachineMaster[FLOW_STATE_CLOSING_RX1][TCP_FIN]
 
 	stateMachineMaster[FLOW_STATE_CLOSING_RX1][TCP_RST] = &StateValue{timeoutConfig.Closing, FLOW_STATE_RESET, false}
 	stateMachineMaster[FLOW_STATE_CLOSING_RX1][TCP_RST|TCP_ACK] = stateMachineMaster[FLOW_STATE_CLOSING_RX1][TCP_RST]
@@ -189,8 +189,14 @@ func (f *FlowGenerator) initStateMachineMaster() {
 	stateMachineMaster[FLOW_STATE_CLOSING_RX2][TCP_PSH|TCP_ACK] = stateMachineMaster[FLOW_STATE_CLOSING_RX2][TCP_ACK]
 	stateMachineMaster[FLOW_STATE_CLOSING_RX2][TCP_PSH|TCP_URG|TCP_ACK] = stateMachineMaster[FLOW_STATE_CLOSING_RX2][TCP_ACK]
 
+	// for FLOW_STATE_CLOSED
+	stateMachineMaster[FLOW_STATE_CLOSED] = make(map[uint8]*StateValue)
+
 	// for FLOW_STATE_RESET
 	stateMachineMaster[FLOW_STATE_RESET] = make(map[uint8]*StateValue)
+
+	// for FLOW_STATE_EXCEPTION
+	stateMachineMaster[FLOW_STATE_EXCEPTION] = make(map[uint8]*StateValue)
 }
 
 func (f *FlowGenerator) initStateMachineSlave() {
@@ -255,6 +261,12 @@ func (f *FlowGenerator) initStateMachineSlave() {
 
 	stateMachineSlave[FLOW_STATE_CLOSING_RX2][TCP_ACK] = &StateValue{timeoutConfig.ClosedFin, FLOW_STATE_CLOSED, true}
 
+	// for FLOW_STATE_CLOSED
+	stateMachineSlave[FLOW_STATE_CLOSED] = make(map[uint8]*StateValue)
+
 	// for FLOW_STATE_RESET
 	stateMachineSlave[FLOW_STATE_RESET] = make(map[uint8]*StateValue)
+
+	// for FLOW_STATE_EXCEPTION
+	stateMachineSlave[FLOW_STATE_EXCEPTION] = make(map[uint8]*StateValue)
 }
