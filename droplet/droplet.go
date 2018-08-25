@@ -5,6 +5,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"time"
 
 	"github.com/op/go-logging"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -98,17 +99,45 @@ func Start(configPath string) {
 
 	flowMapProcess := mapreduce.NewFlowMapProcess()
 	meteringProcess := mapreduce.NewMeteringMapProcess()
+	queueFlushTime := time.Minute
+	flowTimer := time.NewTimer(queueFlushTime)
+	go func() {
+		for {
+			<-flowTimer.C
+			flushFlow := TaggedFlow{Flow: Flow{StartTime: 0}}
+			flowAppOutputQueue.Put(&flushFlow)
+			flowTimer.Reset(queueFlushTime)
+		}
+	}()
 	go func() {
 		for {
 			taggedFlow := flowAppOutputQueue.Get().(*TaggedFlow)
 			log.Info(taggedFlow)
-			flowMapProcess.Process(*taggedFlow)
+			if taggedFlow.StartTime > 0 {
+				flowMapProcess.Process(*taggedFlow)
+			} else if flowMapProcess.NeedFlush() {
+				flowMapProcess.Flush()
+			}
+		}
+	}()
+
+	meteringTimer := time.NewTimer(queueFlushTime)
+	go func() {
+		for {
+			<-meteringTimer.C
+			flushMetering := MetaPacket{Timestamp: 0}
+			meteringQueue.Put(&flushMetering)
+			meteringTimer.Reset(queueFlushTime)
 		}
 	}()
 	go func() {
 		for {
 			metaPacket := meteringQueue.Get().(*MetaPacket)
-			meteringProcess.Process(*metaPacket)
+			if metaPacket.Timestamp != 0 {
+				meteringProcess.Process(*metaPacket)
+			} else if meteringProcess.NeedFlush() {
+				meteringProcess.Flush()
+			}
 		}
 	}()
 }
