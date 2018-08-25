@@ -5,6 +5,7 @@ import (
 
 	"github.com/op/go-logging"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	. "gitlab.x.lan/yunshan/droplet-libs/logger"
 	_ "gitlab.x.lan/yunshan/droplet-libs/monitor"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 
@@ -22,6 +23,8 @@ var log = logging.MustGetLogger("droplet")
 
 func Start(configPath string) {
 	cfg := config.Load(configPath)
+	InitLog(cfg.LogFile, cfg.LogLevel)
+
 	ips := make([]net.IP, 0, len(cfg.ControllerIps))
 	for _, ipString := range cfg.ControllerIps {
 		ip := net.ParseIP(ipString)

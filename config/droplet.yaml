@@ -3,7 +3,7 @@ controller-ips:
 # controller listen port
 controller-port: 20035
 # logfile path
-log-file: /var/log/trident/trident.log
+log-file: /var/log/droplet/droplet.log
 # loglevel: "debug/info/warn/error"
 log-level: info
 # profiler
