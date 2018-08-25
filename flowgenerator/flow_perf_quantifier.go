@@ -696,17 +696,16 @@ func (p *MetaFlowPerf) preprocess(header *MetaPacket, flowInfo *FlowInfo) bool {
 func (p *MetaFlowPerf) Update(header *MetaPacket, reply bool, flowExtra *FlowExtra) error {
 	var err FlowPerfError
 	var sameDirection, oppositeDirection *TcpSessionPeer
-	direction := reply
 
 	if header == nil || flowExtra == nil {
 		err = FlowPerfError{what: "packet header or flow info is nil"}
 		return err
 	}
 
-	flowInfo := initFlowInfo(flowExtra.taggedFlow, flowExtra.flowState, direction)
+	flowInfo := initFlowInfo(flowExtra.taggedFlow, flowExtra.flowState, reply, flowExtra.reversed)
 
 	if valid := p.preprocess(header, flowInfo); valid {
-		if direction == TCP_DIR_CLIENT {
+		if reply == TCP_DIR_CLIENT {
 			sameDirection = &p.ctrlInfo.tcpSession[Bool2Int(TCP_DIR_CLIENT)]
 			oppositeDirection = &p.ctrlInfo.tcpSession[Bool2Int(TCP_DIR_SERVER)]
 		} else {
@@ -895,16 +894,30 @@ func (i *FlowInfo) String() string {
 	return reflectFormat(*i)
 }
 
-func initFlowInfo(flow *TaggedFlow, state FlowState, reply bool) *FlowInfo {
-	return &FlowInfo{
-		flowState:         state,
-		direction:         reply,
-		flowID:            flow.FlowID,
-		totalPacketCount0: flow.TotalPacketCount0,
-		totalPacketCount1: flow.TotalPacketCount1,
-		arrTime0Last:      flow.ArrTime0Last,
-		arrTime1Last:      flow.ArrTime1Last,
-		tcpFlags0:         flow.TCPFlags0,
-		tcpFlags1:         flow.TCPFlags1,
+func initFlowInfo(flow *TaggedFlow, state FlowState, reply, reversed bool) *FlowInfo {
+	if reversed {
+		return &FlowInfo{
+			flowState:         state,
+			direction:         reply,
+			flowID:            flow.FlowID,
+			totalPacketCount0: flow.TotalPacketCount1,
+			totalPacketCount1: flow.TotalPacketCount0,
+			arrTime0Last:      flow.ArrTime1Last,
+			arrTime1Last:      flow.ArrTime0Last,
+			tcpFlags0:         flow.TCPFlags1,
+			tcpFlags1:         flow.TCPFlags0,
+		}
+	} else {
+		return &FlowInfo{
+			flowState:         state,
+			direction:         reply,
+			flowID:            flow.FlowID,
+			totalPacketCount0: flow.TotalPacketCount0,
+			totalPacketCount1: flow.TotalPacketCount1,
+			arrTime0Last:      flow.ArrTime0Last,
+			arrTime1Last:      flow.ArrTime1Last,
+			tcpFlags0:         flow.TCPFlags0,
+			tcpFlags1:         flow.TCPFlags1,
+		}
 	}
 }

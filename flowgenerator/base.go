@@ -90,11 +90,6 @@ var defaultTimeoutConfig TimeoutConfig = TimeoutConfig{
 	TIMEOUT_SINGLE_DIRECTION,
 }
 
-type QuinHashValue struct {
-	hashHigh uint64
-	hashLow  uint64
-}
-
 type FlowExtra struct {
 	taggedFlow     *TaggedFlow
 	metaFlowPerf   *MetaFlowPerf
@@ -118,7 +113,7 @@ type FlowCache struct {
 
 type FlowCacheHashMap struct {
 	hashMap            []*FlowCache
-	size               uint64
+	mapSize            uint64
 	timeoutParallelNum uint64
 }
 
@@ -129,8 +124,8 @@ type FastPath struct {
 type FlowGenerator struct {
 	sync.RWMutex
 	TimeoutConfig
+	FastPath
 
-	fastPath                FastPath
 	metaPacketHeaderInQueue QueueReader
 	flowOutQueue            QueueWriter
 	stats                   FlowGeneratorStats

@@ -100,7 +100,7 @@ func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool) 
 	return nil, false
 }
 
-func (f *FastPath) createFlowCache(cacheCap int, hash uint64) *FlowCache {
+func (f *FlowGenerator) createFlowCache(cacheCap int, hash uint64) *FlowCache {
 	newFlowCache := &FlowCache{
 		capacity: cacheCap,
 		flowList: list.New(),
@@ -289,14 +289,14 @@ func (f *FlowExtra) reverseFlow() {
 
 func (f *FlowGenerator) tryReverseFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) bool {
 	taggedFlow := flowExtra.taggedFlow
-	if !flowExtra.reversed && flagContain(uint8(taggedFlow.TCPFlags0|taggedFlow.TCPFlags1)&TCP_FLAG_MASK, TCP_SYN) {
+	if flagContain(uint8(taggedFlow.TCPFlags0|taggedFlow.TCPFlags1), TCP_SYN) {
 		return false
 	}
-	if reply && flagEqual(meta.TcpData.Flags&TCP_FLAG_MASK, TCP_SYN) {
+	if flagEqual(meta.TcpData.Flags&TCP_FLAG_MASK, TCP_SYN) && reply {
 		flowExtra.reverseFlow()
 		flowExtra.reversed = true
 		return true
-	} else if flagEqual(meta.TcpData.Flags&TCP_FLAG_MASK, TCP_SYN|TCP_ACK) {
+	} else if flagEqual(meta.TcpData.Flags&TCP_FLAG_MASK, TCP_SYN|TCP_ACK) && !reply {
 		flowExtra.reverseFlow()
 		flowExtra.reversed = true
 		return true
@@ -304,21 +304,19 @@ func (f *FlowGenerator) tryReverseFlow(flowExtra *FlowExtra, meta *MetaPacket, r
 	return false
 }
 
-func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply *bool) (bool, bool) {
+func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) (bool, bool) {
 	taggedFlow := flowExtra.taggedFlow
 	bytes := uint64(meta.PacketLen)
 	packetTimestamp := meta.Timestamp
 	maxArrTime := timeMax(taggedFlow.ArrTime0Last, taggedFlow.ArrTime1Last)
-	reversed := false
-	if f.tryReverseFlow(flowExtra, meta, *reply) {
-		*reply = !*reply
-		reversed = true
+	if f.tryReverseFlow(flowExtra, meta, reply) {
+		reply = !reply
 	}
 	if taggedFlow.PacketCount0 == 0 && taggedFlow.PacketCount1 == 0 {
 		taggedFlow.CurStartTime = packetTimestamp
-		flowExtra.updatePlatformData(meta, *reply)
+		flowExtra.updatePlatformData(meta, reply)
 	}
-	if *reply {
+	if reply {
 		if taggedFlow.TotalPacketCount1 == 0 {
 			taggedFlow.ArrTime10 = packetTimestamp
 		}
@@ -349,7 +347,7 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 	}
 	flowExtra.recentTimesSec = packetTimestamp / time.Second
 
-	return f.updateFlowStateMachine(flowExtra, meta.TcpData.Flags, *reply), reversed
+	return f.updateFlowStateMachine(flowExtra, meta.TcpData.Flags, reply), reply
 }
 
 func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireIntervalSec time.Duration) {
@@ -415,26 +413,28 @@ func (f *FlowExtra) tryForceReport(flowOutQueue QueueWriter) {
 
 func (f *FlowGenerator) processPacket(meta *MetaPacket) {
 	reply := false
+	ok := false
 	var flowExtra *FlowExtra
-	fastPath := &f.fastPath
 	flowKey := getFlowKey(meta)
 	hash := getQuinTupleHash(flowKey)
-	flowCache := fastPath.hashMap[hash%HASH_MAP_SIZE]
+	flowCache := f.hashMap[hash%HASH_MAP_SIZE]
 	if flowCache == nil {
-		flowCache = fastPath.createFlowCache(FLOW_CACHE_CAP, hash%HASH_MAP_SIZE)
+		flowCache = f.createFlowCache(FLOW_CACHE_CAP, hash%HASH_MAP_SIZE)
 	}
 	flowCache.Lock()
 	if flowExtra, reply = flowCache.keyMatch(meta, flowKey); flowExtra != nil {
-		if ok, reversed := f.updateFlow(flowExtra, meta, &reply); ok {
+		if ok, reply = f.updateFlow(flowExtra, meta, reply); ok {
 			f.stats.CurrNumFlows--
-			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(reversed)
+			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(flowExtra.reversed)
 			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportIntervalSec)
 			flowExtra.calcCloseType(false)
 			f.flowOutQueue.Put(flowExtra.taggedFlow)
 			// delete front from this FlowCache because flowExtra is moved to front in keyMatch()
 			flowCache.flowList.Remove(flowCache.flowList.Front())
+		} else {
+			// reply is a sign relative to the flow direction, so if the flow is reversed then the sign should be changed
+			flowExtra.metaFlowPerf.Update(meta, flowExtra.reversed != reply, flowExtra)
 		}
-		flowExtra.metaFlowPerf.Update(meta, reply, flowExtra)
 	} else {
 		closed := false
 		flowExtra, closed, reply = f.initFlow(meta, flowKey)
@@ -524,12 +524,12 @@ loop:
 			if flowExtra.recentTimesSec+flowExtra.timeoutSec <= nowSec {
 				del = e
 				f.stats.CurrNumFlows--
-				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false)
+				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(flowExtra.reversed)
 				flowExtra.setCurFlowInfo(now, forceReportIntervalSec)
 				flowExtra.calcCloseType(false)
 				flowOutQueue.Put(flowExtra.taggedFlow)
 			} else if flowExtra.taggedFlow.StartTime/time.Second+forceReportIntervalSec < nowSec {
-				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false)
+				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(flowExtra.reversed)
 				flowExtra.setCurFlowInfo(now, forceReportIntervalSec)
 				flowExtra.calcCloseType(true)
 				flowExtra.tryForceReport(flowOutQueue)
@@ -550,23 +550,22 @@ loop:
 }
 
 func (f *FlowGenerator) timeoutReport() {
-	fastPath := &f.fastPath
-	var num uint64
+	var flowCacheNum uint64
 	f.cleanRunning = true
-	if fastPath.size%fastPath.timeoutParallelNum != 0 {
-		num = fastPath.size / (fastPath.timeoutParallelNum - 1)
+	if f.mapSize%f.timeoutParallelNum != 0 {
+		flowCacheNum = f.mapSize/f.timeoutParallelNum + 1
 	} else {
-		num = fastPath.size / fastPath.timeoutParallelNum
+		flowCacheNum = f.mapSize / f.timeoutParallelNum
 	}
-	for i := uint64(0); i < fastPath.timeoutParallelNum; i++ {
-		start := i * num
-		end := start + num
-		if end <= fastPath.size {
-			go f.cleanTimeoutHashMap(fastPath.hashMap, start, end)
+	for i := uint64(0); i < f.timeoutParallelNum; i++ {
+		start := i * flowCacheNum
+		end := start + flowCacheNum
+		if end <= f.mapSize {
+			go f.cleanTimeoutHashMap(f.hashMap, start, end)
 			log.Infof("clean goroutine %d (hashmap range %d to %d) created", i, start, end)
 		} else {
-			go f.cleanTimeoutHashMap(fastPath.hashMap, start, fastPath.size)
-			log.Infof("clean goroutine %d (hashmap range %d to %d) created", i, start, fastPath.size)
+			go f.cleanTimeoutHashMap(f.hashMap, start, f.mapSize)
+			log.Infof("clean goroutine %d (hashmap range %d to %d) created", i, start, f.mapSize)
 			break
 		}
 	}
@@ -604,9 +603,9 @@ func (f *FlowGenerator) Stop() {
 func New(metaPacketHeaderInQueue QueueReader, flowOutQueue QueueWriter, forceReportIntervalSec time.Duration) *FlowGenerator {
 	flowGenerator := &FlowGenerator{
 		TimeoutConfig:           defaultTimeoutConfig,
+		FastPath:                FastPath{FlowCacheHashMap: FlowCacheHashMap{make([]*FlowCache, HASH_MAP_SIZE), HASH_MAP_SIZE, 4}},
 		metaPacketHeaderInQueue: metaPacketHeaderInQueue,
 		flowOutQueue:            flowOutQueue,
-		fastPath:                FastPath{FlowCacheHashMap: FlowCacheHashMap{make([]*FlowCache, HASH_MAP_SIZE), HASH_MAP_SIZE, 4}},
 		stateMachineMaster:      make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
 		stateMachineSlave:       make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
 		forceReportIntervalSec:  forceReportIntervalSec,
