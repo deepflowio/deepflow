@@ -73,7 +73,6 @@ const (
 type PolicyTable struct {
 	cloudPlatformData *CloudPlatformData
 	policyMap         map[PolicyKey]PolicyId // 策略字典
-	serviceTable      *ServiceTable
 	policyAction      [MAX_POLICY_ID]*Action
 }
 
@@ -84,7 +83,6 @@ func NewPolicyTable( /* 传入Protobuf结构体指针 */ actionTypes ActionType)
 	 * droplet关心**几乎**所有，对关心的信息进行计算*/
 	return &PolicyTable{
 		cloudPlatformData: NewCloudPlatformData(),
-		serviceTable:      NewSerivceTable(),
 	}
 }
 
@@ -108,18 +106,12 @@ func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *Action) {
 	if PortInDeepflowExporter(key.RxInterface) {
 		endpointData.SetL2End(key)
 	}
-	serviceIds := t.serviceTable.GetServiceId(endpointData, key)
-	if serviceIds != nil {
-		//FIXME 添加policy实现
-		log.Debug("SERVICEIDS:", serviceIds)
+	//FIXME 添加policy实现
+	action := &Action{
+		ActionTypes: ActionType(0x3f),
 	}
-	return endpointData, nil
-}
 
-func (t *PolicyTable) UpdateServiceData(data []*ServiceData) {
-	if data != nil {
-		t.serviceTable.UpdateServiceTable(data)
-	}
+	return endpointData, action
 }
 
 func (t *PolicyTable) UpdateInterfaceData(data []*PlatformData) {
