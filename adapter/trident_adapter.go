@@ -113,7 +113,7 @@ func (a *TridentAdapter) cacheClear(data []byte, key uint32, seq uint32) {
 
 func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32) {
 	instance := a.instances[key]
-	if (instance.cacheCount == 0 && seq-instance.seq == 1) || instance.seq == 0 {
+	if (instance.cacheCount == 0 && seq-instance.seq == 1) || instance.seq == 0 || seq == 1 {
 		instance.seq = seq
 		a.decode(data, key)
 		a.counter.RxPackets += 1
@@ -143,7 +143,7 @@ func (a *TridentAdapter) findAndAdd(data []byte, key uint32, seq uint32) {
 
 func (a *TridentAdapter) decode(data []byte, ip uint32) {
 	decoder := handler.NewSequentialDecoder(data)
-	ifMacSuffix := decoder.DecodeHeader()
+	ifMacSuffix, _ := decoder.DecodeHeader()
 
 	for {
 		meta := &datatype.MetaPacket{
@@ -164,14 +164,16 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) {
 func (a *TridentAdapter) run() {
 	log.Infof("Starting trident adapter Listenning <%s>", a.listener.LocalAddr())
 	for a.running {
-		data := make([]byte, 1500)
+		data := make([]byte, handler.UDP_BUFFER_SIZE)
 		_, remote, err := a.listener.ReadFromUDP(data)
 		if err != nil {
 			log.Warningf("trident adapter listener.ReadFromUDP err: %s", err)
 		}
 
 		decoder := handler.NewSequentialDecoder(data)
-		decoder.DecodeHeader()
+		if _, invalid := decoder.DecodeHeader(); invalid {
+			continue
+		}
 		a.findAndAdd(data, IpToUint32(remote.IP), decoder.Seq())
 	}
 	a.listener.Close()
