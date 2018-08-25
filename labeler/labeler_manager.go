@@ -20,12 +20,19 @@ import (
 
 var log = logging.MustGetLogger("labeler")
 
+type QueueType uint8
+
+const (
+	FLOW_QUEUE QueueType = iota
+	METERING_QUEUE
+	MAX_QUEUE_NUM
+)
+
 type LabelerManager struct {
-	policyTable   *policy.PolicyTable
-	readQueue     queue.QueueReader
-	meteringQueue queue.QueueWriter
-	appQueue      []queue.QueueWriter
-	running       bool
+	policyTable *policy.PolicyTable
+	readQueue   queue.QueueReader
+	appQueues   [MAX_QUEUE_NUM]queue.QueueWriter
+	running     bool
 }
 
 const (
@@ -38,15 +45,17 @@ type DumpKey struct {
 	InPort uint32
 }
 
-func NewLabelerManager(readQueue queue.QueueReader, meteringQueue queue.QueueWriter, appQueue ...queue.QueueWriter) *LabelerManager {
+func NewLabelerManager(readQueue queue.QueueReader) *LabelerManager {
 	labeler := &LabelerManager{
-		policyTable:   policy.NewPolicyTable(policy.ACTION_FLOW_STAT),
-		readQueue:     readQueue,
-		meteringQueue: meteringQueue,
-		appQueue:      appQueue,
+		policyTable: policy.NewPolicyTable(policy.ACTION_FLOW_STAT),
+		readQueue:   readQueue,
 	}
 	dropletctl.Register(dropletctl.DROPLETCTL_LABELER, labeler)
 	return labeler
+}
+
+func (l *LabelerManager) RegisterAppQueue(queueType QueueType, appQueue queue.QueueWriter) {
+	l.appQueues[queueType] = appQueue
 }
 
 func (l *LabelerManager) OnPlatformDataChange(data []*datatype.PlatformData) {
@@ -68,7 +77,7 @@ func (l *LabelerManager) GetData(key *datatype.LookupKey) {
 	}
 }
 
-func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket) {
+func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket) *policy.Action {
 	key := &datatype.LookupKey{
 		SrcMac:      uint64(packet.MacSrc),
 		DstMac:      uint64(packet.MacDst),
@@ -79,6 +88,8 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket) {
 		Vlan:        packet.Vlan,
 		Proto:       uint8(packet.Protocol),
 		Ttl:         packet.TTL,
+		L2End0:      packet.L2End0,
+		L2End1:      packet.L2End1,
 		RxInterface: packet.InPort,
 	}
 
@@ -91,6 +102,8 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket) {
 	if policy != nil {
 		log.Debug("POLICY", policy)
 	}
+
+	return policy
 }
 
 func cloneMetaPacket(src *datatype.MetaPacket) *datatype.MetaPacket {
@@ -114,10 +127,12 @@ func cloneMetaPacket(src *datatype.MetaPacket) *datatype.MetaPacket {
 func (l *LabelerManager) run() {
 	for l.running {
 		packet := l.readQueue.Get().(*datatype.MetaPacket)
-		l.GetPolicy(packet)
-		l.meteringQueue.Put(cloneMetaPacket(packet))
-		for _, queue := range l.appQueue {
-			queue.Put(packet)
+		action := l.GetPolicy(packet)
+		if (action.ActionTypes&policy.ACTION_PACKET_STAT) != 0 && l.appQueues[METERING_QUEUE] != nil {
+			l.appQueues[METERING_QUEUE].Put(cloneMetaPacket(packet))
+		}
+		if (action.ActionTypes&policy.ACTION_FLOW_STAT) != 0 && l.appQueues[FLOW_QUEUE] != nil {
+			l.appQueues[FLOW_QUEUE].Put(packet)
 		}
 	}
 
