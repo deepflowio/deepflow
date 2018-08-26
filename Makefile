@@ -41,4 +41,4 @@ clean:
 
 .DEFAULT_GOAL := droplet
 
-.PHONY: lint test droplet clean submodule
+.PHONY: submodule test droplet droplet-ctl clean

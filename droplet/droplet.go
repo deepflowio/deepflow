@@ -2,6 +2,9 @@ package droplet
 
 import (
 	"net"
+	"net/http"
+	_ "net/http/pprof"
+	"os"
 
 	"github.com/op/go-logging"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -21,9 +24,22 @@ import (
 
 var log = logging.MustGetLogger("droplet")
 
+func startProfiler() {
+	go func() {
+		if err := http.ListenAndServe("0.0.0.0:8000", nil); err != nil {
+			log.Error("Start pprof on http 0.0.0.0:8000 failed")
+			os.Exit(1)
+		}
+	}()
+}
+
 func Start(configPath string) {
 	cfg := config.Load(configPath)
 	InitLog(cfg.LogFile, cfg.LogLevel)
+
+	if cfg.Profiler {
+		startProfiler()
+	}
 
 	ips := make([]net.IP, 0, len(cfg.ControllerIps))
 	for _, ipString := range cfg.ControllerIps {

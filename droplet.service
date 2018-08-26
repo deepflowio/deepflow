@@ -1,5 +1,5 @@
 [Unit]
-Description=trident.service
+Description=droplet.service
 After=syslog.target network-online.target
 
 [Service]

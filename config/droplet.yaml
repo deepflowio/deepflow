@@ -8,8 +8,6 @@ log-file: /var/log/droplet/droplet.log
 log-level: info
 # profiler
 profiler: false
-# DANGEROUS: possible flood when close
-close-flood-check: false
 # public traffic
 data-interfaces: []
 # mirrored traffic
