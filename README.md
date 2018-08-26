@@ -115,7 +115,7 @@ droplet应当使用dep
   1. 首先`go get -u github.com/derekparker/delve/cmd/dlv`下载dlv工具
   2. 以dedup为例，执行`dlv test gitlab.x.lan/yunshan/droplet/handler/`
   3. 列举测试用例，`funcs test.Test*`
-  4. 设置断点，`break TestPktExtract`
+  4. 设置断点，`break TestPacketExtract`
   5. 启动调试，`continue`
   6. dlv退出可能挂死，挂死时直接kill
 * 当droplet因panic异常退出时，日志文件将无法捕获到异常栈，此时只能通过运行`journalctl -xel -u droplet`来查看异常栈

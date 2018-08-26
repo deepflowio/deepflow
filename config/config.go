@@ -14,14 +14,13 @@ import (
 var log = logging.MustGetLogger("config")
 
 type Config struct {
-	ControllerIps   []string `yaml:"controller-ips,flow"`
-	ControllerPort  uint16   `yaml:"controller-port"`
-	LogFile         string   `yaml:"log-file"`
-	LogLevel        string   `yaml:"log-level"`
-	Profiler        bool     `yaml:"profiler"`
-	CloseFloodCheck bool     `yaml:"close-flood-check"`
-	DataInterfaces  []string `yaml:"data-interfaces,flow"`
-	TapInterfaces   []string `yaml:"tap-interfaces,flow"`
+	ControllerIps  []string `yaml:"controller-ips,flow"`
+	ControllerPort uint16   `yaml:"controller-port"`
+	LogFile        string   `yaml:"log-file"`
+	LogLevel       string   `yaml:"log-level"`
+	Profiler       bool     `yaml:"profiler"`
+	DataInterfaces []string `yaml:"data-interfaces,flow"`
+	TapInterfaces  []string `yaml:"tap-interfaces,flow"`
 }
 
 func (c *Config) Validate() error {
