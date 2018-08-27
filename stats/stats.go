@@ -57,7 +57,9 @@ const (
 )
 
 type Countable interface {
-	// thread-safe
+	// needs to be thread-safe
+	// accept struct or map[string]interface{},
+	// neither map[string]int nor map[string]int64
 	GetCounter() interface{}
 }
 
@@ -99,6 +101,14 @@ func sendCounter(statSource *StatSource, counter interface{}) {
 	if statsdClient != nil {
 		statSource.statsdClient = statsdClient.Clone(statSource.prefixOption, statSource.tagsOption)
 	} else {
+		return
+	}
+
+	if mapped, ok := counter.(map[string]interface{}); ok {
+		for name, value := range mapped {
+			statsName := strings.Replace(name, "-", "_", 0)
+			statSource.statsdClient.Count(statsName, value)
+		}
 		return
 	}
 
