@@ -6,11 +6,10 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/policy"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
-
-	"gitlab.x.lan/yunshan/droplet/protobuf"
+	"gitlab.x.lan/yunshan/message/trident"
 )
 
-func newPlatformData(vifData *protobuf.Interface) *datatype.PlatformData {
+func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	macInt := uint64(0)
 	if mac, err := net.ParseMAC(vifData.GetMac()); err == nil {
 		macInt = Mac2Uint64(mac)
@@ -52,7 +51,7 @@ func newPlatformData(vifData *protobuf.Interface) *datatype.PlatformData {
 	}
 }
 
-func convert2PlatformData(response *protobuf.SyncResponse) []*datatype.PlatformData {
+func convert2PlatformData(response *trident.SyncResponse) []*datatype.PlatformData {
 	interfaces := response.GetPlatformData().GetInterfaces()
 	platformDatas := make([]*datatype.PlatformData, 0, len(interfaces))
 	for _, data := range interfaces {
@@ -63,7 +62,7 @@ func convert2PlatformData(response *protobuf.SyncResponse) []*datatype.PlatformD
 	return platformDatas
 }
 
-func newIpGroupData(ipGroup *protobuf.Group) *policy.IpGroupData {
+func newIpGroupData(ipGroup *trident.Group) *policy.IpGroupData {
 	if ipGroup == nil || ipGroup.GetIps == nil {
 		return nil
 	}
@@ -75,7 +74,7 @@ func newIpGroupData(ipGroup *protobuf.Group) *policy.IpGroupData {
 	}
 }
 
-func convert2IpGroupdata(response *protobuf.SyncResponse) []*policy.IpGroupData {
+func convert2IpGroupdata(response *trident.SyncResponse) []*policy.IpGroupData {
 	ipGroups := response.GetPlatformData().GetIpGroups()
 	ipGroupDatas := make([]*policy.IpGroupData, 0, len(ipGroups))
 	for _, group := range ipGroups {

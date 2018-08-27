@@ -18,8 +18,8 @@ import (
 	"gitlab.x.lan/yunshan/droplet/labeler"
 	"gitlab.x.lan/yunshan/droplet/mapreduce"
 	"gitlab.x.lan/yunshan/droplet/packet"
-	"gitlab.x.lan/yunshan/droplet/protobuf"
 	"gitlab.x.lan/yunshan/droplet/queue"
+	"gitlab.x.lan/yunshan/message/trident"
 )
 
 var log = logging.MustGetLogger("droplet")
@@ -63,7 +63,7 @@ func Start(configPath string) {
 	labelerManager.RegisterAppQueue(labeler.METERING_QUEUE, meteringQueue)
 	labelerManager.RegisterAppQueue(labeler.FLOW_QUEUE, flowQueue)
 	labelerManager.Start()
-	synchronizer.Register(func(response *protobuf.SyncResponse) {
+	synchronizer.Register(func(response *trident.SyncResponse) {
 		labelerManager.OnPlatformDataChange(convert2PlatformData(response))
 		labelerManager.OnIpGroupDataChange(convert2IpGroupdata(response))
 	})

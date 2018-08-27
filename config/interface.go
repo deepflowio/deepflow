@@ -1,10 +1,10 @@
 package config
 
 import (
-	"gitlab.x.lan/yunshan/droplet/protobuf"
+	"gitlab.x.lan/yunshan/message/trident"
 )
 
-type Handler func(*protobuf.SyncResponse)
+type Handler func(*trident.SyncResponse)
 
 type ConfigSynchronizer interface {
 	Start()
