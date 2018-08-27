@@ -3,6 +3,7 @@ package stats
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"os"
 	"reflect"
 	"strings"
@@ -33,6 +34,18 @@ var (
 )
 
 type StatType uint8
+
+const (
+	COUNT_TYPE StatType = iota
+	GAUGE_TYPE
+)
+
+type StatItem struct {
+	Name     string
+	StatType StatType
+	Value    interface{}
+}
+
 type StatTags map[string]string
 
 var (
@@ -58,8 +71,7 @@ const (
 
 type Countable interface {
 	// needs to be thread-safe
-	// accept struct or map[string]interface{},
-	// neither map[string]int nor map[string]int64
+	// accept struct or []StatItem
 	GetCounter() interface{}
 }
 
@@ -73,7 +85,7 @@ func RegisterCountable(module string, tags StatTags, countable Countable) {
 		index += 2
 	}
 	statSource := &StatSource{
-		prefixOption: Prefix(module),
+		prefixOption: Prefix(strings.Replace(module, "-", "_", -1)),
 		tagsOption:   Tags(tagsOption...),
 	}
 	lock.Lock()
@@ -104,10 +116,14 @@ func sendCounter(statSource *StatSource, counter interface{}) {
 		return
 	}
 
-	if mapped, ok := counter.(map[string]interface{}); ok {
-		for name, value := range mapped {
-			statsName := strings.Replace(name, "-", "_", 0)
-			statSource.statsdClient.Count(statsName, value)
+	if items, ok := counter.([]StatItem); ok {
+		for _, item := range items {
+			statsName := strings.Replace(item.Name, "-", "_", -1)
+			if item.StatType == COUNT_TYPE {
+				statSource.statsdClient.Count(statsName, item.Value)
+			} else { // GAUGE_TYPE
+				statSource.statsdClient.Gauge(statsName, item.Value)
+			}
 		}
 		return
 	}
@@ -118,7 +134,7 @@ func sendCounter(statSource *StatSource, counter interface{}) {
 		if statsName == "" {
 			continue
 		}
-		statsName = strings.Replace(statsName, "-", "_", 0)
+		statsName = strings.Replace(statsName, "-", "_", -1)
 		memberName := val.Type().Field(i).Name
 		if !isUpper(memberName[0]) { // skip private field(starting with lower case letter)
 			log.Warningf("Unexported field %s with stats tag", memberName)
@@ -128,8 +144,9 @@ func sendCounter(statSource *StatSource, counter interface{}) {
 	}
 }
 
-func initStatsdClient() *Client {
-	c, err := New(Address(fmt.Sprintf(":%d", STATSD_PORT)), Prefix(processName), TagsFormat(InfluxDB))
+func initStatsdClient(remote net.IP) *Client {
+	address := Address(fmt.Sprintf("%s:%d", remote, STATSD_PORT))
+	c, err := New(address, Prefix(processName), TagsFormat(InfluxDB))
 	if err != nil {
 		return nil
 	}
@@ -137,9 +154,9 @@ func initStatsdClient() *Client {
 	return c
 }
 
-func run() {
+func run(remote net.IP) {
 	time.Sleep(time.Second) // wait logger init
-	statsdClient = initStatsdClient()
+	statsdClient = initStatsdClient(remote)
 
 	ticker := time.NewTicker(RETRIEVE_INTERVAL)
 	for range ticker.C {
@@ -151,13 +168,13 @@ func run() {
 		lock.Unlock()
 
 		if statsdClient == nil {
-			statsdClient = initStatsdClient()
+			statsdClient = initStatsdClient(remote)
 		}
 	}
 }
 
-func StartStatsd() {
+func StartStatsd(remote net.IP) {
 	paths := strings.Split(os.Args[0], "/")
 	processName = paths[len(paths)-1]
-	go run()
+	go run(remote)
 }

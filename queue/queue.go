@@ -21,19 +21,20 @@ type Transaction struct {
 }
 
 type Counter struct {
-	overwritten uint64 `statsd:"overwritten"`
-	pending     uint   `statsd:"pending"`
+	in          uint64
+	out         uint64
+	overwritten uint64
 }
 
 type OverwriteQueue struct { // XXX: use circle array
 	sync.Mutex
+	Counter
 
-	items       []interface{}
-	waiting     []Transaction
-	size        uint // power of 2
-	putIndex    uint
-	pending     uint
-	overwritten uint64
+	items    []interface{}
+	waiting  []Transaction
+	size     uint // power of 2
+	putIndex uint
+	pending  uint
 }
 
 func NewOverwriteQueue(module string, size int) Queue {
@@ -62,10 +63,15 @@ func (q *OverwriteQueue) Init(module string, size int) {
 
 func (q *OverwriteQueue) GetCounter() interface{} {
 	q.Lock()
-	counter := Counter{q.overwritten, q.pending}
-	q.overwritten = 0
+	statItems := []stats.StatItem{
+		stats.StatItem{"pending", stats.GAUGE_TYPE, q.pending},
+		stats.StatItem{"overwritten", stats.COUNT_TYPE, q.overwritten},
+		stats.StatItem{"in", stats.COUNT_TYPE, q.in},
+		stats.StatItem{"out", stats.COUNT_TYPE, q.out},
+	}
+	q.Counter = Counter{}
 	q.Unlock()
-	return &counter
+	return statItems
 }
 
 func (q *OverwriteQueue) Release() {
@@ -89,6 +95,7 @@ func (q *OverwriteQueue) Put(items ...interface{}) error {
 	}
 
 	q.Lock()
+	q.in += uint64(itemSize)
 	if copied := copy(q.items[q.putIndex:], items); uint(copied) != itemSize {
 		copy(q.items, items[copied:])
 	}
@@ -117,6 +124,7 @@ func (q *OverwriteQueue) Put(items ...interface{}) error {
 func (q *OverwriteQueue) get() interface{} {
 	items := q.items[q.firstIndex()]
 	q.pending--
+	q.out++
 	return items
 }
 
@@ -148,6 +156,7 @@ func (q *OverwriteQueue) gets(output []interface{}) uint {
 		copy(output[copied:], q.items)
 	}
 	q.pending -= size
+	q.out += uint64(size)
 	return size
 }
 
