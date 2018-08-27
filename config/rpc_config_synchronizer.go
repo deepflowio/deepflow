@@ -8,9 +8,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"gitlab.x.lan/yunshan/droplet-libs/grpc"
+	"gitlab.x.lan/yunshan/message/trident"
 	"golang.org/x/net/context"
-
-	"gitlab.x.lan/yunshan/droplet/protobuf"
 )
 
 const (
@@ -30,21 +29,21 @@ type RpcConfigSynchronizer struct {
 }
 
 func (s *RpcConfigSynchronizer) sync() error {
-	var response *protobuf.SyncResponse
+	var response *trident.SyncResponse
 	err := s.GrpcSession.Request(func(ctx context.Context) error {
 		var err error
-		request := protobuf.SyncRequest{
+		request := trident.SyncRequest{
 			BootTime:       proto.Uint32(uint32(s.bootTime.Unix())),
 			ConfigAccepted: proto.Bool(s.configAccepted),
 		}
-		client := protobuf.NewSynchronizerClient(s.GrpcSession.GetClient())
+		client := trident.NewSynchronizerClient(s.GrpcSession.GetClient())
 		response, err = client.Sync(ctx, &request)
 		return err
 	})
 	if err != nil {
 		return err
 	}
-	if status := response.GetStatus(); status != protobuf.Status_SUCCESS {
+	if status := response.GetStatus(); status != trident.Status_SUCCESS {
 		return errors.New("Status Unsuccessful")
 	}
 	s.syncInterval = time.Duration(response.GetConfig().GetSyncInterval()) * time.Second
