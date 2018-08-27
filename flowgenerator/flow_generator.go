@@ -1,7 +1,6 @@
 package flowgenerator
 
 import (
-	"container/list"
 	"time"
 
 	"github.com/google/gopacket/layers"
@@ -84,7 +83,7 @@ func (f *FlowExtra) TunnelMatch(key *FlowKey) bool {
 
 func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool) {
 	for e := f.flowList.Front(); e != nil; e = e.Next() {
-		flowExtra := e.Value.(*FlowExtra)
+		flowExtra := e.Value
 		taggedFlow := flowExtra.taggedFlow
 		if !taggedFlow.Exporter.Equals(&key.Exporter) || (isFromTrident(key.InPort0) && !flowExtra.MacEquals(meta)) {
 			continue
@@ -106,7 +105,7 @@ func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool) 
 func (f *FlowGenerator) createFlowCache(cacheCap int, hash uint64) *FlowCache {
 	newFlowCache := &FlowCache{
 		capacity: cacheCap,
-		flowList: list.New(),
+		flowList: NewListFlowExtra(),
 	}
 	f.hashMap[hash] = newFlowCache
 	return newFlowCache
@@ -444,7 +443,7 @@ func (f *FlowGenerator) processPacket(meta *MetaPacket) {
 			}
 			f.flowOutQueue.Put(flowExtra.taggedFlow)
 			// delete front from this FlowCache because flowExtra is moved to front in keyMatch()
-			flowCache.flowList.Remove(flowCache.flowList.Front())
+			flowCache.flowList.RemoveFront()
 		} else {
 			// reply is a sign relative to the flow direction, so if the flow is reversed then the sign should be changed
 			flowExtra.metaFlowPerf.Update(meta, flowExtra.reversed != reply, flowExtra)
@@ -504,7 +503,7 @@ func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uin
 		}
 		flowCache.Lock()
 		for e := flowCache.flowList.Front(); e != nil; {
-			flowExtra := e.Value.(*FlowExtra)
+			flowExtra := e.Value
 			f.stats.CurrNumFlows--
 			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false)
 			flowExtra.setCurFlowInfo(now, forceReportIntervalSec)
@@ -534,8 +533,8 @@ loop:
 		}
 		flowCache.Lock()
 		for e := flowCache.flowList.Back(); e != nil; {
-			var del *list.Element = nil
-			flowExtra := e.Value.(*FlowExtra)
+			var del *ElementFlowExtra = nil
+			flowExtra := e.Value
 			// remaining flows are too new to output
 			if flowExtra.recentTimesSec >= cleanRangeSec {
 				break
