@@ -28,30 +28,6 @@ var log = logging.MustGetLogger("policy")
 - 通过PolicyId找到Action
 - 合并Action，返回
 */
-
-type ActionType uint32
-
-const (
-	ACTION_PACKET_STAT ActionType = 1 << iota
-	ACTION_FLOW_STAT
-	ACTION_FLOW_PERF
-	ACTION_PACKET_STORE
-	ACTION_FLOW_STORE
-	ACTION_PACKET_BROKER
-)
-
-type Action struct {
-	ActionTypes ActionType // bitwise OR
-	PolicyIds   []PolicyId
-	// FIXME: packet brocker action list
-}
-
-func (l *Action) merge(r *Action) {
-	l.ActionTypes |= r.ActionTypes
-	// FIXME: PolicyId merge
-	// FIXME: packet brocker list merge
-}
-
 type MacKey uint64         // u64(mac)
 type IpKey uint32          // u32(ip)
 type EpcIpKey uint64       // u32(epc_id) . u32(ip)
@@ -72,8 +48,7 @@ const (
 
 type PolicyTable struct {
 	cloudPlatformData *CloudPlatformData
-	policyMap         map[PolicyKey]PolicyId // 策略字典
-	policyAction      [MAX_POLICY_ID]*Action
+	policyLabel       PolicyLabel
 }
 
 func NewPolicyTable( /* 传入Protobuf结构体指针 */ actionTypes ActionType) *PolicyTable {
@@ -87,46 +62,61 @@ func NewPolicyTable( /* 传入Protobuf结构体指针 */ actionTypes ActionType)
 }
 
 // Trident用于PACKET_BROKER、PACKET_STORE
-func (t *PolicyTable) LookupActionByKey(key *LookupKey) *Action {
+func (t *PolicyTable) LookupActionByKey(key *LookupKey) *PolicyData {
 	// 将匹配策略的所有Action merge以后返回
 	// FIXME: 注意将查找过程中的性能监控数据发送到statsd
 	return nil
 }
 
 // River用于PACKET_BROKER，Stream用于FLOW_STORE
-func (t *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *Action {
+func (t *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *PolicyData {
 	// FIXME
 	return nil
 }
 
-// Droplet用于ANALYTIC_*、PACKET_BROKER、PACKET_STORE
-func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *Action) {
-	// FIXME: 注意利用TTL更新L3End（仅当用于ANALYTIC_*时）
-	endpointData := t.cloudPlatformData.GetEndpointData(key)
-	if PortInDeepflowExporter(key.RxInterface) {
-		endpointData.SetL2End(key)
-	}
-	//FIXME 添加policy实现
-	action := &Action{
-		ActionTypes: ActionType(0x3f),
+func (t *PolicyTable) GetPolicyData(endpointData *EndpointData, key *LookupKey) *PolicyData {
+	policyData := &PolicyData{}
+	if aclActions := t.policyLabel.GetPolicyData(endpointData, key); aclActions != nil {
+		for _, aclAction := range aclActions {
+			policyData.Merge(aclAction)
+		}
 	}
 
-	return endpointData, action
+	return policyData
+}
+
+// Droplet用于ANALYTIC_*、PACKET_BROKER、PACKET_STORE
+func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData) {
+	if !key.Tap.CheckTapType(key.Tap) {
+		return NewEndpointData(), &PolicyData{}
+	}
+	endpointData := t.cloudPlatformData.GetEndpointData(key)
+	if key.Tap == TAP_TOR {
+		endpointData.SetL2End(key)
+	}
+	policyData := t.GetPolicyData(endpointData, key)
+	return endpointData, policyData
 }
 
 func (t *PolicyTable) UpdateInterfaceData(data []*PlatformData) {
-	if data != nil {
-		t.cloudPlatformData.UpdateInterfaceTable(data)
-	}
+	t.cloudPlatformData.UpdateInterfaceTable(data)
 }
 
 func (t *PolicyTable) UpdateIpGroupData(data []*IpGroupData) {
-	if data != nil {
-		t.cloudPlatformData.ipGroup.Update(data)
-	}
+	t.cloudPlatformData.ipGroup.Update(data)
+}
+
+func (t *PolicyTable) UpdateAclData(data []*Acl) {
+	t.policyLabel.UpdateAcls(data)
 }
 
 func (t *PolicyTable) GetEndpointInfo(mac uint64, ip uint32, inPort uint32) *EndpointInfo {
-	endpointInfo, _ := t.cloudPlatformData.GetEndpointInfo(mac, ip, inPort)
+	var endpointInfo *EndpointInfo
+	if PortInDeepflowExporter(inPort) {
+		endpointInfo = t.cloudPlatformData.GetEndpointInfo(mac, ip, TAP_TOR)
+	} else {
+		endpointInfo = t.cloudPlatformData.GetEndpointInfo(mac, ip, TAP_ISP)
+	}
+
 	return endpointInfo
 }

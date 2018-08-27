@@ -26,10 +26,6 @@
 
 
 [[constraint]]
-  name = "github.com/cespare/xxhash"
-  version = "1.0.0"
-
-[[constraint]]
   branch = "master"
   name = "github.com/golang-collections/go-datastructures"
 
