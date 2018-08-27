@@ -31,6 +31,7 @@ type MetaPacket struct {
 	Exporter       IPv4Int
 	L2End0, L2End1 bool
 	EndpointData   *EndpointData
+	PolicyData     *PolicyData
 	Raw            RawPacket
 	Invalid        bool
 
