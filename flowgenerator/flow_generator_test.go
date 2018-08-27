@@ -471,7 +471,31 @@ func BenchmarkCleanHashMap(b *testing.B) {
 	}
 }
 
-func BenchmarkProcessPacket(b *testing.B) {
+func BenchmarkShortFlowList(b *testing.B) {
+	runtime.GOMAXPROCS(4)
+	flowGenerator := getDefaultFlowGenerator()
+	flowGenerator.SetTimeout(TimeoutConfig{0, 300, 0, 30, 5, 0, 0})
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		meta := getDefaultPacket()
+		meta.IpSrc += uint32(i)
+		flowGenerator.processPacket(meta)
+	}
+	b.StopTimer()
+	flowCacheNum := 0
+	maxFlowListLen := 0
+	for _, flowCache := range flowGenerator.hashMap[0:] {
+		if flowCache != nil {
+			flowCacheNum++
+			if flowCache.flowList.Len() > maxFlowListLen {
+				maxFlowListLen = flowCache.flowList.Len()
+			}
+		}
+	}
+	b.Logf("b.N: %d, flowCacheNum: %d, maxFlowListLen: %d", b.N, flowCacheNum, maxFlowListLen)
+}
+
+func BenchmarkLongFlowList(b *testing.B) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator := getDefaultFlowGenerator()
 	flowGenerator.SetTimeout(TimeoutConfig{0, 300, 0, 30, 5, 0, 0})
@@ -481,4 +505,16 @@ func BenchmarkProcessPacket(b *testing.B) {
 		meta.PortDst += uint16(i)
 		flowGenerator.processPacket(meta)
 	}
+	b.StopTimer()
+	flowCacheNum := 0
+	maxFlowListLen := 0
+	for _, flowCache := range flowGenerator.hashMap[0:] {
+		if flowCache != nil {
+			flowCacheNum++
+			if flowCache.flowList.Len() > maxFlowListLen {
+				maxFlowListLen = flowCache.flowList.Len()
+			}
+		}
+	}
+	b.Logf("b.N: %d, flowCacheNum: %d, maxFlowListLen: %d", b.N, flowCacheNum, maxFlowListLen)
 }

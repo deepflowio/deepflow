@@ -1,12 +1,10 @@
 package flowgenerator
 
 import (
-	"container/list"
 	"reflect"
 	"sync"
 	"time"
 
-	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
 )
 
@@ -32,22 +30,6 @@ const (
 	CLOSE_TYPE_HALF_CLOSE              // timeout时该TCP连接为半闭，即四次挥手阶段
 )
 
-type FlowState int
-
-const (
-	FLOW_STATE_RAW FlowState = iota
-	FLOW_STATE_OPENING_1
-	FLOW_STATE_OPENING_2
-	FLOW_STATE_ESTABLISHED
-	FLOW_STATE_CLOSING_TX1
-	FLOW_STATE_CLOSING_TX2
-	FLOW_STATE_CLOSING_RX1
-	FLOW_STATE_CLOSING_RX2
-	FLOW_STATE_CLOSED
-	FLOW_STATE_RESET
-	FLOW_STATE_EXCEPTION
-)
-
 const (
 	TIMEOUT_OPENING          = 5
 	TIMEOUT_ESTABLISHED      = 300
@@ -60,13 +42,10 @@ const (
 
 const FLOW_CACHE_CAP = 1024
 const HASH_MAP_SIZE uint64 = 1024 * 2
-
 const IN_PORT_FLOW_ID_MASK uint64 = 0xFF000000
 const TIMER_FLOW_ID_MASK uint64 = 0x00FFFFFF
 const TOTAL_FLOWS_ID_MASK uint64 = 0x0FFFFFFF
-
 const FLOW_LIMIT_NUM uint64 = 1024 * 1024
-
 const REPORT_TOLERANCE = 4
 
 // unit: second
@@ -90,15 +69,6 @@ var defaultTimeoutConfig TimeoutConfig = TimeoutConfig{
 	TIMEOUT_SINGLE_DIRECTION,
 }
 
-type FlowExtra struct {
-	taggedFlow     *TaggedFlow
-	metaFlowPerf   *MetaFlowPerf
-	flowState      FlowState
-	recentTimesSec time.Duration
-	timeoutSec     time.Duration
-	reversed       bool
-}
-
 type FlowGeneratorStats struct {
 	TotalNumFlows uint64 `statsd:"total_flow"`
 	CurrNumFlows  uint64 `statsd:"current_flow"`
@@ -108,7 +78,7 @@ type FlowCache struct {
 	sync.Mutex
 
 	capacity int
-	flowList *list.List
+	flowList *ListFlowExtra
 }
 
 type FlowCacheHashMap struct {
