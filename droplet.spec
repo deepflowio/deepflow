@@ -11,6 +11,7 @@ BuildArch:  x86_64
 Source:     droplet.spec
 
 BuildRequires: golang git
+Requires: zeromq
 
 %define pwd %(echo $PWD)
 

@@ -94,7 +94,8 @@ func Start(configPath string) {
 	flowGenerator.Start()
 	tridentAdapter.Start(true)
 
-	stats.StartStatsd()
+	stats.StartStatsd(net.ParseIP(cfg.StatsdServer))
+
 	flowMapProcess := mapreduce.NewFlowMapProcess()
 	meteringProcess := mapreduce.NewMeteringMapProcess()
 	go func() {

@@ -18,6 +18,7 @@ type Config struct {
 	ControllerPort uint16   `yaml:"controller-port"`
 	LogFile        string   `yaml:"log-file"`
 	LogLevel       string   `yaml:"log-level"`
+	StatsdServer   string   `yaml:"statsd-server"`
 	Profiler       bool     `yaml:"profiler"`
 	DataInterfaces []string `yaml:"data-interfaces,flow"`
 	TapInterfaces  []string `yaml:"tap-interfaces,flow"`
@@ -44,6 +45,10 @@ func (c *Config) Validate() error {
 		c.LogLevel = level
 	} else {
 		c.LogLevel = "info"
+	}
+
+	if net.ParseIP(c.StatsdServer) == nil {
+		return errors.New("Malformed statsd-server")
 	}
 
 	return nil

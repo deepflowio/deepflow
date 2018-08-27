@@ -6,6 +6,8 @@ controller-port: 20035
 log-file: /var/log/droplet/droplet.log
 # loglevel: "debug/info/warn/error"
 log-level: info
+# remote statsd server
+statsd-server: 127.0.0.1
 # profiler
 profiler: false
 # public traffic
