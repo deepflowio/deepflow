@@ -257,12 +257,12 @@ func RegisterCommand() *cobra.Command {
 			count := PacketCounter{}
 			if CommmandGetCounter(&count) {
 				fmt.Println("Trident-Adapter Module Running Status:")
-				fmt.Printf("\tRX_PACKETS:	%v\n", count.RxPackets)
-				fmt.Printf("\tRX_DROP:		%v\n", count.RxDrop)
-				fmt.Printf("\tRX_ERROR:		%v\n", count.RxError)
-				fmt.Printf("\tTX_PACKETS:	%v\n", count.TxPackets)
-				fmt.Printf("\tTX_DROP:		%v\n", count.TxDrop)
-				fmt.Printf("\tTX_ERROR:		%v\n", count.TxError)
+				fmt.Printf("\tRX_PACKETS:    %v\n", count.RxPackets)
+				fmt.Printf("\tRX_DROP:       %v\n", count.RxDrop)
+				fmt.Printf("\tRX_ERROR:      %v\n", count.RxError)
+				fmt.Printf("\tTX_PACKETS:    %v\n", count.TxPackets)
+				fmt.Printf("\tTX_DROP:       %v\n", count.TxDrop)
+				fmt.Printf("\tTX_ERROR:      %v\n", count.TxError)
 			}
 		},
 	}

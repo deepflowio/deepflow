@@ -58,7 +58,7 @@ func Start(configPath string) {
 	}
 
 	flowQueue := manager.NewQueue("FilterToFlow", 1000, &MetaPacket{})
-	meteringQueue := manager.NewQueue("FilterToMetering", 1000, &TaggedMetering{})
+	meteringQueue := manager.NewQueue("FilterToMetering", 1000, &MetaPacket{})
 	labelerManager := labeler.NewLabelerManager(filterQueue)
 	labelerManager.RegisterAppQueue(labeler.METERING_QUEUE, meteringQueue)
 	labelerManager.RegisterAppQueue(labeler.FLOW_QUEUE, flowQueue)
@@ -68,7 +68,7 @@ func Start(configPath string) {
 		labelerManager.OnIpGroupDataChange(convert2IpGroupdata(response))
 	})
 
-	flowAppOutputQueue := manager.NewQueue("flowAppOutputQueue", 1000, &MetaPacket{})
+	flowAppOutputQueue := manager.NewQueue("flowAppOutputQueue", 1000, &TaggedFlow{})
 	flowGenerator := flowgenerator.New(flowQueue, flowAppOutputQueue, 60)
 	if flowGenerator == nil {
 		return
