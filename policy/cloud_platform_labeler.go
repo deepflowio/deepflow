@@ -1,11 +1,9 @@
 package policy
 
 import (
-	"encoding/binary"
 	"sync"
 	"time"
 
-	"github.com/cespare/xxhash"
 	. "github.com/google/gopacket/layers"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -51,8 +49,8 @@ type CloudPlatformData struct {
 	epcIpTable    *EpcIpTable
 	ipGroup       *IpResourceGroup
 	netmaskBitmap uint32
-	fastTable     *FastTable
-	arpTable      *ArpTable
+	fastTable     [TAP_MAX]*FastTable
+	arpTable      [TAP_MAX]*ArpTable
 }
 
 func NewCloudPlatformData() *CloudPlatformData {
@@ -68,13 +66,18 @@ func NewCloudPlatformData() *CloudPlatformData {
 	epcIpTable := &EpcIpTable{
 		epcIpMap: make(EpcIpMapData),
 	}
-	fastTable := &FastTable{
-		fastMap: make(FastMapData),
+	var fastTable [TAP_MAX]*FastTable
+	for i := uint32(0); i < uint32(TAP_MAX); i++ {
+		fastTable[i] = &FastTable{
+			fastMap: make(FastMapData),
+		}
 	}
-	arpTable := &ArpTable{
-		arpMap: make(map[MacIpInportKey]time.Time),
+	var arpTable [TAP_MAX]*ArpTable
+	for i := uint32(0); i < uint32(TAP_MAX); i++ {
+		arpTable[i] = &ArpTable{
+			arpMap: make(map[MacIpInportKey]time.Time),
+		}
 	}
-
 	return &CloudPlatformData{
 		macTable:      macTable,
 		ipTables:      ipTables,
@@ -90,13 +93,9 @@ func PortInDeepflowExporter(inPort uint32) bool {
 	return DEEPFLOW_POSITION_EXPORTER == ((inPort) & DEEPFLOW_POSITION_EXPORTER)
 }
 
-// FIXME: 后续性能问题，可以考虑用异或来做hash
-func calcHashKey(mac uint64, ip uint32, inPort uint32) uint64 {
-	buf := make([]byte, 16)
-	binary.BigEndian.PutUint64(buf, mac)
-	binary.BigEndian.PutUint32(buf[8:], ip)
-	binary.BigEndian.PutUint32(buf[12:], inPort)
-	return xxhash.Sum64(buf[2:])
+// FIXME: 需要验证是否有冲突
+func calcHashKey(mac uint64, ip uint32) uint64 {
+	return uint64(mac<<32) | uint64(ip)
 }
 
 func (d *CloudPlatformData) GetDataByMac(key MacKey) *PlatformData {
@@ -199,34 +198,34 @@ func (d *CloudPlatformData) UpdateEpcIpTable(epcIpMap EpcIpMapData) {
 	}
 }
 
-func (d *CloudPlatformData) InsertInfoToFastPath(hash MacIpInportKey, endpointInfo *EndpointInfo) {
+func (d *CloudPlatformData) InsertInfoToFastPath(hash MacIpInportKey, endpointInfo *EndpointInfo, tapType TapType) {
 	fastPlatformData := &FastPlatformData{
 		endpointInfo: endpointInfo,
 		hash:         hash,
 		timestamp:    time.Now(),
 	}
-	d.fastTable.Lock()
-	d.fastTable.fastMap[hash] = fastPlatformData
-	d.fastTable.Unlock()
+	d.fastTable[tapType].Lock()
+	d.fastTable[tapType].fastMap[hash] = fastPlatformData
+	d.fastTable[tapType].Unlock()
 }
 
-func (d *CloudPlatformData) DeleteFastPathData(hash MacIpInportKey) {
-	d.fastTable.Lock()
-	delete(d.fastTable.fastMap, hash)
-	d.fastTable.Unlock()
+func (d *CloudPlatformData) DeleteFastPathData(hash MacIpInportKey, tapType TapType) {
+	d.fastTable[tapType].Lock()
+	delete(d.fastTable[tapType].fastMap, hash)
+	d.fastTable[tapType].Unlock()
 }
 
-func (d *CloudPlatformData) GetInfoByFastPath(hash MacIpInportKey) *EndpointInfo {
-	d.fastTable.RLock()
-	if data, ok := d.fastTable.fastMap[hash]; ok {
-		d.fastTable.RUnlock()
+func (d *CloudPlatformData) GetInfoByFastPath(hash MacIpInportKey, tapType TapType) *EndpointInfo {
+	d.fastTable[tapType].RLock()
+	if data, ok := d.fastTable[tapType].fastMap[hash]; ok {
+		d.fastTable[tapType].RUnlock()
 		if DATA_VALID_TIME < time.Now().Sub(data.timestamp) {
-			d.DeleteFastPathData(hash)
+			d.DeleteFastPathData(hash, tapType)
 			return nil
 		}
 		return data.endpointInfo
 	}
-	d.fastTable.RUnlock()
+	d.fastTable[tapType].RUnlock()
 	return nil
 }
 
@@ -239,36 +238,36 @@ func (d *CloudPlatformData) UpdateInterfaceTable(platformDatas []*PlatformData) 
 }
 
 //FIXME: 后续考虑时间可以从metpacket获取
-func (d *CloudPlatformData) UpdateArpTable(hash MacIpInportKey) {
-	d.arpTable.Lock()
-	d.arpTable.arpMap[hash] = time.Now()
-	d.arpTable.Unlock()
+func (d *CloudPlatformData) UpdateArpTable(hash MacIpInportKey, tapType TapType) {
+	d.arpTable[tapType].Lock()
+	d.arpTable[tapType].arpMap[hash] = time.Now()
+	d.arpTable[tapType].Unlock()
 }
 
-func (d *CloudPlatformData) DeleteArpData(hash MacIpInportKey) {
-	d.arpTable.Lock()
-	delete(d.arpTable.arpMap, hash)
-	d.arpTable.Unlock()
+func (d *CloudPlatformData) DeleteArpData(hash MacIpInportKey, tapType TapType) {
+	d.arpTable[tapType].Lock()
+	delete(d.arpTable[tapType].arpMap, hash)
+	d.arpTable[tapType].Unlock()
 }
 
-func (d *CloudPlatformData) GetArpTable(hash MacIpInportKey) bool {
-	d.arpTable.RLock()
-	if data, ok := d.arpTable.arpMap[hash]; ok {
-		d.arpTable.RUnlock()
+func (d *CloudPlatformData) GetArpTable(hash MacIpInportKey, tapType TapType) bool {
+	d.arpTable[tapType].RLock()
+	if data, ok := d.arpTable[tapType].arpMap[hash]; ok {
+		d.arpTable[tapType].RUnlock()
 		if ARP_VALID_TIME < time.Now().Sub(data) {
-			d.DeleteArpData(hash)
+			d.DeleteArpData(hash, tapType)
 			return false
 		}
 		return true
 	}
-	d.arpTable.RUnlock()
+	d.arpTable[tapType].RUnlock()
 	return false
 }
 
 // 只更新源mac+ip的arp
 func (d *CloudPlatformData) CheckAndUpdateArpTable(key *LookupKey, hash MacIpInportKey) {
 	if key.EthType == EthernetTypeARP {
-		d.UpdateArpTable(hash)
+		d.UpdateArpTable(hash, key.Tap)
 	}
 }
 
@@ -277,16 +276,16 @@ func (d *CloudPlatformData) ModifyL3End(endpointInfo *EndpointInfo, key *LookupK
 	if endpointInfo.L3End {
 		return
 	}
-	if endpointInfo.L3End = d.GetArpTable(hash); !endpointInfo.L3End {
+	if endpointInfo.L3End = d.GetArpTable(hash, key.Tap); !endpointInfo.L3End {
 		if direction && key.EthType == EthernetTypeIPv4 {
 			endpointInfo.SetL3EndByTtl(key.Ttl)
 		}
 	}
 }
 
-func (d *CloudPlatformData) GetEndpointInfo(mac uint64, ip uint32, inPort uint32) (*EndpointInfo, bool) {
+func (d *CloudPlatformData) GetEndpointInfo(mac uint64, ip uint32, tapType TapType) *EndpointInfo {
 	endpointInfo := &EndpointInfo{}
-	if PortInDeepflowExporter(inPort) {
+	if tapType == TAP_TOR {
 		platformData := d.GetDataByMac(MacKey(mac))
 		if platformData != nil {
 			endpointInfo.SetL2Data(platformData)
@@ -297,43 +296,34 @@ func (d *CloudPlatformData) GetEndpointInfo(mac uint64, ip uint32, inPort uint32
 			if platformData != nil {
 				endpointInfo.SetL3Data(platformData, ip)
 			}
-			d.ipGroup.Populate(ip, endpointInfo)
-		} else {
-			return endpointInfo, d.ipGroup.Populate(ip, endpointInfo)
 		}
+		d.ipGroup.Populate(ip, endpointInfo)
 	} else {
 		platformData := d.GetDataByIp(ip)
 		if platformData != nil {
 			endpointInfo.SetL3Data(platformData, ip)
 			endpointInfo.SetL3EndByMac(platformData, mac)
-			d.ipGroup.Populate(ip, endpointInfo)
-		} else {
-			return endpointInfo, d.ipGroup.Populate(ip, endpointInfo)
 		}
+		d.ipGroup.Populate(ip, endpointInfo)
 	}
-	return endpointInfo, true
+	return endpointInfo
 }
 
 func (d *CloudPlatformData) GetEndpointData(key *LookupKey) *EndpointData {
-	ok := false
-	srcHash := MacIpInportKey(calcHashKey(key.SrcMac, key.SrcIp, key.RxInterface))
+	srcHash := MacIpInportKey(calcHashKey(key.SrcMac, key.SrcIp))
 	d.CheckAndUpdateArpTable(key, srcHash)
-	srcData := d.GetInfoByFastPath(srcHash)
+	srcData := d.GetInfoByFastPath(srcHash, key.Tap)
 	if srcData == nil {
-		srcData, ok = d.GetEndpointInfo(key.SrcMac, key.SrcIp, key.RxInterface)
+		srcData = d.GetEndpointInfo(key.SrcMac, key.SrcIp, key.Tap)
 		d.ModifyL3End(srcData, key, srcHash, true)
-		if ok {
-			d.InsertInfoToFastPath(srcHash, srcData)
-		}
+		d.InsertInfoToFastPath(srcHash, srcData, key.Tap)
 	}
-	dstHash := MacIpInportKey(calcHashKey(key.DstMac, key.DstIp, key.RxInterface))
-	dstData := d.GetInfoByFastPath(dstHash)
+	dstHash := MacIpInportKey(calcHashKey(key.DstMac, key.DstIp))
+	dstData := d.GetInfoByFastPath(dstHash, key.Tap)
 	if dstData == nil {
-		dstData, ok = d.GetEndpointInfo(key.DstMac, key.DstIp, key.RxInterface)
+		dstData = d.GetEndpointInfo(key.DstMac, key.DstIp, key.Tap)
 		d.ModifyL3End(dstData, key, dstHash, false)
-		if ok {
-			d.InsertInfoToFastPath(dstHash, dstData)
-		}
+		d.InsertInfoToFastPath(dstHash, dstData, key.Tap)
 	}
 
 	return &EndpointData{

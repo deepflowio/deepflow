@@ -1,15 +1,19 @@
 package datatype
 
 import (
+	"fmt"
+
 	. "github.com/google/gopacket/layers"
 )
 
 type TapType uint8
 
 const (
-	TAP_ISP TapType = 1 + iota
+	TAP_ANY TapType = iota
+	TAP_ISP
 	TAP_SPINE
 	TAP_TOR
+	TAP_MAX
 )
 
 type EndpointInfo struct {
@@ -44,6 +48,13 @@ type LookupKey struct {
 type EndpointData struct {
 	SrcInfo *EndpointInfo
 	DstInfo *EndpointInfo
+}
+
+func NewEndpointData() *EndpointData {
+	return &EndpointData{
+		SrcInfo: &EndpointInfo{},
+		DstInfo: &EndpointInfo{},
+	}
 }
 
 func (i *EndpointInfo) SetL2Data(data *PlatformData) {
@@ -94,4 +105,15 @@ func (i *EndpointInfo) SetL3EndByMac(data *PlatformData, mac uint64) {
 func (d *EndpointData) SetL2End(key *LookupKey) {
 	d.SrcInfo.L2End = key.L2End0
 	d.DstInfo.L2End = key.L2End1
+}
+
+func (d *EndpointData) String() string {
+	return fmt.Sprintf("SRC: %+v,DST: %+v", *d.SrcInfo, *d.DstInfo)
+}
+
+func (t *TapType) CheckTapType(tapType TapType) bool {
+	if tapType < TAP_MAX {
+		return true
+	}
+	return false
 }

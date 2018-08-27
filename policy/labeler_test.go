@@ -16,11 +16,11 @@ func TestGetPlatformData(t *testing.T) {
 	srcIp := NewIPFromString("192.168.2.12")
 	dstIp := NewIPFromString("192.168.0.11")
 	key := &LookupKey{
-		SrcIp:       srcIp.Int(),
-		SrcMac:      0x80027a42bfc,
-		DstMac:      0x80027a42bfa,
-		DstIp:       dstIp.Int(),
-		RxInterface: 196610,
+		SrcIp:  srcIp.Int(),
+		SrcMac: 0x80027a42bfc,
+		DstMac: 0x80027a42bfa,
+		DstIp:  dstIp.Int(),
+		Tap:    TAP_TOR,
 	}
 	ip := NewIPFromString("192.168.0.11")
 	ipInfo := IpNet{
@@ -99,13 +99,13 @@ func TestGetPlatformDataAboutArp(t *testing.T) {
 	srcIp := NewIPFromString("192.168.2.12")
 	dstIp := NewIPFromString("192.168.0.11")
 	key := &LookupKey{
-		SrcIp:       srcIp.Int(),
-		SrcMac:      0x80027a42bfc,
-		DstMac:      0x80027a42bfa,
-		DstIp:       dstIp.Int(),
-		EthType:     EthernetTypeARP,
-		Ttl:         64,
-		RxInterface: 196610,
+		SrcIp:   srcIp.Int(),
+		SrcMac:  0x80027a42bfc,
+		DstMac:  0x80027a42bfa,
+		DstIp:   dstIp.Int(),
+		EthType: EthernetTypeARP,
+		Ttl:     64,
+		Tap:     TAP_TOR,
 	}
 	ip := NewIPFromString("192.168.0.11")
 	ipInfo := IpNet{
