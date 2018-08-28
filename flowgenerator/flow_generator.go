@@ -74,6 +74,14 @@ func (f *FlowExtra) MacEquals(meta *MetaPacket) bool {
 	return false
 }
 
+func (f *FlowExtra) TunnelMatch(key *FlowKey) bool {
+	taggedFlow := f.taggedFlow
+	if taggedFlow.TunnelType != key.TunnelType || taggedFlow.TunnelID != key.TunnelID {
+		return false
+	}
+	return taggedFlow.TunnelIPSrc^key.TunnelIPSrc^taggedFlow.TunnelIPDst^key.TunnelIPDst == 0
+}
+
 func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool) {
 	for e := f.flowList.Front(); e != nil; e = e.Next() {
 		flowExtra := e.Value.(*FlowExtra)
@@ -81,12 +89,7 @@ func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool) 
 		if !taggedFlow.Exporter.Equals(&key.Exporter) || (isFromTrident(key.InPort0) && !flowExtra.MacEquals(meta)) {
 			continue
 		}
-		if taggedFlow.TunnelType != key.TunnelType || taggedFlow.TunnelID != key.TunnelID {
-			continue
-		}
-		if !(taggedFlow.TunnelIPSrc == key.TunnelIPSrc && taggedFlow.TunnelIPDst == key.TunnelIPDst) {
-			continue
-		} else if !(taggedFlow.TunnelIPSrc == key.TunnelIPDst && taggedFlow.TunnelIPDst == key.TunnelIPSrc) {
+		if !flowExtra.TunnelMatch(key) {
 			continue
 		}
 		if taggedFlow.IPSrc.Equals(&key.IPSrc) && taggedFlow.IPDst.Equals(&key.IPDst) && taggedFlow.PortSrc == key.PortSrc && taggedFlow.PortDst == key.PortDst {
@@ -127,6 +130,7 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, key *FlowKey) (*FlowExtra, bo
 		Flow: Flow{
 			FlowKey:      *key,
 			FlowID:       f.genFlowId(uint64(now), uint64(key.InPort0)),
+			TimeBitmap:   1,
 			StartTime:    now,
 			EndTime:      now,
 			CurStartTime: now,
@@ -346,6 +350,8 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 		taggedFlow.TotalByteCount0 += bytes
 	}
 	flowExtra.recentTimesSec = packetTimestamp / time.Second
+	// a flow will report every minute and StartTime will be reset, so the value could not be overflow
+	taggedFlow.TimeBitmap |= 1 << uint64(flowExtra.recentTimesSec-taggedFlow.StartTime/time.Second)
 
 	return f.updateFlowStateMachine(flowExtra, meta.TcpData.Flags, reply), reply
 }
@@ -363,6 +369,7 @@ func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireIntervalSec time.Dur
 
 func (f *FlowExtra) resetCurFlowInfo(now time.Duration) {
 	taggedFlow := f.taggedFlow
+	taggedFlow.TimeBitmap = 0
 	taggedFlow.StartTime = now
 	taggedFlow.EndTime = now
 	taggedFlow.CurStartTime = now
