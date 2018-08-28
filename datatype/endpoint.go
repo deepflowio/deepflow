@@ -1,5 +1,9 @@
 package datatype
 
+import (
+	. "github.com/google/gopacket/layers"
+)
+
 type TapType uint8
 
 const (
@@ -14,10 +18,10 @@ type EndpointInfo struct {
 	L2DeviceId   uint32
 	L2End        bool
 
-	L3End        bool
 	L3EpcId      int32 // -1表示其它项目
 	L3DeviceType uint32
 	L3DeviceId   uint32
+	L3End        bool
 
 	HostIp   uint32
 	SubnetId uint32
@@ -28,6 +32,7 @@ type LookupKey struct {
 	SrcMac, DstMac   uint64
 	SrcIp, DstIp     uint32
 	SrcPort, DstPort uint16
+	EthType          EthernetType
 	Vlan             uint16
 	Proto            uint8
 	Ttl              uint8
@@ -65,7 +70,7 @@ func (i *EndpointInfo) SetL3Data(data *PlatformData, ip uint32) {
 	}
 }
 
-func (i *EndpointInfo) SetL3EndByTtl(data *PlatformData, ttl uint32) {
+func (i *EndpointInfo) SetL3EndByTtl(ttl uint8) {
 	if ttl == 64 || ttl == 128 || ttl == 255 {
 		i.L3End = true
 	}
