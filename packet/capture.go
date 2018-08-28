@@ -198,7 +198,7 @@ func (c *Capture) Close() error {
 	return nil
 }
 
-func NewCapture(interfaceName string, ip net.IP, isTap bool, outputQueue queue.QueueWriter) (*Capture, error) {
+func NewCapture(interfaceName string, ip net.IP, isTapInterface bool, outputQueue queue.QueueWriter) (*Capture, error) {
 	if _, err := net.InterfaceByName(interfaceName); err != nil {
 		return nil, err
 	}
@@ -208,7 +208,7 @@ func NewCapture(interfaceName string, ip net.IP, isTap bool, outputQueue queue.Q
 		afpacket.OptBlockSize(DEFAULT_BLOCK_SIZE),
 		afpacket.OptFrameSize(DEFAULT_FRAME_SIZE),
 		afpacket.OptNumBlocks(afPacketBlocks),
-		afpacket.OptAddVLANHeader(!isTap),
+		afpacket.OptAddVLANHeader(!isTapInterface),
 	)
 	if err != nil {
 		log.Warning("AF_PACKET init error", err)
@@ -230,9 +230,9 @@ func NewCapture(interfaceName string, ip net.IP, isTap bool, outputQueue queue.Q
 		log.Warning("BPF inject failed:", err)
 	}
 
-	rxInterface := uint32(datatype.CAPTURE_LOCAL)
-	if isTap {
-		rxInterface = uint32(datatype.CAPTURE_REMOTE)
+	rxInterface := uint32(datatype.PACKET_SOURCE_ISP)
+	if isTapInterface {
+		rxInterface = uint32(datatype.PACKET_SOURCE_TOR)
 	}
 
 	cap := &Capture{
