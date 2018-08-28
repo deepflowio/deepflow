@@ -92,7 +92,7 @@ func Start(configPath string) {
 	}
 
 	flowGenerator.Start()
-	tridentAdapter.Start(true)
+	tridentAdapter.Start()
 
 	stats.StartStatsd(net.ParseIP(cfg.StatsdServer))
 

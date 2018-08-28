@@ -3,7 +3,6 @@ package adapter
 import (
 	"bytes"
 	"encoding/gob"
-	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -32,8 +31,8 @@ var log = logging.MustGetLogger("trident_adapter")
 
 type PacketCounter struct {
 	RxPackets uint64 `statsd:"rx_packets"`
-	RxDrop    uint64 `statsd:"rx_drop"`
-	RxError   uint64 `statsd:"rx_error"`
+	RxDrop    uint64 `statsd:"rx_drop"`  // 当前SEQ减去上次的SEQ
+	RxError   uint64 `statsd:"rx_error"` // 当前SEQ小于上次的SEQ时+1，包乱序并且超出了CACHE_SIZE
 
 	TxPackets uint64 `statsd:"tx_packets"`
 	TxDrop    uint64 `statsd:"tx_drop"`
@@ -43,7 +42,6 @@ type PacketCounter struct {
 type TridentKey = uint32
 
 type tridentInstance struct {
-	ip  net.IP // it seems not used
 	seq uint32
 
 	cache      [CACHE_SIZE][]byte
@@ -57,6 +55,7 @@ type TridentAdapter struct {
 
 	instances map[TridentKey]*tridentInstance
 	counter   *PacketCounter
+	stats     *PacketCounter
 
 	running  bool
 	listener *net.UDPConn
@@ -65,6 +64,7 @@ type TridentAdapter struct {
 func NewTridentAdapter(queues ...queue.QueueWriter) *TridentAdapter {
 	adapter := &TridentAdapter{}
 	adapter.counter = &PacketCounter{}
+	adapter.stats = &PacketCounter{}
 	adapter.queues = queues
 	adapter.queueCount = len(queues)
 	adapter.instances = make(map[TridentKey]*tridentInstance)
@@ -81,7 +81,7 @@ func NewTridentAdapter(queues ...queue.QueueWriter) *TridentAdapter {
 
 func (a *TridentAdapter) GetCounter() interface{} {
 	counter := &PacketCounter{}
-	counter = a.counter
+	counter, a.counter = a.counter, counter
 	return counter
 }
 
@@ -97,14 +97,20 @@ func (a *TridentAdapter) cacheClear(data []byte, key uint32, seq uint32) {
 			if instance.cacheMap&(1<<uint32(i)) > 0 {
 				dataSeq := uint32(i) + startSeq
 				a.decode(a.instances[key].cache[i], key)
-				a.counter.RxDrop += uint64(dataSeq - instance.seq - 1)
+				drop := uint64(dataSeq - instance.seq - 1)
+				a.counter.RxDrop += drop
+				a.stats.RxDrop += drop
 				instance.seq = dataSeq
 				a.counter.RxPackets += 1
+				a.stats.RxPackets += 1
 			}
 		}
 	}
+	drop := uint64(seq - instance.seq - 1)
 	a.counter.RxPackets += 1
-	a.counter.RxDrop += uint64(seq - instance.seq - 1)
+	a.stats.RxPackets += 1
+	a.counter.RxDrop += drop
+	a.stats.RxDrop += drop
 	a.decode(data, key)
 	instance.seq = seq
 	instance.cacheCount = 0
@@ -113,17 +119,21 @@ func (a *TridentAdapter) cacheClear(data []byte, key uint32, seq uint32) {
 
 func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32) {
 	instance := a.instances[key]
+	// droplet重启或trident重启时，不考虑SEQ
 	if (instance.cacheCount == 0 && seq-instance.seq == 1) || instance.seq == 0 || seq == 1 {
 		instance.seq = seq
 		a.decode(data, key)
 		a.counter.RxPackets += 1
+		a.stats.RxPackets += 1
 	} else {
 		if seq <= instance.seq {
 			a.counter.RxError += 1
+			a.stats.RxError += 1
 			log.Warningf("trident(%v) seq is less than current, drop", key)
 			return
 		}
 		offset := seq - instance.seq - 1
+		// cache满或乱序超过CACHE_SIZE, 清空cache
 		if offset >= CACHE_SIZE || instance.cacheCount == CACHE_SIZE {
 			a.cacheClear(data, key, seq)
 			return
@@ -155,6 +165,7 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) {
 		}
 
 		a.counter.TxPackets++
+		a.stats.TxPackets++
 		hash := meta.InPort + meta.IpSrc + meta.IpDst +
 			uint32(meta.Protocol) + uint32(meta.PortSrc) + uint32(meta.PortDst)
 		a.queues[hash%uint32(a.queueCount)].Put(meta)
@@ -180,34 +191,11 @@ func (a *TridentAdapter) run() {
 	log.Info("Stopped trident adapter")
 }
 
-func (a *TridentAdapter) wait(running bool) error {
-	for i := 0; i < 4 && a.running != running; i++ {
-		time.Sleep(5 * time.Second)
-	}
-	if a.running != running {
-		if running {
-			return errors.New("trident adapter didn't start within 5 second")
-		} else {
-			return errors.New("trident adapter didn't stop within 5 second")
-		}
-	}
-	return nil
-}
-
-func (a *TridentAdapter) Start(running bool) error {
+func (a *TridentAdapter) Start() error {
 	if !a.running {
 		log.Info("Start trident adapter")
 		a.running = true
 		go a.run()
-	}
-	return nil
-}
-
-func (a *TridentAdapter) Stop(wait bool) error { // TODO: untested
-	if a.running {
-		log.Info("Stop trident adapter")
-		a.running = false
-		return a.wait(false)
 	}
 	return nil
 }
@@ -217,7 +205,7 @@ func (a *TridentAdapter) RecvCommand(conn *net.UDPConn, port int, operate uint16
 	switch operate {
 	case ADAPTER_CMD_SHOW:
 		encoder := gob.NewEncoder(&buff)
-		if err := encoder.Encode(a.counter); err != nil {
+		if err := encoder.Encode(a.stats); err != nil {
 			log.Error(err)
 			return
 		}
@@ -257,12 +245,12 @@ func RegisterCommand() *cobra.Command {
 			count := PacketCounter{}
 			if CommmandGetCounter(&count) {
 				fmt.Println("Trident-Adapter Module Running Status:")
-				fmt.Printf("\tRX_PACKETS:    %v\n", count.RxPackets)
-				fmt.Printf("\tRX_DROP:       %v\n", count.RxDrop)
-				fmt.Printf("\tRX_ERROR:      %v\n", count.RxError)
-				fmt.Printf("\tTX_PACKETS:    %v\n", count.TxPackets)
-				fmt.Printf("\tTX_DROP:       %v\n", count.TxDrop)
-				fmt.Printf("\tTX_ERROR:      %v\n", count.TxError)
+				fmt.Printf("\tRX_PACKETS:           %v\n", count.RxPackets)
+				fmt.Printf("\tRX_DROP:              %v\n", count.RxDrop)
+				fmt.Printf("\tRX_ERROR:             %v\n", count.RxError)
+				fmt.Printf("\tTX_PACKETS:           %v\n", count.TxPackets)
+				fmt.Printf("\tTX_DROP:              %v\n", count.TxDrop)
+				fmt.Printf("\tTX_ERROR:             %v\n", count.TxError)
 			}
 		},
 	}
@@ -280,12 +268,12 @@ func RegisterCommand() *cobra.Command {
 				return
 			}
 			fmt.Println("Trident-Adapter Module Performance:")
-			fmt.Printf("\tRX_PACKETS/S:		%v\n", now.RxPackets-last.RxPackets)
-			fmt.Printf("\tRX_DROP/S:		%v\n", now.RxDrop-last.RxDrop)
-			fmt.Printf("\tRX_ERROR/S:		%v\n", now.RxError-last.RxError)
-			fmt.Printf("\tTX_PACKETS/S:		%v\n", now.TxPackets-last.TxPackets)
-			fmt.Printf("\tTX_DROP/S:		%v\n", now.TxDrop-last.TxDrop)
-			fmt.Printf("\tTX_ERROR/S:		%v\n", now.TxError-last.TxError)
+			fmt.Printf("\tRX_PACKETS/S:             %v\n", now.RxPackets-last.RxPackets)
+			fmt.Printf("\tRX_DROP/S:                %v\n", now.RxDrop-last.RxDrop)
+			fmt.Printf("\tRX_ERROR/S:               %v\n", now.RxError-last.RxError)
+			fmt.Printf("\tTX_PACKETS/S:             %v\n", now.TxPackets-last.TxPackets)
+			fmt.Printf("\tTX_DROP/S:                %v\n", now.TxDrop-last.TxDrop)
+			fmt.Printf("\tTX_ERROR/S:               %v\n", now.TxError-last.TxError)
 		},
 	}
 	cmd.AddCommand(show)
