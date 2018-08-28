@@ -144,7 +144,7 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, key *FlowKey) (*FlowExtra, bo
 	}
 	flowExtra := &FlowExtra{
 		taggedFlow:     taggedFlow,
-		metaFlowPerf:   NewMetaFlowPerf(),
+		metaFlowPerf:   NewMetaFlowPerf(&f.perfCounter),
 		flowState:      FLOW_STATE_RAW,
 		recentTimesSec: now / time.Second,
 		reversed:       false,
@@ -435,7 +435,7 @@ func (f *FlowGenerator) processPacket(meta *MetaPacket) {
 	if flowExtra, reply = flowCache.keyMatch(meta, flowKey); flowExtra != nil {
 		if ok, reply = f.updateFlow(flowExtra, meta, reply); ok {
 			f.stats.CurrNumFlows--
-			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(flowExtra.reversed)
+			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(flowExtra.reversed, &f.perfCounter)
 			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportIntervalSec)
 			flowExtra.calcCloseType(false)
 			if f.servicePortDescriptor.judgeServiceDirection(flowExtra.taggedFlow.PortSrc, flowExtra.taggedFlow.PortDst) {
@@ -446,14 +446,14 @@ func (f *FlowGenerator) processPacket(meta *MetaPacket) {
 			flowCache.flowList.RemoveFront()
 		} else {
 			// reply is a sign relative to the flow direction, so if the flow is reversed then the sign should be changed
-			flowExtra.metaFlowPerf.Update(meta, flowExtra.reversed != reply, flowExtra)
+			flowExtra.metaFlowPerf.Update(meta, flowExtra.reversed != reply, flowExtra, &f.perfCounter)
 		}
 	} else {
 		closed := false
 		flowExtra, closed, reply = f.initFlow(meta, flowKey)
 		f.stats.TotalNumFlows++
 		if closed {
-			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false)
+			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false, &f.perfCounter)
 			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportIntervalSec)
 			flowExtra.calcCloseType(false)
 			if f.servicePortDescriptor.judgeServiceDirection(flowExtra.taggedFlow.PortSrc, flowExtra.taggedFlow.PortDst) {
@@ -461,11 +461,11 @@ func (f *FlowGenerator) processPacket(meta *MetaPacket) {
 			}
 			f.flowOutQueue.Put(flowExtra.taggedFlow)
 		} else {
-			flowExtra.metaFlowPerf.Update(meta, reply, flowExtra)
+			flowExtra.metaFlowPerf.Update(meta, reply, flowExtra, &f.perfCounter)
 
 			if flowExtra == f.addFlow(flowCache, flowExtra) {
 				// reach limit and output directly
-				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false)
+				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false, &f.perfCounter)
 				flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportIntervalSec)
 				flowExtra.taggedFlow.CloseType = CLOSE_TYPE_FLOOD
 				if f.servicePortDescriptor.judgeServiceDirection(flowExtra.taggedFlow.PortSrc, flowExtra.taggedFlow.PortDst) {
@@ -505,7 +505,7 @@ func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uin
 		for e := flowCache.flowList.Front(); e != nil; {
 			flowExtra := e.Value
 			f.stats.CurrNumFlows--
-			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false)
+			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false, &f.perfCounter)
 			flowExtra.setCurFlowInfo(now, forceReportIntervalSec)
 			flowExtra.calcCloseType(false)
 			flowOutQueue.Put(flowExtra.taggedFlow)
@@ -542,7 +542,7 @@ loop:
 			if flowExtra.recentTimesSec+flowExtra.timeoutSec <= nowSec {
 				del = e
 				f.stats.CurrNumFlows--
-				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(flowExtra.reversed)
+				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(flowExtra.reversed, &f.perfCounter)
 				flowExtra.setCurFlowInfo(now, forceReportIntervalSec)
 				flowExtra.calcCloseType(false)
 				if f.servicePortDescriptor.judgeServiceDirection(flowExtra.taggedFlow.PortSrc, flowExtra.taggedFlow.PortDst) {
@@ -550,7 +550,7 @@ loop:
 				}
 				flowOutQueue.Put(flowExtra.taggedFlow)
 			} else if flowExtra.taggedFlow.StartTime/time.Second+forceReportIntervalSec < nowSec {
-				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(flowExtra.reversed)
+				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(flowExtra.reversed, &f.perfCounter)
 				flowExtra.setCurFlowInfo(now, forceReportIntervalSec)
 				flowExtra.calcCloseType(true)
 				if f.servicePortDescriptor.judgeServiceDirection(flowExtra.taggedFlow.PortSrc, flowExtra.taggedFlow.PortDst) {
@@ -638,10 +638,13 @@ func New(metaPacketHeaderInQueue QueueReader, flowOutQueue QueueWriter, forceRep
 		flowLimitNum:            FLOW_LIMIT_NUM,
 		handleRunning:           false,
 		cleanRunning:            false,
+		perfCounter:             NewFlowPerfCounter(),
 	}
 	flowGenerator.initStateMachineMaster()
 	flowGenerator.initStateMachineSlave()
 	RegisterCountable("flow_gen", EMPTY_TAG, flowGenerator)
+	RegisterCountable(FP_NAME, EMPTY_TAG, &flowGenerator.perfCounter)
+
 	log.Info("Flow Generator created")
 	return flowGenerator
 }
