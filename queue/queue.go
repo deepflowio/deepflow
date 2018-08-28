@@ -11,7 +11,7 @@ import (
 )
 
 type DebugMessage struct {
-	Data fmt.Stringer
+	Data string
 }
 
 type Queue struct {
@@ -60,7 +60,7 @@ func (q *Queue) sendDebug(conn *net.UDPConn, port int, items []interface{}) {
 	for _, item := range items {
 		buffer := bytes.Buffer{}
 		gob.Register(q.Data)
-		message := DebugMessage{Data: item.(fmt.Stringer)}
+		message := DebugMessage{Data: item.(fmt.Stringer).String()}
 		encoder := gob.NewEncoder(&buffer)
 		if err := encoder.Encode(message); err != nil {
 			log.Error(err)
