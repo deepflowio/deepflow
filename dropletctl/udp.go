@@ -12,17 +12,22 @@ import (
 	"github.com/op/go-logging"
 )
 
+const (
+	UDP_MAXLEN               = 8192
+	DROPLET_MESSAGE_ARGS_LEN = 4096
+)
+
 type DropletMessage struct {
 	Module, Operate uint16
 	Result          uint32
-	Args            [1024]byte
+	Args            [DROPLET_MESSAGE_ARGS_LEN]byte
 }
 
 var log = logging.MustGetLogger(os.Args[0])
 var running bool = false
 
 func RecvFromDroplet(conn *net.UDPConn) (*bytes.Buffer, error) {
-	data := make([]byte, 1500)
+	data := make([]byte, UDP_MAXLEN)
 	msg := DropletMessage{}
 
 	if _, _, err := conn.ReadFrom(data); err != nil {
@@ -78,7 +83,7 @@ func SendToDropletCtl(conn *net.UDPConn, port int, result uint32, args *bytes.Bu
 }
 
 func process(conn *net.UDPConn) {
-	data := make([]byte, 1500)
+	data := make([]byte, UDP_MAXLEN)
 	msg := DropletMessage{}
 
 	_, remote, err := conn.ReadFromUDP(data)
