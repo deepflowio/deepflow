@@ -157,7 +157,7 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) {
 
 	for {
 		meta := &datatype.MetaPacket{
-			InPort:   ifMacSuffix | datatype.CAPTURE_REMOTE,
+			InPort:   ifMacSuffix | datatype.PACKET_SOURCE_TOR,
 			Exporter: ip,
 		}
 		if decoder.NextPacket(meta) {
