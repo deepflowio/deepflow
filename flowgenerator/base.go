@@ -108,6 +108,8 @@ type FlowGenerator struct {
 	handleRunning           bool
 	cleanRunning            bool
 	cleanWaitGroup          sync.WaitGroup
+
+	perfCounter FlowPerfCounter
 }
 
 func timeMax(a time.Duration, b time.Duration) time.Duration {
