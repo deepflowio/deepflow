@@ -12,6 +12,7 @@ const (
 	NETMASK                    = 0xFFFFFFFF
 	DEEPFLOW_POSITION_EXPORTER = 0x30000
 	DATA_VALID_TIME            = 60 * time.Second
+	ARP_VALID_TIME             = 60 * 60 * time.Second
 )
 
 type IpNet struct {
