@@ -38,13 +38,13 @@ func getDefaultPacket() *MetaPacket {
 			SrcInfo: &EndpointInfo{
 				L2EpcId:  -1,
 				L3EpcId:  -1,
-				GroupIds: make([]uint32, 10),
+				GroupIds: make([]uint32, 0, 10),
 				HostIp:   0x01010101,
 			},
 			DstInfo: &EndpointInfo{
 				L2EpcId:  -1,
 				L3EpcId:  -1,
-				GroupIds: make([]uint32, 10),
+				GroupIds: make([]uint32, 0, 10),
 				HostIp:   0x01010101,
 			},
 		},
