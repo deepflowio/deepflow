@@ -79,11 +79,12 @@ type Flow struct {
 	FlowKey
 	CloseType
 
-	Host      IP
-	FlowID    uint64
-	StartTime time.Duration
-	EndTime   time.Duration
-	Duration  time.Duration
+	Host       IP
+	FlowID     uint64
+	TimeBitmap uint64
+	StartTime  time.Duration
+	EndTime    time.Duration
+	Duration   time.Duration
 
 	/* L2 */
 	VLAN    uint16
@@ -94,12 +95,6 @@ type Flow struct {
 	/* L4 */
 	TCPFlags0 uint16
 	TCPFlags1 uint16
-
-	/* Overlay */
-	OverlayTunnelID   uint32
-	OverlayTunnelType uint8
-
-	/* L7 */
 
 	/* Packet Counters */
 	ByteCount0        uint64
