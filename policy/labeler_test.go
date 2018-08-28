@@ -2,13 +2,16 @@ package policy
 
 import (
 	"testing"
+	"time"
+
+	. "github.com/google/gopacket/layers"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
 func TestGetPlatformData(t *testing.T) {
 
-	ply := NewPolicyTable(ACTION_PACKET_STAT)
+	policy := NewPolicyTable(ACTION_PACKET_STAT)
 
 	srcIp := NewIPFromString("192.168.2.12")
 	dstIp := NewIPFromString("192.168.0.11")
@@ -49,7 +52,7 @@ func TestGetPlatformData(t *testing.T) {
 	vifData.Ips = append(vifData.Ips, &ipInfo1)
 
 	ip2 := NewIPFromString("192.168.2.0")
-	ipinfo2 := IpNet{
+	ipInfo2 := IpNet{
 		Ip:       ip2.Int(),
 		SubnetId: 125,
 		Netmask:  24,
@@ -76,38 +79,73 @@ func TestGetPlatformData(t *testing.T) {
 		HostIp:     launchserver1.Int(),
 	}
 
-	vifData1.Ips = append(vifData1.Ips, &ipinfo2)
+	vifData1.Ips = append(vifData1.Ips, &ipInfo2)
 	vifData1.Ips = append(vifData1.Ips, &ipInfo3)
 
 	var datas []*PlatformData
 	datas = append(datas, &vifData)
 	datas = append(datas, &vifData1)
-	ply.UpdateInterfaceData(datas)
-	result, _ := ply.LookupAllByKey(key)
+	policy.UpdateInterfaceData(datas)
+	result, _ := policy.LookupAllByKey(key)
 	if result != nil {
 		t.Log(result.SrcInfo, "\n")
 		t.Log(result.DstInfo, "\n")
 	}
-	/*
-		vifData1 := labeler.VifData{
-			EpcId:      1,
-			DeviceType: 2,
-			DeviceId:   3,
-			IfType:     12,
-			IfIndex:    4,
-			Mac:        0x123132,
-			HostIp:     123131,
-		}
+}
 
-		var data1s []*labeler.VifData
+func TestGetPlatformDataAboutArp(t *testing.T) {
+	policy := NewPolicyTable(ACTION_PACKET_STAT)
 
-		data1s = append(data1s, &vifData1)
+	srcIp := NewIPFromString("192.168.2.12")
+	dstIp := NewIPFromString("192.168.0.11")
+	key := &LookupKey{
+		SrcIp:       srcIp.Int(),
+		SrcMac:      0x80027a42bfc,
+		DstMac:      0x80027a42bfa,
+		DstIp:       dstIp.Int(),
+		EthType:     EthernetTypeARP,
+		Ttl:         64,
+		RxInterface: 196610,
+	}
+	ip := NewIPFromString("192.168.0.11")
+	ipInfo := IpNet{
+		Ip:       ip.Int(),
+		SubnetId: 121,
+		Netmask:  24,
+	}
 
-		labler.UpdatePlatformData(data1s)
-		result = labler.GetPlatformData(key)
-		fmt.Print(result)
-		key.SrcMac = 0x123132
-		result = labler.GetPlatformData(key)
-		fmt.Print(result)
-	*/
+	ip1 := NewIPFromString("192.168.0.12")
+	ipInfo1 := IpNet{
+		Ip:       ip1.Int(),
+		SubnetId: 122,
+		Netmask:  25,
+	}
+
+	mac := NewMACAddrFromString("08:00:27:a4:2b:fc")
+	launchServer := NewIPFromString("10.10.10.10")
+	vifData := PlatformData{
+		EpcId:      11,
+		DeviceType: 2,
+		DeviceId:   3,
+		IfType:     3,
+		IfIndex:    5,
+		Mac:        mac.Int(),
+		HostIp:     launchServer.Int(),
+	}
+
+	vifData.Ips = append(vifData.Ips, &ipInfo)
+	vifData.Ips = append(vifData.Ips, &ipInfo1)
+	var datas []*PlatformData
+	datas = append(datas, &vifData)
+	policy.UpdateInterfaceData(datas)
+	now := time.Now()
+	result, _ := policy.LookupAllByKey(key)
+	t.Log(time.Now().Sub(now))
+	if result != nil {
+		t.Log(result.SrcInfo, "\n")
+		t.Log(result.DstInfo, "\n")
+	}
+	now = time.Now()
+	result, _ = policy.LookupAllByKey(key)
+	t.Log(time.Now().Sub(now))
 }

@@ -62,15 +62,16 @@ func (g *IpResourceGroup) Update(groups []*IpGroupData) {
 }
 
 // Populate fills tags in flow message
-func (g *IpResourceGroup) Populate(ip uint32, endpointInfo *EndpointInfo) {
-	if endpointInfo == nil {
-		return
-	}
+func (g *IpResourceGroup) Populate(ip uint32, endpointInfo *EndpointInfo) bool {
+	ok := false
 	if endpointInfo.L3EpcId != 0 {
 		for _, v := range g.ipTree.cachedQuery(endpointInfo.L3EpcId, ip) {
 			endpointInfo.GroupIds = append(endpointInfo.GroupIds, uint32(v))
+			ok = true
 		}
 	}
+
+	return ok
 }
 
 type CachedTree struct {
