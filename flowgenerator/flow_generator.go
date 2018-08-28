@@ -139,8 +139,8 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, key *FlowKey) (*FlowExtra, bo
 			TCPFlags1:    0,
 		},
 		Tag: Tag{
-			GroupIDs0: make([]uint32, 10),
-			GroupIDs1: make([]uint32, 10),
+			GroupIDs0: make([]uint32, 0, 10),
+			GroupIDs1: make([]uint32, 0, 10),
 		},
 	}
 	flowExtra := &FlowExtra{
