@@ -50,30 +50,18 @@ func Start(configPath string) {
 	synchronizer := config.NewRpcConfigSynchronizer(ips, cfg.ControllerPort)
 	synchronizer.Start()
 
+	stats.StartStatsd(net.ParseIP(cfg.StatsdServer), 10*time.Second)
+
 	manager := queue.NewManager()
 
-	filterQueue := manager.NewQueue("ToFilter", 1000, &MetaPacket{})
+	// L1 - packet source
+	filterQueue := manager.NewQueue("1-meta-packet-to-filter", 1000, &MetaPacket{})
+
 	tridentAdapter := adapter.NewTridentAdapter(filterQueue)
 	if tridentAdapter == nil {
 		return
 	}
-
-	flowQueue := manager.NewQueue("FilterToFlow", 1000, &MetaPacket{})
-	meteringQueue := manager.NewQueue("FilterToMetering", 1000, &MetaPacket{})
-	labelerManager := labeler.NewLabelerManager(filterQueue)
-	labelerManager.RegisterAppQueue(labeler.METERING_QUEUE, meteringQueue)
-	labelerManager.RegisterAppQueue(labeler.FLOW_QUEUE, flowQueue)
-	labelerManager.Start()
-	synchronizer.Register(func(response *trident.SyncResponse) {
-		labelerManager.OnPlatformDataChange(convert2PlatformData(response))
-		labelerManager.OnIpGroupDataChange(convert2IpGroupdata(response))
-	})
-
-	flowAppOutputQueue := manager.NewQueue("flowAppOutputQueue", 1000, &TaggedFlow{})
-	flowGenerator := flowgenerator.New(flowQueue, flowAppOutputQueue, 60)
-	if flowGenerator == nil {
-		return
-	}
+	tridentAdapter.Start()
 
 	for _, iface := range cfg.DataInterfaces {
 		capture, err := packet.NewCapture(iface, ips[0], false, filterQueue)
@@ -92,10 +80,25 @@ func Start(configPath string) {
 		capture.Start()
 	}
 
-	flowGenerator.Start()
-	tridentAdapter.Start()
+	// L2 - packet filter
+	meteringAppQueue := manager.NewQueue("2-meta-packet-to-metering-app", 1000, &MetaPacket{})
+	flowGeneratorQueue := manager.NewQueue("2-meta-packet-to-flow-generator", 1000, &MetaPacket{})
+	labelerManager := labeler.NewLabelerManager(filterQueue)
+	labelerManager.RegisterAppQueue(labeler.METERING_QUEUE, meteringAppQueue)
+	labelerManager.RegisterAppQueue(labeler.FLOW_QUEUE, flowGeneratorQueue)
+	labelerManager.Start()
+	synchronizer.Register(func(response *trident.SyncResponse) {
+		labelerManager.OnPlatformDataChange(convert2PlatformData(response))
+		labelerManager.OnIpGroupDataChange(convert2IpGroupdata(response))
+	})
 
-	stats.StartStatsd(net.ParseIP(cfg.StatsdServer))
+	// L3 - flow-generator & apps
+	flowAppQueue := manager.NewQueue("3-tagged-flow-to-flow-app", 1000, &TaggedFlow{})
+	flowGenerator := flowgenerator.New(flowGeneratorQueue, flowAppQueue, 60)
+	if flowGenerator == nil {
+		return
+	}
+	flowGenerator.Start()
 
 	flowMapProcess := mapreduce.NewFlowMapProcess()
 	meteringProcess := mapreduce.NewMeteringMapProcess()
@@ -105,13 +108,13 @@ func Start(configPath string) {
 		for {
 			<-flowTimer.C
 			flushFlow := TaggedFlow{Flow: Flow{StartTime: 0}}
-			flowAppOutputQueue.Put(&flushFlow)
+			flowAppQueue.Put(&flushFlow)
 			flowTimer.Reset(queueFlushTime)
 		}
 	}()
 	go func() {
 		for {
-			taggedFlow := flowAppOutputQueue.Get().(*TaggedFlow)
+			taggedFlow := flowAppQueue.Get().(*TaggedFlow)
 			log.Info(taggedFlow)
 			if taggedFlow.StartTime > 0 {
 				flowMapProcess.Process(*taggedFlow)
@@ -126,13 +129,13 @@ func Start(configPath string) {
 		for {
 			<-meteringTimer.C
 			flushMetering := MetaPacket{Timestamp: 0}
-			meteringQueue.Put(&flushMetering)
+			meteringAppQueue.Put(&flushMetering)
 			meteringTimer.Reset(queueFlushTime)
 		}
 	}()
 	go func() {
 		for {
-			metaPacket := meteringQueue.Get().(*MetaPacket)
+			metaPacket := meteringAppQueue.Get().(*MetaPacket)
 			if metaPacket.Timestamp != 0 {
 				meteringProcess.Process(*metaPacket)
 			} else if meteringProcess.NeedFlush() {

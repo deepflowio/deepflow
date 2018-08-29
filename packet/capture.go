@@ -144,7 +144,6 @@ func (c *Capture) run() (retErr error) {
 			Timestamp: timestamp,
 			InPort:    c.rxInterface,
 			Exporter:  c.ip,
-			Raw:       packet,
 			PacketLen: uint16(ci.CaptureLength),
 		}
 		if !metaPacket.Parse(packet) {
