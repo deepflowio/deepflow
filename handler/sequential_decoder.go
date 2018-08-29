@@ -102,11 +102,11 @@ func (d *SequentialDecoder) Seq() uint32 {
 	return d.seq
 }
 
-func decodeTunnel(stream ByteStream) *TunnelInfo {
+func decodeTunnel(stream *ByteStream) *TunnelInfo {
 	src := stream.U32()
 	dst := stream.U32()
-	id := uint32((stream.U8()))<<16 | uint32(stream.U16())
 	tunnelType := TunnelType(stream.U8())
+	id := uint32((stream.U8()))<<16 | uint32(stream.U16())
 	return &TunnelInfo{tunnelType, src, dst, id}
 }
 
@@ -293,7 +293,7 @@ func (d *SequentialDecoder) NextPacket(meta *MetaPacket) bool {
 	}
 	d.timestamp += time.Duration(delta) * time.Microsecond // µs to ns
 	if d.pflags.IsSet(PFLAG_TUNNEL) {
-		meta.Tunnel = decodeTunnel(d.data)
+		meta.Tunnel = decodeTunnel(&d.data)
 	}
 	meta.PacketLen = totalSize
 	meta.Timestamp = d.timestamp
