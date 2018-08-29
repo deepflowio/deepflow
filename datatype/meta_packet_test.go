@@ -2,12 +2,16 @@ package datatype
 
 import (
 	"bytes"
+	. "encoding/binary"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
 )
 
@@ -31,6 +35,49 @@ func loadPcap(file string) []RawPacket {
 		packets = append(packets, packet)
 	}
 	return packets
+}
+
+func TestParseArp(t *testing.T) {
+	da, _ := net.ParseMAC("ac:2b:6e:b3:84:63")
+	sa, _ := net.ParseMAC("52:54:00:33:c4:54")
+	expected := &MetaPacket{
+		PacketLen: 60,
+		MacSrc:    MacIntFromBytes(sa),
+		MacDst:    MacIntFromBytes(da),
+
+		EthType: layers.EthernetTypeARP,
+		IpSrc:   BigEndian.Uint32(net.ParseIP("10.33.0.1").To4()),
+		IpDst:   BigEndian.Uint32(net.ParseIP("10.33.0.105").To4()),
+	}
+	packet := loadPcap("arp.pcap")[0]
+	actual := &MetaPacket{PacketLen: uint16(len(packet))}
+	actual.Parse(packet)
+	if result := cmp.Diff(expected, actual); result != "" {
+		t.Error(result)
+	}
+}
+
+func TestParseInvalid(t *testing.T) {
+	da, _ := net.ParseMAC("00:50:56:e9:32:74")
+	sa, _ := net.ParseMAC("00:0c:29:15:0a:35")
+	expected := &MetaPacket{
+		Invalid:   true,
+		PacketLen: 36,
+		MacSrc:    MacIntFromBytes(sa),
+		MacDst:    MacIntFromBytes(da),
+
+		EthType:  layers.EthernetTypeIPv4,
+		IpSrc:    BigEndian.Uint32(net.ParseIP("192.168.227.152").To4()),
+		IpDst:    BigEndian.Uint32(net.ParseIP("10.33.0.1").To4()),
+		Protocol: layers.IPProtocolTCP,
+		TTL:      64,
+	}
+	packet := loadPcap("invalid.pcap")[0]
+	actual := &MetaPacket{PacketLen: uint16(len(packet))}
+	actual.Parse(packet)
+	if result := cmp.Diff(expected, actual); result != "" {
+		t.Error(result)
+	}
 }
 
 func TestParsePacket(t *testing.T) {

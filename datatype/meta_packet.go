@@ -32,6 +32,7 @@ type MetaPacket struct {
 	L2End0, L2End1 bool
 	EndpointData   *EndpointData
 	Raw            RawPacket
+	Invalid        bool
 
 	Tunnel *TunnelInfo
 
@@ -49,7 +50,7 @@ type MetaPacket struct {
 	TcpData    *MetaPacketTcpHeader
 }
 
-func (h *MetaPacketTcpHeader) extractTcpOptions(stream ByteStream) {
+func (h *MetaPacketTcpHeader) extractTcpOptions(stream *ByteStream) {
 	for stream.Len() >= 2 { // 如果不足2B，那么只可能是NOP或END
 		switch TCPOptionKind(stream.U8()) {
 		case TCPOptionKindEndList:
@@ -72,6 +73,60 @@ func (h *MetaPacketTcpHeader) extractTcpOptions(stream ByteStream) {
 
 func isVlanTagged(ethType EthernetType) bool {
 	return ethType == EthernetTypeQinQ || ethType == EthernetTypeDot1Q
+}
+
+func (p *MetaPacket) ParseArp(stream *ByteStream) {
+	stream.Skip(8 + MAC_ADDR_LEN)
+	p.IpSrc = stream.U32()
+	stream.Skip(MAC_ADDR_LEN)
+	p.IpDst = stream.U32()
+}
+
+func (p *MetaPacket) ParseIp(stream *ByteStream) {
+	ihl := (stream.U8() & 0xF)
+	stream.Skip(5) // skip till TTL
+	fragmentOffset := stream.U16() & 0x1FFF
+	p.TTL = stream.U8()
+	p.Protocol = IPProtocol(stream.U8())
+	stream.Skip(2) // skip checksum
+	p.IpSrc = stream.U32()
+	p.IpDst = stream.U32()
+	ipOptionsSize := int(ihl)*4 - MIN_IPV4_HEADER_SIZE
+	if stream.Len() <= ipOptionsSize || fragmentOffset > 0 { // no more header
+		return
+	}
+	stream.Skip(ipOptionsSize) // skip options
+	p.ParseL4(stream)
+}
+
+func (p *MetaPacket) ParseL4(stream *ByteStream) {
+	if p.Protocol == IPProtocolTCP {
+		if stream.Len() < MIN_TCP_HEADER_SIZE {
+			p.Invalid = true
+			return
+		}
+		p.PortSrc = stream.U16()
+		p.PortDst = stream.U16()
+		seq := stream.U32()
+		ack := stream.U32()
+		dataOffset := int(stream.U8() & 0xF0)
+		flags := stream.U8()
+		winSize := stream.U16()
+		stream.Skip(4) // skip checksum and URG Pointer
+		optionsSize := dataOffset - MIN_TCP_HEADER_SIZE
+		p.PayloadLen = uint16(stream.Len() - optionsSize)
+		tcpHeader := &MetaPacketTcpHeader{flags, seq, ack, winSize, 0, false}
+		tcpHeader.extractTcpOptions(stream)
+		p.TcpData = tcpHeader
+	} else if p.Protocol == IPProtocolUDP {
+		if stream.Len() < UDP_HEADER_SIZE {
+			p.Invalid = true
+			return
+		}
+		p.PortSrc = stream.U16()
+		p.PortDst = stream.U16()
+		p.PayloadLen = stream.U16() - UDP_HEADER_SIZE
+	}
 }
 
 // TODO: 一个合法ip报文应当至少有30B的长度(不考虑非ip情形)
@@ -106,58 +161,20 @@ func (p *MetaPacket) Parse(packet RawPacket) bool {
 	}
 
 	// L3
-	if p.EthType != EthernetTypeIPv4 || stream.Len() < MIN_IPV4_HEADER_SIZE {
-		return true
+	if p.EthType == EthernetTypeIPv4 && stream.Len() >= MIN_IPV4_HEADER_SIZE {
+		p.ParseIp(&stream)
+	} else if p.EthType == EthernetTypeARP && stream.Len() >= ARP_HEADER_SIZE {
+		p.ParseArp(&stream)
 	}
-	ihl := (stream.U8() & 0xF)
-	stream.Field(5) // skip till TTL
-	fragmentOffset := stream.U16() & 0x1FFF
-	p.TTL = stream.U8()
-	p.Protocol = IPProtocol(stream.U8())
-	stream.U16() // skip checksum
-	p.IpSrc = stream.U32()
-	p.IpDst = stream.U32()
-	ipOptionsSize := int(ihl)*4 - MIN_IPV4_HEADER_SIZE
-	if stream.Len() <= ipOptionsSize || fragmentOffset > 0 { // no more header
-		return true
-	}
-	stream.Field(ipOptionsSize) // skip options
-
-	// L4
-	isValidUDP := p.Protocol == IPProtocolUDP && stream.Len() >= UDP_HEADER_SIZE
-	isValidTCP := p.Protocol == IPProtocolTCP && stream.Len() >= MIN_TCP_HEADER_SIZE
-	if !isValidUDP && !isValidTCP {
-		return true
-	}
-	p.PortSrc = stream.U16()
-	p.PortDst = stream.U16()
-	if p.Protocol == IPProtocolUDP {
-		p.PayloadLen = stream.U16() - UDP_HEADER_SIZE
-		return true
-	} // else TCP
-
-	seq := stream.U32()
-	ack := stream.U32()
-	dataOffset := int((stream.U8() & 0xF0) >> 2)
-	flags := stream.U8()
-	winSize := stream.U16()
-	stream.Field(4) // skip checksum and URG Pointer
-	optionsSize := dataOffset - MIN_TCP_HEADER_SIZE
-	p.PayloadLen = uint16(stream.Len() - optionsSize)
-	tcpHeader := &MetaPacketTcpHeader{flags, seq, ack, winSize, 0, false}
-	if optionsSize > 0 {
-		tcpHeader.extractTcpOptions(ByteStream{stream.Slice()[:optionsSize], 0})
-	}
-	p.TcpData = tcpHeader
 	return true
 }
 
 func (p *MetaPacket) String() string {
 	buffer := bytes.Buffer{}
 	var format string
-	format = "timestamp: %d inport: 0x%x exporter: %v len: %d l2_end: %v, %v\n"
+	format = "timestamp: %d inport: 0x%x exporter: %v len: %d l2_end: %v, %v invalid: %v\n"
 	buffer.WriteString(fmt.Sprintf(format, p.Timestamp, p.InPort, IpFromUint32(p.Exporter),
-		p.PacketLen, p.L2End0, p.L2End1))
+		p.PacketLen, p.L2End0, p.L2End1, p.Invalid))
 	if p.Tunnel != nil {
 		buffer.WriteString(fmt.Sprintf("\ttunnel: %s\n", p.Tunnel))
 	}
