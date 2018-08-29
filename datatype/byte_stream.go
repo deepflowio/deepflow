@@ -38,6 +38,16 @@ func (s *ByteStream) U64() uint64 {
 	return binary.BigEndian.Uint64(s.data[s.offset-8:])
 }
 
+func (s *ByteStream) Skip(n int) {
+	if n > 0 {
+		s.offset += n
+	}
+}
+
+func (s *ByteStream) Slice() []byte {
+	return s.data[s.offset:]
+}
+
 func NewByteStream(data []byte) ByteStream {
 	return ByteStream{data, 0}
 }

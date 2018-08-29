@@ -2,8 +2,11 @@ package datatype
 
 import (
 	. "encoding/binary"
+	"fmt"
 
 	. "github.com/google/gopacket/layers"
+
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 type TunnelType uint8
@@ -22,6 +25,10 @@ type TunnelInfo struct {
 	Src  IPv4Int
 	Dst  IPv4Int
 	Id   uint32
+}
+
+func (t *TunnelInfo) String() string {
+	return fmt.Sprintf("type: %s, src: %s, dst: %s, id: %d", t.Type, IpFromUint32(t.Src), IpFromUint32(t.Dst), t.Id)
 }
 
 func (t *TunnelInfo) Decapsulate(packet []byte) int {

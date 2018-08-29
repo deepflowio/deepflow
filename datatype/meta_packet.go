@@ -1,6 +1,7 @@
 package datatype
 
 import (
+	"bytes"
 	"fmt"
 	"time"
 
@@ -48,20 +49,7 @@ type MetaPacket struct {
 	TcpData    *MetaPacketTcpHeader
 }
 
-func (m *MetaPacket) String() string {
-	return fmt.Sprintf("TIMESTAMP: %d INPORT: 0x%X EXPORTER: %v PKT_LEN: %d IS_L2_END: %v - %v ENDPOINTDATA: %p RAW: %p\n"+
-		"    TUNNEL: %+v\n"+
-		"    MAC: %s -> %s TYPE: %d VLAN: %d\n"+
-		"    IP: %v -> %v PROTO: %d TTL: %d\n"+
-		"    PORT: %d -> %d PAYLOAD_LEN: %d TCP: %+v",
-		m.Timestamp, m.InPort, IpFromUint32(m.Exporter), m.PacketLen, m.L2End0, m.L2End1, m.EndpointData, m.Raw,
-		m.Tunnel,
-		Uint64ToMac(m.MacSrc), Uint64ToMac(m.MacDst), m.EthType, m.Vlan,
-		IpFromUint32(m.IpSrc), IpFromUint32(m.IpDst), m.Protocol, m.TTL,
-		m.PortSrc, m.PortDst, m.PayloadLen, m.TcpData)
-}
-
-func (h *MetaPacketTcpHeader) extractTcpOptions(stream *ByteStream) {
+func (h *MetaPacketTcpHeader) extractTcpOptions(stream ByteStream) {
 	for stream.Len() >= 2 { // 如果不足2B，那么只可能是NOP或END
 		switch TCPOptionKind(stream.U8()) {
 		case TCPOptionKindEndList:
@@ -69,15 +57,15 @@ func (h *MetaPacketTcpHeader) extractTcpOptions(stream *ByteStream) {
 		case TCPOptionKindNop:
 			continue
 		case TCPOptionKindWindowScale:
-			stream.U8() // skip length
+			stream.Skip(1)
 			if stream.Len() > 0 {
 				h.WinScale = stream.U8()
 			}
 		case TCPOptionKindSACKPermitted:
-			stream.U8() // skip length
+			stream.Skip(1)
 			h.SACKPermitted = true
 		default: // others
-			stream.U8() // skip length
+			stream.Skip(int(stream.U8()) - 2)
 		}
 	}
 }
@@ -150,14 +138,36 @@ func (p *MetaPacket) Parse(packet RawPacket) bool {
 
 	seq := stream.U32()
 	ack := stream.U32()
-	dataOffset := int(stream.U8() & 0xF0)
+	dataOffset := int((stream.U8() & 0xF0) >> 2)
 	flags := stream.U8()
 	winSize := stream.U16()
 	stream.Field(4) // skip checksum and URG Pointer
 	optionsSize := dataOffset - MIN_TCP_HEADER_SIZE
 	p.PayloadLen = uint16(stream.Len() - optionsSize)
 	tcpHeader := &MetaPacketTcpHeader{flags, seq, ack, winSize, 0, false}
-	tcpHeader.extractTcpOptions(&stream)
+	if optionsSize > 0 {
+		tcpHeader.extractTcpOptions(ByteStream{stream.Slice()[:optionsSize], 0})
+	}
 	p.TcpData = tcpHeader
 	return true
+}
+
+func (p *MetaPacket) String() string {
+	buffer := bytes.Buffer{}
+	var format string
+	format = "timestamp: %d inport: 0x%x exporter: %v len: %d l2_end: %v, %v\n"
+	buffer.WriteString(fmt.Sprintf(format, p.Timestamp, p.InPort, IpFromUint32(p.Exporter),
+		p.PacketLen, p.L2End0, p.L2End1))
+	if p.Tunnel != nil {
+		buffer.WriteString(fmt.Sprintf("\ttunnel: %s\n", p.Tunnel))
+	}
+	format = "\t%s -> %s type: %04x vlan-id: %d\n"
+	buffer.WriteString(fmt.Sprintf(format, Uint64ToMac(p.MacSrc), Uint64ToMac(p.MacDst), uint16(p.EthType), p.Vlan))
+	format = "\t%v:%d -> %v:%d proto: %x ttl: %d payload-len: %d "
+	buffer.WriteString(fmt.Sprintf(format, IpFromUint32(p.IpSrc), p.PortSrc,
+		IpFromUint32(p.IpDst), p.PortDst, p.Protocol, p.TTL, p.PayloadLen))
+	if p.TcpData != nil {
+		buffer.WriteString(fmt.Sprintf("tcp: %+v", p.TcpData))
+	}
+	return buffer.String()
 }

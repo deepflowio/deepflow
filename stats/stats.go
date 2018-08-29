@@ -70,7 +70,7 @@ const (
 )
 
 type Countable interface {
-	// needs to be thread-safe
+	// needs to be thread-safe, clear is required after read
 	// accept struct or []StatItem
 	GetCounter() interface{}
 }
