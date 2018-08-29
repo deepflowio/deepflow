@@ -1,6 +1,7 @@
 package flowgenerator
 
 import (
+	"math/rand"
 	"net"
 	"runtime"
 	"testing"
@@ -211,16 +212,15 @@ func TestGetKeyL3Hash(t *testing.T) {
 
 func TestGetKeyL4Hash(t *testing.T) {
 	flowKey := &FlowKey{}
+	basis := rand.Uint32()
 
 	flowKey.Proto = layers.IPProtocolTCP
 	flowKey.PortSrc = 12345
 	flowKey.PortDst = 22
-	hash0 := getKeyL4Hash(flowKey)
+	hash0 := getKeyL4Hash(flowKey, basis)
 
-	flowKey.Proto = layers.IPProtocolTCP
-	flowKey.PortSrc = 22
-	flowKey.PortDst = 12345
-	hash1 := getKeyL4Hash(flowKey)
+	flowKey.PortSrc, flowKey.PortDst = flowKey.PortDst, flowKey.PortSrc
+	hash1 := getKeyL4Hash(flowKey, basis)
 
 	if hash0 != hash1 {
 		t.Errorf("symmetric hash values are %d and %d", hash0, hash1)
@@ -301,12 +301,12 @@ func TestFlowStateMachine(t *testing.T) {
 	// test handshake
 	taggedFlow.TCPFlags0 = TCP_SYN
 	packetFlags = TCP_SYN | TCP_ACK
-	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, true)
+	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, true, false)
 	if flowExtra.flowState != FLOW_STATE_OPENING_2 {
 		t.Errorf("flowExtra.FlowState is %d, expect %d", flowExtra.flowState, FLOW_STATE_OPENING_2)
 	}
 	packetFlags = TCP_ACK
-	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, false)
+	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, false, false)
 	if flowExtra.flowState != FLOW_STATE_ESTABLISHED {
 		t.Errorf("flowExtra.FlowState is %d, expect %d", flowExtra.flowState, FLOW_STATE_ESTABLISHED)
 	}
@@ -315,17 +315,17 @@ func TestFlowStateMachine(t *testing.T) {
 	taggedFlow.TCPFlags0 = TCP_FIN
 	flowExtra.flowState = FLOW_STATE_CLOSING_TX1
 	packetFlags = TCP_ACK
-	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, true)
+	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, true, false)
 	if flowExtra.flowState != FLOW_STATE_CLOSING_TX1 {
 		t.Errorf("flowExtra.FlowState is %d, expect %d", flowExtra.flowState, FLOW_STATE_CLOSING_TX1)
 	}
 	packetFlags = TCP_FIN | TCP_ACK
-	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, true)
+	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, true, false)
 	if flowExtra.flowState != FLOW_STATE_CLOSING_TX2 {
 		t.Errorf("flowExtra.FlowState is %d, expect %d", flowExtra.flowState, FLOW_STATE_CLOSING_TX2)
 	}
 	packetFlags = TCP_ACK
-	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, false)
+	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, false, false)
 	if flowExtra.flowState != FLOW_STATE_CLOSED {
 		t.Errorf("flowExtra.FlowState is %d, expect %d", flowExtra.flowState, FLOW_STATE_CLOSED)
 	}
@@ -460,7 +460,8 @@ func BenchmarkCleanHashMap(b *testing.B) {
 	flowGenerator := getDefaultFlowGenerator()
 	flowGenerator.SetTimeout(TimeoutConfig{0, 300, 0, 30, 5, 0, 0})
 	flowGenerator.minLoopIntervalSec = 0
-	flowCache := flowGenerator.createFlowCache(b.N, 0)
+	flowCache := &FlowCache{capacity: b.N, flowList: NewListFlowExtra()}
+	flowGenerator.hashMap[0] = flowCache
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		meta := getDefaultPacket()

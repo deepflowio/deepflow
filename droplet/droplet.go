@@ -76,7 +76,7 @@ func Start(configPath string) {
 	manager := queue.NewManager()
 
 	// L1 - packet source
-	filterQueue := manager.NewQueue("1-meta-packet-to-filter", 1000, &MetaPacket{})
+	filterQueue := manager.NewQueue("1-meta-packet-to-filter", 1024*64, &MetaPacket{})
 
 	tridentAdapter := adapter.NewTridentAdapter(filterQueue)
 	if tridentAdapter == nil {
@@ -107,8 +107,8 @@ func Start(configPath string) {
 	}
 
 	// L2 - packet filter
-	meteringAppQueue := manager.NewQueue("2-meta-packet-to-metering-app", 1000, &MetaPacket{})
-	flowGeneratorQueue := manager.NewQueue("2-meta-packet-to-flow-generator", 1000, &MetaPacket{})
+	meteringAppQueue := manager.NewQueue("2-meta-packet-to-metering-app", 1024*64, &MetaPacket{})
+	flowGeneratorQueue := manager.NewQueue("2-meta-packet-to-flow-generator", 1024*64, &MetaPacket{})
 	labelerManager := labeler.NewLabelerManager(filterQueue)
 	labelerManager.RegisterAppQueue(labeler.METERING_QUEUE, meteringAppQueue)
 	labelerManager.RegisterAppQueue(labeler.FLOW_QUEUE, flowGeneratorQueue)
@@ -119,7 +119,7 @@ func Start(configPath string) {
 	})
 
 	// L3 - flow-generator & apps
-	flowAppQueue := manager.NewQueue("3-tagged-flow-to-flow-app", 1000, &TaggedFlow{})
+	flowAppQueue := manager.NewQueue("3-tagged-flow-to-flow-app", 1024*16, &TaggedFlow{})
 	flowGenerator := flowgenerator.New(flowGeneratorQueue, flowAppQueue, 60)
 	if flowGenerator == nil {
 		return
