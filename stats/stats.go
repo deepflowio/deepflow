@@ -65,10 +65,6 @@ func (t *StatTags) String() string {
 	return strBuf.String() + "}"
 }
 
-const (
-	RETRIEVE_INTERVAL = 10 * time.Second
-)
-
 type Countable interface {
 	// needs to be thread-safe, clear is required after read
 	// accept struct or []StatItem
@@ -154,11 +150,11 @@ func initStatsdClient(remote net.IP) *Client {
 	return c
 }
 
-func run(remote net.IP) {
+func run(remote net.IP, interval time.Duration) {
 	time.Sleep(time.Second) // wait logger init
 	statsdClient = initStatsdClient(remote)
 
-	ticker := time.NewTicker(RETRIEVE_INTERVAL)
+	ticker := time.NewTicker(interval)
 	for range ticker.C {
 		lock.Lock()
 		for countable, statSource := range statSources {
@@ -173,8 +169,8 @@ func run(remote net.IP) {
 	}
 }
 
-func StartStatsd(remote net.IP) {
+func StartStatsd(remote net.IP, interval time.Duration) {
 	paths := strings.Split(os.Args[0], "/")
 	processName = paths[len(paths)-1]
-	go run(remote)
+	go run(remote, interval)
 }
