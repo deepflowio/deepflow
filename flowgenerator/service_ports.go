@@ -3,7 +3,14 @@ package flowgenerator
 type ServicePortDescriptor struct {
 	Active           bool
 	PortActivityList []bool
-	PortExcludeList  []uint16
+}
+
+func CreateServicePortDsecriptor(portList []bool) *ServicePortDescriptor {
+	if len(portList) > 65536 {
+		log.Warning("service ports list length should not be more than 65536")
+		return nil
+	}
+	return &ServicePortDescriptor{true, portList}
 }
 
 func getServiceDescriptorWithIANA() *ServicePortDescriptor {
@@ -45,17 +52,17 @@ func getServiceDescriptorWithIANA() *ServicePortDescriptor {
 	for _, port := range portExcludeList {
 		portActivityList[port] = false
 	}
+	portActivityList[0] = false
 	servicePortDescriptor.PortActivityList = portActivityList
-	servicePortDescriptor.PortExcludeList = portExcludeList
 	return servicePortDescriptor
 }
 
 func (s *ServicePortDescriptor) judgeServiceDirection(portSrc, portDst uint16) bool {
 	srcActive, dstActive := false, false
-	if portSrc <= 1024 {
+	if portSrc < uint16(len(s.PortActivityList)) {
 		srcActive = s.PortActivityList[portSrc]
 	}
-	if portDst <= 1024 {
+	if portDst < uint16(len(s.PortActivityList)) {
 		dstActive = s.PortActivityList[portDst]
 	}
 	if !srcActive {

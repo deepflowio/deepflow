@@ -41,7 +41,8 @@ const (
 )
 
 const FLOW_CACHE_CAP = 1024
-const HASH_MAP_SIZE uint64 = 1024 * 2
+const HASH_MAP_SIZE uint64 = 1024 * 256
+
 const IN_PORT_FLOW_ID_MASK uint64 = 0xFF000000
 const TIMER_FLOW_ID_MASK uint64 = 0x00FFFFFF
 const TOTAL_FLOWS_ID_MASK uint64 = 0x0FFFFFFF
@@ -70,8 +71,10 @@ var defaultTimeoutConfig TimeoutConfig = TimeoutConfig{
 }
 
 type FlowGeneratorStats struct {
-	TotalNumFlows uint64 `statsd:"total_flow"`
-	CurrNumFlows  uint64 `statsd:"current_flow"`
+	TotalNumFlows   uint64 `statsd:"total_flow"`
+	CurrNumFlows    uint64 `statsd:"current_flow"`
+	AvgFlowCacheLen uint64 `statsd:"avg_flow_cache_len"`
+	MaxFlowCacheLen int    `statsd:"max_flow_cache_len"`
 }
 
 type FlowCache struct {
@@ -83,6 +86,7 @@ type FlowCache struct {
 
 type FlowCacheHashMap struct {
 	hashMap            []*FlowCache
+	hashBasis          uint32
 	mapSize            uint64
 	timeoutParallelNum uint64
 }
