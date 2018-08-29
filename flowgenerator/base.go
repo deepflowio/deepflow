@@ -131,6 +131,7 @@ type FlowGenerator struct {
 	stats                   FlowGeneratorStats
 	stateMachineMaster      []map[uint8]*StateValue
 	stateMachineSlave       []map[uint8]*StateValue
+	servicePortDescriptor   *ServicePortDescriptor
 	forceReportIntervalSec  time.Duration
 	minLoopIntervalSec      time.Duration
 	flowLimitNum            uint64
@@ -180,4 +181,13 @@ func (t TimeoutConfig) minTimeout() time.Duration {
 		}
 	}
 	return minSec
+}
+
+func (f *FlowGenerator) SetServicePorts(servicePortDescriptor *ServicePortDescriptor) bool {
+	if f.handleRunning || f.cleanRunning {
+		log.Warning("flow generator is running, service ports list can not be configured")
+		return false
+	}
+	f.servicePortDescriptor = servicePortDescriptor
+	return true
 }
