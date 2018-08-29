@@ -110,8 +110,7 @@ message Interface {
 
 enum GroupType {
     VM = 0;
-    PUBLIC_IP = 1;
-    INTERNAL_IP = 2;
+    IP = 1;
 }
 
 message Group {
@@ -142,14 +141,16 @@ enum PolicyType {
 }
 
 enum Action {
-    PACKECT_STATISTICS = 1;
-    FLOW_STATISTICS = 2;
+    PACKECT_COUNTER = 1;
+    FLOW_COUNTER = 2;
     FLOW_STORAGE = 3;
     TCP_PERFORMANCE = 4;
     PCAP = 5;
-    ALARM = 6;
-    MISC = 7;
-    POLICY = 8;
+    MISC = 6;
+    POLICY = 7;
+    PACKECT_COUNTER_PUB = 8;
+    FLOW_COUNTER_PUB = 9;
+    TCP_PERFORMANCE_PUB = 10;
 }
 
 message Policy {
@@ -169,7 +170,6 @@ message FlowAcl {
     optional string src_group_ids = 4;
     optional string dst_group_ids = 5;
     optional Protocol protocol = 6;
-    optional string src_ports = 7;
     optional string dst_ports = 8;
     optional uint32 vlan = 9;
     repeated FlowAction actions = 10;
