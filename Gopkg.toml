@@ -34,10 +34,6 @@
   name = "github.com/golang-collections/go-datastructures"
 
 [[constraint]]
-  name = "github.com/google/go-cmp"
-  version = "0.2.0"
-
-[[constraint]]
   name = "github.com/google/gopacket"
   revision = "d9ba49ce8619de3c5fbd2f58168903b35b2ed0e0"
 

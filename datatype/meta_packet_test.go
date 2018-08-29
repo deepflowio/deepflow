@@ -1,14 +1,13 @@
 package datatype
 
 import (
-	. "encoding/binary"
-	"net"
+	"bytes"
+	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
 )
 
@@ -35,32 +34,35 @@ func loadPcap(file string) []RawPacket {
 }
 
 func TestParsePacket(t *testing.T) {
-	da, _ := net.ParseMAC("00:1b:21:bb:22:42")
-	sa, _ := net.ParseMAC("c8:8d:83:93:58:14")
-	expected := &MetaPacket{
-		PacketLen: 114,
-		MacSrc:    MacIntFromBytes(sa),
-		MacDst:    MacIntFromBytes(da),
-
-		EthType:    layers.EthernetTypeIPv4,
-		IpSrc:      BigEndian.Uint32(net.ParseIP("172.20.1.106").To4()),
-		IpDst:      BigEndian.Uint32(net.ParseIP("172.18.0.4").To4()),
-		Protocol:   layers.IPProtocolUDP,
-		TTL:        63,
-		PortSrc:    20033,
-		PortDst:    20033,
-		PayloadLen: 72,
+	var buffer bytes.Buffer
+	packets := loadPcap("meta_packet_test.pcap")
+	for _, packet := range packets {
+		meta := &MetaPacket{PacketLen: uint16(len(packet))}
+		meta.Parse(packet)
+		buffer.WriteString(meta.String() + "\n")
 	}
-	packet := loadPcap("meta_packet.pcap")[0]
-	actual := &MetaPacket{PacketLen: uint16(len(packet))}
-	actual.Parse(packet)
-	if result := cmp.Diff(expected, actual); result != "" {
-		t.Error(result)
+	expectFile := "meta_packet_test.result"
+	content, _ := ioutil.ReadFile(expectFile)
+	expected := string(content)
+	actual := buffer.String()
+	if expected != actual {
+		ioutil.WriteFile("actual.txt", []byte(actual), 0644)
+		t.Error(fmt.Sprintf("Inconsistent with %s, written to actual.txt", expectFile))
 	}
 }
 
 func BenchmarkParsePacket(b *testing.B) {
 	packets := loadPcap("meta_packet_test.pcap")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		packet := packets[i%len(packets)]
+		actual := &MetaPacket{PacketLen: uint16(len(packet))}
+		actual.Parse(packet)
+	}
+}
+
+func BenchmarkQinQ(b *testing.B) {
+	packets := loadPcap("isp.pcap")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		packet := packets[i%len(packets)]
