@@ -82,26 +82,10 @@ func (p *MetaPacket) ParseArp(stream *ByteStream) {
 	p.IpDst = stream.U32()
 }
 
-func (p *MetaPacket) ParseIp(stream *ByteStream) {
-	ihl := (stream.U8() & 0xF)
-	stream.Skip(5) // skip till TTL
-	fragmentOffset := stream.U16() & 0x1FFF
-	p.TTL = stream.U8()
-	p.Protocol = IPProtocol(stream.U8())
-	stream.Skip(2) // skip checksum
-	p.IpSrc = stream.U32()
-	p.IpDst = stream.U32()
-	ipOptionsSize := int(ihl)*4 - MIN_IPV4_HEADER_SIZE
-	if stream.Len() <= ipOptionsSize || fragmentOffset > 0 { // no more header
-		return
-	}
-	stream.Skip(ipOptionsSize) // skip options
-	p.ParseL4(stream)
-}
-
 func (p *MetaPacket) ParseL4(stream *ByteStream) {
 	if p.Protocol == IPProtocolTCP {
-		if stream.Len() < MIN_TCP_HEADER_SIZE {
+		len := stream.Len()
+		if len < MIN_TCP_HEADER_SIZE {
 			p.Invalid = true
 			return
 		}
@@ -109,12 +93,11 @@ func (p *MetaPacket) ParseL4(stream *ByteStream) {
 		p.PortDst = stream.U16()
 		seq := stream.U32()
 		ack := stream.U32()
-		dataOffset := int(stream.U8() & 0xF0)
+		dataOffset := uint16(stream.U8()&0xF0) >> 2
 		flags := stream.U8()
 		winSize := stream.U16()
 		stream.Skip(4) // skip checksum and URG Pointer
-		optionsSize := dataOffset - MIN_TCP_HEADER_SIZE
-		p.PayloadLen = uint16(stream.Len() - optionsSize)
+		p.PayloadLen = uint16(len) - dataOffset
 		tcpHeader := &MetaPacketTcpHeader{flags, seq, ack, winSize, 0, false}
 		tcpHeader.extractTcpOptions(stream)
 		p.TcpData = tcpHeader
@@ -127,6 +110,25 @@ func (p *MetaPacket) ParseL4(stream *ByteStream) {
 		p.PortDst = stream.U16()
 		p.PayloadLen = stream.U16() - UDP_HEADER_SIZE
 	}
+}
+
+func (p *MetaPacket) ParseIp(stream *ByteStream) {
+	ihl := (stream.U8() & 0xF)
+	stream.Skip(1) // skip tos
+	totalLength := stream.U16()
+	stream.Skip(2) // skip id
+	fragmentOffset := stream.U16() & 0x1FFF
+	p.TTL = stream.U8()
+	p.Protocol = IPProtocol(stream.U8())
+	stream.Skip(2) // skip checksum
+	p.IpSrc = stream.U32()
+	p.IpDst = stream.U32()
+	ipOptionsSize := int(ihl)*4 - MIN_IPV4_HEADER_SIZE
+	if stream.Len() <= ipOptionsSize || fragmentOffset > 0 { // no more header
+		return
+	}
+	stream.Skip(ipOptionsSize) // skip options
+	p.ParseL4(&ByteStream{stream.Slice()[:totalLength-uint16(ihl)*4], 0})
 }
 
 // TODO: 一个合法ip报文应当至少有30B的长度(不考虑非ip情形)
@@ -180,7 +182,7 @@ func (p *MetaPacket) String() string {
 	}
 	format = "\t%s -> %s type: %04x vlan-id: %d\n"
 	buffer.WriteString(fmt.Sprintf(format, Uint64ToMac(p.MacSrc), Uint64ToMac(p.MacDst), uint16(p.EthType), p.Vlan))
-	format = "\t%v:%d -> %v:%d proto: %x ttl: %d payload-len: %d "
+	format = "\t%v:%d -> %v:%d proto: %v ttl: %d payload-len: %d "
 	buffer.WriteString(fmt.Sprintf(format, IpFromUint32(p.IpSrc), p.PortSrc,
 		IpFromUint32(p.IpDst), p.PortDst, p.Protocol, p.TTL, p.PayloadLen))
 	if p.TcpData != nil {
