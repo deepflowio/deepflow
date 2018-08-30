@@ -62,7 +62,7 @@ func (t *TunnelInfo) Decapsulate(packet []byte) int {
 	t.Src = IPv4Int(BigEndian.Uint32(packet[OFFSET_SIP:]))
 	t.Dst = IPv4Int(BigEndian.Uint32(packet[OFFSET_DIP:]))
 	t.Id = BigEndian.Uint32(packet[OFFSET_VXLAN_VNI:]) >> 8
-	return OFFSET_VXLAN_FLAGS + VXLAN_HEADER_SIZE
+	return OFFSET_VXLAN_FLAGS + VXLAN_HEADER_SIZE + vlanTagSize
 }
 
 func (t *TunnelInfo) Valid() bool {

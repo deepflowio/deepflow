@@ -134,7 +134,7 @@ func (p *MetaPacket) ParseL4(stream *ByteStream) {
 func (p *MetaPacket) Parse(packet RawPacket) bool {
 	tunnel := TunnelInfo{}
 	decapsulatedOffset := tunnel.Decapsulate(packet)
-	if tunnel.Valid() {
+	if decapsulatedOffset > 0 {
 		p.Tunnel = &tunnel
 	}
 
