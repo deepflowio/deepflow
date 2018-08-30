@@ -12,6 +12,8 @@ Source:     droplet.spec
 
 BuildRequires: golang git
 Requires: zeromq
+Requires(post): %{_sbindir}/update-alternatives
+Requires(postun): %{_sbindir}/update-alternatives
 
 %define pwd %(echo $PWD)
 
@@ -23,14 +25,14 @@ deepflow droplet
 mkdir -p $RPM_BUILD_ROOT/usr/sbin/
 cp %pwd/bin/droplet $RPM_BUILD_ROOT/usr/sbin/
 mkdir -p $RPM_BUILD_ROOT/usr/bin/
-cp $(go env GOPATH)/bin/dlv $RPM_BUILD_ROOT/usr/bin/
+cp $(go env GOPATH)/bin/dlv $RPM_BUILD_ROOT/usr/bin/dlv.trident
 mkdir -p $RPM_BUILD_ROOT/lib/systemd/system/
 cp %pwd/droplet.service $RPM_BUILD_ROOT/lib/systemd/system/
 mkdir -p $RPM_BUILD_ROOT/etc/
 cp %pwd/config/droplet.yaml $RPM_BUILD_ROOT/etc/
 
 %files
-/usr/bin/dlv
+/usr/bin/dlv.trident
 /usr/sbin/droplet
 /lib/systemd/system/droplet.service
 %config(noreplace) /etc/droplet.yaml
@@ -44,8 +46,12 @@ fi
 %post
 systemctl daemon-reload
 systemctl try-restart droplet
+%{_sbindir}/update-alternatives --install %{_bindir}/dlv %{name} %{_bindir}/dlv.trident 10
 
 %postun
 systemctl daemon-reload
+if [ $1 == 0 ]; then # uninstall
+    %{_sbindir}/update-alternatives --remove %{name} %{_bindir}/dlv
+fi
 
 %changelog
