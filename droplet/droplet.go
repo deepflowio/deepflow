@@ -1,6 +1,7 @@
 package droplet
 
 import (
+	"errors"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -45,7 +46,13 @@ func getLocalIp() (net.IP, error) {
 	if err != nil {
 		return nil, err
 	}
-	return net.ParseIP(addrs[0]), nil
+
+	for _, addr := range addrs {
+		if ip := net.ParseIP(addr).To4(); ip != nil {
+			return ip, nil
+		}
+	}
+	return nil, errors.New("Unable to resolve local ip by hostname")
 }
 
 func Start(configPath string) {
