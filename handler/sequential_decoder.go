@@ -44,7 +44,7 @@ type SequentialDecoder struct {
 	data      ByteStream
 	seq       uint32
 	pflags    PacketFlag
-	direction string
+	forward   bool
 	rx, tx    Decoded
 	x         *Decoded
 }
@@ -125,7 +125,7 @@ func (d *SequentialDecoder) decodeEthernet(meta *MetaPacket) {
 	meta.L2End0 = d.pflags.IsSet(PFLAG_SRC_ENDPOINT)
 	meta.L2End1 = d.pflags.IsSet(PFLAG_DST_ENDPOINT)
 	meta.Vlan = x.vlan
-	if d.direction == "->" {
+	if d.forward {
 		meta.MacSrc = MacIntFromBytes(x.mac0)
 		meta.MacDst = MacIntFromBytes(x.mac1)
 	} else {
@@ -134,10 +134,10 @@ func (d *SequentialDecoder) decodeEthernet(meta *MetaPacket) {
 	}
 	if x.headerType == HEADER_TYPE_ARP {
 		meta.EthType = EthernetTypeARP
-		d.data.Field(ARP_HEADER_SIZE)
+		meta.ParseArp(&d.data)
 	} else if x.headerType < HEADER_TYPE_IPV4 {
 		meta.EthType = EthernetTypeIPv4
-		d.data.U16()
+		d.data.Skip(2)
 	} else {
 		meta.EthType = EthernetTypeIPv4
 		d.decodeIPv4(meta)
@@ -151,7 +151,7 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPacket) {
 		x.ihl = b & 0xF
 		x.dataOffset = b >> 4 // XXX: Valid in TCP Only
 	}
-	d.data.U16()
+	d.data.Skip(2)
 
 	if !d.pflags.IsSet(CFLAG_FLAGS_FRAG_OFFSET) {
 		value := d.data.U16()
@@ -168,7 +168,7 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPacket) {
 		x.ip1 = net.IP(d.data.Field(IP_ADDR_LEN))
 	}
 	meta.TTL = x.ttl
-	if d.direction == "->" {
+	if d.forward {
 		meta.IpSrc = IpToUint32(x.ip0)
 		meta.IpDst = IpToUint32(x.ip1)
 	} else {
@@ -188,12 +188,10 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPacket) {
 		case ICMPv4TypeTimeExceeded:
 			fallthrough
 		case ICMPv4TypeParameterProblem:
-			// TODO; decode udp/tcp header
-			d.data.U32() // skip 4B
-			d.data.Field(28)
+			d.data.Skip(32)
 			return
 		default:
-			d.data.U32()
+			d.data.Skip(4)
 			return
 		}
 	} else if x.headerType == HEADER_TYPE_IPV4 {
@@ -213,7 +211,7 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 		x.port1 = d.data.U16()
 	}
 
-	if d.direction == "->" {
+	if d.forward {
 		meta.PortSrc = x.port0
 		meta.PortDst = x.port1
 	} else {
@@ -247,23 +245,19 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 			meta.TcpData.WinScale = d.data.U8()
 		}
 		if optionFlag&TCP_OPT_FLAG_MSS > 0 {
-			d.data.U16()
+			d.data.Skip(2)
 		}
 		sackPermit := optionFlag&TCP_OPT_FLAG_SACK_PERMIT > 0
 		if sackPermit {
 			meta.TcpData.SACKPermitted = true
 		}
 		sackLength := int(optionFlag & TCP_OPT_FLAG_SACK)
-		if sackLength > 0 {
-			for i := 0; i < sackLength; i += 8 {
-				d.data.U64()
-			}
-		}
+		d.data.Skip(sackLength)
 	}
 }
 
 func (d *SequentialDecoder) DecodeHeader() (uint32, bool) {
-	_ = d.data.U8()
+	d.data.Skip(1)
 	version := d.data.U8()
 	if version != 1 {
 		return 0, true
@@ -283,10 +277,10 @@ func (d *SequentialDecoder) NextPacket(meta *MetaPacket) bool {
 	d.pflags = PacketFlag(d.data.U16())
 	if d.pflags.IsSet(PFLAG_DST_ENDPOINT) {
 		d.x = &d.rx
-		d.direction = "<-"
+		d.forward = false
 	} else {
 		d.x = &d.tx
-		d.direction = "->"
+		d.forward = true
 	}
 	if !d.pflags.IsSet(CFLAG_HEADER_TYPE) {
 		d.x.headerType = HeaderType(d.data.U8())
