@@ -34,6 +34,19 @@ func startProfiler() {
 	}()
 }
 
+func getLocalIp() (net.IP, error) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return nil, err
+	}
+
+	addrs, err := net.LookupHost(hostname)
+	if err != nil {
+		return nil, err
+	}
+	return net.ParseIP(addrs[0]), nil
+}
+
 func Start(configPath string) {
 	cfg := config.Load(configPath)
 	InitLog(cfg.LogFile, cfg.LogLevel)
@@ -42,12 +55,12 @@ func Start(configPath string) {
 		startProfiler()
 	}
 
-	ips := make([]net.IP, 0, len(cfg.ControllerIps))
+	controllers := make([]net.IP, 0, len(cfg.ControllerIps))
 	for _, ipString := range cfg.ControllerIps {
 		ip := net.ParseIP(ipString)
-		ips = append(ips, ip)
+		controllers = append(controllers, ip)
 	}
-	synchronizer := config.NewRpcConfigSynchronizer(ips, cfg.ControllerPort)
+	synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.ControllerPort)
 	synchronizer.Start()
 
 	stats.StartStatsd(net.ParseIP(cfg.StatsdServer), 10*time.Second)
@@ -63,8 +76,13 @@ func Start(configPath string) {
 	}
 	tridentAdapter.Start()
 
+	localIp, err := getLocalIp()
+	if err != nil {
+		log.Error(err)
+		return
+	}
 	for _, iface := range cfg.DataInterfaces {
-		capture, err := packet.NewCapture(iface, ips[0], false, filterQueue)
+		capture, err := packet.NewCapture(iface, localIp, false, filterQueue)
 		if err != nil {
 			log.Error(err)
 			return
@@ -72,7 +90,7 @@ func Start(configPath string) {
 		capture.Start()
 	}
 	for _, iface := range cfg.TapInterfaces {
-		capture, err := packet.NewCapture(iface, ips[0], true, filterQueue)
+		capture, err := packet.NewCapture(iface, localIp, true, filterQueue)
 		if err != nil {
 			log.Error(err)
 			return
