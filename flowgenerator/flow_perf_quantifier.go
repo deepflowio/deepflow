@@ -385,7 +385,7 @@ func isPshAckPacket(header *MetaPacket) bool {
 	tcpFlag := header.TcpData.Flags & TCP_FLAG_MASK
 	payloadLen := header.PayloadLen
 
-	return tcpFlag&(TCP_ACK|TCP_PSH) > 0 && payloadLen > 0
+	return tcpFlag == (TCP_ACK|TCP_PSH) && payloadLen > 1
 }
 
 // 对于payload == 0的keep-alive包，暂时没有好的处理办法，仅当作ACK包
@@ -911,7 +911,7 @@ func (i *FlowPerfDataInfo) calcReportFlowPerfStats(reverse bool) {
 	report.TotalPshUrgCount = flow.pshUrgCount0 + flow.pshUrgCount1
 
 	report.PacketIntervalAvg = uint64(i.packetVariance.packetIntervalAvg)
-	report.PacketIntervalVariance = uint64(i.packetVariance.packetIntervalAvg)
+	report.PacketIntervalVariance = uint64(i.packetVariance.packetIntervalVariance)
 	report.PacketSizeVariance = uint64(i.packetVariance.packetSizeVariance)
 }
 
@@ -1032,7 +1032,7 @@ func (c *FlowPerfCounter) GetCounter() interface{} {
 }
 
 func calcAvgTime(average, consume, times int64) int64 {
-	if times == 1 {
+	if times < 2 || average == 0 {
 		return consume
 	}
 
