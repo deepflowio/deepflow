@@ -13,6 +13,7 @@ import (
 	_ "gitlab.x.lan/yunshan/droplet-libs/monitor"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 
+	"gitlab.x.lan/platform/droplet-mapreduce/pkg/api"
 	"gitlab.x.lan/yunshan/droplet/adapter"
 	"gitlab.x.lan/yunshan/droplet/config"
 	"gitlab.x.lan/yunshan/droplet/flowgenerator"
@@ -118,8 +119,12 @@ func Start(configPath string) {
 	}
 	flowGenerator.Start()
 
-	flowMapProcess := mapreduce.NewFlowMapProcess()
-	meteringProcess := mapreduce.NewMeteringMapProcess()
+	zmqflowOutputQueue := manager.NewQueue("4-flow-to-stream", 1000, &TaggedFlow{})
+	zmqflowAppOutputQueue := manager.NewQueue("4-flow-doc-to-zero", 1000, &api.Document{})
+	flowMapProcess := mapreduce.NewFlowMapProcess(zmqflowOutputQueue, zmqflowAppOutputQueue)
+
+	zmqMeteringAppOutputQueue := manager.NewQueue("4-metering-doc-to-zero", 1000, &api.Document{})
+	meteringProcess := mapreduce.NewMeteringMapProcess(zmqMeteringAppOutputQueue)
 	queueFlushTime := time.Minute
 	flowTimer := time.NewTimer(queueFlushTime)
 	go func() {
