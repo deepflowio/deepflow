@@ -163,3 +163,27 @@ message PerfVisitorMeter {
     optional uint64 sum_duration = 3;
     optional uint64 sum_closed_flow_count = 4;
 }
+
+message FlowMeterSum {
+    optional uint64 flow_count = 1;
+    optional uint64 new_flow_count = 2;
+    optional uint64 closed_flow_count = 3;
+}
+
+message FlowMeterMax {
+    optional uint64 flow_count = 1;
+    optional uint64 new_flow_count = 2;
+    optional uint64 closed_flow_count = 3;
+}
+
+message FlowMeterMin {
+    optional uint64 flow_count = 1;
+    optional uint64 new_flow_count = 2;
+    optional uint64 closed_flow_count = 3;
+}
+
+message FlowMeter {
+    optional FlowMeterSum sum = 1;
+    optional FlowMeterMax max = 2;
+    optional FlowMeterMin min = 3;
+}
