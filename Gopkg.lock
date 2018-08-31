@@ -194,7 +194,7 @@
     "pkg/messenger",
   ]
   pruneopts = "UT"
-  revision = "26fcfa38f14ea3ab954dd83c2c319396b47aa6e0"
+  revision = "f518429892a8427de9d16da41f5cbe2b1dad3905"
 
 [[projects]]
   branch = "master"
