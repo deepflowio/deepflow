@@ -134,13 +134,7 @@ func (p *MetaPacket) ParseIp(stream *ByteStream) {
 // TODO: 一个合法ip报文应当至少有30B的长度(不考虑非ip情形)
 //       因此如果我们能够减少长度的判断，想必能够提升不少的性能
 func (p *MetaPacket) Parse(packet RawPacket) bool {
-	tunnel := TunnelInfo{}
-	decapsulatedOffset := tunnel.Decapsulate(packet)
-	if decapsulatedOffset > 0 {
-		p.Tunnel = &tunnel
-	}
-
-	stream := ByteStream{packet[decapsulatedOffset:], 0}
+	stream := ByteStream{packet, 0}
 
 	// L2
 	if stream.Len() < ETH_HEADER_SIZE {
