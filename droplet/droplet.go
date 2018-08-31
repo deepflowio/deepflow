@@ -90,20 +90,16 @@ func Start(configPath string) {
 		return
 	}
 	for _, iface := range cfg.DataInterfaces {
-		capture, err := packet.NewCapture(iface, localIp, false, filterQueue)
-		if err != nil {
+		if _, err := packet.StartCapture(iface, localIp, false, filterQueue); err != nil {
 			log.Error(err)
 			return
 		}
-		capture.Start()
 	}
 	for _, iface := range cfg.TapInterfaces {
-		capture, err := packet.NewCapture(iface, localIp, true, filterQueue)
-		if err != nil {
+		if _, err := packet.StartCapture(iface, localIp, true, filterQueue); err != nil {
 			log.Error(err)
 			return
 		}
-		capture.Start()
 	}
 
 	// L2 - packet filter
