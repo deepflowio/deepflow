@@ -58,6 +58,7 @@ message Flow {
                                          2. For others, equals to
                                              max(arr_time_0_last, arr_time_1_last) -
                                                  time_of_the_first_packet_in_the_flow */
+    optional uint64 time_bitmap = 14; /* The packet time distribution in one minitue */
 
     /* L1 */
     optional uint32 in_port_0 = 21 [default = 0];
