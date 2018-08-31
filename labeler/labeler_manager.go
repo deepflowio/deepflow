@@ -73,6 +73,13 @@ func (l *LabelerManager) GetData(key *datatype.LookupKey) {
 	}
 }
 
+func GetTapType(inPort uint32) datatype.TapType {
+	if policy.PortInDeepflowExporter(inPort) {
+		return datatype.TAP_TOR
+	}
+	return datatype.TAP_ISP
+}
+
 func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket) *policy.Action {
 	key := &datatype.LookupKey{
 		SrcMac:      uint64(packet.MacSrc),
@@ -81,12 +88,14 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket) *policy.Action {
 		DstIp:       uint32(packet.IpDst),
 		SrcPort:     packet.PortSrc,
 		DstPort:     packet.PortDst,
+		EthType:     packet.EthType,
 		Vlan:        packet.Vlan,
 		Proto:       uint8(packet.Protocol),
 		Ttl:         packet.TTL,
 		L2End0:      packet.L2End0,
 		L2End1:      packet.L2End1,
 		RxInterface: packet.InPort,
+		Tap:         GetTapType(packet.InPort),
 	}
 
 	data, policy := l.policyTable.LookupAllByKey(key)
@@ -104,17 +113,11 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket) *policy.Action {
 
 func cloneMetaPacket(src *datatype.MetaPacket) *datatype.MetaPacket {
 	newPacket := *src
-	if src.EndpointData != nil {
-		endpointData := &datatype.EndpointData{}
-		if src.EndpointData.SrcInfo != nil {
-			endpointData.SrcInfo = &datatype.EndpointInfo{}
-			*endpointData.SrcInfo = *src.EndpointData.SrcInfo
-		}
-		if src.EndpointData.DstInfo != nil {
-			endpointData.DstInfo = &datatype.EndpointInfo{}
-			*endpointData.DstInfo = *src.EndpointData.DstInfo
-		}
-		newPacket.EndpointData = endpointData
+	srcInfo := *src.EndpointData.SrcInfo
+	dstInfo := *src.EndpointData.DstInfo
+	newPacket.EndpointData = &datatype.EndpointData{
+		SrcInfo: &srcInfo,
+		DstInfo: &dstInfo,
 	}
 
 	return &newPacket
