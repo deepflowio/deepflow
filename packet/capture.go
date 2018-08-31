@@ -47,10 +47,10 @@ type PacketCounter struct {
 }
 
 type Capture struct {
-	tPacket     *afpacket.TPacket
-	ip          datatype.IPv4Int
-	rxInterface uint32
-	outputQueue queue.QueueWriter
+	tPacket        *afpacket.TPacket
+	ip             datatype.IPv4Int
+	isTapInterface bool
+	outputQueue    queue.QueueWriter
 
 	counter     *PacketCounter
 	issueStop   bool
@@ -104,6 +104,10 @@ func (c *Capture) IsRunning() bool {
 func (c *Capture) run() (retErr error) {
 	log.Info("Start capture")
 
+	rxInterface := uint32(datatype.PACKET_SOURCE_ISP)
+	if c.isTapInterface {
+		rxInterface = uint32(datatype.PACKET_SOURCE_TOR)
+	}
 	prevTimestamp := time.Duration(0)
 	c.running = true
 	poll := uint64(0)
@@ -142,9 +146,17 @@ func (c *Capture) run() (retErr error) {
 		c.counter.Rx++
 		metaPacket := &datatype.MetaPacket{
 			Timestamp: timestamp,
-			InPort:    c.rxInterface,
+			InPort:    rxInterface,
 			Exporter:  c.ip,
 			PacketLen: uint16(ci.CaptureLength),
+		}
+		if c.isTapInterface {
+			tunnel := datatype.TunnelInfo{}
+			offset := tunnel.Decapsulate(packet)
+			if offset > 0 {
+				packet = packet[offset:]
+				metaPacket.Tunnel = &tunnel
+			}
 		}
 		if !metaPacket.Parse(packet) {
 			continue
@@ -229,17 +241,12 @@ func NewCapture(interfaceName string, ip net.IP, isTapInterface bool, outputQueu
 		log.Warning("BPF inject failed:", err)
 	}
 
-	rxInterface := uint32(datatype.PACKET_SOURCE_ISP)
-	if isTapInterface {
-		rxInterface = uint32(datatype.PACKET_SOURCE_TOR)
-	}
-
 	cap := &Capture{
-		tPacket:     tPacket,
-		ip:          IpToUint32(ip),
-		rxInterface: rxInterface,
-		counter:     &PacketCounter{},
-		outputQueue: outputQueue,
+		tPacket:        tPacket,
+		ip:             IpToUint32(ip),
+		isTapInterface: isTapInterface,
+		counter:        &PacketCounter{},
+		outputQueue:    outputQueue,
 	}
 	stats.RegisterCountable("capture", stats.EMPTY_TAG, cap)
 	runtime.SetFinalizer(cap, func(c *Capture) { c.Close() })
