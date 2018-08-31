@@ -2,36 +2,16 @@ package packet
 
 import (
 	"errors"
-	"net"
 	"reflect"
-	"runtime"
 	"syscall"
 	"time"
 
-	"github.com/docker/go-units"
 	"github.com/google/gopacket/afpacket"
-	. "github.com/google/gopacket/layers"
 	"github.com/op/go-logging"
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
-	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
-	. "gitlab.x.lan/yunshan/droplet-libs/utils"
-	"golang.org/x/net/bpf"
 )
 
 var log = logging.MustGetLogger("capture")
-
-var afPacketBlocks = 128
-
-func SetAfPacketBlocks(n int) {
-	afPacketBlocks = n
-}
-
-const (
-	DEFAULT_BLOCK_SIZE = 1 * units.MiB
-	DEFAULT_FRAME_SIZE = 1 << 16 // only for AF_PACKET v2
-	POLL_TIMEOUT       = 100 * time.Millisecond
-)
 
 type PacketCounter struct {
 	Rx      uint64 `statsd:"rx"`
@@ -47,10 +27,8 @@ type PacketCounter struct {
 }
 
 type Capture struct {
-	tPacket        *afpacket.TPacket
-	ip             datatype.IPv4Int
-	isTapInterface bool
-	outputQueue    queue.QueueWriter
+	tPacket *afpacket.TPacket
+	handler PacketHandler
 
 	counter     *PacketCounter
 	issueStop   bool
@@ -104,10 +82,6 @@ func (c *Capture) IsRunning() bool {
 func (c *Capture) run() (retErr error) {
 	log.Info("Start capture")
 
-	rxInterface := uint32(datatype.PACKET_SOURCE_ISP)
-	if c.isTapInterface {
-		rxInterface = uint32(datatype.PACKET_SOURCE_TOR)
-	}
 	prevTimestamp := time.Duration(0)
 	c.running = true
 	poll := uint64(0)
@@ -144,24 +118,7 @@ func (c *Capture) run() (retErr error) {
 			prevTimestamp = timestamp
 		}
 		c.counter.Rx++
-		metaPacket := &datatype.MetaPacket{
-			Timestamp: timestamp,
-			InPort:    rxInterface,
-			Exporter:  c.ip,
-			PacketLen: uint16(ci.CaptureLength),
-		}
-		if c.isTapInterface {
-			tunnel := datatype.TunnelInfo{}
-			offset := tunnel.Decapsulate(packet)
-			if offset > 0 {
-				packet = packet[offset:]
-				metaPacket.Tunnel = &tunnel
-			}
-		}
-		if !metaPacket.Parse(packet) {
-			continue
-		}
-		c.outputQueue.Put(metaPacket)
+		c.handler.Handle(timestamp, packet)
 	}
 	c.running = false
 	c.issueStop = false
@@ -207,48 +164,4 @@ func (c *Capture) Close() error {
 	c.tPacket.Close()
 	stats.DeregisterCountable(c)
 	return nil
-}
-
-func NewCapture(interfaceName string, ip net.IP, isTapInterface bool, outputQueue queue.QueueWriter) (*Capture, error) {
-	if _, err := net.InterfaceByName(interfaceName); err != nil {
-		return nil, err
-	}
-	tPacket, err := afpacket.NewTPacket(
-		afpacket.OptInterface(interfaceName),
-		afpacket.OptPollTimeout(POLL_TIMEOUT),
-		afpacket.OptBlockSize(DEFAULT_BLOCK_SIZE),
-		afpacket.OptFrameSize(DEFAULT_FRAME_SIZE),
-		afpacket.OptNumBlocks(afPacketBlocks),
-		afpacket.OptAddVLANHeader(!isTapInterface),
-	)
-	if err != nil {
-		log.Warning("AF_PACKET init error", err)
-		return nil, err
-	}
-
-	instructions := []bpf.Instruction{
-		bpf.LoadExtension{Num: bpf.ExtType},
-		bpf.JumpIf{Cond: bpf.JumpNotEqual, Val: uint32(LinuxSLLPacketTypeOutgoing), SkipTrue: 1},
-		bpf.RetConstant{Val: 0},
-		bpf.RetConstant{Val: 65535}, // default accept up to 64KB
-	}
-	rawInstructions, err := bpf.Assemble(instructions)
-	if err != nil {
-		log.Warning("Assemble bpf failed, bpf won't work")
-	}
-
-	if err := tPacket.SetBPF(rawInstructions); err != nil {
-		log.Warning("BPF inject failed:", err)
-	}
-
-	cap := &Capture{
-		tPacket:        tPacket,
-		ip:             IpToUint32(ip),
-		isTapInterface: isTapInterface,
-		counter:        &PacketCounter{},
-		outputQueue:    outputQueue,
-	}
-	stats.RegisterCountable("capture", stats.EMPTY_TAG, cap)
-	runtime.SetFinalizer(cap, func(c *Capture) { c.Close() })
-	return cap, nil
 }
