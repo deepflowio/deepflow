@@ -128,7 +128,8 @@ func (p *MetaPacket) ParseIp(stream *ByteStream) {
 		return
 	}
 	stream.Skip(ipOptionsSize) // skip options
-	p.ParseL4(&ByteStream{stream.Slice()[:totalLength-uint16(ihl)*4], 0})
+	payloadLength := uint16(Min(stream.Len(), int(totalLength)-int(ihl)*4))
+	p.ParseL4(&ByteStream{stream.Slice()[:payloadLength], 0})
 }
 
 // TODO: 一个合法ip报文应当至少有30B的长度(不考虑非ip情形)
