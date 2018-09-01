@@ -766,6 +766,11 @@ func (p *MetaFlowPerf) preprocess(header *MetaPacket, flowInfo *FlowInfo, perfCo
 		return false
 	}
 
+	// 排除无效包
+	if header.Invalid {
+		return false
+	}
+
 	return true
 }
 
