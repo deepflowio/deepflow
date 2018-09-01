@@ -51,6 +51,19 @@
   version = "v1.2.0"
 
 [[projects]]
+  digest = "1:2e3c336fc7fde5c984d2841455a658a6d626450b1754a854b3b32e7a8f49a07a"
+  name = "github.com/google/go-cmp"
+  packages = [
+    "cmp",
+    "cmp/internal/diff",
+    "cmp/internal/function",
+    "cmp/internal/value",
+  ]
+  pruneopts = "UT"
+  revision = "3af367b6b30c263d47e8895973edcca9a49cf029"
+  version = "v0.2.0"
+
+[[projects]]
   digest = "1:92f7df73c43ce74ec411c6720706d0157775e3524a692f0f770062d08582b410"
   name = "github.com/google/gopacket"
   packages = [
@@ -62,15 +75,15 @@
   revision = "d9ba49ce8619de3c5fbd2f58168903b35b2ed0e0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:cf296baa185baae04a9a7004efee8511d08e2f5f51d4cbe5375da89722d681db"
+  digest = "1:8ec8d88c248041a6df5f6574b87bc00e7e0b493881dad2e7ef47b11dc69093b5"
   name = "github.com/hashicorp/golang-lru"
   packages = [
     ".",
     "simplelru",
   ]
   pruneopts = "UT"
-  revision = "0fb14efe8c47ae851c0034ed7a448854d3d34cf3"
+  revision = "20f1fb78b0740ba8c3cb143a61e86ba5c8669768"
+  version = "v0.5.0"
 
 [[projects]]
   branch = "master"
@@ -242,6 +255,7 @@
   input-imports = [
     "github.com/cespare/xxhash",
     "github.com/golang-collections/go-datastructures/bitarray",
+    "github.com/google/go-cmp/cmp",
     "github.com/google/gopacket/layers",
     "github.com/google/gopacket/pcapgo",
     "github.com/hashicorp/golang-lru",
