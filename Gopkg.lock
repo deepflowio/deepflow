@@ -71,15 +71,15 @@
   revision = "d9ba49ce8619de3c5fbd2f58168903b35b2ed0e0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:cf296baa185baae04a9a7004efee8511d08e2f5f51d4cbe5375da89722d681db"
+  digest = "1:8ec8d88c248041a6df5f6574b87bc00e7e0b493881dad2e7ef47b11dc69093b5"
   name = "github.com/hashicorp/golang-lru"
   packages = [
     ".",
     "simplelru",
   ]
   pruneopts = "UT"
-  revision = "0fb14efe8c47ae851c0034ed7a448854d3d34cf3"
+  revision = "20f1fb78b0740ba8c3cb143a61e86ba5c8669768"
+  version = "v0.5.0"
 
 [[projects]]
   digest = "1:870d441fe217b8e689d7949fef6e43efbc787e50f200cb1e70dbca9204a1d6be"
@@ -170,20 +170,20 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:46f010a00f109d4756c52cf50cfe80fa033b9562617eee834d84f3119f190634"
+  digest = "1:03068d178a4dce12e8f38078376e03fc4d98621668d1320c8168bb95d68da838"
   name = "gitlab.x.lan/application/droplet-app"
   packages = [
-    "internal/pkg",
-    "pkg/common",
-    "pkg/flow/epc_flow_topo",
-    "pkg/metering/bw_usage_isp_usage",
+    "internal/pkg/endpoint",
+    "internal/pkg/flow",
+    "pkg/mapper/flow",
+    "pkg/mapper/usage",
   ]
   pruneopts = "UT"
-  revision = "13855d4ca47254514963a1de6dabc09a9ba1dfee"
+  revision = "e5a04beca09b38fdaaa8381c51f81b29bf660059"
 
 [[projects]]
   branch = "master"
-  digest = "1:2bbaf7c06945c7a719b9ecdcef5776102f5217bee9ab52d4c57e81b30ff2c711"
+  digest = "1:102469f2c8f321f55829bb5d45ea39565a5df52ef91a19b23e4fb7e56ceb661a"
   name = "gitlab.x.lan/platform/droplet-mapreduce"
   packages = [
     "internal/pkg/flowsender",
@@ -194,11 +194,11 @@
     "pkg/messenger",
   ]
   pruneopts = "UT"
-  revision = "f518429892a8427de9d16da41f5cbe2b1dad3905"
+  revision = "a8d72216934a543d9eb03a2d6a1c77b24222fd5d"
 
 [[projects]]
   branch = "master"
-  digest = "1:7e7c3169534c43cb4ab570f0a634b0daba38a92ca7d81aeb0d297b76efff5cf0"
+  digest = "1:0ab250af8fe475b9c0f504e32b18ef59e62f1b052e7fcdadcd5e7df741864c38"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "datatype",
@@ -213,11 +213,11 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "89413e43a8292f6981c7e887652b7e073bd6cc03"
+  revision = "3e297e67355ad7dd106e1d1ec547854223e6985b"
 
 [[projects]]
   branch = "feature-os"
-  digest = "1:9964860c9b4285b151c614c2e7a5d100443b3ba57e2db5c22f3b14a883372cd6"
+  digest = "1:b77eda41239f9e74a088c67eea0c0617b16adc48b65a8c9fb381e3e0cdfeae8a"
   name = "gitlab.x.lan/yunshan/message"
   packages = [
     "dfi",
@@ -225,7 +225,7 @@
     "zero",
   ]
   pruneopts = "T"
-  revision = "2fe28236a7e8dd81ac6df31bfb61be4d8a46d954"
+  revision = "c9a5be192c33f68fcd6bd33263b7516fc5295b9b"
 
 [[projects]]
   branch = "release-branch.go1.9"
@@ -348,8 +348,8 @@
     "github.com/google/gopacket/pcapgo",
     "github.com/op/go-logging",
     "github.com/spf13/cobra",
-    "gitlab.x.lan/application/droplet-app/pkg/flow/epc_flow_topo",
-    "gitlab.x.lan/application/droplet-app/pkg/metering/bw_usage_isp_usage",
+    "gitlab.x.lan/application/droplet-app/pkg/mapper/flow",
+    "gitlab.x.lan/application/droplet-app/pkg/mapper/usage",
     "gitlab.x.lan/platform/droplet-mapreduce/pkg/api",
     "gitlab.x.lan/platform/droplet-mapreduce/pkg/handler",
     "gitlab.x.lan/yunshan/droplet-libs/datatype",
