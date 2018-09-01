@@ -5,6 +5,8 @@ import (
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
+
+	"gitlab.x.lan/yunshan/droplet/dedup"
 )
 
 type Timestamp = time.Duration
@@ -45,6 +47,9 @@ func (h *TapHandler) Handle(timestamp Timestamp, packet RawPacket) {
 	if offset := tunnel.Decapsulate(packet); offset > 0 {
 		packet = packet[offset:]
 		metaPacket.Tunnel = &tunnel
+	}
+	if dedup.Lookup(packet, timestamp) {
+		return
 	}
 	if !metaPacket.Parse(packet) {
 		return
