@@ -1,4 +1,4 @@
-package packet
+package capture
 
 import (
 	"time"

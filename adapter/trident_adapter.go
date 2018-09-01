@@ -15,7 +15,6 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
-	"gitlab.x.lan/yunshan/droplet/handler"
 )
 
 const (
@@ -152,7 +151,7 @@ func (a *TridentAdapter) findAndAdd(data []byte, key uint32, seq uint32) {
 }
 
 func (a *TridentAdapter) decode(data []byte, ip uint32) {
-	decoder := handler.NewSequentialDecoder(data)
+	decoder := NewSequentialDecoder(data)
 	ifMacSuffix, _ := decoder.DecodeHeader()
 
 	for {
@@ -175,13 +174,13 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) {
 func (a *TridentAdapter) run() {
 	log.Infof("Starting trident adapter Listenning <%s>", a.listener.LocalAddr())
 	for a.running {
-		data := make([]byte, handler.UDP_BUFFER_SIZE)
+		data := make([]byte, UDP_BUFFER_SIZE)
 		_, remote, err := a.listener.ReadFromUDP(data)
 		if err != nil {
 			log.Warningf("trident adapter listener.ReadFromUDP err: %s", err)
 		}
 
-		decoder := handler.NewSequentialDecoder(data)
+		decoder := NewSequentialDecoder(data)
 		if _, invalid := decoder.DecodeHeader(); invalid {
 			continue
 		}
