@@ -1,4 +1,4 @@
-package handler
+package adapter
 
 import (
 	"os"

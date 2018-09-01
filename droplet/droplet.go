@@ -16,11 +16,11 @@ import (
 
 	"gitlab.x.lan/platform/droplet-mapreduce/pkg/api"
 	"gitlab.x.lan/yunshan/droplet/adapter"
+	"gitlab.x.lan/yunshan/droplet/capture"
 	"gitlab.x.lan/yunshan/droplet/config"
 	"gitlab.x.lan/yunshan/droplet/flowgenerator"
 	"gitlab.x.lan/yunshan/droplet/labeler"
 	"gitlab.x.lan/yunshan/droplet/mapreduce"
-	"gitlab.x.lan/yunshan/droplet/packet"
 	"gitlab.x.lan/yunshan/droplet/queue"
 	"gitlab.x.lan/yunshan/message/trident"
 )
@@ -90,13 +90,13 @@ func Start(configPath string) {
 		return
 	}
 	for _, iface := range cfg.DataInterfaces {
-		if _, err := packet.StartCapture(iface, localIp, false, filterQueue); err != nil {
+		if _, err := capture.StartCapture(iface, localIp, false, filterQueue); err != nil {
 			log.Error(err)
 			return
 		}
 	}
 	for _, iface := range cfg.TapInterfaces {
-		if _, err := packet.StartCapture(iface, localIp, true, filterQueue); err != nil {
+		if _, err := capture.StartCapture(iface, localIp, true, filterQueue); err != nil {
 			log.Error(err)
 			return
 		}
