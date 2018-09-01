@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
 )
 
@@ -42,6 +43,7 @@ const (
 
 const FLOW_CACHE_CAP = 1024
 const HASH_MAP_SIZE uint64 = 1024 * 256
+const TIMOUT_PARALLEL_NUM uint64 = 4
 
 const IN_PORT_FLOW_ID_MASK uint64 = 0xFF000000
 const TIMER_FLOW_ID_MASK uint64 = 0x00FFFFFF
@@ -71,10 +73,11 @@ var defaultTimeoutConfig TimeoutConfig = TimeoutConfig{
 }
 
 type FlowGeneratorStats struct {
-	TotalNumFlows   uint64 `statsd:"total_flow"`
-	CurrNumFlows    uint64 `statsd:"current_flow"`
-	AvgFlowCacheLen uint64 `statsd:"avg_flow_cache_len"`
-	MaxFlowCacheLen int    `statsd:"max_flow_cache_len"`
+	TotalNumFlows             uint64 `statsd:"total_flow"`
+	CurrNumFlows              uint64 `statsd:"current_flow"`
+	NonEmptyFlowCacheNum      int    `statsd:"non_empty_flow_cache_num"`
+	MaxFlowCacheLen           int    `statsd:"max_flow_cache_len"`
+	cleanRoutineFlowCacheNums []int
 }
 
 type FlowCache struct {
@@ -106,6 +109,7 @@ type FlowGenerator struct {
 	stateMachineMaster      []map[uint8]*StateValue
 	stateMachineSlave       []map[uint8]*StateValue
 	servicePortDescriptor   *ServicePortDescriptor
+	innerFlowKey            *FlowKey
 	forceReportIntervalSec  time.Duration
 	minLoopIntervalSec      time.Duration
 	flowLimitNum            uint64

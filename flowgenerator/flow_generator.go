@@ -13,24 +13,21 @@ import (
 
 var log = logging.MustGetLogger("flowgenerator")
 
-func getFlowKey(meta *MetaPacket) *FlowKey {
-	flowKey := &FlowKey{
-		Exporter: *NewIPFromInt(meta.Exporter),
-		IPSrc:    *NewIPFromInt(meta.IpSrc),
-		IPDst:    *NewIPFromInt(meta.IpDst),
-		Proto:    meta.Protocol,
-		PortSrc:  meta.PortSrc,
-		PortDst:  meta.PortDst,
-		InPort0:  meta.InPort,
-	}
-
+func (f *FlowGenerator) genFlowKey(meta *MetaPacket) *FlowKey {
+	flowKey := f.innerFlowKey
+	flowKey.Exporter = *NewIPFromInt(meta.Exporter)
+	flowKey.IPSrc = *NewIPFromInt(meta.IpSrc)
+	flowKey.IPDst = *NewIPFromInt(meta.IpDst)
+	flowKey.Proto = meta.Protocol
+	flowKey.PortSrc = meta.PortSrc
+	flowKey.PortDst = meta.PortDst
+	flowKey.InPort0 = meta.InPort
 	if tunnel := meta.Tunnel; tunnel != nil {
 		flowKey.TunnelType = uint8(tunnel.Type)
 		flowKey.TunnelID = tunnel.Id
 		flowKey.TunnelIPSrc = tunnel.Src
 		flowKey.TunnelIPDst = tunnel.Dst
 	}
-
 	return flowKey
 }
 
@@ -58,8 +55,8 @@ func (f *FlowGenerator) getQuinTupleHash(flowKey *FlowKey) uint64 {
 	return getKeyL3Hash(flowKey) ^ ((uint64(flowKey.InPort0) << 32) | getKeyL4Hash(flowKey, f.hashBasis))
 }
 
-func isFromTrident(inPort0 uint32) bool {
-	return inPort0&DEEPFLOW_POSITION_EXPORTER == DEEPFLOW_POSITION_EXPORTER
+func isFromTor(inPort uint32) bool {
+	return inPort&DEEPFLOW_POSITION_EXPORTER == DEEPFLOW_POSITION_EXPORTER
 }
 
 func (f *FlowExtra) MacEquals(meta *MetaPacket) bool {
@@ -76,6 +73,9 @@ func (f *FlowExtra) MacEquals(meta *MetaPacket) bool {
 
 func (f *FlowExtra) TunnelMatch(key *FlowKey) bool {
 	taggedFlow := f.taggedFlow
+	if taggedFlow.TunnelID == 0 && key.TunnelID == 0 {
+		return true
+	}
 	if taggedFlow.TunnelType != key.TunnelType || taggedFlow.TunnelID != key.TunnelID {
 		return false
 	}
@@ -83,10 +83,11 @@ func (f *FlowExtra) TunnelMatch(key *FlowKey) bool {
 }
 
 func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool) {
+	f.Lock()
 	for e := f.flowList.Front(); e != nil; e = e.Next() {
 		flowExtra := e.Value
 		taggedFlow := flowExtra.taggedFlow
-		if !taggedFlow.Exporter.Equals(&key.Exporter) || (isFromTrident(key.InPort0) && !flowExtra.MacEquals(meta)) {
+		if !taggedFlow.Exporter.Equals(&key.Exporter) || (isFromTor(key.InPort0) && !flowExtra.MacEquals(meta)) {
 			continue
 		}
 		if !flowExtra.TunnelMatch(key) {
@@ -94,12 +95,15 @@ func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool) 
 		}
 		if taggedFlow.IPSrc.Equals(&key.IPSrc) && taggedFlow.IPDst.Equals(&key.IPDst) && taggedFlow.PortSrc == key.PortSrc && taggedFlow.PortDst == key.PortDst {
 			f.flowList.MoveToFront(e)
+			f.Unlock()
 			return flowExtra, false
 		} else if taggedFlow.IPSrc.Equals(&key.IPDst) && taggedFlow.IPDst.Equals(&key.IPSrc) && taggedFlow.PortSrc == key.PortDst && taggedFlow.PortDst == key.PortSrc {
 			f.flowList.MoveToFront(e)
+			f.Unlock()
 			return flowExtra, true
 		}
 	}
+	f.Unlock()
 	return nil, false
 }
 
@@ -118,7 +122,9 @@ func (f *FlowGenerator) addFlow(flowCache *FlowCache, flowExtra *FlowExtra) *Flo
 	if f.stats.CurrNumFlows >= f.flowLimitNum {
 		return flowExtra
 	}
+	flowCache.Lock()
 	flowCache.flowList.PushFront(flowExtra)
+	flowCache.Unlock()
 	return nil
 }
 
@@ -379,7 +385,11 @@ func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireIntervalSec time.Dur
 	} else {
 		taggedFlow.EndTime = now
 	}
-	taggedFlow.Duration = timeMax(taggedFlow.ArrTime0Last, taggedFlow.ArrTime1Last) - timeMin(taggedFlow.ArrTime00, taggedFlow.ArrTime10)
+	minArrTime := timeMin(taggedFlow.ArrTime00, taggedFlow.ArrTime10)
+	if minArrTime == 0 {
+		minArrTime = timeMax(taggedFlow.ArrTime00, taggedFlow.ArrTime10)
+	}
+	taggedFlow.Duration = timeMax(taggedFlow.ArrTime0Last, taggedFlow.ArrTime1Last) - minArrTime
 }
 
 func (f *FlowExtra) resetCurFlowInfo(now time.Duration) {
@@ -438,10 +448,10 @@ func (f *FlowGenerator) processPacket(meta *MetaPacket) {
 	reply := false
 	ok := false
 	var flowExtra *FlowExtra
-	flowKey := getFlowKey(meta)
+	flowKey := f.genFlowKey(meta)
 	hash := f.getQuinTupleHash(flowKey)
 	flowCache := f.hashMap[hash%HASH_MAP_SIZE]
-	flowCache.Lock()
+	// keyMatch is goroutine safety
 	if flowExtra, reply = flowCache.keyMatch(meta, flowKey); flowExtra != nil {
 		if ok, reply = f.updateFlow(flowExtra, meta, reply); ok {
 			f.stats.CurrNumFlows--
@@ -453,7 +463,9 @@ func (f *FlowGenerator) processPacket(meta *MetaPacket) {
 			}
 			f.flowOutQueue.Put(flowExtra.taggedFlow)
 			// delete front from this FlowCache because flowExtra is moved to front in keyMatch()
+			flowCache.Lock()
 			flowCache.flowList.RemoveFront()
+			flowCache.Unlock()
 		} else {
 			// reply is a sign relative to the flow direction, so if the flow is reversed then the sign should be changed
 			flowExtra.metaFlowPerf.Update(meta, flowExtra.reversed != reply, flowExtra, &f.perfCounter)
@@ -486,12 +498,11 @@ func (f *FlowGenerator) processPacket(meta *MetaPacket) {
 			}
 		}
 	}
-	flowCache.Unlock()
 }
 
 func (f *FlowGenerator) handle() {
 	metaPacketInQueue := f.metaPacketHeaderInQueue
-	metaPacketBuffer := make([]interface{}, 1024)
+	metaPacketBuffer := make([]interface{}, 1024*16)
 loop:
 	if !f.handleRunning {
 		log.Info("flow fenerator packet handler exit")
@@ -530,7 +541,7 @@ func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uin
 	}
 }
 
-func (f *FlowGenerator) cleanTimeoutHashMap(hashMap []*FlowCache, start, end uint64) {
+func (f *FlowGenerator) cleanTimeoutHashMap(hashMap []*FlowCache, start, end, index uint64) {
 	flowOutQueue := f.flowOutQueue
 	forceReportIntervalSec := f.forceReportIntervalSec
 	sleepDuration := f.minLoopIntervalSec * time.Second
@@ -544,15 +555,10 @@ loop:
 	nowSec := now / time.Second
 	cleanRangeSec := nowSec - f.minLoopIntervalSec
 	maxFlowCacheLen := 0
+	nonEmptyFlowCacheNum := 0
 	for _, flowCache := range hashMap[start:end] {
-		if flowCache == nil {
-			continue
-		}
 		flowCache.Lock()
-		if len := flowCache.flowList.Len(); maxFlowCacheLen <= len {
-			maxFlowCacheLen = len
-		}
-		for e := flowCache.flowList.Back(); e != nil; {
+		for e := flowCache.flowList.Back(); e != nil; e = e.Prev() {
 			flowExtra := e.Value
 			// remaining flows are too new to output
 			if flowExtra.recentTimesSec >= cleanRangeSec {
@@ -564,12 +570,20 @@ loop:
 			} else if flowExtra.taggedFlow.StartTime/time.Second+forceReportIntervalSec < nowSec {
 				forceReportBuffer.PushFront(flowExtra)
 			}
-			e = e.Prev()
 		}
 		flowCache.Unlock()
+		len := flowCache.flowList.Len()
+		if len > 0 {
+			nonEmptyFlowCacheNum++
+		} else {
+			continue
+		}
+		if maxFlowCacheLen <= len {
+			maxFlowCacheLen = len
+		}
 	}
 	// real output
-	for e := otherReportBuffer.Front(); e != nil; {
+	for e := otherReportBuffer.Front(); e != nil; e = e.Next() {
 		flowExtra := e.Value
 		f.stats.CurrNumFlows--
 		flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(flowExtra.reversed, &f.perfCounter)
@@ -579,10 +593,9 @@ loop:
 			flowExtra.reverseFlow()
 		}
 		flowOutQueue.Put(flowExtra.taggedFlow)
-		e = e.Next()
 	}
 	otherReportBuffer.Init()
-	for e := forceReportBuffer.Front(); e != nil; {
+	for e := forceReportBuffer.Front(); e != nil; e = e.Next() {
 		flowExtra := e.Value
 		flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(flowExtra.reversed, &f.perfCounter)
 		flowExtra.setCurFlowInfo(now, forceReportIntervalSec)
@@ -592,13 +605,17 @@ loop:
 		}
 		flowExtra.tryForceReport(flowOutQueue)
 		flowExtra.resetCurFlowInfo(now)
-		e = e.Next()
 	}
 	forceReportBuffer.Init()
 	if f.stats.MaxFlowCacheLen < maxFlowCacheLen {
 		f.stats.MaxFlowCacheLen = maxFlowCacheLen
 	}
-	f.stats.AvgFlowCacheLen = f.stats.CurrNumFlows / HASH_MAP_SIZE
+	f.stats.cleanRoutineFlowCacheNums[index] = nonEmptyFlowCacheNum
+	nonEmptyFlowCacheNum = 0
+	for num := range f.stats.cleanRoutineFlowCacheNums {
+		nonEmptyFlowCacheNum += num
+	}
+	f.stats.NonEmptyFlowCacheNum = nonEmptyFlowCacheNum
 	if f.cleanRunning {
 		goto loop
 	}
@@ -618,10 +635,10 @@ func (f *FlowGenerator) timeoutReport() {
 		start := i * flowCacheNum
 		end := start + flowCacheNum
 		if end <= f.mapSize {
-			go f.cleanTimeoutHashMap(f.hashMap, start, end)
+			go f.cleanTimeoutHashMap(f.hashMap, start, end, i)
 			log.Infof("clean goroutine %d (hashmap range %d to %d) created", i, start, end)
 		} else {
-			go f.cleanTimeoutHashMap(f.hashMap, start, f.mapSize)
+			go f.cleanTimeoutHashMap(f.hashMap, start, f.mapSize, i)
 			log.Infof("clean goroutine %d (hashmap range %d to %d) created", i, start, f.mapSize)
 			break
 		}
@@ -660,11 +677,13 @@ func (f *FlowGenerator) Stop() {
 func New(metaPacketHeaderInQueue QueueReader, flowOutQueue QueueWriter, forceReportIntervalSec time.Duration) *FlowGenerator {
 	flowGenerator := &FlowGenerator{
 		TimeoutConfig:           defaultTimeoutConfig,
-		FastPath:                FastPath{FlowCacheHashMap: FlowCacheHashMap{make([]*FlowCache, HASH_MAP_SIZE), rand.Uint32(), HASH_MAP_SIZE, 4}},
+		FastPath:                FastPath{FlowCacheHashMap: FlowCacheHashMap{make([]*FlowCache, HASH_MAP_SIZE), rand.Uint32(), HASH_MAP_SIZE, TIMOUT_PARALLEL_NUM}},
 		metaPacketHeaderInQueue: metaPacketHeaderInQueue,
 		flowOutQueue:            flowOutQueue,
+		stats:                   FlowGeneratorStats{cleanRoutineFlowCacheNums: make([]int, TIMOUT_PARALLEL_NUM)},
 		stateMachineMaster:      make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
 		stateMachineSlave:       make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
+		innerFlowKey:            &FlowKey{},
 		servicePortDescriptor:   getServiceDescriptorWithIANA(),
 		forceReportIntervalSec:  forceReportIntervalSec,
 		minLoopIntervalSec:      defaultTimeoutConfig.minTimeout(),
