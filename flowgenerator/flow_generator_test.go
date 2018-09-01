@@ -110,7 +110,6 @@ func TestHandleSynRst(t *testing.T) {
 		t.Errorf("taggedFlow.TcpFlagsSrc is %d, expect %d", taggedFlow.TCPFlags0, TCP_SYN)
 		t.Errorf("taggedFlow.TcpFlagsDst is %d, expect %d", taggedFlow.TCPFlags1, TCP_RST)
 	}
-	t.Logf("\n%s", taggedFlow)
 }
 
 func TestHandleSynFin(t *testing.T) {
@@ -146,7 +145,6 @@ func TestHandleSynFin(t *testing.T) {
 		t.Errorf("taggedFlow.TCPFlags0 is %x, expect %x", taggedFlow.TCPFlags0, TCP_SYN|TCP_ACK|TCP_PSH)
 		t.Errorf("taggedFlow.TCPFlags1 is %x, expect %x", taggedFlow.TCPFlags1, TCP_ACK|TCP_FIN)
 	}
-	t.Logf("\n%s", taggedFlow)
 }
 
 func TestHandleMultiPacket(t *testing.T) {
@@ -231,7 +229,7 @@ func TestInitFlow(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator := getDefaultFlowGenerator()
 	packet := getDefaultPacket()
-	flowKey := getFlowKey(packet)
+	flowKey := flowGenerator.genFlowKey(packet)
 	flowExtra, _, _ := flowGenerator.initFlow(packet, flowKey)
 	taggedFlow := flowExtra.taggedFlow
 
@@ -285,7 +283,6 @@ func TestPlatformData(t *testing.T) {
 	if taggedFlow.Host0 != 0x01010101 {
 		t.Errorf("taggedFlow.Host0 is %d, expect %d", taggedFlow.Host0, 0x01010101)
 	}
-	t.Logf("\n%s", taggedFlow)
 }
 
 func TestFlowStateMachine(t *testing.T) {
@@ -364,8 +361,8 @@ func TestHandshakePerf(t *testing.T) {
 	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
 	if taggedFlow.CloseType != CLOSE_TYPE_FORCE_REPORT {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_FORCE_REPORT)
+		t.Errorf("\n%s", taggedFlow)
 	}
-	t.Logf("\n%s", taggedFlow)
 }
 
 func TestStartStop(t *testing.T) {
@@ -388,8 +385,7 @@ func TestStartStop(t *testing.T) {
 
 	go func() {
 		for {
-			taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
-			t.Logf("\n" + taggedFlow.String())
+			flowOutQueue.(Queue).Get()
 		}
 	}()
 	t.Logf("CurrNumFlows is %d", flowGenerator.stats.CurrNumFlows)
@@ -420,8 +416,8 @@ func TestFlowReverse(t *testing.T) {
 		// the flow is revesed again because of service ports list
 		t.Errorf("taggedFlow.TCPFlags0 is %d, expect %d", taggedFlow.TCPFlags1, 0)
 		t.Errorf("taggedFlow.TCPFlags1 is %d, expect %d", taggedFlow.TCPFlags0, TCP_SYN|TCP_ACK)
+		t.Errorf("\n%s", taggedFlow)
 	}
-	t.Logf("\n%s", taggedFlow)
 }
 
 func TestForceReport(t *testing.T) {
@@ -448,10 +444,10 @@ func TestForceReport(t *testing.T) {
 	if taggedFlow.CloseType != CLOSE_TYPE_FORCE_REPORT {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_FORCE_REPORT)
 	}
-	t.Logf("\n%s", taggedFlow)
 	if flowGenerator.stats.CurrNumFlows != 1 || flowGenerator.stats.TotalNumFlows != 1 {
 		t.Errorf("flowGenerator.stats.CurrNumFlows is %d, expect 1", flowGenerator.stats.CurrNumFlows)
 		t.Errorf("flowGenerator.stats.TotalNumFlows is %d, expect 1", flowGenerator.stats.TotalNumFlows)
+		t.Errorf("\n%s", taggedFlow)
 	}
 }
 
@@ -465,10 +461,10 @@ func BenchmarkCleanHashMap(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		meta := getDefaultPacket()
-		flowKey := getFlowKey(meta)
+		flowKey := flowGenerator.genFlowKey(meta)
 		flowExtra, _, _ := flowGenerator.initFlow(meta, flowKey)
 		flowGenerator.addFlow(flowCache, flowExtra)
-		flowGenerator.cleanTimeoutHashMap(flowGenerator.hashMap, 0, 1)
+		flowGenerator.cleanTimeoutHashMap(flowGenerator.hashMap, 0, 1, 0)
 	}
 }
 
@@ -483,17 +479,15 @@ func BenchmarkShortFlowList(b *testing.B) {
 		flowGenerator.processPacket(meta)
 	}
 	b.StopTimer()
-	flowCacheNum := 0
 	maxFlowListLen := 0
 	for _, flowCache := range flowGenerator.hashMap[0:] {
 		if flowCache != nil {
-			flowCacheNum++
 			if flowCache.flowList.Len() > maxFlowListLen {
 				maxFlowListLen = flowCache.flowList.Len()
 			}
 		}
 	}
-	b.Logf("b.N: %d, flowCacheNum: %d, maxFlowListLen: %d", b.N, flowCacheNum, maxFlowListLen)
+	b.Logf("b.N: %d, maxFlowListLen: %d", b.N, maxFlowListLen)
 }
 
 func BenchmarkLongFlowList(b *testing.B) {
@@ -507,15 +501,14 @@ func BenchmarkLongFlowList(b *testing.B) {
 		flowGenerator.processPacket(meta)
 	}
 	b.StopTimer()
-	flowCacheNum := 0
 	maxFlowListLen := 0
 	for _, flowCache := range flowGenerator.hashMap[0:] {
 		if flowCache != nil {
-			flowCacheNum++
 			if flowCache.flowList.Len() > maxFlowListLen {
 				maxFlowListLen = flowCache.flowList.Len()
 			}
 		}
 	}
-	b.Logf("b.N: %d, flowCacheNum: %d, maxFlowListLen: %d", b.N, flowCacheNum, maxFlowListLen)
+	b.Logf("b.N: %d, maxFlowListLen: %d", b.N, maxFlowListLen)
+	b.Logf("    NonEmptyFlowCacheNum: %d, CurrNumFlows: %d", flowGenerator.stats.NonEmptyFlowCacheNum, flowGenerator.stats.CurrNumFlows)
 }
