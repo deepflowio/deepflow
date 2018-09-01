@@ -38,8 +38,8 @@
   revision = "d9ba49ce8619de3c5fbd2f58168903b35b2ed0e0"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/hashicorp/golang-lru"
+  version = "0.5.0"
 
 [[constraint]]
   branch = "master"
