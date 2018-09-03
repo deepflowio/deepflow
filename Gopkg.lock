@@ -2,6 +2,14 @@
 
 
 [[projects]]
+  digest = "1:3261411fa3369515015a5957d3b9881b806b8457025a034a7722dc3732fe15e8"
+  name = "github.com/OneOfOne/xxhash"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "6def279d2ce6c81a79dd1c1be580f03bb216fb8a"
+  version = "v1.2.2"
+
+[[projects]]
   digest = "1:e92f5581902c345eb4ceffdcd4a854fb8f73cf436d47d837d1ec98ef1fe0a214"
   name = "github.com/StackExchange/wmi"
   packages = ["."]
@@ -253,6 +261,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/OneOfOne/xxhash",
     "github.com/cespare/xxhash",
     "github.com/golang-collections/go-datastructures/bitarray",
     "github.com/google/go-cmp/cmp",
