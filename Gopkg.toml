@@ -69,6 +69,10 @@
   name = "gopkg.in/alexcesaro/statsd.v2"
   version = "2.0.0"
 
+[[constraint]]
+  name = "github.com/OneOfOne/xxhash"
+  version = "1.2.2"
+
 [prune]
   go-tests = true
   unused-packages = true
