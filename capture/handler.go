@@ -4,9 +4,8 @@ import (
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/dedup"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
-
-	"gitlab.x.lan/yunshan/droplet/dedup"
 )
 
 type Timestamp = time.Duration

@@ -65,10 +65,6 @@
   name = "gopkg.in/yaml.v2"
   version = "2.2.1"
 
-[[constraint]]
-  name = "github.com/OneOfOne/xxhash"
-  version = "1.2.2"
-
 [prune]
   go-tests = true
   unused-packages = true

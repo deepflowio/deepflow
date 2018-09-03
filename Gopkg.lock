@@ -206,10 +206,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:0ab250af8fe475b9c0f504e32b18ef59e62f1b052e7fcdadcd5e7df741864c38"
+  digest = "1:9a345a6694f46df8e3db9df170940e62bfda11859d136b24042daa8f3d879b1e"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "datatype",
+    "dedup",
     "grpc",
     "logger",
     "monitor",
@@ -221,7 +222,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "3e297e67355ad7dd106e1d1ec547854223e6985b"
+  revision = "e85a0954b76ac4115379a562aba28dd8ccf0c8b5"
 
 [[projects]]
   branch = "feature-os"
@@ -349,7 +350,6 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/OneOfOne/xxhash",
     "github.com/docker/go-units",
     "github.com/golang/protobuf/proto",
     "github.com/google/gopacket/afpacket",
@@ -362,6 +362,7 @@
     "gitlab.x.lan/platform/droplet-mapreduce/pkg/api",
     "gitlab.x.lan/platform/droplet-mapreduce/pkg/handler",
     "gitlab.x.lan/yunshan/droplet-libs/datatype",
+    "gitlab.x.lan/yunshan/droplet-libs/dedup",
     "gitlab.x.lan/yunshan/droplet-libs/grpc",
     "gitlab.x.lan/yunshan/droplet-libs/logger",
     "gitlab.x.lan/yunshan/droplet-libs/monitor",
