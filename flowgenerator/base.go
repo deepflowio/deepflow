@@ -43,6 +43,7 @@ const (
 
 const FLOW_CACHE_CAP = 1024
 const HASH_MAP_SIZE uint64 = 1024 * 256
+const FLOW_OUT_BUFFER_CAP = 1024 * 32
 const TIMOUT_PARALLEL_NUM uint64 = 4
 
 const IN_PORT_FLOW_ID_MASK uint64 = 0xFF000000
@@ -73,11 +74,12 @@ var defaultTimeoutConfig TimeoutConfig = TimeoutConfig{
 }
 
 type FlowGeneratorStats struct {
-	TotalNumFlows             uint64 `statsd:"total_flow"`
-	CurrNumFlows              uint64 `statsd:"current_flow"`
-	NonEmptyFlowCacheNum      int    `statsd:"non_empty_flow_cache_num"`
-	MaxFlowCacheLen           int    `statsd:"max_flow_cache_len"`
-	cleanRoutineFlowCacheNums []int
+	TotalNumFlows                uint64 `statsd:"total_flow"`
+	CurrNumFlows                 uint64 `statsd:"current_flow"`
+	NonEmptyFlowCacheNum         int    `statsd:"non_empty_flow_cache_num"`
+	MaxFlowCacheLen              int    `statsd:"max_flow_cache_len"`
+	cleanRoutineFlowCacheNums    []int
+	cleanRoutineMaxFlowCacheLens []int
 }
 
 type FlowCache struct {
@@ -96,6 +98,16 @@ type FlowCacheHashMap struct {
 
 type FastPath struct {
 	FlowCacheHashMap
+
+	TaggedFlowPool sync.Pool
+	FlowExtraPool  sync.Pool
+}
+
+type PacketHandler struct {
+	sync.WaitGroup
+
+	recvBuffer    []interface{}
+	processBuffer []interface{}
 }
 
 type FlowGenerator struct {
@@ -110,6 +122,7 @@ type FlowGenerator struct {
 	stateMachineSlave       []map[uint8]*StateValue
 	servicePortDescriptor   *ServicePortDescriptor
 	innerFlowKey            *FlowKey
+	packetHandler           *PacketHandler
 	forceReportIntervalSec  time.Duration
 	minLoopIntervalSec      time.Duration
 	flowLimitNum            uint64
