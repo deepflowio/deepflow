@@ -73,117 +73,122 @@ message Tag {
     optional string vtap = 47;
     optional TapType tap_type = 48;
     optional uint32 subnet_id = 49;
+    optional uint32 acl_id = 50;
 }
 
-message UsageMeterSum {
+message UsageStats {
     optional uint64 packet_tx = 1;
     optional uint64 packet_rx = 2;
     optional uint64 packet = 3;
-    optional uint64 bit_tx = 4;
-    optional uint64 bit_rx = 5;
-    optional uint64 bit = 6;
-}
-
-message UsageMeterMax {
-    optional uint64 packet_tx = 1;
-    optional uint64 packet_rx = 2;
-    optional uint64 packet = 3;
-    optional uint64 bit_tx = 4;
-    optional uint64 bit_rx = 5;
-    optional uint64 bit = 6;
-}
-
-message UsageMeterMin {
     optional uint64 bit_tx = 4;
     optional uint64 bit_rx = 5;
     optional uint64 bit = 6;
 }
 
 message UsageMeter {
-    optional UsageMeterSum sum = 1;
-    optional UsageMeterMax max = 2;
-    optional UsageMeterMin min = 3;
+    optional UsageStats sum = 1;
+    optional UsageStats max = 2;
 }
 
-message PerfMeterSum {
+message PerfStats {
     optional uint64 flow_count = 1;
     optional uint64 closed_flow_count = 2;
     optional uint64 retrans_flow_count = 3;
-    optional uint64 rtt_syn = 4;
-    optional uint64 rtt_avg = 5;
-    optional uint64 rtt_syn_flow = 6;
-    optional uint64 rtt_avg_flow = 7;
-    optional uint64 rtt_syn_per_flow = 8;
-    optional uint64 rtt_avg_per_flow = 9;
-    optional uint64 syn_retrans_cnt_tx = 10;
-    optional uint64 syn_retrans_cnt_rx = 11;
-    optional uint64 syn_retrans_cnt = 12;
-    optional uint64 retrans_cnt_tx = 13;
-    optional uint64 retrans_cnt_rx = 14;
-    optional uint64 retrans_cnt = 15;
-    optional uint64 zero_wnd_cnt_tx = 16;
-    optional uint64 zero_wnd_cnt_rx = 17;
-    optional uint64 zero_wnd_cnt = 18;
-    optional uint64 slow_start_cnt_tx = 19;
-    optional uint64 slow_start_cnt_rx = 20;
-    optional uint64 slow_start_cnt = 21;
-    optional uint64 psh_urg_cnt_tx = 22;
-    optional uint64 psh_urg_cnt_rx = 23;
-    optional uint64 psh_urg_cnt = 24;
+    optional uint64 half_open_flow_count = 4;
+    optional uint64 packet_tx = 5;
+    optional uint64 packet_rx = 6;
+    optional uint64 retrans_cnt_tx = 7;
+    optional uint64 retrans_cnt_rx = 8;
+
+    optional uint64 rtt_syn = 11;
+    optional uint64 rtt_avg = 12;
+    optional uint64 rtt_syn_flow = 13;
+    optional uint64 rtt_avg_flow = 14;
+    optional uint64 rtt_syn_per_flow = 15;
+    optional uint64 rtt_avg_per_flow = 16;
+
+    optional uint64 zero_wnd_cnt_tx = 21;
+    optional uint64 zero_wnd_cnt_rx = 22;
 }
 
-message PerfMeterMax {
-    optional uint64 flow_count = 1;
-    optional uint64 closed_flow_count = 2;
-    optional uint64 rtt_syn = 3;
-    optional uint64 rtt_avg = 4;
-}
-
-message PerfMeterMin {
+message RttStats {
     optional uint64 rtt_syn = 1;
     optional uint64 rtt_avg = 2;
 }
 
 message PerfMeter {
-    optional PerfMeterSum sum = 1;
-    optional PerfMeterMax max = 2;
-    optional PerfMeterMin min = 3;
+    optional PerfStats sum = 1;
+    optional RttStats max = 2;
+    optional RttStats min = 3;
 }
 
-message PerfGeoMeter {
-    optional PerfMeter meter = 1;
+message GeoMeter {
+    optional uint64 sum_closed_flow_count = 1;
     optional uint64 sum_abnormal_flow_count = 2;
-    optional uint64 sum_duration = 3;
-    optional uint64 sum_closed_flow_count = 4;
-}
-
-message PerfVisitorMeter {
-    optional PerfMeterSum meter_sum = 1;
-    optional uint64 sum_abnormal_flow_count = 2;
-    optional uint64 sum_duration = 3;
-    optional uint64 sum_closed_flow_count = 4;
-}
-
-message FlowMeterSum {
-    optional uint64 flow_count = 1;
-    optional uint64 new_flow_count = 2;
-    optional uint64 closed_flow_count = 3;
-}
-
-message FlowMeterMax {
-    optional uint64 flow_count = 1;
-    optional uint64 new_flow_count = 2;
-    optional uint64 closed_flow_count = 3;
-}
-
-message FlowMeterMin {
-    optional uint64 flow_count = 1;
-    optional uint64 new_flow_count = 2;
-    optional uint64 closed_flow_count = 3;
+    optional uint64 sum_closed_flow_duration_us = 3;
+    optional uint64 sum_packet_tx = 5;
+    optional uint64 sum_packet_rx = 6;
+    optional uint64 sum_bit_tx = 7;
+    optional uint64 sum_bit_rx = 8;
 }
 
 message FlowMeter {
-    optional FlowMeterSum sum = 1;
-    optional FlowMeterMax max = 2;
-    optional FlowMeterMin min = 3;
+    optional uint64 sum_flow_count = 1;
+    optional uint64 sum_new_flow_count = 2;
+    optional uint64 sum_closed_flow_count = 3;
+
+    optional uint64 sum_closed_flow_count_l_0s1s = 11;
+    optional uint64 sum_closed_flow_count_l_1s5s = 12;
+    optional uint64 sum_closed_flow_count_l_5s10s = 13;
+    optional uint64 sum_closed_flow_count_l_10s1m = 14;
+    optional uint64 sum_closed_flow_count_l_1m1h = 15;
+    optional uint64 sum_closed_flow_count_l_1h = 16;
+
+    optional uint64 sum_closed_flow_count_e_0k10k = 21;
+    optional uint64 sum_closed_flow_count_e_10k100k = 22;
+    optional uint64 sum_closed_flow_count_e_100k1m = 23;
+    optional uint64 sum_closed_flow_count_e_1m100m = 24;
+    optional uint64 sum_closed_flow_count_e_100m1g = 25;
+    optional uint64 sum_closed_flow_count_e_1g = 26;
+
+    optional uint64 sum_closed_flow_count_t_rst = 31;
+    optional uint64 sum_closed_flow_count_t_half_open = 32;
+    optional uint64 sum_closed_flow_count_t_half_close = 33;
+
+    optional uint64 max_flow_count = 51;
+    optional uint64 max_new_flow_count = 52;
+}
+
+message PlatformMeter {
+    optional uint64 sum_closed_flow_count = 1;
+    optional uint64 sum_packet = 2;
+    optional uint64 sum_bit = 3;
+}
+
+message ConsoleLogMeter {
+    optional uint64 sum_packet_tx = 1;
+    optional uint64 sum_packet_rx = 2;
+    optional uint64 sum_closed_flow_count = 3;
+    optional uint64 sum_closed_flow_duration_us = 4;
+}
+
+message IpDatabaseMeter {
+    optional uint64 sum_bit = 1;
+    optional uint64 sum_closed_flow_count = 3;
+}
+
+message Meter {
+    optional UsageMeter usage = 1;
+    optional PerfMeter perf = 2;
+    optional GeoMeter geo = 3;
+    optional FlowMeter flow = 4;
+    optional PlatformMeter platform = 5;
+    optional ConsoleLogMeter console_log = 6;
+    optional IpDatabaseMeter ip_database = 7;
+}
+
+message ZeroDocument {
+    optional uint32 timestamp = 1;
+    optional Tag tag = 2;
+    optional Meter meter = 3;
 }
