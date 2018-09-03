@@ -614,11 +614,9 @@ func (i *FlowPerfDataInfo) calcRtt(rtt time.Duration, direction bool) {
 func (i *FlowPerfDataInfo) calcRttSyn(rtt time.Duration, direction bool) {
 	if direction == TCP_DIR_CLIENT {
 		i.flowPerfStats.rttSyn0 += rtt
-		i.flowPerfStats.rtt0Sum += rtt
 		i.flowPerfStats.rtt0Count += 1
 	} else {
 		i.flowPerfStats.rttSyn1 += rtt
-		i.flowPerfStats.rtt1Sum += rtt
 		i.flowPerfStats.rtt1Count += 1
 	}
 }
@@ -721,37 +719,34 @@ func NewMetaFlowPerf(perfCounter *FlowPerfCounter) *MetaFlowPerf {
 
 func (p *MetaFlowPerf) calcVarianceStats(header *MetaPacket, flowInfo *FlowInfo) {
 	packetVariance := &p.perfData.packetVariance
-	packetIntervalAvg := packetVariance.packetIntervalAvg
-	packetSizeAvg := packetVariance.packetSizeAvg
-	lastpacketSizeVariance := packetVariance.packetSizeVariance
-	lastpacketIntervalVariance := packetVariance.packetIntervalVariance
-	lastPacketTimestamp := packetVariance.lastPacketTimestamp
 
+	lastIntervalAvg := packetVariance.packetIntervalAvg
+	lastSizeAvg := packetVariance.packetSizeAvg
+
+	packetTimestampUs := header.Timestamp / time.Microsecond
 	packetCount := int64(flowInfo.totalPacketCount0 + flowInfo.totalPacketCount1)
-	packetInterval := float64(header.Timestamp - lastPacketTimestamp)
-	lastIntervalAvg := packetIntervalAvg
-	lastSizeAvg := packetSizeAvg
-	lastDeltaAvgSize := float64(header.PacketLen) - lastSizeAvg
-	lastDeltaAvgInterval := packetInterval - lastIntervalAvg
+	packetInterval := float64(packetTimestampUs - packetVariance.lastPacketTimestamp)
 
-	packetVariance.lastPacketTimestamp = header.Timestamp
-
-	if packetCount > 1 {
-		packetVariance.packetSizeAvg = lastSizeAvg + (float64(header.PacketLen)-lastSizeAvg)/float64(packetCount)
-		packetVariance.packetSizeVariance = ((lastDeltaAvgSize * (float64(header.PacketLen) - packetVariance.packetSizeAvg)) +
-			lastpacketSizeVariance) / float64(packetCount-1)
-	} else {
-		packetVariance.packetSizeAvg = float64(header.PacketLen)
-		packetVariance.packetSizeVariance = 0
-	}
+	packetVariance.lastPacketTimestamp = packetTimestampUs
 
 	if packetCount > 2 {
 		packetVariance.packetIntervalAvg = lastIntervalAvg + (packetInterval-lastIntervalAvg)/float64(packetCount-1)
-		packetVariance.packetIntervalVariance = (lastDeltaAvgInterval*(packetInterval-packetVariance.packetIntervalAvg) +
-			lastpacketIntervalVariance) / float64(packetCount-2)
-	} else if packetCount == 2 {
+		packetVariance.packetIntervalVariance = ((packetInterval-lastIntervalAvg)*(packetInterval-packetVariance.packetIntervalAvg) +
+			packetVariance.packetIntervalVariance) / float64(packetCount-2)
+
+		packetVariance.packetSizeAvg = lastSizeAvg + (float64(header.PacketLen)-lastSizeAvg)/float64(packetCount)
+		packetVariance.packetSizeVariance = (((float64(header.PacketLen) - lastSizeAvg) * (float64(header.PacketLen) - packetVariance.packetSizeAvg)) +
+			packetVariance.packetSizeVariance) / float64(packetCount-1)
+	} else if packetCount > 1 {
+		packetVariance.packetSizeAvg = lastSizeAvg + (float64(header.PacketLen)-lastSizeAvg)/float64(packetCount)
+		packetVariance.packetSizeVariance = (((float64(header.PacketLen) - lastSizeAvg) * (float64(header.PacketLen) - packetVariance.packetSizeAvg)) +
+			packetVariance.packetSizeVariance) / float64(packetCount-1)
+
 		packetVariance.packetIntervalAvg = float64(packetInterval)
 		packetVariance.packetIntervalVariance = 0
+	} else {
+		packetVariance.packetSizeAvg = float64(header.PacketLen)
+		packetVariance.packetSizeVariance = 0
 	}
 }
 

@@ -615,8 +615,8 @@ func TestVariance(t *testing.T) {
 	t.Log(perf)
 
 	header = &MetaPacket{
-		PacketLen: 2000,
-		Timestamp: 3000,
+		PacketLen: 64,
+		Timestamp: 3000000,
 	}
 	flowInfo = &FlowInfo{
 		totalPacketCount0: 2,
