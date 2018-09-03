@@ -20,6 +20,8 @@ import (
 const (
 	LISTEN_PORT = 20033
 	CACHE_SIZE  = 16
+	QUEUE_MAX   = 16
+	PACKET_MAX  = 200
 )
 
 const (
@@ -49,8 +51,10 @@ type tridentInstance struct {
 }
 
 type TridentAdapter struct {
-	queues     []queue.QueueWriter
-	queueCount int
+	queues          []queue.QueueWriter
+	queueCount      int
+	hashBuffers     [QUEUE_MAX][PACKET_MAX]interface{}
+	hashBufferCount [QUEUE_MAX]int
 
 	instances map[TridentKey]*tridentInstance
 	counter   *PacketCounter
@@ -167,7 +171,17 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) {
 		a.stats.TxPackets++
 		hash := meta.InPort + meta.IpSrc + meta.IpDst +
 			uint32(meta.Protocol) + uint32(meta.PortSrc) + uint32(meta.PortDst)
-		a.queues[hash%uint32(a.queueCount)].Put(meta)
+		index := hash % uint32(a.queueCount)
+		a.hashBuffers[index][a.hashBufferCount[index]] = meta
+		a.hashBufferCount[index]++
+	}
+
+	for index := 0; index < a.queueCount; index++ {
+		count := a.hashBufferCount[index]
+		if count > 0 {
+			a.queues[index].Put(a.hashBuffers[index][:count]...)
+			a.hashBufferCount[index] = 0
+		}
 	}
 }
 
