@@ -140,8 +140,8 @@ type FlowInfo struct {
 	totalPacketCount1 uint64
 	arrTime0Last      time.Duration
 	arrTime1Last      time.Duration
-	tcpFlags0         uint16
-	tcpFlags1         uint16
+	tcpFlags0         uint8
+	tcpFlags1         uint8
 }
 
 type MetaFlowPerf struct {
@@ -846,11 +846,7 @@ func (p *MetaFlowPerf) Report(reverse bool, perfCounter *FlowPerfCounter) *TcpPe
 func (i *FlowPerfDataInfo) exchangeReportFlowPerfStats() {
 	report := i.reportPerfStats
 
-	report.RetransCount0, report.RetransCount1 = report.RetransCount1, report.RetransCount0
-	report.SynRetransCount0, report.SynRetransCount1 = report.SynRetransCount1, report.SynRetransCount0
-
-	report.ZeroWinCount0, report.ZeroWinCount1 = report.ZeroWinCount1, report.ZeroWinCount0
-	report.PshUrgCount0, report.PshUrgCount1 = report.PshUrgCount1, report.PshUrgCount0
+	report.TcpPerfCountsPeerSrc, report.TcpPerfCountsPeerDst = TcpPerfCountsPeerSrc(report.TcpPerfCountsPeerDst), TcpPerfCountsPeerDst(report.TcpPerfCountsPeerSrc)
 }
 
 func (i *FlowPerfDataInfo) calcReportFlowPerfStats(reverse bool) {
@@ -860,13 +856,8 @@ func (i *FlowPerfDataInfo) calcReportFlowPerfStats(reverse bool) {
 
 	if !reverse {
 		if period.art1Count > 0 {
-			report.ARTAvg = period.art1Sum / time.Duration(period.art1Count)
+			report.ART = period.art1Sum / time.Duration(period.art1Count)
 		}
-
-		if flow.rtt1Count > 0 {
-			report.RTTAvg = flow.rtt1Sum / time.Duration(flow.rtt1Count)
-		}
-
 		if period.rtt1Count == 0 {
 			period.rtt1Count = flow.rtt1Count
 			period.rtt1Sum = flow.rtt1Sum
@@ -876,13 +867,8 @@ func (i *FlowPerfDataInfo) calcReportFlowPerfStats(reverse bool) {
 		}
 	} else {
 		if period.art0Count > 0 {
-			report.ARTAvg = period.art0Sum / time.Duration(period.art0Count)
+			report.ART = period.art0Sum / time.Duration(period.art0Count)
 		}
-
-		if flow.rtt0Count > 0 {
-			report.RTTAvg = flow.rtt0Sum / time.Duration(flow.rtt0Count)
-		}
-
 		if period.rtt0Count == 0 {
 			period.rtt0Count = flow.rtt0Count
 			period.rtt0Sum = flow.rtt0Sum
@@ -894,19 +880,19 @@ func (i *FlowPerfDataInfo) calcReportFlowPerfStats(reverse bool) {
 
 	report.RTTSyn = flow.rttSyn0 + flow.rttSyn1
 
-	report.SynRetransCount0 = period.retransSyn0
-	report.SynRetransCount1 = period.retransSyn1
+	report.TcpPerfCountsPeerSrc.SynRetransCount = period.retransSyn0
+	report.TcpPerfCountsPeerDst.SynRetransCount = period.retransSyn1
 
-	report.RetransCount0 = period.retrans0
-	report.RetransCount1 = period.retrans1
+	report.TcpPerfCountsPeerSrc.RetransCount = period.retrans0
+	report.TcpPerfCountsPeerDst.RetransCount = period.retrans1
 	report.TotalRetransCount = flow.retrans0 + flow.retrans1
 
-	report.ZeroWinCount0 = period.zeroWinCount0
-	report.ZeroWinCount1 = period.zeroWinCount1
+	report.TcpPerfCountsPeerSrc.ZeroWinCount = period.zeroWinCount0
+	report.TcpPerfCountsPeerDst.ZeroWinCount = period.zeroWinCount1
 	report.TotalZeroWinCount = flow.zeroWinCount0 + flow.zeroWinCount1
 
-	report.PshUrgCount0 = period.pshUrgCount0
-	report.PshUrgCount1 = period.pshUrgCount1
+	report.TcpPerfCountsPeerSrc.PshUrgCount = period.pshUrgCount0
+	report.TcpPerfCountsPeerDst.PshUrgCount = period.pshUrgCount1
 	report.TotalPshUrgCount = flow.pshUrgCount0 + flow.pshUrgCount1
 
 	report.PacketIntervalAvg = uint64(i.packetVariance.packetIntervalAvg)
@@ -986,24 +972,24 @@ func initFlowInfo(flow *TaggedFlow, state FlowState, reply, reversed bool) *Flow
 			flowState:         state,
 			direction:         reply,
 			flowID:            flow.FlowID,
-			totalPacketCount0: flow.TotalPacketCount1,
-			totalPacketCount1: flow.TotalPacketCount0,
-			arrTime0Last:      flow.ArrTime1Last,
-			arrTime1Last:      flow.ArrTime0Last,
-			tcpFlags0:         flow.TCPFlags1,
-			tcpFlags1:         flow.TCPFlags0,
+			totalPacketCount0: flow.FlowMetricsPeerDst.TotalPacketCount,
+			totalPacketCount1: flow.FlowMetricsPeerSrc.TotalPacketCount,
+			arrTime0Last:      flow.FlowMetricsPeerDst.ArrTimeLast,
+			arrTime1Last:      flow.FlowMetricsPeerSrc.ArrTimeLast,
+			tcpFlags0:         flow.FlowMetricsPeerDst.TCPFlags,
+			tcpFlags1:         flow.FlowMetricsPeerSrc.TCPFlags,
 		}
 	} else {
 		return &FlowInfo{
 			flowState:         state,
 			direction:         reply,
 			flowID:            flow.FlowID,
-			totalPacketCount0: flow.TotalPacketCount0,
-			totalPacketCount1: flow.TotalPacketCount1,
-			arrTime0Last:      flow.ArrTime0Last,
-			arrTime1Last:      flow.ArrTime1Last,
-			tcpFlags0:         flow.TCPFlags0,
-			tcpFlags1:         flow.TCPFlags1,
+			totalPacketCount0: flow.FlowMetricsPeerSrc.TotalPacketCount,
+			totalPacketCount1: flow.FlowMetricsPeerDst.TotalPacketCount,
+			arrTime0Last:      flow.FlowMetricsPeerSrc.ArrTimeLast,
+			arrTime1Last:      flow.FlowMetricsPeerDst.ArrTimeLast,
+			tcpFlags0:         flow.FlowMetricsPeerSrc.TCPFlags,
+			tcpFlags1:         flow.FlowMetricsPeerDst.TCPFlags,
 		}
 	}
 }

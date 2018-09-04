@@ -106,9 +106,9 @@ func TestHandleSynRst(t *testing.T) {
 	if taggedFlow.Duration <= DEFAULT_DURATION_MSEC {
 		t.Errorf("taggedFlow.Duration is %d, expect more than %d", taggedFlow.Duration, DEFAULT_DURATION_MSEC)
 	}
-	if taggedFlow.TCPFlags0 != TCP_SYN || taggedFlow.TCPFlags1 != TCP_RST {
-		t.Errorf("taggedFlow.TcpFlagsSrc is %d, expect %d", taggedFlow.TCPFlags0, TCP_SYN)
-		t.Errorf("taggedFlow.TcpFlagsDst is %d, expect %d", taggedFlow.TCPFlags1, TCP_RST)
+	if taggedFlow.FlowMetricsPeerSrc.TCPFlags != TCP_SYN || taggedFlow.FlowMetricsPeerDst.TCPFlags != TCP_RST {
+		t.Errorf("taggedFlow.TcpFlagsSrc is %d, expect %d", taggedFlow.FlowMetricsPeerSrc.TCPFlags, TCP_SYN)
+		t.Errorf("taggedFlow.TcpFlagsDst is %d, expect %d", taggedFlow.FlowMetricsPeerDst.TCPFlags, TCP_RST)
 	}
 }
 
@@ -140,10 +140,10 @@ func TestHandleSynFin(t *testing.T) {
 	if taggedFlow.CloseType != CLOSE_TYPE_HALF_CLOSE {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_HALF_CLOSE)
 	}
-	if taggedFlow.TCPFlags0 != TCP_SYN|TCP_PSH|TCP_ACK ||
-		taggedFlow.TCPFlags1 != TCP_ACK|TCP_FIN {
-		t.Errorf("taggedFlow.TCPFlags0 is %x, expect %x", taggedFlow.TCPFlags0, TCP_SYN|TCP_ACK|TCP_PSH)
-		t.Errorf("taggedFlow.TCPFlags1 is %x, expect %x", taggedFlow.TCPFlags1, TCP_ACK|TCP_FIN)
+	if taggedFlow.FlowMetricsPeerSrc.TCPFlags != TCP_SYN|TCP_PSH|TCP_ACK ||
+		taggedFlow.FlowMetricsPeerDst.TCPFlags != TCP_ACK|TCP_FIN {
+		t.Errorf("taggedFlow.TCPFlags0 is %x, expect %x", taggedFlow.FlowMetricsPeerSrc.TCPFlags, TCP_SYN|TCP_ACK|TCP_PSH)
+		t.Errorf("taggedFlow.TCPFlags1 is %x, expect %x", taggedFlow.FlowMetricsPeerDst.TCPFlags, TCP_ACK|TCP_FIN)
 	}
 }
 
@@ -179,8 +179,8 @@ func TestHandleMultiPacket(t *testing.T) {
 
 	for i := 0; i < num; i++ {
 		taggedFlow = flowOutQueue.(Queue).Get().(*TaggedFlow)
-		if taggedFlow.TotalPacketCount0 != 1 ||
-			taggedFlow.TotalPacketCount1 != 1 {
+		if taggedFlow.FlowMetricsPeerSrc.TotalPacketCount != 1 ||
+			taggedFlow.FlowMetricsPeerDst.TotalPacketCount != 1 {
 			t.Error("taggedFlow.TotalPacketCount0 and taggedFlow.TotalPacketCount1 are not 1")
 		}
 	}
@@ -195,12 +195,12 @@ func TestHandleMultiPacket(t *testing.T) {
 func TestGetKeyL3Hash(t *testing.T) {
 	flowKey := &FlowKey{}
 
-	flowKey.IPSrc = *NewIPFromString("192.168.1.123")
-	flowKey.IPDst = *NewIPFromString("10.168.1.221")
+	flowKey.IPSrc = IPv4Int(NewIPFromString("192.168.1.123").Int())
+	flowKey.IPDst = IPv4Int(NewIPFromString("10.168.1.221").Int())
 	hash0 := getKeyL3Hash(flowKey)
 
-	flowKey.IPDst = *NewIPFromString("192.168.1.123")
-	flowKey.IPSrc = *NewIPFromString("10.168.1.221")
+	flowKey.IPDst = IPv4Int(NewIPFromString("192.168.1.123").Int())
+	flowKey.IPSrc = IPv4Int(NewIPFromString("10.168.1.221").Int())
 	hash1 := getKeyL3Hash(flowKey)
 
 	if hash0 != hash1 {
@@ -236,17 +236,17 @@ func TestInitFlow(t *testing.T) {
 	if taggedFlow.FlowID == 0 {
 		t.Error("taggedFlow.FlowID is 0 with an active flow")
 	}
-	if taggedFlow.TotalByteCount0 != uint64(packet.PacketLen) {
-		t.Errorf("taggedFlow.TotalByteCount0 is %d, PacketLen is %d", taggedFlow.TotalByteCount0, packet.PacketLen)
+	if taggedFlow.FlowMetricsPeerSrc.TotalByteCount != uint64(packet.PacketLen) {
+		t.Errorf("taggedFlow.TotalByteCount0 is %d, PacketLen is %d", taggedFlow.FlowMetricsPeerSrc.TotalByteCount, packet.PacketLen)
 	}
 
-	if taggedFlow.MACSrc.Int() != packet.MacSrc || taggedFlow.MACDst.Int() != packet.MacDst {
-		t.Errorf("taggedFlow.MacSrc is %d, packet.MacSrc is %d", taggedFlow.MACSrc.Int(), packet.MacSrc)
-		t.Errorf("taggedFlow.MacDst is %d, packet.MacDst is %d", taggedFlow.MACDst.Int(), packet.MacDst)
+	if taggedFlow.MACSrc != packet.MacSrc || taggedFlow.MACDst != packet.MacDst {
+		t.Errorf("taggedFlow.MacSrc is %d, packet.MacSrc is %d", taggedFlow.MACSrc, packet.MacSrc)
+		t.Errorf("taggedFlow.MacDst is %d, packet.MacDst is %d", taggedFlow.MACDst, packet.MacDst)
 	}
-	if taggedFlow.IPSrc.Int() != packet.IpSrc || taggedFlow.IPDst.Int() != packet.IpDst {
-		t.Errorf("taggedFlow.IpSrc is %d, packet.IpSrc is %d", taggedFlow.IPSrc.Int(), packet.IpSrc)
-		t.Errorf("taggedFlow.IpDst is %d, packet.IpDst is %d", taggedFlow.IPDst.Int(), packet.IpDst)
+	if taggedFlow.IPSrc != packet.IpSrc || taggedFlow.IPDst != packet.IpDst {
+		t.Errorf("taggedFlow.IpSrc is %d, packet.IpSrc is %d", taggedFlow.IPSrc, packet.IpSrc)
+		t.Errorf("taggedFlow.IpDst is %d, packet.IpDst is %d", taggedFlow.IPDst, packet.IpDst)
 	}
 	if flowKey.Proto != packet.Protocol {
 		t.Errorf("flowKey.Proto is %d, packet.Protocol is %d", taggedFlow.Proto, packet.Protocol)
@@ -276,12 +276,12 @@ func TestPlatformData(t *testing.T) {
 	if taggedFlow.CloseType != CLOSE_TYPE_HALF_OPEN {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_HALF_OPEN)
 	}
-	if taggedFlow.EpcID0 != -1 || taggedFlow.L3EpcID0 != -1 {
-		t.Errorf("taggedFlow.EpcID0 is %d, expect -1", taggedFlow.EpcID0)
-		t.Errorf("taggedFlow.L3EpcID0 is %d, expect -1", taggedFlow.L3EpcID0)
+	if taggedFlow.FlowMetricsPeerSrc.EpcID != -1 || taggedFlow.FlowMetricsPeerSrc.L3EpcID != -1 {
+		t.Errorf("taggedFlow.EpcID0 is %d, expect -1", taggedFlow.FlowMetricsPeerSrc.EpcID)
+		t.Errorf("taggedFlow.L3EpcID0 is %d, expect -1", taggedFlow.FlowMetricsPeerSrc.L3EpcID)
 	}
-	if taggedFlow.Host0 != 0x01010101 {
-		t.Errorf("taggedFlow.Host0 is %d, expect %d", taggedFlow.Host0, 0x01010101)
+	if taggedFlow.FlowMetricsPeerSrc.Host != 0x01010101 {
+		t.Errorf("taggedFlow.FlowMetricsPeerSrc.Host is %d, expect %d", taggedFlow.FlowMetricsPeerSrc.Host, 0x01010101)
 	}
 }
 
@@ -296,7 +296,7 @@ func TestFlowStateMachine(t *testing.T) {
 	flowExtra.flowState = FLOW_STATE_OPENING_1
 
 	// test handshake
-	taggedFlow.TCPFlags0 = TCP_SYN
+	taggedFlow.FlowMetricsPeerSrc.TCPFlags = TCP_SYN
 	packetFlags = TCP_SYN | TCP_ACK
 	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, true, false)
 	if flowExtra.flowState != FLOW_STATE_OPENING_2 {
@@ -309,7 +309,7 @@ func TestFlowStateMachine(t *testing.T) {
 	}
 
 	// test fin
-	taggedFlow.TCPFlags0 = TCP_FIN
+	taggedFlow.FlowMetricsPeerSrc.TCPFlags = TCP_FIN
 	flowExtra.flowState = FLOW_STATE_CLOSING_TX1
 	packetFlags = TCP_ACK
 	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, true, false)
@@ -412,10 +412,10 @@ func TestFlowReverse(t *testing.T) {
 
 	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
 
-	if taggedFlow.TCPFlags1 != 0 && taggedFlow.TCPFlags0 != TCP_SYN|TCP_ACK {
+	if taggedFlow.FlowMetricsPeerDst.TCPFlags != 0 && taggedFlow.FlowMetricsPeerSrc.TCPFlags != TCP_SYN|TCP_ACK {
 		// the flow is revesed again because of service ports list
-		t.Errorf("taggedFlow.TCPFlags0 is %d, expect %d", taggedFlow.TCPFlags1, 0)
-		t.Errorf("taggedFlow.TCPFlags1 is %d, expect %d", taggedFlow.TCPFlags0, TCP_SYN|TCP_ACK)
+		t.Errorf("taggedFlow.TCPFlags0 is %d, expect %d", taggedFlow.FlowMetricsPeerDst.TCPFlags, 0)
+		t.Errorf("taggedFlow.TCPFlags1 is %d, expect %d", taggedFlow.FlowMetricsPeerSrc.TCPFlags, TCP_SYN|TCP_ACK)
 		t.Errorf("\n%s", taggedFlow)
 	}
 }
@@ -466,6 +466,7 @@ func BenchmarkCleanHashMap(b *testing.B) {
 		flowGenerator.addFlow(flowCache, flowExtra)
 		flowGenerator.cleanTimeoutHashMap(flowGenerator.hashMap, 0, 1, 0)
 	}
+	b.Logf("b.N: %d, NonEmptyFlowCacheNum: %d", b.N, flowGenerator.stats.NonEmptyFlowCacheNum)
 }
 
 func BenchmarkShortFlowList(b *testing.B) {
@@ -487,7 +488,7 @@ func BenchmarkShortFlowList(b *testing.B) {
 			}
 		}
 	}
-	b.Logf("b.N: %d, maxFlowListLen: %d", b.N, maxFlowListLen)
+	b.Logf("b.N: %d, maxFlowListLen: %d, NonEmptyFlowCacheNum: %d", b.N, maxFlowListLen, flowGenerator.stats.NonEmptyFlowCacheNum)
 }
 
 func BenchmarkLongFlowList(b *testing.B) {

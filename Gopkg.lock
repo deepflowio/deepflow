@@ -18,14 +18,6 @@
   version = "1.0.0"
 
 [[projects]]
-  digest = "1:3535f00c607f3993a1a2f1cbb1b3faa3bf8903f9edc77c1386491882d3b2754c"
-  name = "github.com/cespare/xxhash"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "5c37fe3735342a2e0d01c87a907579987c8936cc"
-  version = "v1.0.0"
-
-[[projects]]
   digest = "1:6f82cacd0af5921e99bf3f46748705239b36489464f4529a1589bc895764fb18"
   name = "github.com/docker/go-units"
   packages = ["."]
@@ -178,7 +170,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:03068d178a4dce12e8f38078376e03fc4d98621668d1320c8168bb95d68da838"
+  digest = "1:e1fe4954d4dd4b986255bd2c7f9f3438931e040904ab9c90f813853a7855f28f"
   name = "gitlab.x.lan/application/droplet-app"
   packages = [
     "internal/pkg/endpoint",
@@ -187,11 +179,11 @@
     "pkg/mapper/usage",
   ]
   pruneopts = "UT"
-  revision = "e5a04beca09b38fdaaa8381c51f81b29bf660059"
+  revision = "831498703628e0d5dccecdd8b0d86756bbd01e6d"
 
 [[projects]]
   branch = "master"
-  digest = "1:102469f2c8f321f55829bb5d45ea39565a5df52ef91a19b23e4fb7e56ceb661a"
+  digest = "1:9353cb69a822a5a3580f567cf1be540888992abf24b796be4abdf84ebb4a651c"
   name = "gitlab.x.lan/platform/droplet-mapreduce"
   packages = [
     "internal/pkg/flowsender",
@@ -202,11 +194,11 @@
     "pkg/messenger",
   ]
   pruneopts = "UT"
-  revision = "a8d72216934a543d9eb03a2d6a1c77b24222fd5d"
+  revision = "4f92d4c033e2973953d56b181396f612ea7bfb3e"
 
 [[projects]]
   branch = "master"
-  digest = "1:9a345a6694f46df8e3db9df170940e62bfda11859d136b24042daa8f3d879b1e"
+  digest = "1:c0fe13056f96b827b47ba29208afd6b73fe1f99652491bce0b2a95203f9ea475"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "datatype",
@@ -222,11 +214,11 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "2b813cf06ca765d95774a6a4b808c6e606e6e933"
+  revision = "e805a8eebede7eab56298662b0fbde54fd4c38e7"
 
 [[projects]]
   branch = "feature-os"
-  digest = "1:b77eda41239f9e74a088c67eea0c0617b16adc48b65a8c9fb381e3e0cdfeae8a"
+  digest = "1:17eb750e5ce7cbc0adc382bad97fc5cada91f582532d9f88582e5f39f6844a54"
   name = "gitlab.x.lan/yunshan/message"
   packages = [
     "dfi",
@@ -234,7 +226,7 @@
     "zero",
   ]
   pruneopts = "T"
-  revision = "c9a5be192c33f68fcd6bd33263b7516fc5295b9b"
+  revision = "875fd5c238951de2212c75c27379c518d74e8a60"
 
 [[projects]]
   branch = "release-branch.go1.9"
@@ -254,15 +246,15 @@
   revision = "44b7c21cbf19450f38b337eb6b6fe4f6496fb5b3"
 
 [[projects]]
-  branch = "master"
-  digest = "1:7710ea76bd73d3154e86eaf2db8b36a6dffbd6114e4e37b516f1d232c03ddd8d"
+  branch = "release-branch.go1.11"
+  digest = "1:a60cae5be8993938498243605b120290533a5208fd5cac81c932afbad3642fb0"
   name = "golang.org/x/sys"
   packages = [
     "unix",
     "windows",
   ]
   pruneopts = "UT"
-  revision = "11551d06cbcc94edc80a0facaccbda56473c19c1"
+  revision = "98c5dad5d1a0e8a73845ecc8897d0bd56586511d"
 
 [[projects]]
   digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"
@@ -288,12 +280,12 @@
   version = "v0.3.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:077c1c599507b3b3e9156d17d36e1e61928ee9b53a5b420f10f28ebd4a0b275c"
+  branch = "jba-regen"
+  digest = "1:601e63e7d4577f907118bec825902505291918859d223bce015539e79f1160e3"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
   pruneopts = "UT"
-  revision = "c66870c02cf823ceb633bcd05be3c7cda29976f4"
+  revision = "af2e5e2b5d87da17f10febed626e553cad71cac7"
 
 [[projects]]
   digest = "1:3dd7996ce6bf52dec6a2f69fa43e7c4cefea1d4dfa3c8ab7a5f8a9f7434e239d"

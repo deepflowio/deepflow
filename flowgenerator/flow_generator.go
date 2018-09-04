@@ -15,26 +15,25 @@ var log = logging.MustGetLogger("flowgenerator")
 
 func (f *FlowGenerator) genFlowKey(meta *MetaPacket) *FlowKey {
 	flowKey := f.innerFlowKey
-	flowKey.Exporter = *NewIPFromInt(meta.Exporter)
-	flowKey.IPSrc = *NewIPFromInt(meta.IpSrc)
-	flowKey.IPDst = *NewIPFromInt(meta.IpDst)
+	flowKey.Exporter = meta.Exporter
+	flowKey.MACSrc = meta.MacSrc
+	flowKey.MACDst = meta.MacDst
+	flowKey.IPSrc = meta.IpSrc
+	flowKey.IPDst = meta.IpDst
 	flowKey.Proto = meta.Protocol
 	flowKey.PortSrc = meta.PortSrc
 	flowKey.PortDst = meta.PortDst
-	flowKey.InPort0 = meta.InPort
+	flowKey.InPort = meta.InPort
 	if tunnel := meta.Tunnel; tunnel != nil {
-		flowKey.TunnelType = uint8(tunnel.Type)
-		flowKey.TunnelID = tunnel.Id
-		flowKey.TunnelIPSrc = tunnel.Src
-		flowKey.TunnelIPDst = tunnel.Dst
+		flowKey.TunnelInfo = *tunnel
 	}
 	return flowKey
 }
 
 // hash of the key L3, symmetric
 func getKeyL3Hash(flowKey *FlowKey) uint64 {
-	ipSrc := uint64(flowKey.IPSrc.Int())
-	ipDst := uint64(flowKey.IPDst.Int())
+	ipSrc := uint64(flowKey.IPSrc)
+	ipDst := uint64(flowKey.IPDst)
 	if ipSrc >= ipDst {
 		return (ipSrc << 32) | ipDst
 	}
@@ -52,16 +51,16 @@ func getKeyL4Hash(flowKey *FlowKey, basis uint32) uint64 {
 }
 
 func (f *FlowGenerator) getQuinTupleHash(flowKey *FlowKey) uint64 {
-	return getKeyL3Hash(flowKey) ^ ((uint64(flowKey.InPort0) << 32) | getKeyL4Hash(flowKey, f.hashBasis))
+	return getKeyL3Hash(flowKey) ^ ((uint64(flowKey.InPort) << 32) | getKeyL4Hash(flowKey, f.hashBasis))
 }
 
 func isFromTor(inPort uint32) bool {
-	return inPort&DEEPFLOW_POSITION_EXPORTER == DEEPFLOW_POSITION_EXPORTER
+	return inPort&PACKET_SOURCE_TOR == PACKET_SOURCE_TOR
 }
 
 func (f *FlowExtra) MacEquals(meta *MetaPacket) bool {
 	taggedFlow := f.taggedFlow
-	flowMacSrc, flowMacDst := taggedFlow.MACSrc.Int(), taggedFlow.MACDst.Int()
+	flowMacSrc, flowMacDst := taggedFlow.MACSrc, taggedFlow.MACDst
 	if flowMacSrc == meta.MacSrc && flowMacDst == meta.MacDst {
 		return true
 	}
@@ -73,13 +72,13 @@ func (f *FlowExtra) MacEquals(meta *MetaPacket) bool {
 
 func (f *FlowExtra) TunnelMatch(key *FlowKey) bool {
 	taggedFlow := f.taggedFlow
-	if taggedFlow.TunnelID == 0 && key.TunnelID == 0 {
+	if taggedFlow.TunnelInfo.Id == 0 && key.TunnelInfo.Id == 0 {
 		return true
 	}
-	if taggedFlow.TunnelType != key.TunnelType || taggedFlow.TunnelID != key.TunnelID {
+	if taggedFlow.TunnelInfo.Type != key.TunnelInfo.Type || taggedFlow.TunnelInfo.Id != key.TunnelInfo.Id {
 		return false
 	}
-	return taggedFlow.TunnelIPSrc^key.TunnelIPSrc^taggedFlow.TunnelIPDst^key.TunnelIPDst == 0
+	return taggedFlow.TunnelInfo.Src^key.TunnelInfo.Src^taggedFlow.TunnelInfo.Dst^key.TunnelInfo.Dst == 0
 }
 
 func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool) {
@@ -87,17 +86,17 @@ func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool) 
 	for e := f.flowList.Front(); e != nil; e = e.Next() {
 		flowExtra := e.Value
 		taggedFlow := flowExtra.taggedFlow
-		if !taggedFlow.Exporter.Equals(&key.Exporter) || (isFromTor(key.InPort0) && !flowExtra.MacEquals(meta)) {
+		if taggedFlow.Exporter != key.Exporter || (isFromTor(key.InPort) && !flowExtra.MacEquals(meta)) {
 			continue
 		}
 		if !flowExtra.TunnelMatch(key) {
 			continue
 		}
-		if taggedFlow.IPSrc.Equals(&key.IPSrc) && taggedFlow.IPDst.Equals(&key.IPDst) && taggedFlow.PortSrc == key.PortSrc && taggedFlow.PortDst == key.PortDst {
+		if taggedFlow.IPSrc == key.IPSrc && taggedFlow.IPDst == key.IPDst && taggedFlow.PortSrc == key.PortSrc && taggedFlow.PortDst == key.PortDst {
 			f.flowList.MoveToFront(e)
 			f.Unlock()
 			return flowExtra, false
-		} else if taggedFlow.IPSrc.Equals(&key.IPDst) && taggedFlow.IPDst.Equals(&key.IPSrc) && taggedFlow.PortSrc == key.PortDst && taggedFlow.PortDst == key.PortSrc {
+		} else if taggedFlow.IPSrc == key.IPDst && taggedFlow.IPDst == key.IPSrc && taggedFlow.PortSrc == key.PortDst && taggedFlow.PortDst == key.PortSrc {
 			f.flowList.MoveToFront(e)
 			f.Unlock()
 			return flowExtra, true
@@ -136,19 +135,17 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, key *FlowKey) (*FlowExtra, bo
 	now := time.Duration(meta.Timestamp)
 	taggedFlow := &TaggedFlow{
 		Flow: Flow{
-			FlowKey:      *key,
-			FlowID:       f.genFlowId(uint64(now), uint64(key.InPort0)),
-			TimeBitmap:   1,
-			StartTime:    now,
-			EndTime:      now,
-			CurStartTime: now,
-			MACSrc:       *NewMACAddrFromInt(meta.MacSrc),
-			MACDst:       *NewMACAddrFromInt(meta.MacDst),
-			VLAN:         meta.Vlan,
-			EthType:      meta.EthType,
-			CloseType:    CLOSE_TYPE_UNKNOWN,
-			TCPFlags0:    0,
-			TCPFlags1:    0,
+			FlowKey:            *key,
+			FlowID:             f.genFlowId(uint64(now), uint64(key.InPort)),
+			TimeBitmap:         1,
+			StartTime:          now,
+			EndTime:            now,
+			CurStartTime:       now,
+			VLAN:               meta.Vlan,
+			EthType:            meta.EthType,
+			CloseType:          CLOSE_TYPE_UNKNOWN,
+			FlowMetricsPeerSrc: FlowMetricsPeerSrc{TCPFlags: 0},
+			FlowMetricsPeerDst: FlowMetricsPeerDst{TCPFlags: 0},
 		},
 	}
 	flowExtra := &FlowExtra{
@@ -165,26 +162,22 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, key *FlowKey) (*FlowExtra, bo
 	if flagEqual(flags&TCP_FLAG_MASK, TCP_SYN|TCP_ACK) {
 		taggedFlow.IPSrc, taggedFlow.IPDst = taggedFlow.IPDst, taggedFlow.IPSrc
 		taggedFlow.PortSrc, taggedFlow.PortDst = taggedFlow.PortDst, taggedFlow.PortSrc
-		taggedFlow.TunnelIPSrc, taggedFlow.TunnelIPDst = taggedFlow.TunnelIPDst, taggedFlow.TunnelIPSrc
-		taggedFlow.MACSrc = *NewMACAddrFromInt(meta.MacDst)
-		taggedFlow.MACDst = *NewMACAddrFromInt(meta.MacSrc)
-		taggedFlow.ArrTime10 = now
-		taggedFlow.ArrTime1Last = now
-		taggedFlow.TotalPacketCount1 = 1
-		taggedFlow.PacketCount1 = 1
-		taggedFlow.TotalByteCount1 = uint64(meta.PacketLen)
-		taggedFlow.ByteCount1 = uint64(meta.PacketLen)
+		taggedFlow.TunnelInfo.Src, taggedFlow.TunnelInfo.Dst = taggedFlow.TunnelInfo.Dst, taggedFlow.TunnelInfo.Src
+		taggedFlow.FlowMetricsPeerDst.ArrTime0 = now
+		taggedFlow.FlowMetricsPeerDst.ArrTimeLast = now
+		taggedFlow.FlowMetricsPeerDst.TotalPacketCount = 1
+		taggedFlow.FlowMetricsPeerDst.PacketCount = 1
+		taggedFlow.FlowMetricsPeerDst.TotalByteCount = uint64(meta.PacketLen)
+		taggedFlow.FlowMetricsPeerDst.ByteCount = uint64(meta.PacketLen)
 		flowExtra.updatePlatformData(meta, true)
 		return flowExtra, f.updateFlowStateMachine(flowExtra, flags, true, meta.Invalid), true
 	} else {
-		taggedFlow.MACSrc = *NewMACAddrFromInt(meta.MacSrc)
-		taggedFlow.MACDst = *NewMACAddrFromInt(meta.MacDst)
-		taggedFlow.ArrTime00 = now
-		taggedFlow.ArrTime0Last = now
-		taggedFlow.TotalPacketCount0 = 1
-		taggedFlow.PacketCount0 = 1
-		taggedFlow.TotalByteCount0 = uint64(meta.PacketLen)
-		taggedFlow.ByteCount0 = uint64(meta.PacketLen)
+		taggedFlow.FlowMetricsPeerSrc.ArrTime0 = now
+		taggedFlow.FlowMetricsPeerSrc.ArrTimeLast = now
+		taggedFlow.FlowMetricsPeerSrc.TotalPacketCount = 1
+		taggedFlow.FlowMetricsPeerSrc.PacketCount = 1
+		taggedFlow.FlowMetricsPeerSrc.TotalByteCount = uint64(meta.PacketLen)
+		taggedFlow.FlowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
 		flowExtra.updatePlatformData(meta, false)
 		return flowExtra, f.updateFlowStateMachine(flowExtra, flags, false, meta.Invalid), false
 	}
@@ -196,9 +189,9 @@ func (f *FlowGenerator) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8
 	closed := false
 	taggedFlow := flowExtra.taggedFlow
 	if reply {
-		taggedFlow.TCPFlags1 |= uint16(flags)
+		taggedFlow.FlowMetricsPeerDst.TCPFlags |= flags
 	} else {
-		taggedFlow.TCPFlags0 |= uint16(flags)
+		taggedFlow.FlowMetricsPeerSrc.TCPFlags |= flags
 	}
 	if isExceptionFlags(flags, reply) || invalid {
 		flowExtra.timeoutSec = f.Exception
@@ -223,7 +216,7 @@ func (f *FlowGenerator) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8
 	}
 	flowExtra.timeoutSec = timeoutSec
 	flowExtra.flowState = flowState
-	if taggedFlow.TotalPacketCount0 == 0 || taggedFlow.TotalPacketCount1 == 0 {
+	if taggedFlow.FlowMetricsPeerSrc.TotalPacketCount == 0 || taggedFlow.FlowMetricsPeerDst.TotalPacketCount == 0 {
 		flowExtra.timeoutSec = f.SingleDirection
 	}
 	return closed
@@ -244,81 +237,60 @@ func (f *FlowExtra) updatePlatformData(meta *MetaPacket, reply bool) {
 		dstInfo = endpointData.DstInfo
 	}
 	if srcInfo != nil {
-		taggedFlow.EpcID0 = srcInfo.L2EpcId
-		taggedFlow.DeviceType0 = DeviceType(srcInfo.L2DeviceType)
-		taggedFlow.DeviceID0 = srcInfo.L2DeviceId
-		taggedFlow.IsL2End0 = srcInfo.L2End
-		taggedFlow.IsL3End0 = srcInfo.L3End
-		taggedFlow.L3EpcID0 = srcInfo.L3EpcId
-		taggedFlow.L3DeviceType0 = DeviceType(srcInfo.L3DeviceType)
-		taggedFlow.L3DeviceID0 = srcInfo.L3DeviceId
-		taggedFlow.Host0 = srcInfo.HostIp
-		taggedFlow.SubnetID0 = srcInfo.SubnetId
+		taggedFlow.FlowMetricsPeerSrc.EpcID = srcInfo.L2EpcId
+		taggedFlow.FlowMetricsPeerSrc.DeviceType = DeviceType(srcInfo.L2DeviceType)
+		taggedFlow.FlowMetricsPeerSrc.DeviceID = srcInfo.L2DeviceId
+		taggedFlow.FlowMetricsPeerSrc.IsL2End = srcInfo.L2End
+		taggedFlow.FlowMetricsPeerSrc.IsL3End = srcInfo.L3End
+		taggedFlow.FlowMetricsPeerSrc.L3EpcID = srcInfo.L3EpcId
+		taggedFlow.FlowMetricsPeerSrc.L3DeviceType = DeviceType(srcInfo.L3DeviceType)
+		taggedFlow.FlowMetricsPeerSrc.L3DeviceID = srcInfo.L3DeviceId
+		taggedFlow.FlowMetricsPeerSrc.Host = srcInfo.HostIp
+		taggedFlow.FlowMetricsPeerSrc.SubnetID = srcInfo.SubnetId
 		taggedFlow.GroupIDs0 = srcInfo.GroupIds
 	}
 	if dstInfo != nil {
-		taggedFlow.EpcID1 = dstInfo.L2EpcId
-		taggedFlow.DeviceType1 = DeviceType(dstInfo.L2DeviceType)
-		taggedFlow.DeviceID1 = dstInfo.L2DeviceId
-		taggedFlow.IsL2End1 = dstInfo.L2End
-		taggedFlow.IsL3End1 = dstInfo.L3End
-		taggedFlow.L3EpcID1 = dstInfo.L3EpcId
-		taggedFlow.L3DeviceType1 = DeviceType(dstInfo.L3DeviceType)
-		taggedFlow.L3DeviceID1 = dstInfo.L3DeviceId
-		taggedFlow.Host1 = dstInfo.HostIp
-		taggedFlow.SubnetID1 = dstInfo.SubnetId
+		taggedFlow.FlowMetricsPeerDst.EpcID = dstInfo.L2EpcId
+		taggedFlow.FlowMetricsPeerDst.DeviceType = DeviceType(dstInfo.L2DeviceType)
+		taggedFlow.FlowMetricsPeerDst.DeviceID = dstInfo.L2DeviceId
+		taggedFlow.FlowMetricsPeerDst.IsL2End = dstInfo.L2End
+		taggedFlow.FlowMetricsPeerDst.IsL3End = dstInfo.L3End
+		taggedFlow.FlowMetricsPeerDst.L3EpcID = dstInfo.L3EpcId
+		taggedFlow.FlowMetricsPeerDst.L3DeviceType = DeviceType(dstInfo.L3DeviceType)
+		taggedFlow.FlowMetricsPeerDst.L3DeviceID = dstInfo.L3DeviceId
+		taggedFlow.FlowMetricsPeerDst.Host = dstInfo.HostIp
+		taggedFlow.FlowMetricsPeerDst.SubnetID = dstInfo.SubnetId
 		taggedFlow.GroupIDs1 = dstInfo.GroupIds
 	}
 }
 
-func (f *FlowExtra) reverseFlow() {
+func (f *FlowExtra) reverseFlow(perfReverse bool) {
 	taggedFlow := f.taggedFlow
+	taggedFlow.TunnelInfo.Src, taggedFlow.TunnelInfo.Dst = taggedFlow.TunnelInfo.Dst, taggedFlow.TunnelInfo.Src
+	taggedFlow.MACSrc, taggedFlow.MACDst = taggedFlow.MACDst, taggedFlow.MACSrc
 	taggedFlow.IPSrc, taggedFlow.IPDst = taggedFlow.IPDst, taggedFlow.IPSrc
 	taggedFlow.PortSrc, taggedFlow.PortDst = taggedFlow.PortDst, taggedFlow.PortSrc
-	taggedFlow.TunnelIPSrc, taggedFlow.TunnelIPDst = taggedFlow.TunnelIPDst, taggedFlow.TunnelIPSrc
-	taggedFlow.MACSrc, taggedFlow.MACDst = taggedFlow.MACDst, taggedFlow.MACSrc
-	taggedFlow.TCPFlags0, taggedFlow.TCPFlags1 = taggedFlow.TCPFlags1, taggedFlow.TCPFlags0
-	taggedFlow.ByteCount0, taggedFlow.ByteCount1 = taggedFlow.ByteCount1, taggedFlow.ByteCount0
-	taggedFlow.PacketCount0, taggedFlow.PacketCount1 = taggedFlow.PacketCount1, taggedFlow.PacketCount0
-	taggedFlow.TotalByteCount0, taggedFlow.TotalByteCount1 = taggedFlow.TotalByteCount1, taggedFlow.TotalByteCount0
-	taggedFlow.TotalPacketCount0, taggedFlow.TotalPacketCount1 = taggedFlow.TotalPacketCount1, taggedFlow.TotalPacketCount0
-	taggedFlow.ArrTime00, taggedFlow.ArrTime10 = taggedFlow.ArrTime10, taggedFlow.ArrTime00
-	taggedFlow.ArrTime0Last, taggedFlow.ArrTime1Last = taggedFlow.ArrTime1Last, taggedFlow.ArrTime0Last
-	taggedFlow.SubnetID0, taggedFlow.SubnetID1 = taggedFlow.SubnetID1, taggedFlow.SubnetID0
-	taggedFlow.L3DeviceType0, taggedFlow.L3DeviceType1 = taggedFlow.L3DeviceType1, taggedFlow.L3DeviceType0
-	taggedFlow.L3DeviceID0, taggedFlow.L3DeviceID1 = taggedFlow.L3DeviceID1, taggedFlow.L3DeviceID0
-	taggedFlow.L3EpcID0, taggedFlow.L3EpcID1 = taggedFlow.L3EpcID1, taggedFlow.L3EpcID0
-	taggedFlow.Host0, taggedFlow.Host1 = taggedFlow.Host1, taggedFlow.Host0
-	taggedFlow.EpcID0, taggedFlow.EpcID1 = taggedFlow.EpcID1, taggedFlow.EpcID0
-	taggedFlow.DeviceType0, taggedFlow.DeviceType1 = taggedFlow.DeviceType1, taggedFlow.DeviceType0
-	taggedFlow.DeviceID0, taggedFlow.DeviceID1 = taggedFlow.DeviceID1, taggedFlow.DeviceID0
-	taggedFlow.IfIndex0, taggedFlow.IfIndex1 = taggedFlow.IfIndex1, taggedFlow.IfIndex0
-	taggedFlow.IfType0, taggedFlow.IfType1 = taggedFlow.IfType1, taggedFlow.IfType0
-	taggedFlow.IsL2End0, taggedFlow.IsL2End1 = taggedFlow.IsL2End1, taggedFlow.IsL2End0
-	taggedFlow.IsL3End0, taggedFlow.IsL3End1 = taggedFlow.IsL3End1, taggedFlow.IsL3End0
 	taggedFlow.GroupIDs0, taggedFlow.GroupIDs1 = taggedFlow.GroupIDs1, taggedFlow.GroupIDs0
-	if taggedFlow.TcpPerfStats == nil {
+	taggedFlow.FlowMetricsPeerSrc, taggedFlow.FlowMetricsPeerDst = FlowMetricsPeerSrc(taggedFlow.FlowMetricsPeerDst), FlowMetricsPeerDst(taggedFlow.FlowMetricsPeerSrc)
+	tcpPerfStats := taggedFlow.TcpPerfStats
+	if !perfReverse || tcpPerfStats == nil {
 		return
 	}
-	tcpPerfStats := taggedFlow.TcpPerfStats
-	tcpPerfStats.SynRetransCount0, tcpPerfStats.SynRetransCount1 = tcpPerfStats.SynRetransCount1, tcpPerfStats.SynRetransCount0
-	tcpPerfStats.RetransCount0, tcpPerfStats.RetransCount1 = tcpPerfStats.RetransCount1, tcpPerfStats.RetransCount0
-	tcpPerfStats.ZeroWinCount0, tcpPerfStats.ZeroWinCount1 = tcpPerfStats.ZeroWinCount1, tcpPerfStats.ZeroWinCount0
-	tcpPerfStats.PshUrgCount0, tcpPerfStats.PshUrgCount1 = tcpPerfStats.PshUrgCount1, tcpPerfStats.PshUrgCount0
+	tcpPerfStats.TcpPerfCountsPeerSrc, tcpPerfStats.TcpPerfCountsPeerDst = TcpPerfCountsPeerSrc(tcpPerfStats.TcpPerfCountsPeerDst), TcpPerfCountsPeerDst(tcpPerfStats.TcpPerfCountsPeerSrc)
 }
 
 func (f *FlowGenerator) tryReverseFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) bool {
 	taggedFlow := flowExtra.taggedFlow
-	if flagContain(uint8(taggedFlow.TCPFlags0|taggedFlow.TCPFlags1), TCP_SYN) || meta.TcpData == nil {
+	if flagContain(taggedFlow.FlowMetricsPeerSrc.TCPFlags|taggedFlow.FlowMetricsPeerDst.TCPFlags, TCP_SYN) || meta.TcpData == nil {
 		return false
 	}
 	// if meta.Invalid is false, TcpData will not be nil
 	if flagEqual(meta.TcpData.Flags&TCP_FLAG_MASK, TCP_SYN) && reply {
-		flowExtra.reverseFlow()
+		flowExtra.reverseFlow(false)
 		flowExtra.reversed = true
 		return true
 	} else if flagEqual(meta.TcpData.Flags&TCP_FLAG_MASK, TCP_SYN|TCP_ACK) && !reply {
-		flowExtra.reverseFlow()
+		flowExtra.reverseFlow(false)
 		flowExtra.reversed = true
 		return true
 	}
@@ -329,7 +301,7 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 	taggedFlow := flowExtra.taggedFlow
 	bytes := uint64(meta.PacketLen)
 	packetTimestamp := meta.Timestamp
-	maxArrTime := timeMax(taggedFlow.ArrTime0Last, taggedFlow.ArrTime1Last)
+	maxArrTime := timeMax(taggedFlow.FlowMetricsPeerSrc.ArrTimeLast, taggedFlow.FlowMetricsPeerDst.ArrTimeLast)
 	var flags uint8 = 0
 	if meta.TcpData != nil {
 		flags = meta.TcpData.Flags
@@ -337,38 +309,38 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 	if f.tryReverseFlow(flowExtra, meta, reply) {
 		reply = !reply
 	}
-	if taggedFlow.PacketCount0 == 0 && taggedFlow.PacketCount1 == 0 {
+	if taggedFlow.FlowMetricsPeerSrc.PacketCount == 0 && taggedFlow.FlowMetricsPeerDst.PacketCount == 0 {
 		taggedFlow.CurStartTime = packetTimestamp
 		flowExtra.updatePlatformData(meta, reply)
 	}
 	if reply {
-		if taggedFlow.TotalPacketCount1 == 0 {
-			taggedFlow.ArrTime10 = packetTimestamp
+		if taggedFlow.FlowMetricsPeerDst.TotalPacketCount == 0 {
+			taggedFlow.FlowMetricsPeerDst.ArrTime0 = packetTimestamp
 		}
 		if maxArrTime < packetTimestamp {
-			taggedFlow.ArrTime1Last = packetTimestamp
+			taggedFlow.FlowMetricsPeerDst.ArrTimeLast = packetTimestamp
 		} else {
 			packetTimestamp = maxArrTime
 			meta.Timestamp = maxArrTime
 		}
-		taggedFlow.PacketCount1++
-		taggedFlow.TotalPacketCount1++
-		taggedFlow.ByteCount1 += bytes
-		taggedFlow.TotalByteCount1 += bytes
+		taggedFlow.FlowMetricsPeerDst.PacketCount++
+		taggedFlow.FlowMetricsPeerDst.TotalPacketCount++
+		taggedFlow.FlowMetricsPeerDst.ByteCount += bytes
+		taggedFlow.FlowMetricsPeerDst.TotalByteCount += bytes
 	} else {
-		if taggedFlow.TotalPacketCount0 == 0 {
-			taggedFlow.ArrTime00 = packetTimestamp
+		if taggedFlow.FlowMetricsPeerSrc.TotalPacketCount == 0 {
+			taggedFlow.FlowMetricsPeerSrc.ArrTime0 = packetTimestamp
 		}
 		if maxArrTime < packetTimestamp {
-			taggedFlow.ArrTime0Last = packetTimestamp
+			taggedFlow.FlowMetricsPeerSrc.ArrTimeLast = packetTimestamp
 		} else {
 			packetTimestamp = maxArrTime
 			meta.Timestamp = maxArrTime
 		}
-		taggedFlow.PacketCount0++
-		taggedFlow.TotalPacketCount0++
-		taggedFlow.ByteCount0 += bytes
-		taggedFlow.TotalByteCount0 += bytes
+		taggedFlow.FlowMetricsPeerSrc.PacketCount++
+		taggedFlow.FlowMetricsPeerSrc.TotalPacketCount++
+		taggedFlow.FlowMetricsPeerSrc.ByteCount += bytes
+		taggedFlow.FlowMetricsPeerSrc.TotalByteCount += bytes
 	}
 	flowExtra.recentTimesSec = packetTimestamp / time.Second
 	// a flow will report every minute and StartTime will be reset, so the value could not be overflow
@@ -385,11 +357,11 @@ func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireIntervalSec time.Dur
 	} else {
 		taggedFlow.EndTime = now
 	}
-	minArrTime := timeMin(taggedFlow.ArrTime00, taggedFlow.ArrTime10)
+	minArrTime := timeMin(taggedFlow.FlowMetricsPeerSrc.ArrTime0, taggedFlow.FlowMetricsPeerDst.ArrTime0)
 	if minArrTime == 0 {
-		minArrTime = timeMax(taggedFlow.ArrTime00, taggedFlow.ArrTime10)
+		minArrTime = timeMax(taggedFlow.FlowMetricsPeerSrc.ArrTime0, taggedFlow.FlowMetricsPeerDst.ArrTime0)
 	}
-	taggedFlow.Duration = timeMax(taggedFlow.ArrTime0Last, taggedFlow.ArrTime1Last) - minArrTime
+	taggedFlow.Duration = timeMax(taggedFlow.FlowMetricsPeerSrc.ArrTimeLast, taggedFlow.FlowMetricsPeerDst.ArrTimeLast) - minArrTime
 }
 
 func (f *FlowExtra) resetCurFlowInfo(now time.Duration) {
@@ -398,10 +370,10 @@ func (f *FlowExtra) resetCurFlowInfo(now time.Duration) {
 	taggedFlow.StartTime = now
 	taggedFlow.EndTime = now
 	taggedFlow.CurStartTime = now
-	taggedFlow.PacketCount0 = 0
-	taggedFlow.PacketCount1 = 0
-	taggedFlow.ByteCount0 = 0
-	taggedFlow.ByteCount1 = 0
+	taggedFlow.FlowMetricsPeerSrc.PacketCount = 0
+	taggedFlow.FlowMetricsPeerDst.PacketCount = 0
+	taggedFlow.FlowMetricsPeerSrc.ByteCount = 0
+	taggedFlow.FlowMetricsPeerDst.ByteCount = 0
 	taggedFlow.TcpPerfStats = nil
 }
 
@@ -438,7 +410,7 @@ func (f *FlowExtra) calcCloseType(force bool) {
 }
 
 func (f *FlowExtra) tryForceReport(flowOutQueue QueueWriter) {
-	if f.taggedFlow.PacketCount0 != 0 || f.taggedFlow.PacketCount1 != 0 {
+	if f.taggedFlow.FlowMetricsPeerSrc.PacketCount != 0 || f.taggedFlow.FlowMetricsPeerDst.PacketCount != 0 {
 		taggedFlow := *f.taggedFlow
 		flowOutQueue.Put(&taggedFlow)
 	}
@@ -459,7 +431,7 @@ func (f *FlowGenerator) processPacket(meta *MetaPacket) {
 			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportIntervalSec)
 			flowExtra.calcCloseType(false)
 			if f.servicePortDescriptor.judgeServiceDirection(flowExtra.taggedFlow.PortSrc, flowExtra.taggedFlow.PortDst) {
-				flowExtra.reverseFlow()
+				flowExtra.reverseFlow(true)
 			}
 			f.flowOutQueue.Put(flowExtra.taggedFlow)
 			// delete front from this FlowCache because flowExtra is moved to front in keyMatch()
@@ -479,7 +451,7 @@ func (f *FlowGenerator) processPacket(meta *MetaPacket) {
 			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportIntervalSec)
 			flowExtra.calcCloseType(false)
 			if f.servicePortDescriptor.judgeServiceDirection(flowExtra.taggedFlow.PortSrc, flowExtra.taggedFlow.PortDst) {
-				flowExtra.reverseFlow()
+				flowExtra.reverseFlow(true)
 			}
 			f.flowOutQueue.Put(flowExtra.taggedFlow)
 		} else {
@@ -490,7 +462,7 @@ func (f *FlowGenerator) processPacket(meta *MetaPacket) {
 				flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportIntervalSec)
 				flowExtra.taggedFlow.CloseType = CLOSE_TYPE_FLOOD
 				if f.servicePortDescriptor.judgeServiceDirection(flowExtra.taggedFlow.PortSrc, flowExtra.taggedFlow.PortDst) {
-					flowExtra.reverseFlow()
+					flowExtra.reverseFlow(true)
 				}
 				f.flowOutQueue.Put(flowExtra.taggedFlow)
 			} else {
@@ -557,6 +529,15 @@ loop:
 	maxFlowCacheLen := 0
 	nonEmptyFlowCacheNum := 0
 	for _, flowCache := range hashMap[start:end] {
+		len := flowCache.flowList.Len()
+		if len > 0 {
+			nonEmptyFlowCacheNum++
+		} else {
+			continue
+		}
+		if maxFlowCacheLen <= len {
+			maxFlowCacheLen = len
+		}
 		flowCache.Lock()
 		for e := flowCache.flowList.Back(); e != nil; e = e.Prev() {
 			flowExtra := e.Value
@@ -572,27 +553,23 @@ loop:
 			}
 		}
 		flowCache.Unlock()
-		len := flowCache.flowList.Len()
-		if len > 0 {
-			nonEmptyFlowCacheNum++
-		} else {
-			continue
-		}
-		if maxFlowCacheLen <= len {
-			maxFlowCacheLen = len
-		}
 	}
 	// real output
 	for e := otherReportBuffer.Front(); e != nil; e = e.Next() {
 		flowExtra := e.Value
+		taggedFlow := flowExtra.taggedFlow
 		f.stats.CurrNumFlows--
-		flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(flowExtra.reversed, &f.perfCounter)
+		taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(flowExtra.reversed, &f.perfCounter)
 		flowExtra.setCurFlowInfo(now, forceReportIntervalSec)
 		flowExtra.calcCloseType(false)
-		if f.servicePortDescriptor.judgeServiceDirection(flowExtra.taggedFlow.PortSrc, flowExtra.taggedFlow.PortDst) {
-			flowExtra.reverseFlow()
+		if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
+			flowExtra.reverseFlow(true)
 		}
-		flowOutQueue.Put(flowExtra.taggedFlow)
+		if taggedFlow.FlowMetricsPeerSrc.PacketCount != 0 || taggedFlow.FlowMetricsPeerDst.PacketCount != 0 {
+			putFlow := *taggedFlow
+			flowOutQueue.Put(&putFlow)
+		}
+		flowExtra.resetCurFlowInfo(now)
 	}
 	otherReportBuffer.Init()
 	for e := forceReportBuffer.Front(); e != nil; e = e.Next() {
@@ -601,7 +578,7 @@ loop:
 		flowExtra.setCurFlowInfo(now, forceReportIntervalSec)
 		flowExtra.calcCloseType(true)
 		if f.servicePortDescriptor.judgeServiceDirection(flowExtra.taggedFlow.PortSrc, flowExtra.taggedFlow.PortDst) {
-			flowExtra.reverseFlow()
+			flowExtra.reverseFlow(true)
 		}
 		flowExtra.tryForceReport(flowOutQueue)
 		flowExtra.resetCurFlowInfo(now)
