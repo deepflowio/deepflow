@@ -18,14 +18,30 @@ func NewSubscriber(ip string, port int, hwm int, mode ClientOrServer) (Receiver,
 	if err != nil {
 		return nil, err
 	}
-	s.SetRcvhwm(hwm)
-	s.SetRcvtimeo(time.Minute * 5)
-	s.SetLinger(0)
-	if mode == CLIENT {
-		s.Connect(fmt.Sprintf("tcp://%s:%d", ip, port))
-	} else {
-		s.Bind(fmt.Sprintf("tcp://%s:%d", ip, port))
+
+	err = s.SetRcvhwm(hwm)
+	if err != nil {
+		return nil, err
 	}
+
+	err = s.SetRcvtimeo(time.Minute * 5)
+	if err != nil {
+		return nil, err
+	}
+	err = s.SetLinger(0)
+	if err != nil {
+		return nil, err
+	}
+
+	if mode == CLIENT {
+		err = s.Connect(fmt.Sprintf("tcp://%s:%d", ip, port))
+	} else {
+		err = s.Bind(fmt.Sprintf("tcp://%s:%d", ip, port))
+	}
+	if err != nil {
+		return nil, err
+	}
+
 	s.SetSubscribe("")
 	return &Subscriber{Socket: s}, nil
 }

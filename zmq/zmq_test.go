@@ -51,7 +51,7 @@ func TestPushPull(t *testing.T) {
 	c := make(chan int)
 	out := make(chan []byte)
 	push, _ := NewPusher("*", 12345, 10000, SERVER)
-	pull, _ := NewPuller("127.0.0.1", 12345, 1000000, CLIENT)
+	pull, _ := NewPuller("127.0.0.1", 12345, 1000000, time.Minute, CLIENT)
 	go senderRoutine(t, s[:], c, push)
 	go receiverRoutine(t, c, out, pull)
 	s2 := <-out

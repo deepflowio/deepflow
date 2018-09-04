@@ -18,14 +18,31 @@ func NewPusher(ip string, port int, hwm int, mode ClientOrServer) (Sender, error
 	if err != nil {
 		return nil, err
 	}
-	s.SetSndhwm(hwm)
-	s.SetSndtimeo(time.Minute * 5)
-	s.SetLinger(0)
-	if mode == CLIENT {
-		s.Connect(fmt.Sprintf("tcp://%s:%d", ip, port))
-	} else {
-		s.Bind(fmt.Sprintf("tcp://%s:%d", ip, port))
+
+	err = s.SetSndhwm(hwm)
+	if err != nil {
+		return nil, err
 	}
+
+	err = s.SetSndtimeo(time.Minute * 5)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.SetLinger(0)
+	if err != nil {
+		return nil, err
+	}
+
+	if mode == CLIENT {
+		err = s.Connect(fmt.Sprintf("tcp://%s:%d", ip, port))
+	} else {
+		err = s.Bind(fmt.Sprintf("tcp://%s:%d", ip, port))
+	}
+	if err != nil {
+		return nil, err
+	}
+
 	return &Pusher{Socket: s}, nil
 }
 
