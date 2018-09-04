@@ -43,7 +43,7 @@ type FlowKey struct {
 	InPort   uint32
 	/* L2 */
 	MACSrc MacInt
-	MACDsr MacInt
+	MACDst MacInt
 	/* L3 */
 	IPSrc IPv4Int
 	IPDst IPv4Int
