@@ -753,16 +753,15 @@ func (p *MetaFlowPerf) calcVarianceStats(header *MetaPacket, flowInfo *FlowInfo)
 // 异常flag判断，方向识别，payloadLen计算等
 // 去除功能不相关报文
 func (p *MetaFlowPerf) preprocess(header *MetaPacket, flowInfo *FlowInfo, perfCounter *FlowPerfCounter) bool {
+	if header.TcpData == nil { // invalid tcp header
+		return false
+	}
+
 	if ok := checkTcpFlags(header.TcpData.Flags & TCP_FLAG_MASK); !ok {
 		p.stats.InvalidPacketCount += 1
 		perfCounter.counter.InvalidPacketCount += 1
 
 		log.Debugf("flow info:%v, invalid packet, err tcpFlag:0x%x", flowInfo, header.TcpData.Flags&TCP_FLAG_MASK)
-		return false
-	}
-
-	// 排除无效包
-	if header.Invalid {
 		return false
 	}
 
