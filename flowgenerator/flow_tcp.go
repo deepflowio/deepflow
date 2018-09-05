@@ -31,7 +31,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			flowCache.Unlock()
 		} else {
 			// reply is a sign relative to the flow direction, so if the flow is reversed then the sign should be changed
-			if checkIfDoFlowPerf(flowExtra, &f.perfCounter) {
+			if f.checkIfDoFlowPerf(flowExtra) {
 				flowExtra.metaFlowPerf.Update(meta, flowExtra.reversed != reply, flowExtra, &f.perfCounter)
 			}
 		}
@@ -52,7 +52,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			flowExtra.reset()
 			f.FlowExtraPool.Put(flowExtra)
 		} else {
-			if checkIfDoFlowPerf(flowExtra, &f.perfCounter) {
+			if f.checkIfDoFlowPerf(flowExtra) {
 				flowExtra.metaFlowPerf.Update(meta, reply, flowExtra, &f.perfCounter)
 			}
 			taggedFlow := flowExtra.taggedFlow
