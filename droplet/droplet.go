@@ -112,6 +112,7 @@ func Start(configPath string) {
 	synchronizer.Register(func(response *trident.SyncResponse) {
 		labelerManager.OnPlatformDataChange(convert2PlatformData(response))
 		labelerManager.OnIpGroupDataChange(convert2IpGroupdata(response))
+		labelerManager.OnPolicyDataChange(convert2AclData(response))
 	})
 
 	// L3 - flow-generator & apps

@@ -2,12 +2,27 @@ package droplet
 
 import (
 	"net"
+	"strconv"
+	"strings"
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/policy"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/message/trident"
 )
+
+var ActionMap = [...]datatype.ActionType{
+	trident.Action_PACKECT_COUNTER:     datatype.ACTION_PACKET_STAT,
+	trident.Action_FLOW_COUNTER:        datatype.ACTION_FLOW_STAT,
+	trident.Action_FLOW_STORAGE:        datatype.ACTION_FLOW_STORE,
+	trident.Action_TCP_PERFORMANCE:     datatype.ACTION_PERFORMANCE,
+	trident.Action_PCAP:                datatype.ACTION_PCAP,
+	trident.Action_MISC:                datatype.ACTION_MISC,
+	trident.Action_POLICY:              datatype.ACTION_POLICY,
+	trident.Action_PACKECT_COUNTER_PUB: datatype.ACTION_PACKECT_COUNTER_PUB,
+	trident.Action_FLOW_COUNTER_PUB:    datatype.ACTION_FLOW_COUNTER_PUB,
+	trident.Action_TCP_PERFORMANCE_PUB: datatype.ACTION_TCP_PERFORMANCE_PUB,
+}
 
 func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	macInt := uint64(0)
@@ -53,6 +68,7 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 
 func convert2PlatformData(response *trident.SyncResponse) []*datatype.PlatformData {
 	interfaces := response.GetPlatformData().GetInterfaces()
+	log.Debug(interfaces)
 	platformDatas := make([]*datatype.PlatformData, 0, len(interfaces))
 	for _, data := range interfaces {
 		if newData := newPlatformData(data); newData != nil {
@@ -76,6 +92,7 @@ func newIpGroupData(ipGroup *trident.Group) *policy.IpGroupData {
 
 func convert2IpGroupdata(response *trident.SyncResponse) []*policy.IpGroupData {
 	ipGroups := response.GetPlatformData().GetIpGroups()
+	log.Debug(ipGroups)
 	ipGroupDatas := make([]*policy.IpGroupData, 0, len(ipGroups))
 	for _, group := range ipGroups {
 		if newData := newIpGroupData(group); newData != nil {
@@ -84,4 +101,110 @@ func convert2IpGroupdata(response *trident.SyncResponse) []*policy.IpGroupData {
 	}
 
 	return ipGroupDatas
+}
+
+func splitGroup2Int(src string) map[uint32]uint32 {
+	splitSrcGroups := strings.Split(src, ",")
+	groups := make(map[uint32]uint32)
+	for _, group := range splitSrcGroups {
+		groupInt, err := strconv.Atoi(group)
+		if err == nil {
+			groups[uint32(groupInt)] = uint32(groupInt)
+		}
+	}
+
+	return groups
+}
+
+func splitPort2Int(src string) map[uint16]uint16 {
+	splitSrcPorts := strings.Split(src, "-")
+	ports := make(map[uint16]uint16)
+	if len(splitSrcPorts) < 2 {
+		return ports
+	}
+	portRange := [2]uint16{0, 0}
+	for index, port := range splitSrcPorts {
+		if index == 2 {
+			break
+		}
+		portInt, err := strconv.Atoi(port)
+		if err == nil {
+			portRange[index] = uint16(portInt)
+		}
+	}
+	for i := portRange[0]; i <= portRange[1]; i++ {
+		ports[i] = i
+		if i == 0xffff {
+			break
+		}
+	}
+	log.Debug(portRange)
+
+	return ports
+}
+
+func newPolicyInfo(policies []*trident.Policy) []datatype.PolicyInfo {
+	policyInfos := make([]datatype.PolicyInfo, 0, len(policies))
+	for _, value := range policies {
+		info := datatype.PolicyInfo{
+			Id:   value.GetId(),
+			Type: datatype.PolicyType(value.GetType()),
+		}
+		policyInfos = append(policyInfos, info)
+	}
+
+	return policyInfos
+}
+
+func convert2ActionType(action trident.Action) datatype.ActionType {
+	if action := ActionMap[action]; action != 0 {
+		return action
+	} else {
+		log.Error("ACTION is err", action)
+	}
+	return datatype.ActionType(0)
+}
+
+func newAclAction(aclId uint32, actions []*trident.FlowAction) []*datatype.AclAction {
+	aclActions := make([]*datatype.AclAction, 0, len(actions))
+	for _, action := range actions {
+		if policyType := convert2ActionType(action.GetAction()); policyType != 0 {
+			aclAction := &datatype.AclAction{
+				AclId:  aclId,
+				Type:   policyType,
+				Policy: newPolicyInfo(action.GetPolicies()),
+			}
+			aclActions = append(aclActions, aclAction)
+		}
+		continue
+	}
+
+	return aclActions
+}
+
+func newPolicyData(acl *trident.FlowAcl) *policy.Acl {
+	return &policy.Acl{
+		Id:        acl.GetId(),
+		Type:      datatype.TapType(acl.GetTapType()),
+		TapId:     acl.GetTapId(),
+		SrcGroups: splitGroup2Int(acl.GetSrcGroupIds()),
+		DstGroups: splitGroup2Int(acl.GetDstGroupIds()),
+		DstPorts:  splitPort2Int(acl.GetDstPorts()),
+		Proto:     uint8(acl.GetProtocol()),
+		Vlan:      acl.GetVlan(),
+		Action:    newAclAction(acl.GetId(), acl.GetActions()),
+	}
+}
+
+func convert2AclData(response *trident.SyncResponse) []*policy.Acl {
+	flowAcls := response.GetFlowAcls()
+	log.Debug(flowAcls)
+	policies := make([]*policy.Acl, 0, len(flowAcls))
+	for _, acl := range flowAcls {
+		if newData := newPolicyData(acl); newData != nil {
+			policies = append(policies, newData)
+		}
+	}
+
+	return policies
 }
