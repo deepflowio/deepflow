@@ -1,6 +1,7 @@
 syntax = "proto2";
-
 option go_package = "zero";
+
+package Zero;
 
 enum DeviceType {
     VM = 1;
