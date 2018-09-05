@@ -527,8 +527,8 @@ func testReport(flowPerf *MetaFlowPerf, t *testing.T) {
 	var periodData, flowData *MetaPerfStats
 
 	counter := NewFlowPerfCounter()
-	periodData = flowPerf.perfData.periodPerfStats
-	flowData = flowPerf.perfData.flowPerfStats
+	periodData = &flowPerf.perfData.periodPerfStats
+	flowData = &flowPerf.perfData.flowPerfStats
 	periodData.art0Sum = 100
 	flowData.art0Sum += periodData.art0Sum
 	periodData.art0Count = 1
@@ -545,8 +545,8 @@ func testReport(flowPerf *MetaFlowPerf, t *testing.T) {
 		t.Logf("flowperf.perfData:%v\nreport:%v\n", flowPerf.perfData, report)
 	}
 
-	periodData = flowPerf.perfData.periodPerfStats
-	flowData = flowPerf.perfData.flowPerfStats
+	periodData = &flowPerf.perfData.periodPerfStats
+	flowData = &flowPerf.perfData.flowPerfStats
 	periodData.art0Sum = 200
 	flowData.art0Sum += periodData.art0Sum
 	periodData.art0Count = 1

@@ -2,6 +2,8 @@ package flowgenerator
 
 import (
 	"math/rand"
+	"runtime"
+	"sync"
 	"time"
 
 	"github.com/google/gopacket/layers"
@@ -616,8 +618,51 @@ func New(metaPacketHeaderInQueue QueueReader, flowOutQueue QueueWriter, forceRep
 	flowGenerator.initFastPathPool()
 	flowGenerator.initStateMachineMaster()
 	flowGenerator.initStateMachineSlave()
+	flowGenerator.initMetaFlowPerfPool()
 	RegisterCountable("flow_generator", EMPTY_TAG, flowGenerator)
 	RegisterCountable(FP_NAME, EMPTY_TAG, &flowGenerator.perfCounter)
 	log.Info("flow generator created")
 	return flowGenerator
+}
+
+func (f *FlowGenerator) initMetaFlowPerfPool() {
+	gc := func(b *MetaFlowPerfBlock) {
+		f.metaFlowPerfPool.Put(b)
+	}
+
+	newBlock := func() interface{} {
+		block := new(MetaFlowPerfBlock)
+		runtime.SetFinalizer(block, gc)
+		return block
+	}
+
+	f.metaFlowPerfPool = sync.Pool{New: newBlock}
+	f.metaFlowPerfBlock = f.metaFlowPerfPool.Get().(*MetaFlowPerfBlock)
+}
+
+func (f *FlowGenerator) getMetaFlowPerfFromPool() *MetaFlowPerf {
+	perf := &f.metaFlowPerfBlock[f.flowPerfBlockCursor]
+	perf.resetMetaFlowPerf()
+
+	f.flowPerfBlockCursor++
+	if f.flowPerfBlockCursor >= len(*f.metaFlowPerfBlock) {
+		f.metaFlowPerfBlock = f.metaFlowPerfPool.Get().(*MetaFlowPerfBlock)
+		f.flowPerfBlockCursor = 0
+	}
+
+	return perf
+}
+
+func (f *FlowGenerator) checkIfDoFlowPerf(flowExtra *FlowExtra) bool {
+	if flowExtra.taggedFlow.PolicyData == nil {
+		return false
+	}
+	if flowExtra.taggedFlow.PolicyData.ActionList&ACTION_PERFORMANCE > 0 {
+		if flowExtra.metaFlowPerf == nil {
+			flowExtra.metaFlowPerf = f.getMetaFlowPerfFromPool()
+		}
+		return true
+	}
+
+	return false
 }

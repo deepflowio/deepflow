@@ -13,8 +13,9 @@ import (
 )
 
 type ContinuousFlag uint8
-type TcpConnSession [2]TcpSessionPeer
+type TcpConnSession = [2]TcpSessionPeer
 type PacketSeqTypeInSeqList uint8
+type MetaFlowPerfBlock = [META_FLOW_PERF_BLOCK_SIZE]MetaFlowPerf
 
 const (
 	FP_NAME = "flowperf"
@@ -52,6 +53,8 @@ const SEQ_LIST_MAX_LEN = 16
 const (
 	RTT_MAX = 10 * time.Second
 )
+
+const META_FLOW_PERF_BLOCK_SIZE = 1024
 
 type SeqSegment struct { // 避免乱序，识别重传
 	seqNumber uint32
@@ -105,9 +108,8 @@ type MetaPerfStats struct {
 }
 
 type FlowPerfDataInfo struct {
-	reportPerfStats *TcpPerfStats // OUT
-	periodPerfStats *MetaPerfStats
-	flowPerfStats   *MetaPerfStats
+	periodPerfStats MetaPerfStats
+	flowPerfStats   MetaPerfStats
 	packetVariance  FlowPacketVariance
 }
 
@@ -139,8 +141,8 @@ type FlowInfo struct {
 }
 
 type MetaFlowPerf struct {
-	ctrlInfo *FlowPerfCtrlInfo
-	perfData *FlowPerfDataInfo
+	ctrlInfo FlowPerfCtrlInfo
+	perfData FlowPerfDataInfo
 }
 
 func (p *TcpSessionPeer) setArtPrecondition() {
@@ -690,25 +692,15 @@ func checkTcpFlags(tcpFlags uint8) bool {
 }
 
 func NewMetaFlowPerf(perfCounter *FlowPerfCounter) *MetaFlowPerf {
-	current := time.Now()
 	client := TcpSessionPeer{seqList: list.New()}
 	server := TcpSessionPeer{seqList: list.New()}
 
 	// 初始化MetaFlowPerf结构
 	meta := &MetaFlowPerf{
-		ctrlInfo: &FlowPerfCtrlInfo{
+		ctrlInfo: FlowPerfCtrlInfo{
 			tcpSession: TcpConnSession{client, server},
 		},
-		perfData: &FlowPerfDataInfo{
-			reportPerfStats: &TcpPerfStats{},
-			periodPerfStats: &MetaPerfStats{},
-			flowPerfStats:   &MetaPerfStats{},
-		},
 	}
-
-	perfCounter.counter.FlowCount++
-	perfCounter.counter.NewCpuPerf = calcAvgTime(perfCounter.counter.NewCpuPerf,
-		time.Since(current).Nanoseconds(), int64(perfCounter.counter.FlowCount))
 
 	return meta
 }
@@ -819,70 +811,21 @@ func Report(flowPerf *MetaFlowPerf, reverse bool, perfCounter *FlowPerfCounter) 
 		return nil
 	}
 
-	if flowPerf.perfData != nil {
-		current := time.Now()
-		report := &TcpPerfStats{}
-		flowPerf.perfData.calcReportFlowPerfStats(reverse)
+	current := time.Now()
+	report := &TcpPerfStats{}
+	flowPerf.perfData.calcReportFlowPerfStats(report, reverse)
+	flowPerf.perfData.resetPeriodPerfStats()
 
-		if reverse == true {
-			flowPerf.perfData.exchangeReportFlowPerfStats()
-		}
+	perfCounter.counter.ReportCount++
+	perfCounter.counter.ReportCpuPerf = calcAvgTime(perfCounter.counter.ReportCpuPerf,
+		time.Since(current).Nanoseconds(), perfCounter.counter.ReportCount)
 
-		flowPerf.perfData.reportPerfStats, report = report, flowPerf.perfData.reportPerfStats
-
-		flowPerf.perfData.resetPeriodPerfStats()
-
-		perfCounter.counter.ReportCount++
-		perfCounter.counter.ReportCpuPerf = calcAvgTime(perfCounter.counter.ReportCpuPerf,
-			time.Since(current).Nanoseconds(), perfCounter.counter.ReportCount)
-		return report
-	}
-
-	return nil
+	return report
 }
 
-func checkIfDoFlowPerf(flowExtra *FlowExtra, counter *FlowPerfCounter) bool {
-	if flowExtra.taggedFlow.PolicyData == nil {
-		return false
-	}
-	if flowExtra.taggedFlow.PolicyData.ActionList&ACTION_PERFORMANCE > 0 {
-		if flowExtra.metaFlowPerf == nil {
-			flowExtra.metaFlowPerf = NewMetaFlowPerf(counter)
-		}
-		return true
-	}
-
-	return false
-}
-
-func (i *FlowPerfDataInfo) exchangeReportFlowPerfStats() {
-	report := i.reportPerfStats
-
-	report.TcpPerfCountsPeerSrc, report.TcpPerfCountsPeerDst = TcpPerfCountsPeerSrc(report.TcpPerfCountsPeerDst), TcpPerfCountsPeerDst(report.TcpPerfCountsPeerSrc)
-}
-
-func (i *FlowPerfDataInfo) calcReportFlowPerfStats(reverse bool) {
-	report := i.reportPerfStats
+func (i *FlowPerfDataInfo) calcReportFlowPerfStats(report *TcpPerfStats, reverse bool) {
 	period := i.periodPerfStats
 	flow := i.flowPerfStats
-
-	if !reverse {
-		if period.art1Count > 0 {
-			report.ART = period.art1Sum / time.Duration(period.art1Count)
-		}
-
-		if period.rtt1Count > 0 {
-			report.RTT = period.rtt1Sum / time.Duration(period.rtt1Count)
-		}
-	} else {
-		if period.art0Count > 0 {
-			report.ART = period.art0Sum / time.Duration(period.art0Count)
-		}
-
-		if period.rtt0Count > 0 {
-			report.RTT = period.rtt0Sum / time.Duration(period.rtt0Count)
-		}
-	}
 
 	report.RTTSyn = flow.rttSyn0 + flow.rttSyn1
 
@@ -904,10 +847,36 @@ func (i *FlowPerfDataInfo) calcReportFlowPerfStats(reverse bool) {
 	report.PacketIntervalAvg = uint64(i.packetVariance.packetIntervalAvg)
 	report.PacketIntervalVariance = uint64(i.packetVariance.packetIntervalVariance)
 	report.PacketSizeVariance = uint64(i.packetVariance.packetSizeVariance)
+
+	if !reverse {
+		if period.art1Count > 0 {
+			report.ART = period.art1Sum / time.Duration(period.art1Count)
+		}
+		if period.rtt1Count == 0 {
+			period.rtt1Count = flow.rtt1Count
+			period.rtt1Sum = flow.rtt1Sum
+		}
+		if period.rtt1Count > 0 {
+			report.RTT = period.rtt1Sum / time.Duration(period.rtt1Count)
+		}
+	} else {
+		if period.art0Count > 0 {
+			report.ART = period.art0Sum / time.Duration(period.art0Count)
+		}
+		if period.rtt0Count == 0 {
+			period.rtt0Count = flow.rtt0Count
+			period.rtt0Sum = flow.rtt0Sum
+		}
+		if period.rtt0Count > 0 {
+			report.RTT = period.rtt0Sum / time.Duration(period.rtt0Count)
+		}
+
+		report.TcpPerfCountsPeerSrc, report.TcpPerfCountsPeerDst = TcpPerfCountsPeerSrc(report.TcpPerfCountsPeerDst), TcpPerfCountsPeerDst(report.TcpPerfCountsPeerSrc)
+	}
 }
 
 func (i *FlowPerfDataInfo) resetPeriodPerfStats() {
-	i.periodPerfStats = &MetaPerfStats{}
+	i.periodPerfStats = MetaPerfStats{}
 }
 
 func reflectFormat(valueVar interface{}) string {
@@ -921,21 +890,18 @@ func reflectFormat(valueVar interface{}) string {
 	return formatStr
 }
 
-func (i *FlowPerfDataInfo) String() string {
-	var reportStr string
-	report := i.reportPerfStats
-	if report != nil {
-		reportStr = reflectFormat(*report)
-	} else {
-		reportStr = "nil"
-	}
-
-	return fmt.Sprintf("\nreportPerfStats:%v, \nperiodPerfStats:%v, \nflowPerfStats:%v",
-		reportStr, i.periodPerfStats, i.flowPerfStats)
+func (p *MetaFlowPerf) String() string {
+	return fmt.Sprintf("flow ctrlInfo:%v,%v, \nflow perfData:%v",
+		p.ctrlInfo.tcpSession[0], p.ctrlInfo.tcpSession[1], p.perfData)
 }
 
-func (s *MetaPerfStats) String() string {
-	return reflectFormat(*s)
+func (i FlowPerfDataInfo) String() string {
+	return fmt.Sprintf("periodPerfStats:%v, \nflowPerfStats:%v, \npacketVariance:%#v\n",
+		i.periodPerfStats, i.flowPerfStats, i.packetVariance)
+}
+
+func (s MetaPerfStats) String() string {
+	return reflectFormat(s)
 }
 
 type FlowPerfError struct {
@@ -1028,4 +994,10 @@ func calcAvgTime(average, consume, times int64) int64 {
 	}
 
 	return average + (consume-average)/times
+}
+
+func (p *MetaFlowPerf) resetMetaFlowPerf() {
+	*p = MetaFlowPerf{}
+	p.ctrlInfo.tcpSession[0].seqList = list.New()
+	p.ctrlInfo.tcpSession[1].seqList = list.New()
 }
