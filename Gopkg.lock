@@ -222,7 +222,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "e85a0954b76ac4115379a562aba28dd8ccf0c8b5"
+  revision = "2b813cf06ca765d95774a6a4b808c6e606e6e933"
 
 [[projects]]
   branch = "feature-os"

@@ -47,7 +47,7 @@ type DumpKey struct {
 
 func NewLabelerManager(readQueue queue.QueueReader) *LabelerManager {
 	labeler := &LabelerManager{
-		policyTable: policy.NewPolicyTable(policy.ACTION_FLOW_STAT),
+		policyTable: policy.NewPolicyTable(datatype.ACTION_FLOW_STAT),
 		readQueue:   readQueue,
 	}
 	dropletctl.Register(dropletctl.DROPLETCTL_LABELER, labeler)
@@ -66,6 +66,10 @@ func (l *LabelerManager) OnIpGroupDataChange(data []*policy.IpGroupData) {
 	l.policyTable.UpdateIpGroupData(data)
 }
 
+func (l *LabelerManager) OnPolicyDataChange(data []*policy.Acl) {
+	l.policyTable.UpdateAclData(data)
+}
+
 func (l *LabelerManager) GetData(key *datatype.LookupKey) {
 	data, _ := l.policyTable.LookupAllByKey(key)
 	if data != nil {
@@ -80,35 +84,26 @@ func GetTapType(inPort uint32) datatype.TapType {
 	return datatype.TAP_ISP
 }
 
-func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket) *policy.Action {
+func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket) *datatype.PolicyData {
 	key := &datatype.LookupKey{
-		SrcMac:      uint64(packet.MacSrc),
-		DstMac:      uint64(packet.MacDst),
-		SrcIp:       uint32(packet.IpSrc),
-		DstIp:       uint32(packet.IpDst),
-		SrcPort:     packet.PortSrc,
-		DstPort:     packet.PortDst,
-		EthType:     packet.EthType,
-		Vlan:        packet.Vlan,
-		Proto:       uint8(packet.Protocol),
-		Ttl:         packet.TTL,
-		L2End0:      packet.L2End0,
-		L2End1:      packet.L2End1,
-		RxInterface: packet.InPort,
-		Tap:         GetTapType(packet.InPort),
+		SrcMac:  uint64(packet.MacSrc),
+		DstMac:  uint64(packet.MacDst),
+		SrcIp:   uint32(packet.IpSrc),
+		DstIp:   uint32(packet.IpDst),
+		SrcPort: packet.PortSrc,
+		DstPort: packet.PortDst,
+		EthType: packet.EthType,
+		Vlan:    packet.Vlan,
+		Proto:   uint8(packet.Protocol),
+		Ttl:     packet.TTL,
+		L2End0:  packet.L2End0,
+		L2End1:  packet.L2End1,
+		Tap:     GetTapType(packet.InPort),
 	}
 
-	data, policy := l.policyTable.LookupAllByKey(key)
-	if data != nil {
-		packet.EndpointData = data
-		log.Debug("QUERY PACKET:", packet, "SRC:", data.SrcInfo, "DST:", data.DstInfo)
-	}
-
-	if policy != nil {
-		log.Debug("POLICY", policy)
-	}
-
-	return policy
+	packet.EndpointData, packet.PolicyData = l.policyTable.LookupAllByKey(key)
+	log.Debug("QUERY PACKET:", packet, "ENDPOINTDATA:", packet.EndpointData, "POLICYDATA:", packet.PolicyData)
+	return packet.PolicyData
 }
 
 func cloneMetaPacket(src *datatype.MetaPacket) *datatype.MetaPacket {
@@ -127,10 +122,10 @@ func (l *LabelerManager) run() {
 	for l.running {
 		packet := l.readQueue.Get().(*datatype.MetaPacket)
 		action := l.GetPolicy(packet)
-		if (action.ActionTypes&policy.ACTION_PACKET_STAT) != 0 && l.appQueues[METERING_QUEUE] != nil {
+		if (action.ActionList & datatype.ACTION_PACKET_STAT) != 0 {
 			l.appQueues[METERING_QUEUE].Put(cloneMetaPacket(packet))
 		}
-		if (action.ActionTypes&policy.ACTION_FLOW_STAT) != 0 && l.appQueues[FLOW_QUEUE] != nil {
+		if (action.ActionList & datatype.ACTION_FLOW_STAT) != 0 {
 			l.appQueues[FLOW_QUEUE].Put(packet)
 		}
 	}
