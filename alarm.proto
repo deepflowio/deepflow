@@ -1,6 +1,7 @@
+syntax = "proto2";
+option go_package = "alarm";
+
 package Alarm;
-option java_package = "cn.net.yunshan.message";
-option java_outer_classname = "AlarmMessage";
 
 message AlarmContent {
     optional int32 rule_id = 1;
