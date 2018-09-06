@@ -184,6 +184,10 @@ message Flow {
                                                                   current flow */
     optional uint64 pkt_size_variance = 162 [default = 0];     /* Packet byte cnt variance of this flow */
 
+    repeated uint64 acl_id = 163;
+
+    repeated uint64 policy_id = 164;
+
     // FIXME: 200/201 ID已占用
 }
 
