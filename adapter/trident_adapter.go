@@ -5,6 +5,8 @@ import (
 	"encoding/gob"
 	"fmt"
 	"net"
+	"runtime"
+	"sync"
 	"time"
 
 	"github.com/op/go-logging"
@@ -55,6 +57,10 @@ type TridentAdapter struct {
 	queueCount      int
 	hashBuffers     [QUEUE_MAX][PACKET_MAX]interface{}
 	hashBufferCount [QUEUE_MAX]int
+	metaPacketPool  sync.Pool
+	udpPool         sync.Pool
+
+	gc func(p *datatype.MetaPacket)
 
 	instances map[TridentKey]*tridentInstance
 	counter   *PacketCounter
@@ -71,6 +77,9 @@ func NewTridentAdapter(queues ...queue.QueueWriter) *TridentAdapter {
 	adapter.queues = queues
 	adapter.queueCount = len(queues)
 	adapter.instances = make(map[TridentKey]*tridentInstance)
+	adapter.udpPool.New = func() interface{} { return make([]byte, UDP_BUFFER_SIZE) }
+	adapter.metaPacketPool.New = func() interface{} { return new(datatype.MetaPacket) }
+	adapter.gc = func(p *datatype.MetaPacket) { adapter.metaPacketPool.Put(p) }
 	listener, err := net.ListenUDP("udp4", &net.UDPAddr{Port: LISTEN_PORT})
 	if err != nil {
 		log.Error(err)
@@ -132,6 +141,7 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32) {
 		if seq <= instance.seq {
 			a.counter.RxError += 1
 			a.stats.RxError += 1
+			a.udpPool.Put(data)
 			log.Warningf("trident(%v) seq is less than current, drop", key)
 			return
 		}
@@ -159,10 +169,10 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) {
 	ifMacSuffix, _ := decoder.DecodeHeader()
 
 	for {
-		meta := &datatype.MetaPacket{
-			InPort:   ifMacSuffix | datatype.PACKET_SOURCE_TOR,
-			Exporter: ip,
-		}
+		meta := a.metaPacketPool.Get().(*datatype.MetaPacket)
+		runtime.SetFinalizer(meta, a.gc)
+		meta.InPort = ifMacSuffix | datatype.PACKET_SOURCE_TOR
+		meta.Exporter = ip
 		if decoder.NextPacket(meta) {
 			break
 		}
@@ -183,12 +193,13 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) {
 			a.hashBufferCount[index] = 0
 		}
 	}
+	a.udpPool.Put(data)
 }
 
 func (a *TridentAdapter) run() {
 	log.Infof("Starting trident adapter Listenning <%s>", a.listener.LocalAddr())
 	for a.running {
-		data := make([]byte, UDP_BUFFER_SIZE)
+		data := a.udpPool.Get().([]byte)
 		_, remote, err := a.listener.ReadFromUDP(data)
 		if err != nil {
 			log.Warningf("trident adapter listener.ReadFromUDP err: %s", err)
@@ -196,6 +207,7 @@ func (a *TridentAdapter) run() {
 
 		decoder := NewSequentialDecoder(data)
 		if _, invalid := decoder.DecodeHeader(); invalid {
+			a.udpPool.Put(data)
 			continue
 		}
 		a.findAndAdd(data, IpToUint32(remote.IP), decoder.Seq())
