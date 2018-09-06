@@ -147,6 +147,7 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, key *FlowKey) (*FlowExtra, bo
 			FlowMetricsPeerSrc: FlowMetricsPeerSrc{TCPFlags: 0},
 			FlowMetricsPeerDst: FlowMetricsPeerDst{TCPFlags: 0},
 		},
+		Tag: Tag{PolicyData: meta.PolicyData},
 	}
 	flowExtra := &FlowExtra{
 		taggedFlow:     taggedFlow,
@@ -306,6 +307,7 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 	}
 	if taggedFlow.FlowMetricsPeerSrc.PacketCount == 0 && taggedFlow.FlowMetricsPeerDst.PacketCount == 0 {
 		taggedFlow.CurStartTime = packetTimestamp
+		taggedFlow.PolicyData = meta.PolicyData
 		flowExtra.updatePlatformData(meta, reply)
 	}
 	if reply {
