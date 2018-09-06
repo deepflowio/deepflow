@@ -121,16 +121,6 @@ type FlowPerfStats struct {
 	InvalidPacketCount int64  `statsd:"invalid_packet_count"` // 每个异常包,计数加1
 }
 
-type flowPerfInternalStats struct {
-	ValidRttSynTimes     uint32 // Flow中某个满足rttSyn计算的地方计数加1
-	ValidRttTimes        uint32 // Flow中某个满足rtt计算的地方计数加1
-	ValidArtTimes        uint32 // Flow中某个满足art计算的地方计数加1
-	ValidRetransTimes    uint32 // Flow中某个Packet发生多次重传计数加1
-	ValidSynRetransTimes uint32 // Flow中在连接建立阶段，某个Packet发生多次重传计数加1
-	InvalidPacketCount   uint32 // Flow中某个识别为异常包的地方计数加1
-	UnknownPacketCount   uint32 // Flow中某个识别为unknown包的地方计数加1
-}
-
 type FlowInfo struct {
 	flowID            uint64
 	ipSrc, ipDst      IP
@@ -147,7 +137,6 @@ type FlowInfo struct {
 type MetaFlowPerf struct {
 	ctrlInfo *FlowPerfCtrlInfo
 	perfData *FlowPerfDataInfo
-	stats    *flowPerfInternalStats
 }
 
 func (p *TcpSessionPeer) setArtPrecondition() {
@@ -413,7 +402,6 @@ func (p *MetaFlowPerf) isInvalidRetransPacket(sameDirection, oppositeDirection *
 		} else {
 			if sameDirection.isSynReceived {
 				p.perfData.calcRetransSyn(flowInfo.direction)
-				p.stats.ValidSynRetransTimes += 1
 			}
 		}
 		sameDirection.isSynReceived = true
@@ -429,7 +417,6 @@ func (p *MetaFlowPerf) isInvalidRetransPacket(sameDirection, oppositeDirection *
 			}
 		} else {
 			p.perfData.calcRetransSyn(flowInfo.direction)
-			p.stats.ValidSynRetransTimes += 1
 		}
 
 		return isInvalid
@@ -442,7 +429,6 @@ func (p *MetaFlowPerf) isInvalidRetransPacket(sameDirection, oppositeDirection *
 				sameDirection.isAckReceived = true
 			} else {
 				p.perfData.calcRetransSyn(flowInfo.direction)
-				p.stats.ValidSynRetransTimes += 1
 			}
 		}
 
@@ -459,10 +445,8 @@ func (p *MetaFlowPerf) isInvalidRetransPacket(sameDirection, oppositeDirection *
 	if r == SEQ_RETRANS {
 		// established retrans
 		p.perfData.calcRetrans(flowInfo.direction)
-		p.stats.ValidRetransTimes += 1
 	} else if r == SEQ_ERROR {
 		isInvalid = true
-		p.stats.InvalidPacketCount += 1
 		perfCounter.counter.InvalidPacketCount += 1
 	}
 
@@ -483,7 +467,6 @@ func (p *MetaFlowPerf) whenFlowOpening(sameDirection, oppositeDirection *TcpSess
 				oppositeDirection.isReplyPacket(header) {
 			rttSyn := calcTimeInterval(header.Timestamp, oppositeDirection.timestamp)
 			p.perfData.calcRttSyn(rttSyn, flowInfo.direction)
-			p.stats.ValidRttSynTimes += 1
 
 			isOpeningPkt = true
 		}
@@ -513,7 +496,6 @@ func (p *MetaFlowPerf) whenFlowEstablished(sameDirection, oppositeDirection *Tcp
 		if isAckPacket(header) && oppositeDirection.isReplyPacket(header) {
 			if rtt := calcTimeInterval(header.Timestamp, oppositeDirection.timestamp); rtt > 0 {
 				p.perfData.calcRtt(rtt, flowInfo.direction)
-				p.stats.ValidRttTimes += 1
 			}
 		}
 	}
@@ -523,7 +505,6 @@ func (p *MetaFlowPerf) whenFlowEstablished(sameDirection, oppositeDirection *Tcp
 		if isPshAckPacket(header) && sameDirection.isNextPacket(header) {
 			if art := calcTimeInterval(header.Timestamp, oppositeDirection.timestamp); art > 0 {
 				p.perfData.calcArt(art, flowInfo.direction)
-				p.stats.ValidArtTimes += 1
 			}
 		}
 	}
@@ -707,7 +688,6 @@ func NewMetaFlowPerf(perfCounter *FlowPerfCounter) *MetaFlowPerf {
 			periodPerfStats: &MetaPerfStats{},
 			flowPerfStats:   &MetaPerfStats{},
 		},
-		stats: &flowPerfInternalStats{},
 	}
 
 	perfCounter.counter.FlowCount++
@@ -758,7 +738,6 @@ func (p *MetaFlowPerf) preprocess(header *MetaPacket, flowInfo *FlowInfo, perfCo
 	}
 
 	if ok := checkTcpFlags(header.TcpData.Flags & TCP_FLAG_MASK); !ok {
-		p.stats.InvalidPacketCount += 1
 		perfCounter.counter.InvalidPacketCount += 1
 
 		log.Debugf("flow info:%v, invalid packet, err tcpFlag:0x%x", flowInfo, header.TcpData.Flags&TCP_FLAG_MASK)
@@ -793,7 +772,6 @@ func (p *MetaFlowPerf) Update(header *MetaPacket, reply bool, flowExtra *FlowExt
 		}
 
 		if time.Duration(header.Timestamp) < sameDirection.timestamp || time.Duration(header.Timestamp) < oppositeDirection.timestamp {
-			p.stats.InvalidPacketCount += 1
 			perfCounter.counter.InvalidPacketCount += 1
 			log.Debugf("flow info: %v, packet timestamp error, same last:%v, opposite last:%v, packet:%v", flowInfo,
 				sameDirection.timestamp, oppositeDirection.timestamp, header.Timestamp)
