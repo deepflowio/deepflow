@@ -1,6 +1,7 @@
 package capture
 
 import (
+	"sync"
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -16,18 +17,22 @@ type PacketHandler interface {
 }
 
 type DataHandler struct {
+	sync.Pool
+
 	ip    datatype.IPv4Int
 	queue queue.QueueWriter
 }
 
 func (h *DataHandler) Handle(timestamp Timestamp, packet RawPacket) {
-	metaPacket := &datatype.MetaPacket{
+	metaPacket := h.Get().(*datatype.MetaPacket)
+	*metaPacket = datatype.MetaPacket{
 		Timestamp: timestamp,
 		InPort:    uint32(datatype.PACKET_SOURCE_ISP),
 		Exporter:  h.ip,
 		PacketLen: uint16(len(packet)),
 	}
 	if !metaPacket.Parse(packet) {
+		h.Put(metaPacket)
 		return
 	}
 	h.queue.Put(metaPacket)
@@ -48,10 +53,19 @@ func (h *TapHandler) Handle(timestamp Timestamp, packet RawPacket) {
 		metaPacket.Tunnel = &tunnel
 	}
 	if dedup.Lookup(packet, timestamp) {
+		h.Put(metaPacket)
 		return
 	}
 	if !metaPacket.Parse(packet) {
+		h.Put(metaPacket)
 		return
 	}
 	h.queue.Put(metaPacket)
+}
+
+func (h *TapHandler) Init() *TapHandler {
+	h.Pool.New = func() interface{} {
+		return new(datatype.MetaPacket)
+	}
+	return h
 }

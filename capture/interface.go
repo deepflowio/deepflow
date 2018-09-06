@@ -47,11 +47,12 @@ func StartCapture(interfaceName string, ip net.IP, isTapInterface bool, outputQu
 		log.Warning("BPF inject failed:", err)
 	}
 
-	var handler PacketHandler
-	if isTapInterface {
-		handler = &TapHandler{IpToUint32(ip), outputQueue}
-	} else {
-		handler = &DataHandler{IpToUint32(ip), outputQueue}
+	handler := PacketHandler((&TapHandler{
+		ip:    IpToUint32(ip),
+		queue: outputQueue,
+	}).Init())
+	if !isTapInterface {
+		handler = (*DataHandler)(handler.(*TapHandler))
 	}
 
 	cap := &Capture{
