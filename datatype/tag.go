@@ -7,4 +7,5 @@ type Tag struct {
 	WhitelistRuleIDs1 []uint32
 	CustomTagIDs0     []uint32
 	CustomTagIDs1     []uint32
+	PolicyData        *PolicyData
 }
