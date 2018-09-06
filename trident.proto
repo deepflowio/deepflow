@@ -158,9 +158,23 @@ message Policy {
     optional PolicyType type = 2;
 }
 
+enum TagTemplate {
+    NODE = 1;
+    NODE_PORT = 2;
+    EDGE = 4;
+    EDGE_PORT = 8;
+    PORT = 16;
+    POLICY_NODE = 32;
+    POLICY_NODE_PORT = 64;
+    POLICY_EGDE = 128;
+    POLICY_EGDE_PORT = 256;
+    POLICY_PORT = 512;
+}
+
 message FlowAction {
     optional Action action = 1;
     repeated Policy policies = 2;
+    optional uint32 tag_template = 3;
 }
 
 message FlowAcl {
