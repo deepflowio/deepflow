@@ -49,6 +49,10 @@ const (
 
 const SEQ_LIST_MAX_LEN = 16
 
+const (
+	RTT_MAX = 10 * time.Second
+)
+
 type SeqSegment struct { // 避免乱序，识别重传
 	seqNumber uint32
 	length    uint32
@@ -377,6 +381,11 @@ func isPshAckPacket(header *MetaPacket) bool {
 	return tcpFlag == (TCP_ACK|TCP_PSH) && payloadLen > 1
 }
 
+// 需排除payload == 1的包
+func isValidPayloadPacket(header *MetaPacket) bool {
+	return header.PayloadLen > 1
+}
+
 // 对于payload == 0的keep-alive包，暂时没有好的处理办法，仅当作ACK包
 // 暂且把ACK置位，payloadLen == 1的包认为是Tcp Keep-Alive
 func isTcpKeepAlivePacket(header *MetaPacket) bool {
@@ -384,6 +393,14 @@ func isTcpKeepAlivePacket(header *MetaPacket) bool {
 	payloadLen := header.PayloadLen
 
 	return tcpFlag&TCP_ACK > 0 && payloadLen == 1
+}
+
+func adjustRtt(interval time.Duration) time.Duration {
+	if interval > RTT_MAX {
+		interval = 0
+	}
+
+	return interval
 }
 
 func calcTimeInterval(currentTime, lastTime time.Duration) time.Duration {
@@ -435,8 +452,7 @@ func (p *MetaFlowPerf) isInvalidRetransPacket(sameDirection, oppositeDirection *
 		return isInvalid
 	}
 
-	// TCP Keep-alive 包不做重传检查
-	if isTcpKeepAlivePacket(header) {
+	if !isValidPayloadPacket(header) {
 		return isInvalid
 	}
 
@@ -465,9 +481,9 @@ func (p *MetaFlowPerf) whenFlowOpening(sameDirection, oppositeDirection *TcpSess
 		if (flowInfo.direction == TCP_DIR_CLIENT && isHandshakeAckpacket(sameDirection, oppositeDirection, header)) ||
 			(flowInfo.direction == TCP_DIR_SERVER && isSynAckPacket(header)) &&
 				oppositeDirection.isReplyPacket(header) {
-			rttSyn := calcTimeInterval(header.Timestamp, oppositeDirection.timestamp)
-			p.perfData.calcRttSyn(rttSyn, flowInfo.direction)
-
+			if rttSyn := calcTimeInterval(header.Timestamp, oppositeDirection.timestamp); rttSyn > 0 {
+				p.perfData.calcRttSyn(rttSyn, flowInfo.direction)
+			}
 			isOpeningPkt = true
 		}
 	}
@@ -494,7 +510,7 @@ func (p *MetaFlowPerf) whenFlowEstablished(sameDirection, oppositeDirection *Tcp
 	// rtt--用连续的PSH/ACK(payloadLen>0)和反向ACK(payloadLen==0)计算rtt值
 	if sameDirection.getRttPrecondition() {
 		if isAckPacket(header) && oppositeDirection.isReplyPacket(header) {
-			if rtt := calcTimeInterval(header.Timestamp, oppositeDirection.timestamp); rtt > 0 {
+			if rtt := adjustRtt(calcTimeInterval(header.Timestamp, oppositeDirection.timestamp)); rtt > 0 {
 				p.perfData.calcRtt(rtt, flowInfo.direction)
 			}
 		}
@@ -502,7 +518,7 @@ func (p *MetaFlowPerf) whenFlowEstablished(sameDirection, oppositeDirection *Tcp
 
 	// art--用连续的PSH/ACK(payloadLen>0)和ACK(payloadLen==0)[可选]、PSH/ACK(payloadLen>0)计算art值，
 	if sameDirection.getArtPrecondition() {
-		if isPshAckPacket(header) && sameDirection.isNextPacket(header) {
+		if isValidPayloadPacket(header) && sameDirection.isNextPacket(header) {
 			if art := calcTimeInterval(header.Timestamp, oppositeDirection.timestamp); art > 0 {
 				p.perfData.calcArt(art, flowInfo.direction)
 			}
@@ -836,10 +852,7 @@ func (i *FlowPerfDataInfo) calcReportFlowPerfStats(reverse bool) {
 		if period.art1Count > 0 {
 			report.ART = period.art1Sum / time.Duration(period.art1Count)
 		}
-		if period.rtt1Count == 0 {
-			period.rtt1Count = flow.rtt1Count
-			period.rtt1Sum = flow.rtt1Sum
-		}
+
 		if period.rtt1Count > 0 {
 			report.RTT = period.rtt1Sum / time.Duration(period.rtt1Count)
 		}
@@ -847,10 +860,7 @@ func (i *FlowPerfDataInfo) calcReportFlowPerfStats(reverse bool) {
 		if period.art0Count > 0 {
 			report.ART = period.art0Sum / time.Duration(period.art0Count)
 		}
-		if period.rtt0Count == 0 {
-			period.rtt0Count = flow.rtt0Count
-			period.rtt0Sum = flow.rtt0Sum
-		}
+
 		if period.rtt0Count > 0 {
 			report.RTT = period.rtt0Sum / time.Duration(period.rtt0Count)
 		}
