@@ -214,7 +214,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "28441b9fd93f2833df7cd7fc974437c0ada7b836"
+  revision = "c75fd7606d8c29874601c71b649fd3a8493de2c8"
 
 [[projects]]
   branch = "feature-os"
@@ -226,7 +226,7 @@
     "zero",
   ]
   pruneopts = "T"
-  revision = "875fd5c238951de2212c75c27379c518d74e8a60"
+  revision = "8de74d6bb3becb48244b39c380e51b112a163938"
 
 [[projects]]
   branch = "release-branch.go1.9"
