@@ -1,6 +1,7 @@
 package capture
 
 import (
+	"runtime"
 	"sync"
 	"time"
 
@@ -19,6 +20,7 @@ type PacketHandler interface {
 type DataHandler struct {
 	sync.Pool
 
+	gc    func(p *datatype.MetaPacket)
 	ip    datatype.IPv4Int
 	queue queue.QueueWriter
 }
@@ -35,6 +37,7 @@ func (h *DataHandler) Handle(timestamp Timestamp, packet RawPacket) {
 		h.Put(metaPacket)
 		return
 	}
+	runtime.SetFinalizer(metaPacket, h.gc)
 	h.queue.Put(metaPacket)
 }
 
@@ -60,6 +63,7 @@ func (h *TapHandler) Handle(timestamp Timestamp, packet RawPacket) {
 		h.Put(metaPacket)
 		return
 	}
+	runtime.SetFinalizer(metaPacket, h.gc)
 	h.queue.Put(metaPacket)
 }
 
@@ -67,5 +71,6 @@ func (h *TapHandler) Init() *TapHandler {
 	h.Pool.New = func() interface{} {
 		return new(datatype.MetaPacket)
 	}
+	h.gc = func(p *datatype.MetaPacket) { h.Put(p) }
 	return h
 }
