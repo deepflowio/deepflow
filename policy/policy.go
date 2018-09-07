@@ -40,15 +40,9 @@ type GroupId uint32
 type ServiceId uint32
 type PolicyId uint32
 
-const (
-	MAX_GROUP_ID   = 1 << 20
-	MAX_SERVICE_ID = 1 << 20
-	MAX_POLICY_ID  = 1 << 20
-)
-
 type PolicyTable struct {
 	cloudPlatformData *CloudPlatformData
-	policyLabel       PolicyLabel
+	policyLabel       *PolicyLabel
 }
 
 func NewPolicyTable( /* 传入Protobuf结构体指针 */ actionTypes ActionType) *PolicyTable {
@@ -58,6 +52,7 @@ func NewPolicyTable( /* 传入Protobuf结构体指针 */ actionTypes ActionType)
 	 * droplet关心**几乎**所有，对关心的信息进行计算*/
 	return &PolicyTable{
 		cloudPlatformData: NewCloudPlatformData(),
+		policyLabel:       NewPolicyLabel(),
 	}
 }
 
@@ -72,6 +67,17 @@ func (t *PolicyTable) LookupActionByKey(key *LookupKey) *PolicyData {
 func (t *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *PolicyData {
 	// FIXME
 	return nil
+}
+
+func (t *PolicyTable) GetPolicyDataByFastPath(endpointData *EndpointData, key *LookupKey, fastKey *FastKey) *PolicyData {
+	fastKey.Ports = uint64(key.SrcPort<<32) | uint64(key.DstPort)
+	fastKey.ProtoVlan = uint64(key.Proto<<32) | uint64(key.Vlan)
+	policyData := t.policyLabel.GetPolicyByFastPath(fastKey, key.Tap)
+	if policyData == nil {
+		policyData = t.GetPolicyData(endpointData, key)
+		t.policyLabel.InsertPolicyToFastPath(fastKey, policyData, key.Tap)
+	}
+	return policyData
 }
 
 func (t *PolicyTable) GetPolicyData(endpointData *EndpointData, key *LookupKey) *PolicyData {
@@ -90,11 +96,11 @@ func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData
 	if !key.Tap.CheckTapType(key.Tap) {
 		return NewEndpointData(), &PolicyData{}
 	}
-	endpointData := t.cloudPlatformData.GetEndpointData(key)
+	endpointData, fastKey := t.cloudPlatformData.GetEndpointData(key)
 	if key.Tap == TAP_TOR {
 		endpointData.SetL2End(key)
 	}
-	policyData := t.GetPolicyData(endpointData, key)
+	policyData := t.GetPolicyDataByFastPath(endpointData, key, fastKey)
 	return endpointData, policyData
 }
 

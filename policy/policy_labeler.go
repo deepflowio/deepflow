@@ -1,13 +1,10 @@
 package policy
 
 import (
-	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
-)
+	"sync"
+	"time"
 
-const (
-	MAX_FASTPATH_LEN     = 1 << 18
-	NETMASK_BUCKET_SHIFT = 16
-	NETMASK_BUCKETS      = 1 << 16
+	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
 type Acl struct {
@@ -22,11 +19,40 @@ type Acl struct {
 	Action    []*AclAction
 }
 
-type FastPolicyKey uint64
+type FastKey struct {
+	SrcHash   uint64
+	DstHash   uint64
+	Ports     uint64
+	ProtoVlan uint64
+}
+
+type FastPolicyData struct {
+	policyData *PolicyData
+	timestamp  time.Time
+}
+
+type FastPolicyTable struct {
+	sync.RWMutex
+
+	fastPolicyMap map[FastKey]*FastPolicyData
+}
 
 type PolicyLabel struct {
-	aclData        [TAP_MAX][]*Acl
-	fastPolicyPath map[FastPolicyKey]*PolicyData
+	aclData  [TAP_MAX][]*Acl
+	fastPath [TAP_MAX]*FastPolicyTable
+}
+
+func NewPolicyLabel() *PolicyLabel {
+	var fastPath [TAP_MAX]*FastPolicyTable
+	for i := uint32(0); i < uint32(TAP_MAX); i++ {
+		fastPath[i] = &FastPolicyTable{
+			fastPolicyMap: make(map[FastKey]*FastPolicyData),
+		}
+	}
+
+	return &PolicyLabel{
+		fastPath: fastPath,
+	}
 }
 
 func NewAcl() *Acl {
@@ -35,6 +61,37 @@ func NewAcl() *Acl {
 		DstGroups: make(map[uint32]uint32),
 		DstPorts:  make(map[uint16]uint16),
 	}
+}
+
+func (l *PolicyLabel) InsertPolicyToFastPath(fastKey *FastKey, policyData *PolicyData, tapType TapType) {
+	fastPolicyData := &FastPolicyData{
+		policyData: policyData,
+		timestamp:  time.Now(),
+	}
+
+	l.fastPath[tapType].Lock()
+	l.fastPath[tapType].fastPolicyMap[*fastKey] = fastPolicyData
+	l.fastPath[tapType].Unlock()
+}
+
+func (l *PolicyLabel) DeletePolicyFromFastPath(fastKey *FastKey, tapType TapType) {
+	l.fastPath[tapType].Lock()
+	delete(l.fastPath[tapType].fastPolicyMap, *fastKey)
+	l.fastPath[tapType].Unlock()
+}
+
+func (l *PolicyLabel) GetPolicyByFastPath(fastKey *FastKey, tapType TapType) *PolicyData {
+	l.fastPath[tapType].RLock()
+	if policy, ok := l.fastPath[tapType].fastPolicyMap[*fastKey]; ok {
+		l.fastPath[tapType].RUnlock()
+		if DATA_VALID_TIME < time.Now().Sub(policy.timestamp) {
+			l.DeletePolicyFromFastPath(fastKey, tapType)
+			return nil
+		}
+		return policy.policyData
+	}
+	l.fastPath[tapType].RUnlock()
+	return nil
 }
 
 func judgeProto(basisProto uint8, proto uint8) bool {
