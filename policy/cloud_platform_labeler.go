@@ -326,7 +326,7 @@ func (d *CloudPlatformData) ModifyDeviceInfo(endpointInfo *EndpointInfo) {
 	}
 }
 
-func (d *CloudPlatformData) GetEndpointData(key *LookupKey) *EndpointData {
+func (d *CloudPlatformData) GetEndpointData(key *LookupKey) (*EndpointData, *FastKey) {
 	srcHash := MacIpInportKey(calcHashKey(key.SrcMac, key.SrcIp))
 	d.CheckAndUpdateArpTable(key, srcHash)
 	srcData := d.GetInfoByFastPath(srcHash, key.Tap)
@@ -345,8 +345,6 @@ func (d *CloudPlatformData) GetEndpointData(key *LookupKey) *EndpointData {
 		d.InsertInfoToFastPath(dstHash, dstData, key.Tap)
 	}
 
-	return &EndpointData{
-		SrcInfo: srcData,
-		DstInfo: dstData,
-	}
+	return &EndpointData{SrcInfo: srcData, DstInfo: dstData},
+		&FastKey{SrcHash: uint64(srcHash), DstHash: uint64(dstHash)}
 }
