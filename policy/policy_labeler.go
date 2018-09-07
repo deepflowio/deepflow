@@ -109,11 +109,18 @@ func (l *PolicyLabel) GetPolicyFromPolicyTable(endpointData *EndpointData, key *
 		if judgeProto(acl.Proto, key.Proto) && judgeVlan(acl.Vlan, uint32(key.Vlan)) {
 			if judgePort(acl.DstPorts, key.DstPort) {
 				if getPolicyAction(endpointData.SrcInfo.GroupIds, endpointData.DstInfo.GroupIds, acl) {
-					aclActions = append(aclActions, acl.Action...)
+					for _, action := range acl.Action {
+						action.Direction = true
+						aclActions = append(aclActions, action)
+					}
 				}
-			} else if judgePort(acl.DstPorts, key.SrcPort) {
+			}
+			if judgePort(acl.DstPorts, key.SrcPort) {
 				if getPolicyAction(endpointData.DstInfo.GroupIds, endpointData.SrcInfo.GroupIds, acl) {
-					aclActions = append(aclActions, acl.Action...)
+					for _, action := range acl.Action {
+						action.Direction = false
+						aclActions = append(aclActions, action)
+					}
 				}
 			}
 		}

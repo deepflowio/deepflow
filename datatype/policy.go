@@ -40,9 +40,11 @@ const (
 )
 
 type AclAction struct {
-	AclId  uint32
-	Type   ActionType
-	Policy []PolicyInfo
+	AclId       uint32
+	Type        ActionType
+	Policy      []PolicyInfo
+	TapTemplate uint32
+	Direction   bool
 }
 
 func (a *AclAction) String() string {
