@@ -43,7 +43,7 @@ type AclAction struct {
 	AclId       uint32
 	Type        ActionType
 	Policy      []PolicyInfo
-	TapTemplate uint32
+	TagTemplate uint32
 	Direction   bool
 }
 
