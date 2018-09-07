@@ -170,9 +170,10 @@ func newAclAction(aclId uint32, actions []*trident.FlowAction) []*datatype.AclAc
 	for _, action := range actions {
 		if policyType := convert2ActionType(action.GetAction()); policyType != 0 {
 			aclAction := &datatype.AclAction{
-				AclId:  aclId,
-				Type:   policyType,
-				Policy: newPolicyInfo(action.GetPolicies()),
+				AclId:       aclId,
+				Type:        policyType,
+				Policy:      newPolicyInfo(action.GetPolicies()),
+				TagTemplate: action.GetTagTemplate(),
 			}
 			aclActions = append(aclActions, aclAction)
 		}
