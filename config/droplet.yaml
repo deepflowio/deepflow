@@ -14,3 +14,9 @@ profiler: false
 data-interfaces: []
 # mirrored traffic
 tap-interfaces: []
+# zeroes
+zeroes:
+- ip: 172.16.1.152
+  port: 20202
+- ip: 172.16.1.153
+  port: 20202

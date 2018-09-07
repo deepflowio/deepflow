@@ -183,7 +183,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:7a9804d9f46c63eb2196c0b48e6489ff30bd240f3eeef37a09ba0742064122fc"
+  digest = "1:1343cc4b131defb36103cf6f4dc53abce6fdcf2df993ba76925c95a6d621fd91"
   name = "gitlab.x.lan/platform/droplet-mapreduce"
   packages = [
     "internal/pkg/flowsender",
@@ -194,7 +194,7 @@
     "pkg/messenger",
   ]
   pruneopts = "UT"
-  revision = "26d27bb9380b125289a1ed9a99e06b4626410c45"
+  revision = "21991f55be3a509c0742f7f186c946e4a7277c8f"
 
 [[projects]]
   branch = "master"
