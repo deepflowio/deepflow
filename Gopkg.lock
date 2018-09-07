@@ -183,7 +183,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:9353cb69a822a5a3580f567cf1be540888992abf24b796be4abdf84ebb4a651c"
+  digest = "1:7a9804d9f46c63eb2196c0b48e6489ff30bd240f3eeef37a09ba0742064122fc"
   name = "gitlab.x.lan/platform/droplet-mapreduce"
   packages = [
     "internal/pkg/flowsender",
@@ -194,11 +194,11 @@
     "pkg/messenger",
   ]
   pruneopts = "UT"
-  revision = "4f92d4c033e2973953d56b181396f612ea7bfb3e"
+  revision = "26d27bb9380b125289a1ed9a99e06b4626410c45"
 
 [[projects]]
   branch = "master"
-  digest = "1:c0fe13056f96b827b47ba29208afd6b73fe1f99652491bce0b2a95203f9ea475"
+  digest = "1:af5cacd59a009188a79520803e2850945fec9a9cddff699fe8e40abbeba91f4c"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "datatype",
@@ -214,11 +214,11 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "c75fd7606d8c29874601c71b649fd3a8493de2c8"
+  revision = "82d165cb9ac8b488506cca8ca43ffbf157f6aca8"
 
 [[projects]]
   branch = "feature-os"
-  digest = "1:17eb750e5ce7cbc0adc382bad97fc5cada91f582532d9f88582e5f39f6844a54"
+  digest = "1:007edbab15f1f24092cf0dc3653a27843322d1bdca7e7290aa40b4d1e85124ad"
   name = "gitlab.x.lan/yunshan/message"
   packages = [
     "dfi",
@@ -226,7 +226,7 @@
     "zero",
   ]
   pruneopts = "T"
-  revision = "8de74d6bb3becb48244b39c380e51b112a163938"
+  revision = "3366ce123471c16f2bdeeef940617ce5ea55bc4b"
 
 [[projects]]
   branch = "release-branch.go1.9"
@@ -246,15 +246,15 @@
   revision = "44b7c21cbf19450f38b337eb6b6fe4f6496fb5b3"
 
 [[projects]]
-  branch = "release-branch.go1.11"
-  digest = "1:a60cae5be8993938498243605b120290533a5208fd5cac81c932afbad3642fb0"
+  branch = "master"
+  digest = "1:eb687625ffed87cbfa4d219ddb6c344bd9d0dc5900e461b86269373470534bae"
   name = "golang.org/x/sys"
   packages = [
     "unix",
     "windows",
   ]
   pruneopts = "UT"
-  revision = "98c5dad5d1a0e8a73845ecc8897d0bd56586511d"
+  revision = "8cf3aee429924738c56c34bb819c4ea8273fc434"
 
 [[projects]]
   digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"
@@ -280,12 +280,12 @@
   version = "v0.3.0"
 
 [[projects]]
-  branch = "jba-regen"
-  digest = "1:601e63e7d4577f907118bec825902505291918859d223bce015539e79f1160e3"
+  branch = "master"
+  digest = "1:077c1c599507b3b3e9156d17d36e1e61928ee9b53a5b420f10f28ebd4a0b275c"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
   pruneopts = "UT"
-  revision = "af2e5e2b5d87da17f10febed626e553cad71cac7"
+  revision = "11092d34479b07829b72e10713b159248caf5dad"
 
 [[projects]]
   digest = "1:3dd7996ce6bf52dec6a2f69fa43e7c4cefea1d4dfa3c8ab7a5f8a9f7434e239d"
@@ -352,7 +352,9 @@
     "gitlab.x.lan/application/droplet-app/pkg/mapper/flow",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/usage",
     "gitlab.x.lan/platform/droplet-mapreduce/pkg/api",
+    "gitlab.x.lan/platform/droplet-mapreduce/pkg/datatype",
     "gitlab.x.lan/platform/droplet-mapreduce/pkg/handler",
+    "gitlab.x.lan/platform/droplet-mapreduce/pkg/messenger",
     "gitlab.x.lan/yunshan/droplet-libs/datatype",
     "gitlab.x.lan/yunshan/droplet-libs/dedup",
     "gitlab.x.lan/yunshan/droplet-libs/grpc",
@@ -362,6 +364,7 @@
     "gitlab.x.lan/yunshan/droplet-libs/queue",
     "gitlab.x.lan/yunshan/droplet-libs/stats",
     "gitlab.x.lan/yunshan/droplet-libs/utils",
+    "gitlab.x.lan/yunshan/droplet-libs/zmq",
     "gitlab.x.lan/yunshan/message/trident",
     "golang.org/x/net/bpf",
     "golang.org/x/net/context",
