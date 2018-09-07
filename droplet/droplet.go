@@ -22,6 +22,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet/labeler"
 	"gitlab.x.lan/yunshan/droplet/mapreduce"
 	"gitlab.x.lan/yunshan/droplet/queue"
+	"gitlab.x.lan/yunshan/droplet/sender"
 	"gitlab.x.lan/yunshan/message/trident"
 )
 
@@ -123,9 +124,9 @@ func Start(configPath string) {
 	}
 	flowGenerator.Start()
 
-	zmqflowOutputQueue := manager.NewQueue("4-flow-to-stream", 1000, &TaggedFlow{})
-	zmqflowAppOutputQueue := manager.NewQueue("4-flow-doc-to-zero", 1000, &api.Document{})
-	flowMapProcess := mapreduce.NewFlowMapProcess(zmqflowOutputQueue, zmqflowAppOutputQueue)
+	zmqFlowOutputQueue := manager.NewQueue("4-flow-to-stream", 1000, &TaggedFlow{})
+	zmqFlowAppOutputQueue := manager.NewQueue("4-flow-doc-to-zero", 1000, &api.Document{})
+	flowMapProcess := mapreduce.NewFlowMapProcess(zmqFlowOutputQueue, zmqFlowAppOutputQueue)
 
 	zmqMeteringAppOutputQueue := manager.NewQueue("4-metering-doc-to-zero", 1000, &api.Document{})
 	meteringProcess := mapreduce.NewMeteringMapProcess(zmqMeteringAppOutputQueue)
@@ -169,4 +170,10 @@ func Start(configPath string) {
 			}
 		}
 	}()
+	builder := sender.NewZeroDocumentSenderBuilder()
+	builder.AddQueue(zmqFlowAppOutputQueue, zmqMeteringAppOutputQueue)
+	for _, zero := range cfg.Zeroes {
+		builder.AddZero(zero.Ip, zero.Port)
+	}
+	builder.Build().Start()
 }

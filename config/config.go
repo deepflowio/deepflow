@@ -14,14 +14,20 @@ import (
 var log = logging.MustGetLogger("config")
 
 type Config struct {
-	ControllerIps  []string `yaml:"controller-ips,flow"`
-	ControllerPort uint16   `yaml:"controller-port"`
-	LogFile        string   `yaml:"log-file"`
-	LogLevel       string   `yaml:"log-level"`
-	StatsdServer   string   `yaml:"statsd-server"`
-	Profiler       bool     `yaml:"profiler"`
-	DataInterfaces []string `yaml:"data-interfaces,flow"`
-	TapInterfaces  []string `yaml:"tap-interfaces,flow"`
+	ControllerIps  []string     `yaml:"controller-ips,flow"`
+	ControllerPort uint16       `yaml:"controller-port"`
+	LogFile        string       `yaml:"log-file"`
+	LogLevel       string       `yaml:"log-level"`
+	StatsdServer   string       `yaml:"statsd-server"`
+	Profiler       bool         `yaml:"profiler"`
+	DataInterfaces []string     `yaml:"data-interfaces,flow"`
+	TapInterfaces  []string     `yaml:"tap-interfaces,flow"`
+	Zeroes         []ZeroConfig `yaml:"zeroes,flow"`
+}
+
+type ZeroConfig struct {
+	Ip   string `yaml:"ip"`
+	Port int    `yaml:"port"`
 }
 
 func (c *Config) Validate() error {
