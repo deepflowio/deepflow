@@ -2,7 +2,6 @@ package sender
 
 import (
 	"reflect"
-	"testing"
 	"time"
 
 	"github.com/google/gopacket/layers"
@@ -87,19 +86,21 @@ func receiverRoutine(nData, port int, ch chan []byte) {
 	close(ch)
 }
 
-func checkDocument(t *testing.T, doc, other *api.Document) {
+func documentEqual(doc, other *api.Document) bool {
 
 	if doc.Timestamp != other.Timestamp {
-		t.Error("Timestamp在序列化前后不匹配")
+		return false
 	}
 
 	oldTag := doc.Tag.(*dt.Tag)
 	newTag := other.Tag.(*dt.Tag)
 	if !oldTag.Equal(newTag) {
-		t.Error("Tag在序列化前后不匹配")
+		return false
 	}
 
 	if !reflect.DeepEqual(doc.Meter, other.Meter) {
-		t.Error("Meter在序列化前后不匹配")
+		return false
 	}
+
+	return true
 }
