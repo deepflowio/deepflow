@@ -31,6 +31,11 @@ type FlowExtra struct {
 	reversed       bool
 }
 
+func (f *FlowExtra) reset() {
+	f.taggedFlow = nil
+	f.metaFlowPerf = nil
+}
+
 // list element for *FlowExtra
 type ElementFlowExtra struct {
 	next, prev *ElementFlowExtra
