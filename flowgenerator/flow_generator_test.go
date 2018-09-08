@@ -127,13 +127,13 @@ func TestHandleSynFin(t *testing.T) {
 	packet1.TcpData.Flags = TCP_PSH | TCP_ACK
 	metaPacketHeaderInQueue.(Queue).Put(packet1)
 
-	go flowGenerator.Start()
-
 	packet2 := getDefaultPacket()
 	packet2.TcpData.Flags = TCP_ACK | TCP_FIN
 	packet2.Timestamp += DEFAULT_DURATION_MSEC
 	reversePacket(packet2)
 	metaPacketHeaderInQueue.(Queue).Put(packet2)
+
+	go flowGenerator.Start()
 
 	var taggedFlow *TaggedFlow
 	taggedFlow = flowOutQueue.(Queue).Get().(*TaggedFlow)
@@ -144,51 +144,6 @@ func TestHandleSynFin(t *testing.T) {
 		taggedFlow.FlowMetricsPeerDst.TCPFlags != TCP_ACK|TCP_FIN {
 		t.Errorf("taggedFlow.TCPFlags0 is %x, expect %x", taggedFlow.FlowMetricsPeerSrc.TCPFlags, TCP_SYN|TCP_ACK|TCP_PSH)
 		t.Errorf("taggedFlow.TCPFlags1 is %x, expect %x", taggedFlow.FlowMetricsPeerDst.TCPFlags, TCP_ACK|TCP_FIN)
-	}
-}
-
-func TestHandleMultiPacket(t *testing.T) {
-	runtime.GOMAXPROCS(4)
-	flowGenerator := getDefaultFlowGenerator()
-	flowGenerator.SetTimeout(TimeoutConfig{0, 1800, 30, 30, 5, 0, 5})
-	flowGenerator.minLoopIntervalSec = 0
-	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
-	flowOutQueue := flowGenerator.flowOutQueue
-	var packet *MetaPacket
-	var taggedFlow *TaggedFlow
-	num := DEFAULT_QUEUE_LEN / 2
-
-	go flowGenerator.Start()
-
-	// direct 0
-	for i := 0; i < num; i++ {
-		packet = getDefaultPacket()
-		packet.TcpData.Flags = TCP_SYN
-		packet.PortDst = uint16(i)
-		metaPacketHeaderInQueue.(Queue).Put(packet)
-	}
-
-	// direct 1
-	for i := 0; i < num; i++ {
-		packet = getDefaultPacket()
-		packet.TcpData.Flags = TCP_RST
-		packet.PortDst = uint16(i)
-		reversePacket(packet)
-		metaPacketHeaderInQueue.(Queue).Put(packet)
-	}
-
-	for i := 0; i < num; i++ {
-		taggedFlow = flowOutQueue.(Queue).Get().(*TaggedFlow)
-		if taggedFlow.FlowMetricsPeerSrc.TotalPacketCount != 1 ||
-			taggedFlow.FlowMetricsPeerDst.TotalPacketCount != 1 {
-			t.Error("taggedFlow.TotalPacketCount0 and taggedFlow.TotalPacketCount1 are not 1")
-		}
-	}
-	if flowGenerator.stats.TotalNumFlows != uint64(num) {
-		t.Errorf("flowGenerator.stats.TotalNumFlows is %d, expect %d", flowGenerator.stats.TotalNumFlows, num)
-	}
-	if flowGenerator.stats.CurrNumFlows != 0 {
-		t.Errorf("flowGenerator.stats.CurrNumFlows is %d, expect %d", flowGenerator.stats.CurrNumFlows, 0)
 	}
 }
 
@@ -230,7 +185,7 @@ func TestInitFlow(t *testing.T) {
 	flowGenerator := getDefaultFlowGenerator()
 	packet := getDefaultPacket()
 	flowKey := flowGenerator.genFlowKey(packet)
-	flowExtra, _, _ := flowGenerator.initFlow(packet, flowKey)
+	flowExtra, _, _ := flowGenerator.initTcpFlow(packet, flowKey)
 	taggedFlow := flowExtra.taggedFlow
 
 	if taggedFlow.FlowID == 0 {
@@ -451,6 +406,27 @@ func TestForceReport(t *testing.T) {
 	}
 }
 
+func TestUdpShortFlow(t *testing.T) {
+	runtime.GOMAXPROCS(4)
+	flowGenerator := getDefaultFlowGenerator()
+	flowGenerator.SetTimeout(TimeoutConfig{0, 300, 0, 30, 5, 0, 0})
+	flowGenerator.minLoopIntervalSec = 0
+	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
+	flowOutQueue := flowGenerator.flowOutQueue
+	packet := getDefaultPacket()
+	packet.Protocol = layers.IPProtocolUDP
+	metaPacketHeaderInQueue.(Queue).Put(packet)
+	flowGenerator.Start()
+	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
+	if taggedFlow.CloseType != CLOSE_TYPE_TIMEOUT {
+		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_TIMEOUT)
+	}
+	if taggedFlow.Proto != layers.IPProtocolUDP {
+		t.Errorf("taggedFlow.Proto is %d, expect %d", taggedFlow.Proto, layers.IPProtocolUDP)
+		t.Errorf("\n%s", taggedFlow)
+	}
+}
+
 func BenchmarkCleanHashMap(b *testing.B) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator := getDefaultFlowGenerator()
@@ -462,7 +438,7 @@ func BenchmarkCleanHashMap(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		meta := getDefaultPacket()
 		flowKey := flowGenerator.genFlowKey(meta)
-		flowExtra, _, _ := flowGenerator.initFlow(meta, flowKey)
+		flowExtra, _, _ := flowGenerator.initTcpFlow(meta, flowKey)
 		flowGenerator.addFlow(flowCache, flowExtra)
 		flowGenerator.cleanTimeoutHashMap(flowGenerator.hashMap, 0, 1, 0)
 	}
@@ -491,7 +467,7 @@ func BenchmarkShortFlowList(b *testing.B) {
 			}
 		}
 	}
-	b.Logf("b.N: %d, maxFlowListLen: %d, NonEmptyFlowCacheNum: %d", b.N, maxFlowListLen, flowGenerator.stats.NonEmptyFlowCacheNum)
+	b.Logf("b.N: %d, maxFlowListLen: %d", b.N, maxFlowListLen)
 }
 
 func BenchmarkLongFlowList(b *testing.B) {
@@ -516,6 +492,5 @@ func BenchmarkLongFlowList(b *testing.B) {
 			}
 		}
 	}
-	b.Logf("b.N: %d, maxFlowListLen: %d", b.N, maxFlowListLen)
-	b.Logf("    NonEmptyFlowCacheNum: %d, CurrNumFlows: %d", flowGenerator.stats.NonEmptyFlowCacheNum, flowGenerator.stats.CurrNumFlows)
+	b.Logf("b.N: %d, maxFlowListLen: %d, CurrNumFlows: %d", b.N, maxFlowListLen, flowGenerator.stats.CurrNumFlows)
 }
