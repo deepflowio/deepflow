@@ -77,7 +77,10 @@ func isVlanTagged(ethType EthernetType) bool {
 }
 
 func (p *MetaPacket) ParseArp(stream *ByteStream) {
-	stream.Skip(8 + MAC_ADDR_LEN)
+	stream.Skip(6)
+	op := stream.U16()
+	p.Invalid = op == ARPReply // arp reply有代传，MAC和IP地址不对应，所以为无效包
+	stream.Skip(MAC_ADDR_LEN)
 	p.IpSrc = stream.U32()
 	stream.Skip(MAC_ADDR_LEN)
 	p.IpDst = stream.U32()
