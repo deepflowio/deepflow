@@ -41,6 +41,14 @@ func (h *DataHandler) Handle(timestamp Timestamp, packet RawPacket) {
 	h.queue.Put(metaPacket)
 }
 
+func (h *DataHandler) Init() *DataHandler {
+	h.Pool.New = func() interface{} {
+		return new(datatype.MetaPacket)
+	}
+	h.gc = func(p *datatype.MetaPacket) { h.Put(p) }
+	return h
+}
+
 type TapHandler DataHandler
 
 func (h *TapHandler) Handle(timestamp Timestamp, packet RawPacket) {
@@ -65,12 +73,4 @@ func (h *TapHandler) Handle(timestamp Timestamp, packet RawPacket) {
 	}
 	runtime.SetFinalizer(metaPacket, h.gc)
 	h.queue.Put(metaPacket)
-}
-
-func (h *TapHandler) Init() *TapHandler {
-	h.Pool.New = func() interface{} {
-		return new(datatype.MetaPacket)
-	}
-	h.gc = func(p *datatype.MetaPacket) { h.Put(p) }
-	return h
 }
