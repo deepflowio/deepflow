@@ -27,6 +27,7 @@ func main() {
 		cmd := handler()
 		root.AddCommand(cmd)
 	}
+	root.GenBashCompletionFile("/usr/share/bash-completion/completions/droplet-ctl")
 	root.SetArgs(os.Args[1:])
 	root.Execute()
 }
