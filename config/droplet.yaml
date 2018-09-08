@@ -20,3 +20,6 @@ zeroes:
   port: 20202
 - ip: 172.16.1.153
   port: 20202
+stream:
+  ip: 172.16.1.153
+  port: 20201

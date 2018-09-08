@@ -24,8 +24,8 @@ func (m *ZeroDocumentMarshaller) Start() {
 		n := m.input.Gets(buffer)
 		log.Debugf("%d docs received", n)
 		nOut := 0
-		for i := 0; i < n; i++ {
-			if doc, ok := buffer[i].(*api.Document); ok {
+		for _, e := range buffer[:n] {
+			if doc, ok := e.(*api.Document); ok {
 				b, err := messenger.Marshal(doc)
 				if err != nil {
 					log.Warning(err)

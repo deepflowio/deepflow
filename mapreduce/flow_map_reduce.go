@@ -7,6 +7,6 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 )
 
-func NewFlowMapProcess(zmqFlowQueue queue.QueueWriter, zmqAppQueue queue.QueueWriter) *handler.FlowHandler {
-	return handler.NewFlowHandler([]api.FlowProcessor{flow.NewProcessor()}, zmqFlowQueue, zmqAppQueue)
+func NewFlowMapProcess(zmqAppQueue queue.QueueWriter) *handler.FlowHandler {
+	return handler.NewFlowHandler([]api.FlowProcessor{flow.NewProcessor()}, zmqAppQueue)
 }
