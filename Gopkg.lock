@@ -179,14 +179,13 @@
     "pkg/mapper/usage",
   ]
   pruneopts = "UT"
-  revision = "831498703628e0d5dccecdd8b0d86756bbd01e6d"
+  revision = "0c3eacec2fea5d411a989f8efd6867fcce17ae04"
 
 [[projects]]
   branch = "master"
-  digest = "1:1343cc4b131defb36103cf6f4dc53abce6fdcf2df993ba76925c95a6d621fd91"
+  digest = "1:f212f317a8523671501ee1f6e3c2f48a34615267572b2aacd4a34db2e465bc8c"
   name = "gitlab.x.lan/platform/droplet-mapreduce"
   packages = [
-    "internal/pkg/flowsender",
     "internal/pkg/sizedmap",
     "pkg/api",
     "pkg/datatype",
@@ -194,11 +193,11 @@
     "pkg/messenger",
   ]
   pruneopts = "UT"
-  revision = "21991f55be3a509c0742f7f186c946e4a7277c8f"
+  revision = "821c9545840047292e208ca1a8105d5cce5ccb29"
 
 [[projects]]
   branch = "master"
-  digest = "1:af5cacd59a009188a79520803e2850945fec9a9cddff699fe8e40abbeba91f4c"
+  digest = "1:fd3aba7f4e39949254627ca5c2d67048b6af3a9695c08fea9de5c9704d477649"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "datatype",
@@ -214,7 +213,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "82d165cb9ac8b488506cca8ca43ffbf157f6aca8"
+  revision = "b18bcf1f85c288e531e5812d6e5c695ea286c9fe"
 
 [[projects]]
   branch = "feature-os"

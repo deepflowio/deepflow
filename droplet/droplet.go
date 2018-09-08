@@ -117,18 +117,22 @@ func Start(configPath string) {
 	})
 
 	// L3 - flow-generator & apps
-	flowAppQueue := manager.NewQueue("3-tagged-flow-to-flow-app", 1024*16, &TaggedFlow{})
-	flowGenerator := flowgenerator.New(flowGeneratorQueue, flowAppQueue, 60)
+	flowGenOutput := manager.NewQueue("3-tagged-flow-to-duplicator", 1024*16, &TaggedFlow{})
+	flowGenerator := flowgenerator.New(flowGeneratorQueue, flowGenOutput, 60)
 	if flowGenerator == nil {
 		return
 	}
 	flowGenerator.Start()
 
-	zmqFlowOutputQueue := manager.NewQueue("4-flow-to-stream", 1000, &TaggedFlow{})
-	zmqFlowAppOutputQueue := manager.NewQueue("4-flow-doc-to-zero", 1000, &api.Document{})
-	flowMapProcess := mapreduce.NewFlowMapProcess(zmqFlowOutputQueue, zmqFlowAppOutputQueue)
+	flowAppQueue := manager.NewQueue("4-tagged-flow-to-flow-app", 1024*16, &TaggedFlow{})
+	flowSenderQueue := manager.NewQueue("4-tagged-flow-to-stream", 1024*16, &TaggedFlow{})
+	queue.NewDuplicator(1024, flowGenOutput, flowAppQueue, flowSenderQueue).Start()
+	sender.NewFlowSender(flowSenderQueue, cfg.Stream.Ip, cfg.Stream.Port).Start()
 
-	zmqMeteringAppOutputQueue := manager.NewQueue("4-metering-doc-to-zero", 1000, &api.Document{})
+	zmqFlowAppOutputQueue := manager.NewQueue("5-flow-doc-to-zero", 1024*16, &api.Document{})
+	flowMapProcess := mapreduce.NewFlowMapProcess(zmqFlowAppOutputQueue)
+
+	zmqMeteringAppOutputQueue := manager.NewQueue("4-metering-doc-to-zero", 1024*16, &api.Document{})
 	meteringProcess := mapreduce.NewMeteringMapProcess(zmqMeteringAppOutputQueue)
 	queueFlushTime := time.Minute
 	flowTimer := time.NewTimer(queueFlushTime)

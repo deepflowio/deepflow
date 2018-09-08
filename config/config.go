@@ -14,18 +14,19 @@ import (
 var log = logging.MustGetLogger("config")
 
 type Config struct {
-	ControllerIps  []string     `yaml:"controller-ips,flow"`
-	ControllerPort uint16       `yaml:"controller-port"`
-	LogFile        string       `yaml:"log-file"`
-	LogLevel       string       `yaml:"log-level"`
-	StatsdServer   string       `yaml:"statsd-server"`
-	Profiler       bool         `yaml:"profiler"`
-	DataInterfaces []string     `yaml:"data-interfaces,flow"`
-	TapInterfaces  []string     `yaml:"tap-interfaces,flow"`
-	Zeroes         []ZeroConfig `yaml:"zeroes,flow"`
+	ControllerIps  []string       `yaml:"controller-ips,flow"`
+	ControllerPort uint16         `yaml:"controller-port"`
+	LogFile        string         `yaml:"log-file"`
+	LogLevel       string         `yaml:"log-level"`
+	StatsdServer   string         `yaml:"statsd-server"`
+	Profiler       bool           `yaml:"profiler"`
+	DataInterfaces []string       `yaml:"data-interfaces,flow"`
+	TapInterfaces  []string       `yaml:"tap-interfaces,flow"`
+	Zeroes         []IpPortConfig `yaml:"zeroes,flow"`
+	Stream         IpPortConfig   `yaml:"stream,flow"`
 }
 
-type ZeroConfig struct {
+type IpPortConfig struct {
 	Ip   string `yaml:"ip"`
 	Port int    `yaml:"port"`
 }
