@@ -20,17 +20,31 @@ func TestZeroDocumentSender(t *testing.T) {
 	go receiverRoutine(len(TEST_DATA), 20001, chan1)
 	go receiverRoutine(len(TEST_DATA), 20002, chan2)
 
-	i := 0
 	for b := range chan1 {
 		doc, _ := messenger.Unmarshal(b)
-		checkDocument(t, doc, TEST_DATA[i].(*api.Document))
-		i++
+		hasEqual := false
+		for _, data := range TEST_DATA {
+			if documentEqual(doc, data.(*api.Document)) {
+				hasEqual = true
+				break
+			}
+		}
+		if !hasEqual {
+			t.Error("找不到对应文档")
+		}
 	}
 
-	i = 0
 	for b := range chan2 {
 		doc, _ := messenger.Unmarshal(b)
-		checkDocument(t, doc, TEST_DATA[i].(*api.Document))
-		i++
+		hasEqual := false
+		for _, data := range TEST_DATA {
+			if documentEqual(doc, data.(*api.Document)) {
+				hasEqual = true
+				break
+			}
+		}
+		if !hasEqual {
+			t.Error("找不到对应文档")
+		}
 	}
 }

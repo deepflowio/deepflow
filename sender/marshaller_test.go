@@ -26,6 +26,8 @@ func TestMarshaller(t *testing.T) {
 
 		doc := TEST_DATA[0].(*api.Document)
 
-		checkDocument(t, doc, newDoc)
+		if !documentEqual(doc, newDoc) {
+			t.Error("文档不一致")
+		}
 	}
 }
