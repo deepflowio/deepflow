@@ -149,6 +149,14 @@
   revision = "bb4de0191aa41b5507caa14b0650cdbddcd9280b"
 
 [[projects]]
+  branch = "feature-os"
+  digest = "1:007edbab15f1f24092cf0dc3653a27843322d1bdca7e7290aa40b4d1e85124ad"
+  name = "gitlab.x.lan/yunshan/message"
+  packages = ["dfi"]
+  pruneopts = "T"
+  revision = "3366ce123471c16f2bdeeef940617ce5ea55bc4b"
+
+[[projects]]
   branch = "release-branch.go1.9"
   digest = "1:1604cdec55ab4b828b9e83af0e7f1bd0f954cc3ffab4231587f6f33e5db53e6c"
   name = "golang.org/x/net"
@@ -254,8 +262,8 @@
   analyzer-version = 1
   input-imports = [
     "github.com/OneOfOne/xxhash",
-    "github.com/cespare/xxhash",
     "github.com/golang-collections/go-datastructures/bitarray",
+    "github.com/golang/protobuf/proto",
     "github.com/google/go-cmp/cmp",
     "github.com/google/gopacket/layers",
     "github.com/google/gopacket/pcapgo",
@@ -264,6 +272,7 @@
     "github.com/op/go-logging",
     "github.com/pebbe/zmq4",
     "github.com/shirou/gopsutil/process",
+    "gitlab.x.lan/yunshan/message/dfi",
     "golang.org/x/net/context",
     "google.golang.org/grpc",
     "gopkg.in/alexcesaro/statsd.v2",
