@@ -6,6 +6,7 @@ vendor:
 	[ -d ${PROJECT_ROOT} ] || ln -snf ${CURDIR} ${PROJECT_ROOT}
 	[ -f ${GOPATH}/bin/dep ] || curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 	(cd ${PROJECT_ROOT}; dep ensure)
+	go generate ./vendor/gitlab.x.lan/yunshan/message/...
 
 test: vendor
 	go test -short ./...

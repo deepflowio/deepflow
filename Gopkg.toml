@@ -72,3 +72,7 @@
 [prune]
   go-tests = true
   unused-packages = true
+
+  [[prune.project]]
+    name = "gitlab.x.lan/yunshan/message"
+    unused-packages = false
