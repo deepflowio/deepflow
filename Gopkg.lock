@@ -170,20 +170,21 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:e1fe4954d4dd4b986255bd2c7f9f3438931e040904ab9c90f813853a7855f28f"
+  digest = "1:481f75ec82c0f95b548f29c8d2492a5771e4e7c915bc32054ab3d067df655339"
   name = "gitlab.x.lan/application/droplet-app"
   packages = [
     "internal/pkg/endpoint",
     "internal/pkg/flow",
     "pkg/mapper/flow",
+    "pkg/mapper/perf",
     "pkg/mapper/usage",
   ]
   pruneopts = "UT"
-  revision = "0c3eacec2fea5d411a989f8efd6867fcce17ae04"
+  revision = "4ed89b28f5a1456993051e9e00e4ecb4e24bc95b"
 
 [[projects]]
   branch = "master"
-  digest = "1:f212f317a8523671501ee1f6e3c2f48a34615267572b2aacd4a34db2e465bc8c"
+  digest = "1:c17fb2ef12ff744c0ebb8ac10d16eb3b3695db752b8398e1c44041b798ed8ed8"
   name = "gitlab.x.lan/platform/droplet-mapreduce"
   packages = [
     "internal/pkg/sizedmap",
@@ -193,11 +194,11 @@
     "pkg/messenger",
   ]
   pruneopts = "UT"
-  revision = "821c9545840047292e208ca1a8105d5cce5ccb29"
+  revision = "b0161c30919d8b835a0502facbdec788d5bba7f9"
 
 [[projects]]
   branch = "master"
-  digest = "1:fd3aba7f4e39949254627ca5c2d67048b6af3a9695c08fea9de5c9704d477649"
+  digest = "1:7268eeba6b03ffbe7edc9935c43e8aeb6e3abf94f5dae65b51dc15c8e6802a42"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "datatype",
@@ -213,11 +214,11 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "bc7732f7c9fcb55440aa80897b3affb1dbb421da"
+  revision = "cfcb882107dd3003c2be3d79bad29ffdab6dff29"
 
 [[projects]]
   branch = "feature-os"
-  digest = "1:007edbab15f1f24092cf0dc3653a27843322d1bdca7e7290aa40b4d1e85124ad"
+  digest = "1:c512e644063e095c3fb4344de0878373013f82d64b929155c9a788ff79958e7b"
   name = "gitlab.x.lan/yunshan/message"
   packages = [
     "dfi",
@@ -225,7 +226,7 @@
     "zero",
   ]
   pruneopts = "T"
-  revision = "3366ce123471c16f2bdeeef940617ce5ea55bc4b"
+  revision = "8ffe808bc2bbf032adff0e3ff5db389cfcf24d2d"
 
 [[projects]]
   branch = "release-branch.go1.9"
@@ -246,14 +247,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:eb687625ffed87cbfa4d219ddb6c344bd9d0dc5900e461b86269373470534bae"
+  digest = "1:374fc90fcb026e9a367e3fad29e988e5dd944b68ca3f24a184d77abc5307dda4"
   name = "golang.org/x/sys"
   packages = [
     "unix",
     "windows",
   ]
   pruneopts = "UT"
-  revision = "8cf3aee429924738c56c34bb819c4ea8273fc434"
+  revision = "d0be0721c37eeb5299f245a996a483160fc36940"
 
 [[projects]]
   digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"
@@ -349,6 +350,7 @@
     "github.com/op/go-logging",
     "github.com/spf13/cobra",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/flow",
+    "gitlab.x.lan/application/droplet-app/pkg/mapper/perf",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/usage",
     "gitlab.x.lan/platform/droplet-mapreduce/pkg/api",
     "gitlab.x.lan/platform/droplet-mapreduce/pkg/datatype",
