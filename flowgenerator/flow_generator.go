@@ -428,9 +428,7 @@ func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uin
 		for e := flowCache.flowList.Front(); e != nil; {
 			flowExtra := e.Value
 			f.stats.CurrNumFlows--
-			if flowExtra.metaFlowPerf != nil {
-				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(false, &f.perfCounter)
-			}
+			flowExtra.taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, false, &f.perfCounter)
 			flowExtra.setCurFlowInfo(now, forceReportIntervalSec)
 			flowExtra.calcCloseType(false)
 			flowOutQueue.Put(flowExtra.taggedFlow)
@@ -483,9 +481,7 @@ loop:
 					flowExtra.reverseFlow()
 					flowExtra.reversed = !flowExtra.reversed
 				}
-				if flowExtra.metaFlowPerf != nil {
-					taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(flowExtra.reversed, &f.perfCounter)
-				}
+				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 				flowOutBuffer[flowOutNum] = taggedFlow
 				flowOutNum++
 				if flowOutNum >= FLOW_OUT_BUFFER_CAP {
@@ -504,9 +500,7 @@ loop:
 					flowExtra.reverseFlow()
 					flowExtra.reversed = !flowExtra.reversed
 				}
-				if flowExtra.metaFlowPerf != nil {
-					taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(flowExtra.reversed, &f.perfCounter)
-				}
+				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 				if taggedFlow.FlowMetricsPeerSrc.PacketCount != 0 || taggedFlow.FlowMetricsPeerDst.PacketCount != 0 {
 					putFlow := *taggedFlow
 					flowOutBuffer[flowOutNum] = &putFlow

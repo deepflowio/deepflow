@@ -23,7 +23,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 				flowExtra.reverseFlow()
 				flowExtra.reversed = !flowExtra.reversed
 			}
-			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(flowExtra.reversed, &f.perfCounter)
+			flowExtra.taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 			f.flowOutQueue.Put(flowExtra.taggedFlow)
 			// delete front from this FlowCache because flowExtra is moved to front in keyMatch()
 			flowCache.Lock()
@@ -31,13 +31,14 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			flowCache.Unlock()
 		} else {
 			// reply is a sign relative to the flow direction, so if the flow is reversed then the sign should be changed
-			flowExtra.metaFlowPerf.Update(meta, flowExtra.reversed != reply, flowExtra, &f.perfCounter)
+			if checkIfDoFlowPerf(flowExtra, &f.perfCounter) {
+				flowExtra.metaFlowPerf.Update(meta, flowExtra.reversed != reply, flowExtra, &f.perfCounter)
+			}
 		}
 	} else {
 		closed := false
 		flowExtra, closed, reply = f.initTcpFlow(meta, flowKey)
 		taggedFlow := flowExtra.taggedFlow
-		flowExtra.metaFlowPerf = NewMetaFlowPerf(&f.perfCounter)
 		f.stats.TotalNumFlows++
 		if closed {
 			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportIntervalSec)
@@ -46,12 +47,14 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 				flowExtra.reverseFlow()
 				flowExtra.reversed = !flowExtra.reversed
 			}
-			flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(flowExtra.reversed, &f.perfCounter)
+			flowExtra.taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 			f.flowOutQueue.Put(taggedFlow)
 			flowExtra.reset()
 			f.FlowExtraPool.Put(flowExtra)
 		} else {
-			flowExtra.metaFlowPerf.Update(meta, reply, flowExtra, &f.perfCounter)
+			if checkIfDoFlowPerf(flowExtra, &f.perfCounter) {
+				flowExtra.metaFlowPerf.Update(meta, reply, flowExtra, &f.perfCounter)
+			}
 			taggedFlow := flowExtra.taggedFlow
 			if flowExtra == f.addFlow(flowCache, flowExtra) {
 				// reach limit and output directly
@@ -61,7 +64,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 					flowExtra.reverseFlow()
 					flowExtra.reversed = !flowExtra.reversed
 				}
-				flowExtra.taggedFlow.TcpPerfStats = flowExtra.metaFlowPerf.Report(flowExtra.reversed, &f.perfCounter)
+				flowExtra.taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 				f.flowOutQueue.Put(taggedFlow)
 				flowExtra.reset()
 				f.FlowExtraPool.Put(flowExtra)
@@ -75,7 +78,6 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 func (f *FlowGenerator) initTcpFlow(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool, bool) {
 	now := time.Duration(meta.Timestamp)
 	flowExtra := f.initFlow(meta, key, now)
-	flowExtra.metaFlowPerf = NewMetaFlowPerf(&f.perfCounter)
 	taggedFlow := flowExtra.taggedFlow
 	var flags uint8 = 0
 	if meta.TcpData != nil {
