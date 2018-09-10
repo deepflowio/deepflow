@@ -93,16 +93,19 @@ func (m *Manager) NewQueue(name string, size int, data fmt.Stringer) queue.Queue
 	return q
 }
 
-func (m *Manager) NewQueues(name string, size int, count int, data fmt.Stringer) []queue.Queue {
-	queues := make([]queue.Queue, count)
+func (m *Manager) NewQueues(name string, size int, count int, data fmt.Stringer) ([]queue.QueueReader, []queue.QueueWriter) {
+	readQueues := make([]queue.QueueReader, count)
+	writeQueues := make([]queue.QueueWriter, count)
 	queueName := name
 	for i := 0; i < count; i++ {
 		if i > 0 {
 			queueName = name + "_" + strconv.Itoa(i)
 		}
-		queues[i] = m.NewQueue(queueName, size, data)
+		queue := m.NewQueue(queueName, size, data)
+		readQueues[i] = queue
+		writeQueues[i] = queue
 	}
-	return queues
+	return readQueues, writeQueues
 }
 
 func sendCmdOnly(operate int, arg *bytes.Buffer) (*net.UDPConn, *bytes.Buffer, error) {

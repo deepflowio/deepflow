@@ -32,8 +32,8 @@ const (
 
 type LabelerManager struct {
 	policyTable *policy.PolicyTable
-	readQueue   queue.QueueReader
-	appQueues   [MAX_QUEUE_NUM]queue.QueueWriter
+	readQueues  []queue.QueueReader
+	appQueues   [MAX_QUEUE_NUM][]queue.QueueWriter
 	running     bool
 }
 
@@ -48,17 +48,17 @@ type DumpKey struct {
 	InPort uint32
 }
 
-func NewLabelerManager(readQueue queue.QueueReader) *LabelerManager {
+func NewLabelerManager(readQueues ...queue.QueueReader) *LabelerManager {
 	labeler := &LabelerManager{
 		policyTable: policy.NewPolicyTable(datatype.ACTION_FLOW_STAT),
-		readQueue:   readQueue,
+		readQueues:  readQueues,
 	}
 	dropletctl.Register(dropletctl.DROPLETCTL_LABELER, labeler)
 	return labeler
 }
 
-func (l *LabelerManager) RegisterAppQueue(queueType QueueType, appQueue queue.QueueWriter) {
-	l.appQueues[queueType] = appQueue
+func (l *LabelerManager) RegisterAppQueue(queueType QueueType, appQueues ...queue.QueueWriter) {
+	l.appQueues[queueType] = appQueues
 }
 
 func (l *LabelerManager) OnPlatformDataChange(data []*datatype.PlatformData) {
@@ -110,15 +110,23 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket) *datatype.Policy
 	return packet.PolicyData
 }
 
-func (l *LabelerManager) run() {
+func (l *LabelerManager) run(index int) {
+	queue := l.readQueues[index]
+	meteringQueueCount := uint32(len(l.appQueues[METERING_QUEUE]))
+	meteringQueues := l.appQueues[METERING_QUEUE]
+	flowQueueCount := uint32(len(l.appQueues[FLOW_QUEUE]))
+	flowQueues := l.appQueues[FLOW_QUEUE]
+
 	for l.running {
-		packet := l.readQueue.Get().(*datatype.MetaPacket)
+		packet := queue.Get().(*datatype.MetaPacket)
 		action := l.GetPolicy(packet)
+		hash := packet.InPort + packet.IpSrc + packet.IpDst +
+			uint32(packet.Protocol) + uint32(packet.PortSrc) + uint32(packet.PortDst)
 		if (action.ActionList & datatype.ACTION_PACKET_STAT) != 0 {
-			l.appQueues[METERING_QUEUE].Put(packet)
+			meteringQueues[hash%meteringQueueCount].Put(packet)
 		}
 		if (action.ActionList & datatype.ACTION_FLOW_STAT) != 0 {
-			l.appQueues[FLOW_QUEUE].Put(packet)
+			flowQueues[hash%flowQueueCount].Put(packet)
 		}
 	}
 
@@ -129,7 +137,9 @@ func (l *LabelerManager) Start() {
 	if !l.running {
 		l.running = true
 		log.Info("Start labeler manager")
-		go l.run()
+		for i, _ := range l.readQueues {
+			go l.run(i)
+		}
 	}
 }
 
