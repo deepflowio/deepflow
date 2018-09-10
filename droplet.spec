@@ -25,8 +25,8 @@ deepflow droplet
 mkdir -p $RPM_BUILD_ROOT/usr/sbin/
 cp %pwd/bin/droplet $RPM_BUILD_ROOT/usr/sbin/
 mkdir -p $RPM_BUILD_ROOT/usr/bin/
+cp %pwd/bin/droplet-ctl $RPM_BUILD_ROOT/usr/bin/
 cp $(go env GOPATH)/bin/dlv $RPM_BUILD_ROOT/usr/bin/dlv.droplet
-cp $(go env GOPATH)/bin/droplet-ctl $RPM_BUILD_ROOT/usr/bin/droplet-ctl
 mkdir -p $RPM_BUILD_ROOT/lib/systemd/system/
 cp %pwd/droplet.service $RPM_BUILD_ROOT/lib/systemd/system/
 mkdir -p $RPM_BUILD_ROOT/etc/
