@@ -77,27 +77,27 @@ func Start(configPath string) {
 	manager := queue.NewManager()
 
 	// L1 - packet source
-	filterQueue := manager.NewQueue("1-meta-packet-to-filter", 1024*64, &MetaPacket{})
-
-	tridentAdapter := adapter.NewTridentAdapter(filterQueue)
+	labelerReaderQueues, tridentWriterQueues := manager.NewQueues("1-trident-to-filter", 1024*64, 6, &MetaPacket{})
+	tridentAdapter := adapter.NewTridentAdapter(tridentWriterQueues...)
 	if tridentAdapter == nil {
 		return
 	}
 	tridentAdapter.Start()
 
+	captureQueue := manager.NewQueue("1-capture-to-filter", 1024*64, &MetaPacket{})
 	localIp, err := getLocalIp()
 	if err != nil {
 		log.Error(err)
 		return
 	}
 	for _, iface := range cfg.DataInterfaces {
-		if _, err := capture.StartCapture(iface, localIp, false, filterQueue); err != nil {
+		if _, err := capture.StartCapture(iface, localIp, false, captureQueue); err != nil {
 			log.Error(err)
 			return
 		}
 	}
 	for _, iface := range cfg.TapInterfaces {
-		if _, err := capture.StartCapture(iface, localIp, true, filterQueue); err != nil {
+		if _, err := capture.StartCapture(iface, localIp, true, captureQueue); err != nil {
 			log.Error(err)
 			return
 		}
@@ -105,10 +105,11 @@ func Start(configPath string) {
 
 	// L2 - packet filter
 	meteringAppQueue := manager.NewQueue("2-meta-packet-to-metering-app", 1024*64, &MetaPacket{})
-	flowGeneratorQueue := manager.NewQueue("2-meta-packet-to-flow-generator", 1024*64, &MetaPacket{})
-	labelerManager := labeler.NewLabelerManager(filterQueue)
+	flowGeneratorReaderQueues, labelerWriterQueues := manager.NewQueues("2-meta-packet-to-flow-generator", 1024*64, 2, &MetaPacket{})
+	labelerWriterQueues = append(labelerWriterQueues, captureQueue)
+	labelerManager := labeler.NewLabelerManager(labelerReaderQueues...)
 	labelerManager.RegisterAppQueue(labeler.METERING_QUEUE, meteringAppQueue)
-	labelerManager.RegisterAppQueue(labeler.FLOW_QUEUE, flowGeneratorQueue)
+	labelerManager.RegisterAppQueue(labeler.FLOW_QUEUE, labelerWriterQueues...)
 	labelerManager.Start()
 	synchronizer.Register(func(response *trident.SyncResponse) {
 		labelerManager.OnPlatformDataChange(convert2PlatformData(response))
@@ -118,11 +119,14 @@ func Start(configPath string) {
 
 	// L3 - flow-generator & apps
 	flowGenOutput := manager.NewQueue("3-tagged-flow-to-duplicator", 1024*16, &TaggedFlow{})
-	flowGenerator := flowgenerator.New(flowGeneratorQueue, flowGenOutput, 60)
-	if flowGenerator == nil {
-		return
+	flowGenerators := make([]*flowgenerator.FlowGenerator, len(flowGeneratorReaderQueues))
+	for i, queue := range flowGeneratorReaderQueues {
+		flowGenerators[i] = flowgenerator.New(queue, flowGenOutput, 60)
+		if flowGenerators[i] == nil {
+			return
+		}
+		flowGenerators[i].Start()
 	}
-	flowGenerator.Start()
 
 	flowAppQueue := manager.NewQueue("4-tagged-flow-to-flow-app", 1024*16, &TaggedFlow{})
 	flowSenderQueue := manager.NewQueue("4-tagged-flow-to-stream", 1024*16, &TaggedFlow{})
