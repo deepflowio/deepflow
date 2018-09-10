@@ -814,19 +814,23 @@ func (p *MetaFlowPerf) Update(header *MetaPacket, reply bool, flowExtra *FlowExt
 	return nil
 }
 
-func (p *MetaFlowPerf) Report(reverse bool, perfCounter *FlowPerfCounter) *TcpPerfStats {
-	if p.perfData != nil {
+func Report(flowPerf *MetaFlowPerf, reverse bool, perfCounter *FlowPerfCounter) *TcpPerfStats {
+	if flowPerf == nil {
+		return nil
+	}
+
+	if flowPerf.perfData != nil {
 		current := time.Now()
 		report := &TcpPerfStats{}
-		p.perfData.calcReportFlowPerfStats(reverse)
+		flowPerf.perfData.calcReportFlowPerfStats(reverse)
 
 		if reverse == true {
-			p.perfData.exchangeReportFlowPerfStats()
+			flowPerf.perfData.exchangeReportFlowPerfStats()
 		}
 
-		p.perfData.reportPerfStats, report = report, p.perfData.reportPerfStats
+		flowPerf.perfData.reportPerfStats, report = report, flowPerf.perfData.reportPerfStats
 
-		p.perfData.resetPeriodPerfStats()
+		flowPerf.perfData.resetPeriodPerfStats()
 
 		perfCounter.counter.ReportCount++
 		perfCounter.counter.ReportCpuPerf = calcAvgTime(perfCounter.counter.ReportCpuPerf,
@@ -835,6 +839,20 @@ func (p *MetaFlowPerf) Report(reverse bool, perfCounter *FlowPerfCounter) *TcpPe
 	}
 
 	return nil
+}
+
+func checkIfDoFlowPerf(flowExtra *FlowExtra, counter *FlowPerfCounter) bool {
+	if flowExtra.taggedFlow.PolicyData == nil {
+		return false
+	}
+	if flowExtra.taggedFlow.PolicyData.ActionList&ACTION_PERFORMANCE > 0 {
+		if flowExtra.metaFlowPerf == nil {
+			flowExtra.metaFlowPerf = NewMetaFlowPerf(counter)
+		}
+		return true
+	}
+
+	return false
 }
 
 func (i *FlowPerfDataInfo) exchangeReportFlowPerfStats() {
