@@ -23,3 +23,15 @@ zeroes:
 stream:
   ip: 172.16.1.153
   port: 20201
+# flow timeout
+flow-timeout:
+  # inerval time for long flow, in seconds
+  force-report-interval: 60
+  # time for an established tcp flow, in seconds
+  established: 300
+  # timeout for tcp closing stage and get rst after established, in seconds
+  closing-rst: 35
+  # timeout for opening stage, flow with exception and single direction, in seconds
+  others: 5
+# packet and flow queue size
+queue-size: 65536

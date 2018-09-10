@@ -43,14 +43,17 @@ const (
 
 const FLOW_CACHE_CAP = 1024
 const HASH_MAP_SIZE uint64 = 1024 * 256
-const FLOW_OUT_BUFFER_CAP = 1024 * 32
+const FLOW_OUT_BUFFER_CAP = 1024 * 64
 const TIMOUT_PARALLEL_NUM uint64 = 4
 
 const IN_PORT_FLOW_ID_MASK uint64 = 0xFF000000
 const TIMER_FLOW_ID_MASK uint64 = 0x00FFFFFF
 const TOTAL_FLOWS_ID_MASK uint64 = 0x0FFFFFFF
 const FLOW_LIMIT_NUM uint64 = 1024 * 1024
+
+// unit: second
 const REPORT_TOLERANCE = 4
+const FORCE_REPORT_INTERVAL = 60
 
 // unit: second
 type TimeoutConfig struct {

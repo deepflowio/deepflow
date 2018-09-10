@@ -578,7 +578,7 @@ func (f *FlowGenerator) run() {
 // we need these goroutines are thread safe
 func (f *FlowGenerator) Start() {
 	f.run()
-	log.Info("flow generator Started")
+	log.Info("flow generator started")
 }
 
 func (f *FlowGenerator) Stop() {
@@ -589,11 +589,11 @@ func (f *FlowGenerator) Stop() {
 		f.cleanRunning = false
 		f.cleanWaitGroup.Wait()
 	}
-	log.Info("flow generator Stopped")
+	log.Info("flow generator stopped")
 }
 
 // create a new flow generator
-func New(metaPacketHeaderInQueue QueueReader, flowOutQueue QueueWriter, forceReportIntervalSec time.Duration) *FlowGenerator {
+func New(metaPacketHeaderInQueue QueueReader, flowOutQueue QueueWriter, forceReportIntervalSec time.Duration, bufferSize int) *FlowGenerator {
 	flowGenerator := &FlowGenerator{
 		TimeoutConfig:           defaultTimeoutConfig,
 		FastPath:                FastPath{FlowCacheHashMap: FlowCacheHashMap{make([]*FlowCache, HASH_MAP_SIZE), rand.Uint32(), HASH_MAP_SIZE, TIMOUT_PARALLEL_NUM}},
@@ -603,7 +603,7 @@ func New(metaPacketHeaderInQueue QueueReader, flowOutQueue QueueWriter, forceRep
 		stateMachineMaster:      make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
 		stateMachineSlave:       make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
 		innerFlowKey:            &FlowKey{},
-		packetHandler:           &PacketHandler{recvBuffer: make([]interface{}, 1024*64), processBuffer: make([]interface{}, 1024*64)},
+		packetHandler:           &PacketHandler{recvBuffer: make([]interface{}, bufferSize/2), processBuffer: make([]interface{}, bufferSize/2)},
 		servicePortDescriptor:   getServiceDescriptorWithIANA(),
 		forceReportIntervalSec:  forceReportIntervalSec,
 		minLoopIntervalSec:      defaultTimeoutConfig.minTimeout(),
