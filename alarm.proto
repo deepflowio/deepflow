@@ -3,43 +3,48 @@ option go_package = "alarm";
 
 package Alarm;
 
-message AlarmContent {
-    optional int32 rule_id = 1;
-    optional string content = 2;
-    optional string target = 3;
-}
-
-message RttVal {
-    optional string ip = 1;
-    optional uint64 rtt = 2;
-}
-
-enum Protocol {
-    ANY = 0;
-    TCP = 6;
-    UDP = 17;
+enum DeviceType {
+    VM = 1;
+    THIRD_PARTY = 3;
+    VGATEWAY = 5;
+    HOST = 6;
+    NETWORK = 7;
+    FLOATING_IP = 8;
+    DHCP = 9;
 }
 
 message AlarmInfo {
-    optional uint64 timestamp = 1;
+    optional uint32 timestamp = 1;
     optional string type = 2;
-    optional uint32 rule_id = 3;
-    optional int32 epc_id = 4;
-    optional uint32 resource_group_id = 5;
-    optional uint32 vm_id = 6;
-    optional string ip = 7;
-    optional uint32 port = 8;
-    optional Protocol protocol = 9;
-    optional uint64 meter_bit = 10;
-    repeated RttVal rtt_values = 11;
-    repeated string security_event_source_ips = 12;
-    optional uint64 total_flow_count = 13;
-    optional uint64 whitelist_rule_id = 14;
-    optional string whitelist_src_ip = 15;
-    optional uint32 whitelist_src_vm_id = 16;
-    repeated uint32 whitelist_denied_groups = 17;
-    optional uint32 whitelist_target_group_id = 18;
-    optional bool whitelist_is_blocked = 19;
+    optional uint32 acl_id = 3;
+    optional uint32 policy_id = 4;
+    optional uint32 server_port = 5;
+    optional uint32 protocol = 6;
+
+    optional int32 l3_epc_id = 7;
+    optional int32 l3_epc_id_0 = 8;
+    optional int32 l3_epc_id_1 = 9;
+
+    optional uint32 group_id = 10;
+    optional uint32 group_id_0 = 11;
+    optional uint32 group_id_1 = 12;
+
+    optional string ip = 13;
+    optional string ip_0 = 14;
+    optional string ip_1 = 15;
+
+    optional uint32 l3_device_id = 16;
+    optional DeviceType l3_device_type = 17;
+    optional uint32 l3_device_id_0 = 18;
+    optional DeviceType l3_device_type_0 = 19;
+    optional uint32 l3_device_id_1 = 20;
+    optional DeviceType l3_device_type_1 = 21;
+
+    optional uint64 sum_bit = 22;
+    optional uint64 max_rx = 23;
+    optional uint64 max_tx = 24;
+    optional uint32 rtt_avg = 25;
+    optional uint64 flow_count = 26;
 }
 
 enum Status {
