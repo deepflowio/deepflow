@@ -6,27 +6,22 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
-func (f *FlowGenerator) processUdpPacket(meta *MetaPacket) {
+func (f *FlowGenerator) processOtherIpPacket(meta *MetaPacket) {
 	reply := false
 	var flowExtra *FlowExtra
 	flowKey := f.genFlowKey(meta)
 	hash := f.getQuinTupleHash(flowKey)
 	flowCache := f.hashMap[hash%HASH_MAP_SIZE]
 	if flowExtra, reply = flowCache.keyMatch(meta, flowKey); flowExtra != nil {
-		f.updateUdpFlow(flowExtra, meta, reply)
+		f.updateOtherIpFlow(flowExtra, meta, reply)
 	} else {
-		flowExtra = f.initUdpFlow(meta, flowKey)
-		taggedFlow := flowExtra.taggedFlow
+		flowExtra = f.initOtherIpFlow(meta, flowKey)
 		f.stats.TotalNumFlows++
 		if flowExtra == f.addFlow(flowCache, flowExtra) {
 			// reach limit and output directly
 			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportIntervalSec)
 			flowExtra.taggedFlow.CloseType = CLOSE_TYPE_FLOOD
-			if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
-				flowExtra.reverseFlow()
-				flowExtra.reversed = !flowExtra.reversed
-			}
-			f.flowOutQueue.Put(taggedFlow)
+			f.flowOutQueue.Put(flowExtra.taggedFlow)
 			flowExtra.reset()
 			f.FlowExtraPool.Put(flowExtra)
 		} else {
@@ -35,7 +30,7 @@ func (f *FlowGenerator) processUdpPacket(meta *MetaPacket) {
 	}
 }
 
-func (f *FlowGenerator) initUdpFlow(meta *MetaPacket, key *FlowKey) *FlowExtra {
+func (f *FlowGenerator) initOtherIpFlow(meta *MetaPacket, key *FlowKey) *FlowExtra {
 	now := time.Duration(meta.Timestamp)
 	flowExtra := f.initFlow(meta, key, now)
 	taggedFlow := flowExtra.taggedFlow
@@ -45,13 +40,12 @@ func (f *FlowGenerator) initUdpFlow(meta *MetaPacket, key *FlowKey) *FlowExtra {
 	taggedFlow.FlowMetricsPeerSrc.PacketCount = 1
 	taggedFlow.FlowMetricsPeerSrc.TotalByteCount = uint64(meta.PacketLen)
 	taggedFlow.FlowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
-	flowExtra.updatePlatformData(meta, false)
 	flowExtra.flowState = FLOW_STATE_ESTABLISHED
 	flowExtra.timeoutSec = f.TimeoutConfig.Opening
 	return flowExtra
 }
 
-func (f *FlowGenerator) updateUdpFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) {
+func (f *FlowGenerator) updateOtherIpFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) {
 	f.updateFlow(flowExtra, meta, reply)
 	if reply {
 		flowExtra.timeoutSec = f.TimeoutConfig.EstablishedRst

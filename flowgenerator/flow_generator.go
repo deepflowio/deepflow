@@ -94,7 +94,7 @@ func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool) 
 		if taggedFlow.Exporter != key.Exporter || (isFromTor(key.InPort) && !flowExtra.MacEquals(meta)) {
 			continue
 		}
-		if !flowExtra.TunnelMatch(key) {
+		if taggedFlow.Proto != key.Proto || !flowExtra.TunnelMatch(key) {
 			continue
 		}
 		if taggedFlow.IPSrc == key.IPSrc && taggedFlow.IPDst == key.IPDst && taggedFlow.PortSrc == key.PortSrc && taggedFlow.PortDst == key.PortDst {
@@ -394,6 +394,8 @@ loop:
 		f.processTcpPacket(meta)
 	} else if meta.Protocol == layers.IPProtocolUDP {
 		f.processUdpPacket(meta)
+	} else {
+		f.processOtherIpPacket(meta)
 	}
 	goto loop
 }
