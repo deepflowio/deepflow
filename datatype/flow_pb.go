@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/gopacket/layers"
 
 	pb "gitlab.x.lan/yunshan/message/dfi"
 )
@@ -84,7 +83,7 @@ func MarshalFlow(f *TaggedFlow) ([]byte, error) {
 		PolicyId:           policyIDs,
 	}
 	// TCP Perf Data
-	if f.Proto == layers.IPProtocolTCP {
+	if f.TcpPerfStats != nil {
 		flow.RttSyn = proto.Uint64(uint64(f.RTTSyn))
 		flow.Rtt = proto.Uint64(uint64(f.RTT))
 		flow.SynRetransCnt_0 = proto.Uint64(uint64(f.TcpPerfCountsPeerSrc.SynRetransCount))
