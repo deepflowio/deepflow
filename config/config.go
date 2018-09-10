@@ -6,29 +6,42 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/op/go-logging"
 	"gopkg.in/yaml.v2"
+
+	"gitlab.x.lan/yunshan/droplet/flowgenerator"
 )
 
 var log = logging.MustGetLogger("config")
 
 type Config struct {
-	ControllerIps  []string       `yaml:"controller-ips,flow"`
-	ControllerPort uint16         `yaml:"controller-port"`
-	LogFile        string         `yaml:"log-file"`
-	LogLevel       string         `yaml:"log-level"`
-	StatsdServer   string         `yaml:"statsd-server"`
-	Profiler       bool           `yaml:"profiler"`
-	DataInterfaces []string       `yaml:"data-interfaces,flow"`
-	TapInterfaces  []string       `yaml:"tap-interfaces,flow"`
-	Zeroes         []IpPortConfig `yaml:"zeroes,flow"`
-	Stream         IpPortConfig   `yaml:"stream,flow"`
+	ControllerIps  []string          `yaml:"controller-ips,flow"`
+	ControllerPort uint16            `yaml:"controller-port"`
+	LogFile        string            `yaml:"log-file"`
+	LogLevel       string            `yaml:"log-level"`
+	StatsdServer   string            `yaml:"statsd-server"`
+	Profiler       bool              `yaml:"profiler"`
+	DataInterfaces []string          `yaml:"data-interfaces,flow"`
+	TapInterfaces  []string          `yaml:"tap-interfaces,flow"`
+	Zeroes         []IpPortConfig    `yaml:"zeroes,flow"`
+	Stream         IpPortConfig      `yaml:"stream,flow"`
+	FlowTimeout    FlowTimeoutConfig `yaml:"flow-timeout"`
+	QueueSize      uint32            `yaml:"queue-size"`
 }
 
 type IpPortConfig struct {
 	Ip   string `yaml:"ip"`
 	Port int    `yaml:"port"`
+}
+
+// unit: second
+type FlowTimeoutConfig struct {
+	ForceReportInterval time.Duration `yaml:"force-report-interval"`
+	Established         time.Duration `yaml:"established"`
+	ClosingRst          time.Duration `yaml:"closing-rst"`
+	Others              time.Duration `yaml:"others"`
 }
 
 func (c *Config) Validate() error {
@@ -56,6 +69,22 @@ func (c *Config) Validate() error {
 
 	if net.ParseIP(c.StatsdServer) == nil {
 		return errors.New("Malformed statsd-server")
+	}
+
+	if c.FlowTimeout.ForceReportInterval == 0 {
+		c.FlowTimeout.ForceReportInterval = flowgenerator.FORCE_REPORT_INTERVAL
+	}
+	if c.FlowTimeout.Established == 0 {
+		c.FlowTimeout.Established = flowgenerator.TIMEOUT_ESTABLISHED
+	}
+	if c.FlowTimeout.ClosingRst == 0 {
+		c.FlowTimeout.ClosingRst = flowgenerator.TIMEOUT_ESTABLISHED_RST
+	}
+	if c.FlowTimeout.Others == 0 {
+		c.FlowTimeout.Others = flowgenerator.TIMEOUT_EXPCEPTION
+	}
+	if c.QueueSize == 0 {
+		return errors.New("can not get packet and flow queue size")
 	}
 
 	return nil
