@@ -102,6 +102,7 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket) *datatype.Policy
 		L2End0:  packet.L2End0,
 		L2End1:  packet.L2End1,
 		Tap:     GetTapType(packet.InPort),
+		Invalid: packet.Invalid,
 	}
 
 	packet.EndpointData, packet.PolicyData = l.policyTable.LookupAllByKey(key)
@@ -109,24 +110,12 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket) *datatype.Policy
 	return packet.PolicyData
 }
 
-func cloneMetaPacket(src *datatype.MetaPacket) *datatype.MetaPacket {
-	newPacket := *src
-	srcInfo := *src.EndpointData.SrcInfo
-	dstInfo := *src.EndpointData.DstInfo
-	newPacket.EndpointData = &datatype.EndpointData{
-		SrcInfo: &srcInfo,
-		DstInfo: &dstInfo,
-	}
-
-	return &newPacket
-}
-
 func (l *LabelerManager) run() {
 	for l.running {
 		packet := l.readQueue.Get().(*datatype.MetaPacket)
 		action := l.GetPolicy(packet)
 		if (action.ActionList & datatype.ACTION_PACKET_STAT) != 0 {
-			l.appQueues[METERING_QUEUE].Put(cloneMetaPacket(packet))
+			l.appQueues[METERING_QUEUE].Put(packet)
 		}
 		if (action.ActionList & datatype.ACTION_FLOW_STAT) != 0 {
 			l.appQueues[FLOW_QUEUE].Put(packet)
