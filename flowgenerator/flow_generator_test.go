@@ -423,7 +423,6 @@ func TestUdpShortFlow(t *testing.T) {
 	}
 	if taggedFlow.Proto != layers.IPProtocolUDP {
 		t.Errorf("taggedFlow.Proto is %d, expect %d", taggedFlow.Proto, layers.IPProtocolUDP)
-		t.Errorf("\n%s", taggedFlow)
 	}
 }
 

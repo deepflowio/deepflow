@@ -57,6 +57,7 @@ func getServiceDescriptorWithIANA() *ServicePortDescriptor {
 	return servicePortDescriptor
 }
 
+// for an IPv4 flow but not TCP or UDP, return false forever
 func (s *ServicePortDescriptor) judgeServiceDirection(portSrc, portDst uint16) bool {
 	srcActive, dstActive := false, false
 	if portSrc < uint16(len(s.PortActivityList)) {
