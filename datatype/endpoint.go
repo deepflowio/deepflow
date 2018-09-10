@@ -43,6 +43,7 @@ type LookupKey struct {
 	RxInterface      uint32
 	L2End0, L2End1   bool
 	Tap              TapType
+	Invalid          bool
 }
 
 type EndpointData struct {
