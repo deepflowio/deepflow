@@ -166,8 +166,8 @@ enum TagTemplate {
     PORT = 16;
     POLICY_NODE = 32;
     POLICY_NODE_PORT = 64;
-    POLICY_EGDE = 128;
-    POLICY_EGDE_PORT = 256;
+    POLICY_EDGE = 128;
+    POLICY_EDGE_PORT = 256;
     POLICY_PORT = 512;
 }
 
