@@ -55,9 +55,10 @@ func (h *DataHandler) Handle(timestamp Timestamp, packet RawPacket) {
 }
 
 func (h *DataHandler) Init() *DataHandler {
+	gc := func(b *MetaPacketBlock) { h.Put(b) }
 	h.Pool.New = func() interface{} {
 		block := new(MetaPacketBlock)
-		runtime.SetFinalizer(block, func(b *MetaPacketBlock) { h.Pool.Put(block) })
+		runtime.SetFinalizer(block, gc)
 		return block
 	}
 	h.block = new(MetaPacketBlock)
