@@ -266,7 +266,7 @@ func (d *CloudPlatformData) GetArpTable(hash MacIpInportKey, tapType TapType) bo
 
 // 只更新源mac+ip的arp
 func (d *CloudPlatformData) CheckAndUpdateArpTable(key *LookupKey, hash MacIpInportKey) {
-	if key.EthType == EthernetTypeARP {
+	if key.EthType == EthernetTypeARP && !key.Invalid {
 		d.UpdateArpTable(hash, key.Tap)
 	}
 }
