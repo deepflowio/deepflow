@@ -309,6 +309,23 @@ func (d *CloudPlatformData) GetEndpointInfo(mac uint64, ip uint32, tapType TapTy
 	return endpointInfo
 }
 
+func (d *CloudPlatformData) ModifyDeviceInfo(endpointInfo *EndpointInfo) {
+	if endpointInfo.L2End && endpointInfo.L3End {
+		if endpointInfo.L2DeviceId == 0 {
+			endpointInfo.L2DeviceId = endpointInfo.L3DeviceId
+		}
+		if endpointInfo.L3DeviceId == 0 {
+			endpointInfo.L3DeviceId = endpointInfo.L2DeviceId
+		}
+		if endpointInfo.L2DeviceType == 0 {
+			endpointInfo.L2DeviceType = endpointInfo.L3DeviceType
+		}
+		if endpointInfo.L3DeviceType == 0 {
+			endpointInfo.L3DeviceType = endpointInfo.L2DeviceType
+		}
+	}
+}
+
 func (d *CloudPlatformData) GetEndpointData(key *LookupKey) *EndpointData {
 	srcHash := MacIpInportKey(calcHashKey(key.SrcMac, key.SrcIp))
 	d.CheckAndUpdateArpTable(key, srcHash)
@@ -316,6 +333,7 @@ func (d *CloudPlatformData) GetEndpointData(key *LookupKey) *EndpointData {
 	if srcData == nil {
 		srcData = d.GetEndpointInfo(key.SrcMac, key.SrcIp, key.Tap)
 		d.ModifyL3End(srcData, key, srcHash, true)
+		d.ModifyDeviceInfo(srcData)
 		d.InsertInfoToFastPath(srcHash, srcData, key.Tap)
 	}
 	dstHash := MacIpInportKey(calcHashKey(key.DstMac, key.DstIp))
@@ -323,6 +341,7 @@ func (d *CloudPlatformData) GetEndpointData(key *LookupKey) *EndpointData {
 	if dstData == nil {
 		dstData = d.GetEndpointInfo(key.DstMac, key.DstIp, key.Tap)
 		d.ModifyL3End(dstData, key, dstHash, false)
+		d.ModifyDeviceInfo(dstData)
 		d.InsertInfoToFastPath(dstHash, dstData, key.Tap)
 	}
 
