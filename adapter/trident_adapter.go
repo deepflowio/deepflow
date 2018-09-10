@@ -52,6 +52,8 @@ type tridentInstance struct {
 	cacheMap   uint16
 }
 
+type MetaPacketBlock = [1024]datatype.MetaPacket
+
 type TridentAdapter struct {
 	queues          []queue.QueueWriter
 	queueCount      int
@@ -59,8 +61,8 @@ type TridentAdapter struct {
 	hashBufferCount [QUEUE_MAX]int
 	metaPacketPool  sync.Pool
 	udpPool         sync.Pool
-
-	gc func(p *datatype.MetaPacket)
+	block           *MetaPacketBlock
+	blockCursor     int
 
 	instances map[TridentKey]*tridentInstance
 	counter   *PacketCounter
@@ -78,8 +80,12 @@ func NewTridentAdapter(queues ...queue.QueueWriter) *TridentAdapter {
 	adapter.queueCount = len(queues)
 	adapter.instances = make(map[TridentKey]*tridentInstance)
 	adapter.udpPool.New = func() interface{} { return make([]byte, UDP_BUFFER_SIZE) }
-	adapter.metaPacketPool.New = func() interface{} { return new(datatype.MetaPacket) }
-	adapter.gc = func(p *datatype.MetaPacket) { adapter.metaPacketPool.Put(p) }
+	adapter.metaPacketPool.New = func() interface{} {
+		block := new(MetaPacketBlock)
+		runtime.SetFinalizer(block, func(b *MetaPacketBlock) { adapter.metaPacketPool.Put(b) })
+		return block
+	}
+	adapter.block = adapter.metaPacketPool.Get().(*MetaPacketBlock)
 	listener, err := net.ListenUDP("udp4", &net.UDPAddr{Port: LISTEN_PORT})
 	if err != nil {
 		log.Error(err)
@@ -89,6 +95,16 @@ func NewTridentAdapter(queues ...queue.QueueWriter) *TridentAdapter {
 	stats.RegisterCountable("trident_adapter", stats.EMPTY_TAG, adapter)
 	dropletctl.Register(dropletctl.DROPLETCTL_ADAPTER, adapter)
 	return adapter
+}
+
+func (a *TridentAdapter) alloc() *datatype.MetaPacket {
+	metaPacket := &a.block[a.blockCursor]
+	a.blockCursor++
+	if a.blockCursor >= len(a.block) {
+		a.block = a.metaPacketPool.Get().(*MetaPacketBlock)
+		a.blockCursor = 0
+	}
+	return metaPacket
 }
 
 func (a *TridentAdapter) GetCounter() interface{} {
@@ -169,9 +185,8 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) {
 	ifMacSuffix, _ := decoder.DecodeHeader()
 
 	for {
-		meta := a.metaPacketPool.Get().(*datatype.MetaPacket)
-		runtime.SetFinalizer(meta, a.gc)
-		meta.InPort = ifMacSuffix | datatype.PACKET_SOURCE_TOR
+		meta := a.alloc()
+		meta.InPort = uint32(datatype.PACKET_SOURCE_TOR) | ifMacSuffix
 		meta.Exporter = ip
 		if decoder.NextPacket(meta) {
 			break
