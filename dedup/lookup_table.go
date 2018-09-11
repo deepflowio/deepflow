@@ -232,5 +232,5 @@ func init() {
 	for i := 0; i < HASH_TABLE_SIZE; i++ {
 		hashTable[i] = &List{}
 	}
-	stats.RegisterCountable("dedup", stats.EMPTY_TAG, counter)
+	stats.RegisterCountable("dedup", counter)
 }
