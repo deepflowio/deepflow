@@ -40,9 +40,9 @@ func isExceptionFlags(flags uint8, reply bool) bool {
 }
 
 type StateValue struct {
-	timeoutSec time.Duration
-	flowState  FlowState
-	closed     bool
+	timeout   time.Duration
+	flowState FlowState
+	closed    bool
 }
 
 func (f *FlowGenerator) initStateMachineMaster() {

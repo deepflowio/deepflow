@@ -86,7 +86,7 @@ func Start(configPath string) {
 	}
 	tridentAdapter.Start()
 
-	captureQueue := manager.NewQueue("1-capture-to-filter", 1024*64, &MetaPacket{})
+	captureQueue := manager.NewQueue("1-capture-to-filter", queueSize, &MetaPacket{})
 	localIp, err := getLocalIp()
 	if err != nil {
 		log.Error(err)
@@ -133,7 +133,7 @@ func Start(configPath string) {
 	flowGenOutput := manager.NewQueue("3-tagged-flow-to-duplicator", queueSize/4, &TaggedFlow{})
 	flowGenerators := make([]*flowgenerator.FlowGenerator, len(flowGeneratorReaderQueues))
 	for i, queue := range flowGeneratorReaderQueues {
-		flowGenerators[i] = flowgenerator.New(queue, flowGenOutput, flowTimeout.ForceReportInterval, queueSize)
+		flowGenerators[i] = flowgenerator.New(queue, flowGenOutput, flowTimeout.ForceReportInterval, queueSize, i)
 		if flowGenerators[i] == nil {
 			return
 		}

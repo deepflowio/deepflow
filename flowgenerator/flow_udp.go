@@ -20,7 +20,7 @@ func (f *FlowGenerator) processUdpPacket(meta *MetaPacket) {
 		f.stats.TotalNumFlows++
 		if flowExtra == f.addFlow(flowCache, flowExtra) {
 			// reach limit and output directly
-			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportIntervalSec)
+			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportInterval)
 			flowExtra.taggedFlow.CloseType = CLOSE_TYPE_FLOOD
 			if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
 				flowExtra.reverseFlow()
@@ -28,7 +28,6 @@ func (f *FlowGenerator) processUdpPacket(meta *MetaPacket) {
 			}
 			f.flowOutQueue.Put(taggedFlow)
 			flowExtra.reset()
-			f.FlowExtraPool.Put(flowExtra)
 		} else {
 			f.stats.CurrNumFlows++
 		}
@@ -47,13 +46,13 @@ func (f *FlowGenerator) initUdpFlow(meta *MetaPacket, key *FlowKey) *FlowExtra {
 	taggedFlow.FlowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
 	flowExtra.updatePlatformData(meta, false)
 	flowExtra.flowState = FLOW_STATE_ESTABLISHED
-	flowExtra.timeoutSec = f.TimeoutConfig.Opening
+	flowExtra.timeout = f.TimeoutConfig.Opening
 	return flowExtra
 }
 
 func (f *FlowGenerator) updateUdpFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) {
 	f.updateFlow(flowExtra, meta, reply)
 	if reply {
-		flowExtra.timeoutSec = f.TimeoutConfig.EstablishedRst
+		flowExtra.timeout = f.TimeoutConfig.EstablishedRst
 	}
 }

@@ -73,15 +73,23 @@ func (c *Config) Validate() error {
 
 	if c.FlowTimeout.ForceReportInterval == 0 {
 		c.FlowTimeout.ForceReportInterval = flowgenerator.FORCE_REPORT_INTERVAL
+	} else {
+		c.FlowTimeout.ForceReportInterval *= time.Second
 	}
 	if c.FlowTimeout.Established == 0 {
 		c.FlowTimeout.Established = flowgenerator.TIMEOUT_ESTABLISHED
+	} else {
+		c.FlowTimeout.Established *= time.Second
 	}
 	if c.FlowTimeout.ClosingRst == 0 {
 		c.FlowTimeout.ClosingRst = flowgenerator.TIMEOUT_ESTABLISHED_RST
+	} else {
+		c.FlowTimeout.ClosingRst *= time.Second
 	}
 	if c.FlowTimeout.Others == 0 {
 		c.FlowTimeout.Others = flowgenerator.TIMEOUT_EXPCEPTION
+	} else {
+		c.FlowTimeout.Others *= time.Second
 	}
 	if c.QueueSize == 0 {
 		return errors.New("can not get packet and flow queue size")
