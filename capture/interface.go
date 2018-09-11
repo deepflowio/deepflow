@@ -63,7 +63,7 @@ func StartCapture(interfaceName string, ip net.IP, isTapInterface bool, outputQu
 		handler: handler,
 	}
 	cap.Start()
-	stats.RegisterCountable("capture", stats.EMPTY_TAG, cap)
+	stats.RegisterCountable("capture", cap)
 	instance := io.Closer(cap)
 	runtime.SetFinalizer(instance, func(c io.Closer) { c.Close() })
 	return instance, nil

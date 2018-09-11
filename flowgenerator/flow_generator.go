@@ -619,8 +619,8 @@ func New(metaPacketHeaderInQueue QueueReader, flowOutQueue QueueWriter, forceRep
 	flowGenerator.initStateMachineMaster()
 	flowGenerator.initStateMachineSlave()
 	flowGenerator.initMetaFlowPerfPool()
-	RegisterCountable("flow_generator", EMPTY_TAG, flowGenerator)
-	RegisterCountable(FP_NAME, EMPTY_TAG, &flowGenerator.perfCounter)
+	RegisterCountable("flow_generator", flowGenerator)
+	RegisterCountable(FP_NAME, &flowGenerator.perfCounter)
 	log.Info("flow generator created")
 	return flowGenerator
 }
