@@ -39,12 +39,23 @@ const (
 	ACTION_TCP_PERFORMANCE_PUB
 )
 
+type DirectionType uint8
+
+const (
+	NO_DIRECTION DirectionType = 0
+)
+
+const (
+	FORWARD DirectionType = 1 << iota
+	BACKWARD
+)
+
 type AclAction struct {
 	AclId       uint32
 	Type        ActionType
 	Policy      []PolicyInfo
 	TagTemplate uint32
-	Direction   bool
+	Direction   DirectionType
 }
 
 func (a *AclAction) String() string {
