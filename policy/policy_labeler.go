@@ -163,21 +163,22 @@ func getPolicyAction(srcGroups []uint32, dstGroups []uint32, acl *Acl) bool {
 func (l *PolicyLabel) GetPolicyFromPolicyTable(endpointData *EndpointData, key *LookupKey, acls []*Acl) []*AclAction {
 	var aclActions []*AclAction
 	for _, acl := range acls {
+		direction := NO_DIRECTION
 		if judgeProto(acl.Proto, key.Proto) && judgeVlan(acl.Vlan, uint32(key.Vlan)) {
 			if judgePort(acl.DstPorts, key.DstPort) {
 				if getPolicyAction(endpointData.SrcInfo.GroupIds, endpointData.DstInfo.GroupIds, acl) {
-					for _, action := range acl.Action {
-						action.Direction = true
-						aclActions = append(aclActions, action)
-					}
+					direction |= FORWARD
 				}
 			}
 			if judgePort(acl.DstPorts, key.SrcPort) {
 				if getPolicyAction(endpointData.DstInfo.GroupIds, endpointData.SrcInfo.GroupIds, acl) {
-					for _, action := range acl.Action {
-						action.Direction = false
-						aclActions = append(aclActions, action)
-					}
+					direction |= BACKWARD
+				}
+			}
+			if direction != NO_DIRECTION {
+				for _, action := range acl.Action {
+					action.Direction = direction
+					aclActions = append(aclActions, action)
 				}
 			}
 		}
