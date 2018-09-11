@@ -92,7 +92,7 @@ func NewTridentAdapter(queues ...queue.QueueWriter) *TridentAdapter {
 		return nil
 	}
 	adapter.listener = listener
-	stats.RegisterCountable("trident_adapter", stats.EMPTY_TAG, adapter)
+	stats.RegisterCountable("trident_adapter", adapter)
 	dropletctl.Register(dropletctl.DROPLETCTL_ADAPTER, adapter)
 	return adapter
 }

@@ -64,6 +64,9 @@ func Start(configPath string) {
 		startProfiler()
 	}
 
+	stats.SetMinInterval(10 * time.Second)
+	stats.SetRemote(net.ParseIP(cfg.StatsdServer))
+
 	controllers := make([]net.IP, 0, len(cfg.ControllerIps))
 	for _, ipString := range cfg.ControllerIps {
 		ip := net.ParseIP(ipString)
@@ -71,8 +74,6 @@ func Start(configPath string) {
 	}
 	synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.ControllerPort)
 	synchronizer.Start()
-
-	stats.StartStatsd(net.ParseIP(cfg.StatsdServer), 10*time.Second)
 
 	manager := queue.NewManager()
 
