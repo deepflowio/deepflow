@@ -30,6 +30,7 @@ func (s *ZMQBytePusher) Send(b []byte) {
 	n, err := s.Sender.Send(b)
 	if err != nil {
 		log.Warningf("Sender has error, will reconnect: %s\n", err)
+		s.Sender.Close()
 		s.Sender = nil
 		return
 	}
