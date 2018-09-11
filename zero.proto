@@ -19,11 +19,6 @@ enum Direction {
     ANY = 2;
 }
 
-enum PolicyType {
-    CUSTOM_TAG = 0;
-    WHITELIST = 1;
-}
-
 enum TapType {
     OVS = 0;
     ISP = 1;
@@ -66,7 +61,7 @@ message Tag {
 
     optional Direction direction = 40;
     optional uint32 policy_id = 41;
-    optional PolicyType policy_type = 42;
+    optional uint32 policy_type = 42;
     optional uint32 vlan_id = 43;
     optional uint32 protocol = 44;
     optional uint32 server_port = 45;
