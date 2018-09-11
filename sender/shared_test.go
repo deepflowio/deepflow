@@ -1,6 +1,7 @@
 package sender
 
 import (
+	"encoding/binary"
 	"reflect"
 	"time"
 
@@ -15,8 +16,8 @@ var TEST_DATA []interface{}
 func init() {
 	TEST_DATA = make([]interface{}, 0, 10)
 	f := dt.Field{
-		IP:           "10.33.2.200",
-		MAC:          "02:04:06:08:0a:0c",
+		IP:           binary.BigEndian.Uint32([]byte{10, 33, 2, 200}),
+		MAC:          binary.BigEndian.Uint64([]byte{2, 4, 6, 8, 10, 12, 0, 0}),
 		GroupID:      4,
 		L2EpcID:      2,
 		L3EpcID:      2,
@@ -25,10 +26,10 @@ func init() {
 		L3DeviceID:   5,
 		L3DeviceType: dt.VMDevice,
 
-		IP0:           "10.33.2.200",
-		IP1:           "10.33.2.202",
-		MAC0:          "02:04:06:08:0a:0c",
-		MAC1:          "02:03:04:05:06:07",
+		IP0:           binary.BigEndian.Uint32([]byte{10, 33, 2, 200}),
+		IP1:           binary.BigEndian.Uint32([]byte{10, 33, 2, 202}),
+		MAC0:          binary.BigEndian.Uint64([]byte{2, 4, 6, 8, 10, 12, 0, 0}),
+		MAC1:          binary.BigEndian.Uint64([]byte{2, 3, 4, 5, 6, 7, 0, 0}),
 		GroupID0:      4,
 		GroupID1:      2,
 		L2EpcID0:      2,
@@ -49,8 +50,8 @@ func init() {
 		VLANID:     123,
 		Protocol:   layers.IPProtocolTCP,
 		ServerPort: 1024,
-		Host:       "172.16.1.151",
-		VTAP:       "100.100.100.133",
+		Host:       binary.BigEndian.Uint32([]byte{172, 16, 1, 153}),
+		VTAP:       binary.BigEndian.Uint32([]byte{100, 100, 100, 233}),
 		TAPType:    dt.ToR,
 	}
 	tag1 := f.NewTag(dt.IP | dt.L2EpcID | dt.L3EpcID)
