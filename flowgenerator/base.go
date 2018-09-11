@@ -1,6 +1,7 @@
 package flowgenerator
 
 import (
+	"math"
 	"reflect"
 	"sync"
 	"time"
@@ -32,13 +33,13 @@ const (
 )
 
 const (
-	TIMEOUT_OPENING          = 5
-	TIMEOUT_ESTABLISHED      = 300
-	TIMEOUT_CLOSING          = 35
-	TIMEOUT_ESTABLISHED_RST  = 35
-	TIMEOUT_EXPCEPTION       = 5
+	TIMEOUT_OPENING          = 5 * time.Second
+	TIMEOUT_ESTABLISHED      = 300 * time.Second
+	TIMEOUT_CLOSING          = 35 * time.Second
+	TIMEOUT_ESTABLISHED_RST  = 35 * time.Second
+	TIMEOUT_EXPCEPTION       = 5 * time.Second
 	TIMEOUT_CLOSED_FIN       = 0
-	TIMEOUT_SINGLE_DIRECTION = 5
+	TIMEOUT_SINGLE_DIRECTION = 5 * time.Second
 )
 
 const FLOW_CACHE_CAP = 1024
@@ -50,12 +51,9 @@ const IN_PORT_FLOW_ID_MASK uint64 = 0xFF000000
 const TIMER_FLOW_ID_MASK uint64 = 0x00FFFFFF
 const TOTAL_FLOWS_ID_MASK uint64 = 0x0FFFFFFF
 const FLOW_LIMIT_NUM uint64 = 1024 * 1024
+const FORCE_REPORT_INTERVAL = 60 * time.Second
+const REPORT_TOLERANCE = 4 * time.Second
 
-// unit: second
-const REPORT_TOLERANCE = 4
-const FORCE_REPORT_INTERVAL = 60
-
-// unit: second
 type TimeoutConfig struct {
 	Opening         time.Duration
 	Established     time.Duration
@@ -85,25 +83,11 @@ type FlowGeneratorStats struct {
 	cleanRoutineMaxFlowCacheLens []int
 }
 
-type FlowCache struct {
-	sync.Mutex
-
-	capacity int
-	flowList *ListFlowExtra
-}
-
-type FlowCacheHashMap struct {
-	hashMap            []*FlowCache
-	hashBasis          uint32
-	mapSize            uint64
-	timeoutParallelNum uint64
-}
-
 type FastPath struct {
 	FlowCacheHashMap
 
-	TaggedFlowPool sync.Pool
-	FlowExtraPool  sync.Pool
+	taggedFlowHandler TaggedFlowHandler
+	flowExtraHandler  FlowExtraHandler
 }
 
 type PacketHandler struct {
@@ -126,11 +110,12 @@ type FlowGenerator struct {
 	servicePortDescriptor   *ServicePortDescriptor
 	innerFlowKey            *FlowKey
 	packetHandler           *PacketHandler
-	forceReportIntervalSec  time.Duration
-	minLoopIntervalSec      time.Duration
+	forceReportInterval     time.Duration
+	minLoopInterval         time.Duration
 	flowLimitNum            uint64
 	handleRunning           bool
 	cleanRunning            bool
+	index                   int
 	cleanWaitGroup          sync.WaitGroup
 
 	perfCounter         FlowPerfCounter
@@ -154,6 +139,16 @@ func timeMin(a time.Duration, b time.Duration) time.Duration {
 }
 
 func (f *FlowGenerator) GetCounter() interface{} {
+	nonEmptyFlowCacheNum := 0
+	maxFlowCacheLen := 0
+	for i := 0; i < int(TIMOUT_PARALLEL_NUM); i++ {
+		nonEmptyFlowCacheNum += f.stats.cleanRoutineFlowCacheNums[i]
+		if maxFlowCacheLen < f.stats.cleanRoutineMaxFlowCacheLens[i] {
+			maxFlowCacheLen = f.stats.cleanRoutineMaxFlowCacheLens[i]
+		}
+	}
+	f.stats.NonEmptyFlowCacheNum = nonEmptyFlowCacheNum
+	f.stats.MaxFlowCacheLen = maxFlowCacheLen
 	counter := f.stats
 	return &counter
 }
@@ -164,7 +159,7 @@ func (f *FlowGenerator) SetTimeout(timeoutConfig TimeoutConfig) bool {
 		return false
 	}
 	f.TimeoutConfig = timeoutConfig
-	f.minLoopIntervalSec = timeoutConfig.minTimeout()
+	f.minLoopInterval = timeoutConfig.minTimeout()
 	f.initStateMachineMaster()
 	f.initStateMachineSlave()
 	return true
@@ -172,14 +167,14 @@ func (f *FlowGenerator) SetTimeout(timeoutConfig TimeoutConfig) bool {
 
 func (t TimeoutConfig) minTimeout() time.Duration {
 	valueOf := reflect.ValueOf(t)
-	var minSec time.Duration = 1 << 32 // not max, but enough
+	minTime := time.Duration(math.MaxInt64)
 	for i := 0; i < valueOf.NumField(); i++ {
 		value := valueOf.Field(i).Interface().(time.Duration)
-		if minSec > value && value != 0 {
-			minSec = value
+		if minTime > value && value != 0 {
+			minTime = value
 		}
 	}
-	return minSec
+	return minTime
 }
 
 func (f *FlowGenerator) SetServicePorts(servicePortDescriptor *ServicePortDescriptor) bool {

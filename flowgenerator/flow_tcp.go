@@ -17,7 +17,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 	if flowExtra, reply = flowCache.keyMatch(meta, flowKey); flowExtra != nil {
 		if ok, reply = f.updateTcpFlow(flowExtra, meta, reply); ok {
 			f.stats.CurrNumFlows--
-			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportIntervalSec)
+			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportInterval)
 			flowExtra.calcCloseType(false)
 			if f.servicePortDescriptor.judgeServiceDirection(flowExtra.taggedFlow.PortSrc, flowExtra.taggedFlow.PortDst) {
 				flowExtra.reverseFlow()
@@ -41,7 +41,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 		taggedFlow := flowExtra.taggedFlow
 		f.stats.TotalNumFlows++
 		if closed {
-			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportIntervalSec)
+			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportInterval)
 			flowExtra.calcCloseType(false)
 			if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
 				flowExtra.reverseFlow()
@@ -50,7 +50,6 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			flowExtra.taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 			f.flowOutQueue.Put(taggedFlow)
 			flowExtra.reset()
-			f.FlowExtraPool.Put(flowExtra)
 		} else {
 			if f.checkIfDoFlowPerf(flowExtra) {
 				flowExtra.metaFlowPerf.Update(meta, reply, flowExtra, &f.perfCounter)
@@ -58,7 +57,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			taggedFlow := flowExtra.taggedFlow
 			if flowExtra == f.addFlow(flowCache, flowExtra) {
 				// reach limit and output directly
-				flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportIntervalSec)
+				flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportInterval)
 				flowExtra.taggedFlow.CloseType = CLOSE_TYPE_FLOOD
 				if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
 					flowExtra.reverseFlow()
@@ -67,7 +66,6 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 				flowExtra.taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 				f.flowOutQueue.Put(taggedFlow)
 				flowExtra.reset()
-				f.FlowExtraPool.Put(flowExtra)
 			} else {
 				f.stats.CurrNumFlows++
 			}

@@ -23,12 +23,12 @@ const (
 )
 
 type FlowExtra struct {
-	taggedFlow     *TaggedFlow
-	metaFlowPerf   *MetaFlowPerf
-	flowState      FlowState
-	recentTimesSec time.Duration
-	timeoutSec     time.Duration
-	reversed       bool
+	taggedFlow   *TaggedFlow
+	metaFlowPerf *MetaFlowPerf
+	flowState    FlowState
+	recentTime   time.Duration
+	timeout      time.Duration
+	reversed     bool
 }
 
 func (f *FlowExtra) reset() {
