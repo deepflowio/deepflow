@@ -43,6 +43,6 @@ func init() {
 		return
 	}
 	m := &Monitor{proc}
-	stats.RegisterCountable("monitor", stats.EMPTY_TAG, m)
+	stats.RegisterCountable("monitor", m)
 	runtime.SetFinalizer(m, func(m *Monitor) { stats.DeregisterCountable(m) })
 }
