@@ -30,8 +30,8 @@ message Tag {
     optional string id = 1;
     optional uint64 code = 2;
 
-    optional string ip = 4;
-    optional string mac = 5;
+    optional uint32 ip = 4;
+    optional uint64 mac = 5;
     optional uint32 group_id = 6;
     optional int32 l2_epc_id = 7;
     optional int32 l3_epc_id = 8;
@@ -40,10 +40,10 @@ message Tag {
     optional uint32 l3_device_id = 11;
     optional DeviceType l3_device_type = 12;
 
-    optional string ip_0 = 16;
-    optional string ip_1 = 17;
-    optional string mac_0 = 18;
-    optional string mac_1 = 19;
+    optional uint32 ip_0 = 16;
+    optional uint32 ip_1 = 17;
+    optional uint64 mac_0 = 18;
+    optional uint64 mac_1 = 19;
     optional uint32 group_id_0 = 20;
     optional uint32 group_id_1 = 21;
     optional int32 l2_epc_id_0 = 22;
@@ -65,8 +65,8 @@ message Tag {
     optional uint32 vlan_id = 43;
     optional uint32 protocol = 44;
     optional uint32 server_port = 45;
-    optional string host = 46;
-    optional string vtap = 47;
+    optional uint32 host = 46;
+    optional uint32 vtap = 47;
     optional TapType tap_type = 48;
     optional uint32 subnet_id = 49;
     optional uint32 acl_id = 50;
