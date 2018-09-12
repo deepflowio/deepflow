@@ -78,8 +78,8 @@ func (t *PolicyTable) GetCounter() interface{} {
 	}
 	for i := TAP_ANY; i < TAP_MAX; i++ {
 		counter.Acl += uint32(len(t.policyLabel.aclData[i]))
-		counter.FastPath += uint32(len(t.policyLabel.fastPath[i].fastPolicyMap))
-		counter.FastTable += uint32(len(t.cloudPlatformData.fastTable[i].fastMap))
+		counter.FastPath += uint32(t.policyLabel.fastPath[i].fastPolicy.Len())
+		counter.FastTable += uint32(t.cloudPlatformData.fastPath[i].fastPlatform.Len())
 		counter.ArpTable += uint32(len(t.cloudPlatformData.arpTable[i].arpMap))
 	}
 	return counter

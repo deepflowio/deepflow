@@ -37,6 +37,14 @@
   revision = "59788d5eb2591d3497ffb8fafed2f16fe00e7775"
 
 [[projects]]
+  branch = "master"
+  digest = "1:3fb07f8e222402962fa190eb060608b34eddfb64562a18e2167df2de0ece85d8"
+  name = "github.com/golang/groupcache"
+  packages = ["lru"]
+  pruneopts = "UT"
+  revision = "24b0969c4cb722950103eed87108c8d291a8df00"
+
+[[projects]]
   digest = "1:4c0989ca0bcd10799064318923b9bc2db6b4d6338dd75f3f2d86c3511aaaf5cf"
   name = "github.com/golang/protobuf"
   packages = [
@@ -263,6 +271,7 @@
   input-imports = [
     "github.com/OneOfOne/xxhash",
     "github.com/golang-collections/go-datastructures/bitarray",
+    "github.com/golang/groupcache/lru",
     "github.com/golang/protobuf/proto",
     "github.com/google/go-cmp/cmp",
     "github.com/google/gopacket/layers",

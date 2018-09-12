@@ -4,7 +4,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/groupcache/lru"
+
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+)
+
+const (
+	MAX_FASTPATH_LEN = 1 << 20
 )
 
 type Acl struct {
@@ -32,9 +38,8 @@ type FastPolicyData struct {
 }
 
 type FastPolicyTable struct {
-	sync.RWMutex
-
-	fastPolicyMap map[FastKey]*FastPolicyData
+	sync.Mutex
+	fastPolicy *lru.Cache
 }
 
 type PolicyLabel struct {
@@ -46,7 +51,7 @@ func NewPolicyLabel() *PolicyLabel {
 	var fastPath [TAP_MAX]*FastPolicyTable
 	for i := uint32(0); i < uint32(TAP_MAX); i++ {
 		fastPath[i] = &FastPolicyTable{
-			fastPolicyMap: make(map[FastKey]*FastPolicyData),
+			fastPolicy: lru.New(MAX_FASTPATH_LEN),
 		}
 	}
 
@@ -68,29 +73,24 @@ func (l *PolicyLabel) InsertPolicyToFastPath(fastKey *FastKey, policyData *Polic
 		policyData: policyData,
 		timestamp:  time.Now(),
 	}
-
 	l.fastPath[tapType].Lock()
-	l.fastPath[tapType].fastPolicyMap[*fastKey] = fastPolicyData
-	l.fastPath[tapType].Unlock()
-}
-
-func (l *PolicyLabel) DeletePolicyFromFastPath(fastKey *FastKey, tapType TapType) {
-	l.fastPath[tapType].Lock()
-	delete(l.fastPath[tapType].fastPolicyMap, *fastKey)
+	l.fastPath[tapType].fastPolicy.Add(*fastKey, fastPolicyData)
 	l.fastPath[tapType].Unlock()
 }
 
 func (l *PolicyLabel) GetPolicyByFastPath(fastKey *FastKey, tapType TapType) *PolicyData {
-	l.fastPath[tapType].RLock()
-	if policy, ok := l.fastPath[tapType].fastPolicyMap[*fastKey]; ok {
-		l.fastPath[tapType].RUnlock()
-		if DATA_VALID_TIME < time.Now().Sub(policy.timestamp) {
-			l.DeletePolicyFromFastPath(fastKey, tapType)
+	l.fastPath[tapType].Lock()
+	if policy, ok := l.fastPath[tapType].fastPolicy.Get(*fastKey); ok {
+		fastPolicyData := policy.(*FastPolicyData)
+		if DATA_VALID_TIME < time.Now().Sub(fastPolicyData.timestamp) {
+			l.fastPath[tapType].fastPolicy.Remove(*fastKey)
+			l.fastPath[tapType].Unlock()
 			return nil
 		}
-		return policy.policyData
+		l.fastPath[tapType].Unlock()
+		return fastPolicyData.policyData
 	}
-	l.fastPath[tapType].RUnlock()
+	l.fastPath[tapType].Unlock()
 	return nil
 }
 
