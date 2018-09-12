@@ -30,7 +30,10 @@ const (
 	ADAPTER_CMD_SHOW = iota
 )
 
-var log = logging.MustGetLogger("trident_adapter")
+var (
+	log            = logging.MustGetLogger("trident_adapter")
+	zeroMetaPacket = datatype.MetaPacket{}
+)
 
 type PacketCounter struct {
 	RxPackets uint64 `statsd:"rx_packets"`
@@ -99,6 +102,7 @@ func NewTridentAdapter(queues ...queue.QueueWriter) *TridentAdapter {
 
 func (a *TridentAdapter) alloc() *datatype.MetaPacket {
 	metaPacket := &a.block[a.blockCursor]
+	*metaPacket = zeroMetaPacket
 	a.blockCursor++
 	if a.blockCursor >= len(a.block) {
 		a.block = a.metaPacketPool.Get().(*MetaPacketBlock)
