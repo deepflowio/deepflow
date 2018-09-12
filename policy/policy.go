@@ -45,6 +45,17 @@ type PolicyTable struct {
 	policyLabel       *PolicyLabel
 }
 
+type PolicyCounter struct {
+	Acl      uint32 `statsd:"acl"`
+	FastPath uint32 `statsd:"fast_path"`
+
+	MacTable   uint32 `statsd:"mac_table"`
+	IpTable    uint32 `statsd:"ip_table"`
+	EpcIpTable uint32 `statsd:"epc_ip_table"`
+	FastTable  uint32 `statsd:"fast_table"`
+	ArpTable   uint32 `statsd:"arp_table"`
+}
+
 func NewPolicyTable( /* 传入Protobuf结构体指针 */ actionTypes ActionType) *PolicyTable {
 	/* 使用actionTypes过滤，例如
 	 * Trident仅关心PACKET_BROKER和PACKET_STORE，
@@ -54,6 +65,24 @@ func NewPolicyTable( /* 传入Protobuf结构体指针 */ actionTypes ActionType)
 		cloudPlatformData: NewCloudPlatformData(),
 		policyLabel:       NewPolicyLabel(),
 	}
+}
+
+func (t *PolicyTable) GetCounter() interface{} {
+	counter := &PolicyCounter{
+		MacTable:   uint32(len(t.cloudPlatformData.macTable.macMap)),
+		EpcIpTable: uint32(len(t.cloudPlatformData.epcIpTable.epcIpMap)),
+	}
+
+	for i := 0; i < MASK_LEN; i++ {
+		counter.IpTable += uint32(len(t.cloudPlatformData.ipTables[i].ipMap))
+	}
+	for i := TAP_ANY; i < TAP_MAX; i++ {
+		counter.Acl += uint32(len(t.policyLabel.aclData[i]))
+		counter.FastPath += uint32(len(t.policyLabel.fastPath[i].fastPolicyMap))
+		counter.FastTable += uint32(len(t.cloudPlatformData.fastTable[i].fastMap))
+		counter.ArpTable += uint32(len(t.cloudPlatformData.arpTable[i].arpMap))
+	}
+	return counter
 }
 
 // Trident用于PACKET_BROKER、PACKET_STORE
