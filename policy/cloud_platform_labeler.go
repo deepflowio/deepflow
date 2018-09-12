@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/groupcache/lru"
 	. "github.com/google/gopacket/layers"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -34,8 +35,8 @@ type EpcIpTable struct {
 }
 
 type FastTable struct {
-	sync.RWMutex
-	fastMap FastMapData
+	sync.Mutex
+	fastPlatform *lru.Cache
 }
 
 type ArpTable struct {
@@ -49,7 +50,7 @@ type CloudPlatformData struct {
 	epcIpTable    *EpcIpTable
 	ipGroup       *IpResourceGroup
 	netmaskBitmap uint32
-	fastTable     [TAP_MAX]*FastTable
+	fastPath      [TAP_MAX]*FastTable
 	arpTable      [TAP_MAX]*ArpTable
 }
 
@@ -66,10 +67,10 @@ func NewCloudPlatformData() *CloudPlatformData {
 	epcIpTable := &EpcIpTable{
 		epcIpMap: make(EpcIpMapData),
 	}
-	var fastTable [TAP_MAX]*FastTable
+	var fastPath [TAP_MAX]*FastTable
 	for i := uint32(0); i < uint32(TAP_MAX); i++ {
-		fastTable[i] = &FastTable{
-			fastMap: make(FastMapData),
+		fastPath[i] = &FastTable{
+			fastPlatform: lru.New(MAX_FASTPATH_LEN),
 		}
 	}
 	var arpTable [TAP_MAX]*ArpTable
@@ -84,7 +85,7 @@ func NewCloudPlatformData() *CloudPlatformData {
 		epcIpTable:    epcIpTable,
 		ipGroup:       NewIpResourceGroup(),
 		netmaskBitmap: uint32(0),
-		fastTable:     fastTable,
+		fastPath:      fastPath,
 		arpTable:      arpTable,
 	}
 }
@@ -204,28 +205,30 @@ func (d *CloudPlatformData) InsertInfoToFastPath(hash MacIpInportKey, endpointIn
 		hash:         hash,
 		timestamp:    time.Now(),
 	}
-	d.fastTable[tapType].Lock()
-	d.fastTable[tapType].fastMap[hash] = fastPlatformData
-	d.fastTable[tapType].Unlock()
+	d.fastPath[tapType].Lock()
+	d.fastPath[tapType].fastPlatform.Add(hash, fastPlatformData)
+	d.fastPath[tapType].Unlock()
 }
 
 func (d *CloudPlatformData) DeleteFastPathData(hash MacIpInportKey, tapType TapType) {
-	d.fastTable[tapType].Lock()
-	delete(d.fastTable[tapType].fastMap, hash)
-	d.fastTable[tapType].Unlock()
+	d.fastPath[tapType].Lock()
+	d.fastPath[tapType].fastPlatform.Remove(hash)
+	d.fastPath[tapType].Unlock()
 }
 
 func (d *CloudPlatformData) GetInfoByFastPath(hash MacIpInportKey, tapType TapType) *EndpointInfo {
-	d.fastTable[tapType].RLock()
-	if data, ok := d.fastTable[tapType].fastMap[hash]; ok {
-		d.fastTable[tapType].RUnlock()
-		if DATA_VALID_TIME < time.Now().Sub(data.timestamp) {
-			d.DeleteFastPathData(hash, tapType)
+	d.fastPath[tapType].Lock()
+	if data, ok := d.fastPath[tapType].fastPlatform.Get(hash); ok {
+		fastPlatformData := data.(*FastPlatformData)
+		if DATA_VALID_TIME < time.Now().Sub(fastPlatformData.timestamp) {
+			d.fastPath[tapType].fastPlatform.Remove(hash)
+			d.fastPath[tapType].Unlock()
 			return nil
 		}
-		return data.endpointInfo
+		d.fastPath[tapType].Unlock()
+		return fastPlatformData.endpointInfo
 	}
-	d.fastTable[tapType].RUnlock()
+	d.fastPath[tapType].Unlock()
 	return nil
 }
 
