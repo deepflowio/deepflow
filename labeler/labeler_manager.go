@@ -15,6 +15,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/policy"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
+	"gitlab.x.lan/yunshan/droplet-libs/stats"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
@@ -54,7 +55,12 @@ func NewLabelerManager(readQueues ...queue.QueueReader) *LabelerManager {
 		readQueues:  readQueues,
 	}
 	dropletctl.Register(dropletctl.DROPLETCTL_LABELER, labeler)
+	stats.RegisterCountable("labeler", labeler)
 	return labeler
+}
+
+func (l *LabelerManager) GetCounter() interface{} {
+	return l.policyTable.GetCounter()
 }
 
 func (l *LabelerManager) RegisterAppQueue(queueType QueueType, appQueues ...queue.QueueWriter) {
