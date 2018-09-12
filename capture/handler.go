@@ -39,6 +39,7 @@ func (h *DataHandler) confirmAlloc() {
 	h.blockCursor++
 	if h.blockCursor >= len(*h.block) {
 		h.block = h.Get().(*MetaPacketBlock)
+		*h.block = MetaPacketBlock{} // 回收的block包含脏数据，因此需要重新清空
 		h.blockCursor = 0
 	}
 }
