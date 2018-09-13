@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -23,7 +22,7 @@ import (
 var log = logging.MustGetLogger("queue_manager")
 
 type Manager struct {
-	queues map[string]*Queue
+	queues map[string]MonitorOperator
 }
 
 const (
@@ -34,7 +33,7 @@ const (
 
 func NewManager() *Manager {
 	manager := &Manager{}
-	manager.queues = make(map[string]*Queue)
+	manager.queues = make(map[string]MonitorOperator)
 	dropletctl.Register(dropletctl.DROPLETCTL_QUEUE, manager)
 	return manager
 }
@@ -86,26 +85,18 @@ func (m *Manager) RecvCommand(conn *net.UDPConn, port int, operate uint16, arg *
 	}
 }
 
-func (m *Manager) NewQueue(name string, size int, data fmt.Stringer) queue.Queue {
-	q := &Queue{DebugOn: false, Name: name, Data: data}
+func (m *Manager) NewQueue(name string, size int) queue.Queue {
+	q := &Queue{}
 	q.Init(name, size)
 	m.queues[name] = q
 	return q
 }
 
-func (m *Manager) NewQueues(name string, size int, count int, data fmt.Stringer) ([]queue.QueueReader, []queue.QueueWriter) {
-	readQueues := make([]queue.QueueReader, count)
-	writeQueues := make([]queue.QueueWriter, count)
-	queueName := name
-	for i := 0; i < count; i++ {
-		if i > 0 {
-			queueName = name + "_" + strconv.Itoa(i)
-		}
-		queue := m.NewQueue(queueName, size, data)
-		readQueues[i] = queue
-		writeQueues[i] = queue
-	}
-	return readQueues, writeQueues
+func (m *Manager) NewQueues(name string, size int, count int) queue.MultiQueue {
+	q := &MultiQueue{}
+	q.Init(name, size, count)
+	m.queues[name] = q
+	return q
 }
 
 func sendCmdOnly(operate int, arg *bytes.Buffer) (*net.UDPConn, *bytes.Buffer, error) {

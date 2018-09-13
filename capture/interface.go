@@ -15,7 +15,7 @@ import (
 	"golang.org/x/net/bpf"
 )
 
-func StartCapture(interfaceName string, ip net.IP, isTapInterface bool, outputQueue queue.QueueWriter) (io.Closer, error) {
+func StartCapture(interfaceName string, ip net.IP, isTapInterface bool, outputQueue queue.MultiQueueWriter) (io.Closer, error) {
 	if _, err := net.InterfaceByName(interfaceName); err != nil {
 		return nil, err
 	}

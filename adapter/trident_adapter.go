@@ -58,7 +58,7 @@ type tridentInstance struct {
 type MetaPacketBlock = [1024]datatype.MetaPacket
 
 type TridentAdapter struct {
-	queues          []queue.QueueWriter
+	queues          queue.MultiQueueWriter
 	queueCount      int
 	hashBuffers     [QUEUE_MAX][PACKET_MAX]interface{}
 	hashBufferCount [QUEUE_MAX]int
@@ -75,12 +75,12 @@ type TridentAdapter struct {
 	listener *net.UDPConn
 }
 
-func NewTridentAdapter(queues ...queue.QueueWriter) *TridentAdapter {
+func NewTridentAdapter(queues queue.MultiQueueWriter, count int) *TridentAdapter {
 	adapter := &TridentAdapter{}
 	adapter.counter = &PacketCounter{}
 	adapter.stats = &PacketCounter{}
 	adapter.queues = queues
-	adapter.queueCount = len(queues)
+	adapter.queueCount = count
 	adapter.instances = make(map[TridentKey]*tridentInstance)
 	adapter.udpPool.New = func() interface{} { return make([]byte, UDP_BUFFER_SIZE) }
 	adapter.metaPacketPool.New = func() interface{} {
@@ -208,7 +208,7 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) {
 	for index := 0; index < a.queueCount; index++ {
 		count := a.hashBufferCount[index]
 		if count > 0 {
-			a.queues[index].Put(a.hashBuffers[index][:count]...)
+			a.queues.Put(queue.HashKey(index), a.hashBuffers[index][:count]...)
 			a.hashBufferCount[index] = 0
 		}
 	}

@@ -25,7 +25,7 @@ type DataHandler struct {
 	block       *MetaPacketBlock
 	blockCursor int
 	ip          datatype.IPv4Int
-	queue       queue.QueueWriter
+	queue       queue.MultiQueueWriter
 }
 
 func (h *DataHandler) preAlloc() *datatype.MetaPacket {
@@ -52,7 +52,9 @@ func (h *DataHandler) Handle(timestamp Timestamp, packet RawPacket) {
 		return
 	}
 	h.confirmAlloc()
-	h.queue.Put(metaPacket)
+	hash := metaPacket.InPort + metaPacket.IpSrc + metaPacket.IpDst +
+		uint32(metaPacket.Protocol) + uint32(metaPacket.PortSrc) + uint32(metaPacket.PortDst)
+	h.queue.Put(queue.HashKey(hash), metaPacket)
 }
 
 func (h *DataHandler) Init() *DataHandler {
@@ -84,5 +86,7 @@ func (h *TapHandler) Handle(timestamp Timestamp, packet RawPacket) {
 		return
 	}
 	(*DataHandler)(h).confirmAlloc()
-	h.queue.Put(metaPacket)
+	hash := metaPacket.InPort + metaPacket.IpSrc + metaPacket.IpDst +
+		uint32(metaPacket.Protocol) + uint32(metaPacket.PortSrc) + uint32(metaPacket.PortDst)
+	h.queue.Put(queue.HashKey(hash), metaPacket)
 }
