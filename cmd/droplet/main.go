@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"strings"
@@ -20,9 +21,17 @@ func execName() string {
 var log = logging.MustGetLogger(execName())
 
 var configPath = flag.String("f", "/etc/droplet.yaml", "Specify config file location")
+var version = flag.Bool("v", false, "Display the version")
+
+var RevCount, Revision, CommitDate string
 
 func main() {
 	InitConsoleLog("info")
+	flag.Parse()
+	if *version {
+		fmt.Printf("%s-%s %s\n", RevCount, Revision, CommitDate)
+		os.Exit(0)
+	}
 
 	droplet.Start(*configPath)
 
