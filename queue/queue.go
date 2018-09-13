@@ -57,7 +57,7 @@ func (q *OverwriteQueue) Init(module string, size int, statOptions ...stats.Stat
 	q.items = make([]interface{}, size)
 	q.waiting = make([]Transaction, 0, 10)
 	q.size = uint(size)
-	stats.RegisterCountable(module, q, statOptions)
+	stats.RegisterCountable(module, q, statOptions...)
 	runtime.SetFinalizer(q, func(q *OverwriteQueue) { q.Release() })
 }
 
