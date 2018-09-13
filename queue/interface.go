@@ -1,12 +1,14 @@
 package queue
 
+type HashKey = uint8
+
 type QueueReader interface {
 	Get() interface{}
 	Gets([]interface{}) int
 }
 
 type QueueWriter interface {
-	Put(items ...interface{}) error
+	Put(...interface{}) error
 }
 
 type Queue interface {
@@ -14,4 +16,20 @@ type Queue interface {
 	QueueWriter
 
 	Len() int
+}
+
+type MultiQueueReader interface {
+	Get(HashKey) interface{}
+	Gets(HashKey, []interface{}) int
+}
+
+type MultiQueueWriter interface {
+	Put(HashKey, ...interface{}) error
+}
+
+type MultiQueue interface {
+	MultiQueueReader
+	MultiQueueWriter
+
+	Len(HashKey) int
 }
