@@ -17,18 +17,16 @@ type Counter struct {
 	Memory     uint64  `statsd:"memory"` // physical + swap in bytes
 }
 
-type Monitor struct {
-	proc *process.Process
-}
+type Monitor process.Process
 
 func (m *Monitor) GetCounter() interface{} {
 	counter := Counter{}
-	percent, err := m.proc.CPUPercent()
+	percent, err := (*process.Process)(m).CPUPercent()
 	if err != nil {
 		return counter
 	}
 	counter.CpuPercent = percent
-	mem, err := m.proc.MemoryInfo()
+	mem, err := (*process.Process)(m).MemoryInfo()
 	if err != nil {
 		return counter
 	}
@@ -42,7 +40,7 @@ func init() {
 		log.Errorf("%v", err)
 		return
 	}
-	m := &Monitor{proc}
+	m := (*Monitor)(proc)
 	stats.RegisterCountable("monitor", m)
 	runtime.SetFinalizer(m, func(m *Monitor) { stats.DeregisterCountable(m) })
 }
