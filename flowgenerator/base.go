@@ -77,6 +77,7 @@ var defaultTimeoutConfig TimeoutConfig = TimeoutConfig{
 type FlowGeneratorStats struct {
 	TotalNumFlows                uint64 `statsd:"total_flow"`
 	CurrNumFlows                 uint64 `statsd:"current_flow"`
+	FloodDropPackets             uint64 `statsd:"flood_drop_packet"`
 	NonEmptyFlowCacheNum         int    `statsd:"non_empty_flow_cache_num"`
 	MaxFlowCacheLen              int    `statsd:"max_flow_cache_len"`
 	cleanRoutineFlowCacheNums    []int

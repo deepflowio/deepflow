@@ -36,6 +36,10 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			}
 		}
 	} else {
+		if f.stats.CurrNumFlows >= f.flowLimitNum {
+			f.stats.FloodDropPackets++
+			return
+		}
 		closed := false
 		flowExtra, closed, reply = f.initTcpFlow(meta, flowKey)
 		taggedFlow := flowExtra.taggedFlow
@@ -47,28 +51,15 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 				flowExtra.reverseFlow()
 				flowExtra.reversed = !flowExtra.reversed
 			}
-			flowExtra.taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
+			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 			f.flowOutQueue.Put(taggedFlow)
 			flowExtra.reset()
 		} else {
 			if f.checkIfDoFlowPerf(flowExtra) {
 				flowExtra.metaFlowPerf.Update(meta, reply, flowExtra, &f.perfCounter)
 			}
-			taggedFlow := flowExtra.taggedFlow
-			if flowExtra == f.addFlow(flowCache, flowExtra) {
-				// reach limit and output directly
-				flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportInterval)
-				flowExtra.taggedFlow.CloseType = CLOSE_TYPE_FLOOD
-				if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
-					flowExtra.reverseFlow()
-					flowExtra.reversed = !flowExtra.reversed
-				}
-				flowExtra.taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
-				f.flowOutQueue.Put(taggedFlow)
-				flowExtra.reset()
-			} else {
-				f.stats.CurrNumFlows++
-			}
+			f.addFlow(flowCache, flowExtra)
+			f.stats.CurrNumFlows++
 		}
 	}
 }

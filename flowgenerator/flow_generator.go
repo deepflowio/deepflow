@@ -125,9 +125,6 @@ func (f *FlowGenerator) initFlowCache() bool {
 }
 
 func (f *FlowGenerator) addFlow(flowCache *FlowCache, flowExtra *FlowExtra) *FlowExtra {
-	if f.stats.CurrNumFlows >= f.flowLimitNum {
-		return flowExtra
-	}
 	flowCache.Lock()
 	flowCache.flowList.PushFront(flowExtra)
 	flowCache.Unlock()
@@ -464,11 +461,7 @@ loop:
 		flowCache.Lock()
 		for e := flowCache.flowList.Back(); e != nil; e = e.Prev() {
 			flowExtra := e.Value
-			// remaining flows are too new to output
-			if flowExtra.recentTime >= cleanRange {
-				break
-			}
-			if flowExtra.recentTime+flowExtra.timeout <= now {
+			if flowExtra.recentTime < cleanRange && flowExtra.recentTime+flowExtra.timeout <= now {
 				taggedFlow := flowExtra.taggedFlow
 				f.stats.CurrNumFlows--
 				flowExtra.setCurFlowInfo(now, forceReportInterval)
@@ -486,6 +479,7 @@ loop:
 				}
 				flowExtra.reset()
 				flowCache.flowList.Remove(e)
+				continue
 			} else if flowExtra.taggedFlow.StartTime+forceReportInterval < now {
 				taggedFlow := flowExtra.taggedFlow
 				flowExtra.setCurFlowInfo(now, forceReportInterval)
@@ -495,11 +489,9 @@ loop:
 					flowExtra.reversed = !flowExtra.reversed
 				}
 				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
-				if taggedFlow.FlowMetricsPeerSrc.PacketCount != 0 || taggedFlow.FlowMetricsPeerDst.PacketCount != 0 {
-					putFlow := *taggedFlow
-					flowOutBuffer[flowOutNum] = &putFlow
-					flowOutNum++
-				}
+				putFlow := *taggedFlow
+				flowOutBuffer[flowOutNum] = &putFlow
+				flowOutNum++
 				if flowOutNum >= FLOW_OUT_BUFFER_CAP {
 					flowOutQueue.Put(flowOutBuffer[:flowOutNum]...)
 					flowOutNum = 0
