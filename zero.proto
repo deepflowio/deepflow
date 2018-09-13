@@ -70,6 +70,13 @@ message Tag {
     optional TapType tap_type = 48;
     optional uint32 subnet_id = 49;
     optional uint32 acl_id = 50;
+
+    repeated StringField custom_fields = 60;
+}
+
+message StringField {
+    optional string key = 1;
+    optional string value = 2;
 }
 
 message UsageStats {
