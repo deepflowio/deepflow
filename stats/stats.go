@@ -58,7 +58,7 @@ func registerCountable(module string, countable Countable, opts ...StatsOption) 
 			options = append(options, statsd.Tags(tagsOption...))
 		} else if opt, ok := opt.(OptionInterval); ok {
 			i := time.Duration(opt)
-			if time.Duration(i)%time.Second > 0 {
+			if i%time.Second > 0 {
 				msg := fmt.Sprintf("Interval must be multiple of second")
 				return errors.New(msg)
 			}
