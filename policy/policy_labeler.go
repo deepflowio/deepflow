@@ -161,7 +161,7 @@ func getPolicyAction(srcGroups []uint32, dstGroups []uint32, acl *Acl) bool {
 }
 
 func (l *PolicyLabel) GetPolicyFromPolicyTable(endpointData *EndpointData, key *LookupKey, acls []*Acl) []*AclAction {
-	var aclActions []*AclAction
+	aclActions := make([]*AclAction, 0, 32)
 	for _, acl := range acls {
 		direction := NO_DIRECTION
 		if judgeProto(acl.Proto, key.Proto) && judgeVlan(acl.Vlan, uint32(key.Vlan)) {

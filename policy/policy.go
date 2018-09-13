@@ -1,6 +1,9 @@
 package policy
 
 import (
+	"runtime"
+	"sync"
+
 	"github.com/op/go-logging"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -40,9 +43,15 @@ type GroupId uint32
 type ServiceId uint32
 type PolicyId uint32
 
+type PolicyDataBlock = [1024]PolicyData
+
 type PolicyTable struct {
 	cloudPlatformData *CloudPlatformData
 	policyLabel       *PolicyLabel
+
+	policyDataPoll sync.Pool
+	block          *PolicyDataBlock
+	blockCursor    int
 }
 
 type PolicyCounter struct {
@@ -61,10 +70,28 @@ func NewPolicyTable( /* 传入Protobuf结构体指针 */ actionTypes ActionType)
 	 * Trident仅关心PACKET_BROKER和PACKET_STORE，
 	 * 那么就不要将EPC等云平台信息进行计算。
 	 * droplet关心**几乎**所有，对关心的信息进行计算*/
-	return &PolicyTable{
+	policyTable := &PolicyTable{
 		cloudPlatformData: NewCloudPlatformData(),
 		policyLabel:       NewPolicyLabel(),
 	}
+	policyTable.policyDataPoll.New = func() interface{} {
+		block := new(PolicyDataBlock)
+		*block = PolicyDataBlock{}
+		runtime.SetFinalizer(block, func(b *PolicyDataBlock) { policyTable.policyDataPoll.Put(b) })
+		return block
+	}
+	policyTable.block = policyTable.policyDataPoll.Get().(*PolicyDataBlock)
+	return policyTable
+}
+
+func (t *PolicyTable) alloc() *PolicyData {
+	policyData := &t.block[t.blockCursor]
+	t.blockCursor++
+	if t.blockCursor >= len(t.block) {
+		t.block = t.policyDataPoll.Get().(*PolicyDataBlock)
+		t.blockCursor = 0
+	}
+	return policyData
 }
 
 func (t *PolicyTable) GetCounter() interface{} {
@@ -110,7 +137,7 @@ func (t *PolicyTable) GetPolicyDataByFastPath(endpointData *EndpointData, key *L
 }
 
 func (t *PolicyTable) GetPolicyData(endpointData *EndpointData, key *LookupKey) *PolicyData {
-	policyData := &PolicyData{}
+	policyData := t.alloc()
 	if aclActions := t.policyLabel.GetPolicyData(endpointData, key); aclActions != nil {
 		for _, aclAction := range aclActions {
 			policyData.Merge(aclAction)
@@ -123,7 +150,7 @@ func (t *PolicyTable) GetPolicyData(endpointData *EndpointData, key *LookupKey) 
 // Droplet用于ANALYTIC_*、PACKET_BROKER、PACKET_STORE
 func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData) {
 	if !key.Tap.CheckTapType(key.Tap) {
-		return NewEndpointData(), &PolicyData{}
+		return NewEndpointData(), t.alloc()
 	}
 	endpointData, fastKey := t.cloudPlatformData.GetEndpointData(key)
 	if key.Tap == TAP_TOR {
