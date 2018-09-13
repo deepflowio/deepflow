@@ -15,22 +15,14 @@ func (f *FlowGenerator) processUdpPacket(meta *MetaPacket) {
 	if flowExtra, reply = flowCache.keyMatch(meta, flowKey); flowExtra != nil {
 		f.updateUdpFlow(flowExtra, meta, reply)
 	} else {
-		flowExtra = f.initUdpFlow(meta, flowKey)
-		taggedFlow := flowExtra.taggedFlow
-		f.stats.TotalNumFlows++
-		if flowExtra == f.addFlow(flowCache, flowExtra) {
-			// reach limit and output directly
-			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportInterval)
-			flowExtra.taggedFlow.CloseType = CLOSE_TYPE_FLOOD
-			if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
-				flowExtra.reverseFlow()
-				flowExtra.reversed = !flowExtra.reversed
-			}
-			f.flowOutQueue.Put(taggedFlow)
-			flowExtra.reset()
-		} else {
-			f.stats.CurrNumFlows++
+		if f.stats.CurrNumFlows >= f.flowLimitNum {
+			f.stats.FloodDropPackets++
+			return
 		}
+		flowExtra = f.initUdpFlow(meta, flowKey)
+		f.stats.TotalNumFlows++
+		f.addFlow(flowCache, flowExtra)
+		f.stats.CurrNumFlows++
 	}
 }
 

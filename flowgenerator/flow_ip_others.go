@@ -15,17 +15,14 @@ func (f *FlowGenerator) processOtherIpPacket(meta *MetaPacket) {
 	if flowExtra, reply = flowCache.keyMatch(meta, flowKey); flowExtra != nil {
 		f.updateOtherIpFlow(flowExtra, meta, reply)
 	} else {
+		if f.stats.CurrNumFlows >= f.flowLimitNum {
+			f.stats.FloodDropPackets++
+			return
+		}
 		flowExtra = f.initOtherIpFlow(meta, flowKey)
 		f.stats.TotalNumFlows++
-		if flowExtra == f.addFlow(flowCache, flowExtra) {
-			// reach limit and output directly
-			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportInterval)
-			flowExtra.taggedFlow.CloseType = CLOSE_TYPE_FLOOD
-			f.flowOutQueue.Put(flowExtra.taggedFlow)
-			flowExtra.reset()
-		} else {
-			f.stats.CurrNumFlows++
-		}
+		f.addFlow(flowCache, flowExtra)
+		f.stats.CurrNumFlows++
 	}
 }
 
