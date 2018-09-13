@@ -32,10 +32,11 @@ const (
 )
 
 type LabelerManager struct {
-	policyTable *policy.PolicyTable
-	readQueues  []queue.QueueReader
-	appQueues   [MAX_QUEUE_NUM][]queue.QueueWriter
-	running     bool
+	policyTable     *policy.PolicyTable
+	readQueues      queue.MultiQueueReader
+	readQueuesCount int
+	appQueues       [MAX_QUEUE_NUM][]queue.QueueWriter
+	running         bool
 }
 
 const (
@@ -49,10 +50,11 @@ type DumpKey struct {
 	InPort uint32
 }
 
-func NewLabelerManager(readQueues ...queue.QueueReader) *LabelerManager {
+func NewLabelerManager(readQueues queue.MultiQueueReader, count int) *LabelerManager {
 	labeler := &LabelerManager{
-		policyTable: policy.NewPolicyTable(datatype.ACTION_FLOW_STAT),
-		readQueues:  readQueues,
+		policyTable:     policy.NewPolicyTable(datatype.ACTION_FLOW_STAT),
+		readQueues:      readQueues,
+		readQueuesCount: count,
 	}
 	dropletctl.Register(dropletctl.DROPLETCTL_LABELER, labeler)
 	stats.RegisterCountable("labeler", labeler)
@@ -117,14 +119,13 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket) *datatype.Policy
 }
 
 func (l *LabelerManager) run(index int) {
-	queue := l.readQueues[index]
 	meteringQueueCount := uint32(len(l.appQueues[METERING_QUEUE]))
 	meteringQueues := l.appQueues[METERING_QUEUE]
 	flowQueueCount := uint32(len(l.appQueues[FLOW_QUEUE]))
 	flowQueues := l.appQueues[FLOW_QUEUE]
 
 	for l.running {
-		packet := queue.Get().(*datatype.MetaPacket)
+		packet := l.readQueues.Get(queue.HashKey(index)).(*datatype.MetaPacket)
 		action := l.GetPolicy(packet)
 		hash := packet.InPort + packet.IpSrc + packet.IpDst +
 			uint32(packet.Protocol) + uint32(packet.PortSrc) + uint32(packet.PortDst)
@@ -143,7 +144,7 @@ func (l *LabelerManager) Start() {
 	if !l.running {
 		l.running = true
 		log.Info("Start labeler manager")
-		for i, _ := range l.readQueues {
+		for i := 0; i < l.readQueuesCount; i++ {
 			go l.run(i)
 		}
 	}
