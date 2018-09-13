@@ -65,18 +65,17 @@ type PolicyCounter struct {
 	ArpTable   uint32 `statsd:"arp_table"`
 }
 
-func NewPolicyTable( /* 传入Protobuf结构体指针 */ actionTypes ActionType) *PolicyTable {
-	/* 使用actionTypes过滤，例如
-	 * Trident仅关心PACKET_BROKER和PACKET_STORE，
-	 * 那么就不要将EPC等云平台信息进行计算。
-	 * droplet关心**几乎**所有，对关心的信息进行计算*/
+func NewPolicyTable(actionTypes ActionType) *PolicyTable { // 传入Protobuf结构体指针
+	// 使用actionTypes过滤，例如
+	// Trident仅关心PACKET_BROKER和PACKET_STORE，
+	// 那么就不要将EPC等云平台信息进行计算。
+	// droplet关心**几乎**所有，对关心的信息进行计算
 	policyTable := &PolicyTable{
 		cloudPlatformData: NewCloudPlatformData(),
 		policyLabel:       NewPolicyLabel(),
 	}
 	policyTable.policyDataPoll.New = func() interface{} {
 		block := new(PolicyDataBlock)
-		*block = PolicyDataBlock{}
 		runtime.SetFinalizer(block, func(b *PolicyDataBlock) { policyTable.policyDataPoll.Put(b) })
 		return block
 	}
@@ -89,6 +88,7 @@ func (t *PolicyTable) alloc() *PolicyData {
 	t.blockCursor++
 	if t.blockCursor >= len(t.block) {
 		t.block = t.policyDataPoll.Get().(*PolicyDataBlock)
+		*t.block = PolicyDataBlock{}
 		t.blockCursor = 0
 	}
 	return policyData
