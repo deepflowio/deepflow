@@ -45,6 +45,14 @@
   revision = "59788d5eb2591d3497ffb8fafed2f16fe00e7775"
 
 [[projects]]
+  branch = "master"
+  digest = "1:3fb07f8e222402962fa190eb060608b34eddfb64562a18e2167df2de0ece85d8"
+  name = "github.com/golang/groupcache"
+  packages = ["lru"]
+  pruneopts = "UT"
+  revision = "24b0969c4cb722950103eed87108c8d291a8df00"
+
+[[projects]]
   digest = "1:4c0989ca0bcd10799064318923b9bc2db6b4d6338dd75f3f2d86c3511aaaf5cf"
   name = "github.com/golang/protobuf"
   packages = [
@@ -197,7 +205,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:9b82464a71db527e32eb21e7da863586831a67cd20ab0b625d40f6c78ceb7b37"
+  digest = "1:45424624e3b85419ab613c275980809c6f12c703b4bc6aa54fd0d483735f98bb"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "datatype",
@@ -213,7 +221,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "6a5e367d1428708d4ba19f69c1c90558ce6efa4e"
+  revision = "ad7c27b28780ff916a67a7dc4eddedd570203b95"
 
 [[projects]]
   branch = "feature-os"
