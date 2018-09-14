@@ -11,7 +11,7 @@ import (
 
 func TestGetPlatformData(t *testing.T) {
 
-	policy := NewPolicyTable(ACTION_PACKET_STAT)
+	policy := NewPolicyTable(ACTION_PACKET_STAT, 1)
 
 	srcIp := NewIPFromString("192.168.2.12")
 	dstIp := NewIPFromString("192.168.0.11")
@@ -94,7 +94,7 @@ func TestGetPlatformData(t *testing.T) {
 }
 
 func TestGetPlatformDataAboutArp(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_STAT)
+	policy := NewPolicyTable(ACTION_PACKET_STAT, 1)
 
 	srcIp := NewIPFromString("192.168.2.12")
 	dstIp := NewIPFromString("192.168.0.11")
