@@ -26,16 +26,16 @@ var log = logging.MustGetLogger("labeler")
 type QueueType uint8
 
 const (
-	FLOW_QUEUE QueueType = iota
-	METERING_QUEUE
-	MAX_QUEUE_NUM
+	QUEUE_TYPE_FLOW QueueType = iota
+	QUEUE_TYPE_METERING
+	QUEUE_TYPE_MAX
 )
 
 type LabelerManager struct {
 	policyTable     *policy.PolicyTable
 	readQueues      queue.MultiQueueReader
 	readQueuesCount int
-	appQueues       [MAX_QUEUE_NUM][]queue.QueueWriter
+	appQueues       [QUEUE_TYPE_MAX]queue.MultiQueueWriter
 	running         bool
 }
 
@@ -65,7 +65,7 @@ func (l *LabelerManager) GetCounter() interface{} {
 	return l.policyTable.GetCounter()
 }
 
-func (l *LabelerManager) RegisterAppQueue(queueType QueueType, appQueues ...queue.QueueWriter) {
+func (l *LabelerManager) RegisterAppQueue(queueType QueueType, appQueues queue.MultiQueueWriter) {
 	l.appQueues[queueType] = appQueues
 }
 
@@ -120,21 +120,17 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *data
 }
 
 func (l *LabelerManager) run(index int) {
-	meteringQueueCount := uint32(len(l.appQueues[METERING_QUEUE]))
-	meteringQueues := l.appQueues[METERING_QUEUE]
-	flowQueueCount := uint32(len(l.appQueues[FLOW_QUEUE]))
-	flowQueues := l.appQueues[FLOW_QUEUE]
+	meteringQueues := l.appQueues[QUEUE_TYPE_METERING]
+	flowQueues := l.appQueues[QUEUE_TYPE_FLOW]
 
 	for l.running {
 		packet := l.readQueues.Get(queue.HashKey(index)).(*datatype.MetaPacket)
 		action := l.GetPolicy(packet, index)
-		hash := packet.InPort + packet.IpSrc + packet.IpDst +
-			uint32(packet.Protocol) + uint32(packet.PortSrc) + uint32(packet.PortDst)
 		if (action.ActionList & datatype.ACTION_PACKET_STAT) != 0 {
-			meteringQueues[hash%meteringQueueCount].Put(packet)
+			meteringQueues.Put(queue.HashKey(packet.Hash), packet)
 		}
 		if (action.ActionList & datatype.ACTION_FLOW_STAT) != 0 {
-			flowQueues[hash%flowQueueCount].Put(packet)
+			flowQueues.Put(queue.HashKey(packet.Hash), packet)
 		}
 	}
 

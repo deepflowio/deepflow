@@ -14,7 +14,7 @@ import (
 
 const (
 	UDP_MAXLEN               = 8192
-	DROPLET_MESSAGE_ARGS_LEN = 4096
+	DROPLET_MESSAGE_ARGS_LEN = 8000
 )
 
 type DropletMessage struct {
@@ -67,6 +67,10 @@ func SendToDroplet(module DropletCtlModuleId, operate DropletCtlModuleOperate, a
 }
 
 func SendToDropletCtl(conn *net.UDPConn, port int, result uint32, args *bytes.Buffer) {
+	if args != nil && args.Len() > DROPLET_MESSAGE_ARGS_LEN {
+		log.Warningf("len(args) > %v", DROPLET_MESSAGE_ARGS_LEN)
+		return
+	}
 	dst := &net.UDPAddr{IP: net.ParseIP(DROPLETCTL_IP), Port: port}
 	buffer := bytes.Buffer{}
 	msg := DropletMessage{Module: 0, Result: result, Operate: 11}

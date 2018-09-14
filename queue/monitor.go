@@ -70,8 +70,11 @@ func (m *Monitor) sendDebug(conn *net.UDPConn, port int, items []interface{}) {
 }
 
 func (m *Monitor) send(items []interface{}) {
-	if m.isDebugOn() {
-		m.ch <- items
+	if m.isDebugOn() && len(items) > 0 {
+		select {
+		case m.ch <- items:
+		default:
+		}
 	}
 }
 

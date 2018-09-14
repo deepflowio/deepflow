@@ -103,14 +103,15 @@ type FlowGenerator struct {
 	TimeoutConfig
 	FastPath
 
-	metaPacketHeaderInQueue QueueReader
+	metaPacketHeaderInQueue MultiQueueReader
+	inQueueCount            int
 	flowOutQueue            QueueWriter
 	stats                   FlowGeneratorStats
 	stateMachineMaster      []map[uint8]*StateValue
 	stateMachineSlave       []map[uint8]*StateValue
 	servicePortDescriptor   *ServicePortDescriptor
 	innerFlowKey            *FlowKey
-	packetHandler           *PacketHandler
+	packetHandlers          []*PacketHandler
 	forceReportInterval     time.Duration
 	minLoopInterval         time.Duration
 	flowLimitNum            uint64

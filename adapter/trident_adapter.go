@@ -198,8 +198,7 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) {
 
 		a.counter.TxPackets++
 		a.stats.TxPackets++
-		hash := meta.InPort + meta.IpSrc + meta.IpDst +
-			uint32(meta.Protocol) + uint32(meta.PortSrc) + uint32(meta.PortDst)
+		hash := meta.GenerateHash()
 		index := hash % uint32(a.queueCount)
 		a.hashBuffers[index][a.hashBufferCount[index]] = meta
 		a.hashBufferCount[index]++
