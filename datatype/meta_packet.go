@@ -52,8 +52,9 @@ type MetaPacket struct {
 	TcpData    *MetaPacketTcpHeader
 }
 
-func (p *MetaPacket) GenerateHash() {
+func (p *MetaPacket) GenerateHash() uint32 {
 	p.Hash = p.InPort ^ p.IpSrc ^ p.IpDst
+	return p.Hash
 }
 
 func (h *MetaPacketTcpHeader) extractTcpOptions(stream *ByteStream) {
