@@ -12,9 +12,10 @@ import (
 
 type Timestamp = time.Duration
 type RawPacket = []byte
+type PacketSize = int
 
 type PacketHandler interface {
-	Handle(Timestamp, RawPacket)
+	Handle(Timestamp, RawPacket, PacketSize)
 }
 
 type MetaPacketBlock = [1024]datatype.MetaPacket
@@ -43,18 +44,16 @@ func (h *DataHandler) confirmAlloc() {
 	}
 }
 
-func (h *DataHandler) Handle(timestamp Timestamp, packet RawPacket) {
+func (h *DataHandler) Handle(timestamp Timestamp, packet RawPacket, size PacketSize) {
 	metaPacket := h.preAlloc()
 	metaPacket.InPort = uint32(datatype.PACKET_SOURCE_ISP)
 	metaPacket.Timestamp = timestamp
-	metaPacket.PacketLen = uint16(len(packet))
+	metaPacket.PacketLen = uint16(size)
 	if !metaPacket.Parse(packet) {
 		return
 	}
 	h.confirmAlloc()
-	hash := metaPacket.InPort + metaPacket.IpSrc + metaPacket.IpDst +
-		uint32(metaPacket.Protocol) + uint32(metaPacket.PortSrc) + uint32(metaPacket.PortDst)
-	h.queue.Put(queue.HashKey(hash), metaPacket)
+	h.queue.Put(queue.HashKey(metaPacket.GenerateHash()), metaPacket)
 }
 
 func (h *DataHandler) Init() *DataHandler {
@@ -70,11 +69,11 @@ func (h *DataHandler) Init() *DataHandler {
 
 type TapHandler DataHandler
 
-func (h *TapHandler) Handle(timestamp Timestamp, packet RawPacket) {
+func (h *TapHandler) Handle(timestamp Timestamp, packet RawPacket, size PacketSize) {
 	metaPacket := (*DataHandler)(h).preAlloc()
 	metaPacket.InPort = uint32(datatype.PACKET_SOURCE_TOR)
 	metaPacket.Timestamp = timestamp
-	metaPacket.PacketLen = uint16(len(packet))
+	metaPacket.PacketLen = uint16(size)
 	tunnel := datatype.TunnelInfo{}
 	if offset := tunnel.Decapsulate(packet); offset > 0 {
 		packet = packet[offset:]
@@ -87,7 +86,5 @@ func (h *TapHandler) Handle(timestamp Timestamp, packet RawPacket) {
 		return
 	}
 	(*DataHandler)(h).confirmAlloc()
-	hash := metaPacket.InPort + metaPacket.IpSrc + metaPacket.IpDst +
-		uint32(metaPacket.Protocol) + uint32(metaPacket.PortSrc) + uint32(metaPacket.PortDst)
-	h.queue.Put(queue.HashKey(hash), metaPacket)
+	h.queue.Put(queue.HashKey(metaPacket.GenerateHash()), metaPacket)
 }
