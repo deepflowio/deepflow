@@ -52,7 +52,7 @@ type DumpKey struct {
 
 func NewLabelerManager(readQueues queue.MultiQueueReader, count int) *LabelerManager {
 	labeler := &LabelerManager{
-		policyTable:     policy.NewPolicyTable(datatype.ACTION_FLOW_STAT),
+		policyTable:     policy.NewPolicyTable(datatype.ACTION_FLOW_STAT, count),
 		readQueues:      readQueues,
 		readQueuesCount: count,
 	}
@@ -95,22 +95,23 @@ func GetTapType(inPort uint32) datatype.TapType {
 	return datatype.TAP_ISP
 }
 
-func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket) *datatype.PolicyData {
+func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *datatype.PolicyData {
 	key := &datatype.LookupKey{
-		SrcMac:  uint64(packet.MacSrc),
-		DstMac:  uint64(packet.MacDst),
-		SrcIp:   uint32(packet.IpSrc),
-		DstIp:   uint32(packet.IpDst),
-		SrcPort: packet.PortSrc,
-		DstPort: packet.PortDst,
-		EthType: packet.EthType,
-		Vlan:    packet.Vlan,
-		Proto:   uint8(packet.Protocol),
-		Ttl:     packet.TTL,
-		L2End0:  packet.L2End0,
-		L2End1:  packet.L2End1,
-		Tap:     GetTapType(packet.InPort),
-		Invalid: packet.Invalid,
+		SrcMac:    uint64(packet.MacSrc),
+		DstMac:    uint64(packet.MacDst),
+		SrcIp:     uint32(packet.IpSrc),
+		DstIp:     uint32(packet.IpDst),
+		SrcPort:   packet.PortSrc,
+		DstPort:   packet.PortDst,
+		EthType:   packet.EthType,
+		Vlan:      packet.Vlan,
+		Proto:     uint8(packet.Protocol),
+		Ttl:       packet.TTL,
+		L2End0:    packet.L2End0,
+		L2End1:    packet.L2End1,
+		Tap:       GetTapType(packet.InPort),
+		Invalid:   packet.Invalid,
+		FastIndex: index,
 	}
 
 	packet.EndpointData, packet.PolicyData = l.policyTable.LookupAllByKey(key)
@@ -126,7 +127,7 @@ func (l *LabelerManager) run(index int) {
 
 	for l.running {
 		packet := l.readQueues.Get(queue.HashKey(index)).(*datatype.MetaPacket)
-		action := l.GetPolicy(packet)
+		action := l.GetPolicy(packet, index)
 		hash := packet.InPort + packet.IpSrc + packet.IpDst +
 			uint32(packet.Protocol) + uint32(packet.PortSrc) + uint32(packet.PortDst)
 		if (action.ActionList & datatype.ACTION_PACKET_STAT) != 0 {
