@@ -156,8 +156,10 @@ func (p *MetaPacket) Parse(packet RawPacket) bool {
 	if isVlanTagged(p.EthType) && stream.Len() > VLANTAG_LEN {
 		vlanTag := stream.U16()
 		vid := vlanTag & VLAN_ID_MASK
-		if pcp := (vlanTag >> 13) & 0x3; pcp == MIRRORED_TRAFFIC {
-			p.InPort = uint32((vid&0xF00)<<8) | uint32(vid&0xFF)
+		if pcp := (vlanTag >> 13) & 0x7; pcp == MIRRORED_TRAFFIC {
+			p.InPort = (uint32(vid&0xF00) << 8) | uint32(vid&0xFF)
+		} else {
+			p.Vlan = vid
 		}
 		p.EthType = EthernetType(stream.U16())
 	}
