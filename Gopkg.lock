@@ -178,21 +178,23 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:105ab8192a12345531324d0d05210ea4cb27dd84cdab184e12895cfdf72df862"
+  digest = "1:d3b7d25ad2565a7d08e36ef27d560fb74c87cc9d4abcde2ef439efc9aff28156"
   name = "gitlab.x.lan/application/droplet-app"
   packages = [
     "internal/pkg/endpoint",
     "internal/pkg/flow",
+    "internal/pkg/geo",
     "pkg/mapper/flow",
+    "pkg/mapper/geo",
     "pkg/mapper/perf",
     "pkg/mapper/usage",
   ]
   pruneopts = "UT"
-  revision = "afc3277ed6d64f4ea8524de82913f7e573c22824"
+  revision = "d6df4ec8032697c50762018fd908ed32d819fd03"
 
 [[projects]]
   branch = "master"
-  digest = "1:4e4fe0dc43a45d45d99835f3b4dcca188150270dba380f68961ff587573940ca"
+  digest = "1:398532e7d89f1a3e93cc9d9d11c2f52d21dc83d314f5526e2ffe31aec989de98"
   name = "gitlab.x.lan/platform/droplet-mapreduce"
   packages = [
     "pkg/api",
@@ -201,7 +203,7 @@
     "pkg/messenger",
   ]
   pruneopts = "UT"
-  revision = "b4091bf283476ba7538a2ab7a46207e675522cee"
+  revision = "d5abf726d8296ef97fa1fa7c56540a3f71c29218"
 
 [[projects]]
   branch = "master"
@@ -221,11 +223,11 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "9108812bd0b585d0611fbf4f702e99fad3ceffcd"
+  revision = "35a6c91ac840eedd829b814ed4ae4d3f1bd8167a"
 
 [[projects]]
   branch = "feature-os"
-  digest = "1:6576175a55e8880f014d71f608f2e4b4b5b9849e63509851a2cbbdeb478eee15"
+  digest = "1:6a3705b6956398d0b5c34a0ad0272ce28567ac0dd1999250e4412d11113943ba"
   name = "gitlab.x.lan/yunshan/message"
   packages = [
     "dfi",
@@ -233,7 +235,7 @@
     "zero",
   ]
   pruneopts = "T"
-  revision = "0c5ca183c9c40b6225a8780eb707ce8751aeb34f"
+  revision = "04fc08377ca140b505d9e525e15164b011486d88"
 
 [[projects]]
   branch = "release-branch.go1.9"
@@ -288,14 +290,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:077c1c599507b3b3e9156d17d36e1e61928ee9b53a5b420f10f28ebd4a0b275c"
+  digest = "1:9cc1d3de11a1b6994eb01fe3cf81db064470d0fd39a37475f53a396aa5e8622c"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
   pruneopts = "UT"
-  revision = "11092d34479b07829b72e10713b159248caf5dad"
+  revision = "5a2fd4cab2d6d4a18e70c34937662526cd0c4bd1"
 
 [[projects]]
-  digest = "1:3dd7996ce6bf52dec6a2f69fa43e7c4cefea1d4dfa3c8ab7a5f8a9f7434e239d"
+  digest = "1:ab8e92d746fb5c4c18846b0879842ac8e53b3d352449423d0924a11f1020ae1b"
   name = "google.golang.org/grpc"
   packages = [
     ".",
@@ -326,8 +328,8 @@
     "tap",
   ]
   pruneopts = "UT"
-  revision = "32fb0ac620c32ba40a4626ddf94d90d12cce3455"
-  version = "v1.14.0"
+  revision = "8dea3dc473e90c8179e519d91302d0597c0ca1d1"
+  version = "v1.15.0"
 
 [[projects]]
   digest = "1:38b469493eb173db9c03321d64adcad4c7991ea0a19b5edc5bdc094f0e8c7384"
@@ -357,6 +359,7 @@
     "github.com/op/go-logging",
     "github.com/spf13/cobra",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/flow",
+    "gitlab.x.lan/application/droplet-app/pkg/mapper/geo",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/perf",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/usage",
     "gitlab.x.lan/platform/droplet-mapreduce/pkg/api",
