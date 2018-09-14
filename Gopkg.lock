@@ -158,11 +158,14 @@
 
 [[projects]]
   branch = "feature-os"
-  digest = "1:007edbab15f1f24092cf0dc3653a27843322d1bdca7e7290aa40b4d1e85124ad"
+  digest = "1:6a3705b6956398d0b5c34a0ad0272ce28567ac0dd1999250e4412d11113943ba"
   name = "gitlab.x.lan/yunshan/message"
-  packages = ["dfi"]
+  packages = [
+    "dfi",
+    "zero",
+  ]
   pruneopts = "T"
-  revision = "3366ce123471c16f2bdeeef940617ce5ea55bc4b"
+  revision = "04fc08377ca140b505d9e525e15164b011486d88"
 
 [[projects]]
   branch = "release-branch.go1.9"
@@ -282,6 +285,7 @@
     "github.com/pebbe/zmq4",
     "github.com/shirou/gopsutil/process",
     "gitlab.x.lan/yunshan/message/dfi",
+    "gitlab.x.lan/yunshan/message/zero",
     "golang.org/x/net/context",
     "google.golang.org/grpc",
     "gopkg.in/alexcesaro/statsd.v2",
