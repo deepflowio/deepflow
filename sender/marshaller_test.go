@@ -3,8 +3,8 @@ package sender
 import (
 	"testing"
 
-	"gitlab.x.lan/platform/droplet-mapreduce/pkg/api"
-	"gitlab.x.lan/platform/droplet-mapreduce/pkg/messenger"
+	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/messenger"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 )
 
@@ -24,7 +24,7 @@ func TestMarshaller(t *testing.T) {
 	for _, q := range outputQueues {
 		newDoc, _ := messenger.Unmarshal(q.Get().([]byte))
 
-		doc := TEST_DATA[0].(*api.Document)
+		doc := TEST_DATA[0].(*app.Document)
 
 		if !documentEqual(doc, newDoc) {
 			t.Error("文档不一致")

@@ -1,8 +1,8 @@
 package sender
 
 import (
-	"gitlab.x.lan/platform/droplet-mapreduce/pkg/api"
-	"gitlab.x.lan/platform/droplet-mapreduce/pkg/messenger"
+	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/messenger"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 )
 
@@ -11,7 +11,7 @@ type ZeroDocumentMarshaller struct {
 	outputs []queue.QueueWriter
 }
 
-// NewZeroDocumentMarshaller 从input读取api.Document，转换为pb.ZeroDocument结构，复制并推送到每一个outputs里
+// NewZeroDocumentMarshaller 从input读取app.Document，转换为pb.ZeroDocument结构，复制并推送到每一个outputs里
 func NewZeroDocumentMarshaller(input queue.QueueReader, outputs ...queue.QueueWriter) *ZeroDocumentMarshaller {
 	return &ZeroDocumentMarshaller{input, outputs}
 }
@@ -25,7 +25,7 @@ func (m *ZeroDocumentMarshaller) Start() {
 		log.Debugf("%d docs received", n)
 		nOut := 0
 		for _, e := range buffer[:n] {
-			if doc, ok := e.(*api.Document); ok {
+			if doc, ok := e.(*app.Document); ok {
 				b, err := messenger.Marshal(doc)
 				if err != nil {
 					log.Warning(err)
