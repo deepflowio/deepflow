@@ -158,7 +158,7 @@ func run() {
 			counter := countable.GetCounter()
 			sendCounter(client, counter)
 			interval := max(statSource.interval, minInterval)
-			statSource.skip = int(interval / time.Second)
+			statSource.skip = int(interval/time.Second) - 1
 		}
 		lock.Unlock()
 	}
