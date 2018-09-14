@@ -35,8 +35,11 @@ type EpcIpTable struct {
 }
 
 type FastTable struct {
-	sync.Mutex
 	fastPlatform *lru.Cache
+}
+
+type FastPathPlatform struct {
+	fastTable [TAP_MAX]*FastTable
 }
 
 type ArpTable struct {
@@ -50,11 +53,22 @@ type CloudPlatformData struct {
 	epcIpTable    *EpcIpTable
 	ipGroup       *IpResourceGroup
 	netmaskBitmap uint32
-	fastPath      [TAP_MAX]*FastTable
+	fastPath      []*FastPathPlatform
 	arpTable      [TAP_MAX]*ArpTable
 }
 
-func NewCloudPlatformData() *CloudPlatformData {
+func NewFastPathPlatform() *FastPathPlatform {
+	var fastPath FastPathPlatform
+	for i := uint32(0); i < uint32(TAP_MAX); i++ {
+		fastPath.fastTable[i] = &FastTable{
+			fastPlatform: lru.New(MAX_FASTPATH_LEN),
+		}
+	}
+
+	return &fastPath
+}
+
+func NewCloudPlatformData(queueCount int) *CloudPlatformData {
 	macTable := &MacTable{
 		macMap: make(MacMapData),
 	}
@@ -67,11 +81,9 @@ func NewCloudPlatformData() *CloudPlatformData {
 	epcIpTable := &EpcIpTable{
 		epcIpMap: make(EpcIpMapData),
 	}
-	var fastPath [TAP_MAX]*FastTable
-	for i := uint32(0); i < uint32(TAP_MAX); i++ {
-		fastPath[i] = &FastTable{
-			fastPlatform: lru.New(MAX_FASTPATH_LEN),
-		}
+	fastPath := make([]*FastPathPlatform, queueCount)
+	for i := uint32(0); i < uint32(queueCount); i++ {
+		fastPath[i] = NewFastPathPlatform()
 	}
 	var arpTable [TAP_MAX]*ArpTable
 	for i := uint32(0); i < uint32(TAP_MAX); i++ {
@@ -199,36 +211,24 @@ func (d *CloudPlatformData) UpdateEpcIpTable(epcIpMap EpcIpMapData) {
 	}
 }
 
-func (d *CloudPlatformData) InsertInfoToFastPath(hash MacIpInportKey, endpointInfo *EndpointInfo, tapType TapType) {
+func (d *CloudPlatformData) InsertInfoToFastPath(hash MacIpInportKey, endpointInfo *EndpointInfo, tapType TapType, fastIndex int) {
 	fastPlatformData := &FastPlatformData{
 		endpointInfo: endpointInfo,
 		hash:         hash,
 		timestamp:    time.Now(),
 	}
-	d.fastPath[tapType].Lock()
-	d.fastPath[tapType].fastPlatform.Add(hash, fastPlatformData)
-	d.fastPath[tapType].Unlock()
+	d.fastPath[fastIndex].fastTable[tapType].fastPlatform.Add(hash, fastPlatformData)
 }
 
-func (d *CloudPlatformData) DeleteFastPathData(hash MacIpInportKey, tapType TapType) {
-	d.fastPath[tapType].Lock()
-	d.fastPath[tapType].fastPlatform.Remove(hash)
-	d.fastPath[tapType].Unlock()
-}
-
-func (d *CloudPlatformData) GetInfoByFastPath(hash MacIpInportKey, tapType TapType) *EndpointInfo {
-	d.fastPath[tapType].Lock()
-	if data, ok := d.fastPath[tapType].fastPlatform.Get(hash); ok {
+func (d *CloudPlatformData) GetInfoByFastPath(hash MacIpInportKey, tapType TapType, fastIndex int) *EndpointInfo {
+	if data, ok := d.fastPath[fastIndex].fastTable[tapType].fastPlatform.Get(hash); ok {
 		fastPlatformData := data.(*FastPlatformData)
 		if DATA_VALID_TIME < time.Now().Sub(fastPlatformData.timestamp) {
-			d.fastPath[tapType].fastPlatform.Remove(hash)
-			d.fastPath[tapType].Unlock()
+			d.fastPath[fastIndex].fastTable[tapType].fastPlatform.Remove(hash)
 			return nil
 		}
-		d.fastPath[tapType].Unlock()
 		return fastPlatformData.endpointInfo
 	}
-	d.fastPath[tapType].Unlock()
 	return nil
 }
 
@@ -332,20 +332,20 @@ func (d *CloudPlatformData) ModifyDeviceInfo(endpointInfo *EndpointInfo) {
 func (d *CloudPlatformData) GetEndpointData(key *LookupKey) (*EndpointData, *FastKey) {
 	srcHash := MacIpInportKey(calcHashKey(key.SrcMac, key.SrcIp))
 	d.CheckAndUpdateArpTable(key, srcHash)
-	srcData := d.GetInfoByFastPath(srcHash, key.Tap)
+	srcData := d.GetInfoByFastPath(srcHash, key.Tap, key.FastIndex)
 	if srcData == nil {
 		srcData = d.GetEndpointInfo(key.SrcMac, key.SrcIp, key.Tap)
 		d.ModifyL3End(srcData, key, srcHash, true)
 		d.ModifyDeviceInfo(srcData)
-		d.InsertInfoToFastPath(srcHash, srcData, key.Tap)
+		d.InsertInfoToFastPath(srcHash, srcData, key.Tap, key.FastIndex)
 	}
 	dstHash := MacIpInportKey(calcHashKey(key.DstMac, key.DstIp))
-	dstData := d.GetInfoByFastPath(dstHash, key.Tap)
+	dstData := d.GetInfoByFastPath(dstHash, key.Tap, key.FastIndex)
 	if dstData == nil {
 		dstData = d.GetEndpointInfo(key.DstMac, key.DstIp, key.Tap)
 		d.ModifyL3End(dstData, key, dstHash, false)
 		d.ModifyDeviceInfo(dstData)
-		d.InsertInfoToFastPath(dstHash, dstData, key.Tap)
+		d.InsertInfoToFastPath(dstHash, dstData, key.Tap, key.FastIndex)
 	}
 
 	return &EndpointData{SrcInfo: srcData, DstInfo: dstData},

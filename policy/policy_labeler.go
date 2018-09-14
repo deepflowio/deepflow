@@ -1,16 +1,11 @@
 package policy
 
 import (
-	"sync"
 	"time"
 
 	"github.com/golang/groupcache/lru"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
-)
-
-const (
-	MAX_FASTPATH_LEN = 1 << 20
 )
 
 type Acl struct {
@@ -38,21 +33,33 @@ type FastPolicyData struct {
 }
 
 type FastPolicyTable struct {
-	sync.Mutex
 	fastPolicy *lru.Cache
+}
+
+type FastPathPolicy struct {
+	fastPolicyTable [TAP_MAX]*FastPolicyTable
 }
 
 type PolicyLabel struct {
 	aclData  [TAP_MAX][]*Acl
-	fastPath [TAP_MAX]*FastPolicyTable
+	fastPath []*FastPathPolicy
 }
 
-func NewPolicyLabel() *PolicyLabel {
-	var fastPath [TAP_MAX]*FastPolicyTable
+func NewFastPathPolicy() *FastPathPolicy {
+	var fastPathPolicy FastPathPolicy
 	for i := uint32(0); i < uint32(TAP_MAX); i++ {
-		fastPath[i] = &FastPolicyTable{
+		fastPathPolicy.fastPolicyTable[i] = &FastPolicyTable{
 			fastPolicy: lru.New(MAX_FASTPATH_LEN),
 		}
+	}
+
+	return &fastPathPolicy
+}
+
+func NewPolicyLabel(queueCount int) *PolicyLabel {
+	fastPath := make([]*FastPathPolicy, queueCount)
+	for i := uint32(0); i < uint32(queueCount); i++ {
+		fastPath[i] = NewFastPathPolicy()
 	}
 
 	return &PolicyLabel{
@@ -68,29 +75,23 @@ func NewAcl() *Acl {
 	}
 }
 
-func (l *PolicyLabel) InsertPolicyToFastPath(fastKey *FastKey, policyData *PolicyData, tapType TapType) {
+func (l *PolicyLabel) InsertPolicyToFastPath(fastKey *FastKey, policyData *PolicyData, tapType TapType, fastIndex int) {
 	fastPolicyData := &FastPolicyData{
 		policyData: policyData,
 		timestamp:  time.Now(),
 	}
-	l.fastPath[tapType].Lock()
-	l.fastPath[tapType].fastPolicy.Add(*fastKey, fastPolicyData)
-	l.fastPath[tapType].Unlock()
+	l.fastPath[fastIndex].fastPolicyTable[tapType].fastPolicy.Add(*fastKey, fastPolicyData)
 }
 
-func (l *PolicyLabel) GetPolicyByFastPath(fastKey *FastKey, tapType TapType) *PolicyData {
-	l.fastPath[tapType].Lock()
-	if policy, ok := l.fastPath[tapType].fastPolicy.Get(*fastKey); ok {
+func (l *PolicyLabel) GetPolicyByFastPath(fastKey *FastKey, tapType TapType, fastIndex int) *PolicyData {
+	if policy, ok := l.fastPath[fastIndex].fastPolicyTable[tapType].fastPolicy.Get(*fastKey); ok {
 		fastPolicyData := policy.(*FastPolicyData)
 		if DATA_VALID_TIME < time.Now().Sub(fastPolicyData.timestamp) {
-			l.fastPath[tapType].fastPolicy.Remove(*fastKey)
-			l.fastPath[tapType].Unlock()
+			l.fastPath[fastIndex].fastPolicyTable[tapType].fastPolicy.Remove(*fastKey)
 			return nil
 		}
-		l.fastPath[tapType].Unlock()
 		return fastPolicyData.policyData
 	}
-	l.fastPath[tapType].Unlock()
 	return nil
 }
 

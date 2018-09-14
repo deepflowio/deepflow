@@ -44,6 +44,7 @@ type LookupKey struct {
 	L2End0, L2End1   bool
 	Tap              TapType
 	Invalid          bool
+	FastIndex        int
 }
 
 type EndpointData struct {
