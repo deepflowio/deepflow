@@ -23,7 +23,7 @@ func StartCapture(interfaceName string, ip net.IP, isTapInterface bool, outputQu
 		afpacket.OptInterface(interfaceName),
 		afpacket.OptPollTimeout(100*time.Millisecond),
 		afpacket.OptBlockSize(1*units.MiB),
-		afpacket.OptFrameSize(65536),
+		afpacket.OptFrameSize(256),
 		afpacket.OptNumBlocks(1024), // 1GiB in total
 	)
 	if err != nil {
@@ -35,7 +35,7 @@ func StartCapture(interfaceName string, ip net.IP, isTapInterface bool, outputQu
 		bpf.LoadExtension{Num: bpf.ExtType},
 		bpf.JumpIf{Cond: bpf.JumpNotEqual, Val: uint32(LinuxSLLPacketTypeOutgoing), SkipTrue: 1},
 		bpf.RetConstant{Val: 0},
-		bpf.RetConstant{Val: 65535}, // default accept up to 64KB
+		bpf.RetConstant{Val: 256}, // default accept up to 256B
 	}
 	rawInstructions, err := bpf.Assemble(instructions)
 	if err != nil {
@@ -62,7 +62,7 @@ func StartCapture(interfaceName string, ip net.IP, isTapInterface bool, outputQu
 		handler: handler,
 	}
 	cap.Start()
-	stats.RegisterCountable("capture", cap)
+	stats.RegisterCountable("capture", cap, stats.OptionStatTags{"interface": interfaceName})
 	instance := io.Closer(cap)
 	runtime.SetFinalizer(instance, func(c io.Closer) { c.Close() })
 	return instance, nil

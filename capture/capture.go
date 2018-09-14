@@ -2,14 +2,22 @@ package capture
 
 import (
 	"errors"
-	"reflect"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/google/gopacket/afpacket"
 	"github.com/op/go-logging"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
+
+/*
+#include <linux/if_packet.h>  // AF_PACKET, sockaddr_ll
+*/
+import "C"
+
+type SocketStats C.struct_tpacket_stats
+type SocketStatsV3 C.struct_tpacket_stats_v3
 
 var log = logging.MustGetLogger("capture")
 
@@ -18,9 +26,9 @@ type PacketCounter struct {
 	Err     uint64 `statsd:"err"`
 	Retired uint64 `statsd:"retired"`
 
-	KernelPackets uint32 `statsd:"kernel_packets"`
-	KernelDrops   uint32 `statsd:"kernel_drops"`
-	KernelFreezes uint32 `statsd:"kernel_freezes"`
+	KernelPackets uint `statsd:"kernel_packets"`
+	KernelDrops   uint `statsd:"kernel_drops"`
+	KernelFreezes uint `statsd:"kernel_freezes"`
 
 	pollError uint64
 	intrError uint64
@@ -44,22 +52,19 @@ func (c *Capture) GetCounter() interface{} {
 	socketStats, socketStatsV3, _ := c.tPacket.SocketStats()
 	c.tPacket.InitSocketStats()
 	// SocketStats和SocketStatsV3的字段在golang中被识别为私有字段无法读出，
-	// 因此需要通过reflect来获取私有字段
-	refSocketStats := reflect.ValueOf(socketStats)
-	refSocketStatsV3 := reflect.ValueOf(socketStatsV3)
-	max := func(x, y uint64) uint32 {
+	// 因此需要强制类型转换
+	refSocketStats := (*SocketStats)(unsafe.Pointer(&socketStats))
+	refSocketStatsV3 := (*SocketStatsV3)(unsafe.Pointer(&socketStatsV3))
+	max := func(x, y C.uint) uint {
 		if x > y {
-			return uint32(x)
+			return uint(x)
 		} else {
-			return uint32(y)
+			return uint(y)
 		}
 	}
-	uintField := func(v reflect.Value, fieldName string) uint64 {
-		return v.FieldByName(fieldName).Uint()
-	}
-	counter.KernelPackets = max(uintField(refSocketStatsV3, "tp_packets"), uintField(refSocketStats, "tp_packets"))
-	counter.KernelDrops = max(uintField(refSocketStatsV3, "tp_drops"), uintField(refSocketStats, "tp_drops"))
-	counter.KernelFreezes = uint32(uintField(refSocketStatsV3, "tp_freeze_q_cnt"))
+	counter.KernelPackets = max(refSocketStatsV3.tp_packets, refSocketStats.tp_packets)
+	counter.KernelDrops = max(refSocketStatsV3.tp_drops, refSocketStats.tp_drops)
+	counter.KernelFreezes = uint(refSocketStatsV3.tp_freeze_q_cnt)
 
 	if counter.pollError > 0 {
 		log.Warningf("Poll error %c times, last err: %s", counter.pollError, c.lastPollErr.Error())
@@ -118,7 +123,7 @@ func (c *Capture) run() (retErr error) {
 			prevTimestamp = timestamp
 		}
 		c.counter.Rx++
-		c.handler.Handle(timestamp, packet)
+		c.handler.Handle(timestamp, packet, ci.Length)
 	}
 	c.running = false
 	c.issueStop = false
