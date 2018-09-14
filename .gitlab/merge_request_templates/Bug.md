@@ -15,4 +15,4 @@
 
 /assign @xiangyang
 
-/cc @all
+/cc @xiangyang
