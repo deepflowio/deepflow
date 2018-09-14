@@ -46,6 +46,7 @@ type PolicyId uint32
 type PolicyDataBlock = [1024]PolicyData
 
 type PolicyTable struct {
+	sync.Mutex
 	cloudPlatformData *CloudPlatformData
 	policyLabel       *PolicyLabel
 
@@ -84,6 +85,7 @@ func NewPolicyTable(actionTypes ActionType) *PolicyTable { // 传入Protobuf结�
 }
 
 func (t *PolicyTable) alloc() *PolicyData {
+	t.Lock()
 	policyData := &t.block[t.blockCursor]
 	t.blockCursor++
 	if t.blockCursor >= len(t.block) {
@@ -91,6 +93,7 @@ func (t *PolicyTable) alloc() *PolicyData {
 		*t.block = PolicyDataBlock{}
 		t.blockCursor = 0
 	}
+	t.Unlock()
 	return policyData
 }
 
