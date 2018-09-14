@@ -29,4 +29,4 @@
 
 /assign @buyi
 
-/cc @all
+/cc @buyi
