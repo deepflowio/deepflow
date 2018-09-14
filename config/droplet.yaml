@@ -35,3 +35,7 @@ flow-timeout:
   others: 5
 # packet and flow queue size
 queue-size: 65536
+# adapter write queue count
+adapter-queue-count: 2
+# flow generator read queue count
+flow-queue-count: 2

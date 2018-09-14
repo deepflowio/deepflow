@@ -58,6 +58,7 @@ func getLocalIp() (net.IP, error) {
 func Start(configPath string) {
 	cfg := config.Load(configPath)
 	queueSize := int(cfg.QueueSize)
+	filterQueueCount := int(cfg.AdapterQueueCount) + len(cfg.DataInterfaces) + len(cfg.TapInterfaces)
 	InitLog(cfg.LogFile, cfg.LogLevel)
 
 	if cfg.Profiler {
@@ -78,8 +79,8 @@ func Start(configPath string) {
 	manager := queue.NewManager()
 
 	// L1 - packet source
-	filterQueues := manager.NewQueues("1-meta-packet-to-filter", queueSize, 8)
-	tridentAdapter := adapter.NewTridentAdapter(filterQueues, 6)
+	filterQueues := manager.NewQueues("1-meta-packet-to-filter", queueSize, filterQueueCount)
+	tridentAdapter := adapter.NewTridentAdapter(filterQueues, filterQueueCount)
 	if tridentAdapter == nil {
 		return
 	}
@@ -104,11 +105,11 @@ func Start(configPath string) {
 	}
 
 	// L2 - packet filter
-	meteringAppQueue := manager.NewQueue("2-meta-packet-to-metering-app", queueSize)
-	flowGeneratorQueue := manager.NewQueue("2-meta-packet-to-flow-generator", queueSize)
+	meteringAppQueue := manager.NewQueues("2-meta-packet-to-metering-app", queueSize, int(cfg.FlowQueueCount))
+	flowGeneratorQueue := manager.NewQueues("2-meta-packet-to-flow-generator", queueSize, int(cfg.FlowQueueCount))
 	labelerManager := labeler.NewLabelerManager(filterQueues, 8)
-	labelerManager.RegisterAppQueue(labeler.METERING_QUEUE, meteringAppQueue)
-	labelerManager.RegisterAppQueue(labeler.FLOW_QUEUE, flowGeneratorQueue)
+	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_METERING, meteringAppQueue)
+	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_FLOW, flowGeneratorQueue)
 	labelerManager.Start()
 	synchronizer.Register(func(response *trident.SyncResponse) {
 		labelerManager.OnPlatformDataChange(convert2PlatformData(response))
@@ -128,7 +129,7 @@ func Start(configPath string) {
 		SingleDirection: flowTimeout.Others,
 	}
 	flowGenOutput := manager.NewQueue("3-tagged-flow-to-duplicator", queueSize/4)
-	flowGenerator := flowgenerator.New(flowGeneratorQueue, flowGenOutput, flowTimeout.ForceReportInterval, queueSize, 0)
+	flowGenerator := flowgenerator.New(flowGeneratorQueue, 1, flowGenOutput, flowTimeout.ForceReportInterval, queueSize, 0)
 	if flowGenerator == nil {
 		return
 	}
@@ -171,13 +172,13 @@ func Start(configPath string) {
 		for {
 			<-meteringTimer.C
 			flushMetering := MetaPacket{Timestamp: 0}
-			meteringAppQueue.Put(&flushMetering)
+			meteringAppQueue.Put(0, &flushMetering)
 			meteringTimer.Reset(queueFlushTime)
 		}
 	}()
 	go func() {
 		for {
-			metaPacket := meteringAppQueue.Get().(*MetaPacket)
+			metaPacket := meteringAppQueue.Get(0).(*MetaPacket)
 			if metaPacket.Timestamp != 0 {
 				meteringProcess.Process(*metaPacket)
 			} else if meteringProcess.NeedFlush() {

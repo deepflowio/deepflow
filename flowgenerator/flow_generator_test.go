@@ -60,9 +60,9 @@ func reversePacket(packet *MetaPacket) {
 }
 
 func getDefaultFlowGenerator() *FlowGenerator {
-	metaPacketHeaderInQueue := NewOverwriteQueue("metaPacketHeaderInQueue", DEFAULT_QUEUE_LEN)
+	metaPacketHeaderInQueue := NewOverwriteQueues("metaPacketHeaderInQueue", 1, DEFAULT_QUEUE_LEN)
 	flowOutQueue := NewOverwriteQueue("flowOutQueue", DEFAULT_QUEUE_LEN)
-	return New(metaPacketHeaderInQueue, flowOutQueue, DEFAULT_INTERVAL_HIGH, FLOW_OUT_BUFFER_CAP, 0)
+	return New(metaPacketHeaderInQueue, 1, flowOutQueue, DEFAULT_INTERVAL_HIGH, FLOW_OUT_BUFFER_CAP, 0)
 }
 
 func TestNew(t *testing.T) {
@@ -89,7 +89,7 @@ func TestHandleSynRst(t *testing.T) {
 	flowOutQueue := flowGenerator.flowOutQueue
 	flowGenerator.minLoopInterval = 0
 	packet0 := getDefaultPacket()
-	metaPacketHeaderInQueue.(Queue).Put(packet0)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
 
 	flowGenerator.Start()
 
@@ -97,7 +97,7 @@ func TestHandleSynRst(t *testing.T) {
 	packet1.TcpData.Flags = TCP_RST
 	packet1.Timestamp += DEFAULT_DURATION_MSEC
 	reversePacket(packet1)
-	metaPacketHeaderInQueue.(Queue).Put(packet1)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
 
 	var taggedFlow *TaggedFlow
 	taggedFlow = flowOutQueue.(Queue).Get().(*TaggedFlow)
@@ -122,17 +122,17 @@ func TestHandleSynFin(t *testing.T) {
 	flowGenerator.minLoopInterval = 0
 
 	packet0 := getDefaultPacket()
-	metaPacketHeaderInQueue.(Queue).Put(packet0)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
 
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Flags = TCP_PSH | TCP_ACK
-	metaPacketHeaderInQueue.(Queue).Put(packet1)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
 
 	packet2 := getDefaultPacket()
 	packet2.TcpData.Flags = TCP_ACK | TCP_FIN
 	packet2.Timestamp += DEFAULT_DURATION_MSEC
 	reversePacket(packet2)
-	metaPacketHeaderInQueue.(Queue).Put(packet2)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet2)
 
 	go flowGenerator.Start()
 
@@ -224,7 +224,7 @@ func TestPlatformData(t *testing.T) {
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Seq = 1111
 	packet1.TcpData.Ack = 112
-	metaPacketHeaderInQueue.(Queue).Put(packet1)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
 
 	flowGenerator.Start()
 
@@ -297,7 +297,7 @@ func TestHandshakePerf(t *testing.T) {
 	packet0.TcpData.Flags = TCP_SYN
 	packet0.TcpData.Seq = 111
 	packet0.TcpData.Ack = 0
-	metaPacketHeaderInQueue.(Queue).Put(packet0)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
 
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Flags = TCP_SYN | TCP_ACK
@@ -305,14 +305,14 @@ func TestHandshakePerf(t *testing.T) {
 	reversePacket(packet1)
 	packet1.TcpData.Seq = 1111
 	packet1.TcpData.Ack = 112
-	metaPacketHeaderInQueue.(Queue).Put(packet1)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
 
 	packet2 := getDefaultPacket()
 	packet2.TcpData.Flags = TCP_ACK
 	packet2.Timestamp += DEFAULT_DURATION_MSEC * 2
 	packet2.TcpData.Seq = 112
 	packet2.TcpData.Ack = 1112
-	metaPacketHeaderInQueue.(Queue).Put(packet2)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet2)
 
 	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
 	if taggedFlow.CloseType != CLOSE_TYPE_FORCE_REPORT {
@@ -335,7 +335,7 @@ func TestStartStop(t *testing.T) {
 	packet0.TcpData.Flags = TCP_SYN
 	packet0.TcpData.Seq = 111
 	packet0.TcpData.Ack = 0
-	metaPacketHeaderInQueue.(Queue).Put(packet0)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
 
 	flowGenerator.Stop()
 
@@ -360,11 +360,11 @@ func TestFlowReverse(t *testing.T) {
 
 	packet0 := getDefaultPacket()
 	packet0.TcpData.Flags = TCP_ACK
-	metaPacketHeaderInQueue.(Queue).Put(packet0)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
 
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Flags = TCP_SYN | TCP_ACK
-	metaPacketHeaderInQueue.(Queue).Put(packet1)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
 
 	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
 
@@ -385,13 +385,13 @@ func TestForceReport(t *testing.T) {
 	flowOutQueue := flowGenerator.flowOutQueue
 	packet0 := getDefaultPacket()
 	packet0.TcpData.Flags = TCP_SYN | TCP_ACK
-	metaPacketHeaderInQueue.(Queue).Put(packet0)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
 
 	packet2 := getDefaultPacket()
 	packet2.TcpData.Flags = TCP_SYN | TCP_ACK
 	packet2.Timestamp += DEFAULT_DURATION_MSEC
 	reversePacket(packet2)
-	metaPacketHeaderInQueue.(Queue).Put(packet2)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet2)
 
 	flowGenerator.Start()
 
@@ -416,7 +416,7 @@ func TestUdpShortFlow(t *testing.T) {
 	flowOutQueue := flowGenerator.flowOutQueue
 	packet := getDefaultPacket()
 	packet.Protocol = layers.IPProtocolUDP
-	metaPacketHeaderInQueue.(Queue).Put(packet)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet)
 	flowGenerator.Start()
 	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
 	if taggedFlow.CloseType != CLOSE_TYPE_TIMEOUT {
@@ -456,8 +456,8 @@ func BenchmarkShortFlowList(b *testing.B) {
 		processBuffer[i] = meta
 	}
 	b.ResetTimer()
-	flowGenerator.packetHandler.Add(1)
-	flowGenerator.processPackets(processBuffer, b.N)
+	flowGenerator.packetHandlers[0].Add(1)
+	flowGenerator.processPackets(processBuffer, b.N, 0)
 	b.StopTimer()
 	maxFlowListLen := 0
 	for _, flowCache := range flowGenerator.hashMap[0:] {
@@ -481,8 +481,8 @@ func BenchmarkLongFlowList(b *testing.B) {
 		processBuffer[i] = meta
 	}
 	b.ResetTimer()
-	flowGenerator.packetHandler.Add(1)
-	flowGenerator.processPackets(processBuffer, b.N)
+	flowGenerator.packetHandlers[0].Add(1)
+	flowGenerator.processPackets(processBuffer, b.N, 0)
 	b.StopTimer()
 	maxFlowListLen := 0
 	for _, flowCache := range flowGenerator.hashMap[0:] {

@@ -17,18 +17,20 @@ import (
 var log = logging.MustGetLogger("config")
 
 type Config struct {
-	ControllerIps  []string          `yaml:"controller-ips,flow"`
-	ControllerPort uint16            `yaml:"controller-port"`
-	LogFile        string            `yaml:"log-file"`
-	LogLevel       string            `yaml:"log-level"`
-	StatsdServer   string            `yaml:"statsd-server"`
-	Profiler       bool              `yaml:"profiler"`
-	DataInterfaces []string          `yaml:"data-interfaces,flow"`
-	TapInterfaces  []string          `yaml:"tap-interfaces,flow"`
-	Zeroes         []IpPortConfig    `yaml:"zeroes,flow"`
-	Stream         IpPortConfig      `yaml:"stream,flow"`
-	FlowTimeout    FlowTimeoutConfig `yaml:"flow-timeout"`
-	QueueSize      uint32            `yaml:"queue-size"`
+	ControllerIps     []string          `yaml:"controller-ips,flow"`
+	ControllerPort    uint16            `yaml:"controller-port"`
+	LogFile           string            `yaml:"log-file"`
+	LogLevel          string            `yaml:"log-level"`
+	StatsdServer      string            `yaml:"statsd-server"`
+	Profiler          bool              `yaml:"profiler"`
+	DataInterfaces    []string          `yaml:"data-interfaces,flow"`
+	TapInterfaces     []string          `yaml:"tap-interfaces,flow"`
+	Zeroes            []IpPortConfig    `yaml:"zeroes,flow"`
+	Stream            IpPortConfig      `yaml:"stream,flow"`
+	FlowTimeout       FlowTimeoutConfig `yaml:"flow-timeout"`
+	QueueSize         uint32            `yaml:"queue-size"`
+	AdapterQueueCount uint32            `yaml:"adapter-queue-count"`
+	FlowQueueCount    uint32            `yaml:"flow-queue-count"`
 }
 
 type IpPortConfig struct {
@@ -93,6 +95,12 @@ func (c *Config) Validate() error {
 	}
 	if c.QueueSize == 0 {
 		return errors.New("can not get packet and flow queue size")
+	}
+	if c.AdapterQueueCount == 0 {
+		c.AdapterQueueCount = 1
+	}
+	if c.FlowQueueCount == 0 {
+		c.FlowQueueCount = 1
 	}
 
 	return nil
