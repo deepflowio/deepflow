@@ -50,10 +50,6 @@
   branch = "master"
 
 [[constraint]]
-  name = "gitlab.x.lan/platform/droplet-mapreduce"
-  branch = "master"
-
-[[constraint]]
   name = "gitlab.x.lan/yunshan/droplet-libs"
   branch = "master"
 

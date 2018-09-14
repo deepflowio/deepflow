@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/gopacket/layers"
-	"gitlab.x.lan/platform/droplet-mapreduce/pkg/api"
-	dt "gitlab.x.lan/platform/droplet-mapreduce/pkg/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/app"
+	dt "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 	"gitlab.x.lan/yunshan/droplet-libs/zmq"
 )
 
@@ -74,8 +74,8 @@ func init() {
 			MaxBit:      1110,
 		},
 	}
-	TEST_DATA = append(TEST_DATA, &api.Document{Timestamp: 0x12345678, Tag: tag1, Meter: meter})
-	TEST_DATA = append(TEST_DATA, &api.Document{Timestamp: 0x87654321, Tag: tag2, Meter: meter})
+	TEST_DATA = append(TEST_DATA, &app.Document{Timestamp: 0x12345678, Tag: tag1, Meter: meter})
+	TEST_DATA = append(TEST_DATA, &app.Document{Timestamp: 0x87654321, Tag: tag2, Meter: meter})
 }
 
 func receiverRoutine(nData, port int, ch chan []byte) {
@@ -87,7 +87,7 @@ func receiverRoutine(nData, port int, ch chan []byte) {
 	close(ch)
 }
 
-func documentEqual(doc, other *api.Document) bool {
+func documentEqual(doc, other *app.Document) bool {
 
 	if doc.Timestamp != other.Timestamp {
 		return false

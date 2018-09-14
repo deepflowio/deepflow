@@ -3,8 +3,8 @@ package sender
 import (
 	"testing"
 
-	"gitlab.x.lan/platform/droplet-mapreduce/pkg/api"
-	"gitlab.x.lan/platform/droplet-mapreduce/pkg/messenger"
+	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/messenger"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 )
 
@@ -24,7 +24,7 @@ func TestZeroDocumentSender(t *testing.T) {
 		doc, _ := messenger.Unmarshal(b)
 		hasEqual := false
 		for _, data := range TEST_DATA {
-			if documentEqual(doc, data.(*api.Document)) {
+			if documentEqual(doc, data.(*app.Document)) {
 				hasEqual = true
 				break
 			}
@@ -38,7 +38,7 @@ func TestZeroDocumentSender(t *testing.T) {
 		doc, _ := messenger.Unmarshal(b)
 		hasEqual := false
 		for _, data := range TEST_DATA {
-			if documentEqual(doc, data.(*api.Document)) {
+			if documentEqual(doc, data.(*app.Document)) {
 				hasEqual = true
 				break
 			}

@@ -178,7 +178,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:d3b7d25ad2565a7d08e36ef27d560fb74c87cc9d4abcde2ef439efc9aff28156"
+  digest = "1:ea216c34bcfd40ed011bf8ea654b4b205a3284a89686e67ada98ddc1108d9622"
   name = "gitlab.x.lan/application/droplet-app"
   packages = [
     "internal/pkg/endpoint",
@@ -190,40 +190,30 @@
     "pkg/mapper/usage",
   ]
   pruneopts = "UT"
-  revision = "d6df4ec8032697c50762018fd908ed32d819fd03"
+  revision = "1f5d752c08c19db4ce58bc83986deedf805dfead"
 
 [[projects]]
   branch = "master"
-  digest = "1:398532e7d89f1a3e93cc9d9d11c2f52d21dc83d314f5526e2ffe31aec989de98"
-  name = "gitlab.x.lan/platform/droplet-mapreduce"
-  packages = [
-    "pkg/api",
-    "pkg/datatype",
-    "pkg/handler",
-    "pkg/messenger",
-  ]
-  pruneopts = "UT"
-  revision = "d5abf726d8296ef97fa1fa7c56540a3f71c29218"
-
-[[projects]]
-  branch = "master"
-  digest = "1:bf5a62e616006c6b91e3ed175cf2b71f9cee7a79396bfe8a2179bdd42c04dbcf"
+  digest = "1:9e0675172716a302b554eef2a26d3061b7a155d99ad75c9188d508bb44ce5197"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
+    "app",
     "datatype",
     "dedup",
     "grpc",
     "logger",
+    "messenger",
     "monitor",
     "policy",
     "queue",
     "segmenttree",
     "stats",
     "utils",
+    "zerodoc",
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "35a6c91ac840eedd829b814ed4ae4d3f1bd8167a"
+  revision = "a700de4ff47bf39b5fca07696334738e16c9f798"
 
 [[projects]]
   branch = "feature-os"
@@ -362,19 +352,18 @@
     "gitlab.x.lan/application/droplet-app/pkg/mapper/geo",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/perf",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/usage",
-    "gitlab.x.lan/platform/droplet-mapreduce/pkg/api",
-    "gitlab.x.lan/platform/droplet-mapreduce/pkg/datatype",
-    "gitlab.x.lan/platform/droplet-mapreduce/pkg/handler",
-    "gitlab.x.lan/platform/droplet-mapreduce/pkg/messenger",
+    "gitlab.x.lan/yunshan/droplet-libs/app",
     "gitlab.x.lan/yunshan/droplet-libs/datatype",
     "gitlab.x.lan/yunshan/droplet-libs/dedup",
     "gitlab.x.lan/yunshan/droplet-libs/grpc",
     "gitlab.x.lan/yunshan/droplet-libs/logger",
+    "gitlab.x.lan/yunshan/droplet-libs/messenger",
     "gitlab.x.lan/yunshan/droplet-libs/monitor",
     "gitlab.x.lan/yunshan/droplet-libs/policy",
     "gitlab.x.lan/yunshan/droplet-libs/queue",
     "gitlab.x.lan/yunshan/droplet-libs/stats",
     "gitlab.x.lan/yunshan/droplet-libs/utils",
+    "gitlab.x.lan/yunshan/droplet-libs/zerodoc",
     "gitlab.x.lan/yunshan/droplet-libs/zmq",
     "gitlab.x.lan/yunshan/message/trident",
     "golang.org/x/net/bpf",
