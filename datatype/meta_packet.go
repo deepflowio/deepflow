@@ -34,6 +34,7 @@ type MetaPacket struct {
 	PolicyData     *PolicyData
 	Raw            RawPacket
 	Invalid        bool
+	Hash           uint32
 
 	Tunnel *TunnelInfo
 
@@ -49,6 +50,10 @@ type MetaPacket struct {
 	PortDst    uint16
 	PayloadLen uint16
 	TcpData    *MetaPacketTcpHeader
+}
+
+func (p *MetaPacket) GenerateHash() {
+	p.Hash = p.InPort ^ p.IpSrc ^ p.IpDst
 }
 
 func (h *MetaPacketTcpHeader) extractTcpOptions(stream *ByteStream) {
@@ -188,10 +193,10 @@ func (p *MetaPacket) String() string {
 		buffer.WriteString(fmt.Sprintf("tcp: %+v", p.TcpData))
 	}
 	if p.EndpointData != nil {
-		buffer.WriteString(fmt.Sprintf("\nEndpointData(SRC: %+v, DST: %+v)", *p.EndpointData.SrcInfo, *p.EndpointData.DstInfo))
+		buffer.WriteString(fmt.Sprintf("\n\tEndpointData(SRC: %+v, DST: %+v)", *p.EndpointData.SrcInfo, *p.EndpointData.DstInfo))
 	}
 	if p.PolicyData != nil {
-		buffer.WriteString(fmt.Sprintf("\nPolicyData(%+v)", *p.PolicyData))
+		buffer.WriteString(fmt.Sprintf("\n\tPolicyData(%+v)", *p.PolicyData))
 	}
 	return buffer.String()
 }
