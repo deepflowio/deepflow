@@ -43,6 +43,10 @@ type GroupId uint32
 type ServiceId uint32
 type PolicyId uint32
 
+const (
+	MAX_FASTPATH_LEN = 1 << 18
+)
+
 type PolicyDataBlock = [1024]PolicyData
 
 type PolicyTable struct {
@@ -53,6 +57,7 @@ type PolicyTable struct {
 	policyDataPoll sync.Pool
 	block          *PolicyDataBlock
 	blockCursor    int
+	queueCount     int
 }
 
 type PolicyCounter struct {
@@ -66,14 +71,14 @@ type PolicyCounter struct {
 	ArpTable   uint32 `statsd:"arp_table"`
 }
 
-func NewPolicyTable(actionTypes ActionType) *PolicyTable { // 传入Protobuf结构体指针
+func NewPolicyTable(actionTypes ActionType, queueCount int) *PolicyTable { // 传入Protobuf结构体指针
 	// 使用actionTypes过滤，例如
 	// Trident仅关心PACKET_BROKER和PACKET_STORE，
 	// 那么就不要将EPC等云平台信息进行计算。
 	// droplet关心**几乎**所有，对关心的信息进行计算
 	policyTable := &PolicyTable{
-		cloudPlatformData: NewCloudPlatformData(),
-		policyLabel:       NewPolicyLabel(),
+		cloudPlatformData: NewCloudPlatformData(queueCount),
+		policyLabel:       NewPolicyLabel(queueCount),
 	}
 	policyTable.policyDataPoll.New = func() interface{} {
 		block := new(PolicyDataBlock)
@@ -106,10 +111,14 @@ func (t *PolicyTable) GetCounter() interface{} {
 	for i := 0; i < MASK_LEN; i++ {
 		counter.IpTable += uint32(len(t.cloudPlatformData.ipTables[i].ipMap))
 	}
+	for i := 0; i < t.queueCount; i++ {
+		for j := TAP_ANY; j < TAP_MAX; j++ {
+			counter.FastPath += uint32(t.policyLabel.fastPath[i].fastPolicyTable[j].fastPolicy.Len())
+			counter.FastTable += uint32(t.cloudPlatformData.fastPath[i].fastTable[j].fastPlatform.Len())
+		}
+	}
 	for i := TAP_ANY; i < TAP_MAX; i++ {
 		counter.Acl += uint32(len(t.policyLabel.aclData[i]))
-		counter.FastPath += uint32(t.policyLabel.fastPath[i].fastPolicy.Len())
-		counter.FastTable += uint32(t.cloudPlatformData.fastPath[i].fastPlatform.Len())
 		counter.ArpTable += uint32(len(t.cloudPlatformData.arpTable[i].arpMap))
 	}
 	return counter
@@ -131,10 +140,10 @@ func (t *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *PolicyData {
 func (t *PolicyTable) GetPolicyDataByFastPath(endpointData *EndpointData, key *LookupKey, fastKey *FastKey) *PolicyData {
 	fastKey.Ports = uint64(key.SrcPort<<32) | uint64(key.DstPort)
 	fastKey.ProtoVlan = uint64(key.Proto<<32) | uint64(key.Vlan)
-	policyData := t.policyLabel.GetPolicyByFastPath(fastKey, key.Tap)
+	policyData := t.policyLabel.GetPolicyByFastPath(fastKey, key.Tap, key.FastIndex)
 	if policyData == nil {
 		policyData = t.GetPolicyData(endpointData, key)
-		t.policyLabel.InsertPolicyToFastPath(fastKey, policyData, key.Tap)
+		t.policyLabel.InsertPolicyToFastPath(fastKey, policyData, key.Tap, key.FastIndex)
 	}
 	return policyData
 }
