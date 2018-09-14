@@ -25,7 +25,6 @@ func StartCapture(interfaceName string, ip net.IP, isTapInterface bool, outputQu
 		afpacket.OptBlockSize(1*units.MiB),
 		afpacket.OptFrameSize(65536),
 		afpacket.OptNumBlocks(1024), // 1GiB in total
-		afpacket.OptAddVLANHeader(!isTapInterface),
 	)
 	if err != nil {
 		log.Warning("AF_PACKET init error", err)

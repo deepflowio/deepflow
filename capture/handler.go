@@ -30,7 +30,6 @@ type DataHandler struct {
 
 func (h *DataHandler) preAlloc() *datatype.MetaPacket {
 	metaPacket := &h.block[h.blockCursor]
-	metaPacket.InPort = uint32(datatype.PACKET_SOURCE_ISP)
 	metaPacket.Exporter = h.ip
 	return metaPacket
 }
@@ -46,6 +45,7 @@ func (h *DataHandler) confirmAlloc() {
 
 func (h *DataHandler) Handle(timestamp Timestamp, packet RawPacket) {
 	metaPacket := h.preAlloc()
+	metaPacket.InPort = uint32(datatype.PACKET_SOURCE_ISP)
 	metaPacket.Timestamp = timestamp
 	metaPacket.PacketLen = uint16(len(packet))
 	if !metaPacket.Parse(packet) {
@@ -72,6 +72,7 @@ type TapHandler DataHandler
 
 func (h *TapHandler) Handle(timestamp Timestamp, packet RawPacket) {
 	metaPacket := (*DataHandler)(h).preAlloc()
+	metaPacket.InPort = uint32(datatype.PACKET_SOURCE_TOR)
 	metaPacket.Timestamp = timestamp
 	metaPacket.PacketLen = uint16(len(packet))
 	tunnel := datatype.TunnelInfo{}
