@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+const SOCKET_RETRIES = 5
+
 func senderRoutine(t *testing.T, b []byte, ch chan int, p Sender) {
 	defer p.Close()
 	t.Log("Starts to send")
@@ -33,8 +35,27 @@ func TestPubSub(t *testing.T) {
 	s := [...]byte{1, 2, 3}
 	c := make(chan int)
 	out := make(chan []byte)
-	pub, _ := NewPublisher("*", 12345, 10000, SERVER)
-	sub, _ := NewSubscriber("127.0.0.1", 12345, 1000000, CLIENT)
+	var err error
+	var pub Sender
+	for i := 0; i < SOCKET_RETRIES; i++ {
+		pub, err = NewPublisher("*", 12345, 10000, SERVER)
+		if err == nil {
+			break
+		}
+		if i == SOCKET_RETRIES-1 {
+			t.FailNow()
+		}
+	}
+	var sub Receiver
+	for i := 0; i < SOCKET_RETRIES; i++ {
+		sub, err = NewSubscriber("127.0.0.1", 12345, 1000000, CLIENT)
+		if err == nil {
+			break
+		}
+		if i == SOCKET_RETRIES-1 {
+			t.FailNow()
+		}
+	}
 	go senderRoutine(t, s[:], c, pub)
 	go receiverRoutine(t, c, out, sub)
 	s2 := <-out
@@ -50,8 +71,27 @@ func TestPushPull(t *testing.T) {
 	s := [...]byte{1, 2, 3}
 	c := make(chan int)
 	out := make(chan []byte)
-	push, _ := NewPusher("*", 12345, 10000, SERVER)
-	pull, _ := NewPuller("127.0.0.1", 12345, 1000000, time.Minute, CLIENT)
+	var err error
+	var push Sender
+	for i := 0; i < SOCKET_RETRIES; i++ {
+		push, err = NewPusher("*", 12345, 10000, SERVER)
+		if err == nil {
+			break
+		}
+		if i == SOCKET_RETRIES-1 {
+			t.FailNow()
+		}
+	}
+	var pull Receiver
+	for i := 0; i < SOCKET_RETRIES; i++ {
+		pull, err = NewPuller("127.0.0.1", 12345, 1000000, time.Minute, CLIENT)
+		if err == nil {
+			break
+		}
+		if i == SOCKET_RETRIES-1 {
+			t.FailNow()
+		}
+	}
 	go senderRoutine(t, s[:], c, push)
 	go receiverRoutine(t, c, out, pull)
 	s2 := <-out
