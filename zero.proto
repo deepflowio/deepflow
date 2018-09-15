@@ -133,6 +133,9 @@ message GeoMeter {
     optional uint64 sum_packet_rx = 6;
     optional uint64 sum_bit_tx = 7;
     optional uint64 sum_bit_rx = 8;
+
+    optional uint64 sum_rtt_syn = 11;
+    optional uint64 sum_rtt_syn_flow = 12;
 }
 
 message FlowMeter {
