@@ -37,9 +37,9 @@ message Request {
 }
 
 message StreamHeader {
-    optional fixed32 timestamp = 1;
-    optional fixed32 sequence = 2;
-    optional fixed32 action = 3;
+    required fixed32 timestamp = 1;
+    required fixed32 sequence = 2;
+    required fixed32 action = 3;
 }
 
 /*
