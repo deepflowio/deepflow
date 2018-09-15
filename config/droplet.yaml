@@ -41,3 +41,6 @@ adapter-queue-count: 2
 flow-queue-count: 2
 # concurrent flow count limit
 flow-count-limit: 1048576
+# size of policy fast-path map, and
+# labeler-queue-count*1024 <= policy-map-size <= labeler-queue-count*1048576
+policy-map-size: 1048576

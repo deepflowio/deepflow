@@ -107,7 +107,7 @@ func Start(configPath string) {
 	// L2 - packet filter
 	meteringAppQueue := manager.NewQueues("2-meta-packet-to-metering-app", queueSize, int(cfg.FlowQueueCount))
 	flowGeneratorQueue := manager.NewQueues("2-meta-packet-to-flow-generator", queueSize, int(cfg.FlowQueueCount))
-	labelerManager := labeler.NewLabelerManager(filterQueues, 8)
+	labelerManager := labeler.NewLabelerManager(filterQueues, 8, cfg.PolicyMapSize)
 	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_METERING, meteringAppQueue)
 	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_FLOW, flowGeneratorQueue)
 	labelerManager.Start()

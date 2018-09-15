@@ -50,9 +50,9 @@ type DumpKey struct {
 	InPort uint32
 }
 
-func NewLabelerManager(readQueues queue.MultiQueueReader, count int) *LabelerManager {
+func NewLabelerManager(readQueues queue.MultiQueueReader, count int, size uint32) *LabelerManager {
 	labeler := &LabelerManager{
-		policyTable:     policy.NewPolicyTable(datatype.ACTION_FLOW_STAT, count),
+		policyTable:     policy.NewPolicyTable(datatype.ACTION_FLOW_STAT, count, size),
 		readQueues:      readQueues,
 		readQueuesCount: count,
 	}
@@ -79,13 +79,6 @@ func (l *LabelerManager) OnIpGroupDataChange(data []*policy.IpGroupData) {
 
 func (l *LabelerManager) OnPolicyDataChange(data []*policy.Acl) {
 	l.policyTable.UpdateAclData(data)
-}
-
-func (l *LabelerManager) GetData(key *datatype.LookupKey) {
-	data, _ := l.policyTable.LookupAllByKey(key)
-	if data != nil {
-		log.Debug("QUERY KEY:", key, "SRC:", data.SrcInfo, "DST:", data.DstInfo)
-	}
 }
 
 func GetTapType(inPort uint32) datatype.TapType {
