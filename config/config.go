@@ -32,6 +32,7 @@ type Config struct {
 	AdapterQueueCount uint32            `yaml:"adapter-queue-count"`
 	FlowQueueCount    uint32            `yaml:"flow-queue-count"`
 	FlowCountLimit    uint32            `yaml:"flow-count-limit"`
+	PolicyMapSize     uint32            `yaml:"policy-map-size"`
 }
 
 type IpPortConfig struct {
