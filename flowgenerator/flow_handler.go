@@ -24,7 +24,6 @@ type FlowCacheHashMap struct {
 type TaggedFlowBlock = [1024]TaggedFlow
 
 type TaggedFlowHandler struct {
-	sync.Mutex
 	sync.Pool
 
 	block       *TaggedFlowBlock
@@ -43,7 +42,6 @@ func (h *TaggedFlowHandler) Init() *TaggedFlowHandler {
 }
 
 func (h *TaggedFlowHandler) alloc() *TaggedFlow {
-	h.Lock()
 	taggedFlow := &h.block[h.blockCursor]
 	h.blockCursor++
 	if h.blockCursor >= len(*h.block) {
@@ -51,14 +49,12 @@ func (h *TaggedFlowHandler) alloc() *TaggedFlow {
 		*h.block = TaggedFlowBlock{}
 		h.blockCursor = 0
 	}
-	h.Unlock()
 	return taggedFlow
 }
 
 type FlowExtraBlock = [1024]FlowExtra
 
 type FlowExtraHandler struct {
-	sync.Mutex
 	sync.Pool
 
 	block       *FlowExtraBlock
@@ -77,13 +73,11 @@ func (h *FlowExtraHandler) Init() *FlowExtraHandler {
 }
 
 func (h *FlowExtraHandler) alloc() *FlowExtra {
-	h.Lock()
 	flowExtra := &h.block[h.blockCursor]
 	h.blockCursor++
 	if h.blockCursor >= len(*h.block) {
 		h.block = h.Get().(*FlowExtraBlock)
 		h.blockCursor = 0
 	}
-	h.Unlock()
 	return flowExtra
 }

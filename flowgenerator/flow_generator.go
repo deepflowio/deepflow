@@ -3,6 +3,7 @@ package flowgenerator
 import (
 	"math/rand"
 	"runtime"
+	"strconv"
 	"sync"
 	"time"
 
@@ -370,11 +371,11 @@ func (f *FlowExtra) calcCloseType(force bool) {
 	}
 }
 
-func (f *FlowGenerator) processPackets(processBuffer []interface{}, gotSize int, index int) {
+func (f *FlowGenerator) processPackets(processBuffer []interface{}, gotSize int) {
 	i := 0
 loop:
 	if i >= gotSize {
-		f.packetHandlers[index].Done()
+		f.packetHandler.Done()
 		return
 	}
 	meta := processBuffer[i].(*MetaPacket)
@@ -393,20 +394,21 @@ loop:
 	goto loop
 }
 
-func (f *FlowGenerator) handlePackets(index int) {
+func (f *FlowGenerator) handlePackets() {
 	metaPacketInQueue := f.metaPacketHeaderInQueue
-	packetHandler := f.packetHandlers[index]
+	packetHandler := f.packetHandler
 	recvBuffer := packetHandler.recvBuffer
 	processBuffer := packetHandler.processBuffer
 	gotSize := 0
+	hashKey := HashKey(f.index)
 loop:
 	if !f.handleRunning {
 		log.Info("flow fenerator packet handler exit")
 		return
 	}
 	packetHandler.Add(1)
-	go f.processPackets(processBuffer, gotSize, index)
-	gotSize = metaPacketInQueue.Gets(HashKey(index), recvBuffer)
+	go f.processPackets(processBuffer, gotSize)
+	gotSize = metaPacketInQueue.Gets(hashKey, recvBuffer)
 	packetHandler.Wait()
 	processBuffer, recvBuffer = recvBuffer, processBuffer
 	goto loop
@@ -541,11 +543,9 @@ func (f *FlowGenerator) run() {
 		f.cleanRunning = true
 		f.timeoutReport()
 	}
-	for i := 0; i < f.inQueueCount; i++ {
-		if !f.handleRunning {
-			f.handleRunning = true
-			go f.handlePackets(i)
-		}
+	if !f.handleRunning {
+		f.handleRunning = true
+		go f.handlePackets()
 	}
 }
 
@@ -567,29 +567,25 @@ func (f *FlowGenerator) Stop() {
 }
 
 // create a new flow generator
-func New(metaPacketHeaderInQueue MultiQueueReader, inQueueCount int, flowOutQueue QueueWriter, forceReportInterval time.Duration, bufferSize, index int) *FlowGenerator {
+func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, cfg FlowGeneratorConfig, index int) *FlowGenerator {
 	flowGenerator := &FlowGenerator{
 		TimeoutConfig:           defaultTimeoutConfig,
 		FastPath:                FastPath{FlowCacheHashMap: FlowCacheHashMap{make([]*FlowCache, HASH_MAP_SIZE), rand.Uint32(), HASH_MAP_SIZE, TIMOUT_PARALLEL_NUM}},
 		metaPacketHeaderInQueue: metaPacketHeaderInQueue,
-		inQueueCount:            inQueueCount,
 		flowOutQueue:            flowOutQueue,
 		stats:                   FlowGeneratorStats{cleanRoutineFlowCacheNums: make([]int, TIMOUT_PARALLEL_NUM), cleanRoutineMaxFlowCacheLens: make([]int, TIMOUT_PARALLEL_NUM)},
 		stateMachineMaster:      make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
 		stateMachineSlave:       make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
 		innerFlowKey:            &FlowKey{},
+		packetHandler:           &PacketHandler{recvBuffer: make([]interface{}, cfg.BufferSize/2), processBuffer: make([]interface{}, cfg.BufferSize/2)},
 		servicePortDescriptor:   getServiceDescriptorWithIANA(),
-		forceReportInterval:     forceReportInterval,
+		forceReportInterval:     cfg.ForceReportInterval,
 		minLoopInterval:         defaultTimeoutConfig.minTimeout(),
-		flowLimitNum:            FLOW_LIMIT_NUM,
+		flowLimitNum:            cfg.FlowLimitNum,
 		handleRunning:           false,
 		cleanRunning:            false,
 		index:                   index,
 		perfCounter:             NewFlowPerfCounter(),
-	}
-	for i := 0; i < inQueueCount; i++ {
-		packetHandler := &PacketHandler{recvBuffer: make([]interface{}, bufferSize/2), processBuffer: make([]interface{}, bufferSize/2)}
-		flowGenerator.packetHandlers = append(flowGenerator.packetHandlers, packetHandler)
 	}
 	if !flowGenerator.initFlowCache() {
 		return nil
@@ -599,8 +595,9 @@ func New(metaPacketHeaderInQueue MultiQueueReader, inQueueCount int, flowOutQueu
 	flowGenerator.initStateMachineMaster()
 	flowGenerator.initStateMachineSlave()
 	flowGenerator.initMetaFlowPerfPool()
-	RegisterCountable("flow_generator", flowGenerator)
-	RegisterCountable(FP_NAME, &flowGenerator.perfCounter)
+	tags := OptionStatTags{"index": strconv.Itoa(index)}
+	RegisterCountable("flow_generator", flowGenerator, tags)
+	RegisterCountable(FP_NAME, &flowGenerator.perfCounter, tags)
 	log.Infof("flow generator %d created", index)
 	return flowGenerator
 }

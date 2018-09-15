@@ -76,7 +76,7 @@ var defaultTimeoutConfig TimeoutConfig = TimeoutConfig{
 
 type FlowGeneratorStats struct {
 	TotalNumFlows                uint64 `statsd:"total_flow"`
-	CurrNumFlows                 uint64 `statsd:"current_flow"`
+	CurrNumFlows                 uint32 `statsd:"current_flow"`
 	FloodDropPackets             uint64 `statsd:"flood_drop_packet"`
 	NonEmptyFlowCacheNum         int    `statsd:"non_empty_flow_cache_num"`
 	MaxFlowCacheLen              int    `statsd:"max_flow_cache_len"`
@@ -104,17 +104,16 @@ type FlowGenerator struct {
 	FastPath
 
 	metaPacketHeaderInQueue MultiQueueReader
-	inQueueCount            int
 	flowOutQueue            QueueWriter
 	stats                   FlowGeneratorStats
 	stateMachineMaster      []map[uint8]*StateValue
 	stateMachineSlave       []map[uint8]*StateValue
 	servicePortDescriptor   *ServicePortDescriptor
 	innerFlowKey            *FlowKey
-	packetHandlers          []*PacketHandler
+	packetHandler           *PacketHandler
 	forceReportInterval     time.Duration
 	minLoopInterval         time.Duration
-	flowLimitNum            uint64
+	flowLimitNum            uint32
 	handleRunning           bool
 	cleanRunning            bool
 	index                   int
@@ -124,6 +123,12 @@ type FlowGenerator struct {
 	metaFlowPerfPool    sync.Pool
 	metaFlowPerfBlock   *MetaFlowPerfBlock
 	flowPerfBlockCursor int
+}
+
+type FlowGeneratorConfig struct {
+	ForceReportInterval time.Duration
+	BufferSize          int
+	FlowLimitNum        uint32
 }
 
 func timeMax(a time.Duration, b time.Duration) time.Duration {
@@ -152,6 +157,7 @@ func (f *FlowGenerator) GetCounter() interface{} {
 	f.stats.NonEmptyFlowCacheNum = nonEmptyFlowCacheNum
 	f.stats.MaxFlowCacheLen = maxFlowCacheLen
 	counter := f.stats
+	f.stats.FloodDropPackets = 0
 	return &counter
 }
 
