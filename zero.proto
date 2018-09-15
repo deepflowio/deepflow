@@ -190,6 +190,12 @@ message Meter {
     optional IpDatabaseMeter ip_database = 7;
 }
 
+message ZeroHeader {
+    optional fixed32 timestamp = 1;
+    optional fixed32 sequence = 2;
+    optional fixed32 hash = 3;
+}
+
 message ZeroDocument {
     optional uint32 timestamp = 1;
     optional Tag tag = 2;

@@ -36,6 +36,12 @@ message Request {
     optional RequestType type = 1;
 }
 
+message StreamHeader {
+    optional fixed32 timestamp = 1;
+    optional fixed32 sequence = 2;
+    optional fixed32 action = 3;
+}
+
 /*
  * Evaluated in host byte order.
  * If the value is the same as the default value, then the corresponding key
