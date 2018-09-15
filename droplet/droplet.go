@@ -152,7 +152,8 @@ func Start(configPath string) {
 	flowMapProcess := mapreduce.NewFlowMapProcess(zmqFlowAppOutputQueue)
 	zmqMeteringAppOutputQueue := manager.NewQueue("4-metering-doc-to-zero", queueSize/4)
 
-	meteringProcess := mapreduce.NewMeteringMapProcess(zmqMeteringAppOutputQueue)
+	meteringProcess := mapreduce.NewMeteringMapProcess(zmqMeteringAppOutputQueue, meteringAppQueue, int(cfg.FlowQueueCount))
+	meteringProcess.Start()
 	queueFlushTime := time.Minute
 	flowTimer := time.NewTimer(queueFlushTime)
 	go func() {
@@ -174,25 +175,6 @@ func Start(configPath string) {
 		}
 	}()
 
-	meteringTimer := time.NewTimer(queueFlushTime)
-	go func() {
-		for {
-			<-meteringTimer.C
-			flushMetering := MetaPacket{Timestamp: 0}
-			meteringAppQueue.Put(0, &flushMetering)
-			meteringTimer.Reset(queueFlushTime)
-		}
-	}()
-	go func() {
-		for {
-			metaPacket := meteringAppQueue.Get(0).(*MetaPacket)
-			if metaPacket.Timestamp != 0 {
-				meteringProcess.Process(*metaPacket)
-			} else if meteringProcess.NeedFlush() {
-				meteringProcess.Flush()
-			}
-		}
-	}()
 	builder := sender.NewZeroDocumentSenderBuilder()
 	builder.AddQueue(zmqFlowAppOutputQueue, zmqMeteringAppOutputQueue)
 	for _, zero := range cfg.Zeroes {
