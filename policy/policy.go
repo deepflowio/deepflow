@@ -44,7 +44,8 @@ type ServiceId uint32
 type PolicyId uint32
 
 const (
-	MAX_FASTPATH_LEN = 1 << 18
+	MIN_FASTPATH_MAP_LEN = 1 << 10
+	MAX_FASTPATH_MAP_LEN = 1 << 20
 )
 
 type PolicyDataBlock = [1024]PolicyData
@@ -71,14 +72,27 @@ type PolicyCounter struct {
 	ArpTable   uint32 `statsd:"arp_table"`
 }
 
-func NewPolicyTable(actionTypes ActionType, queueCount int) *PolicyTable { // 传入Protobuf结构体指针
+func getAvailableMapSize(queueCount int, mapSize uint32) uint32 {
+	availableMapSize := uint32(MAX_FASTPATH_MAP_LEN)
+	newMapSize := mapSize / uint32(queueCount)
+	if availableMapSize > newMapSize {
+		availableMapSize = uint32(MIN_FASTPATH_MAP_LEN)
+		for availableMapSize < newMapSize {
+			availableMapSize <<= 1
+		}
+	}
+	return availableMapSize
+}
+
+func NewPolicyTable(actionTypes ActionType, queueCount int, mapSize uint32) *PolicyTable { // 传入Protobuf结构体指针
 	// 使用actionTypes过滤，例如
 	// Trident仅关心PACKET_BROKER和PACKET_STORE，
 	// 那么就不要将EPC等云平台信息进行计算。
 	// droplet关心**几乎**所有，对关心的信息进行计算
+	availableMapSize := getAvailableMapSize(queueCount, mapSize)
 	policyTable := &PolicyTable{
-		cloudPlatformData: NewCloudPlatformData(queueCount),
-		policyLabel:       NewPolicyLabel(queueCount),
+		cloudPlatformData: NewCloudPlatformData(queueCount, availableMapSize),
+		policyLabel:       NewPolicyLabel(queueCount, availableMapSize),
 	}
 	policyTable.policyDataPoll.New = func() interface{} {
 		block := new(PolicyDataBlock)
@@ -86,6 +100,7 @@ func NewPolicyTable(actionTypes ActionType, queueCount int) *PolicyTable { // �
 		return block
 	}
 	policyTable.block = policyTable.policyDataPoll.Get().(*PolicyDataBlock)
+	policyTable.queueCount = queueCount
 	return policyTable
 }
 
