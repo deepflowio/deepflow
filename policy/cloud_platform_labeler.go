@@ -57,18 +57,18 @@ type CloudPlatformData struct {
 	arpTable      [TAP_MAX]*ArpTable
 }
 
-func NewFastPathPlatform() *FastPathPlatform {
+func NewFastPathPlatform(mapSize uint32) *FastPathPlatform {
 	var fastPath FastPathPlatform
 	for i := uint32(0); i < uint32(TAP_MAX); i++ {
 		fastPath.fastTable[i] = &FastTable{
-			fastPlatform: lru.New(MAX_FASTPATH_LEN),
+			fastPlatform: lru.New(int(mapSize)),
 		}
 	}
 
 	return &fastPath
 }
 
-func NewCloudPlatformData(queueCount int) *CloudPlatformData {
+func NewCloudPlatformData(queueCount int, mapSize uint32) *CloudPlatformData {
 	macTable := &MacTable{
 		macMap: make(MacMapData),
 	}
@@ -83,7 +83,7 @@ func NewCloudPlatformData(queueCount int) *CloudPlatformData {
 	}
 	fastPath := make([]*FastPathPlatform, queueCount)
 	for i := uint32(0); i < uint32(queueCount); i++ {
-		fastPath[i] = NewFastPathPlatform()
+		fastPath[i] = NewFastPathPlatform(mapSize)
 	}
 	var arpTable [TAP_MAX]*ArpTable
 	for i := uint32(0); i < uint32(TAP_MAX); i++ {

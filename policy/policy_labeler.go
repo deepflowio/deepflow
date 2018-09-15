@@ -45,21 +45,21 @@ type PolicyLabel struct {
 	fastPath []*FastPathPolicy
 }
 
-func NewFastPathPolicy() *FastPathPolicy {
+func NewFastPathPolicy(mapSize uint32) *FastPathPolicy {
 	var fastPathPolicy FastPathPolicy
 	for i := uint32(0); i < uint32(TAP_MAX); i++ {
 		fastPathPolicy.fastPolicyTable[i] = &FastPolicyTable{
-			fastPolicy: lru.New(MAX_FASTPATH_LEN),
+			fastPolicy: lru.New(int(mapSize)),
 		}
 	}
 
 	return &fastPathPolicy
 }
 
-func NewPolicyLabel(queueCount int) *PolicyLabel {
+func NewPolicyLabel(queueCount int, mapSize uint32) *PolicyLabel {
 	fastPath := make([]*FastPathPolicy, queueCount)
 	for i := uint32(0); i < uint32(queueCount); i++ {
-		fastPath[i] = NewFastPathPolicy()
+		fastPath[i] = NewFastPathPolicy(mapSize)
 	}
 
 	return &PolicyLabel{
