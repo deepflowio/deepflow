@@ -12,8 +12,8 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
-func NewMeteringMapProcess(zmqMeteringQueue queue.QueueWriter) *MeteringHandler {
-	return NewMeteringHandler([]app.MeteringProcessor{usage.NewProcessor()}, zmqMeteringQueue)
+func NewMeteringMapProcess(input queue.QueueWriter, output queue.MultiQueue, outputCount int) *MeteringHandler {
+	return NewMeteringHandler([]app.MeteringProcessor{usage.NewProcessor()}, input, output, outputCount)
 }
 
 type meteringAppStats struct {
@@ -26,21 +26,24 @@ type MeteringHandler struct {
 	processors   []app.MeteringProcessor
 	stashes      []*Stash
 
-	lastProcess time.Duration
-
-	zmqAppQueue queue.QueueWriter
-	emitCounter []uint64
+	lastProcess        time.Duration
+	meteringQueue      queue.MultiQueue
+	meteringQueueCount int
+	zmqAppQueue        queue.QueueWriter
+	emitCounter        []uint64
 }
 
-func NewMeteringHandler(processors []app.MeteringProcessor, zmqAppQueue queue.QueueWriter) *MeteringHandler {
+func NewMeteringHandler(processors []app.MeteringProcessor, output queue.QueueWriter, inputs queue.MultiQueue, inputCount int) *MeteringHandler {
 	nApps := len(processors)
 	handler := MeteringHandler{
-		numberOfApps: len(processors),
-		processors:   processors,
-		lastProcess:  time.Duration(time.Now().UnixNano()),
-		stashes:      make([]*Stash, nApps),
-		zmqAppQueue:  zmqAppQueue,
-		emitCounter:  make([]uint64, nApps),
+		numberOfApps:       len(processors),
+		processors:         processors,
+		lastProcess:        time.Duration(time.Now().UnixNano()),
+		stashes:            make([]*Stash, nApps),
+		zmqAppQueue:        output,
+		emitCounter:        make([]uint64, nApps),
+		meteringQueue:      inputs,
+		meteringQueueCount: inputCount,
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.stashes[i] = NewStash(DOCS_IN_BUFFER)
@@ -82,27 +85,49 @@ func isValidMetering(metering datatype.MetaPacket) bool {
 	return true
 }
 
-func (f *MeteringHandler) Process(metering datatype.MetaPacket) error {
-
-	if !isValidMetering(metering) {
-		return errors.New("flow timestamp incorrect and droped")
-	}
-
-	flush := false
-
-	for i, processor := range f.processors {
-		f.stashes[i].Add(processor.Process(metering, false)...)
-		if f.stashes[i].Full() {
-			flush = true
+func (f *MeteringHandler) timeout() {
+	timer := time.NewTimer(time.Minute)
+	for {
+		<-timer.C
+		timer.Reset(time.Minute)
+		flushMetering := datatype.MetaPacket{Timestamp: 0}
+		for i := 0; i < f.meteringQueueCount; i++ {
+			f.meteringQueue.Put(queue.HashKey(i), &flushMetering)
 		}
 	}
+}
 
-	if flush {
-		f.Flush()
+func (f *MeteringHandler) Start() {
+	go f.timeout()
+	for i := 0; i < f.meteringQueueCount; i++ {
+		go f.Process(i)
 	}
+}
 
-	f.lastProcess = time.Duration(time.Now().UnixNano())
-	return nil
+func (f *MeteringHandler) Process(index int) error {
+	for {
+		metering := f.meteringQueue.Get(queue.HashKey(index)).(*datatype.MetaPacket)
+		if metering.Timestamp == 0 && f.NeedFlush() {
+			f.Flush()
+		}
+
+		if !isValidMetering(*metering) {
+			return errors.New("flow timestamp incorrect and droped")
+		}
+
+		flush := false
+
+		for i, processor := range f.processors {
+			f.stashes[i].Add(processor.Process(*metering, false)...)
+			if f.stashes[i].Full() {
+				flush = true
+			}
+		}
+
+		if flush {
+			f.Flush()
+		}
+	}
 }
 
 func (f *MeteringHandler) Flush() {
