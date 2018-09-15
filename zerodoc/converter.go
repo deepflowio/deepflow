@@ -383,7 +383,7 @@ func GeoMeterToPB(m *GeoMeter) *pb.GeoMeter {
 		SumPacketRx:             proto.Uint64(m.SumPacketRx),
 		SumBitTx:                proto.Uint64(m.SumBitTx),
 		SumBitRx:                proto.Uint64(m.SumBitRx),
-		SumRttSyn:               proto.Uint64(m.SumRTTSyn),
+		SumRttSyn:               proto.Uint64(uint64(m.SumRTTSyn)),
 		SumRttSynFlow:           proto.Uint64(m.SumRTTSynFlow),
 	}
 }
@@ -397,7 +397,7 @@ func PBToGeoMeter(m *pb.GeoMeter) *GeoMeter {
 		SumPacketRx:           m.GetSumPacketRx(),
 		SumBitTx:              m.GetSumBitTx(),
 		SumBitRx:              m.GetSumBitRx(),
-		SumRTTSyn:             m.GetSumRttSyn(),
+		SumRTTSyn:             time.Duration(m.GetSumRttSyn()),
 		SumRTTSynFlow:         m.GetSumRttSynFlow(),
 	}
 }
