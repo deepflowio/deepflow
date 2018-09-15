@@ -14,7 +14,7 @@ type GeoMeter struct {
 	SumPacketRx           uint64
 	SumBitTx              uint64
 	SumBitRx              uint64
-	SumRTTSyn             uint64
+	SumRTTSyn             time.Duration
 	SumRTTSynFlow         uint64
 }
 
@@ -55,7 +55,7 @@ func (m *GeoMeter) ToMap() map[string]interface{} {
 	pgm["sum_packet_rx"] = int64(m.SumPacketRx)
 	pgm["sum_bit_tx"] = int64(m.SumBitTx)
 	pgm["sum_bit_rx"] = int64(m.SumBitRx)
-	pgm["sum_rtt_syn"] = int64(m.SumRTTSyn)
+	pgm["sum_rtt_syn"] = int64(m.SumRTTSyn / time.Microsecond)
 	pgm["sum_rtt_syn_flow"] = int64(m.SumRTTSynFlow)
 	return pgm
 }
