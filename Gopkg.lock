@@ -158,14 +158,14 @@
 
 [[projects]]
   branch = "feature-os"
-  digest = "1:6a3705b6956398d0b5c34a0ad0272ce28567ac0dd1999250e4412d11113943ba"
+  digest = "1:8ca450d876e2e6d5ac0e331915a7be76a79af7d7e30e91627280fa076c234728"
   name = "gitlab.x.lan/yunshan/message"
   packages = [
     "dfi",
     "zero",
   ]
   pruneopts = "T"
-  revision = "04fc08377ca140b505d9e525e15164b011486d88"
+  revision = "77835d127b7900c080009dde13ff2298496c14f6"
 
 [[projects]]
   branch = "release-branch.go1.9"
