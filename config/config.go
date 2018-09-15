@@ -31,6 +31,7 @@ type Config struct {
 	QueueSize         uint32            `yaml:"queue-size"`
 	AdapterQueueCount uint32            `yaml:"adapter-queue-count"`
 	FlowQueueCount    uint32            `yaml:"flow-queue-count"`
+	FlowCountLimit    uint32            `yaml:"flow-count-limit"`
 }
 
 type IpPortConfig struct {
@@ -94,13 +95,16 @@ func (c *Config) Validate() error {
 		c.FlowTimeout.Others *= time.Second
 	}
 	if c.QueueSize == 0 {
-		return errors.New("can not get packet and flow queue size")
+		c.QueueSize = 65536
 	}
 	if c.AdapterQueueCount == 0 {
 		c.AdapterQueueCount = 1
 	}
 	if c.FlowQueueCount == 0 {
 		c.FlowQueueCount = 1
+	}
+	if c.FlowCountLimit == 0 {
+		c.FlowCountLimit = 1024 * 1024
 	}
 
 	return nil

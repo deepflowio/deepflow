@@ -128,13 +128,20 @@ func Start(configPath string) {
 		ClosedFin:       0,
 		SingleDirection: flowTimeout.Others,
 	}
-	flowGenOutput := manager.NewQueue("3-tagged-flow-to-duplicator", queueSize/4)
-	flowGenerator := flowgenerator.New(flowGeneratorQueue, 1, flowGenOutput, flowTimeout.ForceReportInterval, queueSize, 0)
-	if flowGenerator == nil {
-		return
+	flowGeneratorConfig := flowgenerator.FlowGeneratorConfig{
+		ForceReportInterval: flowTimeout.ForceReportInterval,
+		BufferSize:          queueSize,
+		FlowLimitNum:        cfg.FlowCountLimit / uint32(cfg.FlowQueueCount),
 	}
-	flowGenerator.SetTimeout(timeoutConfig)
-	flowGenerator.Start()
+	flowGenOutput := manager.NewQueue("3-tagged-flow-to-duplicator", queueSize/4)
+	for i := 0; i < int(cfg.FlowQueueCount); i++ {
+		flowGenerator := flowgenerator.New(flowGeneratorQueue, flowGenOutput, flowGeneratorConfig, i)
+		if flowGenerator == nil {
+			return
+		}
+		flowGenerator.SetTimeout(timeoutConfig)
+		flowGenerator.Start()
+	}
 
 	flowAppQueue := manager.NewQueue("4-tagged-flow-to-flow-app", queueSize/4)
 	flowSenderQueue := manager.NewQueue("4-tagged-flow-to-stream", queueSize/4)

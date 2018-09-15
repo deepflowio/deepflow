@@ -62,7 +62,7 @@ func reversePacket(packet *MetaPacket) {
 func getDefaultFlowGenerator() *FlowGenerator {
 	metaPacketHeaderInQueue := NewOverwriteQueues("metaPacketHeaderInQueue", 1, DEFAULT_QUEUE_LEN)
 	flowOutQueue := NewOverwriteQueue("flowOutQueue", DEFAULT_QUEUE_LEN)
-	return New(metaPacketHeaderInQueue, 1, flowOutQueue, DEFAULT_INTERVAL_HIGH, FLOW_OUT_BUFFER_CAP, 0)
+	return New(metaPacketHeaderInQueue, flowOutQueue, FlowGeneratorConfig{60 * time.Second, 64 * 1024, 1024 * 1024}, 0)
 }
 
 func TestNew(t *testing.T) {
@@ -456,8 +456,8 @@ func BenchmarkShortFlowList(b *testing.B) {
 		processBuffer[i] = meta
 	}
 	b.ResetTimer()
-	flowGenerator.packetHandlers[0].Add(1)
-	flowGenerator.processPackets(processBuffer, b.N, 0)
+	flowGenerator.packetHandler.Add(1)
+	flowGenerator.processPackets(processBuffer, b.N)
 	b.StopTimer()
 	maxFlowListLen := 0
 	for _, flowCache := range flowGenerator.hashMap[0:] {
@@ -481,8 +481,8 @@ func BenchmarkLongFlowList(b *testing.B) {
 		processBuffer[i] = meta
 	}
 	b.ResetTimer()
-	flowGenerator.packetHandlers[0].Add(1)
-	flowGenerator.processPackets(processBuffer, b.N, 0)
+	flowGenerator.packetHandler.Add(1)
+	flowGenerator.processPackets(processBuffer, b.N)
 	b.StopTimer()
 	maxFlowListLen := 0
 	for _, flowCache := range flowGenerator.hashMap[0:] {
