@@ -1,3 +1,3 @@
 package zero
 
-//go:generate protoc --go_out=plugins=grpc:. -I.. ../zero.proto
+//go:generate protoc --gofast_out=plugins=grpc:. -I.. ../zero.proto

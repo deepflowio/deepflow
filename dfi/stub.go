@@ -1,3 +1,3 @@
 package dfi
 
-//go:generate protoc --go_out=plugins=grpc:. -I.. ../dfi.proto
+//go:generate protoc --gofast_out=plugins=grpc:. -I.. ../dfi.proto
