@@ -96,7 +96,10 @@ func NewPolicyTable(actionTypes ActionType, queueCount int, mapSize uint32) *Pol
 	}
 	policyTable.policyDataPoll.New = func() interface{} {
 		block := new(PolicyDataBlock)
-		runtime.SetFinalizer(block, func(b *PolicyDataBlock) { policyTable.policyDataPoll.Put(b) })
+		runtime.SetFinalizer(block, func(b *PolicyDataBlock) {
+			*b = PolicyDataBlock{}
+			policyTable.policyDataPoll.Put(b)
+		})
 		return block
 	}
 
@@ -114,7 +117,6 @@ func (t *PolicyTable) alloc(index int) *PolicyData {
 	t.blockCursors[index]++
 	if t.blockCursors[index] >= len(t.blocks[index]) {
 		t.blocks[index] = t.policyDataPoll.Get().(*PolicyDataBlock)
-		*t.blocks[index] = PolicyDataBlock{}
 		t.blockCursors[index] = 0
 	}
 	return policyData
@@ -169,9 +171,7 @@ func (t *PolicyTable) GetPolicyDataByFastPath(endpointData *EndpointData, key *L
 func (t *PolicyTable) GetPolicyData(endpointData *EndpointData, key *LookupKey, index int) *PolicyData {
 	policyData := t.alloc(index)
 	if aclActions := t.policyLabel.GetPolicyData(endpointData, key); aclActions != nil {
-		for _, aclAction := range aclActions {
-			policyData.Merge(aclAction)
-		}
+		policyData.Merge(aclActions)
 	}
 
 	return policyData
