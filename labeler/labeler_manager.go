@@ -107,7 +107,7 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *data
 		FastIndex: index,
 	}
 
-	packet.EndpointData, packet.PolicyData = l.policyTable.LookupAllByKey(key)
+	packet.EndpointData, packet.PolicyData = l.policyTable.LookupAllByKey(key, index)
 	log.Debug("QUERY PACKET:", packet, "ENDPOINTDATA:", packet.EndpointData, "POLICYDATA:", packet.PolicyData)
 	return packet.PolicyData
 }
@@ -184,7 +184,7 @@ func (l *LabelerManager) recvDumpAcl(conn *net.UDPConn, port int, arg *bytes.Buf
 		return
 	}
 
-	endpoint, policy := l.policyTable.LookupAllByKey(&key)
+	endpoint, policy := l.policyTable.LookupAllByKey(&key, 0)
 	info := fmt.Sprintf("EndPoint: {Src: %+v Dst: %+v} Policy: %+v", endpoint.SrcInfo, endpoint.DstInfo, policy)
 	encoder := gob.NewEncoder(&buffer)
 	if err := encoder.Encode(info); err != nil {
