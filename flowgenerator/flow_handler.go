@@ -31,7 +31,10 @@ type TaggedFlowHandler struct {
 }
 
 func (h *TaggedFlowHandler) Init() *TaggedFlowHandler {
-	gc := func(b *TaggedFlowBlock) { h.Put(b) }
+	gc := func(b *TaggedFlowBlock) {
+		*b = TaggedFlowBlock{}
+		h.Put(b)
+	}
 	h.Pool.New = func() interface{} {
 		block := new(TaggedFlowBlock)
 		runtime.SetFinalizer(block, gc)
@@ -46,7 +49,6 @@ func (h *TaggedFlowHandler) alloc() *TaggedFlow {
 	h.blockCursor++
 	if h.blockCursor >= len(*h.block) {
 		h.block = h.Get().(*TaggedFlowBlock)
-		*h.block = TaggedFlowBlock{}
 		h.blockCursor = 0
 	}
 	return taggedFlow
@@ -62,7 +64,10 @@ type FlowExtraHandler struct {
 }
 
 func (h *FlowExtraHandler) Init() *FlowExtraHandler {
-	gc := func(b *FlowExtraBlock) { h.Put(b) }
+	gc := func(b *FlowExtraBlock) {
+		*b = FlowExtraBlock{}
+		h.Put(b)
+	}
 	h.Pool.New = func() interface{} {
 		block := new(FlowExtraBlock)
 		runtime.SetFinalizer(block, gc)

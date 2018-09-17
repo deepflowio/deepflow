@@ -604,6 +604,7 @@ func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, cfg
 
 func (f *FlowGenerator) initMetaFlowPerfPool() {
 	gc := func(b *MetaFlowPerfBlock) {
+		*b = MetaFlowPerfBlock{}
 		f.metaFlowPerfPool.Put(b)
 	}
 

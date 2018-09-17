@@ -177,7 +177,6 @@ func newAclAction(aclId uint32, actions []*trident.FlowAction) []*datatype.AclAc
 			}
 			aclActions = append(aclActions, aclAction)
 		}
-		continue
 	}
 
 	return aclActions
