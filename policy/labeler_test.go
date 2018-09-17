@@ -86,7 +86,7 @@ func TestGetPlatformData(t *testing.T) {
 	datas = append(datas, &vifData)
 	datas = append(datas, &vifData1)
 	policy.UpdateInterfaceData(datas)
-	result, _ := policy.LookupAllByKey(key)
+	result, _ := policy.LookupAllByKey(key, 0)
 	if result != nil {
 		t.Log(result.SrcInfo, "\n")
 		t.Log(result.DstInfo, "\n")
@@ -139,13 +139,13 @@ func TestGetPlatformDataAboutArp(t *testing.T) {
 	datas = append(datas, &vifData)
 	policy.UpdateInterfaceData(datas)
 	now := time.Now()
-	result, _ := policy.LookupAllByKey(key)
+	result, _ := policy.LookupAllByKey(key, 0)
 	t.Log(time.Now().Sub(now))
 	if result != nil {
 		t.Log(result.SrcInfo, "\n")
 		t.Log(result.DstInfo, "\n")
 	}
 	now = time.Now()
-	result, _ = policy.LookupAllByKey(key)
+	result, _ = policy.LookupAllByKey(key, 0)
 	t.Log(time.Now().Sub(now))
 }
