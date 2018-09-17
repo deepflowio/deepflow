@@ -195,6 +195,21 @@ func (f *FlowGenerator) initStateMachineMaster() {
 	// for FLOW_STATE_RESET
 	stateMachineMaster[FLOW_STATE_RESET] = make(map[uint8]*StateValue)
 
+	stateMachineMaster[FLOW_STATE_RESET][TCP_SYN] = &StateValue{timeoutConfig.Exception, FLOW_STATE_RESET, false}
+	stateMachineMaster[FLOW_STATE_RESET][TCP_SYN|TCP_ACK] = stateMachineMaster[FLOW_STATE_RESET][TCP_SYN]
+
+	stateMachineMaster[FLOW_STATE_RESET][TCP_FIN] = &StateValue{timeoutConfig.Exception, FLOW_STATE_RESET, false}
+	stateMachineMaster[FLOW_STATE_RESET][TCP_FIN|TCP_ACK] = stateMachineMaster[FLOW_STATE_RESET][TCP_FIN]
+	stateMachineMaster[FLOW_STATE_RESET][TCP_FIN|TCP_PSH|TCP_ACK] = stateMachineMaster[FLOW_STATE_RESET][TCP_FIN]
+
+	stateMachineMaster[FLOW_STATE_RESET][TCP_RST] = &StateValue{timeoutConfig.Exception, FLOW_STATE_RESET, true}
+	stateMachineMaster[FLOW_STATE_RESET][TCP_RST|TCP_ACK] = stateMachineMaster[FLOW_STATE_RESET][TCP_RST]
+	stateMachineMaster[FLOW_STATE_RESET][TCP_RST|TCP_PSH|TCP_ACK] = stateMachineMaster[FLOW_STATE_RESET][TCP_RST]
+
+	stateMachineMaster[FLOW_STATE_RESET][TCP_ACK] = &StateValue{timeoutConfig.Exception, FLOW_STATE_RESET, false}
+	stateMachineMaster[FLOW_STATE_RESET][TCP_PSH|TCP_ACK] = stateMachineMaster[FLOW_STATE_RESET][TCP_ACK]
+	stateMachineMaster[FLOW_STATE_RESET][TCP_PSH|TCP_URG|TCP_ACK] = stateMachineMaster[FLOW_STATE_RESET][TCP_ACK]
+
 	// for FLOW_STATE_EXCEPTION
 	stateMachineMaster[FLOW_STATE_EXCEPTION] = make(map[uint8]*StateValue)
 }
@@ -256,7 +271,7 @@ func (f *FlowGenerator) initStateMachineSlave() {
 	stateMachineSlave[FLOW_STATE_CLOSING_RX1][TCP_FIN|TCP_ACK] = stateMachineSlave[FLOW_STATE_CLOSING_RX1][TCP_FIN]
 	stateMachineSlave[FLOW_STATE_CLOSING_RX1][TCP_FIN|TCP_PSH|TCP_ACK] = stateMachineSlave[FLOW_STATE_CLOSING_RX1][TCP_FIN]
 
-	// for FLOW_STATE_CLOSING_TX2
+	// for FLOW_STATE_CLOSING_RX2
 	stateMachineSlave[FLOW_STATE_CLOSING_RX2] = make(map[uint8]*StateValue)
 
 	stateMachineSlave[FLOW_STATE_CLOSING_RX2][TCP_ACK] = &StateValue{timeoutConfig.ClosedFin, FLOW_STATE_CLOSED, true}

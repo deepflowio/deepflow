@@ -99,8 +99,7 @@ func TestHandleSynRst(t *testing.T) {
 	reversePacket(packet1)
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
 
-	var taggedFlow *TaggedFlow
-	taggedFlow = flowOutQueue.(Queue).Get().(*TaggedFlow)
+	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
 	if taggedFlow.CloseType != CLOSE_TYPE_RST {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_RST)
 	}
@@ -136,8 +135,7 @@ func TestHandleSynFin(t *testing.T) {
 
 	go flowGenerator.Start()
 
-	var taggedFlow *TaggedFlow
-	taggedFlow = flowOutQueue.(Queue).Get().(*TaggedFlow)
+	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
 	if taggedFlow.CloseType != CLOSE_TYPE_HALF_CLOSE {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_HALF_CLOSE)
 	}

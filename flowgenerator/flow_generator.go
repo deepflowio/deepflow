@@ -126,9 +126,7 @@ func (f *FlowGenerator) initFlowCache() bool {
 }
 
 func (f *FlowGenerator) addFlow(flowCache *FlowCache, flowExtra *FlowExtra) *FlowExtra {
-	flowCache.Lock()
-	flowCache.flowList.PushFront(flowExtra)
-	flowCache.Unlock()
+	flowCache.SafeFlowListPushFront(flowExtra)
 	return nil
 }
 
@@ -308,7 +306,7 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 	}
 	flowExtra.recentTime = packetTimestamp
 	// a flow will report every minute and StartTime will be reset, so the value could not be overflow
-	taggedFlow.TimeBitmap |= 1 << uint64(flowExtra.recentTime-taggedFlow.StartTime)
+	taggedFlow.TimeBitmap |= 1 << uint64((flowExtra.recentTime-taggedFlow.StartTime)/time.Second)
 }
 
 func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireInterval time.Duration) {
@@ -451,7 +449,8 @@ loop:
 	maxFlowCacheLen := 0
 	nonEmptyFlowCacheNum := 0
 	for _, flowCache := range hashMap[start:end] {
-		len := flowCache.flowList.Len()
+		flowList := flowCache.flowList
+		len := flowList.Len()
 		if len > 0 {
 			nonEmptyFlowCacheNum++
 		} else {
@@ -461,7 +460,8 @@ loop:
 			maxFlowCacheLen = len
 		}
 		flowCache.Lock()
-		for e := flowCache.flowList.Back(); e != nil; e = e.Prev() {
+		e := flowList.Back()
+		for e != nil {
 			flowExtra := e.Value
 			if flowExtra.recentTime < cleanRange && flowExtra.recentTime+flowExtra.timeout <= now {
 				taggedFlow := flowExtra.taggedFlow
@@ -473,14 +473,16 @@ loop:
 					flowExtra.reversed = !flowExtra.reversed
 				}
 				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
+				flowExtra.reset()
 				flowOutBuffer[flowOutNum] = taggedFlow
 				flowOutNum++
 				if flowOutNum >= FLOW_OUT_BUFFER_CAP {
 					flowOutQueue.Put(flowOutBuffer[:flowOutNum]...)
 					flowOutNum = 0
 				}
-				flowExtra.reset()
-				flowCache.flowList.Remove(e)
+				del := e
+				e = e.Prev()
+				flowList.Remove(del)
 				continue
 			} else if flowExtra.taggedFlow.StartTime+forceReportInterval < now {
 				taggedFlow := flowExtra.taggedFlow
@@ -500,6 +502,7 @@ loop:
 				}
 				flowExtra.resetCurFlowInfo(now)
 			}
+			e = e.Prev()
 		}
 		flowCache.Unlock()
 	}
