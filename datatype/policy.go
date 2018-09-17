@@ -75,9 +75,11 @@ func (a *AclAction) String() string {
 	return fmt.Sprintf("%+v", *a)
 }
 
-func (d *PolicyData) Merge(aclAction *AclAction) {
-	d.ActionList |= aclAction.Type
-	d.AclActions = append(d.AclActions, aclAction)
+func (d *PolicyData) Merge(aclActions []*AclAction) {
+	for _, aclAction := range aclActions {
+		d.ActionList |= aclAction.Type
+	}
+	d.AclActions = aclActions
 }
 
 func (a *PolicyData) String() string {

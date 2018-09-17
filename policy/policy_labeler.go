@@ -179,11 +179,10 @@ func (l *PolicyLabel) GetPolicyFromPolicyTable(endpointData *EndpointData, key *
 			if direction != NO_DIRECTION {
 				for _, action := range acl.Action {
 					action.Direction = direction
-					aclActions = append(aclActions, action)
 				}
+				aclActions = append(aclActions, acl.Action...)
 			}
 		}
-		continue
 	}
 
 	return aclActions
