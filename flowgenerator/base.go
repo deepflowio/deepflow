@@ -43,7 +43,7 @@ const (
 )
 
 const FLOW_CACHE_CAP = 1024
-const HASH_MAP_SIZE uint64 = 1024 * 256
+const HASH_MAP_SIZE uint64 = 1024 * 512
 const FLOW_OUT_BUFFER_CAP = 1024 * 64
 const TIMOUT_PARALLEL_NUM uint64 = 4
 

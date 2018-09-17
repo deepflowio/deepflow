@@ -16,19 +16,18 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 	// keyMatch is goroutine safety
 	if flowExtra, reply = flowCache.keyMatch(meta, flowKey); flowExtra != nil {
 		if ok, reply = f.updateTcpFlow(flowExtra, meta, reply); ok {
+			taggedFlow := flowExtra.taggedFlow
 			f.stats.CurrNumFlows--
 			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportInterval)
 			flowExtra.calcCloseType(false)
-			if f.servicePortDescriptor.judgeServiceDirection(flowExtra.taggedFlow.PortSrc, flowExtra.taggedFlow.PortDst) {
+			if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
 				flowExtra.reverseFlow()
 				flowExtra.reversed = !flowExtra.reversed
 			}
-			flowExtra.taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
-			f.flowOutQueue.Put(flowExtra.taggedFlow)
+			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
+			f.flowOutQueue.Put(taggedFlow)
 			// delete front from this FlowCache because flowExtra is moved to front in keyMatch()
-			flowCache.Lock()
-			flowCache.flowList.RemoveFront()
-			flowCache.Unlock()
+			flowCache.SafeFlowListRemoveFront()
 		} else {
 			// reply is a sign relative to the flow direction, so if the flow is reversed then the sign should be changed
 			if f.checkIfDoFlowPerf(flowExtra) {
@@ -52,8 +51,8 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 				flowExtra.reversed = !flowExtra.reversed
 			}
 			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
-			f.flowOutQueue.Put(taggedFlow)
 			flowExtra.reset()
+			f.flowOutQueue.Put(taggedFlow)
 		} else {
 			if f.checkIfDoFlowPerf(flowExtra) {
 				flowExtra.metaFlowPerf.Update(meta, reply, flowExtra, &f.perfCounter)
