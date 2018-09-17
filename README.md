@@ -50,3 +50,15 @@ graph TD;
 ```
 
 那么我想要查询10.30.1.128/23所对应的数据集时，便能够得到[1, 2]的结果
+
+fastpath内存占用
+----------------
+ACL是依据AclId和AclActionType进行划分，FastPolicyData保存ACL切片是动态变化的，
+一个ACL是(40 + N * 6)，N是策略的个数。
+FastPolicyData = 4byte + M * (40 + N * 6)byte, 取M = 5个ACL, N = 5个policyInfo, 进行如下估算： 
+1. 平台数据(key(8byte) + FastPlatformData(96byte)) * 2 * policy-map-size
+2. 策略数据(key(32byte) + FastPolicyData(354byte))  * 2 * policy-map-size
+
+比如policy-map-size = 1024则：
+1. 平台数据 = 104 * 2 * 1024 byte
+2. 策略数据 = 386 * 2 * 1024 byte
