@@ -39,7 +39,6 @@ func (h *DataHandler) confirmAlloc() {
 	h.blockCursor++
 	if h.blockCursor >= len(*h.block) {
 		h.block = h.Get().(*MetaPacketBlock)
-		*h.block = MetaPacketBlock{} // 回收的block包含脏数据，因此需要重新清空
 		h.blockCursor = 0
 	}
 }
@@ -57,7 +56,10 @@ func (h *DataHandler) Handle(timestamp Timestamp, packet RawPacket, size PacketS
 }
 
 func (h *DataHandler) Init() *DataHandler {
-	gc := func(b *MetaPacketBlock) { h.Put(b) }
+	gc := func(b *MetaPacketBlock) {
+		*b = MetaPacketBlock{} // 重新初始化，避免无效的数据或不可预期的引用
+		h.Put(b)
+	}
 	h.Pool.New = func() interface{} {
 		block := new(MetaPacketBlock)
 		runtime.SetFinalizer(block, gc)
