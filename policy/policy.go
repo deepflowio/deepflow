@@ -56,8 +56,8 @@ type PolicyTable struct {
 	policyLabel       *PolicyLabel
 
 	policyDataPoll sync.Pool
-	block          *PolicyDataBlock
-	blockCursor    int
+	blocks         []*PolicyDataBlock
+	blockCursors   []int
 	queueCount     int
 }
 
@@ -99,21 +99,24 @@ func NewPolicyTable(actionTypes ActionType, queueCount int, mapSize uint32) *Pol
 		runtime.SetFinalizer(block, func(b *PolicyDataBlock) { policyTable.policyDataPoll.Put(b) })
 		return block
 	}
-	policyTable.block = policyTable.policyDataPoll.Get().(*PolicyDataBlock)
+
+	policyTable.blockCursors = make([]int, queueCount)
+	policyTable.blocks = make([]*PolicyDataBlock, queueCount)
+	for i := 0; i < queueCount; i++ {
+		policyTable.blocks[i] = policyTable.policyDataPoll.Get().(*PolicyDataBlock)
+	}
 	policyTable.queueCount = queueCount
 	return policyTable
 }
 
-func (t *PolicyTable) alloc() *PolicyData {
-	t.Lock()
-	policyData := &t.block[t.blockCursor]
-	t.blockCursor++
-	if t.blockCursor >= len(t.block) {
-		t.block = t.policyDataPoll.Get().(*PolicyDataBlock)
-		*t.block = PolicyDataBlock{}
-		t.blockCursor = 0
+func (t *PolicyTable) alloc(index int) *PolicyData {
+	policyData := &t.blocks[index][t.blockCursors[index]]
+	t.blockCursors[index]++
+	if t.blockCursors[index] >= len(t.blocks[index]) {
+		t.blocks[index] = t.policyDataPoll.Get().(*PolicyDataBlock)
+		*t.blocks[index] = PolicyDataBlock{}
+		t.blockCursors[index] = 0
 	}
-	t.Unlock()
 	return policyData
 }
 
@@ -152,19 +155,19 @@ func (t *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *PolicyData {
 	return nil
 }
 
-func (t *PolicyTable) GetPolicyDataByFastPath(endpointData *EndpointData, key *LookupKey, fastKey *FastKey) *PolicyData {
+func (t *PolicyTable) GetPolicyDataByFastPath(endpointData *EndpointData, key *LookupKey, fastKey *FastKey, index int) *PolicyData {
 	fastKey.Ports = uint64(key.SrcPort<<32) | uint64(key.DstPort)
 	fastKey.ProtoVlan = uint64(key.Proto<<32) | uint64(key.Vlan)
 	policyData := t.policyLabel.GetPolicyByFastPath(fastKey, key.Tap, key.FastIndex)
 	if policyData == nil {
-		policyData = t.GetPolicyData(endpointData, key)
+		policyData = t.GetPolicyData(endpointData, key, index)
 		t.policyLabel.InsertPolicyToFastPath(fastKey, policyData, key.Tap, key.FastIndex)
 	}
 	return policyData
 }
 
-func (t *PolicyTable) GetPolicyData(endpointData *EndpointData, key *LookupKey) *PolicyData {
-	policyData := t.alloc()
+func (t *PolicyTable) GetPolicyData(endpointData *EndpointData, key *LookupKey, index int) *PolicyData {
+	policyData := t.alloc(index)
 	if aclActions := t.policyLabel.GetPolicyData(endpointData, key); aclActions != nil {
 		for _, aclAction := range aclActions {
 			policyData.Merge(aclAction)
@@ -175,15 +178,15 @@ func (t *PolicyTable) GetPolicyData(endpointData *EndpointData, key *LookupKey) 
 }
 
 // Droplet用于ANALYTIC_*、PACKET_BROKER、PACKET_STORE
-func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData) {
+func (t *PolicyTable) LookupAllByKey(key *LookupKey, index int) (*EndpointData, *PolicyData) {
 	if !key.Tap.CheckTapType(key.Tap) {
-		return NewEndpointData(), t.alloc()
+		return NewEndpointData(), t.alloc(index)
 	}
 	endpointData, fastKey := t.cloudPlatformData.GetEndpointData(key)
 	if key.Tap == TAP_TOR {
 		endpointData.SetL2End(key)
 	}
-	policyData := t.GetPolicyDataByFastPath(endpointData, key, fastKey)
+	policyData := t.GetPolicyDataByFastPath(endpointData, key, fastKey, index)
 	return endpointData, policyData
 }
 
