@@ -178,13 +178,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:6fc70efc20d13de4fe96daa155670778d705364d5fa0aa25a978a830bffa7a39"
+  digest = "1:ef31f8393d9d34d8eec14230e9cf195cb26d7b6edccf61364fd25c95ed2b01a5"
   name = "gitlab.x.lan/application/droplet-app"
   packages = [
     "internal/pkg/endpoint",
     "internal/pkg/flow",
     "internal/pkg/geo",
     "internal/pkg/policy",
+    "pkg/mapper/consolelog",
     "pkg/mapper/flow",
     "pkg/mapper/geo",
     "pkg/mapper/perf",
@@ -349,6 +350,7 @@
     "github.com/google/gopacket/pcapgo",
     "github.com/op/go-logging",
     "github.com/spf13/cobra",
+    "gitlab.x.lan/application/droplet-app/pkg/mapper/consolelog",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/flow",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/geo",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/perf",
