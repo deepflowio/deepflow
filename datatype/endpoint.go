@@ -33,18 +33,19 @@ type EndpointInfo struct {
 }
 
 type LookupKey struct {
-	SrcMac, DstMac   uint64
-	SrcIp, DstIp     uint32
-	SrcPort, DstPort uint16
-	EthType          EthernetType
-	Vlan             uint16
-	Proto            uint8
-	Ttl              uint8
-	RxInterface      uint32
-	L2End0, L2End1   bool
-	Tap              TapType
-	Invalid          bool
-	FastIndex        int
+	SrcMac, DstMac           uint64
+	SrcIp, DstIp             uint32
+	SrcPort, DstPort         uint16
+	EthType                  EthernetType
+	Vlan                     uint16
+	Proto                    uint8
+	Ttl                      uint8
+	RxInterface              uint32
+	L2End0, L2End1           bool
+	Tap                      TapType
+	Invalid                  bool
+	FastIndex                int
+	SrcGroupIds, DstGroupIds []uint32
 }
 
 type EndpointData struct {

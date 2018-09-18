@@ -104,14 +104,14 @@ func (t *PolicyTable) GetCounter() interface{} {
 	for i := 0; i < MASK_LEN; i++ {
 		counter.IpTable += uint32(len(t.cloudPlatformData.ipTables[i].ipMap))
 	}
-	for i := 0; i < t.queueCount; i++ {
-		for j := TAP_ANY; j < TAP_MAX; j++ {
-			counter.FastPath += uint32(t.policyLabel.fastPath[i].fastPolicyTable[j].fastPolicy.Len())
-			counter.FastTable += uint32(t.cloudPlatformData.fastPath[i].fastTable[j].fastPlatform.Len())
+	/*
+		for i := 0; i < t.queueCount; i++ {
+			counter.CloudFastTable += uint32(t.cloudPlatformData.fastPath[i].fastTable[j].fastPlatform.Len())
 		}
-	}
+	*/
+
+	counter.Acl += uint32(len(t.policyLabel.RawAcls))
 	for i := TAP_ANY; i < TAP_MAX; i++ {
-		counter.Acl += uint32(len(t.policyLabel.aclData[i]))
 		counter.ArpTable += uint32(len(t.cloudPlatformData.arpTable[i].arpMap))
 	}
 	counter.MaxHit = t.policyLabel.maxHit
@@ -132,41 +132,27 @@ func (t *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *PolicyData {
 	return nil
 }
 
-func (t *PolicyTable) GetPolicyDataByFastPath(endpointData *EndpointData, key *LookupKey, fastKey *FastKey, index int) *PolicyData {
-	fastKey.Ports = (uint64(key.SrcPort) << 32) | uint64(key.DstPort)
-	fastKey.ProtoVlan = (uint64(key.Proto) << 32) | uint64(key.Vlan)
-	policyData := t.policyLabel.GetPolicyByFastPath(fastKey, key.Tap, key.FastIndex)
-	if policyData == nil {
-		policyData = t.GetPolicyData(endpointData, key)
-		t.policyLabel.InsertPolicyToFastPath(fastKey, policyData, key.Tap, key.FastIndex)
-	}
-	return policyData
-}
-
-func (t *PolicyTable) GetPolicyData(endpointData *EndpointData, key *LookupKey) *PolicyData {
-	policyData := &PolicyData{}
-	if aclActions := t.policyLabel.GetPolicyData(endpointData, key); aclActions != nil {
-		policyData.Merge(aclActions)
-	}
-
-	return policyData
-}
-
 // Droplet用于ANALYTIC_*、PACKET_BROKER、PACKET_STORE
 func (t *PolicyTable) LookupAllByKey(key *LookupKey, index int) (*EndpointData, *PolicyData) {
 	if !key.Tap.CheckTapType(key.Tap) {
-		return NewEndpointData(), &PolicyData{}
+		return nil, nil
 	}
-	endpointData, fastKey := t.cloudPlatformData.GetEndpointData(key)
-	if key.Tap == TAP_TOR {
-		endpointData.SetL2End(key)
+
+	endpoint, policy := t.policyLabel.GetPolicyByFastPath(key)
+	if endpoint == nil {
+		endpoint, _ := t.cloudPlatformData.GetEndpointData(key)
+		if key.Tap == TAP_TOR {
+			endpoint.SetL2End(key)
+		}
+		policy = t.policyLabel.GetPolicyByFirstPath(endpoint, key)
+		return endpoint, policy
 	}
-	policyData := t.GetPolicyDataByFastPath(endpointData, key, fastKey, index)
-	return endpointData, policyData
+	return endpoint, policy
 }
 
 func (t *PolicyTable) UpdateInterfaceData(data []*PlatformData) {
 	t.cloudPlatformData.UpdateInterfaceTable(data)
+	t.policyLabel.GenerateIpNetmaskMap(data)
 }
 
 func (t *PolicyTable) UpdateIpGroupData(data []*IpGroupData) {
