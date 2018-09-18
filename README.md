@@ -62,3 +62,40 @@ FastPolicyData = 4byte + M * (40 + N * 6)byte, 取M = 5个ACL, N = 5个policyInf
 比如policy-map-size = 1024则：
 1. 平台数据 = 104 * 2 * 1024 byte
 2. 策略数据 = 386 * 2 * 1024 byte
+
+flowgen+flowperf内存占用估计
+----------------------------
+
+每生成一条流，需要申请的一个新的FlowExtra结构体，其中包含MetaFlowPerf+TaggedFlow两个指针。
+对于flowgen，输出TaggedFlow时还需申请TcpPerfStats；对于flowperf，每条流的MetaFlowPerf
+结构体中还包含两个TcpSessionPeer链表，限制链表最大长度16。
+
+可通过配置文件对最大流数量进行限制，其中flow-count-limit的默认值为1M。
+
+1. 主要结构体及size(Byte)
+
+    struct name    | size
+    ---------------|-------
+    MetaFlowPerf   |  328
+    TcpSessionPeer |  48
+    TcpPerfStats   |  96
+    TaggedFlow     |  488
+    FlowExtra      |  48
+
+2. 理论内存占用
+
+    理论上flowgen+flowperf内存占用应满足如下关系：
+
+        最小：flow-count-limit * 1KB  (1056 = 48+488+328+96+48*1*2)
+
+        最大：flow-count-limit * 2.5KB(2496 = 48+488+328+96+48*16*2)
+
+    默认配置下，当流数量达到上限时，
+
+        最小内存占用1G = 1M * 1KB
+
+        最大内存占用2.5G = 1M * 2.5KB
+
+3. 说明
+
+    因每次申请内存时，一次申请1024个结构体；故实际内存占用会比理论值多
