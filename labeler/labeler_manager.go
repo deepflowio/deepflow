@@ -19,7 +19,6 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
-	lqueue "gitlab.x.lan/yunshan/droplet/queue"
 )
 
 var log = logging.MustGetLogger("labeler")
@@ -115,43 +114,37 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *data
 
 func (l *LabelerManager) run(index int) {
 	meteringQueues := l.appQueues[QUEUE_TYPE_METERING]
-	meteringQueueCount := uint32(len(meteringQueues.(*lqueue.MultiQueue).FixedMultiQueue))
 	flowQueues := l.appQueues[QUEUE_TYPE_FLOW]
-	flowQueueCount := uint32(len(flowQueues.(*lqueue.MultiQueue).FixedMultiQueue))
-	output := make([]interface{}, 256)
-	flowPacket := make([][256]interface{}, flowQueueCount)
-	meteringPacket := make([][256]interface{}, meteringQueueCount)
+	size := 4096
+	meteringKeys := make([]queue.HashKey, 0, size)
+	flowKeys := make([]queue.HashKey, 0, size)
+	meteringItemBatch := make([]interface{}, 0, size)
+	flowItemBatch := make([]interface{}, 0, size)
+	itemBatch := make([]interface{}, size)
 
 	for l.running {
-		count := l.readQueues.Gets(queue.HashKey(index), output)
-		meteringCount := make([]uint32, meteringQueueCount)
-		flowCount := make([]uint32, flowQueueCount)
-		for _, elem := range output[:count] {
-			metaPacket := elem.(*datatype.MetaPacket)
+		itemCount := l.readQueues.Gets(queue.HashKey(index), itemBatch)
+		for _, item := range itemBatch[:itemCount] {
+			metaPacket := item.(*datatype.MetaPacket)
 			action := l.GetPolicy(metaPacket, index)
-			meteringPosition := metaPacket.Hash % meteringQueueCount
 			if (action.ActionList & datatype.ACTION_PACKET_STAT) != 0 {
-				meteringPacket[meteringPosition][meteringCount[meteringPosition]] = metaPacket
-				meteringCount[meteringPosition]++
+				meteringItemBatch = append(meteringItemBatch, metaPacket)
+				meteringKeys = append(meteringKeys, queue.HashKey(metaPacket.Hash))
 			}
-			flowPosition := metaPacket.Hash % flowQueueCount
 			if (action.ActionList & datatype.ACTION_FLOW_STAT) != 0 {
-				flowPacket[flowPosition][flowCount[meteringPosition]] = metaPacket
-				flowCount[flowPosition]++
+				flowItemBatch = append(flowItemBatch, metaPacket)
+				flowKeys = append(flowKeys, queue.HashKey(metaPacket.Hash))
 			}
 		}
-
-		for index, value := range meteringCount {
-			if value == 0 {
-				continue
-			}
-			meteringQueues.Put(queue.HashKey(index), meteringPacket[index][:value]...)
+		if len(meteringItemBatch) > 0 {
+			meteringQueues.Puts(meteringKeys, meteringItemBatch)
+			meteringKeys = meteringKeys[:0]
+			meteringItemBatch = meteringItemBatch[:0]
 		}
-		for index, value := range flowCount {
-			if value == 0 {
-				continue
-			}
-			flowQueues.Put(queue.HashKey(index), flowPacket[index][:value]...)
+		if len(flowItemBatch) > 0 {
+			flowQueues.Puts(flowKeys, flowItemBatch)
+			flowKeys = flowKeys[:0]
+			flowItemBatch = flowItemBatch[:0]
 		}
 	}
 
