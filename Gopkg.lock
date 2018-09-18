@@ -178,7 +178,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:7be8fb8db4c475fb62d9f7d9b69f0d6d747aedb560d791737983f8be8a0f8d44"
+  digest = "1:f73744744ebd85a89022db417650a13fd627360c2b211ddc9862b087f0031956"
   name = "gitlab.x.lan/application/droplet-app"
   packages = [
     "internal/pkg/endpoint",
@@ -192,7 +192,7 @@
     "pkg/mapper/usage",
   ]
   pruneopts = "UT"
-  revision = "8a6157ed24ecadcf13a275b3178843aae12b8a26"
+  revision = "8a8e7be61ae589f7a365705cdd724ac5ee7d7102"
 
 [[projects]]
   branch = "master"
@@ -220,7 +220,7 @@
 
 [[projects]]
   branch = "feature-os"
-  digest = "1:8ca450d876e2e6d5ac0e331915a7be76a79af7d7e30e91627280fa076c234728"
+  digest = "1:0a42f186e3a16acc97dcd5cc0aae6731211f980a50cfb144d3805453408f2498"
   name = "gitlab.x.lan/yunshan/message"
   packages = [
     "dfi",
@@ -228,7 +228,7 @@
     "zero",
   ]
   pruneopts = "T"
-  revision = "77835d127b7900c080009dde13ff2298496c14f6"
+  revision = "5d2de04edbc057ca16685a8504da45e88851126d"
 
 [[projects]]
   branch = "release-branch.go1.9"
@@ -283,11 +283,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:9cc1d3de11a1b6994eb01fe3cf81db064470d0fd39a37475f53a396aa5e8622c"
+  digest = "1:4b89f7cb4fa89ee4b8ec3fff8e91105e7f1fee84761edcb063a738e376c53357"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
   pruneopts = "UT"
-  revision = "5a2fd4cab2d6d4a18e70c34937662526cd0c4bd1"
+  revision = "4b56f30a1fd96a133a036b62cdd2a249883dd89b"
 
 [[projects]]
   digest = "1:ab8e92d746fb5c4c18846b0879842ac8e53b3d352449423d0924a11f1020ae1b"

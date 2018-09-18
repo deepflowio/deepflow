@@ -3,14 +3,22 @@ package sender
 import (
 	"testing"
 
+	"github.com/golang/protobuf/proto"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/messenger"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
+	"gitlab.x.lan/yunshan/message/zero"
 )
 
 const TEST_QUEUES = 10
 
 func TestMarshaller(t *testing.T) {
+	header := &zero.ZeroHeader{
+		Timestamp: proto.Uint32(0),
+		Sequence:  proto.Uint32(0),
+		Hash:      proto.Uint32(0),
+	}
+	b, _ := proto.Marshal(header)
 	inputQueue := queue.NewOverwriteQueue("", 1024)
 	outputQueues := make([]queue.Queue, TEST_QUEUES)
 	outputWriters := make([]queue.QueueWriter, TEST_QUEUES)
@@ -22,7 +30,8 @@ func TestMarshaller(t *testing.T) {
 
 	inputQueue.Put(TEST_DATA...)
 	for _, q := range outputQueues {
-		newDoc, _ := messenger.Unmarshal(q.Get().([]byte))
+		bytes := q.Get().([]byte)
+		newDoc, _ := messenger.Unmarshal(bytes[len(b):])
 
 		doc := TEST_DATA[0].(*app.Document)
 
