@@ -162,6 +162,7 @@
   name = "gitlab.x.lan/yunshan/message"
   packages = [
     "dfi",
+    "trident",
     "zero",
   ]
   pruneopts = "T"
@@ -285,6 +286,7 @@
     "github.com/pebbe/zmq4",
     "github.com/shirou/gopsutil/process",
     "gitlab.x.lan/yunshan/message/dfi",
+    "gitlab.x.lan/yunshan/message/trident",
     "gitlab.x.lan/yunshan/message/zero",
     "golang.org/x/net/context",
     "google.golang.org/grpc",
