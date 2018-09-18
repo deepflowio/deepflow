@@ -43,6 +43,7 @@ type FastPathPolicy struct {
 type PolicyLabel struct {
 	aclData  [TAP_MAX][]*Acl
 	fastPath []*FastPathPolicy
+	maxHit   uint32
 }
 
 func NewFastPathPolicy(mapSize uint32) *FastPathPolicy {
@@ -161,7 +162,7 @@ func getPolicyAction(srcGroups []uint32, dstGroups []uint32, acl *Acl) bool {
 	return false
 }
 
-func (l *PolicyLabel) GetPolicyFromPolicyTable(endpointData *EndpointData, key *LookupKey, acls []*Acl) []*AclAction {
+func (l *PolicyLabel) GetPolicyFromPolicyTable(endpointData *EndpointData, key *LookupKey, acls []*Acl, hitCount *uint32) []*AclAction {
 	aclActions := make([]*AclAction, 0, 32)
 	for _, acl := range acls {
 		direction := NO_DIRECTION
@@ -181,6 +182,7 @@ func (l *PolicyLabel) GetPolicyFromPolicyTable(endpointData *EndpointData, key *
 					action.Direction = direction
 				}
 				aclActions = append(aclActions, acl.Action...)
+				*hitCount++
 			}
 		}
 	}
@@ -205,8 +207,16 @@ func (l *PolicyLabel) UpdateAcls(acl []*Acl) {
 	l.aclData = l.GenerateAcls(acl)
 }
 
+func (l *PolicyLabel) UpdateMaxHit(hitCount uint32) {
+	if l.maxHit < hitCount {
+		l.maxHit = hitCount
+	}
+}
+
 func (l *PolicyLabel) GetPolicyData(endpointData *EndpointData, key *LookupKey) []*AclAction {
-	aclActions := l.GetPolicyFromPolicyTable(endpointData, key, l.aclData[key.Tap])
-	aclActions = append(aclActions, l.GetPolicyFromPolicyTable(endpointData, key, l.aclData[TAP_ANY])...)
+	hitCount := uint32(0)
+	aclActions := l.GetPolicyFromPolicyTable(endpointData, key, l.aclData[key.Tap], &hitCount)
+	aclActions = append(aclActions, l.GetPolicyFromPolicyTable(endpointData, key, l.aclData[TAP_ANY], &hitCount)...)
+	l.UpdateMaxHit(hitCount)
 	return aclActions
 }
