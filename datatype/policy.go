@@ -61,11 +61,30 @@ func (a *AclAction) String() string {
 	return fmt.Sprintf("%+v", *a)
 }
 
-func (d *PolicyData) Merge(aclActions []*AclAction) {
+func (d *PolicyData) Merge(aclActions []*AclAction, directions ...DirectionType) {
 	for _, aclAction := range aclActions {
-		d.ActionList |= aclAction.Type
+		acl := AclAction{}
+		acl = *aclAction
+		if len(directions) > 0 {
+			acl.Direction = directions[0]
+		}
+		d.AclActions = append(d.AclActions, &acl)
+		d.ActionList |= acl.Type
 	}
-	d.AclActions = aclActions
+}
+
+func (d *PolicyData) MergeAndSwapDirection(aclActions []*AclAction) {
+	for _, aclAction := range aclActions {
+		acl := AclAction{}
+		acl = *aclAction
+		if acl.Direction == FORWARD {
+			acl.Direction = BACKWARD
+		} else {
+			acl.Direction = FORWARD
+		}
+		d.AclActions = append(d.AclActions, &acl)
+		d.ActionList |= acl.Type
+	}
 }
 
 func (a *PolicyData) String() string {
