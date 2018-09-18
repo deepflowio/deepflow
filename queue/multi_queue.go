@@ -4,6 +4,7 @@
 package queue
 
 import (
+	"errors"
 	"strconv"
 
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
@@ -23,8 +24,12 @@ func (q FixedMultiQueue) Gets(key HashKey, output []interface{}) int {
 	return q.entry(key).Gets(output)
 }
 
-func (q FixedMultiQueue) Put(key HashKey, input ...interface{}) error {
-	return q.entry(key).Put(input...)
+func (q FixedMultiQueue) Put(key HashKey, items ...interface{}) error {
+	return q.entry(key).Put(items...)
+}
+
+func (q FixedMultiQueue) Puts(keys []HashKey, items []interface{}) error {
+	return errors.New("Not implemented")
 }
 
 func (q FixedMultiQueue) Len(key HashKey) int {

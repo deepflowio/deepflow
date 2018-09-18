@@ -25,6 +25,7 @@ type MultiQueueReader interface {
 
 type MultiQueueWriter interface {
 	Put(HashKey, ...interface{}) error
+	Puts([]HashKey, []interface{}) error
 }
 
 type MultiQueue interface {
