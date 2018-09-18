@@ -5,6 +5,7 @@ import (
 
 	"time"
 
+	"gitlab.x.lan/application/droplet-app/pkg/mapper/consolelog"
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/flow"
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/geo"
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/perf"
@@ -25,6 +26,7 @@ func NewFlowMapProcess(zmqAppQueue queue.QueueWriter) *FlowHandler {
 		flow.NewProcessor(),
 		perf.NewProcessor(),
 		geo.NewProcessor(GEO_FILE_LOCATION),
+		consolelog.NewProcessor(),
 	}, zmqAppQueue)
 }
 
