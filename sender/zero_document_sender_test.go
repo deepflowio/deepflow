@@ -3,12 +3,20 @@ package sender
 import (
 	"testing"
 
+	"github.com/golang/protobuf/proto"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/messenger"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
+	"gitlab.x.lan/yunshan/message/zero"
 )
 
 func TestZeroDocumentSender(t *testing.T) {
+	header := &zero.ZeroHeader{
+		Timestamp: proto.Uint32(0),
+		Sequence:  proto.Uint32(0),
+		Hash:      proto.Uint32(0),
+	}
+	hb, _ := proto.Marshal(header)
 	inputQueue1 := queue.NewOverwriteQueue("", 1024)
 	inputQueue2 := queue.NewOverwriteQueue("", 1024)
 	NewZeroDocumentSenderBuilder().AddQueue(inputQueue1, inputQueue2).AddZero("127.0.0.1", 20001).AddZero("127.0.0.1", 20002).Build().Start()
@@ -21,7 +29,7 @@ func TestZeroDocumentSender(t *testing.T) {
 	go receiverRoutine(len(TEST_DATA), 20002, chan2)
 
 	for b := range chan1 {
-		doc, _ := messenger.Unmarshal(b)
+		doc, _ := messenger.Unmarshal(b[len(hb):])
 		hasEqual := false
 		for _, data := range TEST_DATA {
 			if documentEqual(doc, data.(*app.Document)) {
@@ -35,7 +43,7 @@ func TestZeroDocumentSender(t *testing.T) {
 	}
 
 	for b := range chan2 {
-		doc, _ := messenger.Unmarshal(b)
+		doc, _ := messenger.Unmarshal(b[len(hb):])
 		hasEqual := false
 		for _, data := range TEST_DATA {
 			if documentEqual(doc, data.(*app.Document)) {
