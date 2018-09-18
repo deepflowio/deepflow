@@ -70,6 +70,7 @@ type PolicyCounter struct {
 	EpcIpTable uint32 `statsd:"epc_ip_table"`
 	FastTable  uint32 `statsd:"fast_table"`
 	ArpTable   uint32 `statsd:"arp_table"`
+	MaxHit     uint32 `statsd:"acl_max_hit"`
 }
 
 func getAvailableMapSize(queueCount int, mapSize uint32) uint32 {
@@ -141,6 +142,8 @@ func (t *PolicyTable) GetCounter() interface{} {
 		counter.Acl += uint32(len(t.policyLabel.aclData[i]))
 		counter.ArpTable += uint32(len(t.cloudPlatformData.arpTable[i].arpMap))
 	}
+	counter.MaxHit = t.policyLabel.maxHit
+	t.policyLabel.maxHit = 0
 	return counter
 }
 
