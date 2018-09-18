@@ -226,7 +226,14 @@ func (t *Tag) ToMap() map[string]string {
 
 	// 1<<32 ~ 1<<39
 	if t.Code&Direction != 0 {
-		ret["direction"] = strconv.Itoa(int(t.Direction))
+		switch t.Direction {
+		case ClientToServer:
+			ret["direction"] = "c2s"
+		case ServerToClient:
+			ret["direction"] = "s2c"
+		default:
+			ret["direction"] = "any"
+		}
 	}
 	if t.Code&Policy != 0 {
 		ret["policy_type"] = strconv.Itoa(int(t.PolicyType))
