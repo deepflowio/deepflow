@@ -178,19 +178,20 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:ea216c34bcfd40ed011bf8ea654b4b205a3284a89686e67ada98ddc1108d9622"
+  digest = "1:6fc70efc20d13de4fe96daa155670778d705364d5fa0aa25a978a830bffa7a39"
   name = "gitlab.x.lan/application/droplet-app"
   packages = [
     "internal/pkg/endpoint",
     "internal/pkg/flow",
     "internal/pkg/geo",
+    "internal/pkg/policy",
     "pkg/mapper/flow",
     "pkg/mapper/geo",
     "pkg/mapper/perf",
     "pkg/mapper/usage",
   ]
   pruneopts = "UT"
-  revision = "1f5d752c08c19db4ce58bc83986deedf805dfead"
+  revision = "45f6ac97eddaf5f4a3faa1525d6df1ec79e841d6"
 
 [[projects]]
   branch = "master"
