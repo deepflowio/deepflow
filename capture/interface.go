@@ -15,7 +15,7 @@ import (
 	"golang.org/x/net/bpf"
 )
 
-func StartCapture(interfaceName string, ip net.IP, isTapInterface bool, outputQueue queue.MultiQueueWriter) (io.Closer, error) {
+func StartCapture(interfaceName string, ip net.IP, outputQueue queue.MultiQueueWriter) (io.Closer, error) {
 	if _, err := net.InterfaceByName(interfaceName); err != nil {
 		return nil, err
 	}
@@ -46,15 +46,12 @@ func StartCapture(interfaceName string, ip net.IP, isTapInterface bool, outputQu
 		log.Warning("BPF inject failed:", err)
 	}
 
-	dataHandler := (&DataHandler{
+	tapHandler := (&TapHandler{
 		ip:    IpToUint32(ip),
 		queue: outputQueue,
 	}).Init(interfaceName)
 
-	handler := PacketHandler(dataHandler)
-	if isTapInterface {
-		handler = (*TapHandler)(dataHandler)
-	}
+	handler := PacketHandler(tapHandler)
 
 	cap := &Capture{
 		tPacket: tPacket,

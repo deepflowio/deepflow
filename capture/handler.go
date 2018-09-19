@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	. "github.com/google/gopacket/layers"
+
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/dedup"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
@@ -20,7 +22,7 @@ type PacketHandler interface {
 
 type MetaPacketBlock = [1024]datatype.MetaPacket
 
-type DataHandler struct {
+type TapHandler struct {
 	sync.Pool
 
 	block       *MetaPacketBlock
@@ -32,13 +34,13 @@ type DataHandler struct {
 	dedupTable *dedup.DedupTable
 }
 
-func (h *DataHandler) preAlloc() *datatype.MetaPacket {
+func (h *TapHandler) preAlloc() *datatype.MetaPacket {
 	metaPacket := &h.block[h.blockCursor]
 	metaPacket.Exporter = h.ip
 	return metaPacket
 }
 
-func (h *DataHandler) confirmAlloc() {
+func (h *TapHandler) confirmAlloc() {
 	h.blockCursor++
 	if h.blockCursor >= len(*h.block) {
 		h.block = h.Get().(*MetaPacketBlock)
@@ -46,19 +48,35 @@ func (h *DataHandler) confirmAlloc() {
 	}
 }
 
-func (h *DataHandler) Handle(timestamp Timestamp, packet RawPacket, size PacketSize) {
+func (h *TapHandler) Handle(timestamp Timestamp, packet RawPacket, size PacketSize) {
 	metaPacket := h.preAlloc()
-	metaPacket.InPort = uint32(datatype.PACKET_SOURCE_ISP)
+	l2Len := metaPacket.ParseL2(packet)
+	if metaPacket.Invalid {
+		return
+	}
 	metaPacket.Timestamp = timestamp
 	metaPacket.PacketLen = uint16(size)
-	if !metaPacket.Parse(packet) {
+	if (metaPacket.InPort & datatype.PACKET_SOURCE_TOR) == datatype.PACKET_SOURCE_TOR {
+		if metaPacket.EthType == EthernetTypeIPv4 {
+			tunnel := datatype.TunnelInfo{}
+			if offset := tunnel.Decapsulate(packet[l2Len:]); offset > 0 {
+				metaPacket.Tunnel = &tunnel
+				packet = packet[l2Len+offset:]
+				l2Len = metaPacket.ParseL2(packet)
+			}
+		}
+		if h.dedupTable.IsDuplicate(packet, timestamp) {
+			return
+		}
+	}
+	if !metaPacket.Parse(packet[l2Len:]) {
 		return
 	}
 	h.confirmAlloc()
 	h.queue.Put(queue.HashKey(metaPacket.GenerateHash()), metaPacket)
 }
 
-func (h *DataHandler) Init(interfaceName string) *DataHandler {
+func (h *TapHandler) Init(interfaceName string) *TapHandler {
 	h.dedupTable = dedup.NewDedupTable(interfaceName)
 	gc := func(b *MetaPacketBlock) {
 		*b = MetaPacketBlock{} // 重新初始化，避免无效的数据或不可预期的引用
@@ -71,26 +89,4 @@ func (h *DataHandler) Init(interfaceName string) *DataHandler {
 	}
 	h.block = new(MetaPacketBlock)
 	return h
-}
-
-type TapHandler DataHandler
-
-func (h *TapHandler) Handle(timestamp Timestamp, packet RawPacket, size PacketSize) {
-	metaPacket := (*DataHandler)(h).preAlloc()
-	metaPacket.InPort = uint32(datatype.PACKET_SOURCE_TOR)
-	metaPacket.Timestamp = timestamp
-	metaPacket.PacketLen = uint16(size)
-	tunnel := datatype.TunnelInfo{}
-	if offset := tunnel.Decapsulate(packet); offset > 0 {
-		packet = packet[offset:]
-		metaPacket.Tunnel = &tunnel
-	}
-	if h.dedupTable.IsDuplicate(packet, timestamp) {
-		return
-	}
-	if !metaPacket.Parse(packet) {
-		return
-	}
-	(*DataHandler)(h).confirmAlloc()
-	h.queue.Put(queue.HashKey(metaPacket.GenerateHash()), metaPacket)
 }
