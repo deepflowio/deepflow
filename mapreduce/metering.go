@@ -2,6 +2,7 @@ package mapreduce
 
 import (
 	"errors"
+	"fmt"
 
 	"time"
 
@@ -24,6 +25,26 @@ type meteringAppStats struct {
 type MeteringHandler struct {
 	numberOfApps int
 	processors   []app.MeteringProcessor
+
+	meteringQueue      queue.MultiQueue
+	meteringQueueCount int
+	zmqAppQueue        queue.QueueWriter
+}
+
+func NewMeteringHandler(processors []app.MeteringProcessor, output queue.QueueWriter, inputs queue.MultiQueue, inputCount int) *MeteringHandler {
+	handler := MeteringHandler{
+		numberOfApps:       len(processors),
+		processors:         processors,
+		zmqAppQueue:        output,
+		meteringQueue:      inputs,
+		meteringQueueCount: inputCount,
+	}
+	return &handler
+}
+
+type subHandler struct {
+	numberOfApps int
+	processors   []app.MeteringProcessor
 	stashes      []*Stash
 
 	lastProcess        time.Duration
@@ -31,28 +52,30 @@ type MeteringHandler struct {
 	meteringQueueCount int
 	zmqAppQueue        queue.QueueWriter
 	emitCounter        []uint64
+
+	queueIndex int
 }
 
-func NewMeteringHandler(processors []app.MeteringProcessor, output queue.QueueWriter, inputs queue.MultiQueue, inputCount int) *MeteringHandler {
+func newSubHandler(processors []app.MeteringProcessor, output queue.QueueWriter, inputs queue.MultiQueue, index int) *subHandler {
 	nApps := len(processors)
-	handler := MeteringHandler{
-		numberOfApps:       len(processors),
-		processors:         processors,
-		lastProcess:        time.Duration(time.Now().UnixNano()),
-		stashes:            make([]*Stash, nApps),
-		zmqAppQueue:        output,
-		emitCounter:        make([]uint64, nApps),
-		meteringQueue:      inputs,
-		meteringQueueCount: inputCount,
+	handler := subHandler{
+		numberOfApps:  len(processors),
+		processors:    processors,
+		lastProcess:   time.Duration(time.Now().UnixNano()),
+		stashes:       make([]*Stash, nApps),
+		zmqAppQueue:   output,
+		emitCounter:   make([]uint64, nApps),
+		meteringQueue: inputs,
+		queueIndex:    index,
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.stashes[i] = NewStash(DOCS_IN_BUFFER)
 	}
-	stats.RegisterCountable("metering_mapper", &handler)
+	stats.RegisterCountable(fmt.Sprintf("metering_mapper_%d", index), &handler)
 	return &handler
 }
 
-func (f *MeteringHandler) GetCounter() interface{} {
+func (f *subHandler) GetCounter() interface{} {
 	counter := &meteringAppStats{}
 	for i := 0; i < f.numberOfApps; i++ {
 		switch f.processors[i].GetName() {
@@ -65,7 +88,7 @@ func (f *MeteringHandler) GetCounter() interface{} {
 	return counter
 }
 
-func (f *MeteringHandler) putToQueue() {
+func (f *subHandler) putToQueue() {
 	for i, stash := range f.stashes {
 		docs := stash.Dump()
 		for _, doc := range docs {
@@ -100,13 +123,13 @@ func (f *MeteringHandler) timeout() {
 func (f *MeteringHandler) Start() {
 	go f.timeout()
 	for i := 0; i < f.meteringQueueCount; i++ {
-		go f.Process(i)
+		go newSubHandler(f.processors, f.zmqAppQueue, f.meteringQueue, i).Process()
 	}
 }
 
-func (f *MeteringHandler) Process(index int) error {
+func (f *subHandler) Process() error {
 	for {
-		metering := f.meteringQueue.Get(queue.HashKey(index)).(*datatype.MetaPacket)
+		metering := f.meteringQueue.Get(queue.HashKey(f.queueIndex)).(*datatype.MetaPacket)
 		if metering.Timestamp == 0 && f.NeedFlush() {
 			f.Flush()
 		}
@@ -130,11 +153,11 @@ func (f *MeteringHandler) Process(index int) error {
 	}
 }
 
-func (f *MeteringHandler) Flush() {
+func (f *subHandler) Flush() {
 	f.putToQueue()
 	f.lastProcess = time.Duration(time.Now().UnixNano())
 }
 
-func (f *MeteringHandler) NeedFlush() bool {
+func (f *subHandler) NeedFlush() bool {
 	return time.Duration(time.Now().UnixNano())-f.lastProcess > time.Minute
 }

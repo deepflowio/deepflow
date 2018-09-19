@@ -107,7 +107,7 @@ func decodeTunnel(stream *ByteStream) *TunnelInfo {
 	dst := stream.U32()
 	tunnelType := TunnelType(stream.U8())
 	id := uint32((stream.U8()))<<16 | uint32(stream.U16())
-	return &TunnelInfo{tunnelType, src, dst, id}
+	return &TunnelInfo{Type: tunnelType, Src: src, Dst: dst, Id: id}
 }
 
 func (d *SequentialDecoder) decodeEthernet(meta *MetaPacket) {

@@ -11,7 +11,7 @@ stages:
 verify:
   stage: verify
   script:
-    - make clean
+    - make clean vendor
     - go fmt ./...; [[ -z $(git status -s --ignore-submodule) ]] || exit -1
     - go vet ./...
     - make
