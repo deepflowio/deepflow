@@ -8,6 +8,8 @@ import (
 	"github.com/OneOfOne/xxhash"
 	. "github.com/google/gopacket/layers"
 	"github.com/op/go-logging"
+
+	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
 var log = logging.MustGetLogger("dedup")
@@ -51,7 +53,21 @@ func hashPacket(packet []byte) (uint32, uint64, PacketId) {
 	return xxhash.Checksum32(packetId[:]), id, packetId
 }
 
-func Lookup(packet []byte, timestamp time.Duration) bool {
+func (t *DedupTable) IsDuplicate(packet []byte, timestamp time.Duration) bool {
 	hash, id, packetId := hashPacket(packet)
-	return lookup(hash, id, timestamp, packetId)
+	return t.lookup(hash, id, timestamp, packetId)
+}
+
+func NewDedupTable(name string) *DedupTable {
+	t := &DedupTable{
+		hashTable: &HashTable{},
+		counter:   &Counter{},
+		queue:     &List{},
+		buffer:    &List{},
+	}
+	for i := 0; i < HASH_TABLE_SIZE; i++ {
+		t.hashTable[i] = &List{}
+	}
+	stats.RegisterCountable("dedup", t, stats.OptionStatTags{"name": name})
+	return t
 }
