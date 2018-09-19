@@ -54,7 +54,7 @@
   version = "2.18.7"
 
 [[constraint]]
-  branch = "release-branch.go1.9"
+  branch = "release-branch.go1.11"
   name = "golang.org/x/net"
 
 [[constraint]]
