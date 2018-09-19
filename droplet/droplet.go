@@ -10,7 +10,6 @@ import (
 
 	"github.com/op/go-logging"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
-	"gitlab.x.lan/yunshan/droplet-libs/dropletpb"
 	. "gitlab.x.lan/yunshan/droplet-libs/logger"
 	_ "gitlab.x.lan/yunshan/droplet-libs/monitor"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
@@ -114,9 +113,7 @@ func Start(configPath string) {
 	labelerManager.Start()
 	synchronizer.Register(func(response *trident.SyncResponse) {
 		log.Debug(response)
-		labelerManager.OnPlatformDataChange(dropletpb.Convert2PlatformData(response))
-		labelerManager.OnIpGroupDataChange(dropletpb.Convert2IpGroupdata(response))
-		labelerManager.OnPolicyDataChange(dropletpb.Convert2AclData(response))
+		labelerManager.OnAclDataChange(response)
 	})
 
 	// L3 - flow-generator & apps

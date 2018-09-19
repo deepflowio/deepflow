@@ -13,12 +13,14 @@ import (
 	"github.com/op/go-logging"
 	"github.com/spf13/cobra"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/dropletpb"
 	"gitlab.x.lan/yunshan/droplet-libs/policy"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
+	"gitlab.x.lan/yunshan/message/trident"
 )
 
 var log = logging.MustGetLogger("labeler")
@@ -67,6 +69,30 @@ func (l *LabelerManager) GetCounter() interface{} {
 
 func (l *LabelerManager) RegisterAppQueue(queueType QueueType, appQueues queue.MultiQueueWriter) {
 	l.appQueues[queueType] = appQueues
+}
+
+func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
+	if plarformData := response.GetPlatformData(); plarformData != nil {
+		if interfaces := plarformData.GetInterfaces(); interfaces != nil {
+			l.OnPlatformDataChange(dropletpb.Convert2PlatformData(response))
+		} else {
+			l.OnPlatformDataChange(nil)
+		}
+		if ipGroups := plarformData.GetIpGroups(); ipGroups != nil {
+			l.OnIpGroupDataChange(dropletpb.Convert2IpGroupdata(response))
+		} else {
+			l.OnIpGroupDataChange(nil)
+		}
+	} else {
+		l.OnPlatformDataChange(nil)
+		l.OnIpGroupDataChange(nil)
+	}
+
+	if flowAcls := response.GetFlowAcls(); flowAcls != nil {
+		l.OnPolicyDataChange(dropletpb.Convert2AclData(response))
+	} else {
+		l.OnPolicyDataChange(nil)
+	}
 }
 
 func (l *LabelerManager) OnPlatformDataChange(data []*datatype.PlatformData) {
