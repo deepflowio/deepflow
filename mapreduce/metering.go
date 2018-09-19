@@ -108,11 +108,8 @@ func isValidMetering(metering datatype.MetaPacket) bool {
 	return true
 }
 
-func (f *MeteringHandler) timeout() {
-	timer := time.NewTimer(time.Minute)
-	for {
-		<-timer.C
-		timer.Reset(time.Minute)
+func (f *MeteringHandler) startTicker() {
+	for range time.NewTicker(time.Minute).C {
 		flushMetering := datatype.MetaPacket{Timestamp: 0}
 		for i := 0; i < f.meteringQueueCount; i++ {
 			f.meteringQueue.Put(queue.HashKey(i), &flushMetering)
@@ -121,7 +118,7 @@ func (f *MeteringHandler) timeout() {
 }
 
 func (f *MeteringHandler) Start() {
-	go f.timeout()
+	go f.startTicker()
 	for i := 0; i < f.meteringQueueCount; i++ {
 		go newSubHandler(f.processors, f.zmqAppQueue, f.meteringQueue, i).Process()
 	}
