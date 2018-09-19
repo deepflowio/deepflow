@@ -17,22 +17,18 @@ import (
 var log = logging.MustGetLogger("config")
 
 type Config struct {
-	ControllerIps     []string          `yaml:"controller-ips,flow"`
-	ControllerPort    uint16            `yaml:"controller-port"`
-	LogFile           string            `yaml:"log-file"`
-	LogLevel          string            `yaml:"log-level"`
-	StatsdServer      string            `yaml:"statsd-server"`
-	Profiler          bool              `yaml:"profiler"`
-	DataInterfaces    []string          `yaml:"data-interfaces,flow"`
-	TapInterfaces     []string          `yaml:"tap-interfaces,flow"`
-	Zeroes            []IpPortConfig    `yaml:"zeroes,flow"`
-	Stream            IpPortConfig      `yaml:"stream,flow"`
-	FlowTimeout       FlowTimeoutConfig `yaml:"flow-timeout"`
-	QueueSize         uint32            `yaml:"queue-size"`
-	AdapterQueueCount uint32            `yaml:"adapter-queue-count"`
-	FlowQueueCount    uint32            `yaml:"flow-queue-count"`
-	FlowCountLimit    uint32            `yaml:"flow-count-limit"`
-	PolicyMapSize     uint32            `yaml:"policy-map-size"`
+	ControllerIps  []string            `yaml:"controller-ips"`
+	ControllerPort uint16              `yaml:"controller-port"`
+	StatsdServer   string              `yaml:"statsd-server"`
+	LogFile        string              `yaml:"log-file"`
+	LogLevel       string              `yaml:"log-level"`
+	Profiler       bool                `yaml:"profiler"`
+	TapInterfaces  []string            `yaml:"tap-interfaces"`
+	Stream         IpPortConfig        `yaml:"stream"`
+	Zeroes         []IpPortConfig      `yaml:"zeroes"`
+	Queue          QueueConfig         `yaml:"queue"`
+	Labeler        LabelerConfig       `yaml:"labeler"`
+	FlowGenerator  FlowGeneratorConfig `yaml:"flow-generator"`
 }
 
 type IpPortConfig struct {
@@ -40,12 +36,24 @@ type IpPortConfig struct {
 	Port int    `yaml:"port"`
 }
 
-// unit: second
-type FlowTimeoutConfig struct {
+type QueueConfig struct {
+	QueueSize               uint32 `yaml:"queue-size"`
+	LabelerQueueCount       uint32 `yaml:"labeler-queue-count"`
+	FlowGeneratorQueueCount uint32 `yaml:"flow-generator-queue-count"`
+	MeteringAppQueueCount   uint32 `yaml:"metering-app-queue-count"`
+}
+
+type LabelerConfig struct {
+	MapSizeLimit uint32 `yaml:"map-size-limit"`
+}
+
+type FlowGeneratorConfig struct {
+	FlowCountLimit uint32 `yaml:"flow-count-limit"`
+	/* unit of interval and timeout: second */
 	ForceReportInterval time.Duration `yaml:"force-report-interval"`
-	Established         time.Duration `yaml:"established"`
-	ClosingRst          time.Duration `yaml:"closing-rst"`
-	Others              time.Duration `yaml:"others"`
+	EstablishedTimeout  time.Duration `yaml:"established-timeout"`
+	ClosingRstTimeout   time.Duration `yaml:"closing-rst-timeout"`
+	OthersTimeout       time.Duration `yaml:"others-timeout"`
 }
 
 func (c *Config) Validate() error {
@@ -57,6 +65,10 @@ func (c *Config) Validate() error {
 		if net.ParseIP(string(ipString)) == nil {
 			return errors.New("controller-ips invalid")
 		}
+	}
+
+	if net.ParseIP(c.StatsdServer) == nil {
+		return errors.New("Malformed statsd-server")
 	}
 
 	if c.LogFile == "" {
@@ -71,41 +83,45 @@ func (c *Config) Validate() error {
 		c.LogLevel = "info"
 	}
 
-	if net.ParseIP(c.StatsdServer) == nil {
-		return errors.New("Malformed statsd-server")
+	if c.Queue.QueueSize == 0 {
+		c.Queue.QueueSize = 65536
+	}
+	if c.Queue.LabelerQueueCount == 0 {
+		c.Queue.LabelerQueueCount = 8
+	}
+	if c.Queue.FlowGeneratorQueueCount == 0 {
+		c.Queue.FlowGeneratorQueueCount = 2
+	}
+	if c.Queue.MeteringAppQueueCount == 0 {
+		c.Queue.MeteringAppQueueCount = 8
 	}
 
-	if c.FlowTimeout.ForceReportInterval == 0 {
-		c.FlowTimeout.ForceReportInterval = flowgenerator.FORCE_REPORT_INTERVAL
+	if c.Labeler.MapSizeLimit == 0 {
+		c.Labeler.MapSizeLimit = 1024 * 1024
+	}
+
+	if c.FlowGenerator.FlowCountLimit == 0 {
+		c.FlowGenerator.FlowCountLimit = 1024 * 1024
+	}
+	if c.FlowGenerator.ForceReportInterval == 0 {
+		c.FlowGenerator.ForceReportInterval = flowgenerator.FORCE_REPORT_INTERVAL
 	} else {
-		c.FlowTimeout.ForceReportInterval *= time.Second
+		c.FlowGenerator.ForceReportInterval *= time.Second
 	}
-	if c.FlowTimeout.Established == 0 {
-		c.FlowTimeout.Established = flowgenerator.TIMEOUT_ESTABLISHED
+	if c.FlowGenerator.EstablishedTimeout == 0 {
+		c.FlowGenerator.EstablishedTimeout = flowgenerator.TIMEOUT_ESTABLISHED
 	} else {
-		c.FlowTimeout.Established *= time.Second
+		c.FlowGenerator.EstablishedTimeout *= time.Second
 	}
-	if c.FlowTimeout.ClosingRst == 0 {
-		c.FlowTimeout.ClosingRst = flowgenerator.TIMEOUT_ESTABLISHED_RST
+	if c.FlowGenerator.ClosingRstTimeout == 0 {
+		c.FlowGenerator.ClosingRstTimeout = flowgenerator.TIMEOUT_ESTABLISHED_RST
 	} else {
-		c.FlowTimeout.ClosingRst *= time.Second
+		c.FlowGenerator.ClosingRstTimeout *= time.Second
 	}
-	if c.FlowTimeout.Others == 0 {
-		c.FlowTimeout.Others = flowgenerator.TIMEOUT_EXPCEPTION
+	if c.FlowGenerator.OthersTimeout == 0 {
+		c.FlowGenerator.OthersTimeout = flowgenerator.TIMEOUT_EXPCEPTION
 	} else {
-		c.FlowTimeout.Others *= time.Second
-	}
-	if c.QueueSize == 0 {
-		c.QueueSize = 65536
-	}
-	if c.AdapterQueueCount == 0 {
-		c.AdapterQueueCount = 1
-	}
-	if c.FlowQueueCount == 0 {
-		c.FlowQueueCount = 1
-	}
-	if c.FlowCountLimit == 0 {
-		c.FlowCountLimit = 1024 * 1024
+		c.FlowGenerator.OthersTimeout *= time.Second
 	}
 
 	return nil

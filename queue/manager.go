@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -190,6 +191,7 @@ func RegisterCommand() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			names := []string{}
 			if sendCmd(QUEUE_CMD_SHOW, nil, &names) {
+				sort.Strings(names)
 				fmt.Println("Queue List:")
 				for i, name := range names {
 					fmt.Printf("\t%3d:				%s\n", i+1, name)

@@ -57,9 +57,6 @@ func getLocalIp() (net.IP, error) {
 
 func Start(configPath string) {
 	cfg := config.Load(configPath)
-	queueSize := int(cfg.QueueSize)
-	filterQueueCount := int(cfg.AdapterQueueCount) + len(cfg.DataInterfaces) + len(cfg.TapInterfaces)
-	filterWriterCount := 1 + len(cfg.DataInterfaces) + len(cfg.TapInterfaces)
 	InitLog(cfg.LogFile, cfg.LogLevel)
 
 	if cfg.Profiler {
@@ -77,65 +74,67 @@ func Start(configPath string) {
 	synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.ControllerPort)
 	synchronizer.Start()
 
-	manager := queue.NewManager()
-
 	// L1 - packet source
-	filterQueues := manager.NewQueues("1-meta-packet-to-filter", queueSize, filterQueueCount, filterWriterCount)
-	tridentAdapter := adapter.NewTridentAdapter(filterQueues, filterQueueCount)
-	if tridentAdapter == nil {
-		return
-	}
-	tridentAdapter.Start()
+	manager := queue.NewManager()
+	queueSize := int(cfg.Queue.QueueSize)
+	labelerQueueCount := int(cfg.Queue.LabelerQueueCount)
+	packetSourceCount := 1 + len(cfg.TapInterfaces)
+	labelerQueues := manager.NewQueues("1-meta-packet-to-labeler", queueSize, labelerQueueCount, packetSourceCount)
 
 	localIp, err := getLocalIp()
 	if err != nil {
 		log.Error(err)
 		return
 	}
-	for _, iface := range cfg.DataInterfaces {
-		if _, err := capture.StartCapture(iface, localIp, false, filterQueues); err != nil {
-			log.Error(err)
-			return
-		}
-	}
 	for _, iface := range cfg.TapInterfaces {
-		if _, err := capture.StartCapture(iface, localIp, true, filterQueues); err != nil {
+		if _, err := capture.StartCapture(iface, localIp, labelerQueues); err != nil {
 			log.Error(err)
 			return
 		}
 	}
 
-	// L2 - packet filter
-	meteringAppQueue := manager.NewQueues("2-meta-packet-to-metering-app", queueSize, int(cfg.FlowQueueCount), filterQueueCount)
-	flowGeneratorQueue := manager.NewQueues("2-meta-packet-to-flow-generator", queueSize, int(cfg.FlowQueueCount), filterQueueCount)
-	labelerManager := labeler.NewLabelerManager(filterQueues, filterQueueCount, cfg.PolicyMapSize)
-	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_METERING, meteringAppQueue)
-	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_FLOW, flowGeneratorQueue)
+	tridentAdapter := adapter.NewTridentAdapter(labelerQueues, labelerQueueCount)
+	if tridentAdapter == nil {
+		return
+	}
+	tridentAdapter.Start()
+
+	// L2 - packet labeler
+	flowGeneratorQueueCount := int(cfg.Queue.FlowGeneratorQueueCount)
+	meteringAppQueueCount := int(cfg.Queue.MeteringAppQueueCount)
+	flowGeneratorQueues := manager.NewQueues("2-meta-packet-to-flow-generator", queueSize, flowGeneratorQueueCount, labelerQueueCount)
+	meteringAppQueues := manager.NewQueues("2-meta-packet-to-metering-app", queueSize, meteringAppQueueCount, labelerQueueCount)
+
+	labelerManager := labeler.NewLabelerManager(labelerQueues, int(labeler.QUEUE_TYPE_MAX), cfg.Labeler.MapSizeLimit)
+	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_FLOW, flowGeneratorQueues)
+	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_METERING, meteringAppQueues)
 	labelerManager.Start()
+
 	synchronizer.Register(func(response *trident.SyncResponse) {
 		log.Debug(response)
 		labelerManager.OnAclDataChange(response)
 	})
 
-	// L3 - flow-generator & apps
-	flowTimeout := cfg.FlowTimeout
+	// L3 - flow generator & metering map
+	flowDuplicatorQueue := manager.NewQueue("3-tagged-flow-to-flow-duplicator", queueSize>>2)
+	meteringAppOutputQueue := manager.NewQueue("3-metering-doc-to-zero", queueSize>>2)
+
 	timeoutConfig := flowgenerator.TimeoutConfig{
-		Opening:         flowTimeout.Others,
-		Established:     flowTimeout.Established,
-		Closing:         flowTimeout.Others,
-		EstablishedRst:  flowTimeout.ClosingRst,
-		Exception:       flowTimeout.Others,
+		Opening:         cfg.FlowGenerator.OthersTimeout,
+		Established:     cfg.FlowGenerator.EstablishedTimeout,
+		Closing:         cfg.FlowGenerator.OthersTimeout,
+		EstablishedRst:  cfg.FlowGenerator.ClosingRstTimeout,
+		Exception:       cfg.FlowGenerator.OthersTimeout,
 		ClosedFin:       0,
-		SingleDirection: flowTimeout.Others,
+		SingleDirection: cfg.FlowGenerator.OthersTimeout,
 	}
 	flowGeneratorConfig := flowgenerator.FlowGeneratorConfig{
-		ForceReportInterval: flowTimeout.ForceReportInterval,
+		ForceReportInterval: cfg.FlowGenerator.ForceReportInterval,
 		BufferSize:          queueSize,
-		FlowLimitNum:        cfg.FlowCountLimit / uint32(cfg.FlowQueueCount),
+		FlowLimitNum:        cfg.FlowGenerator.FlowCountLimit / uint32(flowGeneratorQueueCount),
 	}
-	flowGenOutput := manager.NewQueue("3-tagged-flow-to-duplicator", queueSize/4)
-	for i := 0; i < int(cfg.FlowQueueCount); i++ {
-		flowGenerator := flowgenerator.New(flowGeneratorQueue, flowGenOutput, flowGeneratorConfig, i)
+	for i := 0; i < flowGeneratorQueueCount; i++ {
+		flowGenerator := flowgenerator.New(flowGeneratorQueues, flowDuplicatorQueue, flowGeneratorConfig, i)
 		if flowGenerator == nil {
 			return
 		}
@@ -143,17 +142,20 @@ func Start(configPath string) {
 		flowGenerator.Start()
 	}
 
-	flowAppQueue := manager.NewQueue("4-tagged-flow-to-flow-app", queueSize/4)
-	flowSenderQueue := manager.NewQueue("4-tagged-flow-to-stream", queueSize/4)
-	queue.NewDuplicator(1024, flowGenOutput, flowAppQueue, flowSenderQueue).Start()
+	meteringMapProcess := mapreduce.NewMeteringMapProcess(meteringAppOutputQueue, meteringAppQueues, meteringAppQueueCount)
+	meteringMapProcess.Start()
+
+	// L4 - flow duplicator & flow sender
+	flowAppQueue := manager.NewQueue("4-tagged-flow-to-flow-app", queueSize>>2)
+	flowSenderQueue := manager.NewQueue("4-tagged-flow-to-stream", queueSize>>2)
+
+	queue.NewDuplicator(1024, flowDuplicatorQueue, flowAppQueue, flowSenderQueue).Start()
 	sender.NewFlowSender(flowSenderQueue, cfg.Stream.Ip, cfg.Stream.Port).Start()
 
-	zmqFlowAppOutputQueue := manager.NewQueue("5-flow-doc-to-zero", queueSize/4)
-	flowMapProcess := mapreduce.NewFlowMapProcess(zmqFlowAppOutputQueue)
-	zmqMeteringAppOutputQueue := manager.NewQueue("4-metering-doc-to-zero", queueSize/4)
+	// L5 - flow map
+	flowAppOutputQueue := manager.NewQueue("5-flow-doc-to-zero", queueSize>>2)
+	flowMapProcess := mapreduce.NewFlowMapProcess(flowAppOutputQueue)
 
-	meteringProcess := mapreduce.NewMeteringMapProcess(zmqMeteringAppOutputQueue, meteringAppQueue, int(cfg.FlowQueueCount))
-	meteringProcess.Start()
 	queueFlushTime := time.Minute
 	flowTimer := time.NewTimer(queueFlushTime)
 	go func() {
@@ -176,7 +178,7 @@ func Start(configPath string) {
 	}()
 
 	builder := sender.NewZeroDocumentSenderBuilder()
-	builder.AddQueue(zmqFlowAppOutputQueue, zmqMeteringAppOutputQueue)
+	builder.AddQueue(flowAppOutputQueue, meteringAppOutputQueue)
 	for _, zero := range cfg.Zeroes {
 		builder.AddZero(zero.Ip, zero.Port)
 	}

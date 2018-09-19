@@ -1,46 +1,55 @@
 controller-ips:
   - 127.0.0.1
-# controller listen port
+# controller listening port
 controller-port: 20035
+# remote statsd server
+statsd-server: 127.0.0.1
 # logfile path
 log-file: /var/log/droplet/droplet.log
 # loglevel: "debug/info/warn/error"
 log-level: info
-# remote statsd server
-statsd-server: 127.0.0.1
 # profiler
 profiler: false
-# public traffic
-data-interfaces: []
-# mirrored traffic
+# interfaces for mirrored traffic from ISP or TOR
 tap-interfaces: []
-# zeroes
-zeroes:
-- ip: 172.16.1.152
-  port: 20202
-- ip: 172.16.1.153
-  port: 20202
+# conf for connection with outside stream
 stream:
-  ip: 172.16.1.153
+  ip: 127.0.0.1
   port: 20201
-# flow timeout
-flow-timeout:
-  # inerval time for long flow, in seconds
+# conf for connection with outside zeroes
+zeroes:
+- ip: 127.0.0.1
+  port: 20202
+# internal queues conf
+queue:
+  # packet and flow queue size
+  queue-size: 65536
+  # labeler read queue count
+  labeler-queue-count: 8
+  # flow generator read queue count
+  flow-generator-queue-count: 2
+  # metering app read queue count
+  metering-app-queue-count: 8
+# internal labeler conf
+labeler:
+  # size of policy fast-path map, and
+  # map-size-limit >= filter-queue-count*1024
+  # map-size-limit <= filter-queue-count*1048576
+  map-size-limit: 1048576
+# internal flow generator conf
+flow-generator:
+  # concurrent flow count limit
+  flow-count-limit: 1048576
+  # hard output interval for long flow, in seconds
   force-report-interval: 60
-  # time for an established tcp flow, in seconds
-  established: 300
-  # timeout for tcp closing stage and get rst after established, in seconds
-  closing-rst: 35
-  # timeout for opening stage, flow with exception and single direction, in seconds
-  others: 5
-# packet and flow queue size
-queue-size: 65536
-# adapter write queue count
-adapter-queue-count: 2
-# flow generator read queue count
-flow-queue-count: 2
-# concurrent flow count limit
-flow-count-limit: 1048576
-# size of policy fast-path map, and
-# labeler-queue-count*1024 <= policy-map-size <= labeler-queue-count*1048576
-policy-map-size: 1048576
+  # idle timeout for established tcp flow, in seconds
+  established-timeout: 300
+  # idle timeout for closing tcp flow,
+  # or tcp flow with rst after established,
+  # or non-tcp flow with dual direction, in seconds
+  closing-rst-timeout: 35
+  # idle timeout for opening tcp flow,
+  # or tcp flow with exception,
+  # or flow with single direction, in seconds
+  others-timeout: 5
+#geo-file-location: /opt/droplet/ip_info_mini.json
