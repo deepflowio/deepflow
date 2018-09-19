@@ -12,11 +12,13 @@ func (f *FlowGenerator) processOtherIpPacket(meta *MetaPacket) {
 	flowKey := f.genFlowKey(meta)
 	hash := f.getQuinTupleHash(flowKey)
 	flowCache := f.hashMap[hash%HASH_MAP_SIZE]
+	flowCache.Lock()
 	if flowExtra, reply = flowCache.keyMatch(meta, flowKey); flowExtra != nil {
 		f.updateOtherIpFlow(flowExtra, meta, reply)
 	} else {
 		if f.stats.CurrNumFlows >= f.flowLimitNum {
 			f.stats.FloodDropPackets++
+			flowCache.Unlock()
 			return
 		}
 		flowExtra = f.initOtherIpFlow(meta, flowKey)
@@ -24,6 +26,7 @@ func (f *FlowGenerator) processOtherIpPacket(meta *MetaPacket) {
 		f.addFlow(flowCache, flowExtra)
 		f.stats.CurrNumFlows++
 	}
+	flowCache.Unlock()
 }
 
 func (f *FlowGenerator) initOtherIpFlow(meta *MetaPacket, key *FlowKey) *FlowExtra {

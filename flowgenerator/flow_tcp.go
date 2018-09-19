@@ -14,6 +14,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 	hash := f.getQuinTupleHash(flowKey)
 	flowCache := f.hashMap[hash%HASH_MAP_SIZE]
 	// keyMatch is goroutine safety
+	flowCache.Lock()
 	if flowExtra, reply = flowCache.keyMatch(meta, flowKey); flowExtra != nil {
 		if ok, reply = f.updateTcpFlow(flowExtra, meta, reply); ok {
 			taggedFlow := flowExtra.taggedFlow
@@ -25,9 +26,10 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 				flowExtra.reversed = !flowExtra.reversed
 			}
 			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
+			flowExtra.reset()
 			f.flowOutQueue.Put(taggedFlow)
 			// delete front from this FlowCache because flowExtra is moved to front in keyMatch()
-			flowCache.SafeFlowListRemoveFront()
+			flowCache.flowList.RemoveFront()
 		} else {
 			// reply is a sign relative to the flow direction, so if the flow is reversed then the sign should be changed
 			if f.checkIfDoFlowPerf(flowExtra) {
@@ -37,6 +39,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 	} else {
 		if f.stats.CurrNumFlows >= f.flowLimitNum {
 			f.stats.FloodDropPackets++
+			flowCache.Unlock()
 			return
 		}
 		closed := false
@@ -61,6 +64,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			f.stats.CurrNumFlows++
 		}
 	}
+	flowCache.Unlock()
 }
 
 func (f *FlowGenerator) initTcpFlow(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool, bool) {

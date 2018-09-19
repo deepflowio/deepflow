@@ -90,7 +90,6 @@ func (f *FlowExtra) TunnelMatch(key *FlowKey) bool {
 }
 
 func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool) {
-	f.Lock()
 	for e := f.flowList.Front(); e != nil; e = e.Next() {
 		flowExtra := e.Value
 		taggedFlow := flowExtra.taggedFlow
@@ -102,15 +101,12 @@ func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool) 
 		}
 		if taggedFlow.IPSrc == key.IPSrc && taggedFlow.IPDst == key.IPDst && taggedFlow.PortSrc == key.PortSrc && taggedFlow.PortDst == key.PortDst {
 			f.flowList.MoveToFront(e)
-			f.Unlock()
 			return flowExtra, false
 		} else if taggedFlow.IPSrc == key.IPDst && taggedFlow.IPDst == key.IPSrc && taggedFlow.PortSrc == key.PortDst && taggedFlow.PortDst == key.PortSrc {
 			f.flowList.MoveToFront(e)
-			f.Unlock()
 			return flowExtra, true
 		}
 	}
-	f.Unlock()
 	return nil, false
 }
 
@@ -126,8 +122,7 @@ func (f *FlowGenerator) initFlowCache() bool {
 }
 
 func (f *FlowGenerator) addFlow(flowCache *FlowCache, flowExtra *FlowExtra) *FlowExtra {
-	flowCache.SafeFlowListPushFront(flowExtra)
-	return nil
+	return flowCache.flowList.PushFront(flowExtra).Value
 }
 
 func (f *FlowGenerator) genFlowId(timestamp uint64, inPort uint64) uint64 {
@@ -438,12 +433,12 @@ func (f *FlowGenerator) cleanTimeoutHashMap(hashMap []*FlowCache, start, end, in
 	flowOutQueue := f.flowOutQueue
 	forceReportInterval := f.forceReportInterval
 	sleepDuration := f.minLoopInterval
-	var flowOutBuffer [FLOW_OUT_BUFFER_CAP]interface{}
-	flowOutNum := 0
 	f.cleanWaitGroup.Add(1)
 
 loop:
 	time.Sleep(sleepDuration)
+	flowOutBuffer := [FLOW_OUT_BUFFER_CAP]interface{}{}
+	flowOutNum := 0
 	now := time.Duration(time.Now().UnixNano())
 	cleanRange := now - f.minLoopInterval
 	maxFlowCacheLen := 0
