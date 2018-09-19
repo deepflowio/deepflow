@@ -7,14 +7,14 @@ import (
 type Tag interface {
 	GetID() string
 	HasVariedField() bool
-	ToMap() map[string]string
+	ToKVString() string
 	String() string
 }
 
 type Meter interface {
 	ConcurrentMerge(Meter)
 	SequentialMerge(Meter)
-	ToMap() map[string]interface{}
+	ToKVString() string
 }
 
 type Document struct {
