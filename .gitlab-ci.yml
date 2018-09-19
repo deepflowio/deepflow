@@ -15,7 +15,6 @@ verify:
   script:
     - make clean
     - go fmt ./...; [[ -z $(git status -s --ignore-submodule) ]] || exit -1
-    - go vet ./...
     - make test
   only:
     - pushes

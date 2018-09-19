@@ -169,20 +169,20 @@
   revision = "77835d127b7900c080009dde13ff2298496c14f6"
 
 [[projects]]
-  branch = "release-branch.go1.9"
-  digest = "1:1604cdec55ab4b828b9e83af0e7f1bd0f954cc3ffab4231587f6f33e5db53e6c"
+  branch = "release-branch.go1.11"
+  digest = "1:b5c3834d33445efdc5a8dcb154bed9e4c211edadbf02f6f5cc20c5e9be26a499"
   name = "golang.org/x/net"
   packages = [
     "context",
+    "http/httpguts",
     "http2",
     "http2/hpack",
     "idna",
     "internal/timeseries",
-    "lex/httplex",
     "trace",
   ]
   pruneopts = "UT"
-  revision = "44b7c21cbf19450f38b337eb6b6fe4f6496fb5b3"
+  revision = "c39426892332e1bb5ec0a434a079bf82f5d30c54"
 
 [[projects]]
   branch = "master"
