@@ -10,10 +10,10 @@ type MultiQueue struct {
 	queue.FixedMultiQueue
 	Monitor
 
-	itemBatches [][]interface{}
+	itemBatches [][][]interface{}
 }
 
-func (q *MultiQueue) Init(name string, size int, count int) {
+func (q *MultiQueue) Init(name string, size, count, userCount int) {
 	q.Monitor.init(name)
 	q.FixedMultiQueue = queue.NewOverwriteQueues(name, uint8(count), size)
 
@@ -22,9 +22,12 @@ func (q *MultiQueue) Init(name string, size int, count int) {
 		if batchSize > 1024 {
 			batchSize = 1024
 		}
-		q.itemBatches = make([][]interface{}, len(q.FixedMultiQueue))
-		for index, _ := range q.itemBatches {
-			q.itemBatches[index] = make([]interface{}, 0, batchSize)
+		q.itemBatches = make([][][]interface{}, userCount)
+		for userId, _ := range q.itemBatches {
+			q.itemBatches[userId] = make([][]interface{}, count)
+			for queueId, _ := range q.itemBatches[userId] {
+				q.itemBatches[userId][queueId] = make([]interface{}, 0, batchSize)
+			}
 		}
 	}
 }
@@ -42,33 +45,38 @@ func (q *MultiQueue) Put(key queue.HashKey, items ...interface{}) error {
 	return q.FixedMultiQueue.Put(key, items...)
 }
 
+// The userId key must be placed in keys[0] (with item keys)
 func (q *MultiQueue) Puts(keys []queue.HashKey, items []interface{}) error {
-	if len(keys) != len(items) {
+	if len(keys) <= 1 || len(keys)-1 != len(items) {
 		return errors.New("Requested keys and items are invalid")
 	}
+	userId := keys[0]
+	keys = keys[1:]
 
 	q.Monitor.send(items)
-	keyMask := uint8(len(q.FixedMultiQueue) - 1)
-	if keyMask == 0 {
+	userCount := uint8(len(q.itemBatches))
+	if userCount == 0 {
 		return q.FixedMultiQueue.Put(keys[0], items...)
 	}
 
+	itemBatches := q.itemBatches[userId%userCount]
+	batchCount := uint8(len(itemBatches))
 	for i, item := range items {
-		index := keys[i] & keyMask
-		q.itemBatches[index] = append(q.itemBatches[index], item)
-		itemBatch := q.itemBatches[index]
+		index := keys[i] % batchCount
+		itemBatches[index] = append(itemBatches[index], item)
+		itemBatch := itemBatches[index]
 		if len(itemBatch) == cap(itemBatch) {
 			err := q.FixedMultiQueue.Put(queue.HashKey(index), itemBatch...)
-			q.itemBatches[index] = itemBatch[:0]
+			itemBatches[index] = itemBatch[:0]
 			if err != nil {
 				return err
 			}
 		}
 	}
-	for index, itemBatch := range q.itemBatches {
+	for index, itemBatch := range itemBatches {
 		if len(itemBatch) > 0 {
 			err := q.FixedMultiQueue.Put(queue.HashKey(index), itemBatch...)
-			q.itemBatches[index] = itemBatch[:0]
+			itemBatches[index] = itemBatch[:0]
 			if err != nil {
 				return err
 			}

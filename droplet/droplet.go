@@ -59,6 +59,7 @@ func Start(configPath string) {
 	cfg := config.Load(configPath)
 	queueSize := int(cfg.QueueSize)
 	filterQueueCount := int(cfg.AdapterQueueCount) + len(cfg.DataInterfaces) + len(cfg.TapInterfaces)
+	filterWriterCount := 1 + len(cfg.DataInterfaces) + len(cfg.TapInterfaces)
 	InitLog(cfg.LogFile, cfg.LogLevel)
 
 	if cfg.Profiler {
@@ -79,7 +80,7 @@ func Start(configPath string) {
 	manager := queue.NewManager()
 
 	// L1 - packet source
-	filterQueues := manager.NewQueues("1-meta-packet-to-filter", queueSize, filterQueueCount)
+	filterQueues := manager.NewQueues("1-meta-packet-to-filter", queueSize, filterQueueCount, filterWriterCount)
 	tridentAdapter := adapter.NewTridentAdapter(filterQueues, filterQueueCount)
 	if tridentAdapter == nil {
 		return
@@ -105,9 +106,9 @@ func Start(configPath string) {
 	}
 
 	// L2 - packet filter
-	meteringAppQueue := manager.NewQueues("2-meta-packet-to-metering-app", queueSize, int(cfg.FlowQueueCount))
-	flowGeneratorQueue := manager.NewQueues("2-meta-packet-to-flow-generator", queueSize, int(cfg.FlowQueueCount))
-	labelerManager := labeler.NewLabelerManager(filterQueues, 8, cfg.PolicyMapSize)
+	meteringAppQueue := manager.NewQueues("2-meta-packet-to-metering-app", queueSize, int(cfg.FlowQueueCount), filterQueueCount)
+	flowGeneratorQueue := manager.NewQueues("2-meta-packet-to-flow-generator", queueSize, int(cfg.FlowQueueCount), filterQueueCount)
+	labelerManager := labeler.NewLabelerManager(filterQueues, filterQueueCount, cfg.PolicyMapSize)
 	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_METERING, meteringAppQueue)
 	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_FLOW, flowGeneratorQueue)
 	labelerManager.Start()

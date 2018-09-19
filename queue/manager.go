@@ -92,9 +92,9 @@ func (m *Manager) NewQueue(name string, size int) queue.Queue {
 	return q
 }
 
-func (m *Manager) NewQueues(name string, size int, count int) queue.MultiQueue {
+func (m *Manager) NewQueues(name string, size, count, userCount int) queue.MultiQueue {
 	q := &MultiQueue{}
-	q.Init(name, size, count)
+	q.Init(name, size, count, userCount)
 	m.queues[name] = q
 	return q
 }
