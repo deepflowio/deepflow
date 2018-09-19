@@ -1,6 +1,11 @@
 package zerodoc
 
-import "gitlab.x.lan/yunshan/droplet-libs/app"
+import (
+	"strconv"
+	"strings"
+
+	"gitlab.x.lan/yunshan/droplet-libs/app"
+)
 
 type UsageMeter struct {
 	UsageMeterSum
@@ -21,15 +26,41 @@ func (m *UsageMeter) SequentialMerge(other app.Meter) {
 	}
 }
 
-func (m *UsageMeter) ToMap() map[string]interface{} {
-	um := make(map[string]interface{})
-	//usageMeterSum
-	m.UsageMeterSum.ToMap(um)
+func (m *UsageMeter) ToKVString() string {
+	var buf strings.Builder
 
-	//usageMeterMax
-	m.UsageMeterMax.ToMap(um)
+	// sum
+	sum := m.UsageMeterSum
+	buf.WriteString("sum_packet_tx=")
+	buf.WriteString(strconv.FormatUint(sum.SumPacketTx, 10))
+	buf.WriteString("i,sum_packet_rx=")
+	buf.WriteString(strconv.FormatUint(sum.SumPacketRx, 10))
+	buf.WriteString("i,sum_packet=")
+	buf.WriteString(strconv.FormatUint(sum.SumPacket, 10))
+	buf.WriteString("i,sum_bit_tx=")
+	buf.WriteString(strconv.FormatUint(sum.SumBitTx, 10))
+	buf.WriteString("i,sum_bit_rx=")
+	buf.WriteString(strconv.FormatUint(sum.SumBitRx, 10))
+	buf.WriteString("i,sum_bit=")
+	buf.WriteString(strconv.FormatUint(sum.SumBit, 10))
 
-	return um
+	// max
+	max := m.UsageMeterMax
+	buf.WriteString("i,max_packet_tx=")
+	buf.WriteString(strconv.FormatUint(max.MaxPacketTx, 10))
+	buf.WriteString("i,max_packet_rx=")
+	buf.WriteString(strconv.FormatUint(max.MaxPacketRx, 10))
+	buf.WriteString("i,max_packet=")
+	buf.WriteString(strconv.FormatUint(max.MaxPacket, 10))
+	buf.WriteString("i,max_bit_tx=")
+	buf.WriteString(strconv.FormatUint(max.MaxBitTx, 10))
+	buf.WriteString("i,max_bit_rx=")
+	buf.WriteString(strconv.FormatUint(max.MaxBitRx, 10))
+	buf.WriteString("i,max_bit=")
+	buf.WriteString(strconv.FormatUint(max.MaxBit, 10))
+	buf.WriteRune('i')
+
+	return buf.String()
 }
 
 type UsageMeterSum struct {
@@ -39,15 +70,6 @@ type UsageMeterSum struct {
 	SumBitTx    uint64
 	SumBitRx    uint64
 	SumBit      uint64
-}
-
-func (m *UsageMeterSum) ToMap(sm map[string]interface{}) {
-	sm["sum_packet_tx"] = int64(m.SumPacketTx)
-	sm["sum_packet_rx"] = int64(m.SumPacketRx)
-	sm["sum_packet"] = int64(m.SumPacket)
-	sm["sum_bit_tx"] = int64(m.SumBitTx)
-	sm["sum_bit_rx"] = int64(m.SumBitRx)
-	sm["sum_bit"] = int64(m.SumBit)
 }
 
 func (m *UsageMeterSum) concurrentMerge(other *UsageMeterSum) {
@@ -70,15 +92,6 @@ type UsageMeterMax struct {
 	MaxBitTx    uint64
 	MaxBitRx    uint64
 	MaxBit      uint64
-}
-
-func (m *UsageMeterMax) ToMap(mm map[string]interface{}) {
-	mm["max_packet_tx"] = int64(m.MaxPacketTx)
-	mm["max_packet_rx"] = int64(m.MaxPacketRx)
-	mm["max_packet"] = int64(m.MaxPacket)
-	mm["max_bit_tx"] = int64(m.MaxBitTx)
-	mm["max_bit_rx"] = int64(m.MaxBitRx)
-	mm["max_bit"] = int64(m.MaxBit)
 }
 
 func (m *UsageMeterMax) concurrentMerge(other *UsageMeterMax) {

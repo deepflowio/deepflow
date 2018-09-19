@@ -1,6 +1,8 @@
 package zerodoc
 
 import (
+	"strconv"
+	"strings"
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
@@ -28,17 +30,57 @@ func (m *PerfMeter) SequentialMerge(other app.Meter) {
 	}
 }
 
-func (m *PerfMeter) ToMap() map[string]interface{} {
-	pm := make(map[string]interface{})
-	//perfMeterSum
-	m.PerfMeterSum.ToMap(pm)
+func (m *PerfMeter) ToKVString() string {
+	var buf strings.Builder
 
-	//perfMeterMax
-	m.PerfMeterMax.ToMap(pm)
+	// sum
+	sum := m.PerfMeterSum
+	buf.WriteString("sum_flow_count=")
+	buf.WriteString(strconv.FormatUint(sum.SumFlowCount, 10))
+	buf.WriteString("i,sum_closed_flow_count=")
+	buf.WriteString(strconv.FormatUint(sum.SumClosedFlowCount, 10))
+	buf.WriteString("i,sum_retrans_flow_count=")
+	buf.WriteString(strconv.FormatUint(sum.SumRetransFlowCount, 10))
+	buf.WriteString("i,sum_half_open_flow_count=")
+	buf.WriteString(strconv.FormatUint(sum.SumHalfOpenFlowCount, 10))
+	buf.WriteString("i,sum_packet_tx=")
+	buf.WriteString(strconv.FormatUint(sum.SumPacketTx, 10))
+	buf.WriteString("i,sum_packet_rx=")
+	buf.WriteString(strconv.FormatUint(sum.SumPacketRx, 10))
+	buf.WriteString("i,sum_retrans_cnt_tx=")
+	buf.WriteString(strconv.FormatUint(sum.SumRetransCntTx, 10))
+	buf.WriteString("i,sum_retrans_cnt_rx=")
+	buf.WriteString(strconv.FormatUint(sum.SumRetransCntRx, 10))
 
-	//perfMeterMin
-	m.PerfMeterMin.ToMap(pm)
-	return pm
+	buf.WriteString("i,sum_rtt_syn=")
+	buf.WriteString(strconv.FormatInt(int64(sum.SumRTTSyn/time.Microsecond), 10))
+	buf.WriteString("i,sum_rtt_avg=")
+	buf.WriteString(strconv.FormatInt(int64(sum.SumRTTAvg/time.Microsecond), 10))
+	buf.WriteString("i,sum_rtt_syn_flow=")
+	buf.WriteString(strconv.FormatUint(sum.SumRTTSynFlow, 10))
+	buf.WriteString("i,sum_rtt_avg_flow=")
+	buf.WriteString(strconv.FormatUint(sum.SumRTTAvgFlow, 10))
+	buf.WriteString("i,sum_zero_wnd_cnt_tx=")
+	buf.WriteString(strconv.FormatUint(sum.SumZeroWndCntTx, 10))
+	buf.WriteString("i,sum_zero_wnd_cnt_rx=")
+	buf.WriteString(strconv.FormatUint(sum.SumZeroWndCntRx, 10))
+
+	// max
+	max := m.PerfMeterMax
+	buf.WriteString("i,max_rtt_syn=")
+	buf.WriteString(strconv.FormatInt(int64(max.MaxRTTSyn/time.Microsecond), 10))
+	buf.WriteString("i,max_rtt_avg=")
+	buf.WriteString(strconv.FormatInt(int64(max.MaxRTTAvg/time.Microsecond), 10))
+
+	// min
+	min := m.PerfMeterMin
+	buf.WriteString("i,min_rtt_syn=")
+	buf.WriteString(strconv.FormatInt(int64(min.MinRTTSyn/time.Microsecond), 10))
+	buf.WriteString("i,min_rtt_avg=")
+	buf.WriteString(strconv.FormatInt(int64(min.MinRTTAvg/time.Microsecond), 10))
+	buf.WriteRune('i')
+
+	return buf.String()
 }
 
 type PerfMeterSum struct {
@@ -87,43 +129,9 @@ func (m *PerfMeterSum) sequentialMerge(other *PerfMeterSum) {
 	m.concurrentMerge(other)
 }
 
-func (m *PerfMeterSum) ToMap(mm map[string]interface{}) {
-	mm["sum_flow_count"] = int64(m.SumFlowCount)
-	mm["sum_closed_flow_count"] = int64(m.SumClosedFlowCount)
-	mm["sum_retrans_flow_count"] = int64(m.SumRetransFlowCount)
-	mm["sum_half_open_flow_count"] = int64(m.SumHalfOpenFlowCount)
-	mm["sum_packet_tx"] = int64(m.SumPacketTx)
-	mm["sum_packet_rx"] = int64(m.SumPacketRx)
-	mm["sum_retrans_cnt_tx"] = int64(m.SumRetransCntTx)
-	mm["sum_retrans_cnt_rx"] = int64(m.SumRetransCntRx)
-
-	mm["sum_rtt_syn"] = int64(m.SumRTTSyn / time.Microsecond)
-	mm["sum_rtt_avg"] = int64(m.SumRTTAvg / time.Microsecond)
-	mm["sum_rtt_syn_flow"] = int64(m.SumRTTSynFlow)
-	mm["sum_rtt_avg_flow"] = int64(m.SumRTTAvgFlow)
-	if m.SumRTTSynFlow != 0 {
-		mm["sum_rtt_syn_per_flow"] = int64(m.SumRTTSyn) / int64(m.SumRTTSynFlow)
-	} else {
-		mm["sum_rtt_syn_per_flow"] = 0
-	}
-	if m.SumRTTAvgFlow != 0 {
-		mm["sum_rtt_avg_per_flow"] = int64(m.SumRTTAvg) / int64(m.SumRTTAvgFlow)
-	} else {
-		mm["sum_rtt_avg_per_flow"] = 0
-	}
-
-	mm["sum_zero_wnd_cnt_tx"] = int64(m.SumZeroWndCntTx)
-	mm["sum_zero_wnd_cnt_rx"] = int64(m.SumZeroWndCntRx)
-}
-
 type PerfMeterMax struct {
 	MaxRTTSyn time.Duration
 	MaxRTTAvg time.Duration
-}
-
-func (m *PerfMeterMax) ToMap(mm map[string]interface{}) {
-	mm["max_rtt_syn"] = int64(m.MaxRTTSyn / time.Microsecond)
-	mm["max_rtt_avg"] = int64(m.MaxRTTAvg / time.Microsecond)
 }
 
 func (m *PerfMeterMax) concurrentMerge(other *PerfMeterMax) {
@@ -139,11 +147,6 @@ func (m *PerfMeterMax) sequentialMerge(other *PerfMeterMax) {
 type PerfMeterMin struct {
 	MinRTTSyn time.Duration
 	MinRTTAvg time.Duration
-}
-
-func (m *PerfMeterMin) ToMap(mm map[string]interface{}) {
-	mm["min_rtt_syn"] = int64(m.MinRTTSyn / time.Microsecond)
-	mm["min_rtt_avg"] = int64(m.MinRTTAvg / time.Microsecond)
 }
 
 func (m *PerfMeterMin) concurrentMerge(other *PerfMeterMin) {

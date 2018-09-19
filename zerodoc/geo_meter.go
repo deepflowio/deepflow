@@ -1,6 +1,8 @@
 package zerodoc
 
 import (
+	"strconv"
+	"strings"
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
@@ -46,16 +48,28 @@ func (m *GeoMeter) SequentialMerge(other app.Meter) {
 	}
 }
 
-func (m *GeoMeter) ToMap() map[string]interface{} {
-	pgm := make(map[string]interface{})
-	pgm["sum_closed_flow_count"] = int64(m.SumClosedFlowCount)
-	pgm["sum_abnormal_flow_count"] = int64(m.SumAbnormalFlowCount)
-	pgm["sum_closed_flow_duration"] = int64(m.SumClosedFlowDuration / time.Microsecond)
-	pgm["sum_packet_tx"] = int64(m.SumPacketTx)
-	pgm["sum_packet_rx"] = int64(m.SumPacketRx)
-	pgm["sum_bit_tx"] = int64(m.SumBitTx)
-	pgm["sum_bit_rx"] = int64(m.SumBitRx)
-	pgm["sum_rtt_syn"] = int64(m.SumRTTSyn / time.Microsecond)
-	pgm["sum_rtt_syn_flow"] = int64(m.SumRTTSynFlow)
-	return pgm
+func (m *GeoMeter) ToKVString() string {
+	var buf strings.Builder
+
+	buf.WriteString("sum_closed_flow_count=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCount, 10))
+	buf.WriteString("i,sum_abnormal_flow_count=")
+	buf.WriteString(strconv.FormatUint(m.SumAbnormalFlowCount, 10))
+	buf.WriteString("i,sum_closed_flow_duration=")
+	buf.WriteString(strconv.FormatInt(int64(m.SumClosedFlowDuration/time.Microsecond), 10))
+	buf.WriteString("i,sum_packet_tx=")
+	buf.WriteString(strconv.FormatUint(m.SumPacketTx, 10))
+	buf.WriteString("i,sum_packet_rx=")
+	buf.WriteString(strconv.FormatUint(m.SumPacketRx, 10))
+	buf.WriteString("i,sum_bit_tx=")
+	buf.WriteString(strconv.FormatUint(m.SumBitTx, 10))
+	buf.WriteString("i,sum_bit_rx=")
+	buf.WriteString(strconv.FormatUint(m.SumBitRx, 10))
+	buf.WriteString("i,sum_rtt_syn=")
+	buf.WriteString(strconv.FormatInt(int64(m.SumRTTSyn/time.Microsecond), 10))
+	buf.WriteString("i,sum_rtt_syn_flow=")
+	buf.WriteString(strconv.FormatUint(m.SumRTTSynFlow, 10))
+	buf.WriteRune('i')
+
+	return buf.String()
 }

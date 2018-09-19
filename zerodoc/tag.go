@@ -1,8 +1,8 @@
 package zerodoc
 
 import (
-	"bytes"
 	"strconv"
+	"strings"
 
 	"fmt"
 
@@ -162,118 +162,161 @@ func (f *Field) AddCustomField(code Code, key, value string) {
 	f.CustomFields[codeToPos(code)-(64-CustomFieldNumber)] = &StringField{key, value}
 }
 
-func (t *Tag) ToMap() map[string]string {
-	ret := make(map[string]string)
+func (t *Tag) ToKVString() string {
+	var buf strings.Builder
+	// 在InfluxDB的line protocol中，tag紧跟在measurement name之后，总会以逗号开头
 
 	// 1<<0 ~ 1<<6
 	if t.Code&IP != 0 {
-		ret["ip"] = utils.IpFromUint32(t.IP).String()
+		buf.WriteString(",ip=")
+		buf.WriteString(utils.IpFromUint32(t.IP).String())
 	}
 	if t.Code&MAC != 0 {
-		ret["mac"] = utils.Uint64ToMac(t.MAC).String()
+		buf.WriteString(",mac=")
+		buf.WriteString(utils.Uint64ToMac(t.MAC).String())
 	}
 	if t.Code&GroupID != 0 {
-		ret["group_id"] = strconv.Itoa(t.GroupID)
+		buf.WriteString(",group_id=")
+		buf.WriteString(strconv.Itoa(t.GroupID))
 	}
 	if t.Code&L2EpcID != 0 {
-		ret["l2_epc_id"] = strconv.Itoa(t.L2EpcID)
+		buf.WriteString(",l2_epc_id=")
+		buf.WriteString(strconv.Itoa(t.L2EpcID))
 	}
 	if t.Code&L3EpcID != 0 {
-		ret["l3_epc_id"] = strconv.Itoa(t.L3EpcID)
+		buf.WriteString(",l3_epc_id=")
+		buf.WriteString(strconv.Itoa(t.L3EpcID))
 	}
 	if t.Code&L2Device != 0 {
-		ret["l2_device_id"] = strconv.Itoa(t.L2DeviceID)
-		ret["l2_device_type"] = strconv.Itoa(int(t.L2DeviceType))
+		buf.WriteString(",l2_device_id=")
+		buf.WriteString(strconv.Itoa(t.L2DeviceID))
+		buf.WriteString(",l2_device_type=")
+		buf.WriteString(strconv.Itoa(int(t.L2DeviceType)))
 	}
 	if t.Code&L3Device != 0 {
-		ret["l3_device_id"] = strconv.Itoa(t.L3DeviceID)
-		ret["l3_device_type"] = strconv.Itoa(int(t.L3DeviceType))
+		buf.WriteString(",l3_device_id=")
+		buf.WriteString(strconv.Itoa(t.L3DeviceID))
+		buf.WriteString(",l3_device_type=")
+		buf.WriteString(strconv.Itoa(int(t.L3DeviceType)))
 	}
 
 	// 1<<16 ~ 1<<22
 	if t.Code&IPPath != 0 {
-		ret["ip_0"] = utils.IpFromUint32(t.IP0).String()
-		ret["ip_1"] = utils.IpFromUint32(t.IP1).String()
+		buf.WriteString(",ip_0=")
+		buf.WriteString(utils.IpFromUint32(t.IP0).String())
+		buf.WriteString(",ip_1=")
+		buf.WriteString(utils.IpFromUint32(t.IP1).String())
 	}
 	if t.Code&MACPath != 0 {
-		ret["mac_0"] = utils.Uint64ToMac(t.MAC0).String()
-		ret["mac_1"] = utils.Uint64ToMac(t.MAC1).String()
+		buf.WriteString(",mac_0=")
+		buf.WriteString(utils.Uint64ToMac(t.MAC0).String())
+		buf.WriteString(",mac_1=")
+		buf.WriteString(utils.Uint64ToMac(t.MAC1).String())
 	}
 	if t.Code&GroupIDPath != 0 {
-		ret["group_id_0"] = strconv.Itoa(t.GroupID0)
-		ret["group_id_1"] = strconv.Itoa(t.GroupID1)
+		buf.WriteString(",group_id_0=")
+		buf.WriteString(strconv.Itoa(t.GroupID0))
+		buf.WriteString(",group_id_1=")
+		buf.WriteString(strconv.Itoa(t.GroupID1))
 	}
 	if t.Code&L2EpcIDPath != 0 {
-		ret["l2_epc_id_0"] = strconv.Itoa(t.L2EpcID0)
-		ret["l2_epc_id_1"] = strconv.Itoa(t.L2EpcID1)
+		buf.WriteString(",l2_epc_id_0=")
+		buf.WriteString(strconv.Itoa(t.L2EpcID0))
+		buf.WriteString(",l2_epc_id_1=")
+		buf.WriteString(strconv.Itoa(t.L2EpcID1))
 	}
 	if t.Code&L3EpcIDPath != 0 {
-		ret["l3_epc_id_0"] = strconv.Itoa(t.L3EpcID0)
-		ret["l3_epc_id_1"] = strconv.Itoa(t.L3EpcID1)
+		buf.WriteString(",l3_epc_id_0=")
+		buf.WriteString(strconv.Itoa(t.L3EpcID0))
+		buf.WriteString(",l3_epc_id_1=")
+		buf.WriteString(strconv.Itoa(t.L3EpcID1))
 	}
 	if t.Code&L2DevicePath != 0 {
-		ret["l2_device_id_0"] = strconv.Itoa(t.L2DeviceID0)
-		ret["l2_device_id_1"] = strconv.Itoa(t.L2DeviceID1)
-		ret["l2_device_type_0"] = strconv.Itoa(int(t.L2DeviceType0))
-		ret["l2_device_type_1"] = strconv.Itoa(int(t.L2DeviceType1))
+		buf.WriteString(",l2_device_id_0=")
+		buf.WriteString(strconv.Itoa(t.L2DeviceID0))
+		buf.WriteString(",l2_device_id_1=")
+		buf.WriteString(strconv.Itoa(t.L2DeviceID1))
+		buf.WriteString(",l2_device_type_0=")
+		buf.WriteString(strconv.Itoa(int(t.L2DeviceType0)))
+		buf.WriteString(",l2_device_type_1=")
+		buf.WriteString(strconv.Itoa(int(t.L2DeviceType1)))
 	}
 	if t.Code&L3DevicePath != 0 {
-		ret["l3_device_id_0"] = strconv.Itoa(t.L3DeviceID0)
-		ret["l3_device_id_1"] = strconv.Itoa(t.L3DeviceID1)
-		ret["l3_device_type_0"] = strconv.Itoa(int(t.L3DeviceType0))
-		ret["l3_device_type_1"] = strconv.Itoa(int(t.L3DeviceType1))
+		buf.WriteString(",l3_device_id_0=")
+		buf.WriteString(strconv.Itoa(t.L3DeviceID0))
+		buf.WriteString(",l3_device_id_1=")
+		buf.WriteString(strconv.Itoa(t.L3DeviceID1))
+		buf.WriteString(",l3_device_type_0=")
+		buf.WriteString(strconv.Itoa(int(t.L3DeviceType0)))
+		buf.WriteString(",l3_device_type_1=")
+		buf.WriteString(strconv.Itoa(int(t.L3DeviceType1)))
 	}
 
-	// 1<<32 ~ 1<<39
+	// 1<<32 ~ 1<<48
 	if t.Code&Direction != 0 {
+		buf.WriteString(",direction=")
 		switch t.Direction {
 		case ClientToServer:
-			ret["direction"] = "c2s"
+			buf.WriteString("c2s")
 		case ServerToClient:
-			ret["direction"] = "s2c"
+			buf.WriteString("s2c")
 		default:
-			ret["direction"] = "any"
+			buf.WriteString("any")
 		}
 	}
 	if t.Code&Policy != 0 {
-		ret["policy_type"] = strconv.Itoa(int(t.PolicyType))
-		ret["policy_id"] = strconv.Itoa(t.PolicyID)
+		buf.WriteString(",policy_type=")
+		buf.WriteString(strconv.Itoa(int(t.PolicyType)))
+		buf.WriteString(",policy_id=")
+		buf.WriteString(strconv.Itoa(t.PolicyID))
 	}
 	if t.Code&VLANID != 0 {
-		ret["vlan_id"] = strconv.Itoa(t.VLANID)
+		buf.WriteString(",vlan_id=")
+		buf.WriteString(strconv.Itoa(t.VLANID))
 	}
 	if t.Code&Protocol != 0 {
-		ret["protocol"] = strconv.Itoa(int(t.Protocol))
+		buf.WriteString(",protocol=")
+		buf.WriteString(strconv.Itoa(int(t.Protocol)))
 	}
 	if t.Code&ServerPort != 0 {
-		ret["server_port"] = strconv.Itoa(t.ServerPort)
+		buf.WriteString(",server_port=")
+		buf.WriteString(strconv.Itoa(t.ServerPort))
 	}
 	if t.Code&Host != 0 {
-		ret["host"] = utils.IpFromUint32(t.Host).String()
+		buf.WriteString(",host=")
+		buf.WriteString(utils.IpFromUint32(t.Host).String())
 	}
 	if t.Code&VTAP != 0 {
-		ret["vtap"] = utils.IpFromUint32(t.VTAP).String()
+		buf.WriteString(",vtap=")
+		buf.WriteString(utils.IpFromUint32(t.VTAP).String())
 	}
 	if t.Code&TAPType != 0 {
-		ret["tap_type"] = strconv.Itoa(int(t.TAPType))
+		buf.WriteString(",tap_type=")
+		buf.WriteString(strconv.Itoa(int(t.TAPType)))
 	}
 	if t.Code&SubnetID != 0 {
-		ret["subnet_id"] = strconv.Itoa(t.SubnetID)
+		buf.WriteString(",subnet_id=")
+		buf.WriteString(strconv.Itoa(t.SubnetID))
 	}
 	if t.Code&ACLID != 0 {
-		ret["acl_id"] = strconv.Itoa(t.ACLID)
+		buf.WriteString(",acl_id=")
+		buf.WriteString(strconv.Itoa(t.ACLID))
 	}
 
+	// 1<<63 ~ 1<<49
 	if t.CustomFields != nil {
 		for i := 0; i < CustomFieldNumber; i++ {
 			code := 1 << uint(i+64-CustomFieldNumber)
 			if t.Code&Code(code) != 0 && t.CustomFields[i] != nil {
-				ret[t.CustomFields[i].Key] = t.CustomFields[i].Value
+				buf.WriteRune(',')
+				buf.WriteString(t.CustomFields[i].Key)
+				buf.WriteRune('=')
+				buf.WriteString(t.CustomFields[i].Value)
 			}
 		}
 	}
 
-	return ret
+	return buf.String()
 }
 
 func (f *Field) NewTag(c Code) *Tag {
@@ -281,25 +324,19 @@ func (f *Field) NewTag(c Code) *Tag {
 }
 
 func (t *Tag) String() string {
-	var buffer bytes.Buffer
-	tagMap := t.ToMap()
-	buffer.WriteString("fields:")
-	for key, value := range tagMap {
-		buffer.WriteString(" ")
-		buffer.WriteString(key)
-		buffer.WriteString(":")
-		buffer.WriteString(value)
-	}
-	buffer.WriteString(" code:")
-	buffer.WriteString(fmt.Sprint(t.Code))
-	buffer.WriteString(" id:")
-	buffer.WriteString(t.id)
-	return buffer.String()
+	var buf strings.Builder
+	buf.WriteString("fields:")
+	buf.WriteString(t.ToKVString())
+	buf.WriteString(" code:")
+	buf.WriteString(fmt.Sprint(t.Code))
+	buf.WriteString(" id:")
+	buf.WriteString(t.id)
+	return buf.String()
 }
 
 func (t *Tag) GetID() string {
 	if t.id == "" {
-		var buf bytes.Buffer
+		var buf strings.Builder
 		if t.Code&IP != 0 {
 			buf.WriteString(strconv.FormatInt(int64(t.IP), 16))
 			buf.WriteRune(' ')

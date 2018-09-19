@@ -1,6 +1,11 @@
 package zerodoc
 
-import "gitlab.x.lan/yunshan/droplet-libs/app"
+import (
+	"strconv"
+	"strings"
+
+	"gitlab.x.lan/yunshan/droplet-libs/app"
+)
 
 type FlowMeter struct {
 	SumFlowCount       uint64
@@ -87,32 +92,54 @@ func (m *FlowMeter) SequentialMerge(other app.Meter) {
 	}
 }
 
-func (m *FlowMeter) ToMap() map[string]interface{} {
-	pm := make(map[string]interface{})
-	pm["sum_flow_count"] = int64(m.SumFlowCount)
-	pm["sum_new_flow_count"] = int64(m.SumNewFlowCount)
-	pm["sum_closed_flow_count"] = int64(m.SumClosedFlowCount)
+func (m *FlowMeter) ToKVString() string {
+	var buf strings.Builder
 
-	pm["sum_closed_flow_count_l_0s1s"] = int64(m.SumClosedFlowCountL0S1S)
-	pm["sum_closed_flow_count_l_1s5s"] = int64(m.SumClosedFlowCountL1S5S)
-	pm["sum_closed_flow_count_l_5s10s"] = int64(m.SumClosedFlowCountL5S10S)
-	pm["sum_closed_flow_count_l_10s1m"] = int64(m.SumClosedFlowCountL10S1M)
-	pm["sum_closed_flow_count_l_1m1h"] = int64(m.SumClosedFlowCountL1M1H)
-	pm["sum_closed_flow_count_l_1h"] = int64(m.SumClosedFlowCountL1H)
+	buf.WriteString("sum_flow_count=")
+	buf.WriteString(strconv.FormatUint(m.SumFlowCount, 10))
+	buf.WriteString("i,sum_new_flow_count=")
+	buf.WriteString(strconv.FormatUint(m.SumNewFlowCount, 10))
+	buf.WriteString("i,sum_closed_flow_count=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCount, 10))
 
-	pm["sum_closed_flow_count_e_0k10k"] = int64(m.SumClosedFlowCountE0K10K)
-	pm["sum_closed_flow_count_e_10k100k"] = int64(m.SumClosedFlowCountE10K100K)
-	pm["sum_closed_flow_count_e_100k1m"] = int64(m.SumClosedFlowCountE100K1M)
-	pm["sum_closed_flow_count_e_1m100m"] = int64(m.SumClosedFlowCountE1M100M)
-	pm["sum_closed_flow_count_e_100m1g"] = int64(m.SumClosedFlowCountE100M1G)
-	pm["sum_closed_flow_count_e_1g"] = int64(m.SumClosedFlowCountE1G)
+	buf.WriteString("i,sum_closed_flow_count_l_0s1s=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCountL0S1S, 10))
+	buf.WriteString("i,sum_closed_flow_count_l_1s5s=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCountL1S5S, 10))
+	buf.WriteString("i,sum_closed_flow_count_l_5s10s=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCountL5S10S, 10))
+	buf.WriteString("i,sum_closed_flow_count_l_10s1m=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCountL10S1M, 10))
+	buf.WriteString("i,sum_closed_flow_count_l_1m1h=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCountL1M1H, 10))
+	buf.WriteString("i,sum_closed_flow_count_l_1h=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCountL1H, 10))
 
-	pm["sum_closed_flow_count_t_rst"] = int64(m.SumClosedFlowCountTRst)
-	pm["sum_closed_flow_count_t_half_open"] = int64(m.SumClosedFlowCountTHalfOpen)
-	pm["sum_closed_flow_count_t_half_close"] = int64(m.SumClosedFlowCountTHalfClose)
+	buf.WriteString("i,sum_closed_flow_count_e_0k10k=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCountE0K10K, 10))
+	buf.WriteString("i,sum_closed_flow_count_e_10k100k=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCountE10K100K, 10))
+	buf.WriteString("i,sum_closed_flow_count_e_100k1m=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCountE100K1M, 10))
+	buf.WriteString("i,sum_closed_flow_count_e_1m100m=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCountE1M100M, 10))
+	buf.WriteString("i,sum_closed_flow_count_e_100m1g=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCountE100M1G, 10))
+	buf.WriteString("i,sum_closed_flow_count_e_1g=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCountE1G, 10))
 
-	pm["max_flow_count"] = int64(m.MaxFlowCount)
-	pm["max_new_flow_count"] = int64(m.MaxNewFlowCount)
+	buf.WriteString("i,sum_closed_flow_count_t_rst=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCountTRst, 10))
+	buf.WriteString("i,sum_closed_flow_count_t_half_open=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCountTHalfOpen, 10))
+	buf.WriteString("i,sum_closed_flow_count_t_half_close=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCountTHalfClose, 10))
 
-	return pm
+	buf.WriteString("i,max_flow_count=")
+	buf.WriteString(strconv.FormatUint(m.MaxFlowCount, 10))
+	buf.WriteString("i,max_new_flow_count=")
+	buf.WriteString(strconv.FormatUint(m.MaxNewFlowCount, 10))
+	buf.WriteRune('i')
+
+	return buf.String()
 }
