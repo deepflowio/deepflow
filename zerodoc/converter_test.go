@@ -223,12 +223,10 @@ func TestPerfMeterEqual(t *testing.T) {
 			SumRetransCntTx:      13,
 			SumRetransCntRx:      14,
 
-			SumRTTSyn:        4,
-			SumRTTAvg:        5,
-			SumRTTSynFlow:    6,
-			SumRTTAvgFlow:    7,
-			SumRTTSynPerFlow: 8,
-			SumRTTAvgPerFlow: 9,
+			SumRTTSyn:     4,
+			SumRTTAvg:     5,
+			SumRTTSynFlow: 6,
+			SumRTTAvgFlow: 7,
 
 			SumZeroWndCntTx: 16,
 			SumZeroWndCntRx: 17,
