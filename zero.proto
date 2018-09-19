@@ -107,8 +107,6 @@ message PerfStats {
     optional uint64 rtt_avg = 12;
     optional uint64 rtt_syn_flow = 13;
     optional uint64 rtt_avg_flow = 14;
-    optional uint64 rtt_syn_per_flow = 15;
-    optional uint64 rtt_avg_per_flow = 16;
 
     optional uint64 zero_wnd_cnt_tx = 21;
     optional uint64 zero_wnd_cnt_rx = 22;
