@@ -142,14 +142,17 @@ func (l *LabelerManager) run(index int) {
 	meteringQueues := l.appQueues[QUEUE_TYPE_METERING]
 	flowQueues := l.appQueues[QUEUE_TYPE_FLOW]
 	size := 4096
-	meteringKeys := make([]queue.HashKey, 0, size)
-	flowKeys := make([]queue.HashKey, 0, size)
+	userId := queue.HashKey(index)
+	meteringKeys := make([]queue.HashKey, 0, size+1)
+	meteringKeys = append(meteringKeys, userId)
+	flowKeys := make([]queue.HashKey, 0, size+1)
+	flowKeys = append(flowKeys, userId)
 	meteringItemBatch := make([]interface{}, 0, size)
 	flowItemBatch := make([]interface{}, 0, size)
 	itemBatch := make([]interface{}, size)
 
 	for l.running {
-		itemCount := l.readQueues.Gets(queue.HashKey(index), itemBatch)
+		itemCount := l.readQueues.Gets(userId, itemBatch)
 		for _, item := range itemBatch[:itemCount] {
 			metaPacket := item.(*datatype.MetaPacket)
 			action := l.GetPolicy(metaPacket, index)
@@ -164,12 +167,12 @@ func (l *LabelerManager) run(index int) {
 		}
 		if len(meteringItemBatch) > 0 {
 			meteringQueues.Puts(meteringKeys, meteringItemBatch)
-			meteringKeys = meteringKeys[:0]
+			meteringKeys = meteringKeys[:1]
 			meteringItemBatch = meteringItemBatch[:0]
 		}
 		if len(flowItemBatch) > 0 {
 			flowQueues.Puts(flowKeys, flowItemBatch)
-			flowKeys = flowKeys[:0]
+			flowKeys = flowKeys[:1]
 			flowItemBatch = flowItemBatch[:0]
 		}
 	}
