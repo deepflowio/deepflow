@@ -44,7 +44,7 @@ const (
 
 const FLOW_CACHE_CAP = 1024
 const HASH_MAP_SIZE uint64 = 1024 * 512
-const FLOW_OUT_BUFFER_CAP = 1024 * 64
+const FLOW_OUT_BUFFER_CAP = 1024
 const TIMOUT_PARALLEL_NUM uint64 = 4
 
 const IN_PORT_FLOW_ID_MASK uint64 = 0xFF000000
@@ -80,6 +80,8 @@ type FlowGeneratorStats struct {
 	FloodDropPackets             uint64 `statsd:"flood_drop_packet"`
 	NonEmptyFlowCacheNum         int    `statsd:"non_empty_flow_cache_num"`
 	MaxFlowCacheLen              int    `statsd:"max_flow_cache_len"`
+	FlowPoolGetNum               uint32 `statsd:"flow_pool_get_num"`
+	FlowPoolPutNum               uint32 `statsd:"flow_pool_put_num"`
 	cleanRoutineFlowCacheNums    []int
 	cleanRoutineMaxFlowCacheLens []int
 }
@@ -156,6 +158,8 @@ func (f *FlowGenerator) GetCounter() interface{} {
 	}
 	f.stats.NonEmptyFlowCacheNum = nonEmptyFlowCacheNum
 	f.stats.MaxFlowCacheLen = maxFlowCacheLen
+	f.stats.FlowPoolGetNum = f.taggedFlowHandler.getNum
+	f.stats.FlowPoolPutNum = f.taggedFlowHandler.putNum
 	counter := f.stats
 	f.stats.FloodDropPackets = 0
 	return &counter
