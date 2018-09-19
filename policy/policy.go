@@ -1,7 +1,6 @@
 package policy
 
 import (
-	"runtime"
 	"sync"
 
 	"github.com/op/go-logging"
@@ -55,10 +54,7 @@ type PolicyTable struct {
 	cloudPlatformData *CloudPlatformData
 	policyLabel       *PolicyLabel
 
-	policyDataPoll sync.Pool
-	blocks         []*PolicyDataBlock
-	blockCursors   []int
-	queueCount     int
+	queueCount int
 }
 
 type PolicyCounter struct {
@@ -95,32 +91,8 @@ func NewPolicyTable(actionTypes ActionType, queueCount int, mapSize uint32) *Pol
 		cloudPlatformData: NewCloudPlatformData(queueCount, availableMapSize),
 		policyLabel:       NewPolicyLabel(queueCount, availableMapSize),
 	}
-	policyTable.policyDataPoll.New = func() interface{} {
-		block := new(PolicyDataBlock)
-		runtime.SetFinalizer(block, func(b *PolicyDataBlock) {
-			*b = PolicyDataBlock{}
-			policyTable.policyDataPoll.Put(b)
-		})
-		return block
-	}
-
-	policyTable.blockCursors = make([]int, queueCount)
-	policyTable.blocks = make([]*PolicyDataBlock, queueCount)
-	for i := 0; i < queueCount; i++ {
-		policyTable.blocks[i] = policyTable.policyDataPoll.Get().(*PolicyDataBlock)
-	}
 	policyTable.queueCount = queueCount
 	return policyTable
-}
-
-func (t *PolicyTable) alloc(index int) *PolicyData {
-	policyData := &t.blocks[index][t.blockCursors[index]]
-	t.blockCursors[index]++
-	if t.blockCursors[index] >= len(t.blocks[index]) {
-		t.blocks[index] = t.policyDataPoll.Get().(*PolicyDataBlock)
-		t.blockCursors[index] = 0
-	}
-	return policyData
 }
 
 func (t *PolicyTable) GetCounter() interface{} {
@@ -165,14 +137,14 @@ func (t *PolicyTable) GetPolicyDataByFastPath(endpointData *EndpointData, key *L
 	fastKey.ProtoVlan = uint64(key.Proto<<32) | uint64(key.Vlan)
 	policyData := t.policyLabel.GetPolicyByFastPath(fastKey, key.Tap, key.FastIndex)
 	if policyData == nil {
-		policyData = t.GetPolicyData(endpointData, key, index)
+		policyData = t.GetPolicyData(endpointData, key)
 		t.policyLabel.InsertPolicyToFastPath(fastKey, policyData, key.Tap, key.FastIndex)
 	}
 	return policyData
 }
 
-func (t *PolicyTable) GetPolicyData(endpointData *EndpointData, key *LookupKey, index int) *PolicyData {
-	policyData := t.alloc(index)
+func (t *PolicyTable) GetPolicyData(endpointData *EndpointData, key *LookupKey) *PolicyData {
+	policyData := &PolicyData{}
 	if aclActions := t.policyLabel.GetPolicyData(endpointData, key); aclActions != nil {
 		policyData.Merge(aclActions)
 	}
@@ -183,7 +155,7 @@ func (t *PolicyTable) GetPolicyData(endpointData *EndpointData, key *LookupKey, 
 // Droplet用于ANALYTIC_*、PACKET_BROKER、PACKET_STORE
 func (t *PolicyTable) LookupAllByKey(key *LookupKey, index int) (*EndpointData, *PolicyData) {
 	if !key.Tap.CheckTapType(key.Tap) {
-		return NewEndpointData(), t.alloc(index)
+		return NewEndpointData(), &PolicyData{}
 	}
 	endpointData, fastKey := t.cloudPlatformData.GetEndpointData(key)
 	if key.Tap == TAP_TOR {
