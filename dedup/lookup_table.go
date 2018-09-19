@@ -3,8 +3,6 @@ package dedup
 import (
 	"bytes"
 	"time"
-
-	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
 const (
@@ -19,14 +17,12 @@ const (
 	PACKET_ID_SIZE = 64
 )
 
-var (
+type DedupTable struct {
 	hashTable *HashTable
-
-	counter = &Counter{}
-
-	queue  *List = &List{}
-	buffer *List = &List{}
-)
+	counter   *Counter
+	queue     *List
+	buffer    *List
+}
 
 type Counter struct {
 	Total      uint64 `statsd:"total"`
@@ -36,9 +32,10 @@ type Counter struct {
 	LoadFactor uint   `statsd:"load_factor"`
 }
 
-func (c *Counter) GetCounter() interface{} {
-	counter, c = &Counter{}, counter
-	return c
+func (t *DedupTable) GetCounter() interface{} {
+	counter := &Counter{}
+	t.counter, counter = counter, t.counter
+	return counter
 }
 
 type PacketId [PACKET_ID_SIZE]byte
@@ -132,8 +129,8 @@ func (list *List) remove(node *ListNode) {
 	node.next = nil
 }
 
-func allocateNodePair(timestamp time.Duration, hash uint32, id uint64, packetId PacketId) (qnode, bnode *ListNode) {
-	if buffer.head == nil {
+func (t *DedupTable) allocateNodePair(timestamp time.Duration, hash uint32, id uint64, packetId PacketId) (qnode, bnode *ListNode) {
+	if t.buffer.head == nil {
 		qnode = &ListNode{}
 		qnode.desc = &LinkedPacketDesc{
 			timestamp: timestamp,
@@ -150,87 +147,79 @@ func allocateNodePair(timestamp time.Duration, hash uint32, id uint64, packetId 
 		return qnode, bnode
 	}
 
-	qnode = buffer.popFront()
+	qnode = t.buffer.popFront()
 	qnode.desc.timestamp = timestamp
 	qnode.desc.hash = hash
 	qnode.desc.id = id
 	copy(qnode.desc.packetId[:], packetId[:])
 
-	bnode = buffer.popFront()
+	bnode = t.buffer.popFront()
 
 	return qnode, bnode
 }
 
-func releaseToBuffer(qnode, bnode *ListNode) {
-	buffer.pushBack(qnode)
-	buffer.pushBack(bnode)
+func (t *DedupTable) releaseToBuffer(qnode, bnode *ListNode) {
+	t.buffer.pushBack(qnode)
+	t.buffer.pushBack(bnode)
 }
 
 // 因为我们需要比较packetId来确认是否匹配，因此没有办法用库所提供的map或lru
 type HashTable [HASH_TABLE_SIZE]*List
 
-func withdraw(hash uint32, id uint64, packetId PacketId) bool {
-	bucket := hashTable[compressHash(hash)]
+func (t *DedupTable) withdraw(hash uint32, id uint64, packetId PacketId) bool {
+	bucket := t.hashTable[compressHash(hash)]
 	for bnode := bucket.head; bnode != nil; bnode = bnode.next {
 		if bnode.desc.hash == hash && bnode.desc.id == id && bytes.Equal(bnode.desc.packetId[:], packetId[:]) {
 			qnode := bnode.peer
-			queue.remove(qnode)
+			t.queue.remove(qnode)
 			bucket.remove(bnode)
-			releaseToBuffer(qnode, bnode)
+			t.releaseToBuffer(qnode, bnode)
 			return true
 		}
 	}
 	return false
 }
 
-func enQueue(qnode, bnode *ListNode) {
-	if queue.size >= ELEMENTS_LIMIT {
-		deQueue() // 无需记录此Counter，目前Hash空间不可能丢
+func (t *DedupTable) enQueue(qnode, bnode *ListNode) {
+	if t.queue.size >= ELEMENTS_LIMIT {
+		t.deQueue() // 无需记录此Counter，目前Hash空间不可能丢
 	}
 	key := compressHash(qnode.desc.hash)
 
-	queue.pushBack(qnode)
-	hashTable[key].pushBack(bnode)
+	t.queue.pushBack(qnode)
+	t.hashTable[key].pushBack(bnode)
 
-	if hashTable[key].size > counter.MaxBucket {
-		counter.MaxBucket = hashTable[key].size
+	if t.hashTable[key].size > t.counter.MaxBucket {
+		t.counter.MaxBucket = t.hashTable[key].size
 	}
 }
 
-func deQueue() {
-	qnode := queue.popFront()
+func (t *DedupTable) deQueue() {
+	qnode := t.queue.popFront()
 	if qnode != nil {
-		bnode := hashTable[compressHash(qnode.desc.hash)].popFront() // queue和bucket的第一个一定相同
-		releaseToBuffer(qnode, bnode)
+		bnode := t.hashTable[compressHash(qnode.desc.hash)].popFront() // queue和bucket的第一个一定相同
+		t.releaseToBuffer(qnode, bnode)
 	}
 	return
 }
 
-func deleteTimeout(timestamp time.Duration) {
-	for queue.head != nil && timestamp-queue.head.desc.timestamp > ENTRY_TIMEOUT {
-		counter.Timeout++
-		deQueue()
+func (t *DedupTable) deleteTimeout(timestamp time.Duration) {
+	for t.queue.head != nil && timestamp-t.queue.head.desc.timestamp > ENTRY_TIMEOUT {
+		t.counter.Timeout++
+		t.deQueue()
 	}
 }
 
-func lookup(hash uint32, id uint64, timestamp time.Duration, packetId PacketId) bool {
-	deleteTimeout(timestamp)
-	counter.Total++
+func (t *DedupTable) lookup(hash uint32, id uint64, timestamp time.Duration, packetId PacketId) bool {
+	t.deleteTimeout(timestamp)
+	t.counter.Total++
 
-	if withdraw(hash, id, packetId) {
-		counter.Hit++
+	if t.withdraw(hash, id, packetId) {
+		t.counter.Hit++
 		return true
 	}
 
-	qnode, bnode := allocateNodePair(timestamp, hash, id, packetId)
-	enQueue(qnode, bnode)
+	qnode, bnode := t.allocateNodePair(timestamp, hash, id, packetId)
+	t.enQueue(qnode, bnode)
 	return false
-}
-
-func init() {
-	hashTable = &HashTable{}
-	for i := 0; i < HASH_TABLE_SIZE; i++ {
-		hashTable[i] = &List{}
-	}
-	stats.RegisterCountable("dedup", counter)
 }
