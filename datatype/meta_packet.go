@@ -144,30 +144,8 @@ func (p *MetaPacket) ParseIp(stream *ByteStream) {
 
 // TODO: 一个合法ip报文应当至少有30B的长度(不考虑非ip情形)
 //       因此如果我们能够减少长度的判断，想必能够提升不少的性能
-func (p *MetaPacket) Parse(packet RawPacket) bool {
-	stream := ByteStream{packet, 0}
-
-	// L2
-	if stream.Len() < ETH_HEADER_SIZE {
-		return false
-	}
-	p.MacDst = MacIntFromBytes(stream.Field(MAC_ADDR_LEN))
-	p.MacSrc = MacIntFromBytes(stream.Field(MAC_ADDR_LEN))
-	p.EthType = EthernetType(stream.U16())
-	if isVlanTagged(p.EthType) && stream.Len() > VLANTAG_LEN {
-		vlanTag := stream.U16()
-		vid := vlanTag & VLAN_ID_MASK
-		if pcp := (vlanTag >> 13) & 0x7; pcp == MIRRORED_TRAFFIC {
-			p.InPort = (uint32(vid&0xF00) << 8) | uint32(vid&0xFF)
-		} else {
-			p.Vlan = vid
-		}
-		p.EthType = EthernetType(stream.U16())
-	}
-	if p.EthType == EthernetTypeDot1Q && stream.Len() > VLANTAG_LEN {
-		p.Vlan = stream.U16() & VLAN_ID_MASK
-		p.EthType = EthernetType(stream.U16())
-	}
+func (p *MetaPacket) Parse(l3Packet RawPacket) bool {
+	stream := ByteStream{l3Packet, 0}
 
 	// L3
 	if p.EthType == EthernetTypeIPv4 && stream.Len() >= MIN_IPV4_HEADER_SIZE {
@@ -175,7 +153,45 @@ func (p *MetaPacket) Parse(packet RawPacket) bool {
 	} else if p.EthType == EthernetTypeARP && stream.Len() >= ARP_HEADER_SIZE {
 		p.ParseArp(&stream)
 	}
+
 	return true
+}
+
+func (p *MetaPacket) ParseL2(packet RawPacket) int {
+	stream := ByteStream{packet, 0}
+	inPort := uint32(PACKET_SOURCE_TOR)
+	l2Len := 0
+
+	if stream.Len() < ETH_HEADER_SIZE {
+		p.Invalid = true
+		return l2Len
+	}
+
+	p.MacDst = MacIntFromBytes(stream.Field(MAC_ADDR_LEN))
+	p.MacSrc = MacIntFromBytes(stream.Field(MAC_ADDR_LEN))
+	p.EthType = EthernetType(stream.U16())
+	l2Len += ETH_HEADER_SIZE
+	if isVlanTagged(p.EthType) && stream.Len() > VLANTAG_LEN+ETH_TYPE_LEN {
+		vlanTag := stream.U16()
+		vid := vlanTag & VLAN_ID_MASK
+		if pcp := (vlanTag >> 13) & 0x7; pcp == MIRRORED_TRAFFIC {
+			inPort = (uint32(vid&0xF00) << 8) | uint32(vid&0xFF)
+		} else {
+			p.Vlan = vid
+		}
+		p.EthType = EthernetType(stream.U16())
+		l2Len += VLANTAG_LEN + ETH_TYPE_LEN
+	}
+	if p.EthType == EthernetTypeDot1Q && stream.Len() > VLANTAG_LEN {
+		p.Vlan = stream.U16() & VLAN_ID_MASK
+		p.EthType = EthernetType(stream.U16())
+		l2Len += VLANTAG_LEN + ETH_TYPE_LEN
+	}
+
+	if p.InPort == 0 {
+		p.InPort = inPort
+	}
+	return l2Len
 }
 
 func (p *MetaPacket) String() string {
