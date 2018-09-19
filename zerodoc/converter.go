@@ -311,12 +311,10 @@ func PerfMeterSumToPB(m *PerfMeterSum) *pb.PerfStats {
 		RetransCntTx:      proto.Uint64(m.SumRetransCntTx),
 		RetransCntRx:      proto.Uint64(m.SumRetransCntRx),
 
-		RttSyn:        proto.Uint64(uint64(m.SumRTTSyn)),
-		RttAvg:        proto.Uint64(uint64(m.SumRTTAvg)),
-		RttSynFlow:    proto.Uint64(m.SumRTTSynFlow),
-		RttAvgFlow:    proto.Uint64(m.SumRTTAvgFlow),
-		RttSynPerFlow: proto.Uint64(m.SumRTTSynPerFlow),
-		RttAvgPerFlow: proto.Uint64(m.SumRTTAvgPerFlow),
+		RttSyn:     proto.Uint64(uint64(m.SumRTTSyn)),
+		RttAvg:     proto.Uint64(uint64(m.SumRTTAvg)),
+		RttSynFlow: proto.Uint64(m.SumRTTSynFlow),
+		RttAvgFlow: proto.Uint64(m.SumRTTAvgFlow),
 
 		ZeroWndCntTx: proto.Uint64(m.SumZeroWndCntTx),
 		ZeroWndCntRx: proto.Uint64(m.SumZeroWndCntRx),
@@ -334,12 +332,10 @@ func pbToPerfMeterSum(m *pb.PerfStats) *PerfMeterSum {
 		SumRetransCntTx:      m.GetRetransCntTx(),
 		SumRetransCntRx:      m.GetRetransCntRx(),
 
-		SumRTTSyn:        time.Duration(m.GetRttSyn()),
-		SumRTTAvg:        time.Duration(m.GetRttAvg()),
-		SumRTTSynFlow:    m.GetRttSynFlow(),
-		SumRTTAvgFlow:    m.GetRttAvgFlow(),
-		SumRTTSynPerFlow: m.GetRttSynPerFlow(),
-		SumRTTAvgPerFlow: m.GetRttAvgPerFlow(),
+		SumRTTSyn:     time.Duration(m.GetRttSyn()),
+		SumRTTAvg:     time.Duration(m.GetRttAvg()),
+		SumRTTSynFlow: m.GetRttSynFlow(),
+		SumRTTAvgFlow: m.GetRttAvgFlow(),
 
 		SumZeroWndCntTx: m.GetZeroWndCntTx(),
 		SumZeroWndCntRx: m.GetZeroWndCntRx(),
