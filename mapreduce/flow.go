@@ -9,6 +9,7 @@ import (
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/flow"
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/geo"
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/perf"
+	"gitlab.x.lan/application/droplet-app/pkg/mapper/platform"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
@@ -27,6 +28,7 @@ func NewFlowMapProcess(zmqAppQueue queue.QueueWriter) *FlowHandler {
 		perf.NewProcessor(),
 		geo.NewProcessor(GEO_FILE_LOCATION),
 		consolelog.NewProcessor(),
+		platform.NewProcessor(),
 	}, zmqAppQueue)
 }
 
