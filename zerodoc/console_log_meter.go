@@ -1,6 +1,8 @@
 package zerodoc
 
 import (
+	"strconv"
+	"strings"
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
@@ -31,11 +33,16 @@ func (m *ConsoleLogMeter) SequentialMerge(other app.Meter) {
 	}
 }
 
-func (m *ConsoleLogMeter) ToMap() map[string]interface{} {
-	pm := make(map[string]interface{})
-	pm["sum_packet_tx"] = int64(m.SumPacketTx)
-	pm["sum_packet_rx"] = int64(m.SumPacketRx)
-	pm["sum_closed_flow_count"] = int64(m.SumClosedFlowCount)
-	pm["sum_closed_flow_duration"] = int64(m.SumClosedFlowDuration / time.Microsecond)
-	return pm
+func (m *ConsoleLogMeter) ToKVString() string {
+	var buf strings.Builder
+	buf.WriteString("sum_packet_tx=")
+	buf.WriteString(strconv.FormatUint(m.SumPacketTx, 10))
+	buf.WriteString("i,sum_packet_rx=")
+	buf.WriteString(strconv.FormatUint(m.SumPacketRx, 10))
+	buf.WriteString("i,sum_closed_flow_count=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCount, 10))
+	buf.WriteString("i,sum_closed_flow_duration=")
+	buf.WriteString(strconv.FormatInt(int64(m.SumClosedFlowDuration/time.Microsecond), 10))
+	buf.WriteRune('i')
+	return buf.String()
 }

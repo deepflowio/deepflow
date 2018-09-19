@@ -1,6 +1,11 @@
 package zerodoc
 
-import "gitlab.x.lan/yunshan/droplet-libs/app"
+import (
+	"strconv"
+	"strings"
+
+	"gitlab.x.lan/yunshan/droplet-libs/app"
+)
 
 type IPDatabaseMeter struct {
 	SumBit             uint64
@@ -21,9 +26,12 @@ func (m *IPDatabaseMeter) SequentialMerge(other app.Meter) {
 	}
 }
 
-func (m *IPDatabaseMeter) ToMap() map[string]interface{} {
-	pm := make(map[string]interface{})
-	pm["sum_bit"] = int64(m.SumBit)
-	pm["sum_closed_flow_count"] = int64(m.SumClosedFlowCount)
-	return pm
+func (m *IPDatabaseMeter) ToKVString() string {
+	var buf strings.Builder
+	buf.WriteString("sum_bit=")
+	buf.WriteString(strconv.FormatUint(m.SumBit, 10))
+	buf.WriteString("i,sum_closed_flow_count=")
+	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCount, 10))
+	buf.WriteRune('i')
+	return buf.String()
 }
