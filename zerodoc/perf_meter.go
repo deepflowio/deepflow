@@ -93,12 +93,10 @@ type PerfMeterSum struct {
 	SumRetransCntTx      uint64
 	SumRetransCntRx      uint64
 
-	SumRTTSyn        time.Duration
-	SumRTTAvg        time.Duration
-	SumRTTSynFlow    uint64
-	SumRTTAvgFlow    uint64
-	SumRTTSynPerFlow uint64
-	SumRTTAvgPerFlow uint64
+	SumRTTSyn     time.Duration
+	SumRTTAvg     time.Duration
+	SumRTTSynFlow uint64
+	SumRTTAvgFlow uint64
 
 	SumZeroWndCntTx uint64
 	SumZeroWndCntRx uint64
@@ -118,8 +116,6 @@ func (m *PerfMeterSum) concurrentMerge(other *PerfMeterSum) {
 	m.SumRTTAvg += other.SumRTTAvg
 	m.SumRTTSynFlow += other.SumRTTSynFlow
 	m.SumRTTAvgFlow += other.SumRTTAvgFlow
-	m.SumRTTSynPerFlow += other.SumRTTSynPerFlow
-	m.SumRTTAvgPerFlow += other.SumRTTAvgPerFlow
 
 	m.SumZeroWndCntTx += other.SumZeroWndCntTx
 	m.SumZeroWndCntRx += other.SumZeroWndCntRx
