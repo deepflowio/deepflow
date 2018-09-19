@@ -196,7 +196,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:5911449eb75fa495800bd23b2715a8261821ee36271f702dfb5d95f6fc0c9153"
+  digest = "1:278a5574de17724d63c518e768c57aea4e6243160f2ed6caebb254a7a91e3f64"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "app",
@@ -216,7 +216,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "07ab3d8fad335c2e66a5ffa5b1e032d513ba36a0"
+  revision = "d06752275cc00ecc151d36c1d2286f5a79814944"
 
 [[projects]]
   branch = "master"
@@ -231,21 +231,21 @@
   revision = "5d2de04edbc057ca16685a8504da45e88851126d"
 
 [[projects]]
-  branch = "release-branch.go1.9"
-  digest = "1:480da6f1374fc58e5300f785f43f3398a2ae26b622491294ed44158adcdd6fff"
+  branch = "release-branch.go1.11"
+  digest = "1:b44c99081499ad9bd394e6255a62a11bddf23410760d40965c095d252355c053"
   name = "golang.org/x/net"
   packages = [
     "bpf",
     "context",
+    "http/httpguts",
     "http2",
     "http2/hpack",
     "idna",
     "internal/timeseries",
-    "lex/httplex",
     "trace",
   ]
   pruneopts = "UT"
-  revision = "44b7c21cbf19450f38b337eb6b6fe4f6496fb5b3"
+  revision = "c39426892332e1bb5ec0a434a079bf82f5d30c54"
 
 [[projects]]
   branch = "master"

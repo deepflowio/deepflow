@@ -25,8 +25,11 @@ type DataHandler struct {
 
 	block       *MetaPacketBlock
 	blockCursor int
-	ip          datatype.IPv4Int
-	queue       queue.MultiQueueWriter
+
+	ip    datatype.IPv4Int
+	queue queue.MultiQueueWriter
+
+	dedupTable *dedup.DedupTable
 }
 
 func (h *DataHandler) preAlloc() *datatype.MetaPacket {
@@ -55,7 +58,8 @@ func (h *DataHandler) Handle(timestamp Timestamp, packet RawPacket, size PacketS
 	h.queue.Put(queue.HashKey(metaPacket.GenerateHash()), metaPacket)
 }
 
-func (h *DataHandler) Init() *DataHandler {
+func (h *DataHandler) Init(interfaceName string) *DataHandler {
+	h.dedupTable = dedup.NewDedupTable(interfaceName)
 	gc := func(b *MetaPacketBlock) {
 		*b = MetaPacketBlock{} // 重新初始化，避免无效的数据或不可预期的引用
 		h.Put(b)
@@ -81,7 +85,7 @@ func (h *TapHandler) Handle(timestamp Timestamp, packet RawPacket, size PacketSi
 		packet = packet[offset:]
 		metaPacket.Tunnel = &tunnel
 	}
-	if dedup.Lookup(packet, timestamp) {
+	if h.dedupTable.IsDuplicate(packet, timestamp) {
 		return
 	}
 	if !metaPacket.Parse(packet) {

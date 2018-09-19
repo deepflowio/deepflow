@@ -49,7 +49,7 @@ func StartCapture(interfaceName string, ip net.IP, isTapInterface bool, outputQu
 	dataHandler := (&DataHandler{
 		ip:    IpToUint32(ip),
 		queue: outputQueue,
-	}).Init()
+	}).Init(interfaceName)
 
 	handler := PacketHandler(dataHandler)
 	if isTapInterface {
