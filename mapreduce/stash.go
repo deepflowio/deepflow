@@ -2,61 +2,71 @@ package mapreduce
 
 import (
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 type Stash struct {
-	stashLocation map[uint32]map[string]int
-	stash         []*app.Document
-	entryCount    int
-	capacity      int
+	timestamp     uint32
+	stashLocation []map[string]int
+	slots         int
+
+	stash      []interface{}
+	entryCount int
+	capacity   int
+
+	intBuffer *utils.IntBuffer
 }
 
-func NewStash(capacity int) *Stash {
+func NewStash(capacity, slots int) *Stash {
 	return &Stash{
-		make(map[uint32]map[string]int),
-		make([]*app.Document, capacity),
-		0,
-		capacity,
+		timestamp:     0,
+		stashLocation: make([]map[string]int, slots),
+		slots:         slots,
+		stash:         make([]interface{}, capacity),
+		entryCount:    0,
+		capacity:      capacity,
+		intBuffer:     &utils.IntBuffer{},
 	}
 }
 
-// Add 添加到stash，会改变doc中meter的内容
-func (s *Stash) Add(docs ...*app.Document) bool {
-	for _, doc := range docs {
-		if docByTime, ok := s.stashLocation[doc.Timestamp]; ok {
-			if docLoc, ok := docByTime[doc.GetID()]; ok {
-				s.stash[docLoc].ConcurrentMerge(doc.Meter)
-				continue
-			}
-		} else {
-			s.stashLocation[doc.Timestamp] = make(map[string]int)
+// Add 添加到stash，会改变doc中meter的内容，若stash已满会返回未添加的doc
+func (s *Stash) Add(docs []*app.Document) []*app.Document {
+	for i, doc := range docs {
+		if s.timestamp == 0 {
+			s.timestamp = doc.Timestamp
+		}
+		slot := int(doc.Timestamp) - int(s.timestamp)
+		if slot < 0 || slot >= s.slots {
+			return docs[i:]
+		}
+		if s.stashLocation[slot] == nil {
+			s.stashLocation[slot] = make(map[string]int)
+		}
+		if docLoc, ok := s.stashLocation[slot][doc.GetID(s.intBuffer)]; ok {
+			s.stash[docLoc].(*app.Document).ConcurrentMerge(doc.Meter)
+			continue
 		}
 
 		if s.entryCount >= s.capacity {
-			return false
+			return docs[i:]
 		}
-		docByTime := s.stashLocation[doc.Timestamp]
 		s.stash[s.entryCount] = doc
-		docByTime[doc.GetID()] = s.entryCount
+		s.stashLocation[slot][doc.GetID(s.intBuffer)] = s.entryCount
 		s.entryCount++
 	}
-	return true
+	return nil
 }
 
 func (s *Stash) Size() int {
 	return s.entryCount
 }
 
-// Full 返回true如果数量大于容量80%
-func (s *Stash) Full() bool {
-	return s.entryCount >= s.capacity*8/10
-}
-
-func (s *Stash) Dump() []*app.Document {
+func (s *Stash) Dump() []interface{} {
 	return s.stash[:s.entryCount]
 }
 
 func (s *Stash) Clear() {
-	s.stashLocation = make(map[uint32]map[string]int)
+	s.timestamp = 0
+	s.stashLocation = make([]map[string]int, s.slots)
 	s.entryCount = 0
 }

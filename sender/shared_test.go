@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/gopacket/layers"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	dt "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 	"gitlab.x.lan/yunshan/droplet-libs/zmq"
 )
@@ -95,7 +96,8 @@ func documentEqual(doc, other *app.Document) bool {
 
 	oldTag := doc.Tag.(*dt.Tag)
 	newTag := other.Tag.(*dt.Tag)
-	if !oldTag.Equal(newTag) {
+	b := &utils.IntBuffer{}
+	if oldTag.GetID(b) != newTag.GetID(b) {
 		return false
 	}
 

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	datatype "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 )
 
@@ -59,27 +60,29 @@ func TestStash(t *testing.T) {
 	*meter4 = meter
 	doc4 := &app.Document{Timestamp: 0x12345679, Tag: tag4, Meter: meter4}
 
-	stash := NewStash(100)
-	stash.Add(doc1, doc2, doc3, doc4)
+	stash := NewStash(100, WINDOW_SIZE)
+	stash.Add([]*app.Document{doc1, doc2, doc3, doc4})
 	docs := stash.Dump()
 	if len(docs) != 3 {
 		t.Error("文档数量不正确")
 	}
-	if !docs[0].Tag.(*datatype.Tag).Equal(tag1) {
+
+	b := &utils.IntBuffer{}
+	if docs[0].(*app.Document).Tag.(*datatype.Tag).GetID(b) != tag1.GetID(b) {
 		t.Error("文档0的tag不正确")
 	}
-	if !docs[1].Tag.(*datatype.Tag).Equal(tag2) {
+	if docs[1].(*app.Document).Tag.(*datatype.Tag).GetID(b) != tag2.GetID(b) {
 		t.Error("文档1的tag不正确")
 	}
-	if !docs[2].Tag.(*datatype.Tag).Equal(tag4) {
+	if docs[2].(*app.Document).Tag.(*datatype.Tag).GetID(b) != tag4.GetID(b) {
 		t.Error("文档2的tag不正确")
 	}
-	if docs[0].Meter.(*datatype.UsageMeter).SumPacketTx != 2*meter.SumPacketTx {
+	if docs[0].(*app.Document).Meter.(*datatype.UsageMeter).SumPacketTx != 2*meter.SumPacketTx {
 		t.Error("文档0的meter不正确")
 	}
 
 	stash.Clear()
-	stash.Add(doc1, doc2, doc3, doc4)
+	stash.Add([]*app.Document{doc1, doc2, doc3, doc4})
 	if len(docs) != 3 {
 		t.Error("Clear后文档数量不正确")
 	}
