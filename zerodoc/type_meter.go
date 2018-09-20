@@ -63,7 +63,7 @@ func (m *TypeMeter) ToKVString() string {
 	var buf strings.Builder
 	// TODO: 预计算string长度
 
-	buf.WriteString("i,sum_count_l_0s1s=")
+	buf.WriteString("sum_count_l_0s1s=")
 	buf.WriteString(strconv.FormatUint(m.SumCountL0S1S, 10))
 	buf.WriteString("i,sum_count_l_1s5s=")
 	buf.WriteString(strconv.FormatUint(m.SumCountL1S5S, 10))
