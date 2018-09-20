@@ -141,24 +141,6 @@ message FlowMeter {
     optional uint64 sum_new_flow_count = 2;
     optional uint64 sum_closed_flow_count = 3;
 
-    optional uint64 sum_closed_flow_count_l_0s1s = 11;
-    optional uint64 sum_closed_flow_count_l_1s5s = 12;
-    optional uint64 sum_closed_flow_count_l_5s10s = 13;
-    optional uint64 sum_closed_flow_count_l_10s1m = 14;
-    optional uint64 sum_closed_flow_count_l_1m1h = 15;
-    optional uint64 sum_closed_flow_count_l_1h = 16;
-
-    optional uint64 sum_closed_flow_count_e_0k10k = 21;
-    optional uint64 sum_closed_flow_count_e_10k100k = 22;
-    optional uint64 sum_closed_flow_count_e_100k1m = 23;
-    optional uint64 sum_closed_flow_count_e_1m100m = 24;
-    optional uint64 sum_closed_flow_count_e_100m1g = 25;
-    optional uint64 sum_closed_flow_count_e_1g = 26;
-
-    optional uint64 sum_closed_flow_count_t_rst = 31;
-    optional uint64 sum_closed_flow_count_t_half_open = 32;
-    optional uint64 sum_closed_flow_count_t_half_close = 33;
-
     optional uint64 max_flow_count = 51;
     optional uint64 max_new_flow_count = 52;
 }
@@ -176,9 +158,27 @@ message ConsoleLogMeter {
     optional uint64 sum_closed_flow_duration_us = 4;
 }
 
-message IpDatabaseMeter {
-    optional uint64 sum_bit = 1;
-    optional uint64 sum_closed_flow_count = 3;
+message TypeMeter {
+    optional uint64 sum_count_l_0s1s = 11;
+    optional uint64 sum_count_l_1s5s = 12;
+    optional uint64 sum_count_l_5s10s = 13;
+    optional uint64 sum_count_l_10s1m = 14;
+    optional uint64 sum_count_l_1m1h = 15;
+    optional uint64 sum_count_l_1h = 16;
+
+    optional uint64 sum_count_e_0k10k = 21;
+    optional uint64 sum_count_e_10k100k = 22;
+    optional uint64 sum_count_e_100k1m = 23;
+    optional uint64 sum_count_e_1m100m = 24;
+    optional uint64 sum_count_e_100m1g = 25;
+    optional uint64 sum_count_e_1g = 26;
+
+    optional uint64 sum_count_t_c_rst = 31;
+    optional uint64 sum_count_t_c_half_open = 32;
+    optional uint64 sum_count_t_c_half_close = 33;
+    optional uint64 sum_count_t_s_rst = 34;
+    optional uint64 sum_count_t_s_half_open = 35;
+    optional uint64 sum_count_t_s_half_close = 36;
 }
 
 message Meter {
@@ -188,7 +188,7 @@ message Meter {
     optional FlowMeter flow = 4;
     optional PlatformMeter platform = 5;
     optional ConsoleLogMeter console_log = 6;
-    optional IpDatabaseMeter ip_database = 7;
+    optional TypeMeter type = 8;
 }
 
 message ZeroHeader {
