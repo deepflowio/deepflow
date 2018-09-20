@@ -22,6 +22,7 @@ var ActionMap = [...]datatype.ActionType{
 	trident.Action_PACKECT_COUNTER_PUB: datatype.ACTION_PACKECT_COUNTER_PUB,
 	trident.Action_FLOW_COUNTER_PUB:    datatype.ACTION_FLOW_COUNTER_PUB,
 	trident.Action_TCP_PERFORMANCE_PUB: datatype.ACTION_TCP_PERFORMANCE_PUB,
+	trident.Action_GEO:                 datatype.ACTION_GEO,
 }
 
 func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {

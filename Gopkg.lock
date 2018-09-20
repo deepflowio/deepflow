@@ -166,7 +166,7 @@
     "zero",
   ]
   pruneopts = "T"
-  revision = "77835d127b7900c080009dde13ff2298496c14f6"
+  revision = "fc714d1387a52273e3c9e1cd62b099ab911e217e"
 
 [[projects]]
   branch = "release-branch.go1.11"
