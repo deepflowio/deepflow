@@ -46,7 +46,10 @@ type FlowHandler struct {
 	lastProcess time.Duration
 
 	zmqAppQueue queue.QueueWriter
-	emitCounter []uint64
+
+	emitCounter  []uint64
+	counterLatch int
+	statItems    []stats.StatItem
 }
 
 func NewFlowHandler(processors []app.FlowProcessor, zmqAppQueue queue.QueueWriter) *FlowHandler {
@@ -57,26 +60,31 @@ func NewFlowHandler(processors []app.FlowProcessor, zmqAppQueue queue.QueueWrite
 		stashes:      make([]*Stash, nApps),
 		lastProcess:  time.Duration(time.Now().UnixNano()),
 		zmqAppQueue:  zmqAppQueue,
-		emitCounter:  make([]uint64, nApps),
+		emitCounter:  make([]uint64, nApps*2),
+		counterLatch: 0,
+		statItems:    make([]stats.StatItem, nApps),
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.stashes[i] = NewStash(DOCS_IN_BUFFER)
+		handler.statItems[i].Name = processors[i].GetName()
+		handler.statItems[i].StatType = stats.COUNT_TYPE
 	}
 	stats.RegisterCountable("flow_mapper", &handler)
 	return &handler
 }
 
 func (f *FlowHandler) GetCounter() interface{} {
-	counter := &flowAppStats{}
-	for i := 0; i < f.numberOfApps; i++ {
-		switch f.processors[i].GetName() {
-		case "EpcFlowTopo":
-			counter.EpcEmitCounter = f.emitCounter[i]
-			f.emitCounter[i] = 0
-			//TO DO: add other apps
-		}
+	oldLatch := f.counterLatch
+	if f.counterLatch == 0 {
+		f.counterLatch = f.numberOfApps
+	} else {
+		f.counterLatch = 0
 	}
-	return counter
+	for i := 0; i < f.numberOfApps; i++ {
+		f.statItems[i].Value = f.emitCounter[i+oldLatch]
+		f.emitCounter[i+oldLatch] = 0
+	}
+	return f.statItems
 }
 
 func (f *FlowHandler) putToQueue() {
@@ -85,7 +93,7 @@ func (f *FlowHandler) putToQueue() {
 		for _, doc := range docs {
 			f.zmqAppQueue.Put(doc)
 		}
-		f.emitCounter[i] += uint64(len(docs))
+		f.emitCounter[i+f.counterLatch] += uint64(len(docs))
 		stash.Clear()
 	}
 }

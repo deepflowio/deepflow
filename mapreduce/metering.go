@@ -1,24 +1,16 @@
 package mapreduce
 
 import (
-	"fmt"
-
 	"time"
 
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/usage"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
-	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
 func NewMeteringMapProcess(input queue.QueueWriter, output queue.MultiQueue, outputCount int) *MeteringHandler {
 	return NewMeteringHandler([]app.MeteringProcessor{usage.NewProcessor()}, input, output, outputCount)
-}
-
-type meteringAppStats struct {
-	UsageEmitCounter uint64 `statsd:"usage_doc"`
-	//TO DO: add other apps
 }
 
 type MeteringHandler struct {
@@ -50,7 +42,6 @@ type subHandler struct {
 	meteringQueue      queue.MultiQueue
 	meteringQueueCount int
 	zmqAppQueue        queue.QueueWriter
-	emitCounter        []uint64
 
 	queueIndex int
 }
@@ -63,37 +54,21 @@ func newSubHandler(processors []app.MeteringProcessor, output queue.QueueWriter,
 		lastProcess:   time.Duration(time.Now().UnixNano()),
 		stashes:       make([]*Stash, nApps),
 		zmqAppQueue:   output,
-		emitCounter:   make([]uint64, nApps),
 		meteringQueue: inputs,
 		queueIndex:    index,
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.stashes[i] = NewStash(DOCS_IN_BUFFER)
 	}
-	stats.RegisterCountable(fmt.Sprintf("metering_mapper_%d", index), &handler)
 	return &handler
 }
 
-func (f *subHandler) GetCounter() interface{} {
-	counter := &meteringAppStats{}
-	for i := 0; i < f.numberOfApps; i++ {
-		switch f.processors[i].GetName() {
-		case "BwusageIspUsageInfo":
-			counter.UsageEmitCounter = f.emitCounter[i]
-			f.emitCounter[i] = 0
-			//TO DO: add other apps
-		}
-	}
-	return counter
-}
-
 func (f *subHandler) putToQueue() {
-	for i, stash := range f.stashes {
+	for _, stash := range f.stashes {
 		docs := stash.Dump()
 		for _, doc := range docs {
 			f.zmqAppQueue.Put(doc)
 		}
-		f.emitCounter[i] += uint64(len(docs))
 		stash.Clear()
 	}
 }
