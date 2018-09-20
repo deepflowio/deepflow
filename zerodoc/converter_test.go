@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/google/gopacket/layers"
+
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 func TestFullEqual(t *testing.T) {
@@ -55,8 +57,9 @@ func TestFullEqual(t *testing.T) {
 	fromTag := f.NewTag(0xFFFFFFFFFFFFFFFF)
 	pb := TagToPB(fromTag)
 	toTag := PBToTag(pb)
-	if !fromTag.Equal(toTag) {
-		t.Error("Tag在序列化反序列化之后与原Tag不一致")
+	b := &utils.IntBuffer{}
+	if fromTag.GetID(b) != toTag.GetID(b) {
+		t.Error("Tag在序列化反序列化之后GetID与原Tag不一致")
 	}
 }
 
@@ -117,8 +120,9 @@ func TestPartialTagEqual(t *testing.T) {
 		fromTag := f.NewTag(code)
 		pb := TagToPB(fromTag)
 		toTag := PBToTag(pb)
-		if !fromTag.Equal(toTag) {
-			t.Errorf("Tag在序列化反序列化之后与原Tag不一致, Code=%d", code)
+		b := &utils.IntBuffer{}
+		if fromTag.GetID(b) != toTag.GetID(b) {
+			t.Errorf("Tag在序列化反序列化之后GetID与原Tag不一致, Code=%d", code)
 		}
 	}
 }
@@ -179,8 +183,9 @@ func TestCustomTagEqual(t *testing.T) {
 		fromTag := f.NewTag(code)
 		pb := TagToPB(fromTag)
 		toTag := PBToTag(pb)
-		if !fromTag.Equal(toTag) {
-			t.Errorf("Tag在序列化反序列化之后与原Tag不一致, Code=%d", code)
+		b := &utils.IntBuffer{}
+		if fromTag.GetID(b) != toTag.GetID(b) {
+			t.Errorf("Tag在序列化反序列化之后GetID与原Tag不一致, Code=%d", code)
 		}
 	}
 }

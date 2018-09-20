@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"github.com/google/gopacket/layers"
+
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	dt "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 )
 
@@ -79,8 +81,9 @@ func TestMarshal(t *testing.T) {
 
 	oldTag := doc.Tag.(*dt.Tag)
 	newTag := newDoc.Tag.(*dt.Tag)
-	if !oldTag.Equal(newTag) {
-		t.Error("Tag在序列化前后不匹配")
+	b := &utils.IntBuffer{}
+	if oldTag.GetID(b) != newTag.GetID(b) {
+		t.Error("Tag在序列化前后GetID不匹配")
 	}
 
 	if !reflect.DeepEqual(doc.Meter, newDoc.Meter) {
