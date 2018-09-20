@@ -151,6 +151,7 @@ enum Action {
     PACKECT_COUNTER_PUB = 8;
     FLOW_COUNTER_PUB = 9;
     TCP_PERFORMANCE_PUB = 10;
+    GEO = 11;
 }
 
 message Policy {
