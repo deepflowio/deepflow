@@ -270,24 +270,6 @@ func TestFlowMeterEqual(t *testing.T) {
 		SumNewFlowCount:    2,
 		SumClosedFlowCount: 3,
 
-		SumClosedFlowCountL0S1S:  4,
-		SumClosedFlowCountL1S5S:  5,
-		SumClosedFlowCountL5S10S: 6,
-		SumClosedFlowCountL10S1M: 7,
-		SumClosedFlowCountL1M1H:  8,
-		SumClosedFlowCountL1H:    9,
-
-		SumClosedFlowCountE0K10K:   10,
-		SumClosedFlowCountE10K100K: 11,
-		SumClosedFlowCountE100K1M:  12,
-		SumClosedFlowCountE1M100M:  13,
-		SumClosedFlowCountE100M1G:  14,
-		SumClosedFlowCountE1G:      15,
-
-		SumClosedFlowCountTRst:       16,
-		SumClosedFlowCountTHalfOpen:  17,
-		SumClosedFlowCountTHalfClose: 18,
-
 		MaxFlowCount:    19,
 		MaxNewFlowCount: 20,
 	}
@@ -325,13 +307,31 @@ func TestConsoleLogMeterEqual(t *testing.T) {
 	}
 }
 
-func TestIPDatabaseMeterEqual(t *testing.T) {
-	fromMeter := &IPDatabaseMeter{
-		SumBit:             12345,
-		SumClosedFlowCount: 3,
+func TestTypeMeterEqual(t *testing.T) {
+	fromMeter := &TypeMeter{
+		SumCountL0S1S:  4,
+		SumCountL1S5S:  5,
+		SumCountL5S10S: 6,
+		SumCountL10S1M: 7,
+		SumCountL1M1H:  8,
+		SumCountL1H:    9,
+
+		SumCountE0K10K:   10,
+		SumCountE10K100K: 11,
+		SumCountE100K1M:  12,
+		SumCountE1M100M:  13,
+		SumCountE100M1G:  14,
+		SumCountE1G:      15,
+
+		SumCountTClientRst:       16,
+		SumCountTClientHalfOpen:  17,
+		SumCountTClientHalfClose: 18,
+		SumCountTServerRst:       19,
+		SumCountTServerHalfOpen:  20,
+		SumCountTServerHalfClose: 21,
 	}
-	pb := IPDatabaseMeterToPB(fromMeter)
-	toMeter := PBToIPDatabaseMeter(pb)
+	pb := TypeMeterToPB(fromMeter)
+	toMeter := PBToTypeMeter(pb)
 	if !reflect.DeepEqual(fromMeter, toMeter) {
 		t.Error("Meter在序列化反序列化之后与原Meter不一致")
 	}

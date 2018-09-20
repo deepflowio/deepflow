@@ -404,24 +404,6 @@ func FlowMeterToPB(m *FlowMeter) *pb.FlowMeter {
 		SumNewFlowCount:    proto.Uint64(m.SumNewFlowCount),
 		SumClosedFlowCount: proto.Uint64(m.SumClosedFlowCount),
 
-		SumClosedFlowCountL_0S1S:  proto.Uint64(m.SumClosedFlowCountL0S1S),
-		SumClosedFlowCountL_1S5S:  proto.Uint64(m.SumClosedFlowCountL1S5S),
-		SumClosedFlowCountL_5S10S: proto.Uint64(m.SumClosedFlowCountL5S10S),
-		SumClosedFlowCountL_10S1M: proto.Uint64(m.SumClosedFlowCountL10S1M),
-		SumClosedFlowCountL_1M1H:  proto.Uint64(m.SumClosedFlowCountL1M1H),
-		SumClosedFlowCountL_1H:    proto.Uint64(m.SumClosedFlowCountL1H),
-
-		SumClosedFlowCountE_0K10K:   proto.Uint64(m.SumClosedFlowCountE0K10K),
-		SumClosedFlowCountE_10K100K: proto.Uint64(m.SumClosedFlowCountE10K100K),
-		SumClosedFlowCountE_100K1M:  proto.Uint64(m.SumClosedFlowCountE100K1M),
-		SumClosedFlowCountE_1M100M:  proto.Uint64(m.SumClosedFlowCountE1M100M),
-		SumClosedFlowCountE_100M1G:  proto.Uint64(m.SumClosedFlowCountE100M1G),
-		SumClosedFlowCountE_1G:      proto.Uint64(m.SumClosedFlowCountE1G),
-
-		SumClosedFlowCountTRst:       proto.Uint64(m.SumClosedFlowCountTRst),
-		SumClosedFlowCountTHalfOpen:  proto.Uint64(m.SumClosedFlowCountTHalfOpen),
-		SumClosedFlowCountTHalfClose: proto.Uint64(m.SumClosedFlowCountTHalfClose),
-
 		MaxFlowCount:    proto.Uint64(m.MaxFlowCount),
 		MaxNewFlowCount: proto.Uint64(m.MaxNewFlowCount),
 	}
@@ -432,24 +414,6 @@ func PBToFlowMeter(m *pb.FlowMeter) *FlowMeter {
 		SumFlowCount:       m.GetSumFlowCount(),
 		SumNewFlowCount:    m.GetSumNewFlowCount(),
 		SumClosedFlowCount: m.GetSumClosedFlowCount(),
-
-		SumClosedFlowCountL0S1S:  m.GetSumClosedFlowCountL_0S1S(),
-		SumClosedFlowCountL1S5S:  m.GetSumClosedFlowCountL_1S5S(),
-		SumClosedFlowCountL5S10S: m.GetSumClosedFlowCountL_5S10S(),
-		SumClosedFlowCountL10S1M: m.GetSumClosedFlowCountL_10S1M(),
-		SumClosedFlowCountL1M1H:  m.GetSumClosedFlowCountL_1M1H(),
-		SumClosedFlowCountL1H:    m.GetSumClosedFlowCountL_1H(),
-
-		SumClosedFlowCountE0K10K:   m.GetSumClosedFlowCountE_0K10K(),
-		SumClosedFlowCountE10K100K: m.GetSumClosedFlowCountE_10K100K(),
-		SumClosedFlowCountE100K1M:  m.GetSumClosedFlowCountE_100K1M(),
-		SumClosedFlowCountE1M100M:  m.GetSumClosedFlowCountE_1M100M(),
-		SumClosedFlowCountE100M1G:  m.GetSumClosedFlowCountE_100M1G(),
-		SumClosedFlowCountE1G:      m.GetSumClosedFlowCountE_1G(),
-
-		SumClosedFlowCountTRst:       m.GetSumClosedFlowCountTRst(),
-		SumClosedFlowCountTHalfOpen:  m.GetSumClosedFlowCountTHalfOpen(),
-		SumClosedFlowCountTHalfClose: m.GetSumClosedFlowCountTHalfClose(),
 
 		MaxFlowCount:    m.GetMaxFlowCount(),
 		MaxNewFlowCount: m.GetMaxNewFlowCount(),
@@ -490,16 +454,52 @@ func PBToConsoleLogMeter(m *pb.ConsoleLogMeter) *ConsoleLogMeter {
 	}
 }
 
-func IPDatabaseMeterToPB(m *IPDatabaseMeter) *pb.IpDatabaseMeter {
-	return &pb.IpDatabaseMeter{
-		SumBit:             proto.Uint64(m.SumBit),
-		SumClosedFlowCount: proto.Uint64(m.SumClosedFlowCount),
+func TypeMeterToPB(m *TypeMeter) *pb.TypeMeter {
+	return &pb.TypeMeter{
+		SumCountL_0S1S:  proto.Uint64(m.SumCountL0S1S),
+		SumCountL_1S5S:  proto.Uint64(m.SumCountL1S5S),
+		SumCountL_5S10S: proto.Uint64(m.SumCountL5S10S),
+		SumCountL_10S1M: proto.Uint64(m.SumCountL10S1M),
+		SumCountL_1M1H:  proto.Uint64(m.SumCountL1M1H),
+		SumCountL_1H:    proto.Uint64(m.SumCountL1H),
+
+		SumCountE_0K10K:   proto.Uint64(m.SumCountE0K10K),
+		SumCountE_10K100K: proto.Uint64(m.SumCountE10K100K),
+		SumCountE_100K1M:  proto.Uint64(m.SumCountE100K1M),
+		SumCountE_1M100M:  proto.Uint64(m.SumCountE1M100M),
+		SumCountE_100M1G:  proto.Uint64(m.SumCountE100M1G),
+		SumCountE_1G:      proto.Uint64(m.SumCountE1G),
+
+		SumCountTCRst:       proto.Uint64(m.SumCountTClientRst),
+		SumCountTCHalfOpen:  proto.Uint64(m.SumCountTClientHalfOpen),
+		SumCountTCHalfClose: proto.Uint64(m.SumCountTClientHalfClose),
+		SumCountTSRst:       proto.Uint64(m.SumCountTServerRst),
+		SumCountTSHalfOpen:  proto.Uint64(m.SumCountTServerHalfOpen),
+		SumCountTSHalfClose: proto.Uint64(m.SumCountTServerHalfClose),
 	}
 }
 
-func PBToIPDatabaseMeter(m *pb.IpDatabaseMeter) *IPDatabaseMeter {
-	return &IPDatabaseMeter{
-		SumBit:             m.GetSumBit(),
-		SumClosedFlowCount: m.GetSumClosedFlowCount(),
+func PBToTypeMeter(m *pb.TypeMeter) *TypeMeter {
+	return &TypeMeter{
+		SumCountL0S1S:  m.GetSumCountL_0S1S(),
+		SumCountL1S5S:  m.GetSumCountL_1S5S(),
+		SumCountL5S10S: m.GetSumCountL_5S10S(),
+		SumCountL10S1M: m.GetSumCountL_10S1M(),
+		SumCountL1M1H:  m.GetSumCountL_1M1H(),
+		SumCountL1H:    m.GetSumCountL_1H(),
+
+		SumCountE0K10K:   m.GetSumCountE_0K10K(),
+		SumCountE10K100K: m.GetSumCountE_10K100K(),
+		SumCountE100K1M:  m.GetSumCountE_100K1M(),
+		SumCountE1M100M:  m.GetSumCountE_1M100M(),
+		SumCountE100M1G:  m.GetSumCountE_100M1G(),
+		SumCountE1G:      m.GetSumCountE_1G(),
+
+		SumCountTClientRst:       m.GetSumCountTCRst(),
+		SumCountTClientHalfOpen:  m.GetSumCountTCHalfOpen(),
+		SumCountTClientHalfClose: m.GetSumCountTCHalfClose(),
+		SumCountTServerRst:       m.GetSumCountTSRst(),
+		SumCountTServerHalfOpen:  m.GetSumCountTSHalfOpen(),
+		SumCountTServerHalfClose: m.GetSumCountTSHalfClose(),
 	}
 }

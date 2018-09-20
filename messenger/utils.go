@@ -29,8 +29,8 @@ func Marshal(doc *app.Document) ([]byte, error) {
 		msgType = MSG_PLATFORM
 	case *dt.ConsoleLogMeter:
 		msgType = MSG_CONSOLE_LOG
-	case *dt.IPDatabaseMeter:
-		msgType = MSG_IP_DATABASE
+	case *dt.TypeMeter:
+		msgType = MSG_TYPE
 	default:
 		return nil, fmt.Errorf("Unknown supported type %T", v)
 	}
@@ -65,9 +65,9 @@ func Marshal(doc *app.Document) ([]byte, error) {
 	case MSG_CONSOLE_LOG:
 		meter := doc.Meter.(*dt.ConsoleLogMeter)
 		msg.Meter.ConsoleLog = dt.ConsoleLogMeterToPB(meter)
-	case MSG_IP_DATABASE:
-		meter := doc.Meter.(*dt.IPDatabaseMeter)
-		msg.Meter.IpDatabase = dt.IPDatabaseMeterToPB(meter)
+	case MSG_TYPE:
+		meter := doc.Meter.(*dt.TypeMeter)
+		msg.Meter.Type = dt.TypeMeterToPB(meter)
 	}
 
 	b, err := proto.Marshal(msg)
@@ -105,8 +105,8 @@ func Unmarshal(b []byte) (*app.Document, error) {
 		doc.Meter = dt.PBToPlatformMeter(meter.GetPlatform())
 	case meter.GetConsoleLog() != nil:
 		doc.Meter = dt.PBToConsoleLogMeter(meter.GetConsoleLog())
-	case meter.GetIpDatabase() != nil:
-		doc.Meter = dt.PBToIPDatabaseMeter(meter.GetIpDatabase())
+	case meter.GetType() != nil:
+		doc.Meter = dt.PBToTypeMeter(meter.GetType())
 	}
 
 	return doc, nil
