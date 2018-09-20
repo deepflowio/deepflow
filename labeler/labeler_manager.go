@@ -141,7 +141,7 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *data
 func (l *LabelerManager) run(index int) {
 	meteringQueues := l.appQueues[QUEUE_TYPE_METERING]
 	flowQueues := l.appQueues[QUEUE_TYPE_FLOW]
-	size := 4096
+	size := 1024 * 16
 	userId := queue.HashKey(index)
 	meteringKeys := make([]queue.HashKey, 0, size+1)
 	meteringKeys = append(meteringKeys, userId)
@@ -157,12 +157,12 @@ func (l *LabelerManager) run(index int) {
 			metaPacket := item.(*datatype.MetaPacket)
 			action := l.GetPolicy(metaPacket, index)
 			if (action.ActionList & datatype.ACTION_PACKET_STAT) != 0 {
-				meteringItemBatch = append(meteringItemBatch, metaPacket)
 				meteringKeys = append(meteringKeys, queue.HashKey(metaPacket.Hash))
+				meteringItemBatch = append(meteringItemBatch, metaPacket)
 			}
 			if (action.ActionList & datatype.ACTION_FLOW_STAT) != 0 {
-				flowItemBatch = append(flowItemBatch, metaPacket)
 				flowKeys = append(flowKeys, queue.HashKey(metaPacket.Hash))
+				flowItemBatch = append(flowItemBatch, metaPacket)
 			}
 		}
 		if len(meteringItemBatch) > 0 {

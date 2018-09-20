@@ -22,8 +22,7 @@ import (
 const (
 	LISTEN_PORT = 20033
 	CACHE_SIZE  = 16
-	QUEUE_MAX   = 16
-	PACKET_MAX  = 200
+	PACKET_MAX  = 256
 )
 
 const (
@@ -55,14 +54,13 @@ type tridentInstance struct {
 type MetaPacketBlock = [1024]datatype.MetaPacket
 
 type TridentAdapter struct {
-	queues          queue.MultiQueueWriter
-	queueCount      int
-	hashBuffers     [QUEUE_MAX][PACKET_MAX]interface{}
-	hashBufferCount [QUEUE_MAX]int
-	metaPacketPool  sync.Pool
-	udpPool         sync.Pool
-	block           *MetaPacketBlock
-	blockCursor     int
+	queues         queue.MultiQueueWriter
+	itemKeys       []queue.HashKey
+	itemBatch      []interface{}
+	metaPacketPool sync.Pool
+	udpPool        sync.Pool
+	block          *MetaPacketBlock
+	blockCursor    int
 
 	instances map[TridentKey]*tridentInstance
 	counter   *PacketCounter
@@ -72,12 +70,14 @@ type TridentAdapter struct {
 	listener *net.UDPConn
 }
 
-func NewTridentAdapter(queues queue.MultiQueueWriter, count int) *TridentAdapter {
+func NewTridentAdapter(queues queue.MultiQueueWriter) *TridentAdapter {
 	adapter := &TridentAdapter{}
 	adapter.counter = &PacketCounter{}
 	adapter.stats = &PacketCounter{}
 	adapter.queues = queues
-	adapter.queueCount = count
+	adapter.itemKeys = make([]queue.HashKey, 0, PACKET_MAX+1)
+	adapter.itemKeys = append(adapter.itemKeys, queue.HashKey(0))
+	adapter.itemBatch = make([]interface{}, PACKET_MAX)
 	adapter.instances = make(map[TridentKey]*tridentInstance)
 	adapter.udpPool.New = func() interface{} { return make([]byte, UDP_BUFFER_SIZE) }
 	adapter.metaPacketPool.New = func() interface{} {
@@ -197,19 +197,16 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) {
 
 		a.counter.TxPackets++
 		a.stats.TxPackets++
-		hash := meta.GenerateHash()
-		index := hash % uint32(a.queueCount)
-		a.hashBuffers[index][a.hashBufferCount[index]] = meta
-		a.hashBufferCount[index]++
+		a.itemKeys = append(a.itemKeys, queue.HashKey(meta.GenerateHash()))
+		a.itemBatch = append(a.itemBatch, meta)
 	}
 
-	for index := 0; index < a.queueCount; index++ {
-		count := a.hashBufferCount[index]
-		if count > 0 {
-			a.queues.Put(queue.HashKey(index), a.hashBuffers[index][:count]...)
-			a.hashBufferCount[index] = 0
-		}
+	if len(a.itemBatch) > 0 {
+		a.queues.Puts(a.itemKeys, a.itemBatch)
+		a.itemKeys = a.itemKeys[:1]
+		a.itemBatch = a.itemBatch[:0]
 	}
+
 	a.udpPool.Put(data)
 }
 
