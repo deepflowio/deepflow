@@ -21,20 +21,21 @@ type Transaction struct {
 }
 
 type Counter struct {
-	in          uint64
-	out         uint64
-	overwritten uint64
+	In          uint64 `statsd:"in,count"`
+	Out         uint64 `statsd:"in,count"`
+	Overwritten uint64 `statsd:"in,gauge"`
 }
 
-type OverwriteQueue struct { // XXX: use circle array
+type OverwriteQueue struct {
 	sync.Mutex
-	Counter
 
-	items    []interface{}
-	waiting  []Transaction
-	size     uint // power of 2
-	putIndex uint
-	pending  uint
+	items       []interface{}
+	waiting     []Transaction
+	size        uint // power of 2
+	writeCursor uint
+	pending     uint
+
+	counter *Counter
 }
 
 func NewOverwriteQueue(module string, size int) Queue {
@@ -57,21 +58,15 @@ func (q *OverwriteQueue) Init(module string, size int, statOptions ...stats.Stat
 	q.items = make([]interface{}, size)
 	q.waiting = make([]Transaction, 0, 10)
 	q.size = uint(size)
+	q.counter = &Counter{}
 	stats.RegisterCountable(module, q, statOptions...)
 	runtime.SetFinalizer(q, func(q *OverwriteQueue) { q.Release() })
 }
 
 func (q *OverwriteQueue) GetCounter() interface{} {
-	q.Lock()
-	statItems := []stats.StatItem{
-		stats.StatItem{"pending", stats.GAUGE_TYPE, q.pending},
-		stats.StatItem{"overwritten", stats.COUNT_TYPE, q.overwritten},
-		stats.StatItem{"in", stats.COUNT_TYPE, q.in},
-		stats.StatItem{"out", stats.COUNT_TYPE, q.out},
-	}
-	q.Counter = Counter{}
-	q.Unlock()
-	return statItems
+	var counter *Counter
+	counter, q.counter = q.counter, &Counter{}
+	return counter
 }
 
 func (q *OverwriteQueue) Release() {
@@ -79,7 +74,7 @@ func (q *OverwriteQueue) Release() {
 }
 
 func (q *OverwriteQueue) firstIndex() uint {
-	return (q.putIndex + q.size - q.pending) & (q.size - 1)
+	return (q.writeCursor + q.size - q.pending) & (q.size - 1)
 }
 
 // 获取队列等待处理的元素数量
@@ -95,18 +90,18 @@ func (q *OverwriteQueue) Put(items ...interface{}) error {
 	}
 
 	q.Lock()
-	q.in += uint64(itemSize)
-	if copied := copy(q.items[q.putIndex:], items); uint(copied) != itemSize {
+	q.counter.In += uint64(itemSize)
+	if copied := copy(q.items[q.writeCursor:], items); uint(copied) != itemSize {
 		copy(q.items, items[copied:])
 	}
 
 	freeSize := (q.size - q.pending)
 	if itemSize > freeSize {
-		q.overwritten += uint64(itemSize - freeSize)
+		q.counter.Overwritten += uint64(itemSize - freeSize)
 	}
 
 	q.pending = UintMin(q.pending+itemSize, q.size)
-	q.putIndex = (q.putIndex + itemSize) & (q.size - 1)
+	q.writeCursor = (q.writeCursor + itemSize) & (q.size - 1)
 	for len(q.waiting) > 0 {
 		wait := &q.waiting[len(q.waiting)-1]
 		q.waiting = q.waiting[:len(q.waiting)-1]
@@ -124,7 +119,7 @@ func (q *OverwriteQueue) Put(items ...interface{}) error {
 func (q *OverwriteQueue) get() interface{} {
 	items := q.items[q.firstIndex()]
 	q.pending--
-	q.out++
+	q.counter.Out++
 	return items
 }
 
@@ -156,7 +151,7 @@ func (q *OverwriteQueue) gets(output []interface{}) uint {
 		copy(output[copied:], q.items)
 	}
 	q.pending -= size
-	q.out += uint64(size)
+	q.counter.Out += uint64(size)
 	return size
 }
 
