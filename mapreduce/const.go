@@ -1,8 +1,8 @@
 package mapreduce
 
-import "time"
-
 const (
-	DOCS_IN_BUFFER = 1024
-	minute         = int(time.Minute / time.Second)
+	DOCS_IN_BUFFER = 1 << 16 // FIXME: 放到配置文件中
+	WINDOW_SIZE    = 60 * 3  // 3分钟
+
+	QUEUE_BATCH_SIZE = 4096
 )

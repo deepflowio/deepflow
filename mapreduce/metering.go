@@ -58,7 +58,7 @@ func newSubHandler(processors []app.MeteringProcessor, output queue.QueueWriter,
 		queueIndex:    index,
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
-		handler.stashes[i] = NewStash(DOCS_IN_BUFFER)
+		handler.stashes[i] = NewStash(DOCS_IN_BUFFER, WINDOW_SIZE)
 	}
 	return &handler
 }
@@ -66,8 +66,12 @@ func newSubHandler(processors []app.MeteringProcessor, output queue.QueueWriter,
 func (f *subHandler) putToQueue() {
 	for _, stash := range f.stashes {
 		docs := stash.Dump()
-		for _, doc := range docs {
-			f.zmqAppQueue.Put(doc)
+		for i := 0; i < len(docs); i += QUEUE_BATCH_SIZE {
+			if i+QUEUE_BATCH_SIZE <= len(docs) {
+				f.zmqAppQueue.Put(docs[i : i+QUEUE_BATCH_SIZE]...)
+			} else {
+				f.zmqAppQueue.Put(docs[i:]...)
+			}
 		}
 		stash.Clear()
 	}
@@ -89,8 +93,7 @@ func (f *MeteringHandler) Start() {
 }
 
 func (f *subHandler) Process() error {
-	batchSize := 4096
-	elements := make([]interface{}, batchSize)
+	elements := make([]interface{}, QUEUE_BATCH_SIZE)
 
 	for {
 		n := f.meteringQueue.Gets(queue.HashKey(f.queueIndex), elements)
@@ -114,17 +117,18 @@ func (f *subHandler) Process() error {
 				continue
 			}
 
-			flush := false
 			for i, processor := range f.processors {
-				f.stashes[i].Add(processor.Process(*metering, false)...)
-				if f.stashes[i].Full() {
-					flush = true
+				docs := processor.Process(*metering, false)
+				for {
+					docs = f.stashes[i].Add(docs)
+					if docs == nil {
+						break
+					}
+					f.Flush()
 				}
 			}
-			if flush {
-				f.Flush()
-			}
 		}
+		f.lastProcess = time.Duration(time.Now().UnixNano())
 	}
 }
 

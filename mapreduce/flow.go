@@ -65,7 +65,7 @@ func NewFlowHandler(processors []app.FlowProcessor, zmqAppQueue queue.QueueWrite
 		statItems:    make([]stats.StatItem, nApps),
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
-		handler.stashes[i] = NewStash(DOCS_IN_BUFFER)
+		handler.stashes[i] = NewStash(DOCS_IN_BUFFER, WINDOW_SIZE)
 		handler.statItems[i].Name = processors[i].GetName()
 		handler.statItems[i].StatType = stats.COUNT_TYPE
 	}
@@ -90,8 +90,12 @@ func (f *FlowHandler) GetCounter() interface{} {
 func (f *FlowHandler) putToQueue() {
 	for i, stash := range f.stashes {
 		docs := stash.Dump()
-		for _, doc := range docs {
-			f.zmqAppQueue.Put(doc)
+		for j := 0; j < len(docs); j += QUEUE_BATCH_SIZE {
+			if j+QUEUE_BATCH_SIZE <= len(docs) {
+				f.zmqAppQueue.Put(docs[j : j+QUEUE_BATCH_SIZE]...)
+			} else {
+				f.zmqAppQueue.Put(docs[j:]...)
+			}
 		}
 		f.emitCounter[i+f.counterLatch] += uint64(len(docs))
 		stash.Clear()
@@ -127,21 +131,19 @@ func isValidFlow(flow datatype.TaggedFlow) bool {
 }
 
 func (f *FlowHandler) Process(flow datatype.TaggedFlow) error {
-	flush := false
-
 	if !isValidFlow(flow) {
 		return errors.New("flow timestamp incorrect and droped")
 	}
 
 	for i, processor := range f.processors {
-		f.stashes[i].Add(processor.Process(flow, false)...)
-		if f.stashes[i].Full() {
-			flush = true
+		docs := processor.Process(flow, false)
+		for {
+			docs = f.stashes[i].Add(docs)
+			if docs == nil {
+				break
+			}
+			f.Flush()
 		}
-	}
-
-	if flush {
-		f.Flush()
 	}
 
 	f.lastProcess = time.Duration(time.Now().UnixNano())
