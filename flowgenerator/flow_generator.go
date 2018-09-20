@@ -580,7 +580,7 @@ func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, cfg
 		stateMachineMaster:      make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
 		stateMachineSlave:       make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
 		innerFlowKey:            &FlowKey{},
-		packetHandler:           &PacketHandler{recvBuffer: make([]interface{}, cfg.BufferSize/2), processBuffer: make([]interface{}, cfg.BufferSize/2)},
+		packetHandler:           &PacketHandler{recvBuffer: make([]interface{}, cfg.BufferSize), processBuffer: make([]interface{}, cfg.BufferSize)},
 		servicePortDescriptor:   getServiceDescriptorWithIANA(),
 		forceReportInterval:     cfg.ForceReportInterval,
 		minLoopInterval:         defaultTimeoutConfig.minTimeout(),

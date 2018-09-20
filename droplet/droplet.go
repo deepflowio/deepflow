@@ -78,7 +78,7 @@ func Start(configPath string) {
 	manager := queue.NewManager()
 	queueSize := int(cfg.Queue.QueueSize)
 	labelerQueueCount := int(cfg.Queue.LabelerQueueCount)
-	packetSourceCount := 1 + len(cfg.TapInterfaces)
+	packetSourceCount := 1 // Only adapter will use MultiQueue.Puts
 	labelerQueues := manager.NewQueues("1-meta-packet-to-labeler", queueSize, labelerQueueCount, packetSourceCount)
 
 	localIp, err := getLocalIp()
@@ -93,7 +93,7 @@ func Start(configPath string) {
 		}
 	}
 
-	tridentAdapter := adapter.NewTridentAdapter(labelerQueues, labelerQueueCount)
+	tridentAdapter := adapter.NewTridentAdapter(labelerQueues)
 	if tridentAdapter == nil {
 		return
 	}
@@ -105,7 +105,7 @@ func Start(configPath string) {
 	flowGeneratorQueues := manager.NewQueues("2-meta-packet-to-flow-generator", queueSize, flowGeneratorQueueCount, labelerQueueCount)
 	meteringAppQueues := manager.NewQueues("2-meta-packet-to-metering-app", queueSize, meteringAppQueueCount, labelerQueueCount)
 
-	labelerManager := labeler.NewLabelerManager(labelerQueues, int(labeler.QUEUE_TYPE_MAX), cfg.Labeler.MapSizeLimit)
+	labelerManager := labeler.NewLabelerManager(labelerQueues, labelerQueueCount, cfg.Labeler.MapSizeLimit)
 	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_FLOW, flowGeneratorQueues)
 	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_METERING, meteringAppQueues)
 	labelerManager.Start()
@@ -130,7 +130,7 @@ func Start(configPath string) {
 	}
 	flowGeneratorConfig := flowgenerator.FlowGeneratorConfig{
 		ForceReportInterval: cfg.FlowGenerator.ForceReportInterval,
-		BufferSize:          queueSize,
+		BufferSize:          queueSize / flowGeneratorQueueCount,
 		FlowLimitNum:        cfg.FlowGenerator.FlowCountLimit / uint32(flowGeneratorQueueCount),
 	}
 	for i := 0; i < flowGeneratorQueueCount; i++ {
