@@ -161,7 +161,7 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32) {
 			a.counter.RxError += 1
 			a.stats.RxError += 1
 			a.udpPool.Put(data)
-			log.Warningf("trident(%v) seq is less than current, drop", key)
+			log.Warningf("trident (key=%v) seq %d is less than current %d, drop", key, seq, instance.seq)
 			return
 		}
 		offset := seq - instance.seq - 1

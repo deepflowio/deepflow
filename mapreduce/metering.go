@@ -1,7 +1,6 @@
 package mapreduce
 
 import (
-	"errors"
 	"fmt"
 
 	"time"
@@ -99,20 +98,10 @@ func (f *subHandler) putToQueue() {
 	}
 }
 
-func isValidMetering(metering datatype.MetaPacket) bool {
-	meteringTime := metering.Timestamp
-	curTime := time.Duration(time.Now().UnixNano())
-	if meteringTime == 0 || meteringTime > curTime {
-		return false
-	}
-	return true
-}
-
 func (f *MeteringHandler) startTicker() {
 	for range time.NewTicker(time.Minute).C {
-		flushMetering := datatype.MetaPacket{Timestamp: 0}
 		for i := 0; i < f.meteringQueueCount; i++ {
-			f.meteringQueue.Put(queue.HashKey(i), &flushMetering)
+			f.meteringQueue.Put(queue.HashKey(i), nil)
 		}
 	}
 }
@@ -125,27 +114,41 @@ func (f *MeteringHandler) Start() {
 }
 
 func (f *subHandler) Process() error {
+	batchSize := 4096
+	elements := make([]interface{}, batchSize)
+
 	for {
-		metering := f.meteringQueue.Get(queue.HashKey(f.queueIndex)).(*datatype.MetaPacket)
-		if metering.Timestamp == 0 && f.NeedFlush() {
-			f.Flush()
-		}
-
-		if !isValidMetering(*metering) {
-			return errors.New("flow timestamp incorrect and droped")
-		}
-
-		flush := false
-
-		for i, processor := range f.processors {
-			f.stashes[i].Add(processor.Process(*metering, false)...)
-			if f.stashes[i].Full() {
-				flush = true
+		n := f.meteringQueue.Gets(queue.HashKey(f.queueIndex), elements)
+		for _, e := range elements[:n] {
+			if e == nil { // tick
+				if f.NeedFlush() {
+					f.Flush()
+				}
+				continue
 			}
-		}
 
-		if flush {
-			f.Flush()
+			metering := e.(*datatype.MetaPacket)
+			if metering.PolicyData == nil || metering.EndpointData == nil { // shouldn't happen
+				log.Warningf("drop invalid packet with nil PolicyData or EndpointData %v", metering)
+				continue
+			}
+			now := time.Duration(time.Now().UnixNano())
+			if metering.Timestamp > now+time.Minute {
+				log.Infof("drop invalid packet with a future timestamp (+%s)", metering.Timestamp-now)
+				// FIXME: add statsd counter, remove log
+				continue
+			}
+
+			flush := false
+			for i, processor := range f.processors {
+				f.stashes[i].Add(processor.Process(*metering, false)...)
+				if f.stashes[i].Full() {
+					flush = true
+				}
+			}
+			if flush {
+				f.Flush()
+			}
 		}
 	}
 }
