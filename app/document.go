@@ -2,10 +2,12 @@ package app
 
 import (
 	"fmt"
+
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 type Tag interface {
-	GetID() string
+	GetID(*utils.IntBuffer) string
 	HasVariedField() bool
 	ToKVString() string
 	String() string

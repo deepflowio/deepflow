@@ -334,145 +334,109 @@ func (t *Tag) String() string {
 	return buf.String()
 }
 
-func (t *Tag) GetID() string {
+func (t *Tag) GetID(buf *utils.IntBuffer) string {
 	if t.id == "" {
-		var buf strings.Builder
+		buf.Reset()
+
+		buf.WriteU64(uint64(t.Code))
+
 		if t.Code&IP != 0 {
-			buf.WriteString(strconv.FormatInt(int64(t.IP), 16))
-			buf.WriteRune(' ')
+			buf.WriteU32(t.IP)
 		}
 		if t.Code&MAC != 0 {
-			buf.WriteString(strconv.FormatInt(int64(t.MAC), 16))
-			buf.WriteRune(' ')
+			buf.WriteU48(t.MAC)
 		}
 		if t.Code&GroupID != 0 {
-			buf.WriteString(strconv.Itoa(t.GroupID))
-			buf.WriteRune(' ')
+			buf.WriteU24(uint32(t.GroupID)) // 24bit
 		}
 		if t.Code&L2EpcID != 0 {
-			buf.WriteString(strconv.Itoa(t.L2EpcID))
-			buf.WriteRune(' ')
+			buf.WriteU32(uint32(t.L2EpcID))
 		}
 		if t.Code&L3EpcID != 0 {
-			buf.WriteString(strconv.Itoa(t.L3EpcID))
-			buf.WriteRune(' ')
+			buf.WriteU32(uint32(t.L3EpcID))
 		}
 		if t.Code&L2Device != 0 {
-			buf.WriteString(strconv.Itoa(t.L2DeviceID))
-			buf.WriteRune(' ')
-			buf.WriteString(strconv.Itoa(int(t.L2DeviceType)))
-			buf.WriteRune(' ')
+			buf.WriteU32(uint32(t.L2DeviceID))
+			buf.WriteU8(uint8(t.L2DeviceType))
 		}
 		if t.Code&L3Device != 0 {
-			buf.WriteString(strconv.Itoa(t.L3DeviceID))
-			buf.WriteRune(' ')
-			buf.WriteString(strconv.Itoa(int(t.L3DeviceType)))
-			buf.WriteRune(' ')
+			buf.WriteU32(uint32(t.L3DeviceID))
+			buf.WriteU8(uint8(t.L3DeviceType))
 		}
 
 		if t.Code&IPPath != 0 {
-			buf.WriteString(strconv.FormatInt(int64(t.IP0), 16))
-			buf.WriteRune(' ')
-			buf.WriteString(strconv.FormatInt(int64(t.IP1), 16))
-			buf.WriteRune(' ')
+			buf.WriteU32(t.IP0)
+			buf.WriteU32(t.IP1)
 		}
 		if t.Code&MACPath != 0 {
-			buf.WriteString(strconv.FormatInt(int64(t.MAC0), 16))
-			buf.WriteRune(' ')
-			buf.WriteString(strconv.FormatInt(int64(t.MAC1), 16))
-			buf.WriteRune(' ')
+			buf.WriteU48(t.MAC0)
+			buf.WriteU48(t.MAC1)
 		}
 		if t.Code&GroupIDPath != 0 {
-			buf.WriteString(strconv.Itoa(t.GroupID0))
-			buf.WriteRune(' ')
-			buf.WriteString(strconv.Itoa(t.GroupID1))
-			buf.WriteRune(' ')
+			buf.WriteU24(uint32(t.GroupID0)) // 24bit
+			buf.WriteU24(uint32(t.GroupID1)) // 24bit
 		}
 		if t.Code&L2EpcIDPath != 0 {
-			buf.WriteString(strconv.Itoa(t.L2EpcID0))
-			buf.WriteRune(' ')
-			buf.WriteString(strconv.Itoa(t.L2EpcID1))
-			buf.WriteRune(' ')
+			buf.WriteU32(uint32(t.L2EpcID0))
+			buf.WriteU32(uint32(t.L2EpcID1))
 		}
 		if t.Code&L3EpcIDPath != 0 {
-			buf.WriteString(strconv.Itoa(t.L3EpcID0))
-			buf.WriteRune(' ')
-			buf.WriteString(strconv.Itoa(t.L3EpcID1))
-			buf.WriteRune(' ')
+			buf.WriteU32(uint32(t.L3EpcID0))
+			buf.WriteU32(uint32(t.L3EpcID1))
 		}
 		if t.Code&L2DevicePath != 0 {
-			buf.WriteString(strconv.Itoa(t.L2DeviceID0))
-			buf.WriteRune(' ')
-			buf.WriteString(strconv.Itoa(int(t.L2DeviceType0)))
-			buf.WriteRune(' ')
-			buf.WriteString(strconv.Itoa(t.L2DeviceID1))
-			buf.WriteRune(' ')
-			buf.WriteString(strconv.Itoa(int(t.L2DeviceType1)))
-			buf.WriteRune(' ')
+			buf.WriteU32(uint32(t.L2DeviceID0))
+			buf.WriteU8(uint8(t.L2DeviceType0))
+			buf.WriteU32(uint32(t.L2DeviceID1))
+			buf.WriteU8(uint8(t.L2DeviceType1))
 		}
 		if t.Code&L3DevicePath != 0 {
-			buf.WriteString(strconv.Itoa(t.L3DeviceID0))
-			buf.WriteRune(' ')
-			buf.WriteString(strconv.Itoa(int(t.L3DeviceType0)))
-			buf.WriteRune(' ')
-			buf.WriteString(strconv.Itoa(t.L3DeviceID1))
-			buf.WriteRune(' ')
-			buf.WriteString(strconv.Itoa(int(t.L3DeviceType1)))
-			buf.WriteRune(' ')
+			buf.WriteU32(uint32(t.L3DeviceID0))
+			buf.WriteU8(uint8(t.L3DeviceType0))
+			buf.WriteU32(uint32(t.L3DeviceID1))
+			buf.WriteU8(uint8(t.L3DeviceType1))
 		}
 
 		if t.Code&Direction != 0 {
-			buf.WriteString(strconv.Itoa(int(t.Direction)))
-			buf.WriteRune(' ')
+			buf.WriteU8(uint8(t.Direction))
 		}
 		if t.Code&Policy != 0 {
-			buf.WriteString(strconv.Itoa(int(t.PolicyType)))
-			buf.WriteRune(' ')
-			buf.WriteString(strconv.Itoa(t.PolicyID))
-			buf.WriteRune(' ')
+			buf.WriteU8(uint8(t.PolicyType))
+			buf.WriteU24(uint32(t.PolicyID)) // 24bit
 		}
 		if t.Code&VLANID != 0 {
-			buf.WriteString(strconv.Itoa(t.VLANID))
-			buf.WriteRune(' ')
+			buf.WriteU16(uint16(t.VLANID))
 		}
 		if t.Code&Protocol != 0 {
-			buf.WriteString(strconv.Itoa(int(t.Protocol)))
-			buf.WriteRune(' ')
+			buf.WriteU8(uint8(t.Protocol))
 		}
 		if t.Code&ServerPort != 0 {
-			buf.WriteString(strconv.Itoa(t.ServerPort))
-			buf.WriteRune(' ')
+			buf.WriteU16(uint16(t.ServerPort))
 		}
 		if t.Code&Host != 0 {
-			buf.WriteString(strconv.FormatInt(int64(t.Host), 16))
-			buf.WriteRune(' ')
+			buf.WriteU32(t.Host)
 		}
 		if t.Code&VTAP != 0 {
-			buf.WriteString(strconv.FormatInt(int64(t.VTAP), 16))
-			buf.WriteRune(' ')
+			buf.WriteU32(t.VTAP)
 		}
 		if t.Code&TAPType != 0 {
-			buf.WriteString(strconv.Itoa(int(t.TAPType)))
-			buf.WriteRune(' ')
+			buf.WriteU8(uint8(t.TAPType))
 		}
 		if t.Code&SubnetID != 0 {
-			buf.WriteString(strconv.Itoa(t.SubnetID))
-			buf.WriteRune(' ')
+			buf.WriteU32(uint32(t.SubnetID))
 		}
 		if t.Code&ACLID != 0 {
-			buf.WriteString(strconv.Itoa(t.ACLID))
-			buf.WriteRune(' ')
+			buf.WriteU24(uint32(t.ACLID)) // 24bit
 		}
 		if t.CustomFields != nil {
 			for i := 0; i < CustomFieldNumber; i++ {
 				code := 1 << uint(i+64-CustomFieldNumber)
 				if t.Code&Code(code) != 0 && t.CustomFields[i] != nil {
+					buf.WriteU8(uint8(32)) // space
 					buf.WriteString(t.CustomFields[i].Value)
-					buf.WriteRune(' ')
 				}
 			}
 		}
-		buf.WriteString(strconv.Itoa(int(t.Code)))
 
 		t.id = buf.String()
 	}
@@ -481,8 +445,4 @@ func (t *Tag) GetID() string {
 
 func (t *Tag) HasVariedField() bool {
 	return t.Code&ServerPort != 0
-}
-
-func (t *Tag) Equal(other *Tag) bool {
-	return t.GetID() == other.GetID()
 }
