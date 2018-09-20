@@ -16,7 +16,6 @@ import (
 
 var log = logging.MustGetLogger("stats")
 
-var minInterval = time.Second
 var remote = net.ParseIP("127.0.0.1")
 
 const (
@@ -47,13 +46,10 @@ func registerCountable(module string, countable Countable, opts ...StatsOption) 
 	options := []statsd.Option{statsd.Prefix(strings.Replace(module, "-", "_", -1))}
 	for _, opt := range opts {
 		if tags, ok := opt.(OptionStatTags); ok {
-			tagsOption := make([]string, len(tags)*2)
-			index := 0
+			tagsOption := make([]string, 0, len(tags)*2+2)
 			for key, value := range tags {
-				tagsOption[index] = key
 				// colon represent as start of value and unescapable in statsd
-				tagsOption[index+1] = strings.Replace(value, ":", "-", -1)
-				index += 2
+				tagsOption = append(tagsOption, key, strings.Replace(value, ":", "-", -1))
 			}
 			options = append(options, statsd.Tags(tagsOption...))
 		} else if opt, ok := opt.(OptionInterval); ok {
@@ -65,10 +61,7 @@ func registerCountable(module string, countable Countable, opts ...StatsOption) 
 			interval = i
 		}
 	}
-	statSource := &StatSource{
-		options:  options,
-		interval: interval,
-	}
+	statSource := &StatSource{options: options, interval: interval}
 	lock.Lock()
 	statSources[countable] = statSource
 	lock.Unlock()
@@ -106,23 +99,41 @@ func sendCounter(client *statsd.Client, counter interface{}) {
 
 	val := reflect.Indirect(reflect.ValueOf(counter))
 	for i := 0; i < val.Type().NumField(); i++ {
-		statsName := val.Type().Field(i).Tag.Get("statsd")
-		if statsName == "" {
+		field := val.Type().Field(i)
+		statsTag := field.Tag.Get("statsd")
+		if statsTag == "" {
 			continue
 		}
-		statsName = strings.Replace(statsName, "-", "_", -1)
-		memberName := val.Type().Field(i).Name
-		if !isUpper(memberName[0]) { // skip private field(starting with lower case letter)
-			log.Warningf("Unexported field %s with stats tag", memberName)
+		if !isUpper(field.Name[0]) { // skip private field(starting with lower case letter)
+			log.Warningf("Unexported field %s with stats tag", field.Name)
 			continue
 		}
-		client.Count(statsName, val.Field(i).Interface())
+		statsOpts := strings.Split(statsTag, ",")
+		name := strings.Replace(statsOpts[0], "-", "_", -1)
+		statsType := "count"
+		if len(statsOpts) > 1 {
+			statsType = statsOpts[1]
+		}
+		value := val.Field(i).Interface()
+		switch statsType {
+		case "gauge":
+			client.Gauge(name, value)
+		default: // count
+			client.Count(name, value)
+		}
 	}
 }
 
 func initStatsdClient(remote net.IP) *statsd.Client {
-	address := statsd.Address(fmt.Sprintf("%s:%d", remote, STATSD_PORT))
-	c, err := statsd.New(address, statsd.Prefix(processName), statsd.TagsFormat(statsd.InfluxDB))
+	options := []statsd.Option{
+		statsd.Address(fmt.Sprintf("%s:%d", remote, STATSD_PORT)),
+		statsd.Prefix(processName),
+		statsd.TagsFormat(statsd.InfluxDB),
+	}
+	if Hostname != "" { // specified hostname
+		options = append(options, statsd.Tags("host", Hostname))
+	}
+	c, err := statsd.New(options...)
 	if err != nil {
 		return nil
 	}
@@ -157,16 +168,11 @@ func run() {
 			}
 			counter := countable.GetCounter()
 			sendCounter(client, counter)
-			interval := max(statSource.interval, minInterval)
+			interval := max(statSource.interval, MinInterval)
 			statSource.skip = int(interval/time.Second) - 1
 		}
 		lock.Unlock()
 	}
-}
-
-func setMinInterval(interval time.Duration) {
-	log.Infof("min interval changed to %s", interval)
-	minInterval = interval
 }
 
 func setRemote(ip net.IP) {

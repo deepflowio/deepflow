@@ -13,6 +13,11 @@ const (
 	GAUGE_TYPE
 )
 
+var (
+	MinInterval = time.Second
+	Hostname    string
+)
+
 type StatsOption = interface{}
 
 type OptionStatTags map[string]string
@@ -40,7 +45,7 @@ type Countable interface {
 // 限定stats的最少interval，也就是不论注册Countable时
 // 指定的Interval是多少，只要比此值低就优先使用此值
 func SetMinInterval(interval time.Duration) {
-	setMinInterval(interval)
+	MinInterval = interval
 }
 
 // 指定stats远程服务器地址
