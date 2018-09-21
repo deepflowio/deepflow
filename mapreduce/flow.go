@@ -102,7 +102,7 @@ func (f *FlowHandler) putToQueue() {
 	}
 }
 
-func isValidFlow(flow datatype.TaggedFlow) bool {
+func isValidFlow(flow *datatype.TaggedFlow) bool {
 	startTime := flow.StartTime
 	endTime := flow.EndTime
 	curTime := time.Duration(time.Now().UnixNano())
@@ -130,7 +130,7 @@ func isValidFlow(flow datatype.TaggedFlow) bool {
 	return true
 }
 
-func (f *FlowHandler) Process(flow datatype.TaggedFlow) error {
+func (f *FlowHandler) Process(flow *datatype.TaggedFlow) error {
 	if !isValidFlow(flow) {
 		return errors.New("flow timestamp incorrect and droped")
 	}

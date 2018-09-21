@@ -118,7 +118,7 @@ func (f *subHandler) Process() error {
 			}
 
 			for i, processor := range f.processors {
-				docs := processor.Process(*metering, false)
+				docs := processor.Process(metering, false)
 				for {
 					docs = f.stashes[i].Add(docs)
 					if docs == nil {
