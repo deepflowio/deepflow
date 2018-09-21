@@ -170,7 +170,7 @@ func Start(configPath string) {
 		for {
 			taggedFlow := flowAppQueue.Get().(*TaggedFlow)
 			if taggedFlow.StartTime > 0 {
-				flowMapProcess.Process(*taggedFlow)
+				flowMapProcess.Process(taggedFlow)
 			} else if flowMapProcess.NeedFlush() {
 				flowMapProcess.Flush()
 			}
