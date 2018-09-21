@@ -1,6 +1,7 @@
 package mapreduce
 
 import (
+	"reflect"
 	"time"
 
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/usage"
@@ -48,9 +49,14 @@ type subHandler struct {
 
 func newSubHandler(processors []app.MeteringProcessor, output queue.QueueWriter, inputs queue.MultiQueue, index int) *subHandler {
 	nApps := len(processors)
+	dupProcessors := make([]app.MeteringProcessor, nApps)
+	for i := range processors {
+		dupProcessors[i] = reflect.New(reflect.ValueOf(processors[i]).Elem().Type()).Interface().(app.MeteringProcessor)
+		dupProcessors[i].Prepare()
+	}
 	handler := subHandler{
 		numberOfApps:  len(processors),
-		processors:    processors,
+		processors:    dupProcessors,
 		lastProcess:   time.Duration(time.Now().UnixNano()),
 		stashes:       make([]*Stash, nApps),
 		zmqAppQueue:   output,
