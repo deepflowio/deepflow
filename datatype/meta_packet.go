@@ -182,7 +182,7 @@ func (p *MetaPacket) ParseL2(packet RawPacket) int {
 		p.EthType = EthernetType(stream.U16())
 		l2Len += VLANTAG_LEN + ETH_TYPE_LEN
 	}
-	if p.EthType == EthernetTypeDot1Q && stream.Len() > VLANTAG_LEN {
+	if p.EthType == EthernetTypeDot1Q && stream.Len() > VLANTAG_LEN+ETH_TYPE_LEN {
 		p.Vlan = stream.U16() & VLAN_ID_MASK
 		p.EthType = EthernetType(stream.U16())
 		l2Len += VLANTAG_LEN + ETH_TYPE_LEN
