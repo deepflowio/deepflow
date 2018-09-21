@@ -156,11 +156,11 @@ func (l *LabelerManager) run(index int) {
 		for _, item := range itemBatch[:itemCount] {
 			metaPacket := item.(*datatype.MetaPacket)
 			action := l.GetPolicy(metaPacket, index)
-			if (action.ActionList & datatype.ACTION_PACKET_STAT) != 0 {
+			if (action.ActionList & (datatype.ACTION_PACKET_STAT | datatype.ACTION_PACKECT_COUNTER_PUB)) != 0 {
 				meteringKeys = append(meteringKeys, queue.HashKey(metaPacket.Hash))
 				meteringItemBatch = append(meteringItemBatch, metaPacket)
 			}
-			if (action.ActionList & datatype.ACTION_FLOW_STAT) != 0 {
+			if (action.ActionList & (datatype.ACTION_FLOW_STAT | datatype.ACTION_FLOW_COUNTER_PUB | datatype.ACTION_FLOW_STORE)) != 0 {
 				flowKeys = append(flowKeys, queue.HashKey(metaPacket.Hash))
 				flowItemBatch = append(flowItemBatch, metaPacket)
 			}
