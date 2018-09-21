@@ -12,3 +12,12 @@ func TestCustomTag(t *testing.T) {
 		t.Error("自定义Tag处理不正确")
 	}
 }
+
+func TestFillTag(t *testing.T) {
+	f := Field{L3EpcID: 3}
+	tag := &Tag{}
+	f.FillTag(L3EpcID, tag)
+	if tag.ToKVString() != ",l3_epc_id=3" {
+		t.Error("FillTag处理不正确")
+	}
+}
