@@ -100,8 +100,8 @@ func TestHandleSynRst(t *testing.T) {
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
 
 	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
-	if taggedFlow.CloseType != CLOSE_TYPE_RST {
-		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_RST)
+	if taggedFlow.CloseType != CLOSE_TYPE_SERVER_RST {
+		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_SERVER_RST)
 	}
 	if taggedFlow.Duration <= DEFAULT_DURATION_MSEC {
 		t.Errorf("taggedFlow.Duration is %d, expect more than %d", taggedFlow.Duration, DEFAULT_DURATION_MSEC)
@@ -136,8 +136,8 @@ func TestHandleSynFin(t *testing.T) {
 	go flowGenerator.Start()
 
 	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
-	if taggedFlow.CloseType != CLOSE_TYPE_HALF_CLOSE {
-		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_HALF_CLOSE)
+	if taggedFlow.CloseType != CLOSE_TYPE_CLIENT_HALF_CLOSE {
+		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_CLIENT_HALF_CLOSE)
 	}
 	if taggedFlow.FlowMetricsPeerSrc.TCPFlags != TCP_SYN|TCP_PSH|TCP_ACK ||
 		taggedFlow.FlowMetricsPeerDst.TCPFlags != TCP_ACK|TCP_FIN {
@@ -227,8 +227,8 @@ func TestPlatformData(t *testing.T) {
 	flowGenerator.Start()
 
 	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
-	if taggedFlow.CloseType != CLOSE_TYPE_HALF_OPEN {
-		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_HALF_OPEN)
+	if taggedFlow.CloseType != CLOSE_TYPE_SERVER_HALF_OPEN {
+		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_SERVER_HALF_OPEN)
 	}
 	if taggedFlow.FlowMetricsPeerSrc.EpcID != -1 || taggedFlow.FlowMetricsPeerSrc.L3EpcID != -1 {
 		t.Errorf("taggedFlow.EpcID0 is %d, expect -1", taggedFlow.FlowMetricsPeerSrc.EpcID)

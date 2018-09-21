@@ -341,15 +341,15 @@ func (f *FlowExtra) calcCloseType(force bool) {
 	case FLOW_STATE_EXCEPTION:
 		f.taggedFlow.CloseType = CLOSE_TYPE_UNKNOWN
 	case FLOW_STATE_OPENING_1:
-		fallthrough
+		f.taggedFlow.CloseType = CLOSE_TYPE_SERVER_HALF_OPEN
 	case FLOW_STATE_OPENING_2:
-		f.taggedFlow.CloseType = CLOSE_TYPE_HALF_OPEN
+		f.taggedFlow.CloseType = CLOSE_TYPE_CLIENT_HALF_OPEN
 	case FLOW_STATE_ESTABLISHED:
 		f.taggedFlow.CloseType = CLOSE_TYPE_TIMEOUT
 	case FLOW_STATE_CLOSING_TX1:
-		fallthrough
+		f.taggedFlow.CloseType = CLOSE_TYPE_SERVER_HALF_CLOSE
 	case FLOW_STATE_CLOSING_RX1:
-		f.taggedFlow.CloseType = CLOSE_TYPE_HALF_CLOSE
+		f.taggedFlow.CloseType = CLOSE_TYPE_CLIENT_HALF_CLOSE
 	case FLOW_STATE_CLOSING_TX2:
 		fallthrough
 	case FLOW_STATE_CLOSING_RX2:
@@ -357,7 +357,11 @@ func (f *FlowExtra) calcCloseType(force bool) {
 	case FLOW_STATE_CLOSED:
 		f.taggedFlow.CloseType = CLOSE_TYPE_FIN
 	case FLOW_STATE_RESET:
-		f.taggedFlow.CloseType = CLOSE_TYPE_RST
+		if flagContain(f.taggedFlow.FlowMetricsPeerDst.TCPFlags, TCP_RST) {
+			f.taggedFlow.CloseType = CLOSE_TYPE_SERVER_RST
+		} else {
+			f.taggedFlow.CloseType = CLOSE_TYPE_CLIENT_RST
+		}
 	default:
 		log.Warningf("unexcepted 'unknown' close type, flow id is %d", f.taggedFlow.FlowID)
 		f.taggedFlow.CloseType = CLOSE_TYPE_UNKNOWN
@@ -462,11 +466,11 @@ loop:
 				taggedFlow := flowExtra.taggedFlow
 				f.stats.CurrNumFlows--
 				flowExtra.setCurFlowInfo(now, forceReportInterval)
-				flowExtra.calcCloseType(false)
 				if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
 					flowExtra.reverseFlow()
 					flowExtra.reversed = !flowExtra.reversed
 				}
+				flowExtra.calcCloseType(false)
 				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 				flowExtra.reset()
 				flowOutBuffer[flowOutNum] = taggedFlow
@@ -482,11 +486,11 @@ loop:
 			} else if flowExtra.taggedFlow.StartTime+forceReportInterval < now {
 				taggedFlow := flowExtra.taggedFlow
 				flowExtra.setCurFlowInfo(now, forceReportInterval)
-				flowExtra.calcCloseType(true)
 				if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
 					flowExtra.reverseFlow()
 					flowExtra.reversed = !flowExtra.reversed
 				}
+				flowExtra.calcCloseType(true)
 				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 				putFlow := *taggedFlow
 				flowOutBuffer[flowOutNum] = &putFlow

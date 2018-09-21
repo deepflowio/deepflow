@@ -20,11 +20,11 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			taggedFlow := flowExtra.taggedFlow
 			f.stats.CurrNumFlows--
 			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportInterval)
-			flowExtra.calcCloseType(false)
 			if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
 				flowExtra.reverseFlow()
 				flowExtra.reversed = !flowExtra.reversed
 			}
+			flowExtra.calcCloseType(false)
 			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 			flowExtra.reset()
 			f.flowOutQueue.Put(taggedFlow)
@@ -48,11 +48,11 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 		f.stats.TotalNumFlows++
 		if closed {
 			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportInterval)
-			flowExtra.calcCloseType(false)
 			if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
 				flowExtra.reverseFlow()
 				flowExtra.reversed = !flowExtra.reversed
 			}
+			flowExtra.calcCloseType(false)
 			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 			flowExtra.reset()
 			f.flowOutQueue.Put(taggedFlow)
