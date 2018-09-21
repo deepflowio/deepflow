@@ -22,8 +22,9 @@ type Transaction struct {
 
 type Counter struct {
 	In          uint64 `statsd:"in,count"`
-	Out         uint64 `statsd:"in,count"`
-	Overwritten uint64 `statsd:"in,gauge"`
+	Out         uint64 `statsd:"out,count"`
+	Overwritten uint64 `statsd:"overwritten,count"`
+	Pending     uint64 `statsd:"pending,gauge"`
 }
 
 type OverwriteQueue struct {
@@ -66,6 +67,7 @@ func (q *OverwriteQueue) Init(module string, size int, statOptions ...stats.Stat
 func (q *OverwriteQueue) GetCounter() interface{} {
 	var counter *Counter
 	counter, q.counter = q.counter, &Counter{}
+	counter.Pending = uint64(q.pending)
 	return counter
 }
 
