@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -84,7 +85,7 @@ func TestParseInvalid(t *testing.T) {
 	}
 }
 
-func TestParsePacket(t *testing.T) {
+func TestParseTorPackets(t *testing.T) {
 	var buffer bytes.Buffer
 	packets := loadPcap("meta_packet_test.pcap")
 	for _, packet := range packets {
@@ -100,6 +101,21 @@ func TestParsePacket(t *testing.T) {
 	if expected != actual {
 		ioutil.WriteFile("actual.txt", []byte(actual), 0644)
 		t.Error(fmt.Sprintf("Inconsistent with %s, written to actual.txt", expectFile))
+	}
+}
+
+func TestParseIspPackets(t *testing.T) {
+	expectInPorts := [...]uint32{0x10002, 0x10001, 0x10002, 0x10002, 0x10001, 0x10002, 0x10002, 0x10002, 0x10002, 0x10002}
+	actualInPorts := [len(expectInPorts)]uint32{}
+	packets := loadPcap("isp.pcap")
+	for i, packet := range packets {
+		meta := &MetaPacket{PacketLen: uint16(len(packet))}
+		l2Len := meta.ParseL2(packet)
+		meta.Parse(packet[l2Len:])
+		actualInPorts[i] = meta.InPort
+	}
+	if !reflect.DeepEqual(actualInPorts, expectInPorts) {
+		t.Errorf("Expect %+v, but actual %+v", expectInPorts, actualInPorts)
 	}
 }
 
