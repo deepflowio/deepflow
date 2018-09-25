@@ -2,6 +2,7 @@ package policy
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/op/go-logging"
 
@@ -66,7 +67,9 @@ type PolicyCounter struct {
 	EpcIpTable uint32 `statsd:"epc_ip_table"`
 	FastTable  uint32 `statsd:"fast_table"`
 	ArpTable   uint32 `statsd:"arp_table"`
-	MaxHit     uint32 `statsd:"acl_max_hit"`
+
+	FastHit  uint64 `statsd:"fast_hit"`
+	FirstHit uint64 `statsd:"first_hit"`
 }
 
 func getAvailableMapSize(queueCount int, mapSize uint32) uint32 {
@@ -95,6 +98,22 @@ func NewPolicyTable(actionTypes ActionType, queueCount int, mapSize uint32) *Pol
 	return policyTable
 }
 
+func (t *PolicyTable) GetHitStatus() (uint64, uint64) {
+	return atomic.LoadUint64(&t.policyLabel.FirstPathHit), atomic.LoadUint64(&t.policyLabel.FirstPathHit)
+}
+
+func (t *PolicyTable) AddAcl(acl *Acl) {
+	t.policyLabel.AddAcl(acl)
+}
+
+func (t *PolicyTable) DelAcl(id int) {
+	t.policyLabel.DelAcl(id)
+}
+
+func (t *PolicyTable) GetAcl() []*Acl {
+	return t.policyLabel.RawAcls
+}
+
 func (t *PolicyTable) GetCounter() interface{} {
 	counter := &PolicyCounter{
 		MacTable:   uint32(len(t.cloudPlatformData.macTable.macMap)),
@@ -104,18 +123,18 @@ func (t *PolicyTable) GetCounter() interface{} {
 	for i := 0; i < MASK_LEN; i++ {
 		counter.IpTable += uint32(len(t.cloudPlatformData.ipTables[i].ipMap))
 	}
-	/*
-		for i := 0; i < t.queueCount; i++ {
-			counter.CloudFastTable += uint32(t.cloudPlatformData.fastPath[i].fastTable[j].fastPlatform.Len())
-		}
-	*/
+
+	for i := 0; i < t.queueCount; i++ {
+		counter.FastPath += uint32(t.policyLabel.FastPolicyMaps[i].Len())
+	}
+
+	counter.FastHit = atomic.SwapUint64(&t.policyLabel.FastPathHitTick, 0)
+	counter.FirstHit = atomic.SwapUint64(&t.policyLabel.FirstPathHitTick, 0)
 
 	counter.Acl += uint32(len(t.policyLabel.RawAcls))
 	for i := TAP_ANY; i < TAP_MAX; i++ {
 		counter.ArpTable += uint32(len(t.cloudPlatformData.arpTable[i].arpMap))
 	}
-	counter.MaxHit = t.policyLabel.maxHit
-	t.policyLabel.maxHit = 0
 	return counter
 }
 
@@ -135,7 +154,7 @@ func (t *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *PolicyData {
 // Droplet用于ANALYTIC_*、PACKET_BROKER、PACKET_STORE
 func (t *PolicyTable) LookupAllByKey(key *LookupKey, index int) (*EndpointData, *PolicyData) {
 	if !key.Tap.CheckTapType(key.Tap) {
-		return nil, nil
+		return INVALID_ENDPOINT_DATA, INVALID_POLICY_DATA
 	}
 
 	endpoint, policy := t.policyLabel.GetPolicyByFastPath(key)
@@ -157,6 +176,7 @@ func (t *PolicyTable) UpdateInterfaceData(data []*PlatformData) {
 
 func (t *PolicyTable) UpdateIpGroupData(data []*IpGroupData) {
 	t.cloudPlatformData.ipGroup.Update(data)
+	t.policyLabel.GenerateIpNetmaskMapFromIpResource(data)
 }
 
 func (t *PolicyTable) UpdateAclData(data []*Acl) {

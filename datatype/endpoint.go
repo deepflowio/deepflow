@@ -2,11 +2,16 @@ package datatype
 
 import (
 	"fmt"
+	"time"
 
 	. "github.com/google/gopacket/layers"
 )
 
 type TapType uint8
+
+var (
+	INVALID_ENDPOINT_DATA = &EndpointData{&EndpointInfo{}, &EndpointInfo{}}
+)
 
 const (
 	TAP_ANY TapType = iota
@@ -33,6 +38,7 @@ type EndpointInfo struct {
 }
 
 type LookupKey struct {
+	Timestamp                time.Duration
 	SrcMac, DstMac           uint64
 	SrcIp, DstIp             uint32
 	SrcPort, DstPort         uint16

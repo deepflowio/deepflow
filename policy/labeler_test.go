@@ -1111,4 +1111,16 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 		t.Log("Result:", policyData, "\n")
 		t.Log("Expect:", basicPolicyData, "\n")
 	}
+
+	_, policyData = policy.LookupAllByKey(key, 0)
+	if !CheckPolicyResult(basicPolicyData, policyData) {
+		t.Error("PortProto Check Failed")
+		t.Log("Result:", policyData, "\n")
+		t.Log("Expect:", basicPolicyData, "\n")
+	}
+	if _, fast := policy.GetHitStatus(); fast != 1 {
+		t.Error("PortProto FastPath Check Failed")
+		t.Log("Result:", fast, "\n")
+		t.Log("Expect:", 1, "\n")
+	}
 }

@@ -4,6 +4,10 @@ import (
 	"fmt"
 )
 
+var (
+	INVALID_POLICY_DATA = &PolicyData{}
+)
+
 type PolicyData struct {
 	ActionList ActionType // bitwise OR
 	AclActions []*AclAction
