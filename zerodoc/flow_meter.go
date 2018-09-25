@@ -19,7 +19,7 @@ type FlowMeter struct {
 func (m *FlowMeter) ConcurrentMerge(other app.Meter) {
 	if pm, ok := other.(*FlowMeter); ok {
 		m.SumFlowCount += pm.SumFlowCount
-		m.SumClosedFlowCount += pm.SumNewFlowCount
+		m.SumNewFlowCount += pm.SumNewFlowCount
 		m.SumClosedFlowCount += pm.SumClosedFlowCount
 
 		m.MaxFlowCount += pm.MaxFlowCount
