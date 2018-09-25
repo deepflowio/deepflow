@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/op/go-logging"
-	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/logger"
 	_ "gitlab.x.lan/yunshan/droplet-libs/monitor"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
@@ -64,7 +63,7 @@ func Start(configPath string) {
 	}
 
 	stats.SetMinInterval(10 * time.Second)
-	stats.SetRemote(net.ParseIP(cfg.StatsdServer))
+	stats.SetRemotes(net.ParseIP(cfg.StatsdServer))
 
 	controllers := make([]net.IP, 0, len(cfg.ControllerIps))
 	for _, ipString := range cfg.ControllerIps {
@@ -115,9 +114,9 @@ func Start(configPath string) {
 		labelerManager.OnAclDataChange(response)
 	})
 
-	// L3 - flow generator & metering map
+	// L3 - flow generator & metering marshaller
 	flowDuplicatorQueue := manager.NewQueue("3-tagged-flow-to-flow-duplicator", queueSize>>2)
-	meteringAppOutputQueue := manager.NewQueue("3-metering-doc-to-zero", queueSize>>2)
+	meteringAppOutputQueue := manager.NewQueue("3-metering-doc-to-marshaller", queueSize>>2)
 
 	timeoutConfig := flowgenerator.TimeoutConfig{
 		Opening:         cfg.FlowGenerator.OthersTimeout,
@@ -152,35 +151,15 @@ func Start(configPath string) {
 	queue.NewDuplicator(1024, flowDuplicatorQueue, flowAppQueue, flowSenderQueue).Start()
 	sender.NewFlowSender(flowSenderQueue, cfg.Stream.Ip, cfg.Stream.Port).Start()
 
-	// L5 - flow map
-	flowAppOutputQueue := manager.NewQueue("5-flow-doc-to-zero", queueSize>>2)
-	flowMapProcess := mapreduce.NewFlowMapProcess(flowAppOutputQueue)
+	// L5 - flow doc marshaller
+	flowAppOutputQueue := manager.NewQueue("5-flow-doc-to-marshaller", queueSize>>2)
+	mapreduce.NewFlowMapProcess(flowAppQueue, flowAppOutputQueue)
 
-	queueFlushTime := time.Minute
-	flowTimer := time.NewTimer(queueFlushTime)
-	go func() {
-		for {
-			<-flowTimer.C
-			flushFlow := TaggedFlow{Flow: Flow{StartTime: 0}}
-			flowAppQueue.Put(&flushFlow)
-			flowTimer.Reset(queueFlushTime)
-		}
-	}()
-	go func() {
-		for {
-			taggedFlow := flowAppQueue.Get().(*TaggedFlow)
-			if taggedFlow.StartTime > 0 {
-				flowMapProcess.Process(taggedFlow)
-			} else if flowMapProcess.NeedFlush() {
-				flowMapProcess.Flush()
-			}
-		}
-	}()
-
+	// L6 - flow/metering doc sender
 	builder := sender.NewZeroDocumentSenderBuilder()
 	builder.AddQueue(flowAppOutputQueue, meteringAppOutputQueue)
 	for _, zero := range cfg.Zeroes {
 		builder.AddZero(zero.Ip, zero.Port)
 	}
-	builder.Build().Start()
+	builder.Build().Start(queueSize >> 2)
 }

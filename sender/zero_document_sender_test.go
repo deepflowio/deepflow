@@ -19,7 +19,7 @@ func TestZeroDocumentSender(t *testing.T) {
 	hb, _ := proto.Marshal(header)
 	inputQueue1 := queue.NewOverwriteQueue("", 1024)
 	inputQueue2 := queue.NewOverwriteQueue("", 1024)
-	NewZeroDocumentSenderBuilder().AddQueue(inputQueue1, inputQueue2).AddZero("127.0.0.1", 20001).AddZero("127.0.0.1", 20002).Build().Start()
+	NewZeroDocumentSenderBuilder().AddQueue(inputQueue1, inputQueue2).AddZero("127.0.0.1", 20001).AddZero("127.0.0.1", 20002).Build().Start(1024)
 	inputQueue1.Put(TEST_DATA[0])
 	inputQueue2.Put(TEST_DATA[1])
 

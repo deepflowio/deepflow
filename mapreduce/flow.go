@@ -7,6 +7,7 @@ import (
 
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/consolelog"
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/flow"
+	"gitlab.x.lan/application/droplet-app/pkg/mapper/flowtype"
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/geo"
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/perf"
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/platform"
@@ -22,14 +23,39 @@ const (
 
 const GEO_FILE_LOCATION = "/usr/share/droplet/ip_info_mini.json"
 
-func NewFlowMapProcess(zmqAppQueue queue.QueueWriter) *FlowHandler {
-	return NewFlowHandler([]app.FlowProcessor{
+func NewFlowMapProcess(inputQueue queue.Queue, outputQueue queue.QueueWriter) *FlowHandler {
+	flowMapProcess := NewFlowHandler([]app.FlowProcessor{
 		flow.NewProcessor(),
 		perf.NewProcessor(),
 		geo.NewProcessor(GEO_FILE_LOCATION),
+		flowtype.NewProcessor(),
 		consolelog.NewProcessor(),
 		platform.NewProcessor(),
-	}, zmqAppQueue)
+	}, outputQueue)
+
+	go func() {
+		for range time.NewTicker(time.Minute).C {
+			inputQueue.Put(nil)
+		}
+	}()
+	go func() {
+		elements := make([]interface{}, QUEUE_BATCH_SIZE)
+		for {
+			n := inputQueue.Gets(elements)
+			for _, e := range elements[:n] {
+				if e == nil { // tick
+					if flowMapProcess.NeedFlush() {
+						flowMapProcess.Flush()
+					}
+					continue
+				}
+
+				flowMapProcess.Process(e.(*datatype.TaggedFlow))
+			}
+		}
+	}()
+
+	return flowMapProcess
 }
 
 type flowAppStats struct {
