@@ -49,8 +49,8 @@ func SetMinInterval(interval time.Duration) {
 }
 
 // 指定stats远程服务器地址
-func SetRemote(ip net.IP) {
-	setRemote(ip)
+func SetRemotes(ip ...net.IP) {
+	setRemotes(ip...)
 }
 
 func RegisterCountable(module string, countable Countable, opts ...StatsOption) error {
