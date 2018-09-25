@@ -26,6 +26,7 @@ mkdir -p $RPM_BUILD_ROOT/usr/sbin/
 cp %pwd/bin/droplet $RPM_BUILD_ROOT/usr/sbin/
 mkdir -p $RPM_BUILD_ROOT/usr/bin/
 cp %pwd/bin/droplet-ctl $RPM_BUILD_ROOT/usr/bin/
+cp %pwd/bin/droplet-rpc $RPM_BUILD_ROOT/usr/bin/
 cp $(go env GOPATH)/bin/dlv $RPM_BUILD_ROOT/usr/bin/dlv.droplet
 mkdir -p $RPM_BUILD_ROOT/lib/systemd/system/
 cp %pwd/droplet.service $RPM_BUILD_ROOT/lib/systemd/system/
@@ -37,6 +38,7 @@ cp %pwd/assets/ip_info_mini.json $RPM_BUILD_ROOT/usr/share/droplet/
 %files
 /usr/bin/dlv.droplet
 /usr/bin/droplet-ctl
+/usr/bin/droplet-rpc
 /usr/sbin/droplet
 /lib/systemd/system/droplet.service
 /usr/share/droplet/ip_info_mini.json
