@@ -139,7 +139,7 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, key *FlowKey, now time.Durati
 	taggedFlow.CurStartTime = now
 	taggedFlow.VLAN = meta.Vlan
 	taggedFlow.EthType = meta.EthType
-	taggedFlow.CloseType = CLOSE_TYPE_UNKNOWN
+	taggedFlow.CloseType = CloseTypeUnknown
 	taggedFlow.PolicyData = meta.PolicyData
 
 	flowExtra := f.flowExtraHandler.alloc()
@@ -334,37 +334,37 @@ func (f *FlowExtra) resetCurFlowInfo(now time.Duration) {
 
 func (f *FlowExtra) calcCloseType(force bool) {
 	if force {
-		f.taggedFlow.CloseType = CLOSE_TYPE_FORCE_REPORT
+		f.taggedFlow.CloseType = CloseTypeForcedReport
 		return
 	}
 	switch f.flowState {
 	case FLOW_STATE_EXCEPTION:
-		f.taggedFlow.CloseType = CLOSE_TYPE_UNKNOWN
+		f.taggedFlow.CloseType = CloseTypeUnknown
 	case FLOW_STATE_OPENING_1:
-		f.taggedFlow.CloseType = CLOSE_TYPE_SERVER_HALF_OPEN
+		f.taggedFlow.CloseType = CloseTypeServerHalfOpen
 	case FLOW_STATE_OPENING_2:
-		f.taggedFlow.CloseType = CLOSE_TYPE_CLIENT_HALF_OPEN
+		f.taggedFlow.CloseType = CloseTypeClientHalfOpen
 	case FLOW_STATE_ESTABLISHED:
-		f.taggedFlow.CloseType = CLOSE_TYPE_TIMEOUT
+		f.taggedFlow.CloseType = CloseTypeTimeout
 	case FLOW_STATE_CLOSING_TX1:
-		f.taggedFlow.CloseType = CLOSE_TYPE_SERVER_HALF_CLOSE
+		f.taggedFlow.CloseType = CloseTypeServerHalfClose
 	case FLOW_STATE_CLOSING_RX1:
-		f.taggedFlow.CloseType = CLOSE_TYPE_CLIENT_HALF_CLOSE
+		f.taggedFlow.CloseType = CloseTypeClientHalfClose
 	case FLOW_STATE_CLOSING_TX2:
 		fallthrough
 	case FLOW_STATE_CLOSING_RX2:
 		fallthrough
 	case FLOW_STATE_CLOSED:
-		f.taggedFlow.CloseType = CLOSE_TYPE_FIN
+		f.taggedFlow.CloseType = CloseTypeTCPFin
 	case FLOW_STATE_RESET:
 		if flagContain(f.taggedFlow.FlowMetricsPeerDst.TCPFlags, TCP_RST) {
-			f.taggedFlow.CloseType = CLOSE_TYPE_SERVER_RST
+			f.taggedFlow.CloseType = CloseTypeTCPServerRst
 		} else {
-			f.taggedFlow.CloseType = CLOSE_TYPE_CLIENT_RST
+			f.taggedFlow.CloseType = CloseTypeTCPClientRst
 		}
 	default:
 		log.Warningf("unexcepted 'unknown' close type, flow id is %d", f.taggedFlow.FlowID)
-		f.taggedFlow.CloseType = CLOSE_TYPE_UNKNOWN
+		f.taggedFlow.CloseType = CloseTypeUnknown
 	}
 }
 
@@ -378,6 +378,7 @@ loop:
 	meta := processBuffer[i].(*MetaPacket)
 	i++
 	if meta.EthType != layers.EthernetTypeIPv4 {
+		f.processNonIpPacket(meta)
 		goto loop
 	}
 	if meta.Protocol == layers.IPProtocolTCP {
@@ -386,7 +387,6 @@ loop:
 		f.processUdpPacket(meta)
 	} else {
 		f.processOtherIpPacket(meta)
-		log.Debugf("generator %d gets packet inport %d proto %d", f.index, meta.InPort, meta.Protocol)
 	}
 	goto loop
 }

@@ -22,20 +22,6 @@ const (
 const TCP_FLAG_MASK = 0x3f
 
 const (
-	CLOSE_TYPE_UNKNOWN           = iota
-	CLOSE_TYPE_FIN                          // 基于TCP FIN判断连接已结束
-	CLOSE_TYPE_SERVER_RST                   // 基于TCP RST判断服务端连接已结束
-	CLOSE_TYPE_TIMEOUT                      // 基于相邻网包的间隔时间判断连接已结束
-	CLOSE_TYPE_FLOOD                        // 缓存空间不足被迫判断连接已结束
-	CLOSE_TYPE_FORCE_REPORT                 // 基于连接持续时间超过60秒临时输出
-	CLOSE_TYPE_SERVER_HALF_OPEN  = iota + 1 // 服务端timeout时该TCP连接为半开，即三次握手阶段
-	CLOSE_TYPE_SERVER_HALF_CLOSE            // 服务端timeout时该TCP连接为半闭，即四次挥手阶段
-	CLOSE_TYPE_CLIENT_RST                   // 基于TCP RST判断客户端连接已结束
-	CLOSE_TYPE_CLIENT_HALF_OPEN             // 客户端timeout时该TCP连接为半开，即三次握手阶段
-	CLOSE_TYPE_CLIENT_HALF_CLOSE            // 客户端timeout时该TCP连接为半闭，即四次挥手阶段
-)
-
-const (
 	TIMEOUT_OPENING          = 5 * time.Second
 	TIMEOUT_ESTABLISHED      = 300 * time.Second
 	TIMEOUT_CLOSING          = 35 * time.Second

@@ -100,8 +100,8 @@ func TestHandleSynRst(t *testing.T) {
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
 
 	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
-	if taggedFlow.CloseType != CLOSE_TYPE_SERVER_RST {
-		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_SERVER_RST)
+	if taggedFlow.CloseType != CloseTypeTCPServerRst {
+		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeTCPServerRst)
 	}
 	if taggedFlow.Duration <= DEFAULT_DURATION_MSEC {
 		t.Errorf("taggedFlow.Duration is %d, expect more than %d", taggedFlow.Duration, DEFAULT_DURATION_MSEC)
@@ -136,8 +136,8 @@ func TestHandleSynFin(t *testing.T) {
 	go flowGenerator.Start()
 
 	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
-	if taggedFlow.CloseType != CLOSE_TYPE_CLIENT_HALF_CLOSE {
-		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_CLIENT_HALF_CLOSE)
+	if taggedFlow.CloseType != CloseTypeClientHalfClose {
+		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeClientHalfClose)
 	}
 	if taggedFlow.FlowMetricsPeerSrc.TCPFlags != TCP_SYN|TCP_PSH|TCP_ACK ||
 		taggedFlow.FlowMetricsPeerDst.TCPFlags != TCP_ACK|TCP_FIN {
@@ -227,8 +227,8 @@ func TestPlatformData(t *testing.T) {
 	flowGenerator.Start()
 
 	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
-	if taggedFlow.CloseType != CLOSE_TYPE_SERVER_HALF_OPEN {
-		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_SERVER_HALF_OPEN)
+	if taggedFlow.CloseType != CloseTypeServerHalfOpen {
+		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeServerHalfOpen)
 	}
 	if taggedFlow.FlowMetricsPeerSrc.EpcID != -1 || taggedFlow.FlowMetricsPeerSrc.L3EpcID != -1 {
 		t.Errorf("taggedFlow.EpcID0 is %d, expect -1", taggedFlow.FlowMetricsPeerSrc.EpcID)
@@ -246,7 +246,7 @@ func TestFlowStateMachine(t *testing.T) {
 	flowExtra.taggedFlow = taggedFlow
 	var packetFlags uint8
 
-	taggedFlow.CloseType = CLOSE_TYPE_UNKNOWN
+	taggedFlow.CloseType = CloseTypeUnknown
 	flowExtra.flowState = FLOW_STATE_OPENING_1
 
 	// test handshake
@@ -313,8 +313,8 @@ func TestHandshakePerf(t *testing.T) {
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet2)
 
 	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
-	if taggedFlow.CloseType != CLOSE_TYPE_FORCE_REPORT {
-		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_FORCE_REPORT)
+	if taggedFlow.CloseType != CloseTypeForcedReport {
+		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeForcedReport)
 		t.Errorf("\n%s", taggedFlow)
 	}
 }
@@ -395,8 +395,8 @@ func TestForceReport(t *testing.T) {
 
 	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
 
-	if taggedFlow.CloseType != CLOSE_TYPE_FORCE_REPORT {
-		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_FORCE_REPORT)
+	if taggedFlow.CloseType != CloseTypeForcedReport {
+		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeForcedReport)
 	}
 	if flowGenerator.stats.CurrNumFlows != 1 || flowGenerator.stats.TotalNumFlows != 1 {
 		t.Errorf("flowGenerator.stats.CurrNumFlows is %d, expect 1", flowGenerator.stats.CurrNumFlows)
@@ -417,11 +417,31 @@ func TestUdpShortFlow(t *testing.T) {
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet)
 	flowGenerator.Start()
 	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
-	if taggedFlow.CloseType != CLOSE_TYPE_TIMEOUT {
-		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CLOSE_TYPE_TIMEOUT)
+	if taggedFlow.CloseType != CloseTypeTimeout {
+		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeTimeout)
 	}
 	if taggedFlow.Proto != layers.IPProtocolUDP {
 		t.Errorf("taggedFlow.Proto is %d, expect %d", taggedFlow.Proto, layers.IPProtocolUDP)
+	}
+}
+
+func TestNonIpShortFlow(t *testing.T) {
+	flowGenerator := getDefaultFlowGenerator()
+	flowGenerator.SetTimeout(TimeoutConfig{0, 300 * time.Second, 0, 30 * time.Second, 5 * time.Second, 0, 0})
+	flowGenerator.minLoopInterval = 0
+	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
+	flowOutQueue := flowGenerator.flowOutQueue
+	packet := getDefaultPacket()
+	packet.Protocol = 0
+	packet.EthType = layers.EthernetTypeARP
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet)
+	flowGenerator.Start()
+	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
+	if taggedFlow.CloseType != CloseTypeTimeout {
+		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeTimeout)
+	}
+	if taggedFlow.EthType != layers.EthernetTypeARP {
+		t.Errorf("taggedFlow.EthType is %d, expect %d", taggedFlow.EthType, layers.EthernetTypeARP)
 	}
 }
 
