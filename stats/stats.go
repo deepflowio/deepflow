@@ -16,8 +16,6 @@ import (
 
 var log = logging.MustGetLogger("stats")
 
-var remote = net.ParseIP("127.0.0.1")
-
 const (
 	STATSD_PORT = 20040
 )
@@ -29,10 +27,11 @@ type StatSource struct {
 }
 
 var (
-	processName  string
-	lock         sync.Mutex
-	statSources  map[Countable]*StatSource = make(map[Countable]*StatSource)
-	statsdClient *statsd.Client
+	processName   string
+	lock          sync.Mutex
+	statSources   = make(map[Countable]*StatSource)
+	remotes       = []net.IP{net.ParseIP("127.0.0.1")}
+	statsdClients = make([]*statsd.Client, 1)
 )
 
 type StatItem struct {
@@ -148,37 +147,45 @@ func max(x, y time.Duration) time.Duration {
 	return y
 }
 
+func runOnce() {
+	for i, remote := range remotes {
+		if statsdClients[i] == nil {
+			statsdClients[i] = initStatsdClient(remote)
+		}
+	}
+
+	lock.Lock()
+	for countable, statSource := range statSources {
+		if statSource.skip > 0 {
+			statSource.skip--
+			continue
+		}
+		counter := countable.GetCounter()
+		for _, statsdClient := range statsdClients {
+			if statsdClient == nil {
+				continue
+			}
+			client := statsdClient.Clone(statSource.options...)
+			sendCounter(client, counter)
+		}
+		interval := max(statSource.interval, MinInterval)
+		statSource.skip = int(interval/time.Second) - 1
+	}
+	lock.Unlock()
+}
+
 func run() {
 	time.Sleep(time.Second) // wait logger init
 
 	for range time.NewTicker(time.Second).C {
-		if statsdClient == nil {
-			statsdClient = initStatsdClient(remote)
-			if statsdClient == nil {
-				continue
-			}
-		}
-
-		lock.Lock()
-		for countable, statSource := range statSources {
-			client := statsdClient.Clone(statSource.options...)
-			if statSource.skip > 0 {
-				statSource.skip--
-				continue
-			}
-			counter := countable.GetCounter()
-			sendCounter(client, counter)
-			interval := max(statSource.interval, MinInterval)
-			statSource.skip = int(interval/time.Second) - 1
-		}
-		lock.Unlock()
+		runOnce()
 	}
 }
 
-func setRemote(ip net.IP) {
-	log.Infof("remote changed to %s", ip)
-	remote = ip
-	statsdClient = nil
+func setRemotes(ips ...net.IP) {
+	log.Infof("Remote changed to %s", ips)
+	remotes = ips
+	statsdClients = make([]*statsd.Client, len(ips))
 }
 
 func init() {
