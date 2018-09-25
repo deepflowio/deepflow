@@ -1,8 +1,6 @@
 package sender
 
 import (
-	"strconv"
-
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 )
 
@@ -57,11 +55,11 @@ func (b *zeroDocumentSenderBuilder) Build() *ZeroDocumentSender {
 	}
 }
 
-func (s *ZeroDocumentSender) Start() {
+func (s *ZeroDocumentSender) Start(queueSize int) {
 	queueReaders := make([]queue.QueueReader, len(s.ips))
 	queueWriters := make([]queue.QueueWriter, len(s.ips))
-	for i := range queueReaders {
-		q := queue.NewOverwriteQueue("zero-document-sender-"+strconv.Itoa(i), QUEUE_SIZE)
+	queues := queue.NewOverwriteQueues("6-all-doc-to-zero", uint8(len(s.ips)), queueSize)[:len(s.ips)]
+	for i, q := range queues {
 		queueReaders[i] = q
 		queueWriters[i] = q
 	}
