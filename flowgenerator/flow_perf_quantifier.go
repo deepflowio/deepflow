@@ -852,10 +852,7 @@ func (i *FlowPerfDataInfo) calcReportFlowPerfStats(report *TcpPerfStats, reverse
 		if period.art1Count > 0 {
 			report.ART = period.art1Sum / time.Duration(period.art1Count)
 		}
-		if period.rtt1Count == 0 {
-			period.rtt1Count = flow.rtt1Count
-			period.rtt1Sum = flow.rtt1Sum
-		}
+
 		if period.rtt1Count > 0 {
 			report.RTT = period.rtt1Sum / time.Duration(period.rtt1Count)
 		}
@@ -863,10 +860,7 @@ func (i *FlowPerfDataInfo) calcReportFlowPerfStats(report *TcpPerfStats, reverse
 		if period.art0Count > 0 {
 			report.ART = period.art0Sum / time.Duration(period.art0Count)
 		}
-		if period.rtt0Count == 0 {
-			period.rtt0Count = flow.rtt0Count
-			period.rtt0Sum = flow.rtt0Sum
-		}
+
 		if period.rtt0Count > 0 {
 			report.RTT = period.rtt0Sum / time.Duration(period.rtt0Count)
 		}
