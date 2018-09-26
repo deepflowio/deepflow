@@ -41,39 +41,56 @@ func (s *Stash) Add(docs []*app.Document) []*app.Document {
 		if slot < 0 || slot >= s.slots {
 			return docs[i:]
 		}
+
 		fastID := doc.GetFastID()
 		code := doc.GetCode()
 		if fastID != 0 {
-			if s.fastStashLocation[slot] == nil {
-				s.fastStashLocation[slot] = make(map[uint64]map[uint64]int)
+			slotMap := s.fastStashLocation[slot]
+			if slotMap == nil {
+				slotMap = make(map[uint64]map[uint64]int)
+				s.fastStashLocation[slot] = slotMap
 			}
-			if s.fastStashLocation[slot][code] == nil {
-				s.fastStashLocation[slot][code] = make(map[uint64]int)
+			codeMap := slotMap[code]
+			if codeMap == nil {
+				codeMap = make(map[uint64]int)
+				slotMap[code] = codeMap
 			}
-			if docLoc, ok := s.fastStashLocation[slot][code][fastID]; ok {
+			if docLoc, ok := codeMap[fastID]; ok {
 				s.stash[docLoc].(*app.Document).ConcurrentMerge(doc.Meter)
+				if doc.Pool != nil {
+					doc.Pool.Put(doc)
+				}
 				continue
 			}
-		} else {
-			if s.stashLocation[slot] == nil {
-				s.stashLocation[slot] = make(map[string]int)
-			}
-			if docLoc, ok := s.stashLocation[slot][doc.GetID(s.intBuffer)]; ok {
-				s.stash[docLoc].(*app.Document).ConcurrentMerge(doc.Meter)
-				continue
-			}
-		}
 
-		if s.entryCount >= s.capacity {
-			return docs[i:]
-		}
-		s.stash[s.entryCount] = doc
-		if fastID != 0 {
-			s.fastStashLocation[slot][code][fastID] = s.entryCount
+			if s.entryCount >= s.capacity {
+				return docs[i:]
+			}
+			s.stash[s.entryCount] = doc
+			codeMap[fastID] = s.entryCount
+			s.entryCount++
+
 		} else {
-			s.stashLocation[slot][doc.GetID(s.intBuffer)] = s.entryCount
+			slotMap := s.stashLocation[slot]
+			if s.stashLocation[slot] == nil {
+				slotMap = make(map[string]int)
+				s.stashLocation[slot] = slotMap
+			}
+			if docLoc, ok := slotMap[doc.GetID(s.intBuffer)]; ok {
+				s.stash[docLoc].(*app.Document).ConcurrentMerge(doc.Meter)
+				if doc.Pool != nil {
+					doc.Pool.Put(doc)
+				}
+				continue
+			}
+
+			if s.entryCount >= s.capacity {
+				return docs[i:]
+			}
+			s.stash[s.entryCount] = doc
+			slotMap[doc.GetID(s.intBuffer)] = s.entryCount
+			s.entryCount++
 		}
-		s.entryCount++
 	}
 	return nil
 }
