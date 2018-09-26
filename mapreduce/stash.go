@@ -6,9 +6,10 @@ import (
 )
 
 type Stash struct {
-	timestamp     uint32
-	stashLocation []map[string]int
-	slots         int
+	timestamp         uint32
+	stashLocation     []map[string]int
+	fastStashLocation []map[uint64]map[uint64]int
+	slots             int
 
 	stash      []interface{}
 	entryCount int
@@ -19,13 +20,14 @@ type Stash struct {
 
 func NewStash(capacity, slots int) *Stash {
 	return &Stash{
-		timestamp:     0,
-		stashLocation: make([]map[string]int, slots),
-		slots:         slots,
-		stash:         make([]interface{}, capacity),
-		entryCount:    0,
-		capacity:      capacity,
-		intBuffer:     &utils.IntBuffer{},
+		timestamp:         0,
+		stashLocation:     make([]map[string]int, slots),
+		fastStashLocation: make([]map[uint64]map[uint64]int, slots),
+		slots:             slots,
+		stash:             make([]interface{}, capacity),
+		entryCount:        0,
+		capacity:          capacity,
+		intBuffer:         &utils.IntBuffer{},
 	}
 }
 
@@ -39,19 +41,38 @@ func (s *Stash) Add(docs []*app.Document) []*app.Document {
 		if slot < 0 || slot >= s.slots {
 			return docs[i:]
 		}
-		if s.stashLocation[slot] == nil {
-			s.stashLocation[slot] = make(map[string]int)
-		}
-		if docLoc, ok := s.stashLocation[slot][doc.GetID(s.intBuffer)]; ok {
-			s.stash[docLoc].(*app.Document).ConcurrentMerge(doc.Meter)
-			continue
+		fastID := doc.GetFastID()
+		code := doc.GetCode()
+		if fastID != 0 {
+			if s.fastStashLocation[slot] == nil {
+				s.fastStashLocation[slot] = make(map[uint64]map[uint64]int)
+			}
+			if s.fastStashLocation[slot][code] == nil {
+				s.fastStashLocation[slot][code] = make(map[uint64]int)
+			}
+			if docLoc, ok := s.fastStashLocation[slot][code][fastID]; ok {
+				s.stash[docLoc].(*app.Document).ConcurrentMerge(doc.Meter)
+				continue
+			}
+		} else {
+			if s.stashLocation[slot] == nil {
+				s.stashLocation[slot] = make(map[string]int)
+			}
+			if docLoc, ok := s.stashLocation[slot][doc.GetID(s.intBuffer)]; ok {
+				s.stash[docLoc].(*app.Document).ConcurrentMerge(doc.Meter)
+				continue
+			}
 		}
 
 		if s.entryCount >= s.capacity {
 			return docs[i:]
 		}
 		s.stash[s.entryCount] = doc
-		s.stashLocation[slot][doc.GetID(s.intBuffer)] = s.entryCount
+		if fastID != 0 {
+			s.fastStashLocation[slot][code][fastID] = s.entryCount
+		} else {
+			s.stashLocation[slot][doc.GetID(s.intBuffer)] = s.entryCount
+		}
 		s.entryCount++
 	}
 	return nil
@@ -68,5 +89,6 @@ func (s *Stash) Dump() []interface{} {
 func (s *Stash) Clear() {
 	s.timestamp = 0
 	s.stashLocation = make([]map[string]int, s.slots)
+	s.fastStashLocation = make([]map[uint64]map[uint64]int, s.slots)
 	s.entryCount = 0
 }

@@ -91,6 +91,7 @@ func NewFlowHandler(processors []app.FlowProcessor, zmqAppQueue queue.QueueWrite
 		statItems:    make([]stats.StatItem, nApps),
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
+		processors[i].Prepare()
 		handler.stashes[i] = NewStash(DOCS_IN_BUFFER, WINDOW_SIZE)
 		handler.statItems[i].Name = processors[i].GetName()
 		handler.statItems[i].StatType = stats.COUNT_TYPE
