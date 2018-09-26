@@ -11,15 +11,18 @@ import (
 type CloseType uint8
 
 const (
-	unknownCloseType CloseType = iota
-	TCPFin
-	TCPRst
-	Timeout
-	Flood
-	ForcedReport // 5
-	ForcedClose
-	HalfOpenTimeout
-	HalfCloseTimeout
+	CloseTypeUnknown CloseType = iota
+	CloseTypeTCPFin
+	CloseTypeTCPServerRst
+	CloseTypeTimeout
+	CloseTypeFlood
+	CloseTypeForcedReport
+	// CloseTypeFoecedClose is not used any more, so skip it
+	CloseTypeServerHalfOpen CloseType = iota + 1
+	CloseTypeServerHalfClose
+	CloseTypeTCPClientRst
+	CloseTypeClientHalfOpen
+	CloseTypeClientHalfClose
 )
 
 type DeviceType uint8
