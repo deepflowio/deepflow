@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"sync"
 
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
@@ -25,6 +26,7 @@ type Document struct {
 	Timestamp uint32
 	Tag
 	Meter
+	Pool *sync.Pool
 }
 
 func (d Document) String() string {
