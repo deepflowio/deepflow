@@ -27,6 +27,12 @@ func (m *FlowMeter) ConcurrentMerge(other app.Meter) {
 		m.SumFlowCount += pm.SumFlowCount
 		m.SumNewFlowCount += pm.SumNewFlowCount
 		m.SumClosedFlowCount += pm.SumClosedFlowCount
+		m.SumPacketTx += pm.SumPacketTx
+		m.SumPacketRx += pm.SumPacketRx
+		m.SumPacket += pm.SumPacket
+		m.SumBitTx += pm.SumBitTx
+		m.SumBitRx += pm.SumBitRx
+		m.SumBit += pm.SumBit
 
 		m.MaxFlowCount += pm.MaxFlowCount
 		m.MaxNewFlowCount += pm.MaxNewFlowCount
@@ -38,6 +44,12 @@ func (m *FlowMeter) SequentialMerge(other app.Meter) {
 		m.SumFlowCount += pm.SumFlowCount
 		m.SumNewFlowCount += pm.SumNewFlowCount
 		m.SumClosedFlowCount += pm.SumClosedFlowCount
+		m.SumPacketTx += pm.SumPacketTx
+		m.SumPacketRx += pm.SumPacketRx
+		m.SumPacket += pm.SumPacket
+		m.SumBitTx += pm.SumBitTx
+		m.SumBitRx += pm.SumBitRx
+		m.SumBit += pm.SumBit
 
 		m.MaxFlowCount = maxU64(m.MaxFlowCount, pm.MaxFlowCount)
 		m.MaxNewFlowCount = maxU64(m.MaxNewFlowCount, pm.MaxNewFlowCount)
