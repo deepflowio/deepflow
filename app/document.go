@@ -8,6 +8,8 @@ import (
 
 type Tag interface {
 	GetID(*utils.IntBuffer) string
+	GetCode() uint64
+	GetFastID() uint64
 	HasVariedField() bool
 	ToKVString() string
 	String() string
