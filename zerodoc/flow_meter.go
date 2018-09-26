@@ -11,6 +11,12 @@ type FlowMeter struct {
 	SumFlowCount       uint64
 	SumNewFlowCount    uint64
 	SumClosedFlowCount uint64
+	SumPacketTx        uint64
+	SumPacketRx        uint64
+	SumPacket          uint64
+	SumBitTx           uint64
+	SumBitRx           uint64
+	SumBit             uint64
 
 	MaxFlowCount    uint64
 	MaxNewFlowCount uint64
@@ -47,6 +53,18 @@ func (m *FlowMeter) ToKVString() string {
 	buf.WriteString(strconv.FormatUint(m.SumNewFlowCount, 10))
 	buf.WriteString("i,sum_closed_flow_count=")
 	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCount, 10))
+	buf.WriteString("i,sum_packet_tx=")
+	buf.WriteString(strconv.FormatUint(m.SumPacketTx, 10))
+	buf.WriteString("i,sum_packet_rx=")
+	buf.WriteString(strconv.FormatUint(m.SumPacketRx, 10))
+	buf.WriteString("i,sum_packet=")
+	buf.WriteString(strconv.FormatUint(m.SumPacket, 10))
+	buf.WriteString("i,sum_bit_tx=")
+	buf.WriteString(strconv.FormatUint(m.SumBitTx, 10))
+	buf.WriteString("i,sum_bit_rx=")
+	buf.WriteString(strconv.FormatUint(m.SumBitRx, 10))
+	buf.WriteString("i,sum_bit=")
+	buf.WriteString(strconv.FormatUint(m.SumBit, 10))
 
 	buf.WriteString("i,max_flow_count=")
 	buf.WriteString(strconv.FormatUint(m.MaxFlowCount, 10))
