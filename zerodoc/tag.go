@@ -449,6 +449,46 @@ func (t *Tag) GetID(buf *utils.IntBuffer) string {
 	return t.id
 }
 
+var FAST_CODES = []Code{
+	TAPType,
+	IP | TAPType,
+	L3EpcID | TAPType,
+	L3EpcID | IP | TAPType,
+	Policy | TAPType,
+	Policy | IP | TAPType,
+	Policy | IP | L3EpcID,
+}
+
+// GetFastID 返回uint64的ID，0代表该tag的code不在fast ID的范围内
+func (t *Tag) GetFastID() uint64 {
+	switch t.Code {
+	case TAPType:
+		return uint64(t.TAPType)
+	case IP | TAPType:
+		return (uint64(t.IP) << 32) | (uint64(t.TAPType) & 0xFFFFFFFF)
+	case L3EpcID | TAPType:
+		return (uint64(t.L3EpcID) << 32) | (uint64(t.TAPType) & 0xFFFFFFFF)
+	case L3EpcID | IP | TAPType:
+		// L3EpcID取30位，TAPType取2位
+		return (uint64(t.IP) << 32) | ((uint64(t.L3EpcID) & 0x3FFFFFFF) << 2) | (uint64(t.TAPType) & 0x3)
+	case Policy | TAPType:
+		// PolicyType取2位（直接截取即可，因为对于目前四种类型，后两位都不一样）
+		return (uint64(t.PolicyID) << 34) | ((uint64(t.PolicyType) & 0x3) << 32) | (uint64(t.TAPType) & 0xFFFFFFFF)
+	case Policy | IP | TAPType:
+		// PolicyID取28位，PolicyType取2位，TAPType取2位
+		return (uint64(t.IP) << 32) | ((uint64(t.PolicyID) & 0x0FFFFFFF) << 4) | ((uint64(t.PolicyType) & 0x3) << 2) | (uint64(t.TAPType) & 0x3)
+	case Policy | IP | L3EpcID:
+		// PolicyID取14位，PolicyType取2位，L3EpcID取16位
+		return (uint64(t.IP) << 32) | ((uint64(t.L3EpcID) & 0xFFFF) << 16) | ((uint64(t.PolicyID) & 0x3FFF) << 2) | (uint64(t.PolicyType) & 0x3)
+	default:
+		return 0
+	}
+}
+
+func (t *Tag) GetCode() uint64 {
+	return uint64(t.Code)
+}
+
 func (t *Tag) HasVariedField() bool {
 	return t.Code&ServerPort != 0
 }
