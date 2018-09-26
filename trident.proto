@@ -74,16 +74,6 @@ message Acl {
     optional uint32 payload_slice = 10;
 }
 
-message InterfaceAcl {
-    optional uint32 vni = 1;
-    optional string mac = 2;
-    optional string tap_mac = 3;
-    optional uint64 pps_threshold = 4 [default = 0];
-
-    repeated Acl header_acls = 10;
-    repeated Acl packet_acls = 11;
-}
-
 message Segment { // e.g. single LAN area
     optional uint32 id = 1;
     repeated string mac = 2;
@@ -195,8 +185,8 @@ message SyncResponse {
     optional Config config = 2;
     optional uint64 version = 3 [default = 0]; /* in addition to config field */
 
-    repeated InterfaceAcl interface_acls = 10;
-    repeated Segment local_segments = 11;
+    repeated Segment local_segments = 10;
+    repeated Segment remote_segments = 11;
     optional PlatformData platform_data = 12;
     repeated FlowAcl flow_acls = 13;
 }
