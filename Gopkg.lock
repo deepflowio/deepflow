@@ -218,7 +218,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "a629097dd9ab7e9c084b86fb61d2f0a5c62d56fb"
+  revision = "276b70119e725eeb6d826a7a5371064c264fcea3"
 
 [[projects]]
   branch = "master"

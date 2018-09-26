@@ -44,6 +44,9 @@ type LabelerManager struct {
 const (
 	LABELER_CMD_DUMP_PLATFORM = iota
 	LABELER_CMD_DUMP_ACL
+	LABELER_CMD_SHOW_ACL
+	LABELER_CMD_ADD_ACL
+	LABELER_CMD_DEL_ACL
 )
 
 type DumpKey struct {
@@ -116,6 +119,7 @@ func GetTapType(inPort uint32) datatype.TapType {
 
 func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *datatype.PolicyData {
 	key := &datatype.LookupKey{
+		Timestamp: packet.Timestamp,
 		SrcMac:    uint64(packet.MacSrc),
 		DstMac:    uint64(packet.MacDst),
 		SrcIp:     uint32(packet.IpSrc),
@@ -245,12 +249,69 @@ func (l *LabelerManager) recvDumpAcl(conn *net.UDPConn, port int, arg *bytes.Buf
 	dropletctl.SendToDropletCtl(conn, port, 0, &buffer)
 }
 
+func (l *LabelerManager) recvShowAcl(conn *net.UDPConn, port int, arg *bytes.Buffer) {
+	acls := l.policyTable.GetAcl()
+
+	acl := &policy.Acl{Vlan: 0xffff} // vlan=0xffff 作为命令行判断结束的条件
+	acls = append(acls, acl)
+
+	first, fast := l.policyTable.GetHitStatus()
+	output := fmt.Sprintf("FirstHits: %d FastHits: %d", first, fast)
+	buffer := bytes.Buffer{}
+	encoder := gob.NewEncoder(&buffer)
+	if err := encoder.Encode(&output); err != nil {
+		log.Errorf("encoder.Encode: %s", err)
+	}
+	dropletctl.SendToDropletCtl(conn, port, 0, &buffer)
+
+	for _, acl := range acls {
+		buffer := bytes.Buffer{}
+		encoder := gob.NewEncoder(&buffer)
+		if err := encoder.Encode(acl); err != nil {
+			log.Errorf("encoder.Encode: %s", err)
+			continue
+		}
+
+		dropletctl.SendToDropletCtl(conn, port, 0, &buffer)
+	}
+}
+
+func (l *LabelerManager) recvAddAcl(conn *net.UDPConn, port int, arg *bytes.Buffer) {
+	acl := policy.Acl{}
+
+	decoder := gob.NewDecoder(arg)
+	if err := decoder.Decode(&acl); err != nil {
+		log.Error(err)
+		dropletctl.SendToDropletCtl(conn, port, 1, nil)
+		return
+	}
+	l.policyTable.AddAcl(&acl)
+}
+
+func (l *LabelerManager) recvDelAcl(conn *net.UDPConn, port int, arg *bytes.Buffer) {
+	var id int
+
+	decoder := gob.NewDecoder(arg)
+	if err := decoder.Decode(&id); err != nil {
+		log.Error(err)
+		dropletctl.SendToDropletCtl(conn, port, 1, nil)
+		return
+	}
+	l.policyTable.DelAcl(id)
+}
+
 func (l *LabelerManager) RecvCommand(conn *net.UDPConn, port int, operate uint16, arg *bytes.Buffer) {
 	switch operate {
 	case LABELER_CMD_DUMP_PLATFORM:
 		l.recvDumpPlatform(conn, port, arg)
 	case LABELER_CMD_DUMP_ACL:
 		l.recvDumpAcl(conn, port, arg)
+	case LABELER_CMD_SHOW_ACL:
+		l.recvShowAcl(conn, port, arg)
+	case LABELER_CMD_ADD_ACL:
+		l.recvAddAcl(conn, port, arg)
+	case LABELER_CMD_DEL_ACL:
+		l.recvDelAcl(conn, port, arg)
 	}
 }
 
@@ -449,6 +510,159 @@ func dumpAcl(cmdLine string) {
 	fmt.Printf("%s:\n\t%+v\n", cmdLine, info)
 }
 
+func showAcl() {
+	conn, result, err := dropletctl.SendToDroplet(dropletctl.DROPLETCTL_LABELER, LABELER_CMD_SHOW_ACL, nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	var info string
+	decoder := gob.NewDecoder(result)
+	if err := decoder.Decode(&info); err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Printf("%s\n", info)
+
+	acl := policy.Acl{}
+	for {
+		buffer, err := dropletctl.RecvFromDroplet(conn)
+		if err != nil {
+			fmt.Println(err)
+		}
+		decoder := gob.NewDecoder(buffer)
+		if err := decoder.Decode(&acl); err != nil {
+			fmt.Println(err)
+			return
+		}
+		if acl.Vlan == 0xffff {
+			break
+		}
+		fmt.Printf("\t%+v\n", acl)
+	}
+}
+
+func delAcl(arg string) {
+	id, err := strconv.Atoi(arg)
+	if id < 0 || err != nil {
+		fmt.Printf("invalid id from %s\n", arg)
+		return
+	}
+	buffer := bytes.Buffer{}
+	encoder := gob.NewEncoder(&buffer)
+	if err := encoder.Encode(&id); err != nil {
+		fmt.Println(err)
+		return
+	}
+	dropletctl.SendToDroplet(dropletctl.DROPLETCTL_LABELER, LABELER_CMD_DEL_ACL, &buffer)
+}
+
+func parseAcl(args []string) *policy.Acl {
+	acl := &policy.Acl{}
+	acl.SrcGroups = make(map[uint32]uint32)
+	acl.DstGroups = make(map[uint32]uint32)
+
+	parts := strings.Split(args[0], ",")
+	for _, part := range parts {
+		keyValue := strings.Split(part, "=")
+		switch keyValue[0] {
+		case "sgroup":
+			group, err := strconv.Atoi(keyValue[1])
+			if err != nil || group < 0 {
+				fmt.Printf("invalid sgroup %s from %s\n", keyValue[1], args[0])
+				return nil
+			}
+			acl.SrcGroups[uint32(group)] = uint32(group)
+		case "dgroup":
+			group, err := strconv.Atoi(keyValue[1])
+			if err != nil || group < 0 {
+				fmt.Printf("invalid sgroup %s from %s\n", keyValue[1], args[0])
+				return nil
+			}
+			acl.DstGroups[uint32(group)] = uint32(group)
+		case "id":
+			id, err := strconv.Atoi(keyValue[1])
+			if err != nil || id < 0 {
+				fmt.Printf("invalid id %s from %s\n", keyValue[1], args[0])
+				return nil
+			}
+			acl.Id = uint32(id)
+		case "proto":
+			proto, err := strconv.Atoi(keyValue[1])
+			if err != nil || proto < 0 || proto > 255 {
+				fmt.Printf("invalid proto %s from %s\n", keyValue[1], args[0])
+				return nil
+			}
+			acl.Proto = uint8(proto)
+		case "tap":
+			switch keyValue[1] {
+			case "any":
+				acl.Type = datatype.TAP_ANY
+			case "isp":
+				acl.Type = datatype.TAP_ISP
+			case "tor":
+				acl.Type = datatype.TAP_TOR
+			default:
+				fmt.Printf("invalid tap %s from %s\n", keyValue[1], args[0])
+				return nil
+			}
+		case "vlan":
+			vlan, err := strconv.Atoi(keyValue[1])
+			if err != nil || vlan > 4096 || vlan < 0 {
+				fmt.Printf("invalid vlan %s from %s\n", keyValue[1], args[0])
+				return nil
+			}
+			acl.Vlan = uint32(vlan)
+		case "port":
+			port, err := strconv.Atoi(keyValue[1])
+			if err != nil || port > 65535 || port < 0 {
+				fmt.Printf("invalid port %s from %s\n", keyValue[1], args[0])
+				return nil
+			}
+			acl.DstPorts = make(map[uint16]uint16)
+			acl.DstPorts[uint16(port)] = uint16(port)
+		case "action":
+			action := &datatype.AclAction{}
+			switch keyValue[1] {
+			case "metering":
+				action.Type = datatype.ACTION_PACKET_STAT | datatype.ACTION_PACKECT_COUNTER_PUB
+			case "flow":
+				action.Type = datatype.ACTION_FLOW_STAT | datatype.ACTION_FLOW_COUNTER_PUB | datatype.ACTION_FLOW_STORE
+			default:
+				fmt.Printf("invalid tap %s from %s\n", keyValue[1], args[0])
+				return nil
+			}
+			action.AclId = acl.Id
+			acl.Action = append(acl.Action, action)
+		default:
+			fmt.Printf("invalid key from %s\n", args[0])
+			return nil
+		}
+	}
+	if acl.Id == 0 || len(acl.Action) == 0 {
+		fmt.Printf("invalid input %s\n", args[0])
+		return nil
+	}
+	return acl
+}
+
+func addAcl(args []string) {
+	acl := parseAcl(args)
+	if acl == nil {
+		return
+	}
+
+	buffer := bytes.Buffer{}
+	encoder := gob.NewEncoder(&buffer)
+	if err := encoder.Encode(acl); err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Printf("acl: %+v\n", acl)
+	dropletctl.SendToDroplet(dropletctl.DROPLETCTL_LABELER, LABELER_CMD_ADD_ACL, &buffer)
+}
+
 func RegisterCommand() *cobra.Command {
 	labeler := &cobra.Command{
 		Use:   "labeler",
@@ -471,7 +685,7 @@ func RegisterCommand() *cobra.Command {
 	}
 	dumpAcl := &cobra.Command{
 		Use:   "dump-acl {filter}",
-		Short: "show policy list",
+		Short: "search policy and endpoint",
 		Long: "droplet-ctl labeler dump-acl {[key=value]+}\n" +
 			"key list:\n" +
 			"\ttap         use 'isp|tor'\n" +
@@ -491,7 +705,53 @@ func RegisterCommand() *cobra.Command {
 			dumpAcl(args[0])
 		},
 	}
+	showAcl := &cobra.Command{
+		Use:     "show-acl",
+		Short:   "show policy list",
+		Example: "droplet-ctl labeler show-acl",
+		Run: func(cmd *cobra.Command, args []string) {
+			showAcl()
+		},
+	}
+	delAcl := &cobra.Command{
+		Use:     "del-acl {id}",
+		Short:   "delete policy",
+		Example: "droplet-ctl labeler del-acl 1",
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) < 1 {
+				fmt.Printf("filter is nil, Example: %s\n", cmd.Example)
+				return
+			}
+			delAcl(args[0])
+		},
+	}
+	addAcl := &cobra.Command{
+		Use:     "add-acl {[key=value]+}",
+		Short:   "add policy",
+		Example: "droplet-ctl labeler add-acl vlan=10,port=100,action=flow",
+		Long: "droplet-ctl labeler add-acl {[key=value]+}\n" +
+			"key list:\n" +
+			"\tid                 acl id and action id\n" +
+			"\ttap                use 'isp|tor|any'\n" +
+			"\tvlan               packet vlan\n" +
+			"\tsgroup/dgroup      group id\n" +
+			"\tproto              packet ip proto\n" +
+			"\tport               packet port\n" +
+			"\taction             use 'flow|metering'\n\n" +
+			"\taction: flow=ACTION_PACKET_STAT|ACTION_PACKECT_COUNTER_PUB\n" +
+			"\t        metering=ACTION_FLOW_STAT|ACTION_FLOW_COUNTER_PUB|ACTION_FLOW_STORE",
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) < 1 {
+				fmt.Printf("acl is nil, Example: %s\n", cmd.Example)
+				return
+			}
+			addAcl(args)
+		},
+	}
 	labeler.AddCommand(dump)
 	labeler.AddCommand(dumpAcl)
+	labeler.AddCommand(showAcl)
+	labeler.AddCommand(delAcl)
+	labeler.AddCommand(addAcl)
 	return labeler
 }
