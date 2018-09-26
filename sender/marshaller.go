@@ -55,6 +55,13 @@ func (m *ZeroDocumentMarshaller) Start() {
 				log.Warningf("Invalid message type %T, should be []byte", doc)
 			}
 		}
+		for _, e := range buffer[:n] {
+			if doc, ok := e.(*app.Document); ok {
+				if doc.Pool != nil {
+					doc.Pool.Put(doc)
+				}
+			}
+		}
 		for _, outQueue := range m.outputs {
 			outQueue.Put(outBuffer[:nOut]...)
 		}
