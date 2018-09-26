@@ -140,6 +140,12 @@ message FlowMeter {
     optional uint64 sum_flow_count = 1;
     optional uint64 sum_new_flow_count = 2;
     optional uint64 sum_closed_flow_count = 3;
+    optional uint64 sum_packet_tx = 4;
+    optional uint64 sum_packet_rx = 5;
+    optional uint64 sum_packet = 6;
+    optional uint64 sum_bit_tx = 7;
+    optional uint64 sum_bit_rx = 8;
+    optional uint64 sum_bit = 9;
 
     optional uint64 max_flow_count = 51;
     optional uint64 max_new_flow_count = 52;
