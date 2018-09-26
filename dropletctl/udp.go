@@ -51,7 +51,7 @@ func SendToDroplet(module DropletCtlModuleId, operate DropletCtlModuleOperate, a
 	}
 	sendBuffer := bytes.Buffer{}
 
-	conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	msg := DropletMessage{Module: uint16(module), Operate: uint16(operate), Result: 0}
 	if args != nil {
 		args.Read(msg.Args[:])
