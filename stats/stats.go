@@ -87,11 +87,7 @@ func sendCounter(client *statsd.Client, counter interface{}) {
 	if items, ok := counter.([]StatItem); ok {
 		for _, item := range items {
 			statsName := strings.Replace(item.Name, "-", "_", -1)
-			if item.StatType == COUNT_TYPE {
-				client.Count(statsName, item.Value)
-			} else { // GAUGE_TYPE
-				client.Gauge(statsName, item.Value)
-			}
+			client.Count(statsName, item.Value)
 		}
 		return
 	}
@@ -109,17 +105,8 @@ func sendCounter(client *statsd.Client, counter interface{}) {
 		}
 		statsOpts := strings.Split(statsTag, ",")
 		name := strings.Replace(statsOpts[0], "-", "_", -1)
-		statsType := "count"
-		if len(statsOpts) > 1 {
-			statsType = statsOpts[1]
-		}
 		value := val.Field(i).Interface()
-		switch statsType {
-		case "gauge":
-			client.Gauge(name, value)
-		default: // count
-			client.Count(name, value)
-		}
+		client.Count(name, value)
 	}
 }
 
