@@ -156,8 +156,8 @@ func runOnce() {
 
 	lock.Lock()
 	for countable, statSource := range statSources {
+		statSource.skip--
 		if statSource.skip > 0 {
-			statSource.skip--
 			continue
 		}
 		counter := countable.GetCounter()
@@ -169,7 +169,7 @@ func runOnce() {
 			sendCounter(client, counter)
 		}
 		interval := max(statSource.interval, MinInterval)
-		statSource.skip = int(interval/time.Second) - 1
+		statSource.skip = int(interval / time.Second)
 	}
 	lock.Unlock()
 }

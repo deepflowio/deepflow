@@ -13,8 +13,8 @@ import (
 var log = logging.MustGetLogger("monitor")
 
 type Counter struct {
-	CpuPercent float64 `statsd:"cpu_percent"`
-	Memory     uint64  `statsd:"memory"` // physical + swap in bytes
+	CpuPercent float64 `statsd:"cpu_percent,gauge"`
+	Memory     uint64  `statsd:"memory,gauge"` // physical + swap in bytes
 }
 
 type Monitor process.Process
