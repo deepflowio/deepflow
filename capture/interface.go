@@ -46,18 +46,15 @@ func StartCapture(interfaceName string, ip net.IP, outputQueue queue.MultiQueueW
 		log.Warning("BPF inject failed:", err)
 	}
 
-	tapHandler := (&TapHandler{
-		ip:    IpToUint32(ip),
-		queue: outputQueue,
-	}).Init(interfaceName)
-
-	handler := PacketHandler(tapHandler)
-
 	cap := &Capture{
+		PacketHandler: PacketHandler{
+			ip:    IpToUint32(ip),
+			queue: outputQueue,
+		},
 		tPacket: tPacket,
 		counter: &PacketCounter{},
-		handler: handler,
 	}
+	cap.PacketHandler.Init(interfaceName)
 	cap.Start()
 	stats.RegisterCountable("capture", cap, stats.OptionStatTags{"interface": interfaceName})
 	instance := io.Closer(cap)
