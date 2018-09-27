@@ -35,8 +35,9 @@ type PacketCounter struct {
 }
 
 type Capture struct {
+	PacketHandler
+
 	tPacket *afpacket.TPacket
-	handler PacketHandler
 
 	counter     *PacketCounter
 	issueStop   bool
@@ -123,7 +124,7 @@ func (c *Capture) run() (retErr error) {
 			prevTimestamp = timestamp
 		}
 		c.counter.Rx++
-		c.handler.Handle(timestamp, packet, ci.Length)
+		c.Handle(timestamp, packet, ci.Length)
 	}
 	c.running = false
 	c.issueStop = false

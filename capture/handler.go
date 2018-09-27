@@ -16,13 +16,9 @@ type Timestamp = time.Duration
 type RawPacket = []byte
 type PacketSize = int
 
-type PacketHandler interface {
-	Handle(Timestamp, RawPacket, PacketSize)
-}
-
 type MetaPacketBlock = [1024]datatype.MetaPacket
 
-type TapHandler struct {
+type PacketHandler struct {
 	sync.Pool
 
 	block       *MetaPacketBlock
@@ -34,13 +30,13 @@ type TapHandler struct {
 	dedupTable *dedup.DedupTable
 }
 
-func (h *TapHandler) preAlloc() *datatype.MetaPacket {
+func (h *PacketHandler) preAlloc() *datatype.MetaPacket {
 	metaPacket := &h.block[h.blockCursor]
 	metaPacket.Exporter = h.ip
 	return metaPacket
 }
 
-func (h *TapHandler) confirmAlloc() {
+func (h *PacketHandler) confirmAlloc() {
 	h.blockCursor++
 	if h.blockCursor >= len(*h.block) {
 		h.block = h.Get().(*MetaPacketBlock)
@@ -48,7 +44,7 @@ func (h *TapHandler) confirmAlloc() {
 	}
 }
 
-func (h *TapHandler) Handle(timestamp Timestamp, packet RawPacket, size PacketSize) {
+func (h *PacketHandler) Handle(timestamp Timestamp, packet RawPacket, size PacketSize) {
 	metaPacket := h.preAlloc()
 	l2Len := metaPacket.ParseL2(packet)
 	if metaPacket.Invalid {
@@ -76,7 +72,7 @@ func (h *TapHandler) Handle(timestamp Timestamp, packet RawPacket, size PacketSi
 	h.queue.Put(queue.HashKey(metaPacket.GenerateHash()), metaPacket)
 }
 
-func (h *TapHandler) Init(interfaceName string) *TapHandler {
+func (h *PacketHandler) Init(interfaceName string) *PacketHandler {
 	h.dedupTable = dedup.NewDedupTable(interfaceName)
 	gc := func(b *MetaPacketBlock) {
 		*b = MetaPacketBlock{} // 重新初始化，避免无效的数据或不可预期的引用
