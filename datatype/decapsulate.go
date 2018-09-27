@@ -17,7 +17,10 @@ const (
 )
 
 func (t TunnelType) String() string {
-	return "vxlan"
+	if t == TUNNEL_TYPE_VXLAN {
+		return "vxlan"
+	}
+	return "none"
 }
 
 type TunnelInfo struct {

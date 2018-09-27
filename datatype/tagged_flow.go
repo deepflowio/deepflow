@@ -10,5 +10,5 @@ type TaggedFlow struct {
 }
 
 func (f *TaggedFlow) String() string {
-	return fmt.Sprintf("Flow: %+v, Tag: %+v", f.Flow, f.Tag)
+	return fmt.Sprintf("Flow: %s, Tag: %+v", f.Flow.String(), f.Tag)
 }
