@@ -475,7 +475,7 @@ func BenchmarkShortFlowList(b *testing.B) {
 	}
 	b.ResetTimer()
 	flowGenerator.packetHandler.Add(1)
-	flowGenerator.processPackets(processBuffer, b.N)
+	flowGenerator.processPackets(processBuffer)
 	b.StopTimer()
 	maxFlowListLen := 0
 	for _, flowCache := range flowGenerator.hashMap[0:] {
@@ -500,7 +500,7 @@ func BenchmarkLongFlowList(b *testing.B) {
 	}
 	b.ResetTimer()
 	flowGenerator.packetHandler.Add(1)
-	flowGenerator.processPackets(processBuffer, b.N)
+	flowGenerator.processPackets(processBuffer)
 	b.StopTimer()
 	maxFlowListLen := 0
 	for _, flowCache := range flowGenerator.hashMap[0:] {
