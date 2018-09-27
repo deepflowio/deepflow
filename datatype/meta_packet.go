@@ -3,15 +3,12 @@ package datatype
 import (
 	"bytes"
 	"fmt"
-	"sync"
 	"time"
 
 	. "github.com/google/gopacket/layers"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
-
-var pool = sync.Pool{}
 
 const VLAN_ID_MASK = uint16((1 << 12) - 1)
 const MIRRORED_TRAFFIC = 7
@@ -221,19 +218,4 @@ func (p *MetaPacket) String() string {
 		buffer.WriteString(fmt.Sprintf("\n\tPolicyData(%+v)", *p.PolicyData))
 	}
 	return buffer.String()
-}
-
-func AcquireMetaPacket() *MetaPacket {
-	return pool.Get().(*MetaPacket)
-}
-
-func ReleaseMetaPacket(packet *MetaPacket) {
-	*packet = MetaPacket{}
-	pool.Put(packet)
-}
-
-func init() {
-	pool.New = func() interface{} {
-		return new(MetaPacket)
-	}
 }
