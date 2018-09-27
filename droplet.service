@@ -9,7 +9,7 @@ WorkingDirectory=/tmp/
 ExecStart=/usr/sbin/droplet
 Restart=on-failure
 RestartSec=10
-MemoryLimit=1G
+MemoryLimit=20G
 
 [Install]
 WantedBy=multi-user.target
