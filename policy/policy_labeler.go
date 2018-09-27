@@ -154,6 +154,22 @@ func generateGroupPortKeys(srcGroups []uint32, dstGroups []uint32, port uint16, 
 	return keys
 }
 
+func generateSearchPortKeys(srcGroups []uint32, dstGroups []uint32, srcPort uint16, dstPort uint16, proto uint8) []uint64 {
+	keys := generateGroupPortKeys(srcGroups, dstGroups, dstPort, proto)
+	// port都是0的情况，只查询一次
+	if srcPort != 0 || dstPort != 0 {
+		keys = append(keys, generateGroupPortKeys(dstGroups, srcGroups, srcPort, proto)...)
+	}
+	// FirstPath在生成key时，也需要生成全采集对应的key
+	if dstPort != 0 {
+		keys = append(keys, generateGroupPortKeys(srcGroups, dstGroups, 0, proto)...)
+	}
+	if srcPort != 0 && !reflect.DeepEqual(srcGroups, dstGroups) {
+		keys = append(keys, generateGroupPortKeys(dstGroups, srcGroups, 0, proto)...)
+	}
+	return keys
+}
+
 func generateGroupPortsKeys(acl *Acl, direction DirectionType) []uint64 {
 	keys := make([]uint64, 0, 10)
 
@@ -365,12 +381,27 @@ func (l *PolicyLabel) GenerateInterestMaps(acls []*Acl) {
 	l.InterestPortMaps = interestPortMaps
 }
 
-func (l *PolicyLabel) UpdateAcls(acl []*Acl) {
-	if !reflect.DeepEqual(acl, l.RawAcls) {
-		l.RawAcls = acl
-		l.GenerateGroupPortMaps(acl)
-		l.GenerateGroupVlanMaps(acl)
-		l.GenerateInterestMaps(acl)
+func (l *PolicyLabel) UpdateAcls(acls []*Acl) {
+	if !reflect.DeepEqual(acls, l.RawAcls) {
+		l.RawAcls = acls
+
+		generateAcls := make([]*Acl, 0, len(acls))
+		for _, acl := range acls {
+			if acl.Type == TAP_ANY {
+				// 对于TAP_ANY策略，给其他每一个TAP类型都单独生成一个acl，来避免查找2次
+				for i := TAP_ANY + 1; i < TAP_MAX; i++ {
+					generateAcl := &Acl{}
+					*generateAcl = *acl
+					generateAcl.Type = i
+					generateAcls = append(generateAcls, generateAcl)
+				}
+			} else {
+				generateAcls = append(generateAcls, acl)
+			}
+		}
+		l.GenerateGroupPortMaps(generateAcls)
+		l.GenerateGroupVlanMaps(generateAcls)
+		l.GenerateInterestMaps(generateAcls)
 
 		for i := 0; i < len(l.FastPolicyMaps); i++ {
 			l.FastPolicyMaps[i] = lru.New(int(l.mapSize))
@@ -432,20 +463,10 @@ func (l *PolicyLabel) GetPolicyByFirstPath(endpointData *EndpointData, packet *L
 	}
 
 	// 在port map中查找策略
-	keys := generateGroupPortKeys(packet.SrcGroupIds, packet.DstGroupIds, packet.DstPort, packet.Proto)
+	keys := generateSearchPortKeys(packet.SrcGroupIds, packet.DstGroupIds, packet.SrcPort, packet.DstPort, packet.Proto)
 	for _, key := range keys {
 		if policy := portGroup[key]; policy != nil {
 			findPolicy.Merge(policy.AclActions)
-		}
-	}
-
-	// port都是0的情况，只查询一次
-	if packet.SrcPort != 0 || packet.DstPort != 0 {
-		keys = generateGroupPortKeys(packet.DstGroupIds, packet.SrcGroupIds, packet.SrcPort, packet.Proto)
-		for _, key := range keys {
-			if policy := portGroup[key]; policy != nil {
-				findPolicy.Merge(policy.AclActions)
-			}
 		}
 	}
 
@@ -520,7 +541,7 @@ func (l *PolicyLabel) getFastInterestKeys(packet *LookupKey) {
 			packet.SrcPort = 0
 		}
 		if !l.InterestPortMaps[packet.Tap][packet.DstPort] {
-			packet.SrcPort = 0
+			packet.DstPort = 0
 		}
 	}
 
@@ -534,9 +555,6 @@ func (l *PolicyLabel) getFastInterestKeys(packet *LookupKey) {
 func (l *PolicyLabel) getFastPortPolicy(portPolicyMap *lru.Cache, packet *LookupKey) *FastPathMapValue {
 	srcEpc := uint64(l.MacEpcMaps[packet.SrcMac])
 	dstEpc := uint64(l.MacEpcMaps[packet.DstMac])
-	if (srcEpc == 0 && dstEpc == 0) || portPolicyMap == nil {
-		return nil
-	}
 
 	var value *FastPathMapValue
 	key := dstEpc<<44 | srcEpc<<24 | uint64(packet.Proto)<<16 | uint64(packet.SrcPort)
@@ -562,9 +580,6 @@ found:
 func (l *PolicyLabel) getFastVlanPolicy(vlanPolicyMap *lru.Cache, packet *LookupKey) *FastPathMapValue {
 	srcEpc := uint64(l.MacEpcMaps[packet.SrcMac])
 	dstEpc := uint64(l.MacEpcMaps[packet.DstMac])
-	if (srcEpc == 0 && dstEpc == 0) || vlanPolicyMap == nil {
-		return nil
-	}
 
 	var value *FastPathMapValue
 	key := uint64(packet.Vlan) | uint64(srcEpc)<<32 | uint64(dstEpc)<<12
@@ -606,6 +621,7 @@ func (l *PolicyLabel) getVlanAndPortMap(packet *LookupKey, create bool) *VlanAnd
 func (l *PolicyLabel) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *PolicyData) {
 	policy := &PolicyData{}
 	var endpoint *EndpointData
+	found := false
 
 	l.getFastInterestKeys(packet)
 	if maps := l.getVlanAndPortMap(packet, false); maps != nil {
@@ -613,13 +629,21 @@ func (l *PolicyLabel) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *Po
 			if vlan := l.getFastVlanPolicy(maps.vlanPolicyMap, packet); vlan != nil {
 				policy.Merge(vlan.policy.AclActions)
 				endpoint = vlan.endpoint
+				found = true
 			}
 		}
 		if port := l.getFastPortPolicy(maps.portPolicyMap, packet); port != nil {
 			policy.Merge(port.policy.AclActions)
 			endpoint = port.endpoint
+			found = true
 		}
+		if !found {
+			goto unfound
+		}
+		atomic.AddUint64(&l.FastPathHit, 1)
+		atomic.AddUint64(&l.FastPathHitTick, 1)
 		return endpoint, policy
 	}
-	return nil, policy
+unfound:
+	return nil, INVALID_POLICY_DATA
 }
