@@ -58,6 +58,8 @@ message Tag {
     optional DeviceType l3_device_type_0 = 31;
     optional uint32 l3_device_id_1 = 32;
     optional DeviceType l3_device_type_1 = 33;
+    optional uint32 host_0 = 34;
+    optional uint32 host_1 = 35;
 
     optional Direction direction = 40;
     optional uint32 policy_id = 41;
