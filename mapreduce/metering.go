@@ -134,11 +134,6 @@ func (f *subHandler) Process() error {
 				}
 			}
 		}
-		for _, e := range elements[:n] {
-			if e != nil {
-				datatype.ReleaseMetaPacket(e.(*datatype.MetaPacket))
-			}
-		}
 		f.lastProcess = time.Duration(time.Now().UnixNano())
 	}
 }
