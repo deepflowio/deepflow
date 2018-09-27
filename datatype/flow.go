@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/google/gopacket/layers"
+
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 type CloseType uint8
@@ -130,7 +132,7 @@ type Flow struct {
 }
 
 func (t *TcpPerfStats) String() string {
-	var formatStr string
+	formatted := ""
 
 	if t == nil {
 		return ""
@@ -139,43 +141,50 @@ func (t *TcpPerfStats) String() string {
 	typeOf := reflect.TypeOf(*t)
 	valueOf := reflect.ValueOf(*t)
 	for i := 0; i < typeOf.NumField(); i++ {
-		formatStr += fmt.Sprintf("%v: %v ", typeOf.Field(i).Name, valueOf.Field(i))
+		formatted += fmt.Sprintf("%v: %v ", typeOf.Field(i).Name, valueOf.Field(i))
 	}
-	return formatStr
+	return formatted
 }
 
 func (f *FlowKey) String() string {
-	var formatStr string
-	typeOf := reflect.TypeOf(*f)
-	valueOf := reflect.ValueOf(*f)
-	for i := 0; i < typeOf.NumField(); i++ {
-		formatStr += fmt.Sprintf("%v: %v ", typeOf.Field(i).Name, valueOf.Field(i))
-	}
-	return formatStr
+	formatted := ""
+	formatted += fmt.Sprintf("TunnelInfo: {%s} ", f.TunnelInfo.String())
+	formatted += fmt.Sprintf("Exporter: %s ", IpFromUint32(f.Exporter))
+	formatted += fmt.Sprintf("InPort: %d ", f.InPort)
+	formatted += fmt.Sprintf("MACSrc: %s ", Uint64ToMac(f.MACSrc))
+	formatted += fmt.Sprintf("MACDst: %s ", Uint64ToMac(f.MACDst))
+	formatted += fmt.Sprintf("IPSrc: %s ", IpFromUint32(f.IPSrc))
+	formatted += fmt.Sprintf("IPDst: %s ", IpFromUint32(f.IPDst))
+	formatted += fmt.Sprintf("Proto: %v ", f.Proto)
+	formatted += fmt.Sprintf("PortSrc: %d ", f.PortSrc)
+	formatted += fmt.Sprintf("PortDst: %d ", f.PortDst)
+	return formatted
 }
 
 func (f *FlowMetricsPeer) String() string {
-	var formatStr string
-	typeOf := reflect.TypeOf(*f)
-	valueOf := reflect.ValueOf(*f)
-	for i := 0; i < typeOf.NumField(); i++ {
-		formatStr += fmt.Sprintf("%v: %v ", typeOf.Field(i).Name, valueOf.Field(i))
-	}
-	return formatStr
-}
-
-func (f *Flow) String() string {
 	formatted := ""
 	typeOf := reflect.TypeOf(*f)
 	valueOf := reflect.ValueOf(*f)
 	for i := 0; i < typeOf.NumField(); i++ {
+		formatted += fmt.Sprintf("%v: %v ", typeOf.Field(i).Name, valueOf.Field(i))
+	}
+	return formatted
+}
+
+func (f *Flow) String() string {
+	formatted := ""
+	formatted += fmt.Sprintf("FlowKey: %s ", f.FlowKey.String())
+	formatted += fmt.Sprintf("CloseType: %d ", f.CloseType)
+	typeOf := reflect.TypeOf(*f)
+	valueOf := reflect.ValueOf(*f)
+	for i := 2; i < typeOf.NumField(); i++ {
 		field := typeOf.Field(i)
 		value := valueOf.Field(i)
 		if v := value.MethodByName("String"); v.IsValid() {
 			results := v.Call([]reflect.Value{})
 			formatted += results[0].String()
 		} else {
-			formatted += fmt.Sprintf("%v: %v ", field.Name, value)
+			formatted += fmt.Sprintf("%v: %+v ", field.Name, value)
 		}
 	}
 	return formatted
