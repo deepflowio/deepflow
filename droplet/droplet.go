@@ -63,7 +63,6 @@ func Start(configPath string) {
 	}
 
 	stats.SetMinInterval(10 * time.Second)
-	stats.SetRemotes(net.ParseIP(cfg.StatsdServer))
 
 	controllers := make([]net.IP, 0, len(cfg.ControllerIps))
 	for _, ipString := range cfg.ControllerIps {

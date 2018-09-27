@@ -19,7 +19,6 @@ var log = logging.MustGetLogger("config")
 type Config struct {
 	ControllerIps  []string            `yaml:"controller-ips"`
 	ControllerPort uint16              `yaml:"controller-port"`
-	StatsdServer   string              `yaml:"statsd-server"`
 	LogFile        string              `yaml:"log-file"`
 	LogLevel       string              `yaml:"log-level"`
 	Profiler       bool                `yaml:"profiler"`
@@ -65,10 +64,6 @@ func (c *Config) Validate() error {
 		if net.ParseIP(string(ipString)) == nil {
 			return errors.New("controller-ips invalid")
 		}
-	}
-
-	if net.ParseIP(c.StatsdServer) == nil {
-		return errors.New("Malformed statsd-server")
 	}
 
 	if c.LogFile == "" {

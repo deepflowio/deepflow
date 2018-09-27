@@ -2,8 +2,6 @@ controller-ips:
   - 127.0.0.1
 # controller listening port
 controller-port: 20035
-# remote statsd server
-statsd-server: 127.0.0.1
 # logfile path
 log-file: /var/log/droplet/droplet.log
 # loglevel: "debug/info/warn/error"
