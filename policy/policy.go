@@ -99,7 +99,7 @@ func NewPolicyTable(actionTypes ActionType, queueCount int, mapSize uint32) *Pol
 }
 
 func (t *PolicyTable) GetHitStatus() (uint64, uint64) {
-	return atomic.LoadUint64(&t.policyLabel.FirstPathHit), atomic.LoadUint64(&t.policyLabel.FirstPathHit)
+	return atomic.LoadUint64(&t.policyLabel.FirstPathHit), atomic.LoadUint64(&t.policyLabel.FastPathHit)
 }
 
 func (t *PolicyTable) AddAcl(acl *Acl) {
