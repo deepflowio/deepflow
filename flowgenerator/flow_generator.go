@@ -278,7 +278,6 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 			taggedFlow.FlowMetricsPeerDst.ArrTimeLast = packetTimestamp
 		} else {
 			packetTimestamp = maxArrTime
-			meta.Timestamp = maxArrTime
 		}
 		taggedFlow.FlowMetricsPeerDst.PacketCount++
 		taggedFlow.FlowMetricsPeerDst.TotalPacketCount++
@@ -292,7 +291,6 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 			taggedFlow.FlowMetricsPeerSrc.ArrTimeLast = packetTimestamp
 		} else {
 			packetTimestamp = maxArrTime
-			meta.Timestamp = maxArrTime
 		}
 		taggedFlow.FlowMetricsPeerSrc.PacketCount++
 		taggedFlow.FlowMetricsPeerSrc.TotalPacketCount++
@@ -368,27 +366,21 @@ func (f *FlowExtra) calcCloseType(force bool) {
 	}
 }
 
-func (f *FlowGenerator) processPackets(processBuffer []interface{}, gotSize int) {
-	i := 0
-loop:
-	if i >= gotSize {
-		f.packetHandler.Done()
-		return
+func (f *FlowGenerator) processPackets(processBuffer []interface{}) {
+	for _, e := range processBuffer {
+		meta := e.(*MetaPacket)
+		if meta.EthType != layers.EthernetTypeIPv4 {
+			f.processNonIpPacket(meta)
+		} else if meta.Protocol == layers.IPProtocolTCP {
+			f.processTcpPacket(meta)
+		} else if meta.Protocol == layers.IPProtocolUDP {
+			f.processUdpPacket(meta)
+		} else {
+			f.processOtherIpPacket(meta)
+		}
+		ReleaseMetaPacket(meta)
 	}
-	meta := processBuffer[i].(*MetaPacket)
-	i++
-	if meta.EthType != layers.EthernetTypeIPv4 {
-		f.processNonIpPacket(meta)
-		goto loop
-	}
-	if meta.Protocol == layers.IPProtocolTCP {
-		f.processTcpPacket(meta)
-	} else if meta.Protocol == layers.IPProtocolUDP {
-		f.processUdpPacket(meta)
-	} else {
-		f.processOtherIpPacket(meta)
-	}
-	goto loop
+	f.packetHandler.Done()
 }
 
 func (f *FlowGenerator) handlePackets() {
@@ -404,7 +396,7 @@ loop:
 		return
 	}
 	packetHandler.Add(1)
-	go f.processPackets(processBuffer, gotSize)
+	go f.processPackets(processBuffer[:gotSize])
 	gotSize = metaPacketInQueue.Gets(hashKey, recvBuffer)
 	packetHandler.Wait()
 	processBuffer, recvBuffer = recvBuffer, processBuffer
