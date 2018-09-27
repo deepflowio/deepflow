@@ -133,8 +133,8 @@ func (t *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *PolicyData {
 }
 
 func (t *PolicyTable) GetPolicyDataByFastPath(endpointData *EndpointData, key *LookupKey, fastKey *FastKey, index int) *PolicyData {
-	fastKey.Ports = uint64(key.SrcPort<<32) | uint64(key.DstPort)
-	fastKey.ProtoVlan = uint64(key.Proto<<32) | uint64(key.Vlan)
+	fastKey.Ports = (uint64(key.SrcPort) << 32) | uint64(key.DstPort)
+	fastKey.ProtoVlan = (uint64(key.Proto) << 32) | uint64(key.Vlan)
 	policyData := t.policyLabel.GetPolicyByFastPath(fastKey, key.Tap, key.FastIndex)
 	if policyData == nil {
 		policyData = t.GetPolicyData(endpointData, key)
