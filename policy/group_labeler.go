@@ -43,7 +43,7 @@ func ipGroupToEntries(data *IpGroupData) []tree.Entry {
 		interval := make([]tree.Interval, GROUP_TREE_DIMENSION)
 		interval[0] = epcRange
 		interval[1] = ipRange
-		entries = append(entries, tree.Entry{interval, leafValue(data.Id)})
+		entries = append(entries, tree.Entry{Intervals: interval, Value: leafValue(data.Id)})
 	}
 	return entries
 }

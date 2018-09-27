@@ -21,6 +21,7 @@ func TestFullEqual(t *testing.T) {
 		L2DeviceType: VGatewayDevice,
 		L3DeviceID:   5,
 		L3DeviceType: VMDevice,
+		Host:         0xac100197,
 
 		IP0:           0x0a2102c8,
 		IP1:           0x0a2102ca,
@@ -40,6 +41,8 @@ func TestFullEqual(t *testing.T) {
 		L3DeviceType0: VMDevice,
 		L3DeviceID1:   6,
 		L3DeviceType1: VMDevice,
+		Host0:         0xac100197,
+		Host1:         0xac100198,
 
 		Direction:  ClientToServer,
 		PolicyType: 3,
@@ -47,7 +50,6 @@ func TestFullEqual(t *testing.T) {
 		VLANID:     123,
 		Protocol:   layers.IPProtocolTCP,
 		ServerPort: 1024,
-		Host:       0xac100197,
 		VTAP:       0x64646475,
 		TAPType:    ToR,
 		SubnetID:   10,
@@ -74,6 +76,7 @@ func TestPartialTagEqual(t *testing.T) {
 		L2DeviceType: VGatewayDevice,
 		L3DeviceID:   5,
 		L3DeviceType: VMDevice,
+		Host:         0xac100197,
 
 		IP0:           0x0a2102c8,
 		IP1:           0x0a2102ca,
@@ -93,6 +96,8 @@ func TestPartialTagEqual(t *testing.T) {
 		L3DeviceType0: VMDevice,
 		L3DeviceID1:   6,
 		L3DeviceType1: VMDevice,
+		Host0:         0xac100197,
+		Host1:         0xac100198,
 
 		Direction:  ClientToServer,
 		PolicyType: 3,
@@ -100,7 +105,6 @@ func TestPartialTagEqual(t *testing.T) {
 		VLANID:     123,
 		Protocol:   layers.IPProtocolTCP,
 		ServerPort: 1024,
-		Host:       0xac100197,
 		VTAP:       0x64646475,
 		TAPType:    ToR,
 		SubnetID:   10,
@@ -138,6 +142,7 @@ func TestCustomTagEqual(t *testing.T) {
 		L2DeviceType: VGatewayDevice,
 		L3DeviceID:   5,
 		L3DeviceType: VMDevice,
+		Host:         0xac100197,
 
 		IP0:           0x0a2102c8,
 		IP1:           0x0a2102ca,
@@ -157,6 +162,8 @@ func TestCustomTagEqual(t *testing.T) {
 		L3DeviceType0: VMDevice,
 		L3DeviceID1:   6,
 		L3DeviceType1: VMDevice,
+		Host0:         0xac100197,
+		Host1:         0xac100198,
 
 		Direction:  ClientToServer,
 		PolicyType: 3,
@@ -164,7 +171,6 @@ func TestCustomTagEqual(t *testing.T) {
 		VLANID:     123,
 		Protocol:   layers.IPProtocolTCP,
 		ServerPort: 1024,
-		Host:       0xac100197,
 		VTAP:       0x64646475,
 		TAPType:    ToR,
 		SubnetID:   10,

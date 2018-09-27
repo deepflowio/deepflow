@@ -38,6 +38,9 @@ func TagToPB(t *Tag) *pb.Tag {
 		tag.L3DeviceId = proto.Uint32(uint32(t.L3DeviceID))
 		tag.L3DeviceType = pb.DeviceType(t.L3DeviceType).Enum()
 	}
+	if t.Code&Host != 0 {
+		tag.Host = proto.Uint32(t.Host)
+	}
 
 	if t.Code&IPPath != 0 {
 		tag.Ip_0 = proto.Uint32(t.IP0)
@@ -48,28 +51,32 @@ func TagToPB(t *Tag) *pb.Tag {
 		tag.Mac_1 = proto.Uint64(t.MAC1)
 	}
 	if t.Code&GroupIDPath != 0 {
-		tag.GroupId_0 = proto.Uint32(uint32(t.GroupID0))
-		tag.GroupId_1 = proto.Uint32(uint32(t.GroupID1))
+		tag.GroupId_0 = proto.Uint32(t.GroupID0)
+		tag.GroupId_1 = proto.Uint32(t.GroupID1)
 	}
 	if t.Code&L2EpcIDPath != 0 {
-		tag.L2EpcId_0 = proto.Int32(int32(t.L2EpcID0))
-		tag.L2EpcId_1 = proto.Int32(int32(t.L2EpcID1))
+		tag.L2EpcId_0 = proto.Int32(t.L2EpcID0)
+		tag.L2EpcId_1 = proto.Int32(t.L2EpcID1)
 	}
 	if t.Code&L3EpcIDPath != 0 {
-		tag.L3EpcId_0 = proto.Int32(int32(t.L3EpcID0))
-		tag.L3EpcId_1 = proto.Int32(int32(t.L3EpcID1))
+		tag.L3EpcId_0 = proto.Int32(t.L3EpcID0)
+		tag.L3EpcId_1 = proto.Int32(t.L3EpcID1)
 	}
 	if t.Code&L2DevicePath != 0 {
-		tag.L2DeviceId_0 = proto.Uint32(uint32(t.L2DeviceID0))
+		tag.L2DeviceId_0 = proto.Uint32(t.L2DeviceID0)
 		tag.L2DeviceType_0 = pb.DeviceType(t.L2DeviceType0).Enum()
-		tag.L2DeviceId_1 = proto.Uint32(uint32(t.L2DeviceID1))
+		tag.L2DeviceId_1 = proto.Uint32(t.L2DeviceID1)
 		tag.L2DeviceType_1 = pb.DeviceType(t.L2DeviceType1).Enum()
 	}
 	if t.Code&L3DevicePath != 0 {
-		tag.L3DeviceId_0 = proto.Uint32(uint32(t.L3DeviceID0))
+		tag.L3DeviceId_0 = proto.Uint32(t.L3DeviceID0)
 		tag.L3DeviceType_0 = pb.DeviceType(t.L3DeviceType0).Enum()
-		tag.L3DeviceId_1 = proto.Uint32(uint32(t.L3DeviceID1))
+		tag.L3DeviceId_1 = proto.Uint32(t.L3DeviceID1)
 		tag.L3DeviceType_1 = pb.DeviceType(t.L3DeviceType1).Enum()
+	}
+	if t.Code&HostPath != 0 {
+		tag.Host_0 = proto.Uint32(t.Host0)
+		tag.Host_1 = proto.Uint32(t.Host1)
 	}
 
 	if t.Code&Direction != 0 {
@@ -77,7 +84,7 @@ func TagToPB(t *Tag) *pb.Tag {
 	}
 	if t.Code&Policy != 0 {
 		tag.PolicyType = proto.Uint32(uint32(t.PolicyType))
-		tag.PolicyId = proto.Uint32(uint32(t.PolicyID))
+		tag.PolicyId = proto.Uint32(t.PolicyID)
 	}
 	if t.Code&VLANID != 0 {
 		tag.VlanId = proto.Uint32(uint32(t.VLANID))
@@ -88,9 +95,6 @@ func TagToPB(t *Tag) *pb.Tag {
 	if t.Code&ServerPort != 0 {
 		tag.ServerPort = proto.Uint32(uint32(t.ServerPort))
 	}
-	if t.Code&Host != 0 {
-		tag.Host = proto.Uint32(t.Host)
-	}
 	if t.Code&VTAP != 0 {
 		tag.Vtap = proto.Uint32(t.VTAP)
 	}
@@ -98,10 +102,10 @@ func TagToPB(t *Tag) *pb.Tag {
 		tag.TapType = pb.TapType(t.TAPType).Enum()
 	}
 	if t.Code&SubnetID != 0 {
-		tag.SubnetId = proto.Uint32(uint32(t.SubnetID))
+		tag.SubnetId = proto.Uint32(t.SubnetID)
 	}
 	if t.Code&ACLID != 0 {
-		tag.AclId = proto.Uint32(uint32(t.ACLID))
+		tag.AclId = proto.Uint32(t.ACLID)
 	}
 
 	if t.CustomFields != nil {
@@ -139,21 +143,24 @@ func PBToTag(t *pb.Tag) *Tag {
 		tag.MAC = t.GetMac()
 	}
 	if tag.Code&GroupID != 0 {
-		tag.GroupID = int(t.GetGroupId())
+		tag.GroupID = t.GetGroupId()
 	}
 	if tag.Code&L2EpcID != 0 {
-		tag.L2EpcID = int(t.GetL2EpcId())
+		tag.L2EpcID = t.GetL2EpcId()
 	}
 	if tag.Code&L3EpcID != 0 {
-		tag.L3EpcID = int(t.GetL3EpcId())
+		tag.L3EpcID = t.GetL3EpcId()
 	}
 	if tag.Code&L2Device != 0 {
-		tag.L2DeviceID = int(t.GetL2DeviceId())
+		tag.L2DeviceID = t.GetL2DeviceId()
 		tag.L2DeviceType = DeviceType(t.GetL2DeviceType())
 	}
 	if tag.Code&L3Device != 0 {
-		tag.L3DeviceID = int(t.GetL3DeviceId())
+		tag.L3DeviceID = t.GetL3DeviceId()
 		tag.L3DeviceType = DeviceType(t.GetL3DeviceType())
+	}
+	if tag.Code&Host != 0 {
+		tag.Host = t.GetHost()
 	}
 
 	if tag.Code&IPPath != 0 {
@@ -165,28 +172,32 @@ func PBToTag(t *pb.Tag) *Tag {
 		tag.MAC1 = t.GetMac_1()
 	}
 	if tag.Code&GroupIDPath != 0 {
-		tag.GroupID0 = int(t.GetGroupId_0())
-		tag.GroupID1 = int(t.GetGroupId_1())
+		tag.GroupID0 = t.GetGroupId_0()
+		tag.GroupID1 = t.GetGroupId_1()
 	}
 	if tag.Code&L2EpcIDPath != 0 {
-		tag.L2EpcID0 = int(t.GetL2EpcId_0())
-		tag.L2EpcID1 = int(t.GetL2EpcId_1())
+		tag.L2EpcID0 = t.GetL2EpcId_0()
+		tag.L2EpcID1 = t.GetL2EpcId_1()
 	}
 	if tag.Code&L3EpcIDPath != 0 {
-		tag.L3EpcID0 = int(t.GetL3EpcId_0())
-		tag.L3EpcID1 = int(t.GetL3EpcId_1())
+		tag.L3EpcID0 = t.GetL3EpcId_0()
+		tag.L3EpcID1 = t.GetL3EpcId_1()
 	}
 	if tag.Code&L2DevicePath != 0 {
-		tag.L2DeviceID0 = int(t.GetL2DeviceId_0())
+		tag.L2DeviceID0 = t.GetL2DeviceId_0()
 		tag.L2DeviceType0 = DeviceType(t.GetL2DeviceType_0())
-		tag.L2DeviceID1 = int(t.GetL2DeviceId_1())
+		tag.L2DeviceID1 = t.GetL2DeviceId_1()
 		tag.L2DeviceType1 = DeviceType(t.GetL2DeviceType_1())
 	}
 	if tag.Code&L3DevicePath != 0 {
-		tag.L3DeviceID0 = int(t.GetL3DeviceId_0())
+		tag.L3DeviceID0 = t.GetL3DeviceId_0()
 		tag.L3DeviceType0 = DeviceType(t.GetL3DeviceType_0())
-		tag.L3DeviceID1 = int(t.GetL3DeviceId_1())
+		tag.L3DeviceID1 = t.GetL3DeviceId_1()
 		tag.L3DeviceType1 = DeviceType(t.GetL3DeviceType_1())
+	}
+	if tag.Code&HostPath != 0 {
+		tag.Host0 = t.GetHost_0()
+		tag.Host1 = t.GetHost_1()
 	}
 
 	if tag.Code&Direction != 0 {
@@ -194,19 +205,16 @@ func PBToTag(t *pb.Tag) *Tag {
 	}
 	if tag.Code&Policy != 0 {
 		tag.PolicyType = datatype.PolicyType(t.GetPolicyType())
-		tag.PolicyID = int(t.GetPolicyId())
+		tag.PolicyID = t.GetPolicyId()
 	}
 	if tag.Code&VLANID != 0 {
-		tag.VLANID = int(t.GetVlanId())
+		tag.VLANID = uint16(t.GetVlanId())
 	}
 	if tag.Code&Protocol != 0 {
 		tag.Protocol = layers.IPProtocol(uint8(t.GetProtocol()))
 	}
 	if tag.Code&ServerPort != 0 {
-		tag.ServerPort = int(t.GetServerPort())
-	}
-	if tag.Code&Host != 0 {
-		tag.Host = t.GetHost()
+		tag.ServerPort = uint16(t.GetServerPort())
 	}
 	if tag.Code&VTAP != 0 {
 		tag.VTAP = t.GetVtap()
@@ -215,10 +223,10 @@ func PBToTag(t *pb.Tag) *Tag {
 		tag.TAPType = TAPTypeEnum(t.GetTapType())
 	}
 	if tag.Code&SubnetID != 0 {
-		tag.SubnetID = int(t.GetSubnetId())
+		tag.SubnetID = t.GetSubnetId()
 	}
 	if tag.Code&ACLID != 0 {
-		tag.ACLID = int(t.GetAclId())
+		tag.ACLID = t.GetAclId()
 	}
 
 	if t.GetCustomFields() != nil && tag.Code&0xFFFF000000000000 != 0 {
