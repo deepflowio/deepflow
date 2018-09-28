@@ -67,7 +67,7 @@ message Tag {
     optional uint32 host_1 = 35;
 
     optional Direction direction = 40;
-    optional uint32 policy_acl_group_id = 41;
+    optional uint32 acl_gid = 41;
     optional uint32 vlan_id = 43;
     optional uint32 protocol = 44;
     optional uint32 server_port = 45;
