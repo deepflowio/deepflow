@@ -472,7 +472,7 @@ func TestAllPortPassPolicy(t *testing.T) {
 	_, policyData := policy.LookupAllByKey(key, 0)
 	basicPolicyData := &PolicyData{
 		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{forward, backward, forward, backward},
+		AclActions: []*AclAction{forward, backward},
 	}
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
@@ -518,7 +518,7 @@ func TestSrcPortPassPolicy(t *testing.T) {
 	_, policyData := policy.LookupAllByKey(key, 0)
 	basicPolicyData := &PolicyData{
 		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{forward, backward},
+		AclActions: []*AclAction{backward},
 	}
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
@@ -564,7 +564,7 @@ func TestDstPortPassPolicy(t *testing.T) {
 	_, policyData := policy.LookupAllByKey(key, 0)
 	basicPolicyData := &PolicyData{
 		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{forward, backward},
+		AclActions: []*AclAction{forward},
 	}
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
@@ -611,7 +611,7 @@ func TestSrcDstPortPassPolicy(t *testing.T) {
 	_, policyData := policy.LookupAllByKey(key, 0)
 	basicPolicyData := &PolicyData{
 		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{forward, backward, forward, backward},
+		AclActions: []*AclAction{forward, backward},
 	}
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
@@ -705,7 +705,7 @@ func TestVlanPortPassPolicy(t *testing.T) {
 	_, policyData := policy.LookupAllByKey(key, 0)
 	basicPolicyData := &PolicyData{
 		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{forward, backward},
+		AclActions: []*AclAction{backward},
 	}
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
@@ -753,7 +753,7 @@ func TestPortProtoPassPolicy(t *testing.T) {
 	_, policyData := policy.LookupAllByKey(key, 0)
 	basicPolicyData := &PolicyData{
 		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{forward, backward, forward, backward},
+		AclActions: []*AclAction{forward, backward},
 	}
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
@@ -822,7 +822,7 @@ func TestAclsPassPolicy(t *testing.T) {
 	_, policyData := policy.LookupAllByKey(key, 0)
 	basicPolicyData := &PolicyData{
 		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{forward, backward, forward, backward},
+		AclActions: []*AclAction{forward, backward},
 	}
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
@@ -897,7 +897,7 @@ func TestVlanAclsPassPolicy(t *testing.T) {
 
 	basicPolicyData := &PolicyData{
 		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{aclAction2, aclAction2Backward, forward, backward, forward, backward},
+		AclActions: []*AclAction{aclAction2, aclAction2Backward, forward, backward},
 	}
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
@@ -1037,7 +1037,7 @@ func TestVlanPortAclsPassPolicy1(t *testing.T) {
 	acl2Backward := getBackwardAcl(aclAction2)
 	basicPolicyData := &PolicyData{
 		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{aclAction2, acl2Backward, forward, backward},
+		AclActions: []*AclAction{aclAction2, acl2Backward, forward},
 	}
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
@@ -1104,7 +1104,7 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 	_, policyData := policy.LookupAllByKey(key, 0)
 	basicPolicyData := &PolicyData{
 		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{forward, backward},
+		AclActions: []*AclAction{forward},
 	}
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
@@ -1112,15 +1112,175 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 		t.Log("Expect:", basicPolicyData, "\n")
 	}
 
-	_, policyData = policy.LookupAllByKey(key, 0)
+	_, policyData = policy.policyLabel.GetPolicyByFastPath(key)
+	if !CheckPolicyResult(basicPolicyData, policyData) {
+		t.Error("PortProto FastPath Check Failed")
+		t.Log("Result:", policyData, "\n")
+		t.Log("Expect:", basicPolicyData, "\n")
+	}
+}
+
+// 以下是云平台信息和policy结合起来的测试
+var (
+	server = NewIPFromString("172.20.1.1").Int()
+
+	group1ip1 = NewIPFromString("192.168.1.10").Int()
+	group1mac = NewMACAddrFromString("11:11:11:11:11:11").Int()
+	group1ip2 = NewIPFromString("192.168.1.20").Int()
+	group1Id  = uint32(10)
+
+	group2ip1 = NewIPFromString("10.30.1.10").Int()
+	group2mac = NewMACAddrFromString("22:22:22:22:22:22").Int()
+	group2ip2 = NewIPFromString("10.30.1.20").Int()
+	group2Id  = uint32(20)
+)
+
+func generateIpNet(ip uint32, mask uint32) *IpNet {
+	ipInfo := IpNet{
+		Ip:       ip,
+		SubnetId: 121,
+		Netmask:  mask,
+	}
+	return &ipInfo
+}
+
+func generatePlatformDataWithGroupId(groupId uint32, mac uint64) *PlatformData {
+	data := PlatformData{
+		EpcId:      int32(groupId),
+		DeviceType: 2,
+		DeviceId:   3,
+		IfType:     3,
+		IfIndex:    5,
+		Mac:        mac,
+		HostIp:     server,
+	}
+	data.GroupIds = append(data.GroupIds, groupId)
+	return &data
+}
+
+func generatePolicyTable() *PolicyTable {
+	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+
+	datas := make([]*PlatformData, 0, 2)
+
+	data := generatePlatformDataWithGroupId(group1Id, group1mac)
+	ip := generateIpNet(group1ip1, 24)
+	data.Ips = append(data.Ips, ip)
+	ip = generateIpNet(group1ip2, 25)
+	data.Ips = append(data.Ips, ip)
+	datas = append(datas, data)
+
+	data = generatePlatformDataWithGroupId(group2Id, group2mac)
+	ip = generateIpNet(group2ip1, 24)
+	data.Ips = append(data.Ips, ip)
+	ip = generateIpNet(group2ip2, 25)
+	data.Ips = append(data.Ips, ip)
+	datas = append(datas, data)
+
+	policy.UpdateInterfaceData(datas)
+	return policy
+}
+
+func generatePolicyAcl(table *PolicyTable, id uint32, srcGroupId, dstGroupId uint32, proto uint8, port uint16, vlan uint32) (*Acl, *AclAction) {
+	srcGroups := make(map[uint32]uint32)
+	dstGroups := make(map[uint32]uint32)
+	dstPorts := make(map[uint16]uint16)
+
+	srcGroups[srcGroupId] = srcGroupId
+	dstGroups[dstGroupId] = dstGroupId
+	if port != 0 {
+		dstPorts[port] = port
+	}
+
+	action := &AclAction{
+		AclId:       id,
+		Type:        ACTION_PACKET_STAT,
+		TagTemplate: TEMPLATE_EDGE_PORT,
+		Direction:   FORWARD,
+	}
+	acl := &Acl{
+		Id:        id,
+		Type:      TAP_TOR,
+		TapId:     id + 1,
+		SrcGroups: srcGroups,
+		DstGroups: dstGroups,
+		DstPorts:  dstPorts,
+		Proto:     proto,
+		Vlan:      vlan,
+		Action:    []*AclAction{action},
+	}
+	return acl, action
+}
+func generateLookupKey(srcMac, dstMac uint64, vlan uint16, srcIp, dstIp uint32, proto uint8, srcPort, dstPort uint16) *LookupKey {
+	key := &LookupKey{
+		SrcMac:  srcMac,
+		DstMac:  dstMac,
+		SrcIp:   srcIp,
+		DstIp:   dstIp,
+		Proto:   proto,
+		SrcPort: srcPort,
+		DstPort: dstPort,
+		Vlan:    vlan,
+		Tap:     TAP_TOR,
+	}
+	return key
+}
+
+func TestPolicySimple(t *testing.T) {
+	acls := []*Acl{}
+	// 创建 policyTable
+	table := generatePolicyTable()
+	// 构建acl action  1->2 tcp 8000
+	acl, action := generatePolicyAcl(table, 1, group1Id, group2Id, 6, 8000, 0)
+	acls = append(acls, acl)
+	table.UpdateAclData(acls)
+	// 构建查询key  1:0->2:8000 tcp
+	key := generateLookupKey(group1mac, group2mac, 0, group1ip1, group2ip1, 6, 0, 8000)
+
+	// 获取查询first结果
+	_, policyData := table.LookupAllByKey(key, 0)
+	// 构建预期结果
+	basicPolicyData := &PolicyData{ActionList: ACTION_PACKET_STAT, AclActions: []*AclAction{action}}
+	// 查询结果和预期结果比较
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
 		t.Log("Expect:", basicPolicyData, "\n")
 	}
-	if _, fast := policy.GetHitStatus(); fast != 1 {
-		t.Error("PortProto FastPath Check Failed")
-		t.Log("Result:", fast, "\n")
-		t.Log("Expect:", 1, "\n")
+
+	// 构建查询key  2:8000->1:0 tcp
+	key = generateLookupKey(group2mac, group1mac, 0, group2ip1, group1ip1, 6, 8000, 0)
+	// key和acl方向相反，构建反向的action
+	backward := getBackwardAcl(action)
+	basicPolicyData = &PolicyData{ActionList: ACTION_PACKET_STAT, AclActions: []*AclAction{backward}}
+	_, policyData = table.LookupAllByKey(key, 0)
+	if !CheckPolicyResult(basicPolicyData, policyData) {
+		t.Error("PortProto Check Failed")
+		t.Log("Result:", policyData, "\n")
+		t.Log("Expect:", basicPolicyData, "\n")
+	}
+
+	// 构建无效查询key  2:0->1:8000 tcp
+	key = generateLookupKey(group2mac, group1mac, 0, group2ip1, group1ip1, 6, 0, 8000)
+	_, policyData = table.LookupAllByKey(key, 0)
+	// key不匹配，返回无效policy
+	if !CheckPolicyResult(INVALID_POLICY_DATA, policyData) {
+		t.Error("PortProto Check Failed")
+		t.Log("Result:", policyData, "\n")
+		t.Log("Expect:", INVALID_POLICY_DATA, "\n")
+	}
+
+	// 测试同样的key, 匹配两条action
+	acl, action2 := generatePolicyAcl(table, 2, group1Id, group2Id, 6, 8000, 0)
+	acls = append(acls, acl)
+	table.UpdateAclData(acls)
+	basicPolicyData = &PolicyData{ActionList: ACTION_PACKET_STAT, AclActions: []*AclAction{action, action2}}
+	key = generateLookupKey(group1mac, group2mac, 0, group1ip1, group2ip1, 6, 0, 8000)
+
+	_, policyData = table.LookupAllByKey(key, 0)
+	if !CheckPolicyResult(basicPolicyData, policyData) {
+		t.Error("PortProto Check Failed")
+		t.Log("Result:", policyData, "\n")
+		t.Log("Expect:", basicPolicyData, "\n")
 	}
 }
