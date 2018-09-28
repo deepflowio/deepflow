@@ -46,15 +46,3 @@ message AlarmInfo {
     optional uint32 rtt_avg = 25;
     optional uint64 flow_count = 26;
 }
-
-enum Status {
-    START = 0;
-    END = 1;
-}
-
-message AlarmEvent {
-    optional Status status = 1;
-    optional uint32 rule_id = 2;
-    optional string content = 3;
-    optional string target = 4;
-}
