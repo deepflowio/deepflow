@@ -141,19 +141,6 @@ func splitPort2Int(src string) map[uint16]uint16 {
 	return ports
 }
 
-func newPolicyInfo(policies []*trident.Policy) []datatype.PolicyInfo {
-	policyInfos := make([]datatype.PolicyInfo, 0, len(policies))
-	for _, value := range policies {
-		info := datatype.PolicyInfo{
-			Id:   value.GetId(),
-			Type: datatype.PolicyType(value.GetType()),
-		}
-		policyInfos = append(policyInfos, info)
-	}
-
-	return policyInfos
-}
-
 func convert2ActionType(action trident.Action) datatype.ActionType {
 	if action := ActionMap[action]; action != 0 {
 		return action
@@ -167,8 +154,7 @@ func newAclAction(aclId uint32, actions []*trident.FlowAction) []*datatype.AclAc
 		if policyType := convert2ActionType(action.GetAction()); policyType != 0 {
 			aclAction := &datatype.AclAction{
 				AclId:       aclId,
-				Type:        policyType,
-				Policy:      newPolicyInfo(action.GetPolicies()),
+				ACLGIDs:     action.GetPolicyAclGroupId(),
 				TagTemplate: action.GetTagTemplate(),
 			}
 			aclActions = append(aclActions, aclAction)

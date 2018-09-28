@@ -45,8 +45,7 @@ func TestFullEqual(t *testing.T) {
 		Host1:         0xac100198,
 
 		Direction:  ClientToServer,
-		PolicyType: 3,
-		PolicyID:   3,
+		ACLGID:     3,
 		VLANID:     123,
 		Protocol:   layers.IPProtocolTCP,
 		ServerPort: 1024,
@@ -100,8 +99,7 @@ func TestPartialTagEqual(t *testing.T) {
 		Host1:         0xac100198,
 
 		Direction:  ClientToServer,
-		PolicyType: 3,
-		PolicyID:   3,
+		ACLGID:     3,
 		VLANID:     123,
 		Protocol:   layers.IPProtocolTCP,
 		ServerPort: 1024,
@@ -166,8 +164,7 @@ func TestCustomTagEqual(t *testing.T) {
 		Host1:         0xac100198,
 
 		Direction:  ClientToServer,
-		PolicyType: 3,
-		PolicyID:   3,
+		ACLGID:     3,
 		VLANID:     123,
 		Protocol:   layers.IPProtocolTCP,
 		ServerPort: 1024,
