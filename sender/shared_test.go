@@ -26,6 +26,7 @@ func init() {
 		L2DeviceType: dt.VGatewayDevice,
 		L3DeviceID:   5,
 		L3DeviceType: dt.VMDevice,
+		Host:         binary.BigEndian.Uint32([]byte{172, 16, 1, 153}),
 
 		IP0:           binary.BigEndian.Uint32([]byte{10, 33, 2, 200}),
 		IP1:           binary.BigEndian.Uint32([]byte{10, 33, 2, 202}),
@@ -45,13 +46,13 @@ func init() {
 		L3DeviceType0: dt.VMDevice,
 		L3DeviceID1:   6,
 		L3DeviceType1: dt.VMDevice,
+		Host0:         binary.BigEndian.Uint32([]byte{172, 16, 1, 153}),
+		Host1:         binary.BigEndian.Uint32([]byte{172, 16, 1, 154}),
 
 		Direction:  dt.ClientToServer,
-		PolicyID:   3,
 		VLANID:     123,
 		Protocol:   layers.IPProtocolTCP,
 		ServerPort: 1024,
-		Host:       binary.BigEndian.Uint32([]byte{172, 16, 1, 153}),
 		VTAP:       binary.BigEndian.Uint32([]byte{100, 100, 100, 233}),
 		TAPType:    dt.ToR,
 	}
