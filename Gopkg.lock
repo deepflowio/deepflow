@@ -178,7 +178,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:e4a404e8550490734a393e62e5d9d8216531c1fe69f90900ed58c93b784f35a5"
+  digest = "1:b8ead5a85fb805a95cbf911a242c74f70fc30cf5b8a779f4269b1579b012dd15"
   name = "gitlab.x.lan/application/droplet-app"
   packages = [
     "internal/pkg/endpoint",
@@ -194,11 +194,11 @@
     "pkg/mapper/usage",
   ]
   pruneopts = "UT"
-  revision = "6ddd1ffbd748bc8030c22a619cc720d05c3124c2"
+  revision = "b56406fe7702579d68dac841812e5c554b21e0da"
 
 [[projects]]
   branch = "master"
-  digest = "1:2e93ebb6602b469692f3d368e16e34ea667d196bf1918edd52cb37ed569f51aa"
+  digest = "1:775fc29cb3f1bbc4f9c5a2ebaacb4743a12e4a59453e4e71a4536fad3996221d"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "app",
@@ -218,11 +218,11 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "b8e096a2fefcb4dce0ffbbb5f765d84759ab176e"
+  revision = "a629097dd9ab7e9c084b86fb61d2f0a5c62d56fb"
 
 [[projects]]
   branch = "master"
-  digest = "1:f99d41fd5c35442c97652ecbe9d02239f994a1a0712dd17e0732e3ec83bcdd04"
+  digest = "1:edacf8ee06784248bd6cebe4f981994b090a191cd19afcc6c2ee7ac53affb76c"
   name = "gitlab.x.lan/yunshan/message"
   packages = [
     "dfi",
@@ -230,7 +230,7 @@
     "zero",
   ]
   pruneopts = "T"
-  revision = "f1fe10ed95605bfacd8b3da6ca46ba6695abe763"
+  revision = "d134f3c653e3d04093ff36aee1ff242c1bfb901f"
 
 [[projects]]
   branch = "release-branch.go1.11"
