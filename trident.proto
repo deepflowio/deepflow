@@ -123,13 +123,6 @@ enum TapType {
     TOR = 3;      // 虚拟网络
 }
 
-enum PolicyType {
-    LABEL = 1;
-    REPORT_POLICY = 2;
-    ALARM_POLICY = 3;
-    WHITELIST = 4;
-}
-
 enum Action {
     PACKECT_COUNTER = 1;
     FLOW_COUNTER = 2;
@@ -137,7 +130,6 @@ enum Action {
     TCP_PERFORMANCE = 4;
     PCAP = 5;
     MISC = 6;
-    POLICY = 7;
     PACKECT_COUNTER_PUB = 8;
     FLOW_COUNTER_PUB = 9;
     TCP_PERFORMANCE_PUB = 10;
@@ -150,11 +142,11 @@ enum TagTemplate {
     EDGE = 4;
     EDGE_PORT = 8;
     PORT = 16;
-    POLICY_NODE = 32;
-    POLICY_NODE_PORT = 64;
-    POLICY_EDGE = 128;
-    POLICY_EDGE_PORT = 256;
-    POLICY_PORT = 512;
+    ACL_NODE = 32;
+    ACL_NODE_PORT = 64;
+    ACL_EDGE = 128;
+    ACL_EDGE_PORT = 256;
+    ACL_PORT = 512;
 }
 
 message FlowAction {
