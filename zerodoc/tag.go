@@ -23,6 +23,10 @@ const (
 	Host
 )
 
+func (c Code) HasEdgeTagField() bool {
+	return c&0xffff0000 != 0
+}
+
 const (
 	IPPath Code = 0x10000 << iota // 1 << 16
 	MACPath
