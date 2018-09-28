@@ -70,7 +70,9 @@ func Marshal(doc *app.Document) ([]byte, error) {
 		msg.Meter.Type = dt.TypeMeterToPB(meter)
 	}
 
-	b, err := proto.Marshal(msg)
+	// TODO: 传入buffer
+	b := make([]byte, msg.Size())
+	_, err := msg.MarshalTo(b)
 	if err != nil {
 		return nil, fmt.Errorf("Marshaling protobuf failed: %s", err)
 	}
@@ -84,7 +86,7 @@ func Unmarshal(b []byte) (*app.Document, error) {
 	}
 
 	msg := &pb.ZeroDocument{}
-	if err := proto.Unmarshal(b, msg); err != nil {
+	if err := msg.Unmarshal(b); err != nil {
 		return nil, fmt.Errorf("Unmarshaling protobuf failed: %s", err)
 	}
 
