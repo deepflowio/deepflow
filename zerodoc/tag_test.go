@@ -4,6 +4,17 @@ import (
 	"testing"
 )
 
+func TestHasEdgeTagField(t *testing.T) {
+	c := IPPath
+	if !c.HasEdgeTagField() {
+		t.Error("Edge Tag处理不正确")
+	}
+	c = IP
+	if c.HasEdgeTagField() {
+		t.Error("Edge Tag处理不正确")
+	}
+}
+
 func TestCustomTag(t *testing.T) {
 	f := Field{}
 	f.AddCustomField(Country, "country", "CHN")
