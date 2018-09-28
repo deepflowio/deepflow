@@ -69,6 +69,7 @@ func Marshal(doc *app.Document) ([]byte, error) {
 		meter := doc.Meter.(*dt.TypeMeter)
 		msg.Meter.Type = dt.TypeMeterToPB(meter)
 	}
+	msg.Actions = proto.Uint32(doc.Actions)
 
 	// TODO: 传入buffer
 	b := make([]byte, msg.Size())
@@ -110,6 +111,7 @@ func Unmarshal(b []byte) (*app.Document, error) {
 	case meter.GetType() != nil:
 		doc.Meter = dt.PBToTypeMeter(meter.GetType())
 	}
+	doc.Actions = msg.GetActions()
 
 	return doc, nil
 }

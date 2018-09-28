@@ -26,7 +26,8 @@ type Document struct {
 	Timestamp uint32
 	Tag
 	Meter
-	Pool *sync.Pool
+	Actions uint32
+	Pool    *sync.Pool
 }
 
 func (d Document) String() string {
