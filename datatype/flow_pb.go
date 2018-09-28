@@ -11,7 +11,7 @@ import (
 const TYPE_MULTI = 100000000
 
 func MarshalFlow(f *TaggedFlow) ([]byte, error) {
-	aclIDs, policyIDs := getACLIDsAndPolicyIDs(f)
+	aclIDs, aclGIDs := getACLIDs(f)
 	flow := &pb.Flow{
 		Exporter:   proto.Uint32(f.Exporter),
 		CloseType:  proto.Uint32(uint32(f.CloseType)),
@@ -79,8 +79,8 @@ func MarshalFlow(f *TaggedFlow) ([]byte, error) {
 		WhitelistRuleIds_1: f.WhitelistRuleIDs1,
 		CustomTagIds_0:     f.CustomTagIDs0,
 		CustomTagIds_1:     f.CustomTagIDs1,
-		AclId:              aclIDs,
-		PolicyId:           policyIDs,
+		AclIds:             aclIDs,
+		AclGids:            aclGIDs,
 	}
 	// TCP Perf Data
 	if f.TcpPerfStats != nil {
@@ -108,22 +108,22 @@ func MarshalFlow(f *TaggedFlow) ([]byte, error) {
 	return b, nil
 }
 
-func getACLIDsAndPolicyIDs(f *TaggedFlow) ([]uint32, []uint32) {
+func getACLIDs(f *TaggedFlow) ([]uint32, []uint32) {
 	acl := make(map[uint32]bool)
-	policy := make(map[uint32]bool)
+	aclGIDSet := make(map[uint32]bool)
 	for _, aclAction := range f.PolicyData.AclActions {
 		acl[aclAction.AclId] = true
-		for _, policyInfo := range aclAction.Policy {
-			policy[uint32(policyInfo.Type)*TYPE_MULTI+policyInfo.Id] = true
+		for _, v := range aclAction.ACLGIDs {
+			aclGIDSet[v] = true
 		}
 	}
 	aclIDs := make([]uint32, 0, len(acl))
 	for id := range acl {
 		aclIDs = append(aclIDs, id)
 	}
-	policyIDs := make([]uint32, 0, len(policy))
-	for id := range policy {
-		policyIDs = append(policyIDs, id)
+	aclGIDs := make([]uint32, 0, len(aclGIDSet))
+	for id := range aclGIDSet {
+		aclGIDs = append(aclGIDs, id)
 	}
-	return aclIDs, policyIDs
+	return aclIDs, aclGIDs
 }

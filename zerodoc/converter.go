@@ -6,7 +6,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/google/gopacket/layers"
 
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	pb "gitlab.x.lan/yunshan/message/zero"
 )
 
@@ -82,9 +81,8 @@ func TagToPB(t *Tag) *pb.Tag {
 	if t.Code&Direction != 0 {
 		tag.Direction = pb.Direction(t.Direction).Enum()
 	}
-	if t.Code&Policy != 0 {
-		tag.PolicyType = proto.Uint32(uint32(t.PolicyType))
-		tag.PolicyId = proto.Uint32(t.PolicyID)
+	if t.Code&ACLGID != 0 {
+		tag.AclGid = proto.Uint32(t.ACLGID)
 	}
 	if t.Code&VLANID != 0 {
 		tag.VlanId = proto.Uint32(uint32(t.VLANID))
@@ -203,9 +201,8 @@ func PBToTag(t *pb.Tag) *Tag {
 	if tag.Code&Direction != 0 {
 		tag.Direction = DirectionEnum(t.GetDirection())
 	}
-	if tag.Code&Policy != 0 {
-		tag.PolicyType = datatype.PolicyType(t.GetPolicyType())
-		tag.PolicyID = t.GetPolicyId()
+	if tag.Code&ACLGID != 0 {
+		tag.ACLGID = t.GetAclGid()
 	}
 	if tag.Code&VLANID != 0 {
 		tag.VLANID = uint16(t.GetVlanId())

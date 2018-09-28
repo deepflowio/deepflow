@@ -9,21 +9,6 @@ type PolicyData struct {
 	AclActions []*AclAction
 }
 
-type PolicyType uint16
-
-const (
-	LABEL PolicyType = iota + 1
-	REPORT_POLICY
-	ALARM_POLICY
-	WHITELIST
-	POLICY_MAX
-)
-
-type PolicyInfo struct {
-	Id   uint32
-	Type PolicyType
-}
-
 type ActionType uint32
 
 const (
@@ -67,7 +52,7 @@ const (
 type AclAction struct {
 	AclId       uint32
 	Type        ActionType
-	Policy      []PolicyInfo
+	ACLGIDs     []uint32
 	TagTemplate uint32
 	Direction   DirectionType
 }
