@@ -232,14 +232,26 @@ func (f *FlowExtra) updatePlatformData(meta *MetaPacket, reply bool) {
 	}
 }
 
+func (f *FlowExtra) reversePolicyData() {
+	if f.taggedFlow.PolicyData == nil {
+		return
+	}
+	for _, aclAction := range f.taggedFlow.PolicyData.AclActions {
+		if aclAction.Direction == 1 || aclAction.Direction == 2 {
+			aclAction.Direction = (^aclAction.Direction) & 3
+		}
+	}
+}
+
 func (f *FlowExtra) reverseFlow() {
 	taggedFlow := f.taggedFlow
 	taggedFlow.TunnelInfo.Src, taggedFlow.TunnelInfo.Dst = taggedFlow.TunnelInfo.Dst, taggedFlow.TunnelInfo.Src
 	taggedFlow.MACSrc, taggedFlow.MACDst = taggedFlow.MACDst, taggedFlow.MACSrc
 	taggedFlow.IPSrc, taggedFlow.IPDst = taggedFlow.IPDst, taggedFlow.IPSrc
 	taggedFlow.PortSrc, taggedFlow.PortDst = taggedFlow.PortDst, taggedFlow.PortSrc
-	taggedFlow.GroupIDs0, taggedFlow.GroupIDs1 = taggedFlow.GroupIDs1, taggedFlow.GroupIDs0
 	taggedFlow.FlowMetricsPeerSrc, taggedFlow.FlowMetricsPeerDst = FlowMetricsPeerSrc(taggedFlow.FlowMetricsPeerDst), FlowMetricsPeerDst(taggedFlow.FlowMetricsPeerSrc)
+	taggedFlow.GroupIDs0, taggedFlow.GroupIDs1 = taggedFlow.GroupIDs1, taggedFlow.GroupIDs0
+	f.reversePolicyData()
 }
 
 func (f *FlowGenerator) tryReverseFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) bool {
@@ -268,6 +280,9 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 	if taggedFlow.FlowMetricsPeerSrc.PacketCount == 0 && taggedFlow.FlowMetricsPeerDst.PacketCount == 0 {
 		taggedFlow.CurStartTime = packetTimestamp
 		taggedFlow.PolicyData = meta.PolicyData
+		if flowExtra.reversed {
+			flowExtra.reversePolicyData()
+		}
 		flowExtra.updatePlatformData(meta, reply)
 	}
 	if reply {
