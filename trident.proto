@@ -144,11 +144,6 @@ enum Action {
     GEO = 11;
 }
 
-message Policy {
-    optional uint32 id = 1;
-    optional PolicyType type = 2;
-}
-
 enum TagTemplate {
     NODE = 1;
     NODE_PORT = 2;
@@ -164,7 +159,7 @@ enum TagTemplate {
 
 message FlowAction {
     optional Action action = 1;
-    repeated Policy policies = 2;
+    repeated uint32 policy_acl_group_id = 2;
     optional uint32 tag_template = 3;
 }
 
