@@ -14,9 +14,8 @@ enum DeviceType {
 }
 
 enum Direction {
-    CLIENT_TO_SERVER = 0;
-    SERVER_TO_CLIENT = 1;
-    ANY = 2;
+    CLIENT_TO_SERVER = 1;
+    SERVER_TO_CLIENT = 2;
 }
 
 enum TapType {
@@ -24,6 +23,11 @@ enum TapType {
     ISP = 1;
     SPINE = 2;
     TOR = 3;
+}
+
+enum AclDirection {
+    FORWARD = 1;
+    BACKWARD = 2;
 }
 
 message Tag {
@@ -63,11 +67,11 @@ message Tag {
     optional uint32 host_1 = 35;
 
     optional Direction direction = 40;
-    optional uint32 policy_id = 41;
-    optional uint32 policy_type = 42;
+    optional uint32 policy_acl_group_id = 41;
     optional uint32 vlan_id = 43;
     optional uint32 protocol = 44;
     optional uint32 server_port = 45;
+    optional AclDirection acl_direction = 46;
     optional uint32 vtap = 47;
     optional TapType tap_type = 48;
     optional uint32 subnet_id = 49;
@@ -209,4 +213,5 @@ message ZeroDocument {
     optional uint32 timestamp = 1;
     optional Tag tag = 2;
     optional Meter meter = 3;
+    optional uint32 actions = 4;
 }
