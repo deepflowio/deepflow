@@ -18,7 +18,6 @@ var ActionMap = [...]datatype.ActionType{
 	trident.Action_TCP_PERFORMANCE:     datatype.ACTION_PERFORMANCE,
 	trident.Action_PCAP:                datatype.ACTION_PCAP,
 	trident.Action_MISC:                datatype.ACTION_MISC,
-	trident.Action_POLICY:              datatype.ACTION_POLICY,
 	trident.Action_PACKECT_COUNTER_PUB: datatype.ACTION_PACKECT_COUNTER_PUB,
 	trident.Action_FLOW_COUNTER_PUB:    datatype.ACTION_FLOW_COUNTER_PUB,
 	trident.Action_TCP_PERFORMANCE_PUB: datatype.ACTION_TCP_PERFORMANCE_PUB,
