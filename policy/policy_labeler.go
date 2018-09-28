@@ -157,7 +157,15 @@ func generateGroupPortKeys(srcGroups []uint32, dstGroups []uint32, port uint16, 
 func generateSearchPortKeys(srcGroups []uint32, dstGroups []uint32, port uint16, proto uint8) []uint64 {
 	keys := generateGroupPortKeys(srcGroups, dstGroups, port, proto)
 	if port != 0 {
+		// 匹配port全采集的acl
 		keys = append(keys, generateGroupPortKeys(srcGroups, dstGroups, 0, proto)...)
+	}
+	if proto != 0 {
+		// 匹配proto全采集的acl
+		keys = append(keys, generateGroupPortKeys(srcGroups, dstGroups, 0, 0)...)
+	}
+	if proto != 0 && port != 0 {
+		keys = append(keys, generateGroupPortKeys(srcGroups, dstGroups, port, 0)...)
 	}
 	return keys
 }
@@ -384,6 +392,7 @@ func (l *PolicyLabel) UpdateAcls(acls []*Acl) {
 		l.GenerateInterestMaps(generateAcls)
 
 		for i := 0; i < len(l.FastPolicyMaps); i++ {
+			l.FastPolicyMaps[i].Clear()
 			l.FastPolicyMaps[i] = lru.New(int(l.mapSize))
 		}
 	}
@@ -456,6 +465,7 @@ func (l *PolicyLabel) GetPolicyByFirstPath(endpointData *EndpointData, packet *L
 			portFound = true
 		}
 	}
+
 	if !portFound {
 		// 无论是否差找到policy，都需要向fastPath下发，避免走firstPath
 		l.addPortFastPolicy(endpointData, packet, findPolicy, FORWARD)
