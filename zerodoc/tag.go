@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/google/gopacket/layers"
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
@@ -37,7 +36,7 @@ const (
 
 const (
 	Direction Code = 0x100000000 << iota // 1 << 32
-	Policy
+	ACLGID
 	VLANID
 	Protocol
 	ServerPort
@@ -121,8 +120,7 @@ type Field struct {
 	Host1         uint32
 
 	Direction  DirectionEnum
-	PolicyType datatype.PolicyType
-	PolicyID   uint32
+	ACLGID     uint32
 	VLANID     uint16
 	Protocol   layers.IPProtocol
 	ServerPort uint16
@@ -286,11 +284,9 @@ func (t *Tag) ToKVString() string {
 			buf.WriteString("any")
 		}
 	}
-	if t.Code&Policy != 0 {
-		buf.WriteString(",policy_type=")
-		buf.WriteString(strconv.FormatUint(uint64(t.PolicyType), 10))
-		buf.WriteString(",policy_id=")
-		buf.WriteString(formatU32(t.PolicyID))
+	if t.Code&ACLGID != 0 {
+		buf.WriteString(",acl_gid=")
+		buf.WriteString(formatU32(t.ACLGID))
 	}
 	if t.Code&VLANID != 0 {
 		buf.WriteString(",vlan_id=")
@@ -368,23 +364,23 @@ func (t *Tag) GetID(buf *utils.IntBuffer) string {
 			buf.WriteU32(t.IP)
 		}
 		if t.Code&MAC != 0 {
-			buf.WriteU48(t.MAC)
+			buf.WriteU48(t.MAC) // XXX: 32bit
 		}
 		if t.Code&GroupID != 0 {
-			buf.WriteU24(t.GroupID) // 24bit
+			buf.WriteU24(t.GroupID) // XXX: 16bit
 		}
 		if t.Code&L2EpcID != 0 {
-			buf.WriteU32(uint32(t.L2EpcID))
+			buf.WriteU32(uint32(t.L2EpcID)) // XXX: 16bit
 		}
 		if t.Code&L3EpcID != 0 {
-			buf.WriteU32(uint32(t.L3EpcID))
+			buf.WriteU32(uint32(t.L3EpcID)) // XXX: 16bit
 		}
 		if t.Code&L2Device != 0 {
-			buf.WriteU32(t.L2DeviceID)
+			buf.WriteU32(t.L2DeviceID) // XXX: 16bit
 			buf.WriteU8(uint8(t.L2DeviceType))
 		}
 		if t.Code&L3Device != 0 {
-			buf.WriteU32(t.L3DeviceID)
+			buf.WriteU32(t.L3DeviceID) // XXX: 16bit
 			buf.WriteU8(uint8(t.L3DeviceType))
 		}
 		if t.Code&Host != 0 {
@@ -400,27 +396,27 @@ func (t *Tag) GetID(buf *utils.IntBuffer) string {
 			buf.WriteU48(t.MAC1)
 		}
 		if t.Code&GroupIDPath != 0 {
-			buf.WriteU24(t.GroupID0) // 24bit
-			buf.WriteU24(t.GroupID1) // 24bit
+			buf.WriteU24(t.GroupID0) // XXX: 16bit
+			buf.WriteU24(t.GroupID1) // XXX: 16bit
 		}
 		if t.Code&L2EpcIDPath != 0 {
-			buf.WriteU32(uint32(t.L2EpcID0))
-			buf.WriteU32(uint32(t.L2EpcID1))
+			buf.WriteU32(uint32(t.L2EpcID0)) // XXX: 16bit
+			buf.WriteU32(uint32(t.L2EpcID1)) // XXX: 16bit
 		}
 		if t.Code&L3EpcIDPath != 0 {
-			buf.WriteU32(uint32(t.L3EpcID0))
-			buf.WriteU32(uint32(t.L3EpcID1))
+			buf.WriteU32(uint32(t.L3EpcID0)) // XXX: 16bit
+			buf.WriteU32(uint32(t.L3EpcID1)) // XXX: 16bit
 		}
 		if t.Code&L2DevicePath != 0 {
-			buf.WriteU32(t.L2DeviceID0)
+			buf.WriteU32(t.L2DeviceID0) // XXX: 16bit
 			buf.WriteU8(uint8(t.L2DeviceType0))
-			buf.WriteU32(t.L2DeviceID1)
+			buf.WriteU32(t.L2DeviceID1) // XXX: 16bit
 			buf.WriteU8(uint8(t.L2DeviceType1))
 		}
 		if t.Code&L3DevicePath != 0 {
-			buf.WriteU32(t.L3DeviceID0)
+			buf.WriteU32(t.L3DeviceID0) // XXX: 16bit
 			buf.WriteU8(uint8(t.L3DeviceType0))
-			buf.WriteU32(t.L3DeviceID1)
+			buf.WriteU32(t.L3DeviceID1) // XXX: 16bit
 			buf.WriteU8(uint8(t.L3DeviceType1))
 		}
 		if t.Code&HostPath != 0 {
@@ -431,9 +427,8 @@ func (t *Tag) GetID(buf *utils.IntBuffer) string {
 		if t.Code&Direction != 0 {
 			buf.WriteU8(uint8(t.Direction))
 		}
-		if t.Code&Policy != 0 {
-			buf.WriteU8(uint8(t.PolicyType))
-			buf.WriteU24(t.PolicyID) // 24bit
+		if t.Code&ACLGID != 0 {
+			buf.WriteU24(t.ACLGID) // XXX: 14bit
 		}
 		if t.Code&VLANID != 0 {
 			buf.WriteU16(uint16(t.VLANID))
@@ -454,7 +449,7 @@ func (t *Tag) GetID(buf *utils.IntBuffer) string {
 			buf.WriteU32(t.SubnetID)
 		}
 		if t.Code&ACLID != 0 {
-			buf.WriteU24(t.ACLID) // 24bit
+			buf.WriteU24(t.ACLID) // XXX: 14bit
 		}
 		if t.CustomFields != nil {
 			for i := 0; i < CustomFieldNumber; i++ {
@@ -476,32 +471,28 @@ var FAST_CODES = []Code{
 	IP | TAPType,
 	L3EpcID | TAPType,
 	L3EpcID | IP | TAPType,
-	Policy | TAPType,
-	Policy | IP | TAPType,
-	Policy | IP | L3EpcID,
+	ACLGID | TAPType,
+	ACLGID | IP | TAPType,
+	ACLGID | IP | L3EpcID,
 }
 
 // GetFastID 返回uint64的ID，0代表该tag的code不在fast ID的范围内
 func (t *Tag) GetFastID() uint64 {
 	switch t.Code {
-	case TAPType:
-		return uint64(t.TAPType)
-	case IP | TAPType:
-		return (uint64(t.IP) << 32) | (uint64(t.TAPType) & 0xFFFFFFFF)
-	case L3EpcID | TAPType:
-		return (uint64(t.L3EpcID) << 32) | (uint64(t.TAPType) & 0xFFFFFFFF)
-	case L3EpcID | IP | TAPType:
-		// L3EpcID取30位，TAPType取2位
-		return (uint64(t.IP) << 32) | ((uint64(t.L3EpcID) & 0x3FFFFFFF) << 2) | (uint64(t.TAPType) & 0x3)
-	case Policy | TAPType:
-		// PolicyType取2位（直接截取即可，因为对于目前四种类型，后两位都不一样）
-		return (uint64(t.PolicyID) << 34) | ((uint64(t.PolicyType) & 0x3) << 32) | (uint64(t.TAPType) & 0xFFFFFFFF)
-	case Policy | IP | TAPType:
-		// PolicyID取28位，PolicyType取2位，TAPType取2位
-		return (uint64(t.IP) << 32) | ((uint64(t.PolicyID) & 0x0FFFFFFF) << 4) | ((uint64(t.PolicyType) & 0x3) << 2) | (uint64(t.TAPType) & 0x3)
-	case Policy | IP | L3EpcID:
-		// PolicyID取14位，PolicyType取2位，L3EpcID取16位
-		return (uint64(t.IP) << 32) | ((uint64(t.L3EpcID) & 0xFFFF) << 16) | ((uint64(t.PolicyID) & 0x3FFF) << 2) | (uint64(t.PolicyType) & 0x3)
+	case TAPType: // 2b
+		return uint64(t.TAPType & 0x3)
+	case IP | TAPType: // 32b + 2b
+		return (uint64(t.IP) << 2) | uint64(t.TAPType&0x3)
+	case L3EpcID | TAPType: // 16b + 2b
+		return (uint64(t.L3EpcID&0xFFFF) << 2) | uint64(t.TAPType&0x3)
+	case L3EpcID | IP | TAPType: // 16b + 32b + 2b
+		return (uint64(t.L3EpcID&0xFFFF) << 34) | (uint64(t.IP) << 2) | uint64(t.TAPType&0x3)
+	case ACLGID | TAPType: // 14b + 2b
+		return (uint64(t.ACLGID&0x3FFF) << 2) | uint64(t.TAPType)
+	case ACLGID | IP | TAPType: // 14b + 32b + 2b
+		return (uint64(t.ACLGID&0x3FFF) << 34) | (uint64(t.IP) << 2) | uint64(t.TAPType&0x3)
+	case ACLGID | IP | L3EpcID | TAPType: // 14b + 32b + 16b + 2b
+		return (uint64(t.ACLGID&0x3FFF) << 50) | (uint64(t.IP) << 18) | (uint64(t.L3EpcID&0xFFFF) << 2) | uint64(t.TAPType&0x3)
 	default:
 		return 0
 	}

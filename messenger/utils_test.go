@@ -43,8 +43,7 @@ func TestMarshal(t *testing.T) {
 		L3DeviceType1: dt.VMDevice,
 
 		Direction:  dt.ClientToServer,
-		PolicyType: 3,
-		PolicyID:   3,
+		ACLGID:     3,
 		VLANID:     123,
 		Protocol:   layers.IPProtocolTCP,
 		ServerPort: 1024,
