@@ -9,7 +9,7 @@ import (
 	. "github.com/google/gopacket/layers"
 )
 
-var dedupTable = NewDedupTable("")
+var dedupTable = NewDedupTable("", true)
 
 func m(mac string) net.HardwareAddr {
 	m, _ := net.ParseMAC(mac)
@@ -132,6 +132,21 @@ func TestChecksum(t *testing.T) {
 	BigEndian.PutUint16(packet[40:], 0x1010)
 	if !dedupTable.IsDuplicate(packet, 0) {
 		t.Error("Should hit")
+	}
+}
+
+func TestOverwriteTTL(t *testing.T) {
+	da := "00:00:00:fc:a4:0b"
+	sa := "00:00:00:25:3f:63"
+	packet := buildStubPacket(da, sa, EthernetTypeIPv4, 2)
+	packet[22] = 127 // ttl
+	dedupTable.IsDuplicate(packet, 0)
+	packet[22] = 126 // ttl
+	if !dedupTable.IsDuplicate(packet, 0) {
+		t.Error("Should hit")
+	}
+	if packet[22] != 128 {
+		t.Error("packet ttl not overwritten")
 	}
 }
 
