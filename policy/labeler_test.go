@@ -1124,10 +1124,12 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 var (
 	server = NewIPFromString("172.20.1.1").Int()
 
-	group1ip1 = NewIPFromString("192.168.1.10").Int()
-	group1mac = NewMACAddrFromString("11:11:11:11:11:11").Int()
-	group1ip2 = NewIPFromString("192.168.1.20").Int()
-	group1Id  = uint32(10)
+	group1ip1  = NewIPFromString("192.168.1.10").Int()
+	group1mac  = NewMACAddrFromString("11:11:11:11:11:11").Int()
+	group1ip2  = NewIPFromString("192.168.1.20").Int()
+	group1mac2 = NewMACAddrFromString("11:11:11:11:11:12").Int()
+	group1ip3  = NewIPFromString("102.168.33.22").Int()
+	group1Id   = uint32(10)
 
 	group2ip1 = NewIPFromString("10.30.1.10").Int()
 	group2mac = NewMACAddrFromString("22:22:22:22:22:22").Int()
@@ -1144,9 +1146,9 @@ func generateIpNet(ip uint32, mask uint32) *IpNet {
 	return &ipInfo
 }
 
-func generatePlatformDataWithGroupId(groupId uint32, mac uint64) *PlatformData {
+func generatePlatformDataWithGroupId(epcId int32, groupId uint32, mac uint64) *PlatformData {
 	data := PlatformData{
-		EpcId:      int32(groupId),
+		EpcId:      epcId,
 		DeviceType: 2,
 		DeviceId:   3,
 		IfType:     3,
@@ -1163,14 +1165,19 @@ func generatePolicyTable() *PolicyTable {
 
 	datas := make([]*PlatformData, 0, 2)
 
-	data := generatePlatformDataWithGroupId(group1Id, group1mac)
+	data := generatePlatformDataWithGroupId(int32(group1Id), group1Id, group1mac)
 	ip := generateIpNet(group1ip1, 24)
 	data.Ips = append(data.Ips, ip)
 	ip = generateIpNet(group1ip2, 25)
 	data.Ips = append(data.Ips, ip)
 	datas = append(datas, data)
 
-	data = generatePlatformDataWithGroupId(group2Id, group2mac)
+	data = generatePlatformDataWithGroupId(int32(group1Id), 0, group1mac2)
+	ip = generateIpNet(group1ip3, 18)
+	data.Ips = append(data.Ips, ip)
+	datas = append(datas, data)
+
+	data = generatePlatformDataWithGroupId(int32(group2Id), group2Id, group2mac)
 	ip = generateIpNet(group2ip1, 24)
 	data.Ips = append(data.Ips, ip)
 	ip = generateIpNet(group2ip2, 25)
@@ -1282,5 +1289,64 @@ func TestPolicySimple(t *testing.T) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
 		t.Log("Expect:", basicPolicyData, "\n")
+	}
+}
+
+func TestPolicyEpcPolicy(t *testing.T) {
+	acls := []*Acl{}
+	// 创建 policyTable
+	table := generatePolicyTable()
+	// 构建acl action  1->2 tcp 8000
+	acl, action := generatePolicyAcl(table, 1, group1Id, 0, 6, 8000, 0)
+	acls = append(acls, acl)
+	table.UpdateAclData(acls)
+	// 构建查询key  1:0->2:8000 tcp
+	key := generateLookupKey(group1mac, group1mac2, 0, group1ip1, group1ip3, 6, 0, 8000)
+
+	// 获取查询first结果
+	_, policyData := table.LookupAllByKey(key, 0)
+	// 构建预期结果
+	basicPolicyData := &PolicyData{ActionList: ACTION_PACKET_STAT, AclActions: []*AclAction{action}}
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(basicPolicyData, policyData) {
+		t.Error("TestPolicyEpcPolicy Check Failed")
+		t.Log("Result:", policyData, "\n")
+		t.Log("Expect:", basicPolicyData, "\n")
+	}
+
+	_, policyData = table.policyLabel.GetPolicyByFastPath(key)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(basicPolicyData, policyData) {
+		t.Error("TestPolicyEpcPolicy Check Failed")
+		t.Log("Result:", policyData, "\n")
+		t.Log("Expect:", basicPolicyData, "\n")
+	}
+
+	backward := getBackwardAcl(action)
+	key = generateLookupKey(group1mac2, group1mac, 0, group1ip3, group1ip1, 6, 8000, 0)
+	basicPolicyData = &PolicyData{ActionList: ACTION_PACKET_STAT, AclActions: []*AclAction{backward}}
+	_, policyData = table.policyLabel.GetPolicyByFastPath(key)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(basicPolicyData, policyData) {
+		t.Error("TestPolicyEpcPolicy Check Failed")
+		t.Log("Result:", policyData, "\n")
+		t.Log("Expect:", basicPolicyData, "\n")
+	}
+
+	key = generateLookupKey(group1mac2, group1mac, 0, group1ip3, group1ip1, 6, 0, 8000)
+	_, policyData = table.policyLabel.GetPolicyByFastPath(key)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(INVALID_POLICY_DATA, policyData) {
+		t.Error("TestPolicyEpcPolicy Check Failed")
+		t.Log("Result:", policyData, "\n")
+		t.Log("Expect:", INVALID_POLICY_DATA, "\n")
+	}
+
+	_, policyData = table.LookupAllByKey(key, 0)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(INVALID_POLICY_DATA, policyData) {
+		t.Error("TestPolicyEpcPolicy Check Failed")
+		t.Log("Result:", policyData, "\n")
+		t.Log("Expect:", INVALID_POLICY_DATA, "\n")
 	}
 }

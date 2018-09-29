@@ -256,8 +256,18 @@ func (l *PolicyLabel) GenerateIpNetmaskMap(platforms []*PlatformData) {
 
 	for _, platform := range platforms {
 		for _, network := range platform.Ips {
-			netIp := network.Ip & network.Netmask
+			netIp := network.Ip & 0xffff0000
 			mask := uint32(math.MaxUint32) << (32 - network.Netmask)
+			if mask >= 0xffff0000 && maskMap[netIp] < mask {
+				maskMap[netIp] = mask
+			}
+		}
+	}
+
+	for _, platform := range platforms {
+		for _, network := range platform.Ips {
+			mask := maskMap[network.Ip&0xffff0000]
+			netIp := network.Ip & mask
 			if maskMap[netIp] < mask {
 				maskMap[netIp] = mask
 			}
@@ -285,7 +295,20 @@ func (l *PolicyLabel) GenerateIpNetmaskMapFromIpResource(datas []*IpGroupData) {
 			}
 
 			mask := uint32(math.MaxUint32) << uint32(32-maskSize)
-			netIp := IpToUint32(ip) & mask
+			netIp := IpToUint32(ip) & 0xffff0000
+			if mask >= 0xffff0000 && maskMap[netIp] < mask {
+				maskMap[netIp] = mask
+			}
+		}
+
+		for _, raw := range data.Ips {
+			parts := strings.Split(raw, "/")
+			if len(parts) != 2 {
+				continue
+			}
+			ip := IpToUint32(net.ParseIP(parts[0]))
+			mask := maskMap[ip&0xffff0000]
+			netIp := ip & mask
 			if maskMap[netIp] < mask {
 				maskMap[netIp] = mask
 			}
@@ -523,15 +546,17 @@ func (l *PolicyLabel) addVlanFastPolicy(endpointData *EndpointData, packet *Look
 	forward := &PolicyData{}
 	backward := &PolicyData{}
 
-	maps := l.getVlanAndPortMap(packet, true)
-
 	srcEpc := l.addEpcMap(packet.FastIndex, endpointData.SrcInfo, packet.SrcMac)
 	dstEpc := l.addEpcMap(packet.FastIndex, endpointData.DstInfo, packet.DstMac)
+
+	maps := l.getVlanAndPortMap(packet, FORWARD, true)
 
 	forward.Merge(policy.AclActions)
 	key := uint64(packet.Vlan) | uint64(srcEpc)<<32 | uint64(dstEpc)<<12
 	valueForward := &FastPathMapValue{endpoint: endpointData, policy: forward, timestamp: packet.Timestamp}
 	maps.vlanPolicyMap.Add(key, valueForward)
+
+	maps = l.getVlanAndPortMap(packet, BACKWARD, true)
 
 	backward.MergeAndSwapDirection(policy.AclActions)
 	key = uint64(packet.Vlan) | uint64(dstEpc)<<32 | uint64(srcEpc)<<12
@@ -542,7 +567,7 @@ func (l *PolicyLabel) addVlanFastPolicy(endpointData *EndpointData, packet *Look
 func (l *PolicyLabel) addPortFastPolicy(endpointData *EndpointData, packet *LookupKey, policy *PolicyData, direction DirectionType) {
 	forward := &PolicyData{}
 
-	maps := l.getVlanAndPortMap(packet, true)
+	maps := l.getVlanAndPortMap(packet, direction, true)
 
 	srcEpc := l.addEpcMap(packet.FastIndex, endpointData.SrcInfo, packet.SrcMac)
 	dstEpc := l.addEpcMap(packet.FastIndex, endpointData.DstInfo, packet.DstMac)
@@ -577,62 +602,70 @@ func (l *PolicyLabel) getFastInterestKeys(packet *LookupKey) {
 	}
 }
 
-func (l *PolicyLabel) getFastPortPolicy(portPolicyMap *lru.Cache, packet *LookupKey, policy *PolicyData) *EndpointData {
+func (l *PolicyLabel) getFastPortPolicy(portPolicyMap *lru.Cache, packet *LookupKey, direction DirectionType, policy *PolicyData) *EndpointData {
 	srcEpc := uint64(l.MacEpcMaps[packet.FastIndex][packet.SrcMac])
 	dstEpc := uint64(l.MacEpcMaps[packet.FastIndex][packet.DstMac])
+	port := packet.DstPort
 	var endpoint *EndpointData
 	var value *FastPathMapValue
 
-	key := srcEpc<<44 | dstEpc<<24 | uint64(packet.Proto)<<16 | uint64(packet.DstPort)
+	if direction == BACKWARD {
+		srcEpc, dstEpc = dstEpc, srcEpc
+		port = packet.SrcPort
+	}
+
+	key := srcEpc<<44 | dstEpc<<24 | uint64(packet.Proto)<<16 | uint64(port)
 	if data, ok := portPolicyMap.Get(key); ok {
 		value = data.(*FastPathMapValue)
 		if value.timestamp < packet.Timestamp && packet.Timestamp-value.timestamp > POLICY_TIMEOUT {
 			portPolicyMap.Remove(key)
-			goto backward
+			return nil
 		}
-		policy.Merge(value.policy.AclActions, FORWARD)
+		value.timestamp = packet.Timestamp
+		policy.Merge(value.policy.AclActions, direction)
 		endpoint = value.endpoint
-	}
-
-backward:
-	if dstEpc != srcEpc || packet.SrcPort != packet.DstPort {
-		key = dstEpc<<44 | srcEpc<<24 | uint64(packet.Proto)<<16 | uint64(packet.SrcPort)
-		if data, ok := portPolicyMap.Get(key); ok {
-			value = data.(*FastPathMapValue)
-			if value.timestamp < packet.Timestamp && packet.Timestamp-value.timestamp > POLICY_TIMEOUT {
-				portPolicyMap.Remove(key)
-				return endpoint
-			}
-			policy.Merge(value.policy.AclActions, BACKWARD)
-			endpoint = value.endpoint
-		}
 	}
 	return endpoint
 }
 
-func (l *PolicyLabel) getFastVlanPolicy(vlanPolicyMap *lru.Cache, packet *LookupKey) *FastPathMapValue {
+func (l *PolicyLabel) getFastVlanPolicy(vlanPolicyMap *lru.Cache, packet *LookupKey, direction DirectionType, policy *PolicyData) *EndpointData {
 	srcEpc := uint64(l.MacEpcMaps[packet.FastIndex][packet.SrcMac])
 	dstEpc := uint64(l.MacEpcMaps[packet.FastIndex][packet.DstMac])
+	var endpoint *EndpointData
+
+	if direction == BACKWARD {
+		srcEpc, dstEpc = dstEpc, srcEpc
+	}
 
 	var value *FastPathMapValue
 	key := uint64(packet.Vlan) | uint64(srcEpc)<<32 | uint64(dstEpc)<<12
 	if data, ok := vlanPolicyMap.Get(key); ok {
 		value = data.(*FastPathMapValue)
-		goto found
+		if value.timestamp < packet.Timestamp && packet.Timestamp-value.timestamp > POLICY_TIMEOUT {
+			vlanPolicyMap.Remove(key)
+			return nil
+		}
+		value.timestamp = packet.Timestamp
+		policy.Merge(value.policy.AclActions, direction)
+		endpoint = value.endpoint
 	}
-	return nil
-found:
-	if value.timestamp < packet.Timestamp && packet.Timestamp-value.timestamp > POLICY_TIMEOUT {
-		vlanPolicyMap.Remove(key)
-		return nil
-	}
-	value.timestamp = packet.Timestamp
-	return value
+	return endpoint
 }
 
-func (l *PolicyLabel) getVlanAndPortMap(packet *LookupKey, create bool) *VlanAndPortMap {
-	maskedSrcIp := l.IpNetmaskMap[packet.SrcIp] & packet.SrcIp
-	maskedDstIp := l.IpNetmaskMap[packet.DstIp] & packet.DstIp
+func (l *PolicyLabel) getVlanAndPortMap(packet *LookupKey, direction DirectionType, create bool) *VlanAndPortMap {
+	maskSrc := l.IpNetmaskMap[packet.SrcIp&0xffff0000]
+	if maskSrc < 0xffff0000 {
+		maskSrc = 0xffff0000
+	}
+	maskDst := l.IpNetmaskMap[packet.DstIp&0xffff0000]
+	if maskDst < 0xffff0000 {
+		maskDst = 0xffff0000
+	}
+	maskedSrcIp := packet.SrcIp & maskSrc
+	maskedDstIp := packet.DstIp & maskDst
+	if direction == BACKWARD {
+		maskedSrcIp, maskedDstIp = maskedDstIp, maskedSrcIp
+	}
 	key := uint64(maskedDstIp)<<32 | uint64(maskedSrcIp)
 	if data, ok := l.FastPolicyMaps[packet.FastIndex].Get(key); ok {
 		return data.(*VlanAndPortMap)
@@ -652,25 +685,23 @@ func (l *PolicyLabel) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *Po
 	found := false
 
 	l.getFastInterestKeys(packet)
-	if maps := l.getVlanAndPortMap(packet, false); maps != nil {
-		if packet.Vlan > 0 {
-			if vlan := l.getFastVlanPolicy(maps.vlanPolicyMap, packet); vlan != nil {
-				policy.Merge(vlan.policy.AclActions)
-				endpoint = vlan.endpoint
+	for _, direction := range []DirectionType{FORWARD, BACKWARD} {
+		if maps := l.getVlanAndPortMap(packet, direction, false); maps != nil {
+			if packet.Vlan > 0 {
+				if endpoint = l.getFastVlanPolicy(maps.vlanPolicyMap, packet, direction, policy); endpoint != nil {
+					found = true
+				}
+			}
+			endpoint = l.getFastPortPolicy(maps.portPolicyMap, packet, direction, policy)
+			if endpoint != nil {
 				found = true
 			}
 		}
-		endpoint = l.getFastPortPolicy(maps.portPolicyMap, packet, policy)
-		if endpoint != nil {
-			found = true
-		}
-		if !found {
-			goto unfound
-		}
-		atomic.AddUint64(&l.FastPathHit, 1)
-		atomic.AddUint64(&l.FastPathHitTick, 1)
-		return endpoint, policy
 	}
-unfound:
-	return nil, INVALID_POLICY_DATA
+	if !found {
+		return nil, INVALID_POLICY_DATA
+	}
+	atomic.AddUint64(&l.FastPathHit, 1)
+	atomic.AddUint64(&l.FastPathHitTick, 1)
+	return endpoint, policy
 }
