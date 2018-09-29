@@ -58,13 +58,12 @@ func (t *DedupTable) IsDuplicate(packet []byte, timestamp time.Duration) bool {
 	return t.lookup(hash, id, timestamp, packetId)
 }
 
-func NewDedupTable(name string, overwriteTTL bool) *DedupTable {
+func NewDedupTable(name string) *DedupTable {
 	t := &DedupTable{
-		hashTable:    &HashTable{},
-		queue:        &List{},
-		buffer:       &List{},
-		overwriteTTL: overwriteTTL,
-		counter:      &Counter{},
+		hashTable: &HashTable{},
+		queue:     &List{},
+		buffer:    &List{},
+		counter:   &Counter{},
 	}
 	for i := 0; i < HASH_TABLE_SIZE; i++ {
 		t.hashTable[i] = &List{}

@@ -130,6 +130,10 @@ func (list *List) remove(node *ListNode) {
 	node.next = nil
 }
 
+func (t *DedupTable) SetOverwriteTTL(b bool) {
+	t.overwriteTTL = b
+}
+
 func (t *DedupTable) allocateNodePair(timestamp time.Duration, hash uint32, id uint64, packetId PacketId) (qnode, bnode *ListNode) {
 	if t.buffer.head == nil {
 		qnode = &ListNode{}
