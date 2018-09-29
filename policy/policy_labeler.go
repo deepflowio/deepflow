@@ -58,7 +58,7 @@ type PolicyLabel struct {
 	InterestPortMaps  [TAP_MAX]map[uint16]bool
 	InterestGroupMaps [TAP_MAX]map[uint32]bool
 
-	MacEpcMaps     map[uint64]uint32
+	MacEpcMaps     []map[uint64]uint32
 	IpNetmaskMap   map[uint32]uint32
 	FastPolicyMaps []*lru.Cache
 
@@ -82,12 +82,14 @@ func NewPolicyLabel(queueCount int, mapSize uint32) *PolicyLabel {
 		policy.GroupPortPolicyMaps[i] = make(map[uint64]*PolicyData)
 	}
 
-	policy.MacEpcMaps = make(map[uint64]uint32)
 	policy.IpNetmaskMap = make(map[uint32]uint32)
 
 	policy.mapSize = mapSize
 	for i := 0; i < queueCount; i++ {
 		policy.FastPolicyMaps = append(policy.FastPolicyMaps, lru.New(int(mapSize)))
+
+		macEpcMap := make(map[uint64]uint32)
+		policy.MacEpcMaps = append(policy.MacEpcMaps, macEpcMap)
 	}
 	return policy
 }
@@ -104,16 +106,35 @@ func mapToSlice(in map[uint32]uint32) []uint32 {
 
 func (l *PolicyLabel) generateInterestKeys(endpointData *EndpointData, packet *LookupKey) {
 	groupMap := l.InterestGroupMaps[packet.Tap]
+	hasZero := false
+	// 添加groupid 0匹配全采集的策略
 	for _, id := range endpointData.SrcInfo.GroupIds {
 		if groupMap[id] {
 			packet.SrcGroupIds = append(packet.SrcGroupIds, id)
+			if id == 0 {
+				hasZero = true
+			}
 		}
 	}
+	if !hasZero {
+		// 添加groupid 0匹配全采集的策略
+		packet.SrcGroupIds = append(packet.SrcGroupIds, 0)
+	}
+
+	hasZero = false
 	for _, id := range endpointData.DstInfo.GroupIds {
 		if groupMap[id] {
 			packet.DstGroupIds = append(packet.DstGroupIds, id)
+			if id == 0 {
+				hasZero = true
+			}
 		}
 	}
+	if !hasZero {
+		// 添加groupid 0匹配全采集的策略
+		packet.DstGroupIds = append(packet.DstGroupIds, 0)
+	}
+
 	if !l.InterestProtoMaps[packet.Tap][packet.Proto] {
 		packet.Proto = 0
 	}
@@ -149,6 +170,7 @@ func generateGroupPortKeys(srcGroups []uint32, dstGroups []uint32, port uint16, 
 			dstId := uint64(dst & 0xfffff)
 			key |= srcId<<20 | dstId
 			keys = append(keys, key)
+			key &= 0xffffff0000000000
 		}
 	}
 	return keys
@@ -295,6 +317,7 @@ func generateGroupVlanKeys(srcGroups []uint32, dstGroups []uint32, vlan uint16) 
 			dstId := uint64(dst & 0xfffff)
 			key |= srcId<<20 | dstId
 			keys = append(keys, key)
+			key &= 0xffffff0000000000
 		}
 	}
 	return keys
@@ -479,7 +502,7 @@ func (l *PolicyLabel) GetPolicyByFirstPath(endpointData *EndpointData, packet *L
 	return findPolicy
 }
 
-func (l *PolicyLabel) addEpcMap(endpointInfo *EndpointInfo, mac uint64) uint32 {
+func (l *PolicyLabel) addEpcMap(index int, endpointInfo *EndpointInfo, mac uint64) uint32 {
 	id := uint32(0)
 	if endpointInfo.L2EpcId > 0 {
 		id = uint32(endpointInfo.L2EpcId)
@@ -491,7 +514,7 @@ func (l *PolicyLabel) addEpcMap(endpointInfo *EndpointInfo, mac uint64) uint32 {
 		}
 	}
 	if id > 0 {
-		l.MacEpcMaps[mac] = id
+		l.MacEpcMaps[index][mac] = id
 	}
 	return id
 }
@@ -502,8 +525,8 @@ func (l *PolicyLabel) addVlanFastPolicy(endpointData *EndpointData, packet *Look
 
 	maps := l.getVlanAndPortMap(packet, true)
 
-	srcEpc := l.addEpcMap(endpointData.SrcInfo, packet.SrcMac)
-	dstEpc := l.addEpcMap(endpointData.DstInfo, packet.DstMac)
+	srcEpc := l.addEpcMap(packet.FastIndex, endpointData.SrcInfo, packet.SrcMac)
+	dstEpc := l.addEpcMap(packet.FastIndex, endpointData.DstInfo, packet.DstMac)
 
 	forward.Merge(policy.AclActions)
 	key := uint64(packet.Vlan) | uint64(srcEpc)<<32 | uint64(dstEpc)<<12
@@ -521,8 +544,8 @@ func (l *PolicyLabel) addPortFastPolicy(endpointData *EndpointData, packet *Look
 
 	maps := l.getVlanAndPortMap(packet, true)
 
-	srcEpc := l.addEpcMap(endpointData.SrcInfo, packet.SrcMac)
-	dstEpc := l.addEpcMap(endpointData.DstInfo, packet.DstMac)
+	srcEpc := l.addEpcMap(packet.FastIndex, endpointData.SrcInfo, packet.SrcMac)
+	dstEpc := l.addEpcMap(packet.FastIndex, endpointData.DstInfo, packet.DstMac)
 
 	port := packet.DstPort
 	if direction == BACKWARD {
@@ -555,8 +578,8 @@ func (l *PolicyLabel) getFastInterestKeys(packet *LookupKey) {
 }
 
 func (l *PolicyLabel) getFastPortPolicy(portPolicyMap *lru.Cache, packet *LookupKey, policy *PolicyData) *EndpointData {
-	srcEpc := uint64(l.MacEpcMaps[packet.SrcMac])
-	dstEpc := uint64(l.MacEpcMaps[packet.DstMac])
+	srcEpc := uint64(l.MacEpcMaps[packet.FastIndex][packet.SrcMac])
+	dstEpc := uint64(l.MacEpcMaps[packet.FastIndex][packet.DstMac])
 	var endpoint *EndpointData
 	var value *FastPathMapValue
 
@@ -588,8 +611,8 @@ backward:
 }
 
 func (l *PolicyLabel) getFastVlanPolicy(vlanPolicyMap *lru.Cache, packet *LookupKey) *FastPathMapValue {
-	srcEpc := uint64(l.MacEpcMaps[packet.SrcMac])
-	dstEpc := uint64(l.MacEpcMaps[packet.DstMac])
+	srcEpc := uint64(l.MacEpcMaps[packet.FastIndex][packet.SrcMac])
+	dstEpc := uint64(l.MacEpcMaps[packet.FastIndex][packet.DstMac])
 
 	var value *FastPathMapValue
 	key := uint64(packet.Vlan) | uint64(srcEpc)<<32 | uint64(dstEpc)<<12
