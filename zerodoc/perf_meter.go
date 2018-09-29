@@ -154,3 +154,8 @@ func (m *PerfMeterMin) sequentialMerge(other *PerfMeterMin) {
 	m.MinRTTSyn = minDuration(m.MinRTTSyn, other.MinRTTSyn)
 	m.MinRTTAvg = minDuration(m.MinRTTAvg, other.MinRTTAvg)
 }
+
+func (m *PerfMeter) Duplicate() app.Meter {
+	dup := *m
+	return &dup
+}
