@@ -39,13 +39,8 @@ func (f *FlowGenerator) genFlowKey(meta *MetaPacket) *FlowKey {
 }
 
 // hash of the key L3, symmetric
-func getKeyL3Hash(flowKey *FlowKey) uint64 {
-	ipSrc := uint64(flowKey.IPSrc)
-	ipDst := uint64(flowKey.IPDst)
-	if ipSrc >= ipDst {
-		return (ipSrc << 32) | ipDst
-	}
-	return ipSrc | (ipDst << 32)
+func getKeyL3Hash(flowKey *FlowKey, basis uint32) uint64 {
+	return uint64(hashFinish(hashAdd(basis, flowKey.IPSrc^flowKey.IPDst)))
 }
 
 // hash of the key L4, symmetric
@@ -59,7 +54,7 @@ func getKeyL4Hash(flowKey *FlowKey, basis uint32) uint64 {
 }
 
 func (f *FlowGenerator) getQuinTupleHash(flowKey *FlowKey) uint64 {
-	return getKeyL3Hash(flowKey) ^ ((uint64(flowKey.InPort) << 32) | getKeyL4Hash(flowKey, f.hashBasis))
+	return getKeyL3Hash(flowKey, f.hashBasis) ^ ((uint64(flowKey.InPort) << 32) | getKeyL4Hash(flowKey, f.hashBasis))
 }
 
 func isFromTor(inPort uint32) bool {

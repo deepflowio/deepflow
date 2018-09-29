@@ -148,14 +148,15 @@ func TestHandleSynFin(t *testing.T) {
 
 func TestGetKeyL3Hash(t *testing.T) {
 	flowKey := &FlowKey{}
+	basis := rand.Uint32()
 
 	flowKey.IPSrc = IPv4Int(NewIPFromString("192.168.1.123").Int())
 	flowKey.IPDst = IPv4Int(NewIPFromString("10.168.1.221").Int())
-	hash0 := getKeyL3Hash(flowKey)
+	hash0 := getKeyL3Hash(flowKey, basis)
 
 	flowKey.IPDst = IPv4Int(NewIPFromString("192.168.1.123").Int())
 	flowKey.IPSrc = IPv4Int(NewIPFromString("10.168.1.221").Int())
-	hash1 := getKeyL3Hash(flowKey)
+	hash1 := getKeyL3Hash(flowKey, basis)
 
 	if hash0 != hash1 {
 		t.Errorf("symmetric hash values are %d and %d", hash0, hash1)
