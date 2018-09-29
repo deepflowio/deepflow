@@ -6,13 +6,14 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	dt "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 	pb "gitlab.x.lan/yunshan/message/zero"
 )
 
-func Marshal(doc *app.Document) ([]byte, error) {
+func Marshal(doc *app.Document, bytes *utils.ByteBuffer) error {
 	if doc.Tag == nil || doc.Meter == nil {
-		return nil, errors.New("No tag or meter in document")
+		return errors.New("No tag or meter in document")
 	}
 
 	var msgType MessageType
@@ -32,7 +33,7 @@ func Marshal(doc *app.Document) ([]byte, error) {
 	case *dt.TypeMeter:
 		msgType = MSG_TYPE
 	default:
-		return nil, fmt.Errorf("Unknown supported type %T", v)
+		return fmt.Errorf("Unknown supported type %T", v)
 	}
 
 	msg := &pb.ZeroDocument{}
@@ -41,7 +42,7 @@ func Marshal(doc *app.Document) ([]byte, error) {
 	var tag *dt.Tag
 	tag, ok := doc.Tag.(*dt.Tag)
 	if !ok {
-		return nil, fmt.Errorf("Unknown supported tag type %T", doc.Tag)
+		return fmt.Errorf("Unknown supported tag type %T", doc.Tag)
 	}
 	msg.Tag = dt.TagToPB(tag)
 
@@ -71,14 +72,12 @@ func Marshal(doc *app.Document) ([]byte, error) {
 	}
 	msg.Actions = proto.Uint32(doc.Actions)
 
-	// TODO: 传入buffer
-	b := make([]byte, msg.Size())
-	_, err := msg.MarshalTo(b)
-	if err != nil {
-		return nil, fmt.Errorf("Marshaling protobuf failed: %s", err)
+	buf := bytes.Use(msg.Size())
+	if _, err := msg.MarshalTo(buf); err != nil {
+		return fmt.Errorf("Marshaling protobuf failed: %s", err)
 	}
 
-	return b, nil
+	return nil
 }
 
 func Unmarshal(b []byte) (*app.Document, error) {

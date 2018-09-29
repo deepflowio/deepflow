@@ -71,8 +71,9 @@ func TestMarshal(t *testing.T) {
 		},
 	}
 	doc := &app.Document{Timestamp: 0x12345678, Tag: tag, Meter: meter}
-	bin, _ := Marshal(doc)
-	newDoc, _ := Unmarshal(bin)
+	bytes := utils.AcquireByteBuffer()
+	Marshal(doc, bytes)
+	newDoc, _ := Unmarshal(bytes.Bytes())
 
 	if doc.Timestamp != newDoc.Timestamp {
 		t.Error("Timestamp在序列化前后不匹配")

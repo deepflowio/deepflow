@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/droplet-libs/zmq"
 )
 
@@ -15,34 +16,30 @@ func NewSender(s zmq.Sender) *Sender {
 	return &Sender{s}
 }
 
-func (s *Sender) Send(doc *app.Document) error {
-	b, err := Marshal(doc)
+func (s *Sender) Send(doc *app.Document, bytes *utils.ByteBuffer) error {
+	if err := Marshal(doc, bytes); err != nil {
+		return err
+	}
+	n, err := s.Sender.Send(bytes.Bytes())
 	if err != nil {
 		return err
 	}
-	n, err := s.Sender.Send(b)
-	if err != nil {
-		return err
+	if n != len(bytes.Bytes()) {
+		return fmt.Errorf("Partial message sent, %d in %d bytes", n, len(bytes.Bytes()))
 	}
-	if n != len(b) {
-		return fmt.Errorf("Partial message sent, %d in %d bytes", n, len(b))
-	}
-
 	return nil
 }
 
-func (s *Sender) SendNoBlock(doc *app.Document) error {
-	b, err := Marshal(doc)
+func (s *Sender) SendNoBlock(doc *app.Document, bytes *utils.ByteBuffer) error {
+	if err := Marshal(doc, bytes); err != nil {
+		return err
+	}
+	n, err := s.Sender.SendNoBlock(bytes.Bytes())
 	if err != nil {
 		return err
 	}
-
-	n, err := s.Sender.SendNoBlock(b)
-	if err != nil {
-		return err
-	}
-	if n != len(b) {
-		return fmt.Errorf("Partial message sent, %d in %d bytes", n, len(b))
+	if n != len(bytes.Bytes()) {
+		return fmt.Errorf("Partial message sent, %d in %d bytes", n, len(bytes.Bytes()))
 	}
 	return nil
 }
