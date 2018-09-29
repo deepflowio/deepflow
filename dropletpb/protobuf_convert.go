@@ -150,9 +150,10 @@ func convert2ActionType(action trident.Action) datatype.ActionType {
 func newAclAction(aclId uint32, actions []*trident.FlowAction) []*datatype.AclAction {
 	aclActions := make([]*datatype.AclAction, 0, len(actions))
 	for _, action := range actions {
-		if policyType := convert2ActionType(action.GetAction()); policyType != 0 {
+		if actionType := convert2ActionType(action.GetAction()); actionType != 0 {
 			aclAction := &datatype.AclAction{
 				AclId:       aclId,
+				Type:        actionType,
 				ACLGIDs:     action.GetPolicyAclGroupId(),
 				TagTemplate: action.GetTagTemplate(),
 			}
