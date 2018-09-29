@@ -105,6 +105,9 @@ func TagToPB(t *Tag) *pb.Tag {
 	if t.Code&ACLID != 0 {
 		tag.AclId = proto.Uint32(t.ACLID)
 	}
+	if t.Code&ACLDirection != 0 {
+		tag.AclDirection = pb.AclDirection(t.ACLDirection).Enum()
+	}
 
 	if t.CustomFields != nil {
 		n := 0
@@ -224,6 +227,9 @@ func PBToTag(t *pb.Tag) *Tag {
 	}
 	if tag.Code&ACLID != 0 {
 		tag.ACLID = t.GetAclId()
+	}
+	if tag.Code&ACLDirection != 0 {
+		tag.ACLDirection = ACLDirectionEnum(t.GetAclDirection())
 	}
 
 	if t.GetCustomFields() != nil && tag.Code&0xFFFF000000000000 != 0 {
