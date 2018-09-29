@@ -1188,7 +1188,18 @@ func generatePolicyTable() *PolicyTable {
 	return policy
 }
 
-func generatePolicyAcl(table *PolicyTable, id uint32, srcGroupId, dstGroupId uint32, proto uint8, port uint16, vlan uint32) (*Acl, *AclAction) {
+func generateAclAction(id uint32, actionType ActionType) *AclAction {
+	action := &AclAction{
+		AclId:       id,
+		Type:        actionType,
+		TagTemplate: TEMPLATE_EDGE_PORT,
+		Direction:   FORWARD,
+	}
+	return action
+}
+
+func generatePolicyAcl(table *PolicyTable, action *AclAction, srcGroupId, dstGroupId uint32,
+	proto uint8, port uint16, vlan uint32) *Acl {
 	srcGroups := make(map[uint32]uint32)
 	dstGroups := make(map[uint32]uint32)
 	dstPorts := make(map[uint16]uint16)
@@ -1198,17 +1209,10 @@ func generatePolicyAcl(table *PolicyTable, id uint32, srcGroupId, dstGroupId uin
 	if port != 0 {
 		dstPorts[port] = port
 	}
-
-	action := &AclAction{
-		AclId:       id,
-		Type:        ACTION_PACKET_STAT,
-		TagTemplate: TEMPLATE_EDGE_PORT,
-		Direction:   FORWARD,
-	}
 	acl := &Acl{
-		Id:        id,
+		Id:        action.AclId,
 		Type:      TAP_TOR,
-		TapId:     id + 1,
+		TapId:     action.AclId + 1,
 		SrcGroups: srcGroups,
 		DstGroups: dstGroups,
 		DstPorts:  dstPorts,
@@ -1216,9 +1220,11 @@ func generatePolicyAcl(table *PolicyTable, id uint32, srcGroupId, dstGroupId uin
 		Vlan:      vlan,
 		Action:    []*AclAction{action},
 	}
-	return acl, action
+	return acl
 }
-func generateLookupKey(srcMac, dstMac uint64, vlan uint16, srcIp, dstIp uint32, proto uint8, srcPort, dstPort uint16) *LookupKey {
+
+func generateLookupKey(srcMac, dstMac uint64, vlan uint16, srcIp, dstIp uint32,
+	proto uint8, srcPort, dstPort uint16) *LookupKey {
 	key := &LookupKey{
 		SrcMac:  srcMac,
 		DstMac:  dstMac,
@@ -1238,7 +1244,8 @@ func TestPolicySimple(t *testing.T) {
 	// 创建 policyTable
 	table := generatePolicyTable()
 	// 构建acl action  1->2 tcp 8000
-	acl, action := generatePolicyAcl(table, 1, group1Id, group2Id, 6, 8000, 0)
+	action := generateAclAction(1, ACTION_PACKET_STAT)
+	acl := generatePolicyAcl(table, action, group1Id, group2Id, 6, 8000, 0)
 	acls = append(acls, acl)
 	table.UpdateAclData(acls)
 	// 构建查询key  1:0->2:8000 tcp
@@ -1278,8 +1285,9 @@ func TestPolicySimple(t *testing.T) {
 	}
 
 	// 测试同样的key, 匹配两条action
-	acl, action2 := generatePolicyAcl(table, 2, group1Id, group2Id, 6, 8000, 0)
-	acls = append(acls, acl)
+	action2 := generateAclAction(2, ACTION_PACKET_STAT)
+	acl2 := generatePolicyAcl(table, action2, group1Id, group2Id, 6, 8000, 0)
+	acls = append(acls, acl2)
 	table.UpdateAclData(acls)
 	basicPolicyData = &PolicyData{ActionList: ACTION_PACKET_STAT, AclActions: []*AclAction{action, action2}}
 	key = generateLookupKey(group1mac, group2mac, 0, group1ip1, group2ip1, 6, 0, 8000)
@@ -1297,7 +1305,8 @@ func TestPolicyEpcPolicy(t *testing.T) {
 	// 创建 policyTable
 	table := generatePolicyTable()
 	// 构建acl action  1->2 tcp 8000
-	acl, action := generatePolicyAcl(table, 1, group1Id, 0, 6, 8000, 0)
+	action := generateAclAction(1, ACTION_PACKET_STAT)
+	acl := generatePolicyAcl(table, action, group1Id, 0, 6, 8000, 0)
 	acls = append(acls, acl)
 	table.UpdateAclData(acls)
 	// 构建查询key  1:0->2:8000 tcp
@@ -1347,6 +1356,43 @@ func TestPolicyEpcPolicy(t *testing.T) {
 	if !CheckPolicyResult(INVALID_POLICY_DATA, policyData) {
 		t.Error("TestPolicyEpcPolicy Check Failed")
 		t.Log("Result:", policyData, "\n")
+	}
+}
+
+func TestFlowVlanAcls(t *testing.T) {
+	acls := []*Acl{}
+	table := generatePolicyTable()
+	action := generateAclAction(3, ACTION_FLOW_STAT)
+	acl := generatePolicyAcl(table, action, group1Id, group2Id, 6, 0, 10)
+	acls = append(acls, acl)
+	table.UpdateAclData(acls)
+	// 构建查询key  1:11->2:10 tcp vlan:10
+	key := generateLookupKey(group1mac, group2mac, 10, group1ip1, group2ip1, 6, 11, 10)
+
+	_, policyData := table.LookupAllByKey(key, 0)
+	basicPolicyData := &PolicyData{ActionList: ACTION_FLOW_STAT, AclActions: []*AclAction{action}}
+	if !CheckPolicyResult(basicPolicyData, policyData) {
+		t.Error("PortProto Check Failed")
+		t.Log("Result:", policyData, "\n")
+		t.Log("Expect:", basicPolicyData, "\n")
+	}
+	key = generateLookupKey(group2mac, group1mac, 10, group2ip1, group1ip1, 6, 11, 10)
+	// key和acl方向相反，构建反向的action
+	backward := getBackwardAcl(action)
+	basicPolicyData2 := &PolicyData{ActionList: ACTION_FLOW_STAT, AclActions: []*AclAction{backward}}
+	_, policyData2 := table.policyLabel.GetPolicyByFastPath(key)
+	if !CheckPolicyResult(basicPolicyData2, policyData2) {
+		t.Error("PortProto Check Failed")
+		t.Log("Result:", policyData2, "\n")
+		t.Log("Expect:", basicPolicyData2, "\n")
+	}
+
+	key = generateLookupKey(group2mac, group1mac, 11, group2ip1, group1ip1, 6, 11, 10)
+	_, policyData3 := table.LookupAllByKey(key, 0)
+	// key不匹配，返回无效policy
+	if !CheckPolicyResult(INVALID_POLICY_DATA, policyData3) {
+		t.Error("PortProto Check Failed")
+		t.Log("Result:", policyData3, "\n")
 		t.Log("Expect:", INVALID_POLICY_DATA, "\n")
 	}
 }
