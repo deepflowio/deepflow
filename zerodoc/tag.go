@@ -49,6 +49,7 @@ const (
 	TAPType
 	SubnetID
 	ACLID
+	ACLDirection
 )
 
 const (
@@ -90,6 +91,13 @@ const (
 	ToR
 )
 
+type ACLDirectionEnum uint8
+
+const (
+	ACL_FORWARD ACLDirectionEnum = 1 << iota
+	ACL_BACKWARD
+)
+
 type Field struct {
 	IP           uint32
 	MAC          uint64
@@ -123,15 +131,16 @@ type Field struct {
 	Host0         uint32
 	Host1         uint32
 
-	Direction  DirectionEnum
-	ACLGID     uint32
-	VLANID     uint16
-	Protocol   layers.IPProtocol
-	ServerPort uint16
-	VTAP       uint32
-	TAPType    TAPTypeEnum
-	SubnetID   uint32
-	ACLID      uint32
+	Direction    DirectionEnum
+	ACLGID       uint32
+	VLANID       uint16
+	Protocol     layers.IPProtocol
+	ServerPort   uint16
+	VTAP         uint32
+	TAPType      TAPTypeEnum
+	SubnetID     uint32
+	ACLID        uint32
+	ACLDirection ACLDirectionEnum
 
 	CustomFields []*StringField
 }
@@ -278,14 +287,11 @@ func (t *Tag) ToKVString() string {
 
 	// 1<<32 ~ 1<<48
 	if t.Code&Direction != 0 {
-		buf.WriteString(",direction=")
 		switch t.Direction {
 		case ClientToServer:
-			buf.WriteString("c2s")
+			buf.WriteString(",direction=c2s")
 		case ServerToClient:
-			buf.WriteString("s2c")
-		default:
-			buf.WriteString("any")
+			buf.WriteString(",direction=s2c")
 		}
 	}
 	if t.Code&ACLGID != 0 {
@@ -319,6 +325,14 @@ func (t *Tag) ToKVString() string {
 	if t.Code&ACLID != 0 {
 		buf.WriteString(",acl_id=")
 		buf.WriteString(formatU32(t.ACLID))
+	}
+	if t.Code&ACLDirection != 0 {
+		switch t.ACLDirection {
+		case ACL_FORWARD:
+			buf.WriteString(",acl_direction=fwd")
+		case ACL_BACKWARD:
+			buf.WriteString(",acl_direction=bwd")
+		}
 	}
 
 	// 1<<63 ~ 1<<49
@@ -454,6 +468,9 @@ func (t *Tag) GetID(buf *utils.IntBuffer) string {
 		}
 		if t.Code&ACLID != 0 {
 			buf.WriteU24(t.ACLID) // XXX: 14bit
+		}
+		if t.Code&ACLDirection != 0 {
+			buf.WriteU8(uint8(t.ACLDirection))
 		}
 		if t.CustomFields != nil {
 			for i := 0; i < CustomFieldNumber; i++ {
