@@ -352,11 +352,16 @@ func (t *Tag) ToKVString() string {
 }
 
 func (f *Field) NewTag(c Code) *Tag {
-	return &Tag{Field: f, Code: c}
+	field := &Field{}
+	*field = *f
+	return &Tag{Field: field, Code: c}
 }
 
 func (f *Field) FillTag(c Code, tag *Tag) {
-	tag.Field = f
+	if tag.Field == nil {
+		tag.Field = &Field{}
+	}
+	*tag.Field = *f
 	tag.Code = c
 	tag.id = ""
 }
