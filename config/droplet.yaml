@@ -11,13 +11,12 @@ profiler: false
 # interfaces for mirrored traffic from ISP or TOR
 tap-interfaces: []
 # conf for connection with outside stream
-stream:
-  ip: 127.0.0.1
-  port: 20201
+stream: 127.0.0.1
+stream-port: 20201
 # conf for connection with outside zeroes
-zeroes:
-- ip: 127.0.0.1
-  port: 20202
+zero-hosts: []
+#  - 127.0.0.1
+zero-port: 20202
 # internal queues conf
 queue:
   # packet and flow queue size

@@ -6,20 +6,21 @@ import (
 )
 
 type ZMQBytePusher struct {
-	ip   string
-	port int
 	zmq.Sender
+
+	ip   string
+	port uint16
 }
 
 // NewZMQBytePusher 包装zmq pusher
-func NewZMQBytePusher(ip string, port int) *ZMQBytePusher {
+func NewZMQBytePusher(ip string, port uint16) *ZMQBytePusher {
 	return &ZMQBytePusher{ip: ip, port: port}
 }
 
 // Send 向创建的zmq socket阻塞发送数据
 func (s *ZMQBytePusher) Send(b []byte) {
 	if s.Sender == nil {
-		sender, err := zmq.NewPusher(s.ip, s.port, DEFAULT_HWM, zmq.CLIENT)
+		sender, err := zmq.NewPusher(s.ip, int(s.port), DEFAULT_HWM, zmq.CLIENT)
 		if err != nil {
 			log.Warningf("NewPusher() error: %s\n", err)
 			s.Sender = nil

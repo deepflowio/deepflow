@@ -13,7 +13,7 @@ type FlowSender struct {
 	sequence uint32
 }
 
-func NewFlowSender(input queue.QueueReader, ip string, port int) *FlowSender {
+func NewFlowSender(input queue.QueueReader, ip string, port uint16) *FlowSender {
 	return &FlowSender{input, NewZMQBytePusher(ip, port), 1}
 }
 
