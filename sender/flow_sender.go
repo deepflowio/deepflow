@@ -4,6 +4,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	pb "gitlab.x.lan/yunshan/message/dfi"
 )
 
@@ -13,8 +14,8 @@ type FlowSender struct {
 	sequence uint32
 }
 
-func NewFlowSender(input queue.QueueReader, ip string, port uint16) *FlowSender {
-	return &FlowSender{input, NewZMQBytePusher(ip, port), 1}
+func NewFlowSender(input queue.QueueReader, ip string, port uint16, zmqHWM int) *FlowSender {
+	return &FlowSender{input, NewZMQBytePusher(ip, port, zmqHWM), 1}
 }
 
 // filter 如果流不被存储，返回true
@@ -26,7 +27,9 @@ func (s *FlowSender) filter(flow *datatype.TaggedFlow) bool {
 }
 
 func (s *FlowSender) run() {
+	bytes := utils.AcquireByteBuffer() // never release
 	buffer := make([]interface{}, QUEUE_GET_SIZE)
+
 	for {
 		n := s.input.Gets(buffer)
 		log.Debugf("%d flows received", n)
@@ -40,18 +43,16 @@ func (s *FlowSender) run() {
 					Sequence:  proto.Uint32(s.sequence),
 					Action:    proto.Uint32(uint32(flow.PolicyData.ActionList)),
 				}
-				message, err := proto.Marshal(header)
-				if err != nil {
+				bytes.Reset()
+				if _, err := header.MarshalTo(bytes.Use(header.Size())); err != nil {
 					log.Warningf("Marshalling flow failed: %s", err)
 					continue
 				}
-				bin, err := datatype.MarshalFlow(flow)
-				if err != nil {
+				if err := datatype.MarshalFlow(flow, bytes); err != nil {
 					log.Warningf("Marshalling flow failed: %s", err)
 					continue
 				}
-				message = append(message, bin...)
-				s.ZMQBytePusher.Send(message)
+				s.ZMQBytePusher.Send(bytes.Bytes())
 				s.sequence++
 			} else {
 				log.Warningf("Invalid message type %T, should be *TaggedFlow", flow)

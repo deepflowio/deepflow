@@ -7,6 +7,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/messenger"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/message/zero"
 )
 
@@ -23,12 +24,13 @@ func TestZeroDocumentSender(t *testing.T) {
 	inputQueue1.Put(TEST_DATA[0])
 	inputQueue2.Put(TEST_DATA[1])
 
-	chan1 := make(chan []byte)
-	chan2 := make(chan []byte)
+	chan1 := make(chan *utils.ByteBuffer)
+	chan2 := make(chan *utils.ByteBuffer)
 	go receiverRoutine(len(TEST_DATA), 20001, chan1)
 	go receiverRoutine(len(TEST_DATA), 20002, chan2)
 
-	for b := range chan1 {
+	for bytes := range chan1 {
+		b := bytes.Bytes()
 		doc, _ := messenger.Unmarshal(b[len(hb):])
 		hasEqual := false
 		for _, data := range TEST_DATA {
@@ -42,7 +44,8 @@ func TestZeroDocumentSender(t *testing.T) {
 		}
 	}
 
-	for b := range chan2 {
+	for bytes := range chan2 {
+		b := bytes.Bytes()
 		doc, _ := messenger.Unmarshal(b[len(hb):])
 		hasEqual := false
 		for _, data := range TEST_DATA {

@@ -7,6 +7,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/messenger"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/message/zero"
 )
 
@@ -30,8 +31,8 @@ func TestMarshaller(t *testing.T) {
 
 	inputQueue.Put(TEST_DATA...)
 	for _, q := range outputQueues {
-		bytes := q.Get().([]byte)
-		newDoc, _ := messenger.Unmarshal(bytes[len(b):])
+		bytes := q.Get().(*utils.ByteBuffer)
+		newDoc, _ := messenger.Unmarshal(bytes.Bytes()[len(b):])
 
 		doc := TEST_DATA[0].(*app.Document)
 

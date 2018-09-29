@@ -80,11 +80,13 @@ func init() {
 	TEST_DATA = append(TEST_DATA, &app.Document{Timestamp: 0x87654321, Tag: tag2, Meter: meter})
 }
 
-func receiverRoutine(nData, port int, ch chan []byte) {
+func receiverRoutine(nData, port int, ch chan *utils.ByteBuffer) {
 	receiver, _ := zmq.NewPuller("*", port, 1000000, time.Minute, zmq.SERVER)
 	for i := 0; i < nData; i++ {
 		b, _ := receiver.Recv()
-		ch <- b
+		bytes := utils.AcquireByteBuffer()
+		copy(bytes.Use(len(b)), b)
+		ch <- bytes
 	}
 	close(ch)
 }
