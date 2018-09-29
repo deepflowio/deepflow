@@ -514,8 +514,8 @@ func (l *PolicyLabel) GetPolicyByFirstPath(endpointData *EndpointData, packet *L
 
 	if !portFound {
 		// 无论是否差找到policy，都需要向fastPath下发，避免走firstPath
-		l.addPortFastPolicy(endpointData, packet, findPolicy, FORWARD)
-		l.addPortFastPolicy(endpointData, packet, findPolicy, BACKWARD)
+		l.addPortFastPolicy(endpointData, packet, INVALID_POLICY_DATA, FORWARD)
+		l.addPortFastPolicy(endpointData, packet, INVALID_POLICY_DATA, BACKWARD)
 		if !vlanFound {
 			findPolicy = INVALID_POLICY_DATA
 		}
@@ -646,7 +646,8 @@ func (l *PolicyLabel) getFastVlanPolicy(vlanPolicyMap *lru.Cache, packet *Lookup
 			return nil
 		}
 		value.timestamp = packet.Timestamp
-		policy.Merge(value.policy.AclActions, direction)
+		// vlanMap存储的是有方向的policy，在这里不用更改
+		policy.Merge(value.policy.AclActions)
 		endpoint = value.endpoint
 	}
 	return endpoint
@@ -687,7 +688,8 @@ func (l *PolicyLabel) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *Po
 	l.getFastInterestKeys(packet)
 	for _, direction := range []DirectionType{FORWARD, BACKWARD} {
 		if maps := l.getVlanAndPortMap(packet, direction, false); maps != nil {
-			if packet.Vlan > 0 {
+			// vlan不需要查找BACKWARD方向
+			if packet.Vlan > 0 && direction == FORWARD {
 				if endpoint = l.getFastVlanPolicy(maps.vlanPolicyMap, packet, direction, policy); endpoint != nil {
 					found = true
 				}
