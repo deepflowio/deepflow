@@ -3,7 +3,6 @@ package dedup
 import (
 	. "encoding/binary"
 	"time"
-	"unsafe"
 
 	"github.com/OneOfOne/xxhash"
 	. "github.com/google/gopacket/layers"
@@ -14,7 +13,7 @@ import (
 
 var log = logging.MustGetLogger("dedup")
 
-func hashPacket(packet []byte) (uint32, uint64, PacketId) {
+func (t *DedupTable) hashPacket(packet []byte) (uint32, uint64, PacketId) {
 	var packetId PacketId
 	id := uint64(0)
 
@@ -23,8 +22,10 @@ func hashPacket(packet []byte) (uint32, uint64, PacketId) {
 		return xxhash.Checksum32(packetId[:]), id, packetId
 	}
 
+	vlanTagSize := 0
 	ethType := EthernetType(BigEndian.Uint16(packet[12:]))
 	if ethType == EthernetTypeDot1Q { // ignore vlan tag
+		vlanTagSize = 4
 		ethType = EthernetType(BigEndian.Uint16(packet[16:]))
 		copy(packetId[:12], packet[:12])
 		copy(packetId[12:], packet[16:])
@@ -32,38 +33,38 @@ func hashPacket(packet []byte) (uint32, uint64, PacketId) {
 		copy(packetId[:], packet)
 	}
 
-	l4CsumOffset := 0
 	if ethType == EthernetTypeIPv4 {
+		if t.overwriteTTL {
+			packetId[22] = 128
+			packet[22+vlanTagSize] = 128
+		}
 		id = uint64(BigEndian.Uint32(packetId[18:22])) | // IP ID, Frag
 			(uint64(BigEndian.Uint16(packetId[24:26])) << 32) | // IP checksum
 			(uint64(BigEndian.Uint16(packetId[16:18])) << 48) // IP total length
 		ihl := int(packetId[14] & 0xF)
 		ipProtocol := IPProtocol(packetId[23])
 		if ipProtocol == IPProtocolUDP {
-			l4CsumOffset = 14 + ihl*4 + 6
+			BigEndian.PutUint16(packetId[14+ihl*4+6:], 0) // ignore L4 checksum
 		} else if ipProtocol == IPProtocolTCP {
-			l4CsumOffset = 14 + ihl*4 + 16
+			BigEndian.PutUint16(packetId[14+ihl*4+16:], 0) // ignore L4 checksum
 		}
-	}
-
-	if 0 < l4CsumOffset && l4CsumOffset < PACKET_ID_SIZE { // is L4 and valid offset; l4CsumOffset is even number
-		*(*uint16)(unsafe.Pointer(&packetId[l4CsumOffset])) = 0 // ignore L4 checksum
 	}
 
 	return xxhash.Checksum32(packetId[:]), id, packetId
 }
 
 func (t *DedupTable) IsDuplicate(packet []byte, timestamp time.Duration) bool {
-	hash, id, packetId := hashPacket(packet)
+	hash, id, packetId := t.hashPacket(packet)
 	return t.lookup(hash, id, timestamp, packetId)
 }
 
-func NewDedupTable(name string) *DedupTable {
+func NewDedupTable(name string, overwriteTTL bool) *DedupTable {
 	t := &DedupTable{
-		hashTable: &HashTable{},
-		counter:   &Counter{},
-		queue:     &List{},
-		buffer:    &List{},
+		hashTable:    &HashTable{},
+		queue:        &List{},
+		buffer:       &List{},
+		overwriteTTL: overwriteTTL,
+		counter:      &Counter{},
 	}
 	for i := 0; i < HASH_TABLE_SIZE; i++ {
 		t.hashTable[i] = &List{}
