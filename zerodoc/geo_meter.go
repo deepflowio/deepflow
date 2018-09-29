@@ -73,3 +73,8 @@ func (m *GeoMeter) ToKVString() string {
 
 	return buf.String()
 }
+
+func (m *GeoMeter) Duplicate() app.Meter {
+	dup := *m
+	return &dup
+}

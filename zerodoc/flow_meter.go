@@ -86,3 +86,8 @@ func (m *FlowMeter) ToKVString() string {
 
 	return buf.String()
 }
+
+func (m *FlowMeter) Duplicate() app.Meter {
+	dup := *m
+	return &dup
+}
