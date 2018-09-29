@@ -92,7 +92,9 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 	}
 
 	if flowAcls := response.GetFlowAcls(); flowAcls != nil {
-		l.OnPolicyDataChange(dropletpb.Convert2AclData(response))
+		acls := dropletpb.Convert2AclData(response)
+		log.Debug("droplet grpc recv acl:", acls)
+		l.OnPolicyDataChange(acls)
 	} else {
 		l.OnPolicyDataChange(nil)
 	}
@@ -138,7 +140,6 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *data
 	}
 
 	packet.EndpointData, packet.PolicyData = l.policyTable.LookupAllByKey(key, index)
-	log.Debug("QUERY PACKET:", packet, "ENDPOINTDATA:", packet.EndpointData, "POLICYDATA:", packet.PolicyData)
 	return packet.PolicyData
 }
 
@@ -285,6 +286,7 @@ func (l *LabelerManager) recvAddAcl(conn *net.UDPConn, port int, arg *bytes.Buff
 		dropletctl.SendToDropletCtl(conn, port, 1, nil)
 		return
 	}
+	log.Debug("droplet cmd add-acl:", acl)
 	l.policyTable.AddAcl(&acl)
 }
 
@@ -525,8 +527,8 @@ func showAcl() {
 	}
 	fmt.Printf("%s\n", info)
 
-	acl := policy.Acl{}
 	for {
+		acl := policy.Acl{}
 		buffer, err := dropletctl.RecvFromDroplet(conn)
 		if err != nil {
 			fmt.Println(err)
