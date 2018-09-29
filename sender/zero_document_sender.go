@@ -7,20 +7,20 @@ import (
 type ZeroDocumentSender struct {
 	inputQueues []queue.QueueReader
 	ips         []string
-	ports       []int
+	ports       []uint16
 }
 
 type zeroDocumentSenderBuilder struct {
 	inputQueues []queue.QueueReader
 	ips         []string
-	ports       []int
+	ports       []uint16
 }
 
 func NewZeroDocumentSenderBuilder() *zeroDocumentSenderBuilder {
 	return &zeroDocumentSenderBuilder{
 		inputQueues: make([]queue.QueueReader, 0, 2),
 		ips:         make([]string, 0, 2),
-		ports:       make([]int, 0, 2),
+		ports:       make([]uint16, 0, 2),
 	}
 }
 
@@ -36,7 +36,7 @@ func (b *zeroDocumentSenderBuilder) AddQueue(qs ...queue.QueueReader) *zeroDocum
 	return b
 }
 
-func (b *zeroDocumentSenderBuilder) AddZero(ip string, port int) *zeroDocumentSenderBuilder {
+func (b *zeroDocumentSenderBuilder) AddZero(ip string, port uint16) *zeroDocumentSenderBuilder {
 	for i := range b.ips {
 		if ip == b.ips[i] && b.ports[i] == port {
 			return b

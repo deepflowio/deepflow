@@ -17,14 +17,16 @@ import (
 var log = logging.MustGetLogger("config")
 
 type Config struct {
-	ControllerIps  []string            `yaml:"controller-ips"`
+	ControllerIps  []string            `yaml:"controller-ips,flow"`
 	ControllerPort uint16              `yaml:"controller-port"`
 	LogFile        string              `yaml:"log-file"`
 	LogLevel       string              `yaml:"log-level"`
 	Profiler       bool                `yaml:"profiler"`
-	TapInterfaces  []string            `yaml:"tap-interfaces"`
-	Stream         IpPortConfig        `yaml:"stream"`
-	Zeroes         []IpPortConfig      `yaml:"zeroes"`
+	TapInterfaces  []string            `yaml:"tap-interfaces,flow"`
+	Stream         string              `yaml:"stream"`
+	StreamPort     uint16              `yaml:"stream-port"`
+	ZeroHosts      []string            `yaml:"zero-hosts,flow"`
+	ZeroPort       uint16              `yaml:"zero-port"`
 	Queue          QueueConfig         `yaml:"queue"`
 	Labeler        LabelerConfig       `yaml:"labeler"`
 	FlowGenerator  FlowGeneratorConfig `yaml:"flow-generator"`
@@ -61,7 +63,7 @@ func (c *Config) Validate() error {
 	}
 
 	for _, ipString := range c.ControllerIps {
-		if net.ParseIP(string(ipString)) == nil {
+		if net.ParseIP(ipString) == nil {
 			return errors.New("controller-ips invalid")
 		}
 	}
@@ -70,12 +72,21 @@ func (c *Config) Validate() error {
 		c.LogFile = "/var/log/droplet/droplet.log"
 	}
 	level := strings.ToLower(c.LogLevel)
-	levels := map[string]interface{}{"error": nil, "warn": nil, "info": nil, "debug": nil}
-	_, ok := levels[level]
-	if ok {
-		c.LogLevel = level
-	} else {
-		c.LogLevel = "info"
+	c.LogLevel = "info"
+	for _, l := range []string{"error", "warn", "info", "debug"} {
+		if level == l {
+			c.LogLevel = l
+		}
+	}
+
+	if net.ParseIP(c.Stream) == nil {
+		return errors.New("Malformed stream")
+	}
+
+	for _, ipString := range c.ZeroHosts {
+		if net.ParseIP(ipString) == nil {
+			return errors.New("Malformed zero host")
+		}
 	}
 
 	if c.Queue.QueueSize == 0 {
