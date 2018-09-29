@@ -6,7 +6,7 @@ COMMIT_DATE = $(shell git show -s --format=%cd --date=short HEAD)
 REVISION = $(shell git rev-parse HEAD)
 FLAGS = -ldflags "-X main.RevCount=${REV_COUNT} -X main.Revision=${REVISION} -X main.CommitDate=${COMMIT_DATE}"
 
-all: droplet droplet-ctl droplet-rpc
+all: droplet droplet-ctl
 
 vendor:
 	mkdir -p $(shell dirname ${PROJECT_ROOT})
@@ -29,11 +29,8 @@ droplet: vendor
 
 droplet-ctl: vendor
 	go build ${FLAGS} -o bin/droplet-ctl cmd/droplet-ctl/main.go
-	
-droplet-rpc: vendor
-	go build ${FLAGS} -o bin/droplet-rpc cmd/droplet-rpc/main.go
 
 clean:
 	git clean -dfx
 
-.PHONY: droplet droplet-ctl droplet-rpc test clean
+.PHONY: droplet droplet-ctl test clean
