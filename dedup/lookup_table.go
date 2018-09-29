@@ -18,10 +18,11 @@ const (
 )
 
 type DedupTable struct {
-	hashTable *HashTable
-	counter   *Counter
-	queue     *List
-	buffer    *List
+	hashTable    *HashTable
+	queue        *List
+	buffer       *List
+	overwriteTTL bool
+	counter      *Counter
 }
 
 type Counter struct {
