@@ -20,6 +20,7 @@ type Meter interface {
 	ConcurrentMerge(Meter)
 	SequentialMerge(Meter)
 	ToKVString() string
+	Duplicate() Meter
 }
 
 type Document struct {
