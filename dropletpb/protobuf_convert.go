@@ -118,6 +118,10 @@ func splitPort2Int(src string) map[uint16]uint16 {
 	splitSrcPorts := strings.Split(src, "-")
 	ports := make(map[uint16]uint16)
 	if len(splitSrcPorts) < 2 {
+		portInt, err := strconv.Atoi(src)
+		if err == nil {
+			ports[uint16(portInt)] = uint16(portInt)
+		}
 		return ports
 	}
 	portRange := [2]uint16{0, 0}
