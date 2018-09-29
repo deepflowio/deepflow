@@ -5,12 +5,13 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	pb "gitlab.x.lan/yunshan/message/dfi"
 )
 
 const TYPE_MULTI = 100000000
 
-func MarshalFlow(f *TaggedFlow) ([]byte, error) {
+func MarshalFlow(f *TaggedFlow, bytes *utils.ByteBuffer) error {
 	aclIDs, aclGIDs := getACLIDs(f)
 	flow := &pb.Flow{
 		Exporter:   proto.Uint32(f.Exporter),
@@ -101,11 +102,11 @@ func MarshalFlow(f *TaggedFlow) ([]byte, error) {
 		flow.PktSizeVariance = proto.Uint64(f.PacketSizeVariance)
 	}
 
-	b, err := proto.Marshal(flow)
-	if err != nil {
-		return make([]byte, 0), err
+	buf := bytes.Use(flow.Size())
+	if _, err := flow.MarshalTo(buf); err != nil {
+		return err
 	}
-	return b, nil
+	return nil
 }
 
 func getACLIDs(f *TaggedFlow) ([]uint32, []uint32) {
