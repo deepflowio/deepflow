@@ -67,6 +67,6 @@ func (s *ZeroDocumentSender) Start(queueSize int) {
 		go NewZeroDocumentMarshaller(q, queueWriters...).Start()
 	}
 	for i := range s.ips {
-		go NewZMQBytePusher(s.ips[i], s.ports[i]).QueueForward(queueReaders[i])
+		go NewZMQBytePusher(s.ips[i], s.ports[i], queueSize).QueueForward(queueReaders[i])
 	}
 }

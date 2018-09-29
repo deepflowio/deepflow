@@ -4,9 +4,10 @@ import (
 	"testing"
 
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
-var data = []interface{}{
+var data = [][]byte{
 	[]byte{1, 2, 3, 4, 5},
 	[]byte{2, 3, 4, 5, 6},
 	[]byte{3, 4, 5, 6, 7},
@@ -14,28 +15,30 @@ var data = []interface{}{
 }
 
 func TestBytePusher(t *testing.T) {
-	output := make(chan []byte)
+	output := make(chan *utils.ByteBuffer)
 	q := queue.NewOverwriteQueue("", 1024)
-	q.Put(data...)
+	for _, d := range data {
+		bytes := utils.AcquireByteBuffer()
+		bytes.Use(len(d))
+		copy(bytes.Bytes(), d)
+		q.Put(bytes)
+	}
 	go receiverRoutine(len(data), 12345, output)
 	go senderRoutine(q)
-	for _, rawData := range data {
-		d := rawData.([]byte)
-		b := <-output
-		size := len(b)
-		if size > len(d) {
-			size = len(d)
-		}
-		for i := 0; i < size; i++ {
+	for _, d := range data {
+		bytes := <-output
+		b := bytes.Bytes()
+		for i := 0; i < len(b); i++ {
 			if b[i] != d[i] {
 				t.Error("结果不一致")
 				break
 			}
 		}
+		utils.ReleaseByteBuffer(bytes)
 	}
 }
 
 func senderRoutine(q queue.Queue) {
-	sender := NewZMQBytePusher("127.0.0.1", 12345)
+	sender := NewZMQBytePusher("127.0.0.1", 12345, 1000)
 	sender.QueueForward(q)
 }

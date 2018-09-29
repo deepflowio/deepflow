@@ -148,7 +148,7 @@ func Start(configPath string) {
 	flowSenderQueue := manager.NewQueue("4-tagged-flow-to-stream", queueSize>>2)
 
 	queue.NewDuplicator(1024, flowDuplicatorQueue).AddMultiQueue(flowAppQueue, flowAppQueueCount).AddQueue(flowSenderQueue).Start()
-	sender.NewFlowSender(flowSenderQueue, cfg.Stream, cfg.StreamPort).Start()
+	sender.NewFlowSender(flowSenderQueue, cfg.Stream, cfg.StreamPort, queueSize>>2).Start()
 
 	// L5 - flow doc marshaller
 	flowAppOutputQueue := manager.NewQueue("5-flow-doc-to-marshaller", queueSize>>2)
@@ -160,5 +160,5 @@ func Start(configPath string) {
 	for _, zero := range cfg.ZeroHosts {
 		builder.AddZero(zero, cfg.ZeroPort)
 	}
-	builder.Build().Start(queueSize >> 2)
+	builder.Build().Start(queueSize) // MapReduce发送是突发的，且ZMQ发送缓慢，因此需要大Buffer
 }
