@@ -1,12 +1,12 @@
 /*
- * droplet-rpc is a droplet debug tool,
+ * rpc is a subcommands of droplet-ctl
  * which pulls policy information from controller by rpc.
  * now it contains 3 subcommands:
  *   flowAcls     get flowAcls from controller
  *   ipGroups     get ipGroups from controller
  *   platformData get platformData from controller
  */
-package main
+package dropletctl
 
 import (
 	"encoding/json"
@@ -29,21 +29,21 @@ var configPath = flag.String("f", "/etc/droplet.yaml", "Specify config file loca
 func regiterCommand() []*cobra.Command {
 	platformDataCmd := &cobra.Command{
 		Use:   "platformData",
-		Short: "get platformData from controller",
+		Short: "get platformData from controller, press Ctrl^c to end it",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(platformData)
 		},
 	}
 	ipGroupsCmd := &cobra.Command{
 		Use:   "ipGroups",
-		Short: "get ipGroups from controller",
+		Short: "get ipGroups from controller, press Ctrl^c to end it",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(ipGroups)
 		},
 	}
 	flowAclsCmd := &cobra.Command{
 		Use:   "flowAcls",
-		Short: "get flowAcls from controller",
+		Short: "get flowAcls from controller, press Ctrl^c to end it",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(flowAcls)
 		},
@@ -53,28 +53,22 @@ func regiterCommand() []*cobra.Command {
 	return commands
 }
 
-func main() {
+func RegisterRpcCommand() *cobra.Command {
 	root := &cobra.Command{
-		Use:   "droplet-rpc",
-		Short: "Droplet Policy Tool --- pull policy from controller by rpc",
+		Use:   "rpc",
+		Short: "pull policy from controller by rpc",
 	}
 	cmds := regiterCommand()
 	for _, handler := range cmds {
 		root.AddCommand(handler)
 	}
-	root.GenBashCompletionFile("/usr/share/bash-completion/completions/policy-ctl")
-	root.SetArgs(os.Args[1:])
-	root.Execute()
 
-	wait := make(chan os.Signal)
-	signal.Notify(wait, os.Interrupt)
-	if sig := <-wait; sig == os.Interrupt {
-		fmt.Println("killed by ctrl^c !!")
-	}
+	return root
 }
 
 func initCmd(cmd CmdExecute) {
 	cfg := config.Load(*configPath)
+	cfg.LogLevel = "error"
 	logger.InitLog(cfg.LogFile, cfg.LogLevel)
 
 	controllers := make([]net.IP, 0, len(cfg.ControllerIps))
@@ -86,10 +80,16 @@ func initCmd(cmd CmdExecute) {
 	synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.ControllerPort)
 	synchronizer.Register(func(response *trident.SyncResponse) {
 		cmd(response)
-		fmt.Println("the end !!")
+		fmt.Println("press Ctrl^c to end it !!")
 	})
 
 	synchronizer.Start()
+
+	wait := make(chan os.Signal)
+	signal.Notify(wait, os.Interrupt)
+	if sig := <-wait; sig != os.Interrupt {
+		fmt.Println("press Ctrl^c to end it !!")
+	}
 }
 
 func jsonFormat(index int, v interface{}) {
