@@ -66,9 +66,6 @@ func (s *Stash) Add(docs []*app.Document) []*app.Document {
 			if s.entryCount >= s.capacity {
 				return docs[i:]
 			}
-			// 对于放入stash中的doc（即不是被merge的doc），需要复制其meter
-			// 因为在app中不同的doc会共享同一个meter
-			doc.Meter = doc.Meter.Duplicate()
 			s.stash[s.entryCount] = doc
 			codeMap[fastID] = s.entryCount
 			s.entryCount++
@@ -90,9 +87,6 @@ func (s *Stash) Add(docs []*app.Document) []*app.Document {
 			if s.entryCount >= s.capacity {
 				return docs[i:]
 			}
-			// 对于放入stash中的doc（即不是被merge的doc），需要复制其meter
-			// 因为在app中不同的doc会共享同一个meter
-			doc.Meter = doc.Meter.Duplicate()
 			s.stash[s.entryCount] = doc
 			slotMap[doc.GetID(s.intBuffer)] = s.entryCount
 			s.entryCount++
