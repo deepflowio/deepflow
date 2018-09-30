@@ -10,7 +10,6 @@ package dropletctl
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -24,7 +23,11 @@ import (
 
 type CmdExecute func(response *trident.SyncResponse)
 
-var configPath = flag.String("f", "/etc/droplet.yaml", "Specify config file location")
+var configPath string
+
+func SetConfigPath(path string) {
+	configPath = path
+}
 
 func regiterCommand() []*cobra.Command {
 	platformDataCmd := &cobra.Command{
@@ -67,7 +70,7 @@ func RegisterRpcCommand() *cobra.Command {
 }
 
 func initCmd(cmd CmdExecute) {
-	cfg := config.Load(*configPath)
+	cfg := config.Load(configPath)
 	cfg.LogLevel = "error"
 	logger.InitLog(cfg.LogFile, cfg.LogLevel)
 

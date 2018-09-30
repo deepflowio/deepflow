@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -11,6 +12,8 @@ import (
 	"gitlab.x.lan/yunshan/droplet/queue"
 )
 
+var configPath = flag.String("f", "/etc/droplet.yaml", "Specify config file location")
+
 func regiterCommand() {
 	dropletctl.RegisterCommand(dropletctl.DROPLETCTL_QUEUE, queue.RegisterCommand)
 	dropletctl.RegisterCommand(dropletctl.DROPLETCTL_ADAPTER, adapter.RegisterCommand)
@@ -19,6 +22,7 @@ func regiterCommand() {
 }
 
 func main() {
+	dropletctl.SetConfigPath(*configPath)
 	regiterCommand()
 	root := &cobra.Command{
 		Use:   "droplet-ctl",
