@@ -58,7 +58,7 @@ func init() {
 	pool.New = func() interface{} {
 		bytes := &ByteBuffer{quota: 1 << 16}
 		runtime.SetFinalizer(bytes, func(b *ByteBuffer) {
-			bytes.Reset()
+			b.Reset()
 			pool.Put(b)
 		})
 		return bytes
