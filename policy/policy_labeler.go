@@ -474,6 +474,8 @@ func (l *PolicyLabel) GetPolicyByFirstPath(endpointData *EndpointData, packet *L
 	portGroup := l.GroupPortPolicyMaps[packet.Tap]
 	vlanGroup := l.GroupVlanPolicyMaps[packet.Tap]
 	findPolicy := &PolicyData{}
+	forward := &PolicyData{}
+	backward := &PolicyData{}
 	findPolicy.AclActions = make([]*AclAction, 0, 8)
 	vlanFound := false
 	portFound := false
@@ -495,10 +497,14 @@ func (l *PolicyLabel) GetPolicyByFirstPath(endpointData *EndpointData, packet *L
 	keys := generateSearchPortKeys(packet.SrcGroupIds, packet.DstGroupIds, packet.DstPort, packet.Proto)
 	for _, key := range keys {
 		if policy := portGroup[key]; policy != nil {
-			findPolicy.Merge(policy.AclActions, FORWARD)
-			l.addPortFastPolicy(endpointData, packet, policy, FORWARD)
+			forward.Merge(policy.AclActions, FORWARD)
 			portFound = true
 		}
+	}
+
+	if len(forward.AclActions) > 0 {
+		findPolicy.Merge(forward.AclActions, FORWARD)
+		l.addPortFastPolicy(endpointData, packet, forward, FORWARD)
 	}
 
 	// 在port map中查找策略, 创建反方向key
@@ -506,10 +512,14 @@ func (l *PolicyLabel) GetPolicyByFirstPath(endpointData *EndpointData, packet *L
 	for _, key := range keys {
 		if policy := portGroup[key]; policy != nil {
 			// first层面存储的都是正方向的key, 在这里重新设置方向
-			findPolicy.Merge(policy.AclActions, BACKWARD)
-			l.addPortFastPolicy(endpointData, packet, policy, BACKWARD)
+			backward.Merge(policy.AclActions, BACKWARD)
 			portFound = true
 		}
+	}
+
+	if len(backward.AclActions) > 0 {
+		findPolicy.Merge(backward.AclActions, BACKWARD)
+		l.addPortFastPolicy(endpointData, packet, backward, BACKWARD)
 	}
 
 	if !portFound {
@@ -551,15 +561,15 @@ func (l *PolicyLabel) addVlanFastPolicy(endpointData *EndpointData, packet *Look
 
 	maps := l.getVlanAndPortMap(packet, FORWARD, true)
 
-	forward.Merge(policy.AclActions)
 	key := uint64(packet.Vlan) | uint64(srcEpc)<<32 | uint64(dstEpc)<<12
+	forward.Merge(policy.AclActions)
 	valueForward := &FastPathMapValue{endpoint: endpointData, policy: forward, timestamp: packet.Timestamp}
 	maps.vlanPolicyMap.Add(key, valueForward)
 
 	maps = l.getVlanAndPortMap(packet, BACKWARD, true)
 
-	backward.MergeAndSwapDirection(policy.AclActions)
 	key = uint64(packet.Vlan) | uint64(dstEpc)<<32 | uint64(srcEpc)<<12
+	backward.MergeAndSwapDirection(policy.AclActions)
 	valueBackward := &FastPathMapValue{endpoint: endpointData, policy: backward, timestamp: packet.Timestamp}
 	maps.vlanPolicyMap.Add(key, valueBackward)
 }
@@ -579,8 +589,8 @@ func (l *PolicyLabel) addPortFastPolicy(endpointData *EndpointData, packet *Look
 	}
 
 	// 用epcid + proto + port做为key,将policy插入到PortPolicyMap
-	forward.Merge(policy.AclActions)
 	key := uint64(srcEpc)<<44 | uint64(dstEpc)<<24 | uint64(packet.Proto)<<16 | uint64(port)
+	forward.Merge(policy.AclActions)
 	value := &FastPathMapValue{endpoint: endpointData, policy: forward, timestamp: packet.Timestamp}
 	maps.portPolicyMap.Add(key, value)
 }
