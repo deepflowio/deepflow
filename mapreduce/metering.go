@@ -10,8 +10,8 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 )
 
-func NewMeteringMapProcess(input queue.QueueWriter, output queue.MultiQueue, outputCount int) *MeteringHandler {
-	return NewMeteringHandler([]app.MeteringProcessor{usage.NewProcessor()}, input, output, outputCount)
+func NewMeteringMapProcess(output queue.QueueWriter, input queue.MultiQueue, inputCount int) *MeteringHandler {
+	return NewMeteringHandler([]app.MeteringProcessor{usage.NewProcessor()}, output, input, inputCount)
 }
 
 type MeteringHandler struct {
@@ -24,44 +24,43 @@ type MeteringHandler struct {
 }
 
 func NewMeteringHandler(processors []app.MeteringProcessor, output queue.QueueWriter, inputs queue.MultiQueue, inputCount int) *MeteringHandler {
-	handler := MeteringHandler{
+	return &MeteringHandler{
 		numberOfApps:       len(processors),
 		processors:         processors,
 		zmqAppQueue:        output,
 		meteringQueue:      inputs,
 		meteringQueueCount: inputCount,
 	}
-	return &handler
 }
 
-type subHandler struct {
+type subMeteringHandler struct {
 	numberOfApps int
 	processors   []app.MeteringProcessor
 	stashes      []*Stash
 
-	lastProcess        time.Duration
-	meteringQueue      queue.MultiQueue
-	meteringQueueCount int
-	zmqAppQueue        queue.QueueWriter
+	lastProcess   time.Duration
+	meteringQueue queue.MultiQueue
+	zmqAppQueue   queue.QueueWriter
 
 	queueIndex int
 }
 
-func newSubHandler(processors []app.MeteringProcessor, output queue.QueueWriter, inputs queue.MultiQueue, index int) *subHandler {
-	nApps := len(processors)
-	dupProcessors := make([]app.MeteringProcessor, nApps)
-	for i := range processors {
-		dupProcessors[i] = reflect.New(reflect.ValueOf(processors[i]).Elem().Type()).Interface().(app.MeteringProcessor)
+func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
+	dupProcessors := make([]app.MeteringProcessor, h.numberOfApps)
+	for i, proc := range h.processors {
+		dupProcessors[i] = reflect.New(reflect.ValueOf(proc).Elem().Type()).Interface().(app.MeteringProcessor)
 		dupProcessors[i].Prepare()
 	}
-	handler := subHandler{
-		numberOfApps:  len(processors),
-		processors:    dupProcessors,
+	handler := subMeteringHandler{
+		numberOfApps: h.numberOfApps,
+		processors:   dupProcessors,
+		stashes:      make([]*Stash, h.numberOfApps),
+
 		lastProcess:   time.Duration(time.Now().UnixNano()),
-		stashes:       make([]*Stash, nApps),
-		zmqAppQueue:   output,
-		meteringQueue: inputs,
-		queueIndex:    index,
+		meteringQueue: h.meteringQueue,
+		zmqAppQueue:   h.zmqAppQueue,
+
+		queueIndex: index,
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.stashes[i] = NewStash(DOCS_IN_BUFFER, WINDOW_SIZE)
@@ -69,7 +68,7 @@ func newSubHandler(processors []app.MeteringProcessor, output queue.QueueWriter,
 	return &handler
 }
 
-func (f *subHandler) putToQueue() {
+func (f *subMeteringHandler) putToQueue() {
 	for _, stash := range f.stashes {
 		docs := stash.Dump()
 		for i := 0; i < len(docs); i += QUEUE_BATCH_SIZE {
@@ -94,11 +93,11 @@ func (f *MeteringHandler) startTicker() {
 func (f *MeteringHandler) Start() {
 	go f.startTicker()
 	for i := 0; i < f.meteringQueueCount; i++ {
-		go newSubHandler(f.processors, f.zmqAppQueue, f.meteringQueue, i).Process()
+		go f.newSubMeteringHandler(i).Process()
 	}
 }
 
-func (f *subHandler) Process() error {
+func (f *subMeteringHandler) Process() error {
 	elements := make([]interface{}, QUEUE_BATCH_SIZE)
 
 	for {
@@ -138,11 +137,11 @@ func (f *subHandler) Process() error {
 	}
 }
 
-func (f *subHandler) Flush() {
+func (f *subMeteringHandler) Flush() {
 	f.putToQueue()
 	f.lastProcess = time.Duration(time.Now().UnixNano())
 }
 
-func (f *subHandler) NeedFlush() bool {
+func (f *subMeteringHandler) NeedFlush() bool {
 	return time.Duration(time.Now().UnixNano())-f.lastProcess > time.Minute
 }
