@@ -1,7 +1,8 @@
 package mapreduce
 
 import (
-	"errors"
+	"fmt"
+	"reflect"
 
 	"time"
 
@@ -23,84 +24,85 @@ const (
 
 const GEO_FILE_LOCATION = "/usr/share/droplet/ip_info_mini.json"
 
-func NewFlowMapProcess(inputQueue queue.Queue, outputQueue queue.QueueWriter) *FlowHandler {
-	flowMapProcess := NewFlowHandler([]app.FlowProcessor{
+func NewFlowMapProcess(output queue.QueueWriter, input queue.MultiQueue, inputCount int) *FlowHandler {
+	return NewFlowHandler([]app.FlowProcessor{
 		flow.NewProcessor(),
 		perf.NewProcessor(),
 		geo.NewProcessor(GEO_FILE_LOCATION),
 		flowtype.NewProcessor(),
 		consolelog.NewProcessor(),
 		platform.NewProcessor(),
-	}, outputQueue)
-
-	go func() {
-		for range time.NewTicker(time.Minute).C {
-			inputQueue.Put(nil)
-		}
-	}()
-	go func() {
-		elements := make([]interface{}, QUEUE_BATCH_SIZE)
-		for {
-			n := inputQueue.Gets(elements)
-			for _, e := range elements[:n] {
-				if e == nil { // tick
-					if flowMapProcess.NeedFlush() {
-						flowMapProcess.Flush()
-					}
-					continue
-				}
-
-				flowMapProcess.Process(e.(*datatype.TaggedFlow))
-			}
-		}
-	}()
-
-	return flowMapProcess
-}
-
-type flowAppStats struct {
-	EpcEmitCounter uint64 `statsd:"epc_doc"`
-	//TO DO: add other apps
-
+	}, output, input, inputCount)
 }
 
 type FlowHandler struct {
+	numberOfApps int
+	processors   []app.FlowProcessor
+
+	flowQueue      queue.MultiQueue
+	flowQueueCount int
+	zmqAppQueue    queue.QueueWriter
+}
+
+func NewFlowHandler(processors []app.FlowProcessor, output queue.QueueWriter, inputs queue.MultiQueue, inputCount int) *FlowHandler {
+	return &FlowHandler{
+		numberOfApps:   len(processors),
+		processors:     processors,
+		zmqAppQueue:    output,
+		flowQueue:      inputs,
+		flowQueueCount: inputCount,
+	}
+}
+
+type subFlowHandler struct {
 	numberOfApps int
 	processors   []app.FlowProcessor
 	stashes      []*Stash
 
 	lastProcess time.Duration
 
+	flowQueue   queue.MultiQueue
 	zmqAppQueue queue.QueueWriter
+
+	queueIndex int
 
 	emitCounter  []uint64
 	counterLatch int
 	statItems    []stats.StatItem
 }
 
-func NewFlowHandler(processors []app.FlowProcessor, zmqAppQueue queue.QueueWriter) *FlowHandler {
-	nApps := len(processors)
-	handler := FlowHandler{
-		numberOfApps: nApps,
-		processors:   processors,
-		stashes:      make([]*Stash, nApps),
-		lastProcess:  time.Duration(time.Now().UnixNano()),
-		zmqAppQueue:  zmqAppQueue,
-		emitCounter:  make([]uint64, nApps*2),
+func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
+	dupProcessors := make([]app.FlowProcessor, h.numberOfApps)
+	for i, proc := range h.processors {
+		dupProcessors[i] = reflect.New(reflect.ValueOf(proc).Elem().Type()).Interface().(app.FlowProcessor)
+		dupProcessors[i].Prepare()
+	}
+	handler := subFlowHandler{
+		numberOfApps: h.numberOfApps,
+		processors:   dupProcessors,
+		stashes:      make([]*Stash, h.numberOfApps),
+
+		lastProcess: time.Duration(time.Now().UnixNano()),
+
+		flowQueue:   h.flowQueue,
+		zmqAppQueue: h.zmqAppQueue,
+
+		queueIndex: index,
+
+		emitCounter:  make([]uint64, h.numberOfApps*2),
 		counterLatch: 0,
-		statItems:    make([]stats.StatItem, nApps),
+		statItems:    make([]stats.StatItem, h.numberOfApps),
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
-		processors[i].Prepare()
 		handler.stashes[i] = NewStash(DOCS_IN_BUFFER, WINDOW_SIZE)
-		handler.statItems[i].Name = processors[i].GetName()
+		handler.statItems[i].Name = h.processors[i].GetName()
 		handler.statItems[i].StatType = stats.COUNT_TYPE
 	}
-	stats.RegisterCountable("flow_mapper", &handler)
+	stats.RegisterCountable(fmt.Sprintf("flow_mapper_%d", index), &handler)
 	return &handler
 }
 
-func (f *FlowHandler) GetCounter() interface{} {
+func (f *subFlowHandler) GetCounter() interface{} {
 	oldLatch := f.counterLatch
 	if f.counterLatch == 0 {
 		f.counterLatch = f.numberOfApps
@@ -114,7 +116,7 @@ func (f *FlowHandler) GetCounter() interface{} {
 	return f.statItems
 }
 
-func (f *FlowHandler) putToQueue() {
+func (f *subFlowHandler) putToQueue() {
 	for i, stash := range f.stashes {
 		docs := stash.Dump()
 		for j := 0; j < len(docs); j += QUEUE_BATCH_SIZE {
@@ -126,6 +128,21 @@ func (f *FlowHandler) putToQueue() {
 		}
 		f.emitCounter[i+f.counterLatch] += uint64(len(docs))
 		stash.Clear()
+	}
+}
+
+func (f *FlowHandler) startTicker() {
+	for range time.NewTicker(time.Minute).C {
+		for i := 0; i < f.flowQueueCount; i++ {
+			f.flowQueue.Put(queue.HashKey(i), nil)
+		}
+	}
+}
+
+func (f *FlowHandler) Start() {
+	go f.startTicker()
+	for i := 0; i < f.flowQueueCount; i++ {
+		go f.newSubFlowHandler(i).Process()
 	}
 }
 
@@ -157,31 +174,45 @@ func isValidFlow(flow *datatype.TaggedFlow) bool {
 	return true
 }
 
-func (f *FlowHandler) Process(flow *datatype.TaggedFlow) error {
-	if !isValidFlow(flow) {
-		return errors.New("flow timestamp incorrect and droped")
-	}
+func (f *subFlowHandler) Process() error {
+	elements := make([]interface{}, QUEUE_BATCH_SIZE)
 
-	for i, processor := range f.processors {
-		docs := processor.Process(flow, false)
-		for {
-			docs = f.stashes[i].Add(docs)
-			if docs == nil {
-				break
+	for {
+		n := f.flowQueue.Gets(queue.HashKey(f.queueIndex), elements)
+		for _, e := range elements[:n] {
+			if e == nil {
+				if f.NeedFlush() {
+					f.Flush()
+				}
+				continue
 			}
-			f.Flush()
+
+			flow := e.(*datatype.TaggedFlow)
+			if !isValidFlow(flow) {
+				log.Warning("flow timestamp incorrect and dropped")
+				continue
+			}
+
+			for i, processor := range f.processors {
+				docs := processor.Process(flow, false)
+				for {
+					docs = f.stashes[i].Add(docs)
+					if docs == nil {
+						break
+					}
+					f.Flush()
+				}
+			}
+			f.lastProcess = time.Duration(time.Now().UnixNano())
 		}
 	}
-
-	f.lastProcess = time.Duration(time.Now().UnixNano())
-	return nil
 }
 
-func (f *FlowHandler) Flush() {
+func (f *subFlowHandler) Flush() {
 	f.putToQueue()
 	f.lastProcess = time.Duration(time.Now().UnixNano())
 }
 
-func (f *FlowHandler) NeedFlush() bool {
+func (f *subFlowHandler) NeedFlush() bool {
 	return time.Duration(time.Now().UnixNano())-f.lastProcess > time.Minute
 }

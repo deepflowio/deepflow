@@ -27,6 +27,8 @@ queue:
   flow-generator-queue-count: 2
   # metering app read queue count
   metering-app-queue-count: 8
+  # flow app read queue count
+  flow-app-queue-count: 2
 # internal labeler conf
 labeler:
   # size of policy fast-path map, and

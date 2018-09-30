@@ -42,6 +42,7 @@ type QueueConfig struct {
 	LabelerQueueCount       uint32 `yaml:"labeler-queue-count"`
 	FlowGeneratorQueueCount uint32 `yaml:"flow-generator-queue-count"`
 	MeteringAppQueueCount   uint32 `yaml:"metering-app-queue-count"`
+	FlowAppQueueCount       uint32 `yaml:"flow-app-queue-count"`
 }
 
 type LabelerConfig struct {
@@ -100,6 +101,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Queue.MeteringAppQueueCount == 0 {
 		c.Queue.MeteringAppQueueCount = 8
+	}
+	if c.Queue.FlowAppQueueCount == 0 {
+		c.Queue.FlowAppQueueCount = 2
 	}
 
 	if c.Labeler.MapSizeLimit == 0 {

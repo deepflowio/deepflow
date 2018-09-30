@@ -140,19 +140,19 @@ func Start(configPath string) {
 		flowGenerator.Start()
 	}
 
-	meteringMapProcess := mapreduce.NewMeteringMapProcess(meteringAppOutputQueue, meteringAppQueues, meteringAppQueueCount)
-	meteringMapProcess.Start()
+	mapreduce.NewMeteringMapProcess(meteringAppOutputQueue, meteringAppQueues, meteringAppQueueCount).Start()
 
 	// L4 - flow duplicator & flow sender
-	flowAppQueue := manager.NewQueue("4-tagged-flow-to-flow-app", queueSize>>2)
+	flowAppQueueCount := int(cfg.Queue.FlowAppQueueCount)
+	flowAppQueue := manager.NewQueues("4-tagged-flow-to-flow-app", queueSize>>2, flowAppQueueCount, 1)
 	flowSenderQueue := manager.NewQueue("4-tagged-flow-to-stream", queueSize>>2)
 
-	queue.NewDuplicator(1024, flowDuplicatorQueue, flowAppQueue, flowSenderQueue).Start()
+	queue.NewDuplicator(1024, flowDuplicatorQueue).AddMultiQueue(flowAppQueue, flowAppQueueCount).AddQueue(flowSenderQueue).Start()
 	sender.NewFlowSender(flowSenderQueue, cfg.Stream, cfg.StreamPort).Start()
 
 	// L5 - flow doc marshaller
 	flowAppOutputQueue := manager.NewQueue("5-flow-doc-to-marshaller", queueSize>>2)
-	mapreduce.NewFlowMapProcess(flowAppQueue, flowAppOutputQueue)
+	mapreduce.NewFlowMapProcess(flowAppOutputQueue, flowAppQueue, flowAppQueueCount).Start()
 
 	// L6 - flow/metering doc sender
 	builder := sender.NewZeroDocumentSenderBuilder()
