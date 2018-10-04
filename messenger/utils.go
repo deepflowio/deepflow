@@ -70,7 +70,7 @@ func Marshal(doc *app.Document, bytes *utils.ByteBuffer) error {
 		meter := doc.Meter.(*dt.TypeMeter)
 		msg.Meter.Type = dt.TypeMeterToPB(meter)
 	}
-	msg.Actions = proto.Uint32(doc.Actions)
+	msg.ActionFlags = proto.Uint32(doc.ActionFlags)
 
 	buf := bytes.Use(msg.Size())
 	if _, err := msg.MarshalTo(buf); err != nil {
@@ -110,7 +110,7 @@ func Unmarshal(b []byte) (*app.Document, error) {
 	case meter.GetType() != nil:
 		doc.Meter = dt.PBToTypeMeter(meter.GetType())
 	}
-	doc.Actions = msg.GetActions()
+	doc.ActionFlags = msg.GetActionFlags()
 
 	return doc, nil
 }

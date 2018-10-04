@@ -11,19 +11,6 @@ import (
 	"gitlab.x.lan/yunshan/message/trident"
 )
 
-var ActionMap = [...]datatype.ActionType{
-	trident.Action_PACKECT_COUNTER:     datatype.ACTION_PACKET_STAT,
-	trident.Action_FLOW_COUNTER:        datatype.ACTION_FLOW_STAT,
-	trident.Action_FLOW_STORAGE:        datatype.ACTION_FLOW_STORE,
-	trident.Action_TCP_PERFORMANCE:     datatype.ACTION_PERFORMANCE,
-	trident.Action_PCAP:                datatype.ACTION_PCAP,
-	trident.Action_MISC:                datatype.ACTION_MISC,
-	trident.Action_PACKECT_COUNTER_PUB: datatype.ACTION_PACKECT_COUNTER_PUB,
-	trident.Action_FLOW_COUNTER_PUB:    datatype.ACTION_FLOW_COUNTER_PUB,
-	trident.Action_TCP_PERFORMANCE_PUB: datatype.ACTION_TCP_PERFORMANCE_PUB,
-	trident.Action_GEO:                 datatype.ACTION_GEO,
-}
-
 func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	macInt := uint64(0)
 	if mac, err := net.ParseMAC(vifData.GetMac()); err == nil {
@@ -144,33 +131,36 @@ func splitPort2Int(src string) map[uint16]uint16 {
 	return ports
 }
 
-func convert2ActionType(action trident.Action) datatype.ActionType {
-	if action := ActionMap[action]; action != 0 {
-		return action
-	}
-	return datatype.ActionType(0)
-}
-
-func newAclAction(aclId uint32, actions []*trident.FlowAction) []*datatype.AclAction {
-	aclActions := make([]*datatype.AclAction, 0, len(actions))
+func newAclAction(aclId datatype.ACLID, actions []*trident.FlowAction) []datatype.AclAction {
+	actionSet := make(map[datatype.AclAction]datatype.AclAction)
 	for _, action := range actions {
-		if actionType := convert2ActionType(action.GetAction()); actionType != 0 {
-			aclAction := &datatype.AclAction{
-				AclId:       aclId,
-				Type:        actionType,
-				ACLGIDs:     action.GetPolicyAclGroupId(),
-				TagTemplate: action.GetTagTemplate(),
+		actionFlags := datatype.ActionFlag(1 << uint32(action.GetAction()-1)) // protobuf中的定义从1开始
+		tagTemplates := datatype.TagTemplate(action.GetTagTemplate())
+		key := datatype.AclAction(0).SetACLGID(0).AddActionFlags(actionFlags)
+		if aclAction, find := actionSet[key]; find {
+			actionSet[key] = aclAction.AddTagTemplates(tagTemplates)
+		} else {
+			actionSet[key] = datatype.AclAction(0).SetACLGID(0).AddActionFlags(actionFlags).AddTagTemplates(tagTemplates)
+		}
+		for _, aclGID := range action.GetPolicyAclGroupId() {
+			key = datatype.AclAction(0).SetACLGID(datatype.ACLID(aclGID)).AddActionFlags(actionFlags)
+			if aclAction, find := actionSet[key]; find {
+				actionSet[key] = aclAction.AddTagTemplates(tagTemplates)
+			} else {
+				actionSet[key] = datatype.AclAction(0).SetACLGID(datatype.ACLID(aclGID)).AddActionFlags(actionFlags).AddTagTemplates(tagTemplates)
 			}
-			aclActions = append(aclActions, aclAction)
 		}
 	}
-
+	aclActions := make([]datatype.AclAction, 0, len(actionSet))
+	for _, aclAction := range actionSet {
+		aclActions = append(aclActions, aclAction)
+	}
 	return aclActions
 }
 
 func newPolicyData(acl *trident.FlowAcl) *policy.Acl {
 	return &policy.Acl{
-		Id:        acl.GetId(),
+		Id:        datatype.ACLID(acl.GetId()),
 		Type:      datatype.TapType(acl.GetTapType()),
 		TapId:     acl.GetTapId(),
 		SrcGroups: splitGroup2Int(acl.GetSrcGroupIds()),
@@ -178,7 +168,7 @@ func newPolicyData(acl *trident.FlowAcl) *policy.Acl {
 		DstPorts:  splitPort2Int(acl.GetDstPorts()),
 		Proto:     uint8(acl.GetProtocol()),
 		Vlan:      acl.GetVlan(),
-		Action:    newAclAction(acl.GetId(), acl.GetActions()),
+		Action:    newAclAction(datatype.ACLID(acl.GetId()), acl.GetActions()),
 	}
 }
 
