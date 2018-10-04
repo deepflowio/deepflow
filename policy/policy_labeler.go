@@ -22,7 +22,7 @@ const (
 )
 
 type Acl struct {
-	Id        uint32
+	Id        ACLID
 	Type      TapType
 	TapId     uint32
 	SrcGroups map[uint32]uint32
@@ -30,7 +30,7 @@ type Acl struct {
 	DstPorts  map[uint16]uint16
 	Proto     uint8
 	Vlan      uint32
-	Action    []*AclAction
+	Action    []AclAction
 }
 
 type FastKey struct {
@@ -227,11 +227,11 @@ func (l *PolicyLabel) GenerateGroupPortMaps(acls []*Acl) {
 			for _, key := range keys {
 				if policy := portMap[key]; policy == nil {
 					policy := &PolicyData{}
-					policy.Merge(acl.Action)
+					policy.Merge(acl.Action, acl.Id)
 					portMap[key] = policy
 				} else {
 					// 策略存在则将action合入到现有策略
-					policy.Merge(acl.Action)
+					policy.Merge(acl.Action, acl.Id)
 				}
 			}
 		}
@@ -360,10 +360,10 @@ func (l *PolicyLabel) GenerateGroupVlanMaps(acls []*Acl) {
 			for _, key := range keys {
 				if policy := vlanMap[key]; policy == nil {
 					policy := &PolicyData{}
-					policy.Merge(acl.Action, FORWARD)
+					policy.Merge(acl.Action, acl.Id, FORWARD)
 					vlanMap[key] = policy
 				} else {
-					policy.Merge(acl.Action, FORWARD)
+					policy.Merge(acl.Action, acl.Id, FORWARD)
 				}
 			}
 
@@ -371,10 +371,10 @@ func (l *PolicyLabel) GenerateGroupVlanMaps(acls []*Acl) {
 			for _, key := range keys {
 				if policy := vlanMap[key]; policy == nil {
 					policy := &PolicyData{}
-					policy.Merge(acl.Action, BACKWARD)
+					policy.Merge(acl.Action, acl.Id, BACKWARD)
 					vlanMap[key] = policy
 				} else {
-					policy.Merge(acl.Action, BACKWARD)
+					policy.Merge(acl.Action, acl.Id, BACKWARD)
 				}
 			}
 		}
@@ -476,7 +476,7 @@ func (l *PolicyLabel) GetPolicyByFirstPath(endpointData *EndpointData, packet *L
 	findPolicy := &PolicyData{}
 	forward := &PolicyData{}
 	backward := &PolicyData{}
-	findPolicy.AclActions = make([]*AclAction, 0, 8)
+	findPolicy.AclActions = make([]AclAction, 0, 8)
 	vlanFound := false
 	portFound := false
 
@@ -485,7 +485,7 @@ func (l *PolicyLabel) GetPolicyByFirstPath(endpointData *EndpointData, packet *L
 		keys := generateGroupVlanKeys(packet.SrcGroupIds, packet.DstGroupIds, packet.Vlan)
 		for _, key := range keys {
 			if policy := vlanGroup[key]; policy != nil {
-				findPolicy.Merge(policy.AclActions)
+				findPolicy.Merge(policy.AclActions, policy.ACLID)
 				vlanFound = true
 			}
 		}
@@ -497,13 +497,13 @@ func (l *PolicyLabel) GetPolicyByFirstPath(endpointData *EndpointData, packet *L
 	keys := generateSearchPortKeys(packet.SrcGroupIds, packet.DstGroupIds, packet.DstPort, packet.Proto)
 	for _, key := range keys {
 		if policy := portGroup[key]; policy != nil {
-			forward.Merge(policy.AclActions, FORWARD)
+			forward.Merge(policy.AclActions, policy.ACLID, FORWARD)
 			portFound = true
 		}
 	}
 
 	if len(forward.AclActions) > 0 {
-		findPolicy.Merge(forward.AclActions, FORWARD)
+		findPolicy.Merge(forward.AclActions, forward.ACLID, FORWARD)
 		l.addPortFastPolicy(endpointData, packet, forward, FORWARD)
 	}
 
@@ -512,18 +512,18 @@ func (l *PolicyLabel) GetPolicyByFirstPath(endpointData *EndpointData, packet *L
 	for _, key := range keys {
 		if policy := portGroup[key]; policy != nil {
 			// first层面存储的都是正方向的key, 在这里重新设置方向
-			backward.Merge(policy.AclActions, BACKWARD)
+			backward.Merge(policy.AclActions, policy.ACLID, BACKWARD)
 			portFound = true
 		}
 	}
 
 	if len(backward.AclActions) > 0 {
-		findPolicy.Merge(backward.AclActions, BACKWARD)
+		findPolicy.Merge(backward.AclActions, backward.ACLID, BACKWARD)
 		l.addPortFastPolicy(endpointData, packet, backward, BACKWARD)
 	}
 
 	if !portFound {
-		// 无论是否差找到policy，都需要向fastPath下发，避免走firstPath
+		// 无论是否查找到policy，都需要向fastPath下发，避免走firstPath
 		l.addPortFastPolicy(endpointData, packet, INVALID_POLICY_DATA, FORWARD)
 		l.addPortFastPolicy(endpointData, packet, INVALID_POLICY_DATA, BACKWARD)
 		if !vlanFound {
@@ -562,14 +562,14 @@ func (l *PolicyLabel) addVlanFastPolicy(endpointData *EndpointData, packet *Look
 	maps := l.getVlanAndPortMap(packet, FORWARD, true)
 
 	key := uint64(packet.Vlan) | uint64(srcEpc)<<32 | uint64(dstEpc)<<12
-	forward.Merge(policy.AclActions)
+	forward.Merge(policy.AclActions, policy.ACLID)
 	valueForward := &FastPathMapValue{endpoint: endpointData, policy: forward, timestamp: packet.Timestamp}
 	maps.vlanPolicyMap.Add(key, valueForward)
 
 	maps = l.getVlanAndPortMap(packet, BACKWARD, true)
 
 	key = uint64(packet.Vlan) | uint64(dstEpc)<<32 | uint64(srcEpc)<<12
-	backward.MergeAndSwapDirection(policy.AclActions)
+	backward.MergeAndSwapDirection(policy.AclActions, policy.ACLID)
 	valueBackward := &FastPathMapValue{endpoint: endpointData, policy: backward, timestamp: packet.Timestamp}
 	maps.vlanPolicyMap.Add(key, valueBackward)
 }
@@ -590,7 +590,7 @@ func (l *PolicyLabel) addPortFastPolicy(endpointData *EndpointData, packet *Look
 
 	// 用epcid + proto + port做为key,将policy插入到PortPolicyMap
 	key := uint64(srcEpc)<<44 | uint64(dstEpc)<<24 | uint64(packet.Proto)<<16 | uint64(port)
-	forward.Merge(policy.AclActions)
+	forward.Merge(policy.AclActions, policy.ACLID)
 	value := &FastPathMapValue{endpoint: endpointData, policy: forward, timestamp: packet.Timestamp}
 	maps.portPolicyMap.Add(key, value)
 }
@@ -632,7 +632,7 @@ func (l *PolicyLabel) getFastPortPolicy(portPolicyMap *lru.Cache, packet *Lookup
 			return nil
 		}
 		value.timestamp = packet.Timestamp
-		policy.Merge(value.policy.AclActions, direction)
+		policy.Merge(value.policy.AclActions, value.policy.ACLID, direction)
 		endpoint = value.endpoint
 	}
 	return endpoint
@@ -657,7 +657,7 @@ func (l *PolicyLabel) getFastVlanPolicy(vlanPolicyMap *lru.Cache, packet *Lookup
 		}
 		value.timestamp = packet.Timestamp
 		// vlanMap存储的是有方向的policy，在这里不用更改
-		policy.Merge(value.policy.AclActions)
+		policy.Merge(value.policy.AclActions, value.policy.ACLID)
 		endpoint = value.endpoint
 	}
 	return endpoint
@@ -704,8 +704,7 @@ func (l *PolicyLabel) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *Po
 					found = true
 				}
 			}
-			endpoint = l.getFastPortPolicy(maps.portPolicyMap, packet, direction, policy)
-			if endpoint != nil {
+			if endpoint = l.getFastPortPolicy(maps.portPolicyMap, packet, direction, policy); endpoint != nil {
 				found = true
 			}
 		}
