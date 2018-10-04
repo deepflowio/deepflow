@@ -11,25 +11,12 @@ import (
 )
 
 var (
-	forward = &AclAction{
-		AclId:       10,
-		Type:        ACTION_PACKET_STAT,
-		TagTemplate: TEMPLATE_EDGE_PORT,
-		Direction:   FORWARD,
-	}
-	backward = &AclAction{
-		AclId:       10,
-		Type:        ACTION_PACKET_STAT,
-		TagTemplate: TEMPLATE_EDGE_PORT,
-		Direction:   BACKWARD,
-	}
+	forward  = AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	backward = AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddDirections(BACKWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
 )
 
-func getBackwardAcl(acl *AclAction) *AclAction {
-	aclBackward := &AclAction{}
-	*aclBackward = *acl
-	aclBackward.Direction = BACKWARD
-	return aclBackward
+func getBackwardAcl(acl AclAction) AclAction {
+	return acl.SetDirections(BACKWARD)
 }
 
 func CheckPolicyResult(basicPolicy *PolicyData, targetPolicy *PolicyData) bool {
@@ -317,7 +304,7 @@ func TestAllPassPolicy(t *testing.T) {
 		DstPorts:  dstPorts,
 		Proto:     0,
 		Vlan:      0,
-		Action:    []*AclAction{forward},
+		Action:    []AclAction{forward},
 	}
 	policy.UpdateAclData([]*Acl{acl1})
 
@@ -333,10 +320,8 @@ func TestAllPassPolicy(t *testing.T) {
 		Tap:     TAP_TOR,
 	}
 	_, policyData := policy.LookupAllByKey(key, 0)
-	basicPolicyData := &PolicyData{
-		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{forward, backward},
-	}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{forward, backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -362,7 +347,7 @@ func TestGroupForwardPassPolicy(t *testing.T) {
 		DstPorts:  dstPorts,
 		Proto:     0,
 		Vlan:      0,
-		Action:    []*AclAction{forward},
+		Action:    []AclAction{forward},
 	}
 	policy.UpdateAclData([]*Acl{acl1})
 
@@ -378,10 +363,8 @@ func TestGroupForwardPassPolicy(t *testing.T) {
 		Tap:     TAP_TOR,
 	}
 	_, policyData := policy.LookupAllByKey(key, 0)
-	basicPolicyData := &PolicyData{
-		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{forward},
-	}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{forward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -407,7 +390,7 @@ func TestGroupBackwardPassPolicy(t *testing.T) {
 		DstPorts:  dstPorts,
 		Proto:     0,
 		Vlan:      0,
-		Action:    []*AclAction{backward},
+		Action:    []AclAction{backward},
 	}
 	policy.UpdateAclData([]*Acl{acl1})
 
@@ -423,10 +406,8 @@ func TestGroupBackwardPassPolicy(t *testing.T) {
 		Tap:     TAP_TOR,
 	}
 	_, policyData := policy.LookupAllByKey(key, 0)
-	basicPolicyData := &PolicyData{
-		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{backward},
-	}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -452,7 +433,7 @@ func TestAllPortPassPolicy(t *testing.T) {
 		DstPorts:  dstPorts,
 		Proto:     0,
 		Vlan:      0,
-		Action:    []*AclAction{forward},
+		Action:    []AclAction{forward},
 	}
 	policy.UpdateAclData([]*Acl{acl1})
 
@@ -470,10 +451,8 @@ func TestAllPortPassPolicy(t *testing.T) {
 		Tap:     TAP_TOR,
 	}
 	_, policyData := policy.LookupAllByKey(key, 0)
-	basicPolicyData := &PolicyData{
-		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{forward, backward},
-	}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{forward, backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -499,7 +478,7 @@ func TestSrcPortPassPolicy(t *testing.T) {
 		DstPorts:  dstPorts,
 		Proto:     0,
 		Vlan:      0,
-		Action:    []*AclAction{forward},
+		Action:    []AclAction{forward},
 	}
 	policy.UpdateAclData([]*Acl{acl1})
 
@@ -516,10 +495,8 @@ func TestSrcPortPassPolicy(t *testing.T) {
 		Tap:     TAP_TOR,
 	}
 	_, policyData := policy.LookupAllByKey(key, 0)
-	basicPolicyData := &PolicyData{
-		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{backward},
-	}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -545,7 +522,7 @@ func TestDstPortPassPolicy(t *testing.T) {
 		DstPorts:  dstPorts,
 		Proto:     0,
 		Vlan:      0,
-		Action:    []*AclAction{forward},
+		Action:    []AclAction{forward},
 	}
 	policy.UpdateAclData([]*Acl{acl1})
 
@@ -562,10 +539,8 @@ func TestDstPortPassPolicy(t *testing.T) {
 		Tap:     TAP_TOR,
 	}
 	_, policyData := policy.LookupAllByKey(key, 0)
-	basicPolicyData := &PolicyData{
-		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{forward},
-	}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{forward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -591,7 +566,7 @@ func TestSrcDstPortPassPolicy(t *testing.T) {
 		DstPorts:  dstPorts,
 		Proto:     0,
 		Vlan:      0,
-		Action:    []*AclAction{forward},
+		Action:    []AclAction{forward},
 	}
 	policy.UpdateAclData([]*Acl{acl1})
 
@@ -609,10 +584,8 @@ func TestSrcDstPortPassPolicy(t *testing.T) {
 		Tap:     TAP_TOR,
 	}
 	_, policyData := policy.LookupAllByKey(key, 0)
-	basicPolicyData := &PolicyData{
-		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{forward, backward},
-	}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{forward, backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -637,7 +610,7 @@ func TestVlanPassPolicy(t *testing.T) {
 		DstPorts:  dstPorts,
 		Proto:     0,
 		Vlan:      30,
-		Action:    []*AclAction{forward},
+		Action:    []AclAction{forward},
 	}
 	policy.UpdateAclData([]*Acl{acl1})
 
@@ -656,10 +629,8 @@ func TestVlanPassPolicy(t *testing.T) {
 		Tap:     TAP_TOR,
 	}
 	_, policyData := policy.LookupAllByKey(key, 0)
-	basicPolicyData := &PolicyData{
-		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{forward, backward},
-	}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{forward, backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -685,7 +656,7 @@ func TestVlanPortPassPolicy(t *testing.T) {
 		DstPorts:  dstPorts,
 		Proto:     0,
 		Vlan:      0,
-		Action:    []*AclAction{forward},
+		Action:    []AclAction{forward},
 	}
 	policy.UpdateAclData([]*Acl{acl1})
 	srcIp := NewIPFromString("192.168.0.11")
@@ -703,10 +674,8 @@ func TestVlanPortPassPolicy(t *testing.T) {
 		Tap:     TAP_TOR,
 	}
 	_, policyData := policy.LookupAllByKey(key, 0)
-	basicPolicyData := &PolicyData{
-		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{backward},
-	}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -732,7 +701,7 @@ func TestPortProtoPassPolicy(t *testing.T) {
 		DstPorts:  dstPorts,
 		Proto:     6,
 		Vlan:      0,
-		Action:    []*AclAction{forward},
+		Action:    []AclAction{forward},
 	}
 	policy.UpdateAclData([]*Acl{acl1})
 	srcIp := NewIPFromString("192.168.0.11")
@@ -751,10 +720,8 @@ func TestPortProtoPassPolicy(t *testing.T) {
 		Tap:     TAP_TOR,
 	}
 	_, policyData := policy.LookupAllByKey(key, 0)
-	basicPolicyData := &PolicyData{
-		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{forward, backward},
-	}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{forward, backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -771,11 +738,7 @@ func TestAclsPassPolicy(t *testing.T) {
 	dstGroups := make(map[uint32]uint32)
 	dstPorts := make(map[uint16]uint16)
 	dstPorts[8000] = 8000
-	aclAction1 := &AclAction{
-		AclId:       10,
-		Type:        ACTION_PACKET_STAT,
-		TagTemplate: TEMPLATE_EDGE_PORT,
-	}
+	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl1 := &Acl{
 		Id:        10,
 		Type:      TAP_TOR,
@@ -785,13 +748,9 @@ func TestAclsPassPolicy(t *testing.T) {
 		DstPorts:  dstPorts,
 		Proto:     6,
 		Vlan:      0,
-		Action:    []*AclAction{aclAction1},
+		Action:    []AclAction{aclAction1},
 	}
-	aclAction2 := &AclAction{
-		AclId:       20,
-		Type:        ACTION_PACKET_STAT,
-		TagTemplate: TEMPLATE_EDGE_PORT,
-	}
+	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl2 := &Acl{
 		Id:        20,
 		Type:      TAP_TOR,
@@ -801,7 +760,7 @@ func TestAclsPassPolicy(t *testing.T) {
 		DstPorts:  dstPorts,
 		Proto:     17,
 		Vlan:      0,
-		Action:    []*AclAction{aclAction2},
+		Action:    []AclAction{aclAction2},
 	}
 	policy.UpdateAclData([]*Acl{acl1, acl2})
 	srcIp := NewIPFromString("192.168.0.11")
@@ -820,10 +779,8 @@ func TestAclsPassPolicy(t *testing.T) {
 		Tap:     TAP_TOR,
 	}
 	_, policyData := policy.LookupAllByKey(key, 0)
-	basicPolicyData := &PolicyData{
-		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{forward, backward},
-	}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{forward, backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -840,11 +797,7 @@ func TestVlanAclsPassPolicy(t *testing.T) {
 	dstGroups := make(map[uint32]uint32)
 	dstPorts := make(map[uint16]uint16)
 	dstPorts[8000] = 8000
-	aclAction1 := &AclAction{
-		AclId:       10,
-		Type:        ACTION_PACKET_STAT,
-		TagTemplate: TEMPLATE_EDGE_PORT,
-	}
+	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl1 := &Acl{
 		Id:        10,
 		Type:      TAP_TOR,
@@ -854,13 +807,9 @@ func TestVlanAclsPassPolicy(t *testing.T) {
 		DstPorts:  dstPorts,
 		Proto:     6,
 		Vlan:      0,
-		Action:    []*AclAction{aclAction1},
+		Action:    []AclAction{aclAction1},
 	}
-	aclAction2 := &AclAction{
-		AclId:       20,
-		Type:        ACTION_PACKET_STAT,
-		TagTemplate: TEMPLATE_EDGE_PORT,
-	}
+	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl2 := &Acl{
 		Id:        20,
 		Type:      TAP_TOR,
@@ -870,7 +819,7 @@ func TestVlanAclsPassPolicy(t *testing.T) {
 		DstPorts:  dstPorts,
 		Proto:     6,
 		Vlan:      10,
-		Action:    []*AclAction{aclAction2},
+		Action:    []AclAction{aclAction2},
 	}
 	policy.UpdateAclData([]*Acl{acl1, acl2})
 	srcIp := NewIPFromString("192.168.0.11")
@@ -890,15 +839,12 @@ func TestVlanAclsPassPolicy(t *testing.T) {
 	}
 	_, policyData := policy.LookupAllByKey(key, 0)
 
-	aclAction2.Direction = FORWARD
-	aclAction2Backward := &AclAction{}
-	*aclAction2Backward = *aclAction2
-	aclAction2Backward.Direction = BACKWARD
+	aclAction2 = aclAction2.SetDirections(FORWARD)
+	aclAction2Backward := aclAction2
+	aclAction2Backward.SetDirections(BACKWARD)
 
-	basicPolicyData := &PolicyData{
-		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{aclAction2, aclAction2Backward, forward, backward},
-	}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{aclAction2, aclAction2Backward, forward, backward}, 20)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -915,11 +861,7 @@ func TestVlanPortAclsPassPolicy(t *testing.T) {
 	dstGroups := make(map[uint32]uint32)
 	dstPorts := make(map[uint16]uint16)
 	dstPorts[8000] = 8000
-	aclAction1 := &AclAction{
-		AclId:       10,
-		Type:        ACTION_PACKET_STAT,
-		TagTemplate: TEMPLATE_EDGE_PORT,
-	}
+	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl1 := &Acl{
 		Id:        10,
 		Type:      TAP_TOR,
@@ -929,14 +871,9 @@ func TestVlanPortAclsPassPolicy(t *testing.T) {
 		DstPorts:  dstPorts,
 		Proto:     6,
 		Vlan:      0,
-		Action:    []*AclAction{aclAction1},
+		Action:    []AclAction{aclAction1},
 	}
-	aclAction2 := &AclAction{
-		AclId:       20,
-		Type:        ACTION_PACKET_STAT,
-		TagTemplate: TEMPLATE_EDGE_PORT,
-		Direction:   FORWARD,
-	}
+	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl2 := &Acl{
 		Id:        20,
 		Type:      TAP_TOR,
@@ -946,7 +883,7 @@ func TestVlanPortAclsPassPolicy(t *testing.T) {
 		DstPorts:  make(map[uint16]uint16),
 		Proto:     6,
 		Vlan:      10,
-		Action:    []*AclAction{aclAction2},
+		Action:    []AclAction{aclAction2},
 	}
 	policy.UpdateAclData([]*Acl{acl1, acl2})
 	srcIp := NewIPFromString("192.168.0.11")
@@ -965,10 +902,8 @@ func TestVlanPortAclsPassPolicy(t *testing.T) {
 	}
 	backward := getBackwardAcl(aclAction2)
 	_, policyData := policy.LookupAllByKey(key, 0)
-	basicPolicyData := &PolicyData{
-		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{aclAction2, backward},
-	}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{aclAction2, backward}, 20)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -985,11 +920,7 @@ func TestVlanPortAclsPassPolicy1(t *testing.T) {
 	dstGroups := make(map[uint32]uint32)
 	dstPorts := make(map[uint16]uint16)
 	dstPorts[8000] = 8000
-	aclAction1 := &AclAction{
-		AclId:       10,
-		Type:        ACTION_PACKET_STAT,
-		TagTemplate: TEMPLATE_EDGE_PORT,
-	}
+	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl1 := &Acl{
 		Id:        10,
 		Type:      TAP_TOR,
@@ -999,14 +930,9 @@ func TestVlanPortAclsPassPolicy1(t *testing.T) {
 		DstPorts:  dstPorts,
 		Proto:     6,
 		Vlan:      0,
-		Action:    []*AclAction{aclAction1},
+		Action:    []AclAction{aclAction1},
 	}
-	aclAction2 := &AclAction{
-		AclId:       20,
-		Type:        ACTION_PACKET_STAT,
-		TagTemplate: TEMPLATE_EDGE_PORT,
-		Direction:   FORWARD,
-	}
+	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl2 := &Acl{
 		Id:        20,
 		Type:      TAP_TOR,
@@ -1016,7 +942,7 @@ func TestVlanPortAclsPassPolicy1(t *testing.T) {
 		DstPorts:  make(map[uint16]uint16),
 		Proto:     6,
 		Vlan:      10,
-		Action:    []*AclAction{aclAction2},
+		Action:    []AclAction{aclAction2},
 	}
 	policy.UpdateAclData([]*Acl{acl1, acl2})
 	srcIp := NewIPFromString("192.168.0.11")
@@ -1035,10 +961,8 @@ func TestVlanPortAclsPassPolicy1(t *testing.T) {
 	}
 	_, policyData := policy.LookupAllByKey(key, 0)
 	acl2Backward := getBackwardAcl(aclAction2)
-	basicPolicyData := &PolicyData{
-		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{aclAction2, acl2Backward, forward},
-	}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{aclAction2, acl2Backward, forward}, 20)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -1055,11 +979,7 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 	dstGroups := make(map[uint32]uint32)
 	dstPorts := make(map[uint16]uint16)
 	dstPorts[8000] = 8000
-	aclAction1 := &AclAction{
-		AclId:       10,
-		Type:        ACTION_PACKET_STAT,
-		TagTemplate: TEMPLATE_EDGE_PORT,
-	}
+	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl1 := &Acl{
 		Id:        10,
 		Type:      TAP_TOR,
@@ -1069,13 +989,9 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 		DstPorts:  dstPorts,
 		Proto:     6,
 		Vlan:      0,
-		Action:    []*AclAction{aclAction1},
+		Action:    []AclAction{aclAction1},
 	}
-	aclAction2 := &AclAction{
-		AclId:       20,
-		Type:        ACTION_PACKET_STAT,
-		TagTemplate: TEMPLATE_EDGE_PORT,
-	}
+	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl2 := &Acl{
 		Id:        20,
 		Type:      TAP_TOR,
@@ -1085,7 +1001,7 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 		DstPorts:  make(map[uint16]uint16),
 		Proto:     6,
 		Vlan:      10,
-		Action:    []*AclAction{aclAction2},
+		Action:    []AclAction{aclAction2},
 	}
 	policy.UpdateAclData([]*Acl{acl1, acl2})
 	srcIp := NewIPFromString("192.168.0.11")
@@ -1102,10 +1018,8 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 		Tap:     TAP_TOR,
 	}
 	_, policyData := policy.LookupAllByKey(key, 0)
-	basicPolicyData := &PolicyData{
-		ActionList: ACTION_PACKET_STAT,
-		AclActions: []*AclAction{forward},
-	}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{forward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -1188,17 +1102,11 @@ func generatePolicyTable() *PolicyTable {
 	return policy
 }
 
-func generateAclAction(id uint32, actionType ActionType) *AclAction {
-	action := &AclAction{
-		AclId:       id,
-		Type:        actionType,
-		TagTemplate: TEMPLATE_EDGE_PORT,
-		Direction:   FORWARD,
-	}
-	return action
+func generateAclAction(id ACLID, actionFlags ActionFlag) AclAction {
+	return AclAction(0).AddActionFlags(actionFlags).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
 }
 
-func generatePolicyAcl(table *PolicyTable, action *AclAction, srcGroupId, dstGroupId uint32,
+func generatePolicyAcl(table *PolicyTable, action AclAction, aclID ACLID, srcGroupId, dstGroupId uint32,
 	proto uint8, port uint16, vlan uint32) *Acl {
 	srcGroups := make(map[uint32]uint32)
 	dstGroups := make(map[uint32]uint32)
@@ -1210,15 +1118,15 @@ func generatePolicyAcl(table *PolicyTable, action *AclAction, srcGroupId, dstGro
 		dstPorts[port] = port
 	}
 	acl := &Acl{
-		Id:        action.AclId,
+		Id:        aclID,
 		Type:      TAP_TOR,
-		TapId:     action.AclId + 1,
+		TapId:     uint32(aclID + 1),
 		SrcGroups: srcGroups,
 		DstGroups: dstGroups,
 		DstPorts:  dstPorts,
 		Proto:     proto,
 		Vlan:      vlan,
-		Action:    []*AclAction{action},
+		Action:    []AclAction{action},
 	}
 	return acl
 }
@@ -1244,8 +1152,8 @@ func TestPolicySimple(t *testing.T) {
 	// 创建 policyTable
 	table := generatePolicyTable()
 	// 构建acl action  1->2 tcp 8000
-	action := generateAclAction(1, ACTION_PACKET_STAT)
-	acl := generatePolicyAcl(table, action, group1Id, group2Id, 6, 8000, 0)
+	action := generateAclAction(10, ACTION_PACKET_STAT)
+	acl := generatePolicyAcl(table, action, 10, group1Id, group2Id, 6, 8000, 0)
 	acls = append(acls, acl)
 	table.UpdateAclData(acls)
 	// 构建查询key  1:0->2:8000 tcp
@@ -1254,7 +1162,8 @@ func TestPolicySimple(t *testing.T) {
 	// 获取查询first结果
 	_, policyData := table.LookupAllByKey(key, 0)
 	// 构建预期结果
-	basicPolicyData := &PolicyData{ActionList: ACTION_PACKET_STAT, AclActions: []*AclAction{action}}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{action}, 10)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
@@ -1266,7 +1175,9 @@ func TestPolicySimple(t *testing.T) {
 	key = generateLookupKey(group2mac, group1mac, 0, group2ip1, group1ip1, 6, 8000, 0)
 	// key和acl方向相反，构建反向的action
 	backward := getBackwardAcl(action)
-	basicPolicyData = &PolicyData{ActionList: ACTION_PACKET_STAT, AclActions: []*AclAction{backward}}
+	basicPolicyData = &PolicyData{}
+	basicPolicyData.Merge([]AclAction{backward}, 10)
+	// 查询结果和预期结果比较
 	_, policyData = table.LookupAllByKey(key, 0)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
@@ -1285,11 +1196,12 @@ func TestPolicySimple(t *testing.T) {
 	}
 
 	// 测试同样的key, 匹配两条action
-	action2 := generateAclAction(2, ACTION_PACKET_STAT)
-	acl2 := generatePolicyAcl(table, action2, group1Id, group2Id, 6, 8000, 0)
+	action2 := generateAclAction(12, ACTION_PACKET_STAT)
+	acl2 := generatePolicyAcl(table, action2, 12, group1Id, group2Id, 6, 8000, 0)
 	acls = append(acls, acl2)
 	table.UpdateAclData(acls)
-	basicPolicyData = &PolicyData{ActionList: ACTION_PACKET_STAT, AclActions: []*AclAction{action, action2}}
+	basicPolicyData = &PolicyData{}
+	basicPolicyData.Merge([]AclAction{action, action2}, 10)
 	key = generateLookupKey(group1mac, group2mac, 0, group1ip1, group2ip1, 6, 0, 8000)
 
 	_, policyData = table.LookupAllByKey(key, 0)
@@ -1305,8 +1217,8 @@ func TestPolicyEpcPolicy(t *testing.T) {
 	// 创建 policyTable
 	table := generatePolicyTable()
 	// 构建acl action  1->2 tcp 8000
-	action := generateAclAction(1, ACTION_PACKET_STAT)
-	acl := generatePolicyAcl(table, action, group1Id, 0, 6, 8000, 0)
+	action := generateAclAction(10, ACTION_PACKET_STAT)
+	acl := generatePolicyAcl(table, action, 10, group1Id, 0, 6, 8000, 0)
 	acls = append(acls, acl)
 	table.UpdateAclData(acls)
 	// 构建查询key  1:0->2:8000 tcp
@@ -1315,7 +1227,8 @@ func TestPolicyEpcPolicy(t *testing.T) {
 	// 获取查询first结果
 	_, policyData := table.LookupAllByKey(key, 0)
 	// 构建预期结果
-	basicPolicyData := &PolicyData{ActionList: ACTION_PACKET_STAT, AclActions: []*AclAction{action}}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{action}, 10)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("TestPolicyEpcPolicy Check Failed")
@@ -1333,7 +1246,8 @@ func TestPolicyEpcPolicy(t *testing.T) {
 
 	backward := getBackwardAcl(action)
 	key = generateLookupKey(group1mac2, group1mac, 0, group1ip3, group1ip1, 6, 8000, 0)
-	basicPolicyData = &PolicyData{ActionList: ACTION_PACKET_STAT, AclActions: []*AclAction{backward}}
+	basicPolicyData = &PolicyData{}
+	basicPolicyData.Merge([]AclAction{backward}, 10)
 	_, policyData = table.policyLabel.GetPolicyByFastPath(key)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -1362,24 +1276,26 @@ func TestPolicyEpcPolicy(t *testing.T) {
 func TestFlowVlanAcls(t *testing.T) {
 	acls := []*Acl{}
 	table := generatePolicyTable()
-	action := generateAclAction(3, ACTION_FLOW_STAT)
-	acl := generatePolicyAcl(table, action, group1Id, group2Id, 6, 0, 10)
+	action := generateAclAction(10, ACTION_FLOW_STAT)
+	acl := generatePolicyAcl(table, action, 10, group1Id, group2Id, 6, 0, 10)
 	acls = append(acls, acl)
 	table.UpdateAclData(acls)
-	// 构建查询key  1:11->2:10 tcp vlan:10
+	// 构建查询key  1->2 tcp vlan:10
 	key := generateLookupKey(group1mac, group2mac, 10, group1ip1, group2ip1, 6, 11, 10)
-
 	_, policyData := table.LookupAllByKey(key, 0)
-	basicPolicyData := &PolicyData{ActionList: ACTION_FLOW_STAT, AclActions: []*AclAction{action}}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{action}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
 		t.Log("Expect:", basicPolicyData, "\n")
 	}
-	key = generateLookupKey(group2mac, group1mac, 10, group2ip1, group1ip1, 6, 11, 10)
+
 	// key和acl方向相反，构建反向的action
 	backward := getBackwardAcl(action)
-	basicPolicyData2 := &PolicyData{ActionList: ACTION_FLOW_STAT, AclActions: []*AclAction{backward}}
+	basicPolicyData2 := &PolicyData{}
+	basicPolicyData2.Merge([]AclAction{backward}, 10)
+	key = generateLookupKey(group2mac, group1mac, 10, group2ip1, group1ip1, 6, 11, 10)
 	_, policyData2 := table.policyLabel.GetPolicyByFastPath(key)
 	if !CheckPolicyResult(basicPolicyData2, policyData2) {
 		t.Error("PortProto Check Failed")
@@ -1387,9 +1303,9 @@ func TestFlowVlanAcls(t *testing.T) {
 		t.Log("Expect:", basicPolicyData2, "\n")
 	}
 
+	// key不匹配，返回无效policy
 	key = generateLookupKey(group2mac, group1mac, 11, group2ip1, group1ip1, 6, 11, 10)
 	_, policyData3 := table.LookupAllByKey(key, 0)
-	// key不匹配，返回无效policy
 	if !CheckPolicyResult(INVALID_POLICY_DATA, policyData3) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData3, "\n")
@@ -1401,11 +1317,11 @@ func TestVlanPortAcl(t *testing.T) {
 	acls := []*Acl{}
 	table := generatePolicyTable()
 	// group1->group2,tcp,vlan:10,dstport:20
-	action := generateAclAction(1, ACTION_FLOW_STAT)
-	acl := generatePolicyAcl(table, action, group1Id, group2Id, 6, 20, 10)
+	action := generateAclAction(10, ACTION_FLOW_STAT)
+	acl := generatePolicyAcl(table, action, 10, group1Id, group2Id, 6, 20, 10)
 	// group2->group1,tcp,vlan:10,dstport:21
-	action2 := generateAclAction(2, ACTION_FLOW_STAT)
-	acl2 := generatePolicyAcl(table, action2, group2Id, group1Id, 6, 21, 10)
+	action2 := generateAclAction(12, ACTION_FLOW_STAT)
+	acl2 := generatePolicyAcl(table, action2, 12, group2Id, group1Id, 6, 21, 10)
 	acls = append(acls, acl)
 	acls = append(acls, acl2)
 	table.UpdateAclData(acls)
@@ -1413,7 +1329,8 @@ func TestVlanPortAcl(t *testing.T) {
 	key := generateLookupKey(group1mac, group2mac, 10, group1ip1, group2ip1, 6, 21, 20)
 	_, policyData := table.LookupAllByKey(key, 0)
 	backward := getBackwardAcl(action2)
-	basicPolicyData := &PolicyData{ActionList: ACTION_FLOW_STAT, AclActions: []*AclAction{action, backward}}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{action, backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -1425,14 +1342,14 @@ func TestVlanPortAcl2(t *testing.T) {
 	acls := []*Acl{}
 	table := generatePolicyTable()
 	// group1->group2, vlan:10
-	action1 := generateAclAction(1, ACTION_FLOW_STAT)
-	acl1 := generatePolicyAcl(table, action1, group1Id, group2Id, 0, 0, 10)
+	action1 := generateAclAction(11, ACTION_FLOW_STAT)
+	acl1 := generatePolicyAcl(table, action1, 11, group1Id, group2Id, 0, 0, 10)
 	// group1->group2, proto:6
-	action2 := generateAclAction(2, ACTION_FLOW_STAT)
-	acl2 := generatePolicyAcl(table, action2, group1Id, group2Id, 6, 0, 0)
+	action2 := generateAclAction(12, ACTION_FLOW_STAT)
+	acl2 := generatePolicyAcl(table, action2, 12, group1Id, group2Id, 6, 0, 0)
 	// group1->group2, port:80
-	action3 := generateAclAction(3, ACTION_FLOW_STAT)
-	acl3 := generatePolicyAcl(table, action3, group1Id, group2Id, 0, 80, 0)
+	action3 := generateAclAction(13, ACTION_FLOW_STAT)
+	acl3 := generatePolicyAcl(table, action3, 13, group1Id, group2Id, 0, 80, 0)
 	acls = append(acls, acl1)
 	acls = append(acls, acl2)
 	acls = append(acls, acl3)
@@ -1441,7 +1358,8 @@ func TestVlanPortAcl2(t *testing.T) {
 	key := generateLookupKey(group1mac, group2mac, 10, group1ip1, group2ip1, 6, 10, 10)
 	// 获取first查询结果
 	_, policyData := table.LookupAllByKey(key, 0)
-	basicPolicyData := &PolicyData{ActionList: ACTION_FLOW_STAT, AclActions: []*AclAction{action1, action2}}
+	basicPolicyData := &PolicyData{}
+	basicPolicyData.Merge([]AclAction{action1, action2}, 11)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -1458,7 +1376,8 @@ func TestVlanPortAcl2(t *testing.T) {
 	key = generateLookupKey(group1mac, group2mac, 10, group1ip1, group2ip1, 1, 10, 80)
 	// 获取first查询结果
 	_, policyData = table.LookupAllByKey(key, 0)
-	basicPolicyData = &PolicyData{ActionList: ACTION_FLOW_STAT, AclActions: []*AclAction{action1, action3}}
+	basicPolicyData = &PolicyData{}
+	basicPolicyData.Merge([]AclAction{action1, action3}, 11)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -1475,7 +1394,8 @@ func TestVlanPortAcl2(t *testing.T) {
 	key = generateLookupKey(group1mac, group2mac, 0, group1ip1, group2ip1, 6, 10, 80)
 	// 获取first查询结果
 	_, policyData = table.LookupAllByKey(key, 0)
-	basicPolicyData = &PolicyData{ActionList: ACTION_FLOW_STAT, AclActions: []*AclAction{action2, action3}}
+	basicPolicyData = &PolicyData{}
+	basicPolicyData.Merge([]AclAction{action2, action3}, 12)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -1492,11 +1412,11 @@ func TestVlanPortAcl2(t *testing.T) {
 	acls = []*Acl{}
 	table = generatePolicyTable()
 	// port:80
-	action4 := generateAclAction(4, ACTION_FLOW_STAT)
-	acl4 := generatePolicyAcl(table, action4, 0, 0, 0, 80, 0)
+	action4 := generateAclAction(14, ACTION_FLOW_STAT)
+	acl4 := generatePolicyAcl(table, action4, 14, 0, 0, 0, 80, 0)
 	// group1->group2, proto:6
-	action5 := generateAclAction(5, ACTION_FLOW_STAT)
-	acl5 := generatePolicyAcl(table, action5, group1Id, group2Id, 6, 0, 0)
+	action5 := generateAclAction(15, ACTION_FLOW_STAT)
+	acl5 := generatePolicyAcl(table, action5, 15, group1Id, group2Id, 6, 0, 0)
 	acls = append(acls, acl4)
 	acls = append(acls, acl5)
 	table.UpdateAclData(acls)
@@ -1505,7 +1425,8 @@ func TestVlanPortAcl2(t *testing.T) {
 	// 获取first查询结果
 	_, policyData = table.LookupAllByKey(key, 0)
 	backward1 := getBackwardAcl(action4)
-	basicPolicyData = &PolicyData{ActionList: ACTION_FLOW_STAT, AclActions: []*AclAction{action5, action4}}
+	basicPolicyData = &PolicyData{}
+	basicPolicyData.Merge([]AclAction{action5, action4}, 15)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -1523,7 +1444,8 @@ func TestVlanPortAcl2(t *testing.T) {
 	// 获取first查询结果
 	_, policyData = table.LookupAllByKey(key, 0)
 	backward2 := getBackwardAcl(action5)
-	basicPolicyData = &PolicyData{ActionList: ACTION_FLOW_STAT, AclActions: []*AclAction{backward2, backward1}}
+	basicPolicyData = &PolicyData{}
+	basicPolicyData.Merge([]AclAction{backward2, backward1}, 15)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
