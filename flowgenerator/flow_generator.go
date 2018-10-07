@@ -231,10 +231,8 @@ func (f *FlowExtra) reversePolicyData() {
 	if f.taggedFlow.PolicyData == nil {
 		return
 	}
-	for _, aclAction := range f.taggedFlow.PolicyData.AclActions {
-		if aclAction.Direction == 1 || aclAction.Direction == 2 {
-			aclAction.Direction = (^aclAction.Direction) & 3
-		}
+	for i, aclAction := range f.taggedFlow.PolicyData.AclActions {
+		f.taggedFlow.PolicyData.AclActions[i] = aclAction.ReverseDirection()
 	}
 }
 
@@ -638,7 +636,7 @@ func (f *FlowGenerator) checkIfDoFlowPerf(flowExtra *FlowExtra) bool {
 	if flowExtra.taggedFlow.PolicyData == nil {
 		return false
 	}
-	if flowExtra.taggedFlow.PolicyData.ActionList&(ACTION_PERFORMANCE|ACTION_TCP_PERFORMANCE_PUB|ACTION_FLOW_STORE) > 0 {
+	if flowExtra.taggedFlow.PolicyData.ActionFlags&(ACTION_PERFORMANCE|ACTION_TCP_PERFORMANCE_PUB|ACTION_FLOW_STORE) > 0 {
 		if flowExtra.metaFlowPerf == nil {
 			flowExtra.metaFlowPerf = f.getMetaFlowPerfFromPool()
 		}

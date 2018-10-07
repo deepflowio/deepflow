@@ -20,10 +20,7 @@ func NewFlowSender(input queue.QueueReader, ip string, port uint16, zmqHWM int) 
 
 // filter 如果流不被存储，返回true
 func (s *FlowSender) filter(flow *datatype.TaggedFlow) bool {
-	if flow.PolicyData.ActionList&datatype.ACTION_FLOW_STORE == 0 {
-		return true
-	}
-	return false
+	return flow.PolicyData.ActionFlags&datatype.ACTION_FLOW_STORE == 0
 }
 
 func (s *FlowSender) run() {
@@ -39,9 +36,9 @@ func (s *FlowSender) run() {
 					continue
 				}
 				header := &pb.StreamHeader{
-					Timestamp: proto.Uint32(uint32(flow.StartTime.Seconds())),
-					Sequence:  proto.Uint32(s.sequence),
-					Action:    proto.Uint32(uint32(flow.PolicyData.ActionList)),
+					Timestamp:   proto.Uint32(uint32(flow.StartTime.Seconds())),
+					Sequence:    proto.Uint32(s.sequence),
+					ActionFlags: proto.Uint32(uint32(flow.PolicyData.ActionFlags)),
 				}
 				bytes.Reset()
 				if _, err := header.MarshalTo(bytes.Use(header.Size())); err != nil {
