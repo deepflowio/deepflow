@@ -46,7 +46,7 @@ message Request {
 message StreamHeader {
     required fixed32 timestamp = 1;
     required fixed32 sequence = 2;
-    required fixed32 action = 3;
+    required fixed32 action_flags = 3;
 }
 
 /*
@@ -197,7 +197,7 @@ message Flow {
                                                                   current flow */
     optional uint64 pkt_size_variance = 162 [default = 0];     /* Packet byte cnt variance of this flow */
 
-    repeated uint32 acl_ids = 163;
+    optional uint32 acl_id = 163;
 
     repeated uint32 acl_gids = 164;
 
