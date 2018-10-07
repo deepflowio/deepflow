@@ -219,5 +219,5 @@ message ZeroDocument {
     optional uint32 timestamp = 1;
     optional Tag tag = 2;
     optional Meter meter = 3;
-    optional uint32 actions = 4;
+    optional uint32 action_flags = 4;
 }
