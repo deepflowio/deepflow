@@ -1,8 +1,8 @@
 package mapreduce
 
 import (
-	"fmt"
 	"reflect"
+	"strconv"
 
 	"time"
 
@@ -105,7 +105,7 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 		handler.statItems[i].Name = h.processors[i].GetName()
 		handler.statItems[i].StatType = stats.COUNT_TYPE
 	}
-	stats.RegisterCountable(fmt.Sprintf("flow_mapper_%d", index), &handler)
+	stats.RegisterCountable("flow_mapper", &handler, stats.OptionStatTags{"index": strconv.Itoa(index)})
 	return &handler
 }
 

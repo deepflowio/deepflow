@@ -156,16 +156,21 @@ func (l *LabelerManager) run(index int) {
 	flowItemBatch := make([]interface{}, 0, size)
 	itemBatch := make([]interface{}, size)
 
+	meteringAppActions := datatype.ACTION_PACKET_STAT | datatype.ACTION_PACKECT_COUNTER_PUB
+	flowAppActions := datatype.ACTION_FLOW_STAT | datatype.ACTION_FLOW_STORE | datatype.ACTION_PERFORMANCE |
+		datatype.ACTION_MISC | datatype.ACTION_FLOW_COUNTER_PUB | datatype.ACTION_TCP_PERFORMANCE_PUB | datatype.ACTION_GEO
+
 	for l.running {
 		itemCount := l.readQueues.Gets(userId, itemBatch)
 		for _, item := range itemBatch[:itemCount] {
 			metaPacket := item.(*datatype.MetaPacket)
 			action := l.GetPolicy(metaPacket, index)
-			if (action.ActionList & (datatype.ACTION_PACKET_STAT | datatype.ACTION_PACKECT_COUNTER_PUB)) != 0 {
+			if (action.ActionFlags & meteringAppActions) != 0 {
 				meteringKeys = append(meteringKeys, queue.HashKey(metaPacket.Hash))
 				meteringItemBatch = append(meteringItemBatch, metaPacket)
 			}
-			if (action.ActionList & (datatype.ACTION_FLOW_STAT | datatype.ACTION_FLOW_COUNTER_PUB | datatype.ACTION_FLOW_STORE)) != 0 {
+
+			if (action.ActionFlags & flowAppActions) != 0 {
 				flowKeys = append(flowKeys, queue.HashKey(metaPacket.Hash))
 				flowItemBatch = append(flowItemBatch, metaPacket)
 			}
@@ -589,7 +594,7 @@ func parseAcl(args []string) *policy.Acl {
 				fmt.Printf("invalid id %s from %s\n", keyValue[1], args[0])
 				return nil
 			}
-			acl.Id = uint32(id)
+			acl.Id = datatype.ACLID(id)
 		case "proto":
 			proto, err := strconv.Atoi(keyValue[1])
 			if err != nil || proto < 0 || proto > 255 {
@@ -625,18 +630,19 @@ func parseAcl(args []string) *policy.Acl {
 			acl.DstPorts = make(map[uint16]uint16)
 			acl.DstPorts[uint16(port)] = uint16(port)
 		case "action":
-			action := &datatype.AclAction{}
+			aclAction := datatype.AclAction(0).AddDirections(datatype.FORWARD | datatype.BACKWARD).AddTagTemplates(0xFFFF)
 			switch keyValue[1] {
 			case "metering":
-				action.Type = datatype.ACTION_PACKET_STAT | datatype.ACTION_PACKECT_COUNTER_PUB
+				aclAction = aclAction.AddActionFlags(datatype.ACTION_PACKET_STAT | datatype.ACTION_PACKECT_COUNTER_PUB)
 			case "flow":
-				action.Type = datatype.ACTION_FLOW_STAT | datatype.ACTION_FLOW_COUNTER_PUB | datatype.ACTION_FLOW_STORE
+				aclAction = aclAction.AddActionFlags(datatype.ACTION_FLOW_STAT | datatype.ACTION_FLOW_COUNTER_PUB | datatype.ACTION_FLOW_STORE)
+			case "all":
+				aclAction = aclAction.AddActionFlags(0xFFFF)
 			default:
 				fmt.Printf("invalid tap %s from %s\n", keyValue[1], args[0])
 				return nil
 			}
-			action.AclId = acl.Id
-			acl.Action = append(acl.Action, action)
+			acl.Action = append(acl.Action, aclAction)
 		default:
 			fmt.Printf("invalid key from %s\n", args[0])
 			return nil
@@ -739,7 +745,7 @@ func RegisterCommand() *cobra.Command {
 			"\tsgroup/dgroup      group id\n" +
 			"\tproto              packet ip proto\n" +
 			"\tport               packet port\n" +
-			"\taction             use 'flow|metering'\n\n" +
+			"\taction             use 'flow|metering|all'\n\n" +
 			"\taction: flow=ACTION_PACKET_STAT|ACTION_PACKECT_COUNTER_PUB\n" +
 			"\t        metering=ACTION_FLOW_STAT|ACTION_FLOW_COUNTER_PUB|ACTION_FLOW_STORE",
 		Run: func(cmd *cobra.Command, args []string) {
