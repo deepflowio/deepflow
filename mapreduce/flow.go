@@ -24,7 +24,7 @@ const (
 
 const GEO_FILE_LOCATION = "/usr/share/droplet/ip_info_mini.json"
 
-func NewFlowMapProcess(output queue.QueueWriter, input queue.MultiQueue, inputCount int) *FlowHandler {
+func NewFlowMapProcess(output queue.QueueWriter, input queue.MultiQueue, inputCount int, docsInBuffer int, windowSize int) *FlowHandler {
 	return NewFlowHandler([]app.FlowProcessor{
 		flow.NewProcessor(),
 		perf.NewProcessor(),
@@ -32,7 +32,7 @@ func NewFlowMapProcess(output queue.QueueWriter, input queue.MultiQueue, inputCo
 		flowtype.NewProcessor(),
 		consolelog.NewProcessor(),
 		platform.NewProcessor(),
-	}, output, input, inputCount)
+	}, output, input, inputCount, docsInBuffer, windowSize)
 }
 
 type FlowHandler struct {
@@ -42,15 +42,19 @@ type FlowHandler struct {
 	flowQueue      queue.MultiQueue
 	flowQueueCount int
 	zmqAppQueue    queue.QueueWriter
+	docsInBuffer   int
+	windowSize     int
 }
 
-func NewFlowHandler(processors []app.FlowProcessor, output queue.QueueWriter, inputs queue.MultiQueue, inputCount int) *FlowHandler {
+func NewFlowHandler(processors []app.FlowProcessor, output queue.QueueWriter, inputs queue.MultiQueue, inputCount int, docsInBuffer int, windowSize int) *FlowHandler {
 	return &FlowHandler{
 		numberOfApps:   len(processors),
 		processors:     processors,
 		zmqAppQueue:    output,
 		flowQueue:      inputs,
 		flowQueueCount: inputCount,
+		docsInBuffer:   docsInBuffer,
+		windowSize:     windowSize,
 	}
 }
 
@@ -97,7 +101,7 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 		statItems:    make([]stats.StatItem, h.numberOfApps),
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
-		handler.stashes[i] = NewStash(DOCS_IN_BUFFER, WINDOW_SIZE)
+		handler.stashes[i] = NewStash(h.docsInBuffer, h.windowSize)
 		handler.statItems[i].Name = h.processors[i].GetName()
 		handler.statItems[i].StatType = stats.COUNT_TYPE
 	}

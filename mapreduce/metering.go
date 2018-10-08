@@ -10,8 +10,8 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 )
 
-func NewMeteringMapProcess(output queue.QueueWriter, input queue.MultiQueue, inputCount int) *MeteringHandler {
-	return NewMeteringHandler([]app.MeteringProcessor{usage.NewProcessor()}, output, input, inputCount)
+func NewMeteringMapProcess(output queue.QueueWriter, input queue.MultiQueue, inputCount int, docsInBuffer int, windowSize int) *MeteringHandler {
+	return NewMeteringHandler([]app.MeteringProcessor{usage.NewProcessor()}, output, input, inputCount, docsInBuffer, windowSize)
 }
 
 type MeteringHandler struct {
@@ -21,15 +21,19 @@ type MeteringHandler struct {
 	meteringQueue      queue.MultiQueue
 	meteringQueueCount int
 	zmqAppQueue        queue.QueueWriter
+	docsInBuffer       int
+	windowSize         int
 }
 
-func NewMeteringHandler(processors []app.MeteringProcessor, output queue.QueueWriter, inputs queue.MultiQueue, inputCount int) *MeteringHandler {
+func NewMeteringHandler(processors []app.MeteringProcessor, output queue.QueueWriter, inputs queue.MultiQueue, inputCount int, docsInBuffer int, windowSize int) *MeteringHandler {
 	return &MeteringHandler{
 		numberOfApps:       len(processors),
 		processors:         processors,
 		zmqAppQueue:        output,
 		meteringQueue:      inputs,
 		meteringQueueCount: inputCount,
+		docsInBuffer:       docsInBuffer,
+		windowSize:         windowSize,
 	}
 }
 
@@ -66,7 +70,7 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 		queueIndex: index,
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
-		handler.stashes[i] = NewStash(DOCS_IN_BUFFER, WINDOW_SIZE)
+		handler.stashes[i] = NewStash(h.docsInBuffer, h.windowSize)
 	}
 	return &handler
 }
