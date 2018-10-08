@@ -17,9 +17,6 @@ type FlowMeter struct {
 	SumBitTx           uint64
 	SumBitRx           uint64
 	SumBit             uint64
-
-	MaxFlowCount    uint64
-	MaxNewFlowCount uint64
 }
 
 func (m *FlowMeter) ConcurrentMerge(other app.Meter) {
@@ -33,9 +30,6 @@ func (m *FlowMeter) ConcurrentMerge(other app.Meter) {
 		m.SumBitTx += pm.SumBitTx
 		m.SumBitRx += pm.SumBitRx
 		m.SumBit += pm.SumBit
-
-		m.MaxFlowCount += pm.MaxFlowCount
-		m.MaxNewFlowCount += pm.MaxNewFlowCount
 	}
 }
 
@@ -50,9 +44,6 @@ func (m *FlowMeter) SequentialMerge(other app.Meter) {
 		m.SumBitTx += pm.SumBitTx
 		m.SumBitRx += pm.SumBitRx
 		m.SumBit += pm.SumBit
-
-		m.MaxFlowCount = maxU64(m.MaxFlowCount, pm.MaxFlowCount)
-		m.MaxNewFlowCount = maxU64(m.MaxNewFlowCount, pm.MaxNewFlowCount)
 	}
 }
 
@@ -77,11 +68,6 @@ func (m *FlowMeter) ToKVString() string {
 	buf.WriteString(strconv.FormatUint(m.SumBitRx, 10))
 	buf.WriteString("i,sum_bit=")
 	buf.WriteString(strconv.FormatUint(m.SumBit, 10))
-
-	buf.WriteString("i,max_flow_count=")
-	buf.WriteString(strconv.FormatUint(m.MaxFlowCount, 10))
-	buf.WriteString("i,max_new_flow_count=")
-	buf.WriteString(strconv.FormatUint(m.MaxNewFlowCount, 10))
 	buf.WriteRune('i')
 
 	return buf.String()
