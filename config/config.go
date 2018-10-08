@@ -30,6 +30,7 @@ type Config struct {
 	Queue          QueueConfig         `yaml:"queue"`
 	Labeler        LabelerConfig       `yaml:"labeler"`
 	FlowGenerator  FlowGeneratorConfig `yaml:"flow-generator"`
+	MapReduce      MapReduce           `yaml:"map-reduce"`
 }
 
 type IpPortConfig struct {
@@ -56,6 +57,11 @@ type FlowGeneratorConfig struct {
 	EstablishedTimeout  time.Duration `yaml:"established-timeout"`
 	ClosingRstTimeout   time.Duration `yaml:"closing-rst-timeout"`
 	OthersTimeout       time.Duration `yaml:"others-timeout"`
+}
+
+type MapReduce struct {
+	DocsInBuffer uint32 `yaml:"docs-in-buffer"`
+	WindowSize   uint32 `yaml:"window-size"`
 }
 
 func (c *Config) Validate() error {
