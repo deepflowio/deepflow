@@ -32,6 +32,8 @@ func Marshal(doc *app.Document, bytes *utils.ByteBuffer) error {
 		msgType = MSG_CONSOLE_LOG
 	case *dt.TypeMeter:
 		msgType = MSG_TYPE
+	case *dt.FPSMeter:
+		msgType = MSG_FPS
 	default:
 		return fmt.Errorf("Unknown supported type %T", v)
 	}
@@ -69,6 +71,9 @@ func Marshal(doc *app.Document, bytes *utils.ByteBuffer) error {
 	case MSG_TYPE:
 		meter := doc.Meter.(*dt.TypeMeter)
 		msg.Meter.Type = dt.TypeMeterToPB(meter)
+	case MSG_FPS:
+		meter := doc.Meter.(*dt.FPSMeter)
+		msg.Meter.Fps = dt.FPSMeterToPB(meter)
 	}
 	msg.ActionFlags = proto.Uint32(doc.ActionFlags)
 
@@ -109,6 +114,8 @@ func Unmarshal(b []byte) (*app.Document, error) {
 		doc.Meter = dt.PBToConsoleLogMeter(meter.GetConsoleLog())
 	case meter.GetType() != nil:
 		doc.Meter = dt.PBToTypeMeter(meter.GetType())
+	case meter.GetFps() != nil:
+		doc.Meter = dt.PBToFPSMeter(meter.GetFps())
 	}
 	doc.ActionFlags = msg.GetActionFlags()
 

@@ -272,14 +272,27 @@ func TestGeoMeterEqual(t *testing.T) {
 	}
 }
 
-func TestFlowMeterEqual(t *testing.T) {
-	fromMeter := &FlowMeter{
+func TestFPSMeterEqual(t *testing.T) {
+	fromMeter := &FPSMeter{
 		SumFlowCount:       1,
 		SumNewFlowCount:    2,
 		SumClosedFlowCount: 3,
 
 		MaxFlowCount:    19,
 		MaxNewFlowCount: 20,
+	}
+	pb := FPSMeterToPB(fromMeter)
+	toMeter := PBToFPSMeter(pb)
+	if !reflect.DeepEqual(fromMeter, toMeter) {
+		t.Error("Meter在序列化反序列化之后与原Meter不一致")
+	}
+}
+
+func TestFlowMeterEqual(t *testing.T) {
+	fromMeter := &FlowMeter{
+		SumFlowCount:       1,
+		SumNewFlowCount:    2,
+		SumClosedFlowCount: 3,
 	}
 	pb := FlowMeterToPB(fromMeter)
 	toMeter := PBToFlowMeter(pb)
