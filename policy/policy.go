@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"sort"
 	"sync"
 	"sync/atomic"
 
@@ -8,6 +9,8 @@ import (
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
+
+type AclSlice []*Acl
 
 var log = logging.MustGetLogger("policy")
 
@@ -112,6 +115,23 @@ func (t *PolicyTable) DelAcl(id int) {
 
 func (t *PolicyTable) GetAcl() []*Acl {
 	return t.policyLabel.RawAcls
+}
+
+func (acls AclSlice) Len() int {
+	return len(acls)
+}
+
+func (acls AclSlice) Less(i, j int) bool {
+	return acls[i].Id < acls[j].Id
+}
+
+func (acls AclSlice) Swap(i, j int) {
+	acls[i], acls[j] = acls[j], acls[i]
+}
+
+func SortAclsById(acls []*Acl) []*Acl {
+	sort.Sort(AclSlice(acls))
+	return acls
 }
 
 func (t *PolicyTable) GetCounter() interface{} {
