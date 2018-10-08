@@ -213,6 +213,7 @@ message Meter {
     optional PlatformMeter platform = 5;
     optional ConsoleLogMeter console_log = 6;
     optional TypeMeter type = 8;
+    optional FpsMeter fps = 9;
 }
 
 message ZeroHeader {
