@@ -409,6 +409,28 @@ func PBToGeoMeter(m *pb.GeoMeter) *GeoMeter {
 	}
 }
 
+func FPSMeterToPB(m *FPSMeter) *pb.FpsMeter {
+	return &pb.FpsMeter{
+		SumFlowCount:       proto.Uint64(m.SumFlowCount),
+		SumNewFlowCount:    proto.Uint64(m.SumNewFlowCount),
+		SumClosedFlowCount: proto.Uint64(m.SumClosedFlowCount),
+
+		MaxFlowCount:    proto.Uint64(m.MaxFlowCount),
+		MaxNewFlowCount: proto.Uint64(m.MaxNewFlowCount),
+	}
+}
+
+func PBToFPSMeter(m *pb.FpsMeter) *FPSMeter {
+	return &FPSMeter{
+		SumFlowCount:       m.GetSumFlowCount(),
+		SumNewFlowCount:    m.GetSumNewFlowCount(),
+		SumClosedFlowCount: m.GetSumClosedFlowCount(),
+
+		MaxFlowCount:    m.GetMaxFlowCount(),
+		MaxNewFlowCount: m.GetMaxNewFlowCount(),
+	}
+}
+
 func FlowMeterToPB(m *FlowMeter) *pb.FlowMeter {
 	return &pb.FlowMeter{
 		SumFlowCount:       proto.Uint64(m.SumFlowCount),
@@ -420,9 +442,6 @@ func FlowMeterToPB(m *FlowMeter) *pb.FlowMeter {
 		SumBitTx:           proto.Uint64(m.SumBitTx),
 		SumBitRx:           proto.Uint64(m.SumBitRx),
 		SumBit:             proto.Uint64(m.SumBit),
-
-		MaxFlowCount:    proto.Uint64(m.MaxFlowCount),
-		MaxNewFlowCount: proto.Uint64(m.MaxNewFlowCount),
 	}
 }
 
@@ -437,9 +456,6 @@ func PBToFlowMeter(m *pb.FlowMeter) *FlowMeter {
 		SumBitTx:           m.GetSumBitTx(),
 		SumBitRx:           m.GetSumBitRx(),
 		SumBit:             m.GetSumBit(),
-
-		MaxFlowCount:    m.GetMaxFlowCount(),
-		MaxNewFlowCount: m.GetMaxNewFlowCount(),
 	}
 }
 
