@@ -178,7 +178,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:93099e20d47d78f2c9b10eb8611377f496bfccf48a89070510694e3b99eece2c"
+  digest = "1:5f05eb1867c0e30d67b7b8e8690f5cb7b81ccc1f26d6b03a430246dd87004bab"
   name = "gitlab.x.lan/application/droplet-app"
   packages = [
     "internal/pkg/endpoint",
@@ -188,13 +188,14 @@
     "pkg/mapper/consolelog",
     "pkg/mapper/flow",
     "pkg/mapper/flowtype",
+    "pkg/mapper/fps",
     "pkg/mapper/geo",
     "pkg/mapper/perf",
     "pkg/mapper/platform",
     "pkg/mapper/usage",
   ]
   pruneopts = "UT"
-  revision = "3fd3642fc0ca3a95f9a21d3934bebf39af486c7f"
+  revision = "966a448fe07dd149db335b3e1760addde052e0c7"
 
 [[projects]]
   branch = "master"
@@ -218,7 +219,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "a1adb82f9c29b53003045ec4b23eb207dcc1284c"
+  revision = "d52add8b7d4c910b8d47b593885e3af7464d1de1"
 
 [[projects]]
   branch = "master"
@@ -230,7 +231,7 @@
     "zero",
   ]
   pruneopts = "T"
-  revision = "26b38d08ce31841108019f64bed997cea50225c6"
+  revision = "3102b68d333505361a2acddaea76947148d641f7"
 
 [[projects]]
   branch = "release-branch.go1.11"
@@ -356,6 +357,7 @@
     "gitlab.x.lan/application/droplet-app/pkg/mapper/consolelog",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/flow",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/flowtype",
+    "gitlab.x.lan/application/droplet-app/pkg/mapper/fps",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/geo",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/perf",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/platform",
