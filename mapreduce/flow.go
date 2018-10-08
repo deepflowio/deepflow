@@ -74,7 +74,10 @@ type subFlowHandler struct {
 func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 	dupProcessors := make([]app.FlowProcessor, h.numberOfApps)
 	for i, proc := range h.processors {
-		dupProcessors[i] = reflect.New(reflect.ValueOf(proc).Elem().Type()).Interface().(app.FlowProcessor)
+		elem := reflect.ValueOf(proc).Elem()
+		ref := reflect.New(elem.Type())
+		ref.Elem().Set(elem)
+		dupProcessors[i] = ref.Interface().(app.FlowProcessor)
 		dupProcessors[i].Prepare()
 	}
 	handler := subFlowHandler{
