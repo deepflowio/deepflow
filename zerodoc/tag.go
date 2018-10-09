@@ -504,24 +504,29 @@ var FAST_CODES = []Code{
 
 // GetFastID 返回uint64的ID，0代表该tag的code不在fast ID的范围内
 func (t *Tag) GetFastID() uint64 {
-	switch t.Code {
-	case TAPType: // 2b
-		return uint64(t.TAPType & 0x3)
-	case IP | TAPType: // 32b + 2b
-		return (uint64(t.IP) << 2) | uint64(t.TAPType&0x3)
-	case L3EpcID | TAPType: // 16b + 2b
-		return (uint64(t.L3EpcID&0xFFFF) << 2) | uint64(t.TAPType&0x3)
-	case L3EpcID | IP | TAPType: // 16b + 32b + 2b
-		return (uint64(t.L3EpcID&0xFFFF) << 34) | (uint64(t.IP) << 2) | uint64(t.TAPType&0x3)
-	case ACLGID | TAPType: // 14b + 2b
-		return (uint64(t.ACLGID&0x3FFF) << 2) | uint64(t.TAPType)
-	case ACLGID | IP | TAPType: // 14b + 32b + 2b
-		return (uint64(t.ACLGID&0x3FFF) << 34) | (uint64(t.IP) << 2) | uint64(t.TAPType&0x3)
-	case ACLGID | IP | L3EpcID | TAPType: // 14b + 32b + 16b + 2b
-		return (uint64(t.ACLGID&0x3FFF) << 50) | (uint64(t.IP) << 18) | (uint64(t.L3EpcID&0xFFFF) << 2) | uint64(t.TAPType&0x3)
-	default:
-		return 0
+	var id uint64
+	// 14b ACLGID + 32b IP + 16b L3EpcID + 2b TAPType
+	//
+	// 当code不存在的时候，有以下条件使得不同code的tag不会产生相同的fast ID：
+	//   1. TAPType 0已经弃用，不会冲突
+	//   2. L3EpcID 0是不存在的
+	//   3. IP 255.255.255.255不用
+	//   4. ACLGID 0不存在
+	if t.Code&TAPType != 0 {
+		id |= uint64(t.TAPType & 0x3)
 	}
+	if t.Code&L3EpcID != 0 {
+		id |= uint64(t.L3EpcID&0xFFFF) << 2
+	}
+	if t.Code&IP != 0 {
+		id |= uint64(t.IP) << 18
+	} else {
+		id |= uint64(0xFFFFFFFF) << 18
+	}
+	if t.Code&ACLGID != 0 {
+		id |= uint64(t.ACLGID&0x3FFF) << 50
+	}
+	return id
 }
 
 func (t *Tag) GetCode() uint64 {
