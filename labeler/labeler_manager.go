@@ -532,6 +532,7 @@ func showAcl() {
 	}
 	fmt.Printf("%s\n", info)
 
+	acls := make([]*policy.Acl, 0, 32)
 	for {
 		acl := policy.Acl{}
 		buffer, err := dropletctl.RecvFromDroplet(conn)
@@ -546,7 +547,11 @@ func showAcl() {
 		if acl.Vlan == 0xffff {
 			break
 		}
-		fmt.Printf("\t%+v\n", acl)
+		acls = append(acls, &acl)
+	}
+
+	for index, acl := range policy.SortAclsById(acls) {
+		fmt.Printf("  %v, \t%+v\n", index+1, acl)
 	}
 }
 
