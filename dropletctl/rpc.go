@@ -14,6 +14,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"sort"
 
 	"github.com/spf13/cobra"
 	"gitlab.x.lan/yunshan/droplet-libs/logger"
@@ -22,6 +23,7 @@ import (
 )
 
 type CmdExecute func(response *trident.SyncResponse)
+type SortedAcls []*trident.FlowAcl
 
 var configPath string
 
@@ -103,8 +105,21 @@ func jsonFormat(index int, v interface{}) {
 	fmt.Printf("\t%v: %s\n", index, jsonBytes)
 }
 
+func (a SortedAcls) Len() int {
+	return len(a)
+}
+
+func (a SortedAcls) Less(i, j int) bool {
+	return a[i].GetId() < a[j].GetId()
+}
+
+func (a SortedAcls) Swap(i, j int) {
+	a[i], a[j] = a[j], a[i]
+}
+
 func flowAcls(response *trident.SyncResponse) {
 	if flowAcls := response.GetFlowAcls(); flowAcls != nil {
+		sort.Sort(SortedAcls(flowAcls)) // sort by id
 		fmt.Println("acl data:")
 		for index, entry := range flowAcls {
 			jsonFormat(index+1, entry)
