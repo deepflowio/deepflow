@@ -52,7 +52,7 @@ type LabelerConfig struct {
 }
 
 type FlowGeneratorConfig struct {
-	FlowCountLimit uint32 `yaml:"flow-count-limit"`
+	FlowCountLimit int32 `yaml:"flow-count-limit"`
 	/* unit of interval and timeout: second */
 	ForceReportInterval time.Duration `yaml:"force-report-interval"`
 	EstablishedTimeout  time.Duration `yaml:"established-timeout"`

@@ -197,6 +197,7 @@ func (f *subFlowHandler) Process() error {
 					f.Flush()
 				}
 			}
+			datatype.ReleaseTaggedFlow(flow)
 		}
 	}
 }

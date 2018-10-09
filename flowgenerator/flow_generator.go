@@ -3,6 +3,7 @@ package flowgenerator
 import (
 	"math/rand"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/gopacket/layers"
@@ -123,7 +124,7 @@ func (f *FlowGenerator) genFlowId(timestamp uint64, inPort uint64) uint64 {
 }
 
 func (f *FlowGenerator) initFlow(meta *MetaPacket, key *FlowKey, now time.Duration) *FlowExtra {
-	taggedFlow := f.taggedFlowHandler.alloc()
+	taggedFlow := AcquireTaggedFlow()
 	taggedFlow.FlowKey = *key
 	taggedFlow.FlowID = f.genFlowId(uint64(now), uint64(key.InPort))
 	taggedFlow.TimeBitmap = 1
@@ -135,7 +136,7 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, key *FlowKey, now time.Durati
 	taggedFlow.CloseType = CloseTypeUnknown
 	taggedFlow.PolicyData = meta.PolicyData
 
-	flowExtra := f.flowExtraHandler.alloc()
+	flowExtra := AcquireFlowExtra()
 	flowExtra.taggedFlow = taggedFlow
 	flowExtra.flowState = FLOW_STATE_RAW
 	flowExtra.recentTime = now
@@ -398,7 +399,7 @@ func (f *FlowGenerator) handlePackets() {
 	hashKey := HashKey(f.index)
 loop:
 	if !f.handleRunning {
-		log.Info("flow fenerator packet handler exit")
+		log.Info("flow generator packet handler exit")
 		return
 	}
 	packetHandler.Add(1)
@@ -419,7 +420,7 @@ func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uin
 		flowCache.Lock()
 		for e := flowCache.flowList.Front(); e != nil; {
 			flowExtra := e.Value
-			f.stats.CurrNumFlows--
+			atomic.AddInt32(&f.stats.CurrNumFlows, -1)
 			flowExtra.taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, false, &f.perfCounter)
 			flowExtra.setCurFlowInfo(now, forceReportInterval)
 			flowExtra.calcCloseType(false)
@@ -465,7 +466,7 @@ loop:
 			flowExtra := e.Value
 			if flowExtra.recentTime < cleanRange && flowExtra.recentTime+flowExtra.timeout <= now {
 				taggedFlow := flowExtra.taggedFlow
-				f.stats.CurrNumFlows--
+				atomic.AddInt32(&f.stats.CurrNumFlows, -1)
 				flowExtra.setCurFlowInfo(now, forceReportInterval)
 				if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
 					flowExtra.reverseFlow()
@@ -476,7 +477,7 @@ loop:
 				if flowExtra.metaFlowPerf != nil {
 					ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
 				}
-				flowExtra.reset()
+				ReleaseFlowExtra(flowExtra)
 				flowOutBuffer[flowOutNum] = taggedFlow
 				flowOutNum++
 				if flowOutNum >= FLOW_OUT_BUFFER_CAP {
@@ -576,7 +577,7 @@ func (f *FlowGenerator) Stop() {
 func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, cfg FlowGeneratorConfig, index int) *FlowGenerator {
 	flowGenerator := &FlowGenerator{
 		TimeoutConfig:           defaultTimeoutConfig,
-		FastPath:                FastPath{FlowCacheHashMap: FlowCacheHashMap{make([]*FlowCache, HASH_MAP_SIZE), rand.Uint32(), HASH_MAP_SIZE, TIMOUT_PARALLEL_NUM}},
+		FlowCacheHashMap:        FlowCacheHashMap{make([]*FlowCache, HASH_MAP_SIZE), rand.Uint32(), HASH_MAP_SIZE, TIMOUT_PARALLEL_NUM},
 		metaPacketHeaderInQueue: metaPacketHeaderInQueue,
 		flowOutQueue:            flowOutQueue,
 		stats:                   FlowGeneratorStats{cleanRoutineFlowCacheNums: make([]int, TIMOUT_PARALLEL_NUM), cleanRoutineMaxFlowCacheLens: make([]int, TIMOUT_PARALLEL_NUM)},
@@ -596,8 +597,6 @@ func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, cfg
 	if !flowGenerator.initFlowCache() {
 		return nil
 	}
-	flowGenerator.taggedFlowHandler.Init()
-	flowGenerator.flowExtraHandler.Init()
 	flowGenerator.initStateMachineMaster()
 	flowGenerator.initStateMachineSlave()
 	tags := OptionStatTags{"index": strconv.Itoa(index)}

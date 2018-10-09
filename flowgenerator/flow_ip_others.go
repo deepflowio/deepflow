@@ -1,6 +1,7 @@
 package flowgenerator
 
 import (
+	"sync/atomic"
 	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -24,7 +25,7 @@ func (f *FlowGenerator) processOtherIpPacket(meta *MetaPacket) {
 		flowExtra = f.initOtherIpFlow(meta, flowKey)
 		f.stats.TotalNumFlows++
 		f.addFlow(flowCache, flowExtra)
-		f.stats.CurrNumFlows++
+		atomic.AddInt32(&f.stats.CurrNumFlows, 1)
 	}
 	flowCache.Unlock()
 }
