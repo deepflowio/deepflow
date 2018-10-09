@@ -636,7 +636,7 @@ func (f *FlowGenerator) checkIfDoFlowPerf(flowExtra *FlowExtra) bool {
 	if flowExtra.taggedFlow.PolicyData == nil {
 		return false
 	}
-	if flowExtra.taggedFlow.PolicyData.ActionFlags&(ACTION_PERFORMANCE|ACTION_TCP_PERFORMANCE_PUB|ACTION_FLOW_STORE) > 0 {
+	if flowExtra.taggedFlow.PolicyData.ActionFlags&(ACTION_TCP_FLOW_PERF_COUNTING|ACTION_TCP_FLOW_PERF_COUNT_BROKERING|ACTION_FLOW_STORING) > 0 {
 		if flowExtra.metaFlowPerf == nil {
 			flowExtra.metaFlowPerf = f.getMetaFlowPerfFromPool()
 		}

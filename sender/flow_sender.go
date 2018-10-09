@@ -20,7 +20,7 @@ func NewFlowSender(input queue.QueueReader, ip string, port uint16, zmqHWM int) 
 
 // filter 如果流不被存储，返回true
 func (s *FlowSender) filter(flow *datatype.TaggedFlow) bool {
-	return flow.PolicyData.ActionFlags&datatype.ACTION_FLOW_STORE == 0
+	return flow.PolicyData.ActionFlags&datatype.ACTION_FLOW_STORING == 0
 }
 
 func (s *FlowSender) run() {
