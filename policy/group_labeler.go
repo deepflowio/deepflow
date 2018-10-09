@@ -63,12 +63,10 @@ func (g *IpResourceGroup) Update(groups []*IpGroupData) {
 
 // Populate fills tags in flow message
 func (g *IpResourceGroup) Populate(ip uint32, endpointInfo *EndpointInfo) bool {
-	ok := false
-	if endpointInfo.L3EpcId != 0 {
-		for _, v := range g.ipTree.cachedQuery(endpointInfo.L3EpcId, ip) {
-			endpointInfo.GroupIds = append(endpointInfo.GroupIds, uint32(v))
-			ok = true
-		}
+	queryResult := g.ipTree.cachedQuery(endpointInfo.L3EpcId, ip)
+	ok := queryResult != nil
+	for _, v := range queryResult {
+		endpointInfo.GroupIds = append(endpointInfo.GroupIds, uint32(v))
 	}
 
 	return ok
@@ -97,7 +95,7 @@ func (t *CachedIpTree) cachedQuery(epc int32, ip uint32) []int32 {
 			return v.([]int32)
 		}
 	}
-	value := t.Tree.Query(newEpcRange(epc), newIpRange(ip))
+	value := t.Tree.Query(queryEpcRange(epc), newIpRange(ip))
 	result := make([]int32, len(value))
 	for i := range value {
 		result[i] = int32(value[i].(leafValue))

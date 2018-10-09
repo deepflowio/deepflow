@@ -49,6 +49,13 @@ func newEpcRange(id int32) *epcRange {
 	return &epcRange{id, id}
 }
 
+func queryEpcRange(id int32) *epcRange {
+	if id <= 0 {
+		return &epcRange{0x7FFFFFFF, 0x7FFFFFFF}
+	}
+	return &epcRange{id, id}
+}
+
 func (r *epcRange) Lower() (endpoint tree.Endpoint, closed bool) {
 	return int64(r.lower), true
 }
