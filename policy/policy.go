@@ -73,6 +73,8 @@ type PolicyCounter struct {
 
 	FastHit  uint64 `statsd:"fast_hit"`
 	FirstHit uint64 `statsd:"first_hit"`
+
+	AclHitMax uint64 `statsd:"acl_hit_max"`
 }
 
 func getAvailableMapSize(queueCount int, mapSize uint32) uint32 {
@@ -155,6 +157,7 @@ func (t *PolicyTable) GetCounter() interface{} {
 	for i := TAP_ANY; i < TAP_MAX; i++ {
 		counter.ArpTable += uint32(len(t.cloudPlatformData.arpTable[i].arpMap))
 	}
+	counter.AclHitMax = atomic.SwapUint64(&t.policyLabel.AclHitMax, 0)
 	return counter
 }
 
