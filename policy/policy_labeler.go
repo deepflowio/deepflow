@@ -68,6 +68,7 @@ type PolicyLabel struct {
 
 	FirstPathHit, FastPathHit         uint64
 	FirstPathHitTick, FastPathHitTick uint64
+	AclHitMax                         uint64
 }
 
 func NewPolicyLabel(queueCount int, mapSize uint32) *PolicyLabel {
@@ -714,5 +715,9 @@ func (l *PolicyLabel) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *Po
 	}
 	atomic.AddUint64(&l.FastPathHit, 1)
 	atomic.AddUint64(&l.FastPathHitTick, 1)
+	hitData := atomic.LoadUint64(&l.AclHitMax)
+	if aclLen := uint64(len(policy.AclActions)); hitData < aclLen {
+		atomic.CompareAndSwapUint64(&l.AclHitMax, hitData, aclLen)
+	}
 	return endpoint, policy
 }
