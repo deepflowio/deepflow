@@ -57,7 +57,7 @@ type DumpKey struct {
 
 func NewLabelerManager(readQueues queue.MultiQueueReader, count int, size uint32) *LabelerManager {
 	labeler := &LabelerManager{
-		policyTable:     policy.NewPolicyTable(datatype.ACTION_FLOW_STAT, count, size),
+		policyTable:     policy.NewPolicyTable(datatype.ACTION_FLOW_COUNTING, count, size),
 		readQueues:      readQueues,
 		readQueuesCount: count,
 	}
@@ -156,9 +156,9 @@ func (l *LabelerManager) run(index int) {
 	flowItemBatch := make([]interface{}, 0, size)
 	itemBatch := make([]interface{}, size)
 
-	meteringAppActions := datatype.ACTION_PACKET_STAT | datatype.ACTION_PACKECT_COUNTER_PUB
-	flowAppActions := datatype.ACTION_FLOW_STAT | datatype.ACTION_FLOW_STORE | datatype.ACTION_PERFORMANCE |
-		datatype.ACTION_MISC | datatype.ACTION_FLOW_COUNTER_PUB | datatype.ACTION_TCP_PERFORMANCE_PUB | datatype.ACTION_GEO
+	meteringAppActions := datatype.ACTION_PACKET_COUNTING | datatype.ACTION_PACKET_COUNT_BROKERING
+	flowAppActions := datatype.ACTION_FLOW_COUNTING | datatype.ACTION_FLOW_STORING | datatype.ACTION_TCP_FLOW_PERF_COUNTING |
+		datatype.ACTION_FLOW_MISC_COUNTING | datatype.ACTION_FLOW_COUNT_BROKERING | datatype.ACTION_TCP_FLOW_PERF_COUNT_BROKERING | datatype.ACTION_GEO_POSITIONING
 
 	for l.running {
 		itemCount := l.readQueues.Gets(userId, itemBatch)
@@ -633,9 +633,9 @@ func parseAcl(args []string) *policy.Acl {
 			aclAction := datatype.AclAction(0).AddDirections(datatype.FORWARD | datatype.BACKWARD).AddTagTemplates(0xFFFF)
 			switch keyValue[1] {
 			case "metering":
-				aclAction = aclAction.AddActionFlags(datatype.ACTION_PACKET_STAT | datatype.ACTION_PACKECT_COUNTER_PUB)
+				aclAction = aclAction.AddActionFlags(datatype.ACTION_PACKET_COUNTING | datatype.ACTION_PACKET_COUNT_BROKERING)
 			case "flow":
-				aclAction = aclAction.AddActionFlags(datatype.ACTION_FLOW_STAT | datatype.ACTION_FLOW_COUNTER_PUB | datatype.ACTION_FLOW_STORE)
+				aclAction = aclAction.AddActionFlags(datatype.ACTION_FLOW_COUNTING | datatype.ACTION_FLOW_COUNT_BROKERING | datatype.ACTION_FLOW_STORING)
 			case "all":
 				aclAction = aclAction.AddActionFlags(0xFFFF)
 			default:
@@ -746,8 +746,8 @@ func RegisterCommand() *cobra.Command {
 			"\tproto              packet ip proto\n" +
 			"\tport               packet port\n" +
 			"\taction             use 'flow|metering|all'\n\n" +
-			"\taction: flow=ACTION_PACKET_STAT|ACTION_PACKECT_COUNTER_PUB\n" +
-			"\t        metering=ACTION_FLOW_STAT|ACTION_FLOW_COUNTER_PUB|ACTION_FLOW_STORE",
+			"\taction: flow=ACTION_PACKET_COUNTING|ACTION_PACKET_COUNT_BROKERING\n" +
+			"\t        metering=ACTION_FLOW_COUNTING|ACTION_FLOW_COUNT_BROKERING|ACTION_FLOW_STORING",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
 				fmt.Printf("acl is nil, Example: %s\n", cmd.Example)
