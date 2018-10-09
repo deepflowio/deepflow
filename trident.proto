@@ -114,16 +114,16 @@ enum TapType {
 }
 
 enum Action {
-    PACKECT_COUNTER = 1;
-    FLOW_COUNTER = 2;
-    FLOW_STORAGE = 3;
-    TCP_PERFORMANCE = 4;
-    PCAP = 5;
-    MISC = 6;
-    PACKECT_COUNTER_PUB = 8;
-    FLOW_COUNTER_PUB = 9;
-    TCP_PERFORMANCE_PUB = 10;
-    GEO = 11;
+    PACKET_COUNTING = 1;                // 包统计
+    FLOW_COUNTING = 2;                  // 流统计
+    FLOW_STORING = 3;                   // 流存储
+    TCP_FLOW_PERF_COUNTING = 4;         // TCP性能量化统计
+    PACKET_CAPTURING = 5;               // 包存储（pcap）
+    FLOW_MISC_COUNTING = 6;             // 流杂项统计
+    PACKET_COUNT_BROKERING = 8;         // 包统计数据分发
+    FLOW_COUNT_BROKERING = 9;           // 流统计数据分发
+    TCP_FLOW_PERF_COUNT_BROKERING = 10; // TCP性能量化统计数据分发
+    GEO_POSITIONING = 11;               // 地理定位
 }
 
 enum TagTemplate {
