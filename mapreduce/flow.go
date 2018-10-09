@@ -65,8 +65,6 @@ type subFlowHandler struct {
 	processors   []app.FlowProcessor
 	stashes      []*Stash
 
-	lastProcess time.Duration
-
 	flowQueue   queue.MultiQueue
 	zmqAppQueue queue.QueueWriter
 
@@ -90,8 +88,6 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 		numberOfApps: h.numberOfApps,
 		processors:   dupProcessors,
 		stashes:      make([]*Stash, h.numberOfApps),
-
-		lastProcess: time.Duration(time.Now().UnixNano()),
 
 		flowQueue:   h.flowQueue,
 		zmqAppQueue: h.zmqAppQueue,
@@ -190,9 +186,7 @@ func (f *subFlowHandler) Process() error {
 		n := f.flowQueue.Gets(queue.HashKey(f.queueIndex), elements)
 		for _, e := range elements[:n] {
 			if e == nil {
-				if f.NeedFlush() {
-					f.Flush()
-				}
+				f.Flush()
 				continue
 			}
 
@@ -212,16 +206,10 @@ func (f *subFlowHandler) Process() error {
 					f.Flush()
 				}
 			}
-			f.lastProcess = time.Duration(time.Now().UnixNano())
 		}
 	}
 }
 
 func (f *subFlowHandler) Flush() {
 	f.putToQueue()
-	f.lastProcess = time.Duration(time.Now().UnixNano())
-}
-
-func (f *subFlowHandler) NeedFlush() bool {
-	return time.Duration(time.Now().UnixNano())-f.lastProcess > time.Minute
 }

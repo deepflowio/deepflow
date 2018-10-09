@@ -8,7 +8,7 @@ import (
 type Stash struct {
 	timestamp         uint32
 	stashLocation     []map[string]int
-	fastStashLocation []map[uint64]map[uint64]int
+	fastStashLocation []map[uint64]int
 	slots             int
 
 	stash      []interface{}
@@ -22,7 +22,7 @@ func NewStash(capacity, slots int) *Stash {
 	return &Stash{
 		timestamp:         0,
 		stashLocation:     make([]map[string]int, slots),
-		fastStashLocation: make([]map[uint64]map[uint64]int, slots),
+		fastStashLocation: make([]map[uint64]int, slots),
 		slots:             slots,
 		stash:             make([]interface{}, capacity),
 		entryCount:        0,
@@ -43,19 +43,13 @@ func (s *Stash) Add(docs []*app.Document) []*app.Document {
 		}
 
 		fastID := doc.GetFastID()
-		code := doc.GetCode()
 		if fastID != 0 {
 			slotMap := s.fastStashLocation[slot]
 			if slotMap == nil {
-				slotMap = make(map[uint64]map[uint64]int)
+				slotMap = make(map[uint64]int)
 				s.fastStashLocation[slot] = slotMap
 			}
-			codeMap := slotMap[code]
-			if codeMap == nil {
-				codeMap = make(map[uint64]int)
-				slotMap[code] = codeMap
-			}
-			if docLoc, ok := codeMap[fastID]; ok {
+			if docLoc, ok := slotMap[fastID]; ok {
 				s.stash[docLoc].(*app.Document).ConcurrentMerge(doc.Meter)
 				if doc.Pool != nil {
 					doc.Pool.Put(doc)
@@ -67,7 +61,7 @@ func (s *Stash) Add(docs []*app.Document) []*app.Document {
 				return docs[i:]
 			}
 			s.stash[s.entryCount] = doc
-			codeMap[fastID] = s.entryCount
+			slotMap[fastID] = s.entryCount
 			s.entryCount++
 
 		} else {
@@ -106,6 +100,6 @@ func (s *Stash) Dump() []interface{} {
 func (s *Stash) Clear() {
 	s.timestamp = 0
 	s.stashLocation = make([]map[string]int, s.slots)
-	s.fastStashLocation = make([]map[uint64]map[uint64]int, s.slots)
+	s.fastStashLocation = make([]map[uint64]int, s.slots)
 	s.entryCount = 0
 }
