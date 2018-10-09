@@ -10,11 +10,14 @@ type Duplicator struct {
 	outputQueues      []queue.QueueWriter
 	outputMultiQueues []queue.MultiQueueWriter
 	multiQueueSizes   []int
+	clone             func(items []interface{}) []interface{}
 }
 
+type CloneHelper = func(items []interface{}) []interface{}
+
 // NewDuplicator 从input中拿取数据，推送到outputs中，每次最多拿取bufsize条
-func NewDuplicator(bufsize int, input queue.QueueReader) *Duplicator {
-	return &Duplicator{bufsize: bufsize, input: input}
+func NewDuplicator(bufsize int, input queue.QueueReader, clone CloneHelper) *Duplicator {
+	return &Duplicator{bufsize: bufsize, input: input, clone: clone}
 }
 
 func (d *Duplicator) AddQueue(output queue.QueueWriter) *Duplicator {
@@ -52,11 +55,12 @@ func (d *Duplicator) run() {
 	for {
 		n := d.input.Gets(buffer)
 		log.Debugf("%d items received", n)
+		bufferClone := d.clone(buffer[:n])
 		for _, outQueue := range d.outputQueues {
 			outQueue.Put(buffer[:n]...)
 		}
 		for i, multiQueue := range d.outputMultiQueues {
-			broke(multiQueue, d.multiQueueSizes[i], buffer[:n])
+			broke(multiQueue, d.multiQueueSizes[i], bufferClone[:n])
 		}
 	}
 }

@@ -32,7 +32,7 @@ func (s *FlowSender) run() {
 		log.Debugf("%d flows received", n)
 		for _, e := range buffer[:n] {
 			if flow, ok := e.(*datatype.TaggedFlow); ok {
-				if s.filter(flow) {
+				if s.filter(flow) { // this flow is not created by pool so never release
 					continue
 				}
 				header := &pb.StreamHeader{
@@ -46,12 +46,15 @@ func (s *FlowSender) run() {
 					continue
 				}
 				if err := datatype.MarshalFlow(flow, bytes); err != nil {
+					datatype.ReleaseTaggedFlow(flow)
 					log.Warningf("Marshalling flow failed: %s", err)
 					continue
 				}
+				datatype.ReleaseTaggedFlow(flow)
 				s.ZMQBytePusher.Send(bytes.Bytes())
 				s.sequence++
 			} else {
+				datatype.ReleaseTaggedFlow(flow)
 				log.Warningf("Invalid message type %T, should be *TaggedFlow", flow)
 			}
 		}

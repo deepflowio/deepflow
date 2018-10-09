@@ -151,7 +151,10 @@ func Start(configPath string) {
 	// L3 - flow generator & metering marshaller
 	docsInBuffer := int(cfg.MapReduce.DocsInBuffer)
 	windowSize := int(cfg.MapReduce.WindowSize)
-	flowDuplicatorQueue := manager.NewQueue("3-tagged-flow-to-flow-duplicator", queueSize>>2)
+	releaseTaggedFlow := func(x interface{}) {
+		datatype.ReleaseTaggedFlow(x.(*datatype.TaggedFlow))
+	}
+	flowDuplicatorQueue := manager.NewQueue("3-tagged-flow-to-flow-duplicator", queueSize>>2, releaseTaggedFlow)
 	meteringAppOutputQueue := manager.NewQueue(
 		"3-metering-doc-to-marshaller", docsInBuffer<<1,
 		libqueue.OptionRelease(func(p interface{}) { app.ReleaseDocument(p.(*app.Document)) }),
@@ -169,7 +172,7 @@ func Start(configPath string) {
 	flowGeneratorConfig := flowgenerator.FlowGeneratorConfig{
 		ForceReportInterval: cfg.FlowGenerator.ForceReportInterval,
 		BufferSize:          queueSize / flowGeneratorQueueCount,
-		FlowLimitNum:        cfg.FlowGenerator.FlowCountLimit / uint32(flowGeneratorQueueCount),
+		FlowLimitNum:        cfg.FlowGenerator.FlowCountLimit / int32(flowGeneratorQueueCount),
 	}
 	for i := 0; i < flowGeneratorQueueCount; i++ {
 		flowGenerator := flowgenerator.New(flowGeneratorQueues, flowDuplicatorQueue, flowGeneratorConfig, i)
@@ -184,10 +187,11 @@ func Start(configPath string) {
 
 	// L4 - flow duplicator & flow sender
 	flowAppQueueCount := int(cfg.Queue.FlowAppQueueCount)
-	flowAppQueue := manager.NewQueues("4-tagged-flow-to-flow-app", queueSize>>2, flowAppQueueCount, 1, libqueue.OptionFlushIndicator(time.Minute))
-	flowSenderQueue := manager.NewQueue("4-tagged-flow-to-stream", queueSize>>2)
+	flowAppQueue := manager.NewQueues("4-tagged-flow-to-flow-app", queueSize>>2, flowAppQueueCount, 1, libqueue.OptionFlushIndicator(time.Minute), releaseTaggedFlow)
+	flowSenderQueue := manager.NewQueue("4-tagged-flow-to-stream", queueSize>>2, releaseTaggedFlow)
 
-	queue.NewDuplicator(1024, flowDuplicatorQueue).AddMultiQueue(flowAppQueue, flowAppQueueCount).AddQueue(flowSenderQueue).Start()
+	flowDuplicator := queue.NewDuplicator(1024, flowDuplicatorQueue, datatype.CloneTaggedFlowHelper)
+	flowDuplicator.AddMultiQueue(flowAppQueue, flowAppQueueCount).AddQueue(flowSenderQueue).Start()
 	sender.NewFlowSender(flowSenderQueue, cfg.Stream, cfg.StreamPort, queueSize>>2).Start()
 
 	// L5 - flow doc marshaller

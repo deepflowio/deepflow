@@ -1,6 +1,7 @@
 package flowgenerator
 
 import (
+	"sync/atomic"
 	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -18,7 +19,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 	if flowExtra, reply = flowCache.keyMatch(meta, flowKey); flowExtra != nil {
 		if ok, reply = f.updateTcpFlow(flowExtra, meta, reply); ok {
 			taggedFlow := flowExtra.taggedFlow
-			f.stats.CurrNumFlows--
+			atomic.AddInt32(&f.stats.CurrNumFlows, -1)
 			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportInterval)
 			if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
 				flowExtra.reverseFlow()
@@ -29,7 +30,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			if flowExtra.metaFlowPerf != nil {
 				ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
 			}
-			flowExtra.reset()
+			ReleaseFlowExtra(flowExtra)
 			f.flowOutQueue.Put(taggedFlow)
 			// delete front from this FlowCache because flowExtra is moved to front in keyMatch()
 			flowCache.flowList.RemoveFront()
@@ -60,14 +61,14 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			if flowExtra.metaFlowPerf != nil {
 				ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
 			}
-			flowExtra.reset()
+			ReleaseFlowExtra(flowExtra)
 			f.flowOutQueue.Put(taggedFlow)
 		} else {
 			if f.checkIfDoFlowPerf(flowExtra) {
 				flowExtra.metaFlowPerf.Update(meta, reply, flowExtra, &f.perfCounter)
 			}
 			f.addFlow(flowCache, flowExtra)
-			f.stats.CurrNumFlows++
+			atomic.AddInt32(&f.stats.CurrNumFlows, 1)
 		}
 	}
 	flowCache.Unlock()

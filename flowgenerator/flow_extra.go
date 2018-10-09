@@ -1,6 +1,7 @@
 package flowgenerator
 
 import (
+	"sync"
 	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -31,9 +32,26 @@ type FlowExtra struct {
 	reversed     bool
 }
 
-func (f *FlowExtra) reset() {
-	f.taggedFlow = nil
-	f.metaFlowPerf = nil
+var flowExtraPool = sync.Pool{
+	New: func() interface{} {
+		return new(FlowExtra)
+	},
+}
+
+func AcquireFlowExtra() *FlowExtra {
+	return flowExtraPool.Get().(*FlowExtra)
+}
+
+func ReleaseFlowExtra(flowExtra *FlowExtra) {
+	flowExtra.taggedFlow = nil
+	flowExtra.metaFlowPerf = nil
+	flowExtraPool.Put(flowExtra)
+}
+
+func CloneFlowExtra(flowExtra *FlowExtra) *FlowExtra {
+	newFlowExtra := AcquireFlowExtra()
+	*newFlowExtra = *flowExtra
+	return newFlowExtra
 }
 
 // list element for *FlowExtra
