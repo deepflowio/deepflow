@@ -42,7 +42,6 @@ type subMeteringHandler struct {
 	processors   []app.MeteringProcessor
 	stashes      []*Stash
 
-	lastProcess   time.Duration
 	meteringQueue queue.MultiQueue
 	zmqAppQueue   queue.QueueWriter
 
@@ -63,7 +62,6 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 		processors:   dupProcessors,
 		stashes:      make([]*Stash, h.numberOfApps),
 
-		lastProcess:   time.Duration(time.Now().UnixNano()),
 		meteringQueue: h.meteringQueue,
 		zmqAppQueue:   h.zmqAppQueue,
 
@@ -111,9 +109,7 @@ func (f *subMeteringHandler) Process() error {
 		n := f.meteringQueue.Gets(queue.HashKey(f.queueIndex), elements)
 		for _, e := range elements[:n] {
 			if e == nil { // tick
-				if f.NeedFlush() {
-					f.Flush()
-				}
+				f.Flush()
 				continue
 			}
 
@@ -140,15 +136,9 @@ func (f *subMeteringHandler) Process() error {
 				}
 			}
 		}
-		f.lastProcess = time.Duration(time.Now().UnixNano())
 	}
 }
 
 func (f *subMeteringHandler) Flush() {
 	f.putToQueue()
-	f.lastProcess = time.Duration(time.Now().UnixNano())
-}
-
-func (f *subMeteringHandler) NeedFlush() bool {
-	return time.Duration(time.Now().UnixNano())-f.lastProcess > time.Minute
 }
