@@ -89,7 +89,7 @@ func getAvailableMapSize(queueCount int, mapSize uint32) uint32 {
 
 func NewPolicyTable(actionFlags ActionFlag, queueCount int, mapSize uint32) *PolicyTable { // 传入Protobuf结构体指针
 	// 使用actionFlags过滤，例如
-	// Trident仅关心PACKET_BROKER和PACKET_STORE，
+	// Trident仅关心PACKET_RAW_BROKERING和PACKET_CAPTURING，
 	// 那么就不要将EPC等云平台信息进行计算。
 	// droplet关心**几乎**所有，对关心的信息进行计算
 	availableMapSize := getAvailableMapSize(queueCount, mapSize)
@@ -158,20 +158,20 @@ func (t *PolicyTable) GetCounter() interface{} {
 	return counter
 }
 
-// Trident用于PACKET_BROKER、PACKET_STORE
+// Trident用于PACKET_RAW_BROKERING和PACKET_CAPTURING
 func (t *PolicyTable) LookupActionByKey(key *LookupKey) *PolicyData {
 	// 将匹配策略的所有Action merge以后返回
 	// FIXME: 注意将查找过程中的性能监控数据发送到statsd
 	return nil
 }
 
-// River用于PACKET_BROKER，Stream用于FLOW_STORE
+// River用于PACKET_RAW_BROKERING，Stream用于PACKET_CAPTURING
 func (t *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *PolicyData {
 	// FIXME
 	return nil
 }
 
-// Droplet用于ANALYTIC_*、PACKET_BROKER、PACKET_STORE
+// Droplet用于*_COUNTING、PACKET_RAW_BROKERING、PACKET_CAPTURING
 func (t *PolicyTable) LookupAllByKey(key *LookupKey, index int) (*EndpointData, *PolicyData) {
 	if !key.Tap.CheckTapType(key.Tap) {
 		return INVALID_ENDPOINT_DATA, INVALID_POLICY_DATA
