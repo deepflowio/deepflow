@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	forward  = AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
-	backward = AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddDirections(BACKWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	forward  = AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	backward = AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddDirections(BACKWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
 )
 
 func getBackwardAcl(acl AclAction) AclAction {
@@ -29,7 +29,7 @@ func CheckPolicyResult(basicPolicy *PolicyData, targetPolicy *PolicyData) bool {
 
 func TestGetPlatformData(t *testing.T) {
 
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 
 	srcIp := NewIPFromString("192.168.2.12")
 	dstIp := NewIPFromString("192.168.0.11")
@@ -112,7 +112,7 @@ func TestGetPlatformData(t *testing.T) {
 }
 
 func TestGetPlatformDataAboutArp(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 
 	srcIp := NewIPFromString("192.168.2.12")
 	dstIp := NewIPFromString("192.168.0.11")
@@ -169,7 +169,7 @@ func TestGetPlatformDataAboutArp(t *testing.T) {
 }
 
 func TestGetGroupData(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 
 	srcIp := NewIPFromString("192.168.0.11")
 	dstIp := NewIPFromString("192.168.0.12")
@@ -289,7 +289,7 @@ func generateIpgroupData(policy *PolicyTable) {
 
 //测试全局Pass策略匹配direction==3
 func TestAllPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -331,7 +331,7 @@ func TestAllPassPolicy(t *testing.T) {
 
 //测试资源组forward策略匹配 direction==1
 func TestGroupForwardPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -374,7 +374,7 @@ func TestGroupForwardPassPolicy(t *testing.T) {
 
 //测试资源组backward策略匹配 direction==2
 func TestGroupBackwardPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -417,7 +417,7 @@ func TestGroupBackwardPassPolicy(t *testing.T) {
 
 //测试Port策略匹配 acl配置port=0，查询SrcPort=30，DstPort=30，查询到ACl
 func TestAllPortPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -462,7 +462,7 @@ func TestAllPortPassPolicy(t *testing.T) {
 
 //测试Port策略匹配 acl配置port=30，查询Srcport=30，查到acl的direction=2
 func TestSrcPortPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -506,7 +506,7 @@ func TestSrcPortPassPolicy(t *testing.T) {
 
 //测试Port策略匹配 acl配置port=30，查询Dstport=30，查到acl的direction=1
 func TestDstPortPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -550,7 +550,7 @@ func TestDstPortPassPolicy(t *testing.T) {
 
 //测试Port策略匹配 acl配置port=30，查询SrcPort=30, Dstport=30，查到acl的direction=3
 func TestSrcDstPortPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -595,7 +595,7 @@ func TestSrcDstPortPassPolicy(t *testing.T) {
 
 //测试Vlan策略匹配 acl配置Vlan=30，查询Vlan=30, 查询到Acl
 func TestVlanPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -640,7 +640,7 @@ func TestVlanPassPolicy(t *testing.T) {
 
 //测试Vlan策略匹配 acl配置Vlan=0，Port=8000,查询Vlan=30,Port=8000 查询到Acl
 func TestVlanPortPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -685,7 +685,7 @@ func TestVlanPortPassPolicy(t *testing.T) {
 
 //测试Vlan策略匹配 acl配置Proto=6，Port=8000,查询Proto=6,Port=8000 查询到Acl
 func TestPortProtoPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -731,14 +731,14 @@ func TestPortProtoPassPolicy(t *testing.T) {
 
 //测试两条acl proto为6和17 查询proto=6的acl,proto为6的匹配成功
 func TestAclsPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
 	dstGroups := make(map[uint32]uint32)
 	dstPorts := make(map[uint16]uint16)
 	dstPorts[8000] = 8000
-	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl1 := &Acl{
 		Id:        10,
 		Type:      TAP_TOR,
@@ -750,7 +750,7 @@ func TestAclsPassPolicy(t *testing.T) {
 		Vlan:      0,
 		Action:    []AclAction{aclAction1},
 	}
-	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl2 := &Acl{
 		Id:        20,
 		Type:      TAP_TOR,
@@ -790,14 +790,14 @@ func TestAclsPassPolicy(t *testing.T) {
 
 //测试两条acl vlan为10和0  查询vlan=10的策略，结果两条都能匹配
 func TestVlanAclsPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
 	dstGroups := make(map[uint32]uint32)
 	dstPorts := make(map[uint16]uint16)
 	dstPorts[8000] = 8000
-	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl1 := &Acl{
 		Id:        10,
 		Type:      TAP_TOR,
@@ -809,7 +809,7 @@ func TestVlanAclsPassPolicy(t *testing.T) {
 		Vlan:      0,
 		Action:    []AclAction{aclAction1},
 	}
-	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl2 := &Acl{
 		Id:        20,
 		Type:      TAP_TOR,
@@ -854,14 +854,14 @@ func TestVlanAclsPassPolicy(t *testing.T) {
 
 //测试两条acl vlan=10和port=8000  查询vlan=10,port=1000，匹配到vlan=10的策略
 func TestVlanPortAclsPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
 	dstGroups := make(map[uint32]uint32)
 	dstPorts := make(map[uint16]uint16)
 	dstPorts[8000] = 8000
-	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl1 := &Acl{
 		Id:        10,
 		Type:      TAP_TOR,
@@ -873,7 +873,7 @@ func TestVlanPortAclsPassPolicy(t *testing.T) {
 		Vlan:      0,
 		Action:    []AclAction{aclAction1},
 	}
-	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl2 := &Acl{
 		Id:        20,
 		Type:      TAP_TOR,
@@ -913,14 +913,14 @@ func TestVlanPortAclsPassPolicy(t *testing.T) {
 
 //测试两条acl vlan=10和port=8000  查询vlan=10,port=8000，两条策略都匹配到
 func TestVlanPortAclsPassPolicy1(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
 	dstGroups := make(map[uint32]uint32)
 	dstPorts := make(map[uint16]uint16)
 	dstPorts[8000] = 8000
-	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl1 := &Acl{
 		Id:        10,
 		Type:      TAP_TOR,
@@ -932,7 +932,7 @@ func TestVlanPortAclsPassPolicy1(t *testing.T) {
 		Vlan:      0,
 		Action:    []AclAction{aclAction1},
 	}
-	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl2 := &Acl{
 		Id:        20,
 		Type:      TAP_TOR,
@@ -972,14 +972,14 @@ func TestVlanPortAclsPassPolicy1(t *testing.T) {
 
 //测试两条acl vlan=10和port=8000  查询port=8000，匹配到port=8000的策略
 func TestVlanPortAclsPassPolicy2(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
 	dstGroups := make(map[uint32]uint32)
 	dstPorts := make(map[uint16]uint16)
 	dstPorts[8000] = 8000
-	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl1 := &Acl{
 		Id:        10,
 		Type:      TAP_TOR,
@@ -991,7 +991,7 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 		Vlan:      0,
 		Action:    []AclAction{aclAction1},
 	}
-	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_STAT).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl2 := &Acl{
 		Id:        20,
 		Type:      TAP_TOR,
@@ -1075,7 +1075,7 @@ func generatePlatformDataWithGroupId(epcId int32, groupId uint32, mac uint64) *P
 }
 
 func generatePolicyTable() *PolicyTable {
-	policy := NewPolicyTable(ACTION_PACKET_STAT, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
 
 	datas := make([]*PlatformData, 0, 2)
 
@@ -1152,7 +1152,7 @@ func TestPolicySimple(t *testing.T) {
 	// 创建 policyTable
 	table := generatePolicyTable()
 	// 构建acl action  1->2 tcp 8000
-	action := generateAclAction(10, ACTION_PACKET_STAT)
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	acl := generatePolicyAcl(table, action, 10, group1Id, group2Id, 6, 8000, 0)
 	acls = append(acls, acl)
 	table.UpdateAclData(acls)
@@ -1196,7 +1196,7 @@ func TestPolicySimple(t *testing.T) {
 	}
 
 	// 测试同样的key, 匹配两条action
-	action2 := generateAclAction(12, ACTION_PACKET_STAT)
+	action2 := generateAclAction(12, ACTION_PACKET_COUNTING)
 	acl2 := generatePolicyAcl(table, action2, 12, group1Id, group2Id, 6, 8000, 0)
 	acls = append(acls, acl2)
 	table.UpdateAclData(acls)
@@ -1217,7 +1217,7 @@ func TestPolicyEpcPolicy(t *testing.T) {
 	// 创建 policyTable
 	table := generatePolicyTable()
 	// 构建acl action  1->2 tcp 8000
-	action := generateAclAction(10, ACTION_PACKET_STAT)
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	acl := generatePolicyAcl(table, action, 10, group1Id, 0, 6, 8000, 0)
 	acls = append(acls, acl)
 	table.UpdateAclData(acls)
@@ -1276,7 +1276,7 @@ func TestPolicyEpcPolicy(t *testing.T) {
 func TestFlowVlanAcls(t *testing.T) {
 	acls := []*Acl{}
 	table := generatePolicyTable()
-	action := generateAclAction(10, ACTION_FLOW_STAT)
+	action := generateAclAction(10, ACTION_FLOW_COUNTING)
 	acl := generatePolicyAcl(table, action, 10, group1Id, group2Id, 6, 0, 10)
 	acls = append(acls, acl)
 	table.UpdateAclData(acls)
@@ -1317,10 +1317,10 @@ func TestVlanPortAcl(t *testing.T) {
 	acls := []*Acl{}
 	table := generatePolicyTable()
 	// group1->group2,tcp,vlan:10,dstport:20
-	action := generateAclAction(10, ACTION_FLOW_STAT)
+	action := generateAclAction(10, ACTION_FLOW_COUNTING)
 	acl := generatePolicyAcl(table, action, 10, group1Id, group2Id, 6, 20, 10)
 	// group2->group1,tcp,vlan:10,dstport:21
-	action2 := generateAclAction(12, ACTION_FLOW_STAT)
+	action2 := generateAclAction(12, ACTION_FLOW_COUNTING)
 	acl2 := generatePolicyAcl(table, action2, 12, group2Id, group1Id, 6, 21, 10)
 	acls = append(acls, acl)
 	acls = append(acls, acl2)
@@ -1342,13 +1342,13 @@ func TestVlanPortAcl2(t *testing.T) {
 	acls := []*Acl{}
 	table := generatePolicyTable()
 	// group1->group2, vlan:10
-	action1 := generateAclAction(11, ACTION_FLOW_STAT)
+	action1 := generateAclAction(11, ACTION_FLOW_COUNTING)
 	acl1 := generatePolicyAcl(table, action1, 11, group1Id, group2Id, 0, 0, 10)
 	// group1->group2, proto:6
-	action2 := generateAclAction(12, ACTION_FLOW_STAT)
+	action2 := generateAclAction(12, ACTION_FLOW_COUNTING)
 	acl2 := generatePolicyAcl(table, action2, 12, group1Id, group2Id, 6, 0, 0)
 	// group1->group2, port:80
-	action3 := generateAclAction(13, ACTION_FLOW_STAT)
+	action3 := generateAclAction(13, ACTION_FLOW_COUNTING)
 	acl3 := generatePolicyAcl(table, action3, 13, group1Id, group2Id, 0, 80, 0)
 	acls = append(acls, acl1)
 	acls = append(acls, acl2)
@@ -1412,10 +1412,10 @@ func TestVlanPortAcl2(t *testing.T) {
 	acls = []*Acl{}
 	table = generatePolicyTable()
 	// port:80
-	action4 := generateAclAction(14, ACTION_FLOW_STAT)
+	action4 := generateAclAction(14, ACTION_FLOW_COUNTING)
 	acl4 := generatePolicyAcl(table, action4, 14, 0, 0, 0, 80, 0)
 	// group1->group2, proto:6
-	action5 := generateAclAction(15, ACTION_FLOW_STAT)
+	action5 := generateAclAction(15, ACTION_FLOW_COUNTING)
 	acl5 := generatePolicyAcl(table, action5, 15, group1Id, group2Id, 6, 0, 0)
 	acls = append(acls, acl4)
 	acls = append(acls, acl5)
