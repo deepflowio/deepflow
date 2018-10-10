@@ -23,10 +23,6 @@ const (
 	Host
 )
 
-func (c Code) HasEdgeTagField() bool {
-	return c&0xffff0000 != 0
-}
-
 const (
 	IPPath Code = 0x10000 << iota // 1 << 16
 	MACPath
@@ -51,6 +47,15 @@ const (
 	ACLID
 	ACLDirection
 )
+
+func (c Code) HasEdgeTagField() bool {
+	return c&0xffff0000 != 0
+}
+
+func (c Code) HasL2TagField() bool {
+	// FIXME: GroupID、GroupIDPath待定
+	return c&(MAC|L2EpcID|L2Device|Host|MACPath|L2EpcIDPath|L2DevicePath|HostPath|VLANID|VTAP|SubnetID) != 0
+}
 
 const (
 	// df_geo的自定义code
