@@ -55,9 +55,9 @@ type DumpKey struct {
 	InPort uint32
 }
 
-func NewLabelerManager(readQueues queue.MultiQueueReader, count int, size uint32) *LabelerManager {
+func NewLabelerManager(readQueues queue.MultiQueueReader, count int, size uint32, disable bool) *LabelerManager {
 	labeler := &LabelerManager{
-		policyTable:     policy.NewPolicyTable(datatype.ACTION_FLOW_COUNTING, count, size),
+		policyTable:     policy.NewPolicyTable(datatype.ACTION_FLOW_COUNTING, count, size, disable),
 		readQueues:      readQueues,
 		readQueuesCount: count,
 	}
@@ -75,14 +75,19 @@ func (l *LabelerManager) RegisterAppQueue(queueType QueueType, appQueues queue.M
 }
 
 func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
-	if plarformData := response.GetPlatformData(); plarformData != nil {
-		if interfaces := plarformData.GetInterfaces(); interfaces != nil {
-			l.OnPlatformDataChange(dropletpb.Convert2PlatformData(response))
+	log.Info("droplet grpc recv response")
+	if platformData := response.GetPlatformData(); platformData != nil {
+		if interfaces := platformData.GetInterfaces(); interfaces != nil {
+			platformData := dropletpb.Convert2PlatformData(response)
+			log.Infof("droplet grpc recv platform: %+v", platformData)
+			l.OnPlatformDataChange(platformData)
 		} else {
 			l.OnPlatformDataChange(nil)
 		}
-		if ipGroups := plarformData.GetIpGroups(); ipGroups != nil {
-			l.OnIpGroupDataChange(dropletpb.Convert2IpGroupdata(response))
+		if ipGroups := platformData.GetIpGroups(); ipGroups != nil {
+			ipGroupData := dropletpb.Convert2IpGroupData(response)
+			log.Infof("droplet grpc recv ipgroup: %+v", ipGroupData)
+			l.OnIpGroupDataChange(ipGroupData)
 		} else {
 			l.OnIpGroupDataChange(nil)
 		}
@@ -93,11 +98,13 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 
 	if flowAcls := response.GetFlowAcls(); flowAcls != nil {
 		acls := dropletpb.Convert2AclData(response)
-		log.Debug("droplet grpc recv acl:", acls)
+		log.Infof("droplet grpc recv acl: %+v", acls)
 		l.OnPolicyDataChange(acls)
 	} else {
 		l.OnPolicyDataChange(nil)
 	}
+
+	l.policyTable.EnableAclData()
 }
 
 func (l *LabelerManager) OnPlatformDataChange(data []*datatype.PlatformData) {
@@ -139,7 +146,7 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *data
 		FastIndex: index,
 	}
 
-	packet.EndpointData, packet.PolicyData = l.policyTable.LookupAllByKey(key, index)
+	packet.EndpointData, packet.PolicyData = l.policyTable.LookupAllByKey(key)
 	return packet.PolicyData
 }
 
@@ -162,7 +169,7 @@ func (l *LabelerManager) run(index int) {
 
 	for l.running {
 		itemCount := l.readQueues.Gets(userId, itemBatch)
-		for _, item := range itemBatch[:itemCount] {
+		for i, item := range itemBatch[:itemCount] {
 			metaPacket := item.(*datatype.MetaPacket)
 			action := l.GetPolicy(metaPacket, index)
 			if (action.ActionFlags & meteringAppActions) != 0 {
@@ -174,6 +181,7 @@ func (l *LabelerManager) run(index int) {
 				flowKeys = append(flowKeys, queue.HashKey(metaPacket.Hash))
 				flowItemBatch = append(flowItemBatch, metaPacket)
 			}
+			itemBatch[i] = nil
 		}
 		if len(meteringItemBatch) > 0 {
 			meteringQueues.Puts(meteringKeys, meteringItemBatch)
@@ -244,10 +252,14 @@ func (l *LabelerManager) recvDumpAcl(conn *net.UDPConn, port int, arg *bytes.Buf
 		return
 	}
 
-	endpoint, policy := l.policyTable.LookupAllByKey(&key, 0)
-	info := fmt.Sprintf("EndPoint: {Src: %+v Dst: %+v} Policy: %+v", endpoint.SrcInfo, endpoint.DstInfo, policy)
+	info := make([]string, 0, l.readQueuesCount)
+	for i := 0; i < l.readQueuesCount; i++ {
+		key.FastIndex = i
+		endpoint, policy := l.policyTable.LookupAllByKey(&key)
+		info = append(info, fmt.Sprintf("GoRoutine-%d: EndPoint: {Src: %+v Dst: %+v} Policy: %+v", i, endpoint.SrcInfo, endpoint.DstInfo, policy))
+	}
 	encoder := gob.NewEncoder(&buffer)
-	if err := encoder.Encode(info); err != nil {
+	if err := encoder.Encode(strings.Join(info, "\n\t")); err != nil {
 		log.Errorf("encoder.Encode: %s", err)
 		dropletctl.SendToDropletCtl(conn, port, 1, nil)
 		return
@@ -355,13 +367,6 @@ func newLookupKey(cmdLine string) *datatype.LookupKey {
 				fmt.Printf("unknown tap type from: %s\n", cmdLine)
 				return nil
 			}
-		case "inport":
-			inport, err := parseUint(parts[1])
-			if err != nil {
-				fmt.Printf("%s: %v\n", cmdLine, err)
-				return nil
-			}
-			key.RxInterface = inport
 		case "smac":
 			mac, err := net.ParseMAC(parts[1])
 			if err != nil {

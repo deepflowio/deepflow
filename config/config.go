@@ -47,7 +47,8 @@ type QueueConfig struct {
 }
 
 type LabelerConfig struct {
-	MapSizeLimit uint32 `yaml:"map-size-limit"`
+	FastPathDisable bool   `yaml:"fast-path-disable"`
+	MapSizeLimit    uint32 `yaml:"map-size-limit"`
 }
 
 type FlowGeneratorConfig struct {
