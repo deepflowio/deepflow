@@ -19,6 +19,7 @@ const (
 	TAP_SPINE
 	TAP_TOR
 	TAP_MAX
+	TAP_MIN TapType = TAP_ANY + 1
 )
 
 type EndpointInfo struct {
@@ -46,7 +47,6 @@ type LookupKey struct {
 	Vlan                     uint16
 	Proto                    uint8
 	Ttl                      uint8
-	RxInterface              uint32
 	L2End0, L2End1           bool
 	Tap                      TapType
 	Invalid                  bool

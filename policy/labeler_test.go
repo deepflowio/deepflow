@@ -29,7 +29,7 @@ func CheckPolicyResult(basicPolicy *PolicyData, targetPolicy *PolicyData) bool {
 
 func TestGetPlatformData(t *testing.T) {
 
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 
 	srcIp := NewIPFromString("192.168.2.12")
 	dstIp := NewIPFromString("192.168.0.11")
@@ -104,7 +104,7 @@ func TestGetPlatformData(t *testing.T) {
 	datas = append(datas, &vifData)
 	datas = append(datas, &vifData1)
 	policy.UpdateInterfaceData(datas)
-	result, _ := policy.LookupAllByKey(key, 0)
+	result, _ := policy.LookupAllByKey(key)
 	if result != nil {
 		t.Log(result.SrcInfo, "\n")
 		t.Log(result.DstInfo, "\n")
@@ -112,7 +112,7 @@ func TestGetPlatformData(t *testing.T) {
 }
 
 func TestGetPlatformDataAboutArp(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 
 	srcIp := NewIPFromString("192.168.2.12")
 	dstIp := NewIPFromString("192.168.0.11")
@@ -157,19 +157,19 @@ func TestGetPlatformDataAboutArp(t *testing.T) {
 	datas = append(datas, &vifData)
 	policy.UpdateInterfaceData(datas)
 	now := time.Now()
-	result, _ := policy.LookupAllByKey(key, 0)
+	result, _ := policy.LookupAllByKey(key)
 	t.Log(time.Now().Sub(now))
 	if result != nil {
 		t.Log(result.SrcInfo, "\n")
 		t.Log(result.DstInfo, "\n")
 	}
 	now = time.Now()
-	result, _ = policy.LookupAllByKey(key, 0)
+	result, _ = policy.LookupAllByKey(key)
 	t.Log(time.Now().Sub(now))
 }
 
 func TestGetGroupData(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 
 	srcIp := NewIPFromString("192.168.0.11")
 	dstIp := NewIPFromString("192.168.0.12")
@@ -227,14 +227,14 @@ func TestGetGroupData(t *testing.T) {
 	policy.UpdateIpGroupData(ipGroups)
 
 	now := time.Now()
-	result, _ := policy.LookupAllByKey(key, 0)
+	result, _ := policy.LookupAllByKey(key)
 	t.Log(time.Now().Sub(now))
 	if result != nil {
 		t.Log(result.SrcInfo, "\n")
 		t.Log(result.DstInfo, "\n")
 	}
 	now = time.Now()
-	result, _ = policy.LookupAllByKey(key, 0)
+	result, _ = policy.LookupAllByKey(key)
 	t.Log(time.Now().Sub(now))
 }
 
@@ -289,7 +289,7 @@ func generateIpgroupData(policy *PolicyTable) {
 
 //测试全局Pass策略匹配direction==3
 func TestAllPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -319,7 +319,7 @@ func TestAllPassPolicy(t *testing.T) {
 		Ttl:     64,
 		Tap:     TAP_TOR,
 	}
-	_, policyData := policy.LookupAllByKey(key, 0)
+	_, policyData := policy.LookupAllByKey(key)
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{forward, backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -331,7 +331,7 @@ func TestAllPassPolicy(t *testing.T) {
 
 //测试资源组forward策略匹配 direction==1
 func TestGroupForwardPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -362,7 +362,7 @@ func TestGroupForwardPassPolicy(t *testing.T) {
 		Ttl:     64,
 		Tap:     TAP_TOR,
 	}
-	_, policyData := policy.LookupAllByKey(key, 0)
+	_, policyData := policy.LookupAllByKey(key)
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{forward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -374,7 +374,7 @@ func TestGroupForwardPassPolicy(t *testing.T) {
 
 //测试资源组backward策略匹配 direction==2
 func TestGroupBackwardPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -405,7 +405,7 @@ func TestGroupBackwardPassPolicy(t *testing.T) {
 		Ttl:     64,
 		Tap:     TAP_TOR,
 	}
-	_, policyData := policy.LookupAllByKey(key, 0)
+	_, policyData := policy.LookupAllByKey(key)
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -417,7 +417,7 @@ func TestGroupBackwardPassPolicy(t *testing.T) {
 
 //测试Port策略匹配 acl配置port=0，查询SrcPort=30，DstPort=30，查询到ACl
 func TestAllPortPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -450,7 +450,7 @@ func TestAllPortPassPolicy(t *testing.T) {
 		Ttl:     64,
 		Tap:     TAP_TOR,
 	}
-	_, policyData := policy.LookupAllByKey(key, 0)
+	_, policyData := policy.LookupAllByKey(key)
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{forward, backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -462,7 +462,7 @@ func TestAllPortPassPolicy(t *testing.T) {
 
 //测试Port策略匹配 acl配置port=30，查询Srcport=30，查到acl的direction=2
 func TestSrcPortPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -494,7 +494,7 @@ func TestSrcPortPassPolicy(t *testing.T) {
 		Ttl:     64,
 		Tap:     TAP_TOR,
 	}
-	_, policyData := policy.LookupAllByKey(key, 0)
+	_, policyData := policy.LookupAllByKey(key)
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -506,7 +506,7 @@ func TestSrcPortPassPolicy(t *testing.T) {
 
 //测试Port策略匹配 acl配置port=30，查询Dstport=30，查到acl的direction=1
 func TestDstPortPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -538,7 +538,7 @@ func TestDstPortPassPolicy(t *testing.T) {
 		Ttl:     64,
 		Tap:     TAP_TOR,
 	}
-	_, policyData := policy.LookupAllByKey(key, 0)
+	_, policyData := policy.LookupAllByKey(key)
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{forward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -550,7 +550,7 @@ func TestDstPortPassPolicy(t *testing.T) {
 
 //测试Port策略匹配 acl配置port=30，查询SrcPort=30, Dstport=30，查到acl的direction=3
 func TestSrcDstPortPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -583,7 +583,7 @@ func TestSrcDstPortPassPolicy(t *testing.T) {
 		Ttl:     64,
 		Tap:     TAP_TOR,
 	}
-	_, policyData := policy.LookupAllByKey(key, 0)
+	_, policyData := policy.LookupAllByKey(key)
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{forward, backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -595,7 +595,7 @@ func TestSrcDstPortPassPolicy(t *testing.T) {
 
 //测试Vlan策略匹配 acl配置Vlan=30，查询Vlan=30, 查询到Acl
 func TestVlanPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -628,7 +628,7 @@ func TestVlanPassPolicy(t *testing.T) {
 		Ttl:     64,
 		Tap:     TAP_TOR,
 	}
-	_, policyData := policy.LookupAllByKey(key, 0)
+	_, policyData := policy.LookupAllByKey(key)
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{forward, backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -640,7 +640,7 @@ func TestVlanPassPolicy(t *testing.T) {
 
 //测试Vlan策略匹配 acl配置Vlan=0，Port=8000,查询Vlan=30,Port=8000 查询到Acl
 func TestVlanPortPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -673,7 +673,7 @@ func TestVlanPortPassPolicy(t *testing.T) {
 		Ttl:     64,
 		Tap:     TAP_TOR,
 	}
-	_, policyData := policy.LookupAllByKey(key, 0)
+	_, policyData := policy.LookupAllByKey(key)
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -685,7 +685,7 @@ func TestVlanPortPassPolicy(t *testing.T) {
 
 //测试Vlan策略匹配 acl配置Proto=6，Port=8000,查询Proto=6,Port=8000 查询到Acl
 func TestPortProtoPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -719,7 +719,7 @@ func TestPortProtoPassPolicy(t *testing.T) {
 		Proto:   6,
 		Tap:     TAP_TOR,
 	}
-	_, policyData := policy.LookupAllByKey(key, 0)
+	_, policyData := policy.LookupAllByKey(key)
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{forward, backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -731,7 +731,7 @@ func TestPortProtoPassPolicy(t *testing.T) {
 
 //测试两条acl proto为6和17 查询proto=6的acl,proto为6的匹配成功
 func TestAclsPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -778,7 +778,7 @@ func TestAclsPassPolicy(t *testing.T) {
 		Proto:   6,
 		Tap:     TAP_TOR,
 	}
-	_, policyData := policy.LookupAllByKey(key, 0)
+	_, policyData := policy.LookupAllByKey(key)
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{forward, backward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -790,7 +790,7 @@ func TestAclsPassPolicy(t *testing.T) {
 
 //测试两条acl vlan为10和0  查询vlan=10的策略，结果两条都能匹配
 func TestVlanAclsPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -837,7 +837,7 @@ func TestVlanAclsPassPolicy(t *testing.T) {
 		Proto:   6,
 		Tap:     TAP_TOR,
 	}
-	_, policyData := policy.LookupAllByKey(key, 0)
+	_, policyData := policy.LookupAllByKey(key)
 
 	aclAction2 = aclAction2.SetDirections(FORWARD)
 	aclAction2Backward := aclAction2
@@ -854,7 +854,7 @@ func TestVlanAclsPassPolicy(t *testing.T) {
 
 //测试两条acl vlan=10和port=8000  查询vlan=10,port=1000，匹配到vlan=10的策略
 func TestVlanPortAclsPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -901,7 +901,7 @@ func TestVlanPortAclsPassPolicy(t *testing.T) {
 		Tap:     TAP_TOR,
 	}
 	backward := getBackwardAcl(aclAction2)
-	_, policyData := policy.LookupAllByKey(key, 0)
+	_, policyData := policy.LookupAllByKey(key)
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{aclAction2, backward}, 20)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -913,7 +913,7 @@ func TestVlanPortAclsPassPolicy(t *testing.T) {
 
 //测试两条acl vlan=10和port=8000  查询vlan=10,port=8000，两条策略都匹配到
 func TestVlanPortAclsPassPolicy1(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -959,7 +959,7 @@ func TestVlanPortAclsPassPolicy1(t *testing.T) {
 		Proto:   6,
 		Tap:     TAP_TOR,
 	}
-	_, policyData := policy.LookupAllByKey(key, 0)
+	_, policyData := policy.LookupAllByKey(key)
 	acl2Backward := getBackwardAcl(aclAction2)
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{aclAction2, acl2Backward, forward}, 20)
@@ -972,7 +972,7 @@ func TestVlanPortAclsPassPolicy1(t *testing.T) {
 
 //测试两条acl vlan=10和port=8000  查询port=8000，匹配到port=8000的策略
 func TestVlanPortAclsPassPolicy2(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	srcGroups := make(map[uint32]uint32)
@@ -1017,7 +1017,7 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 		Proto:   6,
 		Tap:     TAP_TOR,
 	}
-	_, policyData := policy.LookupAllByKey(key, 0)
+	_, policyData := policy.LookupAllByKey(key)
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{forward}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -1075,7 +1075,7 @@ func generatePlatformDataWithGroupId(epcId int32, groupId uint32, mac uint64) *P
 }
 
 func generatePolicyTable() *PolicyTable {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024)
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 
 	datas := make([]*PlatformData, 0, 2)
 
@@ -1160,7 +1160,7 @@ func TestPolicySimple(t *testing.T) {
 	key := generateLookupKey(group1mac, group2mac, 0, group1ip1, group2ip1, 6, 0, 8000)
 
 	// 获取查询first结果
-	_, policyData := table.LookupAllByKey(key, 0)
+	_, policyData := table.LookupAllByKey(key)
 	// 构建预期结果
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{action}, 10)
@@ -1178,7 +1178,7 @@ func TestPolicySimple(t *testing.T) {
 	basicPolicyData = &PolicyData{}
 	basicPolicyData.Merge([]AclAction{backward}, 10)
 	// 查询结果和预期结果比较
-	_, policyData = table.LookupAllByKey(key, 0)
+	_, policyData = table.LookupAllByKey(key)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -1187,7 +1187,7 @@ func TestPolicySimple(t *testing.T) {
 
 	// 构建无效查询key  2:0->1:8000 tcp
 	key = generateLookupKey(group2mac, group1mac, 0, group2ip1, group1ip1, 6, 0, 8000)
-	_, policyData = table.LookupAllByKey(key, 0)
+	_, policyData = table.LookupAllByKey(key)
 	// key不匹配，返回无效policy
 	if !CheckPolicyResult(INVALID_POLICY_DATA, policyData) {
 		t.Error("PortProto Check Failed")
@@ -1204,7 +1204,7 @@ func TestPolicySimple(t *testing.T) {
 	basicPolicyData.Merge([]AclAction{action, action2}, 10)
 	key = generateLookupKey(group1mac, group2mac, 0, group1ip1, group2ip1, 6, 0, 8000)
 
-	_, policyData = table.LookupAllByKey(key, 0)
+	_, policyData = table.LookupAllByKey(key)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -1225,7 +1225,7 @@ func TestPolicyEpcPolicy(t *testing.T) {
 	key := generateLookupKey(group1mac, group1mac2, 0, group1ip1, group1ip3, 6, 0, 8000)
 
 	// 获取查询first结果
-	_, policyData := table.LookupAllByKey(key, 0)
+	_, policyData := table.LookupAllByKey(key)
 	// 构建预期结果
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{action}, 10)
@@ -1265,7 +1265,7 @@ func TestPolicyEpcPolicy(t *testing.T) {
 		t.Log("Expect:", INVALID_POLICY_DATA, "\n")
 	}
 
-	_, policyData = table.LookupAllByKey(key, 0)
+	_, policyData = table.LookupAllByKey(key)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(INVALID_POLICY_DATA, policyData) {
 		t.Error("TestPolicyEpcPolicy Check Failed")
@@ -1282,7 +1282,7 @@ func TestFlowVlanAcls(t *testing.T) {
 	table.UpdateAclData(acls)
 	// 构建查询key  1->2 tcp vlan:10
 	key := generateLookupKey(group1mac, group2mac, 10, group1ip1, group2ip1, 6, 11, 10)
-	_, policyData := table.LookupAllByKey(key, 0)
+	_, policyData := table.LookupAllByKey(key)
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{action}, 10)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -1305,7 +1305,7 @@ func TestFlowVlanAcls(t *testing.T) {
 
 	// key不匹配，返回无效policy
 	key = generateLookupKey(group2mac, group1mac, 11, group2ip1, group1ip1, 6, 11, 10)
-	_, policyData3 := table.LookupAllByKey(key, 0)
+	_, policyData3 := table.LookupAllByKey(key)
 	if !CheckPolicyResult(INVALID_POLICY_DATA, policyData3) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData3, "\n")
@@ -1327,7 +1327,7 @@ func TestVlanPortAcl(t *testing.T) {
 	table.UpdateAclData(acls)
 	// 构建查询key  1:21->2:20 tcp vlan:10 ,匹配两条acl
 	key := generateLookupKey(group1mac, group2mac, 10, group1ip1, group2ip1, 6, 21, 20)
-	_, policyData := table.LookupAllByKey(key, 0)
+	_, policyData := table.LookupAllByKey(key)
 	backward := getBackwardAcl(action2)
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{action, backward}, 10)
@@ -1357,7 +1357,7 @@ func TestVlanPortAcl2(t *testing.T) {
 	// 构建查询1-key  1:10->2:10 proto:6 vlan:10
 	key := generateLookupKey(group1mac, group2mac, 10, group1ip1, group2ip1, 6, 10, 10)
 	// 获取first查询结果
-	_, policyData := table.LookupAllByKey(key, 0)
+	_, policyData := table.LookupAllByKey(key)
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{action1, action2}, 11)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -1375,7 +1375,7 @@ func TestVlanPortAcl2(t *testing.T) {
 	// 2-key: 1:10 -> 2:80 proto:1 vlan:10
 	key = generateLookupKey(group1mac, group2mac, 10, group1ip1, group2ip1, 1, 10, 80)
 	// 获取first查询结果
-	_, policyData = table.LookupAllByKey(key, 0)
+	_, policyData = table.LookupAllByKey(key)
 	basicPolicyData = &PolicyData{}
 	basicPolicyData.Merge([]AclAction{action1, action3}, 11)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -1393,7 +1393,7 @@ func TestVlanPortAcl2(t *testing.T) {
 	// 3-key: 1:10 -> 2:80 proto:6 vlan:0
 	key = generateLookupKey(group1mac, group2mac, 0, group1ip1, group2ip1, 6, 10, 80)
 	// 获取first查询结果
-	_, policyData = table.LookupAllByKey(key, 0)
+	_, policyData = table.LookupAllByKey(key)
 	basicPolicyData = &PolicyData{}
 	basicPolicyData.Merge([]AclAction{action2, action3}, 12)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -1423,7 +1423,7 @@ func TestVlanPortAcl2(t *testing.T) {
 	// 4-key  1:10->2:80 proto:6
 	key = generateLookupKey(group1mac, group2mac, 0, group1ip1, group2ip1, 6, 10, 80)
 	// 获取first查询结果
-	_, policyData = table.LookupAllByKey(key, 0)
+	_, policyData = table.LookupAllByKey(key)
 	backward1 := getBackwardAcl(action4)
 	basicPolicyData = &PolicyData{}
 	basicPolicyData.Merge([]AclAction{action5, action4}, 15)
@@ -1442,7 +1442,7 @@ func TestVlanPortAcl2(t *testing.T) {
 	// 5-key 2:80->1:10 proto:6
 	key = generateLookupKey(group2mac, group1mac, 0, group2ip1, group1ip1, 6, 80, 10)
 	// 获取first查询结果
-	_, policyData = table.LookupAllByKey(key, 0)
+	_, policyData = table.LookupAllByKey(key)
 	backward2 := getBackwardAcl(action5)
 	basicPolicyData = &PolicyData{}
 	basicPolicyData.Merge([]AclAction{backward2, backward1}, 15)

@@ -76,7 +76,7 @@ func newIpGroupData(ipGroup *trident.Group) *policy.IpGroupData {
 	}
 }
 
-func Convert2IpGroupdata(response *trident.SyncResponse) []*policy.IpGroupData {
+func Convert2IpGroupData(response *trident.SyncResponse) []*policy.IpGroupData {
 	ipGroups := response.GetPlatformData().GetIpGroups()
 	ipGroupDatas := make([]*policy.IpGroupData, 0, len(ipGroups))
 	for _, group := range ipGroups {
