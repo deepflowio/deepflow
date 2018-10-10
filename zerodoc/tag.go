@@ -362,9 +362,7 @@ func (t *Tag) String() string {
 	buf.WriteString("fields:")
 	buf.WriteString(t.ToKVString())
 	buf.WriteString(" code:")
-	buf.WriteString(fmt.Sprint(t.Code))
-	buf.WriteString(" id:")
-	buf.WriteString(t.id)
+	buf.WriteString(fmt.Sprintf("x%016x", t.Code))
 	return buf.String()
 }
 
