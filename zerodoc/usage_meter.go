@@ -111,8 +111,3 @@ func (m *UsageMeterMax) sequentialMerge(other *UsageMeterMax) {
 	m.MaxBitRx = maxU64(m.MaxBitRx, other.MaxBitRx)
 	m.MaxBit = maxU64(m.MaxBit, other.MaxBit)
 }
-
-func (m *UsageMeter) Duplicate() app.Meter {
-	dup := *m
-	return &dup
-}
