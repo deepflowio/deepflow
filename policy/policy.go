@@ -5,8 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/op/go-logging"
-
+	logging "github.com/op/go-logging"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
@@ -38,7 +37,7 @@ type MacKey uint64         // u64(mac)
 type IpKey uint32          // u32(ip)
 type EpcIpKey uint64       // u32(epc_id) . u32(ip)
 type MacIpKey uint64       // u64(mac) . u32(ip)
-type MacIpInportKey uint64 // u64(mac) . u32(ip) . u32(RxInterface)
+type MacIpInportKey uint64 // u64(mac) . u32(ip) . u32(Tap)
 type ServiceKey uint64     // u20(group_id) . u8(proto) . u16(port)
 type PolicyKey uint64      // u20(group_id) . u20(service_id) . u12(vlan_id)
 
@@ -89,7 +88,7 @@ func getAvailableMapSize(queueCount int, mapSize uint32) uint32 {
 	return availableMapSize
 }
 
-func NewPolicyTable(actionFlags ActionFlag, queueCount int, mapSize uint32) *PolicyTable { // 传入Protobuf结构体指针
+func NewPolicyTable(actionFlags ActionFlag, queueCount int, mapSize uint32, fastPathDisable bool) *PolicyTable { // 传入Protobuf结构体指针
 	// 使用actionFlags过滤，例如
 	// Trident仅关心PACKET_RAW_BROKERING和PACKET_CAPTURING，
 	// 那么就不要将EPC等云平台信息进行计算。
@@ -97,9 +96,9 @@ func NewPolicyTable(actionFlags ActionFlag, queueCount int, mapSize uint32) *Pol
 	availableMapSize := getAvailableMapSize(queueCount, mapSize)
 	policyTable := &PolicyTable{
 		cloudPlatformData: NewCloudPlatformData(queueCount, availableMapSize),
-		policyLabel:       NewPolicyLabel(queueCount, availableMapSize),
+		policyLabel:       NewPolicyLabel(queueCount, availableMapSize, fastPathDisable),
+		queueCount:        queueCount,
 	}
-	policyTable.queueCount = queueCount
 	return policyTable
 }
 
@@ -147,14 +146,16 @@ func (t *PolicyTable) GetCounter() interface{} {
 	}
 
 	for i := 0; i < t.queueCount; i++ {
-		counter.FastPath += uint32(t.policyLabel.FastPolicyMaps[i].Len())
+		for j := TAP_MIN; j < TAP_MAX; j++ {
+			counter.FastPath += uint32(t.policyLabel.FastPolicyMaps[i][j].Len())
+		}
 	}
 
 	counter.FastHit = atomic.SwapUint64(&t.policyLabel.FastPathHitTick, 0)
 	counter.FirstHit = atomic.SwapUint64(&t.policyLabel.FirstPathHitTick, 0)
 
 	counter.Acl += uint32(len(t.policyLabel.RawAcls))
-	for i := TAP_ANY; i < TAP_MAX; i++ {
+	for i := TAP_MIN; i < TAP_MAX; i++ {
 		counter.ArpTable += uint32(len(t.cloudPlatformData.arpTable[i].arpMap))
 	}
 	counter.AclHitMax = atomic.SwapUint64(&t.policyLabel.AclHitMax, 0)
@@ -175,19 +176,18 @@ func (t *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *PolicyData {
 }
 
 // Droplet用于*_COUNTING、PACKET_RAW_BROKERING、PACKET_CAPTURING
-func (t *PolicyTable) LookupAllByKey(key *LookupKey, index int) (*EndpointData, *PolicyData) {
+func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData) {
 	if !key.Tap.CheckTapType(key.Tap) {
 		return INVALID_ENDPOINT_DATA, INVALID_POLICY_DATA
 	}
 
 	endpoint, policy := t.policyLabel.GetPolicyByFastPath(key)
 	if endpoint == nil {
-		endpoint, _ := t.cloudPlatformData.GetEndpointData(key)
+		endpoint = t.cloudPlatformData.GetEndpointData(key)
 		if key.Tap == TAP_TOR {
 			endpoint.SetL2End(key)
 		}
 		policy = t.policyLabel.GetPolicyByFirstPath(endpoint, key)
-		return endpoint, policy
 	}
 	return endpoint, policy
 }
@@ -204,6 +204,10 @@ func (t *PolicyTable) UpdateIpGroupData(data []*IpGroupData) {
 
 func (t *PolicyTable) UpdateAclData(data []*Acl) {
 	t.policyLabel.UpdateAcls(data)
+}
+
+func (t *PolicyTable) EnableAclData() {
+	t.policyLabel.FlushAcls()
 }
 
 func (t *PolicyTable) GetEndpointInfo(mac uint64, ip uint32, inPort uint32) *EndpointInfo {
