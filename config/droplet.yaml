@@ -31,6 +31,8 @@ queue:
   flow-app-queue-count: 2
 # internal labeler conf
 labeler:
+  # whether to use first-path processing only
+  fast-path-disable: false
   # size of policy fast-path map, and
   # map-size-limit >= filter-queue-count*1024
   # map-size-limit <= filter-queue-count*1048576

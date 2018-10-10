@@ -106,11 +106,9 @@ func Start(configPath string) {
 	flowGeneratorQueues := manager.NewQueues("2-meta-packet-to-flow-generator", queueSize, flowGeneratorQueueCount, labelerQueueCount)
 	meteringAppQueues := manager.NewQueues("2-meta-packet-to-metering-app", queueSize, meteringAppQueueCount, labelerQueueCount)
 
-	labelerManager := labeler.NewLabelerManager(labelerQueues, labelerQueueCount, cfg.Labeler.MapSizeLimit)
+	labelerManager := labeler.NewLabelerManager(labelerQueues, labelerQueueCount, cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable)
 	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_FLOW, flowGeneratorQueues)
 	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_METERING, meteringAppQueues)
-	labelerManager.Start()
-
 	synchronizer.Register(func(response *trident.SyncResponse) {
 		log.Debug(response)
 		// Capture更新RemoteSegments
@@ -130,6 +128,7 @@ func Start(configPath string) {
 		// Labeler更新策略信息
 		labelerManager.OnAclDataChange(response)
 	})
+	labelerManager.Start()
 
 	// L3 - flow generator & metering marshaller
 	docsInBuffer := int(cfg.MapReduce.DocsInBuffer)
