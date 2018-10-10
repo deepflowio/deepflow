@@ -105,8 +105,3 @@ func (m *TypeMeter) ToKVString() string {
 
 	return buf.String()
 }
-
-func (m *TypeMeter) Duplicate() app.Meter {
-	dup := *m
-	return &dup
-}

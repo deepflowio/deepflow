@@ -46,8 +46,3 @@ func (m *ConsoleLogMeter) ToKVString() string {
 	buf.WriteRune('i')
 	return buf.String()
 }
-
-func (m *ConsoleLogMeter) Duplicate() app.Meter {
-	dup := *m
-	return &dup
-}

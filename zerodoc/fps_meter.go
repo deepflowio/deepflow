@@ -56,8 +56,3 @@ func (m *FPSMeter) ToKVString() string {
 
 	return buf.String()
 }
-
-func (m *FPSMeter) Duplicate() app.Meter {
-	dup := *m
-	return &dup
-}

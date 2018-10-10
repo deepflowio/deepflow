@@ -40,8 +40,3 @@ func (m *PlatformMeter) ToKVString() string {
 	buf.WriteRune('i')
 	return buf.String()
 }
-
-func (m *PlatformMeter) Duplicate() app.Meter {
-	dup := *m
-	return &dup
-}
