@@ -2,9 +2,7 @@ package flowgenerator
 
 import (
 	"math/rand"
-	"runtime"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/google/gopacket/layers"
@@ -425,6 +423,9 @@ func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uin
 			flowExtra.setCurFlowInfo(now, forceReportInterval)
 			flowExtra.calcCloseType(false)
 			flowOutQueue.Put(flowExtra.taggedFlow)
+			if flowExtra.metaFlowPerf != nil {
+				f.ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
+			}
 			e = e.Next()
 		}
 		flowCache.flowList.Init()
@@ -471,6 +472,9 @@ loop:
 				}
 				flowExtra.calcCloseType(false)
 				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
+				if flowExtra.metaFlowPerf != nil {
+					f.ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
+				}
 				flowExtra.reset()
 				flowOutBuffer[flowOutNum] = taggedFlow
 				flowOutNum++
@@ -601,47 +605,4 @@ func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, cfg
 	RegisterCountable(FP_NAME, &flowGenerator.perfCounter, tags)
 	log.Infof("flow generator %d created", index)
 	return flowGenerator
-}
-
-func (f *FlowGenerator) initMetaFlowPerfPool() {
-	gc := func(b *MetaFlowPerfBlock) {
-		*b = MetaFlowPerfBlock{}
-		f.metaFlowPerfPool.Put(b)
-	}
-
-	newBlock := func() interface{} {
-		block := new(MetaFlowPerfBlock)
-		runtime.SetFinalizer(block, gc)
-		return block
-	}
-
-	f.metaFlowPerfPool = sync.Pool{New: newBlock}
-	f.metaFlowPerfBlock = f.metaFlowPerfPool.Get().(*MetaFlowPerfBlock)
-}
-
-func (f *FlowGenerator) getMetaFlowPerfFromPool() *MetaFlowPerf {
-	perf := &f.metaFlowPerfBlock[f.flowPerfBlockCursor]
-	perf.resetMetaFlowPerf()
-
-	f.flowPerfBlockCursor++
-	if f.flowPerfBlockCursor >= len(*f.metaFlowPerfBlock) {
-		f.metaFlowPerfBlock = f.metaFlowPerfPool.Get().(*MetaFlowPerfBlock)
-		f.flowPerfBlockCursor = 0
-	}
-
-	return perf
-}
-
-func (f *FlowGenerator) checkIfDoFlowPerf(flowExtra *FlowExtra) bool {
-	if flowExtra.taggedFlow.PolicyData == nil {
-		return false
-	}
-	if flowExtra.taggedFlow.PolicyData.ActionFlags&(ACTION_TCP_FLOW_PERF_COUNTING|ACTION_TCP_FLOW_PERF_COUNT_BROKERING|ACTION_FLOW_STORING) > 0 {
-		if flowExtra.metaFlowPerf == nil {
-			flowExtra.metaFlowPerf = f.getMetaFlowPerfFromPool()
-		}
-		return true
-	}
-
-	return false
 }
