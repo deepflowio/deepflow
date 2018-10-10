@@ -33,7 +33,7 @@ type Document struct {
 }
 
 func (d Document) String() string {
-	return fmt.Sprintf("\n{\n\ttimestamp: %d\n\ttag: %s\n\tmeter: %#v\n}\n", d.Timestamp, d.Tag.String(), d.Meter)
+	return fmt.Sprintf("\n{\n\ttimestamp: %d\n\ttag: %s\n\tmeter: %#v\n}\n", d.Timestamp, d.Tag, d.Meter)
 }
 
 var poolDocument sync.Pool = sync.Pool{
