@@ -21,8 +21,9 @@ func TestZeroDocumentSender(t *testing.T) {
 	inputQueue1 := queue.NewOverwriteQueue("", 1024)
 	inputQueue2 := queue.NewOverwriteQueue("", 1024)
 	NewZeroDocumentSenderBuilder().AddQueue(inputQueue1, inputQueue2).AddZero("127.0.0.1", 20001).AddZero("127.0.0.1", 20002).Build().Start(1024)
-	inputQueue1.Put(TEST_DATA[0])
-	inputQueue2.Put(TEST_DATA[1])
+	testData := dupTestData()
+	inputQueue1.Put(testData[0])
+	inputQueue2.Put(testData[1])
 
 	chan1 := make(chan *utils.ByteBuffer)
 	chan2 := make(chan *utils.ByteBuffer)

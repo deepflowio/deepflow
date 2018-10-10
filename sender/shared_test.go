@@ -56,8 +56,6 @@ func init() {
 		VTAP:       binary.BigEndian.Uint32([]byte{100, 100, 100, 233}),
 		TAPType:    dt.ToR,
 	}
-	tag1 := f.NewTag(dt.IP | dt.L2EpcID | dt.L3EpcID)
-	tag2 := f.NewTag(dt.L3Device | dt.MAC | dt.L3EpcID)
 	meter := &dt.UsageMeter{
 		UsageMeterSum: dt.UsageMeterSum{
 			SumPacketTx: 1,
@@ -76,8 +74,30 @@ func init() {
 			MaxBit:      1110,
 		},
 	}
-	TEST_DATA = append(TEST_DATA, &app.Document{Timestamp: 0x12345678, Tag: tag1, Meter: meter})
-	TEST_DATA = append(TEST_DATA, &app.Document{Timestamp: 0x87654321, Tag: tag2, Meter: meter})
+	doc1 := app.AcquireDocument()
+	doc1.Timestamp = 0x12345678
+	doc1.Tag = f.NewTag(dt.IP | dt.L2EpcID | dt.L3EpcID)
+	doc1.Meter = meter.Clone()
+	TEST_DATA = append(TEST_DATA, doc1)
+	doc2 := app.AcquireDocument()
+	doc2.Timestamp = 0x87654321
+	doc2.Tag = f.NewTag(dt.L3Device | dt.MAC | dt.L3EpcID)
+	doc2.Meter = meter.Clone()
+	TEST_DATA = append(TEST_DATA, doc2)
+}
+
+func dupTestData() []interface{} {
+	testData := make([]interface{}, 0, len(TEST_DATA))
+	for _, ref := range TEST_DATA {
+		doc := ref.(*app.Document)
+		newDoc := app.AcquireDocument()
+		newDoc.Timestamp = doc.Timestamp
+		newDoc.Tag = dt.CloneTag(doc.Tag.(*dt.Tag))
+		newDoc.Meter = doc.Meter.Clone()
+		newDoc.ActionFlags = doc.ActionFlags
+		testData = append(testData, newDoc)
+	}
+	return testData
 }
 
 func receiverRoutine(nData, port int, ch chan *utils.ByteBuffer) {

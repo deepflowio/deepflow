@@ -29,7 +29,7 @@ func TestMarshaller(t *testing.T) {
 	}
 	go NewZeroDocumentMarshaller(inputQueue, outputWriters...).Start()
 
-	inputQueue.Put(TEST_DATA...)
+	inputQueue.Put(dupTestData()...)
 	for _, q := range outputQueues {
 		bytes := q.Get().(*utils.ByteBuffer)
 		newDoc, _ := messenger.Unmarshal(bytes.Bytes()[len(b):])
