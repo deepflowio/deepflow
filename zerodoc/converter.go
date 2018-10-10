@@ -132,10 +132,9 @@ func TagToPB(t *Tag) *pb.Tag {
 }
 
 func PBToTag(t *pb.Tag) *Tag {
-	tag := &Tag{
-		Field: &Field{},
-		Code:  Code(t.GetCode()),
-	}
+	tag := AcquireTag()
+	tag.Field = AcquireField()
+	tag.Code = Code(t.GetCode())
 
 	if tag.Code&IP != 0 {
 		tag.IP = t.GetIp()
@@ -270,26 +269,25 @@ func UsageMeterToPB(m *UsageMeter) *pb.UsageMeter {
 }
 
 func PBToUsageMeter(m *pb.UsageMeter) *UsageMeter {
+	meter := AcquireUsageMeter()
+
 	sum := m.GetSum()
+	meter.SumPacketTx = sum.GetPacketTx()
+	meter.SumPacketRx = sum.GetPacketRx()
+	meter.SumPacket = sum.GetPacket()
+	meter.SumBitTx = sum.GetBitTx()
+	meter.SumBitRx = sum.GetBitRx()
+	meter.SumBit = sum.GetBit()
+
 	max := m.GetMax()
-	return &UsageMeter{
-		UsageMeterSum: UsageMeterSum{
-			SumPacketTx: sum.GetPacketTx(),
-			SumPacketRx: sum.GetPacketRx(),
-			SumPacket:   sum.GetPacket(),
-			SumBitTx:    sum.GetBitTx(),
-			SumBitRx:    sum.GetBitRx(),
-			SumBit:      sum.GetBit(),
-		},
-		UsageMeterMax: UsageMeterMax{
-			MaxPacketTx: max.GetPacketTx(),
-			MaxPacketRx: max.GetPacketRx(),
-			MaxPacket:   max.GetPacket(),
-			MaxBitTx:    max.GetBitTx(),
-			MaxBitRx:    max.GetBitRx(),
-			MaxBit:      max.GetBit(),
-		},
-	}
+	meter.MaxPacketTx = max.GetPacketTx()
+	meter.MaxPacketRx = max.GetPacketRx()
+	meter.MaxPacket = max.GetPacket()
+	meter.MaxBitTx = max.GetBitTx()
+	meter.MaxBitRx = max.GetBitRx()
+	meter.MaxBit = max.GetBit()
+
+	return meter
 }
 
 func PerfMeterToPB(m *PerfMeter) *pb.PerfMeter {
@@ -304,11 +302,13 @@ func PerfMeterToPB(m *PerfMeter) *pb.PerfMeter {
 }
 
 func PBToPerfMeter(m *pb.PerfMeter) *PerfMeter {
-	return &PerfMeter{
-		PerfMeterSum: *pbToPerfMeterSum(m.GetSum()),
-		PerfMeterMax: *pbToPerfMeterMax(m.GetMax()),
-		PerfMeterMin: *pbToPerfMeterMin(m.GetMin()),
-	}
+	meter := AcquirePerfMeter()
+
+	meter.PerfMeterSum = *pbToPerfMeterSum(m.GetSum())
+	meter.PerfMeterMax = *pbToPerfMeterMax(m.GetMax())
+	meter.PerfMeterMin = *pbToPerfMeterMin(m.GetMin())
+
+	return meter
 }
 
 func PerfMeterSumToPB(m *PerfMeterSum) *pb.PerfStats {
@@ -396,17 +396,19 @@ func GeoMeterToPB(m *GeoMeter) *pb.GeoMeter {
 }
 
 func PBToGeoMeter(m *pb.GeoMeter) *GeoMeter {
-	return &GeoMeter{
-		SumClosedFlowCount:    m.GetSumClosedFlowCount(),
-		SumAbnormalFlowCount:  m.GetSumAbnormalFlowCount(),
-		SumClosedFlowDuration: time.Duration(m.GetSumClosedFlowDurationUs()) * time.Microsecond,
-		SumPacketTx:           m.GetSumPacketTx(),
-		SumPacketRx:           m.GetSumPacketRx(),
-		SumBitTx:              m.GetSumBitTx(),
-		SumBitRx:              m.GetSumBitRx(),
-		SumRTTSyn:             time.Duration(m.GetSumRttSyn()),
-		SumRTTSynFlow:         m.GetSumRttSynFlow(),
-	}
+	meter := AcquireGeoMeter()
+
+	meter.SumClosedFlowCount = m.GetSumClosedFlowCount()
+	meter.SumAbnormalFlowCount = m.GetSumAbnormalFlowCount()
+	meter.SumClosedFlowDuration = time.Duration(m.GetSumClosedFlowDurationUs()) * time.Microsecond
+	meter.SumPacketTx = m.GetSumPacketTx()
+	meter.SumPacketRx = m.GetSumPacketRx()
+	meter.SumBitTx = m.GetSumBitTx()
+	meter.SumBitRx = m.GetSumBitRx()
+	meter.SumRTTSyn = time.Duration(m.GetSumRttSyn())
+	meter.SumRTTSynFlow = m.GetSumRttSynFlow()
+
+	return meter
 }
 
 func FPSMeterToPB(m *FPSMeter) *pb.FpsMeter {
@@ -421,14 +423,16 @@ func FPSMeterToPB(m *FPSMeter) *pb.FpsMeter {
 }
 
 func PBToFPSMeter(m *pb.FpsMeter) *FPSMeter {
-	return &FPSMeter{
-		SumFlowCount:       m.GetSumFlowCount(),
-		SumNewFlowCount:    m.GetSumNewFlowCount(),
-		SumClosedFlowCount: m.GetSumClosedFlowCount(),
+	meter := AcquireFPSMeter()
 
-		MaxFlowCount:    m.GetMaxFlowCount(),
-		MaxNewFlowCount: m.GetMaxNewFlowCount(),
-	}
+	meter.SumFlowCount = m.GetSumFlowCount()
+	meter.SumNewFlowCount = m.GetSumNewFlowCount()
+	meter.SumClosedFlowCount = m.GetSumClosedFlowCount()
+
+	meter.MaxFlowCount = m.GetMaxFlowCount()
+	meter.MaxNewFlowCount = m.GetMaxNewFlowCount()
+
+	return meter
 }
 
 func FlowMeterToPB(m *FlowMeter) *pb.FlowMeter {
@@ -446,17 +450,19 @@ func FlowMeterToPB(m *FlowMeter) *pb.FlowMeter {
 }
 
 func PBToFlowMeter(m *pb.FlowMeter) *FlowMeter {
-	return &FlowMeter{
-		SumFlowCount:       m.GetSumFlowCount(),
-		SumNewFlowCount:    m.GetSumNewFlowCount(),
-		SumClosedFlowCount: m.GetSumClosedFlowCount(),
-		SumPacketTx:        m.GetSumPacketTx(),
-		SumPacketRx:        m.GetSumPacketRx(),
-		SumPacket:          m.GetSumPacket(),
-		SumBitTx:           m.GetSumBitTx(),
-		SumBitRx:           m.GetSumBitRx(),
-		SumBit:             m.GetSumBit(),
-	}
+	meter := AcquireFlowMeter()
+
+	meter.SumFlowCount = m.GetSumFlowCount()
+	meter.SumNewFlowCount = m.GetSumNewFlowCount()
+	meter.SumClosedFlowCount = m.GetSumClosedFlowCount()
+	meter.SumPacketTx = m.GetSumPacketTx()
+	meter.SumPacketRx = m.GetSumPacketRx()
+	meter.SumPacket = m.GetSumPacket()
+	meter.SumBitTx = m.GetSumBitTx()
+	meter.SumBitRx = m.GetSumBitRx()
+	meter.SumBit = m.GetSumBit()
+
+	return meter
 }
 
 func PlatformMeterToPB(m *PlatformMeter) *pb.PlatformMeter {
@@ -468,11 +474,13 @@ func PlatformMeterToPB(m *PlatformMeter) *pb.PlatformMeter {
 }
 
 func PBToPlatformMeter(m *pb.PlatformMeter) *PlatformMeter {
-	return &PlatformMeter{
-		SumClosedFlowCount: m.GetSumClosedFlowCount(),
-		SumPacket:          m.GetSumPacket(),
-		SumBit:             m.GetSumBit(),
-	}
+	meter := AcquirePlatformMeter()
+
+	meter.SumClosedFlowCount = m.GetSumClosedFlowCount()
+	meter.SumPacket = m.GetSumPacket()
+	meter.SumBit = m.GetSumBit()
+
+	return meter
 }
 
 func ConsoleLogMeterToPB(m *ConsoleLogMeter) *pb.ConsoleLogMeter {
@@ -485,12 +493,14 @@ func ConsoleLogMeterToPB(m *ConsoleLogMeter) *pb.ConsoleLogMeter {
 }
 
 func PBToConsoleLogMeter(m *pb.ConsoleLogMeter) *ConsoleLogMeter {
-	return &ConsoleLogMeter{
-		SumPacketTx:           m.GetSumPacketTx(),
-		SumPacketRx:           m.GetSumPacketRx(),
-		SumClosedFlowCount:    m.GetSumClosedFlowCount(),
-		SumClosedFlowDuration: time.Duration(m.GetSumClosedFlowDurationUs()) * time.Microsecond,
-	}
+	meter := AcquireConsoleLogMeter()
+
+	meter.SumPacketTx = m.GetSumPacketTx()
+	meter.SumPacketRx = m.GetSumPacketRx()
+	meter.SumClosedFlowCount = m.GetSumClosedFlowCount()
+	meter.SumClosedFlowDuration = time.Duration(m.GetSumClosedFlowDurationUs()) * time.Microsecond
+
+	return meter
 }
 
 func TypeMeterToPB(m *TypeMeter) *pb.TypeMeter {
@@ -519,26 +529,28 @@ func TypeMeterToPB(m *TypeMeter) *pb.TypeMeter {
 }
 
 func PBToTypeMeter(m *pb.TypeMeter) *TypeMeter {
-	return &TypeMeter{
-		SumCountL0S1S:  m.GetSumCountL_0S1S(),
-		SumCountL1S5S:  m.GetSumCountL_1S5S(),
-		SumCountL5S10S: m.GetSumCountL_5S10S(),
-		SumCountL10S1M: m.GetSumCountL_10S1M(),
-		SumCountL1M1H:  m.GetSumCountL_1M1H(),
-		SumCountL1H:    m.GetSumCountL_1H(),
+	meter := AcquireTypeMeter()
 
-		SumCountE0K10K:   m.GetSumCountE_0K10K(),
-		SumCountE10K100K: m.GetSumCountE_10K100K(),
-		SumCountE100K1M:  m.GetSumCountE_100K1M(),
-		SumCountE1M100M:  m.GetSumCountE_1M100M(),
-		SumCountE100M1G:  m.GetSumCountE_100M1G(),
-		SumCountE1G:      m.GetSumCountE_1G(),
+	meter.SumCountL0S1S = m.GetSumCountL_0S1S()
+	meter.SumCountL1S5S = m.GetSumCountL_1S5S()
+	meter.SumCountL5S10S = m.GetSumCountL_5S10S()
+	meter.SumCountL10S1M = m.GetSumCountL_10S1M()
+	meter.SumCountL1M1H = m.GetSumCountL_1M1H()
+	meter.SumCountL1H = m.GetSumCountL_1H()
 
-		SumCountTClientRst:       m.GetSumCountTCRst(),
-		SumCountTClientHalfOpen:  m.GetSumCountTCHalfOpen(),
-		SumCountTClientHalfClose: m.GetSumCountTCHalfClose(),
-		SumCountTServerRst:       m.GetSumCountTSRst(),
-		SumCountTServerHalfOpen:  m.GetSumCountTSHalfOpen(),
-		SumCountTServerHalfClose: m.GetSumCountTSHalfClose(),
-	}
+	meter.SumCountE0K10K = m.GetSumCountE_0K10K()
+	meter.SumCountE10K100K = m.GetSumCountE_10K100K()
+	meter.SumCountE100K1M = m.GetSumCountE_100K1M()
+	meter.SumCountE1M100M = m.GetSumCountE_1M100M()
+	meter.SumCountE100M1G = m.GetSumCountE_100M1G()
+	meter.SumCountE1G = m.GetSumCountE_1G()
+
+	meter.SumCountTClientRst = m.GetSumCountTCRst()
+	meter.SumCountTClientHalfOpen = m.GetSumCountTCHalfOpen()
+	meter.SumCountTClientHalfClose = m.GetSumCountTCHalfClose()
+	meter.SumCountTServerRst = m.GetSumCountTSRst()
+	meter.SumCountTServerHalfOpen = m.GetSumCountTSHalfOpen()
+	meter.SumCountTServerHalfClose = m.GetSumCountTSHalfClose()
+
+	return meter
 }
