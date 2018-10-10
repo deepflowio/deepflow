@@ -3,6 +3,7 @@ package zerodoc
 import (
 	"strconv"
 	"strings"
+	"sync"
 
 	"fmt"
 
@@ -356,21 +357,6 @@ func (t *Tag) ToKVString() string {
 	return buf.String()
 }
 
-func (f *Field) NewTag(c Code) *Tag {
-	field := &Field{}
-	*field = *f
-	return &Tag{Field: field, Code: c}
-}
-
-func (f *Field) FillTag(c Code, tag *Tag) {
-	if tag.Field == nil {
-		tag.Field = &Field{}
-	}
-	*tag.Field = *f
-	tag.Code = c
-	tag.id = ""
-}
-
 func (t *Tag) String() string {
 	var buf strings.Builder
 	buf.WriteString("fields:")
@@ -540,4 +526,81 @@ func (t *Tag) GetCode() uint64 {
 
 func (t *Tag) HasVariedField() bool {
 	return t.Code&ServerPort != 0
+}
+
+var poolField sync.Pool = sync.Pool{
+	New: func() interface{} {
+		return &Field{}
+	},
+}
+
+func AcquireField() *Field {
+	return poolField.Get().(*Field)
+}
+
+func ReleaseField(field *Field) {
+	if field == nil {
+		return
+	}
+	*field = Field{}
+	poolField.Put(field)
+}
+
+func CloneField(field *Field) *Field {
+	newField := AcquireField()
+	*newField = *field
+	return newField
+}
+
+var poolTag sync.Pool = sync.Pool{
+	New: func() interface{} {
+		return &Tag{}
+	},
+}
+
+func AcquireTag() *Tag {
+	return poolTag.Get().(*Tag)
+}
+
+// ReleaseTag 需要释放Tag拥有的Field
+func ReleaseTag(tag *Tag) {
+	if tag == nil {
+		return
+	}
+	if tag.Field != nil {
+		ReleaseField(tag.Field)
+	}
+	*tag = Tag{}
+	poolTag.Put(tag)
+}
+
+// CloneTag 需要复制Tag拥有的Field
+func CloneTag(tag *Tag) *Tag {
+	newTag := AcquireTag()
+	newTag.Field = CloneField(tag.Field)
+	newTag.Code = tag.Code
+	newTag.id = tag.id
+	return newTag
+}
+
+func (t *Tag) Release() {
+	ReleaseTag(t)
+}
+
+func (f *Field) NewTag(c Code) *Tag {
+	tag := AcquireTag()
+	tag.Field = CloneField(f)
+	tag.Code = c
+	tag.id = ""
+	return tag
+}
+
+func (f *Field) FillTag(c Code, tag *Tag) {
+	if tag.Field == nil {
+		tag.Field = CloneField(f)
+	} else {
+		*tag.Field = *f
+	}
+	tag.Code = c
+	tag.id = ""
 }
