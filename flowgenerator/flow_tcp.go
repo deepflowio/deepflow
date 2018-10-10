@@ -26,6 +26,9 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			}
 			flowExtra.calcCloseType(false)
 			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
+			if flowExtra.metaFlowPerf != nil {
+				f.ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
+			}
 			flowExtra.reset()
 			f.flowOutQueue.Put(taggedFlow)
 			// delete front from this FlowCache because flowExtra is moved to front in keyMatch()
@@ -54,6 +57,9 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			}
 			flowExtra.calcCloseType(false)
 			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
+			if flowExtra.metaFlowPerf != nil {
+				f.ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
+			}
 			flowExtra.reset()
 			f.flowOutQueue.Put(taggedFlow)
 		} else {
