@@ -43,16 +43,12 @@ func (m *ZeroDocumentMarshaller) Start() {
 				bytes := utils.AcquireByteBuffer()
 				if _, err := header.MarshalTo(bytes.Use(header.Size())); err != nil {
 					utils.ReleaseByteBuffer(bytes)
-					if doc.Pool != nil {
-						doc.Pool.Put(doc)
-					}
+					app.ReleaseDocument(doc)
 					log.Warning(err)
 					continue
 				}
 				err := messenger.Marshal(doc, bytes)
-				if doc.Pool != nil {
-					doc.Pool.Put(doc)
-				}
+				app.ReleaseDocument(doc)
 				if err != nil {
 					utils.ReleaseByteBuffer(bytes)
 					log.Warning(err)

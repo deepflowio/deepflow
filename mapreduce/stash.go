@@ -51,9 +51,7 @@ func (s *Stash) Add(docs []*app.Document) []*app.Document {
 			}
 			if docLoc, ok := slotMap[fastID]; ok {
 				s.stash[docLoc].(*app.Document).ConcurrentMerge(doc.Meter)
-				if doc.Pool != nil {
-					doc.Pool.Put(doc)
-				}
+				app.ReleaseDocument(doc)
 				continue
 			}
 
@@ -72,9 +70,7 @@ func (s *Stash) Add(docs []*app.Document) []*app.Document {
 			}
 			if docLoc, ok := slotMap[doc.GetID(s.intBuffer)]; ok {
 				s.stash[docLoc].(*app.Document).ConcurrentMerge(doc.Meter)
-				if doc.Pool != nil {
-					doc.Pool.Put(doc)
-				}
+				app.ReleaseDocument(doc)
 				continue
 			}
 
