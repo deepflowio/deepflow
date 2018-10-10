@@ -74,6 +74,7 @@ func (h *PacketHandler) Handle(timestamp Timestamp, packet RawPacket, size Packe
 
 func (h *PacketHandler) Init(interfaceName string) {
 	h.dedupTable = dedup.NewDedupTable(interfaceName)
+	h.dedupTable.SetOverwriteTTL(true)
 	gc := func(b *MetaPacketBlock) {
 		*b = MetaPacketBlock{} // 重新初始化，避免无效的数据或不可预期的引用
 		h.Put(b)
