@@ -9,6 +9,7 @@ import (
 	"errors"
 	"runtime"
 	"sync"
+	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
@@ -35,19 +36,35 @@ type OverwriteQueue struct {
 	size        uint // power of 2
 	writeCursor uint
 	pending     uint
+	release     func(x interface{})
 
 	counter *Counter
 }
 
-func NewOverwriteQueue(module string, size int) Queue {
+func NewOverwriteQueue(module string, size int, options ...Option) *OverwriteQueue {
 	queue := &OverwriteQueue{}
-	queue.Init(module, size)
+	queue.Init(module, size, options...)
 	return queue
 }
 
-func (q *OverwriteQueue) Init(module string, size int, statOptions ...stats.StatsOption) {
+func (q *OverwriteQueue) Init(module string, size int, options ...Option) {
 	if q.size != 0 {
 		return
+	}
+
+	var flushIndicator time.Duration
+	var statOptions []stats.StatsOption
+	for _, option := range options {
+		switch option.(type) {
+		case OptionRelease:
+			q.release = option.(OptionRelease)
+		case OptionFlushIndicator:
+			flushIndicator = option.(OptionFlushIndicator)
+		case OptionStatsOption: // XXX: interface{}类型，必须放在最后
+			statOptions = append(statOptions, option.(OptionStatsOption))
+		default:
+			continue
+		}
 	}
 
 	for i := 0; i < 32; i++ {
@@ -61,7 +78,15 @@ func (q *OverwriteQueue) Init(module string, size int, statOptions ...stats.Stat
 	q.size = uint(size)
 	q.counter = &Counter{}
 	stats.RegisterCountable(module, q, statOptions...)
-	runtime.SetFinalizer(q, func(q *OverwriteQueue) { q.Release() })
+	runtime.SetFinalizer(q, func(q *OverwriteQueue) { q.Close() })
+
+	if flushIndicator > 0 {
+		go func() {
+			for range time.NewTicker(flushIndicator).C {
+				q.Put(nil)
+			}
+		}()
+	}
 }
 
 func (q *OverwriteQueue) GetCounter() interface{} {
@@ -71,7 +96,7 @@ func (q *OverwriteQueue) GetCounter() interface{} {
 	return counter
 }
 
-func (q *OverwriteQueue) Release() {
+func (q *OverwriteQueue) Close() {
 	stats.DeregisterCountable(q)
 }
 
@@ -84,6 +109,14 @@ func (q *OverwriteQueue) Len() int {
 	return int(q.pending)
 }
 
+func (q *OverwriteQueue) releaseOverwritten(overwritten []interface{}) {
+	if q.release != nil && q.pending == q.size {
+		for _, toRelease := range overwritten {
+			q.release(toRelease)
+		}
+	}
+}
+
 // 放置单个/多个元素
 func (q *OverwriteQueue) Put(items ...interface{}) error {
 	itemSize := uint(len(items))
@@ -93,7 +126,9 @@ func (q *OverwriteQueue) Put(items ...interface{}) error {
 
 	q.Lock()
 	q.counter.In += uint64(itemSize)
+	q.releaseOverwritten(q.items[q.writeCursor:UintMin(q.writeCursor+uint(len(items)), q.size)])
 	if copied := copy(q.items[q.writeCursor:], items); uint(copied) != itemSize {
+		q.releaseOverwritten(q.items[:len(items)-copied])
 		copy(q.items, items[copied:])
 	}
 

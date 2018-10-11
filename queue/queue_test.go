@@ -3,6 +3,7 @@ package queue
 import (
 	"sync"
 	"testing"
+	"time"
 )
 
 func equals(array []interface{}, args ...int) bool {
@@ -111,20 +112,38 @@ func TestQueueMultiThread(t *testing.T) {
 		wg.Done()
 	}()
 	go func() {
-		for len(queue.(*OverwriteQueue).waiting) < 1 {
+		for len(queue.waiting) < 1 {
 		}
 		if item := queue.Get(); item != 10086 {
 			t.Errorf("Expected 10086, actually %s", item)
 		}
 		wg.Done()
 	}()
-	for len(queue.(*OverwriteQueue).waiting) < 2 {
+	for len(queue.waiting) < 2 {
 	}
 	queue.Put(10086, 10087)
 	wg.Wait()
-	if len(queue.(*OverwriteQueue).waiting) != 0 {
+	if len(queue.waiting) != 0 {
 		t.Error("Should be no waiting")
 	}
+}
+
+func TestReleased(t *testing.T) {
+	var released int
+	release := func(x interface{}) {
+		released = x.(int)
+	}
+	queue := NewOverwriteQueue("whatever", 1, release)
+	queue.Put(10010)
+	queue.Put(10086)
+	if released != 10010 {
+		t.Error("Expected 10010")
+	}
+}
+
+func TestFlushIndicator(t *testing.T) {
+	queue := NewOverwriteQueue("whatever", 1, time.Microsecond)
+	queue.Get()
 }
 
 func BenchmarkQueuePut(b *testing.B) {

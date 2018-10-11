@@ -10,9 +10,9 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
-type FixedMultiQueue []Queue
+type FixedMultiQueue []*OverwriteQueue
 
-func (q FixedMultiQueue) entry(key HashKey) Queue {
+func (q FixedMultiQueue) entry(key HashKey) *OverwriteQueue {
 	return q[key&(uint8(len(q)-1))]
 }
 
@@ -36,21 +36,19 @@ func (q FixedMultiQueue) Len(key HashKey) int {
 	return q.entry(key).Len()
 }
 
-/**
- * HashKey只会取部分低比特位，所以使用key时需要确保低位哈希均匀
- * table的大小和queue的数量并不等同，目的是支持hashKey的比特与操作而非除
- * 哈希的最大值可以通过len来获取
- */
-func NewOverwriteQueues(module string, count uint8, queueSize int) FixedMultiQueue {
+// queueSize要求是2的幂以避免求余计算，如果不是2的幂将会隐式转换为2的幂来构造
+// HashKey要求映射到queueSize范围内，否则MultiQueue只会取低比特位
+// queueSize可以通过len来获取
+func NewOverwriteQueues(module string, count uint8, queueSize int, options ...Option) FixedMultiQueue {
 	size := int(count)
-	queues := make([]Queue, size)
+	queues := make([]*OverwriteQueue, size)
 	for i := 0; i < size; i++ {
-		tags := stats.OptionStatTags{"index": strconv.Itoa(i)}
+		opts := append(options, stats.OptionStatTags{"index": strconv.Itoa(i)})
 		queue := new(OverwriteQueue)
-		queue.Init(module, queueSize, tags)
+		queue.Init(module, queueSize, opts...)
 		queues[i] = queue
 	}
-	tableSize := 16 // at least 16 entries
+	tableSize := 1
 	for tableSize < size {
 		tableSize <<= 1
 	}
