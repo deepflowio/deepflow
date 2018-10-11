@@ -58,6 +58,11 @@ func (c Code) HasL2TagField() bool {
 	return c&(MAC|L2EpcID|L2Device|Host|MACPath|L2EpcIDPath|L2DevicePath|HostPath|VLANID|VTAP|SubnetID) != 0
 }
 
+// 取自网包源、目的侧的字段，哪些可能是对称的：即源侧该字段的值等于目的侧
+func (c Code) IsSymmetric() bool {
+	return c&(GroupID|L2EpcID|L3EpcID|Host|GroupIDPath|L2EpcIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|VTAP|TAPType|SubnetID|ACLID|ACLDirection) == c
+}
+
 const (
 	// df_geo的自定义code
 	Country Code = 1 << 63
