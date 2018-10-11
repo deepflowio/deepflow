@@ -24,8 +24,9 @@ type PacketHandler struct {
 	block       *MetaPacketBlock
 	blockCursor int
 
-	ip    datatype.IPv4Int
-	queue queue.MultiQueueWriter
+	ip             datatype.IPv4Int
+	queue          queue.MultiQueueWriter
+	remoteSegments *SegmentSet
 
 	dedupTable *dedup.DedupTable
 }
@@ -68,9 +69,10 @@ func (h *PacketHandler) Handle(timestamp Timestamp, packet RawPacket, size Packe
 	if !metaPacket.Parse(packet[l2Len:]) {
 		return
 	}
+	metaPacket.L2End0 = !h.remoteSegments.Lookup(metaPacket.MacSrc)
+	metaPacket.L2End1 = !h.remoteSegments.Lookup(metaPacket.MacDst)
+
 	h.confirmAlloc()
-	metaPacket.L2End0 = true // FIXME：需要根据RemoteSegments正确设置此值
-	metaPacket.L2End1 = true
 	h.queue.Put(queue.HashKey(metaPacket.GenerateHash()), metaPacket)
 }
 

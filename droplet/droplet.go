@@ -84,8 +84,26 @@ func Start(configPath string) {
 		log.Error(err)
 		return
 	}
+	remoteSegmentSet := capture.NewSegmentSet()
+	synchronizer.Register(func(response *trident.SyncResponse) {
+		rpcRemoteSegments := response.GetRemoteSegments()
+		remoteSegments := make([]net.HardwareAddr, 0, len(rpcRemoteSegments))
+		for _, segment := range rpcRemoteSegments {
+			for _, macString := range segment.GetMac() {
+				mac, err := net.ParseMAC(macString)
+				if err != nil {
+					log.Warning("Invalid mac ", macString)
+					continue
+				}
+				remoteSegments = append(remoteSegments, mac)
+			}
+		}
+		remoteSegmentSet.OnSegmentChange(remoteSegments)
+	})
+
+	launcher := capture.CaptureLauncher{localIp, remoteSegmentSet, labelerQueues}
 	for _, iface := range cfg.TapInterfaces {
-		if _, err := capture.StartCapture(iface, localIp, labelerQueues); err != nil {
+		if _, err := launcher.StartWith(iface); err != nil {
 			log.Error(err)
 			return
 		}

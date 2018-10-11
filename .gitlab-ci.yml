@@ -13,7 +13,6 @@ verify:
   script:
     - make clean vendor
     - go fmt ./...; [[ -z $(git status -s --ignore-submodule) ]] || exit -1
-    - go vet ./...
     - make
     - make test
   only:

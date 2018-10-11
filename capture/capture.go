@@ -37,6 +37,7 @@ type PacketCounter struct {
 type Capture struct {
 	PacketHandler
 
+	ifName  string
 	tPacket *afpacket.TPacket
 
 	counter     *PacketCounter
@@ -86,7 +87,7 @@ func (c *Capture) IsRunning() bool {
 }
 
 func (c *Capture) run() (retErr error) {
-	log.Info("Start capture")
+	log.Info("Start capture on", c.ifName)
 
 	prevTimestamp := time.Duration(0)
 	c.running = true
@@ -153,7 +154,7 @@ func (c *Capture) Start() {
 }
 
 func (c *Capture) Stop(wait bool) error { // TODO: untested
-	log.Info("Stop capture")
+	log.Info("Stop capture on", c.ifName)
 	if c.running {
 		c.issueStop = true
 	}
