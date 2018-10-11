@@ -69,6 +69,8 @@ func (h *PacketHandler) Handle(timestamp Timestamp, packet RawPacket, size Packe
 		return
 	}
 	h.confirmAlloc()
+	metaPacket.L2End0 = true // FIXME：需要根据RemoteSegments正确设置此值
+	metaPacket.L2End1 = true
 	h.queue.Put(queue.HashKey(metaPacket.GenerateHash()), metaPacket)
 }
 
