@@ -52,7 +52,7 @@ func (s *RpcConfigSynchronizer) sync() error {
 	if s.Version == response.GetVersion() {
 		return nil
 	}
-	//handlers没有注册则Version值为0
+	// handlers没有注册则Version值为0
 	if len(s.handlers) == 0 {
 		s.Version = 0
 	} else {

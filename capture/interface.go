@@ -15,12 +15,18 @@ import (
 	"golang.org/x/net/bpf"
 )
 
-func StartCapture(interfaceName string, ip net.IP, outputQueue queue.MultiQueueWriter) (io.Closer, error) {
-	if _, err := net.InterfaceByName(interfaceName); err != nil {
+type CaptureLauncher struct {
+	Ip             net.IP
+	RemoteSegments *SegmentSet
+	OutputQueue    queue.MultiQueueWriter
+}
+
+func (b CaptureLauncher) StartWith(ifName string) (io.Closer, error) {
+	if _, err := net.InterfaceByName(ifName); err != nil {
 		return nil, err
 	}
 	tPacket, err := afpacket.NewTPacket(
-		afpacket.OptInterface(interfaceName),
+		afpacket.OptInterface(ifName),
 		afpacket.OptPollTimeout(100*time.Millisecond),
 		afpacket.OptBlockSize(1*units.MiB),
 		afpacket.OptFrameSize(256),
@@ -48,15 +54,17 @@ func StartCapture(interfaceName string, ip net.IP, outputQueue queue.MultiQueueW
 
 	cap := &Capture{
 		PacketHandler: PacketHandler{
-			ip:    IpToUint32(ip),
-			queue: outputQueue,
+			ip:             IpToUint32(b.Ip),
+			queue:          b.OutputQueue,
+			remoteSegments: b.RemoteSegments,
 		},
+		ifName:  ifName,
 		tPacket: tPacket,
 		counter: &PacketCounter{},
 	}
-	cap.PacketHandler.Init(interfaceName)
+	cap.PacketHandler.Init(ifName)
 	cap.Start()
-	stats.RegisterCountable("capture", cap, stats.OptionStatTags{"interface": interfaceName})
+	stats.RegisterCountable("capture", cap, stats.OptionStatTags{"interface": ifName})
 	instance := io.Closer(cap)
 	runtime.SetFinalizer(instance, func(c io.Closer) { c.Close() })
 	return instance, nil
