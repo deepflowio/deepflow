@@ -486,18 +486,16 @@ func (t *Tag) GetID(buf *utils.IntBuffer) string {
 	return t.id
 }
 
-var FAST_CODES = []Code{
-	TAPType,
-	IP | TAPType,
-	L3EpcID | TAPType,
-	L3EpcID | IP | TAPType,
-	ACLGID | TAPType,
-	ACLGID | IP | TAPType,
-	ACLGID | IP | L3EpcID,
+func isFastCode(code Code) bool {
+	// 认为所有只包含这四个Code子集的Tag能使用FashID
+	return (code & ^(ACLGID | IP | L3EpcID | TAPType)) == 0
 }
 
 // GetFastID 返回uint64的ID，0代表该tag的code不在fast ID的范围内
 func (t *Tag) GetFastID() uint64 {
+	if !isFastCode(t.Code) {
+		return 0
+	}
 	var id uint64
 	// 14b ACLGID + 32b IP + 16b L3EpcID + 2b TAPType
 	//

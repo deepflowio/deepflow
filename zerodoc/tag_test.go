@@ -32,3 +32,13 @@ func TestFillTag(t *testing.T) {
 		t.Error("FillTag处理不正确")
 	}
 }
+
+func TestFastOrNormalID(t *testing.T) {
+	f := Field{L3EpcID: 3, TAPType: ToR, L2EpcID: 2}
+	if f.NewTag(L3EpcID|TAPType).GetFastID() == 0 {
+		t.Error("FastID没有正确设置")
+	}
+	if f.NewTag(L3EpcID|L2EpcID).GetFastID() != 0 {
+		t.Error("非FastID的Tag被设置了")
+	}
+}
