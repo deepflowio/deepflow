@@ -10,14 +10,19 @@ type TaggedFlow struct {
 	Tag
 }
 
-var taggedFlowPool sync.Pool
+var taggedFlowPool = sync.Pool{
+	New: func() interface{} {
+		return new(TaggedFlow)
+	},
+}
 
 func AcquireTaggedFlow() *TaggedFlow {
 	return taggedFlowPool.Get().(*TaggedFlow)
 }
 
-func ReleaseTaggedFlow(x interface{}) {
-	taggedFlowPool.Put(x)
+func ReleaseTaggedFlow(taggedFlow *TaggedFlow) {
+	*taggedFlow = TaggedFlow{}
+	taggedFlowPool.Put(taggedFlow)
 }
 
 func CloneTaggedFlow(taggedFlow *TaggedFlow) *TaggedFlow {
@@ -39,10 +44,4 @@ func CloneTaggedFlowHelper(items []interface{}) []interface{} {
 
 func (f *TaggedFlow) String() string {
 	return fmt.Sprintf("Flow: %s, Tag: %+v", f.Flow.String(), f.Tag)
-}
-
-func init() {
-	taggedFlowPool.New = func() interface{} {
-		return new(TaggedFlow)
-	}
 }
