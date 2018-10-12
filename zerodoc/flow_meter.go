@@ -33,9 +33,9 @@ func (m *FlowMeter) ConcurrentMerge(other app.Meter) {
 	}
 }
 
-func (m *FlowMeter) SequentialMerge(other app.Meter) {
+func (m *FlowMeter) SequentialMerge(other app.Meter) { // other为后一个时间的统计量
 	if pm, ok := other.(*FlowMeter); ok {
-		m.SumFlowCount += pm.SumFlowCount
+		m.SumFlowCount = m.SumClosedFlowCount + pm.SumFlowCount
 		m.SumNewFlowCount += pm.SumNewFlowCount
 		m.SumClosedFlowCount += pm.SumClosedFlowCount
 		m.SumPacketTx += pm.SumPacketTx
