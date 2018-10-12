@@ -9,9 +9,9 @@ type Queue struct {
 	Monitor
 }
 
-func (q *Queue) Init(name string, size int) {
+func (q *Queue) Init(name string, size int, options ...queue.Option) {
 	q.Monitor.init(name)
-	q.OverwriteQueue.Init(name, size)
+	q.OverwriteQueue.Init(name, size, options...)
 }
 
 func (q *Queue) Get() interface{} {
