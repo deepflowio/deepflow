@@ -1,8 +1,6 @@
 package capture
 
 import (
-	"runtime"
-	"sync"
 	"time"
 
 	. "github.com/google/gopacket/layers"
@@ -16,14 +14,7 @@ type Timestamp = time.Duration
 type RawPacket = []byte
 type PacketSize = int
 
-type MetaPacketBlock = [1024]datatype.MetaPacket
-
 type PacketHandler struct {
-	sync.Pool
-
-	block       *MetaPacketBlock
-	blockCursor int
-
 	ip             datatype.IPv4Int
 	queue          queue.MultiQueueWriter
 	remoteSegments *SegmentSet
@@ -31,24 +22,11 @@ type PacketHandler struct {
 	dedupTable *dedup.DedupTable
 }
 
-func (h *PacketHandler) preAlloc() *datatype.MetaPacket {
-	metaPacket := &h.block[h.blockCursor]
-	metaPacket.Exporter = h.ip
-	return metaPacket
-}
-
-func (h *PacketHandler) confirmAlloc() {
-	h.blockCursor++
-	if h.blockCursor >= len(*h.block) {
-		h.block = h.Get().(*MetaPacketBlock)
-		h.blockCursor = 0
-	}
-}
-
 func (h *PacketHandler) Handle(timestamp Timestamp, packet RawPacket, size PacketSize) {
-	metaPacket := h.preAlloc()
+	metaPacket := datatype.AcquireMetaPacket()
 	l2Len := metaPacket.ParseL2(packet)
 	if metaPacket.Invalid {
+		datatype.ReleaseMetaPacket(metaPacket)
 		return
 	}
 	metaPacket.Timestamp = timestamp
@@ -63,30 +41,21 @@ func (h *PacketHandler) Handle(timestamp Timestamp, packet RawPacket, size Packe
 			}
 		}
 		if h.dedupTable.IsDuplicate(packet, timestamp) {
+			datatype.ReleaseMetaPacket(metaPacket)
 			return
 		}
 	}
 	if !metaPacket.Parse(packet[l2Len:]) {
+		datatype.ReleaseMetaPacket(metaPacket)
 		return
 	}
 	metaPacket.L2End0 = !h.remoteSegments.Lookup(metaPacket.MacSrc)
 	metaPacket.L2End1 = !h.remoteSegments.Lookup(metaPacket.MacDst)
 
-	h.confirmAlloc()
 	h.queue.Put(queue.HashKey(metaPacket.GenerateHash()), metaPacket)
 }
 
 func (h *PacketHandler) Init(interfaceName string) {
 	h.dedupTable = dedup.NewDedupTable(interfaceName)
 	h.dedupTable.SetOverwriteTTL(true)
-	gc := func(b *MetaPacketBlock) {
-		*b = MetaPacketBlock{} // 重新初始化，避免无效的数据或不可预期的引用
-		h.Put(b)
-	}
-	h.Pool.New = func() interface{} {
-		block := new(MetaPacketBlock)
-		runtime.SetFinalizer(block, gc)
-		return block
-	}
-	h.block = new(MetaPacketBlock)
 }

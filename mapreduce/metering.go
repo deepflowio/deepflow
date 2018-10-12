@@ -107,11 +107,13 @@ func (f *subMeteringHandler) Process() error {
 			metering := e.(*datatype.MetaPacket)
 			if metering.PolicyData == nil || metering.EndpointData == nil { // shouldn't happen
 				log.Warningf("drop invalid packet with nil PolicyData or EndpointData %v", metering)
+				datatype.ReleaseMetaPacket(metering)
 				continue
 			}
 			now := time.Duration(time.Now().UnixNano())
 			if metering.Timestamp > now+time.Minute {
 				log.Infof("drop invalid packet with a future timestamp (+%s)", metering.Timestamp-now)
+				datatype.ReleaseMetaPacket(metering)
 				// FIXME: add statsd counter, remove log
 				continue
 			}
@@ -126,6 +128,7 @@ func (f *subMeteringHandler) Process() error {
 					f.Flush()
 				}
 			}
+			datatype.ReleaseMetaPacket(metering)
 		}
 	}
 }

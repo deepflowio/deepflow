@@ -5,7 +5,6 @@ import (
 	"encoding/gob"
 	"fmt"
 	"net"
-	"runtime"
 	"sync"
 	"time"
 
@@ -51,16 +50,11 @@ type tridentInstance struct {
 	cacheMap   uint16
 }
 
-type MetaPacketBlock = [1024]datatype.MetaPacket
-
 type TridentAdapter struct {
-	queues         queue.MultiQueueWriter
-	itemKeys       []queue.HashKey
-	itemBatch      []interface{}
-	metaPacketPool sync.Pool
-	udpPool        sync.Pool
-	block          *MetaPacketBlock
-	blockCursor    int
+	queues    queue.MultiQueueWriter
+	itemKeys  []queue.HashKey
+	itemBatch []interface{}
+	udpPool   sync.Pool
 
 	instances map[TridentKey]*tridentInstance
 	counter   *PacketCounter
@@ -80,15 +74,6 @@ func NewTridentAdapter(queues queue.MultiQueueWriter) *TridentAdapter {
 	adapter.itemBatch = make([]interface{}, PACKET_MAX)
 	adapter.instances = make(map[TridentKey]*tridentInstance)
 	adapter.udpPool.New = func() interface{} { return make([]byte, UDP_BUFFER_SIZE) }
-	adapter.metaPacketPool.New = func() interface{} {
-		block := new(MetaPacketBlock)
-		runtime.SetFinalizer(block, func(b *MetaPacketBlock) {
-			*b = MetaPacketBlock{}
-			adapter.metaPacketPool.Put(b)
-		})
-		return block
-	}
-	adapter.block = adapter.metaPacketPool.Get().(*MetaPacketBlock)
 	listener, err := net.ListenUDP("udp4", &net.UDPAddr{Port: LISTEN_PORT})
 	if err != nil {
 		log.Error(err)
@@ -98,16 +83,6 @@ func NewTridentAdapter(queues queue.MultiQueueWriter) *TridentAdapter {
 	stats.RegisterCountable("trident_adapter", adapter)
 	dropletctl.Register(dropletctl.DROPLETCTL_ADAPTER, adapter)
 	return adapter
-}
-
-func (a *TridentAdapter) alloc() *datatype.MetaPacket {
-	metaPacket := &a.block[a.blockCursor]
-	a.blockCursor++
-	if a.blockCursor >= len(a.block) {
-		a.block = a.metaPacketPool.Get().(*MetaPacketBlock)
-		a.blockCursor = 0
-	}
-	return metaPacket
 }
 
 func (a *TridentAdapter) GetCounter() interface{} {
@@ -188,10 +163,11 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) {
 	ifMacSuffix, _ := decoder.DecodeHeader()
 
 	for {
-		meta := a.alloc()
+		meta := datatype.AcquireMetaPacket()
 		meta.InPort = uint32(datatype.PACKET_SOURCE_TOR) | ifMacSuffix
 		meta.Exporter = ip
 		if decoder.NextPacket(meta) {
+			datatype.ReleaseMetaPacket(meta)
 			break
 		}
 

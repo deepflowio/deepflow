@@ -171,14 +171,18 @@ func (l *LabelerManager) run(index int) {
 		itemCount := l.readQueues.Gets(userId, itemBatch)
 		for i, item := range itemBatch[:itemCount] {
 			metaPacket := item.(*datatype.MetaPacket)
+			metaPacketConsumed := false
 			action := l.GetPolicy(metaPacket, index)
 			if (action.ActionFlags & meteringAppActions) != 0 {
 				meteringKeys = append(meteringKeys, queue.HashKey(metaPacket.Hash))
 				meteringItemBatch = append(meteringItemBatch, metaPacket)
+				metaPacketConsumed = true
 			}
-
 			if (action.ActionFlags & flowAppActions) != 0 {
 				flowKeys = append(flowKeys, queue.HashKey(metaPacket.Hash))
+				if metaPacketConsumed {
+					metaPacket = datatype.CloneMetaPacket(metaPacket)
+				}
 				flowItemBatch = append(flowItemBatch, metaPacket)
 			}
 			itemBatch[i] = nil
