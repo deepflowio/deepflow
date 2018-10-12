@@ -88,26 +88,26 @@ func Convert2IpGroupData(response *trident.SyncResponse) []*policy.IpGroupData {
 	return ipGroupDatas
 }
 
-func splitGroup2Int(src string) map[uint32]uint32 {
+func splitGroup2Int(src string) []uint32 {
 	splitSrcGroups := strings.Split(src, ",")
-	groups := make(map[uint32]uint32)
+	groups := make([]uint32, 0, 8)
 	for _, group := range splitSrcGroups {
 		groupInt, err := strconv.Atoi(group)
 		if err == nil {
-			groups[uint32(groupInt)] = uint32(groupInt)
+			groups = append(groups, uint32(groupInt))
 		}
 	}
 
 	return groups
 }
 
-func splitPort2Int(src string) map[uint16]uint16 {
+func splitPort2Int(src string) []uint16 {
 	splitSrcPorts := strings.Split(src, "-")
-	ports := make(map[uint16]uint16)
+	ports := make([]uint16, 0, 8)
 	if len(splitSrcPorts) < 2 {
 		portInt, err := strconv.Atoi(src)
 		if err == nil {
-			ports[uint16(portInt)] = uint16(portInt)
+			ports = append(ports, uint16(portInt))
 		}
 		return ports
 	}
@@ -122,7 +122,7 @@ func splitPort2Int(src string) map[uint16]uint16 {
 		}
 	}
 	for i := portRange[0]; i <= portRange[1]; i++ {
-		ports[i] = i
+		ports = append(ports, uint16(i))
 		if i == 0xffff {
 			break
 		}
