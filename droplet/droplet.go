@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/op/go-logging"
+	"gitlab.x.lan/yunshan/droplet-libs/app"
 	. "gitlab.x.lan/yunshan/droplet-libs/logger"
 	_ "gitlab.x.lan/yunshan/droplet-libs/monitor"
+	libqueue "gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 
 	"gitlab.x.lan/yunshan/droplet/adapter"
@@ -104,7 +106,10 @@ func Start(configPath string) {
 	flowGeneratorQueueCount := int(cfg.Queue.FlowGeneratorQueueCount)
 	meteringAppQueueCount := int(cfg.Queue.MeteringAppQueueCount)
 	flowGeneratorQueues := manager.NewQueues("2-meta-packet-to-flow-generator", queueSize, flowGeneratorQueueCount, labelerQueueCount)
-	meteringAppQueues := manager.NewQueues("2-meta-packet-to-metering-app", queueSize, meteringAppQueueCount, labelerQueueCount)
+	meteringAppQueues := manager.NewQueues(
+		"2-meta-packet-to-metering-app", queueSize, meteringAppQueueCount, labelerQueueCount,
+		libqueue.OptionFlushIndicator(time.Minute),
+	)
 
 	labelerManager := labeler.NewLabelerManager(labelerQueues, labelerQueueCount, cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable)
 	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_FLOW, flowGeneratorQueues)
@@ -134,7 +139,10 @@ func Start(configPath string) {
 	docsInBuffer := int(cfg.MapReduce.DocsInBuffer)
 	windowSize := int(cfg.MapReduce.WindowSize)
 	flowDuplicatorQueue := manager.NewQueue("3-tagged-flow-to-flow-duplicator", queueSize>>2)
-	meteringAppOutputQueue := manager.NewQueue("3-metering-doc-to-marshaller", docsInBuffer<<1)
+	meteringAppOutputQueue := manager.NewQueue(
+		"3-metering-doc-to-marshaller", docsInBuffer<<1,
+		libqueue.OptionRelease(func(p interface{}) { app.ReleaseDocument(p.(*app.Document)) }),
+	)
 
 	timeoutConfig := flowgenerator.TimeoutConfig{
 		Opening:         cfg.FlowGenerator.OthersTimeout,
@@ -163,14 +171,17 @@ func Start(configPath string) {
 
 	// L4 - flow duplicator & flow sender
 	flowAppQueueCount := int(cfg.Queue.FlowAppQueueCount)
-	flowAppQueue := manager.NewQueues("4-tagged-flow-to-flow-app", queueSize>>2, flowAppQueueCount, 1)
+	flowAppQueue := manager.NewQueues("4-tagged-flow-to-flow-app", queueSize>>2, flowAppQueueCount, 1, libqueue.OptionFlushIndicator(time.Minute))
 	flowSenderQueue := manager.NewQueue("4-tagged-flow-to-stream", queueSize>>2)
 
 	queue.NewDuplicator(1024, flowDuplicatorQueue).AddMultiQueue(flowAppQueue, flowAppQueueCount).AddQueue(flowSenderQueue).Start()
 	sender.NewFlowSender(flowSenderQueue, cfg.Stream, cfg.StreamPort, queueSize>>2).Start()
 
 	// L5 - flow doc marshaller
-	flowAppOutputQueue := manager.NewQueue("5-flow-doc-to-marshaller", docsInBuffer<<1)
+	flowAppOutputQueue := manager.NewQueue(
+		"5-flow-doc-to-marshaller", docsInBuffer<<1,
+		libqueue.OptionRelease(func(p interface{}) { app.ReleaseDocument(p.(*app.Document)) }),
+	)
 	mapreduce.NewFlowMapProcess(flowAppOutputQueue, flowAppQueue, flowAppQueueCount, docsInBuffer, windowSize).Start()
 
 	// L6 - flow/metering doc sender

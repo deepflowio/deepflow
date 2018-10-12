@@ -13,9 +13,9 @@ type MultiQueue struct {
 	itemBatches [][][]interface{}
 }
 
-func (q *MultiQueue) Init(name string, size, count, userCount int) {
+func (q *MultiQueue) Init(name string, size, count, userCount int, options ...queue.Option) {
 	q.Monitor.init(name)
-	q.FixedMultiQueue = queue.NewOverwriteQueues(name, uint8(count), size)
+	q.FixedMultiQueue = queue.NewOverwriteQueues(name, uint8(count), size, options...)
 
 	if count > 1 {
 		batchSize := size
