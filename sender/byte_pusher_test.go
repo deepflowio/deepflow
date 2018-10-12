@@ -38,7 +38,7 @@ func TestBytePusher(t *testing.T) {
 	}
 }
 
-func senderRoutine(q queue.Queue) {
+func senderRoutine(q queue.QueueReader) {
 	sender := NewZMQBytePusher("127.0.0.1", 12345, 1000)
 	sender.QueueForward(q)
 }

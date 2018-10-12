@@ -25,7 +25,7 @@ const (
 
 const GEO_FILE_LOCATION = "/usr/share/droplet/ip_info_mini.json"
 
-func NewFlowMapProcess(output queue.QueueWriter, input queue.MultiQueue, inputCount int, docsInBuffer int, windowSize int) *FlowHandler {
+func NewFlowMapProcess(output queue.QueueWriter, input queue.MultiQueueReader, inputCount int, docsInBuffer int, windowSize int) *FlowHandler {
 	return NewFlowHandler([]app.FlowProcessor{
 		fps.NewProcessor(),
 		flow.NewProcessor(),
@@ -41,14 +41,14 @@ type FlowHandler struct {
 	numberOfApps int
 	processors   []app.FlowProcessor
 
-	flowQueue      queue.MultiQueue
+	flowQueue      queue.MultiQueueReader
 	flowQueueCount int
 	zmqAppQueue    queue.QueueWriter
 	docsInBuffer   int
 	windowSize     int
 }
 
-func NewFlowHandler(processors []app.FlowProcessor, output queue.QueueWriter, inputs queue.MultiQueue, inputCount int, docsInBuffer int, windowSize int) *FlowHandler {
+func NewFlowHandler(processors []app.FlowProcessor, output queue.QueueWriter, inputs queue.MultiQueueReader, inputCount int, docsInBuffer int, windowSize int) *FlowHandler {
 	return &FlowHandler{
 		numberOfApps:   len(processors),
 		processors:     processors,
@@ -65,7 +65,7 @@ type subFlowHandler struct {
 	processors   []app.FlowProcessor
 	stashes      []*Stash
 
-	flowQueue   queue.MultiQueue
+	flowQueue   queue.MultiQueueReader
 	zmqAppQueue queue.QueueWriter
 
 	queueIndex int
@@ -136,16 +136,7 @@ func (f *subFlowHandler) putToQueue() {
 	}
 }
 
-func (f *FlowHandler) startTicker() {
-	for range time.NewTicker(time.Minute).C {
-		for i := 0; i < f.flowQueueCount; i++ {
-			f.flowQueue.Put(queue.HashKey(i), nil)
-		}
-	}
-}
-
 func (f *FlowHandler) Start() {
-	go f.startTicker()
 	for i := 0; i < f.flowQueueCount; i++ {
 		go f.newSubFlowHandler(i).Process()
 	}

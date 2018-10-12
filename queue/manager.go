@@ -15,7 +15,6 @@ import (
 	"github.com/op/go-logging"
 	"github.com/spf13/cobra"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
-	"gitlab.x.lan/yunshan/droplet-libs/queue"
 
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
 )
@@ -86,14 +85,14 @@ func (m *Manager) RecvCommand(conn *net.UDPConn, port int, operate uint16, arg *
 	}
 }
 
-func (m *Manager) NewQueue(name string, size int) queue.Queue {
+func (m *Manager) NewQueue(name string, size int) *Queue {
 	q := &Queue{}
 	q.Init(name, size)
 	m.queues[name] = q
 	return q
 }
 
-func (m *Manager) NewQueues(name string, size, count, userCount int) queue.MultiQueue {
+func (m *Manager) NewQueues(name string, size, count, userCount int) *MultiQueue {
 	q := &MultiQueue{}
 	q.Init(name, size, count, userCount)
 	m.queues[name] = q

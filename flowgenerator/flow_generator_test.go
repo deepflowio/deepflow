@@ -99,7 +99,7 @@ func TestHandleSynRst(t *testing.T) {
 	reversePacket(packet1)
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
 
-	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
+	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
 	if taggedFlow.CloseType != CloseTypeTCPServerRst {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeTCPServerRst)
 	}
@@ -135,7 +135,7 @@ func TestHandleSynFin(t *testing.T) {
 
 	go flowGenerator.Start()
 
-	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
+	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
 	if taggedFlow.CloseType != CloseTypeClientHalfClose {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeClientHalfClose)
 	}
@@ -227,7 +227,7 @@ func TestPlatformData(t *testing.T) {
 
 	flowGenerator.Start()
 
-	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
+	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
 	if taggedFlow.CloseType != CloseTypeServerHalfOpen {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeServerHalfOpen)
 	}
@@ -313,7 +313,7 @@ func TestHandshakePerf(t *testing.T) {
 	packet2.TcpData.Ack = 1112
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet2)
 
-	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
+	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
 	if taggedFlow.CloseType != CloseTypeForcedReport {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeForcedReport)
 		t.Errorf("\n%s", taggedFlow)
@@ -340,7 +340,7 @@ func TestStartStop(t *testing.T) {
 
 	go func() {
 		for {
-			flowOutQueue.(Queue).Get()
+			flowOutQueue.(QueueReader).Get()
 		}
 	}()
 	t.Logf("CurrNumFlows is %d", flowGenerator.stats.CurrNumFlows)
@@ -365,7 +365,7 @@ func TestFlowReverse(t *testing.T) {
 	packet1.TcpData.Flags = TCP_SYN | TCP_ACK
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
 
-	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
+	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
 
 	if taggedFlow.FlowMetricsPeerDst.TCPFlags != 0 && taggedFlow.FlowMetricsPeerSrc.TCPFlags != TCP_SYN|TCP_ACK {
 		// the flow is revesed again because of service ports list
@@ -394,7 +394,7 @@ func TestForceReport(t *testing.T) {
 
 	flowGenerator.Start()
 
-	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
+	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
 
 	if taggedFlow.CloseType != CloseTypeForcedReport {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeForcedReport)
@@ -417,7 +417,7 @@ func TestUdpShortFlow(t *testing.T) {
 	packet.Protocol = layers.IPProtocolUDP
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet)
 	flowGenerator.Start()
-	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
+	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
 	if taggedFlow.CloseType != CloseTypeTimeout {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeTimeout)
 	}
@@ -437,7 +437,7 @@ func TestNonIpShortFlow(t *testing.T) {
 	packet.EthType = layers.EthernetTypeARP
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet)
 	flowGenerator.Start()
-	taggedFlow := flowOutQueue.(Queue).Get().(*TaggedFlow)
+	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
 	if taggedFlow.CloseType != CloseTypeTimeout {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeTimeout)
 	}
