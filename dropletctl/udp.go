@@ -82,6 +82,11 @@ func SendToDropletCtl(conn *net.UDPConn, port int, result uint32, args *bytes.Bu
 		log.Error(err)
 		return
 	}
+
+	if buffer.Len() > UDP_MAXLEN {
+		log.Warningf("buffer.Len() > %v", UDP_MAXLEN)
+		return
+	}
 	conn.WriteToUDP(buffer.Bytes(), dst)
 	return
 }
