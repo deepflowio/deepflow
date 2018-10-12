@@ -24,6 +24,41 @@ const (
 	ACTION_GEO_POSITIONING
 )
 
+func (f ActionFlag) String() string {
+	s := "|"
+	if f&ACTION_PACKET_COUNTING != 0 {
+		s += "PC|"
+	}
+	if f&ACTION_FLOW_COUNTING != 0 {
+		s += "FC|"
+	}
+	if f&ACTION_FLOW_STORING != 0 {
+		s += "FS|"
+	}
+	if f&ACTION_TCP_FLOW_PERF_COUNTING != 0 {
+		s += "TFPC|"
+	}
+	if f&ACTION_PACKET_CAPTURING != 0 {
+		s += "PC2|"
+	}
+	if f&ACTION_FLOW_MISC_COUNTING != 0 {
+		s += "FMC|"
+	}
+	if f&ACTION_PACKET_COUNT_BROKERING != 0 {
+		s += "PCB|"
+	}
+	if f&ACTION_FLOW_COUNT_BROKERING != 0 {
+		s += "FCB|"
+	}
+	if f&ACTION_TCP_FLOW_PERF_COUNT_BROKERING != 0 {
+		s += "TFPCB|"
+	}
+	if f&ACTION_GEO_POSITIONING != 0 {
+		s += "GP|"
+	}
+	return s
+}
+
 type ACLID uint16
 
 type PolicyData struct {
@@ -57,6 +92,41 @@ const (
 	TEMPLATE_ACL_EDGE_PORT
 	TEMPLATE_ACL_PORT
 )
+
+func (t TagTemplate) String() string {
+	s := "|"
+	if t&TEMPLATE_NODE != 0 {
+		s += "N|"
+	}
+	if t&TEMPLATE_NODE_PORT != 0 {
+		s += "NP|"
+	}
+	if t&TEMPLATE_EDGE != 0 {
+		s += "E|"
+	}
+	if t&TEMPLATE_EDGE_PORT != 0 {
+		s += "EP|"
+	}
+	if t&TEMPLATE_PORT != 0 {
+		s += "P|"
+	}
+	if t&TEMPLATE_ACL_NODE != 0 {
+		s += "AN|"
+	}
+	if t&TEMPLATE_ACL_NODE_PORT != 0 {
+		s += "ANP|"
+	}
+	if t&TEMPLATE_ACL_EDGE != 0 {
+		s += "AE|"
+	}
+	if t&TEMPLATE_ACL_EDGE_PORT != 0 {
+		s += "AEP|"
+	}
+	if t&TEMPLATE_ACL_PORT != 0 {
+		s += "AP|"
+	}
+	return s
+}
 
 // keys (16b ACLGID + 16b ActionFlags), values (8b Directions + 16b TagTemplates)
 type AclAction uint64
@@ -127,8 +197,8 @@ func (a AclAction) GetTagTemplates() TagTemplate {
 }
 
 func (a AclAction) String() string {
-	return fmt.Sprintf("AclAction{GID: %v ActionFlags: b%b Directions: b%b TagTemplates: b%b}",
-		a.GetACLGID(), a.GetActionFlags(), a.GetDirections(), a.GetTagTemplates())
+	return fmt.Sprintf("AclAction{GID: %d ActionFlags: %s Directions: %d TagTemplates: %s}",
+		a.GetACLGID(), a.GetActionFlags().String(), a.GetDirections(), a.GetTagTemplates().String())
 }
 
 func (d *PolicyData) Merge(aclActions []AclAction, aclID ACLID, directions ...DirectionType) {
