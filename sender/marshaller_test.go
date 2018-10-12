@@ -21,11 +21,12 @@ func TestMarshaller(t *testing.T) {
 	}
 	b, _ := proto.Marshal(header)
 	inputQueue := queue.NewOverwriteQueue("", 1024)
-	outputQueues := make([]queue.Queue, TEST_QUEUES)
+	outputQueues := make([]queue.QueueReader, TEST_QUEUES)
 	outputWriters := make([]queue.QueueWriter, TEST_QUEUES)
 	for i := 0; i < TEST_QUEUES; i++ {
-		outputQueues[i] = queue.NewOverwriteQueue("", 1024)
-		outputWriters[i] = outputQueues[i]
+		q := queue.NewOverwriteQueue("", 1024)
+		outputQueues[i] = q
+		outputWriters[i] = q
 	}
 	go NewZeroDocumentMarshaller(inputQueue, outputWriters...).Start()
 

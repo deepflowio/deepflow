@@ -10,7 +10,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 )
 
-func NewMeteringMapProcess(output queue.QueueWriter, input queue.MultiQueue, inputCount int, docsInBuffer int, windowSize int) *MeteringHandler {
+func NewMeteringMapProcess(output queue.QueueWriter, input queue.MultiQueueReader, inputCount int, docsInBuffer int, windowSize int) *MeteringHandler {
 	return NewMeteringHandler([]app.MeteringProcessor{usage.NewProcessor()}, output, input, inputCount, docsInBuffer, windowSize)
 }
 
@@ -18,14 +18,14 @@ type MeteringHandler struct {
 	numberOfApps int
 	processors   []app.MeteringProcessor
 
-	meteringQueue      queue.MultiQueue
+	meteringQueue      queue.MultiQueueReader
 	meteringQueueCount int
 	zmqAppQueue        queue.QueueWriter
 	docsInBuffer       int
 	windowSize         int
 }
 
-func NewMeteringHandler(processors []app.MeteringProcessor, output queue.QueueWriter, inputs queue.MultiQueue, inputCount int, docsInBuffer int, windowSize int) *MeteringHandler {
+func NewMeteringHandler(processors []app.MeteringProcessor, output queue.QueueWriter, inputs queue.MultiQueueReader, inputCount int, docsInBuffer int, windowSize int) *MeteringHandler {
 	return &MeteringHandler{
 		numberOfApps:       len(processors),
 		processors:         processors,
@@ -42,7 +42,7 @@ type subMeteringHandler struct {
 	processors   []app.MeteringProcessor
 	stashes      []*Stash
 
-	meteringQueue queue.MultiQueue
+	meteringQueue queue.MultiQueueReader
 	zmqAppQueue   queue.QueueWriter
 
 	queueIndex int
@@ -87,16 +87,7 @@ func (f *subMeteringHandler) putToQueue() {
 	}
 }
 
-func (f *MeteringHandler) startTicker() {
-	for range time.NewTicker(time.Minute).C {
-		for i := 0; i < f.meteringQueueCount; i++ {
-			f.meteringQueue.Put(queue.HashKey(i), nil)
-		}
-	}
-}
-
 func (f *MeteringHandler) Start() {
-	go f.startTicker()
 	for i := 0; i < f.meteringQueueCount; i++ {
 		go f.newSubMeteringHandler(i).Process()
 	}
