@@ -425,7 +425,7 @@ func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uin
 			flowExtra.calcCloseType(false)
 			flowOutQueue.Put(flowExtra.taggedFlow)
 			if flowExtra.metaFlowPerf != nil {
-				f.ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
+				ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
 			}
 			e = e.Next()
 		}
@@ -474,7 +474,7 @@ loop:
 				flowExtra.calcCloseType(false)
 				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 				if flowExtra.metaFlowPerf != nil {
-					f.ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
+					ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
 				}
 				flowExtra.reset()
 				flowOutBuffer[flowOutNum] = taggedFlow
@@ -600,10 +600,21 @@ func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, cfg
 	flowGenerator.flowExtraHandler.Init()
 	flowGenerator.initStateMachineMaster()
 	flowGenerator.initStateMachineSlave()
-	flowGenerator.initMetaFlowPerfPool()
 	tags := OptionStatTags{"index": strconv.Itoa(index)}
 	RegisterCountable("flow_generator", flowGenerator, tags)
 	RegisterCountable(FP_NAME, &flowGenerator.perfCounter, tags)
 	log.Infof("flow generator %d created", index)
 	return flowGenerator
+}
+
+func (f *FlowGenerator) checkIfDoFlowPerf(flowExtra *FlowExtra) bool {
+	if flowExtra.taggedFlow.PolicyData != nil &&
+		flowExtra.taggedFlow.PolicyData.ActionFlags&FLOW_PERF_ACTION_FLAGS > 0 {
+		if flowExtra.metaFlowPerf == nil {
+			flowExtra.metaFlowPerf = AcquireMetaFlowPerf()
+		}
+		return true
+	}
+
+	return false
 }

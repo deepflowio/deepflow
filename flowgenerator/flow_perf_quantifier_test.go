@@ -267,7 +267,7 @@ func TestReestablishFsm(t *testing.T) {
 	var flowInfo *FlowInfo
 
 	counter := NewFlowPerfCounter()
-	flowPerf := NewMetaFlowPerf(&counter)
+	flowPerf := AcquireMetaFlowPerf()
 	perfCtrl := flowPerf.ctrlInfo
 	//perfData := flowPerf.perfData
 	client := &perfCtrl.tcpSession[0]
@@ -338,9 +338,9 @@ func TestReestablishFsm(t *testing.T) {
 	client.updateData(packetHeader)
 }
 
-func TestNewMetaFlowPerf(t *testing.T) {
+func TestAcquireMetaFlowPerf(t *testing.T) {
 	counter := NewFlowPerfCounter()
-	flowPerf := NewMetaFlowPerf(&counter)
+	flowPerf := AcquireMetaFlowPerf()
 	t.Log(flowPerf.ctrlInfo, flowPerf.perfData, /*, flowPerf.perfCounter*/
 		flowPerf.ctrlInfo.tcpSession[0].seqList.PushFront(&SeqSegment{111, 11}))
 	t.Log(counter.counter)
@@ -374,7 +374,7 @@ func TestPreprocess(t *testing.T) {
 	var packetHeader *MetaPacket
 
 	counter := NewFlowPerfCounter()
-	flowPerf := NewMetaFlowPerf(&counter)
+	flowPerf := AcquireMetaFlowPerf()
 	flowInfo := &FlowInfo{}
 
 	//  SYN组合
@@ -424,7 +424,7 @@ func testMetaFlowPerfUpdate(t *testing.T) {
 	var packetHeader *MetaPacket
 
 	counter := NewFlowPerfCounter()
-	flowPerf := NewMetaFlowPerf(&counter)
+	flowPerf := AcquireMetaFlowPerf()
 	flowInfo := &FlowExtra{
 		taggedFlow: &TaggedFlow{},
 	}
@@ -564,8 +564,7 @@ func testReport(flowPerf *MetaFlowPerf, t *testing.T) {
 }
 
 func TestReport(t *testing.T) {
-	counter := NewFlowPerfCounter()
-	flowPerf := NewMetaFlowPerf(&counter)
+	flowPerf := AcquireMetaFlowPerf()
 	testReport(flowPerf, t)
 }
 
@@ -587,7 +586,7 @@ func TestVariance(t *testing.T) {
 	var perf *TcpPerfStats
 
 	counter := NewFlowPerfCounter()
-	p := NewMetaFlowPerf(&counter)
+	p := AcquireMetaFlowPerf()
 	header := &MetaPacket{
 		PacketLen: 1000,
 		Timestamp: 2000,
@@ -635,8 +634,7 @@ func BenchmarkUpdate(b *testing.B) {
 }
 
 func BenchmarkReport(b *testing.B) {
-	counter := NewFlowPerfCounter()
-	flowPerf := NewMetaFlowPerf(&counter)
+	flowPerf := AcquireMetaFlowPerf()
 
 	for i := 0; i < b.N; i++ {
 		testReport(flowPerf, nil)
@@ -644,8 +642,7 @@ func BenchmarkReport(b *testing.B) {
 }
 
 func BenchmarkNew(b *testing.B) {
-	counter := NewFlowPerfCounter()
 	for i := 0; i < b.N; i++ {
-		NewMetaFlowPerf(&counter)
+		AcquireMetaFlowPerf()
 	}
 }
