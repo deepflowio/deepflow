@@ -27,7 +27,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			flowExtra.calcCloseType(false)
 			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 			if flowExtra.metaFlowPerf != nil {
-				f.ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
+				ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
 			}
 			flowExtra.reset()
 			f.flowOutQueue.Put(taggedFlow)
@@ -58,7 +58,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			flowExtra.calcCloseType(false)
 			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 			if flowExtra.metaFlowPerf != nil {
-				f.ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
+				ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
 			}
 			flowExtra.reset()
 			f.flowOutQueue.Put(taggedFlow)

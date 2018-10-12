@@ -56,6 +56,9 @@ const (
 
 const META_FLOW_PERF_BLOCK_SIZE = 1024
 
+const FLOW_PERF_ACTION_FLAGS = ACTION_TCP_FLOW_PERF_COUNTING | ACTION_TCP_FLOW_PERF_COUNT_BROKERING |
+	ACTION_FLOW_STORING | ACTION_GEO_POSITIONING
+
 type SeqSegment struct { // 避免乱序，识别重传
 	seqNumber uint32
 	length    uint32
@@ -691,7 +694,7 @@ func checkTcpFlags(tcpFlags uint8) bool {
 	return true
 }
 
-func NewMetaFlowPerf(perfCounter *FlowPerfCounter) *MetaFlowPerf {
+func NewMetaFlowPerf() *MetaFlowPerf {
 	client := TcpSessionPeer{seqList: list.New()}
 	server := TcpSessionPeer{seqList: list.New()}
 
