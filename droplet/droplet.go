@@ -132,8 +132,10 @@ func Start(configPath string) {
 	})
 
 	// L3 - flow generator & metering marshaller
+	docsInBuffer := int(cfg.MapReduce.DocsInBuffer)
+	windowSize := int(cfg.MapReduce.WindowSize)
 	flowDuplicatorQueue := manager.NewQueue("3-tagged-flow-to-flow-duplicator", queueSize>>2)
-	meteringAppOutputQueue := manager.NewQueue("3-metering-doc-to-marshaller", queueSize>>2)
+	meteringAppOutputQueue := manager.NewQueue("3-metering-doc-to-marshaller", docsInBuffer<<1)
 
 	timeoutConfig := flowgenerator.TimeoutConfig{
 		Opening:         cfg.FlowGenerator.OthersTimeout,
@@ -158,8 +160,6 @@ func Start(configPath string) {
 		flowGenerator.Start()
 	}
 
-	docsInBuffer := int(cfg.MapReduce.DocsInBuffer)
-	windowSize := int(cfg.MapReduce.WindowSize)
 	mapreduce.NewMeteringMapProcess(meteringAppOutputQueue, meteringAppQueues, meteringAppQueueCount, docsInBuffer, windowSize).Start()
 
 	// L4 - flow duplicator & flow sender
@@ -171,7 +171,7 @@ func Start(configPath string) {
 	sender.NewFlowSender(flowSenderQueue, cfg.Stream, cfg.StreamPort, queueSize>>2).Start()
 
 	// L5 - flow doc marshaller
-	flowAppOutputQueue := manager.NewQueue("5-flow-doc-to-marshaller", queueSize>>2)
+	flowAppOutputQueue := manager.NewQueue("5-flow-doc-to-marshaller", docsInBuffer<<1)
 	mapreduce.NewFlowMapProcess(flowAppOutputQueue, flowAppQueue, flowAppQueueCount, docsInBuffer, windowSize).Start()
 
 	// L6 - flow/metering doc sender
