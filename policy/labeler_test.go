@@ -292,19 +292,13 @@ func TestAllPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	srcGroups := make(map[uint32]uint32)
-	dstGroups := make(map[uint32]uint32)
-	dstPorts := make(map[uint16]uint16)
 	acl1 := &Acl{
-		Id:        10,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  dstPorts,
-		Proto:     0,
-		Vlan:      0,
-		Action:    []AclAction{forward},
+		Id:     10,
+		Type:   TAP_TOR,
+		TapId:  11,
+		Proto:  0,
+		Vlan:   0,
+		Action: []AclAction{forward},
 	}
 	policy.UpdateAclData([]*Acl{acl1})
 
@@ -334,17 +328,12 @@ func TestGroupForwardPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	srcGroups := make(map[uint32]uint32)
-	dstGroups := make(map[uint32]uint32)
-	dstPorts := make(map[uint16]uint16)
-	srcGroups[3] = 3
+	srcGroups := []uint32{3}
 	acl1 := &Acl{
 		Id:        10,
 		Type:      TAP_TOR,
 		TapId:     11,
 		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  dstPorts,
 		Proto:     0,
 		Vlan:      0,
 		Action:    []AclAction{forward},
@@ -377,17 +366,12 @@ func TestGroupBackwardPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	srcGroups := make(map[uint32]uint32)
-	dstGroups := make(map[uint32]uint32)
-	dstPorts := make(map[uint16]uint16)
-	dstGroups[3] = 3
+	dstGroups := []uint32{3}
 	acl1 := &Acl{
 		Id:        10,
 		Type:      TAP_TOR,
 		TapId:     11,
-		SrcGroups: srcGroups,
 		DstGroups: dstGroups,
-		DstPorts:  dstPorts,
 		Proto:     0,
 		Vlan:      0,
 		Action:    []AclAction{backward},
@@ -420,20 +404,16 @@ func TestAllPortPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	srcGroups := make(map[uint32]uint32)
-	dstGroups := make(map[uint32]uint32)
-	dstPorts := make(map[uint16]uint16)
-	dstPorts[30] = 30
+	dstPorts := make([]uint16, 1)
+	dstPorts = append(dstPorts, 30)
 	acl1 := &Acl{
-		Id:        10,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  dstPorts,
-		Proto:     0,
-		Vlan:      0,
-		Action:    []AclAction{forward},
+		Id:       10,
+		Type:     TAP_TOR,
+		TapId:    11,
+		DstPorts: dstPorts,
+		Proto:    0,
+		Vlan:     0,
+		Action:   []AclAction{forward},
 	}
 	policy.UpdateAclData([]*Acl{acl1})
 
@@ -465,20 +445,15 @@ func TestSrcPortPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	srcGroups := make(map[uint32]uint32)
-	dstGroups := make(map[uint32]uint32)
-	dstPorts := make(map[uint16]uint16)
-	dstPorts[30] = 30
+	dstPorts := []uint16{30}
 	acl1 := &Acl{
-		Id:        10,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  dstPorts,
-		Proto:     0,
-		Vlan:      0,
-		Action:    []AclAction{forward},
+		Id:       10,
+		Type:     TAP_TOR,
+		TapId:    11,
+		DstPorts: dstPorts,
+		Proto:    0,
+		Vlan:     0,
+		Action:   []AclAction{forward},
 	}
 	policy.UpdateAclData([]*Acl{acl1})
 
@@ -509,20 +484,15 @@ func TestDstPortPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	srcGroups := make(map[uint32]uint32)
-	dstGroups := make(map[uint32]uint32)
-	dstPorts := make(map[uint16]uint16)
-	dstPorts[30] = 30
+	dstPorts := []uint16{30}
 	acl1 := &Acl{
-		Id:        10,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  dstPorts,
-		Proto:     0,
-		Vlan:      0,
-		Action:    []AclAction{forward},
+		Id:       10,
+		Type:     TAP_TOR,
+		TapId:    11,
+		DstPorts: dstPorts,
+		Proto:    0,
+		Vlan:     0,
+		Action:   []AclAction{forward},
 	}
 	policy.UpdateAclData([]*Acl{acl1})
 
@@ -553,20 +523,15 @@ func TestSrcDstPortPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	srcGroups := make(map[uint32]uint32)
-	dstGroups := make(map[uint32]uint32)
-	dstPorts := make(map[uint16]uint16)
-	dstPorts[30] = 30
+	dstPorts := []uint16{30}
 	acl1 := &Acl{
-		Id:        10,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  dstPorts,
-		Proto:     0,
-		Vlan:      0,
-		Action:    []AclAction{forward},
+		Id:       10,
+		Type:     TAP_TOR,
+		TapId:    11,
+		DstPorts: dstPorts,
+		Proto:    0,
+		Vlan:     0,
+		Action:   []AclAction{forward},
 	}
 	policy.UpdateAclData([]*Acl{acl1})
 
@@ -598,19 +563,13 @@ func TestVlanPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	srcGroups := make(map[uint32]uint32)
-	dstGroups := make(map[uint32]uint32)
-	dstPorts := make(map[uint16]uint16)
 	acl1 := &Acl{
-		Id:        10,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  dstPorts,
-		Proto:     0,
-		Vlan:      30,
-		Action:    []AclAction{forward},
+		Id:     10,
+		Type:   TAP_TOR,
+		TapId:  11,
+		Proto:  0,
+		Vlan:   30,
+		Action: []AclAction{forward},
 	}
 	policy.UpdateAclData([]*Acl{acl1})
 
@@ -643,20 +602,15 @@ func TestVlanPortPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	srcGroups := make(map[uint32]uint32)
-	dstGroups := make(map[uint32]uint32)
-	dstPorts := make(map[uint16]uint16)
-	dstPorts[8000] = 8000
+	dstPorts := []uint16{8000}
 	acl1 := &Acl{
-		Id:        10,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  dstPorts,
-		Proto:     0,
-		Vlan:      0,
-		Action:    []AclAction{forward},
+		Id:       10,
+		Type:     TAP_TOR,
+		TapId:    11,
+		DstPorts: dstPorts,
+		Proto:    0,
+		Vlan:     0,
+		Action:   []AclAction{forward},
 	}
 	policy.UpdateAclData([]*Acl{acl1})
 	srcIp := NewIPFromString("192.168.0.11")
@@ -688,20 +642,15 @@ func TestPortProtoPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	srcGroups := make(map[uint32]uint32)
-	dstGroups := make(map[uint32]uint32)
-	dstPorts := make(map[uint16]uint16)
-	dstPorts[8000] = 8000
+	dstPorts := []uint16{8000}
 	acl1 := &Acl{
-		Id:        10,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  dstPorts,
-		Proto:     6,
-		Vlan:      0,
-		Action:    []AclAction{forward},
+		Id:       10,
+		Type:     TAP_TOR,
+		TapId:    11,
+		DstPorts: dstPorts,
+		Proto:    6,
+		Vlan:     0,
+		Action:   []AclAction{forward},
 	}
 	policy.UpdateAclData([]*Acl{acl1})
 	srcIp := NewIPFromString("192.168.0.11")
@@ -734,33 +683,26 @@ func TestAclsPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	srcGroups := make(map[uint32]uint32)
-	dstGroups := make(map[uint32]uint32)
-	dstPorts := make(map[uint16]uint16)
-	dstPorts[8000] = 8000
+	dstPorts := []uint16{8000}
 	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl1 := &Acl{
-		Id:        10,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  dstPorts,
-		Proto:     6,
-		Vlan:      0,
-		Action:    []AclAction{aclAction1},
+		Id:       10,
+		Type:     TAP_TOR,
+		TapId:    11,
+		DstPorts: dstPorts,
+		Proto:    6,
+		Vlan:     0,
+		Action:   []AclAction{aclAction1},
 	}
 	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl2 := &Acl{
-		Id:        20,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  dstPorts,
-		Proto:     17,
-		Vlan:      0,
-		Action:    []AclAction{aclAction2},
+		Id:       20,
+		Type:     TAP_TOR,
+		TapId:    11,
+		DstPorts: dstPorts,
+		Proto:    17,
+		Vlan:     0,
+		Action:   []AclAction{aclAction2},
 	}
 	policy.UpdateAclData([]*Acl{acl1, acl2})
 	srcIp := NewIPFromString("192.168.0.11")
@@ -793,33 +735,26 @@ func TestVlanAclsPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	srcGroups := make(map[uint32]uint32)
-	dstGroups := make(map[uint32]uint32)
-	dstPorts := make(map[uint16]uint16)
-	dstPorts[8000] = 8000
+	dstPorts := []uint16{8000}
 	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl1 := &Acl{
-		Id:        10,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  dstPorts,
-		Proto:     6,
-		Vlan:      0,
-		Action:    []AclAction{aclAction1},
+		Id:       10,
+		Type:     TAP_TOR,
+		TapId:    11,
+		DstPorts: dstPorts,
+		Proto:    6,
+		Vlan:     0,
+		Action:   []AclAction{aclAction1},
 	}
 	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl2 := &Acl{
-		Id:        20,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  dstPorts,
-		Proto:     6,
-		Vlan:      10,
-		Action:    []AclAction{aclAction2},
+		Id:       20,
+		Type:     TAP_TOR,
+		TapId:    11,
+		DstPorts: dstPorts,
+		Proto:    6,
+		Vlan:     10,
+		Action:   []AclAction{aclAction2},
 	}
 	policy.UpdateAclData([]*Acl{acl1, acl2})
 	srcIp := NewIPFromString("192.168.0.11")
@@ -857,33 +792,25 @@ func TestVlanPortAclsPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	srcGroups := make(map[uint32]uint32)
-	dstGroups := make(map[uint32]uint32)
-	dstPorts := make(map[uint16]uint16)
-	dstPorts[8000] = 8000
+	dstPorts := []uint16{8000}
 	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl1 := &Acl{
-		Id:        10,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  dstPorts,
-		Proto:     6,
-		Vlan:      0,
-		Action:    []AclAction{aclAction1},
+		Id:       10,
+		Type:     TAP_TOR,
+		TapId:    11,
+		DstPorts: dstPorts,
+		Proto:    6,
+		Vlan:     0,
+		Action:   []AclAction{aclAction1},
 	}
 	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl2 := &Acl{
-		Id:        20,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  make(map[uint16]uint16),
-		Proto:     6,
-		Vlan:      10,
-		Action:    []AclAction{aclAction2},
+		Id:     20,
+		Type:   TAP_TOR,
+		TapId:  11,
+		Proto:  6,
+		Vlan:   10,
+		Action: []AclAction{aclAction2},
 	}
 	policy.UpdateAclData([]*Acl{acl1, acl2})
 	srcIp := NewIPFromString("192.168.0.11")
@@ -916,33 +843,25 @@ func TestVlanPortAclsPassPolicy1(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	srcGroups := make(map[uint32]uint32)
-	dstGroups := make(map[uint32]uint32)
-	dstPorts := make(map[uint16]uint16)
-	dstPorts[8000] = 8000
+	dstPorts := []uint16{8000}
 	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl1 := &Acl{
-		Id:        10,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  dstPorts,
-		Proto:     6,
-		Vlan:      0,
-		Action:    []AclAction{aclAction1},
+		Id:       10,
+		Type:     TAP_TOR,
+		TapId:    11,
+		DstPorts: dstPorts,
+		Proto:    6,
+		Vlan:     0,
+		Action:   []AclAction{aclAction1},
 	}
 	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl2 := &Acl{
-		Id:        20,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  make(map[uint16]uint16),
-		Proto:     6,
-		Vlan:      10,
-		Action:    []AclAction{aclAction2},
+		Id:     20,
+		Type:   TAP_TOR,
+		TapId:  11,
+		Proto:  6,
+		Vlan:   10,
+		Action: []AclAction{aclAction2},
 	}
 	policy.UpdateAclData([]*Acl{acl1, acl2})
 	srcIp := NewIPFromString("192.168.0.11")
@@ -975,33 +894,25 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	srcGroups := make(map[uint32]uint32)
-	dstGroups := make(map[uint32]uint32)
-	dstPorts := make(map[uint16]uint16)
-	dstPorts[8000] = 8000
+	dstPorts := []uint16{8000}
 	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl1 := &Acl{
-		Id:        10,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  dstPorts,
-		Proto:     6,
-		Vlan:      0,
-		Action:    []AclAction{aclAction1},
+		Id:       10,
+		Type:     TAP_TOR,
+		TapId:    11,
+		DstPorts: dstPorts,
+		Proto:    6,
+		Vlan:     0,
+		Action:   []AclAction{aclAction1},
 	}
 	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
 	acl2 := &Acl{
-		Id:        20,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  make(map[uint16]uint16),
-		Proto:     6,
-		Vlan:      10,
-		Action:    []AclAction{aclAction2},
+		Id:     20,
+		Type:   TAP_TOR,
+		TapId:  11,
+		Proto:  6,
+		Vlan:   10,
+		Action: []AclAction{aclAction2},
 	}
 	policy.UpdateAclData([]*Acl{acl1, acl2})
 	srcIp := NewIPFromString("192.168.0.11")
@@ -1108,14 +1019,14 @@ func generateAclAction(id ACLID, actionFlags ActionFlag) AclAction {
 
 func generatePolicyAcl(table *PolicyTable, action AclAction, aclID ACLID, srcGroupId, dstGroupId uint32,
 	proto uint8, port uint16, vlan uint32) *Acl {
-	srcGroups := make(map[uint32]uint32)
-	dstGroups := make(map[uint32]uint32)
-	dstPorts := make(map[uint16]uint16)
+	srcGroups := make([]uint32, 0, 1)
+	dstGroups := make([]uint32, 0, 1)
+	dstPorts := make([]uint16, 0, 1)
 
-	srcGroups[srcGroupId] = srcGroupId
-	dstGroups[dstGroupId] = dstGroupId
+	srcGroups = append(srcGroups, srcGroupId)
+	dstGroups = append(dstGroups, dstGroupId)
 	if port != 0 {
-		dstPorts[port] = port
+		dstPorts = append(dstPorts, port)
 	}
 	acl := &Acl{
 		Id:        aclID,
