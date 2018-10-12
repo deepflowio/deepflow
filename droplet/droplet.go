@@ -85,6 +85,9 @@ func Start(configPath string) {
 	if err != nil {
 		log.Error(err)
 		return
+	} else if localIp.String() == "127.0.0.1" {
+		log.Error("Invalid ip resolved by hostname")
+		os.Exit(1)
 	}
 	remoteSegmentSet := capture.NewSegmentSet()
 
