@@ -121,8 +121,23 @@ func (m *PerfMeterSum) concurrentMerge(other *PerfMeterSum) {
 	m.SumZeroWndCntRx += other.SumZeroWndCntRx
 }
 
-func (m *PerfMeterSum) sequentialMerge(other *PerfMeterSum) {
-	m.concurrentMerge(other)
+func (m *PerfMeterSum) sequentialMerge(other *PerfMeterSum) { // other为后一个时间的统计量
+	m.SumFlowCount = m.SumClosedFlowCount + other.SumFlowCount
+	m.SumClosedFlowCount += other.SumClosedFlowCount
+	m.SumRetransFlowCount += other.SumRetransFlowCount
+	m.SumHalfOpenFlowCount += other.SumHalfOpenFlowCount
+	m.SumPacketTx += other.SumPacketTx
+	m.SumPacketRx += other.SumPacketRx
+	m.SumRetransCntTx += other.SumRetransCntTx
+	m.SumRetransCntRx += other.SumRetransCntRx
+
+	m.SumRTTSyn += other.SumRTTSyn
+	m.SumRTTAvg += other.SumRTTAvg
+	m.SumRTTSynFlow += other.SumRTTSynFlow
+	m.SumRTTAvgFlow += other.SumRTTAvgFlow
+
+	m.SumZeroWndCntTx += other.SumZeroWndCntTx
+	m.SumZeroWndCntRx += other.SumZeroWndCntRx
 }
 
 type PerfMeterMax struct {
