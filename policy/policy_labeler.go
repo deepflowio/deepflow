@@ -29,9 +29,9 @@ type Acl struct {
 	Id        ACLID
 	Type      TapType
 	TapId     uint32
-	SrcGroups map[uint32]uint32
-	DstGroups map[uint32]uint32
-	DstPorts  map[uint16]uint16
+	SrcGroups []uint32
+	DstGroups []uint32
+	DstPorts  []uint16
 	Proto     uint8
 	Vlan      uint32
 	Action    []AclAction
@@ -100,16 +100,6 @@ func NewPolicyLabel(queueCount int, mapSize uint32, fastPathDisable bool) *Polic
 		}
 	}
 	return policy
-}
-
-func mapToSlice(in map[uint32]uint32) []uint32 {
-	out := make([]uint32, 0, 8)
-	for _, item := range in {
-		if item > 0 {
-			out = append(out, item)
-		}
-	}
-	return out
 }
 
 func (l *PolicyLabel) generateInterestKeys(endpointData *EndpointData, packet *LookupKey) {
@@ -202,11 +192,11 @@ func generateGroupPortsKeys(acl *Acl, direction DirectionType) []uint64 {
 
 	// 策略配置端口全采集，则生成port为0的一条map
 	if len(acl.DstPorts) >= 0xffff || len(acl.DstPorts) == 0 {
-		keys = generateGroupPortKeys(mapToSlice(src), mapToSlice(dst), ANY_PORT, acl.Proto)
+		keys = generateGroupPortKeys(src, dst, ANY_PORT, acl.Proto)
 	} else {
 		// FIXME: 当很多条策略都配置了很多port,内存占用可能会很大
 		for _, port := range acl.DstPorts {
-			keys = append(keys, generateGroupPortKeys(mapToSlice(src), mapToSlice(dst), port, acl.Proto)...)
+			keys = append(keys, generateGroupPortKeys(src, dst, port, acl.Proto)...)
 		}
 	}
 	return keys
@@ -355,7 +345,7 @@ func (l *PolicyLabel) GenerateGroupVlanMaps(acls []*Acl) {
 		if acl.Type.CheckTapType(acl.Type) && acl.Vlan > 0 {
 			vlanMap := vlanMaps[acl.Type]
 
-			keys := generateGroupVlanKeys(mapToSlice(acl.SrcGroups), mapToSlice(acl.DstGroups), uint16(acl.Vlan))
+			keys := generateGroupVlanKeys(acl.SrcGroups, acl.DstGroups, uint16(acl.Vlan))
 			for _, key := range keys {
 				if policy := vlanMap[key]; policy == nil {
 					policy := &PolicyData{}
@@ -366,7 +356,7 @@ func (l *PolicyLabel) GenerateGroupVlanMaps(acls []*Acl) {
 				}
 			}
 
-			keys = generateGroupVlanKeys(mapToSlice(acl.DstGroups), mapToSlice(acl.SrcGroups), uint16(acl.Vlan))
+			keys = generateGroupVlanKeys(acl.DstGroups, acl.SrcGroups, uint16(acl.Vlan))
 			for _, key := range keys {
 				if policy := vlanMap[key]; policy == nil {
 					policy := &PolicyData{}
