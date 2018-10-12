@@ -10,6 +10,7 @@ import (
 
 	"github.com/op/go-logging"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/logger"
 	_ "gitlab.x.lan/yunshan/droplet-libs/monitor"
 	libqueue "gitlab.x.lan/yunshan/droplet-libs/queue"
@@ -79,7 +80,13 @@ func Start(configPath string) {
 	queueSize := int(cfg.Queue.QueueSize)
 	labelerQueueCount := int(cfg.Queue.LabelerQueueCount)
 	packetSourceCount := 1 // Only adapter will use MultiQueue.Puts
-	labelerQueues := manager.NewQueues("1-meta-packet-to-labeler", queueSize, labelerQueueCount, packetSourceCount)
+	releaseMetaPacket := func(x interface{}) {
+		datatype.ReleaseMetaPacket(x.(*datatype.MetaPacket))
+	}
+	labelerQueues := manager.NewQueues(
+		"1-meta-packet-to-labeler", queueSize, labelerQueueCount, packetSourceCount,
+		releaseMetaPacket,
+	)
 
 	localIp, err := getLocalIp()
 	if err != nil {
@@ -108,10 +115,13 @@ func Start(configPath string) {
 	// L2 - packet labeler
 	flowGeneratorQueueCount := int(cfg.Queue.FlowGeneratorQueueCount)
 	meteringAppQueueCount := int(cfg.Queue.MeteringAppQueueCount)
-	flowGeneratorQueues := manager.NewQueues("2-meta-packet-to-flow-generator", queueSize, flowGeneratorQueueCount, labelerQueueCount)
+	flowGeneratorQueues := manager.NewQueues(
+		"2-meta-packet-to-flow-generator", queueSize, flowGeneratorQueueCount, labelerQueueCount,
+		releaseMetaPacket,
+	)
 	meteringAppQueues := manager.NewQueues(
 		"2-meta-packet-to-metering-app", queueSize, meteringAppQueueCount, labelerQueueCount,
-		libqueue.OptionFlushIndicator(time.Minute),
+		libqueue.OptionFlushIndicator(time.Minute), releaseMetaPacket,
 	)
 
 	labelerManager := labeler.NewLabelerManager(labelerQueues, labelerQueueCount, cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable)
