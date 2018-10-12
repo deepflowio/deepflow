@@ -112,7 +112,9 @@ func (q *OverwriteQueue) Len() int {
 func (q *OverwriteQueue) releaseOverwritten(overwritten []interface{}) {
 	if q.release != nil && q.pending == q.size {
 		for _, toRelease := range overwritten {
-			q.release(toRelease)
+			if toRelease != nil { // when flush indicator enabled
+				q.release(toRelease)
+			}
 		}
 	}
 }

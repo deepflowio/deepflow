@@ -3,6 +3,7 @@ package datatype
 import (
 	"bytes"
 	"fmt"
+	"sync"
 	"time"
 
 	. "github.com/google/gopacket/layers"
@@ -194,6 +195,10 @@ func (p *MetaPacket) ParseL2(packet RawPacket) int {
 	return l2Len
 }
 
+func (p *MetaPacket) CopyTo(other *MetaPacket) { // XXX: Shallow copy seems unsafe
+	*other = *p
+}
+
 func (p *MetaPacket) String() string {
 	buffer := bytes.Buffer{}
 	var format string
@@ -218,4 +223,25 @@ func (p *MetaPacket) String() string {
 		buffer.WriteString(fmt.Sprintf("\n\tPolicyData(%+v)", p.PolicyData))
 	}
 	return buffer.String()
+}
+
+var metaPacketPool = sync.Pool{
+	New: func() interface{} {
+		return new(MetaPacket)
+	},
+}
+
+func AcquireMetaPacket() *MetaPacket {
+	return metaPacketPool.Get().(*MetaPacket)
+}
+
+func ReleaseMetaPacket(x *MetaPacket) {
+	*x = MetaPacket{}
+	metaPacketPool.Put(x)
+}
+
+func CloneMetaPacket(x *MetaPacket) *MetaPacket {
+	dup := AcquireMetaPacket()
+	x.CopyTo(dup)
+	return dup
 }
