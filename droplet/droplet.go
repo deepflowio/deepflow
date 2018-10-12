@@ -85,21 +85,6 @@ func Start(configPath string) {
 		return
 	}
 	remoteSegmentSet := capture.NewSegmentSet()
-	synchronizer.Register(func(response *trident.SyncResponse) {
-		rpcRemoteSegments := response.GetRemoteSegments()
-		remoteSegments := make([]net.HardwareAddr, 0, len(rpcRemoteSegments))
-		for _, segment := range rpcRemoteSegments {
-			for _, macString := range segment.GetMac() {
-				mac, err := net.ParseMAC(macString)
-				if err != nil {
-					log.Warning("Invalid mac ", macString)
-					continue
-				}
-				remoteSegments = append(remoteSegments, mac)
-			}
-		}
-		remoteSegmentSet.OnSegmentChange(remoteSegments)
-	})
 
 	launcher := capture.CaptureLauncher{localIp, remoteSegmentSet, labelerQueues}
 	for _, iface := range cfg.TapInterfaces {
@@ -128,6 +113,21 @@ func Start(configPath string) {
 
 	synchronizer.Register(func(response *trident.SyncResponse) {
 		log.Debug(response)
+		// Capture更新RemoteSegments
+		rpcRemoteSegments := response.GetRemoteSegments()
+		remoteSegments := make([]net.HardwareAddr, 0, len(rpcRemoteSegments))
+		for _, segment := range rpcRemoteSegments {
+			for _, macString := range segment.GetMac() {
+				mac, err := net.ParseMAC(macString)
+				if err != nil {
+					log.Warning("Invalid mac ", macString)
+					continue
+				}
+				remoteSegments = append(remoteSegments, mac)
+			}
+		}
+		remoteSegmentSet.OnSegmentChange(remoteSegments)
+		// Labeler更新策略信息
 		labelerManager.OnAclDataChange(response)
 	})
 
