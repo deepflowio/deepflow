@@ -384,6 +384,7 @@ func (f *FlowGenerator) processPackets(processBuffer []interface{}) {
 		} else {
 			f.processOtherIpPacket(meta)
 		}
+		ReleaseMetaPacket(meta)
 	}
 	f.packetHandler.Done()
 }
