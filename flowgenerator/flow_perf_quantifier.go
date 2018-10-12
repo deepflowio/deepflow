@@ -261,11 +261,11 @@ func (p *TcpSessionPeer) assertSeqNumber(tcpHeader *MetaPacketTcpHeader, payload
 
 	node := &SeqSegment{seqNumber: tcpHeader.Seq, length: uint32(payloadLen)}
 
-	l := p.seqList
-	if l == nil {
-		log.Warningf("flow info: %v, seqNumber list is nil, seqNumber data have lost", flowInfo)
-		return SEQ_ERROR
+	if p.seqList == nil {
+		p.seqList = list.New()
 	}
+	l := p.seqList
+
 	if l.Len() == 0 {
 		l.PushFront(node)
 		return SEQ_NOT_CARE
@@ -694,20 +694,6 @@ func checkTcpFlags(tcpFlags uint8) bool {
 	return true
 }
 
-func NewMetaFlowPerf() *MetaFlowPerf {
-	client := TcpSessionPeer{seqList: list.New()}
-	server := TcpSessionPeer{seqList: list.New()}
-
-	// 初始化MetaFlowPerf结构
-	meta := &MetaFlowPerf{
-		ctrlInfo: FlowPerfCtrlInfo{
-			tcpSession: TcpConnSession{client, server},
-		},
-	}
-
-	return meta
-}
-
 func (p *MetaFlowPerf) calcVarianceStats(header *MetaPacket, flowInfo *FlowInfo) {
 	packetVariance := &p.perfData.packetVariance
 
@@ -995,6 +981,4 @@ func calcAvgTime(average, consume, times int64) int64 {
 
 func (p *MetaFlowPerf) resetMetaFlowPerf() {
 	*p = MetaFlowPerf{}
-	p.ctrlInfo.tcpSession[0].seqList = list.New()
-	p.ctrlInfo.tcpSession[1].seqList = list.New()
 }

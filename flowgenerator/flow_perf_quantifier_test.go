@@ -142,8 +142,8 @@ func TestTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// init list
 	if peer.seqList == nil {
 		peer.seqList = list.New()
-		l = peer.seqList
 	}
+	l = peer.seqList
 
 	// list is empty, insert {10, 10}
 	if l.Len() == 0 {
@@ -341,8 +341,7 @@ func TestReestablishFsm(t *testing.T) {
 func TestAcquireMetaFlowPerf(t *testing.T) {
 	counter := NewFlowPerfCounter()
 	flowPerf := AcquireMetaFlowPerf()
-	t.Log(flowPerf.ctrlInfo, flowPerf.perfData, /*, flowPerf.perfCounter*/
-		flowPerf.ctrlInfo.tcpSession[0].seqList.PushFront(&SeqSegment{111, 11}))
+	t.Log(flowPerf.ctrlInfo, flowPerf.perfData)
 	t.Log(counter.counter)
 	/*
 		flow_perf_quantify_test.go:346: &{[{0xc42001f0e0 0 0 0 0 0 0 false false} {0xc42001f110 0 0 0 0 0 0 false false}]}
