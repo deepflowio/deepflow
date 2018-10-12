@@ -5,7 +5,7 @@ import (
 )
 
 var metaFlowPerfPool = sync.Pool{
-	New: func() interface{} { return NewMetaFlowPerf() },
+	New: func() interface{} { return new(MetaFlowPerf) },
 }
 
 func AcquireMetaFlowPerf() *MetaFlowPerf {
