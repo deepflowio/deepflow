@@ -46,6 +46,8 @@ type subMeteringHandler struct {
 	zmqAppQueue   queue.QueueWriter
 
 	queueIndex int
+
+	lastFlush time.Duration
 }
 
 func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
@@ -66,6 +68,8 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 		zmqAppQueue:   h.zmqAppQueue,
 
 		queueIndex: index,
+
+		lastFlush: time.Duration(time.Now().UnixNano()),
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.stashes[i] = NewStash(h.docsInBuffer, h.windowSize)
@@ -130,9 +134,13 @@ func (f *subMeteringHandler) Process() error {
 			}
 			datatype.ReleaseMetaPacket(metering)
 		}
+		if time.Duration(time.Now().UnixNano())-f.lastFlush >= FLUSH_INTERVAL {
+			f.Flush()
+		}
 	}
 }
 
 func (f *subMeteringHandler) Flush() {
+	f.lastFlush = time.Duration(time.Now().UnixNano())
 	f.putToQueue()
 }
