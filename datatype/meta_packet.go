@@ -217,7 +217,7 @@ func (p *MetaPacket) String() string {
 		buffer.WriteString(fmt.Sprintf("tcp: %+v", p.TcpData))
 	}
 	if p.EndpointData != nil {
-		buffer.WriteString(fmt.Sprintf("\n\tEndpointData(SRC: %+v, DST: %+v)", p.EndpointData.SrcInfo, p.EndpointData.DstInfo))
+		buffer.WriteString(fmt.Sprintf("\n\tEndpointData(%+s)", p.EndpointData))
 	}
 	if p.PolicyData != nil {
 		buffer.WriteString(fmt.Sprintf("\n\tPolicyData(%+v)", p.PolicyData))

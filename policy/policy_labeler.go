@@ -107,6 +107,7 @@ func (l *PolicyLabel) generateInterestKeys(endpointData *EndpointData, packet *L
 	hasAnyGroup := false
 	// 添加groupid 0匹配全采集的策略
 	for _, id := range endpointData.SrcInfo.GroupIds {
+		id = FormatGroupId(id)
 		if groupMap[id] {
 			packet.SrcGroupIds = append(packet.SrcGroupIds, id)
 			if id == ANY_GROUP {
@@ -121,6 +122,7 @@ func (l *PolicyLabel) generateInterestKeys(endpointData *EndpointData, packet *L
 
 	hasAnyGroup = false
 	for _, id := range endpointData.DstInfo.GroupIds {
+		id = FormatGroupId(id)
 		if groupMap[id] {
 			packet.DstGroupIds = append(packet.DstGroupIds, id)
 			if id == ANY_GROUP {
@@ -154,9 +156,9 @@ func generateGroupPortKeys(srcGroups []uint32, dstGroups []uint32, port uint16, 
 	}
 
 	for _, src := range srcGroups {
-		srcId := uint64(src & 0xfffff)
+		srcId := uint64(FormatGroupId(src))
 		for _, dst := range dstGroups {
-			dstId := uint64(dst & 0xfffff)
+			dstId := uint64(FormatGroupId(dst))
 			key |= srcId<<20 | dstId
 			keys = append(keys, key)
 			key &= 0xffffff0000000000
@@ -324,9 +326,9 @@ func generateGroupVlanKeys(srcGroups []uint32, dstGroups []uint32, vlan uint16) 
 	}
 
 	for _, src := range srcGroups {
-		srcId := uint64(src & 0xfffff)
+		srcId := uint64(FormatGroupId(src))
 		for _, dst := range dstGroups {
-			dstId := uint64(dst & 0xfffff)
+			dstId := uint64(FormatGroupId(dst))
 			key |= srcId<<20 | dstId
 			keys = append(keys, key)
 			key &= 0xffffff0000000000

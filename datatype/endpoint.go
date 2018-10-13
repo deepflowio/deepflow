@@ -2,6 +2,7 @@ package datatype
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	. "github.com/google/gopacket/layers"
@@ -20,6 +21,10 @@ const (
 	TAP_TOR
 	TAP_MAX
 	TAP_MIN TapType = TAP_ANY + 1
+)
+
+const (
+	IP_GROUP_ID_FLAG = 1e9
 )
 
 type EndpointInfo struct {
@@ -111,13 +116,45 @@ func (i *EndpointInfo) SetL3EndByMac(data *PlatformData, mac uint64) {
 	}
 }
 
+func GroupIdToString(id uint32) string {
+	if id >= IP_GROUP_ID_FLAG {
+		return fmt.Sprintf("IP-%d ", id-IP_GROUP_ID_FLAG)
+	} else {
+		return fmt.Sprintf("DEV-%d ", id)
+	}
+}
+
+func (i *EndpointInfo) GetGroupIdsString() string {
+	str := ""
+	for _, group := range i.GroupIds {
+		str += GroupIdToString(group)
+	}
+
+	return str
+}
+
+func (i *EndpointInfo) String() string {
+	infoString := ""
+	infoType := reflect.TypeOf(*i)
+	infoValue := reflect.ValueOf(*i)
+	for n := 0; n < infoType.NumField(); n++ {
+		if infoType.Field(n).Name == "GroupIds" {
+			infoString += fmt.Sprintf("%v: [%s]", infoType.Field(n).Name, i.GetGroupIdsString())
+		} else {
+			infoString += fmt.Sprintf("%v: %v ", infoType.Field(n).Name, infoValue.Field(n))
+		}
+	}
+
+	return infoString
+}
+
 func (d *EndpointData) SetL2End(key *LookupKey) {
 	d.SrcInfo.L2End = key.L2End0
 	d.DstInfo.L2End = key.L2End1
 }
 
 func (d *EndpointData) String() string {
-	return fmt.Sprintf("SRC: %+v,DST: %+v", *d.SrcInfo, *d.DstInfo)
+	return fmt.Sprintf("SRC: {%+s},\tDST: {%+s}", d.SrcInfo, d.DstInfo)
 }
 
 func (t *TapType) CheckTapType(tapType TapType) bool {
@@ -125,4 +162,12 @@ func (t *TapType) CheckTapType(tapType TapType) bool {
 		return true
 	}
 	return false
+}
+
+func FormatGroupId(id uint32) uint32 {
+	if id >= IP_GROUP_ID_FLAG {
+		return id - IP_GROUP_ID_FLAG
+	} else {
+		return id
+	}
 }
