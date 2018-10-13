@@ -21,13 +21,19 @@ func AcquireTaggedFlow() *TaggedFlow {
 }
 
 func ReleaseTaggedFlow(taggedFlow *TaggedFlow) {
+	if taggedFlow.TcpPerfStats != nil {
+		ReleaseTcpPerfStats(taggedFlow.TcpPerfStats)
+	}
 	*taggedFlow = TaggedFlow{}
 	taggedFlowPool.Put(taggedFlow)
 }
 
 func CloneTaggedFlow(taggedFlow *TaggedFlow) *TaggedFlow {
-	newTaggedFlow := taggedFlowPool.Get().(*TaggedFlow)
+	newTaggedFlow := AcquireTaggedFlow()
 	*newTaggedFlow = *taggedFlow
+	if taggedFlow.TcpPerfStats != nil {
+		newTaggedFlow.TcpPerfStats = CloneTcpPerfStats(taggedFlow.TcpPerfStats)
+	}
 	return newTaggedFlow
 }
 
@@ -35,9 +41,7 @@ func CloneTaggedFlowHelper(items []interface{}) []interface{} {
 	newItems := make([]interface{}, len(items))
 	for i, e := range items {
 		taggedFlow := e.(*TaggedFlow)
-		item := taggedFlowPool.Get().(*TaggedFlow)
-		*item = *taggedFlow
-		newItems[i] = item
+		newItems[i] = CloneTaggedFlow(taggedFlow)
 	}
 	return newItems
 }
