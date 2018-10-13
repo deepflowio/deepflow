@@ -425,9 +425,6 @@ func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uin
 			flowExtra.setCurFlowInfo(now, forceReportInterval)
 			flowExtra.calcCloseType(false)
 			flowOutQueue.Put(flowExtra.taggedFlow)
-			if flowExtra.metaFlowPerf != nil {
-				ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
-			}
 			e = e.Next()
 		}
 		flowCache.flowList.Init()
@@ -474,9 +471,6 @@ loop:
 				}
 				flowExtra.calcCloseType(false)
 				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
-				if flowExtra.metaFlowPerf != nil {
-					ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
-				}
 				ReleaseFlowExtra(flowExtra)
 				flowOutBuffer[flowOutNum] = taggedFlow
 				flowOutNum++

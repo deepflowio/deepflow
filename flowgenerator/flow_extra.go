@@ -44,13 +44,18 @@ func AcquireFlowExtra() *FlowExtra {
 
 func ReleaseFlowExtra(flowExtra *FlowExtra) {
 	flowExtra.taggedFlow = nil
-	flowExtra.metaFlowPerf = nil
+	if flowExtra.metaFlowPerf != nil {
+		ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
+	}
 	flowExtraPool.Put(flowExtra)
 }
 
 func CloneFlowExtra(flowExtra *FlowExtra) *FlowExtra {
 	newFlowExtra := AcquireFlowExtra()
 	*newFlowExtra = *flowExtra
+	if flowExtra.metaFlowPerf != nil {
+		newFlowExtra.metaFlowPerf = CloneMetaFlowPerf(flowExtra.metaFlowPerf)
+	}
 	return newFlowExtra
 }
 
