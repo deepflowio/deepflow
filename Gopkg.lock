@@ -178,7 +178,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:d357f69f48aacfc71d36a4652677e42ad11795a1efb645e77f65888eac7fab13"
+  digest = "1:e6a78fb86f4e5fa688e72fe842c8eb979cad40e3d18c1aaab0db3a4337a0b4d9"
   name = "gitlab.x.lan/application/droplet-app"
   packages = [
     "internal/pkg/endpoint",
@@ -195,7 +195,18 @@
     "pkg/mapper/usage",
   ]
   pruneopts = "UT"
-  revision = "d0d6b19baa8c8bbbf63cd3f5304bc8973245a62a"
+  revision = "bec03090083d54a6d6bf46f76031651e71de4191"
+
+[[projects]]
+  branch = "master"
+  digest = "1:46056edcca02d64ca5843a4f5e271200044ea6d9cca54088965d99bbe42a3889"
+  name = "gitlab.x.lan/platform/trident"
+  packages = [
+    "filter",
+    "utils",
+  ]
+  pruneopts = "UT"
+  revision = "d86cd11fbf1075babf5945888c980818a2830e7f"
 
 [[projects]]
   branch = "master"
