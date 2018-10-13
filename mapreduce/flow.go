@@ -73,6 +73,8 @@ type subFlowHandler struct {
 	emitCounter  []uint64
 	counterLatch int
 	statItems    []stats.StatItem
+
+	lastFlush time.Duration
 }
 
 func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
@@ -97,6 +99,8 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 		emitCounter:  make([]uint64, h.numberOfApps*2),
 		counterLatch: 0,
 		statItems:    make([]stats.StatItem, h.numberOfApps),
+
+		lastFlush: time.Duration(time.Now().UnixNano()),
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.stashes[i] = NewStash(h.docsInBuffer, h.windowSize)
@@ -199,9 +203,13 @@ func (f *subFlowHandler) Process() error {
 			}
 			datatype.ReleaseTaggedFlow(flow)
 		}
+		if time.Duration(time.Now().UnixNano())-f.lastFlush >= FLUSH_INTERVAL {
+			f.Flush()
+		}
 	}
 }
 
 func (f *subFlowHandler) Flush() {
+	f.lastFlush = time.Duration(time.Now().UnixNano())
 	f.putToQueue()
 }
