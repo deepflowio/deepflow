@@ -384,7 +384,7 @@ func (t *Tag) GetID(buf *utils.IntBuffer) string {
 			buf.WriteU48(t.MAC) // XXX: 32bit
 		}
 		if t.Code&GroupID != 0 {
-			buf.WriteU24(t.GroupID) // XXX: 16bit
+			buf.WriteU32(t.GroupID) // XXX: 16bit
 		}
 		if t.Code&L2EpcID != 0 {
 			buf.WriteU32(uint32(t.L2EpcID)) // XXX: 16bit
@@ -413,8 +413,8 @@ func (t *Tag) GetID(buf *utils.IntBuffer) string {
 			buf.WriteU48(t.MAC1)
 		}
 		if t.Code&GroupIDPath != 0 {
-			buf.WriteU24(t.GroupID0) // XXX: 16bit
-			buf.WriteU24(t.GroupID1) // XXX: 16bit
+			buf.WriteU32(t.GroupID0) // XXX: 16bit
+			buf.WriteU32(t.GroupID1) // XXX: 16bit
 		}
 		if t.Code&L2EpcIDPath != 0 {
 			buf.WriteU32(uint32(t.L2EpcID0)) // XXX: 16bit
