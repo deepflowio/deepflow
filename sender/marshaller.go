@@ -37,8 +37,7 @@ func (m *ZeroDocumentMarshaller) Start() {
 				header := &zero.ZeroHeader{
 					Timestamp: proto.Uint32(doc.Timestamp),
 					Sequence:  proto.Uint32(m.sequence),
-					// TODO: 修改hash算法
-					Hash: proto.Uint32(uint32((code >> 32) | code)),
+					Hash:      proto.Uint32(codeHash(code)),
 				}
 				bytes := utils.AcquireByteBuffer()
 				if _, err := header.MarshalTo(bytes.Use(header.Size())); err != nil {
