@@ -9,7 +9,7 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
-type AclSlice []*Acl
+type SortedAcls []*Acl
 
 var log = logging.MustGetLogger("policy")
 
@@ -50,12 +50,10 @@ const (
 	MAX_FASTPATH_MAP_LEN = 1 << 20
 )
 
-type PolicyDataBlock = [1024]PolicyData
-
 type PolicyTable struct {
 	sync.Mutex
-	cloudPlatformData *CloudPlatformData
-	policyLabel       *PolicyLabel
+	cloudPlatformLabeler *CloudPlatformLabeler
+	policyLabeler        *PolicyLabeler
 
 	queueCount int
 }
@@ -95,70 +93,70 @@ func NewPolicyTable(actionFlags ActionFlag, queueCount int, mapSize uint32, fast
 	// droplet关心**几乎**所有，对关心的信息进行计算
 	availableMapSize := getAvailableMapSize(queueCount, mapSize)
 	policyTable := &PolicyTable{
-		cloudPlatformData: NewCloudPlatformData(queueCount, availableMapSize),
-		policyLabel:       NewPolicyLabel(queueCount, availableMapSize, fastPathDisable),
-		queueCount:        queueCount,
+		cloudPlatformLabeler: NewCloudPlatformLabeler(queueCount, availableMapSize),
+		policyLabeler:        NewPolicyLabeler(queueCount, availableMapSize, fastPathDisable),
+		queueCount:           queueCount,
 	}
 	return policyTable
 }
 
 func (t *PolicyTable) GetHitStatus() (uint64, uint64) {
-	return atomic.LoadUint64(&t.policyLabel.FirstPathHit), atomic.LoadUint64(&t.policyLabel.FastPathHit)
+	return atomic.LoadUint64(&t.policyLabeler.FirstPathHit), atomic.LoadUint64(&t.policyLabeler.FastPathHit)
 }
 
 func (t *PolicyTable) AddAcl(acl *Acl) {
-	t.policyLabel.AddAcl(acl)
+	t.policyLabeler.AddAcl(acl)
 }
 
 func (t *PolicyTable) DelAcl(id int) {
-	t.policyLabel.DelAcl(id)
+	t.policyLabeler.DelAcl(id)
 }
 
 func (t *PolicyTable) GetAcl() []*Acl {
-	return t.policyLabel.RawAcls
+	return t.policyLabeler.RawAcls
 }
 
-func (acls AclSlice) Len() int {
+func (acls SortedAcls) Len() int {
 	return len(acls)
 }
 
-func (acls AclSlice) Less(i, j int) bool {
+func (acls SortedAcls) Less(i, j int) bool {
 	return acls[i].Id < acls[j].Id
 }
 
-func (acls AclSlice) Swap(i, j int) {
+func (acls SortedAcls) Swap(i, j int) {
 	acls[i], acls[j] = acls[j], acls[i]
 }
 
 func SortAclsById(acls []*Acl) []*Acl {
-	sort.Sort(AclSlice(acls))
+	sort.Sort(SortedAcls(acls))
 	return acls
 }
 
 func (t *PolicyTable) GetCounter() interface{} {
 	counter := &PolicyCounter{
-		MacTable:   uint32(len(t.cloudPlatformData.macTable.macMap)),
-		EpcIpTable: uint32(len(t.cloudPlatformData.epcIpTable.epcIpMap)),
+		MacTable:   uint32(len(t.cloudPlatformLabeler.macTable.macMap)),
+		EpcIpTable: uint32(len(t.cloudPlatformLabeler.epcIpTable.epcIpMap)),
 	}
 
 	for i := 0; i < MASK_LEN; i++ {
-		counter.IpTable += uint32(len(t.cloudPlatformData.ipTables[i].ipMap))
+		counter.IpTable += uint32(len(t.cloudPlatformLabeler.ipTables[i].ipMap))
 	}
 
 	for i := 0; i < t.queueCount; i++ {
 		for j := TAP_MIN; j < TAP_MAX; j++ {
-			counter.FastPath += uint32(t.policyLabel.FastPolicyMaps[i][j].Len())
+			counter.FastPath += uint32(t.policyLabeler.FastPolicyMaps[i][j].Len())
 		}
 	}
 
-	counter.FastHit = atomic.SwapUint64(&t.policyLabel.FastPathHitTick, 0)
-	counter.FirstHit = atomic.SwapUint64(&t.policyLabel.FirstPathHitTick, 0)
+	counter.FastHit = atomic.SwapUint64(&t.policyLabeler.FastPathHitTick, 0)
+	counter.FirstHit = atomic.SwapUint64(&t.policyLabeler.FirstPathHitTick, 0)
 
-	counter.Acl += uint32(len(t.policyLabel.RawAcls))
+	counter.Acl += uint32(len(t.policyLabeler.RawAcls))
 	for i := TAP_MIN; i < TAP_MAX; i++ {
-		counter.ArpTable += uint32(len(t.cloudPlatformData.arpTable[i].arpMap))
+		counter.ArpTable += uint32(len(t.cloudPlatformLabeler.arpTable[i].arpMap))
 	}
-	counter.AclHitMax = atomic.SwapUint64(&t.policyLabel.AclHitMax, 0)
+	counter.AclHitMax = atomic.SwapUint64(&t.policyLabeler.AclHitMax, 0)
 	return counter
 }
 
@@ -181,41 +179,41 @@ func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData
 		return INVALID_ENDPOINT_DATA, INVALID_POLICY_DATA
 	}
 
-	endpoint, policy := t.policyLabel.GetPolicyByFastPath(key)
+	endpoint, policy := t.policyLabeler.GetPolicyByFastPath(key)
 	if endpoint == nil {
-		endpoint = t.cloudPlatformData.GetEndpointData(key)
+		endpoint = t.cloudPlatformLabeler.GetEndpointData(key)
 		if key.Tap == TAP_TOR {
 			endpoint.SetL2End(key)
 		}
-		policy = t.policyLabel.GetPolicyByFirstPath(endpoint, key)
+		policy = t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
 	}
 	return endpoint, policy
 }
 
 func (t *PolicyTable) UpdateInterfaceData(data []*PlatformData) {
-	t.cloudPlatformData.UpdateInterfaceTable(data)
-	t.policyLabel.GenerateIpNetmaskMap(data)
+	t.cloudPlatformLabeler.UpdateInterfaceTable(data)
+	t.policyLabeler.GenerateIpNetmaskMap(data)
 }
 
 func (t *PolicyTable) UpdateIpGroupData(data []*IpGroupData) {
-	t.cloudPlatformData.ipGroup.Update(data)
-	t.policyLabel.GenerateIpNetmaskMapFromIpResource(data)
+	t.cloudPlatformLabeler.ipGroup.Update(data)
+	t.policyLabeler.GenerateIpNetmaskMapFromIpResource(data)
 }
 
 func (t *PolicyTable) UpdateAclData(data []*Acl) {
-	t.policyLabel.UpdateAcls(data)
+	t.policyLabeler.UpdateAcls(data)
 }
 
 func (t *PolicyTable) EnableAclData() {
-	t.policyLabel.FlushAcls()
+	t.policyLabeler.FlushAcls()
 }
 
 func (t *PolicyTable) GetEndpointInfo(mac uint64, ip uint32, inPort uint32) *EndpointInfo {
-	var endpointInfo *EndpointInfo
+	endpointInfo := (*EndpointInfo)(nil)
 	if PortInDeepflowExporter(inPort) {
-		endpointInfo = t.cloudPlatformData.GetEndpointInfo(mac, ip, TAP_TOR)
+		endpointInfo = t.cloudPlatformLabeler.GetEndpointInfo(mac, ip, TAP_TOR)
 	} else {
-		endpointInfo = t.cloudPlatformData.GetEndpointInfo(mac, ip, TAP_ISP)
+		endpointInfo = t.cloudPlatformLabeler.GetEndpointInfo(mac, ip, TAP_ISP)
 	}
 
 	return endpointInfo

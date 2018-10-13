@@ -38,7 +38,7 @@ type ArpTable struct {
 	arpMap map[MacIpInportKey]time.Time
 }
 
-type CloudPlatformData struct {
+type CloudPlatformLabeler struct {
 	macTable      *MacTable
 	ipTables      [MASK_LEN]*IpTable
 	epcIpTable    *EpcIpTable
@@ -47,7 +47,7 @@ type CloudPlatformData struct {
 	arpTable      [TAP_MAX]*ArpTable
 }
 
-func NewCloudPlatformData(queueCount int, mapSize uint32) *CloudPlatformData {
+func NewCloudPlatformLabeler(queueCount int, mapSize uint32) *CloudPlatformLabeler {
 	macTable := &MacTable{
 		macMap: make(MacMapData),
 	}
@@ -66,7 +66,7 @@ func NewCloudPlatformData(queueCount int, mapSize uint32) *CloudPlatformData {
 			arpMap: make(map[MacIpInportKey]time.Time),
 		}
 	}
-	return &CloudPlatformData{
+	return &CloudPlatformLabeler{
 		macTable:      macTable,
 		ipTables:      ipTables,
 		epcIpTable:    epcIpTable,
@@ -85,21 +85,21 @@ func calcHashKey(mac uint64, ip uint32) uint64 {
 	return uint64(mac<<32) | uint64(ip)
 }
 
-func (d *CloudPlatformData) GetDataByMac(key MacKey) *PlatformData {
-	if info, ok := d.macTable.macMap[key]; ok {
+func (l *CloudPlatformLabeler) GetDataByMac(key MacKey) *PlatformData {
+	if info, ok := l.macTable.macMap[key]; ok {
 		return info
 	}
 
 	return nil
 }
 
-func (d *CloudPlatformData) UpdateMacTable(macmap MacMapData) {
+func (l *CloudPlatformLabeler) UpdateMacTable(macmap MacMapData) {
 	if macmap != nil {
-		d.macTable.macMap = macmap
+		l.macTable.macMap = macmap
 	}
 }
 
-func (d *CloudPlatformData) GenerateMacData(platformDatas []*PlatformData) MacMapData {
+func (l *CloudPlatformLabeler) GenerateMacData(platformDatas []*PlatformData) MacMapData {
 	macMap := make(MacMapData)
 	for _, platformData := range platformDatas {
 		if platformData.Mac != 0 {
@@ -113,20 +113,20 @@ func IfHasNetmaskBit(bitmap uint32, k uint32) bool {
 	return (bitmap & (1 << k)) != 0
 }
 
-func (d *CloudPlatformData) GetDataByIp(ip uint32) *PlatformData {
+func (l *CloudPlatformLabeler) GetDataByIp(ip uint32) *PlatformData {
 	for i := uint32(0); i < MASK_LEN; i++ {
-		if !IfHasNetmaskBit(d.netmaskBitmap, i) {
+		if !IfHasNetmaskBit(l.netmaskBitmap, i) {
 			continue
 		}
 		subip := IpKey(ip & (NETMASK << i))
-		if info, ok := d.ipTables[i].ipMap[subip]; ok {
+		if info, ok := l.ipTables[i].ipMap[subip]; ok {
 			return info
 		}
 	}
 	return nil
 }
 
-func (d *CloudPlatformData) GenerateIpData(platformDatas []*PlatformData) IpMapDatas {
+func (l *CloudPlatformLabeler) GenerateIpData(platformDatas []*PlatformData) IpMapDatas {
 	ips := make(IpMapDatas, MASK_LEN)
 
 	for i := uint32(0); i < MASK_LEN; i++ {
@@ -139,16 +139,16 @@ func (d *CloudPlatformData) GenerateIpData(platformDatas []*PlatformData) IpMapD
 		for _, ipData := range platformData.Ips {
 			netmask := MAX_MASK_LEN - ipData.Netmask
 			ips[netmask][IpKey(ipData.Ip)] = platformData
-			d.netmaskBitmap |= 1 << netmask
+			l.netmaskBitmap |= 1 << netmask
 		}
 	}
 
 	return ips
 }
 
-func (d *CloudPlatformData) UpdateIpTable(ipDatas IpMapDatas) {
+func (l *CloudPlatformLabeler) UpdateIpTable(ipDatas IpMapDatas) {
 	for index, ipMap := range ipDatas {
-		d.ipTables[IpKey(index)].UpdateIpMap(ipMap)
+		l.ipTables[IpKey(index)].UpdateIpMap(ipMap)
 	}
 }
 
@@ -158,16 +158,16 @@ func (t *IpTable) UpdateIpMap(ipMap IpMapData) {
 	}
 }
 
-func (d *CloudPlatformData) GetDataByEpcIp(epc int32, ip uint32) *PlatformData {
+func (l *CloudPlatformLabeler) GetDataByEpcIp(epc int32, ip uint32) *PlatformData {
 	key := EpcIpKey((uint64(epc) << 32) | uint64(ip))
-	if info, ok := d.epcIpTable.epcIpMap[key]; ok {
+	if info, ok := l.epcIpTable.epcIpMap[key]; ok {
 		return info
 	}
 
 	return nil
 }
 
-func (d *CloudPlatformData) GenerateEpcIpData(platformDatas []*PlatformData) EpcIpMapData {
+func (l *CloudPlatformLabeler) GenerateEpcIpData(platformDatas []*PlatformData) EpcIpMapData {
 	epcIpMap := make(EpcIpMapData)
 	for _, platformData := range platformDatas {
 		for _, ipData := range platformData.Ips {
@@ -179,93 +179,93 @@ func (d *CloudPlatformData) GenerateEpcIpData(platformDatas []*PlatformData) Epc
 	return epcIpMap
 }
 
-func (d *CloudPlatformData) UpdateEpcIpTable(epcIpMap EpcIpMapData) {
+func (l *CloudPlatformLabeler) UpdateEpcIpTable(epcIpMap EpcIpMapData) {
 	if epcIpMap != nil {
-		d.epcIpTable.epcIpMap = epcIpMap
+		l.epcIpTable.epcIpMap = epcIpMap
 	}
 }
 
-func (d *CloudPlatformData) UpdateInterfaceTable(platformDatas []*PlatformData) {
+func (l *CloudPlatformLabeler) UpdateInterfaceTable(platformDatas []*PlatformData) {
 	if platformDatas != nil {
-		d.UpdateMacTable(d.GenerateMacData(platformDatas))
-		d.UpdateIpTable(d.GenerateIpData(platformDatas))
-		d.UpdateEpcIpTable(d.GenerateEpcIpData(platformDatas))
+		l.UpdateMacTable(l.GenerateMacData(platformDatas))
+		l.UpdateIpTable(l.GenerateIpData(platformDatas))
+		l.UpdateEpcIpTable(l.GenerateEpcIpData(platformDatas))
 	}
 }
 
 //FIXME: 后续考虑时间可以从metpacket获取
-func (d *CloudPlatformData) UpdateArpTable(hash MacIpInportKey, tapType TapType) {
-	d.arpTable[tapType].Lock()
-	d.arpTable[tapType].arpMap[hash] = time.Now()
-	d.arpTable[tapType].Unlock()
+func (l *CloudPlatformLabeler) UpdateArpTable(hash MacIpInportKey, tapType TapType) {
+	l.arpTable[tapType].Lock()
+	l.arpTable[tapType].arpMap[hash] = time.Now()
+	l.arpTable[tapType].Unlock()
 }
 
-func (d *CloudPlatformData) DeleteArpData(hash MacIpInportKey, tapType TapType) {
-	d.arpTable[tapType].Lock()
-	delete(d.arpTable[tapType].arpMap, hash)
-	d.arpTable[tapType].Unlock()
+func (l *CloudPlatformLabeler) DeleteArpData(hash MacIpInportKey, tapType TapType) {
+	l.arpTable[tapType].Lock()
+	delete(l.arpTable[tapType].arpMap, hash)
+	l.arpTable[tapType].Unlock()
 }
 
-func (d *CloudPlatformData) GetArpTable(hash MacIpInportKey, tapType TapType) bool {
-	d.arpTable[tapType].RLock()
-	if data, ok := d.arpTable[tapType].arpMap[hash]; ok {
-		d.arpTable[tapType].RUnlock()
+func (l *CloudPlatformLabeler) GetArpTable(hash MacIpInportKey, tapType TapType) bool {
+	l.arpTable[tapType].RLock()
+	if data, ok := l.arpTable[tapType].arpMap[hash]; ok {
+		l.arpTable[tapType].RUnlock()
 		if ARP_VALID_TIME < time.Now().Sub(data) {
-			d.DeleteArpData(hash, tapType)
+			l.DeleteArpData(hash, tapType)
 			return false
 		}
 		return true
 	}
-	d.arpTable[tapType].RUnlock()
+	l.arpTable[tapType].RUnlock()
 	return false
 }
 
 // 只更新源mac+ip的arp
-func (d *CloudPlatformData) CheckAndUpdateArpTable(key *LookupKey, hash MacIpInportKey) {
+func (l *CloudPlatformLabeler) CheckAndUpdateArpTable(key *LookupKey, hash MacIpInportKey) {
 	if key.EthType == EthernetTypeARP && !key.Invalid {
-		d.UpdateArpTable(hash, key.Tap)
+		l.UpdateArpTable(hash, key.Tap)
 	}
 }
 
 // 依据arp表和ttl修正L3End，若arp存在mac+ip对应关系L3End为true，ttl只对源mac+ip有效,包含在(64,128,255)则为true
-func (d *CloudPlatformData) ModifyL3End(endpointInfo *EndpointInfo, key *LookupKey, hash MacIpInportKey, direction bool) {
+func (l *CloudPlatformLabeler) ModifyL3End(endpointInfo *EndpointInfo, key *LookupKey, hash MacIpInportKey, direction bool) {
 	if endpointInfo.L3End {
 		return
 	}
-	if endpointInfo.L3End = d.GetArpTable(hash, key.Tap); !endpointInfo.L3End {
+	if endpointInfo.L3End = l.GetArpTable(hash, key.Tap); !endpointInfo.L3End {
 		if direction && key.EthType == EthernetTypeIPv4 {
 			endpointInfo.SetL3EndByTtl(key.Ttl)
 		}
 	}
 }
 
-func (d *CloudPlatformData) GetEndpointInfo(mac uint64, ip uint32, tapType TapType) *EndpointInfo {
-	endpointInfo := &EndpointInfo{}
+func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip uint32, tapType TapType) *EndpointInfo {
+	endpointInfo := AcquireEndpointInfo()
 	if tapType == TAP_TOR {
-		platformData := d.GetDataByMac(MacKey(mac))
+		platformData := l.GetDataByMac(MacKey(mac))
 		if platformData != nil {
 			endpointInfo.SetL2Data(platformData)
 			endpointInfo.SetL3EndByIp(platformData, ip)
-			if platformData = d.GetDataByEpcIp(endpointInfo.L2EpcId, ip); platformData == nil {
-				platformData = d.GetDataByIp(ip)
+			if platformData = l.GetDataByEpcIp(endpointInfo.L2EpcId, ip); platformData == nil {
+				platformData = l.GetDataByIp(ip)
 			}
 			if platformData != nil {
 				endpointInfo.SetL3Data(platformData, ip)
 			}
 		}
-		d.ipGroup.Populate(ip, endpointInfo)
+		l.ipGroup.Populate(ip, endpointInfo)
 	} else {
-		platformData := d.GetDataByIp(ip)
+		platformData := l.GetDataByIp(ip)
 		if platformData != nil {
 			endpointInfo.SetL3Data(platformData, ip)
 			endpointInfo.SetL3EndByMac(platformData, mac)
 		}
-		d.ipGroup.Populate(ip, endpointInfo)
+		l.ipGroup.Populate(ip, endpointInfo)
 	}
 	return endpointInfo
 }
 
-func (d *CloudPlatformData) ModifyDeviceInfo(endpointInfo *EndpointInfo) {
+func (l *CloudPlatformLabeler) ModifyDeviceInfo(endpointInfo *EndpointInfo) {
 	if endpointInfo.L2End && endpointInfo.L3End {
 		if endpointInfo.L2DeviceId == 0 {
 			endpointInfo.L2DeviceId = endpointInfo.L3DeviceId
@@ -282,16 +282,16 @@ func (d *CloudPlatformData) ModifyDeviceInfo(endpointInfo *EndpointInfo) {
 	}
 }
 
-func (d *CloudPlatformData) GetEndpointData(key *LookupKey) *EndpointData {
+func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	srcHash := MacIpInportKey(calcHashKey(key.SrcMac, key.SrcIp))
-	d.CheckAndUpdateArpTable(key, srcHash)
-	srcData := d.GetEndpointInfo(key.SrcMac, key.SrcIp, key.Tap)
-	d.ModifyL3End(srcData, key, srcHash, true)
-	d.ModifyDeviceInfo(srcData)
+	l.CheckAndUpdateArpTable(key, srcHash)
+	srcData := l.GetEndpointInfo(key.SrcMac, key.SrcIp, key.Tap)
+	l.ModifyL3End(srcData, key, srcHash, true)
+	l.ModifyDeviceInfo(srcData)
 	dstHash := MacIpInportKey(calcHashKey(key.DstMac, key.DstIp))
-	dstData := d.GetEndpointInfo(key.DstMac, key.DstIp, key.Tap)
-	d.ModifyL3End(dstData, key, dstHash, false)
-	d.ModifyDeviceInfo(dstData)
+	dstData := l.GetEndpointInfo(key.DstMac, key.DstIp, key.Tap)
+	l.ModifyL3End(dstData, key, dstHash, false)
+	l.ModifyDeviceInfo(dstData)
 
-	return &EndpointData{SrcInfo: srcData, DstInfo: dstData}
+	return AcquireEndpointData(srcData, dstData)
 }
