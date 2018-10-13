@@ -66,7 +66,7 @@ func (g *IpResourceGroup) Populate(ip uint32, endpointInfo *EndpointInfo) bool {
 	queryResult := g.ipTree.cachedQuery(endpointInfo.L3EpcId, ip)
 	ok := queryResult != nil
 	for _, v := range queryResult {
-		endpointInfo.GroupIds = append(endpointInfo.GroupIds, uint32(v))
+		endpointInfo.GroupIds = append(endpointInfo.GroupIds, uint32(v)+IP_GROUP_ID_FLAG)
 	}
 
 	return ok
