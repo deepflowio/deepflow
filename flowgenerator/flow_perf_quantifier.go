@@ -801,7 +801,7 @@ func Report(flowPerf *MetaFlowPerf, reverse bool, perfCounter *FlowPerfCounter) 
 	}
 
 	current := time.Now()
-	report := &TcpPerfStats{}
+	report := AcquireTcpPerfStats()
 	flowPerf.perfData.calcReportFlowPerfStats(report, reverse)
 	flowPerf.perfData.resetPeriodPerfStats()
 
