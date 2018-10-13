@@ -2,10 +2,11 @@ package datatype
 
 import (
 	"fmt"
+	"sync"
 )
 
 var (
-	INVALID_POLICY_DATA = &PolicyData{}
+	INVALID_POLICY_DATA = AcquirePolicyData()
 )
 
 type ActionFlag uint16
@@ -197,7 +198,7 @@ func (a AclAction) GetTagTemplates() TagTemplate {
 }
 
 func (a AclAction) String() string {
-	return fmt.Sprintf("AclAction{GID: %d ActionFlags: %s Directions: %d TagTemplates: %s}",
+	return fmt.Sprintf("{GID: %d ActionFlags: %s Directions: %d TagTemplates: %s}",
 		a.GetACLGID(), a.GetActionFlags().String(), a.GetDirections(), a.GetTagTemplates().String())
 }
 
@@ -239,6 +240,36 @@ func (d *PolicyData) MergeAndSwapDirection(aclActions []AclAction, aclID ACLID) 
 	d.Merge(newAclActions, aclID)
 }
 
-func (a *PolicyData) String() string {
-	return fmt.Sprintf("%+v", *a)
+func (d *PolicyData) String() string {
+	return fmt.Sprintf("{ACLID: %d ActionFlags: %v AclActions: %v}", d.ACLID, d.ActionFlags, d.AclActions)
+}
+
+func NewPolicyData() *PolicyData {
+	return &PolicyData{AclActions: make([]AclAction, 0)}
+}
+
+var policyDataPool = sync.Pool{
+	New: func() interface{} {
+		return NewPolicyData()
+	},
+}
+
+func AcquirePolicyData() *PolicyData {
+	return policyDataPool.Get().(*PolicyData)
+}
+
+func ReleasePolicyData(d *PolicyData) {
+	if d.AclActions != nil {
+		d.AclActions = d.AclActions[:0]
+	}
+	*d = PolicyData{AclActions: d.AclActions}
+	policyDataPool.Put(d)
+}
+
+func ClonePolicyData(d *PolicyData) *PolicyData {
+	dup := AcquirePolicyData()
+	*dup = *d
+	dup.AclActions = make([]AclAction, len(d.AclActions))
+	copy(dup.AclActions, d.AclActions)
+	return dup
 }

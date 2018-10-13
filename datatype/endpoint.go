@@ -3,16 +3,17 @@ package datatype
 import (
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	. "github.com/google/gopacket/layers"
 )
 
-type TapType uint8
-
 var (
-	INVALID_ENDPOINT_DATA = &EndpointData{&EndpointInfo{}, &EndpointInfo{}}
+	INVALID_ENDPOINT_DATA = AcquireEndpointData()
 )
+
+type TapType uint8
 
 const (
 	TAP_ANY TapType = iota
@@ -20,6 +21,7 @@ const (
 	TAP_SPINE
 	TAP_TOR
 	TAP_MAX
+
 	TAP_MIN TapType = TAP_ANY + 1
 )
 
@@ -64,11 +66,12 @@ type EndpointData struct {
 	DstInfo *EndpointInfo
 }
 
+func NewEndpointInfo() *EndpointInfo {
+	return &EndpointInfo{GroupIds: make([]uint32, 0)}
+}
+
 func NewEndpointData() *EndpointData {
-	return &EndpointData{
-		SrcInfo: &EndpointInfo{},
-		DstInfo: &EndpointInfo{},
-	}
+	return &EndpointData{}
 }
 
 func (i *EndpointInfo) SetL2Data(data *PlatformData) {
@@ -118,23 +121,25 @@ func (i *EndpointInfo) SetL3EndByMac(data *PlatformData, mac uint64) {
 
 func GroupIdToString(id uint32) string {
 	if id >= IP_GROUP_ID_FLAG {
-		return fmt.Sprintf("IP-%d ", id-IP_GROUP_ID_FLAG)
+		return fmt.Sprintf("IP-%d", id-IP_GROUP_ID_FLAG)
 	} else {
-		return fmt.Sprintf("DEV-%d ", id)
+		return fmt.Sprintf("DEV-%d", id)
 	}
 }
 
 func (i *EndpointInfo) GetGroupIdsString() string {
 	str := ""
-	for _, group := range i.GroupIds {
+	for id, group := range i.GroupIds {
+		if id != 0 {
+			str += " "
+		}
 		str += GroupIdToString(group)
 	}
-
 	return str
 }
 
 func (i *EndpointInfo) String() string {
-	infoString := ""
+	infoString := "{"
 	infoType := reflect.TypeOf(*i)
 	infoValue := reflect.ValueOf(*i)
 	for n := 0; n < infoType.NumField(); n++ {
@@ -144,17 +149,17 @@ func (i *EndpointInfo) String() string {
 			infoString += fmt.Sprintf("%v: %v ", infoType.Field(n).Name, infoValue.Field(n))
 		}
 	}
-
+	infoString += "}"
 	return infoString
+}
+
+func (d *EndpointData) String() string {
+	return fmt.Sprintf("{Src: %v Dst: %v}", d.SrcInfo, d.DstInfo)
 }
 
 func (d *EndpointData) SetL2End(key *LookupKey) {
 	d.SrcInfo.L2End = key.L2End0
 	d.DstInfo.L2End = key.L2End1
-}
-
-func (d *EndpointData) String() string {
-	return fmt.Sprintf("SRC: {%+s},\tDST: {%+s}", d.SrcInfo, d.DstInfo)
 }
 
 func (t *TapType) CheckTapType(tapType TapType) bool {
@@ -170,4 +175,74 @@ func FormatGroupId(id uint32) uint32 {
 	} else {
 		return id
 	}
+}
+
+var endpointInfoPool = sync.Pool{
+	New: func() interface{} {
+		return NewEndpointInfo()
+	},
+}
+
+func AcquireEndpointInfo() *EndpointInfo {
+	return endpointInfoPool.Get().(*EndpointInfo)
+}
+
+func ReleaseEndpointInfo(i *EndpointInfo) {
+	if i.GroupIds != nil {
+		i.GroupIds = i.GroupIds[:0]
+	}
+	*i = EndpointInfo{GroupIds: i.GroupIds}
+	endpointInfoPool.Put(i)
+}
+
+func CloneEndpointInfo(i *EndpointInfo) *EndpointInfo {
+	dup := AcquireEndpointInfo()
+	*dup = *i
+	dup.GroupIds = make([]uint32, len(i.GroupIds))
+	copy(dup.GroupIds, i.GroupIds)
+	return dup
+}
+
+var endpointDataPool = sync.Pool{
+	New: func() interface{} {
+		return NewEndpointData()
+	},
+}
+
+func AcquireEndpointData(infos ...*EndpointInfo) *EndpointData {
+	d := endpointDataPool.Get().(*EndpointData)
+	len := len(infos)
+	if len == 0 {
+		d.SrcInfo = AcquireEndpointInfo()
+		d.DstInfo = AcquireEndpointInfo()
+	} else if len == 1 {
+		d.SrcInfo = infos[0]
+		d.DstInfo = AcquireEndpointInfo()
+	} else if len == 2 {
+		d.SrcInfo = infos[0]
+		d.DstInfo = infos[1]
+	}
+	return d
+}
+
+func ReleaseEndpointData(d *EndpointData) {
+	if d.SrcInfo != nil {
+		ReleaseEndpointInfo(d.SrcInfo)
+	}
+	if d.DstInfo != nil {
+		ReleaseEndpointInfo(d.DstInfo)
+	}
+	*d = EndpointData{}
+	endpointDataPool.Put(d)
+}
+
+func CloneEndpointData(d *EndpointData) *EndpointData {
+	dup := AcquireEndpointData(nil, nil)
+	if d.SrcInfo != nil {
+		dup.SrcInfo = CloneEndpointInfo(d.SrcInfo)
+	}
+	if d.DstInfo != nil {
+		dup.DstInfo = CloneEndpointInfo(d.DstInfo)
+	}
+	return dup
 }
