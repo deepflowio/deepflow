@@ -581,8 +581,8 @@ func delAcl(arg string) {
 
 func parseAcl(args []string) *policy.Acl {
 	acl := &policy.Acl{}
-	acl.SrcGroups = make(map[uint32]uint32)
-	acl.DstGroups = make(map[uint32]uint32)
+	acl.SrcGroups = make([]uint32, 0)
+	acl.DstGroups = make([]uint32, 0)
 
 	parts := strings.Split(args[0], ",")
 	for _, part := range parts {
@@ -594,14 +594,14 @@ func parseAcl(args []string) *policy.Acl {
 				fmt.Printf("invalid sgroup %s from %s\n", keyValue[1], args[0])
 				return nil
 			}
-			acl.SrcGroups[uint32(group)] = uint32(group)
+			acl.SrcGroups = append(acl.SrcGroups, uint32(group))
 		case "dgroup":
 			group, err := strconv.Atoi(keyValue[1])
 			if err != nil || group < 0 {
 				fmt.Printf("invalid sgroup %s from %s\n", keyValue[1], args[0])
 				return nil
 			}
-			acl.DstGroups[uint32(group)] = uint32(group)
+			acl.DstGroups = append(acl.DstGroups, uint32(group))
 		case "id":
 			id, err := strconv.Atoi(keyValue[1])
 			if err != nil || id < 0 {
@@ -641,8 +641,8 @@ func parseAcl(args []string) *policy.Acl {
 				fmt.Printf("invalid port %s from %s\n", keyValue[1], args[0])
 				return nil
 			}
-			acl.DstPorts = make(map[uint16]uint16)
-			acl.DstPorts[uint16(port)] = uint16(port)
+			acl.DstPorts = make([]uint16, 0)
+			acl.DstPorts = append(acl.DstPorts, uint16(port))
 		case "action":
 			aclAction := datatype.AclAction(0).AddDirections(datatype.FORWARD | datatype.BACKWARD).AddTagTemplates(0xFFFF)
 			switch keyValue[1] {
