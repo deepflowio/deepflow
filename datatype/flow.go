@@ -201,7 +201,7 @@ func AcquireTcpPerfStats() *TcpPerfStats {
 
 func ReleaseTcpPerfStats(s *TcpPerfStats) {
 	*s = TcpPerfStats{}
-	taggedFlowPool.Put(s)
+	tcpPerfStatsPool.Put(s)
 }
 
 func CloneTcpPerfStats(s *TcpPerfStats) *TcpPerfStats {
