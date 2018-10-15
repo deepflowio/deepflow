@@ -5,7 +5,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
-	"gitlab.x.lan/yunshan/droplet-libs/messenger"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/message/zero"
@@ -32,7 +31,7 @@ func TestZeroDocumentSender(t *testing.T) {
 
 	for bytes := range chan1 {
 		b := bytes.Bytes()
-		doc, _ := messenger.Unmarshal(b[len(hb):])
+		doc, _ := unmarshal(b[len(hb):])
 		hasEqual := false
 		for _, data := range TEST_DATA {
 			if documentEqual(doc, data.(*app.Document)) {
@@ -47,7 +46,7 @@ func TestZeroDocumentSender(t *testing.T) {
 
 	for bytes := range chan2 {
 		b := bytes.Bytes()
-		doc, _ := messenger.Unmarshal(b[len(hb):])
+		doc, _ := unmarshal(b[len(hb):])
 		hasEqual := false
 		for _, data := range TEST_DATA {
 			if documentEqual(doc, data.(*app.Document)) {

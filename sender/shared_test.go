@@ -2,6 +2,8 @@ package sender
 
 import (
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"reflect"
 	"time"
 
@@ -10,9 +12,65 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	dt "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 	"gitlab.x.lan/yunshan/droplet-libs/zmq"
+	pb "gitlab.x.lan/yunshan/message/zero"
 )
 
 var TEST_DATA []interface{}
+
+func unmarshal(b []byte) (*app.Document, error) {
+	if b == nil {
+		return nil, errors.New("No input byte")
+	}
+
+	msg := &pb.ZeroDocument{}
+	if err := msg.Unmarshal(b); err != nil {
+		return nil, fmt.Errorf("Unmarshaling protobuf failed: %s", err)
+	}
+
+	doc := &app.Document{}
+	doc.Timestamp = msg.GetTimestamp()
+	doc.Tag = dt.AcquireTag()
+	doc.Tag.(*dt.Tag).Field = dt.AcquireField()
+	dt.PBToTag(msg.GetTag(), doc.Tag.(*dt.Tag))
+	meter := msg.GetMeter()
+	switch {
+	case meter.GetUsage() != nil:
+		m := dt.AcquireUsageMeter()
+		dt.PBToUsageMeter(meter.GetUsage(), m)
+		doc.Meter = m
+	case meter.GetPerf() != nil:
+		m := dt.AcquirePerfMeter()
+		dt.PBToPerfMeter(meter.GetPerf(), m)
+		doc.Meter = m
+	case meter.GetGeo() != nil:
+		m := dt.AcquireGeoMeter()
+		dt.PBToGeoMeter(meter.GetGeo(), m)
+		doc.Meter = m
+	case meter.GetFlow() != nil:
+		m := dt.AcquireFlowMeter()
+		dt.PBToFlowMeter(meter.GetFlow(), m)
+		doc.Meter = m
+	case meter.GetPlatform() != nil:
+		m := dt.AcquirePlatformMeter()
+		dt.PBToPlatformMeter(meter.GetPlatform(), m)
+		doc.Meter = m
+	case meter.GetConsoleLog() != nil:
+		m := dt.AcquireConsoleLogMeter()
+		dt.PBToConsoleLogMeter(meter.GetConsoleLog(), m)
+		doc.Meter = m
+	case meter.GetType() != nil:
+		m := dt.AcquireTypeMeter()
+		dt.PBToTypeMeter(meter.GetType(), m)
+		doc.Meter = m
+	case meter.GetFps() != nil:
+		m := dt.AcquireFPSMeter()
+		dt.PBToFPSMeter(meter.GetFps(), m)
+		doc.Meter = m
+	}
+	doc.ActionFlags = msg.GetActionFlags()
+
+	return doc, nil
+}
 
 func init() {
 	TEST_DATA = make([]interface{}, 0, 10)
