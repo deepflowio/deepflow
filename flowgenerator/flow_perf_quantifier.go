@@ -15,7 +15,6 @@ import (
 type ContinuousFlag uint8
 type TcpConnSession = [2]TcpSessionPeer
 type PacketSeqTypeInSeqList uint8
-type MetaFlowPerfBlock = [META_FLOW_PERF_BLOCK_SIZE]MetaFlowPerf
 
 const (
 	FP_NAME = "flowperf"
