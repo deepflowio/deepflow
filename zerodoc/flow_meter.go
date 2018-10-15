@@ -8,15 +8,15 @@ import (
 )
 
 type FlowMeter struct {
-	SumFlowCount       uint64
-	SumNewFlowCount    uint64
-	SumClosedFlowCount uint64
-	SumPacketTx        uint64
-	SumPacketRx        uint64
-	SumPacket          uint64
-	SumBitTx           uint64
-	SumBitRx           uint64
-	SumBit             uint64
+	SumFlowCount       uint64 `db:"sum_flow_count"`
+	SumNewFlowCount    uint64 `db:"sum_new_flow_count"`
+	SumClosedFlowCount uint64 `db:"sum_closed_flow_count"`
+	SumPacketTx        uint64 `db:"sum_packet_tx"`
+	SumPacketRx        uint64 `db:"sum_packet_rx"`
+	SumPacket          uint64 `db:"sum_packet"`
+	SumBitTx           uint64 `db:"sum_bit_tx"`
+	SumBitRx           uint64 `db:"sum_bit_rx"`
+	SumBit             uint64 `db:"sum_bit"`
 }
 
 func (m *FlowMeter) ConcurrentMerge(other app.Meter) {

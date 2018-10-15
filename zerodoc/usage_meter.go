@@ -64,12 +64,12 @@ func (m *UsageMeter) ToKVString() string {
 }
 
 type UsageMeterSum struct {
-	SumPacketTx uint64
-	SumPacketRx uint64
-	SumPacket   uint64
-	SumBitTx    uint64
-	SumBitRx    uint64
-	SumBit      uint64
+	SumPacketTx uint64 `db:"sum_packet_tx"`
+	SumPacketRx uint64 `db:"sum_packet_rx"`
+	SumPacket   uint64 `db:"sum_packet"`
+	SumBitTx    uint64 `db:"sum_bit_tx"`
+	SumBitRx    uint64 `db:"sum_bit_rx"`
+	SumBit      uint64 `db:"sum_bit"`
 }
 
 func (m *UsageMeterSum) concurrentMerge(other *UsageMeterSum) {
@@ -86,12 +86,12 @@ func (m *UsageMeterSum) sequentialMerge(other *UsageMeterSum) {
 }
 
 type UsageMeterMax struct {
-	MaxPacketTx uint64
-	MaxPacketRx uint64
-	MaxPacket   uint64
-	MaxBitTx    uint64
-	MaxBitRx    uint64
-	MaxBit      uint64
+	MaxPacketTx uint64 `db:"max_packet_tx"`
+	MaxPacketRx uint64 `db:"max_packet_rx"`
+	MaxPacket   uint64 `db:"max_packet"`
+	MaxBitTx    uint64 `db:"max_bit_tx"`
+	MaxBitRx    uint64 `db:"max_bit_rx"`
+	MaxBit      uint64 `db:"max_bit"`
 }
 
 func (m *UsageMeterMax) concurrentMerge(other *UsageMeterMax) {

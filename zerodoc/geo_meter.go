@@ -9,15 +9,15 @@ import (
 )
 
 type GeoMeter struct {
-	SumClosedFlowCount    uint64
-	SumAbnormalFlowCount  uint64
-	SumClosedFlowDuration time.Duration
-	SumPacketTx           uint64
-	SumPacketRx           uint64
-	SumBitTx              uint64
-	SumBitRx              uint64
-	SumRTTSyn             time.Duration
-	SumRTTSynFlow         uint64
+	SumClosedFlowCount    uint64        `db:"sum_closed_flow_count"`
+	SumAbnormalFlowCount  uint64        `db:"sum_abnormal_flow_count"`
+	SumClosedFlowDuration time.Duration `db:"sum_closed_flow_duration"`
+	SumPacketTx           uint64        `db:"sum_packet_tx"`
+	SumPacketRx           uint64        `db:"sum_packet_rx"`
+	SumBitTx              uint64        `db:"sum_bit_tx"`
+	SumBitRx              uint64        `db:"sum_bit_rx"`
+	SumRTTSyn             time.Duration `db:"sum_rtt_syn"`
+	SumRTTSynFlow         uint64        `db:"sum_rtt_syn_flow"`
 }
 
 func (m *GeoMeter) ConcurrentMerge(other app.Meter) {

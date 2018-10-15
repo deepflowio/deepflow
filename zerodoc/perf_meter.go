@@ -84,22 +84,22 @@ func (m *PerfMeter) ToKVString() string {
 }
 
 type PerfMeterSum struct {
-	SumFlowCount         uint64
-	SumClosedFlowCount   uint64
-	SumRetransFlowCount  uint64
-	SumHalfOpenFlowCount uint64
-	SumPacketTx          uint64
-	SumPacketRx          uint64
-	SumRetransCntTx      uint64
-	SumRetransCntRx      uint64
+	SumFlowCount         uint64 `db:"sum_flow_count"`
+	SumClosedFlowCount   uint64 `db:"sum_closed_flow_count"`
+	SumRetransFlowCount  uint64 `db:"sum_retrans_flow_count"`
+	SumHalfOpenFlowCount uint64 `db:"sum_half_open_flow_count"`
+	SumPacketTx          uint64 `db:"sum_packet_tx"`
+	SumPacketRx          uint64 `db:"sum_packet_rx"`
+	SumRetransCntTx      uint64 `db:"sum_retrans_cnt_tx"`
+	SumRetransCntRx      uint64 `db:"sum_retrans_cnt_rx"`
 
-	SumRTTSyn     time.Duration
-	SumRTTAvg     time.Duration
-	SumRTTSynFlow uint64
-	SumRTTAvgFlow uint64
+	SumRTTSyn     time.Duration `db:"sum_rtt_syn"`
+	SumRTTAvg     time.Duration `db:"sum_rtt_avg"`
+	SumRTTSynFlow uint64        `db:"sum_rtt_syn_flow"`
+	SumRTTAvgFlow uint64        `db:"sum_rtt_avg_flow"`
 
-	SumZeroWndCntTx uint64
-	SumZeroWndCntRx uint64
+	SumZeroWndCntTx uint64 `db:"sum_zero_wnd_cnt_tx"`
+	SumZeroWndCntRx uint64 `db:"sum_zero_wnd_cnt_rx"`
 }
 
 func (m *PerfMeterSum) concurrentMerge(other *PerfMeterSum) {
@@ -141,8 +141,8 @@ func (m *PerfMeterSum) sequentialMerge(other *PerfMeterSum) { // other为后一�
 }
 
 type PerfMeterMax struct {
-	MaxRTTSyn time.Duration
-	MaxRTTAvg time.Duration
+	MaxRTTSyn time.Duration `db:"max_rtt_syn"`
+	MaxRTTAvg time.Duration `db:"max_rtt_avg"`
 }
 
 func (m *PerfMeterMax) concurrentMerge(other *PerfMeterMax) {
@@ -156,8 +156,8 @@ func (m *PerfMeterMax) sequentialMerge(other *PerfMeterMax) {
 }
 
 type PerfMeterMin struct {
-	MinRTTSyn time.Duration
-	MinRTTAvg time.Duration
+	MinRTTSyn time.Duration `db:"min_rtt_syn"`
+	MinRTTAvg time.Duration `db:"min_rtt_avg"`
 }
 
 func (m *PerfMeterMin) concurrentMerge(other *PerfMeterMin) {
