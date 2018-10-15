@@ -8,9 +8,9 @@ import (
 )
 
 type PlatformMeter struct {
-	SumClosedFlowCount uint64
-	SumPacket          uint64
-	SumBit             uint64
+	SumClosedFlowCount uint64 `db:"sum_closed_flow_count"`
+	SumPacket          uint64 `db:"sum_packet"`
+	SumBit             uint64 `db:"sum_bit"`
 }
 
 func (m *PlatformMeter) ConcurrentMerge(other app.Meter) {
