@@ -131,9 +131,11 @@ func TagToPB(t *Tag) *pb.Tag {
 	return tag
 }
 
-func PBToTag(t *pb.Tag) *Tag {
-	tag := AcquireTag()
-	tag.Field = AcquireField()
+func PBToTag(t *pb.Tag, tag *Tag) {
+	if tag == nil || tag.Field == nil {
+		panic("tag或tag.Field为空")
+		return
+	}
 	tag.Code = Code(t.GetCode())
 
 	if tag.Code&IP != 0 {
@@ -243,8 +245,6 @@ func PBToTag(t *pb.Tag) *Tag {
 			}
 		}
 	}
-
-	return tag
 }
 
 func UsageMeterToPB(m *UsageMeter) *pb.UsageMeter {
@@ -268,8 +268,11 @@ func UsageMeterToPB(m *UsageMeter) *pb.UsageMeter {
 	}
 }
 
-func PBToUsageMeter(m *pb.UsageMeter) *UsageMeter {
-	meter := AcquireUsageMeter()
+func PBToUsageMeter(m *pb.UsageMeter, meter *UsageMeter) {
+	if meter == nil {
+		panic("meter为空")
+		return
+	}
 
 	sum := m.GetSum()
 	meter.SumPacketTx = sum.GetPacketTx()
@@ -286,8 +289,6 @@ func PBToUsageMeter(m *pb.UsageMeter) *UsageMeter {
 	meter.MaxBitTx = max.GetBitTx()
 	meter.MaxBitRx = max.GetBitRx()
 	meter.MaxBit = max.GetBit()
-
-	return meter
 }
 
 func PerfMeterToPB(m *PerfMeter) *pb.PerfMeter {
@@ -301,14 +302,15 @@ func PerfMeterToPB(m *PerfMeter) *pb.PerfMeter {
 	}
 }
 
-func PBToPerfMeter(m *pb.PerfMeter) *PerfMeter {
-	meter := AcquirePerfMeter()
+func PBToPerfMeter(m *pb.PerfMeter, meter *PerfMeter) {
+	if meter == nil {
+		panic("meter为空")
+		return
+	}
 
-	meter.PerfMeterSum = *pbToPerfMeterSum(m.GetSum())
-	meter.PerfMeterMax = *pbToPerfMeterMax(m.GetMax())
-	meter.PerfMeterMin = *pbToPerfMeterMin(m.GetMin())
-
-	return meter
+	pbToPerfMeterSum(m.GetSum(), &meter.PerfMeterSum)
+	pbToPerfMeterMax(m.GetMax(), &meter.PerfMeterMax)
+	pbToPerfMeterMin(m.GetMin(), &meter.PerfMeterMin)
 }
 
 func PerfMeterSumToPB(m *PerfMeterSum) *pb.PerfStats {
@@ -332,25 +334,23 @@ func PerfMeterSumToPB(m *PerfMeterSum) *pb.PerfStats {
 	}
 }
 
-func pbToPerfMeterSum(m *pb.PerfStats) *PerfMeterSum {
-	return &PerfMeterSum{
-		SumFlowCount:         m.GetFlowCount(),
-		SumClosedFlowCount:   m.GetClosedFlowCount(),
-		SumRetransFlowCount:  m.GetRetransFlowCount(),
-		SumHalfOpenFlowCount: m.GetHalfOpenFlowCount(),
-		SumPacketTx:          m.GetPacketTx(),
-		SumPacketRx:          m.GetPacketRx(),
-		SumRetransCntTx:      m.GetRetransCntTx(),
-		SumRetransCntRx:      m.GetRetransCntRx(),
+func pbToPerfMeterSum(m *pb.PerfStats, meter *PerfMeterSum) {
+	meter.SumFlowCount = m.GetFlowCount()
+	meter.SumClosedFlowCount = m.GetClosedFlowCount()
+	meter.SumRetransFlowCount = m.GetRetransFlowCount()
+	meter.SumHalfOpenFlowCount = m.GetHalfOpenFlowCount()
+	meter.SumPacketTx = m.GetPacketTx()
+	meter.SumPacketRx = m.GetPacketRx()
+	meter.SumRetransCntTx = m.GetRetransCntTx()
+	meter.SumRetransCntRx = m.GetRetransCntRx()
 
-		SumRTTSyn:     time.Duration(m.GetRttSyn()),
-		SumRTTAvg:     time.Duration(m.GetRttAvg()),
-		SumRTTSynFlow: m.GetRttSynFlow(),
-		SumRTTAvgFlow: m.GetRttAvgFlow(),
+	meter.SumRTTSyn = time.Duration(m.GetRttSyn())
+	meter.SumRTTAvg = time.Duration(m.GetRttAvg())
+	meter.SumRTTSynFlow = m.GetRttSynFlow()
+	meter.SumRTTAvgFlow = m.GetRttAvgFlow()
 
-		SumZeroWndCntTx: m.GetZeroWndCntTx(),
-		SumZeroWndCntRx: m.GetZeroWndCntRx(),
-	}
+	meter.SumZeroWndCntTx = m.GetZeroWndCntTx()
+	meter.SumZeroWndCntRx = m.GetZeroWndCntRx()
 }
 
 func PerfMeterMaxToPB(m *PerfMeterMax) *pb.RttStats {
@@ -360,11 +360,9 @@ func PerfMeterMaxToPB(m *PerfMeterMax) *pb.RttStats {
 	}
 }
 
-func pbToPerfMeterMax(m *pb.RttStats) *PerfMeterMax {
-	return &PerfMeterMax{
-		MaxRTTSyn: time.Duration(m.GetRttSyn()),
-		MaxRTTAvg: time.Duration(m.GetRttAvg()),
-	}
+func pbToPerfMeterMax(m *pb.RttStats, meter *PerfMeterMax) {
+	meter.MaxRTTSyn = time.Duration(m.GetRttSyn())
+	meter.MaxRTTAvg = time.Duration(m.GetRttAvg())
 }
 
 func PerfMeterMinToPB(m *PerfMeterMin) *pb.RttStats {
@@ -374,11 +372,9 @@ func PerfMeterMinToPB(m *PerfMeterMin) *pb.RttStats {
 	}
 }
 
-func pbToPerfMeterMin(m *pb.RttStats) *PerfMeterMin {
-	return &PerfMeterMin{
-		MinRTTSyn: time.Duration(m.GetRttSyn()),
-		MinRTTAvg: time.Duration(m.GetRttAvg()),
-	}
+func pbToPerfMeterMin(m *pb.RttStats, meter *PerfMeterMin) {
+	meter.MinRTTSyn = time.Duration(m.GetRttSyn())
+	meter.MinRTTAvg = time.Duration(m.GetRttAvg())
 }
 
 func GeoMeterToPB(m *GeoMeter) *pb.GeoMeter {
@@ -395,8 +391,11 @@ func GeoMeterToPB(m *GeoMeter) *pb.GeoMeter {
 	}
 }
 
-func PBToGeoMeter(m *pb.GeoMeter) *GeoMeter {
-	meter := AcquireGeoMeter()
+func PBToGeoMeter(m *pb.GeoMeter, meter *GeoMeter) {
+	if meter == nil {
+		panic("meter为空")
+		return
+	}
 
 	meter.SumClosedFlowCount = m.GetSumClosedFlowCount()
 	meter.SumAbnormalFlowCount = m.GetSumAbnormalFlowCount()
@@ -407,8 +406,6 @@ func PBToGeoMeter(m *pb.GeoMeter) *GeoMeter {
 	meter.SumBitRx = m.GetSumBitRx()
 	meter.SumRTTSyn = time.Duration(m.GetSumRttSyn())
 	meter.SumRTTSynFlow = m.GetSumRttSynFlow()
-
-	return meter
 }
 
 func FPSMeterToPB(m *FPSMeter) *pb.FpsMeter {
@@ -422,8 +419,11 @@ func FPSMeterToPB(m *FPSMeter) *pb.FpsMeter {
 	}
 }
 
-func PBToFPSMeter(m *pb.FpsMeter) *FPSMeter {
-	meter := AcquireFPSMeter()
+func PBToFPSMeter(m *pb.FpsMeter, meter *FPSMeter) {
+	if meter == nil {
+		panic("meter为空")
+		return
+	}
 
 	meter.SumFlowCount = m.GetSumFlowCount()
 	meter.SumNewFlowCount = m.GetSumNewFlowCount()
@@ -431,8 +431,6 @@ func PBToFPSMeter(m *pb.FpsMeter) *FPSMeter {
 
 	meter.MaxFlowCount = m.GetMaxFlowCount()
 	meter.MaxNewFlowCount = m.GetMaxNewFlowCount()
-
-	return meter
 }
 
 func FlowMeterToPB(m *FlowMeter) *pb.FlowMeter {
@@ -449,8 +447,11 @@ func FlowMeterToPB(m *FlowMeter) *pb.FlowMeter {
 	}
 }
 
-func PBToFlowMeter(m *pb.FlowMeter) *FlowMeter {
-	meter := AcquireFlowMeter()
+func PBToFlowMeter(m *pb.FlowMeter, meter *FlowMeter) {
+	if meter == nil {
+		panic("meter为空")
+		return
+	}
 
 	meter.SumFlowCount = m.GetSumFlowCount()
 	meter.SumNewFlowCount = m.GetSumNewFlowCount()
@@ -461,8 +462,6 @@ func PBToFlowMeter(m *pb.FlowMeter) *FlowMeter {
 	meter.SumBitTx = m.GetSumBitTx()
 	meter.SumBitRx = m.GetSumBitRx()
 	meter.SumBit = m.GetSumBit()
-
-	return meter
 }
 
 func PlatformMeterToPB(m *PlatformMeter) *pb.PlatformMeter {
@@ -473,14 +472,15 @@ func PlatformMeterToPB(m *PlatformMeter) *pb.PlatformMeter {
 	}
 }
 
-func PBToPlatformMeter(m *pb.PlatformMeter) *PlatformMeter {
-	meter := AcquirePlatformMeter()
+func PBToPlatformMeter(m *pb.PlatformMeter, meter *PlatformMeter) {
+	if meter == nil {
+		panic("meter为空")
+		return
+	}
 
 	meter.SumClosedFlowCount = m.GetSumClosedFlowCount()
 	meter.SumPacket = m.GetSumPacket()
 	meter.SumBit = m.GetSumBit()
-
-	return meter
 }
 
 func ConsoleLogMeterToPB(m *ConsoleLogMeter) *pb.ConsoleLogMeter {
@@ -492,15 +492,16 @@ func ConsoleLogMeterToPB(m *ConsoleLogMeter) *pb.ConsoleLogMeter {
 	}
 }
 
-func PBToConsoleLogMeter(m *pb.ConsoleLogMeter) *ConsoleLogMeter {
-	meter := AcquireConsoleLogMeter()
+func PBToConsoleLogMeter(m *pb.ConsoleLogMeter, meter *ConsoleLogMeter) {
+	if meter == nil {
+		panic("meter为空")
+		return
+	}
 
 	meter.SumPacketTx = m.GetSumPacketTx()
 	meter.SumPacketRx = m.GetSumPacketRx()
 	meter.SumClosedFlowCount = m.GetSumClosedFlowCount()
 	meter.SumClosedFlowDuration = time.Duration(m.GetSumClosedFlowDurationUs()) * time.Microsecond
-
-	return meter
 }
 
 func TypeMeterToPB(m *TypeMeter) *pb.TypeMeter {
@@ -528,8 +529,11 @@ func TypeMeterToPB(m *TypeMeter) *pb.TypeMeter {
 	}
 }
 
-func PBToTypeMeter(m *pb.TypeMeter) *TypeMeter {
-	meter := AcquireTypeMeter()
+func PBToTypeMeter(m *pb.TypeMeter, meter *TypeMeter) {
+	if meter == nil {
+		panic("meter为空")
+		return
+	}
 
 	meter.SumCountL0S1S = m.GetSumCountL_0S1S()
 	meter.SumCountL1S5S = m.GetSumCountL_1S5S()
@@ -551,6 +555,4 @@ func PBToTypeMeter(m *pb.TypeMeter) *TypeMeter {
 	meter.SumCountTServerRst = m.GetSumCountTSRst()
 	meter.SumCountTServerHalfOpen = m.GetSumCountTSHalfOpen()
 	meter.SumCountTServerHalfClose = m.GetSumCountTSHalfClose()
-
-	return meter
 }
