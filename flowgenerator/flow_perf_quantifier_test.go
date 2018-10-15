@@ -86,7 +86,7 @@ func testMergeSeqListNode(peer *TcpSessionPeer, node *SeqSegment, position int) 
 	default:
 	}
 
-	peer.mergeSeqListNode()
+	peer.mergeSeqListNode(peer.seqList)
 }
 
 func TestMergeSeqListNode(t *testing.T) {

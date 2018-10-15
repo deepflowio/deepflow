@@ -206,17 +206,18 @@ func isContinuousSeqSegment(left, right, node *SeqSegment, flowInfo *FlowInfo) C
 // 当list超过最大限制长度时，合并SeqList中前两个节点
 // 忽略调sequence最小的2个node之间的间隔,相当于认为包已收到
 // 其带来的影响是，包被误认为是重传
-func (p *TcpSessionPeer) mergeSeqListNode() {
-	if p.seqList.Len() < SEQ_LIST_MAX_LEN {
+func (p *TcpSessionPeer) mergeSeqListNode(seqList *list.List) {
+	if seqList.Len() < SEQ_LIST_MAX_LEN {
 		return
 	}
 
-	first := p.seqList.Front().Value.(*SeqSegment)
-	second := p.seqList.Front().Next().Value.(*SeqSegment)
+	seqNode := seqList.Front()
+	first := seqNode.Value.(*SeqSegment)
+	second := seqNode.Next().Value.(*SeqSegment)
 	second.length = second.seqNumber - first.seqNumber + second.length
 	second.seqNumber = first.seqNumber
 
-	p.seqList.Remove(p.seqList.Front())
+	seqList.Remove(seqNode)
 }
 
 // 如果把SeqSegment看作是sequence number的集合，retrans可认为是left包含node
@@ -261,18 +262,19 @@ func (p *TcpSessionPeer) assertSeqNumber(tcpHeader *MetaPacketTcpHeader, payload
 
 	node := &SeqSegment{seqNumber: tcpHeader.Seq, length: uint32(payloadLen)}
 
-	if p.seqList == nil {
-		p.seqList = list.New()
+	seqList := p.seqList
+	if seqList == nil {
+		seqList = list.New()
+		p.seqList = seqList
 	}
-	l := p.seqList
 
-	if l.Len() == 0 {
-		l.PushFront(node)
+	if seqList.Len() == 0 {
+		seqList.PushFront(node)
 		return SEQ_NOT_CARE
 	}
 
 	// seqList为升序链表，此处，从后往前查找；直至找到seqNumber小于或等于node.seqNumber的节点
-	for rightElement, currentElement = nil, l.Back(); currentElement != nil; rightElement, currentElement = currentElement, currentElement.Prev() {
+	for rightElement, currentElement = nil, seqList.Back(); currentElement != nil; rightElement, currentElement = currentElement, currentElement.Prev() {
 		left = currentElement.Value.(*SeqSegment)
 		if node.seqNumber >= left.seqNumber { // 查找node在list中的位置
 			break
@@ -296,19 +298,19 @@ func (p *TcpSessionPeer) assertSeqNumber(tcpHeader *MetaPacketTcpHeader, payload
 	} else {
 		if c := isContinuousSeqSegment(left, right, node, flowInfo); c == SEQ_NODE_DISCONTINUOUS {
 			if rightElement == nil {
-				l.InsertAfter(node, currentElement)
+				seqList.InsertAfter(node, currentElement)
 			} else {
-				l.InsertBefore(node, rightElement)
+				seqList.InsertBefore(node, rightElement)
 			}
 		} else if c == SEQ_NODE_BOTH_CONTINUOUS {
 			left.length = left.length - node.length + right.length
-			l.Remove(rightElement)
+			seqList.Remove(rightElement)
 		}
 		flag = SEQ_NOT_CARE
 	}
 
-	if p.seqList.Len() >= SEQ_LIST_MAX_LEN {
-		p.mergeSeqListNode()
+	if seqList.Len() >= SEQ_LIST_MAX_LEN {
+		p.mergeSeqListNode(seqList)
 		log.Debugf("flow info: %v, seqList length exceed max length:%v, merge seqList first 2 element", flowInfo, SEQ_LIST_MAX_LEN)
 	}
 
