@@ -11,9 +11,7 @@ type TaggedFlow struct {
 }
 
 var taggedFlowPool = sync.Pool{
-	New: func() interface{} {
-		return new(TaggedFlow)
-	},
+	New: func() interface{} { return new(TaggedFlow) },
 }
 
 func AcquireTaggedFlow() *TaggedFlow {
@@ -23,6 +21,7 @@ func AcquireTaggedFlow() *TaggedFlow {
 func ReleaseTaggedFlow(taggedFlow *TaggedFlow) {
 	if taggedFlow.TcpPerfStats != nil {
 		ReleaseTcpPerfStats(taggedFlow.TcpPerfStats)
+		taggedFlow.TcpPerfStats = nil
 	}
 	*taggedFlow = TaggedFlow{}
 	taggedFlowPool.Put(taggedFlow)
