@@ -156,9 +156,9 @@ func generateGroupPortKeys(srcGroups []uint32, dstGroups []uint32, port uint16, 
 	}
 
 	for _, src := range srcGroups {
-		srcId := uint64(FormatGroupId(src))
+		srcId := uint64(FormatGroupId(src) & 0xfffff)
 		for _, dst := range dstGroups {
-			dstId := uint64(FormatGroupId(dst))
+			dstId := uint64(FormatGroupId(dst) & 0xfffff)
 			key |= srcId<<20 | dstId
 			keys = append(keys, key)
 			key &= 0xffffff0000000000
@@ -326,9 +326,9 @@ func generateGroupVlanKeys(srcGroups []uint32, dstGroups []uint32, vlan uint16) 
 	}
 
 	for _, src := range srcGroups {
-		srcId := uint64(FormatGroupId(src))
+		srcId := uint64(FormatGroupId(src) & 0xfffff)
 		for _, dst := range dstGroups {
-			dstId := uint64(FormatGroupId(dst))
+			dstId := uint64(FormatGroupId(dst) & 0xfffff)
 			key |= srcId<<20 | dstId
 			keys = append(keys, key)
 			key &= 0xffffff0000000000
