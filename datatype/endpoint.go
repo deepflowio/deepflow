@@ -67,7 +67,7 @@ type EndpointData struct {
 }
 
 func NewEndpointInfo() *EndpointInfo {
-	return &EndpointInfo{GroupIds: make([]uint32, 0)}
+	return &EndpointInfo{}
 }
 
 func NewEndpointData() *EndpointData {
@@ -228,9 +228,11 @@ func AcquireEndpointData(infos ...*EndpointInfo) *EndpointData {
 func ReleaseEndpointData(d *EndpointData) {
 	if d.SrcInfo != nil {
 		ReleaseEndpointInfo(d.SrcInfo)
+		d.SrcInfo = nil
 	}
 	if d.DstInfo != nil {
 		ReleaseEndpointInfo(d.DstInfo)
+		d.DstInfo = nil
 	}
 	*d = EndpointData{}
 	endpointDataPool.Put(d)
