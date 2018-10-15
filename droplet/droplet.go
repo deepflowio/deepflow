@@ -6,6 +6,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/op/go-logging"
@@ -75,6 +76,9 @@ func Start(configPath string) {
 	synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.ControllerPort)
 	synchronizer.Start()
 
+	if cfg.MaxCPUs > 0 {
+		runtime.GOMAXPROCS(cfg.MaxCPUs)
+	}
 	// L1 - packet source
 	manager := queue.NewManager()
 	queueSize := int(cfg.Queue.QueueSize)

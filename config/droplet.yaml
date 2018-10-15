@@ -8,6 +8,8 @@ log-file: /var/log/droplet/droplet.log
 log-level: info
 # profiler
 profiler: false
+# maximum usage of cpu cores, 0 means no limit
+max-cpus: 0
 # interfaces for mirrored traffic from ISP or TOR
 tap-interfaces: []
 # conf for connection with outside stream
