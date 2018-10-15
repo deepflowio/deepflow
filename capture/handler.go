@@ -29,6 +29,7 @@ func (h *PacketHandler) Handle(timestamp Timestamp, packet RawPacket, size Packe
 		datatype.ReleaseMetaPacket(metaPacket)
 		return
 	}
+	metaPacket.Exporter = h.ip
 	metaPacket.Timestamp = timestamp
 	metaPacket.PacketLen = uint16(size)
 	if (metaPacket.InPort & datatype.PACKET_SOURCE_TOR) == datatype.PACKET_SOURCE_TOR {
