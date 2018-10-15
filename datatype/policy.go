@@ -245,7 +245,7 @@ func (d *PolicyData) String() string {
 }
 
 func NewPolicyData() *PolicyData {
-	return &PolicyData{AclActions: make([]AclAction, 0)}
+	return &PolicyData{}
 }
 
 var policyDataPool = sync.Pool{
