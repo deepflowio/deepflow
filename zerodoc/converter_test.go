@@ -57,7 +57,9 @@ func TestFullEqual(t *testing.T) {
 
 	fromTag := f.NewTag(0xFFFFFFFFFFFFFFFF)
 	pb := TagToPB(fromTag)
-	toTag := PBToTag(pb)
+	toTag := AcquireTag()
+	toTag.Field = AcquireField()
+	PBToTag(pb, toTag)
 	b := &utils.IntBuffer{}
 	if fromTag.GetID(b) != toTag.GetID(b) {
 		t.Error("Tag在序列化反序列化之后GetID与原Tag不一致")
@@ -121,7 +123,9 @@ func TestPartialTagEqual(t *testing.T) {
 	for _, code := range codes {
 		fromTag := f.NewTag(code)
 		pb := TagToPB(fromTag)
-		toTag := PBToTag(pb)
+		toTag := AcquireTag()
+		toTag.Field = AcquireField()
+		PBToTag(pb, toTag)
 		b := &utils.IntBuffer{}
 		if fromTag.GetID(b) != toTag.GetID(b) {
 			t.Errorf("Tag在序列化反序列化之后GetID与原Tag不一致, Code=%d", code)
@@ -185,7 +189,9 @@ func TestCustomTagEqual(t *testing.T) {
 	for _, code := range codes {
 		fromTag := f.NewTag(code)
 		pb := TagToPB(fromTag)
-		toTag := PBToTag(pb)
+		toTag := AcquireTag()
+		toTag.Field = AcquireField()
+		PBToTag(pb, toTag)
 		b := &utils.IntBuffer{}
 		if fromTag.GetID(b) != toTag.GetID(b) {
 			t.Errorf("Tag在序列化反序列化之后GetID与原Tag不一致, Code=%d", code)
@@ -213,7 +219,8 @@ func TestUsageMeterEqual(t *testing.T) {
 		},
 	}
 	pb := UsageMeterToPB(fromMeter)
-	toMeter := PBToUsageMeter(pb)
+	toMeter := AcquireUsageMeter()
+	PBToUsageMeter(pb, toMeter)
 	if !reflect.DeepEqual(fromMeter, toMeter) {
 		t.Error("Meter在序列化反序列化之后与原Meter不一致")
 	}
@@ -249,7 +256,8 @@ func TestPerfMeterEqual(t *testing.T) {
 		},
 	}
 	pb := PerfMeterToPB(fromMeter)
-	toMeter := PBToPerfMeter(pb)
+	toMeter := AcquirePerfMeter()
+	PBToPerfMeter(pb, toMeter)
 	if !reflect.DeepEqual(fromMeter, toMeter) {
 		t.Error("Meter在序列化反序列化之后与原Meter不一致")
 	}
@@ -266,7 +274,8 @@ func TestGeoMeterEqual(t *testing.T) {
 		SumBitRx:              54321,
 	}
 	pb := GeoMeterToPB(fromMeter)
-	toMeter := PBToGeoMeter(pb)
+	toMeter := AcquireGeoMeter()
+	PBToGeoMeter(pb, toMeter)
 	if !reflect.DeepEqual(fromMeter, toMeter) {
 		t.Error("Meter在序列化反序列化之后与原Meter不一致")
 	}
@@ -282,7 +291,8 @@ func TestFPSMeterEqual(t *testing.T) {
 		MaxNewFlowCount: 20,
 	}
 	pb := FPSMeterToPB(fromMeter)
-	toMeter := PBToFPSMeter(pb)
+	toMeter := AcquireFPSMeter()
+	PBToFPSMeter(pb, toMeter)
 	if !reflect.DeepEqual(fromMeter, toMeter) {
 		t.Error("Meter在序列化反序列化之后与原Meter不一致")
 	}
@@ -295,7 +305,8 @@ func TestFlowMeterEqual(t *testing.T) {
 		SumClosedFlowCount: 3,
 	}
 	pb := FlowMeterToPB(fromMeter)
-	toMeter := PBToFlowMeter(pb)
+	toMeter := AcquireFlowMeter()
+	PBToFlowMeter(pb, toMeter)
 	if !reflect.DeepEqual(fromMeter, toMeter) {
 		t.Error("Meter在序列化反序列化之后与原Meter不一致")
 	}
@@ -308,7 +319,8 @@ func TestPlatformMeterEqual(t *testing.T) {
 		SumBit:             12345,
 	}
 	pb := PlatformMeterToPB(fromMeter)
-	toMeter := PBToPlatformMeter(pb)
+	toMeter := AcquirePlatformMeter()
+	PBToPlatformMeter(pb, toMeter)
 	if !reflect.DeepEqual(fromMeter, toMeter) {
 		t.Error("Meter在序列化反序列化之后与原Meter不一致")
 	}
@@ -322,7 +334,8 @@ func TestConsoleLogMeterEqual(t *testing.T) {
 		SumClosedFlowDuration: time.Second,
 	}
 	pb := ConsoleLogMeterToPB(fromMeter)
-	toMeter := PBToConsoleLogMeter(pb)
+	toMeter := AcquireConsoleLogMeter()
+	PBToConsoleLogMeter(pb, toMeter)
 	if !reflect.DeepEqual(fromMeter, toMeter) {
 		t.Error("Meter在序列化反序列化之后与原Meter不一致")
 	}
@@ -352,7 +365,8 @@ func TestTypeMeterEqual(t *testing.T) {
 		SumCountTServerHalfClose: 21,
 	}
 	pb := TypeMeterToPB(fromMeter)
-	toMeter := PBToTypeMeter(pb)
+	toMeter := AcquireTypeMeter()
+	PBToTypeMeter(pb, toMeter)
 	if !reflect.DeepEqual(fromMeter, toMeter) {
 		t.Error("Meter在序列化反序列化之后与原Meter不一致")
 	}
