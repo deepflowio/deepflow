@@ -19,10 +19,11 @@ type MonitorOperator interface {
 }
 
 type Monitor struct {
-	ch chan []interface{}
-
 	DebugOn bool
 	Name    string
+
+	conn *net.UDPConn
+	port int
 }
 
 func (m *Monitor) isDebugOn() bool {
@@ -35,17 +36,10 @@ func (m *Monitor) debugSwitch(on bool) {
 	m.DebugOn = on
 }
 
-func (m *Monitor) run(conn *net.UDPConn, port int) {
-	for m.DebugOn {
-		items := <-m.ch
-		m.sendDebug(conn, port, items)
-	}
-}
-
 func (m *Monitor) TurnOnDebug(conn *net.UDPConn, port int) {
-	m.ch = make(chan []interface{}, 1000)
+	m.conn = conn
+	m.port = port
 	m.debugSwitch(true)
-	go m.run(conn, port)
 }
 
 func (m *Monitor) TurnOffDebug() {
@@ -71,10 +65,7 @@ func (m *Monitor) sendDebug(conn *net.UDPConn, port int, items []interface{}) {
 
 func (m *Monitor) send(items []interface{}) {
 	if m.isDebugOn() && len(items) > 0 {
-		select {
-		case m.ch <- items:
-		default:
-		}
+		m.sendDebug(m.conn, m.port, items)
 	}
 }
 
