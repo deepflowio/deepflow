@@ -46,6 +46,7 @@ func ReleaseFlowExtra(flowExtra *FlowExtra) {
 	flowExtra.taggedFlow = nil
 	if flowExtra.metaFlowPerf != nil {
 		ReleaseMetaFlowPerf(flowExtra.metaFlowPerf)
+		flowExtra.metaFlowPerf = nil
 	}
 	flowExtraPool.Put(flowExtra)
 }

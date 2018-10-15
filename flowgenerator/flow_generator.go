@@ -491,8 +491,7 @@ loop:
 				}
 				flowExtra.calcCloseType(true)
 				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
-				putFlow := *taggedFlow
-				flowOutBuffer[flowOutNum] = &putFlow
+				flowOutBuffer[flowOutNum] = CloneTaggedFlow(taggedFlow)
 				flowOutNum++
 				if flowOutNum >= FLOW_OUT_BUFFER_CAP {
 					flowOutQueue.Put(flowOutBuffer[:flowOutNum]...)

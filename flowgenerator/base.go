@@ -101,10 +101,7 @@ type FlowGenerator struct {
 	index                   int
 	cleanWaitGroup          sync.WaitGroup
 
-	perfCounter         FlowPerfCounter
-	metaFlowPerfPool    sync.Pool
-	metaFlowPerfBlock   *MetaFlowPerfBlock
-	flowPerfBlockCursor int
+	perfCounter FlowPerfCounter
 }
 
 type FlowGeneratorConfig struct {
