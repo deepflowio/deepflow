@@ -22,6 +22,7 @@ type Config struct {
 	LogFile        string              `yaml:"log-file"`
 	LogLevel       string              `yaml:"log-level"`
 	Profiler       bool                `yaml:"profiler"`
+	MaxCPUs        int                 `yaml:"max-cpus"`
 	TapInterfaces  []string            `yaml:"tap-interfaces,flow"`
 	Stream         string              `yaml:"stream"`
 	StreamPort     uint16              `yaml:"stream-port"`
