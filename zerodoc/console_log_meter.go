@@ -9,10 +9,10 @@ import (
 )
 
 type ConsoleLogMeter struct {
-	SumPacketTx           uint64
-	SumPacketRx           uint64
-	SumClosedFlowCount    uint64
-	SumClosedFlowDuration time.Duration
+	SumPacketTx           uint64        `db:"sum_packet_tx"`
+	SumPacketRx           uint64        `db:"sum_packet_rx"`
+	SumClosedFlowCount    uint64        `db:"sum_closed_flow_count"`
+	SumClosedFlowDuration time.Duration `db:"sum_closed_flow_duration"`
 }
 
 func (m *ConsoleLogMeter) ConcurrentMerge(other app.Meter) {

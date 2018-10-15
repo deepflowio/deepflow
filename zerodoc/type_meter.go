@@ -8,26 +8,26 @@ import (
 )
 
 type TypeMeter struct {
-	SumCountL0S1S  uint64
-	SumCountL1S5S  uint64
-	SumCountL5S10S uint64
-	SumCountL10S1M uint64
-	SumCountL1M1H  uint64
-	SumCountL1H    uint64
+	SumCountL0S1S  uint64 `db:"sum_count_l_0s1s"`
+	SumCountL1S5S  uint64 `db:"sum_count_l_1s5s"`
+	SumCountL5S10S uint64 `db:"sum_count_l_5s10s"`
+	SumCountL10S1M uint64 `db:"sum_count_l_10s1m"`
+	SumCountL1M1H  uint64 `db:"sum_count_l_1m1h"`
+	SumCountL1H    uint64 `db:"sum_count_l_1h"`
 
-	SumCountE0K10K   uint64
-	SumCountE10K100K uint64
-	SumCountE100K1M  uint64
-	SumCountE1M100M  uint64
-	SumCountE100M1G  uint64
-	SumCountE1G      uint64
+	SumCountE0K10K   uint64 `db:"sum_count_e_0k10k"`
+	SumCountE10K100K uint64 `db:"sum_count_e_10k100k"`
+	SumCountE100K1M  uint64 `db:"sum_count_e_100k1m"`
+	SumCountE1M100M  uint64 `db:"sum_count_e_1m100m"`
+	SumCountE100M1G  uint64 `db:"sum_count_e_100m1g"`
+	SumCountE1G      uint64 `db:"sum_count_e_1g"`
 
-	SumCountTClientRst       uint64
-	SumCountTClientHalfOpen  uint64
-	SumCountTClientHalfClose uint64
-	SumCountTServerRst       uint64
-	SumCountTServerHalfOpen  uint64
-	SumCountTServerHalfClose uint64
+	SumCountTClientRst       uint64 `db:"sum_count_t_c_rst"`
+	SumCountTClientHalfOpen  uint64 `db:"sum_count_t_c_half_open"`
+	SumCountTClientHalfClose uint64 `db:"sum_count_t_c_half_close"`
+	SumCountTServerRst       uint64 `db:"sum_count_t_s_rst"`
+	SumCountTServerHalfOpen  uint64 `db:"sum_count_t_s_half_open"`
+	SumCountTServerHalfClose uint64 `db:"sum_count_t_s_half_close"`
 }
 
 func (m *TypeMeter) ConcurrentMerge(other app.Meter) {

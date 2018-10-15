@@ -8,12 +8,12 @@ import (
 )
 
 type FPSMeter struct {
-	SumFlowCount       uint64
-	SumNewFlowCount    uint64
-	SumClosedFlowCount uint64
+	SumFlowCount       uint64 `db:"sum_flow_count"`
+	SumNewFlowCount    uint64 `db:"sum_new_flow_count"`
+	SumClosedFlowCount uint64 `db:"sum_closed_flow_count"`
 
-	MaxFlowCount    uint64
-	MaxNewFlowCount uint64
+	MaxFlowCount    uint64 `db:"max_flow_count"`
+	MaxNewFlowCount uint64 `db:"max_new_flow_count"`
 }
 
 func (m *FPSMeter) ConcurrentMerge(other app.Meter) {
