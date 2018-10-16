@@ -20,7 +20,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 		if ok, reply = f.updateTcpFlow(flowExtra, meta, reply); ok {
 			taggedFlow := flowExtra.taggedFlow
 			atomic.AddInt32(&f.stats.CurrNumFlows, -1)
-			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportInterval)
+			flowExtra.setCurFlowInfo(flowExtra.recentTime, f.forceReportInterval)
 			if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
 				flowExtra.reverseFlow()
 				flowExtra.reversed = !flowExtra.reversed

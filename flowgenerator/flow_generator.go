@@ -268,6 +268,11 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 	taggedFlow := flowExtra.taggedFlow
 	bytes := uint64(meta.PacketLen)
 	packetTimestamp := meta.Timestamp
+	if packetTimestamp > flowExtra.recentTime {
+		flowExtra.recentTime = packetTimestamp
+	} else {
+		packetTimestamp = flowExtra.recentTime
+	}
 	maxArrTime := timeMax(taggedFlow.FlowMetricsPeerSrc.ArrTimeLast, taggedFlow.FlowMetricsPeerDst.ArrTimeLast)
 	if taggedFlow.FlowMetricsPeerSrc.PacketCount == 0 && taggedFlow.FlowMetricsPeerDst.PacketCount == 0 {
 		taggedFlow.CurStartTime = packetTimestamp
@@ -304,7 +309,6 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 		taggedFlow.FlowMetricsPeerSrc.ByteCount += bytes
 		taggedFlow.FlowMetricsPeerSrc.TotalByteCount += bytes
 	}
-	flowExtra.recentTime = packetTimestamp
 	// a flow will report every minute and StartTime will be reset, so the value could not be overflow
 	taggedFlow.TimeBitmap |= 1 << uint64((flowExtra.recentTime-taggedFlow.StartTime)/time.Second)
 }
