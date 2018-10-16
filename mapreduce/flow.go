@@ -149,25 +149,24 @@ func (f *FlowHandler) Start() {
 func isValidFlow(flow *datatype.TaggedFlow) bool {
 	startTime := flow.StartTime
 	endTime := flow.EndTime
-	curTime := time.Duration(time.Now().UnixNano())
+	// we give flow timestamp a tolerance with one minute
+	toleranceCurTime := time.Duration(time.Now().UnixNano()) + time.Minute
 
-	if startTime > curTime || endTime > curTime {
-		return false
-	}
-	if endTime > startTime+2*time.Minute {
+	if startTime > toleranceCurTime || endTime > toleranceCurTime {
 		return false
 	}
 	if endTime != 0 && endTime < startTime {
 		return false
 	}
 
-	currStart := flow.CurStartTime
-	arr0Last := flow.FlowMetricsPeerSrc.ArrTimeLast
-	arr1Last := flow.FlowMetricsPeerDst.ArrTimeLast
 	rightMargin := endTime + 2*time.Minute
-	times := [3]time.Duration{currStart, arr0Last, arr1Last}
+	times := [3]time.Duration{
+		flow.CurStartTime,
+		flow.FlowMetricsPeerSrc.ArrTimeLast,
+		flow.FlowMetricsPeerDst.ArrTimeLast,
+	}
 	for i := 0; i < 3; i++ {
-		if times[i] > rightMargin || times[i] > curTime {
+		if times[i] > rightMargin || times[i] > toleranceCurTime {
 			return false
 		}
 	}
