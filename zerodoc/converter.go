@@ -326,8 +326,10 @@ func PerfMeterSumToPB(m *PerfMeterSum) *pb.PerfStats {
 
 		RttSyn:     proto.Uint64(uint64(m.SumRTTSyn)),
 		RttAvg:     proto.Uint64(uint64(m.SumRTTAvg)),
+		ArtAvg:     proto.Uint64(uint64(m.SumARTAvg)),
 		RttSynFlow: proto.Uint64(m.SumRTTSynFlow),
 		RttAvgFlow: proto.Uint64(m.SumRTTAvgFlow),
+		ArtAvgFlow: proto.Uint64(m.SumARTAvgFlow),
 
 		ZeroWndCntTx: proto.Uint64(m.SumZeroWndCntTx),
 		ZeroWndCntRx: proto.Uint64(m.SumZeroWndCntRx),
@@ -346,8 +348,10 @@ func pbToPerfMeterSum(m *pb.PerfStats, meter *PerfMeterSum) {
 
 	meter.SumRTTSyn = time.Duration(m.GetRttSyn())
 	meter.SumRTTAvg = time.Duration(m.GetRttAvg())
+	meter.SumARTAvg = time.Duration(m.GetArtAvg())
 	meter.SumRTTSynFlow = m.GetRttSynFlow()
 	meter.SumRTTAvgFlow = m.GetRttAvgFlow()
+	meter.SumARTAvgFlow = m.GetArtAvgFlow()
 
 	meter.SumZeroWndCntTx = m.GetZeroWndCntTx()
 	meter.SumZeroWndCntRx = m.GetZeroWndCntRx()
@@ -357,24 +361,28 @@ func PerfMeterMaxToPB(m *PerfMeterMax) *pb.RttStats {
 	return &pb.RttStats{
 		RttSyn: proto.Uint64(uint64(m.MaxRTTSyn)),
 		RttAvg: proto.Uint64(uint64(m.MaxRTTAvg)),
+		ArtAvg: proto.Uint64(uint64(m.MaxARTAvg)),
 	}
 }
 
 func pbToPerfMeterMax(m *pb.RttStats, meter *PerfMeterMax) {
 	meter.MaxRTTSyn = time.Duration(m.GetRttSyn())
 	meter.MaxRTTAvg = time.Duration(m.GetRttAvg())
+	meter.MaxARTAvg = time.Duration(m.GetArtAvg())
 }
 
 func PerfMeterMinToPB(m *PerfMeterMin) *pb.RttStats {
 	return &pb.RttStats{
 		RttSyn: proto.Uint64(uint64(m.MinRTTSyn)),
 		RttAvg: proto.Uint64(uint64(m.MinRTTAvg)),
+		ArtAvg: proto.Uint64(uint64(m.MinARTAvg)),
 	}
 }
 
 func pbToPerfMeterMin(m *pb.RttStats, meter *PerfMeterMin) {
 	meter.MinRTTSyn = time.Duration(m.GetRttSyn())
 	meter.MinRTTAvg = time.Duration(m.GetRttAvg())
+	meter.MinARTAvg = time.Duration(m.GetArtAvg())
 }
 
 func GeoMeterToPB(m *GeoMeter) *pb.GeoMeter {

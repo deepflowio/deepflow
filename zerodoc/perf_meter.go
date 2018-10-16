@@ -56,10 +56,14 @@ func (m *PerfMeter) ToKVString() string {
 	buf.WriteString(strconv.FormatInt(int64(sum.SumRTTSyn/time.Microsecond), 10))
 	buf.WriteString("i,sum_rtt_avg=")
 	buf.WriteString(strconv.FormatInt(int64(sum.SumRTTAvg/time.Microsecond), 10))
+	buf.WriteString("i,sum_art_avg=")
+	buf.WriteString(strconv.FormatInt(int64(sum.SumARTAvg/time.Microsecond), 10))
 	buf.WriteString("i,sum_rtt_syn_flow=")
 	buf.WriteString(strconv.FormatUint(sum.SumRTTSynFlow, 10))
 	buf.WriteString("i,sum_rtt_avg_flow=")
 	buf.WriteString(strconv.FormatUint(sum.SumRTTAvgFlow, 10))
+	buf.WriteString("i,sum_art_avg_flow=")
+	buf.WriteString(strconv.FormatUint(sum.SumARTAvgFlow, 10))
 	buf.WriteString("i,sum_zero_wnd_cnt_tx=")
 	buf.WriteString(strconv.FormatUint(sum.SumZeroWndCntTx, 10))
 	buf.WriteString("i,sum_zero_wnd_cnt_rx=")
@@ -95,8 +99,10 @@ type PerfMeterSum struct {
 
 	SumRTTSyn     time.Duration `db:"sum_rtt_syn"`
 	SumRTTAvg     time.Duration `db:"sum_rtt_avg"`
+	SumARTAvg     time.Duration `db:"sum_art_avg"`
 	SumRTTSynFlow uint64        `db:"sum_rtt_syn_flow"`
 	SumRTTAvgFlow uint64        `db:"sum_rtt_avg_flow"`
+	SumARTAvgFlow uint64        `db:"sum_art_avg_flow"`
 
 	SumZeroWndCntTx uint64 `db:"sum_zero_wnd_cnt_tx"`
 	SumZeroWndCntRx uint64 `db:"sum_zero_wnd_cnt_rx"`
@@ -114,8 +120,10 @@ func (m *PerfMeterSum) concurrentMerge(other *PerfMeterSum) {
 
 	m.SumRTTSyn += other.SumRTTSyn
 	m.SumRTTAvg += other.SumRTTAvg
+	m.SumARTAvg += other.SumARTAvg
 	m.SumRTTSynFlow += other.SumRTTSynFlow
 	m.SumRTTAvgFlow += other.SumRTTAvgFlow
+	m.SumARTAvgFlow += other.SumARTAvgFlow
 
 	m.SumZeroWndCntTx += other.SumZeroWndCntTx
 	m.SumZeroWndCntRx += other.SumZeroWndCntRx
@@ -133,8 +141,10 @@ func (m *PerfMeterSum) sequentialMerge(other *PerfMeterSum) { // other为后一�
 
 	m.SumRTTSyn += other.SumRTTSyn
 	m.SumRTTAvg += other.SumRTTAvg
+	m.SumARTAvg += other.SumARTAvg
 	m.SumRTTSynFlow += other.SumRTTSynFlow
 	m.SumRTTAvgFlow += other.SumRTTAvgFlow
+	m.SumARTAvgFlow += other.SumARTAvgFlow
 
 	m.SumZeroWndCntTx += other.SumZeroWndCntTx
 	m.SumZeroWndCntRx += other.SumZeroWndCntRx
@@ -143,29 +153,35 @@ func (m *PerfMeterSum) sequentialMerge(other *PerfMeterSum) { // other为后一�
 type PerfMeterMax struct {
 	MaxRTTSyn time.Duration `db:"max_rtt_syn"`
 	MaxRTTAvg time.Duration `db:"max_rtt_avg"`
+	MaxARTAvg time.Duration `db:"max_art_avg"`
 }
 
 func (m *PerfMeterMax) concurrentMerge(other *PerfMeterMax) {
 	m.MaxRTTSyn += other.MaxRTTSyn
 	m.MaxRTTAvg += other.MaxRTTAvg
+	m.MaxARTAvg += other.MaxARTAvg
 }
 
 func (m *PerfMeterMax) sequentialMerge(other *PerfMeterMax) {
 	m.MaxRTTSyn = maxDuration(m.MaxRTTSyn, other.MaxRTTSyn)
 	m.MaxRTTAvg = maxDuration(m.MaxRTTAvg, other.MaxRTTAvg)
+	m.MaxARTAvg = maxDuration(m.MaxARTAvg, other.MaxARTAvg)
 }
 
 type PerfMeterMin struct {
 	MinRTTSyn time.Duration `db:"min_rtt_syn"`
 	MinRTTAvg time.Duration `db:"min_rtt_avg"`
+	MinARTAvg time.Duration `db:"min_art_avg"`
 }
 
 func (m *PerfMeterMin) concurrentMerge(other *PerfMeterMin) {
 	m.MinRTTSyn += other.MinRTTSyn
 	m.MinRTTAvg += other.MinRTTAvg
+	m.MinARTAvg += other.MinARTAvg
 }
 
 func (m *PerfMeterMin) sequentialMerge(other *PerfMeterMin) {
 	m.MinRTTSyn = minDuration(m.MinRTTSyn, other.MinRTTSyn)
 	m.MinRTTAvg = minDuration(m.MinRTTAvg, other.MinRTTAvg)
+	m.MinARTAvg = minDuration(m.MinARTAvg, other.MinARTAvg)
 }
