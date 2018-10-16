@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	INVALID_POLICY_DATA = AcquirePolicyData()
+	INVALID_POLICY_DATA = NewPolicyData()
 )
 
 type ActionFlag uint16
