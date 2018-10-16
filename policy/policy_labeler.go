@@ -471,8 +471,7 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 	l.generateInterestKeys(endpointData, packet)
 	portGroup := l.GroupPortPolicyMaps[packet.Tap]
 	vlanGroup := l.GroupVlanPolicyMaps[packet.Tap]
-	findPolicy := NewPolicyData()
-	findPolicy.AclActions = make([]AclAction, 0, 8)
+	findPolicy := AcquirePolicyData()
 	forward := NewPolicyData()
 	backward := NewPolicyData()
 
@@ -526,6 +525,7 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 	}
 
 	if len(findPolicy.AclActions) == 0 {
+		ReleasePolicyData(findPolicy)
 		findPolicy = INVALID_POLICY_DATA
 	}
 	atomic.AddUint64(&l.FirstPathHit, 1)
@@ -718,7 +718,7 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *
 		return nil, nil
 	}
 
-	policy := NewPolicyData()
+	policy := AcquirePolicyData()
 	endpoint := (*EndpointData)(nil)
 	portForwardFound := false
 	portBackwardFound := false
@@ -745,6 +745,7 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *
 	}
 	found := portForwardFound && portBackwardFound && vlanFound
 	if !found {
+		ReleasePolicyData(policy)
 		return nil, nil
 	}
 	atomic.AddUint64(&l.FastPathHit, 1)
