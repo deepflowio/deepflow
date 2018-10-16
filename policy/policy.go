@@ -189,12 +189,12 @@ func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData
 
 func (t *PolicyTable) UpdateInterfaceData(data []*PlatformData) {
 	t.cloudPlatformLabeler.UpdateInterfaceTable(data)
-	t.policyLabeler.GenerateIpNetmaskMap(data)
+	t.policyLabeler.GenerateIpNetmaskMapFromPlatformData(data)
 }
 
 func (t *PolicyTable) UpdateIpGroupData(data []*IpGroupData) {
-	t.cloudPlatformLabeler.ipGroup.Update(data)
-	t.policyLabeler.GenerateIpNetmaskMapFromIpResource(data)
+	t.cloudPlatformLabeler.UpdateGroupTree(data)
+	t.policyLabeler.GenerateIpNetmaskMapFromIpGroupData(data)
 }
 
 func (t *PolicyTable) UpdateAclData(data []*Acl) {
