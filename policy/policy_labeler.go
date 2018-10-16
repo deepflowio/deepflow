@@ -482,7 +482,6 @@ func (l *PolicyLabeler) DelAcl(id int) {
 }
 
 func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet *LookupKey) *PolicyData {
-	// FIXME: 先fast在first，这里的可能和fast里面的冗余了
 	l.generateInterestKeys(endpointData, packet)
 	portGroup := l.GroupPortPolicyMaps[packet.Tap]
 	vlanGroup := l.GroupVlanPolicyMaps[packet.Tap]
@@ -540,6 +539,8 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 	}
 
 	if len(findPolicy.AclActions) == 0 {
+		// 对于内容全为0的findPolicy，统一采用INVALID_POLICY_DATA（同一块内存的数值），
+		// 当前的findPolicy内存释放掉，以节省内存消耗
 		ReleasePolicyData(findPolicy)
 		findPolicy = INVALID_POLICY_DATA
 	}
@@ -723,22 +724,25 @@ func (l *PolicyLabeler) getVlanAndPortMap(packet *LookupKey, direction Direction
 	return nil
 }
 
-// FIXME：会改变packet参数，实际使用可能需要备份一下
 func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *PolicyData) {
 	if l.FastPathDisable {
 		return nil, nil
 	}
 
-	policy := AcquirePolicyData()
-	endpoint := (*EndpointData)(nil)
+	var policy *PolicyData
+	var endpoint *EndpointData
 	portForwardFound := false
 	portBackwardFound := false
 	vlanFound := true
 
+	// NOTE：会改变packet参数，但firstPath同样需要getFastInterestKeys，所以无影响
 	l.getFastInterestKeys(packet)
 	for _, direction := range []DirectionType{FORWARD, BACKWARD} {
 		if maps := l.getVlanAndPortMap(packet, direction, false); maps != nil {
 			// vlan不需要查找BACKWARD方向
+			if policy == nil {
+				policy = AcquirePolicyData()
+			}
 			if packet.Vlan > 0 && direction == FORWARD {
 				vlanFound = false
 				if endpoint = l.getFastVlanPolicy(maps, packet, direction, policy); endpoint != nil {
@@ -756,8 +760,17 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *
 	}
 	found := portForwardFound && portBackwardFound && vlanFound
 	if !found {
-		ReleasePolicyData(policy)
+		if policy != nil {
+			ReleasePolicyData(policy)
+		}
 		return nil, nil
+	} else {
+		if len(policy.AclActions) == 0 {
+			// 对于内容全为0的policy，统一采用INVALID_POLICY_DATA（同一块内存的数值），
+			// 当前的policy内存释放掉，以节省内存消耗
+			ReleasePolicyData(policy)
+			policy = INVALID_POLICY_DATA
+		}
 	}
 	atomic.AddUint64(&l.FastPathHit, 1)
 	atomic.AddUint64(&l.FastPathHitTick, 1)
