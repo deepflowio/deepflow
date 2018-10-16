@@ -240,8 +240,10 @@ func TestPerfMeterEqual(t *testing.T) {
 
 			SumRTTSyn:     4,
 			SumRTTAvg:     5,
+			SumARTAvg:     8,
 			SumRTTSynFlow: 6,
 			SumRTTAvgFlow: 7,
+			SumARTAvgFlow: 9,
 
 			SumZeroWndCntTx: 16,
 			SumZeroWndCntRx: 17,
@@ -249,10 +251,12 @@ func TestPerfMeterEqual(t *testing.T) {
 		PerfMeterMax: PerfMeterMax{
 			MaxRTTSyn: 27,
 			MaxRTTAvg: 28,
+			MaxARTAvg: 31,
 		},
 		PerfMeterMin: PerfMeterMin{
 			MinRTTSyn: 29,
 			MinRTTAvg: 30,
+			MinARTAvg: 32,
 		},
 	}
 	pb := PerfMeterToPB(fromMeter)
