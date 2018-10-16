@@ -116,9 +116,11 @@ message PerfStats {
     optional uint64 retrans_cnt_rx = 8;
 
     optional uint64 rtt_syn = 11;
-    optional uint64 rtt_avg = 12;
-    optional uint64 rtt_syn_flow = 13;
+    optional uint64 rtt_syn_flow = 12;
+    optional uint64 rtt_avg = 13;
     optional uint64 rtt_avg_flow = 14;
+    optional uint64 art_avg = 15;
+    optional uint64 art_avg_flow = 16;
 
     optional uint64 zero_wnd_cnt_tx = 21;
     optional uint64 zero_wnd_cnt_rx = 22;
@@ -127,6 +129,7 @@ message PerfStats {
 message RttStats {
     optional uint64 rtt_syn = 1;
     optional uint64 rtt_avg = 2;
+    optional uint64 art_avg = 3;
 }
 
 message PerfMeter {
