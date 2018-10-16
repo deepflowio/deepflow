@@ -12,14 +12,13 @@ import (
 type FastPlatformData struct {
 	endpointInfo *EndpointInfo
 	timestamp    time.Time
-	hash         MacIpInportKey
+	hash         MacIpKey
 }
 
 type IpMapDatas []map[IpKey]*PlatformData
 type IpMapData map[IpKey]*PlatformData
 type MacMapData map[MacKey]*PlatformData
 type EpcIpMapData map[EpcIpKey]*PlatformData
-type FastMapData map[MacIpInportKey]*FastPlatformData
 
 type MacTable struct {
 	macMap MacMapData
@@ -35,7 +34,7 @@ type EpcIpTable struct {
 
 type ArpTable struct {
 	sync.RWMutex
-	arpMap map[MacIpInportKey]time.Time
+	arpMap map[MacIpKey]time.Time
 }
 
 type CloudPlatformLabeler struct {
@@ -63,7 +62,7 @@ func NewCloudPlatformLabeler(queueCount int, mapSize uint32) *CloudPlatformLabel
 	var arpTable [TAP_MAX]*ArpTable
 	for i := TAP_MIN; i < TAP_MAX; i++ {
 		arpTable[i] = &ArpTable{
-			arpMap: make(map[MacIpInportKey]time.Time),
+			arpMap: make(map[MacIpKey]time.Time),
 		}
 	}
 	return &CloudPlatformLabeler{
@@ -194,19 +193,19 @@ func (l *CloudPlatformLabeler) UpdateInterfaceTable(platformDatas []*PlatformDat
 }
 
 //FIXME: 后续考虑时间可以从metpacket获取
-func (l *CloudPlatformLabeler) UpdateArpTable(hash MacIpInportKey, tapType TapType) {
+func (l *CloudPlatformLabeler) UpdateArpTable(hash MacIpKey, tapType TapType) {
 	l.arpTable[tapType].Lock()
 	l.arpTable[tapType].arpMap[hash] = time.Now()
 	l.arpTable[tapType].Unlock()
 }
 
-func (l *CloudPlatformLabeler) DeleteArpData(hash MacIpInportKey, tapType TapType) {
+func (l *CloudPlatformLabeler) DeleteArpData(hash MacIpKey, tapType TapType) {
 	l.arpTable[tapType].Lock()
 	delete(l.arpTable[tapType].arpMap, hash)
 	l.arpTable[tapType].Unlock()
 }
 
-func (l *CloudPlatformLabeler) GetArpTable(hash MacIpInportKey, tapType TapType) bool {
+func (l *CloudPlatformLabeler) GetArpTable(hash MacIpKey, tapType TapType) bool {
 	l.arpTable[tapType].RLock()
 	if data, ok := l.arpTable[tapType].arpMap[hash]; ok {
 		l.arpTable[tapType].RUnlock()
@@ -221,14 +220,14 @@ func (l *CloudPlatformLabeler) GetArpTable(hash MacIpInportKey, tapType TapType)
 }
 
 // 只更新源mac+ip的arp
-func (l *CloudPlatformLabeler) CheckAndUpdateArpTable(key *LookupKey, hash MacIpInportKey) {
+func (l *CloudPlatformLabeler) CheckAndUpdateArpTable(key *LookupKey, hash MacIpKey) {
 	if key.EthType == EthernetTypeARP && !key.Invalid {
 		l.UpdateArpTable(hash, key.Tap)
 	}
 }
 
 // 依据arp表和ttl修正L3End，若arp存在mac+ip对应关系L3End为true，ttl只对源mac+ip有效,包含在(64,128,255)则为true
-func (l *CloudPlatformLabeler) ModifyL3End(endpointInfo *EndpointInfo, key *LookupKey, hash MacIpInportKey, direction bool) {
+func (l *CloudPlatformLabeler) ModifyL3End(endpointInfo *EndpointInfo, key *LookupKey, hash MacIpKey, direction bool) {
 	if endpointInfo.L3End {
 		return
 	}
@@ -240,7 +239,7 @@ func (l *CloudPlatformLabeler) ModifyL3End(endpointInfo *EndpointInfo, key *Look
 }
 
 func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip uint32, tapType TapType) *EndpointInfo {
-	endpointInfo := AcquireEndpointInfo()
+	endpointInfo := NewEndpointInfo()
 	if tapType == TAP_TOR {
 		platformData := l.GetDataByMac(MacKey(mac))
 		if platformData != nil {
@@ -283,15 +282,28 @@ func (l *CloudPlatformLabeler) ModifyDeviceInfo(endpointInfo *EndpointInfo) {
 }
 
 func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
-	srcHash := MacIpInportKey(calcHashKey(key.SrcMac, key.SrcIp))
+	srcHash := MacIpKey(calcHashKey(key.SrcMac, key.SrcIp))
 	l.CheckAndUpdateArpTable(key, srcHash)
 	srcData := l.GetEndpointInfo(key.SrcMac, key.SrcIp, key.Tap)
 	l.ModifyL3End(srcData, key, srcHash, true)
 	l.ModifyDeviceInfo(srcData)
-	dstHash := MacIpInportKey(calcHashKey(key.DstMac, key.DstIp))
+	dstHash := MacIpKey(calcHashKey(key.DstMac, key.DstIp))
 	dstData := l.GetEndpointInfo(key.DstMac, key.DstIp, key.Tap)
 	l.ModifyL3End(dstData, key, dstHash, false)
 	l.ModifyDeviceInfo(dstData)
+	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
+	if key.Tap == TAP_TOR {
+		endpoint.SetL2End(key)
+	}
 
-	return AcquireEndpointData(srcData, dstData)
+	if !srcData.L2End && !srcData.L3End && srcData.L2EpcId == 0 && srcData.L3EpcId == 0 && len(srcData.GroupIds) == 0 {
+		endpoint.SrcInfo = INVALID_ENDPOINT_INFO
+	}
+	if !dstData.L2End && !dstData.L3End && dstData.L2EpcId == 0 && dstData.L3EpcId == 0 && len(dstData.GroupIds) == 0 {
+		endpoint.DstInfo = INVALID_ENDPOINT_INFO
+	}
+	if endpoint.SrcInfo == INVALID_ENDPOINT_INFO && endpoint.DstInfo == INVALID_ENDPOINT_INFO {
+		endpoint = INVALID_ENDPOINT_DATA
+	}
+	return endpoint
 }
