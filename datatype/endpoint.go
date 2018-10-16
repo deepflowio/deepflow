@@ -10,7 +10,8 @@ import (
 )
 
 var (
-	INVALID_ENDPOINT_DATA = AcquireEndpointData()
+	INVALID_ENDPOINT_INFO = NewEndpointInfo()
+	INVALID_ENDPOINT_DATA = &EndpointData{SrcInfo: INVALID_ENDPOINT_INFO, DstInfo: INVALID_ENDPOINT_INFO}
 )
 
 type TapType uint8
