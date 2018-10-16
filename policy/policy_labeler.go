@@ -537,6 +537,8 @@ func (l *PolicyLabeler) addEpcMap(maps *VlanAndPortMap, endpointInfo *EndpointIn
 	id := uint32(ANY_GROUP)
 	if endpointInfo.L2EpcId > 0 {
 		id = uint32(endpointInfo.L2EpcId)
+	} else if endpointInfo.L2EpcId == -1 {
+		id = 0xffffffff
 	} else if endpointInfo.L2EpcId == 0 {
 		if endpointInfo.L3EpcId > 0 {
 			id = uint32(endpointInfo.L3EpcId)

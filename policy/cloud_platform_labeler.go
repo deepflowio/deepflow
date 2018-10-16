@@ -245,12 +245,12 @@ func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip uint32, tapType Ta
 		if platformData != nil {
 			endpointInfo.SetL2Data(platformData)
 			endpointInfo.SetL3EndByIp(platformData, ip)
-			if platformData = l.GetDataByEpcIp(endpointInfo.L2EpcId, ip); platformData == nil {
-				platformData = l.GetDataByIp(ip)
-			}
-			if platformData != nil {
-				endpointInfo.SetL3Data(platformData, ip)
-			}
+		}
+		if platformData = l.GetDataByEpcIp(endpointInfo.L2EpcId, ip); platformData == nil {
+			platformData = l.GetDataByIp(ip)
+		}
+		if platformData != nil {
+			endpointInfo.SetL3Data(platformData, ip)
 		}
 		l.ipGroup.Populate(ip, endpointInfo)
 	} else {
@@ -278,6 +278,12 @@ func (l *CloudPlatformLabeler) ModifyDeviceInfo(endpointInfo *EndpointInfo) {
 		if endpointInfo.L3DeviceType == 0 {
 			endpointInfo.L3DeviceType = endpointInfo.L2DeviceType
 		}
+		if endpointInfo.L2EpcId == 0 {
+			endpointInfo.L2EpcId = endpointInfo.L3EpcId
+		}
+		if endpointInfo.L3EpcId == 0 {
+			endpointInfo.L3EpcId = endpointInfo.L2EpcId
+		}
 	}
 }
 
@@ -285,16 +291,16 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	srcHash := MacIpKey(calcHashKey(key.SrcMac, key.SrcIp))
 	l.CheckAndUpdateArpTable(key, srcHash)
 	srcData := l.GetEndpointInfo(key.SrcMac, key.SrcIp, key.Tap)
-	l.ModifyL3End(srcData, key, srcHash, true)
-	l.ModifyDeviceInfo(srcData)
 	dstHash := MacIpKey(calcHashKey(key.DstMac, key.DstIp))
 	dstData := l.GetEndpointInfo(key.DstMac, key.DstIp, key.Tap)
-	l.ModifyL3End(dstData, key, dstHash, false)
-	l.ModifyDeviceInfo(dstData)
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
 	if key.Tap == TAP_TOR {
 		endpoint.SetL2End(key)
 	}
+	l.ModifyL3End(srcData, key, srcHash, true)
+	l.ModifyL3End(dstData, key, dstHash, false)
+	l.ModifyDeviceInfo(srcData)
+	l.ModifyDeviceInfo(dstData)
 
 	if !srcData.L2End && !srcData.L3End && srcData.L2EpcId == 0 && srcData.L3EpcId == 0 && len(srcData.GroupIds) == 0 {
 		endpoint.SrcInfo = INVALID_ENDPOINT_INFO
