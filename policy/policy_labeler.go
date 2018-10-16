@@ -20,6 +20,8 @@ const (
 	FAST_PATH_POLICY_MAP_SIZE_LIMIT = 1024
 	FAST_PATH_EPC_MAP_SIZE_LIMIT    = 128
 
+	STANDARD_NETMASK = 0xffff0000
+
 	ANY_GROUP = 0
 	ANY_PROTO = 0
 	ANY_PORT  = 0
@@ -74,6 +76,9 @@ type PolicyLabeler struct {
 	FirstPathHit, FastPathHit         uint64
 	FirstPathHitTick, FastPathHitTick uint64
 	AclHitMax                         uint64
+
+	maskMapFromPlatformData map[uint32]uint32
+	maskMapFromIpGroupData  map[uint32]uint32
 }
 
 func NewPolicyLabeler(queueCount int, mapSize uint32, fastPathDisable bool) *PolicyLabeler {
@@ -89,6 +94,8 @@ func NewPolicyLabeler(queueCount int, mapSize uint32, fastPathDisable bool) *Pol
 	}
 
 	policy.IpNetmaskMap = make(map[uint32]uint32)
+	policy.maskMapFromPlatformData = make(map[uint32]uint32, 1<<16)
+	policy.maskMapFromIpGroupData = make(map[uint32]uint32, 1<<16)
 
 	policy.MapSize = mapSize
 	policy.FastPathDisable = fastPathDisable
@@ -230,51 +237,62 @@ func (l *PolicyLabeler) GenerateGroupPortMaps(acls []*Acl) {
 	l.GroupPortPolicyMaps = portMaps
 }
 
-func (l *PolicyLabeler) makeIpNetmaskMap() map[uint32]uint32 {
+func (l *PolicyLabeler) makeIpNetmaskMap() {
 	maskMap := make(map[uint32]uint32, 1<<16)
 
-	for netIp, mask := range l.IpNetmaskMap {
+	for netIp, mask := range l.maskMapFromPlatformData {
+		if maskMap[netIp] < mask {
+			maskMap[netIp] = mask
+		}
+	}
+	for netIp, mask := range l.maskMapFromIpGroupData {
 		if maskMap[netIp] < mask {
 			maskMap[netIp] = mask
 		}
 	}
 
-	return maskMap
-}
-
-func (l *PolicyLabeler) GenerateIpNetmaskMap(platforms []*PlatformData) {
-	maskMap := l.makeIpNetmaskMap()
-
-	for _, platform := range platforms {
-		for _, network := range platform.Ips {
-			netIp := network.Ip & 0xffff0000
-			mask := uint32(math.MaxUint32) << (32 - network.Netmask)
-			if mask >= 0xffff0000 && maskMap[netIp] < mask {
-				maskMap[netIp] = mask
-			}
-		}
-	}
-
-	for _, platform := range platforms {
-		for _, network := range platform.Ips {
-			mask := maskMap[network.Ip&0xffff0000]
-			netIp := network.Ip & mask
-			if maskMap[netIp] < mask {
-				maskMap[netIp] = mask
-			}
-		}
-	}
 	l.IpNetmaskMap = maskMap
 }
 
-func (l *PolicyLabeler) GenerateIpNetmaskMapFromIpResource(datas []*IpGroupData) {
-	maskMap := l.makeIpNetmaskMap()
+func (l *PolicyLabeler) GenerateIpNetmaskMapFromPlatformData(data []*PlatformData) {
+	maskMap := l.maskMapFromPlatformData
+	for key, _ := range maskMap {
+		delete(maskMap, key)
+	}
 
-	for _, data := range datas {
+	for _, d := range data {
+		for _, network := range d.Ips {
+			minNetIp := network.Ip & STANDARD_NETMASK
+			maxNetIp := minNetIp
+			mask := uint32(math.MaxUint32) << (32 - network.Netmask)
+			// netmask must be either 0 or 0xffff0000~0xffffffff
+			if mask < STANDARD_NETMASK {
+				minNetIp = network.Ip & mask
+				maxNetIp = (minNetIp | ^mask) & STANDARD_NETMASK
+				mask = STANDARD_NETMASK
+			}
+			for netIp := minNetIp; netIp <= maxNetIp && netIp >= minNetIp; netIp += 0x10000 {
+				if maskMap[netIp] < mask {
+					maskMap[netIp] = mask
+				}
+			}
+		}
+	}
+
+	l.makeIpNetmaskMap()
+}
+
+func (l *PolicyLabeler) GenerateIpNetmaskMapFromIpGroupData(data []*IpGroupData) {
+	maskMap := l.maskMapFromIpGroupData
+	for key, _ := range maskMap {
+		delete(maskMap, key)
+	}
+
+	for _, d := range data {
 		// raw = "1.2.3.4/24"
 		// mask = 0xffffff00
 		// netip = "1.2.3"
-		for _, raw := range data.Ips {
+		for _, raw := range d.Ips {
 			parts := strings.Split(raw, "/")
 			if len(parts) != 2 {
 				continue
@@ -285,27 +303,24 @@ func (l *PolicyLabeler) GenerateIpNetmaskMapFromIpResource(datas []*IpGroupData)
 				continue
 			}
 
+			minNetIp := IpToUint32(ip) & STANDARD_NETMASK
+			maxNetIp := minNetIp
 			mask := uint32(math.MaxUint32) << uint32(32-maskSize)
-			netIp := IpToUint32(ip) & 0xffff0000
-			if mask >= 0xffff0000 && maskMap[netIp] < mask {
-				maskMap[netIp] = mask
+			// netmask must be either 0 or 0xffff0000~0xffffffff
+			if mask < STANDARD_NETMASK {
+				minNetIp = IpToUint32(ip) & mask
+				maxNetIp = (minNetIp | ^mask) & STANDARD_NETMASK
+				mask = STANDARD_NETMASK
 			}
-		}
-
-		for _, raw := range data.Ips {
-			parts := strings.Split(raw, "/")
-			if len(parts) != 2 {
-				continue
-			}
-			ip := IpToUint32(net.ParseIP(parts[0]))
-			mask := maskMap[ip&0xffff0000]
-			netIp := ip & mask
-			if maskMap[netIp] < mask {
-				maskMap[netIp] = mask
+			for netIp := minNetIp; netIp <= maxNetIp && netIp >= minNetIp; netIp += 0x10000 {
+				if maskMap[netIp] < mask {
+					maskMap[netIp] = mask
+				}
 			}
 		}
 	}
-	l.IpNetmaskMap = maskMap
+
+	l.makeIpNetmaskMap()
 }
 
 func generateGroupVlanKeys(srcGroups []uint32, dstGroups []uint32, vlan uint16) []uint64 {
@@ -689,14 +704,8 @@ func (l *PolicyLabeler) getFastVlanPolicy(maps *VlanAndPortMap, packet *LookupKe
 }
 
 func (l *PolicyLabeler) getVlanAndPortMap(packet *LookupKey, direction DirectionType, create bool) *VlanAndPortMap {
-	maskSrc := l.IpNetmaskMap[packet.SrcIp&0xffff0000]
-	if maskSrc < 0xffff0000 {
-		maskSrc = 0xffff0000
-	}
-	maskDst := l.IpNetmaskMap[packet.DstIp&0xffff0000]
-	if maskDst < 0xffff0000 {
-		maskDst = 0xffff0000
-	}
+	maskSrc := l.IpNetmaskMap[packet.SrcIp&STANDARD_NETMASK]
+	maskDst := l.IpNetmaskMap[packet.DstIp&STANDARD_NETMASK]
 	maskedSrcIp := packet.SrcIp & maskSrc
 	maskedDstIp := packet.DstIp & maskDst
 	if direction == BACKWARD {
