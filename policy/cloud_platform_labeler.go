@@ -192,6 +192,10 @@ func (l *CloudPlatformLabeler) UpdateInterfaceTable(platformDatas []*PlatformDat
 	}
 }
 
+func (l *CloudPlatformLabeler) UpdateGroupTree(ipGroupDatas []*IpGroupData) {
+	l.ipGroup.Update(ipGroupDatas)
+}
+
 //FIXME: 后续考虑时间可以从metpacket获取
 func (l *CloudPlatformLabeler) UpdateArpTable(hash MacIpKey, tapType TapType) {
 	l.arpTable[tapType].Lock()
