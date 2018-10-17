@@ -172,12 +172,6 @@ message FlowMeter {
     optional uint64 sum_bit = 9;
 }
 
-message PlatformMeter {
-    optional uint64 sum_closed_flow_count = 1;
-    optional uint64 sum_packet = 2;
-    optional uint64 sum_bit = 3;
-}
-
 message ConsoleLogMeter {
     optional uint64 sum_packet_tx = 1;
     optional uint64 sum_packet_rx = 2;
@@ -213,7 +207,6 @@ message Meter {
     optional PerfMeter perf = 2;
     optional GeoMeter geo = 3;
     optional FlowMeter flow = 4;
-    optional PlatformMeter platform = 5;
     optional ConsoleLogMeter console_log = 6;
     optional TypeMeter type = 8;
     optional FpsMeter fps = 9;
