@@ -127,10 +127,6 @@ func unmarshal(b []byte) (*app.Document, error) {
 		m := dt.AcquireFlowMeter()
 		dt.PBToFlowMeter(meter.GetFlow(), m)
 		doc.Meter = m
-	case meter.GetPlatform() != nil:
-		m := dt.AcquirePlatformMeter()
-		dt.PBToPlatformMeter(meter.GetPlatform(), m)
-		doc.Meter = m
 	case meter.GetConsoleLog() != nil:
 		m := dt.AcquireConsoleLogMeter()
 		dt.PBToConsoleLogMeter(meter.GetConsoleLog(), m)

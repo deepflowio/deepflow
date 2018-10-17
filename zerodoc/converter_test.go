@@ -316,20 +316,6 @@ func TestFlowMeterEqual(t *testing.T) {
 	}
 }
 
-func TestPlatformMeterEqual(t *testing.T) {
-	fromMeter := &PlatformMeter{
-		SumClosedFlowCount: 3,
-		SumPacket:          1234,
-		SumBit:             12345,
-	}
-	pb := PlatformMeterToPB(fromMeter)
-	toMeter := AcquirePlatformMeter()
-	PBToPlatformMeter(pb, toMeter)
-	if !reflect.DeepEqual(fromMeter, toMeter) {
-		t.Error("Meter在序列化反序列化之后与原Meter不一致")
-	}
-}
-
 func TestConsoleLogMeterEqual(t *testing.T) {
 	fromMeter := &ConsoleLogMeter{
 		SumPacketTx:           1234,
