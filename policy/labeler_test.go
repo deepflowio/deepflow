@@ -264,6 +264,29 @@ func generatePlatformData(policy *PolicyTable) {
 	policy.UpdateInterfaceData(datas)
 }
 
+func generatePlatformDataByParam(strIp, StrMac string, epcId int32, Iftype uint32) *PlatformData {
+	ip := NewIPFromString(strIp)
+	ipInfo := IpNet{
+		Ip:       ip.Int(),
+		SubnetId: 121,
+		Netmask:  32,
+	}
+
+	mac := NewMACAddrFromString(StrMac)
+	launchServer := NewIPFromString("10.10.10.10")
+	vifData := &PlatformData{
+		EpcId:      epcId,
+		DeviceType: 1,
+		DeviceId:   3,
+		IfType:     Iftype,
+		IfIndex:    5,
+		Mac:        mac.Int(),
+		HostIp:     launchServer.Int(),
+	}
+	vifData.Ips = append(vifData.Ips, &ipInfo)
+	return vifData
+}
+
 func generateIpgroupData(policy *PolicyTable) {
 	ipGroup1 := &IpGroupData{
 		Id:    2,
@@ -957,6 +980,289 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 		t.Error("PortProto FastPath Check Failed")
 		t.Log("Result:", policyData, "\n")
 		t.Log("Expect:", basicPolicyData, "\n")
+	}
+}
+
+func generateAclData(policy *PolicyTable) {
+	dstPorts := []uint16{8000}
+	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	acl1 := &Acl{
+		Id:       10,
+		Type:     TAP_TOR,
+		TapId:    11,
+		DstPorts: dstPorts,
+		Proto:    6,
+		Vlan:     0,
+		Action:   []AclAction{aclAction1},
+	}
+	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	acl2 := &Acl{
+		Id:     20,
+		Type:   TAP_TOR,
+		TapId:  11,
+		Proto:  6,
+		Vlan:   10,
+		Action: []AclAction{aclAction2},
+	}
+	policy.UpdateAclData([]*Acl{acl1, acl2})
+}
+
+type EpcInfo struct {
+	L2EpcId0 int32
+	L3EpcId0 int32
+	L2EpcId1 int32
+	L3EpcId1 int32
+}
+
+func CheckEpcTestResult(epcInfo *EpcInfo, endpointData *EndpointData) bool {
+	return (epcInfo.L2EpcId0 == endpointData.SrcInfo.L2EpcId) &&
+		(epcInfo.L3EpcId0 == endpointData.SrcInfo.L3EpcId) &&
+		(epcInfo.L2EpcId1 == endpointData.DstInfo.L2EpcId) &&
+		(epcInfo.L3EpcId1 == endpointData.DstInfo.L3EpcId)
+}
+
+// l2EpcId0=11,L3EpcId0=11,l2Epcid=0,L3EpcId0=0的数据正确性
+func TestModifyEpcIdPolicy1(t *testing.T) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	platformData1 := generatePlatformDataByParam("192.168.0.11", "08:00:27:a4:2b:fc", 11, 4)
+	policy.UpdateInterfaceData([]*PlatformData{platformData1})
+	generateIpgroupData(policy)
+	generateAclData(policy)
+	srcIp := NewIPFromString("192.168.0.11")
+	dstIp := NewIPFromString("192.168.0.12")
+	key := &LookupKey{
+		SrcIp:   srcIp.Int(),
+		SrcMac:  0x80027a42bfc,
+		DstMac:  0x80027a42bfa,
+		DstIp:   dstIp.Int(),
+		EthType: EthernetTypeIPv4,
+		DstPort: 8000,
+		Ttl:     64,
+		L2End0:  true,
+		L2End1:  true,
+		Proto:   6,
+		Tap:     TAP_TOR,
+	}
+	basicData := &EpcInfo{
+		L2EpcId0: 11,
+		L3EpcId0: 11,
+		L2EpcId1: 0,
+		L3EpcId1: 0,
+	}
+	data, _ := policy.LookupAllByKey(key)
+	if !CheckEpcTestResult(basicData, data) {
+		t.Error("Check Failed")
+		t.Log("Result:", data, "\n")
+		t.Log("Expect:", basicData, "\n")
+	}
+
+	data, _ = policy.policyLabeler.GetPolicyByFastPath(key)
+	if !CheckEpcTestResult(basicData, data) {
+		t.Error("FastPath Check Failed")
+		t.Log("Result:", data, "\n")
+		t.Log("Expect:", basicData, "\n")
+	}
+}
+
+// l2EpcId0=11,l3EpcId0=11,l2EpcId1=12,l3EpcId1=12的数据正确性
+func TestModifyEpcIdPolicy2(t *testing.T) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	platformData1 := generatePlatformDataByParam("192.168.0.11", "08:00:27:a4:2b:fc", 11, 4)
+	platformData2 := generatePlatformDataByParam("192.168.0.12", "08:00:27:a4:2b:fd", 12, 3)
+	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
+	generateIpgroupData(policy)
+	generateAclData(policy)
+	srcIp := NewIPFromString("192.168.0.11")
+	dstIp := NewIPFromString("192.168.0.12")
+	key := &LookupKey{
+		SrcIp:   srcIp.Int(),
+		SrcMac:  0x80027a42bfc,
+		DstMac:  0x80027a42bfd,
+		DstIp:   dstIp.Int(),
+		EthType: EthernetTypeIPv4,
+		DstPort: 8000,
+		Ttl:     64,
+		L2End0:  true,
+		L2End1:  true,
+		Proto:   6,
+		Tap:     TAP_TOR,
+	}
+	basicData := &EpcInfo{
+		L2EpcId0: 11,
+		L3EpcId0: 11,
+		L2EpcId1: 12,
+		L3EpcId1: 12,
+	}
+	data, _ := policy.LookupAllByKey(key)
+	if !CheckEpcTestResult(basicData, data) {
+		t.Error("Check Failed")
+		t.Log("Result:", data, "\n")
+		t.Log("Expect:", basicData, "\n")
+	}
+
+	data, _ = policy.policyLabeler.GetPolicyByFastPath(key)
+	if !CheckEpcTestResult(basicData, data) {
+		t.Error("FastPath Check Failed")
+		t.Log("Result:", data, "\n")
+		t.Log("Expect:", basicData, "\n")
+	}
+}
+
+// l2EpcId0=-1,l3EpcId0=-1,l2Epcid1=0,l3EpcId1=12的数据正确性
+func TestModifyEpcIdPolicy3(t *testing.T) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	platformData1 := generatePlatformDataByParam("192.168.0.11", "08:00:27:a4:2b:fc", 0, 3)
+	platformData2 := generatePlatformDataByParam("192.168.0.12", "08:00:27:a4:2b:fd", 12, 3)
+	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
+	generateIpgroupData(policy)
+	generateAclData(policy)
+	srcIp := NewIPFromString("192.168.0.11")
+	dstIp := NewIPFromString("192.168.0.12")
+	key := &LookupKey{
+		SrcIp:   srcIp.Int(),
+		SrcMac:  0x80027a42bfa,
+		DstMac:  0x80027a42bf0,
+		DstIp:   dstIp.Int(),
+		EthType: EthernetTypeIPv4,
+		DstPort: 8000,
+		Ttl:     64,
+		L2End0:  true,
+		L2End1:  true,
+		Proto:   6,
+		Tap:     TAP_TOR,
+	}
+	basicData := &EpcInfo{
+		L2EpcId0: -1,
+		L3EpcId0: -1,
+		L2EpcId1: 0,
+		L3EpcId1: 12,
+	}
+	data, _ := policy.LookupAllByKey(key)
+	if !CheckEpcTestResult(basicData, data) {
+		t.Error("Check Failed")
+		t.Log("Result:", data, "\n")
+		t.Log("Expect:", basicData, "\n")
+	}
+
+	data, _ = policy.policyLabeler.GetPolicyByFastPath(key)
+	if !CheckEpcTestResult(basicData, data) {
+		t.Error("FastPath Check Failed")
+		t.Log("Result:", data, "\n")
+		t.Log("Expect:", basicData, "\n")
+	}
+}
+
+// l2EpcId0=11,l3EpcId0=11,l2EpcId1=0,l3EpcId1=-1的数据正确性
+func TestModifyEpcIdPolicy4(t *testing.T) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	platformData1 := generatePlatformDataByParam("192.168.0.11", "08:00:27:a4:2b:fc", 11, 3)
+	platformData2 := generatePlatformDataByParam("192.168.0.12", "08:00:27:a4:2b:fd", 0, 3)
+	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
+	generateIpgroupData(policy)
+	generateAclData(policy)
+	srcIp := NewIPFromString("192.168.0.11")
+	dstIp := NewIPFromString("192.168.0.12")
+	key := &LookupKey{
+		SrcIp:   srcIp.Int(),
+		SrcMac:  0x80027a42bfd,
+		DstMac:  0x80027a42bf0,
+		DstIp:   dstIp.Int(),
+		EthType: EthernetTypeIPv4,
+		DstPort: 8000,
+		Ttl:     64,
+		L2End0:  true,
+		L2End1:  true,
+		Proto:   6,
+		Tap:     TAP_TOR,
+	}
+	basicData := &EpcInfo{
+		L2EpcId0: 11,
+		L3EpcId0: 11,
+		L2EpcId1: 0,
+		L3EpcId1: -1,
+	}
+	data, _ := policy.LookupAllByKey(key)
+	if !CheckEpcTestResult(basicData, data) {
+		t.Error("Check Failed")
+		t.Log("Result:", data, "\n")
+		t.Log("Expect:", basicData, "\n")
+	}
+
+	data, _ = policy.policyLabeler.GetPolicyByFastPath(key)
+	if !CheckEpcTestResult(basicData, data) {
+		t.Error("FastPath Check Failed")
+		t.Log("Result:", data, "\n")
+		t.Log("Expect:", basicData, "\n")
+	}
+}
+
+// l3EpcId0=-1, l3EpcId1=-1的数据正确性
+func TestModifyEpcIdPolicy5(t *testing.T) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	platformData1 := generatePlatformDataByParam("192.168.0.11", "08:00:27:a4:2b:fc", 0, 4)
+	platformData2 := generatePlatformDataByParam("192.168.0.12", "08:00:27:a4:2b:fd", 0, 4)
+	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
+	generateIpgroupData(policy)
+	generateAclData(policy)
+
+	// l3EpcId0=-1, l3EpcId1=-1, l2EpcId0=0, l2EpcId1=0
+	srcIp := NewIPFromString("192.168.0.11")
+	dstIp := NewIPFromString("192.168.0.12")
+	key := &LookupKey{
+		SrcIp:   srcIp.Int(),
+		SrcMac:  0x80027a42bfa,
+		DstMac:  0x80027a42bfb,
+		DstIp:   dstIp.Int(),
+		EthType: EthernetTypeIPv4,
+		DstPort: 8000,
+		Ttl:     64,
+		L2End0:  false,
+		L2End1:  true,
+		Proto:   6,
+		Tap:     TAP_TOR,
+	}
+	basicData := &EpcInfo{
+		L2EpcId0: 0,
+		L3EpcId0: -1,
+		L2EpcId1: 0,
+		L3EpcId1: -1,
+	}
+	data, _ := policy.LookupAllByKey(key)
+	if !CheckEpcTestResult(basicData, data) {
+		t.Error("Check Failed")
+		t.Log("Result:", data, "\n")
+		t.Log("Expect:", basicData, "\n")
+	}
+
+	data, _ = policy.policyLabeler.GetPolicyByFastPath(key)
+	if !CheckEpcTestResult(basicData, data) {
+		t.Error("FastPath Check Failed")
+		t.Log("Result:", data, "\n")
+		t.Log("Expect:", basicData, "\n")
+	}
+
+	// l3EpcId0=-1, l3EpcId1=-1, l2EpcId0=-1, l2EpcId1=-1
+	key.SrcMac = 0x80027a42bfc
+	key.DstMac = 0x80027a42bfd
+	key.L2End0 = true
+	basicData = &EpcInfo{
+		L2EpcId0: -1,
+		L3EpcId0: -1,
+		L2EpcId1: -1,
+		L3EpcId1: -1,
+	}
+	data, _ = policy.LookupAllByKey(key)
+	if !CheckEpcTestResult(basicData, data) {
+		t.Error("Check Failed")
+		t.Log("Result:", data, "\n")
+		t.Log("Expect:", basicData, "\n")
+	}
+
+	data, _ = policy.policyLabeler.GetPolicyByFastPath(key)
+	if !CheckEpcTestResult(basicData, data) {
+		t.Error("FastPath Check Failed")
+		t.Log("Result:", data, "\n")
+		t.Log("Expect:", basicData, "\n")
 	}
 }
 
