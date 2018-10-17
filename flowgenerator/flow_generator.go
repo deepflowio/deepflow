@@ -83,7 +83,7 @@ func (f *FlowExtra) TunnelMatch(key *FlowKey) bool {
 	return taggedFlow.TunnelInfo.Src^key.TunnelInfo.Src^taggedFlow.TunnelInfo.Dst^key.TunnelInfo.Dst == 0
 }
 
-func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool) {
+func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool, *ElementFlowExtra) {
 	for e := f.flowList.Front(); e != nil; e = e.Next() {
 		flowExtra := e.Value
 		taggedFlow := flowExtra.taggedFlow
@@ -94,14 +94,12 @@ func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool) 
 			continue
 		}
 		if taggedFlow.IPSrc == key.IPSrc && taggedFlow.IPDst == key.IPDst && taggedFlow.PortSrc == key.PortSrc && taggedFlow.PortDst == key.PortDst {
-			f.flowList.MoveToFront(e)
-			return flowExtra, false
+			return flowExtra, false, e
 		} else if taggedFlow.IPSrc == key.IPDst && taggedFlow.IPDst == key.IPSrc && taggedFlow.PortSrc == key.PortDst && taggedFlow.PortDst == key.PortSrc {
-			f.flowList.MoveToFront(e)
-			return flowExtra, true
+			return flowExtra, true, e
 		}
 	}
-	return nil, false
+	return nil, false, nil
 }
 
 func (f *FlowGenerator) initFlowCache() bool {
@@ -141,6 +139,7 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, key *FlowKey, now time.Durati
 	flowExtra.flowState = FLOW_STATE_RAW
 	flowExtra.recentTime = now
 	flowExtra.reversed = false
+	flowExtra.circlePktGot = true
 
 	return flowExtra
 }
@@ -268,13 +267,13 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 	taggedFlow := flowExtra.taggedFlow
 	bytes := uint64(meta.PacketLen)
 	packetTimestamp := meta.Timestamp
-	if packetTimestamp > flowExtra.recentTime {
-		flowExtra.recentTime = packetTimestamp
-	} else {
-		packetTimestamp = flowExtra.recentTime
+	startTime := taggedFlow.StartTime
+	if packetTimestamp < flowExtra.recentTime || packetTimestamp < startTime {
+		packetTimestamp = timeMax(flowExtra.recentTime, startTime)
 	}
-	maxArrTime := timeMax(taggedFlow.FlowMetricsPeerSrc.ArrTimeLast, taggedFlow.FlowMetricsPeerDst.ArrTimeLast)
-	if taggedFlow.FlowMetricsPeerSrc.PacketCount == 0 && taggedFlow.FlowMetricsPeerDst.PacketCount == 0 {
+	flowExtra.recentTime = packetTimestamp
+	if !flowExtra.circlePktGot {
+		flowExtra.circlePktGot = true
 		taggedFlow.CurStartTime = packetTimestamp
 		taggedFlow.PolicyData = meta.PolicyData
 		if flowExtra.reversed {
@@ -286,11 +285,7 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 		if taggedFlow.FlowMetricsPeerDst.TotalPacketCount == 0 {
 			taggedFlow.FlowMetricsPeerDst.ArrTime0 = packetTimestamp
 		}
-		if maxArrTime < packetTimestamp {
-			taggedFlow.FlowMetricsPeerDst.ArrTimeLast = packetTimestamp
-		} else {
-			packetTimestamp = maxArrTime
-		}
+		taggedFlow.FlowMetricsPeerDst.ArrTimeLast = packetTimestamp
 		taggedFlow.FlowMetricsPeerDst.PacketCount++
 		taggedFlow.FlowMetricsPeerDst.TotalPacketCount++
 		taggedFlow.FlowMetricsPeerDst.ByteCount += bytes
@@ -299,18 +294,14 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 		if taggedFlow.FlowMetricsPeerSrc.TotalPacketCount == 0 {
 			taggedFlow.FlowMetricsPeerSrc.ArrTime0 = packetTimestamp
 		}
-		if maxArrTime < packetTimestamp {
-			taggedFlow.FlowMetricsPeerSrc.ArrTimeLast = packetTimestamp
-		} else {
-			packetTimestamp = maxArrTime
-		}
+		taggedFlow.FlowMetricsPeerSrc.ArrTimeLast = packetTimestamp
 		taggedFlow.FlowMetricsPeerSrc.PacketCount++
 		taggedFlow.FlowMetricsPeerSrc.TotalPacketCount++
 		taggedFlow.FlowMetricsPeerSrc.ByteCount += bytes
 		taggedFlow.FlowMetricsPeerSrc.TotalByteCount += bytes
 	}
 	// a flow will report every minute and StartTime will be reset, so the value could not be overflow
-	taggedFlow.TimeBitmap |= 1 << uint64((flowExtra.recentTime-taggedFlow.StartTime)/time.Second)
+	taggedFlow.TimeBitmap |= 1 << uint64((packetTimestamp-startTime)/time.Second)
 }
 
 func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireInterval time.Duration) {
@@ -329,6 +320,7 @@ func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireInterval time.Durati
 }
 
 func (f *FlowExtra) resetCurFlowInfo(now time.Duration) {
+	f.circlePktGot = false
 	taggedFlow := f.taggedFlow
 	taggedFlow.TimeBitmap = 0
 	taggedFlow.StartTime = now
@@ -414,7 +406,8 @@ loop:
 	goto loop
 }
 
-func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uint64, now time.Duration) {
+func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uint64) {
+	now := time.Duration(time.Now().UnixNano())
 	flowOutQueue := f.flowOutQueue
 	forceReportInterval := f.forceReportInterval
 	for _, flowCache := range hashMap[start:end] {
@@ -516,7 +509,7 @@ loop:
 	if f.cleanRunning {
 		goto loop
 	}
-	f.cleanHashMapByForce(hashMap, start, end, now)
+	f.cleanHashMapByForce(hashMap, start, end)
 	f.cleanWaitGroup.Done()
 }
 
