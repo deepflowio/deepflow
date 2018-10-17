@@ -12,7 +12,6 @@ import (
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/fps"
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/geo"
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/perf"
-	"gitlab.x.lan/application/droplet-app/pkg/mapper/platform"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
@@ -33,7 +32,6 @@ func NewFlowMapProcess(output queue.QueueWriter, input queue.MultiQueueReader, i
 		geo.NewProcessor(GEO_FILE_LOCATION),
 		flowtype.NewProcessor(),
 		consolelog.NewProcessor(),
-		platform.NewProcessor(),
 	}, output, input, inputCount, docsInBuffer, windowSize)
 }
 
