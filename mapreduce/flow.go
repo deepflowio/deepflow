@@ -1,9 +1,9 @@
 package mapreduce
 
 import (
+	"fmt"
 	"reflect"
 	"strconv"
-
 	"time"
 
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/consolelog"
@@ -68,11 +68,17 @@ type subFlowHandler struct {
 
 	queueIndex int
 
-	emitCounter  []uint64
 	counterLatch int
 	statItems    []stats.StatItem
 
-	lastFlush time.Duration
+	lastFlush     time.Duration
+	statsdCounter []StatsdCounter
+}
+
+type StatsdCounter struct {
+	docCounter  uint64
+	flowCounter uint64
+	emitCounter uint64
 }
 
 func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
@@ -94,16 +100,20 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 
 		queueIndex: index,
 
-		emitCounter:  make([]uint64, h.numberOfApps*2),
 		counterLatch: 0,
-		statItems:    make([]stats.StatItem, h.numberOfApps),
+		statItems:    make([]stats.StatItem, h.numberOfApps*2),
 
 		lastFlush: time.Duration(time.Now().UnixNano()),
+
+		statsdCounter: make([]StatsdCounter, h.numberOfApps*2),
 	}
+
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.stashes[i] = NewStash(h.docsInBuffer, h.windowSize)
 		handler.statItems[i].Name = h.processors[i].GetName()
 		handler.statItems[i].StatType = stats.COUNT_TYPE
+		handler.statItems[i+handler.numberOfApps].Name = fmt.Sprintf("%s_doc_counter", h.processors[i].GetName())
+		handler.statItems[i+handler.numberOfApps].StatType = stats.COUNT_TYPE
 	}
 	stats.RegisterCountable("flow_mapper", &handler, stats.OptionStatTags{"index": strconv.Itoa(index)})
 	return &handler
@@ -117,9 +127,15 @@ func (f *subFlowHandler) GetCounter() interface{} {
 		f.counterLatch = 0
 	}
 	for i := 0; i < f.numberOfApps; i++ {
-		f.statItems[i].Value = f.emitCounter[i+oldLatch]
-		f.emitCounter[i+oldLatch] = 0
+		f.statItems[i].Value = f.statsdCounter[i+oldLatch].emitCounter
+		if f.statsdCounter[i+oldLatch].flowCounter != 0 {
+			f.statItems[i+f.numberOfApps].Value = f.statsdCounter[i+oldLatch].docCounter / f.statsdCounter[i+oldLatch].flowCounter
+		}
+		f.statsdCounter[i+oldLatch].emitCounter = 0
+		f.statsdCounter[i+oldLatch].docCounter = 0
+		f.statsdCounter[i+oldLatch].flowCounter = 0
 	}
+
 	return f.statItems
 }
 
@@ -133,7 +149,7 @@ func (f *subFlowHandler) putToQueue() {
 				f.zmqAppQueue.Put(docs[j:]...)
 			}
 		}
-		f.emitCounter[i+f.counterLatch] += uint64(len(docs))
+		f.statsdCounter[i+f.counterLatch].emitCounter += uint64(len(docs))
 		stash.Clear()
 	}
 }
@@ -190,6 +206,8 @@ func (f *subFlowHandler) Process() error {
 
 			for i, processor := range f.processors {
 				docs := processor.Process(flow, false)
+				f.statsdCounter[i+f.counterLatch].docCounter += uint64(len(docs))
+				f.statsdCounter[i+f.counterLatch].flowCounter++
 				for {
 					docs = f.stashes[i].Add(docs)
 					if docs == nil {

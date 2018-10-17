@@ -1,6 +1,7 @@
 package mapreduce
 
 import (
+	"fmt"
 	"reflect"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
+	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
 func NewMeteringMapProcess(output queue.QueueWriter, input queue.MultiQueueReader, inputCount int, docsInBuffer int, windowSize int) *MeteringHandler {
@@ -47,7 +49,11 @@ type subMeteringHandler struct {
 
 	queueIndex int
 
-	lastFlush time.Duration
+	lastFlush    time.Duration
+	counterLatch int
+	statItems    []stats.StatItem
+
+	statsdCounter []StatsdCounter
 }
 
 func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
@@ -70,11 +76,37 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 		queueIndex: index,
 
 		lastFlush: time.Duration(time.Now().UnixNano()),
+
+		statItems: make([]stats.StatItem, h.numberOfApps*2),
+
+		statsdCounter: make([]StatsdCounter, h.numberOfApps*2),
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.stashes[i] = NewStash(h.docsInBuffer, h.windowSize)
+		handler.statItems[i].Name = h.processors[i].GetName()
+		handler.statItems[i].StatType = stats.COUNT_TYPE
+		handler.statItems[i+handler.numberOfApps].Name = fmt.Sprintf("%s_doc_counter", h.processors[i].GetName())
+		handler.statItems[i+handler.numberOfApps].StatType = stats.COUNT_TYPE
 	}
 	return &handler
+}
+
+func (f *subMeteringHandler) GetCounter() interface{} {
+	oldLatch := f.counterLatch
+	if f.counterLatch == 0 {
+		f.counterLatch = f.numberOfApps
+	} else {
+		f.counterLatch = 0
+	}
+	for i := 0; i < f.numberOfApps; i++ {
+		if f.statsdCounter[i+oldLatch].flowCounter != 0 {
+			f.statItems[i+f.numberOfApps].Value = f.statsdCounter[i+oldLatch].docCounter / f.statsdCounter[i+oldLatch].flowCounter
+		}
+		f.statsdCounter[i+oldLatch].docCounter = 0
+		f.statsdCounter[i+oldLatch].flowCounter = 0
+	}
+
+	return f.statItems
 }
 
 func (f *subMeteringHandler) putToQueue() {
@@ -124,6 +156,8 @@ func (f *subMeteringHandler) Process() error {
 
 			for i, processor := range f.processors {
 				docs := processor.Process(metering, false)
+				f.statsdCounter[i+f.counterLatch].docCounter += uint64(len(docs))
+				f.statsdCounter[i+f.counterLatch].flowCounter++
 				for {
 					docs = f.stashes[i].Add(docs)
 					if docs == nil {
