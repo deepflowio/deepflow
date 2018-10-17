@@ -163,7 +163,6 @@ func (l *LabelerManager) run(index int) {
 	flowItemBatch := make([]interface{}, 0, size)
 	itemBatch := make([]interface{}, size)
 
-	meteringAppActions := datatype.ACTION_PACKET_COUNTING | datatype.ACTION_PACKET_COUNT_BROKERING
 	flowAppActions := datatype.ACTION_FLOW_COUNTING | datatype.ACTION_FLOW_STORING | datatype.ACTION_TCP_FLOW_PERF_COUNTING |
 		datatype.ACTION_FLOW_MISC_COUNTING | datatype.ACTION_FLOW_COUNT_BROKERING | datatype.ACTION_TCP_FLOW_PERF_COUNT_BROKERING | datatype.ACTION_GEO_POSITIONING
 
@@ -171,20 +170,16 @@ func (l *LabelerManager) run(index int) {
 		itemCount := l.readQueues.Gets(userId, itemBatch)
 		for i, item := range itemBatch[:itemCount] {
 			metaPacket := item.(*datatype.MetaPacket)
-			metaPacketConsumed := false
 			action := l.GetPolicy(metaPacket, index)
-			if (action.ActionFlags & meteringAppActions) != 0 {
-				meteringKeys = append(meteringKeys, queue.HashKey(metaPacket.Hash))
-				meteringItemBatch = append(meteringItemBatch, metaPacket)
-				metaPacketConsumed = true
-			}
+
+			// 为了统计平台处理的总流量，所有流量都过meteringApp
+			meteringKeys = append(meteringKeys, queue.HashKey(metaPacket.Hash))
+			meteringItemBatch = append(meteringItemBatch, metaPacket)
 			if (action.ActionFlags & flowAppActions) != 0 {
 				flowKeys = append(flowKeys, queue.HashKey(metaPacket.Hash))
-				if metaPacketConsumed {
-					metaPacket = datatype.CloneMetaPacket(metaPacket)
-				}
-				flowItemBatch = append(flowItemBatch, metaPacket)
+				flowItemBatch = append(flowItemBatch, datatype.CloneMetaPacket(metaPacket))
 			}
+
 			itemBatch[i] = nil
 		}
 		if len(meteringItemBatch) > 0 {
