@@ -2,22 +2,20 @@ package flowgenerator
 
 import (
 	"sync/atomic"
-	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
 func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
-	reply := false
-	ok := false
-	var flowExtra *FlowExtra
 	flowKey := f.genFlowKey(meta)
 	hash := f.getQuinTupleHash(flowKey)
 	flowCache := f.hashMap[hash%HASH_MAP_SIZE]
-	// keyMatch is goroutine safety
 	flowCache.Lock()
-	if flowExtra, reply = flowCache.keyMatch(meta, flowKey); flowExtra != nil {
+	if flowExtra, reply, element := flowCache.keyMatch(meta, flowKey); flowExtra != nil {
+		ok := false
 		if ok, reply = f.updateTcpFlow(flowExtra, meta, reply); ok {
+			flowCache.flowList.Remove(element)
+			flowCache.Unlock() // code below does not use flowCache any more
 			taggedFlow := flowExtra.taggedFlow
 			atomic.AddInt32(&f.stats.CurrNumFlows, -1)
 			flowExtra.setCurFlowInfo(flowExtra.recentTime, f.forceReportInterval)
@@ -29,13 +27,12 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 			ReleaseFlowExtra(flowExtra)
 			f.flowOutQueue.Put(taggedFlow)
-			// delete front from this FlowCache because flowExtra is moved to front in keyMatch()
-			flowCache.flowList.RemoveFront()
 		} else {
 			// reply is a sign relative to the flow direction, so if the flow is reversed then the sign should be changed
 			if f.checkIfDoFlowPerf(flowExtra) {
 				flowExtra.metaFlowPerf.Update(meta, flowExtra.reversed != reply, flowExtra, &f.perfCounter)
 			}
+			flowCache.Unlock()
 		}
 	} else {
 		if f.stats.CurrNumFlows >= f.flowLimitNum {
@@ -48,6 +45,9 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 		taggedFlow := flowExtra.taggedFlow
 		f.stats.TotalNumFlows++
 		if closed {
+			log.Warning("unexpected closed flow")
+			log.Warningf("%s", taggedFlow)
+			flowCache.Unlock()
 			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportInterval)
 			if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
 				flowExtra.reverseFlow()
@@ -62,14 +62,14 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 				flowExtra.metaFlowPerf.Update(meta, reply, flowExtra, &f.perfCounter)
 			}
 			f.addFlow(flowCache, flowExtra)
+			flowCache.Unlock()
 			atomic.AddInt32(&f.stats.CurrNumFlows, 1)
 		}
 	}
-	flowCache.Unlock()
 }
 
 func (f *FlowGenerator) initTcpFlow(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool, bool) {
-	now := time.Duration(meta.Timestamp)
+	now := meta.Timestamp
 	flowExtra := f.initFlow(meta, key, now)
 	taggedFlow := flowExtra.taggedFlow
 	var flags uint8 = 0

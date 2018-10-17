@@ -30,6 +30,7 @@ type FlowExtra struct {
 	recentTime   time.Duration
 	timeout      time.Duration
 	reversed     bool
+	circlePktGot bool
 }
 
 var flowExtraPool = sync.Pool{

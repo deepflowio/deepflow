@@ -2,7 +2,6 @@ package flowgenerator
 
 import (
 	"sync/atomic"
-	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
@@ -27,13 +26,11 @@ func (f *FlowCache) keyMatchForNonIp(meta *MetaPacket, key *FlowKey) (*FlowExtra
 }
 
 func (f *FlowGenerator) processNonIpPacket(meta *MetaPacket) {
-	reply := false
-	var flowExtra *FlowExtra
 	flowKey := f.genFlowKey(meta)
 	hash := f.getNonIpQuinTupleHash(flowKey)
 	flowCache := f.hashMap[hash%HASH_MAP_SIZE]
 	flowCache.Lock()
-	if flowExtra, reply = flowCache.keyMatchForNonIp(meta, flowKey); flowExtra != nil {
+	if flowExtra, reply := flowCache.keyMatchForNonIp(meta, flowKey); flowExtra != nil {
 		f.updateNonIpFlow(flowExtra, meta, reply)
 	} else {
 		if f.stats.CurrNumFlows >= f.flowLimitNum {
@@ -50,7 +47,7 @@ func (f *FlowGenerator) processNonIpPacket(meta *MetaPacket) {
 }
 
 func (f *FlowGenerator) initNonIpFlow(meta *MetaPacket, key *FlowKey) *FlowExtra {
-	now := time.Duration(meta.Timestamp)
+	now := meta.Timestamp
 	flowExtra := f.initFlow(meta, key, now)
 	taggedFlow := flowExtra.taggedFlow
 	taggedFlow.FlowMetricsPeerSrc.ArrTime0 = now
