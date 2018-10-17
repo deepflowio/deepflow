@@ -178,7 +178,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:0bead3498b2fb6879a0ab9573c39d77f6c06853ad240d2dab8d90cb006a5c3c1"
+  digest = "1:c39f01d13d9b247a34eb226b74ff48670c351bc1f0d7bcc032bda798530f04a9"
   name = "gitlab.x.lan/application/droplet-app"
   packages = [
     "internal/pkg/endpoint",
@@ -191,11 +191,10 @@
     "pkg/mapper/fps",
     "pkg/mapper/geo",
     "pkg/mapper/perf",
-    "pkg/mapper/platform",
     "pkg/mapper/usage",
   ]
   pruneopts = "UT"
-  revision = "dfeee733e4d7dfd7756e717426f6bc0d30468fed"
+  revision = "6d31ea58ce0972829f0ebafd233e0b4de48917fe"
 
 [[projects]]
   branch = "master"
@@ -210,7 +209,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:724f77e862d94dc4b2ec909045bd0e7ba553e6f29d6a6f005cc2970b5f72fe22"
+  digest = "1:b12ec9a9d5ee8c2cc9847ace62a6d51a2686195441b01fefe431cd4811e0a133"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "app",
@@ -230,11 +229,11 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "28ccd13c689e248e6b08852be982b43ac9662e26"
+  revision = "5fd7d97718089a156a2ada8e81328bdaf596960f"
 
 [[projects]]
   branch = "master"
-  digest = "1:1ceabba5ed9855471fe7080b857307dc0c409bde00a1af8995b3c1255e9faf0f"
+  digest = "1:6c78dffe7cc05decc02fa05942a927ba394a39254ad7b7b0eb587ca9bb5874b9"
   name = "gitlab.x.lan/yunshan/message"
   packages = [
     "dfi",
@@ -242,7 +241,7 @@
     "zero",
   ]
   pruneopts = "T"
-  revision = "36d43f89a107f07435958bbe2eba38d1d128d846"
+  revision = "e8974d5e5f7fd79d7d572598c2bf9dbac00e14e8"
 
 [[projects]]
   branch = "release-branch.go1.11"
@@ -371,7 +370,6 @@
     "gitlab.x.lan/application/droplet-app/pkg/mapper/fps",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/geo",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/perf",
-    "gitlab.x.lan/application/droplet-app/pkg/mapper/platform",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/usage",
     "gitlab.x.lan/yunshan/droplet-libs/app",
     "gitlab.x.lan/yunshan/droplet-libs/datatype",

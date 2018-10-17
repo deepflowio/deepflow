@@ -10,7 +10,6 @@ import (
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/fps"
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/geo"
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/perf"
-	"gitlab.x.lan/application/droplet-app/pkg/mapper/platform"
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/usage"
 	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 )
@@ -32,9 +31,10 @@ var FLOW_APP_CODES = [][]zerodoc.Code{
 
 	flowtype.NODE_CODES,
 
-	geo.REGION_CODES,
-	geo.COUNTRY_CODES,
-	geo.POLICY_CODES,
+	geo.CHN_CODES,
+	geo.NON_CHN_CODES,
+	geo.POLICY_CHN_CODES,
+	geo.POLICY_NON_CHN_CODES,
 
 	perf.NODE_CODES,
 	perf.GROUP_NODE_CODES,
@@ -42,9 +42,6 @@ var FLOW_APP_CODES = [][]zerodoc.Code{
 	perf.GROUP_EDGE_CODES,
 	perf.GROUP_EDGE_PORT_CODES,
 	perf.POLICY_NODE_CODES,
-
-	platform.NODE_CODES,
-	platform.POLICY_CODES,
 }
 
 var METERING_APP_CODES = [][]zerodoc.Code{
