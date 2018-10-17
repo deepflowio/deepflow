@@ -472,25 +472,6 @@ func PBToFlowMeter(m *pb.FlowMeter, meter *FlowMeter) {
 	meter.SumBit = m.GetSumBit()
 }
 
-func PlatformMeterToPB(m *PlatformMeter) *pb.PlatformMeter {
-	return &pb.PlatformMeter{
-		SumClosedFlowCount: proto.Uint64(m.SumClosedFlowCount),
-		SumPacket:          proto.Uint64(m.SumPacket),
-		SumBit:             proto.Uint64(m.SumBit),
-	}
-}
-
-func PBToPlatformMeter(m *pb.PlatformMeter, meter *PlatformMeter) {
-	if meter == nil {
-		panic("meter为空")
-		return
-	}
-
-	meter.SumClosedFlowCount = m.GetSumClosedFlowCount()
-	meter.SumPacket = m.GetSumPacket()
-	meter.SumBit = m.GetSumBit()
-}
-
 func ConsoleLogMeterToPB(m *ConsoleLogMeter) *pb.ConsoleLogMeter {
 	return &pb.ConsoleLogMeter{
 		SumPacketTx:             proto.Uint64(m.SumPacketTx),
