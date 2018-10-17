@@ -485,7 +485,7 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 	l.generateInterestKeys(endpointData, packet)
 	portGroup := l.GroupPortPolicyMaps[packet.Tap]
 	vlanGroup := l.GroupVlanPolicyMaps[packet.Tap]
-	findPolicy := AcquirePolicyData()
+	findPolicy := NewPolicyData()
 	forward := NewPolicyData()
 	backward := NewPolicyData()
 
@@ -539,9 +539,7 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 	}
 
 	if len(findPolicy.AclActions) == 0 {
-		// 对于内容全为0的findPolicy，统一采用INVALID_POLICY_DATA（同一块内存的数值），
-		// 当前的findPolicy内存释放掉，以节省内存消耗
-		ReleasePolicyData(findPolicy)
+		// 对于内容全为0的findPolicy，统一采用INVALID_POLICY_DATA（同一块内存的数值）
 		findPolicy = INVALID_POLICY_DATA
 	}
 	atomic.AddUint64(&l.FirstPathHit, 1)
@@ -729,7 +727,7 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *
 		return nil, nil
 	}
 
-	var policy *PolicyData
+	policy := NewPolicyData()
 	var endpoint *EndpointData
 	portForwardFound := false
 	portBackwardFound := false
@@ -740,9 +738,6 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *
 	for _, direction := range []DirectionType{FORWARD, BACKWARD} {
 		if maps := l.getVlanAndPortMap(packet, direction, false); maps != nil {
 			// vlan不需要查找BACKWARD方向
-			if policy == nil {
-				policy = AcquirePolicyData()
-			}
 			if packet.Vlan > 0 && direction == FORWARD {
 				vlanFound = false
 				if endpoint = l.getFastVlanPolicy(maps, packet, direction, policy); endpoint != nil {
@@ -760,18 +755,12 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *
 	}
 	found := portForwardFound && portBackwardFound && vlanFound
 	if !found {
-		if policy != nil {
-			ReleasePolicyData(policy)
-		}
 		return nil, nil
-	} else {
-		if len(policy.AclActions) == 0 {
-			// 对于内容全为0的policy，统一采用INVALID_POLICY_DATA（同一块内存的数值），
-			// 当前的policy内存释放掉，以节省内存消耗
-			ReleasePolicyData(policy)
-			policy = INVALID_POLICY_DATA
-		}
+	} else if len(policy.AclActions) == 0 {
+		// 对于内容全为0的policy，统一采用INVALID_POLICY_DATA（同一块内存的数值）
+		policy = INVALID_POLICY_DATA
 	}
+
 	atomic.AddUint64(&l.FastPathHit, 1)
 	atomic.AddUint64(&l.FastPathHitTick, 1)
 	hitData := atomic.LoadUint64(&l.AclHitMax)
