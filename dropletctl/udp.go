@@ -45,7 +45,7 @@ func RecvFromDroplet(conn *net.UDPConn) (*bytes.Buffer, error) {
 }
 
 func SendToDroplet(module DropletCtlModuleId, operate DropletCtlModuleOperate, args *bytes.Buffer) (*net.UDPConn, *bytes.Buffer, error) {
-	conn, err := net.Dial("udp4", DROPLETCTL_IP+":"+strconv.Itoa(DROPLETCTL_PORT))
+	conn, err := net.Dial("udp4", dropletCTLIP+":"+strconv.Itoa(dropletCTLPort))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -71,7 +71,7 @@ func SendToDropletCtl(conn *net.UDPConn, port int, result uint32, args *bytes.Bu
 		log.Warningf("len(args) > %v", DROPLET_MESSAGE_ARGS_LEN)
 		return
 	}
-	dst := &net.UDPAddr{IP: net.ParseIP(DROPLETCTL_IP), Port: port}
+	dst := &net.UDPAddr{IP: net.ParseIP(dropletCTLIP), Port: port}
 	buffer := bytes.Buffer{}
 	msg := DropletMessage{Module: 0, Result: result, Operate: 11}
 	if args != nil {
@@ -109,7 +109,7 @@ func process(conn *net.UDPConn) {
 }
 
 func DropletCtlListener() {
-	addr := &net.UDPAddr{IP: net.ParseIP(DROPLETCTL_IP), Port: DROPLETCTL_PORT}
+	addr := &net.UDPAddr{IP: net.ParseIP(dropletCTLIP), Port: dropletCTLPort}
 	go func() {
 		listener, err := net.ListenUDP("udp4", addr)
 		if err != nil {
@@ -117,7 +117,7 @@ func DropletCtlListener() {
 			return
 		}
 		defer listener.Close()
-		log.Infof("DropletCtlListener <%v:%v>", DROPLETCTL_IP, DROPLETCTL_PORT)
+		log.Infof("DropletCtlListener <%v:%v>", dropletCTLIP, dropletCTLPort)
 		for {
 			process(listener)
 		}

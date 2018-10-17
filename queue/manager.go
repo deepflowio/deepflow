@@ -88,14 +88,28 @@ func (m *Manager) RecvCommand(conn *net.UDPConn, port int, operate uint16, arg *
 
 func (m *Manager) NewQueue(name string, size int, options ...queue.Option) *Queue {
 	q := &Queue{}
-	q.Init(name, size, options...)
+	q.Init(name, size, nil, options...)
 	m.queues[name] = q
 	return q
 }
 
 func (m *Manager) NewQueues(name string, size, count, userCount int, options ...queue.Option) *MultiQueue {
 	q := &MultiQueue{}
-	q.Init(name, size, count, userCount, options...)
+	q.Init(name, size, count, userCount, nil, options...)
+	m.queues[name] = q
+	return q
+}
+
+func (m *Manager) NewQueueUnmarshal(name string, size int, unmarshaller Unmarshaller, options ...queue.Option) *Queue {
+	q := &Queue{}
+	q.Init(name, size, unmarshaller, options...)
+	m.queues[name] = q
+	return q
+}
+
+func (m *Manager) NewQueuesUnmarshal(name string, size, count, userCount int, unmarshaller Unmarshaller, options ...queue.Option) *MultiQueue {
+	q := &MultiQueue{}
+	q.Init(name, size, count, userCount, unmarshaller, options...)
 	m.queues[name] = q
 	return q
 }

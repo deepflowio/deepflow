@@ -9,8 +9,8 @@ type Queue struct {
 	Monitor
 }
 
-func (q *Queue) Init(name string, size int, options ...queue.Option) {
-	q.Monitor.init(name)
+func (q *Queue) Init(name string, size int, unmarshaller Unmarshaller, options ...queue.Option) {
+	q.Monitor.init(name, unmarshaller)
 	q.OverwriteQueue.Init(name, size, options...)
 }
 
@@ -25,4 +25,8 @@ func (q *Queue) Gets(output []interface{}) int {
 func (q *Queue) Put(items ...interface{}) error {
 	q.Monitor.send(items)
 	return q.OverwriteQueue.Put(items...)
+}
+
+func (q *Queue) Len() int {
+	return q.OverwriteQueue.Len()
 }

@@ -22,6 +22,14 @@ import (
 	"gitlab.x.lan/yunshan/message/trident"
 )
 
+var dropletCTLPort int = 9527
+var dropletCTLIP string = "127.0.0.1"
+
+func SetQueueCTLIpPort(ip string, port int) {
+	dropletCTLIP = ip
+	dropletCTLPort = port
+}
+
 type CmdExecute func(response *trident.SyncResponse)
 type SortedAcls []*trident.FlowAcl
 

@@ -9,7 +9,7 @@ import (
 
 func TestSingleQueueSingleUserPuts(t *testing.T) {
 	queue := &MultiQueue{}
-	queue.Init("whatever", 8, 1, 1)
+	queue.Init("whatever", 8, 1, 1, nil)
 	keys := []rawqueue.HashKey{0, 2, 2, 1, 2, 1}
 	inBatch := []interface{}{10081, 10082, 10083, 10084, 10085}
 	outBatch := make([]interface{}, 2)
@@ -33,7 +33,7 @@ func TestSingleQueueSingleUserPuts(t *testing.T) {
 
 func TestMultipleQueueSingleUserPuts(t *testing.T) {
 	queue := &MultiQueue{}
-	queue.Init("whatever", 8, 3, 1)
+	queue.Init("whatever", 8, 3, 1, nil)
 	keys := []rawqueue.HashKey{0, 2, 2, 1, 2, 1}
 	inBatch := []interface{}{10081, 10082, 10083, 10084, 10085}
 	outBatch := make([]interface{}, 8)
@@ -59,7 +59,7 @@ func TestMultipleQueueMultipleUserPuts(t *testing.T) {
 	queue := &MultiQueue{}
 	userCount := 8
 	size := userCount * 8
-	queue.Init("whatever", size, 3, userCount)
+	queue.Init("whatever", size, 3, userCount, nil)
 	wg := sync.WaitGroup{}
 	wg.Add(userCount)
 	userPuts := func(i int) {
