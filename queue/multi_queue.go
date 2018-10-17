@@ -13,8 +13,8 @@ type MultiQueue struct {
 	itemBatches [][][]interface{}
 }
 
-func (q *MultiQueue) Init(name string, size, count, userCount int, options ...queue.Option) {
-	q.Monitor.init(name)
+func (q *MultiQueue) Init(name string, size, count, userCount int, unmarshaller Unmarshaller, options ...queue.Option) {
+	q.Monitor.init(name, unmarshaller)
 	q.FixedMultiQueue = queue.NewOverwriteQueues(name, uint8(count), size, options...)
 
 	if count > 1 {
@@ -83,4 +83,8 @@ func (q *MultiQueue) Puts(keys []queue.HashKey, items []interface{}) error {
 		}
 	}
 	return nil
+}
+
+func (q *MultiQueue) Len(key queue.HashKey) int {
+	return q.FixedMultiQueue.Len(key)
 }

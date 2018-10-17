@@ -20,11 +20,6 @@ const (
 	DROPLETCTL_MAX
 )
 
-const (
-	DROPLETCTL_PORT = 9527
-	DROPLETCTL_IP   = "127.0.0.1"
-)
-
 type CommandLineProcess interface {
 	RecvCommand(conn *net.UDPConn, port int, operate uint16, arg *bytes.Buffer)
 }
