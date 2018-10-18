@@ -32,8 +32,9 @@ func NewStash(capacity, slots int) *Stash {
 }
 
 // Add 添加到stash，会改变doc中meter的内容，若stash已满会返回未添加的doc
-func (s *Stash) Add(docs []*app.Document) []*app.Document {
-	for i, doc := range docs {
+func (s *Stash) Add(docs []interface{}) []interface{} {
+	for i, v := range docs {
+		doc := v.(*app.Document)
 		if s.timestamp == 0 {
 			s.timestamp = doc.Timestamp
 		}
@@ -51,14 +52,13 @@ func (s *Stash) Add(docs []*app.Document) []*app.Document {
 			}
 			if docLoc, ok := slotMap[fastID]; ok {
 				s.stash[docLoc].(*app.Document).ConcurrentMerge(doc.Meter)
-				app.ReleaseDocument(doc)
 				continue
 			}
 
 			if s.entryCount >= s.capacity {
 				return docs[i:]
 			}
-			s.stash[s.entryCount] = doc
+			s.stash[s.entryCount] = app.CloneDocument(doc)
 			slotMap[fastID] = s.entryCount
 			s.entryCount++
 
@@ -70,14 +70,13 @@ func (s *Stash) Add(docs []*app.Document) []*app.Document {
 			}
 			if docLoc, ok := slotMap[doc.GetID(s.intBuffer)]; ok {
 				s.stash[docLoc].(*app.Document).ConcurrentMerge(doc.Meter)
-				app.ReleaseDocument(doc)
 				continue
 			}
 
 			if s.entryCount >= s.capacity {
 				return docs[i:]
 			}
-			s.stash[s.entryCount] = doc
+			s.stash[s.entryCount] = app.CloneDocument(doc)
 			slotMap[doc.GetID(s.intBuffer)] = s.entryCount
 			s.entryCount++
 		}

@@ -61,7 +61,7 @@ func TestStash(t *testing.T) {
 	doc4 := &app.Document{Timestamp: 0x12345679, Tag: tag4, Meter: meter4}
 
 	stash := NewStash(100, 30)
-	stash.Add([]*app.Document{doc1, doc2, doc3, doc4})
+	stash.Add([]interface{}{doc1, doc2, doc3, doc4})
 	docs := stash.Dump()
 	if len(docs) != 3 {
 		t.Error("文档数量不正确")
@@ -82,7 +82,7 @@ func TestStash(t *testing.T) {
 	}
 
 	stash.Clear()
-	stash.Add([]*app.Document{doc1, doc2, doc3, doc4})
+	stash.Add([]interface{}{doc1, doc2, doc3, doc4})
 	if len(docs) != 3 {
 		t.Error("Clear后文档数量不正确")
 	}
