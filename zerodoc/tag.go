@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/google/gopacket/layers"
+	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
@@ -486,6 +487,10 @@ func (t *Tag) GetID(buf *utils.IntBuffer) string {
 	return t.id
 }
 
+func (t *Tag) SetID(id string) {
+	t.id = id
+}
+
 func isFastCode(code Code) bool {
 	// 认为所有只包含这四个Code子集的Tag能使用FashID
 	return (code & ^(ACLGID | IP | L3EpcID | TAPType)) == 0
@@ -582,6 +587,10 @@ func CloneTag(tag *Tag) *Tag {
 	newTag.Code = tag.Code
 	newTag.id = tag.id
 	return newTag
+}
+
+func (t *Tag) Clone() app.Tag {
+	return CloneTag(t)
 }
 
 func (t *Tag) Release() {

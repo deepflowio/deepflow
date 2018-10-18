@@ -9,11 +9,13 @@ import (
 
 type Tag interface {
 	GetID(*utils.IntBuffer) string
+	SetID(string)
 	GetCode() uint64
 	GetFastID() uint64
 	HasVariedField() bool
 	ToKVString() string
 	String() string
+	Clone() Tag
 	Release()
 }
 
@@ -59,4 +61,13 @@ func ReleaseDocument(doc *Document) {
 	}
 	*doc = Document{}
 	poolDocument.Put(doc)
+}
+
+func CloneDocument(doc *Document) *Document {
+	newDoc := AcquireDocument()
+	newDoc.Timestamp = doc.Timestamp
+	newDoc.Tag = doc.Tag.Clone()
+	newDoc.Meter = doc.Meter.Clone()
+	newDoc.ActionFlags = doc.ActionFlags
+	return newDoc
 }
