@@ -185,6 +185,7 @@ var endpointInfoPool = sync.Pool{
 }
 
 func AcquireEndpointInfo() *EndpointInfo {
+	ReleaseEndpointInfo(NewEndpointInfo())
 	return endpointInfoPool.Get().(*EndpointInfo)
 }
 
@@ -211,6 +212,7 @@ var endpointDataPool = sync.Pool{
 }
 
 func AcquireEndpointData(infos ...*EndpointInfo) *EndpointData {
+	ReleaseEndpointData(NewEndpointData())
 	d := endpointDataPool.Get().(*EndpointData)
 	len := len(infos)
 	if len == 0 {

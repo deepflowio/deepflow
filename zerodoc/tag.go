@@ -541,6 +541,7 @@ var poolField sync.Pool = sync.Pool{
 }
 
 func AcquireField() *Field {
+	ReleaseField(&Field{})
 	return poolField.Get().(*Field)
 }
 
@@ -565,6 +566,7 @@ var poolTag sync.Pool = sync.Pool{
 }
 
 func AcquireTag() *Tag {
+	ReleaseTag(&Tag{})
 	return poolTag.Get().(*Tag)
 }
 
