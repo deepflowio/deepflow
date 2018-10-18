@@ -79,6 +79,7 @@ type StatsdCounter struct {
 	docCounter  uint64
 	flowCounter uint64
 	emitCounter uint64
+	maxCounter  uint64
 }
 
 func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
@@ -101,7 +102,7 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 		queueIndex: index,
 
 		counterLatch: 0,
-		statItems:    make([]stats.StatItem, h.numberOfApps*2),
+		statItems:    make([]stats.StatItem, h.numberOfApps*3),
 
 		lastFlush: time.Duration(time.Now().UnixNano()),
 
@@ -114,6 +115,8 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 		handler.statItems[i].StatType = stats.COUNT_TYPE
 		handler.statItems[i+handler.numberOfApps].Name = fmt.Sprintf("%s_doc_counter", h.processors[i].GetName())
 		handler.statItems[i+handler.numberOfApps].StatType = stats.COUNT_TYPE
+		handler.statItems[i+handler.numberOfApps*2].Name = fmt.Sprintf("%s_max_doc_counter", h.processors[i].GetName())
+		handler.statItems[i+handler.numberOfApps*2].StatType = stats.COUNT_TYPE
 	}
 	stats.RegisterCountable("flow_mapper", &handler, stats.OptionStatTags{"index": strconv.Itoa(index)})
 	return &handler
@@ -131,9 +134,11 @@ func (f *subFlowHandler) GetCounter() interface{} {
 		if f.statsdCounter[i+oldLatch].flowCounter != 0 {
 			f.statItems[i+f.numberOfApps].Value = f.statsdCounter[i+oldLatch].docCounter / f.statsdCounter[i+oldLatch].flowCounter
 		}
+		f.statItems[i+f.numberOfApps*2].Value = f.statsdCounter[i+oldLatch].maxCounter
 		f.statsdCounter[i+oldLatch].emitCounter = 0
 		f.statsdCounter[i+oldLatch].docCounter = 0
 		f.statsdCounter[i+oldLatch].flowCounter = 0
+		f.statsdCounter[i+oldLatch].maxCounter = 0
 	}
 
 	return f.statItems
@@ -208,6 +213,9 @@ func (f *subFlowHandler) Process() error {
 				docs := processor.Process(flow, false)
 				f.statsdCounter[i+f.counterLatch].docCounter += uint64(len(docs))
 				f.statsdCounter[i+f.counterLatch].flowCounter++
+				if uint64(len(docs)) > f.statsdCounter[i+f.counterLatch].maxCounter {
+					f.statsdCounter[i+f.counterLatch].maxCounter = uint64(len(docs))
+				}
 				for {
 					docs = f.stashes[i].Add(docs)
 					if docs == nil {

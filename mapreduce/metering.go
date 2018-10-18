@@ -79,7 +79,7 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 
 		statItems: make([]stats.StatItem, h.numberOfApps*2),
 
-		statsdCounter: make([]StatsdCounter, h.numberOfApps*2),
+		statsdCounter: make([]StatsdCounter, h.numberOfApps*3),
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.stashes[i] = NewStash(h.docsInBuffer, h.windowSize)
@@ -87,6 +87,8 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 		handler.statItems[i].StatType = stats.COUNT_TYPE
 		handler.statItems[i+handler.numberOfApps].Name = fmt.Sprintf("%s_doc_counter", h.processors[i].GetName())
 		handler.statItems[i+handler.numberOfApps].StatType = stats.COUNT_TYPE
+		handler.statItems[i+handler.numberOfApps*2].Name = fmt.Sprintf("%s_max_doc_counter", h.processors[i].GetName())
+		handler.statItems[i+handler.numberOfApps*2].StatType = stats.COUNT_TYPE
 	}
 	return &handler
 }
@@ -102,8 +104,10 @@ func (f *subMeteringHandler) GetCounter() interface{} {
 		if f.statsdCounter[i+oldLatch].flowCounter != 0 {
 			f.statItems[i+f.numberOfApps].Value = f.statsdCounter[i+oldLatch].docCounter / f.statsdCounter[i+oldLatch].flowCounter
 		}
+		f.statItems[i+f.numberOfApps*2].Value = f.statsdCounter[i+oldLatch].maxCounter
 		f.statsdCounter[i+oldLatch].docCounter = 0
 		f.statsdCounter[i+oldLatch].flowCounter = 0
+		f.statsdCounter[i+oldLatch].maxCounter = 0
 	}
 
 	return f.statItems
@@ -158,6 +162,9 @@ func (f *subMeteringHandler) Process() error {
 				docs := processor.Process(metering, false)
 				f.statsdCounter[i+f.counterLatch].docCounter += uint64(len(docs))
 				f.statsdCounter[i+f.counterLatch].flowCounter++
+				if uint64(len(docs)) > f.statsdCounter[i+f.counterLatch].maxCounter {
+					f.statsdCounter[i+f.counterLatch].maxCounter = uint64(len(docs))
+				}
 				for {
 					docs = f.stashes[i].Add(docs)
 					if docs == nil {
