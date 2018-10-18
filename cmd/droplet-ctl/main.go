@@ -29,8 +29,10 @@ func main() {
 		Short: "Droplet Config Tool",
 	}
 	for _, handler := range dropletctl.RegisterHandlers {
-		cmd := handler()
-		root.AddCommand(cmd)
+		if handler != nil {
+			cmd := handler()
+			root.AddCommand(cmd)
+		}
 	}
 	root.GenBashCompletionFile("/usr/share/bash-completion/completions/droplet-ctl")
 	root.SetArgs(os.Args[1:])
