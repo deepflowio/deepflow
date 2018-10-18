@@ -181,9 +181,8 @@ func (f *Flow) String() string {
 	for i := 2; i < typeOf.NumField(); i++ {
 		field := typeOf.Field(i)
 		value := valueOf.Field(i)
-		if v := value.MethodByName("String"); v.IsValid() {
-			results := v.Call([]reflect.Value{})
-			formatted += results[0].String()
+		if field.Type.Name() == "Duration" {
+			formatted += fmt.Sprintf("%v: %d ", field.Name, value)
 		} else {
 			formatted += fmt.Sprintf("%v: %+v ", field.Name, value)
 		}
@@ -196,6 +195,7 @@ var tcpPerfStatsPool = sync.Pool{
 }
 
 func AcquireTcpPerfStats() *TcpPerfStats {
+	ReleaseTcpPerfStats(&TcpPerfStats{})
 	return tcpPerfStatsPool.Get().(*TcpPerfStats)
 }
 

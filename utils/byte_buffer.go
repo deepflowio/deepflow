@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"runtime"
 	"sync"
 )
 
@@ -36,9 +35,14 @@ func (b *ByteBuffer) SetQuota(n int) {
 	b.quota = n
 }
 
-var pool = sync.Pool{}
+var pool = sync.Pool{
+	New: func() interface{} {
+		return &ByteBuffer{quota: 1 << 16}
+	},
+}
 
 func AcquireByteBuffer() *ByteBuffer {
+	ReleaseByteBuffer(&ByteBuffer{quota: 1 << 16})
 	return pool.Get().(*ByteBuffer)
 }
 
@@ -52,15 +56,4 @@ func CloneByteBuffer(bytes *ByteBuffer) *ByteBuffer {
 func ReleaseByteBuffer(bytes *ByteBuffer) {
 	bytes.Reset()
 	pool.Put(bytes)
-}
-
-func init() {
-	pool.New = func() interface{} {
-		bytes := &ByteBuffer{quota: 1 << 16}
-		runtime.SetFinalizer(bytes, func(b *ByteBuffer) {
-			b.Reset()
-			pool.Put(b)
-		})
-		return bytes
-	}
 }
