@@ -5,11 +5,11 @@ import "gitlab.x.lan/yunshan/droplet-libs/datatype"
 type MeteringProcessor interface {
 	GetName() string
 	Prepare()
-	Process(*datatype.MetaPacket, bool) []*Document
+	Process(*datatype.MetaPacket, bool) []interface{}
 }
 
 type FlowProcessor interface {
 	GetName() string
 	Prepare()
-	Process(*datatype.TaggedFlow, bool) []*Document
+	Process(*datatype.TaggedFlow, bool) []interface{}
 }
