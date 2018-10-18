@@ -20,18 +20,15 @@ type Counter struct {
 type Monitor process.Process
 
 func (m *Monitor) GetCounter() interface{} {
-	counter := Counter{}
-	percent, err := (*process.Process)(m).CPUPercent()
+	percent, err := (*process.Process)(m).Percent(0)
 	if err != nil {
-		return counter
+		return Counter{}
 	}
-	counter.CpuPercent = percent
 	mem, err := (*process.Process)(m).MemoryInfo()
 	if err != nil {
-		return counter
+		return Counter{}
 	}
-	counter.Memory = mem.RSS + mem.Swap
-	return counter
+	return Counter{percent, mem.RSS}
 }
 
 func init() {
