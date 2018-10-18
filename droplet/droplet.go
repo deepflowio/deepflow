@@ -140,7 +140,7 @@ func Start(configPath string) {
 			for _, macString := range segment.GetMac() {
 				mac, err := net.ParseMAC(macString)
 				if err != nil {
-					log.Warning("Invalid mac ", macString)
+					log.Warning("Invalid MAC ", macString)
 					continue
 				}
 				remoteSegments = append(remoteSegments, mac)
@@ -160,7 +160,7 @@ func Start(configPath string) {
 	}
 	flowDuplicatorQueue := manager.NewQueue("3-tagged-flow-to-flow-duplicator", queueSize>>2, releaseTaggedFlow)
 	meteringAppOutputQueue := manager.NewQueue(
-		"3-metering-doc-to-marshaller", docsInBuffer<<1,
+		"3-metering-doc-to-marshaller", docsInBuffer<<1, // MapReduce发送是突发的，且ZMQ发送缓慢，queueSize设置为突发的2倍
 		libqueue.OptionRelease(func(p interface{}) { app.ReleaseDocument(p.(*app.Document)) }),
 	)
 
@@ -191,8 +191,12 @@ func Start(configPath string) {
 
 	// L4 - flow duplicator & flow sender
 	flowAppQueueCount := int(cfg.Queue.FlowAppQueueCount)
-	flowAppQueue := manager.NewQueues("4-tagged-flow-to-flow-app", queueSize>>2, flowAppQueueCount, 1, libqueue.OptionFlushIndicator(time.Minute), releaseTaggedFlow)
-	flowSenderQueue := manager.NewQueue("4-tagged-flow-to-stream", queueSize>>2, releaseTaggedFlow)
+	flowAppQueue := manager.NewQueues(
+		"4-tagged-flow-to-flow-app", (queueSize<<1)/flowGeneratorQueueCount, // flowApp压力大，queueSize设置为上游的2倍
+		flowAppQueueCount, 1, libqueue.OptionFlushIndicator(time.Minute), releaseTaggedFlow)
+	flowSenderQueue := manager.NewQueue(
+		"4-tagged-flow-to-stream", (queueSize<<1)/flowGeneratorQueueCount, // ZMQ发送缓慢，queueSize设置为上游的2倍
+		releaseTaggedFlow)
 
 	flowDuplicator := queue.NewDuplicator(1024, flowDuplicatorQueue, datatype.CloneTaggedFlowHelper)
 	flowDuplicator.AddMultiQueue(flowAppQueue, flowAppQueueCount).AddQueue(flowSenderQueue).Start()
@@ -200,7 +204,7 @@ func Start(configPath string) {
 
 	// L5 - flow doc marshaller
 	flowAppOutputQueue := manager.NewQueue(
-		"5-flow-doc-to-marshaller", docsInBuffer<<1,
+		"5-flow-doc-to-marshaller", docsInBuffer<<1, // MapReduce发送是突发的，且ZMQ发送缓慢，queueSize设置为突发的2倍
 		libqueue.OptionRelease(func(p interface{}) { app.ReleaseDocument(p.(*app.Document)) }),
 	)
 	mapreduce.NewFlowMapProcess(flowAppOutputQueue, flowAppQueue, flowAppQueueCount, docsInBuffer, windowSize).Start()
@@ -211,5 +215,5 @@ func Start(configPath string) {
 	for _, zero := range cfg.ZeroHosts {
 		builder.AddZero(zero, cfg.ZeroPort)
 	}
-	builder.Build().Start(queueSize) // MapReduce发送是突发的，且ZMQ发送缓慢，因此需要大Buffer
+	builder.Build().Start(docsInBuffer << 1) // MapReduce发送是突发的，且ZMQ发送缓慢，queueSize设置为突发的2倍
 }
