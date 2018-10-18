@@ -156,6 +156,7 @@ func TestGetGroupData(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
+	policy.UpdateAcls(nil)
 	key := &LookupKey{
 		SrcIp:   ip3,
 		SrcMac:  0x80027a42bfc,
@@ -276,7 +277,7 @@ func TestAllPortPassPolicy(t *testing.T) {
 		DstIp:   ip4,
 		SrcPort: 30,
 		DstPort: 30,
-		EthType: EthernetTypeARP,
+		EthType: EthernetTypeIPv4,
 		Ttl:     64,
 		Tap:     TAP_TOR,
 	}
@@ -304,8 +305,9 @@ func TestSrcPortPassPolicy(t *testing.T) {
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
 		DstIp:   ip4,
-		EthType: EthernetTypeARP,
+		EthType: EthernetTypeIPv4,
 		SrcPort: 30,
+		Proto:   6,
 		Ttl:     64,
 		Tap:     TAP_TOR,
 	}
@@ -333,8 +335,9 @@ func TestDstPortPassPolicy(t *testing.T) {
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
 		DstIp:   ip4,
-		EthType: EthernetTypeARP,
+		EthType: EthernetTypeIPv4,
 		DstPort: 30,
+		Proto:   6,
 		Ttl:     64,
 		Tap:     TAP_TOR,
 	}
@@ -362,9 +365,10 @@ func TestSrcDstPortPassPolicy(t *testing.T) {
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
 		DstIp:   ip4,
-		EthType: EthernetTypeARP,
+		EthType: EthernetTypeIPv4,
 		DstPort: 30,
 		SrcPort: 30,
+		Proto:   6,
 		Ttl:     64,
 		Tap:     TAP_TOR,
 	}
@@ -391,9 +395,10 @@ func TestVlanPassPolicy(t *testing.T) {
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
 		DstIp:   ip4,
-		EthType: EthernetTypeARP,
+		EthType: EthernetTypeIPv4,
 		DstPort: 30,
 		SrcPort: 30,
+		Proto:   6,
 		Vlan:    30,
 		Ttl:     64,
 		Tap:     TAP_TOR,
@@ -422,9 +427,10 @@ func TestVlanPortPassPolicy(t *testing.T) {
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
 		DstIp:   ip4,
-		EthType: EthernetTypeARP,
+		EthType: EthernetTypeIPv4,
 		DstPort: 30,
 		SrcPort: 8000,
+		Proto:   6,
 		Vlan:    30,
 		Ttl:     64,
 		Tap:     TAP_TOR,
@@ -453,12 +459,12 @@ func TestPortProtoPassPolicy(t *testing.T) {
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
 		DstIp:   ip4,
-		EthType: EthernetTypeARP,
+		EthType: EthernetTypeIPv4,
 		DstPort: 8000,
 		SrcPort: 8000,
+		Proto:   6,
 		Vlan:    30,
 		Ttl:     64,
-		Proto:   6,
 		Tap:     TAP_TOR,
 	}
 	_, policyData := policy.LookupAllByKey(key)
@@ -488,12 +494,12 @@ func TestAclsPassPolicy(t *testing.T) {
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
 		DstIp:   ip4,
-		EthType: EthernetTypeARP,
+		EthType: EthernetTypeIPv4,
 		DstPort: 8000,
 		SrcPort: 8000,
+		Proto:   6,
 		Vlan:    30,
 		Ttl:     64,
-		Proto:   6,
 		Tap:     TAP_TOR,
 	}
 	_, policyData := policy.LookupAllByKey(key)
@@ -523,12 +529,12 @@ func TestVlanAclsPassPolicy(t *testing.T) {
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
 		DstIp:   ip4,
-		EthType: EthernetTypeARP,
+		EthType: EthernetTypeIPv4,
 		DstPort: 8000,
 		SrcPort: 8000,
+		Proto:   6,
 		Vlan:    10,
 		Ttl:     64,
-		Proto:   6,
 		Tap:     TAP_TOR,
 	}
 	_, policyData := policy.LookupAllByKey(key)
@@ -563,11 +569,11 @@ func TestVlanPortAclsPassPolicy(t *testing.T) {
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
 		DstIp:   ip4,
-		EthType: EthernetTypeARP,
+		EthType: EthernetTypeIPv4,
 		DstPort: 1000,
+		Proto:   6,
 		Vlan:    10,
 		Ttl:     64,
-		Proto:   6,
 		Tap:     TAP_TOR,
 	}
 	backward := getBackwardAcl(aclAction2)
@@ -598,7 +604,7 @@ func TestVlanPortAclsPassPolicy1(t *testing.T) {
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
 		DstIp:   ip4,
-		EthType: EthernetTypeARP,
+		EthType: EthernetTypeIPv4,
 		DstPort: 8000,
 		Vlan:    10,
 		Ttl:     64,
@@ -633,7 +639,7 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
 		DstIp:   ip4,
-		EthType: EthernetTypeARP,
+		EthType: EthernetTypeIPv4,
 		DstPort: 8000,
 		Ttl:     64,
 		Proto:   6,
@@ -689,7 +695,7 @@ func generateAclData(policy *PolicyTable) {
 		Vlan:   10,
 		Action: []AclAction{aclAction2},
 	}
-	policy.UpdateAclData([]*Acl{acl1, acl2})
+	policy.UpdateAcls([]*Acl{acl1, acl2})
 }
 
 type EpcInfo struct {
