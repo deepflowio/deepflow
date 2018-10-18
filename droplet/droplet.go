@@ -192,15 +192,14 @@ func Start(configPath string) {
 	// L4 - flow duplicator & flow sender
 	flowAppQueueCount := int(cfg.Queue.FlowAppQueueCount)
 	flowAppQueue := manager.NewQueues(
-		"4-tagged-flow-to-flow-app", (queueSize<<1)/flowGeneratorQueueCount, // flowApp压力大，queueSize设置为上游的2倍
-		flowAppQueueCount, 1, libqueue.OptionFlushIndicator(time.Minute), releaseTaggedFlow)
+		"4-tagged-flow-to-flow-app", (queueSize<<1)/flowAppQueueCount, // flowApp压力大，queueSize设置为上游的2倍
+		flowAppQueueCount, flowGeneratorQueueCount, libqueue.OptionFlushIndicator(time.Minute), releaseTaggedFlow)
 	flowSenderQueue := manager.NewQueue(
-		"4-tagged-flow-to-stream", (queueSize<<1)/flowGeneratorQueueCount, // ZMQ发送缓慢，queueSize设置为上游的2倍
-		releaseTaggedFlow)
+		"4-tagged-flow-to-stream", queueSize<<1, releaseTaggedFlow) // ZMQ发送缓慢，queueSize设置为上游的2倍
 
 	flowDuplicator := queue.NewDuplicator(1024, flowDuplicatorQueue, datatype.CloneTaggedFlowHelper)
 	flowDuplicator.AddMultiQueue(flowAppQueue, flowAppQueueCount).AddQueue(flowSenderQueue).Start()
-	sender.NewFlowSender(flowSenderQueue, cfg.Stream, cfg.StreamPort, queueSize>>2).Start()
+	sender.NewFlowSender(flowSenderQueue, cfg.Stream, cfg.StreamPort, queueSize<<1).Start()
 
 	// L5 - flow doc marshaller
 	flowAppOutputQueue := manager.NewQueue(
