@@ -276,7 +276,7 @@ func (l *PolicyLabeler) GenerateIpNetmaskMapFromPlatformData(data []*PlatformDat
 			minNetIp := network.Ip & STANDARD_NETMASK
 			maxNetIp := minNetIp
 			mask := uint32(math.MaxUint32) << (32 - network.Netmask)
-			// netmask must be either 0 or 0xffff0000~0xffffffff
+			// netmask must be either 0 or STANDARD_NETMASK~math.MaxUint32
 			if mask < STANDARD_NETMASK {
 				minNetIp = network.Ip & mask
 				maxNetIp = (minNetIp | ^mask) & STANDARD_NETMASK
@@ -317,7 +317,7 @@ func (l *PolicyLabeler) GenerateIpNetmaskMapFromIpGroupData(data []*IpGroupData)
 			minNetIp := IpToUint32(ip) & STANDARD_NETMASK
 			maxNetIp := minNetIp
 			mask := uint32(math.MaxUint32) << uint32(32-maskSize)
-			// netmask must be either 0 or 0xffff0000~0xffffffff
+			// netmask must be either 0 or STANDARD_NETMASK~math.MaxUint32
 			if mask < STANDARD_NETMASK {
 				minNetIp = IpToUint32(ip) & mask
 				maxNetIp = (minNetIp | ^mask) & STANDARD_NETMASK
@@ -497,21 +497,7 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 	portGroup := l.GroupPortPolicyMaps[packet.Tap]
 	vlanGroup := l.GroupVlanPolicyMaps[packet.Tap]
 	// 对于内容全为0的findPolicy，统一采用INVALID_POLICY_DATA（同一块内存的数值）
-	vlanPolicy, portForwardPolicy, portBackwardPolicy, findPolicy := INVALID_POLICY_DATA, INVALID_POLICY_DATA, INVALID_POLICY_DATA, INVALID_POLICY_DATA
-
-	// 在vlan map中查找单方向的策略
-	if packet.Vlan > 0 {
-		keys := generateGroupVlanKeys(packet.SrcGroupIds, packet.DstGroupIds, packet.Vlan)
-		for _, key := range keys {
-			if policy := vlanGroup[key]; policy != nil && len(policy.AclActions) > 0 {
-				if vlanPolicy == INVALID_POLICY_DATA {
-					vlanPolicy = NewPolicyData()
-					vlanPolicy.AclActions = make([]AclAction, 0, 4)
-				}
-				vlanPolicy.Merge(policy.AclActions, policy.ACLID)
-			}
-		}
-	}
+	portForwardPolicy, portBackwardPolicy, vlanPolicy, findPolicy := INVALID_POLICY_DATA, INVALID_POLICY_DATA, INVALID_POLICY_DATA, INVALID_POLICY_DATA
 
 	// 在port map中查找策略, 创建正方向key
 	keys := generateSearchPortKeys(packet.SrcGroupIds, packet.DstGroupIds, packet.DstPort, packet.Proto)
@@ -524,6 +510,8 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 			portForwardPolicy.Merge(policy.AclActions, policy.ACLID, FORWARD)
 		}
 	}
+	// 无论是否差找到policy，都需要向fastPath下发，避免重复走firstPath
+	mapsForward := l.addPortFastPolicy(endpointData, packet, portForwardPolicy, FORWARD, nil)
 
 	// 在port map中查找策略, 创建反方向key
 	keys = generateSearchPortKeys(packet.DstGroupIds, packet.SrcGroupIds, packet.SrcPort, packet.Proto)
@@ -537,12 +525,26 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 			portBackwardPolicy.Merge(policy.AclActions, policy.ACLID, BACKWARD)
 		}
 	}
-
 	// 无论是否差找到policy，都需要向fastPath下发，避免重复走firstPath
-	l.addVlanFastPolicy(endpointData, packet, vlanPolicy)
-	l.addPortFastPolicy(endpointData, packet, portForwardPolicy, FORWARD)
-	l.addPortFastPolicy(endpointData, packet, portBackwardPolicy, BACKWARD)
-	len := len(vlanPolicy.AclActions) + len(portForwardPolicy.AclActions) + len(portBackwardPolicy.AclActions)
+	mapsBackward := l.addPortFastPolicy(endpointData, packet, portBackwardPolicy, BACKWARD, mapsForward)
+
+	// 在vlan map中查找单方向的策略
+	if packet.Vlan > 0 {
+		keys := generateGroupVlanKeys(packet.SrcGroupIds, packet.DstGroupIds, packet.Vlan)
+		for _, key := range keys {
+			if policy := vlanGroup[key]; policy != nil && len(policy.AclActions) > 0 {
+				if vlanPolicy == INVALID_POLICY_DATA {
+					vlanPolicy = NewPolicyData()
+					vlanPolicy.AclActions = make([]AclAction, 0, 4)
+				}
+				vlanPolicy.Merge(policy.AclActions, policy.ACLID)
+			}
+		}
+		// 无论是否差找到policy，都需要向fastPath下发，避免重复走firstPath
+		l.addVlanFastPolicy(endpointData, packet, vlanPolicy, mapsForward, mapsBackward)
+	}
+
+	len := len(portForwardPolicy.AclActions) + len(portBackwardPolicy.AclActions) + len(vlanPolicy.AclActions)
 	if len > 0 {
 		findPolicy = NewPolicyData()
 		findPolicy.AclActions = make([]AclAction, 0, len)
@@ -560,26 +562,47 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 	return findPolicy
 }
 
-func (l *PolicyLabeler) addEpcMap(maps *VlanAndPortMap, endpointInfo *EndpointInfo, mac uint64) uint32 {
+func (l *PolicyLabeler) calcEpc(endpointInfo *EndpointInfo) uint32 {
 	id := uint32(0)
 	if endpointInfo.L2EpcId > 0 {
 		id = uint32(endpointInfo.L2EpcId)
 	} else if endpointInfo.L2EpcId == -1 {
-		id = 0xffffffff
+		id = math.MaxUint32
 	} else if endpointInfo.L2EpcId == 0 {
 		if endpointInfo.L3EpcId > 0 {
 			id = uint32(endpointInfo.L3EpcId)
 		} else if endpointInfo.L3EpcId == -1 {
-			id = 0xffffffff
+			id = math.MaxUint32
 		}
-	}
-	if id != 0 {
-		maps.macEpcMap.Add(mac, id)
 	}
 	return id
 }
 
-func (l *PolicyLabeler) addVlanFastPolicy(endpointData *EndpointData, packet *LookupKey, policy *PolicyData) {
+func (l *PolicyLabeler) addEpcMap(maps *VlanAndPortMap, endpoint *EndpointData, packet *LookupKey, direction DirectionType) (uint32, uint32) {
+	ids, offset := uint64(0), uint64(0)
+	var macs uint64
+	var endpointInfos []*EndpointInfo
+	if direction == FORWARD {
+		macs = (packet.SrcMac << 32) | (packet.DstMac & math.MaxUint32)
+		endpointInfos = []*EndpointInfo{endpoint.DstInfo, endpoint.SrcInfo}
+	} else {
+		macs = (packet.DstMac << 32) | (packet.SrcMac & math.MaxUint32)
+		endpointInfos = []*EndpointInfo{endpoint.SrcInfo, endpoint.DstInfo}
+	}
+	for _, endpointInfo := range endpointInfos {
+		id := uint64(l.calcEpc(endpointInfo))
+		ids |= (id << offset)
+		offset += 32
+	}
+	if ids != 0 {
+		// 仅仅使用具有区分性的mac的后32bit
+		maps.macEpcMap.Add(macs, ids)
+		return uint32(ids >> 32), uint32(ids & math.MaxUint32)
+	}
+	return 0, 0
+}
+
+func (l *PolicyLabeler) addVlanFastPolicy(endpointData *EndpointData, packet *LookupKey, policy *PolicyData, mapsForward *VlanAndPortMap, mapsBackward *VlanAndPortMap) {
 	forward, backward := INVALID_POLICY_DATA, INVALID_POLICY_DATA
 	if len(policy.AclActions) > 0 {
 		forward = policy
@@ -587,37 +610,28 @@ func (l *PolicyLabeler) addVlanFastPolicy(endpointData *EndpointData, packet *Lo
 		backward.AclActions = make([]AclAction, 0, len(policy.AclActions))
 		backward.MergeAndSwapDirection(policy.AclActions, policy.ACLID)
 	}
-
-	maps := l.getVlanAndPortMap(packet, FORWARD, true)
-	srcEpc := l.addEpcMap(maps, endpointData.SrcInfo, packet.SrcMac)
-	dstEpc := l.addEpcMap(maps, endpointData.DstInfo, packet.DstMac)
+	srcEpc := l.calcEpc(endpointData.SrcInfo)
+	dstEpc := l.calcEpc(endpointData.DstInfo)
 
 	key := uint64(packet.Vlan) | uint64(srcEpc)<<32 | uint64(dstEpc)<<12
 	valueForward := &FastPathMapValue{endpoint: *endpointData, policy: forward, timestamp: packet.Timestamp}
-	maps.vlanPolicyMap.Add(key, valueForward)
-
-	maps = l.getVlanAndPortMap(packet, BACKWARD, true)
-	srcEpc = l.addEpcMap(maps, endpointData.SrcInfo, packet.SrcMac)
-	dstEpc = l.addEpcMap(maps, endpointData.DstInfo, packet.DstMac)
+	mapsForward.vlanPolicyMap.Add(key, valueForward)
 
 	key = uint64(packet.Vlan) | uint64(dstEpc)<<32 | uint64(srcEpc)<<12
 	valueBackward := &FastPathMapValue{endpoint: *endpointData, policy: backward, timestamp: packet.Timestamp}
 	valueBackward.endpoint.SrcInfo, valueBackward.endpoint.DstInfo = valueBackward.endpoint.DstInfo, valueBackward.endpoint.SrcInfo
-	maps.vlanPolicyMap.Add(key, valueBackward)
+	mapsBackward.vlanPolicyMap.Add(key, valueBackward)
 }
 
-func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packet *LookupKey, policy *PolicyData, direction DirectionType) {
+func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packet *LookupKey, policy *PolicyData, direction DirectionType, mapsForward *VlanAndPortMap) *VlanAndPortMap {
 	forward := INVALID_POLICY_DATA
 	if len(policy.AclActions) > 0 {
 		forward = policy
 	}
-	maps := l.getVlanAndPortMap(packet, direction, true)
-	srcEpc := l.addEpcMap(maps, endpointData.SrcInfo, packet.SrcMac)
-	dstEpc := l.addEpcMap(maps, endpointData.DstInfo, packet.DstMac)
-
+	maps := l.getVlanAndPortMap(packet, direction, true, mapsForward)
+	srcEpc, dstEpc := l.addEpcMap(maps, endpointData, packet, direction)
 	port := packet.DstPort
 	if direction == BACKWARD {
-		srcEpc, dstEpc = dstEpc, srcEpc
 		port = packet.SrcPort
 	}
 
@@ -628,6 +642,8 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packet *Lo
 		value.endpoint.SrcInfo, value.endpoint.DstInfo = value.endpoint.DstInfo, value.endpoint.SrcInfo
 	}
 	maps.portPolicyMap.Add(key, value)
+
+	return maps
 }
 
 func (l *PolicyLabeler) getFastInterestKeys(packet *LookupKey) {
@@ -642,20 +658,21 @@ func (l *PolicyLabeler) getFastInterestKeys(packet *LookupKey) {
 	}
 }
 
-func (l *PolicyLabeler) getFastEpc(maps *VlanAndPortMap, packet *LookupKey) (uint64, uint64) {
-	macEpcMap := maps.macEpcMap
-	srcEpc := uint64(0)
-	if data, ok := macEpcMap.Get(packet.SrcMac); ok {
-		srcEpc = uint64(data.(uint32))
+func (l *PolicyLabeler) getFastEpcs(maps *VlanAndPortMap, packet *LookupKey, direction DirectionType) (uint32, uint32) {
+	var macs uint64
+	if direction == FORWARD {
+		macs = (packet.SrcMac << 32) | (packet.DstMac & math.MaxUint32)
+	} else {
+		macs = (packet.DstMac << 32) | (packet.SrcMac & math.MaxUint32)
 	}
-	dstEpc := uint64(0)
-	if data, ok := macEpcMap.Get(packet.DstMac); ok {
-		dstEpc = uint64(data.(uint32))
+	if data, ok := maps.macEpcMap.Get(macs); ok {
+		epcs := data.(uint64)
+		return uint32(epcs >> 32), uint32(epcs & math.MaxUint32)
 	}
-	return srcEpc, dstEpc
+	return 0, 0
 }
 
-func (l *PolicyLabeler) getFastVlanPolicy(maps *VlanAndPortMap, srcEpc, dstEpc uint64, packet *LookupKey, policy *PolicyData) *EndpointData {
+func (l *PolicyLabeler) getFastVlanPolicy(maps *VlanAndPortMap, srcEpc, dstEpc uint32, packet *LookupKey, policy *PolicyData) *EndpointData {
 	key := uint64(packet.Vlan) | uint64(srcEpc)<<32 | uint64(dstEpc)<<12
 	vlanPolicyMap := maps.vlanPolicyMap
 	if data, ok := vlanPolicyMap.Get(key); ok {
@@ -673,14 +690,14 @@ func (l *PolicyLabeler) getFastVlanPolicy(maps *VlanAndPortMap, srcEpc, dstEpc u
 	return nil
 }
 
-func (l *PolicyLabeler) getFastPortPolicy(maps *VlanAndPortMap, srcEpc, dstEpc uint64, packet *LookupKey, policy *PolicyData, direction DirectionType) *EndpointData {
+func (l *PolicyLabeler) getFastPortPolicy(maps *VlanAndPortMap, srcEpc, dstEpc uint32, packet *LookupKey, policy *PolicyData, direction DirectionType) *EndpointData {
 	port := packet.DstPort
 	if direction == BACKWARD {
 		srcEpc, dstEpc = dstEpc, srcEpc
 		port = packet.SrcPort
 	}
 
-	key := srcEpc<<44 | dstEpc<<24 | uint64(packet.Proto)<<16 | uint64(port)
+	key := uint64(srcEpc)<<44 | uint64(dstEpc)<<24 | uint64(packet.Proto)<<16 | uint64(port)
 	portPolicyMap := maps.portPolicyMap
 	if data, ok := portPolicyMap.Get(key); ok {
 		value := data.(*FastPathMapValue)
@@ -699,15 +716,18 @@ func (l *PolicyLabeler) getFastPortPolicy(maps *VlanAndPortMap, srcEpc, dstEpc u
 	return nil
 }
 
-func (l *PolicyLabeler) getVlanAndPortMap(packet *LookupKey, direction DirectionType, create bool) *VlanAndPortMap {
+func (l *PolicyLabeler) getVlanAndPortMap(packet *LookupKey, direction DirectionType, create bool, mapsForward *VlanAndPortMap) *VlanAndPortMap {
 	maskSrc := l.IpNetmaskMap[packet.SrcIp&STANDARD_NETMASK]
 	maskDst := l.IpNetmaskMap[packet.DstIp&STANDARD_NETMASK]
 	maskedSrcIp := packet.SrcIp & maskSrc
 	maskedDstIp := packet.DstIp & maskDst
 	if direction == BACKWARD {
+		if maskedSrcIp == maskedDstIp {
+			return mapsForward
+		}
 		maskedSrcIp, maskedDstIp = maskedDstIp, maskedSrcIp
 	}
-	key := uint64(maskedDstIp)<<32 | uint64(maskedSrcIp)
+	key := uint64(maskedSrcIp)<<32 | uint64(maskedDstIp)
 	if data, ok := l.FastPolicyMaps[packet.FastIndex][packet.Tap].Get(key); ok {
 		return data.(*VlanAndPortMap)
 	}
@@ -724,40 +744,42 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *
 		return nil, nil
 	}
 
+	var maps *VlanAndPortMap
 	var policy *PolicyData
 	var endpoint *EndpointData
-	srcEpc, dstEpc := uint64(0), uint64(0)
-	portForwardFound, portBackwardFound, vlanFound := false, false, true
+	var srcEpc, dstEpc uint32
+	var vlanFound, portFound bool
 
 	for _, direction := range []DirectionType{FORWARD, BACKWARD} {
-		if maps := l.getVlanAndPortMap(packet, direction, false); maps != nil {
+		portFound = false
+		if packet.Vlan > 0 && direction == FORWARD {
+			vlanFound = false
+		} else {
+			vlanFound = true
+		}
+		if maps = l.getVlanAndPortMap(packet, direction, false, maps); maps != nil {
 			if policy == nil {
-				srcEpc, dstEpc = l.getFastEpc(maps, packet)
+				srcEpc, dstEpc = l.getFastEpcs(maps, packet, direction)
 				// NOTE：会改变packet参数，但firstPath同样需要getFastInterestKeys，所以无影响
 				l.getFastInterestKeys(packet)
 				policy = NewPolicyData()
 				policy.AclActions = make([]AclAction, 0, 8)
 			}
 			// vlan不需要查找BACKWARD方向
-			if packet.Vlan > 0 && direction == FORWARD {
-				vlanFound = false
+			if !vlanFound {
 				if endpoint = l.getFastVlanPolicy(maps, srcEpc, dstEpc, packet, policy); endpoint != nil {
 					vlanFound = true
 				}
 			}
 			if endpoint = l.getFastPortPolicy(maps, srcEpc, dstEpc, packet, policy, direction); endpoint != nil {
-				if direction == FORWARD {
-					portForwardFound = true
-				} else {
-					portBackwardFound = true
-				}
+				portFound = true
 			}
 		}
+		if !portFound || !vlanFound {
+			return nil, nil
+		}
 	}
-	found := portForwardFound && portBackwardFound && vlanFound
-	if !found {
-		return nil, nil
-	} else if len(policy.AclActions) == 0 {
+	if len(policy.AclActions) == 0 {
 		// 对于内容全为0的policy，统一采用INVALID_POLICY_DATA（同一块内存的数值）
 		policy = INVALID_POLICY_DATA
 	}
