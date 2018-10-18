@@ -121,6 +121,11 @@ func splitPort2Int(src string) []uint16 {
 			portRange[index] = uint16(portInt)
 		}
 	}
+
+	if portRange[1] > portRange[0] && portRange[1]-portRange[0] >= 65535 {
+		return ports
+	}
+
 	for i := portRange[0]; i <= portRange[1]; i++ {
 		ports = append(ports, uint16(i))
 		if i == 0xffff {
