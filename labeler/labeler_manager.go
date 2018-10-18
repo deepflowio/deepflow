@@ -8,6 +8,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/gopacket/layers"
 	"github.com/op/go-logging"
@@ -281,15 +282,24 @@ func (l *LabelerManager) recvShowAcl(conn *net.UDPConn, port int, arg *bytes.Buf
 	}
 	dropletctl.SendToDropletCtl(conn, port, 0, &buffer)
 
+	send := &policy.Acl{}
 	for _, acl := range acls {
 		buffer := bytes.Buffer{}
 		encoder := gob.NewEncoder(&buffer)
-		if err := encoder.Encode(acl); err != nil {
+		*send = *acl
+		if len(send.DstPorts) > 1 {
+			send.DstPorts = make([]uint16, 0, 2)
+			send.DstPorts = append(send.DstPorts, acl.DstPorts[0])
+			send.DstPorts = append(send.DstPorts, acl.DstPorts[len(acl.DstPorts)-1])
+		}
+
+		if err := encoder.Encode(send); err != nil {
 			log.Errorf("encoder.Encode: %s", err)
 			continue
 		}
 
 		dropletctl.SendToDropletCtl(conn, port, 0, &buffer)
+		time.Sleep(2 * time.Millisecond)
 	}
 }
 
@@ -536,26 +546,26 @@ func showAcl() {
 	}
 	fmt.Printf("%s\n", info)
 
-	acls := make([]*policy.Acl, 0, 32)
+	acls := make([]*policy.Acl, 0, 1024)
 	for {
-		acl := policy.Acl{}
+		acl := &policy.Acl{}
 		buffer, err := dropletctl.RecvFromDroplet(conn)
 		if err != nil {
 			fmt.Println(err)
 		}
 		decoder := gob.NewDecoder(buffer)
-		if err := decoder.Decode(&acl); err != nil {
+		if err := decoder.Decode(acl); err != nil {
 			fmt.Println(err)
 			return
 		}
 		if acl.Vlan == 0xffff {
 			break
 		}
-		acls = append(acls, &acl)
+		acls = append(acls, acl)
 	}
 
 	for index, acl := range policy.SortAclsById(acls) {
-		fmt.Printf("  %v, \t%+v\n", index+1, acl)
+		fmt.Printf("  %v, \t%s\n", index+1, acl)
 	}
 }
 

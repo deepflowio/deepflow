@@ -17,7 +17,6 @@ import (
 	"sort"
 
 	"github.com/spf13/cobra"
-	"gitlab.x.lan/yunshan/droplet-libs/logger"
 	"gitlab.x.lan/yunshan/droplet/config"
 	"gitlab.x.lan/yunshan/message/trident"
 )
@@ -81,8 +80,6 @@ func RegisterRpcCommand() *cobra.Command {
 
 func initCmd(cmd CmdExecute) {
 	cfg := config.Load(configPath)
-	cfg.LogLevel = "error"
-	logger.InitLog(cfg.LogFile, cfg.LogLevel)
 
 	controllers := make([]net.IP, 0, len(cfg.ControllerIps))
 	for _, ipString := range cfg.ControllerIps {
