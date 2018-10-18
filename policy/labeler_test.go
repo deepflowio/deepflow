@@ -11,99 +11,107 @@ import (
 )
 
 var (
-	forward  = AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
-	backward = AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddDirections(BACKWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	forward       = AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	backward      = AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddDirections(BACKWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	ip1           = NewIPFromString("192.168.2.12").Int()
+	ip2           = NewIPFromString("192.168.2.0").Int()
+	ip3           = NewIPFromString("192.168.0.11").Int()
+	ip4           = NewIPFromString("192.168.0.12").Int()
+	mac1          = NewMACAddrFromString("08:00:27:a4:2b:fc").Int()
+	mac2          = NewMACAddrFromString("08:00:27:a4:2b:fa").Int()
+	launchServer1 = NewIPFromString("10.10.10.10").Int()
 )
+
+func (policy *PolicyTable) UpdateAcls(acl []*Acl) {
+	policy.UpdateAclData(acl)
+	policy.EnableAclData()
+}
 
 func getBackwardAcl(acl AclAction) AclAction {
 	return acl.SetDirections(BACKWARD)
 }
 
 func CheckPolicyResult(basicPolicy *PolicyData, targetPolicy *PolicyData) bool {
-	if reflect.DeepEqual(basicPolicy, targetPolicy) {
-		return true
-	}
+	return reflect.DeepEqual(basicPolicy, targetPolicy)
+}
 
-	return false
+func CheckEndpointDataResult(basicSrcInfo, basicDstInfo *EndpointInfo, targetEndpoint *EndpointData) bool {
+	return (reflect.DeepEqual(basicSrcInfo, targetEndpoint.SrcInfo)) &&
+		(reflect.DeepEqual(basicDstInfo, targetEndpoint.DstInfo))
+}
+
+func generateIpNet(ip uint32, subnetId uint32, mask uint32) *IpNet {
+	ipInfo := IpNet{
+		Ip:       ip,
+		SubnetId: subnetId,
+		Netmask:  mask,
+	}
+	return &ipInfo
+}
+
+func generateIpGroup(groupId uint32, epcId int32, ip string) *IpGroupData {
+	ipgroup := IpGroupData{
+		Id:    groupId,
+		EpcId: epcId,
+	}
+	ipgroup.Ips = append(ipgroup.Ips, ip)
+	return &ipgroup
+}
+
+// 生成特定IP资源组信息
+func generateIpgroupData(policy *PolicyTable) {
+	ipGroup1 := generateIpGroup(2, 11, "192.168.0.11/24")
+	ipGroup2 := generateIpGroup(3, 11, "192.168.0.11/24")
+	ipGroup3 := generateIpGroup(4, 12, "192.168.0.11/24")
+
+	ipGroups := make([]*IpGroupData, 0, 3)
+	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3)
+	policy.UpdateIpGroupData(ipGroups)
+}
+
+func generatePlatformDataExtension(epcId int32, deviceType, deviceId, ifType, ifIndex uint32, mac uint64, hostIp uint32) *PlatformData {
+	data := PlatformData{
+		EpcId:      epcId,
+		DeviceType: deviceType,
+		DeviceId:   deviceId,
+		IfType:     ifType,
+		IfIndex:    ifIndex,
+		Mac:        mac,
+		HostIp:     hostIp,
+	}
+	return &data
+}
+
+// 生成特定平台信息
+func generatePlatformData(policy *PolicyTable) {
+	ipInfo := generateIpNet(ip3, 121, 32)
+
+	vifData := generatePlatformDataExtension(11, 1, 3, 4, 5, mac1, launchServer1)
+	vifData.Ips = append(vifData.Ips, ipInfo)
+
+	var datas []*PlatformData
+	datas = append(datas, vifData)
+	policy.UpdateInterfaceData(datas)
 }
 
 func TestGetPlatformData(t *testing.T) {
-
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	ipInfo := generateIpNet(ip3, 121, 24)
+	ipInfo1 := generateIpNet(ip4, 122, 25)
+	// ecpId:11 DeviceType:2 DeviceId:3 IfType:3 IfIndex:5 Mac:mac1 HostIp:launchServer1
+	vifData := generatePlatformDataExtension(11, 2, 3, 3, 5, mac1, launchServer1)
+	vifData.Ips = append(vifData.Ips, ipInfo, ipInfo1)
 
-	srcIp := NewIPFromString("192.168.2.12")
-	dstIp := NewIPFromString("192.168.0.11")
-	key := &LookupKey{
-		SrcIp:  srcIp.Int(),
-		SrcMac: 0x80027a42bfc,
-		DstMac: 0x80027a42bfa,
-		DstIp:  dstIp.Int(),
-		Tap:    TAP_TOR,
-	}
-	ip := NewIPFromString("192.168.0.11")
-	ipInfo := IpNet{
-		Ip:       ip.Int(),
-		SubnetId: 121,
-		Netmask:  24,
-	}
-
-	ip1 := NewIPFromString("192.168.0.12")
-	ipInfo1 := IpNet{
-		Ip:       ip1.Int(),
-		SubnetId: 122,
-		Netmask:  25,
-	}
-
-	mac := NewMACAddrFromString("08:00:27:a4:2b:fc")
-	launchServer := NewIPFromString("10.10.10.10")
-	vifData := PlatformData{
-		EpcId:      11,
-		DeviceType: 2,
-		DeviceId:   3,
-		IfType:     3,
-		IfIndex:    5,
-		Mac:        mac.Int(),
-		HostIp:     launchServer.Int(),
-	}
-
-	vifData.Ips = append(vifData.Ips, &ipInfo)
-	vifData.Ips = append(vifData.Ips, &ipInfo1)
-
-	ip2 := NewIPFromString("192.168.2.0")
-	ipInfo2 := IpNet{
-		Ip:       ip2.Int(),
-		SubnetId: 125,
-		Netmask:  24,
-	}
-
-	ip3 := NewIPFromString("192.168.2.12")
-
-	ipInfo3 := IpNet{
-		Ip:       ip3.Int(),
-		SubnetId: 126,
-		Netmask:  32,
-	}
-
-	mac1 := NewMACAddrFromString("08:00:27:a4:2b:fa")
-	launchserver1 := NewIPFromString("10.10.10.10")
-
-	vifData1 := PlatformData{
-		EpcId:      0,
-		DeviceType: 1,
-		DeviceId:   100,
-		IfType:     3,
-		IfIndex:    5,
-		Mac:        mac1.Int(),
-		HostIp:     launchserver1.Int(),
-	}
-
-	vifData1.Ips = append(vifData1.Ips, &ipInfo2)
-	vifData1.Ips = append(vifData1.Ips, &ipInfo3)
+	ipInfo2 := generateIpNet(ip2, 125, 24)
+	ipInfo3 := generateIpNet(ip1, 126, 32)
+	vifData1 := generatePlatformDataExtension(0, 1, 100, 3, 5, mac2, launchServer1)
+	vifData1.Ips = append(vifData1.Ips, ipInfo2, ipInfo3)
 
 	var datas []*PlatformData
-	datas = append(datas, &vifData)
-	datas = append(datas, &vifData1)
+	datas = append(datas, vifData, vifData1)
 	policy.UpdateInterfaceData(datas)
+
+	key := generateLookupKey(mac1, mac2, 0, ip1, ip3, 0, 0, 0)
 	result, _ := policy.LookupAllByKey(key)
 	if result != nil {
 		t.Log(result.SrcInfo, "\n")
@@ -114,47 +122,23 @@ func TestGetPlatformData(t *testing.T) {
 func TestGetPlatformDataAboutArp(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 
-	srcIp := NewIPFromString("192.168.2.12")
-	dstIp := NewIPFromString("192.168.0.11")
 	key := &LookupKey{
-		SrcIp:   srcIp.Int(),
+		SrcIp:   ip1,
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
-		DstIp:   dstIp.Int(),
+		DstIp:   ip3,
 		EthType: EthernetTypeARP,
 		Ttl:     64,
 		Tap:     TAP_TOR,
 	}
-	ip := NewIPFromString("192.168.0.11")
-	ipInfo := IpNet{
-		Ip:       ip.Int(),
-		SubnetId: 121,
-		Netmask:  24,
-	}
+	ipInfo := generateIpNet(ip3, 121, 24)
+	ipInfo1 := generateIpNet(ip4, 122, 25)
+	// ecpId:11 DeviceType:2 DeviceId:3 IfType:3 IfIndex:5 Mac:mac1 HostIp:launchServer1
+	vifData := generatePlatformDataExtension(11, 2, 3, 3, 5, mac1, launchServer1)
+	vifData.Ips = append(vifData.Ips, ipInfo, ipInfo1)
 
-	ip1 := NewIPFromString("192.168.0.12")
-	ipInfo1 := IpNet{
-		Ip:       ip1.Int(),
-		SubnetId: 122,
-		Netmask:  25,
-	}
-
-	mac := NewMACAddrFromString("08:00:27:a4:2b:fc")
-	launchServer := NewIPFromString("10.10.10.10")
-	vifData := PlatformData{
-		EpcId:      11,
-		DeviceType: 2,
-		DeviceId:   3,
-		IfType:     3,
-		IfIndex:    5,
-		Mac:        mac.Int(),
-		HostIp:     launchServer.Int(),
-	}
-
-	vifData.Ips = append(vifData.Ips, &ipInfo)
-	vifData.Ips = append(vifData.Ips, &ipInfo1)
 	datas := make([]*PlatformData, 0, 2)
-	datas = append(datas, &vifData)
+	datas = append(datas, vifData)
 	policy.UpdateInterfaceData(datas)
 	now := time.Now()
 	result, _ := policy.LookupAllByKey(key)
@@ -170,62 +154,17 @@ func TestGetPlatformDataAboutArp(t *testing.T) {
 
 func TestGetGroupData(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
-
-	srcIp := NewIPFromString("192.168.0.11")
-	dstIp := NewIPFromString("192.168.0.12")
+	generatePlatformData(policy)
+	generateIpgroupData(policy)
 	key := &LookupKey{
-		SrcIp:   srcIp.Int(),
+		SrcIp:   ip3,
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
-		DstIp:   dstIp.Int(),
+		DstIp:   ip4,
 		EthType: EthernetTypeARP,
 		Ttl:     64,
 		Tap:     TAP_TOR,
 	}
-	ip := NewIPFromString("192.168.0.11")
-	ipInfo := IpNet{
-		Ip:       ip.Int(),
-		SubnetId: 121,
-		Netmask:  32,
-	}
-
-	mac := NewMACAddrFromString("08:00:27:a4:2b:fc")
-	launchServer := NewIPFromString("10.10.10.10")
-	vifData := PlatformData{
-		EpcId:      11,
-		DeviceType: 1,
-		DeviceId:   3,
-		IfType:     4,
-		IfIndex:    5,
-		Mac:        mac.Int(),
-		HostIp:     launchServer.Int(),
-	}
-
-	vifData.Ips = append(vifData.Ips, &ipInfo)
-	var datas []*PlatformData
-	datas = append(datas, &vifData)
-	policy.UpdateInterfaceData(datas)
-	ipGroup1 := &IpGroupData{
-		Id:    2,
-		EpcId: 11,
-		Ips:   []string{"192.168.0.11/24"},
-	}
-	ipGroup2 := &IpGroupData{
-		Id:    3,
-		EpcId: 11,
-		Ips:   []string{"192.168.0.11/24"},
-	}
-	ipGroup3 := &IpGroupData{
-		Id:    4,
-		EpcId: 12,
-		Ips:   []string{"192.168.0.11/24"},
-	}
-	ipGroups := make([]*IpGroupData, 0, 2)
-	ipGroups = append(ipGroups, ipGroup1)
-	ipGroups = append(ipGroups, ipGroup2)
-	ipGroups = append(ipGroups, ipGroup3)
-	policy.UpdateIpGroupData(ipGroups)
-
 	now := time.Now()
 	result, _ := policy.LookupAllByKey(key)
 	t.Log(time.Now().Sub(now))
@@ -238,101 +177,19 @@ func TestGetGroupData(t *testing.T) {
 	t.Log(time.Now().Sub(now))
 }
 
-func generatePlatformData(policy *PolicyTable) {
-	ip := NewIPFromString("192.168.0.11")
-	ipInfo := IpNet{
-		Ip:       ip.Int(),
-		SubnetId: 121,
-		Netmask:  32,
-	}
-
-	mac := NewMACAddrFromString("08:00:27:a4:2b:fc")
-	launchServer := NewIPFromString("10.10.10.10")
-	vifData := PlatformData{
-		EpcId:      11,
-		DeviceType: 1,
-		DeviceId:   3,
-		IfType:     4,
-		IfIndex:    5,
-		Mac:        mac.Int(),
-		HostIp:     launchServer.Int(),
-	}
-
-	vifData.Ips = append(vifData.Ips, &ipInfo)
-	var datas []*PlatformData
-	datas = append(datas, &vifData)
-	policy.UpdateInterfaceData(datas)
-}
-
-func generatePlatformDataByParam(strIp, StrMac string, epcId int32, Iftype uint32) *PlatformData {
-	ip := NewIPFromString(strIp)
-	ipInfo := IpNet{
-		Ip:       ip.Int(),
-		SubnetId: 121,
-		Netmask:  32,
-	}
-
-	mac := NewMACAddrFromString(StrMac)
-	launchServer := NewIPFromString("10.10.10.10")
-	vifData := &PlatformData{
-		EpcId:      epcId,
-		DeviceType: 1,
-		DeviceId:   3,
-		IfType:     Iftype,
-		IfIndex:    5,
-		Mac:        mac.Int(),
-		HostIp:     launchServer.Int(),
-	}
-	vifData.Ips = append(vifData.Ips, &ipInfo)
-	return vifData
-}
-
-func generateIpgroupData(policy *PolicyTable) {
-	ipGroup1 := &IpGroupData{
-		Id:    2,
-		EpcId: 11,
-		Ips:   []string{"192.168.0.11/24"},
-	}
-	ipGroup2 := &IpGroupData{
-		Id:    3,
-		EpcId: 11,
-		Ips:   []string{"192.168.0.11/24"},
-	}
-	ipGroup3 := &IpGroupData{
-		Id:    4,
-		EpcId: 12,
-		Ips:   []string{"192.168.0.11/24"},
-	}
-	ipGroups := make([]*IpGroupData, 0, 2)
-	ipGroups = append(ipGroups, ipGroup1)
-	ipGroups = append(ipGroups, ipGroup2)
-	ipGroups = append(ipGroups, ipGroup3)
-	policy.UpdateIpGroupData(ipGroups)
-}
-
 //测试全局Pass策略匹配direction==3
 func TestAllPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	acl1 := &Acl{
-		Id:     10,
-		Type:   TAP_TOR,
-		TapId:  11,
-		Proto:  0,
-		Vlan:   0,
-		Action: []AclAction{forward},
-	}
-	policy.UpdateAclData([]*Acl{acl1})
-	policy.EnableAclData()
+	acl1 := generatePolicyAcl(policy, forward, 10, 0, 0, 0, 0, 0)
+	policy.UpdateAcls([]*Acl{acl1})
 
-	srcIp := NewIPFromString("192.168.0.11")
-	dstIp := NewIPFromString("192.168.0.12")
 	key := &LookupKey{
-		SrcIp:   srcIp.Int(),
+		SrcIp:   ip3,
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
-		DstIp:   dstIp.Int(),
+		DstIp:   ip4,
 		EthType: EthernetTypeARP,
 		Ttl:     64,
 		Tap:     TAP_TOR,
@@ -352,26 +209,15 @@ func TestGroupForwardPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	srcGroups := []uint32{3}
-	acl1 := &Acl{
-		Id:        10,
-		Type:      TAP_TOR,
-		TapId:     11,
-		SrcGroups: srcGroups,
-		Proto:     0,
-		Vlan:      0,
-		Action:    []AclAction{forward},
-	}
-	policy.UpdateAclData([]*Acl{acl1})
-	policy.EnableAclData()
+	// srcGroups: 3
+	acl1 := generatePolicyAcl(policy, forward, 10, 3, 0, 0, 0, 0)
+	policy.UpdateAcls([]*Acl{acl1})
 
-	srcIp := NewIPFromString("192.168.0.11")
-	dstIp := NewIPFromString("192.168.0.12")
 	key := &LookupKey{
-		SrcIp:   srcIp.Int(),
+		SrcIp:   ip3,
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
-		DstIp:   dstIp.Int(),
+		DstIp:   ip4,
 		EthType: EthernetTypeARP,
 		Ttl:     64,
 		Tap:     TAP_TOR,
@@ -391,26 +237,15 @@ func TestGroupBackwardPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	dstGroups := []uint32{3}
-	acl1 := &Acl{
-		Id:        10,
-		Type:      TAP_TOR,
-		TapId:     11,
-		DstGroups: dstGroups,
-		Proto:     0,
-		Vlan:      0,
-		Action:    []AclAction{backward},
-	}
-	policy.UpdateAclData([]*Acl{acl1})
-	policy.EnableAclData()
+	// dstGroups: 3
+	acl1 := generatePolicyAcl(policy, backward, 10, 0, 3, 0, 0, 0)
+	policy.UpdateAcls([]*Acl{acl1})
 
-	srcIp := NewIPFromString("192.168.0.11")
-	dstIp := NewIPFromString("192.168.0.12")
 	key := &LookupKey{
-		SrcIp:   srcIp.Int(),
+		SrcIp:   ip3,
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
-		DstIp:   dstIp.Int(),
+		DstIp:   ip4,
 		EthType: EthernetTypeARP,
 		Ttl:     64,
 		Tap:     TAP_TOR,
@@ -430,27 +265,15 @@ func TestAllPortPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	dstPorts := make([]uint16, 1)
-	dstPorts = append(dstPorts, 30)
-	acl1 := &Acl{
-		Id:       10,
-		Type:     TAP_TOR,
-		TapId:    11,
-		DstPorts: dstPorts,
-		Proto:    0,
-		Vlan:     0,
-		Action:   []AclAction{forward},
-	}
-	policy.UpdateAclData([]*Acl{acl1})
-	policy.EnableAclData()
+	// dstPorts: 30
+	acl1 := generatePolicyAcl(policy, forward, 10, 0, 0, 0, 30, 0)
+	policy.UpdateAcls([]*Acl{acl1})
 
-	srcIp := NewIPFromString("192.168.0.11")
-	dstIp := NewIPFromString("192.168.0.12")
 	key := &LookupKey{
-		SrcIp:   srcIp.Int(),
+		SrcIp:   ip3,
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
-		DstIp:   dstIp.Int(),
+		DstIp:   ip4,
 		SrcPort: 30,
 		DstPort: 30,
 		EthType: EthernetTypeARP,
@@ -472,26 +295,15 @@ func TestSrcPortPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	dstPorts := []uint16{30}
-	acl1 := &Acl{
-		Id:       10,
-		Type:     TAP_TOR,
-		TapId:    11,
-		DstPorts: dstPorts,
-		Proto:    0,
-		Vlan:     0,
-		Action:   []AclAction{forward},
-	}
-	policy.UpdateAclData([]*Acl{acl1})
-	policy.EnableAclData()
+	// dstPorts : 30
+	acl1 := generatePolicyAcl(policy, forward, 10, 0, 0, 0, 30, 0)
+	policy.UpdateAcls([]*Acl{acl1})
 
-	srcIp := NewIPFromString("192.168.0.11")
-	dstIp := NewIPFromString("192.168.0.12")
 	key := &LookupKey{
-		SrcIp:   srcIp.Int(),
+		SrcIp:   ip3,
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
-		DstIp:   dstIp.Int(),
+		DstIp:   ip4,
 		EthType: EthernetTypeARP,
 		SrcPort: 30,
 		Ttl:     64,
@@ -512,26 +324,15 @@ func TestDstPortPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	dstPorts := []uint16{30}
-	acl1 := &Acl{
-		Id:       10,
-		Type:     TAP_TOR,
-		TapId:    11,
-		DstPorts: dstPorts,
-		Proto:    0,
-		Vlan:     0,
-		Action:   []AclAction{forward},
-	}
-	policy.UpdateAclData([]*Acl{acl1})
-	policy.EnableAclData()
+	//	dstPorts: 30
+	acl1 := generatePolicyAcl(policy, forward, 10, 0, 0, 0, 30, 0)
+	policy.UpdateAcls([]*Acl{acl1})
 
-	srcIp := NewIPFromString("192.168.0.11")
-	dstIp := NewIPFromString("192.168.0.12")
 	key := &LookupKey{
-		SrcIp:   srcIp.Int(),
+		SrcIp:   ip3,
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
-		DstIp:   dstIp.Int(),
+		DstIp:   ip4,
 		EthType: EthernetTypeARP,
 		DstPort: 30,
 		Ttl:     64,
@@ -552,26 +353,15 @@ func TestSrcDstPortPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	dstPorts := []uint16{30}
-	acl1 := &Acl{
-		Id:       10,
-		Type:     TAP_TOR,
-		TapId:    11,
-		DstPorts: dstPorts,
-		Proto:    0,
-		Vlan:     0,
-		Action:   []AclAction{forward},
-	}
-	policy.UpdateAclData([]*Acl{acl1})
-	policy.EnableAclData()
+	//	dstPorts: 30
+	acl1 := generatePolicyAcl(policy, forward, 10, 0, 0, 0, 30, 0)
+	policy.UpdateAcls([]*Acl{acl1})
 
-	srcIp := NewIPFromString("192.168.0.11")
-	dstIp := NewIPFromString("192.168.0.12")
 	key := &LookupKey{
-		SrcIp:   srcIp.Int(),
+		SrcIp:   ip3,
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
-		DstIp:   dstIp.Int(),
+		DstIp:   ip4,
 		EthType: EthernetTypeARP,
 		DstPort: 30,
 		SrcPort: 30,
@@ -593,24 +383,14 @@ func TestVlanPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	acl1 := &Acl{
-		Id:     10,
-		Type:   TAP_TOR,
-		TapId:  11,
-		Proto:  0,
-		Vlan:   30,
-		Action: []AclAction{forward},
-	}
-	policy.UpdateAclData([]*Acl{acl1})
-	policy.EnableAclData()
+	acl1 := generatePolicyAcl(policy, forward, 10, 0, 0, 0, 0, 30)
+	policy.UpdateAcls([]*Acl{acl1})
 
-	srcIp := NewIPFromString("192.168.0.11")
-	dstIp := NewIPFromString("192.168.0.12")
 	key := &LookupKey{
-		SrcIp:   srcIp.Int(),
+		SrcIp:   ip3,
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
-		DstIp:   dstIp.Int(),
+		DstIp:   ip4,
 		EthType: EthernetTypeARP,
 		DstPort: 30,
 		SrcPort: 30,
@@ -633,25 +413,15 @@ func TestVlanPortPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	dstPorts := []uint16{8000}
-	acl1 := &Acl{
-		Id:       10,
-		Type:     TAP_TOR,
-		TapId:    11,
-		DstPorts: dstPorts,
-		Proto:    0,
-		Vlan:     0,
-		Action:   []AclAction{forward},
-	}
-	policy.UpdateAclData([]*Acl{acl1})
-	policy.EnableAclData()
-	srcIp := NewIPFromString("192.168.0.11")
-	dstIp := NewIPFromString("192.168.0.12")
+	//	dstPorts: 8000
+	acl1 := generatePolicyAcl(policy, forward, 10, 0, 0, 0, 8000, 0)
+	policy.UpdateAcls([]*Acl{acl1})
+
 	key := &LookupKey{
-		SrcIp:   srcIp.Int(),
+		SrcIp:   ip3,
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
-		DstIp:   dstIp.Int(),
+		DstIp:   ip4,
 		EthType: EthernetTypeARP,
 		DstPort: 30,
 		SrcPort: 8000,
@@ -674,25 +444,15 @@ func TestPortProtoPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	dstPorts := []uint16{8000}
-	acl1 := &Acl{
-		Id:       10,
-		Type:     TAP_TOR,
-		TapId:    11,
-		DstPorts: dstPorts,
-		Proto:    6,
-		Vlan:     0,
-		Action:   []AclAction{forward},
-	}
-	policy.UpdateAclData([]*Acl{acl1})
-	policy.EnableAclData()
-	srcIp := NewIPFromString("192.168.0.11")
-	dstIp := NewIPFromString("192.168.0.12")
+	//	dstPorts: 8000
+	acl1 := generatePolicyAcl(policy, forward, 10, 0, 0, 6, 8000, 0)
+	policy.UpdateAcls([]*Acl{acl1})
+
 	key := &LookupKey{
-		SrcIp:   srcIp.Int(),
+		SrcIp:   ip3,
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
-		DstIp:   dstIp.Int(),
+		DstIp:   ip4,
 		EthType: EthernetTypeARP,
 		DstPort: 8000,
 		SrcPort: 8000,
@@ -716,36 +476,18 @@ func TestAclsPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	dstPorts := []uint16{8000}
+	//	dstPorts: 8000
 	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
-	acl1 := &Acl{
-		Id:       10,
-		Type:     TAP_TOR,
-		TapId:    11,
-		DstPorts: dstPorts,
-		Proto:    6,
-		Vlan:     0,
-		Action:   []AclAction{aclAction1},
-	}
+	acl1 := generatePolicyAcl(policy, aclAction1, 10, 0, 0, 6, 8000, 0)
 	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
-	acl2 := &Acl{
-		Id:       20,
-		Type:     TAP_TOR,
-		TapId:    11,
-		DstPorts: dstPorts,
-		Proto:    17,
-		Vlan:     0,
-		Action:   []AclAction{aclAction2},
-	}
-	policy.UpdateAclData([]*Acl{acl1, acl2})
-	policy.EnableAclData()
-	srcIp := NewIPFromString("192.168.0.11")
-	dstIp := NewIPFromString("192.168.0.12")
+	acl2 := generatePolicyAcl(policy, aclAction2, 20, 0, 0, 17, 8000, 0)
+	policy.UpdateAcls([]*Acl{acl1, acl2})
+
 	key := &LookupKey{
-		SrcIp:   srcIp.Int(),
+		SrcIp:   ip3,
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
-		DstIp:   dstIp.Int(),
+		DstIp:   ip4,
 		EthType: EthernetTypeARP,
 		DstPort: 8000,
 		SrcPort: 8000,
@@ -769,36 +511,18 @@ func TestVlanAclsPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	dstPorts := []uint16{8000}
+	// dstPorts: 8000
 	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
-	acl1 := &Acl{
-		Id:       10,
-		Type:     TAP_TOR,
-		TapId:    11,
-		DstPorts: dstPorts,
-		Proto:    6,
-		Vlan:     0,
-		Action:   []AclAction{aclAction1},
-	}
+	acl1 := generatePolicyAcl(policy, aclAction1, 10, 0, 0, 6, 8000, 0)
 	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
-	acl2 := &Acl{
-		Id:       20,
-		Type:     TAP_TOR,
-		TapId:    11,
-		DstPorts: dstPorts,
-		Proto:    6,
-		Vlan:     10,
-		Action:   []AclAction{aclAction2},
-	}
-	policy.UpdateAclData([]*Acl{acl1, acl2})
-	policy.EnableAclData()
-	srcIp := NewIPFromString("192.168.0.11")
-	dstIp := NewIPFromString("192.168.0.12")
+	acl2 := generatePolicyAcl(policy, aclAction2, 20, 0, 0, 6, 8000, 10)
+	policy.UpdateAcls([]*Acl{acl1, acl2})
+
 	key := &LookupKey{
-		SrcIp:   srcIp.Int(),
+		SrcIp:   ip3,
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
-		DstIp:   dstIp.Int(),
+		DstIp:   ip4,
 		EthType: EthernetTypeARP,
 		DstPort: 8000,
 		SrcPort: 8000,
@@ -827,35 +551,18 @@ func TestVlanPortAclsPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	dstPorts := []uint16{8000}
+	//	dstPorts: 8000
 	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
-	acl1 := &Acl{
-		Id:       10,
-		Type:     TAP_TOR,
-		TapId:    11,
-		DstPorts: dstPorts,
-		Proto:    6,
-		Vlan:     0,
-		Action:   []AclAction{aclAction1},
-	}
+	acl1 := generatePolicyAcl(policy, aclAction1, 10, 0, 0, 6, 8000, 0)
 	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
-	acl2 := &Acl{
-		Id:     20,
-		Type:   TAP_TOR,
-		TapId:  11,
-		Proto:  6,
-		Vlan:   10,
-		Action: []AclAction{aclAction2},
-	}
-	policy.UpdateAclData([]*Acl{acl1, acl2})
-	policy.EnableAclData()
-	srcIp := NewIPFromString("192.168.0.11")
-	dstIp := NewIPFromString("192.168.0.12")
+	acl2 := generatePolicyAcl(policy, aclAction2, 20, 0, 0, 6, 0, 10)
+	policy.UpdateAcls([]*Acl{acl1, acl2})
+
 	key := &LookupKey{
-		SrcIp:   srcIp.Int(),
+		SrcIp:   ip3,
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
-		DstIp:   dstIp.Int(),
+		DstIp:   ip4,
 		EthType: EthernetTypeARP,
 		DstPort: 1000,
 		Vlan:    10,
@@ -879,35 +586,18 @@ func TestVlanPortAclsPassPolicy1(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	dstPorts := []uint16{8000}
+	// dstPorts: 8000
 	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
-	acl1 := &Acl{
-		Id:       10,
-		Type:     TAP_TOR,
-		TapId:    11,
-		DstPorts: dstPorts,
-		Proto:    6,
-		Vlan:     0,
-		Action:   []AclAction{aclAction1},
-	}
+	acl1 := generatePolicyAcl(policy, aclAction1, 10, 0, 0, 6, 8000, 0)
 	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
-	acl2 := &Acl{
-		Id:     20,
-		Type:   TAP_TOR,
-		TapId:  11,
-		Proto:  6,
-		Vlan:   10,
-		Action: []AclAction{aclAction2},
-	}
-	policy.UpdateAclData([]*Acl{acl1, acl2})
-	policy.EnableAclData()
-	srcIp := NewIPFromString("192.168.0.11")
-	dstIp := NewIPFromString("192.168.0.12")
+	acl2 := generatePolicyAcl(policy, aclAction2, 20, 0, 0, 6, 0, 10)
+	policy.UpdateAcls([]*Acl{acl1, acl2})
+
 	key := &LookupKey{
-		SrcIp:   srcIp.Int(),
+		SrcIp:   ip3,
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
-		DstIp:   dstIp.Int(),
+		DstIp:   ip4,
 		EthType: EthernetTypeARP,
 		DstPort: 8000,
 		Vlan:    10,
@@ -931,35 +621,18 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	dstPorts := []uint16{8000}
+	//	dstPorts: 8000
 	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
-	acl1 := &Acl{
-		Id:       10,
-		Type:     TAP_TOR,
-		TapId:    11,
-		DstPorts: dstPorts,
-		Proto:    6,
-		Vlan:     0,
-		Action:   []AclAction{aclAction1},
-	}
+	acl1 := generatePolicyAcl(policy, aclAction1, 10, 0, 0, 6, 8000, 0)
 	aclAction2 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
-	acl2 := &Acl{
-		Id:     20,
-		Type:   TAP_TOR,
-		TapId:  11,
-		Proto:  6,
-		Vlan:   10,
-		Action: []AclAction{aclAction2},
-	}
-	policy.UpdateAclData([]*Acl{acl1, acl2})
-	policy.EnableAclData()
-	srcIp := NewIPFromString("192.168.0.11")
-	dstIp := NewIPFromString("192.168.0.12")
+	acl2 := generatePolicyAcl(policy, aclAction2, 20, 0, 0, 6, 0, 10)
+	policy.UpdateAcls([]*Acl{acl1, acl2})
+
 	key := &LookupKey{
-		SrcIp:   srcIp.Int(),
+		SrcIp:   ip3,
 		SrcMac:  0x80027a42bfc,
 		DstMac:  0x80027a42bfa,
-		DstIp:   dstIp.Int(),
+		DstIp:   ip4,
 		EthType: EthernetTypeARP,
 		DstPort: 8000,
 		Ttl:     64,
@@ -983,6 +656,18 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 	}
 }
 
+func generatePlatformDataByParam(strIp, StrMac string, epcId int32, Iftype uint32) *PlatformData {
+	ip := NewIPFromString(strIp)
+	ipInfo := generateIpNet(ip.Int(), 121, 32)
+
+	mac := NewMACAddrFromString(StrMac)
+	launchServer := NewIPFromString("10.10.10.10")
+	vifData := generatePlatformDataExtension(epcId, 1, 3, Iftype, 5, mac.Int(), launchServer.Int())
+	vifData.Ips = append(vifData.Ips, ipInfo)
+	return vifData
+}
+
+// 生成特定Acl规则
 func generateAclData(policy *PolicyTable) {
 	dstPorts := []uint16{8000}
 	aclAction1 := AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddTagTemplates(TEMPLATE_EDGE_PORT)
@@ -1306,15 +991,6 @@ var (
 	group7Mac1 = NewMACAddrFromString("66:66:66:66:66:62").Int()
 )
 
-func generateIpNet(ip uint32, subnetId uint32, mask uint32) *IpNet {
-	ipInfo := IpNet{
-		Ip:       ip,
-		SubnetId: subnetId,
-		Netmask:  mask,
-	}
-	return &ipInfo
-}
-
 func generatePlatformDataWithGroupId(epcId int32, groupId uint32, mac uint64) *PlatformData {
 	data := PlatformData{
 		EpcId:      epcId,
@@ -1327,15 +1003,6 @@ func generatePlatformDataWithGroupId(epcId int32, groupId uint32, mac uint64) *P
 	}
 	data.GroupIds = append(data.GroupIds, groupId)
 	return &data
-}
-
-func generateIpGroup(groupId uint32, epcId int32, ip string) *IpGroupData {
-	ipgroup := IpGroupData{
-		Id:    groupId,
-		EpcId: epcId,
-	}
-	ipgroup.Ips = append(ipgroup.Ips, ip)
-	return &ipgroup
 }
 
 func generatePolicyTable() *PolicyTable {
@@ -1456,8 +1123,7 @@ func TestPolicySimple(t *testing.T) {
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	acl := generatePolicyAcl(table, action, 10, group1Id, group2Id, 6, 8000, 0)
 	acls = append(acls, acl)
-	table.UpdateAclData(acls)
-	table.EnableAclData()
+	table.UpdateAcls(acls)
 	// 构建查询key  1:0->2:8000 tcp
 	key := generateLookupKey(group1Mac, group2Mac, 0, group1Ip1, group2Ip1, 6, 0, 8000)
 
@@ -1502,21 +1168,16 @@ func TestPolicySimple(t *testing.T) {
 	action2 := generateAclAction(12, ACTION_PACKET_COUNTING)
 	acl2 := generatePolicyAcl(table, action2, 12, group1Id, group2Id, 6, 8000, 0)
 	acls = append(acls, acl2)
-	table.UpdateAclData(acls)
-	table.EnableAclData()
+	table.UpdateAcls(acls)
 	basicPolicyData = NewPolicyData()
 	basicPolicyData.Merge([]AclAction{action, action2}, 10)
 
 	key = generateLookupKey(group1Mac, group2Mac, 0, group1Ip1, group2Ip1, 6, 0, 8000)
-	result, policyData := table.LookupAllByKey(key)
+	_, policyData = table.LookupAllByKey(key)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("PortProto Check Failed")
 		t.Log("Result:", policyData, "\n")
 		t.Log("Expect:", basicPolicyData, "\n")
-	}
-	if result != nil {
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
 	}
 }
 
@@ -1528,8 +1189,7 @@ func TestPolicyEpcPolicy(t *testing.T) {
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	acl := generatePolicyAcl(table, action, 10, group1Id, 0, 6, 8000, 0)
 	acls = append(acls, acl)
-	table.UpdateAclData(acls)
-	table.EnableAclData()
+	table.UpdateAcls(acls)
 	// 构建查询key  1:0->2:8000 tcp
 	key := generateLookupKey(group1Mac, group1Mac2, 0, group1Ip1, group1Ip3, 6, 0, 8000)
 
@@ -1590,8 +1250,7 @@ func TestFlowVlanAcls(t *testing.T) {
 	action := generateAclAction(10, ACTION_FLOW_COUNTING)
 	acl := generatePolicyAcl(table, action, 10, group1Id, group2Id, 6, 0, 10)
 	acls = append(acls, acl)
-	table.UpdateAclData(acls)
-	table.EnableAclData()
+	table.UpdateAcls(acls)
 	// 构建查询key  1->2 tcp vlan:10
 	key := generateLookupKey(group1Mac, group2Mac, 10, group1Ip1, group2Ip1, 6, 11, 10)
 	_, policyData := table.LookupAllByKey(key)
@@ -1636,8 +1295,7 @@ func TestIpGroupPortAcl(t *testing.T) {
 	action2 := generateAclAction(12, ACTION_FLOW_COUNTING)
 	acl2 := generatePolicyAcl(table, action2, 12, group2Id, group1Id, 6, 21, 10)
 	acls = append(acls, acl, acl2)
-	table.UpdateAclData(acls)
-	table.EnableAclData()
+	table.UpdateAcls(acls)
 	// 构建查询key  1:21->2:20 tcp vlan:10 ,匹配两条acl
 	key := generateLookupKey(group1Mac, group2Mac, 10, group1Ip1, group2Ip1, 6, 21, 20)
 	_, policyData := table.LookupAllByKey(key)
@@ -1664,8 +1322,7 @@ func TestVlanProtoPortAcl(t *testing.T) {
 	action3 := generateAclAction(13, ACTION_FLOW_COUNTING)
 	acl3 := generatePolicyAcl(table, action3, 13, group1Id, group2Id, 0, 80, 0)
 	acls = append(acls, acl1, acl2, acl3)
-	table.UpdateAclData(acls)
-	table.EnableAclData()
+	table.UpdateAcls(acls)
 	// 构建查询1-key  1:10->2:10 proto:6 vlan:10
 	key := generateLookupKey(group1Mac, group2Mac, 10, group1Ip1, group2Ip1, 6, 10, 10)
 	// 获取first查询结果
@@ -1730,8 +1387,7 @@ func TestVlanProtoPortAcl(t *testing.T) {
 	action5 := generateAclAction(15, ACTION_FLOW_COUNTING)
 	acl5 := generatePolicyAcl(table, action5, 15, group1Id, group2Id, 6, 0, 0)
 	acls = append(acls, acl4, acl5)
-	table.UpdateAclData(acls)
-	table.EnableAclData()
+	table.UpdateAcls(acls)
 	// 4-key  1:10->2:80 proto:6
 	key = generateLookupKey(group1Mac, group2Mac, 0, group1Ip1, group2Ip1, 6, 10, 80)
 	// 获取first查询结果
@@ -1780,8 +1436,7 @@ func TestResourceGroupPolicy(t *testing.T) {
 	action1 := generateAclAction(16, ACTION_FLOW_COUNTING)
 	acl1 := generatePolicyAcl(table, action1, 16, 0, group1Id, 0, 0, 0)
 	acls = append(acls, acl1)
-	table.UpdateAclData(acls)
-	table.EnableAclData()
+	table.UpdateAcls(acls)
 	// 构建查询1-key  (group1)group1Ip1:10->(group1)group1Ip2:10 proto:6 vlan:10
 	key := generateLookupKey(group1Mac, group1Mac, 10, group1Ip1, group1Ip2, 6, 10, 10)
 	_, policyData := table.LookupAllByKey(key)
@@ -1812,8 +1467,7 @@ func TestResourceGroupPolicy(t *testing.T) {
 	action3 := generateAclAction(19, ACTION_FLOW_COUNTING)
 	acl3 := generatePolicyAcl(table, action3, 19, group3Id, group5Id, 17, 1023, 0)
 	acls = append(acls, acl2, acl3)
-	table.UpdateAclData(acls)
-	table.EnableAclData()
+	table.UpdateAcls(acls)
 	// 2-key  (group5)groupIp5:1000->(group5)groupIp6:1023 udp
 	key = generateLookupKey(group5Mac1, group5Mac1, 0, groupIp5, groupIp6, 17, 1000, 1023)
 	_, policyData = table.LookupAllByKey(key)
@@ -1869,17 +1523,13 @@ func TestResourceGroupPolicy(t *testing.T) {
 	ip2 := NewIPFromString("10.25.1.10").Int()
 	ip3 := NewIPFromString("192.168.10.10").Int()
 	key = generateLookupKey(group3Mac1, group5Mac1, 0, ip2, ip3, 17, 1000, 1023)
-	result, policyData := table.LookupAllByKey(key)
+	_, policyData = table.LookupAllByKey(key)
 	basicPolicyData = NewPolicyData()
 	basicPolicyData.Merge([]AclAction{action3, action2}, 19)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy: 5-key Check Failed")
 		t.Log("Result:", policyData, "\n")
 		t.Log("Expect:", basicPolicyData, "\n")
-	}
-	if result != nil {
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
 	}
 	_, policyData = table.policyLabeler.GetPolicyByFastPath(key)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -1892,17 +1542,13 @@ func TestResourceGroupPolicy(t *testing.T) {
 	//      (group3)mac和ip不对应情况下，虽能匹配到group3Id，但三层epcId=-1
 	ip := NewIPFromString("10.25.2.2").Int()
 	key = generateLookupKey(group3Mac1, group5Mac2, 10, ip, groupIp5, 17, 1000, 1023)
-	result, policyData = table.LookupAllByKey(key)
+	_, policyData = table.LookupAllByKey(key)
 	basicPolicyData = NewPolicyData()
 	basicPolicyData.Merge([]AclAction{action3, action2}, 19)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy 6-key Check Failed")
 		t.Log("Result:", policyData, "\n")
 		t.Log("Expect:", basicPolicyData, "\n")
-	}
-	if result != nil {
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
 	}
 	_, policyData = table.policyLabeler.GetPolicyByFastPath(key)
 	if !CheckPolicyResult(basicPolicyData, policyData) {
@@ -1922,17 +1568,11 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	action2 := generateAclAction(21, ACTION_PACKET_COUNTING)
 	acl2 := generatePolicyAcl(table, action2, 21, group3Id, 0, 17, 0, 0)
 	acls = append(acls, acl1, acl2)
-	table.UpdateAclData(acls)
-	table.EnableAclData()
+	table.UpdateAcls(acls)
 
 	// key1: (group3/group6)groupIp3 -> (group6)groupIp2 udp
 	key1 := generateLookupKey(group3Mac1, group6Mac1, 0, groupIp3, groupIp2, 17, 0, 0)
 	result := table.cloudPlatformLabeler.GetEndpointData(key1)
-	if result != nil {
-		t.Log("key1 - EndpointData:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
 	policyData := table.policyLabeler.GetPolicyByFirstPath(result, key1)
 	backward1 := getBackwardAcl(action1)
 	basicPolicyData1 := NewPolicyData()
@@ -1946,11 +1586,6 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	// key2: (group3)groupIp4 -> (group3/group6)groupIp3
 	key2 := generateLookupKey(group3Mac1, group6Mac1, 0, groupIp4, groupIp3, 17, 0, 0)
 	result = table.cloudPlatformLabeler.GetEndpointData(key2)
-	if result != nil {
-		t.Log("key2 - EndpointData:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
 	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key2)
 	// 不匹配backward2
 	basicPolicyData2 := NewPolicyData()
@@ -1962,12 +1597,7 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	}
 
 	// key1 - FastPath
-	result, policyData = table.policyLabeler.GetPolicyByFastPath(key1)
-	if result != nil {
-		t.Log("key1 - EndpointData - FastPath:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
+	_, policyData = table.policyLabeler.GetPolicyByFastPath(key1)
 	if !CheckPolicyResult(basicPolicyData1, policyData) {
 		t.Error("key1 FastPath Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -1975,12 +1605,7 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	}
 
 	// key2 - FastPath
-	result, policyData = table.policyLabeler.GetPolicyByFastPath(key2)
-	if result != nil {
-		t.Log("key2 - EndpointData - FastPath:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
+	_, policyData = table.policyLabeler.GetPolicyByFastPath(key2)
 	if !CheckPolicyResult(basicPolicyData2, policyData) {
 		t.Error("key2 FastPath Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -1994,18 +1619,11 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	action4 := generateAclAction(23, ACTION_PACKET_COUNTING)
 	acl4 := generatePolicyAcl(table, action4, 23, group4Id, 0, 17, 0, 0)
 	acls = append(acls, acl3, acl4)
-	table.UpdateAclData(acls)
-	table.EnableAclData()
+	table.UpdateAcls(acls)
 
 	// key3: (group3)groupIp4:8000 -> (group5/group6)groupIp2:6000 udp vlan:10
 	key3 := generateLookupKey(group3Mac1, 0, 10, groupIp4, groupIp2, 17, 8000, 6000)
 	result = table.cloudPlatformLabeler.GetEndpointData(key3)
-	if result != nil {
-		t.Log("=====================")
-		t.Log("key3 - EndpointData:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
 	// 匹配group6、group3，group7有epc限制，group4mac不符
 	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key3)
 	basicPolicyData3 := NewPolicyData()
@@ -2019,11 +1637,6 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	// key4: (group4)groupIp4:8000 -> (group5/group6)groupIp2:6000 udp
 	key4 := generateLookupKey(group4Mac1, group5Mac1, 10, groupIp4, groupIp2, 17, 8000, 6000)
 	result = table.cloudPlatformLabeler.GetEndpointData(key4)
-	if result != nil {
-		t.Log("key4 - EndpointData:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
 	// 源端匹配group4不匹配group3，目的端匹配group6不匹配group7
 	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key4)
 	basicPolicyData4 := NewPolicyData()
@@ -2037,11 +1650,6 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	// key5: (group4)group4Id:8000 -> (group5/group6)groupIp2:6000 udp
 	key5 := generateLookupKey(group4Mac1, 0, 10, groupIp4, groupIp2, 17, 8000, 6000)
 	result = table.cloudPlatformLabeler.GetEndpointData(key5)
-	if result != nil {
-		t.Log("key5 - EndpointData:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
 	// 源端匹配group4不匹配group3,目的端匹配group6不匹配group7
 	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key5)
 	basicPolicyData5 := NewPolicyData()
@@ -2055,11 +1663,6 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	// (mac、ip不匹配) groupIp4 :8000 -> (group6)groupIp2:6000 udp
 	key6 := generateLookupKey(group5Mac2, group7Mac1, 10, groupIp4, groupIp2, 17, 8000, 6000)
 	result = table.cloudPlatformLabeler.GetEndpointData(key6)
-	if result != nil {
-		t.Log("key6 - EndpointData:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
 	// 源端不匹配group3/group4,目的端匹配group6，不匹配group7
 	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key6)
 	basicPolicyData6 := NewPolicyData()
@@ -2071,13 +1674,7 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	}
 
 	// key3 - fastpath
-	result, policyData = table.policyLabeler.GetPolicyByFastPath(key3)
-	if result != nil {
-		t.Log("===============================")
-		t.Log("key3 - EndpointData - FastPath:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
+	_, policyData = table.policyLabeler.GetPolicyByFastPath(key3)
 	if !CheckPolicyResult(basicPolicyData3, policyData) {
 		t.Error("key3 FastPath Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -2085,14 +1682,7 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	}
 
 	// key4 - fastpath
-	result, policyData = table.policyLabeler.GetPolicyByFastPath(key4)
-	if result != nil {
-		t.Log("key4 - EndpointData - FastPath:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	} else {
-		t.Log("key4 fastpath: EndpointData is nil")
-	}
+	_, policyData = table.policyLabeler.GetPolicyByFastPath(key4)
 	if !CheckPolicyResult(basicPolicyData4, policyData) {
 		t.Error("key4 FastPath Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -2100,12 +1690,7 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	}
 
 	// key5 - fastpath
-	result, policyData = table.policyLabeler.GetPolicyByFastPath(key5)
-	if result != nil {
-		t.Log("key5 - EndpointData - FastPath:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
+	_, policyData = table.policyLabeler.GetPolicyByFastPath(key5)
 	if !CheckPolicyResult(basicPolicyData5, policyData) {
 		t.Error("key5 FastPath Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -2113,12 +1698,7 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	}
 
 	// key6 - fastpath
-	result, policyData = table.policyLabeler.GetPolicyByFastPath(key6)
-	if result != nil {
-		t.Log("key6 - EndpointData - FastPath:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
+	_, policyData = table.policyLabeler.GetPolicyByFastPath(key6)
 	if !CheckPolicyResult(basicPolicyData6, policyData) {
 		t.Error("key6 FastPath Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -2137,17 +1717,11 @@ func TestFirstPathVsFastPath(t *testing.T) {
 	action2 := generateAclAction(25, ACTION_PACKET_COUNTING)
 	acl2 := generatePolicyAcl(table, action2, 25, group5Id, 0, 0, 0, 10)
 	acls = append(acls, acl1, acl2)
-	table.UpdateAclData(acls)
-	table.EnableAclData()
+	table.UpdateAcls(acls)
 
 	// key1: (group5)groupIp5:6000 -> (group5/group6)groupIp2:8000 tcp vlan:10
 	key1 := generateLookupKey(group5Mac1, group6Mac1, 10, groupIp5, groupIp2, 6, 6000, 8000)
 	result := table.cloudPlatformLabeler.GetEndpointData(key1)
-	if result != nil {
-		t.Log("key1 - EndpointData:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
 	policyData := table.policyLabeler.GetPolicyByFirstPath(result, key1)
 	// 可匹配acl1，direction=3; 可匹配acl2，direction=1
 	backward1 := getBackwardAcl(action1)
@@ -2163,11 +1737,6 @@ func TestFirstPathVsFastPath(t *testing.T) {
 	// key2:(group6)groupIp3:6000 -> (group5)groupIp5:8000 tcp vlan:10
 	key2 := generateLookupKey(group6Mac1, group5Mac1, 10, groupIp3, groupIp5, 6, 6000, 8000)
 	result = table.cloudPlatformLabeler.GetEndpointData(key2)
-	if result != nil {
-		t.Log("key2 - EndpointData:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
 	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key2)
 	// 不能匹配acl1
 	basicPolicyData2 := NewPolicyData()
@@ -2181,11 +1750,6 @@ func TestFirstPathVsFastPath(t *testing.T) {
 	// key3: (group5)groupIp6:8000 -> (group5)groupIp5:8000 tcp
 	key3 := generateLookupKey(group5Mac2, group5Mac1, 10, groupIp6, groupIp5, 6, 8000, 8000)
 	result = table.cloudPlatformLabeler.GetEndpointData(key3)
-	if result != nil {
-		t.Log("key3 - EndpointData:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
 	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key3)
 	// 可匹配acl1，direction=3；可匹配acl2，direction=3
 	basicPolicyData3 := NewPolicyData()
@@ -2199,11 +1763,6 @@ func TestFirstPathVsFastPath(t *testing.T) {
 	// key4: (group5)groupIp6:6000 -> (group6)groupIp3:8000 tcp vlan:11
 	key4 := generateLookupKey(group5Mac1, group6Mac1, 11, groupIp6, groupIp3, 6, 6000, 8000)
 	result = table.cloudPlatformLabeler.GetEndpointData(key4)
-	if result != nil {
-		t.Log("key4 - EndpointData:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
 	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key4)
 	// 不可匹配acl2，vlan不符
 	basicPolicyData4 := NewPolicyData()
@@ -2217,11 +1776,6 @@ func TestFirstPathVsFastPath(t *testing.T) {
 	// key5: (group5)groupIp5:6000 -> (group6)groupIp3:8000 udp vlan:10
 	key5 := generateLookupKey(group5Mac1, group6Mac1, 10, groupIp5, groupIp3, 17, 6000, 8000)
 	result = table.cloudPlatformLabeler.GetEndpointData(key5)
-	if result != nil {
-		t.Log("key5 - EndpointData:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
 	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key5)
 	// udp协议，不匹配acl1
 	basicPolicyData5 := NewPolicyData()
@@ -2235,11 +1789,6 @@ func TestFirstPathVsFastPath(t *testing.T) {
 	// key6: (group5)groupIp5:6000 -> (group6)groupIp3:6000
 	key6 := generateLookupKey(group5Mac1, group6Mac1, 10, groupIp5, groupIp3, 6, 6000, 6000)
 	result = table.cloudPlatformLabeler.GetEndpointData(key6)
-	if result != nil {
-		t.Log("key6 - EndpointData:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
 	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key6)
 	// port不一致，不匹配acl1
 	basicPolicyData6 := NewPolicyData()
@@ -2253,11 +1802,6 @@ func TestFirstPathVsFastPath(t *testing.T) {
 	// key7: (group5)groupIp5:6000 -> (group6)groupIp3:8000 vlan:11 tcp
 	key7 := generateLookupKey(group5Mac1, group6Mac1, 11, groupIp5, groupIp3, 6, 6000, 8000)
 	result = table.cloudPlatformLabeler.GetEndpointData(key7)
-	if result != nil {
-		t.Log("key7 - EndpointData:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
 	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key7)
 	// 不匹配acl2，vlan不符
 	basicPolicyData7 := NewPolicyData()
@@ -2269,13 +1813,7 @@ func TestFirstPathVsFastPath(t *testing.T) {
 	}
 
 	// key1 - fastpath
-	result, policyData = table.policyLabeler.GetPolicyByFastPath(key1)
-	if result != nil {
-		t.Log("===============================")
-		t.Log("key1 - EndpointData - FastPath:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
+	_, policyData = table.policyLabeler.GetPolicyByFastPath(key1)
 	if !CheckPolicyResult(basicPolicyData1, policyData) {
 		t.Error("key1 FastPath Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -2283,12 +1821,7 @@ func TestFirstPathVsFastPath(t *testing.T) {
 	}
 
 	// key2 - fastpath
-	result, policyData = table.policyLabeler.GetPolicyByFastPath(key2)
-	if result != nil {
-		t.Log("key2 - EndpointData - FastPath:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
+	_, policyData = table.policyLabeler.GetPolicyByFastPath(key2)
 	if !CheckPolicyResult(basicPolicyData2, policyData) {
 		t.Error("key2 FastPath Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -2296,12 +1829,7 @@ func TestFirstPathVsFastPath(t *testing.T) {
 	}
 
 	// key3 - fastpath
-	result, policyData = table.policyLabeler.GetPolicyByFastPath(key3)
-	if result != nil {
-		t.Log("key3 - EndpointData - FastPath:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
+	_, policyData = table.policyLabeler.GetPolicyByFastPath(key3)
 	if !CheckPolicyResult(basicPolicyData3, policyData) {
 		t.Error("key3 FastPath Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -2309,12 +1837,7 @@ func TestFirstPathVsFastPath(t *testing.T) {
 	}
 
 	// key4 - fastpath
-	result, policyData = table.policyLabeler.GetPolicyByFastPath(key4)
-	if result != nil {
-		t.Log("key4 - EndpointData - FastPath:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
+	_, policyData = table.policyLabeler.GetPolicyByFastPath(key4)
 	if !CheckPolicyResult(basicPolicyData4, policyData) {
 		t.Error("key4 FastPath Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -2322,12 +1845,7 @@ func TestFirstPathVsFastPath(t *testing.T) {
 	}
 
 	// key5 - fastpath
-	result, policyData = table.policyLabeler.GetPolicyByFastPath(key5)
-	if result != nil {
-		t.Log("key5 - EndpointData - FastPath:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
+	_, policyData = table.policyLabeler.GetPolicyByFastPath(key5)
 	if !CheckPolicyResult(basicPolicyData5, policyData) {
 		t.Error("key5 FastPath Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -2335,12 +1853,7 @@ func TestFirstPathVsFastPath(t *testing.T) {
 	}
 
 	// key6 - fastpath
-	result, policyData = table.policyLabeler.GetPolicyByFastPath(key6)
-	if result != nil {
-		t.Log("key6 - EndpointData - FastPath:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
+	_, policyData = table.policyLabeler.GetPolicyByFastPath(key6)
 	if !CheckPolicyResult(basicPolicyData6, policyData) {
 		t.Error("key6 FastPath Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -2348,12 +1861,7 @@ func TestFirstPathVsFastPath(t *testing.T) {
 	}
 
 	// key7 - fastpath
-	result, policyData = table.policyLabeler.GetPolicyByFastPath(key7)
-	if result != nil {
-		t.Log("key7 - EndpointData - FastPath:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
-	}
+	_, policyData = table.policyLabeler.GetPolicyByFastPath(key7)
 	if !CheckPolicyResult(basicPolicyData7, policyData) {
 		t.Error("key7 FastPath Check Failed")
 		t.Log("Result:", policyData, "\n")
@@ -2371,17 +1879,20 @@ func TestEndpointDataDirection(t *testing.T) {
 	action2 := generateAclAction(26, ACTION_PACKET_COUNTING)
 	acl2 := generatePolicyAcl(table, action2, 26, group3Id, 0, 6, 1000, 0)
 	acls = append(acls, acl1, acl2)
-	table.UpdateAclData(acls)
-	table.EnableAclData()
+	table.UpdateAcls(acls)
 
 	// key1: (group3/group6)groupIp3:1023 -> (group4)groupIp4:1000 tcp
 	key1 := generateLookupKey(group3Mac1, group4Mac1, 0, groupIp3, groupIp4, 6, 1023, 1000)
 	// src: DEV-30, IP-60 dst: DEV-40
 	result := table.cloudPlatformLabeler.GetEndpointData(key1)
-	if result != nil {
-		t.Log("key1 - EndpointData:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
+	basicSrcInfo1 := table.cloudPlatformLabeler.GetEndpointInfo(group3Mac1, groupIp3, TAP_TOR)
+	basicDstInfo1 := table.cloudPlatformLabeler.GetEndpointInfo(group4Mac1, groupIp4, TAP_TOR)
+	if !CheckEndpointDataResult(basicSrcInfo1, basicDstInfo1, result) {
+		t.Error("key1 EndpointData Check Failed")
+		t.Log("ResultSrcInfo:", result.SrcInfo, "\n")
+		t.Log("ExpectSrcInfo:", basicSrcInfo1, "\n")
+		t.Log("ResultDstInfo:", result.DstInfo, "\n")
+		t.Log("ExpectDstInfo:", basicDstInfo1, "\n")
 	}
 	policyData := table.policyLabeler.GetPolicyByFirstPath(result, key1)
 	basicPolicyData1 := NewPolicyData()
@@ -2396,10 +1907,14 @@ func TestEndpointDataDirection(t *testing.T) {
 	key2 := generateLookupKey(group4Mac1, group3Mac1, 0, groupIp4, groupIp3, 6, 1000, 1023)
 	// src: DEV-40 dst: DEV-30, IP-60
 	result = table.cloudPlatformLabeler.GetEndpointData(key2)
-	if result != nil {
-		t.Log("key2 - EndpointData:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
+	basicSrcInfo2 := table.cloudPlatformLabeler.GetEndpointInfo(group4Mac1, groupIp4, TAP_TOR)
+	basicDstInfo2 := table.cloudPlatformLabeler.GetEndpointInfo(group3Mac1, groupIp3, TAP_TOR)
+	if !CheckEndpointDataResult(basicSrcInfo2, basicDstInfo2, result) {
+		t.Error("key2 EndpointData Check Failed")
+		t.Log("ResultSrcInfo:", result.SrcInfo, "\n")
+		t.Log("ExpectSrcInfo:", basicSrcInfo2, "\n")
+		t.Log("ResultDstInfo:", result.DstInfo, "\n")
+		t.Log("ExpectDstInfo:", basicDstInfo2, "\n")
 	}
 	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key2)
 	backward1 := getBackwardAcl(action1)
@@ -2416,10 +1931,14 @@ func TestEndpointDataDirection(t *testing.T) {
 	key3 := generateLookupKey(group3Mac1, group4Mac1, 0, groupIp3, groupIp4, 6, 1000, 1023)
 	// src: DEV-30, IP-60 dst: DEV-40
 	result = table.cloudPlatformLabeler.GetEndpointData(key3)
-	if result != nil {
-		t.Log("key3 - EndpointData:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
+	basicSrcInfo3 := table.cloudPlatformLabeler.GetEndpointInfo(group3Mac1, groupIp3, TAP_TOR)
+	basicDstInfo3 := table.cloudPlatformLabeler.GetEndpointInfo(group4Mac1, groupIp4, TAP_TOR)
+	if !CheckEndpointDataResult(basicSrcInfo3, basicDstInfo3, result) {
+		t.Error("key3 EndpointData Check Failed")
+		t.Log("ResultSrcInfo:", result.SrcInfo, "\n")
+		t.Log("ExpectSrcInfo:", basicSrcInfo3, "\n")
+		t.Log("ResultDstInfo:", result.DstInfo, "\n")
+		t.Log("ExpectDstInfo:", basicDstInfo3, "\n")
 	}
 	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key3)
 	basicPolicyData3 := INVALID_POLICY_DATA
@@ -2433,10 +1952,14 @@ func TestEndpointDataDirection(t *testing.T) {
 	key4 := generateLookupKey(group4Mac1, group3Mac1, 0, groupIp4, groupIp3, 6, 1023, 1000)
 	// src: DEV-40 dst: DEV-30, IP-60
 	result = table.cloudPlatformLabeler.GetEndpointData(key4)
-	if result != nil {
-		t.Log("key4 - EndpointData:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
+	basicSrcInfo4 := table.cloudPlatformLabeler.GetEndpointInfo(group4Mac1, groupIp4, TAP_TOR)
+	basicDstInfo4 := table.cloudPlatformLabeler.GetEndpointInfo(group3Mac1, groupIp3, TAP_TOR)
+	if !CheckEndpointDataResult(basicSrcInfo4, basicDstInfo4, result) {
+		t.Error("key4 EndpointData Check Failed")
+		t.Log("ResultSrcInfo:", result.SrcInfo, "\n")
+		t.Log("ExpectSrcInfo:", basicSrcInfo4, "\n")
+		t.Log("ResultDstInfo:", result.DstInfo, "\n")
+		t.Log("ExpectDstInfo:", basicDstInfo4, "\n")
 	}
 	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key4)
 	basicPolicyData4 := INVALID_POLICY_DATA
@@ -2448,11 +1971,12 @@ func TestEndpointDataDirection(t *testing.T) {
 
 	// key1 - fastpath
 	result, policyData = table.policyLabeler.GetPolicyByFastPath(key1)
-	if result != nil {
-		t.Log("===============================")
-		t.Log("key1 - EndpointData - FastPath:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
+	if !CheckEndpointDataResult(basicSrcInfo1, basicDstInfo1, result) {
+		t.Error("key1 FastPath EndpointData Check Failed")
+		t.Log("ResultSrcInfo:", result.SrcInfo, "\n")
+		t.Log("ExpectSrcInfo:", basicSrcInfo1, "\n")
+		t.Log("ResultDstInfo:", result.DstInfo, "\n")
+		t.Log("ExpectDstInfo:", basicDstInfo1, "\n")
 	}
 	if !CheckPolicyResult(basicPolicyData1, policyData) {
 		t.Error("FastPath Check Failed")
@@ -2462,10 +1986,12 @@ func TestEndpointDataDirection(t *testing.T) {
 
 	// key2 - fastpath
 	result, policyData = table.policyLabeler.GetPolicyByFastPath(key2)
-	if result != nil {
-		t.Log("key2 - EndpointData - FastPath:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
+	if !CheckEndpointDataResult(basicSrcInfo2, basicDstInfo2, result) {
+		t.Error("key2 FastPath EndpointData Check Failed")
+		t.Log("ResultSrcInfo:", result.SrcInfo, "\n")
+		t.Log("ExpectSrcInfo:", basicSrcInfo2, "\n")
+		t.Log("ResultDstInfo:", result.DstInfo, "\n")
+		t.Log("ExpectDstInfo:", basicDstInfo2, "\n")
 	}
 	if !CheckPolicyResult(basicPolicyData2, policyData) {
 		t.Error("key2 FastPath Check Failed")
@@ -2475,10 +2001,12 @@ func TestEndpointDataDirection(t *testing.T) {
 
 	// key3 - fastpath
 	result, policyData = table.policyLabeler.GetPolicyByFastPath(key3)
-	if result != nil {
-		t.Log("key3 - EndpointData - FastPath:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
+	if !CheckEndpointDataResult(basicSrcInfo3, basicDstInfo3, result) {
+		t.Error("key3 FastPath EndpointData Check Failed")
+		t.Log("ResultSrcInfo:", result.SrcInfo, "\n")
+		t.Log("ExpectSrcInfo:", basicSrcInfo3, "\n")
+		t.Log("ResultDstInfo:", result.DstInfo, "\n")
+		t.Log("ExpectDstInfo:", basicDstInfo3, "\n")
 	}
 	if !CheckPolicyResult(basicPolicyData3, policyData) {
 		t.Error("key3 FastPath Check Failed")
@@ -2488,10 +2016,12 @@ func TestEndpointDataDirection(t *testing.T) {
 
 	// key4 - fastpath
 	result, policyData = table.policyLabeler.GetPolicyByFastPath(key4)
-	if result != nil {
-		t.Log("key4 - EndpointData - FastPath:")
-		t.Log(result.SrcInfo, "\n")
-		t.Log(result.DstInfo, "\n")
+	if !CheckEndpointDataResult(basicSrcInfo4, basicDstInfo4, result) {
+		t.Error("key4 FastPath EndpointData Check Failed")
+		t.Log("ResultSrcInfo:", result.SrcInfo, "\n")
+		t.Log("ExpectSrcInfo:", basicSrcInfo4, "\n")
+		t.Log("ResultDstInfo:", result.DstInfo, "\n")
+		t.Log("ExpectDstInfo:", basicDstInfo4, "\n")
 	}
 	if !CheckPolicyResult(basicPolicyData4, policyData) {
 		t.Error("key4 FastPath Check Failed")
