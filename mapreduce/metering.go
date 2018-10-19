@@ -85,7 +85,7 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 		handler.stashes[i] = NewStash(h.docsInBuffer, h.windowSize)
 		handler.statItems[i].Name = h.processors[i].GetName()
 		handler.statItems[i].StatType = stats.COUNT_TYPE
-		handler.statItems[i+handler.numberOfApps].Name = fmt.Sprintf("%s_doc_counter", h.processors[i].GetName())
+		handler.statItems[i+handler.numberOfApps].Name = fmt.Sprintf("%s_avg_doc_counter", h.processors[i].GetName())
 		handler.statItems[i+handler.numberOfApps].StatType = stats.COUNT_TYPE
 		handler.statItems[i+handler.numberOfApps*2].Name = fmt.Sprintf("%s_max_doc_counter", h.processors[i].GetName())
 		handler.statItems[i+handler.numberOfApps*2].StatType = stats.COUNT_TYPE
