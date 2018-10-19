@@ -9,6 +9,7 @@ var metaFlowPerfPool = sync.Pool{
 }
 
 func AcquireMetaFlowPerf() *MetaFlowPerf {
+	ReleaseMetaFlowPerf(&MetaFlowPerf{})
 	return metaFlowPerfPool.Get().(*MetaFlowPerf)
 }
 

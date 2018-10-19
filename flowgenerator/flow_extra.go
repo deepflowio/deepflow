@@ -40,6 +40,7 @@ var flowExtraPool = sync.Pool{
 }
 
 func AcquireFlowExtra() *FlowExtra {
+	ReleaseFlowExtra(&FlowExtra{})
 	return flowExtraPool.Get().(*FlowExtra)
 }
 
