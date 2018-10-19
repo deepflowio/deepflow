@@ -26,7 +26,7 @@ func flatGetDBTagsInStruct(t reflect.Type) []string {
 
 func getCQ(field string) string {
 	if field == "sum_flow_count" {
-		return "sum(sum_closed_flow_count)+last(sum_flow_count) AS sum_flow_count"
+		return "sum(sum_closed_flow_count)+last(sum_flow_count)-last(sum_closed_flow_count) AS sum_flow_count"
 	}
 	return fmt.Sprintf("%s(%s) AS %s", field[0:3], field, field)
 }
