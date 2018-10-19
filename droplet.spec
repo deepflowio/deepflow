@@ -31,6 +31,7 @@ mkdir -p $RPM_BUILD_ROOT/lib/systemd/system/
 cp %pwd/droplet.service $RPM_BUILD_ROOT/lib/systemd/system/
 mkdir -p $RPM_BUILD_ROOT/etc/
 cp %pwd/config/droplet.yaml $RPM_BUILD_ROOT/etc/
+cp %pwd/config/droplet.yaml $RPM_BUILD_ROOT/etc/droplet.yaml.sample
 mkdir -p $RPM_BUILD_ROOT/usr/share/droplet/
 cp %pwd/assets/ip_info_mini.json $RPM_BUILD_ROOT/usr/share/droplet/
 
@@ -41,6 +42,7 @@ cp %pwd/assets/ip_info_mini.json $RPM_BUILD_ROOT/usr/share/droplet/
 /lib/systemd/system/droplet.service
 /usr/share/droplet/ip_info_mini.json
 %config(noreplace) /etc/droplet.yaml
+/etc/droplet.yaml.sample
 
 %preun
 if [ $1 == 0 ]; then # uninstall
