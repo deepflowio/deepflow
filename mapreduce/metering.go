@@ -77,9 +77,9 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 
 		lastFlush: time.Duration(time.Now().UnixNano()),
 
-		statItems: make([]stats.StatItem, h.numberOfApps*2),
+		statItems: make([]stats.StatItem, h.numberOfApps*3),
 
-		statsdCounter: make([]StatsdCounter, h.numberOfApps*3),
+		statsdCounter: make([]StatsdCounter, h.numberOfApps*2),
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.stashes[i] = NewStash(h.docsInBuffer, h.windowSize)
