@@ -19,7 +19,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			taggedFlow := flowExtra.taggedFlow
 			atomic.AddInt32(&f.stats.CurrNumFlows, -1)
 			flowExtra.setCurFlowInfo(flowExtra.recentTime, f.forceReportInterval)
-			if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
+			if f.servicePortDescriptor.judgeServiceDirection(taggedFlow, flowExtra.reversed) {
 				flowExtra.reverseFlow()
 				flowExtra.reversed = !flowExtra.reversed
 			}
@@ -40,31 +40,14 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			flowCache.Unlock()
 			return
 		}
-		closed := false
-		flowExtra, closed, reply = f.initTcpFlow(meta, flowKey)
-		taggedFlow := flowExtra.taggedFlow
+		flowExtra, _, reply = f.initTcpFlow(meta, flowKey)
 		f.stats.TotalNumFlows++
-		if closed {
-			log.Warning("unexpected closed flow")
-			log.Warningf("%s", taggedFlow)
-			flowCache.Unlock()
-			flowExtra.setCurFlowInfo(meta.Timestamp, f.forceReportInterval)
-			if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
-				flowExtra.reverseFlow()
-				flowExtra.reversed = !flowExtra.reversed
-			}
-			flowExtra.calcCloseType(false)
-			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
-			ReleaseFlowExtra(flowExtra)
-			f.flowOutQueue.Put(taggedFlow)
-		} else {
-			if f.checkIfDoFlowPerf(flowExtra) {
-				flowExtra.metaFlowPerf.Update(meta, reply, flowExtra, &f.perfCounter)
-			}
-			f.addFlow(flowCache, flowExtra)
-			flowCache.Unlock()
-			atomic.AddInt32(&f.stats.CurrNumFlows, 1)
+		if f.checkIfDoFlowPerf(flowExtra) {
+			flowExtra.metaFlowPerf.Update(meta, reply, flowExtra, &f.perfCounter)
 		}
+		f.addFlow(flowCache, flowExtra)
+		flowCache.Unlock()
+		atomic.AddInt32(&f.stats.CurrNumFlows, 1)
 	}
 }
 
@@ -87,6 +70,7 @@ func (f *FlowGenerator) initTcpFlow(meta *MetaPacket, key *FlowKey) (*FlowExtra,
 		taggedFlow.FlowMetricsPeerDst.TotalByteCount = uint64(meta.PacketLen)
 		taggedFlow.FlowMetricsPeerDst.ByteCount = uint64(meta.PacketLen)
 		flowExtra.updatePlatformData(meta, true)
+		flowExtra.reversed = true
 		return flowExtra, f.updateFlowStateMachine(flowExtra, flags, true, meta.Invalid), true
 	} else {
 		taggedFlow.FlowMetricsPeerSrc.ArrTime0 = now

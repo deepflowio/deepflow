@@ -1,5 +1,10 @@
 package flowgenerator
 
+import (
+	"github.com/google/gopacket/layers"
+	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+)
+
 type ServicePortDescriptor struct {
 	Active           bool
 	PortActivityList []bool
@@ -58,7 +63,11 @@ func getServiceDescriptorWithIANA() *ServicePortDescriptor {
 }
 
 // for an IPv4 flow but not TCP or UDP, return false forever
-func (s *ServicePortDescriptor) judgeServiceDirection(portSrc, portDst uint16) bool {
+func (s *ServicePortDescriptor) judgeServiceDirection(taggedFlow *TaggedFlow, reversed bool) bool {
+	if taggedFlow.Proto == layers.IPProtocolTCP && reversed {
+		return false
+	}
+	portSrc, portDst := taggedFlow.PortSrc, taggedFlow.PortDst
 	srcActive, dstActive := false, false
 	if portSrc < uint16(len(s.PortActivityList)) {
 		srcActive = s.PortActivityList[portSrc]

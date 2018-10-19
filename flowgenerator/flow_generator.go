@@ -246,16 +246,11 @@ func (f *FlowExtra) reverseFlow() {
 }
 
 func (f *FlowGenerator) tryReverseFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) bool {
-	taggedFlow := flowExtra.taggedFlow
-	if flagContain(taggedFlow.FlowMetricsPeerSrc.TCPFlags|taggedFlow.FlowMetricsPeerDst.TCPFlags, TCP_SYN) || meta.TcpData == nil {
+	if flowExtra.reversed || meta.TcpData == nil {
 		return false
 	}
 	// if meta.Invalid is false, TcpData will not be nil
-	if flagEqual(meta.TcpData.Flags&TCP_FLAG_MASK, TCP_SYN) && reply {
-		flowExtra.reverseFlow()
-		flowExtra.reversed = !flowExtra.reversed
-		return true
-	} else if flagEqual(meta.TcpData.Flags&TCP_FLAG_MASK, TCP_SYN|TCP_ACK) && !reply {
+	if flagEqual(meta.TcpData.Flags&TCP_FLAG_MASK, TCP_SYN|TCP_ACK) && !reply {
 		flowExtra.reverseFlow()
 		flowExtra.reversed = !flowExtra.reversed
 		return true
@@ -372,12 +367,12 @@ func (f *FlowExtra) calcCloseType(force bool) {
 func (f *FlowGenerator) processPackets(processBuffer []interface{}) {
 	for _, e := range processBuffer {
 		meta := e.(*MetaPacket)
-		if meta.EthType != layers.EthernetTypeIPv4 {
-			f.processNonIpPacket(meta)
-		} else if meta.Protocol == layers.IPProtocolTCP {
+		if meta.Protocol == layers.IPProtocolTCP {
 			f.processTcpPacket(meta)
 		} else if meta.Protocol == layers.IPProtocolUDP {
 			f.processUdpPacket(meta)
+		} else if meta.EthType != layers.EthernetTypeIPv4 {
+			f.processNonIpPacket(meta)
 		} else {
 			f.processOtherIpPacket(meta)
 		}
@@ -394,10 +389,6 @@ func (f *FlowGenerator) handlePackets() {
 	gotSize := 0
 	hashKey := HashKey(f.index)
 loop:
-	if !f.handleRunning {
-		log.Info("flow generator packet handler exit")
-		return
-	}
 	packetHandler.Add(1)
 	go f.processPackets(processBuffer[:gotSize])
 	gotSize = metaPacketInQueue.Gets(hashKey, recvBuffer)
@@ -462,7 +453,7 @@ loop:
 				taggedFlow := flowExtra.taggedFlow
 				atomic.AddInt32(&f.stats.CurrNumFlows, -1)
 				flowExtra.setCurFlowInfo(now, forceReportInterval)
-				if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
+				if f.servicePortDescriptor.judgeServiceDirection(taggedFlow, flowExtra.reversed) {
 					flowExtra.reverseFlow()
 					flowExtra.reversed = !flowExtra.reversed
 				}
@@ -482,7 +473,7 @@ loop:
 			} else if flowExtra.taggedFlow.StartTime+forceReportInterval < now {
 				taggedFlow := flowExtra.taggedFlow
 				flowExtra.setCurFlowInfo(now, forceReportInterval)
-				if f.servicePortDescriptor.judgeServiceDirection(taggedFlow.PortSrc, taggedFlow.PortDst) {
+				if f.servicePortDescriptor.judgeServiceDirection(taggedFlow, flowExtra.reversed) {
 					flowExtra.reverseFlow()
 					flowExtra.reversed = !flowExtra.reversed
 				}

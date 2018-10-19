@@ -367,10 +367,10 @@ func TestFlowReverse(t *testing.T) {
 
 	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
 
-	if taggedFlow.FlowMetricsPeerDst.TCPFlags != 0 && taggedFlow.FlowMetricsPeerSrc.TCPFlags != TCP_SYN|TCP_ACK {
-		// the flow is revesed again because of service ports list
-		t.Errorf("taggedFlow.TCPFlags0 is %d, expect %d", taggedFlow.FlowMetricsPeerDst.TCPFlags, 0)
-		t.Errorf("taggedFlow.TCPFlags1 is %d, expect %d", taggedFlow.FlowMetricsPeerSrc.TCPFlags, TCP_SYN|TCP_ACK)
+	if taggedFlow.FlowMetricsPeerSrc.TCPFlags != 0 && taggedFlow.FlowMetricsPeerDst.TCPFlags != TCP_SYN|TCP_ACK {
+		// the flow is not revesed again with service ports list
+		t.Errorf("taggedFlow.TCPFlags0 is %d, expect %d", taggedFlow.FlowMetricsPeerSrc.TCPFlags, 0)
+		t.Errorf("taggedFlow.TCPFlags1 is %d, expect %d", taggedFlow.FlowMetricsPeerDst.TCPFlags, TCP_SYN|TCP_ACK)
 		t.Errorf("\n%s", taggedFlow)
 	}
 }
