@@ -75,6 +75,8 @@ func (m *PerfMeter) ToKVString() string {
 	buf.WriteString(strconv.FormatInt(int64(max.MaxRTTSyn/time.Microsecond), 10))
 	buf.WriteString("i,max_rtt_avg=")
 	buf.WriteString(strconv.FormatInt(int64(max.MaxRTTAvg/time.Microsecond), 10))
+	buf.WriteString("i,max_art_avg=")
+	buf.WriteString(strconv.FormatInt(int64(max.MaxARTAvg/time.Microsecond), 10))
 
 	// min
 	min := m.PerfMeterMin
@@ -82,6 +84,8 @@ func (m *PerfMeter) ToKVString() string {
 	buf.WriteString(strconv.FormatInt(int64(min.MinRTTSyn/time.Microsecond), 10))
 	buf.WriteString("i,min_rtt_avg=")
 	buf.WriteString(strconv.FormatInt(int64(min.MinRTTAvg/time.Microsecond), 10))
+	buf.WriteString("i,min_art_avg=")
+	buf.WriteString(strconv.FormatInt(int64(min.MinARTAvg/time.Microsecond), 10))
 	buf.WriteRune('i')
 
 	return buf.String()
