@@ -84,11 +84,11 @@ type PolicyLabeler struct {
 
 func (a *Acl) String() string {
 	if len(a.DstPorts) == 2 {
-		return fmt.Sprintf("Id:%v Type:%v TapId:%v SrcGroups:%v DstGroups:%v DstPorts:%v-%v Proto:%v Vlan:%v Action:%v",
+		return fmt.Sprintf("Id:%v Type:%v TapId:%v SrcGroups:%v DstGroups:%v DstPorts:[%v-%v] Proto:%v Vlan:%v Action:%v",
 			a.Id, a.Type, a.TapId, a.SrcGroups, a.DstGroups, a.DstPorts[0], a.DstPorts[1], a.Proto, a.Vlan, a.Action)
 	} else {
 		return fmt.Sprintf("Id:%v Type:%v TapId:%v SrcGroups:%v DstGroups:%v DstPorts:%v Proto:%v Vlan:%v Action:%v",
-			a.Id, a.Type, a.TapId, a.SrcGroups, a.DstGroups, a.DstPorts[0], a.Proto, a.Vlan, a.Action)
+			a.Id, a.Type, a.TapId, a.SrcGroups, a.DstGroups, a.DstPorts, a.Proto, a.Vlan, a.Action)
 	}
 }
 
