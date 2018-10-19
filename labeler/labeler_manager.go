@@ -565,7 +565,7 @@ func showAcl() {
 	}
 
 	for index, acl := range policy.SortAclsById(acls) {
-		fmt.Printf("  %v, \t%s\n", index+1, acl)
+		fmt.Printf("  %4d, \t%s\n", index+1, acl)
 	}
 }
 
