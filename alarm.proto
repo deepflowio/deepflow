@@ -3,6 +3,13 @@ option go_package = "alarm";
 
 package Alarm;
 
+enum TapType {
+    OVS = 0;
+    ISP = 1;
+    SPINE = 2;
+    TOR = 3;
+}
+
 enum DeviceType {
     VM = 1;
     THIRD_PARTY = 3;
@@ -45,4 +52,6 @@ message AlarmInfo {
     optional uint64 max_tx = 24;
     optional uint32 rtt_avg = 25;
     optional uint64 flow_count = 26;
+
+    optional TapType tap_type = 27;
 }
