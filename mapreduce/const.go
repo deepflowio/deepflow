@@ -5,6 +5,6 @@ import (
 )
 
 const (
-	QUEUE_BATCH_SIZE = 4096
+	QUEUE_BATCH_SIZE = 1024
 	FLUSH_INTERVAL   = time.Minute
 )

@@ -58,7 +58,7 @@ flow-generator:
 #geo-file-location: /opt/droplet/ip_info_mini.json
 map-reduce:
    # mapreduce buffer capacity
-   docs-in-buffer: 65536
+   docs-in-buffer: 131072
    # mapreduce window size
    window-size: 30
 
