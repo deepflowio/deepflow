@@ -42,12 +42,11 @@ var pool = sync.Pool{
 }
 
 func AcquireByteBuffer() *ByteBuffer {
-	ReleaseByteBuffer(&ByteBuffer{quota: 1 << 16})
 	return pool.Get().(*ByteBuffer)
 }
 
 func CloneByteBuffer(bytes *ByteBuffer) *ByteBuffer {
-	clone := pool.Get().(*ByteBuffer)
+	clone := AcquireByteBuffer()
 	clone.Use(len(bytes.Bytes()))
 	copy(clone.Bytes(), bytes.Bytes())
 	return clone
