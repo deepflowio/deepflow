@@ -232,7 +232,6 @@ var metaPacketPool = sync.Pool{
 }
 
 func AcquireMetaPacket() *MetaPacket {
-	ReleaseMetaPacket(&MetaPacket{})
 	return metaPacketPool.Get().(*MetaPacket)
 }
 
