@@ -15,7 +15,6 @@ var taggedFlowPool = sync.Pool{
 }
 
 func AcquireTaggedFlow() *TaggedFlow {
-	ReleaseTaggedFlow(&TaggedFlow{})
 	return taggedFlowPool.Get().(*TaggedFlow)
 }
 

@@ -46,7 +46,6 @@ var poolDocument sync.Pool = sync.Pool{
 }
 
 func AcquireDocument() *Document {
-	ReleaseDocument(&Document{})
 	return poolDocument.Get().(*Document)
 }
 

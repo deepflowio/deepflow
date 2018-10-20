@@ -195,7 +195,6 @@ var tcpPerfStatsPool = sync.Pool{
 }
 
 func AcquireTcpPerfStats() *TcpPerfStats {
-	ReleaseTcpPerfStats(&TcpPerfStats{})
 	return tcpPerfStatsPool.Get().(*TcpPerfStats)
 }
 

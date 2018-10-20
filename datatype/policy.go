@@ -255,7 +255,6 @@ var policyDataPool = sync.Pool{
 }
 
 func AcquirePolicyData() *PolicyData {
-	ReleasePolicyData(NewPolicyData())
 	return policyDataPool.Get().(*PolicyData)
 }
 
