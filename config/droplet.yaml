@@ -24,13 +24,13 @@ queue:
   # packet and flow queue size
   queue-size: 65536
   # labeler read queue count
-  labeler-queue-count: 8
+  labeler-queue-count: 4
   # flow generator read queue count
-  flow-generator-queue-count: 2
+  flow-generator-queue-count: 4
   # metering app read queue count
-  metering-app-queue-count: 8
+  metering-app-queue-count: 4
   # flow app read queue count
-  flow-app-queue-count: 2
+  flow-app-queue-count: 4
 # internal labeler conf
 labeler:
   # whether to use first-path processing only
