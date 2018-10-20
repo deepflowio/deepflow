@@ -178,6 +178,8 @@ func (l *LabelerManager) run(index int) {
 			meteringItemBatch = append(meteringItemBatch, metaPacket)
 			if (action.ActionFlags & flowAppActions) != 0 {
 				flowKeys = append(flowKeys, queue.HashKey(metaPacket.Hash))
+				// 在Acquire之前先Release一个对象给Pool，以免Acquire的时候本协程对应的池没有而产生加锁Acquire的代价
+				datatype.ReleaseMetaPacket(&datatype.MetaPacket{})
 				flowItemBatch = append(flowItemBatch, datatype.CloneMetaPacket(metaPacket))
 			}
 
