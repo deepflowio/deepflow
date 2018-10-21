@@ -53,7 +53,7 @@ func (q *OverwriteQueue) Init(module string, size int, options ...Option) {
 	}
 
 	var flushIndicator time.Duration
-	var statOptions []stats.StatsOption
+	statOptions := []stats.StatsOption{stats.OptionStatTags{"module": module}}
 	for _, option := range options {
 		switch option.(type) {
 		case OptionRelease:
@@ -77,7 +77,7 @@ func (q *OverwriteQueue) Init(module string, size int, options ...Option) {
 	q.waiting = make([]Transaction, 0, 10)
 	q.size = uint(size)
 	q.counter = &Counter{}
-	stats.RegisterCountable(module, q, statOptions...)
+	stats.RegisterCountable("queue", q, statOptions...)
 	runtime.SetFinalizer(q, func(q *OverwriteQueue) { q.Close() })
 
 	if flushIndicator > 0 {
@@ -92,7 +92,6 @@ func (q *OverwriteQueue) Init(module string, size int, options ...Option) {
 func (q *OverwriteQueue) GetCounter() interface{} {
 	var counter *Counter
 	counter, q.counter = q.counter, &Counter{}
-	counter.Pending = uint64(q.pending)
 	return counter
 }
 
@@ -140,6 +139,10 @@ func (q *OverwriteQueue) Put(items ...interface{}) error {
 	}
 
 	q.pending = UintMin(q.pending+itemSize, q.size)
+	if q.counter.Pending < uint64(q.pending) {
+		q.counter.Pending = uint64(q.pending)
+	}
+
 	q.writeCursor = (q.writeCursor + itemSize) & (q.size - 1)
 	for len(q.waiting) > 0 {
 		wait := &q.waiting[len(q.waiting)-1]
