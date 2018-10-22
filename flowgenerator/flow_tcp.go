@@ -9,7 +9,7 @@ import (
 func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 	flowKey := f.genFlowKey(meta)
 	hash := f.getQuinTupleHash(flowKey)
-	flowCache := f.hashMap[hash%HASH_MAP_SIZE]
+	flowCache := f.hashMap[hash%hashMapSize]
 	flowCache.Lock()
 	if flowExtra, reply, element := flowCache.keyMatch(meta, flowKey); flowExtra != nil {
 		ok := false
@@ -23,7 +23,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 				flowExtra.reverseFlow()
 				flowExtra.reversed = !flowExtra.reversed
 			}
-			flowExtra.calcCloseType(false)
+			calcCloseType(taggedFlow, flowExtra.flowState)
 			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 			ReleaseFlowExtra(flowExtra)
 			f.flowOutQueue.Put(taggedFlow)
@@ -69,7 +69,7 @@ func (f *FlowGenerator) initTcpFlow(meta *MetaPacket, key *FlowKey) (*FlowExtra,
 		taggedFlow.FlowMetricsPeerDst.PacketCount = 1
 		taggedFlow.FlowMetricsPeerDst.TotalByteCount = uint64(meta.PacketLen)
 		taggedFlow.FlowMetricsPeerDst.ByteCount = uint64(meta.PacketLen)
-		flowExtra.updatePlatformData(meta, true)
+		updatePlatformData(taggedFlow, meta.EndpointData, true)
 		flowExtra.reversed = true
 		return flowExtra, f.updateFlowStateMachine(flowExtra, flags, true, meta.Invalid), true
 	} else {
@@ -79,7 +79,7 @@ func (f *FlowGenerator) initTcpFlow(meta *MetaPacket, key *FlowKey) (*FlowExtra,
 		taggedFlow.FlowMetricsPeerSrc.PacketCount = 1
 		taggedFlow.FlowMetricsPeerSrc.TotalByteCount = uint64(meta.PacketLen)
 		taggedFlow.FlowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
-		flowExtra.updatePlatformData(meta, false)
+		updatePlatformData(taggedFlow, meta.EndpointData, false)
 		return flowExtra, f.updateFlowStateMachine(flowExtra, flags, false, meta.Invalid), false
 	}
 }

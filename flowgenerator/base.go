@@ -32,9 +32,9 @@ const (
 )
 
 const FLOW_CACHE_CAP = 1024
-const HASH_MAP_SIZE uint64 = 1024 * 512
-const FLOW_OUT_BUFFER_CAP = 1024
-const TIMOUT_PARALLEL_NUM uint64 = 4
+const HASH_MAP_SIZE uint64 = 1024 * 256
+const FLOW_OUT_BUFFER_CAP = 1024 * 2
+const TIMEOUT_CLEANER_COUNT uint64 = 4
 
 const IN_PORT_FLOW_ID_MASK uint64 = 0xFF000000
 const TIMER_FLOW_ID_MASK uint64 = 0x00FFFFFF
@@ -42,6 +42,9 @@ const TOTAL_FLOWS_ID_MASK uint64 = 0x0FFFFFFF
 const FLOW_LIMIT_NUM uint64 = 1024 * 1024
 const FORCE_REPORT_INTERVAL = 60 * time.Second
 const REPORT_TOLERANCE = 4 * time.Second
+
+var timeoutCleanerCount uint64
+var hashMapSize uint64
 
 type TimeoutConfig struct {
 	Opening         time.Duration
@@ -108,6 +111,8 @@ type FlowGeneratorConfig struct {
 	ForceReportInterval time.Duration
 	BufferSize          int
 	FlowLimitNum        int32
+	TimeoutCleanerCount uint64
+	HashMapSize         uint64
 }
 
 func timeMax(a time.Duration, b time.Duration) time.Duration {
@@ -127,7 +132,7 @@ func timeMin(a time.Duration, b time.Duration) time.Duration {
 func (f *FlowGenerator) GetCounter() interface{} {
 	nonEmptyFlowCacheNum := 0
 	maxFlowCacheLen := 0
-	for i := 0; i < int(TIMOUT_PARALLEL_NUM); i++ {
+	for i := 0; i < int(timeoutCleanerCount); i++ {
 		nonEmptyFlowCacheNum += f.stats.cleanRoutineFlowCacheNums[i]
 		if maxFlowCacheLen < f.stats.cleanRoutineMaxFlowCacheLens[i] {
 			maxFlowCacheLen = f.stats.cleanRoutineMaxFlowCacheLens[i]

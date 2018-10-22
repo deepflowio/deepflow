@@ -33,8 +33,8 @@ func (f *FlowCache) SafeFlowListPushFront(v *FlowExtra) *ElementFlowExtra {
 }
 
 type FlowCacheHashMap struct {
-	hashMap            []*FlowCache
-	hashBasis          uint32
-	mapSize            uint64
-	timeoutParallelNum uint64
+	hashMap             []*FlowCache
+	hashBasis           uint32
+	mapSize             uint64
+	timeoutCleanerCount uint64
 }

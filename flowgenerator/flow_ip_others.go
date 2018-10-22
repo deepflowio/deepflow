@@ -9,7 +9,7 @@ import (
 func (f *FlowGenerator) processOtherIpPacket(meta *MetaPacket) {
 	flowKey := f.genFlowKey(meta)
 	hash := f.getQuinTupleHash(flowKey)
-	flowCache := f.hashMap[hash%HASH_MAP_SIZE]
+	flowCache := f.hashMap[hash%hashMapSize]
 	flowCache.Lock()
 	if flowExtra, reply, _ := flowCache.keyMatch(meta, flowKey); flowExtra != nil {
 		f.updateOtherIpFlow(flowExtra, meta, reply)
@@ -37,6 +37,7 @@ func (f *FlowGenerator) initOtherIpFlow(meta *MetaPacket, key *FlowKey) *FlowExt
 	taggedFlow.FlowMetricsPeerSrc.PacketCount = 1
 	taggedFlow.FlowMetricsPeerSrc.TotalByteCount = uint64(meta.PacketLen)
 	taggedFlow.FlowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
+	updatePlatformData(taggedFlow, meta.EndpointData, false)
 	flowExtra.flowState = FLOW_STATE_ESTABLISHED
 	flowExtra.timeout = f.TimeoutConfig.Opening
 	return flowExtra

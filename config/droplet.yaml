@@ -83,6 +83,10 @@ flow-generator:
   # or tcp flow with exception,
   # or flow with single direction, in seconds
   others-timeout: 5
+  # flow cleaner count for every generator
+  timeout-cleaner-count: 4
+  # hash map size for every generator
+  hash-map-size: 262166
 #geo-file-location: /opt/droplet/ip_info_mini.json
 map-reduce:
   # mapreduce buffer capacity

@@ -69,6 +69,8 @@ type FlowGeneratorConfig struct {
 	EstablishedTimeout  time.Duration `yaml:"established-timeout"`
 	ClosingRstTimeout   time.Duration `yaml:"closing-rst-timeout"`
 	OthersTimeout       time.Duration `yaml:"others-timeout"`
+	TimeoutCleanerCount uint64        `yaml:"timeout-cleaner-count"`
+	HashMapSize         uint64        `yaml:"hash-map-size"`
 }
 
 type MapReduce struct {
@@ -180,6 +182,12 @@ func (c *Config) Validate() error {
 		c.FlowGenerator.OthersTimeout = flowgenerator.TIMEOUT_EXPCEPTION
 	} else {
 		c.FlowGenerator.OthersTimeout *= time.Second
+	}
+	if c.FlowGenerator.TimeoutCleanerCount == 0 {
+		c.FlowGenerator.TimeoutCleanerCount = flowgenerator.TIMEOUT_CLEANER_COUNT
+	}
+	if c.FlowGenerator.HashMapSize == 0 {
+		c.FlowGenerator.HashMapSize = flowgenerator.HASH_MAP_SIZE
 	}
 
 	if c.MapReduce.DocsInBuffer == 0 {

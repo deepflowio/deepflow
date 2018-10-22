@@ -28,7 +28,7 @@ func (f *FlowCache) keyMatchForNonIp(meta *MetaPacket, key *FlowKey) (*FlowExtra
 func (f *FlowGenerator) processNonIpPacket(meta *MetaPacket) {
 	flowKey := f.genFlowKey(meta)
 	hash := f.getNonIpQuinTupleHash(flowKey)
-	flowCache := f.hashMap[hash%HASH_MAP_SIZE]
+	flowCache := f.hashMap[hash%hashMapSize]
 	flowCache.Lock()
 	if flowExtra, reply := flowCache.keyMatchForNonIp(meta, flowKey); flowExtra != nil {
 		f.updateNonIpFlow(flowExtra, meta, reply)
@@ -56,6 +56,7 @@ func (f *FlowGenerator) initNonIpFlow(meta *MetaPacket, key *FlowKey) *FlowExtra
 	taggedFlow.FlowMetricsPeerSrc.PacketCount = 1
 	taggedFlow.FlowMetricsPeerSrc.TotalByteCount = uint64(meta.PacketLen)
 	taggedFlow.FlowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
+	updatePlatformData(taggedFlow, meta.EndpointData, false)
 	flowExtra.flowState = FLOW_STATE_ESTABLISHED
 	flowExtra.timeout = f.TimeoutConfig.Opening
 	return flowExtra
