@@ -174,6 +174,8 @@ func Start(configPath string) {
 		ForceReportInterval: cfg.FlowGenerator.ForceReportInterval,
 		BufferSize:          cfg.Queue.FlowGeneratorQueueSize / cfg.Queue.FlowGeneratorQueueCount,
 		FlowLimitNum:        cfg.FlowGenerator.FlowCountLimit / int32(cfg.Queue.FlowGeneratorQueueCount),
+		TimeoutCleanerCount: cfg.FlowGenerator.TimeoutCleanerCount,
+		HashMapSize:         cfg.FlowGenerator.HashMapSize,
 	}
 	for i := 0; i < cfg.Queue.FlowGeneratorQueueCount; i++ {
 		flowGenerator := flowgenerator.New(flowGeneratorQueues, flowDuplicatorQueue, flowGeneratorConfig, i)

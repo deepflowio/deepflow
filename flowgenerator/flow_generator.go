@@ -29,17 +29,14 @@ func (f *FlowGenerator) genFlowKey(meta *MetaPacket) *FlowKey {
 	if tunnel := meta.Tunnel; tunnel != nil {
 		flowKey.TunnelInfo = *tunnel
 	} else {
-		flowKey.TunnelInfo.Id = 0
-		flowKey.TunnelInfo.Type = 0
-		flowKey.TunnelInfo.Src = 0
-		flowKey.TunnelInfo.Dst = 0
+		flowKey.TunnelInfo = TunnelInfo{}
 	}
 	return flowKey
 }
 
 // hash of the key L3, symmetric
 func getKeyL3Hash(flowKey *FlowKey, basis uint32) uint64 {
-	return uint64(hashFinish(hashAdd(basis, flowKey.IPSrc^flowKey.IPDst)))
+	return uint64(hashAdd(basis, flowKey.IPSrc^flowKey.IPDst))
 }
 
 // hash of the key L4, symmetric
@@ -47,9 +44,9 @@ func getKeyL4Hash(flowKey *FlowKey, basis uint32) uint64 {
 	portSrc := uint32(flowKey.PortSrc)
 	portDst := uint32(flowKey.PortDst)
 	if portSrc >= portDst {
-		return uint64(hashFinish(hashAdd(basis, (portSrc<<16)|portDst)))
+		return uint64(hashAdd(basis, (portSrc<<16)|portDst))
 	}
-	return uint64(hashFinish(hashAdd(basis, (portDst<<16)|portSrc)))
+	return uint64(hashAdd(basis, (portDst<<16)|portSrc))
 }
 
 func (f *FlowGenerator) getQuinTupleHash(flowKey *FlowKey) uint64 {
@@ -60,9 +57,7 @@ func isFromTor(inPort uint32) bool {
 	return inPort&PACKET_SOURCE_TOR == PACKET_SOURCE_TOR
 }
 
-func (f *FlowExtra) MacEquals(meta *MetaPacket) bool {
-	taggedFlow := f.taggedFlow
-	flowMacSrc, flowMacDst := taggedFlow.MACSrc, taggedFlow.MACDst
+func MacEquals(meta *MetaPacket, flowMacSrc, flowMacDst MacInt) bool {
 	if flowMacSrc == meta.MacSrc && flowMacDst == meta.MacDst {
 		return true
 	}
@@ -72,15 +67,14 @@ func (f *FlowExtra) MacEquals(meta *MetaPacket) bool {
 	return false
 }
 
-func (f *FlowExtra) TunnelMatch(key *FlowKey) bool {
-	taggedFlow := f.taggedFlow
-	if taggedFlow.TunnelInfo.Id == 0 && key.TunnelInfo.Id == 0 {
+func (f *FlowExtra) TunnelMatch(keyTunnelInfo, flowTunnelInfo *TunnelInfo) bool {
+	if flowTunnelInfo.Id == 0 && keyTunnelInfo.Id == 0 {
 		return true
 	}
-	if taggedFlow.TunnelInfo.Type != key.TunnelInfo.Type || taggedFlow.TunnelInfo.Id != key.TunnelInfo.Id {
+	if flowTunnelInfo.Type != keyTunnelInfo.Type || flowTunnelInfo.Id != keyTunnelInfo.Id {
 		return false
 	}
-	return taggedFlow.TunnelInfo.Src^key.TunnelInfo.Src^taggedFlow.TunnelInfo.Dst^key.TunnelInfo.Dst == 0
+	return flowTunnelInfo.Src^keyTunnelInfo.Src^flowTunnelInfo.Dst^keyTunnelInfo.Dst == 0
 }
 
 func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool, *ElementFlowExtra) {
@@ -90,15 +84,20 @@ func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool, 
 		if taggedFlow.Exporter != key.Exporter || key.InPort != taggedFlow.InPort {
 			continue
 		}
-		if isFromTor(key.InPort) && !flowExtra.MacEquals(meta) {
+		if isFromTor(key.InPort) && !MacEquals(meta, taggedFlow.MACSrc, taggedFlow.MACDst) {
 			continue
 		}
-		if taggedFlow.Proto != key.Proto || !flowExtra.TunnelMatch(key) {
+		if taggedFlow.Proto != key.Proto ||
+			!flowExtra.TunnelMatch(&key.TunnelInfo, &taggedFlow.TunnelInfo) {
 			continue
 		}
-		if taggedFlow.IPSrc == key.IPSrc && taggedFlow.IPDst == key.IPDst && taggedFlow.PortSrc == key.PortSrc && taggedFlow.PortDst == key.PortDst {
+		flowIPSrc, flowIPDst := taggedFlow.IPSrc, taggedFlow.IPDst
+		keyIPSrc, keyIPDst := key.IPSrc, key.IPDst
+		flowPortSrc, flowPortDst := taggedFlow.PortSrc, taggedFlow.PortDst
+		keyPortSrc, keyPortDst := key.PortSrc, key.PortDst
+		if flowIPSrc == keyIPSrc && flowIPDst == keyIPDst && flowPortSrc == keyPortSrc && flowPortDst == keyPortDst {
 			return flowExtra, false, e
-		} else if taggedFlow.IPSrc == key.IPDst && taggedFlow.IPDst == key.IPSrc && taggedFlow.PortSrc == key.PortDst && taggedFlow.PortDst == key.PortSrc {
+		} else if flowIPSrc == keyIPDst && flowIPDst == keyIPSrc && flowPortSrc == keyPortDst && flowPortDst == keyPortSrc {
 			return flowExtra, true, e
 		}
 	}
@@ -116,8 +115,8 @@ func (f *FlowGenerator) initFlowCache() bool {
 	return true
 }
 
-func (f *FlowGenerator) addFlow(flowCache *FlowCache, flowExtra *FlowExtra) *FlowExtra {
-	return flowCache.flowList.PushFront(flowExtra).Value
+func (f *FlowGenerator) addFlow(flowCache *FlowCache, flowExtra *FlowExtra) {
+	flowCache.flowList.PushFront(flowExtra)
 }
 
 func (f *FlowGenerator) genFlowId(timestamp uint64, inPort uint64) uint64 {
@@ -134,7 +133,6 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, key *FlowKey, now time.Durati
 	taggedFlow.CurStartTime = now
 	taggedFlow.VLAN = meta.Vlan
 	taggedFlow.EthType = meta.EthType
-	taggedFlow.CloseType = CloseTypeUnknown
 	taggedFlow.PolicyData = meta.PolicyData
 
 	flowExtra := AcquireFlowExtra()
@@ -148,9 +146,6 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, key *FlowKey, now time.Durati
 }
 
 func (f *FlowGenerator) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8, reply, invalid bool) bool {
-	var timeout time.Duration
-	var flowState FlowState
-	closed := false
 	taggedFlow := flowExtra.taggedFlow
 	if reply {
 		taggedFlow.FlowMetricsPeerDst.TCPFlags |= flags
@@ -162,6 +157,9 @@ func (f *FlowGenerator) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8
 		flowExtra.flowState = FLOW_STATE_EXCEPTION
 		return false
 	}
+	var timeout time.Duration
+	var flowState FlowState
+	closed := false
 	if stateValue, ok := f.stateMachineMaster[flowExtra.flowState][flags&TCP_FLAG_MASK]; ok {
 		timeout = stateValue.timeout
 		flowState = stateValue.flowState
@@ -178,21 +176,20 @@ func (f *FlowGenerator) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8
 			closed = stateValue.closed
 		}
 	}
-	flowExtra.timeout = timeout
 	flowExtra.flowState = flowState
 	if taggedFlow.FlowMetricsPeerSrc.TotalPacketCount == 0 || taggedFlow.FlowMetricsPeerDst.TotalPacketCount == 0 {
 		flowExtra.timeout = f.SingleDirection
+	} else {
+		flowExtra.timeout = timeout
 	}
 	return closed
 }
 
-func (f *FlowExtra) updatePlatformData(meta *MetaPacket, reply bool) {
-	endpointData := meta.EndpointData
-	var srcInfo, dstInfo *EndpointInfo
+func updatePlatformData(taggedFlow *TaggedFlow, endpointData *EndpointData, reply bool) {
 	if endpointData == nil {
 		return
 	}
-	taggedFlow := f.taggedFlow
+	var srcInfo, dstInfo *EndpointInfo
 	if reply {
 		srcInfo = endpointData.DstInfo
 		dstInfo = endpointData.SrcInfo
@@ -228,12 +225,12 @@ func (f *FlowExtra) updatePlatformData(meta *MetaPacket, reply bool) {
 	}
 }
 
-func (f *FlowExtra) reversePolicyData() {
-	if f.taggedFlow.PolicyData == nil {
+func reversePolicyData(policyData *PolicyData) {
+	if policyData == nil {
 		return
 	}
-	for i, aclAction := range f.taggedFlow.PolicyData.AclActions {
-		f.taggedFlow.PolicyData.AclActions[i] = aclAction.ReverseDirection()
+	for i, aclAction := range policyData.AclActions {
+		policyData.AclActions[i] = aclAction.ReverseDirection()
 	}
 }
 
@@ -245,7 +242,7 @@ func (f *FlowExtra) reverseFlow() {
 	taggedFlow.PortSrc, taggedFlow.PortDst = taggedFlow.PortDst, taggedFlow.PortSrc
 	taggedFlow.FlowMetricsPeerSrc, taggedFlow.FlowMetricsPeerDst = FlowMetricsPeerSrc(taggedFlow.FlowMetricsPeerDst), FlowMetricsPeerDst(taggedFlow.FlowMetricsPeerSrc)
 	taggedFlow.GroupIDs0, taggedFlow.GroupIDs1 = taggedFlow.GroupIDs1, taggedFlow.GroupIDs0
-	f.reversePolicyData()
+	reversePolicyData(taggedFlow.PolicyData)
 }
 
 func (f *FlowGenerator) tryReverseFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) bool {
@@ -275,9 +272,9 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 		taggedFlow.CurStartTime = packetTimestamp
 		taggedFlow.PolicyData = meta.PolicyData
 		if flowExtra.reversed {
-			flowExtra.reversePolicyData()
+			reversePolicyData(taggedFlow.PolicyData)
 		}
-		flowExtra.updatePlatformData(meta, reply)
+		updatePlatformData(taggedFlow, meta.EndpointData, reply)
 	}
 	if reply {
 		if taggedFlow.FlowMetricsPeerDst.TotalPacketCount == 0 {
@@ -328,42 +325,37 @@ func (f *FlowExtra) resetCurFlowInfo(now time.Duration) {
 	taggedFlow.FlowMetricsPeerDst.PacketCount = 0
 	taggedFlow.FlowMetricsPeerSrc.ByteCount = 0
 	taggedFlow.FlowMetricsPeerDst.ByteCount = 0
-	taggedFlow.TcpPerfStats = nil
 }
 
-func (f *FlowExtra) calcCloseType(force bool) {
-	if force {
-		f.taggedFlow.CloseType = CloseTypeForcedReport
-		return
-	}
-	switch f.flowState {
+func calcCloseType(taggedFlow *TaggedFlow, flowState FlowState) {
+	switch flowState {
 	case FLOW_STATE_EXCEPTION:
-		f.taggedFlow.CloseType = CloseTypeUnknown
+		taggedFlow.CloseType = CloseTypeUnknown
 	case FLOW_STATE_OPENING_1:
-		f.taggedFlow.CloseType = CloseTypeServerHalfOpen
+		taggedFlow.CloseType = CloseTypeServerHalfOpen
 	case FLOW_STATE_OPENING_2:
-		f.taggedFlow.CloseType = CloseTypeClientHalfOpen
+		taggedFlow.CloseType = CloseTypeClientHalfOpen
 	case FLOW_STATE_ESTABLISHED:
-		f.taggedFlow.CloseType = CloseTypeTimeout
+		taggedFlow.CloseType = CloseTypeTimeout
 	case FLOW_STATE_CLOSING_TX1:
-		f.taggedFlow.CloseType = CloseTypeServerHalfClose
+		taggedFlow.CloseType = CloseTypeServerHalfClose
 	case FLOW_STATE_CLOSING_RX1:
-		f.taggedFlow.CloseType = CloseTypeClientHalfClose
+		taggedFlow.CloseType = CloseTypeClientHalfClose
 	case FLOW_STATE_CLOSING_TX2:
 		fallthrough
 	case FLOW_STATE_CLOSING_RX2:
 		fallthrough
 	case FLOW_STATE_CLOSED:
-		f.taggedFlow.CloseType = CloseTypeTCPFin
+		taggedFlow.CloseType = CloseTypeTCPFin
 	case FLOW_STATE_RESET:
-		if flagContain(f.taggedFlow.FlowMetricsPeerDst.TCPFlags, TCP_RST) {
-			f.taggedFlow.CloseType = CloseTypeTCPServerRst
+		if flagContain(taggedFlow.FlowMetricsPeerDst.TCPFlags, TCP_RST) {
+			taggedFlow.CloseType = CloseTypeTCPServerRst
 		} else {
-			f.taggedFlow.CloseType = CloseTypeTCPClientRst
+			taggedFlow.CloseType = CloseTypeTCPClientRst
 		}
 	default:
-		log.Warningf("unexcepted 'unknown' close type, flow id is %d", f.taggedFlow.FlowID)
-		f.taggedFlow.CloseType = CloseTypeUnknown
+		log.Warningf("unexcepted 'unknown' close type, flow id is %d", taggedFlow.FlowID)
+		taggedFlow.CloseType = CloseTypeUnknown
 	}
 }
 
@@ -411,11 +403,12 @@ func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uin
 		flowCache.Lock()
 		for e := flowCache.flowList.Front(); e != nil; {
 			flowExtra := e.Value
+			taggedFlow := flowExtra.taggedFlow
 			atomic.AddInt32(&f.stats.CurrNumFlows, -1)
-			flowExtra.taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, false, &f.perfCounter)
+			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, false, &f.perfCounter)
 			flowExtra.setCurFlowInfo(now, forceReportInterval)
-			flowExtra.calcCloseType(false)
-			flowOutQueue.Put(flowExtra.taggedFlow)
+			calcCloseType(taggedFlow, flowExtra.flowState)
+			flowOutQueue.Put(taggedFlow)
 			e = e.Next()
 		}
 		flowCache.flowList.Init()
@@ -460,7 +453,7 @@ loop:
 					flowExtra.reverseFlow()
 					flowExtra.reversed = !flowExtra.reversed
 				}
-				flowExtra.calcCloseType(false)
+				calcCloseType(taggedFlow, flowExtra.flowState)
 				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 				ReleaseFlowExtra(flowExtra)
 				flowOutBuffer[flowOutNum] = taggedFlow
@@ -480,7 +473,7 @@ loop:
 					flowExtra.reverseFlow()
 					flowExtra.reversed = !flowExtra.reversed
 				}
-				flowExtra.calcCloseType(true)
+				taggedFlow.CloseType = CloseTypeForcedReport
 				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 				flowOutBuffer[flowOutNum] = CloneTaggedFlow(taggedFlow)
 				flowOutNum++
@@ -510,12 +503,12 @@ loop:
 func (f *FlowGenerator) timeoutReport() {
 	var flowCacheNum uint64
 	f.cleanRunning = true
-	if f.mapSize%f.timeoutParallelNum != 0 {
-		flowCacheNum = f.mapSize/f.timeoutParallelNum + 1
+	if f.mapSize%f.timeoutCleanerCount != 0 {
+		flowCacheNum = f.mapSize/f.timeoutCleanerCount + 1
 	} else {
-		flowCacheNum = f.mapSize / f.timeoutParallelNum
+		flowCacheNum = f.mapSize / f.timeoutCleanerCount
 	}
-	for i := uint64(0); i < f.timeoutParallelNum; i++ {
+	for i := uint64(0); i < f.timeoutCleanerCount; i++ {
 		start := i * flowCacheNum
 		end := start + flowCacheNum
 		if end <= f.mapSize {
@@ -559,12 +552,14 @@ func (f *FlowGenerator) Stop() {
 
 // create a new flow generator
 func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, cfg FlowGeneratorConfig, index int) *FlowGenerator {
+	timeoutCleanerCount = cfg.TimeoutCleanerCount
+	hashMapSize = cfg.HashMapSize
 	flowGenerator := &FlowGenerator{
 		TimeoutConfig:           defaultTimeoutConfig,
-		FlowCacheHashMap:        FlowCacheHashMap{make([]*FlowCache, HASH_MAP_SIZE), rand.Uint32(), HASH_MAP_SIZE, TIMOUT_PARALLEL_NUM},
+		FlowCacheHashMap:        FlowCacheHashMap{make([]*FlowCache, hashMapSize), rand.Uint32(), hashMapSize, timeoutCleanerCount},
 		metaPacketHeaderInQueue: metaPacketHeaderInQueue,
 		flowOutQueue:            flowOutQueue,
-		stats:                   FlowGeneratorStats{cleanRoutineFlowCacheNums: make([]int, TIMOUT_PARALLEL_NUM), cleanRoutineMaxFlowCacheLens: make([]int, TIMOUT_PARALLEL_NUM)},
+		stats:                   FlowGeneratorStats{cleanRoutineFlowCacheNums: make([]int, timeoutCleanerCount), cleanRoutineMaxFlowCacheLens: make([]int, timeoutCleanerCount)},
 		stateMachineMaster:      make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
 		stateMachineSlave:       make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
 		innerFlowKey:            &FlowKey{},
@@ -578,9 +573,7 @@ func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, cfg
 		index:                   index,
 		perfCounter:             NewFlowPerfCounter(),
 	}
-	if !flowGenerator.initFlowCache() {
-		return nil
-	}
+	flowGenerator.initFlowCache()
 	flowGenerator.initStateMachineMaster()
 	flowGenerator.initStateMachineSlave()
 	tags := OptionStatTags{"index": strconv.Itoa(index)}
