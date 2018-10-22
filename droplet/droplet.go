@@ -192,7 +192,7 @@ func Start(configPath string) {
 	// L4 - flow duplicator & flow sender
 	flowAppQueueCount := int(cfg.Queue.FlowAppQueueCount)
 	flowAppQueue := manager.NewQueues(
-		"4-tagged-flow-to-flow-app", (queueSize<<1)/flowAppQueueCount, // flowApp压力大，queueSize设置为上游的2倍
+		"4-tagged-flow-to-flow-app", queueSize,
 		flowAppQueueCount, flowGeneratorQueueCount, libqueue.OptionFlushIndicator(time.Minute), releaseTaggedFlow)
 	flowSenderQueue := manager.NewQueue(
 		"4-tagged-flow-to-stream", queueSize<<1, releaseTaggedFlow) // ZMQ发送缓慢，queueSize设置为上游的2倍
