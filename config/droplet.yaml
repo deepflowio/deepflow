@@ -21,16 +21,44 @@ zero-hosts: []
 zero-port: 20202
 # internal queues conf
 queue:
-  # packet and flow queue size
+  # queue size, default 65536
   queue-size: 65536
-  # labeler read queue count
-  labeler-queue-count: 4
-  # flow generator read queue count
-  flow-generator-queue-count: 4
-  # metering app read queue count
-  metering-app-queue-count: 4
-  # flow app read queue count
-  flow-app-queue-count: 4
+  # labeler read queue count, default 8
+  # name: 1-meta-packet-to-labeler
+  labeler-queue-count: 8
+  # labeler read queue size, default queue-size
+  labeler-queue-size: 65536
+  # flow generator read queue count, default 2
+  # name: 2-meta-packet-to-flow-generator
+  flow-generator-queue-count: 2
+  # flow generator read queue size, default queue-size
+  flow-generator-queue-size: 65536
+  # metering app read queue count, default 8
+  # name: 2-meta-packet-to-metering-app
+  metering-app-queue-count: 8
+  # metering app read queue size, default queue-size
+  metering-app-queue-size: 65536
+  # flow app read queue count, default 2
+  # 4-tagged-flow-to-flow-app
+  flow-app-queue-count: 2
+  # flow app read queue size, default queue-size
+  flow-app-queue-size: 65536
+  # flow duplicator read queue size, default flow-generator-queue-size >> 2
+  # name: 3-tagged-flow-to-flow-duplicator
+  flow-duplicator-queue-size: 0
+  # mapreduce buffer capacity, default queue-size << 1
+  docs-queue-size: 131072
+  # metering app output queue size, default docs-queue-size << 1
+  # name: 3-metering-doc-to-marshaller
+  metering-app-output-queue-size: 0
+  # flow app output queue size, default docs-queue-size << 1
+  # name: 5-flow-doc-to-marshaller
+  flow-app-output-queue-size: 0
+  # flow sender queue size, default queue-size << 1
+  # name: 4-tagged-flow-to-stream
+  flow-sender-queue-size: 0
+  # doc sender queue size, default map-reduce.docs-in-buffer << 1
+  doc_sender_queue_size: 0
 # internal labeler conf
 labeler:
   # whether to use first-path processing only
@@ -57,8 +85,7 @@ flow-generator:
   others-timeout: 5
 #geo-file-location: /opt/droplet/ip_info_mini.json
 map-reduce:
-   # mapreduce buffer capacity
-   docs-in-buffer: 131072
-   # mapreduce window size
-   window-size: 30
-
+  # mapreduce buffer capacity
+  docs-in-buffer: 131072
+  # mapreduce window size
+  window-size: 30
