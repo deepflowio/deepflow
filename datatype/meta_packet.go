@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	. "github.com/google/gopacket/layers"
@@ -51,6 +52,8 @@ type MetaPacket struct {
 	PortDst    uint16
 	PayloadLen uint16
 	TcpData    *MetaPacketTcpHeader
+
+	ExtraRefCount int32 // for PseudoClone
 }
 
 func (p *MetaPacket) GenerateHash() uint32 {
@@ -236,6 +239,10 @@ func AcquireMetaPacket() *MetaPacket {
 }
 
 func ReleaseMetaPacket(x *MetaPacket) {
+	if atomic.AddInt32(&x.ExtraRefCount, -1) >= 0 {
+		return
+	}
+
 	*x = MetaPacket{}
 	metaPacketPool.Put(x)
 }
@@ -244,4 +251,8 @@ func CloneMetaPacket(x *MetaPacket) *MetaPacket {
 	dup := AcquireMetaPacket()
 	x.CopyTo(dup)
 	return dup
+}
+
+func PseudoCloneMetaPacket(x *MetaPacket) {
+	atomic.AddInt32(&x.ExtraRefCount, 1)
 }

@@ -3,11 +3,14 @@ package datatype
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 )
 
 type TaggedFlow struct {
 	Flow
 	Tag
+
+	ExtraRefCount int32 // for PseudoClone
 }
 
 var taggedFlowPool = sync.Pool{
@@ -19,6 +22,10 @@ func AcquireTaggedFlow() *TaggedFlow {
 }
 
 func ReleaseTaggedFlow(taggedFlow *TaggedFlow) {
+	if atomic.AddInt32(&taggedFlow.ExtraRefCount, -1) >= 0 {
+		return
+	}
+
 	if taggedFlow.TcpPerfStats != nil {
 		ReleaseTcpPerfStats(taggedFlow.TcpPerfStats)
 		taggedFlow.TcpPerfStats = nil
@@ -36,13 +43,14 @@ func CloneTaggedFlow(taggedFlow *TaggedFlow) *TaggedFlow {
 	return newTaggedFlow
 }
 
-func CloneTaggedFlowHelper(items []interface{}) []interface{} {
-	newItems := make([]interface{}, len(items))
-	for i, e := range items {
-		taggedFlow := e.(*TaggedFlow)
-		newItems[i] = CloneTaggedFlow(taggedFlow)
+func PseudoCloneTaggedFlow(taggedFlow *TaggedFlow) {
+	atomic.AddInt32(&taggedFlow.ExtraRefCount, 1)
+}
+
+func PseudoCloneTaggedFlowHelper(items []interface{}) {
+	for _, e := range items {
+		PseudoCloneTaggedFlow(e.(*TaggedFlow))
 	}
-	return newItems
 }
 
 func (f *TaggedFlow) String() string {

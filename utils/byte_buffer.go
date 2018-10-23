@@ -2,12 +2,15 @@ package utils
 
 import (
 	"sync"
+	"sync/atomic"
 )
 
 type ByteBuffer struct {
 	buf    []byte
 	offset int
 	quota  int
+
+	ExtraRefCount int32 // for PseudoClone
 }
 
 // 返回下一个可用的[]byte，自动增长空间
@@ -29,6 +32,7 @@ func (b *ByteBuffer) Bytes() []byte {
 
 func (b *ByteBuffer) Reset() {
 	b.offset = 0
+	b.ExtraRefCount = 0
 }
 
 func (b *ByteBuffer) SetQuota(n int) {
@@ -52,7 +56,15 @@ func CloneByteBuffer(bytes *ByteBuffer) *ByteBuffer {
 	return clone
 }
 
+func PseudoCloneByteBuffer(bytes *ByteBuffer) {
+	atomic.AddInt32(&bytes.ExtraRefCount, 1)
+}
+
 func ReleaseByteBuffer(bytes *ByteBuffer) {
+	if atomic.AddInt32(&bytes.ExtraRefCount, -1) >= 0 {
+		return
+	}
+
 	bytes.Reset()
 	pool.Put(bytes)
 }
