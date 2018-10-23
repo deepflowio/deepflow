@@ -282,7 +282,12 @@ func (l *PolicyLabeler) GenerateIpNetmaskMapFromPlatformData(data []*PlatformDat
 				maxNetIp = (minNetIp | ^mask) & STANDARD_NETMASK
 				mask = STANDARD_NETMASK
 			}
+			count := 0
 			for netIp := minNetIp; netIp <= maxNetIp && netIp >= minNetIp; netIp += 0x10000 {
+				if count > 0xffff {
+					break
+				}
+				count++
 				if maskMap[netIp] < mask {
 					maskMap[netIp] = mask
 				}
@@ -323,7 +328,12 @@ func (l *PolicyLabeler) GenerateIpNetmaskMapFromIpGroupData(data []*IpGroupData)
 				maxNetIp = (minNetIp | ^mask) & STANDARD_NETMASK
 				mask = STANDARD_NETMASK
 			}
+			count := 0
 			for netIp := minNetIp; netIp <= maxNetIp && netIp >= minNetIp; netIp += 0x10000 {
+				if count > 0xffff {
+					break
+				}
+				count++
 				if maskMap[netIp] < mask {
 					maskMap[netIp] = mask
 				}
