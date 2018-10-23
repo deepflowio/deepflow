@@ -87,7 +87,10 @@ func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool, 
 	for e := f.flowList.Front(); e != nil; e = e.Next() {
 		flowExtra := e.Value
 		taggedFlow := flowExtra.taggedFlow
-		if taggedFlow.Exporter != key.Exporter || (isFromTor(key.InPort) && !flowExtra.MacEquals(meta)) {
+		if taggedFlow.Exporter != key.Exporter || key.InPort != taggedFlow.InPort {
+			continue
+		}
+		if isFromTor(key.InPort) && !flowExtra.MacEquals(meta) {
 			continue
 		}
 		if taggedFlow.Proto != key.Proto || !flowExtra.TunnelMatch(key) {

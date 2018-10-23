@@ -202,7 +202,7 @@ func (f *FlowGenerator) initStateMachineMaster() {
 	stateMachineMaster[FLOW_STATE_RESET][TCP_FIN|TCP_ACK] = stateMachineMaster[FLOW_STATE_RESET][TCP_FIN]
 	stateMachineMaster[FLOW_STATE_RESET][TCP_FIN|TCP_PSH|TCP_ACK] = stateMachineMaster[FLOW_STATE_RESET][TCP_FIN]
 
-	stateMachineMaster[FLOW_STATE_RESET][TCP_RST] = &StateValue{timeoutConfig.Exception, FLOW_STATE_RESET, true}
+	stateMachineMaster[FLOW_STATE_RESET][TCP_RST] = &StateValue{timeoutConfig.Exception, FLOW_STATE_RESET, false}
 	stateMachineMaster[FLOW_STATE_RESET][TCP_RST|TCP_ACK] = stateMachineMaster[FLOW_STATE_RESET][TCP_RST]
 	stateMachineMaster[FLOW_STATE_RESET][TCP_RST|TCP_PSH|TCP_ACK] = stateMachineMaster[FLOW_STATE_RESET][TCP_RST]
 
