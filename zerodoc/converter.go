@@ -109,23 +109,14 @@ func TagToPB(t *Tag) *pb.Tag {
 		tag.AclDirection = pb.AclDirection(t.ACLDirection).Enum()
 	}
 
-	if t.CustomFields != nil {
-		n := 0
-		fields := make([]pb.StringField, CustomFieldNumber)
-		for i := 0; i < CustomFieldNumber; i++ {
-			code := 1 << uint(i+64-CustomFieldNumber)
-			if t.Code&Code(code) != 0 && t.CustomFields[i] != nil {
-				fields[n] = pb.StringField{
-					Key:   proto.String(t.CustomFields[i].Key),
-					Value: proto.String(t.CustomFields[i].Value),
-				}
-				n++
-			}
-		}
-		tag.CustomFields = make([]*pb.StringField, n)
-		for i := 0; i < n; i++ {
-			tag.CustomFields[i] = &fields[i]
-		}
+	if t.Code&Country != 0 {
+		tag.Country = proto.String(t.Country)
+	}
+	if t.Code&Region != 0 {
+		tag.Region = proto.String(t.Region)
+	}
+	if t.Code&ISPCode != 0 {
+		tag.Isp = proto.String(t.ISP)
 	}
 
 	return tag
@@ -134,7 +125,6 @@ func TagToPB(t *Tag) *pb.Tag {
 func PBToTag(t *pb.Tag, tag *Tag) {
 	if tag == nil || tag.Field == nil {
 		panic("tag或tag.Field为空")
-		return
 	}
 	tag.Code = Code(t.GetCode())
 
@@ -233,17 +223,14 @@ func PBToTag(t *pb.Tag, tag *Tag) {
 		tag.ACLDirection = ACLDirectionEnum(t.GetAclDirection())
 	}
 
-	if t.GetCustomFields() != nil && tag.Code&0xFFFF000000000000 != 0 {
-		fields := t.GetCustomFields()
-		tag.CustomFields = make([]*StringField, CustomFieldNumber)
-		n := 0
-		for i := 0; i < CustomFieldNumber; i++ {
-			code := 1 << uint(i+64-CustomFieldNumber)
-			if tag.Code&Code(code) != 0 {
-				tag.CustomFields[i] = &StringField{fields[n].GetKey(), fields[n].GetValue()}
-				n++
-			}
-		}
+	if tag.Code&Country != 0 {
+		tag.Country = t.GetCountry()
+	}
+	if tag.Code&Region != 0 {
+		tag.Region = t.GetRegion()
+	}
+	if tag.Code&ISPCode != 0 {
+		tag.ISP = t.GetIsp()
 	}
 }
 
@@ -271,7 +258,6 @@ func UsageMeterToPB(m *UsageMeter) *pb.UsageMeter {
 func PBToUsageMeter(m *pb.UsageMeter, meter *UsageMeter) {
 	if meter == nil {
 		panic("meter为空")
-		return
 	}
 
 	sum := m.GetSum()
@@ -305,7 +291,6 @@ func PerfMeterToPB(m *PerfMeter) *pb.PerfMeter {
 func PBToPerfMeter(m *pb.PerfMeter, meter *PerfMeter) {
 	if meter == nil {
 		panic("meter为空")
-		return
 	}
 
 	pbToPerfMeterSum(m.GetSum(), &meter.PerfMeterSum)
@@ -402,7 +387,6 @@ func GeoMeterToPB(m *GeoMeter) *pb.GeoMeter {
 func PBToGeoMeter(m *pb.GeoMeter, meter *GeoMeter) {
 	if meter == nil {
 		panic("meter为空")
-		return
 	}
 
 	meter.SumClosedFlowCount = m.GetSumClosedFlowCount()
@@ -430,7 +414,6 @@ func FPSMeterToPB(m *FPSMeter) *pb.FpsMeter {
 func PBToFPSMeter(m *pb.FpsMeter, meter *FPSMeter) {
 	if meter == nil {
 		panic("meter为空")
-		return
 	}
 
 	meter.SumFlowCount = m.GetSumFlowCount()
@@ -458,7 +441,6 @@ func FlowMeterToPB(m *FlowMeter) *pb.FlowMeter {
 func PBToFlowMeter(m *pb.FlowMeter, meter *FlowMeter) {
 	if meter == nil {
 		panic("meter为空")
-		return
 	}
 
 	meter.SumFlowCount = m.GetSumFlowCount()
@@ -484,7 +466,6 @@ func ConsoleLogMeterToPB(m *ConsoleLogMeter) *pb.ConsoleLogMeter {
 func PBToConsoleLogMeter(m *pb.ConsoleLogMeter, meter *ConsoleLogMeter) {
 	if meter == nil {
 		panic("meter为空")
-		return
 	}
 
 	meter.SumPacketTx = m.GetSumPacketTx()
@@ -521,7 +502,6 @@ func TypeMeterToPB(m *TypeMeter) *pb.TypeMeter {
 func PBToTypeMeter(m *pb.TypeMeter, meter *TypeMeter) {
 	if meter == nil {
 		panic("meter为空")
-		return
 	}
 
 	meter.SumCountL0S1S = m.GetSumCountL_0S1S()
