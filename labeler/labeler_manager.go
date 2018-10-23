@@ -80,14 +80,14 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 	if platformData := response.GetPlatformData(); platformData != nil {
 		if interfaces := platformData.GetInterfaces(); interfaces != nil {
 			platformData := dropletpb.Convert2PlatformData(response)
-			log.Infof("droplet grpc recv platform: %+v", platformData)
+			log.Infof("droplet grpc recv %d pieces of platform data", len(platformData))
 			l.OnPlatformDataChange(platformData)
 		} else {
 			l.OnPlatformDataChange(nil)
 		}
 		if ipGroups := platformData.GetIpGroups(); ipGroups != nil {
 			ipGroupData := dropletpb.Convert2IpGroupData(response)
-			log.Infof("droplet grpc recv ipgroup: %+v", ipGroupData)
+			log.Infof("droplet grpc recv %d pieces of ipgroup data", len(ipGroupData))
 			l.OnIpGroupDataChange(ipGroupData)
 		} else {
 			l.OnIpGroupDataChange(nil)
@@ -99,7 +99,7 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 
 	if flowAcls := response.GetFlowAcls(); flowAcls != nil {
 		acls := dropletpb.Convert2AclData(response)
-		log.Infof("droplet grpc recv acl: %+v", acls)
+		log.Infof("droplet grpc recv %d pieces of acl data", len(acls))
 		l.OnPolicyDataChange(acls)
 	} else {
 		l.OnPolicyDataChange(nil)
