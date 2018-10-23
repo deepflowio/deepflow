@@ -24,8 +24,7 @@ func NewZeroDocumentMarshaller(input queue.QueueReader, outputs ...queue.QueueWr
 // Start 不停从input接收，发送到outputs
 func (m *ZeroDocumentMarshaller) Start() {
 	buffer := make([]interface{}, QUEUE_GET_SIZE)
-	outBuffer0 := make([]interface{}, QUEUE_GET_SIZE)
-	outBuffer1 := make([]interface{}, QUEUE_GET_SIZE)
+	outBuffer := make([]interface{}, QUEUE_GET_SIZE)
 
 	for {
 		n := m.input.Gets(buffer)
@@ -53,7 +52,7 @@ func (m *ZeroDocumentMarshaller) Start() {
 					log.Warning(err)
 					continue
 				}
-				outBuffer0[nOut] = bytes
+				outBuffer[nOut] = bytes
 				nOut++
 				m.sequence++
 			} else {
@@ -61,15 +60,16 @@ func (m *ZeroDocumentMarshaller) Start() {
 			}
 		}
 
-		if len(m.outputs) > 1 {
-			for _, q := range m.outputs[1:] {
-				// 复制ByteBuffer，使得消费者能独立Release，避免GC
-				for i, _ := range outBuffer0[:nOut] {
-					outBuffer1[i] = utils.CloneByteBuffer(outBuffer0[i].(*utils.ByteBuffer))
-				}
-				q.Put(outBuffer1[:nOut]...)
+		for i := 1; i < len(m.outputs); i++ { // 先克隆，再发送，避免在队列中被Release
+			for _, b := range outBuffer[:nOut] {
+				utils.PseudoCloneByteBuffer(b.(*utils.ByteBuffer))
 			}
 		}
-		m.outputs[0].Put(outBuffer0[:nOut]...)
+		for _, q := range m.outputs {
+			q.Put(outBuffer[:nOut]...)
+		}
+		for i := 0; i < nOut; i++ {
+			outBuffer[i] = nil // 避免持有对象
+		}
 	}
 }

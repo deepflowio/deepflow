@@ -173,15 +173,15 @@ func (l *LabelerManager) run(index int) {
 			metaPacket := item.(*datatype.MetaPacket)
 			action := l.GetPolicy(metaPacket, index)
 
+			if (action.ActionFlags & flowAppActions) != 0 {
+				flowKeys = append(flowKeys, queue.HashKey(metaPacket.Hash))
+				// meteringApp和flowApp均不会对metaPacket做修改
+				datatype.PseudoCloneMetaPacket(metaPacket) // 注意：先克隆，再发送
+				flowItemBatch = append(flowItemBatch, metaPacket)
+			}
 			// 为了统计平台处理的总流量，所有流量都过meteringApp
 			meteringKeys = append(meteringKeys, queue.HashKey(metaPacket.Hash))
 			meteringItemBatch = append(meteringItemBatch, metaPacket)
-			if (action.ActionFlags & flowAppActions) != 0 {
-				flowKeys = append(flowKeys, queue.HashKey(metaPacket.Hash))
-				// 在Acquire之前先Release一个对象给Pool，以免Acquire的时候本协程对应的池没有而产生加锁Acquire的代价
-				datatype.ReleaseMetaPacket(&datatype.MetaPacket{})
-				flowItemBatch = append(flowItemBatch, datatype.CloneMetaPacket(metaPacket))
-			}
 
 			itemBatch[i] = nil
 		}

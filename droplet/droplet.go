@@ -193,7 +193,7 @@ func Start(configPath string) {
 	flowSenderQueue := manager.NewQueue(
 		"4-tagged-flow-to-stream", cfg.Queue.FlowSenderQueueSize, releaseTaggedFlow) // ZMQ发送缓慢，queueSize设置为上游的2倍
 
-	flowDuplicator := queue.NewDuplicator(1024, flowDuplicatorQueue, datatype.CloneTaggedFlowHelper)
+	flowDuplicator := queue.NewDuplicator(1024, flowDuplicatorQueue, datatype.PseudoCloneTaggedFlowHelper)
 	flowDuplicator.AddMultiQueue(flowAppQueue, cfg.Queue.FlowAppQueueCount).AddQueue(flowSenderQueue).Start()
 	sender.NewFlowSender(flowSenderQueue, cfg.Stream, cfg.StreamPort, cfg.Queue.FlowSenderQueueSize).Start()
 
