@@ -50,6 +50,12 @@ const (
 	ACLDirection
 )
 
+const (
+	Country Code = 1 << 63
+	Region  Code = 1 << 62
+	ISPCode Code = 1 << 61
+)
+
 func (c Code) HasEdgeTagField() bool {
 	return c&0xffff0000 != 0
 }
@@ -63,13 +69,6 @@ func (c Code) HasL2TagField() bool {
 func (c Code) IsSymmetric() bool {
 	return c&(GroupID|L2EpcID|L3EpcID|Host|GroupIDPath|L2EpcIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|VTAP|TAPType|SubnetID|ACLID|ACLDirection) == c
 }
-
-const (
-	// df_geo的自定义code
-	Country Code = 1 << 63
-	Region  Code = 1 << 62
-	ISPCode Code = 1 << 61
-)
 
 type DeviceType uint8
 
@@ -154,39 +153,15 @@ type Field struct {
 	ACLID        uint32
 	ACLDirection ACLDirectionEnum
 
-	CustomFields []*StringField
-}
-
-const CustomFieldNumber = 16
-
-type StringField struct {
-	Key   string
-	Value string
+	Country string
+	Region  string
+	ISP     string
 }
 
 type Tag struct {
 	*Field
 	Code
 	id string
-}
-
-func codeToPos(code Code) int {
-	pos := 0
-	for code != 0 {
-		pos++
-		code >>= 1
-	}
-	return pos - 1
-}
-
-func (f *Field) AddCustomField(code Code, key, value string) {
-	if code < 1<<48 {
-		panic("code必须大于1<<48")
-	}
-	if f.CustomFields == nil {
-		f.CustomFields = make([]*StringField, CustomFieldNumber)
-	}
-	f.CustomFields[codeToPos(code)-(64-CustomFieldNumber)] = &StringField{key, value}
 }
 
 func formatU32(u uint32) string {
@@ -347,17 +322,17 @@ func (t *Tag) ToKVString() string {
 		}
 	}
 
-	// 1<<63 ~ 1<<49
-	if t.CustomFields != nil {
-		for i := 0; i < CustomFieldNumber; i++ {
-			code := 1 << uint(i+64-CustomFieldNumber)
-			if t.Code&Code(code) != 0 && t.CustomFields[i] != nil {
-				buf.WriteRune(',')
-				buf.WriteString(t.CustomFields[i].Key)
-				buf.WriteRune('=')
-				buf.WriteString(t.CustomFields[i].Value)
-			}
-		}
+	if t.Code&Country != 0 {
+		buf.WriteString(",country=")
+		buf.WriteString(t.Country)
+	}
+	if t.Code&Region != 0 {
+		buf.WriteString(",region=")
+		buf.WriteString(t.Region)
+	}
+	if t.Code&ISPCode != 0 {
+		buf.WriteString(",isp=")
+		buf.WriteString(t.ISP)
 	}
 
 	return buf.String()
@@ -472,14 +447,18 @@ func (t *Tag) GetID(buf *utils.IntBuffer) string {
 		if t.Code&ACLDirection != 0 {
 			buf.WriteU8(uint8(t.ACLDirection))
 		}
-		if t.CustomFields != nil {
-			for i := 0; i < CustomFieldNumber; i++ {
-				code := 1 << uint(i+64-CustomFieldNumber)
-				if t.Code&Code(code) != 0 && t.CustomFields[i] != nil {
-					buf.WriteU8(uint8(32)) // space
-					buf.WriteString(t.CustomFields[i].Value)
-				}
-			}
+
+		if t.Code&Country != 0 {
+			buf.WriteU8(uint8(32)) // space
+			buf.WriteString(t.Country)
+		}
+		if t.Code&Region != 0 {
+			buf.WriteU8(uint8(32)) // space
+			buf.WriteString(t.Region)
+		}
+		if t.Code&ISPCode != 0 {
+			buf.WriteU8(uint8(32)) // space
+			buf.WriteString(t.ISP)
 		}
 
 		t.id = buf.String()

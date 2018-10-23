@@ -133,7 +133,7 @@ func TestPartialTagEqual(t *testing.T) {
 	}
 }
 
-func TestCustomTagEqual(t *testing.T) {
+func TestGeoTagEqual(t *testing.T) {
 	f := Field{
 		IP:           0x0a2102c8,
 		MAC:          0x020406080a0c,
@@ -176,10 +176,11 @@ func TestCustomTagEqual(t *testing.T) {
 		TAPType:    ToR,
 		SubnetID:   10,
 		ACLID:      12,
+
+		Country: "CHN",
+		Region:  "Beijing",
+		ISP:     "CHINAMOBILE",
 	}
-	f.AddCustomField(Country, "country", "CHN")
-	f.AddCustomField(Region, "region", "Beijing")
-	f.AddCustomField(ISPCode, "isp", "CHINAMOBILE")
 
 	codes := [...]Code{
 		IP | TAPType,
