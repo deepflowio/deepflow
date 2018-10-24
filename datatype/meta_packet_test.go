@@ -121,6 +121,8 @@ func TestParseIspPackets(t *testing.T) {
 
 func TestAcquireReleaseClone(t *testing.T) {
 	p := AcquireMetaPacket()
+	RefMetaPacket(p)
+	ReleaseMetaPacket(p)
 	ReleaseMetaPacket(p)
 	expected := &MetaPacket{PacketLen: 10086}
 	dup := CloneMetaPacket(expected)
