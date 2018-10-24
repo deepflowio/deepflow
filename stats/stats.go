@@ -121,6 +121,7 @@ func initStatsdClient(remote net.IP) *statsd.Client {
 	}
 	c, err := statsd.New(options...)
 	if err != nil {
+		log.Warning(err)
 		return nil
 	}
 	log.Info("Statsd server connected")
