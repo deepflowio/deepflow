@@ -96,7 +96,8 @@ flowgen+flowperf内存占用估计
 
         最大内存占用2.5G = 1M * 2.5KB
 
-# APP与policy action的关系
+APP与policy action的关系
+------------------------
 
 1. app与policy action的关系
 
@@ -126,3 +127,31 @@ flowgen+flowperf内存占用估计
     TCP_FLOW_PERF_COUNT_BROKERING   | droplet (flowGen, 性能量化, flowApp) | zero发送ZMQ (df_perf), alarmstrap
     GEO_POSITIONING                 | droplet (flowGen, 性能量化, flowApp) | zero写入InfluxDB (df_geo)
 
+平台信息查询结果说明
+------------------
+
+1. 接入网络查找
+  - IP包含在数据库ip_resource表内
+    - 查找的结果l3EpcId=-1，l2Epcid=0，isL2End=false， isL3End会根据查找包的ttl(64,128,256)进行修正
+  - vinterface所属IP的if_Type=3
+    - 查找的结果l3EpcId=(vinterface的epcId)，l2Epcid=0， isL2End=false， isL3End(MAC和IP属于同一个设备则为true），若为false则会根据ttl(64,128,255)进行修正
+  - ip不在数据库内
+    - 查找结果l3EpcId=0，l2Epcid=0
+  - 注意：
+    - 无论是否查找到数据，isL3End都会进行修正
+
+2. 虚拟网络查找
+  - MAC和IP属于同一个设备
+    - 查找结果L3EpcId=(设备epcID)，L2EpcId=(设备epcId)，isL3End=true
+  - MAC属于某一设备，IP不在数据库里
+    - 查找结果L3EpcId=0，L2EpcId=设备EpcId，isL3End=false
+  - MAC属于某一设备， IP属于另一设备
+    - 查找结果L3EpcId=（IP设备的epcId），L2EpcId=（MAC设备的epcId），isL3End=false
+  - MAC属于某一设备， IP属于ip_resource表内数据
+    - 查找结果L3EpcId=-1， L2EpcId=（MAC设备的epcId），isL3End=false
+  - MAC， IP不在数据库内
+    - 查找结果L3EpcId=0，L2EpcId=0，isL3End=false
+
+  - 注意：
+    - isL2End值现在有trident的传过来的数据直接赋值，不在做判断
+    - 如果isL3End=false，会根据ttl(64,128,255)进行修正
