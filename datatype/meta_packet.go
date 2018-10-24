@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	. "github.com/google/gopacket/layers"
 
@@ -52,8 +53,6 @@ type MetaPacket struct {
 	PortDst    uint16
 	PayloadLen uint16
 	TcpData    *MetaPacketTcpHeader
-
-	ExtraRefCount int32 // for PseudoClone
 }
 
 func (p *MetaPacket) GenerateHash() uint32 {
@@ -228,31 +227,41 @@ func (p *MetaPacket) String() string {
 	return buffer.String()
 }
 
+type RefCountedMetaPacket struct {
+	MetaPacket
+
+	refCount uint32
+}
+
 var metaPacketPool = sync.Pool{
 	New: func() interface{} {
-		return new(MetaPacket)
+		return new(RefCountedMetaPacket)
 	},
 }
 
 func AcquireMetaPacket() *MetaPacket {
-	return metaPacketPool.Get().(*MetaPacket)
+	p := metaPacketPool.Get().(*RefCountedMetaPacket)
+	p.refCount = 1
+	return &p.MetaPacket
 }
 
 func ReleaseMetaPacket(x *MetaPacket) {
-	if atomic.AddInt32(&x.ExtraRefCount, -1) >= 0 {
+	p := (*RefCountedMetaPacket)(unsafe.Pointer(x))
+	if atomic.AddUint32(&p.refCount, ^uint32(0)) > 0 {
 		return
 	}
 
 	*x = MetaPacket{}
-	metaPacketPool.Put(x)
+	metaPacketPool.Put(p)
+}
+
+func RefMetaPacket(x *MetaPacket) {
+	p := (*RefCountedMetaPacket)(unsafe.Pointer(x))
+	atomic.AddUint32(&p.refCount, 1)
 }
 
 func CloneMetaPacket(x *MetaPacket) *MetaPacket {
 	dup := AcquireMetaPacket()
 	x.CopyTo(dup)
 	return dup
-}
-
-func PseudoCloneMetaPacket(x *MetaPacket) {
-	atomic.AddInt32(&x.ExtraRefCount, 1)
 }
