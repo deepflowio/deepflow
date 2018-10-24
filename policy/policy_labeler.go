@@ -66,9 +66,9 @@ type PolicyLabeler struct {
 	InterestPortMaps  [TAP_MAX]map[uint16]bool
 	InterestGroupMaps [TAP_MAX]map[uint32]bool
 
-	IpNetmaskMap    map[uint32]uint32 // 根据IP地址查找对应的最大掩码
-	FastPolicyMaps  [][]*lru.Cache    // 快速路径上的Policy映射表，Key为IP掩码对，Value为VlanAndPortMap
-	FastPathDisable bool              // 是否关闭快速路径，只使用慢速路径（FirstPath）
+	IpNetmaskMap    *[math.MaxUint16 + 1]uint32 // 根据IP地址查找对应的最大掩码
+	FastPolicyMaps  [][]*lru.Cache              // 快速路径上的Policy映射表，Key为IP掩码对，Value为VlanAndPortMap
+	FastPathDisable bool                        // 是否关闭快速路径，只使用慢速路径（FirstPath）
 
 	MapSize             uint32
 	GroupPortPolicyMaps [TAP_MAX]map[uint64]*PolicyData // 慢速路径上资源组+协议+端口到Policy的映射表
@@ -78,8 +78,8 @@ type PolicyLabeler struct {
 	FirstPathHitTick, FastPathHitTick uint64
 	AclHitMax                         uint64
 
-	maskMapFromPlatformData map[uint32]uint32
-	maskMapFromIpGroupData  map[uint32]uint32
+	maskMapFromPlatformData [math.MaxUint16 + 1]uint32
+	maskMapFromIpGroupData  [math.MaxUint16 + 1]uint32
 }
 
 func (a *Acl) String() string {
@@ -104,9 +104,7 @@ func NewPolicyLabeler(queueCount int, mapSize uint32, fastPathDisable bool) *Pol
 		policy.GroupPortPolicyMaps[i] = make(map[uint64]*PolicyData)
 	}
 
-	policy.IpNetmaskMap = make(map[uint32]uint32)
-	policy.maskMapFromPlatformData = make(map[uint32]uint32, 1<<16)
-	policy.maskMapFromIpGroupData = make(map[uint32]uint32, 1<<16)
+	policy.IpNetmaskMap = &[math.MaxUint16 + 1]uint32{0}
 
 	policy.MapSize = mapSize
 	policy.FastPathDisable = fastPathDisable
@@ -249,7 +247,7 @@ func (l *PolicyLabeler) GenerateGroupPortMaps(acls []*Acl) {
 }
 
 func (l *PolicyLabeler) makeIpNetmaskMap() {
-	maskMap := make(map[uint32]uint32, 1<<16)
+	maskMap := &[math.MaxUint16 + 1]uint32{0}
 
 	for netIp, mask := range l.maskMapFromPlatformData {
 		if maskMap[netIp] < mask {
@@ -266,9 +264,9 @@ func (l *PolicyLabeler) makeIpNetmaskMap() {
 }
 
 func (l *PolicyLabeler) GenerateIpNetmaskMapFromPlatformData(data []*PlatformData) {
-	maskMap := l.maskMapFromPlatformData
+	maskMap := &l.maskMapFromPlatformData
 	for key, _ := range maskMap {
-		delete(maskMap, key)
+		maskMap[key] = 0
 	}
 
 	for _, d := range data {
@@ -288,8 +286,8 @@ func (l *PolicyLabeler) GenerateIpNetmaskMapFromPlatformData(data []*PlatformDat
 					break
 				}
 				count++
-				if maskMap[netIp] < mask {
-					maskMap[netIp] = mask
+				if maskMap[uint16(netIp>>16)] < mask {
+					maskMap[uint16(netIp>>16)] = mask
 				}
 			}
 		}
@@ -299,9 +297,9 @@ func (l *PolicyLabeler) GenerateIpNetmaskMapFromPlatformData(data []*PlatformDat
 }
 
 func (l *PolicyLabeler) GenerateIpNetmaskMapFromIpGroupData(data []*IpGroupData) {
-	maskMap := l.maskMapFromIpGroupData
+	maskMap := &l.maskMapFromIpGroupData
 	for key, _ := range maskMap {
-		delete(maskMap, key)
+		maskMap[key] = 0
 	}
 
 	for _, d := range data {
@@ -334,8 +332,8 @@ func (l *PolicyLabeler) GenerateIpNetmaskMapFromIpGroupData(data []*IpGroupData)
 					break
 				}
 				count++
-				if maskMap[netIp] < mask {
-					maskMap[netIp] = mask
+				if maskMap[uint16(netIp>>16)] < mask {
+					maskMap[uint16(netIp>>16)] = mask
 				}
 			}
 		}
@@ -727,8 +725,8 @@ func (l *PolicyLabeler) getFastPortPolicy(maps *VlanAndPortMap, srcEpc, dstEpc u
 }
 
 func (l *PolicyLabeler) getVlanAndPortMap(packet *LookupKey, direction DirectionType, create bool, mapsForward *VlanAndPortMap) *VlanAndPortMap {
-	maskSrc := l.IpNetmaskMap[packet.SrcIp&STANDARD_NETMASK]
-	maskDst := l.IpNetmaskMap[packet.DstIp&STANDARD_NETMASK]
+	maskSrc := l.IpNetmaskMap[uint16(packet.SrcIp>>16)]
+	maskDst := l.IpNetmaskMap[uint16(packet.DstIp>>16)]
 	maskedSrcIp := packet.SrcIp & maskSrc
 	maskedDstIp := packet.DstIp & maskDst
 	if direction == BACKWARD {
