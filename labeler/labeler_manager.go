@@ -554,7 +554,9 @@ func showAcl() {
 		buffer, err := dropletctl.RecvFromDroplet(conn)
 		if err != nil {
 			fmt.Println(err)
+			break
 		}
+
 		decoder := gob.NewDecoder(buffer)
 		if err := decoder.Decode(acl); err != nil {
 			fmt.Println(err)
