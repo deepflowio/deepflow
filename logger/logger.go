@@ -5,6 +5,8 @@ import (
 	"path"
 	"time"
 
+	"log/syslog"
+
 	"github.com/lestrrat/go-file-rotatelogs"
 	"github.com/op/go-logging"
 )
@@ -76,5 +78,33 @@ func InitLog(filePath string, levelString string) {
 		),
 	)
 	file.SetLevel(level, "")
-	logging.SetBackend(stdout, file)
+
+	syslogBackend, err := logging.NewSyslogBackendPriority(path.Base(os.Args[0]), logLevelToPriority(level)|syslog.LOG_LOCAL2)
+	if err != nil {
+		log.Error(err.Error())
+		os.Exit(-1)
+	}
+	slog := logging.AddModuleLevel(syslogBackend)
+	slog.SetLevel(level, "")
+
+	logging.SetBackend(stdout, file, slog)
+}
+
+func logLevelToPriority(level logging.Level) syslog.Priority {
+	switch level {
+	case logging.CRITICAL:
+		return syslog.LOG_CRIT
+	case logging.ERROR:
+		return syslog.LOG_ERR
+	case logging.WARNING:
+		return syslog.LOG_WARNING
+	case logging.NOTICE:
+		return syslog.LOG_NOTICE
+	case logging.INFO:
+		return syslog.LOG_INFO
+	case logging.DEBUG:
+		return syslog.LOG_DEBUG
+	default:
+		panic("invalid type")
+	}
 }
