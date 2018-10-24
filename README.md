@@ -96,6 +96,33 @@ flowgen+flowperf内存占用估计
 
         最大内存占用2.5G = 1M * 2.5KB
 
-3. 说明
+# APP与policy action的关系
 
-    因每次申请内存时，一次申请1024个结构体；故实际内存占用会比理论值多
+1. app与policy action的关系
+
+    app | name | id | policy action
+    ----|------|----|-------
+    APPLICATION_ISP_ANALYSIS | 接入网络 | 1 | PACKET_COUNTING、FLOW_COUNTING、FLOW_MISC_COUNTING、GEO_POSITIONING
+    APPLICATION_VL2_ANALYSIS | 虚拟网络 | 2 | PACKET_COUNTING、FLOW_COUNTING、FLOW_MISC_COUNTING
+    APPLICATION_REPORT       | 报表     | 3 | PACKET_COUNTING、FLOW_COUNTING
+    APPLICATION_ALARM        | 告警     | 4 | 流量峰值/流量总量：PACKET_COUNT_BROKERING
+                             |          |   | 白名单：FLOW_COUNT_BROKERING
+    APPLICATION_PERF         | 业务网络 ---- 性能量化   | 5 | FLOW_COUNTING、TCP_FLOW_PERF_COUNTING、FLOW_MISC_COUNTING、GEO_POSITIONING
+    APPLICATION_WHITELIST    | 业务网络 ---- 安全白名单 | 6 | FLOW_COUNTING
+    APPLICATION_FLOW_BACKTRACKING | 回溯分析            | 9 | FLOW_STORING
+
+2. policy action包含关系
+
+    action	| droplet需要做的处理 | 其它组件需要做的处理
+    ------------|-------------------|--------------------
+    PACKET_COUNTING	                | droplet (meteringApp)               | zero写入InfluxDB (df_usage)
+    FLOW_COUNTING	                | droplet (flowGen, flowApp)          | zero写入InfluxDB (df_flow, df_fps)
+    FLOW_STORING	                | droplet (flowGen, 性能量化, flowApp) | stream写入ES (dfi_flow)
+    TCP_FLOW_PERF_COUNTING	        | droplet (flowGen, 性能量化, flowApp) | zero写入InfluxDB (df_perf)
+    PACKET_CAPTURING                | N/A                                 | N/A
+    FLOW_MISC_COUNTING		        | droplet (flowGen, flowApp)          | zero写入InfluxDB (df_type, df_console_log)
+    PACKET_COUNT_BROKERING          | droplet (meteringApp)               | zero发送ZMQ (df_usage), alarmstrap
+    FLOW_COUNT_BROKERING            | droplet (flowGen, flowApp)          | zero发送ZMQ (df_flow), alarmstrap
+    TCP_FLOW_PERF_COUNT_BROKERING   | droplet (flowGen, 性能量化, flowApp) | zero发送ZMQ (df_perf), alarmstrap
+    GEO_POSITIONING                 | droplet (flowGen, 性能量化, flowApp) | zero写入InfluxDB (df_geo)
+
