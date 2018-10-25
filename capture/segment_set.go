@@ -40,7 +40,7 @@ func (s *SegmentSet) OnSegmentChange(segments []net.HardwareAddr) {
 		}
 	}
 	if removing != nil {
-		log.Infof("Removing", removing)
+		log.Info("Removing", removing)
 	}
 
 	s.segmentSet = newSegmentSet
