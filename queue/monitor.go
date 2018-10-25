@@ -35,8 +35,10 @@ func (m *Monitor) isDebugOn() bool {
 }
 
 func (m *Monitor) debugSwitch(on bool) {
-	log.Infof("Monitor[%s] change debug switch to %v", m.Name, on)
-	m.DebugOn = on
+	if m.DebugOn != on {
+		log.Infof("Monitor[%s] change debug switch to %v", m.Name, on)
+		m.DebugOn = on
+	}
 }
 
 func (m *Monitor) TurnOnDebug(conn *net.UDPConn, port int) {
