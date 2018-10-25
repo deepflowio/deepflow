@@ -61,12 +61,23 @@ func (g *IpResourceGroup) Update(groups []*IpGroupData) {
 	g.ipTree = CachedIpTree(makeCachedTree(ipTree))
 }
 
+func generateGroupIds(groupIds []uint32) map[uint32]bool {
+	basicGroupIds := map[uint32]bool{}
+	for _, id := range groupIds {
+		basicGroupIds[id] = true
+	}
+	return basicGroupIds
+}
+
 // Populate fills tags in flow message
 func (g *IpResourceGroup) Populate(ip uint32, endpointInfo *EndpointInfo) bool {
 	queryResult := g.ipTree.cachedQuery(endpointInfo.L3EpcId, ip)
 	ok := queryResult != nil
+	basicGroupIds := generateGroupIds(endpointInfo.GroupIds)
 	for _, v := range queryResult {
-		endpointInfo.GroupIds = append(endpointInfo.GroupIds, uint32(v)+IP_GROUP_ID_FLAG)
+		if _, ok := basicGroupIds[uint32(v)]; !ok {
+			endpointInfo.GroupIds = append(endpointInfo.GroupIds, uint32(v)+IP_GROUP_ID_FLAG)
+		}
 	}
 
 	return ok
