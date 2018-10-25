@@ -101,7 +101,7 @@ func splitGroup2Int(src string) []uint32 {
 	return groups
 }
 
-func splitPort2Int(src string) []uint16 {
+func getPorts(src string) []uint16 {
 	splitSrcPorts := strings.Split(src, "-")
 	ports := make([]uint16, 0, 8)
 	if len(splitSrcPorts) < 2 {
@@ -122,7 +122,7 @@ func splitPort2Int(src string) []uint16 {
 		}
 	}
 
-	if portRange[1] > portRange[0] && portRange[1]-portRange[0] >= 65535 {
+	if portRange[1] > portRange[0] && portRange[1]-portRange[0] >= 65534 {
 		return ports
 	}
 
@@ -132,7 +132,15 @@ func splitPort2Int(src string) []uint16 {
 			break
 		}
 	}
+	return ports
+}
 
+func splitPort2Int(src string) []uint16 {
+	ports := make([]uint16, 0, 8)
+	splitSrcPorts := strings.Split(src, ",")
+	for _, srcPorts := range splitSrcPorts {
+		ports = append(ports, getPorts(srcPorts)...)
+	}
 	return ports
 }
 
