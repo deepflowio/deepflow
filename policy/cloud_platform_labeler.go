@@ -9,12 +9,6 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
-type FastPlatformData struct {
-	endpointInfo *EndpointInfo
-	timestamp    time.Time
-	hash         MacIpKey
-}
-
 type IpMapDatas []map[IpKey]*PlatformData
 type IpMapData map[IpKey]*PlatformData
 type MacMapData map[MacKey]*PlatformData
@@ -244,27 +238,18 @@ func (l *CloudPlatformLabeler) ModifyL3End(endpointInfo *EndpointInfo, key *Look
 
 func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip uint32, tapType TapType) *EndpointInfo {
 	endpointInfo := NewEndpointInfo()
-	if tapType == TAP_TOR {
-		platformData := l.GetDataByMac(MacKey(mac))
-		if platformData != nil {
-			endpointInfo.SetL2Data(platformData)
-			endpointInfo.SetL3EndByIp(platformData, ip)
-		}
-		if platformData = l.GetDataByEpcIp(endpointInfo.L2EpcId, ip); platformData == nil {
-			platformData = l.GetDataByIp(ip)
-		}
-		if platformData != nil {
-			endpointInfo.SetL3Data(platformData, ip)
-		}
-		l.ipGroup.Populate(ip, endpointInfo)
-	} else {
-		platformData := l.GetDataByIp(ip)
-		if platformData != nil {
-			endpointInfo.SetL3Data(platformData, ip)
-			endpointInfo.SetL3EndByMac(platformData, mac)
-		}
-		l.ipGroup.Populate(ip, endpointInfo)
+	platformData := l.GetDataByMac(MacKey(mac))
+	if platformData != nil {
+		endpointInfo.SetL2Data(platformData)
+		endpointInfo.SetL3EndByIp(platformData, ip)
 	}
+	if platformData = l.GetDataByEpcIp(endpointInfo.L2EpcId, ip); platformData == nil {
+		platformData = l.GetDataByIp(ip)
+	}
+	if platformData != nil {
+		endpointInfo.SetL3Data(platformData, ip)
+	}
+	l.ipGroup.Populate(ip, endpointInfo)
 	return endpointInfo
 }
 
