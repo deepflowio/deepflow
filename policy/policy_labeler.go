@@ -40,13 +40,6 @@ type Acl struct {
 	Action    []AclAction
 }
 
-type FastKey struct {
-	SrcHash   uint64
-	DstHash   uint64
-	Ports     uint64
-	ProtoVlan uint64
-}
-
 type FastPathMapValue struct {
 	endpoint  EndpointData
 	policy    *PolicyData

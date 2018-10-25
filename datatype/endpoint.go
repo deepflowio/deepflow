@@ -117,7 +117,6 @@ func (i *EndpointInfo) SetL3EndByIp(data *PlatformData, ip uint32) {
 func (i *EndpointInfo) SetL3EndByMac(data *PlatformData, mac uint64) {
 	if data.Mac == mac {
 		i.L3End = true
-		i.GroupIds = append(i.GroupIds, data.GroupIds...)
 	}
 }
 
