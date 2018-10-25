@@ -723,14 +723,13 @@ func RegisterCommand() *cobra.Command {
 		Long: "droplet-ctl labeler dump-acl {[key=value]+}\n" +
 			"key list:\n" +
 			"\ttap         use 'isp|tor'\n" +
-			"\tinport      capture interface mac suffix\n" +
 			"\tsmac/dmac   packet mac address\n" +
 			"\teth_type    packet eth type\n" +
 			"\tvlan        packet vlan\n" +
 			"\tsip/dip     packet ip address\n" +
 			"\tproto       packet ip proto\n" +
 			"\tsport/dport packet port",
-		Example: "droplet-ctl labeler dump-acl inport=0x10000,smac=12:34:56:78:9a:bc,sip=127.0.0.1",
+		Example: "droplet-ctl labeler dump-acl tap=tor,smac=12:34:56:78:9a:bc,sip=127.0.0.1",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
 				fmt.Printf("filter is nil, Example: %s\n", cmd.Example)
