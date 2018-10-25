@@ -153,3 +153,42 @@ profiler
   - 执行list funcName，可查看某个函数的热点
   - 执行dot，可输出Graphviz源码，粘贴至 http://www.webgraphviz.com/ 可查看热点图
 * 更多内容可以参考[pprof](https://golang.org/pkg/net/http/pprof/)
+
+性能量化字段说明
+----------------
+
+原则：宁愿少算漏算，也不错算误算
+
+* 性能字段
+  - RTT（建立连接RTT延迟）
+      - 对应rtt_syn（两侧加和计算，不区分哪一侧）
+      - rtt_syn计算区分所属阶段（建立连接）只需要看请求包是否含有SYN就行
+        - SYN + 紧邻的反方向SYN/ACK（seq+1和ack一致）
+        - SYN/ACK + 紧邻的正方向的ACK（seq+1和ack一致）
+  - SRT（系统响应时间）
+      - 对应rtt（只算服务端一侧）
+      - 分别计算客户端到引流点、引流点到服务端的rtt（rtt_0和rtt_1），最终输出只输出其中一侧（根据最终的方向判断）
+      - rtt计算区分所属阶段（数据传输）只需要看请求包是否含有PSH就行
+        - PSH/ACK且有payload（payloadlen>1）+ 紧邻的反方向的无payload（payload_len=0）的ACK（seq和ack一致）
+            - 为了避免丢包、乱序情况下TCP Keep-Alive包的影响，限制每对请求、回复包的rtt计算的最大值为10s
+  - ART（应用响应时间）
+      - 对应art（只算服务端一侧）
+      - 分别计算客户端到引流点、引流点到服务端的art（art_0和art_1），最终输出只输出其中一侧（根据最终的方向判断）
+      - art计算区分所属阶段（数据传输）,回复包payloadlen需大于1
+          - PSH/ACK且有payload（payloadlen>1）+ 反方向有payload（payloadlen>1）的ACK或PSH/ACK（seq和ack一致）
+  - 重传
+      - 重传计算区分所属阶段（建立连接还是数据传输）只需要看包的seq是属于临界点seq之前还是之后
+      - 建立连接阶段重传,需确定临界点seq
+          - 请求方向的seq确定：SYN和ACK，根据SYN来计算ACK
+          - 回复方向的seq确定：SYN/ACK
+      - 数据传输阶段重传，需判断包的seq和length是否与已收到的包重复
+      - 需要注意TCP Keep-Alive包的影响
+          - 排除payloadlen=0,或payloadlen=1的包
+  - 零窗
+      - 统计tcp头传输窗口size为0的包
+  - 紧急
+      - 统计tcp头URG置1的包
+  - 熵字段
+      - 包方差PacketSizeDeviation
+      - 包间隔均值PacketIntervalAvg
+      - 包间隔方差PacketIntervalDeviation
