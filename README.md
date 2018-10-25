@@ -53,15 +53,42 @@ graph TD;
 
 fastpath内存占用
 ----------------
-ACL是依据AclId和AclActionType进行划分，FastPolicyData保存ACL切片是动态变化的，
-一个ACL是(40 + N * 6)，N是策略的个数。
-FastPolicyData = 4byte + M * (40 + N * 6)byte, 取M = 5个ACL, N = 5个policyInfo, 进行如下估算： 
-1. 平台数据(key(8byte) + FastPlatformData(96byte)) * 2 * policy-map-size
-2. 策略数据(key(32byte) + FastPolicyData(354byte))  * 2 * policy-map-size
 
-比如policy-map-size = 1024则：
-1. 平台数据 = 104 * 2 * 1024 byte
-2. 策略数据 = 386 * 2 * 1024 byte
+fastPath存储的结构为FastPathMapValue：
+
+    type FastPathMapValue struct {
+    	endpoint  EndpointData
+    	policy    *PolicyData
+    	timestamp time.Duration
+    }
+
+假设每条acl带一个action, 每条EndPointInfo带有一个groupId则：
+
+    FastPathMapValue = 76 + 12 + 8 = 96byte
+
+fastPath数据结构如下：
+
+    FastPolicyMaps[queueCount][TAP_MAX][mapSize] -> VlanAndPortMap
+
+    type VlanAndPortMap struct {
+    	macEpcMap     *lru.Cache // size为128 存uint64
+    	vlanPolicyMap *lru.Cache // size为1000 存储FastPathMapValue
+    	portPolicyMap *lru.Cache // size为1000 存储FastPathMapValue
+    }
+
+假设queueCount为4，mapSize为1000，则使用内存为：
+
+最小：
+
+    VlanAndPortMap = 128 * 8 + 1 * 96 * 2 = 1216byte
+    FastPolicyMaps = 1 * 1 * 1 * 1216 = 1216byte = 1kbyte
+
+最大：
+
+    VlanAndPortMap = 128 * 8 + 1000 * 96 * 2 = 193024byte
+    FastPolicyMaps = 4 * 3 * 1000 * 193024 = 2316288000byte = 2208MByte
+
+即使用内存最小1k字节，最大2208M字节
 
 flowgen+flowperf内存占用估计
 ----------------------------
