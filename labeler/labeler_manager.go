@@ -82,6 +82,7 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 			platformData := dropletpb.Convert2PlatformData(response)
 			log.Infof("droplet grpc recv %d pieces of platform data", len(platformData))
 			l.OnPlatformDataChange(platformData)
+			log.Info("droplet grpc finish platform data")
 		} else {
 			l.OnPlatformDataChange(nil)
 		}
@@ -89,6 +90,7 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 			ipGroupData := dropletpb.Convert2IpGroupData(response)
 			log.Infof("droplet grpc recv %d pieces of ipgroup data", len(ipGroupData))
 			l.OnIpGroupDataChange(ipGroupData)
+			log.Info("droplet grpc finish ipgroup data")
 		} else {
 			l.OnIpGroupDataChange(nil)
 		}
@@ -101,6 +103,7 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 		acls := dropletpb.Convert2AclData(response)
 		log.Infof("droplet grpc recv %d pieces of acl data", len(acls))
 		l.OnPolicyDataChange(acls)
+		log.Info("droplet grpc finish acl data")
 	} else {
 		l.OnPolicyDataChange(nil)
 	}
