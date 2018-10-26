@@ -82,7 +82,7 @@ func Start(configPath string) {
 	}
 	// L1 - packet source
 	manager := queue.NewManager()
-	packetSourceCount := 1 // Only adapter will use MultiQueue.Puts
+	packetSourceCount := 2 // Adapter and capture
 	releaseMetaPacket := func(x interface{}) {
 		datatype.ReleaseMetaPacket(x.(*datatype.MetaPacket))
 	}
