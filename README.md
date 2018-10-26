@@ -50,7 +50,7 @@ Droplet工程开发指南
 * 对象构造
 
   当如下情形都满足时才应当使用new关键字：
-  
+
   1. 明确表明对象未初始化(new虽然会写0初始化，但是和对象初始化并不能等同)
   2. 明确表明对象从堆申请()
 
@@ -60,11 +60,11 @@ Droplet工程开发指南
   2. 单元测试不应当通过将结构体格式化打印为字符串的方式验证内容是否
      与预期一致，否则一旦修改结构体内容，不能在编译期就检查出问题所在，
      需要等到发现单元测试失败后，再修改格式化后的预期结果。
-  
+
 * 变量声明
 
   通过var声明变量仅适用于无法立即为变量赋值或初始化的场合，除此之外均不应当通过var声明变量。
-  
+
 * 结构体定义
 
   继承的结构应当与结构体成员变量通过空行区分开
@@ -193,3 +193,54 @@ profiler
       - 包方差PacketSizeDeviation
       - 包间隔均值PacketIntervalAvg
       - 包间隔方差PacketIntervalDeviation
+
+网流聚合原则
+------------
+
+* 网流聚合
+  - 南北和东西本身区分
+  - 南北和东西区分引流位置：南北为qinq（0x10000+qinq外层vlan偏移），东西为trident宿主机及引流接口（tridentIp+ifMacSuffix）
+  - 南北和东西不区分vlan
+  - 南北不区分mac、东西区分mac
+  - 南北和东西区分tunnelType、tunnelId、tunnelIpSrc、tunnelIpDst
+  - 南北和东西区分ipSrc、ipDst、proto、portSrc、portDst
+      - 对于非TCP/UDP的IPv4或者IPv4分片，portSrc和portDst为0
+  - 聚合后的特殊字段表示
+      - VLAN
+        - 网流双方向仅其中一个有VLAN的情况，将此VLAN记录为网流的VLAN
+        - 网流双方向VLAN不一致的情况下，选择任何一方VLAN作为网流VLAN
+      - TTL
+        - 网流双方向的TTL用双方向首包的TTL表示
+* 网流方向
+  1. 网流的某个端口落在用户输入的服务列表中（比如8080），以该端口为网流的目标端口（服务端）；如果两个端口都满足，以更小值的端口为网流的目标端口（服务端）
+  2. 网流中出现的第一个SYN/ACK包的源端口为网流的目标端口（服务端）
+  3. 网流的某个端口落在[IANA官方定义的服务列表](https://zh.wikipedia.org/wiki/TCP/UDP%E7%AB%AF%E5%8F%A3%E5%88%97%E8%A1%A8)前1024号中，以该端口为网流的目标端口（服务端）；如果两个端口都满足，以更小值的端口为网流的目标端口（服务端）
+  4. 其他情况下，以网流的第一个包的目标端口为网流的目标端口（服务端）
+* 网流状态转换
+  - TCP流量状态转换
+      - 定义的正常状态
+          - RAW, OPENING_1, OPENING_2, ESTABLISHED, CLOSING_1, CLOSING_2, CLOSED
+      - 定义的异常状态
+          - RESET, EXCEPTION
+  - 其他流量无状态机，仅简单使用ESTABLISHED, EXCEPTION等状态用于输出
+  - 网流超时时间
+      - RAW, OPENING_1, OPENING_2, RESET, EXCEPTION状态网流超时时间为5秒
+      - TCP流量ESTABLISHED状态超时时间为300秒
+      - CLOSING_1, CLOSING_2状态超时时间为35秒
+      - 其他协议流量仅单方向有报文时超时时间为5秒，双方向有报文时超时时间为35秒
+      - 以上超时时间均可通过droplet.yaml文件进行配置
+
+![image](http://gitlab.x.lan/hpn/tasks-hpn/uploads/de65de6b51659d4368fd334b6845e40c/image.png)
+
+* 网流结束类型
+  - IPv4-TCP
+      - CLOSE_TYPE_FIN: CLOSED、CLOSING_2
+      - CLOSE_TYPE_RST: RESET（根据第一个RST所在的方向判断：如果是CLIENT到SERVER，那么就是CLIENT_RST，反之就是SERVER_RST）
+      - CLOSE_TYPE_HALF_OPEN: OPENING_1（SERVER_HALF_OPEN）、OPENING_2（CLIENT_HALF_OPEN）
+      - CLOSE_TYPE_HALF_CLOSE: CLOSING_TX1（SERVER_HALF_CLOSE）、CLOSING_RX1（CLIENT_HALF_CLOSE）
+      - CLOSE_TYPE_TIMEOUT: ESTABLISHED
+      - CLOSE_TYPE_UNKNOWN: EXCEPTION
+      - CLOSE_TYPE_FORCE_REPORT: 1分钟强制上报的情况
+  - 其他IPv4
+      - CLOSE_TYPE_TIMEOUT: 默认情况
+      - CLOSE_TYPE_FORCE_REPORT: 1分钟强制上报的情况
