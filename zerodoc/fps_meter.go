@@ -11,6 +11,7 @@ type FPSMeter struct {
 	SumFlowCount       uint64 `db:"sum_flow_count"`
 	SumNewFlowCount    uint64 `db:"sum_new_flow_count"`
 	SumClosedFlowCount uint64 `db:"sum_closed_flow_count"`
+	notClosedFlowCount uint64
 
 	MaxFlowCount    uint64 `db:"max_flow_count"`
 	MaxNewFlowCount uint64 `db:"max_new_flow_count"`
@@ -21,19 +22,43 @@ func (m *FPSMeter) ConcurrentMerge(other app.Meter) {
 		m.SumFlowCount += pm.SumFlowCount
 		m.SumNewFlowCount += pm.SumNewFlowCount
 		m.SumClosedFlowCount += pm.SumClosedFlowCount
+		m.notClosedFlowCount = m.SumFlowCount - m.SumClosedFlowCount
 
 		m.MaxFlowCount += pm.MaxFlowCount
 		m.MaxNewFlowCount += pm.MaxNewFlowCount
 	}
 }
 
-func (m *FPSMeter) SequentialMerge(other app.Meter) { // other为后一个时间的统计量
+// 秒级SumFlowCount/MaxFlowCount计算方法：
+//
+// 在统计每秒流数量时，为了降低压力，仅对新建和结束的时刻做统计：
+//   设原始数据中当前秒的流数量、新建流数量、结束流数量分别是F1, N1, C1
+//   设原始数据中下一秒的流数量、新建流数量、结束流数量分别为F2, N2, C2
+//
+// 当前秒未结束的流数量: F1 - C1
+//
+// 于是下一秒矫正的统计量为：
+//   流数量: F2' = MAX( (F1-C1)+N2, F2 )	// 若中间有数据丢失，F1偏小需要矫正
+//   未结束的流数量: F2' - C2
+//   新建流数量: N2
+//   结束流数量: C2
+//
+// 于是当前秒和下一秒的合并统计量为：
+//   累积流数量：C1 + F2'			// 不要使用F1 + N2，因为F1可能偏小
+//   累积新建流数量: N1 + N2
+//   累积结束流数量: C1 + C2
+func (m *FPSMeter) SequentialMerge(other app.Meter) { // other为下一秒的统计量
 	if pm, ok := other.(*FPSMeter); ok {
-		m.SumFlowCount = m.SumClosedFlowCount + pm.SumFlowCount
+		// 下一秒矫正后的流数量
+		flowCount := maxU64(m.notClosedFlowCount+pm.SumNewFlowCount, pm.SumFlowCount)
+		// 下一秒未结束的流数量
+		m.notClosedFlowCount = flowCount - pm.SumClosedFlowCount
+		// 累积统计量
+		m.SumFlowCount = m.SumClosedFlowCount + flowCount
 		m.SumNewFlowCount += pm.SumNewFlowCount
 		m.SumClosedFlowCount += pm.SumClosedFlowCount
-
-		m.MaxFlowCount = maxU64(m.MaxFlowCount, pm.MaxFlowCount)
+		// 峰值统计量
+		m.MaxFlowCount = maxU64(m.MaxFlowCount, flowCount)
 		m.MaxNewFlowCount = maxU64(m.MaxNewFlowCount, pm.MaxNewFlowCount)
 	}
 }
