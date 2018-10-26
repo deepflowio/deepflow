@@ -163,7 +163,7 @@ func (p *MetaPacket) Parse(l3Packet RawPacket) bool {
 
 func (p *MetaPacket) ParseL2(packet RawPacket) int {
 	stream := ByteStream{packet, 0}
-	inPort := uint32(PACKET_SOURCE_TOR)
+	inPort := uint32(0)
 	l2Len := 0
 
 	if stream.Len() < ETH_HEADER_SIZE {

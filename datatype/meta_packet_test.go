@@ -42,7 +42,7 @@ func TestParseArp(t *testing.T) {
 	da, _ := net.ParseMAC("ac:2b:6e:b3:84:63")
 	sa, _ := net.ParseMAC("52:54:00:33:c4:54")
 	expected := &MetaPacket{
-		InPort:    0x30000,
+		InPort:    0,
 		PacketLen: 60,
 		MacSrc:    MacIntFromBytes(sa),
 		MacDst:    MacIntFromBytes(da),
@@ -64,7 +64,7 @@ func TestParseInvalid(t *testing.T) {
 	da, _ := net.ParseMAC("00:50:56:e9:32:74")
 	sa, _ := net.ParseMAC("00:0c:29:15:0a:35")
 	expected := &MetaPacket{
-		InPort:    0x30000,
+		InPort:    0,
 		Invalid:   true,
 		PacketLen: 36,
 		MacSrc:    MacIntFromBytes(sa),
@@ -89,7 +89,7 @@ func TestParseTorPackets(t *testing.T) {
 	var buffer bytes.Buffer
 	packets := loadPcap("meta_packet_test.pcap")
 	for _, packet := range packets {
-		meta := &MetaPacket{PacketLen: uint16(len(packet))}
+		meta := &MetaPacket{InPort: 0x30000, PacketLen: uint16(len(packet))}
 		l2Len := meta.ParseL2(packet)
 		meta.Parse(packet[l2Len:])
 		buffer.WriteString(meta.String() + "\n")
