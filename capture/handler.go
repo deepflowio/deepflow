@@ -18,6 +18,7 @@ type PacketHandler struct {
 	ip             datatype.IPv4Int
 	queue          queue.MultiQueueWriter
 	remoteSegments *SegmentSet
+	defaultTapType uint32
 
 	dedupTable *dedup.DedupTable
 }
@@ -32,6 +33,9 @@ func (h *PacketHandler) Handle(timestamp Timestamp, packet RawPacket, size Packe
 	metaPacket.Exporter = h.ip
 	metaPacket.Timestamp = timestamp
 	metaPacket.PacketLen = uint16(size)
+	if metaPacket.InPort == 0 {
+		metaPacket.InPort = h.defaultTapType
+	}
 	if (metaPacket.InPort & datatype.PACKET_SOURCE_TOR) == datatype.PACKET_SOURCE_TOR {
 		if metaPacket.EthType == EthernetTypeIPv4 {
 			tunnel := datatype.TunnelInfo{}

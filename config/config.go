@@ -11,6 +11,7 @@ import (
 	"github.com/op/go-logging"
 	"gopkg.in/yaml.v2"
 
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet/flowgenerator"
 )
 
@@ -24,6 +25,7 @@ type Config struct {
 	Profiler       bool                `yaml:"profiler"`
 	MaxCPUs        int                 `yaml:"max-cpus"`
 	TapInterfaces  []string            `yaml:"tap-interfaces,flow"`
+	DefaultTapType uint32              `yaml:"default-tap-type"`
 	Stream         string              `yaml:"stream"`
 	StreamPort     uint16              `yaml:"stream-port"`
 	ZeroHosts      []string            `yaml:"zero-hosts,flow"`
@@ -110,29 +112,32 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if c.DefaultTapType == 0 {
+		c.DefaultTapType = datatype.PACKET_SOURCE_TOR
+	}
 	if c.Queue.QueueSize == 0 {
 		c.Queue.QueueSize = 65536
 	}
 	if c.Queue.LabelerQueueCount == 0 {
-		c.Queue.LabelerQueueCount = 8
+		c.Queue.LabelerQueueCount = 4
 	}
 	if c.Queue.LabelerQueueSize == 0 {
 		c.Queue.LabelerQueueSize = c.Queue.QueueSize
 	}
 	if c.Queue.FlowGeneratorQueueCount == 0 {
-		c.Queue.FlowGeneratorQueueCount = 2
+		c.Queue.FlowGeneratorQueueCount = 4
 	}
 	if c.Queue.FlowGeneratorQueueSize == 0 {
 		c.Queue.FlowGeneratorQueueSize = c.Queue.QueueSize
 	}
 	if c.Queue.MeteringAppQueueCount == 0 {
-		c.Queue.MeteringAppQueueCount = 8
+		c.Queue.MeteringAppQueueCount = 4
 	}
 	if c.Queue.MeteringAppQueueSize == 0 {
 		c.Queue.MeteringAppQueueSize = c.Queue.QueueSize
 	}
 	if c.Queue.FlowAppQueueCount == 0 {
-		c.Queue.FlowAppQueueCount = 2
+		c.Queue.FlowAppQueueCount = 4
 	}
 	if c.Queue.FlowAppQueueSize == 0 {
 		c.Queue.FlowAppQueueSize = c.Queue.QueueSize
