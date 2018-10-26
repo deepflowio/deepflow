@@ -18,6 +18,7 @@ import (
 type CaptureLauncher struct {
 	Ip             net.IP
 	RemoteSegments *SegmentSet
+	DefaultTapType uint32
 	OutputQueue    queue.MultiQueueWriter
 }
 
@@ -57,6 +58,7 @@ func (b CaptureLauncher) StartWith(ifName string) (io.Closer, error) {
 			ip:             IpToUint32(b.Ip),
 			queue:          b.OutputQueue,
 			remoteSegments: b.RemoteSegments,
+			defaultTapType: b.DefaultTapType,
 		},
 		ifName:  ifName,
 		tPacket: tPacket,

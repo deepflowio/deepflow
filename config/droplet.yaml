@@ -12,6 +12,9 @@ profiler: false
 max-cpus: 0
 # interfaces for mirrored traffic from ISP or TOR
 tap-interfaces: []
+# where packet is considered to come by default if packet has no qinq with outer vlan pcp == 7
+# ISP: 0x10000, TOR: 0x30000, default value is 0x10000
+default-tap-type: 0x10000
 # conf for connection with outside stream
 stream: 127.0.0.1
 stream-port: 20201
@@ -23,24 +26,24 @@ zero-port: 20202
 queue:
   # queue size, default 65536
   queue-size: 65536
-  # labeler read queue count, default 8
+  # labeler read queue count, default 4
   # name: 1-meta-packet-to-labeler
-  labeler-queue-count: 8
+  labeler-queue-count: 4
   # labeler read queue size, default queue-size
   labeler-queue-size: 65536
-  # flow generator read queue count, default 2
+  # flow generator read queue count, default 4
   # name: 2-meta-packet-to-flow-generator
-  flow-generator-queue-count: 2
+  flow-generator-queue-count: 4
   # flow generator read queue size, default queue-size
   flow-generator-queue-size: 65536
-  # metering app read queue count, default 8
+  # metering app read queue count, default 4
   # name: 2-meta-packet-to-metering-app
-  metering-app-queue-count: 8
+  metering-app-queue-count: 4
   # metering app read queue size, default queue-size
   metering-app-queue-size: 65536
-  # flow app read queue count, default 2
+  # flow app read queue count, default 4
   # 4-tagged-flow-to-flow-app
-  flow-app-queue-count: 2
+  flow-app-queue-count: 4
   # flow app read queue size, default queue-size
   flow-app-queue-size: 65536
   # flow duplicator read queue size, default flow-generator-queue-size >> 2
