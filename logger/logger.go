@@ -79,7 +79,9 @@ func InitLog(filePath string, levelString string) {
 	)
 	file.SetLevel(level, "")
 
-	syslogBackend, err := logging.NewSyslogBackendPriority(path.Base(os.Args[0]), logLevelToPriority(level)|syslog.LOG_LOCAL2)
+	pName := path.Base(os.Args[0])
+	pName = pName + "/" + pName
+	syslogBackend, err := logging.NewSyslogBackendPriority(pName, logLevelToPriority(level)|syslog.LOG_LOCAL2)
 	if err != nil {
 		log.Error(err.Error())
 		os.Exit(-1)
