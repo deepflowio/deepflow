@@ -98,6 +98,7 @@ func (c *Capture) run() (retErr error) {
 		packet, ci, err := c.tPacket.ZeroCopyReadPacketData()
 		if err != nil {
 			if err == afpacket.ErrTimeout {
+				c.Flush()
 				continue
 			} else if err == afpacket.ErrPoll {
 				c.counter.pollError++
