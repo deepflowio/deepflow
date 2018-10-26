@@ -5,8 +5,8 @@ import (
 )
 
 const (
-	MASK_LEN        = 24
-	MIN_MASK_LEN    = 8
+	MASK_LEN        = 32
+	MIN_MASK_LEN    = 1
 	MAX_MASK_LEN    = 32
 	IF_TYPE_WAN     = 3
 	NETMASK         = 0xFFFFFFFF
