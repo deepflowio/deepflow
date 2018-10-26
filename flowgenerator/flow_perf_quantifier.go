@@ -633,6 +633,8 @@ func (i *FlowPerfDataInfo) calcRetransSyn(direction bool) {
 		i.periodPerfStats.retransSyn1 += 1
 		i.flowPerfStats.retransSyn1 += 1
 	}
+
+	i.calcRetrans(direction)
 }
 
 // 计算retrans值
