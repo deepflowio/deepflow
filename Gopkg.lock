@@ -59,19 +59,6 @@
   version = "v1.2.0"
 
 [[projects]]
-  digest = "1:2e3c336fc7fde5c984d2841455a658a6d626450b1754a854b3b32e7a8f49a07a"
-  name = "github.com/google/go-cmp"
-  packages = [
-    "cmp",
-    "cmp/internal/diff",
-    "cmp/internal/function",
-    "cmp/internal/value",
-  ]
-  pruneopts = "UT"
-  revision = "3af367b6b30c263d47e8895973edcca9a49cf029"
-  version = "v0.2.0"
-
-[[projects]]
   digest = "1:92f7df73c43ce74ec411c6720706d0157775e3524a692f0f770062d08582b410"
   name = "github.com/google/gopacket"
   packages = [
@@ -277,7 +264,6 @@
     "github.com/golang-collections/go-datastructures/bitarray",
     "github.com/golang/groupcache/lru",
     "github.com/golang/protobuf/proto",
-    "github.com/google/go-cmp/cmp",
     "github.com/google/gopacket/layers",
     "github.com/google/gopacket/pcapgo",
     "github.com/hashicorp/golang-lru",

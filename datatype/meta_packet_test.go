@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
 )
@@ -55,8 +54,8 @@ func TestParseArp(t *testing.T) {
 	actual := &MetaPacket{PacketLen: uint16(len(packet))}
 	l2Len := actual.ParseL2(packet)
 	actual.Parse(packet[l2Len:])
-	if result := cmp.Diff(expected, actual); result != "" {
-		t.Error(result)
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("expected: %+v，actual: %+v", expected, actual)
 	}
 }
 
@@ -80,8 +79,8 @@ func TestParseInvalid(t *testing.T) {
 	actual := &MetaPacket{PacketLen: uint16(len(packet))}
 	l2Len := actual.ParseL2(packet)
 	actual.Parse(packet[l2Len:])
-	if result := cmp.Diff(expected, actual); result != "" {
-		t.Error(result)
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("expected: %+v，actual: %+v", expected, actual)
 	}
 }
 
@@ -121,7 +120,7 @@ func TestParseIspPackets(t *testing.T) {
 
 func TestAcquireReleaseClone(t *testing.T) {
 	p := AcquireMetaPacket()
-	RefMetaPacket(p)
+	p.AddReferenceCount()
 	ReleaseMetaPacket(p)
 	ReleaseMetaPacket(p)
 	expected := &MetaPacket{PacketLen: 10086}

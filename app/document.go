@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
@@ -28,6 +29,8 @@ type Meter interface {
 }
 
 type Document struct {
+	datatype.ReferenceCount
+
 	Timestamp uint32
 	Tag
 	Meter
@@ -46,13 +49,16 @@ var poolDocument sync.Pool = sync.Pool{
 }
 
 func AcquireDocument() *Document {
-	return poolDocument.Get().(*Document)
+	d := poolDocument.Get().(*Document)
+	d.Init()
+	return d
 }
 
 func ReleaseDocument(doc *Document) {
-	if doc == nil {
+	if doc == nil || doc.SubReferenceCount() {
 		return
 	}
+
 	if doc.Tag != nil {
 		doc.Tag.Release()
 	}

@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
-	"unsafe"
 
 	. "github.com/google/gopacket/layers"
 
@@ -28,6 +26,8 @@ type MetaPacketTcpHeader struct {
 }
 
 type MetaPacket struct {
+	ReferenceCount
+
 	Timestamp      time.Duration
 	InPort         uint32
 	PacketLen      uint16
@@ -227,37 +227,25 @@ func (p *MetaPacket) String() string {
 	return buffer.String()
 }
 
-type RefCountedMetaPacket struct {
-	MetaPacket
-
-	refCount uint32
-}
-
 var metaPacketPool = sync.Pool{
 	New: func() interface{} {
-		return new(RefCountedMetaPacket)
+		return new(MetaPacket)
 	},
 }
 
 func AcquireMetaPacket() *MetaPacket {
-	p := metaPacketPool.Get().(*RefCountedMetaPacket)
-	p.refCount = 1
-	return &p.MetaPacket
+	p := metaPacketPool.Get().(*MetaPacket)
+	p.Init()
+	return p
 }
 
 func ReleaseMetaPacket(x *MetaPacket) {
-	p := (*RefCountedMetaPacket)(unsafe.Pointer(x))
-	if atomic.AddUint32(&p.refCount, ^uint32(0)) > 0 {
+	if x.SubReferenceCount() {
 		return
 	}
 
 	*x = MetaPacket{}
-	metaPacketPool.Put(p)
-}
-
-func RefMetaPacket(x *MetaPacket) {
-	p := (*RefCountedMetaPacket)(unsafe.Pointer(x))
-	atomic.AddUint32(&p.refCount, 1)
+	metaPacketPool.Put(x)
 }
 
 func CloneMetaPacket(x *MetaPacket) *MetaPacket {
