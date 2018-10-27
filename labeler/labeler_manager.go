@@ -179,7 +179,7 @@ func (l *LabelerManager) run(index int) {
 			if (action.ActionFlags & flowAppActions) != 0 {
 				flowKeys = append(flowKeys, queue.HashKey(metaPacket.Hash))
 				// meteringApp和flowApp均不会对metaPacket做修改
-				datatype.PseudoCloneMetaPacket(metaPacket) // 注意：先克隆，再发送
+				datatype.RefMetaPacket(metaPacket) // 注意：先克隆，再发送
 				flowItemBatch = append(flowItemBatch, metaPacket)
 			}
 			// 为了统计平台处理的总流量，所有流量都过meteringApp
