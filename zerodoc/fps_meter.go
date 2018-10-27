@@ -11,7 +11,6 @@ type FPSMeter struct {
 	SumFlowCount       uint64 `db:"sum_flow_count"`
 	SumNewFlowCount    uint64 `db:"sum_new_flow_count"`
 	SumClosedFlowCount uint64 `db:"sum_closed_flow_count"`
-	notClosedFlowCount uint64
 
 	MaxFlowCount    uint64 `db:"max_flow_count"`
 	MaxNewFlowCount uint64 `db:"max_new_flow_count"`
@@ -22,7 +21,6 @@ func (m *FPSMeter) ConcurrentMerge(other app.Meter) {
 		m.SumFlowCount += pm.SumFlowCount
 		m.SumNewFlowCount += pm.SumNewFlowCount
 		m.SumClosedFlowCount += pm.SumClosedFlowCount
-		m.notClosedFlowCount = m.SumFlowCount - m.SumClosedFlowCount
 
 		m.MaxFlowCount += pm.MaxFlowCount
 		m.MaxNewFlowCount += pm.MaxNewFlowCount
@@ -47,12 +45,13 @@ func (m *FPSMeter) ConcurrentMerge(other app.Meter) {
 //   累积流数量：C1 + F2'			// 不要使用F1 + N2，因为F1可能偏小
 //   累积新建流数量: N1 + N2
 //   累积结束流数量: C1 + C2
+//   未结束的流数量: F2' - C2 = (C1 + F2') - (C1 + C2)	// 即可以使用累积量相减
 func (m *FPSMeter) SequentialMerge(other app.Meter) { // other为下一秒的统计量
 	if pm, ok := other.(*FPSMeter); ok {
+		// 当前秒未结束的流数量
+		notClosedFlowCount := m.SumFlowCount - m.SumClosedFlowCount
 		// 下一秒矫正后的流数量
-		flowCount := maxU64(m.notClosedFlowCount+pm.SumNewFlowCount, pm.SumFlowCount)
-		// 下一秒未结束的流数量
-		m.notClosedFlowCount = flowCount - pm.SumClosedFlowCount
+		flowCount := maxU64(notClosedFlowCount+pm.SumNewFlowCount, pm.SumFlowCount)
 		// 累积统计量
 		m.SumFlowCount = m.SumClosedFlowCount + flowCount
 		m.SumNewFlowCount += pm.SumNewFlowCount
