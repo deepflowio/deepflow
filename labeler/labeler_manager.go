@@ -287,18 +287,11 @@ func (l *LabelerManager) recvShowAcl(conn *net.UDPConn, port int, arg *bytes.Buf
 	}
 	dropletctl.SendToDropletCtl(conn, port, 0, &buffer)
 
-	send := &policy.Acl{}
 	for _, acl := range acls {
 		buffer := bytes.Buffer{}
 		encoder := gob.NewEncoder(&buffer)
-		*send = *acl
-		if len(send.DstPorts) > 1 {
-			send.DstPorts = make([]uint16, 0, 2)
-			send.DstPorts = append(send.DstPorts, acl.DstPorts[0])
-			send.DstPorts = append(send.DstPorts, acl.DstPorts[len(acl.DstPorts)-1])
-		}
 
-		if err := encoder.Encode(send); err != nil {
+		if err := encoder.Encode(acl); err != nil {
 			log.Errorf("encoder.Encode: %s", err)
 			continue
 		}
