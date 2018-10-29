@@ -59,19 +59,16 @@ type PolicyTable struct {
 }
 
 type PolicyCounter struct {
-	Acl      uint32 `statsd:"acl"`
-	FastPath uint32 `statsd:"fast_path"`
-
 	MacTable   uint32 `statsd:"mac_table"`
-	IpTable    uint32 `statsd:"ip_table"`
 	EpcIpTable uint32 `statsd:"epc_ip_table"`
-	FastTable  uint32 `statsd:"fast_table"`
+	IpTable    uint32 `statsd:"ip_table"`
 	ArpTable   uint32 `statsd:"arp_table"`
 
-	FastHit  uint64 `statsd:"fast_hit"`
-	FirstHit uint64 `statsd:"first_hit"`
-
-	AclHitMax uint64 `statsd:"acl_hit_max"`
+	Acl       uint32 `statsd:"acl"`
+	FirstHit  uint64 `statsd:"first_hit"`
+	FastHit   uint64 `statsd:"fast_hit"`
+	AclHitMax uint32 `statsd:"acl_hit_max"`
+	FastPath  uint32 `statsd:"fast_path"`
 }
 
 func getAvailableMapSize(queueCount int, mapSize uint32) uint32 {
@@ -138,25 +135,22 @@ func (t *PolicyTable) GetCounter() interface{} {
 		MacTable:   uint32(len(t.cloudPlatformLabeler.macTable.macMap)),
 		EpcIpTable: uint32(len(t.cloudPlatformLabeler.epcIpTable.epcIpMap)),
 	}
-
 	for i := 0; i < MASK_LEN; i++ {
 		counter.IpTable += uint32(len(t.cloudPlatformLabeler.ipTables[i].ipMap))
 	}
-
-	for i := 0; i < t.queueCount; i++ {
-		for j := TAP_MIN; j < TAP_MAX; j++ {
-			counter.FastPath += uint32(t.policyLabeler.FastPolicyMaps[i][j].Len())
-		}
-	}
-
-	counter.FastHit = atomic.SwapUint64(&t.policyLabeler.FastPathHitTick, 0)
-	counter.FirstHit = atomic.SwapUint64(&t.policyLabeler.FirstPathHitTick, 0)
-
-	counter.Acl += uint32(len(t.policyLabeler.RawAcls))
 	for i := TAP_MIN; i < TAP_MAX; i++ {
 		counter.ArpTable += uint32(len(t.cloudPlatformLabeler.arpTable[i].arpMap))
 	}
-	counter.AclHitMax = atomic.SwapUint64(&t.policyLabeler.AclHitMax, 0)
+
+	counter.Acl += uint32(len(t.policyLabeler.RawAcls))
+	counter.FirstHit = atomic.SwapUint64(&t.policyLabeler.FirstPathHitTick, 0)
+	counter.FastHit = atomic.SwapUint64(&t.policyLabeler.FastPathHitTick, 0)
+	counter.AclHitMax = atomic.SwapUint32(&t.policyLabeler.AclHitMax, 0)
+	for i := 0; i < t.queueCount; i++ {
+		for j := TAP_MIN; j < TAP_MAX; j++ {
+			counter.FastPath += uint32(t.policyLabeler.FastPolicyMaps[i][j].Len() + t.policyLabeler.FastPolicyMapsMini[i][j].Len())
+		}
+	}
 	return counter
 }
 
