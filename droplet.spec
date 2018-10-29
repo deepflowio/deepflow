@@ -39,10 +39,10 @@ cp %pwd/assets/ip_info_mini.json $RPM_BUILD_ROOT/usr/share/droplet/
 /usr/bin/dlv.droplet
 /usr/bin/droplet-ctl
 /usr/sbin/droplet
-/lib/systemd/system/droplet.service
 /usr/share/droplet/ip_info_mini.json
-%config(noreplace) /etc/droplet.yaml
 /etc/droplet.yaml.sample
+%config(noreplace) /lib/systemd/system/droplet.service
+%config(noreplace) /etc/droplet.yaml
 
 %preun
 if [ $1 == 0 ]; then # uninstall
