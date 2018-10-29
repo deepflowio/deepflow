@@ -101,43 +101,20 @@ func TestQueueTwiceGets(t *testing.T) {
 	}
 }
 
-func TestQueueMultiThread(t *testing.T) {
-	queue := NewOverwriteQueue("whatever", 2)
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-	go func() {
-		if item := queue.Get(); item != 10087 {
-			t.Errorf("Expected 10087, actually %s", item)
-		}
-		wg.Done()
-	}()
-	go func() {
-		for len(queue.waiting) < 1 {
-		}
-		if item := queue.Get(); item != 10086 {
-			t.Errorf("Expected 10086, actually %s", item)
-		}
-		wg.Done()
-	}()
-	for len(queue.waiting) < 2 {
-	}
-	queue.Put(10086, 10087)
-	wg.Wait()
-	if len(queue.waiting) != 0 {
-		t.Error("Should be no waiting")
-	}
-}
-
 func TestReleased(t *testing.T) {
 	var released int
 	release := func(x interface{}) {
 		released = x.(int)
 	}
-	queue := NewOverwriteQueue("whatever", 1, release)
-	queue.Put(10010)
-	queue.Put(10086)
+	queue := NewOverwriteQueue("whatever", 2, release)
+	queue.Put(10010, 10011)
+	queue.Put(10012)
 	if released != 10010 {
 		t.Error("Expected 10010")
+	}
+	queue.Put(10013, 10014)
+	if released != 10012 {
+		t.Error("Expected 10012")
 	}
 }
 
