@@ -17,10 +17,6 @@ import (
 
 var OverflowError = errors.New("Requested size is larger than capacity")
 
-type Transaction struct {
-	request, response sync.WaitGroup
-}
-
 type Counter struct {
 	In          uint64 `statsd:"in,count"`
 	Out         uint64 `statsd:"out,count"`
@@ -31,12 +27,14 @@ type Counter struct {
 type OverwriteQueue struct {
 	sync.Mutex
 
-	items       []interface{}
-	waiting     []Transaction
-	size        uint // power of 2
-	writeCursor uint
-	pending     uint
-	release     func(x interface{})
+	writeLock     sync.Mutex
+	readerWaiting bool
+	reader        sync.WaitGroup
+	items         []interface{}
+	size          uint // power of 2
+	writeCursor   uint
+	pending       uint
+	release       func(x interface{})
 
 	counter *Counter
 }
@@ -74,7 +72,6 @@ func (q *OverwriteQueue) Init(module string, size int, options ...Option) {
 		}
 	}
 	q.items = make([]interface{}, size)
-	q.waiting = make([]Transaction, 0, 10)
 	q.size = uint(size)
 	q.counter = &Counter{}
 	stats.RegisterCountable("queue", q, statOptions...)
@@ -125,36 +122,46 @@ func (q *OverwriteQueue) Put(items ...interface{}) error {
 		return OverflowError
 	}
 
-	q.Lock()
-	q.counter.In += uint64(itemSize)
-	q.releaseOverwritten(q.items[q.writeCursor:UintMin(q.writeCursor+uint(len(items)), q.size)])
+	q.writeLock.Lock()
+
+	freeSize := (q.size - q.pending)
+	locked := false
+	if itemSize > freeSize {
+		locked = true
+		q.Lock()
+		if q.writeCursor+itemSize <= q.size {
+			q.releaseOverwritten(q.items[q.writeCursor : q.writeCursor+itemSize])
+		} else {
+			q.releaseOverwritten(q.items[q.writeCursor:q.size])
+			q.releaseOverwritten(q.items[:itemSize-(q.size-q.writeCursor)])
+		}
+	}
+
 	if copied := copy(q.items[q.writeCursor:], items); uint(copied) != itemSize {
-		q.releaseOverwritten(q.items[:len(items)-copied])
 		copy(q.items, items[copied:])
 	}
 
-	freeSize := (q.size - q.pending)
+	q.counter.In += uint64(itemSize)
 	if itemSize > freeSize {
 		q.counter.Overwritten += uint64(itemSize - freeSize)
 	}
 
+	if !locked {
+		q.Lock()
+	}
 	q.pending = UintMin(q.pending+itemSize, q.size)
+	q.writeCursor = (q.writeCursor + itemSize) & (q.size - 1)
+	q.Unlock()
+
 	if q.counter.Pending < uint64(q.pending) {
 		q.counter.Pending = uint64(q.pending)
 	}
 
-	q.writeCursor = (q.writeCursor + itemSize) & (q.size - 1)
-	for len(q.waiting) > 0 {
-		wait := &q.waiting[len(q.waiting)-1]
-		q.waiting = q.waiting[:len(q.waiting)-1]
-		wait.response.Add(1)
-		wait.request.Done()
-		wait.response.Wait()
-		if q.pending == 0 {
-			break
-		}
+	if q.readerWaiting {
+		q.readerWaiting = false
+		q.reader.Done()
 	}
-	q.Unlock()
+	q.writeLock.Unlock()
 	return nil
 }
 
@@ -169,14 +176,13 @@ func (q *OverwriteQueue) get() interface{} {
 func (q *OverwriteQueue) Get() interface{} { // will block
 	q.Lock()
 	if q.pending == 0 {
-		q.waiting = append(q.waiting, Transaction{})
-		wait := &q.waiting[len(q.waiting)-1]
-		wait.request.Add(1)
+		q.reader.Add(1)
+		q.readerWaiting = true
 		q.Unlock()
-		wait.request.Wait()
-		// 不需要重新拿锁，因为Put正在阻塞等待Complete
+		q.reader.Wait()
+		q.Lock()
 		item := q.get()
-		wait.response.Done()
+		q.Unlock()
 		return item
 	}
 	item := q.get()
@@ -184,7 +190,7 @@ func (q *OverwriteQueue) Get() interface{} { // will block
 	return item
 }
 
-func (q *OverwriteQueue) gets(output []interface{}) uint {
+func (q *OverwriteQueue) gets(output []interface{}) int {
 	size := UintMin(uint(len(output)), q.pending)
 	output = output[:size]
 	first := uint(q.firstIndex())
@@ -194,7 +200,7 @@ func (q *OverwriteQueue) gets(output []interface{}) uint {
 	}
 	q.pending -= size
 	q.counter.Out += uint64(size)
-	return size
+	return int(size)
 }
 
 // 获取多个队列中的元素，传入的slice会被覆盖写入，队列为空时阻塞等待
@@ -202,15 +208,14 @@ func (q *OverwriteQueue) gets(output []interface{}) uint {
 func (q *OverwriteQueue) Gets(output []interface{}) int { // will block
 	q.Lock()
 	if q.pending == 0 {
-		q.waiting = append(q.waiting, Transaction{})
-		wait := &q.waiting[len(q.waiting)-1]
-		wait.request.Add(1)
+		q.reader.Add(1)
+		q.readerWaiting = true
 		q.Unlock()
-		wait.request.Wait()
-		// 不需要重新拿锁，因为Put正在阻塞等待Complete
+		q.reader.Wait()
+		q.Lock()
 		size := q.gets(output)
-		wait.response.Done()
-		return int(size)
+		q.Unlock()
+		return size
 	}
 	size := q.gets(output)
 	q.Unlock()
