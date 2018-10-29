@@ -75,14 +75,40 @@ type PolicyLabeler struct {
 	maskMapFromIpGroupData  [math.MaxUint16 + 1]uint32
 }
 
-func (a *Acl) String() string {
-	if len(a.DstPorts) == 2 {
-		return fmt.Sprintf("Id:%v Type:%v TapId:%v SrcGroups:%v DstGroups:%v DstPorts:[%v-%v] Proto:%v Vlan:%v Action:%v",
-			a.Id, a.Type, a.TapId, a.SrcGroups, a.DstGroups, a.DstPorts[0], a.DstPorts[1], a.Proto, a.Vlan, a.Action)
-	} else {
-		return fmt.Sprintf("Id:%v Type:%v TapId:%v SrcGroups:%v DstGroups:%v DstPorts:%v Proto:%v Vlan:%v Action:%v",
-			a.Id, a.Type, a.TapId, a.SrcGroups, a.DstGroups, a.DstPorts, a.Proto, a.Vlan, a.Action)
+func (a *Acl) getPorts() string {
+	// IN: a.DstPorts: 1,3,4,5,7,10,11,12,15,17
+	// OUT: ports: "1,3-5,7,10-12,15,17"
+	end := uint16(0)
+	hasDash := false
+	ports := ""
+	for index, port := range a.DstPorts {
+		if index == 0 {
+			ports += fmt.Sprintf("%d", port)
+			end = port
+			continue
+		}
+
+		if port == end+1 {
+			end = port
+			hasDash = true
+			if index == len(a.DstPorts)-1 {
+				ports += fmt.Sprintf("-%d", port)
+			}
+		} else {
+			if hasDash {
+				ports += fmt.Sprintf("-%d", end)
+				hasDash = false
+			}
+			ports += fmt.Sprintf(",%d", port)
+			end = port
+		}
 	}
+	return ports
+}
+
+func (a *Acl) String() string {
+	return fmt.Sprintf("Id:%v Type:%v TapId:%v SrcGroups:%v DstGroups:%v DstPorts:[%s] Proto:%v Vlan:%v Action:%v",
+		a.Id, a.Type, a.TapId, a.SrcGroups, a.DstGroups, a.getPorts(), a.Proto, a.Vlan, a.Action)
 }
 
 func NewPolicyLabeler(queueCount int, mapSize uint32, fastPathDisable bool) *PolicyLabeler {
