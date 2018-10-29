@@ -36,7 +36,7 @@ func BenchmarkHandler(b *testing.B) {
 	packets := loadPcap("handler_test.pcap")
 	mq := queue.NewOverwriteQueues("benchmark", 1, 100)
 	handler := PacketHandler{queue: mq, remoteSegments: NewSegmentSet()}
-	handler.Init("none")
+	handler.Init(1, "none")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		packet := packets[i%len(packets)]
