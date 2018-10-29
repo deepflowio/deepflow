@@ -82,7 +82,7 @@ func Start(configPath string) {
 	}
 	// L1 - packet source
 	manager := queue.NewManager()
-	packetSourceCount := 2 // Adapter and capture
+	packetSourceCount := 1 + len(cfg.TapInterfaces) // tridentAdapter and capture
 	releaseMetaPacket := func(x interface{}) {
 		datatype.ReleaseMetaPacket(x.(*datatype.MetaPacket))
 	}
@@ -90,6 +90,12 @@ func Start(configPath string) {
 		"1-meta-packet-to-labeler", cfg.Queue.LabelerQueueSize, cfg.Queue.LabelerQueueCount, packetSourceCount,
 		releaseMetaPacket,
 	)
+
+	tridentAdapter := adapter.NewTridentAdapter(labelerQueues)
+	if tridentAdapter == nil {
+		return
+	}
+	tridentAdapter.Start()
 
 	localIp, err := getLocalIp()
 	if err != nil {
@@ -102,18 +108,12 @@ func Start(configPath string) {
 	remoteSegmentSet := capture.NewSegmentSet()
 
 	launcher := capture.CaptureLauncher{localIp, remoteSegmentSet, cfg.DefaultTapType, labelerQueues}
-	for _, iface := range cfg.TapInterfaces {
-		if _, err := launcher.StartWith(iface); err != nil {
+	for tapId, iface := range cfg.TapInterfaces {
+		if _, err := launcher.StartWith(tapId, iface); err != nil {
 			log.Error(err)
 			return
 		}
 	}
-
-	tridentAdapter := adapter.NewTridentAdapter(labelerQueues)
-	if tridentAdapter == nil {
-		return
-	}
-	tridentAdapter.Start()
 
 	// L2 - packet labeler
 	flowGeneratorQueues := manager.NewQueues(

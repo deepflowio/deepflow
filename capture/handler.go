@@ -78,11 +78,11 @@ func (h *PacketHandler) Flush() {
 	}
 }
 
-func (h *PacketHandler) Init(interfaceName string) {
+func (h *PacketHandler) Init(tapId int, interfaceName string) {
 	h.dedupTable = dedup.NewDedupTable(interfaceName)
 	h.dedupTable.SetOverwriteTTL(true)
 	// FIXME: 因为queue的实现和interface的调用约定不一致，
 	// 因此存在产生BUG的风险，需要尽快修改
-	h.keys[0] = queue.HashKey(1)
+	h.keys[0] = queue.HashKey(1 + tapId)
 	h.metaPackets = make([]interface{}, 0, BATCH_SIZE)
 }

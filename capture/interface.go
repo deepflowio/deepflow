@@ -22,7 +22,7 @@ type CaptureLauncher struct {
 	OutputQueue    queue.MultiQueueWriter
 }
 
-func (b CaptureLauncher) StartWith(ifName string) (io.Closer, error) {
+func (b CaptureLauncher) StartWith(tapId int, ifName string) (io.Closer, error) {
 	if _, err := net.InterfaceByName(ifName); err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (b CaptureLauncher) StartWith(ifName string) (io.Closer, error) {
 		tPacket: tPacket,
 		counter: &PacketCounter{},
 	}
-	cap.PacketHandler.Init(ifName)
+	cap.PacketHandler.Init(tapId, ifName)
 	cap.Start()
 	stats.RegisterCountable("capture", cap, stats.OptionStatTags{"interface": ifName})
 	instance := io.Closer(cap)
