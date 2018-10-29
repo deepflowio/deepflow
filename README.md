@@ -164,14 +164,14 @@ profiler
   - RTT（建立连接RTT延迟）
       - 对应rtt_syn（两侧加和计算，不区分哪一侧）
       - rtt_syn计算区分所属阶段（建立连接）只需要看请求包是否含有SYN就行
-        - SYN + 紧邻的反方向SYN/ACK（seq+1和ack一致）
-        - SYN/ACK + 紧邻的正方向的ACK（seq+1和ack一致）
+          - SYN + 紧邻的反方向SYN/ACK（seq+1和ack一致）
+          - SYN/ACK + 紧邻的正方向的ACK（seq+1和ack一致）
   - SRT（系统响应时间）
       - 对应rtt（只算服务端一侧）
       - 分别计算客户端到引流点、引流点到服务端的rtt（rtt_0和rtt_1），最终输出只输出其中一侧（根据最终的方向判断）
       - rtt计算区分所属阶段（数据传输）只需要看请求包是否含有PSH就行
-        - PSH/ACK且有payload（payloadlen>1）+ 紧邻的反方向的无payload（payload_len=0）的ACK（seq和ack一致）
-            - 为了避免丢包、乱序情况下TCP Keep-Alive包的影响，限制每对请求、回复包的rtt计算的最大值为10s
+          - PSH/ACK且有payload（payloadlen>1）+ 紧邻的反方向的无payload（payload_len=0）的ACK（seq和ack一致）
+              - 说明：为了避免丢包、乱序情况下TCP Keep-Alive包的影响，限制每对请求、回复包的rtt计算的最大值为10s
   - ART（应用响应时间）
       - 对应art（只算服务端一侧）
       - 分别计算客户端到引流点、引流点到服务端的art（art_0和art_1），最终输出只输出其中一侧（根据最终的方向判断）
@@ -183,6 +183,7 @@ profiler
           - 请求方向的seq确定：SYN和ACK，根据SYN来计算ACK
           - 回复方向的seq确定：SYN/ACK
       - 数据传输阶段重传，需判断包的seq和length是否与已收到的包重复
+          - 说明：数据传输阶段重传retrans统计包含建立连接阶段重传retransSyn 
       - 需要注意TCP Keep-Alive包的影响
           - 排除payloadlen=0,或payloadlen=1的包
   - 零窗
@@ -193,6 +194,26 @@ profiler
       - 包方差PacketSizeDeviation
       - 包间隔均值PacketIntervalAvg
       - 包间隔方差PacketIntervalDeviation
+
+* 性能字段字段对应关系表
+
+     flow性能量化字段                           | 统计粒度      | 所属阶段 | 是否区分方向 | 其他        | 对应report字段                                | 对应kibana字段
+     -------------------------------------------|---------------|----------|--------------|-------------|-----------------------------------------------|---------------
+     flow.rttSyn0, flow.rttSyn1                 | 每流          | 连接建立 | 是           | N/A         | RTTSyn=rttSyn0+rttSyn1                        | rtt_syn
+     period.retransSyn0, period.retransSyn1     | 每上报周期    | 连接建立 | 是           | N/A         | Src.SynRetransCount, Dst.SynRetransCount      | syn_retrans_cnt_0, syn_retrans_cnt_1
+     period.art0Sum, period.art1Sum             | 每上报周期    | 数据传输 | 是           | N/A         | ART=art1Sum/art1Count                         | art_avg
+     period.art0Count, period.art1Count         | 每上报周期    | 数据传输 | 是           | N/A         | ART=art1Sum/art1Count                         | art_avg
+     period.rtt0Sum, period.rtt1Sum             | 每上报周期    | 数据传输 | 是           | N/A         | RTT=rtt1Sum/rtt1Count                         | rtt
+     period.rtt0Count, period.rtt1Count         | 每上报周期    | 数据传输 | 是           | N/A         | RTT=rtt1Sum/rtt1Count                         | rtt
+     period.retrans0, period.retrans1           | 每上报周期    | 数据传输 | 是           | 包括syn重传 | Src.RetransCount, Dst.RetransCount            | retrans_cnt_0, retrans_cnt_1
+     flow.retrans0, flow.retrans1               | 每流          | 数据传输 | 是           | 包括syn重传 | TotalRetransCount=retrans0+retrans1           | total_retrans_cnt
+     period.zeroWinCount0, period.zeroWinCount1 | 每上报周期    | 数据传输 | 是           | N/A         | Src.ZeroWinCount, Dst.ZeroWinCount            | zero_wnd_cnt_0, zero_wnd_cnt_1
+     flow.zeroWinCount0, flow.zeroWinCount1     | 每流          | 数据传输 | 是           | N/A         | TotalZeroWinCount=zeroWinCount0+zeroWinCount1 | total_zero_wnd_cnt
+     period.pshUrgCount0, period.pshUrgCount1   | 每上报周期    | 数据传输 | 是           | N/A         | Src.PshUrgCount, Dst.PshUrgCount              | psh_urg_cnt_0, psh_urg_cnt_1
+     flow.pshUrgCount0, flow.pshUrgCount1       | 每流          | 数据传输 | 是           | N/A         | TotalPshUrgCount=pshUrgCount0+pshUrgCount1    | total_psh_urg_cnt
+     packetIntervalAvg                          | 每上报周期    | N/A      | 否           | N/A         | PacketIntervalAvg                             | avg_pkt_interval
+     packetIntervalVariance                     | 每上报周期    | N/A      | 否           | N/A         | PacketIntervalVariance                        | pkt_interval_deviation
+     packetSizeVariance                         | 每上报周期    | N/A      | 否           | N/A         | PacketSizeVariance                            | pkt_size_deviation
 
 网流聚合原则
 ------------
