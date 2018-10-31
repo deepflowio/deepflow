@@ -1629,3 +1629,42 @@ func TestEndpointDataDirection(t *testing.T) {
 		t.Error("key4 FastPath Check Failed!")
 	}
 }
+
+func BenchmarkFirstPath(b *testing.B) {
+	acls := []*Acl{}
+	// 创建 policyTable
+	table := generatePolicyTable()
+	// 构建acl action  1->2 tcp 8000
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	acl := generatePolicyAcl(table, action, 10, group1Id, group2Id, 6, 8000, 0)
+	acls = append(acls, acl)
+	table.UpdateAcls(acls)
+	// 构建查询1-key  1:0->2:8000 tcp
+	key := generateLookupKey(group1Mac, group2Mac, 0, group1Ip1, group2Ip1, 6, 0, 8000)
+	endpoint := table.cloudPlatformLabeler.GetEndpointData(key)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		table.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+	}
+}
+
+func BenchmarkFastPath(b *testing.B) {
+	acls := []*Acl{}
+	// 创建 policyTable
+	table := generatePolicyTable()
+	// 构建acl action  1->2 tcp 8000
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	acl := generatePolicyAcl(table, action, 10, group1Id, group2Id, 6, 8000, 0)
+	acls = append(acls, acl)
+	table.UpdateAcls(acls)
+	// 构建查询1-key  1:0->2:8000 tcp
+	key := generateLookupKey(group1Mac, group2Mac, 0, group1Ip1, group2Ip1, 6, 0, 8000)
+	endpoint := table.cloudPlatformLabeler.GetEndpointData(key)
+	table.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		table.policyLabeler.GetPolicyByFastPath(key)
+	}
+}
