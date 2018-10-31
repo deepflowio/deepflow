@@ -861,6 +861,23 @@ func TestModifyEpcIdPolicy5(t *testing.T) {
 	}
 }
 
+func BenchmarkGetEndpointData(b *testing.B) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	platformData1 := generatePlatformDataByParam("192.168.0.11", "08:00:27:a4:2b:fa", 11, 4)
+	platformData1.GroupIds = append(platformData1.GroupIds, 2)
+	platformData2 := generatePlatformDataByParam("192.168.0.12", "08:00:27:a4:2b:fb", 20, 4)
+	platformData2.GroupIds = append(platformData2.GroupIds, 40)
+	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
+	generateIpgroupData(policy)
+	generateAclData(policy)
+	key := generateLookupKey(mac2, mac3, 0, ip3, ip4, uint8(IPProtocolTCP), 0, 8000)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, true, true)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		policy.cloudPlatformLabeler.GetEndpointData(key)
+	}
+}
+
 // 以下是云平台信息和policy结合起来的测试
 func TestPolicySimple(t *testing.T) {
 	acls := []*Acl{}
