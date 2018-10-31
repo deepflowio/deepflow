@@ -6,6 +6,12 @@ import (
 
 type ReferenceCount int32
 
+type ReferenceCounter interface {
+	Init()
+	AddReferenceCount()
+	SubReferenceCount() bool
+}
+
 func (r *ReferenceCount) Init() {
 	*r = 1
 }
