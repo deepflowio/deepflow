@@ -10,8 +10,8 @@ const (
 	MAX_MASK_LEN    = 32
 	IF_TYPE_WAN     = 3
 	NETMASK         = 0xFFFFFFFF
-	DATA_VALID_TIME = 60 * time.Second
-	ARP_VALID_TIME  = 60 * 60 * time.Second
+	DATA_VALID_TIME = 1 * time.Minute
+	ARP_VALID_TIME  = 1 * time.Hour
 )
 
 type IpNet struct {

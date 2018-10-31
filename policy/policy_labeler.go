@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/golang/groupcache/lru"
 
@@ -15,6 +16,8 @@ import (
 )
 
 const (
+	FAST_PATH_HARD_TIMEOUT = 1 * time.Minute
+
 	STANDARD_NETMASK = 0xffff0000
 
 	ANY_GROUP = 0
@@ -37,6 +40,7 @@ type Acl struct {
 type PortPolicyValue struct {
 	endpoint       EndpointData
 	protoPolicyMap map[uint8]*PolicyData
+	timestamp      time.Duration
 }
 
 type VlanAndPortMap struct {
@@ -127,8 +131,8 @@ func NewPolicyLabeler(queueCount int, mapSize uint32, fastPathDisable bool) *Pol
 		policy.FastPolicyMaps[i] = make([]*lru.Cache, TAP_MAX)
 		policy.FastPolicyMapsMini[i] = make([]*lru.Cache, TAP_MAX)
 		for j := TAP_MIN; j < TAP_MAX; j++ {
-			policy.FastPolicyMaps[i][j] = lru.New((int(mapSize) >> 2) * 3)
-			policy.FastPolicyMapsMini[i][j] = lru.New(int(mapSize) >> 2)
+			policy.FastPolicyMaps[i][j] = lru.New((int(mapSize) >> 3) * 7)
+			policy.FastPolicyMapsMini[i][j] = lru.New(int(mapSize) >> 3)
 		}
 	}
 	return policy
@@ -485,8 +489,8 @@ func (l *PolicyLabeler) FlushAcls() {
 		for j := TAP_MIN; j < TAP_MAX; j++ {
 			l.FastPolicyMaps[i][j].Clear()
 			l.FastPolicyMapsMini[i][j].Clear()
-			l.FastPolicyMaps[i][j] = lru.New((int(l.MapSize) >> 2) * 3)
-			l.FastPolicyMapsMini[i][j] = lru.New(int(l.MapSize) >> 2)
+			l.FastPolicyMaps[i][j] = lru.New((int(l.MapSize) >> 3) * 7)
+			l.FastPolicyMapsMini[i][j] = lru.New(int(l.MapSize) >> 3)
 		}
 	}
 }
@@ -649,12 +653,13 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, srcEpc, ds
 	mapsForward := l.getVlanAndPortMap(packet, FORWARD, true, nil)
 	l.addEpcMap(mapsForward, srcEpc, dstEpc, packet)
 	key := uint64(srcEpc)<<48 | uint64(dstEpc)<<32 | uint64(packet.SrcPort)<<16 | uint64(packet.DstPort)
-	if mapsForward.portPolicyMap[key] == nil {
-		value := &PortPolicyValue{endpoint: *endpointData, protoPolicyMap: make(map[uint8]*PolicyData)}
+	if portPolicyValue := mapsForward.portPolicyMap[key]; portPolicyValue == nil {
+		value := &PortPolicyValue{endpoint: *endpointData, protoPolicyMap: make(map[uint8]*PolicyData), timestamp: packet.Timestamp}
 		value.protoPolicyMap[packet.Proto] = forward
 		mapsForward.portPolicyMap[key] = value
 	} else {
-		mapsForward.portPolicyMap[key].protoPolicyMap[packet.Proto] = forward
+		portPolicyValue.endpoint = *endpointData
+		portPolicyValue.protoPolicyMap[packet.Proto] = forward
 	}
 
 	mapsBackward := l.getVlanAndPortMap(packet, BACKWARD, true, mapsForward)
@@ -666,13 +671,14 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, srcEpc, ds
 		}
 	}
 	key = uint64(dstEpc)<<48 | uint64(srcEpc)<<32 | uint64(packet.DstPort)<<16 | uint64(packet.SrcPort)
-	if mapsBackward.portPolicyMap[key] == nil {
-		value := &PortPolicyValue{endpoint: *endpointData, protoPolicyMap: make(map[uint8]*PolicyData)}
+	if portPolicyValue := mapsBackward.portPolicyMap[key]; portPolicyValue == nil {
+		value := &PortPolicyValue{endpoint: *endpointData, protoPolicyMap: make(map[uint8]*PolicyData), timestamp: packet.Timestamp}
 		value.endpoint.SrcInfo, value.endpoint.DstInfo = value.endpoint.DstInfo, value.endpoint.SrcInfo
 		value.protoPolicyMap[packet.Proto] = backward
 		mapsBackward.portPolicyMap[key] = value
 	} else {
-		mapsBackward.portPolicyMap[key].protoPolicyMap[packet.Proto] = backward
+		portPolicyValue.endpoint.SrcInfo, portPolicyValue.endpoint.DstInfo = endpointData.DstInfo, endpointData.SrcInfo
+		portPolicyValue.protoPolicyMap[packet.Proto] = backward
 	}
 
 	return mapsForward, mapsBackward
@@ -704,6 +710,9 @@ func (l *PolicyLabeler) getFastPortPolicy(maps *VlanAndPortMap, srcEpc, dstEpc u
 	key := uint64(srcEpc)<<48 | uint64(dstEpc)<<32 | uint64(packet.SrcPort)<<16 | uint64(packet.DstPort)
 	if value := maps.portPolicyMap[key]; value != nil {
 		if policy := value.protoPolicyMap[packet.Proto]; policy != nil {
+			if packet.Timestamp-value.timestamp > FAST_PATH_HARD_TIMEOUT && packet.Timestamp > value.timestamp {
+				return nil, nil
+			}
 			return &value.endpoint, policy
 		}
 	}

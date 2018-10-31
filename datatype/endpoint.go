@@ -10,8 +10,11 @@ import (
 )
 
 var (
-	INVALID_ENDPOINT_INFO = NewEndpointInfo()
-	INVALID_ENDPOINT_DATA = &EndpointData{SrcInfo: INVALID_ENDPOINT_INFO, DstInfo: INVALID_ENDPOINT_INFO}
+	INVALID_ENDPOINT_INFO           = NewEndpointInfo()
+	INVALID_ENDPOINT_INFO_L2END     = &EndpointInfo{L2End: true}
+	INVALID_ENDPOINT_INFO_L3END     = &EndpointInfo{L3End: true}
+	INVALID_ENDPOINT_INFO_L2AND3END = &EndpointInfo{L2End: true, L3End: true}
+	INVALID_ENDPOINT_DATA           = &EndpointData{SrcInfo: INVALID_ENDPOINT_INFO, DstInfo: INVALID_ENDPOINT_INFO}
 )
 
 type TapType uint8
@@ -99,8 +102,15 @@ func (i *EndpointInfo) SetL3Data(data *PlatformData, ip uint32) {
 	}
 }
 
-func (i *EndpointInfo) SetL3EndByTtl(ttl uint8) {
+func IsOriginalTtl(ttl uint8) bool {
 	if ttl == 64 || ttl == 128 || ttl == 255 {
+		return true
+	}
+	return false
+}
+
+func (i *EndpointInfo) SetL3EndByTtl(ttl uint8) {
+	if IsOriginalTtl(ttl) {
 		i.L3End = true
 	}
 }
@@ -159,8 +169,10 @@ func (d *EndpointData) String() string {
 }
 
 func (d *EndpointData) SetL2End(key *LookupKey) {
-	d.SrcInfo.L2End = key.L2End0
-	d.DstInfo.L2End = key.L2End1
+	if key.Tap == TAP_TOR {
+		d.SrcInfo.L2End = key.L2End0
+		d.DstInfo.L2End = key.L2End1
+	}
 }
 
 func (t *TapType) CheckTapType(tapType TapType) bool {
