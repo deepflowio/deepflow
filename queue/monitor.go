@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
 )
 
@@ -21,17 +23,24 @@ type MonitorOperator interface {
 type Unmarshaller func(interface{}) (interface{}, error)
 
 type Monitor struct {
+	ch chan []interface{}
+
 	DebugOn bool
 	Name    string
 
-	conn         *net.UDPConn
-	port         int
 	unmarshaller Unmarshaller
 }
 
 func (m *Monitor) isDebugOn() bool {
 	on := m.DebugOn
 	return on
+}
+
+func (m *Monitor) run(conn *net.UDPConn, port int) {
+	for m.DebugOn {
+		items := <-m.ch
+		m.sendDebug(conn, port, items)
+	}
 }
 
 func (m *Monitor) debugSwitch(on bool) {
@@ -42,9 +51,9 @@ func (m *Monitor) debugSwitch(on bool) {
 }
 
 func (m *Monitor) TurnOnDebug(conn *net.UDPConn, port int) {
-	m.conn = conn
-	m.port = port
+	m.ch = make(chan []interface{}, 1000)
 	m.debugSwitch(true)
+	go m.run(conn, port)
 }
 
 func (m *Monitor) TurnOffDebug() {
@@ -84,12 +93,24 @@ func (m *Monitor) sendDebug(conn *net.UDPConn, port int, items []interface{}) {
 			break
 		}
 		dropletctl.SendToDropletCtl(conn, port, 0, &buffer)
+		item.(datatype.ReferenceCounter).SubReferenceCount()
 	}
 }
 
 func (m *Monitor) send(items []interface{}) {
 	if m.isDebugOn() && len(items) > 0 {
-		m.sendDebug(m.conn, m.port, items)
+		if _, ok := items[0].(datatype.ReferenceCounter); !ok {
+			log.Errorf("queue[%s] recv invalid data.", m.Name)
+			return
+		}
+		for _, item := range items {
+			item.(datatype.ReferenceCounter).AddReferenceCount()
+		}
+
+		select {
+		case m.ch <- items:
+		default:
+		}
 	}
 }
 

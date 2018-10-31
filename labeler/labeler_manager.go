@@ -178,8 +178,8 @@ func (l *LabelerManager) run(index int) {
 
 			if (action.ActionFlags & flowAppActions) != 0 {
 				flowKeys = append(flowKeys, queue.HashKey(metaPacket.Hash))
-				// meteringApp和flowApp均不会对metaPacket做修改
-				datatype.RefMetaPacket(metaPacket) // 注意：先克隆，再发送
+				// droplet-ctl、meteringApp和flowApp均不会对metaPacket做修改
+				metaPacket.AddReferenceCount() // 引用计数+1，避免被释放
 				flowItemBatch = append(flowItemBatch, metaPacket)
 			}
 			// 为了统计平台处理的总流量，所有流量都过meteringApp
