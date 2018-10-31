@@ -2,6 +2,7 @@ package stats
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -177,6 +178,9 @@ func setRemotes(ips ...net.IP) {
 }
 
 func init() {
+	if flag.Lookup("test.v") != nil {
+		return
+	}
 	paths := strings.Split(os.Args[0], "/")
 	processName = paths[len(paths)-1]
 	go run()
