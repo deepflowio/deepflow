@@ -7,11 +7,10 @@ import (
 )
 
 func (f *FlowGenerator) processUdpPacket(meta *MetaPacket) {
-	flowKey := f.genFlowKey(meta)
-	hash := f.getQuinTupleHash(flowKey)
+	hash := f.getQuinTupleHash(meta)
 	flowCache := f.hashMap[hash%hashMapSize]
 	flowCache.Lock()
-	if flowExtra, reply, _ := flowCache.keyMatch(meta, flowKey); flowExtra != nil {
+	if flowExtra, reply, _ := flowCache.keyMatch(meta); flowExtra != nil {
 		f.updateUdpFlow(flowExtra, meta, reply)
 	} else {
 		if f.stats.CurrNumFlows >= f.flowLimitNum {
@@ -19,7 +18,7 @@ func (f *FlowGenerator) processUdpPacket(meta *MetaPacket) {
 			flowCache.Unlock()
 			return
 		}
-		flowExtra = f.initUdpFlow(meta, flowKey)
+		flowExtra = f.initUdpFlow(meta)
 		f.stats.TotalNumFlows++
 		f.addFlow(flowCache, flowExtra)
 		atomic.AddInt32(&f.stats.CurrNumFlows, 1)
@@ -27,9 +26,9 @@ func (f *FlowGenerator) processUdpPacket(meta *MetaPacket) {
 	flowCache.Unlock()
 }
 
-func (f *FlowGenerator) initUdpFlow(meta *MetaPacket, key *FlowKey) *FlowExtra {
+func (f *FlowGenerator) initUdpFlow(meta *MetaPacket) *FlowExtra {
 	now := meta.Timestamp
-	flowExtra := f.initFlow(meta, key, now)
+	flowExtra := f.initFlow(meta, now)
 	taggedFlow := flowExtra.taggedFlow
 	taggedFlow.FlowMetricsPeerSrc.ArrTime0 = now
 	taggedFlow.FlowMetricsPeerSrc.ArrTimeLast = now

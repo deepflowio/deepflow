@@ -15,42 +15,23 @@ import (
 
 var log = logging.MustGetLogger("flowgenerator")
 
-func (f *FlowGenerator) genFlowKey(meta *MetaPacket) *FlowKey {
-	flowKey := f.innerFlowKey
-	flowKey.Exporter = meta.Exporter
-	flowKey.MACSrc = meta.MacSrc
-	flowKey.MACDst = meta.MacDst
-	flowKey.IPSrc = meta.IpSrc
-	flowKey.IPDst = meta.IpDst
-	flowKey.Proto = meta.Protocol
-	flowKey.PortSrc = meta.PortSrc
-	flowKey.PortDst = meta.PortDst
-	flowKey.InPort = meta.InPort
-	if tunnel := meta.Tunnel; tunnel != nil {
-		flowKey.TunnelInfo = *tunnel
-	} else {
-		flowKey.TunnelInfo = TunnelInfo{}
-	}
-	return flowKey
-}
-
 // hash of the key L3, symmetric
-func getKeyL3Hash(flowKey *FlowKey, basis uint32) uint64 {
-	return uint64(hashAdd(basis, flowKey.IPSrc^flowKey.IPDst))
+func getKeyL3Hash(meta *MetaPacket, basis uint32) uint64 {
+	return uint64(hashAdd(basis, meta.IpSrc^meta.IpDst))
 }
 
 // hash of the key L4, symmetric
-func getKeyL4Hash(flowKey *FlowKey, basis uint32) uint64 {
-	portSrc := uint32(flowKey.PortSrc)
-	portDst := uint32(flowKey.PortDst)
+func getKeyL4Hash(meta *MetaPacket, basis uint32) uint64 {
+	portSrc := uint32(meta.PortSrc)
+	portDst := uint32(meta.PortDst)
 	if portSrc >= portDst {
 		return uint64(hashAdd(basis, (portSrc<<16)|portDst))
 	}
 	return uint64(hashAdd(basis, (portDst<<16)|portSrc))
 }
 
-func (f *FlowGenerator) getQuinTupleHash(flowKey *FlowKey) uint64 {
-	return getKeyL3Hash(flowKey, f.hashBasis) ^ ((uint64(flowKey.InPort) << 32) | getKeyL4Hash(flowKey, f.hashBasis))
+func (f *FlowGenerator) getQuinTupleHash(meta *MetaPacket) uint64 {
+	return getKeyL3Hash(meta, f.hashBasis) ^ ((uint64(meta.InPort) << 32) | getKeyL4Hash(meta, f.hashBasis))
 }
 
 func isFromTor(inPort uint32) bool {
@@ -67,37 +48,40 @@ func MacEquals(meta *MetaPacket, flowMacSrc, flowMacDst MacInt) bool {
 	return false
 }
 
-func (f *FlowExtra) TunnelMatch(keyTunnelInfo, flowTunnelInfo *TunnelInfo) bool {
-	if flowTunnelInfo.Id == 0 && keyTunnelInfo.Id == 0 {
+func (f *FlowExtra) TunnelMatch(metaTunnelInfo, flowTunnelInfo *TunnelInfo) bool {
+	if metaTunnelInfo == nil {
+		metaTunnelInfo = &TunnelInfo{}
+	}
+	if flowTunnelInfo.Id == 0 && metaTunnelInfo.Id == 0 {
 		return true
 	}
-	if flowTunnelInfo.Type != keyTunnelInfo.Type || flowTunnelInfo.Id != keyTunnelInfo.Id {
+	if flowTunnelInfo.Id != metaTunnelInfo.Id || flowTunnelInfo.Type != metaTunnelInfo.Type {
 		return false
 	}
-	return flowTunnelInfo.Src^keyTunnelInfo.Src^flowTunnelInfo.Dst^keyTunnelInfo.Dst == 0
+	return flowTunnelInfo.Src^metaTunnelInfo.Src^flowTunnelInfo.Dst^metaTunnelInfo.Dst == 0
 }
 
-func (f *FlowCache) keyMatch(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool, *ElementFlowExtra) {
+func (f *FlowCache) keyMatch(meta *MetaPacket) (*FlowExtra, bool, *ElementFlowExtra) {
 	for e := f.flowList.Front(); e != nil; e = e.Next() {
 		flowExtra := e.Value
 		taggedFlow := flowExtra.taggedFlow
-		if taggedFlow.Exporter != key.Exporter || key.InPort != taggedFlow.InPort {
+		if taggedFlow.Exporter != meta.Exporter || meta.InPort != taggedFlow.InPort {
 			continue
 		}
-		if isFromTor(key.InPort) && !MacEquals(meta, taggedFlow.MACSrc, taggedFlow.MACDst) {
+		if isFromTor(meta.InPort) && !MacEquals(meta, taggedFlow.MACSrc, taggedFlow.MACDst) {
 			continue
 		}
-		if taggedFlow.Proto != key.Proto ||
-			!flowExtra.TunnelMatch(&key.TunnelInfo, &taggedFlow.TunnelInfo) {
+		if taggedFlow.Proto != meta.Protocol ||
+			!flowExtra.TunnelMatch(meta.Tunnel, &taggedFlow.TunnelInfo) {
 			continue
 		}
 		flowIPSrc, flowIPDst := taggedFlow.IPSrc, taggedFlow.IPDst
-		keyIPSrc, keyIPDst := key.IPSrc, key.IPDst
+		metaIpSrc, metaIpDst := meta.IpSrc, meta.IpDst
 		flowPortSrc, flowPortDst := taggedFlow.PortSrc, taggedFlow.PortDst
-		keyPortSrc, keyPortDst := key.PortSrc, key.PortDst
-		if flowIPSrc == keyIPSrc && flowIPDst == keyIPDst && flowPortSrc == keyPortSrc && flowPortDst == keyPortDst {
+		metaPortSrc, metaPortDst := meta.PortSrc, meta.PortDst
+		if flowIPSrc == metaIpSrc && flowIPDst == metaIpDst && flowPortSrc == metaPortSrc && flowPortDst == metaPortDst {
 			return flowExtra, false, e
-		} else if flowIPSrc == keyIPDst && flowIPDst == keyIPSrc && flowPortSrc == keyPortDst && flowPortDst == keyPortSrc {
+		} else if flowIPSrc == metaIpDst && flowIPDst == metaIpSrc && flowPortSrc == metaPortDst && flowPortDst == metaPortSrc {
 			return flowExtra, true, e
 		}
 	}
@@ -123,10 +107,23 @@ func (f *FlowGenerator) genFlowId(timestamp uint64, inPort uint64) uint64 {
 	return ((inPort & IN_PORT_FLOW_ID_MASK) << 32) | ((timestamp & TIMER_FLOW_ID_MASK) << 32) | (f.stats.TotalNumFlows & TOTAL_FLOWS_ID_MASK)
 }
 
-func (f *FlowGenerator) initFlow(meta *MetaPacket, key *FlowKey, now time.Duration) *FlowExtra {
+func (f *FlowGenerator) initFlow(meta *MetaPacket, now time.Duration) *FlowExtra {
 	taggedFlow := AcquireTaggedFlow()
-	taggedFlow.FlowKey = *key
-	taggedFlow.FlowID = f.genFlowId(uint64(now), uint64(key.InPort))
+	taggedFlow.Exporter = meta.Exporter
+	taggedFlow.MACSrc = meta.MacSrc
+	taggedFlow.MACDst = meta.MacDst
+	taggedFlow.IPSrc = meta.IpSrc
+	taggedFlow.IPDst = meta.IpDst
+	taggedFlow.Proto = meta.Protocol
+	taggedFlow.PortSrc = meta.PortSrc
+	taggedFlow.PortDst = meta.PortDst
+	taggedFlow.InPort = meta.InPort
+	if tunnel := meta.Tunnel; tunnel != nil {
+		taggedFlow.TunnelInfo = *tunnel
+	} else {
+		taggedFlow.TunnelInfo = TunnelInfo{}
+	}
+	taggedFlow.FlowID = f.genFlowId(uint64(now), uint64(meta.InPort))
 	taggedFlow.TimeBitmap = 1
 	taggedFlow.StartTime = now
 	taggedFlow.EndTime = now
@@ -311,7 +308,7 @@ func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireInterval time.Durati
 	if minArrTime == 0 {
 		minArrTime = timeMax(taggedFlow.FlowMetricsPeerSrc.ArrTime0, taggedFlow.FlowMetricsPeerDst.ArrTime0)
 	}
-	taggedFlow.Duration = timeMax(taggedFlow.FlowMetricsPeerSrc.ArrTimeLast, taggedFlow.FlowMetricsPeerDst.ArrTimeLast) - minArrTime
+	taggedFlow.Duration = f.recentTime - minArrTime
 }
 
 func (f *FlowExtra) resetCurFlowInfo(now time.Duration) {
@@ -562,7 +559,6 @@ func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, cfg
 		stats:                   FlowGeneratorStats{cleanRoutineFlowCacheNums: make([]int, timeoutCleanerCount), cleanRoutineMaxFlowCacheLens: make([]int, timeoutCleanerCount)},
 		stateMachineMaster:      make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
 		stateMachineSlave:       make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
-		innerFlowKey:            &FlowKey{},
 		packetHandler:           &PacketHandler{recvBuffer: make([]interface{}, cfg.BufferSize), processBuffer: make([]interface{}, cfg.BufferSize)},
 		servicePortDescriptor:   getServiceDescriptorWithIANA(),
 		forceReportInterval:     cfg.ForceReportInterval,

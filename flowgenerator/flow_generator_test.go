@@ -1,7 +1,6 @@
 package flowgenerator
 
 import (
-	"math/rand"
 	"net"
 	"runtime"
 	"testing"
@@ -146,46 +145,11 @@ func TestHandleSynFin(t *testing.T) {
 	}
 }
 
-func TestGetKeyL3Hash(t *testing.T) {
-	flowKey := &FlowKey{}
-	basis := rand.Uint32()
-
-	flowKey.IPSrc = IPv4Int(NewIPFromString("192.168.1.123").Int())
-	flowKey.IPDst = IPv4Int(NewIPFromString("10.168.1.221").Int())
-	hash0 := getKeyL3Hash(flowKey, basis)
-
-	flowKey.IPDst = IPv4Int(NewIPFromString("192.168.1.123").Int())
-	flowKey.IPSrc = IPv4Int(NewIPFromString("10.168.1.221").Int())
-	hash1 := getKeyL3Hash(flowKey, basis)
-
-	if hash0 != hash1 {
-		t.Errorf("symmetric hash values are %d and %d", hash0, hash1)
-	}
-}
-
-func TestGetKeyL4Hash(t *testing.T) {
-	flowKey := &FlowKey{}
-	basis := rand.Uint32()
-
-	flowKey.Proto = layers.IPProtocolTCP
-	flowKey.PortSrc = 12345
-	flowKey.PortDst = 22
-	hash0 := getKeyL4Hash(flowKey, basis)
-
-	flowKey.PortSrc, flowKey.PortDst = flowKey.PortDst, flowKey.PortSrc
-	hash1 := getKeyL4Hash(flowKey, basis)
-
-	if hash0 != hash1 {
-		t.Errorf("symmetric hash values are %d and %d", hash0, hash1)
-	}
-}
-
 func TestInitFlow(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator := getDefaultFlowGenerator()
 	packet := getDefaultPacket()
-	flowKey := flowGenerator.genFlowKey(packet)
-	flowExtra, _, _ := flowGenerator.initTcpFlow(packet, flowKey)
+	flowExtra, _, _ := flowGenerator.initTcpFlow(packet)
 	taggedFlow := flowExtra.taggedFlow
 
 	if taggedFlow.FlowID == 0 {
@@ -203,8 +167,8 @@ func TestInitFlow(t *testing.T) {
 		t.Errorf("taggedFlow.IpSrc is %d, packet.IpSrc is %d", taggedFlow.IPSrc, packet.IpSrc)
 		t.Errorf("taggedFlow.IpDst is %d, packet.IpDst is %d", taggedFlow.IPDst, packet.IpDst)
 	}
-	if flowKey.Proto != packet.Protocol {
-		t.Errorf("flowKey.Proto is %d, packet.Protocol is %d", taggedFlow.Proto, packet.Protocol)
+	if taggedFlow.Proto != packet.Protocol {
+		t.Errorf("taggedFlow.Proto is %d, packet.Protocol is %d", taggedFlow.Proto, packet.Protocol)
 	}
 	if taggedFlow.PortSrc != packet.PortSrc || taggedFlow.PortDst != packet.PortDst {
 		t.Errorf("taggedFlow.PortSrc is %d, packet.PortSrc is %d", taggedFlow.PortSrc, packet.PortSrc)
@@ -456,8 +420,7 @@ func BenchmarkCleanHashMap(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		meta := getDefaultPacket()
-		flowKey := flowGenerator.genFlowKey(meta)
-		flowExtra, _, _ := flowGenerator.initTcpFlow(meta, flowKey)
+		flowExtra, _, _ := flowGenerator.initTcpFlow(meta)
 		flowGenerator.addFlow(flowCache, flowExtra)
 		flowGenerator.cleanTimeoutHashMap(flowGenerator.hashMap, 0, 1, 0)
 	}
