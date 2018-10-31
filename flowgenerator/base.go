@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
 )
 
@@ -94,7 +93,6 @@ type FlowGenerator struct {
 	stateMachineMaster      []map[uint8]*StateValue
 	stateMachineSlave       []map[uint8]*StateValue
 	servicePortDescriptor   *ServicePortDescriptor
-	innerFlowKey            *FlowKey
 	packetHandler           *PacketHandler
 	forceReportInterval     time.Duration
 	minLoopInterval         time.Duration

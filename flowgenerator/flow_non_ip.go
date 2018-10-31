@@ -6,11 +6,11 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
-func (f *FlowGenerator) getNonIpQuinTupleHash(flowKey *FlowKey) uint64 {
-	return flowKey.MACSrc ^ flowKey.MACDst
+func (f *FlowGenerator) getNonIpQuinTupleHash(meta *MetaPacket) uint64 {
+	return meta.MacSrc ^ meta.MacDst
 }
 
-func (f *FlowCache) keyMatchForNonIp(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool) {
+func (f *FlowCache) keyMatchForNonIp(meta *MetaPacket) (*FlowExtra, bool) {
 	for e := f.flowList.Front(); e != nil; e = e.Next() {
 		flowExtra := e.Value
 		taggedFlow := flowExtra.taggedFlow
@@ -26,11 +26,10 @@ func (f *FlowCache) keyMatchForNonIp(meta *MetaPacket, key *FlowKey) (*FlowExtra
 }
 
 func (f *FlowGenerator) processNonIpPacket(meta *MetaPacket) {
-	flowKey := f.genFlowKey(meta)
-	hash := f.getNonIpQuinTupleHash(flowKey)
+	hash := f.getNonIpQuinTupleHash(meta)
 	flowCache := f.hashMap[hash%hashMapSize]
 	flowCache.Lock()
-	if flowExtra, reply := flowCache.keyMatchForNonIp(meta, flowKey); flowExtra != nil {
+	if flowExtra, reply := flowCache.keyMatchForNonIp(meta); flowExtra != nil {
 		f.updateNonIpFlow(flowExtra, meta, reply)
 	} else {
 		if f.stats.CurrNumFlows >= f.flowLimitNum {
@@ -38,7 +37,7 @@ func (f *FlowGenerator) processNonIpPacket(meta *MetaPacket) {
 			flowCache.Unlock()
 			return
 		}
-		flowExtra = f.initNonIpFlow(meta, flowKey)
+		flowExtra = f.initNonIpFlow(meta)
 		f.stats.TotalNumFlows++
 		f.addFlow(flowCache, flowExtra)
 		atomic.AddInt32(&f.stats.CurrNumFlows, 1)
@@ -46,9 +45,9 @@ func (f *FlowGenerator) processNonIpPacket(meta *MetaPacket) {
 	flowCache.Unlock()
 }
 
-func (f *FlowGenerator) initNonIpFlow(meta *MetaPacket, key *FlowKey) *FlowExtra {
+func (f *FlowGenerator) initNonIpFlow(meta *MetaPacket) *FlowExtra {
 	now := meta.Timestamp
-	flowExtra := f.initFlow(meta, key, now)
+	flowExtra := f.initFlow(meta, now)
 	taggedFlow := flowExtra.taggedFlow
 	taggedFlow.FlowMetricsPeerSrc.ArrTime0 = now
 	taggedFlow.FlowMetricsPeerSrc.ArrTimeLast = now

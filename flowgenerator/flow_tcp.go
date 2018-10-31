@@ -7,11 +7,10 @@ import (
 )
 
 func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
-	flowKey := f.genFlowKey(meta)
-	hash := f.getQuinTupleHash(flowKey)
+	hash := f.getQuinTupleHash(meta)
 	flowCache := f.hashMap[hash%hashMapSize]
 	flowCache.Lock()
-	if flowExtra, reply, element := flowCache.keyMatch(meta, flowKey); flowExtra != nil {
+	if flowExtra, reply, element := flowCache.keyMatch(meta); flowExtra != nil {
 		ok := false
 		if ok, reply = f.updateTcpFlow(flowExtra, meta, reply); ok {
 			flowCache.flowList.Remove(element)
@@ -40,7 +39,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			flowCache.Unlock()
 			return
 		}
-		flowExtra, _, reply = f.initTcpFlow(meta, flowKey)
+		flowExtra, _, reply = f.initTcpFlow(meta)
 		f.stats.TotalNumFlows++
 		if f.checkIfDoFlowPerf(flowExtra) {
 			flowExtra.metaFlowPerf.Update(meta, reply, flowExtra, &f.perfCounter)
@@ -51,9 +50,9 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 	}
 }
 
-func (f *FlowGenerator) initTcpFlow(meta *MetaPacket, key *FlowKey) (*FlowExtra, bool, bool) {
+func (f *FlowGenerator) initTcpFlow(meta *MetaPacket) (*FlowExtra, bool, bool) {
 	now := meta.Timestamp
-	flowExtra := f.initFlow(meta, key, now)
+	flowExtra := f.initFlow(meta, now)
 	taggedFlow := flowExtra.taggedFlow
 	var flags uint8 = 0
 	if meta.TcpData != nil {
