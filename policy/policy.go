@@ -180,6 +180,7 @@ func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData
 		}
 		policy = t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
 	}
+	endpoint = t.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
 	return endpoint, policy
 }
 

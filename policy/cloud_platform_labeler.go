@@ -276,21 +276,76 @@ func (l *CloudPlatformLabeler) ModifyDeviceInfo(endpointInfo *EndpointInfo) {
 	}
 }
 
-func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
-	srcHash := MacIpKey(calcHashKey(key.SrcMac, key.SrcIp))
-	l.CheckAndUpdateArpTable(key, srcHash)
-	srcData := l.GetEndpointInfo(key.SrcMac, key.SrcIp, key.Tap)
-	dstHash := MacIpKey(calcHashKey(key.DstMac, key.DstIp))
-	dstData := l.GetEndpointInfo(key.DstMac, key.DstIp, key.Tap)
-	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
-	if key.Tap == TAP_TOR {
-		endpoint.SetL2End(key)
+func (l *CloudPlatformLabeler) UpdateEndpointData(endpoint *EndpointData, key *LookupKey) *EndpointData {
+	invalidSrc, invalidDst := false, false
+	if endpoint == INVALID_ENDPOINT_DATA {
+		endpoint = &EndpointData{SrcInfo: NewEndpointInfo(), DstInfo: NewEndpointInfo()}
+		invalidSrc, invalidDst = true, true
+	} else {
+		if endpoint.SrcInfo == INVALID_ENDPOINT_INFO {
+			endpoint.SrcInfo = NewEndpointInfo()
+			invalidSrc = true
+		}
+		if endpoint.DstInfo == INVALID_ENDPOINT_INFO {
+			endpoint.DstInfo = NewEndpointInfo()
+			invalidDst = true
+		}
 	}
+	srcData, dstData := endpoint.SrcInfo, endpoint.DstInfo
+
+	// 根据Ttl、Arp request、L2End来判断endpoint是否为最新
+	srcHash := MacIpKey(calcHashKey(key.SrcMac, key.SrcIp))
+	dstHash := MacIpKey(calcHashKey(key.DstMac, key.DstIp))
+	endpoint.SetL2End(key)
+	l.CheckAndUpdateArpTable(key, srcHash)
 	l.ModifyL3End(srcData, key, srcHash, true)
 	l.ModifyL3End(dstData, key, dstHash, false)
 	l.ModifyDeviceInfo(srcData)
 	l.ModifyDeviceInfo(dstData)
 
+	// 优化内存占用
+	if invalidSrc {
+		if srcData.L2End {
+			if srcData.L3End {
+				endpoint.SrcInfo = INVALID_ENDPOINT_INFO_L2AND3END
+			} else {
+				endpoint.SrcInfo = INVALID_ENDPOINT_INFO_L2END
+			}
+		} else {
+			if srcData.L3End {
+				endpoint.SrcInfo = INVALID_ENDPOINT_INFO_L3END
+			} else {
+				endpoint.SrcInfo = INVALID_ENDPOINT_INFO
+			}
+		}
+	}
+	if invalidDst {
+		if dstData.L2End {
+			if dstData.L3End {
+				endpoint.DstInfo = INVALID_ENDPOINT_INFO_L2AND3END
+			} else {
+				endpoint.DstInfo = INVALID_ENDPOINT_INFO_L2END
+			}
+		} else {
+			if dstData.L3End {
+				endpoint.DstInfo = INVALID_ENDPOINT_INFO_L3END
+			} else {
+				endpoint.DstInfo = INVALID_ENDPOINT_INFO
+			}
+		}
+	}
+	if endpoint.SrcInfo == INVALID_ENDPOINT_INFO && endpoint.DstInfo == INVALID_ENDPOINT_INFO {
+		endpoint = INVALID_ENDPOINT_DATA
+	}
+	return endpoint
+}
+
+func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
+	srcData := l.GetEndpointInfo(key.SrcMac, key.SrcIp, key.Tap)
+	dstData := l.GetEndpointInfo(key.DstMac, key.DstIp, key.Tap)
+	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
+
+	// 优化内存占用
 	if !srcData.L2End && !srcData.L3End && srcData.L2EpcId == 0 && srcData.L3EpcId == 0 && len(srcData.GroupIds) == 0 {
 		endpoint.SrcInfo = INVALID_ENDPOINT_INFO
 	}
