@@ -319,6 +319,26 @@ func generateAclData(policy *PolicyTable) {
 	policy.UpdateAcls([]*Acl{acl1, acl2})
 }
 
+func getEndpointData(table *PolicyTable, key *LookupKey) *EndpointData {
+	endpoint := table.cloudPlatformLabeler.GetEndpointData(key)
+	if endpoint != nil {
+		endpoint = table.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
+	}
+	return endpoint
+}
+
+func getPolicyByFastPath(table *PolicyTable, key *LookupKey) (*EndpointData, *PolicyData) {
+	endpoint, policy := table.policyLabeler.GetPolicyByFastPath(key)
+	if endpoint != nil {
+		endpoint = table.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
+	}
+	return endpoint, policy
+}
+
+func getPolicyByFirstPath(table *PolicyTable, endpoint *EndpointData, key *LookupKey) *PolicyData {
+	return table.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+}
+
 func CheckPolicyResult(t *testing.T, basicPolicy *PolicyData, targetPolicy *PolicyData) bool {
 	if !reflect.DeepEqual(basicPolicy, targetPolicy) {
 		t.Log("Result:", targetPolicy, "\n")
@@ -735,7 +755,7 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 		t.Error("TestVlanPortAclsPassPolicy2 Check Failed!")
 	}
 
-	_, policyData = policy.policyLabeler.GetPolicyByFastPath(key)
+	_, policyData = getPolicyByFastPath(policy, key)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestVlanPortAclsPassPolicy2 FastPath Check Failed!")
 	}
@@ -758,7 +778,7 @@ func TestModifyEpcIdPolicy1(t *testing.T) {
 		t.Error("TestModifyEpcIdPolicy1 Check Failed!")
 	}
 
-	data, _ = policy.policyLabeler.GetPolicyByFastPath(key)
+	data, _ = getPolicyByFastPath(policy, key)
 	if !CheckEpcTestResult(t, basicData, data) {
 		t.Error("TestModifyEpcIdPolicy1 FastPath Check Failed!")
 	}
@@ -782,7 +802,7 @@ func TestModifyEpcIdPolicy2(t *testing.T) {
 		t.Error("TestModifyEpcIdPolicy2 Check Failed!")
 	}
 
-	data, _ = policy.policyLabeler.GetPolicyByFastPath(key)
+	data, _ = getPolicyByFastPath(policy, key)
 	if !CheckEpcTestResult(t, basicData, data) {
 		t.Error("TestModifyEpcIdPolicy2 FastPath Check Failed!")
 	}
@@ -806,7 +826,7 @@ func TestModifyEpcIdPolicy3(t *testing.T) {
 		t.Error("TestModifyEpcIdPolicy3 Check Failed!")
 	}
 
-	data, _ = policy.policyLabeler.GetPolicyByFastPath(key)
+	data, _ = getPolicyByFastPath(policy, key)
 	if !CheckEpcTestResult(t, basicData, data) {
 		t.Error("TestModifyEpcIdPolicy3 FastPath Check Failed!")
 	}
@@ -830,7 +850,7 @@ func TestModifyEpcIdPolicy4(t *testing.T) {
 		t.Error("TestModifyEpcIdPolicy4 Check Failed!")
 	}
 
-	data, _ = policy.policyLabeler.GetPolicyByFastPath(key)
+	data, _ = getPolicyByFastPath(policy, key)
 	if !CheckEpcTestResult(t, basicData, data) {
 		t.Error("TestModifyEpcIdPolicy4 FastPath Check Failed!")
 	}
@@ -856,7 +876,7 @@ func TestModifyEpcIdPolicy5(t *testing.T) {
 		t.Error("TestModifyEpcIdPolicy5 Check Failed!")
 	}
 
-	data, _ = policy.policyLabeler.GetPolicyByFastPath(key)
+	data, _ = getPolicyByFastPath(policy, key)
 	if !CheckEpcTestResult(t, basicData, data) {
 		t.Error("TestModifyEpcIdPolicy5 FastPath Check Failed!")
 	}
@@ -872,7 +892,7 @@ func TestModifyEpcIdPolicy5(t *testing.T) {
 		t.Error("TestModifyEpcIdPolicy5-2 Check Failed!")
 	}
 
-	data, _ = policy.policyLabeler.GetPolicyByFastPath(key)
+	data, _ = getPolicyByFastPath(policy, key)
 	if !CheckEpcTestResult(t, basicData, data) {
 		t.Error("TestModifyEpcIdPolicy5-2 FastPath Check Failed!")
 	}
@@ -898,7 +918,7 @@ func TestL2endL3end1(t *testing.T) {
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 63, false, false)
 
 	basicEndInfo := generateEndInfo(false, false, false, false)
-	data := policy.cloudPlatformLabeler.GetEndpointData(key)
+	data := getEndpointData(policy, key)
 	if !checkEndTestResult(t, basicEndInfo, data) {
 		t.Error("TestL2endL3end1 Check Failed!")
 	}
@@ -911,7 +931,7 @@ func TestL2endL3end2(t *testing.T) {
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 63, true, true)
 
 	basicEndInfo := generateEndInfo(true, false, true, false)
-	data := policy.cloudPlatformLabeler.GetEndpointData(key)
+	data := getEndpointData(policy, key)
 	if !checkEndTestResult(t, basicEndInfo, data) {
 		t.Error("TestL2endL3end2 Check Failed!")
 	}
@@ -924,7 +944,7 @@ func TestL2endL3end3(t *testing.T) {
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, false, false)
 
 	basicEndInfo := generateEndInfo(false, true, false, false)
-	data := policy.cloudPlatformLabeler.GetEndpointData(key)
+	data := getEndpointData(policy, key)
 	if !checkEndTestResult(t, basicEndInfo, data) {
 		t.Error("TestL2endL3end3 Check Failed!")
 	}
@@ -937,7 +957,7 @@ func TestL2endL3end4(t *testing.T) {
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
 
 	basicEndInfo := generateEndInfo(true, true, true, false)
-	data := policy.cloudPlatformLabeler.GetEndpointData(key)
+	data := getEndpointData(policy, key)
 	if !checkEndTestResult(t, basicEndInfo, data) {
 		t.Error("TestL2endL3end4 Check Failed!")
 	}
@@ -955,7 +975,7 @@ func TestL2endL3end5(t *testing.T) {
 	// arp包 ip3-->ip4 ttl=64  L2end=L2end1=false L3end0=true,L3end1=false
 	key1 := generateLookupKey(mac3, mac4, 0, ip3, ip4, 0, 0, 8000)
 	setEthTypeAndOthers(key1, EthernetTypeARP, 64, false, false)
-	data := policy.cloudPlatformLabeler.GetEndpointData(key1)
+	data := getEndpointData(policy, key1)
 	basicEndInfo := generateEndInfo(false, true, false, false)
 	if !checkEndTestResult(t, basicEndInfo, data) {
 		t.Error("TestL2endL3end5 Check Failed!")
@@ -965,7 +985,7 @@ func TestL2endL3end5(t *testing.T) {
 	key2 := generateLookupKey(mac4, mac3, 0, ip4, ip3, uint8(IPProtocolTCP), 0, 8000)
 	setEthTypeAndOthers(key2, EthernetTypeIPv4, 64, false, false)
 	basicEndInfo = generateEndInfo(false, true, false, true)
-	data = policy.cloudPlatformLabeler.GetEndpointData(key2)
+	data = getEndpointData(policy, key2)
 	if !checkEndTestResult(t, basicEndInfo, data) {
 		t.Error("TestL2endL3end5 Check Failed!")
 	}
@@ -973,7 +993,7 @@ func TestL2endL3end5(t *testing.T) {
 	// ip包  ip4-->ip3 ttl=63  L2end=L2end1=false L3end0=false,L3end1=true
 	key2.Ttl = 63
 	basicEndInfo.L3End0 = false
-	data = policy.cloudPlatformLabeler.GetEndpointData(key2)
+	data = getEndpointData(policy, key2)
 	if !checkEndTestResult(t, basicEndInfo, data) {
 		t.Error("TestL2endL3end5 Check Failed!")
 	}
@@ -981,7 +1001,7 @@ func TestL2endL3end5(t *testing.T) {
 	// ip包  ip3-->ip4 ttl=63  L2end=L2end1=false L3end0=true,L3end1=false
 	key3 := generateLookupKey(mac3, mac4, 0, ip3, ip4, uint8(IPProtocolTCP), 0, 8000)
 	setEthTypeAndOthers(key3, EthernetTypeIPv4, 63, false, false)
-	data = policy.cloudPlatformLabeler.GetEndpointData(key3)
+	data = getEndpointData(policy, key3)
 	basicEndInfo = generateEndInfo(false, true, false, false)
 	if !checkEndTestResult(t, basicEndInfo, data) {
 		t.Error("TestL2endL3end5 Check Failed!")
@@ -991,13 +1011,13 @@ func TestL2endL3end5(t *testing.T) {
 	key4 := generateLookupKey(mac4, mac3, 0, ip4, ip3, 0, 0, 8000)
 	setEthTypeAndOthers(key4, EthernetTypeARP, 64, false, false)
 	basicEndInfo = generateEndInfo(false, true, false, true)
-	data = policy.cloudPlatformLabeler.GetEndpointData(key4)
+	data = getEndpointData(policy, key4)
 	if !checkEndTestResult(t, basicEndInfo, data) {
 		t.Error("TestL2endL3end5 Check Failed!")
 	}
 
 	// ip包  ip3-->ip4 ttl=63  L2end=L2end1=false L3end0=true,L3end1=true
-	data = policy.cloudPlatformLabeler.GetEndpointData(key3)
+	data = getEndpointData(policy, key3)
 	basicEndInfo = generateEndInfo(false, true, false, true)
 	if !checkEndTestResult(t, basicEndInfo, data) {
 		t.Error("TestL2endL3end5 Check Failed!")
@@ -1017,7 +1037,7 @@ func BenchmarkGetEndpointData(b *testing.B) {
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, true, true)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		policy.cloudPlatformLabeler.GetEndpointData(key)
+		getEndpointData(policy, key)
 	}
 }
 
@@ -1103,7 +1123,7 @@ func TestPolicyEpcPolicy(t *testing.T) {
 		t.Error("TestPolicyEpcPolicy Check Failed!")
 	}
 
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key)
+	_, policyData = getPolicyByFastPath(table, key)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestPolicyEpcPolicy FastPath Check Failed!")
@@ -1113,14 +1133,14 @@ func TestPolicyEpcPolicy(t *testing.T) {
 	key = generateLookupKey(group1Mac2, group1Mac, 0, group1Ip3, group1Ip1, 6, 8000, 0)
 	basicPolicyData = NewPolicyData()
 	basicPolicyData.Merge([]AclAction{backward}, acl.Id)
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key)
+	_, policyData = getPolicyByFastPath(table, key)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestPolicyEpcPolicy Check Failed!")
 	}
 
 	key = generateLookupKey(group1Mac2, group1Mac, 0, group1Ip3, group1Ip1, 6, 0, 8000)
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key)
+	_, policyData = getPolicyByFastPath(table, key)
 	basicPolicyData = nil
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
@@ -1156,7 +1176,7 @@ func TestFlowVlanAcls(t *testing.T) {
 	basicPolicyData2 := NewPolicyData()
 	basicPolicyData2.Merge([]AclAction{backward}, acl.Id)
 	key = generateLookupKey(group2Mac, group1Mac, 10, group2Ip1, group1Ip1, 6, 11, 10)
-	_, policyData2 := table.policyLabeler.GetPolicyByFastPath(key)
+	_, policyData2 := getPolicyByFastPath(table, key)
 	if !CheckPolicyResult(t, basicPolicyData2, policyData2) {
 		t.Error("TestFlowVlanAcls Check Failed!")
 	}
@@ -1216,7 +1236,7 @@ func TestVlanProtoPortAcl(t *testing.T) {
 		t.Error("TestVlanProtoPortAcl Check Failed!")
 	}
 	// 获取fastpath查询结果
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key)
+	_, policyData = getPolicyByFastPath(table, key)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestVlanProtoPortAcl FastPath Check Failed!")
 	}
@@ -1230,7 +1250,7 @@ func TestVlanProtoPortAcl(t *testing.T) {
 		t.Error("TestVlanProtoPortAcl Check Failed!")
 	}
 	// 获取fastpath查询结果
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key)
+	_, policyData = getPolicyByFastPath(table, key)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestVlanProtoPortAcl FastPath Check Failed!")
 	}
@@ -1244,7 +1264,7 @@ func TestVlanProtoPortAcl(t *testing.T) {
 		t.Error("TestVlanProtoPortAcl Check Failed!")
 	}
 	// 获取fastpath查询结果
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key)
+	_, policyData = getPolicyByFastPath(table, key)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestVlanProtoPortAcl FastPath Check Failed!")
 	}
@@ -1270,7 +1290,7 @@ func TestVlanProtoPortAcl(t *testing.T) {
 		t.Error("TestVlanProtoPortAcl Check Failed!")
 	}
 	// 获取fastpath查询结果
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key)
+	_, policyData = getPolicyByFastPath(table, key)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestVlanProtoPortAcl FastPath Check Failed!")
 	}
@@ -1285,7 +1305,7 @@ func TestVlanProtoPortAcl(t *testing.T) {
 		t.Error("TestVlanProtoPortAcl Check Failed!")
 	}
 	// 获取fastpath查询结果
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key)
+	_, policyData = getPolicyByFastPath(table, key)
 	basicPolicyData.Merge([]AclAction{backward2, backward1}, acl5.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestVlanProtoPortAcl FastPath Check Failed!")
@@ -1311,7 +1331,7 @@ func TestResourceGroupPolicy(t *testing.T) {
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy Check Failed!")
 	}
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key)
+	_, policyData = getPolicyByFastPath(table, key)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy FastPath Check Failed!")
 	}
@@ -1338,7 +1358,7 @@ func TestResourceGroupPolicy(t *testing.T) {
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy: 2-key Check Failed!")
 	}
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key)
+	_, policyData = getPolicyByFastPath(table, key)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy: 2-key FastPath Check Failed!")
 	}
@@ -1351,7 +1371,7 @@ func TestResourceGroupPolicy(t *testing.T) {
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy: 3-key Check Failed!")
 	}
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key)
+	_, policyData = getPolicyByFastPath(table, key)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy: 3-key FastPath Check Failed!")
 	}
@@ -1363,7 +1383,7 @@ func TestResourceGroupPolicy(t *testing.T) {
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy: 4-key Check Failed!")
 	}
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key)
+	_, policyData = getPolicyByFastPath(table, key)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy 4-key FastPath Check Failed!")
 	}
@@ -1377,7 +1397,7 @@ func TestResourceGroupPolicy(t *testing.T) {
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy: 5-key Check Failed!")
 	}
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key)
+	_, policyData = getPolicyByFastPath(table, key)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy 5-key FastPath Check Failed!")
 	}
@@ -1392,7 +1412,7 @@ func TestResourceGroupPolicy(t *testing.T) {
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy 6-key Check Failed!")
 	}
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key)
+	_, policyData = getPolicyByFastPath(table, key)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy 6-key FastPath Check Failed!")
 	}
@@ -1412,8 +1432,8 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 
 	// key1: (group3/group6)groupIp3 -> (group6)groupIp2 udp
 	key1 := generateLookupKey(group3Mac1, group6Mac1, 0, groupIp3, groupIp2, 17, 0, 0)
-	result := table.cloudPlatformLabeler.GetEndpointData(key1)
-	policyData := table.policyLabeler.GetPolicyByFirstPath(result, key1)
+	result := getEndpointData(table, key1)
+	policyData := getPolicyByFirstPath(table, result, key1)
 	backward1 := getBackwardAcl(action1)
 	basicPolicyData1 := NewPolicyData()
 	basicPolicyData1.Merge([]AclAction{action2, action1, backward1}, acl2.Id) // 可以匹配backward1
@@ -1423,8 +1443,8 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 
 	// key2: (group3)groupIp4 -> (group3/group6)groupIp3
 	key2 := generateLookupKey(group3Mac1, group6Mac1, 0, groupIp4, groupIp3, 17, 0, 0)
-	result = table.cloudPlatformLabeler.GetEndpointData(key2)
-	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key2)
+	result = getEndpointData(table, key2)
+	policyData = getPolicyByFirstPath(table, result, key2)
 	// 不匹配backward2
 	basicPolicyData2 := NewPolicyData()
 	basicPolicyData2.Merge([]AclAction{action2, action1}, acl2.Id)
@@ -1433,13 +1453,13 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	}
 
 	// key1 - FastPath
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key1)
+	_, policyData = getPolicyByFastPath(table, key1)
 	if !CheckPolicyResult(t, basicPolicyData1, policyData) {
 		t.Error("key1 FastPath Check Failed!")
 	}
 
 	// key2 - FastPath
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key2)
+	_, policyData = getPolicyByFastPath(table, key2)
 	if !CheckPolicyResult(t, basicPolicyData2, policyData) {
 		t.Error("key2 FastPath Check Failed!")
 	}
@@ -1455,9 +1475,9 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 
 	// key3: (group3)groupIp4:8000 -> (group5/group6)groupIp2:6000 udp vlan:10
 	key3 := generateLookupKey(group3Mac1, 0, 10, groupIp4, groupIp2, 17, 8000, 6000)
-	result = table.cloudPlatformLabeler.GetEndpointData(key3)
+	result = getEndpointData(table, key3)
 	// 匹配group6、group3，group7有epc限制，group4mac不符
-	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key3)
+	policyData = getPolicyByFirstPath(table, result, key3)
 	basicPolicyData3 := NewPolicyData()
 	basicPolicyData3.Merge([]AclAction{action2, action1}, acl2.Id)
 	if !CheckPolicyResult(t, basicPolicyData3, policyData) {
@@ -1466,9 +1486,9 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 
 	// key4: (group4)groupIp4:8000 -> (group5/group6)groupIp2:6000 udp
 	key4 := generateLookupKey(group4Mac1, group5Mac1, 10, groupIp4, groupIp2, 17, 8000, 6000)
-	result = table.cloudPlatformLabeler.GetEndpointData(key4)
+	result = getEndpointData(table, key4)
 	// 源端匹配group4不匹配group3，目的端匹配group6不匹配group7
-	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key4)
+	policyData = getPolicyByFirstPath(table, result, key4)
 	basicPolicyData4 := NewPolicyData()
 	basicPolicyData4.Merge([]AclAction{action4, action1}, acl4.Id)
 	if !CheckPolicyResult(t, basicPolicyData4, policyData) {
@@ -1477,9 +1497,9 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 
 	// key5: (group4)group4Id:8000 -> (group5/group6)groupIp2:6000 udp
 	key5 := generateLookupKey(group4Mac1, 0, 10, groupIp4, groupIp2, 17, 8000, 6000)
-	result = table.cloudPlatformLabeler.GetEndpointData(key5)
+	result = getEndpointData(table, key5)
 	// 源端匹配group4不匹配group3,目的端匹配group6不匹配group7
-	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key5)
+	policyData = getPolicyByFirstPath(table, result, key5)
 	basicPolicyData5 := NewPolicyData()
 	basicPolicyData5.Merge([]AclAction{action4, action1}, acl4.Id)
 	if !CheckPolicyResult(t, basicPolicyData5, policyData) {
@@ -1488,9 +1508,9 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 
 	// (mac、ip不匹配) groupIp4 :8000 -> (group6)groupIp2:6000 udp
 	key6 := generateLookupKey(group5Mac2, group7Mac1, 10, groupIp4, groupIp2, 17, 8000, 6000)
-	result = table.cloudPlatformLabeler.GetEndpointData(key6)
+	result = getEndpointData(table, key6)
 	// 源端不匹配group3/group4,目的端匹配group6，不匹配group7
-	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key6)
+	policyData = getPolicyByFirstPath(table, result, key6)
 	basicPolicyData6 := NewPolicyData()
 	basicPolicyData6.Merge([]AclAction{action1}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData6, policyData) {
@@ -1498,25 +1518,25 @@ func TestSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	}
 
 	// key3 - fastpath
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key3)
+	_, policyData = getPolicyByFastPath(table, key3)
 	if !CheckPolicyResult(t, basicPolicyData3, policyData) {
 		t.Error("key3 FastPath Check Failed!")
 	}
 
 	// key4 - fastpath
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key4)
+	_, policyData = getPolicyByFastPath(table, key4)
 	if !CheckPolicyResult(t, basicPolicyData4, policyData) {
 		t.Error("key4 FastPath Check Failed!")
 	}
 
 	// key5 - fastpath
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key5)
+	_, policyData = getPolicyByFastPath(table, key5)
 	if !CheckPolicyResult(t, basicPolicyData5, policyData) {
 		t.Error("key5 FastPath Check Failed!")
 	}
 
 	// key6 - fastpath
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key6)
+	_, policyData = getPolicyByFastPath(table, key6)
 	if !CheckPolicyResult(t, basicPolicyData6, policyData) {
 		t.Error("key6 FastPath Check Failed!")
 	}
@@ -1536,8 +1556,8 @@ func TestFirstPathVsFastPath(t *testing.T) {
 
 	// key1: (group5)groupIp5:6000 -> (group5/group6)groupIp2:8000 tcp vlan:10
 	key1 := generateLookupKey(group5Mac1, group6Mac1, 10, groupIp5, groupIp2, 6, 6000, 8000)
-	result := table.cloudPlatformLabeler.GetEndpointData(key1)
-	policyData := table.policyLabeler.GetPolicyByFirstPath(result, key1)
+	result := getEndpointData(table, key1)
+	policyData := getPolicyByFirstPath(table, result, key1)
 	// 可匹配acl1，direction=3; 可匹配acl2，direction=1
 	backward1 := getBackwardAcl(action1)
 	backward2 := getBackwardAcl(action2)
@@ -1549,8 +1569,8 @@ func TestFirstPathVsFastPath(t *testing.T) {
 
 	// key2:(group6)groupIp3:6000 -> (group5)groupIp5:8000 tcp vlan:10
 	key2 := generateLookupKey(group6Mac1, group5Mac1, 10, groupIp3, groupIp5, 6, 6000, 8000)
-	result = table.cloudPlatformLabeler.GetEndpointData(key2)
-	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key2)
+	result = getEndpointData(table, key2)
+	policyData = getPolicyByFirstPath(table, result, key2)
 	// 不能匹配acl1
 	basicPolicyData2 := NewPolicyData()
 	basicPolicyData2.Merge([]AclAction{backward2}, acl2.Id)
@@ -1560,8 +1580,8 @@ func TestFirstPathVsFastPath(t *testing.T) {
 
 	// key3: (group5)groupIp6:8000 -> (group5)groupIp5:8000 tcp
 	key3 := generateLookupKey(group5Mac2, group5Mac1, 10, groupIp6, groupIp5, 6, 8000, 8000)
-	result = table.cloudPlatformLabeler.GetEndpointData(key3)
-	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key3)
+	result = getEndpointData(table, key3)
+	policyData = getPolicyByFirstPath(table, result, key3)
 	// 可匹配acl1，direction=3；可匹配acl2，direction=3
 	basicPolicyData3 := NewPolicyData()
 	basicPolicyData3.Merge([]AclAction{action2, action1, backward2, backward1}, acl2.Id)
@@ -1571,8 +1591,8 @@ func TestFirstPathVsFastPath(t *testing.T) {
 
 	// key4: (group5)groupIp6:6000 -> (group6)groupIp3:8000 tcp vlan:11
 	key4 := generateLookupKey(group5Mac1, group6Mac1, 11, groupIp6, groupIp3, 6, 6000, 8000)
-	result = table.cloudPlatformLabeler.GetEndpointData(key4)
-	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key4)
+	result = getEndpointData(table, key4)
+	policyData = getPolicyByFirstPath(table, result, key4)
 	// vlan不符，不可匹配acl2
 	basicPolicyData4 := NewPolicyData()
 	basicPolicyData4.Merge([]AclAction{action1}, acl1.Id)
@@ -1582,8 +1602,8 @@ func TestFirstPathVsFastPath(t *testing.T) {
 
 	// key5: (group5)groupIp5:6000 -> (group6)groupIp3:8000 udp vlan:10
 	key5 := generateLookupKey(group5Mac1, group6Mac1, 10, groupIp5, groupIp3, 17, 6000, 8000)
-	result = table.cloudPlatformLabeler.GetEndpointData(key5)
-	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key5)
+	result = getEndpointData(table, key5)
+	policyData = getPolicyByFirstPath(table, result, key5)
 	// udp协议，不匹配acl1
 	basicPolicyData5 := NewPolicyData()
 	basicPolicyData5.Merge([]AclAction{action2}, acl2.Id)
@@ -1593,8 +1613,8 @@ func TestFirstPathVsFastPath(t *testing.T) {
 
 	// key6: (group5)groupIp5:6000 -> (group6)groupIp3:6000
 	key6 := generateLookupKey(group5Mac1, group6Mac1, 10, groupIp5, groupIp3, 6, 6000, 6000)
-	result = table.cloudPlatformLabeler.GetEndpointData(key6)
-	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key6)
+	result = getEndpointData(table, key6)
+	policyData = getPolicyByFirstPath(table, result, key6)
 	// port不一致，不匹配acl1
 	basicPolicyData6 := NewPolicyData()
 	basicPolicyData6.Merge([]AclAction{action2}, acl2.Id)
@@ -1604,8 +1624,8 @@ func TestFirstPathVsFastPath(t *testing.T) {
 
 	// key7: (group5)groupIp5:6000 -> (group6)groupIp3:8000 vlan:11 tcp
 	key7 := generateLookupKey(group5Mac1, group6Mac1, 11, groupIp5, groupIp3, 6, 6000, 8000)
-	result = table.cloudPlatformLabeler.GetEndpointData(key7)
-	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key7)
+	result = getEndpointData(table, key7)
+	policyData = getPolicyByFirstPath(table, result, key7)
 	// vlan不符，不匹配acl2
 	basicPolicyData7 := NewPolicyData()
 	basicPolicyData7.Merge([]AclAction{action1}, acl1.Id)
@@ -1614,43 +1634,43 @@ func TestFirstPathVsFastPath(t *testing.T) {
 	}
 
 	// key1 - fastpath
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key1)
+	_, policyData = getPolicyByFastPath(table, key1)
 	if !CheckPolicyResult(t, basicPolicyData1, policyData) {
 		t.Error("key1 FastPath Check Failed!")
 	}
 
 	// key2 - fastpath
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key2)
+	_, policyData = getPolicyByFastPath(table, key2)
 	if !CheckPolicyResult(t, basicPolicyData2, policyData) {
 		t.Error("key2 FastPath Check Failed!")
 	}
 
 	// key3 - fastpath
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key3)
+	_, policyData = getPolicyByFastPath(table, key3)
 	if !CheckPolicyResult(t, basicPolicyData3, policyData) {
 		t.Error("key3 FastPath Check Failed!")
 	}
 
 	// key4 - fastpath
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key4)
+	_, policyData = getPolicyByFastPath(table, key4)
 	if !CheckPolicyResult(t, basicPolicyData4, policyData) {
 		t.Error("key4 FastPath Check Failed!")
 	}
 
 	// key5 - fastpath
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key5)
+	_, policyData = getPolicyByFastPath(table, key5)
 	if !CheckPolicyResult(t, basicPolicyData5, policyData) {
 		t.Error("key5 FastPath Check Failed!")
 	}
 
 	// key6 - fastpath
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key6)
+	_, policyData = getPolicyByFastPath(table, key6)
 	if !CheckPolicyResult(t, basicPolicyData6, policyData) {
 		t.Error("key6 FastPath Check Failed!")
 	}
 
 	// key7 - fastpath
-	_, policyData = table.policyLabeler.GetPolicyByFastPath(key7)
+	_, policyData = getPolicyByFastPath(table, key7)
 	if !CheckPolicyResult(t, basicPolicyData7, policyData) {
 		t.Error("key7 FastPath Check Failed!")
 	}
@@ -1671,14 +1691,14 @@ func TestEndpointDataDirection(t *testing.T) {
 	// key1: (group3/group6)groupIp3:1023 -> (group4)groupIp4:1000 tcp
 	key1 := generateLookupKey(group3Mac1, group4Mac1, 0, groupIp3, groupIp4, 6, 1023, 1000)
 	// src: DEV-30, IP-60 dst: DEV-40
-	result := table.cloudPlatformLabeler.GetEndpointData(key1)
+	result := getEndpointData(table, key1)
 	basicEndpointData1 := NewEndpointData()
 	basicEndpointData1.SrcInfo = table.cloudPlatformLabeler.GetEndpointInfo(group3Mac1, groupIp3, TAP_TOR)
 	basicEndpointData1.DstInfo = table.cloudPlatformLabeler.GetEndpointInfo(group4Mac1, groupIp4, TAP_TOR)
 	if !CheckEndpointDataResult(t, basicEndpointData1, result) {
 		t.Error("key1 EndpointData Check Failed!")
 	}
-	policyData := table.policyLabeler.GetPolicyByFirstPath(result, key1)
+	policyData := getPolicyByFirstPath(table, result, key1)
 	basicPolicyData1 := NewPolicyData()
 	basicPolicyData1.Merge([]AclAction{action2, action1}, acl2.Id)
 	if !CheckPolicyResult(t, basicPolicyData1, policyData) {
@@ -1688,14 +1708,14 @@ func TestEndpointDataDirection(t *testing.T) {
 	// key2: (group4)groupIp4:1000 -> (group3/group6)groupIp3:1023 tcp
 	key2 := generateLookupKey(group4Mac1, group3Mac1, 0, groupIp4, groupIp3, 6, 1000, 1023)
 	// src: DEV-40 dst: DEV-30, IP-60
-	result = table.cloudPlatformLabeler.GetEndpointData(key2)
+	result = getEndpointData(table, key2)
 	basicEndpointData2 := NewEndpointData()
 	basicEndpointData2.SrcInfo = table.cloudPlatformLabeler.GetEndpointInfo(group4Mac1, groupIp4, TAP_TOR)
 	basicEndpointData2.DstInfo = table.cloudPlatformLabeler.GetEndpointInfo(group3Mac1, groupIp3, TAP_TOR)
 	if !CheckEndpointDataResult(t, basicEndpointData2, result) {
 		t.Error("key2 EndpointData Check Failed!")
 	}
-	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key2)
+	policyData = getPolicyByFirstPath(table, result, key2)
 	backward1 := getBackwardAcl(action1)
 	backward2 := getBackwardAcl(action2)
 	basicPolicyData2 := NewPolicyData()
@@ -1707,14 +1727,14 @@ func TestEndpointDataDirection(t *testing.T) {
 	// key3: (group3/group6)groupIp3:1000 -> (group4)groupIp4:1023 tcp
 	key3 := generateLookupKey(group3Mac1, group4Mac1, 0, groupIp3, groupIp4, 6, 1000, 1023)
 	// src: DEV-30, IP-60 dst: DEV-40
-	result = table.cloudPlatformLabeler.GetEndpointData(key3)
+	result = getEndpointData(table, key3)
 	basicEndpointData3 := NewEndpointData()
 	basicEndpointData3.SrcInfo = table.cloudPlatformLabeler.GetEndpointInfo(group3Mac1, groupIp3, TAP_TOR)
 	basicEndpointData3.DstInfo = table.cloudPlatformLabeler.GetEndpointInfo(group4Mac1, groupIp4, TAP_TOR)
 	if !CheckEndpointDataResult(t, basicEndpointData3, result) {
 		t.Error("key3 EndpointData Check Failed!")
 	}
-	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key3)
+	policyData = getPolicyByFirstPath(table, result, key3)
 	basicPolicyData3 := INVALID_POLICY_DATA
 	if !CheckPolicyResult(t, basicPolicyData3, policyData) {
 		t.Error("key3 FirstPath Check Failed!")
@@ -1723,21 +1743,21 @@ func TestEndpointDataDirection(t *testing.T) {
 	// key4: (group4)groupIp4:1023 -> (group3/group6)groupIp3:1000 tcp
 	key4 := generateLookupKey(group4Mac1, group3Mac1, 0, groupIp4, groupIp3, 6, 1023, 1000)
 	// src: DEV-40 dst: DEV-30, IP-60
-	result = table.cloudPlatformLabeler.GetEndpointData(key4)
+	result = getEndpointData(table, key4)
 	basicEndpointData4 := NewEndpointData()
 	basicEndpointData4.SrcInfo = table.cloudPlatformLabeler.GetEndpointInfo(group4Mac1, groupIp4, TAP_TOR)
 	basicEndpointData4.DstInfo = table.cloudPlatformLabeler.GetEndpointInfo(group3Mac1, groupIp3, TAP_TOR)
 	if !CheckEndpointDataResult(t, basicEndpointData4, result) {
 		t.Error("key4 EndpointData Check Failed!")
 	}
-	policyData = table.policyLabeler.GetPolicyByFirstPath(result, key4)
+	policyData = getPolicyByFirstPath(table, result, key4)
 	basicPolicyData4 := INVALID_POLICY_DATA
 	if !CheckPolicyResult(t, basicPolicyData4, policyData) {
 		t.Error("key4 FirstPath Check Failed")
 	}
 
 	// key1 - fastpath
-	result, policyData = table.policyLabeler.GetPolicyByFastPath(key1)
+	result, policyData = getPolicyByFastPath(table, key1)
 	if !CheckEndpointDataResult(t, basicEndpointData1, result) {
 		t.Error("key1 EndpointData Check Failed!")
 	}
@@ -1746,7 +1766,7 @@ func TestEndpointDataDirection(t *testing.T) {
 	}
 
 	// key2 - fastpath
-	result, policyData = table.policyLabeler.GetPolicyByFastPath(key2)
+	result, policyData = getPolicyByFastPath(table, key2)
 	if !CheckEndpointDataResult(t, basicEndpointData2, result) {
 		t.Error("key2 EndpointData FastPath Check Failed!")
 	}
@@ -1755,7 +1775,7 @@ func TestEndpointDataDirection(t *testing.T) {
 	}
 
 	// key3 - fastpath
-	result, policyData = table.policyLabeler.GetPolicyByFastPath(key3)
+	result, policyData = getPolicyByFastPath(table, key3)
 	if !CheckEndpointDataResult(t, basicEndpointData3, result) {
 		t.Error("key3 EndpointData FastPath Check Failed!")
 	}
@@ -1764,7 +1784,7 @@ func TestEndpointDataDirection(t *testing.T) {
 	}
 
 	// key4 - fastpath
-	result, policyData = table.policyLabeler.GetPolicyByFastPath(key4)
+	result, policyData = getPolicyByFastPath(table, key4)
 	if !CheckEndpointDataResult(t, basicEndpointData4, result) {
 		t.Error("key4 EndpointData FastPath Check Failed!")
 	}
@@ -1784,7 +1804,7 @@ func BenchmarkFirstPath(b *testing.B) {
 	table.UpdateAcls(acls)
 	// 构建查询1-key  1:0->2:8000 tcp
 	key := generateLookupKey(group1Mac, group2Mac, 0, group1Ip1, group2Ip1, 6, 0, 8000)
-	endpoint := table.cloudPlatformLabeler.GetEndpointData(key)
+	endpoint := getEndpointData(table, key)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
@@ -1803,7 +1823,7 @@ func BenchmarkFastPath(b *testing.B) {
 	table.UpdateAcls(acls)
 	// 构建查询1-key  1:0->2:8000 tcp
 	key := generateLookupKey(group1Mac, group2Mac, 0, group1Ip1, group2Ip1, 6, 0, 8000)
-	endpoint := table.cloudPlatformLabeler.GetEndpointData(key)
+	endpoint := getEndpointData(table, key)
 	table.policyLabeler.GetPolicyByFirstPath(endpoint, key)
 	b.ResetTimer()
 
