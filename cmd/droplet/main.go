@@ -33,7 +33,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	droplet.Start(*configPath)
+	closers := droplet.Start(*configPath)
 
 	// setup system signal
 	signalChannel := make(chan os.Signal, 1)
@@ -41,6 +41,9 @@ func main() {
 	for {
 		sig := <-signalChannel
 		if sig == os.Interrupt {
+			for _, closer := range closers {
+				go closer.Close()
+			}
 			log.Info("Gracefully stopping")
 			break
 		}

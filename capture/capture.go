@@ -69,10 +69,10 @@ func (c *Capture) GetCounter() interface{} {
 	counter.KernelFreezes = uint(refSocketStatsV3.tp_freeze_q_cnt)
 
 	if counter.pollError > 0 {
-		log.Warningf("Poll error %c times, last err: %s", counter.pollError, c.lastPollErr.Error())
+		log.Warningf("Poll error %d times, last err: %s", counter.pollError, c.lastPollErr.Error())
 	}
 	if counter.intrError > 0 {
-		log.Warningf("INTR error %c times, last err: %s", counter.intrError, c.lastIntrErr.Error())
+		log.Warningf("INTR error %d times, last err: %s", counter.intrError, c.lastIntrErr.Error())
 	}
 
 	log.Debugf(
