@@ -237,7 +237,7 @@ func (l *CloudPlatformLabeler) ModifyL3End(endpointInfo *EndpointInfo, key *Look
 }
 
 func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip uint32, tapType TapType) *EndpointInfo {
-	endpointInfo := NewEndpointInfo()
+	endpointInfo := new(EndpointInfo)
 	platformData := l.GetDataByMac(MacKey(mac))
 	if platformData != nil {
 		endpointInfo.SetL2Data(platformData)
@@ -279,15 +279,15 @@ func (l *CloudPlatformLabeler) ModifyDeviceInfo(endpointInfo *EndpointInfo) {
 func (l *CloudPlatformLabeler) UpdateEndpointData(endpoint *EndpointData, key *LookupKey) *EndpointData {
 	invalidSrc, invalidDst := false, false
 	if endpoint == INVALID_ENDPOINT_DATA {
-		endpoint = &EndpointData{SrcInfo: NewEndpointInfo(), DstInfo: NewEndpointInfo()}
+		endpoint = &EndpointData{SrcInfo: new(EndpointInfo), DstInfo: new(EndpointInfo)}
 		invalidSrc, invalidDst = true, true
 	} else {
 		if endpoint.SrcInfo == INVALID_ENDPOINT_INFO {
-			endpoint.SrcInfo = NewEndpointInfo()
+			endpoint.SrcInfo = new(EndpointInfo)
 			invalidSrc = true
 		}
 		if endpoint.DstInfo == INVALID_ENDPOINT_INFO {
-			endpoint.DstInfo = NewEndpointInfo()
+			endpoint.DstInfo = new(EndpointInfo)
 			invalidDst = true
 		}
 	}

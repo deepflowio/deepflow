@@ -118,21 +118,6 @@ func TestParseIspPackets(t *testing.T) {
 	}
 }
 
-func TestAcquireReleaseClone(t *testing.T) {
-	p := AcquireMetaPacket()
-	p.AddReferenceCount()
-	ReleaseMetaPacket(p)
-	ReleaseMetaPacket(p)
-	expected := &MetaPacket{PacketLen: 10086}
-	dup := CloneMetaPacket(expected)
-	if p != dup { // pointer compare
-		t.Error("Expected same pointer but actually not")
-	}
-	if dup.PacketLen != expected.PacketLen {
-		t.Error("Not duplicated")
-	}
-}
-
 func BenchmarkParsePacket(b *testing.B) {
 	packets := loadPcap("meta_packet_test.pcap")
 	b.ResetTimer()

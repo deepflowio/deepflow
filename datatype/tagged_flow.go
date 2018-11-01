@@ -18,7 +18,7 @@ var taggedFlowPool = sync.Pool{
 
 func AcquireTaggedFlow() *TaggedFlow {
 	f := taggedFlowPool.Get().(*TaggedFlow)
-	f.Init()
+	f.ReferenceCount.Reset()
 	return f
 }
 

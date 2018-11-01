@@ -2,11 +2,10 @@ package datatype
 
 import (
 	"fmt"
-	"sync"
 )
 
 var (
-	INVALID_POLICY_DATA = NewPolicyData()
+	INVALID_POLICY_DATA = new(PolicyData)
 )
 
 type ActionFlag uint16
@@ -244,15 +243,9 @@ func (d *PolicyData) String() string {
 	return fmt.Sprintf("{ACLID: %d ActionFlags: %v AclActions: %v}", d.ACLID, d.ActionFlags, d.AclActions)
 }
 
-func NewPolicyData() *PolicyData {
-	return &PolicyData{}
-}
-
-var policyDataPool = sync.Pool{
-	New: func() interface{} {
-		return NewPolicyData()
-	},
-}
+var policyDataPool = NewLockFreePool(func() interface{} {
+	return new(PolicyData)
+})
 
 func AcquirePolicyData() *PolicyData {
 	return policyDataPool.Get().(*PolicyData)

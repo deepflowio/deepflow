@@ -3,14 +3,13 @@ package datatype
 import (
 	"fmt"
 	"reflect"
-	"sync"
 	"time"
 
 	. "github.com/google/gopacket/layers"
 )
 
 var (
-	INVALID_ENDPOINT_INFO           = NewEndpointInfo()
+	INVALID_ENDPOINT_INFO           = new(EndpointInfo)
 	INVALID_ENDPOINT_INFO_L2END     = &EndpointInfo{L2End: true}
 	INVALID_ENDPOINT_INFO_L3END     = &EndpointInfo{L3End: true}
 	INVALID_ENDPOINT_INFO_L2AND3END = &EndpointInfo{L2End: true, L3End: true}
@@ -68,14 +67,6 @@ type LookupKey struct {
 type EndpointData struct {
 	SrcInfo *EndpointInfo
 	DstInfo *EndpointInfo
-}
-
-func NewEndpointInfo() *EndpointInfo {
-	return &EndpointInfo{}
-}
-
-func NewEndpointData() *EndpointData {
-	return &EndpointData{}
 }
 
 func (i *EndpointInfo) SetL2Data(data *PlatformData) {
@@ -190,11 +181,9 @@ func FormatGroupId(id uint32) uint32 {
 	}
 }
 
-var endpointInfoPool = sync.Pool{
-	New: func() interface{} {
-		return NewEndpointInfo()
-	},
-}
+var endpointInfoPool = NewLockFreePool(func() interface{} {
+	return new(EndpointInfo)
+})
 
 func AcquireEndpointInfo() *EndpointInfo {
 	return endpointInfoPool.Get().(*EndpointInfo)
@@ -216,11 +205,9 @@ func CloneEndpointInfo(i *EndpointInfo) *EndpointInfo {
 	return dup
 }
 
-var endpointDataPool = sync.Pool{
-	New: func() interface{} {
-		return NewEndpointData()
-	},
-}
+var endpointDataPool = NewLockFreePool(func() interface{} {
+	return new(EndpointData)
+})
 
 func AcquireEndpointData(infos ...*EndpointInfo) *EndpointData {
 	d := endpointDataPool.Get().(*EndpointData)
