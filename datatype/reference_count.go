@@ -6,13 +6,7 @@ import (
 
 type ReferenceCount int32
 
-type ReferenceCounter interface {
-	Init()
-	AddReferenceCount()
-	SubReferenceCount() bool
-}
-
-func (r *ReferenceCount) Init() {
+func (r *ReferenceCount) Reset() {
 	*r = 1
 }
 

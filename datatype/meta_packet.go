@@ -3,7 +3,6 @@ package datatype
 import (
 	"bytes"
 	"fmt"
-	"sync"
 	"time"
 
 	. "github.com/google/gopacket/layers"
@@ -227,16 +226,14 @@ func (p *MetaPacket) String() string {
 	return buffer.String()
 }
 
-var metaPacketPool = sync.Pool{
-	New: func() interface{} {
-		return new(MetaPacket)
-	},
-}
+var metaPacketPool = NewLockFreePool(func() interface{} {
+	return new(MetaPacket)
+})
 
 func AcquireMetaPacket() *MetaPacket {
-	p := metaPacketPool.Get().(*MetaPacket)
-	p.Init()
-	return p
+	m := metaPacketPool.Get().(*MetaPacket)
+	m.ReferenceCount.Reset()
+	return m
 }
 
 func ReleaseMetaPacket(x *MetaPacket) {

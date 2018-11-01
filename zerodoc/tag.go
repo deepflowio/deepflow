@@ -3,12 +3,12 @@ package zerodoc
 import (
 	"strconv"
 	"strings"
-	"sync"
 
 	"fmt"
 
 	"github.com/google/gopacket/layers"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
@@ -519,14 +519,12 @@ func (t *Tag) HasVariedField() bool {
 	return t.Code&ServerPort != 0
 }
 
-var poolField sync.Pool = sync.Pool{
-	New: func() interface{} {
-		return &Field{}
-	},
-}
+var fieldPool = datatype.NewLockFreePool(func() interface{} {
+	return &Field{}
+})
 
 func AcquireField() *Field {
-	return poolField.Get().(*Field)
+	return fieldPool.Get().(*Field)
 }
 
 func ReleaseField(field *Field) {
@@ -534,7 +532,7 @@ func ReleaseField(field *Field) {
 		return
 	}
 	*field = Field{}
-	poolField.Put(field)
+	fieldPool.Put(field)
 }
 
 func CloneField(field *Field) *Field {
@@ -543,14 +541,12 @@ func CloneField(field *Field) *Field {
 	return newField
 }
 
-var poolTag sync.Pool = sync.Pool{
-	New: func() interface{} {
-		return &Tag{}
-	},
-}
+var tagPool = datatype.NewLockFreePool(func() interface{} {
+	return &Tag{}
+})
 
 func AcquireTag() *Tag {
-	return poolTag.Get().(*Tag)
+	return tagPool.Get().(*Tag)
 }
 
 // ReleaseTag 需要释放Tag拥有的Field
@@ -562,7 +558,7 @@ func ReleaseTag(tag *Tag) {
 		ReleaseField(tag.Field)
 	}
 	*tag = Tag{}
-	poolTag.Put(tag)
+	tagPool.Put(tag)
 }
 
 // CloneTag 需要复制Tag拥有的Field

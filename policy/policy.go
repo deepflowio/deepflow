@@ -52,6 +52,7 @@ const (
 
 type PolicyTable struct {
 	sync.Mutex
+
 	cloudPlatformLabeler *CloudPlatformLabeler
 	policyLabeler        *PolicyLabeler
 
