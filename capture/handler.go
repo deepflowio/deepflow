@@ -23,6 +23,7 @@ type PacketHandler struct {
 	defaultTapType uint32
 	keys           [BATCH_SIZE + 1]queue.HashKey
 	metaPackets    []interface{}
+	lastFlush      time.Duration
 
 	dedupTable *dedup.DedupTable
 }
@@ -62,20 +63,22 @@ func (h *PacketHandler) Handle(timestamp Timestamp, packet RawPacket, size Packe
 	metaPacket.L2End1 = !h.remoteSegments.Lookup(metaPacket.MacDst)
 
 	h.metaPackets = append(h.metaPackets, metaPacket)
-	if len(h.metaPackets) >= cap(h.metaPackets) {
+	if len(h.metaPackets) >= cap(h.metaPackets) || timestamp-h.lastFlush >= 200*time.Millisecond {
 		h.Flush()
 	}
 }
 
 func (h *PacketHandler) Flush() {
-	if len(h.metaPackets) > 0 {
-		keys := h.keys[1:]
-		for i, metaPacket := range h.metaPackets {
-			keys[i] = queue.HashKey(metaPacket.(*datatype.MetaPacket).GenerateHash())
-		}
-		h.queue.Puts(h.keys[:len(h.metaPackets)+1], h.metaPackets)
-		h.metaPackets = h.metaPackets[:0]
+	if len(h.metaPackets) == 0 {
+		return
 	}
+	keys := h.keys[1:]
+	for i, metaPacket := range h.metaPackets {
+		keys[i] = queue.HashKey(metaPacket.(*datatype.MetaPacket).GenerateHash())
+	}
+	h.lastFlush = h.metaPackets[len(h.metaPackets)-1].(*datatype.MetaPacket).Timestamp
+	h.queue.Puts(h.keys[:len(h.metaPackets)+1], h.metaPackets) // metaPackets no longer available
+	h.metaPackets = h.metaPackets[:0]
 }
 
 func (h *PacketHandler) Init(tapId int, interfaceName string) {
