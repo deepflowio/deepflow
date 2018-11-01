@@ -30,6 +30,7 @@ const (
 	QUEUE_CMD_SHOW = iota
 	QUEUE_CMD_MONITOR_ON
 	QUEUE_CMD_MONITOR_OFF
+	QUEUE_CMD_CLEAR
 )
 
 func NewManager() *Manager {
@@ -81,6 +82,11 @@ func (m *Manager) RecvCommand(conn *net.UDPConn, port int, operate uint16, arg *
 		}
 		m.queues[name].TurnOffDebug()
 		break
+	case QUEUE_CMD_CLEAR:
+		for _, queue := range m.queues {
+			queue.TurnOffDebug()
+		}
+		dropletctl.SendToDropletCtl(conn, port, 0, nil)
 	default:
 		log.Warningf("Trident Adapter recv unknown command(%v).", operate)
 	}
@@ -237,7 +243,15 @@ func RegisterCommand() *cobra.Command {
 			}
 		},
 	}
+	clear := &cobra.Command{
+		Use:   "clear",
+		Short: "clear all queue",
+		Run: func(cmd *cobra.Command, args []string) {
+			sendCmdOnly(QUEUE_CMD_CLEAR, nil)
+		},
+	}
 	queue.AddCommand(show)
 	queue.AddCommand(monitor)
+	queue.AddCommand(clear)
 	return queue
 }
