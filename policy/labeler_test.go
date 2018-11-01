@@ -72,6 +72,13 @@ var (
 	group7Mac1 = NewMACAddrFromString("66:66:66:66:66:62").Int()
 )
 
+type EndInfo struct {
+	L2End0 bool
+	L3End0 bool
+	L2End1 bool
+	L3End1 bool
+}
+
 type EpcInfo struct {
 	L2EpcId0 int32
 	L3EpcId0 int32
@@ -87,6 +94,16 @@ func generateEpcInfo(l2EpcId0, l3EpcId0, l2EpcId1, l3EpcId1 int32) *EpcInfo {
 		L3EpcId1: l3EpcId1,
 	}
 	return basicData
+}
+
+func generateEndInfo(l2End0, l3End0, l2End1, l3End1 bool) *EndInfo {
+	basicEnd := &EndInfo{
+		L2End0: l2End0,
+		L3End0: l3End0,
+		L2End1: l2End1,
+		L3End1: l3End1,
+	}
+	return basicEnd
 }
 
 func generateIpNet(ip uint32, subnetId uint32, mask uint32) *IpNet {
@@ -858,6 +875,132 @@ func TestModifyEpcIdPolicy5(t *testing.T) {
 	data, _ = policy.policyLabeler.GetPolicyByFastPath(key)
 	if !CheckEpcTestResult(t, basicData, data) {
 		t.Error("TestModifyEpcIdPolicy5-2 FastPath Check Failed!")
+	}
+}
+
+func checkEndTestResult(t *testing.T, basicEndInfo *EndInfo, targetEndpointData *EndpointData) bool {
+	if (basicEndInfo.L2End0 == targetEndpointData.SrcInfo.L2End) &&
+		(basicEndInfo.L3End0 == targetEndpointData.SrcInfo.L3End) &&
+		(basicEndInfo.L2End1 == targetEndpointData.DstInfo.L2End) &&
+		(basicEndInfo.L3End1 == targetEndpointData.DstInfo.L3End) {
+		return true
+	}
+
+	t.Log("Result:", targetEndpointData, "\n")
+	t.Log("Expect:", basicEndInfo, "\n")
+	return false
+}
+
+// L2end0=L2end1=false L3end0=L3end1=false
+func TestL2endL3end1(t *testing.T) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	key := generateLookupKey(mac3, mac4, 0, ip3, ip4, uint8(IPProtocolTCP), 0, 8000)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 63, false, false)
+
+	basicEndInfo := generateEndInfo(false, false, false, false)
+	data := policy.cloudPlatformLabeler.GetEndpointData(key)
+	if !checkEndTestResult(t, basicEndInfo, data) {
+		t.Error("TestL2endL3end1 Check Failed!")
+	}
+}
+
+// L2end0=L2end1=true L3end0=L3end1=false
+func TestL2endL3end2(t *testing.T) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	key := generateLookupKey(mac3, mac4, 0, ip3, ip4, uint8(IPProtocolTCP), 0, 8000)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 63, true, true)
+
+	basicEndInfo := generateEndInfo(true, false, true, false)
+	data := policy.cloudPlatformLabeler.GetEndpointData(key)
+	if !checkEndTestResult(t, basicEndInfo, data) {
+		t.Error("TestL2endL3end2 Check Failed!")
+	}
+}
+
+// L2end0=L2end1=false L3end0=true,L3end01=false
+func TestL2endL3end3(t *testing.T) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	key := generateLookupKey(mac3, mac4, 0, ip3, ip4, uint8(IPProtocolTCP), 0, 8000)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, false, false)
+
+	basicEndInfo := generateEndInfo(false, true, false, false)
+	data := policy.cloudPlatformLabeler.GetEndpointData(key)
+	if !checkEndTestResult(t, basicEndInfo, data) {
+		t.Error("TestL2endL3end3 Check Failed!")
+	}
+}
+
+// L2endn=L2end1=true L3end0=true, L3end1=false
+func TestL2endL3end4(t *testing.T) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	key := generateLookupKey(mac3, mac4, 0, ip3, ip4, uint8(IPProtocolTCP), 0, 8000)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
+
+	basicEndInfo := generateEndInfo(true, true, true, false)
+	data := policy.cloudPlatformLabeler.GetEndpointData(key)
+	if !checkEndTestResult(t, basicEndInfo, data) {
+		t.Error("TestL2endL3end4 Check Failed!")
+	}
+}
+
+// arp包 ip3-->ip4 ttl=64  L2end=L2end1=false L3end0=true,L3end1=false
+// ip包  ip4-->ip3 ttl=64  L2end=L2end1=false L3end0=true,L3end1=true
+// ip包  ip4-->ip3 ttl=63  L2end=L2end1=false L3end0=false,L3end1=true
+// ip包  ip3-->ip4 ttl=63  L2end=L2end1=false L3end0=true,L3end1=false
+// arp包 ip4-->ip3 ttl=64  L2end=L2end1=false L3end0=true,L3end1=true
+// ip包  ip3-->ip4 ttl=63  L2end=L2end1=false L3end0=true,L3end1=true
+func TestL2endL3end5(t *testing.T) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+
+	// arp包 ip3-->ip4 ttl=64  L2end=L2end1=false L3end0=true,L3end1=false
+	key1 := generateLookupKey(mac3, mac4, 0, ip3, ip4, 0, 0, 8000)
+	setEthTypeAndOthers(key1, EthernetTypeARP, 64, false, false)
+	data := policy.cloudPlatformLabeler.GetEndpointData(key1)
+	basicEndInfo := generateEndInfo(false, true, false, false)
+	if !checkEndTestResult(t, basicEndInfo, data) {
+		t.Error("TestL2endL3end5 Check Failed!")
+	}
+
+	// ip包  ip4-->ip3 ttl=64  L2end=L2end1=false L3end0=true,L3end1=true
+	key2 := generateLookupKey(mac4, mac3, 0, ip4, ip3, uint8(IPProtocolTCP), 0, 8000)
+	setEthTypeAndOthers(key2, EthernetTypeIPv4, 64, false, false)
+	basicEndInfo = generateEndInfo(false, true, false, true)
+	data = policy.cloudPlatformLabeler.GetEndpointData(key2)
+	if !checkEndTestResult(t, basicEndInfo, data) {
+		t.Error("TestL2endL3end5 Check Failed!")
+	}
+
+	// ip包  ip4-->ip3 ttl=63  L2end=L2end1=false L3end0=false,L3end1=true
+	key2.Ttl = 63
+	basicEndInfo.L3End0 = false
+	data = policy.cloudPlatformLabeler.GetEndpointData(key2)
+	if !checkEndTestResult(t, basicEndInfo, data) {
+		t.Error("TestL2endL3end5 Check Failed!")
+	}
+
+	// ip包  ip3-->ip4 ttl=63  L2end=L2end1=false L3end0=true,L3end1=false
+	key3 := generateLookupKey(mac3, mac4, 0, ip3, ip4, uint8(IPProtocolTCP), 0, 8000)
+	setEthTypeAndOthers(key3, EthernetTypeIPv4, 63, false, false)
+	data = policy.cloudPlatformLabeler.GetEndpointData(key3)
+	basicEndInfo = generateEndInfo(false, true, false, false)
+	if !checkEndTestResult(t, basicEndInfo, data) {
+		t.Error("TestL2endL3end5 Check Failed!")
+	}
+
+	// arp包 ip4-->ip3 ttl=64  L2end=L2end1=false L3end0=true,L3end1=true
+	key4 := generateLookupKey(mac4, mac3, 0, ip4, ip3, 0, 0, 8000)
+	setEthTypeAndOthers(key4, EthernetTypeARP, 64, false, false)
+	basicEndInfo = generateEndInfo(false, true, false, true)
+	data = policy.cloudPlatformLabeler.GetEndpointData(key4)
+	if !checkEndTestResult(t, basicEndInfo, data) {
+		t.Error("TestL2endL3end5 Check Failed!")
+	}
+
+	// ip包  ip3-->ip4 ttl=63  L2end=L2end1=false L3end0=true,L3end1=true
+	data = policy.cloudPlatformLabeler.GetEndpointData(key3)
+	basicEndInfo = generateEndInfo(false, true, false, true)
+	if !checkEndTestResult(t, basicEndInfo, data) {
+		t.Error("TestL2endL3end5 Check Failed!")
 	}
 }
 
