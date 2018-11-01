@@ -1,7 +1,6 @@
 package flowgenerator
 
 import (
-	"container/list"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -64,13 +63,12 @@ type SeqSegment struct { // 避免乱序，识别重传
 }
 
 type TcpSessionPeer struct {
-	seqList *list.List // 升序链表, 内容为SeqSegment
+	seqArray []SeqSegment
 
 	seqThreshold  uint32 // fast SynRetrans Check
 	isAckReceived bool   // AckRetrans check
 	isSynReceived bool
 
-	flowState  FlowState
 	timestamp  time.Duration
 	seq        uint32
 	payloadLen uint32
@@ -181,6 +179,28 @@ func (p *TcpSessionPeer) isNextPacket(header *MetaPacket) bool {
 	return p.seq+p.payloadLen == header.TcpData.Seq
 }
 
+// merger array[at] and array[at+1] into array[at]
+// 忽略调sequence最小的2个node之间的间隔,相当于认为包已收到
+// 其带来的影响是，包被误认为是重传
+func (p *TcpSessionPeer) mergeSeqListNode(at int) {
+	first := p.seqArray[at]
+	second := p.seqArray[at+1]
+	p.seqArray[at].length = second.seqNumber - first.seqNumber + second.length
+	p.seqArray[at].seqNumber = first.seqNumber
+
+	p.seqArray = append(p.seqArray[:at+1], p.seqArray[at+2:]...)
+}
+
+// insert node to array[at]
+func (p *TcpSessionPeer) insertSeqListNode(node SeqSegment, at int) {
+	if len(p.seqArray) == at {
+		p.seqArray = append(p.seqArray[:], node)
+	} else {
+		p.seqArray = append(p.seqArray[:at+1], p.seqArray[at:]...)
+		p.seqArray[at] = node
+	}
+}
+
 // 用于判断SeqSegment node是否与left或right连续
 // 如果把SeqSegment看作是sequence number的集合，continuous可认为是node与left或right相交
 func isContinuousSeqSegment(left, right, node *SeqSegment, flowInfo *FlowInfo) ContinuousFlag {
@@ -202,30 +222,14 @@ func isContinuousSeqSegment(left, right, node *SeqSegment, flowInfo *FlowInfo) C
 	return flag
 }
 
-// 当list超过最大限制长度时，合并SeqList中前两个节点
-// 忽略调sequence最小的2个node之间的间隔,相当于认为包已收到
-// 其带来的影响是，包被误认为是重传
-func (p *TcpSessionPeer) mergeSeqListNode(seqList *list.List) {
-	if seqList.Len() < SEQ_LIST_MAX_LEN {
-		return
-	}
-
-	seqNode := seqList.Front()
-	first := seqNode.Value.(*SeqSegment)
-	second := seqNode.Next().Value.(*SeqSegment)
-	second.length = second.seqNumber - first.seqNumber + second.length
-	second.seqNumber = first.seqNumber
-
-	seqList.Remove(seqNode)
-}
-
-// 如果把SeqSegment看作是sequence number的集合，retrans可认为是left包含node
-func isRetransSeqSegment(left, node *SeqSegment) bool {
-	if left == nil {
+// 如果把SeqSegment看作是sequence number的集合，retrans可认为是right包含node
+func isRetransSeqSegment(right, node *SeqSegment) bool {
+	if right == nil {
 		return false
 	}
 
-	if node.seqNumber >= left.seqNumber && left.seqNumber+left.length >= node.seqNumber+node.length {
+	if node.seqNumber >= right.seqNumber &&
+		right.seqNumber+right.length >= node.seqNumber+node.length {
 		return true
 	}
 
@@ -234,13 +238,13 @@ func isRetransSeqSegment(left, node *SeqSegment) bool {
 
 // 如果把SeqSegment看作是sequence number的集合，error可认为是node与left或right相交
 func isErrorSeqSegment(left, right, node *SeqSegment) bool {
-	if left != nil &&
-		node.seqNumber < left.seqNumber+left.length &&
-		node.seqNumber+node.length > left.seqNumber+left.length {
+	if right != nil &&
+		((node.seqNumber < right.seqNumber && node.seqNumber+node.length > right.seqNumber) ||
+			node.seqNumber+node.length > right.seqNumber+right.length) {
 		return true
 	}
 
-	if right != nil && node.seqNumber+node.length > right.seqNumber {
+	if left != nil && left.seqNumber+left.length > node.seqNumber {
 		return true
 	}
 
@@ -253,64 +257,55 @@ func isErrorSeqSegment(left, right, node *SeqSegment) bool {
 func (p *TcpSessionPeer) assertSeqNumber(tcpHeader *MetaPacketTcpHeader, payloadLen uint16, flowInfo *FlowInfo) PacketSeqTypeInSeqList {
 	var flag PacketSeqTypeInSeqList
 	var left, right *SeqSegment
-	var rightElement, currentElement *list.Element
+	var rightIndex int
 
 	if payloadLen == 0 {
 		return SEQ_NOT_CARE
 	}
 
-	node := &SeqSegment{seqNumber: tcpHeader.Seq, length: uint32(payloadLen)}
+	node := SeqSegment{seqNumber: tcpHeader.Seq, length: uint32(payloadLen)}
+	if len(p.seqArray) == 0 {
+		p.seqArray = make([]SeqSegment, 0, SEQ_LIST_MAX_LEN+1)
+		p.insertSeqListNode(node, 0)
 
-	seqList := p.seqList
-	if seqList == nil {
-		seqList = list.New()
-		p.seqList = seqList
-	}
-
-	if seqList.Len() == 0 {
-		seqList.PushFront(node)
 		return SEQ_NOT_CARE
 	}
 
-	// seqList为升序链表，此处，从后往前查找；直至找到seqNumber小于或等于node.seqNumber的节点
-	for rightElement, currentElement = nil, seqList.Back(); currentElement != nil; rightElement, currentElement = currentElement, currentElement.Prev() {
-		left = currentElement.Value.(*SeqSegment)
-		if node.seqNumber >= left.seqNumber { // 查找node在list中的位置
+	// seqArray为升序数组；直至找到seqNumber小于或等于node.seqNumber的节点
+	for rightIndex = len(p.seqArray); rightIndex > 0; rightIndex-- {
+		if node.seqNumber >= p.seqArray[rightIndex-1].seqNumber { // 查找node在list中的位置
 			break
 		}
 	}
 
-	if currentElement == nil {
+	if rightIndex == 0 {
 		left = nil
+	} else {
+		left = &p.seqArray[rightIndex-1]
 	}
-	if rightElement == nil {
+
+	if rightIndex == len(p.seqArray) {
 		right = nil
 	} else {
-		right = rightElement.Value.(*SeqSegment)
+		right = &p.seqArray[rightIndex]
 	}
 
-	if e := isErrorSeqSegment(left, right, node); e {
+	if e := isErrorSeqSegment(left, right, &node); e {
 		flag = SEQ_ERROR
-		log.Debugf("flow info: %v, node:%v out of range, left:%v, right:%v", flowInfo, node, left, right)
-	} else if r := isRetransSeqSegment(left, node); r {
+	} else if r := isRetransSeqSegment(right, &node); r {
 		flag = SEQ_RETRANS
 	} else {
-		if c := isContinuousSeqSegment(left, right, node, flowInfo); c == SEQ_NODE_DISCONTINUOUS {
-			if rightElement == nil {
-				seqList.InsertAfter(node, currentElement)
+		if c := isContinuousSeqSegment(left, right, &node, flowInfo); c == SEQ_NODE_DISCONTINUOUS {
+			if len(p.seqArray) >= SEQ_LIST_MAX_LEN {
+				p.insertSeqListNode(node, rightIndex)
+				p.mergeSeqListNode(0)
 			} else {
-				seqList.InsertBefore(node, rightElement)
+				p.insertSeqListNode(node, rightIndex)
 			}
 		} else if c == SEQ_NODE_BOTH_CONTINUOUS {
-			left.length = left.length - node.length + right.length
-			seqList.Remove(rightElement)
+			p.mergeSeqListNode(rightIndex - 1)
 		}
 		flag = SEQ_NOT_CARE
-	}
-
-	if seqList.Len() >= SEQ_LIST_MAX_LEN {
-		p.mergeSeqListNode(seqList)
-		log.Debugf("flow info: %v, seqList length exceed max length:%v, merge seqList first 2 element", flowInfo, SEQ_LIST_MAX_LEN)
 	}
 
 	return flag
@@ -329,31 +324,18 @@ func (p *TcpSessionPeer) updateData(header *MetaPacket) {
 	// winScale不能在这里更新p.winScale = tcpHeader.WinScale
 }
 
-// 更新状态
-func (p *TcpSessionPeer) updateState(state FlowState) {
-	p.flowState = state
-}
-
 func (p *TcpSessionPeer) String() string {
 	var list string
 
-	data := fmt.Sprintf("tcpState:%v, timestamp:%v, seq:%v, payloadLen:%v, winSize:%v"+
+	data := fmt.Sprintf("timestamp:%v, seq:%v, payloadLen:%v, winSize:%v"+
 		"winScale:%v, canCalcRtt:%v, canCalcArt:%v",
-		p.flowState, p.timestamp, p.seq, p.payloadLen,
+		p.timestamp, p.seq, p.payloadLen,
 		p.winSize, p.winScale, p.canCalcRtt, p.canCalcArt)
 
-	l := p.seqList
-	if l == nil {
-		return fmt.Sprintf("%s, seqList:nil", data)
-	}
-
-	length := l.Len()
+	length := len(p.seqArray)
 	list = fmt.Sprintf("length:%v", length)
 	if length > 0 {
-		for e := l.Front(); e != nil; e = e.Next() {
-			v := e.Value.(*SeqSegment)
-			list = fmt.Sprintf("%s,{%v,%v}", list, v.seqNumber, v.length)
-		}
+		list = fmt.Sprintf("%s, %v", list, p.seqArray)
 	}
 
 	return fmt.Sprintf("TcpSessionPeer: %s, seqList:[%s]", data, list)
