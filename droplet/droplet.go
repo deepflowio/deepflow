@@ -2,6 +2,7 @@ package droplet
 
 import (
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -58,7 +59,7 @@ func getLocalIp() (net.IP, error) {
 	return nil, errors.New("Unable to resolve local ip by hostname")
 }
 
-func Start(configPath string) {
+func Start(configPath string) (closers []io.Closer) {
 	cfg := config.Load(configPath)
 	InitLog(cfg.LogFile, cfg.LogLevel)
 	log.Infof("droplet config: %+v\n", cfg)
@@ -109,10 +110,12 @@ func Start(configPath string) {
 
 	launcher := capture.CaptureLauncher{localIp, remoteSegmentSet, cfg.DefaultTapType, labelerQueues}
 	for tapId, iface := range cfg.TapInterfaces {
-		if _, err := launcher.StartWith(tapId, iface); err != nil {
+		closer, err := launcher.StartWith(tapId, iface)
+		if err != nil {
 			log.Error(err)
 			return
 		}
+		closers = append(closers, closer)
 	}
 
 	// L2 - packet labeler
@@ -213,4 +216,5 @@ func Start(configPath string) {
 		builder.AddZero(zero, cfg.ZeroPort)
 	}
 	builder.Build().Start(cfg.Queue.DocSenderQueueSize) // MapReduce发送是突发的，且ZMQ发送缓慢，queueSize设置为突发的2倍
+	return
 }
