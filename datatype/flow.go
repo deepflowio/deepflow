@@ -3,7 +3,6 @@ package datatype
 import (
 	"fmt"
 	"reflect"
-	"sync"
 	"time"
 
 	"github.com/google/gopacket/layers"
@@ -190,9 +189,9 @@ func (f *Flow) String() string {
 	return formatted
 }
 
-var tcpPerfStatsPool = sync.Pool{
-	New: func() interface{} { return new(TcpPerfStats) },
-}
+var tcpPerfStatsPool = NewLockFreePool(func() interface{} {
+	return new(TcpPerfStats)
+})
 
 func AcquireTcpPerfStats() *TcpPerfStats {
 	return tcpPerfStatsPool.Get().(*TcpPerfStats)

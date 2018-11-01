@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"sync"
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
@@ -42,15 +41,13 @@ func (d Document) String() string {
 		d.Timestamp, d.ActionFlags, d.Tag, d.Meter)
 }
 
-var poolDocument sync.Pool = sync.Pool{
-	New: func() interface{} {
-		return &Document{}
-	},
-}
+var poolDocument = datatype.NewLockFreePool(func() interface{} {
+	return &Document{}
+})
 
 func AcquireDocument() *Document {
 	d := poolDocument.Get().(*Document)
-	d.Init()
+	d.ReferenceCount.Reset()
 	return d
 }
 
