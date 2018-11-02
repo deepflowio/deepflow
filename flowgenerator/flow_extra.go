@@ -1,7 +1,6 @@
 package flowgenerator
 
 import (
-	"sync"
 	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -33,11 +32,9 @@ type FlowExtra struct {
 	circlePktGot bool
 }
 
-var flowExtraPool = sync.Pool{
-	New: func() interface{} {
-		return new(FlowExtra)
-	},
-}
+var flowExtraPool = NewLockFreePool(func() interface{} {
+	return new(FlowExtra)
+})
 
 func AcquireFlowExtra() *FlowExtra {
 	return flowExtraPool.Get().(*FlowExtra)
