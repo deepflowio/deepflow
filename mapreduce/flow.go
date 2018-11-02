@@ -133,6 +133,8 @@ func (f *subFlowHandler) GetCounter() interface{} {
 		f.statItems[i].Value = f.statsdCounter[i+oldLatch].emitCounter
 		if f.statsdCounter[i+oldLatch].flowCounter != 0 {
 			f.statItems[i+f.numberOfApps].Value = f.statsdCounter[i+oldLatch].docCounter / f.statsdCounter[i+oldLatch].flowCounter
+		} else {
+			f.statItems[i+f.numberOfApps].Value = 0
 		}
 		f.statItems[i+f.numberOfApps*2].Value = f.statsdCounter[i+oldLatch].maxCounter
 		f.statsdCounter[i+oldLatch].emitCounter = 0
