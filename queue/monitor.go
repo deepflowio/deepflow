@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"net"
 
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
-
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
 )
 
@@ -18,6 +16,11 @@ type DebugMessage struct {
 type MonitorOperator interface {
 	TurnOnDebug(conn *net.UDPConn, port int)
 	TurnOffDebug()
+}
+
+type ReferenceCountable interface {
+	AddReferenceCount()
+	SubReferenceCount() bool
 }
 
 type Unmarshaller func(interface{}) (interface{}, error)
@@ -93,18 +96,18 @@ func (m *Monitor) sendDebug(conn *net.UDPConn, port int, items []interface{}) {
 			break
 		}
 		dropletctl.SendToDropletCtl(conn, port, 0, &buffer)
-		item.(datatype.ReferenceCounter).SubReferenceCount()
+		item.(ReferenceCountable).SubReferenceCount()
 	}
 }
 
 func (m *Monitor) send(items []interface{}) {
 	if m.isDebugOn() && len(items) > 0 {
-		if _, ok := items[0].(datatype.ReferenceCounter); !ok {
+		if _, ok := items[0].(ReferenceCountable); !ok {
 			log.Errorf("queue[%s] recv invalid data.", m.Name)
 			return
 		}
 		for _, item := range items {
-			item.(datatype.ReferenceCounter).AddReferenceCount()
+			item.(ReferenceCountable).AddReferenceCount()
 		}
 
 		select {

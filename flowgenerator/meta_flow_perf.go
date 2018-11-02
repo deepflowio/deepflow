@@ -1,12 +1,12 @@
 package flowgenerator
 
 import (
-	"sync"
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
-var metaFlowPerfPool = sync.Pool{
-	New: func() interface{} { return new(MetaFlowPerf) },
-}
+var metaFlowPerfPool = datatype.NewLockFreePool(func() interface{} {
+	return new(MetaFlowPerf)
+})
 
 func AcquireMetaFlowPerf() *MetaFlowPerf {
 	return metaFlowPerfPool.Get().(*MetaFlowPerf)
