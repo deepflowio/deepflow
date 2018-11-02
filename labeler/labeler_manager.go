@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -40,6 +41,11 @@ type LabelerManager struct {
 	readQueuesCount int
 	appQueues       [QUEUE_TYPE_MAX]queue.MultiQueueWriter
 	running         bool
+
+	rawPlatformDatas []*datatype.PlatformData
+	rawIpGroupDatas  []*policy.IpGroupData
+	rawPolicyData    []*policy.Acl
+	enable           bool
 }
 
 const (
@@ -108,19 +114,37 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 		l.OnPolicyDataChange(nil)
 	}
 
-	l.policyTable.EnableAclData()
+	if l.enable {
+		l.policyTable.EnableAclData()
+		l.enable = false
+	}
 }
 
 func (l *LabelerManager) OnPlatformDataChange(data []*datatype.PlatformData) {
+	if reflect.DeepEqual(l.rawPlatformDatas, data) {
+		return
+	}
 	l.policyTable.UpdateInterfaceData(data)
+	l.rawPlatformDatas = data
+	l.enable = true
 }
 
 func (l *LabelerManager) OnIpGroupDataChange(data []*policy.IpGroupData) {
+	if reflect.DeepEqual(l.rawIpGroupDatas, data) {
+		return
+	}
 	l.policyTable.UpdateIpGroupData(data)
+	l.rawIpGroupDatas = data
+	l.enable = true
 }
 
 func (l *LabelerManager) OnPolicyDataChange(data []*policy.Acl) {
+	if reflect.DeepEqual(l.rawPolicyData, data) {
+		return
+	}
 	l.policyTable.UpdateAclData(data)
+	l.rawPolicyData = data
+	l.enable = true
 }
 
 func GetTapType(inPort uint32) datatype.TapType {
