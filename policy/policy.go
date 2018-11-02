@@ -176,9 +176,7 @@ func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData
 
 	endpoint, policy := t.policyLabeler.GetPolicyByFastPath(key)
 	if policy == nil {
-		if endpoint == nil {
-			endpoint = t.cloudPlatformLabeler.GetEndpointData(key)
-		}
+		endpoint = t.cloudPlatformLabeler.GetEndpointData(key)
 		policy = t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
 	}
 	endpoint = t.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
