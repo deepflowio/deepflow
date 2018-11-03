@@ -107,7 +107,10 @@ func MarshalFlow(f *TaggedFlow, bytes *utils.ByteBuffer) error {
 func getACLGIDs(f *TaggedFlow) []uint32 {
 	set := make(map[ACLID]bool)
 	for _, aclAction := range f.PolicyData.AclActions {
-		set[aclAction.GetACLGID()] = true
+		g := aclAction.GetACLGID()
+		if g > 0 {
+			set[g] = true
+		}
 	}
 	aclGIDs := make([]uint32, 0, len(set))
 	for id := range set {
