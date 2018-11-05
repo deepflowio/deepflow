@@ -152,18 +152,8 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, now time.Duration) *FlowExtra
 	return flowExtra
 }
 
-func (f *FlowGenerator) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8, reply, invalid bool) bool {
+func (f *FlowGenerator) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8, reply bool) bool {
 	taggedFlow := flowExtra.taggedFlow
-	if reply {
-		taggedFlow.FlowMetricsPeerDst.TCPFlags |= flags
-	} else {
-		taggedFlow.FlowMetricsPeerSrc.TCPFlags |= flags
-	}
-	if isExceptionFlags(flags, reply) || invalid {
-		flowExtra.timeout = f.TimeoutConfig.Exception
-		flowExtra.flowState = FLOW_STATE_EXCEPTION
-		return false
-	}
 	var timeout time.Duration
 	var flowState FlowState
 	closed := false
@@ -194,6 +184,7 @@ func (f *FlowGenerator) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8
 
 func updatePlatformData(taggedFlow *TaggedFlow, endpointData *EndpointData, reply bool) {
 	if endpointData == nil {
+		log.Warning("Unexpected nil packet endpointData")
 		return
 	}
 	var srcInfo, dstInfo *EndpointInfo
@@ -204,32 +195,28 @@ func updatePlatformData(taggedFlow *TaggedFlow, endpointData *EndpointData, repl
 		srcInfo = endpointData.SrcInfo
 		dstInfo = endpointData.DstInfo
 	}
-	if srcInfo != nil {
-		taggedFlow.FlowMetricsPeerSrc.EpcID = srcInfo.L2EpcId
-		taggedFlow.FlowMetricsPeerSrc.DeviceType = DeviceType(srcInfo.L2DeviceType)
-		taggedFlow.FlowMetricsPeerSrc.DeviceID = srcInfo.L2DeviceId
-		taggedFlow.FlowMetricsPeerSrc.IsL2End = srcInfo.L2End
-		taggedFlow.FlowMetricsPeerSrc.IsL3End = srcInfo.L3End
-		taggedFlow.FlowMetricsPeerSrc.L3EpcID = srcInfo.L3EpcId
-		taggedFlow.FlowMetricsPeerSrc.L3DeviceType = DeviceType(srcInfo.L3DeviceType)
-		taggedFlow.FlowMetricsPeerSrc.L3DeviceID = srcInfo.L3DeviceId
-		taggedFlow.FlowMetricsPeerSrc.Host = srcInfo.HostIp
-		taggedFlow.FlowMetricsPeerSrc.SubnetID = srcInfo.SubnetId
-		taggedFlow.GroupIDs0 = srcInfo.GroupIds
-	}
-	if dstInfo != nil {
-		taggedFlow.FlowMetricsPeerDst.EpcID = dstInfo.L2EpcId
-		taggedFlow.FlowMetricsPeerDst.DeviceType = DeviceType(dstInfo.L2DeviceType)
-		taggedFlow.FlowMetricsPeerDst.DeviceID = dstInfo.L2DeviceId
-		taggedFlow.FlowMetricsPeerDst.IsL2End = dstInfo.L2End
-		taggedFlow.FlowMetricsPeerDst.IsL3End = dstInfo.L3End
-		taggedFlow.FlowMetricsPeerDst.L3EpcID = dstInfo.L3EpcId
-		taggedFlow.FlowMetricsPeerDst.L3DeviceType = DeviceType(dstInfo.L3DeviceType)
-		taggedFlow.FlowMetricsPeerDst.L3DeviceID = dstInfo.L3DeviceId
-		taggedFlow.FlowMetricsPeerDst.Host = dstInfo.HostIp
-		taggedFlow.FlowMetricsPeerDst.SubnetID = dstInfo.SubnetId
-		taggedFlow.GroupIDs1 = dstInfo.GroupIds
-	}
+	taggedFlow.FlowMetricsPeerSrc.EpcID = srcInfo.L2EpcId
+	taggedFlow.FlowMetricsPeerSrc.DeviceType = DeviceType(srcInfo.L2DeviceType)
+	taggedFlow.FlowMetricsPeerSrc.DeviceID = srcInfo.L2DeviceId
+	taggedFlow.FlowMetricsPeerSrc.IsL2End = srcInfo.L2End
+	taggedFlow.FlowMetricsPeerSrc.IsL3End = srcInfo.L3End
+	taggedFlow.FlowMetricsPeerSrc.L3EpcID = srcInfo.L3EpcId
+	taggedFlow.FlowMetricsPeerSrc.L3DeviceType = DeviceType(srcInfo.L3DeviceType)
+	taggedFlow.FlowMetricsPeerSrc.L3DeviceID = srcInfo.L3DeviceId
+	taggedFlow.FlowMetricsPeerSrc.Host = srcInfo.HostIp
+	taggedFlow.FlowMetricsPeerSrc.SubnetID = srcInfo.SubnetId
+	taggedFlow.GroupIDs0 = srcInfo.GroupIds
+	taggedFlow.FlowMetricsPeerDst.EpcID = dstInfo.L2EpcId
+	taggedFlow.FlowMetricsPeerDst.DeviceType = DeviceType(dstInfo.L2DeviceType)
+	taggedFlow.FlowMetricsPeerDst.DeviceID = dstInfo.L2DeviceId
+	taggedFlow.FlowMetricsPeerDst.IsL2End = dstInfo.L2End
+	taggedFlow.FlowMetricsPeerDst.IsL3End = dstInfo.L3End
+	taggedFlow.FlowMetricsPeerDst.L3EpcID = dstInfo.L3EpcId
+	taggedFlow.FlowMetricsPeerDst.L3DeviceType = DeviceType(dstInfo.L3DeviceType)
+	taggedFlow.FlowMetricsPeerDst.L3DeviceID = dstInfo.L3DeviceId
+	taggedFlow.FlowMetricsPeerDst.Host = dstInfo.HostIp
+	taggedFlow.FlowMetricsPeerDst.SubnetID = dstInfo.SubnetId
+	taggedFlow.GroupIDs1 = dstInfo.GroupIds
 }
 
 // reversePolicyData will return a clone of the current PolicyData
@@ -256,11 +243,11 @@ func (f *FlowExtra) reverseFlow() {
 }
 
 func (f *FlowGenerator) tryReverseFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) bool {
-	if flowExtra.reversed || meta.TcpData == nil {
+	if flowExtra.reversed {
 		return false
 	}
 	// if meta.Invalid is false, TcpData will not be nil
-	if flagEqual(meta.TcpData.Flags&TCP_FLAG_MASK, TCP_SYN|TCP_ACK) && !reply {
+	if flagEqual(meta.TcpData.Flags, TCP_SYN|TCP_ACK) && !reply {
 		flowExtra.reverseFlow()
 		flowExtra.reversed = !flowExtra.reversed
 		return true
@@ -421,6 +408,10 @@ func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uin
 			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, false, &f.perfCounter)
 			flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
 			calcCloseType(taggedFlow, flowExtra.flowState)
+			if f.checkL4ServiceReverse(taggedFlow, flowExtra.reversed) {
+				flowExtra.reverseFlow()
+				flowExtra.reversed = !flowExtra.reversed
+			}
 			flowOutQueue.Put(taggedFlow)
 			e = e.Next()
 		}
@@ -463,11 +454,11 @@ loop:
 				taggedFlow := flowExtra.taggedFlow
 				atomic.AddInt32(&f.stats.CurrNumFlows, -1)
 				flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
-				if f.servicePortDescriptor.judgeServiceDirection(taggedFlow, flowExtra.reversed) {
+				calcCloseType(taggedFlow, flowExtra.flowState)
+				if f.checkL4ServiceReverse(taggedFlow, flowExtra.reversed) {
 					flowExtra.reverseFlow()
 					flowExtra.reversed = !flowExtra.reversed
 				}
-				calcCloseType(taggedFlow, flowExtra.flowState)
 				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 				ReleaseFlowExtra(flowExtra)
 				flowOutBuffer[flowOutNum] = taggedFlow
@@ -483,11 +474,11 @@ loop:
 			} else if flowExtra.taggedFlow.StartTime+forceReportInterval < now {
 				taggedFlow := flowExtra.taggedFlow
 				flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
-				if f.servicePortDescriptor.judgeServiceDirection(taggedFlow, flowExtra.reversed) {
+				taggedFlow.CloseType = CloseTypeForcedReport
+				if f.checkL4ServiceReverse(taggedFlow, flowExtra.reversed) {
 					flowExtra.reverseFlow()
 					flowExtra.reversed = !flowExtra.reversed
 				}
-				taggedFlow.CloseType = CloseTypeForcedReport
 				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 				flowOutBuffer[flowOutNum] = CloneTaggedFlow(taggedFlow)
 				flowOutNum++
@@ -571,13 +562,13 @@ func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, cfg
 	flowGenerator := &FlowGenerator{
 		TimeoutConfig:           defaultTimeoutConfig,
 		FlowCacheHashMap:        FlowCacheHashMap{make([]*FlowCache, hashMapSize), rand.Uint32(), hashMapSize, timeoutCleanerCount, &TunnelInfo{}},
+		ServiceManager:          NewServiceManager(64 * 1024),
 		metaPacketHeaderInQueue: metaPacketHeaderInQueue,
 		flowOutQueue:            flowOutQueue,
 		stats:                   FlowGeneratorStats{cleanRoutineFlowCacheNums: make([]int, timeoutCleanerCount), cleanRoutineMaxFlowCacheLens: make([]int, timeoutCleanerCount)},
 		stateMachineMaster:      make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
 		stateMachineSlave:       make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
 		packetHandler:           &PacketHandler{recvBuffer: make([]interface{}, cfg.BufferSize), processBuffer: make([]interface{}, cfg.BufferSize)},
-		servicePortDescriptor:   getServiceDescriptorWithIANA(),
 		forceReportInterval:     cfg.ForceReportInterval,
 		minLoopInterval:         defaultTimeoutConfig.minTimeout(),
 		flowLimitNum:            cfg.FlowLimitNum,
@@ -605,5 +596,17 @@ func (f *FlowGenerator) checkIfDoFlowPerf(flowExtra *FlowExtra) bool {
 		return true
 	}
 
+	return false
+}
+
+func (f *FlowGenerator) checkL4ServiceReverse(taggedFlow *TaggedFlow, reversed bool) ServiceStatus {
+	if reversed {
+		return false
+	}
+	if taggedFlow.Proto == layers.IPProtocolTCP {
+		return f.checkTcpServiceReverse(taggedFlow, reversed)
+	} else if taggedFlow.Proto == layers.IPProtocolUDP {
+		return f.checkUdpServiceReverse(taggedFlow, reversed)
+	}
 	return false
 }
