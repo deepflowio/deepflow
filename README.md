@@ -51,8 +51,89 @@ graph TD;
 
 那么我想要查询10.30.1.128/23所对应的数据集时，便能够得到[1, 2]的结果
 
-fastpath内存占用
-----------------
+平台信息查询结果说明
+------------------
+
+1. 接入网络查找
+  - IP包含在数据库ip_resource表内
+    - 查找的结果l3EpcId=-1，l2Epcid=0，isL2End=false， isL3End会根据查找包的ttl(64,128,256)进行修正
+  - vinterface所属IP的if_Type=3
+    - 查找的结果l3EpcId=(vinterface的epcId)，l2Epcid=0， isL2End=false， isL3End(MAC和IP属于同一个设备则为true），若为false则会根据ttl(64,128,255)进行修正
+  - ip不在数据库内
+    - 查找结果l3EpcId=0，l2Epcid=0
+  - 注意：
+    - 无论是否查找到数据，isL3End都会进行修正
+
+2. 虚拟网络查找
+  - MAC和IP属于同一个设备
+    - 查找结果L3EpcId=(设备epcID)，L2EpcId=(设备epcId)，isL3End=true
+  - MAC属于某一设备，IP不在数据库里
+    - 查找结果L3EpcId=0，L2EpcId=设备EpcId，isL3End=false
+  - MAC属于某一设备， IP属于另一设备
+    - 查找结果L3EpcId=（IP设备的epcId），L2EpcId=（MAC设备的epcId），isL3End=false
+  - MAC属于某一设备， IP属于ip_resource表内数据
+    - 查找结果L3EpcId=-1， L2EpcId=（MAC设备的epcId），isL3End=false
+  - MAC， IP不在数据库内
+    - 查找结果L3EpcId=0，L2EpcId=0，isL3End=false
+
+  - 注意：
+    - isL2End值现在有trident的传过来的数据直接赋值，不在做判断
+    - 如果isL3End=false，会根据ttl(64,128,255)进行修正
+
+policy firstpath查找流程
+------------------------
+
+查找使用的全局map及其初始化流程：
+
+             名字         |                                     流程
+    ----------------------|---------------------------------------------------------------------------------
+	InterestProtoMaps     | 使用策略中的Proto做key，设置value为true
+	InterestPortMaps      | 使用策略中的Port做key，设置value为true
+	InterestGroupMaps     | 使用策略中的GroupId做key，设置value为true
+	GroupPortPolicyMaps   | 策略中的SrcGroupIds + DstGroupIds + Proto + Port做key, policy为value, policy无方向
+	GroupVlanPolicyMaps   | 策略中的SrcGroupIds + DstGroupIds + Vlan 做key, policy为value, policy的方向为正, 策略中的DstGroupIds + SrcGroupIds + Vlan 做key, policy为value, policy的方向为反
+
+查找流程：
+
+  - 使用packet中的相关字段，在Interest相关map中查找，若为false则将packet中对应字段置为0
+  - 查找Port相关的策略
+    - 使用packet中的SrcGroupIds + DstGroupIds + Proto + DstPort生成一系列正方向的keys， 使用keys在GroupPortPolicyMaps中查找，将查找到的policy合并方向为正
+    - 使用packet中的DstGroupIds + SrcGroupIds + Proto + SrcPort生成一系列反方向的keys， 使用keys在GroupPortPolicyMaps中查找，将查找到的policy合并方向为反
+  - 查找Vlan相关的策略
+    - 使用packet中的SrcGroupIds + DstGroupIds + Vlan生成一系列的keys， 使用keys在GroupVlanPolicyMaps中查找，将查找到的policy合并
+
+policy fastpath查找流程
+-----------------------
+
+查找使用的全局map及说明：
+
+             名字         |                                          说明
+    ----------------------|----------------------------------------------------------------------------------------------------
+     IpNetmaskMap         | 根据平台数据和IP资源组生成的map, key为uint16(IP>>16), value为最大掩码，例如0xffff0000
+     FastPolicyMap        | 当Mask > 16时, key为uint64(maskedSrcIp << 32 + maskedDstIp), value为VlanAndPortMap
+     FastPolicyMapMini    | 当Mask <= 16时, key为uint32((maskedSrcIp & 0xffff0000) + maskedDstIp >> 16), value为VlanAndPortMap
+     VlanAndPortMap       | 结构体中有macEpcMap、vlanPolicyMap和portPolicyMap
+     macEpcMap            | key为mac地址，value为epcId
+     vlanPolicyMap        | key为 srcEpcId + dstEpcId + vlan, value为policy
+     portPolicyMap        | key为 srcEpcId + dstEpcId + srcPort + dstPort, value为PortPolicyValue结构体
+     PortPolicyValue      | 结构体中有endpoint、protoPolicyMap和timestamp
+     protoPolicyMap       | key为Proto, value为policy
+
+创建和查找流程：
+
+  - 当流量进入firstpath后，无论是否有策略都会向fastpath下发策略
+  - 使用packet中的IP在IpNetmaskMap查找Mask, 经过计算后得到maskedSrcIp和maskedDstIp, 若Mask都小于等于0xffff0000
+    后续使用FastPolicyMapMini，否则使用FastPolicyMap，后续步骤统一使用`FastMap`
+  - 用maskedSrcIp和maskedDstIp做key，在FastMap中查找获取VlanAndPortMap，若无则创建
+  - 创建时使用mac和对应的epcId向VlanAndPortMap结构体中的macEpcMap插入数据, 查找使用mac查对应的epcId
+  - 插入或查找Port相关Policy
+    - 使用srcEpcId、dstEpcId、srcPort和dstPort做key，在portPolicyMap查找PortPolicyValue结构体，若无则创建
+    - 使用proto做key, 在PortPolicyValue结构体中的protoPolicyMap查找Policy, 若无则创建
+  - 插入或查找Vlan相关Policy
+    - 使用srcEpcId、dstEpcId和vlan做key，在vlanPolicyMap查找Policy，若无则创建
+
+policy fastpath内存占用
+-----------------------
 
 fastPath存储的结构为FastPathMapValue：
 
@@ -90,6 +171,37 @@ fastPath数据结构如下：
 
 即使用内存最小1k字节，最大2208M字节
 
+APP与policy action的关系
+------------------------
+
+1. app与policy action的关系
+
+    app | name | id | policy action
+    ----|------|----|-------
+    APPLICATION_ISP_ANALYSIS | 接入网络 | 1 | PACKET_COUNTING、FLOW_COUNTING、FLOW_MISC_COUNTING、GEO_POSITIONING
+    APPLICATION_VL2_ANALYSIS | 虚拟网络 | 2 | PACKET_COUNTING、FLOW_COUNTING、FLOW_MISC_COUNTING
+    APPLICATION_REPORT       | 报表     | 3 | PACKET_COUNTING、FLOW_COUNTING
+    APPLICATION_ALARM        | 告警     | 4 | 流量峰值/流量总量：PACKET_COUNT_BROKERING
+                             |          |   | 白名单：FLOW_COUNT_BROKERING
+    APPLICATION_PERF         | 业务网络 ---- 性能量化   | 5 | FLOW_COUNTING、TCP_FLOW_PERF_COUNTING、FLOW_MISC_COUNTING、GEO_POSITIONING
+    APPLICATION_WHITELIST    | 业务网络 ---- 安全白名单 | 6 | FLOW_COUNTING
+    APPLICATION_FLOW_BACKTRACKING | 回溯分析            | 9 | FLOW_STORING
+
+2. policy action包含关系
+
+    action	| droplet需要做的处理 | 其它组件需要做的处理
+    ------------|-------------------|--------------------
+    PACKET_COUNTING	                | droplet (meteringApp)               | zero写入InfluxDB (df_usage)
+    FLOW_COUNTING	                | droplet (flowGen, flowApp)          | zero写入InfluxDB (df_flow, df_fps)
+    FLOW_STORING	                | droplet (flowGen, 性能量化, flowApp) | stream写入ES (dfi_flow)
+    TCP_FLOW_PERF_COUNTING	        | droplet (flowGen, 性能量化, flowApp) | zero写入InfluxDB (df_perf)
+    PACKET_CAPTURING                | N/A                                 | N/A
+    FLOW_MISC_COUNTING		        | droplet (flowGen, flowApp)          | zero写入InfluxDB (df_type, df_console_log)
+    PACKET_COUNT_BROKERING          | droplet (meteringApp)               | zero发送ZMQ (df_usage), alarmstrap
+    FLOW_COUNT_BROKERING            | droplet (flowGen, flowApp)          | zero发送ZMQ (df_flow), alarmstrap
+    TCP_FLOW_PERF_COUNT_BROKERING   | droplet (flowGen, 性能量化, flowApp) | zero发送ZMQ (df_perf), alarmstrap
+    GEO_POSITIONING                 | droplet (flowGen, 性能量化, flowApp) | zero写入InfluxDB (df_geo)
+
 flowgen+flowperf内存占用估计
 ----------------------------
 
@@ -122,63 +234,3 @@ flowgen+flowperf内存占用估计
         最小内存占用1G = 1M * 1KB
 
         最大内存占用2.5G = 1M * 2.5KB
-
-APP与policy action的关系
-------------------------
-
-1. app与policy action的关系
-
-    app | name | id | policy action
-    ----|------|----|-------
-    APPLICATION_ISP_ANALYSIS | 接入网络 | 1 | PACKET_COUNTING、FLOW_COUNTING、FLOW_MISC_COUNTING、GEO_POSITIONING
-    APPLICATION_VL2_ANALYSIS | 虚拟网络 | 2 | PACKET_COUNTING、FLOW_COUNTING、FLOW_MISC_COUNTING
-    APPLICATION_REPORT       | 报表     | 3 | PACKET_COUNTING、FLOW_COUNTING
-    APPLICATION_ALARM        | 告警     | 4 | 流量峰值/流量总量：PACKET_COUNT_BROKERING
-                             |          |   | 白名单：FLOW_COUNT_BROKERING
-    APPLICATION_PERF         | 业务网络 ---- 性能量化   | 5 | FLOW_COUNTING、TCP_FLOW_PERF_COUNTING、FLOW_MISC_COUNTING、GEO_POSITIONING
-    APPLICATION_WHITELIST    | 业务网络 ---- 安全白名单 | 6 | FLOW_COUNTING
-    APPLICATION_FLOW_BACKTRACKING | 回溯分析            | 9 | FLOW_STORING
-
-2. policy action包含关系
-
-    action	| droplet需要做的处理 | 其它组件需要做的处理
-    ------------|-------------------|--------------------
-    PACKET_COUNTING	                | droplet (meteringApp)               | zero写入InfluxDB (df_usage)
-    FLOW_COUNTING	                | droplet (flowGen, flowApp)          | zero写入InfluxDB (df_flow, df_fps)
-    FLOW_STORING	                | droplet (flowGen, 性能量化, flowApp) | stream写入ES (dfi_flow)
-    TCP_FLOW_PERF_COUNTING	        | droplet (flowGen, 性能量化, flowApp) | zero写入InfluxDB (df_perf)
-    PACKET_CAPTURING                | N/A                                 | N/A
-    FLOW_MISC_COUNTING		        | droplet (flowGen, flowApp)          | zero写入InfluxDB (df_type, df_console_log)
-    PACKET_COUNT_BROKERING          | droplet (meteringApp)               | zero发送ZMQ (df_usage), alarmstrap
-    FLOW_COUNT_BROKERING            | droplet (flowGen, flowApp)          | zero发送ZMQ (df_flow), alarmstrap
-    TCP_FLOW_PERF_COUNT_BROKERING   | droplet (flowGen, 性能量化, flowApp) | zero发送ZMQ (df_perf), alarmstrap
-    GEO_POSITIONING                 | droplet (flowGen, 性能量化, flowApp) | zero写入InfluxDB (df_geo)
-
-平台信息查询结果说明
-------------------
-
-1. 接入网络查找
-  - IP包含在数据库ip_resource表内
-    - 查找的结果l3EpcId=-1，l2Epcid=0，isL2End=false， isL3End会根据查找包的ttl(64,128,256)进行修正
-  - vinterface所属IP的if_Type=3
-    - 查找的结果l3EpcId=(vinterface的epcId)，l2Epcid=0， isL2End=false， isL3End(MAC和IP属于同一个设备则为true），若为false则会根据ttl(64,128,255)进行修正
-  - ip不在数据库内
-    - 查找结果l3EpcId=0，l2Epcid=0
-  - 注意：
-    - 无论是否查找到数据，isL3End都会进行修正
-
-2. 虚拟网络查找
-  - MAC和IP属于同一个设备
-    - 查找结果L3EpcId=(设备epcID)，L2EpcId=(设备epcId)，isL3End=true
-  - MAC属于某一设备，IP不在数据库里
-    - 查找结果L3EpcId=0，L2EpcId=设备EpcId，isL3End=false
-  - MAC属于某一设备， IP属于另一设备
-    - 查找结果L3EpcId=（IP设备的epcId），L2EpcId=（MAC设备的epcId），isL3End=false
-  - MAC属于某一设备， IP属于ip_resource表内数据
-    - 查找结果L3EpcId=-1， L2EpcId=（MAC设备的epcId），isL3End=false
-  - MAC， IP不在数据库内
-    - 查找结果L3EpcId=0，L2EpcId=0，isL3End=false
-
-  - 注意：
-    - isL2End值现在有trident的传过来的数据直接赋值，不在做判断
-    - 如果isL3End=false，会根据ttl(64,128,255)进行修正
