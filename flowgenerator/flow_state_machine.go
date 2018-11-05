@@ -1,6 +1,10 @@
 package flowgenerator
 
-import "time"
+import (
+	"time"
+
+	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+)
 
 func flagEqual(flags, target uint8) bool {
 	return flags == target
@@ -10,11 +14,14 @@ func flagContain(flags, target uint8) bool {
 	return flags&target > 0
 }
 
-func isExceptionFlags(flags uint8, reply bool) bool {
-	switch flags & TCP_FLAG_MASK {
+// return true if unexpected flags got
+func (f *FlowGenerator) StatePreprocess(meta *MetaPacket, flags uint8) bool {
+	switch flags {
 	case TCP_SYN:
+		f.ServiceManager.disableStatus(meta.EndpointData.SrcInfo.L3EpcId, meta.IpSrc, meta.PortSrc)
 		return false
 	case TCP_SYN | TCP_ACK:
+		f.ServiceManager.enableStatus(meta.EndpointData.SrcInfo.L3EpcId, meta.IpSrc, meta.PortSrc)
 		return false
 	case TCP_FIN:
 		return false

@@ -48,3 +48,17 @@ func (f *FlowGenerator) updateUdpFlow(flowExtra *FlowExtra, meta *MetaPacket, re
 		flowExtra.timeout = f.TimeoutConfig.EstablishedRst
 	}
 }
+
+func (f *FlowGenerator) checkUdpServiceReverse(taggedFlow *TaggedFlow, reversed bool) ServiceStatus {
+	if reversed {
+		return false
+	}
+	portSrc := taggedFlow.PortSrc
+	portDst := taggedFlow.PortDst
+	if portSrc >= portDst {
+		return false
+	} else if portSrc < IANA_PORT_RANGE {
+		return IANAPortServiceList[portSrc]
+	}
+	return false
+}

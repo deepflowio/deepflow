@@ -199,12 +199,12 @@ func TestFlowStateMachine(t *testing.T) {
 	// test handshake
 	taggedFlow.FlowMetricsPeerSrc.TCPFlags = TCP_SYN
 	packetFlags = TCP_SYN | TCP_ACK
-	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, true, false)
+	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, true)
 	if flowExtra.flowState != FLOW_STATE_OPENING_2 {
 		t.Errorf("flowExtra.FlowState is %d, expect %d", flowExtra.flowState, FLOW_STATE_OPENING_2)
 	}
 	packetFlags = TCP_ACK
-	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, false, false)
+	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, false)
 	if flowExtra.flowState != FLOW_STATE_ESTABLISHED {
 		t.Errorf("flowExtra.FlowState is %d, expect %d", flowExtra.flowState, FLOW_STATE_ESTABLISHED)
 	}
@@ -213,17 +213,17 @@ func TestFlowStateMachine(t *testing.T) {
 	taggedFlow.FlowMetricsPeerSrc.TCPFlags = TCP_FIN
 	flowExtra.flowState = FLOW_STATE_CLOSING_TX1
 	packetFlags = TCP_ACK
-	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, true, false)
+	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, true)
 	if flowExtra.flowState != FLOW_STATE_CLOSING_TX1 {
 		t.Errorf("flowExtra.FlowState is %d, expect %d", flowExtra.flowState, FLOW_STATE_CLOSING_TX1)
 	}
 	packetFlags = TCP_FIN | TCP_ACK
-	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, true, false)
+	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, true)
 	if flowExtra.flowState != FLOW_STATE_CLOSING_TX2 {
 		t.Errorf("flowExtra.FlowState is %d, expect %d", flowExtra.flowState, FLOW_STATE_CLOSING_TX2)
 	}
 	packetFlags = TCP_ACK
-	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, false, false)
+	flowGenerator.updateFlowStateMachine(flowExtra, packetFlags, false)
 	if flowExtra.flowState != FLOW_STATE_CLOSED {
 		t.Errorf("flowExtra.FlowState is %d, expect %d", flowExtra.flowState, FLOW_STATE_CLOSED)
 	}
@@ -426,6 +426,28 @@ func TestNonIpShortFlow(t *testing.T) {
 	}
 	if taggedFlow.EthType != layers.EthernetTypeARP {
 		t.Errorf("taggedFlow.EthType is %d, expect %d", taggedFlow.EthType, layers.EthernetTypeARP)
+	}
+}
+
+func TestServicePort(t *testing.T) {
+	serviceManager := NewServiceManager(64 * 1024)
+	epcId := int32(3)
+	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
+	port1 := uint16(80)
+	port2 := uint16(8080)
+	// check default IANA port service
+	if !serviceManager.getStatus(epcId, ip, port1) {
+		t.Error("serviceManager.getStatus() return false, expect true")
+	}
+	// check disable port service
+	serviceManager.disableStatus(epcId, ip, port2)
+	if serviceManager.getStatus(epcId, ip, port2) {
+		t.Error("serviceManager.getStatus() return true, expect false")
+	}
+	// check enable port service
+	serviceManager.enableStatus(epcId, ip, port2)
+	if !serviceManager.getStatus(epcId, ip, port2) {
+		t.Error("serviceManager.getStatus() return false, expect true")
 	}
 }
 

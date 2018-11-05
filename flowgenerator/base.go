@@ -83,16 +83,15 @@ type PacketHandler struct {
 }
 
 type FlowGenerator struct {
-	sync.RWMutex
 	TimeoutConfig
 	FlowCacheHashMap
+	*ServiceManager
 
 	metaPacketHeaderInQueue MultiQueueReader
 	flowOutQueue            QueueWriter
 	stats                   FlowGeneratorStats
 	stateMachineMaster      []map[uint8]*StateValue
 	stateMachineSlave       []map[uint8]*StateValue
-	servicePortDescriptor   *ServicePortDescriptor
 	packetHandler           *PacketHandler
 	forceReportInterval     time.Duration
 	minLoopInterval         time.Duration
@@ -167,13 +166,4 @@ func (t TimeoutConfig) minTimeout() time.Duration {
 		}
 	}
 	return minTime
-}
-
-func (f *FlowGenerator) SetServicePorts(servicePortDescriptor *ServicePortDescriptor) bool {
-	if f.handleRunning || f.cleanRunning {
-		log.Warning("flow generator is running, service ports list can not be configured")
-		return false
-	}
-	f.servicePortDescriptor = servicePortDescriptor
-	return true
 }
