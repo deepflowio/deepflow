@@ -123,20 +123,29 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	peer := &TcpSessionPeer{}
 
 	// 测试例 payload == 0
-	peer.assertSeqNumber(&MetaPacketTcpHeader{}, 0, nil)
+	if flag := peer.assertSeqNumber(&MetaPacketTcpHeader{}, 0, nil); flag != SEQ_NOT_CARE {
+		t.Logf("result is %v, expected %v", flag, SEQ_NOT_CARE)
+	}
 
-	peer.assertSeqNumber(&MetaPacketTcpHeader{}, 1, nil)
+	if flag := peer.assertSeqNumber(&MetaPacketTcpHeader{}, 1, nil); flag != SEQ_NOT_CARE {
+		t.Logf("result is %v, expected %v", flag, SEQ_NOT_CARE)
+	}
+	// {0, 1}
 
 	// {10, 10}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 10, Ack: 20}
 	payload = 10
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_DISCONTINUOUS {
+		t.Logf("result is %v, expected %v", flag, SEQ_DISCONTINUOUS)
+	}
 	//t.Log(peer.String())
 
 	// {20, 10}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 20}
 	payload = 10
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_CONTINUOUS {
+		t.Logf("result is %v, expected %v", flag, SEQ_CONTINUOUS)
+	}
 	// {10,20}
 	//t.Log(peer.String())
 
@@ -144,7 +153,9 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// input test case {10, 10}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 10}
 	payload = 10
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_RETRANS {
+		t.Logf("result is %v, expected %v", flag, SEQ_RETRANS)
+	}
 	// {10, 20}
 	//t.Log(peer.String())
 
@@ -152,19 +163,25 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// {40, 20}, 异常情况{10,21}, {29, 5}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 40}
 	payload = 20
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_DISCONTINUOUS {
+		t.Logf("result is %v, expected %v", flag, SEQ_DISCONTINUOUS)
+	}
 	// {10,20}, {40,20}
 	//t.Log(peer.String())
 
 	tcpHeader = &MetaPacketTcpHeader{Seq: 10}
 	payload = 21
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_ERROR {
+		t.Logf("result is %v, expected %v", flag, SEQ_ERROR)
+	}
 	// {10,20}, {40,20}
 	//t.Log(peer.String())
 
 	tcpHeader = &MetaPacketTcpHeader{Seq: 29}
 	payload = 5
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_ERROR {
+		t.Logf("result is %v, expected %v", flag, SEQ_ERROR)
+	}
 	// {10,20}, {40,20}
 	//t.Log(peer.String())
 
@@ -174,7 +191,9 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// {10,20}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 10}
 	payload = 20
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_RETRANS {
+		t.Logf("result is %v, expected %v", flag, SEQ_RETRANS)
+	}
 	// {10,20}, {40,20}
 	//t.Log(peer.String())
 
@@ -182,7 +201,9 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// {31,4}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 31}
 	payload = 4
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_DISCONTINUOUS {
+		t.Logf("result is %v, expected %v", flag, SEQ_DISCONTINUOUS)
+	}
 	// {10,20}, {31,4}, {40,20}
 	//t.Log(peer.String())
 
@@ -190,38 +211,50 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// {30,1}, {35,2}, {39,1}/*异常情况{38, 7}, {10,28}, {35,5}*/
 	tcpHeader = &MetaPacketTcpHeader{Seq: 30}
 	payload = 1
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_CONTINUOUS_BOTH {
+		t.Logf("result is %v, expected %v", flag, SEQ_CONTINUOUS_BOTH)
+	}
 	// {10,25}, {40,20}
 	//t.Log(peer.String())
 
 	tcpHeader = &MetaPacketTcpHeader{Seq: 35}
 	payload = 2
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_CONTINUOUS {
+		t.Logf("result is %v, expected %v", flag, SEQ_CONTINUOUS)
+	}
 	// {10,27}, {40,20}
 	//t.Log(peer.String())
 
 	tcpHeader = &MetaPacketTcpHeader{Seq: 39}
 	payload = 1
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_CONTINUOUS {
+		t.Logf("result is %v, expected %v", flag, SEQ_CONTINUOUS)
+	}
 	// {10,27}, {39,21}
 	//t.Log(peer.String())
 
 	// 异常情况{38, 7}, {10,28}, {35,5}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 38}
 	payload = 7
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_ERROR {
+		t.Logf("result is %v, expected %v", flag, SEQ_ERROR)
+	}
 	// {10,27}, {39,21}
 	//t.Log(peer.String())
 
 	tcpHeader = &MetaPacketTcpHeader{Seq: 10}
 	payload = 28
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_ERROR {
+		t.Logf("result is %v, expected %v", flag, SEQ_ERROR)
+	}
 	// {10,27}, {39,21}
 	//t.Log(peer.String())
 
 	tcpHeader = &MetaPacketTcpHeader{Seq: 35}
 	payload = 5
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_ERROR {
+		t.Logf("result is %v, expected %v", flag, SEQ_ERROR)
+	}
 	// {10,27}, {39,21}
 	//t.Log(peer.String())
 
@@ -230,14 +263,18 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// {5,5}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 5}
 	payload = 5
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_CONTINUOUS {
+		t.Logf("result is %v, expected %v", flag, SEQ_CONTINUOUS)
+	}
 	// {5,32}, {39,21}
 	//t.Log(peer.String())
 
 	// {1,3}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 1}
 	payload = 3
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_CONTINUOUS {
+		t.Logf("result is %v, expected %v", flag, SEQ_CONTINUOUS)
+	}
 	// {0,4}, {5,32}, {39,21}
 	//t.Log(peer.String())
 

@@ -33,10 +33,12 @@ const (
 
 const (
 	SEQ_ERROR PacketSeqTypeInSeqList = iota
-	SEQ_CONTINUOUS
-	SEQ_DISCONTINUOUS
 	SEQ_RETRANS
 	SEQ_NOT_CARE
+	SEQ_MERGE
+	SEQ_DISCONTINUOUS
+	SEQ_CONTINUOUS
+	SEQ_CONTINUOUS_BOTH
 )
 
 const (
@@ -273,7 +275,7 @@ func (p *TcpSessionPeer) assertSeqNumber(tcpHeader *MetaPacketTcpHeader, payload
 
 	// seqArray为升序数组；直至找到seqNumber小于或等于node.seqNumber的节点
 	for rightIndex = len(p.seqArray); rightIndex > 0; rightIndex-- {
-		if node.seqNumber >= p.seqArray[rightIndex-1].seqNumber { // 查找node在list中的位置
+		if node.seqNumber > p.seqArray[rightIndex-1].seqNumber { // 查找node在list中的位置
 			break
 		}
 	}
@@ -299,13 +301,17 @@ func (p *TcpSessionPeer) assertSeqNumber(tcpHeader *MetaPacketTcpHeader, payload
 			if len(p.seqArray) >= SEQ_LIST_MAX_LEN {
 				p.insertSeqListNode(node, rightIndex)
 				p.mergeSeqListNode(0)
+				flag = SEQ_MERGE
 			} else {
 				p.insertSeqListNode(node, rightIndex)
+				flag = SEQ_DISCONTINUOUS
 			}
 		} else if c == SEQ_NODE_BOTH_CONTINUOUS {
 			p.mergeSeqListNode(rightIndex - 1)
+			flag = SEQ_CONTINUOUS_BOTH
+		} else {
+			flag = SEQ_CONTINUOUS
 		}
-		flag = SEQ_NOT_CARE
 	}
 
 	return flag
