@@ -54,31 +54,38 @@ graph TD;
 平台信息查询结果说明
 ------------------
 
-1. 接入网络查找
-  - IP包含在数据库ip_resource表内
-    - 查找的结果l3EpcId=-1，l2Epcid=0，isL2End=false， isL3End会根据查找包的ttl(64,128,256)进行修正
-  - vinterface所属IP的if_Type=3
-    - 查找的结果l3EpcId=(vinterface的epcId)，l2Epcid=0， isL2End=false， isL3End(MAC和IP属于同一个设备则为true），若为false则会根据ttl(64,128,255)进行修正
-  - ip不在数据库内
-    - 查找结果l3EpcId=0，l2Epcid=0
-  - 注意：
-    - 无论是否查找到数据，isL3End都会进行修正
+接入网络和虚拟网络查找过程现在是一致的
 
-2. 虚拟网络查找
+1. 查找条件及结果
+  - MAC，IP不在数据库内
+    - 查找结果L3EpcId=0，L2EpcId=0，IsL3End=false
+  - MAC不在数据库，IP包含在数据库ip_resource表内
+    - 查找的结果L3EpcId=-1，L2EpcId=0，IsL3End会根据查找包的Ttl(64,128,256)进行修正
+  - MAC不在数据库, IP属于某个设备并且if_type=3
+    - 查找的结果L3EpcId=(设备的EpcId)，L2EpcId=0，IsL3End(MAC和IP属于同一个设备则为true)
+  - MAC不在数据库, IP属于某个设备并且if_type!=3
+    - 查找结果L3EpcId=0，L2EpcId=0，IsL3End=false
   - MAC和IP属于同一个设备
-    - 查找结果L3EpcId=(设备epcID)，L2EpcId=(设备epcId)，isL3End=true
+    - 查找结果L3EpcId=(设备的EpcId)，L2EpcId=(设备的EpcId)，IsL3End=true
   - MAC属于某一设备，IP不在数据库里
-    - 查找结果L3EpcId=0，L2EpcId=设备EpcId，isL3End=false
-  - MAC属于某一设备， IP属于另一设备
-    - 查找结果L3EpcId=（IP设备的epcId），L2EpcId=（MAC设备的epcId），isL3End=false
-  - MAC属于某一设备， IP属于ip_resource表内数据
-    - 查找结果L3EpcId=-1， L2EpcId=（MAC设备的epcId），isL3End=false
-  - MAC， IP不在数据库内
-    - 查找结果L3EpcId=0，L2EpcId=0，isL3End=false
+    - 查找结果L3EpcId=0，L2EpcId=设备EpcId，IsL3End=false
+  - MAC属于某一设备，IP属于另一设备, 两个设备属于同一个EpcId
+    - 查找结果L3EpcId=(IP设备的EpcId)，L2EpcId=(MAC设备的EpcId)
+  - MAC属于某一设备，IP属于另一设备, 两个设备属于不同的EpcId，IP的if_type!=3
+    - 查找结果L3EpcId=0，L2EpcId=(MAC设备EpcId)
+  - MAC属于某一设备，IP属于另一设备, 两个设备属于不同的EpcId，IP的if_type=3 
+    - 查找结果L3EpcId=(IP设备的EpcId)，L2EpcId=(MAC设备的EpcId)
+  - MAC属于某一设备，IP属于ip_resource表内数据
+    - 查找结果L3EpcId=-1，L2EpcId=(MAC设备的EpcId)，IsL3End=false
+  - host_0/host_1对应的是MAC的Host
+    - 可能出现host_0/host_1是属于同一个宿主机，但是IP分别属于不同的宿主机，这是正常的
 
   - 注意：
-    - isL2End值现在有trident的传过来的数据直接赋值，不在做判断
-    - 如果isL3End=false，会根据ttl(64,128,255)进行修正
+    - IsL2End值现在由trident的传过来的数据直接赋值，不在做判断
+    - 如果IsL3End=false，会根据Ttl(64,128,255)进行修正
+    - host_0/host_1的值和IP没有关系
+    - 无论是否查找到数据，IsL3End为false会根据缓存Arp表和Ttl(64,128,255)进行修正
+
 
 policy firstpath查找流程
 ------------------------
