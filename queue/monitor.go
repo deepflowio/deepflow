@@ -81,7 +81,7 @@ func (m *Monitor) unmarshal(item interface{}) interface{} {
 
 func (m *Monitor) sendDebug(conn *net.UDPConn, port int, items []interface{}) {
 	if _, ok := items[0].(fmt.Stringer); !ok && m.unmarshaller == nil {
-		log.Error("item.(fmt.Stringer) type assertions error.")
+		log.Debug("item.(fmt.Stringer) type assertions error.")
 		return
 	}
 	for _, item := range items {
@@ -107,7 +107,9 @@ func (m *Monitor) send(items []interface{}) {
 			return
 		}
 		for _, item := range items {
-			item.(ReferenceCountable).AddReferenceCount()
+			if item != nil {
+				item.(ReferenceCountable).AddReferenceCount()
+			}
 		}
 
 		select {
