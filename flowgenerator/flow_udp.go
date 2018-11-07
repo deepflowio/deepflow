@@ -10,7 +10,7 @@ func (f *FlowGenerator) processUdpPacket(meta *MetaPacket) {
 	hash := f.getQuinTupleHash(meta)
 	flowCache := f.hashMap[hash%hashMapSize]
 	flowCache.Lock()
-	if flowExtra, reply, _ := flowCache.keyMatch(meta); flowExtra != nil {
+	if flowExtra, reply, _ := f.keyMatch(flowCache, meta); flowExtra != nil {
 		f.updateUdpFlow(flowExtra, meta, reply)
 	} else {
 		if f.stats.CurrNumFlows >= f.flowLimitNum {

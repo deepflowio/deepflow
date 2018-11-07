@@ -48,9 +48,9 @@ func MacEquals(meta *MetaPacket, flowMacSrc, flowMacDst MacInt) bool {
 	return false
 }
 
-func (f *FlowExtra) TunnelMatch(metaTunnelInfo, flowTunnelInfo *TunnelInfo) bool {
+func (f *FlowGenerator) TunnelMatch(metaTunnelInfo, flowTunnelInfo *TunnelInfo) bool {
 	if metaTunnelInfo == nil {
-		metaTunnelInfo = &TunnelInfo{}
+		metaTunnelInfo = f.innerTunnelInfo
 	}
 	if flowTunnelInfo.Id == 0 && metaTunnelInfo.Id == 0 {
 		return true
@@ -58,11 +58,16 @@ func (f *FlowExtra) TunnelMatch(metaTunnelInfo, flowTunnelInfo *TunnelInfo) bool
 	if flowTunnelInfo.Id != metaTunnelInfo.Id || flowTunnelInfo.Type != metaTunnelInfo.Type {
 		return false
 	}
-	return flowTunnelInfo.Src^metaTunnelInfo.Src^flowTunnelInfo.Dst^metaTunnelInfo.Dst == 0
+	// FIXME: should compare with outer ip at the same time
+	if (flowTunnelInfo.Src == metaTunnelInfo.Src && flowTunnelInfo.Dst == metaTunnelInfo.Dst) ||
+		(flowTunnelInfo.Src == metaTunnelInfo.Dst && flowTunnelInfo.Dst == metaTunnelInfo.Src) {
+		return true
+	}
+	return false
 }
 
-func (f *FlowCache) keyMatch(meta *MetaPacket) (*FlowExtra, bool, *ElementFlowExtra) {
-	for e := f.flowList.Front(); e != nil; e = e.Next() {
+func (f *FlowGenerator) keyMatch(flowCache *FlowCache, meta *MetaPacket) (*FlowExtra, bool, *ElementFlowExtra) {
+	for e := flowCache.flowList.Front(); e != nil; e = e.Next() {
 		flowExtra := e.Value
 		taggedFlow := flowExtra.taggedFlow
 		if taggedFlow.Exporter != meta.Exporter || meta.InPort != taggedFlow.InPort {
@@ -72,7 +77,7 @@ func (f *FlowCache) keyMatch(meta *MetaPacket) (*FlowExtra, bool, *ElementFlowEx
 			continue
 		}
 		if taggedFlow.Proto != meta.Protocol ||
-			!flowExtra.TunnelMatch(meta.Tunnel, &taggedFlow.TunnelInfo) {
+			!f.TunnelMatch(meta.Tunnel, &taggedFlow.TunnelInfo) {
 			continue
 		}
 		flowIPSrc, flowIPDst := taggedFlow.IPSrc, taggedFlow.IPDst
@@ -553,7 +558,7 @@ func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, cfg
 	hashMapSize = cfg.HashMapSize
 	flowGenerator := &FlowGenerator{
 		TimeoutConfig:           defaultTimeoutConfig,
-		FlowCacheHashMap:        FlowCacheHashMap{make([]*FlowCache, hashMapSize), rand.Uint32(), hashMapSize, timeoutCleanerCount},
+		FlowCacheHashMap:        FlowCacheHashMap{make([]*FlowCache, hashMapSize), rand.Uint32(), hashMapSize, timeoutCleanerCount, &TunnelInfo{}},
 		metaPacketHeaderInQueue: metaPacketHeaderInQueue,
 		flowOutQueue:            flowOutQueue,
 		stats:                   FlowGeneratorStats{cleanRoutineFlowCacheNums: make([]int, timeoutCleanerCount), cleanRoutineMaxFlowCacheLens: make([]int, timeoutCleanerCount)},

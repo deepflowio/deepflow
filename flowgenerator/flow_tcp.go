@@ -10,7 +10,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 	hash := f.getQuinTupleHash(meta)
 	flowCache := f.hashMap[hash%hashMapSize]
 	flowCache.Lock()
-	if flowExtra, reply, element := flowCache.keyMatch(meta); flowExtra != nil {
+	if flowExtra, reply, element := f.keyMatch(flowCache, meta); flowExtra != nil {
 		ok := false
 		if ok, reply = f.updateTcpFlow(flowExtra, meta, reply); ok {
 			flowCache.flowList.Remove(element)
