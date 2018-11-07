@@ -19,6 +19,7 @@ func regiterCommand() {
 	dropletctl.RegisterCommand(dropletctl.DROPLETCTL_LABELER, labeler.RegisterCommand)
 	dropletctl.RegisterCommand(dropletctl.DROPLETCTL_RPC, rpc.RegisterRpcCommand)
 	dropletctl.RegisterCommand(dropletctl.DROPLETCTL_CONFIG, dropletctl.RegisterProfilerCommand)
+	dropletctl.RegisterCommand(dropletctl.DROPLETCTL_LOGLEVEL, dropletctl.RegisterLoglevelCommand)
 }
 
 func main() {

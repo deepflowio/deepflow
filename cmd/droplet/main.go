@@ -11,6 +11,7 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/logger"
 
 	"gitlab.x.lan/yunshan/droplet/droplet"
+	"gitlab.x.lan/yunshan/droplet/dropletctl"
 )
 
 func execName() string {
@@ -34,6 +35,7 @@ func main() {
 	}
 
 	closers := droplet.Start(*configPath)
+	dropletctl.NewLoglevelControl()
 
 	// setup system signal
 	signalChannel := make(chan os.Signal, 1)
