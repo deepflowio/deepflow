@@ -96,7 +96,6 @@ func (m *Monitor) sendDebug(conn *net.UDPConn, port int, items []interface{}) {
 			break
 		}
 		dropletctl.SendToDropletCtl(conn, port, 0, &buffer)
-		item.(ReferenceCountable).SubReferenceCount()
 	}
 }
 
