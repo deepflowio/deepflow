@@ -29,10 +29,11 @@ type StatSource struct {
 
 var (
 	processName   string
+	hostname      string
 	lock          sync.Mutex
 	statSources   = make(map[Countable]*StatSource)
 	remotes       = []net.IP{net.ParseIP("127.0.0.1")}
-	statsdClients = make([]*statsd.Client, 1)
+	statsdClients = make([]*statsd.Client, 1) // could be nil
 )
 
 type StatItem struct {
@@ -111,14 +112,14 @@ func sendCounter(client *statsd.Client, counter interface{}) {
 	}
 }
 
-func initStatsdClient(remote net.IP) *statsd.Client {
+func newStatsdClient(remote net.IP) *statsd.Client {
 	options := []statsd.Option{
 		statsd.Address(fmt.Sprintf("%s:%d", remote, STATSD_PORT)),
 		statsd.Prefix(processName),
 		statsd.TagsFormat(statsd.InfluxDB),
 	}
-	if Hostname != "" { // specified hostname
-		options = append(options, statsd.Tags("host", Hostname))
+	if hostname != "" { // specified hostname
+		options = append(options, statsd.Tags("host", hostname))
 	}
 	c, err := statsd.New(options...)
 	if err != nil {
@@ -137,13 +138,13 @@ func max(x, y time.Duration) time.Duration {
 }
 
 func runOnce() {
+	lock.Lock()
 	for i, remote := range remotes {
 		if statsdClients[i] == nil {
-			statsdClients[i] = initStatsdClient(remote)
+			statsdClients[i] = newStatsdClient(remote)
 		}
 	}
 
-	lock.Lock()
 	for countable, statSource := range statSources {
 		statSource.skip--
 		if statSource.skip > 0 {
@@ -171,10 +172,26 @@ func run() {
 	}
 }
 
+func resetClients() {
+	lock.Lock()
+	for _, c := range statsdClients {
+		if c != nil {
+			c.Close()
+		}
+	}
+	statsdClients = make([]*statsd.Client, len(remotes))
+	lock.Unlock()
+}
+
 func setRemotes(ips ...net.IP) {
 	log.Infof("Remote changed to %s", ips)
 	remotes = ips
-	statsdClients = make([]*statsd.Client, len(ips))
+	resetClients()
+}
+
+func setHostname(name string) {
+	hostname = name
+	resetClients()
 }
 
 func init() {
