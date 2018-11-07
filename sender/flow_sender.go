@@ -42,6 +42,7 @@ func (s *FlowSender) run() {
 				}
 				bytes.Reset()
 				if _, err := header.MarshalTo(bytes.Use(header.Size())); err != nil {
+					datatype.ReleaseTaggedFlow(flow)
 					log.Warningf("Marshalling flow failed: %s", err)
 					continue
 				}

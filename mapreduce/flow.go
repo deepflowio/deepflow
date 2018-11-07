@@ -207,6 +207,7 @@ func (f *subFlowHandler) Process() error {
 
 			flow := e.(*datatype.TaggedFlow)
 			if !isValidFlow(flow) {
+				datatype.ReleaseTaggedFlow(flow)
 				log.Warning("flow timestamp incorrect and dropped")
 				continue
 			}

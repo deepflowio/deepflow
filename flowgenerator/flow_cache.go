@@ -2,6 +2,8 @@ package flowgenerator
 
 import (
 	"sync"
+
+	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
 type FlowCache struct {
@@ -37,4 +39,5 @@ type FlowCacheHashMap struct {
 	hashBasis           uint32
 	mapSize             uint64
 	timeoutCleanerCount uint64
+	innerTunnelInfo     *TunnelInfo
 }

@@ -80,6 +80,15 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestTunnelMatch(t *testing.T) {
+	flowGenerator := getDefaultFlowGenerator()
+	metaTunnelInfo := &TunnelInfo{1, 0, 2, 1}
+	flowTunnelInfo := &TunnelInfo{1, 1, 3, 1}
+	if ok := flowGenerator.TunnelMatch(metaTunnelInfo, flowTunnelInfo); ok {
+		t.Errorf("flowGenerator.TunnelMatch return %t, expect false", ok)
+	}
+}
+
 func TestHandleSynRst(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator := getDefaultFlowGenerator()
@@ -142,37 +151,6 @@ func TestHandleSynFin(t *testing.T) {
 		taggedFlow.FlowMetricsPeerDst.TCPFlags != TCP_ACK|TCP_FIN {
 		t.Errorf("taggedFlow.TCPFlags0 is %x, expect %x", taggedFlow.FlowMetricsPeerSrc.TCPFlags, TCP_SYN|TCP_ACK|TCP_PSH)
 		t.Errorf("taggedFlow.TCPFlags1 is %x, expect %x", taggedFlow.FlowMetricsPeerDst.TCPFlags, TCP_ACK|TCP_FIN)
-	}
-}
-
-func TestInitFlow(t *testing.T) {
-	runtime.GOMAXPROCS(4)
-	flowGenerator := getDefaultFlowGenerator()
-	packet := getDefaultPacket()
-	flowExtra, _, _ := flowGenerator.initTcpFlow(packet)
-	taggedFlow := flowExtra.taggedFlow
-
-	if taggedFlow.FlowID == 0 {
-		t.Error("taggedFlow.FlowID is 0 with an active flow")
-	}
-	if taggedFlow.FlowMetricsPeerSrc.TotalByteCount != uint64(packet.PacketLen) {
-		t.Errorf("taggedFlow.TotalByteCount0 is %d, PacketLen is %d", taggedFlow.FlowMetricsPeerSrc.TotalByteCount, packet.PacketLen)
-	}
-
-	if taggedFlow.MACSrc != packet.MacSrc || taggedFlow.MACDst != packet.MacDst {
-		t.Errorf("taggedFlow.MacSrc is %d, packet.MacSrc is %d", taggedFlow.MACSrc, packet.MacSrc)
-		t.Errorf("taggedFlow.MacDst is %d, packet.MacDst is %d", taggedFlow.MACDst, packet.MacDst)
-	}
-	if taggedFlow.IPSrc != packet.IpSrc || taggedFlow.IPDst != packet.IpDst {
-		t.Errorf("taggedFlow.IpSrc is %d, packet.IpSrc is %d", taggedFlow.IPSrc, packet.IpSrc)
-		t.Errorf("taggedFlow.IpDst is %d, packet.IpDst is %d", taggedFlow.IPDst, packet.IpDst)
-	}
-	if taggedFlow.Proto != packet.Protocol {
-		t.Errorf("taggedFlow.Proto is %d, packet.Protocol is %d", taggedFlow.Proto, packet.Protocol)
-	}
-	if taggedFlow.PortSrc != packet.PortSrc || taggedFlow.PortDst != packet.PortDst {
-		t.Errorf("taggedFlow.PortSrc is %d, packet.PortSrc is %d", taggedFlow.PortSrc, packet.PortSrc)
-		t.Errorf("taggedFlow.PortDst is %d, packet.PortDst is %d", taggedFlow.PortDst, packet.PortDst)
 	}
 }
 
