@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"net"
-	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"runtime"
@@ -31,15 +30,6 @@ import (
 
 var log = logging.MustGetLogger("droplet")
 
-func startProfiler() {
-	go func() {
-		if err := http.ListenAndServe("0.0.0.0:8000", nil); err != nil {
-			log.Error("Start pprof on http 0.0.0.0:8000 failed")
-			os.Exit(1)
-		}
-	}()
-}
-
 func getLocalIp() (net.IP, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -65,8 +55,9 @@ func Start(configPath string) (closers []io.Closer) {
 	log.Infof("droplet config: %+v\n", cfg)
 
 	if cfg.Profiler {
-		startProfiler()
+		StartProfiler()
 	}
+	RegisterProfilerCommand()
 
 	stats.SetMinInterval(10 * time.Second)
 

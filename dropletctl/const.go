@@ -18,6 +18,7 @@ const (
 	DROPLETCTL_LABELER
 	DROPLETCTL_RPC
 	DROPLETCTL_LOGLEVEL
+	DROPLETCTL_CONFIG
 	DROPLETCTL_MAX
 )
 
@@ -27,3 +28,5 @@ type CommandLineProcess interface {
 
 var RecvHandlers = [DROPLETCTL_MAX]CommandLineProcess{}
 var RegisterHandlers = [DROPLETCTL_MAX]RegisterCommmandLine{}
+
+var ConfigPath string

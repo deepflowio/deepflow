@@ -6,7 +6,7 @@
  *   ipGroups     get ipGroups from controller
  *   platformData get platformData from controller
  */
-package dropletctl
+package rpc
 
 import (
 	"encoding/json"
@@ -18,25 +18,12 @@ import (
 
 	"github.com/spf13/cobra"
 	"gitlab.x.lan/yunshan/droplet/config"
+	"gitlab.x.lan/yunshan/droplet/dropletctl"
 	"gitlab.x.lan/yunshan/message/trident"
 )
 
-var dropletCTLPort int = 9527
-var dropletCTLIP string = "127.0.0.1"
-
-func SetQueueCTLIpPort(ip string, port int) {
-	dropletCTLIP = ip
-	dropletCTLPort = port
-}
-
 type CmdExecute func(response *trident.SyncResponse)
 type SortedAcls []*trident.FlowAcl
-
-var configPath string
-
-func SetConfigPath(path string) {
-	configPath = path
-}
 
 func regiterCommand() []*cobra.Command {
 	platformDataCmd := &cobra.Command{
@@ -79,7 +66,7 @@ func RegisterRpcCommand() *cobra.Command {
 }
 
 func initCmd(cmd CmdExecute) {
-	cfg := config.Load(configPath)
+	cfg := config.Load(dropletctl.ConfigPath)
 
 	controllers := make([]net.IP, 0, len(cfg.ControllerIps))
 	for _, ipString := range cfg.ControllerIps {

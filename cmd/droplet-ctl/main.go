@@ -8,21 +8,21 @@ import (
 
 	"gitlab.x.lan/yunshan/droplet/adapter"
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
+	"gitlab.x.lan/yunshan/droplet/dropletctl/rpc"
 	"gitlab.x.lan/yunshan/droplet/labeler"
 	"gitlab.x.lan/yunshan/droplet/queue"
 )
-
-var configPath = flag.String("f", "/etc/droplet.yaml", "Specify config file location")
 
 func regiterCommand() {
 	dropletctl.RegisterCommand(dropletctl.DROPLETCTL_QUEUE, queue.RegisterCommand)
 	dropletctl.RegisterCommand(dropletctl.DROPLETCTL_ADAPTER, adapter.RegisterCommand)
 	dropletctl.RegisterCommand(dropletctl.DROPLETCTL_LABELER, labeler.RegisterCommand)
-	dropletctl.RegisterCommand(dropletctl.DROPLETCTL_RPC, dropletctl.RegisterRpcCommand)
+	dropletctl.RegisterCommand(dropletctl.DROPLETCTL_RPC, rpc.RegisterRpcCommand)
+	dropletctl.RegisterCommand(dropletctl.DROPLETCTL_CONFIG, dropletctl.RegisterProfilerCommand)
 }
 
 func main() {
-	dropletctl.SetConfigPath(*configPath)
+	flag.StringVar(&dropletctl.ConfigPath, "f", "/etc/droplet.yaml", "Specify config file location")
 	regiterCommand()
 	root := &cobra.Command{
 		Use:   "droplet-ctl",
