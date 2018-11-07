@@ -15,7 +15,6 @@ const (
 
 var (
 	MinInterval = time.Second
-	Hostname    string
 )
 
 type StatsOption = interface{}
@@ -51,6 +50,10 @@ func SetMinInterval(interval time.Duration) {
 // 指定stats远程服务器地址
 func SetRemotes(ip ...net.IP) {
 	setRemotes(ip...)
+}
+
+func SetHostname(name string) {
+	setHostname(name)
 }
 
 func RegisterCountable(module string, countable Countable, opts ...StatsOption) error {
