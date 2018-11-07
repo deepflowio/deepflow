@@ -76,6 +76,8 @@ message Interface {
 enum GroupType {
     VM = 0;
     IP = 1;
+    ANONYMOUS_VM = 2;
+    ANONYMOUS_IP = 3;
 }
 
 message Group {
