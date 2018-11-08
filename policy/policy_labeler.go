@@ -618,6 +618,10 @@ func (l *PolicyLabeler) addEpcMap(maps *VlanAndPortMap, srcEpc, dstEpc uint16, s
 func (l *PolicyLabeler) addVlanFastPolicy(srcEpc, dstEpc uint16, packet *LookupKey, policy *PolicyData, mapsForward, mapsBackward *VlanAndPortMap) {
 	forward, backward := INVALID_POLICY_DATA, INVALID_POLICY_DATA
 
+	if mapsForward == nil || mapsBackward == nil {
+		return
+	}
+
 	if len(policy.AclActions) > 0 {
 		forward = policy
 	}
@@ -640,6 +644,9 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, srcEpc, ds
 	forward, backward := INVALID_POLICY_DATA, INVALID_POLICY_DATA
 
 	mapsForward := l.getVlanAndPortMap(packet, FORWARD, true, nil)
+	if mapsForward == nil {
+		return nil, nil
+	}
 	l.addEpcMap(mapsForward, srcEpc, dstEpc, packet.SrcMac, packet.DstMac)
 	if len := len(policyForward.AclActions) + len(policyBackward.AclActions); len > 0 {
 		forward = new(PolicyData)
@@ -658,6 +665,9 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, srcEpc, ds
 	}
 
 	mapsBackward := l.getVlanAndPortMap(packet, BACKWARD, true, mapsForward)
+	if mapsBackward == nil {
+		return nil, nil
+	}
 	if mapsBackward != mapsForward {
 		l.addEpcMap(mapsBackward, dstEpc, srcEpc, packet.DstMac, packet.SrcMac)
 	} else {
