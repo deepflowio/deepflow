@@ -10,25 +10,6 @@
   version = "v1.2.2"
 
 [[projects]]
-  digest = "1:e92f5581902c345eb4ceffdcd4a854fb8f73cf436d47d837d1ec98ef1fe0a214"
-  name = "github.com/StackExchange/wmi"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "5d049714c4a64225c3c79a7cf7d02f7fb5b96338"
-  version = "1.0.0"
-
-[[projects]]
-  digest = "1:64a5a67c69b70c2420e607a8545d674a23778ed9c3e80607bfd17b77c6c87f6a"
-  name = "github.com/go-ole/go-ole"
-  packages = [
-    ".",
-    "oleutil",
-  ]
-  pruneopts = "UT"
-  revision = "a41e3c4b706f6ae8dfbff342b06e40fa4d2d0506"
-  version = "v1.2.1"
-
-[[projects]]
   branch = "master"
   digest = "1:d0019b96b284ac4c24be77891eca40dabdae8ccf168b6684350d15c13cb2aada"
   name = "github.com/golang-collections/go-datastructures"
@@ -121,29 +102,6 @@
   version = "v0.8.0"
 
 [[projects]]
-  digest = "1:7395b855a6078ad2e6c40311402a057a91125fb9f32cf228e1b32cdc57c33538"
-  name = "github.com/shirou/gopsutil"
-  packages = [
-    "cpu",
-    "host",
-    "internal/common",
-    "mem",
-    "net",
-    "process",
-  ]
-  pruneopts = "UT"
-  revision = "8048a2e9c5773235122027dd585cf821b2af1249"
-  version = "v2.18.07"
-
-[[projects]]
-  branch = "master"
-  digest = "1:99c6a6dab47067c9b898e8c8b13d130c6ab4ffbcc4b7cc6236c2cd0b1e344f5b"
-  name = "github.com/shirou/w32"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "bb4de0191aa41b5507caa14b0650cdbddcd9280b"
-
-[[projects]]
   branch = "master"
   digest = "1:42889dcf8fcfbb278b594568752000234ecb9bfa3fe4c1c3d2b371c4b7eaf355"
   name = "gitlab.x.lan/yunshan/message"
@@ -173,12 +131,9 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:49edbccdd6fb213dcf45486b0c939b788740451e5f2ff77aa42ca742d10da449"
+  digest = "1:199248809ceaae02531db528e4e72d0d46eac33028bdf416ec5839bd8b35a1f7"
   name = "golang.org/x/sys"
-  packages = [
-    "unix",
-    "windows",
-  ]
+  packages = ["unix"]
   pruneopts = "UT"
   revision = "1561086e645b2809fb9f8a1e2a38160bf8d53bf4"
 
@@ -270,7 +225,6 @@
     "github.com/lestrrat/go-file-rotatelogs",
     "github.com/op/go-logging",
     "github.com/pebbe/zmq4",
-    "github.com/shirou/gopsutil/process",
     "gitlab.x.lan/yunshan/message/dfi",
     "gitlab.x.lan/yunshan/message/trident",
     "gitlab.x.lan/yunshan/message/zero",

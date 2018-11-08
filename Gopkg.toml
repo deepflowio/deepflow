@@ -50,10 +50,6 @@
   version = "1.0.0"
 
 [[constraint]]
-  name = "github.com/shirou/gopsutil"
-  version = "2.18.7"
-
-[[constraint]]
   branch = "release-branch.go1.11"
   name = "golang.org/x/net"
 
