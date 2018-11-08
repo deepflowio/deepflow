@@ -150,34 +150,22 @@ func (f *FlowKey) String() string {
 	formatted := ""
 	formatted += fmt.Sprintf("TunnelInfo: {%s} ", f.TunnelInfo.String())
 	formatted += fmt.Sprintf("Exporter: %s ", IpFromUint32(f.Exporter))
-	formatted += fmt.Sprintf("InPort: %d ", f.InPort)
-	formatted += fmt.Sprintf("MACSrc: %s ", Uint64ToMac(f.MACSrc))
+	formatted += fmt.Sprintf("InPort: %d\n", f.InPort)
+	formatted += fmt.Sprintf("\tMACSrc: %s ", Uint64ToMac(f.MACSrc))
 	formatted += fmt.Sprintf("MACDst: %s ", Uint64ToMac(f.MACDst))
 	formatted += fmt.Sprintf("IPSrc: %s ", IpFromUint32(f.IPSrc))
 	formatted += fmt.Sprintf("IPDst: %s ", IpFromUint32(f.IPDst))
 	formatted += fmt.Sprintf("Proto: %v ", f.Proto)
 	formatted += fmt.Sprintf("PortSrc: %d ", f.PortSrc)
-	formatted += fmt.Sprintf("PortDst: %d ", f.PortDst)
+	formatted += fmt.Sprintf("PortDst: %d", f.PortDst)
 	return formatted
 }
 
-func (f *FlowMetricsPeer) String() string {
+func (f *FlowMetricsPeerSrc) String() string {
 	formatted := ""
 	typeOf := reflect.TypeOf(*f)
 	valueOf := reflect.ValueOf(*f)
 	for i := 0; i < typeOf.NumField(); i++ {
-		formatted += fmt.Sprintf("%v: %v ", typeOf.Field(i).Name, valueOf.Field(i))
-	}
-	return formatted
-}
-
-func (f *Flow) String() string {
-	formatted := ""
-	formatted += fmt.Sprintf("FlowKey: %s ", f.FlowKey.String())
-	formatted += fmt.Sprintf("CloseType: %d ", f.CloseType)
-	typeOf := reflect.TypeOf(*f)
-	valueOf := reflect.ValueOf(*f)
-	for i := 2; i < typeOf.NumField(); i++ {
 		field := typeOf.Field(i)
 		value := valueOf.Field(i)
 		if field.Type.Name() == "Duration" {
@@ -185,6 +173,41 @@ func (f *Flow) String() string {
 		} else {
 			formatted += fmt.Sprintf("%v: %+v ", field.Name, value)
 		}
+	}
+	return formatted
+}
+
+func (f *FlowMetricsPeerDst) String() string {
+	formatted := ""
+	typeOf := reflect.TypeOf(*f)
+	valueOf := reflect.ValueOf(*f)
+	for i := 0; i < typeOf.NumField(); i++ {
+		field := typeOf.Field(i)
+		value := valueOf.Field(i)
+		if field.Type.Name() == "Duration" {
+			formatted += fmt.Sprintf("%v: %d ", field.Name, value)
+		} else {
+			formatted += fmt.Sprintf("%v: %+v ", field.Name, value)
+		}
+	}
+	return formatted
+}
+
+func (f *Flow) String() string {
+	formatted := fmt.Sprintf("FlowID: %d ", f.FlowID)
+	formatted += fmt.Sprintf("CloseType: %d ", f.CloseType)
+	formatted += fmt.Sprintf("TimeBitmap: %d ", f.TimeBitmap)
+	formatted += fmt.Sprintf("StartTime: %d ", f.StartTime)
+	formatted += fmt.Sprintf("CurStartTime: %d ", f.CurStartTime)
+	formatted += fmt.Sprintf("EndTime: %d ", f.EndTime)
+	formatted += fmt.Sprintf("Duration: %d\n", f.Duration)
+	formatted += fmt.Sprintf("\tVLAN: %d ", f.VLAN)
+	formatted += fmt.Sprintf("EthType: %d ", f.EthType)
+	formatted += fmt.Sprintf("%s\n", f.FlowKey.String())
+	formatted += fmt.Sprintf("\tFlowMetricsPeerSrc: {%s}\n", f.FlowMetricsPeerSrc.String())
+	formatted += fmt.Sprintf("\tFlowMetricsPeerDst: {%s}", f.FlowMetricsPeerDst.String())
+	if f.TcpPerfStats != nil {
+		formatted += fmt.Sprintf("\n\t%s", f.TcpPerfStats.String())
 	}
 	return formatted
 }
