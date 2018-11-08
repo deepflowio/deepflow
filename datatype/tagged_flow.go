@@ -51,5 +51,5 @@ func PseudoCloneTaggedFlowHelper(items []interface{}) {
 }
 
 func (f *TaggedFlow) String() string {
-	return fmt.Sprintf("Flow: %s, Tag: %+v", f.Flow.String(), f.Tag)
+	return fmt.Sprintf("%s\n\tTag: %+v", f.Flow.String(), f.Tag)
 }
