@@ -179,6 +179,7 @@ func Start(configPath string) (closers []io.Closer) {
 		FlowLimitNum:        cfg.FlowGenerator.FlowCountLimit / int32(cfg.Queue.FlowGeneratorQueueCount),
 		TimeoutCleanerCount: cfg.FlowGenerator.TimeoutCleanerCount,
 		HashMapSize:         cfg.FlowGenerator.HashMapSize,
+		ReportTolerance:     cfg.FlowGenerator.ReportTolerance,
 	}
 	for i := 0; i < cfg.Queue.FlowGeneratorQueueCount; i++ {
 		flowGenerator := flowgenerator.New(flowGeneratorQueues, flowDuplicatorQueue, flowGeneratorConfig, i)

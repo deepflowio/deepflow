@@ -90,6 +90,8 @@ flow-generator:
   timeout-cleaner-count: 4
   # hash map size for every generator
   hash-map-size: 262166
+  # report tolerance for the endtime field of a flow, in seconds
+  report-tolerance: 4
 #geo-file-location: /opt/droplet/ip_info_mini.json
 map-reduce:
   # mapreduce buffer capacity

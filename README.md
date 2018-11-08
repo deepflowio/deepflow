@@ -183,7 +183,7 @@ profiler
           - 请求方向的seq确定：SYN和ACK，根据SYN来计算ACK
           - 回复方向的seq确定：SYN/ACK
       - 数据传输阶段重传，需判断包的seq和length是否与已收到的包重复
-          - 说明：数据传输阶段重传retrans统计包含建立连接阶段重传retransSyn 
+          - 说明：数据传输阶段重传retrans统计包含建立连接阶段重传retransSyn
       - 需要注意TCP Keep-Alive包的影响
           - 排除payloadlen=0,或payloadlen=1的包
   - 零窗
@@ -265,3 +265,16 @@ profiler
   - 其他IPv4
       - CLOSE_TYPE_TIMEOUT: 默认情况
       - CLOSE_TYPE_FORCE_REPORT: 1分钟强制上报的情况
+
+* 网流时间序列字段
+  - arrTime00: 整条流的请求方向的第一个包的时间戳（内部使用）
+  - arrTime10: 整条流的应答方向的第一个包的时间戳（内部使用）
+  - arrTime0Last: 此次上报时整条流的请求方向的最后一个包的时间戳（内部使用）
+  - arrTime1Last: 此次上报时整条流的应答方向的最后一个包的时间戳（内部使用）
+  - startTime: 本次上报的统计起始时间
+  - endTime: 本次上报的统计结束时间（与startTime的时间差应该在60秒以内，允许4秒的误差）
+      - endTime与`startTime+duration`并不一定相等，主要体现在突发短流和长流包数少的情况下
+      - 4秒容差为默认值，可通过droplet.yaml进行配置
+  - timeBitmap: 本次上报的一分钟统计中相对于startTime的每一秒中是否有包，有的话对应bit为1（共64bit）
+  - duration: 本次上报时max(arrTime0Last,arrTime1Last)与min(arrTime00,arrTime10)的时间差
+      - （``乱序处理``：如果正在处理的包的timestamp小于max(arrTime0Last,arrTime1Last)，则将其timestamp调整为max(arrTime0Last,arrTime1Last)）

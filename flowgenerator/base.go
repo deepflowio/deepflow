@@ -96,6 +96,7 @@ type FlowGenerator struct {
 	packetHandler           *PacketHandler
 	forceReportInterval     time.Duration
 	minLoopInterval         time.Duration
+	reportTolerance         time.Duration
 	flowLimitNum            int32
 	handleRunning           bool
 	cleanRunning            bool
@@ -111,6 +112,7 @@ type FlowGeneratorConfig struct {
 	FlowLimitNum        int32
 	TimeoutCleanerCount uint64
 	HashMapSize         uint64
+	ReportTolerance     time.Duration
 }
 
 func timeMax(a time.Duration, b time.Duration) time.Duration {

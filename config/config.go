@@ -73,6 +73,7 @@ type FlowGeneratorConfig struct {
 	OthersTimeout       time.Duration `yaml:"others-timeout"`
 	TimeoutCleanerCount uint64        `yaml:"timeout-cleaner-count"`
 	HashMapSize         uint64        `yaml:"hash-map-size"`
+	ReportTolerance     time.Duration `yaml:"report-tolerance"`
 }
 
 type MapReduce struct {
@@ -193,6 +194,11 @@ func (c *Config) Validate() error {
 	}
 	if c.FlowGenerator.HashMapSize == 0 {
 		c.FlowGenerator.HashMapSize = flowgenerator.HASH_MAP_SIZE
+	}
+	if c.FlowGenerator.ReportTolerance == 0 {
+		c.FlowGenerator.ReportTolerance = flowgenerator.REPORT_TOLERANCE
+	} else {
+		c.FlowGenerator.OthersTimeout *= time.Second
 	}
 
 	if c.MapReduce.DocsInBuffer == 0 {

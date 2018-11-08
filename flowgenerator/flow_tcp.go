@@ -17,7 +17,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			flowCache.Unlock() // code below does not use flowCache any more
 			taggedFlow := flowExtra.taggedFlow
 			atomic.AddInt32(&f.stats.CurrNumFlows, -1)
-			flowExtra.setCurFlowInfo(flowExtra.recentTime, f.forceReportInterval)
+			flowExtra.setCurFlowInfo(flowExtra.recentTime, f.forceReportInterval, f.reportTolerance)
 			if f.servicePortDescriptor.judgeServiceDirection(taggedFlow, flowExtra.reversed) {
 				flowExtra.reverseFlow()
 				flowExtra.reversed = !flowExtra.reversed
