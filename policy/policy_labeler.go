@@ -737,22 +737,30 @@ func (l *PolicyLabeler) getVlanAndPortMap(packet *LookupKey, direction Direction
 	}
 	if maskSrc > STANDARD_NETMASK || maskDst > STANDARD_NETMASK {
 		key := uint64(maskedSrcIp)<<32 | uint64(maskedDstIp)
-		if data, ok := l.FastPolicyMaps[packet.FastIndex][packet.Tap].Get(key); ok {
+		maps := l.FastPolicyMaps[packet.FastIndex][packet.Tap]
+		if maps == nil {
+			return nil
+		}
+		if data, ok := maps.Get(key); ok {
 			return data.(*VlanAndPortMap)
 		}
 		if create {
 			value := &VlanAndPortMap{make(map[uint64]uint32), make(map[uint64]*PolicyData), make(map[uint64]*PortPolicyValue)}
-			l.FastPolicyMaps[packet.FastIndex][packet.Tap].Add(key, value)
+			maps.Add(key, value)
 			return value
 		}
 	} else {
 		key := (maskedSrcIp & STANDARD_NETMASK) | (maskedDstIp >> 16)
-		if data, ok := l.FastPolicyMapsMini[packet.FastIndex][packet.Tap].Get(key); ok {
+		maps := l.FastPolicyMapsMini[packet.FastIndex][packet.Tap]
+		if maps == nil {
+			return nil
+		}
+		if data, ok := maps.Get(key); ok {
 			return data.(*VlanAndPortMap)
 		}
 		if create {
 			value := &VlanAndPortMap{make(map[uint64]uint32), make(map[uint64]*PolicyData), make(map[uint64]*PortPolicyValue)}
-			l.FastPolicyMapsMini[packet.FastIndex][packet.Tap].Add(key, value)
+			maps.Add(key, value)
 			return value
 		}
 	}
