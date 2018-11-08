@@ -56,6 +56,12 @@ func SetHostname(name string) {
 	setHostname(name)
 }
 
+func RegisterPreHook(hook func()) {
+	lock.Lock()
+	preHooks = append(preHooks, hook)
+	lock.Unlock()
+}
+
 func RegisterCountable(module string, countable Countable, opts ...StatsOption) error {
 	return registerCountable(module, countable, opts...)
 }

@@ -31,6 +31,7 @@ var (
 	processName   string
 	hostname      string
 	lock          sync.Mutex
+	preHooks      []func()
 	statSources   = make(map[Countable]*StatSource)
 	remotes       = []net.IP{net.ParseIP("127.0.0.1")}
 	statsdClients = make([]*statsd.Client, 1) // could be nil
@@ -75,7 +76,7 @@ func deregisterCountable(countable Countable) {
 		log.Info("Countable not registered", reflect.ValueOf(countable).String())
 		return
 	}
-	log.Info("Deregistering countable", reflect.ValueOf(countable).String())
+	log.Debug("Deregistering countable", reflect.ValueOf(countable).String())
 	lock.Lock()
 	delete(statSources, countable)
 	lock.Unlock()
@@ -138,6 +139,13 @@ func max(x, y time.Duration) time.Duration {
 }
 
 func runOnce() {
+	lock.Lock()
+	hooks := preHooks
+	lock.Unlock()
+	for _, hook := range hooks {
+		hook()
+	}
+
 	lock.Lock()
 	for i, remote := range remotes {
 		if statsdClients[i] == nil {
