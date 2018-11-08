@@ -301,11 +301,11 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 	taggedFlow.TimeBitmap |= 1 << uint64((packetTimestamp-startTime)/time.Second)
 }
 
-func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireInterval time.Duration) {
+func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireInterval, reportTolerance time.Duration) {
 	taggedFlow := f.taggedFlow
 	// desireInterval should not be too small
-	if now-taggedFlow.StartTime > desireInterval+REPORT_TOLERANCE {
-		taggedFlow.EndTime = now - REPORT_TOLERANCE
+	if now-taggedFlow.StartTime > desireInterval+reportTolerance {
+		taggedFlow.EndTime = now - reportTolerance
 	} else {
 		taggedFlow.EndTime = now
 	}
@@ -398,6 +398,7 @@ func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uin
 	now := time.Duration(time.Now().UnixNano())
 	flowOutQueue := f.flowOutQueue
 	forceReportInterval := f.forceReportInterval
+	reportTolerance := f.reportTolerance
 	for _, flowCache := range hashMap[start:end] {
 		if flowCache == nil {
 			continue
@@ -408,7 +409,7 @@ func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uin
 			taggedFlow := flowExtra.taggedFlow
 			atomic.AddInt32(&f.stats.CurrNumFlows, -1)
 			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, false, &f.perfCounter)
-			flowExtra.setCurFlowInfo(now, forceReportInterval)
+			flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
 			calcCloseType(taggedFlow, flowExtra.flowState)
 			flowOutQueue.Put(taggedFlow)
 			e = e.Next()
@@ -422,11 +423,12 @@ func (f *FlowGenerator) cleanTimeoutHashMap(hashMap []*FlowCache, start, end, in
 	flowOutQueue := f.flowOutQueue
 	forceReportInterval := f.forceReportInterval
 	sleepDuration := f.minLoopInterval
+	reportTolerance := f.reportTolerance
 	f.cleanWaitGroup.Add(1)
+	flowOutBuffer := [FLOW_OUT_BUFFER_CAP]interface{}{}
 
 loop:
 	time.Sleep(sleepDuration)
-	flowOutBuffer := [FLOW_OUT_BUFFER_CAP]interface{}{}
 	flowOutNum := 0
 	now := time.Duration(time.Now().UnixNano())
 	cleanRange := now - f.minLoopInterval
@@ -450,7 +452,7 @@ loop:
 			if flowExtra.recentTime < cleanRange && flowExtra.recentTime+flowExtra.timeout <= now {
 				taggedFlow := flowExtra.taggedFlow
 				atomic.AddInt32(&f.stats.CurrNumFlows, -1)
-				flowExtra.setCurFlowInfo(now, forceReportInterval)
+				flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
 				if f.servicePortDescriptor.judgeServiceDirection(taggedFlow, flowExtra.reversed) {
 					flowExtra.reverseFlow()
 					flowExtra.reversed = !flowExtra.reversed
@@ -470,7 +472,7 @@ loop:
 				continue
 			} else if flowExtra.taggedFlow.StartTime+forceReportInterval < now {
 				taggedFlow := flowExtra.taggedFlow
-				flowExtra.setCurFlowInfo(now, forceReportInterval)
+				flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
 				if f.servicePortDescriptor.judgeServiceDirection(taggedFlow, flowExtra.reversed) {
 					flowExtra.reverseFlow()
 					flowExtra.reversed = !flowExtra.reversed

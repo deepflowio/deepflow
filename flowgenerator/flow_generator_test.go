@@ -61,7 +61,7 @@ func reversePacket(packet *MetaPacket) {
 func getDefaultFlowGenerator() *FlowGenerator {
 	metaPacketHeaderInQueue := NewOverwriteQueues("metaPacketHeaderInQueue", 1, DEFAULT_QUEUE_LEN)
 	flowOutQueue := NewOverwriteQueue("flowOutQueue", DEFAULT_QUEUE_LEN)
-	return New(metaPacketHeaderInQueue, flowOutQueue, FlowGeneratorConfig{60 * time.Second, 64 * 1024, 1024 * 1024, 4, 1024 * 256}, 0)
+	return New(metaPacketHeaderInQueue, flowOutQueue, FlowGeneratorConfig{60 * time.Second, 64 * 1024, 1024 * 1024, 4, 1024 * 256, 4}, 0)
 }
 
 func TestNew(t *testing.T) {
