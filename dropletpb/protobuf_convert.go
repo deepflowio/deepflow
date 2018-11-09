@@ -1,6 +1,7 @@
 package dropletpb
 
 import (
+	"bytes"
 	"net"
 	"strconv"
 	"strings"
@@ -10,6 +11,10 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/message/trident"
 )
+
+const MAXLEN = 32
+
+var ALLFF = net.ParseIP("255.255.255.255").To4()
 
 func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	macInt := uint64(0)
@@ -64,15 +69,82 @@ func Convert2PlatformData(response *trident.SyncResponse) []*datatype.PlatformDa
 	return platformDatas
 }
 
+func ipRangeConvert2CIDR(startIp, endIp net.IP) (ips []*net.IPNet) {
+	for bytes.Compare(startIp, endIp) <= 0 {
+		masklen := 32
+		for masklen > 0 {
+			ipMask := net.CIDRMask(masklen-1, MAXLEN)
+			if bytes.Compare(startIp, getFirstIp(startIp, ipMask)) != 0 || bytes.Compare(getLastIp(startIp, ipMask), endIp) > 0 {
+				break
+			}
+			masklen--
+		}
+		ips = append(ips, &net.IPNet{IP: startIp, Mask: net.CIDRMask(masklen, MAXLEN)})
+		startIp = getLastIp(startIp, net.CIDRMask(masklen, MAXLEN))
+		if bytes.Compare(startIp, ALLFF) == 0 {
+			break
+		}
+		startIp = getNextToParsedIp(startIp)
+	}
+	return ips
+}
+
+func getNextToParsedIp(ip net.IP) net.IP {
+	ipLen := len(ip)
+	out := make(net.IP, ipLen)
+	isCopy := false
+	for ipLen > 0 {
+		ipLen--
+		if isCopy {
+			out[ipLen] = ip[ipLen]
+			continue
+		}
+		if ip[ipLen] < 255 {
+			out[ipLen] = ip[ipLen] + 1
+			isCopy = true
+			continue
+		}
+		out[ipLen] = 0
+	}
+	return out
+}
+
+func getFirstIp(ip net.IP, mask net.IPMask) net.IP {
+	return ip.Mask(mask)
+}
+
+func getLastIp(ip net.IP, mask net.IPMask) net.IP {
+	ipLen := len(ip)
+	out := make(net.IP, ipLen)
+	for index := 0; index < ipLen; index++ {
+		out[index] = ip[index] | ^mask[index]
+	}
+	return out
+}
+
 func newIpGroupData(ipGroup *trident.Group) *policy.IpGroupData {
-	if ipGroup == nil || ipGroup.GetIps() == nil {
+	if ipGroup == nil || (ipGroup.GetIps() == nil && ipGroup.GetIpRanges() == nil) {
 		return nil
+	}
+
+	ips := make([]string, 0, len(ipGroup.GetIps()))
+	if ipGroup.GetIps() != nil {
+		ips = ipGroup.GetIps()
+	}
+	if ipGroup.GetIpRanges() != nil {
+		for _, ipRange := range ipGroup.GetIpRanges() {
+			startIp := net.ParseIP(strings.Split(ipRange, "-")[0]).To4()
+			endIp := net.ParseIP(strings.Split(ipRange, "-")[1]).To4()
+			for _, ip := range ipRangeConvert2CIDR(startIp, endIp) {
+				ips = append(ips, ip.String())
+			}
+		}
 	}
 	return &policy.IpGroupData{
 		Id:    ipGroup.GetId(),
 		EpcId: int32(ipGroup.GetEpcId()),
 		Type:  uint8(ipGroup.GetType()),
-		Ips:   ipGroup.GetIps(),
+		Ips:   ips,
 	}
 }
 
