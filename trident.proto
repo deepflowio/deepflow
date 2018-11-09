@@ -84,6 +84,7 @@ message Group {
     optional GroupType type = 3;
     repeated uint32 vm_ids = 4;
     repeated string ips = 5;
+    repeated string ip_ranges = 6;
 }
 
 message PlatformData {
