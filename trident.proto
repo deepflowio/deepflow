@@ -7,10 +7,20 @@ service Synchronizer {
     rpc Sync (SyncRequest) returns (SyncResponse) {}
 }
 
+enum State {
+    ENVIRONMENT_CHECK = 0; // 检查运行环境
+    DISABLED          = 1; // 禁用
+    RUNNING           = 2; // 正常运行
+    REBOOTING         = 3; // 因配置变更等缘故触发重启
+    STRESSED          = 4; // 负载太大产生丢包
+    RESTRICTED        = 5; // 占用过多系统资源
+}
+
 message SyncRequest {
     optional uint32 boot_time = 1;
     optional bool config_accepted = 2 [default = true];
     optional uint64 version = 3 [default = 0];
+    optional State state = 4;
 }
 
 enum Status {
@@ -32,7 +42,8 @@ message Config {
     optional uint64  global_pps_threshold = 6 [default = 100000];
     optional TapMode tap_mode             = 7 [default = LOCAL];
     optional string  tap_interface_regex  = 8;
-    optional string  host                 = 9; // override statsd host tag
+    optional string  host                 = 9;  // override statsd host tag
+    optional string  self_update_url      = 10; // specify only when self-update required
 
     optional uint32 output_vlan = 11 [default = 0];
     optional uint32 mtu = 12 [default = 1500];
@@ -102,16 +113,17 @@ enum TapType {
 }
 
 enum Action {
-    PACKET_COUNTING = 1;                // 包统计
-    FLOW_COUNTING = 2;                  // 流统计
-    FLOW_STORING = 3;                   // 流存储
-    TCP_FLOW_PERF_COUNTING = 4;         // TCP性能量化统计
-    PACKET_CAPTURING = 5;               // 包存储（pcap）
-    FLOW_MISC_COUNTING = 6;             // 流杂项统计
-    PACKET_COUNT_BROKERING = 8;         // 包统计数据分发
-    FLOW_COUNT_BROKERING = 9;           // 流统计数据分发
+    PACKET_COUNTING               = 1;  // 包统计
+    FLOW_COUNTING                 = 2;  // 流统计
+    FLOW_STORING                  = 3;  // 流存储
+    TCP_FLOW_PERF_COUNTING        = 4;  // TCP性能量化统计
+    PACKET_CAPTURING              = 5;  // 包存储（pcap）
+    FLOW_MISC_COUNTING            = 6;  // 流杂项统计
+    PACKET_BROKERING              = 7;  // 包分发
+    PACKET_COUNT_BROKERING        = 8;  // 包统计数据分发
+    FLOW_COUNT_BROKERING          = 9;  // 流统计数据分发
     TCP_FLOW_PERF_COUNT_BROKERING = 10; // TCP性能量化统计数据分发
-    GEO_POSITIONING = 11;               // 地理定位
+    GEO_POSITIONING               = 11; // 地理定位
 }
 
 enum TagTemplate {
@@ -127,10 +139,17 @@ enum TagTemplate {
     ACL_PORT = 512;
 }
 
+message NpbAction {
+    required uint32 tunnel_id = 2;
+    required uint32 tunnel_ip = 3;
+    optional uint32 payload_slice = 4;
+}
+
 message FlowAction {
     optional Action action = 1;
     repeated uint32 policy_acl_group_id = 2;
     optional uint32 tag_template = 3;
+    repeated NpbAction npb_actions = 4;
 }
 
 message FlowAcl {
