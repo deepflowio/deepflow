@@ -50,8 +50,8 @@
   version = "1.0.0"
 
 [[constraint]]
-  branch = "release-branch.go1.11"
   name = "golang.org/x/net"
+  branch = "release-branch.go1.11"
 
 [[constraint]]
   name = "google.golang.org/grpc"

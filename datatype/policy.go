@@ -2,6 +2,8 @@ package datatype
 
 import (
 	"fmt"
+
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 var (
@@ -10,6 +12,31 @@ var (
 
 type ActionFlag uint16
 
+type NpbAction uint64 // tunnel-ip | tunnel-id | payload-slice
+
+func (a NpbAction) TunnelIp() IPv4Int {
+	return IPv4Int(a >> 32)
+}
+
+func (a NpbAction) TunnelId() uint32 {
+	return uint32(uint16(a >> 16))
+}
+
+func (a NpbAction) PayloadSlice() int {
+	return int(uint16(a))
+}
+
+func (a NpbAction) String() string {
+	if a.PayloadSlice() > 0 {
+		return fmt.Sprintf("{%d@%s slice %d}", a.TunnelId(), IpFromUint32(a.TunnelIp()), a.PayloadSlice())
+	}
+	return fmt.Sprintf("{%d@%s}", a.TunnelId(), IpFromUint32(a.TunnelIp()))
+}
+
+func toNpbAction(ip IPv4Int, id uint16, slice int) NpbAction {
+	return NpbAction(ip)<<32 | NpbAction(id)<<16 | NpbAction(slice)
+}
+
 const (
 	ACTION_PACKET_COUNTING ActionFlag = 1 << iota
 	ACTION_FLOW_COUNTING
@@ -17,7 +44,7 @@ const (
 	ACTION_TCP_FLOW_PERF_COUNTING
 	ACTION_PACKET_CAPTURING
 	ACTION_FLOW_MISC_COUNTING
-	_ // skip
+	ACTION_PACKET_BROKERING
 	ACTION_PACKET_COUNT_BROKERING
 	ACTION_FLOW_COUNT_BROKERING
 	ACTION_TCP_FLOW_PERF_COUNT_BROKERING
@@ -44,6 +71,9 @@ func (f ActionFlag) String() string {
 	if f&ACTION_FLOW_MISC_COUNTING != 0 {
 		s += "FMC|"
 	}
+	if f&ACTION_PACKET_BROKERING != 0 {
+		s += "PB|"
+	}
 	if f&ACTION_PACKET_COUNT_BROKERING != 0 {
 		s += "PCB|"
 	}
@@ -65,6 +95,7 @@ type PolicyData struct {
 	ACLID       ACLID      // 匹配的第一个ACL
 	ActionFlags ActionFlag // bitwise OR
 	AclActions  []AclAction
+	NpbActions  []NpbAction
 }
 
 type DirectionType uint8
@@ -240,7 +271,8 @@ func (d *PolicyData) MergeAndSwapDirection(aclActions []AclAction, aclID ACLID) 
 }
 
 func (d *PolicyData) String() string {
-	return fmt.Sprintf("{ACLID: %d ActionFlags: %v AclActions: %v}", d.ACLID, d.ActionFlags, d.AclActions)
+	return fmt.Sprintf("{ACLID: %d ActionFlags: %v AclActions: %v NpbActions: %v}",
+		d.ACLID, d.ActionFlags, d.AclActions, d.NpbActions)
 }
 
 var policyDataPool = NewLockFreePool(func() interface{} {
