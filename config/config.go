@@ -138,7 +138,7 @@ func (c *Config) Validate() error {
 		c.Queue.MeteringAppQueueSize = c.Queue.QueueSize
 	}
 	if c.Queue.FlowAppQueueCount == 0 {
-		c.Queue.FlowAppQueueCount = 4
+		c.Queue.FlowAppQueueCount = 8
 	}
 	if c.Queue.FlowAppQueueSize == 0 {
 		c.Queue.FlowAppQueueSize = c.Queue.QueueSize
