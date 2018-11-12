@@ -41,9 +41,9 @@ queue:
   metering-app-queue-count: 4
   # metering app read queue size, default queue-size
   metering-app-queue-size: 65536
-  # flow app read queue count, default 4
+  # flow app read queue count, default 8
   # 4-tagged-flow-to-flow-app
-  flow-app-queue-count: 4
+  flow-app-queue-count: 8
   # flow app read queue size, default queue-size
   flow-app-queue-size: 65536
   # flow duplicator read queue size, default flow-generator-queue-size >> 2
