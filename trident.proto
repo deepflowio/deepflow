@@ -21,6 +21,7 @@ message SyncRequest {
     optional bool config_accepted = 2 [default = true];
     optional uint64 version = 3 [default = 0];
     optional State state = 4;
+    optional string revision = 5; // trident用于self-update
 }
 
 enum Status {
@@ -43,14 +44,13 @@ message Config {
     optional TapMode tap_mode             = 7 [default = LOCAL];
     optional string  tap_interface_regex  = 8;
     optional string  host                 = 9;  // override statsd host tag
-    optional string  self_update_url      = 10; // specify only when self-update required
+    optional bool    rsyslog_enabled      = 10 [default = false];
+    optional uint32  output_vlan          = 11 [default = 0];
+    optional uint32  mtu                  = 12 [default = 1500];
+    optional string  self_update_url      = 13; // specify only when self-update required
 
-    optional uint32 output_vlan = 11 [default = 0];
-    optional uint32 mtu = 12 [default = 1500];
-
-    optional string source_ip = 21;
-
-    optional string analyzer_ip = 31;
+    optional string  source_ip            = 21;
+    optional string  analyzer_ip          = 31;
 }
 
 enum Protocol {
