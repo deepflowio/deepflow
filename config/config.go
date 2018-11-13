@@ -18,22 +18,23 @@ import (
 var log = logging.MustGetLogger("config")
 
 type Config struct {
-	ControllerIps  []string            `yaml:"controller-ips,flow"`
-	ControllerPort uint16              `yaml:"controller-port"`
-	LogFile        string              `yaml:"log-file"`
-	LogLevel       string              `yaml:"log-level"`
-	Profiler       bool                `yaml:"profiler"`
-	MaxCPUs        int                 `yaml:"max-cpus"`
-	TapInterfaces  []string            `yaml:"tap-interfaces,flow"`
-	DefaultTapType uint32              `yaml:"default-tap-type"`
-	Stream         string              `yaml:"stream"`
-	StreamPort     uint16              `yaml:"stream-port"`
-	ZeroHosts      []string            `yaml:"zero-hosts,flow"`
-	ZeroPort       uint16              `yaml:"zero-port"`
-	Queue          QueueConfig         `yaml:"queue"`
-	Labeler        LabelerConfig       `yaml:"labeler"`
-	FlowGenerator  FlowGeneratorConfig `yaml:"flow-generator"`
-	MapReduce      MapReduce           `yaml:"map-reduce"`
+	ControllerIps    []string            `yaml:"controller-ips,flow"`
+	ControllerPort   uint16              `yaml:"controller-port"`
+	LogFile          string              `yaml:"log-file"`
+	LogLevel         string              `yaml:"log-level"`
+	Profiler         bool                `yaml:"profiler"`
+	MaxCPUs          int                 `yaml:"max-cpus"`
+	TapInterfaces    []string            `yaml:"tap-interfaces,flow"`
+	DefaultTapType   uint32              `yaml:"default-tap-type"`
+	AdapterCacheSize int                 `yaml:"adapter-cache-size"`
+	Stream           string              `yaml:"stream"`
+	StreamPort       uint16              `yaml:"stream-port"`
+	ZeroHosts        []string            `yaml:"zero-hosts,flow"`
+	ZeroPort         uint16              `yaml:"zero-port"`
+	Queue            QueueConfig         `yaml:"queue"`
+	Labeler          LabelerConfig       `yaml:"labeler"`
+	FlowGenerator    FlowGeneratorConfig `yaml:"flow-generator"`
+	MapReduce        MapReduce           `yaml:"map-reduce"`
 }
 
 type IpPortConfig struct {
@@ -115,6 +116,12 @@ func (c *Config) Validate() error {
 
 	if c.DefaultTapType == 0 {
 		c.DefaultTapType = datatype.PACKET_SOURCE_TOR
+	}
+	if c.AdapterCacheSize == 0 {
+		c.AdapterCacheSize = 16
+	}
+	if c.AdapterCacheSize > 64 {
+		c.AdapterCacheSize = 64
 	}
 	if c.Queue.QueueSize == 0 {
 		c.Queue.QueueSize = 65536

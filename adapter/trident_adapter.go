@@ -20,7 +20,6 @@ import (
 
 const (
 	LISTEN_PORT     = 20033
-	CACHE_SIZE      = 16
 	PACKET_MAX      = 256
 	TRIDENT_TIMEOUT = 60 * time.Second
 )
@@ -47,12 +46,14 @@ type tridentInstance struct {
 	seq       uint32
 	timestamp time.Duration
 
-	cache      [CACHE_SIZE][]byte
+	cache      [][]byte
 	cacheCount uint8
-	cacheMap   uint16
+	cacheMap   uint64
 }
 
 type TridentAdapter struct {
+	cacheSize int
+
 	queues    queue.MultiQueueWriter
 	itemKeys  []queue.HashKey
 	itemBatch []interface{}
@@ -66,10 +67,11 @@ type TridentAdapter struct {
 	listener *net.UDPConn
 }
 
-func NewTridentAdapter(queues queue.MultiQueueWriter) *TridentAdapter {
+func NewTridentAdapter(queues queue.MultiQueueWriter, cacheSize int) *TridentAdapter {
 	adapter := &TridentAdapter{}
 	adapter.counter = &PacketCounter{}
 	adapter.stats = &PacketCounter{}
+	adapter.cacheSize = cacheSize
 	adapter.queues = queues
 	adapter.itemKeys = make([]queue.HashKey, 0, PACKET_MAX+1)
 	adapter.itemKeys = append(adapter.itemKeys, queue.HashKey(0))
@@ -101,8 +103,8 @@ func (a *TridentAdapter) cacheClear(data []byte, key uint32, seq uint32) {
 	startSeq := a.instances[key].seq
 	instance := a.instances[key]
 	if instance.cacheCount > 0 {
-		for i := 0; i < CACHE_SIZE; i++ {
-			if instance.cacheMap&(1<<uint32(i)) == uint16(1<<uint32(i)) {
+		for i := 0; i < a.cacheSize; i++ {
+			if instance.cacheMap&(1<<uint64(i)) == uint64(1<<uint32(i)) {
 				dataSeq := uint32(i) + startSeq + 1
 				a.decode(a.instances[key].cache[i], key)
 				drop := uint64(dataSeq - instance.seq - 1)
@@ -147,7 +149,7 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32, timest
 		}
 		offset := seq - instance.seq - 1
 		// cache满或乱序超过CACHE_SIZE, 清空cache
-		if offset >= CACHE_SIZE || instance.cacheCount == CACHE_SIZE {
+		if int(offset) >= a.cacheSize || int(instance.cacheCount) == a.cacheSize {
 			a.cacheClear(data, key, seq)
 			return
 		}
@@ -159,7 +161,9 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32, timest
 
 func (a *TridentAdapter) findAndAdd(data []byte, key uint32, seq uint32, timestamp time.Duration) {
 	if a.instances[key] == nil {
-		a.instances[key] = &tridentInstance{}
+		instance := &tridentInstance{}
+		instance.cache = make([][]byte, a.cacheSize)
+		a.instances[key] = instance
 	}
 	a.cacheLookup(data, key, seq, timestamp)
 }
