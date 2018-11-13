@@ -149,7 +149,6 @@ message FlowAction {
     optional Action action = 1;
     repeated uint32 policy_acl_group_id = 2;
     optional uint32 tag_template = 3;
-    repeated NpbAction npb_actions = 4;
 }
 
 message FlowAcl {
@@ -162,6 +161,7 @@ message FlowAcl {
     optional string dst_ports = 8;
     optional uint32 vlan = 9;
     repeated FlowAction actions = 10;
+    repeated NpbAction npb_actions = 11;
 }
 
 message SyncResponse {
