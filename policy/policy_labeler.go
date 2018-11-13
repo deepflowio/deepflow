@@ -67,6 +67,7 @@ type PolicyLabeler struct {
 
 	maskMapFromPlatformData [math.MaxUint16 + 1]uint32
 	maskMapFromIpGroupData  [math.MaxUint16 + 1]uint32
+	cloudPlatformLabeler    *CloudPlatformLabeler
 }
 
 func (a *Acl) getPorts() string {
@@ -543,6 +544,10 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 			// first层面存储的都是正方向的key, 在这里重新设置方向
 			portBackwardPolicy.Merge(policy.AclActions, policy.NpbActions, policy.ACLID, BACKWARD)
 		}
+	}
+	// 剔除匿名资源组ID
+	if l.cloudPlatformLabeler != nil {
+		l.cloudPlatformLabeler.RemoveAnonymousId(endpointData)
 	}
 	// 无论是否差找到policy，都需要向fastPath下发，避免重复走firstPath
 	mapsForward, mapsBackward := l.addPortFastPolicy(endpointData, srcEpc, dstEpc, packet, portForwardPolicy, portBackwardPolicy)

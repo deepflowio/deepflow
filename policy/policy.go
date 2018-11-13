@@ -93,6 +93,7 @@ func NewPolicyTable(actionFlags ActionFlag, queueCount int, mapSize uint32, fast
 		policyLabeler:        NewPolicyLabeler(queueCount, availableMapSize, fastPathDisable),
 		queueCount:           queueCount,
 	}
+	policyTable.policyLabeler.cloudPlatformLabeler = policyTable.cloudPlatformLabeler
 	return policyTable
 }
 

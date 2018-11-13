@@ -422,3 +422,11 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	}
 	return endpoint
 }
+
+func (l *CloudPlatformLabeler) RemoveAnonymousId(endpoint *EndpointData) {
+	if len(l.ipGroup.anonymousIds) == 0 {
+		return
+	}
+	endpoint.SrcInfo.GroupIds = l.ipGroup.RemoveAnonymousId(endpoint.SrcInfo.GroupIds)
+	endpoint.DstInfo.GroupIds = l.ipGroup.RemoveAnonymousId(endpoint.DstInfo.GroupIds)
+}
