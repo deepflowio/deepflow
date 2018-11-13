@@ -67,7 +67,7 @@
 
 [[constraint]]
   name = "gitlab.x.lan/yunshan/message"
-  branch = "master"
+  branch = "feature-npb"
 
 [prune]
   go-tests = true
