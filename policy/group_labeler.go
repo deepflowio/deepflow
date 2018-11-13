@@ -10,6 +10,10 @@ import (
 const (
 	GROUP_TREE_DIMENSION = 2
 	MAX_LRU_SIZE         = 1000
+	VM_GROUP             = 0
+	IP_GROUP             = 1
+	ANONYMOUS_VM         = 2
+	ANONYMOUS_IP         = 3
 )
 
 type IpGroupData struct {
@@ -21,14 +25,15 @@ type IpGroupData struct {
 
 // IpResourceGroup is the labeler for resource groups
 type IpResourceGroup struct {
-	ipTree CachedIpTree
+	ipTree       CachedIpTree
+	anonymousIds map[uint32]bool
 }
 
 type CachedIpTree CachedTree
 
 func NewIpResourceGroup() *IpResourceGroup {
 	ipTree, _ := tree.New(GROUP_TREE_DIMENSION)
-	return &IpResourceGroup{CachedIpTree(makeCachedTree(ipTree))}
+	return &IpResourceGroup{CachedIpTree(makeCachedTree(ipTree)), make(map[uint32]bool)}
 }
 
 func ipGroupToEntries(data *IpGroupData) []tree.Entry {
@@ -48,17 +53,37 @@ func ipGroupToEntries(data *IpGroupData) []tree.Entry {
 	return entries
 }
 
+func (g *IpResourceGroup) AppendAnonymousId(anonymous map[uint32]bool, group *IpGroupData) {
+	if group.Type == ANONYMOUS_IP || group.Type == ANONYMOUS_VM {
+		anonymous[group.Id] = true
+	}
+}
+
+func (g *IpResourceGroup) RemoveAnonymousId(groupIds []uint32) []uint32 {
+	result := make([]uint32, 0, len(groupIds))
+	for _, v := range groupIds {
+		if _, ok := g.anonymousIds[FormatGroupId(v)]; !ok {
+			result = append(result, v)
+		}
+	}
+
+	return result
+}
+
 // Update triggers the creation of trees in labeler
 func (g *IpResourceGroup) Update(groups []*IpGroupData) {
 	ipEntries := make([]tree.Entry, 0, len(groups))
-	for _, g := range groups {
-		ipEntries = append(ipEntries, ipGroupToEntries(g)...)
+	anonymousIds := make(map[uint32]bool)
+	for _, group := range groups {
+		ipEntries = append(ipEntries, ipGroupToEntries(group)...)
+		g.AppendAnonymousId(anonymousIds, group)
 	}
 	ipTree, err := tree.New(GROUP_TREE_DIMENSION, ipEntries...)
 	if err != nil {
 		log.Warning("IP resource group error:", err)
 	}
 	g.ipTree = CachedIpTree(makeCachedTree(ipTree))
+	g.anonymousIds = anonymousIds
 }
 
 func generateGroupIds(groupIds []uint32) map[uint32]bool {
