@@ -57,8 +57,8 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	}
 }
 
-func Convert2PlatformData(response *trident.SyncResponse) []*datatype.PlatformData {
-	interfaces := response.GetPlatformData().GetInterfaces()
+// response.GetPlatformData().GetInterfaces()
+func Convert2PlatformData(interfaces []*trident.Interface) []*datatype.PlatformData {
 	platformDatas := make([]*datatype.PlatformData, 0, len(interfaces))
 	for _, data := range interfaces {
 		if newData := newPlatformData(data); newData != nil {
@@ -135,8 +135,8 @@ func newIpGroupData(ipGroup *trident.Group) *policy.IpGroupData {
 	}
 }
 
-func Convert2IpGroupData(response *trident.SyncResponse) []*policy.IpGroupData {
-	ipGroups := response.GetPlatformData().GetIpGroups()
+// response.GetPlatformData().GetIpGroups()
+func Convert2IpGroupData(ipGroups []*trident.Group) []*policy.IpGroupData {
 	ipGroupDatas := make([]*policy.IpGroupData, 0, len(ipGroups))
 	for _, group := range ipGroups {
 		if newData := newIpGroupData(group); newData != nil {
@@ -244,8 +244,8 @@ func newPolicyData(acl *trident.FlowAcl) *policy.Acl {
 	}
 }
 
-func Convert2AclData(response *trident.SyncResponse) []*policy.Acl {
-	flowAcls := response.GetFlowAcls()
+// response.GetFlowAcls()
+func Convert2AclData(flowAcls []*trident.FlowAcl) []*policy.Acl {
 	policies := make([]*policy.Acl, 0, len(flowAcls))
 	for _, acl := range flowAcls {
 		if newData := newPolicyData(acl); newData != nil {
