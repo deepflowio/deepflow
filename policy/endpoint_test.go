@@ -774,6 +774,34 @@ func TestFastpathEndInfo(t *testing.T) {
 	}
 }
 
+func TestAnonymousGroupData(t *testing.T) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	generatePlatformData(policy)
+	ipGroup1 := generateIpGroup(group[1], 0, ipGroup6IpNet1)
+	ipGroup1.Type = ANONYMOUS_IP
+	ipGroup2 := generateIpGroup(group[2], 0, ipGroup6IpNet2)
+	ipGroup2.Type = ANONYMOUS_IP
+	ipGroups := make([]*IpGroupData, 0, 2)
+	ipGroups = append(ipGroups, ipGroup1, ipGroup2)
+	policy.UpdateIpGroupData(ipGroups)
+
+	key := generateClassicLookupKey(mac1, mac2, ipGroup6Ip1, ipGroup6Ip2, 0, 0, EthernetTypeIPv4)
+	data := getEndpointData(policy, key)
+	if data.SrcInfo.GroupIds[0] != group[1]+1e9 ||
+		data.DstInfo.GroupIds[0] != group[2]+1e9 {
+		t.Error("TestAnonymousGroupData Check Failed!")
+		t.Log(data.SrcInfo, "\n")
+		t.Log(data.DstInfo, "\n")
+	}
+	data, _ = policy.LookupAllByKey(key)
+	if len(data.SrcInfo.GroupIds) != 0 ||
+		len(data.DstInfo.GroupIds) != 0 {
+		t.Error("TestAnonymousGroupData Check Failed!")
+		t.Log(data.SrcInfo, "\n")
+		t.Log(data.DstInfo, "\n")
+	}
+}
+
 func BenchmarkGetEndpointData(b *testing.B) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	platformData1 := generatePlatformDataByParam(group1Ip1, group1Mac, groupEpc[1], 4)
