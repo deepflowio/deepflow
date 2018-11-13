@@ -230,17 +230,27 @@ func newAclAction(aclId datatype.ACLID, actions []*trident.FlowAction) []datatyp
 	return aclActions
 }
 
+func newNpbActions(npbs []*trident.NpbAction) []datatype.NpbAction {
+	actions := make([]datatype.NpbAction, 0, len(npbs))
+	for _, npb := range npbs {
+		action := datatype.ToNpbAction(npb.GetTunnelIp(), npb.GetTunnelId(), npb.GetPayloadSlice())
+		actions = append(actions, action)
+	}
+	return actions
+}
+
 func newPolicyData(acl *trident.FlowAcl) *policy.Acl {
 	return &policy.Acl{
-		Id:        datatype.ACLID(acl.GetId()),
-		Type:      datatype.TapType(acl.GetTapType()),
-		TapId:     acl.GetTapId(),
-		SrcGroups: splitGroup2Int(acl.GetSrcGroupIds()),
-		DstGroups: splitGroup2Int(acl.GetDstGroupIds()),
-		DstPorts:  splitPort2Int(acl.GetDstPorts()),
-		Proto:     uint8(acl.GetProtocol()),
-		Vlan:      acl.GetVlan(),
-		Action:    newAclAction(datatype.ACLID(acl.GetId()), acl.GetActions()),
+		Id:         datatype.ACLID(acl.GetId()),
+		Type:       datatype.TapType(acl.GetTapType()),
+		TapId:      acl.GetTapId(),
+		SrcGroups:  splitGroup2Int(acl.GetSrcGroupIds()),
+		DstGroups:  splitGroup2Int(acl.GetDstGroupIds()),
+		DstPorts:   splitPort2Int(acl.GetDstPorts()),
+		Proto:      uint8(acl.GetProtocol()),
+		Vlan:       acl.GetVlan(),
+		Action:     newAclAction(datatype.ACLID(acl.GetId()), acl.GetActions()),
+		NpbActions: newNpbActions(acl.GetNpbActions()),
 	}
 }
 

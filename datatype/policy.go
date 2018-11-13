@@ -33,7 +33,7 @@ func (a NpbAction) String() string {
 	return fmt.Sprintf("{%d@%s}", a.TunnelId(), IpFromUint32(a.TunnelIp()))
 }
 
-func toNpbAction(ip IPv4Int, id uint16, slice int) NpbAction {
+func ToNpbAction(ip uint32, id uint32, slice uint32) NpbAction {
 	return NpbAction(ip)<<32 | NpbAction(id)<<16 | NpbAction(slice)
 }
 
@@ -232,10 +232,32 @@ func (a AclAction) String() string {
 		a.GetACLGID(), a.GetActionFlags().String(), a.GetDirections(), a.GetTagTemplates().String())
 }
 
-func (d *PolicyData) Merge(aclActions []AclAction, aclID ACLID, directions ...DirectionType) {
+func (d *PolicyData) MergeNpbAction(actions []NpbAction) {
+	newActions := make([]NpbAction, 0, len(actions))
+	for _, m := range actions {
+		repeat := false
+		for _, n := range d.NpbActions {
+			if m == n {
+				repeat = true
+				break
+			}
+		}
+
+		if !repeat {
+			newActions = append(newActions, m)
+		}
+	}
+
+	if len(newActions) > 0 {
+		d.NpbActions = append(d.NpbActions, newActions...)
+	}
+}
+
+func (d *PolicyData) Merge(aclActions []AclAction, npbActions []NpbAction, aclID ACLID, directions ...DirectionType) {
 	if d.ACLID == 0 {
 		d.ACLID = aclID
 	}
+	d.MergeNpbAction(npbActions)
 	for _, newAclAction := range aclActions {
 		if len(directions) > 0 {
 			newAclAction = newAclAction.SetDirections(directions[0])
@@ -262,12 +284,12 @@ func (d *PolicyData) Merge(aclActions []AclAction, aclID ACLID, directions ...Di
 	}
 }
 
-func (d *PolicyData) MergeAndSwapDirection(aclActions []AclAction, aclID ACLID) {
+func (d *PolicyData) MergeAndSwapDirection(aclActions []AclAction, npbActions []NpbAction, aclID ACLID) {
 	newAclActions := make([]AclAction, len(aclActions))
 	for i, _ := range aclActions {
 		newAclActions[i] = aclActions[i].ReverseDirection()
 	}
-	d.Merge(newAclActions, aclID)
+	d.Merge(newAclActions, npbActions, aclID)
 }
 
 func (d *PolicyData) String() string {
