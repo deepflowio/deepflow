@@ -21,6 +21,9 @@ var (
 	ip6           = NewIPFromString("10.25.1.10").Int()
 	ip7           = NewIPFromString("192.168.10.10").Int()
 	ip8           = NewIPFromString("10.25.2.2").Int()
+	ip9           = NewIPFromString("172.16.10.10").Int()
+	ip10          = NewIPFromString("172.16.10.20").Int()
+	ip11          = NewIPFromString("255.255.255.255").Int()
 	ipNet1        = "192.168.0.11/24"
 	groupEpcOther = int32(-1)
 	groupEpcAny   = int32(0)

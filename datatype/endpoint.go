@@ -9,11 +9,16 @@ import (
 )
 
 var (
-	INVALID_ENDPOINT_INFO           = new(EndpointInfo)
-	INVALID_ENDPOINT_INFO_L2END     = &EndpointInfo{L2End: true}
-	INVALID_ENDPOINT_INFO_L3END     = &EndpointInfo{L3End: true}
-	INVALID_ENDPOINT_INFO_L2AND3END = &EndpointInfo{L2End: true, L3End: true}
-	INVALID_ENDPOINT_DATA           = &EndpointData{SrcInfo: INVALID_ENDPOINT_INFO, DstInfo: INVALID_ENDPOINT_INFO}
+	INVALID_ENDPOINT_INFO                   = new(EndpointInfo)
+	INVALID_ENDPOINT_INFO_L3EPCID           = &EndpointInfo{L3EpcId: -1}
+	INVALID_ENDPOINT_INFO_L2END             = &EndpointInfo{L2End: true}
+	INVALID_ENDPOINT_INFO_L3END             = &EndpointInfo{L3End: true}
+	INVALID_ENDPOINT_INFO_L2AND3END         = &EndpointInfo{L2End: true, L3End: true}
+	INVALID_ENDPOINT_INFO_L2END_L3EPCID     = &EndpointInfo{L2End: true, L3EpcId: -1}
+	INVALID_ENDPOINT_INFO_L3END_L3EPCID     = &EndpointInfo{L3End: true, L3EpcId: -1}
+	INVALID_ENDPOINT_INFO_L2AND3END_L3EPCID = &EndpointInfo{L2End: true, L3End: true, L3EpcId: -1}
+	INVALID_ENDPOINT_DATA                   = &EndpointData{SrcInfo: INVALID_ENDPOINT_INFO, DstInfo: INVALID_ENDPOINT_INFO}
+	INVALID_ENDPOINT_DATA_L3EPCID           = &EndpointData{SrcInfo: INVALID_ENDPOINT_INFO_L3EPCID, DstInfo: INVALID_ENDPOINT_INFO_L3EPCID}
 )
 
 type TapType uint8
