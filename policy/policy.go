@@ -10,6 +10,7 @@ import (
 )
 
 type SortedAcls []*Acl
+type SortedIpGroups []*IpGroupData
 
 var log = logging.MustGetLogger("policy")
 
@@ -129,6 +130,23 @@ func (acls SortedAcls) Swap(i, j int) {
 func SortAclsById(acls []*Acl) []*Acl {
 	sort.Sort(SortedAcls(acls))
 	return acls
+}
+
+func (ipGroups SortedIpGroups) Len() int {
+	return len(ipGroups)
+}
+
+func (ipGroups SortedIpGroups) Less(i, j int) bool {
+	return ipGroups[i].Id < ipGroups[j].Id
+}
+
+func (ipGroups SortedIpGroups) Swap(i, j int) {
+	ipGroups[i], ipGroups[j] = ipGroups[j], ipGroups[i]
+}
+
+func SortIpGroupsById(ipGroups []*IpGroupData) []*IpGroupData {
+	sort.Sort(SortedIpGroups(ipGroups))
+	return ipGroups
 }
 
 func (t *PolicyTable) GetCounter() interface{} {
