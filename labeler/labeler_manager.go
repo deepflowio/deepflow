@@ -427,9 +427,9 @@ func newLookupKey(cmdLine string) *datatype.LookupKey {
 			}
 			key.EthType = layers.EthernetType(ethType)
 		case "sip":
-			key.SrcIp = IpToUint32(net.ParseIP(parts[1]))
+			key.SrcIp = IpToUint32(net.ParseIP(parts[1]).To4())
 		case "dip":
-			key.DstIp = IpToUint32(net.ParseIP(parts[1]))
+			key.DstIp = IpToUint32(net.ParseIP(parts[1]).To4())
 		case "proto":
 			proto, err := strconv.Atoi(parts[1])
 			if err != nil {
@@ -473,7 +473,7 @@ func newDumpKey(cmdLine string) *DumpKey {
 			}
 			key.Mac = Mac2Uint64(mac)
 		case "ip":
-			key.Ip = IpToUint32(net.ParseIP(parts[1]))
+			key.Ip = IpToUint32(net.ParseIP(parts[1]).To4())
 		case "inport":
 			inport, err := parseUint(parts[1])
 			if err != nil {

@@ -23,7 +23,7 @@ func getDefaultPacket() *MetaPacket {
 	dst, _ := net.ParseMAC("21:43:65:87:A9:CB")
 	return &MetaPacket{
 		Timestamp: time.Duration(time.Now().UnixNano()),
-		Exporter:  IpToUint32(net.ParseIP("192.168.1.1")),
+		Exporter:  IpToUint32(net.ParseIP("192.168.1.1").To4()),
 		InPort:    65533,
 		MacSrc:    MacIntFromBytes(src),
 		MacDst:    MacIntFromBytes(dst),
