@@ -18,31 +18,22 @@ const (
 	LOG_COLOR_FORMAT      = "%{color}%{time:2006-01-02 15:04:05.000} [%{level:.4s}]%{color:reset} %{shortfile} %{message}"
 )
 
-var log = logging.MustGetLogger(os.Args[0])
+var log = logging.MustGetLogger(path.Base(os.Args[0]))
 
-func InitConsoleLog(levelString string) {
-	level, err := logging.LogLevel(levelString)
-	if err != nil {
-		log.Error(err.Error())
-		os.Exit(-1)
-	}
-	stdout := logging.AddModuleLevel(
-		logging.NewBackendFormatter(
-			logging.NewLogBackend(os.Stdout, "", 0),
-			logging.MustStringFormatter(LOG_COLOR_FORMAT),
-		),
-	)
-	stdout.SetLevel(level, "")
-	logging.SetBackend(stdout)
+type StdoutLog string
+type FileLog string
+type Rsyslog string
+type SyslogLog string
+
+func Stdout() StdoutLog {
+	return ""
 }
 
-func InitLog(filePath string, levelString string) {
-	level, err := logging.LogLevel(levelString)
-	if err != nil {
-		log.Error(err.Error())
-		os.Exit(-1)
-	}
+func Syslog() SyslogLog {
+	return ""
+}
 
+func stdoutBackend(level logging.Level) logging.Backend {
 	stdout := logging.AddModuleLevel(
 		logging.NewBackendFormatter(
 			logging.NewLogBackend(os.Stdout, "", 0),
@@ -50,8 +41,11 @@ func InitLog(filePath string, levelString string) {
 		),
 	)
 	stdout.SetLevel(level, "")
+	return stdout
+}
 
-	dir := path.Dir(filePath)
+func fileBackend(level logging.Level, logPath string) logging.Backend {
+	dir := path.Dir(logPath)
 	if _, err := os.Stat(dir); err != nil {
 		if os.IsNotExist(err) {
 			os.MkdirAll(dir, 0755)
@@ -61,8 +55,8 @@ func InitLog(filePath string, levelString string) {
 	}
 
 	ioWriter, err := rotatelogs.New(
-		filePath+".%Y-%m-%d",
-		rotatelogs.WithLinkName(filePath),
+		logPath+".%Y-%m-%d",
+		rotatelogs.WithLinkName(logPath),
 		rotatelogs.WithMaxAge(LOG_MAX_AGE),
 		rotatelogs.WithRotationTime(LOG_ROTATION_INTERVAL),
 	)
@@ -78,18 +72,7 @@ func InitLog(filePath string, levelString string) {
 		),
 	)
 	file.SetLevel(level, "")
-
-	pName := path.Base(os.Args[0])
-	pName = pName + "/" + pName
-	syslogBackend, err := logging.NewSyslogBackendPriority(pName, logLevelToPriority(level)|syslog.LOG_LOCAL2)
-	if err != nil {
-		log.Error(err.Error())
-		os.Exit(-1)
-	}
-	slog := logging.AddModuleLevel(syslogBackend)
-	slog.SetLevel(level, "")
-
-	logging.SetBackend(stdout, file, slog)
+	return file
 }
 
 func logLevelToPriority(level logging.Level) syslog.Priority {
@@ -109,4 +92,61 @@ func logLevelToPriority(level logging.Level) syslog.Priority {
 	default:
 		panic("invalid type")
 	}
+}
+
+func syslogBackend(level logging.Level) logging.Backend {
+	processName := path.Base(os.Args[0])
+	processName = processName + "/" + processName
+	syslogBackend, err := logging.NewSyslogBackendPriority(processName, logLevelToPriority(level)|syslog.LOG_LOCAL2)
+	if err != nil {
+		log.Error(err.Error())
+		os.Exit(-1)
+	}
+	syslog := logging.AddModuleLevel(syslogBackend)
+	syslog.SetLevel(level, "")
+	return syslog
+}
+
+func rsyslogWriter(level logging.Level, remote string) (logging.Backend, error) {
+	rsyslogWriter, err := syslog.Dial("udp", remote, logLevelToPriority(level), path.Base(os.Args[0]))
+	if err != nil {
+		return nil, err
+	}
+	rsyslog := logging.AddModuleLevel(
+		logging.NewBackendFormatter(
+			logging.NewLogBackend(rsyslogWriter, "", 0),
+			logging.MustStringFormatter(LOG_FORMAT),
+		),
+	)
+	rsyslog.SetLevel(level, "")
+	return rsyslog, nil
+}
+
+func InitLog(levelString string, loggers ...interface{}) error {
+	level, err := logging.LogLevel(levelString)
+	if err != nil {
+		return err
+	}
+
+	backends := make([]logging.Backend, 0, len(loggers))
+	for _, logger := range loggers {
+		switch logger.(type) {
+		case StdoutLog:
+			backends = append(backends, stdoutBackend(level))
+		case FileLog:
+			backends = append(backends, fileBackend(level, (string)(logger.(FileLog))))
+		case SyslogLog:
+			backends = append(backends, syslogBackend(level))
+		case Rsyslog:
+			rsyslog, err := rsyslogWriter(level, (string)(logger.(Rsyslog)))
+			if err != nil {
+				return err
+			}
+			backends = append(backends, rsyslog)
+		default:
+			continue
+		}
+	}
+	logging.SetBackend(backends...)
+	return nil
 }
