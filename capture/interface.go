@@ -55,7 +55,7 @@ func (b CaptureLauncher) StartWith(tapId int, ifName string) (io.Closer, error) 
 
 	cap := &Capture{
 		PacketHandler: PacketHandler{
-			ip:             IpToUint32(b.Ip),
+			ip:             IpToUint32(b.Ip.To4()),
 			queue:          b.OutputQueue,
 			remoteSegments: b.RemoteSegments,
 			defaultTapType: b.DefaultTapType,

@@ -229,7 +229,7 @@ func (a *TridentAdapter) run() {
 			a.udpPool.Put(data)
 			continue
 		}
-		a.findAndAdd(data, IpToUint32(remote.IP), decoder.Seq(), decoder.timestamp)
+		a.findAndAdd(data, IpToUint32(remote.IP.To4()), decoder.Seq(), decoder.timestamp)
 	}
 	a.listener.Close()
 	log.Info("Stopped trident adapter")
