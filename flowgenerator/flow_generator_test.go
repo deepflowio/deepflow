@@ -52,6 +52,10 @@ func getDefaultPacket() *MetaPacket {
 	}
 }
 
+func generateAclAction(id ACLID, actionFlags ActionFlag) AclAction {
+	return AclAction(id).AddActionFlags(actionFlags).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
+}
+
 func reversePacket(packet *MetaPacket) {
 	packet.MacSrc, packet.MacDst = packet.MacDst, packet.MacSrc
 	packet.IpSrc, packet.IpDst = packet.IpDst, packet.IpSrc
@@ -299,12 +303,17 @@ func TestFlowReverse(t *testing.T) {
 
 	flowGenerator.Start()
 
+	policyData := new(PolicyData)
+	policyData.Merge([]AclAction{generateAclAction(10, ACTION_PACKET_COUNTING)}, 10)
+
 	packet0 := getDefaultPacket()
 	packet0.TcpData.Flags = TCP_ACK
+	packet0.PolicyData = policyData
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
 
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Flags = TCP_SYN | TCP_ACK
+	packet1.PolicyData = policyData
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
 
 	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
@@ -314,6 +323,38 @@ func TestFlowReverse(t *testing.T) {
 		t.Errorf("taggedFlow.TCPFlags0 is %d, expect %d", taggedFlow.FlowMetricsPeerSrc.TCPFlags, 0)
 		t.Errorf("taggedFlow.TCPFlags1 is %d, expect %d", taggedFlow.FlowMetricsPeerDst.TCPFlags, TCP_SYN|TCP_ACK)
 		t.Errorf("\n%s", taggedFlow)
+	}
+	if d := taggedFlow.PolicyData.AclActions[0].GetDirections(); d != BACKWARD {
+		t.Errorf("taggedFlow.PolicyData.AclActions[0].GetDirections() is %d, expect %d", d, BACKWARD)
+		t.Errorf("\n%s", taggedFlow)
+	}
+}
+
+func TestReverseInNewCircle(t *testing.T) {
+	flowGenerator := getDefaultFlowGenerator()
+
+	policyData0 := new(PolicyData)
+	policyData0.Merge([]AclAction{generateAclAction(10, ACTION_PACKET_COUNTING)}, 10)
+	packet0 := getDefaultPacket()
+	packet0.PolicyData = policyData0
+
+	policyData1 := new(PolicyData)
+	policyData1.Merge([]AclAction{generateAclAction(11, ACTION_PACKET_COUNTING)}, 11)
+	packet1 := getDefaultPacket()
+	packet1.TcpData.Flags = TCP_SYN | TCP_ACK
+	reversePacket(packet1)
+	packet1.PolicyData = policyData1
+
+	flowExtra := flowGenerator.initFlow(packet0, packet0.Timestamp)
+	flowExtra.circlePktGot = false
+	flowGenerator.updateFlow(flowExtra, packet1, true)
+
+	direction := flowExtra.taggedFlow.PolicyData.AclActions[0].GetDirections()
+	aclid := flowExtra.taggedFlow.PolicyData.ACLID
+	if direction != BACKWARD || aclid != 11 {
+		t.Errorf("taggedFlow.PolicyData.AclActions[0].GetDirections() is %d, expect %d", direction, BACKWARD)
+		t.Errorf("taggedFlow.PolicyData.GetACLID is %d, expect %d", aclid, 11)
+		t.Errorf("\n%s", flowExtra.taggedFlow)
 	}
 }
 
