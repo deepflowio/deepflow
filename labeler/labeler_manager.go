@@ -53,6 +53,8 @@ type LabelerManager struct {
 const (
 	LABELER_CMD_DUMP_PLATFORM = iota
 	LABELER_CMD_DUMP_ACL
+	LABELER_CMD_DUMP_FIRST_ACL
+	LABELER_CMD_DUMP_FAST_ACL
 	LABELER_CMD_SHOW_ACL
 	LABELER_CMD_ADD_ACL
 	LABELER_CMD_DEL_ACL
@@ -273,7 +275,7 @@ func (l *LabelerManager) recvDumpPlatform(conn *net.UDPConn, port int, arg *byte
 	dropletctl.SendToDropletCtl(conn, port, 0, &buffer)
 }
 
-func (l *LabelerManager) recvDumpAcl(conn *net.UDPConn, port int, arg *bytes.Buffer) {
+func (l *LabelerManager) recvDumpAcl(conn *net.UDPConn, port int, arg *bytes.Buffer, queryType uint16) {
 	key := datatype.LookupKey{}
 	buffer := bytes.Buffer{}
 
@@ -285,11 +287,24 @@ func (l *LabelerManager) recvDumpAcl(conn *net.UDPConn, port int, arg *bytes.Buf
 	}
 
 	info := make([]string, 0, l.readQueuesCount)
-	for i := 0; i < l.readQueuesCount; i++ {
-		key.FastIndex = i
-		endpoint, policy := l.policyTable.LookupAllByKey(&key)
-		info = append(info, fmt.Sprintf("GoRoutine-%d: EndPoint: {Src: %+v Dst: %+v} Policy: %+v", i, endpoint.SrcInfo, endpoint.DstInfo, policy))
+	switch queryType {
+	case LABELER_CMD_DUMP_ACL:
+		for i := 0; i < l.readQueuesCount; i++ {
+			key.FastIndex = i
+			endpoint, policy := l.policyTable.LookupAllByKey(&key)
+			info = append(info, fmt.Sprintf("GoRoutine-%d: EndPoint: {Src: %+v Dst: %+v} Policy: %+v", i, endpoint.SrcInfo, endpoint.DstInfo, policy))
+		}
+	case LABELER_CMD_DUMP_FIRST_ACL:
+		endpoint, policy := l.policyTable.GetPolicyByFirstPath(&key)
+		info = append(info, fmt.Sprintf("EndPoint: {Src: %+v Dst: %+v} Policy: %+v", endpoint.SrcInfo, endpoint.DstInfo, policy))
+	case LABELER_CMD_DUMP_FAST_ACL:
+		for i := 0; i < l.readQueuesCount; i++ {
+			key.FastIndex = i
+			endpoint, policy := l.policyTable.GetPolicyByFastPath(&key)
+			info = append(info, fmt.Sprintf("GoRoutine-%d: EndPoint: {Src: %+v Dst: %+v} Policy: %+v", i, endpoint.SrcInfo, endpoint.DstInfo, policy))
+		}
 	}
+
 	encoder := gob.NewEncoder(&buffer)
 	if err := encoder.Encode(strings.Join(info, "\n\t")); err != nil {
 		log.Errorf("encoder.Encode: %s", err)
@@ -379,8 +394,8 @@ func (l *LabelerManager) RecvCommand(conn *net.UDPConn, port int, operate uint16
 	switch operate {
 	case LABELER_CMD_DUMP_PLATFORM:
 		l.recvDumpPlatform(conn, port, arg)
-	case LABELER_CMD_DUMP_ACL:
-		l.recvDumpAcl(conn, port, arg)
+	case LABELER_CMD_DUMP_ACL, LABELER_CMD_DUMP_FIRST_ACL, LABELER_CMD_DUMP_FAST_ACL:
+		l.recvDumpAcl(conn, port, arg, operate)
 	case LABELER_CMD_SHOW_ACL:
 		l.recvShowAcl(conn, port, arg)
 	case LABELER_CMD_ADD_ACL:
@@ -413,9 +428,10 @@ func parseTapType(s string) datatype.TapType {
 	}
 }
 
-func newLookupKey(cmdLine string) *datatype.LookupKey {
+func newLookupKey(cmdLine string) (*datatype.LookupKey, uint16) {
 	key := &datatype.LookupKey{}
 	keyValues := strings.Split(cmdLine, ",")
+	queryType := uint16(LABELER_CMD_DUMP_ACL)
 	for _, keyValue := range keyValues {
 		parts := strings.Split(keyValue, "=")
 		switch parts[0] {
@@ -423,34 +439,34 @@ func newLookupKey(cmdLine string) *datatype.LookupKey {
 			key.Tap = parseTapType(parts[1])
 			if key.Tap != datatype.TAP_TOR && key.Tap != datatype.TAP_ISP {
 				fmt.Printf("unknown tap type from: %s\n", cmdLine)
-				return nil
+				return nil, queryType
 			}
 		case "smac":
 			mac, err := net.ParseMAC(parts[1])
 			if err != nil {
 				fmt.Printf("unknown mac address from: %s[%v]\n", cmdLine, err)
-				return nil
+				return nil, queryType
 			}
 			key.SrcMac = Mac2Uint64(mac)
 		case "dmac":
 			mac, err := net.ParseMAC(parts[1])
 			if err != nil {
 				fmt.Printf("unknown mac address from: %s[%v]\n", cmdLine, err)
-				return nil
+				return nil, queryType
 			}
 			key.DstMac = Mac2Uint64(mac)
 		case "vlan":
 			vlan, err := strconv.Atoi(parts[1])
 			if err != nil {
 				fmt.Printf("unknown vlan from: %s[%v]\n", cmdLine, err)
-				return nil
+				return nil, queryType
 			}
 			key.Vlan = uint16(vlan)
 		case "eth_type":
 			ethType, err := strconv.Atoi(parts[1])
 			if err != nil {
 				fmt.Printf("unknown eth_type from: %s[%v]\n", cmdLine, err)
-				return nil
+				return nil, queryType
 			}
 			key.EthType = layers.EthernetType(ethType)
 		case "sip":
@@ -461,29 +477,40 @@ func newLookupKey(cmdLine string) *datatype.LookupKey {
 			proto, err := strconv.Atoi(parts[1])
 			if err != nil {
 				fmt.Printf("unknown proto from: %s[%v]\n", cmdLine, err)
-				return nil
+				return nil, queryType
 			}
 			key.Proto = uint8(proto)
 		case "sport":
 			port, err := strconv.Atoi(parts[1])
 			if err != nil {
 				fmt.Printf("unknown port from: %s[%v]\n", cmdLine, err)
-				return nil
+				return nil, queryType
 			}
 			key.SrcPort = uint16(port)
 		case "dport":
 			port, err := strconv.Atoi(parts[1])
 			if err != nil {
 				fmt.Printf("unknown port from: %s[%v]\n", cmdLine, err)
-				return nil
+				return nil, queryType
 			}
 			key.DstPort = uint16(port)
+		case "type":
+			if "first" == parts[1] {
+				queryType = LABELER_CMD_DUMP_FIRST_ACL
+			} else if "fast" == parts[1] {
+				queryType = LABELER_CMD_DUMP_FAST_ACL
+			} else if "normal" == parts[1] {
+				queryType = LABELER_CMD_DUMP_ACL
+			} else {
+				fmt.Printf("unknown querytype from: %s \n", cmdLine)
+				return nil, queryType
+			}
 		default:
 			fmt.Printf("unknown key %s from %s\n", parts[0], cmdLine)
-			return nil
+			return nil, queryType
 		}
 	}
-	return key
+	return key, queryType
 }
 
 func newDumpKey(cmdLine string) *DumpKey {
@@ -517,7 +544,7 @@ func newDumpKey(cmdLine string) *DumpKey {
 }
 
 func sendLookupKey(cmdLine string) (*bytes.Buffer, error) {
-	key := newLookupKey(cmdLine)
+	key, queryType := newLookupKey(cmdLine)
 	if key == nil {
 		return nil, errors.New("input error!")
 	}
@@ -526,7 +553,7 @@ func sendLookupKey(cmdLine string) (*bytes.Buffer, error) {
 	if err := encoder.Encode(key); err != nil {
 		return nil, err
 	}
-	_, result, err := dropletctl.SendToDroplet(dropletctl.DROPLETCTL_LABELER, LABELER_CMD_DUMP_ACL, &buffer)
+	_, result, err := dropletctl.SendToDroplet(dropletctl.DROPLETCTL_LABELER, dropletctl.DropletCtlModuleOperate(queryType), &buffer)
 	if err != nil {
 		return nil, err
 	}
@@ -809,7 +836,8 @@ func RegisterCommand() *cobra.Command {
 			"\tvlan        packet vlan\n" +
 			"\tsip/dip     packet ip address\n" +
 			"\tproto       packet ip proto\n" +
-			"\tsport/dport packet port",
+			"\tsport/dport packet port\n" +
+			"\ttype        use query type 'normal|first|fast' default normal",
 		Example: "droplet-ctl labeler dump-acl tap=tor,smac=12:34:56:78:9a:bc,sip=127.0.0.1",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
