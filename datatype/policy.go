@@ -23,7 +23,7 @@ func (a NpbAction) TunnelId() uint32 {
 }
 
 func (a NpbAction) PayloadSlice() int {
-	return int(uint16(a))
+	return int(int16(a))
 }
 
 func (a NpbAction) String() string {
@@ -33,8 +33,8 @@ func (a NpbAction) String() string {
 	return fmt.Sprintf("{%d@%s}", a.TunnelId(), IpFromUint32(a.TunnelIp()))
 }
 
-func ToNpbAction(ip uint32, id uint32, slice uint32) NpbAction {
-	return NpbAction(ip)<<32 | NpbAction(id)<<16 | NpbAction(slice)
+func ToNpbAction(ip uint32, id uint32, slice int) NpbAction {
+	return NpbAction(ip)<<32 | NpbAction(uint16(id))<<16 | NpbAction(uint16(slice))
 }
 
 const (
