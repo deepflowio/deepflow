@@ -23,14 +23,14 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	}
 
 	hostIp := uint32(0)
-	ip := net.ParseIP(vifData.GetLaunchServer())
+	ip := net.ParseIP(vifData.GetLaunchServer()).To4()
 	if ip != nil {
 		hostIp = IpToUint32(ip)
 	}
 
 	ips := make([]*datatype.IpNet, 0, 1024)
 	for _, ipResource := range vifData.IpResources {
-		fixIp := net.ParseIP(ipResource.GetIp())
+		fixIp := net.ParseIP(ipResource.GetIp()).To4()
 		if fixIp == nil {
 			continue
 		}
