@@ -227,13 +227,16 @@ func updatePlatformData(taggedFlow *TaggedFlow, endpointData *EndpointData, repl
 	}
 }
 
-func reversePolicyData(policyData *PolicyData) {
+// reversePolicyData will return a clone of the current PolicyData
+func reversePolicyData(policyData *PolicyData) *PolicyData {
 	if policyData == nil {
-		return
+		return nil
 	}
-	for i, aclAction := range policyData.AclActions {
-		policyData.AclActions[i] = aclAction.ReverseDirection()
+	newPolicyData := ClonePolicyData(policyData)
+	for i, aclAction := range newPolicyData.AclActions {
+		newPolicyData.AclActions[i] = aclAction.ReverseDirection()
 	}
+	return newPolicyData
 }
 
 func (f *FlowExtra) reverseFlow() {
@@ -244,7 +247,7 @@ func (f *FlowExtra) reverseFlow() {
 	taggedFlow.PortSrc, taggedFlow.PortDst = taggedFlow.PortDst, taggedFlow.PortSrc
 	taggedFlow.FlowMetricsPeerSrc, taggedFlow.FlowMetricsPeerDst = FlowMetricsPeerSrc(taggedFlow.FlowMetricsPeerDst), FlowMetricsPeerDst(taggedFlow.FlowMetricsPeerSrc)
 	taggedFlow.GroupIDs0, taggedFlow.GroupIDs1 = taggedFlow.GroupIDs1, taggedFlow.GroupIDs0
-	reversePolicyData(taggedFlow.PolicyData)
+	taggedFlow.PolicyData = reversePolicyData(taggedFlow.PolicyData)
 }
 
 func (f *FlowGenerator) tryReverseFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) bool {
@@ -273,8 +276,10 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 		flowExtra.circlePktGot = true
 		taggedFlow.CurStartTime = packetTimestamp
 		taggedFlow.PolicyData = meta.PolicyData
-		if flowExtra.reversed {
-			reversePolicyData(taggedFlow.PolicyData)
+		if reply {
+			taggedFlow.PolicyData = reversePolicyData(meta.PolicyData)
+		} else {
+			taggedFlow.PolicyData = meta.PolicyData
 		}
 		updatePlatformData(taggedFlow, meta.EndpointData, reply)
 	}
