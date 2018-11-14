@@ -2,7 +2,6 @@ package policy
 
 import (
 	"sort"
-	"sync"
 	"sync/atomic"
 
 	logging "github.com/op/go-logging"
@@ -52,8 +51,6 @@ const (
 )
 
 type PolicyTable struct {
-	sync.Mutex
-
 	cloudPlatformLabeler *CloudPlatformLabeler
 	policyLabeler        *PolicyLabeler
 
@@ -188,6 +185,7 @@ func (t *PolicyTable) LookupPolicyByKey(key *LookupKey) *PolicyData {
 	}
 	endpoint, policy := t.policyLabeler.GetPolicyByFastPath(key)
 	if policy == nil {
+		endpoint = t.cloudPlatformLabeler.GetEndpointData(key)
 		policy = t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
 	}
 	return policy
