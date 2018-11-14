@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"reflect"
 	"strconv"
@@ -22,6 +23,7 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
+	"gitlab.x.lan/yunshan/droplet/dropletctl/rpc"
 	"gitlab.x.lan/yunshan/message/trident"
 )
 
@@ -54,6 +56,7 @@ const (
 	LABELER_CMD_SHOW_ACL
 	LABELER_CMD_ADD_ACL
 	LABELER_CMD_DEL_ACL
+	LABELER_CMD_SHOW_IPGROUP
 )
 
 type DumpKey struct {
@@ -350,6 +353,28 @@ func (l *LabelerManager) recvDelAcl(conn *net.UDPConn, port int, arg *bytes.Buff
 	l.policyTable.DelAcl(id)
 }
 
+func (l *LabelerManager) GetParsedIpGroupData() []*policy.IpGroupData {
+	return l.rawIpGroupDatas
+}
+
+func (l *LabelerManager) recvShowIpGroup(conn *net.UDPConn, port int, arg *bytes.Buffer) {
+	ipGroups := l.GetParsedIpGroupData()
+	ipGroup := &policy.IpGroupData{Id: math.MaxUint32, EpcId: math.MaxInt32} //作为命令行判断结束的条件
+	ipGroups = append(ipGroups, ipGroup)
+	for _, ipGroup := range ipGroups {
+		buffer := bytes.Buffer{}
+		encoder := gob.NewEncoder(&buffer)
+
+		if err := encoder.Encode(ipGroup); err != nil {
+			log.Errorf("encoder.Encode: %s", err)
+			continue
+		}
+
+		dropletctl.SendToDropletCtl(conn, port, 0, &buffer)
+		time.Sleep(2 * time.Millisecond)
+	}
+}
+
 func (l *LabelerManager) RecvCommand(conn *net.UDPConn, port int, operate uint16, arg *bytes.Buffer) {
 	switch operate {
 	case LABELER_CMD_DUMP_PLATFORM:
@@ -362,6 +387,8 @@ func (l *LabelerManager) RecvCommand(conn *net.UDPConn, port int, operate uint16
 		l.recvAddAcl(conn, port, arg)
 	case LABELER_CMD_DEL_ACL:
 		l.recvDelAcl(conn, port, arg)
+	case LABELER_CMD_SHOW_IPGROUP:
+		l.recvShowIpGroup(conn, port, arg)
 	}
 }
 
@@ -576,7 +603,6 @@ func showAcl() {
 			fmt.Println(err)
 			break
 		}
-
 		decoder := gob.NewDecoder(buffer)
 		if err := decoder.Decode(acl); err != nil {
 			fmt.Println(err)
@@ -714,6 +740,44 @@ func addAcl(args []string) {
 	dropletctl.SendToDroplet(dropletctl.DROPLETCTL_LABELER, LABELER_CMD_ADD_ACL, &buffer)
 }
 
+func showIpGroup() {
+	conn, result, err := dropletctl.SendToDroplet(dropletctl.DROPLETCTL_LABELER, LABELER_CMD_SHOW_IPGROUP, nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	ipGroups := make([]*policy.IpGroupData, 0, 1024)
+	ipGroup := &policy.IpGroupData{}
+	decoder := gob.NewDecoder(result)
+	if err := decoder.Decode(ipGroup); err != nil {
+		fmt.Println(err)
+		return
+	}
+	ipGroups = append(ipGroups, ipGroup)
+
+	for {
+		ipGroup := &policy.IpGroupData{}
+		buffer, err := dropletctl.RecvFromDroplet(conn)
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
+		decoder := gob.NewDecoder(buffer)
+		if err := decoder.Decode(ipGroup); err != nil {
+			fmt.Println(err)
+			return
+		}
+		if ipGroup.Id == math.MaxUint32 && ipGroup.EpcId == math.MaxInt32 {
+			break
+		}
+		ipGroups = append(ipGroups, ipGroup)
+	}
+
+	for index, ipGroup := range policy.SortIpGroupsById(ipGroups) {
+		rpc.JsonFormat(index+1, ipGroup)
+	}
+}
+
 func RegisterCommand() *cobra.Command {
 	labeler := &cobra.Command{
 		Use:   "labeler",
@@ -798,10 +862,19 @@ func RegisterCommand() *cobra.Command {
 			addAcl(args)
 		},
 	}
+	showIpGroup := &cobra.Command{
+		Use:     "show-ipGroup",
+		Short:   "show parsed ipGroup list",
+		Example: "droplet-ctl labeler show-ipGroup",
+		Run: func(cmd *cobra.Command, args []string) {
+			showIpGroup()
+		},
+	}
 	labeler.AddCommand(dump)
 	labeler.AddCommand(dumpAcl)
 	labeler.AddCommand(showAcl)
 	labeler.AddCommand(delAcl)
 	labeler.AddCommand(addAcl)
+	labeler.AddCommand(showIpGroup)
 	return labeler
 }

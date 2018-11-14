@@ -89,7 +89,7 @@ func initCmd(cmd CmdExecute) {
 	}
 }
 
-func jsonFormat(index int, v interface{}) {
+func JsonFormat(index int, v interface{}) {
 	jsonBytes, err := json.Marshal(v)
 	if err != nil {
 		fmt.Println("json encode failed")
@@ -114,7 +114,7 @@ func flowAcls(response *trident.SyncResponse) {
 		sort.Sort(SortedAcls(flowAcls)) // sort by id
 		fmt.Println("acl data:")
 		for index, entry := range flowAcls {
-			jsonFormat(index+1, entry)
+			JsonFormat(index+1, entry)
 		}
 	}
 }
@@ -124,7 +124,7 @@ func ipGroups(response *trident.SyncResponse) {
 		if ipGroups := plarformData.GetIpGroups(); ipGroups != nil {
 			fmt.Println("ipGroups data:")
 			for index, entry := range ipGroups {
-				jsonFormat(index+1, entry)
+				JsonFormat(index+1, entry)
 			}
 		}
 	}
@@ -135,7 +135,7 @@ func platformData(response *trident.SyncResponse) {
 		if interfaces := plarformData.GetInterfaces(); interfaces != nil {
 			fmt.Println("platform data:")
 			for index, entry := range interfaces {
-				jsonFormat(index+1, entry)
+				JsonFormat(index+1, entry)
 			}
 		}
 	}
