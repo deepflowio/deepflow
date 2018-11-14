@@ -331,7 +331,7 @@ func (l *PolicyLabeler) GenerateIpNetmaskMapFromIpGroupData(data []*IpGroupData)
 			if len(parts) != 2 {
 				continue
 			}
-			ip := net.ParseIP(parts[0])
+			ip := net.ParseIP(parts[0]).To4()
 			maskSize, err := strconv.Atoi(parts[1])
 			if err != nil {
 				continue

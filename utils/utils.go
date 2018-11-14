@@ -60,8 +60,9 @@ func Max(x, y int) int {
 	return y
 }
 
+// 调用者保证入参是IPv4
 func IpToUint32(ip net.IP) uint32 {
-	return BigEndian.Uint32(ip.To4())
+	return BigEndian.Uint32(ip)
 }
 
 func IpFromUint32(ipInt uint32) net.IP {
