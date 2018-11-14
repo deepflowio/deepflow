@@ -236,3 +236,20 @@ func (t *PolicyTable) GetEndpointInfo(mac uint64, ip uint32, inPort uint32) *End
 
 	return endpointInfo
 }
+
+func (t *PolicyTable) GetPolicyByFastPath(key *LookupKey) (*EndpointData, *PolicyData) {
+	endpoint, policy := t.policyLabeler.GetPolicyByFastPath(key)
+	if endpoint != nil {
+		endpoint = t.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
+	} else {
+		return INVALID_ENDPOINT_DATA, INVALID_POLICY_DATA
+	}
+	return endpoint, policy
+}
+
+func (t *PolicyTable) GetPolicyByFirstPath(key *LookupKey) (*EndpointData, *PolicyData) {
+	endpoint := t.cloudPlatformLabeler.GetEndpointData(key)
+	policy := t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+	endpoint = t.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
+	return endpoint, policy
+}
