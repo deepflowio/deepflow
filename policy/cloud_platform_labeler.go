@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"encoding/binary"
 	"sync"
 	"time"
 
@@ -38,6 +39,13 @@ type CloudPlatformLabeler struct {
 	ipGroup       *IpResourceGroup
 	netmaskBitmap uint32
 	arpTable      [TAP_MAX]*ArpTable
+}
+
+var PRIVATE_PREFIXS = [][2]uint32{
+	{binary.BigEndian.Uint32([]byte{10, 0, 0, 0}), 0xff000000},
+	{binary.BigEndian.Uint32([]byte{172, 16, 0, 0}), 0xfff00000},
+	{binary.BigEndian.Uint32([]byte{192, 168, 0, 0}), 0xffff0000},
+	{binary.BigEndian.Uint32([]byte{255, 255, 255, 255}), 0xffffffff},
 }
 
 func NewCloudPlatformLabeler(queueCount int, mapSize uint32) *CloudPlatformLabeler {
@@ -276,6 +284,27 @@ func (l *CloudPlatformLabeler) ModifyDeviceInfo(endpointInfo *EndpointInfo) {
 	}
 }
 
+func isPrivateAddress(ip uint32) bool {
+	for _, prefix := range PRIVATE_PREFIXS {
+		if prefix[0] == (prefix[1] & ip) {
+			return true
+		}
+	}
+	return false
+}
+
+func (l *CloudPlatformLabeler) ModifyPrivateIp(endpoint *EndpointData, key *LookupKey) {
+	if key.Tap != TAP_TOR {
+		return
+	}
+	if endpoint.SrcInfo.L3EpcId == 0 && isPrivateAddress(key.SrcIp) {
+		endpoint.SrcInfo.L3EpcId = -1
+	}
+	if endpoint.DstInfo.L3EpcId == 0 && isPrivateAddress(key.DstIp) {
+		endpoint.DstInfo.L3EpcId = -1
+	}
+}
+
 func (l *CloudPlatformLabeler) UpdateEndpointData(endpoint *EndpointData, key *LookupKey) *EndpointData {
 	invalidSrc, invalidDst := false, false
 	if endpoint == INVALID_ENDPOINT_DATA {
@@ -302,20 +331,33 @@ func (l *CloudPlatformLabeler) UpdateEndpointData(endpoint *EndpointData, key *L
 	l.ModifyL3End(dstData, key, dstHash, false)
 	l.ModifyDeviceInfo(srcData)
 	l.ModifyDeviceInfo(dstData)
+	l.ModifyPrivateIp(endpoint, key)
 
 	// 优化内存占用
 	if invalidSrc {
 		if srcData.L2End {
 			if srcData.L3End {
 				endpoint.SrcInfo = INVALID_ENDPOINT_INFO_L2AND3END
+				if srcData.L3EpcId == -1 {
+					endpoint.SrcInfo = INVALID_ENDPOINT_INFO_L2AND3END_L3EPCID
+				}
 			} else {
 				endpoint.SrcInfo = INVALID_ENDPOINT_INFO_L2END
+				if srcData.L3EpcId == -1 {
+					endpoint.SrcInfo = INVALID_ENDPOINT_INFO_L2END_L3EPCID
+				}
 			}
 		} else {
 			if srcData.L3End {
 				endpoint.SrcInfo = INVALID_ENDPOINT_INFO_L3END
+				if srcData.L3EpcId == -1 {
+					endpoint.SrcInfo = INVALID_ENDPOINT_INFO_L3END_L3EPCID
+				}
 			} else {
 				endpoint.SrcInfo = INVALID_ENDPOINT_INFO
+				if srcData.L3EpcId == -1 {
+					endpoint.SrcInfo = INVALID_ENDPOINT_INFO_L3EPCID
+				}
 			}
 		}
 	}
@@ -323,19 +365,34 @@ func (l *CloudPlatformLabeler) UpdateEndpointData(endpoint *EndpointData, key *L
 		if dstData.L2End {
 			if dstData.L3End {
 				endpoint.DstInfo = INVALID_ENDPOINT_INFO_L2AND3END
+				if dstData.L3EpcId == -1 {
+					endpoint.DstInfo = INVALID_ENDPOINT_INFO_L2AND3END_L3EPCID
+				}
 			} else {
 				endpoint.DstInfo = INVALID_ENDPOINT_INFO_L2END
+				if dstData.L3EpcId == -1 {
+					endpoint.DstInfo = INVALID_ENDPOINT_INFO_L2END_L3EPCID
+				}
 			}
 		} else {
 			if dstData.L3End {
 				endpoint.DstInfo = INVALID_ENDPOINT_INFO_L3END
+				if dstData.L3EpcId == -1 {
+					endpoint.DstInfo = INVALID_ENDPOINT_INFO_L3END_L3EPCID
+				}
 			} else {
 				endpoint.DstInfo = INVALID_ENDPOINT_INFO
+				if dstData.L3EpcId == -1 {
+					endpoint.DstInfo = INVALID_ENDPOINT_INFO_L3EPCID
+				}
 			}
 		}
 	}
 	if endpoint.SrcInfo == INVALID_ENDPOINT_INFO && endpoint.DstInfo == INVALID_ENDPOINT_INFO {
 		endpoint = INVALID_ENDPOINT_DATA
+	}
+	if endpoint.SrcInfo == INVALID_ENDPOINT_INFO_L3EPCID && endpoint.DstInfo == INVALID_ENDPOINT_INFO_L3EPCID {
+		endpoint = INVALID_ENDPOINT_DATA_L3EPCID
 	}
 	return endpoint
 }
