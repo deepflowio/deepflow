@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path"
 	"reflect"
 	"strings"
 	"sync"
@@ -206,7 +207,6 @@ func init() {
 	if flag.Lookup("test.v") != nil {
 		return
 	}
-	paths := strings.Split(os.Args[0], "/")
-	processName = paths[len(paths)-1]
+	processName = path.Base(os.Args[0])
 	go run()
 }
