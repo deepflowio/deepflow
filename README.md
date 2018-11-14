@@ -56,7 +56,7 @@ graph TD;
 
 接入网络和虚拟网络查找过程现在是一致的
 
-1. 查找条件及结果
+查找条件及结果
   - MAC，IP不在数据库内
     - 查找结果L3EpcId=0，L2EpcId=0，IsL3End=false
   - MAC不在数据库，IP包含在数据库ip_resource表内
