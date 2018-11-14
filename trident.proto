@@ -48,6 +48,7 @@ message Config {
     optional uint32  output_vlan          = 11 [default = 0];
     optional uint32  mtu                  = 12 [default = 1500];
     optional string  self_update_url      = 13; // specify only when self-update required
+    optional uint64  npb_bps_threshold    = 14;
 
     optional string  source_ip            = 21;
     optional string  analyzer_ip          = 31;
