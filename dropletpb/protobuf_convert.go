@@ -233,7 +233,11 @@ func newAclAction(aclId datatype.ACLID, actions []*trident.FlowAction) []datatyp
 func newNpbActions(npbs []*trident.NpbAction) []datatype.NpbAction {
 	actions := make([]datatype.NpbAction, 0, len(npbs))
 	for _, npb := range npbs {
-		action := datatype.ToNpbAction(npb.GetTunnelIp(), npb.GetTunnelId(), npb.GetPayloadSlice())
+		payloadSlice := -1
+		if npb.PayloadSlice != nil {
+			payloadSlice = int(npb.GetPayloadSlice())
+		}
+		action := datatype.ToNpbAction(npb.GetTunnelIp(), npb.GetTunnelId(), payloadSlice)
 		actions = append(actions, action)
 	}
 	return actions
