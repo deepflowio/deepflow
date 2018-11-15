@@ -157,7 +157,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:af03f824a0aa8b2bd4272aca1ee50525150a05c346cb100d332127207862d22e"
+  digest = "1:2574aa1ad5c122116bcf7cfd2d2e9dda9101a24857582ba54b93f1bcc1c7c009"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "app",
