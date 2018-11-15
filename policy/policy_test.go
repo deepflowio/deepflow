@@ -38,8 +38,6 @@ var (
 	mac4          = NewMACAddrFromString("08:00:27:a4:2b:fc").Int()
 	mac5          = NewMACAddrFromString("08:00:27:a4:2b:fd").Int()
 	launchServer1 = NewIPFromString("10.10.10.10").Int()
-	datas         = make([]*PlatformData, 0, 2)
-	ipGroups      = make([]*IpGroupData, 0, 3)
 	l2EndBool     = []bool{false, true}
 	l3EndBool     = []bool{false, true}
 )
@@ -314,6 +312,7 @@ func (policy *PolicyTable) UpdateAcls(acl []*Acl) {
 
 // 生成特定IP资源组信息
 func generateIpgroupData(policy *PolicyTable) {
+	ipGroups := make([]*IpGroupData, 0, 3)
 	// groupEpc[8] = groupEpc[4], group[8] != group[4]
 	ipGroup1 := generateIpGroup(group[4], groupEpc[4], ipNet1)
 	ipGroup2 := generateIpGroup(group[5], groupEpc[5], ipNet1)
@@ -326,6 +325,7 @@ func generateIpgroupData(policy *PolicyTable) {
 // 生成特定平台信息
 func generatePlatformData(policy *PolicyTable) {
 	// epcId:40 IfType:4
+	datas := make([]*PlatformData, 0, 2)
 	vifData := generatePlatformDataByParam(ip4, mac4, groupEpc[4], 4)
 	datas = append(datas, vifData)
 
@@ -335,16 +335,18 @@ func generatePlatformData(policy *PolicyTable) {
 // 生成特定平台和资源组信息
 func generatePolicyTable() *PolicyTable {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	datas := make([]*PlatformData, 0, 2)
+	ipGroups := make([]*IpGroupData, 0, 3)
 
-	ip1 := generateIpNet(group1Ip1, 121, 24)
-	ip2 := generateIpNet(group1Ip2, 121, 25)
+	ip1 := generateIpNet(group1Ip1, 121, 32)
+	ip2 := generateIpNet(group1Ip2, 121, 32)
 	data1 := generatePlatformDataWithGroupId(groupEpc[1], group[1], group1Mac, ip1, ip2)
 
-	ip1 = generateIpNet(group1Ip3, 121, 18)
+	ip1 = generateIpNet(group1Ip3, 121, 32)
 	data2 := generatePlatformDataWithGroupId(groupEpcAny, groupAny, group1Mac2, ip1)
 
-	ip1 = generateIpNet(group2Ip1, 121, 24)
-	ip2 = generateIpNet(group2Ip2, 121, 25)
+	ip1 = generateIpNet(group2Ip1, 122, 32)
+	ip2 = generateIpNet(group2Ip2, 122, 32)
 	data3 := generatePlatformDataWithGroupId(groupEpc[2], group[2], group2Mac, ip1, ip2)
 	datas = append(datas, data1, data2, data3)
 
@@ -1198,8 +1200,8 @@ func TestNpbAction(t *testing.T) {
 
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
 	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
-	npb1 := NpbAction(1000)
-	npb2 := NpbAction(2000)
+	npb1 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_IP, TAPSIDE_DST, 100)
+	npb2 := ToNpbAction(20, 200, RESOURCE_GROUP_TYPE_IP, TAPSIDE_DST, 200)
 	acl1 := generatePolicyAcl(table, action1, 25, groupAny, groupAny, IPProtocolTCP, 1000, vlanAny, npb1)
 	action2 := generateAclAction(26, ACTION_PACKET_BROKERING)
 	// acl2 Group: 0 -> 0 Port: 1000 Proto: 0 vlan: any
@@ -1212,22 +1214,67 @@ func TestNpbAction(t *testing.T) {
 	// 构建预期结果
 	basicPolicyData := &PolicyData{}
 	basicPolicyData.Merge([]AclAction{action1, action2}, []NpbAction{npb1}, 25)
-	// key1: (group3/ipGroup6)group3Ip1:1023 -> (group4)group4Ip2:1000 tcp
-	key1 := generateLookupKey(group3Mac1, group4Mac1, vlanAny, group3Ip1, group4Ip2, IPProtocolTCP, 1023, 1000)
+
+	// key1: ip3:1023 -> ip4:1000 tcp
+	key1 := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1023, 1000)
+	setEthTypeAndOthers(key1, EthernetTypeIPv4, 64, true, true)
 	policyData := table.LookupPolicyByKey(key1)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestPolicySimple Check Failed!")
+		t.Error("TestNpbAction Check Failed!")
 	}
 
-	// key2: (group3/ipGroup6)group3Ip1:1023 -> (group4)group4Ip2:1000 udp
+	// key2: ip3:1023 -> ip4:1000 udp
 	*basicPolicyData = PolicyData{}
 	basicPolicyData.Merge([]AclAction{action3, action2}, []NpbAction{npb2, npb1}, 27)
-	key2 := generateLookupKey(group3Mac1, group4Mac1, vlanAny, group3Ip1, group4Ip2, IPProtocolUDP, 1023, 1000)
+	key2 := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolUDP, 1023, 1000)
+	setEthTypeAndOthers(key2, EthernetTypeIPv4, 64, true, true)
 	policyData = table.LookupPolicyByKey(key2)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestPolicySimple Check Failed!")
+		t.Error("TestNpbAction Check Failed!")
+	}
+}
+
+func BenchmarkNpbFirstPath(b *testing.B) {
+	table := generatePolicyTable()
+
+	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
+	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
+	npb1 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_IP, TAPSIDE_DST, 100)
+	acl1 := generatePolicyAcl(table, action1, 25, groupAny, groupAny, IPProtocolTCP, 1000, vlanAny, npb1)
+	acls := []*Acl{acl1}
+	table.UpdateAcls(acls)
+
+	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1023, 1000)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
+	endpoint := getEndpointData(table, key)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		table.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+	}
+
+}
+
+func BenchmarkNpbFastPath(b *testing.B) {
+	table := generatePolicyTable()
+
+	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
+	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
+	npb1 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_IP, TAPSIDE_DST, 100)
+	acl1 := generatePolicyAcl(table, action1, 25, groupAny, groupAny, IPProtocolTCP, 1000, vlanAny, npb1)
+	acls := []*Acl{acl1}
+	table.UpdateAcls(acls)
+
+	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1023, 1000)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
+	endpoint := getEndpointData(table, key)
+	table.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		table.policyLabeler.GetPolicyByFastPath(key)
 	}
 }
 

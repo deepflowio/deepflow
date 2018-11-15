@@ -187,6 +187,7 @@ func (t *PolicyTable) LookupPolicyByKey(key *LookupKey) *PolicyData {
 	endpoint, policy := t.policyLabeler.GetPolicyByFastPath(key)
 	if policy == nil {
 		endpoint = t.cloudPlatformLabeler.GetEndpointData(key)
+		t.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
 		policy = t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
 	}
 	return policy
@@ -216,11 +217,13 @@ func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData
 func (t *PolicyTable) UpdateInterfaceData(data []*PlatformData) {
 	t.cloudPlatformLabeler.UpdateInterfaceTable(data)
 	t.policyLabeler.GenerateIpNetmaskMapFromPlatformData(data)
+	t.policyLabeler.generateGroupIdMapByPlatformData(data)
 }
 
 func (t *PolicyTable) UpdateIpGroupData(data []*IpGroupData) {
 	t.cloudPlatformLabeler.UpdateGroupTree(data)
 	t.policyLabeler.GenerateIpNetmaskMapFromIpGroupData(data)
+	t.policyLabeler.generateGroupIdMapByIpGroupData(data)
 }
 
 func (t *PolicyTable) UpdateAclData(data []*Acl) {
