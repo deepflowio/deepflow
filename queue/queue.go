@@ -106,7 +106,7 @@ func (q *OverwriteQueue) Len() int {
 }
 
 func (q *OverwriteQueue) releaseOverwritten(overwritten []interface{}) {
-	if q.release != nil && q.pending == q.size {
+	if q.release != nil {
 		for _, toRelease := range overwritten {
 			if toRelease != nil { // when flush indicator enabled
 				q.release(toRelease)
@@ -129,11 +129,15 @@ func (q *OverwriteQueue) Put(items ...interface{}) error {
 	if itemSize > freeSize {
 		locked = true
 		q.Lock()
-		if q.writeCursor+itemSize <= q.size {
-			q.releaseOverwritten(q.items[q.writeCursor : q.writeCursor+itemSize])
+		releaseFrom, releaseTo := q.firstIndex(), q.writeCursor+itemSize
+		if releaseTo > q.size {
+			releaseTo = releaseTo & (q.size - 1)
+		}
+		if releaseFrom < releaseTo {
+			q.releaseOverwritten(q.items[releaseFrom:releaseTo])
 		} else {
-			q.releaseOverwritten(q.items[q.writeCursor:q.size])
-			q.releaseOverwritten(q.items[:itemSize-(q.size-q.writeCursor)])
+			q.releaseOverwritten(q.items[releaseFrom:q.size])
+			q.releaseOverwritten(q.items[:releaseTo])
 		}
 	}
 
