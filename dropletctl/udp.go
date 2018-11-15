@@ -108,7 +108,9 @@ func process(conn *net.UDPConn) {
 		log.Error(err)
 		return
 	}
-	RecvHandlers[msg.Module].RecvCommand(conn, remote.Port, msg.Operate, bytes.NewBuffer(msg.Args[:]))
+	if RecvHandlers[msg.Module] != nil {
+		RecvHandlers[msg.Module].RecvCommand(conn, remote.Port, msg.Operate, bytes.NewBuffer(msg.Args[:]))
+	}
 }
 
 func DropletCtlListener() {
