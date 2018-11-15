@@ -102,19 +102,52 @@ func TestQueueTwiceGets(t *testing.T) {
 }
 
 func TestReleased(t *testing.T) {
-	var released int
+	released := 1
 	release := func(x interface{}) {
-		released = x.(int)
+		released *= x.(int)
 	}
-	queue := NewOverwriteQueue("whatever", 2, release)
-	queue.Put(10010, 10011)
-	queue.Put(10012)
-	if released != 10010 {
-		t.Error("Expected 10010")
+	queue := NewOverwriteQueue("whatever", 4, release)
+	queue.Put(2, 3, 5, 7)
+	queue.Put(11)
+	if released != 2 {
+		t.Error("Expected 2")
 	}
-	queue.Put(10013, 10014)
-	if released != 10012 {
-		t.Error("Expected 10012")
+	queue.Put(13, 17) // 11 13 17 7
+	released = 1
+	queue.Put(19, 23) // 23 13 17 19
+	if released != 77 {
+		t.Error("Expected 77")
+	}
+	queue.Put(29, 31) // 23, 29, 31, 19
+	released = 1
+	queue.Put(37)
+	if released != 19 {
+		t.Error("Expected 19")
+	}
+}
+
+func TestPartialRelease(t *testing.T) {
+	released := 1
+	release := func(x interface{}) {
+		released *= x.(int)
+	}
+	queue := NewOverwriteQueue("whatever", 4, release)
+	queue.Put(1, 2, 3)
+	queue.Put(5, 7) // 7 .2 3 5
+	if released != 1 {
+		t.Error("Expected 1, actually", released)
+	}
+	queue.Get()
+	queue.Put(11, 13) // 7 11 13 .5
+	if released != 3 {
+		t.Error("Expected 3, actually", released)
+	}
+	queue.Get()
+	queue.Get()
+	released = 1
+	queue.Put(17, 19, 23) // 19 23 .13 17
+	if released != 11 {
+		t.Error("Expected 11, actually", released)
 	}
 }
 
