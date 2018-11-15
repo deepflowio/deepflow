@@ -48,6 +48,10 @@ type VlanAndPortMap struct {
 type PolicyLabeler struct {
 	RawAcls []*Acl
 
+	groupIdMaps         map[uint32]int
+	groupIdFromPlatform []uint32
+	groupIdFromIpGroup  []uint32
+
 	InterestProtoMaps [TAP_MAX]map[uint8]bool
 	InterestPortMaps  [TAP_MAX]map[uint16]bool
 	InterestGroupMaps [TAP_MAX]map[uint32]bool
@@ -133,6 +137,38 @@ func NewPolicyLabeler(queueCount int, mapSize uint32, fastPathDisable bool) *Pol
 		}
 	}
 	return policy
+}
+
+func (l *PolicyLabeler) generateGroupIdMap() {
+	groupIdMaps := make(map[uint32]int, len(l.groupIdFromPlatform)+len(l.groupIdFromIpGroup))
+
+	for _, id := range l.groupIdFromPlatform {
+		groupIdMaps[id] = RESOURCE_GROUP_TYPE_DEV
+	}
+
+	// 资源组ID一致的情况，设备资源组优先
+	for _, id := range l.groupIdFromIpGroup {
+		if groupIdMaps[id] != RESOURCE_GROUP_TYPE_DEV {
+			groupIdMaps[id] = RESOURCE_GROUP_TYPE_IP
+		}
+	}
+	l.groupIdMaps = groupIdMaps
+}
+
+func (l *PolicyLabeler) generateGroupIdMapByIpGroupData(datas []*IpGroupData) {
+	l.groupIdFromIpGroup = make([]uint32, len(datas))
+	for _, data := range datas {
+		l.groupIdFromIpGroup = append(l.groupIdFromIpGroup, data.Id)
+	}
+	l.generateGroupIdMap()
+}
+
+func (l *PolicyLabeler) generateGroupIdMapByPlatformData(datas []*PlatformData) {
+	l.groupIdFromPlatform = make([]uint32, 1024)
+	for _, data := range datas {
+		l.groupIdFromPlatform = append(l.groupIdFromPlatform, data.GroupIds...)
+	}
+	l.generateGroupIdMap()
 }
 
 func (l *PolicyLabeler) generateInterestKeys(endpointData *EndpointData, packet *LookupKey) {
@@ -460,6 +496,21 @@ func (l *PolicyLabeler) UpdateAcls(acls []*Acl) {
 
 	generateAcls := make([]*Acl, 0, len(acls))
 	for _, acl := range acls {
+		// acl需要根据groupIdMaps更新里面的NpbActions
+		if len(acl.NpbActions) > 0 {
+			groupType := RESOURCE_GROUP_TYPE_IP | RESOURCE_GROUP_TYPE_DEV
+			for _, id := range append(acl.SrcGroups, acl.DstGroups...) {
+				// 带NPB的acl，资源组类型为全DEV或全IP两种情况
+				if id != 0 && l.groupIdMaps[id] != 0 {
+					groupType = l.groupIdMaps[id]
+				}
+				break
+			}
+			for _, action := range acl.NpbActions {
+				action.SetResourceGroupType(groupType)
+			}
+		}
+
 		if acl.Type == TAP_ANY {
 			// 对于TAP_ANY策略，给其他每一个TAP类型都单独生成一个acl，来避免查找2次
 			for i := TAP_MIN; i < TAP_MAX; i++ {
@@ -511,6 +562,49 @@ func (l *PolicyLabeler) DelAcl(id int) {
 		l.UpdateAcls(newAcls)
 		l.FlushAcls()
 	}
+}
+
+func (l *PolicyLabeler) checkNpbAction(endpointData *EndpointData, policy *PolicyData) *PolicyData {
+	if policy == nil || len(policy.NpbActions) == 0 {
+		return policy
+	}
+
+	validActions := make([]NpbAction, 0, len(policy.NpbActions))
+	for _, action := range policy.NpbActions {
+		if (action.TapSideCompare(TAPSIDE_SRC) == true && endpointData.SrcInfo.L2End == true) ||
+			(action.TapSideCompare(TAPSIDE_DST) == true && endpointData.DstInfo.L2End == true) {
+			if action.ResourceGroupTypeCompare(RESOURCE_GROUP_TYPE_DEV) {
+				validActions = append(validActions, action)
+			} else if (action.TapSideCompare(TAPSIDE_SRC) == true && endpointData.SrcInfo.L3End == true) ||
+				(action.TapSideCompare(TAPSIDE_DST) == true && endpointData.DstInfo.L3End == true) {
+				validActions = append(validActions, action)
+			}
+		}
+	}
+
+	if len(validActions) == 0 {
+		if policy.ActionFlags == 0 {
+			return INVALID_POLICY_DATA
+		}
+		return policy
+	}
+
+	result := &PolicyData{}
+	*result = *policy
+	result.NpbActions = result.NpbActions[:0]
+
+	for i := 0; i < len(validActions); i++ {
+		repeat := false
+		for j := i + 1; j < len(validActions); j++ {
+			if validActions[i].TunnelInfo() == validActions[j].TunnelInfo() {
+				repeat = true
+			}
+		}
+		if !repeat {
+			result.NpbActions = append(result.NpbActions, validActions[i])
+		}
+	}
+	return result
 }
 
 func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet *LookupKey) *PolicyData {
@@ -583,7 +677,7 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 	if aclHit := uint32(len); aclHitMax < aclHit {
 		atomic.CompareAndSwapUint32(&l.AclHitMax, aclHitMax, aclHit)
 	}
-	return findPolicy
+	return l.checkNpbAction(endpointData, findPolicy)
 }
 
 func (l *PolicyLabeler) calcEpc(endpointInfo *EndpointInfo) uint16 {
@@ -809,5 +903,6 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *
 
 	atomic.AddUint64(&l.FastPathHit, 1)
 	atomic.AddUint64(&l.FastPathHitTick, 1)
+	policy = l.checkNpbAction(endpoint, policy)
 	return endpoint, policy
 }

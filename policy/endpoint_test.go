@@ -12,6 +12,7 @@ import (
 // 平台信息有关测试
 func TestGetPlatformData(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	datas := make([]*PlatformData, 0, 2)
 	ipInfo := generateIpNet(ip3, 121, 24)
 	ipInfo1 := generateIpNet(ip4, 122, 25)
 	// epcId:40 DeviceType:2 DeviceId:3 IfType:3 IfIndex:5 Mac:mac4 HostIp:launchServer1
@@ -36,6 +37,7 @@ func TestGetPlatformData(t *testing.T) {
 
 func TestGetPlatformDataAboutArp(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	datas := make([]*PlatformData, 0, 2)
 
 	ipInfo := generateIpNet(ip3, 121, 24)
 	ipInfo1 := generateIpNet(ip4, 122, 25)
