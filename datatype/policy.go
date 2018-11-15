@@ -12,14 +12,50 @@ var (
 
 type ActionFlag uint16
 
-type NpbAction uint64 // tunnel-ip | tunnel-id | payload-slice
+type NpbAction uint64 // tunnel-ip | tunnel-id | Dep/Ip | TapSide | payload-slice
+
+const (
+	TAPSIDE_SRC  = 0x1
+	TAPSIDE_DST  = 0x2
+	TAPSIDE_MASK = TAPSIDE_SRC | TAPSIDE_DST
+)
+
+const (
+	RESOURCE_GROUP_TYPE_DEV  = 0x1
+	RESOURCE_GROUP_TYPE_IP   = 0x2
+	RESOURCE_GROUP_TYPE_MASK = RESOURCE_GROUP_TYPE_DEV | RESOURCE_GROUP_TYPE_IP
+)
+
+func (a NpbAction) TapSideCompare(flag int) bool {
+	return (a.TapSide() & flag) == flag
+}
+
+func (a NpbAction) TapSide() int {
+	return int((a >> 16) & TAPSIDE_MASK)
+}
+
+func (a NpbAction) ResourceGroupTypeCompare(flag int) bool {
+	return (a.ResourceGroupType() & flag) == flag
+}
+
+func (a *NpbAction) SetResourceGroupType(groupType int) {
+	*a |= ((NpbAction(groupType & RESOURCE_GROUP_TYPE_MASK)) << 18)
+}
+
+func (a NpbAction) ResourceGroupType() int {
+	return int((a >> 18) & RESOURCE_GROUP_TYPE_MASK)
+}
 
 func (a NpbAction) TunnelIp() IPv4Int {
 	return IPv4Int(a >> 32)
 }
 
 func (a NpbAction) TunnelId() uint32 {
-	return uint32(uint16(a >> 16))
+	return uint32((a >> 20) & 0xff)
+}
+
+func (a NpbAction) TunnelInfo() uint64 {
+	return uint64(a >> 20)
 }
 
 func (a NpbAction) PayloadSlice() int {
@@ -28,13 +64,13 @@ func (a NpbAction) PayloadSlice() int {
 
 func (a NpbAction) String() string {
 	if a.PayloadSlice() > 0 {
-		return fmt.Sprintf("{%d@%s slice %d}", a.TunnelId(), IpFromUint32(a.TunnelIp()), a.PayloadSlice())
+		return fmt.Sprintf("{%d@%s slice %d side: %d group: %d}", a.TunnelId(), IpFromUint32(a.TunnelIp()), a.PayloadSlice(), a.TapSide(), a.ResourceGroupType())
 	}
-	return fmt.Sprintf("{%d@%s}", a.TunnelId(), IpFromUint32(a.TunnelIp()))
+	return fmt.Sprintf("{%d@%s side: %d group: %d}", a.TunnelId(), IpFromUint32(a.TunnelIp()), a.TapSide(), a.ResourceGroupType())
 }
 
-func ToNpbAction(ip uint32, id uint32, slice int) NpbAction {
-	return NpbAction(ip)<<32 | NpbAction(uint16(id))<<16 | NpbAction(uint16(slice))
+func ToNpbAction(ip uint32, id uint32, group, tapSide, slice int) NpbAction {
+	return NpbAction(ip)<<32 | NpbAction(uint8(id))<<20 | (NpbAction(group)&RESOURCE_GROUP_TYPE_MASK)<<18 | (NpbAction(tapSide)&TAPSIDE_MASK)<<16 | NpbAction(uint16(slice))
 }
 
 const (
