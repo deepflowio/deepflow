@@ -167,7 +167,14 @@ func (t *PolicyTable) GetCounter() interface{} {
 	counter.AclHitMax = atomic.SwapUint32(&t.policyLabeler.AclHitMax, 0)
 	for i := 0; i < t.queueCount; i++ {
 		for j := TAP_MIN; j < TAP_MAX; j++ {
-			counter.FastPath += uint32(t.policyLabeler.FastPolicyMaps[i][j].Len() + t.policyLabeler.FastPolicyMapsMini[i][j].Len())
+			maps := t.policyLabeler.FastPolicyMaps[i][j]
+			mapsMini := t.policyLabeler.FastPolicyMapsMini[i][j]
+			if maps != nil {
+				counter.FastPath += uint32(maps.Len())
+			}
+			if mapsMini != nil {
+				counter.FastPath += uint32(mapsMini.Len())
+			}
 		}
 	}
 	return counter
