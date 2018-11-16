@@ -86,8 +86,8 @@ func TestNew(t *testing.T) {
 
 func TestTunnelMatch(t *testing.T) {
 	flowGenerator := getDefaultFlowGenerator()
-	metaTunnelInfo := &TunnelInfo{1, 0, 2, 1}
-	flowTunnelInfo := &TunnelInfo{1, 1, 3, 1}
+	metaTunnelInfo := &TunnelInfo{Type: 1, Src: 0, Dst: 2, Id: 1}
+	flowTunnelInfo := &TunnelInfo{Type: 1, Src: 1, Dst: 3, Id: 1}
 	if ok := flowGenerator.TunnelMatch(metaTunnelInfo, flowTunnelInfo); ok {
 		t.Errorf("flowGenerator.TunnelMatch return %t, expect false", ok)
 	}
