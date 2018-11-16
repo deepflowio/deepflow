@@ -106,11 +106,9 @@ func (q *OverwriteQueue) Len() int {
 }
 
 func (q *OverwriteQueue) releaseOverwritten(overwritten []interface{}) {
-	if q.release != nil {
-		for _, toRelease := range overwritten {
-			if toRelease != nil { // when flush indicator enabled
-				q.release(toRelease)
-			}
+	for _, toRelease := range overwritten {
+		if toRelease != nil { // when flush indicator enabled
+			q.release(toRelease)
 		}
 	}
 }
@@ -124,20 +122,25 @@ func (q *OverwriteQueue) Put(items ...interface{}) error {
 
 	q.writeLock.Lock()
 
-	freeSize := (q.size - q.pending)
+	freeSize := q.size - q.pending
 	locked := false
+	// q.pending的增长由writeLock保护，q.pending的减少虽然非线程安全，
+	// 但滞后的q.pending的减少反而会倾向于导致进入此分支，因此是安全的
 	if itemSize > freeSize {
 		locked = true
 		q.Lock()
-		releaseFrom, releaseTo := q.firstIndex(), q.writeCursor+itemSize
-		if releaseTo > q.size {
-			releaseTo = releaseTo & (q.size - 1)
-		}
-		if releaseFrom < releaseTo {
-			q.releaseOverwritten(q.items[releaseFrom:releaseTo])
-		} else {
-			q.releaseOverwritten(q.items[releaseFrom:q.size])
-			q.releaseOverwritten(q.items[:releaseTo])
+		freeSize = q.size - q.pending
+		if q.release != nil && itemSize > freeSize { // 需要再次判断确认是否需要释放
+			releaseFrom, releaseTo := q.firstIndex(), q.writeCursor+itemSize
+			if releaseTo > q.size {
+				releaseTo = releaseTo & (q.size - 1)
+			}
+			if releaseFrom <= releaseTo {
+				q.releaseOverwritten(q.items[releaseFrom:releaseTo])
+			} else {
+				q.releaseOverwritten(q.items[releaseFrom:q.size])
+				q.releaseOverwritten(q.items[:releaseTo])
+			}
 		}
 	}
 
