@@ -308,18 +308,21 @@ func (l *CloudPlatformLabeler) ModifyPrivateIp(endpoint *EndpointData, key *Look
 func (l *CloudPlatformLabeler) UpdateEndpointData(endpoint *EndpointData, key *LookupKey) *EndpointData {
 	invalidSrc, invalidDst := false, false
 	if endpoint == INVALID_ENDPOINT_DATA {
-		endpoint = &EndpointData{SrcInfo: new(EndpointInfo), DstInfo: new(EndpointInfo)}
+		//	endpoint = &EndpointData{SrcInfo: new(EndpointInfo), DstInfo: new(EndpointInfo)}
 		invalidSrc, invalidDst = true, true
 	} else {
 		if endpoint.SrcInfo == INVALID_ENDPOINT_INFO {
-			endpoint.SrcInfo = new(EndpointInfo)
+			//		endpoint.SrcInfo = new(EndpointInfo)
 			invalidSrc = true
 		}
 		if endpoint.DstInfo == INVALID_ENDPOINT_INFO {
-			endpoint.DstInfo = new(EndpointInfo)
+			//		endpoint.DstInfo = new(EndpointInfo)
 			invalidDst = true
 		}
 	}
+	// FIXME：解决部分重复流量要纠正的结果冲突的问题，后面需要单独把L2End、L3End拿出来纠正，
+	// 不单独申请内存
+	endpoint = CloneEndpointData(endpoint)
 	srcData, dstData := endpoint.SrcInfo, endpoint.DstInfo
 
 	// 根据Ttl、Arp request、L2End来判断endpoint是否为最新
