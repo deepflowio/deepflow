@@ -157,7 +157,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:255327609ff9ca9a0e547c020722c7cea94adbaba96c14089fdd26aed5926e42"
+  digest = "1:415608d27a287f62dfc36c2b58ec34d2465da11f4415e34ec143843cb0249957"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "app",
@@ -176,7 +176,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "9dc982d9b40ab61e5c92b7d7298d375979eb8691"
+  revision = "93e0ae76f45fd6688a5b2cdaf1a197b39dfd6c48"
 
 [[projects]]
   branch = "master"
