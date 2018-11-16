@@ -100,7 +100,12 @@ func Start(configPath string) (closers []io.Closer) {
 	}
 	remoteSegmentSet := capture.NewSegmentSet()
 
-	launcher := capture.CaptureLauncher{localIp, remoteSegmentSet, cfg.DefaultTapType, labelerQueues}
+	launcher := capture.CaptureLauncher{
+		Ip:             localIp,
+		RemoteSegments: remoteSegmentSet,
+		DefaultTapType: cfg.DefaultTapType,
+		OutputQueue:    labelerQueues,
+	}
 	for tapId, iface := range cfg.TapInterfaces {
 		closer, err := launcher.StartWith(tapId, iface)
 		if err != nil {
