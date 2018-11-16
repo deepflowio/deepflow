@@ -2,7 +2,6 @@ package datatype
 
 import (
 	"fmt"
-	"sync"
 )
 
 type TaggedFlow struct {
@@ -12,9 +11,9 @@ type TaggedFlow struct {
 	ReferenceCount
 }
 
-var taggedFlowPool = sync.Pool{
-	New: func() interface{} { return new(TaggedFlow) },
-}
+var taggedFlowPool = NewLockFreePool(func() interface{} {
+	return new(TaggedFlow)
+})
 
 func AcquireTaggedFlow() *TaggedFlow {
 	f := taggedFlowPool.Get().(*TaggedFlow)
