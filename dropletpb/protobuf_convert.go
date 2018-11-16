@@ -1,7 +1,7 @@
 package dropletpb
 
 import (
-	"bytes"
+	"math"
 	"net"
 	"strconv"
 	"strings"
@@ -12,9 +12,10 @@ import (
 	"gitlab.x.lan/yunshan/message/trident"
 )
 
-const MAXLEN = 32
+const MAX_MASKLEN = 32
+const MIN_MASKLEN = 0
 
-var ALLFF = net.ParseIP("255.255.255.255").To4()
+var maskLenToNetmask [MAX_MASKLEN + 1]uint32
 
 func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	macInt := uint64(0)
@@ -69,57 +70,42 @@ func Convert2PlatformData(response *trident.SyncResponse) []*datatype.PlatformDa
 	return platformDatas
 }
 
-func ipRangeConvert2CIDR(startIp, endIp net.IP) (ips []*net.IPNet) {
-	for bytes.Compare(startIp, endIp) <= 0 {
-		masklen := 32
-		for masklen > 0 {
-			ipMask := net.CIDRMask(masklen-1, MAXLEN)
-			if bytes.Compare(startIp, getFirstIp(startIp, ipMask)) != 0 || bytes.Compare(getLastIp(startIp, ipMask), endIp) > 0 {
-				break
-			}
-			masklen--
-		}
-		ips = append(ips, &net.IPNet{IP: startIp, Mask: net.CIDRMask(masklen, MAXLEN)})
-		startIp = getLastIp(startIp, net.CIDRMask(masklen, MAXLEN))
-		if bytes.Compare(startIp, ALLFF) == 0 {
+func ipRangeConvert2CIDR(startIp, endIp net.IP) []net.IPNet {
+	start := IpToUint32(startIp)
+	end := IpToUint32(endIp)
+	var ips []net.IPNet
+	for start <= end {
+		maskLen := getFirstMask(start, end)
+		ip := IpFromUint32(start)
+		ipMask := net.CIDRMask(int(maskLen), MAX_MASKLEN)
+		ips = append(ips, net.IPNet{IP: ip, Mask: ipMask})
+		lastIp := getLastIp(start, maskLen)
+		if lastIp == math.MaxUint32 {
 			break
 		}
-		startIp = getNextToParsedIp(startIp)
+		start += 1 << uint32(MAX_MASKLEN-maskLen)
 	}
 	return ips
 }
 
-func getNextToParsedIp(ip net.IP) net.IP {
-	ipLen := len(ip)
-	out := make(net.IP, ipLen)
-	isCopy := false
-	for ipLen > 0 {
-		ipLen--
-		if isCopy {
-			out[ipLen] = ip[ipLen]
-			continue
+func getFirstMask(start, end uint32) uint8 {
+	maxLen := MAX_MASKLEN
+	for ; maxLen > MIN_MASKLEN; maxLen-- {
+		if start&(1<<uint32(MAX_MASKLEN-maxLen)) != 0 {
+			// maxLen继续减少将会使得start不是所在网段的第一个IP
+			break
 		}
-		if ip[ipLen] < 255 {
-			out[ipLen] = ip[ipLen] + 1
-			isCopy = true
-			continue
+		if start+^maskLenToNetmask[maxLen] >= end || start+^maskLenToNetmask[maxLen-1] > end {
+			// maxLen继续减少将会使得网段包含end之后的IP
+			break
 		}
-		out[ipLen] = 0
 	}
-	return out
+	return uint8(maxLen)
 }
 
-func getFirstIp(ip net.IP, mask net.IPMask) net.IP {
-	return ip.Mask(mask)
-}
-
-func getLastIp(ip net.IP, mask net.IPMask) net.IP {
-	ipLen := len(ip)
-	out := make(net.IP, ipLen)
-	for index := 0; index < ipLen; index++ {
-		out[index] = ip[index] | ^mask[index]
-	}
-	return out
+func getLastIp(ip uint32, mask uint8) uint32 {
+	ip += ^maskLenToNetmask[mask]
+	return ip
 }
 
 func newIpGroupData(ipGroup *trident.Group) *policy.IpGroupData {
@@ -267,4 +253,13 @@ func Convert2AclData(response *trident.SyncResponse) []*policy.Acl {
 	}
 
 	return policies
+}
+
+func init() {
+	// fill maskLenToNetmask with {0x00000000, 0x80000000, 0xC0000000, ...}
+	mask := uint32(math.MaxUint32)
+	for i := 0; i <= MAX_MASKLEN; i++ {
+		maskLenToNetmask[i] = ^mask
+		mask >>= 1
+	}
 }
