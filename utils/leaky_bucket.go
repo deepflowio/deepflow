@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"math"
 	"sync"
 	"time"
 )
@@ -11,20 +12,31 @@ type LeakyBucket struct {
 	last      time.Duration
 	rate      uint64
 	interval  time.Duration
+	unit      uint64
 	available uint64
 }
 
-func NewLeakyBucket(rate uint64) LeakyBucket {
-	if rate < 1 {
-		rate = 1
+func (b *LeakyBucket) SetRate(rate uint64) {
+	if rate == 0 {
+		rate = math.MaxUint64
 	}
 	interval := time.Second / time.Duration(rate)
+	b.unit = 1
+	if interval < time.Nanosecond {
+		interval = time.Nanosecond
+		b.unit = uint64(time.Duration(rate) / time.Second)
+	}
 	last := time.Duration(time.Now().UnixNano()) - time.Millisecond // for safety
-	return LeakyBucket{last: last * interval / interval, rate: rate, interval: interval}
+	b.last = last * interval / interval
+	b.rate = rate
+	b.interval = interval
 }
 
 func (b *LeakyBucket) Acquire(timestamp time.Duration, size uint64) bool {
-	b.available += uint64((timestamp - b.last) / b.interval)
+	if timestamp < b.last {
+		return false
+	}
+	b.available += uint64((timestamp-b.last)/b.interval) * b.unit
 	if b.available > b.rate {
 		b.available = b.rate
 	}
