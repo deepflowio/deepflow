@@ -2,6 +2,7 @@ package datatype
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -19,9 +20,12 @@ type MetaPacketTcpHeader struct {
 	Flags         uint8
 	Seq           uint32
 	Ack           uint32
+	DataOffset    uint8
 	WinSize       uint16
 	WinScale      uint8
 	SACKPermitted bool
+	MSS           uint16
+	Sack          []byte // sack value
 }
 
 type MetaPacket struct {
@@ -47,11 +51,16 @@ type MetaPacket struct {
 	IpSrc, IpDst IPv4Int
 	Protocol     IPProtocol
 	TTL          uint8
+	IHL          uint8
+	IpID         uint16
+	IpFlags      uint16 // Flags and Fragment Offset
 
 	PortSrc    uint16
 	PortDst    uint16
 	PayloadLen uint16
 	TcpData    *MetaPacketTcpHeader
+
+	RawHeader []byte // total arp, or icmp header
 }
 
 func (p *MetaPacket) GenerateHash() uint32 {
@@ -80,6 +89,15 @@ func (h *MetaPacketTcpHeader) extractTcpOptions(stream *ByteStream) {
 		case TCPOptionKindSACKPermitted:
 			stream.Skip(1)
 			h.SACKPermitted = true
+		case TCPOptionKindMSS:
+			stream.Skip(1)
+			h.MSS = stream.U16()
+		case TCPOptionKindSACK:
+			sackLen := int(stream.U8() - 2)
+			if stream.Len() >= sackLen {
+				h.Sack = make([]byte, sackLen)
+				copy(h.Sack, stream.Field(sackLen))
+			}
 		default: // others
 			stream.Skip(int(stream.U8()) - 2)
 		}
@@ -91,6 +109,9 @@ func isVlanTagged(ethType EthernetType) bool {
 }
 
 func (p *MetaPacket) ParseArp(stream *ByteStream) {
+	p.RawHeader = make([]byte, ARP_HEADER_SIZE)
+	copy(p.RawHeader, stream.Slice())
+
 	stream.Skip(6)
 	op := stream.U16()
 	p.Invalid = op == ARPReply // arp reply有代传，MAC和IP地址不对应，所以为无效包
@@ -98,6 +119,28 @@ func (p *MetaPacket) ParseArp(stream *ByteStream) {
 	p.IpSrc = stream.U32()
 	stream.Skip(MAC_ADDR_LEN)
 	p.IpDst = stream.U32()
+}
+
+func (p *MetaPacket) ParseIcmp(stream *ByteStream) {
+	p.RawHeader = make([]byte, 0, 36)
+	p.RawHeader = append(p.RawHeader, stream.Slice()[:2]...)
+	icmpType, _ := stream.U8(), stream.U8()
+	switch icmpType {
+	case ICMPv4TypeDestinationUnreachable:
+		fallthrough
+	case ICMPv4TypeSourceQuench:
+		fallthrough
+	case ICMPv4TypeRedirect:
+		fallthrough
+	case ICMPv4TypeTimeExceeded:
+		fallthrough
+	case ICMPv4TypeParameterProblem:
+		p.RawHeader = append(p.RawHeader[:4], stream.Field(32)...)
+		return
+	default:
+		p.RawHeader = append(p.RawHeader[:4], stream.Field(4)...)
+		return
+	}
 }
 
 func (p *MetaPacket) ParseL4(stream *ByteStream) {
@@ -116,8 +159,10 @@ func (p *MetaPacket) ParseL4(stream *ByteStream) {
 		winSize := stream.U16()
 		stream.Skip(4) // skip checksum and URG Pointer
 		p.PayloadLen = uint16(len) - dataOffset
-		tcpHeader := &MetaPacketTcpHeader{flags, seq, ack, winSize, 0, false}
-		tcpHeader.extractTcpOptions(stream)
+		tcpHeader := &MetaPacketTcpHeader{flags, seq, ack, uint8(dataOffset >> 2), winSize, 0, false, 0, nil}
+		if dataOffset-MIN_TCP_HEADER_SIZE > 0 {
+			tcpHeader.extractTcpOptions(stream)
+		}
 		p.TcpData = tcpHeader
 	} else if p.Protocol == IPProtocolUDP {
 		if stream.Len() < UDP_HEADER_SIZE {
@@ -127,15 +172,19 @@ func (p *MetaPacket) ParseL4(stream *ByteStream) {
 		p.PortSrc = stream.U16()
 		p.PortDst = stream.U16()
 		p.PayloadLen = stream.U16() - UDP_HEADER_SIZE
+	} else if p.Protocol == IPProtocolICMPv4 {
+		p.ParseIcmp(stream)
 	}
 }
 
 func (p *MetaPacket) ParseIp(stream *ByteStream) {
 	ihl := (stream.U8() & 0xF)
+	p.IHL = ihl
 	stream.Skip(1) // skip tos
 	totalLength := stream.U16()
-	stream.Skip(2) // skip id
-	fragmentOffset := stream.U16() & 0x1FFF
+	p.IpID = stream.U16()
+	p.IpFlags = stream.U16()
+	fragmentOffset := p.IpFlags & 0x1FFF
 	p.TTL = stream.U8()
 	p.Protocol = IPProtocol(stream.U8())
 	stream.Skip(2) // skip checksum
@@ -217,9 +266,9 @@ func (p *MetaPacket) String() string {
 	}
 	format = "\t%s -> %s type: %04x vlan-id: %d\n"
 	buffer.WriteString(fmt.Sprintf(format, Uint64ToMac(p.MacSrc), Uint64ToMac(p.MacDst), uint16(p.EthType), p.Vlan))
-	format = "\t%v:%d -> %v:%d proto: %v ttl: %d payload-len: %d "
+	format = "\t%v:%d -> %v:%d proto: %v ttl: %d ihl: %d id: %d flags: 0x%01x, fragment Offset: %d payload-len: %d "
 	buffer.WriteString(fmt.Sprintf(format, IpFromUint32(p.IpSrc), p.PortSrc,
-		IpFromUint32(p.IpDst), p.PortDst, p.Protocol, p.TTL, p.PayloadLen))
+		IpFromUint32(p.IpDst), p.PortDst, p.Protocol, p.TTL, p.IHL, p.IpID, p.IpFlags>>13, p.IpFlags&0x1FFF, p.PayloadLen))
 	if p.TcpData != nil {
 		buffer.WriteString(fmt.Sprintf("tcp: %+v", p.TcpData))
 	}
@@ -229,6 +278,16 @@ func (p *MetaPacket) String() string {
 	if p.PolicyData != nil {
 		buffer.WriteString(fmt.Sprintf("\n\tPolicy: %v", p.PolicyData))
 	}
+
+	if len(p.Raw) > 0 {
+		endIndex := Min(len(p.Raw), 64)
+		buffer.WriteString(fmt.Sprintf("\n\tRawPacket: %v, len: %v", hex.Dump(p.Raw[:endIndex]), len(p.Raw)))
+	}
+	if len(p.RawHeader) > 0 {
+		endIndex := Min(len(p.RawHeader), 64)
+		buffer.WriteString(fmt.Sprintf("\n\tlen: %v, RawHeader:\n%v", len(p.RawHeader), hex.Dump(p.RawHeader[:endIndex])))
+	}
+
 	return buffer.String()
 }
 
