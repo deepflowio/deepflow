@@ -40,19 +40,20 @@ func loadPcap(file string) []RawPacket {
 func TestParseArp(t *testing.T) {
 	da, _ := net.ParseMAC("ac:2b:6e:b3:84:63")
 	sa, _ := net.ParseMAC("52:54:00:33:c4:54")
+	packet := loadPcap("arp.pcap")[0]
+	actual := &MetaPacket{PacketLen: uint16(len(packet))}
+	l2Len := actual.ParseL2(packet)
 	expected := &MetaPacket{
 		InPort:    0,
 		PacketLen: 60,
 		MacSrc:    MacIntFromBytes(sa),
 		MacDst:    MacIntFromBytes(da),
 
-		EthType: layers.EthernetTypeARP,
-		IpSrc:   BigEndian.Uint32(net.ParseIP("10.33.0.1").To4()),
-		IpDst:   BigEndian.Uint32(net.ParseIP("10.33.0.105").To4()),
+		EthType:   layers.EthernetTypeARP,
+		IpSrc:     BigEndian.Uint32(net.ParseIP("10.33.0.1").To4()),
+		IpDst:     BigEndian.Uint32(net.ParseIP("10.33.0.105").To4()),
+		RawHeader: packet[l2Len : l2Len+ARP_HEADER_SIZE],
 	}
-	packet := loadPcap("arp.pcap")[0]
-	actual := &MetaPacket{PacketLen: uint16(len(packet))}
-	l2Len := actual.ParseL2(packet)
 	actual.Parse(packet[l2Len:])
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("expected: %+v，actual: %+v", expected, actual)
@@ -74,6 +75,8 @@ func TestParseInvalid(t *testing.T) {
 		IpDst:    BigEndian.Uint32(net.ParseIP("10.33.0.1").To4()),
 		Protocol: layers.IPProtocolTCP,
 		TTL:      64,
+		IHL:      5,
+		IpID:     0xE9A5,
 	}
 	packet := loadPcap("invalid.pcap")[0]
 	actual := &MetaPacket{PacketLen: uint16(len(packet))}
@@ -91,6 +94,7 @@ func TestParseTorPackets(t *testing.T) {
 		meta := &MetaPacket{InPort: 0x30000, PacketLen: uint16(len(packet))}
 		l2Len := meta.ParseL2(packet)
 		meta.Parse(packet[l2Len:])
+		meta.RawHeader = nil
 		buffer.WriteString(meta.String() + "\n")
 	}
 	expectFile := "meta_packet_test.result"
