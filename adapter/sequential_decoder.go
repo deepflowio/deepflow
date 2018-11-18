@@ -30,6 +30,7 @@ type Decoded struct {
 	ihl        uint8
 	ttl        uint8
 	flags      uint8
+	IpID       uint16
 	fragOffset uint16
 
 	// l4
@@ -150,16 +151,20 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPacket) {
 		b := d.data.U8()
 		x.ihl = b & 0xF
 		x.dataOffset = b >> 4 // XXX: Valid in TCP Only
+		meta.IHL = x.ihl
 	}
-	d.data.Skip(2)
+	x.IpID = d.data.U16()
+	meta.IpID = x.IpID
 
 	if !d.pflags.IsSet(CFLAG_FLAGS_FRAG_OFFSET) {
 		value := d.data.U16()
 		x.flags, x.fragOffset = uint8(value>>13), value&0x1FFF
+		meta.IpFlags = value
 	}
 
 	if !d.pflags.IsSet(CFLAG_TTL) {
 		x.ttl = d.data.U8()
+		meta.TTL = x.ttl
 	}
 	if !d.pflags.IsSet(CFLAG_IP0) {
 		x.ip0 = net.IP(d.data.Field(IP_ADDR_LEN))
@@ -167,7 +172,6 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPacket) {
 	if !d.pflags.IsSet(CFLAG_IP1) {
 		x.ip1 = net.IP(d.data.Field(IP_ADDR_LEN))
 	}
-	meta.TTL = x.ttl
 	if d.forward {
 		meta.IpSrc = IpToUint32(x.ip0)
 		meta.IpDst = IpToUint32(x.ip1)
@@ -177,23 +181,8 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPacket) {
 	}
 	if x.headerType == HEADER_TYPE_IPV4_ICMP {
 		meta.Protocol = IPProtocolICMPv4
-		icmpType, _ := d.data.U8(), d.data.U8()
-		switch icmpType {
-		case ICMPv4TypeDestinationUnreachable:
-			fallthrough
-		case ICMPv4TypeSourceQuench:
-			fallthrough
-		case ICMPv4TypeRedirect:
-			fallthrough
-		case ICMPv4TypeTimeExceeded:
-			fallthrough
-		case ICMPv4TypeParameterProblem:
-			d.data.Skip(32)
-			return
-		default:
-			d.data.Skip(4)
-			return
-		}
+		meta.ParseIcmp(&d.data)
+		return
 	} else if x.headerType == HEADER_TYPE_IPV4 {
 		proto := d.data.U8()
 		meta.Protocol = IPProtocol(proto)
@@ -238,21 +227,22 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 	if !d.pflags.IsSet(CFLAG_WIN) {
 		x.win = d.data.U16()
 	}
-	meta.TcpData = &MetaPacketTcpHeader{Seq: seq, Ack: ack, Flags: x.tcpFlags, WinSize: x.win}
+	meta.TcpData = &MetaPacketTcpHeader{Seq: seq, Ack: ack, Flags: x.tcpFlags, WinSize: x.win, DataOffset: x.dataOffset}
 	if x.dataOffset > 5 {
 		optionFlag := d.data.U8()
 		if optionFlag&TCP_OPT_FLAG_WIN_SCALE > 0 {
 			meta.TcpData.WinScale = d.data.U8()
 		}
 		if optionFlag&TCP_OPT_FLAG_MSS > 0 {
-			d.data.Skip(2)
+			meta.TcpData.MSS = d.data.U16()
 		}
 		sackPermit := optionFlag&TCP_OPT_FLAG_SACK_PERMIT > 0
 		if sackPermit {
 			meta.TcpData.SACKPermitted = true
 		}
 		sackLength := int(optionFlag & TCP_OPT_FLAG_SACK)
-		d.data.Skip(sackLength)
+		meta.TcpData.Sack = make([]byte, sackLength)
+		copy(meta.TcpData.Sack, d.data.Field(sackLength))
 	}
 }
 
