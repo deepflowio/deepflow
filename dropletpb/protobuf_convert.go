@@ -240,7 +240,7 @@ func newNpbActions(npbs []*trident.NpbAction) []datatype.NpbAction {
 		id := uint8(npb.GetTunnelId())
 		side := uint8(npb.GetTapSide())
 		slice := uint16(npb.GetPayloadSlice())
-		action := datatype.ToNpbAction(IpToUint32(ip), id, 0, side, slice)
+		action := datatype.ToNpbAction(IpToUint32(ip.To4()), id, 0, side, slice)
 		actions = append(actions, action)
 	}
 	return actions
