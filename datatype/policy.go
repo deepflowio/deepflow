@@ -58,19 +58,16 @@ func (a NpbAction) TunnelInfo() uint64 {
 	return uint64(a >> 20)
 }
 
-func (a NpbAction) PayloadSlice() int {
-	return int(int16(a))
+func (a NpbAction) PayloadSlice() uint16 {
+	return uint16(a)
 }
 
 func (a NpbAction) String() string {
-	if a.PayloadSlice() > 0 {
-		return fmt.Sprintf("{%d@%s slice %d side: %d group: %d}", a.TunnelId(), IpFromUint32(a.TunnelIp()), a.PayloadSlice(), a.TapSide(), a.ResourceGroupType())
-	}
-	return fmt.Sprintf("{%d@%s side: %d group: %d}", a.TunnelId(), IpFromUint32(a.TunnelIp()), a.TapSide(), a.ResourceGroupType())
+	return fmt.Sprintf("{%d@%s slice %d side: %d group: %d}", a.TunnelId(), IpFromUint32(a.TunnelIp()), a.PayloadSlice(), a.TapSide(), a.ResourceGroupType())
 }
 
-func ToNpbAction(ip uint32, id uint32, group, tapSide, slice int) NpbAction {
-	return NpbAction(ip)<<32 | NpbAction(uint8(id))<<20 | (NpbAction(group)&RESOURCE_GROUP_TYPE_MASK)<<18 | (NpbAction(tapSide)&TAPSIDE_MASK)<<16 | NpbAction(uint16(slice))
+func ToNpbAction(ip uint32, id uint8, group, tapSide uint8, slice uint16) NpbAction {
+	return NpbAction(uint64(ip)<<32 | uint64(id)<<20 | (uint64(group)&RESOURCE_GROUP_TYPE_MASK)<<18 | (uint64(tapSide)&TAPSIDE_MASK)<<16 | uint64(slice))
 }
 
 const (
