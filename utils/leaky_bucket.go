@@ -20,11 +20,11 @@ func (b *LeakyBucket) SetRate(rate uint64) {
 	if rate == 0 {
 		rate = math.MaxUint64
 	}
-	interval := time.Second / time.Duration(rate)
+	interval := time.Duration(uint64(time.Second) / rate)
 	b.unit = 1
 	if interval < time.Nanosecond {
 		interval = time.Nanosecond
-		b.unit = uint64(time.Duration(rate) / time.Second)
+		b.unit = rate / uint64(time.Second)
 	}
 	last := time.Duration(time.Now().UnixNano()) - time.Millisecond // for safety
 	b.last = last * interval / interval
