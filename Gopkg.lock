@@ -111,7 +111,7 @@
 
 [[projects]]
   branch = "feature-npb"
-  digest = "1:f47e413c909d4d82db0ec1bcaf56b12ff623e10c158950953d1d8f82275523d0"
+  digest = "1:2b05fce781ade3a73f1cd4e36f97bd0b7b737227bc5d67d577a7dda50c6b3409"
   name = "gitlab.x.lan/yunshan/message"
   packages = [
     "dfi",
@@ -119,7 +119,7 @@
     "zero",
   ]
   pruneopts = "T"
-  revision = "cc8374dc0ed7828ee86f1941261b7210b9d39617"
+  revision = "b8bdb4e3a12bbd02ce168ae41c6fed42ffed1278"
 
 [[projects]]
   branch = "release-branch.go1.11"

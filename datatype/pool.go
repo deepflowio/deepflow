@@ -35,12 +35,15 @@ func (p *LockFreePool) Put(x interface{}) {
 	p.Pool.Put(pool)
 }
 
-// 通过返回值赋值省去Init方法
-func NewLockFreePool(alloc func() interface{}) (pool LockFreePool) {
-	pool.New = func() interface{} {
+func NewLockFreePool(alloc func() interface{}) LockFreePool {
+	newSlice := func() interface{} {
 		p := make([]interface{}, 0, 1024) // assuming about 1024 elements to cache
 		return &p
 	}
-	pool.alloc = alloc
-	return
+	return LockFreePool{
+		Pool: sync.Pool{
+			New: newSlice,
+		},
+		alloc: alloc,
+	}
 }
