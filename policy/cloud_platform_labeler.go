@@ -305,37 +305,42 @@ func (l *CloudPlatformLabeler) ModifyPrivateIp(endpoint *EndpointData, key *Look
 	}
 }
 
+// 检查L2End和L3End是否有可能进行修正
+func (l *CloudPlatformLabeler) CheckEndpointDataIfNeedCopy(endpoint *EndpointData, key *LookupKey) *EndpointData {
+	srcHash := MacIpKey(calcHashKey(key.SrcMac, key.SrcIp))
+	dstHash := MacIpKey(calcHashKey(key.DstMac, key.DstIp))
+	l.CheckAndUpdateArpTable(key, srcHash)
+	if key.Tap == TAP_TOR && ((key.L2End0 != endpoint.SrcInfo.L2End) ||
+		(key.L2End1 != endpoint.DstInfo.L2End)) {
+		endpoint = ShallowCopyEndpointData(endpoint)
+		endpoint.SetL2End(key)
+	} else if !endpoint.SrcInfo.L3End || !endpoint.DstInfo.L3End {
+		endpoint = ShallowCopyEndpointData(endpoint)
+	}
+	// 根据Ttl、Arp request、L2End来判断endpoint是否为最新
+	l.ModifyL3End(endpoint.SrcInfo, key, srcHash, true)
+	l.ModifyL3End(endpoint.DstInfo, key, dstHash, false)
+	l.ModifyDeviceInfo(endpoint.SrcInfo)
+	l.ModifyDeviceInfo(endpoint.DstInfo)
+	l.ModifyPrivateIp(endpoint, key)
+
+	return endpoint
+}
+
 func (l *CloudPlatformLabeler) UpdateEndpointData(endpoint *EndpointData, key *LookupKey) *EndpointData {
 	invalidSrc, invalidDst := false, false
 	if endpoint == INVALID_ENDPOINT_DATA {
-		//	endpoint = &EndpointData{SrcInfo: new(EndpointInfo), DstInfo: new(EndpointInfo)}
 		invalidSrc, invalidDst = true, true
 	} else {
 		if endpoint.SrcInfo == INVALID_ENDPOINT_INFO {
-			//		endpoint.SrcInfo = new(EndpointInfo)
 			invalidSrc = true
 		}
 		if endpoint.DstInfo == INVALID_ENDPOINT_INFO {
-			//		endpoint.DstInfo = new(EndpointInfo)
 			invalidDst = true
 		}
 	}
-	// FIXME：解决部分重复流量要纠正的结果冲突的问题，后面需要单独把L2End、L3End拿出来纠正，
-	// 不单独申请内存
-	endpoint = CloneEndpointData(endpoint)
+	endpoint = l.CheckEndpointDataIfNeedCopy(endpoint, key)
 	srcData, dstData := endpoint.SrcInfo, endpoint.DstInfo
-
-	// 根据Ttl、Arp request、L2End来判断endpoint是否为最新
-	srcHash := MacIpKey(calcHashKey(key.SrcMac, key.SrcIp))
-	dstHash := MacIpKey(calcHashKey(key.DstMac, key.DstIp))
-	endpoint.SetL2End(key)
-	l.CheckAndUpdateArpTable(key, srcHash)
-	l.ModifyL3End(srcData, key, srcHash, true)
-	l.ModifyL3End(dstData, key, dstHash, false)
-	l.ModifyDeviceInfo(srcData)
-	l.ModifyDeviceInfo(dstData)
-	l.ModifyPrivateIp(endpoint, key)
-
 	// 优化内存占用
 	if invalidSrc {
 		if srcData.L2End {
