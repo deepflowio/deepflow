@@ -52,7 +52,7 @@ func TestLeakyBucket(t *testing.T) {
 
 func TestLeakyBucketBps(t *testing.T) {
 	b := LeakyBucket{}
-	b.SetRate(units.TB * 8) // 100Tbps
+	b.SetRate(0) // almost infinity
 	b.last = time.Second
 	for i := 1; i <= 1000; i++ {
 		if !b.Acquire(time.Second+time.Millisecond*time.Duration(i), units.GB*8) {
