@@ -233,15 +233,14 @@ func newAclAction(aclId datatype.ACLID, actions []*trident.FlowAction) []datatyp
 func newNpbActions(npbs []*trident.NpbAction) []datatype.NpbAction {
 	actions := make([]datatype.NpbAction, 0, len(npbs))
 	for _, npb := range npbs {
-		payloadSlice := -1
-		if npb.PayloadSlice != nil {
-			payloadSlice = int(npb.GetPayloadSlice())
-		}
 		ip := net.ParseIP(npb.GetTunnelIp())
 		if ip == nil {
 			continue
 		}
-		action := datatype.ToNpbAction(IpToUint32(ip), npb.GetTunnelId(), 0, int(npb.GetTapSide()), payloadSlice)
+		id := uint8(npb.GetTunnelId())
+		side := uint8(npb.GetTapSide())
+		slice := uint16(npb.GetPayloadSlice())
+		action := datatype.ToNpbAction(IpToUint32(ip), id, 0, side, slice)
 		actions = append(actions, action)
 	}
 	return actions
