@@ -619,7 +619,7 @@ func TestL2endL3end2(t *testing.T) {
 	}
 }
 
-// L2end0=L2end1=false L3end0=true,L3end01=false
+// L2end0=L2end1=false L3end0=true,L3end1=false
 func TestL2endL3end3(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	key := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, IPProtocolTCP, 0, 8000)
@@ -632,7 +632,7 @@ func TestL2endL3end3(t *testing.T) {
 	}
 }
 
-// L2endn=L2end1=true L3end0=true, L3end1=false
+// L2end0=L2end1=true L3end0=true, L3end1=false
 func TestL2endL3end4(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	key := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, IPProtocolTCP, 0, 8000)
@@ -642,6 +642,26 @@ func TestL2endL3end4(t *testing.T) {
 	data := getEndpointData(policy, key)
 	if !checkEndTestResult(t, basicEndInfo, data) {
 		t.Error("TestL2endL3end4 Check Failed!")
+	}
+}
+
+// L2end0,L2end1 修正
+func TesModifyL2end(t *testing.T) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	key := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, IPProtocolTCP, 0, 8000)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, l2EndBool[1], l2EndBool[0])
+	basicEndInfo := generateEndInfo(l2EndBool[1], l3EndBool[1], l2EndBool[0], l3EndBool[0])
+	data := getEndpointData(policy, key)
+
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, l2EndBool[0], l2EndBool[1])
+	basicEndInfo1 := generateEndInfo(l2EndBool[0], l3EndBool[1], l2EndBool[1], l3EndBool[0])
+	data1 := getEndpointData(policy, key)
+
+	if !checkEndTestResult(t, basicEndInfo, data) {
+		t.Error("TesModifyL2end Check Failed!")
+	}
+	if !checkEndTestResult(t, basicEndInfo1, data1) {
+		t.Error("TesModifyL2end Check Failed!")
 	}
 }
 
