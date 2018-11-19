@@ -20,12 +20,21 @@ const (
 	ANY_PORT  = 0
 )
 
+const (
+	ACL_PROTO_ALL = iota
+	ACL_PROTO_TCP
+	ACL_PROTO_UDP
+	ACL_PROTO_MAX
+	ACL_PROTO_MIN = ACL_PROTO_ALL + 1
+)
+
 type Acl struct {
 	Id         ACLID
 	Type       TapType
 	TapId      uint32
 	SrcGroups  []uint32
 	DstGroups  []uint32
+	SrcPorts   []uint16
 	DstPorts   []uint16
 	Proto      uint8
 	Vlan       uint32
@@ -46,7 +55,8 @@ type VlanAndPortMap struct {
 }
 
 type PolicyLabeler struct {
-	RawAcls []*Acl
+	RawAcls     []*Acl
+	aclProtoMap [math.MaxUint8 + 1]uint8
 
 	groupIdMaps         map[uint32]int
 	groupIdFromPlatform []uint32
@@ -62,8 +72,8 @@ type PolicyLabeler struct {
 	FastPathDisable    bool                        // 是否关闭快速路径，只使用慢速路径（FirstPath）
 
 	MapSize             uint32
-	GroupPortPolicyMaps [TAP_MAX]map[uint64]*PolicyData // 慢速路径上资源组+协议+端口到Policy的映射表
-	GroupVlanPolicyMaps [TAP_MAX]map[uint64]*PolicyData // 慢速路径上资源组+Vlan到Policy的映射表
+	GroupPortPolicyMaps [TAP_MAX][ACL_PROTO_MAX]map[uint64]*PolicyData // 慢速路径上资源组+协议+端口到Policy的映射表
+	GroupVlanPolicyMaps [TAP_MAX]map[uint64]*PolicyData                // 慢速路径上资源组+Vlan到Policy的映射表
 
 	FirstPathHit, FastPathHit         uint64
 	FirstPathHitTick, FastPathHitTick uint64
@@ -74,13 +84,13 @@ type PolicyLabeler struct {
 	cloudPlatformLabeler    *CloudPlatformLabeler
 }
 
-func (a *Acl) getPorts() string {
-	// IN: a.DstPorts: 1,3,4,5,7,10,11,12,15,17
+func (a *Acl) getPorts(rawPorts []uint16) string {
+	// IN: rawPorts: 1,3,4,5,7,10,11,12,15,17
 	// OUT: ports: "1,3-5,7,10-12,15,17"
 	end := uint16(0)
 	hasDash := false
 	ports := ""
-	for index, port := range a.DstPorts {
+	for index, port := range rawPorts {
 		if index == 0 {
 			ports += fmt.Sprintf("%d", port)
 			end = port
@@ -90,7 +100,7 @@ func (a *Acl) getPorts() string {
 		if port == end+1 {
 			end = port
 			hasDash = true
-			if index == len(a.DstPorts)-1 {
+			if index == len(rawPorts)-1 {
 				ports += fmt.Sprintf("-%d", port)
 			}
 		} else {
@@ -106,12 +116,15 @@ func (a *Acl) getPorts() string {
 }
 
 func (a *Acl) String() string {
-	return fmt.Sprintf("Id:%v Type:%v TapId:%v SrcGroups:%v DstGroups:%v DstPorts:[%s] Proto:%v Vlan:%v Action:%v NpbActions:%s",
-		a.Id, a.Type, a.TapId, a.SrcGroups, a.DstGroups, a.getPorts(), a.Proto, a.Vlan, a.Action, a.NpbActions)
+	return fmt.Sprintf("Id:%v Type:%v TapId:%v SrcGroups:%v DstGroups:%v SrcPorts:[%s] DstPorts:[%s] Proto:%v Vlan:%v Action:%v NpbActions:%s",
+		a.Id, a.Type, a.TapId, a.SrcGroups, a.DstGroups, a.getPorts(a.SrcPorts), a.getPorts(a.DstPorts), a.Proto, a.Vlan, a.Action, a.NpbActions)
 }
 
 func NewPolicyLabeler(queueCount int, mapSize uint32, fastPathDisable bool) *PolicyLabeler {
 	policy := &PolicyLabeler{}
+
+	policy.aclProtoMap[6] = ACL_PROTO_TCP
+	policy.aclProtoMap[17] = ACL_PROTO_UDP
 
 	for i := TAP_MIN; i < TAP_MAX; i++ {
 		policy.InterestProtoMaps[i] = make(map[uint8]bool)
@@ -119,7 +132,9 @@ func NewPolicyLabeler(queueCount int, mapSize uint32, fastPathDisable bool) *Pol
 		policy.InterestGroupMaps[i] = make(map[uint32]bool)
 
 		policy.GroupVlanPolicyMaps[i] = make(map[uint64]*PolicyData)
-		policy.GroupPortPolicyMaps[i] = make(map[uint64]*PolicyData)
+		for j := 0; j < ACL_PROTO_MAX; j++ {
+			policy.GroupPortPolicyMaps[i][j] = make(map[uint64]*PolicyData)
+		}
 	}
 
 	policy.IpNetmaskMap = &[math.MaxUint16 + 1]uint32{0}
@@ -207,14 +222,14 @@ func (l *PolicyLabeler) generateInterestKeys(endpointData *EndpointData, packet 
 	l.getFastInterestKeys(packet)
 }
 
-func generateGroupPortKeys(srcGroups []uint32, dstGroups []uint32, port uint16, proto uint8) []uint64 {
+func generateGroupPortKeys(srcGroups []uint32, dstGroups []uint32, srcPort uint16, dstPort uint16) []uint64 {
 	// port key:
-	//  64         56            40           20            0
+	//  64         48            32           16            0
 	//  +---------------------------------------------------+
-	//  |   proto   |   port     |     id0/1   |    id0/1   |
+	//  |   sport   |   dport     |     id0/1   |    id0/1   |
 	//  +---------------------------------------------------+
 	keys := make([]uint64, 0, 10)
-	key := uint64(port)<<40 | uint64(proto)<<56
+	key := uint64(srcPort)<<48 | uint64(dstPort)<<32
 
 	if len(srcGroups) == 0 {
 		srcGroups = append(srcGroups, ANY_GROUP)
@@ -225,29 +240,28 @@ func generateGroupPortKeys(srcGroups []uint32, dstGroups []uint32, port uint16, 
 	}
 
 	for _, src := range srcGroups {
-		srcId := uint64(FormatGroupId(src) & 0xfffff)
+		srcId := uint64(FormatGroupId(src) & 0xffff)
 		for _, dst := range dstGroups {
-			dstId := uint64(FormatGroupId(dst) & 0xfffff)
-			key |= srcId<<20 | dstId
+			dstId := uint64(FormatGroupId(dst) & 0xffff)
+			key |= srcId<<16 | dstId
 			keys = append(keys, key)
-			key &= 0xffffff0000000000
+			key &= 0xffffffff00000000
 		}
 	}
 	return keys
 }
 
-func generateSearchPortKeys(srcGroups []uint32, dstGroups []uint32, port uint16, proto uint8) []uint64 {
-	keys := generateGroupPortKeys(srcGroups, dstGroups, port, proto)
-	if port != 0 {
-		// 匹配port全采集的acl
-		keys = append(keys, generateGroupPortKeys(srcGroups, dstGroups, ANY_PORT, proto)...)
+func generateSearchPortKeys(srcGroups []uint32, dstGroups []uint32, srcPort, dstPort uint16) []uint64 {
+	keys := generateGroupPortKeys(srcGroups, dstGroups, srcPort, dstPort)
+	// 匹配port全采集的acl
+	if srcPort != 0 {
+		keys = append(keys, generateGroupPortKeys(srcGroups, dstGroups, ANY_PORT, dstPort)...)
 	}
-	if proto != 0 {
-		// 匹配proto全采集的acl
-		keys = append(keys, generateGroupPortKeys(srcGroups, dstGroups, ANY_PORT, ANY_PROTO)...)
+	if dstPort != 0 {
+		keys = append(keys, generateGroupPortKeys(srcGroups, dstGroups, srcPort, ANY_PORT)...)
 	}
-	if proto != 0 && port != 0 {
-		keys = append(keys, generateGroupPortKeys(srcGroups, dstGroups, port, ANY_PROTO)...)
+	if srcPort != 0 && dstPort != 0 {
+		keys = append(keys, generateGroupPortKeys(srcGroups, dstGroups, ANY_PORT, ANY_PORT)...)
 	}
 	return keys
 }
@@ -255,33 +269,48 @@ func generateSearchPortKeys(srcGroups []uint32, dstGroups []uint32, port uint16,
 func generateGroupPortsKeys(acl *Acl, direction DirectionType) []uint64 {
 	keys := make([]uint64, 0, 10)
 
-	src := acl.SrcGroups
-	dst := acl.DstGroups
+	srcGroups := acl.SrcGroups
+	dstGroups := acl.DstGroups
+	srcPorts := acl.SrcPorts
+	dstPorts := acl.DstPorts
 	if direction == BACKWARD {
-		src, dst = dst, src
+		srcGroups, dstGroups = dstGroups, srcGroups
+		srcPorts, dstPorts = dstPorts, srcPorts
 	}
 
 	// 策略配置端口全采集，则生成port为0的一条map
-	if len(acl.DstPorts) >= 0xffff || len(acl.DstPorts) == 0 {
-		keys = generateGroupPortKeys(src, dst, ANY_PORT, acl.Proto)
-	} else {
-		// FIXME: 当很多条策略都配置了很多port,内存占用可能会很大
-		for _, port := range acl.DstPorts {
-			keys = append(keys, generateGroupPortKeys(src, dst, port, acl.Proto)...)
+	if len(srcPorts) >= 0xffff || len(srcPorts) == 0 {
+		srcPorts = append(srcPorts[:0], ANY_PORT)
+	}
+	if len(dstPorts) >= 0xffff || len(dstPorts) == 0 {
+		dstPorts = append(dstPorts[:0], ANY_PORT)
+	}
+
+	for _, src := range srcPorts {
+		for _, dst := range dstPorts {
+			// FIXME: 当很多条策略都配置了很多port,内存占用可能会很大
+			keys = append(keys, generateGroupPortKeys(srcGroups, dstGroups, src, dst)...)
 		}
 	}
 	return keys
 }
 
+func (l *PolicyLabeler) getAclProto(proto uint8) uint8 {
+	return l.aclProtoMap[proto]
+}
+
 func (l *PolicyLabeler) GenerateGroupPortMaps(acls []*Acl) {
-	portMaps := [TAP_MAX]map[uint64]*PolicyData{}
+	portMaps := [TAP_MAX][ACL_PROTO_MAX]map[uint64]*PolicyData{}
 	for i := TAP_MIN; i < TAP_MAX; i++ {
-		portMaps[i] = make(map[uint64]*PolicyData)
+		for j := 0; j < ACL_PROTO_MAX; j++ {
+			portMaps[i][j] = make(map[uint64]*PolicyData)
+		}
 	}
 
 	for _, acl := range acls {
 		if acl.Type.CheckTapType(acl.Type) && acl.Vlan == 0 {
-			portMap := portMaps[acl.Type]
+			fmt.Printf("proto: %v\n", l.getAclProto(acl.Proto))
+			portMap := portMaps[acl.Type][l.getAclProto(acl.Proto)]
 
 			keys := generateGroupPortsKeys(acl, FORWARD)
 			for _, key := range keys {
@@ -292,6 +321,19 @@ func (l *PolicyLabeler) GenerateGroupPortMaps(acls []*Acl) {
 				} else {
 					// 策略存在则将action合入到现有策略
 					policy.Merge(acl.Action, acl.NpbActions, acl.Id)
+				}
+			}
+		}
+	}
+
+	for i := TAP_MIN; i < TAP_MAX; i++ {
+		anyPortMap := portMaps[i][ANY_PROTO]
+		for key, value := range anyPortMap {
+			for j := ACL_PROTO_MIN; j < ACL_PROTO_MAX; j++ {
+				if portMaps[i][j][key] == nil {
+					portMaps[i][j][key] = value
+				} else {
+					portMaps[i][j][key].Merge(value.AclActions, value.NpbActions, value.ACLID)
 				}
 			}
 		}
@@ -477,6 +519,12 @@ func (l *PolicyLabeler) GenerateInterestMaps(acls []*Acl) {
 				}
 			}
 
+			if len(acl.SrcPorts) < 0xffff {
+				for _, port := range acl.SrcPorts {
+					portMap[port] = true
+				}
+			}
+
 			groupMap := interestGroupMaps[acl.Type]
 			for _, group := range acl.DstGroups {
 				groupMap[group] = true
@@ -611,13 +659,13 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 	l.generateInterestKeys(endpointData, packet)
 	srcEpc := l.calcEpc(endpointData.SrcInfo)
 	dstEpc := l.calcEpc(endpointData.DstInfo)
-	portGroup := l.GroupPortPolicyMaps[packet.Tap]
+	portGroup := l.GroupPortPolicyMaps[packet.Tap][l.getAclProto(packet.Proto)]
 	vlanGroup := l.GroupVlanPolicyMaps[packet.Tap]
 	// 对于内容全为0的findPolicy，统一采用INVALID_POLICY_DATA（同一块内存的数值）
 	portForwardPolicy, portBackwardPolicy, vlanPolicy, findPolicy := INVALID_POLICY_DATA, INVALID_POLICY_DATA, INVALID_POLICY_DATA, INVALID_POLICY_DATA
 
 	// 在port map中查找策略, 创建正方向key
-	keys := generateSearchPortKeys(packet.SrcGroupIds, packet.DstGroupIds, packet.DstPort, packet.Proto)
+	keys := generateSearchPortKeys(packet.SrcGroupIds, packet.DstGroupIds, packet.SrcPort, packet.DstPort)
 	for _, key := range keys {
 		if policy := portGroup[key]; policy != nil && len(policy.AclActions) > 0 {
 			if portForwardPolicy == INVALID_POLICY_DATA {
@@ -628,7 +676,7 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 		}
 	}
 	// 在port map中查找策略, 创建反方向key
-	keys = generateSearchPortKeys(packet.DstGroupIds, packet.SrcGroupIds, packet.SrcPort, packet.Proto)
+	keys = generateSearchPortKeys(packet.DstGroupIds, packet.SrcGroupIds, packet.DstPort, packet.SrcPort)
 	for _, key := range keys {
 		if policy := portGroup[key]; policy != nil && len(policy.AclActions) > 0 {
 			if portBackwardPolicy == INVALID_POLICY_DATA {
