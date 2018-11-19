@@ -237,7 +237,11 @@ func newNpbActions(npbs []*trident.NpbAction) []datatype.NpbAction {
 		if npb.PayloadSlice != nil {
 			payloadSlice = int(npb.GetPayloadSlice())
 		}
-		action := datatype.ToNpbAction(npb.GetTunnelIp(), npb.GetTunnelId(), payloadSlice)
+		ip := net.ParseIP(npb.GetTunnelIp())
+		if ip == nil {
+			continue
+		}
+		action := datatype.ToNpbAction(IpToUint32(ip), npb.GetTunnelId(), payloadSlice)
 		actions = append(actions, action)
 	}
 	return actions
