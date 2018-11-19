@@ -47,8 +47,7 @@ message Config {
     optional bool    rsyslog_enabled      = 10 [default = false];
     optional uint32  output_vlan          = 11 [default = 0];
     optional uint32  mtu                  = 12 [default = 1500];
-    optional string  self_update_url      = 13; // specify only when self-update required
-    optional uint64  npb_bps_threshold    = 14;
+    optional uint64  npb_bps_threshold    = 13;
 
     optional string  source_ip            = 21;
     optional string  analyzer_ip          = 31;
@@ -150,7 +149,7 @@ message NpbAction {
     required uint32 tunnel_id = 2;
     required string tunnel_ip = 3;
     required TapSide tap_side = 4;
-    optional uint32 payload_slice = 5;
+    required uint32 payload_slice = 5 [default = 65535];
 }
 
 message FlowAction {
@@ -177,6 +176,8 @@ message SyncResponse {
     optional Status status = 1;
     optional Config config = 2;
     optional uint64 version = 3 [default = 0]; /* in addition to config field */
+    optional string revision = 4; // 指定升级的目标revision
+    optional string self_update_url = 5; // 指定升级的URL路径
 
     repeated Segment local_segments = 10;
     repeated Segment remote_segments = 11;
