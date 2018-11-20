@@ -34,6 +34,7 @@ type QueueType uint8
 const (
 	QUEUE_TYPE_FLOW QueueType = iota
 	QUEUE_TYPE_METERING
+	QUEUE_TYPE_PCAP
 	QUEUE_TYPE_MAX
 )
 
@@ -202,14 +203,19 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *data
 func (l *LabelerManager) run(index int) {
 	meteringQueues := l.appQueues[QUEUE_TYPE_METERING]
 	flowQueues := l.appQueues[QUEUE_TYPE_FLOW]
+	captureQueues := l.appQueues[QUEUE_TYPE_PCAP]
 	size := 1024 * 16
 	userId := queue.HashKey(index)
 	meteringKeys := make([]queue.HashKey, 0, size+1)
 	meteringKeys = append(meteringKeys, userId)
 	flowKeys := make([]queue.HashKey, 0, size+1)
 	flowKeys = append(flowKeys, userId)
+	captureKeys := make([]queue.HashKey, 0, size+1)
+	captureKeys = append(captureKeys, userId)
+
 	meteringItemBatch := make([]interface{}, 0, size)
 	flowItemBatch := make([]interface{}, 0, size)
+	captureItemBatch := make([]interface{}, 0, size)
 	itemBatch := make([]interface{}, size)
 
 	flowAppActions := datatype.ACTION_FLOW_COUNTING | datatype.ACTION_FLOW_STORING | datatype.ACTION_TCP_FLOW_PERF_COUNTING |
@@ -227,6 +233,13 @@ func (l *LabelerManager) run(index int) {
 				metaPacket.AddReferenceCount() // 引用计数+1，避免被释放
 				flowItemBatch = append(flowItemBatch, metaPacket)
 			}
+
+			if (action.ActionFlags & datatype.ACTION_PACKET_CAPTURING) != 0 {
+				captureKeys = append(captureKeys, queue.HashKey(metaPacket.Hash))
+				metaPacket.AddReferenceCount() // 引用计数+1，避免被释放
+				captureItemBatch = append(captureItemBatch, metaPacket)
+			}
+
 			// 为了统计平台处理的总流量，所有流量都过meteringApp
 			meteringKeys = append(meteringKeys, queue.HashKey(metaPacket.Hash))
 			meteringItemBatch = append(meteringItemBatch, metaPacket)
@@ -242,6 +255,11 @@ func (l *LabelerManager) run(index int) {
 			flowQueues.Puts(flowKeys, flowItemBatch)
 			flowKeys = flowKeys[:1]
 			flowItemBatch = flowItemBatch[:0]
+		}
+		if len(captureItemBatch) > 0 {
+			captureQueues.Puts(captureKeys, captureItemBatch)
+			captureKeys = captureKeys[:1]
+			captureItemBatch = captureItemBatch[:0]
 		}
 	}
 
