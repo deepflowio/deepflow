@@ -17,7 +17,12 @@ var log = logging.MustGetLogger("flowgenerator")
 
 // hash of the key L3, symmetric
 func getKeyL3Hash(meta *MetaPacket, basis uint32) uint64 {
-	return uint64(hashAdd(basis, meta.IpSrc^meta.IpDst))
+	ipSrc := uint64(meta.IpSrc)
+	ipDst := uint64(meta.IpDst)
+	if ipSrc >= ipDst {
+		return ipSrc<<32 | ipDst
+	}
+	return ipDst<<32 | ipSrc
 }
 
 // hash of the key L4, symmetric
