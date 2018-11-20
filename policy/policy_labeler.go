@@ -309,7 +309,6 @@ func (l *PolicyLabeler) GenerateGroupPortMaps(acls []*Acl) {
 
 	for _, acl := range acls {
 		if acl.Type.CheckTapType(acl.Type) && acl.Vlan == 0 {
-			fmt.Printf("proto: %v\n", l.getAclProto(acl.Proto))
 			portMap := portMaps[acl.Type][l.getAclProto(acl.Proto)]
 
 			keys := generateGroupPortsKeys(acl, FORWARD)
