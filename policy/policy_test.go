@@ -1288,6 +1288,60 @@ func TestPolicyDoublePort(t *testing.T) {
 	}
 }
 
+func TestPolicySrcPort(t *testing.T) {
+	acls := []*Acl{}
+	// 创建 policyTable
+	table := generatePolicyTable()
+	// 构建acl action  1:1000->2:0 tcp
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	acl.SrcPorts = append(acl.SrcPorts, 1000)
+	acls = append(acls, acl)
+	table.UpdateAcls(acls)
+	// 构建查询1-key  1:1000->2:8000 tcp
+	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 8000)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
+
+	// 获取查询first结果
+	policyData := table.LookupPolicyByKey(key)
+	// 构建预期结果
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestPolicySrcPort Check Failed!")
+	}
+
+	// 构建查询2-key  2:8000->1:1000 tcp
+	key = generateLookupKey(group2Mac, group1Mac, vlanAny, group2Ip1, group1Ip1, IPProtocolTCP, 8000, 1000)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
+	policyData = table.LookupPolicyByKey(key)
+	backward := getBackwardAcl(action)
+	basicPolicyData = new(PolicyData)
+	basicPolicyData.Merge([]AclAction{backward}, nil, acl.Id)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestPolicySrcPort Check Failed!")
+	}
+
+	// 构建查询3-key  1:2000->2:8000 tcp
+	key = generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 2000, 8000)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
+	policyData = table.LookupPolicyByKey(key)
+	if !CheckPolicyResult(t, INVALID_POLICY_DATA, policyData) {
+		t.Error("TestPolicySrcPort Check Failed!")
+	}
+
+	// 构建查询4-key  1:1000->2:7000 tcp
+	key = generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 7000)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
+	basicPolicyData = new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	policyData = table.LookupPolicyByKey(key)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestPolicySrcPort Check Failed!")
+	}
+}
+
 func BenchmarkNpbFirstPath(b *testing.B) {
 	table := generatePolicyTable()
 
