@@ -124,10 +124,15 @@ func Start(configPath string) (closers []io.Closer) {
 		"2-meta-packet-to-metering-app", cfg.Queue.MeteringAppQueueSize, cfg.Queue.MeteringAppQueueCount, cfg.Queue.LabelerQueueCount,
 		libqueue.OptionFlushIndicator(time.Minute), releaseMetaPacket,
 	)
+	pcapAppQueues := manager.NewQueues(
+		"2-meta-packet-to-pcap-app", cfg.Queue.MeteringAppQueueSize, cfg.Queue.MeteringAppQueueCount, cfg.Queue.LabelerQueueCount,
+		libqueue.OptionFlushIndicator(time.Minute), releaseMetaPacket,
+	)
 
 	labelerManager := labeler.NewLabelerManager(labelerQueues, cfg.Queue.LabelerQueueCount, cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable)
 	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_FLOW, flowGeneratorQueues)
 	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_METERING, meteringAppQueues)
+	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_PCAP, pcapAppQueues)
 	synchronizer.Register(func(response *trident.SyncResponse) {
 		log.Debug(response)
 		// Capture更新RemoteSegments
