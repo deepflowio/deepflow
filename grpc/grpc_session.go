@@ -11,6 +11,10 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	DEFAULT_SYNC_TIMEOUT = 8 * time.Second
+)
+
 var log = logging.MustGetLogger("grpc")
 
 type SyncFunction func(context.Context) error
@@ -25,6 +29,7 @@ type GrpcSession struct {
 	ipIndex      int
 	clientConn   *grpc.ClientConn
 	synchronized bool
+	timeout      time.Duration
 }
 
 func (s *GrpcSession) GetClient() *grpc.ClientConn {
@@ -56,8 +61,12 @@ func (s *GrpcSession) Request(syncFunction SyncFunction) error {
 			return err
 		}
 	}
+	timeout := DEFAULT_SYNC_TIMEOUT
+	if s.timeout > 0 {
+		timeout = s.timeout
+	}
 	for i := 0; i < len(s.ips); i++ {
-		ctx, _ := context.WithTimeout(context.Background(), time.Second)
+		ctx, _ := context.WithTimeout(context.Background(), timeout)
 		if err := syncFunction(ctx); err != nil {
 			if s.synchronized {
 				s.synchronized = false
