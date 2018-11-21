@@ -23,7 +23,7 @@ bench: vendor
 	go test -bench=. ./...
 
 debug: vendor
-	go build ${FLAGS} -gcflags '-N -l' -o bin/droplet cmd/droplet/main.go
+	go build ${FLAGS} -gcflags 'all=-N -l' -o bin/droplet cmd/droplet/main.go
 
 droplet: vendor
 	go build ${FLAGS} -o bin/droplet cmd/droplet/main.go

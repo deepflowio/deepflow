@@ -159,6 +159,14 @@ func GetTapType(inPort uint32) datatype.TapType {
 	return datatype.TAP_ISP
 }
 
+func getTTL(packet *datatype.MetaPacket) uint8 {
+	if packet.InPort == datatype.PACKET_SOURCE_TOR {
+		return 128
+	}
+
+	return packet.TTL
+}
+
 func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *datatype.PolicyData {
 	key := &datatype.LookupKey{
 		Timestamp: packet.Timestamp,
@@ -171,7 +179,7 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *data
 		EthType:   packet.EthType,
 		Vlan:      packet.Vlan,
 		Proto:     uint8(packet.Protocol),
-		Ttl:       packet.TTL,
+		Ttl:       getTTL(packet),
 		L2End0:    packet.L2End0,
 		L2End1:    packet.L2End1,
 		Tap:       GetTapType(packet.InPort),

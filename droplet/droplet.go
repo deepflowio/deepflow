@@ -65,7 +65,7 @@ func Start(configPath string) (closers []io.Closer) {
 		ip := net.ParseIP(ipString)
 		controllers = append(controllers, ip)
 	}
-	synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.ControllerPort)
+	synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.ControllerPort, cfg.RpcTimeout)
 	synchronizer.Start()
 
 	if cfg.MaxCPUs > 0 {
