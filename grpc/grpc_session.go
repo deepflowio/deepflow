@@ -108,6 +108,10 @@ func (s *GrpcSession) Close() {
 	}
 }
 
+func (s *GrpcSession) SetTimeout(timeout time.Duration) {
+	s.timeout = timeout
+}
+
 func (s *GrpcSession) Init(ips []net.IP, port uint16, syncInterval time.Duration, runOnce func()) {
 	s.ips = ips
 	s.port = port
