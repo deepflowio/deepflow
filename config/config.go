@@ -35,6 +35,7 @@ type Config struct {
 	Labeler          LabelerConfig       `yaml:"labeler"`
 	FlowGenerator    FlowGeneratorConfig `yaml:"flow-generator"`
 	MapReduce        MapReduce           `yaml:"map-reduce"`
+	RpcTimeout       time.Duration       `yaml:"rpc-timeout"`
 }
 
 type IpPortConfig struct {
@@ -213,6 +214,9 @@ func (c *Config) Validate() error {
 	}
 	if c.MapReduce.WindowSize == 0 {
 		c.MapReduce.WindowSize = 30
+	}
+	if c.RpcTimeout > 0 {
+		c.RpcTimeout *= time.Second
 	}
 	return nil
 }

@@ -72,7 +72,7 @@ func (s *RpcConfigSynchronizer) Register(handler Handler) {
 	s.Unlock()
 }
 
-func NewRpcConfigSynchronizer(ips []net.IP, port uint16) ConfigSynchronizer {
+func NewRpcConfigSynchronizer(ips []net.IP, port uint16, timeout time.Duration) ConfigSynchronizer {
 	s := &RpcConfigSynchronizer{
 		GrpcSession:    grpc.GrpcSession{},
 		bootTime:       time.Now(),
@@ -85,5 +85,6 @@ func NewRpcConfigSynchronizer(ips []net.IP, port uint16) ConfigSynchronizer {
 		}
 	}
 	s.GrpcSession.Init(ips, port, DEFAULT_SYNC_INTERVAL, runOnce)
+	s.GrpcSession.SetTimeout(timeout)
 	return s
 }
