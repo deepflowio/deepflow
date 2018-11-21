@@ -660,6 +660,7 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, srcEpc, ds
 	} else {
 		portPolicyValue.endpoint = *endpointData
 		portPolicyValue.protoPolicyMap[packet.Proto] = forward
+		portPolicyValue.timestamp = packet.Timestamp
 	}
 
 	mapsBackward := l.getVlanAndPortMap(packet, BACKWARD, true, mapsForward)
@@ -687,6 +688,7 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, srcEpc, ds
 	} else {
 		portPolicyValue.endpoint = EndpointData{SrcInfo: endpointData.DstInfo, DstInfo: endpointData.SrcInfo}
 		portPolicyValue.protoPolicyMap[packet.Proto] = backward
+		portPolicyValue.timestamp = packet.Timestamp
 	}
 
 	return mapsForward, mapsBackward
