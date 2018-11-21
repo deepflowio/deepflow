@@ -46,6 +46,11 @@ queue:
   metering-app-queue-count: 4
   # metering app read queue size, default queue-size
   metering-app-queue-size: 65536
+  # pcap app read queue count, default 1
+  # name: 2-meta-packet-to-pcap-app
+  pcap-app-queue-count: 1
+  # pcap app read queue size, default queue-size
+  pcap-app-queue-size: 65536
   # flow app read queue count, default 8
   # 4-tagged-flow-to-flow-app
   flow-app-queue-count: 8
@@ -107,3 +112,18 @@ map-reduce:
   docs-in-buffer: 131072
   # mapreduce window size
   window-size: 30
+pcap:
+  # 同时在写的最大pcap文件数，默认5000
+  max-concurrent-files: 5000
+  # 每个pcap文件的最大大小，默认25MB
+  max-file-size-mb: 25
+  # 所有pcap文件的最大总大小，默认100GB
+  max-directory-size-gb: 100
+  # 磁盘剩余空间不足该数值时进行删除，默认10GB
+  disk-free-space-margin-gb: 10
+  # 每个pcap文件的最大时间，默认300秒
+  max-file-period-second: 300
+  # 每个pcap文件的保留时间，默认7天
+  max-file-keep-day: 7
+  # pcap文件存储的文件夹
+  file-directory: /var/lib/droplet/pcap
