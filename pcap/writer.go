@@ -12,12 +12,19 @@ const (
 	SNAPLEN = 65535
 )
 
+type WriterCounter struct {
+	totalBufferedBytes uint64
+	totalWrittenBytes  uint64
+}
+
 type Writer struct {
 	filename string
 	fp       *os.File
 
 	buffer []byte
 	offset int
+
+	WriterCounter
 }
 
 func NewWriter(filename string) (*Writer, error) {
@@ -48,6 +55,7 @@ func (w *Writer) init(filename string) error {
 		}
 		NewGlobalHeader(w.buffer, SNAPLEN)
 		w.offset = GLOBAL_HEADER_LEN
+		w.totalBufferedBytes += GLOBAL_HEADER_LEN
 	} else {
 		if w.fp, err = os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0644); err != nil {
 			return err
@@ -64,6 +72,7 @@ func (w *Writer) Write(packet *datatype.MetaPacket) error {
 	header.SetTimestamp(packet.Timestamp)
 	header.SetOrigLen(int(packet.PacketLen))
 	header.SetInclLen(size)
+	w.totalBufferedBytes += uint64(RECORD_HEADER_LEN + size)
 	if BUFSIZE-w.offset < RECORD_HEADER_LEN+MAX_PACKET_LEN {
 		if err := w.Flush(); err != nil {
 			return err
@@ -72,7 +81,29 @@ func (w *Writer) Write(packet *datatype.MetaPacket) error {
 	return nil
 }
 
+func (w *Writer) Size() int {
+	return w.offset
+}
+
+func (w *Writer) GetStats() WriterCounter {
+	return w.WriterCounter
+}
+
+func (w *Writer) ResetStats() {
+	w.totalBufferedBytes = 0
+	w.totalWrittenBytes = 0
+}
+
+func (w *Writer) GetAndResetStats() WriterCounter {
+	c := w.GetStats()
+	w.ResetStats()
+	return c
+}
+
 func (w *Writer) Close() error {
+	if err := w.Flush(); err != nil {
+		return err
+	}
 	return w.fp.Close()
 }
 
@@ -88,6 +119,8 @@ func (w *Writer) Flush() error {
 		return err
 	} else if n != w.offset {
 		return fmt.Errorf("Flush(): not all bytes written to file %s", w.filename)
+	} else {
+		w.totalWrittenBytes += uint64(n)
 	}
 	w.Clear()
 	return nil

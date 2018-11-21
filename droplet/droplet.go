@@ -22,6 +22,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet/flowgenerator"
 	"gitlab.x.lan/yunshan/droplet/labeler"
 	"gitlab.x.lan/yunshan/droplet/mapreduce"
+	"gitlab.x.lan/yunshan/droplet/pcap"
 	"gitlab.x.lan/yunshan/droplet/queue"
 	"gitlab.x.lan/yunshan/droplet/sender"
 	"gitlab.x.lan/yunshan/message/trident"
@@ -125,7 +126,7 @@ func Start(configPath string) (closers []io.Closer) {
 		libqueue.OptionFlushIndicator(time.Minute), releaseMetaPacket,
 	)
 	pcapAppQueues := manager.NewQueues(
-		"2-meta-packet-to-pcap-app", cfg.Queue.MeteringAppQueueSize, cfg.Queue.MeteringAppQueueCount, cfg.Queue.LabelerQueueCount,
+		"2-meta-packet-to-pcap-app", cfg.Queue.PCapAppQueueSize, cfg.Queue.PCapAppQueueCount, cfg.Queue.LabelerQueueCount,
 		libqueue.OptionFlushIndicator(time.Minute), releaseMetaPacket,
 	)
 
@@ -154,7 +155,7 @@ func Start(configPath string) (closers []io.Closer) {
 	})
 	labelerManager.Start()
 
-	// L3 - flow generator & metering marshaller
+	// L3 - flow generator & metering marshaller & pcap
 	docsInBuffer := int(cfg.MapReduce.DocsInBuffer)
 	windowSize := int(cfg.MapReduce.WindowSize)
 	releaseTaggedFlow := func(x interface{}) {
@@ -195,6 +196,19 @@ func Start(configPath string) (closers []io.Closer) {
 	}
 
 	mapreduce.NewMeteringMapProcess(meteringAppOutputQueue, meteringAppQueues, cfg.Queue.MeteringAppQueueCount, docsInBuffer, windowSize).Start()
+
+	pcapClosers := pcap.NewWorkerManager(
+		pcapAppQueues,
+		cfg.Queue.PCapAppQueueCount,
+		cfg.PCap.MaxConcurrentFiles,
+		cfg.PCap.MaxFileSizeMB,
+		cfg.PCap.MaxFilePeriodSecond,
+		cfg.PCap.MaxDirectorySizeGB,
+		cfg.PCap.DiskFreeSpaceMarginGB,
+		cfg.PCap.MaxFileKeepDay,
+		cfg.PCap.FileDirectory,
+	).Start()
+	closers = append(closers, pcapClosers...)
 
 	// L4 - flow duplicator & flow sender
 	flowAppQueue := manager.NewQueues(

@@ -34,8 +34,9 @@ type Config struct {
 	Queue            QueueConfig         `yaml:"queue"`
 	Labeler          LabelerConfig       `yaml:"labeler"`
 	FlowGenerator    FlowGeneratorConfig `yaml:"flow-generator"`
-	MapReduce        MapReduce           `yaml:"map-reduce"`
+	MapReduce        MapReduceConfig     `yaml:"map-reduce"`
 	RpcTimeout       time.Duration       `yaml:"rpc-timeout"`
+	PCap             PCapConfig          `yaml:"pcap"`
 }
 
 type IpPortConfig struct {
@@ -51,6 +52,8 @@ type QueueConfig struct {
 	FlowGeneratorQueueSize      int `yaml:"flow-generator-queue-size"`
 	MeteringAppQueueCount       int `yaml:"metering-app-queue-count"`
 	MeteringAppQueueSize        int `yaml:"metering-app-queue-size"`
+	PCapAppQueueCount           int `yaml:"pcap-app-queue-count"`
+	PCapAppQueueSize            int `yaml:"pcap-app-queue-size"`
 	FlowAppQueueCount           int `yaml:"flow-app-queue-count"`
 	FlowAppQueueSize            int `yaml:"flow-app-queue-size"`
 	FlowDuplicatorQueueSize     int `yaml:"flow-duplicator-queue-size"`
@@ -80,9 +83,19 @@ type FlowGeneratorConfig struct {
 	ReportTolerance     time.Duration `yaml:"report-tolerance"`
 }
 
-type MapReduce struct {
+type MapReduceConfig struct {
 	DocsInBuffer uint32 `yaml:"docs-in-buffer"`
 	WindowSize   uint32 `yaml:"window-size"`
+}
+
+type PCapConfig struct {
+	MaxConcurrentFiles    int    `yaml:"max-concurrent-files"`
+	MaxFileSizeMB         int    `yaml:"max-file-size-mb"`
+	MaxFilePeriodSecond   int    `yaml:"max-file-period-second"`
+	MaxDirectorySizeGB    int    `yaml:"max-directory-size-gb"`
+	DiskFreeSpaceMarginGB int    `yaml:"disk-free-space-margin-gb"`
+	MaxFileKeepDay        int    `yaml:"max-file-keep-day"`
+	FileDirectory         string `yaml:"file-directory"`
 }
 
 func (c *Config) Validate() error {
@@ -146,6 +159,12 @@ func (c *Config) Validate() error {
 	}
 	if c.Queue.MeteringAppQueueSize == 0 {
 		c.Queue.MeteringAppQueueSize = c.Queue.QueueSize
+	}
+	if c.Queue.PCapAppQueueCount <= 0 {
+		c.Queue.PCapAppQueueCount = 1
+	}
+	if c.Queue.PCapAppQueueSize <= 0 {
+		c.Queue.PCapAppQueueSize = c.Queue.QueueSize
 	}
 	if c.Queue.FlowAppQueueCount == 0 {
 		c.Queue.FlowAppQueueCount = 8
@@ -225,6 +244,28 @@ func (c *Config) Validate() error {
 	}
 	if c.RpcTimeout > 0 {
 		c.RpcTimeout *= time.Second
+	}
+
+	if c.PCap.MaxConcurrentFiles <= 0 {
+		c.PCap.MaxConcurrentFiles = 5000
+	}
+	if c.PCap.MaxFileSizeMB <= 0 {
+		c.PCap.MaxFileSizeMB = 25
+	}
+	if c.PCap.MaxFilePeriodSecond <= 0 {
+		c.PCap.MaxFilePeriodSecond = 300
+	}
+	if c.PCap.MaxDirectorySizeGB <= 0 {
+		c.PCap.MaxDirectorySizeGB = 100
+	}
+	if c.PCap.DiskFreeSpaceMarginGB <= 0 {
+		c.PCap.DiskFreeSpaceMarginGB = 10
+	}
+	if c.PCap.MaxFileKeepDay <= 0 {
+		c.PCap.MaxFileKeepDay = 7
+	}
+	if c.PCap.FileDirectory == "" {
+		c.PCap.FileDirectory = "/var/lib/droplet/pcap"
 	}
 	return nil
 }

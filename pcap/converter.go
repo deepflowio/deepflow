@@ -165,7 +165,7 @@ func (p RawPacket) fillTCP(packet *datatype.MetaPacket, start, ipv4Offset int) i
 	if packet.TcpData != nil {
 		binary.BigEndian.PutUint32(base[TCP_SEQ_NUMBER_OFFSET:], packet.TcpData.Seq)
 		binary.BigEndian.PutUint32(base[TCP_ACK_NUMBER_OFFSET:], packet.TcpData.Ack)
-		base[TCP_DATA_OFFSET_OFFSET] = packet.TcpData.DataOffset
+		base[TCP_DATA_OFFSET_OFFSET] = packet.TcpData.DataOffset << 4
 		base[TCP_FLAGS_OFFSET] = packet.TcpData.Flags
 		binary.BigEndian.PutUint16(base[TCP_WINDOW_SIZE_OFFSET:], packet.TcpData.WinSize)
 
@@ -204,7 +204,7 @@ func (p RawPacket) fillTCP(packet *datatype.MetaPacket, start, ipv4Offset int) i
 			}
 			length += optOffset
 		}
-		if uint8(length<<2) != packet.TcpData.DataOffset {
+		if uint8(length>>2) != packet.TcpData.DataOffset {
 			log.Debugf("DataOffset %d mismatch with real length %d", packet.TcpData.DataOffset, length)
 		}
 	}
