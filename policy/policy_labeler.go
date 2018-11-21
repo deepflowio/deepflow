@@ -487,8 +487,6 @@ func (l *PolicyLabeler) UpdateAcls(acls []*Acl) {
 func (l *PolicyLabeler) FlushAcls() {
 	for i := 0; i < len(l.FastPolicyMaps); i++ {
 		for j := TAP_MIN; j < TAP_MAX; j++ {
-			l.FastPolicyMaps[i][j].Clear()
-			l.FastPolicyMapsMini[i][j].Clear()
 			l.FastPolicyMaps[i][j] = lru.New((int(l.MapSize) >> 3) * 7)
 			l.FastPolicyMapsMini[i][j] = lru.New(int(l.MapSize) >> 3)
 		}
