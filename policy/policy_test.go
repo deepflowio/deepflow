@@ -1201,19 +1201,20 @@ func TestNpbAction(t *testing.T) {
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
 	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
 	npb1 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_IP, TAPSIDE_DST, 100)
-	npb2 := ToNpbAction(20, 200, RESOURCE_GROUP_TYPE_IP, TAPSIDE_DST, 200)
+	npb2 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_IP, TAPSIDE_DST, 200)
+	npb3 := ToNpbAction(20, 200, RESOURCE_GROUP_TYPE_IP, TAPSIDE_DST, 200)
 	acl1 := generatePolicyAcl(table, action1, 25, groupAny, groupAny, IPProtocolTCP, 1000, vlanAny, npb1)
 	action2 := generateAclAction(26, ACTION_PACKET_BROKERING)
 	// acl2 Group: 0 -> 0 Port: 1000 Proto: 0 vlan: any
-	acl2 := generatePolicyAcl(table, action2, 26, groupAny, groupAny, protoAny, 1000, vlanAny, npb1)
+	acl2 := generatePolicyAcl(table, action2, 26, groupAny, groupAny, protoAny, 1000, vlanAny, npb2)
 	action3 := generateAclAction(27, ACTION_PACKET_BROKERING)
 	// acl3 Group: 0 -> 0 Port: 0 Proto: 6 vlan: any
-	acl3 := generatePolicyAcl(table, action3, 27, groupAny, groupAny, IPProtocolUDP, 1000, vlanAny, npb2)
+	acl3 := generatePolicyAcl(table, action3, 27, groupAny, groupAny, IPProtocolUDP, 1000, vlanAny, npb3)
 	acls = append(acls, acl1, acl2, acl3)
 	table.UpdateAcls(acls)
 	// 构建预期结果
 	basicPolicyData := &PolicyData{}
-	basicPolicyData.Merge([]AclAction{action1, action2}, []NpbAction{npb1}, 25)
+	basicPolicyData.Merge([]AclAction{action1, action2}, []NpbAction{npb2}, 25)
 
 	// key1: ip3:1023 -> ip4:1000 tcp
 	key1 := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1023, 1000)
@@ -1226,7 +1227,7 @@ func TestNpbAction(t *testing.T) {
 
 	// key2: ip3:1023 -> ip4:1000 udp
 	*basicPolicyData = PolicyData{}
-	basicPolicyData.Merge([]AclAction{action3, action2}, []NpbAction{npb2, npb1}, 27)
+	basicPolicyData.Merge([]AclAction{action3, action2}, []NpbAction{npb3, npb2}, 27)
 	key2 := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolUDP, 1023, 1000)
 	setEthTypeAndOthers(key2, EthernetTypeIPv4, 64, true, true)
 	policyData = table.LookupPolicyByKey(key2)
