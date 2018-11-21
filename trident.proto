@@ -146,10 +146,10 @@ enum TapSide {
 }
 
 message NpbAction {
-    required uint32 tunnel_id = 2;
-    required string tunnel_ip = 3;
-    required TapSide tap_side = 4;
-    required uint32 payload_slice = 5 [default = 65535];
+    optional uint32 tunnel_id = 2;
+    optional string tunnel_ip = 3;
+    optional TapSide tap_side = 4;
+    optional uint32 payload_slice = 5 [default = 65535];
 }
 
 message FlowAction {
