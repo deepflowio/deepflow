@@ -641,15 +641,23 @@ func (l *PolicyLabeler) checkNpbAction(endpointData *EndpointData, policy *Polic
 	result.NpbActions = result.NpbActions[:0]
 
 	for i := 0; i < len(validActions); i++ {
-		repeat := false
 		for j := i + 1; j < len(validActions); j++ {
-			if validActions[i].TunnelInfo() == validActions[j].TunnelInfo() {
-				repeat = true
+			if validActions[i].TunnelInfo() != validActions[j].TunnelInfo() {
+				continue
 			}
+
+			if validActions[i].PayloadSlice() == 0 ||
+				validActions[i].PayloadSlice() > validActions[j].PayloadSlice() {
+				validActions = append(validActions[:j], validActions[j+1:]...)
+			} else {
+				validActions = append(validActions[:i], validActions[i+1:]...)
+			}
+			i--
+			break
 		}
-		if !repeat {
-			result.NpbActions = append(result.NpbActions, validActions[i])
-		}
+	}
+	if len(validActions) > 0 {
+		result.NpbActions = append(result.NpbActions, validActions...)
 	}
 	return result
 }
