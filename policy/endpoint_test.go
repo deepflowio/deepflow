@@ -14,8 +14,8 @@ func TestGetPlatformData(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	ipInfo := generateIpNet(ip3, 121, 24)
 	ipInfo1 := generateIpNet(ip4, 122, 25)
-	// ecpId:11 DeviceType:2 DeviceId:3 IfType:3 IfIndex:5 Mac:mac4 HostIp:launchServer1
-	vifData := generatePlatformDataExtension(groupEpc[8], 2, 3, 3, 5, mac4, launchServer1)
+	// epcId:40 DeviceType:2 DeviceId:3 IfType:3 IfIndex:5 Mac:mac4 HostIp:launchServer1
+	vifData := generatePlatformDataExtension(groupEpc[4], 2, 3, 3, 5, mac4, launchServer1)
 	vifData.Ips = append(vifData.Ips, ipInfo, ipInfo1)
 
 	ipInfo2 := generateIpNet(ip2, 125, 24)
@@ -26,7 +26,7 @@ func TestGetPlatformData(t *testing.T) {
 	datas = append(datas, vifData, vifData1)
 	policy.UpdateInterfaceData(datas)
 
-	key := generateLookupKey(mac4, mac2, vlanAny, ip1, ip3, protoAny, 0, 0)
+	key := generateLookupKey(mac4, mac2, vlanAny, ip2, ip4, protoAny, 0, 0)
 	result, _ := policy.LookupAllByKey(key)
 	if result != nil {
 		t.Log(result.SrcInfo, "\n")
@@ -39,14 +39,14 @@ func TestGetPlatformDataAboutArp(t *testing.T) {
 
 	ipInfo := generateIpNet(ip3, 121, 24)
 	ipInfo1 := generateIpNet(ip4, 122, 25)
-	// ecpId:11 DeviceType:2 DeviceId:3 IfType:3 IfIndex:5 Mac:mac4 HostIp:launchServer1
-	vifData := generatePlatformDataExtension(groupEpc[8], 2, 3, 3, 5, mac4, launchServer1)
+	// epcId:40 DeviceType:2 DeviceId:3 IfType:3 IfIndex:5 Mac:mac4 HostIp:launchServer1
+	vifData := generatePlatformDataExtension(groupEpc[4], 2, 3, 3, 5, mac4, launchServer1)
 	vifData.Ips = append(vifData.Ips, ipInfo, ipInfo1)
 
 	datas = append(datas, vifData)
 	policy.UpdateInterfaceData(datas)
 
-	key := generateClassicLookupKey(mac4, mac2, ip1, ip3, 0, 0, EthernetTypeARP)
+	key := generateClassicLookupKey(mac4, mac3, ip4, ip3, 0, 0, EthernetTypeARP)
 	now := time.Now()
 	result, _ := policy.LookupAllByKey(key)
 	t.Log(time.Now().Sub(now))
@@ -65,7 +65,7 @@ func TestGetGroupData(t *testing.T) {
 	generateIpgroupData(policy)
 	policy.UpdateAcls(nil)
 
-	key := generateClassicLookupKey(mac4, mac2, ip3, ip4, 0, 0, EthernetTypeARP)
+	key := generateClassicLookupKey(mac4, mac2, ip4, ip2, 0, 0, EthernetTypeARP)
 	now := time.Now()
 	result, _ := policy.LookupAllByKey(key)
 	t.Log(time.Now().Sub(now))
@@ -86,7 +86,7 @@ func TestAllPassPolicy(t *testing.T) {
 	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, protoAny, 0, vlanAny)
 	policy.UpdateAcls([]*Acl{acl1})
 
-	key := generateClassicLookupKey(mac4, mac2, ip3, ip4, 0, 0, EthernetTypeARP)
+	key := generateClassicLookupKey(mac4, mac2, ip4, ip2, 0, 0, EthernetTypeARP)
 	_, policyData := policy.LookupAllByKey(key)
 	basicPolicyData := new(PolicyData)
 	basicPolicyData.Merge([]AclAction{forward, backward}, acl1.Id)
@@ -100,11 +100,11 @@ func TestGroupForwardPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	// srcGroups: 3
-	acl1 := generatePolicyAcl(policy, forward, 10, group[9], groupAny, protoAny, 0, vlanAny)
+	// srcGroups: 40
+	acl1 := generatePolicyAcl(policy, forward, 10, group[4], groupAny, protoAny, 0, vlanAny)
 	policy.UpdateAcls([]*Acl{acl1})
 
-	key := generateClassicLookupKey(mac4, mac2, ip3, ip4, 0, 0, EthernetTypeARP)
+	key := generateClassicLookupKey(mac4, mac2, ip4, ip2, 0, 0, EthernetTypeARP)
 	_, policyData := policy.LookupAllByKey(key)
 	basicPolicyData := new(PolicyData)
 	basicPolicyData.Merge([]AclAction{forward}, acl1.Id)
@@ -118,11 +118,11 @@ func TestGroupBackwardPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	// dstGroups: 3
-	acl1 := generatePolicyAcl(policy, backward, 10, groupAny, group[9], protoAny, 0, vlanAny)
+	// dstGroups: 40
+	acl1 := generatePolicyAcl(policy, backward, 10, groupAny, group[4], protoAny, 0, vlanAny)
 	policy.UpdateAcls([]*Acl{acl1})
 
-	key := generateClassicLookupKey(mac4, mac2, ip3, ip4, 0, 0, EthernetTypeARP)
+	key := generateClassicLookupKey(mac4, mac2, ip4, ip2, 0, 0, EthernetTypeARP)
 	_, policyData := policy.LookupAllByKey(key)
 	basicPolicyData := new(PolicyData)
 	basicPolicyData.Merge([]AclAction{backward}, acl1.Id)
@@ -140,7 +140,7 @@ func TestAllPortPassPolicy(t *testing.T) {
 	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, protoAny, 30, vlanAny)
 	policy.UpdateAcls([]*Acl{acl1})
 
-	key := generateClassicLookupKey(mac4, mac2, ip3, ip4, 30, 30, EthernetTypeARP)
+	key := generateClassicLookupKey(mac4, mac2, ip4, ip2, 30, 30, EthernetTypeARP)
 	_, policyData := policy.LookupAllByKey(key)
 	basicPolicyData := new(PolicyData)
 	basicPolicyData.Merge([]AclAction{forward, backward}, acl1.Id)
@@ -158,7 +158,7 @@ func TestSrcPortPassPolicy(t *testing.T) {
 	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, protoAny, 30, vlanAny)
 	policy.UpdateAcls([]*Acl{acl1})
 
-	key := generateLookupKey(mac4, mac2, vlanAny, ip3, ip4, IPProtocolTCP, 30, 0)
+	key := generateLookupKey(mac4, mac2, vlanAny, ip4, ip2, IPProtocolTCP, 30, 0)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[0], l2EndBool[0])
 
 	_, policyData := policy.LookupAllByKey(key)
@@ -178,7 +178,7 @@ func TestDstPortPassPolicy(t *testing.T) {
 	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, protoAny, 30, vlanAny)
 	policy.UpdateAcls([]*Acl{acl1})
 
-	key := generateLookupKey(mac4, mac2, vlanAny, ip3, ip4, IPProtocolTCP, 0, 30)
+	key := generateLookupKey(mac4, mac2, vlanAny, ip4, ip2, IPProtocolTCP, 0, 30)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[0], l2EndBool[0])
 
 	_, policyData := policy.LookupAllByKey(key)
@@ -198,7 +198,7 @@ func TestSrcDstPortPassPolicy(t *testing.T) {
 	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, protoAny, 30, vlanAny)
 	policy.UpdateAcls([]*Acl{acl1})
 
-	key := generateLookupKey(mac4, mac2, vlanAny, ip3, ip4, IPProtocolTCP, 30, 30)
+	key := generateLookupKey(mac4, mac2, vlanAny, ip4, ip2, IPProtocolTCP, 30, 30)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[0], l2EndBool[0])
 
 	_, policyData := policy.LookupAllByKey(key)
@@ -217,7 +217,7 @@ func TestVlanPassPolicy(t *testing.T) {
 	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, protoAny, 0, 30)
 	policy.UpdateAcls([]*Acl{acl1})
 
-	key := generateLookupKey(mac4, mac2, 30, ip3, ip4, IPProtocolTCP, 30, 30)
+	key := generateLookupKey(mac4, mac2, 30, ip4, ip2, IPProtocolTCP, 30, 30)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[0], l2EndBool[0])
 
 	_, policyData := policy.LookupAllByKey(key)
@@ -237,7 +237,7 @@ func TestVlanPortPassPolicy(t *testing.T) {
 	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, protoAny, 8000, vlanAny)
 	policy.UpdateAcls([]*Acl{acl1})
 
-	key := generateLookupKey(mac4, mac2, 30, ip3, ip4, IPProtocolTCP, 8000, 30)
+	key := generateLookupKey(mac4, mac2, 30, ip4, ip2, IPProtocolTCP, 8000, 30)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[0], l2EndBool[0])
 
 	_, policyData := policy.LookupAllByKey(key)
@@ -257,7 +257,7 @@ func TestPortProtoPassPolicy(t *testing.T) {
 	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, IPProtocolTCP, 8000, vlanAny)
 	policy.UpdateAcls([]*Acl{acl1})
 
-	key := generateLookupKey(mac4, mac2, 30, ip3, ip4, IPProtocolTCP, 8000, 8000)
+	key := generateLookupKey(mac4, mac2, 30, ip4, ip2, IPProtocolTCP, 8000, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[0], l2EndBool[0])
 
 	_, policyData := policy.LookupAllByKey(key)
@@ -280,7 +280,7 @@ func TestAclsPassPolicy(t *testing.T) {
 	acl2 := generatePolicyAcl(policy, aclAction2, 20, groupAny, groupAny, IPProtocolUDP, 8000, vlanAny)
 	policy.UpdateAcls([]*Acl{acl1, acl2})
 
-	key := generateLookupKey(mac4, mac2, 30, ip3, ip4, IPProtocolTCP, 8000, 8000)
+	key := generateLookupKey(mac4, mac2, 30, ip4, ip2, IPProtocolTCP, 8000, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[0], l2EndBool[0])
 
 	_, policyData := policy.LookupAllByKey(key)
@@ -305,7 +305,7 @@ func TestVlanAclsPassPolicy(t *testing.T) {
 	acl2 := generatePolicyAcl(policy, aclAction2, 20, groupAny, groupAny, IPProtocolTCP, 8000, 10)
 	policy.UpdateAcls([]*Acl{acl1, acl2})
 
-	key := generateLookupKey(mac4, mac2, 10, ip3, ip4, IPProtocolTCP, 8000, 8000)
+	key := generateLookupKey(mac4, mac2, 10, ip4, ip2, IPProtocolTCP, 8000, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[0], l2EndBool[0])
 
 	_, policyData := policy.LookupAllByKey(key)
@@ -331,7 +331,7 @@ func TestVlanPortAclsPassPolicy(t *testing.T) {
 	acl2 := generatePolicyAcl(policy, aclAction2, 20, groupAny, groupAny, IPProtocolTCP, 0, 10)
 	policy.UpdateAcls([]*Acl{acl1, acl2})
 
-	key := generateLookupKey(mac4, mac2, 10, ip3, ip4, IPProtocolTCP, 0, 1000)
+	key := generateLookupKey(mac4, mac2, 10, ip4, ip2, IPProtocolTCP, 0, 1000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[0], l2EndBool[0])
 
 	backward := getBackwardAcl(aclAction2)
@@ -355,7 +355,7 @@ func TestVlanPortAclsPassPolicy1(t *testing.T) {
 	acl2 := generatePolicyAcl(policy, aclAction2, 20, groupAny, groupAny, IPProtocolTCP, 0, 10)
 	policy.UpdateAcls([]*Acl{acl1, acl2})
 
-	key := generateLookupKey(mac4, mac2, 10, ip3, ip4, IPProtocolTCP, 0, 8000)
+	key := generateLookupKey(mac4, mac2, 10, ip4, ip2, IPProtocolTCP, 0, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[0], l2EndBool[0])
 
 	_, policyData := policy.LookupAllByKey(key)
@@ -379,7 +379,7 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 	acl2 := generatePolicyAcl(policy, aclAction2, 20, groupAny, groupAny, IPProtocolTCP, 0, 10)
 	policy.UpdateAcls([]*Acl{acl1, acl2})
 
-	key := generateLookupKey(mac4, mac2, vlanAny, ip3, ip4, IPProtocolTCP, 0, 8000)
+	key := generateLookupKey(mac4, mac2, vlanAny, ip4, ip2, IPProtocolTCP, 0, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[0], l2EndBool[0])
 
 	_, policyData := policy.LookupAllByKey(key)
@@ -395,18 +395,18 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 	}
 }
 
-// l2EpcId0=11,L3EpcId0=11,l2Epcid1=0,L3EpcId1=-1的数据正确性
+// l2EpcId0=40,L3EpcId0=40,l2Epcid1=0,L3EpcId1=-1的数据正确性
 func TestModifyEpcIdPolicy1(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
-	platformData1 := generatePlatformDataByParam(ip3, mac4, groupEpc[8], 4)
+	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpc[4], 4)
 	policy.UpdateInterfaceData([]*PlatformData{platformData1})
 	generateIpgroupData(policy)
 	generateAclData(policy)
 
-	key := generateLookupKey(mac4, mac2, vlanAny, ip3, ip4, IPProtocolTCP, 0, 8000)
+	key := generateLookupKey(mac4, mac2, vlanAny, ip4, ip2, IPProtocolTCP, 0, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[1], l2EndBool[1])
 
-	basicData := generateEpcInfo(groupEpc[8], groupEpc[8], groupEpcAny, groupEpcOther)
+	basicData := generateEpcInfo(groupEpc[4], groupEpc[4], groupEpcAny, groupEpcOther)
 	data, _ := policy.LookupAllByKey(key)
 	if !CheckEpcTestResult(t, basicData, data) {
 		t.Error("TestModifyEpcIdPolicy1 Check Failed!")
@@ -418,19 +418,19 @@ func TestModifyEpcIdPolicy1(t *testing.T) {
 	}
 }
 
-// l2EpcId0=11,l3EpcId0=11,l2EpcId1=12,l3EpcId1=12的数据正确性
+// l2EpcId0=40,l3EpcId0=40,l2EpcId1=50,l3EpcId1=50的数据正确性
 func TestModifyEpcIdPolicy2(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
-	platformData1 := generatePlatformDataByParam(ip3, mac4, groupEpc[8], 4)
-	platformData2 := generatePlatformDataByParam(ip4, mac5, groupEpc[10], 3)
+	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpc[4], 4)
+	platformData2 := generatePlatformDataByParam(ip5, mac5, groupEpc[5], 3)
 	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
 	generateIpgroupData(policy)
 	generateAclData(policy)
 
-	key := generateLookupKey(mac4, mac5, vlanAny, ip3, ip4, IPProtocolTCP, 0, 8000)
+	key := generateLookupKey(mac4, mac5, vlanAny, ip4, ip5, IPProtocolTCP, 0, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[1], l2EndBool[1])
 
-	basicData := generateEpcInfo(groupEpc[8], groupEpc[8], groupEpc[10], groupEpc[10])
+	basicData := generateEpcInfo(groupEpc[4], groupEpc[4], groupEpc[5], groupEpc[5])
 	data, _ := policy.LookupAllByKey(key)
 	if !CheckEpcTestResult(t, basicData, data) {
 		t.Error("TestModifyEpcIdPolicy2 Check Failed!")
@@ -442,19 +442,19 @@ func TestModifyEpcIdPolicy2(t *testing.T) {
 	}
 }
 
-// l2EpcId0=-1,l3EpcId0=-1,l2Epcid1=0,l3EpcId1=12的数据正确性
+// l2EpcId0=-1,l3EpcId0=-1,l2Epcid1=0,l3EpcId1=50的数据正确性
 func TestModifyEpcIdPolicy3(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
-	platformData1 := generatePlatformDataByParam(ip3, mac4, groupEpcAny, 3)
-	platformData2 := generatePlatformDataByParam(ip4, mac5, groupEpc[10], 3)
+	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpcAny, 3)
+	platformData2 := generatePlatformDataByParam(ip5, mac5, groupEpc[5], 3)
 	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
 	generateIpgroupData(policy)
 	generateAclData(policy)
 
-	key := generateLookupKey(mac2, mac1, vlanAny, ip3, ip4, IPProtocolTCP, 0, 8000)
+	key := generateLookupKey(mac2, mac1, vlanAny, ip4, ip5, IPProtocolTCP, 0, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[1], l2EndBool[1])
 
-	basicData := generateEpcInfo(groupEpcOther, groupEpcOther, groupEpcAny, groupEpc[10])
+	basicData := generateEpcInfo(groupEpcOther, groupEpcOther, groupEpcAny, groupEpc[5])
 	data, _ := policy.LookupAllByKey(key)
 	if !CheckEpcTestResult(t, basicData, data) {
 		t.Error("TestModifyEpcIdPolicy3 Check Failed!")
@@ -466,19 +466,19 @@ func TestModifyEpcIdPolicy3(t *testing.T) {
 	}
 }
 
-// l2EpcId0=11,l3EpcId0=11,l2EpcId1=0,l3EpcId1=-1的数据正确性
+// l2EpcId0=40,l3EpcId0=40,l2EpcId1=0,l3EpcId1=-1的数据正确性
 func TestModifyEpcIdPolicy4(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
-	platformData1 := generatePlatformDataByParam(ip3, mac4, groupEpc[8], 3)
-	platformData2 := generatePlatformDataByParam(ip4, mac5, groupEpcAny, 3)
+	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpc[4], 3)
+	platformData2 := generatePlatformDataByParam(ip5, mac5, groupEpcAny, 3)
 	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
 	generateIpgroupData(policy)
 	generateAclData(policy)
 
-	key := generateLookupKey(mac5, mac1, vlanAny, ip3, ip4, IPProtocolTCP, 0, 8000)
+	key := generateLookupKey(mac5, mac1, vlanAny, ip4, ip5, IPProtocolTCP, 0, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[1], l2EndBool[1])
 
-	basicData := generateEpcInfo(groupEpc[8], groupEpc[8], groupEpcAny, groupEpcOther)
+	basicData := generateEpcInfo(groupEpc[4], groupEpc[4], groupEpcAny, groupEpcOther)
 	data, _ := policy.LookupAllByKey(key)
 	if !CheckEpcTestResult(t, basicData, data) {
 		t.Error("TestModifyEpcIdPolicy4 Check Failed!")
@@ -493,15 +493,15 @@ func TestModifyEpcIdPolicy4(t *testing.T) {
 // l3EpcId0=-1, l3EpcId1=-1的数据正确性
 func TestModifyEpcIdPolicy5(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
-	platformData1 := generatePlatformDataByParam(ip3, mac4, groupEpcAny, 4)
-	platformData2 := generatePlatformDataByParam(ip4, mac5, groupEpcAny, 4)
+	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpcAny, 4)
+	platformData2 := generatePlatformDataByParam(ip5, mac5, groupEpcAny, 4)
 	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
 	generateIpgroupData(policy)
 	generateAclData(policy)
 
 	// l3EpcId0=-1, l3EpcId1=-1, l2EpcId0=0, l2EpcId1=0
 
-	key := generateLookupKey(mac2, mac3, vlanAny, ip3, ip4, IPProtocolTCP, 0, 8000)
+	key := generateLookupKey(mac2, mac3, vlanAny, ip4, ip5, IPProtocolTCP, 0, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[0], l2EndBool[1])
 
 	basicData := generateEpcInfo(groupEpcAny, groupEpcOther, groupEpcAny, groupEpcOther)
