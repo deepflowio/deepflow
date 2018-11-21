@@ -24,7 +24,7 @@ var (
 	ip9           = NewIPFromString("172.16.10.10").Int()
 	ip10          = NewIPFromString("172.16.10.20").Int()
 	ip11          = NewIPFromString("255.255.255.255").Int()
-	ipNet1        = "192.168.0.11/24"
+	ipNet1        = "192.168.0.12/24"
 	groupEpcOther = int32(-1)
 	groupEpcAny   = int32(0)
 	groupAny      = uint32(0)
@@ -49,7 +49,7 @@ var (
 	server = NewIPFromString("172.20.1.1").Int()
 
 	group    = []uint32{0, 10, 20, 30, 40, 50, 60, 70, 2, 3, 4}
-	groupEpc = []int32{0, 10, 20, 0, 40, 50, 0, 70, 11, 11, 12}
+	groupEpc = []int32{0, 10, 20, 0, 40, 50, 0, 70, 40, 11, 12}
 	ipGroup6 = group[6] + IP_GROUP_ID_FLAG
 
 	group1Ip1  = NewIPFromString("192.168.1.10").Int()
@@ -282,9 +282,10 @@ func (policy *PolicyTable) UpdateAcls(acl []*Acl) {
 
 // 生成特定IP资源组信息
 func generateIpgroupData(policy *PolicyTable) {
-	ipGroup1 := generateIpGroup(group[8], groupEpc[8], ipNet1)
-	ipGroup2 := generateIpGroup(group[9], groupEpc[9], ipNet1)
-	ipGroup3 := generateIpGroup(group[10], groupEpc[10], ipNet1)
+	// groupEpc[8] = groupEpc[4], group[8] != group[4]
+	ipGroup1 := generateIpGroup(group[4], groupEpc[4], ipNet1)
+	ipGroup2 := generateIpGroup(group[5], groupEpc[5], ipNet1)
+	ipGroup3 := generateIpGroup(group[8], groupEpc[8], ipNet1)
 
 	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3)
 	policy.UpdateIpGroupData(ipGroups)
@@ -292,8 +293,8 @@ func generateIpgroupData(policy *PolicyTable) {
 
 // 生成特定平台信息
 func generatePlatformData(policy *PolicyTable) {
-	// epcId:11 IfType:4
-	vifData := generatePlatformDataByParam(ip3, mac4, groupEpc[8], 4)
+	// epcId:40 IfType:4
+	vifData := generatePlatformDataByParam(ip4, mac4, groupEpc[4], 4)
 	datas = append(datas, vifData)
 
 	policy.UpdateInterfaceData(datas)
