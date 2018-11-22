@@ -160,8 +160,8 @@ func (p *MetaPacket) ParseL4(stream *ByteStream) {
 		stream.Skip(4) // skip checksum and URG Pointer
 		p.PayloadLen = uint16(len) - dataOffset
 		tcpHeader := &MetaPacketTcpHeader{flags, seq, ack, uint8(dataOffset >> 2), winSize, 0, false, 0, nil}
-		if dataOffset-MIN_TCP_HEADER_SIZE > 0 {
-			tcpHeader.extractTcpOptions(stream)
+		if optionsLen := dataOffset - MIN_TCP_HEADER_SIZE; optionsLen > 0 {
+			tcpHeader.extractTcpOptions(&ByteStream{stream.Field(int(optionsLen)), 0})
 		}
 		p.TcpData = tcpHeader
 	} else if p.Protocol == IPProtocolUDP {
