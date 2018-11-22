@@ -2,6 +2,8 @@ controller-ips:
   - 127.0.0.1
 # controller listening port
 controller-port: 20035
+# Rpc synchronization timeout default 8s
+rpc-timeout: 8
 # logfile path
 log-file: /var/log/droplet/droplet.log
 # loglevel: "debug/info/warn/error"
@@ -25,8 +27,6 @@ stream-port: 20201
 zero-hosts: []
 #  - 127.0.0.1
 zero-port: 20202
-# Rpc synchronization timeout default 8s
-rpc-timeout: 8
 # internal queues conf
 queue:
   # queue size, default 65536
