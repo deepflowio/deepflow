@@ -22,10 +22,8 @@ func (t *DedupTable) hashPacket(packet []byte) (uint32, uint64, PacketId) {
 		return xxhash.Checksum32(packetId[:]), id, packetId
 	}
 
-	vlanTagSize := 0
 	ethType := EthernetType(BigEndian.Uint16(packet[12:]))
 	if ethType == EthernetTypeDot1Q { // ignore vlan tag
-		vlanTagSize = 4
 		ethType = EthernetType(BigEndian.Uint16(packet[16:]))
 		copy(packetId[:12], packet[:12])
 		copy(packetId[12:], packet[16:])
@@ -34,9 +32,8 @@ func (t *DedupTable) hashPacket(packet []byte) (uint32, uint64, PacketId) {
 	}
 
 	if ethType == EthernetTypeIPv4 {
-		if t.overwriteTTL {
+		if t.ignoreTTL {
 			packetId[22] = 128
-			packet[22+vlanTagSize] = 128
 		}
 		id = uint64(BigEndian.Uint32(packetId[18:22])) | // IP ID, Frag
 			(uint64(BigEndian.Uint16(packetId[24:26])) << 32) | // IP checksum
