@@ -18,11 +18,11 @@ const (
 )
 
 type DedupTable struct {
-	hashTable    *HashTable
-	queue        *List
-	buffer       *List
-	overwriteTTL bool
-	counter      *Counter
+	hashTable *HashTable
+	queue     *List
+	buffer    *List
+	ignoreTTL bool
+	counter   *Counter
 }
 
 type Counter struct {
@@ -130,8 +130,8 @@ func (list *List) remove(node *ListNode) {
 	node.next = nil
 }
 
-func (t *DedupTable) SetOverwriteTTL(b bool) {
-	t.overwriteTTL = b
+func (t *DedupTable) SetIgnoreTTL(b bool) {
+	t.ignoreTTL = b
 }
 
 func (t *DedupTable) allocateNodePair(timestamp time.Duration, hash uint32, id uint64, packetId PacketId) (qnode, bnode *ListNode) {
