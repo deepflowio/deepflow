@@ -147,6 +147,7 @@ func (p *MetaPacket) ParseL4(stream *ByteStream) {
 	if p.Protocol == IPProtocolTCP {
 		len := stream.Len()
 		if len < MIN_TCP_HEADER_SIZE {
+			p.PayloadLen = 0
 			p.Invalid = true
 			return
 		}
@@ -158,7 +159,7 @@ func (p *MetaPacket) ParseL4(stream *ByteStream) {
 		flags := stream.U8()
 		winSize := stream.U16()
 		stream.Skip(4) // skip checksum and URG Pointer
-		p.PayloadLen = uint16(len) - dataOffset
+		p.PayloadLen -= dataOffset
 		tcpHeader := &MetaPacketTcpHeader{flags, seq, ack, uint8(dataOffset >> 2), winSize, 0, false, 0, nil}
 		if optionsLen := dataOffset - MIN_TCP_HEADER_SIZE; optionsLen > 0 {
 			tcpHeader.extractTcpOptions(&ByteStream{stream.Field(int(optionsLen)), 0})
@@ -196,6 +197,9 @@ func (p *MetaPacket) ParseIp(stream *ByteStream) {
 	}
 	stream.Skip(ipOptionsSize) // skip options
 	payloadLength := uint16(Min(stream.Len(), int(totalLength)-int(ihl)*4))
+	if p.Protocol == IPProtocolTCP {
+		p.PayloadLen = totalLength - uint16(ihl*4)
+	}
 	p.ParseL4(&ByteStream{stream.Slice()[:payloadLength], 0})
 }
 
