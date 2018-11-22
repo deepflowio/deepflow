@@ -135,21 +135,18 @@ func TestChecksum(t *testing.T) {
 	}
 }
 
-func TestOverwriteTTL(t *testing.T) {
+func TestIgnoreTTL(t *testing.T) {
 	da := "00:00:00:fc:a4:0b"
 	sa := "00:00:00:25:3f:63"
 	packet := buildStubPacket(da, sa, EthernetTypeIPv4, 2)
 	packet[22] = 127 // ttl
-	dedupTable.SetOverwriteTTL(true)
+	dedupTable.SetIgnoreTTL(true)
 	dedupTable.IsDuplicate(packet, 0)
 	packet[22] = 126 // ttl
 	if !dedupTable.IsDuplicate(packet, 0) {
 		t.Error("Should hit")
 	}
-	if packet[22] != 128 {
-		t.Error("packet ttl not overwritten")
-	}
-	dedupTable.SetOverwriteTTL(false)
+	dedupTable.SetIgnoreTTL(false)
 }
 
 func TestTimeout(t *testing.T) {
