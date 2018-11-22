@@ -15,7 +15,9 @@ import (
 	"github.com/google/gopacket/pcapgo"
 )
 
-func loadPcap(file string) []RawPacket {
+type PacketLen = int
+
+func loadPcap(file string) ([]RawPacket, []PacketLen) {
 	var f *os.File
 	cwd, _ := os.Getwd()
 	if strings.Contains(cwd, "datatype") {
@@ -27,21 +29,28 @@ func loadPcap(file string) []RawPacket {
 
 	r, _ := pcapgo.NewReader(f)
 	var packets []RawPacket
+	var packetLens []PacketLen
 	for {
-		packet, _, err := r.ReadPacketData()
+		packet, ci, err := r.ReadPacketData()
 		if err != nil || packet == nil {
 			break
 		}
-		packets = append(packets, packet)
+		packetLens = append(packetLens, ci.Length)
+		if len(packet) > 128 {
+			packets = append(packets, packet[:128])
+		} else {
+			packets = append(packets, packet)
+		}
 	}
-	return packets
+	return packets, packetLens
 }
 
 func TestParseArp(t *testing.T) {
 	da, _ := net.ParseMAC("ac:2b:6e:b3:84:63")
 	sa, _ := net.ParseMAC("52:54:00:33:c4:54")
-	packet := loadPcap("arp.pcap")[0]
-	actual := &MetaPacket{PacketLen: uint16(len(packet))}
+	packets, packetLens := loadPcap("arp.pcap")
+	packet := packets[0]
+	actual := &MetaPacket{PacketLen: uint16(packetLens[0])}
 	l2Len := actual.ParseL2(packet)
 	expected := &MetaPacket{
 		InPort:    0,
@@ -78,8 +87,9 @@ func TestParseInvalid(t *testing.T) {
 		IHL:      5,
 		IpID:     0xE9A5,
 	}
-	packet := loadPcap("invalid.pcap")[0]
-	actual := &MetaPacket{PacketLen: uint16(len(packet))}
+	packets, packetLens := loadPcap("invalid.pcap")
+	packet := packets[0]
+	actual := &MetaPacket{PacketLen: uint16(packetLens[0])}
 	l2Len := actual.ParseL2(packet)
 	actual.Parse(packet[l2Len:])
 	if !reflect.DeepEqual(expected, actual) {
@@ -89,9 +99,9 @@ func TestParseInvalid(t *testing.T) {
 
 func TestParseTorPackets(t *testing.T) {
 	var buffer bytes.Buffer
-	packets := loadPcap("meta_packet_test.pcap")
-	for _, packet := range packets {
-		meta := &MetaPacket{InPort: 0x30000, PacketLen: uint16(len(packet))}
+	packets, packetLens := loadPcap("meta_packet_test.pcap")
+	for index, packet := range packets {
+		meta := &MetaPacket{InPort: 0x30000, PacketLen: uint16(packetLens[index])}
 		l2Len := meta.ParseL2(packet)
 		meta.Parse(packet[l2Len:])
 		meta.RawHeader = nil
@@ -110,9 +120,9 @@ func TestParseTorPackets(t *testing.T) {
 func TestParseIspPackets(t *testing.T) {
 	expectInPorts := [...]uint32{0x10002, 0x10001, 0x10002, 0x10002, 0x10001, 0x10002, 0x10002, 0x10002, 0x10002, 0x10002}
 	actualInPorts := [len(expectInPorts)]uint32{}
-	packets := loadPcap("isp.pcap")
+	packets, packetLens := loadPcap("isp.pcap")
 	for i, packet := range packets {
-		meta := &MetaPacket{PacketLen: uint16(len(packet))}
+		meta := &MetaPacket{PacketLen: uint16(packetLens[i])}
 		l2Len := meta.ParseL2(packet)
 		meta.Parse(packet[l2Len:])
 		actualInPorts[i] = meta.InPort
@@ -123,22 +133,24 @@ func TestParseIspPackets(t *testing.T) {
 }
 
 func BenchmarkParsePacket(b *testing.B) {
-	packets := loadPcap("meta_packet_test.pcap")
+	packets, packetLens := loadPcap("meta_packet_test.pcap")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		packet := packets[i%len(packets)]
-		actual := &MetaPacket{PacketLen: uint16(len(packet))}
+		index := i % len(packets)
+		packet := packets[index]
+		actual := &MetaPacket{PacketLen: uint16(packetLens[index])}
 		l2Len := actual.ParseL2(packet)
 		actual.Parse(packet[l2Len:])
 	}
 }
 
 func BenchmarkQinQ(b *testing.B) {
-	packets := loadPcap("isp.pcap")
+	packets, packetLens := loadPcap("isp.pcap")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		packet := packets[i%len(packets)]
-		actual := &MetaPacket{PacketLen: uint16(len(packet))}
+		index := i % len(packets)
+		packet := packets[index]
+		actual := &MetaPacket{PacketLen: uint16(packetLens[index])}
 		l2Len := actual.ParseL2(packet)
 		actual.Parse(packet[l2Len:])
 	}
