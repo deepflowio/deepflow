@@ -87,7 +87,7 @@ func (l *LabelerManager) RegisterAppQueue(queueType QueueType, appQueues queue.M
 }
 
 func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
-	log.Info("droplet grpc recv response")
+	log.Info("droplet grpc recv response, version:", response.GetVersion())
 	if platformData := response.GetPlatformData(); platformData != nil {
 		if interfaces := platformData.GetInterfaces(); interfaces != nil {
 			platformData := dropletpb.Convert2PlatformData(response)
