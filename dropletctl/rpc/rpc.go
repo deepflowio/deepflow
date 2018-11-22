@@ -76,6 +76,7 @@ func initCmd(cmd CmdExecute) {
 
 	synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.ControllerPort, cfg.RpcTimeout)
 	synchronizer.Register(func(response *trident.SyncResponse) {
+		fmt.Println("version:", response.GetVersion())
 		cmd(response)
 		fmt.Println("press Ctrl^c to end it !!")
 	})
