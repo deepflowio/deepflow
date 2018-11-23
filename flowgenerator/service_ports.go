@@ -14,7 +14,7 @@ type IpPortEpcKey uint64
 type ServiceMap map[IpPortEpcKey]ServiceStatus
 
 type ServiceManager struct {
-	sync.RWMutex
+	sync.Mutex
 
 	lruCache *lru.Cache
 }
@@ -60,9 +60,9 @@ func NewServiceManager(capacity int) *ServiceManager {
 
 func (m *ServiceManager) getStatus(l3EpcId int32, ip IPv4Int, port uint16) ServiceStatus {
 	key := IpPortEpcKey((uint64(ip) << 32) | (uint64(port) << 16) | uint64(l3EpcId))
-	m.RLock()
+	m.Lock()
 	status, ok := m.lruCache.Get(key)
-	m.RUnlock()
+	m.Unlock()
 	if !ok {
 		if port < IANA_PORT_RANGE {
 			return IANAPortServiceList[port]
