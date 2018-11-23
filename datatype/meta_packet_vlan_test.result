@@ -1,0 +1,24 @@
+timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 271 l2_end: false, false invalid: false
+	00:1c:f6:ea:40:00 -> 00:25:45:00:77:40 type: 0800 vlan-id: 256
+	10.90.13.24:443 -> 10.82.65.97:61802 proto: TCP ttl: 125 ihl: 5 id: 18201 flags: 0x2, fragment Offset: 0 payload-len: 213 tcp: &{Flags:24 Seq:3530214087 Ack:3745480996 DataOffset:5 WinSize:256 WinScale:0 SACKPermitted:false MSS:0 Sack:[]}
+timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 83 l2_end: false, false invalid: false
+	00:1c:f6:f8:3b:81 -> 00:00:5e:00:01:65 type: 0800 vlan-id: 1
+	220.181.15.138:25 -> 202.96.219.12:54320 proto: TCP ttl: 55 ihl: 5 id: 8618 flags: 0x2, fragment Offset: 0 payload-len: 13 tcp: &{Flags:24 Seq:2066713222 Ack:4048316186 DataOffset:8 WinSize:114 WinScale:0 SACKPermitted:false MSS:0 Sack:[]}
+timestamp: 0 inport: 0x10002 exporter: 0.0.0.0 len: 64 l2_end: false, false invalid: false
+	00:25:45:00:77:40 -> 00:1c:f6:ea:40:00 type: 0800 vlan-id: 0
+	10.92.60.106:50230 -> 10.94.28.9:445 proto: TCP ttl: 124 ihl: 5 id: 1735 flags: 0x2, fragment Offset: 0 payload-len: 0 tcp: &{Flags:16 Seq:3073744204 Ack:38082375 DataOffset:5 WinSize:256 WinScale:0 SACKPermitted:false MSS:0 Sack:[]}
+timestamp: 0 inport: 0x2 exporter: 0.0.0.0 len: 114 l2_end: false, false invalid: false
+	00:25:45:00:77:40 -> 00:1c:f6:ea:40:00 type: 0800 vlan-id: 0
+	10.73.14.50:50002 -> 10.91.240.136:4172 proto: UDP ttl: 123 ihl: 5 id: 22881 flags: 0x0, fragment Offset: 0 payload-len: 68 
+timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 64 l2_end: false, false invalid: false
+	00:03:b2:30:52:c0 -> 00:1c:f6:f8:3b:81 type: 0800 vlan-id: 513
+	202.96.219.40:5061 -> 175.102.15.218:42163 proto: TCP ttl: 126 ihl: 5 id: 3210 flags: 0x2, fragment Offset: 0 payload-len: 0 tcp: &{Flags:16 Seq:1648460715 Ack:3122464936 DataOffset:5 WinSize:251 WinScale:0 SACKPermitted:false MSS:0 Sack:[]}
+timestamp: 0 inport: 0x20002 exporter: 0.0.0.0 len: 1420 l2_end: false, false invalid: false
+	00:25:45:00:77:40 -> 00:1c:f6:ea:40:00 type: 0800 vlan-id: 0
+	10.129.19.51:53783 -> 10.94.32.18:9092 proto: TCP ttl: 58 ihl: 5 id: 42266 flags: 0x2, fragment Offset: 0 payload-len: 1350 tcp: &{Flags:16 Seq:4017303283 Ack:605449860 DataOffset:8 WinSize:198 WinScale:0 SACKPermitted:false MSS:0 Sack:[]}
+timestamp: 0 inport: 0x10002 exporter: 0.0.0.0 len: 1522 l2_end: false, false invalid: false
+	00:1c:f6:ea:48:00 -> 00:1c:b0:b4:ad:c0 type: 0800 vlan-id: 6
+	10.90.1.133:8080 -> 10.64.184.11:60182 proto: TCP ttl: 62 ihl: 5 id: 15575 flags: 0x2, fragment Offset: 0 payload-len: 1460 tcp: &{Flags:16 Seq:1543519573 Ack:3238184533 DataOffset:5 WinSize:7300 WinScale:0 SACKPermitted:false MSS:0 Sack:[]}
+timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 1424 l2_end: false, false invalid: false
+	00:25:45:00:77:40 -> 00:1c:f6:ea:40:00 type: 0800 vlan-id: 6
+	10.129.19.51:0 -> 10.94.32.18:0 proto: TCP ttl: 58 ihl: 5 id: 42267 flags: 0x4, fragment Offset: 1271 payload-len: 0 
