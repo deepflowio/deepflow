@@ -283,13 +283,9 @@ func (p *MetaPacket) String() string {
 		buffer.WriteString(fmt.Sprintf("\n\tPolicy: %v", p.PolicyData))
 	}
 
-	if len(p.Raw) > 0 {
-		endIndex := Min(len(p.Raw), 64)
-		buffer.WriteString(fmt.Sprintf("\n\tRawPacket: %v, len: %v", hex.Dump(p.Raw[:endIndex]), len(p.Raw)))
-	}
 	if len(p.RawHeader) > 0 {
 		endIndex := Min(len(p.RawHeader), 64)
-		buffer.WriteString(fmt.Sprintf("\n\tlen: %v, RawHeader:\n%v", len(p.RawHeader), hex.Dump(p.RawHeader[:endIndex])))
+		buffer.WriteString(fmt.Sprintf("\n\tRawHeader len: %v, RawHeader: %v", len(p.RawHeader), hex.EncodeToString(p.RawHeader[:endIndex])))
 	}
 
 	return buffer.String()
