@@ -48,7 +48,7 @@ func loadPcap(file string) ([]RawPacket, []PacketLen) {
 func TestParseArp(t *testing.T) {
 	da, _ := net.ParseMAC("ac:2b:6e:b3:84:63")
 	sa, _ := net.ParseMAC("52:54:00:33:c4:54")
-	packets, packetLens := loadPcap("arp.pcap")
+	packets, packetLens := loadPcap("meta_packet_arp_test.pcap")
 	packet := packets[0]
 	actual := &MetaPacket{PacketLen: uint16(packetLens[0])}
 	l2Len := actual.ParseL2(packet)
@@ -66,6 +66,66 @@ func TestParseArp(t *testing.T) {
 	actual.Parse(packet[l2Len:])
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("expected: %+v，actual: %+v", expected, actual)
+	}
+}
+
+func TestParseIcmp(t *testing.T) {
+	var buffer bytes.Buffer
+	packets, packetLens := loadPcap("meta_packet_icmp_test.pcap")
+
+	for index, packet := range packets {
+		meta := &MetaPacket{InPort: 0x30000, PacketLen: uint16(packetLens[index])}
+		l2Len := meta.ParseL2(packet)
+		meta.Parse(packet[l2Len:])
+		buffer.WriteString(meta.String() + "\n")
+	}
+	expectFile := "meta_packet_icmp_test.result"
+	content, _ := ioutil.ReadFile(expectFile)
+	expected := string(content)
+	actual := buffer.String()
+	if expected != actual {
+		ioutil.WriteFile("actual_icmp.txt", []byte(actual), 0644)
+		t.Error(fmt.Sprintf("Inconsistent with %s, written to actual_icmp.txt", expectFile))
+	}
+}
+
+func TestParseL2(t *testing.T) {
+	var buffer bytes.Buffer
+	packets, packetLens := loadPcap("meta_packet_layer2_test.pcap")
+	for index, packet := range packets {
+		meta := &MetaPacket{InPort: 0x30000, PacketLen: uint16(packetLens[index])}
+		l2Len := meta.ParseL2(packet)
+		meta.Parse(packet[l2Len:])
+		meta.RawHeader = nil
+		buffer.WriteString(meta.String() + "\n")
+	}
+	expectFile := "meta_packet_layer2_test.result"
+	content, _ := ioutil.ReadFile(expectFile)
+	expected := string(content)
+	actual := buffer.String()
+	if expected != actual {
+		ioutil.WriteFile("l2_actual.txt", []byte(actual), 0644)
+		t.Error(fmt.Sprintf("Inconsistent with %s, written to l2_actual.txt", expectFile))
+	}
+}
+
+func TestParseVlan(t *testing.T) {
+	var buffer bytes.Buffer
+	packets, packetLens := loadPcap("meta_packet_vlan_test.pcap")
+	for index, packet := range packets {
+		meta := &MetaPacket{PacketLen: uint16(packetLens[index])}
+		l2Len := meta.ParseL2(packet)
+		meta.Parse(packet[l2Len:])
+		meta.RawHeader = nil
+		buffer.WriteString(meta.String() + "\n")
+	}
+	expectFile := "meta_packet_vlan_test.result"
+	content, _ := ioutil.ReadFile(expectFile)
+	expected := string(content)
+	actual := buffer.String()
+	if expected != actual {
+		ioutil.WriteFile("vlan_actual.txt", []byte(actual), 0644)
+		t.Error(fmt.Sprintf("Inconsistent with %s, written to vlan_actual.txt", expectFile))
 	}
 }
 
@@ -87,7 +147,7 @@ func TestParseInvalid(t *testing.T) {
 		IHL:      5,
 		IpID:     0xE9A5,
 	}
-	packets, packetLens := loadPcap("invalid.pcap")
+	packets, packetLens := loadPcap("meta_packet_tcp_invalid_test.pcap")
 	packet := packets[0]
 	actual := &MetaPacket{PacketLen: uint16(packetLens[0])}
 	l2Len := actual.ParseL2(packet)
@@ -99,7 +159,7 @@ func TestParseInvalid(t *testing.T) {
 
 func TestParseTorPackets(t *testing.T) {
 	var buffer bytes.Buffer
-	packets, packetLens := loadPcap("meta_packet_test.pcap")
+	packets, packetLens := loadPcap("meta_packet_tcp_udp_test.pcap")
 	for index, packet := range packets {
 		meta := &MetaPacket{InPort: 0x30000, PacketLen: uint16(packetLens[index])}
 		l2Len := meta.ParseL2(packet)
@@ -120,7 +180,7 @@ func TestParseTorPackets(t *testing.T) {
 func TestParseIspPackets(t *testing.T) {
 	expectInPorts := [...]uint32{0x10002, 0x10001, 0x10002, 0x10002, 0x10001, 0x10002, 0x10002, 0x10002, 0x10002, 0x10002}
 	actualInPorts := [len(expectInPorts)]uint32{}
-	packets, packetLens := loadPcap("isp.pcap")
+	packets, packetLens := loadPcap("meta_packet_isp_test.pcap")
 	for i, packet := range packets {
 		meta := &MetaPacket{PacketLen: uint16(packetLens[i])}
 		l2Len := meta.ParseL2(packet)
@@ -133,7 +193,7 @@ func TestParseIspPackets(t *testing.T) {
 }
 
 func BenchmarkParsePacket(b *testing.B) {
-	packets, packetLens := loadPcap("meta_packet_test.pcap")
+	packets, packetLens := loadPcap("meta_packet_tcp_udp_test.pcap")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		index := i % len(packets)
@@ -145,7 +205,7 @@ func BenchmarkParsePacket(b *testing.B) {
 }
 
 func BenchmarkQinQ(b *testing.B) {
-	packets, packetLens := loadPcap("isp.pcap")
+	packets, packetLens := loadPcap("meta_packet_isp_test.pcap")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		index := i % len(packets)
