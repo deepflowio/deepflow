@@ -3,8 +3,8 @@ package flowgenerator
 import (
 	"sync"
 
-	"github.com/golang/groupcache/lru"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 type ServiceStatus bool
@@ -14,9 +14,9 @@ type IpPortEpcKey uint64
 type ServiceMap map[IpPortEpcKey]ServiceStatus
 
 type ServiceManager struct {
-	sync.Mutex
+	sync.RWMutex
 
-	lruCache *lru.Cache
+	lruCache *Cache
 }
 
 var IANAPortExcludeList = []uint16{
@@ -55,14 +55,14 @@ var IANAPortServiceList []ServiceStatus
 const IANA_PORT_RANGE = 1024 + 1
 
 func NewServiceManager(capacity int) *ServiceManager {
-	return &ServiceManager{lruCache: lru.New(capacity)}
+	return &ServiceManager{lruCache: NewCache(capacity)}
 }
 
 func (m *ServiceManager) getStatus(l3EpcId int32, ip IPv4Int, port uint16) ServiceStatus {
 	key := IpPortEpcKey((uint64(ip) << 32) | (uint64(port) << 16) | uint64(l3EpcId))
-	m.Lock()
-	status, ok := m.lruCache.Get(key)
-	m.Unlock()
+	m.RLock()
+	status, ok := m.lruCache.Check(key)
+	m.RUnlock()
 	if !ok {
 		if port < IANA_PORT_RANGE {
 			return IANAPortServiceList[port]
