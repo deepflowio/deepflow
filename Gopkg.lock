@@ -157,7 +157,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:bb6a9830577cf37bcc00824694e22fa646876ae9dcf916ac07f49b4ab61718dd"
+  digest = "1:c404030c516fbe68aac3af43e542f644a7a5078627ce10cfa86ab514495f1355"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "app",
@@ -176,7 +176,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "00b4ae162c346b61055e77caeda8007354e3d9b9"
+  revision = "5b385b8c93d530d360c959678854899a6cb0af16"
 
 [[projects]]
   branch = "master"
@@ -302,7 +302,6 @@
   analyzer-version = 1
   input-imports = [
     "github.com/docker/go-units",
-    "github.com/golang/groupcache/lru",
     "github.com/golang/protobuf/proto",
     "github.com/google/gopacket/afpacket",
     "github.com/google/gopacket/layers",
