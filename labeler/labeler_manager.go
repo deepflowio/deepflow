@@ -48,6 +48,7 @@ type LabelerManager struct {
 	rawIpGroupDatas  []*policy.IpGroupData
 	rawPolicyData    []*policy.Acl
 	enable           bool
+	version          uint64
 }
 
 const (
@@ -87,13 +88,18 @@ func (l *LabelerManager) RegisterAppQueue(queueType QueueType, appQueues queue.M
 }
 
 func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
-	log.Info("droplet grpc recv response, version:", response.GetVersion())
+	newVersion := response.GetVersion()
+	log.Debugf("droplet grpc recv response with version %d, and current version is %d:", newVersion, l.version)
+	if newVersion == l.version {
+		return
+	}
+	log.Infof("droplet grpc recv response with version %d (vs. current %d)", newVersion, l.version)
+
 	if platformData := response.GetPlatformData(); platformData != nil {
 		if interfaces := platformData.GetInterfaces(); interfaces != nil {
 			platformData := dropletpb.Convert2PlatformData(response)
 			log.Infof("droplet grpc recv %d pieces of platform data", len(platformData))
 			l.OnPlatformDataChange(platformData)
-			log.Info("droplet grpc finish platform data")
 		} else {
 			l.OnPlatformDataChange(nil)
 		}
@@ -101,7 +107,6 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 			ipGroupData := dropletpb.Convert2IpGroupData(response)
 			log.Infof("droplet grpc recv %d pieces of ipgroup data", len(ipGroupData))
 			l.OnIpGroupDataChange(ipGroupData)
-			log.Info("droplet grpc finish ipgroup data")
 		} else {
 			l.OnIpGroupDataChange(nil)
 		}
@@ -114,15 +119,18 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 		acls := dropletpb.Convert2AclData(response)
 		log.Infof("droplet grpc recv %d pieces of acl data", len(acls))
 		l.OnPolicyDataChange(acls)
-		log.Info("droplet grpc finish acl data")
 	} else {
 		l.OnPolicyDataChange(nil)
 	}
 
 	if l.enable {
+		log.Info("droplet grpc enable fast-path policy change")
 		l.policyTable.EnableAclData()
 		l.enable = false
 	}
+
+	l.version = newVersion
+	log.Info("droplet grpc finish data change")
 }
 
 func (l *LabelerManager) OnPlatformDataChange(data []*datatype.PlatformData) {
