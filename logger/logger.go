@@ -64,18 +64,16 @@ func EnableFileLog(logPath string) error {
 	return nil
 }
 
-func EnableSyslog() error {
+func EnableSyslog(facility syslog.Priority) error {
 	if syslogBackend != nil {
 		return nil
 	}
 
-	processName := path.Base(os.Args[0])
-	processName = processName + "/" + processName
-	syslog, err := logging.NewSyslogBackend(processName)
+	syslogWriter, err := syslog.New(syslog.LOG_CRIT|facility, path.Base(os.Args[0]))
 	if err != nil {
 		return err
 	}
-	syslogBackend = syslog
+	syslogBackend = &logging.SyslogBackend{Writer: syslogWriter}
 	applyBackendChange()
 	return nil
 }
@@ -90,10 +88,8 @@ func EnableRsyslog(remotes ...string) error {
 		if err != nil {
 			return err
 		}
-		rsyslogBackends = append(rsyslogBackends, logging.NewBackendFormatter(
-			logging.NewLogBackend(rsyslogWriter, "", 0),
-			logging.MustStringFormatter(LOG_FORMAT),
-		))
+		backend := &logging.SyslogBackend{Writer: rsyslogWriter}
+		rsyslogBackends = append(rsyslogBackends, backend)
 	}
 	applyBackendChange()
 	return nil
