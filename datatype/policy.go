@@ -18,6 +18,7 @@ const (
 	TAPSIDE_SRC  = 0x1
 	TAPSIDE_DST  = 0x2
 	TAPSIDE_MASK = TAPSIDE_SRC | TAPSIDE_DST
+	TAPSIDE_ALL  = TAPSIDE_SRC | TAPSIDE_DST
 )
 
 const (
@@ -32,6 +33,15 @@ func (a NpbAction) TapSideCompare(flag int) bool {
 
 func (a NpbAction) TapSide() int {
 	return int((a >> 16) & TAPSIDE_MASK)
+}
+
+func (a *NpbAction) ReverseTapSide() NpbAction {
+	if a.TapSide() == TAPSIDE_ALL {
+		return *a
+	}
+
+	*a ^= NpbAction(uint64(TAPSIDE_MASK) << 16)
+	return *a
 }
 
 func (a NpbAction) ResourceGroupTypeCompare(flag int) bool {
@@ -322,7 +332,11 @@ func (d *PolicyData) MergeAndSwapDirection(aclActions []AclAction, npbActions []
 	for i, _ := range aclActions {
 		newAclActions[i] = aclActions[i].ReverseDirection()
 	}
-	d.Merge(newAclActions, npbActions, aclID)
+	newNpbActions := make([]NpbAction, len(npbActions))
+	for i, _ := range npbActions {
+		newNpbActions[i] = npbActions[i].ReverseTapSide()
+	}
+	d.Merge(newAclActions, newNpbActions, aclID)
 }
 
 func (d *PolicyData) String() string {
