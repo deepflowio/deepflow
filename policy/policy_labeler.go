@@ -16,9 +16,7 @@ import (
 )
 
 const (
-	FAST_PATH_SOFT_TIMEOUT = 1 * time.Minute
-
-	STANDARD_NETMASK = 0xffff0000
+	FAST_PATH_SOFT_TIMEOUT = 30 * time.Minute
 
 	ANY_GROUP = 0
 	ANY_PROTO = 0
