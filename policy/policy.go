@@ -154,7 +154,7 @@ func (t *PolicyTable) GetCounter() interface{} {
 		MacTable:   uint32(len(t.cloudPlatformLabeler.macTable.macMap)),
 		EpcIpTable: uint32(len(t.cloudPlatformLabeler.epcIpTable.epcIpMap)),
 	}
-	for i := 0; i < MASK_LEN; i++ {
+	for i := MIN_MASK_LEN; i < MAX_MASK_LEN; i++ {
 		counter.IpTable += uint32(len(t.cloudPlatformLabeler.ipTables[i].ipMap))
 	}
 	for i := TAP_MIN; i < TAP_MAX; i++ {

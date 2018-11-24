@@ -34,7 +34,7 @@ type ArpTable struct {
 
 type CloudPlatformLabeler struct {
 	macTable      *MacTable
-	ipTables      [MASK_LEN]*IpTable
+	ipTables      [MASK_LEN_NUM]*IpTable
 	epcIpTable    *EpcIpTable
 	ipGroup       *IpResourceGroup
 	netmaskBitmap uint32
@@ -52,8 +52,8 @@ func NewCloudPlatformLabeler(queueCount int, mapSize uint32) *CloudPlatformLabel
 	macTable := &MacTable{
 		macMap: make(MacMapData),
 	}
-	var ipTables [MASK_LEN]*IpTable
-	for i := uint32(0); i < MASK_LEN; i++ {
+	var ipTables [MASK_LEN_NUM]*IpTable
+	for i := uint32(MIN_MASK_LEN); i <= MAX_MASK_LEN; i++ {
 		ipTables[i] = &IpTable{
 			ipMap: make(IpMapData),
 		}
@@ -115,11 +115,11 @@ func IfHasNetmaskBit(bitmap uint32, k uint32) bool {
 }
 
 func (l *CloudPlatformLabeler) GetDataByIp(ip uint32) *PlatformData {
-	for i := uint32(0); i < MASK_LEN; i++ {
+	for i := uint32(MIN_MASK_LEN); i <= MAX_MASK_LEN; i++ {
 		if !IfHasNetmaskBit(l.netmaskBitmap, i) {
 			continue
 		}
-		subip := IpKey(ip & (NETMASK << i))
+		subip := IpKey(ip & (MAX_NETMASK << i))
 		if info, ok := l.ipTables[i].ipMap[subip]; ok {
 			return info
 		}
@@ -128,9 +128,9 @@ func (l *CloudPlatformLabeler) GetDataByIp(ip uint32) *PlatformData {
 }
 
 func (l *CloudPlatformLabeler) GenerateIpData(platformDatas []*PlatformData) IpMapDatas {
-	ips := make(IpMapDatas, MASK_LEN)
+	ips := make(IpMapDatas, MASK_LEN_NUM)
 
-	for i := uint32(0); i < MASK_LEN; i++ {
+	for i := uint32(MIN_MASK_LEN); i <= MAX_MASK_LEN; i++ {
 		ips[i] = make(IpMapData)
 	}
 	for _, platformData := range platformDatas {

@@ -1,7 +1,6 @@
 package dropletpb
 
 import (
-	"math"
 	"net"
 	"strconv"
 	"strings"
@@ -12,10 +11,7 @@ import (
 	"gitlab.x.lan/yunshan/message/trident"
 )
 
-const MAX_MASKLEN = 32
-const MIN_MASKLEN = 0
-
-var maskLenToNetmask [MAX_MASKLEN + 1]uint32
+var maskLenToNetmask [datatype.MASK_LEN_NUM]uint32
 
 func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	macInt := uint64(0)
@@ -36,8 +32,10 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 			continue
 		}
 		netmask := ipResource.GetMasklen()
-		if netmask == 0 || netmask > datatype.MAX_MASK_LEN || netmask < datatype.MIN_MASK_LEN {
+		if netmask > datatype.MAX_MASK_LEN {
 			netmask = datatype.MAX_MASK_LEN
+		} else if netmask < datatype.MIN_MASK_LEN {
+			netmask = datatype.MIN_MASK_LEN
 		}
 		ipinfo := &datatype.IpNet{
 			Ip:       IpToUint32(fixIp),
@@ -77,21 +75,21 @@ func ipRangeConvert2CIDR(startIp, endIp net.IP) []net.IPNet {
 	for start <= end {
 		maskLen := getFirstMask(start, end)
 		ip := IpFromUint32(start)
-		ipMask := net.CIDRMask(int(maskLen), MAX_MASKLEN)
+		ipMask := net.CIDRMask(int(maskLen), datatype.MAX_MASK_LEN)
 		ips = append(ips, net.IPNet{IP: ip, Mask: ipMask})
 		lastIp := getLastIp(start, maskLen)
-		if lastIp == math.MaxUint32 {
+		if lastIp == datatype.MAX_NETMASK {
 			break
 		}
-		start += 1 << uint32(MAX_MASKLEN-maskLen)
+		start += 1 << uint32(datatype.MAX_MASK_LEN-maskLen)
 	}
 	return ips
 }
 
 func getFirstMask(start, end uint32) uint8 {
-	maxLen := MAX_MASKLEN
-	for ; maxLen > MIN_MASKLEN; maxLen-- {
-		if start&(1<<uint32(MAX_MASKLEN-maxLen)) != 0 {
+	maxLen := datatype.MAX_MASK_LEN
+	for ; maxLen > datatype.MIN_MASK_LEN; maxLen-- {
+		if start&(1<<uint32(datatype.MAX_MASK_LEN-maxLen)) != 0 {
 			// maxLen继续减少将会使得start不是所在网段的第一个IP
 			break
 		}
@@ -257,8 +255,8 @@ func Convert2AclData(response *trident.SyncResponse) []*policy.Acl {
 
 func init() {
 	// fill maskLenToNetmask with {0x00000000, 0x80000000, 0xC0000000, ...}
-	mask := uint32(math.MaxUint32)
-	for i := 0; i <= MAX_MASKLEN; i++ {
+	mask := uint32(datatype.MAX_NETMASK)
+	for i := datatype.MIN_MASK_LEN; i <= datatype.MAX_MASK_LEN; i++ {
 		maskLenToNetmask[i] = ^mask
 		mask >>= 1
 	}
