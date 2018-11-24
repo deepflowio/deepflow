@@ -53,12 +53,12 @@ fi
 %post
 systemctl daemon-reload
 systemctl try-restart droplet
-%{_sbindir}/update-alternatives --install %{_bindir}/dlv %{name} %{_bindir}/dlv.droplet 10
+%{_sbindir}/update-alternatives --install %{_bindir}/dlv dlv %{_bindir}/dlv.droplet 10
 
 %postun
 systemctl daemon-reload
 if [ $1 == 0 ]; then # uninstall
-    %{_sbindir}/update-alternatives --remove %{name} %{_bindir}/dlv
+    %{_sbindir}/update-alternatives --remove dlv %{_bindir}/dlv.droplet
 fi
 
 %changelog
