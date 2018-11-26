@@ -16,6 +16,7 @@ const (
 	LOG_MAX_AGE           = 30 * 24 * time.Hour // every month
 	LOG_FORMAT            = "%{time:2006-01-02 15:04:05.000} [%{level:.4s}] %{shortfile} %{message}"
 	LOG_COLOR_FORMAT      = "%{color}%{time:2006-01-02 15:04:05.000} [%{level:.4s}]%{color:reset} %{shortfile} %{message}"
+	SYSLOG_PRIORITY       = syslog.LOG_CRIT | syslog.LOG_DAEMON
 )
 
 var (
@@ -64,12 +65,12 @@ func EnableFileLog(logPath string) error {
 	return nil
 }
 
-func EnableSyslog(facility syslog.Priority) error {
+func EnableSyslog() error {
 	if syslogBackend != nil {
 		return nil
 	}
 
-	syslogWriter, err := syslog.New(syslog.LOG_CRIT|facility, path.Base(os.Args[0]))
+	syslogWriter, err := syslog.New(SYSLOG_PRIORITY, path.Base(os.Args[0]))
 	if err != nil {
 		return err
 	}
@@ -84,7 +85,7 @@ func EnableRsyslog(remotes ...string) error {
 		if !strings.Contains(remote, ":") {
 			remote += ":514"
 		}
-		rsyslogWriter, err := syslog.Dial("udp", remote, syslog.LOG_CRIT, path.Base(os.Args[0]))
+		rsyslogWriter, err := syslog.Dial("udp", remote, SYSLOG_PRIORITY, path.Base(os.Args[0]))
 		if err != nil {
 			return err
 		}
