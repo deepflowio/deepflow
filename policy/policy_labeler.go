@@ -733,7 +733,7 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 	if aclHit := uint32(len(findPolicy.AclActions) + len(findPolicy.NpbActions)); aclHitMax < aclHit {
 		atomic.CompareAndSwapUint32(&l.AclHitMax, aclHitMax, aclHit)
 	}
-	return l.checkNpbAction(endpointData, findPolicy)
+	return findPolicy
 }
 
 func (l *PolicyLabeler) calcEpc(endpointInfo *EndpointInfo) uint16 {
@@ -959,6 +959,5 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *
 
 	atomic.AddUint64(&l.FastPathHit, 1)
 	atomic.AddUint64(&l.FastPathHitTick, 1)
-	policy = l.checkNpbAction(endpoint, policy)
 	return endpoint, policy
 }
