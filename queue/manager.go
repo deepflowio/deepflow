@@ -226,6 +226,7 @@ func RegisterCommand() *cobra.Command {
 			"1-meta-packet-to-labeler",
 			"2-meta-packet-to-flow-generator",
 			"2-meta-packet-to-metering-app",
+			"2-meta-packet-to-pcap-app",
 			"3-metering-doc-to-marshaller",
 			"3-tagged-flow-to-flow-duplicator",
 			"4-tagged-flow-to-flow-app",
