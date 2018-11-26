@@ -67,11 +67,10 @@ func (c *Cleaner) work() {
 		sumSize := int64(0)
 		nDeleted := 0
 		for _, f := range files {
+			sumSize += f.size
 			if sumSize >= c.maxDirectorySize || now.Sub(f.fileTime) > c.timeToLive {
 				os.Remove(f.location)
 				nDeleted++
-			} else {
-				sumSize += f.size
 			}
 		}
 
