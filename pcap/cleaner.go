@@ -35,7 +35,7 @@ func NewCleaner(maxDirectorySize, diskFreeSpaceMargin int64, timeToLive time.Dur
 	}
 }
 
-func (c *Cleaner) Start() {
+func (c *Cleaner) work() {
 	var files []File
 	for range time.Tick(CLEAN_PERIOD) {
 		files = files[:0]
@@ -85,4 +85,8 @@ func (c *Cleaner) Start() {
 			}
 		}
 	}
+}
+
+func (c *Cleaner) Start() {
+	go c.work()
 }
