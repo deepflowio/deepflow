@@ -15,8 +15,10 @@ import (
 const DEFAULT_QUEUE_LEN = 200
 const DEFAULT_INTERVAL_HIGH = 60 * time.Second
 const DEFAULT_INTERVAL_LOW = 10 * time.Second
-const DEFAULT_DURATION_MSEC = time.Millisecond * 123
+const DEFAULT_DURATION_MSEC = time.Millisecond * 10
 const DEFAULT_PKT_LEN = 128
+
+var defaultConfig = FlowGeneratorConfig{60 * time.Second, 64 * 1024, 1024 * 1024, 4, 1024 * 32, 4, false}
 
 func getDefaultPacket() *MetaPacket {
 	src, _ := net.ParseMAC("12:34:56:78:9A:BC")
@@ -52,6 +54,15 @@ func getDefaultPacket() *MetaPacket {
 	}
 }
 
+func getUdpDefaultPacket() *MetaPacket {
+	packet := getDefaultPacket()
+	packet.Protocol = 17
+	packet.TcpData = nil
+	packet.PortSrc = 80
+	packet.PortDst = 8080
+	return packet
+}
+
 func generateAclAction(id ACLID, actionFlags ActionFlag) AclAction {
 	return AclAction(id).AddActionFlags(actionFlags).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
 }
@@ -62,16 +73,23 @@ func reversePacket(packet *MetaPacket) {
 	packet.PortSrc, packet.PortDst = packet.PortDst, packet.PortSrc
 }
 
-func getDefaultFlowGenerator() *FlowGenerator {
+func getDefaultFlowGenerator(config FlowGeneratorConfig) *FlowGenerator {
 	metaPacketHeaderInQueue := NewOverwriteQueues("metaPacketHeaderInQueue", 1, DEFAULT_QUEUE_LEN)
 	flowOutQueue := NewOverwriteQueue("flowOutQueue", DEFAULT_QUEUE_LEN)
-	cfg := FlowGeneratorConfig{60 * time.Second, 64 * 1024, 1024 * 1024, 4, 1024 * 256, 4, false}
-	return New(metaPacketHeaderInQueue, flowOutQueue, cfg, 0)
+	return New(metaPacketHeaderInQueue, flowOutQueue, config, 0)
+}
+
+func flowGeneratorInit() (*FlowGenerator, MultiQueueReader, QueueWriter) {
+	flowGenerator := getDefaultFlowGenerator(defaultConfig)
+	flowGenerator.forceReportInterval = 0
+	flowGenerator.SetTimeout(TimeoutConfig{0, 5 * time.Second, 0, 5 * time.Second, 5 * time.Second, 0, 0})
+	flowGenerator.minLoopInterval = 0
+	return flowGenerator, flowGenerator.metaPacketHeaderInQueue, flowGenerator.flowOutQueue
 }
 
 func TestNew(t *testing.T) {
 	runtime.GOMAXPROCS(4)
-	flowGenerator := getDefaultFlowGenerator()
+	flowGenerator := getDefaultFlowGenerator(defaultConfig)
 
 	if flowGenerator == nil {
 		t.Error("flowGenerator is nil")
@@ -86,7 +104,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestTunnelMatch(t *testing.T) {
-	flowGenerator := getDefaultFlowGenerator()
+	flowGenerator := getDefaultFlowGenerator(defaultConfig)
 	metaTunnelInfo := &TunnelInfo{Type: 1, Src: 0, Dst: 2, Id: 1}
 	flowTunnelInfo := &TunnelInfo{Type: 1, Src: 1, Dst: 3, Id: 1}
 	if ok := flowGenerator.TunnelMatch(metaTunnelInfo, flowTunnelInfo); ok {
@@ -96,21 +114,19 @@ func TestTunnelMatch(t *testing.T) {
 
 func TestHandleSynRst(t *testing.T) {
 	runtime.GOMAXPROCS(4)
-	flowGenerator := getDefaultFlowGenerator()
-	flowGenerator.SetTimeout(TimeoutConfig{0, 1800 * time.Second, 0, 30 * time.Second, 5 * time.Second, 0, 0})
-	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
-	flowOutQueue := flowGenerator.flowOutQueue
-	flowGenerator.minLoopInterval = 0
+	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
+	flowGenerator.forceReportInterval = 60 * time.Second
+
 	packet0 := getDefaultPacket()
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
-
-	flowGenerator.Start()
 
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Flags = TCP_RST
 	packet1.Timestamp += DEFAULT_DURATION_MSEC
 	reversePacket(packet1)
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
+
+	flowGenerator.Start()
 
 	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
 	if taggedFlow.CloseType != CloseTypeTCPServerRst {
@@ -127,11 +143,8 @@ func TestHandleSynRst(t *testing.T) {
 
 func TestHandleSynFin(t *testing.T) {
 	runtime.GOMAXPROCS(4)
-	flowGenerator := getDefaultFlowGenerator()
-	flowGenerator.SetTimeout(TimeoutConfig{5, 1800, 0, 30, 5, 0, 5})
-	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
-	flowOutQueue := flowGenerator.flowOutQueue
-	flowGenerator.minLoopInterval = 0
+	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
+	flowGenerator.forceReportInterval = 60 * time.Second
 
 	packet0 := getDefaultPacket()
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
@@ -161,11 +174,8 @@ func TestHandleSynFin(t *testing.T) {
 
 func TestPlatformData(t *testing.T) {
 	runtime.GOMAXPROCS(4)
-	flowGenerator := getDefaultFlowGenerator()
-	flowGenerator.SetTimeout(TimeoutConfig{0, 1800 * time.Second, 0, 30 * time.Second, 5 * time.Second, 0, 0})
-	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
-	flowGenerator.minLoopInterval = 0
-	flowOutQueue := flowGenerator.flowOutQueue
+	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
+	flowGenerator.forceReportInterval = 60 * time.Second
 
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Seq = 1111
@@ -174,13 +184,14 @@ func TestPlatformData(t *testing.T) {
 
 	flowGenerator.Start()
 
+	expectEpcID0, expectL3EpcId := int32(-1), int32(-1)
 	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
 	if taggedFlow.CloseType != CloseTypeServerHalfOpen {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeServerHalfOpen)
 	}
-	if taggedFlow.FlowMetricsPeerSrc.EpcID != -1 || taggedFlow.FlowMetricsPeerSrc.L3EpcID != -1 {
-		t.Errorf("taggedFlow.EpcID0 is %d, expect -1", taggedFlow.FlowMetricsPeerSrc.EpcID)
-		t.Errorf("taggedFlow.L3EpcID0 is %d, expect -1", taggedFlow.FlowMetricsPeerSrc.L3EpcID)
+	if taggedFlow.FlowMetricsPeerSrc.EpcID != expectEpcID0 || taggedFlow.FlowMetricsPeerSrc.L3EpcID != expectL3EpcId {
+		t.Errorf("taggedFlow.EpcID0 is %d, expect %d", taggedFlow.FlowMetricsPeerSrc.EpcID, expectEpcID0)
+		t.Errorf("taggedFlow.L3EpcID0 is %d, expect %d", taggedFlow.FlowMetricsPeerSrc.L3EpcID, expectL3EpcId)
 	}
 	if taggedFlow.FlowMetricsPeerSrc.Host != 0x01010101 {
 		t.Errorf("taggedFlow.FlowMetricsPeerSrc.Host is %d, expect %d", taggedFlow.FlowMetricsPeerSrc.Host, 0x01010101)
@@ -188,7 +199,7 @@ func TestPlatformData(t *testing.T) {
 }
 
 func TestFlowStateMachine(t *testing.T) {
-	flowGenerator := getDefaultFlowGenerator()
+	flowGenerator := getDefaultFlowGenerator(defaultConfig)
 	flowExtra := &FlowExtra{}
 	taggedFlow := &TaggedFlow{}
 	flowExtra.taggedFlow = taggedFlow
@@ -232,11 +243,7 @@ func TestFlowStateMachine(t *testing.T) {
 
 func TestHandshakePerf(t *testing.T) {
 	runtime.GOMAXPROCS(4)
-	flowGenerator := getDefaultFlowGenerator()
-	flowGenerator.forceReportInterval = 0
-	flowGenerator.minLoopInterval = 0
-	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
-	flowOutQueue := flowGenerator.flowOutQueue
+	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
 
 	flowGenerator.Start()
 	packet0 := getDefaultPacket()
@@ -269,11 +276,7 @@ func TestHandshakePerf(t *testing.T) {
 
 func TestStartStop(t *testing.T) {
 	runtime.GOMAXPROCS(4)
-	flowGenerator := getDefaultFlowGenerator()
-	flowGenerator.forceReportInterval = 0
-	flowGenerator.minLoopInterval = 0
-	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
-	flowOutQueue := flowGenerator.flowOutQueue
+	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
 
 	flowGenerator.Start()
 
@@ -295,12 +298,7 @@ func TestStartStop(t *testing.T) {
 
 func TestFlowReverse(t *testing.T) {
 	runtime.GOMAXPROCS(4)
-	flowGenerator := getDefaultFlowGenerator()
-	flowGenerator.SetTimeout(TimeoutConfig{0, 1800 * time.Second, 0, 30 * time.Second, 5 * time.Second, 0, 0})
-	flowGenerator.forceReportInterval = 0
-	flowGenerator.minLoopInterval = 0
-	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
-	flowOutQueue := flowGenerator.flowOutQueue
+	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
 
 	flowGenerator.Start()
 
@@ -332,7 +330,7 @@ func TestFlowReverse(t *testing.T) {
 }
 
 func TestReverseInNewCircle(t *testing.T) {
-	flowGenerator := getDefaultFlowGenerator()
+	flowGenerator := getDefaultFlowGenerator(defaultConfig)
 
 	policyData0 := new(PolicyData)
 	policyData0.Merge([]AclAction{generateAclAction(10, ACTION_PACKET_COUNTING)}, nil, 10)
@@ -361,11 +359,8 @@ func TestReverseInNewCircle(t *testing.T) {
 
 func TestForceReport(t *testing.T) {
 	runtime.GOMAXPROCS(4)
-	flowGenerator := getDefaultFlowGenerator()
-	flowGenerator.forceReportInterval = 0
-	flowGenerator.minLoopInterval = 0
-	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
-	flowOutQueue := flowGenerator.flowOutQueue
+	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
+
 	packet0 := getDefaultPacket()
 	packet0.TcpData.Flags = TCP_SYN | TCP_ACK
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
@@ -392,11 +387,8 @@ func TestForceReport(t *testing.T) {
 
 func TestUdpShortFlow(t *testing.T) {
 	runtime.GOMAXPROCS(4)
-	flowGenerator := getDefaultFlowGenerator()
-	flowGenerator.SetTimeout(TimeoutConfig{0, 300 * time.Second, 0, 30 * time.Second, 5 * time.Second, 0, 0})
-	flowGenerator.minLoopInterval = 0
-	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
-	flowOutQueue := flowGenerator.flowOutQueue
+	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
+
 	packet := getDefaultPacket()
 	packet.Protocol = layers.IPProtocolUDP
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet)
@@ -411,11 +403,8 @@ func TestUdpShortFlow(t *testing.T) {
 }
 
 func TestNonIpShortFlow(t *testing.T) {
-	flowGenerator := getDefaultFlowGenerator()
-	flowGenerator.SetTimeout(TimeoutConfig{0, 300 * time.Second, 0, 30 * time.Second, 5 * time.Second, 0, 0})
-	flowGenerator.minLoopInterval = 0
-	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
-	flowOutQueue := flowGenerator.flowOutQueue
+	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
+
 	packet := getDefaultPacket()
 	packet.Protocol = 0
 	packet.EthType = layers.EthernetTypeARP
@@ -431,7 +420,7 @@ func TestNonIpShortFlow(t *testing.T) {
 }
 
 func TestInPortEqualTor(t *testing.T) {
-	flowGenerator := getDefaultFlowGenerator()
+	flowGenerator := getDefaultFlowGenerator(defaultConfig)
 	flowGenerator.SetTimeout(TimeoutConfig{0, 300 * time.Second, 0, 30 * time.Second, 5 * time.Second, 0, 0})
 	flowGenerator.minLoopInterval = 0
 	flowGenerator.ignoreTorMac = true
@@ -456,43 +445,10 @@ func TestInPortEqualTor(t *testing.T) {
 	}
 }
 
-func TestServiceKey(t *testing.T) {
-	epcId := int32(-1)
-	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
-	port1 := uint16(80)
-	port2 := uint16(8080)
-	key1 := genServiceKey(epcId, ip, port1)
-	key2 := genServiceKey(epcId, ip, port2)
-	if key1 == key2 {
-		t.Errorf("key1 %d should not be equal to key2 %d", key1, key2)
-	}
-}
-
-func TestServicePort(t *testing.T) {
-	serviceManager := NewServiceManager(64 * 1024)
-	epcId := int32(-1)
-	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
-	port1 := uint16(80)
-	port2 := uint16(8080)
-	// check default IANA port service
-	if !serviceManager.getStatus(epcId, ip, port1) {
-		t.Error("serviceManager.getStatus() return false, expect true")
-	}
-	// check disable port service
-	serviceManager.disableStatus(epcId, ip, port2)
-	if serviceManager.getStatus(epcId, ip, port2) {
-		t.Error("serviceManager.getStatus() return true, expect false")
-	}
-	// check enable port service
-	serviceManager.enableStatus(epcId, ip, port2)
-	if !serviceManager.getStatus(epcId, ip, port2) {
-		t.Error("serviceManager.getStatus() return false, expect true")
-	}
-}
-
 func BenchmarkCleanHashMap(b *testing.B) {
 	runtime.GOMAXPROCS(4)
-	flowGenerator := getDefaultFlowGenerator()
+	config := FlowGeneratorConfig{60 * time.Second, 64 * 1024, 1024 * 1024, 4, 1024 * 256, 4, false}
+	flowGenerator := getDefaultFlowGenerator(config)
 	flowGenerator.SetTimeout(TimeoutConfig{0, 300 * time.Second, 0, 30 * time.Second, 5 * time.Second, 0, 0})
 	flowGenerator.minLoopInterval = 0
 	flowCache := &FlowCache{capacity: b.N, flowList: NewListFlowExtra()}
@@ -509,7 +465,8 @@ func BenchmarkCleanHashMap(b *testing.B) {
 
 func BenchmarkShortFlowList(b *testing.B) {
 	runtime.GOMAXPROCS(4)
-	flowGenerator := getDefaultFlowGenerator()
+	config := FlowGeneratorConfig{60 * time.Second, 64 * 1024, 1024 * 1024, 4, 1024 * 256, 4, false}
+	flowGenerator := getDefaultFlowGenerator(config)
 	flowGenerator.SetTimeout(TimeoutConfig{0, 300 * time.Second, 0, 30 * time.Second, 5 * time.Second, 0, 0})
 	processBuffer := make([]interface{}, b.N)
 	for i := 0; i < b.N; i++ {
@@ -535,7 +492,8 @@ func BenchmarkShortFlowList(b *testing.B) {
 
 func BenchmarkLongFlowList(b *testing.B) {
 	runtime.GOMAXPROCS(4)
-	flowGenerator := getDefaultFlowGenerator()
+	config := FlowGeneratorConfig{60 * time.Second, 64 * 1024, 1024 * 1024, 4, 1024 * 256, 4, false}
+	flowGenerator := getDefaultFlowGenerator(config)
 	flowGenerator.SetTimeout(TimeoutConfig{0, 300 * time.Second, 0, 30 * time.Second, 5 * time.Second, 0, 0})
 	processBuffer := make([]interface{}, b.N)
 	for i := 0; i < b.N; i++ {
