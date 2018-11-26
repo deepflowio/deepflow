@@ -40,8 +40,7 @@ func (a *NpbAction) ReverseTapSide() NpbAction {
 		return *a
 	}
 
-	*a ^= NpbAction(uint64(TAPSIDE_MASK) << 16)
-	return *a
+	return *a ^ NpbAction(uint64(TAPSIDE_MASK)<<16)
 }
 
 func (a NpbAction) ResourceGroupTypeCompare(flag int) bool {
