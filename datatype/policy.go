@@ -71,6 +71,11 @@ func (a NpbAction) PayloadSlice() uint16 {
 	return uint16(a)
 }
 
+func (a *NpbAction) SetPayloadSlice(payload uint16) {
+	*a &= ^NpbAction(0xffff)
+	*a |= NpbAction(payload)
+}
+
 func (a NpbAction) String() string {
 	return fmt.Sprintf("{%d@%s slice %d side: %d group: %d}", a.TunnelId(), IpFromUint32(a.TunnelIp()), a.PayloadSlice(), a.TapSide(), a.ResourceGroupType())
 }
