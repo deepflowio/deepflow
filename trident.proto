@@ -22,6 +22,8 @@ message SyncRequest {
     optional uint64 version = 3 [default = 0];
     optional State state = 4;
     optional string revision = 5; // trident用于self-update
+
+    optional string ctrl_ip = 21; // only for mt trisolaris.check
 }
 
 enum Status {
