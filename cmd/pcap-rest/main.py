@@ -70,9 +70,17 @@ def _ip_convert(ip):
     return ''.join(['0' * (3 - len(s)) + s for s in ip.split('.')])
 
 
+def _ip_convert_back(ip):
+    return '%d.%d.%d.%d' % (int(ip[0:3]), int(ip[3:6]), int(ip[6:9]), int(ip[9:12]))
+
+
 # convert mac like 01:02:03:04:05:06 to 010203040506
 def _mac_convert(mac):
-    return ''.join(mac.split('.-'))
+    return mac.replace(':', '').replace('-', '')
+
+
+def _mac_convert_back(mac):
+    return '%s:%s:%s:%s:%s:%s' % (mac[0:2], mac[2:4], mac[4:6], mac[6:8], mac[8:10], mac[10:12])
 
 
 def _tap_type_to_id(tapType):
@@ -93,21 +101,32 @@ def _time_to_epoch(time_str):
 def get_files(acl_gid, mac=None, ip=None):
     directory = PCAP_DIR + '/' + str(acl_gid) + '/'
     files = []
+    mac_rep = None
+    ip_rep = None
     if mac is not None:
         mac_str = _mac_convert(mac)
+        mac_rep = mac
     if ip is not None:
         ip_str = _ip_convert(ip)
+        ip_rep = ip
     for file in os.listdir(directory):
         if not file.endswith(FILE_SUFFIX):
             continue
         segs = file[:-len(FILE_SUFFIX)].split('_')
         if len(segs) != 5:
             continue
-        if ip is not None and ip_str != segs[1]:
+        if mac is not None and mac_str != segs[1]:
             continue
-        if mac is not None and mac_str != segs[2]:
+        if ip is not None and ip_str != segs[2]:
             continue
+        if mac_rep is None or ip_rep is None:
+            if mac_rep is None:
+                mac_rep = _mac_convert_back(segs[1])
+            else:
+                ip_rep = _ip_convert_back(segs[2])
         files.append({
+            'mac': mac_rep,
+            'ip': ip_rep,
             'tap_type': _tap_type_to_id(segs[0]),
             'filename': file,
             'start_epoch': _time_to_epoch(segs[3]),
