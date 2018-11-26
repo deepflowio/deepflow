@@ -4,7 +4,7 @@ After=syslog.target network-online.target
 
 [Service]
 ExecStart=/usr/bin/python /usr/local/deepflow/pcap-rest/main.py
-ExecReload=/bin/kill -s SIGHUP $MAINPID
+ExecStop=/bin/kill $MAINPID
 Restart=on-failure
 RestartSec=60
 

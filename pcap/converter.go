@@ -48,13 +48,13 @@ func (p RawPacket) MetaPacketToRaw(packet *datatype.MetaPacket) int {
 }
 
 const (
-	ETHERNET_SIZE = 14
-	VLAN_SIZE     = 4
+	ETHERNET_LEN = 14
+	VLAN_LEN     = 4
 )
 
 func (p RawPacket) fillEthernet(packet *datatype.MetaPacket, start int) int {
 	base := p[start:]
-	for i := 0; i < ETHERNET_SIZE+VLAN_SIZE; i++ {
+	for i := 0; i < ETHERNET_LEN+VLAN_LEN; i++ {
 		base[i] = 0
 	}
 
@@ -86,7 +86,7 @@ const (
 	IPV4_HEADER_CHECKSUM_OFFSET = 10
 	IPV4_SIP_OFFSET             = 12
 	IPV4_DIP_OFFSET             = 16
-	IPV4_SIZE                   = 20 // no options
+	IPV4_LEN                    = 20 // no options
 )
 
 const (
@@ -95,7 +95,7 @@ const (
 
 func (p RawPacket) fillIPv4(packet *datatype.MetaPacket, start int) int {
 	base := p[start:]
-	for i := 0; i < IPV4_SIZE; i++ {
+	for i := 0; i < IPV4_LEN; i++ {
 		base[i] = 0
 	}
 
@@ -111,7 +111,7 @@ func (p RawPacket) fillIPv4(packet *datatype.MetaPacket, start int) int {
 	base[IPV4_HEADER_CHECKSUM_OFFSET] = 0
 	base[IPV4_HEADER_CHECKSUM_OFFSET+1] = 0
 	var csum uint32
-	for i := 0; i < IPV4_SIZE; i += 2 {
+	for i := 0; i < IPV4_LEN; i += 2 {
 		csum += uint32(base[i]) << 8
 		csum += uint32(base[i+1])
 	}
@@ -120,7 +120,7 @@ func (p RawPacket) fillIPv4(packet *datatype.MetaPacket, start int) int {
 	}
 	binary.BigEndian.PutUint16(base[IPV4_HEADER_CHECKSUM_OFFSET:], ^uint16(csum))
 
-	return IPV4_SIZE
+	return IPV4_LEN
 }
 
 func (p RawPacket) fillARP(packet *datatype.MetaPacket, start int) int {
@@ -141,8 +141,8 @@ const (
 	TCP_WINDOW_SIZE_OFFSET = 14
 	TCP_CHECKSUM_OFFSET    = 16
 	TCP_OPTIONS_OFFSET     = 20
-	TCP_MAX_OPTIONS_SIZE   = 40
-	TCP_MIN_SIZE           = 20
+	TCP_MAX_OPTIONS_LEN    = 40
+	TCP_MIN_LEN            = 20
 )
 
 const (
@@ -153,11 +153,11 @@ const (
 
 func (p RawPacket) fillTCP(packet *datatype.MetaPacket, start, ipv4Offset int) int {
 	base := p[start:]
-	for i := 0; i < TCP_OPTIONS_OFFSET+TCP_MAX_OPTIONS_SIZE; i++ {
+	for i := 0; i < TCP_OPTIONS_OFFSET+TCP_MAX_OPTIONS_LEN; i++ {
 		base[i] = 0
 	}
 
-	length := TCP_MIN_SIZE
+	length := TCP_MIN_LEN
 
 	binary.BigEndian.PutUint16(base[TCP_SPORT_OFFSET:], packet.PortSrc)
 	binary.BigEndian.PutUint16(base[TCP_DPORT_OFFSET:], packet.PortDst)
@@ -209,6 +209,8 @@ func (p RawPacket) fillTCP(packet *datatype.MetaPacket, start, ipv4Offset int) i
 		}
 	}
 
+	binary.BigEndian.PutUint16(base[TCP_CHECKSUM_OFFSET:], p.tcpIPChecksum(layers.IPProtocolTCP, ipv4Offset, start, length))
+
 	return length
 }
 
@@ -217,32 +219,43 @@ const (
 	UDP_DPORT_OFFSET    = 2
 	UDP_LENGTH_OFFSET   = 4
 	UDP_CHECKSUM_OFFSET = 6
-	UDP_SIZE            = 8
+	UDP_LEN             = 8
 )
 
 func (p RawPacket) fillUDP(packet *datatype.MetaPacket, start, ipv4Offset int) int {
 	base := p[start:]
-	for i := 0; i < UDP_SIZE; i++ {
+	for i := 0; i < UDP_LEN; i++ {
 		base[i] = 0
 	}
 
 	binary.BigEndian.PutUint16(base[UDP_SPORT_OFFSET:], packet.PortSrc)
 	binary.BigEndian.PutUint16(base[UDP_DPORT_OFFSET:], packet.PortDst)
-	binary.BigEndian.PutUint16(base[UDP_LENGTH_OFFSET:], packet.PacketLen-uint16(start))
+	binary.BigEndian.PutUint16(base[UDP_LENGTH_OFFSET:], UDP_LEN)
+	binary.BigEndian.PutUint16(base[UDP_CHECKSUM_OFFSET:], p.tcpIPChecksum(layers.IPProtocolUDP, ipv4Offset, start, UDP_LEN))
 
+	return UDP_LEN
+}
+
+func (p RawPacket) tcpIPChecksum(protocol layers.IPProtocol, ipv4Offset, tcpIPOffset int, length int) uint16 {
+	csum := uint32(0)
+
+	// pseudo header
 	ipv4Layer := p[ipv4Offset:]
-	var csum uint32
 	csum += (uint32(ipv4Layer[IPV4_SIP_OFFSET]) + uint32(ipv4Layer[IPV4_SIP_OFFSET+2])) << 8
 	csum += uint32(ipv4Layer[IPV4_SIP_OFFSET+1]) + uint32(ipv4Layer[IPV4_SIP_OFFSET+3])
 	csum += (uint32(ipv4Layer[IPV4_DIP_OFFSET]) + uint32(ipv4Layer[IPV4_DIP_OFFSET+2])) << 8
 	csum += uint32(ipv4Layer[IPV4_DIP_OFFSET+1]) + uint32(ipv4Layer[IPV4_DIP_OFFSET+3])
-	csum += uint32(layers.IPProtocolUDP) + uint32(packet.PacketLen-uint16(start))
+	csum += uint32(protocol) + uint32(length)
+	// tcp/ip header
+	tcpIPLayer := p[tcpIPOffset:]
+	for i := 0; i < length; i += 2 {
+		csum += uint32(binary.BigEndian.Uint16(tcpIPLayer[i : i+2]))
+	}
 	for csum > 0xFFFF {
 		csum = (csum >> 16) + (csum & 0xFFFF)
 	}
-	binary.BigEndian.PutUint16(base[UDP_CHECKSUM_OFFSET:], ^uint16(csum))
 
-	return UDP_SIZE
+	return ^uint16(csum)
 }
 
 func min(x, y int) int {
