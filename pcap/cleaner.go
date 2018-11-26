@@ -76,7 +76,7 @@ func (c *Cleaner) work() {
 
 		fs := syscall.Statfs_t{}
 		err := syscall.Statfs(c.baseDirectory, &fs)
-		if err != nil {
+		if err == nil {
 			free := int64(fs.Bfree) * int64(fs.Bsize)
 			for i := len(files) - nDeleted - 1; i >= 0 && free < c.diskFreeSpaceMargin; i-- {
 				os.Remove(files[i].location)
