@@ -151,21 +151,22 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPacket) {
 		b := d.data.U8()
 		x.ihl = b & 0xF
 		x.dataOffset = b >> 4 // XXX: Valid in TCP Only
-		meta.IHL = x.ihl
 	}
+	meta.IHL = x.ihl
 	x.IpID = d.data.U16()
 	meta.IpID = x.IpID
 
 	if !d.pflags.IsSet(CFLAG_FLAGS_FRAG_OFFSET) {
 		value := d.data.U16()
 		x.flags, x.fragOffset = uint8(value>>13), value&0x1FFF
-		meta.IpFlags = value
 	}
+	meta.IpFlags = uint16(x.flags<<13) | x.fragOffset
 
 	if !d.pflags.IsSet(CFLAG_TTL) {
 		x.ttl = d.data.U8()
-		meta.TTL = x.ttl
 	}
+	meta.TTL = x.ttl
+
 	if !d.pflags.IsSet(CFLAG_IP0) {
 		x.ip0 = net.IP(d.data.Field(IP_ADDR_LEN))
 	}
