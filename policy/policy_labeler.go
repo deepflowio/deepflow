@@ -633,6 +633,7 @@ func (l *PolicyLabeler) checkNpbAction(endpointData *EndpointData, policy *Polic
 		if policy.ActionFlags == 0 {
 			return INVALID_POLICY_DATA
 		}
+		policy.NpbActions = policy.NpbActions[:0]
 		return policy
 	}
 
@@ -699,6 +700,7 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 			}
 			// first层面存储的都是正方向的key, 在这里重新设置方向
 			portBackwardPolicy.Merge(policy.AclActions, policy.NpbActions, policy.ACLID, BACKWARD)
+			portBackwardPolicy.ReverseNpbActions()
 		}
 	}
 	// 剔除匿名资源组ID

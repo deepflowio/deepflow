@@ -279,6 +279,12 @@ func (a AclAction) String() string {
 		a.GetACLGID(), a.GetActionFlags().String(), a.GetDirections(), a.GetTagTemplates().String())
 }
 
+func (d *PolicyData) ReverseNpbActions() {
+	for index, npb := range d.NpbActions {
+		d.NpbActions[index] = npb.ReverseTapSide()
+	}
+}
+
 func (d *PolicyData) MergeNpbAction(actions []NpbAction) {
 	newActions := make([]NpbAction, 0, len(actions))
 	for _, m := range actions {
