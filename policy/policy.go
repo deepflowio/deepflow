@@ -187,10 +187,9 @@ func (t *PolicyTable) LookupPolicyByKey(key *LookupKey) *PolicyData {
 	endpoint, policy := t.policyLabeler.GetPolicyByFastPath(key)
 	if policy == nil {
 		endpoint = t.cloudPlatformLabeler.GetEndpointData(key)
-		policy = t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+		_, policy = t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+		return policy
 	}
-	endpoint = t.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
-	policy = t.policyLabeler.checkNpbAction(endpoint, policy)
 	return policy
 }
 
@@ -209,9 +208,8 @@ func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData
 	endpoint, policy := t.policyLabeler.GetPolicyByFastPath(key)
 	if policy == nil {
 		endpoint = t.cloudPlatformLabeler.GetEndpointData(key)
-		policy = t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+		endpoint, policy = t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
 	}
-	endpoint = t.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
 	return endpoint, policy
 }
 
@@ -248,9 +246,7 @@ func (t *PolicyTable) GetEndpointInfo(mac uint64, ip uint32, inPort uint32) *End
 
 func (t *PolicyTable) GetPolicyByFastPath(key *LookupKey) (*EndpointData, *PolicyData) {
 	endpoint, policy := t.policyLabeler.GetPolicyByFastPath(key)
-	if endpoint != nil {
-		endpoint = t.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
-	} else {
+	if endpoint == nil {
 		return INVALID_ENDPOINT_DATA, INVALID_POLICY_DATA
 	}
 	return endpoint, policy
@@ -258,7 +254,6 @@ func (t *PolicyTable) GetPolicyByFastPath(key *LookupKey) (*EndpointData, *Polic
 
 func (t *PolicyTable) GetPolicyByFirstPath(key *LookupKey) (*EndpointData, *PolicyData) {
 	endpoint := t.cloudPlatformLabeler.GetEndpointData(key)
-	policy := t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
-	endpoint = t.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
+	endpoint, policy := t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
 	return endpoint, policy
 }
