@@ -35,6 +35,10 @@ func (a NpbAction) TapSide() int {
 	return int((a >> 16) & TAPSIDE_MASK)
 }
 
+func (a *NpbAction) SetTapSide(flag int) {
+	*a |= NpbAction((flag & TAPSIDE_MASK) << 16)
+}
+
 func (a *NpbAction) ReverseTapSide() NpbAction {
 	if a.TapSide() == TAPSIDE_ALL {
 		return *a
@@ -61,6 +65,11 @@ func (a NpbAction) TunnelIp() IPv4Int {
 
 func (a NpbAction) TunnelId() uint32 {
 	return uint32((a >> 20) & 0xff)
+}
+
+func (a *NpbAction) SetTunnelId(id uint32) {
+	*a &= ^NpbAction(0xff << 20)
+	*a |= NpbAction((id & 0xff) << 20)
 }
 
 func (a NpbAction) TunnelInfo() uint64 {
@@ -286,23 +295,31 @@ func (d *PolicyData) ReverseNpbActions() {
 }
 
 func (d *PolicyData) MergeNpbAction(actions []NpbAction) {
-	newActions := make([]NpbAction, 0, len(actions))
-	for _, m := range actions {
+	for _, n := range actions {
 		repeat := false
-		for _, n := range d.NpbActions {
+		for index, m := range d.NpbActions {
 			if m == n {
 				repeat = true
 				break
 			}
-		}
 
+			if m.TunnelIp() != n.TunnelIp() {
+				continue
+			}
+			if n.PayloadSlice() == 0 ||
+				n.PayloadSlice() > m.PayloadSlice() {
+				d.NpbActions[index].SetPayloadSlice(n.PayloadSlice())
+			}
+			if n.TunnelId() > m.TunnelId() {
+				d.NpbActions[index].SetTunnelId(n.TunnelId())
+			}
+			d.NpbActions[index].SetTapSide(n.TapSide())
+			d.NpbActions[index].SetResourceGroupType(n.ResourceGroupType())
+			repeat = true
+		}
 		if !repeat {
-			newActions = append(newActions, m)
+			d.NpbActions = append(d.NpbActions, n)
 		}
-	}
-
-	if len(newActions) > 0 {
-		d.NpbActions = append(d.NpbActions, newActions...)
 	}
 }
 
