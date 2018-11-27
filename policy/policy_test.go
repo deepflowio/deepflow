@@ -1200,9 +1200,9 @@ func TestNpbAction(t *testing.T) {
 
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
 	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
-	npb1 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_IP, TAPSIDE_DST, 100)
-	npb2 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_IP, TAPSIDE_DST, 200)
-	npb3 := ToNpbAction(20, 200, RESOURCE_GROUP_TYPE_IP, TAPSIDE_DST, 200)
+	npb1 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
+	npb2 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 200)
+	npb3 := ToNpbAction(20, 200, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 200)
 	acl1 := generatePolicyAcl(table, action1, 25, groupAny, groupAny, IPProtocolTCP, 1000, vlanAny, npb1)
 	action2 := generateAclAction(26, ACTION_PACKET_BROKERING)
 	// acl2 Group: 0 -> 0 Port: 1000 Proto: 0 vlan: any
@@ -1214,12 +1214,23 @@ func TestNpbAction(t *testing.T) {
 	table.UpdateAcls(acls)
 	// 构建预期结果
 	basicPolicyData := &PolicyData{}
-	basicPolicyData.Merge([]AclAction{action1, action2}, []NpbAction{npb2}, 25)
+	basicPolicyData.Merge([]AclAction{action1, action2}, []NpbAction{npb2.ReverseTapSide()}, 25, BACKWARD)
+
+	// key1: ip4:1000 -> ip3:1023 tcp
+	key1 := generateLookupKey(mac2, mac1, vlanAny, group2Ip1, group1Ip1, IPProtocolTCP, 1000, 1023)
+	setEthTypeAndOthers(key1, EthernetTypeIPv4, 64, false, true)
+	policyData := table.LookupPolicyByKey(key1)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestNpbAction Check Failed!")
+	}
 
 	// key1: ip3:1023 -> ip4:1000 tcp
-	key1 := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1023, 1000)
-	setEthTypeAndOthers(key1, EthernetTypeIPv4, 64, true, true)
-	policyData := table.LookupPolicyByKey(key1)
+	key1 = generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1023, 1000)
+	setEthTypeAndOthers(key1, EthernetTypeIPv4, 64, true, false)
+	policyData = table.LookupPolicyByKey(key1)
+	basicPolicyData = &PolicyData{}
+	basicPolicyData.Merge([]AclAction{action1, action2}, []NpbAction{npb2}, 25)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestNpbAction Check Failed!")
