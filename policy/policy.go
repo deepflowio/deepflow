@@ -189,7 +189,7 @@ func (t *PolicyTable) LookupPolicyByKey(key *LookupKey) *PolicyData {
 		endpoint = t.cloudPlatformLabeler.GetEndpointData(key)
 		policy = t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
 	}
-	t.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
+	endpoint = t.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
 	policy = t.policyLabeler.checkNpbAction(endpoint, policy)
 	return policy
 }
