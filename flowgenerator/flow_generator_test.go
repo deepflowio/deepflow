@@ -429,9 +429,21 @@ func TestNonIpShortFlow(t *testing.T) {
 	}
 }
 
+func TestServiceKey(t *testing.T) {
+	epcId := int32(-1)
+	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
+	port1 := uint16(80)
+	port2 := uint16(8080)
+	key1 := genServiceKey(epcId, ip, port1)
+	key2 := genServiceKey(epcId, ip, port2)
+	if key1 == key2 {
+		t.Errorf("key1 %d should not be equal to key2 %d", key1, key2)
+	}
+}
+
 func TestServicePort(t *testing.T) {
 	serviceManager := NewServiceManager(64 * 1024)
-	epcId := int32(3)
+	epcId := int32(-1)
 	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
 	port1 := uint16(80)
 	port2 := uint16(8080)

@@ -58,8 +58,12 @@ func NewServiceManager(capacity int) *ServiceManager {
 	return &ServiceManager{lruCache: NewLRU64Cache(capacity)}
 }
 
+func genServiceKey(l3EpcId int32, ip IPv4Int, port uint16) IpPortEpcKey {
+	return IpPortEpcKey((uint64(ip) << 32) | (uint64(port) << 16) | uint64(uint16(l3EpcId)))
+}
+
 func (m *ServiceManager) getStatus(l3EpcId int32, ip IPv4Int, port uint16) ServiceStatus {
-	key := IpPortEpcKey((uint64(ip) << 32) | (uint64(port) << 16) | uint64(l3EpcId))
+	key := genServiceKey(l3EpcId, ip, port)
 	m.RLock()
 	status, ok := m.lruCache.Peek(key)
 	m.RUnlock()
@@ -73,14 +77,14 @@ func (m *ServiceManager) getStatus(l3EpcId int32, ip IPv4Int, port uint16) Servi
 }
 
 func (m *ServiceManager) enableStatus(l3EpcId int32, ip IPv4Int, port uint16) {
-	key := IpPortEpcKey((uint64(ip) << 32) | (uint64(port) << 16) | uint64(l3EpcId))
+	key := genServiceKey(l3EpcId, ip, port)
 	m.Lock()
 	m.lruCache.Add(key, ServiceStatus(true))
 	m.Unlock()
 }
 
 func (m *ServiceManager) disableStatus(l3EpcId int32, ip IPv4Int, port uint16) {
-	key := IpPortEpcKey((uint64(ip) << 32) | (uint64(port) << 16) | uint64(l3EpcId))
+	key := genServiceKey(l3EpcId, ip, port)
 	m.Lock()
 	// XXX: maybe we don't need to remove the peer
 	m.lruCache.Remove(key)
