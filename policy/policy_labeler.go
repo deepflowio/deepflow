@@ -85,6 +85,8 @@ type PolicyLabeler struct {
 	cloudPlatformLabeler    *CloudPlatformLabeler
 }
 
+var STANDARD_NETMASK = MaskLenToNetmask(STANDARD_MASK_LEN)
+
 func (a *Acl) getPorts(rawPorts []uint16) string {
 	// IN: rawPorts: 1,3,4,5,7,10,11,12,15,17
 	// OUT: ports: "1,3-5,7,10-12,15,17"
@@ -394,7 +396,6 @@ func (l *PolicyLabeler) GenerateIpNetmaskMapFromIpGroupData(data []*IpGroupData)
 	for key, _ := range maskMap {
 		maskMap[key] = 0
 	}
-
 	for _, d := range data {
 		// raw = "1.2.3.4/24"
 		// mask = 0xffffff00
@@ -704,7 +705,7 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 	portBackwardPolicy.ReverseNpbActions()
 	// 剔除匿名资源组ID
 	if l.cloudPlatformLabeler != nil {
-		l.cloudPlatformLabeler.RemoveAnonymousId(endpointData)
+		l.cloudPlatformLabeler.RemoveAnonymousGroupIds(endpointData)
 	}
 
 	packetEndpointData := l.cloudPlatformLabeler.UpdateEndpointData(endpointData, packet)
