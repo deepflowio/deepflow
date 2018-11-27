@@ -2,6 +2,7 @@ package policy
 
 import (
 	"encoding/binary"
+	"math"
 	"sync"
 	"time"
 
@@ -119,7 +120,7 @@ func (l *CloudPlatformLabeler) GetDataByIp(ip uint32) *PlatformData {
 		if !IfHasNetmaskBit(l.netmaskBitmap, i) {
 			continue
 		}
-		subip := IpKey(ip & (MAX_NETMASK << i))
+		subip := IpKey(ip & (math.MaxUint32 << i))
 		if info, ok := l.ipTables[i].ipMap[subip]; ok {
 			return info
 		}
@@ -422,10 +423,10 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	return endpoint
 }
 
-func (l *CloudPlatformLabeler) RemoveAnonymousId(endpoint *EndpointData) {
-	if len(l.ipGroup.anonymousIds) == 0 {
+func (l *CloudPlatformLabeler) RemoveAnonymousGroupIds(endpoint *EndpointData) {
+	if len(l.ipGroup.anonymousGroupIds) == 0 {
 		return
 	}
-	endpoint.SrcInfo.GroupIds = l.ipGroup.RemoveAnonymousId(endpoint.SrcInfo.GroupIds)
-	endpoint.DstInfo.GroupIds = l.ipGroup.RemoveAnonymousId(endpoint.DstInfo.GroupIds)
+	endpoint.SrcInfo.GroupIds = l.ipGroup.RemoveAnonymousGroupIds(endpoint.SrcInfo.GroupIds)
+	endpoint.DstInfo.GroupIds = l.ipGroup.RemoveAnonymousGroupIds(endpoint.DstInfo.GroupIds)
 }

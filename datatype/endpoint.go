@@ -100,7 +100,7 @@ func (i *EndpointInfo) SetL3Data(data *PlatformData, ip uint32) {
 	i.L3DeviceId = data.DeviceId
 
 	for _, ipInfo := range data.Ips {
-		if ipInfo.Ip == (ip & (MAX_NETMASK << (MAX_MASK_LEN - ipInfo.Netmask))) {
+		if ipInfo.Ip == (ip & MaskLenToNetmask(ipInfo.Netmask)) {
 			i.SubnetId = ipInfo.SubnetId
 			break
 		}
@@ -122,7 +122,7 @@ func (i *EndpointInfo) SetL3EndByTtl(ttl uint8) {
 
 func (i *EndpointInfo) SetL3EndByIp(data *PlatformData, ip uint32) {
 	for _, ipInfo := range data.Ips {
-		if ipInfo.Ip == (ip & (MAX_NETMASK << (MAX_MASK_LEN - ipInfo.Netmask))) {
+		if ipInfo.Ip == (ip & MaskLenToNetmask(ipInfo.Netmask)) {
 			i.L3End = true
 			break
 		}

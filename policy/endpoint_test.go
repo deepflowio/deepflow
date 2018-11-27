@@ -804,6 +804,49 @@ func TestAnonymousGroupData(t *testing.T) {
 	}
 }
 
+func TestIpNetmaskGroup(t *testing.T) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	ipGroup1 := generateIpGroup(group[11], groupEpc[0], ipNet10, ipNet11)
+	ipGroup2 := generateIpGroup(group[12], groupEpc[0], ipNet12)
+	ipGroup3 := generateIpGroup(group[13], groupEpc[0], ipNet13)
+	ipGroup4 := generateIpGroup(group[14], groupEpc[0], ipNet14)
+	ipGroup5 := generateIpGroup(group[15], groupEpc[0], ipNet15)
+	ipGroups := make([]*IpGroupData, 0, 5)
+	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3, ipGroup4, ipGroup5)
+	policy.UpdateIpGroupData(ipGroups)
+	srcIp := NewIPFromString("10.90.1.12").Int()
+	dstIp := NewIPFromString("10.90.9.123").Int()
+	key := generateLookupKey(mac1, mac2, vlanAny, srcIp, dstIp, IPProtocolTCP, 50, 60)
+	data, _ := policy.LookupAllByKey(key)
+	if len(data.SrcInfo.GroupIds) != 4 ||
+		len(data.DstInfo.GroupIds) != 5 {
+		t.Error("TestIpNetmaskGroup Check Failed!")
+	}
+}
+
+func TestIpNetmaskGroup1(t *testing.T) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	ipGroup1 := generateIpGroup(group[11], groupEpc[0], ipNet10, ipNet11)
+	ipGroup2 := generateIpGroup(group[12], groupEpc[0], ipNet12)
+	ipGroup3 := generateIpGroup(group[13], groupEpc[0], ipNet13)
+	ipGroup4 := generateIpGroup(group[14], groupEpc[0], ipNet14)
+	ipGroup5 := generateIpGroup(group[15], groupEpc[0], ipNet15)
+	ipGroups := make([]*IpGroupData, 0, 5)
+	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3, ipGroup4, ipGroup5)
+	policy.UpdateIpGroupData(ipGroups)
+	srcIp := NewIPFromString("10.90.1.12").Int()
+	dstIp := NewIPFromString("10.90.9.123").Int()
+	ipNet := generateIpNet(srcIp, 123, 32)
+	data1 := generatePlatformDataWithGroupId(groupEpc[1], group[1], group1Mac, ipNet)
+	policy.UpdateInterfaceData([]*PlatformData{data1})
+	key := generateLookupKey(group1Mac, mac2, vlanAny, srcIp, dstIp, IPProtocolTCP, 50, 60)
+	data, _ := policy.LookupAllByKey(key)
+	if len(data.SrcInfo.GroupIds) != 5 ||
+		len(data.DstInfo.GroupIds) != 5 {
+		t.Error("TestIpNetmaskGroup Check Failed!")
+	}
+}
+
 func BenchmarkGetEndpointData(b *testing.B) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	platformData1 := generatePlatformDataByParam(group1Ip1, group1Mac, groupEpc[1], 4)

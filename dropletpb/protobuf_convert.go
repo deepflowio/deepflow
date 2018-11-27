@@ -11,7 +11,7 @@ import (
 	"gitlab.x.lan/yunshan/message/trident"
 )
 
-var maskLenToNetmask [datatype.MASK_LEN_NUM]uint32
+var MAX_NETMASK = MaskLenToNetmask(datatype.MAX_MASK_LEN)
 
 func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	macInt := uint64(0)
@@ -78,7 +78,7 @@ func ipRangeConvert2CIDR(startIp, endIp net.IP) []net.IPNet {
 		ipMask := net.CIDRMask(int(maskLen), datatype.MAX_MASK_LEN)
 		ips = append(ips, net.IPNet{IP: ip, Mask: ipMask})
 		lastIp := getLastIp(start, maskLen)
-		if lastIp == datatype.MAX_NETMASK {
+		if lastIp == MAX_NETMASK {
 			break
 		}
 		start += 1 << uint32(datatype.MAX_MASK_LEN-maskLen)
@@ -93,7 +93,7 @@ func getFirstMask(start, end uint32) uint8 {
 			// maxLen继续减少将会使得start不是所在网段的第一个IP
 			break
 		}
-		if start+^maskLenToNetmask[maxLen] >= end || start+^maskLenToNetmask[maxLen-1] > end {
+		if start+^MaskLenToNetmask(uint32(maxLen)) >= end || start+^MaskLenToNetmask(uint32(maxLen-1)) > end {
 			// maxLen继续减少将会使得网段包含end之后的IP
 			break
 		}
@@ -102,7 +102,7 @@ func getFirstMask(start, end uint32) uint8 {
 }
 
 func getLastIp(ip uint32, mask uint8) uint32 {
-	ip += ^maskLenToNetmask[mask]
+	ip += ^MaskLenToNetmask(uint32(mask))
 	return ip
 }
 
@@ -263,13 +263,4 @@ func Convert2AclData(flowAcls []*trident.FlowAcl) []*policy.Acl {
 	}
 
 	return policies
-}
-
-func init() {
-	// fill maskLenToNetmask with {0x00000000, 0x80000000, 0xC0000000, ...}
-	mask := uint32(datatype.MAX_NETMASK)
-	for i := datatype.MIN_MASK_LEN; i <= datatype.MAX_MASK_LEN; i++ {
-		maskLenToNetmask[i] = ^mask
-		mask >>= 1
-	}
 }

@@ -25,6 +25,12 @@ var (
 	ip10          = NewIPFromString("172.16.10.20").Int()
 	ip11          = NewIPFromString("255.255.255.255").Int()
 	ipNet1        = "192.168.0.12/24"
+	ipNet10       = "10.90.0.0/16"
+	ipNet11       = "10.90.9.0/24"
+	ipNet12       = "10.0.0.0/8"
+	ipNet13       = "10.90.0.0/16"
+	ipNet14       = "10.90.9.123/32"
+	ipNet15       = "0.0.0.0/0"
 	groupEpcOther = int32(-1)
 	groupEpcAny   = int32(0)
 	groupAny      = uint32(0)
@@ -46,7 +52,7 @@ var (
 var (
 	server = NewIPFromString("172.20.1.1").Int()
 
-	group    = []uint32{0, 10, 20, 30, 40, 50, 60, 70, 2, 3, 4}
+	group    = []uint32{0, 10, 20, 30, 40, 50, 60, 70, 2, 3, 4, 11, 12, 13, 14, 15}
 	groupEpc = []int32{0, 10, 20, 0, 40, 50, 0, 70, 40, 11, 12}
 	ipGroup6 = group[6] + IP_GROUP_ID_FLAG
 
