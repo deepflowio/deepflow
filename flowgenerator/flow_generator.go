@@ -243,7 +243,7 @@ func (f *FlowExtra) reverseFlow() {
 }
 
 func (f *FlowGenerator) tryReverseFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) bool {
-	if flowExtra.reversed {
+	if flowExtra.reversed || meta.TcpData == nil {
 		return false
 	}
 	// if meta.Invalid is false, TcpData will not be nil

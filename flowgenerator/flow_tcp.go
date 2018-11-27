@@ -55,7 +55,10 @@ func (f *FlowGenerator) initTcpFlow(meta *MetaPacket) (*FlowExtra, bool, bool) {
 	flowExtra := f.initFlow(meta, now)
 	taggedFlow := flowExtra.taggedFlow
 	reply := false
-	flags := meta.TcpData.Flags
+	flags := uint8(0)
+	if meta.TcpData != nil {
+		flags = meta.TcpData.Flags
+	}
 	if flagEqual(flags, TCP_SYN|TCP_ACK) {
 		reply = true
 		flowExtra.reversed = reply
@@ -90,7 +93,10 @@ func (f *FlowGenerator) initTcpFlow(meta *MetaPacket) (*FlowExtra, bool, bool) {
 
 func (f *FlowGenerator) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) (bool, bool) {
 	taggedFlow := flowExtra.taggedFlow
-	flags := meta.TcpData.Flags
+	flags := uint8(0)
+	if meta.TcpData != nil {
+		flags = meta.TcpData.Flags
+	}
 	if reply {
 		taggedFlow.FlowMetricsPeerDst.TCPFlags |= flags
 	} else {
