@@ -1,16 +1,14 @@
 package datatype
 
 import (
-	"math"
 	"time"
 )
 
 const (
-	MIN_MASK_LEN     = 0
-	MAX_MASK_LEN     = 32
-	MASK_LEN_NUM     = MAX_MASK_LEN + 1
-	MAX_NETMASK      = math.MaxUint32
-	STANDARD_NETMASK = 0xffff0000
+	MIN_MASK_LEN      = 0
+	STANDARD_MASK_LEN = 16
+	MAX_MASK_LEN      = 32
+	MASK_LEN_NUM      = MAX_MASK_LEN + 1
 
 	IF_TYPE_WAN = 3
 

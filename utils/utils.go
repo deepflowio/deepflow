@@ -2,6 +2,7 @@ package utils
 
 import (
 	. "encoding/binary"
+	"math"
 	"net"
 	"strings"
 )
@@ -76,6 +77,10 @@ func Bool2Int(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+func MaskLenToNetmask(mask uint32) uint32 {
+	return (math.MaxUint32) << (32 - mask)
 }
 
 func ParserStringIpV4(ipStr string) net.IP {

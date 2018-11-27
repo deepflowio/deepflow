@@ -52,17 +52,6 @@
   version = "v1.1.15"
 
 [[projects]]
-  digest = "1:8ec8d88c248041a6df5f6574b87bc00e7e0b493881dad2e7ef47b11dc69093b5"
-  name = "github.com/hashicorp/golang-lru"
-  packages = [
-    ".",
-    "simplelru",
-  ]
-  pruneopts = "UT"
-  revision = "20f1fb78b0740ba8c3cb143a61e86ba5c8669768"
-  version = "v0.5.0"
-
-[[projects]]
   branch = "master"
   digest = "1:f7d8e8432e355163397d2da1e17d0fb616d611db1360c43b1ac73e56f87038e2"
   name = "github.com/lestrrat/go-file-rotatelogs"
@@ -231,7 +220,6 @@
     "github.com/golang/protobuf/proto",
     "github.com/google/gopacket/layers",
     "github.com/google/gopacket/pcapgo",
-    "github.com/hashicorp/golang-lru",
     "github.com/lestrrat/go-file-rotatelogs",
     "github.com/op/go-logging",
     "github.com/pebbe/zmq4",
