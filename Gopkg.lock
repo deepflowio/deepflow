@@ -157,7 +157,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:831130ecec3f81997da686eff4b7ce6dc3a2f958ffa9e6fc398b3ef0e358a6f8"
+  digest = "1:37c8965d73a5c1586913991d793ade7e4343c2c13257f801f02066c5972cdc28"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "app",
@@ -172,11 +172,12 @@
     "segmenttree",
     "stats",
     "utils",
+    "utils/lru",
     "zerodoc",
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "d0b5a82e4a9f3bd03994515fd670f565263f3097"
+  revision = "83e21badc6b4571b40a5f6ee9dc213c95bf4c31b"
 
 [[projects]]
   branch = "master"
@@ -326,6 +327,7 @@
     "gitlab.x.lan/yunshan/droplet-libs/queue",
     "gitlab.x.lan/yunshan/droplet-libs/stats",
     "gitlab.x.lan/yunshan/droplet-libs/utils",
+    "gitlab.x.lan/yunshan/droplet-libs/utils/lru",
     "gitlab.x.lan/yunshan/droplet-libs/zerodoc",
     "gitlab.x.lan/yunshan/droplet-libs/zmq",
     "gitlab.x.lan/yunshan/message/dfi",
