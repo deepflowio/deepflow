@@ -206,7 +206,7 @@ func (c *Config) Validate() error {
 	if c.FlowGenerator.ReportTolerance == 0 {
 		c.FlowGenerator.ReportTolerance = flowgenerator.REPORT_TOLERANCE
 	} else {
-		c.FlowGenerator.OthersTimeout *= time.Second
+		c.FlowGenerator.ReportTolerance *= time.Second
 	}
 
 	if c.MapReduce.DocsInBuffer == 0 {

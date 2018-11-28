@@ -151,6 +151,7 @@ func (f *FlowGenerator) SetTimeout(timeoutConfig TimeoutConfig) bool {
 	}
 	f.TimeoutConfig = timeoutConfig
 	f.minLoopInterval = timeoutConfig.minTimeout()
+	log.Infof("flow generator %d timeout config: %+v", f.index, f.TimeoutConfig)
 	f.initStateMachineMaster()
 	f.initStateMachineSlave()
 	return true
