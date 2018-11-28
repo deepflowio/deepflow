@@ -71,15 +71,15 @@ func registerCountable(module string, countable Countable, opts ...StatsOption) 
 }
 
 func deregisterCountable(countable Countable) {
+	lock.Lock()
+	defer lock.Unlock()
 	_, ok := statSources[countable]
 	if !ok {
-		log.Info("Countable not registered", reflect.ValueOf(countable).String())
+		log.Warning("Countable not registered", reflect.ValueOf(countable).String())
 		return
 	}
 	log.Debug("Deregistering countable", reflect.ValueOf(countable).String())
-	lock.Lock()
 	delete(statSources, countable)
-	lock.Unlock()
 }
 
 func isUpper(c byte) bool {
