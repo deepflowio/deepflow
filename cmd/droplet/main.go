@@ -42,20 +42,15 @@ func main() {
 	// setup system signal
 	signalChannel := make(chan os.Signal, 1)
 	signal.Notify(signalChannel, syscall.SIGINT, syscall.SIGTERM)
-	for {
-		sig := <-signalChannel
-		if sig == syscall.SIGINT || sig == syscall.SIGTERM {
-			log.Info("Gracefully stopping")
-			wg := sync.WaitGroup{}
-			wg.Add(len(closers))
-			for _, closer := range closers {
-				go func() {
-					closer.Close()
-					wg.Done()
-				}()
-			}
-			wg.Wait()
-			break
-		}
+	<-signalChannel
+	log.Info("Gracefully stopping")
+	wg := sync.WaitGroup{}
+	wg.Add(len(closers))
+	for _, closer := range closers {
+		go func() {
+			closer.Close()
+			wg.Done()
+		}()
 	}
+	wg.Wait()
 }
