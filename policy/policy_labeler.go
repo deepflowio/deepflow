@@ -3,7 +3,6 @@ package policy
 import (
 	"fmt"
 	"math"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -323,11 +322,7 @@ func (l *PolicyLabeler) GenerateIpNetmaskMapFromIpGroupData(data []*IpGroupData)
 		// mask = 0xffffff00
 		// netip = "1.2.3"
 		for _, raw := range d.Ips {
-			parts := strings.Split(raw, "/")
-			if len(parts) != 2 {
-				continue
-			}
-			ip, maskSize, err := IpNetmaskFromStringCIDR(parts[0])
+			ip, maskSize, err := IpNetmaskFromStringCIDR(raw)
 			if err != nil {
 				log.Warning(err)
 				continue
