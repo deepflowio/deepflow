@@ -20,14 +20,14 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	}
 
 	hostIp := uint32(0)
-	ip := net.ParseIP(vifData.GetLaunchServer()).To4()
+	ip := ParserStringIpV4(vifData.GetLaunchServer())
 	if ip != nil {
 		hostIp = IpToUint32(ip)
 	}
 
 	ips := make([]*datatype.IpNet, 0, 1024)
 	for _, ipResource := range vifData.IpResources {
-		fixIp := net.ParseIP(ipResource.GetIp()).To4()
+		fixIp := ParserStringIpV4(ipResource.GetIp())
 		if fixIp == nil {
 			continue
 		}
@@ -117,8 +117,11 @@ func newIpGroupData(ipGroup *trident.Group) *policy.IpGroupData {
 	}
 	if ipGroup.GetIpRanges() != nil {
 		for _, ipRange := range ipGroup.GetIpRanges() {
-			startIp := net.ParseIP(strings.Split(ipRange, "-")[0]).To4()
-			endIp := net.ParseIP(strings.Split(ipRange, "-")[1]).To4()
+			startIp := ParserStringIpV4(strings.Split(ipRange, "-")[0])
+			endIp := ParserStringIpV4(strings.Split(ipRange, "-")[1])
+			if startIp == nil || endIp == nil {
+				continue
+			}
 			for _, ip := range ipRangeConvert2CIDR(startIp, endIp) {
 				ips = append(ips, ip.String())
 			}

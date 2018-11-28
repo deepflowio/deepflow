@@ -3,8 +3,6 @@ package policy
 import (
 	"fmt"
 	"math"
-	"net"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -329,18 +327,18 @@ func (l *PolicyLabeler) GenerateIpNetmaskMapFromIpGroupData(data []*IpGroupData)
 			if len(parts) != 2 {
 				continue
 			}
-			ip := net.ParseIP(parts[0]).To4()
-			maskSize, err := strconv.Atoi(parts[1])
+			ip, maskSize, err := IpNetmaskFromStringCIDR(parts[0])
 			if err != nil {
+				log.Warning(err)
 				continue
 			}
 
-			minNetIp := IpToUint32(ip) & STANDARD_NETMASK
+			minNetIp := ip & STANDARD_NETMASK
 			maxNetIp := minNetIp
 			mask := uint32(math.MaxUint32) << uint32(32-maskSize)
 			// netmask must be either 0 or STANDARD_NETMASK~math.MaxUint32
 			if mask < STANDARD_NETMASK {
-				minNetIp = IpToUint32(ip) & mask
+				minNetIp = ip & mask
 				maxNetIp = (minNetIp | ^mask) & STANDARD_NETMASK
 				mask = STANDARD_NETMASK
 			}

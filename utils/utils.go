@@ -77,3 +77,25 @@ func Bool2Int(b bool) int {
 	}
 	return 0
 }
+
+func ParserStringIpV4(ipStr string) net.IP {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return nil
+	}
+	if ip = ip.To4(); ip == nil {
+		return nil
+	}
+
+	return ip
+}
+
+func IpNetmaskFromStringCIDR(ipStr string) (uint32, uint32, error) {
+	_, r, err := net.ParseCIDR(ipStr)
+	if err != nil {
+		return 0, 0, err
+	}
+	ipInt := BigEndian.Uint32(r.IP)
+	maskInt, _ := r.Mask.Size()
+	return ipInt, uint32(maskInt), nil
+}
