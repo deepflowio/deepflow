@@ -56,9 +56,13 @@ queue:
   flow-duplicator-queue-size: 0
   # mapreduce buffer capacity, default queue-size << 1
   docs-queue-size: 131072
+  # metering app output queue count, default 1
+  metering-app-output-queue-count: 1
   # metering app output queue size, default docs-queue-size << 1
   # name: 3-metering-doc-to-marshaller
   metering-app-output-queue-size: 0
+  # flow app output queue count, default 1
+  flow-app-output-queue-count: 1
   # flow app output queue size, default docs-queue-size << 1
   # name: 5-flow-doc-to-marshaller
   flow-app-output-queue-size: 0

@@ -9,34 +9,36 @@ import (
 )
 
 type ZeroDocumentSender struct {
-	inputQueues []queue.QueueReader
+	inputQueues []queue.MultiQueueReader
+	queueCounts []int
 	ips         []string
 	ports       []uint16
 }
 
 type zeroDocumentSenderBuilder struct {
-	inputQueues []queue.QueueReader
+	inputQueues []queue.MultiQueueReader
+	queueCounts []int
 	ips         []string
 	ports       []uint16
 }
 
 func NewZeroDocumentSenderBuilder() *zeroDocumentSenderBuilder {
 	return &zeroDocumentSenderBuilder{
-		inputQueues: make([]queue.QueueReader, 0, 2),
+		inputQueues: make([]queue.MultiQueueReader, 0, 2),
+		queueCounts: make([]int, 0, 2),
 		ips:         make([]string, 0, 2),
 		ports:       make([]uint16, 0, 2),
 	}
 }
 
-func (b *zeroDocumentSenderBuilder) AddQueue(qs ...queue.QueueReader) *zeroDocumentSenderBuilder {
-	for _, q := range qs {
-		for _, inputQueue := range b.inputQueues {
-			if inputQueue == q {
-				return b
-			}
+func (b *zeroDocumentSenderBuilder) AddQueue(q queue.MultiQueueReader, count int) *zeroDocumentSenderBuilder {
+	for _, inputQueue := range b.inputQueues {
+		if &inputQueue == &q {
+			return b
 		}
-		b.inputQueues = append(b.inputQueues, q)
 	}
+	b.inputQueues = append(b.inputQueues, q)
+	b.queueCounts = append(b.queueCounts, count)
 	return b
 }
 
@@ -54,6 +56,7 @@ func (b *zeroDocumentSenderBuilder) AddZero(ip string, port uint16) *zeroDocumen
 func (b *zeroDocumentSenderBuilder) Build() *ZeroDocumentSender {
 	return &ZeroDocumentSender{
 		inputQueues: b.inputQueues,
+		queueCounts: b.queueCounts,
 		ips:         b.ips,
 		ports:       b.ports,
 	}
@@ -71,8 +74,10 @@ func (s *ZeroDocumentSender) Start(queueSize int) {
 		queueReaders[i] = q
 		queueWriters[i] = q
 	}
-	for _, q := range s.inputQueues {
-		go NewZeroDocumentMarshaller(q, queueWriters...).Start()
+	for i, q := range s.inputQueues {
+		for key := 0; key < s.queueCounts[i]; key++ {
+			go NewZeroDocumentMarshaller(q, queue.HashKey(key), queueWriters...).Start()
+		}
 	}
 	for i := range s.ips {
 		go NewZMQBytePusher(s.ips[i], s.ports[i], queueSize).QueueForward(queueReaders[i])

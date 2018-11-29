@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"time"
 
+	"math/rand"
+
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/usage"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -12,7 +14,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
-func NewMeteringMapProcess(output queue.QueueWriter, input queue.MultiQueueReader, inputCount int, docsInBuffer int, windowSize int) *MeteringHandler {
+func NewMeteringMapProcess(output queue.MultiQueueWriter, input queue.MultiQueueReader, inputCount int, docsInBuffer int, windowSize int) *MeteringHandler {
 	return NewMeteringHandler([]app.MeteringProcessor{usage.NewProcessor()}, output, input, inputCount, docsInBuffer, windowSize)
 }
 
@@ -22,12 +24,12 @@ type MeteringHandler struct {
 
 	meteringQueue      queue.MultiQueueReader
 	meteringQueueCount int
-	zmqAppQueue        queue.QueueWriter
+	zmqAppQueue        queue.MultiQueueWriter
 	docsInBuffer       int
 	windowSize         int
 }
 
-func NewMeteringHandler(processors []app.MeteringProcessor, output queue.QueueWriter, inputs queue.MultiQueueReader, inputCount int, docsInBuffer int, windowSize int) *MeteringHandler {
+func NewMeteringHandler(processors []app.MeteringProcessor, output queue.MultiQueueWriter, inputs queue.MultiQueueReader, inputCount int, docsInBuffer int, windowSize int) *MeteringHandler {
 	return &MeteringHandler{
 		numberOfApps:       len(processors),
 		processors:         processors,
@@ -45,9 +47,10 @@ type subMeteringHandler struct {
 	stashes      []*Stash
 
 	meteringQueue queue.MultiQueueReader
-	zmqAppQueue   queue.QueueWriter
+	zmqAppQueue   queue.MultiQueueWriter
 
 	queueIndex int
+	hashKey    queue.HashKey
 
 	lastFlush    time.Duration
 	counterLatch int
@@ -74,6 +77,7 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 		zmqAppQueue:   h.zmqAppQueue,
 
 		queueIndex: index,
+		hashKey:    queue.HashKey(rand.Int()),
 
 		lastFlush: time.Duration(time.Now().UnixNano()),
 
@@ -118,10 +122,11 @@ func (f *subMeteringHandler) putToQueue() {
 		docs := stash.Dump()
 		for i := 0; i < len(docs); i += QUEUE_BATCH_SIZE {
 			if i+QUEUE_BATCH_SIZE <= len(docs) {
-				f.zmqAppQueue.Put(docs[i : i+QUEUE_BATCH_SIZE]...)
+				f.zmqAppQueue.Put(f.hashKey, docs[i:i+QUEUE_BATCH_SIZE]...)
 			} else {
-				f.zmqAppQueue.Put(docs[i:]...)
+				f.zmqAppQueue.Put(f.hashKey, docs[i:]...)
 			}
+			f.hashKey++
 		}
 		stash.Clear()
 	}

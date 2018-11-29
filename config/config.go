@@ -44,21 +44,23 @@ type IpPortConfig struct {
 }
 
 type QueueConfig struct {
-	QueueSize                  int `yaml:"queue-size"`
-	LabelerQueueCount          int `yaml:"labeler-queue-count"`
-	LabelerQueueSize           int `yaml:"labeler-queue-size"`
-	FlowGeneratorQueueCount    int `yaml:"flow-generator-queue-count"`
-	FlowGeneratorQueueSize     int `yaml:"flow-generator-queue-size"`
-	MeteringAppQueueCount      int `yaml:"metering-app-queue-count"`
-	MeteringAppQueueSize       int `yaml:"metering-app-queue-size"`
-	FlowAppQueueCount          int `yaml:"flow-app-queue-count"`
-	FlowAppQueueSize           int `yaml:"flow-app-queue-size"`
-	FlowDuplicatorQueueSize    int `yaml:"flow-duplicator-queue-size"`
-	DocsQueueSize              int `yaml:"docs-queue-size"`
-	MeteringAppOutputQueueSize int `yaml:"metering-app-output-queue-size"`
-	FlowAppOutputQueueSize     int `yaml:"flow-app-output-queue-size"`
-	FlowSenderQueueSize        int `yaml:"flow-sender-queue-size"`
-	DocSenderQueueSize         int `yaml:"doc_sender_queue_size"`
+	QueueSize                   int `yaml:"queue-size"`
+	LabelerQueueCount           int `yaml:"labeler-queue-count"`
+	LabelerQueueSize            int `yaml:"labeler-queue-size"`
+	FlowGeneratorQueueCount     int `yaml:"flow-generator-queue-count"`
+	FlowGeneratorQueueSize      int `yaml:"flow-generator-queue-size"`
+	MeteringAppQueueCount       int `yaml:"metering-app-queue-count"`
+	MeteringAppQueueSize        int `yaml:"metering-app-queue-size"`
+	FlowAppQueueCount           int `yaml:"flow-app-queue-count"`
+	FlowAppQueueSize            int `yaml:"flow-app-queue-size"`
+	FlowDuplicatorQueueSize     int `yaml:"flow-duplicator-queue-size"`
+	DocsQueueSize               int `yaml:"docs-queue-size"`
+	MeteringAppOutputQueueCount int `yaml:"metering-app-output-queue-count"`
+	MeteringAppOutputQueueSize  int `yaml:"metering-app-output-queue-size"`
+	FlowAppOutputQueueCount     int `yaml:"flow-app-output-queue-count"`
+	FlowAppOutputQueueSize      int `yaml:"flow-app-output-queue-size"`
+	FlowSenderQueueSize         int `yaml:"flow-sender-queue-size"`
+	DocSenderQueueSize          int `yaml:"doc_sender_queue_size"`
 }
 
 type LabelerConfig struct {
@@ -157,8 +159,14 @@ func (c *Config) Validate() error {
 	if c.Queue.DocsQueueSize == 0 {
 		c.Queue.DocsQueueSize = c.Queue.QueueSize << 1
 	}
+	if c.Queue.MeteringAppOutputQueueCount == 0 {
+		c.Queue.MeteringAppOutputQueueCount = 1
+	}
 	if c.Queue.MeteringAppOutputQueueSize == 0 {
 		c.Queue.MeteringAppOutputQueueSize = c.Queue.DocsQueueSize << 1
+	}
+	if c.Queue.FlowAppOutputQueueCount == 0 {
+		c.Queue.FlowAppOutputQueueCount = 1
 	}
 	if c.Queue.FlowAppOutputQueueSize == 0 {
 		c.Queue.FlowAppOutputQueueSize = c.Queue.DocsQueueSize << 1

@@ -17,12 +17,12 @@ func TestZeroDocumentSender(t *testing.T) {
 		Hash:      proto.Uint32(0),
 	}
 	hb, _ := proto.Marshal(header)
-	inputQueue1 := queue.NewOverwriteQueue("", 1024)
-	inputQueue2 := queue.NewOverwriteQueue("", 1024)
-	NewZeroDocumentSenderBuilder().AddQueue(inputQueue1, inputQueue2).AddZero("127.0.0.1", 20001).AddZero("127.0.0.1", 20002).Build().Start(1024)
+	inputQueue1 := queue.NewOverwriteQueues("", 1, 1024)
+	inputQueue2 := queue.NewOverwriteQueues("", 1, 1024)
+	NewZeroDocumentSenderBuilder().AddQueue(inputQueue1, 1).AddQueue(inputQueue2, 1).AddZero("127.0.0.1", 20001).AddZero("127.0.0.1", 20002).Build().Start(1024)
 	testData := dupTestData()
-	inputQueue1.Put(testData[0])
-	inputQueue2.Put(testData[1])
+	inputQueue1.Put(queue.HashKey(0), testData[0])
+	inputQueue2.Put(queue.HashKey(0), testData[1])
 
 	chan1 := make(chan *utils.ByteBuffer)
 	chan2 := make(chan *utils.ByteBuffer)
