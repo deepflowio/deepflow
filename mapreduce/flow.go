@@ -2,6 +2,7 @@ package mapreduce
 
 import (
 	"fmt"
+	"math/rand"
 	"reflect"
 	"strconv"
 	"time"
@@ -24,7 +25,7 @@ const (
 
 const GEO_FILE_LOCATION = "/usr/share/droplet/ip_info_mini.json"
 
-func NewFlowMapProcess(output queue.QueueWriter, input queue.MultiQueueReader, inputCount int, docsInBuffer int, windowSize int) *FlowHandler {
+func NewFlowMapProcess(output queue.MultiQueueWriter, input queue.MultiQueueReader, inputCount int, docsInBuffer int, windowSize int) *FlowHandler {
 	return NewFlowHandler([]app.FlowProcessor{
 		fps.NewProcessor(),
 		flow.NewProcessor(),
@@ -41,12 +42,12 @@ type FlowHandler struct {
 
 	flowQueue      queue.MultiQueueReader
 	flowQueueCount int
-	zmqAppQueue    queue.QueueWriter
+	zmqAppQueue    queue.MultiQueueWriter
 	docsInBuffer   int
 	windowSize     int
 }
 
-func NewFlowHandler(processors []app.FlowProcessor, output queue.QueueWriter, inputs queue.MultiQueueReader, inputCount int, docsInBuffer int, windowSize int) *FlowHandler {
+func NewFlowHandler(processors []app.FlowProcessor, output queue.MultiQueueWriter, inputs queue.MultiQueueReader, inputCount int, docsInBuffer int, windowSize int) *FlowHandler {
 	return &FlowHandler{
 		numberOfApps:   len(processors),
 		processors:     processors,
@@ -64,9 +65,10 @@ type subFlowHandler struct {
 	stashes      []*Stash
 
 	flowQueue   queue.MultiQueueReader
-	zmqAppQueue queue.QueueWriter
+	zmqAppQueue queue.MultiQueueWriter
 
 	queueIndex int
+	hashKey    queue.HashKey
 
 	counterLatch int
 	statItems    []stats.StatItem
@@ -100,6 +102,7 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 		zmqAppQueue: h.zmqAppQueue,
 
 		queueIndex: index,
+		hashKey:    queue.HashKey(rand.Int()),
 
 		counterLatch: 0,
 		statItems:    make([]stats.StatItem, h.numberOfApps*3),
@@ -151,10 +154,11 @@ func (f *subFlowHandler) putToQueue() {
 		docs := stash.Dump()
 		for j := 0; j < len(docs); j += QUEUE_BATCH_SIZE {
 			if j+QUEUE_BATCH_SIZE <= len(docs) {
-				f.zmqAppQueue.Put(docs[j : j+QUEUE_BATCH_SIZE]...)
+				f.zmqAppQueue.Put(f.hashKey, docs[j:j+QUEUE_BATCH_SIZE]...)
 			} else {
-				f.zmqAppQueue.Put(docs[j:]...)
+				f.zmqAppQueue.Put(f.hashKey, docs[j:]...)
 			}
+			f.hashKey++
 		}
 		f.statsdCounter[i+f.counterLatch].emitCounter += uint64(len(docs))
 		stash.Clear()

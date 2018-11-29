@@ -149,8 +149,10 @@ func Start(configPath string) (closers []io.Closer) {
 		datatype.ReleaseTaggedFlow(x.(*datatype.TaggedFlow))
 	}
 	flowDuplicatorQueue := manager.NewQueue("3-tagged-flow-to-flow-duplicator", cfg.Queue.FlowDuplicatorQueueSize, releaseTaggedFlow)
-	meteringAppOutputQueue := manager.NewQueue(
-		"3-metering-doc-to-marshaller", cfg.Queue.MeteringAppOutputQueueSize, // MapReduce发送是突发的，且ZMQ发送缓慢，queueSize设置为突发的2倍
+	meteringAppOutputQueue := manager.NewQueues(
+		"3-metering-doc-to-marshaller",
+		cfg.Queue.MeteringAppOutputQueueSize, cfg.Queue.MeteringAppOutputQueueCount, // MapReduce发送是突发的，且ZMQ发送缓慢，queueSize设置为突发的2倍
+		cfg.Queue.MeteringAppQueueCount,
 		libqueue.OptionRelease(func(p interface{}) { app.ReleaseDocument(p.(*app.Document)) }),
 	)
 
@@ -194,15 +196,18 @@ func Start(configPath string) (closers []io.Closer) {
 	sender.NewFlowSender(flowSenderQueue, cfg.Stream, cfg.StreamPort, cfg.Queue.FlowSenderQueueSize).Start()
 
 	// L5 - flow doc marshaller
-	flowAppOutputQueue := manager.NewQueue(
-		"5-flow-doc-to-marshaller", cfg.Queue.FlowAppOutputQueueSize, // MapReduce发送是突发的，且ZMQ发送缓慢，queueSize设置为突发的2倍
+	flowAppOutputQueue := manager.NewQueues(
+		"5-flow-doc-to-marshaller",
+		cfg.Queue.FlowAppOutputQueueSize, cfg.Queue.FlowAppOutputQueueCount, // MapReduce发送是突发的，且ZMQ发送缓慢，queueSize设置为突发的2倍
+		cfg.Queue.FlowAppQueueCount,
 		libqueue.OptionRelease(func(p interface{}) { app.ReleaseDocument(p.(*app.Document)) }),
 	)
 	mapreduce.NewFlowMapProcess(flowAppOutputQueue, flowAppQueue, cfg.Queue.FlowAppQueueCount, docsInBuffer, windowSize).Start()
 
 	// L6 - flow/metering doc sender
 	builder := sender.NewZeroDocumentSenderBuilder()
-	builder.AddQueue(flowAppOutputQueue, meteringAppOutputQueue)
+	builder.AddQueue(meteringAppOutputQueue, cfg.Queue.MeteringAppOutputQueueCount)
+	builder.AddQueue(flowAppOutputQueue, cfg.Queue.FlowAppOutputQueueCount)
 	for _, zero := range cfg.ZeroHosts {
 		builder.AddZero(zero, cfg.ZeroPort)
 	}

@@ -19,7 +19,7 @@ func TestMarshaller(t *testing.T) {
 		Hash:      proto.Uint32(0),
 	}
 	b, _ := proto.Marshal(header)
-	inputQueue := queue.NewOverwriteQueue("", 1024)
+	inputQueue := queue.NewOverwriteQueues("", 1, 1024)
 	outputQueues := make([]queue.QueueReader, TEST_QUEUES)
 	outputWriters := make([]queue.QueueWriter, TEST_QUEUES)
 	for i := 0; i < TEST_QUEUES; i++ {
@@ -27,9 +27,9 @@ func TestMarshaller(t *testing.T) {
 		outputQueues[i] = q
 		outputWriters[i] = q
 	}
-	go NewZeroDocumentMarshaller(inputQueue, outputWriters...).Start()
+	go NewZeroDocumentMarshaller(inputQueue, queue.HashKey(0), outputWriters...).Start()
 
-	inputQueue.Put(dupTestData()...)
+	inputQueue.Put(queue.HashKey(0), dupTestData()...)
 	for _, q := range outputQueues {
 		bytes := q.Get().(*utils.ByteBuffer)
 		newDoc, _ := unmarshal(bytes.Bytes()[len(b):])
