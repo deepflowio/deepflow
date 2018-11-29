@@ -81,6 +81,7 @@ type FlowGeneratorConfig struct {
 	TimeoutCleanerCount uint64        `yaml:"timeout-cleaner-count"`
 	HashMapSize         uint64        `yaml:"hash-map-size"`
 	ReportTolerance     time.Duration `yaml:"report-tolerance"`
+	IgnoreTorMac        bool          `yaml:"ignore-tor-mac"`
 }
 
 type MapReduceConfig struct {

@@ -43,7 +43,18 @@ func isFromTor(inPort uint32) bool {
 	return inPort&PACKET_SOURCE_TOR == PACKET_SOURCE_TOR
 }
 
-func MacEquals(meta *MetaPacket, flowMacSrc, flowMacDst MacInt) bool {
+func isEqualTor(inPort uint32) bool {
+	return inPort == PACKET_SOURCE_TOR
+}
+
+func requireMacMatch(inPort uint32, ignore bool) bool {
+	if isEqualTor(inPort) {
+		return !ignore
+	}
+	return isFromTor(inPort)
+}
+
+func MacMatch(meta *MetaPacket, flowMacSrc, flowMacDst MacInt) bool {
 	if flowMacSrc == meta.MacSrc && flowMacDst == meta.MacDst {
 		return true
 	}
@@ -78,7 +89,8 @@ func (f *FlowGenerator) keyMatch(flowCache *FlowCache, meta *MetaPacket) (*FlowE
 		if taggedFlow.Exporter != meta.Exporter || meta.InPort != taggedFlow.InPort {
 			continue
 		}
-		if isFromTor(meta.InPort) && !MacEquals(meta, taggedFlow.MACSrc, taggedFlow.MACDst) {
+		if requireMacMatch(meta.InPort, f.ignoreTorMac) &&
+			!MacMatch(meta, taggedFlow.MACSrc, taggedFlow.MACDst) {
 			continue
 		}
 		if taggedFlow.Proto != meta.Protocol ||
@@ -574,9 +586,11 @@ func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, cfg
 		flowLimitNum:            cfg.FlowLimitNum,
 		handleRunning:           false,
 		cleanRunning:            false,
+		ignoreTorMac:            cfg.IgnoreTorMac,
 		index:                   index,
 		perfCounter:             NewFlowPerfCounter(),
 	}
+	log.Infof("flow generator %d base config: %+v", index, cfg)
 	flowGenerator.initFlowCache()
 	flowGenerator.initStateMachineMaster()
 	flowGenerator.initStateMachineSlave()
