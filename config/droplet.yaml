@@ -106,6 +106,8 @@ flow-generator:
   hash-map-size: 262166
   # report tolerance for the endtime field of a flow, in seconds
   report-tolerance: 4
+  # if true, then not check mac for flow match when inport is 0x30000
+  ignore-tor-mac: false
 #geo-file-location: /opt/droplet/ip_info_mini.json
 map-reduce:
   # mapreduce buffer capacity

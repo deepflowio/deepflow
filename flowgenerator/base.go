@@ -99,6 +99,7 @@ type FlowGenerator struct {
 	flowLimitNum            int32
 	handleRunning           bool
 	cleanRunning            bool
+	ignoreTorMac            bool
 	index                   int
 	cleanWaitGroup          sync.WaitGroup
 
@@ -112,6 +113,7 @@ type FlowGeneratorConfig struct {
 	TimeoutCleanerCount uint64
 	HashMapSize         uint64
 	ReportTolerance     time.Duration
+	IgnoreTorMac        bool
 }
 
 func timeMax(a time.Duration, b time.Duration) time.Duration {

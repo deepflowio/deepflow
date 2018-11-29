@@ -65,7 +65,8 @@ func reversePacket(packet *MetaPacket) {
 func getDefaultFlowGenerator() *FlowGenerator {
 	metaPacketHeaderInQueue := NewOverwriteQueues("metaPacketHeaderInQueue", 1, DEFAULT_QUEUE_LEN)
 	flowOutQueue := NewOverwriteQueue("flowOutQueue", DEFAULT_QUEUE_LEN)
-	return New(metaPacketHeaderInQueue, flowOutQueue, FlowGeneratorConfig{60 * time.Second, 64 * 1024, 1024 * 1024, 4, 1024 * 256, 4}, 0)
+	cfg := FlowGeneratorConfig{60 * time.Second, 64 * 1024, 1024 * 1024, 4, 1024 * 256, 4, false}
+	return New(metaPacketHeaderInQueue, flowOutQueue, cfg, 0)
 }
 
 func TestNew(t *testing.T) {
@@ -426,6 +427,32 @@ func TestNonIpShortFlow(t *testing.T) {
 	}
 	if taggedFlow.EthType != layers.EthernetTypeARP {
 		t.Errorf("taggedFlow.EthType is %d, expect %d", taggedFlow.EthType, layers.EthernetTypeARP)
+	}
+}
+
+func TestInPortEqualTor(t *testing.T) {
+	flowGenerator := getDefaultFlowGenerator()
+	flowGenerator.SetTimeout(TimeoutConfig{0, 300 * time.Second, 0, 30 * time.Second, 5 * time.Second, 0, 0})
+	flowGenerator.minLoopInterval = 0
+	flowGenerator.ignoreTorMac = true
+	metaPacketHeaderInQueue := flowGenerator.metaPacketHeaderInQueue
+	flowOutQueue := flowGenerator.flowOutQueue
+
+	packet0 := getDefaultPacket()
+	packet0.InPort = 0x30000
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
+
+	packet1 := getDefaultPacket()
+	dst, _ := net.ParseMAC("21:43:65:AA:AA:AA")
+	packet1.MacDst = MacIntFromBytes(dst)
+	packet1.InPort = 0x30000
+	packet1.TcpData.Flags = TCP_RST
+	reversePacket(packet1)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
+	flowGenerator.Start()
+	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
+	if cnt := taggedFlow.FlowMetricsPeerDst.PacketCount; cnt != 1 {
+		t.Errorf("taggedFlow.FlowMetricsPeerDst.PacketCount is %d, expect 1", cnt)
 	}
 }
 
