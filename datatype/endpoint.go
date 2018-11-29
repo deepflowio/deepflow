@@ -6,6 +6,8 @@ import (
 	"time"
 
 	. "github.com/google/gopacket/layers"
+
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 var (
@@ -72,6 +74,12 @@ type LookupKey struct {
 type EndpointData struct {
 	SrcInfo *EndpointInfo
 	DstInfo *EndpointInfo
+}
+
+func (k *LookupKey) String() string {
+	return fmt.Sprintf("%d %s:%v > %s:%v %v vlan: %v %v:%d > %v:%d proto: %v ttl %v tap: %v",
+		k.Timestamp, Uint64ToMac(k.SrcMac), k.L2End0, Uint64ToMac(k.DstMac), k.L2End1, k.EthType, k.Vlan,
+		IpFromUint32(k.SrcIp), k.SrcPort, IpFromUint32(k.DstIp), k.DstPort, k.Proto, k.Ttl, k.Tap)
 }
 
 func (i *EndpointInfo) SetL2Data(data *PlatformData) {
