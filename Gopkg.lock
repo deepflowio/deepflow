@@ -110,7 +110,7 @@
   version = "v0.8.0"
 
 [[projects]]
-  branch = "feature-npb"
+  branch = "master"
   digest = "1:e30079bdb962b20e07cab4d27bf348a570569d44d51cd656838dba414a1b455b"
   name = "gitlab.x.lan/yunshan/message"
   packages = [
