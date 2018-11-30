@@ -1201,6 +1201,8 @@ func TestNpbAction(t *testing.T) {
 	npb1 := ToNpbAction(10, 150, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
 	npb2 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 200)
 	npb3 := ToNpbAction(20, 200, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 200)
+	npb := ToNpbAction(10, 150, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 200)
+
 	acl1 := generatePolicyAcl(table, action1, 25, groupAny, groupAny, IPProtocolTCP, 1000, vlanAny, npb1)
 	action2 := generateAclAction(26, ACTION_PACKET_BROKERING)
 	// acl2 Group: 0 -> 0 Port: 1000 Proto: 0 vlan: any
@@ -1212,7 +1214,7 @@ func TestNpbAction(t *testing.T) {
 	table.UpdateAcls(acls)
 	// 构建预期结果
 	basicPolicyData := &PolicyData{}
-	basicPolicyData.Merge([]AclAction{action1, action2}, []NpbAction{npb2.ReverseTapSide(), npb1.ReverseTapSide()}, 25, BACKWARD)
+	basicPolicyData.Merge([]AclAction{action1, action2}, []NpbAction{npb.ReverseTapSide()}, 25, BACKWARD)
 
 	// key1: ip4:1000 -> ip3:1023 tcp
 	key1 := generateLookupKey(mac2, mac1, vlanAny, group2Ip1, group1Ip1, IPProtocolTCP, 1000, 1023)
@@ -1228,7 +1230,7 @@ func TestNpbAction(t *testing.T) {
 	setEthTypeAndOthers(key1, EthernetTypeIPv4, 64, true, false)
 	policyData = table.LookupPolicyByKey(key1)
 	basicPolicyData = &PolicyData{}
-	basicPolicyData.Merge([]AclAction{action1, action2}, []NpbAction{npb2, npb1}, 25)
+	basicPolicyData.Merge([]AclAction{action1, action2}, []NpbAction{npb}, 25)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestNpbAction Check Failed!")

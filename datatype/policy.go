@@ -35,7 +35,7 @@ func (a NpbAction) TapSide() int {
 	return int((a >> 16) & TAPSIDE_MASK)
 }
 
-func (a *NpbAction) SetTapSide(flag int) {
+func (a *NpbAction) AddTapSide(flag int) {
 	*a |= NpbAction((flag & TAPSIDE_MASK) << 16)
 }
 
@@ -51,7 +51,7 @@ func (a NpbAction) ResourceGroupTypeCompare(flag int) bool {
 	return (a.ResourceGroupType() & flag) == flag
 }
 
-func (a *NpbAction) SetResourceGroupType(groupType int) {
+func (a *NpbAction) AddResourceGroupType(groupType int) {
 	*a |= ((NpbAction(groupType & RESOURCE_GROUP_TYPE_MASK)) << 18)
 }
 
@@ -294,28 +294,47 @@ func (d *PolicyData) ReverseNpbActions() {
 	}
 }
 
-func (d *PolicyData) MergeNpbAction(actions []NpbAction) {
-	for _, n := range actions {
+func (d *PolicyData) DedupNpbAction() {
+	validActions := make([]NpbAction, 0, len(d.NpbActions))
+	for i := 0; i < len(d.NpbActions); i++ {
 		repeat := false
-		for index, m := range d.NpbActions {
-			if m == n {
+		actionI := &d.NpbActions[i]
+		for j := i + 1; j < len(d.NpbActions); j++ {
+			actionJ := &d.NpbActions[j]
+			if *actionJ == *actionI {
 				repeat = true
 				break
 			}
 
-			if m.TunnelIp() != n.TunnelIp() {
+			if actionI.TunnelIp() != actionJ.TunnelIp() {
 				continue
 			}
-			if n.PayloadSlice() == 0 ||
-				n.PayloadSlice() > m.PayloadSlice() {
-				d.NpbActions[index].SetPayloadSlice(n.PayloadSlice())
+			if actionI.PayloadSlice() == 0 ||
+				actionI.PayloadSlice() > actionJ.PayloadSlice() {
+				actionJ.SetPayloadSlice(actionI.PayloadSlice())
 			}
-			if n.TunnelId() > m.TunnelId() {
-				d.NpbActions[index].SetTunnelId(n.TunnelId())
+			if actionI.TunnelId() > actionJ.TunnelId() {
+				actionJ.SetTunnelId(actionI.TunnelId())
 			}
-			d.NpbActions[index].SetTapSide(n.TapSide())
-			d.NpbActions[index].SetResourceGroupType(n.ResourceGroupType())
+			actionJ.AddTapSide(actionI.TapSide())
+			actionJ.AddResourceGroupType(actionI.ResourceGroupType())
 			repeat = true
+		}
+		if !repeat {
+			validActions = append(validActions, *actionI)
+		}
+	}
+	d.NpbActions = append(d.NpbActions[:0], validActions...)
+}
+
+func (d *PolicyData) MergeNpbAction(actions []NpbAction) {
+	for _, n := range actions {
+		repeat := false
+		for _, m := range d.NpbActions {
+			if m == n {
+				repeat = true
+				break
+			}
 		}
 		if !repeat {
 			d.NpbActions = append(d.NpbActions, n)

@@ -554,7 +554,7 @@ func (l *PolicyLabeler) UpdateAcls(acls []*Acl) {
 				break
 			}
 			for _, action := range acl.NpbActions {
-				action.SetResourceGroupType(groupType)
+				action.AddResourceGroupType(groupType)
 			}
 		}
 
@@ -795,13 +795,16 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packetEndp
 			npbActions = l.checkNpbAction(packetEndpointData, npbActions)
 			if policyForward.ACLID > 0 {
 				policyForward.NpbActions = append(policyForward.NpbActions[:0], npbActions...)
+				policyForward.DedupNpbAction()
 			}
 			if policyBackward.ACLID > 0 {
 				policyBackward.NpbActions = append(policyBackward.NpbActions[:0], npbActions...)
+				policyBackward.DedupNpbAction()
 			}
 		}
 		forward.Merge(policyForward.AclActions, nil, policyForward.ACLID)
 		forward.Merge(policyBackward.AclActions, npbActions, policyBackward.ACLID)
+		forward.DedupNpbAction()
 	}
 	key := uint64(srcEpc)<<48 | uint64(dstEpc)<<32 | uint64(packet.SrcPort)<<16 | uint64(packet.DstPort)
 	if portPolicyValue := mapsForward.portPolicyMap[key]; portPolicyValue == nil {
