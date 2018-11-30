@@ -35,6 +35,11 @@ func (a NpbAction) TapSide() int {
 	return int((a >> 16) & TAPSIDE_MASK)
 }
 
+func (a *NpbAction) SetTapSide(flag int) {
+	*a &= ^NpbAction(TAPSIDE_MASK << 16)
+	*a |= NpbAction((flag & TAPSIDE_MASK) << 16)
+}
+
 func (a *NpbAction) AddTapSide(flag int) {
 	*a |= NpbAction((flag & TAPSIDE_MASK) << 16)
 }
@@ -330,11 +335,25 @@ func (d *PolicyData) DedupNpbAction() {
 func (d *PolicyData) MergeNpbAction(actions []NpbAction) {
 	for _, n := range actions {
 		repeat := false
-		for _, m := range d.NpbActions {
+		for index, m := range d.NpbActions {
 			if m == n {
 				repeat = true
 				break
 			}
+
+			if m.TunnelIp() != n.TunnelIp() {
+				continue
+			}
+			if n.PayloadSlice() == 0 ||
+				n.PayloadSlice() > m.PayloadSlice() {
+				d.NpbActions[index].SetPayloadSlice(n.PayloadSlice())
+			}
+			if n.TunnelId() > m.TunnelId() {
+				d.NpbActions[index].SetTunnelId(n.TunnelId())
+			}
+			d.NpbActions[index].AddResourceGroupType(n.ResourceGroupType())
+			d.NpbActions[index].SetTapSide(n.TapSide())
+			repeat = true
 		}
 		if !repeat {
 			d.NpbActions = append(d.NpbActions, n)
