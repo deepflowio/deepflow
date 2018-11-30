@@ -146,7 +146,10 @@ Benchmark
 profiler
 ---------------
 
-* 运行droplet前编辑droplet.yaml，修改profiler为true
+运行droplet前，编辑droplet.yaml，修改profiler为true
+
+开发/测试环境获取方式:
+
 * 观察堆内存：本地或远端执行`go tool pprof -inuse_space http://HOSTNAME:8000/debug/pprof/heap`
 * 观察CPU：本地或远端执行`go tool pprof http://HOSTNAME:8000/debug/pprof/profile`
   - 执行top 30，可查看最热的30个函数
@@ -154,6 +157,12 @@ profiler
   - 执行pdf可以输出pdf格式的热点图
   - 如果本地不方便运行go，可以使用socat代理socket，命令为`socat TCP4-LISTEN:8000 TCP4:analyzer2:8000`
 * 更多内容可以参考[pprof](https://golang.org/pkg/net/http/pprof/)
+
+生产环境获取方式:
+
+* 获取CPU profiler: 
+  1. 运行环境执行`wget http://localhost:8000/debug/pprof/profile?seconds=30 -o droplet.pprof`
+  2. 将droplet.pprof拷贝到本地，然后执行`go tool pprof droplet.pprof`
 
 性能量化字段说明
 ----------------
