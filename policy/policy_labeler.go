@@ -779,9 +779,6 @@ func (l *PolicyLabeler) addVlanFastPolicy(srcEpc, dstEpc uint16, packet *LookupK
 
 func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packetEndpointData *EndpointData, srcEpc, dstEpc uint16, packet *LookupKey, policyForward, policyBackward *PolicyData) (*VlanAndPortMap, *VlanAndPortMap) {
 	forward, backward := INVALID_POLICY_DATA, INVALID_POLICY_DATA
-	npbActions := make([]NpbAction, 0, len(policyBackward.NpbActions)+len(policyForward.NpbActions))
-	npbActions = append(npbActions, policyForward.NpbActions...)
-	npbActions = append(npbActions, policyBackward.NpbActions...)
 
 	mapsForward := l.getVlanAndPortMap(packet, FORWARD, true, nil)
 	if mapsForward == nil {
@@ -791,20 +788,17 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packetEndp
 	if id := policyForward.ACLID + policyBackward.ACLID; id > 0 {
 		forward = new(PolicyData)
 		forward.AclActions = make([]AclAction, 0, len(policyForward.AclActions)+len(policyBackward.AclActions))
-		if len(npbActions) > 0 {
-			npbActions = l.checkNpbAction(packetEndpointData, npbActions)
+		forward.Merge(policyForward.AclActions, policyForward.NpbActions, policyForward.ACLID)
+		forward.Merge(policyBackward.AclActions, policyBackward.NpbActions, policyBackward.ACLID)
+		if len(forward.NpbActions) > 0 {
+			npbActions := l.checkNpbAction(packetEndpointData, forward.NpbActions)
 			if policyForward.ACLID > 0 {
 				policyForward.NpbActions = append(policyForward.NpbActions[:0], npbActions...)
-				policyForward.DedupNpbAction()
 			}
 			if policyBackward.ACLID > 0 {
 				policyBackward.NpbActions = append(policyBackward.NpbActions[:0], npbActions...)
-				policyBackward.DedupNpbAction()
 			}
 		}
-		forward.Merge(policyForward.AclActions, nil, policyForward.ACLID)
-		forward.Merge(policyBackward.AclActions, npbActions, policyBackward.ACLID)
-		forward.DedupNpbAction()
 	}
 	key := uint64(srcEpc)<<48 | uint64(dstEpc)<<32 | uint64(packet.SrcPort)<<16 | uint64(packet.DstPort)
 	if portPolicyValue := mapsForward.portPolicyMap[key]; portPolicyValue == nil {
