@@ -26,14 +26,6 @@
   version = "v0.3.3"
 
 [[projects]]
-  branch = "master"
-  digest = "1:3fb07f8e222402962fa190eb060608b34eddfb64562a18e2167df2de0ece85d8"
-  name = "github.com/golang/groupcache"
-  packages = ["lru"]
-  pruneopts = "UT"
-  revision = "24b0969c4cb722950103eed87108c8d291a8df00"
-
-[[projects]]
   digest = "1:4c0989ca0bcd10799064318923b9bc2db6b4d6338dd75f3f2d86c3511aaaf5cf"
   name = "github.com/golang/protobuf"
   packages = [
@@ -120,7 +112,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:70971184131ab1aa6b65aef90f0acb605048d99e4a6048767ae6224b1deb6422"
+  digest = "1:b496a5e9eee5ef3fdbbc67e5c0329f614c5091d9a6b19aa68a774b4c1851db7e"
   name = "gitlab.x.lan/yunshan/message"
   packages = [
     "dfi",
@@ -128,7 +120,7 @@
     "zero",
   ]
   pruneopts = "T"
-  revision = "2c855fa69815cfff6e9570df27c1246dbacd2b7d"
+  revision = "86429df282c4e6caeae2f4a880e424ba952cba8d"
 
 [[projects]]
   branch = "release-branch.go1.11"
@@ -236,7 +228,6 @@
     "github.com/OneOfOne/xxhash",
     "github.com/Workiva/go-datastructures/bitarray",
     "github.com/docker/go-units",
-    "github.com/golang/groupcache/lru",
     "github.com/golang/protobuf/proto",
     "github.com/google/gopacket/layers",
     "github.com/google/gopacket/pcapgo",
