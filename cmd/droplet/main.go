@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	"github.com/op/go-logging"
-	. "gitlab.x.lan/yunshan/droplet-libs/logger"
+	"gitlab.x.lan/yunshan/droplet-libs/logger"
 
 	"gitlab.x.lan/yunshan/droplet/droplet"
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
@@ -29,7 +29,7 @@ var version = flag.Bool("v", false, "Display the version")
 var RevCount, Revision, CommitDate string
 
 func main() {
-	InitConsoleLog("info")
+	logger.EnableStdoutLog()
 	flag.Parse()
 	if *version {
 		fmt.Printf("%s-%s %s\n", RevCount, Revision, CommitDate)

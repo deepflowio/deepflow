@@ -12,7 +12,7 @@ import (
 	"github.com/op/go-logging"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
-	. "gitlab.x.lan/yunshan/droplet-libs/logger"
+	"gitlab.x.lan/yunshan/droplet-libs/logger"
 	libqueue "gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 
@@ -50,7 +50,9 @@ func getLocalIp() (net.IP, error) {
 
 func Start(configPath string) (closers []io.Closer) {
 	cfg := config.Load(configPath)
-	InitLog(cfg.LogFile, cfg.LogLevel)
+	logger.EnableFileLog(cfg.LogFile)
+	logLevel, _ := logging.LogLevel(cfg.LogLevel)
+	logging.SetLevel(logLevel, "")
 	log.Infof("droplet config: %+v\n", cfg)
 
 	if cfg.Profiler {

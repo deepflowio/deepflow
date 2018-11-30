@@ -304,7 +304,7 @@ func TestFlowReverse(t *testing.T) {
 	flowGenerator.Start()
 
 	policyData := new(PolicyData)
-	policyData.Merge([]AclAction{generateAclAction(10, ACTION_PACKET_COUNTING)}, 10)
+	policyData.Merge([]AclAction{generateAclAction(10, ACTION_PACKET_COUNTING)}, nil, 10)
 
 	packet0 := getDefaultPacket()
 	packet0.TcpData.Flags = TCP_ACK
@@ -334,12 +334,12 @@ func TestReverseInNewCircle(t *testing.T) {
 	flowGenerator := getDefaultFlowGenerator()
 
 	policyData0 := new(PolicyData)
-	policyData0.Merge([]AclAction{generateAclAction(10, ACTION_PACKET_COUNTING)}, 10)
+	policyData0.Merge([]AclAction{generateAclAction(10, ACTION_PACKET_COUNTING)}, nil, 10)
 	packet0 := getDefaultPacket()
 	packet0.PolicyData = policyData0
 
 	policyData1 := new(PolicyData)
-	policyData1.Merge([]AclAction{generateAclAction(11, ACTION_PACKET_COUNTING)}, 11)
+	policyData1.Merge([]AclAction{generateAclAction(11, ACTION_PACKET_COUNTING)}, nil, 11)
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Flags = TCP_SYN | TCP_ACK
 	reversePacket(packet1)
