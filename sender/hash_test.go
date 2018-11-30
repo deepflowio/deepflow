@@ -19,7 +19,7 @@ var FLOW_APP_CODES = [][]zerodoc.Code{
 
 	flow.NODE_CODES,
 	flow.NODE_PORT_CODES,
-	flow.ISP_EDGE_CODES,
+	flow.EDGE_CODES,
 	flow.TOR_EDGE_CODES,
 	flow.GROUP_NODE_CODES,
 	flow.GROUP_NODE_PORT_CODES,
