@@ -8,6 +8,7 @@ import (
 
 	. "github.com/google/gopacket/layers"
 
+	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
@@ -29,7 +30,7 @@ type MetaPacketTcpHeader struct {
 }
 
 type MetaPacket struct {
-	ReferenceCount
+	pool.ReferenceCount
 
 	Timestamp      time.Duration
 	InPort         uint32
@@ -291,7 +292,7 @@ func (p *MetaPacket) String() string {
 	return buffer.String()
 }
 
-var metaPacketPool = NewLockFreePool(func() interface{} {
+var metaPacketPool = pool.NewLockFreePool(func() interface{} {
 	return new(MetaPacket)
 })
 

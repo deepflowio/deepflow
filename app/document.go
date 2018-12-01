@@ -3,12 +3,12 @@ package app
 import (
 	"fmt"
 
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
+	"gitlab.x.lan/yunshan/droplet-libs/pool"
 )
 
 type Tag interface {
-	GetID(*utils.IntBuffer) string
+	GetID(*codec.SimpleEncoder) string
 	SetID(string)
 	GetCode() uint64
 	GetFastID() uint64
@@ -20,6 +20,8 @@ type Tag interface {
 }
 
 type Meter interface {
+	Encode(*codec.SimpleEncoder)
+	Decode(*codec.SimpleDecoder)
 	ConcurrentMerge(Meter)
 	SequentialMerge(Meter)
 	ToKVString() string
@@ -28,7 +30,7 @@ type Meter interface {
 }
 
 type Document struct {
-	datatype.ReferenceCount
+	pool.ReferenceCount
 
 	Timestamp uint32
 	Tag
@@ -41,7 +43,7 @@ func (d Document) String() string {
 		d.Timestamp, d.ActionFlags, d.Tag, d.Meter)
 }
 
-var poolDocument = datatype.NewLockFreePool(func() interface{} {
+var poolDocument = pool.NewLockFreePool(func() interface{} {
 	return &Document{}
 })
 
