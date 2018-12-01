@@ -1,8 +1,8 @@
 package sender
 
 import (
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/droplet-libs/zmq"
 )
 
@@ -50,11 +50,11 @@ func (s *ZMQBytePusher) QueueForward(q queue.QueueReader) {
 		n := q.Gets(buffer)
 		log.Debugf("%d byte arrays received", n)
 		for i := 0; i < n; i++ {
-			if bytes, ok := buffer[i].(*utils.ByteBuffer); ok {
-				s.Send(bytes.Bytes())
-				utils.ReleaseByteBuffer(bytes)
+			if encoder, ok := buffer[i].(*codec.SimpleEncoder); ok {
+				s.Send(encoder.Bytes())
+				codec.ReleaseSimpleEncoder(encoder)
 			} else {
-				log.Warningf("Invalid message type %T, should be *utils.ByteBuffer", bytes)
+				log.Warningf("Invalid message type %T, should be *codec.SimpleEncoder", encoder)
 			}
 		}
 	}

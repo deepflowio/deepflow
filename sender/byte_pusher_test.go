@@ -3,8 +3,8 @@ package sender
 import (
 	"testing"
 
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 var data = [][]byte{
@@ -15,26 +15,25 @@ var data = [][]byte{
 }
 
 func TestBytePusher(t *testing.T) {
-	output := make(chan *utils.ByteBuffer)
+	output := make(chan *codec.SimpleEncoder)
 	q := queue.NewOverwriteQueue("", 1024)
 	for _, d := range data {
-		bytes := utils.AcquireByteBuffer()
-		bytes.Use(len(d))
-		copy(bytes.Bytes(), d)
-		q.Put(bytes)
+		encoder := codec.AcquireSimpleEncoder()
+		encoder.WriteRawString(string(d))
+		q.Put(encoder)
 	}
 	go receiverRoutine(len(data), "127.0.0.1", 12345, output)
 	go senderRoutine(q)
 	for _, d := range data {
-		bytes := <-output
-		b := bytes.Bytes()
+		encoder := <-output
+		b := encoder.Bytes()
 		for i := 0; i < len(b); i++ {
 			if b[i] != d[i] {
 				t.Error("结果不一致")
 				break
 			}
 		}
-		utils.ReleaseByteBuffer(bytes)
+		codec.ReleaseSimpleEncoder(encoder)
 	}
 }
 

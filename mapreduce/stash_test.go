@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	datatype "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 )
 
@@ -67,14 +67,14 @@ func TestStash(t *testing.T) {
 		t.Error("文档数量不正确")
 	}
 
-	b := &utils.IntBuffer{}
-	if docs[0].(*app.Document).Tag.(*datatype.Tag).GetID(b) != tag1.GetID(b) {
+	e := &codec.SimpleEncoder{}
+	if docs[0].(*app.Document).Tag.(*datatype.Tag).GetID(e) != tag1.GetID(e) {
 		t.Error("文档0的tag不正确")
 	}
-	if docs[1].(*app.Document).Tag.(*datatype.Tag).GetID(b) != tag2.GetID(b) {
+	if docs[1].(*app.Document).Tag.(*datatype.Tag).GetID(e) != tag2.GetID(e) {
 		t.Error("文档1的tag不正确")
 	}
-	if docs[2].(*app.Document).Tag.(*datatype.Tag).GetID(b) != tag4.GetID(b) {
+	if docs[2].(*app.Document).Tag.(*datatype.Tag).GetID(e) != tag4.GetID(e) {
 		t.Error("文档2的tag不正确")
 	}
 	if docs[0].(*app.Document).Meter.(*datatype.UsageMeter).SumPacketTx != 2*meter.SumPacketTx {

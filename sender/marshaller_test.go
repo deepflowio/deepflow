@@ -3,22 +3,14 @@ package sender
 import (
 	"testing"
 
-	"github.com/golang/protobuf/proto"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
-	"gitlab.x.lan/yunshan/message/zero"
 )
 
 const TEST_QUEUES = 10
 
 func TestMarshaller(t *testing.T) {
-	header := &zero.ZeroHeader{
-		Timestamp: proto.Uint32(0),
-		Sequence:  proto.Uint32(0),
-		Hash:      proto.Uint32(0),
-	}
-	b, _ := proto.Marshal(header)
 	inputQueue := queue.NewOverwriteQueues("", 1, 1024)
 	outputQueues := make([]queue.QueueReader, TEST_QUEUES)
 	outputWriters := make([]queue.QueueWriter, TEST_QUEUES)
@@ -31,8 +23,8 @@ func TestMarshaller(t *testing.T) {
 
 	inputQueue.Put(queue.HashKey(0), dupTestData()...)
 	for _, q := range outputQueues {
-		bytes := q.Get().(*utils.ByteBuffer)
-		newDoc, _ := unmarshal(bytes.Bytes()[len(b):])
+		bytes := q.Get().(*codec.SimpleEncoder)
+		newDoc, _ := decode(bytes.Bytes())
 
 		doc := TEST_DATA[0].(*app.Document)
 

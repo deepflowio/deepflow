@@ -2,7 +2,7 @@ package mapreduce
 
 import (
 	"gitlab.x.lan/yunshan/droplet-libs/app"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 )
 
 type Stash struct {
@@ -15,7 +15,7 @@ type Stash struct {
 	entryCount int
 	capacity   int
 
-	intBuffer *utils.IntBuffer
+	encoder *codec.SimpleEncoder
 }
 
 func NewStash(capacity, slots int) *Stash {
@@ -27,7 +27,7 @@ func NewStash(capacity, slots int) *Stash {
 		stash:             make([]interface{}, capacity),
 		entryCount:        0,
 		capacity:          capacity,
-		intBuffer:         &utils.IntBuffer{},
+		encoder:           &codec.SimpleEncoder{},
 	}
 }
 
@@ -68,7 +68,7 @@ func (s *Stash) Add(docs []interface{}) []interface{} {
 				slotMap = make(map[string]int)
 				s.stashLocation[slot] = slotMap
 			}
-			if docLoc, ok := slotMap[doc.GetID(s.intBuffer)]; ok {
+			if docLoc, ok := slotMap[doc.GetID(s.encoder)]; ok {
 				s.stash[docLoc].(*app.Document).ConcurrentMerge(doc.Meter)
 				continue
 			}
@@ -77,7 +77,7 @@ func (s *Stash) Add(docs []interface{}) []interface{} {
 				return docs[i:]
 			}
 			s.stash[s.entryCount] = app.CloneDocument(doc)
-			slotMap[doc.GetID(s.intBuffer)] = s.entryCount
+			slotMap[doc.GetID(s.encoder)] = s.entryCount
 			s.entryCount++
 		}
 	}

@@ -3,9 +3,9 @@ package sender
 import (
 	"strconv"
 
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 type ZeroDocumentSender struct {
@@ -66,7 +66,7 @@ func (s *ZeroDocumentSender) Start(queueSize int) {
 	for i := 0; i < lenOfPorts; i++ {
 		q := queue.NewOverwriteQueue(
 			"6-all-doc-to-zero", queueSize,
-			queue.OptionRelease(func(p interface{}) { utils.ReleaseByteBuffer(p.(*utils.ByteBuffer)) }),
+			queue.OptionRelease(func(p interface{}) { codec.ReleaseSimpleEncoder(p.(*codec.SimpleEncoder)) }),
 			stats.OptionStatTags{"index": strconv.Itoa(i)},
 		)
 		queueWriters[i] = q
