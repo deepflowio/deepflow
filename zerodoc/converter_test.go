@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/gopacket/layers"
 
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 )
 
 func TestFullEqual(t *testing.T) {
@@ -60,8 +60,8 @@ func TestFullEqual(t *testing.T) {
 	toTag := AcquireTag()
 	toTag.Field = AcquireField()
 	PBToTag(pb, toTag)
-	b := &utils.IntBuffer{}
-	if fromTag.GetID(b) != toTag.GetID(b) {
+	e := &codec.SimpleEncoder{}
+	if fromTag.GetID(e) != toTag.GetID(e) {
 		t.Error("Tag在序列化反序列化之后GetID与原Tag不一致")
 	}
 }
@@ -126,8 +126,8 @@ func TestPartialTagEqual(t *testing.T) {
 		toTag := AcquireTag()
 		toTag.Field = AcquireField()
 		PBToTag(pb, toTag)
-		b := &utils.IntBuffer{}
-		if fromTag.GetID(b) != toTag.GetID(b) {
+		e := &codec.SimpleEncoder{}
+		if fromTag.GetID(e) != toTag.GetID(e) {
 			t.Errorf("Tag在序列化反序列化之后GetID与原Tag不一致, Code=%d", code)
 		}
 	}
@@ -193,8 +193,8 @@ func TestGeoTagEqual(t *testing.T) {
 		toTag := AcquireTag()
 		toTag.Field = AcquireField()
 		PBToTag(pb, toTag)
-		b := &utils.IntBuffer{}
-		if fromTag.GetID(b) != toTag.GetID(b) {
+		e := &codec.SimpleEncoder{}
+		if fromTag.GetID(e) != toTag.GetID(e) {
 			t.Errorf("Tag在序列化反序列化之后GetID与原Tag不一致, Code=%d", code)
 		}
 	}

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 )
 
 type FlowMeter struct {
@@ -17,6 +18,30 @@ type FlowMeter struct {
 	SumBitTx           uint64 `db:"sum_bit_tx"`
 	SumBitRx           uint64 `db:"sum_bit_rx"`
 	SumBit             uint64 `db:"sum_bit"`
+}
+
+func (m *FlowMeter) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteU64(m.SumFlowCount)
+	encoder.WriteU64(m.SumNewFlowCount)
+	encoder.WriteU64(m.SumClosedFlowCount)
+	encoder.WriteU64(m.SumPacketTx)
+	encoder.WriteU64(m.SumPacketRx)
+	encoder.WriteU64(m.SumPacket)
+	encoder.WriteU64(m.SumBitTx)
+	encoder.WriteU64(m.SumBitRx)
+	encoder.WriteU64(m.SumBit)
+}
+
+func (m *FlowMeter) Decode(decoder *codec.SimpleDecoder) {
+	m.SumFlowCount = decoder.ReadU64()
+	m.SumNewFlowCount = decoder.ReadU64()
+	m.SumClosedFlowCount = decoder.ReadU64()
+	m.SumPacketTx = decoder.ReadU64()
+	m.SumPacketRx = decoder.ReadU64()
+	m.SumPacket = decoder.ReadU64()
+	m.SumBitTx = decoder.ReadU64()
+	m.SumBitRx = decoder.ReadU64()
+	m.SumBit = decoder.ReadU64()
 }
 
 func (m *FlowMeter) ConcurrentMerge(other app.Meter) {

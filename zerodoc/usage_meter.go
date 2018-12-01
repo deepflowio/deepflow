@@ -5,11 +5,22 @@ import (
 	"strings"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 )
 
 type UsageMeter struct {
 	UsageMeterSum
 	UsageMeterMax
+}
+
+func (m *UsageMeter) Encode(encoder *codec.SimpleEncoder) {
+	m.UsageMeterSum.Encode(encoder)
+	m.UsageMeterMax.Encode(encoder)
+}
+
+func (m *UsageMeter) Decode(decoder *codec.SimpleDecoder) {
+	m.UsageMeterSum.Decode(decoder)
+	m.UsageMeterMax.Decode(decoder)
 }
 
 func (m *UsageMeter) ConcurrentMerge(other app.Meter) {
@@ -72,6 +83,24 @@ type UsageMeterSum struct {
 	SumBit      uint64 `db:"sum_bit"`
 }
 
+func (m *UsageMeterSum) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteU64(m.SumPacketTx)
+	encoder.WriteU64(m.SumPacketRx)
+	encoder.WriteU64(m.SumPacket)
+	encoder.WriteU64(m.SumBitTx)
+	encoder.WriteU64(m.SumBitRx)
+	encoder.WriteU64(m.SumBit)
+}
+
+func (m *UsageMeterSum) Decode(decoder *codec.SimpleDecoder) {
+	m.SumPacketTx = decoder.ReadU64()
+	m.SumPacketRx = decoder.ReadU64()
+	m.SumPacket = decoder.ReadU64()
+	m.SumBitTx = decoder.ReadU64()
+	m.SumBitRx = decoder.ReadU64()
+	m.SumBit = decoder.ReadU64()
+}
+
 func (m *UsageMeterSum) concurrentMerge(other *UsageMeterSum) {
 	m.SumPacketTx += other.SumPacketTx
 	m.SumPacketRx += other.SumPacketRx
@@ -92,6 +121,24 @@ type UsageMeterMax struct {
 	MaxBitTx    uint64 `db:"max_bit_tx"`
 	MaxBitRx    uint64 `db:"max_bit_rx"`
 	MaxBit      uint64 `db:"max_bit"`
+}
+
+func (m *UsageMeterMax) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteU64(m.MaxPacketTx)
+	encoder.WriteU64(m.MaxPacketRx)
+	encoder.WriteU64(m.MaxPacket)
+	encoder.WriteU64(m.MaxBitTx)
+	encoder.WriteU64(m.MaxBitRx)
+	encoder.WriteU64(m.MaxBit)
+}
+
+func (m *UsageMeterMax) Decode(decoder *codec.SimpleDecoder) {
+	m.MaxPacketTx = decoder.ReadU64()
+	m.MaxPacketRx = decoder.ReadU64()
+	m.MaxPacket = decoder.ReadU64()
+	m.MaxBitTx = decoder.ReadU64()
+	m.MaxBitRx = decoder.ReadU64()
+	m.MaxBit = decoder.ReadU64()
 }
 
 func (m *UsageMeterMax) concurrentMerge(other *UsageMeterMax) {

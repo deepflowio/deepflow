@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/gopacket/layers"
 
+	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
@@ -212,7 +213,7 @@ func (f *Flow) String() string {
 	return formatted
 }
 
-var tcpPerfStatsPool = NewLockFreePool(func() interface{} {
+var tcpPerfStatsPool = pool.NewLockFreePool(func() interface{} {
 	return new(TcpPerfStats)
 })
 
