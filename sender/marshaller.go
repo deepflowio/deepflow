@@ -1,13 +1,11 @@
 package sender
 
 import (
-	"github.com/golang/protobuf/proto"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	"gitlab.x.lan/yunshan/droplet-libs/messenger"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
-	"gitlab.x.lan/yunshan/message/zero"
 )
 
 type ZeroDocumentMarshaller struct {
@@ -34,26 +32,15 @@ func (m *ZeroDocumentMarshaller) Start() {
 		for _, e := range buffer[:n] {
 			if doc, ok := e.(*app.Document); ok {
 				code := doc.Tag.(*zerodoc.Tag).Code
-				header := &zero.ZeroHeader{
-					Timestamp: proto.Uint32(doc.Timestamp),
-					Sequence:  proto.Uint32(m.sequence),
-					Hash:      proto.Uint32(codeHash(code)),
-				}
-				bytes := utils.AcquireByteBuffer()
-				if _, err := header.MarshalTo(bytes.Use(header.Size())); err != nil {
-					utils.ReleaseByteBuffer(bytes)
-					app.ReleaseDocument(doc)
-					log.Warning(err)
-					continue
-				}
-				err := messenger.Marshal(doc, bytes)
+				encoder := codec.AcquireSimpleEncoder()
+				err := messenger.Encode(m.sequence, codeHash(code), doc, encoder)
 				app.ReleaseDocument(doc)
 				if err != nil {
-					utils.ReleaseByteBuffer(bytes)
+					codec.ReleaseSimpleEncoder(encoder)
 					log.Warning(err)
 					continue
 				}
-				outBuffer[nOut] = bytes
+				outBuffer[nOut] = encoder
 				nOut++
 				m.sequence++
 			} else {
@@ -63,7 +50,7 @@ func (m *ZeroDocumentMarshaller) Start() {
 
 		for i := 1; i < len(m.outputs); i++ { // 先克隆，再发送，避免在队列中被Release
 			for _, b := range outBuffer[:nOut] {
-				utils.PseudoCloneByteBuffer(b.(*utils.ByteBuffer))
+				codec.PseudoCloneSimpleEncoder(b.(*codec.SimpleEncoder))
 			}
 		}
 		for _, q := range m.outputs {

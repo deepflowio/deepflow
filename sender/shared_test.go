@@ -9,62 +9,55 @@ import (
 
 	"github.com/google/gopacket/layers"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
+	"gitlab.x.lan/yunshan/droplet-libs/messenger"
 	dt "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 	"gitlab.x.lan/yunshan/droplet-libs/zmq"
-	pb "gitlab.x.lan/yunshan/message/zero"
 )
 
 var TEST_DATA []interface{}
 
-func unmarshal(b []byte) (*app.Document, error) {
+func decode(b []byte) (*app.Document, error) {
 	if b == nil {
 		return nil, errors.New("No input byte")
 	}
 
-	msg := &pb.ZeroDocument{}
-	if err := msg.Unmarshal(b); err != nil {
-		return nil, fmt.Errorf("Unmarshaling protobuf failed: %s", err)
-	}
+	decoder := &codec.SimpleDecoder{}
+	decoder.Init(b)
 
 	doc := &app.Document{}
-	doc.Timestamp = msg.GetTimestamp()
+	decoder.ReadU32() // sequence
+	decoder.ReadU32() // hash
+	doc.Timestamp = decoder.ReadU32()
 	doc.Tag = dt.AcquireTag()
 	doc.Tag.(*dt.Tag).Field = dt.AcquireField()
-	dt.PBToTag(msg.GetTag(), doc.Tag.(*dt.Tag))
-	meter := msg.GetMeter()
-	switch {
-	case meter.GetUsage() != nil:
-		m := dt.AcquireUsageMeter()
-		dt.PBToUsageMeter(meter.GetUsage(), m)
-		doc.Meter = m
-	case meter.GetPerf() != nil:
-		m := dt.AcquirePerfMeter()
-		dt.PBToPerfMeter(meter.GetPerf(), m)
-		doc.Meter = m
-	case meter.GetGeo() != nil:
-		m := dt.AcquireGeoMeter()
-		dt.PBToGeoMeter(meter.GetGeo(), m)
-		doc.Meter = m
-	case meter.GetFlow() != nil:
-		m := dt.AcquireFlowMeter()
-		dt.PBToFlowMeter(meter.GetFlow(), m)
-		doc.Meter = m
-	case meter.GetConsoleLog() != nil:
-		m := dt.AcquireConsoleLogMeter()
-		dt.PBToConsoleLogMeter(meter.GetConsoleLog(), m)
-		doc.Meter = m
-	case meter.GetType() != nil:
-		m := dt.AcquireTypeMeter()
-		dt.PBToTypeMeter(meter.GetType(), m)
-		doc.Meter = m
-	case meter.GetFps() != nil:
-		m := dt.AcquireFPSMeter()
-		dt.PBToFPSMeter(meter.GetFps(), m)
-		doc.Meter = m
-	}
-	doc.ActionFlags = msg.GetActionFlags()
+	doc.Tag.(*dt.Tag).Decode(decoder)
 
+	meterType := messenger.MessageType(decoder.ReadU8())
+	var m app.Meter
+	switch meterType {
+	case messenger.MSG_USAGE:
+		m = dt.AcquireUsageMeter()
+	case messenger.MSG_PERF:
+		m = dt.AcquirePerfMeter()
+	case messenger.MSG_GEO:
+		m = dt.AcquireGeoMeter()
+	case messenger.MSG_FLOW:
+		m = dt.AcquireFlowMeter()
+	case messenger.MSG_CONSOLE_LOG:
+		m = dt.AcquireConsoleLogMeter()
+	case messenger.MSG_TYPE:
+		m = dt.AcquireTypeMeter()
+	case messenger.MSG_FPS:
+		m = dt.AcquireFPSMeter()
+	}
+	doc.Meter = m
+	m.Decode(decoder)
+	doc.ActionFlags = decoder.ReadU32()
+
+	if decoder.Failed() {
+		return nil, fmt.Errorf("Unmarshaling protobuf failed")
+	}
 	return doc, nil
 }
 
@@ -154,7 +147,7 @@ func dupTestData() []interface{} {
 	return testData
 }
 
-func receiverRoutine(nData int, ip string, port int, ch chan *utils.ByteBuffer) {
+func receiverRoutine(nData int, ip string, port int, ch chan *codec.SimpleEncoder) {
 	var receiver zmq.Receiver
 	if ip == "" || ip == "*" {
 		receiver, _ = zmq.NewPuller("*", port, 1000000, time.Minute, zmq.SERVER)
@@ -163,23 +156,22 @@ func receiverRoutine(nData int, ip string, port int, ch chan *utils.ByteBuffer) 
 	}
 	for i := 0; i < nData; i++ {
 		b, _ := receiver.Recv()
-		bytes := utils.AcquireByteBuffer()
-		copy(bytes.Use(len(b)), b)
-		ch <- bytes
+		encoder := codec.AcquireSimpleEncoder()
+		encoder.WriteRawString(string(b))
+		ch <- encoder
 	}
 	close(ch)
 }
 
 func documentEqual(doc, other *app.Document) bool {
-
 	if doc.Timestamp != other.Timestamp {
 		return false
 	}
 
 	oldTag := doc.Tag.(*dt.Tag)
 	newTag := other.Tag.(*dt.Tag)
-	b := &utils.IntBuffer{}
-	if oldTag.GetID(b) != newTag.GetID(b) {
+	e := &codec.SimpleEncoder{}
+	if oldTag.GetID(e) != newTag.GetID(e) {
 		return false
 	}
 

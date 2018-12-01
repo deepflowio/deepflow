@@ -1,10 +1,10 @@
 package flowgenerator
 
 import (
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/pool"
 )
 
-var metaFlowPerfPool = datatype.NewLockFreePool(func() interface{} {
+var metaFlowPerfPool = pool.NewLockFreePool(func() interface{} {
 	return new(MetaFlowPerf)
 })
 

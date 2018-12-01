@@ -136,7 +136,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:223555908e313a3b624130f1194711d93f3d75bc1304a98bd918d2dd3d08c41b"
+  digest = "1:febe8b62290fc434e835ad6a7d5f68667cd6769afe90a6731df1061312e146fc"
   name = "gitlab.x.lan/application/droplet-app"
   packages = [
     "internal/pkg/docbuffer",
@@ -153,14 +153,15 @@
     "pkg/mapper/usage",
   ]
   pruneopts = "UT"
-  revision = "48b1daca8ce2f744a4a0feff2f0ad1179aa66b22"
+  revision = "57bb6b87ea07cbab44f5d36b8f47b36b736f1ba1"
 
 [[projects]]
   branch = "master"
-  digest = "1:ac951ebfd0f5512829008b0cf70213273146e1e876dc34af8c371c49821aa998"
+  digest = "1:368b2dfb4896f6632cc77f7652d71da90087fc4b426e268a9bd89e34ecfca9da"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "app",
+    "codec",
     "datatype",
     "dedup",
     "dropletpb",
@@ -168,6 +169,7 @@
     "logger",
     "messenger",
     "policy",
+    "pool",
     "queue",
     "segmenttree",
     "stats",
@@ -177,7 +179,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "5213440555a8f35eafe3900c43bedda9fc65149c"
+  revision = "34a16c932dabc97ca440a9611507ab29ad81cc8e"
 
 [[projects]]
   branch = "master"
@@ -317,6 +319,7 @@
     "gitlab.x.lan/application/droplet-app/pkg/mapper/perf",
     "gitlab.x.lan/application/droplet-app/pkg/mapper/usage",
     "gitlab.x.lan/yunshan/droplet-libs/app",
+    "gitlab.x.lan/yunshan/droplet-libs/codec",
     "gitlab.x.lan/yunshan/droplet-libs/datatype",
     "gitlab.x.lan/yunshan/droplet-libs/dedup",
     "gitlab.x.lan/yunshan/droplet-libs/dropletpb",
@@ -324,6 +327,7 @@
     "gitlab.x.lan/yunshan/droplet-libs/logger",
     "gitlab.x.lan/yunshan/droplet-libs/messenger",
     "gitlab.x.lan/yunshan/droplet-libs/policy",
+    "gitlab.x.lan/yunshan/droplet-libs/pool",
     "gitlab.x.lan/yunshan/droplet-libs/queue",
     "gitlab.x.lan/yunshan/droplet-libs/stats",
     "gitlab.x.lan/yunshan/droplet-libs/utils",
@@ -332,7 +336,6 @@
     "gitlab.x.lan/yunshan/droplet-libs/zmq",
     "gitlab.x.lan/yunshan/message/dfi",
     "gitlab.x.lan/yunshan/message/trident",
-    "gitlab.x.lan/yunshan/message/zero",
     "golang.org/x/net/bpf",
     "golang.org/x/net/context",
     "gopkg.in/yaml.v2",

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/pool"
 )
 
 type FlowState int
@@ -32,7 +33,7 @@ type FlowExtra struct {
 	circlePktGot bool
 }
 
-var flowExtraPool = NewLockFreePool(func() interface{} {
+var flowExtraPool = pool.NewLockFreePool(func() interface{} {
 	return new(FlowExtra)
 })
 
