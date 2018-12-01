@@ -24,9 +24,7 @@ adapter-cache-size: 16
 stream: 127.0.0.1
 stream-port: 20201
 # conf for connection with outside zeroes
-zero-hosts: []
-#  - 127.0.0.1
-zero-port: 20202
+zero-ports: [20211, 20212]
 # internal queues conf
 queue:
   # queue size, default 65536
