@@ -235,9 +235,7 @@ func Start(configPath string) (closers []io.Closer) {
 	builder := sender.NewZeroDocumentSenderBuilder()
 	builder.AddQueue(meteringAppOutputQueue, cfg.Queue.MeteringAppOutputQueueCount)
 	builder.AddQueue(flowAppOutputQueue, cfg.Queue.FlowAppOutputQueueCount)
-	for _, zero := range cfg.ZeroHosts {
-		builder.AddZero(zero, cfg.ZeroPort)
-	}
+	builder.AddListenPorts(cfg.ZeroPorts...)
 	builder.Build().Start(cfg.Queue.DocSenderQueueSize) // MapReduce发送是突发的，且ZMQ发送缓慢，queueSize设置为突发的2倍
 	return
 }

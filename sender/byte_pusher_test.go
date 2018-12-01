@@ -23,7 +23,7 @@ func TestBytePusher(t *testing.T) {
 		copy(bytes.Bytes(), d)
 		q.Put(bytes)
 	}
-	go receiverRoutine(len(data), 12345, output)
+	go receiverRoutine(len(data), "127.0.0.1", 12345, output)
 	go senderRoutine(q)
 	for _, d := range data {
 		bytes := <-output
@@ -39,6 +39,6 @@ func TestBytePusher(t *testing.T) {
 }
 
 func senderRoutine(q queue.QueueReader) {
-	sender := NewZMQBytePusher("127.0.0.1", 12345, 1000)
+	sender := NewZMQBytePusher("*", 12345, 1000)
 	sender.QueueForward(q)
 }

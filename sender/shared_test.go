@@ -154,8 +154,13 @@ func dupTestData() []interface{} {
 	return testData
 }
 
-func receiverRoutine(nData, port int, ch chan *utils.ByteBuffer) {
-	receiver, _ := zmq.NewPuller("*", port, 1000000, time.Minute, zmq.SERVER)
+func receiverRoutine(nData int, ip string, port int, ch chan *utils.ByteBuffer) {
+	var receiver zmq.Receiver
+	if ip == "" || ip == "*" {
+		receiver, _ = zmq.NewPuller("*", port, 1000000, time.Minute, zmq.SERVER)
+	} else {
+		receiver, _ = zmq.NewPuller(ip, port, 1000000, time.Minute, zmq.CLIENT)
+	}
 	for i := 0; i < nData; i++ {
 		b, _ := receiver.Recv()
 		bytes := utils.AcquireByteBuffer()

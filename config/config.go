@@ -29,8 +29,7 @@ type Config struct {
 	AdapterCacheSize int                 `yaml:"adapter-cache-size"`
 	Stream           string              `yaml:"stream"`
 	StreamPort       uint16              `yaml:"stream-port"`
-	ZeroHosts        []string            `yaml:"zero-hosts,flow"`
-	ZeroPort         uint16              `yaml:"zero-port"`
+	ZeroPorts        []uint16            `yaml:"zero-ports"`
 	Queue            QueueConfig         `yaml:"queue"`
 	Labeler          LabelerConfig       `yaml:"labeler"`
 	FlowGenerator    FlowGeneratorConfig `yaml:"flow-generator"`
@@ -123,12 +122,6 @@ func (c *Config) Validate() error {
 
 	if net.ParseIP(c.Stream) == nil {
 		return errors.New("Malformed stream")
-	}
-
-	for _, ipString := range c.ZeroHosts {
-		if net.ParseIP(ipString) == nil {
-			return errors.New("Malformed zero host")
-		}
 	}
 
 	if c.DefaultTapType == 0 {

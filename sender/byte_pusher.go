@@ -22,22 +22,25 @@ func NewZMQBytePusher(ip string, port uint16, zmqHWM int) *ZMQBytePusher {
 // Send 向创建的zmq socket阻塞发送数据
 func (s *ZMQBytePusher) Send(b []byte) {
 	if s.Sender == nil {
-		sender, err := zmq.NewPusher(s.ip, int(s.port), s.zmqHWM, zmq.CLIENT)
+		var err error
+		if s.ip == "" || s.ip == "*" {
+			s.Sender, err = zmq.NewPusher("*", int(s.port), s.zmqHWM, zmq.SERVER)
+		} else {
+			s.Sender, err = zmq.NewPusher(s.ip, int(s.port), s.zmqHWM, zmq.CLIENT)
+		}
 		if err != nil {
 			log.Warningf("NewPusher() error: %s\n", err)
 			s.Sender = nil
 			return
 		}
-		s.Sender = sender
 	}
-	n, err := s.Sender.Send(b)
+	_, err := s.Sender.Send(b)
 	if err != nil {
 		log.Warningf("Sender has error, will reconnect: %s\n", err)
 		s.Sender.Close()
 		s.Sender = nil
 		return
 	}
-	log.Debugf("Sent %d bytes", n)
 }
 
 // QueueForward 不断读取q中的数据，并通过创建的zmq socket向外发送
