@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
-	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/droplet-libs/zmq"
 )
@@ -17,7 +16,7 @@ func NewSender(s zmq.Sender) *Sender {
 	return &Sender{s}
 }
 
-// send to alarm
+// zero send to alarm
 func (s *Sender) SlowSend(doc *app.Document, bytes *utils.ByteBuffer) error {
 	if err := Marshal(doc, bytes); err != nil {
 		return err
@@ -32,7 +31,7 @@ func (s *Sender) SlowSend(doc *app.Document, bytes *utils.ByteBuffer) error {
 	return nil
 }
 
-// send to alarm
+// zero send to alarm
 func (s *Sender) SlowSendNoBlock(doc *app.Document, bytes *utils.ByteBuffer) error {
 	if err := Marshal(doc, bytes); err != nil {
 		return err
@@ -43,36 +42,6 @@ func (s *Sender) SlowSendNoBlock(doc *app.Document, bytes *utils.ByteBuffer) err
 	}
 	if n != len(bytes.Bytes()) {
 		return fmt.Errorf("Partial message sent, %d in %d bytes", n, len(bytes.Bytes()))
-	}
-	return nil
-}
-
-// send to zero
-func (s *Sender) Send(doc *app.Document, encoder *codec.SimpleEncoder) error {
-	if err := Encode(doc, encoder); err != nil {
-		return err
-	}
-	n, err := s.Sender.Send(encoder.Bytes())
-	if err != nil {
-		return err
-	}
-	if n != len(encoder.Bytes()) {
-		return fmt.Errorf("Partial message sent, %d in %d bytes", n, len(encoder.Bytes()))
-	}
-	return nil
-}
-
-// send to zero
-func (s *Sender) SendNoBlock(doc *app.Document, encoder *codec.SimpleEncoder) error {
-	if err := Encode(doc, encoder); err != nil {
-		return err
-	}
-	n, err := s.Sender.SendNoBlock(encoder.Bytes())
-	if err != nil {
-		return err
-	}
-	if n != len(encoder.Bytes()) {
-		return fmt.Errorf("Partial message sent, %d in %d bytes", n, len(encoder.Bytes()))
 	}
 	return nil
 }

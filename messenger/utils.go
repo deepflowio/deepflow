@@ -83,7 +83,15 @@ func Marshal(doc *app.Document, bytes *utils.ByteBuffer) error {
 }
 
 // send to zero
-func Encode(doc *app.Document, encoder *codec.SimpleEncoder) error {
+// Protocol:
+//     sequence    uint32
+//     hash        uint32
+//     timestamp   uint32
+//     tag         Tag (bytes)
+//     meterType   uint8
+//     meter       Meter (bytes)
+//     actionFlags uint32
+func Encode(sequence uint32, hash uint32, doc *app.Document, encoder *codec.SimpleEncoder) error {
 	if doc.Tag == nil || doc.Meter == nil {
 		return errors.New("No tag or meter in document")
 	}
@@ -109,12 +117,8 @@ func Encode(doc *app.Document, encoder *codec.SimpleEncoder) error {
 		return fmt.Errorf("Unknown supported type %T", v)
 	}
 
-	// Protocol:
-	// optional uint32 timestamp = 1;
-	// optional Tag tag = 2;
-	// optional Meter meter = 3; // with uint8 type
-	// optional uint32 action_flags = 4;
-
+	encoder.WriteU32(sequence)
+	encoder.WriteU32(hash)
 	encoder.WriteU32(doc.Timestamp)
 
 	var tag *dt.Tag
