@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 )
 
 type GeoMeter struct {
@@ -18,6 +19,30 @@ type GeoMeter struct {
 	SumBitRx              uint64        `db:"sum_bit_rx"`
 	SumRTTSyn             time.Duration `db:"sum_rtt_syn"`
 	SumRTTSynFlow         uint64        `db:"sum_rtt_syn_flow"`
+}
+
+func (m *GeoMeter) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteU64(m.SumClosedFlowCount)
+	encoder.WriteU64(m.SumAbnormalFlowCount)
+	encoder.WriteU64(uint64(m.SumClosedFlowDuration))
+	encoder.WriteU64(m.SumPacketTx)
+	encoder.WriteU64(m.SumPacketRx)
+	encoder.WriteU64(m.SumBitTx)
+	encoder.WriteU64(m.SumBitRx)
+	encoder.WriteU64(uint64(m.SumRTTSyn))
+	encoder.WriteU64(m.SumRTTSynFlow)
+}
+
+func (m *GeoMeter) Decode(decoder *codec.SimpleDecoder) {
+	m.SumClosedFlowCount = decoder.ReadU64()
+	m.SumAbnormalFlowCount = decoder.ReadU64()
+	m.SumClosedFlowDuration = time.Duration(decoder.ReadU64())
+	m.SumPacketTx = decoder.ReadU64()
+	m.SumPacketRx = decoder.ReadU64()
+	m.SumBitTx = decoder.ReadU64()
+	m.SumBitRx = decoder.ReadU64()
+	m.SumRTTSyn = time.Duration(decoder.ReadU64())
+	m.SumRTTSynFlow = decoder.ReadU64()
 }
 
 func (m *GeoMeter) ConcurrentMerge(other app.Meter) {

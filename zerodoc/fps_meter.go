@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 )
 
 type FPSMeter struct {
@@ -14,6 +15,24 @@ type FPSMeter struct {
 
 	MaxFlowCount    uint64 `db:"max_flow_count"`
 	MaxNewFlowCount uint64 `db:"max_new_flow_count"`
+}
+
+func (m *FPSMeter) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteU64(m.SumFlowCount)
+	encoder.WriteU64(m.SumNewFlowCount)
+	encoder.WriteU64(m.SumClosedFlowCount)
+
+	encoder.WriteU64(m.MaxFlowCount)
+	encoder.WriteU64(m.MaxNewFlowCount)
+}
+
+func (m *FPSMeter) Decode(decoder *codec.SimpleDecoder) {
+	m.SumFlowCount = decoder.ReadU64()
+	m.SumNewFlowCount = decoder.ReadU64()
+	m.SumClosedFlowCount = decoder.ReadU64()
+
+	m.MaxFlowCount = decoder.ReadU64()
+	m.MaxNewFlowCount = decoder.ReadU64()
 }
 
 func (m *FPSMeter) ConcurrentMerge(other app.Meter) {

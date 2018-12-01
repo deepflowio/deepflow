@@ -3,6 +3,7 @@ package datatype
 import (
 	"fmt"
 
+	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
@@ -409,7 +410,7 @@ func (d *PolicyData) String() string {
 		d.ACLID, d.ActionFlags, d.AclActions, d.NpbActions)
 }
 
-var policyDataPool = NewLockFreePool(func() interface{} {
+var policyDataPool = pool.NewLockFreePool(func() interface{} {
 	return new(PolicyData)
 })
 

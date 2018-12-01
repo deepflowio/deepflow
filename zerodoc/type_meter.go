@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 )
 
 type TypeMeter struct {
@@ -28,6 +29,52 @@ type TypeMeter struct {
 	SumCountTServerRst       uint64 `db:"sum_count_t_s_rst"`
 	SumCountTServerHalfOpen  uint64 `db:"sum_count_t_s_half_open"`
 	SumCountTServerHalfClose uint64 `db:"sum_count_t_s_half_close"`
+}
+
+func (m *TypeMeter) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteU64(m.SumCountL0S1S)
+	encoder.WriteU64(m.SumCountL1S5S)
+	encoder.WriteU64(m.SumCountL5S10S)
+	encoder.WriteU64(m.SumCountL10S1M)
+	encoder.WriteU64(m.SumCountL1M1H)
+	encoder.WriteU64(m.SumCountL1H)
+
+	encoder.WriteU64(m.SumCountE0K10K)
+	encoder.WriteU64(m.SumCountE10K100K)
+	encoder.WriteU64(m.SumCountE100K1M)
+	encoder.WriteU64(m.SumCountE1M100M)
+	encoder.WriteU64(m.SumCountE100M1G)
+	encoder.WriteU64(m.SumCountE1G)
+
+	encoder.WriteU64(m.SumCountTClientRst)
+	encoder.WriteU64(m.SumCountTClientHalfOpen)
+	encoder.WriteU64(m.SumCountTClientHalfClose)
+	encoder.WriteU64(m.SumCountTServerRst)
+	encoder.WriteU64(m.SumCountTServerHalfOpen)
+	encoder.WriteU64(m.SumCountTServerHalfClose)
+}
+
+func (m *TypeMeter) Decode(decoder *codec.SimpleDecoder) {
+	m.SumCountL0S1S = decoder.ReadU64()
+	m.SumCountL1S5S = decoder.ReadU64()
+	m.SumCountL5S10S = decoder.ReadU64()
+	m.SumCountL10S1M = decoder.ReadU64()
+	m.SumCountL1M1H = decoder.ReadU64()
+	m.SumCountL1H = decoder.ReadU64()
+
+	m.SumCountE0K10K = decoder.ReadU64()
+	m.SumCountE10K100K = decoder.ReadU64()
+	m.SumCountE100K1M = decoder.ReadU64()
+	m.SumCountE1M100M = decoder.ReadU64()
+	m.SumCountE100M1G = decoder.ReadU64()
+	m.SumCountE1G = decoder.ReadU64()
+
+	m.SumCountTClientRst = decoder.ReadU64()
+	m.SumCountTClientHalfOpen = decoder.ReadU64()
+	m.SumCountTClientHalfClose = decoder.ReadU64()
+	m.SumCountTServerRst = decoder.ReadU64()
+	m.SumCountTServerHalfOpen = decoder.ReadU64()
+	m.SumCountTServerHalfClose = decoder.ReadU64()
 }
 
 func (m *TypeMeter) ConcurrentMerge(other app.Meter) {

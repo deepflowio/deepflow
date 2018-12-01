@@ -7,6 +7,7 @@ import (
 
 	. "github.com/google/gopacket/layers"
 
+	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
@@ -194,7 +195,7 @@ func FormatGroupId(id uint32) uint32 {
 	}
 }
 
-var endpointInfoPool = NewLockFreePool(func() interface{} {
+var endpointInfoPool = pool.NewLockFreePool(func() interface{} {
 	return new(EndpointInfo)
 })
 
@@ -218,7 +219,7 @@ func CloneEndpointInfo(i *EndpointInfo) *EndpointInfo {
 	return dup
 }
 
-var endpointDataPool = NewLockFreePool(func() interface{} {
+var endpointDataPool = pool.NewLockFreePool(func() interface{} {
 	return new(EndpointData)
 })
 

@@ -9,6 +9,7 @@ import (
 	"github.com/google/gopacket/layers"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	dt "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 	pb "gitlab.x.lan/yunshan/message/zero"
@@ -84,8 +85,8 @@ func TestMarshal(t *testing.T) {
 
 	oldTag := doc.Tag.(*dt.Tag)
 	newTag := newDoc.Tag.(*dt.Tag)
-	b := &utils.IntBuffer{}
-	if oldTag.GetID(b) != newTag.GetID(b) {
+	e := &codec.SimpleEncoder{}
+	if oldTag.GetID(e) != newTag.GetID(e) {
 		t.Error("Tag在序列化前后GetID不匹配")
 	}
 

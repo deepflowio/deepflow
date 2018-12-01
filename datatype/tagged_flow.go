@@ -2,16 +2,18 @@ package datatype
 
 import (
 	"fmt"
+
+	"gitlab.x.lan/yunshan/droplet-libs/pool"
 )
 
 type TaggedFlow struct {
 	Flow
 	Tag
 
-	ReferenceCount
+	pool.ReferenceCount
 }
 
-var taggedFlowPool = NewLockFreePool(func() interface{} {
+var taggedFlowPool = pool.NewLockFreePool(func() interface{} {
 	return new(TaggedFlow)
 })
 

@@ -7,18 +7,15 @@ BASE_CODE = """
 package zerodoc
 
 import (
-	"sync"
-
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/pool"
 )
 """
 
 METER_CODE = """
-var {pool_name} sync.Pool = sync.Pool{{
-	New: func() interface{{}} {{
-		return &{name}{{}}
-	}},
-}}
+var {pool_name} = pool.NewLockFreePool(func() interface{{}} {{
+	return new({name})
+}})
 
 func Acquire{name}() *{name} {{
 	return {pool_name}.Get().(*{name})

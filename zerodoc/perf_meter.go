@@ -6,12 +6,25 @@ import (
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 )
 
 type PerfMeter struct {
 	PerfMeterSum
 	PerfMeterMax
 	PerfMeterMin
+}
+
+func (m *PerfMeter) Encode(encoder *codec.SimpleEncoder) {
+	m.PerfMeterSum.Encode(encoder)
+	m.PerfMeterMax.Encode(encoder)
+	m.PerfMeterMin.Encode(encoder)
+}
+
+func (m *PerfMeter) Decode(decoder *codec.SimpleDecoder) {
+	m.PerfMeterSum.Decode(decoder)
+	m.PerfMeterMax.Decode(decoder)
+	m.PerfMeterMin.Decode(decoder)
 }
 
 func (m *PerfMeter) ConcurrentMerge(other app.Meter) {
@@ -112,6 +125,48 @@ type PerfMeterSum struct {
 	SumZeroWndCntRx uint64 `db:"sum_zero_wnd_cnt_rx"`
 }
 
+func (m *PerfMeterSum) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteU64(m.SumFlowCount)
+	encoder.WriteU64(m.SumClosedFlowCount)
+	encoder.WriteU64(m.SumRetransFlowCount)
+	encoder.WriteU64(m.SumHalfOpenFlowCount)
+	encoder.WriteU64(m.SumPacketTx)
+	encoder.WriteU64(m.SumPacketRx)
+	encoder.WriteU64(m.SumRetransCntTx)
+	encoder.WriteU64(m.SumRetransCntRx)
+
+	encoder.WriteU64(uint64(m.SumRTTSyn))
+	encoder.WriteU64(uint64(m.SumRTTAvg))
+	encoder.WriteU64(uint64(m.SumARTAvg))
+	encoder.WriteU64(m.SumRTTSynFlow)
+	encoder.WriteU64(m.SumRTTAvgFlow)
+	encoder.WriteU64(m.SumARTAvgFlow)
+
+	encoder.WriteU64(m.SumZeroWndCntTx)
+	encoder.WriteU64(m.SumZeroWndCntRx)
+}
+
+func (m *PerfMeterSum) Decode(decoder *codec.SimpleDecoder) {
+	m.SumFlowCount = decoder.ReadU64()
+	m.SumClosedFlowCount = decoder.ReadU64()
+	m.SumRetransFlowCount = decoder.ReadU64()
+	m.SumHalfOpenFlowCount = decoder.ReadU64()
+	m.SumPacketTx = decoder.ReadU64()
+	m.SumPacketRx = decoder.ReadU64()
+	m.SumRetransCntTx = decoder.ReadU64()
+	m.SumRetransCntRx = decoder.ReadU64()
+
+	m.SumRTTSyn = time.Duration(decoder.ReadU64())
+	m.SumRTTAvg = time.Duration(decoder.ReadU64())
+	m.SumARTAvg = time.Duration(decoder.ReadU64())
+	m.SumRTTSynFlow = decoder.ReadU64()
+	m.SumRTTAvgFlow = decoder.ReadU64()
+	m.SumARTAvgFlow = decoder.ReadU64()
+
+	m.SumZeroWndCntTx = decoder.ReadU64()
+	m.SumZeroWndCntRx = decoder.ReadU64()
+}
+
 func (m *PerfMeterSum) concurrentMerge(other *PerfMeterSum) {
 	m.SumFlowCount += other.SumFlowCount
 	m.SumClosedFlowCount += other.SumClosedFlowCount
@@ -160,6 +215,18 @@ type PerfMeterMax struct {
 	MaxARTAvg time.Duration `db:"max_art_avg"`
 }
 
+func (m *PerfMeterMax) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteU64(uint64(m.MaxRTTSyn))
+	encoder.WriteU64(uint64(m.MaxRTTAvg))
+	encoder.WriteU64(uint64(m.MaxARTAvg))
+}
+
+func (m *PerfMeterMax) Decode(decoder *codec.SimpleDecoder) {
+	m.MaxRTTSyn = time.Duration(decoder.ReadU64())
+	m.MaxRTTAvg = time.Duration(decoder.ReadU64())
+	m.MaxARTAvg = time.Duration(decoder.ReadU64())
+}
+
 func (m *PerfMeterMax) concurrentMerge(other *PerfMeterMax) {
 	m.MaxRTTSyn += other.MaxRTTSyn
 	m.MaxRTTAvg += other.MaxRTTAvg
@@ -176,6 +243,18 @@ type PerfMeterMin struct {
 	MinRTTSyn time.Duration `db:"min_rtt_syn"`
 	MinRTTAvg time.Duration `db:"min_rtt_avg"`
 	MinARTAvg time.Duration `db:"min_art_avg"`
+}
+
+func (m *PerfMeterMin) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteU64(uint64(m.MinRTTSyn))
+	encoder.WriteU64(uint64(m.MinRTTAvg))
+	encoder.WriteU64(uint64(m.MinARTAvg))
+}
+
+func (m *PerfMeterMin) Decode(decoder *codec.SimpleDecoder) {
+	m.MinRTTSyn = time.Duration(decoder.ReadU64())
+	m.MinRTTAvg = time.Duration(decoder.ReadU64())
+	m.MinARTAvg = time.Duration(decoder.ReadU64())
 }
 
 func (m *PerfMeterMin) concurrentMerge(other *PerfMeterMin) {

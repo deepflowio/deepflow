@@ -8,7 +8,8 @@ import (
 
 	"github.com/google/gopacket/layers"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
+	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
@@ -353,121 +354,236 @@ func (t *Tag) String() string {
 	return buf.String()
 }
 
-func (t *Tag) GetID(buf *utils.IntBuffer) string {
+func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
+	t.Code = Code(decoder.ReadU64())
+
+	if t.Code&IP != 0 {
+		t.IP = decoder.ReadU32()
+	}
+	if t.Code&MAC != 0 {
+		t.MAC = decoder.ReadU64() // XXX: 48bit
+	}
+	if t.Code&GroupID != 0 {
+		t.GroupID = decoder.ReadU32() // XXX: 16bit
+	}
+	if t.Code&L2EpcID != 0 {
+		t.L2EpcID = int32(decoder.ReadU32()) // XXX: 16bit
+	}
+	if t.Code&L3EpcID != 0 {
+		t.L3EpcID = int32(decoder.ReadU32()) // XXX: 16bit
+	}
+	if t.Code&L2Device != 0 {
+		t.L2DeviceID = decoder.ReadU32() // XXX: 16bit
+		t.L2DeviceType = DeviceType(decoder.ReadU8())
+	}
+	if t.Code&L3Device != 0 {
+		t.L3DeviceID = decoder.ReadU32() // XXX: 16bit
+		t.L3DeviceType = DeviceType(decoder.ReadU8())
+	}
+	if t.Code&Host != 0 {
+		t.Host = decoder.ReadU32()
+	}
+
+	if t.Code&IPPath != 0 {
+		t.IP0 = decoder.ReadU32()
+		t.IP1 = decoder.ReadU32()
+	}
+	if t.Code&MACPath != 0 {
+		t.MAC0 = decoder.ReadU64()
+		t.MAC1 = decoder.ReadU64()
+	}
+	if t.Code&GroupIDPath != 0 {
+		t.GroupID0 = decoder.ReadU32() // XXX: 16bit
+		t.GroupID1 = decoder.ReadU32() // XXX: 16bit
+	}
+	if t.Code&L2EpcIDPath != 0 {
+		t.L2EpcID0 = int32(decoder.ReadU32()) // XXX: 16bit
+		t.L2EpcID1 = int32(decoder.ReadU32()) // XXX: 16bit
+	}
+	if t.Code&L3EpcIDPath != 0 {
+		t.L3EpcID0 = int32(decoder.ReadU32()) // XXX: 16bit
+		t.L3EpcID1 = int32(decoder.ReadU32()) // XXX: 16bit
+	}
+	if t.Code&L2DevicePath != 0 {
+		t.L2DeviceID0 = decoder.ReadU32() // XXX: 16bit
+		t.L2DeviceType0 = DeviceType(decoder.ReadU8())
+		t.L2DeviceID1 = decoder.ReadU32() // XXX: 16bit
+		t.L2DeviceType1 = DeviceType(decoder.ReadU8())
+	}
+	if t.Code&L3DevicePath != 0 {
+		t.L3DeviceID0 = decoder.ReadU32() // XXX: 16bit
+		t.L3DeviceType0 = DeviceType(decoder.ReadU8())
+		t.L3DeviceID1 = decoder.ReadU32() // XXX: 16bit
+		t.L3DeviceType1 = DeviceType(decoder.ReadU8())
+	}
+	if t.Code&HostPath != 0 {
+		t.Host0 = decoder.ReadU32()
+		t.Host1 = decoder.ReadU32()
+	}
+
+	if t.Code&Direction != 0 {
+		t.Direction = DirectionEnum(decoder.ReadU8())
+	}
+	if t.Code&ACLGID != 0 {
+		t.ACLGID = uint32(decoder.ReadU16()) // 16bit
+	}
+	if t.Code&VLANID != 0 {
+		t.VLANID = decoder.ReadU16()
+	}
+	if t.Code&Protocol != 0 {
+		t.Protocol = layers.IPProtocol(decoder.ReadU8())
+	}
+	if t.Code&ServerPort != 0 {
+		t.ServerPort = decoder.ReadU16()
+	}
+	if t.Code&VTAP != 0 {
+		t.VTAP = decoder.ReadU32()
+	}
+	if t.Code&TAPType != 0 {
+		t.TAPType = TAPTypeEnum(decoder.ReadU8())
+	}
+	if t.Code&SubnetID != 0 {
+		t.SubnetID = decoder.ReadU32()
+	}
+	if t.Code&ACLID != 0 {
+		t.ACLID = uint32(decoder.ReadU16()) // 16bit
+	}
+	if t.Code&ACLDirection != 0 {
+		t.ACLDirection = ACLDirectionEnum(decoder.ReadU8())
+	}
+
+	if t.Code&Country != 0 {
+		t.Country = decoder.ReadString255()
+	}
+	if t.Code&Region != 0 {
+		t.Region = decoder.ReadString255()
+	}
+	if t.Code&ISPCode != 0 {
+		t.ISP = decoder.ReadString255()
+	}
+
+	t.id = decoder.String() // ID就是序列化bytes，避免重复计算
+}
+
+func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
+	if t.id != "" {
+		encoder.WriteRawString(t.id) // ID就是序列化bytes，避免重复计算
+		return
+	}
+
+	encoder.WriteU64(uint64(t.Code))
+
+	if t.Code&IP != 0 {
+		encoder.WriteU32(t.IP)
+	}
+	if t.Code&MAC != 0 {
+		encoder.WriteU64(t.MAC) // XXX: 48bit
+	}
+	if t.Code&GroupID != 0 {
+		encoder.WriteU32(t.GroupID) // XXX: 16bit
+	}
+	if t.Code&L2EpcID != 0 {
+		encoder.WriteU32(uint32(t.L2EpcID)) // XXX: 16bit
+	}
+	if t.Code&L3EpcID != 0 {
+		encoder.WriteU32(uint32(t.L3EpcID)) // XXX: 16bit
+	}
+	if t.Code&L2Device != 0 {
+		encoder.WriteU32(t.L2DeviceID) // XXX: 16bit
+		encoder.WriteU8(uint8(t.L2DeviceType))
+	}
+	if t.Code&L3Device != 0 {
+		encoder.WriteU32(t.L3DeviceID) // XXX: 16bit
+		encoder.WriteU8(uint8(t.L3DeviceType))
+	}
+	if t.Code&Host != 0 {
+		encoder.WriteU32(t.Host)
+	}
+
+	if t.Code&IPPath != 0 {
+		encoder.WriteU32(t.IP0)
+		encoder.WriteU32(t.IP1)
+	}
+	if t.Code&MACPath != 0 {
+		encoder.WriteU64(t.MAC0)
+		encoder.WriteU64(t.MAC1)
+	}
+	if t.Code&GroupIDPath != 0 {
+		encoder.WriteU32(t.GroupID0) // XXX: 16bit
+		encoder.WriteU32(t.GroupID1) // XXX: 16bit
+	}
+	if t.Code&L2EpcIDPath != 0 {
+		encoder.WriteU32(uint32(t.L2EpcID0)) // XXX: 16bit
+		encoder.WriteU32(uint32(t.L2EpcID1)) // XXX: 16bit
+	}
+	if t.Code&L3EpcIDPath != 0 {
+		encoder.WriteU32(uint32(t.L3EpcID0)) // XXX: 16bit
+		encoder.WriteU32(uint32(t.L3EpcID1)) // XXX: 16bit
+	}
+	if t.Code&L2DevicePath != 0 {
+		encoder.WriteU32(t.L2DeviceID0) // XXX: 16bit
+		encoder.WriteU8(uint8(t.L2DeviceType0))
+		encoder.WriteU32(t.L2DeviceID1) // XXX: 16bit
+		encoder.WriteU8(uint8(t.L2DeviceType1))
+	}
+	if t.Code&L3DevicePath != 0 {
+		encoder.WriteU32(t.L3DeviceID0) // XXX: 16bit
+		encoder.WriteU8(uint8(t.L3DeviceType0))
+		encoder.WriteU32(t.L3DeviceID1) // XXX: 16bit
+		encoder.WriteU8(uint8(t.L3DeviceType1))
+	}
+	if t.Code&HostPath != 0 {
+		encoder.WriteU32(t.Host0)
+		encoder.WriteU32(t.Host1)
+	}
+
+	if t.Code&Direction != 0 {
+		encoder.WriteU8(uint8(t.Direction))
+	}
+	if t.Code&ACLGID != 0 {
+		encoder.WriteU16(uint16(t.ACLGID)) // 16bit
+	}
+	if t.Code&VLANID != 0 {
+		encoder.WriteU16(t.VLANID)
+	}
+	if t.Code&Protocol != 0 {
+		encoder.WriteU8(uint8(t.Protocol))
+	}
+	if t.Code&ServerPort != 0 {
+		encoder.WriteU16(t.ServerPort)
+	}
+	if t.Code&VTAP != 0 {
+		encoder.WriteU32(t.VTAP)
+	}
+	if t.Code&TAPType != 0 {
+		encoder.WriteU8(uint8(t.TAPType))
+	}
+	if t.Code&SubnetID != 0 {
+		encoder.WriteU32(t.SubnetID)
+	}
+	if t.Code&ACLID != 0 {
+		encoder.WriteU16(uint16(t.ACLID)) // 16bit
+	}
+	if t.Code&ACLDirection != 0 {
+		encoder.WriteU8(uint8(t.ACLDirection))
+	}
+
+	if t.Code&Country != 0 {
+		encoder.WriteString255(t.Country)
+	}
+	if t.Code&Region != 0 {
+		encoder.WriteString255(t.Region)
+	}
+	if t.Code&ISPCode != 0 {
+		encoder.WriteString255(t.ISP)
+	}
+}
+
+func (t *Tag) GetID(encoder *codec.SimpleEncoder) string {
 	if t.id == "" {
-		buf.Reset()
-
-		buf.WriteU64(uint64(t.Code))
-
-		if t.Code&IP != 0 {
-			buf.WriteU32(t.IP)
-		}
-		if t.Code&MAC != 0 {
-			buf.WriteU48(t.MAC) // XXX: 32bit
-		}
-		if t.Code&GroupID != 0 {
-			buf.WriteU32(t.GroupID) // XXX: 16bit
-		}
-		if t.Code&L2EpcID != 0 {
-			buf.WriteU32(uint32(t.L2EpcID)) // XXX: 16bit
-		}
-		if t.Code&L3EpcID != 0 {
-			buf.WriteU32(uint32(t.L3EpcID)) // XXX: 16bit
-		}
-		if t.Code&L2Device != 0 {
-			buf.WriteU32(t.L2DeviceID) // XXX: 16bit
-			buf.WriteU8(uint8(t.L2DeviceType))
-		}
-		if t.Code&L3Device != 0 {
-			buf.WriteU32(t.L3DeviceID) // XXX: 16bit
-			buf.WriteU8(uint8(t.L3DeviceType))
-		}
-		if t.Code&Host != 0 {
-			buf.WriteU32(t.Host)
-		}
-
-		if t.Code&IPPath != 0 {
-			buf.WriteU32(t.IP0)
-			buf.WriteU32(t.IP1)
-		}
-		if t.Code&MACPath != 0 {
-			buf.WriteU48(t.MAC0)
-			buf.WriteU48(t.MAC1)
-		}
-		if t.Code&GroupIDPath != 0 {
-			buf.WriteU32(t.GroupID0) // XXX: 16bit
-			buf.WriteU32(t.GroupID1) // XXX: 16bit
-		}
-		if t.Code&L2EpcIDPath != 0 {
-			buf.WriteU32(uint32(t.L2EpcID0)) // XXX: 16bit
-			buf.WriteU32(uint32(t.L2EpcID1)) // XXX: 16bit
-		}
-		if t.Code&L3EpcIDPath != 0 {
-			buf.WriteU32(uint32(t.L3EpcID0)) // XXX: 16bit
-			buf.WriteU32(uint32(t.L3EpcID1)) // XXX: 16bit
-		}
-		if t.Code&L2DevicePath != 0 {
-			buf.WriteU32(t.L2DeviceID0) // XXX: 16bit
-			buf.WriteU8(uint8(t.L2DeviceType0))
-			buf.WriteU32(t.L2DeviceID1) // XXX: 16bit
-			buf.WriteU8(uint8(t.L2DeviceType1))
-		}
-		if t.Code&L3DevicePath != 0 {
-			buf.WriteU32(t.L3DeviceID0) // XXX: 16bit
-			buf.WriteU8(uint8(t.L3DeviceType0))
-			buf.WriteU32(t.L3DeviceID1) // XXX: 16bit
-			buf.WriteU8(uint8(t.L3DeviceType1))
-		}
-		if t.Code&HostPath != 0 {
-			buf.WriteU32(t.Host0)
-			buf.WriteU32(t.Host1)
-		}
-
-		if t.Code&Direction != 0 {
-			buf.WriteU8(uint8(t.Direction))
-		}
-		if t.Code&ACLGID != 0 {
-			buf.WriteU24(t.ACLGID) // XXX: 14bit
-		}
-		if t.Code&VLANID != 0 {
-			buf.WriteU16(uint16(t.VLANID))
-		}
-		if t.Code&Protocol != 0 {
-			buf.WriteU8(uint8(t.Protocol))
-		}
-		if t.Code&ServerPort != 0 {
-			buf.WriteU16(uint16(t.ServerPort))
-		}
-		if t.Code&VTAP != 0 {
-			buf.WriteU32(t.VTAP)
-		}
-		if t.Code&TAPType != 0 {
-			buf.WriteU8(uint8(t.TAPType))
-		}
-		if t.Code&SubnetID != 0 {
-			buf.WriteU32(t.SubnetID)
-		}
-		if t.Code&ACLID != 0 {
-			buf.WriteU24(t.ACLID) // XXX: 14bit
-		}
-		if t.Code&ACLDirection != 0 {
-			buf.WriteU8(uint8(t.ACLDirection))
-		}
-
-		if t.Code&Country != 0 {
-			buf.WriteU8(uint8(32)) // space
-			buf.WriteString(t.Country)
-		}
-		if t.Code&Region != 0 {
-			buf.WriteU8(uint8(32)) // space
-			buf.WriteString(t.Region)
-		}
-		if t.Code&ISPCode != 0 {
-			buf.WriteU8(uint8(32)) // space
-			buf.WriteString(t.ISP)
-		}
-
-		t.id = buf.String()
+		encoder.Reset()
+		t.Encode(encoder)
+		t.id = encoder.String()
 	}
 	return t.id
 }
@@ -519,7 +635,7 @@ func (t *Tag) HasVariedField() bool {
 	return t.Code&ServerPort != 0
 }
 
-var fieldPool = datatype.NewLockFreePool(func() interface{} {
+var fieldPool = pool.NewLockFreePool(func() interface{} {
 	return &Field{}
 })
 
@@ -541,7 +657,7 @@ func CloneField(field *Field) *Field {
 	return newField
 }
 
-var tagPool = datatype.NewLockFreePool(func() interface{} {
+var tagPool = pool.NewLockFreePool(func() interface{} {
 	return &Tag{}
 })
 
