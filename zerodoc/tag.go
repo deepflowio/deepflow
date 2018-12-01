@@ -461,8 +461,6 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&ISPCode != 0 {
 		t.ISP = decoder.ReadString255()
 	}
-
-	t.id = decoder.String() // ID就是序列化bytes，避免重复计算
 }
 
 func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
