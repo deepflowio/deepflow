@@ -84,8 +84,9 @@ type FlowGeneratorConfig struct {
 }
 
 type MapReduceConfig struct {
-	DocsInBuffer uint32 `yaml:"docs-in-buffer"`
-	WindowSize   uint32 `yaml:"window-size"`
+	DocsInBuffer   uint32 `yaml:"docs-in-buffer"`
+	VariedDocLimit uint32 `yaml:"varied-doc-limit"`
+	WindowSize     uint32 `yaml:"window-size"`
 }
 
 type PCapConfig struct {
@@ -232,6 +233,9 @@ func (c *Config) Validate() error {
 
 	if c.MapReduce.DocsInBuffer == 0 {
 		c.MapReduce.DocsInBuffer = 131072
+	}
+	if c.MapReduce.VariedDocLimit == 0 {
+		c.MapReduce.VariedDocLimit = c.MapReduce.DocsInBuffer
 	}
 	if c.MapReduce.WindowSize == 0 {
 		c.MapReduce.WindowSize = 30
