@@ -68,7 +68,10 @@ func (m *FPSMeter) ConcurrentMerge(other app.Meter) {
 func (m *FPSMeter) SequentialMerge(other app.Meter) { // other为下一秒的统计量
 	if pm, ok := other.(*FPSMeter); ok {
 		// 当前秒未结束的流数量
-		notClosedFlowCount := m.SumFlowCount - m.SumClosedFlowCount
+		notClosedFlowCount := uint64(0)
+		if m.SumFlowCount > m.SumClosedFlowCount {
+			notClosedFlowCount = m.SumFlowCount - m.SumClosedFlowCount
+		}
 		// 下一秒矫正后的流数量
 		flowCount := maxU64(notClosedFlowCount+pm.SumNewFlowCount, pm.SumFlowCount)
 		// 累积统计量
