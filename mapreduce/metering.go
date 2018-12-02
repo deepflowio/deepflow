@@ -3,6 +3,7 @@ package mapreduce
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 
 	"math/rand"
@@ -14,8 +15,13 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
-func NewMeteringMapProcess(output queue.MultiQueueWriter, input queue.MultiQueueReader, inputCount int, docsInBuffer int, windowSize int) *MeteringHandler {
-	return NewMeteringHandler([]app.MeteringProcessor{usage.NewProcessor()}, output, input, inputCount, docsInBuffer, windowSize)
+func NewMeteringMapProcess(
+	output queue.MultiQueueWriter, input queue.MultiQueueReader,
+	inputCount, docsInBuffer, variedDocLimit, windowSize int,
+) *MeteringHandler {
+	return NewMeteringHandler(
+		[]app.MeteringProcessor{usage.NewProcessor()}, output, input,
+		inputCount, docsInBuffer, variedDocLimit, windowSize)
 }
 
 type MeteringHandler struct {
@@ -26,10 +32,15 @@ type MeteringHandler struct {
 	meteringQueueCount int
 	zmqAppQueue        queue.MultiQueueWriter
 	docsInBuffer       int
+	variedDocLimit     int
 	windowSize         int
 }
 
-func NewMeteringHandler(processors []app.MeteringProcessor, output queue.MultiQueueWriter, inputs queue.MultiQueueReader, inputCount int, docsInBuffer int, windowSize int) *MeteringHandler {
+func NewMeteringHandler(
+	processors []app.MeteringProcessor,
+	output queue.MultiQueueWriter, inputs queue.MultiQueueReader,
+	inputCount, docsInBuffer, variedDocLimit, windowSize int,
+) *MeteringHandler {
 	return &MeteringHandler{
 		numberOfApps:       len(processors),
 		processors:         processors,
@@ -37,6 +48,7 @@ func NewMeteringHandler(processors []app.MeteringProcessor, output queue.MultiQu
 		meteringQueue:      inputs,
 		meteringQueueCount: inputCount,
 		docsInBuffer:       docsInBuffer,
+		variedDocLimit:     variedDocLimit,
 		windowSize:         windowSize,
 	}
 }
@@ -81,71 +93,82 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 
 		lastFlush: time.Duration(time.Now().UnixNano()),
 
-		statItems: make([]stats.StatItem, h.numberOfApps*3),
+		statItems: make([]stats.StatItem, h.numberOfApps*4),
 
 		statsdCounter: make([]StatsdCounter, h.numberOfApps*2),
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
-		handler.stashes[i] = NewStash(h.docsInBuffer, h.windowSize)
+		handler.stashes[i] = NewStash(h.docsInBuffer, h.variedDocLimit, h.windowSize)
 		handler.statItems[i].Name = h.processors[i].GetName()
 		handler.statItems[i].StatType = stats.COUNT_TYPE
 		handler.statItems[i+handler.numberOfApps].Name = fmt.Sprintf("%s_avg_doc_counter", h.processors[i].GetName())
 		handler.statItems[i+handler.numberOfApps].StatType = stats.COUNT_TYPE
 		handler.statItems[i+handler.numberOfApps*2].Name = fmt.Sprintf("%s_max_doc_counter", h.processors[i].GetName())
 		handler.statItems[i+handler.numberOfApps*2].StatType = stats.COUNT_TYPE
+		handler.statItems[i+handler.numberOfApps*3].Name = fmt.Sprintf("%s_rejected_doc", h.processors[i].GetName())
+		handler.statItems[i+handler.numberOfApps*3].StatType = stats.COUNT_TYPE
 	}
+	stats.RegisterCountable("metering_mapper", &handler, stats.OptionStatTags{"index": strconv.Itoa(index)})
 	return &handler
 }
 
-func (f *subMeteringHandler) GetCounter() interface{} {
-	oldLatch := f.counterLatch
-	if f.counterLatch == 0 {
-		f.counterLatch = f.numberOfApps
+func (h *subMeteringHandler) GetCounter() interface{} {
+	oldLatch := h.counterLatch
+	if h.counterLatch == 0 {
+		h.counterLatch = h.numberOfApps
 	} else {
-		f.counterLatch = 0
+		h.counterLatch = 0
 	}
-	for i := 0; i < f.numberOfApps; i++ {
-		if f.statsdCounter[i+oldLatch].flowCounter != 0 {
-			f.statItems[i+f.numberOfApps].Value = f.statsdCounter[i+oldLatch].docCounter / f.statsdCounter[i+oldLatch].flowCounter
+	for i := 0; i < h.numberOfApps; i++ {
+		h.statItems[i].Value = h.statsdCounter[i+oldLatch].emitCounter
+		if h.statsdCounter[i+oldLatch].flowCounter != 0 {
+			h.statItems[i+h.numberOfApps].Value =
+				h.statsdCounter[i+oldLatch].docCounter / h.statsdCounter[i+oldLatch].flowCounter
+		} else {
+			h.statItems[i+h.numberOfApps].Value = 0
 		}
-		f.statItems[i+f.numberOfApps*2].Value = f.statsdCounter[i+oldLatch].maxCounter
-		f.statsdCounter[i+oldLatch].docCounter = 0
-		f.statsdCounter[i+oldLatch].flowCounter = 0
-		f.statsdCounter[i+oldLatch].maxCounter = 0
+		h.statItems[i+h.numberOfApps*2].Value = h.statsdCounter[i+oldLatch].maxCounter
+		h.statItems[i+h.numberOfApps*3].Value = h.statsdCounter[i+oldLatch].rejectionCounter
+		h.statsdCounter[i+oldLatch].emitCounter = 0
+		h.statsdCounter[i+oldLatch].docCounter = 0
+		h.statsdCounter[i+oldLatch].flowCounter = 0
+		h.statsdCounter[i+oldLatch].maxCounter = 0
+		h.statsdCounter[i+oldLatch].rejectionCounter = 0
 	}
 
-	return f.statItems
+	return h.statItems
 }
 
-func (f *subMeteringHandler) putToQueue() {
-	for _, stash := range f.stashes {
+func (h *subMeteringHandler) putToQueue() {
+	for i, stash := range h.stashes {
 		docs := stash.Dump()
-		for i := 0; i < len(docs); i += QUEUE_BATCH_SIZE {
-			if i+QUEUE_BATCH_SIZE <= len(docs) {
-				f.zmqAppQueue.Put(f.hashKey, docs[i:i+QUEUE_BATCH_SIZE]...)
+		for j := 0; j < len(docs); j += QUEUE_BATCH_SIZE {
+			if j+QUEUE_BATCH_SIZE <= len(docs) {
+				h.zmqAppQueue.Put(h.hashKey, docs[j:j+QUEUE_BATCH_SIZE]...)
 			} else {
-				f.zmqAppQueue.Put(f.hashKey, docs[i:]...)
+				h.zmqAppQueue.Put(h.hashKey, docs[j:]...)
 			}
-			f.hashKey++
+			h.hashKey++
 		}
+		h.statsdCounter[i+h.counterLatch].emitCounter += uint64(len(docs))
 		stash.Clear()
 	}
 }
 
-func (f *MeteringHandler) Start() {
-	for i := 0; i < f.meteringQueueCount; i++ {
-		go f.newSubMeteringHandler(i).Process()
+func (h *MeteringHandler) Start() {
+	for i := 0; i < h.meteringQueueCount; i++ {
+		go h.newSubMeteringHandler(i).Process()
 	}
 }
 
-func (f *subMeteringHandler) Process() error {
+func (h *subMeteringHandler) Process() error {
 	elements := make([]interface{}, QUEUE_BATCH_SIZE)
 
 	for {
-		n := f.meteringQueue.Gets(queue.HashKey(f.queueIndex), elements)
+		n := h.meteringQueue.Gets(queue.HashKey(h.queueIndex), elements)
 		for _, e := range elements[:n] {
 			if e == nil { // tick
-				f.Flush()
+				h.Flush()
 				continue
 			}
 
@@ -163,30 +186,32 @@ func (f *subMeteringHandler) Process() error {
 				continue
 			}
 
-			for i, processor := range f.processors {
+			for i, processor := range h.processors {
 				docs := processor.Process(metering, false)
-				f.statsdCounter[i+f.counterLatch].docCounter += uint64(len(docs))
-				f.statsdCounter[i+f.counterLatch].flowCounter++
-				if uint64(len(docs)) > f.statsdCounter[i+f.counterLatch].maxCounter {
-					f.statsdCounter[i+f.counterLatch].maxCounter = uint64(len(docs))
+				rejected := uint64(0)
+				h.statsdCounter[i+h.counterLatch].docCounter += uint64(len(docs))
+				h.statsdCounter[i+h.counterLatch].flowCounter++
+				if uint64(len(docs)) > h.statsdCounter[i+h.counterLatch].maxCounter {
+					h.statsdCounter[i+h.counterLatch].maxCounter = uint64(len(docs))
 				}
 				for {
-					docs = f.stashes[i].Add(docs)
+					docs, rejected = h.stashes[i].Add(docs)
+					h.statsdCounter[i+h.counterLatch].rejectionCounter += rejected
 					if docs == nil {
 						break
 					}
-					f.Flush()
+					h.Flush()
 				}
 			}
 			datatype.ReleaseMetaPacket(metering)
 		}
-		if time.Duration(time.Now().UnixNano())-f.lastFlush >= FLUSH_INTERVAL {
-			f.Flush()
+		if time.Duration(time.Now().UnixNano())-h.lastFlush >= FLUSH_INTERVAL {
+			h.Flush()
 		}
 	}
 }
 
-func (f *subMeteringHandler) Flush() {
-	f.lastFlush = time.Duration(time.Now().UnixNano())
-	f.putToQueue()
+func (h *subMeteringHandler) Flush() {
+	h.lastFlush = time.Duration(time.Now().UnixNano())
+	h.putToQueue()
 }

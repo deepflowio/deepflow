@@ -110,6 +110,8 @@ flow-generator:
 map-reduce:
   # mapreduce buffer capacity
   docs-in-buffer: 131072
+  # reject varied doc (with edge or port tag) when buffer usage exceed the limit, default docs-in-buffer
+  varied-doc-limit: 0
   # mapreduce window size
   window-size: 30
 pcap:

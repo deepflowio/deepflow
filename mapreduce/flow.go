@@ -25,7 +25,10 @@ const (
 
 const GEO_FILE_LOCATION = "/usr/share/droplet/ip_info_mini.json"
 
-func NewFlowMapProcess(output queue.MultiQueueWriter, input queue.MultiQueueReader, inputCount int, docsInBuffer int, windowSize int) *FlowHandler {
+func NewFlowMapProcess(
+	output queue.MultiQueueWriter, input queue.MultiQueueReader,
+	inputCount, docsInBuffer, variedDocLimit, windowSize int,
+) *FlowHandler {
 	return NewFlowHandler([]app.FlowProcessor{
 		fps.NewProcessor(),
 		flow.NewProcessor(),
@@ -33,7 +36,7 @@ func NewFlowMapProcess(output queue.MultiQueueWriter, input queue.MultiQueueRead
 		geo.NewProcessor(GEO_FILE_LOCATION),
 		flowtype.NewProcessor(),
 		consolelog.NewProcessor(),
-	}, output, input, inputCount, docsInBuffer, windowSize)
+	}, output, input, inputCount, docsInBuffer, variedDocLimit, windowSize)
 }
 
 type FlowHandler struct {
@@ -44,10 +47,15 @@ type FlowHandler struct {
 	flowQueueCount int
 	zmqAppQueue    queue.MultiQueueWriter
 	docsInBuffer   int
+	variedDocLimit int
 	windowSize     int
 }
 
-func NewFlowHandler(processors []app.FlowProcessor, output queue.MultiQueueWriter, inputs queue.MultiQueueReader, inputCount int, docsInBuffer int, windowSize int) *FlowHandler {
+func NewFlowHandler(
+	processors []app.FlowProcessor,
+	output queue.MultiQueueWriter, inputs queue.MultiQueueReader,
+	inputCount, docsInBuffer, variedDocLimit, windowSize int,
+) *FlowHandler {
 	return &FlowHandler{
 		numberOfApps:   len(processors),
 		processors:     processors,
@@ -55,6 +63,7 @@ func NewFlowHandler(processors []app.FlowProcessor, output queue.MultiQueueWrite
 		flowQueue:      inputs,
 		flowQueueCount: inputCount,
 		docsInBuffer:   docsInBuffer,
+		variedDocLimit: variedDocLimit,
 		windowSize:     windowSize,
 	}
 }
@@ -78,10 +87,11 @@ type subFlowHandler struct {
 }
 
 type StatsdCounter struct {
-	docCounter  uint64
-	flowCounter uint64
-	emitCounter uint64
-	maxCounter  uint64
+	docCounter       uint64
+	flowCounter      uint64
+	emitCounter      uint64
+	maxCounter       uint64
+	rejectionCounter uint64
 }
 
 func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
@@ -105,7 +115,7 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 		hashKey:    queue.HashKey(rand.Int()),
 
 		counterLatch: 0,
-		statItems:    make([]stats.StatItem, h.numberOfApps*3),
+		statItems:    make([]stats.StatItem, h.numberOfApps*4),
 
 		lastFlush: time.Duration(time.Now().UnixNano()),
 
@@ -113,61 +123,66 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 	}
 
 	for i := 0; i < handler.numberOfApps; i++ {
-		handler.stashes[i] = NewStash(h.docsInBuffer, h.windowSize)
+		handler.stashes[i] = NewStash(h.docsInBuffer, h.variedDocLimit, h.windowSize)
 		handler.statItems[i].Name = h.processors[i].GetName()
 		handler.statItems[i].StatType = stats.COUNT_TYPE
 		handler.statItems[i+handler.numberOfApps].Name = fmt.Sprintf("%s_avg_doc_counter", h.processors[i].GetName())
 		handler.statItems[i+handler.numberOfApps].StatType = stats.COUNT_TYPE
 		handler.statItems[i+handler.numberOfApps*2].Name = fmt.Sprintf("%s_max_doc_counter", h.processors[i].GetName())
 		handler.statItems[i+handler.numberOfApps*2].StatType = stats.COUNT_TYPE
+		handler.statItems[i+handler.numberOfApps*3].Name = fmt.Sprintf("%s_rejected_doc", h.processors[i].GetName())
+		handler.statItems[i+handler.numberOfApps*3].StatType = stats.COUNT_TYPE
 	}
 	stats.RegisterCountable("flow_mapper", &handler, stats.OptionStatTags{"index": strconv.Itoa(index)})
 	return &handler
 }
 
-func (f *subFlowHandler) GetCounter() interface{} {
-	oldLatch := f.counterLatch
-	if f.counterLatch == 0 {
-		f.counterLatch = f.numberOfApps
+func (h *subFlowHandler) GetCounter() interface{} {
+	oldLatch := h.counterLatch
+	if h.counterLatch == 0 {
+		h.counterLatch = h.numberOfApps
 	} else {
-		f.counterLatch = 0
+		h.counterLatch = 0
 	}
-	for i := 0; i < f.numberOfApps; i++ {
-		f.statItems[i].Value = f.statsdCounter[i+oldLatch].emitCounter
-		if f.statsdCounter[i+oldLatch].flowCounter != 0 {
-			f.statItems[i+f.numberOfApps].Value = f.statsdCounter[i+oldLatch].docCounter / f.statsdCounter[i+oldLatch].flowCounter
+	for i := 0; i < h.numberOfApps; i++ {
+		h.statItems[i].Value = h.statsdCounter[i+oldLatch].emitCounter
+		if h.statsdCounter[i+oldLatch].flowCounter != 0 {
+			h.statItems[i+h.numberOfApps].Value =
+				h.statsdCounter[i+oldLatch].docCounter / h.statsdCounter[i+oldLatch].flowCounter
 		} else {
-			f.statItems[i+f.numberOfApps].Value = 0
+			h.statItems[i+h.numberOfApps].Value = 0
 		}
-		f.statItems[i+f.numberOfApps*2].Value = f.statsdCounter[i+oldLatch].maxCounter
-		f.statsdCounter[i+oldLatch].emitCounter = 0
-		f.statsdCounter[i+oldLatch].docCounter = 0
-		f.statsdCounter[i+oldLatch].flowCounter = 0
-		f.statsdCounter[i+oldLatch].maxCounter = 0
+		h.statItems[i+h.numberOfApps*2].Value = h.statsdCounter[i+oldLatch].maxCounter
+		h.statItems[i+h.numberOfApps*3].Value = h.statsdCounter[i+oldLatch].rejectionCounter
+		h.statsdCounter[i+oldLatch].emitCounter = 0
+		h.statsdCounter[i+oldLatch].docCounter = 0
+		h.statsdCounter[i+oldLatch].flowCounter = 0
+		h.statsdCounter[i+oldLatch].maxCounter = 0
+		h.statsdCounter[i+oldLatch].rejectionCounter = 0
 	}
 
-	return f.statItems
+	return h.statItems
 }
 
-func (f *subFlowHandler) putToQueue() {
-	for i, stash := range f.stashes {
+func (h *subFlowHandler) putToQueue() {
+	for i, stash := range h.stashes {
 		docs := stash.Dump()
 		for j := 0; j < len(docs); j += QUEUE_BATCH_SIZE {
 			if j+QUEUE_BATCH_SIZE <= len(docs) {
-				f.zmqAppQueue.Put(f.hashKey, docs[j:j+QUEUE_BATCH_SIZE]...)
+				h.zmqAppQueue.Put(h.hashKey, docs[j:j+QUEUE_BATCH_SIZE]...)
 			} else {
-				f.zmqAppQueue.Put(f.hashKey, docs[j:]...)
+				h.zmqAppQueue.Put(h.hashKey, docs[j:]...)
 			}
-			f.hashKey++
+			h.hashKey++
 		}
-		f.statsdCounter[i+f.counterLatch].emitCounter += uint64(len(docs))
+		h.statsdCounter[i+h.counterLatch].emitCounter += uint64(len(docs))
 		stash.Clear()
 	}
 }
 
-func (f *FlowHandler) Start() {
-	for i := 0; i < f.flowQueueCount; i++ {
-		go f.newSubFlowHandler(i).Process()
+func (h *FlowHandler) Start() {
+	for i := 0; i < h.flowQueueCount; i++ {
+		go h.newSubFlowHandler(i).Process()
 	}
 }
 
@@ -198,14 +213,14 @@ func isValidFlow(flow *datatype.TaggedFlow) bool {
 	return true
 }
 
-func (f *subFlowHandler) Process() error {
+func (h *subFlowHandler) Process() error {
 	elements := make([]interface{}, QUEUE_BATCH_SIZE)
 
 	for {
-		n := f.flowQueue.Gets(queue.HashKey(f.queueIndex), elements)
+		n := h.flowQueue.Gets(queue.HashKey(h.queueIndex), elements)
 		for _, e := range elements[:n] {
 			if e == nil {
-				f.Flush()
+				h.Flush()
 				continue
 			}
 
@@ -216,30 +231,32 @@ func (f *subFlowHandler) Process() error {
 				continue
 			}
 
-			for i, processor := range f.processors {
+			for i, processor := range h.processors {
 				docs := processor.Process(flow, false)
-				f.statsdCounter[i+f.counterLatch].docCounter += uint64(len(docs))
-				f.statsdCounter[i+f.counterLatch].flowCounter++
-				if uint64(len(docs)) > f.statsdCounter[i+f.counterLatch].maxCounter {
-					f.statsdCounter[i+f.counterLatch].maxCounter = uint64(len(docs))
+				rejected := uint64(0)
+				h.statsdCounter[i+h.counterLatch].docCounter += uint64(len(docs))
+				h.statsdCounter[i+h.counterLatch].flowCounter++
+				if uint64(len(docs)) > h.statsdCounter[i+h.counterLatch].maxCounter {
+					h.statsdCounter[i+h.counterLatch].maxCounter = uint64(len(docs))
 				}
 				for {
-					docs = f.stashes[i].Add(docs)
+					docs, rejected = h.stashes[i].Add(docs)
+					h.statsdCounter[i+h.counterLatch].rejectionCounter += rejected
 					if docs == nil {
 						break
 					}
-					f.Flush()
+					h.Flush()
 				}
 			}
 			datatype.ReleaseTaggedFlow(flow)
 		}
-		if time.Duration(time.Now().UnixNano())-f.lastFlush >= FLUSH_INTERVAL {
-			f.Flush()
+		if time.Duration(time.Now().UnixNano())-h.lastFlush >= FLUSH_INTERVAL {
+			h.Flush()
 		}
 	}
 }
 
-func (f *subFlowHandler) Flush() {
-	f.lastFlush = time.Duration(time.Now().UnixNano())
-	f.putToQueue()
+func (h *subFlowHandler) Flush() {
+	h.lastFlush = time.Duration(time.Now().UnixNano())
+	h.putToQueue()
 }
