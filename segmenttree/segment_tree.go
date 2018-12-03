@@ -3,7 +3,7 @@ package segmenttree
 import (
 	"sync"
 
-	"github.com/golang-collections/go-datastructures/bitarray"
+	"github.com/Workiva/go-datastructures/bitarray"
 )
 
 func intervalToIntegerRange(interval Interval) IntegerRange {

@@ -1,5 +1,5 @@
 /**
- * 参照github.com/golang-collections/go-datastructures的PriorityQueue实现
+ * 参照github.com/Workiva/go-datastructures的PriorityQueue实现
  * 区别主要是，PriorityQueue通过优先级来决定放置到队首或队尾，但是此Queue
  * 是固定长度队列，新的数据会覆盖旧的数据，并且没有优先级比较的过程。
  */

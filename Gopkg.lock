@@ -10,20 +10,20 @@
   version = "v1.2.2"
 
 [[projects]]
+  digest = "1:e35a444ef99d081224766d9ecf3566e7ad811ef621c55b3f3c7d37041e39c772"
+  name = "github.com/Workiva/go-datastructures"
+  packages = ["bitarray"]
+  pruneopts = "UT"
+  revision = "f07cbe3f82ca2fd6e5ab94afce65fe43319f675f"
+  version = "v1.0.50"
+
+[[projects]]
   digest = "1:6f82cacd0af5921e99bf3f46748705239b36489464f4529a1589bc895764fb18"
   name = "github.com/docker/go-units"
   packages = ["."]
   pruneopts = "UT"
   revision = "47565b4f722fb6ceae66b95f853feed578a4a51c"
   version = "v0.3.3"
-
-[[projects]]
-  branch = "master"
-  digest = "1:d0019b96b284ac4c24be77891eca40dabdae8ccf168b6684350d15c13cb2aada"
-  name = "github.com/golang-collections/go-datastructures"
-  packages = ["bitarray"]
-  pruneopts = "UT"
-  revision = "59788d5eb2591d3497ffb8fafed2f16fe00e7775"
 
 [[projects]]
   branch = "master"
@@ -48,7 +48,7 @@
   version = "v1.2.0"
 
 [[projects]]
-  digest = "1:92f7df73c43ce74ec411c6720706d0157775e3524a692f0f770062d08582b410"
+  digest = "1:708ada6e2d57b8065e50954c0b2b64f3ff654a6b9f2965e7dee25c97e9e196a1"
   name = "github.com/google/gopacket"
   packages = [
     ".",
@@ -56,7 +56,8 @@
     "pcapgo",
   ]
   pruneopts = "UT"
-  revision = "d9ba49ce8619de3c5fbd2f58168903b35b2ed0e0"
+  revision = "a6b099ece4680a8bdea84fa78166d0712108a95c"
+  version = "v1.1.15"
 
 [[projects]]
   digest = "1:8ec8d88c248041a6df5f6574b87bc00e7e0b493881dad2e7ef47b11dc69093b5"
@@ -84,6 +85,14 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "ba3bf9c1d0421aa146564a632931730344f1f9f1"
+
+[[projects]]
+  branch = "master"
+  digest = "1:450f3a64f7a76d3f229ff33a30f0a889629dde46b0f82ece7c53404528316665"
+  name = "github.com/mdlayher/raw"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "fa5ef3332ca961deab5782da07b1616fea8a9dd8"
 
 [[projects]]
   branch = "master"
@@ -123,9 +132,10 @@
 
 [[projects]]
   branch = "release-branch.go1.11"
-  digest = "1:b5c3834d33445efdc5a8dcb154bed9e4c211edadbf02f6f5cc20c5e9be26a499"
+  digest = "1:b44c99081499ad9bd394e6255a62a11bddf23410760d40965c095d252355c053"
   name = "golang.org/x/net"
   packages = [
+    "bpf",
     "context",
     "http/httpguts",
     "http2",
@@ -224,8 +234,8 @@
   analyzer-version = 1
   input-imports = [
     "github.com/OneOfOne/xxhash",
+    "github.com/Workiva/go-datastructures/bitarray",
     "github.com/docker/go-units",
-    "github.com/golang-collections/go-datastructures/bitarray",
     "github.com/golang/groupcache/lru",
     "github.com/golang/protobuf/proto",
     "github.com/google/gopacket/layers",
