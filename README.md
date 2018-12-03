@@ -6,7 +6,7 @@
 queue队列
 ---------
 
-虽然Golang已经在`github.com/golang-collections/go-datastructures的PriorityQueue`
+虽然Golang已经在`github.com/Workiva/go-datastructures的PriorityQueue`
 提供了`Queue`和`PriorityQueue`，但是在这些方面它们不能够满足我们的需求：
 
 1. 我们需要的是一个固定长度的queue，虽然这可以通过外部代码判断当前queue长度解决

@@ -26,12 +26,12 @@
 
 
 [[constraint]]
-  branch = "master"
-  name = "github.com/golang-collections/go-datastructures"
+  name = "github.com/Workiva/go-datastructures"
+  version = "v1.0.50"
 
 [[constraint]]
   name = "github.com/google/gopacket"
-  revision = "d9ba49ce8619de3c5fbd2f58168903b35b2ed0e0"
+  version = "v1.1.15"
 
 [[constraint]]
   name = "github.com/hashicorp/golang-lru"
