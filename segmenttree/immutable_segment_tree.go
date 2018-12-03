@@ -6,7 +6,7 @@ package segmenttree
 import (
 	"sort"
 
-	"github.com/golang-collections/go-datastructures/bitarray"
+	"github.com/Workiva/go-datastructures/bitarray"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
