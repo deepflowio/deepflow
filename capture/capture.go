@@ -4,20 +4,11 @@ import (
 	"errors"
 	"syscall"
 	"time"
-	"unsafe"
 
 	"github.com/google/gopacket/afpacket"
 	"github.com/op/go-logging"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
-
-/*
-#include <linux/if_packet.h>  // AF_PACKET, sockaddr_ll
-*/
-import "C"
-
-type SocketStats C.struct_tpacket_stats
-type SocketStatsV3 C.struct_tpacket_stats_v3
 
 var log = logging.MustGetLogger("capture")
 
@@ -53,20 +44,16 @@ func (c *Capture) GetCounter() interface{} {
 
 	socketStats, socketStatsV3, _ := c.tPacket.SocketStats()
 	c.tPacket.InitSocketStats()
-	// SocketStats和SocketStatsV3的字段在golang中被识别为私有字段无法读出，
-	// 因此需要强制类型转换
-	refSocketStats := (*SocketStats)(unsafe.Pointer(&socketStats))
-	refSocketStatsV3 := (*SocketStatsV3)(unsafe.Pointer(&socketStatsV3))
-	max := func(x, y C.uint) uint {
+	max := func(x, y uint) uint {
 		if x > y {
-			return uint(x)
+			return x
 		} else {
-			return uint(y)
+			return y
 		}
 	}
-	counter.KernelPackets = max(refSocketStatsV3.tp_packets, refSocketStats.tp_packets)
-	counter.KernelDrops = max(refSocketStatsV3.tp_drops, refSocketStats.tp_drops)
-	counter.KernelFreezes = uint(refSocketStatsV3.tp_freeze_q_cnt)
+	counter.KernelPackets = max(socketStatsV3.Packets(), socketStats.Packets())
+	counter.KernelDrops = max(socketStatsV3.Drops(), socketStats.Drops())
+	counter.KernelFreezes = uint(socketStatsV3.QueueFreezes())
 
 	if counter.pollError > 0 {
 		log.Warningf("Poll error %d times, last err: %s", counter.pollError, c.lastPollErr.Error())
