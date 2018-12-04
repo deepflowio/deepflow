@@ -93,7 +93,7 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 
 		lastFlush: time.Duration(time.Now().UnixNano()),
 
-		statItems: make([]stats.StatItem, h.numberOfApps*4),
+		statItems: make([]stats.StatItem, h.numberOfApps*5),
 
 		statsdCounter: make([]StatsdCounter, h.numberOfApps*2),
 	}
@@ -107,6 +107,8 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 		handler.statItems[i+handler.numberOfApps*2].StatType = stats.COUNT_TYPE
 		handler.statItems[i+handler.numberOfApps*3].Name = fmt.Sprintf("%s_rejected_doc", h.processors[i].GetName())
 		handler.statItems[i+handler.numberOfApps*3].StatType = stats.COUNT_TYPE
+		handler.statItems[i+handler.numberOfApps*4].Name = fmt.Sprintf("%s_flush", h.processors[i].GetName())
+		handler.statItems[i+handler.numberOfApps*4].StatType = stats.COUNT_TYPE
 	}
 	stats.RegisterCountable("metering_mapper", &handler, stats.OptionStatTags{"index": strconv.Itoa(index)})
 	return &handler
@@ -129,18 +131,24 @@ func (h *subMeteringHandler) GetCounter() interface{} {
 		}
 		h.statItems[i+h.numberOfApps*2].Value = h.statsdCounter[i+oldLatch].maxCounter
 		h.statItems[i+h.numberOfApps*3].Value = h.statsdCounter[i+oldLatch].rejectionCounter
+		h.statItems[i+h.numberOfApps*4].Value = h.statsdCounter[i+oldLatch].flushCounter
 		h.statsdCounter[i+oldLatch].emitCounter = 0
 		h.statsdCounter[i+oldLatch].docCounter = 0
 		h.statsdCounter[i+oldLatch].flowCounter = 0
 		h.statsdCounter[i+oldLatch].maxCounter = 0
 		h.statsdCounter[i+oldLatch].rejectionCounter = 0
+		h.statsdCounter[i+oldLatch].flushCounter = 0
 	}
 
 	return h.statItems
 }
 
-func (h *subMeteringHandler) putToQueue() {
+// processorID = -1 for all stash
+func (h *subMeteringHandler) putToQueue(processorID int) {
 	for i, stash := range h.stashes {
+		if processorID > 0 && processorID != i {
+			continue
+		}
 		docs := stash.Dump()
 		for j := 0; j < len(docs); j += QUEUE_BATCH_SIZE {
 			if j+QUEUE_BATCH_SIZE <= len(docs) {
@@ -168,7 +176,7 @@ func (h *subMeteringHandler) Process() error {
 		n := h.meteringQueue.Gets(queue.HashKey(h.queueIndex), elements)
 		for _, e := range elements[:n] {
 			if e == nil { // tick
-				h.Flush()
+				h.Flush(-1)
 				continue
 			}
 
@@ -200,18 +208,21 @@ func (h *subMeteringHandler) Process() error {
 					if docs == nil {
 						break
 					}
-					h.Flush()
+					h.statsdCounter[i+h.counterLatch].flushCounter++
+					h.Flush(i)
 				}
 			}
 			datatype.ReleaseMetaPacket(metering)
 		}
 		if time.Duration(time.Now().UnixNano())-h.lastFlush >= FLUSH_INTERVAL {
-			h.Flush()
+			h.Flush(-1)
 		}
 	}
 }
 
-func (h *subMeteringHandler) Flush() {
-	h.lastFlush = time.Duration(time.Now().UnixNano())
-	h.putToQueue()
+func (h *subMeteringHandler) Flush(processorID int) {
+	if processorID == -1 { // 单独Flush某个processor的stash时不更新
+		h.lastFlush = time.Duration(time.Now().UnixNano())
+	}
+	h.putToQueue(processorID)
 }

@@ -92,6 +92,7 @@ type StatsdCounter struct {
 	emitCounter      uint64
 	maxCounter       uint64
 	rejectionCounter uint64
+	flushCounter     uint64
 }
 
 func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
@@ -115,7 +116,7 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 		hashKey:    queue.HashKey(rand.Int()),
 
 		counterLatch: 0,
-		statItems:    make([]stats.StatItem, h.numberOfApps*4),
+		statItems:    make([]stats.StatItem, h.numberOfApps*5),
 
 		lastFlush: time.Duration(time.Now().UnixNano()),
 
@@ -132,6 +133,8 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 		handler.statItems[i+handler.numberOfApps*2].StatType = stats.COUNT_TYPE
 		handler.statItems[i+handler.numberOfApps*3].Name = fmt.Sprintf("%s_rejected_doc", h.processors[i].GetName())
 		handler.statItems[i+handler.numberOfApps*3].StatType = stats.COUNT_TYPE
+		handler.statItems[i+handler.numberOfApps*4].Name = fmt.Sprintf("%s_flush", h.processors[i].GetName())
+		handler.statItems[i+handler.numberOfApps*4].StatType = stats.COUNT_TYPE
 	}
 	stats.RegisterCountable("flow_mapper", &handler, stats.OptionStatTags{"index": strconv.Itoa(index)})
 	return &handler
@@ -154,18 +157,24 @@ func (h *subFlowHandler) GetCounter() interface{} {
 		}
 		h.statItems[i+h.numberOfApps*2].Value = h.statsdCounter[i+oldLatch].maxCounter
 		h.statItems[i+h.numberOfApps*3].Value = h.statsdCounter[i+oldLatch].rejectionCounter
+		h.statItems[i+h.numberOfApps*4].Value = h.statsdCounter[i+oldLatch].flushCounter
 		h.statsdCounter[i+oldLatch].emitCounter = 0
 		h.statsdCounter[i+oldLatch].docCounter = 0
 		h.statsdCounter[i+oldLatch].flowCounter = 0
 		h.statsdCounter[i+oldLatch].maxCounter = 0
 		h.statsdCounter[i+oldLatch].rejectionCounter = 0
+		h.statsdCounter[i+oldLatch].flushCounter = 0
 	}
 
 	return h.statItems
 }
 
-func (h *subFlowHandler) putToQueue() {
+// processorID = -1 for all stash
+func (h *subFlowHandler) putToQueue(processorID int) {
 	for i, stash := range h.stashes {
+		if processorID > 0 && processorID != i {
+			continue
+		}
 		docs := stash.Dump()
 		for j := 0; j < len(docs); j += QUEUE_BATCH_SIZE {
 			if j+QUEUE_BATCH_SIZE <= len(docs) {
@@ -220,7 +229,7 @@ func (h *subFlowHandler) Process() error {
 		n := h.flowQueue.Gets(queue.HashKey(h.queueIndex), elements)
 		for _, e := range elements[:n] {
 			if e == nil {
-				h.Flush()
+				h.Flush(-1)
 				continue
 			}
 
@@ -245,18 +254,21 @@ func (h *subFlowHandler) Process() error {
 					if docs == nil {
 						break
 					}
-					h.Flush()
+					h.statsdCounter[i+h.counterLatch].flushCounter++
+					h.Flush(i)
 				}
 			}
 			datatype.ReleaseTaggedFlow(flow)
 		}
 		if time.Duration(time.Now().UnixNano())-h.lastFlush >= FLUSH_INTERVAL {
-			h.Flush()
+			h.Flush(-1)
 		}
 	}
 }
 
-func (h *subFlowHandler) Flush() {
-	h.lastFlush = time.Duration(time.Now().UnixNano())
-	h.putToQueue()
+func (h *subFlowHandler) Flush(processorID int) {
+	if processorID == -1 { // 单独Flush某个processor的stash时不更新
+		h.lastFlush = time.Duration(time.Now().UnixNano())
+	}
+	h.putToQueue(processorID)
 }
