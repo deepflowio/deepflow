@@ -10,20 +10,20 @@
   version = "v1.2.2"
 
 [[projects]]
+  digest = "1:e35a444ef99d081224766d9ecf3566e7ad811ef621c55b3f3c7d37041e39c772"
+  name = "github.com/Workiva/go-datastructures"
+  packages = ["bitarray"]
+  pruneopts = "UT"
+  revision = "f07cbe3f82ca2fd6e5ab94afce65fe43319f675f"
+  version = "v1.0.50"
+
+[[projects]]
   digest = "1:6f82cacd0af5921e99bf3f46748705239b36489464f4529a1589bc895764fb18"
   name = "github.com/docker/go-units"
   packages = ["."]
   pruneopts = "UT"
   revision = "47565b4f722fb6ceae66b95f853feed578a4a51c"
   version = "v0.3.3"
-
-[[projects]]
-  branch = "master"
-  digest = "1:d0019b96b284ac4c24be77891eca40dabdae8ccf168b6684350d15c13cb2aada"
-  name = "github.com/golang-collections/go-datastructures"
-  packages = ["bitarray"]
-  pruneopts = "UT"
-  revision = "59788d5eb2591d3497ffb8fafed2f16fe00e7775"
 
 [[projects]]
   branch = "master"
@@ -48,7 +48,7 @@
   version = "v1.2.0"
 
 [[projects]]
-  digest = "1:f9d18fa71dcba6a66a37988ba01acc9d09f412c345a000eb591edb95cbf32b72"
+  digest = "1:9d87185d010e1df24a433b9b54d5426f4717089af2a86a180e69f13c5b06f71f"
   name = "github.com/google/gopacket"
   packages = [
     ".",
@@ -57,7 +57,8 @@
     "pcapgo",
   ]
   pruneopts = "UT"
-  revision = "d9ba49ce8619de3c5fbd2f58168903b35b2ed0e0"
+  revision = "a6b099ece4680a8bdea84fa78166d0712108a95c"
+  version = "v1.1.15"
 
 [[projects]]
   digest = "1:8ec8d88c248041a6df5f6574b87bc00e7e0b493881dad2e7ef47b11dc69093b5"
@@ -93,6 +94,14 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "ba3bf9c1d0421aa146564a632931730344f1f9f1"
+
+[[projects]]
+  branch = "master"
+  digest = "1:450f3a64f7a76d3f229ff33a30f0a889629dde46b0f82ece7c53404528316665"
+  name = "github.com/mdlayher/raw"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "fa5ef3332ca961deab5782da07b1616fea8a9dd8"
 
 [[projects]]
   branch = "master"
@@ -154,11 +163,11 @@
     "pkg/mapper/usage",
   ]
   pruneopts = "UT"
-  revision = "0ec793f755cf0976db70f35e5a5f97b05e5595e7"
+  revision = "73293ffc7704683b751f81c69ade3d940d91a69f"
 
 [[projects]]
   branch = "master"
-  digest = "1:42382cdbe6b94c23343c9e7f2aa7fc62a6a4c324bf005ad719681e915c00be4d"
+  digest = "1:05cb62c3ba5500dd7d5df43a4f6b6a75c6331f6fd37da8a2cebef9e69d880933"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "app",
@@ -180,7 +189,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "7bf27f5029d603d1d867af5e2895671d06843443"
+  revision = "a7a6deb228c8a6bd044efc226d44f1c0b4d7e726"
 
 [[projects]]
   branch = "master"
