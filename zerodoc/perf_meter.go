@@ -228,12 +228,11 @@ func (m *PerfMeterMax) Decode(decoder *codec.SimpleDecoder) {
 }
 
 func (m *PerfMeterMax) concurrentMerge(other *PerfMeterMax) {
-	m.MaxRTTSyn += other.MaxRTTSyn
-	m.MaxRTTAvg += other.MaxRTTAvg
-	m.MaxARTAvg += other.MaxARTAvg
+	m.sequentialMerge(other)
 }
 
 func (m *PerfMeterMax) sequentialMerge(other *PerfMeterMax) {
+	// 注意：若有max之外的操作，需要修改concurrentMerge
 	m.MaxRTTSyn = maxDuration(m.MaxRTTSyn, other.MaxRTTSyn)
 	m.MaxRTTAvg = maxDuration(m.MaxRTTAvg, other.MaxRTTAvg)
 	m.MaxARTAvg = maxDuration(m.MaxARTAvg, other.MaxARTAvg)
@@ -258,12 +257,11 @@ func (m *PerfMeterMin) Decode(decoder *codec.SimpleDecoder) {
 }
 
 func (m *PerfMeterMin) concurrentMerge(other *PerfMeterMin) {
-	m.MinRTTSyn += other.MinRTTSyn
-	m.MinRTTAvg += other.MinRTTAvg
-	m.MinARTAvg += other.MinARTAvg
+	m.sequentialMerge(other)
 }
 
 func (m *PerfMeterMin) sequentialMerge(other *PerfMeterMin) {
+	// 注意：若有min之外的操作，需要修改concurrentMerge
 	m.MinRTTSyn = minDuration(m.MinRTTSyn, other.MinRTTSyn)
 	m.MinRTTAvg = minDuration(m.MinRTTAvg, other.MinRTTAvg)
 	m.MinARTAvg = minDuration(m.MinARTAvg, other.MinARTAvg)
