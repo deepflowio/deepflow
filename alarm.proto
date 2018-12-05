@@ -32,9 +32,9 @@ message AlarmInfo {
     optional int32 l3_epc_id_0 = 8;
     optional int32 l3_epc_id_1 = 9;
 
-    optional uint32 group_id = 10;
-    optional uint32 group_id_0 = 11;
-    optional uint32 group_id_1 = 12;
+    optional int32 group_id = 10;
+    optional int32 group_id_0 = 11;
+    optional int32 group_id_1 = 12;
 
     optional uint32 ip = 13;
     optional uint32 ip_0 = 14;
