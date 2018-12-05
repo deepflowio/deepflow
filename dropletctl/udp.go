@@ -15,6 +15,11 @@ import (
 var dropletCTLPort int = 9527
 var dropletCTLIP string = "127.0.0.1"
 
+func SetCTLIpPort(ip string, port int) {
+	dropletCTLIP = ip
+	dropletCTLPort = port
+}
+
 const (
 	UDP_MAXLEN               = 8192
 	DROPLET_MESSAGE_ARGS_LEN = 8000
