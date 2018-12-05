@@ -42,7 +42,7 @@ message Tag {
 
     optional uint32 ip = 4;
     optional uint64 mac = 5;
-    optional uint32 group_id = 6;
+    optional int32 group_id = 6;
     optional int32 l2_epc_id = 7;
     optional int32 l3_epc_id = 8;
     optional uint32 l2_device_id = 9;
@@ -55,8 +55,8 @@ message Tag {
     optional uint32 ip_1 = 17;
     optional uint64 mac_0 = 18;
     optional uint64 mac_1 = 19;
-    optional uint32 group_id_0 = 20;
-    optional uint32 group_id_1 = 21;
+    optional int32 group_id_0 = 20;
+    optional int32 group_id_1 = 21;
     optional int32 l2_epc_id_0 = 22;
     optional int32 l2_epc_id_1 = 23;
     optional int32 l3_epc_id_0 = 24;
