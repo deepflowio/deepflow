@@ -630,7 +630,7 @@ func (t *Tag) GetCode() uint64 {
 }
 
 func (t *Tag) HasVariedField() bool {
-	return t.Code&ServerPort != 0 || t.HasEdgeTagField()
+	return t.Code&(ServerPort|Region|Country|ISPCode) != 0 || t.HasEdgeTagField()
 }
 
 var fieldPool = pool.NewLockFreePool(func() interface{} {
