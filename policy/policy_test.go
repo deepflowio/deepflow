@@ -1198,10 +1198,10 @@ func TestNpbAction(t *testing.T) {
 
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
 	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
-	npb1 := ToNpbAction(10, 150, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
-	npb2 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 200)
-	npb3 := ToNpbAction(20, 200, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 200)
-	npb := ToNpbAction(10, 150, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 200)
+	npb1 := ToNpbAction(10, 150, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
+	npb2 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
+	npb3 := ToNpbAction(20, 200, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
+	npb := ToNpbAction(10, 150, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
 
 	acl1 := generatePolicyAcl(table, action1, 25, groupAny, groupAny, IPProtocolTCP, 1000, vlanAny, npb1)
 	action2 := generateAclAction(26, ACTION_PACKET_BROKERING)

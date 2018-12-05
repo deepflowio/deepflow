@@ -553,8 +553,8 @@ func (l *PolicyLabeler) UpdateAcls(acls []*Acl) {
 				}
 				break
 			}
-			for _, action := range acl.NpbActions {
-				action.AddResourceGroupType(groupType)
+			for index, _ := range acl.NpbActions {
+				acl.NpbActions[index].AddResourceGroupType(groupType)
 			}
 		}
 
@@ -635,14 +635,9 @@ func (l *PolicyLabeler) checkNpbPolicy(endpointData *EndpointData, policy *Polic
 	if policy == nil || len(policy.NpbActions) == 0 {
 		return policy
 	}
-
 	validActions := l.checkNpbAction(endpointData, policy.NpbActions)
-	if len(validActions) == 0 {
-		if policy.ActionFlags == 0 {
-			return INVALID_POLICY_DATA
-		}
-		policy.NpbActions = policy.NpbActions[:0]
-		return policy
+	if len(validActions) == 0 && policy.ActionFlags == 0 {
+		return INVALID_POLICY_DATA
 	}
 
 	result := new(PolicyData)
