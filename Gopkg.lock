@@ -120,7 +120,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:e30079bdb962b20e07cab4d27bf348a570569d44d51cd656838dba414a1b455b"
+  digest = "1:70971184131ab1aa6b65aef90f0acb605048d99e4a6048767ae6224b1deb6422"
   name = "gitlab.x.lan/yunshan/message"
   packages = [
     "dfi",
@@ -128,7 +128,7 @@
     "zero",
   ]
   pruneopts = "T"
-  revision = "113e6246648e6485541b3f3dc3b061aa7e7c374d"
+  revision = "2c855fa69815cfff6e9570df27c1246dbacd2b7d"
 
 [[projects]]
   branch = "release-branch.go1.11"
