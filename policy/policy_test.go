@@ -401,6 +401,9 @@ func getEndpointData(table *PolicyTable, key *LookupKey) *EndpointData {
 
 func getPolicyByFastPath(table *PolicyTable, key *LookupKey) (*EndpointData, *PolicyData) {
 	endpoint, policy := table.policyLabeler.GetPolicyByFastPath(key)
+	if endpoint != nil {
+		endpoint = table.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
+	}
 	return endpoint, policy
 }
 

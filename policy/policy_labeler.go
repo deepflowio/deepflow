@@ -611,15 +611,15 @@ func (l *PolicyLabeler) DelAcl(id int) {
 	}
 }
 
-func (l *PolicyLabeler) checkNpbAction(endpointData *EndpointData, npbActions []NpbAction) []NpbAction {
+func (l *PolicyLabeler) checkNpbAction(packet *LookupKey, endpointData *EndpointData, npbActions []NpbAction) []NpbAction {
 	if len(npbActions) == 0 {
 		return nil
 	}
 
 	validActions := make([]NpbAction, 0, len(npbActions))
 	for _, action := range npbActions {
-		if (action.TapSideCompare(TAPSIDE_SRC) == true && endpointData.SrcInfo.L2End == true) ||
-			(action.TapSideCompare(TAPSIDE_DST) == true && endpointData.DstInfo.L2End == true) {
+		if (action.TapSideCompare(TAPSIDE_SRC) == true && packet.L2End0 == true) ||
+			(action.TapSideCompare(TAPSIDE_DST) == true && packet.L2End1 == true) {
 			if action.ResourceGroupTypeCompare(RESOURCE_GROUP_TYPE_DEV) {
 				validActions = append(validActions, action)
 			} else if (action.TapSideCompare(TAPSIDE_SRC) == true && endpointData.SrcInfo.L3End == true) ||
@@ -631,11 +631,11 @@ func (l *PolicyLabeler) checkNpbAction(endpointData *EndpointData, npbActions []
 	return validActions
 }
 
-func (l *PolicyLabeler) checkNpbPolicy(endpointData *EndpointData, policy *PolicyData) *PolicyData {
+func (l *PolicyLabeler) checkNpbPolicy(packet *LookupKey, endpointData *EndpointData, policy *PolicyData) *PolicyData {
 	if policy == nil || len(policy.NpbActions) == 0 {
 		return policy
 	}
-	validActions := l.checkNpbAction(endpointData, policy.NpbActions)
+	validActions := l.checkNpbAction(packet, endpointData, policy.NpbActions)
 	if len(validActions) == 0 && policy.ActionFlags == 0 {
 		return INVALID_POLICY_DATA
 	}
@@ -786,7 +786,7 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packetEndp
 		forward.Merge(policyForward.AclActions, policyForward.NpbActions, policyForward.ACLID)
 		forward.Merge(policyBackward.AclActions, policyBackward.NpbActions, policyBackward.ACLID)
 		if len(forward.NpbActions) > 0 {
-			npbActions := l.checkNpbAction(packetEndpointData, forward.NpbActions)
+			npbActions := l.checkNpbAction(packet, packetEndpointData, forward.NpbActions)
 			if policyForward.ACLID > 0 {
 				policyForward.NpbActions = append(policyForward.NpbActions[:0], npbActions...)
 			}
@@ -954,8 +954,7 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *
 	}
 
 	if endpoint != nil {
-		endpoint = l.cloudPlatformLabeler.UpdateEndpointData(endpoint, packet)
-		policy = l.checkNpbPolicy(endpoint, policy)
+		policy = l.checkNpbPolicy(packet, endpoint, policy)
 	}
 
 	atomic.AddUint64(&l.FastPathHit, 1)
