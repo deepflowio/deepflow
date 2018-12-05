@@ -21,6 +21,10 @@ type GeoMeter struct {
 	SumRTTSynFlow         uint64        `db:"sum_rtt_syn_flow"`
 }
 
+func (m *GeoMeter) SortKey() uint64 {
+	return m.SumPacketTx + m.SumPacketRx
+}
+
 func (m *GeoMeter) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU64(m.SumClosedFlowCount)
 	encoder.WriteU64(m.SumAbnormalFlowCount)

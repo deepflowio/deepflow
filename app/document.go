@@ -25,6 +25,7 @@ type Meter interface {
 	ConcurrentMerge(Meter)
 	SequentialMerge(Meter)
 	ToKVString() string
+	SortKey() uint64
 	Clone() Meter
 	Release()
 }

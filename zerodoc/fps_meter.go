@@ -17,6 +17,10 @@ type FPSMeter struct {
 	MaxNewFlowCount uint64 `db:"max_new_flow_count"`
 }
 
+func (m *FPSMeter) SortKey() uint64 {
+	return m.SumFlowCount
+}
+
 func (m *FPSMeter) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU64(m.SumFlowCount)
 	encoder.WriteU64(m.SumNewFlowCount)

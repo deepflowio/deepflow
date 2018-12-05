@@ -16,6 +16,10 @@ type ConsoleLogMeter struct {
 	SumClosedFlowDuration time.Duration `db:"sum_closed_flow_duration"`
 }
 
+func (m *ConsoleLogMeter) SortKey() uint64 {
+	return m.SumPacketTx + m.SumPacketRx
+}
+
 func (m *ConsoleLogMeter) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU64(m.SumPacketTx)
 	encoder.WriteU64(m.SumPacketRx)

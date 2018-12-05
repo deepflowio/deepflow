@@ -20,6 +20,10 @@ type FlowMeter struct {
 	SumBit             uint64 `db:"sum_bit"`
 }
 
+func (m *FlowMeter) SortKey() uint64 {
+	return m.SumPacket
+}
+
 func (m *FlowMeter) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU64(m.SumFlowCount)
 	encoder.WriteU64(m.SumNewFlowCount)

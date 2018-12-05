@@ -29,6 +29,15 @@ type TypeMeter struct {
 	SumCountTServerRst       uint64 `db:"sum_count_t_s_rst"`
 	SumCountTServerHalfOpen  uint64 `db:"sum_count_t_s_half_open"`
 	SumCountTServerHalfClose uint64 `db:"sum_count_t_s_half_close"`
+
+	sortKey uint64
+}
+
+func (m *TypeMeter) SortKey() uint64 {
+	if m.sortKey == 0 {
+		m.sortKey = m.SumCountL0S1S + m.SumCountL1S5S + m.SumCountL5S10S + m.SumCountL10S1M + m.SumCountL1M1H + m.SumCountL1H + 1
+	}
+	return m.sortKey
 }
 
 func (m *TypeMeter) Encode(encoder *codec.SimpleEncoder) {
