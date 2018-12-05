@@ -21,7 +21,7 @@ func TagToPB(t *Tag) *pb.Tag {
 		tag.Mac = proto.Uint64(t.MAC)
 	}
 	if t.Code&GroupID != 0 {
-		tag.GroupId = proto.Uint32(uint32(t.GroupID))
+		tag.GroupId = proto.Int32(int32(t.GroupID))
 	}
 	if t.Code&L2EpcID != 0 {
 		tag.L2EpcId = proto.Int32(int32(t.L2EpcID))
@@ -50,8 +50,8 @@ func TagToPB(t *Tag) *pb.Tag {
 		tag.Mac_1 = proto.Uint64(t.MAC1)
 	}
 	if t.Code&GroupIDPath != 0 {
-		tag.GroupId_0 = proto.Uint32(t.GroupID0)
-		tag.GroupId_1 = proto.Uint32(t.GroupID1)
+		tag.GroupId_0 = proto.Int32(t.GroupID0)
+		tag.GroupId_1 = proto.Int32(t.GroupID1)
 	}
 	if t.Code&L2EpcIDPath != 0 {
 		tag.L2EpcId_0 = proto.Int32(t.L2EpcID0)

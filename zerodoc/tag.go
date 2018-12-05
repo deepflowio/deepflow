@@ -119,7 +119,7 @@ const (
 type Field struct {
 	IP           uint32
 	MAC          uint64
-	GroupID      uint32
+	GroupID      int32
 	L2EpcID      int32
 	L3EpcID      int32
 	L2DeviceID   uint32
@@ -132,8 +132,8 @@ type Field struct {
 	IP1           uint32
 	MAC0          uint64
 	MAC1          uint64
-	GroupID0      uint32
-	GroupID1      uint32
+	GroupID0      int32
+	GroupID1      int32
 	L2EpcID0      int32
 	L2EpcID1      int32
 	L3EpcID0      int32
@@ -194,7 +194,7 @@ func (t *Tag) ToKVString() string {
 	}
 	if t.Code&GroupID != 0 {
 		buf.WriteString(",group_id=")
-		buf.WriteString(formatU32(t.GroupID))
+		buf.WriteString(formatI32(t.GroupID))
 	}
 	if t.Code&L2EpcID != 0 {
 		buf.WriteString(",l2_epc_id=")
@@ -236,9 +236,9 @@ func (t *Tag) ToKVString() string {
 	}
 	if t.Code&GroupIDPath != 0 {
 		buf.WriteString(",group_id_0=")
-		buf.WriteString(formatU32(t.GroupID0))
+		buf.WriteString(formatI32(t.GroupID0))
 		buf.WriteString(",group_id_1=")
-		buf.WriteString(formatU32(t.GroupID1))
+		buf.WriteString(formatI32(t.GroupID1))
 	}
 	if t.Code&L2EpcIDPath != 0 {
 		buf.WriteString(",l2_epc_id_0=")
@@ -364,7 +364,7 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 		t.MAC = decoder.ReadU64() // XXX: 48bit
 	}
 	if t.Code&GroupID != 0 {
-		t.GroupID = decoder.ReadU32() // XXX: 16bit
+		t.GroupID = int32(decoder.ReadU32()) // XXX: 16bit
 	}
 	if t.Code&L2EpcID != 0 {
 		t.L2EpcID = int32(decoder.ReadU32()) // XXX: 16bit
@@ -393,8 +393,8 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 		t.MAC1 = decoder.ReadU64()
 	}
 	if t.Code&GroupIDPath != 0 {
-		t.GroupID0 = decoder.ReadU32() // XXX: 16bit
-		t.GroupID1 = decoder.ReadU32() // XXX: 16bit
+		t.GroupID0 = int32(decoder.ReadU32()) // XXX: 16bit
+		t.GroupID1 = int32(decoder.ReadU32()) // XXX: 16bit
 	}
 	if t.Code&L2EpcIDPath != 0 {
 		t.L2EpcID0 = int32(decoder.ReadU32()) // XXX: 16bit
@@ -478,7 +478,7 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 		encoder.WriteU64(t.MAC) // XXX: 48bit
 	}
 	if t.Code&GroupID != 0 {
-		encoder.WriteU32(t.GroupID) // XXX: 16bit
+		encoder.WriteU32(uint32(t.GroupID)) // XXX: 16bit
 	}
 	if t.Code&L2EpcID != 0 {
 		encoder.WriteU32(uint32(t.L2EpcID)) // XXX: 16bit
@@ -507,8 +507,8 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 		encoder.WriteU64(t.MAC1)
 	}
 	if t.Code&GroupIDPath != 0 {
-		encoder.WriteU32(t.GroupID0) // XXX: 16bit
-		encoder.WriteU32(t.GroupID1) // XXX: 16bit
+		encoder.WriteU32(uint32(t.GroupID0)) // XXX: 16bit
+		encoder.WriteU32(uint32(t.GroupID1)) // XXX: 16bit
 	}
 	if t.Code&L2EpcIDPath != 0 {
 		encoder.WriteU32(uint32(t.L2EpcID0)) // XXX: 16bit
