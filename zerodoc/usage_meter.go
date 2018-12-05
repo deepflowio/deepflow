@@ -13,6 +13,10 @@ type UsageMeter struct {
 	UsageMeterMax
 }
 
+func (m *UsageMeter) SortKey() uint64 {
+	return m.UsageMeterSum.SumPacket
+}
+
 func (m *UsageMeter) Encode(encoder *codec.SimpleEncoder) {
 	m.UsageMeterSum.Encode(encoder)
 	m.UsageMeterMax.Encode(encoder)

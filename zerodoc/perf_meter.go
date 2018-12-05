@@ -15,6 +15,10 @@ type PerfMeter struct {
 	PerfMeterMin
 }
 
+func (m *PerfMeter) SortKey() uint64 {
+	return m.PerfMeterSum.SumPacketTx + m.PerfMeterSum.SumPacketRx
+}
+
 func (m *PerfMeter) Encode(encoder *codec.SimpleEncoder) {
 	m.PerfMeterSum.Encode(encoder)
 	m.PerfMeterMax.Encode(encoder)
