@@ -36,6 +36,9 @@ func maxDuration(x, y time.Duration) time.Duration {
 }
 
 func minDuration(x, y time.Duration) time.Duration {
+	if x == 0 || y == 0 {
+		return x + y
+	}
 	if x < y {
 		return x
 	}
