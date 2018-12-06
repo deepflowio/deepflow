@@ -322,7 +322,6 @@ func (l *CloudPlatformLabeler) CheckEndpointDataIfNeedCopy(endpoint *EndpointDat
 	l.ModifyL3End(endpoint.DstInfo, key, dstHash, false)
 	l.ModifyDeviceInfo(endpoint.SrcInfo)
 	l.ModifyDeviceInfo(endpoint.DstInfo)
-	l.ModifyPrivateIp(endpoint, key)
 
 	return endpoint
 }
@@ -409,7 +408,7 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	srcData := l.GetEndpointInfo(key.SrcMac, key.SrcIp, key.Tap)
 	dstData := l.GetEndpointInfo(key.DstMac, key.DstIp, key.Tap)
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
-
+	l.ModifyPrivateIp(endpoint, key)
 	// 优化内存占用
 	if !srcData.L2End && !srcData.L3End && srcData.L2EpcId == 0 && srcData.L3EpcId == 0 && len(srcData.GroupIds) == 0 {
 		endpoint.SrcInfo = INVALID_ENDPOINT_INFO
