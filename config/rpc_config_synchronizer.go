@@ -49,20 +49,12 @@ func (s *RpcConfigSynchronizer) sync() error {
 		return errors.New("Status Unsuccessful")
 	}
 	s.syncInterval = time.Duration(response.GetConfig().GetSyncInterval()) * time.Second
-	if s.Version == response.GetVersion() {
-		return nil
-	}
-	// handlers没有注册则Version值为0
-	if len(s.handlers) == 0 {
-		s.Version = 0
-	} else {
-		s.Version = response.GetVersion()
-	}
 	s.Lock()
 	for _, handler := range s.handlers {
 		handler(response)
 	}
 	s.Unlock()
+	s.Version = response.GetVersion()
 	return nil
 }
 
