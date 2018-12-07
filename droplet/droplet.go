@@ -181,8 +181,10 @@ func Start(configPath string) (closers []io.Closer) {
 	}
 	flowGeneratorConfig := flowgenerator.FlowGeneratorConfig{
 		ForceReportInterval: cfg.FlowGenerator.ForceReportInterval,
+		MinForceReportTime:  cfg.FlowGenerator.MinForceReportTime,
 		BufferSize:          cfg.Queue.FlowGeneratorQueueSize / cfg.Queue.FlowGeneratorQueueCount,
 		FlowLimitNum:        cfg.FlowGenerator.FlowCountLimit / int32(cfg.Queue.FlowGeneratorQueueCount),
+		FlowCleanInterval:   cfg.FlowGenerator.FlowCleanInterval,
 		TimeoutCleanerCount: cfg.FlowGenerator.TimeoutCleanerCount,
 		HashMapSize:         cfg.FlowGenerator.HashMapSize,
 		ReportTolerance:     cfg.FlowGenerator.ReportTolerance,

@@ -39,8 +39,11 @@ const IN_PORT_FLOW_ID_MASK uint64 = 0xFF000000
 const TIMER_FLOW_ID_MASK uint64 = 0x00FFFFFF
 const TOTAL_FLOWS_ID_MASK uint64 = 0x0FFFFFFF
 const FLOW_LIMIT_NUM uint64 = 1024 * 1024
+const FLOW_CLEAN_INTERVAL = time.Second
 const FORCE_REPORT_INTERVAL = 60 * time.Second
+const MIN_FORCE_REPORT_TIME = 5 * time.Second
 const REPORT_TOLERANCE = 4 * time.Second
+const SECOND_COUNT_PER_MINUTE = 60
 
 var timeoutCleanerCount uint64
 var hashMapSize uint64
@@ -94,6 +97,7 @@ type FlowGenerator struct {
 	stateMachineSlave       []map[uint8]*StateValue
 	packetHandler           *PacketHandler
 	forceReportInterval     time.Duration
+	minForceReportTime      time.Duration
 	minLoopInterval         time.Duration
 	reportTolerance         time.Duration
 	flowLimitNum            int32
@@ -108,8 +112,10 @@ type FlowGenerator struct {
 
 type FlowGeneratorConfig struct {
 	ForceReportInterval time.Duration
+	MinForceReportTime  time.Duration
 	BufferSize          int
 	FlowLimitNum        int32
+	FlowCleanInterval   time.Duration
 	TimeoutCleanerCount uint64
 	HashMapSize         uint64
 	ReportTolerance     time.Duration
@@ -128,6 +134,14 @@ func timeMin(a time.Duration, b time.Duration) time.Duration {
 		return a
 	}
 	return b
+}
+
+func getBitmap(now time.Duration) uint64 {
+	return 1 << uint64((now/time.Second+1)%SECOND_COUNT_PER_MINUTE)
+}
+
+func toTimestamp(t time.Time) time.Duration {
+	return time.Duration(t.UnixNano())
 }
 
 func (f *FlowGenerator) GetCounter() interface{} {
@@ -152,8 +166,10 @@ func (f *FlowGenerator) SetTimeout(timeoutConfig TimeoutConfig) bool {
 		return false
 	}
 	f.TimeoutConfig = timeoutConfig
-	f.minLoopInterval = timeoutConfig.minTimeout()
 	log.Infof("flow generator %d timeout config: %+v", f.index, f.TimeoutConfig)
+	if f.minLoopInterval > timeoutConfig.minTimeout() {
+		log.Warningf("flow-clean-interval (%v) is too large, may cause inaccurate flow time", f.minLoopInterval)
+	}
 	f.initStateMachineMaster()
 	f.initStateMachineSlave()
 	return true
