@@ -265,13 +265,13 @@ func CloneEndpointData(d *EndpointData) *EndpointData {
 
 // 浅拷贝 共用同一个资源组信息
 func ShallowCopyEndpointInfo(i *EndpointInfo) *EndpointInfo {
-	dup := AcquireEndpointInfo()
+	dup := new(EndpointInfo)
 	*dup = *i
 	return dup
 }
 
 func ShallowCopyEndpointData(d *EndpointData) *EndpointData {
-	dup := AcquireEndpointData(nil, nil)
+	dup := new(EndpointData)
 	if d.SrcInfo != nil {
 		dup.SrcInfo = ShallowCopyEndpointInfo(d.SrcInfo)
 	}
