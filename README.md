@@ -160,7 +160,7 @@ profiler
 
 生产环境获取方式:
 
-* 获取CPU profiler: 
+* 获取CPU profiler:
   1. 运行环境执行`wget http://localhost:8000/debug/pprof/profile?seconds=30 -o droplet.pprof`
   2. 将droplet.pprof拷贝到本地，然后执行`go tool pprof droplet.pprof`
 
@@ -258,6 +258,8 @@ profiler
       - TCP流量ESTABLISHED状态超时时间为300秒
       - CLOSING_1, CLOSING_2状态超时时间为35秒
       - 其他协议流量仅单方向有报文时超时时间为5秒，双方向有报文时超时时间为35秒
+      - 每自然分钟第0秒上报所有flow
+      - 每条网流第5秒进行一次上报
       - 以上超时时间均可通过droplet.yaml文件进行配置
 
 ![image](http://gitlab.x.lan/hpn/tasks-hpn/uploads/de65de6b51659d4368fd334b6845e40c/image.png)
@@ -270,10 +272,10 @@ profiler
       - CLOSE_TYPE_HALF_CLOSE: CLOSING_TX1（SERVER_HALF_CLOSE）、CLOSING_RX1（CLIENT_HALF_CLOSE）
       - CLOSE_TYPE_TIMEOUT: ESTABLISHED
       - CLOSE_TYPE_UNKNOWN: EXCEPTION
-      - CLOSE_TYPE_FORCE_REPORT: 1分钟强制上报的情况
+      - CLOSE_TYPE_FORCE_REPORT: 第5秒或每自然分钟分钟第0秒强制上报的情况
   - 其他IPv4
       - CLOSE_TYPE_TIMEOUT: 默认情况
-      - CLOSE_TYPE_FORCE_REPORT: 1分钟强制上报的情况
+      - CLOSE_TYPE_FORCE_REPORT: 第5秒或每自然分钟分钟第0秒强制上报的情况
 
 * 网流时间序列字段
   - arrTime00: 整条流的请求方向的第一个包的时间戳（内部使用）
@@ -284,6 +286,6 @@ profiler
   - endTime: 本次上报的统计结束时间（与startTime的时间差应该在60秒以内，允许4秒的误差）
       - endTime与`startTime+duration`并不一定相等，主要体现在突发短流和长流包数少的情况下
       - 4秒容差为默认值，可通过droplet.yaml进行配置
-  - timeBitmap: 本次上报的一分钟统计中相对于startTime的每一秒中是否有包，有的话对应bit为1（共64bit）
+  - timeBitmap: 网流每自然分钟内每一秒中是否有包，有的话对应bit为1（共64bit）
   - duration: 本次上报时max(arrTime0Last,arrTime1Last)与min(arrTime00,arrTime10)的时间差
       - （``乱序处理``：如果正在处理的包的timestamp小于max(arrTime0Last,arrTime1Last)，则将其timestamp调整为max(arrTime0Last,arrTime1Last)）

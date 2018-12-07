@@ -259,7 +259,6 @@ func TestUdpBothPortsInIANA(t *testing.T) {
 
 	// 首包: 80 -> 200 flow: 200 -> 80
 	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
-	flowGenerator.Start()
 	packet0 := getUdpDefaultPacket()
 	packet0.PortDst = port1
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
@@ -271,6 +270,7 @@ func TestUdpBothPortsInIANA(t *testing.T) {
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
 
 	expectPortSrc, expectPortDst := packet0.PortDst, packet0.PortSrc
+	flowGenerator.Start()
 	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
 	if taggedFlow.PortSrc != expectPortSrc || taggedFlow.PortDst != expectPortDst {
 		t.Errorf("taggedFlow.PortSrc is %d, expect %d", taggedFlow.PortSrc, expectPortSrc)
@@ -284,7 +284,6 @@ func TestUdpBothPortsNotInIANA(t *testing.T) {
 
 	// 首包: 8080 -> 12345 flow: 8080 -> 12345
 	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
-	flowGenerator.Start()
 	packet0 := getUdpDefaultPacket()
 	packet0.PortSrc = packet0.PortDst
 	packet0.PortDst = port1
@@ -297,6 +296,7 @@ func TestUdpBothPortsNotInIANA(t *testing.T) {
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
 
 	expectPortSrc, expectPortDst := packet0.PortSrc, packet0.PortDst
+	flowGenerator.Start()
 	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
 	if taggedFlow.PortSrc != expectPortSrc || taggedFlow.PortDst != expectPortDst {
 		t.Errorf("taggedFlow.PortSrc is %d, expect %d", taggedFlow.PortSrc, expectPortSrc)

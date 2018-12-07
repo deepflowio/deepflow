@@ -75,9 +75,11 @@ type FlowGeneratorConfig struct {
 	FlowCountLimit int32 `yaml:"flow-count-limit"`
 	/* unit of interval and timeout: second */
 	ForceReportInterval time.Duration `yaml:"force-report-interval"`
+	MinForceReportTime  time.Duration `yaml:"min-force-report-time"`
 	EstablishedTimeout  time.Duration `yaml:"established-timeout"`
 	ClosingRstTimeout   time.Duration `yaml:"closing-rst-timeout"`
 	OthersTimeout       time.Duration `yaml:"others-timeout"`
+	FlowCleanInterval   time.Duration `yaml:"flow-clean-interval"`
 	TimeoutCleanerCount uint64        `yaml:"timeout-cleaner-count"`
 	HashMapSize         uint64        `yaml:"hash-map-size"`
 	ReportTolerance     time.Duration `yaml:"report-tolerance"`
@@ -208,6 +210,11 @@ func (c *Config) Validate() error {
 	} else {
 		c.FlowGenerator.ForceReportInterval *= time.Second
 	}
+	if c.FlowGenerator.MinForceReportTime == 0 {
+		c.FlowGenerator.MinForceReportTime = flowgenerator.MIN_FORCE_REPORT_TIME
+	} else {
+		c.FlowGenerator.MinForceReportTime *= time.Second
+	}
 	if c.FlowGenerator.EstablishedTimeout == 0 {
 		c.FlowGenerator.EstablishedTimeout = flowgenerator.TIMEOUT_ESTABLISHED
 	} else {
@@ -222,6 +229,11 @@ func (c *Config) Validate() error {
 		c.FlowGenerator.OthersTimeout = flowgenerator.TIMEOUT_EXPCEPTION
 	} else {
 		c.FlowGenerator.OthersTimeout *= time.Second
+	}
+	if c.FlowGenerator.FlowCleanInterval == 0 {
+		c.FlowGenerator.FlowCleanInterval = flowgenerator.FLOW_CLEAN_INTERVAL
+	} else {
+		c.FlowGenerator.FlowCleanInterval *= time.Second
 	}
 	if c.FlowGenerator.TimeoutCleanerCount == 0 {
 		c.FlowGenerator.TimeoutCleanerCount = flowgenerator.TIMEOUT_CLEANER_COUNT

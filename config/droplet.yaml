@@ -60,7 +60,7 @@ queue:
   flow-app-queue-size: 65536
   # flow duplicator read queue size, default flow-generator-queue-size >> 2
   # name: 3-tagged-flow-to-flow-duplicator
-  flow-duplicator-queue-size: 0
+  flow-duplicator-queue-size: 131072
   # mapreduce buffer capacity, default queue-size << 1
   docs-queue-size: 131072
   # metering app output queue count, default 1
@@ -89,9 +89,11 @@ labeler:
 # internal flow generator conf
 flow-generator:
   # concurrent flow count limit
-  flow-count-limit: 1048576
+  flow-count-limit: 4194304
   # hard output interval for long flow, in seconds
   force-report-interval: 60
+  # an output threshold of each flow, but only report once, in seconds
+  min-force-report-time: 5
   # idle timeout for established tcp flow, in seconds
   established-timeout: 300
   # idle timeout for closing tcp flow,
@@ -102,6 +104,8 @@ flow-generator:
   # or tcp flow with exception,
   # or flow with single direction, in seconds
   others-timeout: 5
+  # clean interval for flow, should not be too large, in seconds
+  flow-clean-interval: 1
   # flow cleaner count for every generator
   timeout-cleaner-count: 4
   # hash map size for every generator

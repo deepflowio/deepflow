@@ -146,7 +146,7 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, now time.Duration) *FlowExtra
 		taggedFlow.TunnelInfo = TunnelInfo{}
 	}
 	taggedFlow.FlowID = f.genFlowId(uint64(now), uint64(meta.InPort))
-	taggedFlow.TimeBitmap = 1
+	taggedFlow.TimeBitmap = getBitmap(now)
 	taggedFlow.StartTime = now
 	taggedFlow.EndTime = now
 	taggedFlow.CurStartTime = now
@@ -157,6 +157,7 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, now time.Duration) *FlowExtra
 	flowExtra := AcquireFlowExtra()
 	flowExtra.taggedFlow = taggedFlow
 	flowExtra.flowState = FLOW_STATE_RAW
+	flowExtra.minArrTime = now
 	flowExtra.recentTime = now
 	flowExtra.reversed = false
 	flowExtra.circlePktGot = true
@@ -307,7 +308,7 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 		taggedFlow.FlowMetricsPeerSrc.TotalByteCount += bytes
 	}
 	// a flow will report every minute and StartTime will be reset, so the value could not be overflow
-	taggedFlow.TimeBitmap |= 1 << uint64((packetTimestamp-startTime)/time.Second)
+	taggedFlow.TimeBitmap |= getBitmap(packetTimestamp)
 }
 
 func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireInterval, reportTolerance time.Duration) {
@@ -318,11 +319,7 @@ func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireInterval, reportTole
 	} else {
 		taggedFlow.EndTime = now
 	}
-	minArrTime := timeMin(taggedFlow.FlowMetricsPeerSrc.ArrTime0, taggedFlow.FlowMetricsPeerDst.ArrTime0)
-	if minArrTime == 0 {
-		minArrTime = timeMax(taggedFlow.FlowMetricsPeerSrc.ArrTime0, taggedFlow.FlowMetricsPeerDst.ArrTime0)
-	}
-	taggedFlow.Duration = f.recentTime - minArrTime
+	taggedFlow.Duration = f.recentTime - f.minArrTime
 }
 
 func (f *FlowExtra) resetCurFlowInfo(now time.Duration) {
@@ -403,8 +400,92 @@ loop:
 	goto loop
 }
 
+func (f *FlowGenerator) reportForClean(flowExtra *FlowExtra, force bool) *TaggedFlow {
+	taggedFlow := flowExtra.taggedFlow
+	if f.checkL4ServiceReverse(taggedFlow, flowExtra.reversed) {
+		flowExtra.reverseFlow()
+		flowExtra.reversed = !flowExtra.reversed
+	}
+	taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
+	if force {
+		taggedFlow.CloseType = CloseTypeForcedReport
+		return CloneTaggedFlow(taggedFlow)
+	}
+	calcCloseType(taggedFlow, flowExtra.flowState)
+	ReleaseFlowExtra(flowExtra)
+	return taggedFlow
+}
+
+func tryCleanBuffer(queue QueueWriter, buffer []interface{}, num int) int {
+	if num >= FLOW_OUT_BUFFER_CAP {
+		queue.Put(buffer[:num]...)
+		return 0
+	}
+	return num
+}
+
+func reportFlowListTimeout(f *FlowGenerator, list *ListFlowExtra, now, cleanRange time.Duration, buffer []interface{}, num int) int {
+	flowOutQueue := f.flowOutQueue
+	forceReportInterval := f.forceReportInterval
+	reportTolerance := f.reportTolerance
+	minFroceReportTime := f.minForceReportTime
+	cleanCount := 0
+	e := list.Back()
+	for e != nil {
+		flowExtra := e.Value
+		if flowExtra.recentTime < cleanRange && flowExtra.recentTime+flowExtra.timeout <= now {
+			flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
+			buffer[num] = f.reportForClean(flowExtra, false)
+			num = tryCleanBuffer(flowOutQueue, buffer, num+1)
+			cleanCount++
+			del := e
+			e = e.Prev()
+			list.Remove(del)
+			continue
+		} else if !flowExtra.startReport && flowExtra.minArrTime+minFroceReportTime <= now {
+			flowExtra.startReport = true
+			flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
+			buffer[num] = f.reportForClean(flowExtra, true)
+			num = tryCleanBuffer(flowOutQueue, buffer, num+1)
+		}
+		e = e.Prev()
+	}
+	if cleanCount > 0 {
+		atomic.AddInt32(&f.stats.CurrNumFlows, int32(0-cleanCount))
+	}
+	return num
+}
+
+func reportFlowListGeneral(f *FlowGenerator, list *ListFlowExtra, now, cleanRange time.Duration, buffer []interface{}, num int) int {
+	flowOutQueue := f.flowOutQueue
+	forceReportInterval := f.forceReportInterval
+	reportTolerance := f.reportTolerance
+	cleanCount := 0
+	e := list.Back()
+	for e != nil {
+		flowExtra := e.Value
+		flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
+		if flowExtra.recentTime < cleanRange && flowExtra.recentTime+flowExtra.timeout <= now {
+			buffer[num] = f.reportForClean(flowExtra, false)
+			cleanCount++
+			del := e
+			e = e.Prev()
+			list.Remove(del)
+		} else {
+			buffer[num] = f.reportForClean(flowExtra, true)
+			flowExtra.resetCurFlowInfo(now)
+			e = e.Prev()
+		}
+		num = tryCleanBuffer(flowOutQueue, buffer, num+1)
+	}
+	if cleanCount > 0 {
+		atomic.AddInt32(&f.stats.CurrNumFlows, int32(0-cleanCount))
+	}
+	return num
+}
+
 func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uint64) {
-	now := time.Duration(time.Now().UnixNano())
+	now := toTimestamp(time.Now())
 	flowOutQueue := f.flowOutQueue
 	forceReportInterval := f.forceReportInterval
 	reportTolerance := f.reportTolerance
@@ -415,15 +496,9 @@ func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uin
 		flowCache.Lock()
 		for e := flowCache.flowList.Front(); e != nil; {
 			flowExtra := e.Value
-			taggedFlow := flowExtra.taggedFlow
-			atomic.AddInt32(&f.stats.CurrNumFlows, -1)
-			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, false, &f.perfCounter)
 			flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
-			calcCloseType(taggedFlow, flowExtra.flowState)
-			if f.checkL4ServiceReverse(taggedFlow, flowExtra.reversed) {
-				flowExtra.reverseFlow()
-				flowExtra.reversed = !flowExtra.reversed
-			}
+			taggedFlow := f.reportForClean(flowExtra, false)
+			atomic.AddInt32(&f.stats.CurrNumFlows, -1)
 			flowOutQueue.Put(taggedFlow)
 			e = e.Next()
 		}
@@ -432,81 +507,58 @@ func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uin
 	}
 }
 
-func (f *FlowGenerator) cleanTimeoutHashMap(hashMap []*FlowCache, start, end, index uint64) {
-	flowOutQueue := f.flowOutQueue
-	forceReportInterval := f.forceReportInterval
-	sleepDuration := f.minLoopInterval
-	reportTolerance := f.reportTolerance
-	f.cleanWaitGroup.Add(1)
+func (f *FlowGenerator) cleanTimeoutHashMap(start, end, index uint64) {
+	hashMap := f.hashMap
+	// temp buffer to write flow
 	flowOutBuffer := [FLOW_OUT_BUFFER_CAP]interface{}{}
+	// vars about time
+	minLoopInterval := f.minLoopInterval
+	sleepDuration := minLoopInterval
+	forceReportInterval := f.forceReportInterval
+	reportFlowList := reportFlowListTimeout
+	now := toTimestamp(time.Now())
+	nextGeneralReport := now + forceReportInterval - now%forceReportInterval
+	f.cleanWaitGroup.Add(1)
 
 loop:
 	time.Sleep(sleepDuration)
-	flowOutNum := 0
-	now := time.Duration(time.Now().UnixNano())
-	cleanRange := now - f.minLoopInterval
-	maxFlowCacheLen := 0
+	now = toTimestamp(time.Now())
+	cleanRange := now - minLoopInterval
 	nonEmptyFlowCacheNum := 0
+	maxFlowCacheLen := 0
+	num := 0
+	if now > nextGeneralReport {
+		reportFlowList = reportFlowListGeneral
+		nextGeneralReport += forceReportInterval
+	} else {
+		reportFlowList = reportFlowListTimeout
+	}
 	for _, flowCache := range hashMap[start:end] {
 		flowList := flowCache.flowList
-		len := flowList.Len()
-		if len > 0 {
+		length := flowList.Len()
+		if length > 0 {
 			nonEmptyFlowCacheNum++
 		} else {
 			continue
 		}
-		if maxFlowCacheLen <= len {
-			maxFlowCacheLen = len
+		if maxFlowCacheLen <= length {
+			maxFlowCacheLen = length
 		}
 		flowCache.Lock()
-		e := flowList.Back()
-		for e != nil {
-			flowExtra := e.Value
-			if flowExtra.recentTime < cleanRange && flowExtra.recentTime+flowExtra.timeout <= now {
-				taggedFlow := flowExtra.taggedFlow
-				atomic.AddInt32(&f.stats.CurrNumFlows, -1)
-				flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
-				calcCloseType(taggedFlow, flowExtra.flowState)
-				if f.checkL4ServiceReverse(taggedFlow, flowExtra.reversed) {
-					flowExtra.reverseFlow()
-					flowExtra.reversed = !flowExtra.reversed
-				}
-				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
-				ReleaseFlowExtra(flowExtra)
-				flowOutBuffer[flowOutNum] = taggedFlow
-				flowOutNum++
-				if flowOutNum >= FLOW_OUT_BUFFER_CAP {
-					flowOutQueue.Put(flowOutBuffer[:flowOutNum]...)
-					flowOutNum = 0
-				}
-				del := e
-				e = e.Prev()
-				flowList.Remove(del)
-				continue
-			} else if flowExtra.taggedFlow.StartTime+forceReportInterval < now {
-				taggedFlow := flowExtra.taggedFlow
-				flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
-				taggedFlow.CloseType = CloseTypeForcedReport
-				if f.checkL4ServiceReverse(taggedFlow, flowExtra.reversed) {
-					flowExtra.reverseFlow()
-					flowExtra.reversed = !flowExtra.reversed
-				}
-				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
-				flowOutBuffer[flowOutNum] = CloneTaggedFlow(taggedFlow)
-				flowOutNum++
-				if flowOutNum >= FLOW_OUT_BUFFER_CAP {
-					flowOutQueue.Put(flowOutBuffer[:flowOutNum]...)
-					flowOutNum = 0
-				}
-				flowExtra.resetCurFlowInfo(now)
-			}
-			e = e.Prev()
-		}
+		num = reportFlowList(f, flowList, now, cleanRange, flowOutBuffer[:], num)
 		flowCache.Unlock()
 	}
-	if flowOutNum > 0 {
-		flowOutQueue.Put(flowOutBuffer[:flowOutNum]...)
-		flowOutNum = 0
+	if num > 0 {
+		f.flowOutQueue.Put(flowOutBuffer[:num]...)
+	}
+	// calc the next sleep duration and minLoopInterval
+	endtime := toTimestamp(time.Now())
+	used := endtime - now
+	if minLoopInterval > used {
+		sleepDuration = minLoopInterval - used
+	} else {
+		sleepDuration = 0
+		log.Debugf("clean time of generator %d is too long, maybe pressure is heavy", f.index)
 	}
 	f.stats.cleanRoutineFlowCacheNums[index] = nonEmptyFlowCacheNum
 	f.stats.cleanRoutineMaxFlowCacheLens[index] = maxFlowCacheLen
@@ -529,10 +581,10 @@ func (f *FlowGenerator) timeoutReport() {
 		start := i * flowCacheNum
 		end := start + flowCacheNum
 		if end <= f.mapSize {
-			go f.cleanTimeoutHashMap(f.hashMap, start, end, i)
+			go f.cleanTimeoutHashMap(start, end, i)
 			log.Infof("clean goroutine %d (hashmap range %d to %d) created", i, start, end)
 		} else {
-			go f.cleanTimeoutHashMap(f.hashMap, start, f.mapSize, i)
+			go f.cleanTimeoutHashMap(start, f.mapSize, i)
 			log.Infof("clean goroutine %d (hashmap range %d to %d) created", i, start, f.mapSize)
 			break
 		}
@@ -582,7 +634,8 @@ func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, cfg
 		stateMachineSlave:       make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
 		packetHandler:           &PacketHandler{recvBuffer: make([]interface{}, cfg.BufferSize), processBuffer: make([]interface{}, cfg.BufferSize)},
 		forceReportInterval:     cfg.ForceReportInterval,
-		minLoopInterval:         defaultTimeoutConfig.minTimeout(),
+		minForceReportTime:      cfg.MinForceReportTime,
+		minLoopInterval:         cfg.FlowCleanInterval,
 		flowLimitNum:            cfg.FlowLimitNum,
 		handleRunning:           false,
 		cleanRunning:            false,

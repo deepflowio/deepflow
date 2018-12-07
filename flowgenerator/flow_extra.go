@@ -27,8 +27,10 @@ type FlowExtra struct {
 	taggedFlow   *TaggedFlow
 	metaFlowPerf *MetaFlowPerf
 	flowState    FlowState
+	minArrTime   time.Duration
 	recentTime   time.Duration
 	timeout      time.Duration
+	startReport  bool
 	reversed     bool
 	circlePktGot bool
 }
