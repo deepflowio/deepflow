@@ -5,6 +5,7 @@ After=syslog.target network-online.target
 [Service]
 Environment=GOTRACEBACK=crash
 LimitCORE=infinity
+LimitNOFILE=65536
 WorkingDirectory=/tmp/
 ExecStart=/usr/sbin/droplet
 Restart=on-failure
