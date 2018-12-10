@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
@@ -66,6 +67,12 @@ func (m *WorkerManager) newWorker(index int) *Worker {
 
 func (m *WorkerManager) Start() []io.Closer {
 	os.MkdirAll(m.baseDirectory, os.ModePerm)
+
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go markAndCleanTempFiles(m.baseDirectory, wg)
+	wg.Wait()
+
 	NewCleaner(int64(m.maxDirectorySizeGB)<<30, int64(m.diskFreeSpaceMarginGB)<<30, time.Duration(m.maxFileKeepDay)*time.Hour*24, m.baseDirectory).Start()
 	closers := make([]io.Closer, m.nQueues)
 	for i := 0; i < m.nQueues; i++ {

@@ -85,8 +85,12 @@ func formatDuration(d time.Duration) string {
 	return time.Unix(0, int64(d)).Format(TIME_FORMAT)
 }
 
+func getTempFilename(tapType datatype.TapType, mac datatype.MacInt, ip datatype.IPv4Int, firstPacketTime time.Duration) string {
+	return fmt.Sprintf("%s_%s_%s_%s_.pcap.temp", tapTypeToString(tapType), macToString(mac), ipToString(ip), formatDuration(firstPacketTime))
+}
+
 func (w *WrappedWriter) getTempFilename(base string) string {
-	return fmt.Sprintf("%s/%d/%s_%s_%s_%s_.pcap.temp", base, w.aclGID, tapTypeToString(w.tapType), macToString(w.mac), ipToString(w.ip), formatDuration(w.firstPacketTime))
+	return fmt.Sprintf("%s/%d/%s", base, w.aclGID, getTempFilename(w.tapType, w.mac, w.ip, w.firstPacketTime))
 }
 
 func (w *WrappedWriter) getFilename(base string) string {
@@ -95,10 +99,7 @@ func (w *WrappedWriter) getFilename(base string) string {
 
 func (w *Worker) shouldCloseFile(writer *WrappedWriter, packet *datatype.MetaPacket) bool {
 	// check for file size and time
-	if stats, err := os.Stat(writer.tempFilename); err != nil {
-		log.Warningf("os.Stat() error on file %s: %s", writer.tempFilename, err)
-		return true
-	} else if stats.Size()+int64(writer.Size()) >= w.maxFileSize {
+	if writer.FileSize()+int64(writer.BufferSize()) >= w.maxFileSize {
 		return true
 	}
 	if packet.Timestamp-writer.firstPacketTime > w.maxFilePeriod {

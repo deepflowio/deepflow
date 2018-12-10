@@ -24,6 +24,8 @@ type Writer struct {
 	buffer []byte
 	offset int
 
+	fileSize int64
+
 	WriterCounter
 }
 
@@ -81,8 +83,12 @@ func (w *Writer) Write(packet *datatype.MetaPacket) error {
 	return nil
 }
 
-func (w *Writer) Size() int {
+func (w *Writer) BufferSize() int {
 	return w.offset
+}
+
+func (w *Writer) FileSize() int64 {
+	return w.fileSize
 }
 
 func (w *Writer) GetStats() WriterCounter {
@@ -117,10 +123,12 @@ func (w *Writer) Flush() error {
 	}
 	if n, err := w.fp.Write(w.buffer[:w.offset]); err != nil {
 		return err
-	} else if n != w.offset {
-		return fmt.Errorf("Flush(): not all bytes written to file %s", w.filename)
 	} else {
+		w.fileSize += int64(n)
 		w.totalWrittenBytes += uint64(n)
+		if n != w.offset {
+			return fmt.Errorf("Flush(): not all bytes written to file %s", w.filename)
+		}
 	}
 	w.Clear()
 	return nil
