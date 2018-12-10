@@ -53,8 +53,10 @@ func (s *RpcConfigSynchronizer) sync() error {
 	for _, handler := range s.handlers {
 		handler(response)
 	}
+	if len(s.handlers) > 0 {
+		s.Version = response.GetVersion()
+	}
 	s.Unlock()
-	s.Version = response.GetVersion()
 	return nil
 }
 
