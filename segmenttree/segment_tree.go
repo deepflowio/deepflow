@@ -1,6 +1,7 @@
 package segmenttree
 
 import (
+	"runtime"
 	"sync"
 
 	"github.com/Workiva/go-datastructures/bitarray"
@@ -58,6 +59,12 @@ func (t *SegmentTree) Query(intervals ...Interval) []Value {
 	return values
 }
 
+func (t *SegmentTree) clear() {
+	for i := 0; i < len(t.trees); i++ {
+		t.trees[i].clear()
+	}
+}
+
 func New(dimension int, entries ...Entry) (Tree, error) {
 	if dimension == 0 {
 		return nil, InvalidDimension
@@ -78,5 +85,9 @@ func New(dimension int, entries ...Entry) (Tree, error) {
 		}
 		trees[d].init(intervals)
 	}
-	return &SegmentTree{trees, values}, nil
+	tree := &SegmentTree{trees: trees, values: values}
+	runtime.SetFinalizer(tree, func(t *SegmentTree) {
+		t.clear()
+	})
+	return tree, nil
 }

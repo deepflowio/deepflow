@@ -8,6 +8,7 @@ import (
 
 	"github.com/Workiva/go-datastructures/bitarray"
 
+	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
@@ -19,6 +20,10 @@ const (
 	RIGHT_CLOSED                     // ... endpoint] (...
 )
 
+var subTreePool = pool.NewLockFreePool(func() interface{} {
+	return new(SubTree)
+})
+
 type TypedEndpoint struct {
 	endpoint     Endpoint
 	endpointType EndpointType
@@ -26,6 +31,17 @@ type TypedEndpoint struct {
 
 type SortableEndpoints struct {
 	sortedEndpoints []TypedEndpoint
+}
+
+func subTree(tree SubTree) *SubTree {
+	t := subTreePool.Get().(*SubTree)
+	*t = tree
+	return t
+}
+
+func releaseSubTree(t *SubTree) {
+	*t = SubTree{}
+	subTreePool.Put(t)
 }
 
 func (s *SortableEndpoints) Len() int {
@@ -55,6 +71,24 @@ type ImmutableSegmentTree struct {
 	root *SubTree
 }
 
+func (t *ImmutableSegmentTree) clear() {
+	if t.root == nil {
+		return
+	}
+	queue := &LinkedList{}
+	queue.PushFront(t.root)
+	for value := queue.PopFront(); value != nil; value = queue.PopFront() {
+		tree := value.(*SubTree)
+		if tree.left != nil {
+			queue.PushFront(tree.left)
+		}
+		if tree.right != nil {
+			queue.PushFront(tree.left)
+		}
+		releaseSubTree(tree)
+	}
+}
+
 // 只是构造树，并不包含插入数据
 func (t *ImmutableSegmentTree) buildTree(sortedEndpoints []TypedEndpoint) {
 	endpointIndexMap := make(map[Endpoint]int)
@@ -82,20 +116,20 @@ func (t *ImmutableSegmentTree) buildTree(sortedEndpoints []TypedEndpoint) {
 		middle := sortedEndpoints[(lowerIndex+upperIndex)/2]
 		upperClosed := middle.endpointType == LEFT_CLOSED
 		if lowerIndex == -1 {
-			subtree.left = &SubTree{interval: upToRange(middle.endpoint, upperClosed)}
+			subtree.left = subTree(SubTree{interval: upToRange(middle.endpoint, upperClosed)})
 		} else {
 			lower := sortedEndpoints[lowerIndex]
 			lowerClosed := lower.endpointType == RIGHT_CLOSED
-			subtree.left = &SubTree{interval: ranged(lower.endpoint, lowerClosed, middle.endpoint, upperClosed)}
+			subtree.left = subTree(SubTree{interval: ranged(lower.endpoint, lowerClosed, middle.endpoint, upperClosed)})
 		}
 
 		lowerClosed := middle.endpointType == RIGHT_CLOSED
 		if upperIndex == len(sortedEndpoints) {
-			subtree.right = &SubTree{interval: downToRange(middle.endpoint, lowerClosed)}
+			subtree.right = subTree(SubTree{interval: downToRange(middle.endpoint, lowerClosed)})
 		} else {
 			upper := sortedEndpoints[upperIndex]
 			upperClosed := upper.endpointType == LEFT_CLOSED
-			subtree.right = &SubTree{interval: ranged(middle.endpoint, lowerClosed, upper.endpoint, upperClosed)}
+			subtree.right = subTree(SubTree{interval: ranged(middle.endpoint, lowerClosed, upper.endpoint, upperClosed)})
 		}
 		queue.PushBack(subtree.left)
 		queue.PushBack(subtree.right)
@@ -131,21 +165,20 @@ func (t *ImmutableSegmentTree) insertIndex(interval IntegerRange, index uint) {
 			}
 			continue
 		}
-
 		// 子树interval和interval部分重合但没有更多的子树，因此需要拆分interval再次构造左右子树
 		intersection := interval.intersection(curInterval)
 		if intersection.isEmpty() {
 			continue
 		}
 		if curInterval.hasLowerBound() && curInterval.lowerEndpoint() == intersection.lowerEndpoint() {
-			subtree.left = &SubTree{interval: intersection, indexBitSet: bitArrayOf(index)}
+			subtree.left = subTree(SubTree{interval: intersection, indexBitSet: bitArrayOf(index)})
 			var upperInterval IntegerRange
 			if curInterval.hasUpperBound() {
 				upperInterval = IntegerRange{Cut{intersection.upperEndpoint(), false}, curInterval.upper}
 			} else {
 				upperInterval = downToRange(intersection.upperEndpoint(), false)
 			}
-			subtree.right = &SubTree{interval: upperInterval}
+			subtree.right = subTree(SubTree{interval: upperInterval})
 		} else {
 			var lowerInterval IntegerRange
 			if curInterval.hasLowerBound() {
@@ -153,8 +186,8 @@ func (t *ImmutableSegmentTree) insertIndex(interval IntegerRange, index uint) {
 			} else {
 				lowerInterval = upToRange(intersection.lowerEndpoint(), false)
 			}
-			subtree.left = &SubTree{interval: lowerInterval}
-			subtree.right = &SubTree{interval: intersection, indexBitSet: bitArrayOf(index)}
+			subtree.left = subTree(SubTree{interval: lowerInterval})
+			subtree.right = subTree(SubTree{interval: intersection, indexBitSet: bitArrayOf(index)})
 		}
 	}
 }
@@ -195,8 +228,7 @@ func (t *ImmutableSegmentTree) init(intervals []IntegerRange) {
 	if len(intervals) <= 0 {
 		return
 	}
-
-	t.root = &SubTree{interval: RANGE_ALL}
+	t.root = subTree(SubTree{interval: RANGE_ALL})
 	if len(intervals) > 0 {
 		t.buildTree(toEndpoints(intervals))
 	}
