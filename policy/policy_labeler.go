@@ -61,9 +61,9 @@ type PolicyLabeler struct {
 	groupIdFromPlatform []uint32
 	groupIdFromIpGroup  []uint32
 
-	InterestProtoMaps [TAP_MAX]map[uint8]bool
-	InterestPortMaps  [TAP_MAX]map[uint16]bool
-	InterestGroupMaps [TAP_MAX]map[uint32]bool
+	InterestProtoMaps *[TAP_MAX][math.MaxUint8 + 1]bool
+	InterestPortMaps  *[TAP_MAX][math.MaxUint16 + 1]bool
+	InterestGroupMaps *[TAP_MAX][math.MaxUint16 + 1]bool
 
 	IpNetmaskMap       *[math.MaxUint16 + 1]uint32 // 根据IP地址查找对应的最大掩码
 	FastPolicyMaps     [][]*LRU64Cache             // 快速路径上的Policy映射表，Key为IP掩码对，Value为VlanAndPortMap
@@ -125,11 +125,11 @@ func NewPolicyLabeler(queueCount int, mapSize uint32, fastPathDisable bool) *Pol
 	policy.aclProtoMap[6] = ACL_PROTO_TCP
 	policy.aclProtoMap[17] = ACL_PROTO_UDP
 
-	for i := TAP_MIN; i < TAP_MAX; i++ {
-		policy.InterestProtoMaps[i] = make(map[uint8]bool)
-		policy.InterestPortMaps[i] = make(map[uint16]bool)
-		policy.InterestGroupMaps[i] = make(map[uint32]bool)
+	policy.InterestProtoMaps = &[TAP_MAX][math.MaxUint8 + 1]bool{}
+	policy.InterestPortMaps = &[TAP_MAX][math.MaxUint16 + 1]bool{}
+	policy.InterestGroupMaps = &[TAP_MAX][math.MaxUint16 + 1]bool{}
 
+	for i := TAP_MIN; i < TAP_MAX; i++ {
 		policy.GroupVlanPolicyMaps[i] = make(map[uint64]*PolicyData)
 		for j := 0; j < ACL_PROTO_MAX; j++ {
 			policy.GroupPortPolicyMaps[i][j] = make(map[uint64]*PolicyData)
@@ -497,38 +497,32 @@ func (l *PolicyLabeler) GenerateGroupVlanMaps(acls []*Acl) {
 }
 
 func (l *PolicyLabeler) GenerateInterestMaps(acls []*Acl) {
-	interestProtoMaps := [TAP_MAX]map[uint8]bool{}
-	interestPortMaps := [TAP_MAX]map[uint16]bool{}
-	interestGroupMaps := [TAP_MAX]map[uint32]bool{}
-	for i := TAP_MIN; i < TAP_MAX; i++ {
-		interestProtoMaps[i] = make(map[uint8]bool)
-		interestPortMaps[i] = make(map[uint16]bool)
-		interestGroupMaps[i] = make(map[uint32]bool)
-	}
+	interestProtoMaps := &[TAP_MAX][math.MaxUint8 + 1]bool{}
+	interestPortMaps := &[TAP_MAX][math.MaxUint16 + 1]bool{}
+	interestGroupMaps := &[TAP_MAX][math.MaxUint16 + 1]bool{}
+
 	// 将策略中存在的proto、port、group id存在map中
 	for _, acl := range acls {
 		if acl.Type.CheckTapType(acl.Type) {
 			interestProtoMaps[acl.Type][acl.Proto] = true
 
-			portMap := interestPortMaps[acl.Type]
 			if len(acl.DstPorts) < 0xffff {
 				for _, port := range acl.DstPorts {
-					portMap[port] = true
+					interestPortMaps[acl.Type][port] = true
 				}
 			}
 
 			if len(acl.SrcPorts) < 0xffff {
 				for _, port := range acl.SrcPorts {
-					portMap[port] = true
+					interestPortMaps[acl.Type][port] = true
 				}
 			}
 
-			groupMap := interestGroupMaps[acl.Type]
 			for _, group := range acl.DstGroups {
-				groupMap[group] = true
+				interestGroupMaps[acl.Type][group] = true
 			}
 			for _, group := range acl.SrcGroups {
-				groupMap[group] = true
+				interestGroupMaps[acl.Type][group] = true
 			}
 		}
 	}
