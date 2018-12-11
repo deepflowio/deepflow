@@ -63,11 +63,13 @@ type PolicyCounter struct {
 	IpTable    uint32 `statsd:"ip_table"`
 	ArpTable   uint32 `statsd:"arp_table"`
 
-	Acl       uint32 `statsd:"acl"`
-	FirstHit  uint64 `statsd:"first_hit"`
-	FastHit   uint64 `statsd:"fast_hit"`
-	AclHitMax uint32 `statsd:"acl_hit_max"`
-	FastPath  uint32 `statsd:"fast_path"`
+	Acl                 uint32 `statsd:"acl"`
+	FirstHit            uint64 `statsd:"first_hit"`
+	FastHit             uint64 `statsd:"fast_hit"`
+	AclHitMax           uint32 `statsd:"acl_hit_max"`
+	FastPath            uint32 `statsd:"fast_path"`
+	FastPathMacCount    uint32 `statsd:"fast_path_mac_count"`
+	FastPathPolicyCount uint32 `statsd:"fast_path_policy_count"`
 }
 
 func getAvailableMapSize(queueCount int, mapSize uint32) uint32 {
@@ -163,6 +165,8 @@ func (t *PolicyTable) GetCounter() interface{} {
 	counter.FirstHit = atomic.SwapUint64(&t.policyLabeler.FirstPathHitTick, 0)
 	counter.FastHit = atomic.SwapUint64(&t.policyLabeler.FastPathHitTick, 0)
 	counter.AclHitMax = atomic.SwapUint32(&t.policyLabeler.AclHitMax, 0)
+	counter.FastPathMacCount = atomic.LoadUint32(&t.policyLabeler.FastPathMacCount)
+	counter.FastPathPolicyCount = atomic.LoadUint32(&t.policyLabeler.FastPathPolicyCount)
 	for i := 0; i < t.queueCount; i++ {
 		for j := TAP_MIN; j < TAP_MAX; j++ {
 			maps := t.policyLabeler.FastPolicyMaps[i][j]
