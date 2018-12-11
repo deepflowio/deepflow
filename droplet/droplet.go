@@ -204,6 +204,7 @@ func Start(configPath string) (closers []io.Closer) {
 	pcapClosers := pcap.NewWorkerManager(
 		pcapAppQueues,
 		cfg.Queue.PCapAppQueueCount,
+		cfg.PCap.TCPIPChecksum,
 		cfg.PCap.BlockSizeKB,
 		cfg.PCap.MaxConcurrentFiles,
 		cfg.PCap.MaxFileSizeMB,

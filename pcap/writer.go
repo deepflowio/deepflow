@@ -31,15 +31,18 @@ type Writer struct {
 
 	fileSize int64
 
+	tcpipChecksum bool
+
 	WriterCounter
 }
 
-func NewWriter(filename string, bufferSize int) (*Writer, error) {
+func NewWriter(filename string, bufferSize int, tcpipChecksum bool) (*Writer, error) {
 	writer := &Writer{}
 	writer.bufferSize = bufferSize
 	writer.buffer[0] = make([]byte, bufferSize)
 	writer.buffer[1] = make([]byte, bufferSize)
 	writer.flushed = &sync.WaitGroup{}
+	writer.tcpipChecksum = tcpipChecksum
 	if err := writer.init(filename); err != nil {
 		return nil, err
 	}
@@ -79,7 +82,7 @@ func (w *Writer) init(filename string) error {
 func (w *Writer) Write(packet *datatype.MetaPacket) error {
 	header := NewRecordHeader(w.buffer[w.latch][w.offset:])
 	w.offset += RECORD_HEADER_LEN
-	size := NewRawPacket(w.buffer[w.latch][w.offset:]).MetaPacketToRaw(packet)
+	size := NewRawPacket(w.buffer[w.latch][w.offset:]).MetaPacketToRaw(packet, w.tcpipChecksum)
 	w.offset += size
 	header.SetTimestamp(packet.Timestamp)
 	header.SetOrigLen(int(packet.PacketLen))

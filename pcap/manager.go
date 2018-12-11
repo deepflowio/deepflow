@@ -15,6 +15,7 @@ type WorkerManager struct {
 	inputQueue queue.MultiQueueReader
 	nQueues    int
 
+	tcpipChecksum         bool
 	blockSizeKB           int
 	maxConcurrentFiles    int
 	maxFileSizeMB         int
@@ -28,6 +29,7 @@ type WorkerManager struct {
 func NewWorkerManager(
 	inputQueue queue.MultiQueueReader,
 	nQueues int,
+	tcpipChecksum bool,
 	blockSizeKB int,
 	maxConcurrentFiles int,
 	maxFileSizeMB int,
@@ -41,6 +43,7 @@ func NewWorkerManager(
 		inputQueue: inputQueue,
 		nQueues:    nQueues,
 
+		tcpipChecksum:         tcpipChecksum,
 		blockSizeKB:           blockSizeKB,
 		maxConcurrentFiles:    maxConcurrentFiles,
 		maxFileSizeMB:         maxFileSizeMB,
@@ -67,6 +70,7 @@ func (m *WorkerManager) newWorker(index int) *Worker {
 		writers: make(map[WriterKey]*WrappedWriter),
 
 		writerBufferSize: m.blockSizeKB << 10,
+		tcpipChecksum:    m.tcpipChecksum,
 	}
 }
 
