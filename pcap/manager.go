@@ -15,6 +15,7 @@ type WorkerManager struct {
 	inputQueue queue.MultiQueueReader
 	nQueues    int
 
+	blockSizeKB           int
 	maxConcurrentFiles    int
 	maxFileSizeMB         int
 	maxFilePeriodSecond   int
@@ -27,6 +28,7 @@ type WorkerManager struct {
 func NewWorkerManager(
 	inputQueue queue.MultiQueueReader,
 	nQueues int,
+	blockSizeKB int,
 	maxConcurrentFiles int,
 	maxFileSizeMB int,
 	maxFilePeriodSecond int,
@@ -39,6 +41,7 @@ func NewWorkerManager(
 		inputQueue: inputQueue,
 		nQueues:    nQueues,
 
+		blockSizeKB:           blockSizeKB,
 		maxConcurrentFiles:    maxConcurrentFiles,
 		maxFileSizeMB:         maxFileSizeMB,
 		maxFilePeriodSecond:   maxFilePeriodSecond,
@@ -62,6 +65,8 @@ func (m *WorkerManager) newWorker(index int) *Worker {
 		WorkerCounter: &WorkerCounter{},
 
 		writers: make(map[WriterKey]*WrappedWriter),
+
+		writerBufferSize: m.blockSizeKB << 10,
 	}
 }
 

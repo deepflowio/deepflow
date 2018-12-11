@@ -115,6 +115,8 @@ map-reduce:
   # mapreduce window size
   window-size: 30
 pcap:
+  # 单次写入文件的块大小，默认64KB
+  block-size-kb: 64
   # 同时在写的最大pcap文件数，默认5000
   max-concurrent-files: 5000
   # 每个pcap文件的最大大小，默认25MB
