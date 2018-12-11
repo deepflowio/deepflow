@@ -56,6 +56,7 @@ type Worker struct {
 	writers map[WriterKey]*WrappedWriter
 
 	writerBufferSize int
+	tcpipChecksum    bool
 }
 
 func isISP(inPort uint32) bool {
@@ -155,7 +156,7 @@ func (w *Worker) writePacket(packet *datatype.MetaPacket, tapType datatype.TapTy
 		log.Debugf("Begin to write packets to %s", writer.tempFilename)
 		// TODO: 池化writer（有一个[65536]byte）
 		var err error
-		if writer.Writer, err = NewWriter(writer.tempFilename, w.writerBufferSize); err != nil {
+		if writer.Writer, err = NewWriter(writer.tempFilename, w.writerBufferSize, w.tcpipChecksum); err != nil {
 			log.Warningf("Failed to create writer for %s: %s", writer.tempFilename, err)
 			return
 		}

@@ -20,7 +20,7 @@ func NewRawPacket(buffer []byte) RawPacket {
 	return buffer
 }
 
-func (p RawPacket) MetaPacketToRaw(packet *datatype.MetaPacket) int {
+func (p RawPacket) MetaPacketToRaw(packet *datatype.MetaPacket, tcpipChecksum bool) int {
 	size := 0
 
 	size += p.fillEthernet(packet, size)
@@ -38,9 +38,9 @@ func (p RawPacket) MetaPacketToRaw(packet *datatype.MetaPacket) int {
 		case layers.IPProtocolICMPv4:
 			size += p.fillICMPv4(packet, size)
 		case layers.IPProtocolTCP:
-			size += p.fillTCP(packet, size, l3Offset)
+			size += p.fillTCP(packet, size, l3Offset, tcpipChecksum)
 		case layers.IPProtocolUDP:
-			size += p.fillUDP(packet, size, l3Offset)
+			size += p.fillUDP(packet, size, l3Offset, tcpipChecksum)
 		}
 	}
 
@@ -147,7 +147,7 @@ const (
 	TCP_OPTION_KIND_SACK_PERMITTED_LEN = 2
 )
 
-func (p RawPacket) fillTCP(packet *datatype.MetaPacket, start, ipv4Offset int) int {
+func (p RawPacket) fillTCP(packet *datatype.MetaPacket, start, ipv4Offset int, checksum bool) int {
 	if packet.Invalid || packet.TcpData == nil {
 		return 0
 	}
@@ -194,7 +194,11 @@ func (p RawPacket) fillTCP(packet *datatype.MetaPacket, start, ipv4Offset int) i
 	}
 	length := int(packet.TcpData.DataOffset) << 2
 
-	binary.BigEndian.PutUint16(base[TCP_CHECKSUM_OFFSET:], p.tcpIPChecksum(layers.IPProtocolTCP, ipv4Offset, start, length))
+	if checksum {
+		binary.BigEndian.PutUint16(base[TCP_CHECKSUM_OFFSET:], p.tcpIPChecksum(layers.IPProtocolTCP, ipv4Offset, start, length))
+	} else {
+		binary.BigEndian.PutUint16(base[TCP_CHECKSUM_OFFSET:], 0)
+	}
 
 	return length
 }
@@ -207,16 +211,17 @@ const (
 	UDP_LEN             = 8
 )
 
-func (p RawPacket) fillUDP(packet *datatype.MetaPacket, start, ipv4Offset int) int {
+func (p RawPacket) fillUDP(packet *datatype.MetaPacket, start, ipv4Offset int, checksum bool) int {
 	base := p[start:]
-	for i := 0; i < UDP_LEN; i++ {
-		base[i] = 0
-	}
 
 	binary.BigEndian.PutUint16(base[UDP_SPORT_OFFSET:], packet.PortSrc)
 	binary.BigEndian.PutUint16(base[UDP_DPORT_OFFSET:], packet.PortDst)
 	binary.BigEndian.PutUint16(base[UDP_LENGTH_OFFSET:], UDP_LEN)
-	binary.BigEndian.PutUint16(base[UDP_CHECKSUM_OFFSET:], p.tcpIPChecksum(layers.IPProtocolUDP, ipv4Offset, start, UDP_LEN))
+	if checksum {
+		binary.BigEndian.PutUint16(base[UDP_CHECKSUM_OFFSET:], p.tcpIPChecksum(layers.IPProtocolUDP, ipv4Offset, start, UDP_LEN))
+	} else {
+		binary.BigEndian.PutUint16(base[UDP_CHECKSUM_OFFSET:], 0)
+	}
 
 	return UDP_LEN
 }

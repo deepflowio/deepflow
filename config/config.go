@@ -90,6 +90,7 @@ type MapReduceConfig struct {
 }
 
 type PCapConfig struct {
+	TCPIPChecksum         bool   `yaml:"tcpip-checksum"`
 	BlockSizeKB           int    `yaml:"block-size-kb"`
 	MaxConcurrentFiles    int    `yaml:"max-concurrent-files"`
 	MaxFileSizeMB         int    `yaml:"max-file-size-mb"`
