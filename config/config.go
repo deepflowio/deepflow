@@ -90,6 +90,7 @@ type MapReduceConfig struct {
 }
 
 type PCapConfig struct {
+	BlockSizeKB           int    `yaml:"block-size-kb"`
 	MaxConcurrentFiles    int    `yaml:"max-concurrent-files"`
 	MaxFileSizeMB         int    `yaml:"max-file-size-mb"`
 	MaxFilePeriodSecond   int    `yaml:"max-file-period-second"`
@@ -244,6 +245,9 @@ func (c *Config) Validate() error {
 		c.RpcTimeout *= time.Second
 	}
 
+	if c.PCap.BlockSizeKB <= 0 {
+		c.PCap.BlockSizeKB = 64
+	}
 	if c.PCap.MaxConcurrentFiles <= 0 {
 		c.PCap.MaxConcurrentFiles = 5000
 	}

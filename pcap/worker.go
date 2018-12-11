@@ -36,6 +36,8 @@ type WorkerCounter struct {
 	FileCreations  uint64 `statsd:"file_creations"`
 	FileCloses     uint64 `statsd:"file_closes"`
 	FileRejections uint64 `statsd:"file_rejections"`
+	BufferedCount  uint64 `statsd:"buffered_count"`
+	WrittenCount   uint64 `statsd:"written_count"`
 	BufferedBytes  uint64 `statsd:"buffered_bytes"`
 	WrittenBytes   uint64 `statsd:"written_bytes"`
 }
@@ -52,6 +54,8 @@ type Worker struct {
 	*WorkerCounter
 
 	writers map[WriterKey]*WrappedWriter
+
+	writerBufferSize int
 }
 
 func isISP(inPort uint32) bool {
@@ -111,6 +115,8 @@ func (w *Worker) shouldCloseFile(writer *WrappedWriter, packet *datatype.MetaPac
 func (w *Worker) finishWriter(writer *WrappedWriter, newFilename string) {
 	writer.Close()
 	counter := writer.GetAndResetStats()
+	w.BufferedCount += counter.totalBufferedCount
+	w.WrittenCount += counter.totalWrittenCount
 	w.BufferedBytes += counter.totalBufferedBytes
 	w.WrittenBytes += counter.totalWrittenBytes
 	log.Debugf("Finish writing %s, renaming to %s", writer.tempFilename, newFilename)
@@ -149,7 +155,7 @@ func (w *Worker) writePacket(packet *datatype.MetaPacket, tapType datatype.TapTy
 		log.Debugf("Begin to write packets to %s", writer.tempFilename)
 		// TODO: 池化writer（有一个[65536]byte）
 		var err error
-		if writer.Writer, err = NewWriter(writer.tempFilename); err != nil {
+		if writer.Writer, err = NewWriter(writer.tempFilename, w.writerBufferSize); err != nil {
 			log.Warningf("Failed to create writer for %s: %s", writer.tempFilename, err)
 			return
 		}
@@ -161,6 +167,8 @@ func (w *Worker) writePacket(packet *datatype.MetaPacket, tapType datatype.TapTy
 		return
 	}
 	counter := writer.GetAndResetStats()
+	w.BufferedCount += counter.totalBufferedCount
+	w.WrittenCount += counter.totalWrittenCount
 	w.BufferedBytes += counter.totalBufferedBytes
 	w.WrittenBytes += counter.totalWrittenBytes
 	writer.lastPacketTime = packet.Timestamp

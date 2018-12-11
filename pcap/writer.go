@@ -3,16 +3,18 @@ package pcap
 import (
 	"fmt"
 	"os"
+	"sync"
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
 const (
-	BUFSIZE = 65536
 	SNAPLEN = 65535
 )
 
 type WriterCounter struct {
+	totalBufferedCount uint64
+	totalWrittenCount  uint64
 	totalBufferedBytes uint64
 	totalWrittenBytes  uint64
 }
@@ -21,16 +23,23 @@ type Writer struct {
 	filename string
 	fp       *os.File
 
-	buffer []byte
-	offset int
+	buffer     [2][]byte
+	bufferSize int
+	latch      int
+	flushed    *sync.WaitGroup
+	offset     int
 
 	fileSize int64
 
 	WriterCounter
 }
 
-func NewWriter(filename string) (*Writer, error) {
-	writer := &Writer{buffer: make([]byte, BUFSIZE)}
+func NewWriter(filename string, bufferSize int) (*Writer, error) {
+	writer := &Writer{}
+	writer.bufferSize = bufferSize
+	writer.buffer[0] = make([]byte, bufferSize)
+	writer.buffer[1] = make([]byte, bufferSize)
+	writer.flushed = &sync.WaitGroup{}
 	if err := writer.init(filename); err != nil {
 		return nil, err
 	}
@@ -55,8 +64,9 @@ func (w *Writer) init(filename string) error {
 		if w.fp, err = os.Create(filename); err != nil {
 			return err
 		}
-		NewGlobalHeader(w.buffer, SNAPLEN)
+		NewGlobalHeader(w.buffer[w.latch], SNAPLEN)
 		w.offset = GLOBAL_HEADER_LEN
+		w.totalBufferedCount++
 		w.totalBufferedBytes += GLOBAL_HEADER_LEN
 	} else {
 		if w.fp, err = os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0644); err != nil {
@@ -67,15 +77,16 @@ func (w *Writer) init(filename string) error {
 }
 
 func (w *Writer) Write(packet *datatype.MetaPacket) error {
-	header := NewRecordHeader(w.buffer[w.offset:])
+	header := NewRecordHeader(w.buffer[w.latch][w.offset:])
 	w.offset += RECORD_HEADER_LEN
-	size := NewRawPacket(w.buffer[w.offset:]).MetaPacketToRaw(packet)
+	size := NewRawPacket(w.buffer[w.latch][w.offset:]).MetaPacketToRaw(packet)
 	w.offset += size
 	header.SetTimestamp(packet.Timestamp)
 	header.SetOrigLen(int(packet.PacketLen))
 	header.SetInclLen(size)
+	w.totalBufferedCount++
 	w.totalBufferedBytes += uint64(RECORD_HEADER_LEN + size)
-	if BUFSIZE-w.offset < RECORD_HEADER_LEN+MAX_PACKET_LEN {
+	if w.bufferSize-w.offset < RECORD_HEADER_LEN+MAX_PACKET_LEN {
 		if err := w.Flush(); err != nil {
 			return err
 		}
@@ -96,6 +107,8 @@ func (w *Writer) GetStats() WriterCounter {
 }
 
 func (w *Writer) ResetStats() {
+	w.totalBufferedCount = 0
+	w.totalWrittenCount = 0
 	w.totalBufferedBytes = 0
 	w.totalWrittenBytes = 0
 }
@@ -110,6 +123,7 @@ func (w *Writer) Close() error {
 	if err := w.Flush(); err != nil {
 		return err
 	}
+	w.flushed.Wait()
 	return w.fp.Close()
 }
 
@@ -117,19 +131,29 @@ func (w *Writer) Clear() {
 	w.offset = 0
 }
 
-func (w *Writer) Flush() error {
-	if w.offset == 0 {
-		return nil
-	}
-	if n, err := w.fp.Write(w.buffer[:w.offset]); err != nil {
+func (w *Writer) backgroundFlush(latch, size int) error {
+	defer w.flushed.Done()
+	if n, err := w.fp.Write(w.buffer[latch][:size]); err != nil {
 		return err
 	} else {
 		w.fileSize += int64(n)
+		w.totalWrittenCount++
 		w.totalWrittenBytes += uint64(n)
-		if n != w.offset {
+		if n != size {
 			return fmt.Errorf("Flush(): not all bytes written to file %s", w.filename)
 		}
 	}
+	return nil
+}
+
+func (w *Writer) Flush() error {
+	w.flushed.Wait()
+	if w.offset == 0 {
+		return nil
+	}
+	w.flushed.Add(1)
+	go w.backgroundFlush(w.latch, w.offset)
+	w.latch = 1 - w.latch
 	w.Clear()
 	return nil
 }
