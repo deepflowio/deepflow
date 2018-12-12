@@ -80,6 +80,7 @@ var (
 	group5Mac2 = NewMACAddrFromString("55:55:55:55:55:52").Int()
 
 	ipGroup3IpNet1 = "10.25.1.2/24"
+	ipGroup3IpNet2 = "10.30.1.2/24"
 
 	ipGroup5IpNet1 = "192.168.10.10/24" // ipGroup5/ipGroup6/ipGroup7
 	ipGroup5Ip1    = NewIPFromString("192.168.10.10").Int()
@@ -88,9 +89,11 @@ var (
 
 	ipGroup6IpNet1 = "192.168.10.10/24"  // ipGroup5/ipGroup6/ipGroup7
 	ipGroup6IpNet2 = "192.168.20.112/32" // ipGroup6/ipGroup7
+	ipGroup6IpNet3 = "192.168.20.100/32" // ipGroup6
 	ipGroup6Ip1    = NewIPFromString("192.168.10.10").Int()
 	ipGroup6Ip2    = NewIPFromString("192.168.20.112").Int()
 	ipGroup6Ip3    = NewIPFromString("192.168.10.123").Int()
+	ipGroup6Ip4    = NewIPFromString("192.168.20.100").Int()
 	ipGroup6Mac1   = NewMACAddrFromString("66:66:66:66:66:61").Int()
 
 	ipGroup7IpNet1 = "192.168.10.10/24"  // ipGroup5/ipGroup6/ipGroup7
@@ -375,10 +378,10 @@ func generatePolicyTable() *PolicyTable {
 
 	policy.UpdateInterfaceData(datas)
 
-	ipGroup1 := generateIpGroup(group[3], groupEpc[3], ipGroup3IpNet1)
+	ipGroup1 := generateIpGroup(group[3], groupEpc[3], ipGroup3IpNet1, ipGroup3IpNet2)
 	ipGroup2 := generateIpGroup(group[5], groupEpc[5], ipGroup5IpNet1)
 	groupEpc[5] = 50
-	ipGroup3 := generateIpGroup(group[6], groupEpc[6], ipGroup6IpNet1, ipGroup6IpNet2)
+	ipGroup3 := generateIpGroup(group[6], groupEpc[6], ipGroup6IpNet1, ipGroup6IpNet2, ipGroup6IpNet3)
 	ipGroup4 := generateIpGroup(group[7], groupEpc[7], ipGroup7IpNet1, ipGroup7IpNet2)
 	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3, ipGroup4)
 
@@ -401,6 +404,15 @@ func getEndpointData(table *PolicyTable, key *LookupKey) *EndpointData {
 	endpoint := table.cloudPlatformLabeler.GetEndpointData(key)
 	if endpoint != nil {
 		endpoint = table.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
+	}
+	return endpoint
+}
+
+func modifyEndpointDataL3End(table *PolicyTable, key *LookupKey, l3End0, l3End1 bool) *EndpointData {
+	endpoint := table.cloudPlatformLabeler.GetEndpointData(key)
+	if endpoint != nil {
+		endpoint.SrcInfo.L3End = l3End0
+		endpoint.DstInfo.L3End = l3End1
 	}
 	return endpoint
 }
@@ -1382,6 +1394,70 @@ func TestMultiNpbAction1(t *testing.T) {
 	}
 }
 
+func TestNpbActionDedup(t *testing.T) {
+	table := generatePolicyTable()
+	npb1 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
+	npb2 := ToNpbAction(10, 150, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
+	npb3 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
+	npb4 := ToNpbAction(20, 100, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
+	// VM段-A -> ANY, DEV-group2 -> ANY
+	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
+	acl1 := generatePolicyAcl(table, action1, 25, group[2], groupAny, IPProtocolTCP, 0, vlanAny, npb1)
+	// IP段-A -> ANY, IP-group3 -> ANY
+	action2 := generateAclAction(26, ACTION_PACKET_BROKERING)
+	acl2 := generatePolicyAcl(table, action2, 26, group[3], groupAny, IPProtocolTCP, 0, vlanAny, npb2)
+	acls := []*Acl{acl1, acl2}
+	table.UpdateAcls(acls)
+
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action1, action2}, []NpbAction{npb1, npb2}, 25)
+	// key: true:(DEV-group2/IP-group3)group2Ip1:1000 -> true:(DEV-group4/IP-group6)group4Ip1:1023 tcp
+	key := generateLookupKey(group2Mac, group4Mac1, vlanAny, group2Ip1, group4Ip1, IPProtocolTCP, 1000, 1023)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
+	endpoint := modifyEndpointDataL3End(table, key, l3EndBool[1], l3EndBool[1])
+	policyData := getPolicyByFirstPath(table, endpoint, key)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestNpbActionDedup Check Failed!")
+	}
+
+	// IP段-B -> VMA, IP-group6 -> DEV-group2
+	action3 := generateAclAction(27, ACTION_PACKET_BROKERING)
+	acl3 := generatePolicyAcl(table, action3, 27, group[6], group[2], IPProtocolTCP, 0, vlanAny, npb3)
+	// VMB -> IP段-A, DEV-group4 -> IP-group3
+	action4 := generateAclAction(28, ACTION_PACKET_BROKERING)
+	acl4 := generatePolicyAcl(table, action4, 28, group[4], group[3], IPProtocolTCP, 0, vlanAny, npb4)
+
+	acls = append(acls, acl3, acl4)
+	table.UpdateAcls(acls)
+
+	basicPolicyData = new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action1, action2, action4.SetDirections(BACKWARD), action3.SetDirections(BACKWARD)},
+		[]NpbAction{npb1, npb2, npb4.ReverseTapSide(), npb3.ReverseTapSide()}, acl1.Id)
+	// key不变，acl改变
+	policyData = getPolicyByFirstPath(table, endpoint, key)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestNpbActionDedup Check Failed!")
+	}
+
+	// IP段-A -> IP段-B, IP-group3 -> IP-group6
+	npb5 := ToNpbAction(20, 150, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
+	action5 := generateAclAction(29, ACTION_PACKET_BROKERING)
+	acl5 := generatePolicyAcl(table, action5, 29, group[6], group[6], IPProtocolTCP, 0, vlanAny, npb5)
+	acls = []*Acl{acl5}
+	table.UpdateAcls(acls)
+
+	basicPolicyData = new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action5, action5.SetDirections(BACKWARD)}, []NpbAction{npb5, npb5.ReverseTapSide()}, acl5.Id)
+	// key: true:(IP-group6)ipGroup6Ip2:1000 -> true:(IP-group6)ipGroup6Ip4:1023 tcp
+	key = generateLookupKey(ipGroup6Mac1, ipGroup6Mac1, vlanAny, ipGroup6Ip2, ipGroup6Ip4, IPProtocolTCP, 1000, 1023)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
+	endpoint = modifyEndpointDataL3End(table, key, l3EndBool[1], l3EndBool[1])
+	policyData = getPolicyByFirstPath(table, endpoint, key)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestNpbActionDedup Check Failed!")
+	}
+}
+
 func TestPolicyDoublePort(t *testing.T) {
 	acls := []*Acl{}
 	// 创建 policyTable
@@ -1527,6 +1603,39 @@ func BenchmarkNpbFastPath(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		table.policyLabeler.GetPolicyByFastPath(key)
+	}
+}
+
+func BenchmarkNpbDedup(b *testing.B) {
+	table := generatePolicyTable()
+
+	npb1 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
+	npb2 := ToNpbAction(10, 150, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
+	npb3 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
+	npb4 := ToNpbAction(20, 100, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
+	// VMA -> ANY
+	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
+	acl1 := generatePolicyAcl(table, action1, 25, group[2], groupAny, IPProtocolTCP, 0, vlanAny, npb1)
+	// IP段-A -> ANY
+	action2 := generateAclAction(26, ACTION_PACKET_BROKERING)
+	acl2 := generatePolicyAcl(table, action2, 26, group[3], groupAny, IPProtocolTCP, 0, vlanAny, npb2)
+	// IP段-B -> VMA
+	action3 := generateAclAction(27, ACTION_PACKET_BROKERING)
+	acl3 := generatePolicyAcl(table, action3, 27, group[6], group[2], IPProtocolTCP, 0, vlanAny, npb3)
+	// VMB -> IP段-A
+	action4 := generateAclAction(28, ACTION_PACKET_BROKERING)
+	acl4 := generatePolicyAcl(table, action4, 28, group[4], group[3], IPProtocolTCP, 0, vlanAny, npb4)
+
+	acls := []*Acl{acl1, acl2, acl3, acl4}
+	table.UpdateAcls(acls)
+
+	policyData := new(PolicyData)
+	npbActions := []NpbAction{npb1, npb2, npb4.ReverseTapSide(), npb3.ReverseTapSide()}
+	aclActions := []AclAction{action1, action2, action4.SetDirections(BACKWARD), action3.SetDirections(BACKWARD)}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		policyData.Merge(aclActions, npbActions, acl1.Id)
 	}
 }
 
