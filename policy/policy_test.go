@@ -240,23 +240,23 @@ func generatePolicyAcl(table *PolicyTable, action AclAction, aclID ACLID, args .
 
 	srcGroups := make([]uint32, 0, 1)
 	dstGroups := make([]uint32, 0, 1)
-	dstPorts := make([]uint16, 0, 1)
+	dstPorts := make([]PortRange, 0, 1)
 
 	srcGroups = append(srcGroups, srcGroupId)
 	dstGroups = append(dstGroups, dstGroupId)
 	if port != 0 {
-		dstPorts = append(dstPorts, port)
+		dstPorts = append(dstPorts, NewPortRange(port, port))
 	}
 	acl := &Acl{
-		Id:        aclID,
-		Type:      TAP_TOR,
-		TapId:     uint32(aclID + 1),
-		SrcGroups: srcGroups,
-		DstGroups: dstGroups,
-		DstPorts:  dstPorts,
-		Proto:     uint8(proto),
-		Vlan:      vlan,
-		Action:    []AclAction{action},
+		Id:           aclID,
+		Type:         TAP_TOR,
+		TapId:        uint32(aclID + 1),
+		SrcGroups:    srcGroups,
+		DstGroups:    dstGroups,
+		DstPortRange: dstPorts,
+		Proto:        uint8(proto),
+		Vlan:         vlan,
+		Action:       []AclAction{action},
 	}
 	if npb != 0 {
 		acl.NpbActions = append(acl.NpbActions, npb)
@@ -1383,7 +1383,7 @@ func TestPolicyDoublePort(t *testing.T) {
 	// 构建acl action  1:1000->2:8000 tcp
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 8000, vlanAny)
-	acl.SrcPorts = append(acl.SrcPorts, 1000)
+	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
 	// 构建查询1-key  1:1000->2:8000 tcp
@@ -1435,7 +1435,7 @@ func TestPolicySrcPort(t *testing.T) {
 	// 构建acl action  1:1000->2:0 tcp
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
-	acl.SrcPorts = append(acl.SrcPorts, 1000)
+	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
 	// 构建查询1-key  1:1000->2:8000 tcp
@@ -1560,5 +1560,28 @@ func BenchmarkFastPath(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		table.policyLabeler.GetPolicyByFastPath(key)
+	}
+}
+
+func BenchmarkAcl(b *testing.B) {
+	acls := []*Acl{}
+	table := generatePolicyTable()
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+
+	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1, 65535))
+	acl.DstPortRange = append(acl.DstPortRange, NewPortRange(1, 65535))
+	for i := 0; i < 100; i++ {
+		acl.SrcGroups = append(acl.SrcGroups, uint32(i))
+		acl.DstGroups = append(acl.DstGroups, uint32(i))
+	}
+
+	acls = append(acls, acl)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		table.UpdateAcls(acls)
+		acl.DstPorts = acl.DstPorts[:0]
+		acl.SrcPorts = acl.SrcPorts[:0]
 	}
 }
