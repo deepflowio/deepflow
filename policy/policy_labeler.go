@@ -28,17 +28,19 @@ const (
 )
 
 type Acl struct {
-	Id         ACLID
-	Type       TapType
-	TapId      uint32
-	SrcGroups  []uint32
-	DstGroups  []uint32
-	SrcPorts   []uint16
-	DstPorts   []uint16
-	Proto      uint8
-	Vlan       uint32
-	Action     []AclAction
-	NpbActions []NpbAction
+	Id           ACLID
+	Type         TapType
+	TapId        uint32
+	SrcGroups    []uint32
+	DstGroups    []uint32
+	SrcPortRange []PortRange
+	DstPortRange []PortRange
+	SrcPorts     []uint16
+	DstPorts     []uint16
+	Proto        uint8
+	Vlan         uint32
+	Action       []AclAction
+	NpbActions   []NpbAction
 }
 
 type PortPolicyValue struct {
@@ -62,7 +64,7 @@ type PolicyLabeler struct {
 	groupIdFromIpGroup  []uint32
 
 	InterestProtoMaps *[TAP_MAX][math.MaxUint8 + 1]bool
-	InterestPortMaps  *[TAP_MAX][math.MaxUint16 + 1]bool
+	InterestPortMaps  *[TAP_MAX][math.MaxUint16 + 1]PortRange
 	InterestGroupMaps *[TAP_MAX][math.MaxUint16 + 1]bool
 
 	IpNetmaskMap       *[math.MaxUint16 + 1]uint32 // 根据IP地址查找对应的最大掩码
@@ -115,8 +117,8 @@ func (a *Acl) getPorts(rawPorts []uint16) string {
 }
 
 func (a *Acl) String() string {
-	return fmt.Sprintf("Id:%v Type:%v TapId:%v SrcGroups:%v DstGroups:%v SrcPorts:[%s] DstPorts:[%s] Proto:%v Vlan:%v Action:%v NpbActions:%s",
-		a.Id, a.Type, a.TapId, a.SrcGroups, a.DstGroups, a.getPorts(a.SrcPorts), a.getPorts(a.DstPorts), a.Proto, a.Vlan, a.Action, a.NpbActions)
+	return fmt.Sprintf("Id:%v Type:%v TapId:%v SrcGroups:%v DstGroups:%v SrcPortRange:[%v] SrcPorts:[%s] DstPortRange:[%v] DstPorts:[%s] Proto:%v Vlan:%v Action:%v NpbActions:%s",
+		a.Id, a.Type, a.TapId, a.SrcGroups, a.DstGroups, a.SrcPortRange, a.getPorts(a.SrcPorts), a.DstPortRange, a.getPorts(a.DstPorts), a.Proto, a.Vlan, a.Action, a.NpbActions)
 }
 
 func NewPolicyLabeler(queueCount int, mapSize uint32, fastPathDisable bool) *PolicyLabeler {
@@ -126,7 +128,7 @@ func NewPolicyLabeler(queueCount int, mapSize uint32, fastPathDisable bool) *Pol
 	policy.aclProtoMap[17] = ACL_PROTO_UDP
 
 	policy.InterestProtoMaps = &[TAP_MAX][math.MaxUint8 + 1]bool{}
-	policy.InterestPortMaps = &[TAP_MAX][math.MaxUint16 + 1]bool{}
+	policy.InterestPortMaps = &[TAP_MAX][math.MaxUint16 + 1]PortRange{}
 	policy.InterestGroupMaps = &[TAP_MAX][math.MaxUint16 + 1]bool{}
 
 	for i := TAP_MIN; i < TAP_MAX; i++ {
@@ -227,16 +229,15 @@ func generateGroupPortKeys(srcGroups []uint32, dstGroups []uint32, srcPort uint1
 	//  +---------------------------------------------------+
 	//  |   sport   |   dport     |     id0/1   |    id0/1   |
 	//  +---------------------------------------------------+
-	keys := make([]uint64, 0, 10)
-	key := uint64(srcPort)<<48 | uint64(dstPort)<<32
-
 	if len(srcGroups) == 0 {
 		srcGroups = append(srcGroups, ANY_GROUP)
 	}
-
 	if len(dstGroups) == 0 {
 		dstGroups = append(dstGroups, ANY_GROUP)
 	}
+
+	keys := make([]uint64, 0, len(srcGroups)*len(dstGroups))
+	key := uint64(srcPort)<<48 | uint64(dstPort)<<32
 
 	for _, src := range srcGroups {
 		srcId := uint64(FormatGroupId(src) & 0xffff)
@@ -266,8 +267,6 @@ func generateSearchPortKeys(srcGroups []uint32, dstGroups []uint32, srcPort, dst
 }
 
 func generateGroupPortsKeys(acl *Acl, direction DirectionType) []uint64 {
-	keys := make([]uint64, 0, 10)
-
 	srcGroups := acl.SrcGroups
 	dstGroups := acl.DstGroups
 	srcPorts := acl.SrcPorts
@@ -278,16 +277,17 @@ func generateGroupPortsKeys(acl *Acl, direction DirectionType) []uint64 {
 	}
 
 	// 策略配置端口全采集，则生成port为0的一条map
-	if len(srcPorts) >= 0xffff || len(srcPorts) == 0 {
+	if len(srcPorts) == 0 {
 		srcPorts = append(srcPorts[:0], ANY_PORT)
 	}
-	if len(dstPorts) >= 0xffff || len(dstPorts) == 0 {
+	if len(dstPorts) == 0 {
 		dstPorts = append(dstPorts[:0], ANY_PORT)
 	}
 
+	keys := make([]uint64, 0, len(srcPorts)*len(dstPorts))
+
 	for _, src := range srcPorts {
 		for _, dst := range dstPorts {
-			// FIXME: 当很多条策略都配置了很多port,内存占用可能会很大
 			keys = append(keys, generateGroupPortKeys(srcGroups, dstGroups, src, dst)...)
 		}
 	}
@@ -496,27 +496,58 @@ func (l *PolicyLabeler) GenerateGroupVlanMaps(acls []*Acl) {
 	l.GroupVlanPolicyMaps = vlanMaps
 }
 
+func (l *PolicyLabeler) generateInterestPortMap(acls []*Acl) {
+	interestPortMaps := &[TAP_MAX][math.MaxUint16 + 1]PortRange{}
+	ports := make([]PortRange, 0, 1000)
+
+	for tapType := TAP_MIN; tapType < TAP_MAX; tapType++ {
+		ports = ports[:0]
+		for _, acl := range acls {
+			if acl.Type == tapType {
+				ports = append(ports, acl.SrcPortRange...)
+				ports = append(ports, acl.DstPortRange...)
+			}
+		}
+
+		ports = GetPortRanges(ports)
+
+		for _, port := range ports {
+			for i := int(port.Min()); i <= int(port.Max()); i++ {
+				interestPortMaps[tapType][i] = port
+			}
+		}
+	}
+
+	for _, acl := range acls {
+		for _, port := range acl.SrcPortRange {
+			for i := int(port.Min()); i <= int(port.Max()); {
+				portRangs := interestPortMaps[acl.Type][i]
+				acl.SrcPorts = append(acl.SrcPorts, portRangs.Min())
+				i = int(portRangs.Max()) + 1
+			}
+		}
+
+		for _, port := range acl.DstPortRange {
+			for i := int(port.Min()); i <= int(port.Max()); {
+				portRangs := interestPortMaps[acl.Type][i]
+				acl.DstPorts = append(acl.DstPorts, portRangs.Min())
+				i = int(portRangs.Max()) + 1
+			}
+		}
+	}
+	l.InterestPortMaps = interestPortMaps
+}
+
 func (l *PolicyLabeler) GenerateInterestMaps(acls []*Acl) {
+	l.generateInterestPortMap(acls)
+
 	interestProtoMaps := &[TAP_MAX][math.MaxUint8 + 1]bool{}
-	interestPortMaps := &[TAP_MAX][math.MaxUint16 + 1]bool{}
 	interestGroupMaps := &[TAP_MAX][math.MaxUint16 + 1]bool{}
 
-	// 将策略中存在的proto、port、group id存在map中
+	// 将策略中存在的proto、group id存在map中
 	for _, acl := range acls {
 		if acl.Type.CheckTapType(acl.Type) {
 			interestProtoMaps[acl.Type][acl.Proto] = true
-
-			if len(acl.DstPorts) < 0xffff {
-				for _, port := range acl.DstPorts {
-					interestPortMaps[acl.Type][port] = true
-				}
-			}
-
-			if len(acl.SrcPorts) < 0xffff {
-				for _, port := range acl.SrcPorts {
-					interestPortMaps[acl.Type][port] = true
-				}
-			}
 
 			for _, group := range acl.DstGroups {
 				interestGroupMaps[acl.Type][group] = true
@@ -528,7 +559,6 @@ func (l *PolicyLabeler) GenerateInterestMaps(acls []*Acl) {
 	}
 	l.InterestGroupMaps = interestGroupMaps
 	l.InterestProtoMaps = interestProtoMaps
-	l.InterestPortMaps = interestPortMaps
 }
 
 func (l *PolicyLabeler) UpdateAcls(acls []*Acl) {
@@ -563,9 +593,9 @@ func (l *PolicyLabeler) UpdateAcls(acls []*Acl) {
 			generateAcls = append(generateAcls, acl)
 		}
 	}
+	l.GenerateInterestMaps(generateAcls)
 	l.GenerateGroupPortMaps(generateAcls)
 	l.GenerateGroupVlanMaps(generateAcls)
-	l.GenerateInterestMaps(generateAcls)
 }
 
 func (l *PolicyLabeler) FlushAcls() {
@@ -832,12 +862,10 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packetEndp
 }
 
 func (l *PolicyLabeler) getFastInterestKeys(packet *LookupKey) {
-	if !l.InterestPortMaps[packet.Tap][packet.SrcPort] {
-		packet.SrcPort = ANY_PORT
-	}
-	if !l.InterestPortMaps[packet.Tap][packet.DstPort] {
-		packet.DstPort = ANY_PORT
-	}
+	ports := l.InterestPortMaps[packet.Tap][packet.SrcPort]
+	packet.SrcPort = ports.Min()
+	ports = l.InterestPortMaps[packet.Tap][packet.DstPort]
+	packet.DstPort = ports.Min()
 	if !l.InterestProtoMaps[packet.Tap][packet.Proto] {
 		packet.Proto = ANY_PROTO
 	}
