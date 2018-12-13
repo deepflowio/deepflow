@@ -160,42 +160,33 @@ func splitGroup2Int(src string) []uint32 {
 	return groups
 }
 
-func getPorts(src string) []uint16 {
+func getPorts(src string) []datatype.PortRange {
 	splitSrcPorts := strings.Split(src, "-")
-	ports := make([]uint16, 0, 8)
+	ports := make([]datatype.PortRange, 0, 8)
 	if len(splitSrcPorts) < 2 {
 		portInt, err := strconv.Atoi(src)
 		if err == nil {
-			ports = append(ports, uint16(portInt))
+			ports = append(ports, datatype.NewPortRange(uint16(portInt), uint16(portInt)))
 		}
 		return ports
 	}
-	portRange := [2]uint16{0, 0}
-	for index, port := range splitSrcPorts {
-		if index == 2 {
-			break
-		}
-		portInt, err := strconv.Atoi(port)
-		if err == nil {
-			portRange[index] = uint16(portInt)
-		}
-	}
 
-	if portRange[1] > portRange[0] && portRange[1]-portRange[0] >= 65534 {
+	min, err := strconv.Atoi(splitSrcPorts[0])
+	if err != nil {
 		return ports
 	}
 
-	for i := portRange[0]; i <= portRange[1]; i++ {
-		ports = append(ports, uint16(i))
-		if i == 0xffff {
-			break
-		}
+	max, err := strconv.Atoi(splitSrcPorts[1])
+	if err != nil {
+		return ports
 	}
+
+	ports = append(ports, datatype.NewPortRange(uint16(min), uint16(max)))
 	return ports
 }
 
-func splitPort2Int(src string) []uint16 {
-	ports := make([]uint16, 0, 8)
+func splitPort2Int(src string) []datatype.PortRange {
+	ports := make([]datatype.PortRange, 0, 8)
 	splitSrcPorts := strings.Split(src, ",")
 	for _, srcPorts := range splitSrcPorts {
 		ports = append(ports, getPorts(srcPorts)...)
@@ -248,17 +239,17 @@ func newNpbActions(npbs []*trident.NpbAction) []datatype.NpbAction {
 
 func newPolicyData(acl *trident.FlowAcl) *policy.Acl {
 	return &policy.Acl{
-		Id:         datatype.ACLID(acl.GetId()),
-		Type:       datatype.TapType(acl.GetTapType()),
-		TapId:      acl.GetTapId(),
-		SrcGroups:  splitGroup2Int(acl.GetSrcGroupIds()),
-		DstGroups:  splitGroup2Int(acl.GetDstGroupIds()),
-		SrcPorts:   splitPort2Int(acl.GetSrcPorts()),
-		DstPorts:   splitPort2Int(acl.GetDstPorts()),
-		Proto:      uint8(acl.GetProtocol()),
-		Vlan:       acl.GetVlan(),
-		Action:     newAclAction(datatype.ACLID(acl.GetId()), acl.GetActions()),
-		NpbActions: newNpbActions(acl.GetNpbActions()),
+		Id:           datatype.ACLID(acl.GetId()),
+		Type:         datatype.TapType(acl.GetTapType()),
+		TapId:        acl.GetTapId(),
+		SrcGroups:    splitGroup2Int(acl.GetSrcGroupIds()),
+		DstGroups:    splitGroup2Int(acl.GetDstGroupIds()),
+		SrcPortRange: splitPort2Int(acl.GetSrcPorts()),
+		DstPortRange: splitPort2Int(acl.GetDstPorts()),
+		Proto:        uint8(acl.GetProtocol()),
+		Vlan:         acl.GetVlan(),
+		Action:       newAclAction(datatype.ACLID(acl.GetId()), acl.GetActions()),
+		NpbActions:   newNpbActions(acl.GetNpbActions()),
 	}
 }
 
