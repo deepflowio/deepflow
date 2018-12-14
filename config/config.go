@@ -128,7 +128,7 @@ func (c *Config) Validate() error {
 	}
 
 	if c.DefaultTapType == 0 {
-		c.DefaultTapType = datatype.PACKET_SOURCE_TOR
+		c.DefaultTapType = datatype.PACKET_SOURCE_ISP
 	}
 	if c.AdapterCacheSize == 0 {
 		c.AdapterCacheSize = 16
