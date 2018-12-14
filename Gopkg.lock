@@ -155,7 +155,7 @@
     "pkg/mapper/usage",
   ]
   pruneopts = "UT"
-  revision = "636eea74343fed3e777abec48959b1897cabede1"
+  revision = "4123b4adc25edeaea3d994af1ede6f15b16604bd"
 
 [[projects]]
   branch = "master"
