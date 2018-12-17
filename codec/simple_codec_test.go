@@ -1,6 +1,7 @@
 package codec
 
 import (
+	"math/rand"
 	"testing"
 )
 
@@ -125,5 +126,57 @@ func TestReset(t *testing.T) {
 	e.WriteRawString(exp)
 	if e.String() != exp {
 		t.Errorf("Expected %v found %v", exp, e.String())
+	}
+}
+
+func BenchmarkEncodeU32(b *testing.B) {
+	u32s := []uint32{}
+	for i := 0; i < b.N; i++ {
+		u32s = append(u32s, rand.Uint32())
+	}
+	e := &SimpleEncoder{buf: make([]byte, b.N*4, b.N*4)}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		e.WriteU32(u32s[i])
+	}
+}
+
+func BenchmarkEncodeU64(b *testing.B) {
+	u64s := []uint64{}
+	for i := 0; i < b.N; i++ {
+		u64s = append(u64s, rand.Uint64())
+	}
+	e := &SimpleEncoder{buf: make([]byte, b.N*8, b.N*8)}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		e.WriteU64(u64s[i])
+	}
+}
+
+func BenchmarkDecodeU32(b *testing.B) {
+	e := &SimpleEncoder{}
+	for i := 0; i < b.N; i++ {
+		e.WriteU32(rand.Uint32())
+	}
+
+	d := &SimpleDecoder{}
+	d.Init(e.Bytes())
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		d.ReadU32()
+	}
+}
+
+func BenchmarkDecodeU64(b *testing.B) {
+	e := &SimpleEncoder{}
+	for i := 0; i < b.N; i++ {
+		e.WriteU64(rand.Uint64())
+	}
+
+	d := &SimpleDecoder{}
+	d.Init(e.Bytes())
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		d.ReadU64()
 	}
 }
