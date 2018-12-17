@@ -117,15 +117,17 @@ func (f *FlowGenerator) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket, re
 }
 
 // return true if a flow should be reversed
-func (f *FlowGenerator) checkTcpServiceReverse(taggedFlow *TaggedFlow, reversed bool) ServiceStatus {
+func (f *FlowGenerator) checkTcpServiceReverse(taggedFlow *TaggedFlow, reversed bool) bool {
 	if reversed {
 		return false
 	}
-	srcOk := f.ServiceManager.getStatus(taggedFlow.FlowMetricsPeerSrc.L3EpcID, taggedFlow.IPSrc, taggedFlow.PortSrc)
+	serviceKey := genServiceKey(taggedFlow.FlowMetricsPeerSrc.L3EpcID, taggedFlow.IPSrc, taggedFlow.PortSrc)
+	srcOk := getTcpServiceManager(serviceKey).getStatus(serviceKey, taggedFlow.PortSrc)
 	if !srcOk {
 		return false
 	}
-	dstOk := f.ServiceManager.getStatus(taggedFlow.FlowMetricsPeerDst.L3EpcID, taggedFlow.IPDst, taggedFlow.PortDst)
+	serviceKey = genServiceKey(taggedFlow.FlowMetricsPeerDst.L3EpcID, taggedFlow.IPDst, taggedFlow.PortDst)
+	dstOk := getTcpServiceManager(serviceKey).getStatus(serviceKey, taggedFlow.PortDst)
 	if !dstOk {
 		return true
 	} else if taggedFlow.PortDst <= taggedFlow.PortSrc {

@@ -11,6 +11,8 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
+const DEFAULT_IP_LEARN_CNT = 5
+
 func TestServiceKey(t *testing.T) {
 	epcId := int32(-1)
 	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
@@ -30,22 +32,35 @@ func TestServicePortStatus(t *testing.T) {
 	port1 := uint16(80)
 	port2 := uint16(8080)
 	// check default IANA port service
-	if !serviceManager.getStatus(epcId, ip, port1) {
+	if !serviceManager.getStatus(genServiceKey(epcId, ip, port1), port1) {
 		t.Error("serviceManager.getStatus() return false, expect true")
 	}
 	// check disable port service
-	serviceManager.disableStatus(epcId, ip, port2)
-	if serviceManager.getStatus(epcId, ip, port2) {
+	serviceManager.disableStatus(genServiceKey(epcId, ip, port2))
+	if serviceManager.getStatus(genServiceKey(epcId, ip, port2), port2) {
 		t.Error("serviceManager.getStatus() return true, expect false")
 	}
-	// check enable port service
-	serviceManager.enableStatus(epcId, ip, port2)
-	if !serviceManager.getStatus(epcId, ip, port2) {
+}
+
+func TestHitPortStatus(t *testing.T) {
+	serviceManager := NewServiceManager(64 * 1024)
+	epcId := int32(3)
+	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
+	port := uint16(8080)
+	key := genServiceKey(epcId, ip, port)
+	if serviceManager.getStatus(key, port) {
+		t.Error("serviceManager.getStatus() return true, expect false")
+	}
+	for i := 0; i < DEFAULT_IP_LEARN_CNT; i++ {
+		serviceManager.hitStatus(key, uint32(i+1), time.Duration(i*100))
+	}
+	if !serviceManager.getStatus(key, port) {
 		t.Error("serviceManager.getStatus() return false, expect true")
 	}
 }
 
 func TestGoroutinesServicePortStatus(t *testing.T) {
+	portStatsSrcEndCount = 1
 	serviceManager := NewServiceManager(64 * 1024)
 	epcId := int32(3)
 	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
@@ -56,16 +71,16 @@ func TestGoroutinesServicePortStatus(t *testing.T) {
 	waitGroup.Add(1)
 	go func() {
 		defer waitGroup.Done()
-		serviceManager.enableStatus(epcId, ip, port2)
-		if !serviceManager.getStatus(epcId, ip, port2) {
+		serviceManager.hitStatus(genServiceKey(epcId, ip, port2), uint32(123), time.Duration(123))
+		if !serviceManager.getStatus(genServiceKey(epcId, ip, port2), port2) {
 			t.Error("serviceManager.getStatus() return false, expect true")
 		}
 	}()
 	waitGroup.Add(1)
 	go func() {
 		defer waitGroup.Done()
-		serviceManager.disableStatus(epcId, ip, port1)
-		if !serviceManager.getStatus(epcId, ip, port1) {
+		serviceManager.disableStatus(genServiceKey(epcId, ip, port1))
+		if !serviceManager.getStatus(genServiceKey(epcId, ip, port1), port1) {
 			t.Error("serviceManager.getStatus() return false, expect true")
 		}
 	}()
@@ -178,7 +193,8 @@ func TestSynSrcPortEnable(t *testing.T) {
 	packet0.PortDst = packet0.PortSrc
 	packet0.PortSrc = port1
 	l3EpcId := packet0.EndpointData.SrcInfo.L3EpcId
-	flowGenerator.ServiceManager.enableStatus(l3EpcId, packet0.IpSrc, packet0.PortSrc)
+	serviceKey := genServiceKey(l3EpcId, packet0.IpSrc, packet0.PortSrc)
+	getTcpServiceManager(serviceKey).enableStatus(serviceKey)
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
 
 	packet1 := getDefaultPacket()
@@ -206,6 +222,7 @@ func TestTcpAckSrcPortEnable(t *testing.T) {
 	// 首包为Ack包，源端口不在IANA服务列表中，但在lruCache中
 	// 首包: Ack: 12345 -> 8080 flow: 8080 -> 12345
 	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
+	portStatsSrcEndCount = 1
 	flowGenerator.Start()
 	packet0 := getDefaultPacket()
 	packet0.TcpData.Flags = TCP_ACK
@@ -213,7 +230,8 @@ func TestTcpAckSrcPortEnable(t *testing.T) {
 	packet0.TcpData.Ack = 200
 	packet0.PortDst = port1
 	l3EpcId := packet0.EndpointData.SrcInfo.L3EpcId
-	flowGenerator.ServiceManager.enableStatus(l3EpcId, packet0.IpSrc, packet0.PortSrc)
+	serviceKey := genServiceKey(l3EpcId, packet0.IpSrc, packet0.PortSrc)
+	getTcpServiceManager(serviceKey).enableStatus(serviceKey)
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
 
 	packet1 := getDefaultPacket()
@@ -237,6 +255,7 @@ func TestTcpAckSrcPortEnable(t *testing.T) {
 func TestUdpSrcPortInIANA(t *testing.T) {
 	// 首包: 80 -> 8080 flow: 8080 -> 80
 	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
+	portStatsSrcEndCount = 1
 	flowGenerator.Start()
 	packet0 := getUdpDefaultPacket()
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
@@ -260,6 +279,7 @@ func TestUdpBothPortsInIANA(t *testing.T) {
 
 	// 首包: 80 -> 200 flow: 200 -> 80
 	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
+	portStatsSrcEndCount = 1
 	minForceReportTime = time.Millisecond * 10
 	packet0 := getUdpDefaultPacket()
 	packet0.PortDst = port1
@@ -277,7 +297,6 @@ func TestUdpBothPortsInIANA(t *testing.T) {
 	if taggedFlow.PortSrc != expectPortSrc || taggedFlow.PortDst != expectPortDst {
 		t.Errorf("taggedFlow.PortSrc is %d, expect %d", taggedFlow.PortSrc, expectPortSrc)
 		t.Errorf("taggedFlow.PortDst is %d, expect %d", taggedFlow.PortDst, expectPortDst)
-		t.Errorf("\n%s", taggedFlow)
 	}
 }
 
@@ -304,5 +323,25 @@ func TestUdpBothPortsNotInIANA(t *testing.T) {
 		t.Errorf("taggedFlow.PortSrc is %d, expect %d", taggedFlow.PortSrc, expectPortSrc)
 		t.Errorf("taggedFlow.PortDst is %d, expect %d", taggedFlow.PortDst, expectPortDst)
 		t.Errorf("\n%s", taggedFlow)
+	}
+}
+
+func TestUdpHitStatus(t *testing.T) {
+	portStatsSrcEndCount = 5
+	serverPort := uint16(9999)
+	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
+	for i := 0; i < 5; i++ {
+		packet := getUdpDefaultPacket()
+		packet.Timestamp = DEFAULT_DURATION_MSEC * time.Duration(i)
+		packet.PortDst = serverPort
+		packet.PortSrc = uint16(3000 + i)
+		metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet)
+	}
+	flowGenerator.Start()
+	for i := 0; i < 5; i++ {
+		taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
+		if taggedFlow.PortDst != serverPort {
+			t.Errorf("taggedFlow.PortDst is %d, expect %d", taggedFlow.PortDst, serverPort)
+		}
 	}
 }

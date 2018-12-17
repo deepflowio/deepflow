@@ -653,7 +653,6 @@ func (f *FlowGenerator) Stop() {
 func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, bufferSize int, flowLimitNum int32, index int) *FlowGenerator {
 	flowGenerator := &FlowGenerator{
 		FlowCacheHashMap:        FlowCacheHashMap{make([]*FlowCache, hashMapSize), rand.Uint32(), hashMapSize, timeoutCleanerCount, &TunnelInfo{}},
-		ServiceManager:          NewServiceManager(64 * 1024),
 		metaPacketHeaderInQueue: metaPacketHeaderInQueue,
 		flowOutQueue:            flowOutQueue,
 		stats:                   FlowGeneratorStats{cleanRoutineFlowCacheNums: make([]int, timeoutCleanerCount), cleanRoutineMaxFlowCacheLens: make([]int, timeoutCleanerCount)},
@@ -689,7 +688,7 @@ func (f *FlowGenerator) checkIfDoFlowPerf(flowExtra *FlowExtra) bool {
 	return false
 }
 
-func (f *FlowGenerator) checkL4ServiceReverse(taggedFlow *TaggedFlow, reversed bool) ServiceStatus {
+func (f *FlowGenerator) checkL4ServiceReverse(taggedFlow *TaggedFlow, reversed bool) bool {
 	if reversed {
 		return false
 	}

@@ -29,6 +29,13 @@ var testTimeoutConfig = TimeoutConfig{
 }
 
 func flowGeneratorInit() (*FlowGenerator, MultiQueueReader, QueueWriter) {
+	flowGeneratorCount = 1
+	innerTcpSMA = make([]*ServiceManager, flowGeneratorCount)
+	innerUdpSMA = make([]*ServiceManager, flowGeneratorCount)
+	for i := uint64(0); i < flowGeneratorCount; i++ {
+		innerTcpSMA[i] = NewServiceManager(32 * 1024)
+		innerUdpSMA[i] = NewServiceManager(32 * 1024)
+	}
 	forceReportInterval = time.Millisecond * 100
 	minForceReportTime = time.Millisecond * 20
 	flowCleanInterval = time.Millisecond * 100
@@ -37,6 +44,8 @@ func flowGeneratorInit() (*FlowGenerator, MultiQueueReader, QueueWriter) {
 	reportTolerance = 4 * time.Second
 	ignoreTorMac = false
 	ignoreL2End = false
+	portStatsInterval = time.Second
+	portStatsSrcEndCount = 5
 	SetTimeout(testTimeoutConfig)
 	metaPacketHeaderInQueue := NewOverwriteQueues("metaPacketHeaderInQueue", 1, DEFAULT_QUEUE_LEN)
 	flowOutQueue := NewOverwriteQueue("flowOutQueue", DEFAULT_QUEUE_LEN)
