@@ -1567,21 +1567,26 @@ func BenchmarkAcl(b *testing.B) {
 	acls := []*Acl{}
 	table := generatePolicyTable()
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
-	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
 
-	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1, 65535))
-	acl.DstPortRange = append(acl.DstPortRange, NewPortRange(1, 65535))
-	for i := 0; i < 100; i++ {
-		acl.SrcGroups = append(acl.SrcGroups, uint32(i))
-		acl.DstGroups = append(acl.DstGroups, uint32(i))
+	for i := uint16(10000); i < 25000; i += 5000 {
+		acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+
+		acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(i-5000, i+5000))
+		acl.DstPortRange = append(acl.DstPortRange, NewPortRange(i-5000, i+5000))
+		for i := 0; i < 100; i++ {
+			acl.SrcGroups = append(acl.SrcGroups, uint32(i))
+			acl.DstGroups = append(acl.DstGroups, uint32(i))
+		}
+
+		acls = append(acls, acl)
 	}
-
-	acls = append(acls, acl)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		table.UpdateAcls(acls)
-		acl.DstPorts = acl.DstPorts[:0]
-		acl.SrcPorts = acl.SrcPorts[:0]
+		for _, acl := range acls {
+			acl.DstPorts = acl.DstPorts[:0]
+			acl.SrcPorts = acl.SrcPorts[:0]
+		}
 	}
 }
