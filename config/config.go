@@ -78,17 +78,19 @@ type LabelerConfig struct {
 type FlowGeneratorConfig struct {
 	FlowCountLimit int32 `yaml:"flow-count-limit"`
 	/* unit of interval and timeout: second */
-	ForceReportInterval time.Duration `yaml:"force-report-interval"`
-	MinForceReportTime  time.Duration `yaml:"min-force-report-time"`
-	EstablishedTimeout  time.Duration `yaml:"established-timeout"`
-	ClosingRstTimeout   time.Duration `yaml:"closing-rst-timeout"`
-	OthersTimeout       time.Duration `yaml:"others-timeout"`
-	FlowCleanInterval   time.Duration `yaml:"flow-clean-interval"`
-	TimeoutCleanerCount uint64        `yaml:"timeout-cleaner-count"`
-	HashMapSize         uint64        `yaml:"hash-map-size"`
-	ReportTolerance     time.Duration `yaml:"report-tolerance"`
-	IgnoreTorMac        bool          `yaml:"ignore-tor-mac"`
-	IgnoreL2End         bool          `yaml:"ignore-l2-end"`
+	ForceReportInterval  time.Duration `yaml:"force-report-interval"`
+	MinForceReportTime   time.Duration `yaml:"min-force-report-time"`
+	EstablishedTimeout   time.Duration `yaml:"established-timeout"`
+	ClosingRstTimeout    time.Duration `yaml:"closing-rst-timeout"`
+	OthersTimeout        time.Duration `yaml:"others-timeout"`
+	FlowCleanInterval    time.Duration `yaml:"flow-clean-interval"`
+	TimeoutCleanerCount  uint64        `yaml:"timeout-cleaner-count"`
+	HashMapSize          uint64        `yaml:"hash-map-size"`
+	ReportTolerance      time.Duration `yaml:"report-tolerance"`
+	IgnoreTorMac         bool          `yaml:"ignore-tor-mac"`
+	IgnoreL2End          bool          `yaml:"ignore-l2-end"`
+	PortStatsInterval    time.Duration `yaml:"port-stats-interval"`
+	PortStatsSrcEndCount int           `yaml:"port-stats-src-end-count"`
 }
 
 type MapReduceConfig struct {
@@ -252,6 +254,14 @@ func (c *Config) Validate() error {
 		c.FlowGenerator.ReportTolerance = 4 * time.Second
 	} else {
 		c.FlowGenerator.ReportTolerance *= time.Second
+	}
+	if c.FlowGenerator.PortStatsInterval == 0 {
+		c.FlowGenerator.PortStatsInterval = time.Second
+	} else {
+		c.FlowGenerator.PortStatsInterval *= time.Second
+	}
+	if c.FlowGenerator.PortStatsSrcEndCount == 0 {
+		c.FlowGenerator.PortStatsSrcEndCount = 5
 	}
 
 	if c.MapReduce.VariedDocLimit == 0 {

@@ -55,14 +55,17 @@ const SECOND_COUNT_PER_MINUTE = 60
 
 // configurations for base flow generator, read only
 var (
-	timeoutCleanerCount uint64
-	hashMapSize         uint64
-	forceReportInterval time.Duration
-	minForceReportTime  time.Duration
-	flowCleanInterval   time.Duration
-	reportTolerance     time.Duration
-	ignoreTorMac        bool
-	ignoreL2End         bool
+	flowGeneratorCount   uint64
+	timeoutCleanerCount  uint64
+	hashMapSize          uint64
+	forceReportInterval  time.Duration
+	minForceReportTime   time.Duration
+	flowCleanInterval    time.Duration
+	reportTolerance      time.Duration
+	ignoreTorMac         bool
+	ignoreL2End          bool
+	portStatsInterval    time.Duration
+	portStatsSrcEndCount int
 )
 
 // configurations for timeout, read only
@@ -107,7 +110,6 @@ type PacketHandler struct {
 
 type FlowGenerator struct {
 	FlowCacheHashMap
-	*ServiceManager
 
 	metaPacketHeaderInQueue MultiQueueReader
 	flowOutQueue            QueueWriter
@@ -183,6 +185,14 @@ func SetTimeout(timeout TimeoutConfig) {
 }
 
 func SetFlowGenerator(cfg config.Config) {
+	flowGeneratorCount = uint64(cfg.Queue.FlowGeneratorQueueCount)
+	innerTcpSMA = make([]*ServiceManager, flowGeneratorCount)
+	innerUdpSMA = make([]*ServiceManager, flowGeneratorCount)
+	for i := uint64(0); i < flowGeneratorCount; i++ {
+		innerTcpSMA[i] = NewServiceManager(32 * 1024)
+		innerUdpSMA[i] = NewServiceManager(32 * 1024)
+	}
+
 	forceReportInterval = cfg.FlowGenerator.ForceReportInterval
 	minForceReportTime = cfg.FlowGenerator.MinForceReportTime
 	flowCleanInterval = cfg.FlowGenerator.FlowCleanInterval
@@ -191,6 +201,8 @@ func SetFlowGenerator(cfg config.Config) {
 	reportTolerance = cfg.FlowGenerator.ReportTolerance
 	ignoreTorMac = cfg.FlowGenerator.IgnoreTorMac
 	ignoreL2End = cfg.FlowGenerator.IgnoreL2End
+	portStatsInterval = cfg.FlowGenerator.PortStatsInterval
+	portStatsSrcEndCount = cfg.FlowGenerator.PortStatsSrcEndCount
 }
 
 func (t TimeoutConfig) minTimeout() time.Duration {

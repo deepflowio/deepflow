@@ -2,22 +2,32 @@ package flowgenerator
 
 import (
 	"sync"
+	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/lru"
 )
 
-type ServiceStatus bool
+type ServiceStatus struct {
+	clientMap map[uint32]bool
+	threshold time.Duration
+	active    bool
+}
 
 type IpPortEpcKey = uint64
-
-type ServiceMap map[IpPortEpcKey]ServiceStatus
 
 type ServiceManager struct {
 	sync.RWMutex
 
 	lruCache *lru.Cache64
 }
+
+// inner tcp service manager allocator
+// the count of service manager is equal to flow generator number
+var (
+	innerTcpSMA []*ServiceManager
+	innerUdpSMA []*ServiceManager
+)
 
 var IANAPortExcludeList = []uint16{
 	4, 6, 8, 10, 12, 14, 15, 16, 26, 28,
@@ -50,7 +60,7 @@ var IANAPortExcludeList = []uint16{
 	986, 987, 988, 1002, 1003, 1004, 1005, 1006, 1007,
 }
 
-var IANAPortServiceList []ServiceStatus
+var IANAPortServiceList []bool
 
 const IANA_PORT_RANGE = 1024 + 1
 
@@ -62,10 +72,17 @@ func genServiceKey(l3EpcId int32, ip IPv4Int, port uint16) IpPortEpcKey {
 	return IpPortEpcKey((uint64(ip) << 32) | (uint64(port) << 16) | uint64(uint16(l3EpcId)))
 }
 
-func (m *ServiceManager) getStatus(l3EpcId int32, ip IPv4Int, port uint16) ServiceStatus {
-	key := genServiceKey(l3EpcId, ip, port)
+func getTcpServiceManager(key IpPortEpcKey) *ServiceManager {
+	return innerTcpSMA[key%flowGeneratorCount]
+}
+
+func getUdpServiceManager(key IpPortEpcKey) *ServiceManager {
+	return innerUdpSMA[key%flowGeneratorCount]
+}
+
+func (m *ServiceManager) getStatus(key IpPortEpcKey, port uint16) bool {
 	m.RLock()
-	status, ok := m.lruCache.Peek(key)
+	value, ok := m.lruCache.Peek(key)
 	m.RUnlock()
 	if !ok {
 		if port < IANA_PORT_RANGE {
@@ -73,18 +90,56 @@ func (m *ServiceManager) getStatus(l3EpcId int32, ip IPv4Int, port uint16) Servi
 		}
 		return false
 	}
-	return status.(ServiceStatus)
+	return value.(*ServiceStatus).active
 }
 
-func (m *ServiceManager) enableStatus(l3EpcId int32, ip IPv4Int, port uint16) {
-	key := genServiceKey(l3EpcId, ip, port)
+func (m *ServiceManager) enableStatus(key IpPortEpcKey) {
 	m.Lock()
-	m.lruCache.Add(key, ServiceStatus(true))
+	value, ok := m.lruCache.Get(key)
+	if !ok {
+		// threshold is not used for an active service port
+		status := &ServiceStatus{make(map[uint32]bool), 0, false}
+		status.active = true
+		m.lruCache.Add(key, status)
+	} else {
+		status := value.(*ServiceStatus)
+		status.active = true
+	}
 	m.Unlock()
 }
 
-func (m *ServiceManager) disableStatus(l3EpcId int32, ip IPv4Int, port uint16) {
-	key := genServiceKey(l3EpcId, ip, port)
+func (m *ServiceManager) hitStatus(key IpPortEpcKey, clientHash uint32, timestamp time.Duration) {
+	var status *ServiceStatus
+	m.Lock()
+	value, ok := m.lruCache.Get(key)
+	if !ok {
+		status = &ServiceStatus{make(map[uint32]bool), timestamp + portStatsInterval, false}
+		m.lruCache.Add(key, status)
+	} else {
+		status = value.(*ServiceStatus)
+	}
+	if status.active {
+		m.Unlock()
+		return
+	}
+	// if timestamp interval is bigger than 'learn interval',
+	// then restart the learning
+	if status.threshold < timestamp {
+		status.threshold = timestamp + portStatsInterval
+		status.active = false
+		// delete will not release any memory of map
+		for key := range status.clientMap {
+			delete(status.clientMap, key)
+		}
+	}
+	status.clientMap[clientHash] = true
+	m.Unlock()
+	if len(status.clientMap) >= portStatsSrcEndCount {
+		status.active = true
+	}
+}
+
+func (m *ServiceManager) disableStatus(key IpPortEpcKey) {
 	m.Lock()
 	// XXX: maybe we don't need to remove the peer
 	m.lruCache.Remove(key)
@@ -92,7 +147,7 @@ func (m *ServiceManager) disableStatus(l3EpcId int32, ip IPv4Int, port uint16) {
 }
 
 func init() {
-	IANAPortServiceList = make([]ServiceStatus, IANA_PORT_RANGE)
+	IANAPortServiceList = make([]bool, IANA_PORT_RANGE)
 	for i := range IANAPortServiceList {
 		IANAPortServiceList[i] = true
 	}

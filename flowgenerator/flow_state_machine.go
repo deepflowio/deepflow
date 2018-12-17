@@ -18,10 +18,12 @@ func flagContain(flags, target uint8) bool {
 func (f *FlowGenerator) StatePreprocess(meta *MetaPacket, flags uint8) bool {
 	switch flags {
 	case TCP_SYN:
-		f.ServiceManager.disableStatus(meta.EndpointData.SrcInfo.L3EpcId, meta.IpSrc, meta.PortSrc)
+		serviceKey := genServiceKey(meta.EndpointData.SrcInfo.L3EpcId, meta.IpSrc, meta.PortSrc)
+		getTcpServiceManager(serviceKey).disableStatus(serviceKey)
 		return false
 	case TCP_SYN | TCP_ACK:
-		f.ServiceManager.enableStatus(meta.EndpointData.SrcInfo.L3EpcId, meta.IpSrc, meta.PortSrc)
+		serviceKey := genServiceKey(meta.EndpointData.SrcInfo.L3EpcId, meta.IpSrc, meta.PortSrc)
+		getTcpServiceManager(serviceKey).enableStatus(serviceKey)
 		return false
 	case TCP_FIN:
 		return false

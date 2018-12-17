@@ -30,6 +30,9 @@ func (f *FlowGenerator) initUdpFlow(meta *MetaPacket) *FlowExtra {
 	now := meta.Timestamp
 	flowExtra := f.initFlow(meta, now)
 	taggedFlow := flowExtra.taggedFlow
+	clientHash := uint32(meta.IpSrc) + uint32(meta.PortSrc)
+	serviceKey := genServiceKey(taggedFlow.FlowMetricsPeerDst.L3EpcID, taggedFlow.IPDst, taggedFlow.PortDst)
+	getUdpServiceManager(serviceKey).hitStatus(serviceKey, clientHash, meta.Timestamp)
 	taggedFlow.FlowMetricsPeerSrc.ArrTime0 = now
 	taggedFlow.FlowMetricsPeerSrc.ArrTimeLast = now
 	taggedFlow.FlowMetricsPeerSrc.TotalPacketCount = 1
@@ -49,16 +52,21 @@ func (f *FlowGenerator) updateUdpFlow(flowExtra *FlowExtra, meta *MetaPacket, re
 	}
 }
 
-func (f *FlowGenerator) checkUdpServiceReverse(taggedFlow *TaggedFlow, reversed bool) ServiceStatus {
+func (f *FlowGenerator) checkUdpServiceReverse(taggedFlow *TaggedFlow, reversed bool) bool {
 	if reversed {
 		return false
 	}
-	portSrc := taggedFlow.PortSrc
-	portDst := taggedFlow.PortDst
-	if portSrc >= portDst {
+	serviceKey := genServiceKey(taggedFlow.FlowMetricsPeerSrc.L3EpcID, taggedFlow.IPSrc, taggedFlow.PortSrc)
+	srcOk := getUdpServiceManager(serviceKey).getStatus(serviceKey, taggedFlow.PortSrc)
+	if !srcOk {
 		return false
-	} else if portSrc < IANA_PORT_RANGE {
-		return IANAPortServiceList[portSrc]
 	}
-	return false
+	serviceKey = genServiceKey(taggedFlow.FlowMetricsPeerDst.L3EpcID, taggedFlow.IPDst, taggedFlow.PortDst)
+	dstOk := getUdpServiceManager(serviceKey).getStatus(serviceKey, taggedFlow.PortDst)
+	if !dstOk {
+		return true
+	} else if taggedFlow.PortDst <= taggedFlow.PortSrc {
+		return false
+	}
+	return true
 }
