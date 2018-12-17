@@ -31,8 +31,8 @@ func NewPortRange(min, max uint16) PortRange {
 	return PortRange(uint32(min)<<16 | uint32(max))
 }
 
-func createPortStatusTable(raw []PortRange) [math.MaxUint16 + 1]PortStatus {
-	table := [math.MaxUint16 + 1]PortStatus{}
+func createPortStatusTable(raw []PortRange) []PortStatus {
+	table := make([]PortStatus, math.MaxUint16+1)
 
 	for _, port := range raw {
 		if port.Min() == port.Max() {
@@ -53,7 +53,7 @@ func createPortStatusTable(raw []PortRange) [math.MaxUint16 + 1]PortStatus {
 	return table
 }
 
-func createPortRangeByTable(table [math.MaxUint16 + 1]PortStatus) []PortRange {
+func createPortRangeByTable(table []PortStatus) []PortRange {
 	portRanges := make([]PortRange, 0, 1000)
 
 	start := 0
