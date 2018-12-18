@@ -25,7 +25,7 @@ func BenchmarkDecoder(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < MIN_PPS; {
-		decoder := NewSequentialDecoder(packet)
+		decoder := NewSequentialDecoder(packet, 0)
 		decoder.DecodeHeader()
 		for {
 			meta := &MetaPacket{}
