@@ -184,6 +184,7 @@ const (
 	TEMPLATE_ACL_EDGE
 	TEMPLATE_ACL_EDGE_PORT
 	TEMPLATE_ACL_PORT
+	TEMPLATE_ACL_EDGE_PORT_ALL
 )
 
 func (t TagTemplate) String() string {
@@ -217,6 +218,9 @@ func (t TagTemplate) String() string {
 	}
 	if t&TEMPLATE_ACL_PORT != 0 {
 		s += "AP|"
+	}
+	if t&TEMPLATE_ACL_EDGE_PORT_ALL != 0 {
+		s += "AEP+|"
 	}
 	return s
 }
