@@ -156,7 +156,7 @@ func Start(configPath string) (closers []io.Closer) {
 	labelerManager.Start()
 
 	// L3 - flow generator & metering marshaller & pcap
-	docsInBuffer := int(cfg.MapReduce.DocsInBuffer)
+	docsInBuffer := int(cfg.Queue.DocsQueueSize)
 	variedDocLimit := int(cfg.MapReduce.VariedDocLimit)
 	windowSize := int(cfg.MapReduce.WindowSize)
 	releaseTaggedFlow := func(x interface{}) {
