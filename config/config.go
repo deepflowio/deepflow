@@ -166,7 +166,7 @@ func (c *Config) Validate() error {
 		c.Queue.PCapAppQueueSize = c.Queue.QueueSize
 	}
 	if c.Queue.FlowAppQueueCount == 0 {
-		c.Queue.FlowAppQueueCount = 8
+		c.Queue.FlowAppQueueCount = 2
 	}
 	if c.Queue.FlowAppQueueSize == 0 {
 		c.Queue.FlowAppQueueSize = c.Queue.QueueSize
@@ -236,7 +236,7 @@ func (c *Config) Validate() error {
 	}
 
 	if c.MapReduce.DocsInBuffer == 0 {
-		c.MapReduce.DocsInBuffer = 131072
+		c.MapReduce.DocsInBuffer = 524288
 	}
 	if c.MapReduce.VariedDocLimit == 0 {
 		c.MapReduce.VariedDocLimit = c.MapReduce.DocsInBuffer
