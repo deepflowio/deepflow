@@ -55,7 +55,7 @@ queue:
   pcap-app-queue-size: 65536
   # flow app read queue count, default 8
   # 4-tagged-flow-to-flow-app
-  flow-app-queue-count: 8
+  flow-app-queue-count: 2
   # flow app read queue size, default queue-size
   flow-app-queue-size: 65536
   # flow duplicator read queue size, default flow-generator-queue-size >> 2
@@ -113,7 +113,7 @@ flow-generator:
 #geo-file-location: /opt/droplet/ip_info_mini.json
 map-reduce:
   # mapreduce buffer capacity
-  docs-in-buffer: 131072
+  docs-in-buffer: 524288
   # reject varied doc (with edge or port tag) when buffer usage exceed the limit, default docs-in-buffer
   varied-doc-limit: 0
   # mapreduce window size
