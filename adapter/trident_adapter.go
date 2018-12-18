@@ -52,7 +52,8 @@ type tridentInstance struct {
 }
 
 type TridentAdapter struct {
-	cacheSize int
+	cacheSize  int
+	timeAdjust int64
 
 	queues    queue.MultiQueueWriter
 	itemKeys  []queue.HashKey
@@ -67,11 +68,12 @@ type TridentAdapter struct {
 	listener *net.UDPConn
 }
 
-func NewTridentAdapter(queues queue.MultiQueueWriter, cacheSize int) *TridentAdapter {
+func NewTridentAdapter(queues queue.MultiQueueWriter, cacheSize int, timeAdjust int64) *TridentAdapter {
 	adapter := &TridentAdapter{}
 	adapter.counter = &PacketCounter{}
 	adapter.stats = &PacketCounter{}
 	adapter.cacheSize = cacheSize
+	adapter.timeAdjust = timeAdjust
 	adapter.queues = queues
 	adapter.itemKeys = make([]queue.HashKey, 0, PACKET_MAX+1)
 	adapter.itemKeys = append(adapter.itemKeys, queue.HashKey(0))
@@ -169,7 +171,7 @@ func (a *TridentAdapter) findAndAdd(data []byte, key uint32, seq uint32, timesta
 }
 
 func (a *TridentAdapter) decode(data []byte, ip uint32) {
-	decoder := NewSequentialDecoder(data)
+	decoder := NewSequentialDecoder(data, a.timeAdjust)
 	ifMacSuffix, _ := decoder.DecodeHeader()
 
 	for {
@@ -224,7 +226,7 @@ func (a *TridentAdapter) run() {
 			return
 		}
 
-		decoder := NewSequentialDecoder(data)
+		decoder := NewSequentialDecoder(data, a.timeAdjust)
 		if _, invalid := decoder.DecodeHeader(); invalid {
 			a.udpPool.Put(data)
 			continue

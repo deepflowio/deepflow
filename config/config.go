@@ -18,24 +18,25 @@ import (
 var log = logging.MustGetLogger("config")
 
 type Config struct {
-	ControllerIps    []string            `yaml:"controller-ips,flow"`
-	ControllerPort   uint16              `yaml:"controller-port"`
-	LogFile          string              `yaml:"log-file"`
-	LogLevel         string              `yaml:"log-level"`
-	Profiler         bool                `yaml:"profiler"`
-	MaxCPUs          int                 `yaml:"max-cpus"`
-	TapInterfaces    []string            `yaml:"tap-interfaces,flow"`
-	DefaultTapType   uint32              `yaml:"default-tap-type"`
-	AdapterCacheSize int                 `yaml:"adapter-cache-size"`
-	Stream           string              `yaml:"stream"`
-	StreamPort       uint16              `yaml:"stream-port"`
-	ZeroPorts        []uint16            `yaml:"zero-ports"`
-	Queue            QueueConfig         `yaml:"queue"`
-	Labeler          LabelerConfig       `yaml:"labeler"`
-	FlowGenerator    FlowGeneratorConfig `yaml:"flow-generator"`
-	MapReduce        MapReduceConfig     `yaml:"map-reduce"`
-	RpcTimeout       time.Duration       `yaml:"rpc-timeout"`
-	PCap             PCapConfig          `yaml:"pcap"`
+	ControllerIps     []string            `yaml:"controller-ips,flow"`
+	ControllerPort    uint16              `yaml:"controller-port"`
+	LogFile           string              `yaml:"log-file"`
+	LogLevel          string              `yaml:"log-level"`
+	Profiler          bool                `yaml:"profiler"`
+	MaxCPUs           int                 `yaml:"max-cpus"`
+	TapInterfaces     []string            `yaml:"tap-interfaces,flow"`
+	DefaultTapType    uint32              `yaml:"default-tap-type"`
+	AdapterTimeAdjust int64               `yaml:"adapter-time-adjust"`
+	AdapterCacheSize  int                 `yaml:"adapter-cache-size"`
+	Stream            string              `yaml:"stream"`
+	StreamPort        uint16              `yaml:"stream-port"`
+	ZeroPorts         []uint16            `yaml:"zero-ports"`
+	Queue             QueueConfig         `yaml:"queue"`
+	Labeler           LabelerConfig       `yaml:"labeler"`
+	FlowGenerator     FlowGeneratorConfig `yaml:"flow-generator"`
+	MapReduce         MapReduceConfig     `yaml:"map-reduce"`
+	RpcTimeout        time.Duration       `yaml:"rpc-timeout"`
+	PCap              PCapConfig          `yaml:"pcap"`
 }
 
 type IpPortConfig struct {
@@ -130,6 +131,7 @@ func (c *Config) Validate() error {
 	if c.DefaultTapType == 0 {
 		c.DefaultTapType = datatype.PACKET_SOURCE_ISP
 	}
+	c.AdapterTimeAdjust *= int64(time.Second)
 	if c.AdapterCacheSize == 0 {
 		c.AdapterCacheSize = 16
 	}

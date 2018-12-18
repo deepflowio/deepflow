@@ -17,6 +17,10 @@ tap-interfaces: []
 # where packet is considered to come by default if packet has no qinq with outer vlan pcp == 7
 # ISP: 0x10000, TOR: 0x30000, default value is 0x10000
 default-tap-type: 0x10000
+# trident和droplet的时间差，用于修正trident的时间戳，单位为秒
+# 当trident的时间大于droplet, adapter-time-adjust为负数
+# 当trident的时间小于droplet, adapter-time-adjust为正数
+adapter-time-adjust: 0
 # adapter cache size, default value is 16
 # 0 <= value <= 64, value is 64 when value > 64
 adapter-cache-size: 16
