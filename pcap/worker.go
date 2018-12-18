@@ -11,6 +11,8 @@ import (
 
 const (
 	QUEUE_BATCH_SIZE = 1024
+	BROADCAST_MAC    = datatype.MacInt(^uint64(0) >> 16)
+	BROADCAST_IP     = datatype.IPv4Int(^uint32(0))
 )
 
 type WriterKey uint64
@@ -208,21 +210,21 @@ func (w *Worker) Process() {
 			var tapType datatype.TapType
 			if isISP(packet.InPort) {
 				tapType = datatype.TAP_ISP
-				if packet.EndpointData.SrcInfo.L3EpcId != 0 {
+				if packet.EndpointData.SrcInfo.L3EpcId != 0 && packet.IpSrc != BROADCAST_IP && packet.MacSrc != BROADCAST_MAC {
 					ips = append(ips, packet.IpSrc)
 					macs = append(macs, packet.MacSrc)
 				}
-				if packet.EndpointData.DstInfo.L3EpcId != 0 {
+				if packet.EndpointData.DstInfo.L3EpcId != 0 && packet.IpDst != BROADCAST_IP && packet.MacDst != BROADCAST_MAC {
 					ips = append(ips, packet.IpDst)
 					macs = append(macs, packet.MacDst)
 				}
 			} else if isTOR(packet.InPort) {
 				tapType = datatype.TAP_TOR
-				if packet.EndpointData.SrcInfo.L2End {
+				if packet.EndpointData.SrcInfo.L2End && packet.IpSrc != BROADCAST_IP && packet.MacSrc != BROADCAST_MAC {
 					ips = append(ips, packet.IpSrc)
 					macs = append(macs, packet.MacSrc)
 				}
-				if packet.EndpointData.DstInfo.L2End {
+				if packet.EndpointData.DstInfo.L2End && packet.IpDst != BROADCAST_IP && packet.MacDst != BROADCAST_MAC {
 					ips = append(ips, packet.IpDst)
 					macs = append(macs, packet.MacDst)
 				}
