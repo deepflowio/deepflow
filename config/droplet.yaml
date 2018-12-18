@@ -61,8 +61,8 @@ queue:
   # flow duplicator read queue size, default flow-generator-queue-size >> 2
   # name: 3-tagged-flow-to-flow-duplicator
   flow-duplicator-queue-size: 131072
-  # mapreduce buffer capacity, default queue-size << 1
-  docs-queue-size: 131072
+  # mapreduce buffer capacity, default 524288
+  docs-queue-size: 524288
   # metering app output queue count, default 1
   metering-app-output-queue-count: 1
   # metering app output queue size, default docs-queue-size << 1
@@ -76,7 +76,7 @@ queue:
   # flow sender queue size, default queue-size << 1
   # name: 4-tagged-flow-to-stream
   flow-sender-queue-size: 0
-  # doc sender queue size, default map-reduce.docs-in-buffer << 1
+  # doc sender queue size, default docs-queue-size << 1
   doc_sender_queue_size: 0
 # internal labeler conf
 labeler:
@@ -116,9 +116,7 @@ flow-generator:
   ignore-tor-mac: false
 #geo-file-location: /opt/droplet/ip_info_mini.json
 map-reduce:
-  # mapreduce buffer capacity
-  docs-in-buffer: 524288
-  # reject varied doc (with edge or port tag) when buffer usage exceed the limit, default docs-in-buffer
+  # reject varied doc (with edge or port tag) when buffer usage exceed the limit, default queue.docs-queue-size
   varied-doc-limit: 0
   # mapreduce window size
   window-size: 30

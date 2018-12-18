@@ -87,7 +87,6 @@ type FlowGeneratorConfig struct {
 }
 
 type MapReduceConfig struct {
-	DocsInBuffer   uint32 `yaml:"docs-in-buffer"`
 	VariedDocLimit uint32 `yaml:"varied-doc-limit"`
 	WindowSize     uint32 `yaml:"window-size"`
 }
@@ -177,7 +176,7 @@ func (c *Config) Validate() error {
 		c.Queue.FlowDuplicatorQueueSize = c.Queue.FlowGeneratorQueueSize >> 2
 	}
 	if c.Queue.DocsQueueSize == 0 {
-		c.Queue.DocsQueueSize = c.Queue.QueueSize << 1
+		c.Queue.DocsQueueSize = 524288
 	}
 	if c.Queue.MeteringAppOutputQueueCount == 0 {
 		c.Queue.MeteringAppOutputQueueCount = 1
@@ -195,7 +194,7 @@ func (c *Config) Validate() error {
 		c.Queue.FlowSenderQueueSize = c.Queue.QueueSize << 1
 	}
 	if c.Queue.DocSenderQueueSize == 0 {
-		c.Queue.DocSenderQueueSize = int(c.MapReduce.DocsInBuffer) << 1
+		c.Queue.DocSenderQueueSize = c.Queue.DocsQueueSize << 1
 	}
 
 	if c.Labeler.MapSizeLimit == 0 {
@@ -247,11 +246,8 @@ func (c *Config) Validate() error {
 		c.FlowGenerator.ReportTolerance *= time.Second
 	}
 
-	if c.MapReduce.DocsInBuffer == 0 {
-		c.MapReduce.DocsInBuffer = 524288
-	}
 	if c.MapReduce.VariedDocLimit == 0 {
-		c.MapReduce.VariedDocLimit = c.MapReduce.DocsInBuffer
+		c.MapReduce.VariedDocLimit = uint32(c.Queue.DocsQueueSize)
 	}
 	if c.MapReduce.WindowSize == 0 {
 		c.MapReduce.WindowSize = 30
