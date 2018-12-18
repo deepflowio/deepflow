@@ -139,6 +139,7 @@ enum TagTemplate {
     ACL_EDGE = 128;
     ACL_EDGE_PORT = 256;
     ACL_PORT = 512;
+    ACL_EDGE_PORT_ALL = 1024; // 白名单需统计所有端口号，无论是否活跃
 }
 
 enum TapSide {
