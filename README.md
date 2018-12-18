@@ -73,7 +73,7 @@ graph TD;
     - 查找结果L3EpcId=(IP设备的EpcId)，L2EpcId=(MAC设备的EpcId)
   - MAC属于某一设备，IP属于另一设备, 两个设备属于不同的EpcId，IP的if_type!=3
     - 查找结果L3EpcId=0，L2EpcId=(MAC设备EpcId)
-  - MAC属于某一设备，IP属于另一设备, 两个设备属于不同的EpcId，IP的if_type=3 
+  - MAC属于某一设备，IP属于另一设备, 两个设备属于不同的EpcId，IP的if_type=3
     - 查找结果L3EpcId=(IP设备的EpcId)，L2EpcId=(MAC设备的EpcId)
   - MAC属于某一设备，IP属于ip_resource表内数据
     - 查找结果L3EpcId=-1，L2EpcId=(MAC设备的EpcId)，IsL3End=false
@@ -93,20 +93,21 @@ policy firstpath查找流程
 
 查找使用的全局map及其初始化流程：
 
-             名字         |                                     流程
-    ----------------------|---------------------------------------------------------------------------------
-	InterestProtoMaps     | 使用策略中的Proto做key，设置value为true
-	InterestPortMaps      | 使用策略中的Port做key，设置value为true
-	InterestGroupMaps     | 使用策略中的GroupId做key，设置value为true
-	GroupPortPolicyMaps   | 策略中的SrcGroupIds + DstGroupIds + Proto + Port做key, policy为value, policy无方向
-	GroupVlanPolicyMaps   | 策略中的SrcGroupIds + DstGroupIds + Vlan 做key, policy为value, policy的方向为正, 策略中的DstGroupIds + SrcGroupIds + Vlan 做key, policy为value, policy的方向为反
+             名字       |                                     流程
+    --------------------|---------------------------------------------------------------------------------
+	InterestProtoMaps   | 使用策略中的Proto做key，设置value为true
+	InterestPortMaps    | 使用策略中的PortRange, 生成一系列无交集的PortRange，key为无交集的PortRange中的端口，value为对应的PortRange
+	InterestGroupMaps   | 使用策略中的GroupId做key，设置value为true
+	GroupPortPolicyMaps | 策略使用PortRange查InterestPortMaps，将查找的PortRange.Min()赋值给策略对应的Port字段，策略中的SrcGroupIds + DstGroupIds + SrcPort + DstPort做key, policy为value, policy无方向
+	GroupVlanPolicyMaps | 策略中的SrcGroupIds + DstGroupIds + Vlan 做key, policy为value, policy的方向为正, 策略中的DstGroupIds + SrcGroupIds + Vlan 做key, policy为value, policy的方向为反
 
 查找流程：
 
-  - 使用packet中的相关字段，在Interest相关map中查找，若为false则将packet中对应字段置为0
+  - 使用packet中的Proto、Group字段，在Interest相关map中查找，若为false则将packet中对应字段置为0
+  - 使用packet中的Port字段，在InterestPortMaps中查找，将Port改为PortRange.Min()
   - 查找Port相关的策略
-    - 使用packet中的SrcGroupIds + DstGroupIds + Proto + DstPort生成一系列正方向的keys， 使用keys在GroupPortPolicyMaps中查找，将查找到的policy合并方向为正
-    - 使用packet中的DstGroupIds + SrcGroupIds + Proto + SrcPort生成一系列反方向的keys， 使用keys在GroupPortPolicyMaps中查找，将查找到的policy合并方向为反
+    - 使用packet中的SrcGroupIds + DstGroupIds + SrcPort + DstPort生成一系列正方向的keys， 使用keys在GroupPortPolicyMaps[Proto]中查找，将查找到的policy合并方向为正
+    - 使用packet中的DstGroupIds + SrcGroupIds + DstPort + SrcPort生成一系列反方向的keys， 使用keys在GroupPortPolicyMaps[Proto]中查找，将查找到的policy合并方向为反
   - 查找Vlan相关的策略
     - 使用packet中的SrcGroupIds + DstGroupIds + Vlan生成一系列的keys， 使用keys在GroupVlanPolicyMaps中查找，将查找到的policy合并
 
