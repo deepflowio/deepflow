@@ -189,6 +189,7 @@ func Start(configPath string) (closers []io.Closer) {
 		HashMapSize:         cfg.FlowGenerator.HashMapSize,
 		ReportTolerance:     cfg.FlowGenerator.ReportTolerance,
 		IgnoreTorMac:        cfg.FlowGenerator.IgnoreTorMac,
+		IgnoreL2End:         cfg.FlowGenerator.IgnoreL2End,
 	}
 	for i := 0; i < cfg.Queue.FlowGeneratorQueueCount; i++ {
 		flowGenerator := flowgenerator.New(flowGeneratorQueues, flowDuplicatorQueue, flowGeneratorConfig, i)
