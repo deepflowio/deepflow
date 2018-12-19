@@ -292,6 +292,9 @@ func (p *MetaPacket) String() string {
 	}
 	if p.PolicyData != nil {
 		buffer.WriteString(fmt.Sprintf("\n\tPolicy: %v", p.PolicyData))
+		if p.EndpointData != nil {
+			buffer.WriteString("\n\t" + FormatAclGidBitmap(p.EndpointData, p.PolicyData))
+		}
 	}
 
 	if len(p.RawHeader) > 0 {
