@@ -18,6 +18,8 @@ const MIRRORED_TRAFFIC = 7
 type RawPacket = []byte
 
 type MetaPacketTcpHeader struct {
+	pool.ReferenceCount
+
 	Flags         uint8
 	Seq           uint32
 	Ack           uint32
@@ -152,16 +154,17 @@ func (p *MetaPacket) ParseL4(stream *ByteStream) {
 			p.Invalid = true
 			return
 		}
+		tcpHeader := AcquireTcpHeader()
 		p.PortSrc = stream.U16()
 		p.PortDst = stream.U16()
-		seq := stream.U32()
-		ack := stream.U32()
+		tcpHeader.Seq = stream.U32()
+		tcpHeader.Ack = stream.U32()
 		dataOffset := uint16(stream.U8()&0xF0) >> 2
-		flags := stream.U8()
-		winSize := stream.U16()
+		tcpHeader.DataOffset = uint8(dataOffset >> 2)
+		tcpHeader.Flags = stream.U8()
+		tcpHeader.WinSize = stream.U16()
 		stream.Skip(4) // skip checksum and URG Pointer
 		p.PayloadLen -= dataOffset
-		tcpHeader := &MetaPacketTcpHeader{flags, seq, ack, uint8(dataOffset >> 2), winSize, 0, false, 0, nil}
 		p.TcpData = tcpHeader
 
 		optionsLen := int(dataOffset) - MIN_TCP_HEADER_SIZE
@@ -282,7 +285,7 @@ func (p *MetaPacket) String() string {
 	buffer.WriteString(fmt.Sprintf(format, IpFromUint32(p.IpSrc), p.PortSrc,
 		IpFromUint32(p.IpDst), p.PortDst, p.Protocol, p.TTL, p.IHL, p.IpID, p.IpFlags>>13, p.IpFlags&0x1FFF, p.PayloadLen))
 	if p.TcpData != nil {
-		buffer.WriteString(fmt.Sprintf("tcp: %+v", p.TcpData))
+		buffer.WriteString(fmt.Sprintf("tcp: %v", p.TcpData))
 	}
 	if p.EndpointData != nil {
 		buffer.WriteString(fmt.Sprintf("\n\tEndpoint: %v", p.EndpointData))
@@ -299,6 +302,36 @@ func (p *MetaPacket) String() string {
 	return buffer.String()
 }
 
+func (h *MetaPacketTcpHeader) String() string {
+	return fmt.Sprintf("&{Flags:%v Seq:%v Ack:%v DataOffset:%v WinSize:%v WinScale:%v SACKPermitted:%v MSS:%v Sack:%v}",
+		h.Flags, h.Seq, h.Ack, h.DataOffset, h.WinSize, h.WinScale, h.SACKPermitted, h.MSS, h.Sack)
+}
+
+var tcpHeaderPool = pool.NewLockFreePool(func() interface{} {
+	return new(MetaPacketTcpHeader)
+})
+
+func AcquireTcpHeader() *MetaPacketTcpHeader {
+	h := tcpHeaderPool.Get().(*MetaPacketTcpHeader)
+	h.ReferenceCount.Reset()
+	return h
+}
+
+func ReleaseTcpHeader(h *MetaPacketTcpHeader) {
+	if h.SubReferenceCount() {
+		return
+	}
+
+	*h = MetaPacketTcpHeader{}
+	tcpHeaderPool.Put(h)
+}
+
+func CloneTcpHeader(h *MetaPacketTcpHeader) *MetaPacketTcpHeader {
+	dup := AcquireTcpHeader()
+	*dup = *h
+	return dup
+}
+
 var metaPacketPool = pool.NewLockFreePool(func() interface{} {
 	return new(MetaPacket)
 })
@@ -312,6 +345,10 @@ func AcquireMetaPacket() *MetaPacket {
 func ReleaseMetaPacket(x *MetaPacket) {
 	if x.SubReferenceCount() {
 		return
+	}
+
+	if x.TcpData != nil {
+		ReleaseTcpHeader(x.TcpData)
 	}
 
 	*x = MetaPacket{}
