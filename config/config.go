@@ -84,6 +84,7 @@ type FlowGeneratorConfig struct {
 	HashMapSize         uint64        `yaml:"hash-map-size"`
 	ReportTolerance     time.Duration `yaml:"report-tolerance"`
 	IgnoreTorMac        bool          `yaml:"ignore-tor-mac"`
+	IgnoreL2End         bool          `yaml:"ignore-l2-end"`
 }
 
 type MapReduceConfig struct {

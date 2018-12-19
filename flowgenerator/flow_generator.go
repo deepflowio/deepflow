@@ -39,27 +39,44 @@ func (f *FlowGenerator) getQuinTupleHash(meta *MetaPacket) uint64 {
 	return getKeyL3Hash(meta, f.hashBasis) ^ ((uint64(meta.InPort) << 32) | getKeyL4Hash(meta, f.hashBasis))
 }
 
-func isFromTor(inPort uint32) bool {
-	return inPort&PACKET_SOURCE_TOR == PACKET_SOURCE_TOR
+func isFromTrident(inPort uint32) bool {
+	return inPort > PACKET_SOURCE_TOR
 }
 
-func isEqualTor(inPort uint32) bool {
+func isFromTorMirror(inPort uint32) bool {
 	return inPort == PACKET_SOURCE_TOR
 }
 
-func requireMacMatch(inPort uint32, ignore bool) bool {
-	if isEqualTor(inPort) {
-		return !ignore
+// return value stands different match type, defined by MAC_MATCH_*
+// TODO: maybe should consider L2End0 and L2End1 when InPort == 0x30000
+func requireMacMatch(meta *MetaPacket, ignoreTorMac, ignoreL2End bool) int {
+	if !ignoreL2End && isFromTrident(meta.InPort) {
+		if !meta.L2End0 && !meta.L2End1 {
+			return MAC_MATCH_NONE
+		} else if !meta.L2End0 {
+			return MAC_MATCH_DST
+		} else {
+			return MAC_MATCH_SRC
+		}
 	}
-	return isFromTor(inPort)
+	if ignoreTorMac && isFromTorMirror(meta.InPort) {
+		return MAC_MATCH_NONE
+	}
+	return MAC_MATCH_ALL
 }
 
-func MacMatch(meta *MetaPacket, flowMacSrc, flowMacDst MacInt) bool {
-	if flowMacSrc == meta.MacSrc && flowMacDst == meta.MacDst {
-		return true
-	}
-	if flowMacSrc == meta.MacDst && flowMacDst == meta.MacSrc {
-		return true
+func MacMatch(meta *MetaPacket, flowMacSrc, flowMacDst MacInt, matchType int) bool {
+	if matchType == MAC_MATCH_DST {
+		return flowMacDst == meta.MacDst || flowMacSrc == meta.MacDst
+	} else if matchType == MAC_MATCH_SRC {
+		return flowMacSrc == meta.MacSrc || flowMacDst == meta.MacSrc
+	} else {
+		if flowMacSrc == meta.MacSrc && flowMacDst == meta.MacDst {
+			return true
+		}
+		if flowMacSrc == meta.MacDst && flowMacDst == meta.MacSrc {
+			return true
+		}
 	}
 	return false
 }
@@ -89,8 +106,8 @@ func (f *FlowGenerator) keyMatch(flowCache *FlowCache, meta *MetaPacket) (*FlowE
 		if taggedFlow.Exporter != meta.Exporter || meta.InPort != taggedFlow.InPort {
 			continue
 		}
-		if requireMacMatch(meta.InPort, f.ignoreTorMac) &&
-			!MacMatch(meta, taggedFlow.MACSrc, taggedFlow.MACDst) {
+		macMatchType := requireMacMatch(meta, f.ignoreTorMac, f.ignoreL2End)
+		if macMatchType != MAC_MATCH_NONE && !MacMatch(meta, taggedFlow.MACSrc, taggedFlow.MACDst, macMatchType) {
 			continue
 		}
 		if taggedFlow.Proto != meta.Protocol ||
@@ -558,6 +575,7 @@ loop:
 		sleepDuration = minLoopInterval - used
 	} else {
 		sleepDuration = 0
+		log.Debugf("used: %d, minLoop: %d", used, minLoopInterval)
 		log.Debugf("clean time of generator %d is too long, maybe pressure is heavy", f.index)
 	}
 	f.stats.cleanRoutineFlowCacheNums[index] = nonEmptyFlowCacheNum
@@ -640,6 +658,7 @@ func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, cfg
 		handleRunning:           false,
 		cleanRunning:            false,
 		ignoreTorMac:            cfg.IgnoreTorMac,
+		ignoreL2End:             cfg.IgnoreL2End,
 		index:                   index,
 		perfCounter:             NewFlowPerfCounter(),
 	}

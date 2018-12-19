@@ -30,6 +30,13 @@ const (
 	TIMEOUT_SINGLE_DIRECTION = 5 * time.Second
 )
 
+const (
+	MAC_MATCH_NONE = 0x00 // don't match any mac
+	MAC_MATCH_DST  = 0x01 // ignore src and only match dst mac
+	MAC_MATCH_SRC  = 0x10 // ignore dst and only match src mac
+	MAC_MATCH_ALL  = 0x11 // match all macs
+)
+
 const FLOW_CACHE_CAP = 1024
 const HASH_MAP_SIZE uint64 = 1024 * 256
 const FLOW_OUT_BUFFER_CAP = 1024 * 2
@@ -104,6 +111,7 @@ type FlowGenerator struct {
 	handleRunning           bool
 	cleanRunning            bool
 	ignoreTorMac            bool
+	ignoreL2End             bool
 	index                   int
 	cleanWaitGroup          sync.WaitGroup
 
@@ -120,6 +128,7 @@ type FlowGeneratorConfig struct {
 	HashMapSize         uint64
 	ReportTolerance     time.Duration
 	IgnoreTorMac        bool
+	IgnoreL2End         bool
 }
 
 func timeMax(a time.Duration, b time.Duration) time.Duration {
