@@ -174,7 +174,7 @@ func (c *Config) Validate() error {
 		c.Queue.FlowAppQueueSize = c.Queue.QueueSize
 	}
 	if c.Queue.FlowDuplicatorQueueSize == 0 {
-		c.Queue.FlowDuplicatorQueueSize = c.Queue.FlowGeneratorQueueSize >> 2
+		c.Queue.FlowDuplicatorQueueSize = c.Queue.QueueSize << 1
 	}
 	if c.Queue.DocsQueueSize == 0 {
 		c.Queue.DocsQueueSize = 524288
