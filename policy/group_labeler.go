@@ -149,24 +149,34 @@ func (g *IpResourceGroup) GenerateIpNetmaskMap(ipgroupData []*IpGroupData) {
 	g.maskLenDataMini = maskLenDataMini
 }
 
-func getIpGroupIdFromMap(key uint64, groupIdsMap map[uint32]bool, epcMaskedIpGroupMap map[uint64]*GroupIdData) {
+func getIpGroupIdFromMap(key uint64, groupIdSlice []uint32, groupIdMap map[uint32]bool, epcMaskedIpGroupMap map[uint64]*GroupIdData) []uint32 {
 	if group, ok := epcMaskedIpGroupMap[key]; ok {
 		for _, value := range group.GroupIdSlice {
-			groupIdsMap[value] = true
+			if ok := groupIdMap[value]; !ok {
+				groupIdSlice = append(groupIdSlice, value)
+				groupIdMap[value] = true
+			}
 		}
 	}
+	return groupIdSlice
 }
 
-func getIpGroupIdFromMiniMap(key uint32, groupIdsMap map[uint32]bool, epcMaskedIpGroupMap map[uint32]*GroupIdData) {
+func getIpGroupIdFromMiniMap(key uint32, groupIdSlice []uint32, groupIdMap map[uint32]bool, epcMaskedIpGroupMap map[uint32]*GroupIdData) []uint32 {
 	if group, ok := epcMaskedIpGroupMap[key]; ok {
 		for _, value := range group.GroupIdSlice {
-			groupIdsMap[value] = true
+			if ok := groupIdMap[value]; !ok {
+				groupIdSlice = append(groupIdSlice, value)
+				groupIdMap[value] = true
+			}
 		}
 	}
+
+	return groupIdSlice
 }
 
-func (g *IpResourceGroup) GetGroupIds(ip uint32, endpointInfo *EndpointInfo) map[uint32]bool {
-	groupIdsMap := map[uint32]bool{}
+func (g *IpResourceGroup) GetGroupIds(ip uint32, endpointInfo *EndpointInfo) []uint32 {
+	var groupIdSlice []uint32
+	groupIdMap := map[uint32]bool{}
 	epcId := uint16(0)
 	if endpointInfo.L3EpcId != -1 {
 		epcId = uint16(endpointInfo.L3EpcId)
@@ -174,25 +184,25 @@ func (g *IpResourceGroup) GetGroupIds(ip uint32, endpointInfo *EndpointInfo) map
 	for _, maskLen := range g.maskLenData.maskLenSlice {
 		epcMaskedIpGroupMap := g.maskLenGroupData.maskLenGroups[maskLen]
 		key := uint64(epcId)<<32 | uint64(ip&utils.MaskLenToNetmask(uint32(maskLen)))
-		getIpGroupIdFromMap(key, groupIdsMap, epcMaskedIpGroupMap)
+		groupIdSlice = getIpGroupIdFromMap(key, groupIdSlice, groupIdMap, epcMaskedIpGroupMap)
 		// 查找项目全采集的资源组
 		if epcId != 0 {
 			key = uint64(ip & (math.MaxUint32 << uint32(MAX_MASK_LEN-maskLen)))
-			getIpGroupIdFromMap(key, groupIdsMap, epcMaskedIpGroupMap)
+			groupIdSlice = getIpGroupIdFromMap(key, groupIdSlice, groupIdMap, epcMaskedIpGroupMap)
 		}
 	}
 	for _, maskLen := range g.maskLenDataMini.maskLenSlice {
 		epcMaskedIpGroupMap := g.maskLenGroupDataMini.maskLenGroups[maskLen]
 		key := uint32(epcId)<<16 | uint32(ip&utils.MaskLenToNetmask(uint32(maskLen)))>>16
-		getIpGroupIdFromMiniMap(key, groupIdsMap, epcMaskedIpGroupMap)
+		groupIdSlice = getIpGroupIdFromMiniMap(key, groupIdSlice, groupIdMap, epcMaskedIpGroupMap)
 		// 查找项目全采集的资源组
 		if epcId != 0 {
 			key = uint32(ip&(math.MaxUint32<<uint32(MAX_MASK_LEN-maskLen))) >> 16
-			getIpGroupIdFromMiniMap(key, groupIdsMap, epcMaskedIpGroupMap)
+			groupIdSlice = getIpGroupIdFromMiniMap(key, groupIdSlice, groupIdMap, epcMaskedIpGroupMap)
 		}
 	}
 
-	return groupIdsMap
+	return groupIdSlice
 }
 
 func (g *IpResourceGroup) Update(groups []*IpGroupData) {
@@ -212,9 +222,9 @@ func inDevGroupIds(groupIds []uint32, len int, groupId uint32) bool {
 // Populate fills tags in flow message
 func (g *IpResourceGroup) Populate(ip uint32, endpointInfo *EndpointInfo) {
 	devGroupIdLen := len(endpointInfo.GroupIds)
-	for k, _ := range g.GetGroupIds(ip, endpointInfo) {
-		if !inDevGroupIds(endpointInfo.GroupIds, devGroupIdLen, k) {
-			endpointInfo.GroupIds = append(endpointInfo.GroupIds, uint32(k)+IP_GROUP_ID_FLAG)
+	for _, v := range g.GetGroupIds(ip, endpointInfo) {
+		if !inDevGroupIds(endpointInfo.GroupIds, devGroupIdLen, v) {
+			endpointInfo.GroupIds = append(endpointInfo.GroupIds, uint32(v)+IP_GROUP_ID_FLAG)
 		}
 	}
 }

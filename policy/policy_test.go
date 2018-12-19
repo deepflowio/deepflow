@@ -1564,6 +1564,129 @@ func TestPolicySrcPort(t *testing.T) {
 	}
 }
 
+func generateAclGidBitmap(groupType uint32, offset uint32, bitOffset uint32) AclGidBitmap {
+	aclGidBitmap := AclGidBitmap(0)
+	if groupType == GROUP_TYPE_SRC {
+		aclGidBitmap.SetSrcFlag()
+	} else {
+		aclGidBitmap.SetDstFlag()
+	}
+	aclGidBitmap.SetMapOffset(offset)
+	aclGidBitmap.SetMapBits(bitOffset)
+
+	return aclGidBitmap
+}
+
+func TestAclGidBitmap(t *testing.T) {
+	acls := []*Acl{}
+	// 创建 policyTable
+	table := generatePolicyTable()
+	// 构建acl action  1:1000->2:0 tcp
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	action = action.SetACLGID(10)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
+	acls = append(acls, acl)
+	table.UpdateAcls(acls)
+	// 构建查询1-key  1:1000->2:8000 tcp
+	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 8000)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
+	_, policyData := table.LookupAllByKey(key)
+	aclGidbitmap0 := generateAclGidBitmap(GROUP_TYPE_SRC, 0, 0)
+	aclGidbitmap1 := generateAclGidBitmap(GROUP_TYPE_DST, 0, 0)
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(2)
+	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidbitmap0, aclGidbitmap1)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmap Check Failed!")
+	}
+}
+
+func TestAclGidBitmapFirstPathVsFastPath(t *testing.T) {
+	acls := []*Acl{}
+	// 创建 policyTable
+	table := generatePolicyTable()
+	// 构建acl action  1:1000->2:0 tcp
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	action = action.SetACLGID(10)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
+	acl1 := generatePolicyAcl(table, action, 20, group[2], group[1], IPProtocolTCP, 0, vlanAny)
+	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(8000, 8000))
+	acls = append(acls, acl, acl1)
+	table.UpdateAcls(acls)
+	// 构建查询1-key  1:1000->2:8000 tcp
+	key1 := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 8000)
+	setEthTypeAndOthers(key1, EthernetTypeIPv4, 64, true, true)
+	result := getEndpointData(table, key1)
+	policyData := getPolicyByFirstPath(table, result, key1)
+	aclGidbitmap0 := generateAclGidBitmap(GROUP_TYPE_SRC, 0, 0)
+	aclGidbitmap1 := generateAclGidBitmap(GROUP_TYPE_DST, 0, 0)
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].AddDirections(BACKWARD)
+	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(2)
+	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidbitmap0, aclGidbitmap1)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmapFirstPathVsFastPath FirstPath Check Failed!")
+	}
+	_, policyData = getPolicyByFastPath(table, key1)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmapFirstPathVsFastPath FastPath Check Failed!")
+	}
+
+	key2 := generateLookupKey(group2Mac, group1Mac, vlanAny, group2Ip1, group1Ip1, IPProtocolTCP, 8000, 1000)
+	setEthTypeAndOthers(key2, EthernetTypeIPv4, 64, true, true)
+	basicPolicyData.ACLID = 20
+	result = getEndpointData(table, key2)
+	policyData = getPolicyByFirstPath(table, result, key2)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmapFirstPathVsFastPath FirstPath Check Failed!")
+	}
+	_, policyData = getPolicyByFastPath(table, key2)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmapFirstPathVsFastPath FastPath Check Failed!")
+	}
+}
+
+func TestAclGidBitmapGroup100(t *testing.T) {
+	acls := []*Acl{}
+	table := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	action = action.SetACLGID(100)
+	acl := generatePolicyAcl(table, action, 10, groupAny, groupAny, IPProtocolTCP, 0, vlanAny)
+	acls = append(acls, acl)
+	table.UpdateAcls(acls)
+	ipGroups := make([]*IpGroupData, 0, 100)
+	for i := 1; i <= 100; i++ {
+		ipGroups = append(ipGroups, generateIpGroup(uint32(i), 0, "0.0.0.0/0"))
+	}
+	table.UpdateIpGroupData(ipGroups)
+	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 0)
+	_, policyData := table.LookupAllByKey(key)
+	aclGidbitmap0 := generateAclGidBitmap(GROUP_TYPE_SRC, 0, 0)
+	aclGidbitmap1 := generateAclGidBitmap(GROUP_TYPE_SRC, 56, 0)
+	aclGidbitmap2 := generateAclGidBitmap(GROUP_TYPE_DST, 0, 0)
+	aclGidbitmap3 := generateAclGidBitmap(GROUP_TYPE_DST, 56, 0)
+	for i := 0; i < 56; i++ {
+		aclGidbitmap0.SetMapBits(uint32(i))
+		aclGidbitmap2.SetMapBits(uint32(i))
+	}
+	for i := 56; i < 100; i++ {
+		aclGidbitmap1.SetMapBits(uint32(i))
+		aclGidbitmap3.SetMapBits(uint32(i))
+	}
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].AddDirections(BACKWARD)
+	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(4)
+	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidbitmap0, aclGidbitmap1, aclGidbitmap2, aclGidbitmap3)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmap Check Failed!")
+	}
+}
+
 func BenchmarkNpbFirstPath(b *testing.B) {
 	table := generatePolicyTable()
 
