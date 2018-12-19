@@ -2,6 +2,7 @@ package datatype
 
 import (
 	"fmt"
+	"math"
 
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
@@ -26,6 +27,16 @@ const (
 	RESOURCE_GROUP_TYPE_DEV  = 0x1
 	RESOURCE_GROUP_TYPE_IP   = 0x2
 	RESOURCE_GROUP_TYPE_MASK = RESOURCE_GROUP_TYPE_DEV | RESOURCE_GROUP_TYPE_IP
+)
+
+const (
+	GROUP_TYPE_OFFSET    = 62
+	GROUP_MAPBITS_OFFSET = 56
+	GROUP_TYPE_MASK      = 0x1
+	GROUP_TYPE_SRC       = 0x0
+	GROUP_TYPE_DST       = 0x1
+	GROUP_MAPOFFSET_MASK = 0x3F
+	GROUP_MAPBITS_MASK   = math.MaxUint64 >> 8
 )
 
 func (a NpbAction) TapSideCompare(flag int) bool {
@@ -154,10 +165,11 @@ func (f ActionFlag) String() string {
 type ACLID uint16
 
 type PolicyData struct {
-	ACLID       ACLID      // 匹配的第一个ACL
-	ActionFlags ActionFlag // bitwise OR
-	AclActions  []AclAction
-	NpbActions  []NpbAction
+	ACLID         ACLID      // 匹配的第一个ACL
+	ActionFlags   ActionFlag // bitwise OR
+	AclActions    []AclAction
+	NpbActions    []NpbAction
+	AclGidBitmaps []AclGidBitmap
 }
 
 type DirectionType uint8
@@ -225,7 +237,60 @@ func (t TagTemplate) String() string {
 	return s
 }
 
-// keys (16b ACLGID + 16b ActionFlags), values (8b Directions + 16b TagTemplates)
+//  MSB        63          62              56         0
+//  +-------------------------------------------------+
+//  | RESERVED | SRC/DST   |   MapOffset   |  MapBits |
+//  +-------------------------------------------------+
+// SRC/DST: 源或目的资源组
+// MapOffset: AclGidBitmap在资源组的起始偏移量
+// MapBits: AclGidBitmap在资源组相对起始值的偏移量,每个bit是对应一个资源组
+type AclGidBitmap uint64
+
+func (b *AclGidBitmap) SetSrcFlag() {
+	*b &= ^AclGidBitmap(GROUP_TYPE_MASK << GROUP_TYPE_OFFSET)
+}
+
+func (b *AclGidBitmap) SetDstFlag() {
+	*b |= AclGidBitmap(GROUP_TYPE_MASK << GROUP_TYPE_OFFSET)
+}
+
+func (b *AclGidBitmap) SetMapOffset(offset uint32) {
+	realOffset := offset / GROUP_MAPBITS_OFFSET
+	*b &= ^(AclGidBitmap(GROUP_MAPOFFSET_MASK) << GROUP_MAPBITS_OFFSET)
+	*b |= AclGidBitmap(realOffset&GROUP_MAPOFFSET_MASK) << GROUP_MAPBITS_OFFSET
+}
+
+func (b *AclGidBitmap) SetMapBits(offset uint32) {
+	realOffset := offset % GROUP_MAPBITS_OFFSET
+	*b |= (AclGidBitmap(1) << realOffset) & GROUP_MAPBITS_MASK
+}
+
+func (b *AclGidBitmap) ReverseGroupType() {
+	if b.GetGroupType() == GROUP_TYPE_SRC {
+		b.SetDstFlag()
+	} else {
+		b.SetSrcFlag()
+	}
+}
+
+func (b AclGidBitmap) GetGroupType() uint8 {
+	return uint8((b >> GROUP_TYPE_OFFSET) & GROUP_TYPE_MASK)
+}
+
+func (b AclGidBitmap) GetMapOffset() uint32 {
+	return uint32((b>>GROUP_MAPBITS_OFFSET)&GROUP_MAPOFFSET_MASK) * GROUP_MAPBITS_OFFSET
+}
+
+func (b AclGidBitmap) GetMapBits() uint64 {
+	return uint64(uint64(b) & GROUP_MAPBITS_MASK)
+}
+
+func (b AclGidBitmap) String() string {
+	return fmt.Sprintf("{Type: %d, MapOffset: %d, MapBitOffset: 0x%x, RAW: 0x%x}",
+		b.GetGroupType(), b.GetMapOffset(), b.GetMapBits(), uint64(b))
+}
+
+// keys (16b ACLGID + 16b ActionFlags + ), values (16b AclGidMapOffset + 4b MapCount + 2b Directions + 10b TagTemplates)
 type AclAction uint64
 
 func (a AclAction) SetACLGID(aclGID ACLID) AclAction {
@@ -246,13 +311,25 @@ func (a AclAction) AddActionFlags(actionFlags ActionFlag) AclAction {
 }
 
 func (a AclAction) SetDirections(directions DirectionType) AclAction {
-	a &= ^AclAction(0xFF << 16)
-	a |= AclAction(directions&0xFF) << 16
+	a &= ^AclAction(0x3 << 10)
+	a |= AclAction(directions&0x3) << 10
 	return a
 }
 
 func (a AclAction) AddDirections(directions DirectionType) AclAction {
-	a |= AclAction(directions&0xFF) << 16
+	a |= AclAction(directions&0x3) << 10
+	return a
+}
+
+func (a AclAction) SetAclGidBitmapOffset(offset uint16) AclAction {
+	a &= ^AclAction(0xFFFF << 16)
+	a |= AclAction(offset&0xFFFF) << 16
+	return a
+}
+
+func (a AclAction) SetAclGidBitmapCount(count uint8) AclAction {
+	a &= ^AclAction(0xF << 12)
+	a |= AclAction(count&0xF) << 12
 	return a
 }
 
@@ -267,13 +344,13 @@ func (a AclAction) ReverseDirection() AclAction {
 }
 
 func (a AclAction) SetTagTemplates(tagTemplates TagTemplate) AclAction {
-	a &= ^AclAction(0xFFFF)
-	a |= AclAction(tagTemplates & 0xFFFF)
+	a &= ^AclAction(0x3FF)
+	a |= AclAction(tagTemplates & 0x3FF)
 	return a
 }
 
 func (a AclAction) AddTagTemplates(tagTemplates TagTemplate) AclAction {
-	a |= AclAction(tagTemplates & 0xFFFF)
+	a |= AclAction(tagTemplates & 0x3FF)
 	return a
 }
 
@@ -286,16 +363,25 @@ func (a AclAction) GetActionFlags() ActionFlag {
 }
 
 func (a AclAction) GetDirections() DirectionType {
-	return DirectionType((a >> 16) & 0xFF)
+	return DirectionType((a >> 10) & 0x3)
 }
 
 func (a AclAction) GetTagTemplates() TagTemplate {
-	return TagTemplate(a & 0xFFFF)
+	return TagTemplate(a & 0x3FF)
+}
+
+func (a AclAction) GetAclGidBitmapOffset() uint16 {
+	return uint16(a>>16) & 0x3FF
+}
+
+func (a AclAction) GetAclGidBitmapCount() uint8 {
+	return uint8(a>>12) & 0xF
 }
 
 func (a AclAction) String() string {
-	return fmt.Sprintf("{GID: %d ActionFlags: %s Directions: %d TagTemplates: %s}",
-		a.GetACLGID(), a.GetActionFlags().String(), a.GetDirections(), a.GetTagTemplates().String())
+	return fmt.Sprintf("{GID: %d ActionFlags: %s Directions: %d TagTemplates: %s GidMapOffset: %d, GidMapCount: %d}",
+		a.GetACLGID(), a.GetActionFlags().String(), a.GetDirections(), a.GetTagTemplates().String(), a.GetAclGidBitmapOffset(),
+		a.GetAclGidBitmapCount())
 }
 
 func (d *PolicyData) ReverseNpbActions() {
@@ -409,9 +495,49 @@ func (d *PolicyData) MergeAndSwapDirection(aclActions []AclAction, npbActions []
 	d.Merge(newAclActions, newNpbActions, aclID)
 }
 
+func formatGroup(aclGidBitmap AclGidBitmap, endpointData *EndpointData) string {
+	var formatStr string
+	groupType := aclGidBitmap.GetGroupType()
+	groupOffset := aclGidBitmap.GetMapOffset()
+	groupBitOffset := aclGidBitmap.GetMapBits()
+	if groupType == GROUP_TYPE_SRC {
+		formatStr += " SRC: "
+	} else if groupType == GROUP_TYPE_DST {
+		formatStr += " DST: "
+	} else {
+		return formatStr
+	}
+	for j := uint32(0); j < GROUP_MAPBITS_OFFSET; j++ {
+		if (groupBitOffset & (uint64(1) << j)) > 0 {
+			if groupType == GROUP_TYPE_SRC {
+				formatStr += GroupIdToString(endpointData.SrcInfo.GroupIds[groupOffset+j])
+			} else {
+				formatStr += GroupIdToString(endpointData.DstInfo.GroupIds[groupOffset+j])
+			}
+		}
+	}
+	return formatStr
+}
+
+func FormatAclGidBitmap(endpointData *EndpointData, policyData *PolicyData) string {
+	var formatStr string
+	for _, aclAction := range policyData.AclActions {
+		if aclAction.GetACLGID() > ACLID(0) {
+			formatStr += fmt.Sprintf("{ACLGID: %d ", aclAction.GetACLGID())
+			mapOffset := aclAction.GetAclGidBitmapOffset()
+			mapCount := aclAction.GetAclGidBitmapCount()
+			for i := mapOffset; i < mapOffset+uint16(mapCount); i++ {
+				formatStr += formatGroup(policyData.AclGidBitmaps[i], endpointData)
+			}
+			formatStr += "} "
+		}
+	}
+	return formatStr
+}
+
 func (d *PolicyData) String() string {
-	return fmt.Sprintf("{ACLID: %d ActionFlags: %v AclActions: %v NpbActions: %v}",
-		d.ACLID, d.ActionFlags, d.AclActions, d.NpbActions)
+	return fmt.Sprintf("{ACLID: %d ActionFlags: %v AclActions: %v NpbActions: %v AclGidBitmaps: %v}",
+		d.ACLID, d.ActionFlags, d.AclActions, d.NpbActions, d.AclGidBitmaps)
 }
 
 var policyDataPool = pool.NewLockFreePool(func() interface{} {
