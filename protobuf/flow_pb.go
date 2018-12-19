@@ -5,13 +5,14 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	pb "gitlab.x.lan/yunshan/message/dfi"
 )
 
 const TYPE_MULTI = 100000000
 
-func MarshalFlow(f *TaggedFlow, bytes *utils.ByteBuffer) error {
+func MarshalFlow(f *datatype.TaggedFlow, bytes *utils.ByteBuffer) error {
 	flow := &pb.Flow{
 		Exporter:   proto.Uint32(f.Exporter),
 		CloseType:  proto.Uint32(uint32(f.CloseType)),
@@ -104,8 +105,8 @@ func MarshalFlow(f *TaggedFlow, bytes *utils.ByteBuffer) error {
 	return nil
 }
 
-func getACLGIDs(f *TaggedFlow) []uint32 {
-	set := make(map[ACLID]bool)
+func getACLGIDs(f *datatype.TaggedFlow) []uint32 {
+	set := make(map[datatype.ACLID]bool)
 	for _, aclAction := range f.PolicyData.AclActions {
 		g := aclAction.GetACLGID()
 		if g > 0 {
