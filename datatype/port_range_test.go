@@ -47,4 +47,16 @@ func TestPortRange(t *testing.T) {
 	if !reflect.DeepEqual(expect, result) {
 		t.Errorf("TestPortRange expect: %+v  return: %+v ", expect, result)
 	}
+
+	expect = []PortRange{NewPortRange(1, 9), NewPortRange(10, 19), NewPortRange(20, 29), NewPortRange(30, 39), NewPortRange(40, 60), NewPortRange(61, 70), NewPortRange(71, 80), NewPortRange(81, 90), NewPortRange(91, 100)}
+	result = GetPortRanges([]PortRange{NewPortRange(1, 100), NewPortRange(10, 90), NewPortRange(20, 80), NewPortRange(30, 70), NewPortRange(40, 60)})
+	if !reflect.DeepEqual(expect, result) {
+		t.Errorf("TestPortRange expect: %+v  return: %+v ", expect, result)
+	}
+
+	expect = []PortRange{NewPortRange(1, 1), NewPortRange(2, 2), NewPortRange(3, 3), NewPortRange(4, 79), NewPortRange(80, 80), NewPortRange(81, 100), NewPortRange(200, 300)}
+	result = GetPortRanges([]PortRange{NewPortRange(1, 1), NewPortRange(2, 2), NewPortRange(3, 3), NewPortRange(3, 100), NewPortRange(80, 80), NewPortRange(200, 300)})
+	if !reflect.DeepEqual(expect, result) {
+		t.Errorf("TestPortRange expect: %+v  return: %+v ", expect, result)
+	}
 }

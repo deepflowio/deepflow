@@ -56,40 +56,33 @@ func createPortStatusTable(raw []PortRange) []PortStatus {
 func createPortRangeByTable(table []PortStatus) []PortRange {
 	portRanges := make([]PortRange, 0, 1000)
 
-	start := 0
-	end := 0
-	first := true
+	left := 0
+	right := 0
 	for port := 1; port <= math.MaxUint16; port++ {
 		status := table[port]
-		if start == 0 {
-			start = port
-			end = port
-			if status != RANGE_EDGE {
-				first = false
-				continue
-			}
-		}
 
 		switch status {
 		case RANGE_NONE:
-			end = port
 		case RANGE_EDGE:
-			if !first {
-				portRanges = append(portRanges, NewPortRange(uint16(start), uint16(end)))
+			if left > 0 && left != port {
+				portRanges = append(portRanges, NewPortRange(uint16(left), uint16(port)-1))
 			}
 			portRanges = append(portRanges, NewPortRange(uint16(port), uint16(port)))
-			start = port + 1
-			end = start
+			left = port + 1
 		case RANGE_LEFT:
-			if end > start {
-				portRanges = append(portRanges, NewPortRange(uint16(start), uint16(end)))
+			if left > 0 && left != port {
+				portRanges = append(portRanges, NewPortRange(uint16(left), uint16(port)-1))
 			}
-			start = port
-			end = start
+			left = port
 		case RANGE_RIGHT:
-			portRanges = append(portRanges, NewPortRange(uint16(start), uint16(port)))
-			start = port + 1
-			end = start
+			if left > 0 {
+				portRanges = append(portRanges, NewPortRange(uint16(left), uint16(port)))
+				left = 0
+				right = port + 1
+			} else if right > 0 {
+				portRanges = append(portRanges, NewPortRange(uint16(right), uint16(port)))
+				right = port + 1
+			}
 		}
 	}
 	return portRanges
