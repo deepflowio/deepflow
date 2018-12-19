@@ -201,6 +201,9 @@ func BenchmarkParsePacket(b *testing.B) {
 		actual := &MetaPacket{PacketLen: uint16(packetLens[index])}
 		l2Len := actual.ParseL2(packet)
 		actual.Parse(packet[l2Len:])
+		if actual.TcpData != nil {
+			ReleaseTcpHeader(actual.TcpData)
+		}
 	}
 }
 
