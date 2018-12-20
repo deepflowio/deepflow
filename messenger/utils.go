@@ -7,6 +7,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
+	"gitlab.x.lan/yunshan/droplet-libs/protobuf"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	dt "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 	pb "gitlab.x.lan/yunshan/message/zero"
@@ -46,31 +47,31 @@ func Marshal(doc *app.Document, bytes *utils.ByteBuffer) error {
 	if !ok {
 		return fmt.Errorf("Unknown supported tag type %T", doc.Tag)
 	}
-	msg.Tag = dt.TagToPB(tag)
+	msg.Tag = protobuf.TagToPB(tag)
 
 	msg.Meter = &pb.Meter{}
 	switch msgType {
 	case MSG_USAGE:
 		meter := doc.Meter.(*dt.UsageMeter)
-		msg.Meter.Usage = dt.UsageMeterToPB(meter)
+		msg.Meter.Usage = protobuf.UsageMeterToPB(meter)
 	case MSG_PERF:
 		meter := doc.Meter.(*dt.PerfMeter)
-		msg.Meter.Perf = dt.PerfMeterToPB(meter)
+		msg.Meter.Perf = protobuf.PerfMeterToPB(meter)
 	case MSG_GEO:
 		meter := doc.Meter.(*dt.GeoMeter)
-		msg.Meter.Geo = dt.GeoMeterToPB(meter)
+		msg.Meter.Geo = protobuf.GeoMeterToPB(meter)
 	case MSG_FLOW:
 		meter := doc.Meter.(*dt.FlowMeter)
-		msg.Meter.Flow = dt.FlowMeterToPB(meter)
+		msg.Meter.Flow = protobuf.FlowMeterToPB(meter)
 	case MSG_CONSOLE_LOG:
 		meter := doc.Meter.(*dt.ConsoleLogMeter)
-		msg.Meter.ConsoleLog = dt.ConsoleLogMeterToPB(meter)
+		msg.Meter.ConsoleLog = protobuf.ConsoleLogMeterToPB(meter)
 	case MSG_TYPE:
 		meter := doc.Meter.(*dt.TypeMeter)
-		msg.Meter.Type = dt.TypeMeterToPB(meter)
+		msg.Meter.Type = protobuf.TypeMeterToPB(meter)
 	case MSG_FPS:
 		meter := doc.Meter.(*dt.FPSMeter)
-		msg.Meter.Fps = dt.FPSMeterToPB(meter)
+		msg.Meter.Fps = protobuf.FPSMeterToPB(meter)
 	}
 	msg.ActionFlags = proto.Uint32(doc.ActionFlags)
 

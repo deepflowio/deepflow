@@ -34,10 +34,6 @@
   version = "v1.1.15"
 
 [[constraint]]
-  name = "github.com/hashicorp/golang-lru"
-  version = "0.5.0"
-
-[[constraint]]
   branch = "master"
   name = "github.com/lestrrat/go-file-rotatelogs"
 
