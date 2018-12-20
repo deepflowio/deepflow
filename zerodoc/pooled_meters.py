@@ -44,23 +44,22 @@ func (m *{name}) Release() {{
 }}
 """
 
-def extract_name(file):
+def extract_structs(file):
+	names = []
 	with open(file, 'r') as f:
 		for line in f:
 			if line.startswith('type'):
 				kws = line.split()
 				if kws[2] == 'struct':
-					return kws[1]
-	return ''
+					names.append(kws[1])
+	return names
 
 
 def find_meters():
 	names = []
 	for f in os.listdir('.'):
 		if f.endswith('_meter.go'):
-			name = extract_name(f)
-			if name is not None and name != '':
-				names.append(name)
+			names.extend([name for name in extract_structs(f) if name is not None and name != '' and name.endswith('Meter')])
 	return names
 
 
