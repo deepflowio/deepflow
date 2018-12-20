@@ -53,17 +53,6 @@
   version = "v1.1.15"
 
 [[projects]]
-  digest = "1:8ec8d88c248041a6df5f6574b87bc00e7e0b493881dad2e7ef47b11dc69093b5"
-  name = "github.com/hashicorp/golang-lru"
-  packages = [
-    ".",
-    "simplelru",
-  ]
-  pruneopts = "UT"
-  revision = "20f1fb78b0740ba8c3cb143a61e86ba5c8669768"
-  version = "v0.5.0"
-
-[[projects]]
   digest = "1:870d441fe217b8e689d7949fef6e43efbc787e50f200cb1e70dbca9204a1d6be"
   name = "github.com/inconshreveable/mousetrap"
   packages = ["."]
@@ -159,7 +148,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:a6668fa10e534171899a3cfaa9ee5864d23a5b2d56404d282551b1fbd70f2228"
+  digest = "1:e339b38e691fd95e8dcde2feceda6384f81389b642b1bd8515ffb6eb0bc3fc43"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "app",
@@ -172,6 +161,7 @@
     "messenger",
     "policy",
     "pool",
+    "protobuf",
     "queue",
     "segmenttree",
     "stats",
@@ -181,7 +171,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "b6976a5a822b61f60f2a9769eaf9440e66c71124"
+  revision = "860f1f4a4c2b805e1d99f35123505024c69e15eb"
 
 [[projects]]
   branch = "master"
@@ -330,6 +320,7 @@
     "gitlab.x.lan/yunshan/droplet-libs/messenger",
     "gitlab.x.lan/yunshan/droplet-libs/policy",
     "gitlab.x.lan/yunshan/droplet-libs/pool",
+    "gitlab.x.lan/yunshan/droplet-libs/protobuf",
     "gitlab.x.lan/yunshan/droplet-libs/queue",
     "gitlab.x.lan/yunshan/droplet-libs/stats",
     "gitlab.x.lan/yunshan/droplet-libs/utils",

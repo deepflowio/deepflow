@@ -3,6 +3,7 @@ package sender
 import (
 	"github.com/golang/protobuf/proto"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/protobuf"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	pb "gitlab.x.lan/yunshan/message/dfi"
@@ -46,7 +47,7 @@ func (s *FlowSender) run() {
 					log.Warningf("Marshalling flow failed: %s", err)
 					continue
 				}
-				if err := datatype.MarshalFlow(flow, bytes); err != nil {
+				if err := protobuf.MarshalFlow(flow, bytes); err != nil {
 					datatype.ReleaseTaggedFlow(flow)
 					log.Warningf("Marshalling flow failed: %s", err)
 					continue
