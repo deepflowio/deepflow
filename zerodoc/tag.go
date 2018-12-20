@@ -48,7 +48,8 @@ const (
 	TAPType
 	SubnetID
 	ACLID
-	ACLDirection
+	ACLDirection // 42
+	Scope
 )
 
 const (
@@ -116,6 +117,33 @@ const (
 	ACL_BACKWARD
 )
 
+type ScopeEnum uint8
+
+const (
+	SCOPE_ALL ScopeEnum = iota
+	SCOPE_IN_EPC
+	SCOPE_OUT_EPC
+	SCOPE_IN_SUBNET
+	SCOPE_OUT_SUBNET
+)
+
+func (s ScopeEnum) String() string {
+	switch s {
+	case SCOPE_ALL:
+		return "all"
+	case SCOPE_IN_EPC:
+		return "in_epc"
+	case SCOPE_OUT_EPC:
+		return "out_epc"
+	case SCOPE_IN_SUBNET:
+		return "in_subnet"
+	case SCOPE_OUT_SUBNET:
+		return "out_subnet"
+	default:
+		panic("invalid scope type")
+	}
+}
+
 type Field struct {
 	IP           uint32
 	MAC          uint64
@@ -159,6 +187,7 @@ type Field struct {
 	SubnetID     uint32
 	ACLID        uint32
 	ACLDirection ACLDirectionEnum
+	Scope        ScopeEnum
 
 	Country string
 	Region  string
@@ -328,6 +357,10 @@ func (t *Tag) ToKVString() string {
 			buf.WriteString(",acl_direction=bwd")
 		}
 	}
+	if t.Code&Scope != 0 {
+		buf.WriteString(",scope=")
+		buf.WriteString(t.Scope.String())
+	}
 
 	if t.Code&Country != 0 {
 		buf.WriteString(",country=")
@@ -451,6 +484,9 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&ACLDirection != 0 {
 		t.ACLDirection = ACLDirectionEnum(decoder.ReadU8())
 	}
+	if t.Code&Scope != 0 {
+		t.Scope = ScopeEnum(decoder.ReadU8())
+	}
 
 	if t.Code&Country != 0 {
 		t.Country = decoder.ReadString255()
@@ -565,6 +601,9 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 	if t.Code&ACLDirection != 0 {
 		encoder.WriteU8(uint8(t.ACLDirection))
 	}
+	if t.Code&Scope != 0 {
+		encoder.WriteU8(uint8(t.Scope))
+	}
 
 	if t.Code&Country != 0 {
 		encoder.WriteString255(t.Country)
@@ -631,6 +670,31 @@ func (t *Tag) GetCode() uint64 {
 
 func (t *Tag) HasVariedField() bool {
 	return t.Code&(ServerPort|Region|Country|ISPCode) != 0 || t.HasEdgeTagField()
+}
+
+var databaseSuffix = [...]string{
+	"",              // 000
+	"acl",           // 001
+	"edge",          // 010
+	"acl_edge",      // 011
+	"port",          // 100
+	"acl_port",      // 101
+	"edge_port",     // 110
+	"acl_edge_port", // 111
+}
+
+func (t *Tag) DatabaseSuffix() string {
+	code := 0
+	if t.Code&(ACLID|ACLGID) != 0 {
+		code |= 0x1
+	}
+	if t.Code.HasEdgeTagField() {
+		code |= 0x2
+	}
+	if t.Code&ServerPort != 0 {
+		code |= 0x4
+	}
+	return databaseSuffix[code]
 }
 
 var fieldPool = pool.NewLockFreePool(func() interface{} {
