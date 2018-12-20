@@ -1,10 +1,11 @@
-package zerodoc
+package protobuf
 
 import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/google/gopacket/layers"
+	. "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 
 	pb "gitlab.x.lan/yunshan/message/zero"
 )

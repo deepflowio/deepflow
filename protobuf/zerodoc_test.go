@@ -1,4 +1,4 @@
-package zerodoc
+package protobuf
 
 import (
 	"reflect"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/gopacket/layers"
+	. "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
 )

@@ -10,6 +10,7 @@ import (
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
+	"gitlab.x.lan/yunshan/droplet-libs/protobuf"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	dt "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 	pb "gitlab.x.lan/yunshan/message/zero"
@@ -109,36 +110,36 @@ func unmarshal(b []byte) (*app.Document, error) {
 	doc.Timestamp = msg.GetTimestamp()
 	doc.Tag = dt.AcquireTag()
 	doc.Tag.(*dt.Tag).Field = dt.AcquireField()
-	dt.PBToTag(msg.GetTag(), doc.Tag.(*dt.Tag))
+	protobuf.PBToTag(msg.GetTag(), doc.Tag.(*dt.Tag))
 	meter := msg.GetMeter()
 	switch {
 	case meter.GetUsage() != nil:
 		m := dt.AcquireUsageMeter()
-		dt.PBToUsageMeter(meter.GetUsage(), m)
+		protobuf.PBToUsageMeter(meter.GetUsage(), m)
 		doc.Meter = m
 	case meter.GetPerf() != nil:
 		m := dt.AcquirePerfMeter()
-		dt.PBToPerfMeter(meter.GetPerf(), m)
+		protobuf.PBToPerfMeter(meter.GetPerf(), m)
 		doc.Meter = m
 	case meter.GetGeo() != nil:
 		m := dt.AcquireGeoMeter()
-		dt.PBToGeoMeter(meter.GetGeo(), m)
+		protobuf.PBToGeoMeter(meter.GetGeo(), m)
 		doc.Meter = m
 	case meter.GetFlow() != nil:
 		m := dt.AcquireFlowMeter()
-		dt.PBToFlowMeter(meter.GetFlow(), m)
+		protobuf.PBToFlowMeter(meter.GetFlow(), m)
 		doc.Meter = m
 	case meter.GetConsoleLog() != nil:
 		m := dt.AcquireConsoleLogMeter()
-		dt.PBToConsoleLogMeter(meter.GetConsoleLog(), m)
+		protobuf.PBToConsoleLogMeter(meter.GetConsoleLog(), m)
 		doc.Meter = m
 	case meter.GetType() != nil:
 		m := dt.AcquireTypeMeter()
-		dt.PBToTypeMeter(meter.GetType(), m)
+		protobuf.PBToTypeMeter(meter.GetType(), m)
 		doc.Meter = m
 	case meter.GetFps() != nil:
 		m := dt.AcquireFPSMeter()
-		dt.PBToFPSMeter(meter.GetFps(), m)
+		protobuf.PBToFPSMeter(meter.GetFps(), m)
 		doc.Meter = m
 	}
 	doc.ActionFlags = msg.GetActionFlags()
