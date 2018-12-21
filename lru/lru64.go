@@ -1,10 +1,10 @@
-package utils
+package lru
 
 import (
 	"container/list"
 )
 
-type LRU64Cache struct {
+type Cache64 struct {
 	capacity int
 	lruList  *list.List
 	cache    map[uint64]*list.Element
@@ -15,15 +15,15 @@ type entry64 struct {
 	value interface{}
 }
 
-func NewLRU64Cache(maxEntries int) *LRU64Cache {
-	return &LRU64Cache{
+func NewCache64(maxEntries int) *Cache64 {
+	return &Cache64{
 		capacity: maxEntries,
 		lruList:  list.New(),
 		cache:    make(map[uint64]*list.Element),
 	}
 }
 
-func (c *LRU64Cache) Add(key uint64, value interface{}) {
+func (c *Cache64) Add(key uint64, value interface{}) {
 	if c.cache == nil {
 		c.cache = make(map[uint64]*list.Element)
 		c.lruList = list.New()
@@ -40,7 +40,7 @@ func (c *LRU64Cache) Add(key uint64, value interface{}) {
 	}
 }
 
-func (c *LRU64Cache) Get(key uint64) (value interface{}, ok bool) {
+func (c *Cache64) Get(key uint64) (value interface{}, ok bool) {
 	if c.cache == nil {
 		return
 	}
@@ -52,7 +52,7 @@ func (c *LRU64Cache) Get(key uint64) (value interface{}, ok bool) {
 }
 
 // Contain will check if a key is in the cache, but not modify the list
-func (c *LRU64Cache) Contain(key uint64) bool {
+func (c *Cache64) Contain(key uint64) bool {
 	if c.cache == nil {
 		return false
 	}
@@ -61,7 +61,7 @@ func (c *LRU64Cache) Contain(key uint64) bool {
 }
 
 // Peek will return the key value but not modify the list
-func (c *LRU64Cache) Peek(key uint64) (value interface{}, ok bool) {
+func (c *Cache64) Peek(key uint64) (value interface{}, ok bool) {
 	if c.cache == nil {
 		return
 	}
@@ -72,7 +72,7 @@ func (c *LRU64Cache) Peek(key uint64) (value interface{}, ok bool) {
 }
 
 // Keys returns a slice of all keys, from oldest to newest
-func (c *LRU64Cache) Keys() []uint64 {
+func (c *Cache64) Keys() []uint64 {
 	keys := make([]uint64, len(c.cache))
 	i := 0
 	for ele := c.lruList.Back(); ele != nil; ele = ele.Prev() {
@@ -83,7 +83,7 @@ func (c *LRU64Cache) Keys() []uint64 {
 }
 
 // Values returns a slice of all values, from oldest to newest
-func (c *LRU64Cache) Values() []interface{} {
+func (c *Cache64) Values() []interface{} {
 	values := make([]interface{}, len(c.cache))
 	i := 0
 	for ele := c.lruList.Back(); ele != nil; ele = ele.Prev() {
@@ -93,7 +93,7 @@ func (c *LRU64Cache) Values() []interface{} {
 	return values
 }
 
-func (c *LRU64Cache) Remove(key uint64) {
+func (c *Cache64) Remove(key uint64) {
 	if c.cache == nil {
 		return
 	}
@@ -102,7 +102,7 @@ func (c *LRU64Cache) Remove(key uint64) {
 	}
 }
 
-func (c *LRU64Cache) removeOldest() {
+func (c *Cache64) removeOldest() {
 	if c.cache == nil {
 		return
 	}
@@ -112,20 +112,20 @@ func (c *LRU64Cache) removeOldest() {
 	}
 }
 
-func (c *LRU64Cache) removeElement(e *list.Element) {
+func (c *Cache64) removeElement(e *list.Element) {
 	c.lruList.Remove(e)
 	kv := e.Value.(*entry64)
 	delete(c.cache, kv.key)
 }
 
-func (c *LRU64Cache) Len() int {
+func (c *Cache64) Len() int {
 	if c.cache == nil {
 		return 0
 	}
 	return c.lruList.Len()
 }
 
-func (c *LRU64Cache) Clear() {
+func (c *Cache64) Clear() {
 	c.lruList = nil
 	c.cache = nil
 }
