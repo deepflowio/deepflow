@@ -1,4 +1,4 @@
-package utils
+package lru
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 
 func TestKeys(t *testing.T) {
 	capacity := 100
-	lru := NewLRUCache(capacity)
+	lru := NewCache(capacity)
 	for i := 0; i < capacity; i++ {
 		lru.Add(i, i)
 	}
@@ -22,7 +22,7 @@ func TestKeys(t *testing.T) {
 
 func TestValues(t *testing.T) {
 	capacity := 100
-	lru := NewLRUCache(capacity)
+	lru := NewCache(capacity)
 	for i := 0; i < capacity; i++ {
 		lru.Add(i, i)
 	}

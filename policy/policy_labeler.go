@@ -7,8 +7,8 @@ import (
 	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/lru"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
-	. "gitlab.x.lan/yunshan/droplet-libs/utils/lru"
 )
 
 const (
@@ -68,8 +68,8 @@ type PolicyLabeler struct {
 	InterestGroupMaps *[TAP_MAX][math.MaxUint16 + 1]bool
 
 	IpNetmaskMap       *[math.MaxUint16 + 1]uint32 // 根据IP地址查找对应的最大掩码
-	FastPolicyMaps     [][]*LRU64Cache             // 快速路径上的Policy映射表，Key为IP掩码对，Value为VlanAndPortMap
-	FastPolicyMapsMini [][]*LRU32Cache             // 同FastPolicyMaps，不过Key为32bit
+	FastPolicyMaps     [][]*lru.Cache64            // 快速路径上的Policy映射表，Key为IP掩码对，Value为VlanAndPortMap
+	FastPolicyMapsMini [][]*lru.Cache32            // 同FastPolicyMaps，不过Key为32bit
 	FastPathDisable    bool                        // 是否关闭快速路径，只使用慢速路径（FirstPath）
 
 	MapSize             uint32
@@ -145,14 +145,14 @@ func NewPolicyLabeler(queueCount int, mapSize uint32, fastPathDisable bool) *Pol
 
 	policy.MapSize = mapSize
 	policy.FastPathDisable = fastPathDisable
-	policy.FastPolicyMaps = make([][]*LRU64Cache, queueCount)
-	policy.FastPolicyMapsMini = make([][]*LRU32Cache, queueCount)
+	policy.FastPolicyMaps = make([][]*lru.Cache64, queueCount)
+	policy.FastPolicyMapsMini = make([][]*lru.Cache32, queueCount)
 	for i := 0; i < queueCount; i++ {
-		policy.FastPolicyMaps[i] = make([]*LRU64Cache, TAP_MAX)
-		policy.FastPolicyMapsMini[i] = make([]*LRU32Cache, TAP_MAX)
+		policy.FastPolicyMaps[i] = make([]*lru.Cache64, TAP_MAX)
+		policy.FastPolicyMapsMini[i] = make([]*lru.Cache32, TAP_MAX)
 		for j := TAP_MIN; j < TAP_MAX; j++ {
-			policy.FastPolicyMaps[i][j] = NewLRU64Cache((int(mapSize) >> 3) * 7)
-			policy.FastPolicyMapsMini[i][j] = NewLRU32Cache(int(mapSize) >> 3)
+			policy.FastPolicyMaps[i][j] = lru.NewCache64((int(mapSize) >> 3) * 7)
+			policy.FastPolicyMapsMini[i][j] = lru.NewCache32(int(mapSize) >> 3)
 		}
 	}
 	return policy
@@ -603,8 +603,8 @@ func (l *PolicyLabeler) UpdateAcls(acls []*Acl) {
 func (l *PolicyLabeler) FlushAcls() {
 	for i := 0; i < len(l.FastPolicyMaps); i++ {
 		for j := TAP_MIN; j < TAP_MAX; j++ {
-			l.FastPolicyMaps[i][j] = NewLRU64Cache((int(l.MapSize) >> 3) * 7)
-			l.FastPolicyMapsMini[i][j] = NewLRU32Cache(int(l.MapSize) >> 3)
+			l.FastPolicyMaps[i][j] = lru.NewCache64((int(l.MapSize) >> 3) * 7)
+			l.FastPolicyMapsMini[i][j] = lru.NewCache32(int(l.MapSize) >> 3)
 		}
 	}
 	atomic.StoreUint32(&l.FastPathMacCount, 0)

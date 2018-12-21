@@ -1,58 +1,58 @@
-package utils
+package lru
 
 import (
 	"container/list"
 )
 
-type LRU32Cache struct {
+type Cache struct {
 	capacity int
 	lruList  *list.List
-	cache    map[uint32]*list.Element
+	cache    map[interface{}]*list.Element
 }
 
-type entry32 struct {
-	key   uint32
+type entry struct {
+	key   interface{}
 	value interface{}
 }
 
-func NewLRU32Cache(maxEntries int) *LRU32Cache {
-	return &LRU32Cache{
+func NewCache(maxEntries int) *Cache {
+	return &Cache{
 		capacity: maxEntries,
 		lruList:  list.New(),
-		cache:    make(map[uint32]*list.Element),
+		cache:    make(map[interface{}]*list.Element),
 	}
 }
 
-func (c *LRU32Cache) Add(key uint32, value interface{}) {
+func (c *Cache) Add(key interface{}, value interface{}) {
 	if c.cache == nil {
-		c.cache = make(map[uint32]*list.Element)
+		c.cache = make(map[interface{}]*list.Element)
 		c.lruList = list.New()
 	}
 	if ee, ok := c.cache[key]; ok {
 		c.lruList.MoveToFront(ee)
-		ee.Value.(*entry32).value = value
+		ee.Value.(*entry).value = value
 		return
 	}
-	ele := c.lruList.PushFront(&entry32{key, value})
+	ele := c.lruList.PushFront(&entry{key, value})
 	c.cache[key] = ele
 	if c.lruList.Len() > c.capacity {
 		c.removeOldest()
 	}
 }
 
-func (c *LRU32Cache) Get(key uint32) (value interface{}, ok bool) {
+func (c *Cache) Get(key interface{}) (value interface{}, ok bool) {
 	if c.cache == nil {
 		return
 	}
 	if ele, hit := c.cache[key]; hit {
 		c.lruList.MoveToFront(ele)
-		return ele.Value.(*entry32).value, true
+		return ele.Value.(*entry).value, true
 	}
 	return
 }
 
 // Contain will check if a key is in the cache, but not modify the list
-func (c *LRU32Cache) Contain(key uint32) bool {
+func (c *Cache) Contain(key interface{}) bool {
 	if c.cache == nil {
 		return false
 	}
@@ -61,39 +61,39 @@ func (c *LRU32Cache) Contain(key uint32) bool {
 }
 
 // Peek will return the key value but not modify the list
-func (c *LRU32Cache) Peek(key uint32) (value interface{}, ok bool) {
+func (c *Cache) Peek(key interface{}) (value interface{}, ok bool) {
 	if c.cache == nil {
 		return
 	}
 	if ele, hit := c.cache[key]; hit {
-		return ele.Value.(*entry32).value, true
+		return ele.Value.(*entry).value, true
 	}
 	return
 }
 
 // Keys returns a slice of all keys, from oldest to newest
-func (c *LRU32Cache) Keys() []uint32 {
-	keys := make([]uint32, len(c.cache))
+func (c *Cache) Keys() []interface{} {
+	keys := make([]interface{}, len(c.cache))
 	i := 0
 	for ele := c.lruList.Back(); ele != nil; ele = ele.Prev() {
-		keys[i] = ele.Value.(*entry32).key
+		keys[i] = ele.Value.(*entry).key
 		i++
 	}
 	return keys
 }
 
 // Values returns a slice of all values, from oldest to newest
-func (c *LRU32Cache) Values() []interface{} {
+func (c *Cache) Values() []interface{} {
 	values := make([]interface{}, len(c.cache))
 	i := 0
 	for ele := c.lruList.Back(); ele != nil; ele = ele.Prev() {
-		values[i] = ele.Value.(*entry32).value
+		values[i] = ele.Value.(*entry).value
 		i++
 	}
 	return values
 }
 
-func (c *LRU32Cache) Remove(key uint32) {
+func (c *Cache) Remove(key interface{}) {
 	if c.cache == nil {
 		return
 	}
@@ -102,7 +102,7 @@ func (c *LRU32Cache) Remove(key uint32) {
 	}
 }
 
-func (c *LRU32Cache) removeOldest() {
+func (c *Cache) removeOldest() {
 	if c.cache == nil {
 		return
 	}
@@ -112,20 +112,20 @@ func (c *LRU32Cache) removeOldest() {
 	}
 }
 
-func (c *LRU32Cache) removeElement(e *list.Element) {
+func (c *Cache) removeElement(e *list.Element) {
 	c.lruList.Remove(e)
-	kv := e.Value.(*entry32)
+	kv := e.Value.(*entry)
 	delete(c.cache, kv.key)
 }
 
-func (c *LRU32Cache) Len() int {
+func (c *Cache) Len() int {
 	if c.cache == nil {
 		return 0
 	}
 	return c.lruList.Len()
 }
 
-func (c *LRU32Cache) Clear() {
+func (c *Cache) Clear() {
 	c.lruList = nil
 	c.cache = nil
 }
