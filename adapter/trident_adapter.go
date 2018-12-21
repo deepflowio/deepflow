@@ -19,9 +19,10 @@ import (
 )
 
 const (
-	LISTEN_PORT     = 20033
-	PACKET_MAX      = 256
-	TRIDENT_TIMEOUT = 60 * time.Second
+	LISTEN_PORT        = 20033
+	LISTEN_BUFFER_SIZE = 1 << 20
+	PACKET_MAX         = 256
+	TRIDENT_TIMEOUT    = 60 * time.Second
 )
 
 const (
@@ -213,6 +214,7 @@ func (a *TridentAdapter) flushInstance() {
 func (a *TridentAdapter) run() {
 	log.Infof("Starting trident adapter Listenning <%s>", a.listener.LocalAddr())
 	a.listener.SetReadDeadline(time.Now().Add(TRIDENT_TIMEOUT))
+	a.listener.SetReadBuffer(LISTEN_BUFFER_SIZE)
 	for a.running {
 		data := a.udpPool.Get().([]byte)
 		_, remote, err := a.listener.ReadFromUDP(data)
