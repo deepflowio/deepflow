@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
-	. "gitlab.x.lan/yunshan/droplet-libs/utils/lru"
+	"gitlab.x.lan/yunshan/droplet-libs/lru"
 )
 
 type ServiceStatus bool
@@ -16,7 +16,7 @@ type ServiceMap map[IpPortEpcKey]ServiceStatus
 type ServiceManager struct {
 	sync.RWMutex
 
-	lruCache *LRU64Cache
+	lruCache *lru.Cache64
 }
 
 var IANAPortExcludeList = []uint16{
@@ -55,7 +55,7 @@ var IANAPortServiceList []ServiceStatus
 const IANA_PORT_RANGE = 1024 + 1
 
 func NewServiceManager(capacity int) *ServiceManager {
-	return &ServiceManager{lruCache: NewLRU64Cache(capacity)}
+	return &ServiceManager{lruCache: lru.NewCache64(capacity)}
 }
 
 func genServiceKey(l3EpcId int32, ip IPv4Int, port uint16) IpPortEpcKey {
