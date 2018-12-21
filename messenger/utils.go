@@ -155,3 +155,70 @@ func Encode(sequence uint32, hash uint32, doc *app.Document, encoder *codec.Simp
 }
 
 // TODO: 增加Decode函数供Zero使用
+
+func EncodeVTAP(doc *app.Document, encoder *codec.SimpleEncoder) error {
+	if doc.Tag == nil || doc.Meter == nil {
+		return errors.New("No tag or meter in document")
+	}
+	encoder.Reset()
+
+	var msgType MessageType
+	switch v := doc.Meter.(type) {
+	case *dt.VTAPUsageMeter:
+		msgType = MSG_VTAP_USAGE
+	default:
+		return fmt.Errorf("Unknown supported type %T", v)
+	}
+
+	encoder.WriteU32(doc.Timestamp)
+
+	var tag *dt.Tag
+	tag, ok := doc.Tag.(*dt.Tag)
+	if !ok {
+		return fmt.Errorf("Unknown supported tag type %T", doc.Tag)
+	}
+	tag.Encode(encoder)
+
+	encoder.WriteU8(uint8(msgType))
+	var meter app.Meter
+	switch msgType {
+	case MSG_VTAP_USAGE:
+		meter = doc.Meter.(*dt.VTAPUsageMeter)
+	}
+	meter.Encode(encoder)
+
+	return nil
+}
+
+func DecodeVTAP(b []byte) (*app.Document, error) {
+	if b == nil {
+		return nil, errors.New("No input byte")
+	}
+
+	decoder := &codec.SimpleDecoder{}
+	decoder.Init(b)
+
+	doc := app.AcquireDocument()
+
+	doc.Timestamp = decoder.ReadU32()
+
+	tag := dt.AcquireTag()
+	tag.Field = dt.AcquireField()
+	tag.Decode(decoder)
+	doc.Tag = tag
+
+	msgType := decoder.ReadU8()
+	switch MessageType(msgType) {
+	case MSG_VTAP_USAGE:
+		m := dt.AcquireVTAPUsageMeter()
+		m.Decode(decoder)
+		doc.Meter = m
+	default:
+		return nil, fmt.Errorf("Error meter type %v", msgType)
+	}
+
+	if decoder.Failed() {
+		return nil, errors.New("Decode failed")
+	}
+	return doc, nil
+}
