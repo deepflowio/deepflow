@@ -240,10 +240,10 @@ func UsageMeterToPB(m *UsageMeter) *pb.UsageMeter {
 		Sum: &pb.UsageStats{
 			PacketTx: proto.Uint64(m.SumPacketTx),
 			PacketRx: proto.Uint64(m.SumPacketRx),
-			Packet:   proto.Uint64(m.SumPacket),
+			Packet:   proto.Uint64(m.SumPacketTx + m.SumPacketRx),
 			BitTx:    proto.Uint64(m.SumBitTx),
 			BitRx:    proto.Uint64(m.SumBitRx),
-			Bit:      proto.Uint64(m.SumBit),
+			Bit:      proto.Uint64(m.SumBitTx + m.SumBitRx),
 		},
 		Max: &pb.UsageStats{
 			PacketTx: proto.Uint64(m.MaxPacketTx),
@@ -264,10 +264,8 @@ func PBToUsageMeter(m *pb.UsageMeter, meter *UsageMeter) {
 	sum := m.GetSum()
 	meter.SumPacketTx = sum.GetPacketTx()
 	meter.SumPacketRx = sum.GetPacketRx()
-	meter.SumPacket = sum.GetPacket()
 	meter.SumBitTx = sum.GetBitTx()
 	meter.SumBitRx = sum.GetBitRx()
-	meter.SumBit = sum.GetBit()
 
 	max := m.GetMax()
 	meter.MaxPacketTx = max.GetPacketTx()
@@ -432,10 +430,10 @@ func FlowMeterToPB(m *FlowMeter) *pb.FlowMeter {
 		SumClosedFlowCount: proto.Uint64(m.SumClosedFlowCount),
 		SumPacketTx:        proto.Uint64(m.SumPacketTx),
 		SumPacketRx:        proto.Uint64(m.SumPacketRx),
-		SumPacket:          proto.Uint64(m.SumPacket),
+		SumPacket:          proto.Uint64(m.SumPacketTx + m.SumPacketRx),
 		SumBitTx:           proto.Uint64(m.SumBitTx),
 		SumBitRx:           proto.Uint64(m.SumBitRx),
-		SumBit:             proto.Uint64(m.SumBit),
+		SumBit:             proto.Uint64(m.SumBitTx + m.SumBitRx),
 	}
 }
 
@@ -449,10 +447,8 @@ func PBToFlowMeter(m *pb.FlowMeter, meter *FlowMeter) {
 	meter.SumClosedFlowCount = m.GetSumClosedFlowCount()
 	meter.SumPacketTx = m.GetSumPacketTx()
 	meter.SumPacketRx = m.GetSumPacketRx()
-	meter.SumPacket = m.GetSumPacket()
 	meter.SumBitTx = m.GetSumBitTx()
 	meter.SumBitRx = m.GetSumBitRx()
-	meter.SumBit = m.GetSumBit()
 }
 
 func ConsoleLogMeterToPB(m *ConsoleLogMeter) *pb.ConsoleLogMeter {

@@ -61,10 +61,8 @@ func TestMarshal(t *testing.T) {
 		UsageMeterSum: dt.UsageMeterSum{
 			SumPacketTx: 1,
 			SumPacketRx: 2,
-			SumPacket:   3,
 			SumBitTx:    4,
 			SumBitRx:    5,
-			SumBit:      9,
 		},
 		UsageMeterMax: dt.UsageMeterMax{
 			MaxPacketTx: 123,

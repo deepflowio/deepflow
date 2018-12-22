@@ -14,14 +14,12 @@ type FlowMeter struct {
 	SumClosedFlowCount uint64 `db:"sum_closed_flow_count"`
 	SumPacketTx        uint64 `db:"sum_packet_tx"`
 	SumPacketRx        uint64 `db:"sum_packet_rx"`
-	SumPacket          uint64 `db:"sum_packet"`
 	SumBitTx           uint64 `db:"sum_bit_tx"`
 	SumBitRx           uint64 `db:"sum_bit_rx"`
-	SumBit             uint64 `db:"sum_bit"`
 }
 
 func (m *FlowMeter) SortKey() uint64 {
-	return m.SumPacket
+	return m.SumPacketTx + m.SumPacketRx
 }
 
 func (m *FlowMeter) Encode(encoder *codec.SimpleEncoder) {
@@ -30,10 +28,8 @@ func (m *FlowMeter) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU64(m.SumClosedFlowCount)
 	encoder.WriteU64(m.SumPacketTx)
 	encoder.WriteU64(m.SumPacketRx)
-	encoder.WriteU64(m.SumPacket)
 	encoder.WriteU64(m.SumBitTx)
 	encoder.WriteU64(m.SumBitRx)
-	encoder.WriteU64(m.SumBit)
 }
 
 func (m *FlowMeter) Decode(decoder *codec.SimpleDecoder) {
@@ -42,10 +38,8 @@ func (m *FlowMeter) Decode(decoder *codec.SimpleDecoder) {
 	m.SumClosedFlowCount = decoder.ReadU64()
 	m.SumPacketTx = decoder.ReadU64()
 	m.SumPacketRx = decoder.ReadU64()
-	m.SumPacket = decoder.ReadU64()
 	m.SumBitTx = decoder.ReadU64()
 	m.SumBitRx = decoder.ReadU64()
-	m.SumBit = decoder.ReadU64()
 }
 
 func (m *FlowMeter) ConcurrentMerge(other app.Meter) {
@@ -55,10 +49,8 @@ func (m *FlowMeter) ConcurrentMerge(other app.Meter) {
 		m.SumClosedFlowCount += pm.SumClosedFlowCount
 		m.SumPacketTx += pm.SumPacketTx
 		m.SumPacketRx += pm.SumPacketRx
-		m.SumPacket += pm.SumPacket
 		m.SumBitTx += pm.SumBitTx
 		m.SumBitRx += pm.SumBitRx
-		m.SumBit += pm.SumBit
 	}
 }
 
@@ -69,10 +61,8 @@ func (m *FlowMeter) SequentialMerge(other app.Meter) { // other为后一个时�
 		m.SumClosedFlowCount += pm.SumClosedFlowCount
 		m.SumPacketTx += pm.SumPacketTx
 		m.SumPacketRx += pm.SumPacketRx
-		m.SumPacket += pm.SumPacket
 		m.SumBitTx += pm.SumBitTx
 		m.SumBitRx += pm.SumBitRx
-		m.SumBit += pm.SumBit
 	}
 }
 
@@ -90,13 +80,13 @@ func (m *FlowMeter) ToKVString() string {
 	buf.WriteString("i,sum_packet_rx=")
 	buf.WriteString(strconv.FormatUint(m.SumPacketRx, 10))
 	buf.WriteString("i,sum_packet=")
-	buf.WriteString(strconv.FormatUint(m.SumPacket, 10))
+	buf.WriteString(strconv.FormatUint(m.SumPacketTx+m.SumBitRx, 10))
 	buf.WriteString("i,sum_bit_tx=")
 	buf.WriteString(strconv.FormatUint(m.SumBitTx, 10))
 	buf.WriteString("i,sum_bit_rx=")
 	buf.WriteString(strconv.FormatUint(m.SumBitRx, 10))
 	buf.WriteString("i,sum_bit=")
-	buf.WriteString(strconv.FormatUint(m.SumBit, 10))
+	buf.WriteString(strconv.FormatUint(m.SumBitTx+m.SumBitRx, 10))
 	buf.WriteRune('i')
 
 	return buf.String()

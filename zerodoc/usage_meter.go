@@ -14,7 +14,7 @@ type UsageMeter struct {
 }
 
 func (m *UsageMeter) SortKey() uint64 {
-	return m.UsageMeterSum.SumPacket
+	return m.UsageMeterSum.SumPacketTx + m.UsageMeterSum.SumPacketRx
 }
 
 func (m *UsageMeter) Encode(encoder *codec.SimpleEncoder) {
@@ -51,13 +51,13 @@ func (m *UsageMeter) ToKVString() string {
 	buf.WriteString("i,sum_packet_rx=")
 	buf.WriteString(strconv.FormatUint(sum.SumPacketRx, 10))
 	buf.WriteString("i,sum_packet=")
-	buf.WriteString(strconv.FormatUint(sum.SumPacket, 10))
+	buf.WriteString(strconv.FormatUint(sum.SumPacketTx+sum.SumPacketRx, 10))
 	buf.WriteString("i,sum_bit_tx=")
 	buf.WriteString(strconv.FormatUint(sum.SumBitTx, 10))
 	buf.WriteString("i,sum_bit_rx=")
 	buf.WriteString(strconv.FormatUint(sum.SumBitRx, 10))
 	buf.WriteString("i,sum_bit=")
-	buf.WriteString(strconv.FormatUint(sum.SumBit, 10))
+	buf.WriteString(strconv.FormatUint(sum.SumBitTx+sum.SumBitRx, 10))
 
 	// max
 	max := m.UsageMeterMax
@@ -81,37 +81,29 @@ func (m *UsageMeter) ToKVString() string {
 type UsageMeterSum struct {
 	SumPacketTx uint64 `db:"sum_packet_tx"`
 	SumPacketRx uint64 `db:"sum_packet_rx"`
-	SumPacket   uint64 `db:"sum_packet"`
 	SumBitTx    uint64 `db:"sum_bit_tx"`
 	SumBitRx    uint64 `db:"sum_bit_rx"`
-	SumBit      uint64 `db:"sum_bit"`
 }
 
 func (m *UsageMeterSum) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU64(m.SumPacketTx)
 	encoder.WriteU64(m.SumPacketRx)
-	encoder.WriteU64(m.SumPacket)
 	encoder.WriteU64(m.SumBitTx)
 	encoder.WriteU64(m.SumBitRx)
-	encoder.WriteU64(m.SumBit)
 }
 
 func (m *UsageMeterSum) Decode(decoder *codec.SimpleDecoder) {
 	m.SumPacketTx = decoder.ReadU64()
 	m.SumPacketRx = decoder.ReadU64()
-	m.SumPacket = decoder.ReadU64()
 	m.SumBitTx = decoder.ReadU64()
 	m.SumBitRx = decoder.ReadU64()
-	m.SumBit = decoder.ReadU64()
 }
 
 func (m *UsageMeterSum) concurrentMerge(other *UsageMeterSum) {
 	m.SumPacketTx += other.SumPacketTx
 	m.SumPacketRx += other.SumPacketRx
-	m.SumPacket += other.SumPacket
 	m.SumBitTx += other.SumBitTx
 	m.SumBitRx += other.SumBitRx
-	m.SumBit += other.SumBit
 }
 
 func (m *UsageMeterSum) sequentialMerge(other *UsageMeterSum) {
