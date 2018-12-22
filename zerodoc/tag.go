@@ -56,7 +56,22 @@ const (
 	Country Code = 1 << 63
 	Region  Code = 1 << 62
 	ISPCode Code = 1 << 61
+
+	CodeIndexBits uint32 = 6 // 修改此值需更新zero
+	MaxCodeIndex  uint32 = (1 << CodeIndexBits) - 1
+	CodeIndices   Code   = Code(MaxCodeIndex) << 48 // 1<<48 ~ 1<<53: code index
 )
+
+func IndexToCode(i uint32) Code {
+	if i > MaxCodeIndex {
+		panic(fmt.Sprintf("目前支持的最大CodeIndex为%d", MaxCodeIndex))
+	}
+	return Code(i) << 48
+}
+
+func CodeToIndex(c Code) uint32 {
+	return uint32(c>>48) & MaxCodeIndex
+}
 
 func (c Code) HasEdgeTagField() bool {
 	return c&0xffff0000 != 0
@@ -70,12 +85,12 @@ func (c Code) HasL2TagField() bool {
 // 从不同EndPoint获取的网包字段组成Field，是否可能重复。
 // 注意，不能判断从同样的EndPoint获取的网包字段组成Field可能重复。
 func (c Code) PossibleDuplicate() bool {
-	return c&(GroupID|L2EpcID|L3EpcID|Host|GroupIDPath|L2EpcIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|VTAP|TAPType|SubnetID|ACLID|ACLDirection|Country|Region|ISPCode) == c
+	return c&(CodeIndices|GroupID|L2EpcID|L3EpcID|Host|GroupIDPath|L2EpcIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|VTAP|TAPType|SubnetID|ACLID|ACLDirection|Country|Region|ISPCode) == c
 }
 
 // 是否全部取自网包的对称字段（非源、目的字段）
 func (c Code) IsSymmetric() bool {
-	return c&(ACLGID|VLANID|Protocol|VTAP|TAPType|SubnetID|ACLID|ACLDirection) == c
+	return c&(CodeIndices|ACLGID|VLANID|Protocol|VTAP|TAPType|SubnetID|ACLID|ACLDirection) == c
 }
 
 type DeviceType uint8
@@ -631,7 +646,7 @@ func (t *Tag) SetID(id string) {
 
 func isFastCode(code Code) bool {
 	// 认为所有只包含这四个Code子集的Tag能使用FashID
-	return (code & ^(ACLGID | IP | L3EpcID | TAPType)) == 0
+	return (code & ^(CodeIndices | ACLGID | IP | L3EpcID | TAPType)) == 0
 }
 
 // GetFastID 返回uint64的ID，0代表该tag的code不在fast ID的范围内

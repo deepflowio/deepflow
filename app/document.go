@@ -77,3 +77,7 @@ func CloneDocument(doc *Document) *Document {
 	newDoc.ActionFlags = doc.ActionFlags
 	return newDoc
 }
+
+func PseudoCloneDocument(doc *Document) {
+	doc.AddReferenceCount()
+}

@@ -206,10 +206,8 @@ func TestUsageMeterEqual(t *testing.T) {
 		UsageMeterSum: UsageMeterSum{
 			SumPacketTx: 1,
 			SumPacketRx: 2,
-			SumPacket:   3,
 			SumBitTx:    4,
 			SumBitRx:    5,
-			SumBit:      9,
 		},
 		UsageMeterMax: UsageMeterMax{
 			MaxPacketTx: 123,
