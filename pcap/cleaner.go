@@ -51,7 +51,9 @@ func (c *Cleaner) work() {
 		files = files[:0]
 		filepath.Walk(c.baseDirectory, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				return err
+				log.Debugf("Walk directory error: %s", err)
+				// 返回nil，否则Walk()会中止
+				return nil
 			}
 			name := info.Name()
 			if info.IsDir() || !strings.HasSuffix(name, ".pcap") {
