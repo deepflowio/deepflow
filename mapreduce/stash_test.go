@@ -26,10 +26,8 @@ func TestStash(t *testing.T) {
 		UsageMeterSum: datatype.UsageMeterSum{
 			SumPacketTx: 1,
 			SumPacketRx: 2,
-			SumPacket:   3,
 			SumBitTx:    4,
 			SumBitRx:    5,
-			SumBit:      9,
 		},
 		UsageMeterMax: datatype.UsageMeterMax{
 			MaxPacketTx: 123,
