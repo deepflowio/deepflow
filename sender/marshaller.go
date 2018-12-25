@@ -1,11 +1,17 @@
 package sender
 
 import (
+	"fmt"
+
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	"gitlab.x.lan/yunshan/droplet-libs/messenger"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
-	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
+)
+
+const (
+	ENCODE_BIND_COUNT = 16
 )
 
 type ZeroDocumentMarshaller struct {
@@ -20,6 +26,32 @@ func NewZeroDocumentMarshaller(input queue.MultiQueueReader, hashKey queue.HashK
 	return &ZeroDocumentMarshaller{input, hashKey, outputs, 1}
 }
 
+func (m *ZeroDocumentMarshaller) batchEncode(buffer []interface{}) *codec.SimpleEncoder {
+	encoder := codec.AcquireSimpleEncoder()
+
+	for _, buf := range buffer {
+		if doc, ok := buf.(*app.Document); ok {
+			err := messenger.Encode(m.sequence, 0, doc, encoder)
+			app.ReleaseDocument(doc)
+			if err != nil {
+				log.Warning(err)
+				encoder.Reset()
+				continue
+			}
+			m.sequence++
+		} else {
+			panic(fmt.Sprintf("Invalid message type %T, should be *app.Document", buf))
+		}
+	}
+
+	if len(encoder.Bytes()) == 0 {
+		codec.ReleaseSimpleEncoder(encoder)
+		log.Infof("Batch encode null, buffer len=%d", len(buffer))
+		return nil
+	}
+	return encoder
+}
+
 // Start 不停从input接收，发送到outputs
 func (m *ZeroDocumentMarshaller) Start() {
 	buffer := make([]interface{}, QUEUE_GET_SIZE)
@@ -29,22 +61,11 @@ func (m *ZeroDocumentMarshaller) Start() {
 		n := m.input.Gets(m.hashKey, buffer)
 		log.Debugf("%d docs received", n)
 		nOut := 0
-		for _, e := range buffer[:n] {
-			if doc, ok := e.(*app.Document); ok {
-				code := doc.Tag.(*zerodoc.Tag).Code
-				encoder := codec.AcquireSimpleEncoder()
-				err := messenger.Encode(m.sequence, codeHash(code), doc, encoder)
-				app.ReleaseDocument(doc)
-				if err != nil {
-					codec.ReleaseSimpleEncoder(encoder)
-					log.Warning(err)
-					continue
-				}
+		for i := 0; i < n; i += ENCODE_BIND_COUNT {
+			encoder := m.batchEncode(buffer[i:utils.Min(i+ENCODE_BIND_COUNT, n)])
+			if encoder != nil {
 				outBuffer[nOut] = encoder
 				nOut++
-				m.sequence++
-			} else {
-				log.Warningf("Invalid message type %T, should be []byte", doc)
 			}
 		}
 
