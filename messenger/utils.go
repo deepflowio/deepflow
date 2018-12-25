@@ -96,7 +96,6 @@ func Encode(sequence uint32, hash uint32, doc *app.Document, encoder *codec.Simp
 	if doc.Tag == nil || doc.Meter == nil {
 		return errors.New("No tag or meter in document")
 	}
-	encoder.Reset()
 
 	var msgType MessageType
 	switch v := doc.Meter.(type) {
@@ -154,7 +153,70 @@ func Encode(sequence uint32, hash uint32, doc *app.Document, encoder *codec.Simp
 	return nil
 }
 
-// TODO: 增加Decode函数供Zero使用
+// The return Document, must call app.ReleaseDocument to release after used
+func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
+	if decoder == nil {
+		return nil, errors.New("No input decoder")
+	}
+
+	// sequence
+	decoder.ReadU32()
+	// hash, DEPRECATED
+	decoder.ReadU32()
+
+	doc := app.AcquireDocument()
+
+	doc.Timestamp = decoder.ReadU32()
+
+	tag := dt.AcquireTag()
+	tag.Field = dt.AcquireField()
+	tag.Decode(decoder)
+	doc.Tag = tag
+
+	msgType := decoder.ReadU8()
+	switch MessageType(msgType) {
+	case MSG_USAGE:
+		m := dt.AcquireUsageMeter()
+		m.Decode(decoder)
+		doc.Meter = m
+	case MSG_PERF:
+		m := dt.AcquirePerfMeter()
+		m.Decode(decoder)
+		doc.Meter = m
+	case MSG_GEO:
+		m := dt.AcquireGeoMeter()
+		m.Decode(decoder)
+		doc.Meter = m
+	case MSG_FLOW:
+		m := dt.AcquireFlowMeter()
+		m.Decode(decoder)
+		doc.Meter = m
+	case MSG_CONSOLE_LOG:
+		m := dt.AcquireConsoleLogMeter()
+		m.Decode(decoder)
+		doc.Meter = m
+	case MSG_TYPE:
+		m := dt.AcquireTypeMeter()
+		m.Decode(decoder)
+		doc.Meter = m
+	case MSG_FPS:
+		m := dt.AcquireFPSMeter()
+		m.Decode(decoder)
+		doc.Meter = m
+	default:
+		app.ReleaseDocument(doc)
+		return nil, errors.New(fmt.Sprintf("Error meter type %v", msgType))
+	}
+
+	doc.ActionFlags = decoder.ReadU32()
+
+	if decoder.Failed() {
+		app.ReleaseDocument(doc)
+		return nil, errors.New("Decode failed")
+	}
+
+	return doc, nil
+}
 
 func EncodeVTAP(doc *app.Document, encoder *codec.SimpleEncoder) error {
 	if doc.Tag == nil || doc.Meter == nil {

@@ -142,6 +142,10 @@ func (d *SimpleDecoder) Failed() bool {
 	return d.err != 0
 }
 
+func (d *SimpleDecoder) IsEnd() bool {
+	return d.offset >= len(d.buf)
+}
+
 func (d *SimpleDecoder) Bytes() []byte {
 	return d.buf
 }
