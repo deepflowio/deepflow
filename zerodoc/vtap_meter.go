@@ -72,7 +72,7 @@ func (m *Metrics) Release() {
 	panic("not supported!")
 }
 
-func (m *Metrics) merge(other *Metrics) {
+func (m *Metrics) Merge(other *Metrics) {
 	m.TxBytes += other.TxBytes
 	m.RxBytes += other.RxBytes
 	m.TxPackets += other.TxPackets
@@ -81,7 +81,7 @@ func (m *Metrics) merge(other *Metrics) {
 
 func (m *Metrics) ConcurrentMerge(other app.Meter) {
 	if other, ok := other.(*Metrics); ok {
-		m.merge(other)
+		m.Merge(other)
 	}
 }
 
@@ -164,33 +164,33 @@ func (m *VTAPUsageMeter) ConcurrentMerge(other app.Meter) {
 		m.Fields |= other.Fields
 
 		if m.Fields&METRICS_ALL != 0 {
-			m.All.merge(&other.All)
+			m.All.Merge(&other.All)
 		}
 		if m.Fields&METRICS_EPC != 0 {
-			m.InEPC.merge(&other.InEPC)
+			m.InEPC.Merge(&other.InEPC)
 		}
 		if m.Fields&METRICS_SUBNET != 0 {
-			m.InSubnet.merge(&other.InSubnet)
+			m.InSubnet.Merge(&other.InSubnet)
 		}
 
 		if m.Fields&METRICS_TCP != 0 {
-			m.TCP.merge(&other.TCP)
+			m.TCP.Merge(&other.TCP)
 		}
 		if m.Fields&METRICS_EPC_TCP != 0 {
-			m.InEPCTCP.merge(&other.InEPCTCP)
+			m.InEPCTCP.Merge(&other.InEPCTCP)
 		}
 		if m.Fields&METRICS_SUBNET_TCP != 0 {
-			m.InSubnetTCP.merge(&other.InSubnetTCP)
+			m.InSubnetTCP.Merge(&other.InSubnetTCP)
 		}
 
 		if m.Fields&METRICS_UDP != 0 {
-			m.UDP.merge(&other.UDP)
+			m.UDP.Merge(&other.UDP)
 		}
 		if m.Fields&METRICS_EPC_UDP != 0 {
-			m.InEPCUDP.merge(&other.InEPCUDP)
+			m.InEPCUDP.Merge(&other.InEPCUDP)
 		}
 		if m.Fields&METRICS_SUBNET_UDP != 0 {
-			m.InSubnetUDP.merge(&other.InSubnetUDP)
+			m.InSubnetUDP.Merge(&other.InSubnetUDP)
 		}
 	}
 }
