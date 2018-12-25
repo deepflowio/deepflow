@@ -242,15 +242,21 @@ profiler
   - 南北和东西区分引流位置：南北为qinq（0x10000+qinq外层vlan偏移），东西为trident宿主机及引流接口（tridentIp+ifMacSuffix）
   - 南北和东西不区分vlan
   - 南北不区分mac、东西区分mac
+  - 东西向trident流量可根据yaml配置字段`ignore-l2-end`选择是否开启支持由ecmp导致的mac不一致
+      - 配置为false时，会根据网包l2end情况选择flow聚合时是否匹配mac
+      - 配置为true时，忽略l2end对mac匹配的影响，聚合时强制匹配mac
+  - 东西向镜像流量可根据yaml配置字段`ignore-tor-mac`选择是否开启mac匹配
+      - 配置为false时，强制匹配mac
+      - 配置为true时，忽略匹配mac
   - 南北和东西区分tunnelType、tunnelId、tunnelIpSrc、tunnelIpDst
   - 南北和东西区分ipSrc、ipDst、proto、portSrc、portDst
       - 对于非TCP/UDP的IPv4或者IPv4分片，portSrc和portDst为0
   - 聚合后的特殊字段表示
       - VLAN
-        - 网流双方向仅其中一个有VLAN的情况，将此VLAN记录为网流的VLAN
-        - 网流双方向VLAN不一致的情况下，选择任何一方VLAN作为网流VLAN
+          - 网流双方向仅其中一个有VLAN的情况，将此VLAN记录为网流的VLAN
+          - 网流双方向VLAN不一致的情况下，选择任何一方VLAN作为网流VLAN
       - TTL
-        - 网流双方向的TTL用双方向首包的TTL表示
+          - 网流双方向的TTL用双方向首包的TTL表示
 * 网流方向
   1. 网流的某个端口落在用户输入的服务列表中（比如8080），以该端口为网流的目标端口（服务端）；如果两个端口都满足，以更小值的端口为网流的目标端口（服务端）
   2. 网流中出现的第一个SYN/ACK包的源端口为网流的目标端口（服务端）
