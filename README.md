@@ -55,8 +55,9 @@ graph TD;
 ------------------
 
 接入网络和虚拟网络查找过程现在是一致的
-
+ 
 查找条件及结果
+
   - MAC，IP不在数据库内
     - 查找结果L3EpcId=0，L2EpcId=0，IsL3End=false
   - MAC不在数据库，IP包含在数据库ip_resource表内
@@ -87,6 +88,12 @@ graph TD;
     - 无论是否查找到数据，IsL3End为false会根据缓存Arp表和Ttl(64,128,255)进行修正
     - 东西向流量，l3EpcId=0，IP包含在{10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 255.255.255.255/32}内的数据，
       会修正l3EpcId=-1
+
+SubnetId查询依据
+
+  - 查MAC表获取L2EpcId，L2EpcId + Ip作为Key查询EpcIp表获取SubnetId
+  - 若查询EpcIp表没有数据，则直接用Ip作为Key查询Ip表获取SubnetId
+  - 若都没有数据则SubnetId=0
 
 policy firstpath查找流程
 ------------------------
