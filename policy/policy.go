@@ -182,21 +182,6 @@ func (t *PolicyTable) GetCounter() interface{} {
 	return counter
 }
 
-// Trident用于PACKET_BROKERING和PACKET_CAPTURING
-func (t *PolicyTable) LookupPolicyByKey(key *LookupKey) *PolicyData {
-	// TODO: 将查找过程中的性能监控数据发送到statsd
-	if !key.Tap.CheckTapType(key.Tap) {
-		return nil
-	}
-	endpoint, policy := t.policyLabeler.GetPolicyByFastPath(key)
-	if policy == nil {
-		endpoint = t.cloudPlatformLabeler.GetEndpointData(key)
-		_, policy = t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
-		return policy
-	}
-	return policy
-}
-
 // River用于PACKET_BROKERING，Stream用于PACKET_CAPTURING
 func (t *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *PolicyData {
 	// FIXME
@@ -204,7 +189,8 @@ func (t *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *PolicyData {
 }
 
 // Droplet用于*_COUNTING、PACKET_BROKERING、PACKET_CAPTURING
-func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData) {
+// FIXME: tricky argument
+func (t *PolicyTable) LookupAllByKey(key *LookupKey, isTrident ...bool) (*EndpointData, *PolicyData) {
 	if !key.Tap.CheckTapType(key.Tap) {
 		return INVALID_ENDPOINT_DATA, INVALID_POLICY_DATA
 	}
@@ -214,7 +200,9 @@ func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData
 		endpoint = t.cloudPlatformLabeler.GetEndpointData(key)
 		endpoint, policy = t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
 	}
-	endpoint = t.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
+	if len(isTrident) == 0 {
+		endpoint = t.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
+	}
 	return endpoint, policy
 }
 
