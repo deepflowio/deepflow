@@ -17,7 +17,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			flowCache.flowList.Remove(element)
 			flowCache.Unlock() // code below does not use flowCache any more
 			atomic.AddInt32(&f.stats.CurrNumFlows, -1)
-			flowExtra.setCurFlowInfo(flowExtra.recentTime, f.forceReportInterval, f.reportTolerance)
+			flowExtra.setCurFlowInfo(flowExtra.recentTime, forceReportInterval, reportTolerance)
 			if f.checkTcpServiceReverse(taggedFlow, flowExtra.reversed) {
 				flowExtra.reverseFlow()
 				flowExtra.reversed = !flowExtra.reversed
@@ -85,7 +85,7 @@ func (f *FlowGenerator) initTcpFlow(meta *MetaPacket) (*FlowExtra, bool, bool) {
 		updatePlatformData(taggedFlow, meta.EndpointData, reply)
 	}
 	if f.StatePreprocess(meta, flags) || meta.Invalid {
-		flowExtra.timeout = f.TimeoutConfig.Exception
+		flowExtra.timeout = exceptionTimeout
 		flowExtra.flowState = FLOW_STATE_EXCEPTION
 		return flowExtra, false, reply
 	}
@@ -106,7 +106,7 @@ func (f *FlowGenerator) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket, re
 	f.updateFlow(flowExtra, meta, reply)
 	reply = reply != f.tryReverseFlow(flowExtra, meta, reply)
 	if f.StatePreprocess(meta, flags) || meta.Invalid {
-		flowExtra.timeout = f.TimeoutConfig.Exception
+		flowExtra.timeout = exceptionTimeout
 		flowExtra.flowState = FLOW_STATE_EXCEPTION
 		return false, reply
 	}

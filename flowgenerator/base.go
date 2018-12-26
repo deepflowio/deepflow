@@ -7,6 +7,7 @@ import (
 	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
+	"gitlab.x.lan/yunshan/droplet/config"
 )
 
 const (
@@ -52,9 +53,31 @@ const MIN_FORCE_REPORT_TIME = 5 * time.Second
 const REPORT_TOLERANCE = 4 * time.Second
 const SECOND_COUNT_PER_MINUTE = 60
 
-var timeoutCleanerCount uint64
-var hashMapSize uint64
+// configurations for base flow generator, read only
+var (
+	timeoutCleanerCount uint64
+	hashMapSize         uint64
+	forceReportInterval time.Duration
+	minForceReportTime  time.Duration
+	flowCleanInterval   time.Duration
+	reportTolerance     time.Duration
+	ignoreTorMac        bool
+	ignoreL2End         bool
+)
 
+// configurations for timeout, read only
+var (
+	openingTimeout         time.Duration
+	establishedTimeout     time.Duration
+	closingTimeout         time.Duration
+	establishedRstTimeout  time.Duration
+	exceptionTimeout       time.Duration
+	closedFinTimeout       time.Duration
+	singleDirectionTimeout time.Duration
+	minTimeout             time.Duration
+)
+
+// timeout config for outer user
 type TimeoutConfig struct {
 	Opening         time.Duration
 	Established     time.Duration
@@ -63,16 +86,6 @@ type TimeoutConfig struct {
 	Exception       time.Duration
 	ClosedFin       time.Duration
 	SingleDirection time.Duration
-}
-
-var defaultTimeoutConfig TimeoutConfig = TimeoutConfig{
-	TIMEOUT_OPENING,
-	TIMEOUT_ESTABLISHED,
-	TIMEOUT_CLOSING,
-	TIMEOUT_ESTABLISHED_RST,
-	TIMEOUT_EXPCEPTION,
-	TIMEOUT_CLOSED_FIN,
-	TIMEOUT_SINGLE_DIRECTION,
 }
 
 type FlowGeneratorStats struct {
@@ -93,7 +106,6 @@ type PacketHandler struct {
 }
 
 type FlowGenerator struct {
-	TimeoutConfig
 	FlowCacheHashMap
 	*ServiceManager
 
@@ -103,32 +115,14 @@ type FlowGenerator struct {
 	stateMachineMaster      []map[uint8]*StateValue
 	stateMachineSlave       []map[uint8]*StateValue
 	packetHandler           *PacketHandler
-	forceReportInterval     time.Duration
-	minForceReportTime      time.Duration
-	minLoopInterval         time.Duration
-	reportTolerance         time.Duration
+	bufferSize              int
 	flowLimitNum            int32
 	handleRunning           bool
 	cleanRunning            bool
-	ignoreTorMac            bool
-	ignoreL2End             bool
 	index                   int
 	cleanWaitGroup          sync.WaitGroup
 
 	perfCounter FlowPerfCounter
-}
-
-type FlowGeneratorConfig struct {
-	ForceReportInterval time.Duration
-	MinForceReportTime  time.Duration
-	BufferSize          int
-	FlowLimitNum        int32
-	FlowCleanInterval   time.Duration
-	TimeoutCleanerCount uint64
-	HashMapSize         uint64
-	ReportTolerance     time.Duration
-	IgnoreTorMac        bool
-	IgnoreL2End         bool
 }
 
 func timeMax(a time.Duration, b time.Duration) time.Duration {
@@ -169,19 +163,30 @@ func (f *FlowGenerator) GetCounter() interface{} {
 	return &counter
 }
 
-func (f *FlowGenerator) SetTimeout(timeoutConfig TimeoutConfig) bool {
-	if f.handleRunning || f.cleanRunning {
-		log.Warning("flow generator is running, timeout info can not be configured")
-		return false
+func SetTimeout(timeout TimeoutConfig) {
+	openingTimeout = timeout.Opening
+	establishedTimeout = timeout.Established
+	closingTimeout = timeout.Closing
+	establishedRstTimeout = timeout.EstablishedRst
+	exceptionTimeout = timeout.Exception
+	closedFinTimeout = timeout.ClosedFin
+	singleDirectionTimeout = timeout.SingleDirection
+	minTimeout = timeout.minTimeout()
+	log.Infof("flow generator timeout config: %+v", timeout)
+	if flowCleanInterval > minTimeout {
+		log.Warningf("flow-clean-interval (%v) is too large, may cause inaccurate flow time", flowCleanInterval)
 	}
-	f.TimeoutConfig = timeoutConfig
-	log.Infof("flow generator %d timeout config: %+v", f.index, f.TimeoutConfig)
-	if f.minLoopInterval > timeoutConfig.minTimeout() {
-		log.Warningf("flow-clean-interval (%v) is too large, may cause inaccurate flow time", f.minLoopInterval)
-	}
-	f.initStateMachineMaster()
-	f.initStateMachineSlave()
-	return true
+}
+
+func SetFlowGenerator(cfg config.Config) {
+	forceReportInterval = cfg.FlowGenerator.ForceReportInterval
+	minForceReportTime = cfg.FlowGenerator.MinForceReportTime
+	flowCleanInterval = cfg.FlowGenerator.FlowCleanInterval
+	timeoutCleanerCount = cfg.FlowGenerator.TimeoutCleanerCount
+	hashMapSize = cfg.FlowGenerator.HashMapSize
+	reportTolerance = cfg.FlowGenerator.ReportTolerance
+	ignoreTorMac = cfg.FlowGenerator.IgnoreTorMac
+	ignoreL2End = cfg.FlowGenerator.IgnoreL2End
 }
 
 func (t TimeoutConfig) minTimeout() time.Duration {

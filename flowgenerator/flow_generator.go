@@ -106,7 +106,7 @@ func (f *FlowGenerator) keyMatch(flowCache *FlowCache, meta *MetaPacket) (*FlowE
 		if taggedFlow.Exporter != meta.Exporter || meta.InPort != taggedFlow.InPort {
 			continue
 		}
-		macMatchType := requireMacMatch(meta, f.ignoreTorMac, f.ignoreL2End)
+		macMatchType := requireMacMatch(meta, ignoreTorMac, ignoreL2End)
 		if macMatchType != MAC_MATCH_NONE && !MacMatch(meta, taggedFlow.MACSrc, taggedFlow.MACDst, macMatchType) {
 			continue
 		}
@@ -187,17 +187,17 @@ func (f *FlowGenerator) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8
 	var timeout time.Duration
 	var flowState FlowState
 	closed := false
-	if stateValue, ok := f.stateMachineMaster[flowExtra.flowState][flags&TCP_FLAG_MASK]; ok {
+	if stateValue, ok := f.stateMachineMaster[flowExtra.flowState][flags]; ok {
 		timeout = stateValue.timeout
 		flowState = stateValue.flowState
 		closed = stateValue.closed
 	} else {
-		timeout = f.TimeoutConfig.Exception
+		timeout = exceptionTimeout
 		flowState = FLOW_STATE_EXCEPTION
 		closed = false
 	}
 	if reply {
-		if stateValue, ok := f.stateMachineSlave[flowExtra.flowState][flags&TCP_FLAG_MASK]; ok {
+		if stateValue, ok := f.stateMachineSlave[flowExtra.flowState][flags]; ok {
 			timeout = stateValue.timeout
 			flowState = stateValue.flowState
 			closed = stateValue.closed
@@ -205,7 +205,7 @@ func (f *FlowGenerator) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8
 	}
 	flowExtra.flowState = flowState
 	if taggedFlow.FlowMetricsPeerSrc.TotalPacketCount == 0 || taggedFlow.FlowMetricsPeerDst.TotalPacketCount == 0 {
-		flowExtra.timeout = f.SingleDirection
+		flowExtra.timeout = singleDirectionTimeout
 	} else {
 		flowExtra.timeout = timeout
 	}
@@ -443,9 +443,6 @@ func tryCleanBuffer(queue QueueWriter, buffer []interface{}, num int) int {
 
 func reportFlowListTimeout(f *FlowGenerator, list *ListFlowExtra, now, cleanRange time.Duration, buffer []interface{}, num int) int {
 	flowOutQueue := f.flowOutQueue
-	forceReportInterval := f.forceReportInterval
-	reportTolerance := f.reportTolerance
-	minFroceReportTime := f.minForceReportTime
 	cleanCount := 0
 	e := list.Back()
 	for e != nil {
@@ -459,7 +456,7 @@ func reportFlowListTimeout(f *FlowGenerator, list *ListFlowExtra, now, cleanRang
 			e = e.Prev()
 			list.Remove(del)
 			continue
-		} else if !flowExtra.startReport && flowExtra.minArrTime+minFroceReportTime <= now {
+		} else if !flowExtra.startReport && flowExtra.minArrTime+minForceReportTime <= now {
 			flowExtra.startReport = true
 			flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
 			buffer[num] = f.reportForClean(flowExtra, true)
@@ -475,8 +472,6 @@ func reportFlowListTimeout(f *FlowGenerator, list *ListFlowExtra, now, cleanRang
 
 func reportFlowListGeneral(f *FlowGenerator, list *ListFlowExtra, now, cleanRange time.Duration, buffer []interface{}, num int) int {
 	flowOutQueue := f.flowOutQueue
-	forceReportInterval := f.forceReportInterval
-	reportTolerance := f.reportTolerance
 	cleanCount := 0
 	e := list.Back()
 	for e != nil {
@@ -504,8 +499,6 @@ func reportFlowListGeneral(f *FlowGenerator, list *ListFlowExtra, now, cleanRang
 func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uint64) {
 	now := toTimestamp(time.Now())
 	flowOutQueue := f.flowOutQueue
-	forceReportInterval := f.forceReportInterval
-	reportTolerance := f.reportTolerance
 	for _, flowCache := range hashMap[start:end] {
 		if flowCache == nil {
 			continue
@@ -529,9 +522,7 @@ func (f *FlowGenerator) cleanTimeoutHashMap(start, end, index uint64) {
 	// temp buffer to write flow
 	flowOutBuffer := [FLOW_OUT_BUFFER_CAP]interface{}{}
 	// vars about time
-	minLoopInterval := f.minLoopInterval
-	sleepDuration := minLoopInterval
-	forceReportInterval := f.forceReportInterval
+	sleepDuration := flowCleanInterval
 	reportFlowList := reportFlowListTimeout
 	now := toTimestamp(time.Now())
 	nextGeneralReport := now + forceReportInterval - now%forceReportInterval
@@ -540,7 +531,7 @@ func (f *FlowGenerator) cleanTimeoutHashMap(start, end, index uint64) {
 loop:
 	time.Sleep(sleepDuration)
 	now = toTimestamp(time.Now())
-	cleanRange := now - minLoopInterval
+	cleanRange := now - flowCleanInterval
 	nonEmptyFlowCacheNum := 0
 	maxFlowCacheLen := 0
 	num := 0
@@ -568,14 +559,14 @@ loop:
 	if num > 0 {
 		f.flowOutQueue.Put(flowOutBuffer[:num]...)
 	}
-	// calc the next sleep duration and minLoopInterval
+	// calc the next sleep duration
 	endtime := toTimestamp(time.Now())
 	used := endtime - now
-	if minLoopInterval > used {
-		sleepDuration = minLoopInterval - used
+	if flowCleanInterval > used {
+		sleepDuration = flowCleanInterval - used
 	} else {
 		sleepDuration = 0
-		log.Debugf("used: %d, minLoop: %d", used, minLoopInterval)
+		log.Debugf("used: %d, clean interval: %d", used, flowCleanInterval)
 		log.Debugf("clean time of generator %d is too long, maybe pressure is heavy", f.index)
 	}
 	f.stats.cleanRoutineFlowCacheNums[index] = nonEmptyFlowCacheNum
@@ -638,11 +629,8 @@ func (f *FlowGenerator) Stop() {
 }
 
 // create a new flow generator
-func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, cfg FlowGeneratorConfig, index int) *FlowGenerator {
-	timeoutCleanerCount = cfg.TimeoutCleanerCount
-	hashMapSize = cfg.HashMapSize
+func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, bufferSize int, flowLimitNum int32, index int) *FlowGenerator {
 	flowGenerator := &FlowGenerator{
-		TimeoutConfig:           defaultTimeoutConfig,
 		FlowCacheHashMap:        FlowCacheHashMap{make([]*FlowCache, hashMapSize), rand.Uint32(), hashMapSize, timeoutCleanerCount, &TunnelInfo{}},
 		ServiceManager:          NewServiceManager(64 * 1024),
 		metaPacketHeaderInQueue: metaPacketHeaderInQueue,
@@ -650,19 +638,14 @@ func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, cfg
 		stats:                   FlowGeneratorStats{cleanRoutineFlowCacheNums: make([]int, timeoutCleanerCount), cleanRoutineMaxFlowCacheLens: make([]int, timeoutCleanerCount)},
 		stateMachineMaster:      make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
 		stateMachineSlave:       make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
-		packetHandler:           &PacketHandler{recvBuffer: make([]interface{}, cfg.BufferSize), processBuffer: make([]interface{}, cfg.BufferSize)},
-		forceReportInterval:     cfg.ForceReportInterval,
-		minForceReportTime:      cfg.MinForceReportTime,
-		minLoopInterval:         cfg.FlowCleanInterval,
-		flowLimitNum:            cfg.FlowLimitNum,
+		packetHandler:           &PacketHandler{recvBuffer: make([]interface{}, bufferSize), processBuffer: make([]interface{}, bufferSize)},
+		bufferSize:              bufferSize,
+		flowLimitNum:            flowLimitNum,
 		handleRunning:           false,
 		cleanRunning:            false,
-		ignoreTorMac:            cfg.IgnoreTorMac,
-		ignoreL2End:             cfg.IgnoreL2End,
 		index:                   index,
 		perfCounter:             NewFlowPerfCounter(),
 	}
-	log.Infof("flow generator %d base config: %+v", index, cfg)
 	flowGenerator.initFlowCache()
 	flowGenerator.initStateMachineMaster()
 	flowGenerator.initStateMachineSlave()
