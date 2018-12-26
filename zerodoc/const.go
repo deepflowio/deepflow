@@ -1,4 +1,4 @@
-package messenger
+package zerodoc
 
 type MessageType uint8
 

@@ -6,7 +6,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
-	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	"gitlab.x.lan/yunshan/droplet-libs/protobuf"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	dt "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
@@ -19,22 +18,22 @@ func Marshal(doc *app.Document, bytes *utils.ByteBuffer) error {
 		return errors.New("No tag or meter in document")
 	}
 
-	var msgType MessageType
+	var msgType dt.MessageType
 	switch v := doc.Meter.(type) {
 	case *dt.UsageMeter:
-		msgType = MSG_USAGE
+		msgType = dt.MSG_USAGE
 	case *dt.PerfMeter:
-		msgType = MSG_PERF
+		msgType = dt.MSG_PERF
 	case *dt.GeoMeter:
-		msgType = MSG_GEO
+		msgType = dt.MSG_GEO
 	case *dt.FlowMeter:
-		msgType = MSG_FLOW
+		msgType = dt.MSG_FLOW
 	case *dt.ConsoleLogMeter:
-		msgType = MSG_CONSOLE_LOG
+		msgType = dt.MSG_CONSOLE_LOG
 	case *dt.TypeMeter:
-		msgType = MSG_TYPE
+		msgType = dt.MSG_TYPE
 	case *dt.FPSMeter:
-		msgType = MSG_FPS
+		msgType = dt.MSG_FPS
 	default:
 		return fmt.Errorf("Unknown supported type %T", v)
 	}
@@ -51,25 +50,25 @@ func Marshal(doc *app.Document, bytes *utils.ByteBuffer) error {
 
 	msg.Meter = &pb.Meter{}
 	switch msgType {
-	case MSG_USAGE:
+	case dt.MSG_USAGE:
 		meter := doc.Meter.(*dt.UsageMeter)
 		msg.Meter.Usage = protobuf.UsageMeterToPB(meter)
-	case MSG_PERF:
+	case dt.MSG_PERF:
 		meter := doc.Meter.(*dt.PerfMeter)
 		msg.Meter.Perf = protobuf.PerfMeterToPB(meter)
-	case MSG_GEO:
+	case dt.MSG_GEO:
 		meter := doc.Meter.(*dt.GeoMeter)
 		msg.Meter.Geo = protobuf.GeoMeterToPB(meter)
-	case MSG_FLOW:
+	case dt.MSG_FLOW:
 		meter := doc.Meter.(*dt.FlowMeter)
 		msg.Meter.Flow = protobuf.FlowMeterToPB(meter)
-	case MSG_CONSOLE_LOG:
+	case dt.MSG_CONSOLE_LOG:
 		meter := doc.Meter.(*dt.ConsoleLogMeter)
 		msg.Meter.ConsoleLog = protobuf.ConsoleLogMeterToPB(meter)
-	case MSG_TYPE:
+	case dt.MSG_TYPE:
 		meter := doc.Meter.(*dt.TypeMeter)
 		msg.Meter.Type = protobuf.TypeMeterToPB(meter)
-	case MSG_FPS:
+	case dt.MSG_FPS:
 		meter := doc.Meter.(*dt.FPSMeter)
 		msg.Meter.Fps = protobuf.FPSMeterToPB(meter)
 	}
@@ -81,206 +80,4 @@ func Marshal(doc *app.Document, bytes *utils.ByteBuffer) error {
 	}
 
 	return nil
-}
-
-// send to zero
-// Protocol:
-//     sequence    uint32
-//     hash        uint32
-//     timestamp   uint32
-//     tag         Tag (bytes)
-//     meterType   uint8
-//     meter       Meter (bytes)
-//     actionFlags uint32
-func Encode(sequence uint32, hash uint32, doc *app.Document, encoder *codec.SimpleEncoder) error {
-	if doc.Tag == nil || doc.Meter == nil {
-		return errors.New("No tag or meter in document")
-	}
-
-	var msgType MessageType
-	switch v := doc.Meter.(type) {
-	case *dt.UsageMeter:
-		msgType = MSG_USAGE
-	case *dt.PerfMeter:
-		msgType = MSG_PERF
-	case *dt.GeoMeter:
-		msgType = MSG_GEO
-	case *dt.FlowMeter:
-		msgType = MSG_FLOW
-	case *dt.ConsoleLogMeter:
-		msgType = MSG_CONSOLE_LOG
-	case *dt.TypeMeter:
-		msgType = MSG_TYPE
-	case *dt.FPSMeter:
-		msgType = MSG_FPS
-	default:
-		return fmt.Errorf("Unknown supported type %T", v)
-	}
-
-	encoder.WriteU32(sequence)
-	encoder.WriteU32(hash)
-	encoder.WriteU32(doc.Timestamp)
-
-	var tag *dt.Tag
-	tag, ok := doc.Tag.(*dt.Tag)
-	if !ok {
-		return fmt.Errorf("Unknown supported tag type %T", doc.Tag)
-	}
-	tag.Encode(encoder)
-
-	encoder.WriteU8(uint8(msgType))
-	var meter app.Meter
-	switch msgType {
-	case MSG_USAGE:
-		meter = doc.Meter.(*dt.UsageMeter)
-	case MSG_PERF:
-		meter = doc.Meter.(*dt.PerfMeter)
-	case MSG_GEO:
-		meter = doc.Meter.(*dt.GeoMeter)
-	case MSG_FLOW:
-		meter = doc.Meter.(*dt.FlowMeter)
-	case MSG_CONSOLE_LOG:
-		meter = doc.Meter.(*dt.ConsoleLogMeter)
-	case MSG_TYPE:
-		meter = doc.Meter.(*dt.TypeMeter)
-	case MSG_FPS:
-		meter = doc.Meter.(*dt.FPSMeter)
-	}
-	meter.Encode(encoder)
-
-	encoder.WriteU32(doc.ActionFlags)
-
-	return nil
-}
-
-// The return Document, must call app.ReleaseDocument to release after used
-func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
-	if decoder == nil {
-		return nil, errors.New("No input decoder")
-	}
-
-	// sequence
-	decoder.ReadU32()
-	// hash, DEPRECATED
-	decoder.ReadU32()
-
-	doc := app.AcquireDocument()
-
-	doc.Timestamp = decoder.ReadU32()
-
-	tag := dt.AcquireTag()
-	tag.Field = dt.AcquireField()
-	tag.Decode(decoder)
-	doc.Tag = tag
-
-	msgType := decoder.ReadU8()
-	switch MessageType(msgType) {
-	case MSG_USAGE:
-		m := dt.AcquireUsageMeter()
-		m.Decode(decoder)
-		doc.Meter = m
-	case MSG_PERF:
-		m := dt.AcquirePerfMeter()
-		m.Decode(decoder)
-		doc.Meter = m
-	case MSG_GEO:
-		m := dt.AcquireGeoMeter()
-		m.Decode(decoder)
-		doc.Meter = m
-	case MSG_FLOW:
-		m := dt.AcquireFlowMeter()
-		m.Decode(decoder)
-		doc.Meter = m
-	case MSG_CONSOLE_LOG:
-		m := dt.AcquireConsoleLogMeter()
-		m.Decode(decoder)
-		doc.Meter = m
-	case MSG_TYPE:
-		m := dt.AcquireTypeMeter()
-		m.Decode(decoder)
-		doc.Meter = m
-	case MSG_FPS:
-		m := dt.AcquireFPSMeter()
-		m.Decode(decoder)
-		doc.Meter = m
-	default:
-		app.ReleaseDocument(doc)
-		return nil, errors.New(fmt.Sprintf("Error meter type %v", msgType))
-	}
-
-	doc.ActionFlags = decoder.ReadU32()
-
-	if decoder.Failed() {
-		app.ReleaseDocument(doc)
-		return nil, errors.New("Decode failed")
-	}
-
-	return doc, nil
-}
-
-func EncodeVTAP(doc *app.Document, encoder *codec.SimpleEncoder) error {
-	if doc.Tag == nil || doc.Meter == nil {
-		return errors.New("No tag or meter in document")
-	}
-	encoder.Reset()
-
-	var msgType MessageType
-	switch v := doc.Meter.(type) {
-	case *dt.VTAPUsageMeter:
-		msgType = MSG_VTAP_USAGE
-	default:
-		return fmt.Errorf("Unknown supported type %T", v)
-	}
-
-	encoder.WriteU32(doc.Timestamp)
-
-	var tag *dt.Tag
-	tag, ok := doc.Tag.(*dt.Tag)
-	if !ok {
-		return fmt.Errorf("Unknown supported tag type %T", doc.Tag)
-	}
-	tag.Encode(encoder)
-
-	encoder.WriteU8(uint8(msgType))
-	var meter app.Meter
-	switch msgType {
-	case MSG_VTAP_USAGE:
-		meter = doc.Meter.(*dt.VTAPUsageMeter)
-	}
-	meter.Encode(encoder)
-
-	return nil
-}
-
-func DecodeVTAP(b []byte) (*app.Document, error) {
-	if b == nil {
-		return nil, errors.New("No input byte")
-	}
-
-	decoder := &codec.SimpleDecoder{}
-	decoder.Init(b)
-
-	doc := app.AcquireDocument()
-
-	doc.Timestamp = decoder.ReadU32()
-
-	tag := dt.AcquireTag()
-	tag.Field = dt.AcquireField()
-	tag.Decode(decoder)
-	doc.Tag = tag
-
-	msgType := decoder.ReadU8()
-	switch MessageType(msgType) {
-	case MSG_VTAP_USAGE:
-		m := dt.AcquireVTAPUsageMeter()
-		m.Decode(decoder)
-		doc.Meter = m
-	default:
-		return nil, fmt.Errorf("Error meter type %v", msgType)
-	}
-
-	if decoder.Failed() {
-		return nil, errors.New("Decode failed")
-	}
-	return doc, nil
 }
