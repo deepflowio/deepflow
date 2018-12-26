@@ -147,6 +147,10 @@ func runOnce() {
 		hook()
 	}
 
+	if len(statSources) == 0 {
+		return
+	}
+
 	lock.Lock()
 	for i, remote := range remotes {
 		if statsdClients[i] == nil {
