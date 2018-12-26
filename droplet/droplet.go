@@ -170,6 +170,7 @@ func Start(configPath string) (closers []io.Closer) {
 		libqueue.OptionRelease(func(p interface{}) { app.ReleaseDocument(p.(*app.Document)) }),
 	)
 
+	flowgenerator.SetFlowGenerator(cfg)
 	timeoutConfig := flowgenerator.TimeoutConfig{
 		Opening:         cfg.FlowGenerator.OthersTimeout,
 		Established:     cfg.FlowGenerator.EstablishedTimeout,
@@ -179,24 +180,11 @@ func Start(configPath string) (closers []io.Closer) {
 		ClosedFin:       0,
 		SingleDirection: cfg.FlowGenerator.OthersTimeout,
 	}
-	flowGeneratorConfig := flowgenerator.FlowGeneratorConfig{
-		ForceReportInterval: cfg.FlowGenerator.ForceReportInterval,
-		MinForceReportTime:  cfg.FlowGenerator.MinForceReportTime,
-		BufferSize:          cfg.Queue.FlowGeneratorQueueSize / cfg.Queue.FlowGeneratorQueueCount,
-		FlowLimitNum:        cfg.FlowGenerator.FlowCountLimit / int32(cfg.Queue.FlowGeneratorQueueCount),
-		FlowCleanInterval:   cfg.FlowGenerator.FlowCleanInterval,
-		TimeoutCleanerCount: cfg.FlowGenerator.TimeoutCleanerCount,
-		HashMapSize:         cfg.FlowGenerator.HashMapSize,
-		ReportTolerance:     cfg.FlowGenerator.ReportTolerance,
-		IgnoreTorMac:        cfg.FlowGenerator.IgnoreTorMac,
-		IgnoreL2End:         cfg.FlowGenerator.IgnoreL2End,
-	}
+	flowgenerator.SetTimeout(timeoutConfig)
+	bufferSize := cfg.Queue.FlowGeneratorQueueSize / cfg.Queue.FlowGeneratorQueueCount
+	flowLimitNum := cfg.FlowGenerator.FlowCountLimit / int32(cfg.Queue.FlowGeneratorQueueCount)
 	for i := 0; i < cfg.Queue.FlowGeneratorQueueCount; i++ {
-		flowGenerator := flowgenerator.New(flowGeneratorQueues, flowDuplicatorQueue, flowGeneratorConfig, i)
-		if flowGenerator == nil {
-			return
-		}
-		flowGenerator.SetTimeout(timeoutConfig)
+		flowGenerator := flowgenerator.New(flowGeneratorQueues, flowDuplicatorQueue, bufferSize, flowLimitNum, i)
 		flowGenerator.Start()
 	}
 

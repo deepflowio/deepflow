@@ -12,7 +12,6 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
-	"gitlab.x.lan/yunshan/droplet/flowgenerator"
 )
 
 var log = logging.MustGetLogger("config")
@@ -213,43 +212,43 @@ func (c *Config) Validate() error {
 		c.FlowGenerator.FlowCountLimit = 1024 * 1024
 	}
 	if c.FlowGenerator.ForceReportInterval == 0 {
-		c.FlowGenerator.ForceReportInterval = flowgenerator.FORCE_REPORT_INTERVAL
+		c.FlowGenerator.ForceReportInterval = 60 * time.Second
 	} else {
 		c.FlowGenerator.ForceReportInterval *= time.Second
 	}
 	if c.FlowGenerator.MinForceReportTime == 0 {
-		c.FlowGenerator.MinForceReportTime = flowgenerator.MIN_FORCE_REPORT_TIME
+		c.FlowGenerator.MinForceReportTime = 5 * time.Second
 	} else {
 		c.FlowGenerator.MinForceReportTime *= time.Second
 	}
 	if c.FlowGenerator.EstablishedTimeout == 0 {
-		c.FlowGenerator.EstablishedTimeout = flowgenerator.TIMEOUT_ESTABLISHED
+		c.FlowGenerator.EstablishedTimeout = 300 * time.Second
 	} else {
 		c.FlowGenerator.EstablishedTimeout *= time.Second
 	}
 	if c.FlowGenerator.ClosingRstTimeout == 0 {
-		c.FlowGenerator.ClosingRstTimeout = flowgenerator.TIMEOUT_ESTABLISHED_RST
+		c.FlowGenerator.ClosingRstTimeout = 35 * time.Second
 	} else {
 		c.FlowGenerator.ClosingRstTimeout *= time.Second
 	}
 	if c.FlowGenerator.OthersTimeout == 0 {
-		c.FlowGenerator.OthersTimeout = flowgenerator.TIMEOUT_EXPCEPTION
+		c.FlowGenerator.OthersTimeout = 5 * time.Second
 	} else {
 		c.FlowGenerator.OthersTimeout *= time.Second
 	}
 	if c.FlowGenerator.FlowCleanInterval == 0 {
-		c.FlowGenerator.FlowCleanInterval = flowgenerator.FLOW_CLEAN_INTERVAL
+		c.FlowGenerator.FlowCleanInterval = time.Second
 	} else {
 		c.FlowGenerator.FlowCleanInterval *= time.Second
 	}
 	if c.FlowGenerator.TimeoutCleanerCount == 0 {
-		c.FlowGenerator.TimeoutCleanerCount = flowgenerator.TIMEOUT_CLEANER_COUNT
+		c.FlowGenerator.TimeoutCleanerCount = 4
 	}
 	if c.FlowGenerator.HashMapSize == 0 {
-		c.FlowGenerator.HashMapSize = flowgenerator.HASH_MAP_SIZE
+		c.FlowGenerator.HashMapSize = uint64(c.FlowGenerator.FlowCountLimit) / uint64(c.Queue.FlowGeneratorQueueCount) * 4
 	}
 	if c.FlowGenerator.ReportTolerance == 0 {
-		c.FlowGenerator.ReportTolerance = flowgenerator.REPORT_TOLERANCE
+		c.FlowGenerator.ReportTolerance = 4 * time.Second
 	} else {
 		c.FlowGenerator.ReportTolerance *= time.Second
 	}

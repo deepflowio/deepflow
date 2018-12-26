@@ -4,6 +4,7 @@ import (
 	"net"
 	"sync"
 	"testing"
+	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
@@ -259,6 +260,7 @@ func TestUdpBothPortsInIANA(t *testing.T) {
 
 	// 首包: 80 -> 200 flow: 200 -> 80
 	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
+	minForceReportTime = time.Millisecond * 10
 	packet0 := getUdpDefaultPacket()
 	packet0.PortDst = port1
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)

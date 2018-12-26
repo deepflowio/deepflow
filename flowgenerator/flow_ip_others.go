@@ -38,13 +38,13 @@ func (f *FlowGenerator) initOtherIpFlow(meta *MetaPacket) *FlowExtra {
 	taggedFlow.FlowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
 	updatePlatformData(taggedFlow, meta.EndpointData, false)
 	flowExtra.flowState = FLOW_STATE_ESTABLISHED
-	flowExtra.timeout = f.TimeoutConfig.Opening
+	flowExtra.timeout = openingTimeout
 	return flowExtra
 }
 
 func (f *FlowGenerator) updateOtherIpFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) {
 	f.updateFlow(flowExtra, meta, reply)
 	if reply {
-		flowExtra.timeout = f.TimeoutConfig.EstablishedRst
+		flowExtra.timeout = establishedRstTimeout
 	}
 }
