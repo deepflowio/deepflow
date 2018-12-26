@@ -7,12 +7,6 @@ Droplet工程开发指南
 为了达到易于部署、统一后端技术栈、减少模块间信息传递开销等目的，我们希望整合
 目前几乎所有后端的工程，来实现一个重量级、单进程的应用程序。
 
-当然，这也是一个具有挑战的项目，目前能够遇见到的困难包括如下几点：
-
-* 曾经的C、Java和Python的技术栈将会被抛弃，需要尽快熟悉Golang的使用
-* 如何划分组件以实现组件隔离，以及设计调用接口来尽可能减少模块间耦合
-* 单个组件的缺陷可能会导致整个Droplet崩溃
-
 目录结构组织
 ------------
 
@@ -70,7 +64,7 @@ Droplet工程开发指南
   继承的结构应当与结构体成员变量通过空行区分开
 
 Droplet依赖管理
---------
+---------------
 
 Golang自身具备基于git repo的组件依赖描述，因此我们应当遵循这种方式。
 
@@ -95,6 +89,22 @@ droplet应当使用dep
 当需要下载droplet所需的依赖时，通过`make vendor`命令完成
 
 当需要更新某个依赖时，通过`dep ensure -update gitlab.x.lan/yunshan/droplet-libs`
+
+当然有时我们需要测试某个更新了的依赖，但是继承的依赖关系可能会造成依赖冲突，从而导致依赖解析失败。
+在这样的情形下我们可以强制覆盖依赖版本，这里以gopacket为例：
+1. 原本的依赖描述如下：
+   ```
+   [[constraint]]
+   name = "github.com/google/gopacket"
+   version = "v1.1.15"
+   ```
+2. 将constraint修改为override：
+   ```
+   [[override]]
+   name = "github.com/google/gopacket"
+   branch = "master"
+   ```
+3. 执行`dep ensure -update github.com/google/gopacket`
 
 编译打包步骤
 ------------
