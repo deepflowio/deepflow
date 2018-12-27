@@ -19,10 +19,9 @@ import (
 )
 
 const (
-	LISTEN_PORT        = 20033
-	LISTEN_BUFFER_SIZE = 1 << 20
-	PACKET_MAX         = 256
-	TRIDENT_TIMEOUT    = 60 * time.Second
+	LISTEN_PORT     = 20033
+	PACKET_MAX      = 256
+	TRIDENT_TIMEOUT = 60 * time.Second
 )
 
 const (
@@ -53,8 +52,9 @@ type tridentInstance struct {
 }
 
 type TridentAdapter struct {
-	cacheSize  int
-	timeAdjust int64
+	listenBufferSize int
+	cacheSize        int
+	timeAdjust       int64
 
 	queues    queue.MultiQueueWriter
 	itemKeys  []queue.HashKey
@@ -69,10 +69,11 @@ type TridentAdapter struct {
 	listener *net.UDPConn
 }
 
-func NewTridentAdapter(queues queue.MultiQueueWriter, cacheSize int, timeAdjust int64) *TridentAdapter {
+func NewTridentAdapter(queues queue.MultiQueueWriter, listenBufferSize, cacheSize int, timeAdjust int64) *TridentAdapter {
 	adapter := &TridentAdapter{}
 	adapter.counter = &PacketCounter{}
 	adapter.stats = &PacketCounter{}
+	adapter.listenBufferSize = listenBufferSize
 	adapter.cacheSize = cacheSize
 	adapter.timeAdjust = timeAdjust
 	adapter.queues = queues
@@ -214,7 +215,7 @@ func (a *TridentAdapter) flushInstance() {
 func (a *TridentAdapter) run() {
 	log.Infof("Starting trident adapter Listenning <%s>", a.listener.LocalAddr())
 	a.listener.SetReadDeadline(time.Now().Add(TRIDENT_TIMEOUT))
-	a.listener.SetReadBuffer(LISTEN_BUFFER_SIZE)
+	a.listener.SetReadBuffer(a.listenBufferSize)
 	for a.running {
 		data := a.udpPool.Get().([]byte)
 		_, remote, err := a.listener.ReadFromUDP(data)
