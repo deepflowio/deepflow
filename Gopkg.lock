@@ -148,7 +148,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:e8f2b0300e8c0c510d40ee497c39378ebfede297271c847479ab635ba1be98f2"
+  digest = "1:2df65359233275ac937799f5e5f20ecfa46e83617644329e68228070b3778446"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "app",
@@ -159,7 +159,6 @@
     "grpc",
     "logger",
     "lru",
-    "messenger",
     "policy",
     "pool",
     "protobuf",
@@ -171,7 +170,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "553afe3679d336065df3bd8a62e33d130256e70a"
+  revision = "0807c4d829d43da6c7a0a38e404d8bc70cf03283"
 
 [[projects]]
   branch = "master"
@@ -318,7 +317,6 @@
     "gitlab.x.lan/yunshan/droplet-libs/grpc",
     "gitlab.x.lan/yunshan/droplet-libs/logger",
     "gitlab.x.lan/yunshan/droplet-libs/lru",
-    "gitlab.x.lan/yunshan/droplet-libs/messenger",
     "gitlab.x.lan/yunshan/droplet-libs/policy",
     "gitlab.x.lan/yunshan/droplet-libs/pool",
     "gitlab.x.lan/yunshan/droplet-libs/protobuf",

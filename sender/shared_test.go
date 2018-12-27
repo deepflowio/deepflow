@@ -10,7 +10,6 @@ import (
 	"github.com/google/gopacket/layers"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
-	"gitlab.x.lan/yunshan/droplet-libs/messenger"
 	dt "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 	"gitlab.x.lan/yunshan/droplet-libs/zmq"
 )
@@ -33,22 +32,22 @@ func decode(b []byte) (*app.Document, error) {
 	doc.Tag.(*dt.Tag).Field = dt.AcquireField()
 	doc.Tag.(*dt.Tag).Decode(decoder)
 
-	meterType := messenger.MessageType(decoder.ReadU8())
+	meterType := dt.MessageType(decoder.ReadU8())
 	var m app.Meter
 	switch meterType {
-	case messenger.MSG_USAGE:
+	case dt.MSG_USAGE:
 		m = dt.AcquireUsageMeter()
-	case messenger.MSG_PERF:
+	case dt.MSG_PERF:
 		m = dt.AcquirePerfMeter()
-	case messenger.MSG_GEO:
+	case dt.MSG_GEO:
 		m = dt.AcquireGeoMeter()
-	case messenger.MSG_FLOW:
+	case dt.MSG_FLOW:
 		m = dt.AcquireFlowMeter()
-	case messenger.MSG_CONSOLE_LOG:
+	case dt.MSG_CONSOLE_LOG:
 		m = dt.AcquireConsoleLogMeter()
-	case messenger.MSG_TYPE:
+	case dt.MSG_TYPE:
 		m = dt.AcquireTypeMeter()
-	case messenger.MSG_FPS:
+	case dt.MSG_FPS:
 		m = dt.AcquireFPSMeter()
 	}
 	doc.Meter = m

@@ -5,9 +5,9 @@ import (
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
-	"gitlab.x.lan/yunshan/droplet-libs/messenger"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
+	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 )
 
 const (
@@ -31,7 +31,7 @@ func (m *ZeroDocumentMarshaller) batchEncode(buffer []interface{}) *codec.Simple
 
 	for _, buf := range buffer {
 		if doc, ok := buf.(*app.Document); ok {
-			err := messenger.Encode(m.sequence, 0, doc, encoder)
+			err := zerodoc.Encode(m.sequence, 0, doc, encoder)
 			app.ReleaseDocument(doc)
 			if err != nil {
 				log.Warning(err)
