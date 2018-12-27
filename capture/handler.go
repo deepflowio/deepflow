@@ -30,6 +30,7 @@ type PacketHandler struct {
 
 func (h *PacketHandler) Handle(timestamp Timestamp, packet RawPacket, size PacketSize) {
 	metaPacket := datatype.AcquireMetaPacket()
+	metaPacket.PacketLen = uint16(size)
 	l2Len := metaPacket.ParseL2(packet)
 	if metaPacket.Invalid {
 		datatype.ReleaseMetaPacket(metaPacket)
@@ -37,7 +38,6 @@ func (h *PacketHandler) Handle(timestamp Timestamp, packet RawPacket, size Packe
 	}
 	metaPacket.Exporter = h.ip
 	metaPacket.Timestamp = timestamp
-	metaPacket.PacketLen = uint16(size)
 	if metaPacket.InPort == 0 {
 		metaPacket.InPort = h.defaultTapType
 	}
