@@ -248,6 +248,9 @@ func (p *MetaPacket) ParseL2(packet RawPacket) int {
 		vid := vlanTag & VLAN_ID_MASK
 		if pcp := (vlanTag >> 13) & 0x7; pcp == MIRRORED_TRAFFIC {
 			inPort = (uint32(vid&0xF00) << 8) | uint32(vid&0xFF)
+			if p.PacketLen > 0 {
+				p.PacketLen -= (VLANTAG_LEN + ETH_TYPE_LEN)
+			}
 		} else {
 			p.Vlan = vid
 		}
