@@ -170,6 +170,7 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, now time.Duration) *FlowExtra
 	taggedFlow.VLAN = meta.Vlan
 	taggedFlow.EthType = meta.EthType
 	taggedFlow.PolicyData = meta.PolicyData
+	taggedFlow.Hash = meta.Hash
 
 	flowExtra := AcquireFlowExtra()
 	flowExtra.taggedFlow = taggedFlow

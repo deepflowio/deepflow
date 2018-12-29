@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 )
 
@@ -11,6 +12,7 @@ type Duplicator struct {
 	bufsize           int
 	input             queue.QueueReader
 	outputQueues      []queue.QueueWriter
+	hasMultiQueue     bool
 	outputMultiQueues []queue.MultiQueueWriter
 	multiQueueSizes   []int
 	clone             PseudoCloneHelper
@@ -27,31 +29,15 @@ func (d *Duplicator) AddQueue(output queue.QueueWriter) *Duplicator {
 }
 
 func (d *Duplicator) AddMultiQueue(output queue.MultiQueueWriter, size int) *Duplicator {
+	d.hasMultiQueue = true
 	d.outputMultiQueues = append(d.outputMultiQueues, output)
 	d.multiQueueSizes = append(d.multiQueueSizes, size)
 	return d
 }
 
-func broke(output queue.MultiQueueWriter, size int, items []interface{}) {
-	itemSize := len(items)
-	if itemSize == 0 {
-		return
-	}
-	itemPerQueue := itemSize/size + 1
-	for i := 0; i < size; i++ {
-		start := itemPerQueue * i
-		if start >= itemSize {
-			break
-		}
-		end := itemPerQueue * (i + 1)
-		if end > itemSize {
-			end = itemSize
-		}
-		output.Put(queue.HashKey(i), items[start:end]...)
-	}
-}
-
 func (d *Duplicator) run() {
+	hashKeys := make([]queue.HashKey, d.bufsize+1)
+	hashKeys[0] = 0 // user id
 	buffer := make([]interface{}, d.bufsize)
 	for {
 		n := d.input.Gets(buffer)
@@ -63,8 +49,15 @@ func (d *Duplicator) run() {
 		for _, outQueue := range d.outputQueues {
 			outQueue.Put(buffer[:n]...)
 		}
-		for i, multiQueue := range d.outputMultiQueues {
-			broke(multiQueue, d.multiQueueSizes[i], buffer[:n])
+		if d.hasMultiQueue {
+			for i, item := range buffer[:n] {
+				if flow, ok := item.(*datatype.TaggedFlow); ok {
+					hashKeys[i+1] = queue.HashKey(flow.Hash)
+				}
+			}
+		}
+		for _, multiQueue := range d.outputMultiQueues {
+			multiQueue.Puts(hashKeys[:n+1], buffer[:n])
 		}
 
 		for i := 0; i < n; i++ { // 避免持有对象
