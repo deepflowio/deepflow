@@ -114,6 +114,7 @@ type Flow struct {
 	CloseType
 	FlowMetricsPeerSrc
 	FlowMetricsPeerDst
+	Hash uint32
 
 	FlowID     uint64
 	TimeBitmap uint64
