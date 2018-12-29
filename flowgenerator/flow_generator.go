@@ -39,6 +39,10 @@ func (f *FlowGenerator) getQuinTupleHash(meta *MetaPacket) uint64 {
 	return getKeyL3Hash(meta, f.hashBasis) ^ ((uint64(meta.InPort) << 32) | getKeyL4Hash(meta, f.hashBasis))
 }
 
+func isFromISP(inPort uint32) bool {
+	return inPort&PACKET_SOURCE_ISP == PACKET_SOURCE_ISP
+}
+
 func isFromTrident(inPort uint32) bool {
 	return inPort > PACKET_SOURCE_TOR
 }
@@ -50,7 +54,8 @@ func isFromTorMirror(inPort uint32) bool {
 // return value stands different match type, defined by MAC_MATCH_*
 // TODO: maybe should consider L2End0 and L2End1 when InPort == 0x30000
 func requireMacMatch(meta *MetaPacket, ignoreTorMac, ignoreL2End bool) int {
-	if !ignoreL2End && isFromTrident(meta.InPort) {
+	inPort := meta.InPort
+	if !ignoreL2End && isFromTrident(inPort) {
 		if !meta.L2End0 && !meta.L2End1 {
 			return MAC_MATCH_NONE
 		} else if !meta.L2End0 {
@@ -59,7 +64,8 @@ func requireMacMatch(meta *MetaPacket, ignoreTorMac, ignoreL2End bool) int {
 			return MAC_MATCH_SRC
 		}
 	}
-	if ignoreTorMac && isFromTorMirror(meta.InPort) {
+	// for inport 0x1xxxx return MAC_MATCH_NONE
+	if isFromISP(inPort) || (ignoreTorMac && isFromTorMirror(inPort)) {
 		return MAC_MATCH_NONE
 	}
 	return MAC_MATCH_ALL
