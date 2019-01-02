@@ -109,6 +109,32 @@ func TestWriteRawString(t *testing.T) {
 	}
 }
 
+func TestRefOfString(t *testing.T) {
+	e := &SimpleEncoder{}
+	exp := ""
+	if e.RefOfString() != exp {
+		t.Errorf("Expected %v found %v", exp, e.RefOfString())
+	}
+
+	exp = "A"
+	e.WriteRawString(exp)
+	if e.RefOfString() != exp {
+		t.Errorf("Expected %v found %v", exp, e.RefOfString())
+	}
+
+	e.Reset()
+	exp = ""
+	if e.RefOfString() != exp {
+		t.Errorf("Expected %v found %v", exp, e.RefOfString())
+	}
+
+	exp = "AB"
+	e.WriteRawString(exp)
+	if e.RefOfString() != exp {
+		t.Errorf("Expected %v found %v", exp, e.RefOfString())
+	}
+}
+
 func TestReset(t *testing.T) {
 	e := &SimpleEncoder{}
 	exp := "Hello, world! Hello, Yunshan Networks!"
