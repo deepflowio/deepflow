@@ -95,6 +95,32 @@ SubnetId查询依据
   - 若查询EpcIp表没有数据，则直接用Ip作为Key查询Ip表获取SubnetId
   - 若都没有数据则SubnetId=0
 
+EndpointData查找流程
+------------------------
+
+1. 使用packet中的MAC，在MAC表中查找L2层数据
+2. 使用L2层数据L2EpcId和packet中的IP组合为KEY, 查询EpcIp表获取L3层数据(若第一步没有查到数据，则L2EpcId=0)
+3. 若第二步没有查到数据，则使用packet中的IP作为KEY，查询Ip表，获取L3层数据
+4. 使用L3层的L3EpcId和packet中的IP组合为KEY，查找IP资源组信息
+
+注意： L2层数据通过MAC查找一次确定，L3层数据通过EpcIp表和Ip表来确定
+
+L2层数据:
+* L2EpcId
+* L2DeviceType
+* L2DeviceId
+* L2End
+* HostIp
+* GroupId(DEV)
+
+L3层数据:
+* L3EpcId
+* L3DeviceType
+* L3DeviceId 
+* L3End
+* SubnetId
+* GroupId(IP) 
+
 policy firstpath查找流程
 ------------------------
 
