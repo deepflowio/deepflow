@@ -84,6 +84,7 @@ func (f *FlowGenerator) initTcpFlow(meta *MetaPacket) (*FlowExtra, bool, bool) {
 		taggedFlow.FlowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
 		updatePlatformData(taggedFlow, meta.EndpointData, reply)
 	}
+	flags = flags & TCP_FLAG_MASK
 	if f.StatePreprocess(meta, flags) || meta.Invalid {
 		flowExtra.timeout = exceptionTimeout
 		flowExtra.flowState = FLOW_STATE_EXCEPTION
@@ -105,6 +106,7 @@ func (f *FlowGenerator) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket, re
 	}
 	f.updateFlow(flowExtra, meta, reply)
 	reply = reply != f.tryReverseFlow(flowExtra, meta, reply)
+	flags = flags & TCP_FLAG_MASK
 	if f.StatePreprocess(meta, flags) || meta.Invalid {
 		flowExtra.timeout = exceptionTimeout
 		flowExtra.flowState = FLOW_STATE_EXCEPTION

@@ -284,7 +284,7 @@ func (f *FlowGenerator) tryReverseFlow(flowExtra *FlowExtra, meta *MetaPacket, r
 		return false
 	}
 	// if meta.Invalid is false, TcpData will not be nil
-	if flagEqual(meta.TcpData.Flags, TCP_SYN|TCP_ACK) && !reply {
+	if flagEqual(meta.TcpData.Flags&TCP_FLAG_MASK, TCP_SYN|TCP_ACK) && !reply {
 		flowExtra.reverseFlow()
 		flowExtra.reversed = !flowExtra.reversed
 		return true
