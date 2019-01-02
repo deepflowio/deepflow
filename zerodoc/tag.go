@@ -403,6 +403,8 @@ func (t *Tag) String() string {
 }
 
 func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
+	offset := decoder.Offset()
+
 	t.Code = Code(decoder.ReadU64())
 
 	if t.Code&IP != 0 {
@@ -512,6 +514,8 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&ISPCode != 0 {
 		t.ISP = decoder.ReadString255()
 	}
+
+	t.id = string(decoder.Bytes()[offset:decoder.Offset()]) // Encode内容就是它的id
 }
 
 func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
