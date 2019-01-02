@@ -2,6 +2,7 @@ package codec
 
 import (
 	"encoding/binary"
+	"unsafe"
 
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
 )
@@ -50,6 +51,13 @@ func (e *SimpleEncoder) Reset() {
 
 func (e *SimpleEncoder) Bytes() []byte {
 	return e.buf
+}
+
+func (e *SimpleEncoder) RefOfString() string {
+	if e.buf == nil {
+		return ""
+	}
+	return *(*string)(unsafe.Pointer(&e.buf))
 }
 
 func (e *SimpleEncoder) String() string {
