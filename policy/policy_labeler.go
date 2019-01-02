@@ -718,7 +718,7 @@ func (l *PolicyLabeler) checkNpbPolicy(packet *LookupKey, endpointData *Endpoint
 }
 
 // 添加资源组bitmap
-func (l *PolicyLabeler) AddAclGidBitmap(addType uint32, aclGid uint32, endpointData *EndpointData, policyData *PolicyData) uint8 {
+func (l *PolicyLabeler) AddAclGidBitmap(addType uint32, aclGid uint32, endpointData *EndpointData, policyData *PolicyData, direction DirectionType) uint8 {
 	addCount := uint8(0)
 	bitmapFlag := false
 	var groupIds []uint32
@@ -727,13 +727,22 @@ func (l *PolicyLabeler) AddAclGidBitmap(addType uint32, aclGid uint32, endpointD
 	mapCount := GROUP_MAPBITS_OFFSET
 	if addType == GROUP_TYPE_SRC {
 		groupIds = endpointData.SrcInfo.GroupIds
-		groupAclGidMap = l.SrcGroupAclGidMap
+		if direction&FORWARD == FORWARD {
+			groupAclGidMap = l.SrcGroupAclGidMap
+		} else {
+			groupAclGidMap = l.DstGroupAclGidMap
+		}
 		aclGidBitMap.SetSrcFlag()
 	} else {
 		groupIds = endpointData.DstInfo.GroupIds
-		groupAclGidMap = l.DstGroupAclGidMap
+		if direction&FORWARD == FORWARD {
+			groupAclGidMap = l.DstGroupAclGidMap
+		} else {
+			groupAclGidMap = l.SrcGroupAclGidMap
+		}
 		aclGidBitMap.SetDstFlag()
 	}
+
 	for i, groupId := range groupIds {
 		if i >= mapCount {
 			if aclGidBitMap.GetMapBits() > 0 {
@@ -779,8 +788,8 @@ func (l *PolicyLabeler) AddAclGidBitmaps(endpointData *EndpointData, policyData 
 		if aclGid == 0 {
 			continue
 		}
-		mapCount := l.AddAclGidBitmap(GROUP_TYPE_SRC, aclGid, endpointData, policyData)
-		mapCount += l.AddAclGidBitmap(GROUP_TYPE_DST, aclGid, endpointData, policyData)
+		mapCount := l.AddAclGidBitmap(GROUP_TYPE_SRC, aclGid, endpointData, policyData, aclAction.GetDirections())
+		mapCount += l.AddAclGidBitmap(GROUP_TYPE_DST, aclGid, endpointData, policyData, aclAction.GetDirections())
 		if mapCount > 0 {
 			policyData.AclActions[index] = aclAction.SetAclGidBitmapOffset(mapOffset).SetAclGidBitmapCount(mapCount)
 		}
