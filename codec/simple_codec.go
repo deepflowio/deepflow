@@ -146,6 +146,10 @@ func (d *SimpleDecoder) ReadString255() string {
 	return string(d.buf[d.offset-l : d.offset])
 }
 
+func (d *SimpleDecoder) Offset() int {
+	return d.offset
+}
+
 func (d *SimpleDecoder) Failed() bool {
 	return d.err != 0
 }
