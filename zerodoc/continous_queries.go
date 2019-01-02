@@ -33,6 +33,14 @@ func getCQ(field string) string {
 
 func GetContinousQueryString(obj app.Meter) string {
 	fields := flatGetDBTagsInStruct(reflect.TypeOf(obj).Elem())
+	switch obj.(type) {
+	case *FlowMeter:
+		fields = append(fields, "sum_packet", "sum_bit")
+	case *PerfMeter:
+		fields = append(fields, "sum_bit")
+	case *UsageMeter:
+		fields = append(fields, "sum_packet", "sum_bit")
+	}
 	queries := make([]string, len(fields))
 	for i, v := range fields {
 		queries[i] = getCQ(v)
