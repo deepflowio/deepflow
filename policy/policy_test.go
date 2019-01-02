@@ -37,6 +37,7 @@ var (
 	subnetAny     = uint32(0)
 	protoAny      = IPProtocol(0)
 	vlanAny       = uint32(0)
+	vlan1         = uint32(10)
 	macAny        = uint64(0)
 	mac1          = NewMACAddrFromString("08:00:27:a4:2b:f0").Int()
 	mac2          = NewMACAddrFromString("08:00:27:a4:2b:fa").Int()
@@ -1647,6 +1648,77 @@ func TestAclGidBitmapFirstPathVsFastPath(t *testing.T) {
 	_, policyData = getPolicyByFastPath(table, key2)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestAclGidBitmapFirstPathVsFastPath FastPath Check Failed!")
+	}
+}
+
+func TestAclGidBitmapFirstPathVsFastPathByVlan(t *testing.T) {
+	acls := []*Acl{}
+	// 创建 policyTable
+	table := generatePolicyTable()
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	action = action.SetACLGID(10)
+	acl1 := generatePolicyAcl(table, action, 10, group[1], group[2], protoAny, 0, vlan1)
+	acl2 := generatePolicyAcl(table, action, 20, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	acls = append(acls, acl1, acl2)
+	table.UpdateAcls(acls)
+	// vlan1策略正向
+	key1 := generateLookupKey(group1Mac, group2Mac, vlan1, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 8000)
+	setEthTypeAndOthers(key1, EthernetTypeIPv4, 64, true, true)
+	result := getEndpointData(table, key1)
+	policyData := getPolicyByFirstPath(table, result, key1)
+	aclGidbitmap0 := generateAclGidBitmap(GROUP_TYPE_SRC, 0, 0)
+	aclGidbitmap1 := generateAclGidBitmap(GROUP_TYPE_DST, 0, 0)
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl1.Id)
+	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(2)
+	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidbitmap0, aclGidbitmap1)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FirstPath Check Failed!")
+	}
+	_, policyData = getPolicyByFastPath(table, key1)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FastPath Check Failed!")
+	}
+	// vlan1策略反向
+	key2 := generateLookupKey(group2Mac, group1Mac, vlan1, group2Ip1, group1Ip1, IPProtocolTCP, 8000, 1000)
+	setEthTypeAndOthers(key2, EthernetTypeIPv4, 64, true, true)
+	result = getEndpointData(table, key2)
+	policyData = getPolicyByFirstPath(table, result, key2)
+	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetDirections(BACKWARD)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FirstPath Check Failed!")
+	}
+	_, policyData = getPolicyByFastPath(table, key2)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FastPath Check Failed!")
+	}
+	// vlanAny策略正向
+	key3 := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 8000)
+	setEthTypeAndOthers(key3, EthernetTypeIPv4, 64, true, true)
+	result = getEndpointData(table, key3)
+	policyData = getPolicyByFirstPath(table, result, key3)
+	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetDirections(FORWARD)
+	basicPolicyData.ACLID = 20
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FirstPath Check Failed!")
+	}
+	_, policyData = getPolicyByFastPath(table, key3)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FastPath Check Failed!")
+	}
+	// vlanAny策略反向
+	key4 := generateLookupKey(group2Mac, group1Mac, vlanAny, group2Ip1, group1Ip1, IPProtocolTCP, 8000, 1000)
+	setEthTypeAndOthers(key3, EthernetTypeIPv4, 64, true, true)
+	result = getEndpointData(table, key4)
+	policyData = getPolicyByFirstPath(table, result, key4)
+	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetDirections(BACKWARD)
+	basicPolicyData.ACLID = 20
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FirstPath Check Failed!")
+	}
+	_, policyData = getPolicyByFastPath(table, key4)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FastPath Check Failed!")
 	}
 }
 
