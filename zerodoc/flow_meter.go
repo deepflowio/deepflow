@@ -80,7 +80,7 @@ func (m *FlowMeter) ToKVString() string {
 	buf.WriteString("i,sum_packet_rx=")
 	buf.WriteString(strconv.FormatUint(m.SumPacketRx, 10))
 	buf.WriteString("i,sum_packet=")
-	buf.WriteString(strconv.FormatUint(m.SumPacketTx+m.SumBitRx, 10))
+	buf.WriteString(strconv.FormatUint(m.SumPacketTx+m.SumPacketRx, 10))
 	buf.WriteString("i,sum_bit_tx=")
 	buf.WriteString(strconv.FormatUint(m.SumBitTx, 10))
 	buf.WriteString("i,sum_bit_rx=")
