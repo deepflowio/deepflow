@@ -56,7 +56,7 @@ func TestFullEqual(t *testing.T) {
 		ACLID:      12,
 	}
 
-	fromTag := f.NewTag(0xFFFFFFFFFFFFFFFF)
+	fromTag := f.NewTag(0xFFFFFFFFFFFF)
 	pb := TagToPB(fromTag)
 	toTag := AcquireTag()
 	toTag.Field = AcquireField()
