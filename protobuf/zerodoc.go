@@ -12,7 +12,7 @@ import (
 
 func TagToPB(t *Tag) *pb.Tag {
 	tag := &pb.Tag{
-		Code: proto.Uint64(uint64(t.Code)),
+		Code: proto.Uint64(uint64(t.Code.RemoveIndex())),
 	}
 
 	if t.Code&IP != 0 {
