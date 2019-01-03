@@ -11,6 +11,7 @@ import (
 	"github.com/op/go-logging"
 	"github.com/spf13/cobra"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/debug"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
@@ -90,7 +91,7 @@ func NewTridentAdapter(queues queue.MultiQueueWriter, listenBufferSize, cacheSiz
 	}
 	adapter.listener = listener
 	stats.RegisterCountable("trident_adapter", adapter)
-	dropletctl.Register(dropletctl.DROPLETCTL_ADAPTER, adapter)
+	debug.Register(dropletctl.DROPLETCTL_ADAPTER, adapter)
 	return adapter
 }
 
@@ -253,7 +254,7 @@ func (a *TridentAdapter) Start() error {
 	return nil
 }
 
-func (a *TridentAdapter) RecvCommand(conn *net.UDPConn, port int, operate uint16, arg *bytes.Buffer) {
+func (a *TridentAdapter) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, operate uint16, arg *bytes.Buffer) {
 	buff := bytes.Buffer{}
 	switch operate {
 	case ADAPTER_CMD_SHOW:
@@ -262,7 +263,7 @@ func (a *TridentAdapter) RecvCommand(conn *net.UDPConn, port int, operate uint16
 			log.Error(err)
 			return
 		}
-		dropletctl.SendToDropletCtl(conn, port, 0, &buff)
+		debug.SendToClient(conn, remote, 0, &buff)
 		break
 	default:
 		log.Warningf("Trident Adapter recv unknown command(%v).", operate)
@@ -270,7 +271,7 @@ func (a *TridentAdapter) RecvCommand(conn *net.UDPConn, port int, operate uint16
 }
 
 func CommmandGetCounter(count *PacketCounter) bool {
-	_, result, err := dropletctl.SendToDroplet(dropletctl.DROPLETCTL_ADAPTER, ADAPTER_CMD_SHOW, nil)
+	_, result, err := debug.SendToServer(dropletctl.DROPLETCTL_ADAPTER, ADAPTER_CMD_SHOW, nil)
 	if err != nil {
 		log.Warning(err)
 		return false

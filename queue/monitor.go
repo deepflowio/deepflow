@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net"
 
-	"gitlab.x.lan/yunshan/droplet/dropletctl"
+	"gitlab.x.lan/yunshan/droplet-libs/debug"
 )
 
 type DebugMessage struct {
@@ -14,7 +14,7 @@ type DebugMessage struct {
 }
 
 type MonitorOperator interface {
-	TurnOnDebug(conn *net.UDPConn, port int)
+	TurnOnDebug(conn *net.UDPConn, remote *net.UDPAddr)
 	TurnOffDebug()
 }
 
@@ -39,10 +39,10 @@ func (m *Monitor) isDebugOn() bool {
 	return on
 }
 
-func (m *Monitor) run(conn *net.UDPConn, port int) {
+func (m *Monitor) run(conn *net.UDPConn, remote *net.UDPAddr) {
 	for m.DebugOn {
 		items := <-m.ch
-		m.sendDebug(conn, port, items)
+		m.sendDebug(conn, remote, items)
 	}
 }
 
@@ -53,10 +53,10 @@ func (m *Monitor) debugSwitch(on bool) {
 	}
 }
 
-func (m *Monitor) TurnOnDebug(conn *net.UDPConn, port int) {
+func (m *Monitor) TurnOnDebug(conn *net.UDPConn, remote *net.UDPAddr) {
 	m.ch = make(chan []interface{}, 1000)
 	m.debugSwitch(true)
-	go m.run(conn, port)
+	go m.run(conn, remote)
 }
 
 func (m *Monitor) TurnOffDebug() {
@@ -79,7 +79,7 @@ func (m *Monitor) unmarshal(item interface{}) interface{} {
 	return item
 }
 
-func (m *Monitor) sendDebug(conn *net.UDPConn, port int, items []interface{}) {
+func (m *Monitor) sendDebug(conn *net.UDPConn, remote *net.UDPAddr, items []interface{}) {
 	if _, ok := items[0].(fmt.Stringer); !ok && m.unmarshaller == nil {
 		log.Debug("item.(fmt.Stringer) type assertions error.")
 		return
@@ -95,7 +95,7 @@ func (m *Monitor) sendDebug(conn *net.UDPConn, port int, items []interface{}) {
 			log.Error(err)
 			break
 		}
-		dropletctl.SendToDropletCtl(conn, port, 0, &buffer)
+		debug.SendToClient(conn, remote, 0, &buffer)
 	}
 }
 
