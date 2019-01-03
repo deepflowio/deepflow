@@ -148,9 +148,10 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32, timest
 			a.counter.RxError += 1
 			a.stats.RxError += 1
 			a.udpPool.Put(data)
-			log.Warningf("trident (key=%v) seq %d is less than current %d, drop", key, seq, instance.seq)
+			log.Warningf("trident(%v) recv seq %d is less than current %d, drop", IpFromUint32(key), seq, instance.seq)
 			return
 		}
+		log.Debugf("trident(%v) cache add seq %d, current seq is %d", IpFromUint32(key), seq, instance.seq)
 		offset := seq - instance.seq - 1
 		// cache满或乱序超过CACHE_SIZE, 清空cache
 		if int(offset) >= a.cacheSize || int(instance.cacheCount) == a.cacheSize {
