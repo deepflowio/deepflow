@@ -160,22 +160,10 @@ func BenchmarkEncodeU32(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		u32s = append(u32s, rand.Uint32())
 	}
-	e := &SimpleEncoder{buf: make([]byte, b.N*4, b.N*4)}
+	e := &SimpleEncoder{buf: make([]byte, 0, b.N*4)}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		e.WriteU32(u32s[i])
-	}
-}
-
-func BenchmarkEncodeU64(b *testing.B) {
-	u64s := []uint64{}
-	for i := 0; i < b.N; i++ {
-		u64s = append(u64s, rand.Uint64())
-	}
-	e := &SimpleEncoder{buf: make([]byte, b.N*8, b.N*8)}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		e.WriteU64(u64s[i])
 	}
 }
 
@@ -190,6 +178,18 @@ func BenchmarkDecodeU32(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		d.ReadU32()
+	}
+}
+
+func BenchmarkEncodeU64(b *testing.B) {
+	u64s := []uint64{}
+	for i := 0; i < b.N; i++ {
+		u64s = append(u64s, rand.Uint64())
+	}
+	e := &SimpleEncoder{buf: make([]byte, 0, b.N*8)}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		e.WriteU64(u64s[i])
 	}
 }
 
