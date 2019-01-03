@@ -32,12 +32,13 @@ var log = logging.MustGetLogger("trident_adapter")
 
 type PacketCounter struct {
 	RxPackets uint64 `statsd:"rx_packets"`
-	RxDrop    uint64 `statsd:"rx_drop"`  // 当前SEQ减去上次的SEQ
-	RxError   uint64 `statsd:"rx_error"` // 当前SEQ小于上次的SEQ时+1，包乱序并且超出了CACHE_SIZE
+	RxDropped uint64 `statsd:"rx_dropped"` // 当前SEQ减去上次的SEQ
+	RxErrors  uint64 `statsd:"rx_errors"`  // 当前SEQ小于上次的SEQ时+1，包乱序并且超出了CACHE_SIZE
+	RxCached  uint64 `statsd:"rx_cached"`
 
 	TxPackets uint64 `statsd:"tx_packets"`
-	TxDrop    uint64 `statsd:"tx_drop"`
-	TxError   uint64 `statsd:"tx_error"`
+	TxDropped uint64 `statsd:"tx_dropped"`
+	TxErrors  uint64 `statsd:"tx_errors"`
 }
 
 type TridentKey = uint32
@@ -112,8 +113,8 @@ func (a *TridentAdapter) cacheClear(data []byte, key uint32, seq uint32) {
 				dataSeq := uint32(i) + startSeq + 1
 				a.decode(a.instances[key].cache[i], key)
 				drop := uint64(dataSeq - instance.seq - 1)
-				a.counter.RxDrop += drop
-				a.stats.RxDrop += drop
+				a.counter.RxDropped += drop
+				a.stats.RxDropped += drop
 				instance.seq = dataSeq
 				a.counter.RxPackets += 1
 				a.stats.RxPackets += 1
@@ -127,8 +128,8 @@ func (a *TridentAdapter) cacheClear(data []byte, key uint32, seq uint32) {
 		drop := uint64(seq - instance.seq - 1)
 		a.counter.RxPackets += 1
 		a.stats.RxPackets += 1
-		a.counter.RxDrop += drop
-		a.stats.RxDrop += drop
+		a.counter.RxDropped += drop
+		a.stats.RxDropped += drop
 		a.decode(data, key)
 		instance.seq = seq
 	}
@@ -145,8 +146,8 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32, timest
 		a.stats.RxPackets += 1
 	} else {
 		if seq <= instance.seq {
-			a.counter.RxError += 1
-			a.stats.RxError += 1
+			a.counter.RxErrors += 1
+			a.stats.RxErrors += 1
 			a.udpPool.Put(data)
 			log.Warningf("trident(%v) recv seq %d is less than current %d, drop", IpFromUint32(key), seq, instance.seq)
 			return
@@ -161,6 +162,8 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32, timest
 		instance.cache[offset] = data
 		instance.cacheCount++
 		instance.cacheMap |= 1 << offset
+		a.counter.RxCached++
+		a.stats.RxCached++
 	}
 }
 
@@ -296,11 +299,12 @@ func RegisterCommand() *cobra.Command {
 			if CommmandGetCounter(&count) {
 				fmt.Println("Trident-Adapter Module Running Status:")
 				fmt.Printf("\tRX_PACKETS:           %v\n", count.RxPackets)
-				fmt.Printf("\tRX_DROP:              %v\n", count.RxDrop)
-				fmt.Printf("\tRX_ERROR:             %v\n", count.RxError)
+				fmt.Printf("\tRX_DROP:              %v\n", count.RxDropped)
+				fmt.Printf("\tRX_ERROR:             %v\n", count.RxErrors)
+				fmt.Printf("\tRX_CACHE:             %v\n", count.RxCached)
 				fmt.Printf("\tTX_PACKETS:           %v\n", count.TxPackets)
-				fmt.Printf("\tTX_DROP:              %v\n", count.TxDrop)
-				fmt.Printf("\tTX_ERROR:             %v\n", count.TxError)
+				fmt.Printf("\tTX_DROP:              %v\n", count.TxDropped)
+				fmt.Printf("\tTX_ERROR:             %v\n", count.TxErrors)
 			}
 		},
 	}
@@ -319,11 +323,12 @@ func RegisterCommand() *cobra.Command {
 			}
 			fmt.Println("Trident-Adapter Module Performance:")
 			fmt.Printf("\tRX_PACKETS/S:             %v\n", now.RxPackets-last.RxPackets)
-			fmt.Printf("\tRX_DROP/S:                %v\n", now.RxDrop-last.RxDrop)
-			fmt.Printf("\tRX_ERROR/S:               %v\n", now.RxError-last.RxError)
+			fmt.Printf("\tRX_DROPPED/S:             %v\n", now.RxDropped-last.RxDropped)
+			fmt.Printf("\tRX_ERRORS/S:              %v\n", now.RxErrors-last.RxErrors)
+			fmt.Printf("\tRX_CACHED/S:              %v\n", now.RxCached-last.RxCached)
 			fmt.Printf("\tTX_PACKETS/S:             %v\n", now.TxPackets-last.TxPackets)
-			fmt.Printf("\tTX_DROP/S:                %v\n", now.TxDrop-last.TxDrop)
-			fmt.Printf("\tTX_ERROR/S:               %v\n", now.TxError-last.TxError)
+			fmt.Printf("\tTX_DROPPED/S:             %v\n", now.TxDropped-last.TxDropped)
+			fmt.Printf("\tTX_ERRORS/S:              %v\n", now.TxErrors-last.TxErrors)
 		},
 	}
 	cmd.AddCommand(show)
