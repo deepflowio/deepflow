@@ -15,6 +15,7 @@ import (
 	"github.com/op/go-logging"
 	"github.com/spf13/cobra"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/debug"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
@@ -36,11 +37,11 @@ const (
 func NewManager() *Manager {
 	manager := &Manager{}
 	manager.queues = make(map[string]MonitorOperator)
-	dropletctl.Register(dropletctl.DROPLETCTL_QUEUE, manager)
+	debug.Register(dropletctl.DROPLETCTL_QUEUE, manager)
 	return manager
 }
 
-func (m *Manager) RecvCommand(conn *net.UDPConn, port int, operate uint16, arg *bytes.Buffer) {
+func (m *Manager) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, operate uint16, arg *bytes.Buffer) {
 	buffer := bytes.Buffer{}
 	switch operate {
 	case QUEUE_CMD_SHOW:
@@ -53,7 +54,7 @@ func (m *Manager) RecvCommand(conn *net.UDPConn, port int, operate uint16, arg *
 			log.Error(err)
 			return
 		}
-		dropletctl.SendToDropletCtl(conn, port, 0, &buffer)
+		debug.SendToClient(conn, remote, 0, &buffer)
 		break
 	case QUEUE_CMD_MONITOR_ON:
 		name := ""
@@ -66,8 +67,8 @@ func (m *Manager) RecvCommand(conn *net.UDPConn, port int, operate uint16, arg *
 			log.Errorf("queue[%s] not found.", name)
 			return
 		}
-		m.queues[name].TurnOnDebug(conn, port)
-		dropletctl.SendToDropletCtl(conn, port, 0, nil)
+		m.queues[name].TurnOnDebug(conn, remote)
+		debug.SendToClient(conn, remote, 0, nil)
 		break
 	case QUEUE_CMD_MONITOR_OFF:
 		name := ""
@@ -86,7 +87,7 @@ func (m *Manager) RecvCommand(conn *net.UDPConn, port int, operate uint16, arg *
 		for _, queue := range m.queues {
 			queue.TurnOffDebug()
 		}
-		dropletctl.SendToDropletCtl(conn, port, 0, nil)
+		debug.SendToClient(conn, remote, 0, nil)
 	default:
 		log.Warningf("Trident Adapter recv unknown command(%v).", operate)
 	}
@@ -121,7 +122,7 @@ func (m *Manager) NewQueuesUnmarshal(name string, size, count, userCount int, un
 }
 
 func sendCmdOnly(operate int, arg *bytes.Buffer) (*net.UDPConn, *bytes.Buffer, error) {
-	conn, result, err := dropletctl.SendToDroplet(dropletctl.DROPLETCTL_QUEUE, dropletctl.DropletCtlModuleOperate(operate), arg)
+	conn, result, err := debug.SendToServer(dropletctl.DROPLETCTL_QUEUE, debug.ModuleOperate(operate), arg)
 	if err != nil {
 		return conn, nil, err
 	}
@@ -174,7 +175,7 @@ func recvDebugMsg(conn *net.UDPConn, name string) {
 			return
 		default:
 			conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
-			buffer, err := dropletctl.RecvFromDroplet(conn)
+			buffer, err := debug.RecvFromServer(conn)
 			if err != nil {
 				if isNotTimeout(err) {
 					queueOperate(name, QUEUE_CMD_MONITOR_OFF)

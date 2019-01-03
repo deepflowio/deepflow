@@ -12,6 +12,7 @@ import (
 	"github.com/op/go-logging"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/debug"
 	"gitlab.x.lan/yunshan/droplet-libs/logger"
 	libqueue "gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
@@ -23,12 +24,18 @@ import (
 	"gitlab.x.lan/yunshan/droplet/labeler"
 	"gitlab.x.lan/yunshan/droplet/mapreduce"
 	"gitlab.x.lan/yunshan/droplet/pcap"
+	"gitlab.x.lan/yunshan/droplet/profiler"
 	"gitlab.x.lan/yunshan/droplet/queue"
 	"gitlab.x.lan/yunshan/droplet/sender"
 	"gitlab.x.lan/yunshan/message/trident"
 )
 
 var log = logging.MustGetLogger("droplet")
+
+const (
+	DEBUG_LISTEN_IP   = "127.0.0.1"
+	DEBUG_LISTEN_PORT = 9527
+)
 
 func getLocalIp() (net.IP, error) {
 	hostname, err := os.Hostname()
@@ -54,12 +61,13 @@ func Start(configPath string) (closers []io.Closer) {
 	logger.EnableFileLog(cfg.LogFile)
 	logLevel, _ := logging.LogLevel(cfg.LogLevel)
 	logging.SetLevel(logLevel, "")
+	debug.SetIpAndPort(DEBUG_LISTEN_IP, DEBUG_LISTEN_PORT)
 	log.Infof("droplet config: %+v\n", cfg)
+	profiler := profiler.NewProfiler()
 
 	if cfg.Profiler {
-		StartProfiler()
+		profiler.Start()
 	}
-	RegisterProfilerCommand()
 
 	stats.SetMinInterval(10 * time.Second)
 

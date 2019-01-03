@@ -8,6 +8,7 @@ import (
 
 	"github.com/op/go-logging"
 	"github.com/spf13/cobra"
+	"gitlab.x.lan/yunshan/droplet-libs/debug"
 )
 
 const (
@@ -18,10 +19,12 @@ const (
 type LoglevelControl struct {
 }
 
+var log = logging.MustGetLogger("dropletctl")
+
 func NewLoglevelControl() *LoglevelControl {
 	loglevelProcess := &LoglevelControl{}
 	// 服务端注册处理函数
-	Register(DROPLETCTL_LOGLEVEL, loglevelProcess)
+	debug.Register(DROPLETCTL_LOGLEVEL, loglevelProcess)
 	return loglevelProcess
 }
 
@@ -45,30 +48,30 @@ func encodeLoglevel(level string) (*bytes.Buffer, error) {
 	return &buffer, nil
 }
 
-func (l *LoglevelControl) RecvCommand(conn *net.UDPConn, port int, operate uint16, arg *bytes.Buffer) {
+func (l *LoglevelControl) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, operate uint16, arg *bytes.Buffer) {
 	switch operate {
 	case LOGLEVEL_CMD_SHOW:
 		loglevel := getLogLevel()
 		enc, err := encodeLoglevel(loglevel)
 		if err != nil {
-			SendToDropletCtl(conn, port, 1, nil)
+			debug.SendToClient(conn, remote, 1, nil)
 		} else {
-			SendToDropletCtl(conn, port, 0, enc)
+			debug.SendToClient(conn, remote, 0, enc)
 		}
 	case LOGLEVEL_CMD_SET:
 		loglevel, err := decodeLoglevel(arg)
 		if err != nil {
-			SendToDropletCtl(conn, port, 1, nil)
+			debug.SendToClient(conn, remote, 1, nil)
 		} else {
 			log.Infof("set loglevel to (%s)", loglevel)
 			if err := setLogLevel(loglevel); err != nil {
 				log.Warningf("set loglevel(%s) failed: %s", loglevel, err)
-				SendToDropletCtl(conn, port, 1, nil)
+				debug.SendToClient(conn, remote, 1, nil)
 			} else {
 				if enc, err := encodeLoglevel(loglevel); err != nil {
-					SendToDropletCtl(conn, port, 0, nil)
+					debug.SendToClient(conn, remote, 0, nil)
 				} else {
-					SendToDropletCtl(conn, port, 0, enc)
+					debug.SendToClient(conn, remote, 0, enc)
 				}
 			}
 		}
@@ -97,7 +100,7 @@ func sendCmd(operate int, loglevel string, out interface{}) bool {
 		return false
 	}
 
-	_, result, err := SendToDroplet(DROPLETCTL_LOGLEVEL, DropletCtlModuleOperate(operate), &buffer)
+	_, result, err := debug.SendToServer(DROPLETCTL_LOGLEVEL, debug.ModuleOperate(operate), &buffer)
 	if err != nil {
 		fmt.Println(err)
 		return false

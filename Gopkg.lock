@@ -148,12 +148,13 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:08fb9faecb157aea3342baee97b71ad28275bb43be53da5e46dbcf1aefc9048e"
+  digest = "1:9da0902c302c6c6aa36283be5abd3d0b075723075c917b099843d90b5c2bfadd"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "app",
     "codec",
     "datatype",
+    "debug",
     "dedup",
     "dropletpb",
     "grpc",
@@ -170,7 +171,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "46958a7b4ba592aa9931e6e28f45fc8a794c1c50"
+  revision = "9324b4870dcfa88bbbf56cc1368ef02c149d643b"
 
 [[projects]]
   branch = "master"
@@ -312,6 +313,7 @@
     "gitlab.x.lan/yunshan/droplet-libs/app",
     "gitlab.x.lan/yunshan/droplet-libs/codec",
     "gitlab.x.lan/yunshan/droplet-libs/datatype",
+    "gitlab.x.lan/yunshan/droplet-libs/debug",
     "gitlab.x.lan/yunshan/droplet-libs/dedup",
     "gitlab.x.lan/yunshan/droplet-libs/dropletpb",
     "gitlab.x.lan/yunshan/droplet-libs/grpc",
