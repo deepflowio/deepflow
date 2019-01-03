@@ -82,6 +82,10 @@ func (c Code) HasL2TagField() bool {
 	return c&(MAC|L2EpcID|L2Device|Host|MACPath|L2EpcIDPath|L2DevicePath|HostPath|VLANID|VTAP|SubnetID) != 0
 }
 
+func (c Code) RemoveIndex() Code {
+	return c &^ CodeIndices
+}
+
 // 从不同EndPoint获取的网包字段组成Field，是否可能重复。
 // 注意，不能判断从同样的EndPoint获取的网包字段组成Field可能重复。
 func (c Code) PossibleDuplicate() bool {
