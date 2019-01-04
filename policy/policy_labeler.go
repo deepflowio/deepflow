@@ -781,7 +781,10 @@ func (l *PolicyLabeler) AddAclGidBitmap(addType uint32, aclGid uint32, endpointD
 	return addCount
 }
 
-func (l *PolicyLabeler) AddAclGidBitmaps(endpointData *EndpointData, policyData *PolicyData) {
+func (l *PolicyLabeler) AddAclGidBitmaps(endpointData *EndpointData, policyData *PolicyData, packet *LookupKey) {
+	if !packet.HasFeatureFlag(NPM) {
+		return
+	}
 	mapOffset := uint16(0)
 	for index, aclAction := range policyData.AclActions {
 		aclGid := uint32(aclAction.GetACLGID())
@@ -864,7 +867,7 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 		findPolicy.Merge(vlanPolicy.AclActions, vlanPolicy.NpbActions, vlanPolicy.ACLID)
 		findPolicy.Merge(portForwardPolicy.AclActions, portForwardPolicy.NpbActions, portForwardPolicy.ACLID, FORWARD)
 		findPolicy.Merge(portBackwardPolicy.AclActions, portBackwardPolicy.NpbActions, portBackwardPolicy.ACLID, BACKWARD)
-		l.AddAclGidBitmaps(packetEndpointData, findPolicy)
+		l.AddAclGidBitmaps(packetEndpointData, findPolicy, packet)
 	}
 
 	atomic.AddUint64(&l.FirstPathHit, 1)
@@ -920,11 +923,11 @@ func (l *PolicyLabeler) addVlanFastPolicy(srcEpc, dstEpc uint16, packet *LookupK
 	if vlanPolicy == nil {
 		atomic.AddUint32(&l.FastPathPolicyCount, 1)
 		// 添加forward方向bitmap
-		l.AddAclGidBitmaps(endpointData, forward)
+		l.AddAclGidBitmaps(endpointData, forward, packet)
 		mapsForward.vlanPolicyMap[key] = forward
 	} else {
 		// 添加forward方向bitmap
-		l.AddAclGidBitmaps(endpointData, forward)
+		l.AddAclGidBitmaps(endpointData, forward, packet)
 		*vlanPolicy = *forward
 	}
 
@@ -942,11 +945,11 @@ func (l *PolicyLabeler) addVlanFastPolicy(srcEpc, dstEpc uint16, packet *LookupK
 	if vlanPolicy == nil {
 		atomic.AddUint32(&l.FastPathPolicyCount, 1)
 		// 添加backward方向bitmap
-		l.AddAclGidBitmaps(&backwardEndpoint, backward)
+		l.AddAclGidBitmaps(&backwardEndpoint, backward, packet)
 		mapsBackward.vlanPolicyMap[key] = backward
 	} else {
 		// 添加backward方向bitmap
-		l.AddAclGidBitmaps(&backwardEndpoint, backward)
+		l.AddAclGidBitmaps(&backwardEndpoint, backward, packet)
 		*vlanPolicy = *backward
 	}
 }
@@ -979,14 +982,14 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packetEndp
 	if portPolicyValue := mapsForward.portPolicyMap[key]; portPolicyValue == nil {
 		value := &PortPolicyValue{endpoint: *endpointData, protoPolicy: make([]*PolicyData, 3), timestamp: packet.Timestamp}
 		// 添加forward方向bitmap
-		l.AddAclGidBitmaps(&value.endpoint, forward)
+		l.AddAclGidBitmaps(&value.endpoint, forward, packet)
 		value.protoPolicy[index] = forward
 		mapsForward.portPolicyMap[key] = value
 		atomic.AddUint32(&l.FastPathPolicyCount, 1)
 	} else {
 		portPolicyValue.endpoint = *endpointData
 		// 添加forward方向bitmap
-		l.AddAclGidBitmaps(&portPolicyValue.endpoint, forward)
+		l.AddAclGidBitmaps(&portPolicyValue.endpoint, forward, packet)
 		portPolicyValue.protoPolicy[index] = forward
 		portPolicyValue.timestamp = packet.Timestamp
 	}
@@ -1012,14 +1015,14 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packetEndp
 		value := &PortPolicyValue{endpoint: *endpointData, protoPolicy: make([]*PolicyData, 3), timestamp: packet.Timestamp}
 		value.endpoint.SrcInfo, value.endpoint.DstInfo = value.endpoint.DstInfo, value.endpoint.SrcInfo
 		// 添加backward方向bitmap
-		l.AddAclGidBitmaps(&value.endpoint, backward)
+		l.AddAclGidBitmaps(&value.endpoint, backward, packet)
 		value.protoPolicy[index] = backward
 		mapsBackward.portPolicyMap[key] = value
 		atomic.AddUint32(&l.FastPathPolicyCount, 1)
 	} else {
 		portPolicyValue.endpoint = EndpointData{SrcInfo: endpointData.DstInfo, DstInfo: endpointData.SrcInfo}
 		// 添加backward方向bitmap
-		l.AddAclGidBitmaps(&portPolicyValue.endpoint, backward)
+		l.AddAclGidBitmaps(&portPolicyValue.endpoint, backward, packet)
 		portPolicyValue.protoPolicy[index] = backward
 		portPolicyValue.timestamp = packet.Timestamp
 	}
@@ -1140,9 +1143,7 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *
 		policy.AclActions = make([]AclAction, 0, len(vlanPolicy.AclActions)+len(portPolicy.AclActions))
 		policy.Merge(vlanPolicy.AclActions, vlanPolicy.NpbActions, vlanPolicy.ACLID)
 		policy.Merge(portPolicy.AclActions, portPolicy.NpbActions, portPolicy.ACLID)
-		if endpoint != nil {
-			l.AddAclGidBitmaps(endpoint, policy)
-		}
+		l.AddAclGidBitmaps(endpoint, policy, packet)
 	}
 
 	if endpoint != nil {

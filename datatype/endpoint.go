@@ -36,6 +36,13 @@ const (
 	TAP_MIN TapType = TAP_ANY + 1
 )
 
+type FeatureFlags uint32
+
+const (
+	NPM FeatureFlags = 1 << iota
+	NPB
+)
+
 const (
 	IP_GROUP_ID_FLAG = 1e9
 )
@@ -70,6 +77,7 @@ type LookupKey struct {
 	Invalid                  bool
 	FastIndex                int
 	SrcGroupIds, DstGroupIds []uint32
+	FeatureFlag              FeatureFlags
 }
 
 type EndpointData struct {
@@ -81,6 +89,10 @@ func (k *LookupKey) String() string {
 	return fmt.Sprintf("%d %s:%v > %s:%v %v vlan: %v %v:%d > %v:%d proto: %v ttl %v tap: %v",
 		k.Timestamp, Uint64ToMac(k.SrcMac), k.L2End0, Uint64ToMac(k.DstMac), k.L2End1, k.EthType, k.Vlan,
 		IpFromUint32(k.SrcIp), k.SrcPort, IpFromUint32(k.DstIp), k.DstPort, k.Proto, k.Ttl, k.Tap)
+}
+
+func (k *LookupKey) HasFeatureFlag(featureFlag FeatureFlags) bool {
+	return k.FeatureFlag&featureFlag == featureFlag
 }
 
 func (i *EndpointInfo) SetL2Data(data *PlatformData) {

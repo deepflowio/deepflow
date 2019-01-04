@@ -190,17 +190,16 @@ func (t *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *PolicyData {
 
 // Droplet用于*_COUNTING、PACKET_BROKERING、PACKET_CAPTURING
 // FIXME: tricky argument
-func (t *PolicyTable) LookupAllByKey(key *LookupKey, isTrident ...bool) (*EndpointData, *PolicyData) {
+func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData) {
 	if !key.Tap.CheckTapType(key.Tap) {
 		return INVALID_ENDPOINT_DATA, INVALID_POLICY_DATA
 	}
-
 	endpoint, policy := t.policyLabeler.GetPolicyByFastPath(key)
 	if policy == nil {
 		endpoint = t.cloudPlatformLabeler.GetEndpointData(key)
 		endpoint, policy = t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
 	}
-	if len(isTrident) == 0 {
+	if key.HasFeatureFlag(NPM) {
 		endpoint = t.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
 	}
 	return endpoint, policy
