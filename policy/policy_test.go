@@ -1874,17 +1874,41 @@ func BenchmarkFastPath(b *testing.B) {
 	}
 }
 
+func BenchmarkFirstPathWithMultiGroup(b *testing.B) {
+	acls := []*Acl{}
+	table := generatePolicyTable()
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	for i := 100; i < 200; i++ {
+		acl.SrcGroups = append(acl.SrcGroups, uint32(i))
+		acl.DstGroups = append(acl.DstGroups, uint32(i))
+	}
+
+	acls = append(acls, acl)
+	table.UpdateAcls(acls)
+
+	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 8000)
+	endpoint := getEndpointData(table, key)
+	endpoint.SrcInfo.GroupIds = acl.SrcGroups
+	endpoint.DstInfo.GroupIds = acl.DstGroups
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		table.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+	}
+}
+
 func BenchmarkAcl(b *testing.B) {
 	acls := []*Acl{}
 	table := generatePolicyTable()
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 
-	for i := uint16(10000); i < 25000; i += 5000 {
+	for i := uint16(1); i <= 1000; i++ {
 		acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
 
-		acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(i-5000, i+5000))
-		acl.DstPortRange = append(acl.DstPortRange, NewPortRange(i-5000, i+5000))
-		for i := 0; i < 100; i++ {
+		acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(i+100, i+200))
+		acl.DstPortRange = append(acl.DstPortRange, NewPortRange(i+2000, i+2100))
+		for i := 100; i < 200; i++ {
 			acl.SrcGroups = append(acl.SrcGroups, uint32(i))
 			acl.DstGroups = append(acl.DstGroups, uint32(i))
 		}
@@ -1892,12 +1916,5 @@ func BenchmarkAcl(b *testing.B) {
 		acls = append(acls, acl)
 	}
 	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		table.UpdateAcls(acls)
-		for _, acl := range acls {
-			acl.DstPorts = acl.DstPorts[:0]
-			acl.SrcPorts = acl.SrcPorts[:0]
-		}
-	}
+	table.UpdateAcls(acls)
 }

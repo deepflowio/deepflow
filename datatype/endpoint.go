@@ -76,7 +76,7 @@ type LookupKey struct {
 	Tap                      TapType
 	Invalid                  bool
 	FastIndex                int
-	SrcGroupIds, DstGroupIds []uint32
+	SrcGroupIds, DstGroupIds []uint16
 	FeatureFlag              FeatureFlags
 }
 
