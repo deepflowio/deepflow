@@ -277,15 +277,16 @@ func generatePolicyAcl(table *PolicyTable, action AclAction, aclID ACLID, args .
 func generateLookupKey(srcMac, dstMac uint64, vlan uint32, srcIp, dstIp uint32,
 	proto IPProtocol, srcPort, dstPort uint16) *LookupKey {
 	key := &LookupKey{
-		SrcMac:  srcMac,
-		DstMac:  dstMac,
-		SrcIp:   srcIp,
-		DstIp:   dstIp,
-		Proto:   uint8(proto),
-		SrcPort: srcPort,
-		DstPort: dstPort,
-		Vlan:    uint16(vlan),
-		Tap:     TAP_TOR,
+		SrcMac:      srcMac,
+		DstMac:      dstMac,
+		SrcIp:       srcIp,
+		DstIp:       dstIp,
+		Proto:       uint8(proto),
+		SrcPort:     srcPort,
+		DstPort:     dstPort,
+		Vlan:        uint16(vlan),
+		Tap:         TAP_TOR,
+		FeatureFlag: NPM,
 	}
 	return key
 }
