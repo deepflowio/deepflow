@@ -19,7 +19,6 @@ import (
 func TestMarshal(t *testing.T) {
 	f := dt.Field{
 		IP:           0x0a2102c8,
-		MAC:          0x020406080a0c,
 		GroupID:      4,
 		L2EpcID:      2,
 		L3EpcID:      2,
@@ -28,22 +27,12 @@ func TestMarshal(t *testing.T) {
 		L3DeviceID:   5,
 		L3DeviceType: dt.VMDevice,
 
-		IP0:           0x0a2102c8,
 		IP1:           0x0a2102ca,
-		MAC0:          0x020406080a0c,
-		MAC1:          0x020304050607,
-		GroupID0:      4,
 		GroupID1:      2,
-		L2EpcID0:      2,
 		L2EpcID1:      -1,
-		L3EpcID0:      2,
 		L3EpcID1:      -1,
-		L2DeviceID0:   3,
-		L2DeviceType0: dt.VGatewayDevice,
 		L2DeviceID1:   6,
 		L2DeviceType1: dt.VMDevice,
-		L3DeviceID0:   5,
-		L3DeviceType0: dt.VMDevice,
 		L3DeviceID1:   6,
 		L3DeviceType1: dt.VMDevice,
 
@@ -53,7 +42,6 @@ func TestMarshal(t *testing.T) {
 		Protocol:   layers.IPProtocolTCP,
 		ServerPort: 1024,
 		Host:       0xac100197,
-		VTAP:       0x64646475,
 		TAPType:    dt.ToR,
 	}
 	tag := f.NewTag(dt.IP | dt.L2EpcID | dt.L3EpcID)
