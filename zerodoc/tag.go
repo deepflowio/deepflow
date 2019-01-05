@@ -17,7 +17,7 @@ type Code uint64
 
 const (
 	IP Code = 0x1 << iota
-	MAC
+	_       // 1 << 1, MAC
 	GroupID
 	L2EpcID
 	L3EpcID
@@ -28,7 +28,7 @@ const (
 
 const (
 	IPPath Code = 0x10000 << iota // 1 << 16
-	MACPath
+	_                             // 1 << 17, MACPath
 	GroupIDPath
 	L2EpcIDPath
 	L3EpcIDPath
@@ -43,12 +43,12 @@ const (
 	VLANID
 	Protocol
 	ServerPort
-	_ // 37
-	VTAP
+	_ // 1 << 37
+	_ // 1 << 38, VTAP
 	TAPType
 	SubnetID
-	ACLID
-	ACLDirection // 42
+	_ // 1 << 41, ACLID
+	ACLDirection
 	Scope
 )
 
@@ -79,7 +79,7 @@ func (c Code) HasEdgeTagField() bool {
 
 func (c Code) HasL2TagField() bool {
 	// FIXME: GroupID、GroupIDPath待定
-	return c&(MAC|L2EpcID|L2Device|Host|MACPath|L2EpcIDPath|L2DevicePath|HostPath|VLANID|VTAP|SubnetID) != 0
+	return c&(L2EpcID|L2Device|Host|L2EpcIDPath|L2DevicePath|HostPath|VLANID|SubnetID) != 0
 }
 
 func (c Code) RemoveIndex() Code {
@@ -89,12 +89,12 @@ func (c Code) RemoveIndex() Code {
 // 从不同EndPoint获取的网包字段组成Field，是否可能重复。
 // 注意，不能判断从同样的EndPoint获取的网包字段组成Field可能重复。
 func (c Code) PossibleDuplicate() bool {
-	return c&(CodeIndices|GroupID|L2EpcID|L3EpcID|Host|GroupIDPath|L2EpcIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|VTAP|TAPType|SubnetID|ACLID|ACLDirection|Country|Region|ISPCode) == c
+	return c&(CodeIndices|GroupID|L2EpcID|L3EpcID|Host|GroupIDPath|L2EpcIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|TAPType|SubnetID|ACLDirection|Country|Region|ISPCode) == c
 }
 
 // 是否全部取自网包的对称字段（非源、目的字段）
 func (c Code) IsSymmetric() bool {
-	return c&(CodeIndices|ACLGID|VLANID|Protocol|VTAP|TAPType|SubnetID|ACLID|ACLDirection) == c
+	return c&(CodeIndices|ACLGID|VLANID|Protocol|TAPType|SubnetID|ACLDirection) == c
 }
 
 type DeviceType uint8
@@ -164,47 +164,35 @@ func (s ScopeEnum) String() string {
 }
 
 type Field struct {
+	// 注意字节对齐！
+
 	IP           uint32
-	MAC          uint64
-	GroupID      int32
-	L2EpcID      int32
-	L3EpcID      int32
-	L2DeviceID   uint32
+	GroupID      int16
+	L2EpcID      int16
+	L3EpcID      int16
+	L2DeviceID   uint16
+	L3DeviceID   uint16
 	L2DeviceType DeviceType
-	L3DeviceID   uint32
 	L3DeviceType DeviceType
 	Host         uint32
 
-	IP0           uint32
 	IP1           uint32
-	MAC0          uint64
-	MAC1          uint64
-	GroupID0      int32
-	GroupID1      int32
-	L2EpcID0      int32
-	L2EpcID1      int32
-	L3EpcID0      int32
-	L3EpcID1      int32
-	L2DeviceID0   uint32
-	L2DeviceType0 DeviceType
-	L2DeviceID1   uint32
+	GroupID1      int16
+	L2EpcID1      int16
+	L3EpcID1      int16
+	L2DeviceID1   uint16
+	L3DeviceID1   uint16
 	L2DeviceType1 DeviceType
-	L3DeviceID0   uint32
-	L3DeviceType0 DeviceType
-	L3DeviceID1   uint32
 	L3DeviceType1 DeviceType
-	Host0         uint32
 	Host1         uint32
 
-	Direction    DirectionEnum
-	ACLGID       uint32
+	ACLGID       uint16
 	VLANID       uint16
+	Direction    DirectionEnum
 	Protocol     layers.IPProtocol
 	ServerPort   uint16
-	VTAP         uint32
+	SubnetID     uint16
 	TAPType      TAPTypeEnum
-	SubnetID     uint32
-	ACLID        uint32
 	ACLDirection ACLDirectionEnum
 	Scope        ScopeEnum
 
@@ -219,14 +207,6 @@ type Tag struct {
 	id string
 }
 
-func formatU32(u uint32) string {
-	return strconv.FormatUint(uint64(u), 10)
-}
-
-func formatI32(i int32) string {
-	return strconv.FormatInt(int64(i), 10)
-}
-
 func (t *Tag) ToKVString() string {
 	var buf strings.Builder
 	// 在InfluxDB的line protocol中，tag紧跟在measurement name之后，总会以逗号开头
@@ -236,31 +216,27 @@ func (t *Tag) ToKVString() string {
 		buf.WriteString(",ip=")
 		buf.WriteString(utils.IpFromUint32(t.IP).String())
 	}
-	if t.Code&MAC != 0 {
-		buf.WriteString(",mac=")
-		buf.WriteString(utils.Uint64ToMac(t.MAC).String())
-	}
 	if t.Code&GroupID != 0 {
 		buf.WriteString(",group_id=")
-		buf.WriteString(formatI32(t.GroupID))
+		buf.WriteString(strconv.FormatInt(int64(t.GroupID), 10))
 	}
 	if t.Code&L2EpcID != 0 {
 		buf.WriteString(",l2_epc_id=")
-		buf.WriteString(formatI32(t.L2EpcID))
+		buf.WriteString(strconv.FormatInt(int64(t.L2EpcID), 10))
 	}
 	if t.Code&L3EpcID != 0 {
 		buf.WriteString(",l3_epc_id=")
-		buf.WriteString(formatI32(t.L3EpcID))
+		buf.WriteString(strconv.FormatInt(int64(t.L3EpcID), 10))
 	}
 	if t.Code&L2Device != 0 {
 		buf.WriteString(",l2_device_id=")
-		buf.WriteString(formatU32(t.L2DeviceID))
+		buf.WriteString(strconv.FormatUint(uint64(t.L2DeviceID), 10))
 		buf.WriteString(",l2_device_type=")
 		buf.WriteString(strconv.FormatUint(uint64(t.L2DeviceType), 10))
 	}
 	if t.Code&L3Device != 0 {
 		buf.WriteString(",l3_device_id=")
-		buf.WriteString(formatU32(t.L3DeviceID))
+		buf.WriteString(strconv.FormatUint(uint64(t.L3DeviceID), 10))
 		buf.WriteString(",l3_device_type=")
 		buf.WriteString(strconv.FormatUint(uint64(t.L3DeviceType), 10))
 	}
@@ -272,57 +248,51 @@ func (t *Tag) ToKVString() string {
 	// 1<<16 ~ 1<<22
 	if t.Code&IPPath != 0 {
 		buf.WriteString(",ip_0=")
-		buf.WriteString(utils.IpFromUint32(t.IP0).String())
+		buf.WriteString(utils.IpFromUint32(t.IP).String())
 		buf.WriteString(",ip_1=")
 		buf.WriteString(utils.IpFromUint32(t.IP1).String())
 	}
-	if t.Code&MACPath != 0 {
-		buf.WriteString(",mac_0=")
-		buf.WriteString(utils.Uint64ToMac(t.MAC0).String())
-		buf.WriteString(",mac_1=")
-		buf.WriteString(utils.Uint64ToMac(t.MAC1).String())
-	}
 	if t.Code&GroupIDPath != 0 {
 		buf.WriteString(",group_id_0=")
-		buf.WriteString(formatI32(t.GroupID0))
+		buf.WriteString(strconv.FormatInt(int64(t.GroupID), 10))
 		buf.WriteString(",group_id_1=")
-		buf.WriteString(formatI32(t.GroupID1))
+		buf.WriteString(strconv.FormatInt(int64(t.GroupID1), 10))
 	}
 	if t.Code&L2EpcIDPath != 0 {
 		buf.WriteString(",l2_epc_id_0=")
-		buf.WriteString(formatI32(t.L2EpcID0))
+		buf.WriteString(strconv.FormatInt(int64(t.L2EpcID), 10))
 		buf.WriteString(",l2_epc_id_1=")
-		buf.WriteString(formatI32(t.L2EpcID1))
+		buf.WriteString(strconv.FormatInt(int64(t.L2EpcID1), 10))
 	}
 	if t.Code&L3EpcIDPath != 0 {
 		buf.WriteString(",l3_epc_id_0=")
-		buf.WriteString(formatI32(t.L3EpcID0))
+		buf.WriteString(strconv.FormatInt(int64(t.L3EpcID), 10))
 		buf.WriteString(",l3_epc_id_1=")
-		buf.WriteString(formatI32(t.L3EpcID1))
+		buf.WriteString(strconv.FormatInt(int64(t.L3EpcID1), 10))
 	}
 	if t.Code&L2DevicePath != 0 {
 		buf.WriteString(",l2_device_id_0=")
-		buf.WriteString(formatU32(t.L2DeviceID0))
+		buf.WriteString(strconv.FormatUint(uint64(t.L2DeviceID), 10))
 		buf.WriteString(",l2_device_id_1=")
-		buf.WriteString(formatU32(t.L2DeviceID1))
+		buf.WriteString(strconv.FormatUint(uint64(t.L2DeviceID1), 10))
 		buf.WriteString(",l2_device_type_0=")
-		buf.WriteString(strconv.FormatUint(uint64(t.L2DeviceType0), 10))
+		buf.WriteString(strconv.FormatUint(uint64(t.L2DeviceType), 10))
 		buf.WriteString(",l2_device_type_1=")
 		buf.WriteString(strconv.FormatUint(uint64(t.L2DeviceType1), 10))
 	}
 	if t.Code&L3DevicePath != 0 {
 		buf.WriteString(",l3_device_id_0=")
-		buf.WriteString(formatU32(t.L3DeviceID0))
+		buf.WriteString(strconv.FormatUint(uint64(t.L3DeviceID), 10))
 		buf.WriteString(",l3_device_id_1=")
-		buf.WriteString(formatU32(t.L3DeviceID1))
+		buf.WriteString(strconv.FormatUint(uint64(t.L3DeviceID1), 10))
 		buf.WriteString(",l3_device_type_0=")
-		buf.WriteString(strconv.FormatUint(uint64(t.L3DeviceType0), 10))
+		buf.WriteString(strconv.FormatUint(uint64(t.L3DeviceType), 10))
 		buf.WriteString(",l3_device_type_1=")
 		buf.WriteString(strconv.FormatUint(uint64(t.L3DeviceType1), 10))
 	}
 	if t.Code&HostPath != 0 {
 		buf.WriteString(",host_0=")
-		buf.WriteString(utils.IpFromUint32(t.Host0).String())
+		buf.WriteString(utils.IpFromUint32(t.Host).String())
 		buf.WriteString(",host_1=")
 		buf.WriteString(utils.IpFromUint32(t.Host1).String())
 	}
@@ -338,7 +308,7 @@ func (t *Tag) ToKVString() string {
 	}
 	if t.Code&ACLGID != 0 {
 		buf.WriteString(",acl_gid=")
-		buf.WriteString(formatU32(t.ACLGID))
+		buf.WriteString(strconv.FormatUint(uint64(t.ACLGID), 10))
 	}
 	if t.Code&VLANID != 0 {
 		buf.WriteString(",vlan_id=")
@@ -352,21 +322,13 @@ func (t *Tag) ToKVString() string {
 		buf.WriteString(",server_port=")
 		buf.WriteString(strconv.FormatUint(uint64(t.ServerPort), 10))
 	}
-	if t.Code&VTAP != 0 {
-		buf.WriteString(",vtap=")
-		buf.WriteString(utils.IpFromUint32(t.VTAP).String())
-	}
 	if t.Code&TAPType != 0 {
 		buf.WriteString(",tap_type=")
 		buf.WriteString(strconv.FormatUint(uint64(t.TAPType), 10))
 	}
 	if t.Code&SubnetID != 0 {
 		buf.WriteString(",subnet_id=")
-		buf.WriteString(formatU32(t.SubnetID))
-	}
-	if t.Code&ACLID != 0 {
-		buf.WriteString(",acl_id=")
-		buf.WriteString(formatU32(t.ACLID))
+		buf.WriteString(strconv.FormatUint(uint64(t.SubnetID), 10))
 	}
 	if t.Code&ACLDirection != 0 {
 		switch t.ACLDirection {
@@ -414,24 +376,21 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&IP != 0 {
 		t.IP = decoder.ReadU32()
 	}
-	if t.Code&MAC != 0 {
-		t.MAC = decoder.ReadU64() // XXX: 48bit
-	}
 	if t.Code&GroupID != 0 {
-		t.GroupID = int32(decoder.ReadU32()) // XXX: 16bit
+		t.GroupID = int16(decoder.ReadU16())
 	}
 	if t.Code&L2EpcID != 0 {
-		t.L2EpcID = int32(decoder.ReadU32()) // XXX: 16bit
+		t.L2EpcID = int16(decoder.ReadU16())
 	}
 	if t.Code&L3EpcID != 0 {
-		t.L3EpcID = int32(decoder.ReadU32()) // XXX: 16bit
+		t.L3EpcID = int16(decoder.ReadU16())
 	}
 	if t.Code&L2Device != 0 {
-		t.L2DeviceID = decoder.ReadU32() // XXX: 16bit
+		t.L2DeviceID = uint16(decoder.ReadU16())
 		t.L2DeviceType = DeviceType(decoder.ReadU8())
 	}
 	if t.Code&L3Device != 0 {
-		t.L3DeviceID = decoder.ReadU32() // XXX: 16bit
+		t.L3DeviceID = uint16(decoder.ReadU16())
 		t.L3DeviceType = DeviceType(decoder.ReadU8())
 	}
 	if t.Code&Host != 0 {
@@ -439,39 +398,35 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	}
 
 	if t.Code&IPPath != 0 {
-		t.IP0 = decoder.ReadU32()
+		t.IP = decoder.ReadU32()
 		t.IP1 = decoder.ReadU32()
 	}
-	if t.Code&MACPath != 0 {
-		t.MAC0 = decoder.ReadU64()
-		t.MAC1 = decoder.ReadU64()
-	}
 	if t.Code&GroupIDPath != 0 {
-		t.GroupID0 = int32(decoder.ReadU32()) // XXX: 16bit
-		t.GroupID1 = int32(decoder.ReadU32()) // XXX: 16bit
+		t.GroupID = int16(decoder.ReadU16())
+		t.GroupID1 = int16(decoder.ReadU16())
 	}
 	if t.Code&L2EpcIDPath != 0 {
-		t.L2EpcID0 = int32(decoder.ReadU32()) // XXX: 16bit
-		t.L2EpcID1 = int32(decoder.ReadU32()) // XXX: 16bit
+		t.L2EpcID = int16(decoder.ReadU16())
+		t.L2EpcID1 = int16(decoder.ReadU16())
 	}
 	if t.Code&L3EpcIDPath != 0 {
-		t.L3EpcID0 = int32(decoder.ReadU32()) // XXX: 16bit
-		t.L3EpcID1 = int32(decoder.ReadU32()) // XXX: 16bit
+		t.L3EpcID = int16(decoder.ReadU16())
+		t.L3EpcID1 = int16(decoder.ReadU16())
 	}
 	if t.Code&L2DevicePath != 0 {
-		t.L2DeviceID0 = decoder.ReadU32() // XXX: 16bit
-		t.L2DeviceType0 = DeviceType(decoder.ReadU8())
-		t.L2DeviceID1 = decoder.ReadU32() // XXX: 16bit
+		t.L2DeviceID = uint16(decoder.ReadU16())
+		t.L2DeviceType = DeviceType(decoder.ReadU8())
+		t.L2DeviceID1 = uint16(decoder.ReadU16())
 		t.L2DeviceType1 = DeviceType(decoder.ReadU8())
 	}
 	if t.Code&L3DevicePath != 0 {
-		t.L3DeviceID0 = decoder.ReadU32() // XXX: 16bit
-		t.L3DeviceType0 = DeviceType(decoder.ReadU8())
-		t.L3DeviceID1 = decoder.ReadU32() // XXX: 16bit
+		t.L3DeviceID = uint16(decoder.ReadU16())
+		t.L3DeviceType = DeviceType(decoder.ReadU8())
+		t.L3DeviceID1 = uint16(decoder.ReadU16())
 		t.L3DeviceType1 = DeviceType(decoder.ReadU8())
 	}
 	if t.Code&HostPath != 0 {
-		t.Host0 = decoder.ReadU32()
+		t.Host = decoder.ReadU32()
 		t.Host1 = decoder.ReadU32()
 	}
 
@@ -479,7 +434,7 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 		t.Direction = DirectionEnum(decoder.ReadU8())
 	}
 	if t.Code&ACLGID != 0 {
-		t.ACLGID = uint32(decoder.ReadU16()) // 16bit
+		t.ACLGID = uint16(decoder.ReadU16())
 	}
 	if t.Code&VLANID != 0 {
 		t.VLANID = decoder.ReadU16()
@@ -490,17 +445,11 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&ServerPort != 0 {
 		t.ServerPort = decoder.ReadU16()
 	}
-	if t.Code&VTAP != 0 {
-		t.VTAP = decoder.ReadU32()
-	}
 	if t.Code&TAPType != 0 {
 		t.TAPType = TAPTypeEnum(decoder.ReadU8())
 	}
 	if t.Code&SubnetID != 0 {
-		t.SubnetID = decoder.ReadU32()
-	}
-	if t.Code&ACLID != 0 {
-		t.ACLID = uint32(decoder.ReadU16()) // 16bit
+		t.SubnetID = decoder.ReadU16()
 	}
 	if t.Code&ACLDirection != 0 {
 		t.ACLDirection = ACLDirectionEnum(decoder.ReadU8())
@@ -533,24 +482,21 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 	if t.Code&IP != 0 {
 		encoder.WriteU32(t.IP)
 	}
-	if t.Code&MAC != 0 {
-		encoder.WriteU64(t.MAC) // XXX: 48bit
-	}
 	if t.Code&GroupID != 0 {
-		encoder.WriteU32(uint32(t.GroupID)) // XXX: 16bit
+		encoder.WriteU16(uint16(t.GroupID))
 	}
 	if t.Code&L2EpcID != 0 {
-		encoder.WriteU32(uint32(t.L2EpcID)) // XXX: 16bit
+		encoder.WriteU16(uint16(t.L2EpcID))
 	}
 	if t.Code&L3EpcID != 0 {
-		encoder.WriteU32(uint32(t.L3EpcID)) // XXX: 16bit
+		encoder.WriteU16(uint16(t.L3EpcID))
 	}
 	if t.Code&L2Device != 0 {
-		encoder.WriteU32(t.L2DeviceID) // XXX: 16bit
+		encoder.WriteU16(t.L2DeviceID)
 		encoder.WriteU8(uint8(t.L2DeviceType))
 	}
 	if t.Code&L3Device != 0 {
-		encoder.WriteU32(t.L3DeviceID) // XXX: 16bit
+		encoder.WriteU16(t.L3DeviceID)
 		encoder.WriteU8(uint8(t.L3DeviceType))
 	}
 	if t.Code&Host != 0 {
@@ -558,39 +504,35 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 	}
 
 	if t.Code&IPPath != 0 {
-		encoder.WriteU32(t.IP0)
+		encoder.WriteU32(t.IP)
 		encoder.WriteU32(t.IP1)
 	}
-	if t.Code&MACPath != 0 {
-		encoder.WriteU64(t.MAC0)
-		encoder.WriteU64(t.MAC1)
-	}
 	if t.Code&GroupIDPath != 0 {
-		encoder.WriteU32(uint32(t.GroupID0)) // XXX: 16bit
-		encoder.WriteU32(uint32(t.GroupID1)) // XXX: 16bit
+		encoder.WriteU16(uint16(t.GroupID))
+		encoder.WriteU16(uint16(t.GroupID1))
 	}
 	if t.Code&L2EpcIDPath != 0 {
-		encoder.WriteU32(uint32(t.L2EpcID0)) // XXX: 16bit
-		encoder.WriteU32(uint32(t.L2EpcID1)) // XXX: 16bit
+		encoder.WriteU16(uint16(t.L2EpcID))
+		encoder.WriteU16(uint16(t.L2EpcID1))
 	}
 	if t.Code&L3EpcIDPath != 0 {
-		encoder.WriteU32(uint32(t.L3EpcID0)) // XXX: 16bit
-		encoder.WriteU32(uint32(t.L3EpcID1)) // XXX: 16bit
+		encoder.WriteU16(uint16(t.L3EpcID))
+		encoder.WriteU16(uint16(t.L3EpcID1))
 	}
 	if t.Code&L2DevicePath != 0 {
-		encoder.WriteU32(t.L2DeviceID0) // XXX: 16bit
-		encoder.WriteU8(uint8(t.L2DeviceType0))
-		encoder.WriteU32(t.L2DeviceID1) // XXX: 16bit
+		encoder.WriteU16(t.L2DeviceID)
+		encoder.WriteU8(uint8(t.L2DeviceType))
+		encoder.WriteU16(t.L2DeviceID1)
 		encoder.WriteU8(uint8(t.L2DeviceType1))
 	}
 	if t.Code&L3DevicePath != 0 {
-		encoder.WriteU32(t.L3DeviceID0) // XXX: 16bit
-		encoder.WriteU8(uint8(t.L3DeviceType0))
-		encoder.WriteU32(t.L3DeviceID1) // XXX: 16bit
+		encoder.WriteU16(t.L3DeviceID)
+		encoder.WriteU8(uint8(t.L3DeviceType))
+		encoder.WriteU16(t.L3DeviceID1)
 		encoder.WriteU8(uint8(t.L3DeviceType1))
 	}
 	if t.Code&HostPath != 0 {
-		encoder.WriteU32(t.Host0)
+		encoder.WriteU32(t.Host)
 		encoder.WriteU32(t.Host1)
 	}
 
@@ -598,7 +540,7 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 		encoder.WriteU8(uint8(t.Direction))
 	}
 	if t.Code&ACLGID != 0 {
-		encoder.WriteU16(uint16(t.ACLGID)) // 16bit
+		encoder.WriteU16(t.ACLGID)
 	}
 	if t.Code&VLANID != 0 {
 		encoder.WriteU16(t.VLANID)
@@ -609,17 +551,11 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 	if t.Code&ServerPort != 0 {
 		encoder.WriteU16(t.ServerPort)
 	}
-	if t.Code&VTAP != 0 {
-		encoder.WriteU32(t.VTAP)
-	}
 	if t.Code&TAPType != 0 {
 		encoder.WriteU8(uint8(t.TAPType))
 	}
 	if t.Code&SubnetID != 0 {
-		encoder.WriteU32(t.SubnetID)
-	}
-	if t.Code&ACLID != 0 {
-		encoder.WriteU16(uint16(t.ACLID)) // 16bit
+		encoder.WriteU16(t.SubnetID)
 	}
 	if t.Code&ACLDirection != 0 {
 		encoder.WriteU8(uint8(t.ACLDirection))
@@ -674,7 +610,7 @@ func (t *Tag) GetFastID() uint64 {
 		id |= uint64(t.TAPType & 0x3)
 	}
 	if t.Code&L3EpcID != 0 {
-		id |= uint64(t.L3EpcID&0xFFFF) << 2
+		id |= uint64(uint16(t.L3EpcID)&0xFFFF) << 2
 	}
 	if t.Code&IP != 0 {
 		id |= uint64(t.IP) << 18

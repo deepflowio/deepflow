@@ -14,7 +14,6 @@ import (
 func TestFullEqual(t *testing.T) {
 	f := Field{
 		IP:           0x0a2102c8,
-		MAC:          0x020406080a0c,
 		GroupID:      4,
 		L2EpcID:      2,
 		L3EpcID:      2,
@@ -24,25 +23,14 @@ func TestFullEqual(t *testing.T) {
 		L3DeviceType: VMDevice,
 		Host:         0xac100197,
 
-		IP0:           0x0a2102c8,
 		IP1:           0x0a2102ca,
-		MAC0:          0x020406080a0c,
-		MAC1:          0x020304050607,
-		GroupID0:      4,
 		GroupID1:      2,
-		L2EpcID0:      2,
 		L2EpcID1:      -1,
-		L3EpcID0:      2,
 		L3EpcID1:      -1,
-		L2DeviceID0:   3,
-		L2DeviceType0: VGatewayDevice,
 		L2DeviceID1:   6,
 		L2DeviceType1: VMDevice,
-		L3DeviceID0:   5,
-		L3DeviceType0: VMDevice,
 		L3DeviceID1:   6,
 		L3DeviceType1: VMDevice,
-		Host0:         0xac100197,
 		Host1:         0xac100198,
 
 		Direction:  ClientToServer,
@@ -50,10 +38,8 @@ func TestFullEqual(t *testing.T) {
 		VLANID:     123,
 		Protocol:   layers.IPProtocolTCP,
 		ServerPort: 1024,
-		VTAP:       0x64646475,
 		TAPType:    ToR,
 		SubnetID:   10,
-		ACLID:      12,
 	}
 
 	fromTag := f.NewTag(0xFFFFFFFFFFFF)
@@ -70,7 +56,6 @@ func TestFullEqual(t *testing.T) {
 func TestPartialTagEqual(t *testing.T) {
 	f := Field{
 		IP:           0x0a2102c8,
-		MAC:          0x020406080a0c,
 		GroupID:      4,
 		L2EpcID:      2,
 		L3EpcID:      2,
@@ -80,25 +65,14 @@ func TestPartialTagEqual(t *testing.T) {
 		L3DeviceType: VMDevice,
 		Host:         0xac100197,
 
-		IP0:           0x0a2102c8,
 		IP1:           0x0a2102ca,
-		MAC0:          0x020406080a0c,
-		MAC1:          0x020304050607,
-		GroupID0:      4,
 		GroupID1:      2,
-		L2EpcID0:      2,
 		L2EpcID1:      -1,
-		L3EpcID0:      2,
 		L3EpcID1:      -1,
-		L2DeviceID0:   3,
-		L2DeviceType0: VGatewayDevice,
 		L2DeviceID1:   6,
 		L2DeviceType1: VMDevice,
-		L3DeviceID0:   5,
-		L3DeviceType0: VMDevice,
 		L3DeviceID1:   6,
 		L3DeviceType1: VMDevice,
-		Host0:         0xac100197,
 		Host1:         0xac100198,
 
 		Direction:  ClientToServer,
@@ -106,10 +80,8 @@ func TestPartialTagEqual(t *testing.T) {
 		VLANID:     123,
 		Protocol:   layers.IPProtocolTCP,
 		ServerPort: 1024,
-		VTAP:       0x64646475,
 		TAPType:    ToR,
 		SubnetID:   10,
-		ACLID:      12,
 	}
 
 	codes := [...]Code{
@@ -137,7 +109,6 @@ func TestPartialTagEqual(t *testing.T) {
 func TestGeoTagEqual(t *testing.T) {
 	f := Field{
 		IP:           0x0a2102c8,
-		MAC:          0x020406080a0c,
 		GroupID:      4,
 		L2EpcID:      2,
 		L3EpcID:      2,
@@ -147,25 +118,14 @@ func TestGeoTagEqual(t *testing.T) {
 		L3DeviceType: VMDevice,
 		Host:         0xac100197,
 
-		IP0:           0x0a2102c8,
 		IP1:           0x0a2102ca,
-		MAC0:          0x020406080a0c,
-		MAC1:          0x020304050607,
-		GroupID0:      4,
 		GroupID1:      2,
-		L2EpcID0:      2,
 		L2EpcID1:      -1,
-		L3EpcID0:      2,
 		L3EpcID1:      -1,
-		L2DeviceID0:   3,
-		L2DeviceType0: VGatewayDevice,
 		L2DeviceID1:   6,
 		L2DeviceType1: VMDevice,
-		L3DeviceID0:   5,
-		L3DeviceType0: VMDevice,
 		L3DeviceID1:   6,
 		L3DeviceType1: VMDevice,
-		Host0:         0xac100197,
 		Host1:         0xac100198,
 
 		Direction:  ClientToServer,
@@ -173,10 +133,8 @@ func TestGeoTagEqual(t *testing.T) {
 		VLANID:     123,
 		Protocol:   layers.IPProtocolTCP,
 		ServerPort: 1024,
-		VTAP:       0x64646475,
 		TAPType:    ToR,
 		SubnetID:   10,
-		ACLID:      12,
 
 		Country: "CHN",
 		Region:  "Beijing",
