@@ -2,7 +2,6 @@ package zerodoc
 
 import (
 	"strconv"
-	"strings"
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
@@ -48,70 +47,77 @@ func (m *PerfMeter) SequentialMerge(other app.Meter) {
 }
 
 func (m *PerfMeter) ToKVString() string {
-	var buf strings.Builder
+	buffer := make([]byte, MAX_STRING_LENGTH)
+	size := m.MarshalTo(buffer)
+	return string(buffer[:size])
+}
+
+func (m *PerfMeter) MarshalTo(b []byte) int {
+	offset := 0
 
 	// sum
 	sum := m.PerfMeterSum
-	buf.WriteString("sum_flow_count=")
-	buf.WriteString(strconv.FormatUint(sum.SumFlowCount, 10))
-	buf.WriteString("i,sum_closed_flow_count=")
-	buf.WriteString(strconv.FormatUint(sum.SumClosedFlowCount, 10))
-	buf.WriteString("i,sum_retrans_flow_count=")
-	buf.WriteString(strconv.FormatUint(sum.SumRetransFlowCount, 10))
-	buf.WriteString("i,sum_half_open_flow_count=")
-	buf.WriteString(strconv.FormatUint(sum.SumHalfOpenFlowCount, 10))
-	buf.WriteString("i,sum_packet_tx=")
-	buf.WriteString(strconv.FormatUint(sum.SumPacketTx, 10))
-	buf.WriteString("i,sum_packet_rx=")
-	buf.WriteString(strconv.FormatUint(sum.SumPacketRx, 10))
-	buf.WriteString("i,sum_bit_tx=")
-	buf.WriteString(strconv.FormatUint(sum.SumBitTx, 10))
-	buf.WriteString("i,sum_bit_rx=")
-	buf.WriteString(strconv.FormatUint(sum.SumBitRx, 10))
-	buf.WriteString("i,sum_bit=")
-	buf.WriteString(strconv.FormatUint(sum.SumBitTx+sum.SumBitRx, 10))
-	buf.WriteString("i,sum_retrans_cnt_tx=")
-	buf.WriteString(strconv.FormatUint(sum.SumRetransCntTx, 10))
-	buf.WriteString("i,sum_retrans_cnt_rx=")
-	buf.WriteString(strconv.FormatUint(sum.SumRetransCntRx, 10))
+	offset += copy(b[offset:], "sum_flow_count=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumFlowCount, 10))
+	offset += copy(b[offset:], "i,sum_closed_flow_count=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumClosedFlowCount, 10))
+	offset += copy(b[offset:], "i,sum_retrans_flow_count=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumRetransFlowCount, 10))
+	offset += copy(b[offset:], "i,sum_half_open_flow_count=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumHalfOpenFlowCount, 10))
+	offset += copy(b[offset:], "i,sum_packet_tx=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumPacketTx, 10))
+	offset += copy(b[offset:], "i,sum_packet_rx=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumPacketRx, 10))
+	offset += copy(b[offset:], "i,sum_bit_tx=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumBitTx, 10))
+	offset += copy(b[offset:], "i,sum_bit_rx=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumBitRx, 10))
+	offset += copy(b[offset:], "i,sum_bit=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumBitTx+sum.SumBitRx, 10))
+	offset += copy(b[offset:], "i,sum_retrans_cnt_tx=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumRetransCntTx, 10))
+	offset += copy(b[offset:], "i,sum_retrans_cnt_rx=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumRetransCntRx, 10))
 
-	buf.WriteString("i,sum_rtt_syn=")
-	buf.WriteString(strconv.FormatInt(int64(sum.SumRTTSyn/time.Microsecond), 10))
-	buf.WriteString("i,sum_rtt_avg=")
-	buf.WriteString(strconv.FormatInt(int64(sum.SumRTTAvg/time.Microsecond), 10))
-	buf.WriteString("i,sum_art_avg=")
-	buf.WriteString(strconv.FormatInt(int64(sum.SumARTAvg/time.Microsecond), 10))
-	buf.WriteString("i,sum_rtt_syn_flow=")
-	buf.WriteString(strconv.FormatUint(sum.SumRTTSynFlow, 10))
-	buf.WriteString("i,sum_rtt_avg_flow=")
-	buf.WriteString(strconv.FormatUint(sum.SumRTTAvgFlow, 10))
-	buf.WriteString("i,sum_art_avg_flow=")
-	buf.WriteString(strconv.FormatUint(sum.SumARTAvgFlow, 10))
-	buf.WriteString("i,sum_zero_wnd_cnt_tx=")
-	buf.WriteString(strconv.FormatUint(sum.SumZeroWndCntTx, 10))
-	buf.WriteString("i,sum_zero_wnd_cnt_rx=")
-	buf.WriteString(strconv.FormatUint(sum.SumZeroWndCntRx, 10))
+	offset += copy(b[offset:], "i,sum_rtt_syn=")
+	offset += copy(b[offset:], strconv.FormatInt(int64(sum.SumRTTSyn/time.Microsecond), 10))
+	offset += copy(b[offset:], "i,sum_rtt_avg=")
+	offset += copy(b[offset:], strconv.FormatInt(int64(sum.SumRTTAvg/time.Microsecond), 10))
+	offset += copy(b[offset:], "i,sum_art_avg=")
+	offset += copy(b[offset:], strconv.FormatInt(int64(sum.SumARTAvg/time.Microsecond), 10))
+	offset += copy(b[offset:], "i,sum_rtt_syn_flow=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumRTTSynFlow, 10))
+	offset += copy(b[offset:], "i,sum_rtt_avg_flow=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumRTTAvgFlow, 10))
+	offset += copy(b[offset:], "i,sum_art_avg_flow=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumARTAvgFlow, 10))
+	offset += copy(b[offset:], "i,sum_zero_wnd_cnt_tx=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumZeroWndCntTx, 10))
+	offset += copy(b[offset:], "i,sum_zero_wnd_cnt_rx=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumZeroWndCntRx, 10))
 
 	// max
 	max := m.PerfMeterMax
-	buf.WriteString("i,max_rtt_syn=")
-	buf.WriteString(strconv.FormatInt(int64(max.MaxRTTSyn/time.Microsecond), 10))
-	buf.WriteString("i,max_rtt_avg=")
-	buf.WriteString(strconv.FormatInt(int64(max.MaxRTTAvg/time.Microsecond), 10))
-	buf.WriteString("i,max_art_avg=")
-	buf.WriteString(strconv.FormatInt(int64(max.MaxARTAvg/time.Microsecond), 10))
+	offset += copy(b[offset:], "i,max_rtt_syn=")
+	offset += copy(b[offset:], strconv.FormatInt(int64(max.MaxRTTSyn/time.Microsecond), 10))
+	offset += copy(b[offset:], "i,max_rtt_avg=")
+	offset += copy(b[offset:], strconv.FormatInt(int64(max.MaxRTTAvg/time.Microsecond), 10))
+	offset += copy(b[offset:], "i,max_art_avg=")
+	offset += copy(b[offset:], strconv.FormatInt(int64(max.MaxARTAvg/time.Microsecond), 10))
 
 	// min
 	min := m.PerfMeterMin
-	buf.WriteString("i,min_rtt_syn=")
-	buf.WriteString(strconv.FormatInt(int64(min.MinRTTSyn/time.Microsecond), 10))
-	buf.WriteString("i,min_rtt_avg=")
-	buf.WriteString(strconv.FormatInt(int64(min.MinRTTAvg/time.Microsecond), 10))
-	buf.WriteString("i,min_art_avg=")
-	buf.WriteString(strconv.FormatInt(int64(min.MinARTAvg/time.Microsecond), 10))
-	buf.WriteRune('i')
+	offset += copy(b[offset:], "i,min_rtt_syn=")
+	offset += copy(b[offset:], strconv.FormatInt(int64(min.MinRTTSyn/time.Microsecond), 10))
+	offset += copy(b[offset:], "i,min_rtt_avg=")
+	offset += copy(b[offset:], strconv.FormatInt(int64(min.MinRTTAvg/time.Microsecond), 10))
+	offset += copy(b[offset:], "i,min_art_avg=")
+	offset += copy(b[offset:], strconv.FormatInt(int64(min.MinARTAvg/time.Microsecond), 10))
+	b[offset] = 'i'
+	offset++
 
-	return buf.String()
+	return offset
 }
 
 type PerfMeterSum struct {

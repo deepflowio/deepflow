@@ -2,7 +2,6 @@ package zerodoc
 
 import (
 	"strconv"
-	"strings"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
@@ -67,27 +66,34 @@ func (m *FlowMeter) SequentialMerge(other app.Meter) { // other为后一个时�
 }
 
 func (m *FlowMeter) ToKVString() string {
-	var buf strings.Builder
+	buffer := make([]byte, MAX_STRING_LENGTH)
+	size := m.MarshalTo(buffer)
+	return string(buffer[:size])
+}
 
-	buf.WriteString("sum_flow_count=")
-	buf.WriteString(strconv.FormatUint(m.SumFlowCount, 10))
-	buf.WriteString("i,sum_new_flow_count=")
-	buf.WriteString(strconv.FormatUint(m.SumNewFlowCount, 10))
-	buf.WriteString("i,sum_closed_flow_count=")
-	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCount, 10))
-	buf.WriteString("i,sum_packet_tx=")
-	buf.WriteString(strconv.FormatUint(m.SumPacketTx, 10))
-	buf.WriteString("i,sum_packet_rx=")
-	buf.WriteString(strconv.FormatUint(m.SumPacketRx, 10))
-	buf.WriteString("i,sum_packet=")
-	buf.WriteString(strconv.FormatUint(m.SumPacketTx+m.SumPacketRx, 10))
-	buf.WriteString("i,sum_bit_tx=")
-	buf.WriteString(strconv.FormatUint(m.SumBitTx, 10))
-	buf.WriteString("i,sum_bit_rx=")
-	buf.WriteString(strconv.FormatUint(m.SumBitRx, 10))
-	buf.WriteString("i,sum_bit=")
-	buf.WriteString(strconv.FormatUint(m.SumBitTx+m.SumBitRx, 10))
-	buf.WriteRune('i')
+func (m *FlowMeter) MarshalTo(b []byte) int {
+	offset := 0
 
-	return buf.String()
+	offset += copy(b[offset:], "sum_flow_count=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumFlowCount, 10))
+	offset += copy(b[offset:], "i,sum_new_flow_count=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumNewFlowCount, 10))
+	offset += copy(b[offset:], "i,sum_closed_flow_count=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumClosedFlowCount, 10))
+	offset += copy(b[offset:], "i,sum_packet_tx=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumPacketTx, 10))
+	offset += copy(b[offset:], "i,sum_packet_rx=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumPacketRx, 10))
+	offset += copy(b[offset:], "i,sum_packet=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumPacketTx+m.SumPacketRx, 10))
+	offset += copy(b[offset:], "i,sum_bit_tx=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumBitTx, 10))
+	offset += copy(b[offset:], "i,sum_bit_rx=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumBitRx, 10))
+	offset += copy(b[offset:], "i,sum_bit=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumBitTx+m.SumBitRx, 10))
+	b[offset] = 'i'
+	offset++
+
+	return offset
 }

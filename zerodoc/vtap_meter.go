@@ -64,6 +64,10 @@ func (m *Metrics) ToKVString() string {
 	panic("not supported!")
 }
 
+func (m *Metrics) MarshalTo(b []byte) int {
+	panic("not supported!")
+}
+
 func (m *Metrics) Clone() app.Meter {
 	panic("not supported!")
 }
@@ -156,6 +160,10 @@ func (m *VTAPUsageMeter) SortKey() uint64 {
 }
 
 func (m *VTAPUsageMeter) ToKVString() string {
+	panic("not supported!")
+}
+
+func (m *VTAPUsageMeter) MarshalTo(b []byte) int {
 	panic("not supported!")
 }
 

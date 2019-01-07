@@ -13,3 +13,7 @@ const (
 
 	MSG_VTAP_USAGE
 )
+
+const (
+	MAX_STRING_LENGTH = 1024
+)
