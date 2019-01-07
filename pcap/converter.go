@@ -44,6 +44,8 @@ func (p RawPacket) MetaPacketToRaw(packet *datatype.MetaPacket, tcpipChecksum bo
 		}
 	}
 
+	p.fillIpTotalLen(packet, l3Offset+IPV4_TOTAL_LENGTH_OFFSET)
+
 	return size
 }
 
@@ -51,6 +53,33 @@ const (
 	ETHERNET_LEN = 14
 	VLAN_LEN     = 4
 )
+
+// only when packet's length <= 64B, need adjust ip total length
+func (p RawPacket) fillIpTotalLen(packet *datatype.MetaPacket, at int) {
+	if packet.PacketLen > 64 || packet.EthType != layers.EthernetTypeIPv4 {
+		return
+	}
+
+	ipTotalLen := uint16(packet.IHL << 2)
+
+	switch packet.Protocol {
+	case layers.IPProtocolICMPv4:
+		if packet.RawHeader == nil {
+			return
+		}
+		ipTotalLen += uint16(len(packet.RawHeader))
+	case layers.IPProtocolTCP:
+		if packet.Invalid || packet.TcpData == nil {
+			return
+		}
+		ipTotalLen += uint16(packet.TcpData.DataOffset << 2)
+	case layers.IPProtocolUDP:
+		ipTotalLen += 8
+	}
+
+	ipTotalLen += packet.PayloadLen
+	binary.BigEndian.PutUint16(p[at:], ipTotalLen)
+}
 
 func (p RawPacket) fillEthernet(packet *datatype.MetaPacket, start int) int {
 	base := p[start:]
