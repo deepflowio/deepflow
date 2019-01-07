@@ -2,7 +2,6 @@ package zerodoc
 
 import (
 	"strconv"
-	"strings"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
@@ -116,48 +115,54 @@ func (m *TypeMeter) SequentialMerge(other app.Meter) {
 }
 
 func (m *TypeMeter) ToKVString() string {
-	var buf strings.Builder
-	// TODO: 预计算string长度
+	buffer := make([]byte, MAX_STRING_LENGTH)
+	size := m.MarshalTo(buffer)
+	return string(buffer[:size])
+}
 
-	buf.WriteString("sum_count_l_0s1s=")
-	buf.WriteString(strconv.FormatUint(m.SumCountL0S1S, 10))
-	buf.WriteString("i,sum_count_l_1s5s=")
-	buf.WriteString(strconv.FormatUint(m.SumCountL1S5S, 10))
-	buf.WriteString("i,sum_count_l_5s10s=")
-	buf.WriteString(strconv.FormatUint(m.SumCountL5S10S, 10))
-	buf.WriteString("i,sum_count_l_10s1m=")
-	buf.WriteString(strconv.FormatUint(m.SumCountL10S1M, 10))
-	buf.WriteString("i,sum_count_l_1m1h=")
-	buf.WriteString(strconv.FormatUint(m.SumCountL1M1H, 10))
-	buf.WriteString("i,sum_count_l_1h=")
-	buf.WriteString(strconv.FormatUint(m.SumCountL1H, 10))
+func (m *TypeMeter) MarshalTo(b []byte) int {
+	offset := 0
 
-	buf.WriteString("i,sum_count_e_0k10k=")
-	buf.WriteString(strconv.FormatUint(m.SumCountE0K10K, 10))
-	buf.WriteString("i,sum_count_e_10k100k=")
-	buf.WriteString(strconv.FormatUint(m.SumCountE10K100K, 10))
-	buf.WriteString("i,sum_count_e_100k1m=")
-	buf.WriteString(strconv.FormatUint(m.SumCountE100K1M, 10))
-	buf.WriteString("i,sum_count_e_1m100m=")
-	buf.WriteString(strconv.FormatUint(m.SumCountE1M100M, 10))
-	buf.WriteString("i,sum_count_e_100m1g=")
-	buf.WriteString(strconv.FormatUint(m.SumCountE100M1G, 10))
-	buf.WriteString("i,sum_count_e_1g=")
-	buf.WriteString(strconv.FormatUint(m.SumCountE1G, 10))
+	offset += copy(b[offset:], "sum_count_l_0s1s=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumCountL0S1S, 10))
+	offset += copy(b[offset:], "i,sum_count_l_1s5s=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumCountL1S5S, 10))
+	offset += copy(b[offset:], "i,sum_count_l_5s10s=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumCountL5S10S, 10))
+	offset += copy(b[offset:], "i,sum_count_l_10s1m=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumCountL10S1M, 10))
+	offset += copy(b[offset:], "i,sum_count_l_1m1h=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumCountL1M1H, 10))
+	offset += copy(b[offset:], "i,sum_count_l_1h=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumCountL1H, 10))
 
-	buf.WriteString("i,sum_count_t_c_rst=")
-	buf.WriteString(strconv.FormatUint(m.SumCountTClientRst, 10))
-	buf.WriteString("i,sum_count_t_c_half_open=")
-	buf.WriteString(strconv.FormatUint(m.SumCountTClientHalfOpen, 10))
-	buf.WriteString("i,sum_count_t_c_half_close=")
-	buf.WriteString(strconv.FormatUint(m.SumCountTClientHalfClose, 10))
-	buf.WriteString("i,sum_count_t_s_rst=")
-	buf.WriteString(strconv.FormatUint(m.SumCountTServerRst, 10))
-	buf.WriteString("i,sum_count_t_s_half_open=")
-	buf.WriteString(strconv.FormatUint(m.SumCountTServerHalfOpen, 10))
-	buf.WriteString("i,sum_count_t_s_half_close=")
-	buf.WriteString(strconv.FormatUint(m.SumCountTServerHalfClose, 10))
-	buf.WriteRune('i')
+	offset += copy(b[offset:], "i,sum_count_e_0k10k=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumCountE0K10K, 10))
+	offset += copy(b[offset:], "i,sum_count_e_10k100k=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumCountE10K100K, 10))
+	offset += copy(b[offset:], "i,sum_count_e_100k1m=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumCountE100K1M, 10))
+	offset += copy(b[offset:], "i,sum_count_e_1m100m=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumCountE1M100M, 10))
+	offset += copy(b[offset:], "i,sum_count_e_100m1g=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumCountE100M1G, 10))
+	offset += copy(b[offset:], "i,sum_count_e_1g=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumCountE1G, 10))
 
-	return buf.String()
+	offset += copy(b[offset:], "i,sum_count_t_c_rst=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumCountTClientRst, 10))
+	offset += copy(b[offset:], "i,sum_count_t_c_half_open=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumCountTClientHalfOpen, 10))
+	offset += copy(b[offset:], "i,sum_count_t_c_half_close=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumCountTClientHalfClose, 10))
+	offset += copy(b[offset:], "i,sum_count_t_s_rst=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumCountTServerRst, 10))
+	offset += copy(b[offset:], "i,sum_count_t_s_half_open=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumCountTServerHalfOpen, 10))
+	offset += copy(b[offset:], "i,sum_count_t_s_half_close=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumCountTServerHalfClose, 10))
+	b[offset] = 'i'
+	offset++
+
+	return offset
 }

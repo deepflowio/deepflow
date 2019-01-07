@@ -2,7 +2,6 @@ package zerodoc
 
 import (
 	"strconv"
-	"strings"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
@@ -89,20 +88,27 @@ func (m *FPSMeter) SequentialMerge(other app.Meter) { // other为下一秒的统
 }
 
 func (m *FPSMeter) ToKVString() string {
-	var buf strings.Builder
+	buffer := make([]byte, MAX_STRING_LENGTH)
+	size := m.MarshalTo(buffer)
+	return string(buffer[:size])
+}
 
-	buf.WriteString("sum_flow_count=")
-	buf.WriteString(strconv.FormatUint(m.SumFlowCount, 10))
-	buf.WriteString("i,sum_new_flow_count=")
-	buf.WriteString(strconv.FormatUint(m.SumNewFlowCount, 10))
-	buf.WriteString("i,sum_closed_flow_count=")
-	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCount, 10))
+func (m *FPSMeter) MarshalTo(b []byte) int {
+	offset := 0
 
-	buf.WriteString("i,max_flow_count=")
-	buf.WriteString(strconv.FormatUint(m.MaxFlowCount, 10))
-	buf.WriteString("i,max_new_flow_count=")
-	buf.WriteString(strconv.FormatUint(m.MaxNewFlowCount, 10))
-	buf.WriteRune('i')
+	offset += copy(b[offset:], "sum_flow_count=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumFlowCount, 10))
+	offset += copy(b[offset:], "i,sum_new_flow_count=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumNewFlowCount, 10))
+	offset += copy(b[offset:], "i,sum_closed_flow_count=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumClosedFlowCount, 10))
 
-	return buf.String()
+	offset += copy(b[offset:], "i,max_flow_count=")
+	offset += copy(b[offset:], strconv.FormatUint(m.MaxFlowCount, 10))
+	offset += copy(b[offset:], "i,max_new_flow_count=")
+	offset += copy(b[offset:], strconv.FormatUint(m.MaxNewFlowCount, 10))
+	b[offset] = 'i'
+	offset++
+
+	return offset
 }

@@ -2,7 +2,6 @@ package zerodoc
 
 import (
 	"strconv"
-	"strings"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
@@ -42,40 +41,47 @@ func (m *UsageMeter) SequentialMerge(other app.Meter) {
 }
 
 func (m *UsageMeter) ToKVString() string {
-	var buf strings.Builder
+	buffer := make([]byte, MAX_STRING_LENGTH)
+	size := m.MarshalTo(buffer)
+	return string(buffer[:size])
+}
+
+func (m *UsageMeter) MarshalTo(b []byte) int {
+	offset := 0
 
 	// sum
 	sum := m.UsageMeterSum
-	buf.WriteString("sum_packet_tx=")
-	buf.WriteString(strconv.FormatUint(sum.SumPacketTx, 10))
-	buf.WriteString("i,sum_packet_rx=")
-	buf.WriteString(strconv.FormatUint(sum.SumPacketRx, 10))
-	buf.WriteString("i,sum_packet=")
-	buf.WriteString(strconv.FormatUint(sum.SumPacketTx+sum.SumPacketRx, 10))
-	buf.WriteString("i,sum_bit_tx=")
-	buf.WriteString(strconv.FormatUint(sum.SumBitTx, 10))
-	buf.WriteString("i,sum_bit_rx=")
-	buf.WriteString(strconv.FormatUint(sum.SumBitRx, 10))
-	buf.WriteString("i,sum_bit=")
-	buf.WriteString(strconv.FormatUint(sum.SumBitTx+sum.SumBitRx, 10))
+	offset += copy(b[offset:], "sum_packet_tx=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumPacketTx, 10))
+	offset += copy(b[offset:], "i,sum_packet_rx=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumPacketRx, 10))
+	offset += copy(b[offset:], "i,sum_packet=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumPacketTx+sum.SumPacketRx, 10))
+	offset += copy(b[offset:], "i,sum_bit_tx=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumBitTx, 10))
+	offset += copy(b[offset:], "i,sum_bit_rx=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumBitRx, 10))
+	offset += copy(b[offset:], "i,sum_bit=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumBitTx+sum.SumBitRx, 10))
 
 	// max
 	max := m.UsageMeterMax
-	buf.WriteString("i,max_packet_tx=")
-	buf.WriteString(strconv.FormatUint(max.MaxPacketTx, 10))
-	buf.WriteString("i,max_packet_rx=")
-	buf.WriteString(strconv.FormatUint(max.MaxPacketRx, 10))
-	buf.WriteString("i,max_packet=")
-	buf.WriteString(strconv.FormatUint(max.MaxPacket, 10))
-	buf.WriteString("i,max_bit_tx=")
-	buf.WriteString(strconv.FormatUint(max.MaxBitTx, 10))
-	buf.WriteString("i,max_bit_rx=")
-	buf.WriteString(strconv.FormatUint(max.MaxBitRx, 10))
-	buf.WriteString("i,max_bit=")
-	buf.WriteString(strconv.FormatUint(max.MaxBit, 10))
-	buf.WriteRune('i')
+	offset += copy(b[offset:], "i,max_packet_tx=")
+	offset += copy(b[offset:], strconv.FormatUint(max.MaxPacketTx, 10))
+	offset += copy(b[offset:], "i,max_packet_rx=")
+	offset += copy(b[offset:], strconv.FormatUint(max.MaxPacketRx, 10))
+	offset += copy(b[offset:], "i,max_packet=")
+	offset += copy(b[offset:], strconv.FormatUint(max.MaxPacket, 10))
+	offset += copy(b[offset:], "i,max_bit_tx=")
+	offset += copy(b[offset:], strconv.FormatUint(max.MaxBitTx, 10))
+	offset += copy(b[offset:], "i,max_bit_rx=")
+	offset += copy(b[offset:], strconv.FormatUint(max.MaxBitRx, 10))
+	offset += copy(b[offset:], "i,max_bit=")
+	offset += copy(b[offset:], strconv.FormatUint(max.MaxBit, 10))
+	b[offset] = 'i'
+	offset++
 
-	return buf.String()
+	return offset
 }
 
 type UsageMeterSum struct {

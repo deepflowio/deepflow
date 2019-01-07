@@ -2,7 +2,6 @@ package zerodoc
 
 import (
 	"strconv"
-	"strings"
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
@@ -53,15 +52,24 @@ func (m *ConsoleLogMeter) SequentialMerge(other app.Meter) {
 }
 
 func (m *ConsoleLogMeter) ToKVString() string {
-	var buf strings.Builder
-	buf.WriteString("sum_packet_tx=")
-	buf.WriteString(strconv.FormatUint(m.SumPacketTx, 10))
-	buf.WriteString("i,sum_packet_rx=")
-	buf.WriteString(strconv.FormatUint(m.SumPacketRx, 10))
-	buf.WriteString("i,sum_closed_flow_count=")
-	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCount, 10))
-	buf.WriteString("i,sum_closed_flow_duration=")
-	buf.WriteString(strconv.FormatInt(int64(m.SumClosedFlowDuration/time.Microsecond), 10))
-	buf.WriteRune('i')
-	return buf.String()
+	buffer := make([]byte, MAX_STRING_LENGTH)
+	size := m.MarshalTo(buffer)
+	return string(buffer[:size])
+}
+
+func (m *ConsoleLogMeter) MarshalTo(b []byte) int {
+	offset := 0
+
+	offset += copy(b[offset:], "sum_packet_tx=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumPacketTx, 10))
+	offset += copy(b[offset:], "i,sum_packet_rx=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumPacketRx, 10))
+	offset += copy(b[offset:], "i,sum_closed_flow_count=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumClosedFlowCount, 10))
+	offset += copy(b[offset:], "i,sum_closed_flow_duration=")
+	offset += copy(b[offset:], strconv.FormatInt(int64(m.SumClosedFlowDuration/time.Microsecond), 10))
+	b[offset] = 'i'
+	offset++
+
+	return offset
 }

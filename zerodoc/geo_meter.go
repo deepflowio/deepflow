@@ -2,7 +2,6 @@ package zerodoc
 
 import (
 	"strconv"
-	"strings"
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
@@ -78,27 +77,34 @@ func (m *GeoMeter) SequentialMerge(other app.Meter) {
 }
 
 func (m *GeoMeter) ToKVString() string {
-	var buf strings.Builder
+	buffer := make([]byte, MAX_STRING_LENGTH)
+	size := m.MarshalTo(buffer)
+	return string(buffer[:size])
+}
 
-	buf.WriteString("sum_closed_flow_count=")
-	buf.WriteString(strconv.FormatUint(m.SumClosedFlowCount, 10))
-	buf.WriteString("i,sum_abnormal_flow_count=")
-	buf.WriteString(strconv.FormatUint(m.SumAbnormalFlowCount, 10))
-	buf.WriteString("i,sum_closed_flow_duration=")
-	buf.WriteString(strconv.FormatInt(int64(m.SumClosedFlowDuration/time.Microsecond), 10))
-	buf.WriteString("i,sum_packet_tx=")
-	buf.WriteString(strconv.FormatUint(m.SumPacketTx, 10))
-	buf.WriteString("i,sum_packet_rx=")
-	buf.WriteString(strconv.FormatUint(m.SumPacketRx, 10))
-	buf.WriteString("i,sum_bit_tx=")
-	buf.WriteString(strconv.FormatUint(m.SumBitTx, 10))
-	buf.WriteString("i,sum_bit_rx=")
-	buf.WriteString(strconv.FormatUint(m.SumBitRx, 10))
-	buf.WriteString("i,sum_rtt_syn=")
-	buf.WriteString(strconv.FormatInt(int64(m.SumRTTSyn/time.Microsecond), 10))
-	buf.WriteString("i,sum_rtt_syn_flow=")
-	buf.WriteString(strconv.FormatUint(m.SumRTTSynFlow, 10))
-	buf.WriteRune('i')
+func (m *GeoMeter) MarshalTo(b []byte) int {
+	offset := 0
 
-	return buf.String()
+	offset += copy(b[offset:], "sum_closed_flow_count=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumClosedFlowCount, 10))
+	offset += copy(b[offset:], "i,sum_abnormal_flow_count=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumAbnormalFlowCount, 10))
+	offset += copy(b[offset:], "i,sum_closed_flow_duration=")
+	offset += copy(b[offset:], strconv.FormatInt(int64(m.SumClosedFlowDuration/time.Microsecond), 10))
+	offset += copy(b[offset:], "i,sum_packet_tx=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumPacketTx, 10))
+	offset += copy(b[offset:], "i,sum_packet_rx=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumPacketRx, 10))
+	offset += copy(b[offset:], "i,sum_bit_tx=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumBitTx, 10))
+	offset += copy(b[offset:], "i,sum_bit_rx=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumBitRx, 10))
+	offset += copy(b[offset:], "i,sum_rtt_syn=")
+	offset += copy(b[offset:], strconv.FormatInt(int64(m.SumRTTSyn/time.Microsecond), 10))
+	offset += copy(b[offset:], "i,sum_rtt_syn_flow=")
+	offset += copy(b[offset:], strconv.FormatUint(m.SumRTTSynFlow, 10))
+	b[offset] = 'i'
+	offset++
+
+	return offset
 }

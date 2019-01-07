@@ -18,6 +18,7 @@ type Tag interface {
 	GetFastID() uint64
 	HasVariedField() bool
 	ToKVString() string
+	MarshalTo([]byte) int
 	String() string
 	Clone() Tag
 	Release()
@@ -29,6 +30,7 @@ type Meter interface {
 	ConcurrentMerge(Meter)
 	SequentialMerge(Meter)
 	ToKVString() string
+	MarshalTo([]byte) int
 	SortKey() uint64
 	Clone() Meter
 	Release()
