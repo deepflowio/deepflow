@@ -468,7 +468,9 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 		t.ISP = decoder.ReadString255()
 	}
 
-	t.id = string(decoder.Bytes()[offset:decoder.Offset()]) // Encode内容就是它的id
+	if !decoder.Failed() {
+		t.id = string(decoder.Bytes()[offset:decoder.Offset()]) // Encode内容就是它的id
+	}
 }
 
 func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
