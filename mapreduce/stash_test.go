@@ -11,7 +11,6 @@ import (
 func TestStash(t *testing.T) {
 	f := datatype.Field{
 		IP:           0x0a2102c8,
-		MAC:          0x020406080a0c,
 		GroupID:      4,
 		L2EpcID:      2,
 		L3EpcID:      2,
