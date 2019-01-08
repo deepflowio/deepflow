@@ -10,14 +10,14 @@ import (
 
 // send to zero
 // Protocol:
+//     version     uint32
 //     sequence    uint32
-//     hash        uint32
 //     timestamp   uint32
 //     tag         Tag (bytes)
 //     meterType   uint8
 //     meter       Meter (bytes)
 //     actionFlags uint32
-func Encode(sequence uint32, hash uint32, doc *app.Document, encoder *codec.SimpleEncoder) error {
+func Encode(sequence uint32, doc *app.Document, encoder *codec.SimpleEncoder) error {
 	if doc.Tag == nil || doc.Meter == nil {
 		return errors.New("No tag or meter in document")
 	}
@@ -42,8 +42,8 @@ func Encode(sequence uint32, hash uint32, doc *app.Document, encoder *codec.Simp
 		return fmt.Errorf("Unknown supported type %T", v)
 	}
 
+	encoder.WriteU32(app.VERSION)
 	encoder.WriteU32(sequence)
-	encoder.WriteU32(hash)
 	encoder.WriteU32(doc.Timestamp)
 
 	var tag *Tag
@@ -84,10 +84,10 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 		return nil, errors.New("No input decoder")
 	}
 
-	// sequence
-	decoder.ReadU32()
-	// hash, DEPRECATED
-	decoder.ReadU32()
+	if version := decoder.ReadU32(); version != app.VERSION {
+		return nil, errors.New(fmt.Sprintf("message version incorrect, expect %d, found %d.", app.VERSION, version))
+	}
+	decoder.ReadU32() // sequence
 
 	doc := app.AcquireDocument()
 
