@@ -31,7 +31,7 @@ func (m *ZeroDocumentMarshaller) batchEncode(buffer []interface{}) *codec.Simple
 
 	for _, buf := range buffer {
 		if doc, ok := buf.(*app.Document); ok {
-			err := zerodoc.Encode(m.sequence, 0, doc, encoder)
+			err := zerodoc.Encode(m.sequence, doc, encoder)
 			app.ReleaseDocument(doc)
 			if err != nil {
 				log.Warning(err)
