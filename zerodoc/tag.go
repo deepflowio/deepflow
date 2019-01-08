@@ -434,7 +434,7 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 		t.Direction = DirectionEnum(decoder.ReadU8())
 	}
 	if t.Code&ACLGID != 0 {
-		t.ACLGID = uint16(decoder.ReadU16())
+		t.ACLGID = decoder.ReadU16()
 	}
 	if t.Code&VLANID != 0 {
 		t.VLANID = decoder.ReadU16()
@@ -644,7 +644,7 @@ var databaseSuffix = [...]string{
 
 func (t *Tag) DatabaseSuffix() string {
 	code := 0
-	if t.Code&(ACLID|ACLGID) != 0 {
+	if t.Code&ACLGID != 0 {
 		code |= 0x1
 	}
 	if t.Code.HasEdgeTagField() {
