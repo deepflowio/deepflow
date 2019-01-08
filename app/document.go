@@ -7,6 +7,10 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
 )
 
+const (
+	VERSION = 20190108 // 修改Document的序列化结构时需同步修改此常量
+)
+
 type Tag interface {
 	GetID(*codec.SimpleEncoder) string
 	SetID(string)
