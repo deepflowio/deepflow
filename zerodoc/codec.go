@@ -157,6 +157,7 @@ func EncodeVTAP(doc *app.Document, encoder *codec.SimpleEncoder) error {
 		return fmt.Errorf("Unknown supported type %T", v)
 	}
 
+	encoder.WriteU32(app.VERSION)
 	encoder.WriteU32(doc.Timestamp)
 
 	var tag *Tag
@@ -184,6 +185,10 @@ func DecodeVTAP(b []byte) (*app.Document, error) {
 
 	decoder := &codec.SimpleDecoder{}
 	decoder.Init(b)
+
+	if version := decoder.ReadU32(); version != app.VERSION {
+		return nil, errors.New(fmt.Sprintf("message version incorrect, expect %d, found %d.", app.VERSION, version))
+	}
 
 	doc := app.AcquireDocument()
 
