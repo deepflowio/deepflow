@@ -106,59 +106,6 @@ func TestPartialTagEqual(t *testing.T) {
 	}
 }
 
-func TestGeoTagEqual(t *testing.T) {
-	f := Field{
-		IP:           0x0a2102c8,
-		GroupID:      4,
-		L2EpcID:      2,
-		L3EpcID:      2,
-		L2DeviceID:   3,
-		L2DeviceType: VGatewayDevice,
-		L3DeviceID:   5,
-		L3DeviceType: VMDevice,
-		Host:         0xac100197,
-
-		IP1:           0x0a2102ca,
-		GroupID1:      2,
-		L2EpcID1:      -1,
-		L3EpcID1:      -1,
-		L2DeviceID1:   6,
-		L2DeviceType1: VMDevice,
-		L3DeviceID1:   6,
-		L3DeviceType1: VMDevice,
-		Host1:         0xac100198,
-
-		Direction:  ClientToServer,
-		ACLGID:     3,
-		VLANID:     123,
-		Protocol:   layers.IPProtocolTCP,
-		ServerPort: 1024,
-		TAPType:    ToR,
-		SubnetID:   10,
-
-		Country: "CHN",
-		Region:  "Beijing",
-		ISP:     "CHINAMOBILE",
-	}
-
-	codes := [...]Code{
-		IP | TAPType,
-		IP | TAPType | Country | Region,
-		IP | TAPType | Country | Region | ISPCode,
-	}
-	for _, code := range codes {
-		fromTag := f.NewTag(code)
-		pb := TagToPB(fromTag)
-		toTag := AcquireTag()
-		toTag.Field = AcquireField()
-		PBToTag(pb, toTag)
-		e := &codec.SimpleEncoder{}
-		if fromTag.GetID(e) != toTag.GetID(e) {
-			t.Errorf("Tag在序列化反序列化之后GetID与原Tag不一致, Code=%d", code)
-		}
-	}
-}
-
 func TestUsageMeterEqual(t *testing.T) {
 	fromMeter := &UsageMeter{
 		UsageMeterSum: UsageMeterSum{

@@ -15,16 +15,6 @@ func TestHasEdgeTagField(t *testing.T) {
 	}
 }
 
-func TestCustomTag(t *testing.T) {
-	f := Field{
-		Country: "CHN",
-	}
-	s := f.NewTag(Country).ToKVString()
-	if s != ",country=CHN" {
-		t.Error("自定义Tag处理不正确")
-	}
-}
-
 func TestFillTag(t *testing.T) {
 	f := Field{L3EpcID: 3}
 	tag := &Tag{}

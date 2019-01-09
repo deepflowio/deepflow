@@ -97,16 +97,6 @@ func TagToPB(t *Tag) *pb.Tag {
 		tag.AclDirection = pb.AclDirection(t.ACLDirection).Enum()
 	}
 
-	if t.Code&Country != 0 {
-		tag.Country = proto.String(t.Country)
-	}
-	if t.Code&Region != 0 {
-		tag.Region = proto.String(t.Region)
-	}
-	if t.Code&ISPCode != 0 {
-		tag.Isp = proto.String(t.ISP)
-	}
-
 	return tag
 }
 
@@ -196,16 +186,6 @@ func PBToTag(t *pb.Tag, tag *Tag) {
 	}
 	if tag.Code&ACLDirection != 0 {
 		tag.ACLDirection = ACLDirectionEnum(t.GetAclDirection())
-	}
-
-	if tag.Code&Country != 0 {
-		tag.Country = t.GetCountry()
-	}
-	if tag.Code&Region != 0 {
-		tag.Region = t.GetRegion()
-	}
-	if tag.Code&ISPCode != 0 {
-		tag.ISP = t.GetIsp()
 	}
 }
 
