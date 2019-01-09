@@ -290,7 +290,7 @@ func (b AclGidBitmap) String() string {
 		b.GetGroupType(), b.GetMapOffset(), b.GetMapBits(), uint64(b))
 }
 
-// keys (16b ACLGID + 16b ActionFlags + ), values (16b AclGidMapOffset + 4b MapCount + 2b Directions + 10b TagTemplates)
+// keys (16b ACLGID + 16b ActionFlags + ), values (14b AclGidMapOffset + 4b MapCount + 2b Directions + 12b TagTemplates)
 type AclAction uint64
 
 func (a AclAction) SetACLGID(aclGID ACLID) AclAction {
@@ -311,25 +311,25 @@ func (a AclAction) AddActionFlags(actionFlags ActionFlag) AclAction {
 }
 
 func (a AclAction) SetDirections(directions DirectionType) AclAction {
-	a &= ^AclAction(0x3 << 10)
-	a |= AclAction(directions&0x3) << 10
+	a &= ^AclAction(0x3 << 12)
+	a |= AclAction(directions&0x3) << 12
 	return a
 }
 
 func (a AclAction) AddDirections(directions DirectionType) AclAction {
-	a |= AclAction(directions&0x3) << 10
+	a |= AclAction(directions&0x3) << 12
 	return a
 }
 
 func (a AclAction) SetAclGidBitmapOffset(offset uint16) AclAction {
-	a &= ^AclAction(0xFFFF << 16)
-	a |= AclAction(offset&0xFFFF) << 16
+	a &= ^AclAction(0x3FFF << 18)
+	a |= AclAction(offset&0x3FFF) << 18
 	return a
 }
 
 func (a AclAction) SetAclGidBitmapCount(count uint8) AclAction {
-	a &= ^AclAction(0xF << 12)
-	a |= AclAction(count&0xF) << 12
+	a &= ^AclAction(0xF << 14)
+	a |= AclAction(count&0xF) << 14
 	return a
 }
 
@@ -344,13 +344,13 @@ func (a AclAction) ReverseDirection() AclAction {
 }
 
 func (a AclAction) SetTagTemplates(tagTemplates TagTemplate) AclAction {
-	a &= ^AclAction(0x3FF)
-	a |= AclAction(tagTemplates & 0x3FF)
+	a &= ^AclAction(0xFFF)
+	a |= AclAction(tagTemplates & 0xFFF)
 	return a
 }
 
 func (a AclAction) AddTagTemplates(tagTemplates TagTemplate) AclAction {
-	a |= AclAction(tagTemplates & 0x3FF)
+	a |= AclAction(tagTemplates & 0xFFF)
 	return a
 }
 
@@ -363,19 +363,19 @@ func (a AclAction) GetActionFlags() ActionFlag {
 }
 
 func (a AclAction) GetDirections() DirectionType {
-	return DirectionType((a >> 10) & 0x3)
+	return DirectionType((a >> 12) & 0x3)
 }
 
 func (a AclAction) GetTagTemplates() TagTemplate {
-	return TagTemplate(a & 0x3FF)
+	return TagTemplate(a & 0xFFF)
 }
 
 func (a AclAction) GetAclGidBitmapOffset() uint16 {
-	return uint16(a>>16) & 0x3FF
+	return uint16(a>>18) & 0x3FF
 }
 
 func (a AclAction) GetAclGidBitmapCount() uint8 {
-	return uint8(a>>12) & 0xF
+	return uint8(a>>14) & 0xF
 }
 
 func (a AclAction) String() string {
