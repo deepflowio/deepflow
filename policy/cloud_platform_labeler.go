@@ -405,10 +405,27 @@ func (l *CloudPlatformLabeler) UpdateEndpointData(endpoint *EndpointData, key *L
 	return endpoint
 }
 
+func (l *CloudPlatformLabeler) ModifyEndpointData(endpointData *EndpointData, key *LookupKey) {
+	srcData, dstData := endpointData.SrcInfo, endpointData.DstInfo
+	// 默认L2End为false时L3EpcId == 0，L2End为true时L2EpcId不为0
+	if dstData.L3EpcId == 0 && srcData.L2EpcId != 0 {
+		if platformData := l.GetDataByEpcIp(srcData.L2EpcId, key.DstIp); platformData != nil {
+			dstData.SetL3Data(platformData, key.DstIp)
+		}
+	}
+
+	if srcData.L3EpcId == 0 && dstData.L2EpcId != 0 {
+		if platformData := l.GetDataByEpcIp(dstData.L2EpcId, key.SrcIp); platformData != nil {
+			srcData.SetL3Data(platformData, key.SrcIp)
+		}
+	}
+}
+
 func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	srcData := l.GetEndpointInfo(key.SrcMac, key.SrcIp, key.Tap)
 	dstData := l.GetEndpointInfo(key.DstMac, key.DstIp, key.Tap)
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
+	l.ModifyEndpointData(endpoint, key)
 	l.ModifyPrivateIp(endpoint, key)
 	// 优化内存占用
 	if !srcData.L2End && !srcData.L3End && srcData.L2EpcId == 0 && srcData.L3EpcId == 0 && len(srcData.GroupIds) == 0 {
