@@ -9,6 +9,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
+	"gitlab.x.lan/yunshan/droplet-libs/geo"
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
@@ -194,11 +195,12 @@ type Field struct {
 	SubnetID     uint16
 	TAPType      TAPTypeEnum
 	ACLDirection ACLDirectionEnum
-	Scope        ScopeEnum
 
-	Country string
-	Region  string
-	ISP     string
+	Scope ScopeEnum
+
+	Country uint8
+	Region  uint8
+	ISP     uint8
 }
 
 type Tag struct {
@@ -351,15 +353,15 @@ func (t *Tag) MarshalTo(b []byte) int {
 
 	if t.Code&Country != 0 {
 		offset += copy(b[offset:], ",country=")
-		offset += copy(b[offset:], t.Country)
+		offset += copy(b[offset:], geo.DecodeCountry(t.Country))
 	}
 	if t.Code&Region != 0 {
 		offset += copy(b[offset:], ",region=")
-		offset += copy(b[offset:], t.Region)
+		offset += copy(b[offset:], geo.DecodeRegion(t.Region))
 	}
 	if t.Code&ISPCode != 0 {
 		offset += copy(b[offset:], ",isp=")
-		offset += copy(b[offset:], t.ISP)
+		offset += copy(b[offset:], geo.DecodeISP(t.ISP))
 	}
 
 	return offset
@@ -465,13 +467,13 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	}
 
 	if t.Code&Country != 0 {
-		t.Country = decoder.ReadString255()
+		t.Country = decoder.ReadU8()
 	}
 	if t.Code&Region != 0 {
-		t.Region = decoder.ReadString255()
+		t.Region = decoder.ReadU8()
 	}
 	if t.Code&ISPCode != 0 {
-		t.ISP = decoder.ReadString255()
+		t.ISP = decoder.ReadU8()
 	}
 
 	if !decoder.Failed() {
@@ -573,13 +575,13 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 	}
 
 	if t.Code&Country != 0 {
-		encoder.WriteString255(t.Country)
+		encoder.WriteU8(t.Country)
 	}
 	if t.Code&Region != 0 {
-		encoder.WriteString255(t.Region)
+		encoder.WriteU8(t.Region)
 	}
 	if t.Code&ISPCode != 0 {
-		encoder.WriteString255(t.ISP)
+		encoder.WriteU8(t.ISP)
 	}
 }
 
