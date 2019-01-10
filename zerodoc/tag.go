@@ -124,9 +124,9 @@ const (
 type TAPTypeEnum uint8
 
 const (
-	OvS TAPTypeEnum = iota
-	ISP
-	Spine
+	ISP0 TAPTypeEnum = iota
+	ISP1
+	ISP2
 	ToR
 )
 
@@ -614,6 +614,9 @@ func isFastCode(code Code) bool {
 func (t *Tag) GetFastID() uint64 {
 	if !isFastCode(t.Code) {
 		return 0
+	}
+	if t.Code == 0 {
+		return 0xFFFFFFFF // 因为ACL_GID不存在0x3FFF，不会与其它Code冲突
 	}
 	var id uint64
 	// 14b ACLGID + 32b IP + 16b L3EpcID + 2b TAPType

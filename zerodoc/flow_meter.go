@@ -2,19 +2,22 @@ package zerodoc
 
 import (
 	"strconv"
+	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
 )
 
 type FlowMeter struct {
-	SumFlowCount       uint64 `db:"sum_flow_count"`
-	SumNewFlowCount    uint64 `db:"sum_new_flow_count"`
-	SumClosedFlowCount uint64 `db:"sum_closed_flow_count"`
-	SumPacketTx        uint64 `db:"sum_packet_tx"`
-	SumPacketRx        uint64 `db:"sum_packet_rx"`
-	SumBitTx           uint64 `db:"sum_bit_tx"`
-	SumBitRx           uint64 `db:"sum_bit_rx"`
+	SumFlowCount          uint64        `db:"sum_flow_count"`
+	SumNewFlowCount       uint64        `db:"sum_new_flow_count"`
+	SumClosedFlowCount    uint64        `db:"sum_closed_flow_count"`
+	SumPacketTx           uint64        `db:"sum_packet_tx"`
+	SumPacketRx           uint64        `db:"sum_packet_rx"`
+	SumBitTx              uint64        `db:"sum_bit_tx"`
+	SumBitRx              uint64        `db:"sum_bit_rx"`
+	SumFlowDuration       time.Duration `db:"sum_flow_duration"`
+	SumClosedFlowDuration time.Duration `db:"sum_closed_flow_duration"`
 }
 
 func (m *FlowMeter) SortKey() uint64 {
@@ -29,6 +32,8 @@ func (m *FlowMeter) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(m.SumPacketRx)
 	encoder.WriteVarintU64(m.SumBitTx)
 	encoder.WriteVarintU64(m.SumBitRx)
+	encoder.WriteVarintU64(uint64(m.SumFlowDuration))
+	encoder.WriteVarintU64(uint64(m.SumClosedFlowDuration))
 }
 
 func (m *FlowMeter) Decode(decoder *codec.SimpleDecoder) {
@@ -39,6 +44,8 @@ func (m *FlowMeter) Decode(decoder *codec.SimpleDecoder) {
 	m.SumPacketRx = decoder.ReadVarintU64()
 	m.SumBitTx = decoder.ReadVarintU64()
 	m.SumBitRx = decoder.ReadVarintU64()
+	m.SumFlowDuration = time.Duration(decoder.ReadVarintU64())
+	m.SumClosedFlowDuration = time.Duration(decoder.ReadVarintU64())
 }
 
 func (m *FlowMeter) ConcurrentMerge(other app.Meter) {
@@ -50,6 +57,8 @@ func (m *FlowMeter) ConcurrentMerge(other app.Meter) {
 		m.SumPacketRx += pm.SumPacketRx
 		m.SumBitTx += pm.SumBitTx
 		m.SumBitRx += pm.SumBitRx
+		m.SumFlowDuration += pm.SumFlowDuration
+		m.SumClosedFlowDuration += pm.SumClosedFlowDuration
 	}
 }
 
@@ -62,6 +71,8 @@ func (m *FlowMeter) SequentialMerge(other app.Meter) { // other为后一个时�
 		m.SumPacketRx += pm.SumPacketRx
 		m.SumBitTx += pm.SumBitTx
 		m.SumBitRx += pm.SumBitRx
+		m.SumFlowDuration += m.SumClosedFlowDuration + pm.SumFlowDuration
+		m.SumClosedFlowDuration += pm.SumClosedFlowDuration
 	}
 }
 
@@ -92,6 +103,10 @@ func (m *FlowMeter) MarshalTo(b []byte) int {
 	offset += copy(b[offset:], strconv.FormatUint(m.SumBitRx, 10))
 	offset += copy(b[offset:], "i,sum_bit=")
 	offset += copy(b[offset:], strconv.FormatUint(m.SumBitTx+m.SumBitRx, 10))
+	offset += copy(b[offset:], "i,sum_flow_duration=")
+	offset += copy(b[offset:], strconv.FormatUint(uint64(m.SumFlowDuration), 10))
+	offset += copy(b[offset:], "i,sum_closed_flow_duration=")
+	offset += copy(b[offset:], strconv.FormatUint(uint64(m.SumClosedFlowDuration), 10))
 	b[offset] = 'i'
 	offset++
 
