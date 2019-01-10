@@ -126,7 +126,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:84cc3d9f98ebe558e94a10aa9bd6b7b45dd32be491f5c9e2c50fc8c4a6e7e8d6"
+  digest = "1:8dd04ab4649f3ef12b435f35eb00d1ca70319c3be71bbdd3283c02400e64dc76"
   name = "gitlab.x.lan/application/droplet-app"
   packages = [
     "internal/pkg/docbuffer",
@@ -144,11 +144,11 @@
     "pkg/mapper/usage",
   ]
   pruneopts = "UT"
-  revision = "c63af93a853205c7da3429cafdafb7035e2ceb83"
+  revision = "b23666478805e23c39ac2d2b35813774844cad60"
 
 [[projects]]
   branch = "master"
-  digest = "1:a2b9b7d6f1c41251fb779eec2c685c2af45408c498da71926f66400a461e1873"
+  digest = "1:b448dd525f96054e24f0045e1fc9c63a00a40275832950d087eca7aa63c04fca"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "app",
@@ -157,6 +157,7 @@
     "debug",
     "dedup",
     "dropletpb",
+    "geo",
     "grpc",
     "logger",
     "lru",
@@ -171,7 +172,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "d7780298cea1ba44432023d44d6bb266e8c4f8bc"
+  revision = "3735c579ad490e4c36aae1779488ebf37fe9caef"
 
 [[projects]]
   branch = "master"

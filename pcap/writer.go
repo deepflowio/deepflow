@@ -123,10 +123,12 @@ func (w *Writer) GetAndResetStats() WriterCounter {
 }
 
 func (w *Writer) Close() error {
-	if err := w.Flush(); err != nil {
-		return err
+	if w.offset != 0 {
+		if err := w.Flush(); err != nil {
+			return err
+		}
+		w.flushed.Wait()
 	}
-	w.flushed.Wait()
 	return w.fp.Close()
 }
 
