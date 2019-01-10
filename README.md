@@ -102,6 +102,8 @@ EndpointData查找流程
 2. 使用L2层数据L2EpcId和packet中的IP组合为KEY, 查询EpcIp表获取L3层数据(若第一步没有查到数据，则L2EpcId=0)
 3. 若第二步没有查到数据，则使用packet中的IP作为KEY，查询Ip表，获取L3层数据
 4. 使用L3层的L3EpcId和packet中的IP组合为KEY，查找IP资源组信息
+5. 通过源端和目的端数据对比进行修正(若源端L3EpcId为0而目的端l2EpcId不为0，则用目的端l2EpcId+源端IP为KEY，
+   查询EpcIp表获取源端L3层数据，若目的端L3EpcId为0，则对比源端做类型操作)
 
 注意： L2层数据通过MAC查找一次确定，L3层数据通过EpcIp表和Ip表来确定
 
@@ -120,6 +122,16 @@ L3层数据:
 * L3End
 * SubnetId
 * GroupId(IP) 
+
+ACLGID和Group对应关系
+------------------------
+
+1. 在PolicyData中添加一个AclGidBitmaps的slice，每一个AclGidBitmap表示对应到EndpoinData内Group的关系，具体含义如下：
+   - b63-62（2bits）：表示映射端mapSide，b00表示映射源资源组，b01表示映射目的资源组
+   - b61-56（6bits）：表示偏移值offset，从源/目的资源组slice的第offset*56个资源组开始对应
+   - b55-0（56bits）：表示映射关系mapBits，如果对应bitN为1，表示对应的第offset*56+N个资源组包含在当前AaclGid中
+
+2. 在AclAction中用18个bit来把ACLGID对应到bitmap，其中14个bit表示在ACLGIDBitmaps slice中的offset，4个bit表示占用的bitmap个数
 
 policy firstpath查找流程
 ------------------------
