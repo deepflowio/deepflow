@@ -9,10 +9,6 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/debug"
 )
 
-type DebugMessage struct {
-	Data string
-}
-
 type MonitorOperator interface {
 	TurnOnDebug(conn *net.UDPConn, remote *net.UDPAddr)
 	TurnOffDebug()
@@ -89,7 +85,10 @@ func (m *Monitor) sendDebug(conn *net.UDPConn, remote *net.UDPAddr, items []inte
 		if item = m.unmarshal(item); item == nil {
 			break
 		}
-		message := DebugMessage{Data: item.(fmt.Stringer).String()}
+		message := item.(fmt.Stringer).String()
+		if len(message) > debug.DEBUG_MESSAGE_ARGS_LEN-8 {
+			message = message[:debug.DEBUG_MESSAGE_ARGS_LEN-8-3] + "..."
+		}
 		encoder := gob.NewEncoder(&buffer)
 		if err := encoder.Encode(message); err != nil {
 			log.Error(err)

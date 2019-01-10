@@ -165,7 +165,7 @@ func isNotTimeout(err error) bool {
 func recvDebugMsg(conn *net.UDPConn, name string) {
 	sigs := make(chan os.Signal, 10)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGKILL, syscall.SIGQUIT, syscall.SIGSTOP)
-	message := DebugMessage{}
+	var message string
 	for {
 		select {
 		case sig := <-sigs:
@@ -191,7 +191,7 @@ func recvDebugMsg(conn *net.UDPConn, name string) {
 				fmt.Printf("decoder.Decode: %v\n", err)
 				return
 			}
-			fmt.Printf("%s\n", message.Data)
+			fmt.Printf("%s\n", message)
 		}
 	}
 }
