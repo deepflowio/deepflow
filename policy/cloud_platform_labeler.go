@@ -251,9 +251,9 @@ func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip uint32, tapType Ta
 	if platformData != nil {
 		endpointInfo.SetL2Data(platformData)
 		endpointInfo.SetL3EndByIp(platformData, ip)
-		// ip为0，则取MAC对应的SubnetId
+		// IP为0，则取MAC对应的二层数据作为三层数据
 		if ip == 0 {
-			endpointInfo.SetSubnetIdByMac(platformData)
+			endpointInfo.SetL3DataByMac(platformData)
 		}
 	}
 	if platformData = l.GetDataByEpcIp(endpointInfo.L2EpcId, ip); platformData == nil {
