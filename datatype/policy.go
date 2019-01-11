@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	"gitlab.x.lan/yunshan/droplet-libs/bit"
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
@@ -513,7 +514,7 @@ func formatGroup(aclGidBitmap AclGidBitmap, endpointData *EndpointData) string {
 	var formatStr string
 	groupType := aclGidBitmap.GetGroupType()
 	groupOffset := aclGidBitmap.GetMapOffset()
-	groupBitOffset := aclGidBitmap.GetMapBits()
+	groupMapBits := aclGidBitmap.GetMapBits()
 	if groupType == GROUP_TYPE_SRC {
 		formatStr += " SRC: "
 	} else if groupType == GROUP_TYPE_DST {
@@ -522,7 +523,7 @@ func formatGroup(aclGidBitmap AclGidBitmap, endpointData *EndpointData) string {
 		return formatStr
 	}
 	for j := uint32(0); j < GROUP_MAPBITS_OFFSET; j++ {
-		if (groupBitOffset & (uint64(1) << j)) > 0 {
+		if (groupMapBits & (uint64(1) << j)) > 0 {
 			if groupType == GROUP_TYPE_SRC {
 				formatStr += GroupIdToString(endpointData.SrcInfo.GroupIds[groupOffset+j])
 			} else {
@@ -635,6 +636,33 @@ func (d *PolicyData) AddAclGidBitmaps(packet *LookupKey, endpointData *EndpointD
 func (d *PolicyData) String() string {
 	return fmt.Sprintf("{ACLID: %d ActionFlags: %v AclActions: %v NpbActions: %v AclGidBitmaps: %v}",
 		d.ACLID, d.ActionFlags, d.AclActions, d.NpbActions, d.AclGidBitmaps)
+}
+
+func FillGroupID(aclAction AclAction, aclGidBitmaps []AclGidBitmap, allGroupIDs [][]uint32, aclGroupIDs [][]int32) {
+	if len(allGroupIDs) != 2 || len(aclGroupIDs) != 2 {
+		panic("长度必须为2")
+	}
+
+	aclGroupIDs[0] = aclGroupIDs[0][:0]
+	aclGroupIDs[1] = aclGroupIDs[1][:0]
+
+	mapOffset := aclAction.GetAclGidBitmapOffset()
+	mapEnd := mapOffset + uint16(aclAction.GetAclGidBitmapCount())
+	for i := mapOffset; i < mapEnd; i++ {
+		aclGidBitmap := aclGidBitmaps[i]
+		groupOffset := aclGidBitmap.GetMapOffset()
+		groupMapBits := aclGidBitmap.GetMapBits()
+
+		ep := 0
+		if aclGidBitmap.GetGroupType() == GROUP_TYPE_DST {
+			ep = 1
+		}
+		for groupMapBits > 0 {
+			j := bit.CountTrailingZeros64(groupMapBits)
+			groupMapBits ^= 1 << uint64(j)
+			aclGroupIDs[ep] = append(aclGroupIDs[ep], int32(FormatGroupId(allGroupIDs[ep][groupOffset+uint32(j)])))
+		}
+	}
 }
 
 var policyDataPool = pool.NewLockFreePool(func() interface{} {
