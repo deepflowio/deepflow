@@ -119,11 +119,14 @@ func (i *EndpointInfo) SetL3Data(data *PlatformData, ip uint32) {
 	}
 }
 
-// 默认MAC对应的SubentId唯一, 取第一个IpNet的SubnetId
-func (i *EndpointInfo) SetSubnetIdByMac(data *PlatformData) {
+func (i *EndpointInfo) SetL3DataByMac(data *PlatformData) {
+	// 默认MAC对应的SubentId唯一, 取第一个IpNet的SubnetId
 	if len(data.Ips) != 0 {
 		i.SubnetId = data.Ips[0].SubnetId
 	}
+	i.L3EpcId = data.EpcId
+	i.L3DeviceType = data.DeviceType
+	i.L3DeviceId = data.DeviceId
 }
 
 func IsOriginalTtl(ttl uint8) bool {
