@@ -771,125 +771,6 @@ func (l *PolicyLabeler) DelAcl(id int) {
 	}
 }
 
-func (l *PolicyLabeler) checkNpbAction(packet *LookupKey, endpointData *EndpointData, npbActions []NpbAction) []NpbAction {
-	if len(npbActions) == 0 {
-		return nil
-	}
-
-	validActions := make([]NpbAction, 0, len(npbActions))
-	for _, action := range npbActions {
-		if (action.TapSideCompare(TAPSIDE_SRC) == true && packet.L2End0 == true) ||
-			(action.TapSideCompare(TAPSIDE_DST) == true && packet.L2End1 == true) {
-			if action.ResourceGroupTypeCompare(RESOURCE_GROUP_TYPE_DEV) {
-				validActions = append(validActions, action)
-			} else if (action.TapSideCompare(TAPSIDE_SRC) == true && endpointData.SrcInfo.L3End == true) ||
-				(action.TapSideCompare(TAPSIDE_DST) == true && endpointData.DstInfo.L3End == true) {
-				validActions = append(validActions, action)
-			}
-		}
-	}
-	return validActions
-}
-
-func (l *PolicyLabeler) checkNpbPolicy(packet *LookupKey, endpointData *EndpointData, policy *PolicyData) *PolicyData {
-	if policy == nil || len(policy.NpbActions) == 0 {
-		return policy
-	}
-	validActions := l.checkNpbAction(packet, endpointData, policy.NpbActions)
-	if len(validActions) == 0 && policy.ActionFlags == 0 {
-		return INVALID_POLICY_DATA
-	}
-
-	result := new(PolicyData)
-	*result = *policy
-	result.NpbActions = append(result.NpbActions[:0], validActions...)
-	return result
-}
-
-// 添加资源组bitmap
-func (l *PolicyLabeler) AddAclGidBitmap(addType uint32, aclGid uint32, endpointData *EndpointData, policyData *PolicyData, direction DirectionType) uint8 {
-	addCount := uint8(0)
-	bitmapFlag := false
-	var groupIds []uint32
-	var groupAclGidMap map[uint32]bool
-	aclGidBitMap := AclGidBitmap(0)
-	mapCount := GROUP_MAPBITS_OFFSET
-	if addType == GROUP_TYPE_SRC {
-		groupIds = endpointData.SrcInfo.GroupIds
-		if direction&FORWARD == FORWARD {
-			groupAclGidMap = l.SrcGroupAclGidMap
-		} else {
-			groupAclGidMap = l.DstGroupAclGidMap
-		}
-		aclGidBitMap.SetSrcFlag()
-	} else {
-		groupIds = endpointData.DstInfo.GroupIds
-		if direction&FORWARD == FORWARD {
-			groupAclGidMap = l.DstGroupAclGidMap
-		} else {
-			groupAclGidMap = l.SrcGroupAclGidMap
-		}
-		aclGidBitMap.SetDstFlag()
-	}
-
-	for i, groupId := range groupIds {
-		if i >= mapCount {
-			if aclGidBitMap.GetMapBits() > 0 {
-				result := aclGidBitMap
-				policyData.AclGidBitmaps = append(policyData.AclGidBitmaps, result)
-				addCount += 1
-			}
-			mapCount += GROUP_MAPBITS_OFFSET
-			aclGidBitMap = AclGidBitmap(0)
-			if addType == GROUP_TYPE_SRC {
-				aclGidBitMap.SetSrcFlag()
-			} else {
-				aclGidBitMap.SetDstFlag()
-			}
-			bitmapFlag = false
-		}
-		key := aclGid<<16 | FormatGroupId(groupId)
-		if ok := groupAclGidMap[key]; ok {
-			aclGidBitMap.SetMapOffset(uint32(i))
-			aclGidBitMap.SetMapBits(uint32(i))
-			bitmapFlag = true
-		} else {
-			// 查找资源组全采
-			key = aclGid << 16
-			if ok := groupAclGidMap[key]; ok {
-				aclGidBitMap.SetMapOffset(uint32(i))
-				aclGidBitMap.SetMapBits(uint32(i))
-				bitmapFlag = true
-			}
-		}
-	}
-	if bitmapFlag && aclGidBitMap.GetMapBits() > 0 {
-		policyData.AclGidBitmaps = append(policyData.AclGidBitmaps, aclGidBitMap)
-		addCount += 1
-	}
-	return addCount
-}
-
-func (l *PolicyLabeler) AddAclGidBitmaps(endpointData *EndpointData, policyData *PolicyData, packet *LookupKey) {
-	if !packet.HasFeatureFlag(NPM) {
-		return
-	}
-	mapOffset := uint16(0)
-	for index, aclAction := range policyData.AclActions {
-		aclGid := uint32(aclAction.GetACLGID())
-		if aclGid == 0 {
-			continue
-		}
-		mapCount := l.AddAclGidBitmap(GROUP_TYPE_SRC, aclGid, endpointData, policyData, aclAction.GetDirections())
-		mapCount += l.AddAclGidBitmap(GROUP_TYPE_DST, aclGid, endpointData, policyData, aclAction.GetDirections())
-		if mapCount > 0 {
-			policyData.AclActions[index] = aclAction.SetAclGidBitmapOffset(mapOffset).SetAclGidBitmapCount(mapCount)
-		}
-		mapOffset += uint16(mapCount)
-	}
-	//	log.Debug(endpointData, policyData)
-}
-
 func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet *LookupKey) (*EndpointData, *PolicyData) {
 	l.generateInterestKeys(endpointData, packet)
 	srcEpc := l.calcEpc(endpointData.SrcInfo)
@@ -922,13 +803,11 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 			portBackwardPolicy.Merge(policy.AclActions, policy.NpbActions, policy.ACLID, BACKWARD)
 		}
 	}
-	portBackwardPolicy.ReverseNpbActions()
-	// 剔除匿名资源组ID
-	if l.cloudPlatformLabeler != nil {
-		l.cloudPlatformLabeler.RemoveAnonymousGroupIds(endpointData)
-	}
 
+	// 剔除匿名资源组ID
+	l.cloudPlatformLabeler.RemoveAnonymousGroupIds(endpointData)
 	packetEndpointData := l.cloudPlatformLabeler.UpdateEndpointData(endpointData, packet)
+
 	// 无论是否查找到policy，都需要向fastPath下发，避免重复走firstPath
 	mapsForward, mapsBackward := l.addPortFastPolicy(endpointData, packetEndpointData, srcEpc, dstEpc, packet, portForwardPolicy, portBackwardPolicy)
 
@@ -954,9 +833,11 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 		length := len(portForwardPolicy.AclActions) + len(portBackwardPolicy.AclActions) + len(vlanPolicy.AclActions)
 		findPolicy.AclActions = make([]AclAction, 0, length)
 		findPolicy.Merge(vlanPolicy.AclActions, vlanPolicy.NpbActions, vlanPolicy.ACLID)
-		findPolicy.Merge(portForwardPolicy.AclActions, portForwardPolicy.NpbActions, portForwardPolicy.ACLID, FORWARD)
-		findPolicy.Merge(portBackwardPolicy.AclActions, portBackwardPolicy.NpbActions, portBackwardPolicy.ACLID, BACKWARD)
-		l.AddAclGidBitmaps(packetEndpointData, findPolicy, packet)
+		findPolicy.Merge(portForwardPolicy.AclActions, portForwardPolicy.NpbActions, portForwardPolicy.ACLID)
+		findPolicy.Merge(portBackwardPolicy.AclActions, portBackwardPolicy.NpbActions, portBackwardPolicy.ACLID)
+		findPolicy.FormatNpbAction()
+		findPolicy.NpbActions = findPolicy.CheckNpbAction(packet, packetEndpointData)
+		findPolicy.AddAclGidBitmaps(packet, packetEndpointData, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
 	}
 
 	atomic.AddUint64(&l.FirstPathHit, 1)
@@ -1012,11 +893,11 @@ func (l *PolicyLabeler) addVlanFastPolicy(srcEpc, dstEpc uint16, packet *LookupK
 	if vlanPolicy == nil {
 		atomic.AddUint32(&l.FastPathPolicyCount, 1)
 		// 添加forward方向bitmap
-		l.AddAclGidBitmaps(endpointData, forward, packet)
+		forward.AddAclGidBitmaps(packet, endpointData, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
 		mapsForward.vlanPolicyMap[key] = forward
 	} else {
 		// 添加forward方向bitmap
-		l.AddAclGidBitmaps(endpointData, forward, packet)
+		forward.AddAclGidBitmaps(packet, endpointData, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
 		*vlanPolicy = *forward
 	}
 
@@ -1034,11 +915,11 @@ func (l *PolicyLabeler) addVlanFastPolicy(srcEpc, dstEpc uint16, packet *LookupK
 	if vlanPolicy == nil {
 		atomic.AddUint32(&l.FastPathPolicyCount, 1)
 		// 添加backward方向bitmap
-		l.AddAclGidBitmaps(&backwardEndpoint, backward, packet)
+		backward.AddAclGidBitmaps(packet, &backwardEndpoint, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
 		mapsBackward.vlanPolicyMap[key] = backward
 	} else {
 		// 添加backward方向bitmap
-		l.AddAclGidBitmaps(&backwardEndpoint, backward, packet)
+		backward.AddAclGidBitmaps(packet, &backwardEndpoint, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
 		*vlanPolicy = *backward
 	}
 }
@@ -1056,29 +937,21 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packetEndp
 		forward.AclActions = make([]AclAction, 0, len(policyForward.AclActions)+len(policyBackward.AclActions))
 		forward.Merge(policyForward.AclActions, policyForward.NpbActions, policyForward.ACLID)
 		forward.Merge(policyBackward.AclActions, policyBackward.NpbActions, policyBackward.ACLID)
-		if len(forward.NpbActions) > 0 {
-			npbActions := l.checkNpbAction(packet, packetEndpointData, forward.NpbActions)
-			if policyForward.ACLID > 0 {
-				policyForward.NpbActions = append(policyForward.NpbActions[:0], npbActions...)
-			}
-			if policyBackward.ACLID > 0 {
-				policyBackward.NpbActions = append(policyBackward.NpbActions[:0], npbActions...)
-			}
-		}
+		forward.FormatNpbAction()
 	}
 	key := uint64(srcEpc)<<48 | uint64(dstEpc)<<32 | uint64(packet.SrcPort)<<16 | uint64(packet.DstPort)
 	index := l.aclProtoMap[packet.Proto]
 	if portPolicyValue := mapsForward.portPolicyMap[key]; portPolicyValue == nil {
 		value := &PortPolicyValue{endpoint: *endpointData, protoPolicy: make([]*PolicyData, 3), timestamp: packet.Timestamp}
 		// 添加forward方向bitmap
-		l.AddAclGidBitmaps(&value.endpoint, forward, packet)
+		forward.AddAclGidBitmaps(packet, &value.endpoint, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
 		value.protoPolicy[index] = forward
 		mapsForward.portPolicyMap[key] = value
 		atomic.AddUint32(&l.FastPathPolicyCount, 1)
 	} else {
 		portPolicyValue.endpoint = *endpointData
 		// 添加forward方向bitmap
-		l.AddAclGidBitmaps(&portPolicyValue.endpoint, forward, packet)
+		forward.AddAclGidBitmaps(packet, &portPolicyValue.endpoint, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
 		portPolicyValue.protoPolicy[index] = forward
 		portPolicyValue.timestamp = packet.Timestamp
 	}
@@ -1097,21 +970,23 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packetEndp
 	if id := policyForward.ACLID + policyBackward.ACLID; id > 0 {
 		backward = new(PolicyData)
 		backward.AclActions = make([]AclAction, 0, len(policyForward.AclActions)+len(policyBackward.AclActions))
-		backward.MergeAndSwapDirection(forward.AclActions, forward.NpbActions, forward.ACLID)
+		backward.MergeAndSwapDirection(policyForward.AclActions, policyForward.NpbActions, policyForward.ACLID)
+		backward.MergeAndSwapDirection(policyBackward.AclActions, policyBackward.NpbActions, policyBackward.ACLID)
+		backward.FormatNpbAction()
 	}
 	key = uint64(dstEpc)<<48 | uint64(srcEpc)<<32 | uint64(packet.DstPort)<<16 | uint64(packet.SrcPort)
 	if portPolicyValue := mapsBackward.portPolicyMap[key]; portPolicyValue == nil {
 		value := &PortPolicyValue{endpoint: *endpointData, protoPolicy: make([]*PolicyData, 3), timestamp: packet.Timestamp}
 		value.endpoint.SrcInfo, value.endpoint.DstInfo = value.endpoint.DstInfo, value.endpoint.SrcInfo
 		// 添加backward方向bitmap
-		l.AddAclGidBitmaps(&value.endpoint, backward, packet)
+		backward.AddAclGidBitmaps(packet, &value.endpoint, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
 		value.protoPolicy[index] = backward
 		mapsBackward.portPolicyMap[key] = value
 		atomic.AddUint32(&l.FastPathPolicyCount, 1)
 	} else {
 		portPolicyValue.endpoint = EndpointData{SrcInfo: endpointData.DstInfo, DstInfo: endpointData.SrcInfo}
 		// 添加backward方向bitmap
-		l.AddAclGidBitmaps(&portPolicyValue.endpoint, backward, packet)
+		backward.AddAclGidBitmaps(packet, &portPolicyValue.endpoint, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
 		portPolicyValue.protoPolicy[index] = backward
 		portPolicyValue.timestamp = packet.Timestamp
 	}
@@ -1232,11 +1107,12 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *
 		policy.AclActions = make([]AclAction, 0, len(vlanPolicy.AclActions)+len(portPolicy.AclActions))
 		policy.Merge(vlanPolicy.AclActions, vlanPolicy.NpbActions, vlanPolicy.ACLID)
 		policy.Merge(portPolicy.AclActions, portPolicy.NpbActions, portPolicy.ACLID)
-		l.AddAclGidBitmaps(endpoint, policy, packet)
+		policy.FormatNpbAction()
+		policy.AddAclGidBitmaps(packet, endpoint, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
 	}
 
-	if endpoint != nil {
-		policy = l.checkNpbPolicy(packet, endpoint, policy)
+	if policy != nil && endpoint != nil {
+		policy = policy.CheckNpbPolicy(packet, endpoint)
 	}
 
 	atomic.AddUint64(&l.FastPathHit, 1)
