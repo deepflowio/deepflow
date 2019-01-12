@@ -1287,7 +1287,9 @@ func TestMultiNpbAction1(t *testing.T) {
 	acls := []*Acl{acl, acl2, acl3, acl4}
 	table.UpdateAcls(acls)
 	basicPolicyData := &PolicyData{}
-	basicPolicyData.Merge([]AclAction{action.AddDirections(BACKWARD)}, []NpbAction{npb.ReverseTapSide()}, 25)
+	basicPolicyData.AclActions = make([]AclAction, 0, 2)
+	basicPolicyData.NpbActions = make([]NpbAction, 0, 1)
+	basicPolicyData.Merge([]AclAction{action.AddDirections(BACKWARD)}, []NpbAction{}, 25)
 
 	// key: false:ip1:1000 -> true:ip2:1023 tcp
 	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 1023)
@@ -1295,6 +1297,8 @@ func TestMultiNpbAction1(t *testing.T) {
 	_, policyData := table.LookupAllByKey(key)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestMultiNpbAction Check Failed!")
+		t.Error(cap(basicPolicyData.AclActions), cap(basicPolicyData.NpbActions), cap(basicPolicyData.AclGidBitmaps))
+		t.Error(cap(policyData.AclActions), cap(policyData.NpbActions), cap(policyData.AclGidBitmaps))
 	}
 
 	// key: true:ip2:1023 -> false:ip1:1000 tcp
@@ -1319,7 +1323,7 @@ func TestMultiNpbAction1(t *testing.T) {
 	key = generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 1023)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, false)
 	_, policyData = table.LookupAllByKey(key)
-	if !CheckPolicyResult(t, INVALID_POLICY_DATA, policyData) {
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestMultiNpbAction Check Failed!")
 	}
 
@@ -1435,6 +1439,7 @@ func TestNpbActionDedup(t *testing.T) {
 	basicPolicyData = new(PolicyData)
 	basicPolicyData.Merge([]AclAction{action1, action2, action4.SetDirections(BACKWARD), action3.SetDirections(BACKWARD)},
 		[]NpbAction{npb1, npb2, npb4.ReverseTapSide(), npb3.ReverseTapSide()}, acl1.Id)
+	basicPolicyData.FormatNpbAction()
 	// key不变，acl改变
 	policyData = getPolicyByFirstPath(table, endpoint, key)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
@@ -1450,6 +1455,7 @@ func TestNpbActionDedup(t *testing.T) {
 
 	basicPolicyData = new(PolicyData)
 	basicPolicyData.Merge([]AclAction{action5, action5.SetDirections(BACKWARD)}, []NpbAction{npb5, npb5.ReverseTapSide()}, acl5.Id)
+	basicPolicyData.FormatNpbAction()
 	// key: true:(IP-group6)ipGroup6Ip2:1000 -> true:(IP-group6)ipGroup6Ip4:1023 tcp
 	key = generateLookupKey(ipGroup6Mac1, ipGroup6Mac1, vlanAny, ipGroup6Ip2, ipGroup6Ip4, IPProtocolTCP, 1000, 1023)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
