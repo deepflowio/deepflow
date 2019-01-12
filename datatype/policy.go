@@ -384,46 +384,52 @@ func (a AclAction) String() string {
 		a.GetAclGidBitmapCount())
 }
 
-func (d *PolicyData) ReverseNpbActions() {
-	for index, npb := range d.NpbActions {
-		d.NpbActions[index] = npb.ReverseTapSide()
+// 如果双方向都匹配了同一策略，对应的NpbActions Merge后会是TAPSIDE_ALL，
+// 此时只保留TAPSIDE_SRC方向，即对应只处理src为true的tx流量
+func (d *PolicyData) FormatNpbAction() {
+	for index, _ := range d.NpbActions {
+		if d.NpbActions[index].TapSide() == TAPSIDE_ALL {
+			d.NpbActions[index].SetTapSide(TAPSIDE_SRC)
+		}
 	}
 }
 
-func (d *PolicyData) DedupNpbAction() {
+func (d *PolicyData) CheckNpbAction(packet *LookupKey, endpointData *EndpointData) []NpbAction {
+	if len(d.NpbActions) == 0 {
+		return nil
+	}
+
 	validActions := make([]NpbAction, 0, len(d.NpbActions))
-	for i := 0; i < len(d.NpbActions); i++ {
-		repeat := false
-		actionI := &d.NpbActions[i]
-		for j := i + 1; j < len(d.NpbActions); j++ {
-			actionJ := &d.NpbActions[j]
-			if *actionJ == *actionI {
-				repeat = true
-				break
+	for _, action := range d.NpbActions {
+		if (action.TapSideCompare(TAPSIDE_SRC) == true && packet.L2End0 == true) ||
+			(action.TapSideCompare(TAPSIDE_DST) == true && packet.L2End1 == true) {
+			if action.ResourceGroupTypeCompare(RESOURCE_GROUP_TYPE_DEV) {
+				validActions = append(validActions, action)
+			} else if (action.TapSideCompare(TAPSIDE_SRC) == true && endpointData.SrcInfo.L3End == true) ||
+				(action.TapSideCompare(TAPSIDE_DST) == true && endpointData.DstInfo.L3End == true) {
+				validActions = append(validActions, action)
 			}
-
-			if actionI.TunnelIp() != actionJ.TunnelIp() {
-				continue
-			}
-			if actionI.PayloadSlice() == 0 ||
-				actionI.PayloadSlice() > actionJ.PayloadSlice() {
-				actionJ.SetPayloadSlice(actionI.PayloadSlice())
-			}
-			if actionI.TunnelId() > actionJ.TunnelId() {
-				actionJ.SetTunnelId(actionI.TunnelId())
-			}
-			actionJ.AddTapSide(actionI.TapSide())
-			actionJ.AddResourceGroupType(actionI.ResourceGroupType())
-			repeat = true
-		}
-		if !repeat {
-			validActions = append(validActions, *actionI)
 		}
 	}
-	d.NpbActions = append(d.NpbActions[:0], validActions...)
+	return validActions
 }
 
-func (d *PolicyData) MergeNpbAction(actions []NpbAction) {
+func (d *PolicyData) CheckNpbPolicy(packet *LookupKey, endpointData *EndpointData) *PolicyData {
+	if len(d.NpbActions) == 0 {
+		return d
+	}
+	validActions := d.CheckNpbAction(packet, endpointData)
+	if len(validActions) == 0 && d.ActionFlags == 0 {
+		return INVALID_POLICY_DATA
+	}
+
+	validPolicyData := new(PolicyData)
+	*validPolicyData = *d
+	validPolicyData.NpbActions = append(validPolicyData.NpbActions[:0], validActions...)
+	return validPolicyData
+}
+
+func (d *PolicyData) MergeNpbAction(actions []NpbAction, directions ...DirectionType) {
 	for _, n := range actions {
 		repeat := false
 		for index, m := range d.NpbActions {
@@ -443,11 +449,19 @@ func (d *PolicyData) MergeNpbAction(actions []NpbAction) {
 				d.NpbActions[index].SetTunnelId(n.TunnelId())
 			}
 			d.NpbActions[index].AddResourceGroupType(n.ResourceGroupType())
-			d.NpbActions[index].SetTapSide(n.TapSide())
+			if len(directions) > 0 {
+				d.NpbActions[index].SetTapSide(int(directions[0]))
+			} else {
+				d.NpbActions[index].AddTapSide(n.TapSide())
+			}
 			repeat = true
 		}
 		if !repeat {
-			d.NpbActions = append(d.NpbActions, n)
+			npbAction := n
+			if len(directions) > 0 {
+				npbAction.SetTapSide(int(directions[0]))
+			}
+			d.NpbActions = append(d.NpbActions, npbAction)
 		}
 	}
 }
@@ -456,7 +470,6 @@ func (d *PolicyData) Merge(aclActions []AclAction, npbActions []NpbAction, aclID
 	if d.ACLID == 0 {
 		d.ACLID = aclID
 	}
-	d.MergeNpbAction(npbActions)
 	for _, newAclAction := range aclActions {
 		if len(directions) > 0 {
 			newAclAction = newAclAction.SetDirections(directions[0])
@@ -481,6 +494,7 @@ func (d *PolicyData) Merge(aclActions []AclAction, npbActions []NpbAction, aclID
 		d.AclActions = append(d.AclActions, newAclAction)
 		d.ActionFlags |= newAclAction.GetActionFlags()
 	}
+	d.MergeNpbAction(npbActions, directions...)
 }
 
 func (d *PolicyData) MergeAndSwapDirection(aclActions []AclAction, npbActions []NpbAction, aclID ACLID) {
@@ -533,6 +547,89 @@ func FormatAclGidBitmap(endpointData *EndpointData, policyData *PolicyData) stri
 		}
 	}
 	return formatStr
+}
+
+// 添加资源组bitmap
+func (d *PolicyData) AddAclGidBitmap(addType uint32, aclGid uint32, endpointData *EndpointData, direction DirectionType, srcMap, dstMap map[uint32]bool) uint8 {
+	addCount := uint8(0)
+	bitmapFlag := false
+	var groupIds []uint32
+	var groupAclGidMap map[uint32]bool
+	aclGidBitMap := AclGidBitmap(0)
+	mapCount := GROUP_MAPBITS_OFFSET
+	if addType == GROUP_TYPE_SRC {
+		groupIds = endpointData.SrcInfo.GroupIds
+		if direction&FORWARD == FORWARD {
+			groupAclGidMap = srcMap
+		} else {
+			groupAclGidMap = dstMap
+		}
+		aclGidBitMap.SetSrcFlag()
+	} else {
+		groupIds = endpointData.DstInfo.GroupIds
+		if direction&FORWARD == FORWARD {
+			groupAclGidMap = dstMap
+		} else {
+			groupAclGidMap = srcMap
+		}
+		aclGidBitMap.SetDstFlag()
+	}
+
+	for i, groupId := range groupIds {
+		if i >= mapCount {
+			if aclGidBitMap.GetMapBits() > 0 {
+				result := aclGidBitMap
+				d.AclGidBitmaps = append(d.AclGidBitmaps, result)
+				addCount += 1
+			}
+			mapCount += GROUP_MAPBITS_OFFSET
+			aclGidBitMap = AclGidBitmap(0)
+			if addType == GROUP_TYPE_SRC {
+				aclGidBitMap.SetSrcFlag()
+			} else {
+				aclGidBitMap.SetDstFlag()
+			}
+			bitmapFlag = false
+		}
+		key := aclGid<<16 | FormatGroupId(groupId)
+		if ok := groupAclGidMap[key]; ok {
+			aclGidBitMap.SetMapOffset(uint32(i))
+			aclGidBitMap.SetMapBits(uint32(i))
+			bitmapFlag = true
+		} else {
+			// 查找资源组全采
+			key = aclGid << 16
+			if ok := groupAclGidMap[key]; ok {
+				aclGidBitMap.SetMapOffset(uint32(i))
+				aclGidBitMap.SetMapBits(uint32(i))
+				bitmapFlag = true
+			}
+		}
+	}
+	if bitmapFlag && aclGidBitMap.GetMapBits() > 0 {
+		d.AclGidBitmaps = append(d.AclGidBitmaps, aclGidBitMap)
+		addCount += 1
+	}
+	return addCount
+}
+
+func (d *PolicyData) AddAclGidBitmaps(packet *LookupKey, endpointData *EndpointData, srcMap, dstMap map[uint32]bool) {
+	if !packet.HasFeatureFlag(NPM) {
+		return
+	}
+	mapOffset := uint16(0)
+	for index, aclAction := range d.AclActions {
+		aclGid := uint32(aclAction.GetACLGID())
+		if aclGid == 0 {
+			continue
+		}
+		mapCount := d.AddAclGidBitmap(GROUP_TYPE_SRC, aclGid, endpointData, aclAction.GetDirections(), srcMap, dstMap)
+		mapCount += d.AddAclGidBitmap(GROUP_TYPE_DST, aclGid, endpointData, aclAction.GetDirections(), srcMap, dstMap)
+		if mapCount > 0 {
+			d.AclActions[index] = aclAction.SetAclGidBitmapOffset(mapOffset).SetAclGidBitmapCount(mapCount)
+		}
+		mapOffset += uint16(mapCount)
+	}
 }
 
 func (d *PolicyData) String() string {
