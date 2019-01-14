@@ -10,12 +10,13 @@ PB_FILES = vendor/gitlab.x.lan/yunshan/message/dfi/dfi.pb.go vendor/gitlab.x.lan
 
 all: droplet droplet-ctl
 
-vendor:
+vendor: patch/001-fix-afpacket-dirty-block.patch
 	mkdir -p $(shell dirname ${PROJECT_ROOT})
 	[ -d ${PROJECT_ROOT} ] || ln -snf ${CURDIR} ${PROJECT_ROOT}
 	[ -f ${GOPATH}/bin/dep ] || curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 	(cd ${PROJECT_ROOT}; dep ensure)
 	go generate ./vendor/gitlab.x.lan/yunshan/droplet-libs/...
+	cat $^ | patch -d ./vendor/github.com/google/gopacket -p1
 
 ${PB_FILES}: vendor
 	go generate ./vendor/gitlab.x.lan/yunshan/message/...

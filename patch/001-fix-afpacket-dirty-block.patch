@@ -1,0 +1,18 @@
+diff --git a/afpacket/header.go b/afpacket/header.go
+index 0b9918e..1327dca 100644
+--- a/afpacket/header.go
++++ b/afpacket/header.go
+@@ -126,7 +126,12 @@ func (w *v3wrapper) getStatus() int {
+ 	return int(w.blockhdr.block_status)
+ }
+ func (w *v3wrapper) clearStatus() {
+-	w.blockhdr.block_status = 0
++	w.blockhdr.num_pkts = 0
++	block := unsafe.Pointer(w.block)
++	packet := (*C.struct_tpacket3_hdr)(unsafe.Pointer(uintptr(block) + uintptr(w.blockhdr.offset_to_first_pkt)))
++	*packet = C.struct_tpacket3_hdr{}
++	w.blockhdr.offset_to_first_pkt = 0
++	w.blockhdr.block_status = C.TP_STATUS_KERNEL
+ }
+ func (w *v3wrapper) getTime() time.Time {
+ 	return time.Unix(int64(w.packet.tp_sec), int64(w.packet.tp_nsec))
