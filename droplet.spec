@@ -1,5 +1,5 @@
 Name:       droplet
-Version:    1.0
+Version:    1.1
 Release:    %(git rev-list --count HEAD)%{?dist}
 Summary:    deepflow droplet
 

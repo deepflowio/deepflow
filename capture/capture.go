@@ -102,16 +102,15 @@ func (c *Capture) run() (retErr error) {
 		}
 
 		timestamp := time.Duration(ci.Timestamp.UnixNano())
-		if prevTimestamp-time.Millisecond > timestamp {
-			// AF_PACKET v3在某些内核上存在缺陷，目前使用1ms判断是否为过期数据
+		if timestamp < prevTimestamp-time.Millisecond { // FIXME: just in case
 			c.counter.Retired++
 			continue
 		}
-		if prevTimestamp > timestamp {
+		if timestamp < prevTimestamp {
 			timestamp = prevTimestamp
-		} else {
-			prevTimestamp = timestamp
 		}
+		prevTimestamp = timestamp
+
 		c.counter.Rx++
 		c.Handle(timestamp, packet, ci.Length)
 	}
