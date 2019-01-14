@@ -2,7 +2,6 @@ package datatype
 
 import (
 	"fmt"
-	"math"
 
 	"gitlab.x.lan/yunshan/droplet-libs/bit"
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
@@ -28,16 +27,6 @@ const (
 	RESOURCE_GROUP_TYPE_DEV  = 0x1
 	RESOURCE_GROUP_TYPE_IP   = 0x2
 	RESOURCE_GROUP_TYPE_MASK = RESOURCE_GROUP_TYPE_DEV | RESOURCE_GROUP_TYPE_IP
-)
-
-const (
-	GROUP_TYPE_OFFSET    = 62
-	GROUP_MAPBITS_OFFSET = 56
-	GROUP_TYPE_MASK      = 0x1
-	GROUP_TYPE_SRC       = 0x0
-	GROUP_TYPE_DST       = 0x1
-	GROUP_MAPOFFSET_MASK = 0x3F
-	GROUP_MAPBITS_MASK   = math.MaxUint64 >> 8
 )
 
 func (a NpbAction) TapSideCompare(flag int) bool {
@@ -238,62 +227,94 @@ func (t TagTemplate) String() string {
 	return s
 }
 
-//  MSB        63          62              56         0
-//  +-------------------------------------------------+
-//  | RESERVED | SRC/DST   |   MapOffset   |  MapBits |
-//  +-------------------------------------------------+
-// SRC/DST: 源或目的资源组
-// MapOffset: AclGidBitmap在资源组的起始偏移量
-// MapBits: AclGidBitmap在资源组相对起始值的偏移量,每个bit是对应一个资源组
+const (
+	GROUP_TYPE_OFFSET         = 62
+	GROUP_TYPE_ALL            = 0x2
+	GROUP_SRC_MAPOFFSET_SHIFT = 55
+	GROUP_DST_MAPOFFSET_SHIFT = 48
+	GROUP_SRC_MAPBITS_SHIFT   = 24
+	GROUP_DST_MAPBITS_SHIFT   = 24
+	GROUP_MAPBITS_CNT         = 24
+	GROUP_ALL_MAPOFFSET_MASK  = 0x7f
+	GROUP_ALL_MAPBITS_MASK    = 0xFFFFFF
+	GROUP_TYPE_SRC            = 0x0
+	GROUP_TYPE_DST            = 0x1
+)
+
+//  MSB       62             55            48           24            0
+//  +---------+--------------+--------------+------------+------------+
+//  | SRC/DST | SrcMapOffset | DstMapOffset | SrcMapBits | DstMapBits |
+//  +-----------------------------------------------------------------+
+// SRC/DST: 源或目的资源组，源目的资源组混合
+// SrcMapOffset: AclGidBitmap在源资源组的起始偏移量
+// DstMapOffset: AclGidBitmap在目的资源组的起始偏移量
+// SrcMapBits: AclGidBitmap在源资源组相对起始值的偏移量，每个bit是对应一个资源组
+// DstMapBits: AclGidBitmap在目的资源组相对起始值的偏移量，每个bit是对应一个资源组
 type AclGidBitmap uint64
 
-func (b *AclGidBitmap) SetSrcFlag() {
-	*b &= ^AclGidBitmap(GROUP_TYPE_MASK << GROUP_TYPE_OFFSET)
+func (b AclGidBitmap) SetSrcAndDstFlag() AclGidBitmap {
+	b |= AclGidBitmap(GROUP_TYPE_ALL << GROUP_TYPE_OFFSET)
+	return b
 }
 
-func (b *AclGidBitmap) SetDstFlag() {
-	*b |= AclGidBitmap(GROUP_TYPE_MASK << GROUP_TYPE_OFFSET)
+func (b AclGidBitmap) SetSrcMapOffset(offset uint32) AclGidBitmap {
+	realOffset := offset / GROUP_MAPBITS_CNT
+	b &= ^(AclGidBitmap(GROUP_ALL_MAPOFFSET_MASK) << GROUP_SRC_MAPOFFSET_SHIFT)
+	b |= AclGidBitmap(realOffset&GROUP_ALL_MAPOFFSET_MASK) << GROUP_SRC_MAPOFFSET_SHIFT
+	return b
 }
 
-func (b *AclGidBitmap) SetMapOffset(offset uint32) {
-	realOffset := offset / GROUP_MAPBITS_OFFSET
-	*b &= ^(AclGidBitmap(GROUP_MAPOFFSET_MASK) << GROUP_MAPBITS_OFFSET)
-	*b |= AclGidBitmap(realOffset&GROUP_MAPOFFSET_MASK) << GROUP_MAPBITS_OFFSET
+func (b AclGidBitmap) SetDstMapOffset(offset uint32) AclGidBitmap {
+	realOffset := offset / GROUP_MAPBITS_CNT
+	b &= ^(AclGidBitmap(GROUP_ALL_MAPOFFSET_MASK) << GROUP_DST_MAPOFFSET_SHIFT)
+	b |= AclGidBitmap(realOffset&GROUP_ALL_MAPOFFSET_MASK) << GROUP_DST_MAPOFFSET_SHIFT
+	return b
 }
 
-func (b *AclGidBitmap) SetMapBits(offset uint32) {
-	realOffset := offset % GROUP_MAPBITS_OFFSET
-	*b |= (AclGidBitmap(1) << realOffset) & GROUP_MAPBITS_MASK
+func (b AclGidBitmap) SetSrcMapBits(offset uint32) AclGidBitmap {
+	realOffset := offset % GROUP_SRC_MAPBITS_SHIFT
+	b |= AclGidBitmap(1) << (realOffset + GROUP_SRC_MAPBITS_SHIFT)
+	return b
 }
 
-func (b *AclGidBitmap) ResetMapBits(offset uint32) {
-	realOffset := offset % GROUP_MAPBITS_OFFSET
-	*b &= ^((AclGidBitmap(1) << realOffset) & GROUP_MAPBITS_MASK)
+func (b AclGidBitmap) SetDstMapBits(offset uint32) AclGidBitmap {
+	realOffset := offset % GROUP_DST_MAPBITS_SHIFT
+	b |= AclGidBitmap(1) << realOffset
+	return b
+}
+
+func (b AclGidBitmap) GetSrcAndDstFlag() uint8 {
+	return uint8((b >> GROUP_TYPE_OFFSET) & GROUP_TYPE_ALL)
+}
+
+func (b AclGidBitmap) GetSrcMapOffset() uint32 {
+	return uint32((b>>GROUP_SRC_MAPOFFSET_SHIFT)&GROUP_ALL_MAPOFFSET_MASK) * GROUP_SRC_MAPBITS_SHIFT
+}
+
+func (b AclGidBitmap) GetDstMapOffset() uint32 {
+	return uint32((b>>GROUP_DST_MAPOFFSET_SHIFT)&GROUP_ALL_MAPOFFSET_MASK) * GROUP_DST_MAPBITS_SHIFT
+}
+
+func (b AclGidBitmap) GetSrcMapBits() uint32 {
+	return uint32((uint64(b) >> GROUP_SRC_MAPBITS_SHIFT) & GROUP_ALL_MAPBITS_MASK)
+}
+
+func (b AclGidBitmap) GetDstMapBits() uint32 {
+	return uint32(uint64(b) & GROUP_ALL_MAPBITS_MASK)
 }
 
 func (b *AclGidBitmap) ReverseGroupType() {
-	if b.GetGroupType() == GROUP_TYPE_SRC {
-		b.SetDstFlag()
-	} else {
-		b.SetSrcFlag()
-	}
-}
-
-func (b AclGidBitmap) GetGroupType() uint8 {
-	return uint8((b >> GROUP_TYPE_OFFSET) & GROUP_TYPE_MASK)
-}
-
-func (b AclGidBitmap) GetMapOffset() uint32 {
-	return uint32((b>>GROUP_MAPBITS_OFFSET)&GROUP_MAPOFFSET_MASK) * GROUP_MAPBITS_OFFSET
-}
-
-func (b AclGidBitmap) GetMapBits() uint64 {
-	return uint64(uint64(b) & GROUP_MAPBITS_MASK)
+	rAclGidBitmap := AclGidBitmap(0).SetSrcAndDstFlag()
+	rAclGidBitmap = rAclGidBitmap.SetSrcMapOffset(b.GetDstMapOffset())
+	rAclGidBitmap = rAclGidBitmap.SetDstMapOffset(b.GetSrcMapOffset())
+	rAclGidBitmap |= AclGidBitmap(b.GetSrcMapBits())
+	rAclGidBitmap |= AclGidBitmap(b.GetDstMapBits() << GROUP_DST_MAPBITS_SHIFT)
+	*b = rAclGidBitmap
 }
 
 func (b AclGidBitmap) String() string {
-	return fmt.Sprintf("{Type: %d, MapOffset: %d, MapBitOffset: 0x%x, RAW: 0x%x}",
-		b.GetGroupType(), b.GetMapOffset(), b.GetMapBits(), uint64(b))
+	return fmt.Sprintf("{Type: %d, SrcMapOffset: %d, SrcMapBitOffset: 0x%x, DstMapOffset: %d, DstMapBitOffset: 0x%x,RAW: 0x%x}",
+		b.GetSrcAndDstFlag(), b.GetSrcMapOffset(), b.GetSrcMapBits(), b.GetDstMapOffset(), b.GetDstMapBits(), uint64(b))
 }
 
 // keys (16b ACLGID + 16b ActionFlags + ), values (14b AclGidMapOffset + 4b MapCount + 2b Directions + 12b TagTemplates)
@@ -547,23 +568,37 @@ func (d *PolicyData) ReverseData() *PolicyData {
 
 func formatGroup(aclGidBitmap AclGidBitmap, endpointData *EndpointData) string {
 	var formatStr string
-	var groupIds []uint32
-	groupType := aclGidBitmap.GetGroupType()
-	groupOffset := aclGidBitmap.GetMapOffset()
-	groupMapBits := aclGidBitmap.GetMapBits()
-	if groupType == GROUP_TYPE_SRC {
+	srcGroupOffset := aclGidBitmap.GetSrcMapOffset()
+	srcGroupMapBits := aclGidBitmap.GetSrcMapBits()
+	dstGroupOffset := aclGidBitmap.GetDstMapOffset()
+	dstGroupMapBits := aclGidBitmap.GetDstMapBits()
+	srcLen := uint32(len(endpointData.SrcInfo.GroupIds))
+	dstLen := uint32(len(endpointData.DstInfo.GroupIds))
+
+	if srcGroupMapBits > 0 {
 		formatStr += " SRC: "
-		groupIds = endpointData.SrcInfo.GroupIds
-	} else if groupType == GROUP_TYPE_DST {
-		formatStr += " DST: "
-		groupIds = endpointData.DstInfo.GroupIds
-	} else {
-		return formatStr
+		for srcGroupMapBits > 0 {
+			j := bit.CountTrailingZeros32(srcGroupMapBits)
+			srcGroupMapBits ^= 1 << uint32(j)
+			if srcGroupOffset+uint32(j) >= srcLen {
+				formatStr += " SRCERR "
+				continue
+			}
+			formatStr += GroupIdToString(endpointData.SrcInfo.GroupIds[srcGroupOffset+uint32(j)])
+		}
 	}
-	for groupMapBits > 0 {
-		j := uint32(bit.CountTrailingZeros64(groupMapBits))
-		groupMapBits ^= 1 << j
-		formatStr += GroupIdToString(groupIds[groupOffset+j])
+
+	if dstGroupMapBits > 0 {
+		formatStr += " DST: "
+		for dstGroupMapBits > 0 {
+			j := bit.CountTrailingZeros32(dstGroupMapBits)
+			dstGroupMapBits ^= 1 << uint32(j)
+			if dstGroupOffset+uint32(j) >= dstLen {
+				formatStr += " DSTERR "
+				continue
+			}
+			formatStr += GroupIdToString(endpointData.DstInfo.GroupIds[dstGroupOffset+uint32(j)])
+		}
 	}
 	return formatStr
 }
@@ -584,94 +619,141 @@ func FormatAclGidBitmap(endpointData *EndpointData, policyData *PolicyData) stri
 	return formatStr
 }
 
-func (d *PolicyData) getBitmapGroupIds(addType uint32, packet *LookupKey, swap bool, direction DirectionType, srcMap, dstMap map[uint32]bool) ([]uint16, map[uint32]bool) {
-	var groupIds []uint16
-	var groupAclGidMap map[uint32]bool
-	if addType == GROUP_TYPE_SRC {
-		groupIds = packet.SrcAllGroupIds
-		if swap {
-			groupIds = packet.DstAllGroupIds
-		}
-		if direction&FORWARD == FORWARD {
-			groupAclGidMap = srcMap
-		} else {
-			groupAclGidMap = dstMap
-		}
-	} else {
-		groupIds = packet.DstAllGroupIds
-		if swap {
-			groupIds = packet.SrcAllGroupIds
-		}
-		if direction&FORWARD == FORWARD {
-			groupAclGidMap = dstMap
-		} else {
-			groupAclGidMap = srcMap
+func AclGidAndGroupIdInMap(aclGid uint32, groupId uint16, groupAclGidMap, groupAclGidMapOther map[uint32]bool) bool {
+	addFlag := false
+	key := (aclGid << 16) | uint32(groupId)
+	if groupAclGidMap != nil {
+		if ok := groupAclGidMap[key]; ok {
+			addFlag = true
 		}
 	}
-	return groupIds, groupAclGidMap
+	if addFlag != true && groupAclGidMapOther != nil {
+		if ok := groupAclGidMapOther[key]; ok {
+			addFlag = true
+		}
+	}
+	return addFlag
 }
 
 // 添加资源组bitmap
-func (d *PolicyData) AddAclGidBitmap(addType uint32, aclGid uint32, groupIds []uint16, groupAclGidMap map[uint32]bool) uint8 {
-	addCount := uint8(0)
+func (d *PolicyData) AddAclGidBitmap(aclGid uint32, packet *LookupKey, direction DirectionType, swap bool, srcMap, dstMap map[uint32]bool, addType uint32) []AclGidBitmap {
+	aclGidBitmaps := []AclGidBitmap{}
 	bitmapFlag := false
-	mapCount := GROUP_MAPBITS_OFFSET
-	aclGidBitMap := AclGidBitmap(0)
+	groupIds := packet.SrcAllGroupIds
+	var groupAclGidMap map[uint32]bool
+	var groupAclGidMapOther map[uint32]bool
+	aclGidBitMap := AclGidBitmap(0).SetSrcAndDstFlag()
+	mapCount := GROUP_MAPBITS_CNT
+
 	if addType == GROUP_TYPE_SRC {
-		aclGidBitMap.SetSrcFlag()
+		if swap {
+			groupIds = packet.DstAllGroupIds
+		}
 	} else {
-		aclGidBitMap.SetDstFlag()
+		if !swap {
+			groupIds = packet.DstAllGroupIds
+		}
+	}
+	if addType == GROUP_TYPE_SRC {
+		if direction&FORWARD == FORWARD {
+			groupAclGidMap = srcMap
+		}
+		if direction&BACKWARD == BACKWARD {
+			groupAclGidMapOther = dstMap
+		}
+	} else {
+		if direction&FORWARD == FORWARD {
+			groupAclGidMap = dstMap
+		}
+		if direction&BACKWARD == BACKWARD {
+			groupAclGidMapOther = srcMap
+		}
 	}
 
 	for i, groupId := range groupIds {
 		if i >= mapCount {
-			if aclGidBitMap.GetMapBits() > 0 {
+			if aclGidBitMap.GetSrcMapBits() > 0 || aclGidBitMap.GetDstMapBits() > 0 {
 				result := aclGidBitMap
-				d.AclGidBitmaps = append(d.AclGidBitmaps, result)
-				addCount += 1
+				aclGidBitmaps = append(aclGidBitmaps, result)
 			}
-			mapCount += GROUP_MAPBITS_OFFSET
-			aclGidBitMap = AclGidBitmap(0)
-			if addType == GROUP_TYPE_SRC {
-				aclGidBitMap.SetSrcFlag()
-			} else {
-				aclGidBitMap.SetDstFlag()
-			}
+			mapCount += GROUP_MAPBITS_CNT
+			aclGidBitMap = AclGidBitmap(0).SetSrcAndDstFlag()
 			bitmapFlag = false
 		}
-		key := aclGid<<16 | uint32(groupId)
-		if ok := groupAclGidMap[key]; ok {
-			aclGidBitMap.SetMapOffset(uint32(i))
-			aclGidBitMap.SetMapBits(uint32(i))
+		if AclGidAndGroupIdInMap(aclGid, groupId, groupAclGidMap, groupAclGidMapOther) {
+			if addType == GROUP_TYPE_SRC {
+				aclGidBitMap = aclGidBitMap.SetSrcMapOffset(uint32(i)).SetSrcMapBits(uint32(i))
+			} else {
+				aclGidBitMap = aclGidBitMap.SetDstMapOffset(uint32(i)).SetDstMapBits(uint32(i))
+			}
 			bitmapFlag = true
 		}
 	}
-	if bitmapFlag && aclGidBitMap.GetMapBits() > 0 {
-		d.AclGidBitmaps = append(d.AclGidBitmaps, aclGidBitMap)
-		addCount += 1
+	if bitmapFlag {
+		if aclGidBitMap.GetSrcMapBits() > 0 || aclGidBitMap.GetDstMapBits() > 0 {
+			aclGidBitmaps = append(aclGidBitmaps, aclGidBitMap)
+		}
 	}
-	return addCount
+	return aclGidBitmaps
+}
+
+func mergeAclGidBitmaps(srcAclGIdBitmaps []AclGidBitmap, dstAclGIdBitmaps []AclGidBitmap) []AclGidBitmap {
+	srcLen := len(srcAclGIdBitmaps)
+	dstLen := len(dstAclGIdBitmaps)
+	var fromAclGIdBitmaps []AclGidBitmap
+	var toAclGIdBitmaps []AclGidBitmap
+
+	if srcLen == 0 {
+		return dstAclGIdBitmaps
+	} else if dstLen == 0 {
+		return srcAclGIdBitmaps
+	}
+
+	if srcLen > dstLen {
+		toAclGIdBitmaps = srcAclGIdBitmaps
+		fromAclGIdBitmaps = dstAclGIdBitmaps
+	} else {
+		toAclGIdBitmaps = dstAclGIdBitmaps
+		fromAclGIdBitmaps = srcAclGIdBitmaps
+	}
+
+	for index, value := range fromAclGIdBitmaps {
+		toAclGIdBitmaps[index] |= value
+	}
+
+	return toAclGIdBitmaps
 }
 
 func (d *PolicyData) AddAclGidBitmaps(packet *LookupKey, swap bool, srcMap, dstMap map[uint32]bool) {
 	if !packet.HasFeatureFlag(NPM) {
 		return
 	}
+	aclGidMap := map[ACLID]AclAction{}
 	mapOffset := uint16(0)
 	for index, aclAction := range d.AclActions {
 		aclGid := uint32(aclAction.GetACLGID())
 		if aclGid == 0 {
 			continue
 		}
-		groupIds, maps := d.getBitmapGroupIds(GROUP_TYPE_SRC, packet, swap, aclAction.GetDirections(), srcMap, dstMap)
-		mapCount := d.AddAclGidBitmap(GROUP_TYPE_SRC, aclGid, groupIds, maps)
-		groupIds, maps = d.getBitmapGroupIds(GROUP_TYPE_DST, packet, swap, aclAction.GetDirections(), srcMap, dstMap)
-		mapCount += d.AddAclGidBitmap(GROUP_TYPE_DST, aclGid, groupIds, maps)
-		if mapCount > 0 {
-			d.AclActions[index] = aclAction.SetAclGidBitmapOffset(mapOffset).SetAclGidBitmapCount(mapCount)
+		if action, ok := aclGidMap[ACLID(aclGid)]; ok {
+			offset := action.GetAclGidBitmapOffset()
+			count := action.GetAclGidBitmapCount()
+			if count > 0 {
+				d.AclActions[index] = aclAction.SetAclGidBitmapOffset(offset).SetAclGidBitmapCount(count)
+			}
+			continue
 		}
-		mapOffset += uint16(mapCount)
+		srcAclGIdBitmaps := d.AddAclGidBitmap(aclGid, packet, aclAction.GetDirections(), swap, srcMap, dstMap, GROUP_TYPE_SRC)
+		dstAclGIdBitmaps := d.AddAclGidBitmap(aclGid, packet, aclAction.GetDirections(), swap, srcMap, dstMap, GROUP_TYPE_DST)
+		aclGIdBitmaps := mergeAclGidBitmaps(srcAclGIdBitmaps, dstAclGIdBitmaps)
+		if len(aclGIdBitmaps) > 0 {
+			d.AclActions[index] = aclAction.SetAclGidBitmapOffset(mapOffset).SetAclGidBitmapCount(uint8(len(aclGIdBitmaps)))
+			d.AclGidBitmaps = append(d.AclGidBitmaps, aclGIdBitmaps...)
+		}
+		aclGidMap[ACLID(aclGid)] = d.AclActions[index]
+		mapOffset += uint16(len(aclGIdBitmaps))
 	}
+	//	log.Debug(endpointData, policyData)
 }
 
 func (d *PolicyData) String() string {
@@ -689,24 +771,33 @@ func FillGroupID(aclAction AclAction, aclGidBitmaps []AclGidBitmap, allGroupIDs 
 
 	mapOffset := aclAction.GetAclGidBitmapOffset()
 	mapEnd := mapOffset + uint16(aclAction.GetAclGidBitmapCount())
+	srcLen := uint32(len(allGroupIDs[0]))
+	dstLen := uint32(len(allGroupIDs[1]))
 	for i := mapOffset; i < mapEnd; i++ {
 		aclGidBitmap := aclGidBitmaps[i]
-		groupOffset := aclGidBitmap.GetMapOffset()
-		groupMapBits := aclGidBitmap.GetMapBits()
-
-		ep := 0
-		if aclGidBitmap.GetGroupType() == GROUP_TYPE_DST {
-			ep = 1
+		srcGroupOffset := aclGidBitmap.GetSrcMapOffset()
+		srcGroupMapBits := aclGidBitmap.GetSrcMapBits()
+		dstGroupOffset := aclGidBitmap.GetDstMapOffset()
+		dstGroupMapBits := aclGidBitmap.GetDstMapBits()
+		for srcGroupMapBits > 0 {
+			j := bit.CountTrailingZeros32(srcGroupMapBits)
+			srcGroupMapBits ^= 1 << uint32(j)
+			if srcGroupOffset+uint32(j) >= srcLen {
+				log.Warningf("map bits and group id mismatch,, %v %v %v",
+					aclAction, aclGidBitmaps, allGroupIDs)
+				continue
+			}
+			aclGroupIDs[0] = append(aclGroupIDs[0], int32(FormatGroupId(allGroupIDs[0][srcGroupOffset+uint32(j)])))
 		}
-		if bit.CountLeadingZeros64(groupMapBits)+int(groupOffset) >= len(allGroupIDs[ep]) {
-			log.Warningf("map bits and group id mismatch, %v groupOffset=0x%016x, groupMapBits=0x%016x, groupIDs=%v", aclAction, groupOffset, groupMapBits, allGroupIDs[ep])
-			continue
-		}
-
-		for groupMapBits > 0 {
-			j := bit.CountTrailingZeros64(groupMapBits)
-			groupMapBits ^= 1 << uint64(j)
-			aclGroupIDs[ep] = append(aclGroupIDs[ep], int32(FormatGroupId(allGroupIDs[ep][groupOffset+uint32(j)])))
+		for dstGroupMapBits > 0 {
+			j := bit.CountTrailingZeros32(dstGroupMapBits)
+			dstGroupMapBits ^= 1 << uint32(j)
+			if dstGroupOffset+uint32(j) >= dstLen {
+				log.Warningf("map bits and group id mismatch, %v %v %v",
+					aclAction, aclGidBitmaps, allGroupIDs)
+				continue
+			}
+			aclGroupIDs[1] = append(aclGroupIDs[1], int32(FormatGroupId(allGroupIDs[1][dstGroupOffset+uint32(j)])))
 		}
 	}
 }
