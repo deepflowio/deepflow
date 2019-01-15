@@ -126,7 +126,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:8dd04ab4649f3ef12b435f35eb00d1ca70319c3be71bbdd3283c02400e64dc76"
+  digest = "1:4a4a48a6409b23cb996ae6e782d79a4de84bd78f3944884287614509e61caf75"
   name = "gitlab.x.lan/application/droplet-app"
   packages = [
     "internal/pkg/docbuffer",
@@ -144,7 +144,7 @@
     "pkg/mapper/usage",
   ]
   pruneopts = "UT"
-  revision = "b23666478805e23c39ac2d2b35813774844cad60"
+  revision = "493cc24e826bab3a704b396eca989148bb29fa02"
 
 [[projects]]
   branch = "master"
