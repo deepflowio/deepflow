@@ -55,25 +55,6 @@ func NewWorkerManager(
 	}
 }
 
-func (m *WorkerManager) newWorker(index int) *Worker {
-	return &Worker{
-		inputQueue: m.inputQueue,
-		queueKey:   queue.HashKey(uint8(index)),
-
-		maxConcurrentFiles: m.maxConcurrentFiles / m.nQueues,
-		maxFileSize:        int64(m.maxFileSizeMB) << 20,
-		maxFilePeriod:      time.Duration(m.maxFilePeriodSecond) * time.Second,
-		baseDirectory:      m.baseDirectory,
-
-		WorkerCounter: &WorkerCounter{},
-
-		writers: make(map[WriterKey]*WrappedWriter),
-
-		writerBufferSize: m.blockSizeKB << 10,
-		tcpipChecksum:    m.tcpipChecksum,
-	}
-}
-
 func (m *WorkerManager) Start() []io.Closer {
 	os.MkdirAll(m.baseDirectory, os.ModePerm)
 

@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strings"
@@ -47,10 +48,10 @@ func main() {
 	wg := sync.WaitGroup{}
 	wg.Add(len(closers))
 	for _, closer := range closers {
-		go func() {
-			closer.Close()
+		go func(c io.Closer) {
+			c.Close()
 			wg.Done()
-		}()
+		}(closer)
 	}
 	wg.Wait()
 }
