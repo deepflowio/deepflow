@@ -790,6 +790,15 @@ func (l *PolicyLabeler) DelAcl(id int) {
 	}
 }
 
+func (l *PolicyLabeler) getAclId(ids ...ACLID) ACLID {
+	for _, id := range ids {
+		if id != 0 {
+			return id
+		}
+	}
+	return ACLID(0)
+}
+
 func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet *LookupKey) (*EndpointData, *PolicyData) {
 	l.generateInterestKeys(endpointData, packet)
 	srcEpc := l.calcEpc(endpointData.SrcInfo)
@@ -846,17 +855,22 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 		l.addVlanFastPolicy(srcEpc, dstEpc, packet, vlanPolicy, endpointData, mapsForward, mapsBackward)
 	}
 
-	id := portForwardPolicy.ACLID + portBackwardPolicy.ACLID + vlanPolicy.ACLID
+	id := l.getAclId(vlanPolicy.ACLID, portForwardPolicy.ACLID, portBackwardPolicy.ACLID)
 	if id > 0 {
 		findPolicy = new(PolicyData)
-		length := len(portForwardPolicy.AclActions) + len(portBackwardPolicy.AclActions) + len(vlanPolicy.AclActions)
-		findPolicy.AclActions = make([]AclAction, 0, length)
-		findPolicy.Merge(vlanPolicy.AclActions, vlanPolicy.NpbActions, vlanPolicy.ACLID)
-		findPolicy.Merge(portForwardPolicy.AclActions, portForwardPolicy.NpbActions, portForwardPolicy.ACLID)
-		findPolicy.Merge(portBackwardPolicy.AclActions, portBackwardPolicy.NpbActions, portBackwardPolicy.ACLID)
-		findPolicy.FormatNpbAction()
-		findPolicy.NpbActions = findPolicy.CheckNpbAction(packet, packetEndpointData)
-		findPolicy.AddAclGidBitmaps(packet, false, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])
+		if packet.HasFeatureFlag(NPM) {
+			length := len(portForwardPolicy.AclActions) + len(portBackwardPolicy.AclActions) + len(vlanPolicy.AclActions)
+			findPolicy.AclActions = make([]AclAction, 0, length)
+			findPolicy.MergeAclAction(append(vlanPolicy.AclActions, append(portForwardPolicy.AclActions, portBackwardPolicy.AclActions...)...), id)
+			findPolicy.AddAclGidBitmaps(packet, false, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])
+		}
+		if packet.HasFeatureFlag(NPB) {
+			length := len(portForwardPolicy.NpbActions) + len(portBackwardPolicy.NpbActions)
+			findPolicy.NpbActions = make([]NpbAction, 0, length)
+			findPolicy.MergeNpbAction(append(portForwardPolicy.NpbActions, portBackwardPolicy.NpbActions...), id)
+			findPolicy.FormatNpbAction()
+			findPolicy.NpbActions = findPolicy.CheckNpbAction(packet, packetEndpointData)
+		}
 	}
 
 	atomic.AddUint64(&l.FirstPathHit, 1)
@@ -950,12 +964,18 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packetEndp
 		return nil, nil
 	}
 	l.addEpcMap(mapsForward, srcEpc, dstEpc, packet.SrcMac, packet.DstMac)
-	if id := policyForward.ACLID + policyBackward.ACLID; id > 0 {
+	id := l.getAclId(policyForward.ACLID, policyBackward.ACLID)
+	if id > 0 {
 		forward = new(PolicyData)
-		forward.AclActions = make([]AclAction, 0, len(policyForward.AclActions)+len(policyBackward.AclActions))
-		forward.Merge(policyForward.AclActions, policyForward.NpbActions, policyForward.ACLID)
-		forward.Merge(policyBackward.AclActions, policyBackward.NpbActions, policyBackward.ACLID)
-		forward.FormatNpbAction()
+		if packet.HasFeatureFlag(NPM) {
+			forward.AclActions = make([]AclAction, 0, len(policyForward.AclActions)+len(policyBackward.AclActions))
+			forward.MergeAclAction(append(policyForward.AclActions, policyBackward.AclActions...), id)
+		}
+		if packet.HasFeatureFlag(NPB) {
+			forward.NpbActions = make([]NpbAction, 0, len(policyForward.NpbActions)+len(policyBackward.NpbActions))
+			forward.MergeNpbAction(append(policyForward.NpbActions, policyBackward.NpbActions...), id)
+			forward.FormatNpbAction()
+		}
 	}
 	key := uint64(srcEpc)<<48 | uint64(dstEpc)<<32 | uint64(packet.SrcPort)<<16 | uint64(packet.DstPort)
 	index := l.aclProtoMap[packet.Proto]
@@ -985,12 +1005,17 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packetEndp
 			return mapsForward, mapsBackward
 		}
 	}
-	if id := policyForward.ACLID + policyBackward.ACLID; id > 0 {
+	if id > 0 {
 		backward = new(PolicyData)
-		backward.AclActions = make([]AclAction, 0, len(policyForward.AclActions)+len(policyBackward.AclActions))
-		backward.MergeAndSwapDirection(policyForward.AclActions, policyForward.NpbActions, policyForward.ACLID)
-		backward.MergeAndSwapDirection(policyBackward.AclActions, policyBackward.NpbActions, policyBackward.ACLID)
-		backward.FormatNpbAction()
+		if packet.HasFeatureFlag(NPM) {
+			backward.AclActions = make([]AclAction, 0, len(policyForward.AclActions)+len(policyBackward.AclActions))
+			backward.MergeAclAndSwapDirection(append(policyForward.AclActions, policyBackward.AclActions...), id)
+		}
+		if packet.HasFeatureFlag(NPB) {
+			backward.NpbActions = make([]NpbAction, 0, len(policyForward.NpbActions)+len(policyBackward.NpbActions))
+			backward.MergeNpbAndSwapDirection(append(policyForward.NpbActions, policyBackward.NpbActions...), id)
+			backward.FormatNpbAction()
+		}
 	}
 	key = uint64(dstEpc)<<48 | uint64(srcEpc)<<32 | uint64(packet.DstPort)<<16 | uint64(packet.SrcPort)
 	if portPolicyValue := mapsBackward.portPolicyMap[key]; portPolicyValue == nil {
@@ -1110,7 +1135,7 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *
 		if endpoint, portPolicy = l.getFastPortPolicy(maps, srcEpc, dstEpc, packet); portPolicy == nil {
 			return nil, nil
 		}
-		if packet.Vlan > 0 {
+		if packet.Vlan > 0 && packet.HasFeatureFlag(NPM) {
 			if vlanPolicy = l.getFastVlanPolicy(maps, srcEpc, dstEpc, packet); vlanPolicy == nil {
 				return nil, nil
 			}
@@ -1121,12 +1146,18 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *
 	} else if portPolicy.ACLID == 0 {
 		policy = vlanPolicy
 	} else {
+		id := l.getAclId(vlanPolicy.ACLID, portPolicy.ACLID)
 		policy = new(PolicyData)
-		policy.AclActions = make([]AclAction, 0, len(vlanPolicy.AclActions)+len(portPolicy.AclActions))
-		policy.Merge(vlanPolicy.AclActions, vlanPolicy.NpbActions, vlanPolicy.ACLID)
-		policy.Merge(portPolicy.AclActions, portPolicy.NpbActions, portPolicy.ACLID)
-		policy.FormatNpbAction()
-		policy.AddAclGidBitmaps(packet, false, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])
+		if packet.HasFeatureFlag(NPM) {
+			policy.AclActions = make([]AclAction, 0, len(vlanPolicy.AclActions)+len(portPolicy.AclActions))
+			policy.MergeAclAction(append(vlanPolicy.AclActions, portPolicy.AclActions...), id)
+			policy.AddAclGidBitmaps(packet, false, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])
+		}
+		if packet.HasFeatureFlag(NPB) {
+			policy.NpbActions = make([]NpbAction, 0, len(portPolicy.NpbActions))
+			policy.MergeNpbAction(portPolicy.NpbActions, id)
+			policy.FormatNpbAction()
+		}
 	}
 
 	if policy != nil && endpoint != nil {
