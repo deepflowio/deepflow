@@ -112,7 +112,7 @@ def get_files(acl_gid, mac=None, ip=None):
     for file in os.listdir(directory):
         if not file.endswith(FILE_SUFFIX):
             continue
-        segs = file[:-len(FILE_SUFFIX)].split('_')
+        segs = file[:file.find('.')].split('_')
         if len(segs) != 5:
             continue
         if mac is not None and mac_str != segs[1]:

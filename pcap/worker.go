@@ -28,6 +28,7 @@ type WrappedWriter struct {
 	aclGID  datatype.ACLID
 	ip      datatype.IPv4Int
 	mac     datatype.MacInt
+	tid     int
 
 	tempFilename    string
 	firstPacketTime time.Duration
@@ -46,6 +47,7 @@ type WorkerCounter struct {
 
 type Worker struct {
 	inputQueue queue.MultiQueueReader
+	index      int
 	queueKey   queue.HashKey
 
 	maxConcurrentFiles int
@@ -59,6 +61,26 @@ type Worker struct {
 
 	writerBufferSize int
 	tcpipChecksum    bool
+}
+
+func (m *WorkerManager) newWorker(index int) *Worker {
+	return &Worker{
+		inputQueue: m.inputQueue,
+		index:      index,
+		queueKey:   queue.HashKey(uint8(index)),
+
+		maxConcurrentFiles: m.maxConcurrentFiles / m.nQueues,
+		maxFileSize:        int64(m.maxFileSizeMB) << 20,
+		maxFilePeriod:      time.Duration(m.maxFilePeriodSecond) * time.Second,
+		baseDirectory:      m.baseDirectory,
+
+		WorkerCounter: &WorkerCounter{},
+
+		writers: make(map[WriterKey]*WrappedWriter),
+
+		writerBufferSize: m.blockSizeKB << 10,
+		tcpipChecksum:    m.tcpipChecksum,
+	}
 }
 
 func isISP(inPort uint32) bool {
@@ -92,16 +114,16 @@ func formatDuration(d time.Duration) string {
 	return time.Unix(0, int64(d)).Format(TIME_FORMAT)
 }
 
-func getTempFilename(tapType datatype.TapType, mac datatype.MacInt, ip datatype.IPv4Int, firstPacketTime time.Duration) string {
-	return fmt.Sprintf("%s_%s_%s_%s_.pcap.temp", tapTypeToString(tapType), macToString(mac), ipToString(ip), formatDuration(firstPacketTime))
+func getTempFilename(tapType datatype.TapType, mac datatype.MacInt, ip datatype.IPv4Int, firstPacketTime time.Duration, index int) string {
+	return fmt.Sprintf("%s_%s_%s_%s_.%d.pcap.temp", tapTypeToString(tapType), macToString(mac), ipToString(ip), formatDuration(firstPacketTime), index)
 }
 
 func (w *WrappedWriter) getTempFilename(base string) string {
-	return fmt.Sprintf("%s/%d/%s", base, w.aclGID, getTempFilename(w.tapType, w.mac, w.ip, w.firstPacketTime))
+	return fmt.Sprintf("%s/%d/%s", base, w.aclGID, getTempFilename(w.tapType, w.mac, w.ip, w.firstPacketTime, w.tid))
 }
 
 func (w *WrappedWriter) getFilename(base string) string {
-	return fmt.Sprintf("%s/%d/%s_%s_%s_%s_%s.pcap", base, w.aclGID, tapTypeToString(w.tapType), macToString(w.mac), ipToString(w.ip), formatDuration(w.firstPacketTime), formatDuration(w.lastPacketTime))
+	return fmt.Sprintf("%s/%d/%s_%s_%s_%s_%s.%d.pcap", base, w.aclGID, tapTypeToString(w.tapType), macToString(w.mac), ipToString(w.ip), formatDuration(w.firstPacketTime), formatDuration(w.lastPacketTime), w.tid)
 }
 
 func (w *Worker) shouldCloseFile(writer *WrappedWriter, packet *datatype.MetaPacket) bool {
@@ -151,6 +173,7 @@ func (w *Worker) writePacket(packet *datatype.MetaPacket, tapType datatype.TapTy
 			aclGID:          aclGID,
 			ip:              ip,
 			mac:             mac,
+			tid:             w.index,
 			firstPacketTime: packet.Timestamp,
 			lastPacketTime:  packet.Timestamp,
 		}
@@ -250,7 +273,7 @@ func (w *Worker) Process() {
 }
 
 func (w *Worker) Close() error {
-	log.Infof("Stop pcap worker writing to %d files", len(w.writers))
+	log.Infof("Stop pcap worker (%d) writing to %d files", w.index, len(w.writers))
 	for _, writer := range w.writers {
 		newFilename := writer.getFilename(w.baseDirectory)
 		w.finishWriter(writer, newFilename)

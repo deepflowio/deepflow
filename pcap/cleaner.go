@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	EXAMPLE_TEMPNAME        = getTempFilename(datatype.TAP_ISP, 0, 0, time.Duration(time.Now().UnixNano()))
+	EXAMPLE_TEMPNAME        = getTempFilename(datatype.TAP_ISP, 0, 0, time.Duration(time.Now().UnixNano()), 0)
 	EXAMPLE_TEMPNAME_SPLITS = len(strings.Split(EXAMPLE_TEMPNAME, "_"))
 )
 
@@ -59,7 +59,7 @@ func (c *Cleaner) work() {
 			if info.IsDir() || !strings.HasSuffix(name, ".pcap") {
 				return nil
 			}
-			segs := strings.Split(name[:len(name)-len(".pcap")], "_")
+			segs := strings.Split(name[:strings.IndexByte(name, '.')], "_")
 			if fileTime, err := time.Parse(TIME_FORMAT, segs[len(segs)-1]); err != nil {
 				log.Warningf("Incorrect name for file %s", path)
 			} else {
@@ -156,7 +156,8 @@ func markAndCleanTempFiles(baseDirectory string, scanWg *sync.WaitGroup) {
 			os.Remove(path)
 			continue
 		}
-		newFilename := path[:len(path)-len(".pcap.temp")] + formatDuration(lastPacketTime) + ".pcap"
+		firstDotIndex := strings.IndexByte(path, '.')
+		newFilename := path[:firstDotIndex] + formatDuration(lastPacketTime) + path[firstDotIndex:strings.Index(path, ".temp")]
 		os.Rename(path, newFilename)
 	}
 }
