@@ -435,7 +435,10 @@ func (d *PolicyData) CheckNpbPolicy(packet *LookupKey, endpointData *EndpointDat
 	return validPolicyData
 }
 
-func (d *PolicyData) MergeNpbAction(actions []NpbAction, directions ...DirectionType) {
+func (d *PolicyData) MergeNpbAction(actions []NpbAction, aclID ACLID, directions ...DirectionType) {
+	if d.ACLID == 0 {
+		d.ACLID = aclID
+	}
 	for _, n := range actions {
 		repeat := false
 		for index, m := range d.NpbActions {
@@ -472,11 +475,11 @@ func (d *PolicyData) MergeNpbAction(actions []NpbAction, directions ...Direction
 	}
 }
 
-func (d *PolicyData) Merge(aclActions []AclAction, npbActions []NpbAction, aclID ACLID, directions ...DirectionType) {
+func (d *PolicyData) MergeAclAction(actions []AclAction, aclID ACLID, directions ...DirectionType) {
 	if d.ACLID == 0 {
 		d.ACLID = aclID
 	}
-	for _, newAclAction := range aclActions {
+	for _, newAclAction := range actions {
 		if len(directions) > 0 {
 			newAclAction = newAclAction.SetDirections(directions[0])
 		}
@@ -500,19 +503,34 @@ func (d *PolicyData) Merge(aclActions []AclAction, npbActions []NpbAction, aclID
 		d.AclActions = append(d.AclActions, newAclAction)
 		d.ActionFlags |= newAclAction.GetActionFlags()
 	}
-	d.MergeNpbAction(npbActions, directions...)
+}
+
+func (d *PolicyData) Merge(aclActions []AclAction, npbActions []NpbAction, aclID ACLID, directions ...DirectionType) {
+	d.MergeAclAction(aclActions, aclID, directions...)
+	d.MergeNpbAction(npbActions, aclID, directions...)
+}
+
+func (d *PolicyData) MergeNpbAndSwapDirection(actions []NpbAction, aclID ACLID) {
+	newNpbActions := make([]NpbAction, len(actions))
+	for i, _ := range actions {
+		newNpbActions[i] = actions[i].ReverseTapSide()
+	}
+
+	d.MergeNpbAction(newNpbActions, aclID)
+}
+
+func (d *PolicyData) MergeAclAndSwapDirection(actions []AclAction, aclID ACLID) {
+	newAclActions := make([]AclAction, len(actions))
+	for i, _ := range actions {
+		newAclActions[i] = actions[i].ReverseDirection()
+	}
+
+	d.MergeAclAction(newAclActions, aclID)
 }
 
 func (d *PolicyData) MergeAndSwapDirection(aclActions []AclAction, npbActions []NpbAction, aclID ACLID) {
-	newAclActions := make([]AclAction, len(aclActions))
-	for i, _ := range aclActions {
-		newAclActions[i] = aclActions[i].ReverseDirection()
-	}
-	newNpbActions := make([]NpbAction, len(npbActions))
-	for i, _ := range npbActions {
-		newNpbActions[i] = npbActions[i].ReverseTapSide()
-	}
-	d.Merge(newAclActions, newNpbActions, aclID)
+	d.MergeAclAndSwapDirection(aclActions, aclID)
+	d.MergeNpbAndSwapDirection(npbActions, aclID)
 }
 
 func formatGroup(aclGidBitmap AclGidBitmap, endpointData *EndpointData) string {
