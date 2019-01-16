@@ -21,21 +21,21 @@ func (m *FPSMeter) SortKey() uint64 {
 }
 
 func (m *FPSMeter) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU64(m.SumFlowCount)
-	encoder.WriteU64(m.SumNewFlowCount)
-	encoder.WriteU64(m.SumClosedFlowCount)
+	encoder.WriteVarintU64(m.SumFlowCount)
+	encoder.WriteVarintU64(m.SumNewFlowCount)
+	encoder.WriteVarintU64(m.SumClosedFlowCount)
 
-	encoder.WriteU64(m.MaxFlowCount)
-	encoder.WriteU64(m.MaxNewFlowCount)
+	encoder.WriteVarintU64(m.MaxFlowCount)
+	encoder.WriteVarintU64(m.MaxNewFlowCount)
 }
 
 func (m *FPSMeter) Decode(decoder *codec.SimpleDecoder) {
-	m.SumFlowCount = decoder.ReadU64()
-	m.SumNewFlowCount = decoder.ReadU64()
-	m.SumClosedFlowCount = decoder.ReadU64()
+	m.SumFlowCount = decoder.ReadVarintU64()
+	m.SumNewFlowCount = decoder.ReadVarintU64()
+	m.SumClosedFlowCount = decoder.ReadVarintU64()
 
-	m.MaxFlowCount = decoder.ReadU64()
-	m.MaxNewFlowCount = decoder.ReadU64()
+	m.MaxFlowCount = decoder.ReadVarintU64()
+	m.MaxNewFlowCount = decoder.ReadVarintU64()
 }
 
 func (m *FPSMeter) ConcurrentMerge(other app.Meter) {

@@ -144,49 +144,49 @@ type PerfMeterSum struct {
 }
 
 func (m *PerfMeterSum) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU64(m.SumFlowCount)
-	encoder.WriteU64(m.SumClosedFlowCount)
-	encoder.WriteU64(m.SumRetransFlowCount)
-	encoder.WriteU64(m.SumHalfOpenFlowCount)
-	encoder.WriteU64(m.SumPacketTx)
-	encoder.WriteU64(m.SumPacketRx)
-	encoder.WriteU64(m.SumBitTx)
-	encoder.WriteU64(m.SumBitRx)
-	encoder.WriteU64(m.SumRetransCntTx)
-	encoder.WriteU64(m.SumRetransCntRx)
+	encoder.WriteVarintU64(m.SumFlowCount)
+	encoder.WriteVarintU64(m.SumClosedFlowCount)
+	encoder.WriteVarintU64(m.SumRetransFlowCount)
+	encoder.WriteVarintU64(m.SumHalfOpenFlowCount)
+	encoder.WriteVarintU64(m.SumPacketTx)
+	encoder.WriteVarintU64(m.SumPacketRx)
+	encoder.WriteVarintU64(m.SumBitTx)
+	encoder.WriteVarintU64(m.SumBitRx)
+	encoder.WriteVarintU64(m.SumRetransCntTx)
+	encoder.WriteVarintU64(m.SumRetransCntRx)
 
-	encoder.WriteU64(uint64(m.SumRTTSyn))
-	encoder.WriteU64(uint64(m.SumRTTAvg))
-	encoder.WriteU64(uint64(m.SumARTAvg))
-	encoder.WriteU64(m.SumRTTSynFlow)
-	encoder.WriteU64(m.SumRTTAvgFlow)
-	encoder.WriteU64(m.SumARTAvgFlow)
+	encoder.WriteVarintU64(uint64(m.SumRTTSyn))
+	encoder.WriteVarintU64(uint64(m.SumRTTAvg))
+	encoder.WriteVarintU64(uint64(m.SumARTAvg))
+	encoder.WriteVarintU64(m.SumRTTSynFlow)
+	encoder.WriteVarintU64(m.SumRTTAvgFlow)
+	encoder.WriteVarintU64(m.SumARTAvgFlow)
 
-	encoder.WriteU64(m.SumZeroWndCntTx)
-	encoder.WriteU64(m.SumZeroWndCntRx)
+	encoder.WriteVarintU64(m.SumZeroWndCntTx)
+	encoder.WriteVarintU64(m.SumZeroWndCntRx)
 }
 
 func (m *PerfMeterSum) Decode(decoder *codec.SimpleDecoder) {
-	m.SumFlowCount = decoder.ReadU64()
-	m.SumClosedFlowCount = decoder.ReadU64()
-	m.SumRetransFlowCount = decoder.ReadU64()
-	m.SumHalfOpenFlowCount = decoder.ReadU64()
-	m.SumPacketTx = decoder.ReadU64()
-	m.SumPacketRx = decoder.ReadU64()
-	m.SumBitTx = decoder.ReadU64()
-	m.SumBitRx = decoder.ReadU64()
-	m.SumRetransCntTx = decoder.ReadU64()
-	m.SumRetransCntRx = decoder.ReadU64()
+	m.SumFlowCount = decoder.ReadVarintU64()
+	m.SumClosedFlowCount = decoder.ReadVarintU64()
+	m.SumRetransFlowCount = decoder.ReadVarintU64()
+	m.SumHalfOpenFlowCount = decoder.ReadVarintU64()
+	m.SumPacketTx = decoder.ReadVarintU64()
+	m.SumPacketRx = decoder.ReadVarintU64()
+	m.SumBitTx = decoder.ReadVarintU64()
+	m.SumBitRx = decoder.ReadVarintU64()
+	m.SumRetransCntTx = decoder.ReadVarintU64()
+	m.SumRetransCntRx = decoder.ReadVarintU64()
 
-	m.SumRTTSyn = time.Duration(decoder.ReadU64())
-	m.SumRTTAvg = time.Duration(decoder.ReadU64())
-	m.SumARTAvg = time.Duration(decoder.ReadU64())
-	m.SumRTTSynFlow = decoder.ReadU64()
-	m.SumRTTAvgFlow = decoder.ReadU64()
-	m.SumARTAvgFlow = decoder.ReadU64()
+	m.SumRTTSyn = time.Duration(decoder.ReadVarintU64())
+	m.SumRTTAvg = time.Duration(decoder.ReadVarintU64())
+	m.SumARTAvg = time.Duration(decoder.ReadVarintU64())
+	m.SumRTTSynFlow = decoder.ReadVarintU64()
+	m.SumRTTAvgFlow = decoder.ReadVarintU64()
+	m.SumARTAvgFlow = decoder.ReadVarintU64()
 
-	m.SumZeroWndCntTx = decoder.ReadU64()
-	m.SumZeroWndCntRx = decoder.ReadU64()
+	m.SumZeroWndCntTx = decoder.ReadVarintU64()
+	m.SumZeroWndCntRx = decoder.ReadVarintU64()
 }
 
 func (m *PerfMeterSum) concurrentMerge(other *PerfMeterSum) {
@@ -242,15 +242,15 @@ type PerfMeterMax struct {
 }
 
 func (m *PerfMeterMax) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU64(uint64(m.MaxRTTSyn))
-	encoder.WriteU64(uint64(m.MaxRTTAvg))
-	encoder.WriteU64(uint64(m.MaxARTAvg))
+	encoder.WriteVarintU64(uint64(m.MaxRTTSyn))
+	encoder.WriteVarintU64(uint64(m.MaxRTTAvg))
+	encoder.WriteVarintU64(uint64(m.MaxARTAvg))
 }
 
 func (m *PerfMeterMax) Decode(decoder *codec.SimpleDecoder) {
-	m.MaxRTTSyn = time.Duration(decoder.ReadU64())
-	m.MaxRTTAvg = time.Duration(decoder.ReadU64())
-	m.MaxARTAvg = time.Duration(decoder.ReadU64())
+	m.MaxRTTSyn = time.Duration(decoder.ReadVarintU64())
+	m.MaxRTTAvg = time.Duration(decoder.ReadVarintU64())
+	m.MaxARTAvg = time.Duration(decoder.ReadVarintU64())
 }
 
 func (m *PerfMeterMax) concurrentMerge(other *PerfMeterMax) {
@@ -271,15 +271,15 @@ type PerfMeterMin struct {
 }
 
 func (m *PerfMeterMin) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU64(uint64(m.MinRTTSyn))
-	encoder.WriteU64(uint64(m.MinRTTAvg))
-	encoder.WriteU64(uint64(m.MinARTAvg))
+	encoder.WriteVarintU64(uint64(m.MinRTTSyn))
+	encoder.WriteVarintU64(uint64(m.MinRTTAvg))
+	encoder.WriteVarintU64(uint64(m.MinARTAvg))
 }
 
 func (m *PerfMeterMin) Decode(decoder *codec.SimpleDecoder) {
-	m.MinRTTSyn = time.Duration(decoder.ReadU64())
-	m.MinRTTAvg = time.Duration(decoder.ReadU64())
-	m.MinARTAvg = time.Duration(decoder.ReadU64())
+	m.MinRTTSyn = time.Duration(decoder.ReadVarintU64())
+	m.MinRTTAvg = time.Duration(decoder.ReadVarintU64())
+	m.MinARTAvg = time.Duration(decoder.ReadVarintU64())
 }
 
 func (m *PerfMeterMin) concurrentMerge(other *PerfMeterMin) {

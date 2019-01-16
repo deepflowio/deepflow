@@ -25,27 +25,27 @@ func (m *GeoMeter) SortKey() uint64 {
 }
 
 func (m *GeoMeter) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU64(m.SumClosedFlowCount)
-	encoder.WriteU64(m.SumAbnormalFlowCount)
-	encoder.WriteU64(uint64(m.SumClosedFlowDuration))
-	encoder.WriteU64(m.SumPacketTx)
-	encoder.WriteU64(m.SumPacketRx)
-	encoder.WriteU64(m.SumBitTx)
-	encoder.WriteU64(m.SumBitRx)
-	encoder.WriteU64(uint64(m.SumRTTSyn))
-	encoder.WriteU64(m.SumRTTSynFlow)
+	encoder.WriteVarintU64(m.SumClosedFlowCount)
+	encoder.WriteVarintU64(m.SumAbnormalFlowCount)
+	encoder.WriteVarintU64(uint64(m.SumClosedFlowDuration))
+	encoder.WriteVarintU64(m.SumPacketTx)
+	encoder.WriteVarintU64(m.SumPacketRx)
+	encoder.WriteVarintU64(m.SumBitTx)
+	encoder.WriteVarintU64(m.SumBitRx)
+	encoder.WriteVarintU64(uint64(m.SumRTTSyn))
+	encoder.WriteVarintU64(m.SumRTTSynFlow)
 }
 
 func (m *GeoMeter) Decode(decoder *codec.SimpleDecoder) {
-	m.SumClosedFlowCount = decoder.ReadU64()
-	m.SumAbnormalFlowCount = decoder.ReadU64()
-	m.SumClosedFlowDuration = time.Duration(decoder.ReadU64())
-	m.SumPacketTx = decoder.ReadU64()
-	m.SumPacketRx = decoder.ReadU64()
-	m.SumBitTx = decoder.ReadU64()
-	m.SumBitRx = decoder.ReadU64()
-	m.SumRTTSyn = time.Duration(decoder.ReadU64())
-	m.SumRTTSynFlow = decoder.ReadU64()
+	m.SumClosedFlowCount = decoder.ReadVarintU64()
+	m.SumAbnormalFlowCount = decoder.ReadVarintU64()
+	m.SumClosedFlowDuration = time.Duration(decoder.ReadVarintU64())
+	m.SumPacketTx = decoder.ReadVarintU64()
+	m.SumPacketRx = decoder.ReadVarintU64()
+	m.SumBitTx = decoder.ReadVarintU64()
+	m.SumBitRx = decoder.ReadVarintU64()
+	m.SumRTTSyn = time.Duration(decoder.ReadVarintU64())
+	m.SumRTTSynFlow = decoder.ReadVarintU64()
 }
 
 func (m *GeoMeter) ConcurrentMerge(other app.Meter) {

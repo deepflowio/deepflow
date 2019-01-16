@@ -92,17 +92,17 @@ type UsageMeterSum struct {
 }
 
 func (m *UsageMeterSum) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU64(m.SumPacketTx)
-	encoder.WriteU64(m.SumPacketRx)
-	encoder.WriteU64(m.SumBitTx)
-	encoder.WriteU64(m.SumBitRx)
+	encoder.WriteVarintU64(m.SumPacketTx)
+	encoder.WriteVarintU64(m.SumPacketRx)
+	encoder.WriteVarintU64(m.SumBitTx)
+	encoder.WriteVarintU64(m.SumBitRx)
 }
 
 func (m *UsageMeterSum) Decode(decoder *codec.SimpleDecoder) {
-	m.SumPacketTx = decoder.ReadU64()
-	m.SumPacketRx = decoder.ReadU64()
-	m.SumBitTx = decoder.ReadU64()
-	m.SumBitRx = decoder.ReadU64()
+	m.SumPacketTx = decoder.ReadVarintU64()
+	m.SumPacketRx = decoder.ReadVarintU64()
+	m.SumBitTx = decoder.ReadVarintU64()
+	m.SumBitRx = decoder.ReadVarintU64()
 }
 
 func (m *UsageMeterSum) concurrentMerge(other *UsageMeterSum) {
@@ -126,21 +126,21 @@ type UsageMeterMax struct {
 }
 
 func (m *UsageMeterMax) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU64(m.MaxPacketTx)
-	encoder.WriteU64(m.MaxPacketRx)
-	encoder.WriteU64(m.MaxPacket)
-	encoder.WriteU64(m.MaxBitTx)
-	encoder.WriteU64(m.MaxBitRx)
-	encoder.WriteU64(m.MaxBit)
+	encoder.WriteVarintU64(m.MaxPacketTx)
+	encoder.WriteVarintU64(m.MaxPacketRx)
+	encoder.WriteVarintU64(m.MaxPacket)
+	encoder.WriteVarintU64(m.MaxBitTx)
+	encoder.WriteVarintU64(m.MaxBitRx)
+	encoder.WriteVarintU64(m.MaxBit)
 }
 
 func (m *UsageMeterMax) Decode(decoder *codec.SimpleDecoder) {
-	m.MaxPacketTx = decoder.ReadU64()
-	m.MaxPacketRx = decoder.ReadU64()
-	m.MaxPacket = decoder.ReadU64()
-	m.MaxBitTx = decoder.ReadU64()
-	m.MaxBitRx = decoder.ReadU64()
-	m.MaxBit = decoder.ReadU64()
+	m.MaxPacketTx = decoder.ReadVarintU64()
+	m.MaxPacketRx = decoder.ReadVarintU64()
+	m.MaxPacket = decoder.ReadVarintU64()
+	m.MaxBitTx = decoder.ReadVarintU64()
+	m.MaxBitRx = decoder.ReadVarintU64()
+	m.MaxBit = decoder.ReadVarintU64()
 }
 
 func (m *UsageMeterMax) concurrentMerge(other *UsageMeterMax) {
