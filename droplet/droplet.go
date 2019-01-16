@@ -63,7 +63,7 @@ func Start(configPath string) (closers []io.Closer) {
 	logging.SetLevel(logLevel, "")
 	debug.SetIpAndPort(DEBUG_LISTEN_IP, DEBUG_LISTEN_PORT)
 	log.Infof("droplet config: %+v\n", cfg)
-	profiler := profiler.NewProfiler()
+	profiler := profiler.NewProfiler(8000)
 
 	if cfg.Profiler {
 		profiler.Start()
