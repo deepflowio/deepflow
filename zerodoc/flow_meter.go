@@ -22,23 +22,23 @@ func (m *FlowMeter) SortKey() uint64 {
 }
 
 func (m *FlowMeter) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU64(m.SumFlowCount)
-	encoder.WriteU64(m.SumNewFlowCount)
-	encoder.WriteU64(m.SumClosedFlowCount)
-	encoder.WriteU64(m.SumPacketTx)
-	encoder.WriteU64(m.SumPacketRx)
-	encoder.WriteU64(m.SumBitTx)
-	encoder.WriteU64(m.SumBitRx)
+	encoder.WriteVarintU64(m.SumFlowCount)
+	encoder.WriteVarintU64(m.SumNewFlowCount)
+	encoder.WriteVarintU64(m.SumClosedFlowCount)
+	encoder.WriteVarintU64(m.SumPacketTx)
+	encoder.WriteVarintU64(m.SumPacketRx)
+	encoder.WriteVarintU64(m.SumBitTx)
+	encoder.WriteVarintU64(m.SumBitRx)
 }
 
 func (m *FlowMeter) Decode(decoder *codec.SimpleDecoder) {
-	m.SumFlowCount = decoder.ReadU64()
-	m.SumNewFlowCount = decoder.ReadU64()
-	m.SumClosedFlowCount = decoder.ReadU64()
-	m.SumPacketTx = decoder.ReadU64()
-	m.SumPacketRx = decoder.ReadU64()
-	m.SumBitTx = decoder.ReadU64()
-	m.SumBitRx = decoder.ReadU64()
+	m.SumFlowCount = decoder.ReadVarintU64()
+	m.SumNewFlowCount = decoder.ReadVarintU64()
+	m.SumClosedFlowCount = decoder.ReadVarintU64()
+	m.SumPacketTx = decoder.ReadVarintU64()
+	m.SumPacketRx = decoder.ReadVarintU64()
+	m.SumBitTx = decoder.ReadVarintU64()
+	m.SumBitRx = decoder.ReadVarintU64()
 }
 
 func (m *FlowMeter) ConcurrentMerge(other app.Meter) {

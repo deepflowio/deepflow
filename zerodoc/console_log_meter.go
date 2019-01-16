@@ -20,17 +20,17 @@ func (m *ConsoleLogMeter) SortKey() uint64 {
 }
 
 func (m *ConsoleLogMeter) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU64(m.SumPacketTx)
-	encoder.WriteU64(m.SumPacketRx)
-	encoder.WriteU64(m.SumClosedFlowCount)
-	encoder.WriteU64(uint64(m.SumClosedFlowDuration))
+	encoder.WriteVarintU64(m.SumPacketTx)
+	encoder.WriteVarintU64(m.SumPacketRx)
+	encoder.WriteVarintU64(m.SumClosedFlowCount)
+	encoder.WriteVarintU64(uint64(m.SumClosedFlowDuration))
 }
 
 func (m *ConsoleLogMeter) Decode(decoder *codec.SimpleDecoder) {
-	m.SumPacketTx = decoder.ReadU64()
-	m.SumPacketRx = decoder.ReadU64()
-	m.SumClosedFlowCount = decoder.ReadU64()
-	m.SumClosedFlowDuration = time.Duration(decoder.ReadU64())
+	m.SumPacketTx = decoder.ReadVarintU64()
+	m.SumPacketRx = decoder.ReadVarintU64()
+	m.SumClosedFlowCount = decoder.ReadVarintU64()
+	m.SumClosedFlowDuration = time.Duration(decoder.ReadVarintU64())
 }
 
 func (m *ConsoleLogMeter) ConcurrentMerge(other app.Meter) {
