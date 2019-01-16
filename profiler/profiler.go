@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/op/go-logging"
@@ -17,6 +18,7 @@ import (
 
 type ProfilerServer struct {
 	http.Server
+	port int
 
 	running bool
 }
@@ -29,8 +31,8 @@ const (
 
 var log = logging.MustGetLogger("profile")
 
-func NewProfiler() *ProfilerServer {
-	server := &ProfilerServer{http.Server{Addr: "0.0.0.0:8000"}, false}
+func NewProfiler(port int) *ProfilerServer {
+	server := &ProfilerServer{http.Server{Addr: "0.0.0.0:" + strconv.Itoa(port)}, port, false}
 	debug.Register(dropletctl.DROPLETCTL_CONFIG, server)
 	return server
 }
@@ -87,8 +89,8 @@ func (s *ProfilerServer) recvProfilerRunningStatus(conn *net.UDPConn, remote *ne
 
 func (s *ProfilerServer) start() {
 	s.running = true
-	s.Server = http.Server{Addr: "0.0.0.0:8000"}
-	log.Info("Start profiler on http 0.0.0.0:8000")
+	s.Server = http.Server{Addr: "0.0.0.0:" + strconv.Itoa(s.port)}
+	log.Infof("Start profiler on http 0.0.0.0:%d", s.port)
 	go func() {
 		if err := s.ListenAndServe(); err != nil {
 			if err != http.ErrServerClosed {
@@ -105,7 +107,7 @@ func (s *ProfilerServer) Stop() {
 		if err := s.Shutdown(nil); err != nil {
 			log.Infof("Close profiler failed as %v", err)
 		} else {
-			log.Info("Close profiler on http 0.0.0.0:8000")
+			log.Infof("Close profiler on http 0.0.0.0:%d", s.port)
 		}
 
 		s.running = false
