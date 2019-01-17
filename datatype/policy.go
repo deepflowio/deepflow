@@ -677,7 +677,10 @@ func ReleasePolicyData(d *PolicyData) {
 	if d.AclActions != nil {
 		d.AclActions = d.AclActions[:0]
 	}
-	*d = PolicyData{AclActions: d.AclActions}
+	if d.AclGidBitmaps != nil {
+		d.AclGidBitmaps = d.AclGidBitmaps[:0]
+	}
+	*d = PolicyData{AclActions: d.AclActions, AclGidBitmaps: d.AclGidBitmaps}
 	policyDataPool.Put(d)
 }
 
@@ -685,6 +688,8 @@ func ClonePolicyData(d *PolicyData) *PolicyData {
 	dup := AcquirePolicyData()
 	*dup = *d
 	dup.AclActions = make([]AclAction, len(d.AclActions))
+	dup.AclGidBitmaps = make([]AclGidBitmap, len(d.AclGidBitmaps))
 	copy(dup.AclActions, d.AclActions)
+	copy(dup.AclGidBitmaps, d.AclGidBitmaps)
 	return dup
 }
