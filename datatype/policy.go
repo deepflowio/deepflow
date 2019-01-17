@@ -657,6 +657,11 @@ func FillGroupID(aclAction AclAction, aclGidBitmaps []AclGidBitmap, allGroupIDs 
 		if aclGidBitmap.GetGroupType() == GROUP_TYPE_DST {
 			ep = 1
 		}
+		if bit.CountLeadingZeros64(groupMapBits)+int(groupOffset) >= len(allGroupIDs[ep]) {
+			log.Warningf("map bits和group id不匹配, groupOffset=0x%016x, groupMapBits=0x%016x, groupIDs=%v", groupOffset, groupMapBits, allGroupIDs[ep])
+			continue
+		}
+
 		for groupMapBits > 0 {
 			j := bit.CountTrailingZeros64(groupMapBits)
 			groupMapBits ^= 1 << uint64(j)
