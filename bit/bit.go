@@ -40,3 +40,22 @@ func CountTrailingZeros64(x uint64) int {
 	}
 	return CountTrailingZeros32(uint32(x))
 }
+
+func CountLeadingZeros32(x uint32) int {
+	// bit smearing, 将首位1的右边所有位设置成1
+	x |= x >> 16
+	x |= x >> 8
+	x |= x >> 4
+	x |= x >> 2
+	x |= x >> 1
+	// 得到最高位的1
+	x ^= x >> 1
+	return lookup[x%37]
+}
+
+func CountLeadingZeros64(x uint64) int {
+	if (x >> 32) == 0 {
+		return CountLeadingZeros32(uint32(x))
+	}
+	return CountTrailingZeros32(uint32(x>>32)) + 32
+}
