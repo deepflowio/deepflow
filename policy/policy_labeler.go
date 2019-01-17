@@ -604,6 +604,7 @@ func (l *PolicyLabeler) generateGroupRelationByGroups(groups []uint32, tapType T
 		if len(raw) != 0 {
 			to[tapType][relateId] = raw
 			to[tapType][*id] = both
+			from[tapType][uint16(group&0xffff)] = *id
 			*id++
 		}
 	}
@@ -623,10 +624,15 @@ func (l *PolicyLabeler) generateGroupRelationByGroups(groups []uint32, tapType T
 // 资源组再分组后， [1, 2]为组m，[3, 4]为组n:
 //     key个数 = m * n = 1
 func (l *PolicyLabeler) generateGroupRelation(acls []*Acl, to *[TAP_MAX][math.MaxUint16 + 1][]uint16, from *[TAP_MAX][math.MaxUint16 + 1]uint16) {
-	id := uint16(1)
-	for _, acl := range acls {
-		for _, groups := range [][]uint32{acl.SrcGroups, acl.DstGroups} {
-			l.generateGroupRelationByGroups(groups, acl.Type, &id, to, from)
+	for tapType := TAP_MIN; tapType < TAP_MAX; tapType++ {
+		id := uint16(1)
+		for _, acl := range acls {
+			if acl.Type != tapType {
+				continue
+			}
+			for _, groups := range [][]uint32{acl.SrcGroups, acl.DstGroups} {
+				l.generateGroupRelationByGroups(groups, acl.Type, &id, to, from)
+			}
 		}
 	}
 }
