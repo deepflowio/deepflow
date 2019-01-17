@@ -144,7 +144,7 @@
     "pkg/mapper/usage",
   ]
   pruneopts = "UT"
-  revision = "dbcb33d2769e707cebfea1408e58c703d20e82f5"
+  revision = "f42c16e23a2ff4f6759e309bf7382024268a651f"
 
 [[projects]]
   branch = "master"
@@ -173,7 +173,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "6c96d5ba157f457fe5b5b4fcdf301e0e74581368"
+  revision = "a81830aed867383543b7dff49c94bd4553383ff4"
 
 [[projects]]
   branch = "master"

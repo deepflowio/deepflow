@@ -29,8 +29,6 @@ var FLOW_APP_CODES = [][]zerodoc.Code{
 
 	flowtype.NODE_CODES,
 
-	geo.CHN_CODES,
-	geo.NON_CHN_CODES,
 	geo.POLICY_CHN_CODES,
 	geo.POLICY_NON_CHN_CODES,
 
