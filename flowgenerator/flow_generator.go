@@ -265,6 +265,9 @@ func reversePolicyData(policyData *PolicyData) *PolicyData {
 	for i, aclAction := range newPolicyData.AclActions {
 		newPolicyData.AclActions[i] = aclAction.ReverseDirection()
 	}
+	for i, _ := range newPolicyData.AclGidBitmaps {
+		newPolicyData.AclGidBitmaps[i].ReverseGroupType()
+	}
 	return newPolicyData
 }
 
