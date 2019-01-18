@@ -215,6 +215,13 @@ func (t *Tag) ToKVString() string {
 	return string(buffer[:size])
 }
 
+func marshalUint16WithMinusOne(v int16) string {
+	if v == -1 {
+		return "-1"
+	}
+	return strconv.FormatUint(uint64(v)&uint64(^uint16(0)), 10)
+}
+
 func (t *Tag) MarshalTo(b []byte) int {
 	offset := 0
 
@@ -226,15 +233,15 @@ func (t *Tag) MarshalTo(b []byte) int {
 	}
 	if t.Code&GroupID != 0 {
 		offset += copy(b[offset:], ",group_id=")
-		offset += copy(b[offset:], strconv.FormatInt(int64(t.GroupID), 10))
+		offset += copy(b[offset:], marshalUint16WithMinusOne(t.GroupID))
 	}
 	if t.Code&L2EpcID != 0 {
 		offset += copy(b[offset:], ",l2_epc_id=")
-		offset += copy(b[offset:], strconv.FormatInt(int64(t.L2EpcID), 10))
+		offset += copy(b[offset:], marshalUint16WithMinusOne(t.L2EpcID))
 	}
 	if t.Code&L3EpcID != 0 {
 		offset += copy(b[offset:], ",l3_epc_id=")
-		offset += copy(b[offset:], strconv.FormatInt(int64(t.L3EpcID), 10))
+		offset += copy(b[offset:], marshalUint16WithMinusOne(t.L3EpcID))
 	}
 	if t.Code&L2Device != 0 {
 		offset += copy(b[offset:], ",l2_device_id=")
@@ -262,21 +269,21 @@ func (t *Tag) MarshalTo(b []byte) int {
 	}
 	if t.Code&GroupIDPath != 0 {
 		offset += copy(b[offset:], ",group_id_0=")
-		offset += copy(b[offset:], strconv.FormatInt(int64(t.GroupID), 10))
+		offset += copy(b[offset:], marshalUint16WithMinusOne(t.GroupID))
 		offset += copy(b[offset:], ",group_id_1=")
-		offset += copy(b[offset:], strconv.FormatInt(int64(t.GroupID1), 10))
+		offset += copy(b[offset:], marshalUint16WithMinusOne(t.GroupID1))
 	}
 	if t.Code&L2EpcIDPath != 0 {
 		offset += copy(b[offset:], ",l2_epc_id_0=")
-		offset += copy(b[offset:], strconv.FormatInt(int64(t.L2EpcID), 10))
+		offset += copy(b[offset:], marshalUint16WithMinusOne(t.L2EpcID))
 		offset += copy(b[offset:], ",l2_epc_id_1=")
-		offset += copy(b[offset:], strconv.FormatInt(int64(t.L2EpcID1), 10))
+		offset += copy(b[offset:], marshalUint16WithMinusOne(t.L2EpcID1))
 	}
 	if t.Code&L3EpcIDPath != 0 {
 		offset += copy(b[offset:], ",l3_epc_id_0=")
-		offset += copy(b[offset:], strconv.FormatInt(int64(t.L3EpcID), 10))
+		offset += copy(b[offset:], marshalUint16WithMinusOne(t.L3EpcID))
 		offset += copy(b[offset:], ",l3_epc_id_1=")
-		offset += copy(b[offset:], strconv.FormatInt(int64(t.L3EpcID1), 10))
+		offset += copy(b[offset:], marshalUint16WithMinusOne(t.L3EpcID1))
 	}
 	if t.Code&L2DevicePath != 0 {
 		offset += copy(b[offset:], ",l2_device_id_0=")
