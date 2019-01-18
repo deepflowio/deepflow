@@ -33,3 +33,11 @@ func TestFastOrNormalID(t *testing.T) {
 		t.Error("非FastID的Tag被设置了")
 	}
 }
+
+func TestNegativeID(t *testing.T) {
+	a := int16(30000)
+	f := Field{L3EpcID: -1, L2EpcID: int16(a * 2), GroupID: -1}
+	if f.NewTag(L3EpcID|L2EpcID|GroupID).ToKVString() != ",group_id=-1,l2_epc_id=60000,l3_epc_id=-1" {
+		t.Error("int16值处理得不正确")
+	}
+}
