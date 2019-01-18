@@ -122,7 +122,7 @@ EndpointData查找流程
 3. 若第二步没有查到数据，则使用packet中的IP作为KEY，查询Ip表，获取L3层数据
 4. 使用L3层的L3EpcId和packet中的IP组合为KEY，查找IP资源组信息
 5. 通过源端和目的端数据对比进行修正(若源端L3EpcId为0而目的端l2EpcId不为0，则用目的端l2EpcId+源端IP为KEY，
-   查询EpcIp表获取源端L3层数据，若目的端L3EpcId为0，则对比源端做类型操作)
+   查询EpcIp表获取源端L3层数据，若目的端L3EpcId为0，则对比源端做类似操作)
 
 注意： L2层数据通过MAC查找一次确定，L3层数据通过EpcIp表和Ip表来确定
 
@@ -141,6 +141,31 @@ L3层数据:
 * L3End
 * SubnetId
 * GroupId(IP)
+
+EndpointData内存占用
+------------------------
+
+EndpointData结构如下：
+
+    L3_L2_END_MAX = 4
+    type EndpointData struct {
+        SrcInfo *EndpointInfo
+        DstInfo *EndpointInfo
+        SrcInfos [L3_L2_END_MAX]EndpointInfo
+        DstInfos [L3_L2_END_MAX]EndpointInfo
+    }
+
+* 每个EndpointInfo占用 40 + N * 4 byte(N为资源组个数)
+* SrcInfo有n个资源组，DstInfo有m个资源组，则EndpointData占用 40 * 8 + n * 4 * 4 + m * 4 * 4 byte
+
+FistPath内存占用：
+
+* 每查一次FirstPath都会产生一条EndpointData数据，所以和查询次数相关，对于稳定的网络环境
+假设每个EndpointInfo有4个资源组，总共需要查询1000次则产生内存1000 * (320 + 64 + 64) = 437.5MByte
+
+FastPath内存占用：
+
+* FastPath有1000个EndpointData数据，每个EndpointInfo有4个资源组，则占用内存为 1000 * (320 + 64 + 64) = 437.5MByte 
 
 ACLGID和Group对应关系
 ------------------------
