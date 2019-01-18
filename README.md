@@ -55,7 +55,7 @@ graph TD;
 ------------------
 
 接入网络和虚拟网络查找过程现在是一致的
- 
+
 查找条件及结果
 
   - MAC，IP不在数据库内
@@ -119,10 +119,10 @@ L2层数据:
 L3层数据:
 * L3EpcId
 * L3DeviceType
-* L3DeviceId 
+* L3DeviceId
 * L3End
 * SubnetId
-* GroupId(IP) 
+* GroupId(IP)
 
 ACLGID和Group对应关系
 ------------------------
@@ -200,31 +200,49 @@ fastPath存储的结构为FastPathMapValue：
 
 假设每条acl带一个action, 每条EndPointInfo带有一个groupId则：
 
-    FastPathMapValue = 76 + 12 + 8 = 96byte
+    FastPathMapValue = 78 + 20 + 8 = 106byte
+
+若为NPB且fast存储都是1个NPB策略则:
+
+    FastPathMapValue = 78 + 12 + 8 = 98byte
 
 fastPath数据结构如下：
 
     FastPolicyMaps[queueCount][TAP_MAX][mapSize] -> VlanAndPortMap
 
     type VlanAndPortMap struct {
-    	macEpcMap     *lru.Cache // size为128 存uint64
-    	vlanPolicyMap *lru.Cache // size为1000 存储FastPathMapValue
-    	portPolicyMap *lru.Cache // size为1000 存储FastPathMapValue
+    	macEpcMap     map[uint64]uint32           // 大小为n * 12
+    	vlanPolicyMap map[uint64]*PolicyData      // 大小为n * 20或n * 12
+    	portPolicyMap map[uint64]*PortPolicyValue // 大小为n * 106
     }
 
-假设queueCount为4，mapSize为1000，则使用内存为：
+假设queueCount为4，mapSize为1024*1024，则NPM使用内存为：
 
 最小：
 
-    VlanAndPortMap = 128 * 8 + 1 * 96 * 2 = 1216byte
-    FastPolicyMaps = 1 * 1 * 1 * 1216 = 1216byte = 1kbyte
+    VlanAndPortMap = (12 + 20) * 2 = 64byte
+    FastPolicyMaps = 1 * 1 * 1 * 64 = 64byte
 
 最大：
 
-    VlanAndPortMap = 128 * 8 + 1000 * 96 * 2 = 193024byte
-    FastPolicyMaps = 4 * 3 * 1000 * 193024 = 2316288000byte = 2208MByte
+    VlanAndPortMap = n *(12 + 20 + 106) = 138 * n
+    FastPolicyMaps = 4 * 3 * 1024 * 1024 * 138 * n = 1736441856 * n byte = n * 1656MByte
 
-即使用内存最小1k字节，最大2208M字节
+假设queueCount为4，mapSize为1000，则NPB使用内存为：
+
+最小：
+
+    VlanAndPortMap = (12 + 106) * 2 = 236byte
+    FastPolicyMaps = 1 * 1 * 1 * 236 = 236byte
+
+最大：
+
+    VlanAndPortMap = n * (12 + 106) = n * 118byte
+    FastPolicyMaps = 4 * 3 * 1024 * 1024 * 118 * n = 1484783616 * n byte = n * 1416MByte
+
+若每个VlanAndPortMap记录一条：
+
+即使用内存最小1k字节，最大NPM使用1656M字节、NPB使用1416M字节
 
 APP与policy action的关系
 ------------------------
