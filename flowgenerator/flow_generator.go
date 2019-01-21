@@ -152,6 +152,17 @@ func (f *FlowGenerator) genFlowId(timestamp uint64, inPort uint64) uint64 {
 	return ((inPort & IN_PORT_FLOW_ID_MASK) << 32) | ((timestamp & TIMER_FLOW_ID_MASK) << 32) | (f.stats.TotalNumFlows & TOTAL_FLOWS_ID_MASK)
 }
 
+func updateFlowTag(taggedFlow *TaggedFlow, meta *MetaPacket) {
+	taggedFlow.PolicyData = meta.PolicyData
+	endpointdata := meta.EndpointData
+	if endpointdata == nil {
+		log.Warning("Unexpected nil packet endpointData")
+		return
+	}
+	taggedFlow.GroupIDs0 = endpointdata.SrcInfo.GroupIds
+	taggedFlow.GroupIDs1 = endpointdata.DstInfo.GroupIds
+}
+
 func (f *FlowGenerator) initFlow(meta *MetaPacket, now time.Duration) *FlowExtra {
 	taggedFlow := AcquireTaggedFlow()
 	taggedFlow.Exporter = meta.Exporter
@@ -175,8 +186,8 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, now time.Duration) *FlowExtra
 	taggedFlow.CurStartTime = now
 	taggedFlow.VLAN = meta.Vlan
 	taggedFlow.EthType = meta.EthType
-	taggedFlow.PolicyData = meta.PolicyData
 	taggedFlow.Hash = meta.Hash
+	updateFlowTag(taggedFlow, meta)
 
 	flowExtra := AcquireFlowExtra()
 	flowExtra.taggedFlow = taggedFlow
@@ -242,7 +253,6 @@ func updatePlatformData(taggedFlow *TaggedFlow, endpointData *EndpointData, repl
 	taggedFlow.FlowMetricsPeerSrc.L3DeviceID = srcInfo.L3DeviceId
 	taggedFlow.FlowMetricsPeerSrc.Host = srcInfo.HostIp
 	taggedFlow.FlowMetricsPeerSrc.SubnetID = srcInfo.SubnetId
-	taggedFlow.GroupIDs0 = srcInfo.GroupIds
 	taggedFlow.FlowMetricsPeerDst.EpcID = dstInfo.L2EpcId
 	taggedFlow.FlowMetricsPeerDst.DeviceType = DeviceType(dstInfo.L2DeviceType)
 	taggedFlow.FlowMetricsPeerDst.DeviceID = dstInfo.L2DeviceId
@@ -253,7 +263,6 @@ func updatePlatformData(taggedFlow *TaggedFlow, endpointData *EndpointData, repl
 	taggedFlow.FlowMetricsPeerDst.L3DeviceID = dstInfo.L3DeviceId
 	taggedFlow.FlowMetricsPeerDst.Host = dstInfo.HostIp
 	taggedFlow.FlowMetricsPeerDst.SubnetID = dstInfo.SubnetId
-	taggedFlow.GroupIDs1 = dstInfo.GroupIds
 }
 
 // reversePolicyData will return a clone of the current PolicyData
@@ -271,6 +280,11 @@ func reversePolicyData(policyData *PolicyData) *PolicyData {
 	return newPolicyData
 }
 
+func reverseFlowTag(taggedFlow *TaggedFlow) {
+	taggedFlow.GroupIDs0, taggedFlow.GroupIDs1 = taggedFlow.GroupIDs1, taggedFlow.GroupIDs0
+	taggedFlow.PolicyData = reversePolicyData(taggedFlow.PolicyData)
+}
+
 func (f *FlowExtra) reverseFlow() {
 	taggedFlow := f.taggedFlow
 	taggedFlow.TunnelInfo.Src, taggedFlow.TunnelInfo.Dst = taggedFlow.TunnelInfo.Dst, taggedFlow.TunnelInfo.Src
@@ -278,8 +292,7 @@ func (f *FlowExtra) reverseFlow() {
 	taggedFlow.IPSrc, taggedFlow.IPDst = taggedFlow.IPDst, taggedFlow.IPSrc
 	taggedFlow.PortSrc, taggedFlow.PortDst = taggedFlow.PortDst, taggedFlow.PortSrc
 	taggedFlow.FlowMetricsPeerSrc, taggedFlow.FlowMetricsPeerDst = FlowMetricsPeerSrc(taggedFlow.FlowMetricsPeerDst), FlowMetricsPeerDst(taggedFlow.FlowMetricsPeerSrc)
-	taggedFlow.GroupIDs0, taggedFlow.GroupIDs1 = taggedFlow.GroupIDs1, taggedFlow.GroupIDs0
-	taggedFlow.PolicyData = reversePolicyData(taggedFlow.PolicyData)
+	reverseFlowTag(taggedFlow)
 }
 
 func (f *FlowGenerator) tryReverseFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) bool {
@@ -307,11 +320,9 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 	if !flowExtra.circlePktGot {
 		flowExtra.circlePktGot = true
 		taggedFlow.CurStartTime = packetTimestamp
-		taggedFlow.PolicyData = meta.PolicyData
+		updateFlowTag(taggedFlow, meta)
 		if reply {
-			taggedFlow.PolicyData = reversePolicyData(meta.PolicyData)
-		} else {
-			taggedFlow.PolicyData = meta.PolicyData
+			reverseFlowTag(taggedFlow)
 		}
 		updatePlatformData(taggedFlow, meta.EndpointData, reply)
 	}
