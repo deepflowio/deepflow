@@ -6,25 +6,24 @@ COMMIT_DATE = $(shell git show -s --format=%cd --date=short HEAD)
 REVISION = $(shell git rev-parse HEAD)
 FLAGS = -ldflags "-X main.RevCount=${REV_COUNT} -X main.Revision=${REVISION} -X main.CommitDate=${COMMIT_DATE}"
 
-PB_FILES = vendor/gitlab.x.lan/yunshan/message/dfi/dfi.pb.go vendor/gitlab.x.lan/yunshan/message/zero/zero.pb.go vendor/gitlab.x.lan/yunshan/message/trident/trident.pb.go
-
 all: droplet droplet-ctl
 
 vendor: patch/001-fix-afpacket-dirty-block.patch
-	mkdir -p $(shell dirname ${PROJECT_ROOT})
+	mkdir -p $(dir ${PROJECT_ROOT})
 	[ -d ${PROJECT_ROOT} ] || ln -snf ${CURDIR} ${PROJECT_ROOT}
 	[ -f ${GOPATH}/bin/dep ] || curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 	(cd ${PROJECT_ROOT}; dep ensure)
 	go generate ./vendor/gitlab.x.lan/yunshan/droplet-libs/...
 	cat $^ | patch -d ./vendor/github.com/google/gopacket -p1
 
-${PB_FILES}: vendor
+PROTOBUF_FILES = $(addprefix vendor/gitlab.x.lan/yunshan/message/,dfi/dfi.pb.go zero/zero.pb.go trident/trident.pb.go)
+${PROTOBUF_FILES}: vendor
 	go generate ./vendor/gitlab.x.lan/yunshan/message/...
 
-deps: vendor ${PB_FILES}
+deps: vendor ${PROTOBUF_FILES}
 
 test: deps
-	go test -short ./... -timeout 5s
+	go test -short ./... -timeout 5s -coverprofile .test-coverage.txt
 
 bench: deps
 	go test -bench=. ./...
@@ -41,4 +40,4 @@ droplet-ctl: deps
 clean:
 	git clean -dfx
 
-.PHONY: droplet droplet-ctl test clean
+.PHONY: droplet droplet-ctl deps test bench clean
