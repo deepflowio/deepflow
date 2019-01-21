@@ -27,7 +27,7 @@ const GEO_FILE_LOCATION = "/usr/share/droplet/ip_info_mini.json"
 
 func NewFlowMapProcess(
 	output queue.MultiQueueWriter, input queue.MultiQueueReader,
-	inputCount, docsInBuffer, variedDocLimit, windowSize int,
+	inputCount, docsInBuffer, variedDocLimit, windowSize, windowLeftMargin int,
 ) *FlowHandler {
 	return NewFlowHandler([]app.FlowProcessor{
 		fps.NewProcessor(),
@@ -36,35 +36,37 @@ func NewFlowMapProcess(
 		geo.NewProcessor(GEO_FILE_LOCATION),
 		flowtype.NewProcessor(),
 		consolelog.NewProcessor(),
-	}, output, input, inputCount, docsInBuffer, variedDocLimit, windowSize)
+	}, output, input, inputCount, docsInBuffer, variedDocLimit, windowSize, windowLeftMargin)
 }
 
 type FlowHandler struct {
 	numberOfApps int
 	processors   []app.FlowProcessor
 
-	flowQueue      queue.MultiQueueReader
-	flowQueueCount int
-	zmqAppQueue    queue.MultiQueueWriter
-	docsInBuffer   int
-	variedDocLimit int
-	windowSize     int
+	flowQueue        queue.MultiQueueReader
+	flowQueueCount   int
+	zmqAppQueue      queue.MultiQueueWriter
+	docsInBuffer     int
+	variedDocLimit   int
+	windowSize       int
+	windowLeftMargin int
 }
 
 func NewFlowHandler(
 	processors []app.FlowProcessor,
 	output queue.MultiQueueWriter, inputs queue.MultiQueueReader,
-	inputCount, docsInBuffer, variedDocLimit, windowSize int,
+	inputCount, docsInBuffer, variedDocLimit, windowSize, windowLeftMargin int,
 ) *FlowHandler {
 	return &FlowHandler{
-		numberOfApps:   len(processors),
-		processors:     processors,
-		zmqAppQueue:    output,
-		flowQueue:      inputs,
-		flowQueueCount: inputCount,
-		docsInBuffer:   docsInBuffer,
-		variedDocLimit: variedDocLimit,
-		windowSize:     windowSize,
+		numberOfApps:     len(processors),
+		processors:       processors,
+		zmqAppQueue:      output,
+		flowQueue:        inputs,
+		flowQueueCount:   inputCount,
+		docsInBuffer:     docsInBuffer,
+		variedDocLimit:   variedDocLimit,
+		windowSize:       windowSize,
+		windowLeftMargin: windowLeftMargin,
 	}
 }
 
@@ -124,7 +126,7 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 	}
 
 	for i := 0; i < handler.numberOfApps; i++ {
-		handler.stashes[i] = NewStash(h.docsInBuffer, h.variedDocLimit, h.windowSize)
+		handler.stashes[i] = NewStash(h.docsInBuffer, h.variedDocLimit, h.windowSize, h.windowLeftMargin)
 		handler.statItems[i].Name = h.processors[i].GetName()
 		handler.statItems[i].StatType = stats.COUNT_TYPE
 		handler.statItems[i+handler.numberOfApps].Name = fmt.Sprintf("%s_avg_doc_counter", h.processors[i].GetName())

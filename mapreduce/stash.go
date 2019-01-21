@@ -11,6 +11,7 @@ type Stash struct {
 	stashLocation     []map[string]int
 	fastStashLocation []map[uint64]int
 	slots             int
+	leftSlots         int
 
 	stash          []interface{}
 	entryCount     int
@@ -20,12 +21,13 @@ type Stash struct {
 	encoder *codec.SimpleEncoder
 }
 
-func NewStash(capacity, variedDocLimit, slots int) *Stash {
+func NewStash(capacity, variedDocLimit, slots, leftSlots int) *Stash {
 	return &Stash{
 		timestamp:         0,
 		stashLocation:     make([]map[string]int, slots),
 		fastStashLocation: make([]map[uint64]int, slots),
 		slots:             slots,
+		leftSlots:         leftSlots,
 		stash:             make([]interface{}, capacity),
 		entryCount:        0,
 		capacity:          capacity,
@@ -40,7 +42,7 @@ func (s *Stash) Add(docs []interface{}) ([]interface{}, uint64) {
 	for i, v := range docs {
 		doc := v.(*app.Document)
 		if s.timestamp == 0 {
-			s.timestamp = doc.Timestamp
+			s.timestamp = doc.Timestamp - uint32(s.leftSlots)
 		}
 		slot := int(doc.Timestamp) - int(s.timestamp)
 		if slot < 0 || slot >= s.slots {
