@@ -17,11 +17,11 @@ import (
 
 func NewMeteringMapProcess(
 	output queue.MultiQueueWriter, input queue.MultiQueueReader,
-	inputCount, docsInBuffer, variedDocLimit, windowSize int,
+	inputCount, docsInBuffer, variedDocLimit, windowSize, windowLeftMargin int,
 ) *MeteringHandler {
 	return NewMeteringHandler(
 		[]app.MeteringProcessor{usage.NewProcessor()}, output, input,
-		inputCount, docsInBuffer, variedDocLimit, windowSize)
+		inputCount, docsInBuffer, variedDocLimit, windowSize, windowLeftMargin)
 }
 
 type MeteringHandler struct {
@@ -34,12 +34,13 @@ type MeteringHandler struct {
 	docsInBuffer       int
 	variedDocLimit     int
 	windowSize         int
+	windowLeftMargin   int
 }
 
 func NewMeteringHandler(
 	processors []app.MeteringProcessor,
 	output queue.MultiQueueWriter, inputs queue.MultiQueueReader,
-	inputCount, docsInBuffer, variedDocLimit, windowSize int,
+	inputCount, docsInBuffer, variedDocLimit, windowSize, windowLeftMargin int,
 ) *MeteringHandler {
 	return &MeteringHandler{
 		numberOfApps:       len(processors),
@@ -50,6 +51,7 @@ func NewMeteringHandler(
 		docsInBuffer:       docsInBuffer,
 		variedDocLimit:     variedDocLimit,
 		windowSize:         windowSize,
+		windowLeftMargin:   windowLeftMargin,
 	}
 }
 
@@ -98,7 +100,7 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 		statsdCounter: make([]StatsdCounter, h.numberOfApps*2),
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
-		handler.stashes[i] = NewStash(h.docsInBuffer, h.variedDocLimit, h.windowSize)
+		handler.stashes[i] = NewStash(h.docsInBuffer, h.variedDocLimit, h.windowSize, h.windowLeftMargin)
 		handler.statItems[i].Name = h.processors[i].GetName()
 		handler.statItems[i].StatType = stats.COUNT_TYPE
 		handler.statItems[i+handler.numberOfApps].Name = fmt.Sprintf("%s_avg_doc_counter", h.processors[i].GetName())

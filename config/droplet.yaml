@@ -130,7 +130,9 @@ map-reduce:
   # reject varied doc (with edge or port tag) when buffer usage exceed the limit, default queue.docs-queue-size
   varied-doc-limit: 0
   # mapreduce window size
-  window-size: 30
+  window-size: 61
+  # 窗口移动时，左边缘与数据位置的差值。该配置必须小于window-size，否则会被置为window-size / 2
+  window-left-margin: 0
 pcap:
   # 计算TCP/IP checksum，默认不计算
   tcpip-checksum: false

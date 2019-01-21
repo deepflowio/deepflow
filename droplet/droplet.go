@@ -167,6 +167,7 @@ func Start(configPath string) (closers []io.Closer) {
 	docsInBuffer := int(cfg.Queue.DocsQueueSize)
 	variedDocLimit := int(cfg.MapReduce.VariedDocLimit)
 	windowSize := int(cfg.MapReduce.WindowSize)
+	windowLeftMargin := int(cfg.MapReduce.WindowLeftMargin)
 	releaseTaggedFlow := func(x interface{}) {
 		datatype.ReleaseTaggedFlow(x.(*datatype.TaggedFlow))
 	}
@@ -198,7 +199,7 @@ func Start(configPath string) (closers []io.Closer) {
 
 	mapreduce.NewMeteringMapProcess(
 		meteringAppOutputQueue, meteringAppQueues, cfg.Queue.MeteringAppQueueCount,
-		docsInBuffer, variedDocLimit, windowSize).Start()
+		docsInBuffer, variedDocLimit, windowSize, windowLeftMargin).Start()
 
 	pcapClosers := pcap.NewWorkerManager(
 		pcapAppQueues,
@@ -235,7 +236,7 @@ func Start(configPath string) (closers []io.Closer) {
 	)
 	mapreduce.NewFlowMapProcess(
 		flowAppOutputQueue, flowAppQueue, cfg.Queue.FlowAppQueueCount,
-		docsInBuffer, variedDocLimit, windowSize).Start()
+		docsInBuffer, variedDocLimit, windowSize, windowLeftMargin).Start()
 
 	// L6 - flow/metering doc sender
 	builder := sender.NewZeroDocumentSenderBuilder()
