@@ -73,6 +73,7 @@ func (f *FlowGenerator) initTcpFlow(meta *MetaPacket) (*FlowExtra, bool, bool) {
 		taggedFlow.FlowMetricsPeerDst.PacketCount = 1
 		taggedFlow.FlowMetricsPeerDst.TotalByteCount = uint64(meta.PacketLen)
 		taggedFlow.FlowMetricsPeerDst.ByteCount = uint64(meta.PacketLen)
+		reverseFlowTag(taggedFlow)
 		updatePlatformData(taggedFlow, meta.EndpointData, reply)
 	} else {
 		taggedFlow.FlowMetricsPeerSrc.TCPFlags |= flags
