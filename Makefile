@@ -2,7 +2,7 @@ GOPATH = $(shell go env GOPATH)
 PROJECT_ROOT = ${GOPATH}/src/gitlab.x.lan/yunshan/droplet-libs
 
 vendor:
-	mkdir -p $(shell dirname ${PROJECT_ROOT})
+	mkdir -p $(dir ${PROJECT_ROOT})
 	[ -d ${PROJECT_ROOT} ] || ln -snf ${CURDIR} ${PROJECT_ROOT}
 	[ -f ${GOPATH}/bin/dep ] || curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 	(cd ${PROJECT_ROOT}; dep ensure)
@@ -11,7 +11,7 @@ vendor:
 	go generate ./zerodoc/...
 
 test: vendor
-	go test -short ./...
+	go test -short ./... -coverprofile .test-coverage.txt
 
 bench: vendor
 	go test -bench=. ./...
