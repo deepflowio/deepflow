@@ -13,7 +13,7 @@ const (
 	IF_TYPE_WAN = 3
 
 	DATA_VALID_TIME = 1 * time.Minute
-	ARP_VALID_TIME  = 1 * time.Hour
+	ARP_VALID_TIME  = 1 * time.Minute
 )
 
 type IpNet struct {

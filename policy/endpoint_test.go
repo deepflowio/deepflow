@@ -667,62 +667,37 @@ func TesModifyL2end(t *testing.T) {
 	}
 }
 
-// arp包 ip3-->ip4 ttl=64  L2end=L2end1=false L3end0=true,L3end1=false
-// ip包  ip4-->ip3 ttl=64  L2end=L2end1=false L3end0=true,L3end1=true
-// ip包  ip4-->ip3 ttl=63  L2end=L2end1=false L3end0=false,L3end1=true
-// ip包  ip3-->ip4 ttl=63  L2end=L2end1=false L3end0=true,L3end1=false
-// arp包 ip4-->ip3 ttl=64  L2end=L2end1=false L3end0=true,L3end1=true
+// arp包 ip3-->ip4
+// arp包 ip4-->ip3
 // ip包  ip3-->ip4 ttl=63  L2end=L2end1=false L3end0=true,L3end1=true
+// ip包  ip4-->ip3 ttl=63  L2end=L2end1=false L3end0=true,L3end1=true
 func TestL2endL3end5(t *testing.T) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 
-	// arp包 ip3-->ip4 ttl=64  L2end=L2end1=false L3end0=true,L3end1=false
+	// arp包 ip3-->ip4
 	key1 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 8000)
 	setEthTypeAndOthers(key1, EthernetTypeARP, 64, l2EndBool[0], l2EndBool[0])
-	data := getEndpointData(policy, key1)
-	basicEndInfo := generateEndInfo(l2EndBool[0], l3EndBool[1], l2EndBool[0], l3EndBool[0])
+	getEndpointData(policy, key1)
+	// arp包 ip4-->ip3
+	key2 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, protoAny, 0, 8000)
+	setEthTypeAndOthers(key2, EthernetTypeARP, 64, l2EndBool[0], l2EndBool[0])
+	getEndpointData(policy, key2)
+
+	// ip包  ip3-->ip4 ttl=63  L2end=L2end1=false L3end0=true,L3end1=true
+	key3 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, IPProtocolTCP, 0, 8000)
+	setEthTypeAndOthers(key3, EthernetTypeIPv4, 63, l2EndBool[0], l2EndBool[0])
+	key3.Timestamp = time.Duration(time.Now().UnixNano()) + ARP_VALID_TIME
+	data := getEndpointData(policy, key3)
+	basicEndInfo := generateEndInfo(l2EndBool[0], l3EndBool[1], l2EndBool[0], l3EndBool[1])
 	if !checkEndTestResult(t, basicEndInfo, data) {
 		t.Error("TestL2endL3end5 Check Failed!")
 	}
 
 	// ip包  ip4-->ip3 ttl=64  L2end=L2end1=false L3end0=true,L3end1=true
-	key2 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, IPProtocolTCP, 0, 8000)
-	setEthTypeAndOthers(key2, EthernetTypeIPv4, 64, l2EndBool[0], l2EndBool[0])
-	basicEndInfo = generateEndInfo(l2EndBool[0], l3EndBool[1], l2EndBool[0], l3EndBool[1])
-	data = getEndpointData(policy, key2)
-	if !checkEndTestResult(t, basicEndInfo, data) {
-		t.Error("TestL2endL3end5 Check Failed!")
-	}
-
-	// ip包  ip4-->ip3 ttl=63  L2end=L2end1=false L3end0=false,L3end1=true
-	key2.Ttl = 63
-	basicEndInfo.L3End0 = false
-	data = getEndpointData(policy, key2)
-	if !checkEndTestResult(t, basicEndInfo, data) {
-		t.Error("TestL2endL3end5 Check Failed!")
-	}
-
-	// ip包  ip3-->ip4 ttl=63  L2end=L2end1=false L3end0=true,L3end1=false
-	key3 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, IPProtocolTCP, 0, 8000)
-	setEthTypeAndOthers(key3, EthernetTypeIPv4, 63, l2EndBool[0], l2EndBool[0])
-	data = getEndpointData(policy, key3)
-	basicEndInfo = generateEndInfo(l2EndBool[0], l3EndBool[1], l2EndBool[0], l3EndBool[0])
-	if !checkEndTestResult(t, basicEndInfo, data) {
-		t.Error("TestL2endL3end5 Check Failed!")
-	}
-
-	// arp包 ip4-->ip3 ttl=64  L2end=L2end1=false L3end0=true,L3end1=true
-	key4 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, protoAny, 0, 8000)
-	setEthTypeAndOthers(key4, EthernetTypeARP, 64, l2EndBool[0], l2EndBool[0])
+	key4 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, IPProtocolTCP, 0, 8000)
+	setEthTypeAndOthers(key4, EthernetTypeIPv4, 64, l2EndBool[0], l2EndBool[0])
 	basicEndInfo = generateEndInfo(l2EndBool[0], l3EndBool[1], l2EndBool[0], l3EndBool[1])
 	data = getEndpointData(policy, key4)
-	if !checkEndTestResult(t, basicEndInfo, data) {
-		t.Error("TestL2endL3end5 Check Failed!")
-	}
-
-	// ip包  ip3-->ip4 ttl=63  L2end=L2end1=false L3end0=true,L3end1=true
-	data = getEndpointData(policy, key3)
-	basicEndInfo = generateEndInfo(l2EndBool[0], l3EndBool[1], l2EndBool[0], l3EndBool[1])
 	if !checkEndTestResult(t, basicEndInfo, data) {
 		t.Error("TestL2endL3end5 Check Failed!")
 	}
@@ -734,43 +709,25 @@ func TestFastpathEndInfo(t *testing.T) {
 	// arp包 ip3-->ip4 ttl=64  L2end=L2end1=false L3end0=true,L3end1=false
 	key1 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 0)
 	setEthTypeAndOthers(key1, EthernetTypeARP, 64, l2EndBool[0], l2EndBool[0])
-	data, _ := policy.LookupAllByKey(key1)
-	basicEndInfo := generateEndInfo(l2EndBool[0], l3EndBool[1], l2EndBool[0], l3EndBool[0])
-	if !checkEndTestResult(t, basicEndInfo, data) {
-		t.Error("TestFastpathEndInfo Check Failed!")
-	}
-
-	// ip包  ip4-->ip3 ttl=63  L2end=L2end1=false L3end0=false,L3end1=true
-	key2 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, IPProtocolTCP, 60, 50)
-	setEthTypeAndOthers(key2, EthernetTypeIPv4, 63, l2EndBool[0], l2EndBool[0])
-	basicEndInfo = generateEndInfo(l2EndBool[0], l3EndBool[0], l2EndBool[0], l3EndBool[1])
-	data, _ = policy.LookupAllByKey(key2)
-	if !checkEndTestResult(t, basicEndInfo, data) {
-		t.Error("TestFastpathEndInfo Check Failed!")
-		return
-	}
-
+	policy.LookupAllByKey(key1)
 	// arp包 ip4-->ip3 ttl=64  L2end=L2end1=false L3end0=true,L3end1=true
-	key3 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, protoAny, 0, 0)
-	setEthTypeAndOthers(key3, EthernetTypeARP, 64, l2EndBool[0], l2EndBool[0])
-	basicEndInfo = generateEndInfo(l2EndBool[0], l3EndBool[1], l2EndBool[0], l3EndBool[1])
-	data, _ = policy.LookupAllByKey(key3)
-	if !checkEndTestResult(t, basicEndInfo, data) {
-		t.Error("TestFastpathEndInfo Check Failed!")
-	}
+	key2 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, protoAny, 0, 0)
+	setEthTypeAndOthers(key2, EthernetTypeARP, 64, l2EndBool[0], l2EndBool[0])
+	policy.LookupAllByKey(key2)
 
 	// ip包  ip3-->ip4 ttl=63  L2end=L2end1=false L3end0=true,L3end1=true
-	key4 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, IPProtocolTCP, 50, 60)
-	setEthTypeAndOthers(key4, EthernetTypeIPv4, 63, l2EndBool[0], l2EndBool[0])
-	data, _ = policy.LookupAllByKey(key4)
-	basicEndInfo = generateEndInfo(l2EndBool[0], l3EndBool[1], l2EndBool[0], l3EndBool[1])
+	key3 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, IPProtocolTCP, 50, 60)
+	setEthTypeAndOthers(key3, EthernetTypeIPv4, 63, l2EndBool[0], l2EndBool[0])
+	key3.Timestamp = time.Duration(time.Now().UnixNano()) + ARP_VALID_TIME
+	data, _ := policy.LookupAllByKey(key3)
+	basicEndInfo := generateEndInfo(l2EndBool[0], l3EndBool[1], l2EndBool[0], l3EndBool[1])
 	if !checkEndTestResult(t, basicEndInfo, data) {
 		t.Error("TestFastpathEndInfo Check Failed!")
 	}
 
 	// ip包  ip4-->ip3 ttl=63  L2end=L2end1=false L3end0=true,L3end1=true
 	basicEndInfo = generateEndInfo(l2EndBool[0], l3EndBool[1], l2EndBool[0], l3EndBool[1])
-	data, _ = policy.LookupAllByKey(key2)
+	data, _ = policy.LookupAllByKey(key3)
 	if !checkEndTestResult(t, basicEndInfo, data) {
 		t.Error("TestFastpathEndInfo Check Failed!")
 	}
