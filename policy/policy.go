@@ -158,7 +158,7 @@ func (t *PolicyTable) GetCounter() interface{} {
 		counter.IpTable += uint32(len(t.cloudPlatformLabeler.ipTables[i].ipMap))
 	}
 	for i := TAP_MIN; i < TAP_MAX; i++ {
-		counter.ArpTable += uint32(len(t.cloudPlatformLabeler.arpTable[i].arpMap))
+		counter.ArpTable += uint32(len(t.cloudPlatformLabeler.arpTable[i]))
 	}
 
 	counter.Acl += uint32(len(t.policyLabeler.RawAcls))

@@ -28,18 +28,18 @@ type EpcIpTable struct {
 	epcIpMap EpcIpMapData
 }
 
-type ArpTable struct {
-	sync.RWMutex
-	arpMap map[MacIpKey]time.Time
-}
-
 type CloudPlatformLabeler struct {
+	sync.Mutex
+
 	macTable      *MacTable
 	ipTables      [MASK_LEN_NUM]*IpTable
 	epcIpTable    *EpcIpTable
 	ipGroup       *IpResourceGroup
 	netmaskBitmap uint32
-	arpTable      [TAP_MAX]*ArpTable
+
+	lastArpSwapTime time.Duration
+	arpTable        [TAP_MAX]map[MacIpKey]bool
+	tempArpTable    [TAP_MAX]map[MacIpKey]bool
 }
 
 var PRIVATE_PREFIXS = [][2]uint32{
@@ -62,20 +62,19 @@ func NewCloudPlatformLabeler(queueCount int, mapSize uint32) *CloudPlatformLabel
 	epcIpTable := &EpcIpTable{
 		epcIpMap: make(EpcIpMapData),
 	}
-	var arpTable [TAP_MAX]*ArpTable
+	cloud := &CloudPlatformLabeler{
+		macTable:        macTable,
+		ipTables:        ipTables,
+		epcIpTable:      epcIpTable,
+		ipGroup:         NewIpResourceGroup(),
+		netmaskBitmap:   uint32(0),
+		lastArpSwapTime: time.Duration(time.Now().UnixNano()),
+	}
 	for i := TAP_MIN; i < TAP_MAX; i++ {
-		arpTable[i] = &ArpTable{
-			arpMap: make(map[MacIpKey]time.Time),
-		}
+		cloud.tempArpTable[i] = make(map[MacIpKey]bool)
+		cloud.arpTable[i] = make(map[MacIpKey]bool)
 	}
-	return &CloudPlatformLabeler{
-		macTable:      macTable,
-		ipTables:      ipTables,
-		epcIpTable:    epcIpTable,
-		ipGroup:       NewIpResourceGroup(),
-		netmaskBitmap: uint32(0),
-		arpTable:      arpTable,
-	}
+	return cloud
 }
 
 func PortInDeepflowExporter(inPort uint32) bool {
@@ -199,37 +198,26 @@ func (l *CloudPlatformLabeler) UpdateGroupTree(ipGroupDatas []*IpGroupData) {
 	l.ipGroup.Update(ipGroupDatas)
 }
 
-//FIXME: 后续考虑时间可以从metpacket获取
-func (l *CloudPlatformLabeler) UpdateArpTable(hash MacIpKey, tapType TapType) {
-	l.arpTable[tapType].Lock()
-	l.arpTable[tapType].arpMap[hash] = time.Now()
-	l.arpTable[tapType].Unlock()
-}
-
-func (l *CloudPlatformLabeler) DeleteArpData(hash MacIpKey, tapType TapType) {
-	l.arpTable[tapType].Lock()
-	delete(l.arpTable[tapType].arpMap, hash)
-	l.arpTable[tapType].Unlock()
-}
-
 func (l *CloudPlatformLabeler) GetArpTable(hash MacIpKey, tapType TapType) bool {
-	l.arpTable[tapType].RLock()
-	if data, ok := l.arpTable[tapType].arpMap[hash]; ok {
-		l.arpTable[tapType].RUnlock()
-		if ARP_VALID_TIME < time.Now().Sub(data) {
-			l.DeleteArpData(hash, tapType)
-			return false
-		}
-		return true
-	}
-	l.arpTable[tapType].RUnlock()
-	return false
+	return l.arpTable[tapType][hash]
 }
 
 // 只更新源mac+ip的arp
-func (l *CloudPlatformLabeler) CheckAndUpdateArpTable(key *LookupKey, hash MacIpKey) {
+func (l *CloudPlatformLabeler) CheckAndUpdateArpTable(key *LookupKey, hash MacIpKey, timestamp time.Duration) {
 	if key.EthType == EthernetTypeARP && !key.Invalid {
-		l.UpdateArpTable(hash, key.Tap)
+		l.Lock()
+		l.tempArpTable[key.Tap][hash] = true
+		l.Unlock()
+	}
+
+	if timestamp-l.lastArpSwapTime >= ARP_VALID_TIME {
+		l.Lock()
+		for i := TAP_MIN; i < TAP_MAX; i++ {
+			l.arpTable[i] = l.tempArpTable[i]
+			l.tempArpTable[i] = make(map[MacIpKey]bool)
+		}
+		l.Unlock()
+		l.lastArpSwapTime = timestamp
 	}
 }
 
@@ -314,7 +302,7 @@ func (l *CloudPlatformLabeler) ModifyPrivateIp(endpoint *EndpointData, key *Look
 func (l *CloudPlatformLabeler) CheckEndpointDataIfNeedCopy(endpoint *EndpointData, key *LookupKey) *EndpointData {
 	srcHash := MacIpKey(calcHashKey(key.SrcMac, key.SrcIp))
 	dstHash := MacIpKey(calcHashKey(key.DstMac, key.DstIp))
-	l.CheckAndUpdateArpTable(key, srcHash)
+	l.CheckAndUpdateArpTable(key, srcHash, key.Timestamp)
 	if key.Tap == TAP_TOR && ((key.L2End0 != endpoint.SrcInfo.L2End) ||
 		(key.L2End1 != endpoint.DstInfo.L2End)) {
 		endpoint = ShallowCopyEndpointData(endpoint)
