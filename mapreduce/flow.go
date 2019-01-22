@@ -27,7 +27,7 @@ const GEO_FILE_LOCATION = "/usr/share/droplet/ip_info_mini.json"
 
 func NewFlowMapProcess(
 	output queue.MultiQueueWriter, input queue.MultiQueueReader,
-	inputCount, docsInBuffer, variedDocLimit, windowSize, windowLeftMargin int,
+	inputCount, docsInBuffer, variedDocLimit, windowSize, windowMoveMargin int,
 ) *FlowHandler {
 	return NewFlowHandler([]app.FlowProcessor{
 		fps.NewProcessor(),
@@ -36,7 +36,7 @@ func NewFlowMapProcess(
 		geo.NewProcessor(GEO_FILE_LOCATION),
 		flowtype.NewProcessor(),
 		consolelog.NewProcessor(),
-	}, output, input, inputCount, docsInBuffer, variedDocLimit, windowSize, windowLeftMargin)
+	}, output, input, inputCount, docsInBuffer, variedDocLimit, windowSize, windowMoveMargin)
 }
 
 type FlowHandler struct {
@@ -49,13 +49,13 @@ type FlowHandler struct {
 	docsInBuffer     int
 	variedDocLimit   int
 	windowSize       int
-	windowLeftMargin int
+	windowMoveMargin int
 }
 
 func NewFlowHandler(
 	processors []app.FlowProcessor,
 	output queue.MultiQueueWriter, inputs queue.MultiQueueReader,
-	inputCount, docsInBuffer, variedDocLimit, windowSize, windowLeftMargin int,
+	inputCount, docsInBuffer, variedDocLimit, windowSize, windowMoveMargin int,
 ) *FlowHandler {
 	return &FlowHandler{
 		numberOfApps:     len(processors),
@@ -66,7 +66,7 @@ func NewFlowHandler(
 		docsInBuffer:     docsInBuffer,
 		variedDocLimit:   variedDocLimit,
 		windowSize:       windowSize,
-		windowLeftMargin: windowLeftMargin,
+		windowMoveMargin: windowMoveMargin,
 	}
 }
 
@@ -126,7 +126,7 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 	}
 
 	for i := 0; i < handler.numberOfApps; i++ {
-		handler.stashes[i] = NewStash(h.docsInBuffer, h.variedDocLimit, h.windowSize, h.windowLeftMargin)
+		handler.stashes[i] = NewStash(h.docsInBuffer, h.variedDocLimit, h.windowSize, h.windowMoveMargin)
 		handler.statItems[i].Name = h.processors[i].GetName()
 		handler.statItems[i].StatType = stats.COUNT_TYPE
 		handler.statItems[i+handler.numberOfApps].Name = fmt.Sprintf("%s_avg_doc_counter", h.processors[i].GetName())
@@ -174,7 +174,7 @@ func (h *subFlowHandler) GetCounter() interface{} {
 // processorID = -1 for all stash
 func (h *subFlowHandler) putToQueue(processorID int) {
 	for i, stash := range h.stashes {
-		if processorID > 0 && processorID != i {
+		if processorID >= 0 && processorID != i {
 			continue
 		}
 		docs := stash.Dump()

@@ -17,11 +17,11 @@ import (
 
 func NewMeteringMapProcess(
 	output queue.MultiQueueWriter, input queue.MultiQueueReader,
-	inputCount, docsInBuffer, variedDocLimit, windowSize, windowLeftMargin int,
+	inputCount, docsInBuffer, variedDocLimit, windowSize, windowMoveMargin int,
 ) *MeteringHandler {
 	return NewMeteringHandler(
 		[]app.MeteringProcessor{usage.NewProcessor()}, output, input,
-		inputCount, docsInBuffer, variedDocLimit, windowSize, windowLeftMargin)
+		inputCount, docsInBuffer, variedDocLimit, windowSize, windowMoveMargin)
 }
 
 type MeteringHandler struct {
@@ -34,13 +34,13 @@ type MeteringHandler struct {
 	docsInBuffer       int
 	variedDocLimit     int
 	windowSize         int
-	windowLeftMargin   int
+	windowMoveMargin   int
 }
 
 func NewMeteringHandler(
 	processors []app.MeteringProcessor,
 	output queue.MultiQueueWriter, inputs queue.MultiQueueReader,
-	inputCount, docsInBuffer, variedDocLimit, windowSize, windowLeftMargin int,
+	inputCount, docsInBuffer, variedDocLimit, windowSize, windowMoveMargin int,
 ) *MeteringHandler {
 	return &MeteringHandler{
 		numberOfApps:       len(processors),
@@ -51,7 +51,7 @@ func NewMeteringHandler(
 		docsInBuffer:       docsInBuffer,
 		variedDocLimit:     variedDocLimit,
 		windowSize:         windowSize,
-		windowLeftMargin:   windowLeftMargin,
+		windowMoveMargin:   windowMoveMargin,
 	}
 }
 
@@ -100,7 +100,7 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 		statsdCounter: make([]StatsdCounter, h.numberOfApps*2),
 	}
 	for i := 0; i < handler.numberOfApps; i++ {
-		handler.stashes[i] = NewStash(h.docsInBuffer, h.variedDocLimit, h.windowSize, h.windowLeftMargin)
+		handler.stashes[i] = NewStash(h.docsInBuffer, h.variedDocLimit, h.windowSize, h.windowMoveMargin)
 		handler.statItems[i].Name = h.processors[i].GetName()
 		handler.statItems[i].StatType = stats.COUNT_TYPE
 		handler.statItems[i+handler.numberOfApps].Name = fmt.Sprintf("%s_avg_doc_counter", h.processors[i].GetName())
@@ -148,7 +148,7 @@ func (h *subMeteringHandler) GetCounter() interface{} {
 // processorID = -1 for all stash
 func (h *subMeteringHandler) putToQueue(processorID int) {
 	for i, stash := range h.stashes {
-		if processorID > 0 && processorID != i {
+		if processorID >= 0 && processorID != i {
 			continue
 		}
 		docs := stash.Dump()

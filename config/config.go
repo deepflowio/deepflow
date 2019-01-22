@@ -94,7 +94,7 @@ type FlowGeneratorConfig struct {
 type MapReduceConfig struct {
 	VariedDocLimit   uint32 `yaml:"varied-doc-limit"`
 	WindowSize       uint32 `yaml:"window-size"`
-	WindowLeftMargin uint32 `yaml:"window-left-margin"`
+	WindowMoveMargin uint32 `yaml:"window-move-margin"`
 }
 
 type PCapConfig struct {
@@ -258,10 +258,13 @@ func (c *Config) Validate() error {
 		c.MapReduce.VariedDocLimit = uint32(c.Queue.DocsQueueSize)
 	}
 	if c.MapReduce.WindowSize == 0 {
-		c.MapReduce.WindowSize = 30
+		c.MapReduce.WindowSize = 70
 	}
-	if c.MapReduce.WindowLeftMargin >= c.MapReduce.WindowSize {
-		c.MapReduce.WindowLeftMargin = c.MapReduce.WindowSize / 2
+	if c.MapReduce.WindowMoveMargin == 0 {
+		c.MapReduce.WindowMoveMargin = 3
+	}
+	if c.MapReduce.WindowMoveMargin >= c.MapReduce.WindowSize {
+		c.MapReduce.WindowMoveMargin = 0
 	}
 	if c.RpcTimeout > 0 {
 		c.RpcTimeout *= time.Second

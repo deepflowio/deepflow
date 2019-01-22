@@ -11,7 +11,7 @@ type Stash struct {
 	stashLocation     []map[string]int
 	fastStashLocation []map[uint64]int
 	slots             int
-	leftSlots         int
+	marginSlots       int
 
 	stash          []interface{}
 	entryCount     int
@@ -21,13 +21,13 @@ type Stash struct {
 	encoder *codec.SimpleEncoder
 }
 
-func NewStash(capacity, variedDocLimit, slots, leftSlots int) *Stash {
+func NewStash(capacity, variedDocLimit, slots, marginSlots int) *Stash {
 	return &Stash{
 		timestamp:         0,
 		stashLocation:     make([]map[string]int, slots),
 		fastStashLocation: make([]map[uint64]int, slots),
 		slots:             slots,
-		leftSlots:         leftSlots,
+		marginSlots:       marginSlots,
 		stash:             make([]interface{}, capacity),
 		entryCount:        0,
 		capacity:          capacity,
@@ -42,10 +42,16 @@ func (s *Stash) Add(docs []interface{}) ([]interface{}, uint64) {
 	for i, v := range docs {
 		doc := v.(*app.Document)
 		if s.timestamp == 0 {
-			s.timestamp = doc.Timestamp - uint32(s.leftSlots)
+			s.timestamp = doc.Timestamp - uint32(s.marginSlots)
 		}
 		slot := int(doc.Timestamp) - int(s.timestamp)
-		if slot < 0 || slot >= s.slots {
+		if slot < 0 {
+			// 当文档超出窗口的左边界时，下一个窗口的左边界以文档时间为准
+			s.timestamp = doc.Timestamp - uint32(s.marginSlots)
+			return docs[i:], rejected
+		} else if slot >= s.slots {
+			// 当文档超出窗口的右边界时，下一个窗口的右边界以文档时间为准
+			s.timestamp = doc.Timestamp + uint32(s.marginSlots) - uint32(s.slots) + 1
 			return docs[i:], rejected
 		}
 
@@ -107,7 +113,6 @@ func (s *Stash) Dump() []interface{} {
 }
 
 func (s *Stash) Clear() {
-	s.timestamp = 0
 	s.stashLocation = make([]map[string]int, s.slots)
 	s.fastStashLocation = make([]map[uint64]int, s.slots)
 	s.entryCount = 0
