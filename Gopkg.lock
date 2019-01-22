@@ -2,6 +2,14 @@
 
 
 [[projects]]
+  digest = "1:17131c6158c724a12a6249bf4e28c239357695cb15ffccb6bc3f246d95e04f09"
+  name = "bou.ke/monkey"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "bdf6dea004c6fd1cdf4b25da8ad45a606c09409a"
+  version = "v1.0.1"
+
+[[projects]]
   digest = "1:3261411fa3369515015a5957d3b9881b806b8457025a034a7722dc3732fe15e8"
   name = "github.com/OneOfOne/xxhash"
   packages = ["."]
@@ -24,6 +32,14 @@
   pruneopts = "UT"
   revision = "47565b4f722fb6ceae66b95f853feed578a4a51c"
   version = "v0.3.3"
+
+[[projects]]
+  digest = "1:b60efdeb75d3c0ceed88783ac2495256aba3491a537d0f31401202579fd62a94"
+  name = "github.com/golang/mock"
+  packages = ["gomock"]
+  pruneopts = "UT"
+  revision = "51421b967af1f557f93a59e0057aaf15ca02e29c"
+  version = "v1.2.0"
 
 [[projects]]
   digest = "1:4c0989ca0bcd10799064318923b9bc2db6b4d6338dd75f3f2d86c3511aaaf5cf"
@@ -263,9 +279,11 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "bou.ke/monkey",
     "github.com/OneOfOne/xxhash",
     "github.com/Workiva/go-datastructures/bitarray",
     "github.com/docker/go-units",
+    "github.com/golang/mock/gomock",
     "github.com/golang/protobuf/proto",
     "github.com/google/gopacket/layers",
     "github.com/google/gopacket/pcapgo",
