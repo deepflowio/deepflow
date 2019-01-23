@@ -5,6 +5,7 @@ option go_package = "trident";
 
 service Synchronizer {
     rpc Sync (SyncRequest) returns (SyncResponse) {}
+    rpc Push (SyncRequest) returns (stream SyncResponse) {}
 }
 
 enum State {
