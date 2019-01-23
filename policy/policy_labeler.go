@@ -675,18 +675,6 @@ func addGroupAclGidsToMap(acl *Acl, aclGid uint32, srcMap map[uint32]bool, dstMa
 			dstMap[key] = true
 		}
 	}
-	if len(acl.SrcGroups) == 0 {
-		key := aclGid << 16
-		if ok := srcMap[key]; !ok {
-			srcMap[key] = true
-		}
-	}
-	if len(acl.DstGroups) == 0 {
-		key := aclGid << 16
-		if ok := dstMap[key]; !ok {
-			dstMap[key] = true
-		}
-	}
 }
 
 func (l *PolicyLabeler) GenerateGroupAclGidMaps(acls []*Acl) {

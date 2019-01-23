@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -1580,7 +1581,9 @@ func generateAclGidBitmap(groupType uint32, offset uint32, bitOffset uint32) Acl
 		aclGidBitmap.SetDstFlag()
 	}
 	aclGidBitmap.SetMapOffset(offset)
-	aclGidBitmap.SetMapBits(bitOffset)
+	if bitOffset != math.MaxUint32 {
+		aclGidBitmap.SetMapBits(bitOffset)
+	}
 
 	return aclGidBitmap
 }
@@ -1734,21 +1737,29 @@ func TestAclGidBitmapGroup100(t *testing.T) {
 	table := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	action = action.SetACLGID(100)
-	acl := generatePolicyAcl(table, action, 10, groupAny, groupAny, IPProtocolTCP, 0, vlanAny)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	for i := 102; i < 200; i++ {
+		acl.SrcGroups = append(acl.SrcGroups, uint32(i))
+		acl.DstGroups = append(acl.DstGroups, uint32(i))
+	}
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
 	ipGroups := make([]*IpGroupData, 0, 100)
-	for i := 1; i <= 100; i++ {
+	ipGroups = append(ipGroups, generateIpGroup(group[1], 0, "0.0.0.0/0"))
+	ipGroups = append(ipGroups, generateIpGroup(group[2], 0, "0.0.0.0/0"))
+	for i := 102; i < 200; i++ {
 		ipGroups = append(ipGroups, generateIpGroup(uint32(i), 0, "0.0.0.0/0"))
 	}
 	table.UpdateIpGroupData(ipGroups)
 	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 0)
 	_, policyData := table.LookupAllByKey(key)
-	aclGidbitmap0 := generateAclGidBitmap(GROUP_TYPE_SRC, 0, 0)
-	aclGidbitmap1 := generateAclGidBitmap(GROUP_TYPE_SRC, 56, 0)
-	aclGidbitmap2 := generateAclGidBitmap(GROUP_TYPE_DST, 0, 0)
-	aclGidbitmap3 := generateAclGidBitmap(GROUP_TYPE_DST, 56, 0)
-	for i := 0; i < 56; i++ {
+	aclGidbitmap0 := generateAclGidBitmap(GROUP_TYPE_SRC, 0, math.MaxUint32)
+	aclGidbitmap1 := generateAclGidBitmap(GROUP_TYPE_SRC, 56, math.MaxUint32)
+	aclGidbitmap2 := generateAclGidBitmap(GROUP_TYPE_DST, 0, math.MaxUint32)
+	aclGidbitmap3 := generateAclGidBitmap(GROUP_TYPE_DST, 56, math.MaxUint32)
+	aclGidbitmap0.SetMapBits(0)
+	aclGidbitmap2.SetMapBits(1)
+	for i := 2; i < 56; i++ {
 		aclGidbitmap0.SetMapBits(uint32(i))
 		aclGidbitmap2.SetMapBits(uint32(i))
 	}

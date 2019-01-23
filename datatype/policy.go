@@ -266,6 +266,11 @@ func (b *AclGidBitmap) SetMapBits(offset uint32) {
 	*b |= (AclGidBitmap(1) << realOffset) & GROUP_MAPBITS_MASK
 }
 
+func (b *AclGidBitmap) ResetMapBits(offset uint32) {
+	realOffset := offset % GROUP_MAPBITS_OFFSET
+	*b &= ^((AclGidBitmap(1) << realOffset) & GROUP_MAPBITS_MASK)
+}
+
 func (b *AclGidBitmap) ReverseGroupType() {
 	if b.GetGroupType() == GROUP_TYPE_SRC {
 		b.SetDstFlag()
@@ -597,14 +602,6 @@ func (d *PolicyData) AddAclGidBitmap(addType uint32, aclGid uint32, endpointData
 			aclGidBitMap.SetMapOffset(uint32(i))
 			aclGidBitMap.SetMapBits(uint32(i))
 			bitmapFlag = true
-		} else {
-			// 查找资源组全采
-			key = aclGid << 16
-			if ok := groupAclGidMap[key]; ok {
-				aclGidBitMap.SetMapOffset(uint32(i))
-				aclGidBitMap.SetMapBits(uint32(i))
-				bitmapFlag = true
-			}
 		}
 	}
 	if bitmapFlag && aclGidBitMap.GetMapBits() > 0 {
