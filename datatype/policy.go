@@ -555,29 +555,42 @@ func FormatAclGidBitmap(endpointData *EndpointData, policyData *PolicyData) stri
 	return formatStr
 }
 
+func (d *PolicyData) getBitmapGroupIds(addType uint32, packet *LookupKey, swap bool, direction DirectionType, srcMap, dstMap map[uint32]bool) ([]uint16, map[uint32]bool) {
+	var groupIds []uint16
+	var groupAclGidMap map[uint32]bool
+	if addType == GROUP_TYPE_SRC {
+		groupIds = packet.SrcAllGroupIds
+		if swap {
+			groupIds = packet.DstAllGroupIds
+		}
+		if direction&FORWARD == FORWARD {
+			groupAclGidMap = srcMap
+		} else {
+			groupAclGidMap = dstMap
+		}
+	} else {
+		groupIds = packet.DstAllGroupIds
+		if swap {
+			groupIds = packet.SrcAllGroupIds
+		}
+		if direction&FORWARD == FORWARD {
+			groupAclGidMap = dstMap
+		} else {
+			groupAclGidMap = srcMap
+		}
+	}
+	return groupIds, groupAclGidMap
+}
+
 // 添加资源组bitmap
-func (d *PolicyData) AddAclGidBitmap(addType uint32, aclGid uint32, endpointData *EndpointData, direction DirectionType, srcMap, dstMap map[uint32]bool) uint8 {
+func (d *PolicyData) AddAclGidBitmap(addType uint32, aclGid uint32, groupIds []uint16, groupAclGidMap map[uint32]bool) uint8 {
 	addCount := uint8(0)
 	bitmapFlag := false
-	var groupIds []uint32
-	var groupAclGidMap map[uint32]bool
-	aclGidBitMap := AclGidBitmap(0)
 	mapCount := GROUP_MAPBITS_OFFSET
+	aclGidBitMap := AclGidBitmap(0)
 	if addType == GROUP_TYPE_SRC {
-		groupIds = endpointData.SrcInfo.GroupIds
-		if direction&FORWARD == FORWARD {
-			groupAclGidMap = srcMap
-		} else {
-			groupAclGidMap = dstMap
-		}
 		aclGidBitMap.SetSrcFlag()
 	} else {
-		groupIds = endpointData.DstInfo.GroupIds
-		if direction&FORWARD == FORWARD {
-			groupAclGidMap = dstMap
-		} else {
-			groupAclGidMap = srcMap
-		}
 		aclGidBitMap.SetDstFlag()
 	}
 
@@ -597,7 +610,7 @@ func (d *PolicyData) AddAclGidBitmap(addType uint32, aclGid uint32, endpointData
 			}
 			bitmapFlag = false
 		}
-		key := aclGid<<16 | FormatGroupId(groupId)
+		key := aclGid<<16 | uint32(groupId)
 		if ok := groupAclGidMap[key]; ok {
 			aclGidBitMap.SetMapOffset(uint32(i))
 			aclGidBitMap.SetMapBits(uint32(i))
@@ -611,7 +624,7 @@ func (d *PolicyData) AddAclGidBitmap(addType uint32, aclGid uint32, endpointData
 	return addCount
 }
 
-func (d *PolicyData) AddAclGidBitmaps(packet *LookupKey, endpointData *EndpointData, srcMap, dstMap map[uint32]bool) {
+func (d *PolicyData) AddAclGidBitmaps(packet *LookupKey, swap bool, srcMap, dstMap map[uint32]bool) {
 	if !packet.HasFeatureFlag(NPM) {
 		return
 	}
@@ -621,8 +634,10 @@ func (d *PolicyData) AddAclGidBitmaps(packet *LookupKey, endpointData *EndpointD
 		if aclGid == 0 {
 			continue
 		}
-		mapCount := d.AddAclGidBitmap(GROUP_TYPE_SRC, aclGid, endpointData, aclAction.GetDirections(), srcMap, dstMap)
-		mapCount += d.AddAclGidBitmap(GROUP_TYPE_DST, aclGid, endpointData, aclAction.GetDirections(), srcMap, dstMap)
+		groupIds, maps := d.getBitmapGroupIds(GROUP_TYPE_SRC, packet, swap, aclAction.GetDirections(), srcMap, dstMap)
+		mapCount := d.AddAclGidBitmap(GROUP_TYPE_SRC, aclGid, groupIds, maps)
+		groupIds, maps = d.getBitmapGroupIds(GROUP_TYPE_DST, packet, swap, aclAction.GetDirections(), srcMap, dstMap)
+		mapCount += d.AddAclGidBitmap(GROUP_TYPE_DST, aclGid, groupIds, maps)
 		if mapCount > 0 {
 			d.AclActions[index] = aclAction.SetAclGidBitmapOffset(mapOffset).SetAclGidBitmapCount(mapCount)
 		}

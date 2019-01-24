@@ -64,20 +64,21 @@ type EndpointInfo struct {
 }
 
 type LookupKey struct {
-	Timestamp                time.Duration
-	SrcMac, DstMac           uint64
-	SrcIp, DstIp             uint32
-	SrcPort, DstPort         uint16
-	EthType                  EthernetType
-	Vlan                     uint16
-	Proto                    uint8
-	Ttl                      uint8
-	L2End0, L2End1           bool
-	Tap                      TapType
-	Invalid                  bool
-	FastIndex                int
-	SrcGroupIds, DstGroupIds []uint16
-	FeatureFlag              FeatureFlags
+	Timestamp                      time.Duration
+	SrcMac, DstMac                 uint64
+	SrcIp, DstIp                   uint32
+	SrcPort, DstPort               uint16
+	EthType                        EthernetType
+	Vlan                           uint16
+	Proto                          uint8
+	Ttl                            uint8
+	L2End0, L2End1                 bool
+	Tap                            TapType
+	Invalid                        bool
+	FastIndex                      int
+	SrcGroupIds, DstGroupIds       []uint16 //资源组的再分组ID, 没有重复用于策略匹配
+	SrcAllGroupIds, DstAllGroupIds []uint16 //资源组的再分组ID，有重复用于aclgid bitmap生成
+	FeatureFlag                    FeatureFlags
 }
 
 type EndpointData struct {

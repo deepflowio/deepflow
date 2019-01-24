@@ -1923,12 +1923,15 @@ func BenchmarkAcl(b *testing.B) {
 	for i := uint16(1); i <= 1000; i++ {
 		acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
 
-		acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(i+100, i+200))
-		acl.DstPortRange = append(acl.DstPortRange, NewPortRange(i+2000, i+2100))
-		for i := 100; i < 200; i++ {
-			acl.SrcGroups = append(acl.SrcGroups, uint32(i))
-			acl.DstGroups = append(acl.DstGroups, uint32(i))
+		acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1+10*i, 100+10*i))
+		acl.DstPortRange = append(acl.DstPortRange, NewPortRange(30000+10*i, 30100+10*i))
+		acl.SrcGroups = acl.SrcGroups[:0]
+		acl.DstGroups = acl.DstGroups[:0]
+		for j := 100; j < 200; j++ {
+			acl.SrcGroups = append(acl.SrcGroups, uint32(j))
+			acl.DstGroups = append(acl.DstGroups, uint32(j))
 		}
+		acl.Action[0].SetACLGID(10)
 
 		acls = append(acls, acl)
 	}
