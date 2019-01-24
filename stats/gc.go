@@ -6,6 +6,8 @@ import (
 )
 
 type GcMonitor struct {
+	Closable
+
 	lastPauseDuration uint64
 }
 
@@ -14,7 +16,7 @@ func (t *GcMonitor) GetCounter() interface{} {
 	runtime.ReadMemStats(&memStats)
 	gcDuration := memStats.PauseTotalNs - t.lastPauseDuration
 	t.lastPauseDuration = memStats.PauseTotalNs
-	return []StatItem{{"duration", COUNT_TYPE, gcDuration}}
+	return []StatItem{{"duration", gcDuration}}
 }
 
 func RegisterGcMonitor() {
