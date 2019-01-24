@@ -5,11 +5,11 @@ import (
 	"time"
 )
 
-type GcCountable struct {
+type GcMonitor struct {
 	lastPauseDuration uint64
 }
 
-func (t *GcCountable) GetCounter() interface{} {
+func (t *GcMonitor) GetCounter() interface{} {
 	memStats := runtime.MemStats{}
 	runtime.ReadMemStats(&memStats)
 	gcDuration := memStats.PauseTotalNs - t.lastPauseDuration
@@ -17,6 +17,6 @@ func (t *GcCountable) GetCounter() interface{} {
 	return []StatItem{{"duration", COUNT_TYPE, gcDuration}}
 }
 
-func RegisterGcCountable() {
-	registerCountable("gc", &GcCountable{}, OptionInterval(time.Second))
+func RegisterGcMonitor() {
+	registerCountable("gc", &GcMonitor{}, OptionInterval(time.Second))
 }
