@@ -39,6 +39,8 @@ type TagIDPair struct {
 }
 
 type TimedTagMap struct {
+	stats.Closable
+
 	tagIDMap   map[string][]TagID
 	tagIDPairs [][]TagIDPair
 
@@ -77,7 +79,7 @@ func NewTimedTagMap(name string, thread int, ttl int) *TimedTagMap {
 		m.tagIDPairs[t] = make([]TagIDPair, 0)
 	}
 
-	stats.RegisterCountable("ttm", m, []stats.StatsOption{
+	stats.RegisterCountable("ttm", m, []stats.Option{
 		stats.OptionStatTags{"name": name},
 		stats.OptionStatTags{"thread": strconv.Itoa(thread)},
 	}...)
