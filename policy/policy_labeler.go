@@ -672,16 +672,28 @@ func (l *PolicyLabeler) GenerateInterestMaps(acls []*Acl) {
 }
 
 func addGroupAclGidsToMap(acl *Acl, aclGid uint32, srcMap map[uint32]bool, dstMap map[uint32]bool) {
+	srcLen := len(acl.SrcGroups)
+	dstLen := len(acl.DstGroups)
 	for _, group := range acl.SrcGroupRelations {
 		key := aclGid<<16 | uint32(group)
 		if ok := srcMap[key]; !ok {
 			srcMap[key] = true
+		}
+		if dstLen == 0 {
+			if ok := dstMap[key]; !ok {
+				dstMap[key] = true
+			}
 		}
 	}
 	for _, group := range acl.DstGroupRelations {
 		key := aclGid<<16 | uint32(group)
 		if ok := dstMap[key]; !ok {
 			dstMap[key] = true
+		}
+		if srcLen == 0 {
+			if ok := srcMap[key]; !ok {
+				srcMap[key] = true
+			}
 		}
 	}
 }
