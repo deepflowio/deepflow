@@ -550,6 +550,7 @@ func newLookupKey(cmdLine string) (*datatype.LookupKey, uint16) {
 			return nil, queryType
 		}
 	}
+	key.FeatureFlag = datatype.NPM
 	return key, queryType
 }
 
