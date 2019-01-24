@@ -86,8 +86,8 @@ type PolicyLabeler struct {
 
 	maskMapFromPlatformData [math.MaxUint16 + 1]uint32
 	maskMapFromIpGroupData  [math.MaxUint16 + 1]uint32
-	SrcGroupAclGidMap       map[uint32]bool
-	DstGroupAclGidMap       map[uint32]bool
+	SrcGroupAclGidMaps      [TAP_MAX]map[uint32]bool
+	DstGroupAclGidMaps      [TAP_MAX]map[uint32]bool
 	cloudPlatformLabeler    *CloudPlatformLabeler
 }
 
@@ -144,6 +144,9 @@ func NewPolicyLabeler(queueCount int, mapSize uint32, fastPathDisable bool) *Pol
 		for j := 0; j < ACL_PROTO_MAX; j++ {
 			policy.GroupPortPolicyMaps[i][j] = make(map[uint64]*PolicyData)
 		}
+		policy.SrcGroupAclGidMaps[i] = make(map[uint32]bool)
+		policy.DstGroupAclGidMaps[i] = make(map[uint32]bool)
+
 	}
 
 	policy.IpNetmaskMap = &[math.MaxUint16 + 1]uint32{0}
@@ -160,8 +163,6 @@ func NewPolicyLabeler(queueCount int, mapSize uint32, fastPathDisable bool) *Pol
 			policy.FastPolicyMapsMini[i][j] = lru.NewCache32(int(mapSize) >> 3)
 		}
 	}
-	policy.SrcGroupAclGidMap = make(map[uint32]bool)
-	policy.DstGroupAclGidMap = make(map[uint32]bool)
 	return policy
 }
 
@@ -205,6 +206,7 @@ func (l *PolicyLabeler) generateInterestKeys(endpointData *EndpointData, packet 
 		id = FormatGroupId(id)
 		if relations := groupMap[id]; relations > 0 {
 			packet.SrcGroupIds = l.appendNoRepeat(packet.SrcGroupIds, relations)
+			packet.SrcAllGroupIds = append(packet.SrcAllGroupIds, relations)
 			if id == ANY_GROUP {
 				hasAnyGroup = true
 			}
@@ -220,6 +222,7 @@ func (l *PolicyLabeler) generateInterestKeys(endpointData *EndpointData, packet 
 		id = FormatGroupId(id)
 		if relations := groupMap[id]; relations > 0 {
 			packet.DstGroupIds = l.appendNoRepeat(packet.DstGroupIds, relations)
+			packet.DstAllGroupIds = append(packet.DstAllGroupIds, relations)
 			if id == ANY_GROUP {
 				hasAnyGroup = true
 			}
@@ -549,17 +552,23 @@ func (l *PolicyLabeler) generateInterestPortMap(acls []*Acl) {
 
 func (l *PolicyLabeler) splitGroups(raw []uint16, keys []uint32) ([]uint16, []uint16) {
 	both := make([]uint16, 0, len(raw))
-	for _, key := range keys {
-		groupId := uint16(key & 0xffff)
-		for index, id := range raw {
-			if groupId == id {
-				both = append(both, groupId)
-				raw = append(raw[:index], raw[index+1:]...)
+	last := make([]uint16, 0, len(raw))
+	for _, id := range raw {
+		repeat := false
+		for _, key := range keys {
+			if uint16(key&0xffff) == id {
+				repeat = true
 				break
 			}
 		}
+		if !repeat {
+			last = append(last, id)
+		} else {
+			both = append(both, id)
+		}
 	}
-	return both, raw
+
+	return both, last
 }
 
 func (l *PolicyLabeler) appendNoRepeat(raws []uint16, key uint16) []uint16 {
@@ -602,8 +611,8 @@ func (l *PolicyLabeler) generateGroupRelationByGroups(groups []uint32, tapType T
 		}
 		both, raw := l.splitGroups(to[tapType][relateId], groups)
 		if len(raw) != 0 {
-			to[tapType][relateId] = raw
 			to[tapType][*id] = both
+			to[tapType][relateId] = raw
 			from[tapType][uint16(group&0xffff)] = *id
 			*id++
 		}
@@ -663,14 +672,14 @@ func (l *PolicyLabeler) GenerateInterestMaps(acls []*Acl) {
 }
 
 func addGroupAclGidsToMap(acl *Acl, aclGid uint32, srcMap map[uint32]bool, dstMap map[uint32]bool) {
-	for _, group := range acl.SrcGroups {
-		key := aclGid<<16 | group
+	for _, group := range acl.SrcGroupRelations {
+		key := aclGid<<16 | uint32(group)
 		if ok := srcMap[key]; !ok {
 			srcMap[key] = true
 		}
 	}
-	for _, group := range acl.DstGroups {
-		key := aclGid<<16 | group
+	for _, group := range acl.DstGroupRelations {
+		key := aclGid<<16 | uint32(group)
 		if ok := dstMap[key]; !ok {
 			dstMap[key] = true
 		}
@@ -678,15 +687,19 @@ func addGroupAclGidsToMap(acl *Acl, aclGid uint32, srcMap map[uint32]bool, dstMa
 }
 
 func (l *PolicyLabeler) GenerateGroupAclGidMaps(acls []*Acl) {
-	srcGroupAclGidMap := make(map[uint32]bool)
-	dstGroupAclGidMap := make(map[uint32]bool)
+	srcGroupAclGidMaps := [TAP_MAX]map[uint32]bool{}
+	dstGroupAclGidMaps := [TAP_MAX]map[uint32]bool{}
+	for i := TAP_MIN; i < TAP_MAX; i++ {
+		dstGroupAclGidMaps[i] = make(map[uint32]bool)
+		srcGroupAclGidMaps[i] = make(map[uint32]bool)
+	}
 	for _, acl := range acls {
 		for _, action := range acl.Action {
-			addGroupAclGidsToMap(acl, uint32(action.GetACLGID()), srcGroupAclGidMap, dstGroupAclGidMap)
+			addGroupAclGidsToMap(acl, uint32(action.GetACLGID()), srcGroupAclGidMaps[acl.Type], dstGroupAclGidMaps[acl.Type])
 		}
 	}
-	l.SrcGroupAclGidMap = srcGroupAclGidMap
-	l.DstGroupAclGidMap = dstGroupAclGidMap
+	l.SrcGroupAclGidMaps = srcGroupAclGidMaps
+	l.DstGroupAclGidMaps = dstGroupAclGidMaps
 }
 
 func (l *PolicyLabeler) UpdateAcls(acls []*Acl) {
@@ -831,7 +844,7 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 		findPolicy.Merge(portBackwardPolicy.AclActions, portBackwardPolicy.NpbActions, portBackwardPolicy.ACLID)
 		findPolicy.FormatNpbAction()
 		findPolicy.NpbActions = findPolicy.CheckNpbAction(packet, packetEndpointData)
-		findPolicy.AddAclGidBitmaps(packet, packetEndpointData, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
+		findPolicy.AddAclGidBitmaps(packet, false, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])
 	}
 
 	atomic.AddUint64(&l.FirstPathHit, 1)
@@ -887,11 +900,11 @@ func (l *PolicyLabeler) addVlanFastPolicy(srcEpc, dstEpc uint16, packet *LookupK
 	if vlanPolicy == nil {
 		atomic.AddUint32(&l.FastPathPolicyCount, 1)
 		// 添加forward方向bitmap
-		forward.AddAclGidBitmaps(packet, endpointData, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
+		forward.AddAclGidBitmaps(packet, false, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])
 		mapsForward.vlanPolicyMap[key] = forward
 	} else {
 		// 添加forward方向bitmap
-		forward.AddAclGidBitmaps(packet, endpointData, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
+		forward.AddAclGidBitmaps(packet, false, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])
 		*vlanPolicy = *forward
 	}
 
@@ -903,17 +916,16 @@ func (l *PolicyLabeler) addVlanFastPolicy(srcEpc, dstEpc uint16, packet *LookupK
 		backward.AclActions = make([]AclAction, 0, len(policy.AclActions))
 		backward.MergeAndSwapDirection(policy.AclActions, policy.NpbActions, policy.ACLID)
 	}
-	backwardEndpoint := EndpointData{SrcInfo: endpointData.DstInfo, DstInfo: endpointData.SrcInfo}
 	key = uint64(dstEpc)<<48 | uint64(srcEpc)<<32 | uint64(packet.Vlan)
 	vlanPolicy = mapsBackward.vlanPolicyMap[key]
 	if vlanPolicy == nil {
 		atomic.AddUint32(&l.FastPathPolicyCount, 1)
 		// 添加backward方向bitmap
-		backward.AddAclGidBitmaps(packet, &backwardEndpoint, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
+		backward.AddAclGidBitmaps(packet, true, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])
 		mapsBackward.vlanPolicyMap[key] = backward
 	} else {
 		// 添加backward方向bitmap
-		backward.AddAclGidBitmaps(packet, &backwardEndpoint, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
+		backward.AddAclGidBitmaps(packet, true, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])
 		*vlanPolicy = *backward
 	}
 }
@@ -938,14 +950,14 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packetEndp
 	if portPolicyValue := mapsForward.portPolicyMap[key]; portPolicyValue == nil {
 		value := &PortPolicyValue{endpoint: *endpointData, protoPolicy: make([]*PolicyData, 3), timestamp: packet.Timestamp}
 		// 添加forward方向bitmap
-		forward.AddAclGidBitmaps(packet, &value.endpoint, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
+		forward.AddAclGidBitmaps(packet, false, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])
 		value.protoPolicy[index] = forward
 		mapsForward.portPolicyMap[key] = value
 		atomic.AddUint32(&l.FastPathPolicyCount, 1)
 	} else {
 		portPolicyValue.endpoint = *endpointData
 		// 添加forward方向bitmap
-		forward.AddAclGidBitmaps(packet, &portPolicyValue.endpoint, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
+		forward.AddAclGidBitmaps(packet, false, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])
 		portPolicyValue.protoPolicy[index] = forward
 		portPolicyValue.timestamp = packet.Timestamp
 	}
@@ -973,14 +985,14 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packetEndp
 		value := &PortPolicyValue{endpoint: *endpointData, protoPolicy: make([]*PolicyData, 3), timestamp: packet.Timestamp}
 		value.endpoint.SrcInfo, value.endpoint.DstInfo = value.endpoint.DstInfo, value.endpoint.SrcInfo
 		// 添加backward方向bitmap
-		backward.AddAclGidBitmaps(packet, &value.endpoint, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
+		backward.AddAclGidBitmaps(packet, true, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])
 		value.protoPolicy[index] = backward
 		mapsBackward.portPolicyMap[key] = value
 		atomic.AddUint32(&l.FastPathPolicyCount, 1)
 	} else {
 		portPolicyValue.endpoint = EndpointData{SrcInfo: endpointData.DstInfo, DstInfo: endpointData.SrcInfo}
 		// 添加backward方向bitmap
-		backward.AddAclGidBitmaps(packet, &portPolicyValue.endpoint, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
+		backward.AddAclGidBitmaps(packet, true, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])
 		portPolicyValue.protoPolicy[index] = backward
 		portPolicyValue.timestamp = packet.Timestamp
 	}
@@ -1102,7 +1114,7 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *
 		policy.Merge(vlanPolicy.AclActions, vlanPolicy.NpbActions, vlanPolicy.ACLID)
 		policy.Merge(portPolicy.AclActions, portPolicy.NpbActions, portPolicy.ACLID)
 		policy.FormatNpbAction()
-		policy.AddAclGidBitmaps(packet, endpoint, l.SrcGroupAclGidMap, l.DstGroupAclGidMap)
+		policy.AddAclGidBitmaps(packet, false, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])
 	}
 
 	if policy != nil && endpoint != nil {
