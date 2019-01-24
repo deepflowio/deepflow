@@ -69,6 +69,7 @@ func Start(configPath string) (closers []io.Closer) {
 		profiler.Start()
 	}
 
+	stats.RegisterGcMonitor()
 	stats.SetMinInterval(10 * time.Second)
 
 	controllers := make([]net.IP, 0, len(cfg.ControllerIps))
