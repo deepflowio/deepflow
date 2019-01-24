@@ -3,6 +3,8 @@ package dedup
 import (
 	"bytes"
 	"time"
+
+	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
 const (
@@ -18,6 +20,8 @@ const (
 )
 
 type DedupTable struct {
+	stats.Closable
+
 	hashTable *HashTable
 	queue     *List
 	buffer    *List
@@ -26,11 +30,10 @@ type DedupTable struct {
 }
 
 type Counter struct {
-	Total      uint64 `statsd:"total,counter"`
-	Hit        uint64 `statsd:"hit,counter"`
-	Timeout    uint64 `statsd:"timeout,counter"`
-	MaxBucket  int    `statsd:"max_bucket,gauge"`
-	LoadFactor uint   `statsd:"load_factor,gauge"`
+	Total     uint64 `statsd:"total,counter"`
+	Hit       uint64 `statsd:"hit,counter"`
+	Timeout   uint64 `statsd:"timeout,counter"`
+	MaxBucket int    `statsd:"max_bucket,gauge"`
 }
 
 func (t *DedupTable) GetCounter() interface{} {

@@ -1,9 +1,7 @@
 package stats
 
 import (
-	"errors"
 	"flag"
-	"fmt"
 	"net"
 	"os"
 	"path"
@@ -12,112 +10,131 @@ import (
 	"sync"
 	"time"
 
+	"github.com/influxdata/influxdb/client/v2"
+	"github.com/influxdata/influxdb/models"
 	"github.com/op/go-logging"
 	"gopkg.in/alexcesaro/statsd.v2"
+
+	. "gitlab.x.lan/yunshan/droplet-libs/datastructure"
 )
 
 var log = logging.MustGetLogger("stats")
 
-const (
-	STATSD_PORT = 20040
-)
+const STATSD_PORT = 20040
+
+var remoteType = REMOTE_TYPE_INFLUXDB
 
 type StatSource struct {
-	options  []statsd.Option
-	interval time.Duration // use MinInterval when 0
-	skip     int
+	module    string
+	interval  time.Duration // use MinInterval when 0
+	countable Countable
+	tags      OptionStatTags
+	skip      int
 }
 
 var (
-	processName   string
-	hostname      string
-	lock          sync.Mutex
-	preHooks      []func()
-	statSources   = make(map[Countable]*StatSource)
-	remotes       = []net.IP{net.ParseIP("127.0.0.1")}
+	processName string
+	hostname    string
+	lock        sync.Mutex
+	preHooks    []func()
+	statSources = LinkedList{}
+	remotes     = []net.UDPAddr{}
+	remoteIndex = -1
+	connection  client.Client
+
 	statsdClients = make([]*statsd.Client, 1) // could be nil
 )
 
 type StatItem struct {
-	Name     string
-	StatType StatType
-	Value    interface{}
+	Name  string
+	Value interface{}
 }
 
-func registerCountable(module string, countable Countable, opts ...StatsOption) error {
-	interval := time.Duration(0)
-	options := []statsd.Option{statsd.Prefix(strings.Replace(module, "-", "_", -1))}
+func registerCountable(module string, countable Countable, opts ...Option) error {
+	source := StatSource{module: module, countable: countable}
 	for _, opt := range opts {
 		if tags, ok := opt.(OptionStatTags); ok {
-			tagsOption := make([]string, 0, len(tags)*2+2)
-			for key, value := range tags {
-				// colon represent as start of value and unescapable in statsd
-				tagsOption = append(tagsOption, key, strings.Replace(value, ":", "-", -1))
-			}
-			options = append(options, statsd.Tags(tagsOption...))
+			source.tags = tags
 		} else if opt, ok := opt.(OptionInterval); ok {
-			i := time.Duration(opt)
-			if i%time.Second > 0 {
-				msg := fmt.Sprintf("Interval must be multiple of second")
-				return errors.New(msg)
+			source.interval = time.Duration(opt) / time.Second * time.Second
+			if source.interval > time.Second {
+				source.skip = 60 - time.Now().Second()
 			}
-			interval = i
 		}
 	}
-	statSource := &StatSource{options: options, interval: interval}
+	if source.tags == nil {
+		source.tags = OptionStatTags{}
+	}
+	source.tags["host"] = hostname
 	lock.Lock()
-	statSources[countable] = statSource
+	statSources.PushBack(source)
 	lock.Unlock()
 	return nil
 }
 
-func deregisterCountable(countable Countable) {
-	lock.Lock()
-	defer lock.Unlock()
-	_, ok := statSources[countable]
-	if !ok {
-		log.Warning("Countable not registered", reflect.ValueOf(countable).String())
-		return
-	}
-	log.Debug("Deregistering countable", reflect.ValueOf(countable).String())
-	delete(statSources, countable)
-}
-
-func isUpper(c byte) bool {
-	return 'A' <= c && c <= 'Z'
-}
-
-func sendCounter(client *statsd.Client, counter interface{}) {
+func counterToFields(counter interface{}) models.Fields {
+	fields := models.Fields{}
 	if items, ok := counter.([]StatItem); ok {
 		for _, item := range items {
-			statsName := strings.Replace(item.Name, "-", "_", -1)
-			client.Count(statsName, item.Value)
+			fields[item.Name] = item.Value
 		}
-		return
+	} else {
+		val := reflect.Indirect(reflect.ValueOf(counter))
+		for i := 0; i < val.Type().NumField(); i++ {
+			if !val.Field(i).CanInterface() {
+				continue
+			}
+			field := val.Type().Field(i)
+			statsTag := field.Tag.Get("statsd")
+			if statsTag == "" {
+				continue
+			}
+			statsOpts := strings.Split(statsTag, ",")
+			switch val.Field(i).Kind() {
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				fields[statsOpts[0]] = int64(val.Field(i).Uint())
+			default:
+				fields[statsOpts[0]] = val.Field(i).Interface()
+			}
+		}
 	}
-
-	val := reflect.Indirect(reflect.ValueOf(counter))
-	for i := 0; i < val.Type().NumField(); i++ {
-		field := val.Type().Field(i)
-		statsTag := field.Tag.Get("statsd")
-		if statsTag == "" {
-			continue
-		}
-		if !isUpper(field.Name[0]) { // skip private field(starting with lower case letter)
-			log.Warningf("Unexported field %s with stats tag", field.Name)
-			continue
-		}
-		statsOpts := strings.Split(statsTag, ",")
-		name := strings.Replace(statsOpts[0], "-", "_", -1)
-		value := val.Field(i).Interface()
-		client.Count(name, value)
-	}
+	return fields
 }
 
-func newStatsdClient(remote net.IP) *statsd.Client {
+func collectBatchPoints() client.BatchPoints {
+	timestamp := time.Now()
+	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{Precision: "s"})
+	lock.Lock()
+	for it := statSources.Iterator(); !it.Empty(); it.Next() {
+		statSource := it.Value().(StatSource)
+		for statSource.countable.Closed() {
+			statSources.Remove(&it)
+		}
+
+		max := func(x, y time.Duration) time.Duration {
+			if x > y {
+				return x
+			}
+			return y
+		}
+
+		statSource.skip--
+		if statSource.skip > 0 {
+			continue
+		}
+		statSource.skip = int(max(statSource.interval, MinInterval) / time.Second)
+
+		fields := counterToFields(statSource.countable.GetCounter())
+		point, _ := client.NewPoint(processName+"."+statSource.module, statSource.tags, fields, timestamp)
+		bp.AddPoint(point)
+	}
+	lock.Unlock()
+	return bp
+}
+
+func newStatsdClient(remote net.UDPAddr) *statsd.Client {
 	options := []statsd.Option{
-		statsd.Address(fmt.Sprintf("%s:%d", remote, STATSD_PORT)),
-		statsd.Prefix(processName),
+		statsd.Address(remote.String()),
 		statsd.TagsFormat(statsd.InfluxDB),
 	}
 	if hostname != "" { // specified hostname
@@ -128,83 +145,114 @@ func newStatsdClient(remote net.IP) *statsd.Client {
 		log.Warning(err)
 		return nil
 	}
-	log.Info("Statsd server connected")
 	return c
 }
 
-func max(x, y time.Duration) time.Duration {
-	if x > y {
-		return x
-	}
-	return y
-}
-
-func runOnce() {
-	lock.Lock()
-	hooks := preHooks
-	lock.Unlock()
-	for _, hook := range hooks {
-		hook()
-	}
-
-	if len(statSources) == 0 {
-		return
-	}
-
-	lock.Lock()
+func sendStatsd(bp client.BatchPoints) {
 	for i, remote := range remotes {
 		if statsdClients[i] == nil {
-			statsdClients[i] = newStatsdClient(remote)
+			statsdClients[i] = newStatsdClient(net.UDPAddr{remote.IP, STATSD_PORT, ""})
 		}
 	}
 
-	for countable, statSource := range statSources {
-		statSource.skip--
-		if statSource.skip > 0 {
-			continue
+	for _, point := range bp.Points() {
+		module := point.Name()
+		tags := point.Tags()
+		tagsOption := make([]string, 0, len(tags)*2)
+		for key, value := range tags {
+			tagsOption = append(tagsOption, key, strings.Replace(value, ":", "-", -1))
 		}
-		counter := countable.GetCounter()
+		fields, _ := point.Fields()
 		for _, statsdClient := range statsdClients {
 			if statsdClient == nil {
 				continue
 			}
-			client := statsdClient.Clone(statSource.options...)
-			sendCounter(client, counter)
+			statsdClient = statsdClient.Clone(
+				statsd.Prefix(strings.Replace(module, "-", "_", -1)),
+				statsd.Tags(tagsOption...),
+			)
+			for key, value := range fields {
+				name := strings.Replace(key, "-", "_", -1)
+				statsdClient.Count(name, value)
+			}
 		}
-		interval := max(statSource.interval, MinInterval)
-		statSource.skip = int(interval / time.Second)
 	}
-	lock.Unlock()
+}
+
+func nextRemote() error {
+	remoteIndex = (remoteIndex + 1) % len(remotes)
+	conn, err := client.NewUDPClient(client.UDPConfig{remotes[remoteIndex].String(), 1400})
+	if err != nil {
+		return err
+	}
+	connection = conn
+	return nil
+}
+
+func runOnce() {
+	bp := collectBatchPoints()
+
+	if len(remotes) == 0 {
+		return
+	}
+
+	// FIXME: deprecated statsd
+	if remoteType == REMOTE_TYPE_STATSD {
+		sendStatsd(bp)
+		return
+	}
+
+	for i := 0; i < len(remotes); i++ {
+		if connection == nil {
+			goto next_server
+		}
+		if err := connection.Write(bp); err != nil {
+			log.Warning(err) // probably ICMP unreachable
+			goto next_server
+		}
+		break
+	next_server:
+		if err := nextRemote(); err != nil {
+			log.Warning(err) // probably route unreachable
+		}
+	}
 }
 
 func run() {
 	time.Sleep(time.Second) // wait logger init
 
 	for range time.NewTicker(time.Second).C {
-		runOnce()
-	}
-}
+		lock.Lock()
+		hooks := preHooks
+		lock.Unlock()
+		for _, hook := range hooks {
+			hook()
+		}
 
-func resetClients() {
-	lock.Lock()
-	for _, c := range statsdClients {
-		if c != nil {
-			c.Close()
+		if statSources.Len() > 0 {
+			runOnce()
 		}
 	}
-	statsdClients = make([]*statsd.Client, len(remotes))
-	lock.Unlock()
 }
 
-func setRemotes(ips ...net.IP) {
-	log.Infof("Remote changed to %s", ips)
-	remotes = ips
-	resetClients()
+func setRemotes(addrs ...net.UDPAddr) {
+	log.Info("Remote changed to", addrs)
+	remotes = addrs
+	lock.Lock()
+	if connection != nil {
+		connection.Close()
+		connection = nil
+	}
+	lock.Unlock()
 }
 
 func setHostname(name string) {
 	hostname = name
-	resetClients()
+	lock.Lock()
+	for it := statSources.Iterator(); !it.Empty(); it.Next() {
+		it.Value().(StatSource).tags["host"] = hostname
+	}
+	lock.Unlock()
 }
 
 func init() {

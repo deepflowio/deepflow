@@ -11,7 +11,7 @@ type HashKey = uint8
 type Option = interface{}
 
 type OptionRelease = func(x interface{})
-type OptionStatsOption = stats.StatsOption
+type OptionStatsOption = stats.Option
 type OptionFlushIndicator = time.Duration // scheduled put nil into queue
 
 type QueueReader interface {

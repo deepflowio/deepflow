@@ -1,5 +1,5 @@
 // Golang的list简直就是辣鸡
-package utils
+package datastructure
 
 import (
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
@@ -65,20 +65,41 @@ func (q *LinkedList) PopFront() interface{} {
 	return v
 }
 
+func (q *LinkedList) Remove(it *Iterator) interface{} {
+	if it.head != q.head {
+		return nil
+	}
+	if q.head == it.current {
+		return q.PopFront()
+	}
+	current := it.current
+	it.prev.next = current.next
+	v := current.value
+	if q.tail == current {
+		q.tail = it.prev
+	}
+	q.size--
+	it.Next()
+	releaseElement(current)
+	return v
+}
+
 func (q *LinkedList) Len() int {
 	return q.size
 }
 
 func (q *LinkedList) Iterator() Iterator {
-	return Iterator{q.head.next}
+	return Iterator{q.head, q.head, nil}
 }
 
 type Iterator struct {
+	head    *Element
 	current *Element
+	prev    *Element
 }
 
 func (it *Iterator) Next() {
-	it.current = it.current.next
+	it.prev, it.current = it.current, it.current.next
 }
 
 func (it *Iterator) Empty() bool {

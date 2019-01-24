@@ -30,12 +30,20 @@
   version = "v1.0.50"
 
 [[constraint]]
+  name = "github.com/influxdata/influxdb"
+  version = "v1.6.4"
+
+[[constraint]]
+  name = "gopkg.in/alexcesaro/statsd.v2"
+  version = "2.0.0"
+
+[[constraint]]
   name = "github.com/google/gopacket"
   version = "v1.1.15"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/lestrrat/go-file-rotatelogs"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/op/go-logging"
@@ -52,10 +60,6 @@
 [[constraint]]
   name = "google.golang.org/grpc"
   version = "1.14.0"
-
-[[constraint]]
-  name = "gopkg.in/alexcesaro/statsd.v2"
-  version = "2.0.0"
 
 [[constraint]]
   name = "github.com/OneOfOne/xxhash"

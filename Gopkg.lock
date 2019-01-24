@@ -60,6 +60,28 @@
   version = "v1.0"
 
 [[projects]]
+  digest = "1:718c57979a9197414a044fff2028e57cb9fe145069e4f507059755bfe87f1bfe"
+  name = "github.com/influxdata/influxdb"
+  packages = [
+    "client/v2",
+    "models",
+    "pkg/escape",
+  ]
+  pruneopts = "UT"
+  revision = "698dbc789aff13c2678357a6b93ff73dd7136571"
+  version = "v1.7.3"
+
+[[projects]]
+  digest = "1:937258f1293bc9295b4789b0abea5b4ec030e3caecb65a4e1dc0b6999957a5ed"
+  name = "github.com/influxdata/platform"
+  packages = [
+    "models",
+    "pkg/escape",
+  ]
+  pruneopts = "UT"
+  revision = "0f79e4ea3248354c789cba274542e0a8e55971db"
+
+[[projects]]
   branch = "master"
   digest = "1:f7d8e8432e355163397d2da1e17d0fb616d611db1360c43b1ac73e56f87038e2"
   name = "github.com/lestrrat/go-file-rotatelogs"
@@ -244,6 +266,8 @@
     "github.com/golang/protobuf/proto",
     "github.com/google/gopacket/layers",
     "github.com/google/gopacket/pcapgo",
+    "github.com/influxdata/influxdb/client/v2",
+    "github.com/influxdata/influxdb/models",
     "github.com/lestrrat/go-file-rotatelogs",
     "github.com/op/go-logging",
     "github.com/pebbe/zmq4",

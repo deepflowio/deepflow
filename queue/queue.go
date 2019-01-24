@@ -7,7 +7,6 @@ package queue
 
 import (
 	"errors"
-	"runtime"
 	"sync"
 	"time"
 
@@ -25,6 +24,7 @@ type Counter struct {
 }
 
 type OverwriteQueue struct {
+	stats.Closable
 	sync.Mutex
 
 	writeLock     sync.Mutex
@@ -51,7 +51,7 @@ func (q *OverwriteQueue) Init(module string, size int, options ...Option) {
 	}
 
 	var flushIndicator time.Duration
-	statOptions := []stats.StatsOption{stats.OptionStatTags{"module": module}}
+	statOptions := []stats.Option{stats.OptionStatTags{"module": module}}
 	for _, option := range options {
 		switch option.(type) {
 		case OptionRelease:
@@ -75,7 +75,6 @@ func (q *OverwriteQueue) Init(module string, size int, options ...Option) {
 	q.size = uint(size)
 	q.counter = &Counter{}
 	stats.RegisterCountable("queue", q, statOptions...)
-	runtime.SetFinalizer(q, func(q *OverwriteQueue) { q.Close() })
 
 	if flushIndicator > 0 {
 		go func() {
@@ -90,10 +89,6 @@ func (q *OverwriteQueue) GetCounter() interface{} {
 	var counter *Counter
 	counter, q.counter = q.counter, &Counter{}
 	return counter
-}
-
-func (q *OverwriteQueue) Close() {
-	stats.DeregisterCountable(q)
 }
 
 func (q *OverwriteQueue) firstIndex() uint {

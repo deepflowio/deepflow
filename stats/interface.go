@@ -1,44 +1,43 @@
 package stats
 
 import (
-	"bytes"
 	"net"
 	"time"
-)
-
-type StatType uint8
-
-const (
-	COUNT_TYPE StatType = iota
-	GAUGE_TYPE
 )
 
 var (
 	MinInterval = time.Second
 )
 
-type StatsOption = interface{}
+type RemoteType = bool
 
-type OptionStatTags map[string]string
-type OptionInterval time.Duration
+const (
+	REMOTE_TYPE_STATSD   = true
+	REMOTE_TYPE_INFLUXDB = false
+)
 
-func (t *OptionStatTags) String() string {
-	if len(*t) == 0 {
-		return "{}"
-	}
-	var strBuf bytes.Buffer
-	strBuf.WriteString("{")
-	for key, value := range *t {
-		strBuf.WriteString(key + ": " + value + ", ")
-	}
-	strBuf.Truncate(strBuf.Len() - 2)
-	return strBuf.String() + "}"
-}
+type Option = interface{}
+type OptionStatTags = map[string]string
+type OptionInterval time.Duration // must be time.Second, time.Minute or time.Hour
 
 type Countable interface {
 	// needs to be thread-safe, clear is required after read
 	// accept struct or []StatItem
 	GetCounter() interface{}
+
+	// once closed, countable will be removed from stats
+	Closed() bool
+}
+
+type Closable bool
+
+func (c *Closable) Close() error {
+	*c = Closable(true)
+	return nil
+}
+
+func (c *Closable) Closed() bool {
+	return bool(*c)
 }
 
 // 限定stats的最少interval，也就是不论注册Countable时
@@ -47,9 +46,15 @@ func SetMinInterval(interval time.Duration) {
 	MinInterval = interval
 }
 
-// 指定stats远程服务器地址
-func SetRemotes(ip ...net.IP) {
-	setRemotes(ip...)
+// 指定influxdb远程服务器
+// 只会有其中一个远程服务器会收到统计数据
+func SetRemotes(addrs ...net.UDPAddr) {
+	setRemotes(addrs...)
+}
+
+// 指定远程服务器类型，默认influxdb
+func SetRemoteType(t RemoteType) {
+	remoteType = t
 }
 
 func SetHostname(name string) {
@@ -62,10 +67,6 @@ func RegisterPreHook(hook func()) {
 	lock.Unlock()
 }
 
-func RegisterCountable(module string, countable Countable, opts ...StatsOption) error {
+func RegisterCountable(module string, countable Countable, opts ...Option) error {
 	return registerCountable(module, countable, opts...)
-}
-
-func DeregisterCountable(countable Countable) {
-	deregisterCountable(countable)
 }
