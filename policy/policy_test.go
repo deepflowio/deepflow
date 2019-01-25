@@ -58,15 +58,17 @@ var (
 	groupEpc = []int32{0, 10, 20, 0, 40, 50, 0, 70, 40, 11, 12}
 	ipGroup6 = group[6] + IP_GROUP_ID_FLAG
 
-	group1Ip1  = NewIPFromString("192.168.1.10").Int()
-	group1Ip2  = NewIPFromString("192.168.1.20").Int()
-	group1Ip3  = NewIPFromString("102.168.33.22").Int()
-	group1Mac  = NewMACAddrFromString("11:11:11:11:11:11").Int()
-	group1Mac2 = NewMACAddrFromString("11:11:11:11:11:12").Int()
+	group1Ip1Net = "192.168.1.0/24"
+	group1Ip1    = NewIPFromString("192.168.1.10").Int()
+	group1Ip2    = NewIPFromString("192.168.1.20").Int()
+	group1Ip3    = NewIPFromString("102.168.33.22").Int()
+	group1Mac    = NewMACAddrFromString("11:11:11:11:11:11").Int()
+	group1Mac2   = NewMACAddrFromString("11:11:11:11:11:12").Int()
 
-	group2Ip1 = NewIPFromString("10.30.1.10").Int()
-	group2Ip2 = NewIPFromString("10.30.1.20").Int()
-	group2Mac = NewMACAddrFromString("22:22:22:22:22:22").Int()
+	group2Ip1Net = "10.30.1.0/24"
+	group2Ip1    = NewIPFromString("10.30.1.10").Int()
+	group2Ip2    = NewIPFromString("10.30.1.20").Int()
+	group2Mac    = NewMACAddrFromString("22:22:22:22:22:22").Int()
 
 	group3Ip1  = NewIPFromString("192.168.20.112").Int() // group3/group4
 	group3Ip2  = NewIPFromString("172.16.1.200").Int()   // group3/group4
@@ -252,9 +254,12 @@ func generatePolicyAcl(table *PolicyTable, action AclAction, aclID ACLID, args .
 	srcGroups := make([]uint32, 0, 1)
 	dstGroups := make([]uint32, 0, 1)
 	dstPorts := make([]PortRange, 0, 1)
-
-	srcGroups = append(srcGroups, srcGroupId)
-	dstGroups = append(dstGroups, dstGroupId)
+	if srcGroupId != 0 {
+		srcGroups = append(srcGroups, srcGroupId)
+	}
+	if dstGroupId != 0 {
+		dstGroups = append(dstGroups, dstGroupId)
+	}
 	if port != 0 {
 		dstPorts = append(dstPorts, NewPortRange(port, port))
 	}
@@ -1772,6 +1777,82 @@ func TestAclGidBitmapGroup100(t *testing.T) {
 	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].AddDirections(BACKWARD)
 	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(4)
 	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidbitmap0, aclGidbitmap1, aclGidbitmap2, aclGidbitmap3)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmap Check Failed!")
+	}
+}
+
+func TestAclGidBitmapByDesignationAcls(t *testing.T) {
+	table := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	action1 := generateAclAction(10, ACTION_PACKET_COUNTING)
+	action1 = action1.SetACLGID(100)
+	action2 := generateAclAction(20, ACTION_PACKET_COUNTING)
+	action2 = action2.SetACLGID(200)
+	action3 := generateAclAction(30, ACTION_PACKET_COUNTING)
+	action3 = action3.SetACLGID(300)
+	action4 := generateAclAction(30, ACTION_PACKET_COUNTING)
+	action4 = action4.SetACLGID(400)
+	// 10->20
+	acl1 := generatePolicyAcl(table, action1, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	// any->20
+	acl2 := generatePolicyAcl(table, action2, 20, groupAny, group[2], IPProtocolTCP, 0, vlanAny)
+	// 10->any
+	acl3 := generatePolicyAcl(table, action3, 30, group[1], groupAny, IPProtocolTCP, 0, vlanAny)
+	// any->any
+	acl4 := generatePolicyAcl(table, action4, 40, groupAny, groupAny, IPProtocolTCP, 0, vlanAny)
+	acls := []*Acl{}
+	acls = append(acls, acl1, acl2, acl3, acl4)
+	table.UpdateAcls(acls)
+	ipGroups := make([]*IpGroupData, 0, 100)
+	ipGroups = append(ipGroups, generateIpGroup(group[1], 0, group1Ip1Net))
+	ipGroups = append(ipGroups, generateIpGroup(group[2], 0, group2Ip1Net))
+	table.UpdateIpGroupData(ipGroups)
+	// group1Ip1 -> group2Ip1
+	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 0)
+	endpointData, policyData := table.LookupAllByKey(key)
+	aclGidbitmap1 := generateAclGidBitmap(GROUP_TYPE_SRC, 0, math.MaxUint32)
+	aclGidbitmap1.SetMapBits(0)
+	aclGidbitmap2 := generateAclGidBitmap(GROUP_TYPE_DST, 0, math.MaxUint32)
+	aclGidbitmap2.SetMapBits(0)
+	aclGidbitmap3 := generateAclGidBitmap(GROUP_TYPE_SRC, 0, math.MaxUint32)
+	aclGidbitmap3.SetMapBits(0)
+	aclGidbitmap4 := generateAclGidBitmap(GROUP_TYPE_DST, 0, math.MaxUint32)
+	aclGidbitmap4.SetMapBits(0)
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action1, action3, action2, action4}, nil, acl1.Id)
+	basicPolicyData.AclActions[3] = basicPolicyData.AclActions[3].AddDirections(BACKWARD)
+	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(2)
+	basicPolicyData.AclActions[1] = basicPolicyData.AclActions[1].SetAclGidBitmapOffset(2).SetAclGidBitmapCount(1)
+	basicPolicyData.AclActions[2] = basicPolicyData.AclActions[2].SetAclGidBitmapOffset(3).SetAclGidBitmapCount(1)
+	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidbitmap1, aclGidbitmap2, aclGidbitmap3, aclGidbitmap4)
+	t.Log(endpointData)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmap Check Failed!")
+	}
+	// group1Ip1 -> group3Ip1
+	key1 := generateLookupKey(group1Mac, group3Mac1, vlanAny, group1Ip1, group3Ip1, IPProtocolTCP, 0, 0)
+	_, policyData = table.LookupAllByKey(key1)
+	aclGidbitmap1 = generateAclGidBitmap(GROUP_TYPE_SRC, 0, math.MaxUint32)
+	aclGidbitmap1.SetMapBits(0)
+	basicPolicyData = new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action3, action4}, nil, acl3.Id)
+	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(1)
+	basicPolicyData.AclActions[1] = basicPolicyData.AclActions[1].AddDirections(BACKWARD)
+	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidbitmap1)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmap Check Failed!")
+	}
+	// group2Ip1 -> group3Ip1
+	key2 := generateLookupKey(group2Mac, group3Mac1, vlanAny, group2Ip1, group3Ip1, IPProtocolTCP, 0, 0)
+	_, policyData = table.LookupAllByKey(key2)
+	aclGidbitmap1 = generateAclGidBitmap(GROUP_TYPE_SRC, 0, math.MaxUint32)
+	aclGidbitmap1.SetMapBits(0)
+	basicPolicyData = new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action4, action2}, nil, acl4.Id)
+	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].AddDirections(BACKWARD)
+	basicPolicyData.AclActions[1] = basicPolicyData.AclActions[1].SetDirections(BACKWARD)
+	basicPolicyData.AclActions[1] = basicPolicyData.AclActions[1].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(1)
+	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidbitmap1)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestAclGidBitmap Check Failed!")
 	}
