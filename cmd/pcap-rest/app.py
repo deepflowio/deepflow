@@ -160,8 +160,12 @@ def _mac_convert_back(mac):
 
 
 def _tap_type_to_id(tapType):
-    if tapType == 'isp':
+    if tapType == 'isp0':
+        return 0
+    if tapType == 'isp' or tapType == 'isp1':
         return 1
+    if tapType == 'isp2':
+        return 2
     if tapType == 'tor':
         return 3
     return 0
