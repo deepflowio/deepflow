@@ -7,6 +7,7 @@ import (
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
+	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 )
 
 const (
@@ -17,14 +18,14 @@ const (
 
 type WriterKey uint64
 
-func getWriterKey(ipInt datatype.IPv4Int, aclGID datatype.ACLID, tapType datatype.TapType) WriterKey {
+func getWriterKey(ipInt datatype.IPv4Int, aclGID datatype.ACLID, tapType zerodoc.TAPTypeEnum) WriterKey {
 	return WriterKey((uint64(ipInt) << 32) | (uint64(aclGID) << 16) | uint64(tapType))
 }
 
 type WrappedWriter struct {
 	*Writer
 
-	tapType datatype.TapType
+	tapType zerodoc.TAPTypeEnum
 	aclGID  datatype.ACLID
 	ip      datatype.IPv4Int
 	mac     datatype.MacInt
@@ -99,11 +100,15 @@ func ipToString(ip datatype.IPv4Int) string {
 	return fmt.Sprintf("%03d%03d%03d%03d", uint8(ip>>24), uint8(ip>>16), uint8(ip>>8), uint8(ip))
 }
 
-func tapTypeToString(tapType datatype.TapType) string {
+func tapTypeToString(tapType zerodoc.TAPTypeEnum) string {
 	switch tapType {
-	case datatype.TAP_ISP:
-		return "isp"
-	case datatype.TAP_TOR:
+	case zerodoc.ISP0:
+		return "isp0"
+	case zerodoc.ISP1:
+		return "isp1"
+	case zerodoc.ISP2:
+		return "isp2"
+	case zerodoc.ToR:
 		return "tor"
 	default:
 		panic("unsupported tap type")
@@ -114,7 +119,7 @@ func formatDuration(d time.Duration) string {
 	return time.Unix(0, int64(d)).Format(TIME_FORMAT)
 }
 
-func getTempFilename(tapType datatype.TapType, mac datatype.MacInt, ip datatype.IPv4Int, firstPacketTime time.Duration, index int) string {
+func getTempFilename(tapType zerodoc.TAPTypeEnum, mac datatype.MacInt, ip datatype.IPv4Int, firstPacketTime time.Duration, index int) string {
 	return fmt.Sprintf("%s_%s_%s_%s_.%d.pcap.temp", tapTypeToString(tapType), macToString(mac), ipToString(ip), formatDuration(firstPacketTime), index)
 }
 
@@ -149,7 +154,7 @@ func (w *Worker) finishWriter(writer *WrappedWriter, newFilename string) {
 	w.FileCloses++
 }
 
-func (w *Worker) writePacket(packet *datatype.MetaPacket, tapType datatype.TapType, ip datatype.IPv4Int, mac datatype.MacInt, aclGID datatype.ACLID) {
+func (w *Worker) writePacket(packet *datatype.MetaPacket, tapType zerodoc.TAPTypeEnum, ip datatype.IPv4Int, mac datatype.MacInt, aclGID datatype.ACLID) {
 	key := getWriterKey(ip, aclGID, tapType)
 	writer, exist := w.writers[key]
 	if exist && w.shouldCloseFile(writer, packet) {
@@ -230,9 +235,9 @@ func (w *Worker) Process() {
 
 			ips = ips[:0]
 			macs = macs[:0]
-			var tapType datatype.TapType
+			var tapType zerodoc.TAPTypeEnum
 			if isISP(packet.InPort) {
-				tapType = datatype.TAP_ISP
+				tapType = zerodoc.TAPTypeEnum(packet.InPort - 0x10000)
 				if packet.EndpointData.SrcInfo.L3EpcId != 0 && packet.IpSrc != BROADCAST_IP && packet.MacSrc != BROADCAST_MAC {
 					ips = append(ips, packet.IpSrc)
 					macs = append(macs, packet.MacSrc)
@@ -242,7 +247,7 @@ func (w *Worker) Process() {
 					macs = append(macs, packet.MacDst)
 				}
 			} else if isTOR(packet.InPort) {
-				tapType = datatype.TAP_TOR
+				tapType = zerodoc.ToR
 				if packet.EndpointData.SrcInfo.L2End && packet.IpSrc != BROADCAST_IP && packet.MacSrc != BROADCAST_MAC {
 					ips = append(ips, packet.IpSrc)
 					macs = append(macs, packet.MacSrc)

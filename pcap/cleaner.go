@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 )
 
 const (
@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	EXAMPLE_TEMPNAME        = getTempFilename(datatype.TAP_ISP, 0, 0, time.Duration(time.Now().UnixNano()), 0)
+	EXAMPLE_TEMPNAME        = getTempFilename(zerodoc.ISP1, 0, 0, time.Duration(time.Now().UnixNano()), 0)
 	EXAMPLE_TEMPNAME_SPLITS = len(strings.Split(EXAMPLE_TEMPNAME, "_"))
 )
 
