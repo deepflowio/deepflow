@@ -163,6 +163,10 @@ func (f *FlowGenerator) GetCounter() interface{} {
 	return &counter
 }
 
+func (f *FlowGenerator) Closed() bool {
+	return false // FIXME: never close?
+}
+
 func SetTimeout(timeout TimeoutConfig) {
 	openingTimeout = timeout.Opening
 	establishedTimeout = timeout.Established

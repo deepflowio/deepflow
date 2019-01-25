@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/gopacket/afpacket"
 	"github.com/op/go-logging"
-	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
 var log = logging.MustGetLogger("capture")
@@ -67,10 +66,6 @@ func (c *Capture) GetCounter() interface{} {
 		counter.Rx, counter.Err, counter.KernelPackets, counter.KernelDrops, counter.KernelFreezes,
 	)
 	return counter
-}
-
-func (c *Capture) IsRunning() bool {
-	return c.running
 }
 
 func (c *Capture) run() (retErr error) {
@@ -156,6 +151,10 @@ func (c *Capture) Close() error {
 		return err
 	}
 	c.tPacket.Close()
-	stats.DeregisterCountable(c)
+	c.tPacket = nil
 	return nil
+}
+
+func (c *Capture) Closed() bool {
+	return c.tPacket == nil
 }

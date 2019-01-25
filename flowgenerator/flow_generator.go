@@ -10,7 +10,7 @@ import (
 	"github.com/op/go-logging"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
-	. "gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
 var log = logging.MustGetLogger("flowgenerator")
@@ -670,9 +670,9 @@ func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, buf
 	flowGenerator.initFlowCache()
 	flowGenerator.initStateMachineMaster()
 	flowGenerator.initStateMachineSlave()
-	tags := OptionStatTags{"index": strconv.Itoa(index)}
-	RegisterCountable("flow_generator", flowGenerator, tags)
-	RegisterCountable(FP_NAME, &flowGenerator.perfCounter, tags)
+	tags := stats.OptionStatTags{"index": strconv.Itoa(index)}
+	stats.RegisterCountable("flow_generator", flowGenerator, tags)
+	stats.RegisterCountable(FP_NAME, &flowGenerator.perfCounter, tags)
 	log.Infof("flow generator %d created", index)
 	return flowGenerator
 }

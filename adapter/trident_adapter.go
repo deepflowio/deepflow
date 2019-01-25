@@ -72,18 +72,26 @@ type TridentAdapter struct {
 }
 
 func NewTridentAdapter(queues queue.MultiQueueWriter, listenBufferSize, cacheSize int, timeAdjust int64) *TridentAdapter {
-	adapter := &TridentAdapter{}
-	adapter.counter = &PacketCounter{}
-	adapter.stats = &PacketCounter{}
-	adapter.listenBufferSize = listenBufferSize
-	adapter.cacheSize = cacheSize
-	adapter.timeAdjust = timeAdjust
-	adapter.queues = queues
-	adapter.itemKeys = make([]queue.HashKey, 0, PACKET_MAX+1)
+	adapter := &TridentAdapter{
+		listenBufferSize: listenBufferSize,
+		cacheSize:        cacheSize,
+		timeAdjust:       timeAdjust,
+
+		queues:    queues,
+		itemKeys:  make([]queue.HashKey, 0, PACKET_MAX+1),
+		itemBatch: make([]interface{}, PACKET_MAX),
+		udpPool: sync.Pool{
+			New: func() interface{} {
+				return make([]byte, UDP_BUFFER_SIZE)
+			},
+		},
+
+		instances: make(map[TridentKey]*tridentInstance),
+		counter:   &PacketCounter{},
+		stats:     &PacketCounter{},
+	}
+
 	adapter.itemKeys = append(adapter.itemKeys, queue.HashKey(0))
-	adapter.itemBatch = make([]interface{}, PACKET_MAX)
-	adapter.instances = make(map[TridentKey]*tridentInstance)
-	adapter.udpPool.New = func() interface{} { return make([]byte, UDP_BUFFER_SIZE) }
 	listener, err := net.ListenUDP("udp4", &net.UDPAddr{Port: LISTEN_PORT})
 	if err != nil {
 		log.Error(err)
@@ -101,8 +109,8 @@ func (a *TridentAdapter) GetCounter() interface{} {
 	return counter
 }
 
-func (a *TridentAdapter) IsRunning() bool {
-	return a.running
+func (a *TridentAdapter) Closed() bool {
+	return false // FIXME: never close?
 }
 
 func (a *TridentAdapter) cacheClear(data []byte, key uint32, seq uint32) {
