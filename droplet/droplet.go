@@ -33,8 +33,9 @@ import (
 var log = logging.MustGetLogger("droplet")
 
 const (
-	DEBUG_LISTEN_IP   = "127.0.0.1"
-	DEBUG_LISTEN_PORT = 9527
+	INFLUXDB_RELAY_PORT = 20048
+	DEBUG_LISTEN_IP     = "127.0.0.1"
+	DEBUG_LISTEN_PORT   = 9527
 )
 
 func getLocalIp() (net.IP, error) {
@@ -72,11 +73,15 @@ func Start(configPath string) (closers []io.Closer) {
 	stats.RegisterGcMonitor()
 	stats.SetMinInterval(10 * time.Second)
 
-	controllers := make([]net.IP, 0, len(cfg.ControllerIps))
-	for _, ipString := range cfg.ControllerIps {
-		ip := net.ParseIP(ipString)
-		controllers = append(controllers, ip)
+	influxdbHosts := make([]net.UDPAddr, len(cfg.ControllerIps))
+	controllers := make([]net.IP, len(cfg.ControllerIps))
+	for i, ipString := range cfg.ControllerIps {
+		ip := net.ParseIP(ipString).To4()
+		influxdbHosts[i] = net.UDPAddr{ip, INFLUXDB_RELAY_PORT, ""}
+		controllers[i] = ip
 	}
+	stats.SetRemotes(influxdbHosts...)
+
 	synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.ControllerPort, cfg.RpcTimeout)
 	synchronizer.Start()
 

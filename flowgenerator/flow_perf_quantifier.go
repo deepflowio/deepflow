@@ -116,6 +116,8 @@ type FlowPerfDataInfo struct {
 }
 
 type FlowPerfCounter struct {
+	stats.Closable
+
 	counter *FlowPerfStats
 }
 
@@ -942,16 +944,12 @@ func initFlowInfo(flow *TaggedFlow, state FlowState, reply, reversed bool) *Flow
 
 func NewFlowPerfCounter() FlowPerfCounter {
 	return FlowPerfCounter{
-		&FlowPerfStats{},
+		counter: &FlowPerfStats{},
 	}
 }
 
 func (c *FlowPerfCounter) String() string {
 	return reflectFormat(*c)
-}
-
-func (c *FlowPerfCounter) Close() {
-	stats.DeregisterCountable(c)
 }
 
 // implement stats/GetCounter interface

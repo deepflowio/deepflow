@@ -283,11 +283,16 @@ func (w *Worker) Close() error {
 		newFilename := writer.getFilename(w.baseDirectory)
 		w.finishWriter(writer, newFilename)
 	}
+	w.writers = nil
 	return nil
 }
 
-func (c *Worker) GetCounter() interface{} {
+func (w *Worker) GetCounter() interface{} {
 	counter := &WorkerCounter{}
-	counter, c.WorkerCounter = c.WorkerCounter, counter
+	counter, w.WorkerCounter = w.WorkerCounter, counter
 	return counter
+}
+
+func (w *Worker) Closed() bool {
+	return w.writers == nil
 }

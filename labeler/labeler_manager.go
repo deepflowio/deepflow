@@ -85,6 +85,10 @@ func (l *LabelerManager) GetCounter() interface{} {
 	return l.policyTable.GetCounter()
 }
 
+func (l *LabelerManager) Closed() bool {
+	return false // FIXME: never close?
+}
+
 func (l *LabelerManager) RegisterAppQueue(queueType QueueType, appQueues queue.MultiQueueWriter) {
 	l.appQueues[queueType] = appQueues
 }

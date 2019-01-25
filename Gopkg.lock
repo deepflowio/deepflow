@@ -61,6 +61,28 @@
   version = "v1.0"
 
 [[projects]]
+  digest = "1:718c57979a9197414a044fff2028e57cb9fe145069e4f507059755bfe87f1bfe"
+  name = "github.com/influxdata/influxdb"
+  packages = [
+    "client/v2",
+    "models",
+    "pkg/escape",
+  ]
+  pruneopts = "UT"
+  revision = "698dbc789aff13c2678357a6b93ff73dd7136571"
+  version = "v1.7.3"
+
+[[projects]]
+  digest = "1:937258f1293bc9295b4789b0abea5b4ec030e3caecb65a4e1dc0b6999957a5ed"
+  name = "github.com/influxdata/platform"
+  packages = [
+    "models",
+    "pkg/escape",
+  ]
+  pruneopts = "UT"
+  revision = "0f79e4ea3248354c789cba274542e0a8e55971db"
+
+[[projects]]
   branch = "master"
   digest = "1:f7d8e8432e355163397d2da1e17d0fb616d611db1360c43b1ac73e56f87038e2"
   name = "github.com/lestrrat/go-file-rotatelogs"
@@ -148,12 +170,13 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:a7b7d2c1084ad6762a6f6d41b7099819809bb58c57cc58e1ab6233d56f3e1d45"
+  digest = "1:1944119d7a29639ccccf82212437ad45cc171acd223ea1f38d765eef64129445"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "app",
     "bit",
     "codec",
+    "datastructure",
     "datatype",
     "debug",
     "dedup",
@@ -173,7 +196,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "0d57cc02b8a349dd27203fccfbff69b50df45db2"
+  revision = "d910778f3699e9e4d77c00afe5a113cf13ee37a6"
 
 [[projects]]
   branch = "master"

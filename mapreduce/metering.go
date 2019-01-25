@@ -102,15 +102,10 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.stashes[i] = NewStash(h.docsInBuffer, h.variedDocLimit, h.windowSize, h.windowMoveMargin)
 		handler.statItems[i].Name = h.processors[i].GetName()
-		handler.statItems[i].StatType = stats.COUNT_TYPE
 		handler.statItems[i+handler.numberOfApps].Name = fmt.Sprintf("%s_avg_doc_counter", h.processors[i].GetName())
-		handler.statItems[i+handler.numberOfApps].StatType = stats.COUNT_TYPE
 		handler.statItems[i+handler.numberOfApps*2].Name = fmt.Sprintf("%s_max_doc_counter", h.processors[i].GetName())
-		handler.statItems[i+handler.numberOfApps*2].StatType = stats.COUNT_TYPE
 		handler.statItems[i+handler.numberOfApps*3].Name = fmt.Sprintf("%s_rejected_doc", h.processors[i].GetName())
-		handler.statItems[i+handler.numberOfApps*3].StatType = stats.COUNT_TYPE
 		handler.statItems[i+handler.numberOfApps*4].Name = fmt.Sprintf("%s_flush", h.processors[i].GetName())
-		handler.statItems[i+handler.numberOfApps*4].StatType = stats.COUNT_TYPE
 	}
 	stats.RegisterCountable("metering_mapper", &handler, stats.OptionStatTags{"index": strconv.Itoa(index)})
 	return &handler
@@ -143,6 +138,10 @@ func (h *subMeteringHandler) GetCounter() interface{} {
 	}
 
 	return h.statItems
+}
+
+func (h *subMeteringHandler) Closed() bool {
+	return false // FIXME: never close?
 }
 
 // processorID = -1 for all stash
