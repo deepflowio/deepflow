@@ -81,9 +81,21 @@ type LookupKey struct {
 	FeatureFlag                    FeatureFlags
 }
 
+type L3L2End int
+
+const (
+	L3_L2_END_FALSE_FALSE L3L2End = iota
+	L3_L2_END_FALSE_TRUE
+	L3_L2_END_TRUE_FALSE
+	L3_L2_END_TRUE_TRUE
+	L3_L2_END_MAX
+)
+
 type EndpointData struct {
-	SrcInfo *EndpointInfo
-	DstInfo *EndpointInfo
+	SrcInfo  *EndpointInfo
+	DstInfo  *EndpointInfo
+	SrcInfos [L3_L2_END_MAX]EndpointInfo
+	DstInfos [L3_L2_END_MAX]EndpointInfo
 }
 
 func (k *LookupKey) String() string {
@@ -94,6 +106,30 @@ func (k *LookupKey) String() string {
 
 func (k *LookupKey) HasFeatureFlag(featureFlag FeatureFlags) bool {
 	return k.FeatureFlag&featureFlag == featureFlag
+}
+
+func newL3L2End(l2End, l3End bool) L3L2End {
+	ends := L3_L2_END_FALSE_FALSE
+	if l2End {
+		ends += L3_L2_END_FALSE_TRUE
+	}
+	if l3End {
+		ends += L3_L2_END_TRUE_FALSE
+	}
+	return ends
+}
+
+func (i *EndpointInfo) SetL3L2End(ends L3L2End) {
+	if (ends & L3_L2_END_FALSE_TRUE) > 0 {
+		i.L2End = true
+	}
+	if ends >= L3_L2_END_TRUE_FALSE {
+		i.L3End = true
+	}
+}
+
+func (i *EndpointInfo) GetL3L2End() L3L2End {
+	return newL3L2End(i.L2End, i.L3End)
 }
 
 func (i *EndpointInfo) SetL2Data(data *PlatformData) {
@@ -137,10 +173,11 @@ func IsOriginalTtl(ttl uint8) bool {
 	return false
 }
 
-func (i *EndpointInfo) SetL3EndByTtl(ttl uint8) {
+func (i *EndpointInfo) GetL3EndByTtl(ttl uint8) bool {
 	if IsOriginalTtl(ttl) {
-		i.L3End = true
+		return true
 	}
+	return false
 }
 
 func (i *EndpointInfo) SetL3EndByIp(data *PlatformData, ip uint32) {
@@ -201,6 +238,22 @@ func (d *EndpointData) SetL2End(key *LookupKey) {
 		d.SrcInfo.L2End = key.L2End0
 		d.DstInfo.L2End = key.L2End1
 	}
+}
+
+func (d *EndpointData) InitPointer() {
+	for i := L3_L2_END_FALSE_FALSE; i < L3_L2_END_MAX; i++ {
+		d.SrcInfos[i] = *d.SrcInfo
+		d.SrcInfos[i].SetL3L2End(i)
+		d.DstInfos[i] = *d.DstInfo
+		d.DstInfos[i].SetL3L2End(i)
+	}
+	d.SrcInfo = &d.SrcInfos[d.SrcInfo.GetL3L2End()]
+	d.DstInfo = &d.DstInfos[d.DstInfo.GetL3L2End()]
+}
+
+func (d *EndpointData) UpdatePointer(l2End0, l2End1, l3End0, l3End1 bool) {
+	d.SrcInfo = &d.SrcInfos[newL3L2End(l2End0, l3End0)]
+	d.DstInfo = &d.DstInfos[newL3L2End(l2End1, l3End1)]
 }
 
 func (t *TapType) CheckTapType(tapType TapType) bool {

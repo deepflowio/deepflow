@@ -1032,6 +1032,7 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packetEndp
 		atomic.AddUint32(&l.FastPathPolicyCount, 1)
 	} else {
 		portPolicyValue.endpoint = EndpointData{SrcInfo: endpointData.DstInfo, DstInfo: endpointData.SrcInfo}
+		portPolicyValue.endpoint.InitPointer()
 		// 添加backward方向bitmap
 		backward.AddAclGidBitmaps(packet, true, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])
 		portPolicyValue.protoPolicy[index] = backward
