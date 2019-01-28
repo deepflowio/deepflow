@@ -40,6 +40,9 @@ type PacketCounter struct {
 	TxPackets uint64 `statsd:"tx_packets"`
 	TxDropped uint64 `statsd:"tx_dropped"`
 	TxErrors  uint64 `statsd:"tx_errors"`
+
+	AverageTime uint64 `statsd:"average_time"`
+	MaxTime     uint64 `statsd:"max_time"`
 }
 
 type TridentKey = uint32
@@ -51,12 +54,12 @@ type tridentInstance struct {
 	cache      [][]byte
 	cacheCount uint8
 	cacheMap   uint64
+	timeAdjust time.Duration
 }
 
 type TridentAdapter struct {
 	listenBufferSize int
 	cacheSize        int
-	timeAdjust       int64
 
 	queues    queue.MultiQueueWriter
 	itemKeys  []queue.HashKey
@@ -71,11 +74,15 @@ type TridentAdapter struct {
 	listener *net.UDPConn
 }
 
-func NewTridentAdapter(queues queue.MultiQueueWriter, listenBufferSize, cacheSize int, timeAdjust int64) *TridentAdapter {
+func abs(n time.Duration) time.Duration {
+	m := n >> 63
+	return (n ^ m) - m
+}
+
+func NewTridentAdapter(queues queue.MultiQueueWriter, listenBufferSize, cacheSize int) *TridentAdapter {
 	adapter := &TridentAdapter{
 		listenBufferSize: listenBufferSize,
 		cacheSize:        cacheSize,
-		timeAdjust:       timeAdjust,
 
 		queues:    queues,
 		itemKeys:  make([]queue.HashKey, 0, PACKET_MAX+1),
@@ -90,7 +97,6 @@ func NewTridentAdapter(queues queue.MultiQueueWriter, listenBufferSize, cacheSiz
 		counter:   &PacketCounter{},
 		stats:     &PacketCounter{},
 	}
-
 	adapter.itemKeys = append(adapter.itemKeys, queue.HashKey(0))
 	listener, err := net.ListenUDP("udp4", &net.UDPAddr{Port: LISTEN_PORT})
 	if err != nil {
@@ -106,6 +112,10 @@ func NewTridentAdapter(queues queue.MultiQueueWriter, listenBufferSize, cacheSiz
 func (a *TridentAdapter) GetCounter() interface{} {
 	counter := &PacketCounter{}
 	counter, a.counter = a.counter, counter
+	if counter.RxPackets > 0 {
+		counter.AverageTime = counter.AverageTime / counter.RxPackets
+		log.Debug("counter.AverageTime", counter.AverageTime, "counter.RxPackets", counter.RxPackets)
+	}
 	return counter
 }
 
@@ -125,8 +135,6 @@ func (a *TridentAdapter) cacheClear(data []byte, key uint32, seq uint32) {
 				a.counter.RxDropped += drop
 				a.stats.RxDropped += drop
 				instance.seq = dataSeq
-				a.counter.RxPackets += 1
-				a.stats.RxPackets += 1
 			}
 		}
 		instance.cacheCount = 0
@@ -135,8 +143,6 @@ func (a *TridentAdapter) cacheClear(data []byte, key uint32, seq uint32) {
 
 	if seq > 0 {
 		drop := uint64(seq - instance.seq - 1)
-		a.counter.RxPackets += 1
-		a.stats.RxPackets += 1
 		a.counter.RxDropped += drop
 		a.stats.RxDropped += drop
 		a.decode(data, key)
@@ -147,12 +153,31 @@ func (a *TridentAdapter) cacheClear(data []byte, key uint32, seq uint32) {
 func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32, timestamp time.Duration) {
 	instance := a.instances[key]
 	instance.timestamp = timestamp
+	timeAdjust := (time.Duration(time.Now().UnixNano()) - timestamp) / time.Second
+	interval := uint64(abs(timeAdjust))
+	if interval >= 1 {
+		//	timestamp = raw + instance.timeAdjust
+		//	timeAdjust = time.Now() - timestamp
+		//	所以
+		//	timeAdjust = time.Now() - raw - instance.timeAdjust
+		//	所以 此包与本地真正的时间差为
+		//	rawTimeAdjust = timadjust + instance.timeAdjust = time.Now() - raw
+		//	即 instance.timeAdjust = rawTimeAdjust = timeAdjust + instance.timeAdjust
+		instance.timeAdjust += timeAdjust
+		interval = uint64(abs(instance.timeAdjust))
+		log.Infof("trident(%v) set timeAdjust %ds.", IpFromUint32(key), instance.timeAdjust)
+	}
+
+	if interval > a.counter.MaxTime {
+		a.counter.MaxTime = interval
+	}
+	a.counter.AverageTime += interval
+	a.counter.RxPackets += 1
+	a.stats.RxPackets += 1
 	// droplet重启或trident重启时，不考虑SEQ
 	if (instance.cacheCount == 0 && seq-instance.seq == 1) || instance.seq == 0 || seq == 1 {
 		instance.seq = seq
 		a.decode(data, key)
-		a.counter.RxPackets += 1
-		a.stats.RxPackets += 1
 	} else {
 		if seq <= instance.seq {
 			a.counter.RxErrors += 1
@@ -186,7 +211,8 @@ func (a *TridentAdapter) findAndAdd(data []byte, key uint32, seq uint32, timesta
 }
 
 func (a *TridentAdapter) decode(data []byte, ip uint32) {
-	decoder := NewSequentialDecoder(data, a.timeAdjust)
+	timeAdjust := a.getTimeAdjust(ip)
+	decoder := NewSequentialDecoder(data, timeAdjust)
 	ifMacSuffix, _ := decoder.DecodeHeader()
 
 	for {
@@ -225,6 +251,14 @@ func (a *TridentAdapter) flushInstance() {
 	}
 }
 
+func (a *TridentAdapter) getTimeAdjust(key uint32) time.Duration {
+	if instance := a.instances[key]; instance != nil {
+		return instance.timeAdjust
+	} else {
+		return 0
+	}
+}
+
 func (a *TridentAdapter) run() {
 	log.Infof("Starting trident adapter Listenning <%s>", a.listener.LocalAddr())
 	a.listener.SetReadDeadline(time.Now().Add(TRIDENT_TIMEOUT))
@@ -241,13 +275,14 @@ func (a *TridentAdapter) run() {
 			log.Errorf("trident adapter listener.ReadFromUDP err: %s", err)
 			return
 		}
-
-		decoder := NewSequentialDecoder(data, a.timeAdjust)
+		key := IpToUint32(remote.IP.To4())
+		timeAdjust := a.getTimeAdjust(key)
+		decoder := NewSequentialDecoder(data, timeAdjust)
 		if _, invalid := decoder.DecodeHeader(); invalid {
 			a.udpPool.Put(data)
 			continue
 		}
-		a.findAndAdd(data, IpToUint32(remote.IP.To4()), decoder.Seq(), decoder.timestamp)
+		a.findAndAdd(data, key, decoder.Seq(), decoder.timestamp)
 	}
 	a.listener.Close()
 	log.Info("Stopped trident adapter")
