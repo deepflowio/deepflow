@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"io"
 	"net"
 	"sync"
 	"time"
@@ -14,11 +15,13 @@ import (
 
 const (
 	DEFAULT_SYNC_INTERVAL = 10 * time.Second
+	DEFAULT_PUSH_INTERVAL = 2 * time.Second
 )
 
 type RpcConfigSynchronizer struct {
 	sync.Mutex
-	grpc.GrpcSession
+	PollingSession   grpc.GrpcSession
+	triggeredSession grpc.GrpcSession
 
 	bootTime     time.Time
 	syncInterval time.Duration
@@ -31,15 +34,16 @@ type RpcConfigSynchronizer struct {
 
 func (s *RpcConfigSynchronizer) sync() error {
 	var response *trident.SyncResponse
-	err := s.GrpcSession.Request(func(ctx context.Context) error {
+	err := s.PollingSession.Request(func(ctx context.Context) error {
 		var err error
 		request := trident.SyncRequest{
 			BootTime:       proto.Uint32(uint32(s.bootTime.Unix())),
 			ConfigAccepted: proto.Bool(s.configAccepted),
 			Version:        proto.Uint64(s.Version),
 		}
-		client := trident.NewSynchronizerClient(s.GrpcSession.GetClient())
+		client := trident.NewSynchronizerClient(s.PollingSession.GetClient())
 		response, err = client.Sync(ctx, &request)
+
 		return err
 	})
 	if err != nil {
@@ -60,17 +64,68 @@ func (s *RpcConfigSynchronizer) sync() error {
 	return nil
 }
 
+func (s *RpcConfigSynchronizer) pull() error {
+	var stream trident.Synchronizer_PushClient
+	var response *trident.SyncResponse
+	err := s.triggeredSession.Request(func(ctx context.Context) error {
+		var err error
+		request := trident.SyncRequest{
+			BootTime:       proto.Uint32(uint32(s.bootTime.Unix())),
+			ConfigAccepted: proto.Bool(s.configAccepted),
+			Version:        proto.Uint64(s.Version),
+		}
+		client := trident.NewSynchronizerClient(s.triggeredSession.GetClient())
+		stream, err = client.Push(context.Background(), &request)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	for {
+		response, err = stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if status := response.GetStatus(); status != trident.Status_SUCCESS {
+			return errors.New("Status Unsuccessful")
+		}
+		s.Lock()
+		for _, handler := range s.handlers {
+			handler(response)
+		}
+		if len(s.handlers) > 0 {
+			s.Version = response.GetVersion()
+		}
+		s.Unlock()
+	}
+	return nil
+}
+
 func (s *RpcConfigSynchronizer) Register(handler Handler) {
 	s.Lock()
 	s.handlers = append(s.handlers, handler)
 	s.Unlock()
 }
 
+func (s *RpcConfigSynchronizer) Start() {
+	s.PollingSession.Start()
+	s.triggeredSession.Start()
+}
+
+func (s *RpcConfigSynchronizer) Stop() {
+	s.PollingSession.Stop()
+	s.triggeredSession.Stop()
+}
+
 func NewRpcConfigSynchronizer(ips []net.IP, port uint16, timeout time.Duration) ConfigSynchronizer {
 	s := &RpcConfigSynchronizer{
-		GrpcSession:    grpc.GrpcSession{},
-		bootTime:       time.Now(),
-		configAccepted: true,
+		PollingSession:   grpc.GrpcSession{},
+		triggeredSession: grpc.GrpcSession{},
+		bootTime:         time.Now(),
+		configAccepted:   true,
 	}
 	runOnce := func() {
 		if err := s.sync(); err != nil {
@@ -78,7 +133,14 @@ func NewRpcConfigSynchronizer(ips []net.IP, port uint16, timeout time.Duration) 
 			return
 		}
 	}
-	s.GrpcSession.Init(ips, port, DEFAULT_SYNC_INTERVAL, runOnce)
-	s.GrpcSession.SetTimeout(timeout)
+	s.PollingSession.Init(ips, port, DEFAULT_SYNC_INTERVAL, runOnce)
+	s.PollingSession.SetTimeout(timeout)
+	run := func() {
+		if err := s.pull(); err != nil {
+			log.Warning(err)
+			return
+		}
+	}
+	s.triggeredSession.Init(ips, port, DEFAULT_PUSH_INTERVAL, run)
 	return s
 }

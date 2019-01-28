@@ -96,7 +96,7 @@ func (l *LabelerManager) RegisterAppQueue(queueType QueueType, appQueues queue.M
 func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 	newVersion := response.GetVersion()
 	log.Debugf("droplet grpc recv response with version %d, and current version is %d:", newVersion, l.version)
-	if newVersion == l.version {
+	if newVersion <= l.version {
 		return
 	}
 	log.Infof("droplet grpc recv response with version %d (vs. current %d)", newVersion, l.version)
