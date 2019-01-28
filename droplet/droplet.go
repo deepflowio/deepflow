@@ -97,7 +97,7 @@ func Start(configPath string) (closers []io.Closer) {
 		releaseMetaPacket,
 	)
 
-	tridentAdapter := adapter.NewTridentAdapter(labelerQueues, cfg.Adapter.SocketBufferSize, cfg.Adapter.OrderingCacheSize, cfg.Adapter.TimeDiffAdjust)
+	tridentAdapter := adapter.NewTridentAdapter(labelerQueues, cfg.Adapter.SocketBufferSize, cfg.Adapter.OrderingCacheSize)
 	if tridentAdapter == nil {
 		return
 	}

@@ -54,8 +54,8 @@ type SequentialDecoder struct {
 	x          *Decoded
 }
 
-func NewSequentialDecoder(data []byte, timeAdjust int64) *SequentialDecoder {
-	return &SequentialDecoder{data: NewByteStream(data), timeAdjust: time.Duration(timeAdjust)}
+func NewSequentialDecoder(data []byte, timeAdjust time.Duration) *SequentialDecoder {
+	return &SequentialDecoder{data: NewByteStream(data), timeAdjust: timeAdjust}
 }
 
 var FLAGS_NAME = [...]string{
@@ -286,7 +286,7 @@ func (d *SequentialDecoder) DecodeHeader() (uint32, bool) {
 		return 0, true
 	}
 	d.seq = d.data.U32()
-	d.timestamp = time.Duration(d.data.U64())*time.Microsecond + d.timeAdjust // µs to ns
+	d.timestamp = time.Duration(d.data.U64())*time.Microsecond + d.timeAdjust*time.Second
 	ifMacSuffix := d.data.U32()
 	return ifMacSuffix & 0xffff, false
 }
