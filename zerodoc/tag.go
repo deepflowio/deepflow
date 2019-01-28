@@ -36,6 +36,7 @@ const (
 	L2DevicePath // 1 << 21
 	L3DevicePath
 	HostPath
+	SubnetIDPath
 )
 
 const (
@@ -90,12 +91,12 @@ func (c Code) RemoveIndex() Code {
 // 从不同EndPoint获取的网包字段组成Field，是否可能重复。
 // 注意，不能判断从同样的EndPoint获取的网包字段组成Field可能重复。
 func (c Code) PossibleDuplicate() bool {
-	return c&(CodeIndices|GroupID|L2EpcID|L3EpcID|Host|GroupIDPath|L2EpcIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|TAPType|SubnetID|ACLDirection|Country|Region|ISPCode|Scope) == c
+	return c&(CodeIndices|GroupID|L2EpcID|L3EpcID|Host|GroupIDPath|L2EpcIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|TAPType|SubnetID|SubnetIDPath|ACLDirection|Country|Region|ISPCode|Scope) == c
 }
 
 // 是否全部取自网包的对称字段（非源、目的字段）
 func (c Code) IsSymmetric() bool {
-	return c&(CodeIndices|ACLGID|VLANID|Protocol|TAPType|SubnetID|ACLDirection|Scope) == c
+	return c&(CodeIndices|ACLGID|VLANID|Protocol|TAPType|ACLDirection|Scope) == c
 }
 
 type DeviceType uint8
@@ -193,6 +194,7 @@ type Field struct {
 	Protocol     layers.IPProtocol
 	ServerPort   uint16
 	SubnetID     uint16
+	SubnetID1    uint16
 	TAPType      TAPTypeEnum
 	ACLDirection ACLDirectionEnum
 
@@ -310,6 +312,12 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], utils.IpFromUint32(t.Host).String())
 		offset += copy(b[offset:], ",host_1=")
 		offset += copy(b[offset:], utils.IpFromUint32(t.Host1).String())
+	}
+	if t.Code&SubnetIDPath != 0 {
+		offset += copy(b[offset:], ",subnet_id0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.SubnetID), 10))
+		offset += copy(b[offset:], ",subnet_id1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.SubnetID1), 10))
 	}
 
 	// 1<<32 ~ 1<<48
@@ -444,6 +452,10 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 		t.Host = decoder.ReadU32()
 		t.Host1 = decoder.ReadU32()
 	}
+	if t.Code&SubnetIDPath != 0 {
+		t.SubnetID = decoder.ReadU16()
+		t.SubnetID1 = decoder.ReadU16()
+	}
 
 	if t.Code&Direction != 0 {
 		t.Direction = DirectionEnum(decoder.ReadU8())
@@ -551,6 +563,10 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 	if t.Code&HostPath != 0 {
 		encoder.WriteU32(t.Host)
 		encoder.WriteU32(t.Host1)
+	}
+	if t.Code&SubnetIDPath != 0 {
+		encoder.WriteU16(t.SubnetID)
+		encoder.WriteU16(t.SubnetID1)
 	}
 
 	if t.Code&Direction != 0 {
