@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	VERSION = 20190117 // 修改Document的序列化结构时需同步修改此常量
+	VERSION = 20190128 // 修改Document的序列化结构时需同步修改此常量
 )
 
 type Tag interface {
