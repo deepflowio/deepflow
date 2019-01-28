@@ -222,15 +222,17 @@ func (l *CloudPlatformLabeler) CheckAndUpdateArpTable(key *LookupKey, hash MacIp
 }
 
 // 依据arp表和ttl修正L3End，若arp存在mac+ip对应关系L3End为true，ttl只对源mac+ip有效,包含在(64,128,255)则为true
-func (l *CloudPlatformLabeler) ModifyL3End(endpointInfo *EndpointInfo, key *LookupKey, hash MacIpKey, direction bool) {
+func (l *CloudPlatformLabeler) GetL3End(endpointInfo *EndpointInfo, key *LookupKey, hash MacIpKey, direction bool) bool {
 	if endpointInfo.L3End {
-		return
+		return endpointInfo.L3End
 	}
-	if endpointInfo.L3End = l.GetArpTable(hash, key.Tap); !endpointInfo.L3End {
+	end := l.GetArpTable(hash, key.Tap)
+	if !end {
 		if direction && key.EthType == EthernetTypeIPv4 {
-			endpointInfo.SetL3EndByTtl(key.Ttl)
+			end = endpointInfo.GetL3EndByTtl(key.Ttl)
 		}
 	}
+	return end
 }
 
 func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip uint32, tapType TapType) *EndpointInfo {
@@ -303,16 +305,15 @@ func (l *CloudPlatformLabeler) CheckEndpointDataIfNeedCopy(endpoint *EndpointDat
 	srcHash := MacIpKey(calcHashKey(key.SrcMac, key.SrcIp))
 	dstHash := MacIpKey(calcHashKey(key.DstMac, key.DstIp))
 	l.CheckAndUpdateArpTable(key, srcHash, key.Timestamp)
+	l2End0, l3End0, l2End1, l3End1 := endpoint.SrcInfo.L2End, endpoint.SrcInfo.L3End, endpoint.DstInfo.L2End, endpoint.DstInfo.L3End
 	if key.Tap == TAP_TOR && ((key.L2End0 != endpoint.SrcInfo.L2End) ||
 		(key.L2End1 != endpoint.DstInfo.L2End)) {
-		endpoint = ShallowCopyEndpointData(endpoint)
-		endpoint.SetL2End(key)
-	} else if !endpoint.SrcInfo.L3End || !endpoint.DstInfo.L3End {
-		endpoint = ShallowCopyEndpointData(endpoint)
+		l2End0, l2End1 = key.L2End0, key.L2End1
 	}
 	// 根据Ttl、Arp request、L2End来判断endpoint是否为最新
-	l.ModifyL3End(endpoint.SrcInfo, key, srcHash, true)
-	l.ModifyL3End(endpoint.DstInfo, key, dstHash, false)
+	l3End0 = l.GetL3End(endpoint.SrcInfo, key, srcHash, true)
+	l3End1 = l.GetL3End(endpoint.DstInfo, key, dstHash, false)
+	endpoint.UpdatePointer(l2End0, l2End1, l3End0, l3End1)
 	l.ModifyDeviceInfo(endpoint.SrcInfo)
 	l.ModifyDeviceInfo(endpoint.DstInfo)
 
@@ -320,81 +321,7 @@ func (l *CloudPlatformLabeler) CheckEndpointDataIfNeedCopy(endpoint *EndpointDat
 }
 
 func (l *CloudPlatformLabeler) UpdateEndpointData(endpoint *EndpointData, key *LookupKey) *EndpointData {
-	invalidSrc, invalidDst := false, false
-	if endpoint == INVALID_ENDPOINT_DATA {
-		invalidSrc, invalidDst = true, true
-	} else {
-		if endpoint.SrcInfo == INVALID_ENDPOINT_INFO {
-			invalidSrc = true
-		}
-		if endpoint.DstInfo == INVALID_ENDPOINT_INFO {
-			invalidDst = true
-		}
-	}
-	endpoint = l.CheckEndpointDataIfNeedCopy(endpoint, key)
-	srcData, dstData := endpoint.SrcInfo, endpoint.DstInfo
-	// 优化内存占用
-	if invalidSrc {
-		if srcData.L2End {
-			if srcData.L3End {
-				endpoint.SrcInfo = INVALID_ENDPOINT_INFO_L2AND3END
-				if srcData.L3EpcId == -1 {
-					endpoint.SrcInfo = INVALID_ENDPOINT_INFO_L2AND3END_L3EPCID
-				}
-			} else {
-				endpoint.SrcInfo = INVALID_ENDPOINT_INFO_L2END
-				if srcData.L3EpcId == -1 {
-					endpoint.SrcInfo = INVALID_ENDPOINT_INFO_L2END_L3EPCID
-				}
-			}
-		} else {
-			if srcData.L3End {
-				endpoint.SrcInfo = INVALID_ENDPOINT_INFO_L3END
-				if srcData.L3EpcId == -1 {
-					endpoint.SrcInfo = INVALID_ENDPOINT_INFO_L3END_L3EPCID
-				}
-			} else {
-				endpoint.SrcInfo = INVALID_ENDPOINT_INFO
-				if srcData.L3EpcId == -1 {
-					endpoint.SrcInfo = INVALID_ENDPOINT_INFO_L3EPCID
-				}
-			}
-		}
-	}
-	if invalidDst {
-		if dstData.L2End {
-			if dstData.L3End {
-				endpoint.DstInfo = INVALID_ENDPOINT_INFO_L2AND3END
-				if dstData.L3EpcId == -1 {
-					endpoint.DstInfo = INVALID_ENDPOINT_INFO_L2AND3END_L3EPCID
-				}
-			} else {
-				endpoint.DstInfo = INVALID_ENDPOINT_INFO_L2END
-				if dstData.L3EpcId == -1 {
-					endpoint.DstInfo = INVALID_ENDPOINT_INFO_L2END_L3EPCID
-				}
-			}
-		} else {
-			if dstData.L3End {
-				endpoint.DstInfo = INVALID_ENDPOINT_INFO_L3END
-				if dstData.L3EpcId == -1 {
-					endpoint.DstInfo = INVALID_ENDPOINT_INFO_L3END_L3EPCID
-				}
-			} else {
-				endpoint.DstInfo = INVALID_ENDPOINT_INFO
-				if dstData.L3EpcId == -1 {
-					endpoint.DstInfo = INVALID_ENDPOINT_INFO_L3EPCID
-				}
-			}
-		}
-	}
-	if endpoint.SrcInfo == INVALID_ENDPOINT_INFO && endpoint.DstInfo == INVALID_ENDPOINT_INFO {
-		endpoint = INVALID_ENDPOINT_DATA
-	}
-	if endpoint.SrcInfo == INVALID_ENDPOINT_INFO_L3EPCID && endpoint.DstInfo == INVALID_ENDPOINT_INFO_L3EPCID {
-		endpoint = INVALID_ENDPOINT_DATA_L3EPCID
-	}
-	return endpoint
+	return l.CheckEndpointDataIfNeedCopy(endpoint, key)
 }
 
 func (l *CloudPlatformLabeler) ModifyEndpointData(endpointData *EndpointData, key *LookupKey) {
@@ -419,16 +346,7 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
 	l.ModifyEndpointData(endpoint, key)
 	l.ModifyPrivateIp(endpoint, key)
-	// 优化内存占用
-	if !srcData.L2End && !srcData.L3End && srcData.L2EpcId == 0 && srcData.L3EpcId == 0 && len(srcData.GroupIds) == 0 {
-		endpoint.SrcInfo = INVALID_ENDPOINT_INFO
-	}
-	if !dstData.L2End && !dstData.L3End && dstData.L2EpcId == 0 && dstData.L3EpcId == 0 && len(dstData.GroupIds) == 0 {
-		endpoint.DstInfo = INVALID_ENDPOINT_INFO
-	}
-	if endpoint.SrcInfo == INVALID_ENDPOINT_INFO && endpoint.DstInfo == INVALID_ENDPOINT_INFO {
-		endpoint = INVALID_ENDPOINT_DATA
-	}
+	endpoint.InitPointer()
 	return endpoint
 }
 
@@ -438,4 +356,8 @@ func (l *CloudPlatformLabeler) RemoveAnonymousGroupIds(endpoint *EndpointData) {
 	}
 	endpoint.SrcInfo.GroupIds = l.ipGroup.RemoveAnonymousGroupIds(endpoint.SrcInfo.GroupIds)
 	endpoint.DstInfo.GroupIds = l.ipGroup.RemoveAnonymousGroupIds(endpoint.DstInfo.GroupIds)
+	for i := L3_L2_END_FALSE_FALSE; i < L3_L2_END_MAX; i++ {
+		endpoint.SrcInfos[i].GroupIds = endpoint.SrcInfo.GroupIds
+		endpoint.DstInfos[i].GroupIds = endpoint.DstInfo.GroupIds
+	}
 }
