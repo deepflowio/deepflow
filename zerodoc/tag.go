@@ -314,9 +314,9 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], utils.IpFromUint32(t.Host1).String())
 	}
 	if t.Code&SubnetIDPath != 0 {
-		offset += copy(b[offset:], ",subnet_id0=")
+		offset += copy(b[offset:], ",subnet_id_0=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.SubnetID), 10))
-		offset += copy(b[offset:], ",subnet_id1=")
+		offset += copy(b[offset:], ",subnet_id_1=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.SubnetID1), 10))
 	}
 
