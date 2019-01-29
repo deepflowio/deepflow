@@ -37,6 +37,7 @@ const (
 	L3DevicePath
 	HostPath
 	SubnetIDPath
+	RegionPath // 只在roze中使用，encode/decode的时候不做处理
 )
 
 const (
