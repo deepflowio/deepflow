@@ -86,6 +86,7 @@ message Interface {
     optional string launch_server = 7;
     repeated IpResource ip_resources = 8;
     repeated uint32 group_ids = 9;
+    optional uint32 region_id = 10;
 }
 
 enum GroupType {
