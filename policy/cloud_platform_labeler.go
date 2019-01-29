@@ -29,14 +29,13 @@ type EpcIpTable struct {
 }
 
 type CloudPlatformLabeler struct {
-	sync.Mutex
-
 	macTable      *MacTable
 	ipTables      [MASK_LEN_NUM]*IpTable
 	epcIpTable    *EpcIpTable
 	ipGroup       *IpResourceGroup
 	netmaskBitmap uint32
 
+	arpMutex        [TAP_MAX]sync.Mutex
 	lastArpSwapTime time.Duration
 	arpTable        [TAP_MAX]map[MacIpKey]bool
 	tempArpTable    [TAP_MAX]map[MacIpKey]bool
@@ -205,18 +204,19 @@ func (l *CloudPlatformLabeler) GetArpTable(hash MacIpKey, tapType TapType) bool 
 // 只更新源mac+ip的arp
 func (l *CloudPlatformLabeler) CheckAndUpdateArpTable(key *LookupKey, hash MacIpKey, timestamp time.Duration) {
 	if key.EthType == EthernetTypeARP && !key.Invalid {
-		l.Lock()
+		l.arpMutex[key.Tap].Lock()
 		l.tempArpTable[key.Tap][hash] = true
-		l.Unlock()
+		l.arpMutex[key.Tap].Unlock()
 	}
 
 	if timestamp-l.lastArpSwapTime >= ARP_VALID_TIME {
-		l.Lock()
 		for i := TAP_MIN; i < TAP_MAX; i++ {
+			table := make(map[MacIpKey]bool)
+			l.arpMutex[key.Tap].Lock()
 			l.arpTable[i] = l.tempArpTable[i]
-			l.tempArpTable[i] = make(map[MacIpKey]bool)
+			l.tempArpTable[i] = table
+			l.arpMutex[key.Tap].Unlock()
 		}
-		l.Unlock()
 		l.lastArpSwapTime = timestamp
 	}
 }
