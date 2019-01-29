@@ -985,6 +985,7 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packetEndp
 	index := l.aclProtoMap[packet.Proto]
 	if portPolicyValue := mapsForward.portPolicyMap[key]; portPolicyValue == nil {
 		value := &PortPolicyValue{endpoint: *endpointData, protoPolicy: make([]*PolicyData, 3), timestamp: packet.Timestamp}
+		value.endpoint.InitPointer()
 		// 添加forward方向bitmap
 		forward.AddAclGidBitmaps(packet, false, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])
 		value.protoPolicy[index] = forward
@@ -992,6 +993,7 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packetEndp
 		atomic.AddUint32(&l.FastPathPolicyCount, 1)
 	} else {
 		portPolicyValue.endpoint = *endpointData
+		portPolicyValue.endpoint.InitPointer()
 		// 添加forward方向bitmap
 		forward.AddAclGidBitmaps(packet, false, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])
 		portPolicyValue.protoPolicy[index] = forward
@@ -1025,6 +1027,7 @@ func (l *PolicyLabeler) addPortFastPolicy(endpointData *EndpointData, packetEndp
 	if portPolicyValue := mapsBackward.portPolicyMap[key]; portPolicyValue == nil {
 		value := &PortPolicyValue{endpoint: *endpointData, protoPolicy: make([]*PolicyData, 3), timestamp: packet.Timestamp}
 		value.endpoint.SrcInfo, value.endpoint.DstInfo = value.endpoint.DstInfo, value.endpoint.SrcInfo
+		value.endpoint.InitPointer()
 		// 添加backward方向bitmap
 		backward.AddAclGidBitmaps(packet, true, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])
 		value.protoPolicy[index] = backward
