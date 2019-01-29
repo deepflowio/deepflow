@@ -210,6 +210,8 @@ func (l *PolicyLabeler) generateInterestKeys(endpointData *EndpointData, packet 
 			if id == ANY_GROUP {
 				hasAnyGroup = true
 			}
+		} else {
+			packet.SrcAllGroupIds = append(packet.SrcAllGroupIds, 0)
 		}
 	}
 	if !hasAnyGroup {
@@ -226,6 +228,8 @@ func (l *PolicyLabeler) generateInterestKeys(endpointData *EndpointData, packet 
 			if id == ANY_GROUP {
 				hasAnyGroup = true
 			}
+		} else {
+			packet.DstAllGroupIds = append(packet.DstAllGroupIds, 0)
 		}
 	}
 	if !hasAnyGroup {
