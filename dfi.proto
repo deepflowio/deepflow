@@ -5,6 +5,8 @@
  * Finish Date: 2015-11-24
  */
 
+syntax = "proto2";
+
 package DFI;
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
