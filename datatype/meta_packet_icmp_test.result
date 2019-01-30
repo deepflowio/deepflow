@@ -1,16 +1,31 @@
 timestamp: 0 inport: 0x30000 exporter: 0.0.0.0 len: 74 l2_end: false, false invalid: false
 	60:14:b3:c8:df:a7 -> 52:54:00:33:c4:54 type: 0800 vlan-id: 0
 	10.33.0.177:0 -> 10.30.10.1:0 proto: ICMPv4 ttl: 64 ihl: 5 id: 30771 flags: 0x0, fragment Offset: 0 payload-len: 0 
-	RawHeader len: 8, RawHeader: 080000004d3a0001
+	RawHeader len: 8, RawHeader: 0800000000010021
 timestamp: 0 inport: 0x30000 exporter: 0.0.0.0 len: 102 l2_end: false, false invalid: false
 	52:54:00:33:c4:54 -> 60:14:b3:c8:df:a7 type: 0800 vlan-id: 0
 	10.0.0.1:0 -> 10.33.0.177:0 proto: ICMPv4 ttl: 63 ihl: 5 id: 37317 flags: 0x0, fragment Offset: 0 payload-len: 0 
-	RawHeader len: 36, RawHeader: 03010000fcfe000000004500003c783300003e01e59d0a2100b10a1e0a0108004d3a0001
+	RawHeader len: 24, RawHeader: 03010000000000004500003c783300003e01e59d0a2100b1
 timestamp: 0 inport: 0x30000 exporter: 0.0.0.0 len: 74 l2_end: false, false invalid: false
 	60:14:b3:c8:df:a7 -> 52:54:00:33:c4:54 type: 0800 vlan-id: 0
 	10.33.0.177:0 -> 10.30.0.1:0 proto: ICMPv4 ttl: 64 ihl: 5 id: 21561 flags: 0x0, fragment Offset: 0 payload-len: 0 
-	RawHeader len: 8, RawHeader: 080000004d380001
+	RawHeader len: 8, RawHeader: 0800000000010023
 timestamp: 0 inport: 0x30000 exporter: 0.0.0.0 len: 74 l2_end: false, false invalid: false
 	52:54:00:33:c4:54 -> 60:14:b3:c8:df:a7 type: 0800 vlan-id: 0
 	10.30.0.1:0 -> 10.33.0.177:0 proto: ICMPv4 ttl: 63 ihl: 5 id: 37319 flags: 0x0, fragment Offset: 0 payload-len: 0 
-	RawHeader len: 8, RawHeader: 0000000055380001
+	RawHeader len: 8, RawHeader: 0000000000010023
+timestamp: 0 inport: 0x30000 exporter: 0.0.0.0 len: 41 l2_end: false, false invalid: true
+	52:54:00:33:c4:54 -> 60:14:b3:c8:df:a7 type: 0800 vlan-id: 0
+	10.0.0.1:0 -> 10.33.0.177:0 proto: ICMPv4 ttl: 63 ihl: 5 id: 37317 flags: 0x0, fragment Offset: 0 payload-len: 0 
+timestamp: 0 inport: 0x30000 exporter: 0.0.0.0 len: 42 l2_end: false, false invalid: false
+	52:54:00:33:c4:54 -> 60:14:b3:c8:df:a7 type: 0800 vlan-id: 0
+	10.0.0.1:0 -> 10.33.0.177:0 proto: ICMPv4 ttl: 63 ihl: 5 id: 37317 flags: 0x0, fragment Offset: 0 payload-len: 0 
+	RawHeader len: 8, RawHeader: 0301000000000000
+timestamp: 0 inport: 0x30000 exporter: 0.0.0.0 len: 67 l2_end: false, false invalid: false
+	52:54:00:33:c4:54 -> 60:14:b3:c8:df:a7 type: 0800 vlan-id: 0
+	10.0.0.1:0 -> 10.33.0.177:0 proto: ICMPv4 ttl: 63 ihl: 5 id: 37317 flags: 0x0, fragment Offset: 0 payload-len: 0 
+	RawHeader len: 24, RawHeader: 03010000000000004500003c783300003e01e59d0a2100b1
+timestamp: 0 inport: 0x30000 exporter: 0.0.0.0 len: 42 l2_end: false, false invalid: false
+	60:14:b3:c8:df:a7 -> 52:54:00:33:c4:54 type: 0800 vlan-id: 0
+	10.33.0.177:0 -> 10.30.10.1:0 proto: ICMPv4 ttl: 64 ihl: 5 id: 30771 flags: 0x0, fragment Offset: 0 payload-len: 0 
+	RawHeader len: 8, RawHeader: 0800000000010021

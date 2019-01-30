@@ -125,9 +125,10 @@ func (p *MetaPacket) ParseArp(stream *ByteStream) {
 }
 
 func (p *MetaPacket) ParseIcmp(stream *ByteStream) {
-	p.RawHeader = make([]byte, 0, 36)
+	p.RawHeader = make([]byte, 0, ICMP_HEADER_SIZE+MIN_IPV4_HEADER_SIZE)
 	p.RawHeader = append(p.RawHeader, stream.Slice()[:2]...)
-	icmpType, _ := stream.U8(), stream.U8()
+	icmpType := stream.U8()
+	stream.Skip(3)
 	switch icmpType {
 	case ICMPv4TypeDestinationUnreachable:
 		fallthrough
@@ -138,7 +139,11 @@ func (p *MetaPacket) ParseIcmp(stream *ByteStream) {
 	case ICMPv4TypeTimeExceeded:
 		fallthrough
 	case ICMPv4TypeParameterProblem:
-		p.RawHeader = append(p.RawHeader[:4], stream.Field(32)...)
+		dataLen := MIN_IPV4_HEADER_SIZE
+		if stream.Len() < MIN_IPV4_HEADER_SIZE {
+			dataLen = stream.Len()
+		}
+		p.RawHeader = append(p.RawHeader[:4], stream.Field(dataLen)...)
 		return
 	default:
 		p.RawHeader = append(p.RawHeader[:4], stream.Field(4)...)
@@ -185,6 +190,10 @@ func (p *MetaPacket) ParseL4(stream *ByteStream) {
 		p.PortDst = stream.U16()
 		p.PayloadLen = stream.U16() - UDP_HEADER_SIZE
 	} else if p.Protocol == IPProtocolICMPv4 {
+		if stream.Len() < ICMP_HEADER_SIZE {
+			p.Invalid = true
+			return
+		}
 		p.ParseIcmp(stream)
 	}
 }
