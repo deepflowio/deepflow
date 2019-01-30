@@ -42,8 +42,8 @@
   version = "v1.1.15"
 
 [[constraint]]
-  name = "github.com/lestrrat/go-file-rotatelogs"
-  branch = "master"
+  name = "github.com/lestrrat-go/file-rotatelogs"
+  branch = "master" # TODO: lock on next tag
 
 [[constraint]]
   name = "github.com/op/go-logging"

@@ -83,19 +83,22 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:f7d8e8432e355163397d2da1e17d0fb616d611db1360c43b1ac73e56f87038e2"
-  name = "github.com/lestrrat/go-file-rotatelogs"
-  packages = ["."]
+  digest = "1:14e8f959d8494ed29af82df87eab0f80ee3b85a972c23f82f6a63f19e809e9de"
+  name = "github.com/lestrrat-go/file-rotatelogs"
+  packages = [
+    ".",
+    "internal/option",
+  ]
   pruneopts = "UT"
-  revision = "d3151e2a480fdcd05fb97102f5310a47d96274c4"
+  revision = "4ce522c92b91beadfd4c77f75dcc06ffe97cf9c6"
 
 [[projects]]
   branch = "master"
-  digest = "1:b9f2e1d7b042e6fdb2aa1e3762afdb99e0c584f66a1a346b03cf8b4be203c694"
-  name = "github.com/lestrrat/go-strftime"
+  digest = "1:8654122ef85f2bc03859b0a7ea2d36c9965888689cdac7640cceaa6edb11cff6"
+  name = "github.com/lestrrat-go/strftime"
   packages = ["."]
   pruneopts = "UT"
-  revision = "ba3bf9c1d0421aa146564a632931730344f1f9f1"
+  revision = "8b31f9c59b0feb56c456ce49a7b3d2b2e93a6f18"
 
 [[projects]]
   branch = "master"
@@ -268,7 +271,7 @@
     "github.com/google/gopacket/pcapgo",
     "github.com/influxdata/influxdb/client/v2",
     "github.com/influxdata/influxdb/models",
-    "github.com/lestrrat/go-file-rotatelogs",
+    "github.com/lestrrat-go/file-rotatelogs",
     "github.com/op/go-logging",
     "github.com/pebbe/zmq4",
     "github.com/spf13/cobra",
