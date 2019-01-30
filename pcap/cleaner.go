@@ -101,13 +101,14 @@ func (c *Cleaner) work() {
 func findLastRecordTime(file string) time.Duration {
 	fp, err := os.Open(file)
 	if err != nil {
-		log.Warningf("Open %s failed: %s", file, err)
+		log.Debugf("Open %s failed: %s", file, err)
 		return 0
 	}
 	defer fp.Close()
 
 	if info, err := fp.Stat(); err != nil || info.Size() <= GLOBAL_HEADER_LEN+RECORD_HEADER_LEN {
-		log.Warningf("Invalid content in file %s", file)
+		log.Debugf("Invalid content in file %s", file)
+		return 0
 	}
 
 	buffer := make([]byte, RECORD_HEADER_LEN)
