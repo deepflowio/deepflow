@@ -4,6 +4,7 @@
  * Author Name: Song Zhen
  * Finish Date: 2014-03-04
  */
+syntax = "proto2";
 
 package Talker;
 

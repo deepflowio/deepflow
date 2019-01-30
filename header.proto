@@ -4,6 +4,7 @@
  * Author Name: Xiang Yang
  * Finish Date: 2013-11-18
  */
+syntax = "proto2";
 
 package Header;
 option java_package = "cn.net.yunshan.message";

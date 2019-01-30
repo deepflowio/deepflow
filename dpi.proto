@@ -1,3 +1,5 @@
+syntax = "proto2";
+
 package DPI;
 option java_package = "cn.net.yunshan.message";
 option java_outer_classname = "DPIMessage";
