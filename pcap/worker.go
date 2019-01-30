@@ -37,13 +37,15 @@ type WrappedWriter struct {
 }
 
 type WorkerCounter struct {
-	FileCreations  uint64 `statsd:"file_creations"`
-	FileCloses     uint64 `statsd:"file_closes"`
-	FileRejections uint64 `statsd:"file_rejections"`
-	BufferedCount  uint64 `statsd:"buffered_count"`
-	WrittenCount   uint64 `statsd:"written_count"`
-	BufferedBytes  uint64 `statsd:"buffered_bytes"`
-	WrittenBytes   uint64 `statsd:"written_bytes"`
+	FileCreations        uint64 `statsd:"file_creations"`
+	FileCloses           uint64 `statsd:"file_closes"`
+	FileRejections       uint64 `statsd:"file_rejections"`
+	FileCreationFailures uint64 `statsd:"file_creation_failures"`
+	FileWritingFailures  uint64 `statsd:"file_writing_failures"`
+	BufferedCount        uint64 `statsd:"buffered_count"`
+	WrittenCount         uint64 `statsd:"written_count"`
+	BufferedBytes        uint64 `statsd:"buffered_bytes"`
+	WrittenBytes         uint64 `statsd:"written_bytes"`
 }
 
 type Worker struct {
@@ -187,14 +189,16 @@ func (w *Worker) writePacket(packet *datatype.MetaPacket, tapType zerodoc.TAPTyp
 		// TODO: 池化writer（有一个[65536]byte）
 		var err error
 		if writer.Writer, err = NewWriter(writer.tempFilename, w.writerBufferSize, w.tcpipChecksum); err != nil {
-			log.Warningf("Failed to create writer for %s: %s", writer.tempFilename, err)
+			log.Debugf("Failed to create writer for %s: %s", writer.tempFilename, err)
+			w.FileCreationFailures++
 			return
 		}
 		w.writers[key] = writer
 		w.FileCreations++
 	}
 	if err := writer.Write(packet); err != nil {
-		log.Warningf("Failed to write packet to %s: %s", writer.tempFilename, err)
+		log.Debugf("Failed to write packet to %s: %s", writer.tempFilename, err)
+		w.FileWritingFailures++
 		return
 	}
 	counter := writer.GetAndResetStats()
