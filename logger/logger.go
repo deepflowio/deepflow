@@ -1,13 +1,15 @@
 package logger
 
 import (
+	"compress/gzip"
+	"io"
 	"log/syslog"
 	"os"
 	"path"
 	"strings"
 	"time"
 
-	"github.com/lestrrat/go-file-rotatelogs"
+	"github.com/lestrrat-go/file-rotatelogs"
 	"github.com/op/go-logging"
 )
 
@@ -37,6 +39,30 @@ func EnableStdoutLog() {
 	applyBackendChange()
 }
 
+func compressFile(filename string) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	gzfile, err := os.OpenFile(filename+".gz", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer gzfile.Close()
+
+	gzWriter := gzip.NewWriter(gzfile)
+	defer gzWriter.Close()
+
+	if _, err := io.Copy(gzWriter, file); err != nil {
+		return err // probably disk full
+	}
+
+	os.Remove(filename)
+	return nil
+}
+
 func EnableFileLog(logPath string) error {
 	dir := path.Dir(logPath)
 	if _, err := os.Stat(dir); err != nil {
@@ -47,11 +73,21 @@ func EnableFileLog(logPath string) error {
 		}
 	}
 
+	rotationHandler := rotatelogs.HandlerFunc(func(e rotatelogs.Event) {
+		if e.Type() != rotatelogs.FileRotatedEventType {
+			return
+		}
+		filename := e.(*rotatelogs.FileRotatedEvent).PreviousFile()
+		if err := compressFile(filename); err != nil {
+			os.Remove(filename + ".gz")
+		}
+	})
 	ioWriter, err := rotatelogs.New(
 		logPath+".%Y-%m-%d",
 		rotatelogs.WithLinkName(logPath),
 		rotatelogs.WithMaxAge(LOG_MAX_AGE),
 		rotatelogs.WithRotationTime(LOG_ROTATION_INTERVAL),
+		rotatelogs.WithHandler(rotationHandler),
 	)
 	if err != nil {
 		return err
