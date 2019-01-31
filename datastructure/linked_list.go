@@ -66,10 +66,12 @@ func (q *LinkedList) PopFront() interface{} {
 }
 
 func (q *LinkedList) Remove(it *Iterator) interface{} {
-	if it.head != q.head {
+	if it.head != q.head || it.current == nil {
 		return nil
 	}
 	if q.head == it.current {
+		it.Next()
+		it.head = it.current
 		return q.PopFront()
 	}
 	current := it.current
