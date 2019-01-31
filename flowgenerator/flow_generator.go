@@ -671,7 +671,7 @@ func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, buf
 	flowGenerator.initStateMachineMaster()
 	flowGenerator.initStateMachineSlave()
 	tags := stats.OptionStatTags{"index": strconv.Itoa(index)}
-	stats.RegisterCountable("flow_generator", flowGenerator, tags)
+	stats.RegisterCountable("flow-generator", flowGenerator, tags)
 	stats.RegisterCountable(FP_NAME, &flowGenerator.perfCounter, tags)
 	log.Infof("flow generator %d created", index)
 	return flowGenerator

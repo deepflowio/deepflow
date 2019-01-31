@@ -16,7 +16,7 @@ type TcpConnSession = [2]TcpSessionPeer
 type PacketSeqTypeInSeqList uint8
 
 const (
-	FP_NAME = "flowperf"
+	FP_NAME = "flow-perf"
 )
 
 const (

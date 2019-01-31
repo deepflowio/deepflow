@@ -133,7 +133,7 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 		handler.statItems[i+handler.numberOfApps*3].Name = fmt.Sprintf("%s_rejected_doc", h.processors[i].GetName())
 		handler.statItems[i+handler.numberOfApps*4].Name = fmt.Sprintf("%s_flush", h.processors[i].GetName())
 	}
-	stats.RegisterCountable("flow_mapper", &handler, stats.OptionStatTags{"index": strconv.Itoa(index)})
+	stats.RegisterCountable("flow-mapper", &handler, stats.OptionStatTags{"index": strconv.Itoa(index)})
 	return &handler
 }
 

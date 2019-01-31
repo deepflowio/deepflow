@@ -98,7 +98,7 @@ func NewTridentAdapter(queues queue.MultiQueueWriter, listenBufferSize, cacheSiz
 		return nil
 	}
 	adapter.listener = listener
-	stats.RegisterCountable("trident_adapter", adapter)
+	stats.RegisterCountable("trident-adapter", adapter)
 	debug.Register(dropletctl.DROPLETCTL_ADAPTER, adapter)
 	return adapter
 }
