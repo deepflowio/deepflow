@@ -265,6 +265,8 @@ func init() {
 	if flag.Lookup("test.v") != nil {
 		return
 	}
+	name, _ := os.Hostname()
+	hostname = name
 	processName = path.Base(os.Args[0])
 	go run()
 }
