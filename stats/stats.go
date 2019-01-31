@@ -76,7 +76,12 @@ func counterToFields(counter interface{}) models.Fields {
 	fields := models.Fields{}
 	if items, ok := counter.([]StatItem); ok {
 		for _, item := range items {
-			fields[item.Name] = item.Value
+			switch item.Value.(type) {
+			case uint, uint8, uint16, uint32, uint64:
+				fields[item.Name] = int64(reflect.ValueOf(item.Value).Uint())
+			default:
+				fields[item.Name] = item.Value
+			}
 		}
 	} else {
 		val := reflect.Indirect(reflect.ValueOf(counter))
