@@ -109,6 +109,7 @@ func collectBatchPoints() client.BatchPoints {
 		statSource := it.Value().(StatSource)
 		for statSource.countable.Closed() {
 			statSources.Remove(&it)
+			statSource = it.Value().(StatSource)
 		}
 
 		max := func(x, y time.Duration) time.Duration {
