@@ -102,6 +102,7 @@ def get_file(acl_gid, pcap_name):
 
 HTTP request args:
 
+  ip: IP地址筛选，可以填写多个
   protocol: 协议，可选值为[6, 17]
   port: 端口
 
@@ -113,6 +114,7 @@ HTTP response body:
 
   octet-stream
     """
+    ips = request.query.getlist('ip')
     protocol = None
     if request.query.protocol != '':
         protocol = int(request.query.protocol)
@@ -120,11 +122,11 @@ HTTP response body:
     if request.query.port != '':
         port = int(request.query.port)
     directory = PCAP_DIR + '/' + str(acl_gid) + '/'
-    if protocol is None:
-        return static_file(pcap_name, root=directory, download=pcap_name)
-    else:
+    if ips or protocol is not None:
         headers = {'Content-Disposition': 'attachment; filename="%s"' % pcap_name}
-        return HTTPResponse(filter_pcap(directory + pcap_name, protocol, port), **headers)
+        return HTTPResponse(filter_pcap(directory + pcap_name, ips, protocol, port), **headers)
+    else:
+        return static_file(pcap_name, root=directory, download=pcap_name)
 
 
 @app.delete(API_PREFIX + '/pcaps/<acl_gid:int>/')

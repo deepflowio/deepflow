@@ -1,4 +1,5 @@
 import logging
+import socket
 import struct
 
 LOG = logging.getLogger(__name__)
@@ -22,42 +23,65 @@ IHL_OFFSET = 0
 PROTOCOL_OFFSET = 9
 PROTOCOL_TCP = 6
 PROTOCOL_UDP = 17
+SRC_IP_OFFSET = 12
+DST_IP_OFFSET = 16
 
 SRC_PORT_OFFSET = 0
 DST_PORT_OFFSET = 2
 
+import struct
 
-def __packet_matches_condition(packet, protocol, port=None):
+
+def _ip_to_int(addr):
+    try:
+        return struct.unpack("!I", socket.inet_aton(addr))[0]
+    except socket.error:
+        return None
+
+
+def __packet_matches_condition(packet, ips_int, protocol, port):
     # ethernet
     off = ETHER_TYPE_OFFSET
-    eth_type = struct.unpack('>H', packet[off:off+2])[0]
+    eth_type = struct.unpack('!H', packet[off:off+2])[0]
     l3_offset = ETHERNET_HEADER_LEN
     if eth_type == ETHER_TYPE_VLAN:
         off = ETHER_TYPE_OFFSET + VLAN_LEN
-        eth_type = struct.unpack('>H', packet[off:off+2])[0]
+        eth_type = struct.unpack('!H', packet[off:off+2])[0]
         l3_offset += VLAN_LEN
     if eth_type != ETHER_TYPE_IPV4:
         return False
 
+    if ips_int:
+        off = l3_offset+SRC_IP_OFFSET
+        ip_src = struct.unpack('!L', packet[off:off+4])[0]
+        off = l3_offset+DST_IP_OFFSET
+        ip_dst = struct.unpack('!L', packet[off:off+4])[0]
+        if len(ips_int) == 1:
+            if ips_int[0] != ip_src and ips_int[0] != ip_dst:
+                return False
+        else:
+            if ip_src not in ips_int or ip_dst not in ips_int:
+                return False
+
     # ipv4
-    r_protocol = ord(packet[l3_offset+PROTOCOL_OFFSET])
-    if r_protocol != protocol:
-        return False
-    if port is None:
-        return True
-    l4_offset = l3_offset + ((ord(packet[l3_offset+IHL_OFFSET]) & 0xF) << 2)
+    if protocol is not None:
+        r_protocol = ord(packet[l3_offset+PROTOCOL_OFFSET])
+        if r_protocol != protocol:
+            return False
 
-    # tcp/udp
-    off = l4_offset + SRC_PORT_OFFSET
-    port_src = struct.unpack('>H', packet[off:off+2])[0]
-    if port_src == port:
-        return True
-    off = l4_offset + DST_PORT_OFFSET
-    port_dst = struct.unpack('>H', packet[off:off+2])[0]
-    if port_dst == port:
-        return True
+    if port is not None:
 
-    return False
+        l4_offset = l3_offset + ((ord(packet[l3_offset+IHL_OFFSET]) & 0xF) << 2)
+
+        # tcp/udp
+        off = l4_offset + SRC_PORT_OFFSET
+        port_src = struct.unpack('>H', packet[off:off+2])[0]
+        off = l4_offset + DST_PORT_OFFSET
+        port_dst = struct.unpack('>H', packet[off:off+2])[0]
+        if port_src != port and port_dst != port:
+            return False
+
+    return True
 
 
 def found_in_pcap(filename, protocol, port=None):
@@ -97,8 +121,15 @@ def found_in_pcap(filename, protocol, port=None):
         return False
 
 
-def filter_pcap(filename, protocol, port=None):
-    if protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
+def filter_pcap(filename, ips=None, protocol=None, port=None):
+    ips_int = []
+    if ips is not None:
+        for ip in ips:
+            ip_int = _ip_to_int(ip)
+            if ip_int is not None:
+                ips_int.append(ip_int)
+
+    if protocol is not None and protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
         return
 
     try:
@@ -126,7 +157,7 @@ def filter_pcap(filename, protocol, port=None):
                 packet = fp.read(incl_len)
                 if len(packet) != incl_len:
                     return
-                if __packet_matches_condition(packet, protocol, port):
+                if __packet_matches_condition(packet, ips_int, protocol, port):
                     yield r_header + packet
 
 
