@@ -51,8 +51,26 @@ graph TD;
 
 那么我想要查询10.30.1.128/23所对应的数据集时，便能够得到[1, 2]的结果
 
-平台信息查询结果说明
+无锁对象池性能分析
 ------------------
+
+目前pool的性能数据如下
+```
+goos: linux
+goarch: amd64
+pkg: gitlab.x.lan/yunshan/droplet-libs/pool
+BenchmarkPoolGet-20             50000000                29.8 ns/op             4 B/op          0 allocs/op
+BenchmarkPoolPut-20             30000000                62.1 ns/op             6 B/op          0 allocs/op
+BenchmarkPoolHungryGet-20       50000000                28.6 ns/op             0 B/op          0 allocs/op
+BenchmarkPoolOverPut-20         50000000                24.9 ns/op             0 B/op          0 allocs/op
+PASS
+ok      gitlab.x.lan/yunshan/droplet-libs/pool  12.126s
+```
+由于设计上pool就是无锁pool，因此不论是否遇到多线程互斥，pool的性能都会是这个数字，
+如果profiler上看到pool的开销过大，那么说明的是对象构造函数开销过大而非pool本身的开销过大。
+
+平台信息查询结果说明
+--------------------
 
 接入网络和虚拟网络查找过程现在是一致的
 
@@ -97,7 +115,7 @@ SubnetId查询依据
   - 若都没有数据则SubnetId=0
 
 EndpointData查找流程
-------------------------
+--------------------
 
 1. 使用packet中的MAC，在MAC表中查找L2层数据
 2. 使用L2层数据L2EpcId和packet中的IP组合为KEY, 查询EpcIp表获取L3层数据(若第一步没有查到数据，则L2EpcId=0)
