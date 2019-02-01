@@ -104,9 +104,9 @@ func (m *FlowMeter) MarshalTo(b []byte) int {
 	offset += copy(b[offset:], "i,sum_bit=")
 	offset += copy(b[offset:], strconv.FormatUint(m.SumBitTx+m.SumBitRx, 10))
 	offset += copy(b[offset:], "i,sum_flow_duration=")
-	offset += copy(b[offset:], strconv.FormatUint(uint64(m.SumFlowDuration), 10))
+	offset += copy(b[offset:], strconv.FormatUint(uint64(m.SumFlowDuration/time.Microsecond), 10))
 	offset += copy(b[offset:], "i,sum_closed_flow_duration=")
-	offset += copy(b[offset:], strconv.FormatUint(uint64(m.SumClosedFlowDuration), 10))
+	offset += copy(b[offset:], strconv.FormatUint(uint64(m.SumClosedFlowDuration/time.Microsecond), 10))
 	b[offset] = 'i'
 	offset++
 
