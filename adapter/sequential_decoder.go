@@ -15,6 +15,9 @@ const (
 	PACKET_STREAM_END   = 1<<(DELTA_TIMESTAMP_LEN*8) - 1
 	UDP_BUFFER_SIZE     = 1800
 	PAYLOAD_MAX         = 1500
+	ICMP_TYPE_CODE      = 2
+	ICMP_ID_SEQ         = 4
+	ICMP_REST           = 28
 )
 
 type Decoded struct {
@@ -183,7 +186,7 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPacket) {
 	}
 	if x.headerType == HEADER_TYPE_IPV4_ICMP {
 		meta.Protocol = IPProtocolICMPv4
-		meta.ParseIcmp(&d.data)
+		d.decodeICMP(meta)
 		return
 	} else if x.headerType == HEADER_TYPE_IPV4 {
 		proto := d.data.U8()
@@ -191,6 +194,34 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPacket) {
 		return
 	}
 	d.decodeL4(meta)
+}
+
+func (d *SequentialDecoder) decodeICMP(meta *MetaPacket) {
+	stream := &d.data
+	meta.RawHeader = make([]byte, ICMP_HEADER_SIZE+ICMP_REST)
+	icmpType, icmpCode := stream.U8(), stream.U8()
+	meta.RawHeader[0] = icmpType
+	meta.RawHeader[1] = icmpCode
+	switch icmpType {
+	case ICMPv4TypeDestinationUnreachable:
+		fallthrough
+	case ICMPv4TypeSourceQuench:
+		fallthrough
+	case ICMPv4TypeRedirect:
+		fallthrough
+	case ICMPv4TypeTimeExceeded:
+		fallthrough
+	case ICMPv4TypeParameterProblem:
+		dataLen := ICMP_ID_SEQ + ICMP_REST
+		if stream.Len() < dataLen {
+			dataLen = stream.Len()
+		}
+		meta.RawHeader = append(meta.RawHeader[:4], stream.Field(dataLen)...)
+		return
+	default:
+		meta.RawHeader = append(meta.RawHeader[:4], stream.Field(ICMP_ID_SEQ)...)
+		return
+	}
 }
 
 func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
