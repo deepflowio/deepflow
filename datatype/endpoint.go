@@ -256,6 +256,13 @@ func (d *EndpointData) UpdatePointer(l2End0, l2End1, l3End0, l3End1 bool) {
 	d.DstInfo = &d.DstInfos[newL3L2End(l2End1, l3End1)]
 }
 
+// ReverseData will return a reversed replica of the current EndpointData
+func (d *EndpointData) ReverseData() *EndpointData {
+	newEndpointData := CloneEndpointData(d)
+	newEndpointData.SrcInfo, newEndpointData.DstInfo = newEndpointData.DstInfo, newEndpointData.SrcInfo
+	return newEndpointData
+}
+
 func (t *TapType) CheckTapType(tapType TapType) bool {
 	if tapType < TAP_MAX {
 		return true

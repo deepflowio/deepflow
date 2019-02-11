@@ -533,6 +533,18 @@ func (d *PolicyData) MergeAndSwapDirection(aclActions []AclAction, npbActions []
 	d.MergeNpbAndSwapDirection(npbActions, aclID)
 }
 
+// ReverseData will return a reversed replica of the current PolicyData
+func (d *PolicyData) ReverseData() *PolicyData {
+	newPolicyData := ClonePolicyData(d)
+	for i, aclAction := range newPolicyData.AclActions {
+		newPolicyData.AclActions[i] = aclAction.ReverseDirection()
+	}
+	for i, _ := range newPolicyData.AclGidBitmaps {
+		newPolicyData.AclGidBitmaps[i].ReverseGroupType()
+	}
+	return newPolicyData
+}
+
 func formatGroup(aclGidBitmap AclGidBitmap, endpointData *EndpointData) string {
 	var formatStr string
 	groupType := aclGidBitmap.GetGroupType()
