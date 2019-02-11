@@ -820,3 +820,19 @@ func BenchmarkGetEndpointData(b *testing.B) {
 		getEndpointData(policy, key)
 	}
 }
+
+func BenchmarkGetDataByIp(b *testing.B) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	ip1 := generateIpNet(testIp1, 100, 32)
+	data1 := generatePlatformDataWithGroupId(groupEpc[1], group[1], testMac1, ip1)
+	ip2 := generateIpNet(testIp2, 200, 24)
+	data2 := generatePlatformDataWithGroupId(groupEpc[2], group[2], testMac2, ip2)
+	ip3 := generateIpNet(testIp3, 300, 16)
+	data3 := generatePlatformDataWithGroupId(groupEpc[3], group[3], testMac3, ip3)
+	ip4 := generateIpNet(testIp4, 300, 8)
+	data4 := generatePlatformDataWithGroupId(groupEpc[4], group[4], testMac4, ip4)
+	policy.UpdateInterfaceData([]*PlatformData{data1, data2, data3, data4})
+	for i := 0; i < b.N; i++ {
+		policy.cloudPlatformLabeler.GetDataByIp(queryIp)
+	}
+}
