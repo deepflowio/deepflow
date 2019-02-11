@@ -617,6 +617,9 @@ func (l *PolicyLabeler) generateGroupRelationByGroups(groups []uint32, tapType T
 		if len(raw) != 0 {
 			to[tapType][*id] = both
 			to[tapType][relateId] = raw
+			for _, gid := range both {
+				from[tapType][gid] = *id
+			}
 			from[tapType][uint16(group&0xffff)] = *id
 			*id++
 		}
