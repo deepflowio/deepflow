@@ -8,6 +8,7 @@ import (
 
 	. "github.com/google/gopacket/layers"
 
+	"gitlab.x.lan/yunshan/droplet-libs/bit"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
@@ -114,10 +115,10 @@ func IfHasNetmaskBit(bitmap uint32, k uint32) bool {
 }
 
 func (l *CloudPlatformLabeler) GetDataByIp(ip uint32) *PlatformData {
-	for i := uint32(MIN_MASK_LEN); i <= MAX_MASK_LEN; i++ {
-		if !IfHasNetmaskBit(l.netmaskBitmap, i) {
-			continue
-		}
+	netmaskBitmap := l.netmaskBitmap
+	for netmaskBitmap > 0 {
+		i := uint32(bit.CountTrailingZeros32(netmaskBitmap))
+		netmaskBitmap ^= 1 << i
 		subip := IpKey(ip & (math.MaxUint32 << i))
 		if info, ok := l.ipTables[i].ipMap[subip]; ok {
 			return info

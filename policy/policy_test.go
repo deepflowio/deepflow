@@ -106,6 +106,15 @@ var (
 	ipGroup7Ip2    = NewIPFromString("192.168.20.112").Int()
 	ipGroup7Ip3    = NewIPFromString("192.168.10.123").Int()
 	ipGroup7Mac1   = NewMACAddrFromString("77:77:77:77:77:71").Int()
+	testIp1        = NewIPFromString("10.30.1.21").Int()
+	testMac1       = NewMACAddrFromString("ab:cd:11:11:11:11").Int()
+	testIp2        = NewIPFromString("10.20.30.0").Int()
+	testMac2       = NewMACAddrFromString("ab:cd:22:11:11:11").Int()
+	testIp3        = NewIPFromString("10.10.0.0").Int()
+	testMac3       = NewMACAddrFromString("ab:cd:33:11:11:11").Int()
+	testIp4        = NewIPFromString("20.0.0.0").Int()
+	testMac4       = NewMACAddrFromString("ab:cd:44:11:11:11").Int()
+	queryIp        = NewIPFromString("20.30.1.100").Int()
 )
 
 type EndInfo struct {
