@@ -1622,6 +1622,55 @@ func TestAclGidBitmap(t *testing.T) {
 	}
 }
 
+func TestAclGidBitmapMultiGroup(t *testing.T) {
+	acls := []*Acl{}
+	// 创建 policyTable
+	table := generatePolicyTable()
+	// 构建acl action  1:1000->2:0 tcp
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	action = action.SetACLGID(10)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
+	acls = append(acls, acl)
+	table.UpdateAcls(acls)
+
+	// 构建查询1-key  1:1000->2:8000 tcp
+	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 8000)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
+	endpoint := getEndpointData(table, key)
+
+	// endpoint中匹配策略的资源组和不匹配策略的资源组相交叉
+	endpoint.SrcInfo.GroupIds = append(endpoint.SrcInfo.GroupIds[:0], group[1], 100, group[1])
+	endpoint.DstInfo.GroupIds = append(endpoint.DstInfo.GroupIds[:0], group[2], 200, group[2])
+	policyData := getPolicyByFirstPath(table, endpoint, key)
+	aclGidbitmap0 := generateAclGidBitmap(GROUP_TYPE_SRC, 0, 0)
+	aclGidbitmap0.SetMapBits(2)
+	aclGidbitmap1 := generateAclGidBitmap(GROUP_TYPE_DST, 0, 0)
+	aclGidbitmap1.SetMapBits(2)
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(2)
+	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidbitmap0, aclGidbitmap1)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmap Check Failed!")
+	}
+
+	// endpoint中匹配策略的资源组在不匹配策略的资源组的后面
+	key = generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 8000)
+	endpoint.SrcInfo.GroupIds = append(endpoint.SrcInfo.GroupIds[:0], 100, group[1])
+	endpoint.DstInfo.GroupIds = append(endpoint.DstInfo.GroupIds[:0], 200, group[2])
+	policyData = getPolicyByFirstPath(table, endpoint, key)
+	aclGidbitmap0 = generateAclGidBitmap(GROUP_TYPE_SRC, 0, 1)
+	aclGidbitmap1 = generateAclGidBitmap(GROUP_TYPE_DST, 0, 1)
+	basicPolicyData = new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(2)
+	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidbitmap0, aclGidbitmap1)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmap Check Failed!")
+	}
+}
+
 func TestAclGidBitmapFirstPathVsFastPath(t *testing.T) {
 	acls := []*Acl{}
 	// 创建 policyTable
@@ -1858,6 +1907,85 @@ func TestAclGidBitmapByDesignationAcls(t *testing.T) {
 	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidbitmap1)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestAclGidBitmap Check Failed!")
+	}
+}
+
+func TestGroupRelation(t *testing.T) {
+	table := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	action = action.SetACLGID(100)
+
+	acl1 := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	acl2 := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	acls := []*Acl{acl1, acl2}
+
+	// 部分交集
+	to := &[TAP_MAX][math.MaxUint16 + 1][]uint16{}
+	from := &[TAP_MAX][math.MaxUint16 + 1]uint16{}
+	acl1.SrcGroups = acl1.SrcGroups[:0]
+	acl1.DstGroups = acl1.DstGroups[:0]
+	acl2.SrcGroups = acl2.SrcGroups[:0]
+	acl2.DstGroups = acl2.DstGroups[:0]
+	for i := 10; i < 20; i++ {
+		acl1.SrcGroups = append(acl1.SrcGroups, uint32(i))
+		acl2.SrcGroups = append(acl2.SrcGroups, uint32(i+5))
+	}
+
+	relation1 := []uint16{10, 11, 12, 13, 14}
+	relation2 := []uint16{15, 16, 17, 18, 19}
+	relation3 := []uint16{20, 21, 22, 23, 24}
+	table.policyLabeler.generateGroupRelation(acls, to, from)
+	if !reflect.DeepEqual(relation1, to[acl1.Type][1]) {
+		t.Log("Result:", to[acl1.Type][1], "\n")
+		t.Log("Expect:", relation1, "\n")
+	}
+	if !reflect.DeepEqual(relation2, to[acl1.Type][2]) {
+		t.Log("Result:", to[acl1.Type][2], "\n")
+		t.Log("Expect:", relation2, "\n")
+	}
+	if !reflect.DeepEqual(relation3, to[acl1.Type][3]) {
+		t.Log("Result:", to[acl1.Type][3], "\n")
+		t.Log("Expect:", relation2, "\n")
+	}
+
+	// 包含
+	to = &[TAP_MAX][math.MaxUint16 + 1][]uint16{}
+	from = &[TAP_MAX][math.MaxUint16 + 1]uint16{}
+	acl1.SrcGroups = append(acl1.SrcGroups[:0], 10, 20, 30, 40)
+	acl1.DstGroups = acl1.DstGroups[:0]
+	acl2.SrcGroups = append(acl2.SrcGroups[:0], 20, 30)
+	acl2.DstGroups = acl2.DstGroups[:0]
+
+	relation1 = []uint16{10, 40}
+	relation2 = []uint16{20, 30}
+	table.policyLabeler.generateGroupRelation(acls, to, from)
+	if !reflect.DeepEqual(relation1, to[acl1.Type][1]) {
+		t.Log("Result:", to[acl1.Type][1], "\n")
+		t.Log("Expect:", relation1, "\n")
+	}
+	if !reflect.DeepEqual(relation2, to[acl1.Type][2]) {
+		t.Log("Result:", to[acl1.Type][2], "\n")
+		t.Log("Expect:", relation2, "\n")
+	}
+
+	// 无交集
+	to = &[TAP_MAX][math.MaxUint16 + 1][]uint16{}
+	from = &[TAP_MAX][math.MaxUint16 + 1]uint16{}
+	acl1.SrcGroups = append(acl1.SrcGroups[:0], 10, 20)
+	acl1.DstGroups = acl1.DstGroups[:0]
+	acl2.SrcGroups = append(acl2.SrcGroups[:0], 30, 40)
+	acl2.DstGroups = acl2.DstGroups[:0]
+
+	relation1 = []uint16{10, 20}
+	relation2 = []uint16{30, 40}
+	table.policyLabeler.generateGroupRelation(acls, to, from)
+	if !reflect.DeepEqual(relation1, to[acl1.Type][1]) {
+		t.Log("Result:", to[acl1.Type][1], "\n")
+		t.Log("Expect:", relation1, "\n")
+	}
+	if !reflect.DeepEqual(relation2, to[acl1.Type][2]) {
+		t.Log("Result:", to[acl1.Type][2], "\n")
+		t.Log("Expect:", relation2, "\n")
 	}
 }
 
