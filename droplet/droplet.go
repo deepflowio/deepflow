@@ -72,16 +72,12 @@ func Start(configPath string) (closers []io.Closer) {
 
 	stats.RegisterGcMonitor()
 	stats.SetMinInterval(10 * time.Second)
+	stats.SetRemotes(net.UDPAddr{net.ParseIP("127.0.0.1").To4(), INFLUXDB_RELAY_PORT, ""})
 
-	influxdbHosts := make([]net.UDPAddr, len(cfg.ControllerIps))
 	controllers := make([]net.IP, len(cfg.ControllerIps))
 	for i, ipString := range cfg.ControllerIps {
-		ip := net.ParseIP(ipString).To4()
-		influxdbHosts[i] = net.UDPAddr{ip, INFLUXDB_RELAY_PORT, ""}
-		controllers[i] = ip
+		controllers[i] = net.ParseIP(ipString).To4()
 	}
-	stats.SetRemotes(influxdbHosts...)
-
 	synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.ControllerPort, cfg.RpcTimeout)
 	synchronizer.Start()
 
