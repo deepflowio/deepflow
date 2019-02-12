@@ -682,7 +682,7 @@ func (d *PolicyData) String() string {
 
 func FillGroupID(aclAction AclAction, aclGidBitmaps []AclGidBitmap, allGroupIDs [][]uint32, aclGroupIDs [][]int32) {
 	if len(allGroupIDs) != 2 || len(aclGroupIDs) != 2 {
-		panic("长度必须为2")
+		panic("Length must be 2")
 	}
 
 	aclGroupIDs[0] = aclGroupIDs[0][:0]
@@ -700,7 +700,7 @@ func FillGroupID(aclAction AclAction, aclGidBitmaps []AclGidBitmap, allGroupIDs 
 			ep = 1
 		}
 		if bit.CountLeadingZeros64(groupMapBits)+int(groupOffset) >= len(allGroupIDs[ep]) {
-			log.Warningf("map bits和group id不匹配, groupOffset=0x%016x, groupMapBits=0x%016x, groupIDs=%v", groupOffset, groupMapBits, allGroupIDs[ep])
+			log.Warningf("map bits and group id mismatch, %v groupOffset=0x%016x, groupMapBits=0x%016x, groupIDs=%v", aclAction, groupOffset, groupMapBits, allGroupIDs[ep])
 			continue
 		}
 
