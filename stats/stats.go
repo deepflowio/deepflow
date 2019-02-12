@@ -67,7 +67,7 @@ func registerCountable(module string, countable Countable, opts ...Option) error
 	}
 	source.tags["host"] = hostname
 	lock.Lock()
-	statSources.PushBack(source)
+	statSources.PushBack(&source)
 	lock.Unlock()
 	return nil
 }
@@ -111,10 +111,10 @@ func collectBatchPoints() client.BatchPoints {
 	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{Precision: "s"})
 	lock.Lock()
 	for it := statSources.Iterator(); !it.Empty(); it.Next() {
-		statSource := it.Value().(StatSource)
+		statSource := it.Value().(*StatSource)
 		for statSource.countable.Closed() {
 			statSources.Remove(&it)
-			statSource = it.Value().(StatSource)
+			statSource = it.Value().(*StatSource)
 		}
 
 		max := func(x, y time.Duration) time.Duration {
