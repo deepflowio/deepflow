@@ -83,6 +83,7 @@ type PolicyLabeler struct {
 	FirstPathHitTick, FastPathHitTick     uint64
 	AclHitMax                             uint32
 	FastPathMacCount, FastPathPolicyCount uint32
+	UnmatchedPacketCount                  uint64
 
 	maskMapFromPlatformData [math.MaxUint16 + 1]uint32
 	maskMapFromIpGroupData  [math.MaxUint16 + 1]uint32
@@ -768,6 +769,7 @@ func (l *PolicyLabeler) FlushAcls() {
 	}
 	atomic.StoreUint32(&l.FastPathMacCount, 0)
 	atomic.StoreUint32(&l.FastPathPolicyCount, 0)
+	atomic.StoreUint64(&l.UnmatchedPacketCount, 0)
 }
 
 func (l *PolicyLabeler) AddAcl(acl *Acl) {
@@ -878,6 +880,8 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 			findPolicy.FormatNpbAction()
 			findPolicy.NpbActions = findPolicy.CheckNpbAction(packet, packetEndpointData)
 		}
+	} else {
+		atomic.AddUint64(&l.UnmatchedPacketCount, 1)
 	}
 
 	atomic.AddUint64(&l.FirstPathHit, 1)
@@ -1173,6 +1177,10 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointData, *
 
 	if policy != nil && endpoint != nil {
 		policy = policy.CheckNpbPolicy(packet, endpoint)
+	}
+
+	if policy != nil && policy.ACLID == 0 {
+		atomic.AddUint64(&l.UnmatchedPacketCount, 1)
 	}
 
 	atomic.AddUint64(&l.FastPathHit, 1)
