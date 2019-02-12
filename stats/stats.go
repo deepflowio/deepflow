@@ -51,10 +51,12 @@ type StatItem struct {
 }
 
 func registerCountable(module string, countable Countable, opts ...Option) error {
-	source := StatSource{module: module, countable: countable}
+	source := StatSource{module: module, countable: countable, tags: OptionStatTags{}}
 	for _, opt := range opts {
-		if tags, ok := opt.(OptionStatTags); ok {
-			source.tags = tags
+		if tags, ok := opt.(OptionStatTags); ok { // 可能有多个
+			for k, v := range tags {
+				source.tags[k] = v
+			}
 		} else if opt, ok := opt.(OptionInterval); ok {
 			source.interval = time.Duration(opt) / time.Second * time.Second
 			if source.interval > time.Second {
