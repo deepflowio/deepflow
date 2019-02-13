@@ -1,68 +1,42 @@
 // Golang的list简直就是辣鸡
 package datastructure
 
-import (
-	"gitlab.x.lan/yunshan/droplet-libs/pool"
-)
-
-var elementPool = pool.NewLockFreePool(func() interface{} {
-	return new(Element)
-})
-
-type Element struct {
-	value interface{}
-	next  *Element
-}
-
 type LinkedList struct {
 	head *Element
 	tail *Element
 	size int
 }
 
-func element(v interface{}) *Element {
-	e := elementPool.Get().(*Element)
-	e.value = v
-	return e
-}
-
-func releaseElement(e *Element) {
-	*e = Element{}
-	elementPool.Put(e)
-}
-
 func (q *LinkedList) PushFront(v interface{}) {
-	e := element(v)
+	e := WrapElement(v)
 	if q.size == 0 {
 		q.tail = e
 	} else {
-		e.next = q.head
+		e.Next = q.head
 	}
 	q.head = e
 	q.size++
 }
 
 func (q *LinkedList) PushBack(v interface{}) {
-	e := element(v)
+	e := WrapElement(v)
 	if q.size == 0 {
 		q.head = e
 	} else {
-		q.tail.next = e
+		q.tail.Next = e
 	}
 	q.tail = e
 	q.size++
 }
 
 func (q *LinkedList) PopFront() interface{} {
-	var toRelease *Element
 	if q.size == 0 {
 		return nil
 	}
-	v := q.head.value
-	toRelease, q.head = q.head, q.head.next
-	releaseElement(toRelease)
+	element := q.head
+	q.head = q.head.Next
 	q.size--
-	return v
+	return UnwrapElement(element)
 }
 
 func (q *LinkedList) Remove(it *Iterator) interface{} {
@@ -75,15 +49,13 @@ func (q *LinkedList) Remove(it *Iterator) interface{} {
 		return q.PopFront()
 	}
 	current := it.current
-	it.prev.next = current.next
-	v := current.value
+	it.prev.Next = current.Next
 	if q.tail == current {
 		q.tail = it.prev
 	}
 	q.size--
 	it.Next()
-	releaseElement(current)
-	return v
+	return UnwrapElement(current)
 }
 
 func (q *LinkedList) Len() int {
@@ -101,7 +73,7 @@ type Iterator struct {
 }
 
 func (it *Iterator) Next() {
-	it.prev, it.current = it.current, it.current.next
+	it.prev, it.current = it.current, it.current.Next
 }
 
 func (it *Iterator) Empty() bool {
@@ -109,5 +81,5 @@ func (it *Iterator) Empty() bool {
 }
 
 func (it *Iterator) Value() interface{} {
-	return it.current.value
+	return it.current.Value
 }
