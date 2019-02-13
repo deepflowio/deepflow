@@ -16,6 +16,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/logger"
 	libqueue "gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gopkg.in/yaml.v2"
 
 	"gitlab.x.lan/yunshan/droplet/adapter"
 	"gitlab.x.lan/yunshan/droplet/capture"
@@ -63,7 +64,8 @@ func Start(configPath string) (closers []io.Closer) {
 	logLevel, _ := logging.LogLevel(cfg.LogLevel)
 	logging.SetLevel(logLevel, "")
 	debug.SetIpAndPort(DEBUG_LISTEN_IP, DEBUG_LISTEN_PORT)
-	log.Infof("droplet config: %+v\n", cfg)
+	bytes, _ := yaml.Marshal(cfg)
+	log.Infof("droplet config:\n%s", string(bytes))
 	profiler := profiler.NewProfiler(8000)
 
 	if cfg.Profiler {

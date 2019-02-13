@@ -171,7 +171,7 @@ profiler
 生产环境获取方式:
 
 * 获取CPU profiler:
-  1. 运行环境执行`wget http://localhost:8000/debug/pprof/profile?seconds=30 -o droplet.pprof`
+  1. 运行环境执行`curl 'http://localhost:8000/debug/pprof/profile?seconds=30' -o droplet.pprof`
   2. 将droplet.pprof拷贝到本地，然后执行`go tool pprof droplet.pprof`
 
 性能量化字段说明
