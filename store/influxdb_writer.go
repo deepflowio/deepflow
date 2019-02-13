@@ -59,6 +59,7 @@ type WriterInfo struct {
 	writeTime  int64
 	pointCache map[string]*PointCache
 	counter    *Counter
+	stats.Closable
 }
 
 type InfluxdbWriter struct {
@@ -218,10 +219,6 @@ func (i *WriterInfo) GetCounter() interface{} {
 	return counter
 }
 
-func (i *WriterInfo) Closed() bool {
-	return true
-}
-
 func newPointCache(db string, size int) *PointCache {
 	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
 		Database:  db,
@@ -275,7 +272,7 @@ func getCurrentDBs(httpClient client.Client) map[string]bool {
 
 func (w *InfluxdbWriter) queueProcess(queueID int) {
 	stats.RegisterCountable("influxdb_writer", w.QueueWriterInfos[queueID], stats.OptionStatTags{"thread": strconv.Itoa(queueID)})
-	defer w.QueueWriterInfos[queueID].Closed()
+	defer w.QueueWriterInfos[queueID].Close()
 
 	rawItems := make([]interface{}, QUEUE_FETCH_MAX_SIZE)
 	for {
