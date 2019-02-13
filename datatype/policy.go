@@ -547,24 +547,23 @@ func (d *PolicyData) ReverseData() *PolicyData {
 
 func formatGroup(aclGidBitmap AclGidBitmap, endpointData *EndpointData) string {
 	var formatStr string
+	var groupIds []uint32
 	groupType := aclGidBitmap.GetGroupType()
 	groupOffset := aclGidBitmap.GetMapOffset()
 	groupMapBits := aclGidBitmap.GetMapBits()
 	if groupType == GROUP_TYPE_SRC {
 		formatStr += " SRC: "
+		groupIds = endpointData.SrcInfo.GroupIds
 	} else if groupType == GROUP_TYPE_DST {
 		formatStr += " DST: "
+		groupIds = endpointData.DstInfo.GroupIds
 	} else {
 		return formatStr
 	}
-	for j := uint32(0); j < GROUP_MAPBITS_OFFSET; j++ {
-		if (groupMapBits & (uint64(1) << j)) > 0 {
-			if groupType == GROUP_TYPE_SRC {
-				formatStr += GroupIdToString(endpointData.SrcInfo.GroupIds[groupOffset+j])
-			} else {
-				formatStr += GroupIdToString(endpointData.DstInfo.GroupIds[groupOffset+j])
-			}
-		}
+	for groupMapBits > 0 {
+		j := uint32(bit.CountTrailingZeros64(groupMapBits))
+		groupMapBits ^= 1 << j
+		formatStr += GroupIdToString(groupIds[groupOffset+j])
 	}
 	return formatStr
 }
