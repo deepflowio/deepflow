@@ -41,7 +41,7 @@ func (m *UsageMeter) SequentialMerge(other app.Meter) {
 }
 
 func (m *UsageMeter) ToKVString() string {
-	buffer := make([]byte, MAX_STRING_LENGTH)
+	buffer := make([]byte, app.MAX_DOC_STRING_LENGTH)
 	size := m.MarshalTo(buffer)
 	return string(buffer[:size])
 }

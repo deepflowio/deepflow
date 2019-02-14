@@ -115,7 +115,7 @@ func (m *TypeMeter) SequentialMerge(other app.Meter) {
 }
 
 func (m *TypeMeter) ToKVString() string {
-	buffer := make([]byte, MAX_STRING_LENGTH)
+	buffer := make([]byte, app.MAX_DOC_STRING_LENGTH)
 	size := m.MarshalTo(buffer)
 	return string(buffer[:size])
 }
