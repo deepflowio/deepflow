@@ -11,6 +11,7 @@ import (
 	"github.com/op/go-logging"
 
 	"github.com/influxdata/influxdb/models"
+	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
@@ -18,15 +19,14 @@ import (
 var log = logging.MustGetLogger("influxdb_writer")
 
 const (
-	QUEUE_FETCH_MAX_SIZE       = 1024
-	ESTIMATED_MAX_POINT_LENGTH = 1024
-	DEFAULT_BATCH_SIZE         = 512 * 1024
-	DEFAULT_FLUSH_TIMEOUT      = 5 // 单位 秒
-	DEFAULT_QUEUE_SIZE         = 256 * 1024
-	DEFAULT_QUEUE_NAME         = "influxdb_writer"
-	INFLUXDB_PRECISION_S       = "s"
-	UNIX_TIMESTAMP_TO_TIME     = (1969*365 + 1969/4 - 1969/100 + 1969/400) * 24 * 60 * 60
-	TIME_BINARY_LEN            = 15
+	QUEUE_FETCH_MAX_SIZE   = 1024
+	DEFAULT_BATCH_SIZE     = 512 * 1024
+	DEFAULT_FLUSH_TIMEOUT  = 5 // 单位 秒
+	DEFAULT_QUEUE_SIZE     = 256 * 1024
+	DEFAULT_QUEUE_NAME     = "influxdb_writer"
+	INFLUXDB_PRECISION_S   = "s"
+	UNIX_TIMESTAMP_TO_TIME = (1969*365 + 1969/4 - 1969/100 + 1969/400) * 24 * 60 * 60
+	TIME_BINARY_LEN        = 15
 )
 
 type InfluxdbItem interface {
@@ -228,7 +228,7 @@ func newPointCache(db string, size int) *PointCache {
 		panic(fmt.Sprintf("create BatchPoints for db %s failed: %s", db, err))
 	}
 
-	buffer := make([]byte, size+ESTIMATED_MAX_POINT_LENGTH)
+	buffer := make([]byte, size+app.MAX_DOC_STRING_LENGTH)
 	return &PointCache{
 		bp:     bp,
 		buffer: buffer,

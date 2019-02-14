@@ -213,7 +213,7 @@ type Tag struct {
 }
 
 func (t *Tag) ToKVString() string {
-	buffer := make([]byte, MAX_STRING_LENGTH)
+	buffer := make([]byte, app.MAX_DOC_STRING_LENGTH)
 	size := t.MarshalTo(buffer)
 	return string(buffer[:size])
 }
