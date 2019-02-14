@@ -16,6 +16,11 @@ const (
 	LOGLEVEL_CMD_SET
 )
 
+type LevelInfo struct {
+	Module string
+	Level  string
+}
+
 type LoglevelControl struct {
 }
 
@@ -28,20 +33,20 @@ func NewLoglevelControl() *LoglevelControl {
 	return loglevelProcess
 }
 
-func decodeLoglevel(arg *bytes.Buffer) (string, error) {
-	var level string
+func decodeLoglevel(arg *bytes.Buffer) (*LevelInfo, error) {
+	levelInfo := &LevelInfo{}
 	decoder := gob.NewDecoder(arg)
-	if err := decoder.Decode(&level); err != nil {
+	if err := decoder.Decode(levelInfo); err != nil {
 		log.Error(err)
-		return "", err
+		return levelInfo, err
 	}
-	return level, nil
+	return levelInfo, nil
 }
 
-func encodeLoglevel(level string) (*bytes.Buffer, error) {
+func encodeLoglevel(levelInfo *LevelInfo) (*bytes.Buffer, error) {
 	buffer := bytes.Buffer{}
 	encoder := gob.NewEncoder(&buffer)
-	if err := encoder.Encode(level); err != nil {
+	if err := encoder.Encode(levelInfo); err != nil {
 		log.Errorf("encoder.Encode: %s", err)
 		return nil, err
 	}
@@ -51,7 +56,8 @@ func encodeLoglevel(level string) (*bytes.Buffer, error) {
 func (l *LoglevelControl) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, operate uint16, arg *bytes.Buffer) {
 	switch operate {
 	case LOGLEVEL_CMD_SHOW:
-		loglevel := getLogLevel()
+		loglevel, _ := decodeLoglevel(arg)
+		loglevel.Level = getLogInfo(loglevel.Module)
 		enc, err := encodeLoglevel(loglevel)
 		if err != nil {
 			debug.SendToClient(conn, remote, 1, nil)
@@ -78,25 +84,34 @@ func (l *LoglevelControl) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, op
 	}
 }
 
-func getLogLevel() string {
-	levelId := logging.GetLevel("")
+func getLogInfo(module string) string {
+	if module == "modules" {
+		return getModules()
+	}
+	levelId := logging.GetLevel(module)
 	return levelId.String()
 }
 
-func setLogLevel(level string) error {
-	levelId, err := logging.LogLevel(level)
+func setLogLevel(levelInfo *LevelInfo) error {
+	levelId, err := logging.LogLevel(levelInfo.Level)
 	if err != nil {
 		return err
 	}
-	logging.SetLevel(levelId, "")
+	if levelInfo.Module == "all" {
+		for i, _ := range logging.Modules {
+			logging.SetLevel(levelId, logging.Modules[i])
+		}
+		return nil
+	}
+	logging.SetLevel(levelId, levelInfo.Module)
 	return nil
 }
 
-func sendCmd(operate int, loglevel string, out interface{}) bool {
+func sendCmd(operate int, levelInfo *LevelInfo) bool {
 	buffer := bytes.Buffer{}
 	encoder := gob.NewEncoder(&buffer)
-	if err := encoder.Encode(loglevel); err != nil {
-		fmt.Printf("%v: %s\n", err, loglevel)
+	if err := encoder.Encode(levelInfo); err != nil {
+		fmt.Printf("%v: %s\n", err, levelInfo)
 		return false
 	}
 
@@ -107,11 +122,34 @@ func sendCmd(operate int, loglevel string, out interface{}) bool {
 	}
 
 	decoder := gob.NewDecoder(result)
-	if err = decoder.Decode(out); err != nil {
-		fmt.Printf("%v: %v\n", err, out)
+	if err = decoder.Decode(levelInfo); err != nil {
+		fmt.Printf("%v: %v\n", err, levelInfo)
 		return false
 	}
 	return true
+}
+
+func checkInput(module string) bool {
+	if module == "all" || module == "modules" {
+		return true
+	}
+	for i, _ := range logging.Modules {
+		if logging.Modules[i] == module {
+			return true
+		}
+	}
+
+	return false
+}
+
+func getModules() string {
+	var modules string
+	for i, _ := range logging.Modules {
+		modules += logging.Modules[i]
+		modules += "|"
+	}
+
+	return modules
 }
 
 // 客户端注册命令
@@ -125,31 +163,51 @@ func RegisterLoglevelCommand() *cobra.Command {
 	}
 
 	show := &cobra.Command{
-		Use:   "show",
-		Short: "show current loglevel",
+		Use:     "show",
+		Short:   "show current loglevel | Modules",
+		Example: "droplet-ctl loglevel show flowgenerator|modules",
+		Long:    "droplet-ctl loglevel show {module}",
 		Run: func(cmd *cobra.Command, args []string) {
-			var level string
-			if sendCmd(LOGLEVEL_CMD_SHOW, "", &level) {
-				fmt.Printf("Current loglevel: %s\n", level)
+			if len(args) != 1 || !checkInput(args[0]) {
+				fmt.Printf("Input Err. Example: %s\n", cmd.Example)
+				return
+			}
+			levelInfo := LevelInfo{
+				Module: args[0],
+			}
+			if sendCmd(LOGLEVEL_CMD_SHOW, &levelInfo) {
+				fmt.Printf("Current Info: %s\n", levelInfo)
 			}
 		},
 	}
 
 	set := &cobra.Command{
-		Use:   "set {loglevel}",
-		Short: "set loglevel",
+		Use:     "set {module} {loglevel}",
+		Short:   "set loglevel",
+		Example: "droplet-ctl loglevel set flowgenerator info",
+		Long: "droplet-ctl loglevel set {key+}\n" +
+			"key list:\n" +
+			"\tmodule       module| all(set all modules)\n" +
+			"\tlevel        debug|info|warning|error",
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) != 1 {
+			if len(args) != 2 {
+				fmt.Printf("Input Err. Example: %s\n", cmd.Example)
+				return
+			}
+			if !checkInput(args[0]) {
+				fmt.Printf("Input Err. Example: %s\n", cmd.Example)
+				return
+			}
+			if args[1] != "debug" && args[1] != "info" && args[1] != "warning" && args[1] != "error" {
 				fmt.Println("please run with 'debug|info|warning|error'.")
 				return
 			}
-			if args[0] != "debug" && args[0] != "info" && args[0] != "warning" && args[0] != "error" {
-				fmt.Println("please run with 'debug|info|warning|error'.")
-				return
+			levelInfo := LevelInfo{
+				Module: args[0],
+				Level:  args[1],
 			}
-			var level string
-			if sendCmd(LOGLEVEL_CMD_SET, args[0], &level) {
-				fmt.Printf("Set loglevel: %s\n", level)
+			if sendCmd(LOGLEVEL_CMD_SET, &levelInfo) {
+				fmt.Printf("Set loglevel: %s\n", levelInfo)
 			}
 		},
 	}
