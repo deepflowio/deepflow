@@ -182,12 +182,18 @@ func DecodeVTAP(b []byte) (*app.Document, error) {
 	if b == nil {
 		return nil, errors.New("No input byte")
 	}
-
 	decoder := &codec.SimpleDecoder{}
 	decoder.Init(b)
+	return DecodeVTAPIn(decoder)
+}
+
+func DecodeVTAPIn(decoder *codec.SimpleDecoder) (*app.Document, error) {
+	if decoder == nil {
+		return nil, errors.New("No input decoder")
+	}
 
 	if version := decoder.ReadU32(); version != app.VERSION {
-		return nil, errors.New(fmt.Sprintf("message version incorrect, expect %d, found %d.", app.VERSION, version))
+		return nil, fmt.Errorf("message version incorrect, expect %d, found %d", app.VERSION, version)
 	}
 
 	doc := app.AcquireDocument()
