@@ -120,6 +120,7 @@ func newL3L2End(l2End, l3End bool) L3L2End {
 }
 
 func (i *EndpointInfo) SetL3L2End(ends L3L2End) {
+	i.L2End, i.L3End = false, false
 	if (ends & L3_L2_END_FALSE_TRUE) > 0 {
 		i.L2End = true
 	}
