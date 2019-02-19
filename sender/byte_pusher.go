@@ -1,6 +1,8 @@
 package sender
 
 import (
+	"time"
+
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/zmq"
@@ -29,14 +31,18 @@ func (s *ZMQBytePusher) Send(b []byte) {
 			s.Sender, err = zmq.NewPusher(s.ip, int(s.port), s.zmqHWM, zmq.CLIENT)
 		}
 		if err != nil {
-			log.Warningf("NewPusher() error: %s\n", err)
+			log.Warningf("NewPusher(%s:%d) error: %s\n", s.ip, s.port, err)
+			time.Sleep(10 * time.Second)
 			s.Sender = nil
 			return
 		}
 	}
 	_, err := s.Sender.Send(b)
 	if err != nil {
-		log.Warningf("Sender has error, will reconnect: %s\n", err)
+		if err.Error() == "resource temporarily unavailable" {
+			return
+		}
+		log.Warningf("Sender(%s:%d) has error, will reconnect: %s\n", s.ip, s.port, err)
 		s.Sender.Close()
 		s.Sender = nil
 		return
