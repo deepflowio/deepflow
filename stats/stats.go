@@ -258,7 +258,7 @@ func setHostname(name string) {
 	hostname = name
 	lock.Lock()
 	for it := statSources.Iterator(); !it.Empty(); it.Next() {
-		it.Value().(StatSource).tags["host"] = hostname
+		it.Value().(*StatSource).tags["host"] = hostname
 	}
 	lock.Unlock()
 }
