@@ -108,7 +108,7 @@ func (k *LookupKey) HasFeatureFlag(featureFlag FeatureFlags) bool {
 	return k.FeatureFlag&featureFlag == featureFlag
 }
 
-func newL3L2End(l2End, l3End bool) L3L2End {
+func NewL3L2End(l2End, l3End bool) L3L2End {
 	ends := L3_L2_END_FALSE_FALSE
 	if l2End {
 		ends += L3_L2_END_FALSE_TRUE
@@ -130,7 +130,7 @@ func (i *EndpointInfo) SetL3L2End(ends L3L2End) {
 }
 
 func (i *EndpointInfo) GetL3L2End() L3L2End {
-	return newL3L2End(i.L2End, i.L3End)
+	return NewL3L2End(i.L2End, i.L3End)
 }
 
 func (i *EndpointInfo) SetL2Data(data *PlatformData) {
@@ -253,8 +253,8 @@ func (d *EndpointData) InitPointer() {
 }
 
 func (d *EndpointData) UpdatePointer(l2End0, l2End1, l3End0, l3End1 bool) {
-	d.SrcInfo = &d.SrcInfos[newL3L2End(l2End0, l3End0)]
-	d.DstInfo = &d.DstInfos[newL3L2End(l2End1, l3End1)]
+	d.SrcInfo = &d.SrcInfos[NewL3L2End(l2End0, l3End0)]
+	d.DstInfo = &d.DstInfos[NewL3L2End(l2End1, l3End1)]
 }
 
 // ReverseData will return a reversed replica of the current EndpointData
