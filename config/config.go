@@ -255,11 +255,7 @@ func (c *Config) Validate() error {
 	} else {
 		c.FlowGenerator.ReportTolerance *= time.Second
 	}
-	if c.FlowGenerator.PortStatsInterval == 0 {
-		c.FlowGenerator.PortStatsInterval = time.Second
-	} else {
-		c.FlowGenerator.PortStatsInterval *= time.Second
-	}
+	c.FlowGenerator.PortStatsInterval *= time.Second
 	if c.FlowGenerator.PortStatsSrcEndCount == 0 {
 		c.FlowGenerator.PortStatsSrcEndCount = 5
 	}

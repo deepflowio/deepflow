@@ -19,7 +19,11 @@ type IpPortEpcKey = uint64
 type ServiceManager struct {
 	sync.RWMutex
 
-	lruCache *lru.Cache64
+	lruCache      *lru.Cache64
+	getStatus     func(IpPortEpcKey, uint16) bool
+	enableStatus  func(IpPortEpcKey)
+	hitStatus     func(IpPortEpcKey, uint32, time.Duration)
+	disableStatus func(IpPortEpcKey)
 }
 
 // inner tcp service manager allocator
@@ -65,7 +69,20 @@ var IANAPortServiceList []bool
 const IANA_PORT_RANGE = 1024 + 1
 
 func NewServiceManager(capacity int) *ServiceManager {
-	return &ServiceManager{lruCache: lru.NewCache64(capacity)}
+	serviceManager := &ServiceManager{lruCache: lru.NewCache64(capacity)}
+	// if portStatsInterval is 0, then not learn any port
+	if portStatsInterval > 0 {
+		serviceManager.getStatus = serviceManager.getStatusLearnOn
+		serviceManager.enableStatus = serviceManager.enableStatusLearnOn
+		serviceManager.hitStatus = serviceManager.hitStatusLearnOn
+		serviceManager.disableStatus = serviceManager.disableStatusLearnOn
+	} else {
+		serviceManager.getStatus = serviceManager.getStatusLearnOff
+		serviceManager.enableStatus = serviceManager.enableStatusLearnOff
+		serviceManager.hitStatus = serviceManager.hitStatusLearnOff
+		serviceManager.disableStatus = serviceManager.disableStatusLearnOff
+	}
+	return serviceManager
 }
 
 func genServiceKey(l3EpcId int32, ip IPv4Int, port uint16) IpPortEpcKey {
@@ -80,7 +97,7 @@ func getUdpServiceManager(key IpPortEpcKey) *ServiceManager {
 	return innerUdpSMA[key%flowGeneratorCount]
 }
 
-func (m *ServiceManager) getStatus(key IpPortEpcKey, port uint16) bool {
+func (m *ServiceManager) getStatusLearnOn(key IpPortEpcKey, port uint16) bool {
 	m.RLock()
 	value, ok := m.lruCache.Peek(key)
 	m.RUnlock()
@@ -93,7 +110,14 @@ func (m *ServiceManager) getStatus(key IpPortEpcKey, port uint16) bool {
 	return value.(*ServiceStatus).active
 }
 
-func (m *ServiceManager) enableStatus(key IpPortEpcKey) {
+func (m *ServiceManager) getStatusLearnOff(key IpPortEpcKey, port uint16) bool {
+	if port < IANA_PORT_RANGE {
+		return IANAPortServiceList[port]
+	}
+	return false
+}
+
+func (m *ServiceManager) enableStatusLearnOn(key IpPortEpcKey) {
 	m.Lock()
 	value, ok := m.lruCache.Get(key)
 	if !ok {
@@ -108,7 +132,11 @@ func (m *ServiceManager) enableStatus(key IpPortEpcKey) {
 	m.Unlock()
 }
 
-func (m *ServiceManager) hitStatus(key IpPortEpcKey, clientHash uint32, timestamp time.Duration) {
+func (m *ServiceManager) enableStatusLearnOff(key IpPortEpcKey) {
+	return
+}
+
+func (m *ServiceManager) hitStatusLearnOn(key IpPortEpcKey, clientHash uint32, timestamp time.Duration) {
 	var status *ServiceStatus
 	m.Lock()
 	value, ok := m.lruCache.Get(key)
@@ -139,11 +167,19 @@ func (m *ServiceManager) hitStatus(key IpPortEpcKey, clientHash uint32, timestam
 	}
 }
 
-func (m *ServiceManager) disableStatus(key IpPortEpcKey) {
+func (m *ServiceManager) hitStatusLearnOff(key IpPortEpcKey, clientHash uint32, timestamp time.Duration) {
+	return
+}
+
+func (m *ServiceManager) disableStatusLearnOn(key IpPortEpcKey) {
 	m.Lock()
 	// XXX: maybe we don't need to remove the peer
 	m.lruCache.Remove(key)
 	m.Unlock()
+}
+
+func (m *ServiceManager) disableStatusLearnOff(key IpPortEpcKey) {
+	return
 }
 
 func init() {
