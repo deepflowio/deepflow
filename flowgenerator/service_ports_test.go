@@ -42,7 +42,30 @@ func TestServicePortStatus(t *testing.T) {
 	}
 }
 
+func TestPortLearnInvalid(t *testing.T) {
+	portStatsInterval = 0
+	serviceManager := NewServiceManager(64 * 1024)
+	epcId := int32(3)
+	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
+	port := uint16(8080)
+	key := genServiceKey(epcId, ip, port)
+	if serviceManager.getStatus(key, port) {
+		t.Error("serviceManager.getStatus() return true, expect false")
+	}
+	for i := 0; i < DEFAULT_IP_LEARN_CNT; i++ {
+		serviceManager.hitStatus(key, uint32(i+1), time.Duration(i*100))
+	}
+	if serviceManager.getStatus(key, port) {
+		t.Error("serviceManager.getStatus() return true, expect false")
+	}
+	serviceManager.enableStatus(key)
+	if serviceManager.getStatus(key, port) {
+		t.Error("serviceManager.getStatus() return true, expect false")
+	}
+}
+
 func TestHitPortStatus(t *testing.T) {
+	portStatsInterval = time.Second
 	serviceManager := NewServiceManager(64 * 1024)
 	epcId := int32(3)
 	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
@@ -60,6 +83,7 @@ func TestHitPortStatus(t *testing.T) {
 }
 
 func TestGoroutinesServicePortStatus(t *testing.T) {
+	portStatsInterval = time.Second
 	portStatsSrcEndCount = 1
 	serviceManager := NewServiceManager(64 * 1024)
 	epcId := int32(3)
