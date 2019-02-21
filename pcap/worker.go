@@ -2,7 +2,9 @@ package pcap
 
 import (
 	"fmt"
+	"github.com/op/go-logging"
 	"os"
+	"sync"
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -64,6 +66,10 @@ type Worker struct {
 
 	writerBufferSize int
 	tcpipChecksum    bool
+
+	exiting bool
+	exited  bool
+	exitWg  *sync.WaitGroup
 }
 
 func (m *WorkerManager) newWorker(index int) *Worker {
@@ -83,6 +89,10 @@ func (m *WorkerManager) newWorker(index int) *Worker {
 
 		writerBufferSize: m.blockSizeKB << 10,
 		tcpipChecksum:    m.tcpipChecksum,
+
+		exiting: false,
+		exited:  false,
+		exitWg:  &sync.WaitGroup{},
 	}
 }
 
@@ -167,7 +177,9 @@ func (w *Worker) writePacket(packet *datatype.MetaPacket, tapType zerodoc.TAPTyp
 	}
 	if !exist {
 		if len(w.writers) >= w.maxConcurrentFiles {
-			log.Debugf("Max concurrent file (%d files) exceeded", w.maxConcurrentFiles)
+			if log.IsEnabledFor(logging.DEBUG) {
+				log.Debugf("Max concurrent file (%d files) exceeded", w.maxConcurrentFiles)
+			}
 			w.FileRejections++
 			return
 		}
@@ -185,11 +197,14 @@ func (w *Worker) writePacket(packet *datatype.MetaPacket, tapType zerodoc.TAPTyp
 			lastPacketTime:  packet.Timestamp,
 		}
 		writer.tempFilename = writer.getTempFilename(w.baseDirectory)
-		log.Debugf("Begin to write packets to %s", writer.tempFilename)
-		// TODO: 池化writer（有一个[65536]byte）
+		if log.IsEnabledFor(logging.DEBUG) {
+			log.Debugf("Begin to write packets to %s", writer.tempFilename)
+		}
 		var err error
 		if writer.Writer, err = NewWriter(writer.tempFilename, w.writerBufferSize, w.tcpipChecksum); err != nil {
-			log.Debugf("Failed to create writer for %s: %s", writer.tempFilename, err)
+			if log.IsEnabledFor(logging.DEBUG) {
+				log.Debugf("Failed to create writer for %s: %s", writer.tempFilename, err)
+			}
 			w.FileCreationFailures++
 			return
 		}
@@ -214,11 +229,15 @@ func (w *Worker) Process() {
 	ips := make([]datatype.IPv4Int, 0, 2)
 	macs := make([]datatype.MacInt, 0, 2)
 
-	for {
+WORKING_LOOP:
+	for !w.exiting {
 		n := w.inputQueue.Gets(w.queueKey, elements)
 		timeNow := time.Duration(time.Now().UnixNano())
 		for _, e := range elements[:n] {
 			if e == nil { // tick
+				if w.exiting {
+					break WORKING_LOOP
+				}
 				for key, writer := range w.writers {
 					if timeNow-writer.firstPacketTime > w.maxFilePeriod {
 						newFilename := writer.getFilename(w.baseDirectory)
@@ -279,15 +298,21 @@ func (w *Worker) Process() {
 			datatype.ReleaseMetaPacket(packet)
 		}
 	}
-}
 
-func (w *Worker) Close() error {
-	log.Infof("Stop pcap worker (%d) writing to %d files", w.index, len(w.writers))
 	for _, writer := range w.writers {
 		newFilename := writer.getFilename(w.baseDirectory)
 		w.finishWriter(writer, newFilename)
 	}
-	w.writers = nil
+	log.Infof("Stopped pcap worker (%d)", w.index)
+	w.exitWg.Done()
+}
+
+func (w *Worker) Close() error {
+	log.Infof("Stop pcap worker (%d) writing to %d files", w.index, len(w.writers))
+	w.exitWg.Add(1)
+	w.exiting = true
+	w.exitWg.Wait()
+	w.exited = true
 	return nil
 }
 
@@ -298,5 +323,5 @@ func (w *Worker) GetCounter() interface{} {
 }
 
 func (w *Worker) Closed() bool {
-	return w.writers == nil
+	return w.exited
 }
