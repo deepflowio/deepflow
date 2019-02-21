@@ -77,34 +77,44 @@ func (p *MetaPacket) GenerateHash() uint32 {
 	return p.Hash
 }
 
-func (h *MetaPacketTcpHeader) extractTcpOptions(stream *ByteStream) {
+func (h *MetaPacketTcpHeader) extractTcpOptions(stream *ByteStream) bool {
 	for stream.Len() >= 2 { // 如果不足2B，那么只可能是NOP或END
 		switch TCPOptionKind(stream.U8()) {
 		case TCPOptionKindEndList:
-			return
+			return true
 		case TCPOptionKindNop:
 			continue
 		case TCPOptionKindWindowScale:
 			stream.Skip(1)
-			if stream.Len() > 0 {
-				h.WinScale = stream.U8()
+			if stream.Len() < 1 {
+				return false
 			}
+			h.WinScale = stream.U8()
 		case TCPOptionKindSACKPermitted:
 			stream.Skip(1)
 			h.SACKPermitted = true
 		case TCPOptionKindMSS:
 			stream.Skip(1)
+			if stream.Len() < 2 {
+				return false
+			}
 			h.MSS = stream.U16()
 		case TCPOptionKindSACK:
-			sackLen := int(stream.U8() - 2)
-			if stream.Len() >= sackLen {
-				h.Sack = make([]byte, sackLen)
-				copy(h.Sack, stream.Field(sackLen))
+			sackLen := int(stream.U8()) - 2
+			if stream.Len() < sackLen {
+				return false
 			}
+			h.Sack = make([]byte, sackLen)
+			copy(h.Sack, stream.Field(sackLen))
 		default: // others
-			stream.Skip(int(stream.U8()) - 2)
+			otherLen := int(stream.U8()) - 2
+			if stream.Len() < otherLen {
+				return false
+			}
+			stream.Skip(otherLen)
 		}
 	}
+	return true
 }
 
 func isVlanTagged(ethType EthernetType) bool {
@@ -178,7 +188,7 @@ func (p *MetaPacket) ParseL4(stream *ByteStream) {
 			return
 		}
 		if optionsLen > 0 {
-			tcpHeader.extractTcpOptions(&ByteStream{stream.Field(int(optionsLen)), 0})
+			p.Invalid = !tcpHeader.extractTcpOptions(&ByteStream{stream.Field(int(optionsLen)), 0})
 			p.TcpData = tcpHeader
 		}
 	} else if p.Protocol == IPProtocolUDP {
