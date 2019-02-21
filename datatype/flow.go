@@ -114,10 +114,11 @@ type Flow struct {
 	CloseType
 	FlowMetricsPeerSrc
 	FlowMetricsPeerDst
-	Hash uint32
 
-	FlowID     uint64
-	TimeBitmap uint64
+	FlowID              uint64
+	TimeBitmap          uint64
+	Hash                uint32
+	IntervalFirstReport bool
 
 	/* Timers */
 	StartTime    time.Duration
@@ -199,6 +200,7 @@ func (f *Flow) String() string {
 	formatted := fmt.Sprintf("FlowID: %d ", f.FlowID)
 	formatted += fmt.Sprintf("CloseType: %d ", f.CloseType)
 	formatted += fmt.Sprintf("TimeBitmap: %d ", f.TimeBitmap)
+	formatted += fmt.Sprintf("IntervalFirstReport: %t ", f.IntervalFirstReport)
 	formatted += fmt.Sprintf("StartTime: %d ", f.StartTime)
 	formatted += fmt.Sprintf("CurStartTime: %d ", f.CurStartTime)
 	formatted += fmt.Sprintf("EndTime: %d ", f.EndTime)
