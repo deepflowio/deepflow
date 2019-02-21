@@ -351,12 +351,12 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	return endpoint
 }
 
-func (l *CloudPlatformLabeler) RemoveAnonymousGroupIds(endpoint *EndpointData) {
+func (l *CloudPlatformLabeler) RemoveAnonymousGroupIds(endpoint *EndpointData, key *LookupKey) {
 	if len(l.ipGroup.anonymousGroupIds) == 0 {
 		return
 	}
-	endpoint.SrcInfo.GroupIds = l.ipGroup.RemoveAnonymousGroupIds(endpoint.SrcInfo.GroupIds)
-	endpoint.DstInfo.GroupIds = l.ipGroup.RemoveAnonymousGroupIds(endpoint.DstInfo.GroupIds)
+	endpoint.SrcInfo.GroupIds, key.SrcAllGroupIds = l.ipGroup.RemoveAnonymousGroupIds(endpoint.SrcInfo.GroupIds, key.SrcAllGroupIds)
+	endpoint.DstInfo.GroupIds, key.DstAllGroupIds = l.ipGroup.RemoveAnonymousGroupIds(endpoint.DstInfo.GroupIds, key.DstAllGroupIds)
 	for i := L3_L2_END_FALSE_FALSE; i < L3_L2_END_MAX; i++ {
 		endpoint.SrcInfos[i].GroupIds = endpoint.SrcInfo.GroupIds
 		endpoint.DstInfos[i].GroupIds = endpoint.DstInfo.GroupIds

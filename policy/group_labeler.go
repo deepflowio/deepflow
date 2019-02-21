@@ -235,13 +235,15 @@ func (g *IpResourceGroup) AddAnonymousGroupId(anonymous map[uint32]bool, group *
 	}
 }
 
-func (g *IpResourceGroup) RemoveAnonymousGroupIds(groupIds []uint32) []uint32 {
-	result := make([]uint32, 0, len(groupIds))
-	for _, v := range groupIds {
-		if _, ok := g.anonymousGroupIds[FormatGroupId(v)]; !ok {
-			result = append(result, v)
+func (g *IpResourceGroup) RemoveAnonymousGroupIds(groupIds []uint32, relationIds []uint16) ([]uint32, []uint16) {
+	groups := make([]uint32, 0, len(groupIds))
+	relations := make([]uint16, 0, len(relationIds))
+	for index := range groupIds {
+		if _, ok := g.anonymousGroupIds[FormatGroupId(groupIds[index])]; !ok {
+			groups = append(groups, groupIds[index])
+			relations = append(relations, relationIds[index])
 		}
 	}
 
-	return result
+	return groups, relations
 }
