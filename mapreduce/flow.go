@@ -1,7 +1,6 @@
 package mapreduce
 
 import (
-	"fmt"
 	"math/rand"
 	"reflect"
 	"strconv"
@@ -72,6 +71,7 @@ func NewFlowHandler(
 
 type subFlowHandler struct {
 	numberOfApps int
+	names        []string
 	processors   []app.FlowProcessor
 	stashes      []*Stash
 
@@ -84,17 +84,9 @@ type subFlowHandler struct {
 	counterLatch int
 	statItems    []stats.StatItem
 
-	lastFlush     time.Duration
-	statsdCounter []StatsdCounter
-}
-
-type StatsdCounter struct {
-	docCounter       uint64
-	flowCounter      uint64
-	emitCounter      uint64
-	maxCounter       uint64
-	rejectionCounter uint64
-	flushCounter     uint64
+	lastFlush        time.Duration
+	handlerCounter   []HandlerCounter
+	processorCounter [][]ProcessorCounter
 }
 
 func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
@@ -108,6 +100,7 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 	}
 	handler := subFlowHandler{
 		numberOfApps: h.numberOfApps,
+		names:        make([]string, h.numberOfApps),
 		processors:   dupProcessors,
 		stashes:      make([]*Stash, h.numberOfApps),
 
@@ -118,20 +111,19 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 		hashKey:    queue.HashKey(rand.Int()),
 
 		counterLatch: 0,
-		statItems:    make([]stats.StatItem, h.numberOfApps*5),
+		statItems:    make([]stats.StatItem, 0),
 
 		lastFlush: time.Duration(time.Now().UnixNano()),
 
-		statsdCounter: make([]StatsdCounter, h.numberOfApps*2),
+		handlerCounter:   make([]HandlerCounter, 2),
+		processorCounter: make([][]ProcessorCounter, 2),
 	}
+	handler.processorCounter[0] = make([]ProcessorCounter, handler.numberOfApps)
+	handler.processorCounter[1] = make([]ProcessorCounter, handler.numberOfApps)
 
 	for i := 0; i < handler.numberOfApps; i++ {
+		handler.names[i] = handler.processors[i].GetName()
 		handler.stashes[i] = NewStash(h.docsInBuffer, h.variedDocLimit, h.windowSize, h.windowMoveMargin)
-		handler.statItems[i].Name = h.processors[i].GetName()
-		handler.statItems[i+handler.numberOfApps].Name = fmt.Sprintf("%s_avg_doc_counter", h.processors[i].GetName())
-		handler.statItems[i+handler.numberOfApps*2].Name = fmt.Sprintf("%s_max_doc_counter", h.processors[i].GetName())
-		handler.statItems[i+handler.numberOfApps*3].Name = fmt.Sprintf("%s_rejected_doc", h.processors[i].GetName())
-		handler.statItems[i+handler.numberOfApps*4].Name = fmt.Sprintf("%s_flush", h.processors[i].GetName())
 	}
 	stats.RegisterCountable("flow-mapper", &handler, stats.OptionStatTags{"index": strconv.Itoa(index)})
 	return &handler
@@ -140,28 +132,16 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 func (h *subFlowHandler) GetCounter() interface{} {
 	oldLatch := h.counterLatch
 	if h.counterLatch == 0 {
-		h.counterLatch = h.numberOfApps
+		h.counterLatch = 1
 	} else {
 		h.counterLatch = 0
 	}
+	h.statItems = h.statItems[:0]
+	h.statItems = FillStatItems(h.statItems, h.handlerCounter[oldLatch], h.names, h.processorCounter[oldLatch])
 	for i := 0; i < h.numberOfApps; i++ {
-		h.statItems[i].Value = h.statsdCounter[i+oldLatch].emitCounter
-		if h.statsdCounter[i+oldLatch].flowCounter != 0 {
-			h.statItems[i+h.numberOfApps].Value =
-				h.statsdCounter[i+oldLatch].docCounter / h.statsdCounter[i+oldLatch].flowCounter
-		} else {
-			h.statItems[i+h.numberOfApps].Value = 0
-		}
-		h.statItems[i+h.numberOfApps*2].Value = h.statsdCounter[i+oldLatch].maxCounter
-		h.statItems[i+h.numberOfApps*3].Value = h.statsdCounter[i+oldLatch].rejectionCounter
-		h.statItems[i+h.numberOfApps*4].Value = h.statsdCounter[i+oldLatch].flushCounter
-		h.statsdCounter[i+oldLatch].emitCounter = 0
-		h.statsdCounter[i+oldLatch].docCounter = 0
-		h.statsdCounter[i+oldLatch].flowCounter = 0
-		h.statsdCounter[i+oldLatch].maxCounter = 0
-		h.statsdCounter[i+oldLatch].rejectionCounter = 0
-		h.statsdCounter[i+oldLatch].flushCounter = 0
+		h.processorCounter[oldLatch][i] = ProcessorCounter{}
 	}
+	h.handlerCounter[oldLatch] = HandlerCounter{}
 
 	return h.statItems
 }
@@ -185,7 +165,7 @@ func (h *subFlowHandler) putToQueue(processorID int) {
 			}
 			h.hashKey++
 		}
-		h.statsdCounter[i+h.counterLatch].emitCounter += uint64(len(docs))
+		h.processorCounter[h.counterLatch][i].emitCounter += uint64(len(docs))
 		stash.Clear()
 	}
 }
@@ -237,25 +217,25 @@ func (h *subFlowHandler) Process() error {
 			flow := e.(*datatype.TaggedFlow)
 			if !isValidFlow(flow) {
 				datatype.ReleaseTaggedFlow(flow)
-				log.Warning("flow timestamp incorrect and dropped")
+				h.handlerCounter[h.counterLatch].dropCounter++
 				continue
 			}
 
+			h.handlerCounter[h.counterLatch].flowCounter++
 			for i, processor := range h.processors {
 				docs := processor.Process(flow, false)
 				rejected := uint64(0)
-				h.statsdCounter[i+h.counterLatch].docCounter += uint64(len(docs))
-				h.statsdCounter[i+h.counterLatch].flowCounter++
-				if uint64(len(docs)) > h.statsdCounter[i+h.counterLatch].maxCounter {
-					h.statsdCounter[i+h.counterLatch].maxCounter = uint64(len(docs))
+				h.processorCounter[h.counterLatch][i].docCounter += uint64(len(docs))
+				if uint64(len(docs)) > h.processorCounter[h.counterLatch][i].maxCounter {
+					h.processorCounter[h.counterLatch][i].maxCounter = uint64(len(docs))
 				}
 				for {
 					docs, rejected = h.stashes[i].Add(docs)
-					h.statsdCounter[i+h.counterLatch].rejectionCounter += rejected
+					h.processorCounter[h.counterLatch][i].rejectionCounter += rejected
 					if docs == nil {
 						break
 					}
-					h.statsdCounter[i+h.counterLatch].flushCounter++
+					h.processorCounter[h.counterLatch][i].flushCounter++
 					h.Flush(i)
 				}
 			}
