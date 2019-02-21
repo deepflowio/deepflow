@@ -1680,6 +1680,41 @@ func TestAclGidBitmapMultiGroup(t *testing.T) {
 	}
 }
 
+func TestAclGidBitmapAnonymousGroupIds(t *testing.T) {
+	acls := []*Acl{}
+	// 创建 policyTable
+	table := generatePolicyTable()
+	// 构建acl action  1:1000->2:0 tcp
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	action = action.SetACLGID(10)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
+	acls = append(acls, acl)
+	table.UpdateAcls(acls)
+
+	// 构建查询1-key  1:1000->2:8000 tcp
+	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 8000)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
+	endpoint := getEndpointData(table, key)
+
+	// endpoint中匹配策略的资源组和不匹配策略的资源组相交叉
+	endpoint.SrcInfo.GroupIds = append(endpoint.SrcInfo.GroupIds[:0], group[1], 100, 300, group[1])
+	endpoint.DstInfo.GroupIds = append(endpoint.DstInfo.GroupIds[:0], group[2], 200, 300, group[2])
+	table.cloudPlatformLabeler.ipGroup.anonymousGroupIds[300] = true
+	policyData := getPolicyByFirstPath(table, endpoint, key)
+	aclGidbitmap0 := generateAclGidBitmap(GROUP_TYPE_SRC, 0, 0)
+	aclGidbitmap0.SetMapBits(2)
+	aclGidbitmap1 := generateAclGidBitmap(GROUP_TYPE_DST, 0, 0)
+	aclGidbitmap1.SetMapBits(2)
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(2)
+	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidbitmap0, aclGidbitmap1)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestAclGidBitmap Check Failed!")
+	}
+}
+
 func TestAclGidBitmapFirstPathVsFastPath(t *testing.T) {
 	acls := []*Acl{}
 	// 创建 policyTable

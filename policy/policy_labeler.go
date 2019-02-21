@@ -842,7 +842,7 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 	}
 
 	// 剔除匿名资源组ID
-	l.cloudPlatformLabeler.RemoveAnonymousGroupIds(endpointData)
+	l.cloudPlatformLabeler.RemoveAnonymousGroupIds(endpointData, packet)
 	packetEndpointData := l.cloudPlatformLabeler.UpdateEndpointData(endpointData, packet)
 
 	// 无论是否查找到policy，都需要向fastPath下发，避免重复走firstPath
