@@ -86,6 +86,8 @@ func MarshalFlow(f *datatype.TaggedFlow, bytes *utils.ByteBuffer) error {
 	// TCP Perf Data
 	if f.TcpPerfStats != nil {
 		flow.RttSyn = proto.Uint64(uint64(f.RTTSyn))
+		flow.RttSynClient = proto.Uint64(uint64(f.RTTSynClient))
+		flow.RttSynServer = proto.Uint64(uint64(f.RTTSynServer))
 		flow.Rtt = proto.Uint64(uint64(f.RTT))
 		flow.SynRetransCnt_0 = proto.Uint64(uint64(f.TcpPerfCountsPeerSrc.SynRetransCount))
 		flow.SynRetransCnt_1 = proto.Uint64(uint64(f.TcpPerfCountsPeerDst.SynRetransCount))

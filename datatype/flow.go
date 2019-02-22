@@ -70,9 +70,11 @@ type TcpPerfCountsPeerSrc TcpPerfCountsPeer
 type TcpPerfCountsPeerDst TcpPerfCountsPeer
 
 type TcpPerfStats struct {
-	RTTSyn time.Duration
-	RTT    time.Duration
-	ART    time.Duration
+	RTTSyn       time.Duration
+	RTTSynClient time.Duration
+	RTTSynServer time.Duration
+	RTT          time.Duration
+	ART          time.Duration
 	TcpPerfCountsPeerSrc
 	TcpPerfCountsPeerDst
 	TotalRetransCount      uint32
