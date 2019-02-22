@@ -91,11 +91,17 @@ const (
 	L3_L2_END_MAX
 )
 
-type EndpointData struct {
-	SrcInfo  *EndpointInfo
-	DstInfo  *EndpointInfo
+type EndpointStore struct {
+	Endpoints *EndpointData
+
 	SrcInfos [L3_L2_END_MAX]EndpointInfo
 	DstInfos [L3_L2_END_MAX]EndpointInfo
+	Datas    [L3_L2_END_MAX][L3_L2_END_MAX]EndpointData
+}
+
+type EndpointData struct {
+	SrcInfo *EndpointInfo
+	DstInfo *EndpointInfo
 }
 
 func (k *LookupKey) String() string {
@@ -241,20 +247,24 @@ func (d *EndpointData) SetL2End(key *LookupKey) {
 	}
 }
 
-func (d *EndpointData) InitPointer() {
+func (s *EndpointStore) InitPointer(d *EndpointData) {
+	s.Endpoints = d
 	for i := L3_L2_END_FALSE_FALSE; i < L3_L2_END_MAX; i++ {
-		d.SrcInfos[i] = *d.SrcInfo
-		d.SrcInfos[i].SetL3L2End(i)
-		d.DstInfos[i] = *d.DstInfo
-		d.DstInfos[i].SetL3L2End(i)
+		s.SrcInfos[i] = *d.SrcInfo
+		s.SrcInfos[i].SetL3L2End(i)
+		s.DstInfos[i] = *d.DstInfo
+		s.DstInfos[i].SetL3L2End(i)
 	}
-	d.SrcInfo = &d.SrcInfos[d.SrcInfo.GetL3L2End()]
-	d.DstInfo = &d.DstInfos[d.DstInfo.GetL3L2End()]
+	for i := L3_L2_END_FALSE_FALSE; i < L3_L2_END_MAX; i++ {
+		for j := L3_L2_END_FALSE_FALSE; j < L3_L2_END_MAX; j++ {
+			s.Datas[i][j].SrcInfo = &s.SrcInfos[i]
+			s.Datas[i][j].DstInfo = &s.DstInfos[j]
+		}
+	}
 }
 
-func (d *EndpointData) UpdatePointer(l2End0, l2End1, l3End0, l3End1 bool) {
-	d.SrcInfo = &d.SrcInfos[NewL3L2End(l2End0, l3End0)]
-	d.DstInfo = &d.DstInfos[NewL3L2End(l2End1, l3End1)]
+func (s *EndpointStore) UpdatePointer(l2End0, l2End1, l3End0, l3End1 bool) *EndpointData {
+	return &s.Datas[NewL3L2End(l2End0, l3End0)][NewL3L2End(l2End1, l3End1)]
 }
 
 // ReverseData will return a reversed replica of the current EndpointData

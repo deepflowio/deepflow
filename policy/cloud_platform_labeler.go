@@ -302,10 +302,11 @@ func (l *CloudPlatformLabeler) ModifyPrivateIp(endpoint *EndpointData, key *Look
 }
 
 // 检查L2End和L3End是否有可能进行修正
-func (l *CloudPlatformLabeler) CheckEndpointDataIfNeedCopy(endpoint *EndpointData, key *LookupKey) *EndpointData {
+func (l *CloudPlatformLabeler) CheckEndpointDataIfNeedCopy(store *EndpointStore, key *LookupKey) *EndpointData {
 	srcHash := MacIpKey(calcHashKey(key.SrcMac, key.SrcIp))
 	dstHash := MacIpKey(calcHashKey(key.DstMac, key.DstIp))
 	l.CheckAndUpdateArpTable(key, srcHash, key.Timestamp)
+	endpoint := store.Endpoints
 	l2End0, l3End0, l2End1, l3End1 := endpoint.SrcInfo.L2End, endpoint.SrcInfo.L3End, endpoint.DstInfo.L2End, endpoint.DstInfo.L3End
 	if key.Tap == TAP_TOR && ((key.L2End0 != endpoint.SrcInfo.L2End) ||
 		(key.L2End1 != endpoint.DstInfo.L2End)) {
@@ -314,14 +315,14 @@ func (l *CloudPlatformLabeler) CheckEndpointDataIfNeedCopy(endpoint *EndpointDat
 	// 根据Ttl、Arp request、L2End来判断endpoint是否为最新
 	l3End0 = l.GetL3End(endpoint.SrcInfo, key, srcHash, true)
 	l3End1 = l.GetL3End(endpoint.DstInfo, key, dstHash, false)
-	endpoint.UpdatePointer(l2End0, l2End1, l3End0, l3End1)
-	l.ModifyDeviceInfo(endpoint.SrcInfo)
-	l.ModifyDeviceInfo(endpoint.DstInfo)
+	newEndpoints := store.UpdatePointer(l2End0, l2End1, l3End0, l3End1)
+	l.ModifyDeviceInfo(newEndpoints.SrcInfo)
+	l.ModifyDeviceInfo(newEndpoints.DstInfo)
 
-	return endpoint
+	return newEndpoints
 }
 
-func (l *CloudPlatformLabeler) UpdateEndpointData(endpoint *EndpointData, key *LookupKey) *EndpointData {
+func (l *CloudPlatformLabeler) UpdateEndpointData(endpoint *EndpointStore, key *LookupKey) *EndpointData {
 	return l.CheckEndpointDataIfNeedCopy(endpoint, key)
 }
 
@@ -347,18 +348,18 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
 	l.ModifyEndpointData(endpoint, key)
 	l.ModifyPrivateIp(endpoint, key)
-	endpoint.InitPointer()
 	return endpoint
 }
 
-func (l *CloudPlatformLabeler) RemoveAnonymousGroupIds(endpoint *EndpointData, key *LookupKey) {
+func (l *CloudPlatformLabeler) RemoveAnonymousGroupIds(store *EndpointStore, key *LookupKey) {
 	if len(l.ipGroup.anonymousGroupIds) == 0 {
 		return
 	}
+	endpoint := store.Endpoints
 	endpoint.SrcInfo.GroupIds, key.SrcAllGroupIds = l.ipGroup.RemoveAnonymousGroupIds(endpoint.SrcInfo.GroupIds, key.SrcAllGroupIds)
 	endpoint.DstInfo.GroupIds, key.DstAllGroupIds = l.ipGroup.RemoveAnonymousGroupIds(endpoint.DstInfo.GroupIds, key.DstAllGroupIds)
 	for i := L3_L2_END_FALSE_FALSE; i < L3_L2_END_MAX; i++ {
-		endpoint.SrcInfos[i].GroupIds = endpoint.SrcInfo.GroupIds
-		endpoint.DstInfos[i].GroupIds = endpoint.DstInfo.GroupIds
+		store.SrcInfos[i].GroupIds = endpoint.SrcInfo.GroupIds
+		store.DstInfos[i].GroupIds = endpoint.DstInfo.GroupIds
 	}
 }

@@ -733,16 +733,30 @@ func TestFastpathEndInfo(t *testing.T) {
 	}
 }
 
-func checkEndpointInfos(t *testing.T, endpoint *EndpointData) bool {
+func checkEndpointStore(t *testing.T, store *EndpointStore) bool {
 	for i := L3_L2_END_FALSE_FALSE; i < L3_L2_END_MAX; i++ {
-		if i != NewL3L2End(endpoint.SrcInfos[i].L2End, endpoint.SrcInfos[i].L3End) ||
-			i != NewL3L2End(endpoint.DstInfos[i].L2End, endpoint.DstInfos[i].L3End) {
-			t.Error("Result:", endpoint.SrcInfos[i], endpoint.DstInfos[i])
-			t.Error("Expect:", i)
-			return false
+		for j := L3_L2_END_FALSE_FALSE; j < L3_L2_END_MAX; j++ {
+			if store.Datas[i][j].SrcInfo != &store.SrcInfos[i] ||
+				store.Datas[i][j].DstInfo != &store.DstInfos[j] {
+				t.Error("Result:", store.Datas[i][j])
+				t.Error("Expect:", store.SrcInfos[i], store.DstInfos[j])
+				return false
+			}
 		}
 	}
 	return true
+}
+
+func TestFastpathEndpointStore(t *testing.T) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	// l2End0=true, l3End0=false, l2End1=false, l3End1=false
+	key := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 0)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 63, l2EndBool[1], l2EndBool[0])
+	policy.LookupAllByKey(key)
+	store, _ := policy.policyLabeler.GetPolicyByFastPath(key)
+	if !checkEndpointStore(t, store) {
+		t.Error("TestFastpathEndpointStore Check Failed!")
+	}
 }
 
 func TestFastpathL2End(t *testing.T) {
@@ -756,9 +770,6 @@ func TestFastpathL2End(t *testing.T) {
 	if !checkEndTestResult(t, basicEndInfo, endpoint) {
 		t.Error("TestFastpathL2End-getPolicyByFastPath Check Failed!")
 	}
-	if !checkEndpointInfos(t, endpoint) {
-		t.Error("TestFastpathL2End-EndpointInfos Check Failed!")
-	}
 
 	// l2End0=false, l3End0=false, l2End1=true, l3End1=false
 	key2 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, protoAny, 0, 0)
@@ -769,9 +780,6 @@ func TestFastpathL2End(t *testing.T) {
 	if !checkEndTestResult(t, basicEndInfo, endpoint) {
 		t.Error("TestFastpathL2End-getPolicyByFastPath Check Failed!")
 	}
-	if !checkEndpointInfos(t, endpoint) {
-		t.Error("TestFastpathL2End-EndpointInfos Check Failed!")
-	}
 
 	// l2End0=true, l3End0=false, l2End1=true, l3End1=false
 	key3 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 80)
@@ -781,9 +789,6 @@ func TestFastpathL2End(t *testing.T) {
 	if !checkEndTestResult(t, basicEndInfo, endpoint) {
 		t.Error("TestFastpathL2End-getPolicyByFastPath Check Failed!")
 	}
-	if !checkEndpointInfos(t, endpoint) {
-		t.Error("TestFastpathL2End-EndpointInfos Check Failed!")
-	}
 
 	// l2End0=false, l3End0=false, l2End1=false, l3End1=false
 	key4 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 80)
@@ -792,9 +797,6 @@ func TestFastpathL2End(t *testing.T) {
 	basicEndInfo = generateEndInfo(l2EndBool[0], l3EndBool[0], l2EndBool[0], l3EndBool[0])
 	if !checkEndTestResult(t, basicEndInfo, endpoint) {
 		t.Error("TestFastpathL2End-getPolicyByFastPath Check Failed!")
-	}
-	if !checkEndpointInfos(t, endpoint) {
-		t.Error("TestFastpathL2End-EndpointInfos Check Failed!")
 	}
 }
 
@@ -809,9 +811,6 @@ func TestFastpathL2L3End(t *testing.T) {
 	if !checkEndTestResult(t, basicEndInfo, endpoint) {
 		t.Error("TestFastpathL2L3End-getPolicyByFastPath Check Failed!")
 	}
-	if !checkEndpointInfos(t, endpoint) {
-		t.Error("TestFastpathL2L3End-EndpointInfos Check Failed!")
-	}
 
 	// l2End0=false, l3End0=true, l2End1=false, l3End1=false
 	key2 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 80)
@@ -822,9 +821,6 @@ func TestFastpathL2L3End(t *testing.T) {
 	if !checkEndTestResult(t, basicEndInfo, endpoint) {
 		t.Error("TestFastpathL2L3End-getPolicyByFastPath Check Failed!")
 	}
-	if !checkEndpointInfos(t, endpoint) {
-		t.Error("TestFastpathL2L3End-EndpointInfos Check Failed!")
-	}
 
 	// l2End0=true, l3End0=true, l2End1=false, l3End1=false
 	key3 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 80)
@@ -834,9 +830,6 @@ func TestFastpathL2L3End(t *testing.T) {
 	if !checkEndTestResult(t, basicEndInfo, endpoint) {
 		t.Error("TestFastpathL2L3End-getPolicyByFastPath Check Failed!")
 	}
-	if !checkEndpointInfos(t, endpoint) {
-		t.Error("TestFastpathL2L3End-EndpointInfos Check Failed!")
-	}
 
 	// l2End0=false, l3End0=true, l2End1=true, l3End1=false
 	key4 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, protoAny, 80, 0)
@@ -845,9 +838,6 @@ func TestFastpathL2L3End(t *testing.T) {
 	basicEndInfo = generateEndInfo(l2EndBool[0], l3EndBool[1], l2EndBool[1], l3EndBool[0])
 	if !checkEndTestResult(t, basicEndInfo, endpoint) {
 		t.Error("TestFastpathL2L3End-getPolicyByFastPath Check Failed!")
-	}
-	if !checkEndpointInfos(t, endpoint) {
-		t.Error("TestFastpathL2L3End-EndpointInfos Check Failed!")
 	}
 
 	generatePlatformData(policy)
@@ -860,9 +850,6 @@ func TestFastpathL2L3End(t *testing.T) {
 	if !checkEndTestResult(t, basicEndInfo, endpoint) {
 		t.Error("TestFastpathL2L3End-getPolicyByFastPath Check Failed!")
 	}
-	if !checkEndpointInfos(t, endpoint) {
-		t.Error("TestFastpathL2L3End-EndpointInfos Check Failed!")
-	}
 
 	// l2End0=false, l3End0=true, l2End1=false, l3End1=true
 	key6 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 80, 0)
@@ -873,9 +860,6 @@ func TestFastpathL2L3End(t *testing.T) {
 	if !checkEndTestResult(t, basicEndInfo, endpoint) {
 		t.Error("TestFastpathL2L3End-getPolicyByFastPath Check Failed!")
 	}
-	if !checkEndpointInfos(t, endpoint) {
-		t.Error("TestFastpathL2L3End-EndpointInfos Check Failed!")
-	}
 
 	// l2End0=true, l3End0=true, l2End1=false, l3End1=true
 	key7 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 80, 0)
@@ -885,9 +869,6 @@ func TestFastpathL2L3End(t *testing.T) {
 	if !checkEndTestResult(t, basicEndInfo, endpoint) {
 		t.Error("TestFastpathL2L3End-getPolicyByFastPath Check Failed!")
 	}
-	if !checkEndpointInfos(t, endpoint) {
-		t.Error("TestFastpathL2L3End-EndpointInfos Check Failed!")
-	}
 
 	// l2End0=false, l3End0=true, l2End1=true, l3End1=true
 	key8 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 80, 0)
@@ -896,9 +877,6 @@ func TestFastpathL2L3End(t *testing.T) {
 	basicEndInfo = generateEndInfo(l2EndBool[0], l3EndBool[1], l2EndBool[1], l3EndBool[1])
 	if !checkEndTestResult(t, basicEndInfo, endpoint) {
 		t.Error("TestFastpathL2L3End-getPolicyByFastPath Check Failed!")
-	}
-	if !checkEndpointInfos(t, endpoint) {
-		t.Error("TestFastpathL2L3End-EndpointInfos Check Failed!")
 	}
 }
 

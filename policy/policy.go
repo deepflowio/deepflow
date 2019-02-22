@@ -196,13 +196,14 @@ func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData
 	if !key.Tap.CheckTapType(key.Tap) {
 		return INVALID_ENDPOINT_DATA, INVALID_POLICY_DATA
 	}
-	endpoint, policy := t.policyLabeler.GetPolicyByFastPath(key)
+	store, policy := t.policyLabeler.GetPolicyByFastPath(key)
 	if policy == nil {
-		endpoint = t.cloudPlatformLabeler.GetEndpointData(key)
-		endpoint, policy = t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+		endpoint := t.cloudPlatformLabeler.GetEndpointData(key)
+		store, policy = t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
 	}
+	endpoint := store.Endpoints
 	if key.HasFeatureFlag(NPM) {
-		endpoint = t.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
+		endpoint = t.cloudPlatformLabeler.UpdateEndpointData(store, key)
 	}
 	return endpoint, policy
 }
@@ -243,11 +244,11 @@ func (t *PolicyTable) GetPolicyByFastPath(key *LookupKey) (*EndpointData, *Polic
 	if endpoint == nil {
 		return INVALID_ENDPOINT_DATA, INVALID_POLICY_DATA
 	}
-	return endpoint, policy
+	return endpoint.Endpoints, policy
 }
 
 func (t *PolicyTable) GetPolicyByFirstPath(key *LookupKey) (*EndpointData, *PolicyData) {
 	endpoint := t.cloudPlatformLabeler.GetEndpointData(key)
-	endpoint, policy := t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
-	return endpoint, policy
+	store, policy := t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+	return store.Endpoints, policy
 }
