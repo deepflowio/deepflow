@@ -425,7 +425,9 @@ func generateAclData(policy *PolicyTable) {
 func getEndpointData(table *PolicyTable, key *LookupKey) *EndpointData {
 	endpoint := table.cloudPlatformLabeler.GetEndpointData(key)
 	if endpoint != nil {
-		endpoint = table.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
+		store := &EndpointStore{}
+		store.InitPointer(endpoint)
+		endpoint = table.cloudPlatformLabeler.UpdateEndpointData(store, key)
 	}
 	return endpoint
 }
@@ -440,11 +442,12 @@ func modifyEndpointDataL3End(table *PolicyTable, key *LookupKey, l3End0, l3End1 
 }
 
 func getPolicyByFastPath(table *PolicyTable, key *LookupKey) (*EndpointData, *PolicyData) {
-	endpoint, policy := table.policyLabeler.GetPolicyByFastPath(key)
-	if endpoint != nil {
-		endpoint = table.cloudPlatformLabeler.UpdateEndpointData(endpoint, key)
+	store, policy := table.policyLabeler.GetPolicyByFastPath(key)
+	if store != nil {
+		endpoint := table.cloudPlatformLabeler.UpdateEndpointData(store, key)
+		return endpoint, policy
 	}
-	return endpoint, policy
+	return nil, nil
 }
 
 func getPolicyByFirstPath(table *PolicyTable, endpoint *EndpointData, key *LookupKey) *PolicyData {
