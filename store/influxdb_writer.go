@@ -71,7 +71,7 @@ type InfluxdbWriter struct {
 	BatchSize    int
 	FlushTimeout int64
 	ExistDBs     map[string]bool
-	addDBLock    sync.Mutex
+	sync.RWMutex
 }
 
 func NewInfluxdbWriter(httpAddr string, queueCount int) (*InfluxdbWriter, error) {
@@ -346,14 +346,17 @@ func (w *InfluxdbWriter) writeInfluxdb(queueID int, bp client.BatchPoints) bool 
 	w.QueueWriterInfos[queueID].writeTime = time.Now().Unix()
 	httpClient := w.QueueWriterInfos[queueID].httpClient
 	db := bp.Database()
-	if _, ok := w.ExistDBs[db]; !ok {
+	w.RLock()
+	_, ok := w.ExistDBs[db]
+	w.RUnlock()
+	if !ok {
 		if !createDB(httpClient, db) {
 			w.QueueWriterInfos[queueID].counter.WriteFailedCount += int64(len(bp.Points()))
 			return false
 		}
-		w.addDBLock.Lock()
+		w.Lock()
 		w.ExistDBs[db] = true
-		w.addDBLock.Unlock()
+		w.Unlock()
 	}
 
 	if err := httpClient.Write(bp); err != nil {
