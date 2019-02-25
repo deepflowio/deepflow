@@ -477,11 +477,6 @@ func reportFlowListTimeout(f *FlowGenerator, list *ListFlowExtra, now, cleanRang
 			e = e.Prev()
 			list.Remove(del)
 			continue
-		} else if !flowExtra.startReport && flowExtra.minArrTime+minForceReportTime <= now {
-			flowExtra.startReport = true
-			flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
-			buffer[num] = f.reportForClean(flowExtra, true)
-			num = tryCleanBuffer(flowOutQueue, buffer, num+1)
 		}
 		e = e.Prev()
 	}

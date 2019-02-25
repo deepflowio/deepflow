@@ -79,7 +79,6 @@ type FlowGeneratorConfig struct {
 	FlowCountLimit int32 `yaml:"flow-count-limit"`
 	/* unit of interval and timeout: second */
 	ForceReportInterval  time.Duration `yaml:"force-report-interval"`
-	MinForceReportTime   time.Duration `yaml:"min-force-report-time"`
 	EstablishedTimeout   time.Duration `yaml:"established-timeout"`
 	ClosingRstTimeout    time.Duration `yaml:"closing-rst-timeout"`
 	OthersTimeout        time.Duration `yaml:"others-timeout"`
@@ -218,11 +217,6 @@ func (c *Config) Validate() error {
 		c.FlowGenerator.ForceReportInterval = 60 * time.Second
 	} else {
 		c.FlowGenerator.ForceReportInterval *= time.Second
-	}
-	if c.FlowGenerator.MinForceReportTime == 0 {
-		c.FlowGenerator.MinForceReportTime = 5 * time.Second
-	} else {
-		c.FlowGenerator.MinForceReportTime *= time.Second
 	}
 	if c.FlowGenerator.EstablishedTimeout == 0 {
 		c.FlowGenerator.EstablishedTimeout = 300 * time.Second
