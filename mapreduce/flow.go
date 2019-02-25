@@ -73,7 +73,7 @@ type subFlowHandler struct {
 	numberOfApps int
 	names        []string
 	processors   []app.FlowProcessor
-	stashes      []*Stash
+	stashes      []Stash
 
 	flowQueue   queue.MultiQueueReader
 	zmqAppQueue queue.MultiQueueWriter
@@ -87,6 +87,8 @@ type subFlowHandler struct {
 	lastFlush        time.Duration
 	handlerCounter   []HandlerCounter
 	processorCounter [][]ProcessorCounter
+
+	fpsAppIndex int
 }
 
 func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
@@ -102,7 +104,7 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 		numberOfApps: h.numberOfApps,
 		names:        make([]string, h.numberOfApps),
 		processors:   dupProcessors,
-		stashes:      make([]*Stash, h.numberOfApps),
+		stashes:      make([]Stash, h.numberOfApps),
 
 		flowQueue:   h.flowQueue,
 		zmqAppQueue: h.zmqAppQueue,
@@ -117,13 +119,21 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 
 		handlerCounter:   make([]HandlerCounter, 2),
 		processorCounter: make([][]ProcessorCounter, 2),
+
+		fpsAppIndex: -1,
 	}
 	handler.processorCounter[0] = make([]ProcessorCounter, handler.numberOfApps)
 	handler.processorCounter[1] = make([]ProcessorCounter, handler.numberOfApps)
 
+	fpsAppName := fps.NewProcessor().GetName()
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.names[i] = handler.processors[i].GetName()
-		handler.stashes[i] = NewStash(h.docsInBuffer, h.variedDocLimit, h.windowSize, h.windowMoveMargin)
+		if handler.names[i] == fpsAppName {
+			handler.fpsAppIndex = i
+			handler.stashes[i] = NewSlidingStash(h.docsInBuffer, h.variedDocLimit, h.windowSize, h.windowMoveMargin)
+		} else {
+			handler.stashes[i] = NewFixedStash(h.docsInBuffer, h.variedDocLimit, h.windowSize)
+		}
 	}
 	stats.RegisterCountable("flow-mapper", &handler, stats.OptionStatTags{"index": strconv.Itoa(index)})
 	return &handler
@@ -208,6 +218,7 @@ func (h *subFlowHandler) Process() error {
 
 	for {
 		n := h.flowQueue.Gets(queue.HashKey(h.queueIndex), elements)
+		epoch := uint32(time.Now().Unix())
 		for _, e := range elements[:n] {
 			if e == nil {
 				h.Flush(-1)
@@ -237,6 +248,13 @@ func (h *subFlowHandler) Process() error {
 					}
 					h.processorCounter[h.counterLatch][i].flushCounter++
 					h.Flush(i)
+				}
+				if i != h.fpsAppIndex && epoch > h.stashes[i].GetWindowRight() {
+					if h.stashes[i].Size() > 0 {
+						h.processorCounter[h.counterLatch][i].flushCounter++
+						h.Flush(i)
+					}
+					h.stashes[i].SetTimestamp(epoch / MINUTE * MINUTE)
 				}
 			}
 			datatype.ReleaseTaggedFlow(flow)
