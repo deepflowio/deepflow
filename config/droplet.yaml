@@ -100,8 +100,6 @@ flow-generator:
   flow-count-limit: 4194304
   # hard output interval for long flow, in seconds
   force-report-interval: 60
-  # an output threshold of each flow, but only report once, in seconds
-  min-force-report-time: 5
   # idle timeout for established tcp flow, in seconds
   established-timeout: 300
   # idle timeout for closing tcp flow,

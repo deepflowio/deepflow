@@ -59,7 +59,6 @@ var (
 	timeoutCleanerCount  uint64
 	hashMapSize          uint64
 	forceReportInterval  time.Duration
-	minForceReportTime   time.Duration
 	flowCleanInterval    time.Duration
 	reportTolerance      time.Duration
 	ignoreTorMac         bool
@@ -194,7 +193,6 @@ func SetFlowGenerator(cfg config.Config) {
 	}
 
 	forceReportInterval = cfg.FlowGenerator.ForceReportInterval
-	minForceReportTime = cfg.FlowGenerator.MinForceReportTime
 	flowCleanInterval = cfg.FlowGenerator.FlowCleanInterval
 	timeoutCleanerCount = cfg.FlowGenerator.TimeoutCleanerCount
 	hashMapSize = cfg.FlowGenerator.HashMapSize

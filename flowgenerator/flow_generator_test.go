@@ -37,7 +37,6 @@ func flowGeneratorInit() (*FlowGenerator, MultiQueueReader, QueueWriter) {
 		innerUdpSMA[i] = NewServiceManager(32 * 1024)
 	}
 	forceReportInterval = time.Millisecond * 100
-	minForceReportTime = time.Millisecond * 20
 	flowCleanInterval = time.Millisecond * 100
 	timeoutCleanerCount = 4
 	hashMapSize = 1024 * 32
@@ -132,7 +131,6 @@ func TestTunnelMatch(t *testing.T) {
 func TestHandleSynRst(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
-	minForceReportTime = 5 * time.Second
 	forceReportInterval = 60 * time.Second
 
 	packet0 := getDefaultPacket()
@@ -163,7 +161,6 @@ func TestHandleSynRst(t *testing.T) {
 func TestHandleSynFin(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
-	minForceReportTime = 5 * time.Second
 	forceReportInterval = 60 * time.Second
 
 	packet0 := getDefaultPacket()

@@ -275,7 +275,6 @@ profiler
       - CLOSING_1, CLOSING_2状态超时时间为35秒
       - 其他协议流量仅单方向有报文时超时时间为5秒，双方向有报文时超时时间为35秒
       - 每自然分钟第0秒上报所有flow
-      - 每条网流第5秒进行一次上报
       - 以上超时时间均可通过droplet.yaml文件进行配置
 
 ![image](http://gitlab.x.lan/hpn/tasks-hpn/uploads/de65de6b51659d4368fd334b6845e40c/image.png)
