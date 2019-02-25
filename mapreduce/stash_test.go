@@ -57,7 +57,7 @@ func TestStash(t *testing.T) {
 	*meter4 = meter
 	doc4 := &app.Document{Timestamp: 0x12345679, Tag: tag4, Meter: meter4}
 
-	stash := NewStash(100, 100, 30, 0)
+	stash := NewSlidingStash(100, 100, 30, 0)
 	stash.Add([]interface{}{doc1, doc2, doc3, doc4})
 	docs := stash.Dump()
 	if len(docs) != 3 {

@@ -257,7 +257,7 @@ func (c *Config) Validate() error {
 	if c.MapReduce.VariedDocLimit == 0 {
 		c.MapReduce.VariedDocLimit = uint32(c.Queue.DocsQueueSize)
 	}
-	if c.MapReduce.WindowSize == 0 {
+	if c.MapReduce.WindowSize < 70 {
 		c.MapReduce.WindowSize = 70
 	}
 	if c.MapReduce.WindowMoveMargin == 0 {

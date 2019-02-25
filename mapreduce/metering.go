@@ -58,7 +58,7 @@ type subMeteringHandler struct {
 	numberOfApps int
 	names        []string
 	processors   []app.MeteringProcessor
-	stashes      []*Stash
+	stashes      []Stash
 
 	meteringQueue queue.MultiQueueReader
 	zmqAppQueue   queue.MultiQueueWriter
@@ -87,7 +87,7 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 		numberOfApps: h.numberOfApps,
 		names:        make([]string, h.numberOfApps),
 		processors:   dupProcessors,
-		stashes:      make([]*Stash, h.numberOfApps),
+		stashes:      make([]Stash, h.numberOfApps),
 
 		meteringQueue: h.meteringQueue,
 		zmqAppQueue:   h.zmqAppQueue,
@@ -107,7 +107,7 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.names[i] = handler.processors[i].GetName()
-		handler.stashes[i] = NewStash(h.docsInBuffer, h.variedDocLimit, h.windowSize, h.windowMoveMargin)
+		handler.stashes[i] = NewSlidingStash(h.docsInBuffer, h.variedDocLimit, h.windowSize, h.windowMoveMargin)
 	}
 	stats.RegisterCountable("metering-mapper", &handler, stats.OptionStatTags{"index": strconv.Itoa(index)})
 	return &handler

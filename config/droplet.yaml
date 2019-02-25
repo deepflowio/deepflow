@@ -132,9 +132,9 @@ flow-generator:
 map-reduce:
   # reject varied doc (with edge or port tag) when buffer usage exceed the limit, default queue.docs-queue-size
   varied-doc-limit: 0
-  # 聚合窗口的大小，单位秒，调整时注意考虑report-tolerance
+  # 聚合窗口的大小，单位秒，最小值为70，调整时注意考虑report-tolerance
   window-size: 70
-  # 窗口移动时，窗口边缘与数据位置的差值。该配置必须小于window-size，否则会被置为0
+  # 窗口移动时，窗口边缘与数据位置的差值。该配置必须小于window-size，否则会被置为0。该配置仅对usage和fps有效
   window-move-margin: 3
 pcap:
   # 计算TCP/IP checksum，默认不计算
