@@ -983,3 +983,23 @@ func BenchmarkGetDataByIp(b *testing.B) {
 		policy.cloudPlatformLabeler.GetDataByIp(queryIp)
 	}
 }
+
+func BenchmarkUpdateEndpointData(b *testing.B) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	ipGroup1 := generateIpGroup(group[11], groupEpc[0], ipNet10, ipNet11)
+	policy.UpdateIpGroupData([]*IpGroupData{ipGroup1})
+	ipNet := generateIpNet(group1Ip1, 123, 32)
+	data1 := generatePlatformDataWithGroupId(groupEpc[1], group[1], group1Mac, ipNet)
+	policy.UpdateInterfaceData([]*PlatformData{data1})
+	key := generateLookupKey(group1Mac, group1Mac2, vlanAny, group1Ip1, group1Ip2, IPProtocolTCP, 50, 60)
+	endpointData, _ := policy.LookupAllByKey(key)
+	key.Ttl = 128
+	key.L2End0 = true
+	key.EthType = EthernetTypeARP
+	key.Invalid = false
+	endpointStore := &EndpointStore{}
+	endpointStore.InitPointer(endpointData)
+	for i := 0; i < b.N; i++ {
+		policy.cloudPlatformLabeler.UpdateEndpointData(endpointStore, key)
+	}
+}
