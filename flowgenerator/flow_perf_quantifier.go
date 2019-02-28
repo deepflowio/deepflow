@@ -810,6 +810,8 @@ func (i *FlowPerfDataInfo) calcReportFlowPerfStats(report *TcpPerfStats, reverse
 	flow := i.flowPerfStats
 
 	report.RTTSyn = flow.rttSyn0 + flow.rttSyn1
+	report.RTTSynClient = flow.rttSyn0
+	report.RTTSynServer = flow.rttSyn1
 
 	report.TcpPerfCountsPeerSrc.SynRetransCount = period.retransSyn0
 	report.TcpPerfCountsPeerDst.SynRetransCount = period.retransSyn1
