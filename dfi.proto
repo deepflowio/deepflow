@@ -197,6 +197,15 @@ message Flow {
 
     repeated uint32 acl_gids = 164;
 
+    optional uint64 rtt_syn_client = 165 [default = 0];        /* The RTT in the handshake phase of the flow.
+                                                                  When pkt_cnt_0 >= 2 && pkt_cnt_1 >= 1,
+                                                                  SYN/ACK -> ACK,
+                                                                  rtt_syn = arr_time_0_1 (ACK) - arr_time_1_0 (SYN/ACK) */
+    optional uint64 rtt_syn_server = 166 [default = 0];        /* The RTT in the handshake phase of the flow.
+                                                                  When pkt_cnt_0 >= 1 && pkt_cnt_1 >= 1,
+                                                                  SYN -> SYN/ACK,
+                                                                  rtt_syn = arr_time_1_0 (SYN/ACK) - arr_time_0_0 (SYN) */
+
     /* Geo Info */
     optional uint32 country = 170 [default = 0];               /* Flow非云内IP端国家信息 */
     optional uint32 Region = 171 [default = 0];                /* Flow非云内IP端区域信息 */
