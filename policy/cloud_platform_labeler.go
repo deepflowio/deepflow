@@ -253,7 +253,6 @@ func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip uint32, tapType Ta
 	if platformData != nil {
 		endpointInfo.SetL3Data(platformData, ip)
 	}
-	l.ipGroup.Populate(ip, endpointInfo)
 	return endpointInfo
 }
 
@@ -348,6 +347,8 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
 	l.ModifyEndpointData(endpoint, key)
 	l.ModifyPrivateIp(endpoint, key)
+	l.ipGroup.Populate(key.SrcIp, endpoint.SrcInfo)
+	l.ipGroup.Populate(key.DstIp, endpoint.DstInfo)
 	return endpoint
 }
 
