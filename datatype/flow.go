@@ -172,7 +172,7 @@ func (f *FlowMetricsPeerSrc) String() string {
 		field := typeOf.Field(i)
 		value := valueOf.Field(i)
 		if field.Type.Name() == "Duration" {
-			formatted += fmt.Sprintf("%v: %d ", field.Name, value)
+			formatted += fmt.Sprintf("%v: %d ", field.Name, value.Int())
 		} else {
 			formatted += fmt.Sprintf("%v: %+v ", field.Name, value)
 		}
@@ -188,7 +188,7 @@ func (f *FlowMetricsPeerDst) String() string {
 		field := typeOf.Field(i)
 		value := valueOf.Field(i)
 		if field.Type.Name() == "Duration" {
-			formatted += fmt.Sprintf("%v: %d ", field.Name, value)
+			formatted += fmt.Sprintf("%v: %d ", field.Name, value.Int())
 		} else {
 			formatted += fmt.Sprintf("%v: %+v ", field.Name, value)
 		}
