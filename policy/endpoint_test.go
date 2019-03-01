@@ -951,6 +951,29 @@ func TestIpNetmaskGroup1(t *testing.T) {
 	}
 }
 
+func TestArpProxy(t *testing.T) {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	ipGroup1 := generateIpGroup(group[11], groupEpc[1], ipNet1)
+	policy.UpdateIpGroupData([]*IpGroupData{ipGroup1})
+	net1 := generateIpNet(ip3, 123, 32)
+	data1 := generatePlatformDataWithGroupId(groupEpc[1], group[1], mac1, net1)
+	net2 := generateIpNet(ip4, 123, 32)
+	data2 := generatePlatformDataWithGroupId(groupEpc[1], group[1], mac2, net2)
+	policy.UpdateInterfaceData([]*PlatformData{data1, data2})
+	key := generateLookupKey(mac1, group1Mac, vlanAny, ip3, ip4, IPProtocolTCP, 50, 60)
+	key.L2End0 = true
+	endpointData, _ := policy.LookupAllByKey(key)
+	basicData1 := new(EndpointData)
+	basicData1.SrcInfo = generateEndpointInfo(groupEpc[1], groupEpc[1], l2EndBool[1], l3EndBool[1], 123, group[1], group[11]+1e9)
+	basicData1.DstInfo = generateEndpointInfo(0, groupEpc[1], l2EndBool[0], l3EndBool[0], 123, group[11]+1e9)
+	basicData1.DstInfo.L2DeviceType = 0
+	basicData1.DstInfo.L2DeviceId = 0
+	basicData1.DstInfo.HostIp = 0
+	if !CheckEndpointDataResult(t, basicData1, endpointData) {
+		t.Error("TestArpProxy Check Failed!")
+	}
+}
+
 func BenchmarkGetEndpointData(b *testing.B) {
 	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
 	platformData1 := generatePlatformDataByParam(group1Ip1, group1Mac, groupEpc[1], 4)
