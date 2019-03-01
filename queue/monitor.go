@@ -7,6 +7,8 @@ import (
 	"net"
 
 	"gitlab.x.lan/yunshan/droplet-libs/debug"
+
+	"gitlab.x.lan/yunshan/droplet/dropletctl"
 )
 
 type MonitorOperator interface {
@@ -86,8 +88,8 @@ func (m *Monitor) sendDebug(conn *net.UDPConn, remote *net.UDPAddr, items []inte
 			break
 		}
 		message := item.(fmt.Stringer).String()
-		if len(message) > debug.DEBUG_MESSAGE_ARGS_LEN-8 {
-			message = message[:debug.DEBUG_MESSAGE_ARGS_LEN-8-3] + "..."
+		if len(message) > dropletctl.DEBUG_MESSAGE_LEN-8 {
+			message = message[:dropletctl.DEBUG_MESSAGE_LEN-8-3] + "..."
 		}
 		encoder := gob.NewEncoder(&buffer)
 		if err := encoder.Encode(message); err != nil {

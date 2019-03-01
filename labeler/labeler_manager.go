@@ -371,8 +371,8 @@ func (l *LabelerManager) recvShowAcl(conn *net.UDPConn, remote *net.UDPAddr, arg
 		encoder := gob.NewEncoder(&buffer)
 		context := acl.String()
 		// gob封装为'String: ' + context
-		if len(context) >= debug.DEBUG_MESSAGE_ARGS_LEN-8 {
-			context = context[:debug.DEBUG_MESSAGE_ARGS_LEN-8-3] + "..."
+		if len(context) >= dropletctl.DEBUG_MESSAGE_LEN-8 {
+			context = context[:dropletctl.DEBUG_MESSAGE_LEN-8-3] + "..."
 		}
 
 		if err := encoder.Encode(context); err != nil {
@@ -383,6 +383,7 @@ func (l *LabelerManager) recvShowAcl(conn *net.UDPConn, remote *net.UDPAddr, arg
 		debug.SendToClient(conn, remote, 0, &buffer)
 		time.Sleep(2 * time.Millisecond)
 	}
+	buffer.Reset()
 	encoder.Encode("END")
 	debug.SendToClient(conn, remote, 0, &buffer)
 }

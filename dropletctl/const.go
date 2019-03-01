@@ -12,4 +12,8 @@ const (
 	DROPLETCTL_MAX
 )
 
+const (
+	DEBUG_MESSAGE_LEN = 4096
+)
+
 var ConfigPath string
