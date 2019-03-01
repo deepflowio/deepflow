@@ -22,10 +22,9 @@ type CommandLineProcess interface {
 }
 
 const (
-	DEFAULT_LISTEN_PORT    = 9528
-	UDP_MAXLEN             = 1500
-	DEBUG_MESSAGE_ARGS_LEN = 1200
-	MODULE_MAX             = 32
+	DEFAULT_LISTEN_PORT = 9528
+	UDP_MAXLEN          = 9710
+	MODULE_MAX          = 32
 )
 
 var (
@@ -41,7 +40,7 @@ var (
 type DebugMessage struct {
 	Module, Operate uint16
 	Result          uint32
-	Args            [DEBUG_MESSAGE_ARGS_LEN]byte
+	Args            []byte
 }
 
 func SetIpAndPort(ip string, port int) {
@@ -77,7 +76,7 @@ func SendToServer(module ModuleId, operate ModuleOperate, args *bytes.Buffer) (*
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	msg := DebugMessage{Module: uint16(module), Operate: uint16(operate), Result: 0}
 	if args != nil {
-		args.Read(msg.Args[:])
+		msg.Args = args.Bytes()
 	}
 	encoder := gob.NewEncoder(&sendBuffer)
 	if err := encoder.Encode(msg); err != nil {
@@ -90,14 +89,10 @@ func SendToServer(module ModuleId, operate ModuleOperate, args *bytes.Buffer) (*
 }
 
 func SendToClient(conn *net.UDPConn, remote *net.UDPAddr, result uint32, args *bytes.Buffer) {
-	if args != nil && args.Len() > DEBUG_MESSAGE_ARGS_LEN {
-		log.Warningf("len(args) > %v", DEBUG_MESSAGE_ARGS_LEN)
-		return
-	}
 	buffer := bytes.Buffer{}
 	msg := DebugMessage{Module: 0, Result: result, Operate: 11}
 	if args != nil {
-		args.Read(msg.Args[:])
+		msg.Args = args.Bytes()
 	}
 	encoder := gob.NewEncoder(&buffer)
 	if err := encoder.Encode(msg); err != nil {
