@@ -35,7 +35,7 @@
 
 [[constraint]]
   name = "github.com/google/gopacket"
-  version = "v1.1.15"
+  version = "v1.1.16"
 
 [[constraint]]
   name = "github.com/op/go-logging"
