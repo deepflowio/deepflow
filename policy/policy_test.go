@@ -2078,6 +2078,25 @@ func BenchmarkNpbFastPath(b *testing.B) {
 	}
 }
 
+func BenchmarkNpbCheck(b *testing.B) {
+	npb1 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
+	npb2 := ToNpbAction(20, 150, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
+	npb3 := ToNpbAction(30, 150, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
+
+	policy := new(PolicyData)
+	policy.MergeNpbAction([]NpbAction{npb1, npb2, npb3}, 25)
+	endpoints := new(EndpointData)
+	endpoints.SrcInfo = generateEndpointInfo(10, 10, true, true, 20, 100, 200)
+	endpoints.DstInfo = generateEndpointInfo(10, 10, true, false, 20, 100, 200)
+
+	key := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, protoAny, 0, 0)
+	setEthTypeAndOthers(key, EthernetTypeIPv4, 63, l2EndBool[1], l2EndBool[1])
+
+	for i := 0; i < b.N; i++ {
+		policy.CheckNpbPolicy(key, endpoints)
+	}
+}
+
 func BenchmarkNpbDedup(b *testing.B) {
 	table := generatePolicyTable()
 
