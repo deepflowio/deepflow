@@ -40,7 +40,7 @@
   version = "v1.2.0"
 
 [[projects]]
-  digest = "1:9d87185d010e1df24a433b9b54d5426f4717089af2a86a180e69f13c5b06f71f"
+  digest = "1:7f66e371e482ffacb7a50dc19691ebe8701c5ffbae7aa0eb718ecc54705ffc28"
   name = "github.com/google/gopacket"
   packages = [
     ".",
@@ -49,8 +49,8 @@
     "pcapgo",
   ]
   pruneopts = "UT"
-  revision = "a6b099ece4680a8bdea84fa78166d0712108a95c"
-  version = "v1.1.15"
+  revision = "7f3fc6cbbb499248dca53da7fe3ed6c25a78d22f"
+  version = "v1.1.16"
 
 [[projects]]
   digest = "1:870d441fe217b8e689d7949fef6e43efbc787e50f200cb1e70dbca9204a1d6be"
@@ -173,7 +173,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:860a208b3391b33901be54a8960487f4f430e612fd87c6cc1d9cceb83af8fb8d"
+  digest = "1:6848645789c0aafd7044e6624519030bdd8d5dc8b26581e5b78956a3d781444a"
   name = "gitlab.x.lan/yunshan/droplet-libs"
   packages = [
     "app",
@@ -199,7 +199,7 @@
     "zmq",
   ]
   pruneopts = "UT"
-  revision = "05be6d8ba80ae0a09dddc12be288ce06ca8182dd"
+  revision = "df1199e30317338f24f8bfdf9efc3ff9b08bd036"
 
 [[projects]]
   branch = "master"
