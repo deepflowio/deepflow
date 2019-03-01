@@ -64,9 +64,9 @@ queue:
   # flow app read queue count, default 8
   # 4-tagged-flow-to-flow-app
   flow-app-queue-count: 2
-  # flow app read queue size, default queue-size
-  flow-app-queue-size: 65536
-  # flow duplicator read queue size, default queue-size << 1
+  # flow app read queue size, default queue-size << 3
+  flow-app-queue-size: 0
+  # flow duplicator read queue size, default queue-size << 3
   # name: 3-tagged-flow-to-flow-duplicator
   flow-duplicator-queue-size: 0
   # mapreduce buffer capacity, default 524288
@@ -78,10 +78,10 @@ queue:
   metering-app-output-queue-size: 0
   # flow app output queue count, default 1
   flow-app-output-queue-count: 1
-  # flow app output queue size, default docs-queue-size << 1
+  # flow app output queue size, default docs-queue-size << 3
   # name: 5-flow-doc-to-marshaller
   flow-app-output-queue-size: 0
-  # flow sender queue size, default queue-size << 1
+  # flow sender queue size, default queue-size << 3
   # name: 4-tagged-flow-to-stream
   flow-sender-queue-size: 0
   # doc sender queue size, default docs-queue-size << 1

@@ -179,10 +179,10 @@ func (c *Config) Validate() error {
 		c.Queue.FlowAppQueueCount = 2
 	}
 	if c.Queue.FlowAppQueueSize == 0 {
-		c.Queue.FlowAppQueueSize = c.Queue.QueueSize
+		c.Queue.FlowAppQueueSize = c.Queue.QueueSize << 3
 	}
 	if c.Queue.FlowDuplicatorQueueSize == 0 {
-		c.Queue.FlowDuplicatorQueueSize = c.Queue.QueueSize << 1
+		c.Queue.FlowDuplicatorQueueSize = c.Queue.QueueSize << 3
 	}
 	if c.Queue.DocsQueueSize == 0 {
 		c.Queue.DocsQueueSize = 524288
@@ -197,10 +197,10 @@ func (c *Config) Validate() error {
 		c.Queue.FlowAppOutputQueueCount = 1
 	}
 	if c.Queue.FlowAppOutputQueueSize == 0 {
-		c.Queue.FlowAppOutputQueueSize = c.Queue.DocsQueueSize << 1
+		c.Queue.FlowAppOutputQueueSize = c.Queue.DocsQueueSize << 3
 	}
 	if c.Queue.FlowSenderQueueSize == 0 {
-		c.Queue.FlowSenderQueueSize = c.Queue.QueueSize << 1
+		c.Queue.FlowSenderQueueSize = c.Queue.QueueSize << 3
 	}
 	if c.Queue.DocSenderQueueSize == 0 {
 		c.Queue.DocSenderQueueSize = c.Queue.DocsQueueSize << 1
