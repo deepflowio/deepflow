@@ -4,6 +4,7 @@ import (
 	"bytes"
 	. "encoding/binary"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"os"
@@ -16,6 +17,8 @@ import (
 )
 
 type PacketLen = int
+
+const MAX_ERR_PCAP_LEN = 10 * 1024
 
 func loadPcap(file string) ([]RawPacket, []PacketLen) {
 	var f *os.File
@@ -36,6 +39,51 @@ func loadPcap(file string) ([]RawPacket, []PacketLen) {
 			break
 		}
 		packetLens = append(packetLens, ci.Length)
+		if len(packet) > 128 {
+			packets = append(packets, packet[:128])
+		} else {
+			packets = append(packets, packet)
+		}
+	}
+	return packets, packetLens
+}
+
+func loadErrorPcap(file string) ([]RawPacket, []PacketLen) {
+	var f *os.File
+	cwd, _ := os.Getwd()
+	if strings.Contains(cwd, "datatype") {
+		f, _ = os.Open(file)
+	} else { // dlv
+		f, _ = os.Open("datatype/" + file)
+	}
+	defer f.Close()
+
+	var packets []RawPacket
+	var packetLens []PacketLen
+	var packet RawPacket
+	rawPcap := make(RawPacket, MAX_ERR_PCAP_LEN)
+	f.Seek(0, io.SeekStart)
+	n, err := f.Read(rawPcap)
+	fmt.Printf("pcap len:%v, data:%v\n", n, rawPcap[:n])
+	if err != nil || n == MAX_ERR_PCAP_LEN {
+		return nil, nil
+	}
+
+	stream := NewByteStream(rawPcap[:n])
+	if stream.Len() > 24 {
+		stream.Skip(24)
+	}
+
+	for stream.Len() > 0 {
+		stream.Skip(8)
+		capLen, realLen := LittleEndian.Uint32(stream.Field(4)), LittleEndian.Uint32(stream.Field(4))
+		fmt.Printf("================\n")
+		fmt.Printf("packet capLen:%v, realLen:%v", capLen, realLen)
+		packet = stream.Field(int(capLen))
+		fmt.Printf("================\n")
+		fmt.Printf("stream len:%v, packet:%v", stream.Len(), packet)
+
+		packetLens = append(packetLens, int(realLen))
 		if len(packet) > 128 {
 			packets = append(packets, packet[:128])
 		} else {
@@ -189,6 +237,26 @@ func TestParseIspPackets(t *testing.T) {
 	}
 	if !reflect.DeepEqual(actualInPorts, expectInPorts) {
 		t.Errorf("Expect %+v, but actual %+v", expectInPorts, actualInPorts)
+	}
+}
+
+func TestParseErrorPackets(t *testing.T) {
+	var buffer bytes.Buffer
+	packets, packetLens := loadErrorPcap("err_mss.pcap")
+
+	for i, packet := range packets {
+		meta := &MetaPacket{PacketLen: uint16(packetLens[i])}
+		l2Len := meta.ParseL2(packet)
+		meta.Parse(packet[l2Len:])
+		buffer.WriteString(meta.String() + "\n")
+	}
+	expectFile := "meta_error_packet_test.result"
+	content, _ := ioutil.ReadFile(expectFile)
+	expected := string(content)
+	actual := buffer.String()
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("Expect %+v, but actual %+v", expected, actual)
+		ioutil.WriteFile("actual_error.txt", []byte(actual), 0644)
 	}
 }
 
