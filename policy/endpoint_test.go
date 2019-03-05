@@ -968,7 +968,7 @@ func TestArpProxy(t *testing.T) {
 	basicData1.DstInfo = generateEndpointInfo(0, groupEpc[1], l2EndBool[0], l3EndBool[0], 123, group[11]+1e9)
 	basicData1.DstInfo.L2DeviceType = 0
 	basicData1.DstInfo.L2DeviceId = 0
-	basicData1.DstInfo.HostIp = 0
+	basicData1.DstInfo.HostIp = server
 	if !CheckEndpointDataResult(t, basicData1, endpointData) {
 		t.Error("TestArpProxy Check Failed!")
 	}
