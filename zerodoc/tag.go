@@ -82,7 +82,7 @@ func (c Code) HasEdgeTagField() bool {
 
 func (c Code) HasL2TagField() bool {
 	// FIXME: GroupID、GroupIDPath待定
-	return c&(L2EpcID|L2Device|Host|L2EpcIDPath|L2DevicePath|HostPath|VLANID|SubnetID) != 0
+	return c&(L2EpcID|L2Device|L2EpcIDPath|L2DevicePath|VLANID|SubnetID) != 0
 }
 
 func (c Code) RemoveIndex() Code {

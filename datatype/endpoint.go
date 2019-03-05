@@ -143,7 +143,6 @@ func (i *EndpointInfo) SetL2Data(data *PlatformData) {
 	i.L2EpcId = data.EpcId
 	i.L2DeviceType = data.DeviceType
 	i.L2DeviceId = data.DeviceId
-	i.HostIp = data.HostIp
 	i.GroupIds = append(i.GroupIds, data.GroupIds...)
 }
 
@@ -154,6 +153,7 @@ func (i *EndpointInfo) SetL3Data(data *PlatformData, ip uint32) {
 	}
 	i.L3DeviceType = data.DeviceType
 	i.L3DeviceId = data.DeviceId
+	i.HostIp = data.HostIp
 
 	for _, ipInfo := range data.Ips {
 		if ipInfo.Ip == (ip & MaskLenToNetmask(ipInfo.Netmask)) {
