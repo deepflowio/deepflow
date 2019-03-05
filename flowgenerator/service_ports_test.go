@@ -350,6 +350,7 @@ func TestUdpBothPortsNotInIANA(t *testing.T) {
 }
 
 func TestUdpHitStatus(t *testing.T) {
+	portStatsInterval = time.Second
 	portStatsSrcEndCount = 5
 	serverPort := uint16(9999)
 	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
@@ -366,5 +367,14 @@ func TestUdpHitStatus(t *testing.T) {
 		if taggedFlow.PortDst != serverPort {
 			t.Errorf("taggedFlow.PortDst is %d, expect %d", taggedFlow.PortDst, serverPort)
 		}
+	}
+	packet := getUdpDefaultPacket()
+	reversePacket(packet)
+	packet.PortSrc = serverPort
+	packet.PortDst = 12345
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet)
+	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
+	if taggedFlow.PortDst != serverPort {
+		t.Errorf("taggedFlow.PortDst is %d, expect %d", taggedFlow.PortDst, serverPort)
 	}
 }
