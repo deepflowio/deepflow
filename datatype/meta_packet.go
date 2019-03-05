@@ -101,14 +101,14 @@ func (h *MetaPacketTcpHeader) extractTcpOptions(stream *ByteStream) bool {
 			h.MSS = stream.U16()
 		case TCPOptionKindSACK:
 			sackLen := int(stream.U8()) - 2
-			if stream.Len() < sackLen {
+			if sackLen <= 0 || sackLen > 40 || stream.Len() < sackLen {
 				return false
 			}
 			h.Sack = make([]byte, sackLen)
 			copy(h.Sack, stream.Field(sackLen))
 		default: // others
 			otherLen := int(stream.U8()) - 2
-			if stream.Len() < otherLen {
+			if otherLen < 0 || otherLen > 40 || stream.Len() < otherLen {
 				return false
 			}
 			stream.Skip(otherLen)
@@ -163,8 +163,8 @@ func (p *MetaPacket) ParseIcmp(stream *ByteStream) {
 
 func (p *MetaPacket) ParseL4(stream *ByteStream) {
 	if p.Protocol == IPProtocolTCP {
-		len := stream.Len()
-		if len < MIN_TCP_HEADER_SIZE {
+		length := stream.Len()
+		if length < MIN_TCP_HEADER_SIZE {
 			p.PayloadLen = 0
 			p.Invalid = true
 			return
@@ -183,7 +183,7 @@ func (p *MetaPacket) ParseL4(stream *ByteStream) {
 		p.TcpData = tcpHeader
 
 		optionsLen := int(dataOffset) - MIN_TCP_HEADER_SIZE
-		if optionsLen < 0 || optionsLen > 40 || optionsLen > len-MIN_TCP_HEADER_SIZE {
+		if optionsLen < 0 || optionsLen > 40 || optionsLen > length-MIN_TCP_HEADER_SIZE {
 			p.Invalid = true
 			return
 		}
@@ -221,6 +221,11 @@ func (p *MetaPacket) ParseIp(stream *ByteStream) {
 	stream.Skip(2) // skip checksum
 	p.IpSrc = stream.U32()
 	p.IpDst = stream.U32()
+	if ihl < 5 || totalLength < MIN_IPV4_HEADER_SIZE || totalLength < uint16(ihl*4) {
+		p.Invalid = true
+		return
+	}
+
 	ipOptionsSize := int(ihl)*4 - MIN_IPV4_HEADER_SIZE
 	if stream.Len() <= ipOptionsSize || fragmentOffset > 0 { // no more header
 		return
