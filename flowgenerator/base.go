@@ -185,13 +185,6 @@ func SetTimeout(timeout TimeoutConfig) {
 
 func SetFlowGenerator(cfg config.Config) {
 	flowGeneratorCount = uint64(cfg.Queue.FlowGeneratorQueueCount)
-	innerTcpSMA = make([]*ServiceManager, flowGeneratorCount)
-	innerUdpSMA = make([]*ServiceManager, flowGeneratorCount)
-	for i := uint64(0); i < flowGeneratorCount; i++ {
-		innerTcpSMA[i] = NewServiceManager(32 * 1024)
-		innerUdpSMA[i] = NewServiceManager(32 * 1024)
-	}
-
 	forceReportInterval = cfg.FlowGenerator.ForceReportInterval
 	flowCleanInterval = cfg.FlowGenerator.FlowCleanInterval
 	timeoutCleanerCount = cfg.FlowGenerator.TimeoutCleanerCount
@@ -201,6 +194,12 @@ func SetFlowGenerator(cfg config.Config) {
 	ignoreL2End = cfg.FlowGenerator.IgnoreL2End
 	portStatsInterval = cfg.FlowGenerator.PortStatsInterval
 	portStatsSrcEndCount = cfg.FlowGenerator.PortStatsSrcEndCount
+	innerTcpSMA = make([]*ServiceManager, flowGeneratorCount)
+	innerUdpSMA = make([]*ServiceManager, flowGeneratorCount)
+	for i := uint64(0); i < flowGeneratorCount; i++ {
+		innerTcpSMA[i] = NewServiceManager(32 * 1024)
+		innerUdpSMA[i] = NewServiceManager(32 * 1024)
+	}
 }
 
 func (t TimeoutConfig) minTimeout() time.Duration {

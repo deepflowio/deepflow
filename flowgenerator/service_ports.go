@@ -77,6 +77,7 @@ func NewServiceManager(capacity int) *ServiceManager {
 		serviceManager.hitStatus = serviceManager.hitStatusLearnOn
 		serviceManager.disableStatus = serviceManager.disableStatusLearnOn
 	} else {
+		log.Infof("port-stats-interval is %d, maybe it is unexpected", portStatsInterval)
 		serviceManager.getStatus = serviceManager.getStatusLearnOff
 		serviceManager.enableStatus = serviceManager.enableStatusLearnOff
 		serviceManager.hitStatus = serviceManager.hitStatusLearnOff
@@ -107,6 +108,7 @@ func (m *ServiceManager) getStatusLearnOn(key IpPortEpcKey, port uint16) bool {
 		}
 		return false
 	}
+	log.Debugf("IpPortEpcKey %x, active %t", key, value.(*ServiceStatus).active)
 	return value.(*ServiceStatus).active
 }
 
@@ -159,11 +161,13 @@ func (m *ServiceManager) hitStatusLearnOn(key IpPortEpcKey, clientHash uint32, t
 		for key := range status.clientMap {
 			delete(status.clientMap, key)
 		}
+		log.Debugf("IpPortEpcKey %x learn failed", key)
 	}
 	status.clientMap[clientHash] = true
 	m.Unlock()
 	if len(status.clientMap) >= portStatsSrcEndCount {
 		status.active = true
+		log.Debugf("IpPortEpcKey %x learn as service port", key)
 	}
 }
 
