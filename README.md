@@ -74,39 +74,50 @@ ok      gitlab.x.lan/yunshan/droplet-libs/pool  12.126s
 
 接入网络和虚拟网络查找过程现在是一致的
 
-查找条件及结果
+基础查找条件及对应结果：
 
   - MAC，IP不在数据库内
     - 查找结果L3EpcId=0，L2EpcId=0，IsL3End=false
+    - 进行附1，2，3，4修正
   - MAC不在数据库，IP包含在数据库ip_resource表内
     - 查找的结果L3EpcId=-1，L2EpcId=0，IsL3End会根据查找包的Ttl(64,128,256)进行修正
+    - 进行附3，4修正
   - MAC不在数据库, IP属于某个设备并且if_type=3
     - 查找的结果L3EpcId=(设备的EpcId)，L2EpcId=0，IsL3End(MAC和IP属于同一个设备则为true)
+    - 进行附3，4修正
   - MAC不在数据库, IP属于某个设备并且if_type!=3
     - 查找结果L3EpcId=0，L2EpcId=0，IsL3End=false
+    - 进行附1，2，3，4修正
   - MAC和IP属于同一个设备
     - 查找结果L3EpcId=(设备的EpcId)，L2EpcId=(设备的EpcId)，IsL3End=true
   - MAC属于某一设备，IP不在数据库里
     - 查找结果L3EpcId=0，L2EpcId=设备EpcId，IsL3End=false
+    - 进行附2，3，4修正
   - MAC属于某一设备，IP属于另一设备, 两个设备属于同一个EpcId
     - 查找结果L3EpcId=(IP设备的EpcId)，L2EpcId=(MAC设备的EpcId)
+    - 进行附3修正
   - MAC属于某一设备，IP属于另一设备, 两个设备属于不同的EpcId，IP的if_type!=3
     - 查找结果L3EpcId=0，L2EpcId=(MAC设备EpcId)
+    - 进行附3修正
   - MAC属于某一设备，IP属于另一设备, 两个设备属于不同的EpcId，IP的if_type=3
     - 查找结果L3EpcId=(IP设备的EpcId)，L2EpcId=(MAC设备的EpcId)
+    - 进行附3修正
   - MAC属于某一设备，IP属于ip_resource表内数据
     - 查找结果L3EpcId=-1，L2EpcId=(MAC设备的EpcId)，IsL3End=false
+    - 进行附3，4修正
   - host_0/host_1对应的是MAC的Host
-    - 可能出现host_0/host_1是属于同一个宿主机，但是IP分别属于不同的宿主机，这是正常的
+    - 可能出现host_0/host_1是属于同一个宿主机，但是IP分别属于不同的宿主机，这是正常的 
 
-  - 注意：
-    - IsL2End值现在由trident的传过来的数据直接赋值，不在做判断
-    - 如果IsL3End=false，会根据Ttl(64,128,255)进行修正
-    - host_0/host_1的值和IP没有关系
-    - 无论是否查找到数据，IsL3End为false会根据缓存Arp表和Ttl(64,128,255)进行修正
-    - 东西向流量，l3EpcId=0，IP包含在{10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 255.255.255.255/32}内的数据，
-      会修正l3EpcId=-1
-    - 东西向流量，当InPort=0x30000时，会将LookupKey的Ttl强制改写为128，导致源IsL3End的查询为True
+附：
+
+  - 1. 若L3EpcId=0，对端的L2EpcId!=0，则会在对端项目内查找对应资源，消除arp代理的影响
+  - 2. 东西向流量，l3EpcId=0，IP包含在{10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 255.255.255.255/32}内的数据，
+      修正l3EpcId=-1
+  - 3. 若源IsL3End=false，查询Key的Ttl在(64,128,255)内，则源IsL3End将设置为true，只使用于源
+  - 4. 若IsL3End为false，则会根据Arp表进行修正，若存在MAC和IP的对应关系则将IsL3End设置为true，
+  - 5. IsL2End值由trident传过来的数据直接赋值
+
+  注意：若无特殊说明，修正方式同时适用于源和目的，查询结果以修正后的数据为准
 
 SubnetId查询依据
 
