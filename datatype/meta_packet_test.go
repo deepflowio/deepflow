@@ -64,7 +64,6 @@ func loadErrorPcap(file string) ([]RawPacket, []PacketLen) {
 	rawPcap := make(RawPacket, MAX_ERR_PCAP_LEN)
 	f.Seek(0, io.SeekStart)
 	n, err := f.Read(rawPcap)
-	fmt.Printf("pcap len:%v, data:%v\n", n, rawPcap[:n])
 	if err != nil || n == MAX_ERR_PCAP_LEN {
 		return nil, nil
 	}
@@ -77,11 +76,7 @@ func loadErrorPcap(file string) ([]RawPacket, []PacketLen) {
 	for stream.Len() > 0 {
 		stream.Skip(8)
 		capLen, realLen := LittleEndian.Uint32(stream.Field(4)), LittleEndian.Uint32(stream.Field(4))
-		fmt.Printf("================\n")
-		fmt.Printf("packet capLen:%v, realLen:%v", capLen, realLen)
 		packet = stream.Field(int(capLen))
-		fmt.Printf("================\n")
-		fmt.Printf("stream len:%v, packet:%v", stream.Len(), packet)
 
 		packetLens = append(packetLens, int(realLen))
 		if len(packet) > 128 {
@@ -242,7 +237,7 @@ func TestParseIspPackets(t *testing.T) {
 
 func TestParseErrorPackets(t *testing.T) {
 	var buffer bytes.Buffer
-	packets, packetLens := loadErrorPcap("err_mss.pcap")
+	packets, packetLens := loadErrorPcap("all_error_pkts.pcap")
 
 	for i, packet := range packets {
 		meta := &MetaPacket{PacketLen: uint16(packetLens[i])}
