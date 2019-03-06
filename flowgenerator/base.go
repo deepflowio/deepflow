@@ -109,6 +109,7 @@ type PacketHandler struct {
 
 type FlowGenerator struct {
 	FlowCacheHashMap
+	FlowGeo
 
 	metaPacketHeaderInQueue MultiQueueReader
 	flowOutQueue            QueueWriter
