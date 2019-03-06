@@ -188,6 +188,7 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, now time.Duration) *FlowExtra
 	taggedFlow.EthType = meta.EthType
 	taggedFlow.Hash = meta.Hash
 	updateFlowTag(taggedFlow, meta)
+	f.fillGeoInfo(taggedFlow)
 
 	flowExtra := AcquireFlowExtra()
 	flowExtra.taggedFlow = taggedFlow
@@ -662,6 +663,7 @@ func (f *FlowGenerator) Stop() {
 func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, bufferSize int, flowLimitNum int32, index int) *FlowGenerator {
 	flowGenerator := &FlowGenerator{
 		FlowCacheHashMap:        FlowCacheHashMap{make([]*FlowCache, hashMapSize), rand.Uint32(), hashMapSize, timeoutCleanerCount, &TunnelInfo{}},
+		FlowGeo:                 innerFlowGeo,
 		metaPacketHeaderInQueue: metaPacketHeaderInQueue,
 		flowOutQueue:            flowOutQueue,
 		stats:                   FlowGeneratorStats{cleanRoutineFlowCacheNums: make([]int, timeoutCleanerCount), cleanRoutineMaxFlowCacheLens: make([]int, timeoutCleanerCount)},

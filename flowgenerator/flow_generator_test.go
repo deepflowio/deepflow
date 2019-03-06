@@ -71,17 +71,18 @@ func getDefaultPacket() *MetaPacket {
 		EndpointData: &EndpointData{
 			SrcInfo: &EndpointInfo{
 				L2EpcId:  -1,
-				L3EpcId:  -1,
+				L3EpcId:  1,
 				GroupIds: make([]uint32, 0, 10),
 				HostIp:   0x01010101,
 			},
 			DstInfo: &EndpointInfo{
 				L2EpcId:  -1,
-				L3EpcId:  -1,
+				L3EpcId:  0,
 				GroupIds: make([]uint32, 0, 10),
 				HostIp:   0x01010101,
 			},
 		},
+		PolicyData: &PolicyData{ActionFlags: ACTION_GEO_POSITIONING},
 	}
 }
 
@@ -103,6 +104,7 @@ func reversePacket(packet *MetaPacket) {
 	packet.IpSrc, packet.IpDst = packet.IpDst, packet.IpSrc
 	packet.PortSrc, packet.PortDst = packet.PortDst, packet.PortSrc
 	packet.L2End0, packet.L2End1 = packet.L2End1, packet.L2End0
+	packet.EndpointData = packet.EndpointData.ReverseData()
 }
 
 func TestNew(t *testing.T) {
@@ -200,7 +202,7 @@ func TestPlatformData(t *testing.T) {
 
 	flowGenerator.Start()
 
-	expectEpcID0, expectL3EpcId := int32(-1), int32(-1)
+	expectEpcID0, expectL3EpcId := int32(-1), int32(1)
 	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
 	if taggedFlow.CloseType != CloseTypeServerHalfOpen {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeServerHalfOpen)
