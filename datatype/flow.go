@@ -115,10 +115,9 @@ type Flow struct {
 	FlowMetricsPeerSrc
 	FlowMetricsPeerDst
 
-	FlowID              uint64
-	TimeBitmap          uint64
-	Hash                uint32
-	IntervalFirstReport bool
+	FlowID     uint64
+	TimeBitmap uint64
+	Hash       uint32
 
 	/* Timers */
 	StartTime    time.Duration
@@ -132,6 +131,11 @@ type Flow struct {
 
 	/* TCP Perf Data */
 	*TcpPerfStats
+
+	/* Flow Geo Info */
+	Country uint8
+	Region  uint8
+	ISP     uint8
 }
 
 func (t *TcpPerfStats) String() string {
@@ -200,13 +204,15 @@ func (f *Flow) String() string {
 	formatted := fmt.Sprintf("FlowID: %d ", f.FlowID)
 	formatted += fmt.Sprintf("CloseType: %d ", f.CloseType)
 	formatted += fmt.Sprintf("TimeBitmap: %d ", f.TimeBitmap)
-	formatted += fmt.Sprintf("IntervalFirstReport: %t ", f.IntervalFirstReport)
 	formatted += fmt.Sprintf("StartTime: %d ", f.StartTime)
 	formatted += fmt.Sprintf("CurStartTime: %d ", f.CurStartTime)
 	formatted += fmt.Sprintf("EndTime: %d ", f.EndTime)
 	formatted += fmt.Sprintf("Duration: %d\n", f.Duration)
 	formatted += fmt.Sprintf("\tVLAN: %d ", f.VLAN)
 	formatted += fmt.Sprintf("EthType: %d ", f.EthType)
+	formatted += fmt.Sprintf("Country: %d ", f.Country)
+	formatted += fmt.Sprintf("Region: %d ", f.Region)
+	formatted += fmt.Sprintf("ISP: %d ", f.ISP)
 	formatted += fmt.Sprintf("%s\n", f.FlowKey.String())
 	formatted += fmt.Sprintf("\tFlowMetricsPeerSrc: {%s}\n", f.FlowMetricsPeerSrc.String())
 	formatted += fmt.Sprintf("\tFlowMetricsPeerDst: {%s}", f.FlowMetricsPeerDst.String())
