@@ -3,9 +3,6 @@ package datatype
 import (
 	"fmt"
 	"reflect"
-	"time"
-
-	. "github.com/google/gopacket/layers"
 
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
@@ -63,24 +60,6 @@ type EndpointInfo struct {
 	GroupIds []uint32
 }
 
-type LookupKey struct {
-	Timestamp                      time.Duration
-	SrcMac, DstMac                 uint64
-	SrcIp, DstIp                   uint32
-	SrcPort, DstPort               uint16
-	EthType                        EthernetType
-	Vlan                           uint16
-	Proto                          uint8
-	Ttl                            uint8
-	L2End0, L2End1                 bool
-	Tap                            TapType
-	Invalid                        bool
-	FastIndex                      int
-	SrcGroupIds, DstGroupIds       []uint16 //资源组的再分组ID, 没有重复用于策略匹配
-	SrcAllGroupIds, DstAllGroupIds []uint16 //资源组的再分组ID，有重复用于aclgid bitmap生成
-	FeatureFlag                    FeatureFlags
-}
-
 type L3L2End int
 
 const (
@@ -102,16 +81,6 @@ type EndpointStore struct {
 type EndpointData struct {
 	SrcInfo *EndpointInfo
 	DstInfo *EndpointInfo
-}
-
-func (k *LookupKey) String() string {
-	return fmt.Sprintf("%d %s:%v > %s:%v %v vlan: %v %v:%d > %v:%d proto: %v ttl %v tap: %v",
-		k.Timestamp, Uint64ToMac(k.SrcMac), k.L2End0, Uint64ToMac(k.DstMac), k.L2End1, k.EthType, k.Vlan,
-		IpFromUint32(k.SrcIp), k.SrcPort, IpFromUint32(k.DstIp), k.DstPort, k.Proto, k.Ttl, k.Tap)
-}
-
-func (k *LookupKey) HasFeatureFlag(featureFlag FeatureFlags) bool {
-	return k.FeatureFlag&featureFlag == featureFlag
 }
 
 func NewL3L2End(l2End, l3End bool) L3L2End {
