@@ -1,14 +1,17 @@
-module:
-	go mod download
-	make -C $(shell go list -e -f '{{.Dir}}' gitlab.x.lan/yunshan/message)
+MESSAGE = gitlab.x.lan/yunshan/message
+
+vendor:
+	go mod download && go mod vendor
+	cp -r $(shell go list -e -f '{{.Dir}}' ${MESSAGE})/* vendor/${MESSAGE}/
+	make -C vendor/${MESSAGE}
 	go generate ./geo/...
 	go generate ./zerodoc/...
 
-test: module
-	go test -short ./... -coverprofile .test-coverage.txt
+test: vendor
+	go test -mod vendor -short ./... -coverprofile .test-coverage.txt
 
-bench: module
-	go test -bench=. ./...
+bench: vendor
+	go test -mod vendor -bench=. ./...
 
 clean:
 	git clean -dfx
