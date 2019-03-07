@@ -2,6 +2,7 @@ package datatype
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
@@ -140,6 +141,23 @@ func (i *EndpointInfo) SetL3DataByMac(data *PlatformData) {
 	i.L3EpcId = data.EpcId
 	i.L3DeviceType = data.DeviceType
 	i.L3DeviceId = data.DeviceId
+}
+
+func (i *EndpointInfo) GetEpc() uint16 {
+	id := uint16(0)
+	if i.L2EpcId > 0 {
+		id = uint16(i.L2EpcId)
+	} else if i.L2EpcId == -1 {
+		// 和L3的EpcId == -1进行区分
+		id = math.MaxUint16 - 1
+	} else if i.L2EpcId == 0 {
+		if i.L3EpcId > 0 {
+			id = uint16(i.L3EpcId)
+		} else if i.L3EpcId == -1 {
+			id = math.MaxUint16
+		}
+	}
+	return id
 }
 
 func IsOriginalTtl(ttl uint8) bool {

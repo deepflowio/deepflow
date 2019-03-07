@@ -753,7 +753,7 @@ func TestFastpathEndpointStore(t *testing.T) {
 	key := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 0)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 63, l2EndBool[1], l2EndBool[0])
 	policy.LookupAllByKey(key)
-	store, _ := policy.policyLabeler.GetPolicyByFastPath(key)
+	store, _ := policy.operator.GetPolicyByFastPath(key)
 	if !checkEndpointStore(t, store) {
 		t.Error("TestFastpathEndpointStore Check Failed!")
 	}

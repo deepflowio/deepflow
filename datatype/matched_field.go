@@ -63,6 +63,13 @@ func (f *MatchedField) Set(flag MatchFlags, value uint16) {
 	f.fields[index] |= (uint64(value) << offset)
 }
 
+func (f *MatchedField) SetMask(flag MatchFlags, value uint16) {
+	if value != 0 {
+		value = uint16(fieldMask[flag])
+	}
+	f.Set(flag, value)
+}
+
 func (f *MatchedField) SetBits(whichs ...int) {
 	f.fields[0] = 0
 	f.fields[1] = 0
@@ -74,11 +81,11 @@ func (f *MatchedField) SetBits(whichs ...int) {
 	}
 }
 
-func (f *MatchedField) GetTableIndex(maskVector *MatchedField) uint16 {
+func (f *MatchedField) GetTableIndex(maskVector *MatchedField, min, max int) uint16 {
 	result := f.And(maskVector)
 	index := uint16(0)
 	offset := uint16(0)
-	for i := 0; i < MATCHED_FIELD_BITS_LEN; i++ {
+	for i := min; i <= max; i++ {
 		if !result.IsBitZero(i) {
 			index |= 1 << offset
 		}

@@ -1,8 +1,8 @@
 package policy
 
 import (
+	"math"
 	"sort"
-	"sync/atomic"
 
 	logging "github.com/op/go-logging"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -50,9 +50,46 @@ const (
 	MAX_FASTPATH_MAP_LEN = 1 << 20
 )
 
+type TableID int
+
+const (
+	NORMAL TableID = iota
+	DDBS
+)
+
+type TableCreator func(queueCount int, mapSize uint32, fastPathDisable bool) TableOperator
+
+var tableCreator = [...]TableCreator{
+	NORMAL: NewPolicyLabeler,
+	DDBS:   NewDdbs,
+}
+
+type TableOperator interface {
+	GetHitStatus() (uint64, uint64)
+	GetCounter() interface{}
+
+	AddAcl(acl *Acl)
+	DelAcl(id int)
+	GetAcl() []*Acl
+	FlushAcls()
+	UpdateAcls(data []*Acl)
+	GenerateIpNetmaskMapFromIpGroupData(data []*IpGroupData)
+	GenerateIpNetmaskMapFromPlatformData(data []*PlatformData)
+	GenerateGroupIdMapByIpGroupData(data []*IpGroupData)
+	GenerateGroupIdMapByPlatformData(data []*PlatformData)
+
+	SetCloudPlatform(cloudPlatformLabeler *CloudPlatformLabeler)
+
+	GetPolicyByFirstPath(*EndpointData, *LookupKey) (*EndpointStore, *PolicyData)
+	GetPolicyByFastPath(key *LookupKey) (*EndpointStore, *PolicyData)
+
+	// test
+	generateGroupRelation(acls []*Acl, to *[TAP_MAX][math.MaxUint16 + 1][]uint16, from *[TAP_MAX][math.MaxUint16 + 1]uint16)
+}
+
 type PolicyTable struct {
 	cloudPlatformLabeler *CloudPlatformLabeler
-	policyLabeler        *PolicyLabeler
+	operator             TableOperator
 
 	queueCount int
 }
@@ -85,7 +122,7 @@ func getAvailableMapSize(queueCount int, mapSize uint32) uint32 {
 	return availableMapSize
 }
 
-func NewPolicyTable(actionFlags ActionFlag, queueCount int, mapSize uint32, fastPathDisable bool) *PolicyTable { // 传入Protobuf结构体指针
+func NewPolicyTable(actionFlags ActionFlag, queueCount int, mapSize uint32, fastPathDisable bool, ids ...TableID) *PolicyTable { // 传入Protobuf结构体指针
 	// 使用actionFlags过滤，例如
 	// Trident仅关心PACKET_BROKERING和PACKET_CAPTURING，
 	// 那么就不要将EPC等云平台信息进行计算。
@@ -93,27 +130,32 @@ func NewPolicyTable(actionFlags ActionFlag, queueCount int, mapSize uint32, fast
 	availableMapSize := getAvailableMapSize(queueCount, mapSize)
 	policyTable := &PolicyTable{
 		cloudPlatformLabeler: NewCloudPlatformLabeler(queueCount, availableMapSize),
-		policyLabeler:        NewPolicyLabeler(queueCount, availableMapSize, fastPathDisable),
 		queueCount:           queueCount,
 	}
-	policyTable.policyLabeler.cloudPlatformLabeler = policyTable.cloudPlatformLabeler
+
+	id := NORMAL
+	if len(ids) > 0 {
+		id = ids[0]
+	}
+	policyTable.operator = tableCreator[id](queueCount, mapSize, fastPathDisable)
+	policyTable.operator.SetCloudPlatform(policyTable.cloudPlatformLabeler)
 	return policyTable
 }
 
 func (t *PolicyTable) GetHitStatus() (uint64, uint64) {
-	return atomic.LoadUint64(&t.policyLabeler.FirstPathHit), atomic.LoadUint64(&t.policyLabeler.FastPathHit)
+	return t.operator.GetHitStatus()
 }
 
 func (t *PolicyTable) AddAcl(acl *Acl) {
-	t.policyLabeler.AddAcl(acl)
+	t.operator.AddAcl(acl)
 }
 
 func (t *PolicyTable) DelAcl(id int) {
-	t.policyLabeler.DelAcl(id)
+	t.operator.DelAcl(id)
 }
 
 func (t *PolicyTable) GetAcl() []*Acl {
-	return t.policyLabeler.RawAcls
+	return t.operator.GetAcl()
 }
 
 func (acls SortedAcls) Len() int {
@@ -151,37 +193,7 @@ func SortIpGroupsById(ipGroups []*IpGroupData) []*IpGroupData {
 }
 
 func (t *PolicyTable) GetCounter() interface{} {
-	counter := &PolicyCounter{
-		MacTable:   uint32(len(t.cloudPlatformLabeler.macTable.macMap)),
-		EpcIpTable: uint32(len(t.cloudPlatformLabeler.epcIpTable.epcIpMap)),
-	}
-	for i := MIN_MASK_LEN; i < MAX_MASK_LEN; i++ {
-		counter.IpTable += uint32(len(t.cloudPlatformLabeler.ipTables[i].ipMap))
-	}
-	for i := TAP_MIN; i < TAP_MAX; i++ {
-		counter.ArpTable += uint32(len(t.cloudPlatformLabeler.arpTable[i]))
-	}
-
-	counter.Acl += uint32(len(t.policyLabeler.RawAcls))
-	counter.FirstHit = atomic.SwapUint64(&t.policyLabeler.FirstPathHitTick, 0)
-	counter.FastHit = atomic.SwapUint64(&t.policyLabeler.FastPathHitTick, 0)
-	counter.AclHitMax = atomic.SwapUint32(&t.policyLabeler.AclHitMax, 0)
-	counter.FastPathMacCount = atomic.LoadUint32(&t.policyLabeler.FastPathMacCount)
-	counter.FastPathPolicyCount = atomic.LoadUint32(&t.policyLabeler.FastPathPolicyCount)
-	counter.UnmatchedPacketCount = atomic.LoadUint64(&t.policyLabeler.UnmatchedPacketCount)
-	for i := 0; i < t.queueCount; i++ {
-		for j := TAP_MIN; j < TAP_MAX; j++ {
-			maps := t.policyLabeler.FastPolicyMaps[i][j]
-			mapsMini := t.policyLabeler.FastPolicyMapsMini[i][j]
-			if maps != nil {
-				counter.FastPath += uint32(maps.Len())
-			}
-			if mapsMini != nil {
-				counter.FastPath += uint32(mapsMini.Len())
-			}
-		}
-	}
-	return counter
+	return t.operator.GetCounter()
 }
 
 // River用于PACKET_BROKERING，Stream用于PACKET_CAPTURING
@@ -196,10 +208,10 @@ func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData
 	if !key.Tap.CheckTapType(key.Tap) {
 		return INVALID_ENDPOINT_DATA, INVALID_POLICY_DATA
 	}
-	store, policy := t.policyLabeler.GetPolicyByFastPath(key)
+	store, policy := t.operator.GetPolicyByFastPath(key)
 	if policy == nil {
 		endpoint := t.cloudPlatformLabeler.GetEndpointData(key)
-		store, policy = t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+		store, policy = t.operator.GetPolicyByFirstPath(endpoint, key)
 	}
 	endpoint := store.Endpoints
 	if key.HasFeatureFlag(NPM) {
@@ -210,22 +222,22 @@ func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData
 
 func (t *PolicyTable) UpdateInterfaceData(data []*PlatformData) {
 	t.cloudPlatformLabeler.UpdateInterfaceTable(data)
-	t.policyLabeler.GenerateIpNetmaskMapFromPlatformData(data)
-	t.policyLabeler.generateGroupIdMapByPlatformData(data)
+	t.operator.GenerateIpNetmaskMapFromPlatformData(data)
+	t.operator.GenerateGroupIdMapByPlatformData(data)
 }
 
 func (t *PolicyTable) UpdateIpGroupData(data []*IpGroupData) {
 	t.cloudPlatformLabeler.UpdateGroupTree(data)
-	t.policyLabeler.GenerateIpNetmaskMapFromIpGroupData(data)
-	t.policyLabeler.generateGroupIdMapByIpGroupData(data)
+	t.operator.GenerateIpNetmaskMapFromIpGroupData(data)
+	t.operator.GenerateGroupIdMapByIpGroupData(data)
 }
 
 func (t *PolicyTable) UpdateAclData(data []*Acl) {
-	t.policyLabeler.UpdateAcls(data)
+	t.operator.UpdateAcls(data)
 }
 
 func (t *PolicyTable) EnableAclData() {
-	t.policyLabeler.FlushAcls()
+	t.operator.FlushAcls()
 }
 
 func (t *PolicyTable) GetEndpointInfo(mac uint64, ip uint32, inPort uint32) *EndpointInfo {
@@ -240,7 +252,7 @@ func (t *PolicyTable) GetEndpointInfo(mac uint64, ip uint32, inPort uint32) *End
 }
 
 func (t *PolicyTable) GetPolicyByFastPath(key *LookupKey) (*EndpointData, *PolicyData) {
-	endpoint, policy := t.policyLabeler.GetPolicyByFastPath(key)
+	endpoint, policy := t.operator.GetPolicyByFastPath(key)
 	if endpoint == nil {
 		return INVALID_ENDPOINT_DATA, INVALID_POLICY_DATA
 	}
@@ -249,6 +261,6 @@ func (t *PolicyTable) GetPolicyByFastPath(key *LookupKey) (*EndpointData, *Polic
 
 func (t *PolicyTable) GetPolicyByFirstPath(key *LookupKey) (*EndpointData, *PolicyData) {
 	endpoint := t.cloudPlatformLabeler.GetEndpointData(key)
-	store, policy := t.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+	store, policy := t.operator.GetPolicyByFirstPath(endpoint, key)
 	return store.Endpoints, policy
 }
