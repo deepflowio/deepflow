@@ -7,3 +7,7 @@ type GeoInfo struct {
 	Region  uint8
 	ISP     uint8
 }
+
+type GeoTree interface {
+	Query(ip uint32) *GeoInfo
+}
