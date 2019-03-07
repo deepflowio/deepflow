@@ -213,10 +213,10 @@ func (l *CloudPlatformLabeler) CheckAndUpdateArpTable(key *LookupKey, hash MacIp
 	if timestamp-l.lastArpSwapTime >= ARP_VALID_TIME {
 		for i := TAP_MIN; i < TAP_MAX; i++ {
 			table := make(map[MacIpKey]bool)
-			l.arpMutex[key.Tap].Lock()
+			l.arpMutex[i].Lock()
 			l.arpTable[i] = l.tempArpTable[i]
 			l.tempArpTable[i] = table
-			l.arpMutex[key.Tap].Unlock()
+			l.arpMutex[i].Unlock()
 		}
 		l.lastArpSwapTime = timestamp
 	}
