@@ -123,7 +123,7 @@ func Start(configPath string) (closers []io.Closer) {
 		closer, err := launcher.StartWith(tapId, iface)
 		if err != nil {
 			log.Error(err)
-			return
+			os.Exit(1)
 		}
 		closers = append(closers, closer)
 	}
