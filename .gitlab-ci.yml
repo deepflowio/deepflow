@@ -1,9 +1,3 @@
-before_script:
-  - export GO_PROJECT_ROOT="$(go env GOPATH)/src/gitlab.x.lan/yunshan/droplet"
-  - mkdir -p $(dirname $GO_PROJECT_ROOT)
-  - ln -snf $(pwd) $GO_PROJECT_ROOT
-  - cd $GO_PROJECT_ROOT
-
 stages:
   - verify
   - package
@@ -11,7 +5,7 @@ stages:
 verify:
   stage: verify
   script:
-    - make clean vendor
+    - go mod tidy
     - go fmt ./...; [[ -z $(git status -s --ignore-submodule) ]] || exit -1
     - make
     - make test

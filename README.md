@@ -80,31 +80,9 @@ import (
 )
 ```
 
-Golang的依赖并没有包含版本的描述，是隐式地通过GOPATH下所依赖工程当前签出的代码版本来决定的，
-这想必不是我们所希望的结果，因此引入额外的版本管理组件很有必要
+当需要更新某个依赖时，使用`go get -u domain.suffix/group/project@version`即可
 
-虽然目前droplet使用的Godep来完成版本管理，但是如今Golang官方提供了dep以供版本管理，因此
-droplet应当使用dep
-
-当需要下载droplet所需的依赖时，通过`make vendor`命令完成
-
-当需要更新某个依赖时，通过`dep ensure -update gitlab.x.lan/yunshan/droplet-libs`
-
-当然有时我们需要测试某个更新了的依赖，但是继承的依赖关系可能会造成依赖冲突，从而导致依赖解析失败。
-在这样的情形下我们可以强制覆盖依赖版本，这里以gopacket为例：
-1. 原本的依赖描述如下：
-   ```
-   [[constraint]]
-   name = "github.com/google/gopacket"
-   version = "v1.1.15"
-   ```
-2. 将constraint修改为override：
-   ```
-   [[override]]
-   name = "github.com/google/gopacket"
-   branch = "master"
-   ```
-3. 执行`dep ensure -update github.com/google/gopacket`
+查看依赖关系可以使用`go mod graph`
 
 编译打包步骤
 ------------
