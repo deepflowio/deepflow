@@ -84,7 +84,7 @@ func TestBitZero(t *testing.T) {
 func TestTableIndex(t *testing.T) {
 	matched := newMatchedField(1, 1, 1, 1, 1, 1, 1)
 	maskVector := newMatchedField(1, 0, 1, 0, 0, 0, 0)
-	index := matched.GetTableIndex(&maskVector)
+	index := matched.GetTableIndex(&maskVector, 64, 78)
 	if index != 0x3 {
 		t.Errorf("TestTableIndex Error. %s\n", matched)
 		t.Error("Expect index: 0x3.")
@@ -93,7 +93,7 @@ func TestTableIndex(t *testing.T) {
 
 	matched = newMatchedField(1, 0, 1, 1, 1, 1, 1)
 	maskVector = newMatchedField(1, 1, 1, 0, 0, 0, 0)
-	index = matched.GetTableIndex(&maskVector)
+	index = matched.GetTableIndex(&maskVector, 64, 78)
 	if index != 0x5 {
 		t.Errorf("TestTableIndex Error. %s\n", matched)
 		t.Error("Expect index: 0x5.")
@@ -102,7 +102,7 @@ func TestTableIndex(t *testing.T) {
 
 	matched = newMatchedField(1, 1, 1, 1, 1, 1, 1)
 	maskVector = newMatchedField(0, 0, 0, 0, 1, 0, 1)
-	index = matched.GetTableIndex(&maskVector)
+	index = matched.GetTableIndex(&maskVector, 0, 32)
 	if index != 0x3 {
 		t.Errorf("TestTableIndex Error. %s\n", matched)
 		t.Error("Expect index: 0x3.")
@@ -111,7 +111,7 @@ func TestTableIndex(t *testing.T) {
 
 	matched = newMatchedField(1, 1, 1, 1, 1, 0, 1)
 	maskVector = newMatchedField(0, 0, 0, 0, 1, 1, 1)
-	index = matched.GetTableIndex(&maskVector)
+	index = matched.GetTableIndex(&maskVector, 0, 32)
 	if index != 0x5 {
 		t.Errorf("TestTableIndex Error. %s\n", matched)
 		t.Error("Expect index: 0x5.")

@@ -364,8 +364,8 @@ func generatePlatformData(policy *PolicyTable) {
 }
 
 // 生成特定平台和资源组信息
-func generatePolicyTable() *PolicyTable {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+func generatePolicyTable(ids ...TableID) *PolicyTable {
+	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false, ids...)
 	datas := make([]*PlatformData, 0, 2)
 	ipGroups := make([]*IpGroupData, 0, 3)
 
@@ -442,7 +442,7 @@ func modifyEndpointDataL3End(table *PolicyTable, key *LookupKey, l3End0, l3End1 
 }
 
 func getPolicyByFastPath(table *PolicyTable, key *LookupKey) (*EndpointData, *PolicyData) {
-	store, policy := table.policyLabeler.GetPolicyByFastPath(key)
+	store, policy := table.operator.GetPolicyByFastPath(key)
 	if store != nil {
 		endpoint := table.cloudPlatformLabeler.UpdateEndpointData(store, key)
 		return endpoint, policy
@@ -451,7 +451,7 @@ func getPolicyByFastPath(table *PolicyTable, key *LookupKey) (*EndpointData, *Po
 }
 
 func getPolicyByFirstPath(table *PolicyTable, endpoint *EndpointData, key *LookupKey) *PolicyData {
-	_, policy := table.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+	_, policy := table.operator.GetPolicyByFirstPath(endpoint, key)
 	return policy
 }
 
@@ -1955,7 +1955,7 @@ func TestGroupRelation(t *testing.T) {
 	relation1 := []uint16{10, 11, 12, 13, 14}
 	relation2 := []uint16{15, 16, 17, 18, 19}
 	relation3 := []uint16{20, 21, 22, 23, 24}
-	table.policyLabeler.generateGroupRelation(acls, to, from)
+	table.operator.generateGroupRelation(acls, to, from)
 	if !reflect.DeepEqual(relation1, to[acl1.Type][1]) {
 		t.Log("Result:", to[acl1.Type][1], "\n")
 		t.Log("Expect:", relation1, "\n")
@@ -1979,7 +1979,7 @@ func TestGroupRelation(t *testing.T) {
 
 	relation1 = []uint16{10, 40}
 	relation2 = []uint16{20, 30}
-	table.policyLabeler.generateGroupRelation(acls, to, from)
+	table.operator.generateGroupRelation(acls, to, from)
 	if !reflect.DeepEqual(relation1, to[acl1.Type][1]) {
 		t.Log("Result:", to[acl1.Type][1], "\n")
 		t.Log("Expect:", relation1, "\n")
@@ -1999,7 +1999,7 @@ func TestGroupRelation(t *testing.T) {
 
 	relation1 = []uint16{10, 20}
 	relation2 = []uint16{30, 40}
-	table.policyLabeler.generateGroupRelation(acls, to, from)
+	table.operator.generateGroupRelation(acls, to, from)
 	if !reflect.DeepEqual(relation1, to[acl1.Type][1]) {
 		t.Log("Result:", to[acl1.Type][1], "\n")
 		t.Log("Expect:", relation1, "\n")
@@ -2026,7 +2026,7 @@ func BenchmarkNpbFirstPath(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		table.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+		table.operator.GetPolicyByFirstPath(endpoint, key)
 	}
 
 }
@@ -2044,11 +2044,11 @@ func BenchmarkNpbFastPath(b *testing.B) {
 	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1023, 1000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
 	endpoint := getEndpointData(table, key)
-	table.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+	table.operator.GetPolicyByFirstPath(endpoint, key)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		table.policyLabeler.GetPolicyByFastPath(key)
+		table.operator.GetPolicyByFastPath(key)
 	}
 }
 
@@ -2104,6 +2104,22 @@ func BenchmarkNpbDedup(b *testing.B) {
 	}
 }
 
+func BenchmarkEndpoint(b *testing.B) {
+	acls := []*Acl{}
+	// 创建 policyTable
+	table := generatePolicyTable()
+	// 构建acl action  1->2 tcp 8000
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 8000, vlanAny)
+	acls = append(acls, acl)
+	table.UpdateAcls(acls)
+	// 构建查询1-key  1:0->2:8000 tcp
+	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 8000)
+	for i := 0; i < b.N; i++ {
+		getEndpointData(table, key)
+	}
+}
+
 func BenchmarkFirstPath(b *testing.B) {
 	acls := []*Acl{}
 	// 创建 policyTable
@@ -2119,7 +2135,7 @@ func BenchmarkFirstPath(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		table.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+		table.operator.GetPolicyByFirstPath(endpoint, key)
 	}
 }
 
@@ -2135,11 +2151,11 @@ func BenchmarkFastPath(b *testing.B) {
 	// 构建查询1-key  1:0->2:8000 tcp
 	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 8000)
 	endpoint := getEndpointData(table, key)
-	table.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+	table.operator.GetPolicyByFirstPath(endpoint, key)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		table.policyLabeler.GetPolicyByFastPath(key)
+		table.operator.GetPolicyByFastPath(key)
 	}
 }
 
@@ -2183,7 +2199,7 @@ func BenchmarkFirstPathWithMultiGroup(b *testing.B) {
 	endpoint.DstInfo.GroupIds = acl.DstGroups
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		table.policyLabeler.GetPolicyByFirstPath(endpoint, key)
+		table.operator.GetPolicyByFirstPath(endpoint, key)
 	}
 }
 

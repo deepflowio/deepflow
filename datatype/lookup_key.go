@@ -25,7 +25,7 @@ type LookupKey struct {
 	SrcGroupIds, DstGroupIds        []uint16 //资源组的再分组ID, 没有重复用于策略匹配
 	SrcAllGroupIds, DstAllGroupIds  []uint16 //资源组的再分组ID，有重复用于aclgid bitmap生成
 	FeatureFlag                     FeatureFlags
-	forwardMatched, backwardMatched []MatchedField
+	ForwardMatched, BackwardMatched []MatchedField
 }
 
 func (k *LookupKey) generateMatchedField(direction DirectionType) []MatchedField {
@@ -54,8 +54,8 @@ func (k *LookupKey) generateMatchedField(direction DirectionType) []MatchedField
 }
 
 func (k *LookupKey) GenerateMatchedField() {
-	k.forwardMatched = k.generateMatchedField(FORWARD)
-	k.backwardMatched = k.generateMatchedField(BACKWARD)
+	k.ForwardMatched = k.generateMatchedField(FORWARD)
+	k.BackwardMatched = k.generateMatchedField(BACKWARD)
 }
 
 func (k *LookupKey) String() string {
