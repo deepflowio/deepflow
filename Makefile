@@ -1,43 +1,45 @@
-GOPATH = $(shell go env GOPATH)
-PROJECT_ROOT = ${GOPATH}/src/gitlab.x.lan/yunshan/droplet
+MESSAGE = gitlab.x.lan/yunshan/message
+DROPLET_LIBS = gitlab.x.lan/yunshan/droplet-libs
 
 REV_COUNT = $(shell git rev-list --count HEAD)
 COMMIT_DATE = $(shell git show -s --format=%cd --date=short HEAD)
 REVISION = $(shell git rev-parse HEAD)
 FLAGS = -ldflags "-X main.RevCount=${REV_COUNT} -X main.Revision=${REVISION} -X main.CommitDate=${COMMIT_DATE}"
 
+.PHONY: all
 all: droplet droplet-ctl
 
 vendor: patch/001-fix-afpacket-dirty-block.patch
-	mkdir -p $(dir ${PROJECT_ROOT})
-	[ -d ${PROJECT_ROOT} ] || ln -snf ${CURDIR} ${PROJECT_ROOT}
-	[ -f ${GOPATH}/bin/dep ] || curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-	(cd ${PROJECT_ROOT}; dep ensure)
-	go generate ./vendor/gitlab.x.lan/yunshan/droplet-libs/...
-	cat $^ | patch -d ./vendor/github.com/google/gopacket -p1
+	go mod tidy && go mod vendor
+	test -n "$(shell go list -e -f '{{.Dir}}' ${MESSAGE})"
+	test -n "$(shell go list -e -f '{{.Dir}}' ${DROPLET_LIBS})"
+	cp -r $(shell go list -e -f '{{.Dir}}' ${MESSAGE})/* vendor/${MESSAGE}/
+	cp -r $(shell go list -e -f '{{.Dir}}' ${DROPLET_LIBS})/* vendor/${DROPLET_LIBS}/
+	find vendor -type d -exec chmod +w {} \;
+	cd vendor/${MESSAGE} && go generate ./...
+	cd vendor/${DROPLET_LIBS} && go generate ./...
+	cat $^ | patch -sN -d vendor/github.com/google/gopacket -p1
 
-PROTOBUF_FILES = $(addprefix vendor/gitlab.x.lan/yunshan/message/,dfi/dfi.pb.go zero/zero.pb.go trident/trident.pb.go)
-${PROTOBUF_FILES}: vendor
-	go generate ./vendor/gitlab.x.lan/yunshan/message/...
+.PHONY: test
+test: vendor
+	go test -mod vendor -short ./... -timeout 5s -coverprofile .test-coverage.txt
 
-deps: vendor ${PROTOBUF_FILES}
+.PHONY: bench
+bench: vendor
+	go test -mod vendor -bench=. ./...
 
-test: deps
-	go test -short ./... -timeout 5s -coverprofile .test-coverage.txt
+.PHONY: debug
+debug: vendor
+	go build -mod vendor ${FLAGS} -gcflags 'all=-N -l' -o bin/droplet cmd/droplet/main.go
 
-bench: deps
-	go test -bench=. ./...
+.PHONY: droplet
+droplet: vendor
+	go build -mod vendor ${FLAGS} -o bin/droplet cmd/droplet/main.go
 
-debug: deps
-	go build ${FLAGS} -gcflags 'all=-N -l' -o bin/droplet cmd/droplet/main.go
+.PHONY: droplet-ctl
+droplet-ctl: vendor
+	go build -mod vendor ${FLAGS} -o bin/droplet-ctl cmd/droplet-ctl/main.go
 
-droplet: deps
-	go build ${FLAGS} -o bin/droplet cmd/droplet/main.go
-
-droplet-ctl: deps
-	go build ${FLAGS} -o bin/droplet-ctl cmd/droplet-ctl/main.go
-
+.PHONY: clean
 clean:
 	git clean -dfx
-
-.PHONY: droplet droplet-ctl deps test bench clean
