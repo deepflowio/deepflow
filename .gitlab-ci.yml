@@ -3,4 +3,5 @@ stages:
 
 verify:
   stage: verify
-  script: make verify
+  script:
+    - make verify
