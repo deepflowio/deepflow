@@ -112,13 +112,11 @@ func collectBatchPoints() client.BatchPoints {
 	timestamp := time.Now()
 	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{Precision: "s"})
 	lock.Lock()
+	statSources.Remove(func(x interface{}) bool {
+		return x.(*StatSource).countable.Closed()
+	})
 	for it := statSources.Iterator(); !it.Empty(); it.Next() {
 		statSource := it.Value().(*StatSource)
-		for statSource.countable.Closed() {
-			statSources.Remove(&it)
-			statSource = it.Value().(*StatSource)
-		}
-
 		max := func(x, y time.Duration) time.Duration {
 			if x > y {
 				return x
