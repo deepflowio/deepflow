@@ -1,7 +1,7 @@
 MESSAGE = gitlab.x.lan/yunshan/message
 
 vendor:
-	go mod download && go mod vendor
+	go mod tidy && go mod download && go mod vendor
 	cp -r $(shell go list -e -f '{{.Dir}}' ${MESSAGE})/* vendor/${MESSAGE}/
 	make -C vendor/${MESSAGE}
 	go generate ./geo/...
