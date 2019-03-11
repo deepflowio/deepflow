@@ -65,25 +65,21 @@ func (q *LinkedList) PopFront() interface{} {
 	return v
 }
 
-func (q *LinkedList) Remove(it *Iterator) interface{} {
-	if it.head != q.head || it.current == nil {
-		return nil
+func (q *LinkedList) Remove(filter func(interface{}) bool) {
+	for e, prev := q.head, (*Element)(nil); e != nil; {
+		if !filter(e.value) {
+			prev, e = e, e.next
+			continue
+		}
+		toRelease := e
+		if e == q.head {
+			q.head = e.next
+		} else {
+			prev.next = e.next
+		}
+		e = e.next
+		releaseElement(toRelease)
 	}
-	if q.head == it.current {
-		it.Next()
-		it.head = it.current
-		return q.PopFront()
-	}
-	current := it.current
-	it.prev.next = current.next
-	v := current.value
-	if q.tail == current {
-		q.tail = it.prev
-	}
-	q.size--
-	it.Next()
-	releaseElement(current)
-	return v
 }
 
 func (q *LinkedList) Len() int {
@@ -91,17 +87,15 @@ func (q *LinkedList) Len() int {
 }
 
 func (q *LinkedList) Iterator() Iterator {
-	return Iterator{q.head, q.head, nil}
+	return Iterator{q.head}
 }
 
 type Iterator struct {
-	head    *Element
 	current *Element
-	prev    *Element
 }
 
 func (it *Iterator) Next() {
-	it.prev, it.current = it.current, it.current.next
+	it.current = it.current.next
 }
 
 func (it *Iterator) Empty() bool {
