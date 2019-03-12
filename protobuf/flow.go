@@ -78,6 +78,10 @@ func MarshalFlow(f *datatype.TaggedFlow, bytes *utils.ByteBuffer) error {
 		GroupIds_1:     f.GroupIDs1,
 		AclId:          proto.Uint32(uint32(f.PolicyData.ACLID)),
 		AclGids:        getACLGIDs(f),
+		// Geo Info
+		Country: proto.Uint32(uint32(f.Country)),
+		Region:  proto.Uint32(uint32(f.Region)),
+		Isp:     proto.Uint32(uint32(f.ISP)),
 	}
 	// TCP Perf Data
 	if f.TcpPerfStats != nil {
