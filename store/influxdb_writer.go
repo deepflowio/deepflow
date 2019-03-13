@@ -44,8 +44,10 @@ type InfluxdbPoint struct {
 }
 
 type Counter struct {
-	WriteSuccessCount int64 `statsd:"write-success-count"`
-	WriteFailedCount  int64 `statsd:"write-failed-count"`
+	WriteSuccessCount1 int64 `statsd:"write-success-count1"`
+	WriteFailedCount1  int64 `statsd:"write-failed-count1"`
+	WriteSuccessCount2 int64 `statsd:"write-success-count2"`
+	WriteFailedCount2  int64 `statsd:"write-failed-count2"`
 }
 
 type PointCache struct {
@@ -55,44 +57,55 @@ type PointCache struct {
 }
 
 type WriterInfo struct {
-	httpClient client.Client
-	writeTime  int64
-	pointCache map[string]*PointCache
-	counter    *Counter
+	httpClients []client.Client
+	writeTime   int64
+	pointCache  map[string]*PointCache
+	counter     *Counter
 	stats.Closable
 }
 
+type DBCreateCtl struct {
+	HttpClient client.Client
+	ExistDBs   map[string]bool
+	sync.RWMutex
+}
+
 type InfluxdbWriter struct {
-	HttpClient       client.Client
+	DBCreateCtls     []DBCreateCtl
 	DataQueues       queue.FixedMultiQueue
 	QueueCount       int
 	QueueWriterInfos []*WriterInfo
 
 	BatchSize    int
 	FlushTimeout int64
-	ExistDBs     map[string]bool
-	sync.RWMutex
 }
 
-func NewInfluxdbWriter(httpAddr string, queueCount int) (*InfluxdbWriter, error) {
-	httpClient, err := client.NewHTTPClient(client.HTTPConfig{Addr: httpAddr})
-	if err != nil {
-		log.Error("create influxdb http client failed:", err)
-		return nil, err
+func NewInfluxdbWriter(httpAddrs []string, queueCount int) (*InfluxdbWriter, error) {
+	DBCreateCtls := make([]DBCreateCtl, 0)
+	for _, httpAddr := range httpAddrs {
+		httpClient, err := client.NewHTTPClient(client.HTTPConfig{Addr: httpAddr})
+		if err != nil {
+			log.Error("create influxdb http client failed:", err)
+			return nil, err
+		}
+
+		if _, _, err = httpClient.Ping(0); err != nil {
+			log.Errorf("http connect to influxdb(%s) failed: %s", httpAddr, err)
+		}
+		dbCtl := DBCreateCtl{
+			HttpClient: httpClient,
+			ExistDBs:   getCurrentDBs(httpClient),
+		}
+		DBCreateCtls = append(DBCreateCtls, dbCtl)
 	}
 
-	if _, _, err = httpClient.Ping(0); err != nil {
-		log.Errorf("http connect to influxdb(%s) failed: %s", httpAddr, err)
-	}
-
-	queueWriterInfos, err := newWriterInfos(httpAddr, queueCount)
+	queueWriterInfos, err := newWriterInfos(httpAddrs, queueCount)
 	if err != nil {
 		log.Error("create queue writer infos failed:", err)
 		return nil, err
 	}
 
 	return &InfluxdbWriter{
-		HttpClient: httpClient,
 		DataQueues: queue.NewOverwriteQueues(
 			DEFAULT_QUEUE_NAME, queue.HashKey(queueCount), DEFAULT_QUEUE_SIZE,
 			queue.OptionFlushIndicator(DEFAULT_FLUSH_TIMEOUT),
@@ -102,7 +115,7 @@ func NewInfluxdbWriter(httpAddr string, queueCount int) (*InfluxdbWriter, error)
 
 		FlushTimeout: int64(DEFAULT_FLUSH_TIMEOUT),
 		BatchSize:    DEFAULT_BATCH_SIZE,
-		ExistDBs:     getCurrentDBs(httpClient),
+		DBCreateCtls: DBCreateCtls,
 	}, nil
 }
 
@@ -121,8 +134,8 @@ func (w *InfluxdbWriter) SetBatchTimeout(timeout int64) {
 }
 
 // 高性能接口，需要用户实现InfluxdbItem接口
-func (w *InfluxdbWriter) Put(queueID int, item InfluxdbItem) {
-	w.DataQueues.Put(queue.HashKey(queueID), item)
+func (w *InfluxdbWriter) Put(queueID int, item ...interface{}) {
+	w.DataQueues.Put(queue.HashKey(queueID), item...)
 }
 
 // 普通接口，性能较差，易用
@@ -191,22 +204,27 @@ func (p *InfluxdbPoint) GetDBName() string {
 func (p *InfluxdbPoint) Release() {
 }
 
-func newWriterInfos(httpAddr string, count int) ([]*WriterInfo, error) {
+func newWriterInfos(httpAddrs []string, count int) ([]*WriterInfo, error) {
 	ws := make([]*WriterInfo, count)
 	for i := 0; i < count; i++ {
-		httpClient, err := client.NewHTTPClient(client.HTTPConfig{Addr: httpAddr})
-		if err != nil {
-			log.Error("create influxdb http client %d failed:", i, err)
-			return nil, err
-		}
-		if _, _, err = httpClient.Ping(0); err != nil {
-			log.Errorf("http %d connect to influxdb(%s) failed: %s", i, httpAddr, err)
+		httpClients := make([]client.Client, 0)
+		for _, httpAddr := range httpAddrs {
+			httpClient, err := client.NewHTTPClient(client.HTTPConfig{Addr: httpAddr})
+			if err != nil {
+				log.Error("create influxdb http client %d failed:", i, err)
+				return nil, err
+			}
+			if _, _, err = httpClient.Ping(0); err != nil {
+				log.Errorf("http %d connect to influxdb(%s) failed: %s", i, httpAddr, err)
+			}
+			httpClients = append(httpClients, httpClient)
+			log.Infof("new influxdb http client %s", httpAddr)
 		}
 		ws[i] = &WriterInfo{
-			httpClient: httpClient,
-			writeTime:  time.Now().Unix(),
-			pointCache: make(map[string]*PointCache),
-			counter:    &Counter{},
+			httpClients: httpClients,
+			writeTime:   time.Now().Unix(),
+			pointCache:  make(map[string]*PointCache),
+			counter:     &Counter{},
 		}
 	}
 	return ws, nil
@@ -344,27 +362,43 @@ func createDB(httpClient client.Client, db string) bool {
 
 func (w *InfluxdbWriter) writeInfluxdb(queueID int, bp client.BatchPoints) bool {
 	w.QueueWriterInfos[queueID].writeTime = time.Now().Unix()
-	httpClient := w.QueueWriterInfos[queueID].httpClient
+	ret := true
+	httpClients := w.QueueWriterInfos[queueID].httpClients
 	db := bp.Database()
-	w.RLock()
-	_, ok := w.ExistDBs[db]
-	w.RUnlock()
-	if !ok {
-		if !createDB(httpClient, db) {
-			w.QueueWriterInfos[queueID].counter.WriteFailedCount += int64(len(bp.Points()))
-			return false
+
+	for i, httpClient := range httpClients {
+		var writeSuccCount, writeFailedCount *int64
+		if i == 0 {
+			writeFailedCount = &w.QueueWriterInfos[queueID].counter.WriteFailedCount1
+			writeSuccCount = &w.QueueWriterInfos[queueID].counter.WriteSuccessCount1
+		} else {
+			writeFailedCount = &w.QueueWriterInfos[queueID].counter.WriteFailedCount2
+			writeSuccCount = &w.QueueWriterInfos[queueID].counter.WriteSuccessCount2
 		}
-		w.Lock()
-		w.ExistDBs[db] = true
-		w.Unlock()
+
+		w.DBCreateCtls[i].RLock()
+		_, ok := w.DBCreateCtls[i].ExistDBs[db]
+		w.DBCreateCtls[i].RUnlock()
+
+		if !ok {
+			if !createDB(httpClient, db) {
+				*writeFailedCount += int64(len(bp.Points()))
+				ret = false
+				continue
+			}
+			w.DBCreateCtls[i].Lock()
+			w.DBCreateCtls[i].ExistDBs[db] = true
+			w.DBCreateCtls[i].Unlock()
+		}
+
+		if err := httpClient.Write(bp); err != nil {
+			*writeFailedCount += int64(len(bp.Points()))
+			log.Errorf("httpclient index(%d) db(%s) write batch point failed: %s", i, db, err)
+			ret = false
+			continue
+		}
+		*writeSuccCount += int64(len(bp.Points()))
 	}
 
-	if err := httpClient.Write(bp); err != nil {
-		w.QueueWriterInfos[queueID].counter.WriteFailedCount += int64(len(bp.Points()))
-		log.Errorf("db(%s) write batch point failed: %s", db, err)
-		return false
-	}
-	w.QueueWriterInfos[queueID].counter.WriteSuccessCount += int64(len(bp.Points()))
-
-	return true
+	return ret
 }
