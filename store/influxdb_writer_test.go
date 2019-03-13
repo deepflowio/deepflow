@@ -107,7 +107,7 @@ func TestInfluxdbItem(t *testing.T) {
 
 	queueCount := 3
 
-	iw, _ := NewInfluxdbWriter(INFLUXDB_HTTP_ADDR, queueCount)
+	iw, _ := NewInfluxdbWriter([]string{INFLUXDB_HTTP_ADDR}, queueCount)
 	iw.SetBatchTimeout(0)
 	iw.SetQueueSize(100)
 	for i := 0; i < 100; i++ {
@@ -146,7 +146,7 @@ func TestInfluxdbPoint(t *testing.T) {
 	})
 
 	queueCount := 3
-	iw, _ := NewInfluxdbWriter(INFLUXDB_HTTP_ADDR, queueCount)
+	iw, _ := NewInfluxdbWriter([]string{INFLUXDB_HTTP_ADDR}, queueCount)
 	iw.SetBatchTimeout(0)
 	iw.SetQueueSize(100)
 	for i := 0; i < 100; i++ {
