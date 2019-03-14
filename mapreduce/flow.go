@@ -87,8 +87,6 @@ type subFlowHandler struct {
 	lastFlush        time.Duration
 	handlerCounter   []HandlerCounter
 	processorCounter [][]ProcessorCounter
-
-	fpsAppIndex int
 }
 
 func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
@@ -119,21 +117,13 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 
 		handlerCounter:   make([]HandlerCounter, 2),
 		processorCounter: make([][]ProcessorCounter, 2),
-
-		fpsAppIndex: -1,
 	}
 	handler.processorCounter[0] = make([]ProcessorCounter, handler.numberOfApps)
 	handler.processorCounter[1] = make([]ProcessorCounter, handler.numberOfApps)
 
-	fpsAppName := fps.NewProcessor().GetName()
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.names[i] = handler.processors[i].GetName()
-		if handler.names[i] == fpsAppName {
-			handler.fpsAppIndex = i
-			handler.stashes[i] = NewSlidingStash(h.docsInBuffer, h.variedDocLimit, h.windowSize, h.windowMoveMargin)
-		} else {
-			handler.stashes[i] = NewFixedStash(h.docsInBuffer, h.variedDocLimit, h.windowSize)
-		}
+		handler.stashes[i] = NewFixedStash(h.docsInBuffer, h.variedDocLimit, h.windowSize)
 	}
 	stats.RegisterCountable("flow-mapper", &handler, stats.OptionStatTags{"index": strconv.Itoa(index)})
 	return &handler
@@ -160,24 +150,19 @@ func (h *subFlowHandler) Closed() bool {
 	return false // FIXME: never close?
 }
 
-// processorID = -1 for all stash
 func (h *subFlowHandler) putToQueue(processorID int) {
-	for i, stash := range h.stashes {
-		if processorID >= 0 && processorID != i {
-			continue
+	stash := h.stashes[processorID]
+	docs := stash.Dump()
+	for j := 0; j < len(docs); j += QUEUE_BATCH_SIZE {
+		if j+QUEUE_BATCH_SIZE <= len(docs) {
+			h.zmqAppQueue.Put(h.hashKey, docs[j:j+QUEUE_BATCH_SIZE]...)
+		} else {
+			h.zmqAppQueue.Put(h.hashKey, docs[j:]...)
 		}
-		docs := stash.Dump()
-		for j := 0; j < len(docs); j += QUEUE_BATCH_SIZE {
-			if j+QUEUE_BATCH_SIZE <= len(docs) {
-				h.zmqAppQueue.Put(h.hashKey, docs[j:j+QUEUE_BATCH_SIZE]...)
-			} else {
-				h.zmqAppQueue.Put(h.hashKey, docs[j:]...)
-			}
-			h.hashKey++
-		}
-		h.processorCounter[h.counterLatch][i].emitCounter += uint64(len(docs))
-		stash.Clear()
+		h.hashKey++
 	}
+	h.processorCounter[h.counterLatch][processorID].emitCounter += uint64(len(docs))
+	stash.Clear()
 }
 
 func (h *FlowHandler) Start() {
@@ -218,10 +203,21 @@ func (h *subFlowHandler) Process() error {
 
 	for {
 		n := h.flowQueue.Gets(queue.HashKey(h.queueIndex), elements)
+
+		// 当前时间超出窗口右边界时，上个自然分钟的数据已计算完毕，一定能将窗口滑动一次。
 		epoch := uint32(time.Now().Unix())
+		for i := range h.processors {
+			if epoch > h.stashes[i].GetWindowRight() {
+				if h.stashes[i].Size() > 0 {
+					h.processorCounter[h.counterLatch][i].flushCounter++
+					h.putToQueue(i)
+				}
+				h.stashes[i].SetTimestamp(epoch / MINUTE * MINUTE)
+			}
+		}
+
 		for _, e := range elements[:n] {
-			if e == nil {
-				h.Flush(-1)
+			if e == nil { // FlushIndicator
 				continue
 			}
 
@@ -247,27 +243,10 @@ func (h *subFlowHandler) Process() error {
 						break
 					}
 					h.processorCounter[h.counterLatch][i].flushCounter++
-					h.Flush(i)
-				}
-				if i != h.fpsAppIndex && epoch > h.stashes[i].GetWindowRight() {
-					if h.stashes[i].Size() > 0 {
-						h.processorCounter[h.counterLatch][i].flushCounter++
-						h.Flush(i)
-					}
-					h.stashes[i].SetTimestamp(epoch / MINUTE * MINUTE)
+					h.putToQueue(i)
 				}
 			}
 			datatype.ReleaseTaggedFlow(flow)
 		}
-		if time.Duration(time.Now().UnixNano())-h.lastFlush >= FLUSH_INTERVAL {
-			h.Flush(-1)
-		}
 	}
-}
-
-func (h *subFlowHandler) Flush(processorID int) {
-	if processorID == -1 { // 单独Flush某个processor的stash时不更新
-		h.lastFlush = time.Duration(time.Now().UnixNano())
-	}
-	h.putToQueue(processorID)
 }

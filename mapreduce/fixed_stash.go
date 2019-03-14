@@ -46,12 +46,13 @@ func (s *FixedStash) Add(docs []interface{}) ([]interface{}, uint64) {
 		slot := int(doc.Timestamp) - int(s.timestamp)
 		if slot < 0 {
 			// 当文档超出窗口的左边界时，下一个窗口的左边界以文档时间所在分钟开始为准
-			s.timestamp = doc.Timestamp
+			s.timestamp = doc.Timestamp / MINUTE * MINUTE
 			return docs[i:], rejected
 		} else if slot >= s.slots {
-			// 当文档超出窗口的右边界时，下一个窗口的左边界以文档时间所在分钟上一分钟开始为准
+			// 当文档超出窗口的右边界时，
+			// 下一个窗口的左边界以文档时间减去安全区间（slots-1m）所在分钟开始为准
 			// 这里要求slots的数量一定大于60
-			s.timestamp = doc.Timestamp - MINUTE
+			s.timestamp = (doc.Timestamp - uint32(s.slots) + MINUTE) / MINUTE * MINUTE
 			return docs[i:], rejected
 		}
 
