@@ -4,4 +4,5 @@ stages:
 verify:
   stage: verify
   script:
-    - make verify
+    - GOPATH=$(go env GOPATH)
+    - protoc -I=. -I=${GOPATH}/src -I=${GOPATH}/src/github.com/gogo/protobuf/protobuf -o /dev/null *.proto
