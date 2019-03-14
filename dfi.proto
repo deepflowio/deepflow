@@ -208,7 +208,7 @@ message Flow {
 
     /* Geo Info */
     optional uint32 country = 170 [default = 0];               /* Flow非云内IP端国家信息 */
-    optional uint32 Region = 171 [default = 0];                /* Flow非云内IP端区域信息 */
+    optional uint32 region = 171 [default = 0];                /* Flow非云内IP端区域信息 */
     optional uint32 isp = 172 [default = 0];                   /* Flow非云内IP端ISP信息 */
 }
 
