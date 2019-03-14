@@ -135,11 +135,11 @@ func Start(configPath string) (closers []io.Closer) {
 	)
 	meteringAppQueues := manager.NewQueues(
 		"2-meta-packet-to-metering-app", cfg.Queue.MeteringAppQueueSize, cfg.Queue.MeteringAppQueueCount, cfg.Queue.LabelerQueueCount,
-		libqueue.OptionFlushIndicator(time.Minute), releaseMetaPacket,
+		libqueue.OptionFlushIndicator(time.Second*10), releaseMetaPacket,
 	)
 	pcapAppQueues := manager.NewQueues(
 		"2-meta-packet-to-pcap-app", cfg.Queue.PCapAppQueueSize, cfg.Queue.PCapAppQueueCount, cfg.Queue.LabelerQueueCount,
-		libqueue.OptionFlushIndicator(time.Minute), releaseMetaPacket,
+		libqueue.OptionFlushIndicator(time.Second*10), releaseMetaPacket,
 	)
 
 	labelerManager := labeler.NewLabelerManager(labelerQueues, cfg.Queue.LabelerQueueCount, cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable)
@@ -223,7 +223,7 @@ func Start(configPath string) (closers []io.Closer) {
 	// L4 - flow duplicator & flow sender
 	flowAppQueue := manager.NewQueues(
 		"4-tagged-flow-to-flow-app", cfg.Queue.FlowAppQueueSize,
-		cfg.Queue.FlowAppQueueCount, cfg.Queue.FlowGeneratorQueueCount, libqueue.OptionFlushIndicator(time.Minute), releaseTaggedFlow)
+		cfg.Queue.FlowAppQueueCount, cfg.Queue.FlowGeneratorQueueCount, libqueue.OptionFlushIndicator(time.Second*10), releaseTaggedFlow)
 	flowSenderQueue := manager.NewQueue(
 		"4-tagged-flow-to-stream", cfg.Queue.FlowSenderQueueSize, releaseTaggedFlow) // ZMQ发送缓慢，queueSize设置为上游的2倍
 
