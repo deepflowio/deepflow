@@ -78,6 +78,8 @@ type InfluxdbWriter struct {
 
 	BatchSize    int
 	FlushTimeout int64
+
+	exit bool
 }
 
 func NewInfluxdbWriter(httpAddrs []string, queueCount int) (*InfluxdbWriter, error) {
@@ -108,7 +110,7 @@ func NewInfluxdbWriter(httpAddrs []string, queueCount int) (*InfluxdbWriter, err
 	return &InfluxdbWriter{
 		DataQueues: queue.NewOverwriteQueues(
 			DEFAULT_QUEUE_NAME, queue.HashKey(queueCount), DEFAULT_QUEUE_SIZE,
-			queue.OptionFlushIndicator(DEFAULT_FLUSH_TIMEOUT),
+			queue.OptionFlushIndicator(time.Second),
 			queue.OptionRelease(func(p interface{}) { p.(InfluxdbItem).Release() })),
 		QueueCount:       queueCount,
 		QueueWriterInfos: queueWriterInfos,
@@ -120,8 +122,8 @@ func NewInfluxdbWriter(httpAddrs []string, queueCount int) (*InfluxdbWriter, err
 }
 
 func (w *InfluxdbWriter) SetQueueSize(size int) {
-	w.DataQueues = queue.NewOverwriteQueues(DEFAULT_QUEUE_NAME, queue.HashKey(w.QueueCount), size, w.FlushTimeout,
-		queue.OptionFlushIndicator(DEFAULT_FLUSH_TIMEOUT),
+	w.DataQueues = queue.NewOverwriteQueues(DEFAULT_QUEUE_NAME, queue.HashKey(w.QueueCount), size,
+		queue.OptionFlushIndicator(time.Second),
 		queue.OptionRelease(func(p interface{}) { p.(InfluxdbItem).Release() }))
 }
 
@@ -293,7 +295,7 @@ func (w *InfluxdbWriter) queueProcess(queueID int) {
 	defer w.QueueWriterInfos[queueID].Close()
 
 	rawItems := make([]interface{}, QUEUE_FETCH_MAX_SIZE)
-	for {
+	for !w.exit {
 		n := w.DataQueues.Gets(queue.HashKey(queueID), rawItems)
 		for i := 0; i < n; i++ {
 			item := rawItems[i]
@@ -401,4 +403,20 @@ func (w *InfluxdbWriter) writeInfluxdb(queueID int, bp client.BatchPoints) bool 
 	}
 
 	return ret
+}
+
+func (w *InfluxdbWriter) Close() {
+	w.exit = true
+
+	for _, dbCtl := range w.DBCreateCtls {
+		dbCtl.HttpClient.Close()
+	}
+
+	for _, writeInfo := range w.QueueWriterInfos {
+		for _, httpClient := range writeInfo.httpClients {
+			httpClient.Close()
+		}
+	}
+
+	log.Info("Stopped influx writer")
 }
