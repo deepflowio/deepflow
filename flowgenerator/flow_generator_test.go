@@ -421,6 +421,33 @@ func TestUdpShortFlow(t *testing.T) {
 	}
 }
 
+func TestStartTimeFix(t *testing.T) {
+	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
+
+	packet0 := getDefaultPacket()
+	packet0.Timestamp = 59 * time.Second
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
+
+	packet1 := getDefaultPacket()
+	packet1.TcpData.Flags = TCP_SYN | TCP_ACK
+	packet1.Timestamp = 60 * time.Second
+	reversePacket(packet1)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
+
+	packet2 := getDefaultPacket()
+	packet2.TcpData.Flags = TCP_ACK
+	packet2.Timestamp = 75 * time.Second
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet2)
+
+	flowGenerator.Start()
+
+	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
+	pivotalTime := taggedFlow.EndTime - taggedFlow.EndTime%forceReportInterval
+	if taggedFlow.StartTime != pivotalTime {
+		t.Errorf("taggedFlow.StartTime is %d, expect %d", taggedFlow.StartTime, pivotalTime)
+	}
+}
+
 func TestNonIpShortFlow(t *testing.T) {
 	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
 

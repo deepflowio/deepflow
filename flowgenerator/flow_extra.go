@@ -30,7 +30,7 @@ type FlowExtra struct {
 	minArrTime   time.Duration
 	recentTime   time.Duration
 	timeout      time.Duration
-	startReport  bool
+	reported     bool
 	reversed     bool
 	circlePktGot bool
 }
