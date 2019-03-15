@@ -194,6 +194,7 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, now time.Duration) *FlowExtra
 	flowExtra.flowState = FLOW_STATE_RAW
 	flowExtra.minArrTime = now
 	flowExtra.recentTime = now
+	flowExtra.reported = false
 	flowExtra.reversed = false
 	flowExtra.circlePktGot = true
 
@@ -319,6 +320,7 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 	flowExtra.recentTime = packetTimestamp
 	if !flowExtra.circlePktGot {
 		flowExtra.circlePktGot = true
+		// FIXME: if StartTime is fixed, CurStartTime should be recalculated?
 		taggedFlow.CurStartTime = packetTimestamp
 		updateFlowTag(taggedFlow, meta)
 		if reply {
@@ -357,7 +359,19 @@ func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireInterval, reportTole
 	} else {
 		taggedFlow.EndTime = now
 	}
+	// FIXME bitmap should be recalculated, 5.5.2
+	pivotalTime := taggedFlow.EndTime - taggedFlow.EndTime%forceReportInterval
+	if taggedFlow.StartTime < pivotalTime {
+		taggedFlow.StartTime = pivotalTime
+		if !f.reported {
+			// FIXME maybe we should choose only one ArrTime
+			taggedFlow.FlowMetricsPeerSrc.ArrTime0 = pivotalTime
+			taggedFlow.FlowMetricsPeerDst.ArrTime0 = pivotalTime
+			f.minArrTime = pivotalTime
+		}
+	}
 	taggedFlow.Duration = f.recentTime - f.minArrTime
+	f.reported = true
 }
 
 func (f *FlowExtra) resetCurFlowInfo(now time.Duration) {
