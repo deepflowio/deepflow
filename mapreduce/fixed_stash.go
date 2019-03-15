@@ -41,7 +41,7 @@ func (s *FixedStash) Add(docs []interface{}) ([]interface{}, uint64) {
 	for i, v := range docs {
 		doc := v.(*app.Document)
 		if s.timestamp == 0 {
-			s.timestamp = doc.Timestamp
+			s.timestamp = doc.Timestamp / MINUTE * MINUTE
 		}
 		slot := int(doc.Timestamp) - int(s.timestamp)
 		if slot < 0 {
