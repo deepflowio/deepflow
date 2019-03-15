@@ -7,8 +7,9 @@ import (
 )
 
 type HandlerCounter struct {
-	flowCounter uint64
-	dropCounter uint64
+	inputCounter uint64
+	dropCounter  uint64
+	byteCounter  uint64
 }
 
 type ProcessorCounter struct {
@@ -24,12 +25,16 @@ func FillStatItems(items []stats.StatItem, handlerCounter HandlerCounter, proces
 		panic("processor长度不匹配")
 	}
 	items = append(items, stats.StatItem{
-		Name:  "flow_counter",
-		Value: handlerCounter.flowCounter,
+		Name:  "input_counter",
+		Value: handlerCounter.inputCounter,
 	})
 	items = append(items, stats.StatItem{
 		Name:  "drop_counter",
 		Value: handlerCounter.dropCounter,
+	})
+	items = append(items, stats.StatItem{
+		Name:  "byte_counter",
+		Value: handlerCounter.byteCounter,
 	})
 	for i, name := range processorNames {
 		counter := processorCounters[i]
@@ -40,8 +45,8 @@ func FillStatItems(items []stats.StatItem, handlerCounter HandlerCounter, proces
 		})
 
 		avgDoc := uint64(0)
-		if handlerCounter.flowCounter != 0 {
-			avgDoc = counter.docCounter / handlerCounter.flowCounter
+		if handlerCounter.inputCounter != 0 {
+			avgDoc = counter.docCounter / handlerCounter.inputCounter
 		}
 		items = append(items, stats.StatItem{
 			Name:  fmt.Sprintf("%s_avg_doc_counter", name),
