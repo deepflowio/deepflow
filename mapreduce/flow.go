@@ -228,7 +228,7 @@ func (h *subFlowHandler) Process() error {
 				continue
 			}
 
-			h.handlerCounter[h.counterLatch].flowCounter++
+			h.handlerCounter[h.counterLatch].inputCounter++
 			for i, processor := range h.processors {
 				docs := processor.Process(flow, false)
 				rejected := uint64(0)

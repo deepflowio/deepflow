@@ -185,7 +185,8 @@ func (h *subMeteringHandler) Process() error {
 				continue
 			}
 
-			h.handlerCounter[h.counterLatch].flowCounter++
+			h.handlerCounter[h.counterLatch].inputCounter++
+			h.handlerCounter[h.counterLatch].byteCounter += uint64(metering.PacketLen)
 			for i, processor := range h.processors {
 				docs := processor.Process(metering, false)
 				rejected := uint64(0)
