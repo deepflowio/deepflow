@@ -188,7 +188,6 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, now time.Duration) *FlowExtra
 	taggedFlow.EthType = meta.EthType
 	taggedFlow.Hash = meta.Hash
 	updateFlowTag(taggedFlow, meta)
-	f.fillGeoInfo(taggedFlow)
 
 	flowExtra := AcquireFlowExtra()
 	flowExtra.taggedFlow = taggedFlow

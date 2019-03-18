@@ -38,10 +38,10 @@ func (f *FlowGeo) fillGeoInfo(taggedFlow *TaggedFlow) {
 	ips := [2]uint32{taggedFlow.IPSrc, taggedFlow.IPDst}
 	l3EpcIDs := [2]int32{taggedFlow.FlowMetricsPeerSrc.L3EpcID, taggedFlow.FlowMetricsPeerDst.L3EpcID}
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
-		otherEnd := getOppositeEndpoint(thisEnd)
 		if l3EpcIDs[thisEnd] == 0 {
 			continue
 		}
+		otherEnd := getOppositeEndpoint(thisEnd)
 		geoInfo := f.GeoTree.Query(ips[otherEnd])
 		if geoInfo == nil {
 			continue

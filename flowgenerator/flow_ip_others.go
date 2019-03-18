@@ -37,6 +37,7 @@ func (f *FlowGenerator) initOtherIpFlow(meta *MetaPacket) *FlowExtra {
 	taggedFlow.FlowMetricsPeerSrc.TotalByteCount = uint64(meta.PacketLen)
 	taggedFlow.FlowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
 	updatePlatformData(taggedFlow, meta.EndpointData, false)
+	f.fillGeoInfo(taggedFlow)
 	flowExtra.flowState = FLOW_STATE_ESTABLISHED
 	flowExtra.timeout = openingTimeout
 	return flowExtra
