@@ -75,6 +75,7 @@ func (f *FlowGenerator) initTcpFlow(meta *MetaPacket) (*FlowExtra, bool, bool) {
 		taggedFlow.FlowMetricsPeerDst.ByteCount = uint64(meta.PacketLen)
 		reverseFlowTag(taggedFlow)
 		updatePlatformData(taggedFlow, meta.EndpointData, reply)
+		f.fillGeoInfo(taggedFlow)
 	} else {
 		taggedFlow.FlowMetricsPeerSrc.TCPFlags |= flags
 		taggedFlow.FlowMetricsPeerSrc.ArrTime0 = now
@@ -84,6 +85,7 @@ func (f *FlowGenerator) initTcpFlow(meta *MetaPacket) (*FlowExtra, bool, bool) {
 		taggedFlow.FlowMetricsPeerSrc.TotalByteCount = uint64(meta.PacketLen)
 		taggedFlow.FlowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
 		updatePlatformData(taggedFlow, meta.EndpointData, reply)
+		f.fillGeoInfo(taggedFlow)
 	}
 	flags = flags & TCP_FLAG_MASK
 	if f.StatePreprocess(meta, flags) || meta.Invalid {

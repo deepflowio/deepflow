@@ -37,6 +37,7 @@ func (f *FlowGenerator) initUdpFlow(meta *MetaPacket) *FlowExtra {
 	taggedFlow.FlowMetricsPeerSrc.TotalByteCount = uint64(meta.PacketLen)
 	taggedFlow.FlowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
 	updatePlatformData(taggedFlow, meta.EndpointData, false)
+	f.fillGeoInfo(taggedFlow)
 	clientHash := uint32(meta.IpSrc) + uint32(meta.PortSrc)
 	serviceKey := genServiceKey(taggedFlow.FlowMetricsPeerDst.L3EpcID, taggedFlow.IPDst, taggedFlow.PortDst)
 	getUdpServiceManager(serviceKey).hitStatus(serviceKey, clientHash, meta.Timestamp)
