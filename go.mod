@@ -8,8 +8,8 @@ require (
 	github.com/influxdata/platform v0.0.0-20190117200541-d500d3cf5589 // indirect
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/spf13/cobra v0.0.3
-	gitlab.x.lan/application/droplet-app v0.0.0-20190314101606-fdae5dbc34f6
-	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190314062639-f1fa4df11d0e
+	gitlab.x.lan/application/droplet-app v0.0.0-20190319181718-dcf275880b91
+	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190319143343-1d021d7a3f11
 	gitlab.x.lan/yunshan/message v0.0.0-20190314040443-79de28d3aa46
 	golang.org/x/net v0.0.0-20190313220215-9f648a60d977
 	gopkg.in/yaml.v2 v2.2.1
