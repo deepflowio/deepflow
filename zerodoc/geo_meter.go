@@ -11,7 +11,7 @@ import (
 type GeoMeter struct {
 	SumClosedFlowCount    uint64        `db:"sum_closed_flow_count"`
 	SumAbnormalFlowCount  uint64        `db:"sum_abnormal_flow_count"`
-	SumClosedFlowDuration time.Duration `db:"sum_closed_flow_duration"`
+	SumClosedFlowDuration uint64        `db:"sum_closed_flow_duration"` // ms
 	SumPacketTx           uint64        `db:"sum_packet_tx"`
 	SumPacketRx           uint64        `db:"sum_packet_rx"`
 	SumBitTx              uint64        `db:"sum_bit_tx"`
@@ -27,7 +27,7 @@ func (m *GeoMeter) SortKey() uint64 {
 func (m *GeoMeter) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(m.SumClosedFlowCount)
 	encoder.WriteVarintU64(m.SumAbnormalFlowCount)
-	encoder.WriteVarintU64(uint64(m.SumClosedFlowDuration))
+	encoder.WriteVarintU64(m.SumClosedFlowDuration)
 	encoder.WriteVarintU64(m.SumPacketTx)
 	encoder.WriteVarintU64(m.SumPacketRx)
 	encoder.WriteVarintU64(m.SumBitTx)
@@ -39,7 +39,7 @@ func (m *GeoMeter) Encode(encoder *codec.SimpleEncoder) {
 func (m *GeoMeter) Decode(decoder *codec.SimpleDecoder) {
 	m.SumClosedFlowCount = decoder.ReadVarintU64()
 	m.SumAbnormalFlowCount = decoder.ReadVarintU64()
-	m.SumClosedFlowDuration = time.Duration(decoder.ReadVarintU64())
+	m.SumClosedFlowDuration = decoder.ReadVarintU64()
 	m.SumPacketTx = decoder.ReadVarintU64()
 	m.SumPacketRx = decoder.ReadVarintU64()
 	m.SumBitTx = decoder.ReadVarintU64()
@@ -90,7 +90,7 @@ func (m *GeoMeter) MarshalTo(b []byte) int {
 	offset += copy(b[offset:], "i,sum_abnormal_flow_count=")
 	offset += copy(b[offset:], strconv.FormatUint(m.SumAbnormalFlowCount, 10))
 	offset += copy(b[offset:], "i,sum_closed_flow_duration=")
-	offset += copy(b[offset:], strconv.FormatInt(int64(m.SumClosedFlowDuration/time.Microsecond), 10))
+	offset += copy(b[offset:], strconv.FormatUint(m.SumClosedFlowDuration*1000, 10)) // us
 	offset += copy(b[offset:], "i,sum_packet_tx=")
 	offset += copy(b[offset:], strconv.FormatUint(m.SumPacketTx, 10))
 	offset += copy(b[offset:], "i,sum_packet_rx=")
