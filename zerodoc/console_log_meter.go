@@ -2,17 +2,16 @@ package zerodoc
 
 import (
 	"strconv"
-	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
 )
 
 type ConsoleLogMeter struct {
-	SumPacketTx           uint64        `db:"sum_packet_tx"`
-	SumPacketRx           uint64        `db:"sum_packet_rx"`
-	SumClosedFlowCount    uint64        `db:"sum_closed_flow_count"`
-	SumClosedFlowDuration time.Duration `db:"sum_closed_flow_duration"`
+	SumPacketTx           uint64 `db:"sum_packet_tx"`
+	SumPacketRx           uint64 `db:"sum_packet_rx"`
+	SumClosedFlowCount    uint64 `db:"sum_closed_flow_count"`
+	SumClosedFlowDuration uint64 `db:"sum_closed_flow_duration"` // ms
 }
 
 func (m *ConsoleLogMeter) SortKey() uint64 {
@@ -23,14 +22,14 @@ func (m *ConsoleLogMeter) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(m.SumPacketTx)
 	encoder.WriteVarintU64(m.SumPacketRx)
 	encoder.WriteVarintU64(m.SumClosedFlowCount)
-	encoder.WriteVarintU64(uint64(m.SumClosedFlowDuration))
+	encoder.WriteVarintU64(m.SumClosedFlowDuration)
 }
 
 func (m *ConsoleLogMeter) Decode(decoder *codec.SimpleDecoder) {
 	m.SumPacketTx = decoder.ReadVarintU64()
 	m.SumPacketRx = decoder.ReadVarintU64()
 	m.SumClosedFlowCount = decoder.ReadVarintU64()
-	m.SumClosedFlowDuration = time.Duration(decoder.ReadVarintU64())
+	m.SumClosedFlowDuration = decoder.ReadVarintU64()
 }
 
 func (m *ConsoleLogMeter) ConcurrentMerge(other app.Meter) {
@@ -67,7 +66,7 @@ func (m *ConsoleLogMeter) MarshalTo(b []byte) int {
 	offset += copy(b[offset:], "i,sum_closed_flow_count=")
 	offset += copy(b[offset:], strconv.FormatUint(m.SumClosedFlowCount, 10))
 	offset += copy(b[offset:], "i,sum_closed_flow_duration=")
-	offset += copy(b[offset:], strconv.FormatInt(int64(m.SumClosedFlowDuration/time.Microsecond), 10))
+	offset += copy(b[offset:], strconv.FormatUint(m.SumClosedFlowDuration*1000, 10)) // us
 	b[offset] = 'i'
 	offset++
 

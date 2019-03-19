@@ -3,7 +3,6 @@ package protobuf
 import (
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/google/gopacket/layers"
 	. "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
@@ -176,7 +175,7 @@ func TestGeoMeterEqual(t *testing.T) {
 	fromMeter := &GeoMeter{
 		SumClosedFlowCount:    1,
 		SumAbnormalFlowCount:  2,
-		SumClosedFlowDuration: time.Second,
+		SumClosedFlowDuration: 1,
 		SumPacketTx:           1234,
 		SumPacketRx:           4321,
 		SumBitTx:              12345,
@@ -226,7 +225,7 @@ func TestConsoleLogMeterEqual(t *testing.T) {
 		SumPacketTx:           1234,
 		SumPacketRx:           4321,
 		SumClosedFlowCount:    1,
-		SumClosedFlowDuration: time.Second,
+		SumClosedFlowDuration: 1,
 	}
 	pb := ConsoleLogMeterToPB(fromMeter)
 	toMeter := AcquireConsoleLogMeter()

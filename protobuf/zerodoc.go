@@ -327,7 +327,7 @@ func GeoMeterToPB(m *GeoMeter) *pb.GeoMeter {
 	return &pb.GeoMeter{
 		SumClosedFlowCount:      proto.Uint64(m.SumClosedFlowCount),
 		SumAbnormalFlowCount:    proto.Uint64(m.SumAbnormalFlowCount),
-		SumClosedFlowDurationUs: proto.Uint64(uint64(m.SumClosedFlowDuration / time.Microsecond)),
+		SumClosedFlowDurationUs: proto.Uint64(m.SumClosedFlowDuration * 1000), // us
 		SumPacketTx:             proto.Uint64(m.SumPacketTx),
 		SumPacketRx:             proto.Uint64(m.SumPacketRx),
 		SumBitTx:                proto.Uint64(m.SumBitTx),
@@ -344,7 +344,7 @@ func PBToGeoMeter(m *pb.GeoMeter, meter *GeoMeter) {
 
 	meter.SumClosedFlowCount = m.GetSumClosedFlowCount()
 	meter.SumAbnormalFlowCount = m.GetSumAbnormalFlowCount()
-	meter.SumClosedFlowDuration = time.Duration(m.GetSumClosedFlowDurationUs()) * time.Microsecond
+	meter.SumClosedFlowDuration = m.GetSumClosedFlowDurationUs() / 1000 // ms
 	meter.SumPacketTx = m.GetSumPacketTx()
 	meter.SumPacketRx = m.GetSumPacketRx()
 	meter.SumBitTx = m.GetSumBitTx()
@@ -410,7 +410,7 @@ func ConsoleLogMeterToPB(m *ConsoleLogMeter) *pb.ConsoleLogMeter {
 		SumPacketTx:             proto.Uint64(m.SumPacketTx),
 		SumPacketRx:             proto.Uint64(m.SumPacketRx),
 		SumClosedFlowCount:      proto.Uint64(m.SumClosedFlowCount),
-		SumClosedFlowDurationUs: proto.Uint64(uint64(m.SumClosedFlowDuration / time.Microsecond)),
+		SumClosedFlowDurationUs: proto.Uint64(m.SumClosedFlowDuration * 1000), // us
 	}
 }
 
@@ -422,7 +422,7 @@ func PBToConsoleLogMeter(m *pb.ConsoleLogMeter, meter *ConsoleLogMeter) {
 	meter.SumPacketTx = m.GetSumPacketTx()
 	meter.SumPacketRx = m.GetSumPacketRx()
 	meter.SumClosedFlowCount = m.GetSumClosedFlowCount()
-	meter.SumClosedFlowDuration = time.Duration(m.GetSumClosedFlowDurationUs()) * time.Microsecond
+	meter.SumClosedFlowDuration = m.GetSumClosedFlowDurationUs() / 1000 // ms
 }
 
 func TypeMeterToPB(m *TypeMeter) *pb.TypeMeter {
