@@ -281,10 +281,10 @@ github.com/xanzy/ssh-agent v0.2.0/go.mod h1:0NyE30eGUDliuLEHJgYte/zncp2zdTStcOnW
 github.com/yudai/gojsondiff v1.0.0/go.mod h1:AY32+k2cwILAkW1fbgxQ5mUmMiZFgLIV+FBNExI05xg=
 github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82/go.mod h1:lgjkn3NuSvDfVJdfcVVdX+jpBxNmX4rDAzaS45IcYoM=
 github.com/yudai/pp v2.0.1+incompatible/go.mod h1:PuxR/8QJ7cyCkFp/aUDS+JY727OFEZkTdatxwunjIkc=
-gitlab.x.lan/application/droplet-app v0.0.0-20190314101606-fdae5dbc34f6 h1:LP6xrYs3Swj8NgQ9JXQXONaPBubuy8y+uOQDfYRV/MI=
-gitlab.x.lan/application/droplet-app v0.0.0-20190314101606-fdae5dbc34f6/go.mod h1:8/M2+b851IG5pvouOlPoU/8gCwErltgoiKJdr4yIWBc=
-gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190314062639-f1fa4df11d0e h1:G3rEHTKGuQqW2xToaePsfX56GOfnTdInv1WuQcMmkoI=
-gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190314062639-f1fa4df11d0e/go.mod h1:euNsC2e3F2a5LlpXk0SmIC6yrm6qOsxZ0eXxTFZ7r4w=
+gitlab.x.lan/application/droplet-app v0.0.0-20190319181718-dcf275880b91 h1:vskbXwfZbwXrNmjWpwyti9ROVPUBniQ5SD5nTgWUKl0=
+gitlab.x.lan/application/droplet-app v0.0.0-20190319181718-dcf275880b91/go.mod h1:lCj/sRG2vLlqW7g/3BgIWvOM8M3B402SCZNhShJUnwY=
+gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190319143343-1d021d7a3f11 h1:hzzg0nz1zcLWTqRsjUeNNM55mK60spyNY1/WaVoO6jE=
+gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190319143343-1d021d7a3f11/go.mod h1:euNsC2e3F2a5LlpXk0SmIC6yrm6qOsxZ0eXxTFZ7r4w=
 gitlab.x.lan/yunshan/message v0.0.0-20190314040443-79de28d3aa46 h1:JzM99ocWNtm5c3i8Oip44nRJ151vvD3haULWOXq/koU=
 gitlab.x.lan/yunshan/message v0.0.0-20190314040443-79de28d3aa46/go.mod h1:R5ZX1w+XLKWpf45DbKsAXvRyklT7rfgBN/WKClV2MP4=
 go.uber.org/atomic v1.3.2/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
