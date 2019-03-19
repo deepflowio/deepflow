@@ -27,6 +27,57 @@ func TestFillGeoInfo(t *testing.T) {
 	}
 }
 
+func TestNegativeL3EpcIDSrc(t *testing.T) {
+	taggedFlow := &TaggedFlow{}
+	taggedFlow.IPSrc = IpToUint32(net.ParseIP("8.8.8.8").To4())
+	taggedFlow.IPDst = IpToUint32(net.ParseIP("114.114.114.114").To4())
+	taggedFlow.FlowMetricsPeerSrc.L3EpcID = -1
+	taggedFlow.FlowMetricsPeerDst.L3EpcID = 5
+	taggedFlow.PolicyData = &PolicyData{ActionFlags: ACTION_GEO_POSITIONING}
+	innerFlowGeo.fillGeoInfo(taggedFlow)
+	// 查ip_info.go文件获得Country和Region实际值
+	country := uint8(98)
+	region := uint8(0)
+	if taggedFlow.Country != country || taggedFlow.Region != region {
+		t.Errorf("taggedFlow.Country is %d, expect %d", taggedFlow.Country, country)
+		t.Errorf("taggedFlow.Region is %d, expect %d", taggedFlow.Region, region)
+	}
+}
+
+func TestNegativeL3EpcIDDst(t *testing.T) {
+	taggedFlow := &TaggedFlow{}
+	taggedFlow.IPSrc = IpToUint32(net.ParseIP("8.8.8.8").To4())
+	taggedFlow.IPDst = IpToUint32(net.ParseIP("114.114.114.114").To4())
+	taggedFlow.FlowMetricsPeerSrc.L3EpcID = 5
+	taggedFlow.FlowMetricsPeerDst.L3EpcID = -1
+	taggedFlow.PolicyData = &PolicyData{ActionFlags: ACTION_GEO_POSITIONING}
+	innerFlowGeo.fillGeoInfo(taggedFlow)
+	// 查ip_info.go文件获得Country和Region实际值
+	country := uint8(5)
+	region := uint8(34)
+	if taggedFlow.Country != country || taggedFlow.Region != region {
+		t.Errorf("taggedFlow.Country is %d, expect %d", taggedFlow.Country, country)
+		t.Errorf("taggedFlow.Region is %d, expect %d", taggedFlow.Region, region)
+	}
+}
+
+func TestNegativeL3EpcIDAll(t *testing.T) {
+	taggedFlow := &TaggedFlow{}
+	taggedFlow.IPSrc = IpToUint32(net.ParseIP("8.8.8.8").To4())
+	taggedFlow.IPDst = IpToUint32(net.ParseIP("114.114.114.114").To4())
+	taggedFlow.FlowMetricsPeerSrc.L3EpcID = -1
+	taggedFlow.FlowMetricsPeerDst.L3EpcID = -1
+	taggedFlow.PolicyData = &PolicyData{ActionFlags: ACTION_GEO_POSITIONING}
+	innerFlowGeo.fillGeoInfo(taggedFlow)
+	// 查ip_info.go文件获得Country和Region实际值
+	country := uint8(98)
+	region := uint8(0)
+	if taggedFlow.Country != country || taggedFlow.Region != region {
+		t.Errorf("taggedFlow.Country is %d, expect %d", taggedFlow.Country, country)
+		t.Errorf("taggedFlow.Region is %d, expect %d", taggedFlow.Region, region)
+	}
+}
+
 func TestFlowGeoInfo(t *testing.T) {
 	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
 	forceReportInterval = 60 * time.Second
