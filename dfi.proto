@@ -155,43 +155,60 @@ message Flow {
     repeated uint32 group_ids_1 = 135;                         /* 目的端资源组ID */
 
     /* TCP Perf Data */
-    optional uint64 rtt_syn = 140 [default = 0];               /* The RTT in the handshake phase of the flow.
-                                                                  When pkt_cnt_0 >= 2 && pkt_cnt_1 >= 1,
-                                                                  SYN -> SYN/ACK -> ACK,
-                                                                  rtt_syn = arr_time_0_1 (ACK) - arr_time_0_0 (SYN) */
-    optional uint64 rtt = 141 [default = 0];                   /* The RTT in the data transmission phase of the flow
-                                                                  it's a average value in this report period
-                                                                  ... PSH/ACK_n-1 -> PSH/ACK_n -> ACK_n -> PSH/ACK_n+1 -> PSH/ACK_n+2 ...,
-                                                                  rtt_Nth = tx_time_1 (PSH/ACK_n+1) - tx_time_0 (PSH/ACK_n),
+    /* tcp会话报文交互过程简图 
+    client端         探针点          server端
+    |     SYN         t0|                   |
+    | ----------------> | ----------------> |
+    |     SYN         t1|                   |
+    | ----------------> | ----------------> | 
+    |                   |                   |
+    |                   |t2       SYN/ACK   |
+    | <---------------- | <---------------- | 
+    |                   |t3       SYN/ACK   |
+    | <---------------- | <---------------- |
+    |                   |                   |
+    |     ACK         t4|                   |
+    | ----------------> | ----------------> |
+    |     ACK         t5|                   |
+    | ----------------> | ----------------> |
+    |                   |                   |
+    |    DATA(len>1)  t6|                   |
+    | ----------------> | ----------------> |
+    |    DATA(len>1)  t7|                   |
+    | ----------------> | ----------------> |
+    |                   |t8    ACK(len==0)  |
+    | <---------------- | <---------------- |
+    |                   |                   |
+    |   DATA(len>1)   t9|                   |
+    | ----------------> | ----------------> |
+    |   DATA(len>1)  t10|                   |
+    | ----------------> | ----------------> |
+    |                   |t11 DATA/ACK(len>1)|
+    | <---------------- | <---------------- | */
+    
+    optional uint64 rtt_syn = 140 [default = 0];               /* 网络时延(rtt_syn), 单位：ns, tcp三次握手阶段, 每次上报均携带，force-report后不清空.
+                                                                  rtt_syn = (t2-t1) + (t4-t3) */
+    optional uint64 rtt = 141 [default = 0];                   /* 系统响应时延(rtt/srt), 单位：ns, tcp数据传输阶段, 单个上报周期内rtt的均值. 不包含握手阶段的网络时延.
+                                                                  rtt_Nth = t8 - t7
                                                                   rtt = (rtt_1st + rtt_2nd + ... + rtt_Nth) / N, or
                                                                   rtt = (rtt * (N - 1) + rtt_Nth) / N */
-    optional uint64 rtt_avg = 142 [default = 0];               /* 不存：The RTT in the session of the flow
-                                                                  it's a average value in flow life cycle */
-    optional uint64 syn_retrans_cnt_0 = 143 [default = 0];     /* Times of packets retransmission within connection establishment during this report period
-                                                                  in forward direction */
-    optional uint64 syn_retrans_cnt_1 = 144 [default = 0];     /* Times of packets retransmission within connection establishment during this report period
-                                                                  in backword direction */
-    optional uint64 retrans_cnt_0 = 145 [default = 0];         /* Times of packets retransmission during this report period
-                                                                  in forward direction */
-    optional uint64 retrans_cnt_1 = 146 [default = 0];         /* Times of packets retransmission during this report period
-                                                                  in backword direction */
-    optional uint64 total_retrans_cnt = 147 [default = 0];     /* Times of packets retransmission in flow life cycle
-                                                                  including forward and backword direction */
-    optional uint64 zero_wnd_cnt_0 = 148 [default = 0];        /* Times of TCP connection window is set to zero in forward direction
-                                                                  during this report period */
-    optional uint64 zero_wnd_cnt_1 = 149 [default = 0];        /* Times of TCP connection window is set to zero in backward direction
-                                                                  during this report period */
-    optional uint64 psh_urg_cnt_0 = 154 [default = 0];         /* Times of TCP connection sending urgent data in forward direction
-                                                                  during this report period */
-    optional uint64 psh_urg_cnt_1 = 155 [default = 0];         /* Times of TCP connection sending urgent data in backward direction
-                                                                  during this report period */
-    optional uint64 art_avg = 157 [default = 0];               /* Application response time in the data transmission phase of the flow
-                                                                  it's a average value during this report period */
-    optional uint64 avg_pkt_interval = 160 [default = 0];      /* The average interval of all packets for
-                                                                  current flow */
-    optional uint64 pkt_interval_variance = 161 [default = 0]; /* The variance of all packet intervals for
-                                                                  current flow */
-    optional uint64 pkt_size_variance = 162 [default = 0];     /* Packet byte cnt variance of this flow */
+    optional uint64 rtt_avg = 142 [default = 0];               /* 未提供, Discarded*/
+    optional uint64 syn_retrans_cnt_0 = 143 [default = 0];     /* 重传计数(syn_retrans_client), tcp三次握手阶段, client端发生的重传包数量, 每次上报均携带，force-report后不清空. */
+    optional uint64 syn_retrans_cnt_1 = 144 [default = 0];     /* 重传计数(syn_retrans_server), tcp三次握手阶段, server端发生的重传包数量, 每次上报均携带，force-report后不清空. */
+    optional uint64 retrans_cnt_0 = 145 [default = 0];         /* 重传计数(retrans_client), tcp数据传输阶段, 单个上报周期内, client端的重传包数量, 不包含握手阶段重传数量 */
+    optional uint64 retrans_cnt_1 = 146 [default = 0];         /* 重传计数(retrans_server), tcp数据传输阶段, 单个上报周期内, server端的重传包数量, 不包含握手阶段重传数量 */
+    optional uint64 total_retrans_cnt = 147 [default = 0];     /* 重传计数(retrans), tcp数据传输阶段, 整条流client与server端的重传包数量之和, 不包含握手阶段重传数量 */
+    optional uint64 zero_wnd_cnt_0 = 148 [default = 0];        /* 零窗口(zero_window_client), 单个上报周期内，client端零窗口包数量, 包含握手阶段零窗数量 */
+    optional uint64 zero_wnd_cnt_1 = 149 [default = 0];        /* 零窗口(zero_window_server), 单个上报周期内，server端零窗口包数量, 包含握手阶段零窗数量 */
+    optional uint64 psh_urg_cnt_0 = 154 [default = 0];         /* 紧急标志(psh_urg_client), 单个上报周期内，client端psh,urg标志被置位的包数量, 包含握手阶段计数 */
+    optional uint64 psh_urg_cnt_1 = 155 [default = 0];         /* 紧急标志(psh_urg_client), 单个上报周期内，server端psh,urg标志被置位的包数量, 包含握手阶段计数 */
+    optional uint64 art_avg = 157 [default = 0];               /* 应用响应时延(art), 单位：ns, tcp数据传输阶段, 单个上报周期内, art的均值，不包含握手阶段的网络时延.
+                                                                  art_Nth = t11 - t10
+                                                                  art = (art_1st + art_2nd + ... + art_Nth) / N, or
+                                                                  art = (art * (N - 1) + art_Nth) / N */
+    optional uint64 avg_pkt_interval = 160 [default = 0];      /* 包间隔均值, 单条流相邻2个包到达时间间隔的均值 */
+    optional uint64 pkt_interval_variance = 161 [default = 0]; /* 包间隔方差, 单条流相邻2个包到达时间间隔的方差 */
+    optional uint64 pkt_size_variance = 162 [default = 0];     /* 包大小方差, 单条流每个包包长的方差 */
 
     optional uint32 acl_id = 163;
 
