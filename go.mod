@@ -28,7 +28,7 @@ require (
 	github.com/spf13/pflag v1.0.3 // indirect
 	github.com/stretchr/testify v1.3.0 // indirect
 	github.com/tebeka/strftime v0.0.0-20140926081919-3f9c7761e312 // indirect
-	gitlab.x.lan/yunshan/message v0.0.0-20190314040443-79de28d3aa46
+	gitlab.x.lan/yunshan/message v0.0.0-20190321031241-863a1709ee76
 	golang.org/x/net v0.0.0-20190313220215-9f648a60d977
 	golang.org/x/sys v0.0.0-20190312061237-fead79001313 // indirect
 	golang.org/x/text v0.3.1-0.20180807135948-17ff2d5776d2 // indirect
