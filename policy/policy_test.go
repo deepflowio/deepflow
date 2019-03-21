@@ -54,7 +54,7 @@ var (
 var (
 	server = NewIPFromString("172.20.1.1").Int()
 
-	group    = []uint32{0, 10, 20, 30, 40, 50, 60, 70, 2, 3, 4, 11, 12, 13, 14, 15}
+	group    = []uint32{0, 10, 20, 30, 40, 50, 60, 70, 2, 3, 4, 11, 12, 13, 14, 15, 16}
 	groupEpc = []int32{0, 10, 20, 0, 40, 50, 0, 70, 40, 11, 12}
 	ipGroup6 = group[6] + IP_GROUP_ID_FLAG
 
@@ -82,6 +82,8 @@ var (
 	group5Ip2  = NewIPFromString("10.33.1.10").Int()
 	group5Mac1 = NewMACAddrFromString("55:55:55:55:55:51").Int()
 	group5Mac2 = NewMACAddrFromString("55:55:55:55:55:52").Int()
+
+	group16Ip1 = NewIPFromString("1.1.1.2").Int()
 
 	ipGroup3IpNet1 = "10.25.1.2/24"
 	ipGroup3IpNet2 = "10.30.1.2/24"
@@ -115,6 +117,9 @@ var (
 	testIp4        = NewIPFromString("20.0.0.0").Int()
 	testMac4       = NewMACAddrFromString("ab:cd:44:11:11:11").Int()
 	queryIp        = NewIPFromString("20.30.1.100").Int()
+
+	ipGroup8IpNet1 = "1.1.1.0/24"
+	ipGroup8IpNet2 = "1.1.2.0/24"
 )
 
 type EndInfo struct {
@@ -405,7 +410,9 @@ func generatePolicyTable(ids ...TableID) *PolicyTable {
 	groupEpc[5] = 50
 	ipGroup3 := generateIpGroup(group[6], groupEpc[6], ipGroup6IpNet1, ipGroup6IpNet2, ipGroup6IpNet3)
 	ipGroup4 := generateIpGroup(group[7], groupEpc[7], ipGroup7IpNet1, ipGroup7IpNet2)
-	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3, ipGroup4)
+	ipGroup5 := generateIpGroup(group[16], groupEpc[1], group1Ip1Net, group2Ip1Net)
+	ipGroup5.Type = 3
+	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3, ipGroup4, ipGroup5)
 
 	policy.UpdateIpGroupData(ipGroups)
 
@@ -602,6 +609,32 @@ func TestPolicyEpcPolicy(t *testing.T) {
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestPolicyEpcPolicy Check Failed!")
+	}
+}
+
+func TestPolicyEpcIpGroup(t *testing.T) {
+	acls := []*Acl{}
+	// 创建 policyTable
+	table := generatePolicyTable()
+	// 构建acl action  1->2 tcp 8000
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	acl := generatePolicyAcl(table, action, 10, group[16], groupAny, IPProtocolTCP, 8000, vlanAny)
+	acls = append(acls, acl)
+	table.UpdateAcls(acls)
+
+	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group1Ip3, IPProtocolTCP, 0, 8000)
+	_, policyData := table.LookupAllByKey(key)
+	// 构建预期结果
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestPolicyEpcIpGroup Check Failed!")
+	}
+
+	key = generateLookupKey(group1Mac, group2Mac, vlanAny, group2Ip2, group1Ip3, IPProtocolTCP, 0, 8000)
+	_, policyData = table.LookupAllByKey(key)
+	if !CheckPolicyResult(t, INVALID_POLICY_DATA, policyData) {
+		t.Error("TestPolicyEpcIpGroup Check Failed!")
 	}
 }
 
@@ -2131,10 +2164,10 @@ func BenchmarkFirstPath(b *testing.B) {
 	table.UpdateAcls(acls)
 	// 构建查询1-key  1:0->2:8000 tcp
 	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 8000)
-	endpoint := getEndpointData(table, key)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
+		endpoint := getEndpointData(table, key)
 		table.operator.GetPolicyByFirstPath(endpoint, key)
 	}
 }
@@ -2185,20 +2218,23 @@ func BenchmarkFirstPathWithMultiGroup(b *testing.B) {
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
-	for i := 100; i < 200; i++ {
-		acl.SrcGroups = append(acl.SrcGroups, uint32(i))
-		acl.DstGroups = append(acl.DstGroups, uint32(i))
-	}
-
 	acls = append(acls, acl)
+	srcGroups := []uint32{group[1]}
+	dstGroups := []uint32{group[2]}
+	for i := group[2]; i <= 100; i += 10 {
+		acl := generatePolicyAcl(table, action, ACLID(i), uint32(i), uint32(i+10), IPProtocolTCP, 0, vlanAny)
+		acls = append(acls, acl)
+		srcGroups = append(srcGroups, i+10)
+		dstGroups = append(dstGroups, i+10)
+	}
 	table.UpdateAcls(acls)
 
 	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 8000)
-	endpoint := getEndpointData(table, key)
-	endpoint.SrcInfo.GroupIds = acl.SrcGroups
-	endpoint.DstInfo.GroupIds = acl.DstGroups
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		endpoint := getEndpointData(table, key)
+		endpoint.SrcInfo.GroupIds = srcGroups
+		endpoint.DstInfo.GroupIds = dstGroups
 		table.operator.GetPolicyByFirstPath(endpoint, key)
 	}
 }

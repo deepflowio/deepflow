@@ -22,49 +22,70 @@ type Acl struct {
 	Vlan              uint32
 	Action            []AclAction
 	NpbActions        []NpbAction
-	AllMatcheds       []MatchedField
-	MatchedMask       MatchedField // MatchedMask对应的位为0，表示对应Matched的位为*，0或1都匹配该策略
+	AllMatched        []MatchedField
+	AllMatchedMask    []MatchedField // MatchedMask对应的位为0，表示对应Matched的位为*，0或1都匹配该策略
 }
 
-func (a *Acl) generateMatchedField() {
-	matches := make([]MatchedField, 0, len(a.SrcGroupRelations)*len(a.DstGroupRelations)*len(a.SrcPortRange)*len(a.DstPortRange))
-	// FIXME: 循化嵌套太多
-	for _, srcGroup := range a.SrcGroupRelations {
-		for _, dstGroup := range a.DstGroupRelations {
-			for _, srcPort := range a.SrcPortRange {
-				for _, dstPort := range a.DstPortRange {
-					match := MatchedField{}
-					match.Set(MATCHED_TAP_TYPE, uint16(a.Type))
-					match.Set(MATCHED_PROTO, uint16(a.Proto))
-					match.Set(MATCHED_VLAN, uint16(a.Vlan))
-					match.Set(MATCHED_SRC_GROUP, srcGroup)
-					match.Set(MATCHED_DST_GROUP, dstGroup)
-					match.Set(MATCHED_SRC_PORT, srcPort.Min())
-					match.Set(MATCHED_DST_PORT, dstPort.Min())
-					matches = append(matches, match)
-				}
-			}
+func (a *Acl) generateMatchedField(srcMac, dstMac uint32, srcIps, dstIps ipSegment) {
+	for _, srcPort := range a.SrcPorts {
+		for _, dstPort := range a.DstPorts {
+			match := MatchedField{}
+			match.Set(MATCHED_TAP_TYPE, uint32(a.Type))
+			match.Set(MATCHED_PROTO, uint32(a.Proto))
+			match.Set(MATCHED_VLAN, uint32(a.Vlan))
+			match.Set(MATCHED_SRC_MAC, srcMac)
+			match.Set(MATCHED_DST_MAC, dstMac)
+			match.Set(MATCHED_SRC_IP, srcIps.getIp())
+			match.Set(MATCHED_SRC_EPC, uint32(srcIps.getEpcId()))
+			match.Set(MATCHED_DST_IP, dstIps.getIp())
+			match.Set(MATCHED_DST_EPC, uint32(dstIps.getEpcId()))
+			match.Set(MATCHED_SRC_PORT, uint32(srcPort))
+			match.Set(MATCHED_DST_PORT, uint32(dstPort))
+			a.AllMatched = append(a.AllMatched, match)
+
+			mask := MatchedField{}
+			mask.SetMask(MATCHED_TAP_TYPE, uint32(a.Type))
+			mask.SetMask(MATCHED_PROTO, uint32(a.Proto))
+			mask.SetMask(MATCHED_VLAN, uint32(a.Vlan))
+			mask.SetMask(MATCHED_SRC_MAC, srcMac)
+			mask.SetMask(MATCHED_DST_MAC, dstMac)
+			mask.Set(MATCHED_SRC_IP, srcIps.getMask())
+			mask.SetMask(MATCHED_SRC_EPC, uint32(srcIps.getEpcId()))
+			mask.Set(MATCHED_DST_IP, dstIps.getMask())
+			mask.SetMask(MATCHED_DST_EPC, uint32(dstIps.getEpcId()))
+			mask.SetMask(MATCHED_SRC_PORT, uint32(srcPort))
+			mask.SetMask(MATCHED_DST_PORT, uint32(dstPort))
+			a.AllMatchedMask = append(a.AllMatchedMask, mask)
 		}
 	}
-	a.AllMatcheds = matches
 }
 
-func (a *Acl) generateMatchedMask() {
-	// 字段非0，对应位值为其掩码
-	a.MatchedMask.SetMask(MATCHED_TAP_TYPE, uint16(a.Type))
-	a.MatchedMask.SetMask(MATCHED_PROTO, uint16(a.Proto))
-	a.MatchedMask.SetMask(MATCHED_VLAN, uint16(a.Vlan))
-	// 掩码只区分是否全采集，所以使用切片中的一个
-	a.MatchedMask.SetMask(MATCHED_SRC_GROUP, a.SrcGroupRelations[0])
-	a.MatchedMask.SetMask(MATCHED_DST_GROUP, a.DstGroupRelations[0])
-	a.MatchedMask.SetMask(MATCHED_SRC_PORT, a.SrcPorts[0])
-	a.MatchedMask.SetMask(MATCHED_DST_PORT, a.DstPorts[0])
+func (a *Acl) generateMatched(srcMac, dstMac []uint32, srcIps, dstIps []ipSegment) {
+	if len(a.SrcPorts) == 0 {
+		a.SrcPorts = append(a.SrcPorts, 0)
+	}
+	if len(a.DstPorts) == 0 {
+		a.DstPorts = append(a.DstPorts, 0)
+	}
+
+	for _, srcMac := range srcMac {
+		for _, dstMac := range dstMac {
+			a.generateMatchedField(srcMac, dstMac, emptyIpSegment, emptyIpSegment)
+		}
+		for _, dstIp := range dstIps {
+			a.generateMatchedField(srcMac, 0, emptyIpSegment, dstIp)
+		}
+	}
+	for _, srcIp := range srcIps {
+		for _, dstMac := range dstMac {
+			a.generateMatchedField(0, dstMac, srcIp, emptyIpSegment)
+		}
+		for _, dstIp := range dstIps {
+			a.generateMatchedField(0, 0, srcIp, dstIp)
+		}
+	}
 }
 
-func (a *Acl) generateMatched() {
-	a.generateMatchedField()
-	a.generateMatchedMask()
-}
 func (a *Acl) getPorts(rawPorts []uint16) string {
 	// IN: rawPorts: 1,3,4,5,7,10,11,12,15,17
 	// OUT: ports: "1,3-5,7,10-12,15,17"

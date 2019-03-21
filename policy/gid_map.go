@@ -16,10 +16,25 @@ func (m *AclGidMap) Init() {
 	}
 }
 
-func addGroupAclGidsToMap(acl *Acl, aclGid uint32, srcMap map[uint32]bool, dstMap map[uint32]bool) {
+func toSliceUint16(raw []uint32) []uint16 {
+	result := make([]uint16, 0, len(raw))
+	for _, id := range raw {
+		result = append(result, uint16(id&0xffff))
+	}
+	return result
+}
+
+func addGroupAclGidsToMap(acl *Acl, enable bool, aclGid uint32, srcMap map[uint32]bool, dstMap map[uint32]bool) {
 	srcLen := len(acl.SrcGroups)
 	dstLen := len(acl.DstGroups)
-	for _, group := range acl.SrcGroupRelations {
+	srcGroups := acl.SrcGroupRelations
+	dstGroups := acl.DstGroupRelations
+	if !enable {
+		srcGroups = toSliceUint16(acl.SrcGroups)
+		dstGroups = toSliceUint16(acl.DstGroups)
+	}
+
+	for _, group := range srcGroups {
 		key := aclGid<<16 | uint32(group)
 		if ok := srcMap[key]; !ok {
 			srcMap[key] = true
@@ -30,7 +45,7 @@ func addGroupAclGidsToMap(acl *Acl, aclGid uint32, srcMap map[uint32]bool, dstMa
 			}
 		}
 	}
-	for _, group := range acl.DstGroupRelations {
+	for _, group := range dstGroups {
 		key := aclGid<<16 | uint32(group)
 		if ok := dstMap[key]; !ok {
 			dstMap[key] = true
@@ -43,7 +58,7 @@ func addGroupAclGidsToMap(acl *Acl, aclGid uint32, srcMap map[uint32]bool, dstMa
 	}
 }
 
-func (m *AclGidMap) GenerateGroupAclGidMaps(acls []*Acl) {
+func (m *AclGidMap) GenerateGroupAclGidMaps(acls []*Acl, enable bool) {
 	srcGroupAclGidMaps := [TAP_MAX]map[uint32]bool{}
 	dstGroupAclGidMaps := [TAP_MAX]map[uint32]bool{}
 	for i := TAP_MIN; i < TAP_MAX; i++ {
@@ -52,7 +67,7 @@ func (m *AclGidMap) GenerateGroupAclGidMaps(acls []*Acl) {
 	}
 	for _, acl := range acls {
 		for _, action := range acl.Action {
-			addGroupAclGidsToMap(acl, uint32(action.GetACLGID()), srcGroupAclGidMaps[acl.Type], dstGroupAclGidMaps[acl.Type])
+			addGroupAclGidsToMap(acl, enable, uint32(action.GetACLGID()), srcGroupAclGidMaps[acl.Type], dstGroupAclGidMaps[acl.Type])
 		}
 	}
 	m.SrcGroupAclGidMaps = srcGroupAclGidMaps
