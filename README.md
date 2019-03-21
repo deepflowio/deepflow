@@ -202,7 +202,7 @@ profiler
 
      flow性能量化字段                           | 统计粒度      | 所属阶段 | 是否区分方向 | 其他        | 对应report字段                                | 对应kibana字段
      -------------------------------------------|---------------|----------|--------------|-------------|-----------------------------------------------|---------------
-     flow.rttSyn0, flow.rttSyn1                 | 每流          | 连接建立 | 是           | 持续上报    | RTTSyn=rttSyn0+rttSyn1,                       | rtt_syn 
+     flow.rttSyn0, flow.rttSyn1                 | 每流          | 连接建立 | 是           | 持续上报    | RTTSyn=rttSyn0+rttSyn1,                       | rtt_syn
      同上                                       | 同上          | 同上     | 同上         | 同上           | RTTSynClient=rttSyn0, RTTSynServer=rttSyn1 | rtt_syn_client, rtt_syn_server
      period.retransSyn0, period.retransSyn1     | 每上报周期    | 连接建立 | 是           | N/A         | Src.SynRetransCount, Dst.SynRetransCount      | syn_retrans_cnt_0, syn_retrans_cnt_1
      period.art0Sum, period.art1Sum             | 每上报周期    | 数据传输 | 是           | 不含握手    | ART=art1Sum/art1Count                         | art_avg
@@ -272,10 +272,10 @@ profiler
       - CLOSE_TYPE_HALF_CLOSE: CLOSING_TX1（SERVER_HALF_CLOSE）、CLOSING_RX1（CLIENT_HALF_CLOSE）
       - CLOSE_TYPE_TIMEOUT: ESTABLISHED
       - CLOSE_TYPE_UNKNOWN: EXCEPTION
-      - CLOSE_TYPE_FORCE_REPORT: 第5秒或每自然分钟分钟第0秒强制上报的情况
+      - CLOSE_TYPE_FORCE_REPORT: 每自然分钟分钟第0秒强制上报的情况
   - 其他IPv4
       - CLOSE_TYPE_TIMEOUT: 默认情况
-      - CLOSE_TYPE_FORCE_REPORT: 第5秒或每自然分钟分钟第0秒强制上报的情况
+      - CLOSE_TYPE_FORCE_REPORT: 每自然分钟分钟第0秒强制上报的情况
 
 * 网流时间序列字段
   - arrTime00: 整条流的请求方向的第一个包的时间戳（内部使用）
@@ -283,9 +283,25 @@ profiler
   - arrTime0Last: 此次上报时整条流的请求方向的最后一个包的时间戳（内部使用）
   - arrTime1Last: 此次上报时整条流的应答方向的最后一个包的时间戳（内部使用）
   - startTime: 本次上报的统计起始时间
+      - 当startTime与endTime取值分别落在两个不同自然分钟内时，矫正startTime为endTime所在分钟的0秒时刻
   - endTime: 本次上报的统计结束时间（与startTime的时间差应该在60秒以内，允许4秒的误差）
       - endTime与`startTime+duration`并不一定相等，主要体现在突发短流和长流包数少的情况下
       - 4秒容差为默认值，可通过droplet.yaml进行配置
   - timeBitmap: 网流每自然分钟内每一秒中是否有包，有的话对应bit为1（共64bit）
   - duration: 本次上报时max(arrTime0Last,arrTime1Last)与min(arrTime00,arrTime10)的时间差
       - （``乱序处理``：如果正在处理的包的timestamp小于max(arrTime0Last,arrTime1Last)，则将其timestamp调整为max(arrTime0Last,arrTime1Last)）
+
+* 网流地理信息查询
+  - 地理信息标记网流中云外IP或在监控列表中的IP的国家、区域和运营商信息，其查询方式与L3EpcID相关
+
+    |  L3EpcID_0  |  L3EpID_1  |  查询端  |
+    |  ---------  |  --------  |  ------  |
+    |  0          |  0         |  不查询  |
+    |  大于0      |  0         |  目的端  |
+    |  0          |  大于0     |  源端    |
+    |  -1         |  0         |  目的端  |
+    |  0          |  -1        |  源端    |
+    |  大于0      |  大于0     |  源端    |
+    |  -1         |  -1        |  源端    |
+    |  大于0      |  -1        |  目的端  |
+    |  -1         |  大于0     |  源端    |
