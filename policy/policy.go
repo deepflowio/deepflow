@@ -73,10 +73,8 @@ type TableOperator interface {
 	GetAcl() []*Acl
 	FlushAcls()
 	UpdateAcls(data []*Acl)
-	GenerateIpNetmaskMapFromIpGroupData(data []*IpGroupData)
-	GenerateIpNetmaskMapFromPlatformData(data []*PlatformData)
-	GenerateGroupIdMapByIpGroupData(data []*IpGroupData)
-	GenerateGroupIdMapByPlatformData(data []*PlatformData)
+	UpdateInterfaceData(data []*PlatformData)
+	UpdateIpGroupData(data []*IpGroupData)
 
 	SetCloudPlatform(cloudPlatformLabeler *CloudPlatformLabeler)
 
@@ -222,14 +220,12 @@ func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData
 
 func (t *PolicyTable) UpdateInterfaceData(data []*PlatformData) {
 	t.cloudPlatformLabeler.UpdateInterfaceTable(data)
-	t.operator.GenerateIpNetmaskMapFromPlatformData(data)
-	t.operator.GenerateGroupIdMapByPlatformData(data)
+	t.operator.UpdateInterfaceData(data)
 }
 
 func (t *PolicyTable) UpdateIpGroupData(data []*IpGroupData) {
 	t.cloudPlatformLabeler.UpdateGroupTree(data)
-	t.operator.GenerateIpNetmaskMapFromIpGroupData(data)
-	t.operator.GenerateGroupIdMapByIpGroupData(data)
+	t.operator.UpdateIpGroupData(data)
 }
 
 func (t *PolicyTable) UpdateAclData(data []*Acl) {

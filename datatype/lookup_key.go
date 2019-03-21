@@ -25,37 +25,36 @@ type LookupKey struct {
 	SrcGroupIds, DstGroupIds        []uint16 //资源组的再分组ID, 没有重复用于策略匹配
 	SrcAllGroupIds, DstAllGroupIds  []uint16 //资源组的再分组ID，有重复用于aclgid bitmap生成
 	FeatureFlag                     FeatureFlags
-	ForwardMatched, BackwardMatched []MatchedField
+	ForwardMatched, BackwardMatched MatchedField
 }
 
-func (k *LookupKey) generateMatchedField(direction DirectionType) []MatchedField {
-	matcheds := make([]MatchedField, 0, len(k.SrcGroupIds)*len(k.DstGroupIds))
+func (k *LookupKey) generateMatchedField(direction DirectionType, srcEpc, dstEpc uint16) {
 	srcPort, dstPort := k.SrcPort, k.DstPort
-	srcGroups, dstGroups := k.SrcGroupIds, k.DstGroupIds
-
+	srcIp, dstIp := k.SrcIp, k.DstIp
+	srcMac, dstMac := k.SrcMac, k.DstMac
+	matched := &k.ForwardMatched
 	if direction == BACKWARD {
 		srcPort, dstPort = k.DstPort, k.SrcPort
-		srcGroups, dstGroups = k.DstGroupIds, k.SrcGroupIds
+		srcIp, dstIp = k.DstIp, k.SrcIp
+		srcMac, dstMac = k.DstMac, k.SrcMac
+		matched = &k.BackwardMatched
 	}
-	for _, srcGroup := range srcGroups {
-		for _, dstGroup := range dstGroups {
-			matched := MatchedField{}
-			matched.Set(MATCHED_TAP_TYPE, uint16(k.Tap))
-			matched.Set(MATCHED_PROTO, uint16(k.Proto))
-			matched.Set(MATCHED_VLAN, uint16(k.Vlan))
-			matched.Set(MATCHED_SRC_GROUP, srcGroup)
-			matched.Set(MATCHED_DST_GROUP, dstGroup)
-			matched.Set(MATCHED_SRC_PORT, srcPort)
-			matched.Set(MATCHED_DST_PORT, dstPort)
-			matcheds = append(matcheds, matched)
-		}
-	}
-	return matcheds
+	matched.Set(MATCHED_TAP_TYPE, uint32(k.Tap))
+	matched.Set(MATCHED_PROTO, uint32(k.Proto))
+	matched.Set(MATCHED_VLAN, uint32(k.Vlan))
+	matched.Set(MATCHED_SRC_MAC, uint32(srcMac&0xffffffff))
+	matched.Set(MATCHED_DST_MAC, uint32(dstMac&0xffffffff))
+	matched.Set(MATCHED_SRC_IP, srcIp)
+	matched.Set(MATCHED_DST_IP, dstIp)
+	matched.Set(MATCHED_SRC_EPC, uint32(srcEpc))
+	matched.Set(MATCHED_DST_EPC, uint32(dstEpc))
+	matched.Set(MATCHED_SRC_PORT, uint32(srcPort))
+	matched.Set(MATCHED_DST_PORT, uint32(dstPort))
 }
 
-func (k *LookupKey) GenerateMatchedField() {
-	k.ForwardMatched = k.generateMatchedField(FORWARD)
-	k.BackwardMatched = k.generateMatchedField(BACKWARD)
+func (k *LookupKey) GenerateMatchedField(srcEpc, dstEpc uint16) {
+	k.generateMatchedField(FORWARD, srcEpc, dstEpc)
+	k.generateMatchedField(BACKWARD, dstEpc, srcEpc)
 }
 
 func (k *LookupKey) String() string {

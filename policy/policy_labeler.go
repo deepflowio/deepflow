@@ -290,7 +290,7 @@ func (l *PolicyLabeler) GenerateGroupVlanMaps(acls []*Acl) {
 }
 
 func (l *PolicyLabeler) GenerateGroupAclGidMaps(acls []*Acl) {
-	l.AclGidMap.GenerateGroupAclGidMaps(acls)
+	l.AclGidMap.GenerateGroupAclGidMaps(acls, true)
 	l.FastPath.UpdateGroupAclGidMaps(l.AclGidMap.SrcGroupAclGidMaps, l.AclGidMap.DstGroupAclGidMaps)
 }
 
@@ -462,6 +462,16 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 		atomic.CompareAndSwapUint32(&l.AclHitMax, aclHitMax, aclHit)
 	}
 	return endpointStore, findPolicy
+}
+
+func (l *PolicyLabeler) UpdateInterfaceData(data []*PlatformData) {
+	l.GenerateIpNetmaskMapFromPlatformData(data)
+	l.GenerateGroupIdMapByPlatformData(data)
+}
+
+func (l *PolicyLabeler) UpdateIpGroupData(data []*IpGroupData) {
+	l.GenerateIpNetmaskMapFromIpGroupData(data)
+	l.GenerateGroupIdMapByIpGroupData(data)
 }
 
 func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointStore, *PolicyData) {

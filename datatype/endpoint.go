@@ -143,6 +143,14 @@ func (i *EndpointInfo) SetL3DataByMac(data *PlatformData) {
 	i.L3DeviceId = data.DeviceId
 }
 
+func (i *EndpointInfo) GetL3Epc() uint16 {
+	id := uint16(0)
+	if i.L3EpcId > 0 {
+		id = uint16(i.L3EpcId)
+	}
+	return id
+}
+
 func (i *EndpointInfo) GetEpc() uint16 {
 	id := uint16(0)
 	if i.L2EpcId > 0 {
