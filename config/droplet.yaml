@@ -126,6 +126,7 @@ flow-generator:
   # the interval when learning different clients, in seconds
   # if the current port has 'port-learn-end-count' clients in an interval,
   # then it can be set as a service port
+  # set 'port-stats-interval' as 0 to disable port learning
   port-stats-interval: 1
   port-stats-src-end-count: 5
 #geo-file-location: /opt/droplet/ip_info_mini.json
