@@ -9,9 +9,10 @@ import (
 )
 
 type ServiceStatus struct {
-	clientMap map[uint32]bool
-	threshold time.Duration
-	active    bool
+	clientMap  map[uint32]bool
+	threshold  time.Duration
+	lastAccess time.Duration
+	active     bool
 }
 
 type IpPortEpcKey = uint64
@@ -21,9 +22,10 @@ type ServiceManager struct {
 
 	lruCache      *lru.Cache64
 	getStatus     func(IpPortEpcKey, uint16) bool
-	enableStatus  func(IpPortEpcKey)
+	enableStatus  func(IpPortEpcKey, time.Duration)
 	hitStatus     func(IpPortEpcKey, uint32, time.Duration)
 	disableStatus func(IpPortEpcKey)
+	checkTimeout  func(time.Duration, time.Duration) bool
 }
 
 // inner tcp service manager allocator
@@ -70,6 +72,11 @@ const IANA_PORT_RANGE = 1024 + 1
 
 func NewServiceManager(capacity int) *ServiceManager {
 	serviceManager := &ServiceManager{lruCache: lru.NewCache64(capacity)}
+	if portStatsTimeout > 0 {
+		serviceManager.checkTimeout = serviceManager.checkTimeoutOn
+	} else {
+		serviceManager.checkTimeout = serviceManager.checkTimeoutOff
+	}
 	// if portStatsInterval is 0, then not learn any port
 	if portStatsInterval > 0 {
 		serviceManager.getStatus = serviceManager.getStatusLearnOn
@@ -82,6 +89,8 @@ func NewServiceManager(capacity int) *ServiceManager {
 		serviceManager.enableStatus = serviceManager.enableStatusLearnOff
 		serviceManager.hitStatus = serviceManager.hitStatusLearnOff
 		serviceManager.disableStatus = serviceManager.disableStatusLearnOff
+		// if portStatsInterval is 0, timeout will be invalid
+		serviceManager.checkTimeout = serviceManager.checkTimeoutOff
 	}
 	return serviceManager
 }
@@ -96,6 +105,14 @@ func getTcpServiceManager(key IpPortEpcKey) *ServiceManager {
 
 func getUdpServiceManager(key IpPortEpcKey) *ServiceManager {
 	return innerUdpSMA[key%flowGeneratorCount]
+}
+
+func (m *ServiceManager) checkTimeoutOn(lastAccess, timestamp time.Duration) bool {
+	return lastAccess+portStatsTimeout < timestamp
+}
+
+func (m *ServiceManager) checkTimeoutOff(lastAccess, timestamp time.Duration) bool {
+	return false
 }
 
 func (m *ServiceManager) getStatusLearnOn(key IpPortEpcKey, port uint16) bool {
@@ -119,22 +136,23 @@ func (m *ServiceManager) getStatusLearnOff(key IpPortEpcKey, port uint16) bool {
 	return false
 }
 
-func (m *ServiceManager) enableStatusLearnOn(key IpPortEpcKey) {
+func (m *ServiceManager) enableStatusLearnOn(key IpPortEpcKey, timestamp time.Duration) {
 	m.Lock()
 	value, ok := m.lruCache.Get(key)
 	if !ok {
 		// threshold is not used for an active service port
-		status := &ServiceStatus{make(map[uint32]bool), 0, false}
-		status.active = true
+		status := &ServiceStatus{make(map[uint32]bool), 0, timestamp, false}
 		m.lruCache.Add(key, status)
+		status.active = true
 	} else {
 		status := value.(*ServiceStatus)
+		status.lastAccess = timestamp
 		status.active = true
 	}
 	m.Unlock()
 }
 
-func (m *ServiceManager) enableStatusLearnOff(key IpPortEpcKey) {
+func (m *ServiceManager) enableStatusLearnOff(key IpPortEpcKey, timestamp time.Duration) {
 	return
 }
 
@@ -143,17 +161,23 @@ func (m *ServiceManager) hitStatusLearnOn(key IpPortEpcKey, clientHash uint32, t
 	m.Lock()
 	value, ok := m.lruCache.Get(key)
 	if !ok {
-		status = &ServiceStatus{make(map[uint32]bool), timestamp + portStatsInterval, false}
+		status = &ServiceStatus{make(map[uint32]bool), timestamp + portStatsInterval, timestamp, false}
 		m.lruCache.Add(key, status)
 	} else {
 		status = value.(*ServiceStatus)
+		// status is timeout and restart learning
+		if m.checkTimeout(status.lastAccess, timestamp) {
+			status.active = false
+			log.Debugf("IpPortEpcKey %x is timeout", key)
+		}
+		status.lastAccess = timestamp
 	}
 	if status.active {
 		m.Unlock()
 		return
 	}
 	// if timestamp interval is bigger than 'learn interval',
-	// then restart the learning
+	// then restart learning
 	if status.threshold < timestamp {
 		status.threshold = timestamp + portStatsInterval
 		status.active = false

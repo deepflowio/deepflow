@@ -123,12 +123,16 @@ flow-generator:
   # if true, then not check mac for flow match
   # when inport is bigger than 0x30000 and l2end is false
   ignore-l2-end: false
-  # the interval when learning different clients, in seconds
-  # if the current port has 'port-learn-end-count' clients in an interval,
-  # then it can be set as a service port
-  # set 'port-stats-interval' as 0 to disable port learning
-  port-stats-interval: 1
-  port-stats-src-end-count: 5
+  port-stats:
+    disable: false
+    # the interval when learning different clients, in seconds
+    # if the current port has 'port-learn-end-count' clients in an interval,
+    # then it can be set as a service port
+    # set 'port-stats-interval' as 0 to disable port learning
+    port-stats-interval: 1
+    port-stats-src-end-count: 5
+    # timeout for an active server port, in seconds, set as 0 to disable timeout
+    port-stats-timeout: 300
 #geo-file-location: /opt/droplet/ip_info_mini.json
 map-reduce:
   # reject varied doc (with edge or port tag) when buffer usage exceed the limit, default queue.docs-queue-size
