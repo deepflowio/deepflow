@@ -74,11 +74,6 @@ type TridentAdapter struct {
 	listener *net.UDPConn
 }
 
-func abs(n time.Duration) time.Duration {
-	m := n >> 63
-	return (n ^ m) - m
-}
-
 func NewTridentAdapter(queues queue.MultiQueueWriter, listenBufferSize, cacheSize int) *TridentAdapter {
 	adapter := &TridentAdapter{
 		listenBufferSize: listenBufferSize,
@@ -154,7 +149,7 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32, timest
 	instance := a.instances[key]
 	instance.timestamp = timestamp
 	timeAdjust := (time.Duration(time.Now().UnixNano()) - timestamp) / time.Second
-	interval := uint64(abs(timeAdjust))
+	interval := uint64(Abs(timeAdjust))
 	if interval >= 1 {
 		//	timestamp = raw + instance.timeAdjust
 		//	timeAdjust = time.Now() - timestamp
@@ -164,7 +159,7 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32, timest
 		//	rawTimeAdjust = timadjust + instance.timeAdjust = time.Now() - raw
 		//	即 instance.timeAdjust = rawTimeAdjust = timeAdjust + instance.timeAdjust
 		instance.timeAdjust += timeAdjust
-		interval = uint64(abs(instance.timeAdjust))
+		interval = uint64(Abs(instance.timeAdjust))
 		log.Infof("trident(%v) set timeAdjust %ds.", IpFromUint32(key), instance.timeAdjust)
 	}
 
