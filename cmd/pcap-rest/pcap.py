@@ -84,8 +84,15 @@ def __packet_matches_condition(packet, ips_int, protocol, port):
     return True
 
 
-def found_in_pcap(filename, protocol, port=None):
-    if protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
+def found_in_pcap(filename, ips=None, protocol=None, port=None):
+    ips_int = []
+    if ips is not None:
+        for ip in ips:
+            ip_int = _ip_to_int(ip)
+            if ip_int is not None:
+                ips_int.append(ip_int)
+
+    if protocol is not None and protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
         return False
 
     try:
@@ -112,7 +119,7 @@ def found_in_pcap(filename, protocol, port=None):
                 packet = fp.read(incl_len)
                 if len(packet) != incl_len:
                     return False
-                if __packet_matches_condition(packet, protocol, port):
+                if __packet_matches_condition(packet, ips_int, protocol, port):
                     return True
 
 

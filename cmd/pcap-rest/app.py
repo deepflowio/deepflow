@@ -53,6 +53,7 @@ def get_files_by_ip(acl_gid, ip):
 
 HTTP request args:
 
+  ip: IP地址筛选，可以填写多个
   protocol: 协议，可选值为[6, 17]
   port: 端口
 
@@ -83,6 +84,7 @@ HTTP response body:
       "OPT_STATUS": "SUCCESS"
     }
     """
+    ips = request.query.getlist('ip')
     protocol = None
     if request.query.protocol != '':
         protocol = int(request.query.protocol)
@@ -90,7 +92,7 @@ HTTP response body:
     if request.query.port != '':
         port = int(request.query.port)
     return {
-        'DATA': get_files(acl_gid, ip=ip, protocol=protocol, port=port),
+        'DATA': get_files(acl_gid, ip=ip, ip_filter=ips, protocol=protocol, port=port),
         'OPT_STATUS': 'SUCCESS',
     }
 
@@ -180,11 +182,13 @@ def _time_to_epoch(time_str):
         return 0
 
 
-def get_files(acl_gid, mac=None, ip=None, protocol=None, port=None):
+def get_files(acl_gid, mac=None, ip=None, ip_filter=None, protocol=None, port=None):
     if protocol is not None and protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
         return []
 
     directory = PCAP_DIR + '/' + str(acl_gid) + '/'
+    if not os.path.isdir(directory):
+        return []
     files = []
     mac_rep = None
     ip_rep = None
@@ -209,7 +213,7 @@ def get_files(acl_gid, mac=None, ip=None, protocol=None, port=None):
                 mac_rep = _mac_convert_back(segs[1])
             else:
                 ip_rep = _ip_convert_back(segs[2])
-        if protocol is not None and not found_in_pcap(directory + file, protocol, port):
+        if (ip_filter is not None or protocol is not None) and not found_in_pcap(directory + file, ip_filter, protocol, port):
             continue
         files.append({
             'mac': mac_rep,
