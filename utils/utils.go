@@ -5,6 +5,7 @@ import (
 	"math"
 	"net"
 	"strings"
+	"time"
 )
 
 func UintMin(x, y uint) uint {
@@ -59,6 +60,11 @@ func Max(x, y int) int {
 		return x
 	}
 	return y
+}
+
+func Abs(n time.Duration) time.Duration {
+	m := n >> 63
+	return (n ^ m) - m
 }
 
 // 调用者保证入参是IPv4
