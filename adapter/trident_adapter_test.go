@@ -66,7 +66,7 @@ func TestTimestampAdjust(t *testing.T) {
 		}
 		adapter.findAndAdd(data, key, decoder.Seq(), decoder.timestamp)
 	}
-	expectMaxTime := uint64(abs(firstPacketTime-time.Duration(time.Now().UnixNano())) / time.Second)
+	expectMaxTime := uint64(Abs(firstPacketTime-time.Duration(time.Now().UnixNano())) / time.Second)
 	actualMaxTime := adapter.counter.MaxTime
 	expectAverageTime := expectMaxTime / packetCount
 	// 因未达到定期上报时间节点，counter中的AverageTime只做了求和，需手动平均
