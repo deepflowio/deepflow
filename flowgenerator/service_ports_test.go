@@ -103,7 +103,7 @@ func TestPortLearnInvalid(t *testing.T) {
 	if serviceManager.getStatus(key, port) {
 		t.Error("serviceManager.getStatus() return true, expect false")
 	}
-	serviceManager.enableStatus(key)
+	serviceManager.enableStatus(key, time.Second)
 	if serviceManager.getStatus(key, port) {
 		t.Error("serviceManager.getStatus() return true, expect false")
 	}
@@ -111,6 +111,7 @@ func TestPortLearnInvalid(t *testing.T) {
 
 func TestHitPortStatus(t *testing.T) {
 	portStatsInterval = time.Second
+	portStatsTimeout = 0
 	serviceManager := NewServiceManager(64 * 1024)
 	epcId := int32(3)
 	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
@@ -124,6 +125,30 @@ func TestHitPortStatus(t *testing.T) {
 	}
 	if !serviceManager.getStatus(key, port) {
 		t.Error("serviceManager.getStatus() return false, expect true")
+	}
+}
+
+func TestCheckTimeout(t *testing.T) {
+	portStatsSrcEndCount = DEFAULT_IP_LEARN_CNT
+	portStatsInterval = time.Second
+	portStatsTimeout = 5 * time.Second
+	serviceManager := NewServiceManager(64 * 1024)
+	epcId := int32(3)
+	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
+	port := uint16(8080)
+	key := genServiceKey(epcId, ip, port)
+	if serviceManager.getStatus(key, port) {
+		t.Error("serviceManager.getStatus() return true, expect false")
+	}
+	for i := 0; i < DEFAULT_IP_LEARN_CNT; i++ {
+		serviceManager.hitStatus(key, uint32(i+1), time.Duration(i*100))
+	}
+	if !serviceManager.getStatus(key, port) {
+		t.Error("serviceManager.getStatus() return false, expect true")
+	}
+	serviceManager.hitStatus(key, 100, 2*portStatsTimeout)
+	if serviceManager.getStatus(key, port) {
+		t.Error("serviceManager.getStatus() return true, expect false")
 	}
 }
 
@@ -366,7 +391,7 @@ func TestSynSrcPortEnable(t *testing.T) {
 	packet0.PortSrc = port1
 	l3EpcId := packet0.EndpointData.SrcInfo.L3EpcId
 	serviceKey := genServiceKey(l3EpcId, packet0.IpSrc, packet0.PortSrc)
-	getTcpServiceManager(serviceKey).enableStatus(serviceKey)
+	getTcpServiceManager(serviceKey).enableStatus(serviceKey, packet0.Timestamp)
 	action0 := generateAclAction(10, ACTION_PACKET_COUNTING|ACTION_FLOW_COUNTING)
 	generateEndpointAndPolicy(packet0, srcGroupId, dstGroupId, action0, 10)
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
@@ -421,7 +446,7 @@ func TestSynAckSrcPortEnable(t *testing.T) {
 	packet0.PortDst = port1
 	l3EpcId := packet0.EndpointData.SrcInfo.L3EpcId
 	serviceKey := genServiceKey(l3EpcId, packet0.IpSrc, packet0.PortSrc)
-	getTcpServiceManager(serviceKey).enableStatus(serviceKey)
+	getTcpServiceManager(serviceKey).enableStatus(serviceKey, packet0.Timestamp)
 	action0 := generateAclAction(10, ACTION_PACKET_COUNTING|ACTION_FLOW_COUNTING)
 	generateEndpointAndPolicy(packet0, srcGroupId, dstGroupId, action0, 10)
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
@@ -612,5 +637,47 @@ func TestUdpHitStatus(t *testing.T) {
 	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
 	if taggedFlow.PortDst != serverPort {
 		t.Errorf("taggedFlow.PortDst is %d, expect %d", taggedFlow.PortDst, serverPort)
+	}
+}
+
+func TestUdpPortTimeout(t *testing.T) {
+	portStatsInterval = time.Second
+	portStatsSrcEndCount = 5
+	portStatsTimeout = 5 * time.Second
+	serverPort := uint16(9999)
+	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
+	for i := 0; i < 5; i++ {
+		packet := getUdpDefaultPacket()
+		packet.Timestamp = DEFAULT_DURATION_MSEC * time.Duration(i)
+		packet.PortDst = serverPort
+		packet.PortSrc = uint16(3000 + i)
+		metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet)
+	}
+	flowGenerator.Start()
+	for i := 0; i < 5; i++ {
+		taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
+		if taggedFlow.PortDst != serverPort {
+			t.Errorf("taggedFlow.PortDst is %d, expect %d", taggedFlow.PortDst, serverPort)
+		}
+	}
+
+	packet := getUdpDefaultPacket()
+	packet.Timestamp = 10*DEFAULT_DURATION_MSEC + portStatsTimeout
+	packet.PortDst = serverPort
+	packet.PortSrc = 4000
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet)
+	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
+	if taggedFlow.PortDst != serverPort {
+		t.Errorf("taggedFlow.PortDst is %d, expect %d", taggedFlow.PortDst, serverPort)
+	}
+
+	packet = getUdpDefaultPacket()
+	reversePacket(packet)
+	packet.PortSrc = serverPort
+	packet.PortDst = 12346
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet)
+	taggedFlow = flowOutQueue.(QueueReader).Get().(*TaggedFlow)
+	if taggedFlow.PortSrc != serverPort {
+		t.Errorf("taggedFlow.PortSrc is %d, expect %d", taggedFlow.PortSrc, serverPort)
 	}
 }

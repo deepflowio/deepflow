@@ -23,7 +23,7 @@ func (f *FlowGenerator) StatePreprocess(meta *MetaPacket, flags uint8) bool {
 		return false
 	case TCP_SYN | TCP_ACK:
 		serviceKey := genServiceKey(meta.EndpointData.SrcInfo.L3EpcId, meta.IpSrc, meta.PortSrc)
-		getTcpServiceManager(serviceKey).enableStatus(serviceKey)
+		getTcpServiceManager(serviceKey).enableStatus(serviceKey, meta.Timestamp)
 		return false
 	case TCP_FIN:
 		return false

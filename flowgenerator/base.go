@@ -65,6 +65,7 @@ var (
 	ignoreL2End          bool
 	portStatsInterval    time.Duration
 	portStatsSrcEndCount int
+	portStatsTimeout     time.Duration
 )
 
 // configurations for timeout, read only
@@ -193,8 +194,9 @@ func SetFlowGenerator(cfg config.Config) {
 	reportTolerance = cfg.FlowGenerator.ReportTolerance
 	ignoreTorMac = cfg.FlowGenerator.IgnoreTorMac
 	ignoreL2End = cfg.FlowGenerator.IgnoreL2End
-	portStatsInterval = cfg.FlowGenerator.PortStatsInterval
-	portStatsSrcEndCount = cfg.FlowGenerator.PortStatsSrcEndCount
+	portStatsInterval = cfg.FlowGenerator.PortStats.Interval
+	portStatsSrcEndCount = cfg.FlowGenerator.PortStats.SrcEndCount
+	portStatsTimeout = cfg.FlowGenerator.PortStats.Timeout
 	innerTcpSMA = make([]*ServiceManager, flowGeneratorCount)
 	innerUdpSMA = make([]*ServiceManager, flowGeneratorCount)
 	for i := uint64(0); i < flowGeneratorCount; i++ {

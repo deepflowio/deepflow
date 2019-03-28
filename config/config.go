@@ -75,21 +75,27 @@ type LabelerConfig struct {
 	MapSizeLimit    uint32 `yaml:"map-size-limit"`
 }
 
+type PortStatsConfig struct {
+	Disable     bool          `yaml:"disable"`
+	Interval    time.Duration `yaml:"interval"`
+	SrcEndCount int           `yaml:"src-end-count"`
+	Timeout     time.Duration `yaml:"timeout"`
+}
+
 type FlowGeneratorConfig struct {
 	FlowCountLimit int32 `yaml:"flow-count-limit"`
 	/* unit of interval and timeout: second */
-	ForceReportInterval  time.Duration `yaml:"force-report-interval"`
-	EstablishedTimeout   time.Duration `yaml:"established-timeout"`
-	ClosingRstTimeout    time.Duration `yaml:"closing-rst-timeout"`
-	OthersTimeout        time.Duration `yaml:"others-timeout"`
-	FlowCleanInterval    time.Duration `yaml:"flow-clean-interval"`
-	TimeoutCleanerCount  uint64        `yaml:"timeout-cleaner-count"`
-	HashMapSize          uint64        `yaml:"hash-map-size"`
-	ReportTolerance      time.Duration `yaml:"report-tolerance"`
-	IgnoreTorMac         bool          `yaml:"ignore-tor-mac"`
-	IgnoreL2End          bool          `yaml:"ignore-l2-end"`
-	PortStatsInterval    time.Duration `yaml:"port-stats-interval"`
-	PortStatsSrcEndCount int           `yaml:"port-stats-src-end-count"`
+	ForceReportInterval time.Duration   `yaml:"force-report-interval"`
+	EstablishedTimeout  time.Duration   `yaml:"established-timeout"`
+	ClosingRstTimeout   time.Duration   `yaml:"closing-rst-timeout"`
+	OthersTimeout       time.Duration   `yaml:"others-timeout"`
+	FlowCleanInterval   time.Duration   `yaml:"flow-clean-interval"`
+	TimeoutCleanerCount uint64          `yaml:"timeout-cleaner-count"`
+	HashMapSize         uint64          `yaml:"hash-map-size"`
+	ReportTolerance     time.Duration   `yaml:"report-tolerance"`
+	IgnoreTorMac        bool            `yaml:"ignore-tor-mac"`
+	IgnoreL2End         bool            `yaml:"ignore-l2-end"`
+	PortStats           PortStatsConfig `yaml:"port-stats"`
 }
 
 type MapReduceConfig struct {
@@ -249,9 +255,24 @@ func (c *Config) Validate() error {
 	} else {
 		c.FlowGenerator.ReportTolerance *= time.Second
 	}
-	c.FlowGenerator.PortStatsInterval *= time.Second
-	if c.FlowGenerator.PortStatsSrcEndCount == 0 {
-		c.FlowGenerator.PortStatsSrcEndCount = 5
+	if c.FlowGenerator.PortStats.Disable {
+		c.FlowGenerator.PortStats.Interval = 0
+		c.FlowGenerator.PortStats.SrcEndCount = 0
+		c.FlowGenerator.PortStats.Timeout = 0
+	} else {
+		if c.FlowGenerator.PortStats.Interval == 0 {
+			c.FlowGenerator.PortStats.Interval = time.Second
+		} else {
+			c.FlowGenerator.PortStats.Interval *= time.Second
+		}
+		if c.FlowGenerator.PortStats.SrcEndCount == 0 {
+			c.FlowGenerator.PortStats.SrcEndCount = 5
+		}
+		if c.FlowGenerator.PortStats.Timeout == 0 {
+			c.FlowGenerator.PortStats.Timeout = 300 * time.Second
+		} else {
+			c.FlowGenerator.PortStats.Timeout *= time.Second
+		}
 	}
 
 	if c.MapReduce.VariedDocLimit == 0 {
