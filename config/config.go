@@ -43,9 +43,8 @@ type IpPortConfig struct {
 }
 
 type AdapterConfig struct {
-	TimeDiffAdjust    int64 `yaml:"time-diff-adjust"`
-	SocketBufferSize  int   `yaml:"socket-buffer-size"`
-	OrderingCacheSize int   `yaml:"ordering-cache-size"`
+	SocketBufferSize  int `yaml:"socket-buffer-size"`
+	OrderingCacheSize int `yaml:"ordering-cache-size"`
 }
 
 type QueueConfig struct {
@@ -71,8 +70,9 @@ type QueueConfig struct {
 }
 
 type LabelerConfig struct {
-	FastPathDisable bool   `yaml:"fast-path-disable"`
-	MapSizeLimit    uint32 `yaml:"map-size-limit"`
+	FastPathDisable      bool   `yaml:"fast-path-disable"`
+	FirstPathDdbsDisable bool   `yaml:"first-path-ddbs-disable"`
+	MapSizeLimit         uint32 `yaml:"map-size-limit"`
 }
 
 type PortStatsConfig struct {
@@ -145,7 +145,6 @@ func (c *Config) Validate() error {
 	if c.DefaultTapType == 0 {
 		c.DefaultTapType = datatype.PACKET_SOURCE_ISP
 	}
-	c.Adapter.TimeDiffAdjust *= int64(time.Second)
 	if c.Adapter.SocketBufferSize == 0 {
 		c.Adapter.SocketBufferSize = 32 * 1024 * 1024
 	}

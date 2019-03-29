@@ -70,9 +70,13 @@ type DumpKey struct {
 	InPort uint32
 }
 
-func NewLabelerManager(readQueues queue.MultiQueueReader, count int, size uint32, disable bool) *LabelerManager {
+func NewLabelerManager(readQueues queue.MultiQueueReader, count int, size uint32, disable bool, ddbsDisable bool) *LabelerManager {
+	id := policy.DDBS
+	if ddbsDisable {
+		id = policy.NORMAL
+	}
 	labeler := &LabelerManager{
-		policyTable:     policy.NewPolicyTable(datatype.ACTION_FLOW_COUNTING, count, size, disable),
+		policyTable:     policy.NewPolicyTable(datatype.ACTION_FLOW_COUNTING, count, size, disable, id),
 		readQueues:      readQueues,
 		readQueuesCount: count,
 	}

@@ -141,8 +141,7 @@ func Start(configPath string) (closers []io.Closer) {
 		"2-meta-packet-to-pcap-app", cfg.Queue.PCapAppQueueSize, cfg.Queue.PCapAppQueueCount, cfg.Queue.LabelerQueueCount,
 		libqueue.OptionFlushIndicator(time.Second*10), releaseMetaPacket,
 	)
-
-	labelerManager := labeler.NewLabelerManager(labelerQueues, cfg.Queue.LabelerQueueCount, cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable)
+	labelerManager := labeler.NewLabelerManager(labelerQueues, cfg.Queue.LabelerQueueCount, cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable, cfg.Labeler.FirstPathDdbsDisable)
 	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_FLOW, flowGeneratorQueues)
 	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_METERING, meteringAppQueues)
 	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_PCAP, pcapAppQueues)

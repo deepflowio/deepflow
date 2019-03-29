@@ -24,10 +24,6 @@ stream-port: 20201
 zero-ports: [20211, 20212]
 # trident adapter
 adapter:
-  # trident和droplet的时间差，用于修正trident的时间戳，单位为秒
-  # 当trident的时间大于droplet, adapter-time-adjust为负数
-  # 当trident的时间小于droplet, adapter-time-adjust为正数
-  time-diff-adjust: 0
   # udp socket buffer size (Bytes) for receiving trident traffic,
   # default 32MB, and maximum 2GB
   # note that the actual value will depend on the minimum between
@@ -88,6 +84,8 @@ queue:
   doc_sender_queue_size: 0
 # internal labeler conf
 labeler:
+  # whether to use ddbs
+  first-path-ddbs-disable: true
   # whether to use first-path processing only
   fast-path-disable: false
   # size of policy fast-path map, and
