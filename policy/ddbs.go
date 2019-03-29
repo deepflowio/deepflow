@@ -125,7 +125,7 @@ func (d *Ddbs) generateMaskVector(acls []*Acl) {
 	vectorSize := MASK_VECTOR_SIZE
 	if len(acls) < 500 {
 		vectorSize = MASK_VECTOR_SIZE - 2
-	} else if len(acls) < 102400 {
+	} else if len(acls) < 10240 {
 		vectorSize = MASK_VECTOR_SIZE - 1
 	}
 	vectorBits := make([]int, 0, vectorSize)

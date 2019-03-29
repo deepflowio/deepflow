@@ -19,6 +19,7 @@ func newIpSegment(ips string, epcId uint16) ipSegment {
 	maskCount := uint32(0)
 	segment.ip, maskCount, _ = IpNetmaskFromStringCIDR(ips)
 	segment.mask = 0xffffffff << (32 - maskCount)
+	segment.ip = segment.ip & segment.mask
 	segment.epcId = epcId
 	return segment
 }
