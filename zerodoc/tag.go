@@ -628,40 +628,39 @@ func isFastCode(code Code) bool {
 }
 
 // GetFastID 返回uint64的ID，0代表该tag的code不在fast ID的范围内
+// 注意：ID中会忽略TAPType
 func (t *Tag) GetFastID() uint64 {
-	if !isFastCode(t.Code) {
+	if !isFastCode(t.Code) || t.Code == 0 {
 		return 0
 	}
-	if t.Code == 0 {
-		return 0xFFFFFFFF // 因为ACL_GID不存在0x3FFF，不会与其它Code冲突
-	}
+
 	var id uint64
-	// 14b ACLGID + 32b IP + 16b L3EpcID + 2b TAPType
+	// 16b ACLGID + 32b IP + 16b L3EpcID
 	//
 	// 当code不存在的时候，有以下条件使得不同code的tag不会产生相同的fast ID：
-	//   1. TAPType 0已经弃用，不会冲突
-	//   2. L3EpcID 0是不存在的
-	//   3. IP 255.255.255.255不用
-	//   4. ACLGID 0不存在
-	if t.Code&TAPType != 0 {
-		id |= uint64(t.TAPType & 0x3)
-	}
+	//   1. L3EpcID 0是不存在的
+	//   2. IP 255.255.255.255不用
+	//   3. ACLGID 0不存在
 	if t.Code&L3EpcID != 0 {
-		id |= uint64(uint16(t.L3EpcID)&0xFFFF) << 2
+		id |= uint64(uint16(t.L3EpcID))
 	}
 	if t.Code&IP != 0 {
-		id |= uint64(t.IP) << 18
+		id |= uint64(t.IP) << 16
 	} else {
-		id |= uint64(0xFFFFFFFF) << 18
+		id |= uint64(0xFFFFFFFF) << 16
 	}
 	if t.Code&ACLGID != 0 {
-		id |= uint64(t.ACLGID&0x3FFF) << 50
+		id |= uint64(t.ACLGID) << 48
 	}
 	return id
 }
 
 func (t *Tag) GetCode() uint64 {
 	return uint64(t.Code)
+}
+
+func (t *Tag) GetTAPType() uint8 {
+	return uint8(t.TAPType)
 }
 
 func (t *Tag) HasVariedField() bool {
