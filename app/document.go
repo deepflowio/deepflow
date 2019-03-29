@@ -17,6 +17,7 @@ type Tag interface {
 	SetID(string)
 	GetCode() uint64
 	GetFastID() uint64
+	GetTAPType() uint8
 	HasVariedField() bool
 	ToKVString() string
 	MarshalTo([]byte) int
