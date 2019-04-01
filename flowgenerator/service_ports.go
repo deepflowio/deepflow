@@ -21,7 +21,7 @@ type ServiceManager struct {
 	sync.RWMutex
 
 	lruCache      *lru.Cache64
-	getStatus     func(IpPortEpcKey, uint16) bool
+	getStatus     func(IpPortEpcKey, uint16, time.Duration) bool
 	enableStatus  func(IpPortEpcKey, time.Duration)
 	hitStatus     func(IpPortEpcKey, uint32, time.Duration)
 	disableStatus func(IpPortEpcKey)
@@ -115,7 +115,7 @@ func (m *ServiceManager) checkTimeoutOff(lastAccess, timestamp time.Duration) bo
 	return false
 }
 
-func (m *ServiceManager) getStatusLearnOn(key IpPortEpcKey, port uint16) bool {
+func (m *ServiceManager) getStatusLearnOn(key IpPortEpcKey, port uint16, now time.Duration) bool {
 	m.RLock()
 	value, ok := m.lruCache.Peek(key)
 	m.RUnlock()
@@ -125,11 +125,15 @@ func (m *ServiceManager) getStatusLearnOn(key IpPortEpcKey, port uint16) bool {
 		}
 		return false
 	}
-	log.Debugf("IpPortEpcKey %x, active %t", key, value.(*ServiceStatus).active)
-	return value.(*ServiceStatus).active
+	status := value.(*ServiceStatus)
+	if m.checkTimeout(status.lastAccess, now) {
+		status.active = false
+	}
+	log.Debugf("IpPortEpcKey %x, active %t", key, status.active)
+	return status.active
 }
 
-func (m *ServiceManager) getStatusLearnOff(key IpPortEpcKey, port uint16) bool {
+func (m *ServiceManager) getStatusLearnOff(key IpPortEpcKey, port uint16, now time.Duration) bool {
 	if port < IANA_PORT_RANGE {
 		return IANAPortServiceList[port]
 	}
@@ -180,7 +184,6 @@ func (m *ServiceManager) hitStatusLearnOn(key IpPortEpcKey, clientHash uint32, t
 	// then restart learning
 	if status.threshold < timestamp {
 		status.threshold = timestamp + portStatsInterval
-		status.active = false
 		// delete will not release any memory of map
 		for key := range status.clientMap {
 			delete(status.clientMap, key)

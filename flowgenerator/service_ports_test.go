@@ -77,12 +77,12 @@ func TestServicePortStatus(t *testing.T) {
 	port1 := uint16(80)
 	port2 := uint16(8080)
 	// check default IANA port service
-	if !serviceManager.getStatus(genServiceKey(epcId, ip, port1), port1) {
+	if !serviceManager.getStatus(genServiceKey(epcId, ip, port1), port1, 0) {
 		t.Error("serviceManager.getStatus() return false, expect true")
 	}
 	// check disable port service
 	serviceManager.disableStatus(genServiceKey(epcId, ip, port2))
-	if serviceManager.getStatus(genServiceKey(epcId, ip, port2), port2) {
+	if serviceManager.getStatus(genServiceKey(epcId, ip, port2), port2, 0) {
 		t.Error("serviceManager.getStatus() return true, expect false")
 	}
 }
@@ -94,17 +94,17 @@ func TestPortLearnInvalid(t *testing.T) {
 	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
 	port := uint16(8080)
 	key := genServiceKey(epcId, ip, port)
-	if serviceManager.getStatus(key, port) {
+	if serviceManager.getStatus(key, port, 0) {
 		t.Error("serviceManager.getStatus() return true, expect false")
 	}
 	for i := 0; i < DEFAULT_IP_LEARN_CNT; i++ {
 		serviceManager.hitStatus(key, uint32(i+1), time.Duration(i*100))
 	}
-	if serviceManager.getStatus(key, port) {
+	if serviceManager.getStatus(key, port, 0) {
 		t.Error("serviceManager.getStatus() return true, expect false")
 	}
 	serviceManager.enableStatus(key, time.Second)
-	if serviceManager.getStatus(key, port) {
+	if serviceManager.getStatus(key, port, 0) {
 		t.Error("serviceManager.getStatus() return true, expect false")
 	}
 }
@@ -117,13 +117,13 @@ func TestHitPortStatus(t *testing.T) {
 	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
 	port := uint16(8080)
 	key := genServiceKey(epcId, ip, port)
-	if serviceManager.getStatus(key, port) {
+	if serviceManager.getStatus(key, port, 0) {
 		t.Error("serviceManager.getStatus() return true, expect false")
 	}
 	for i := 0; i < DEFAULT_IP_LEARN_CNT; i++ {
 		serviceManager.hitStatus(key, uint32(i+1), time.Duration(i*100))
 	}
-	if !serviceManager.getStatus(key, port) {
+	if !serviceManager.getStatus(key, port, 0) {
 		t.Error("serviceManager.getStatus() return false, expect true")
 	}
 }
@@ -137,17 +137,17 @@ func TestCheckTimeout(t *testing.T) {
 	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
 	port := uint16(8080)
 	key := genServiceKey(epcId, ip, port)
-	if serviceManager.getStatus(key, port) {
+	if serviceManager.getStatus(key, port, 0) {
 		t.Error("serviceManager.getStatus() return true, expect false")
 	}
 	for i := 0; i < DEFAULT_IP_LEARN_CNT; i++ {
 		serviceManager.hitStatus(key, uint32(i+1), time.Duration(i*100))
 	}
-	if !serviceManager.getStatus(key, port) {
+	if !serviceManager.getStatus(key, port, 0) {
 		t.Error("serviceManager.getStatus() return false, expect true")
 	}
 	serviceManager.hitStatus(key, 100, 2*portStatsTimeout)
-	if serviceManager.getStatus(key, port) {
+	if serviceManager.getStatus(key, port, 0) {
 		t.Error("serviceManager.getStatus() return true, expect false")
 	}
 }
@@ -166,7 +166,7 @@ func TestGoroutinesServicePortStatus(t *testing.T) {
 	go func() {
 		defer waitGroup.Done()
 		serviceManager.hitStatus(genServiceKey(epcId, ip, port2), uint32(123), time.Duration(123))
-		if !serviceManager.getStatus(genServiceKey(epcId, ip, port2), port2) {
+		if !serviceManager.getStatus(genServiceKey(epcId, ip, port2), port2, 0) {
 			t.Error("serviceManager.getStatus() return false, expect true")
 		}
 	}()
@@ -174,7 +174,7 @@ func TestGoroutinesServicePortStatus(t *testing.T) {
 	go func() {
 		defer waitGroup.Done()
 		serviceManager.disableStatus(genServiceKey(epcId, ip, port1))
-		if !serviceManager.getStatus(genServiceKey(epcId, ip, port1), port1) {
+		if !serviceManager.getStatus(genServiceKey(epcId, ip, port1), port1, 0) {
 			t.Error("serviceManager.getStatus() return false, expect true")
 		}
 	}()
@@ -615,9 +615,10 @@ func TestUdpHitStatus(t *testing.T) {
 	portStatsSrcEndCount = 5
 	serverPort := uint16(9999)
 	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
+	now := time.Duration(time.Now().UnixNano())
 	for i := 0; i < 5; i++ {
 		packet := getUdpDefaultPacket()
-		packet.Timestamp = DEFAULT_DURATION_MSEC * time.Duration(i)
+		packet.Timestamp = now + DEFAULT_DURATION_MSEC*time.Duration(i)
 		packet.PortDst = serverPort
 		packet.PortSrc = uint16(3000 + i)
 		metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet)

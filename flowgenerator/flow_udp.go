@@ -2,6 +2,7 @@ package flowgenerator
 
 import (
 	"sync/atomic"
+	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
@@ -53,17 +54,17 @@ func (f *FlowGenerator) updateUdpFlow(flowExtra *FlowExtra, meta *MetaPacket, re
 	}
 }
 
-func (f *FlowGenerator) checkUdpServiceReverse(taggedFlow *TaggedFlow, reversed bool) bool {
+func (f *FlowGenerator) checkUdpServiceReverse(taggedFlow *TaggedFlow, reversed bool, now time.Duration) bool {
 	if reversed {
 		return false
 	}
 	serviceKey := genServiceKey(taggedFlow.FlowMetricsPeerSrc.L3EpcID, taggedFlow.IPSrc, taggedFlow.PortSrc)
-	srcOk := getUdpServiceManager(serviceKey).getStatus(serviceKey, taggedFlow.PortSrc)
+	srcOk := getUdpServiceManager(serviceKey).getStatus(serviceKey, taggedFlow.PortSrc, now)
 	if !srcOk {
 		return false
 	}
 	serviceKey = genServiceKey(taggedFlow.FlowMetricsPeerDst.L3EpcID, taggedFlow.IPDst, taggedFlow.PortDst)
-	dstOk := getUdpServiceManager(serviceKey).getStatus(serviceKey, taggedFlow.PortDst)
+	dstOk := getUdpServiceManager(serviceKey).getStatus(serviceKey, taggedFlow.PortDst, now)
 	if !dstOk {
 		return true
 	} else if taggedFlow.PortDst <= taggedFlow.PortSrc {

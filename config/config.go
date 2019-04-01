@@ -270,6 +270,9 @@ func (c *Config) Validate() error {
 		}
 		if c.FlowGenerator.PortStats.Timeout == 0 {
 			c.FlowGenerator.PortStats.Timeout = 300 * time.Second
+		} else if c.FlowGenerator.PortStats.Timeout < c.FlowGenerator.ClosingRstTimeout {
+			log.Error("port-stats-timeout is smaller than closing-rst-timeout")
+			os.Exit(1)
 		} else {
 			c.FlowGenerator.PortStats.Timeout *= time.Second
 		}
