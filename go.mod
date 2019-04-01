@@ -9,7 +9,7 @@ require (
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/spf13/cobra v0.0.3
 	gitlab.x.lan/application/droplet-app v0.0.0-20190325104422-89eb605e4d0a
-	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190328110937-acd700461ec7
+	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190401150929-71f759b64663
 	gitlab.x.lan/yunshan/message v0.0.0-20190321031241-863a1709ee76
 	golang.org/x/net v0.0.0-20190313220215-9f648a60d977
 	gopkg.in/yaml.v2 v2.2.1

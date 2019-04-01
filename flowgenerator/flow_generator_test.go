@@ -45,6 +45,7 @@ func flowGeneratorInit() (*FlowGenerator, MultiQueueReader, QueueWriter) {
 	ignoreL2End = false
 	portStatsInterval = time.Second
 	portStatsSrcEndCount = 5
+	innerFlowGeo = testFlowGeo
 	SetTimeout(testTimeoutConfig)
 	metaPacketHeaderInQueue := NewOverwriteQueues("metaPacketHeaderInQueue", 1, DEFAULT_QUEUE_LEN)
 	flowOutQueue := NewOverwriteQueue("flowOutQueue", DEFAULT_QUEUE_LEN)

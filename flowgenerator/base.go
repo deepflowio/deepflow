@@ -201,6 +201,7 @@ func SetFlowGenerator(cfg config.Config) {
 		innerTcpSMA[i] = NewServiceManager(32 * 1024)
 		innerUdpSMA[i] = NewServiceManager(32 * 1024)
 	}
+	innerFlowGeo = newFlowGeo()
 }
 
 func (t TimeoutConfig) minTimeout() time.Duration {
