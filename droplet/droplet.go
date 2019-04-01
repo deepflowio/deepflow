@@ -195,6 +195,9 @@ func Start(configPath string) (closers []io.Closer) {
 	flowgenerator.SetTimeout(timeoutConfig)
 	bufferSize := cfg.Queue.FlowGeneratorQueueSize / cfg.Queue.FlowGeneratorQueueCount
 	flowLimitNum := cfg.FlowGenerator.FlowCountLimit / int32(cfg.Queue.FlowGeneratorQueueCount)
+	if bufferSize > 8192 {
+		bufferSize = 8192
+	}
 	for i := 0; i < cfg.Queue.FlowGeneratorQueueCount; i++ {
 		flowGenerator := flowgenerator.New(flowGeneratorQueues, flowDuplicatorQueue, bufferSize, flowLimitNum, i)
 		flowGenerator.Start()
