@@ -85,7 +85,7 @@ queue:
 # internal labeler conf
 labeler:
   # whether to use ddbs
-  first-path-ddbs-disable: true
+  first-path-ddbs-disable: false
   # whether to use first-path processing only
   fast-path-disable: false
   # size of policy fast-path map, and
