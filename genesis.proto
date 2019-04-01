@@ -1,0 +1,62 @@
+syntax = "proto2";
+
+package genesis;
+option go_package = "genesis";
+
+service Synchronizer {
+    rpc Sync (SyncRequest) returns (SyncResponse) {}
+    rpc Push (stream SyncRequest) returns (SyncResponse) {}
+}
+
+message SyncRequest {
+    optional uint64 version = 1 [default = 0];
+
+    optional PlatformData platform_data = 9;
+}
+
+message SyncResponse {
+    optional uint64 version = 1 [default = 0];
+}
+
+message PlatformData {
+    repeated Vm vms = 1;
+    repeated Vpc vpcs = 2;
+    repeated Network networks = 3;
+}
+
+message Vm {
+    optional string uuid = 1;
+    optional string name = 2;
+    optional string label = 3;
+
+    optional string vpc_uuid = 9;
+
+    repeated Interface interfaces = 13;
+}
+
+message Interface {
+    optional uint64 mac = 1;
+    repeated Ip ips = 2;
+    optional string network_uuid = 3;
+}
+
+message Ip {
+    optional uint32 ip = 1;
+    optional uint32 last_seen = 2;
+}
+
+message Vpc {
+    optional string uuid = 1;
+    optional string name = 2;
+}
+
+message Network {
+    optional string uuid = 1;
+    optional uint32 segmentation_id = 5;
+    repeated Subnet subnets = 7;
+}
+
+message Subnet {
+    optional string cidr = 1;
+    optional uint32 last_seen = 2;
+}
