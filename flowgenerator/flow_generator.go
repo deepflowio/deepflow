@@ -452,13 +452,15 @@ loop:
 	goto loop
 }
 
-func (f *FlowGenerator) reportForClean(flowExtra *FlowExtra, force bool) *TaggedFlow {
+func (f *FlowGenerator) reportForClean(flowExtra *FlowExtra, force bool, now time.Duration) *TaggedFlow {
 	taggedFlow := flowExtra.taggedFlow
-	if f.checkL4ServiceReverse(taggedFlow, flowExtra.reversed) {
+	if f.checkL4ServiceReverse(taggedFlow, flowExtra.reversed, now) {
 		flowExtra.reverseFlow()
-		flowExtra.reversed = !flowExtra.reversed
+		flowExtra.reversed = true
 	}
-	taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
+	if taggedFlow.Proto == layers.IPProtocolTCP {
+		taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
+	}
 	if force {
 		taggedFlow.CloseType = CloseTypeForcedReport
 		return CloneTaggedFlow(taggedFlow)
@@ -484,7 +486,7 @@ func reportFlowListTimeout(f *FlowGenerator, list *ListFlowExtra, now, cleanRang
 		flowExtra := e.Value
 		if flowExtra.recentTime < cleanRange && flowExtra.recentTime+flowExtra.timeout <= now {
 			flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
-			buffer[num] = f.reportForClean(flowExtra, false)
+			buffer[num] = f.reportForClean(flowExtra, false, now)
 			num = tryCleanBuffer(flowOutQueue, buffer, num+1)
 			cleanCount++
 			del := e
@@ -508,13 +510,13 @@ func reportFlowListGeneral(f *FlowGenerator, list *ListFlowExtra, now, cleanRang
 		flowExtra := e.Value
 		flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
 		if flowExtra.recentTime < cleanRange && flowExtra.recentTime+flowExtra.timeout <= now {
-			buffer[num] = f.reportForClean(flowExtra, false)
+			buffer[num] = f.reportForClean(flowExtra, false, now)
 			cleanCount++
 			del := e
 			e = e.Prev()
 			list.Remove(del)
 		} else {
-			buffer[num] = f.reportForClean(flowExtra, true)
+			buffer[num] = f.reportForClean(flowExtra, true, now)
 			flowExtra.resetCurFlowInfo(now)
 			e = e.Prev()
 		}
@@ -537,7 +539,7 @@ func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uin
 		for e := flowCache.flowList.Front(); e != nil; {
 			flowExtra := e.Value
 			flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
-			taggedFlow := f.reportForClean(flowExtra, false)
+			taggedFlow := f.reportForClean(flowExtra, false, now)
 			atomic.AddInt32(&f.stats.CurrNumFlows, -1)
 			flowOutQueue.Put(taggedFlow)
 			e = e.Next()
@@ -698,14 +700,14 @@ func (f *FlowGenerator) checkIfDoFlowPerf(flowExtra *FlowExtra) bool {
 	return false
 }
 
-func (f *FlowGenerator) checkL4ServiceReverse(taggedFlow *TaggedFlow, reversed bool) bool {
+func (f *FlowGenerator) checkL4ServiceReverse(taggedFlow *TaggedFlow, reversed bool, now time.Duration) bool {
 	if reversed {
 		return false
 	}
 	if taggedFlow.Proto == layers.IPProtocolTCP {
-		return f.checkTcpServiceReverse(taggedFlow, reversed)
+		return f.checkTcpServiceReverse(taggedFlow, reversed, now)
 	} else if taggedFlow.Proto == layers.IPProtocolUDP {
-		return f.checkUdpServiceReverse(taggedFlow, reversed)
+		return f.checkUdpServiceReverse(taggedFlow, reversed, now)
 	}
 	return false
 }

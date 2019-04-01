@@ -2,6 +2,7 @@ package flowgenerator
 
 import (
 	"sync/atomic"
+	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
@@ -18,9 +19,9 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			flowCache.Unlock() // code below does not use flowCache any more
 			atomic.AddInt32(&f.stats.CurrNumFlows, -1)
 			flowExtra.setCurFlowInfo(flowExtra.recentTime, forceReportInterval, reportTolerance)
-			if f.checkTcpServiceReverse(taggedFlow, flowExtra.reversed) {
+			if f.checkTcpServiceReverse(taggedFlow, flowExtra.reversed, meta.Timestamp) {
 				flowExtra.reverseFlow()
-				flowExtra.reversed = !flowExtra.reversed
+				flowExtra.reversed = true
 			}
 			calcCloseType(taggedFlow, flowExtra.flowState)
 			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
@@ -119,17 +120,17 @@ func (f *FlowGenerator) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket, re
 }
 
 // return true if a flow should be reversed
-func (f *FlowGenerator) checkTcpServiceReverse(taggedFlow *TaggedFlow, reversed bool) bool {
+func (f *FlowGenerator) checkTcpServiceReverse(taggedFlow *TaggedFlow, reversed bool, now time.Duration) bool {
 	if reversed {
 		return false
 	}
 	serviceKey := genServiceKey(taggedFlow.FlowMetricsPeerSrc.L3EpcID, taggedFlow.IPSrc, taggedFlow.PortSrc)
-	srcOk := getTcpServiceManager(serviceKey).getStatus(serviceKey, taggedFlow.PortSrc)
+	srcOk := getTcpServiceManager(serviceKey).getStatus(serviceKey, taggedFlow.PortSrc, now)
 	if !srcOk {
 		return false
 	}
 	serviceKey = genServiceKey(taggedFlow.FlowMetricsPeerDst.L3EpcID, taggedFlow.IPDst, taggedFlow.PortDst)
-	dstOk := getTcpServiceManager(serviceKey).getStatus(serviceKey, taggedFlow.PortDst)
+	dstOk := getTcpServiceManager(serviceKey).getStatus(serviceKey, taggedFlow.PortDst, now)
 	if !dstOk {
 		return true
 	} else if taggedFlow.PortDst <= taggedFlow.PortSrc {
