@@ -749,7 +749,33 @@ func (p *MetaFlowPerf) Update(header *MetaPacket, reply bool, flowExtra *FlowExt
 		return err
 	}
 
-	flowInfo := initFlowInfo(flowExtra.taggedFlow, flowExtra.flowState, reply, flowExtra.reversed)
+	var flowInfo *FlowInfo
+	if flowExtra.reversed {
+		flowInfo = &FlowInfo{
+			flowState:         flowExtra.flowState,
+			direction:         reply,
+			flowID:            flowExtra.taggedFlow.FlowID,
+			totalPacketCount0: flowExtra.taggedFlow.FlowMetricsPeerDst.TotalPacketCount,
+			totalPacketCount1: flowExtra.taggedFlow.FlowMetricsPeerSrc.TotalPacketCount,
+			arrTime0Last:      flowExtra.taggedFlow.FlowMetricsPeerDst.ArrTimeLast,
+			arrTime1Last:      flowExtra.taggedFlow.FlowMetricsPeerSrc.ArrTimeLast,
+			tcpFlags0:         flowExtra.taggedFlow.FlowMetricsPeerDst.TCPFlags,
+			tcpFlags1:         flowExtra.taggedFlow.FlowMetricsPeerSrc.TCPFlags,
+		}
+	} else {
+		flowInfo = &FlowInfo{
+			flowState:         flowExtra.flowState,
+			direction:         reply,
+			flowID:            flowExtra.taggedFlow.FlowID,
+			totalPacketCount0: flowExtra.taggedFlow.FlowMetricsPeerSrc.TotalPacketCount,
+			totalPacketCount1: flowExtra.taggedFlow.FlowMetricsPeerDst.TotalPacketCount,
+			arrTime0Last:      flowExtra.taggedFlow.FlowMetricsPeerSrc.ArrTimeLast,
+			arrTime1Last:      flowExtra.taggedFlow.FlowMetricsPeerDst.ArrTimeLast,
+			tcpFlags0:         flowExtra.taggedFlow.FlowMetricsPeerSrc.TCPFlags,
+			tcpFlags1:         flowExtra.taggedFlow.FlowMetricsPeerDst.TCPFlags,
+		}
+	}
+
 	p.calcVarianceStats(header, flowInfo)
 
 	if valid := p.preprocess(header, flowInfo, perfCounter); valid {
@@ -914,34 +940,6 @@ func (i *FlowInfo) String() string {
 	}
 
 	return reflectFormat(*i)
-}
-
-func initFlowInfo(flow *TaggedFlow, state FlowState, reply, reversed bool) *FlowInfo {
-	if reversed {
-		return &FlowInfo{
-			flowState:         state,
-			direction:         reply,
-			flowID:            flow.FlowID,
-			totalPacketCount0: flow.FlowMetricsPeerDst.TotalPacketCount,
-			totalPacketCount1: flow.FlowMetricsPeerSrc.TotalPacketCount,
-			arrTime0Last:      flow.FlowMetricsPeerDst.ArrTimeLast,
-			arrTime1Last:      flow.FlowMetricsPeerSrc.ArrTimeLast,
-			tcpFlags0:         flow.FlowMetricsPeerDst.TCPFlags,
-			tcpFlags1:         flow.FlowMetricsPeerSrc.TCPFlags,
-		}
-	} else {
-		return &FlowInfo{
-			flowState:         state,
-			direction:         reply,
-			flowID:            flow.FlowID,
-			totalPacketCount0: flow.FlowMetricsPeerSrc.TotalPacketCount,
-			totalPacketCount1: flow.FlowMetricsPeerDst.TotalPacketCount,
-			arrTime0Last:      flow.FlowMetricsPeerSrc.ArrTimeLast,
-			arrTime1Last:      flow.FlowMetricsPeerDst.ArrTimeLast,
-			tcpFlags0:         flow.FlowMetricsPeerSrc.TCPFlags,
-			tcpFlags1:         flow.FlowMetricsPeerDst.TCPFlags,
-		}
-	}
 }
 
 func NewFlowPerfCounter() FlowPerfCounter {
