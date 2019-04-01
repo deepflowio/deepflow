@@ -54,8 +54,10 @@ message Config {
     optional uint64  npb_bps_threshold    = 13;
     optional bool    collector_enabled    = 14 [default = false];
     optional string  roze_ip              = 15;
-    optional uint64  server_tx_bandwidth_threshold = 16 [default = 0];
-    optional uint64  bandwidth_probe_interval = 17 [default = 10];
+    optional bool    platform_enabled     = 16 [default = false];
+    optional uint32  platform_interval    = 17;
+    optional uint64  server_tx_bandwidth_threshold = 18 [default = 0];
+    optional uint64  bandwidth_probe_interval = 19 [default = 10];
 
     optional string  source_ip            = 21;
     optional string  analyzer_ip          = 31;
