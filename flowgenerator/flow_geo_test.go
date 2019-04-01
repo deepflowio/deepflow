@@ -10,6 +10,10 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
+var (
+	testFlowGeo = newFlowGeo()
+)
+
 func TestFillGeoInfo(t *testing.T) {
 	taggedFlow := &TaggedFlow{}
 	taggedFlow.IPSrc = IpToUint32(net.ParseIP("8.8.8.8").To4())
@@ -17,7 +21,7 @@ func TestFillGeoInfo(t *testing.T) {
 	taggedFlow.FlowMetricsPeerSrc.L3EpcID = 1
 	taggedFlow.FlowMetricsPeerDst.L3EpcID = 0
 	taggedFlow.PolicyData = &PolicyData{ActionFlags: ACTION_GEO_POSITIONING}
-	innerFlowGeo.fillGeoInfo(taggedFlow)
+	testFlowGeo.fillGeoInfo(taggedFlow)
 	// 查ip_info.go文件获得Country和Region实际值
 	country := uint8(5)
 	region := uint8(34)
@@ -34,7 +38,7 @@ func TestNegativeL3EpcIDSrc(t *testing.T) {
 	taggedFlow.FlowMetricsPeerSrc.L3EpcID = -1
 	taggedFlow.FlowMetricsPeerDst.L3EpcID = 5
 	taggedFlow.PolicyData = &PolicyData{ActionFlags: ACTION_GEO_POSITIONING}
-	innerFlowGeo.fillGeoInfo(taggedFlow)
+	testFlowGeo.fillGeoInfo(taggedFlow)
 	// 查ip_info.go文件获得Country和Region实际值
 	country := uint8(98)
 	region := uint8(0)
@@ -51,7 +55,7 @@ func TestNegativeL3EpcIDDst(t *testing.T) {
 	taggedFlow.FlowMetricsPeerSrc.L3EpcID = 5
 	taggedFlow.FlowMetricsPeerDst.L3EpcID = -1
 	taggedFlow.PolicyData = &PolicyData{ActionFlags: ACTION_GEO_POSITIONING}
-	innerFlowGeo.fillGeoInfo(taggedFlow)
+	testFlowGeo.fillGeoInfo(taggedFlow)
 	// 查ip_info.go文件获得Country和Region实际值
 	country := uint8(5)
 	region := uint8(34)
@@ -68,7 +72,7 @@ func TestNegativeL3EpcIDAll(t *testing.T) {
 	taggedFlow.FlowMetricsPeerSrc.L3EpcID = -1
 	taggedFlow.FlowMetricsPeerDst.L3EpcID = -1
 	taggedFlow.PolicyData = &PolicyData{ActionFlags: ACTION_GEO_POSITIONING}
-	innerFlowGeo.fillGeoInfo(taggedFlow)
+	testFlowGeo.fillGeoInfo(taggedFlow)
 	// 查ip_info.go文件获得Country和Region实际值
 	country := uint8(98)
 	region := uint8(0)
@@ -80,6 +84,7 @@ func TestNegativeL3EpcIDAll(t *testing.T) {
 
 func TestFlowGeoInfo(t *testing.T) {
 	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
+	flowGenerator.FlowGeo = testFlowGeo
 	forceReportInterval = 60 * time.Second
 
 	packet0 := getDefaultPacket()
@@ -111,8 +116,9 @@ func BenchmarkFillGeoInfo(b *testing.B) {
 	taggedFlow.FlowMetricsPeerSrc.L3EpcID = 1
 	taggedFlow.FlowMetricsPeerDst.L3EpcID = 0
 	taggedFlow.PolicyData = &PolicyData{ActionFlags: ACTION_GEO_POSITIONING}
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		taggedFlow.FlowMetricsPeerSrc.L3EpcID, taggedFlow.FlowMetricsPeerDst.L3EpcID = taggedFlow.FlowMetricsPeerDst.L3EpcID, taggedFlow.FlowMetricsPeerSrc.L3EpcID
-		innerFlowGeo.fillGeoInfo(taggedFlow)
+		testFlowGeo.fillGeoInfo(taggedFlow)
 	}
 }

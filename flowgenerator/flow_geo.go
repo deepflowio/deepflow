@@ -16,7 +16,9 @@ const (
 	ONE
 )
 
-var innerFlowGeo FlowGeo
+var (
+	innerFlowGeo FlowGeo
+)
 
 func newFlowGeo() FlowGeo {
 	return FlowGeo{geo.NewNetmaskGeoTree()}
@@ -55,8 +57,4 @@ func (f *FlowGeo) fillGeoInfo(taggedFlow *TaggedFlow) {
 		taggedFlow.ISP = geoInfo.ISP
 		return
 	}
-}
-
-func init() {
-	innerFlowGeo = FlowGeo{geo.NewNetmaskGeoTree()}
 }
