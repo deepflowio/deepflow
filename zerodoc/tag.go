@@ -130,6 +130,7 @@ const (
 	ISP1
 	ISP2
 	ToR
+	// 4~30 ISP
 )
 
 type ACLDirectionEnum uint8
