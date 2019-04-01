@@ -285,8 +285,8 @@ gitlab.x.lan/application/droplet-app v0.0.0-20190325104422-89eb605e4d0a h1:hqYc7
 gitlab.x.lan/application/droplet-app v0.0.0-20190325104422-89eb605e4d0a/go.mod h1:scJjC4Z2MCzOT4uy5C/ejp7maDYWtJbX5JVbNr9LM2A=
 gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190321085357-1d74add49520 h1:LicHrUDoNQTulV8STn+ticyaGuMPGCzuymGE98tK0gs=
 gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190321085357-1d74add49520/go.mod h1:BmF06vVGW3L0PEjeDYDqzdEAw/p1ECkgHvQe7KluSUE=
-gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190401150929-71f759b64663 h1:PVhdAQzZUnmrt8cyevsVn5c8ElBZRpkYyPQUEMQToxo=
-gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190401150929-71f759b64663/go.mod h1:BmF06vVGW3L0PEjeDYDqzdEAw/p1ECkgHvQe7KluSUE=
+gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190401183445-4e5d43ec5d09 h1:yMgFyKKAJWUkFFcjPgQzgPV1+LbZsvzJclXpOU+Fv0U=
+gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190401183445-4e5d43ec5d09/go.mod h1:BmF06vVGW3L0PEjeDYDqzdEAw/p1ECkgHvQe7KluSUE=
 gitlab.x.lan/yunshan/message v0.0.0-20190321031241-863a1709ee76 h1:Yae0Yaj7cbvBY7nlL7ao1LAGjw6KVePcpRcGwYXeBcw=
 gitlab.x.lan/yunshan/message v0.0.0-20190321031241-863a1709ee76/go.mod h1:R5ZX1w+XLKWpf45DbKsAXvRyklT7rfgBN/WKClV2MP4=
 go.uber.org/atomic v1.3.2/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=

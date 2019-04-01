@@ -9,7 +9,7 @@ import (
 type FixedStash struct {
 	timestamp         uint32
 	stashLocation     []map[string]int
-	fastStashLocation []map[uint64]int
+	fastStashLocation [][]map[uint64]int
 	slots             int
 
 	stash          []interface{}
@@ -21,10 +21,10 @@ type FixedStash struct {
 }
 
 func NewFixedStash(capacity, variedDocLimit, slots int) Stash {
-	return &FixedStash{
+	stash := &FixedStash{
 		timestamp:         0,
 		stashLocation:     make([]map[string]int, slots),
-		fastStashLocation: make([]map[uint64]int, slots),
+		fastStashLocation: make([][]map[uint64]int, TAP_TYPE_COUNT),
 		slots:             slots,
 		stash:             make([]interface{}, capacity),
 		entryCount:        0,
@@ -32,6 +32,12 @@ func NewFixedStash(capacity, variedDocLimit, slots int) Stash {
 		variedDocLimit:    variedDocLimit,
 		encoder:           &codec.SimpleEncoder{},
 	}
+
+	for i := 0; i < TAP_TYPE_COUNT; i++ {
+		stash.fastStashLocation[i] = make([]map[uint64]int, slots)
+	}
+
+	return stash
 }
 
 // Add 添加到stash，会改变doc中meter的内容，若stash已满会返回未添加的doc
@@ -57,11 +63,12 @@ func (s *FixedStash) Add(docs []interface{}) ([]interface{}, uint64) {
 		}
 
 		fastID := doc.GetFastID()
+		tapType := doc.GetTAPType()
 		if fastID != 0 {
-			slotMap := s.fastStashLocation[slot]
+			slotMap := s.fastStashLocation[tapType][slot]
 			if slotMap == nil {
 				slotMap = make(map[uint64]int)
-				s.fastStashLocation[slot] = slotMap
+				s.fastStashLocation[tapType][slot] = slotMap
 			}
 			if docLoc, ok := slotMap[fastID]; ok {
 				s.stash[docLoc].(*app.Document).ConcurrentMerge(doc.Meter)
@@ -115,7 +122,9 @@ func (s *FixedStash) Dump() []interface{} {
 
 func (s *FixedStash) Clear() {
 	s.stashLocation = make([]map[string]int, s.slots)
-	s.fastStashLocation = make([]map[uint64]int, s.slots)
+	for i := 0; i < TAP_TYPE_COUNT; i++ {
+		s.fastStashLocation[i] = make([]map[uint64]int, s.slots)
+	}
 	s.entryCount = 0
 }
 
