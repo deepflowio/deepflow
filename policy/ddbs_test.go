@@ -514,7 +514,7 @@ func TestDdbsSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	// 匹配ipGroup6、group3，ipGroup7有epc限制，group4mac不符
 	policyData = getPolicyByFirstPath(table, result, key3)
 	basicPolicyData3 := new(PolicyData)
-	basicPolicyData3.Merge([]AclAction{action2, action1}, nil, acl2.Id)
+	basicPolicyData3.Merge([]AclAction{action1, action2}, nil, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData3, policyData) {
 		t.Error("key3 FirstPath Check Failed!")
 	}
