@@ -39,8 +39,8 @@ type Ddbs struct {
 
 	vectorBits             []int
 	maskMinBit, maskMaxBit int
-	maskVector             MatchedField            // 根据所有策略计算出的M-Vector, 用于创建查询table
-	table                  [TABLE_SIZE][]TableItem // 策略使用计算出的索引从这里查询策略
+	maskVector             MatchedField              // 根据所有策略计算出的M-Vector, 用于创建查询table
+	table                  *[TABLE_SIZE][]*TableItem // 策略使用计算出的索引从这里查询策略
 
 	cloudPlatformLabeler *CloudPlatformLabeler
 }
@@ -48,12 +48,13 @@ type Ddbs struct {
 func NewDdbs(queueCount int, mapSize uint32, fastPathDisable bool) TableOperator {
 	ddbs := new(Ddbs)
 	ddbs.queueCount = queueCount
-	ddbs.AclGidMap.Init()
 	ddbs.FastPathDisable = fastPathDisable
-	ddbs.InterestTable.Init()
-	ddbs.FastPath.Init(mapSize, queueCount, ddbs.AclGidMap.SrcGroupAclGidMaps, ddbs.AclGidMap.DstGroupAclGidMaps)
 	ddbs.groupMacMap = make(map[uint16][]uint32, 1000)
 	ddbs.groupIpMap = make(map[uint16][]ipSegment, 1000)
+	ddbs.AclGidMap.Init()
+	ddbs.InterestTable.Init()
+	ddbs.FastPath.Init(mapSize, queueCount, ddbs.AclGidMap.SrcGroupAclGidMaps, ddbs.AclGidMap.DstGroupAclGidMaps)
+	ddbs.table = &[TABLE_SIZE][]*TableItem{}
 	return ddbs
 }
 
@@ -123,7 +124,11 @@ func (d *Ddbs) generateMaskVector(acls []*Acl) {
 	}
 
 	vectorSize := MASK_VECTOR_SIZE
-	if len(acls) < 500 {
+	if len(acls) < 100 {
+		vectorSize = MASK_VECTOR_SIZE - 4
+	} else if len(acls) < 300 {
+		vectorSize = MASK_VECTOR_SIZE - 3
+	} else if len(acls) < 500 {
 		vectorSize = MASK_VECTOR_SIZE - 2
 	} else if len(acls) < 10240 {
 		vectorSize = MASK_VECTOR_SIZE - 1
@@ -146,14 +151,16 @@ func (d *Ddbs) generateMaskVector(acls []*Acl) {
 }
 
 func (d *Ddbs) generateVectorTable(acls []*Acl) {
+	table := &[TABLE_SIZE][]*TableItem{}
 	for _, acl := range acls {
 		for i, match := range acl.AllMatched {
 			index := match.GetAllTableIndex(&d.maskVector, &acl.AllMatchedMask[i], d.maskMinBit, d.maskMaxBit, d.vectorBits)
 			for _, index := range index {
-				d.table[index] = append(d.table[index], TableItem{match, acl.AllMatchedMask[i], acl.Action, acl.NpbActions, acl.Id})
+				table[index] = append(table[index], &TableItem{match, acl.AllMatchedMask[i], acl.Action, acl.NpbActions, acl.Id})
 			}
 		}
 	}
+	d.table = table
 }
 
 func (d *Ddbs) generateDdbsTable(acls []*Acl) {
@@ -261,11 +268,43 @@ func (d *Ddbs) GetPolicyByFirstPath(endpointData *EndpointData, packet *LookupKe
 }
 
 func (d *Ddbs) UpdateAcls(acls []*Acl) {
+	d.RawAcls = acls
+
+	generateAcls := make([]*Acl, 0, len(acls))
+	for _, acl := range acls {
+		// acl需要根据groupIdMaps更新里面的NpbActions
+		if len(acl.NpbActions) > 0 {
+			groupType := RESOURCE_GROUP_TYPE_IP | RESOURCE_GROUP_TYPE_DEV
+			for _, id := range append(acl.SrcGroups, acl.DstGroups...) {
+				// 带NPB的acl，资源组类型为全DEV或全IP两种情况
+				if id != 0 && d.groupIdMaps[id] != 0 {
+					groupType = d.groupIdMaps[id]
+				}
+				break
+			}
+			for index, _ := range acl.NpbActions {
+				acl.NpbActions[index].AddResourceGroupType(groupType)
+			}
+		}
+
+		if acl.Type == TAP_ANY {
+			// 对于TAP_ANY策略，给其他每一个TAP类型都单独生成一个acl，来避免查找2次
+			for i := TAP_MIN; i < TAP_MAX; i++ {
+				generateAcl := &Acl{}
+				*generateAcl = *acl
+				generateAcl.Type = i
+				generateAcls = append(generateAcls, generateAcl)
+			}
+		} else {
+			generateAcls = append(generateAcls, acl)
+		}
+	}
+
 	// 生成策略InterestMap,更新策略
-	d.GenerateInterestMaps(acls)
-	d.GenerateGroupAclGidMaps(acls)
+	d.GenerateInterestMaps(generateAcls)
+	d.GenerateGroupAclGidMaps(generateAcls)
 	// 生成Ddbs查询表
-	d.generateDdbsTable(acls)
+	d.generateDdbsTable(generateAcls)
 }
 
 func (d *Ddbs) GetHitStatus() (uint64, uint64) {
@@ -304,6 +343,11 @@ func (d *Ddbs) GetCounter() interface{} {
 		}
 	}
 	return counter
+}
+
+func (d *Ddbs) FlushAcls() {
+	d.FastPath.FlushAcls()
+	atomic.StoreUint64(&d.UnmatchedPacketCount, 0)
 }
 
 func (d *Ddbs) AddAcl(acl *Acl) {

@@ -65,6 +65,14 @@ type MatchedField struct {
 	fields [MATCHED_FIELD_LEN]uint64
 }
 
+func (f *MatchedField) GobEncode() ([]byte, error) {
+	return []byte{}, nil
+}
+
+func (f *MatchedField) GobDecode(in []byte) error {
+	return nil
+}
+
 func (f *MatchedField) Get(flag MatchFlags) uint32 {
 	index := fieldOffset[flag] >> 6
 	offset := fieldOffset[flag] & 0x3f
