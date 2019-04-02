@@ -42,7 +42,7 @@ var (
 	remoteIndex = -1
 	connection  client.Client
 
-	statsdClients = make([]*statsd.Client, 1) // could be nil
+	statsdClients = make([]*statsd.Client, 2) // could be nil
 )
 
 type StatItem struct {
@@ -156,6 +156,9 @@ func newStatsdClient(remote net.UDPAddr) *statsd.Client {
 
 func sendStatsd(bp client.BatchPoints) {
 	for i, remote := range remotes {
+		if len(statsdClients) <= i {
+			statsdClients = append(statsdClients, newStatsdClient(net.UDPAddr{remote.IP, STATSD_PORT, ""}))
+		}
 		if statsdClients[i] == nil {
 			statsdClients[i] = newStatsdClient(net.UDPAddr{remote.IP, STATSD_PORT, ""})
 		}
