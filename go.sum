@@ -281,8 +281,8 @@ github.com/xanzy/ssh-agent v0.2.0/go.mod h1:0NyE30eGUDliuLEHJgYte/zncp2zdTStcOnW
 github.com/yudai/gojsondiff v1.0.0/go.mod h1:AY32+k2cwILAkW1fbgxQ5mUmMiZFgLIV+FBNExI05xg=
 github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82/go.mod h1:lgjkn3NuSvDfVJdfcVVdX+jpBxNmX4rDAzaS45IcYoM=
 github.com/yudai/pp v2.0.1+incompatible/go.mod h1:PuxR/8QJ7cyCkFp/aUDS+JY727OFEZkTdatxwunjIkc=
-gitlab.x.lan/application/droplet-app v0.0.0-20190325104422-89eb605e4d0a h1:hqYc7nFkxPkeG7BALCwlVW5EJp3cuz1PgrCcS2ScPJM=
-gitlab.x.lan/application/droplet-app v0.0.0-20190325104422-89eb605e4d0a/go.mod h1:scJjC4Z2MCzOT4uy5C/ejp7maDYWtJbX5JVbNr9LM2A=
+gitlab.x.lan/application/droplet-app v0.0.0-20190401210815-c82a62b51f1c h1:xaXyI/JnJiSC1y2dmH3MGNV3e7pFDlEc0bifh9B3Hig=
+gitlab.x.lan/application/droplet-app v0.0.0-20190401210815-c82a62b51f1c/go.mod h1:scJjC4Z2MCzOT4uy5C/ejp7maDYWtJbX5JVbNr9LM2A=
 gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190321085357-1d74add49520 h1:LicHrUDoNQTulV8STn+ticyaGuMPGCzuymGE98tK0gs=
 gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190321085357-1d74add49520/go.mod h1:BmF06vVGW3L0PEjeDYDqzdEAw/p1ECkgHvQe7KluSUE=
 gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190401183445-4e5d43ec5d09 h1:yMgFyKKAJWUkFFcjPgQzgPV1+LbZsvzJclXpOU+Fv0U=
