@@ -24,11 +24,62 @@ type Acl struct {
 	NpbActions        []NpbAction
 	AllMatched        []MatchedField
 	AllMatchedMask    []MatchedField // MatchedMask对应的位为0，表示对应Matched的位为*，0或1都匹配该策略
+	policy            PolicyRawData
+}
+
+func (a *Acl) InitPolicy() {
+	a.policy.ACLID = a.Id
+	a.policy.AclActions = a.Action
+	a.policy.NpbActions = a.NpbActions
+}
+
+func (a *Acl) getPortRange(rawPorts []uint16) []PortRange {
+	ranges := make([]PortRange, 0, 2)
+
+	min, max := uint16(0), uint16(0)
+	for index, port := range rawPorts {
+		if min == 0 {
+			min = port
+			max = port
+			if len(rawPorts) == index+1 {
+				ranges = append(ranges, NewPortRange(min, max))
+			}
+			continue
+		}
+
+		if port == max+1 {
+			max = port
+		} else {
+			ranges = append(ranges, NewPortRange(min, max))
+			min = port
+			max = port
+		}
+
+		if len(rawPorts) == index+1 {
+			ranges = append(ranges, NewPortRange(min, max))
+		}
+	}
+	return ranges
 }
 
 func (a *Acl) generateMatchedField(srcMac, dstMac uint32, srcIps, dstIps ipSegment) {
-	for _, srcPort := range a.SrcPorts {
-		for _, dstPort := range a.DstPorts {
+	srcSegment := make([]portSegment, 0, 2)
+	dstSegment := make([]portSegment, 0, 2)
+	for _, ports := range a.getPortRange(a.SrcPorts) {
+		srcSegment = append(srcSegment, newPortSegments(ports)...)
+	}
+	for _, ports := range a.getPortRange(a.DstPorts) {
+		dstSegment = append(dstSegment, newPortSegments(ports)...)
+	}
+	if len(srcSegment) == 0 {
+		srcSegment = append(srcSegment, emptyPortSegment)
+	}
+	if len(dstSegment) == 0 {
+		dstSegment = append(dstSegment, emptyPortSegment)
+	}
+
+	for _, srcPort := range srcSegment {
+		for _, dstPort := range dstSegment {
 			match := MatchedField{}
 			match.Set(MATCHED_TAP_TYPE, uint32(a.Type))
 			match.Set(MATCHED_PROTO, uint32(a.Proto))
@@ -39,8 +90,8 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint32, srcIps, dstIps ipSegme
 			match.Set(MATCHED_SRC_EPC, uint32(srcIps.getEpcId()))
 			match.Set(MATCHED_DST_IP, dstIps.getIp())
 			match.Set(MATCHED_DST_EPC, uint32(dstIps.getEpcId()))
-			match.Set(MATCHED_SRC_PORT, uint32(srcPort))
-			match.Set(MATCHED_DST_PORT, uint32(dstPort))
+			match.Set(MATCHED_SRC_PORT, uint32(srcPort.port))
+			match.Set(MATCHED_DST_PORT, uint32(dstPort.port))
 			a.AllMatched = append(a.AllMatched, match)
 
 			mask := MatchedField{}
@@ -53,21 +104,14 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint32, srcIps, dstIps ipSegme
 			mask.SetMask(MATCHED_SRC_EPC, uint32(srcIps.getEpcId()))
 			mask.Set(MATCHED_DST_IP, dstIps.getMask())
 			mask.SetMask(MATCHED_DST_EPC, uint32(dstIps.getEpcId()))
-			mask.SetMask(MATCHED_SRC_PORT, uint32(srcPort))
-			mask.SetMask(MATCHED_DST_PORT, uint32(dstPort))
+			mask.Set(MATCHED_SRC_PORT, uint32(srcPort.mask))
+			mask.Set(MATCHED_DST_PORT, uint32(dstPort.mask))
 			a.AllMatchedMask = append(a.AllMatchedMask, mask)
 		}
 	}
 }
 
 func (a *Acl) generateMatched(srcMac, dstMac []uint32, srcIps, dstIps []ipSegment) {
-	if len(a.SrcPorts) == 0 {
-		a.SrcPorts = append(a.SrcPorts, 0)
-	}
-	if len(a.DstPorts) == 0 {
-		a.DstPorts = append(a.DstPorts, 0)
-	}
-
 	for _, srcMac := range srcMac {
 		for _, dstMac := range dstMac {
 			a.generateMatchedField(srcMac, dstMac, emptyIpSegment, emptyIpSegment)

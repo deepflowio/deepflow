@@ -2,6 +2,7 @@ package policy
 
 import (
 	"math"
+	"runtime"
 	"sort"
 	"sync/atomic"
 
@@ -11,9 +12,7 @@ import (
 type TableItem struct {
 	match, mask MatchedField
 
-	aclAction  []AclAction
-	npbActions []NpbAction
-	aclID      ACLID
+	policy *PolicyRawData
 }
 
 const (
@@ -88,6 +87,7 @@ func (d *Ddbs) generateAclBits(acls []*Acl) {
 		}
 		// 根据策略字段生成对应的bits
 		acl.generateMatched(srcMac, dstMac, srcIps, dstIps)
+		acl.InitPolicy()
 	}
 }
 
@@ -98,7 +98,40 @@ func abs(a, b int) int {
 	return b - a
 }
 
-func (d *Ddbs) generateMaskVector(acls []*Acl) {
+func (d *Ddbs) getVectorSize(aclNum int) int {
+	vectorSize := MASK_VECTOR_SIZE
+	if aclNum < 100 {
+		vectorSize = MASK_VECTOR_SIZE - 4
+	} else if aclNum < 300 {
+		vectorSize = MASK_VECTOR_SIZE - 3
+	} else if aclNum < 500 {
+		vectorSize = MASK_VECTOR_SIZE - 2
+	} else if aclNum < 10240 {
+		vectorSize = MASK_VECTOR_SIZE - 1
+	}
+	return vectorSize
+}
+
+func (d *Ddbs) getSortTableIndex(matched0, matched1, base int) int {
+	index := abs(matched0, matched1)
+	// index计算引入影响因子和影响百分比，将这样的位（mathed0/1: 0, 1 base: 2000）排在后面
+	perCent := 1 - float32(matched0+matched1)/float32(base)
+	factor := float32(base / 2)
+	if base > math.MaxUint16 {
+		factor = float32(math.MaxUint16 / 2)
+	}
+	index += int(factor * perCent)
+	if index >= math.MaxUint16 || (matched0 == 0 && matched1 == 0) {
+		index = math.MaxUint16 - 1
+	}
+	return index
+}
+
+func (d *Ddbs) generateSortTable(acls []*Acl) *[math.MaxUint16][]int {
+	base := 0
+	for _, acl := range acls {
+		base += len(acl.AllMatched)
+	}
 	// 计算对应bits匹配0和1的策略差值
 	table := [math.MaxUint16][]int{}
 	for i := 0; i < MATCHED_FIELD_BITS_LEN; i++ {
@@ -115,24 +148,15 @@ func (d *Ddbs) generateMaskVector(acls []*Acl) {
 				}
 			}
 		}
-
-		index := abs(matched0, matched1)
-		if index >= math.MaxUint16 || (matched0 == 0 && matched1 == 0) {
-			index = math.MaxUint16 - 1
-		}
+		index := d.getSortTableIndex(matched0, matched1, base)
 		table[index] = append(table[index], i)
 	}
+	return &table
+}
 
-	vectorSize := MASK_VECTOR_SIZE
-	if len(acls) < 100 {
-		vectorSize = MASK_VECTOR_SIZE - 4
-	} else if len(acls) < 300 {
-		vectorSize = MASK_VECTOR_SIZE - 3
-	} else if len(acls) < 500 {
-		vectorSize = MASK_VECTOR_SIZE - 2
-	} else if len(acls) < 10240 {
-		vectorSize = MASK_VECTOR_SIZE - 1
-	}
+func (d *Ddbs) generateMaskVector(acls []*Acl) {
+	table := d.generateSortTable(acls)
+	vectorSize := d.getVectorSize(len(acls))
 	vectorBits := make([]int, 0, vectorSize)
 	// 使用对应差值最小的10个bit位做为MaskVector
 	for i := 0; i < math.MaxUint16 && len(vectorBits) < vectorSize; i++ {
@@ -156,11 +180,12 @@ func (d *Ddbs) generateVectorTable(acls []*Acl) {
 		for i, match := range acl.AllMatched {
 			index := match.GetAllTableIndex(&d.maskVector, &acl.AllMatchedMask[i], d.maskMinBit, d.maskMaxBit, d.vectorBits)
 			for _, index := range index {
-				table[index] = append(table[index], &TableItem{match, acl.AllMatchedMask[i], acl.Action, acl.NpbActions, acl.Id})
+				table[index] = append(table[index], &TableItem{match, acl.AllMatchedMask[i], &acl.policy})
 			}
 		}
 	}
 	d.table = table
+	runtime.GC()
 }
 
 func (d *Ddbs) generateDdbsTable(acls []*Acl) {
@@ -217,12 +242,13 @@ func (d *Ddbs) getPolicyFromTable(key *MatchedField, direction DirectionType, po
 			if portPolicy == INVALID_POLICY_DATA {
 				portPolicy = new(PolicyData)
 			}
-			portPolicy.Merge(item.aclAction, item.npbActions, item.aclID, direction)
+			policy := item.policy
+			portPolicy.Merge(policy.AclActions, policy.NpbActions, policy.ACLID, direction)
 			if item.match.Get(MATCHED_VLAN) > 0 {
 				if vlanPolicy == INVALID_POLICY_DATA {
 					vlanPolicy = new(PolicyData)
 				}
-				vlanPolicy.Merge(item.aclAction, item.npbActions, item.aclID, direction)
+				vlanPolicy.Merge(policy.AclActions, policy.NpbActions, policy.ACLID, direction)
 			}
 		}
 	}
@@ -286,18 +312,7 @@ func (d *Ddbs) UpdateAcls(acls []*Acl) {
 				acl.NpbActions[index].AddResourceGroupType(groupType)
 			}
 		}
-
-		if acl.Type == TAP_ANY {
-			// 对于TAP_ANY策略，给其他每一个TAP类型都单独生成一个acl，来避免查找2次
-			for i := TAP_MIN; i < TAP_MAX; i++ {
-				generateAcl := &Acl{}
-				*generateAcl = *acl
-				generateAcl.Type = i
-				generateAcls = append(generateAcls, generateAcl)
-			}
-		} else {
-			generateAcls = append(generateAcls, acl)
-		}
+		generateAcls = append(generateAcls, acl)
 	}
 
 	// 生成策略InterestMap,更新策略
