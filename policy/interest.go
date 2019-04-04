@@ -104,10 +104,10 @@ func (t *InterestTable) generateInterestPortMap(acls []*Acl) {
 	interestPortMaps := &[TAP_MAX][math.MaxUint16 + 1]PortRange{}
 	ports := make([]PortRange, 0, 1000)
 
-	for tapType := TAP_MIN; tapType < TAP_MAX; tapType++ {
+	for tapType := TAP_MIN - 1; tapType < TAP_MAX; tapType++ {
 		ports = ports[:0]
 		for _, acl := range acls {
-			if acl.Type == tapType {
+			if acl.Type == tapType || acl.Type == TAP_ANY || tapType == TAP_ANY {
 				ports = append(ports, acl.SrcPortRange...)
 				ports = append(ports, acl.DstPortRange...)
 			}
@@ -231,11 +231,17 @@ func (t *InterestTable) generateGroupRelation(acls []*Acl, to *[TAP_MAX][math.Ma
 	for tapType := TAP_MIN; tapType < TAP_MAX; tapType++ {
 		id := uint16(1)
 		for _, acl := range acls {
-			if acl.Type != tapType {
+			if acl.Type != tapType && acl.Type != TAP_ANY {
 				continue
 			}
 			for _, groups := range [][]uint32{acl.SrcGroups, acl.DstGroups} {
-				t.generateGroupRelationByGroups(groups, acl.Type, &id, to, from)
+				if acl.Type != TAP_ANY {
+					t.generateGroupRelationByGroups(groups, acl.Type, &id, to, from)
+				} else {
+					for tapType := TAP_MIN; tapType < TAP_MAX; tapType++ {
+						t.generateGroupRelationByGroups(groups, tapType, &id, to, from)
+					}
+				}
 			}
 		}
 	}

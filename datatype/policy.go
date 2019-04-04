@@ -154,6 +154,20 @@ func (f ActionFlag) String() string {
 
 type ACLID uint16
 
+type PolicyRawData struct {
+	ACLID      ACLID // 匹配的第一个ACL
+	AclActions []AclAction
+	NpbActions []NpbAction
+}
+
+func (d *PolicyRawData) GobEncode() ([]byte, error) {
+	return []byte{}, nil
+}
+
+func (d *PolicyRawData) GobDecode(in []byte) error {
+	return nil
+}
+
 type PolicyData struct {
 	ACLID         ACLID      // 匹配的第一个ACL
 	ActionFlags   ActionFlag // bitwise OR

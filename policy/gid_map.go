@@ -67,7 +67,13 @@ func (m *AclGidMap) GenerateGroupAclGidMaps(acls []*Acl, enable bool) {
 	}
 	for _, acl := range acls {
 		for _, action := range acl.Action {
-			addGroupAclGidsToMap(acl, enable, uint32(action.GetACLGID()), srcGroupAclGidMaps[acl.Type], dstGroupAclGidMaps[acl.Type])
+			if acl.Type != TAP_ANY {
+				addGroupAclGidsToMap(acl, enable, uint32(action.GetACLGID()), srcGroupAclGidMaps[acl.Type], dstGroupAclGidMaps[acl.Type])
+			} else {
+				for i := TAP_MIN; i < TAP_MAX; i++ {
+					addGroupAclGidsToMap(acl, enable, uint32(action.GetACLGID()), srcGroupAclGidMaps[i], dstGroupAclGidMaps[i])
+				}
+			}
 		}
 	}
 	m.SrcGroupAclGidMaps = srcGroupAclGidMaps
