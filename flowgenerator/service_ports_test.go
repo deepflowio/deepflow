@@ -16,15 +16,18 @@ import (
 const DEFAULT_IP_LEARN_CNT = 5
 
 func generateAclGidBitmap(groupType uint32, offset uint32, bitOffset uint32) AclGidBitmap {
-	aclGidBitmap := AclGidBitmap(0)
+	aclGidBitmap := AclGidBitmap(0).SetSrcAndDstFlag()
 	if groupType == GROUP_TYPE_SRC {
-		aclGidBitmap.SetSrcFlag()
+		aclGidBitmap = aclGidBitmap.SetSrcMapOffset(offset)
 	} else {
-		aclGidBitmap.SetDstFlag()
+		aclGidBitmap = aclGidBitmap.SetDstMapOffset(offset)
 	}
-	aclGidBitmap.SetMapOffset(offset)
 	if bitOffset != math.MaxUint32 {
-		aclGidBitmap.SetMapBits(bitOffset)
+		if groupType == GROUP_TYPE_SRC {
+			aclGidBitmap = aclGidBitmap.SetSrcMapBits(bitOffset)
+		} else {
+			aclGidBitmap = aclGidBitmap.SetDstMapBits(bitOffset)
+		}
 	}
 
 	return aclGidBitmap
