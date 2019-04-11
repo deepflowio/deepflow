@@ -2,79 +2,77 @@ package datastructure
 
 import (
 	"math"
-	"sync/atomic"
 	"time"
-	"unsafe"
 )
 
-// 这里的last并非最后一次Acquire的时间，而是最后一次Acquire后，
-// 按剩余bucket数量倒推出来的等效时间戳，也就是它不仅包含了时间戳的记录，
-// 还包含了剩余bucket数量
 type LeakyBucket struct {
 	rate     uint64
-	interval time.Duration // 生成一次token的间隔
-	unit     uint64        // 生成一次token的数量，当interval少于1ns时，unit > 1，否则unit = 1
-	last     time.Duration
+	interval time.Duration // the unit is ms
+	token    uint64
+	full     uint64
+	quantity uint64 // get token number per timer
+	timer    *time.Ticker
+	multiple uint64 // burst multiple
+	running  bool
+	spin     SpinLock
+}
+
+func (b *LeakyBucket) Init(rate uint64) {
+	b.interval = 100
+	b.multiple = 10
+	// setup timer
+	b.timer = time.NewTicker(time.Duration(b.interval) * time.Millisecond)
+
+	// initial token, feed to the bucket full
+	b.SetRate(rate)
+	b.token = b.full
+	b.running = true
+
+	go b.run()
+}
+
+func (b *LeakyBucket) Close() {
+	b.running = false
+	b.timer.Stop()
+}
+
+func (b *LeakyBucket) run() {
+	for b.running == true {
+		<-b.timer.C
+
+		// fill token
+		b.spin.Lock()
+		if b.token+b.quantity > b.full {
+			b.token = b.full
+		} else {
+			b.token += b.quantity
+		}
+		b.spin.Unlock()
+	}
 }
 
 func (b *LeakyBucket) SetRate(rate uint64) {
 	if rate == 0 {
 		rate = math.MaxUint64
 	}
-	interval := time.Duration(uint64(time.Second) / rate)
-	b.unit = 1
-	if interval < time.Nanosecond {
-		interval = time.Nanosecond
-		b.unit = rate / uint64(time.Second)
+	quantity := rate / uint64(time.Second/time.Millisecond/b.interval)
+	if quantity == 0 { // for 1 <= rate < 10
+		quantity = 1
 	}
-	last := time.Duration(time.Now().UnixNano()) - time.Millisecond // for safety
-	b.last = last * interval / interval
+	b.spin.Lock()
 	b.rate = rate
-	b.interval = interval
+	b.quantity = quantity
+	b.full = b.quantity * b.multiple
+	b.spin.Unlock()
 }
 
-func (b *LeakyBucket) Acquire(timestamp time.Duration, size uint64) bool {
-	if timestamp < b.last {
+func (b *LeakyBucket) Acquire(size uint64) bool {
+	b.spin.Lock()
+	if b.token < size {
+		b.spin.Unlock()
 		return false
 	}
-	full := false
-	available := uint64((timestamp-b.last)/b.interval) * b.unit
-	if available > b.rate {
-		available = b.rate
-		full = true
-	}
-	if available >= size {
-		available -= size
-		if full {
-			b.last = timestamp - time.Duration(available/b.unit)*b.interval
-		} else {
-			b.last += time.Duration(size/b.unit) * b.interval
-		}
-		return true
-	}
-	return false
-}
-
-func (b *LeakyBucket) SafeAcquire(timestamp time.Duration, size uint64) bool {
-	if timestamp < b.last {
-		return false
-	}
-	full := false
-	available := uint64((timestamp-b.last)/b.interval) * b.unit
-	if available > b.rate {
-		available = b.rate
-		full = true
-	}
-	if available >= size {
-		available -= size
-		if full {
-			last := timestamp - time.Duration(available/b.unit)*b.interval
-			if atomic.CompareAndSwapUint64((*uint64)(unsafe.Pointer(&b.last)), uint64(b.last), uint64(last)) {
-				return true
-			}
-		}
-		atomic.AddUint64((*uint64)(unsafe.Pointer(&b.last)), size/b.unit*uint64(b.interval))
-		return true
-	}
-	return false
+	b.token -= size
+	b.spin.Unlock()
+	return true
 }
