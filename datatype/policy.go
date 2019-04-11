@@ -609,8 +609,11 @@ func FormatAclGidBitmap(endpointData *EndpointData, policyData *PolicyData) stri
 		if aclAction.GetACLGID() > ACLID(0) {
 			formatStr += fmt.Sprintf("{ACLGID: %d ", aclAction.GetACLGID())
 			mapOffset := aclAction.GetAclGidBitmapOffset()
-			mapCount := aclAction.GetAclGidBitmapCount()
-			for i := mapOffset; i < mapOffset+uint16(mapCount); i++ {
+			mapEnd := mapOffset + uint16(aclAction.GetAclGidBitmapCount())
+			if mapEnd > uint16(len(policyData.AclGidBitmaps)) {
+				mapEnd = uint16(len(policyData.AclGidBitmaps))
+			}
+			for i := mapOffset; i < mapEnd; i++ {
 				formatStr += formatGroup(policyData.AclGidBitmaps[i], endpointData)
 			}
 			formatStr += "} "
@@ -773,6 +776,11 @@ func FillGroupID(aclAction AclAction, aclGidBitmaps []AclGidBitmap, allGroupIDs 
 	mapEnd := mapOffset + uint16(aclAction.GetAclGidBitmapCount())
 	srcLen := uint32(len(allGroupIDs[0]))
 	dstLen := uint32(len(allGroupIDs[1]))
+	if mapEnd > uint16(len(aclGidBitmaps)) {
+		log.Warningf("AclActions' reference %v exceeds AclGidBitmaps' len %v",
+			mapEnd, len(aclGidBitmaps))
+		mapEnd = uint16(len(aclGidBitmaps))
+	}
 	for i := mapOffset; i < mapEnd; i++ {
 		aclGidBitmap := aclGidBitmaps[i]
 		srcGroupOffset := aclGidBitmap.GetSrcMapOffset()
