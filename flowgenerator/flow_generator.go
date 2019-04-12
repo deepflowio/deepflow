@@ -361,13 +361,12 @@ func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireInterval, reportTole
 	}
 	// FIXME bitmap should be recalculated, 5.5.2
 	pivotalTime := taggedFlow.EndTime - taggedFlow.EndTime%forceReportInterval
-	if taggedFlow.StartTime < pivotalTime {
+	if taggedFlow.StartTime < pivotalTime && taggedFlow.EndTime > pivotalTime {
 		taggedFlow.StartTime = pivotalTime
 		if !f.reported {
 			// FIXME maybe we should choose only one ArrTime
 			taggedFlow.FlowMetricsPeerSrc.ArrTime0 = pivotalTime
 			taggedFlow.FlowMetricsPeerDst.ArrTime0 = pivotalTime
-			f.minArrTime = pivotalTime
 		}
 	}
 	taggedFlow.Duration = f.recentTime - f.minArrTime
