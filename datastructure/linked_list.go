@@ -71,6 +71,7 @@ func (q *LinkedList) Remove(filter func(interface{}) bool) {
 			prev, e = e, e.next
 			continue
 		}
+		q.size--
 		toRelease := e
 		if e == q.head {
 			q.head = e.next

@@ -9,6 +9,9 @@ func TestRemoveFirst(t *testing.T) {
 	list.PushBack(1)
 	list.PushBack(2)
 	list.Remove(func(x interface{}) bool { return x.(int) == 1 })
+	if list.Len() != 1 {
+		t.Error("Should be 1, actually", list.Len())
+	}
 	it := list.Iterator()
 	if v := it.Value(); v != 2 {
 		t.Error("Should be 2, actually", v)
@@ -20,6 +23,9 @@ func TestRemoveLast(t *testing.T) {
 	list.PushBack(1)
 	list.PushBack(2)
 	list.Remove(func(x interface{}) bool { return x.(int) == 2 })
+	if list.Len() != 1 {
+		t.Error("Should be 1, actually", list.Len())
+	}
 	it := list.Iterator()
 	it.Next()
 	if !it.Empty() {
