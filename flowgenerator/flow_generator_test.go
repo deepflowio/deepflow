@@ -424,22 +424,24 @@ func TestUdpShortFlow(t *testing.T) {
 	}
 }
 
-func TestStartTimeFix(t *testing.T) {
+func TestTimeFixAndDuration(t *testing.T) {
 	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
 
 	packet0 := getDefaultPacket()
-	packet0.Timestamp = 59 * time.Second
+	packet0.Timestamp -= 60 * time.Second
+	minArrTime := packet0.Timestamp
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
 
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Flags = TCP_SYN | TCP_ACK
-	packet1.Timestamp = 60 * time.Second
+	packet1.Timestamp += 55 * time.Second
 	reversePacket(packet1)
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
 
 	packet2 := getDefaultPacket()
 	packet2.TcpData.Flags = TCP_ACK
-	packet2.Timestamp = 75 * time.Second
+	packet2.Timestamp += 60 * time.Second
+	recentTime := packet2.Timestamp
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet2)
 
 	flowGenerator.Start()
@@ -448,6 +450,10 @@ func TestStartTimeFix(t *testing.T) {
 	pivotalTime := taggedFlow.EndTime - taggedFlow.EndTime%forceReportInterval
 	if taggedFlow.StartTime != pivotalTime {
 		t.Errorf("taggedFlow.StartTime is %d, expect %d", taggedFlow.StartTime, pivotalTime)
+	}
+	duration := recentTime - minArrTime
+	if taggedFlow.Duration < duration {
+		t.Errorf("taggedFlow.Duration is %d, expect %d", taggedFlow.Duration, duration)
 	}
 }
 
