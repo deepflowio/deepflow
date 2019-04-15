@@ -200,12 +200,11 @@ func (l *PolicyLabeler) generateGroupIdMapByPlatformData(datas []*PlatformData) 
 }
 
 func (l *PolicyLabeler) generateInterestKeys(endpointData *EndpointData, packet *LookupKey) {
-	groupMap := l.fromInterestGroupMaps[packet.Tap]
 	hasAnyGroup := false
 	// 添加groupid 0匹配全采集的策略
 	for _, id := range endpointData.SrcInfo.GroupIds {
 		id = FormatGroupId(id)
-		if relations := groupMap[id]; relations > 0 {
+		if relations := l.fromInterestGroupMaps[packet.Tap][id]; relations > 0 {
 			packet.SrcGroupIds = l.appendNoRepeat(packet.SrcGroupIds, relations)
 			packet.SrcAllGroupIds = append(packet.SrcAllGroupIds, relations)
 			if id == ANY_GROUP {
@@ -223,7 +222,7 @@ func (l *PolicyLabeler) generateInterestKeys(endpointData *EndpointData, packet 
 	hasAnyGroup = false
 	for _, id := range endpointData.DstInfo.GroupIds {
 		id = FormatGroupId(id)
-		if relations := groupMap[id]; relations > 0 {
+		if relations := l.fromInterestGroupMaps[packet.Tap][id]; relations > 0 {
 			packet.DstGroupIds = l.appendNoRepeat(packet.DstGroupIds, relations)
 			packet.DstAllGroupIds = append(packet.DstAllGroupIds, relations)
 			if id == ANY_GROUP {
@@ -1164,6 +1163,7 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointStore, 
 		id := l.getAclId(vlanPolicy.ACLID, portPolicy.ACLID)
 		policy = new(PolicyData)
 		if packet.HasFeatureFlag(NPM) {
+			l.generateInterestKeys(endpoint.Endpoints, packet)
 			policy.AclActions = make([]AclAction, 0, len(vlanPolicy.AclActions)+len(portPolicy.AclActions))
 			policy.MergeAclAction(append(vlanPolicy.AclActions, portPolicy.AclActions...), id)
 			policy.AddAclGidBitmaps(packet, false, l.SrcGroupAclGidMaps[packet.Tap], l.DstGroupAclGidMaps[packet.Tap])

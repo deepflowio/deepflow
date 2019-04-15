@@ -1767,6 +1767,8 @@ func TestAclGidBitmapFirstPathVsFastPathByVlan(t *testing.T) {
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FirstPath Check Failed!")
 	}
+	key1.SrcAllGroupIds = nil
+	key1.DstAllGroupIds = nil
 	_, policyData = getPolicyByFastPath(table, key1)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FastPath Check Failed!")
@@ -1780,6 +1782,8 @@ func TestAclGidBitmapFirstPathVsFastPathByVlan(t *testing.T) {
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FirstPath Check Failed!")
 	}
+	key2.SrcAllGroupIds = nil
+	key2.DstAllGroupIds = nil
 	_, policyData = getPolicyByFastPath(table, key2)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FastPath Check Failed!")
@@ -2136,6 +2140,26 @@ func BenchmarkFastPath(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		table.policyLabeler.GetPolicyByFastPath(key)
+	}
+}
+
+func BenchmarkFastPathWithVlanAndAclGid(b *testing.B) {
+	acls := []*Acl{}
+	// 创建 policyTable
+	table := generatePolicyTable()
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	action = action.SetACLGID(10)
+	acl1 := generatePolicyAcl(table, action, 10, group[1], group[2], protoAny, 0, vlan1)
+	acl2 := generatePolicyAcl(table, action, 20, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	acls = append(acls, acl1, acl2)
+	table.UpdateAcls(acls)
+	// vlan1策略正向
+	key1 := generateLookupKey(group1Mac, group2Mac, vlan1, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 8000)
+	setEthTypeAndOthers(key1, EthernetTypeIPv4, 64, true, true)
+	result := getEndpointData(table, key1)
+	getPolicyByFirstPath(table, result, key1)
+	for i := 0; i < b.N; i++ {
+		getPolicyByFastPath(table, key1)
 	}
 }
 
