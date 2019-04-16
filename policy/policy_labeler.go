@@ -504,7 +504,7 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointStore, 
 		id := getAclId(vlanPolicy.ACLID, portPolicy.ACLID)
 		policy = new(PolicyData)
 		if packet.HasFeatureFlag(NPM) {
-			l.generateInterestKeys(endpoint.Endpoints, packet)
+			l.generateInterestKeys(endpoint.Endpoints, packet, false)
 			policy.AclActions = make([]AclAction, 0, len(vlanPolicy.AclActions)+len(portPolicy.AclActions))
 			policy.MergeAclAction(append(vlanPolicy.AclActions, portPolicy.AclActions...), id)
 			+policy.AddAclGidBitmaps(packet, false, l.AclGidMap.SrcGroupAclGidMaps[packet.Tap], l.AclGidMap.DstGroupAclGidMaps[packet.Tap])
