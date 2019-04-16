@@ -259,8 +259,15 @@ func (t *InterestTable) generateInterestProtoMaps(acls []*Acl) {
 	interestProtoMaps := &[TAP_MAX][math.MaxUint8 + 1]bool{}
 
 	for _, acl := range acls {
-		if acl.Type.CheckTapType(acl.Type) {
+		if !acl.Type.CheckTapType(acl.Type) {
+			continue
+		}
+		if acl.Type != TAP_ANY {
 			interestProtoMaps[acl.Type][acl.Proto] = true
+		} else {
+			for tapType := TAP_MIN; tapType < TAP_MAX; tapType++ {
+				interestProtoMaps[tapType][acl.Proto] = true
+			}
 		}
 	}
 	t.InterestProtoMaps = interestProtoMaps
