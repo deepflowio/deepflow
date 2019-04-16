@@ -466,6 +466,7 @@ func (d *Ddbs) GetPolicyByFastPath(packet *LookupKey) (*EndpointStore, *PolicyDa
 		id := getAclId(vlanPolicy.ACLID, portPolicy.ACLID)
 		policy = new(PolicyData)
 		if packet.HasFeatureFlag(NPM) {
+			d.initGroupIds(endpoint.Endpoints, packet)
 			policy.AclActions = make([]AclAction, 0, len(vlanPolicy.AclActions)+len(portPolicy.AclActions))
 			policy.MergeAclAction(append(vlanPolicy.AclActions, portPolicy.AclActions...), id)
 			policy.AddAclGidBitmaps(packet, false, d.AclGidMap.SrcGroupAclGidMaps[packet.Tap], d.AclGidMap.DstGroupAclGidMaps[packet.Tap])
