@@ -19,30 +19,26 @@ message SyncResponse {
 }
 
 message PlatformData {
-    repeated Vm vms = 1;
-    repeated Vpc vpcs = 2;
-    repeated Network networks = 3;
+    optional Host host = 1;
+    repeated Vm vms = 2;
+    repeated Vpc vpcs = 3;
+    repeated Network networks = 4;
+    repeated Subnet subnets = 5;
+    repeated Port ports = 6;
+    repeated Ip ips = 7;
+}
+
+message Host {
+    optional string hostname = 1;
 }
 
 message Vm {
     optional string uuid = 1;
     optional string name = 2;
     optional string label = 3;
+    optional string launch_server = 4;
 
     optional string vpc_uuid = 9;
-
-    repeated Interface interfaces = 13;
-}
-
-message Interface {
-    optional uint64 mac = 1;
-    repeated Ip ips = 2;
-    optional string network_uuid = 3;
-}
-
-message Ip {
-    optional uint32 ip = 1;
-    optional uint32 last_seen = 2;
 }
 
 message Vpc {
@@ -53,10 +49,26 @@ message Vpc {
 message Network {
     optional string uuid = 1;
     optional uint32 segmentation_id = 5;
-    repeated Subnet subnets = 7;
 }
 
 message Subnet {
     optional string cidr = 1;
     optional uint32 last_seen = 2;
+
+    optional string network_uuid = 9;
+}
+
+message Port {
+    optional string uuid = 1;
+    optional uint64 mac = 2;
+    optional string device_uuid = 4;
+
+    optional string network_uuid = 9;
+}
+
+message Ip {
+    optional uint32 ip = 1;
+    optional uint32 last_seen = 2;
+
+    optional string port_uuid = 9;
 }
