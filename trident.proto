@@ -30,6 +30,7 @@ message SyncRequest {
 enum Status {
     SUCCESS = 0;
     FAILED = 1;
+    HEARTBEAT = 2;
 }
 
 enum TapMode {
