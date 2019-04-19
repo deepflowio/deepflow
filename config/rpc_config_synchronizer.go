@@ -49,7 +49,11 @@ func (s *RpcConfigSynchronizer) sync() error {
 	if err != nil {
 		return err
 	}
-	if status := response.GetStatus(); status != trident.Status_SUCCESS {
+	status := response.GetStatus()
+	if status == trident.Status_HEARTBEAT {
+		return nil
+	}
+	if status == trident.Status_FAILED {
 		return errors.New("Status Unsuccessful")
 	}
 	s.syncInterval = time.Duration(response.GetConfig().GetSyncInterval()) * time.Second
@@ -89,7 +93,11 @@ func (s *RpcConfigSynchronizer) pull() error {
 		if err != nil {
 			return err
 		}
-		if status := response.GetStatus(); status != trident.Status_SUCCESS {
+		status := response.GetStatus()
+		if status == trident.Status_HEARTBEAT {
+			continue
+		}
+		if status == trident.Status_FAILED {
 			return errors.New("Status Unsuccessful")
 		}
 		s.Lock()
