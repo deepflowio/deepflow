@@ -98,7 +98,8 @@ func (s *RpcConfigSynchronizer) pull() error {
 			continue
 		}
 		if status == trident.Status_FAILED {
-			return errors.New("Status Unsuccessful")
+			log.Error("Status Unsuccessful")
+			continue
 		}
 		s.Lock()
 		for _, handler := range s.handlers {
