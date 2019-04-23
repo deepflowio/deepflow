@@ -32,12 +32,19 @@ message Host {
     optional string hostname = 1;
 }
 
+enum VmState {
+    OTHER = 0;
+    RUNNING = 1;
+    PAUSED = 2;
+    SHUTOFF = 3;
+}
+
 message Vm {
     optional string uuid = 1;
     optional string name = 2;
     optional string label = 3;
     optional string launch_server = 4;
-    optional uint32 state = 5;
+    optional VmState state = 5;
 
     optional string vpc_uuid = 9;
 }
