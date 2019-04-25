@@ -15,39 +15,30 @@ import (
 
 const DEFAULT_IP_LEARN_CNT = 5
 
-func generateAclGidBitmap(groupType uint32, offset uint32, bitOffset uint32) AclGidBitmap {
-	aclGidBitmap := AclGidBitmap(0).SetSrcAndDstFlag()
-	if groupType == GROUP_TYPE_SRC {
-		aclGidBitmap = aclGidBitmap.SetSrcMapOffset(offset)
-	} else {
-		aclGidBitmap = aclGidBitmap.SetDstMapOffset(offset)
+func generateAclGidBitmap(srcOffset uint32, srcBitOffset uint32, dstOffset uint32, dstBitOffset uint32) AclGidBitmap {
+	aclGidBitmap := AclGidBitmap(0).SetSrcAndDstFlag().SetSrcMapOffset(srcOffset).SetDstMapOffset(dstOffset)
+	if srcBitOffset != math.MaxUint32 {
+		aclGidBitmap = aclGidBitmap.SetSrcMapBits(srcBitOffset)
 	}
-	if bitOffset != math.MaxUint32 {
-		if groupType == GROUP_TYPE_SRC {
-			aclGidBitmap = aclGidBitmap.SetSrcMapBits(bitOffset)
-		} else {
-			aclGidBitmap = aclGidBitmap.SetDstMapBits(bitOffset)
-		}
+	if dstBitOffset != math.MaxUint32 {
+		aclGidBitmap = aclGidBitmap.SetDstMapBits(dstBitOffset)
 	}
-
 	return aclGidBitmap
 }
 
 func generateEndpointAndPolicy(packet *MetaPacket, srcGroupId, dstGroupId uint32, action AclAction, aclId ACLID) {
 	packet.EndpointData.SrcInfo.GroupIds = append(packet.EndpointData.SrcInfo.GroupIds, srcGroupId)
 	packet.EndpointData.DstInfo.GroupIds = append(packet.EndpointData.DstInfo.GroupIds, dstGroupId)
-	aclGidBitmap0 := generateAclGidBitmap(GROUP_TYPE_SRC, 0, 0)
-	aclGidBitmap1 := generateAclGidBitmap(GROUP_TYPE_DST, 0, 0)
+	aclGidBitmap := generateAclGidBitmap(0, 0, 0, 0)
 	policyData := new(PolicyData)
 	if action.GetDirections() == BACKWARD {
 		action = action.SetACLGID(ACLID(dstGroupId))
-		aclGidBitmap0, aclGidBitmap1 = aclGidBitmap1, aclGidBitmap0
 	} else {
 		action = action.SetACLGID(ACLID(srcGroupId))
 	}
 	policyData.Merge([]AclAction{action}, nil, aclId)
 	policyData.AclActions[0] = policyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(2)
-	policyData.AclGidBitmaps = append(policyData.AclGidBitmaps, aclGidBitmap0, aclGidBitmap1)
+	policyData.AclGidBitmaps = append(policyData.AclGidBitmaps, aclGidBitmap)
 	packet.PolicyData = policyData
 }
 
