@@ -41,9 +41,6 @@ type PacketCounter struct {
 	TxPackets uint64 `statsd:"tx_packets"`
 	TxDropped uint64 `statsd:"tx_dropped"`
 	TxErrors  uint64 `statsd:"tx_errors"`
-
-	AverageTime uint64 `statsd:"average_time"`
-	MaxTime     uint64 `statsd:"max_time"`
 }
 
 type TridentKey = uint32
@@ -109,10 +106,6 @@ func NewTridentAdapter(queues queue.MultiQueueWriter, listenBufferSize, cacheSiz
 func (a *TridentAdapter) GetCounter() interface{} {
 	counter := &PacketCounter{}
 	counter, a.counter = a.counter, counter
-	if counter.RxPackets > 0 {
-		counter.AverageTime = counter.AverageTime / counter.RxPackets
-		log.Debug("counter.AverageTime", counter.AverageTime, "counter.RxPackets", counter.RxPackets)
-	}
 	return counter
 }
 
@@ -128,7 +121,7 @@ func (a *TridentAdapter) cacheClear(data []byte, key uint32, seq uint32) {
 		for i := 0; i < a.cacheSize; i++ {
 			if instance.cacheMap&(1<<uint64(i)) == uint64(1<<uint32(i)) {
 				dataSeq := uint32(i) + startSeq + 1
-				a.decode(a.instances[key].cache[i], key)
+				instance.timestamp = a.decode(a.instances[key].cache[i], key)
 				drop := uint64(dataSeq - instance.seq - 1)
 				a.counter.RxDropped += drop
 				a.stats.RxDropped += drop
@@ -143,42 +136,22 @@ func (a *TridentAdapter) cacheClear(data []byte, key uint32, seq uint32) {
 		drop := uint64(seq - instance.seq - 1)
 		a.counter.RxDropped += drop
 		a.stats.RxDropped += drop
-		a.decode(data, key)
+		instance.timestamp = a.decode(data, key)
 		instance.seq = seq
 	}
 	a.instancesLock.Unlock()
 }
 
-func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32, timestamp time.Duration) {
+func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32) {
 	a.instancesLock.Lock()
 	instance := a.instances[key]
 	a.instancesLock.Unlock()
-	instance.timestamp = timestamp
-	timeAdjust := (time.Duration(time.Now().UnixNano()) - timestamp) / time.Second
-	interval := uint64(Abs(timeAdjust))
-	if interval >= 1 {
-		//	timestamp = raw + instance.timeAdjust
-		//	timeAdjust = time.Now() - timestamp
-		//	所以
-		//	timeAdjust = time.Now() - raw - instance.timeAdjust
-		//	所以 此包与本地真正的时间差为
-		//	rawTimeAdjust = timadjust + instance.timeAdjust = time.Now() - raw
-		//	即 instance.timeAdjust = rawTimeAdjust = timeAdjust + instance.timeAdjust
-		instance.timeAdjust += timeAdjust
-		interval = uint64(Abs(instance.timeAdjust))
-		log.Infof("trident(%v) set timeAdjust %ds.", IpFromUint32(key), instance.timeAdjust)
-	}
-
-	if interval > a.counter.MaxTime {
-		a.counter.MaxTime = interval
-	}
-	a.counter.AverageTime += interval
 	a.counter.RxPackets += 1
 	a.stats.RxPackets += 1
 	// droplet重启或trident重启时，不考虑SEQ
 	if (instance.cacheCount == 0 && seq-instance.seq == 1) || instance.seq == 0 || seq == 1 {
 		instance.seq = seq
-		a.decode(data, key)
+		instance.timestamp = a.decode(data, key)
 	} else {
 		if seq <= instance.seq {
 			a.counter.RxErrors += 1
@@ -202,7 +175,7 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32, timest
 	}
 }
 
-func (a *TridentAdapter) findAndAdd(data []byte, key uint32, seq uint32, timestamp time.Duration) {
+func (a *TridentAdapter) findAndAdd(data []byte, key uint32, seq uint32) {
 	a.instancesLock.Lock()
 	if a.instances[key] == nil {
 		instance := &tridentInstance{}
@@ -210,13 +183,13 @@ func (a *TridentAdapter) findAndAdd(data []byte, key uint32, seq uint32, timesta
 		a.instances[key] = instance
 	}
 	a.instancesLock.Unlock()
-	a.cacheLookup(data, key, seq, timestamp)
+	a.cacheLookup(data, key, seq)
 }
 
-func (a *TridentAdapter) decode(data []byte, ip uint32) {
-	timeAdjust := a.getTimeAdjust(ip)
-	decoder := NewSequentialDecoder(data, timeAdjust)
+func (a *TridentAdapter) decode(data []byte, ip uint32) time.Duration {
+	decoder := NewSequentialDecoder(data)
 	ifMacSuffix, _ := decoder.DecodeHeader()
+	timestamp := decoder.timestamp
 
 	for {
 		meta := datatype.AcquireMetaPacket()
@@ -240,6 +213,7 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) {
 	}
 
 	a.udpPool.Put(data)
+	return timestamp
 }
 
 func (a *TridentAdapter) flushInstance() {
@@ -247,24 +221,12 @@ func (a *TridentAdapter) flushInstance() {
 	a.instancesLock.Lock()
 	for key, instance := range a.instances {
 		if timestamp > int64(instance.timestamp) && timestamp-int64(instance.timestamp) >= int64(TRIDENT_TIMEOUT) {
-			instance.timestamp = time.Duration(timestamp)
 			if instance.cacheMap != 0 {
 				a.cacheClear(nil, key, 0)
 			}
 		}
 	}
 	a.instancesLock.Unlock()
-}
-
-func (a *TridentAdapter) getTimeAdjust(key uint32) time.Duration {
-	a.instancesLock.Lock()
-	if instance := a.instances[key]; instance != nil {
-		a.instancesLock.Unlock()
-		return instance.timeAdjust
-	} else {
-		a.instancesLock.Unlock()
-		return 0
-	}
 }
 
 func (a *TridentAdapter) run() {
@@ -284,13 +246,12 @@ func (a *TridentAdapter) run() {
 			return
 		}
 		key := IpToUint32(remote.IP.To4())
-		timeAdjust := a.getTimeAdjust(key)
-		decoder := NewSequentialDecoder(data, timeAdjust)
+		decoder := NewSequentialDecoder(data)
 		if _, invalid := decoder.DecodeHeader(); invalid {
 			a.udpPool.Put(data)
 			continue
 		}
-		a.findAndAdd(data, key, decoder.Seq(), decoder.timestamp)
+		a.findAndAdd(data, key, decoder.Seq())
 	}
 	a.listener.Close()
 	log.Info("Stopped trident adapter")
@@ -321,8 +282,8 @@ func (a *TridentAdapter) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, ope
 		status := ""
 		a.instancesLock.Lock()
 		for key, instance := range a.instances {
-			status += fmt.Sprintf("Host: %16s Seq: %10d Timestamp: %30s Cache: %2d\n",
-				IpFromUint32(key), instance.seq, time.Unix(int64(instance.timestamp/time.Second), int64(instance.timestamp%time.Second)), instance.cacheCount)
+			status += fmt.Sprintf("Host: %16s Seq: %10d Cache: %2d Timestamp: %30s\n",
+				IpFromUint32(key), instance.seq, instance.cacheCount, time.Unix(int64(instance.timestamp/time.Second), int64(instance.timestamp%time.Second)))
 		}
 		a.instancesLock.Unlock()
 
@@ -406,7 +367,7 @@ func RegisterCommand() *cobra.Command {
 			if !CommmandGetResult(ADAPTER_CMD_STATUS, &result) {
 				return
 			}
-			fmt.Printf("Tridents Running Status, Current Time: %s\n", time.Now())
+			fmt.Printf("Tridents Running Status:\n")
 			fmt.Printf("%s", result)
 		},
 	}
