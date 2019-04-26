@@ -27,6 +27,7 @@ const (
 
 const (
 	ADAPTER_CMD_SHOW = iota
+	ADAPTER_CMD_STATUS
 )
 
 var log = logging.MustGetLogger("trident_adapter")
@@ -66,9 +67,10 @@ type TridentAdapter struct {
 	itemBatch []interface{}
 	udpPool   sync.Pool
 
-	instances map[TridentKey]*tridentInstance
-	counter   *PacketCounter
-	stats     *PacketCounter
+	instancesLock sync.Mutex
+	instances     map[TridentKey]*tridentInstance
+	counter       *PacketCounter
+	stats         *PacketCounter
 
 	running  bool
 	listener *net.UDPConn
@@ -119,6 +121,7 @@ func (a *TridentAdapter) Closed() bool {
 }
 
 func (a *TridentAdapter) cacheClear(data []byte, key uint32, seq uint32) {
+	a.instancesLock.Lock()
 	startSeq := a.instances[key].seq
 	instance := a.instances[key]
 	if instance.cacheCount > 0 {
@@ -143,10 +146,13 @@ func (a *TridentAdapter) cacheClear(data []byte, key uint32, seq uint32) {
 		a.decode(data, key)
 		instance.seq = seq
 	}
+	a.instancesLock.Unlock()
 }
 
 func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32, timestamp time.Duration) {
+	a.instancesLock.Lock()
 	instance := a.instances[key]
+	a.instancesLock.Unlock()
 	instance.timestamp = timestamp
 	timeAdjust := (time.Duration(time.Now().UnixNano()) - timestamp) / time.Second
 	interval := uint64(Abs(timeAdjust))
@@ -197,11 +203,13 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32, timest
 }
 
 func (a *TridentAdapter) findAndAdd(data []byte, key uint32, seq uint32, timestamp time.Duration) {
+	a.instancesLock.Lock()
 	if a.instances[key] == nil {
 		instance := &tridentInstance{}
 		instance.cache = make([][]byte, a.cacheSize)
 		a.instances[key] = instance
 	}
+	a.instancesLock.Unlock()
 	a.cacheLookup(data, key, seq, timestamp)
 }
 
@@ -236,6 +244,7 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) {
 
 func (a *TridentAdapter) flushInstance() {
 	timestamp := time.Now().UnixNano()
+	a.instancesLock.Lock()
 	for key, instance := range a.instances {
 		if timestamp > int64(instance.timestamp) && timestamp-int64(instance.timestamp) >= int64(TRIDENT_TIMEOUT) {
 			instance.timestamp = time.Duration(timestamp)
@@ -244,12 +253,16 @@ func (a *TridentAdapter) flushInstance() {
 			}
 		}
 	}
+	a.instancesLock.Unlock()
 }
 
 func (a *TridentAdapter) getTimeAdjust(key uint32) time.Duration {
+	a.instancesLock.Lock()
 	if instance := a.instances[key]; instance != nil {
+		a.instancesLock.Unlock()
 		return instance.timeAdjust
 	} else {
+		a.instancesLock.Unlock()
 		return 0
 	}
 }
@@ -303,19 +316,34 @@ func (a *TridentAdapter) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, ope
 		}
 		debug.SendToClient(conn, remote, 0, &buff)
 		break
+	case ADAPTER_CMD_STATUS:
+		encoder := gob.NewEncoder(&buff)
+		status := ""
+		a.instancesLock.Lock()
+		for key, instance := range a.instances {
+			status += fmt.Sprintf("Host: %16s Seq: %10d Timestamp: %30s Cache: %2d\n",
+				IpFromUint32(key), instance.seq, time.Unix(int64(instance.timestamp/time.Second), int64(instance.timestamp%time.Second)), instance.cacheCount)
+		}
+		a.instancesLock.Unlock()
+
+		if err := encoder.Encode(status); err != nil {
+			log.Error(err)
+			return
+		}
+		debug.SendToClient(conn, remote, 0, &buff)
 	default:
 		log.Warningf("Trident Adapter recv unknown command(%v).", operate)
 	}
 }
 
-func CommmandGetCounter(count *PacketCounter) bool {
-	_, result, err := debug.SendToServer(dropletctl.DROPLETCTL_ADAPTER, ADAPTER_CMD_SHOW, nil)
+func CommmandGetResult(operate uint16, output interface{}) bool {
+	_, result, err := debug.SendToServer(dropletctl.DROPLETCTL_ADAPTER, debug.ModuleOperate(operate), nil)
 	if err != nil {
 		log.Warning(err)
 		return false
 	}
 	decoder := gob.NewDecoder(result)
-	if err = decoder.Decode(count); err != nil {
+	if err = decoder.Decode(output); err != nil {
 		log.Error(err)
 		return false
 	}
@@ -335,7 +363,7 @@ func RegisterCommand() *cobra.Command {
 		Short: "show module adapter infomation",
 		Run: func(cmd *cobra.Command, args []string) {
 			count := PacketCounter{}
-			if CommmandGetCounter(&count) {
+			if CommmandGetResult(ADAPTER_CMD_SHOW, &count) {
 				fmt.Println("Trident-Adapter Module Running Status:")
 				fmt.Printf("\tRX_PACKETS:           %v\n", count.RxPackets)
 				fmt.Printf("\tRX_DROP:              %v\n", count.RxDropped)
@@ -352,12 +380,12 @@ func RegisterCommand() *cobra.Command {
 		Short: "show adapter performance information",
 		Run: func(cmd *cobra.Command, args []string) {
 			last := PacketCounter{}
-			if !CommmandGetCounter(&last) {
+			if !CommmandGetResult(ADAPTER_CMD_SHOW, &last) {
 				return
 			}
 			time.Sleep(1 * time.Second)
 			now := PacketCounter{}
-			if !CommmandGetCounter(&now) {
+			if !CommmandGetResult(ADAPTER_CMD_SHOW, &now) {
 				return
 			}
 			fmt.Println("Trident-Adapter Module Performance:")
@@ -370,7 +398,20 @@ func RegisterCommand() *cobra.Command {
 			fmt.Printf("\tTX_ERRORS/S:              %v\n", now.TxErrors-last.TxErrors)
 		},
 	}
+	status := &cobra.Command{
+		Use:   "status",
+		Short: "show trident status",
+		Run: func(cmd *cobra.Command, args []string) {
+			var result string
+			if !CommmandGetResult(ADAPTER_CMD_STATUS, &result) {
+				return
+			}
+			fmt.Printf("Tridents Running Status, Current Time: %s\n", time.Now())
+			fmt.Printf("%s", result)
+		},
+	}
 	cmd.AddCommand(show)
 	cmd.AddCommand(showPerf)
+	cmd.AddCommand(status)
 	return cmd
 }
