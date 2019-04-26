@@ -30,7 +30,7 @@ func TestDecoder(t *testing.T) {
 			packet = append(packet, padding[:]...)
 		}
 
-		decoder := NewSequentialDecoder(packet, 0)
+		decoder := NewSequentialDecoder(packet)
 		decoder.DecodeHeader()
 		for {
 			meta := &MetaPacket{}
@@ -67,7 +67,7 @@ func BenchmarkDecoder(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < MIN_PPS; {
-		decoder := NewSequentialDecoder(packet, 0)
+		decoder := NewSequentialDecoder(packet)
 		decoder.DecodeHeader()
 		for {
 			meta := &MetaPacket{}
