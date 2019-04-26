@@ -70,6 +70,13 @@ type DBCreateCtl struct {
 	sync.RWMutex
 }
 
+type RetentionPolicy struct {
+	name          string
+	duration      string
+	shardDuration string
+	defaultFlag   bool
+}
+
 type InfluxdbWriter struct {
 	DBCreateCtls     []DBCreateCtl
 	DataQueues       queue.FixedMultiQueue
@@ -78,8 +85,9 @@ type InfluxdbWriter struct {
 
 	BatchSize    int
 	FlushTimeout int64
-
-	exit bool
+	StatsName    string
+	RP           RetentionPolicy
+	exit         bool
 }
 
 func NewInfluxdbWriter(httpAddrs []string, queueCount int) (*InfluxdbWriter, error) {
@@ -96,7 +104,7 @@ func NewInfluxdbWriter(httpAddrs []string, queueCount int) (*InfluxdbWriter, err
 		}
 		dbCtl := DBCreateCtl{
 			HttpClient: httpClient,
-			ExistDBs:   getCurrentDBs(httpClient),
+			ExistDBs:   make(map[string]bool),
 		}
 		DBCreateCtls = append(DBCreateCtls, dbCtl)
 	}
@@ -117,6 +125,7 @@ func NewInfluxdbWriter(httpAddrs []string, queueCount int) (*InfluxdbWriter, err
 
 		FlushTimeout: int64(DEFAULT_FLUSH_TIMEOUT),
 		BatchSize:    DEFAULT_BATCH_SIZE,
+		StatsName:    "influxdb_writer",
 		DBCreateCtls: DBCreateCtls,
 	}, nil
 }
@@ -133,6 +142,18 @@ func (w *InfluxdbWriter) SetBatchSize(size int) {
 
 func (w *InfluxdbWriter) SetBatchTimeout(timeout int64) {
 	w.FlushTimeout = timeout
+}
+
+func (w *InfluxdbWriter) SetRetentionPolicy(rp, duration, shardDuration string, defaultFlag bool) {
+	w.RP.name = rp
+	w.RP.duration = duration
+	w.RP.shardDuration = shardDuration
+	w.RP.defaultFlag = defaultFlag
+}
+
+// 如果一个进程起多个influxdb_writer, 统计结果需要按名字区分
+func (w *InfluxdbWriter) SetStatsName(name string) {
+	w.StatsName = name
 }
 
 // 高性能接口，需要用户实现InfluxdbItem接口
@@ -239,10 +260,11 @@ func (i *WriterInfo) GetCounter() interface{} {
 	return counter
 }
 
-func newPointCache(db string, size int) *PointCache {
+func newPointCache(db, rp string, size int) *PointCache {
 	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:  db,
-		Precision: INFLUXDB_PRECISION_S,
+		Database:        db,
+		Precision:       INFLUXDB_PRECISION_S,
+		RetentionPolicy: rp,
 	})
 	if err != nil {
 		panic(fmt.Sprintf("create BatchPoints for db %s failed: %s", db, err))
@@ -255,10 +277,11 @@ func newPointCache(db string, size int) *PointCache {
 	}
 }
 
-func (p *PointCache) Reset(db string) {
+func (p *PointCache) Reset(db, rp string) {
 	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:  db,
-		Precision: INFLUXDB_PRECISION_S,
+		Database:        db,
+		Precision:       INFLUXDB_PRECISION_S,
+		RetentionPolicy: rp,
 	})
 	p.bp = bp
 	p.offset = 0
@@ -291,7 +314,7 @@ func getCurrentDBs(httpClient client.Client) map[string]bool {
 }
 
 func (w *InfluxdbWriter) queueProcess(queueID int) {
-	stats.RegisterCountable("influxdb_writer", w.QueueWriterInfos[queueID], stats.OptionStatTags{"thread": strconv.Itoa(queueID)})
+	stats.RegisterCountable(w.StatsName, w.QueueWriterInfos[queueID], stats.OptionStatTags{"thread": strconv.Itoa(queueID)})
 	defer w.QueueWriterInfos[queueID].Close()
 
 	rawItems := make([]interface{}, QUEUE_FETCH_MAX_SIZE)
@@ -317,7 +340,7 @@ func (w *InfluxdbWriter) writeCache(queueID int, item InfluxdbItem) bool {
 
 	db := item.GetDBName()
 	if _, ok := pointCache[db]; !ok {
-		pointCache[db] = newPointCache(db, w.BatchSize)
+		pointCache[db] = newPointCache(db, w.RP.name, w.BatchSize)
 	}
 	buffer := pointCache[db].buffer
 	offset := pointCache[db].offset
@@ -334,7 +357,7 @@ func (w *InfluxdbWriter) writeCache(queueID int, item InfluxdbItem) bool {
 
 	if pointCache[db].offset > w.BatchSize {
 		w.writeInfluxdb(queueID, pointCache[db].bp)
-		pointCache[db].Reset(db)
+		pointCache[db].Reset(db, w.RP.name)
 	}
 	return true
 }
@@ -347,11 +370,76 @@ func (w *InfluxdbWriter) flushWriteCache(queueID int) {
 		}
 		log.Debugf("flush %d points to %s", len(pc.bp.Points()), db)
 		w.writeInfluxdb(queueID, pc.bp)
-		pc.Reset(db)
+		pc.Reset(db, w.RP.name)
 	}
 }
 
-func createDB(httpClient client.Client, db string) bool {
+func createRetentionPolicy(httpClient client.Client, dbName, rpName, duration, shardDuration string, defaultFlag bool) bool {
+	setDefault := ""
+	if defaultFlag {
+		setDefault = "default"
+	}
+	cmd := fmt.Sprintf("CREATE RETENTION POLICY %s ON %s DURATION %s REPLICATION 1 SHARD DURATION %s %s",
+		rpName, dbName, duration, shardDuration, setDefault)
+
+	res, err := httpClient.Query(client.NewQuery(
+		cmd, dbName, ""))
+	if err := checkResponse(res, err); err != nil {
+		log.Errorf("DB(%s) create retention policy(%s) failed, error info: %s", dbName, rpName, err)
+		return false
+	}
+
+	log.Infof("DB(%s) create retention policy(%s)", dbName, cmd)
+	return true
+}
+
+func retentionPolicyExists(httpClient client.Client, db, rp string) bool {
+	// Validate if specified retention policy exists
+	response, err := httpClient.Query(client.Query{Command: fmt.Sprintf("SHOW RETENTION POLICIES ON %q", db)})
+	if err := checkResponse(response, err); err != nil {
+		log.Warningf("DB(%s) check retention policy(%s) failed: %s", db, rp, err)
+		return false
+	}
+
+	for _, result := range response.Results {
+		for _, row := range result.Series {
+			for _, values := range row.Values {
+				for k, v := range values {
+					if k != 0 {
+						continue
+					}
+					if v == rp {
+						return true
+					}
+				}
+			}
+		}
+	}
+	log.Warningf("DB(%s) retention policy(%s) not exist", db, rp)
+
+	return false
+}
+
+func alterRetentionPolicy(httpClient client.Client, dbName, rpName, duration, shardDuration string, defaultFlag bool) bool {
+	setDefault := ""
+	if defaultFlag {
+		setDefault = "default"
+	}
+	cmd := fmt.Sprintf("ALTER RETENTION POLICY %s ON %s DURATION %s SHARD DURATION %s %s",
+		rpName, dbName, duration, shardDuration, setDefault)
+
+	res, err := httpClient.Query(client.NewQuery(
+		cmd, dbName, ""))
+	if err := checkResponse(res, err); err != nil {
+		log.Errorf("DB(%s) alter retention policy(%s) failed, error info: %s", dbName, rpName, err)
+		return false
+	}
+
+	log.Infof("DB(%s) alter retention policy(%s)", dbName, cmd)
+	return true
+}
+
+func (w *InfluxdbWriter) createDB(httpClient client.Client, db string) bool {
 	log.Infof("database %s no exists, create database now.", db)
 	res, err := httpClient.Query(client.NewQuery(
 		fmt.Sprintf("CREATE DATABASE %s", db), "", ""))
@@ -359,6 +447,15 @@ func createDB(httpClient client.Client, db string) bool {
 		log.Errorf("Create database %s failed, error info: %s", db, err)
 		return false
 	}
+
+	if w.RP.name != "" {
+		if retentionPolicyExists(httpClient, db, w.RP.name) {
+			return alterRetentionPolicy(httpClient, db, w.RP.name, w.RP.duration, w.RP.shardDuration, w.RP.defaultFlag)
+		} else {
+			return createRetentionPolicy(httpClient, db, w.RP.name, w.RP.duration, w.RP.shardDuration, w.RP.defaultFlag)
+		}
+	}
+
 	return true
 }
 
@@ -383,7 +480,7 @@ func (w *InfluxdbWriter) writeInfluxdb(queueID int, bp client.BatchPoints) bool 
 		w.DBCreateCtls[i].RUnlock()
 
 		if !ok {
-			if !createDB(httpClient, db) {
+			if !w.createDB(httpClient, db) {
 				*writeFailedCount += int64(len(bp.Points()))
 				ret = false
 				continue
