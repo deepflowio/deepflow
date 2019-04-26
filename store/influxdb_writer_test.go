@@ -89,7 +89,6 @@ func TestInfluxdbItem(t *testing.T) {
 	c.EXPECT().Query(Any()).Return(newResp(nil, nil), nil)
 	c.EXPECT().Query(Any()).Return(newResp(nil, nil), nil)
 	c.EXPECT().Query(Any()).Return(newResp(nil, nil), nil)
-	c.EXPECT().Query(Any()).Return(newResp(nil, nil), nil)
 
 	c.EXPECT().Ping(Any()).Return(time.Duration(0), "", nil)
 	c.EXPECT().Ping(Any()).Return(time.Duration(0), "", nil)
@@ -126,7 +125,6 @@ func TestInfluxdbPoint(t *testing.T) {
 	ctrl := NewController(t)
 	defer ctrl.Finish()
 	c := mock_client.NewMockClient(ctrl)
-	c.EXPECT().Query(Any()).Return(newResp(nil, nil), nil)
 	c.EXPECT().Query(Any()).Return(newResp(nil, nil), nil)
 	c.EXPECT().Query(Any()).Return(newResp(nil, nil), nil)
 	c.EXPECT().Query(Any()).Return(newResp(nil, nil), nil)
