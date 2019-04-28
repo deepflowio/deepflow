@@ -5,20 +5,20 @@ option go_package = "diagnose";
 
 service Diagnose {
     // TOPOLOGY
-    rpc GetOvsBridges(DiagnoseReqeust) returns (DiagnoseResponse) {} // ovs-vsctl -f csv -d bare list bridge
-    rpc GetOvsPorts(DiagnoseReqeust) returns (DiagnoseResponse) {} // ovs-vsctl -f csv -d bare list port
-    rpc GetOvsInterfaces(DiagnoseReqeust) returns (DiagnoseResponse) {} // ovs-vsctl -f csv -d bare list interface
-    rpc GetVeths(DiagnoseReqeust) returns (DiagnoseResponse) {} // ip link show type veth
-    rpc GetIpAddress(DiagnoseReqeust) returns (DiagnoseResponse) {} // ip address show
+    rpc GetOvsBridges(DiagnoseRequest) returns (DiagnoseResponse) {} // ovs-vsctl -f csv -d bare list bridge
+    rpc GetOvsPorts(DiagnoseRequest) returns (DiagnoseResponse) {} // ovs-vsctl -f csv -d bare list port
+    rpc GetOvsInterfaces(DiagnoseRequest) returns (DiagnoseResponse) {} // ovs-vsctl -f csv -d bare list interface
+    rpc GetVeths(DiagnoseRequest) returns (DiagnoseResponse) {} // ip link show type veth
+    rpc GetIpAddress(DiagnoseRequest) returns (DiagnoseResponse) {} // ip address show
 
     // ACL
-    rpc GetIptablesAcls(DiagnoseReqeust) returns (DiagnoseResponse) {} // iptables -w 1 -vnL --line-numbers -x
+    rpc GetIptablesAcls(DiagnoseRequest) returns (DiagnoseResponse) {} // iptables -w 1 -vnL --line-numbers -x
 
     // FLOW
-    rpc GetOvsBridgeFlow(DiagnoseReqeust) returns (DiagnoseResponse) {} //ovs-ofctl dump-flows $br
+    rpc GetOvsBridgeFlow(DiagnoseRequest) returns (DiagnoseResponse) {} //ovs-ofctl dump-flows $br
 }
 
-message DiagnoseReqeust {
+message DiagnoseRequest {
     optional string arg = 1;
 }
 
