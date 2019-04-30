@@ -11,6 +11,7 @@ import (
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/flowtype"
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/fps"
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/geo"
+	"gitlab.x.lan/application/droplet-app/pkg/mapper/logusage"
 	"gitlab.x.lan/application/droplet-app/pkg/mapper/perf"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -35,6 +36,7 @@ func NewFlowMapProcess(
 		geo.NewProcessor(GEO_FILE_LOCATION),
 		flowtype.NewProcessor(),
 		consolelog.NewProcessor(),
+		logusage.NewProcessor(),
 	}, output, input, inputCount, docsInBuffer, variedDocLimit, windowSize, windowMoveMargin)
 }
 
