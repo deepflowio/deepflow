@@ -38,6 +38,8 @@ func Encode(sequence uint32, doc *app.Document, encoder *codec.SimpleEncoder) er
 		msgType = MSG_TYPE
 	case *FPSMeter:
 		msgType = MSG_FPS
+	case *LogUsageMeter:
+		msgType = MSG_LOG_USAGE
 	default:
 		return fmt.Errorf("Unknown supported type %T", v)
 	}
@@ -70,6 +72,8 @@ func Encode(sequence uint32, doc *app.Document, encoder *codec.SimpleEncoder) er
 		meter = doc.Meter.(*TypeMeter)
 	case MSG_FPS:
 		meter = doc.Meter.(*FPSMeter)
+	case MSG_LOG_USAGE:
+		meter = doc.Meter.(*LogUsageMeter)
 	}
 	meter.Encode(encoder)
 
@@ -126,6 +130,10 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 		doc.Meter = m
 	case MSG_FPS:
 		m := AcquireFPSMeter()
+		m.Decode(decoder)
+		doc.Meter = m
+	case MSG_LOG_USAGE:
+		m := AcquireLogUsageMeter()
 		m.Decode(decoder)
 		doc.Meter = m
 	default:

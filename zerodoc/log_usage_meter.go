@@ -59,7 +59,7 @@ func (m *LogUsageMeter) ToKVString() string {
 func (m *LogUsageMeter) MarshalTo(b []byte) int {
 	offset := 0
 
-	offset += copy(b[offset:], "i,sum_packet_tx=")
+	offset += copy(b[offset:], "sum_packet_tx=")
 	offset += copy(b[offset:], strconv.FormatUint(m.SumPacketTx, 10))
 	offset += copy(b[offset:], "i,sum_packet_rx=")
 	offset += copy(b[offset:], strconv.FormatUint(m.SumPacketRx, 10))
