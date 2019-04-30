@@ -56,6 +56,7 @@ HTTP request args:
   ip: IP地址筛选，可以填写多个
   protocol: 协议，可选值为[6, 17]
   port: 端口
+  tap_type: 探针点
 
 HTTP request body:
 
@@ -91,8 +92,11 @@ HTTP response body:
     port = None
     if request.query.port != '':
         port = int(request.query.port)
+    tap_type = None
+    if request.query.tap_type != '':
+        tap_type = int(request.query.tap_type)
     return {
-        'DATA': get_files(acl_gid, ip=ip, ip_filter=ips, protocol=protocol, port=port),
+        'DATA': get_files(acl_gid, ip=ip, ip_filter=ips, protocol=protocol, port=port, tap_type=tap_type),
         'OPT_STATUS': 'SUCCESS',
     }
 
@@ -164,12 +168,13 @@ def _mac_convert_back(mac):
 
 
 def _tap_type_to_id(tapType):
-    if tapType == 'isp0':
-        return 0
-    if tapType == 'isp' or tapType == 'isp1':
+    if tapType == 'isp':
         return 1
-    if tapType == 'isp2':
-        return 2
+    if tapType.startswith('isp'):
+        try:
+            return int(tapType[3:])
+        except ValueError:
+            return 0
     if tapType == 'tor':
         return 3
     return 0
@@ -182,7 +187,7 @@ def _time_to_epoch(time_str):
         return 0
 
 
-def get_files(acl_gid, mac=None, ip=None, ip_filter=None, protocol=None, port=None):
+def get_files(acl_gid, mac=None, ip=None, ip_filter=None, protocol=None, port=None, tap_type=None):
     if protocol is not None and protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
         return []
 
@@ -203,6 +208,8 @@ def get_files(acl_gid, mac=None, ip=None, ip_filter=None, protocol=None, port=No
             continue
         segs = file[:file.find('.')].split('_')
         if len(segs) != 5:
+            continue
+        if tap_type is not None and _tap_type_to_id(segs[0]) != tap_type:
             continue
         if mac is not None and mac_str != segs[1]:
             continue
