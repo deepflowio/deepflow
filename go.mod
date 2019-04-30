@@ -10,8 +10,8 @@ require (
 	github.com/mdlayher/raw v0.0.0-20190419142535-64193704e472 // indirect
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/spf13/cobra v0.0.3
-	gitlab.x.lan/application/droplet-app v0.0.0-20190417073333-f1eb5fbbbe74
-	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190425034931-a9ad7dca2f24
+	gitlab.x.lan/application/droplet-app v0.0.0-20190430113957-5a351c893b73
+	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190430154335-dbc4c5e36a11
 	gitlab.x.lan/yunshan/message v0.0.0-20190419090638-555713d7cf02
 	golang.org/x/net v0.0.0-20190424112056-4829fb13d2c6
 	golang.org/x/sys v0.0.0-20190425045458-9f0b1ff7b46a // indirect
