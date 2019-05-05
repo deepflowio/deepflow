@@ -94,12 +94,12 @@ github.com/xanzy/ssh-agent v0.2.0/go.mod h1:0NyE30eGUDliuLEHJgYte/zncp2zdTStcOnW
 github.com/yudai/gojsondiff v1.0.0/go.mod h1:AY32+k2cwILAkW1fbgxQ5mUmMiZFgLIV+FBNExI05xg=
 github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82/go.mod h1:lgjkn3NuSvDfVJdfcVVdX+jpBxNmX4rDAzaS45IcYoM=
 github.com/yudai/pp v2.0.1+incompatible/go.mod h1:PuxR/8QJ7cyCkFp/aUDS+JY727OFEZkTdatxwunjIkc=
-gitlab.x.lan/application/droplet-app v0.0.0-20190430113957-5a351c893b73 h1:3Ie+L4HAY33CyqzZv+FjDkWcCc3DRp+7LPL8InzRTmQ=
-gitlab.x.lan/application/droplet-app v0.0.0-20190430113957-5a351c893b73/go.mod h1:7ooZCxuw79OkVOOjWInFh/kQlksoKC1YCMR5Rwvltpk=
+gitlab.x.lan/application/droplet-app v0.0.0-20190505111011-ee06d5b41776 h1:jHxOHJTL0k66gLzpbk9NZUMZLwukQoU5uPW1Yo57bWE=
+gitlab.x.lan/application/droplet-app v0.0.0-20190505111011-ee06d5b41776/go.mod h1:7ooZCxuw79OkVOOjWInFh/kQlksoKC1YCMR5Rwvltpk=
 gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190429164422-7b8171775c82 h1:b5OOS5OUv4NF0oMhHpTOIiMAwLiDZWeYZib/8tt+Vgs=
 gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190429164422-7b8171775c82/go.mod h1:BmF06vVGW3L0PEjeDYDqzdEAw/p1ECkgHvQe7KluSUE=
-gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190430154335-dbc4c5e36a11 h1:FHOSrV3SRll+RPz4FUhMk+5VCXzMKZTVbNDwPJSfE1o=
-gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190430154335-dbc4c5e36a11/go.mod h1:BmF06vVGW3L0PEjeDYDqzdEAw/p1ECkgHvQe7KluSUE=
+gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190430154335-550b0a25ea82 h1:DxV4dr+fyPm+ZUUa+Pe9VbqX2Z8EP+D3GMUrRQYspBI=
+gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190430154335-550b0a25ea82/go.mod h1:BmF06vVGW3L0PEjeDYDqzdEAw/p1ECkgHvQe7KluSUE=
 gitlab.x.lan/yunshan/message v0.0.0-20190321031241-863a1709ee76 h1:Yae0Yaj7cbvBY7nlL7ao1LAGjw6KVePcpRcGwYXeBcw=
 gitlab.x.lan/yunshan/message v0.0.0-20190321031241-863a1709ee76/go.mod h1:R5ZX1w+XLKWpf45DbKsAXvRyklT7rfgBN/WKClV2MP4=
 gitlab.x.lan/yunshan/message v0.0.0-20190419090638-555713d7cf02 h1:6iL7Dm4+4euMgy7WURk7PqbCaGX6XvX7VIQE5F3kv3U=
