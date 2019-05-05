@@ -239,6 +239,9 @@ func (t TagTemplate) String() string {
 	if t&TEMPLATE_ACL_EDGE_PORT_ALL != 0 {
 		s += "AEP+|"
 	}
+	if t&TEMPLATE_EDGE_PORT_ALL != 0 {
+		s += "EP+|"
+	}
 	return s
 }
 
