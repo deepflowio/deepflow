@@ -23,7 +23,6 @@ const (
 	DEFAULT_BATCH_SIZE     = 512 * 1024
 	DEFAULT_FLUSH_TIMEOUT  = 5 // 单位 秒
 	DEFAULT_QUEUE_SIZE     = 256 * 1024
-	DEFAULT_QUEUE_NAME     = "influxdb_writer"
 	INFLUXDB_PRECISION_S   = "s"
 	UNIX_TIMESTAMP_TO_TIME = (1969*365 + 1969/4 - 1969/100 + 1969/400) * 24 * 60 * 60
 	TIME_BINARY_LEN        = 15
@@ -80,17 +79,17 @@ type RetentionPolicy struct {
 type InfluxdbWriter struct {
 	DBCreateCtls     []DBCreateCtl
 	DataQueues       queue.FixedMultiQueue
+	Name             string
 	QueueCount       int
 	QueueWriterInfos []*WriterInfo
 
 	BatchSize    int
 	FlushTimeout int64
-	StatsName    string
 	RP           RetentionPolicy
 	exit         bool
 }
 
-func NewInfluxdbWriter(httpAddrs []string, queueCount int) (*InfluxdbWriter, error) {
+func NewInfluxdbWriter(httpAddrs []string, name string, queueCount int) (*InfluxdbWriter, error) {
 	DBCreateCtls := make([]DBCreateCtl, 0)
 	for _, httpAddr := range httpAddrs {
 		httpClient, err := client.NewHTTPClient(client.HTTPConfig{Addr: httpAddr})
@@ -117,7 +116,7 @@ func NewInfluxdbWriter(httpAddrs []string, queueCount int) (*InfluxdbWriter, err
 
 	return &InfluxdbWriter{
 		DataQueues: queue.NewOverwriteQueues(
-			DEFAULT_QUEUE_NAME, queue.HashKey(queueCount), DEFAULT_QUEUE_SIZE,
+			name, queue.HashKey(queueCount), DEFAULT_QUEUE_SIZE,
 			queue.OptionFlushIndicator(time.Second),
 			queue.OptionRelease(func(p interface{}) { p.(InfluxdbItem).Release() })),
 		QueueCount:       queueCount,
@@ -125,13 +124,13 @@ func NewInfluxdbWriter(httpAddrs []string, queueCount int) (*InfluxdbWriter, err
 
 		FlushTimeout: int64(DEFAULT_FLUSH_TIMEOUT),
 		BatchSize:    DEFAULT_BATCH_SIZE,
-		StatsName:    "influxdb_writer",
+		Name:         name,
 		DBCreateCtls: DBCreateCtls,
 	}, nil
 }
 
 func (w *InfluxdbWriter) SetQueueSize(size int) {
-	w.DataQueues = queue.NewOverwriteQueues(DEFAULT_QUEUE_NAME, queue.HashKey(w.QueueCount), size,
+	w.DataQueues = queue.NewOverwriteQueues(w.Name, queue.HashKey(w.QueueCount), size,
 		queue.OptionFlushIndicator(time.Second),
 		queue.OptionRelease(func(p interface{}) { p.(InfluxdbItem).Release() }))
 }
@@ -149,11 +148,6 @@ func (w *InfluxdbWriter) SetRetentionPolicy(rp, duration, shardDuration string, 
 	w.RP.duration = duration
 	w.RP.shardDuration = shardDuration
 	w.RP.defaultFlag = defaultFlag
-}
-
-// 如果一个进程起多个influxdb_writer, 统计结果需要按名字区分
-func (w *InfluxdbWriter) SetStatsName(name string) {
-	w.StatsName = name
 }
 
 // 高性能接口，需要用户实现InfluxdbItem接口
@@ -314,7 +308,7 @@ func getCurrentDBs(httpClient client.Client) map[string]bool {
 }
 
 func (w *InfluxdbWriter) queueProcess(queueID int) {
-	stats.RegisterCountable(w.StatsName, w.QueueWriterInfos[queueID], stats.OptionStatTags{"thread": strconv.Itoa(queueID)})
+	stats.RegisterCountable(w.Name, w.QueueWriterInfos[queueID], stats.OptionStatTags{"thread": strconv.Itoa(queueID)})
 	defer w.QueueWriterInfos[queueID].Close()
 
 	rawItems := make([]interface{}, QUEUE_FETCH_MAX_SIZE)
