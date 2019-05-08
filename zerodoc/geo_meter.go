@@ -16,7 +16,7 @@ type GeoMeter struct {
 	SumPacketRx           uint64        `db:"sum_packet_rx"`
 	SumBitTx              uint64        `db:"sum_bit_tx"`
 	SumBitRx              uint64        `db:"sum_bit_rx"`
-	SumRTTSyn             time.Duration `db:"sum_rtt_syn"`
+	SumRTTSynClient       time.Duration `db:"sum_rtt_syn_client"`
 	SumRTTSynFlow         uint64        `db:"sum_rtt_syn_flow"`
 }
 
@@ -32,7 +32,7 @@ func (m *GeoMeter) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(m.SumPacketRx)
 	encoder.WriteVarintU64(m.SumBitTx)
 	encoder.WriteVarintU64(m.SumBitRx)
-	encoder.WriteVarintU64(uint64(m.SumRTTSyn))
+	encoder.WriteVarintU64(uint64(m.SumRTTSynClient))
 	encoder.WriteVarintU64(m.SumRTTSynFlow)
 }
 
@@ -44,7 +44,7 @@ func (m *GeoMeter) Decode(decoder *codec.SimpleDecoder) {
 	m.SumPacketRx = decoder.ReadVarintU64()
 	m.SumBitTx = decoder.ReadVarintU64()
 	m.SumBitRx = decoder.ReadVarintU64()
-	m.SumRTTSyn = time.Duration(decoder.ReadVarintU64())
+	m.SumRTTSynClient = time.Duration(decoder.ReadVarintU64())
 	m.SumRTTSynFlow = decoder.ReadVarintU64()
 }
 
@@ -57,7 +57,7 @@ func (m *GeoMeter) ConcurrentMerge(other app.Meter) {
 		m.SumPacketRx += pgm.SumPacketRx
 		m.SumBitTx += pgm.SumBitTx
 		m.SumBitRx += pgm.SumBitRx
-		m.SumRTTSyn += pgm.SumRTTSyn
+		m.SumRTTSynClient += pgm.SumRTTSynClient
 		m.SumRTTSynFlow += pgm.SumRTTSynFlow
 	}
 }
@@ -71,7 +71,7 @@ func (m *GeoMeter) SequentialMerge(other app.Meter) {
 		m.SumPacketRx += pgm.SumPacketRx
 		m.SumBitTx += pgm.SumBitTx
 		m.SumBitRx += pgm.SumBitRx
-		m.SumRTTSyn += pgm.SumRTTSyn
+		m.SumRTTSynClient += pgm.SumRTTSynClient
 		m.SumRTTSynFlow += pgm.SumRTTSynFlow
 	}
 }
@@ -99,8 +99,8 @@ func (m *GeoMeter) MarshalTo(b []byte) int {
 	offset += copy(b[offset:], strconv.FormatUint(m.SumBitTx, 10))
 	offset += copy(b[offset:], "i,sum_bit_rx=")
 	offset += copy(b[offset:], strconv.FormatUint(m.SumBitRx, 10))
-	offset += copy(b[offset:], "i,sum_rtt_syn=")
-	offset += copy(b[offset:], strconv.FormatInt(int64(m.SumRTTSyn/time.Microsecond), 10))
+	offset += copy(b[offset:], "i,sum_rtt_syn_client=")
+	offset += copy(b[offset:], strconv.FormatInt(int64(m.SumRTTSynClient/time.Microsecond), 10))
 	offset += copy(b[offset:], "i,sum_rtt_syn_flow=")
 	offset += copy(b[offset:], strconv.FormatUint(m.SumRTTSynFlow, 10))
 	b[offset] = 'i'
