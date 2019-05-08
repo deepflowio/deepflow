@@ -46,14 +46,13 @@ func (s *ZMQBytePusher) Send(b []byte) {
 			s.Sender = sender
 		}
 	}
-	n, err := s.Sender.Send(b)
+	_, err := s.Sender.Send(b)
 	if err != nil {
 		log.Warningf("Sender has error, will reconnect: %s\n", err)
 		s.Sender.Close()
 		s.Sender = nil
 		return
 	}
-	log.Debugf("Sent %d bytes", n)
 }
 
 // QueueForward 不断读取q中的数据，并通过创建的zmq socket向外发送
