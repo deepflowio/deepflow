@@ -69,8 +69,8 @@ message Config {
     optional string  roze_ip              = 15;
     optional bool    platform_enabled     = 16 [default = false];
     optional uint32  platform_interval    = 17;
-    optional uint64  server_tx_bandwidth_threshold = 18 [default = 0];
-    optional uint64  bandwidth_probe_interval = 19 [default = 10];
+    optional uint64  server_tx_bandwidth_threshold = 18 [default = 0]; //bps
+    optional uint64  bandwidth_probe_interval = 19 [default = 10];  //second
 
     optional string  source_ip            = 21;
     optional string  analyzer_ip          = 31;
