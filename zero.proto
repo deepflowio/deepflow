@@ -145,7 +145,7 @@ message GeoMeter {
     optional uint64 sum_bit_rx = 8;
 
     optional uint64 sum_rtt_syn_client = 11;
-    optional uint64 sum_rtt_syn_flow = 12;
+    optional uint64 sum_rtt_syn_client_flow = 12;
 }
 
 message FpsMeter {
