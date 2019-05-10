@@ -10,6 +10,8 @@ service Diagnose {
     rpc GetOvsInterfaces(DiagnoseRequest) returns (DiagnoseResponse) {} // ovs-vsctl -f csv -d bare list interface
     rpc GetVeths(DiagnoseRequest) returns (DiagnoseResponse) {} // ip link show type veth
     rpc GetIpAddress(DiagnoseRequest) returns (DiagnoseResponse) {} // ip address show
+    rpc GetAllVmXml(DiagnoseRequest) returns (DiagnoseResponse) {} // virsh list --all --uuid | xargs virsh dumpxml
+    rpc GetBridgeMapping(DiagnoseRequest) returns (DiagnoseResponse) {} // grep "^bridge_mappings" /etc/neutron/plugins/ml2/openvswitch.agent.ini
 
     // ACL
     rpc GetIptablesAcls(DiagnoseRequest) returns (DiagnoseResponse) {} // iptables -w 1 -vnL --line-numbers -x
