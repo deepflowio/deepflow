@@ -20,6 +20,12 @@ const (
 	ICMP_REST           = 28
 )
 
+const (
+	ANALYZER_TRIDENT      = 0xffffffe0 // 压缩报文来自analyzer上的trident
+	ANALYZER_TRIDNET_MASK = 0x1f       // 压缩报文来自analyzer上的trident时的掩码
+	TRIDNET_MASK          = 0xffff     // 压缩报文来自vtap上的trident时的掩码
+)
+
 type Decoded struct {
 	// meta
 	headerType HeaderType
@@ -286,8 +292,18 @@ func (d *SequentialDecoder) DecodeHeader() (uint32, bool) {
 	}
 	d.seq = d.data.U32()
 	d.timestamp = time.Duration(d.data.U64()) * time.Microsecond
-	ifMacSuffix := d.data.U32()
-	return ifMacSuffix & 0xffff, false
+	inPort := d.data.U32()
+	if inPort&ANALYZER_TRIDENT == ANALYZER_TRIDENT {
+		inPort = inPort & ANALYZER_TRIDNET_MASK
+		if TapType(inPort) == TAP_TOR {
+			inPort = PACKET_SOURCE_TOR
+		} else {
+			inPort = PACKET_SOURCE_ISP | inPort
+		}
+	} else {
+		inPort = inPort&TRIDNET_MASK | PACKET_SOURCE_TOR
+	}
+	return inPort, false
 }
 
 func (d *SequentialDecoder) NextPacket(meta *MetaPacket) bool {
