@@ -188,12 +188,12 @@ func (a *TridentAdapter) findAndAdd(data []byte, key uint32, seq uint32) {
 
 func (a *TridentAdapter) decode(data []byte, ip uint32) time.Duration {
 	decoder := NewSequentialDecoder(data)
-	ifMacSuffix, _ := decoder.DecodeHeader()
+	inPort, _ := decoder.DecodeHeader()
 	timestamp := decoder.timestamp
 
 	for {
 		meta := datatype.AcquireMetaPacket()
-		meta.InPort = uint32(datatype.PACKET_SOURCE_TOR) | ifMacSuffix
+		meta.InPort = inPort
 		meta.Exporter = ip
 		if decoder.NextPacket(meta) {
 			datatype.ReleaseMetaPacket(meta)
