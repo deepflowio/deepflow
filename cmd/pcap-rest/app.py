@@ -40,8 +40,14 @@ def read_config():
 
 @app.get(API_PREFIX + '/pcaps/<acl_gid:int>/<mac:re:%s>/' % MAC_REGEX)
 def get_files_by_mac(acl_gid, mac):
+    start_ts = int(time.time()) - 600
+    end_ts = int(time.time())
+    if request.query.start_ts != '':
+        start_ts = int(request.query.start_ts)
+    if request.query.end_ts != '':
+        end_ts = int(request.query.end_ts)
     return {
-        'DATA': get_files(acl_gid, mac=mac),
+        'DATA': get_files(acl_gid, start_ts, end_ts, mac=mac),
         'OPT_STATUS': 'SUCCESS',
     }
 
@@ -53,6 +59,8 @@ def get_files_by_ip(acl_gid, ip):
 
 HTTP request args:
 
+  start_ts: 开始时间戳，闭区间，默认now-600
+  end_ts: 结束时间戳，闭区间，默认now
   ip: IP地址筛选，可以填写多个
   protocol: 协议，可选值为[6, 17]
   port: 端口
@@ -95,8 +103,14 @@ HTTP response body:
     tap_type = None
     if request.query.tap_type != '':
         tap_type = int(request.query.tap_type)
+    start_ts = int(time.time()) - 600
+    end_ts = int(time.time())
+    if request.query.start_ts != '':
+        start_ts = int(request.query.start_ts)
+    if request.query.end_ts != '':
+        end_ts = int(request.query.end_ts)
     return {
-        'DATA': get_files(acl_gid, ip=ip, ip_filter=ips, protocol=protocol, port=port, tap_type=tap_type),
+        'DATA': get_files(acl_gid, start_ts, end_ts, ip=ip, ip_filter=ips, protocol=protocol, port=port, tap_type=tap_type),
         'OPT_STATUS': 'SUCCESS',
     }
 
@@ -187,7 +201,7 @@ def _time_to_epoch(time_str):
         return 0
 
 
-def get_files(acl_gid, mac=None, ip=None, ip_filter=None, protocol=None, port=None, tap_type=None):
+def get_files(acl_gid, start_ts, end_ts, mac=None, ip=None, ip_filter=None, protocol=None, port=None, tap_type=None):
     if protocol is not None and protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
         return []
 
@@ -209,6 +223,10 @@ def get_files(acl_gid, mac=None, ip=None, ip_filter=None, protocol=None, port=No
         segs = file[:file.find('.')].split('_')
         if len(segs) != 5:
             continue
+        start_epoch = _time_to_epoch(segs[3])
+        end_epoch = _time_to_epoch(segs[4])
+        if start_epoch > end_ts or end_epoch < start_ts:
+            continue
         if tap_type is not None and _tap_type_to_id(segs[0]) != tap_type:
             continue
         if mac is not None and mac_str != segs[1]:
@@ -227,9 +245,9 @@ def get_files(acl_gid, mac=None, ip=None, ip_filter=None, protocol=None, port=No
             'ip': ip_rep,
             'tap_type': _tap_type_to_id(segs[0]),
             'filename': file,
-            'start_epoch': _time_to_epoch(segs[3]),
+            'start_epoch': start_epoch,
             'start_datetime': segs[3],
-            'end_epoch': _time_to_epoch(segs[4]),
+            'end_epoch': end_epoch,
             'end_datetime': segs[4],
             'size': os.path.getsize(directory + file),
             'hostname': HOSTNAME,
