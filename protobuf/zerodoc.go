@@ -88,7 +88,7 @@ func TagToPB(t *Tag) *pb.Tag {
 		tag.ServerPort = proto.Uint32(uint32(t.ServerPort))
 	}
 	if t.Code&TAPType != 0 {
-		tag.TapType = pb.TapType(t.TAPType).Enum()
+		tag.TapType = proto.Uint32(uint32(t.TAPType))
 	}
 	if t.Code&SubnetID != 0 {
 		tag.SubnetId = proto.Uint32(uint32(t.SubnetID))
