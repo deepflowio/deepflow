@@ -113,18 +113,13 @@ func ipToString(ip datatype.IPv4Int) string {
 }
 
 func tapTypeToString(tapType zerodoc.TAPTypeEnum) string {
-	switch tapType {
-	case zerodoc.ISP0:
-		return "isp0"
-	case zerodoc.ISP1:
-		return "isp1"
-	case zerodoc.ISP2:
-		return "isp2"
-	case zerodoc.ToR:
+	if tapType == 3 {
 		return "tor"
-	default:
-		panic("unsupported tap type")
 	}
+	if tapType >= 0 && tapType <= 30 {
+		return fmt.Sprintf("isp%d", tapType)
+	}
+	panic(fmt.Sprintf("unsupported tap type %d", tapType))
 }
 
 func formatDuration(d time.Duration) string {
