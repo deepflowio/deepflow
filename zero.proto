@@ -24,13 +24,6 @@ enum Direction {
     SERVER_TO_CLIENT = 2;
 }
 
-enum TapType {
-    OVS = 0;
-    ISP = 1;
-    SPINE = 2;
-    TOR = 3;
-}
-
 enum AclDirection {
     FORWARD = 1;
     BACKWARD = 2;
@@ -79,7 +72,7 @@ message Tag {
     optional uint32 server_port = 45;
     optional AclDirection acl_direction = 46;
     optional uint32 vtap = 47;
-    optional TapType tap_type = 48;
+    optional uint32 tap_type = 48;
     optional uint32 subnet_id = 49;
     optional uint32 acl_id = 50;
 
