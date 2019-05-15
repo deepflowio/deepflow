@@ -7,11 +7,11 @@ import (
 
 	"math/rand"
 
-	"gitlab.x.lan/application/droplet-app/pkg/mapper/usage"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.x.lan/yunshan/droplet/app/usage"
 )
 
 func NewMeteringMapProcess(

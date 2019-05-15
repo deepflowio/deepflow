@@ -6,17 +6,17 @@ import (
 	"strconv"
 	"time"
 
-	"gitlab.x.lan/application/droplet-app/pkg/mapper/consolelog"
-	"gitlab.x.lan/application/droplet-app/pkg/mapper/flow"
-	"gitlab.x.lan/application/droplet-app/pkg/mapper/flowtype"
-	"gitlab.x.lan/application/droplet-app/pkg/mapper/fps"
-	"gitlab.x.lan/application/droplet-app/pkg/mapper/geo"
-	"gitlab.x.lan/application/droplet-app/pkg/mapper/logusage"
-	"gitlab.x.lan/application/droplet-app/pkg/mapper/perf"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.x.lan/yunshan/droplet/app/consolelog"
+	"gitlab.x.lan/yunshan/droplet/app/flow"
+	"gitlab.x.lan/yunshan/droplet/app/flowtype"
+	"gitlab.x.lan/yunshan/droplet/app/fps"
+	"gitlab.x.lan/yunshan/droplet/app/geo"
+	"gitlab.x.lan/yunshan/droplet/app/logusage"
+	"gitlab.x.lan/yunshan/droplet/app/perf"
 )
 
 const (
