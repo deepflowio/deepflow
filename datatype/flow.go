@@ -135,6 +135,7 @@ type Flow struct {
 	*TcpPerfStats
 
 	/* Flow Geo Info */
+	GeoEnd  uint8
 	Country uint8
 	Region  uint8
 	ISP     uint8
