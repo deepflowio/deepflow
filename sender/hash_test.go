@@ -4,14 +4,14 @@ import (
 	"sort"
 	"testing"
 
-	"gitlab.x.lan/application/droplet-app/pkg/mapper/consolelog"
-	"gitlab.x.lan/application/droplet-app/pkg/mapper/flow"
-	"gitlab.x.lan/application/droplet-app/pkg/mapper/flowtype"
-	"gitlab.x.lan/application/droplet-app/pkg/mapper/fps"
-	"gitlab.x.lan/application/droplet-app/pkg/mapper/geo"
-	"gitlab.x.lan/application/droplet-app/pkg/mapper/perf"
-	"gitlab.x.lan/application/droplet-app/pkg/mapper/usage"
 	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
+	"gitlab.x.lan/yunshan/droplet/app/consolelog"
+	"gitlab.x.lan/yunshan/droplet/app/flow"
+	"gitlab.x.lan/yunshan/droplet/app/flowtype"
+	"gitlab.x.lan/yunshan/droplet/app/fps"
+	"gitlab.x.lan/yunshan/droplet/app/geo"
+	"gitlab.x.lan/yunshan/droplet/app/perf"
+	"gitlab.x.lan/yunshan/droplet/app/usage"
 )
 
 var FLOW_APP_CODES = [][]zerodoc.Code{

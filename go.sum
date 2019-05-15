@@ -62,8 +62,6 @@ github.com/lestrrat-go/strftime v0.0.0-20180821113735-8b31f9c59b0f h1:/o/LRlB6dB
 github.com/lestrrat-go/strftime v0.0.0-20180821113735-8b31f9c59b0f/go.mod h1:RMlXygAD3c48Psmr06d2G75L4E4xxzxkIe/+ppX9eAU=
 github.com/mdlayher/raw v0.0.0-20181016155347-fa5ef3332ca9 h1:tOtO8DXiNGj9NshRKHWiZuGlSldPFzFCFYhNtsKTBCs=
 github.com/mdlayher/raw v0.0.0-20181016155347-fa5ef3332ca9/go.mod h1:rC/yE65s/DoHB6BzVOUBNYBGTg772JVytyAytffIZkY=
-github.com/mdlayher/raw v0.0.0-20190313224157-43dbcdd7739d h1:rjAS0af7FIYCScTtEU5KjIldC6qVaEScUJhABHC+ccM=
-github.com/mdlayher/raw v0.0.0-20190313224157-43dbcdd7739d/go.mod h1:r1fbeITl2xL/zLbVnNHFyOzQJTgr/3fpf1lJX/cjzR8=
 github.com/mdlayher/raw v0.0.0-20190419142535-64193704e472 h1:3QZ+iCYiorY0MXIia13+KK+uJHIsOJDHl7Y8Ul1Endc=
 github.com/mdlayher/raw v0.0.0-20190419142535-64193704e472/go.mod h1:7EpbotpCmVZcu+KCX4g9WaRNuu11uyhiW7+Le1dKawg=
 github.com/op/go-logging v0.0.0-20160315200505-970db520ece7 h1:lDH9UUVJtmYCjyT0CI4q8xvlXPxeZ0gYCVvWbmPlp88=
@@ -85,8 +83,6 @@ github.com/stretchr/testify v1.3.0 h1:TivCn/peBQ7UY8ooIcPgZFpTNSz0Q2U6UrFlUfqbe0
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/tebeka/strftime v0.0.0-20140926081919-3f9c7761e312 h1:frNEkk4P8mq+47LAMvj9LvhDq01kFDUhpJZzzei8IuM=
 github.com/tebeka/strftime v0.0.0-20140926081919-3f9c7761e312/go.mod h1:o6CrSUtupq/A5hylbvAsdydn0d5yokJExs8VVdx4wwI=
-gitlab.x.lan/application/droplet-app v0.0.0-20190510142159-c85a146d25b5 h1:iMABRSJb7fZBgdjVk+P/CsIMCRVRcXcPZy/VggkMkRY=
-gitlab.x.lan/application/droplet-app v0.0.0-20190510142159-c85a146d25b5/go.mod h1:idlBin2x1TWSxOuR7l3logRfk1DG+Tz7124divyczzA=
 gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190510114607-b612780c975a h1:/A6JZonStQe196ox6ORte9az7r+dV0oFa9qZGtrPQwA=
 gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190510114607-b612780c975a/go.mod h1:r8SUb9s4snU1q5OqPiZeW7GUCubzgKxXxUmkTXAsAbY=
 gitlab.x.lan/yunshan/message v0.0.0-20190510031015-08538270ff1b h1:1T2nRN6/MEdaWlreAVIkurPwy0j7G1tTNIfS1hBb4Bw=
