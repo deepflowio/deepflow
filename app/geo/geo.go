@@ -98,6 +98,9 @@ func (p *FlowToGeoDocumentMapper) Prepare() {
 func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedTag bool) []interface{} {
 	p.docs.Reset()
 
+	if rawFlow.GeoEnd != uint8(ZERO) { // 产品需求：永远仅统计云外、客户端的地理位置信息
+		return p.docs.Slice()
+	}
 	if rawFlow.Proto != layers.IPProtocolTCP {
 		return p.docs.Slice()
 	}
@@ -118,6 +121,12 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 	directions := [2]outputtype.DirectionEnum{outputtype.ClientToServer, outputtype.ServerToClient}
 	docTimestamp := RoundToMinute(flow.StartTime)
 
+	for i := range ips {
+		if IsOuterPublicIp(l3EpcIDs[i]) {
+			ips[i] = 0
+		}
+	}
+
 	docMap := make(map[string]bool)
 
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
@@ -135,16 +144,11 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 			SumRTTSynClientFlow: flow.RTTSynClientFlow(),
 		}
 
-		if l3EpcIDs[thisEnd] == 0 {
-			// 仅统计接入网络、云内IP。
-			continue
-		}
-
 		field := outputtype.Field{
 			IP:           ips[thisEnd],
 			TAPType:      TAPTypeFromInPort(flow.InPort),
 			Direction:    directions[thisEnd],
-			ACLDirection: outputtype.ACL_FORWARD, // 性能量化APP仅考虑ACL正向匹配
+			ACLDirection: outputtype.ACL_FORWARD, // 含ACLDirection字段时仅考虑ACL正向匹配
 			Country:      flow.Country,
 			Region:       flow.Region,
 			ISP:          flow.ISP,
@@ -153,68 +157,66 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 
 		// policy
 		for _, policy := range p.policyGroup {
-			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE == 0 {
-				continue
-			}
 			field.ACLGID = uint16(policy.GetACLGID())
-			if flow.Country == CHN_ID {
-				codes = POLICY_CHN_CODES[:]
-			} else {
-				codes = POLICY_NON_CHN_CODES[:]
-			}
 
-			for _, code := range codes {
-				if IsDupTraffic(flow.InPort, l3EpcIDs[thisEnd], isL2End[thisEnd], isL3End[thisEnd], code) {
-					continue
+			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE != 0 && thisEnd == ONE {
+				// 产品需求：永远仅统计云外、客户端的地理位置信息，即单侧统计量永远基于服务端视角
+				if flow.Country == CHN_ID {
+					codes = POLICY_CHN_CODES[:]
+				} else {
+					codes = POLICY_NON_CHN_CODES[:]
 				}
-				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
-					continue
-				}
-				tag := &outputtype.Tag{Field: &field, Code: code}
-				if code.PossibleDuplicate() {
-					id := tag.GetID(p.encoder)
-					if _, exists := docMap[id]; exists {
+				for _, code := range codes {
+					if IsDupTraffic(flow.InPort, l3EpcIDs[thisEnd], isL2End[thisEnd], isL3End[thisEnd], code) {
 						continue
 					}
-					docMap[id] = true
-				}
-				doc := p.docs.Get().(*app.Document)
-				doc.Timestamp = docTimestamp
-				field.FillTag(code, doc.Tag.(*outputtype.Tag))
-				doc.Tag.SetID(tag.GetID(p.encoder))
-				doc.Meter = &meter
-			}
-
-			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE == 0 {
-				continue
-			}
-			field.ACLGID = uint16(policy.GetACLGID())
-			if flow.Country == CHN_ID {
-				codes = POLICY_CHN_EDGE_CODES[:]
-			} else {
-				codes = POLICY_NON_CHN_EDGE_CODES[:]
-			}
-
-			for _, code := range codes {
-				if IsDupTraffic(flow.InPort, l3EpcIDs[otherEnd], isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧tag
-					continue
-				}
-				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) { // 双侧tag
-					continue
-				}
-				tag := &outputtype.Tag{Field: &field, Code: code}
-				if code.PossibleDuplicate() {
-					id := tag.GetID(p.encoder)
-					if _, exists := docMap[id]; exists {
+					if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
 						continue
 					}
-					docMap[id] = true
+					tag := &outputtype.Tag{Field: &field, Code: code}
+					if code.PossibleDuplicate() {
+						id := tag.GetID(p.encoder)
+						if _, exists := docMap[id]; exists {
+							continue
+						}
+						docMap[id] = true
+					}
+					doc := p.docs.Get().(*app.Document)
+					doc.Timestamp = docTimestamp
+					field.FillTag(code, doc.Tag.(*outputtype.Tag))
+					doc.Tag.SetID(tag.GetID(p.encoder))
+					doc.Meter = &meter
 				}
-				doc := p.docs.Get().(*app.Document)
-				doc.Timestamp = docTimestamp
-				field.FillTag(code, doc.Tag.(*outputtype.Tag))
-				doc.Tag.SetID(tag.GetID(p.encoder))
-				doc.Meter = &meter
+			}
+
+			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE != 0 && thisEnd == ZERO {
+				// 产品需求：永远仅统计云外、客户端的地理位置信息，即双侧统计量永远基于客户端视角
+				if flow.Country == CHN_ID {
+					codes = POLICY_CHN_EDGE_CODES[:]
+				} else {
+					codes = POLICY_NON_CHN_EDGE_CODES[:]
+				}
+				for _, code := range codes {
+					if IsDupTraffic(flow.InPort, l3EpcIDs[otherEnd], isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧tag
+						continue
+					}
+					if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) { // 双侧tag
+						continue
+					}
+					tag := &outputtype.Tag{Field: &field, Code: code}
+					if code.PossibleDuplicate() {
+						id := tag.GetID(p.encoder)
+						if _, exists := docMap[id]; exists {
+							continue
+						}
+						docMap[id] = true
+					}
+					doc := p.docs.Get().(*app.Document)
+					doc.Timestamp = docTimestamp
+					field.FillTag(code, doc.Tag.(*outputtype.Tag))
+					doc.Tag.SetID(tag.GetID(p.encoder))
+					doc.Meter = &meter
+				}
 			}
 
 			flow.FillACLGroupID(policy, p.aclGroups[:])
