@@ -149,7 +149,7 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 			IP:           ips[thisEnd],
 			TAPType:      TAPTypeFromInPort(flow.InPort),
 			Direction:    directions[thisEnd],
-			ACLDirection: outputtype.ACL_FORWARD, // 性能量化APP仅考虑ACL正向匹配
+			ACLDirection: outputtype.ACL_FORWARD, // 含ACLDirection字段时仅考虑ACL正向匹配
 
 			IP1: ips[otherEnd],
 		}

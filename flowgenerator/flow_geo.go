@@ -33,6 +33,7 @@ func getOppositeEndpoint(val EndPoint) EndPoint {
 }
 
 func (f *FlowGeo) fillGeoInfo(taggedFlow *TaggedFlow) {
+	taggedFlow.GeoEnd = uint8(0xFF)
 	actionFlags := taggedFlow.PolicyData.ActionFlags
 	if actionFlags&ACTION_GEO_POSITIONING == 0 {
 		return
@@ -52,6 +53,7 @@ func (f *FlowGeo) fillGeoInfo(taggedFlow *TaggedFlow) {
 		if geoInfo == nil {
 			continue
 		}
+		taggedFlow.GeoEnd = uint8(queryEnd)
 		taggedFlow.Country = geoInfo.Country
 		taggedFlow.Region = geoInfo.Region
 		taggedFlow.ISP = geoInfo.ISP
