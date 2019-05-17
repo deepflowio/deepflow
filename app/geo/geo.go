@@ -52,8 +52,7 @@ var POLICY_CHN_CODES = []outputtype.Code{
 }
 
 var POLICY_NON_CHN_CODES = []outputtype.Code{ // 注意：就是POLICY_CHN_CODES中包含Country的部分
-	outputtype.IndexToCode(0x04) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.Country | outputtype.TAPType,
-	outputtype.IndexToCode(0x05) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IP | outputtype.Country | outputtype.TAPType,
+	// v5.5.3：产品没有世界地图需求
 }
 
 var POLICY_CHN_EDGE_CODES = []outputtype.Code{
@@ -63,7 +62,7 @@ var POLICY_CHN_EDGE_CODES = []outputtype.Code{
 }
 
 var POLICY_NON_CHN_EDGE_CODES = []outputtype.Code{ // 注意：就是POLICY_CHN_EDGE_CODES中包含Country的部分
-	outputtype.IndexToCode(0x08) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IPPath | outputtype.Country | outputtype.TAPType,
+	// v5.5.3：产品没有世界地图需求
 }
 
 var POLICY_CHN_GROUP_NODE_CODES = []outputtype.Code{}
