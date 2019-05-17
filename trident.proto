@@ -129,13 +129,6 @@ message PlatformData {
     repeated Group ip_groups = 2;
 }
 
-enum TapType {
-    ANY_TAP = 0;
-    ISP = 1;      // 接入网络
-    SPINE = 2;    // 物理网络
-    TOR = 3;      // 虚拟网络
-}
-
 enum Action {
     PACKET_COUNTING               = 1;  // 包统计
     FLOW_COUNTING                 = 2;  // 流统计
@@ -186,8 +179,7 @@ message FlowAction {
 
 message FlowAcl {
     optional uint32 id = 1;
-    optional TapType tap_type = 2;
-    optional uint32 tap_id = 3;
+    optional uint32 tap_type = 2; // 3: in_port 0x3****, 0~2/4~30: in_port 0x1****
     optional string src_group_ids = 4;
     optional string dst_group_ids = 5;
     optional Protocol protocol = 6;
