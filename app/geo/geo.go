@@ -139,7 +139,7 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 			SumBitTx:              bits[thisEnd],
 			SumBitRx:              bits[otherEnd],
 
-			SumRTTSynClient:     flow.GetRTTSynClient(),
+			SumRTTSynClient:     flow.ClosedRTTSynClient(),
 			SumRTTSynClientFlow: flow.RTTSynClientFlow(),
 		}
 
