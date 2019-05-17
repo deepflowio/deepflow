@@ -1,6 +1,7 @@
 package dropletpb
 
 import (
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -237,11 +238,21 @@ func newNpbActions(npbs []*trident.NpbAction) []datatype.NpbAction {
 	return actions
 }
 
+// FIXME: 这么做会导致应用存多份，后面需要修改算法，做到准确匹配
+func convertTapType(tapType uint32) datatype.TapType {
+	if tapType == 3 {
+		return datatype.TapType(datatype.TAP_TOR)
+	} else if tapType >= 0 && tapType <= 30 {
+		return datatype.TapType(datatype.TAP_ISP)
+	} else {
+		panic(fmt.Sprintf("invalid tapType: %v", tapType))
+	}
+}
+
 func newPolicyData(acl *trident.FlowAcl) *policy.Acl {
 	return &policy.Acl{
 		Id:           datatype.ACLID(acl.GetId()),
-		Type:         datatype.TapType(acl.GetTapType()),
-		TapId:        acl.GetTapId(),
+		Type:         convertTapType(acl.GetTapType()),
 		SrcGroups:    splitGroup2Int(acl.GetSrcGroupIds()),
 		DstGroups:    splitGroup2Int(acl.GetDstGroupIds()),
 		SrcPortRange: splitPort2Int(acl.GetSrcPorts()),
