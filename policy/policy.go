@@ -241,7 +241,7 @@ func (t *PolicyTable) GetEndpointInfo(mac uint64, ip uint32, inPort uint32) *End
 	if PortInDeepflowExporter(inPort) {
 		endpointInfo = t.cloudPlatformLabeler.GetEndpointInfo(mac, ip, TAP_TOR)
 	} else {
-		endpointInfo = t.cloudPlatformLabeler.GetEndpointInfo(mac, ip, TAP_ISP)
+		endpointInfo = t.cloudPlatformLabeler.GetEndpointInfo(mac, ip, TAP_ISP_MIN)
 	}
 
 	return endpointInfo

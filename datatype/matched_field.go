@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	MATCHED_FIELD_BITS_LEN = 208 // 2(TapType) + 12(Vlan) + 2(Proto) + 16(Port)*2 + 64(MAC+IP)*2
+	MATCHED_FIELD_BITS_LEN = 211 // 5(TapType) + 12(Vlan) + 2(Proto) + 16(Port)*2 + 64(MAC+IP)*2
 	MATCHED_FIELD_LEN      = 4
 )
 
@@ -58,7 +58,7 @@ var fieldMask = [...]uint64{
 	MATCHED_DST_EPC:  0xffff,
 	MATCHED_PROTO:    0x3,
 	MATCHED_VLAN:     0xfff,
-	MATCHED_TAP_TYPE: 0x3,
+	MATCHED_TAP_TYPE: 0x1f,
 }
 
 type MatchedField struct {

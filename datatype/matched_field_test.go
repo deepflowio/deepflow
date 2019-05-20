@@ -50,8 +50,8 @@ func TestSetGet1(t *testing.T) {
 }
 
 func TestSetGet2(t *testing.T) {
-	matched := newMatchedField(0x7, 0x1fff, 0x7, 10, 20, 30, 40, 50, 60)
-	if matched.Get(MATCHED_TAP_TYPE) != 3 {
+	matched := newMatchedField(0x3f, 0x1fff, 0x7, 10, 20, 30, 40, 50, 60)
+	if matched.Get(MATCHED_TAP_TYPE) != 0x1f {
 		t.Errorf("MATCHED_TAP_TYPE Error. %v\n", matched)
 	}
 	if matched.Get(MATCHED_VLAN) != 0xfff {
