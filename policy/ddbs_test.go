@@ -1445,6 +1445,49 @@ func TestDdbsAclGidBitmapGroup48(t *testing.T) {
 	}
 }
 
+func TestDdbsTapType(t *testing.T) {
+	acls := []*Acl{}
+	// 创建 policyTable
+	table := generatePolicyTable(DDBS)
+	// 构建acl action  1->2 tcp 8000 tapType=0|1
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	action2 := generateAclAction(100, ACTION_FLOW_COUNTING)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 8000, vlanAny)
+	acl.Type = 1
+	acl2 := generatePolicyAcl(table, action2, 100, group[1], group[2], IPProtocolTCP, 8000, vlanAny)
+	acl2.Type = 0
+	acls = append(acls, acl, acl2)
+	table.UpdateAcls(acls)
+
+	// 构建查询1-key  1:0->2:8000 tcp tapType=1
+	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 8000)
+	key.Tap = GetTapType(0x10001)
+
+	// 获取查询first结果
+	_, policyData := table.LookupAllByKey(key)
+	// 构建预期结果
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action, action2}, nil, acl.Id)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestDdbsTapType Check Failed!")
+	}
+
+	// 构建查询1-key  1:0->2:8000 tcp tapType=2
+	key = generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 8000)
+	key.Tap = GetTapType(0x10002)
+
+	// 获取查询first结果
+	_, policyData = table.LookupAllByKey(key)
+	// 构建预期结果
+	basicPolicyData = new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action2}, nil, acl2.Id)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestDdbsTapType Check Failed!")
+	}
+}
+
 func TestDdbsAclGidBitmapByDesignationAcls(t *testing.T) {
 	table := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false, DDBS)
 	action1 := generateAclAction(10, ACTION_PACKET_COUNTING)

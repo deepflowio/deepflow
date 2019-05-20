@@ -22,18 +22,6 @@ var (
 	INVALID_ENDPOINT_DATA_L3EPCID           = &EndpointData{SrcInfo: INVALID_ENDPOINT_INFO_L3EPCID, DstInfo: INVALID_ENDPOINT_INFO_L3EPCID}
 )
 
-type TapType uint8
-
-const (
-	TAP_ANY TapType = iota
-	TAP_ISP
-	TAP_SPINE
-	TAP_TOR
-	TAP_MAX
-
-	TAP_MIN TapType = TAP_ANY + 1
-)
-
 type FeatureFlags uint32
 
 const (
