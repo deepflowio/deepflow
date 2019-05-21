@@ -1417,13 +1417,14 @@ func TestDdbsAclGidBitmapGroup48(t *testing.T) {
 		acl.DstGroups = append(acl.DstGroups, uint32(i))
 	}
 	acls = append(acls, acl)
-	table.UpdateAcls(acls)
 	ipGroups := make([]*IpGroupData, 0, 48)
+	// internet资源组
 	for i := 102; i < 150; i++ {
 		ipGroups = append(ipGroups, generateIpGroup(uint32(i), 0, "0.0.0.0/0"))
 	}
 	table.UpdateIpGroupData(ipGroups)
-	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 0)
+	table.UpdateAcls(acls)
+	key := generateLookupKey(group1Mac, group2Mac, vlanAny, testIp4, queryIp, IPProtocolTCP, 0, 0)
 	_, policyData := table.LookupAllByKey(key)
 	aclGidBitmap0 := AclGidBitmap(0).SetSrcAndDstFlag()
 	aclGidBitmap1 := AclGidBitmap(0).SetSrcAndDstFlag()
@@ -1516,6 +1517,32 @@ func TestDdbsAclGidBitmapByDesignationAcls(t *testing.T) {
 	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidBitmap1)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestAclGidBitmap Check Failed!")
+	}
+}
+
+func TestDdbsInternet(t *testing.T) {
+	// 创建 policyTable
+	table := generatePolicyTable(DDBS)
+	// 构建acl action  1->2 tcp 8000
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	acls := []*Acl{}
+	acl := generatePolicyAcl(table, action, 10, group[1], uint32(1000), IPProtocolTCP, 8000, vlanAny)
+	acls = append(acls, acl)
+	ipGroups := make([]*IpGroupData, 0, 1)
+	ipGroups = append(ipGroups, generateIpGroup(1000, 0, "0.0.0.0/0")) // internet
+	table.UpdateIpGroupData(ipGroups)
+	table.UpdateAcls(acls)
+
+	// 构建查询1-key  1:0->2:8000 tcp, 这里dstMac使用一个不在Platform中的，避免获取到资源组
+	key := generateLookupKey(group1Mac, 100, vlanAny, group1Ip1, queryIp, IPProtocolTCP, 0, 8000)
+	// 获取查询first结果
+	_, policyData := table.LookupAllByKey(key)
+	// 构建预期结果
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestDdbsInternet Check Failed!")
 	}
 }
 
