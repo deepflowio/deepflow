@@ -914,16 +914,15 @@ func TestIpNetmaskGroup(t *testing.T) {
 	ipGroup2 := generateIpGroup(group[12], groupEpc[0], ipNet12)
 	ipGroup3 := generateIpGroup(group[13], groupEpc[0], ipNet13)
 	ipGroup4 := generateIpGroup(group[14], groupEpc[0], ipNet14)
-	ipGroup5 := generateIpGroup(group[15], groupEpc[0], ipNet15)
-	ipGroups := make([]*IpGroupData, 0, 5)
-	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3, ipGroup4, ipGroup5)
+	ipGroups := make([]*IpGroupData, 0, 4)
+	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3, ipGroup4)
 	policy.UpdateIpGroupData(ipGroups)
 	srcIp := NewIPFromString("10.90.1.12").Int()
 	dstIp := NewIPFromString("10.90.9.123").Int()
 	key := generateLookupKey(mac1, mac2, vlanAny, srcIp, dstIp, IPProtocolTCP, 50, 60)
 	data, _ := policy.LookupAllByKey(key)
-	if len(data.SrcInfo.GroupIds) != 4 ||
-		len(data.DstInfo.GroupIds) != 5 {
+	if len(data.SrcInfo.GroupIds) != 3 ||
+		len(data.DstInfo.GroupIds) != 4 {
 		t.Error("TestIpNetmaskGroup Check Failed!")
 	}
 }
@@ -934,9 +933,8 @@ func TestIpNetmaskGroup1(t *testing.T) {
 	ipGroup2 := generateIpGroup(group[12], groupEpc[0], ipNet12)
 	ipGroup3 := generateIpGroup(group[13], groupEpc[0], ipNet13)
 	ipGroup4 := generateIpGroup(group[14], groupEpc[0], ipNet14)
-	ipGroup5 := generateIpGroup(group[15], groupEpc[0], ipNet15)
 	ipGroups := make([]*IpGroupData, 0, 5)
-	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3, ipGroup4, ipGroup5)
+	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3, ipGroup4)
 	policy.UpdateIpGroupData(ipGroups)
 	srcIp := NewIPFromString("10.90.1.12").Int()
 	dstIp := NewIPFromString("10.90.9.123").Int()
@@ -945,8 +943,8 @@ func TestIpNetmaskGroup1(t *testing.T) {
 	policy.UpdateInterfaceData([]*PlatformData{data1})
 	key := generateLookupKey(group1Mac, mac2, vlanAny, srcIp, dstIp, IPProtocolTCP, 50, 60)
 	data, _ := policy.LookupAllByKey(key)
-	if len(data.SrcInfo.GroupIds) != 5 ||
-		len(data.DstInfo.GroupIds) != 5 {
+	if len(data.SrcInfo.GroupIds) != 4 ||
+		len(data.DstInfo.GroupIds) != 4 {
 		t.Error("TestIpNetmaskGroup Check Failed!")
 	}
 }

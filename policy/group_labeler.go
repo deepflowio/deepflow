@@ -41,6 +41,8 @@ type IpResourceGroup struct {
 	anonymousGroupIds    map[uint32]bool       // 匿名资源组相关数据
 	maskLenData          *MaskLenData          // IP资源组涉及到大于16掩码
 	maskLenDataMini      *MaskLenData          // IP资源组涉及到小于等于16掩码
+
+	internetGroupIds []uint32 // internet资源组ID单独存放, 因为是0.0.0.0/0网段匹配所有IP地址
 }
 
 type GroupIdData struct {
@@ -79,7 +81,7 @@ func NewMaskLenGroupDataMini() *MaskLenGroupDataMini {
 }
 
 func NewIpResourceGroup() *IpResourceGroup {
-	return &IpResourceGroup{NewMaskLenGroupData(), NewMaskLenGroupDataMini(), map[uint32]bool{}, NewMaskLenData(), NewMaskLenData()}
+	return &IpResourceGroup{NewMaskLenGroupData(), NewMaskLenGroupDataMini(), map[uint32]bool{}, NewMaskLenData(), NewMaskLenData(), nil}
 }
 
 func addGroupIdToMap(epcMaskedIpGroupMap map[uint64]*GroupIdData, epcIpKey uint64, id uint32) {
@@ -120,6 +122,7 @@ func (g *IpResourceGroup) GenerateIpNetmaskMap(ipgroupData []*IpGroupData) {
 	anonymousGroupIds := map[uint32]bool{}
 	maskLenData := NewMaskLenData()
 	maskLenDataMini := NewMaskLenData()
+	internetGroupIds := make([]uint32, 0, 10)
 
 	for _, group := range ipgroupData {
 		g.AddAnonymousGroupId(anonymousGroupIds, group)
@@ -130,6 +133,12 @@ func (g *IpResourceGroup) GenerateIpNetmaskMap(ipgroupData []*IpGroupData) {
 			if err != nil {
 				continue
 			}
+			// internet资源组
+			if ip == 0 && maskLen == 0 && epcId == 0 {
+				internetGroupIds = append(internetGroupIds, IP_GROUP_ID_FLAG+id)
+				continue
+			}
+
 			mask := utils.MaskLenToNetmask(maskLen)
 			if maskLen > STANDARD_MASK_LEN {
 				epcIpKey := (uint64(epcId) << 32) | uint64(ip&mask)
@@ -147,6 +156,7 @@ func (g *IpResourceGroup) GenerateIpNetmaskMap(ipgroupData []*IpGroupData) {
 	g.anonymousGroupIds = anonymousGroupIds
 	g.maskLenData = maskLenData
 	g.maskLenDataMini = maskLenDataMini
+	g.internetGroupIds = internetGroupIds
 }
 
 func getIpGroupIdFromMap(key uint64, groupIdSlice []uint32, groupIdMap map[uint32]bool, epcMaskedIpGroupMap map[uint64]*GroupIdData) []uint32 {
@@ -226,6 +236,11 @@ func (g *IpResourceGroup) Populate(ip uint32, endpointInfo *EndpointInfo) {
 		if !inDevGroupIds(endpointInfo.GroupIds, devGroupIdLen, v) {
 			endpointInfo.GroupIds = append(endpointInfo.GroupIds, uint32(v)+IP_GROUP_ID_FLAG)
 		}
+	}
+	// 当流量未匹配到任何资源组，其为internet网络IP
+	// ip为0时，L2EpcId会赋值给L3EpcId, 是非internet流量
+	if len(endpointInfo.GroupIds) == 0 && endpointInfo.L3EpcId == 0 && ip != 0 {
+		endpointInfo.GroupIds = append(endpointInfo.GroupIds, g.internetGroupIds...)
 	}
 }
 
