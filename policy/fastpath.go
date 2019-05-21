@@ -363,6 +363,10 @@ func (f *FastPath) GenerateIpNetmaskMapFromIpGroupData(data []*IpGroupData) {
 				log.Warning(err)
 				continue
 			}
+			// internet资源因为匹配左右IP, 不需要加在这里
+			if ip == 0 && d.EpcId == 0 && maskSize == 0 {
+				continue
+			}
 
 			minNetIp := ip & STANDARD_NETMASK
 			maxNetIp := minNetIp
