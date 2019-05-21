@@ -170,13 +170,6 @@ func (l *LabelerManager) OnPolicyDataChange(data []*policy.Acl) {
 	l.enable = true
 }
 
-func GetTapType(inPort uint32) datatype.TapType {
-	if policy.PortInDeepflowExporter(inPort) {
-		return datatype.TAP_TOR
-	}
-	return datatype.TAP_ISP
-}
-
 func getTTL(packet *datatype.MetaPacket) uint8 {
 	if packet.InPort == datatype.PACKET_SOURCE_TOR {
 		return 128
@@ -200,7 +193,7 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *data
 		Ttl:         getTTL(packet),
 		L2End0:      packet.L2End0,
 		L2End1:      packet.L2End1,
-		Tap:         GetTapType(packet.InPort),
+		Tap:         datatype.GetTapType(packet.InPort),
 		Invalid:     packet.Invalid,
 		FastIndex:   index,
 		FeatureFlag: datatype.NPM,
@@ -468,12 +461,15 @@ func parseUint(s string) (uint32, error) {
 
 func parseTapType(s string) datatype.TapType {
 	switch s {
-	case "isp":
-		return datatype.TAP_ISP
 	case "tor":
 		return datatype.TAP_TOR
 	default:
-		return 0
+		typeId, err := strconv.Atoi(s)
+		if err != nil {
+			fmt.Printf("unknown tapType from: %s[%v]\n", s, err)
+			return 0
+		}
+		return datatype.TapType(typeId)
 	}
 }
 
@@ -486,7 +482,7 @@ func newLookupKey(cmdLine string) (*datatype.LookupKey, uint16) {
 		switch parts[0] {
 		case "tap":
 			key.Tap = parseTapType(parts[1])
-			if key.Tap != datatype.TAP_TOR && key.Tap != datatype.TAP_ISP {
+			if key.Tap >= datatype.TAP_MAX {
 				fmt.Printf("unknown tap type from: %s\n", cmdLine)
 				return nil, queryType
 			}
@@ -747,13 +743,15 @@ func parseAcl(args []string) *policy.Acl {
 			switch keyValue[1] {
 			case "any":
 				acl.Type = datatype.TAP_ANY
-			case "isp":
-				acl.Type = datatype.TAP_ISP
 			case "tor":
 				acl.Type = datatype.TAP_TOR
 			default:
-				fmt.Printf("invalid tap %s from %s\n", keyValue[1], args[0])
-				return nil
+				typeId, err := strconv.Atoi(keyValue[1])
+				if err != nil {
+					fmt.Printf("invalid tap %s from %s\n", keyValue[1], args[0])
+					return nil
+				}
+				acl.Type = datatype.TapType(typeId)
 			}
 		case "vlan":
 			vlan, err := strconv.Atoi(keyValue[1])
@@ -875,7 +873,7 @@ func RegisterCommand() *cobra.Command {
 		Short: "search policy and endpoint",
 		Long: "droplet-ctl labeler dump-acl {[key=value]+}\n" +
 			"key list:\n" +
-			"\ttap         use 'isp|tor'\n" +
+			"\ttap         use '[1-2,4-30]|tor'\n" +
 			"\tsmac/dmac   packet mac address\n" +
 			"\teth_type    packet eth type\n" +
 			"\tvlan        packet vlan\n" +
@@ -919,7 +917,7 @@ func RegisterCommand() *cobra.Command {
 		Long: "droplet-ctl labeler add-acl {[key=value]+}\n" +
 			"key list:\n" +
 			"\tid                 acl id and action id\n" +
-			"\ttap                use 'isp|tor|any'\n" +
+			"\ttap                use '[1-2,4-30]|tor|any'\n" +
 			"\tvlan               packet vlan\n" +
 			"\tsgroup/dgroup      group id\n" +
 			"\tproto              packet ip proto\n" +
