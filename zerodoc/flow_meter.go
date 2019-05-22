@@ -15,8 +15,8 @@ type FlowMeter struct {
 	SumPacketRx           uint64 `db:"sum_packet_rx"`
 	SumBitTx              uint64 `db:"sum_bit_tx"`
 	SumBitRx              uint64 `db:"sum_bit_rx"`
-	SumFlowDuration       uint64 `db:"sum_flow_duration"`        // ms
-	SumClosedFlowDuration uint64 `db:"sum_closed_flow_duration"` // ms
+	SumFlowDuration       uint64 `db:"sum_flow_duration"`        // ms 废弃
+	SumClosedFlowDuration uint64 `db:"sum_closed_flow_duration"` // ms 废弃
 }
 
 func (m *FlowMeter) SortKey() uint64 {
@@ -102,10 +102,6 @@ func (m *FlowMeter) MarshalTo(b []byte) int {
 	offset += copy(b[offset:], strconv.FormatUint(m.SumBitRx, 10))
 	offset += copy(b[offset:], "i,sum_bit=")
 	offset += copy(b[offset:], strconv.FormatUint(m.SumBitTx+m.SumBitRx, 10))
-	offset += copy(b[offset:], "i,sum_flow_duration=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumFlowDuration*1000, 10))
-	offset += copy(b[offset:], "i,sum_closed_flow_duration=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumClosedFlowDuration*1000, 10)) // us
 	b[offset] = 'i'
 	offset++
 

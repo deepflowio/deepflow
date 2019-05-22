@@ -9,9 +9,9 @@ import (
 )
 
 type GeoMeter struct {
-	SumClosedFlowCount    uint64        `db:"sum_closed_flow_count"`
-	SumAbnormalFlowCount  uint64        `db:"sum_abnormal_flow_count"`
-	SumClosedFlowDuration uint64        `db:"sum_closed_flow_duration"` // ms
+	SumClosedFlowCount    uint64        `db:"sum_closed_flow_count"`    // 废弃
+	SumAbnormalFlowCount  uint64        `db:"sum_abnormal_flow_count"`  // 废弃
+	SumClosedFlowDuration uint64        `db:"sum_closed_flow_duration"` // ms 废弃
 	SumPacketTx           uint64        `db:"sum_packet_tx"`
 	SumPacketRx           uint64        `db:"sum_packet_rx"`
 	SumBitTx              uint64        `db:"sum_bit_tx"`
@@ -85,13 +85,7 @@ func (m *GeoMeter) ToKVString() string {
 func (m *GeoMeter) MarshalTo(b []byte) int {
 	offset := 0
 
-	offset += copy(b[offset:], "sum_closed_flow_count=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumClosedFlowCount, 10))
-	offset += copy(b[offset:], "i,sum_abnormal_flow_count=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumAbnormalFlowCount, 10))
-	offset += copy(b[offset:], "i,sum_closed_flow_duration=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumClosedFlowDuration*1000, 10)) // us
-	offset += copy(b[offset:], "i,sum_packet_tx=")
+	offset += copy(b[offset:], "sum_packet_tx=")
 	offset += copy(b[offset:], strconv.FormatUint(m.SumPacketTx, 10))
 	offset += copy(b[offset:], "i,sum_packet_rx=")
 	offset += copy(b[offset:], strconv.FormatUint(m.SumPacketRx, 10))

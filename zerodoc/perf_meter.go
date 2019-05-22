@@ -61,20 +61,12 @@ func (m *PerfMeter) MarshalTo(b []byte) int {
 	offset += copy(b[offset:], strconv.FormatUint(sum.SumFlowCount, 10))
 	offset += copy(b[offset:], "i,sum_closed_flow_count=")
 	offset += copy(b[offset:], strconv.FormatUint(sum.SumClosedFlowCount, 10))
-	offset += copy(b[offset:], "i,sum_retrans_flow_count=")
-	offset += copy(b[offset:], strconv.FormatUint(sum.SumRetransFlowCount, 10))
 	offset += copy(b[offset:], "i,sum_half_open_flow_count=")
 	offset += copy(b[offset:], strconv.FormatUint(sum.SumHalfOpenFlowCount, 10))
 	offset += copy(b[offset:], "i,sum_packet_tx=")
 	offset += copy(b[offset:], strconv.FormatUint(sum.SumPacketTx, 10))
 	offset += copy(b[offset:], "i,sum_packet_rx=")
 	offset += copy(b[offset:], strconv.FormatUint(sum.SumPacketRx, 10))
-	offset += copy(b[offset:], "i,sum_bit_tx=")
-	offset += copy(b[offset:], strconv.FormatUint(sum.SumBitTx, 10))
-	offset += copy(b[offset:], "i,sum_bit_rx=")
-	offset += copy(b[offset:], strconv.FormatUint(sum.SumBitRx, 10))
-	offset += copy(b[offset:], "i,sum_bit=")
-	offset += copy(b[offset:], strconv.FormatUint(sum.SumBitTx+sum.SumBitRx, 10))
 	offset += copy(b[offset:], "i,sum_retrans_cnt_tx=")
 	offset += copy(b[offset:], strconv.FormatUint(sum.SumRetransCntTx, 10))
 	offset += copy(b[offset:], "i,sum_retrans_cnt_rx=")
@@ -123,12 +115,12 @@ func (m *PerfMeter) MarshalTo(b []byte) int {
 type PerfMeterSum struct {
 	SumFlowCount         uint64 `db:"sum_flow_count"`
 	SumClosedFlowCount   uint64 `db:"sum_closed_flow_count"`
-	SumRetransFlowCount  uint64 `db:"sum_retrans_flow_count"`
+	SumRetransFlowCount  uint64 `db:"sum_retrans_flow_count"` // 废弃
 	SumHalfOpenFlowCount uint64 `db:"sum_half_open_flow_count"`
 	SumPacketTx          uint64 `db:"sum_packet_tx"`
 	SumPacketRx          uint64 `db:"sum_packet_rx"`
-	SumBitTx             uint64 `db:"sum_bit_tx"`
-	SumBitRx             uint64 `db:"sum_bit_rx"`
+	SumBitTx             uint64 `db:"sum_bit_tx"` // 废弃
+	SumBitRx             uint64 `db:"sum_bit_rx"` // 废弃
 	SumRetransCntTx      uint64 `db:"sum_retrans_cnt_tx"`
 	SumRetransCntRx      uint64 `db:"sum_retrans_cnt_rx"`
 
