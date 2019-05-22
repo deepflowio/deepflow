@@ -134,7 +134,7 @@ func (g *IpResourceGroup) GenerateIpNetmaskMap(ipgroupData []*IpGroupData) {
 				continue
 			}
 			// internet资源组
-			if ip == 0 && maskLen == 0 && epcId == 0 {
+			if ip == 0 && maskLen == 0 && epcId == EPC_FROM_INTERNET {
 				internetGroupIds = append(internetGroupIds, IP_GROUP_ID_FLAG+id)
 				continue
 			}
@@ -240,7 +240,8 @@ func (g *IpResourceGroup) Populate(ip uint32, endpointInfo *EndpointInfo) {
 	// 当流量未匹配到任何资源组，其为internet网络IP
 	// ip为0时，L2EpcId会赋值给L3EpcId, 是非internet流量
 	if len(endpointInfo.GroupIds) == 0 && endpointInfo.L3EpcId == 0 && ip != 0 {
-		endpointInfo.GroupIds = append(endpointInfo.GroupIds, g.internetGroupIds...)
+		// 因为aclgitbitmap目前不需要internet资源组，ddbs算法又不需要资源组，这里先注释掉
+		//endpointInfo.GroupIds = append(endpointInfo.GroupIds, g.internetGroupIds...)
 	}
 }
 

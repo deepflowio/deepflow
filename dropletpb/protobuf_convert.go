@@ -128,7 +128,7 @@ func newIpGroupData(ipGroup *trident.Group) *policy.IpGroupData {
 		}
 	}
 	return &policy.IpGroupData{
-		Id:    ipGroup.GetId(),
+		Id:    ipGroup.GetId() & 0xffff,
 		EpcId: int32(ipGroup.GetEpcId()),
 		Type:  uint8(ipGroup.GetType()),
 		Ips:   ips,
@@ -153,7 +153,7 @@ func splitGroup2Int(src string) []uint32 {
 	for _, group := range splitSrcGroups {
 		groupInt, err := strconv.Atoi(group)
 		if err == nil {
-			groups = append(groups, uint32(groupInt))
+			groups = append(groups, uint32(groupInt&0xffff))
 		}
 	}
 

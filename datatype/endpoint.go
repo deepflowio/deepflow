@@ -9,6 +9,12 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
+const (
+	EPC_FROM_DEEPFLOW = -1
+	EPC_FROM_INTERNET = -2
+	GROUP_INTERNET    = -2
+)
+
 var (
 	INVALID_ENDPOINT_INFO                   = new(EndpointInfo)
 	INVALID_ENDPOINT_INFO_L3EPCID           = &EndpointInfo{L3EpcId: -1}
@@ -132,11 +138,11 @@ func (i *EndpointInfo) SetL3DataByMac(data *PlatformData) {
 }
 
 func (i *EndpointInfo) GetL3Epc() uint16 {
-	id := uint16(0)
-	if i.L3EpcId > 0 {
-		id = uint16(i.L3EpcId)
+	if i.L3EpcId == 0 {
+		return uint16(EPC_FROM_INTERNET & 0xffff)
+	} else {
+		return uint16(i.L3EpcId & 0xffff)
 	}
-	return id
 }
 
 func (i *EndpointInfo) GetEpc() uint16 {

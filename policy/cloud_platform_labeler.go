@@ -293,10 +293,10 @@ func (l *CloudPlatformLabeler) ModifyPrivateIp(endpoint *EndpointData, key *Look
 		return
 	}
 	if endpoint.SrcInfo.L3EpcId == 0 && isPrivateAddress(key.SrcIp) {
-		endpoint.SrcInfo.L3EpcId = -1
+		endpoint.SrcInfo.L3EpcId = EPC_FROM_DEEPFLOW
 	}
 	if endpoint.DstInfo.L3EpcId == 0 && isPrivateAddress(key.DstIp) {
-		endpoint.DstInfo.L3EpcId = -1
+		endpoint.DstInfo.L3EpcId = EPC_FROM_DEEPFLOW
 	}
 }
 
