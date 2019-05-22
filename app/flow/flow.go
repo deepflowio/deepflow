@@ -2,7 +2,6 @@ package flow
 
 import (
 	"sync"
-	"time"
 
 	"github.com/google/gopacket/layers"
 	logging "github.com/op/go-logging"
@@ -199,16 +198,14 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
 		otherEnd := GetOppositeEndpoint(thisEnd)
-		meter := outputtype.FlowMeter{ // FIXME: 待确认
-			SumFlowCount:          1,
-			SumNewFlowCount:       flow.NewFlowCount(),
-			SumClosedFlowCount:    flow.ClosedFlowCount(),
-			SumPacketTx:           packets[thisEnd],
-			SumPacketRx:           packets[otherEnd],
-			SumBitTx:              bits[thisEnd],
-			SumBitRx:              bits[otherEnd],
-			SumFlowDuration:       uint64(flow.Duration / time.Millisecond),             // ms
-			SumClosedFlowDuration: uint64(flow.ClosedFlowDuration() / time.Millisecond), // ms
+		meter := outputtype.FlowMeter{
+			SumFlowCount:       1,
+			SumNewFlowCount:    flow.NewFlowCount(),
+			SumClosedFlowCount: flow.ClosedFlowCount(),
+			SumPacketTx:        packets[thisEnd],
+			SumPacketRx:        packets[otherEnd],
+			SumBitTx:           bits[thisEnd],
+			SumBitRx:           bits[otherEnd],
 		}
 		field := outputtype.Field{
 			IP:           ips[thisEnd],

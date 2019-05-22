@@ -94,7 +94,6 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 	isL2End := [2]bool{flow.FlowMetricsPeerSrc.IsL2End, flow.FlowMetricsPeerDst.IsL2End}
 	isL3End := [2]bool{flow.FlowMetricsPeerSrc.IsL3End, flow.FlowMetricsPeerDst.IsL3End}
 	packets := [2]uint64{flow.FlowMetricsPeerSrc.PacketCount, flow.FlowMetricsPeerDst.PacketCount}
-	bits := [2]uint64{flow.FlowMetricsPeerSrc.ByteCount << 3, flow.FlowMetricsPeerDst.ByteCount << 3}
 	retransCnt := [2]uint32{flow.RetransCountSrc(), flow.RetransCountDst()}
 	zeroWinCnt := [2]uint32{flow.ZeroWinCountSrc(), flow.ZeroWinCountDst()}
 
@@ -111,16 +110,13 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
 		otherEnd := GetOppositeEndpoint(thisEnd)
-		meter := outputtype.PerfMeter{ // FIXME: 确认字段
+		meter := outputtype.PerfMeter{
 			PerfMeterSum: outputtype.PerfMeterSum{
 				SumFlowCount:         1,
 				SumClosedFlowCount:   flow.ClosedFlowCount(),
-				SumRetransFlowCount:  flow.RetransFlowCount(),
 				SumHalfOpenFlowCount: flow.HalfOpenFlowCount(),
 				SumPacketTx:          packets[thisEnd],
 				SumPacketRx:          packets[otherEnd],
-				SumBitTx:             bits[thisEnd],
-				SumBitRx:             bits[otherEnd],
 				SumRetransCntTx:      uint64(retransCnt[thisEnd]),
 				SumRetransCntRx:      uint64(retransCnt[otherEnd]),
 
