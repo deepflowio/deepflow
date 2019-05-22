@@ -1,8 +1,6 @@
 package geo
 
 import (
-	"time"
-
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	inputtype "gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -130,14 +128,11 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
 		otherEnd := GetOppositeEndpoint(thisEnd)
-		meter := outputtype.GeoMeter{ // FIXME: 确认字段
-			SumClosedFlowCount:    flow.ClosedFlowCount(),
-			SumAbnormalFlowCount:  flow.AbnormalFlowCount(),
-			SumClosedFlowDuration: uint64(flow.ClosedFlowDuration() / time.Millisecond), // ms
-			SumPacketTx:           packets[thisEnd],
-			SumPacketRx:           packets[otherEnd],
-			SumBitTx:              bits[thisEnd],
-			SumBitRx:              bits[otherEnd],
+		meter := outputtype.GeoMeter{
+			SumPacketTx: packets[thisEnd],
+			SumPacketRx: packets[otherEnd],
+			SumBitTx:    bits[thisEnd],
+			SumBitRx:    bits[otherEnd],
 
 			SumRTTSynClient:     flow.ClosedRTTSynClient(),
 			SumRTTSynClientFlow: flow.RTTSynClientFlow(),

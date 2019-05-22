@@ -1,8 +1,6 @@
 package flowtype
 
 import (
-	"time"
-
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	inputtype "gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -104,7 +102,6 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 	isL2End := [2]bool{flow.FlowMetricsPeerSrc.IsL2End, flow.FlowMetricsPeerDst.IsL2End}
 	isL3End := [2]bool{flow.FlowMetricsPeerSrc.IsL3End, flow.FlowMetricsPeerDst.IsL3End}
 	directions := [2]outputtype.DirectionEnum{outputtype.ClientToServer, outputtype.ServerToClient}
-	bytes := flow.FlowMetricsPeerSrc.TotalByteCount + flow.FlowMetricsPeerDst.TotalByteCount // 由于仅统计ClosedFlow，这里用Total
 	docTimestamp := RoundToMinute(flow.StartTime)
 
 	for i := range ips {
@@ -118,36 +115,6 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
 		otherEnd := GetOppositeEndpoint(thisEnd)
 		meter := outputtype.TypeMeter{}
-
-		switch { // FIXME: 三个switch case待确认
-		case flow.Duration < time.Second:
-			meter.SumCountL0S1S = 1
-		case flow.Duration < 5*time.Second:
-			meter.SumCountL1S5S = 1
-		case flow.Duration < 10*time.Second:
-			meter.SumCountL5S10S = 1
-		case flow.Duration < time.Minute:
-			meter.SumCountL10S1M = 1
-		case flow.Duration < time.Hour:
-			meter.SumCountL1M1H = 1
-		default:
-			meter.SumCountL1H = 1
-		}
-
-		switch {
-		case bytes < 10e3:
-			meter.SumCountE0K10K = 1
-		case bytes < 100e3:
-			meter.SumCountE10K100K = 1
-		case bytes < 1e6:
-			meter.SumCountE100K1M = 1
-		case bytes < 100e6:
-			meter.SumCountE1M100M = 1
-		case bytes < 1e9:
-			meter.SumCountE100M1G = 1
-		default:
-			meter.SumCountE1G = 1
-		}
 
 		switch flow.CloseType {
 		case inputtype.CloseTypeTCPServerRst:
