@@ -8,19 +8,19 @@ import (
 )
 
 type TypeMeter struct {
-	SumCountL0S1S  uint64 `db:"sum_count_l_0s1s"`
-	SumCountL1S5S  uint64 `db:"sum_count_l_1s5s"`
-	SumCountL5S10S uint64 `db:"sum_count_l_5s10s"`
-	SumCountL10S1M uint64 `db:"sum_count_l_10s1m"`
-	SumCountL1M1H  uint64 `db:"sum_count_l_1m1h"`
-	SumCountL1H    uint64 `db:"sum_count_l_1h"`
+	SumCountL0S1S  uint64 `db:"sum_count_l_0s1s"`  // 废弃
+	SumCountL1S5S  uint64 `db:"sum_count_l_1s5s"`  // 废弃
+	SumCountL5S10S uint64 `db:"sum_count_l_5s10s"` // 废弃
+	SumCountL10S1M uint64 `db:"sum_count_l_10s1m"` // 废弃
+	SumCountL1M1H  uint64 `db:"sum_count_l_1m1h"`  // 废弃
+	SumCountL1H    uint64 `db:"sum_count_l_1h"`    // 废弃
 
-	SumCountE0K10K   uint64 `db:"sum_count_e_0k10k"`
-	SumCountE10K100K uint64 `db:"sum_count_e_10k100k"`
-	SumCountE100K1M  uint64 `db:"sum_count_e_100k1m"`
-	SumCountE1M100M  uint64 `db:"sum_count_e_1m100m"`
-	SumCountE100M1G  uint64 `db:"sum_count_e_100m1g"`
-	SumCountE1G      uint64 `db:"sum_count_e_1g"`
+	SumCountE0K10K   uint64 `db:"sum_count_e_0k10k"`   // 废弃
+	SumCountE10K100K uint64 `db:"sum_count_e_10k100k"` // 废弃
+	SumCountE100K1M  uint64 `db:"sum_count_e_100k1m"`  // 废弃
+	SumCountE1M100M  uint64 `db:"sum_count_e_1m100m"`  // 废弃
+	SumCountE100M1G  uint64 `db:"sum_count_e_100m1g"`  // 废弃
+	SumCountE1G      uint64 `db:"sum_count_e_1g"`      // 废弃
 
 	SumCountTClientRst       uint64 `db:"sum_count_t_c_rst"`
 	SumCountTClientHalfOpen  uint64 `db:"sum_count_t_c_half_open"`
@@ -123,33 +123,7 @@ func (m *TypeMeter) ToKVString() string {
 func (m *TypeMeter) MarshalTo(b []byte) int {
 	offset := 0
 
-	offset += copy(b[offset:], "sum_count_l_0s1s=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumCountL0S1S, 10))
-	offset += copy(b[offset:], "i,sum_count_l_1s5s=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumCountL1S5S, 10))
-	offset += copy(b[offset:], "i,sum_count_l_5s10s=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumCountL5S10S, 10))
-	offset += copy(b[offset:], "i,sum_count_l_10s1m=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumCountL10S1M, 10))
-	offset += copy(b[offset:], "i,sum_count_l_1m1h=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumCountL1M1H, 10))
-	offset += copy(b[offset:], "i,sum_count_l_1h=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumCountL1H, 10))
-
-	offset += copy(b[offset:], "i,sum_count_e_0k10k=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumCountE0K10K, 10))
-	offset += copy(b[offset:], "i,sum_count_e_10k100k=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumCountE10K100K, 10))
-	offset += copy(b[offset:], "i,sum_count_e_100k1m=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumCountE100K1M, 10))
-	offset += copy(b[offset:], "i,sum_count_e_1m100m=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumCountE1M100M, 10))
-	offset += copy(b[offset:], "i,sum_count_e_100m1g=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumCountE100M1G, 10))
-	offset += copy(b[offset:], "i,sum_count_e_1g=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumCountE1G, 10))
-
-	offset += copy(b[offset:], "i,sum_count_t_c_rst=")
+	offset += copy(b[offset:], "sum_count_t_c_rst=")
 	offset += copy(b[offset:], strconv.FormatUint(m.SumCountTClientRst, 10))
 	offset += copy(b[offset:], "i,sum_count_t_c_half_open=")
 	offset += copy(b[offset:], strconv.FormatUint(m.SumCountTClientHalfOpen, 10))
