@@ -55,10 +55,11 @@ var POLICY_NODE_CODES = []outputtype.Code{
 
 var POLICY_PORT_CODES = []outputtype.Code{
 	outputtype.IndexToCode(0x04) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Protocol | outputtype.ServerPort | outputtype.TAPType,
-	outputtype.IndexToCode(0x05) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Protocol | outputtype.IP | outputtype.ServerPort | outputtype.TAPType,
 }
 
-var POLICY_NODE_PORT_CODES = []outputtype.Code{}
+var POLICY_NODE_PORT_CODES = []outputtype.Code{
+	outputtype.IndexToCode(0x05) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Protocol | outputtype.IP | outputtype.ServerPort | outputtype.TAPType,
+}
 
 var POLICY_NODE_CODES_LEN = len(POLICY_NODE_CODES) + len(POLICY_PORT_CODES) + len(POLICY_NODE_PORT_CODES)
 
