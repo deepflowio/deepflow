@@ -45,8 +45,6 @@ var POLICY_CHN_CODES = []outputtype.Code{
 	outputtype.IndexToCode(0x01) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.Region | outputtype.TAPType,
 	outputtype.IndexToCode(0x02) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IP | outputtype.ISPCode | outputtype.TAPType,
 	outputtype.IndexToCode(0x03) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IP | outputtype.Region | outputtype.TAPType,
-	outputtype.IndexToCode(0x04) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.Country | outputtype.TAPType,
-	outputtype.IndexToCode(0x05) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IP | outputtype.Country | outputtype.TAPType,
 }
 
 var POLICY_NON_CHN_CODES = []outputtype.Code{ // 注意：就是POLICY_CHN_CODES中包含Country的部分
@@ -54,9 +52,8 @@ var POLICY_NON_CHN_CODES = []outputtype.Code{ // 注意：就是POLICY_CHN_CODES
 }
 
 var POLICY_CHN_EDGE_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x06) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IPPath | outputtype.ISPCode | outputtype.TAPType,
-	outputtype.IndexToCode(0x07) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IPPath | outputtype.Region | outputtype.TAPType,
-	outputtype.IndexToCode(0x08) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IPPath | outputtype.Country | outputtype.TAPType,
+	outputtype.IndexToCode(0x04) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IPPath | outputtype.ISPCode | outputtype.TAPType,
+	outputtype.IndexToCode(0x05) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IPPath | outputtype.Region | outputtype.TAPType,
 }
 
 var POLICY_NON_CHN_EDGE_CODES = []outputtype.Code{ // 注意：就是POLICY_CHN_EDGE_CODES中包含Country的部分
