@@ -140,9 +140,12 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 			TAPType:      TAPTypeFromInPort(flow.InPort),
 			Direction:    directions[thisEnd],
 			ACLDirection: outputtype.ACL_FORWARD, // 含ACLDirection字段时仅考虑ACL正向匹配
-			Country:      flow.Country,
-			Region:       flow.Region,
-			ISP:          flow.ISP,
+
+			IP1: ips[otherEnd],
+
+			Country: flow.Country,
+			Region:  flow.Region,
+			ISP:     flow.ISP,
 		}
 		var codes []outputtype.Code
 
