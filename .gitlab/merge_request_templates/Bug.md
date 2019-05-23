@@ -27,6 +27,6 @@
 - [ ] 是共性问题(代码中存在类似问题)
 - [ ] 打包成功(如果有修改Makefile)
 
-/assign @buyi
+/assign @xiangyang
 
-/cc @buyi
+/cc @buyi @yuanchao @jinjie @wangtuo @tianxiong
