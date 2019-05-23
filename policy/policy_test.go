@@ -2050,10 +2050,10 @@ func TestInternet(t *testing.T) {
 	// 构建acl action  1->2 tcp 8000
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	acls := []*Acl{}
-	acl := generatePolicyAcl(table, action, 10, group[1], uint32(1000), IPProtocolTCP, 8000, vlanAny)
+	acl := generatePolicyAcl(table, action, 10, group[1], uint32(GROUP_INTERNET&0xffff), IPProtocolTCP, 8000, vlanAny)
 	acls = append(acls, acl)
 	ipGroups := make([]*IpGroupData, 0, 1)
-	ipGroups = append(ipGroups, generateIpGroup(1000, 0, "0.0.0.0/0")) // internet
+	ipGroups = append(ipGroups, generateIpGroup(GROUP_INTERNET&0xffff, EPC_FROM_INTERNET, "0.0.0.0/0")) // internet
 	table.UpdateIpGroupData(ipGroups)
 	table.UpdateAcls(acls)
 
