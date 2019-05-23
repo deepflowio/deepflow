@@ -9,8 +9,6 @@ verify:
     - go fmt ./...; [[ -z $(git status -s --ignore-submodule) ]] || exit -1
     - make
     - make test
-  only:
-    - pushes
 
 package:
   stage: package
