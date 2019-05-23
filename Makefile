@@ -24,6 +24,7 @@ vendor: patch/001-fix-afpacket-dirty-block.patch patch/002-record-logging-module
 .PHONY: test
 test: vendor
 	go test -mod vendor -short ./... -timeout 5s -coverprofile .test-coverage.txt
+	go tool cover -func=.test-coverage.txt
 
 .PHONY: bench
 bench: vendor
