@@ -196,17 +196,16 @@ func (d *Ddbs) generateDdbsTable(acls []*Acl) {
 }
 
 func (d *Ddbs) addFastPath(endpointData *EndpointData, packet *LookupKey, policyForward, policyBackward, vlanPolicy *PolicyData) (*EndpointStore, *EndpointData) {
-	srcEpc := endpointData.SrcInfo.GetEpc()
-	dstEpc := endpointData.DstInfo.GetEpc()
+	srcMacSuffix, dstMacSuffix := uint16(packet.SrcMac&0xffff), uint16(packet.DstMac&0xffff)
 	endpointStore := &EndpointStore{}
 	endpointStore.InitPointer(endpointData)
 
 	d.cloudPlatformLabeler.RemoveAnonymousGroupIds(endpointStore, packet)
 	packetEndpointData := d.cloudPlatformLabeler.UpdateEndpointData(endpointStore, packet)
-	mapsForward, mapsBackward := d.addPortFastPolicy(endpointStore, packetEndpointData, srcEpc, dstEpc, packet, policyForward, policyBackward)
+	mapsForward, mapsBackward := d.addPortFastPolicy(endpointStore, packetEndpointData, srcMacSuffix, dstMacSuffix, packet, policyForward, policyBackward)
 
 	if packet.Vlan > 0 {
-		d.addVlanFastPolicy(srcEpc, dstEpc, packet, vlanPolicy, endpointData, mapsForward, mapsBackward)
+		d.addVlanFastPolicy(srcMacSuffix, dstMacSuffix, packet, vlanPolicy, endpointData, mapsForward, mapsBackward)
 	}
 	return endpointStore, packetEndpointData
 }
@@ -446,14 +445,14 @@ func (d *Ddbs) GetPolicyByFastPath(packet *LookupKey) (*EndpointStore, *PolicyDa
 	vlanPolicy, policy := INVALID_POLICY_DATA, INVALID_POLICY_DATA
 
 	if maps := d.getVlanAndPortMap(packet, FORWARD, false, nil); maps != nil {
-		srcEpc, dstEpc := d.getFastEpcs(maps, packet)
+		srcMacSuffix, dstMacSuffix := uint16(packet.SrcMac&0xffff), uint16(packet.DstMac&0xffff)
 		// NOTE：会改变packet参数，但firstPath同样需要getFastInterestKeys，所以无影响
 		d.getFastInterestKeys(packet)
-		if endpoint, portPolicy = d.getFastPortPolicy(maps, srcEpc, dstEpc, packet); portPolicy == nil {
+		if endpoint, portPolicy = d.getFastPortPolicy(maps, srcMacSuffix, dstMacSuffix, packet); portPolicy == nil {
 			return nil, nil
 		}
 		if packet.Vlan > 0 && packet.HasFeatureFlag(NPM) {
-			if vlanPolicy = d.getFastVlanPolicy(maps, srcEpc, dstEpc, packet); vlanPolicy == nil {
+			if vlanPolicy = d.getFastVlanPolicy(maps, srcMacSuffix, dstMacSuffix, packet); vlanPolicy == nil {
 				return nil, nil
 			}
 		}
