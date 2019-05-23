@@ -10,7 +10,8 @@ vendor:
 	go generate ./zerodoc/...
 
 test: vendor
-	go test -mod vendor -short ./... -coverprofile .test-coverage.txt
+	go test -mod vendor -short ./... -timeout 30s -coverprofile .test-coverage.txt
+	go tool cover -func=.test-coverage.txt
 
 bench: vendor
 	go test -mod vendor -bench=. ./...
