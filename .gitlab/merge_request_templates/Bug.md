@@ -27,6 +27,6 @@
 - [ ] 编译通过
 - [ ] 单元测试通过
 
-/assign @buyi
+/assign @xiangyang
 
-/cc @buyi
+/cc @buyi @yuanchao @jinjie @zhuofeng @wangtuo
