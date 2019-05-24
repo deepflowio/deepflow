@@ -143,9 +143,6 @@ func newStatsdClient(remote net.UDPAddr) *statsd.Client {
 		statsd.Address(remote.String()),
 		statsd.TagsFormat(statsd.InfluxDB),
 	}
-	if hostname != "" { // specified hostname
-		options = append(options, statsd.Tags("host", hostname))
-	}
 	c, err := statsd.New(options...)
 	if err != nil {
 		log.Warning(err)
@@ -170,6 +167,9 @@ func sendStatsd(bp client.BatchPoints) {
 		tagsOption := make([]string, 0, len(tags)*2)
 		for key, value := range tags {
 			tagsOption = append(tagsOption, key, strings.Replace(value, ":", "-", -1))
+		}
+		if hostname != "" { // specified hostname
+			tagsOption = append(tagsOption, "host", hostname)
 		}
 		fields, _ := point.Fields()
 		for _, statsdClient := range statsdClients {
