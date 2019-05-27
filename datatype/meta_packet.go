@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"time"
 
 	. "github.com/google/gopacket/layers"
@@ -51,12 +52,13 @@ type MetaPacket struct {
 	EthType        EthernetType
 	Vlan           uint16
 
-	IpSrc, IpDst IPv4Int
-	Protocol     IPProtocol
-	TTL          uint8
-	IHL          uint8
-	IpID         uint16
-	IpFlags      uint16 // Flags and Fragment Offset
+	IpSrc, IpDst   uint32
+	Ip6Src, Ip6Dst net.IP
+	Protocol       IPProtocol
+	TTL            uint8
+	IHL            uint8
+	IpID           uint16
+	IpFlags        uint16 // Flags and Fragment Offset
 
 	PortSrc    uint16
 	PortDst    uint16
@@ -208,6 +210,18 @@ func (p *MetaPacket) ParseL4(stream *ByteStream) {
 	}
 }
 
+func (p *MetaPacket) ParseIp6(stream *ByteStream) {
+	if stream.Len() < MIN_IPV6_HEADER_SIZE {
+		p.Invalid = true
+		return
+	}
+
+	// FIXME: 因为目前只需要获取IP地址来确认L3End是否为true,其他字段不解析
+	stream.Skip(8) // skip version,traffix class,flow label,payload length,next header,ttl
+	p.Ip6Src = net.IP(stream.Field(16))
+	p.Ip6Dst = net.IP(stream.Field(16))
+}
+
 func (p *MetaPacket) ParseIp(stream *ByteStream) {
 	ihl := (stream.U8() & 0xF)
 	p.IHL = ihl
@@ -248,6 +262,8 @@ func (p *MetaPacket) Parse(l3Packet RawPacket) bool {
 		p.ParseIp(&stream)
 	} else if p.EthType == EthernetTypeARP && stream.Len() >= ARP_HEADER_SIZE {
 		p.ParseArp(&stream)
+	} else if p.EthType == EthernetTypeIPv6 {
+		p.ParseIp6(&stream)
 	}
 
 	return true
@@ -309,8 +325,13 @@ func (p *MetaPacket) String() string {
 	format = "\t%s -> %s type: %04x vlan-id: %d\n"
 	buffer.WriteString(fmt.Sprintf(format, Uint64ToMac(p.MacSrc), Uint64ToMac(p.MacDst), uint16(p.EthType), p.Vlan))
 	format = "\t%v:%d -> %v:%d proto: %v ttl: %d ihl: %d id: %d flags: 0x%01x, fragment Offset: %d payload-len: %d "
-	buffer.WriteString(fmt.Sprintf(format, IpFromUint32(p.IpSrc), p.PortSrc,
-		IpFromUint32(p.IpDst), p.PortDst, p.Protocol, p.TTL, p.IHL, p.IpID, p.IpFlags>>13, p.IpFlags&0x1FFF, p.PayloadLen))
+	if p.EthType == EthernetTypeIPv6 {
+		buffer.WriteString(fmt.Sprintf(format, p.Ip6Src, p.PortSrc,
+			p.Ip6Dst, p.PortDst, p.Protocol, p.TTL, p.IHL, p.IpID, p.IpFlags>>13, p.IpFlags&0x1FFF, p.PayloadLen))
+	} else {
+		buffer.WriteString(fmt.Sprintf(format, IpFromUint32(p.IpSrc), p.PortSrc,
+			IpFromUint32(p.IpDst), p.PortDst, p.Protocol, p.TTL, p.IHL, p.IpID, p.IpFlags>>13, p.IpFlags&0x1FFF, p.PayloadLen))
+	}
 	if p.TcpData != nil {
 		buffer.WriteString(fmt.Sprintf("tcp: %v", p.TcpData))
 	}

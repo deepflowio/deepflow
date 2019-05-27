@@ -108,7 +108,7 @@ func TestParseArp(t *testing.T) {
 	}
 	actual.Parse(packet[l2Len:])
 	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expected: %+v，actual: %+v", expected, actual)
+		t.Errorf("\nexpected: %+v\n actual: %+v", expected, actual)
 	}
 }
 
@@ -196,7 +196,7 @@ func TestParseInvalid(t *testing.T) {
 	l2Len := actual.ParseL2(packet)
 	actual.Parse(packet[l2Len:])
 	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expected: %+v，actual: %+v", expected, actual)
+		t.Errorf("expected: %+v\n actual: %+v", expected, actual)
 	}
 }
 

@@ -67,8 +67,10 @@ func Abs(n time.Duration) time.Duration {
 	return (n ^ m) - m
 }
 
-// 调用者保证入参是IPv4
 func IpToUint32(ip net.IP) uint32 {
+	if ip.To4() == nil {
+		return 0
+	}
 	return BigEndian.Uint32(ip)
 }
 
@@ -89,6 +91,17 @@ func MaskLenToNetmask(mask uint32) uint32 {
 	return (math.MaxUint32) << (32 - mask)
 }
 
+func ParserStringIp(ipStr string) net.IP {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return nil
+	}
+	if ipv4 := ip.To4(); ipv4 != nil {
+		return ipv4
+	}
+	return ip
+}
+
 func ParserStringIpV4(ipStr string) net.IP {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
@@ -97,7 +110,6 @@ func ParserStringIpV4(ipStr string) net.IP {
 	if ip = ip.To4(); ip == nil {
 		return nil
 	}
-
 	return ip
 }
 

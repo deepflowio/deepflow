@@ -1589,6 +1589,28 @@ func TestDdbsInternet(t *testing.T) {
 	}
 }
 
+func TestDdbsPolicyIpv6(t *testing.T) {
+	acls := []*Acl{}
+	table := generatePolicyTable(DDBS)
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 8000, vlanAny)
+	acls = append(acls, acl)
+	table.UpdateAcls(acls)
+	// 构建查询1-key  1:0->2:8000 tcp
+	key := generateLookupKey6(group1Mac, group2Mac, vlanAny, ip12, ip13, IPProtocolTCP, 0, 8000)
+
+	// 获取查询first结果
+	endpoints, policyData := table.LookupAllByKey(key)
+	// 构建预期结果
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, basicPolicyData, policyData) || endpoints.SrcInfo.L3End != true || endpoints.DstInfo.L3End != true {
+		t.Error(endpoints)
+		t.Error("TestDdbsPolicyIpv6 Check Failed!")
+	}
+}
+
 func BenchmarkDdbsAcl(b *testing.B) {
 	acls := []*Acl{}
 	table := generatePolicyTable(DDBS)
