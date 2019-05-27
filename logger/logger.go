@@ -3,10 +3,8 @@ package logger
 import (
 	"compress/gzip"
 	"io"
-	"log/syslog"
 	"os"
 	"path"
-	"strings"
 	"time"
 
 	"github.com/lestrrat-go/file-rotatelogs"
@@ -14,11 +12,10 @@ import (
 )
 
 const (
-	LOG_ROTATION_INTERVAL = 24 * time.Hour      // every day
-	LOG_MAX_AGE           = 30 * 24 * time.Hour // every month
+	LOG_ROTATION_INTERVAL = 24 * time.Hour       // every day
+	LOG_MAX_AGE           = 365 * 24 * time.Hour // every year
 	LOG_FORMAT            = "%{time:2006-01-02 15:04:05.000} [%{level:.4s}] %{shortfile} %{message}"
 	LOG_COLOR_FORMAT      = "%{color}%{time:2006-01-02 15:04:05.000} [%{level:.4s}]%{color:reset} %{shortfile} %{message}"
-	SYSLOG_PRIORITY       = syslog.LOG_CRIT | syslog.LOG_DAEMON
 )
 
 var (
@@ -97,37 +94,6 @@ func EnableFileLog(logPath string) error {
 		logging.NewLogBackend(ioWriter, "", 0),
 		logging.MustStringFormatter(LOG_FORMAT),
 	)
-	applyBackendChange()
-	return nil
-}
-
-func EnableSyslog() error {
-	if syslogBackend != nil {
-		return nil
-	}
-
-	syslogWriter, err := syslog.New(SYSLOG_PRIORITY, path.Base(os.Args[0]))
-	if err != nil {
-		return err
-	}
-	syslogBackend = &logging.SyslogBackend{Writer: syslogWriter}
-	applyBackendChange()
-	return nil
-}
-
-func EnableRsyslog(remotes ...string) error {
-	rsyslogBackends = rsyslogBackends[:0]
-	for _, remote := range remotes {
-		if !strings.Contains(remote, ":") {
-			remote += ":514"
-		}
-		rsyslogWriter, err := syslog.Dial("udp", remote, SYSLOG_PRIORITY, path.Base(os.Args[0]))
-		if err != nil {
-			return err
-		}
-		backend := &logging.SyslogBackend{Writer: rsyslogWriter}
-		rsyslogBackends = append(rsyslogBackends, backend)
-	}
 	applyBackendChange()
 	return nil
 }
