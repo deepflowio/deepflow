@@ -20,7 +20,6 @@ const (
 
 type IpNet struct {
 	RawIp    net.IP
-	Ip       uint32
 	Netmask  uint32
 	SubnetId uint32
 }

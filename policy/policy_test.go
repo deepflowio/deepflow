@@ -182,7 +182,6 @@ func generateEndpointInfo(l2EpcId, l3EpcId int32, l2End, l3End bool, subnetId ui
 func generateIpNet6(ip net.IP, subnetId uint32, mask uint32) *IpNet {
 	ipInfo := IpNet{
 		RawIp:    ip,
-		Ip:       0,
 		SubnetId: subnetId,
 		Netmask:  mask,
 	}
@@ -192,7 +191,6 @@ func generateIpNet6(ip net.IP, subnetId uint32, mask uint32) *IpNet {
 func generateIpNet(ip uint32, subnetId uint32, mask uint32) *IpNet {
 	ipInfo := IpNet{
 		RawIp:    IpFromUint32(ip).To4(),
-		Ip:       ip,
 		SubnetId: subnetId,
 		Netmask:  mask,
 	}

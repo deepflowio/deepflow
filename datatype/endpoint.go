@@ -7,7 +7,6 @@ import (
 	"reflect"
 
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
-	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 const (
@@ -111,7 +110,7 @@ func (i *EndpointInfo) SetL2Data(data *PlatformData) {
 	i.GroupIds = append(i.GroupIds, data.GroupIds...)
 }
 
-func (i *EndpointInfo) SetL3Data(data *PlatformData, ip uint32) {
+func (i *EndpointInfo) SetL3Data(data *PlatformData, ip net.IP) {
 	i.L3EpcId = -1
 	if data.EpcId != 0 {
 		i.L3EpcId = data.EpcId
@@ -121,7 +120,13 @@ func (i *EndpointInfo) SetL3Data(data *PlatformData, ip uint32) {
 	i.HostIp = data.HostIp
 
 	for _, ipInfo := range data.Ips {
-		if ipInfo.Ip == (ip & MaskLenToNetmask(ipInfo.Netmask)) {
+		var mask net.IPMask
+		if len(ipInfo.RawIp) == 4 {
+			mask = net.CIDRMask(int(ipInfo.Netmask), 32)
+		} else {
+			mask = net.CIDRMask(int(ipInfo.Netmask), 128)
+		}
+		if ipInfo.RawIp.Equal(ip.Mask(mask)) {
 			i.SubnetId = ipInfo.SubnetId
 			break
 		}
@@ -179,8 +184,10 @@ func (i *EndpointInfo) GetL3EndByTtl(ttl uint8) bool {
 
 func (i *EndpointInfo) SetL3EndByIp(data *PlatformData, ip net.IP) {
 	for _, ipInfo := range data.Ips {
-		mask := net.CIDRMask(int(ipInfo.Netmask), 32)
-		if len(ipInfo.RawIp) != 4 {
+		var mask net.IPMask
+		if len(ipInfo.RawIp) == 4 {
+			mask = net.CIDRMask(int(ipInfo.Netmask), 32)
+		} else {
 			mask = net.CIDRMask(int(ipInfo.Netmask), 128)
 		}
 

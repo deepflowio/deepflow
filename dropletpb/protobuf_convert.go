@@ -47,9 +47,6 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 			Netmask:  netmask,
 			SubnetId: ipResource.GetSubnetId(),
 		}
-		if len(fixIp) == 4 {
-			ipinfo.Ip = IpToUint32(fixIp)
-		}
 		ips = append(ips, ipinfo)
 	}
 	return &datatype.PlatformData{

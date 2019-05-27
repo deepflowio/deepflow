@@ -140,9 +140,10 @@ func (l *CloudPlatformLabeler) GenerateIpData(platformDatas []*PlatformData) IpM
 			continue
 		}
 		for _, ipData := range platformData.Ips {
+			// TODO: ipv6
 			if len(ipData.RawIp) == 4 {
 				netmask := MAX_MASK_LEN - ipData.Netmask
-				ips[netmask][IpKey(ipData.Ip)] = platformData
+				ips[netmask][IpKey(IpToUint32(ipData.RawIp))] = platformData
 				l.netmaskBitmap |= 1 << netmask
 			}
 		}
@@ -176,8 +177,11 @@ func (l *CloudPlatformLabeler) GenerateEpcIpData(platformDatas []*PlatformData) 
 	epcIpMap := make(EpcIpMapData)
 	for _, platformData := range platformDatas {
 		for _, ipData := range platformData.Ips {
-			key := EpcIpKey((uint64(platformData.EpcId) << 32) | uint64(ipData.Ip))
-			epcIpMap[key] = platformData
+			// TODO: ipv6
+			if len(ipData.RawIp) == 4 {
+				key := EpcIpKey((uint64(platformData.EpcId) << 32) | uint64(IpToUint32(ipData.RawIp)))
+				epcIpMap[key] = platformData
+			}
 		}
 	}
 
@@ -255,7 +259,7 @@ func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType Ta
 		platformData = l.GetDataByIp(IpToUint32(ip))
 	}
 	if platformData != nil {
-		endpointInfo.SetL3Data(platformData, IpToUint32(ip))
+		endpointInfo.SetL3Data(platformData, ip)
 	}
 	return endpointInfo
 }
@@ -335,13 +339,13 @@ func (l *CloudPlatformLabeler) ModifyEndpointData(endpointData *EndpointData, ke
 	// 默认L2End为false时L3EpcId == 0，L2End为true时L2EpcId不为0
 	if dstData.L3EpcId == 0 && srcData.L2EpcId != 0 {
 		if platformData := l.GetDataByEpcIp(srcData.L2EpcId, key.DstIp); platformData != nil {
-			dstData.SetL3Data(platformData, key.DstIp)
+			dstData.SetL3Data(platformData, IpFromUint32(key.DstIp))
 		}
 	}
 
 	if srcData.L3EpcId == 0 && dstData.L2EpcId != 0 {
 		if platformData := l.GetDataByEpcIp(dstData.L2EpcId, key.SrcIp); platformData != nil {
-			srcData.SetL3Data(platformData, key.SrcIp)
+			srcData.SetL3Data(platformData, IpFromUint32(key.SrcIp))
 		}
 	}
 }
