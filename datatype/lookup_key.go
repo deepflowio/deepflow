@@ -2,6 +2,7 @@ package datatype
 
 import (
 	"fmt"
+	"net"
 	"time"
 
 	. "github.com/google/gopacket/layers"
@@ -13,6 +14,7 @@ type LookupKey struct {
 	Timestamp                       time.Duration
 	SrcMac, DstMac                  uint64
 	SrcIp, DstIp                    uint32
+	Src6Ip, Dst6Ip                  net.IP
 	SrcPort, DstPort                uint16
 	EthType                         EthernetType
 	Vlan                            uint16
@@ -58,9 +60,15 @@ func (k *LookupKey) GenerateMatchedField(srcEpc, dstEpc uint16) {
 }
 
 func (k *LookupKey) String() string {
-	return fmt.Sprintf("%d %s:%v > %s:%v %v vlan: %v %v:%d > %v:%d proto: %v ttl %v tap: %v",
-		k.Timestamp, Uint64ToMac(k.SrcMac), k.L2End0, Uint64ToMac(k.DstMac), k.L2End1, k.EthType, k.Vlan,
-		IpFromUint32(k.SrcIp), k.SrcPort, IpFromUint32(k.DstIp), k.DstPort, k.Proto, k.Ttl, k.Tap)
+	if k.EthType == EthernetTypeIPv6 {
+		return fmt.Sprintf("%d %s:%v > %s:%v %v vlan: %v %v:%d > %v:%d proto: %v ttl %v tap: %v",
+			k.Timestamp, Uint64ToMac(k.SrcMac), k.L2End0, Uint64ToMac(k.DstMac), k.L2End1, k.EthType, k.Vlan,
+			k.Src6Ip, k.SrcPort, k.Dst6Ip, k.DstPort, k.Proto, k.Ttl, k.Tap)
+	} else {
+		return fmt.Sprintf("%d %s:%v > %s:%v %v vlan: %v %v:%d > %v:%d proto: %v ttl %v tap: %v",
+			k.Timestamp, Uint64ToMac(k.SrcMac), k.L2End0, Uint64ToMac(k.DstMac), k.L2End1, k.EthType, k.Vlan,
+			IpFromUint32(k.SrcIp), k.SrcPort, IpFromUint32(k.DstIp), k.DstPort, k.Proto, k.Ttl, k.Tap)
+	}
 }
 
 func (k *LookupKey) HasFeatureFlag(featureFlag FeatureFlags) bool {
