@@ -31,9 +31,9 @@ timestamp: 0 inport: 0x2 exporter: 0.0.0.0 len: 77 l2_end: false, false invalid:
 timestamp: 0 inport: 0x10002 exporter: 0.0.0.0 len: 60 l2_end: false, false invalid: false
 	00:25:45:00:77:40 -> 00:1c:f6:ea:40:00 type: 0800 vlan-id: 0
 	10.92.60.106:50230 -> 10.94.28.9:445 proto: TCP ttl: 124 ihl: 5 id: 1735 flags: 0x2, fragment Offset: 0 payload-len: 60 tcp: &{Flags:16 Seq:3073744204 Ack:38082375 DataOffset:5 WinSize:256 WinScale:0 SACKPermitted:false MSS:0 Sack:[]}
-timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 34 l2_end: false, false invalid: false
+timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 34 l2_end: false, false invalid: true
 	60:14:b3:c8:df:a7 -> 52:54:00:33:c4:54 type: 86dd vlan-id: 0
-	0.0.0.0:0 -> 0.0.0.0:0 proto: IPv6HopByHop ttl: 0 ihl: 0 id: 0 flags: 0x0, fragment Offset: 0 payload-len: 0 
+	<nil>:0 -> <nil>:0 proto: IPv6HopByHop ttl: 0 ihl: 0 id: 0 flags: 0x0, fragment Offset: 0 payload-len: 0 
 timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 40 l2_end: false, false invalid: true
 	60:14:b3:c8:df:a7 -> 52:54:00:33:c4:54 type: 0800 vlan-id: 0
 	10.33.0.177:0 -> 10.30.10.1:0 proto: ICMPv4 ttl: 64 ihl: 5 id: 30771 flags: 0x0, fragment Offset: 0 payload-len: 0 

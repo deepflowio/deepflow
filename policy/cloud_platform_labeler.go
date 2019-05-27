@@ -3,6 +3,7 @@ package policy
 import (
 	"encoding/binary"
 	"math"
+	"net"
 	"sync"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 
 	"gitlab.x.lan/yunshan/droplet-libs/bit"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 type IpMapDatas []map[IpKey]*PlatformData
@@ -138,9 +140,11 @@ func (l *CloudPlatformLabeler) GenerateIpData(platformDatas []*PlatformData) IpM
 			continue
 		}
 		for _, ipData := range platformData.Ips {
-			netmask := MAX_MASK_LEN - ipData.Netmask
-			ips[netmask][IpKey(ipData.Ip)] = platformData
-			l.netmaskBitmap |= 1 << netmask
+			if len(ipData.RawIp) == 4 {
+				netmask := MAX_MASK_LEN - ipData.Netmask
+				ips[netmask][IpKey(ipData.Ip)] = platformData
+				l.netmaskBitmap |= 1 << netmask
+			}
 		}
 	}
 
@@ -236,22 +240,22 @@ func (l *CloudPlatformLabeler) GetL3End(endpointInfo *EndpointInfo, key *LookupK
 	return end
 }
 
-func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip uint32, tapType TapType) *EndpointInfo {
+func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType TapType) *EndpointInfo {
 	endpointInfo := new(EndpointInfo)
 	platformData := l.GetDataByMac(MacKey(mac))
 	if platformData != nil {
 		endpointInfo.SetL2Data(platformData)
 		endpointInfo.SetL3EndByIp(platformData, ip)
 		// IP为0，则取MAC对应的二层数据作为三层数据
-		if ip == 0 {
+		if ip.IsUnspecified() {
 			endpointInfo.SetL3DataByMac(platformData)
 		}
 	}
-	if platformData = l.GetDataByEpcIp(endpointInfo.L2EpcId, ip); platformData == nil {
-		platformData = l.GetDataByIp(ip)
+	if platformData = l.GetDataByEpcIp(endpointInfo.L2EpcId, IpToUint32(ip)); platformData == nil {
+		platformData = l.GetDataByIp(IpToUint32(ip))
 	}
 	if platformData != nil {
-		endpointInfo.SetL3Data(platformData, ip)
+		endpointInfo.SetL3Data(platformData, IpToUint32(ip))
 	}
 	return endpointInfo
 }
@@ -292,6 +296,7 @@ func (l *CloudPlatformLabeler) ModifyPrivateIp(endpoint *EndpointData, key *Look
 	if key.Tap != TAP_TOR {
 		return
 	}
+
 	if endpoint.SrcInfo.L3EpcId == 0 && isPrivateAddress(key.SrcIp) {
 		endpoint.SrcInfo.L3EpcId = EPC_FROM_DEEPFLOW
 	}
@@ -342,8 +347,12 @@ func (l *CloudPlatformLabeler) ModifyEndpointData(endpointData *EndpointData, ke
 }
 
 func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
-	srcData := l.GetEndpointInfo(key.SrcMac, key.SrcIp, key.Tap)
-	dstData := l.GetEndpointInfo(key.DstMac, key.DstIp, key.Tap)
+	srcIp, dstIp := IpFromUint32(key.SrcIp), IpFromUint32(key.DstIp)
+	if key.EthType == EthernetTypeIPv6 || key.Src6Ip != nil {
+		srcIp, dstIp = key.Src6Ip, key.Dst6Ip
+	}
+	srcData := l.GetEndpointInfo(key.SrcMac, srcIp, key.Tap)
+	dstData := l.GetEndpointInfo(key.DstMac, dstIp, key.Tap)
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
 	l.ModifyEndpointData(endpoint, key)
 	l.ModifyPrivateIp(endpoint, key)

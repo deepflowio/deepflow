@@ -1,6 +1,7 @@
 package datatype
 
 import (
+	"net"
 	"time"
 )
 
@@ -8,6 +9,7 @@ const (
 	MIN_MASK_LEN      = 0
 	STANDARD_MASK_LEN = 16
 	MAX_MASK_LEN      = 32
+	MAX_MASK6_LEN     = 128
 	MASK_LEN_NUM      = MAX_MASK_LEN + 1
 
 	IF_TYPE_WAN = 3
@@ -17,6 +19,7 @@ const (
 )
 
 type IpNet struct {
+	RawIp    net.IP
 	Ip       uint32
 	Netmask  uint32
 	SubnetId uint32

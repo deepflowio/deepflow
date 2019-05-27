@@ -25,20 +25,30 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 
 	ips := make([]*datatype.IpNet, 0, 1024)
 	for _, ipResource := range vifData.IpResources {
-		fixIp := ParserStringIpV4(ipResource.GetIp())
+		fixIp := ParserStringIp(ipResource.GetIp())
 		if fixIp == nil {
 			continue
 		}
+
 		netmask := ipResource.GetMasklen()
-		if netmask > datatype.MAX_MASK_LEN {
-			netmask = datatype.MAX_MASK_LEN
-		} else if netmask < datatype.MIN_MASK_LEN {
-			netmask = datatype.MIN_MASK_LEN
+		max := uint32(datatype.MAX_MASK_LEN)
+		min := uint32(datatype.MIN_MASK_LEN)
+		if len(fixIp) != 4 {
+			max = uint32(datatype.MAX_MASK6_LEN)
 		}
+		if netmask > max {
+			netmask = max
+		} else if netmask < min {
+			netmask = min
+		}
+
 		ipinfo := &datatype.IpNet{
-			Ip:       IpToUint32(fixIp),
+			RawIp:    fixIp,
 			Netmask:  netmask,
 			SubnetId: ipResource.GetSubnetId(),
+		}
+		if len(fixIp) == 4 {
+			ipinfo.Ip = IpToUint32(fixIp)
 		}
 		ips = append(ips, ipinfo)
 	}

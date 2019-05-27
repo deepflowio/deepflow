@@ -3,6 +3,7 @@ package datatype
 import (
 	"fmt"
 	"math"
+	"net"
 	"reflect"
 
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
@@ -176,9 +177,14 @@ func (i *EndpointInfo) GetL3EndByTtl(ttl uint8) bool {
 	return false
 }
 
-func (i *EndpointInfo) SetL3EndByIp(data *PlatformData, ip uint32) {
+func (i *EndpointInfo) SetL3EndByIp(data *PlatformData, ip net.IP) {
 	for _, ipInfo := range data.Ips {
-		if ipInfo.Ip == (ip & MaskLenToNetmask(ipInfo.Netmask)) {
+		mask := net.CIDRMask(int(ipInfo.Netmask), 32)
+		if len(ipInfo.RawIp) != 4 {
+			mask = net.CIDRMask(int(ipInfo.Netmask), 128)
+		}
+
+		if ipInfo.RawIp.Equal(ip.Mask(mask)) {
 			i.L3End = true
 			break
 		}

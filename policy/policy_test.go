@@ -2,12 +2,14 @@ package policy
 
 import (
 	"math"
+	"net"
 	"reflect"
 	"testing"
 
 	. "github.com/google/gopacket/layers"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 var (
@@ -25,6 +27,8 @@ var (
 	ip9           = NewIPFromString("172.16.10.10").Int()
 	ip10          = NewIPFromString("172.16.10.20").Int()
 	ip11          = NewIPFromString("255.255.255.255").Int()
+	ip12          = net.ParseIP("1234::abcd")
+	ip13          = net.ParseIP("abcd::1234")
 	ipNet1        = "192.168.0.12/24"
 	ipNet10       = "10.90.0.0/16"
 	ipNet11       = "10.90.9.0/24"
@@ -32,6 +36,8 @@ var (
 	ipNet13       = "10.90.0.0/16"
 	ipNet14       = "10.90.9.123/32"
 	ipNet15       = "0.0.0.0/0"
+	ip6Net1       = "1234::abcd/128"
+	ip6Net2       = "abcd::1234/128"
 	groupEpcOther = int32(-1)
 	groupEpcAny   = int32(0)
 	groupAny      = uint32(0)
@@ -173,8 +179,19 @@ func generateEndpointInfo(l2EpcId, l3EpcId int32, l2End, l3End bool, subnetId ui
 	return basicEndpointInfo
 }
 
+func generateIpNet6(ip net.IP, subnetId uint32, mask uint32) *IpNet {
+	ipInfo := IpNet{
+		RawIp:    ip,
+		Ip:       0,
+		SubnetId: subnetId,
+		Netmask:  mask,
+	}
+	return &ipInfo
+}
+
 func generateIpNet(ip uint32, subnetId uint32, mask uint32) *IpNet {
 	ipInfo := IpNet{
+		RawIp:    IpFromUint32(ip).To4(),
 		Ip:       ip,
 		SubnetId: subnetId,
 		Netmask:  mask,
@@ -295,6 +312,26 @@ func generatePolicyAcl(table *PolicyTable, action AclAction, aclID ACLID, args .
 	return acl
 }
 
+func generateLookupKey6(srcMac, dstMac uint64, vlan uint32, srcIp, dstIp net.IP,
+	proto IPProtocol, srcPort, dstPort uint16, flags ...FeatureFlags) *LookupKey {
+	key := &LookupKey{
+		SrcMac:      srcMac,
+		DstMac:      dstMac,
+		Src6Ip:      srcIp,
+		Dst6Ip:      dstIp,
+		Proto:       uint8(proto),
+		SrcPort:     srcPort,
+		DstPort:     dstPort,
+		Vlan:        uint16(vlan),
+		Tap:         TAP_TOR,
+		FeatureFlag: NPM,
+	}
+	if len(flags) > 0 {
+		key.FeatureFlag = flags[0]
+	}
+	return key
+}
+
 func generateLookupKey(srcMac, dstMac uint64, vlan uint32, srcIp, dstIp uint32,
 	proto IPProtocol, srcPort, dstPort uint16, flags ...FeatureFlags) *LookupKey {
 	key := &LookupKey{
@@ -376,14 +413,16 @@ func generatePolicyTable(ids ...TableID) *PolicyTable {
 
 	ip1 := generateIpNet(group1Ip1, 121, 32)
 	ip2 := generateIpNet(group1Ip2, 121, 32)
-	data1 := generatePlatformDataWithGroupId(groupEpc[1], group[1], group1Mac, ip1, ip2)
+	ip3 := generateIpNet6(ip12, 121, 128)
+	data1 := generatePlatformDataWithGroupId(groupEpc[1], group[1], group1Mac, ip1, ip2, ip3)
 
 	ip1 = generateIpNet(group1Ip3, 121, 32)
 	data2 := generatePlatformDataWithGroupId(groupEpcAny, groupAny, group1Mac2, ip1)
 
 	ip1 = generateIpNet(group2Ip1, 122, 32)
 	ip2 = generateIpNet(group2Ip2, 122, 32)
-	data3 := generatePlatformDataWithGroupId(groupEpc[2], group[2], group2Mac, ip1, ip2)
+	ip3 = generateIpNet6(ip13, 122, 128)
+	data3 := generatePlatformDataWithGroupId(groupEpc[2], group[2], group2Mac, ip1, ip2, ip3)
 	datas = append(datas, data1, data2, data3)
 
 	ip1 = generateIpNet(group3Ip1, 121, 24)
@@ -2067,6 +2106,28 @@ func TestInternet(t *testing.T) {
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestInternet Check Failed!")
+	}
+}
+
+func TestPolicyIpv6(t *testing.T) {
+	acls := []*Acl{}
+	table := generatePolicyTable()
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 8000, vlanAny)
+	acls = append(acls, acl)
+	table.UpdateAcls(acls)
+	// 构建查询1-key  1:0->2:8000 tcp
+	key := generateLookupKey6(group1Mac, group2Mac, vlanAny, ip12, ip13, IPProtocolTCP, 0, 8000)
+
+	// 获取查询first结果
+	endpoints, policyData := table.LookupAllByKey(key)
+	// 构建预期结果
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, basicPolicyData, policyData) || endpoints.SrcInfo.L3End != true || endpoints.DstInfo.L3End != true {
+		t.Error(endpoints)
+		t.Error("TestPolicyIpv6 Check Failed!")
 	}
 }
 

@@ -2,6 +2,7 @@ package policy
 
 import (
 	"math"
+	"net"
 	"sort"
 
 	logging "github.com/op/go-logging"
@@ -236,7 +237,7 @@ func (t *PolicyTable) EnableAclData() {
 	t.operator.FlushAcls()
 }
 
-func (t *PolicyTable) GetEndpointInfo(mac uint64, ip uint32, inPort uint32) *EndpointInfo {
+func (t *PolicyTable) GetEndpointInfo(mac uint64, ip net.IP, inPort uint32) *EndpointInfo {
 	var endpointInfo *EndpointInfo
 	if PortInDeepflowExporter(inPort) {
 		endpointInfo = t.cloudPlatformLabeler.GetEndpointInfo(mac, ip, TAP_TOR)
