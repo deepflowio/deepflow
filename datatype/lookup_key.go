@@ -61,7 +61,7 @@ func (k *LookupKey) GenerateMatchedField(srcEpc, dstEpc uint16) {
 
 func (k *LookupKey) String() string {
 	if k.EthType == EthernetTypeIPv6 {
-		return fmt.Sprintf("%d %s:%v > %s:%v %v vlan: %v %v:%d > %v:%d proto: %v ttl %v tap: %v",
+		return fmt.Sprintf("%d %s:%v > %s:%v %v vlan: %v %v.%d > %v.%d proto: %v ttl %v tap: %v",
 			k.Timestamp, Uint64ToMac(k.SrcMac), k.L2End0, Uint64ToMac(k.DstMac), k.L2End1, k.EthType, k.Vlan,
 			k.Src6Ip, k.SrcPort, k.Dst6Ip, k.DstPort, k.Proto, k.Ttl, k.Tap)
 	} else {

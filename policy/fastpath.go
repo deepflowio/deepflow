@@ -300,23 +300,27 @@ func (f *FastPath) GenerateIpNetmaskMapFromPlatformData(data []*PlatformData) {
 
 	for _, d := range data {
 		for _, network := range d.Ips {
-			minNetIp := network.Ip & STANDARD_NETMASK
-			maxNetIp := minNetIp
-			mask := uint32(math.MaxUint32) << (32 - network.Netmask)
-			// netmask must be either 0 or STANDARD_NETMASK~math.MaxUint32
-			if mask < STANDARD_NETMASK {
-				minNetIp = network.Ip & mask
-				maxNetIp = (minNetIp | ^mask) & STANDARD_NETMASK
-				mask = STANDARD_NETMASK
-			}
-			count := 0
-			for netIp := minNetIp; netIp <= maxNetIp && netIp >= minNetIp; netIp += 0x10000 {
-				if count > 0xffff {
-					break
+			// TODO: 支持IPV6
+			if len(network.RawIp) == 4 {
+				ip := IpToUint32(network.RawIp)
+				minNetIp := ip & STANDARD_NETMASK
+				maxNetIp := minNetIp
+				mask := uint32(math.MaxUint32) << (32 - network.Netmask)
+				// netmask must be either 0 or STANDARD_NETMASK~math.MaxUint32
+				if mask < STANDARD_NETMASK {
+					minNetIp = ip & mask
+					maxNetIp = (minNetIp | ^mask) & STANDARD_NETMASK
+					mask = STANDARD_NETMASK
 				}
-				count++
-				if maskMap[uint16(netIp>>16)] < mask {
-					maskMap[uint16(netIp>>16)] = mask
+				count := 0
+				for netIp := minNetIp; netIp <= maxNetIp && netIp >= minNetIp; netIp += 0x10000 {
+					if count > 0xffff {
+						break
+					}
+					count++
+					if maskMap[uint16(netIp>>16)] < mask {
+						maskMap[uint16(netIp>>16)] = mask
+					}
 				}
 			}
 		}

@@ -106,7 +106,7 @@ ok      gitlab.x.lan/yunshan/droplet-libs/pool  12.126s
     - 查找结果L3EpcId=-1，L2EpcId=(MAC设备的EpcId)，IsL3End=false
     - 进行附3，4修正
   - host_0/host_1对应的是MAC的Host
-    - 可能出现host_0/host_1是属于同一个宿主机，但是IP分别属于不同的宿主机，这是正常的 
+    - 可能出现host_0/host_1是属于同一个宿主机，但是IP分别属于不同的宿主机，这是正常的
 
 附：
 
@@ -176,7 +176,7 @@ FistPath内存占用：
 
 FastPath内存占用：
 
-* FastPath有1000个EndpointData数据，每个EndpointInfo有4个资源组，则占用内存为 1000 * (320 + 64 + 64) = 437.5MByte 
+* FastPath有1000个EndpointData数据，每个EndpointInfo有4个资源组，则占用内存为 1000 * (320 + 64 + 64) = 437.5MByte
 
 ACLGID和Group对应关系
 ------------------------
@@ -231,7 +231,7 @@ policy fastpath查找流程
 创建和查找流程：
 
   - 当流量进入firstpath后，无论是否有策略都会向fastpath下发策略
-  - 使用packet中的IP在IpNetmaskMap查找Mask, 经过计算后得到maskedSrcIp和maskedDstIp, 若Mask都小于等于0xffff0000
+  - 使用packet中的IP在IpNetmaskMap查找Mask(IPv6使用0.0.0.0计算), 经过计算后得到maskedSrcIp和maskedDstIp, 若Mask都小于等于0xffff0000
     后续使用FastPolicyMapMini，否则使用FastPolicyMap，后续步骤统一使用`FastMap`
   - 用maskedSrcIp和maskedDstIp做key，在FastMap中查找获取VlanAndPortMap，若无则创建
   - 创建时使用mac和对应的epcId向VlanAndPortMap结构体中的macEpcMap插入数据, 查找使用mac查对应的epcId

@@ -16,10 +16,21 @@ const (
 	HEADER_TYPE_IPV4_ICMP
 )
 
+const HEADER_TYPE_IPV6_L3 = 0x40
+const (
+	HEADER_TYPE_IPV6 = HEADER_TYPE_IPV6_L3 + iota
+)
+
 const HEADER_TYPE_L4 = 0x80
 const (
 	HEADER_TYPE_IPV4_TCP = HEADER_TYPE_L4 + iota
 	HEADER_TYPE_IPV4_UDP
+)
+
+const HEADER_TYPE_IPV6_L4 = 0xb0
+const (
+	HEADER_TYPE_IPV6_TCP = HEADER_TYPE_IPV6_L4 + iota
+	HEADER_TYPE_IPV6_UDP
 )
 
 const (
@@ -50,7 +61,6 @@ const (
 	UDP_HEADER_SIZE   = 8
 
 	MIN_IPV4_HEADER_SIZE = 20
-	MIN_IPV6_HEADER_SIZE = 40
 	MIN_TCP_HEADER_SIZE  = 20
 	ICMP_HEADER_SIZE     = 8
 
@@ -86,3 +96,11 @@ const (
 	IPV4_FRAG_MORE_FRAGMENT = 0x2000
 	IPV4_FRAG_OFFSET_MASK   = 0x1fff
 )
+
+func (t HeaderType) IsL3() bool {
+	return t < HEADER_TYPE_L4
+}
+
+func (t HeaderType) IsIpv6() bool {
+	return t == HEADER_TYPE_IPV6 || t == HEADER_TYPE_IPV6_TCP || t == HEADER_TYPE_IPV6_UDP
+}
