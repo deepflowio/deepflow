@@ -59,6 +59,8 @@ func (m *PerfMeter) MarshalTo(b []byte) int {
 	sum := m.PerfMeterSum
 	offset += copy(b[offset:], "sum_flow_count=")
 	offset += copy(b[offset:], strconv.FormatUint(sum.SumFlowCount, 10))
+	offset += copy(b[offset:], "i,sum_new_flow_count=")
+	offset += copy(b[offset:], strconv.FormatUint(sum.SumNewFlowCount, 10))
 	offset += copy(b[offset:], "i,sum_closed_flow_count=")
 	offset += copy(b[offset:], strconv.FormatUint(sum.SumClosedFlowCount, 10))
 	offset += copy(b[offset:], "i,sum_half_open_flow_count=")
@@ -114,6 +116,7 @@ func (m *PerfMeter) MarshalTo(b []byte) int {
 
 type PerfMeterSum struct {
 	SumFlowCount         uint64 `db:"sum_flow_count"`
+	SumNewFlowCount      uint64 `db:"sum_new_flow_count"`
 	SumClosedFlowCount   uint64 `db:"sum_closed_flow_count"`
 	SumRetransFlowCount  uint64 `db:"sum_retrans_flow_count"` // 废弃
 	SumHalfOpenFlowCount uint64 `db:"sum_half_open_flow_count"`
@@ -137,6 +140,7 @@ type PerfMeterSum struct {
 
 func (m *PerfMeterSum) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(m.SumFlowCount)
+	encoder.WriteVarintU64(m.SumNewFlowCount)
 	encoder.WriteVarintU64(m.SumClosedFlowCount)
 	encoder.WriteVarintU64(m.SumRetransFlowCount)
 	encoder.WriteVarintU64(m.SumHalfOpenFlowCount)
@@ -160,6 +164,7 @@ func (m *PerfMeterSum) Encode(encoder *codec.SimpleEncoder) {
 
 func (m *PerfMeterSum) Decode(decoder *codec.SimpleDecoder) {
 	m.SumFlowCount = decoder.ReadVarintU64()
+	m.SumNewFlowCount = decoder.ReadVarintU64()
 	m.SumClosedFlowCount = decoder.ReadVarintU64()
 	m.SumRetransFlowCount = decoder.ReadVarintU64()
 	m.SumHalfOpenFlowCount = decoder.ReadVarintU64()
@@ -183,6 +188,7 @@ func (m *PerfMeterSum) Decode(decoder *codec.SimpleDecoder) {
 
 func (m *PerfMeterSum) concurrentMerge(other *PerfMeterSum) {
 	m.SumFlowCount += other.SumFlowCount
+	m.SumNewFlowCount += other.SumNewFlowCount
 	m.SumClosedFlowCount += other.SumClosedFlowCount
 	m.SumRetransFlowCount += other.SumRetransFlowCount
 	m.SumHalfOpenFlowCount += other.SumHalfOpenFlowCount
@@ -206,6 +212,7 @@ func (m *PerfMeterSum) concurrentMerge(other *PerfMeterSum) {
 
 func (m *PerfMeterSum) sequentialMerge(other *PerfMeterSum) { // other为后一个时间的统计量
 	m.SumFlowCount = m.SumClosedFlowCount + other.SumFlowCount
+	m.SumNewFlowCount += other.SumNewFlowCount
 	m.SumClosedFlowCount += other.SumClosedFlowCount
 	m.SumRetransFlowCount += other.SumRetransFlowCount
 	m.SumHalfOpenFlowCount += other.SumHalfOpenFlowCount
