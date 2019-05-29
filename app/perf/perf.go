@@ -113,6 +113,7 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 		meter := outputtype.PerfMeter{
 			PerfMeterSum: outputtype.PerfMeterSum{
 				SumFlowCount:         1,
+				SumNewFlowCount:      flow.NewFlowCount(),
 				SumClosedFlowCount:   flow.ClosedFlowCount(),
 				SumHalfOpenFlowCount: flow.HalfOpenFlowCount(),
 				SumPacketTx:          packets[thisEnd],
