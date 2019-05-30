@@ -254,6 +254,7 @@ func PBToPerfMeter(m *pb.PerfMeter, meter *PerfMeter) {
 func PerfMeterSumToPB(m *PerfMeterSum) *pb.PerfStats {
 	return &pb.PerfStats{
 		FlowCount:         proto.Uint64(m.SumFlowCount),
+		NewFlowCount:      proto.Uint64(m.SumNewFlowCount),
 		ClosedFlowCount:   proto.Uint64(m.SumClosedFlowCount),
 		RetransFlowCount:  proto.Uint64(m.SumRetransFlowCount),
 		HalfOpenFlowCount: proto.Uint64(m.SumHalfOpenFlowCount),
@@ -276,6 +277,7 @@ func PerfMeterSumToPB(m *PerfMeterSum) *pb.PerfStats {
 
 func pbToPerfMeterSum(m *pb.PerfStats, meter *PerfMeterSum) {
 	meter.SumFlowCount = m.GetFlowCount()
+	meter.SumNewFlowCount = m.GetNewFlowCount()
 	meter.SumClosedFlowCount = m.GetClosedFlowCount()
 	meter.SumRetransFlowCount = m.GetRetransFlowCount()
 	meter.SumHalfOpenFlowCount = m.GetHalfOpenFlowCount()
