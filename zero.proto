@@ -97,13 +97,14 @@ message UsageMeter {
 
 message PerfStats {
     optional uint64 flow_count = 1;
-    optional uint64 closed_flow_count = 2;
-    optional uint64 retrans_flow_count = 3;
-    optional uint64 half_open_flow_count = 4;
-    optional uint64 packet_tx = 5;
-    optional uint64 packet_rx = 6;
-    optional uint64 retrans_cnt_tx = 7;
-    optional uint64 retrans_cnt_rx = 8;
+    optional uint64 new_flow_count = 2;
+    optional uint64 closed_flow_count = 3;
+    optional uint64 retrans_flow_count = 4;
+    optional uint64 half_open_flow_count = 5;
+    optional uint64 packet_tx = 6;
+    optional uint64 packet_rx = 7;
+    optional uint64 retrans_cnt_tx = 8;
+    optional uint64 retrans_cnt_rx = 9;
 
     optional uint64 rtt_syn = 11;
     optional uint64 rtt_syn_flow = 12;
