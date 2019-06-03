@@ -31,11 +31,17 @@ var POLICY_NODE_CODES = []outputtype.Code{
 	outputtype.IndexToCode(0x01) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IP | outputtype.TAPType,
 }
 
+var POLICY_NODE_CODE_LEN = len(POLICY_NODE_CODES)
+
 var POLICY_EDGE_CODES = []outputtype.Code{
 	outputtype.IndexToCode(0x02) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IPPath | outputtype.TAPType,
 }
 
-var POLICY_NODE_CODE_LEN = len(POLICY_NODE_CODES)
+var POLICY_EDGE_PORT_CODES = []outputtype.Code{
+	outputtype.IndexToCode(0x03) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.Protocol | outputtype.IPPath | outputtype.ServerPort | outputtype.TAPType,
+}
+
+var POLICY_EDGE_CODE_LEN = len(POLICY_EDGE_PORT_CODES)
 
 var POLICY_GROUP_NODE_CODES = []outputtype.Code{}
 var POLICY_GROUP_EDGE_CODES = []outputtype.Code{}
@@ -134,9 +140,11 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				SumZeroWndCntRx: uint64(zeroWinCnt[otherEnd]),
 			},
 			PerfMeterMax: outputtype.PerfMeterMax{
-				MaxRTTSyn: flow.ClosedRTTSyn(),
-				MaxRTTAvg: flow.GetRTT(),
-				MaxARTAvg: flow.GetART(),
+				MaxRTTSyn:       flow.ClosedRTTSyn(),
+				MaxRTTAvg:       flow.GetRTT(),
+				MaxARTAvg:       flow.GetART(),
+				MaxRTTSynClient: flow.ClosedRTTSynClient(),
+				MaxRTTSynServer: flow.ClosedRTTSynServer(),
 			},
 			PerfMeterMin: outputtype.PerfMeterMin{
 				MinRTTSyn: flow.ClosedRTTSyn(),
@@ -210,6 +218,9 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 			codes = p.codes[:0]
 			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE != 0 {
 				codes = append(codes, POLICY_EDGE_CODES...)
+			}
+			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE_PORT != 0 && !flow.ServiceNotAlive() { // 含有端口号的，仅统计活跃端口
+				codes = append(codes, POLICY_EDGE_PORT_CODES...)
 			}
 			for _, code := range codes {
 				if IsDupTraffic(flow.InPort, l3EpcIDs[otherEnd], isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧Tag
