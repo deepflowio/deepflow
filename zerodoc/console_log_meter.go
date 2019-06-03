@@ -72,3 +72,21 @@ func (m *ConsoleLogMeter) MarshalTo(b []byte) int {
 
 	return offset
 }
+
+func (m *ConsoleLogMeter) Fill(isTag []bool, names []string, values []interface{}) {
+	for i, name := range names {
+		if isTag[i] {
+			continue
+		}
+		switch name {
+		case "sum_packet_tx":
+			m.SumPacketTx = uint64(values[i].(int64))
+		case "sum_packet_rx":
+			m.SumPacketRx = uint64(values[i].(int64))
+		case "sum_closed_flow_count":
+			m.SumClosedFlowCount = uint64(values[i].(int64))
+		case "sum_closed_flow_duration":
+			m.SumClosedFlowDuration = uint64(values[i].(int64))
+		}
+	}
+}

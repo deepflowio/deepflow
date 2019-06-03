@@ -3,6 +3,9 @@ package zerodoc
 import (
 	"errors"
 	"fmt"
+	"time"
+
+	"strings"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
@@ -40,6 +43,10 @@ func Encode(sequence uint32, doc *app.Document, encoder *codec.SimpleEncoder) er
 		msgType = MSG_FPS
 	case *LogUsageMeter:
 		msgType = MSG_LOG_USAGE
+	case *VTAPUsageMeter:
+		msgType = MSG_VTAP_USAGE
+	case *VTAPSimpleMeter:
+		msgType = MSG_VTAP_SIMPLE
 	default:
 		return fmt.Errorf("Unknown supported type %T", v)
 	}
@@ -74,6 +81,10 @@ func Encode(sequence uint32, doc *app.Document, encoder *codec.SimpleEncoder) er
 		meter = doc.Meter.(*FPSMeter)
 	case MSG_LOG_USAGE:
 		meter = doc.Meter.(*LogUsageMeter)
+	case MSG_VTAP_USAGE:
+		meter = doc.Meter.(*VTAPUsageMeter)
+	case MSG_VTAP_SIMPLE:
+		meter = doc.Meter.(*VTAPSimpleMeter)
 	}
 	meter.Encode(encoder)
 
@@ -136,6 +147,14 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 		m := AcquireLogUsageMeter()
 		m.Decode(decoder)
 		doc.Meter = m
+	case MSG_VTAP_USAGE:
+		m := AcquireVTAPUsageMeter()
+		m.Decode(decoder)
+		doc.Meter = m
+	case MSG_VTAP_SIMPLE:
+		m := AcquireVTAPSimpleMeter()
+		m.Decode(decoder)
+		doc.Meter = m
 	default:
 		app.ReleaseDocument(doc)
 		return nil, errors.New(fmt.Sprintf("Error meter type %v", msgType))
@@ -151,80 +170,108 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 	return doc, nil
 }
 
-func EncodeVTAP(doc *app.Document, encoder *codec.SimpleEncoder) error {
-	if doc.Tag == nil || doc.Meter == nil {
-		return errors.New("No tag or meter in document")
+func GetMsgType(db string) (MessageType, error) {
+	s := strings.Split(db, "_")
+	if len(s) < 2 {
+		return MSG_INVILID, fmt.Errorf("Unsupport db %s", db)
 	}
-	encoder.Reset()
+	dbPrefix := strings.Join(s[:2], "_")
 
 	var msgType MessageType
-	switch v := doc.Meter.(type) {
-	case *VTAPUsageMeter:
-		msgType = MSG_VTAP_USAGE
+	switch dbPrefix {
+	case "df_usage":
+		msgType = MSG_USAGE
+	case "df_perf":
+		msgType = MSG_PERF
+	case "df_geo":
+		msgType = MSG_GEO
+	case "df_flow":
+		msgType = MSG_FLOW
+	case "df_console":
+		msgType = MSG_CONSOLE_LOG
+	case "df_type":
+		msgType = MSG_TYPE
+	case "df_fps":
+		msgType = MSG_FPS
+	case "log_usage":
+		msgType = MSG_LOG_USAGE
+	// 从influxdb streaming读取vtap_usage的数据时，会使用MSG_VTAP_SIMPLE消息打包成doc, 而不用MSG_VTAP_USAGE
+	case "vtap_usage":
+		msgType = MSG_VTAP_SIMPLE
 	default:
-		return fmt.Errorf("Unknown supported type %T", v)
+		return MSG_INVILID, fmt.Errorf("Unknown supported dbPrefix %s", dbPrefix)
 	}
 
-	encoder.WriteU32(app.VERSION)
-	encoder.WriteU32(doc.Timestamp)
+	return msgType, nil
+}
 
-	var tag *Tag
-	tag, ok := doc.Tag.(*Tag)
-	if !ok {
-		return fmt.Errorf("Unknown supported tag type %T", doc.Tag)
+// send to reciter
+// Protocol:
+//     version     uint32
+//     sequence    uint32
+//     timestamp   uint32
+//     tag         Tag (bytes)
+//     meterType   uint8
+//     meter       Meter (bytes)
+//     actionFlags uint32
+func EncodeRow(tag *Tag, msgType MessageType, isTag []bool, columnNames []string, columnValues []interface{}, encoder *codec.SimpleEncoder) error {
+	encoder.WriteU32(app.VERSION) // version
+	encoder.WriteU32(0)           // sequence
+
+	if timestamp, ok := columnValues[0].(time.Time); ok {
+		encoder.WriteU32(uint32(timestamp.Unix())) // timestamp
+	} else {
+		return fmt.Errorf("Unknown timestamp %v", columnValues[0])
 	}
+
+	tag.FillValues(isTag, columnNames, columnValues)
 	tag.Encode(encoder)
 
 	encoder.WriteU8(uint8(msgType))
-	var meter app.Meter
+
 	switch msgType {
-	case MSG_VTAP_USAGE:
-		meter = doc.Meter.(*VTAPUsageMeter)
+	case MSG_USAGE:
+		var m UsageMeter
+		m.Fill(isTag, columnNames, columnValues)
+		m.Encode(encoder)
+	case MSG_PERF:
+		var m PerfMeter
+		m.Fill(isTag, columnNames, columnValues)
+		m.Encode(encoder)
+	case MSG_GEO:
+		var m GeoMeter
+		m.Fill(isTag, columnNames, columnValues)
+		m.Encode(encoder)
+	case MSG_FLOW:
+		var m FlowMeter
+		m.Fill(isTag, columnNames, columnValues)
+		m.Encode(encoder)
+	case MSG_CONSOLE_LOG:
+		var m ConsoleLogMeter
+		m.Fill(isTag, columnNames, columnValues)
+		m.Encode(encoder)
+	case MSG_TYPE:
+		var m TypeMeter
+		m.Fill(isTag, columnNames, columnValues)
+		m.Encode(encoder)
+	case MSG_FPS:
+		var m FPSMeter
+		m.Fill(isTag, columnNames, columnValues)
+		m.Encode(encoder)
+	case MSG_LOG_USAGE:
+		var m LogUsageMeter
+		m.Fill(isTag, columnNames, columnValues)
+		m.Encode(encoder)
+	// 从influxdb streaming读取vtap_usage的数据时，使用MSG_VTAP_SIMPLE消息打包成doc
+	case MSG_VTAP_SIMPLE:
+		var m VTAPSimpleMeter
+		m.Fill(isTag, columnNames, columnValues)
+		m.Encode(encoder)
+	default:
+		return fmt.Errorf("Unknown supported msgType %d", msgType)
 	}
-	meter.Encode(encoder)
+
+	encoder.WriteU32(0) // actionflag
 
 	return nil
-}
-
-func DecodeVTAP(b []byte) (*app.Document, error) {
-	if b == nil {
-		return nil, errors.New("No input byte")
-	}
-	decoder := &codec.SimpleDecoder{}
-	decoder.Init(b)
-	return DecodeVTAPIn(decoder)
-}
-
-func DecodeVTAPIn(decoder *codec.SimpleDecoder) (*app.Document, error) {
-	if decoder == nil {
-		return nil, errors.New("No input decoder")
-	}
-
-	if version := decoder.ReadU32(); version != app.VERSION {
-		return nil, fmt.Errorf("message version incorrect, expect %d, found %d", app.VERSION, version)
-	}
-
-	doc := app.AcquireDocument()
-
-	doc.Timestamp = decoder.ReadU32()
-
-	tag := AcquireTag()
-	tag.Field = AcquireField()
-	tag.Decode(decoder)
-	doc.Tag = tag
-
-	msgType := decoder.ReadU8()
-	switch MessageType(msgType) {
-	case MSG_VTAP_USAGE:
-		m := AcquireVTAPUsageMeter()
-		m.Decode(decoder)
-		doc.Meter = m
-	default:
-		return nil, fmt.Errorf("Error meter type %v", msgType)
-	}
-
-	if decoder.Failed() {
-		return nil, errors.New("Decode failed")
-	}
-	return doc, nil
 }

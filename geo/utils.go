@@ -23,6 +23,27 @@ func decode(list []string, key uint8) string {
 	return list[key]
 }
 
+func EncodeCountry(country string) uint8 {
+	if v, ok := COUNTRY_NAMES_MAP[country]; ok {
+		return v
+	}
+	return 0
+}
+
+func EncodeRegion(region string) uint8 {
+	if v, ok := REGION_NAMES_MAP[region]; ok {
+		return v
+	}
+	return 0
+}
+
+func EncodeISP(isp string) uint8 {
+	if v, ok := ISP_NAMES_MAP[isp]; ok {
+		return v
+	}
+	return 0
+}
+
 type IPRange struct {
 	lower uint32
 	upper uint32

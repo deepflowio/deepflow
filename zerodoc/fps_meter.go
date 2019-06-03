@@ -112,3 +112,23 @@ func (m *FPSMeter) MarshalTo(b []byte) int {
 
 	return offset
 }
+
+func (m *FPSMeter) Fill(isTag []bool, names []string, values []interface{}) {
+	for i, name := range names {
+		if isTag[i] {
+			continue
+		}
+		switch name {
+		case "sum_flow_count":
+			m.SumFlowCount = uint64(values[i].(int64))
+		case "sum_new_flow_count":
+			m.SumNewFlowCount = uint64(values[i].(int64))
+		case "sum_closed_flow_count":
+			m.SumClosedFlowCount = uint64(values[i].(int64))
+		case "max_flow_count":
+			m.MaxFlowCount = uint64(values[i].(int64))
+		case "max_new_flow_count":
+			m.MaxNewFlowCount = uint64(values[i].(int64))
+		}
+	}
+}
