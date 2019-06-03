@@ -1,10 +1,10 @@
 package zerodoc
 
 import (
+	"fmt"
+	"net"
 	"strconv"
 	"strings"
-
-	"fmt"
 
 	"github.com/google/gopacket/layers"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
@@ -148,6 +148,8 @@ const (
 	SCOPE_OUT_EPC
 	SCOPE_IN_SUBNET
 	SCOPE_OUT_SUBNET
+
+	SCOPE_INVALID
 )
 
 func (s ScopeEnum) String() string {
@@ -164,6 +166,23 @@ func (s ScopeEnum) String() string {
 		return "out_subnet"
 	default:
 		panic("invalid scope type")
+	}
+}
+
+func StringToScope(s string) ScopeEnum {
+	switch s {
+	case "all":
+		return SCOPE_ALL
+	case "in_epc":
+		return SCOPE_IN_EPC
+	case "out_epc":
+		return SCOPE_OUT_EPC
+	case "in_subnet":
+		return SCOPE_IN_SUBNET
+	case "out_subnet":
+		return SCOPE_OUT_SUBNET
+	default:
+		return SCOPE_INVALID
 	}
 }
 
@@ -224,6 +243,14 @@ func marshalUint16WithMinusOne(v int16) string {
 		return "-1"
 	}
 	return strconv.FormatUint(uint64(v)&uint64(^uint16(0)), 10)
+}
+
+func unmarshalUint16WithMinusOne(s string) (int16, error) {
+	i, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return -1, err
+	}
+	return int16(i), nil
 }
 
 func (t *Tag) MarshalTo(b []byte) int {
@@ -768,4 +795,179 @@ func (f *Field) FillTag(c Code, tag *Tag) {
 	}
 	tag.Code = c
 	tag.id = ""
+}
+
+func (t *Tag) Fill(code Code, tags map[string]string) error {
+	t.Code = code
+	for tagk, tagv := range tags {
+		if err := t.fillValue(tagk, tagv); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (t *Tag) fillValue(name, value string) (err error) {
+	field := t.Field
+	var i uint64
+	switch name {
+	case "ip", "ip_0":
+		field.IP = utils.IpToUint32(net.ParseIP(value).To4())
+	case "group_id", "group_id_0":
+		field.GroupID, err = unmarshalUint16WithMinusOne(value)
+	case "l2_epc_id", "l2_epc_id_0":
+		field.L2EpcID, err = unmarshalUint16WithMinusOne(value)
+	case "l3_epc_id", "l3_epc_id_0":
+		field.L3EpcID, err = unmarshalUint16WithMinusOne(value)
+	case "l2_device_id", "l2_device_id_0":
+		i, err = strconv.ParseUint(value, 10, 16)
+		field.L2DeviceID = uint16(i)
+	case "l2_device_type", "l2_device_type_0":
+		i, err = strconv.ParseUint(value, 10, 8)
+		field.L2DeviceType = DeviceType(i)
+	case "l3_device_id", "l3_device_id_0":
+		i, err = strconv.ParseUint(value, 10, 16)
+		field.L3DeviceID = uint16(i)
+	case "l3_device_type", "l3_device_type_0":
+		i, err = strconv.ParseUint(value, 10, 8)
+		field.L3DeviceType = DeviceType(i)
+	case "host", "host_0":
+		field.Host = utils.IpToUint32(net.ParseIP(value).To4())
+	case "host_1":
+		field.Host1 = utils.IpToUint32(net.ParseIP(value).To4())
+	case "ip_1":
+		field.IP1 = utils.IpToUint32(net.ParseIP(value).To4())
+	case "group_id_1":
+		field.GroupID1, err = unmarshalUint16WithMinusOne(value)
+	case "l2_epc_id_1":
+		field.L2EpcID1, err = unmarshalUint16WithMinusOne(value)
+	case "l3_epc_id_1":
+		field.L3EpcID1, err = unmarshalUint16WithMinusOne(value)
+	case "l2_device_id_1":
+		i, err = strconv.ParseUint(value, 10, 16)
+		field.L2DeviceID1 = uint16(i)
+	case "l2_device_type_1":
+		i, err = strconv.ParseUint(value, 10, 8)
+		field.L2DeviceType1 = DeviceType(i)
+	case "l3_device_id_1":
+		i, err = strconv.ParseUint(value, 10, 16)
+		field.L3DeviceID1 = uint16(i)
+	case "l3_device_type_1":
+		i, err = strconv.ParseUint(value, 10, 8)
+		field.L3DeviceType1 = DeviceType(i)
+	case "subnet_id", "subnet_id_0":
+		i, err = strconv.ParseUint(value, 10, 16)
+		field.SubnetID = uint16(i)
+	case "subnet_id_1":
+		i, err = strconv.ParseUint(value, 10, 16)
+		field.SubnetID1 = uint16(i)
+	case "direction":
+		switch value {
+		case "c2s":
+			field.Direction = ClientToServer
+		case "s2c":
+			field.Direction = ServerToClient
+		}
+	case "acl_gid":
+		i, err = strconv.ParseUint(value, 10, 16)
+		field.ACLGID = uint16(i)
+	case "vlan_id":
+		i, err = strconv.ParseUint(value, 10, 16)
+		field.VLANID = uint16(i)
+	case "protocol":
+		i, err = strconv.ParseUint(value, 10, 8)
+		field.Protocol = layers.IPProtocol(i)
+	case "server_port":
+		i, err = strconv.ParseUint(value, 10, 16)
+		field.ServerPort = uint16(i)
+	case "tap_type":
+		i, _ := strconv.ParseUint(value, 10, 8)
+		field.TAPType = TAPTypeEnum(i)
+	case "acl_direction":
+		switch value {
+		case "fwd":
+			field.ACLDirection = ACL_FORWARD
+		case "bwd":
+			field.ACLDirection = ACL_BACKWARD
+		}
+	case "scope":
+		field.Scope = StringToScope(value)
+	case "country":
+		field.Country = geo.EncodeCountry(value)
+	case "region":
+		field.Region = geo.EncodeRegion(value)
+	case "isp":
+		field.ISP = geo.EncodeISP(value)
+	default:
+		err = fmt.Errorf("unsupoort tag name %s ", name)
+	}
+	if err != nil {
+		return fmt.Errorf("fill tag:%s value:%s failed: %s", name, value, err)
+	}
+	return nil
+}
+
+var TAG_NAMES map[string]uint8 = map[string]uint8{
+	"ip":               0,
+	"ip_0":             0,
+	"group_id":         0,
+	"group_id_0":       0,
+	"l2_epc_id":        0,
+	"l2_epc_id_0":      0,
+	"l3_epc_id":        0,
+	"l3_epc_id_0":      0,
+	"l2_device_id":     0,
+	"l2_device_id_0":   0,
+	"l2_device_type":   0,
+	"l2_device_type_0": 0,
+	"l3_device_id":     0,
+	"l3_device_id_0":   0,
+	"l3_device_type":   0,
+	"l3_device_type_0": 0,
+	"host":             0,
+	"host_0":           0,
+	"ip_1":             0,
+	"group_id_1":       0,
+	"l2_epc_id_1":      0,
+	"l3_epc_id_1":      0,
+	"l2_device_id_1":   0,
+	"l2_device_type_1": 0,
+	"l3_device_id_1":   0,
+	"l3_device_type_1": 0,
+	"host_1":           0,
+	"subnet_id_0":      0,
+	"subnet_id_1":      0,
+	"direction":        0,
+	"acl_gid":          0,
+	"vlan_id":          0,
+	"protocol":         0,
+	"server_port":      0,
+	"tap_type":         0,
+	"subnet_id":        0,
+	"acl_direction":    0,
+	"scope":            0,
+	"country":          0,
+	"region":           0,
+	"isp":              0,
+}
+
+func IsTag(names []string) []bool {
+	b := make([]bool, len(names))
+	for i, name := range names {
+		if _, ok := TAG_NAMES[name]; ok {
+			b[i] = true
+		}
+	}
+	return b
+}
+
+func (t *Tag) FillValues(isTag []bool, names []string, values []interface{}) error {
+	for i, name := range names {
+		if isTag[i] {
+			if err := t.fillValue(name, values[i].(string)); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

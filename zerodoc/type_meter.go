@@ -140,3 +140,25 @@ func (m *TypeMeter) MarshalTo(b []byte) int {
 
 	return offset
 }
+
+func (m *TypeMeter) Fill(isTag []bool, names []string, values []interface{}) {
+	for i, name := range names {
+		if isTag[i] {
+			continue
+		}
+		switch name {
+		case "sum_count_t_c_rst":
+			m.SumCountTClientRst = uint64(values[i].(int64))
+		case "sum_count_t_c_half_open":
+			m.SumCountTClientHalfOpen = uint64(values[i].(int64))
+		case "sum_count_t_c_half_close":
+			m.SumCountTClientHalfClose = uint64(values[i].(int64))
+		case "sum_count_t_s_rst":
+			m.SumCountTServerRst = uint64(values[i].(int64))
+		case "sum_count_t_s_half_open":
+			m.SumCountTServerHalfOpen = uint64(values[i].(int64))
+		case "sum_count_t_s_half_close":
+			m.SumCountTServerHalfClose = uint64(values[i].(int64))
+		}
+	}
+}

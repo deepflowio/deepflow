@@ -114,6 +114,63 @@ func (m *PerfMeter) MarshalTo(b []byte) int {
 	return offset
 }
 
+func (m *PerfMeter) Fill(isTag []bool, names []string, values []interface{}) {
+	for i, name := range names {
+		if isTag[i] {
+			continue
+		}
+		switch name {
+		case "sum_flow_count":
+			m.SumFlowCount = uint64(values[i].(int64))
+		case "sum_new_flow_count":
+			m.SumNewFlowCount = uint64(values[i].(int64))
+		case "sum_closed_flow_count":
+			m.SumClosedFlowCount = uint64(values[i].(int64))
+		case "sum_half_open_flow_count":
+			m.SumHalfOpenFlowCount = uint64(values[i].(int64))
+		case "sum_packet_tx":
+			m.SumPacketTx = uint64(values[i].(int64))
+		case "sum_packet_rx":
+			m.SumPacketRx = uint64(values[i].(int64))
+		case "sum_retrans_cnt_tx":
+			m.SumRetransCntTx = uint64(values[i].(int64))
+		case "sum_retrans_cnt_rx":
+			m.SumRetransCntRx = uint64(values[i].(int64))
+
+		case "sum_rtt_syn":
+			m.SumRTTSyn = time.Duration(values[i].(int64))
+		case "sum_rtt_avg":
+			m.SumRTTAvg = time.Duration(values[i].(int64))
+		case "sum_art_avg":
+			m.SumARTAvg = time.Duration(values[i].(int64))
+		case "sum_rtt_syn_flow":
+			m.SumRTTSynFlow = uint64(values[i].(int64))
+		case "sum_rtt_avg_flow":
+			m.SumRTTAvgFlow = uint64(values[i].(int64))
+		case "sum_art_avg_flow":
+			m.SumARTAvgFlow = uint64(values[i].(int64))
+		case "sum_zero_wnd_cnt_tx":
+			m.SumZeroWndCntTx = uint64(values[i].(int64))
+		case "sum_zero_wnd_cnt_rx":
+			m.SumZeroWndCntRx = uint64(values[i].(int64))
+
+		case "max_rtt_syn":
+			m.MaxRTTSyn = time.Duration(values[i].(int64))
+		case "max_rtt_avg":
+			m.MaxRTTAvg = time.Duration(values[i].(int64))
+		case "max_art_avg":
+			m.MaxARTAvg = time.Duration(values[i].(int64))
+
+		case "min_rtt_syn":
+			m.MinRTTSyn = time.Duration(values[i].(int64))
+		case "min_rtt_avg":
+			m.MinRTTAvg = time.Duration(values[i].(int64))
+		case "min_art_avg":
+			m.MinARTAvg = time.Duration(values[i].(int64))
+		}
+	}
+}
+
 type PerfMeterSum struct {
 	SumFlowCount         uint64 `db:"sum_flow_count"`
 	SumNewFlowCount      uint64 `db:"sum_new_flow_count"`
