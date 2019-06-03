@@ -107,3 +107,27 @@ func (m *FlowMeter) MarshalTo(b []byte) int {
 
 	return offset
 }
+
+func (m *FlowMeter) Fill(isTag []bool, names []string, values []interface{}) {
+	for i, name := range names {
+		if isTag[i] {
+			continue
+		}
+		switch name {
+		case "sum_flow_count":
+			m.SumFlowCount = uint64(values[i].(int64))
+		case "sum_new_flow_count":
+			m.SumNewFlowCount = uint64(values[i].(int64))
+		case "sum_closed_flow_count":
+			m.SumClosedFlowCount = uint64(values[i].(int64))
+		case "sum_packet_tx":
+			m.SumPacketTx = uint64(values[i].(int64))
+		case "sum_packet_rx":
+			m.SumPacketRx = uint64(values[i].(int64))
+		case "sum_bit_tx":
+			m.SumBitTx = uint64(values[i].(int64))
+		case "sum_bit_rx":
+			m.SumBitRx = uint64(values[i].(int64))
+		}
+	}
+}

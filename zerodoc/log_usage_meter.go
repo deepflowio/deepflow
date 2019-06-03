@@ -72,3 +72,21 @@ func (m *LogUsageMeter) MarshalTo(b []byte) int {
 
 	return offset
 }
+
+func (m *LogUsageMeter) Fill(isTag []bool, names []string, values []interface{}) {
+	for i, name := range names {
+		if isTag[i] {
+			continue
+		}
+		switch name {
+		case "sum_packet_tx":
+			m.SumPacketTx = uint64(values[i].(int64))
+		case "sum_packet_rx":
+			m.SumPacketRx = uint64(values[i].(int64))
+		case "sum_bit_tx":
+			m.SumBitTx = uint64(values[i].(int64))
+		case "sum_bit_rx":
+			m.SumBitRx = uint64(values[i].(int64))
+		}
+	}
+}
