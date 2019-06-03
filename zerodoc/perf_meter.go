@@ -99,6 +99,10 @@ func (m *PerfMeter) MarshalTo(b []byte) int {
 	offset += copy(b[offset:], strconv.FormatInt(int64(max.MaxRTTAvg/time.Microsecond), 10))
 	offset += copy(b[offset:], "i,max_art_avg=")
 	offset += copy(b[offset:], strconv.FormatInt(int64(max.MaxARTAvg/time.Microsecond), 10))
+	offset += copy(b[offset:], "i,max_rtt_syn_client=")
+	offset += copy(b[offset:], strconv.FormatInt(int64(max.MaxRTTSynClient/time.Microsecond), 10))
+	offset += copy(b[offset:], "i,max_rtt_syn_server=")
+	offset += copy(b[offset:], strconv.FormatInt(int64(max.MaxRTTSynServer/time.Microsecond), 10))
 
 	// min
 	min := m.PerfMeterMin
@@ -160,6 +164,10 @@ func (m *PerfMeter) Fill(isTag []bool, names []string, values []interface{}) {
 			m.MaxRTTAvg = time.Duration(values[i].(int64)) * time.Microsecond
 		case "max_art_avg":
 			m.MaxARTAvg = time.Duration(values[i].(int64)) * time.Microsecond
+		case "max_rtt_syn_client":
+			m.MaxRTTSynClient = time.Duration(values[i].(int64)) * time.Microsecond
+		case "max_rtt_syn_server":
+			m.MaxRTTSynServer = time.Duration(values[i].(int64)) * time.Microsecond
 
 		case "min_rtt_syn":
 			m.MinRTTSyn = time.Duration(values[i].(int64)) * time.Microsecond
@@ -292,21 +300,27 @@ func (m *PerfMeterSum) sequentialMerge(other *PerfMeterSum) { // other为后一�
 }
 
 type PerfMeterMax struct {
-	MaxRTTSyn time.Duration `db:"max_rtt_syn"`
-	MaxRTTAvg time.Duration `db:"max_rtt_avg"`
-	MaxARTAvg time.Duration `db:"max_art_avg"`
+	MaxRTTSyn       time.Duration `db:"max_rtt_syn"`
+	MaxRTTAvg       time.Duration `db:"max_rtt_avg"`
+	MaxARTAvg       time.Duration `db:"max_art_avg"`
+	MaxRTTSynClient time.Duration `db:"max_rtt_syn_client"`
+	MaxRTTSynServer time.Duration `db:"max_rtt_syn_server"`
 }
 
 func (m *PerfMeterMax) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(uint64(m.MaxRTTSyn))
 	encoder.WriteVarintU64(uint64(m.MaxRTTAvg))
 	encoder.WriteVarintU64(uint64(m.MaxARTAvg))
+	encoder.WriteVarintU64(uint64(m.MaxRTTSynClient))
+	encoder.WriteVarintU64(uint64(m.MaxRTTSynServer))
 }
 
 func (m *PerfMeterMax) Decode(decoder *codec.SimpleDecoder) {
 	m.MaxRTTSyn = time.Duration(decoder.ReadVarintU64())
 	m.MaxRTTAvg = time.Duration(decoder.ReadVarintU64())
 	m.MaxARTAvg = time.Duration(decoder.ReadVarintU64())
+	m.MaxRTTSynClient = time.Duration(decoder.ReadVarintU64())
+	m.MaxRTTSynServer = time.Duration(decoder.ReadVarintU64())
 }
 
 func (m *PerfMeterMax) concurrentMerge(other *PerfMeterMax) {
@@ -318,6 +332,8 @@ func (m *PerfMeterMax) sequentialMerge(other *PerfMeterMax) {
 	m.MaxRTTSyn = maxDuration(m.MaxRTTSyn, other.MaxRTTSyn)
 	m.MaxRTTAvg = maxDuration(m.MaxRTTAvg, other.MaxRTTAvg)
 	m.MaxARTAvg = maxDuration(m.MaxARTAvg, other.MaxARTAvg)
+	m.MaxRTTSynClient = maxDuration(m.MaxRTTSynClient, other.MaxRTTSynClient)
+	m.MaxRTTSynServer = maxDuration(m.MaxRTTSynServer, other.MaxRTTSynServer)
 }
 
 type PerfMeterMin struct {
