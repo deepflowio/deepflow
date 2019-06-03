@@ -143,6 +143,14 @@ func (f *Flow) ClosedRTTSynClient() time.Duration {
 	}
 }
 
+func (f *Flow) ClosedRTTSynServer() time.Duration {
+	if !f.IsClosedFlow() {
+		return 0
+	} else {
+		return f.GetRTTSynServer()
+	}
+}
+
 func (f *Flow) RTTSynFlow() uint64 {
 	if f.TcpPerfStats == nil {
 		return 0
@@ -199,6 +207,13 @@ func (f *Flow) GetRTTSynClient() time.Duration {
 		return 0
 	}
 	return f.RTTSynClient
+}
+
+func (f *Flow) GetRTTSynServer() time.Duration {
+	if f.TcpPerfStats == nil {
+		return 0
+	}
+	return f.RTTSynServer
 }
 
 func (f *Flow) GetRTT() time.Duration {
