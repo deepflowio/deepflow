@@ -128,18 +128,19 @@ func TestFlowMeterFill(t *testing.T) {
 func TestPerfMeterFill(t *testing.T) {
 	f := &PerfMeter{}
 
-	isTag := []bool{false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false}
+	isTag := []bool{false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false}
 	names := []string{
 		"sum_flow_count", "ip", "sum_new_flow_count", "sum_closed_flow_count", "sum_half_open_flow_count",
 		"sum_packet_tx", "sum_packet_rx", "sum_retrans_cnt_tx", "sum_retrans_cnt_rx",
 		"sum_rtt_syn", "sum_rtt_avg", "sum_art_avg", "sum_rtt_syn_flow", "sum_rtt_avg_flow", "sum_art_avg_flow",
 		"sum_zero_wnd_cnt_tx", "sum_zero_wnd_cnt_rx",
 		"max_rtt_syn", "max_rtt_avg", "max_art_avg",
-		"min_rtt_syn", "min_rtt_avg", "min_art_avg"}
-	var v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21, v22 int64
-	v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21, v22 =
-		123, 12345, 12345678, 1234567890123, 123456789012345, 12345678901234567, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
-	values := []interface{}{v1, "ip", v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21, v22}
+		"min_rtt_syn", "min_rtt_avg", "min_art_avg",
+		"max_rtt_syn_client", "max_rtt_syn_server"}
+	var v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21, v22, v23, v24 int64
+	v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21, v22, v23, v24 =
+		123, 12345, 12345678, 1234567890123, 123456789012345, 12345678901234567, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17
+	values := []interface{}{v1, "ip", v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21, v22, v23, v24}
 	f.Fill(isTag, names, values)
 
 	if f.SumFlowCount != uint64(v1) {
@@ -209,6 +210,12 @@ func TestPerfMeterFill(t *testing.T) {
 	}
 	if f.MinARTAvg != time.Duration(v22)*time.Microsecond {
 		t.Error("MinARTAvg 处理错误")
+	}
+	if f.MaxRTTSynClient != time.Duration(v23)*time.Microsecond {
+		t.Error("MaxRTTSynClient 处理错误")
+	}
+	if f.MaxRTTSynServer != time.Duration(v24)*time.Microsecond {
+		t.Error("MaxRTTSynServer 处理错误")
 	}
 }
 
