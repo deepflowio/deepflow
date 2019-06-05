@@ -72,7 +72,7 @@ type TableOperator interface {
 	DelAcl(id int)
 	GetAcl() []*Acl
 	FlushAcls()
-	UpdateAcls(data []*Acl)
+	UpdateAcls(data []*Acl, check ...bool)
 	UpdateInterfaceData(data []*PlatformData)
 	UpdateIpGroupData(data []*IpGroupData)
 
@@ -228,8 +228,8 @@ func (t *PolicyTable) UpdateIpGroupData(data []*IpGroupData) {
 	t.operator.UpdateIpGroupData(data)
 }
 
-func (t *PolicyTable) UpdateAclData(data []*Acl) {
-	t.operator.UpdateAcls(data)
+func (t *PolicyTable) UpdateAclData(data []*Acl, check ...bool) {
+	t.operator.UpdateAcls(data, check...)
 }
 
 func (t *PolicyTable) EnableAclData() {

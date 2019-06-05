@@ -294,7 +294,7 @@ func (l *PolicyLabeler) GenerateGroupAclGidMaps(acls []*Acl) {
 	l.FastPath.UpdateGroupAclGidMaps(l.AclGidMap.SrcGroupAclGidMaps, l.AclGidMap.DstGroupAclGidMaps)
 }
 
-func (l *PolicyLabeler) UpdateAcls(acls []*Acl) {
+func (l *PolicyLabeler) UpdateAcls(acls []*Acl, _ ...bool) {
 	l.RawAcls = acls
 
 	generateAcls := make([]*Acl, 0, len(acls))

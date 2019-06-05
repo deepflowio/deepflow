@@ -1423,7 +1423,7 @@ func TestDdbsAclGidBitmapGroup48(t *testing.T) {
 		ipGroups = append(ipGroups, generateIpGroup(uint32(i), 0, "0.0.0.0/0"))
 	}
 	table.UpdateIpGroupData(ipGroups)
-	table.UpdateAcls(acls)
+	table.UpdateAclData(acls, false)
 	key := generateLookupKey(group1Mac, group2Mac, vlanAny, testIp4, queryIp, IPProtocolTCP, 0, 0)
 	_, policyData := table.LookupAllByKey(key)
 	aclGidBitmap0 := AclGidBitmap(0).SetSrcAndDstFlag()
