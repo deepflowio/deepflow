@@ -162,7 +162,9 @@ func (l *LabelerManager) OnIpGroupDataChange(data []*policy.IpGroupData) {
 }
 
 func (l *LabelerManager) OnPolicyDataChange(data []*policy.Acl) {
-	if reflect.DeepEqual(l.rawPolicyData, data) {
+	// DDBS算法中需要根据资源组查询MAC和IP建立查询表，
+	// 所以当平台数据或IP资源组更新后，即使策略不变也应该重新建立查询表
+	if reflect.DeepEqual(l.rawPolicyData, data) && !l.enable {
 		return
 	}
 	l.policyTable.UpdateAclData(data)
