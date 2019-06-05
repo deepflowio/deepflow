@@ -292,11 +292,37 @@ func (d *Ddbs) GetPolicyByFirstPath(endpointData *EndpointData, packet *LookupKe
 	return endpointStore, findPolicy
 }
 
-func (d *Ddbs) UpdateAcls(acls []*Acl) {
-	d.RawAcls = acls
+func (d *Ddbs) checkAcl(acl *Acl, check ...bool) bool {
+	if len(check) > 0 && !check[0] {
+		return false
+	}
 
+	// 若策略的资源组中任何一个未在云平台数据和IP资源组中查找到，算作无效策略
+	for _, group := range acl.SrcGroups {
+		if len(d.groupMacMap[uint16(group)]) == 0 && len(d.groupIpMap[uint16(group)]) == 0 {
+			log.Warningf("invalid acl by group(%d): %s\n", group, acl)
+			return true
+		}
+	}
+
+	for _, group := range acl.DstGroups {
+		if len(d.groupMacMap[uint16(group)]) == 0 && len(d.groupIpMap[uint16(group)]) == 0 {
+			log.Warningf("invalid acl by group(%d): %s\n", group, acl)
+			return true
+		}
+	}
+	return false
+}
+
+func (d *Ddbs) UpdateAcls(acls []*Acl, check ...bool) {
+	d.RawAcls = acls
 	generateAcls := make([]*Acl, 0, len(acls))
+
 	for _, acl := range acls {
+		invalid := d.checkAcl(acl, check...)
+		if invalid {
+			continue
+		}
 		// acl需要根据groupIdMaps更新里面的NpbActions
 		if len(acl.NpbActions) > 0 {
 			groupType := RESOURCE_GROUP_TYPE_IP | RESOURCE_GROUP_TYPE_DEV
