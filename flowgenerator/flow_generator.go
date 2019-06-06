@@ -297,19 +297,6 @@ func (f *FlowExtra) reverseFlow() {
 	reverseFlowTag(taggedFlow)
 }
 
-func (f *FlowGenerator) tryReverseFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) bool {
-	if flowExtra.reversed || meta.TcpData == nil {
-		return false
-	}
-	// if meta.Invalid is false, TcpData will not be nil
-	if flagEqual(meta.TcpData.Flags&TCP_FLAG_MASK, TCP_SYN|TCP_ACK) && !reply {
-		flowExtra.reverseFlow()
-		flowExtra.reversed = !flowExtra.reversed
-		return true
-	}
-	return false
-}
-
 func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) {
 	taggedFlow := flowExtra.taggedFlow
 	bytes := uint64(meta.PacketLen)
@@ -705,7 +692,7 @@ func (f *FlowGenerator) checkL4ServiceReverse(taggedFlow *TaggedFlow, reversed b
 		return false
 	}
 	if taggedFlow.Proto == layers.IPProtocolTCP {
-		return f.checkTcpServiceReverse(taggedFlow, reversed, now)
+		return f.checkTcpServiceReverse(taggedFlow, reversed)
 	} else if taggedFlow.Proto == layers.IPProtocolUDP {
 		return f.checkUdpServiceReverse(taggedFlow, reversed, now)
 	}

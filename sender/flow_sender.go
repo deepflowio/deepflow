@@ -30,7 +30,6 @@ func (s *FlowSender) run() {
 
 	for {
 		n := s.input.Gets(buffer)
-		log.Debugf("%d flows received", n)
 		for _, e := range buffer[:n] {
 			if flow, ok := e.(*datatype.TaggedFlow); ok {
 				if s.filter(flow) { // this flow is not created by pool so never release

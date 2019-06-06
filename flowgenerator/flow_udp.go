@@ -39,9 +39,9 @@ func (f *FlowGenerator) initUdpFlow(meta *MetaPacket) *FlowExtra {
 	taggedFlow.FlowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
 	updatePlatformData(taggedFlow, meta.EndpointData, false)
 	f.fillGeoInfo(taggedFlow)
-	clientHash := uint32(meta.IpSrc) + uint32(meta.PortSrc)
+	clientHash := (uint64(meta.IpSrc) << 16) | uint64(meta.PortSrc)
 	serviceKey := genServiceKey(taggedFlow.FlowMetricsPeerDst.L3EpcID, taggedFlow.IPDst, taggedFlow.PortDst)
-	getUdpServiceManager(serviceKey).hitStatus(serviceKey, clientHash, meta.Timestamp)
+	getUdpServiceManager(f.index).hitUdpStatus(serviceKey, clientHash, meta.Timestamp)
 	flowExtra.flowState = FLOW_STATE_ESTABLISHED
 	flowExtra.timeout = openingTimeout
 	return flowExtra
@@ -59,12 +59,12 @@ func (f *FlowGenerator) checkUdpServiceReverse(taggedFlow *TaggedFlow, reversed 
 		return false
 	}
 	serviceKey := genServiceKey(taggedFlow.FlowMetricsPeerSrc.L3EpcID, taggedFlow.IPSrc, taggedFlow.PortSrc)
-	srcOk := getUdpServiceManager(serviceKey).getStatus(serviceKey, taggedFlow.PortSrc, now)
+	srcOk := getUdpServiceManager(f.index).getUdpStatus(serviceKey, taggedFlow.PortSrc, now)
 	if !srcOk {
 		return false
 	}
 	serviceKey = genServiceKey(taggedFlow.FlowMetricsPeerDst.L3EpcID, taggedFlow.IPDst, taggedFlow.PortDst)
-	dstOk := getUdpServiceManager(serviceKey).getStatus(serviceKey, taggedFlow.PortDst, now)
+	dstOk := getUdpServiceManager(f.index).getUdpStatus(serviceKey, taggedFlow.PortDst, now)
 	if !dstOk {
 		return true
 	} else if taggedFlow.PortDst <= taggedFlow.PortSrc {

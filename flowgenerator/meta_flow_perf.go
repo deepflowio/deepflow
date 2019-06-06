@@ -13,12 +13,26 @@ func AcquireMetaFlowPerf() *MetaFlowPerf {
 }
 
 func ReleaseMetaFlowPerf(p *MetaFlowPerf) {
-	p.resetMetaFlowPerf()
-	metaFlowPerfPool.Put(p)
+	if p != nil {
+		ReleaseSeqSegmentSlice(p.ctrlInfo.tcpSession[0].seqArray)
+		ReleaseSeqSegmentSlice(p.ctrlInfo.tcpSession[1].seqArray)
+
+		p.resetMetaFlowPerf()
+		metaFlowPerfPool.Put(p)
+	}
 }
 
-func CloneMetaFlowPerf(p *MetaFlowPerf) *MetaFlowPerf {
-	clone := AcquireMetaFlowPerf()
-	*clone = *p
-	return clone
+var seqSegmentSlicePool = pool.NewLockFreePool(func() interface{} {
+	return make([]SeqSegment, 0, SEQ_LIST_MAX_LEN+1)
+})
+
+func AcquireSeqSegmentSlice() []SeqSegment {
+	return seqSegmentSlicePool.Get().([]SeqSegment)
+}
+
+func ReleaseSeqSegmentSlice(p []SeqSegment) {
+	if p != nil {
+		p = p[:0]
+		seqSegmentSlicePool.Put(p)
+	}
 }

@@ -41,7 +41,6 @@ func (d *Duplicator) run() {
 	buffer := make([]interface{}, d.bufsize)
 	for {
 		n := d.input.Gets(buffer)
-		log.Debugf("%d items received", n)
 		for _ = range d.outputMultiQueues {
 			d.clone(buffer[:n]) // 先克隆，再发送，避免在队列中被Release
 		}

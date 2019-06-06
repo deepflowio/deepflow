@@ -47,6 +47,8 @@ type FlowToPerfDocumentMapper struct {
 	encoder   *codec.SimpleEncoder
 	codes     []outputtype.Code
 	aclGroups [2][]int32
+
+	fields [2]outputtype.Field
 }
 
 func (p *FlowToPerfDocumentMapper) GetName() string {
@@ -142,14 +144,13 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				MinARTAvg: flow.GetART(),
 			},
 		}
-		field := outputtype.Field{
-			IP:           ips[thisEnd],
-			TAPType:      TAPTypeFromInPort(flow.InPort),
-			Direction:    directions[thisEnd],
-			ACLDirection: outputtype.ACL_FORWARD, // 含ACLDirection字段时仅考虑ACL正向匹配
 
-			IP1: ips[otherEnd],
-		}
+		field := &p.fields[thisEnd]
+		field.IP = ips[thisEnd]
+		field.TAPType = TAPTypeFromInPort(flow.InPort)
+		field.Direction = directions[thisEnd]
+		field.ACLDirection = outputtype.ACL_FORWARD // 含ACLDirection字段时仅考虑ACL正向匹配
+		field.IP1 = ips[otherEnd]
 
 		// node
 		for _, code := range oneSideCodes {
@@ -159,7 +160,7 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 			if IsWrongEndPoint(thisEnd, code) {
 				continue
 			}
-			tag := &outputtype.Tag{Field: &field, Code: code}
+			tag := &outputtype.Tag{Field: field, Code: code}
 			if code.PossibleDuplicate() {
 				id := tag.GetID(p.encoder)
 				if _, exists := docMap[id]; exists {
@@ -189,7 +190,7 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
 					continue
 				}
-				tag := &outputtype.Tag{Field: &field, Code: code}
+				tag := &outputtype.Tag{Field: field, Code: code}
 				if code.PossibleDuplicate() {
 					id := tag.GetID(p.encoder)
 					if _, exists := docMap[id]; exists {
@@ -217,7 +218,7 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) { // 双侧Tag
 					continue
 				}
-				tag := &outputtype.Tag{Field: &field, Code: code}
+				tag := &outputtype.Tag{Field: field, Code: code}
 				if code.PossibleDuplicate() {
 					id := tag.GetID(p.encoder)
 					if _, exists := docMap[id]; exists {
@@ -232,77 +233,6 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				doc.Tag.SetID(tag.GetID(p.encoder))
 				doc.Meter = &meter
 				doc.ActionFlags = uint32(policy.GetActionFlags())
-			}
-
-			flow.FillACLGroupID(policy, p.aclGroups[:])
-
-			// group node
-			codes = codes[:0]
-			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE != 0 {
-				codes = append(codes, POLICY_GROUP_NODE_CODES...)
-			}
-			for _, code := range codes {
-				for _, groupID := range p.aclGroups[thisEnd] {
-					if groupID == 0 {
-						continue
-					}
-					field.GroupID = int16(groupID)
-					if IsDupTraffic(flow.InPort, l3EpcIDs[thisEnd], isL2End[thisEnd], isL3End[thisEnd], code) {
-						continue
-					}
-					if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
-						continue
-					}
-					tag := &outputtype.Tag{Field: &field, Code: code}
-					if code.PossibleDuplicate() {
-						id := tag.GetID(p.encoder)
-						if _, exists := docMap[id]; exists {
-							continue
-						}
-						docMap[id] = true
-					}
-					doc := p.docs.Get().(*app.Document)
-					doc.Timestamp = docTimestamp
-					field.FillTag(code, doc.Tag.(*outputtype.Tag))
-					doc.Tag.SetID(tag.GetID(p.encoder))
-					doc.Meter = &meter
-					doc.ActionFlags = uint32(policy.GetActionFlags())
-				}
-			}
-
-			// group edge
-			codes = codes[:0]
-			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE != 0 {
-				codes = append(codes, POLICY_GROUP_EDGE_CODES...)
-			}
-			for _, code := range codes {
-				for _, srcGroup := range p.aclGroups[thisEnd] {
-					field.GroupID = int16(srcGroup)
-					for _, dstGroup := range p.aclGroups[otherEnd] {
-						field.GroupID1 = int16(dstGroup)
-						if IsDupTraffic(flow.InPort, l3EpcIDs[otherEnd], isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧tag
-							continue
-						}
-						if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) { // 双侧tag
-							continue
-						}
-						tag := &outputtype.Tag{Field: &field, Code: code}
-						if code.PossibleDuplicate() {
-							id := tag.GetID(p.encoder)
-							if _, exists := docMap[id]; exists {
-								continue
-
-							}
-							docMap[id] = true
-						}
-						doc := p.docs.Get().(*app.Document)
-						doc.Timestamp = docTimestamp
-						field.FillTag(code, doc.Tag.(*outputtype.Tag))
-						doc.Tag.SetID(tag.GetID(p.encoder))
-						doc.Meter = &meter
-						doc.ActionFlags = uint32(policy.GetActionFlags())
-					}
-				}
 			}
 		}
 	}

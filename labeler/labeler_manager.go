@@ -46,6 +46,7 @@ type LabelerManager struct {
 	appQueues       [QUEUE_TYPE_MAX]queue.MultiQueueWriter
 	running         bool
 
+	lookupKey        []datatype.LookupKey
 	rawPlatformDatas []*datatype.PlatformData
 	rawIpGroupDatas  []*policy.IpGroupData
 	rawPolicyData    []*policy.Acl
@@ -76,6 +77,7 @@ func NewLabelerManager(readQueues queue.MultiQueueReader, count int, size uint32
 		id = policy.NORMAL
 	}
 	labeler := &LabelerManager{
+		lookupKey:       make([]datatype.LookupKey, size),
 		policyTable:     policy.NewPolicyTable(datatype.ACTION_FLOW_COUNTING, count, size, disable, id),
 		readQueues:      readQueues,
 		readQueuesCount: count,
@@ -181,27 +183,27 @@ func getTTL(packet *datatype.MetaPacket) uint8 {
 }
 
 func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *datatype.PolicyData {
-	key := &datatype.LookupKey{
-		Timestamp:   packet.Timestamp,
-		SrcMac:      uint64(packet.MacSrc),
-		DstMac:      uint64(packet.MacDst),
-		SrcIp:       uint32(packet.IpSrc),
-		DstIp:       uint32(packet.IpDst),
-		SrcPort:     packet.PortSrc,
-		DstPort:     packet.PortDst,
-		EthType:     packet.EthType,
-		Vlan:        packet.Vlan,
-		Proto:       uint8(packet.Protocol),
-		Ttl:         getTTL(packet),
-		L2End0:      packet.L2End0,
-		L2End1:      packet.L2End1,
-		Tap:         datatype.GetTapType(packet.InPort),
-		Invalid:     packet.Invalid,
-		FastIndex:   index,
-		FeatureFlag: datatype.NPM,
-		Src6Ip:      packet.Ip6Src,
-		Dst6Ip:      packet.Ip6Dst,
-	}
+	key := &l.lookupKey[index]
+
+	key.Timestamp = packet.Timestamp
+	key.SrcMac = uint64(packet.MacSrc)
+	key.DstMac = uint64(packet.MacDst)
+	key.SrcIp = uint32(packet.IpSrc)
+	key.DstIp = uint32(packet.IpDst)
+	key.SrcPort = packet.PortSrc
+	key.DstPort = packet.PortDst
+	key.EthType = packet.EthType
+	key.Vlan = packet.Vlan
+	key.Proto = uint8(packet.Protocol)
+	key.Ttl = getTTL(packet)
+	key.L2End0 = packet.L2End0
+	key.L2End1 = packet.L2End1
+	key.Tap = datatype.GetTapType(packet.InPort)
+	key.Invalid = packet.Invalid
+	key.FastIndex = index
+	key.FeatureFlag = datatype.NPM
+	key.Src6Ip = packet.Ip6Src
+	key.Dst6Ip = packet.Ip6Dst
 
 	packet.EndpointData, packet.PolicyData = l.policyTable.LookupAllByKey(key)
 	return packet.PolicyData

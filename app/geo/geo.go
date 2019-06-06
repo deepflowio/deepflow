@@ -72,6 +72,9 @@ type FlowToGeoDocumentMapper struct {
 	docs      *utils.StructBuffer
 	encoder   *codec.SimpleEncoder
 	aclGroups [2][]int32
+
+	fields [2]outputtype.Field
+	meters [2]outputtype.GeoMeter
 }
 
 func (p *FlowToGeoDocumentMapper) GetName() string {
@@ -125,28 +128,25 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
 		otherEnd := GetOppositeEndpoint(thisEnd)
-		meter := outputtype.GeoMeter{
-			SumPacketTx: packets[thisEnd],
-			SumPacketRx: packets[otherEnd],
-			SumBitTx:    bits[thisEnd],
-			SumBitRx:    bits[otherEnd],
 
-			SumRTTSynClient:     flow.ClosedRTTSynClient(),
-			SumRTTSynClientFlow: flow.RTTSynClientFlow(),
-		}
+		meter := &p.meters[thisEnd]
+		meter.SumPacketTx = packets[thisEnd]
+		meter.SumPacketRx = packets[otherEnd]
+		meter.SumBitTx = bits[thisEnd]
+		meter.SumBitRx = bits[otherEnd]
+		meter.SumRTTSynClient = flow.ClosedRTTSynClient()
+		meter.SumRTTSynClientFlow = flow.RTTSynClientFlow()
 
-		field := outputtype.Field{
-			IP:           ips[thisEnd],
-			TAPType:      TAPTypeFromInPort(flow.InPort),
-			Direction:    directions[thisEnd],
-			ACLDirection: outputtype.ACL_FORWARD, // 含ACLDirection字段时仅考虑ACL正向匹配
+		field := &p.fields[thisEnd]
+		field.IP = ips[thisEnd]
+		field.TAPType = TAPTypeFromInPort(flow.InPort)
+		field.Direction = directions[thisEnd]
+		field.ACLDirection = outputtype.ACL_FORWARD // 含ACLDirection字段时仅考虑ACL正向匹配
+		field.IP1 = ips[otherEnd]
+		field.Country = flow.Country
+		field.Region = flow.Region
+		field.ISP = flow.ISP
 
-			IP1: ips[otherEnd],
-
-			Country: flow.Country,
-			Region:  flow.Region,
-			ISP:     flow.ISP,
-		}
 		var codes []outputtype.Code
 
 		// policy
@@ -167,7 +167,7 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 					if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
 						continue
 					}
-					tag := &outputtype.Tag{Field: &field, Code: code}
+					tag := &outputtype.Tag{Field: field, Code: code}
 					if code.PossibleDuplicate() {
 						id := tag.GetID(p.encoder)
 						if _, exists := docMap[id]; exists {
@@ -179,7 +179,7 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 					doc.Timestamp = docTimestamp
 					field.FillTag(code, doc.Tag.(*outputtype.Tag))
 					doc.Tag.SetID(tag.GetID(p.encoder))
-					doc.Meter = &meter
+					doc.Meter = meter
 				}
 			}
 
@@ -197,7 +197,7 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 					if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) { // 双侧tag
 						continue
 					}
-					tag := &outputtype.Tag{Field: &field, Code: code}
+					tag := &outputtype.Tag{Field: field, Code: code}
 					if code.PossibleDuplicate() {
 						id := tag.GetID(p.encoder)
 						if _, exists := docMap[id]; exists {
@@ -209,43 +209,7 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 					doc.Timestamp = docTimestamp
 					field.FillTag(code, doc.Tag.(*outputtype.Tag))
 					doc.Tag.SetID(tag.GetID(p.encoder))
-					doc.Meter = &meter
-				}
-			}
-
-			flow.FillACLGroupID(policy, p.aclGroups[:])
-
-			// group
-			if flow.Country == CHN_ID {
-				codes = POLICY_CHN_GROUP_NODE_CODES[:]
-			} else {
-				codes = POLICY_NON_CHN_GROUP_NODE_CODES[:]
-			}
-			for _, code := range codes {
-				for _, groupID := range p.aclGroups[thisEnd] {
-					if groupID == 0 {
-						continue
-					}
-					field.GroupID = int16(groupID)
-					if IsDupTraffic(flow.InPort, l3EpcIDs[thisEnd], isL2End[thisEnd], isL3End[thisEnd], code) {
-						continue
-					}
-					if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
-						continue
-					}
-					tag := &outputtype.Tag{Field: &field, Code: code}
-					if code.PossibleDuplicate() {
-						id := tag.GetID(p.encoder)
-						if _, exists := docMap[id]; exists {
-							continue
-						}
-						docMap[id] = true
-					}
-					doc := p.docs.Get().(*app.Document)
-					doc.Timestamp = docTimestamp
-					field.FillTag(code, doc.Tag.(*outputtype.Tag))
-					doc.Tag.SetID(tag.GetID(p.encoder))
-					doc.Meter = &meter
+					doc.Meter = meter
 				}
 			}
 		}

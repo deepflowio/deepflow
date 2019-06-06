@@ -52,15 +52,6 @@ func ReleaseFlowExtra(flowExtra *FlowExtra) {
 	flowExtraPool.Put(flowExtra)
 }
 
-func CloneFlowExtra(flowExtra *FlowExtra) *FlowExtra {
-	newFlowExtra := AcquireFlowExtra()
-	*newFlowExtra = *flowExtra
-	if flowExtra.metaFlowPerf != nil {
-		newFlowExtra.metaFlowPerf = CloneMetaFlowPerf(flowExtra.metaFlowPerf)
-	}
-	return newFlowExtra
-}
-
 // list element for *FlowExtra
 type ElementFlowExtra struct {
 	next, prev *ElementFlowExtra
@@ -68,6 +59,19 @@ type ElementFlowExtra struct {
 	list *ListFlowExtra
 	// The value stored with this element.
 	Value *FlowExtra
+}
+
+var elementFlowExtraPool = pool.NewLockFreePool(func() interface{} {
+	return new(ElementFlowExtra)
+})
+
+func AcquireElementFlowExtra() *ElementFlowExtra {
+	return elementFlowExtraPool.Get().(*ElementFlowExtra)
+}
+
+func ReleaseElementFlowExtra(efe *ElementFlowExtra) {
+	*efe = ElementFlowExtra{}
+	elementFlowExtraPool.Put(efe)
 }
 
 func (e *ElementFlowExtra) Next() *ElementFlowExtra {
@@ -133,60 +137,25 @@ func (l *ListFlowExtra) insert(e, at *ElementFlowExtra) *ElementFlowExtra {
 }
 
 func (l *ListFlowExtra) insertValue(v *FlowExtra, at *ElementFlowExtra) *ElementFlowExtra {
-	return l.insert(&ElementFlowExtra{Value: v}, at)
+	efe := AcquireElementFlowExtra()
+	efe.Value = v
+	return l.insert(efe, at)
 }
 
-func (l *ListFlowExtra) remove(e *ElementFlowExtra) *ElementFlowExtra {
+func (l *ListFlowExtra) remove(e *ElementFlowExtra) {
 	e.prev.next = e.next
 	e.next.prev = e.prev
-	e.next = nil // avoid memory leaks
-	e.prev = nil // avoid memory leaks
-	e.list = nil
 	l.len--
-	return e
+	ReleaseElementFlowExtra(e) // 所有e的成员指针将会被清空为nil
 }
 
-func (l *ListFlowExtra) Remove(e *ElementFlowExtra) *FlowExtra {
+func (l *ListFlowExtra) Remove(e *ElementFlowExtra) {
 	if e.list == l {
 		l.remove(e)
 	}
-	return e.Value
-}
-
-func (l *ListFlowExtra) RemoveFront() *ElementFlowExtra {
-	if l.root.next == nil {
-		return nil
-	}
-	return l.remove(l.root.next)
-}
-
-func (l *ListFlowExtra) RemoveBack() *ElementFlowExtra {
-	if l.root.prev == nil {
-		return nil
-	}
-	return l.remove(l.root.next)
 }
 
 func (l *ListFlowExtra) PushFront(v *FlowExtra) *ElementFlowExtra {
 	l.lazyInit()
 	return l.insertValue(v, &l.root)
-}
-
-func (l *ListFlowExtra) PushBack(v *FlowExtra) *ElementFlowExtra {
-	l.lazyInit()
-	return l.insertValue(v, l.root.prev)
-}
-
-func (l *ListFlowExtra) MoveToFront(e *ElementFlowExtra) {
-	if e.list != l || l.root.next == e {
-		return
-	}
-	l.insert(l.remove(e), &l.root)
-}
-
-func (l *ListFlowExtra) MoveToBack(e *ElementFlowExtra) {
-	if e.list != l || l.root.prev == e {
-		return
-	}
-	l.insert(l.remove(e), l.root.prev)
 }
