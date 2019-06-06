@@ -4,7 +4,6 @@ import (
 	"math"
 	"net"
 	"reflect"
-	"sync"
 	"testing"
 	"time"
 
@@ -68,13 +67,13 @@ func TestServicePortStatus(t *testing.T) {
 	port1 := uint16(80)
 	port2 := uint16(8080)
 	// check default IANA port service
-	if !serviceManager.getStatus(genServiceKey(epcId, ip, port1), port1, 0) {
-		t.Error("serviceManager.getStatus() return false, expect true")
+	if !serviceManager.getUdpStatus(genServiceKey(epcId, ip, port1), port1, 0) {
+		t.Error("serviceManager.getUdpStatus() return false, expect true")
 	}
 	// check disable port service
-	serviceManager.disableStatus(genServiceKey(epcId, ip, port2))
-	if serviceManager.getStatus(genServiceKey(epcId, ip, port2), port2, 0) {
-		t.Error("serviceManager.getStatus() return true, expect false")
+	serviceManager.disableTcpStatus(genServiceKey(epcId, ip, port2))
+	if serviceManager.getTcpStatus(genServiceKey(epcId, ip, port2), port2) {
+		t.Error("serviceManager.getTcpStatus() return true, expect false")
 	}
 }
 
@@ -85,18 +84,18 @@ func TestPortLearnInvalid(t *testing.T) {
 	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
 	port := uint16(8080)
 	key := genServiceKey(epcId, ip, port)
-	if serviceManager.getStatus(key, port, 0) {
-		t.Error("serviceManager.getStatus() return true, expect false")
+	if serviceManager.getTcpStatus(key, port) {
+		t.Error("serviceManager.getTcpStatus() return true, expect false")
 	}
 	for i := 0; i < DEFAULT_IP_LEARN_CNT; i++ {
-		serviceManager.hitStatus(key, uint32(i+1), time.Duration(i*100))
+		serviceManager.hitUdpStatus(key, uint64(i+1), time.Duration(i*100))
 	}
-	if serviceManager.getStatus(key, port, 0) {
-		t.Error("serviceManager.getStatus() return true, expect false")
+	if serviceManager.getUdpStatus(key, port, 0) {
+		t.Error("serviceManager.getUdpStatus() return true, expect false")
 	}
-	serviceManager.enableStatus(key, time.Second)
-	if serviceManager.getStatus(key, port, 0) {
-		t.Error("serviceManager.getStatus() return true, expect false")
+	serviceManager.enableTcpStatus(key)
+	if serviceManager.getTcpStatus(key, port) {
+		t.Error("serviceManager.getTcpStatus() return true, expect false")
 	}
 }
 
@@ -108,14 +107,14 @@ func TestHitPortStatus(t *testing.T) {
 	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
 	port := uint16(8080)
 	key := genServiceKey(epcId, ip, port)
-	if serviceManager.getStatus(key, port, 0) {
-		t.Error("serviceManager.getStatus() return true, expect false")
+	if serviceManager.getUdpStatus(key, port, 0) {
+		t.Error("serviceManager.getUdpStatus() return true, expect false")
 	}
 	for i := 0; i < DEFAULT_IP_LEARN_CNT; i++ {
-		serviceManager.hitStatus(key, uint32(i+1), time.Duration(i*100))
+		serviceManager.hitUdpStatus(key, uint64(i+1), time.Duration(i*100))
 	}
-	if !serviceManager.getStatus(key, port, 0) {
-		t.Error("serviceManager.getStatus() return false, expect true")
+	if !serviceManager.getUdpStatus(key, port, 0) {
+		t.Error("serviceManager.getUdpStatus() return false, expect true")
 	}
 }
 
@@ -128,48 +127,19 @@ func TestCheckTimeout(t *testing.T) {
 	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
 	port := uint16(8080)
 	key := genServiceKey(epcId, ip, port)
-	if serviceManager.getStatus(key, port, 0) {
-		t.Error("serviceManager.getStatus() return true, expect false")
+	if serviceManager.getUdpStatus(key, port, 0) {
+		t.Error("serviceManager.getUdpStatus() return true, expect false")
 	}
 	for i := 0; i < DEFAULT_IP_LEARN_CNT; i++ {
-		serviceManager.hitStatus(key, uint32(i+1), time.Duration(i*100))
+		serviceManager.hitUdpStatus(key, uint64(i+1), time.Duration(i*100))
 	}
-	if !serviceManager.getStatus(key, port, 0) {
-		t.Error("serviceManager.getStatus() return false, expect true")
+	if !serviceManager.getUdpStatus(key, port, 0) {
+		t.Error("serviceManager.getUdpStatus() return false, expect true")
 	}
-	serviceManager.hitStatus(key, 100, 2*portStatsTimeout)
-	if serviceManager.getStatus(key, port, 0) {
-		t.Error("serviceManager.getStatus() return true, expect false")
+	serviceManager.hitUdpStatus(key, 100, 2*portStatsTimeout)
+	if serviceManager.getUdpStatus(key, port, 0) {
+		t.Error("serviceManager.getUdpStatus() return true, expect false")
 	}
-}
-
-func TestGoroutinesServicePortStatus(t *testing.T) {
-	portStatsInterval = time.Second
-	portStatsSrcEndCount = 1
-	serviceManager := NewServiceManager(64 * 1024)
-	epcId := int32(3)
-	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
-	port1 := uint16(80)
-	port2 := uint16(8080)
-	var waitGroup sync.WaitGroup
-
-	waitGroup.Add(1)
-	go func() {
-		defer waitGroup.Done()
-		serviceManager.hitStatus(genServiceKey(epcId, ip, port2), uint32(123), time.Duration(123))
-		if !serviceManager.getStatus(genServiceKey(epcId, ip, port2), port2, 0) {
-			t.Error("serviceManager.getStatus() return false, expect true")
-		}
-	}()
-	waitGroup.Add(1)
-	go func() {
-		defer waitGroup.Done()
-		serviceManager.disableStatus(genServiceKey(epcId, ip, port1))
-		if !serviceManager.getStatus(genServiceKey(epcId, ip, port1), port1, 0) {
-			t.Error("serviceManager.getStatus() return false, expect true")
-		}
-	}()
-	waitGroup.Wait()
 }
 
 func TestFlowReverseGroupId0(t *testing.T) {
@@ -382,7 +352,7 @@ func TestSynSrcPortEnable(t *testing.T) {
 	packet0.PortSrc = port1
 	l3EpcId := packet0.EndpointData.SrcInfo.L3EpcId
 	serviceKey := genServiceKey(l3EpcId, packet0.IpSrc, packet0.PortSrc)
-	getTcpServiceManager(serviceKey).enableStatus(serviceKey, packet0.Timestamp)
+	getTcpServiceManager(0).enableTcpStatus(serviceKey)
 	action0 := generateAclAction(10, ACTION_PACKET_COUNTING|ACTION_FLOW_COUNTING)
 	generateEndpointAndPolicy(packet0, srcGroupId, dstGroupId, action0, 10)
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
@@ -437,7 +407,7 @@ func TestSynAckSrcPortEnable(t *testing.T) {
 	packet0.PortDst = port1
 	l3EpcId := packet0.EndpointData.SrcInfo.L3EpcId
 	serviceKey := genServiceKey(l3EpcId, packet0.IpSrc, packet0.PortSrc)
-	getTcpServiceManager(serviceKey).enableStatus(serviceKey, packet0.Timestamp)
+	getTcpServiceManager(0).enableTcpStatus(serviceKey)
 	action0 := generateAclAction(10, ACTION_PACKET_COUNTING|ACTION_FLOW_COUNTING)
 	generateEndpointAndPolicy(packet0, srcGroupId, dstGroupId, action0, 10)
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)

@@ -2,7 +2,6 @@ package flowgenerator
 
 import (
 	"sync/atomic"
-	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
@@ -19,7 +18,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			flowCache.Unlock() // code below does not use flowCache any more
 			atomic.AddInt32(&f.stats.CurrNumFlows, -1)
 			flowExtra.setCurFlowInfo(flowExtra.recentTime, forceReportInterval, reportTolerance)
-			if f.checkTcpServiceReverse(taggedFlow, flowExtra.reversed, meta.Timestamp) {
+			if f.checkTcpServiceReverse(taggedFlow, flowExtra.reversed) {
 				flowExtra.reverseFlow()
 				flowExtra.reversed = true
 			}
@@ -109,7 +108,6 @@ func (f *FlowGenerator) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket, re
 		taggedFlow.FlowMetricsPeerSrc.TCPFlags |= flags
 	}
 	f.updateFlow(flowExtra, meta, reply)
-	reply = reply != f.tryReverseFlow(flowExtra, meta, reply)
 	flags = flags & TCP_FLAG_MASK
 	if f.StatePreprocess(meta, flags) || meta.Invalid {
 		flowExtra.timeout = exceptionTimeout
@@ -120,17 +118,17 @@ func (f *FlowGenerator) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket, re
 }
 
 // return true if a flow should be reversed
-func (f *FlowGenerator) checkTcpServiceReverse(taggedFlow *TaggedFlow, reversed bool, now time.Duration) bool {
+func (f *FlowGenerator) checkTcpServiceReverse(taggedFlow *TaggedFlow, reversed bool) bool {
 	if reversed {
 		return false
 	}
 	serviceKey := genServiceKey(taggedFlow.FlowMetricsPeerSrc.L3EpcID, taggedFlow.IPSrc, taggedFlow.PortSrc)
-	srcOk := getTcpServiceManager(serviceKey).getStatus(serviceKey, taggedFlow.PortSrc, now)
+	srcOk := getTcpServiceManager(f.index).getTcpStatus(serviceKey, taggedFlow.PortSrc)
 	if !srcOk {
 		return false
 	}
 	serviceKey = genServiceKey(taggedFlow.FlowMetricsPeerDst.L3EpcID, taggedFlow.IPDst, taggedFlow.PortDst)
-	dstOk := getTcpServiceManager(serviceKey).getStatus(serviceKey, taggedFlow.PortDst, now)
+	dstOk := getTcpServiceManager(f.index).getTcpStatus(serviceKey, taggedFlow.PortDst)
 	if !dstOk {
 		return true
 	} else if taggedFlow.PortDst <= taggedFlow.PortSrc {

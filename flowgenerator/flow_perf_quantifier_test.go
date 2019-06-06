@@ -12,7 +12,7 @@ func testSeqSegmentIsContinuous(left, right, node *SeqSegment, t *testing.T) {
 		return
 	}
 
-	ret := isContinuousSeqSegment(left, right, node, nil)
+	ret := isContinuousSeqSegment(left, right, node)
 	if ret == SEQ_NODE_DISCONTINUOUS {
 		t.Logf("%s test faild\n", t.Name())
 	}
@@ -89,7 +89,7 @@ func TestMergeSeqListNode(t *testing.T) {
 	for i := 1; i <= SEQ_LIST_MAX_LEN; i++ {
 		tcpHeader = &MetaPacketTcpHeader{Seq: uint32(100 * i), Ack: 20}
 		payload = 10
-		peer.assertSeqNumber(tcpHeader, payload, nil)
+		peer.assertSeqNumber(tcpHeader, payload)
 	}
 	//t.Log(peer.String())
 
@@ -123,11 +123,11 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	peer := &TcpSessionPeer{}
 
 	// 测试例 payload == 0
-	if flag := peer.assertSeqNumber(&MetaPacketTcpHeader{}, 0, nil); flag != SEQ_NOT_CARE {
+	if flag := peer.assertSeqNumber(&MetaPacketTcpHeader{}, 0); flag != SEQ_NOT_CARE {
 		t.Logf("result is %v, expected %v", flag, SEQ_NOT_CARE)
 	}
 
-	if flag := peer.assertSeqNumber(&MetaPacketTcpHeader{}, 1, nil); flag != SEQ_NOT_CARE {
+	if flag := peer.assertSeqNumber(&MetaPacketTcpHeader{}, 1); flag != SEQ_NOT_CARE {
 		t.Logf("result is %v, expected %v", flag, SEQ_NOT_CARE)
 	}
 	// {0, 1}
@@ -135,7 +135,7 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// {10, 10}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 10, Ack: 20}
 	payload = 10
-	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_DISCONTINUOUS {
+	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_DISCONTINUOUS {
 		t.Logf("result is %v, expected %v", flag, SEQ_DISCONTINUOUS)
 	}
 	//t.Log(peer.String())
@@ -143,7 +143,7 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// {20, 10}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 20}
 	payload = 10
-	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_CONTINUOUS {
+	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_CONTINUOUS {
 		t.Logf("result is %v, expected %v", flag, SEQ_CONTINUOUS)
 	}
 	// {10,20}
@@ -153,7 +153,7 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// input test case {10, 10}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 10}
 	payload = 10
-	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_RETRANS {
+	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_RETRANS {
 		t.Logf("result is %v, expected %v", flag, SEQ_RETRANS)
 	}
 	// {10, 20}
@@ -163,7 +163,7 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// {40, 20}, 异常情况{10,21}, {29, 5}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 40}
 	payload = 20
-	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_DISCONTINUOUS {
+	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_DISCONTINUOUS {
 		t.Logf("result is %v, expected %v", flag, SEQ_DISCONTINUOUS)
 	}
 	// {10,20}, {40,20}
@@ -171,7 +171,7 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 
 	tcpHeader = &MetaPacketTcpHeader{Seq: 10}
 	payload = 21
-	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_ERROR {
+	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_ERROR {
 		t.Logf("result is %v, expected %v", flag, SEQ_ERROR)
 	}
 	// {10,20}, {40,20}
@@ -179,7 +179,7 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 
 	tcpHeader = &MetaPacketTcpHeader{Seq: 29}
 	payload = 5
-	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_ERROR {
+	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_ERROR {
 		t.Logf("result is %v, expected %v", flag, SEQ_ERROR)
 	}
 	// {10,20}, {40,20}
@@ -191,7 +191,7 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// {10,20}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 10}
 	payload = 20
-	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_RETRANS {
+	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_RETRANS {
 		t.Logf("result is %v, expected %v", flag, SEQ_RETRANS)
 	}
 	// {10,20}, {40,20}
@@ -201,7 +201,7 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// {31,4}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 31}
 	payload = 4
-	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_DISCONTINUOUS {
+	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_DISCONTINUOUS {
 		t.Logf("result is %v, expected %v", flag, SEQ_DISCONTINUOUS)
 	}
 	// {10,20}, {31,4}, {40,20}
@@ -211,7 +211,7 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// {30,1}, {35,2}, {39,1}/*异常情况{38, 7}, {10,28}, {35,5}*/
 	tcpHeader = &MetaPacketTcpHeader{Seq: 30}
 	payload = 1
-	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_CONTINUOUS_BOTH {
+	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_CONTINUOUS_BOTH {
 		t.Logf("result is %v, expected %v", flag, SEQ_CONTINUOUS_BOTH)
 	}
 	// {10,25}, {40,20}
@@ -219,7 +219,7 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 
 	tcpHeader = &MetaPacketTcpHeader{Seq: 35}
 	payload = 2
-	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_CONTINUOUS {
+	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_CONTINUOUS {
 		t.Logf("result is %v, expected %v", flag, SEQ_CONTINUOUS)
 	}
 	// {10,27}, {40,20}
@@ -227,7 +227,7 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 
 	tcpHeader = &MetaPacketTcpHeader{Seq: 39}
 	payload = 1
-	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_CONTINUOUS {
+	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_CONTINUOUS {
 		t.Logf("result is %v, expected %v", flag, SEQ_CONTINUOUS)
 	}
 	// {10,27}, {39,21}
@@ -236,7 +236,7 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// 异常情况{38, 7}, {10,28}, {35,5}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 38}
 	payload = 7
-	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_ERROR {
+	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_ERROR {
 		t.Logf("result is %v, expected %v", flag, SEQ_ERROR)
 	}
 	// {10,27}, {39,21}
@@ -244,7 +244,7 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 
 	tcpHeader = &MetaPacketTcpHeader{Seq: 10}
 	payload = 28
-	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_ERROR {
+	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_ERROR {
 		t.Logf("result is %v, expected %v", flag, SEQ_ERROR)
 	}
 	// {10,27}, {39,21}
@@ -252,7 +252,7 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 
 	tcpHeader = &MetaPacketTcpHeader{Seq: 35}
 	payload = 5
-	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_ERROR {
+	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_ERROR {
 		t.Logf("result is %v, expected %v", flag, SEQ_ERROR)
 	}
 	// {10,27}, {39,21}
@@ -263,7 +263,7 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// {5,5}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 5}
 	payload = 5
-	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_CONTINUOUS {
+	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_CONTINUOUS {
 		t.Logf("result is %v, expected %v", flag, SEQ_CONTINUOUS)
 	}
 	// {5,32}, {39,21}
@@ -272,7 +272,7 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// {1,3}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 1}
 	payload = 3
-	if flag := peer.assertSeqNumber(tcpHeader, payload, nil); flag != SEQ_CONTINUOUS {
+	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_CONTINUOUS {
 		t.Logf("result is %v, expected %v", flag, SEQ_CONTINUOUS)
 	}
 	// {0,4}, {5,32}, {39,21}
@@ -292,7 +292,6 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 func TestReestablishFsm(t *testing.T) {
 	var tcpHeader *MetaPacketTcpHeader
 	var packetHeader *MetaPacket
-	var flowInfo *FlowInfo
 
 	counter := NewFlowPerfCounter()
 	flowPerf := AcquireMetaFlowPerf()
@@ -303,66 +302,58 @@ func TestReestablishFsm(t *testing.T) {
 
 	// 1SYN -> 2SYN/ACK -> 1ACK -> 1ACK/LEN>0 -> 2ACK -> 2ACK/LEN>0 -> 1ACK -> 1ACK/LEN>0
 	// 1SYN
-	flowInfo = &FlowInfo{direction: false}
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_SYN, Seq: 111, Ack: 0}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3333, PayloadLen: 0}
-	flowPerf.update(client, server, packetHeader, flowInfo, &counter)
+	flowPerf.update(client, server, packetHeader, TCP_DIR_CLIENT, &counter)
 	//t.Logf("%v, %v, %v", client.String(), server.String(), perfData)
 	client.updateData(packetHeader)
 
 	// 2SYN/ACK rttSyn1 = 1
-	flowInfo = &FlowInfo{direction: true}
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_SYN | TCP_ACK, Seq: 1111, Ack: 112}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3334, PayloadLen: 0}
-	flowPerf.update(server, client, packetHeader, flowInfo, &counter)
+	flowPerf.update(server, client, packetHeader, TCP_DIR_SERVER, &counter)
 	//t.Logf("%v, %v, %v", client.String(), server.String(), perfData)
 	server.updateData(packetHeader)
 
 	// 1ACK rttSyn0 = 10
-	flowInfo = &FlowInfo{direction: false}
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 112, Ack: 1112}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3344, PayloadLen: 0}
-	flowPerf.update(client, server, packetHeader, flowInfo, &counter)
+	flowPerf.update(client, server, packetHeader, TCP_DIR_CLIENT, &counter)
 	//t.Logf("%v, %v, %v", client.String(), server.String(), perfData)
 	client.updateData(packetHeader)
 
 	// 1ACK/LEN>0 len=100
-	flowInfo = &FlowInfo{flowState: FLOW_STATE_ESTABLISHED, direction: false}
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 112, Ack: 1112}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3350, PayloadLen: 100}
-	flowPerf.update(client, server, packetHeader, flowInfo, &counter)
+	flowPerf.update(client, server, packetHeader, TCP_DIR_CLIENT, &counter)
 	//t.Logf("%v, %v, %v", client.String(), server.String(), perfData)
 	client.updateData(packetHeader)
 
 	// 2ACK rtt1 = 4
-	flowInfo = &FlowInfo{flowState: FLOW_STATE_ESTABLISHED, direction: true}
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 1112, Ack: 212}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3354, PayloadLen: 0}
-	flowPerf.update(server, client, packetHeader, flowInfo, &counter)
+	flowPerf.update(server, client, packetHeader, TCP_DIR_SERVER, &counter)
 	//t.Logf("%v, %v, %v", client.String(), server.String(), perfData)
 	server.updateData(packetHeader)
 
 	// 2ACK/LEN>0 len=500 art1 = 30
-	flowInfo = &FlowInfo{flowState: FLOW_STATE_ESTABLISHED, direction: true}
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_PSH | TCP_ACK, Seq: 1112, Ack: 212}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3384, PayloadLen: 500}
-	flowPerf.update(server, client, packetHeader, flowInfo, &counter)
+	flowPerf.update(server, client, packetHeader, TCP_DIR_SERVER, &counter)
 	//t.Logf("%v, %v, %v", client.String(), server.String(), perfData)
 	server.updateData(packetHeader)
 
 	// 1ACK rtt0 = 16
-	flowInfo = &FlowInfo{flowState: FLOW_STATE_ESTABLISHED, direction: false}
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 212, Ack: 1612}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3400, PayloadLen: 0}
-	flowPerf.update(client, server, packetHeader, flowInfo, &counter)
+	flowPerf.update(client, server, packetHeader, TCP_DIR_CLIENT, &counter)
 	//t.Logf("%v, %v, %v", client.String(), server.String(), perfData)
 	client.updateData(packetHeader)
 
 	// 1ACK/LEN>0 len=200 art0 = 54
-	flowInfo = &FlowInfo{flowState: FLOW_STATE_ESTABLISHED, direction: false}
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 212, Ack: 1612}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3454, PayloadLen: 200}
-	flowPerf.update(client, server, packetHeader, flowInfo, &counter)
+	flowPerf.update(client, server, packetHeader, TCP_DIR_CLIENT, &counter)
 	//t.Logf("%v, %v, %v", client.String(), server.String(), perfData)
 	client.updateData(packetHeader)
 }
@@ -380,46 +371,45 @@ func TestPreprocess(t *testing.T) {
 
 	counter := NewFlowPerfCounter()
 	flowPerf := AcquireMetaFlowPerf()
-	flowInfo := &FlowInfo{}
 
 	//  SYN组合
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_SYN | TCP_ACK | TCP_PSH | TCP_URG}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 1000}
-	if ok := flowPerf.preprocess(packetHeader, flowInfo, &counter); ok != true {
+	if ok := flowPerf.preprocess(packetHeader, &counter); ok != true {
 		t.Errorf("tcpflag:0x%04x, faild\n", tcpHeader.Flags)
 	}
 
 	//  ACK组合
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_ACK /*| TCP_FIN | TCP_RST*/ | TCP_PSH | TCP_URG}
 	packetHeader = &MetaPacket{TcpData: tcpHeader}
-	if ok := flowPerf.preprocess(packetHeader, flowInfo, &counter); ok != true {
+	if ok := flowPerf.preprocess(packetHeader, &counter); ok != true {
 		t.Errorf("tcpflag:0x%04x, faild\n", tcpHeader.Flags)
 	}
 	/*
 		//  SYN异常组合
 		tcpHeader = &MetaPacketTcpHeader{Flags: TCP_SYN | TCP_RST | TCP_FIN}
 		packetHeader = &MetaPacket{TcpData: tcpHeader}
-		if ok := flowPerf.preprocess(packetHeader, flowInfo, &counter); ok != false {
+		if ok := flowPerf.preprocess(packetHeader, &counter); ok != false {
 			t.Errorf("tcpflag:0x%04x, faild, result:%v\n", tcpHeader.Flags, ok)
 		}
 
 		//  FIN异常组合
 		tcpHeader = &MetaPacketTcpHeader{Flags: TCP_FIN | TCP_PSH | TCP_URG}
 		packetHeader = &MetaPacket{TcpData: tcpHeader}
-		if ok := flowPerf.preprocess(packetHeader, flowInfo, &counter); ok != false {
+		if ok := flowPerf.preprocess(packetHeader, &counter); ok != false {
 			t.Errorf("tcpflag:0x%04x, faild\n", tcpHeader.Flags)
 		}
 	*/
 
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_RST}
 	packetHeader = &MetaPacket{TcpData: tcpHeader}
-	if ok := flowPerf.preprocess(packetHeader, flowInfo, &counter); ok != false {
+	if ok := flowPerf.preprocess(packetHeader, &counter); ok != false {
 		t.Errorf("tcpflag:0x%04x, faild\n", tcpHeader.Flags)
 	}
 
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_FIN}
 	packetHeader = &MetaPacket{TcpData: tcpHeader}
-	if ok := flowPerf.preprocess(packetHeader, flowInfo, &counter); ok != false {
+	if ok := flowPerf.preprocess(packetHeader, &counter); ok != false {
 		t.Errorf("tcpflag:0x%04x, faild\n", tcpHeader.Flags)
 	}
 }
@@ -431,7 +421,7 @@ func testMetaFlowPerfUpdate(t *testing.T) {
 
 	counter := NewFlowPerfCounter()
 	flowPerf := AcquireMetaFlowPerf()
-	flowInfo := &FlowExtra{
+	flowExtra := &FlowExtra{
 		taggedFlow: &TaggedFlow{},
 	}
 
@@ -449,57 +439,57 @@ func testMetaFlowPerfUpdate(t *testing.T) {
 	// 1SYN
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_SYN, Seq: 111, Ack: 0}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3333, PayloadLen: 0}
-	flowPerf.Update(packetHeader, false, flowInfo, &counter)
+	flowPerf.Update(packetHeader, false, flowExtra, &counter)
 
 	// 2SYN/ACK rttSyn1=1
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_SYN | TCP_ACK, Seq: 1111, Ack: 112}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3334, PayloadLen: 0}
-	flowPerf.Update(packetHeader, true, flowInfo, &counter)
+	flowPerf.Update(packetHeader, true, flowExtra, &counter)
 
 	// 1ACK rttSyn0=10
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 112, Ack: 1112}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3344, PayloadLen: 0}
-	flowPerf.Update(packetHeader, false, flowInfo, &counter)
+	flowPerf.Update(packetHeader, false, flowExtra, &counter)
 
 	// 1ACK/LEN>0 len=100
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 112, Ack: 1112}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3350, PayloadLen: 100}
-	flowPerf.Update(packetHeader, false, flowInfo, &counter)
+	flowPerf.Update(packetHeader, false, flowExtra, &counter)
 
 	// 2ACK/LEN>0包，len=100 *art1=4
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 1112, Ack: 212}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3354, PayloadLen: 100}
-	flowPerf.Update(packetHeader, true, flowInfo, &counter)
+	flowPerf.Update(packetHeader, true, flowExtra, &counter)
 
 	// 2ACK 测试连续ACK包, 对RTT计算的影响
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 1212, Ack: 212}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3358, PayloadLen: 0}
-	flowPerf.Update(packetHeader, true, flowInfo, &counter)
+	flowPerf.Update(packetHeader, true, flowExtra, &counter)
 
 	// 2ACK/LEN>0 len=500
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_PSH | TCP_ACK, Seq: 1212, Ack: 212}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3384, PayloadLen: 500}
-	flowPerf.Update(packetHeader, true, flowInfo, &counter)
+	flowPerf.Update(packetHeader, true, flowExtra, &counter)
 
 	// 1ACK rtt0=16
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 212, Ack: 1712}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3400, PayloadLen: 0}
-	flowPerf.Update(packetHeader, false, flowInfo, &counter)
+	flowPerf.Update(packetHeader, false, flowExtra, &counter)
 
 	// 1ACK/LEN>0 len=200 art0=70
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 212, Ack: 1712}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3454, PayloadLen: 200}
-	flowPerf.Update(packetHeader, false, flowInfo, &counter)
+	flowPerf.Update(packetHeader, false, flowExtra, &counter)
 
 	// 2ACK *rtt1=100
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 1712, Ack: 412}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3554, PayloadLen: 0}
-	flowPerf.Update(packetHeader, true, flowInfo, &counter)
+	flowPerf.Update(packetHeader, true, flowExtra, &counter)
 
 	// 2ACK/LEN>0 len=300 *art1=106
 	tcpHeader = &MetaPacketTcpHeader{Flags: TCP_ACK, Seq: 1712, Ack: 412}
 	packetHeader = &MetaPacket{TcpData: tcpHeader, Timestamp: 3560, PayloadLen: 300}
-	flowPerf.Update(packetHeader, true, flowInfo, &counter)
+	flowPerf.Update(packetHeader, true, flowExtra, &counter)
 	if t != nil {
 		expectedPeriodPerfStats := MetaPerfStats{
 			art0Count: 1, art1Count: 0, rtt0Count: 1, rtt1Count: 0,
@@ -600,11 +590,7 @@ func TestVariance(t *testing.T) {
 		PacketLen: 1000,
 		Timestamp: 2000,
 	}
-	flowInfo := &FlowInfo{
-		totalPacketCount0: 1,
-		totalPacketCount1: 0,
-	}
-	p.calcVarianceStats(header, flowInfo)
+	p.calcVarianceStats(header, 1)
 	perf = Report(p, false, &counter)
 	t.Log(p.perfData.packetVariance)
 	t.Log(perf)
@@ -613,11 +599,7 @@ func TestVariance(t *testing.T) {
 		PacketLen: 4000,
 		Timestamp: 6000,
 	}
-	flowInfo = &FlowInfo{
-		totalPacketCount0: 1,
-		totalPacketCount1: 1,
-	}
-	p.calcVarianceStats(header, flowInfo)
+	p.calcVarianceStats(header, 2)
 	perf = Report(p, false, &counter)
 	t.Log(p.perfData.packetVariance)
 	t.Log(perf)
@@ -626,11 +608,7 @@ func TestVariance(t *testing.T) {
 		PacketLen: 64,
 		Timestamp: 3000000,
 	}
-	flowInfo = &FlowInfo{
-		totalPacketCount0: 2,
-		totalPacketCount1: 1,
-	}
-	p.calcVarianceStats(header, flowInfo)
+	p.calcVarianceStats(header, 3)
 	perf = Report(p, false, &counter)
 	t.Log(p.perfData.packetVariance)
 	t.Log(perf)
@@ -668,35 +646,35 @@ func benchTcpSessionPeerSeqNoAssert(isDesc bool) {
 		for i := 0; i < SEQ_LIST_MAX_LEN; i++ {
 			tcpHeader = &MetaPacketTcpHeader{Seq: uint32(i*10 + i), Ack: 20}
 			payload = 10
-			peer.assertSeqNumber(tcpHeader, payload, nil)
+			peer.assertSeqNumber(tcpHeader, payload)
 		}
 	} else {
 		for i := SEQ_LIST_MAX_LEN; i >= 0; i-- {
 			tcpHeader = &MetaPacketTcpHeader{Seq: uint32(i*10 + i), Ack: 20}
 			payload = 10
-			peer.assertSeqNumber(tcpHeader, payload, nil)
+			peer.assertSeqNumber(tcpHeader, payload)
 		}
 	}
 
 	// isErrorSeqSegment
 	tcpHeader = &MetaPacketTcpHeader{Seq: uint32(SEQ_LIST_MAX_LEN * 10), Ack: 20}
 	payload = 10
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	peer.assertSeqNumber(tcpHeader, payload)
 
 	// isRetransSeqSegment
 	tcpHeader = &MetaPacketTcpHeader{Seq: 0, Ack: 20}
 	payload = 10
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	peer.assertSeqNumber(tcpHeader, payload)
 
 	// insert 17th node(mergeSeqListNode)
 	tcpHeader = &MetaPacketTcpHeader{Seq: 200, Ack: 20}
 	payload = 10
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	peer.assertSeqNumber(tcpHeader, payload)
 
 	// isContinuousSeqSegment
 	tcpHeader = &MetaPacketTcpHeader{Seq: 10, Ack: 20}
 	payload = 1
-	peer.assertSeqNumber(tcpHeader, payload, nil)
+	peer.assertSeqNumber(tcpHeader, payload)
 }
 
 func BenchmarkTcpSessionPeerSeqNoAssertDesc(b *testing.B) {

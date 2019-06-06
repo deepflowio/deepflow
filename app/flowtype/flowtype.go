@@ -21,8 +21,9 @@ import (
 var log = logging.MustGetLogger("flowtype")
 
 const (
-	CODES_LEN  = 64
-	GROUPS_LEN = 16
+	CODES_LEN     = 64
+	GROUPS_LEN    = 16
+	MAX_FLOW_TYPE = inputtype.CloseTypeClientHalfClose + 1
 )
 
 // node
@@ -61,6 +62,9 @@ type FlowToTypeDocumentMapper struct {
 	encoder   *codec.SimpleEncoder
 	codes     []outputtype.Code
 	aclGroups [2][]int32
+
+	fields [2]outputtype.Field
+	meters [MAX_FLOW_TYPE]outputtype.TypeMeter
 }
 
 func (p *FlowToTypeDocumentMapper) GetName() string {
@@ -77,6 +81,23 @@ func (p *FlowToTypeDocumentMapper) Prepare() {
 	p.encoder = &codec.SimpleEncoder{}
 	p.codes = make([]outputtype.Code, 0, CODES_LEN)
 	p.aclGroups = [2][]int32{make([]int32, 0, GROUPS_LEN), make([]int32, 0, GROUPS_LEN)}
+
+	for flowType := inputtype.CloseType(0); flowType <= MAX_FLOW_TYPE; flowType++ {
+		switch flowType {
+		case inputtype.CloseTypeTCPServerRst:
+			p.meters[flowType].SumCountTServerRst = 1
+		case inputtype.CloseTypeTCPClientRst:
+			p.meters[flowType].SumCountTClientRst = 1
+		case inputtype.CloseTypeServerHalfOpen:
+			p.meters[flowType].SumCountTServerHalfOpen = 1
+		case inputtype.CloseTypeClientHalfOpen:
+			p.meters[flowType].SumCountTClientHalfOpen = 1
+		case inputtype.CloseTypeServerHalfClose:
+			p.meters[flowType].SumCountTServerHalfClose = 1
+		case inputtype.CloseTypeClientHalfClose:
+			p.meters[flowType].SumCountTClientHalfClose = 1
+		}
+	}
 }
 
 func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedTag bool) []interface{} {
@@ -91,6 +112,9 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 	}
 	flow := Flow(*rawFlow)
 	if !flow.IsClosedFlow() {
+		return p.docs.Slice()
+	}
+	if flow.CloseType >= MAX_FLOW_TYPE {
 		return p.docs.Slice()
 	}
 
@@ -114,30 +138,15 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
 		otherEnd := GetOppositeEndpoint(thisEnd)
-		meter := outputtype.TypeMeter{}
 
-		switch flow.CloseType {
-		case inputtype.CloseTypeTCPServerRst:
-			meter.SumCountTServerRst = 1
-		case inputtype.CloseTypeTCPClientRst:
-			meter.SumCountTClientRst = 1
-		case inputtype.CloseTypeServerHalfOpen:
-			meter.SumCountTServerHalfOpen = 1
-		case inputtype.CloseTypeClientHalfOpen:
-			meter.SumCountTClientHalfOpen = 1
-		case inputtype.CloseTypeServerHalfClose:
-			meter.SumCountTServerHalfClose = 1
-		case inputtype.CloseTypeClientHalfClose:
-			meter.SumCountTClientHalfClose = 1
-		}
-		field := outputtype.Field{
-			IP:           ips[thisEnd],
-			TAPType:      TAPTypeFromInPort(flow.InPort),
-			Direction:    directions[thisEnd],
-			ACLDirection: outputtype.ACL_FORWARD, // 含ACLDirection字段时仅考虑ACL正向匹配
+		meter := &p.meters[flow.CloseType]
 
-			IP1: ips[otherEnd],
-		}
+		field := &p.fields[thisEnd]
+		field.IP = ips[thisEnd]
+		field.TAPType = TAPTypeFromInPort(flow.InPort)
+		field.Direction = directions[thisEnd]
+		field.ACLDirection = outputtype.ACL_FORWARD // 含ACLDirection字段时仅考虑ACL正向匹配
+		field.IP1 = ips[otherEnd]
 
 		// node
 		if statTemplates&inputtype.TEMPLATE_NODE != 0 {
@@ -148,7 +157,7 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				if IsWrongEndPoint(thisEnd, code) {
 					continue
 				}
-				tag := &outputtype.Tag{Field: &field, Code: code}
+				tag := &outputtype.Tag{Field: field, Code: code}
 				if code.PossibleDuplicate() {
 					id := tag.GetID(p.encoder)
 					if _, exists := docMap[id]; exists {
@@ -160,7 +169,7 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				doc.Timestamp = docTimestamp
 				field.FillTag(code, doc.Tag.(*outputtype.Tag))
 				doc.Tag.SetID(tag.GetID(p.encoder))
-				doc.Meter = &meter
+				doc.Meter = meter
 			}
 		}
 
@@ -178,7 +187,7 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
 					continue
 				}
-				tag := &outputtype.Tag{Field: &field, Code: code}
+				tag := &outputtype.Tag{Field: field, Code: code}
 				if code.PossibleDuplicate() {
 					id := tag.GetID(p.encoder)
 					if _, exists := docMap[id]; exists {
@@ -191,7 +200,7 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				doc.Timestamp = docTimestamp
 				field.FillTag(code, doc.Tag.(*outputtype.Tag))
 				doc.Tag.SetID(tag.GetID(p.encoder))
-				doc.Meter = &meter
+				doc.Meter = meter
 			}
 
 			codes = p.codes[:0]
@@ -205,7 +214,7 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) { // 双侧tag
 					continue
 				}
-				tag := &outputtype.Tag{Field: &field, Code: code}
+				tag := &outputtype.Tag{Field: field, Code: code}
 				if code.PossibleDuplicate() {
 					id := tag.GetID(p.encoder)
 					if _, exists := docMap[id]; exists {
@@ -218,77 +227,7 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				doc.Timestamp = docTimestamp
 				field.FillTag(code, doc.Tag.(*outputtype.Tag))
 				doc.Tag.SetID(tag.GetID(p.encoder))
-				doc.Meter = &meter
-			}
-
-			flow.FillACLGroupID(policy, p.aclGroups[:])
-
-			// group
-			codes = codes[:0]
-			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE != 0 {
-				codes = append(codes, POLICY_GROUP_NODE_CODES...)
-			}
-			for _, code := range codes {
-				for _, groupID := range p.aclGroups[thisEnd] {
-					if groupID == 0 {
-						continue
-					}
-					field.GroupID = int16(groupID)
-					if IsDupTraffic(flow.InPort, l3EpcIDs[thisEnd], isL2End[thisEnd], isL3End[thisEnd], code) {
-						continue
-					}
-					if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
-						continue
-					}
-					tag := &outputtype.Tag{Field: &field, Code: code}
-					if code.PossibleDuplicate() {
-						id := tag.GetID(p.encoder)
-						if _, exists := docMap[id]; exists {
-							continue
-
-						}
-						docMap[id] = true
-					}
-					doc := p.docs.Get().(*app.Document)
-					doc.Timestamp = docTimestamp
-					field.FillTag(code, doc.Tag.(*outputtype.Tag))
-					doc.Tag.SetID(tag.GetID(p.encoder))
-					doc.Meter = &meter
-				}
-			}
-
-			// group edge
-			codes = codes[:0]
-			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE != 0 {
-				codes = append(codes, POLICY_GROUP_EDGE_CODES...)
-			}
-			for _, code := range codes {
-				for _, srcGroup := range p.aclGroups[thisEnd] {
-					field.GroupID = int16(srcGroup)
-					for _, dstGroup := range p.aclGroups[otherEnd] {
-						field.GroupID1 = int16(dstGroup)
-						if IsDupTraffic(flow.InPort, l3EpcIDs[otherEnd], isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧tag
-							continue
-						}
-						if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) { // 双侧tag
-							continue
-						}
-						tag := &outputtype.Tag{Field: &field, Code: code}
-						if code.PossibleDuplicate() {
-							id := tag.GetID(p.encoder)
-							if _, exists := docMap[id]; exists {
-								continue
-
-							}
-							docMap[id] = true
-						}
-						doc := p.docs.Get().(*app.Document)
-						doc.Timestamp = docTimestamp
-						field.FillTag(code, doc.Tag.(*outputtype.Tag))
-						doc.Tag.SetID(tag.GetID(p.encoder))
-						doc.Meter = &meter
-					}
-				}
+				doc.Meter = meter
 			}
 		}
 	}

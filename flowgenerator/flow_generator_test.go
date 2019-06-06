@@ -315,39 +315,6 @@ func TestStartStop(t *testing.T) {
 	t.Logf("CurrNumFlows is %d", flowGenerator.stats.CurrNumFlows)
 }
 
-func TestFlowReverse(t *testing.T) {
-	runtime.GOMAXPROCS(4)
-	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
-
-	policyData := new(PolicyData)
-	policyData.Merge([]AclAction{generateAclAction(10, ACTION_PACKET_COUNTING)}, nil, 10)
-
-	packet0 := getDefaultPacket()
-	packet0.TcpData.Flags = TCP_ACK
-	packet0.PolicyData = policyData
-	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
-
-	packet1 := getDefaultPacket()
-	packet1.TcpData.Flags = TCP_SYN | TCP_ACK
-	packet1.PolicyData = policyData
-	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
-
-	flowGenerator.Start()
-
-	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
-
-	if taggedFlow.FlowMetricsPeerSrc.TCPFlags != 0 && taggedFlow.FlowMetricsPeerDst.TCPFlags != TCP_SYN|TCP_ACK {
-		// the flow is not revesed again with service ports list
-		t.Errorf("taggedFlow.TCPFlags0 is %d, expect %d", taggedFlow.FlowMetricsPeerSrc.TCPFlags, 0)
-		t.Errorf("taggedFlow.TCPFlags1 is %d, expect %d", taggedFlow.FlowMetricsPeerDst.TCPFlags, TCP_SYN|TCP_ACK)
-		t.Errorf("\n%s", taggedFlow)
-	}
-	if d := taggedFlow.PolicyData.AclActions[0].GetDirections(); d != BACKWARD {
-		t.Errorf("taggedFlow.PolicyData.AclActions[0].GetDirections() is %d, expect %d", d, BACKWARD)
-		t.Errorf("\n%s", taggedFlow)
-	}
-}
-
 func TestReverseInNewCircle(t *testing.T) {
 	flowGenerator, _, _ := flowGeneratorInit()
 

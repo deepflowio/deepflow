@@ -101,6 +101,9 @@ type FlowToFlowDocumentMapper struct {
 	codes        []outputtype.Code
 	rawSrcGroups []int32
 	aclGroups    [2][]int32
+
+	fields [2]outputtype.Field
+	meters [2]outputtype.FlowMeter
 }
 
 func (p *FlowToFlowDocumentMapper) GetName() string {
@@ -199,24 +202,23 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
 		otherEnd := GetOppositeEndpoint(thisEnd)
-		meter := outputtype.FlowMeter{
-			SumFlowCount:       1,
-			SumNewFlowCount:    flow.NewFlowCount(),
-			SumClosedFlowCount: flow.ClosedFlowCount(),
-			SumPacketTx:        packets[thisEnd],
-			SumPacketRx:        packets[otherEnd],
-			SumBitTx:           bits[thisEnd],
-			SumBitRx:           bits[otherEnd],
-		}
-		field := outputtype.Field{
-			IP:           ips[thisEnd],
-			TAPType:      TAPTypeFromInPort(flow.InPort),
-			Protocol:     flow.Proto,
-			ServerPort:   flow.PortDst,
-			ACLDirection: outputtype.ACL_FORWARD, // 含ACLDirection字段时仅考虑ACL正向匹配
 
-			IP1: ips[otherEnd],
-		}
+		meter := &p.meters[thisEnd]
+		meter.SumFlowCount = 1
+		meter.SumNewFlowCount = flow.NewFlowCount()
+		meter.SumClosedFlowCount = flow.ClosedFlowCount()
+		meter.SumPacketTx = packets[thisEnd]
+		meter.SumPacketRx = packets[otherEnd]
+		meter.SumBitTx = bits[thisEnd]
+		meter.SumBitRx = bits[otherEnd]
+
+		field := &p.fields[thisEnd]
+		field.IP = ips[thisEnd]
+		field.TAPType = TAPTypeFromInPort(flow.InPort)
+		field.Protocol = flow.Proto
+		field.ServerPort = flow.PortDst
+		field.ACLDirection = outputtype.ACL_FORWARD // 含ACLDirection字段时仅考虑ACL正向匹配
+		field.IP1 = ips[otherEnd]
 
 		// oneSideCodes
 		for _, code := range oneSideCodes {
@@ -230,7 +232,7 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				// 产品要求：统计服务器内所有虚拟接口流量之和
 				continue
 			}
-			p.appendDoc(docMap, docTimestamp, &field, code, &meter, uint32(inputtype.ACTION_FLOW_COUNTING))
+			p.appendDoc(docMap, docTimestamp, field, code, meter, uint32(inputtype.ACTION_FLOW_COUNTING))
 		}
 
 		// edgeCodes
@@ -241,7 +243,7 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 			if IsWrongEndPoint(thisEnd, code) { // 双侧Tag
 				continue
 			}
-			p.appendDoc(docMap, docTimestamp, &field, code, &meter, uint32(inputtype.ACTION_FLOW_COUNTING))
+			p.appendDoc(docMap, docTimestamp, field, code, meter, uint32(inputtype.ACTION_FLOW_COUNTING))
 		}
 
 		// policy
@@ -270,7 +272,7 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 					// 产品要求：统计服务器内所有虚拟接口流量之和
 					continue
 				}
-				p.appendDoc(docMap, docTimestamp, &field, code, &meter, uint32(policy.GetActionFlags()))
+				p.appendDoc(docMap, docTimestamp, field, code, meter, uint32(policy.GetActionFlags()))
 			}
 
 			// edge
@@ -288,73 +290,7 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) { // 双侧Tag
 					continue
 				}
-				p.appendDoc(docMap, docTimestamp, &field, code, &meter, uint32(policy.GetActionFlags()))
-			}
-
-			flow.FillACLGroupID(policy, p.aclGroups[:])
-
-			// group node & group node port
-			codes = codes[:0]
-			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE != 0 {
-				codes = append(codes, POLICY_GROUP_NODE_CODES...)
-			}
-			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE_PORT != 0 && !flow.ServiceNotAlive() { // 含有端口号的，仅统计活跃端口
-				codes = append(codes, POLICY_GROUP_NODE_PORT_CODES...)
-			}
-			for _, code := range codes {
-				for _, groupID := range p.aclGroups[thisEnd] {
-					if groupID == 0 {
-						continue
-					}
-					field.GroupID = int16(groupID)
-					if IsDupTraffic(flow.InPort, l3EpcIDs[thisEnd], isL2End[thisEnd], isL3End[thisEnd], code) {
-						continue
-					}
-					if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
-						continue
-					}
-					p.appendDoc(docMap, docTimestamp, &field, code, &meter, uint32(policy.GetActionFlags()))
-				}
-			}
-
-			// group_edge
-			srcGroups := p.aclGroups[thisEnd]
-			codes = codes[:0]
-			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE != 0 {
-				codes = append(codes, POLICY_GROUP_EDGE_CODES...)
-			}
-			// 白名单与其他应用不会使用同一个acl_gid，所以这里是正确的
-			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE_PORT != 0 && !flow.ServiceNotAlive() {
-				codes = append(codes, POLICY_GROUP_EDGE_PORT_CODES...)
-			} else if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE_PORT_ALL != 0 &&
-				TOR.IsPortInRange(flow.InPort) && flow.IsInterestWhitelistServerPort() {
-				codes = append(codes, POLICY_GROUP_EDGE_PORT_CODES...) // 白名单：虚拟网络、所有端口，即使端口号不活跃也需要记录
-				// 白名单使用未经acl过滤的源资源组
-				if len(p.rawSrcGroups) == 0 {
-					for _, v := range flow.GroupIDs0 {
-						p.rawSrcGroups = append(p.rawSrcGroups, int32(inputtype.FormatGroupId(v)))
-					}
-					if len(p.rawSrcGroups) == 0 {
-						p.rawSrcGroups = append(p.rawSrcGroups, -1)
-					}
-				}
-				srcGroups = p.rawSrcGroups
-			}
-
-			for _, code := range codes {
-				for _, gidSrc := range srcGroups {
-					field.GroupID = int16(gidSrc)
-					for _, gidDst := range p.aclGroups[otherEnd] {
-						field.GroupID1 = int16(gidDst)
-						if IsDupTraffic(flow.InPort, l3EpcIDs[otherEnd], isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧Tag
-							continue
-						}
-						if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) { // 双侧Tag
-							continue
-						}
-						p.appendDoc(docMap, docTimestamp, &field, code, &meter, uint32(policy.GetActionFlags()))
-					}
-				}
+				p.appendDoc(docMap, docTimestamp, field, code, meter, uint32(policy.GetActionFlags()))
 			}
 		}
 	}
