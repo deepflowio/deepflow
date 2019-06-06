@@ -46,7 +46,7 @@ const (
 	VLANID
 	Protocol
 	ServerPort
-	_ // 1 << 37
+	CastType
 	_ // 1 << 38, VTAP
 	TAPType
 	SubnetID
@@ -140,6 +140,15 @@ const (
 	ACL_BACKWARD
 )
 
+type CastTypeEnum uint8
+
+const (
+	UNKNOWN CastTypeEnum = iota
+	BROADCAST
+	MULTICAST
+	UNICAST
+)
+
 type ScopeEnum uint8
 
 const (
@@ -218,6 +227,7 @@ type Field struct {
 	SubnetID1    uint16
 	TAPType      TAPTypeEnum
 	ACLDirection ACLDirectionEnum
+	CastType     CastTypeEnum
 
 	Scope ScopeEnum
 
@@ -390,6 +400,18 @@ func (t *Tag) MarshalTo(b []byte) int {
 			offset += copy(b[offset:], ",acl_direction=bwd")
 		}
 	}
+	if t.Code&CastType != 0 {
+		switch t.CastType {
+		case UNKNOWN:
+			offset += copy(b[offset:], ",cast_type=unknown")
+		case BROADCAST:
+			offset += copy(b[offset:], ",cast_type=broadcast")
+		case MULTICAST:
+			offset += copy(b[offset:], ",cast_type=multicast")
+		case UNICAST:
+			offset += copy(b[offset:], ",cast_type=unicast")
+		}
+	}
 	if t.Code&Scope != 0 {
 		offset += copy(b[offset:], ",scope=")
 		offset += copy(b[offset:], t.Scope.String())
@@ -510,6 +532,9 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&ACLDirection != 0 {
 		t.ACLDirection = ACLDirectionEnum(decoder.ReadU8())
 	}
+	if t.Code&CastType != 0 {
+		t.CastType = CastTypeEnum(decoder.ReadU8())
+	}
 	if t.Code&Scope != 0 {
 		t.Scope = ScopeEnum(decoder.ReadU8())
 	}
@@ -621,6 +646,9 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 	}
 	if t.Code&ACLDirection != 0 {
 		encoder.WriteU8(uint8(t.ACLDirection))
+	}
+	if t.Code&CastType != 0 {
+		encoder.WriteU8(uint8(t.CastType))
 	}
 	if t.Code&Scope != 0 {
 		encoder.WriteU8(uint8(t.Scope))
