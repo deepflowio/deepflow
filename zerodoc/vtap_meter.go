@@ -24,6 +24,10 @@ const (
 	METRICS_UDP
 	METRICS_EPC_UDP
 	METRICS_SUBNET_UDP
+	METRICS_UNKNOWN
+	METRICS_BROADCAST
+	METRICS_MULTICAST
+	METRICS_UNICAST
 )
 
 type VTAPUsageMeter struct {
@@ -40,6 +44,11 @@ type VTAPUsageMeter struct {
 	UDP         Metrics
 	InEPCUDP    Metrics
 	InSubnetUDP Metrics
+
+	Unknown   Metrics
+	Broadcast Metrics
+	Multicast Metrics
+	Unicast   Metrics
 }
 
 func (m *Metrics) Encode(encoder *codec.SimpleEncoder) {
@@ -122,6 +131,18 @@ func (m *VTAPUsageMeter) Encode(encoder *codec.SimpleEncoder) {
 	if m.Fields&METRICS_SUBNET_UDP != 0 {
 		m.InSubnetUDP.Encode(encoder)
 	}
+	if m.Fields&METRICS_UNKNOWN != 0 {
+		m.Unknown.Encode(encoder)
+	}
+	if m.Fields&METRICS_BROADCAST != 0 {
+		m.Broadcast.Encode(encoder)
+	}
+	if m.Fields&METRICS_MULTICAST != 0 {
+		m.Multicast.Encode(encoder)
+	}
+	if m.Fields&METRICS_UNICAST != 0 {
+		m.Unicast.Encode(encoder)
+	}
 }
 
 func (m *VTAPUsageMeter) Decode(decoder *codec.SimpleDecoder) {
@@ -152,6 +173,18 @@ func (m *VTAPUsageMeter) Decode(decoder *codec.SimpleDecoder) {
 	}
 	if m.Fields&METRICS_SUBNET_UDP != 0 {
 		m.InSubnetUDP.Decode(decoder)
+	}
+	if m.Fields&METRICS_UNKNOWN != 0 {
+		m.Unknown.Decode(decoder)
+	}
+	if m.Fields&METRICS_BROADCAST != 0 {
+		m.Broadcast.Decode(decoder)
+	}
+	if m.Fields&METRICS_MULTICAST != 0 {
+		m.Multicast.Decode(decoder)
+	}
+	if m.Fields&METRICS_UNICAST != 0 {
+		m.Unicast.Decode(decoder)
 	}
 }
 
@@ -199,6 +232,18 @@ func (m *VTAPUsageMeter) ConcurrentMerge(other app.Meter) {
 		}
 		if m.Fields&METRICS_SUBNET_UDP != 0 {
 			m.InSubnetUDP.Merge(&other.InSubnetUDP)
+		}
+		if m.Fields&METRICS_UNKNOWN != 0 {
+			m.Unknown.Merge(&other.Unknown)
+		}
+		if m.Fields&METRICS_BROADCAST != 0 {
+			m.Broadcast.Merge(&other.Broadcast)
+		}
+		if m.Fields&METRICS_MULTICAST != 0 {
+			m.Multicast.Merge(&other.Multicast)
+		}
+		if m.Fields&METRICS_UNICAST != 0 {
+			m.Unicast.Merge(&other.Unicast)
 		}
 	}
 }
