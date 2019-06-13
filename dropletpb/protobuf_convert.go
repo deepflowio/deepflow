@@ -2,16 +2,14 @@ package dropletpb
 
 import (
 	"net"
-	"strconv"
 	"strings"
+
+	"gitlab.x.lan/yunshan/message/trident"
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/policy"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
-	"gitlab.x.lan/yunshan/message/trident"
 )
-
-var MAX_NETMASK = MaskLenToNetmask(datatype.MAX_MASK_LEN)
 
 func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	macInt := uint64(0)
@@ -68,44 +66,6 @@ func Convert2PlatformData(interfaces []*trident.Interface) []*datatype.PlatformD
 	return platformDatas
 }
 
-func ipRangeConvert2CIDR(startIp, endIp net.IP) []net.IPNet {
-	start := IpToUint32(startIp)
-	end := IpToUint32(endIp)
-	var ips []net.IPNet
-	for start <= end {
-		maskLen := getFirstMask(start, end)
-		ip := IpFromUint32(start)
-		ipMask := net.CIDRMask(int(maskLen), datatype.MAX_MASK_LEN)
-		ips = append(ips, net.IPNet{IP: ip, Mask: ipMask})
-		lastIp := getLastIp(start, maskLen)
-		if lastIp == MAX_NETMASK {
-			break
-		}
-		start += 1 << uint32(datatype.MAX_MASK_LEN-maskLen)
-	}
-	return ips
-}
-
-func getFirstMask(start, end uint32) uint8 {
-	maxLen := datatype.MAX_MASK_LEN
-	for ; maxLen > datatype.MIN_MASK_LEN; maxLen-- {
-		if start&(1<<uint32(datatype.MAX_MASK_LEN-maxLen)) != 0 {
-			// maxLen继续减少将会使得start不是所在网段的第一个IP
-			break
-		}
-		if start+^MaskLenToNetmask(uint32(maxLen)) >= end || start+^MaskLenToNetmask(uint32(maxLen-1)) > end {
-			// maxLen继续减少将会使得网段包含end之后的IP
-			break
-		}
-	}
-	return uint8(maxLen)
-}
-
-func getLastIp(ip uint32, mask uint8) uint32 {
-	ip += ^MaskLenToNetmask(uint32(mask))
-	return ip
-}
-
 func newIpGroupData(ipGroup *trident.Group) *policy.IpGroupData {
 	if ipGroup == nil || (ipGroup.GetIps() == nil && ipGroup.GetIpRanges() == nil) {
 		return nil
@@ -122,7 +82,7 @@ func newIpGroupData(ipGroup *trident.Group) *policy.IpGroupData {
 			if startIp == nil || endIp == nil {
 				continue
 			}
-			for _, ip := range ipRangeConvert2CIDR(startIp, endIp) {
+			for _, ip := range datatype.IpRangeConvert2CIDR(startIp, endIp) {
 				ips = append(ips, ip.String())
 			}
 		}
@@ -145,53 +105,6 @@ func Convert2IpGroupData(ipGroups []*trident.Group) []*policy.IpGroupData {
 	}
 
 	return ipGroupDatas
-}
-
-func splitGroup2Int(src string) []uint32 {
-	splitSrcGroups := strings.Split(src, ",")
-	groups := make([]uint32, 0, 8)
-	for _, group := range splitSrcGroups {
-		groupInt, err := strconv.Atoi(group)
-		if err == nil {
-			groups = append(groups, uint32(groupInt&0xffff))
-		}
-	}
-
-	return groups
-}
-
-func getPorts(src string) []datatype.PortRange {
-	splitSrcPorts := strings.Split(src, "-")
-	ports := make([]datatype.PortRange, 0, 8)
-	if len(splitSrcPorts) < 2 {
-		portInt, err := strconv.Atoi(src)
-		if err == nil {
-			ports = append(ports, datatype.NewPortRange(uint16(portInt), uint16(portInt)))
-		}
-		return ports
-	}
-
-	min, err := strconv.Atoi(splitSrcPorts[0])
-	if err != nil {
-		return ports
-	}
-
-	max, err := strconv.Atoi(splitSrcPorts[1])
-	if err != nil {
-		return ports
-	}
-
-	ports = append(ports, datatype.NewPortRange(uint16(min), uint16(max)))
-	return ports
-}
-
-func splitPort2Int(src string) []datatype.PortRange {
-	ports := make([]datatype.PortRange, 0, 8)
-	splitSrcPorts := strings.Split(src, ",")
-	for _, srcPorts := range splitSrcPorts {
-		ports = append(ports, getPorts(srcPorts)...)
-	}
-	return ports
 }
 
 func newAclAction(aclId datatype.ACLID, actions []*trident.FlowAction) []datatype.AclAction {
@@ -241,10 +154,10 @@ func newPolicyData(acl *trident.FlowAcl) *policy.Acl {
 	return &policy.Acl{
 		Id:           datatype.ACLID(acl.GetId()),
 		Type:         datatype.TapType(acl.GetTapType()),
-		SrcGroups:    splitGroup2Int(acl.GetSrcGroupIds()),
-		DstGroups:    splitGroup2Int(acl.GetDstGroupIds()),
-		SrcPortRange: splitPort2Int(acl.GetSrcPorts()),
-		DstPortRange: splitPort2Int(acl.GetDstPorts()),
+		SrcGroups:    datatype.SplitGroup2Int(acl.GetSrcGroupIds()),
+		DstGroups:    datatype.SplitGroup2Int(acl.GetDstGroupIds()),
+		SrcPortRange: datatype.SplitPort2Int(acl.GetSrcPorts()),
+		DstPortRange: datatype.SplitPort2Int(acl.GetDstPorts()),
 		Proto:        uint8(acl.GetProtocol()),
 		Vlan:         acl.GetVlan() & 0xfff,
 		Action:       newAclAction(datatype.ACLID(acl.GetId()), acl.GetActions()),
