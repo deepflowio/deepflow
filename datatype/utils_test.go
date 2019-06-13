@@ -1,4 +1,4 @@
-package dropletpb
+package datatype
 
 import (
 	"net"
@@ -63,7 +63,7 @@ func TestSpecialIPsConvert(t *testing.T) {
 	for index, ipRange := range ipRanges {
 		start := net.ParseIP(ipRange.start).To4()
 		end := net.ParseIP(ipRange.end).To4()
-		ips := ipRangeConvert2CIDR(start, end)
+		ips := IpRangeConvert2CIDR(start, end)
 		result := generateConvertResult(ips)
 		if !checkParsedIPRangesResult(t, basicResultGroup[index], result) {
 			t.Error("TestSpecialIPsConvert Check Failed!")
@@ -73,7 +73,7 @@ func TestSpecialIPsConvert(t *testing.T) {
 
 // 可转换成一个网段的ip
 func TestOneNetIPsConvert(t *testing.T) {
-	ips := ipRangeConvert2CIDR(start1, end1)
+	ips := IpRangeConvert2CIDR(start1, end1)
 	result := generateConvertResult(ips)
 	if !checkParsedIPRangesResult(t, basicResult1, result) {
 		t.Error("TestOneNetIPsConvert Check Failed!")
@@ -82,17 +82,17 @@ func TestOneNetIPsConvert(t *testing.T) {
 
 // 可转换成多个网段的ip
 func TestMoreNetIPsConvert(t *testing.T) {
-	ips := ipRangeConvert2CIDR(start2, end2)
+	ips := IpRangeConvert2CIDR(start2, end2)
 	result := generateConvertResult(ips)
 	if !checkParsedIPRangesResult(t, basicResult2, result) {
 		t.Error("TestMoreNetIPsConvert Check Failed!")
 	}
-	ips = ipRangeConvert2CIDR(start3, end3)
+	ips = IpRangeConvert2CIDR(start3, end3)
 	result = generateConvertResult(ips)
 	if !checkParsedIPRangesResult(t, basicResult3, result) {
 		t.Error("TestMoreNetIPsConvert Check Failed!")
 	}
-	ips = ipRangeConvert2CIDR(start4, end4)
+	ips = IpRangeConvert2CIDR(start4, end4)
 	result = generateConvertResult(ips)
 	if !checkParsedIPRangesResult(t, basicResult4, result) {
 		t.Error("TestMoreNetIPsConvert Check Failed!")
