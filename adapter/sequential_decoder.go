@@ -18,6 +18,8 @@ const (
 	ICMP_TYPE_CODE      = 2
 	ICMP_ID_SEQ         = 4
 	ICMP_REST           = 28
+
+	IPV6_ADDR_LEN = 16
 )
 
 const (
@@ -148,10 +150,51 @@ func (d *SequentialDecoder) decodeEthernet(meta *MetaPacket) {
 	} else if x.headerType < HEADER_TYPE_IPV4 {
 		meta.EthType = EthernetTypeIPv4
 		d.data.Skip(2)
+	} else if x.headerType.IsIpv6() {
+		meta.EthType = EthernetTypeIPv6
+		d.decodeIPv6(meta)
 	} else {
 		meta.EthType = EthernetTypeIPv4
 		d.decodeIPv4(meta)
 	}
+}
+
+func (d *SequentialDecoder) decodeIPv6(meta *MetaPacket) {
+	x := d.x
+	if !d.pflags.IsSet(CFLAG_DATAOFF_IHL) {
+		b := d.data.U8()
+		x.dataOffset = b >> 4 // XXX: Valid in TCP Only
+		x.ihl = b & 0xf
+	}
+	meta.IHL = x.ihl
+	if !d.pflags.IsSet(CFLAG_FLAGS_FRAG_OFFSET) {
+		x.fragOffset = d.data.U16()
+	}
+	meta.IpFlags = x.fragOffset
+	if !d.pflags.IsSet(CFLAG_TTL) {
+		x.ttl = d.data.U8()
+	}
+	meta.TTL = x.ttl
+	if !d.pflags.IsSet(CFLAG_IP0) {
+		x.ip0 = net.IP(d.data.Field(IPV6_ADDR_LEN))
+	}
+	if !d.pflags.IsSet(CFLAG_IP1) {
+		x.ip1 = net.IP(d.data.Field(IPV6_ADDR_LEN))
+	}
+	meta.Ip6Src = x.ip0
+	meta.Ip6Dst = x.ip1
+	if !d.forward {
+		meta.Ip6Src, meta.Ip6Dst = meta.Ip6Dst, meta.Ip6Src
+	}
+	meta.NextHeader = IPProtocol(d.data.U8())
+	if length := d.data.U8(); length > 0 {
+		meta.Options = d.data.Field(int(length))
+	}
+	if x.headerType == HEADER_TYPE_IPV6 {
+		meta.Protocol = meta.NextHeader
+		return
+	}
+	d.decodeL4(meta)
 }
 
 func (d *SequentialDecoder) decodeIPv4(meta *MetaPacket) {

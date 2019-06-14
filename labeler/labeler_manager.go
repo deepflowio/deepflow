@@ -199,6 +199,8 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *data
 		Invalid:     packet.Invalid,
 		FastIndex:   index,
 		FeatureFlag: datatype.NPM,
+		Src6Ip:      packet.Ip6Src,
+		Dst6Ip:      packet.Ip6Dst,
 	}
 
 	packet.EndpointData, packet.PolicyData = l.policyTable.LookupAllByKey(key)
@@ -299,7 +301,7 @@ func (l *LabelerManager) recvDumpPlatform(conn *net.UDPConn, remote *net.UDPAddr
 		return
 	}
 
-	info := l.policyTable.GetEndpointInfo(key.Mac, key.Ip, key.InPort)
+	info := l.policyTable.GetEndpointInfo(key.Mac, IpFromUint32(key.Ip), key.InPort)
 	if info == nil {
 		log.Warningf("GetEndpointInfo(%+v) return nil", key)
 		debug.SendToClient(conn, remote, 1, nil)
