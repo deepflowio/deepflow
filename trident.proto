@@ -37,8 +37,10 @@ message SyncRequest {
     optional string revision = 5; // trident用于self-update
     optional uint64 exception = 6 [default = 0]; // trident exception status
     optional string process_name = 7;
+    optional TapMode tap_mode = 8 [default = LOCAL];
 
-    optional string ctrl_ip = 21; // only for mt trisolaris.check
+    optional string ctrl_ip = 21;
+    optional string host = 22;
 }
 
 enum Status {
