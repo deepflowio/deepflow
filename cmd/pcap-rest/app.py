@@ -4,6 +4,7 @@ import mimetypes
 import os
 import socket
 import time
+from operator import itemgetter
 
 from bottle import get, request, static_file, delete, Bottle, HTTPResponse
 
@@ -21,6 +22,8 @@ API_PREFIX = '/' + API_VERSION
 
 MAC_REGEX = r'(?:[0-9a-zA-Z]{2}[-:]){5}[0-9a-zA-Z]{2}'
 IP_REGEX = r'(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)'
+
+DEFAULT_PCAP_LIST_SIZE = 1000
 
 
 app = Bottle()
@@ -52,8 +55,9 @@ def get_files_by_mac(acl_gid, mac):
     }
 
 
+@app.get(API_PREFIX + '/pcaps/<acl_gid:int>/')
 @app.get(API_PREFIX + '/pcaps/<acl_gid:int>/<ip:re:%s>/' % IP_REGEX)
-def get_files_by_ip(acl_gid, ip):
+def get_files_by_ip(acl_gid, ip=None):
     u"""
 按IP查询acl_gid下的pcap文件
 
@@ -61,6 +65,7 @@ HTTP request args:
 
   start_ts: 开始时间戳，闭区间，默认now-600
   end_ts: 结束时间戳，闭区间，默认now
+  size: 条目数，默认1000，按start_ts降序排列
   ip: IP地址筛选，可以填写多个
   protocol: 协议，可选值为[6, 17]
   port: 端口
@@ -109,8 +114,9 @@ HTTP response body:
         start_ts = int(request.query.start_ts)
     if request.query.end_ts != '':
         end_ts = int(request.query.end_ts)
+    size = int(request.query.size) if request.query.size != '' else None
     return {
-        'DATA': get_files(acl_gid, start_ts, end_ts, ip=ip, ip_filter=ips, protocol=protocol, port=port, tap_type=tap_type),
+        'DATA': get_files(acl_gid, start_ts, end_ts, size=size, ip=ip, ip_filter=ips, protocol=protocol, port=port, tap_type=tap_type),
         'OPT_STATUS': 'SUCCESS',
     }
 
@@ -201,7 +207,9 @@ def _time_to_epoch(time_str):
         return 0
 
 
-def get_files(acl_gid, start_ts, end_ts, mac=None, ip=None, ip_filter=None, protocol=None, port=None, tap_type=None):
+def get_files(acl_gid, start_ts, end_ts, size=DEFAULT_PCAP_LIST_SIZE, mac=None, ip=None, ip_filter=None, protocol=None, port=None, tap_type=None):
+    if size < 0:
+        size = DEFAULT_PCAP_LIST_SIZE
     if protocol is not None and protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
         return []
 
@@ -233,11 +241,10 @@ def get_files(acl_gid, start_ts, end_ts, mac=None, ip=None, ip_filter=None, prot
             continue
         if ip is not None and ip_str != segs[2]:
             continue
-        if mac_rep is None or ip_rep is None:
-            if mac_rep is None:
-                mac_rep = _mac_convert_back(segs[1])
-            else:
-                ip_rep = _ip_convert_back(segs[2])
+        if mac_rep is None:
+            mac_rep = _mac_convert_back(segs[1])
+        if ip_rep is None:
+            ip_rep = _ip_convert_back(segs[2])
         if (ip_filter is not None or protocol is not None) and not found_in_pcap(directory + file, ip_filter, protocol, port):
             continue
         files.append({
@@ -252,4 +259,4 @@ def get_files(acl_gid, start_ts, end_ts, mac=None, ip=None, ip_filter=None, prot
             'size': os.path.getsize(directory + file),
             'hostname': HOSTNAME,
         })
-    return files
+    return sorted(files, key=itemgetter('start_epoch'), reverse=True)[:size]
