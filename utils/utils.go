@@ -2,6 +2,7 @@ package utils
 
 import (
 	. "encoding/binary"
+	"fmt"
 	"math"
 	"net"
 	"strings"
@@ -121,4 +122,31 @@ func IpNetmaskFromStringCIDR(ipStr string) (uint32, uint32, error) {
 	ipInt := BigEndian.Uint32(r.IP)
 	maskInt, _ := r.Mask.Size()
 	return ipInt, uint32(maskInt), nil
+}
+
+func IPv4ToBinary(ip uint32) string {
+	var buf [32]byte
+	for i := uint32(0); i < 32; i++ {
+		if ip&(1<<i) != 0 {
+			buf[31-i] = '1'
+		} else {
+			buf[31-i] = '0'
+		}
+	}
+	return string(buf[:])
+}
+
+func IPv6ToBinary(ip net.IP) string {
+	if len(ip) != 16 {
+		panic(fmt.Sprintf("Invalid IPv6 address %v", ip))
+	}
+	var buf [128]byte
+	for i := uint8(0); i < 128; i++ {
+		if ip[15-i/8]&(1<<(i%8)) != 0 {
+			buf[127-i] = '1'
+		} else {
+			buf[127-i] = '0'
+		}
+	}
+	return string(buf[:])
 }

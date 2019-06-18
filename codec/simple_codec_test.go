@@ -2,6 +2,7 @@ package codec
 
 import (
 	"math/rand"
+	"net"
 	"testing"
 )
 
@@ -85,6 +86,29 @@ func TestWriteU64(t *testing.T) {
 		if v != expU64[i] {
 			t.Errorf("Expected %v found %v", expU64[i], v)
 		}
+	}
+}
+
+func TestWriteIPv6(t *testing.T) {
+	e := &SimpleEncoder{}
+	d := &SimpleDecoder{}
+	ip := net.ParseIP("1:23:456:789a:0::1")
+	e.WriteIPv6(ip)
+	expU8 := []byte{0x0, 0x1, 0x0, 0x23, 0x4, 0x56, 0x78, 0x9a, 0, 0, 0, 0, 0, 0, 0, 0x1}
+	d.Init(e.Bytes())
+	for i := 0; i < len(expU8); i++ {
+		v := d.ReadU8()
+		if v != expU8[i] {
+			t.Errorf("Expected %v found %v", expU8[i], v)
+		}
+	}
+
+	d.Init(e.Bytes())
+	var v net.IP
+	v = make([]byte, 16)
+	d.ReadIPv6(v)
+	if !v.Equal(ip) {
+		t.Errorf("Expected %v found %v", ip, v)
 	}
 }
 
