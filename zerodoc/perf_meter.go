@@ -138,11 +138,11 @@ func (m *PerfMeter) Fill(isTag []bool, names []string, values []interface{}) {
 			m.SumRetransCntRx = uint64(values[i].(int64))
 
 		case "sum_rtt_syn":
-			m.SumRTTSyn = time.Duration(values[i].(int64))
+			m.SumRTTSyn = time.Duration(values[i].(int64)) * time.Microsecond
 		case "sum_rtt_avg":
-			m.SumRTTAvg = time.Duration(values[i].(int64))
+			m.SumRTTAvg = time.Duration(values[i].(int64)) * time.Microsecond
 		case "sum_art_avg":
-			m.SumARTAvg = time.Duration(values[i].(int64))
+			m.SumARTAvg = time.Duration(values[i].(int64)) * time.Microsecond
 		case "sum_rtt_syn_flow":
 			m.SumRTTSynFlow = uint64(values[i].(int64))
 		case "sum_rtt_avg_flow":
@@ -155,18 +155,18 @@ func (m *PerfMeter) Fill(isTag []bool, names []string, values []interface{}) {
 			m.SumZeroWndCntRx = uint64(values[i].(int64))
 
 		case "max_rtt_syn":
-			m.MaxRTTSyn = time.Duration(values[i].(int64))
+			m.MaxRTTSyn = time.Duration(values[i].(int64)) * time.Microsecond
 		case "max_rtt_avg":
-			m.MaxRTTAvg = time.Duration(values[i].(int64))
+			m.MaxRTTAvg = time.Duration(values[i].(int64)) * time.Microsecond
 		case "max_art_avg":
-			m.MaxARTAvg = time.Duration(values[i].(int64))
+			m.MaxARTAvg = time.Duration(values[i].(int64)) * time.Microsecond
 
 		case "min_rtt_syn":
-			m.MinRTTSyn = time.Duration(values[i].(int64))
+			m.MinRTTSyn = time.Duration(values[i].(int64)) * time.Microsecond
 		case "min_rtt_avg":
-			m.MinRTTAvg = time.Duration(values[i].(int64))
+			m.MinRTTAvg = time.Duration(values[i].(int64)) * time.Microsecond
 		case "min_art_avg":
-			m.MinARTAvg = time.Duration(values[i].(int64))
+			m.MinARTAvg = time.Duration(values[i].(int64)) * time.Microsecond
 		}
 	}
 }

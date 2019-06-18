@@ -86,7 +86,7 @@ func (m *ConsoleLogMeter) Fill(isTag []bool, names []string, values []interface{
 		case "sum_closed_flow_count":
 			m.SumClosedFlowCount = uint64(values[i].(int64))
 		case "sum_closed_flow_duration":
-			m.SumClosedFlowDuration = uint64(values[i].(int64))
+			m.SumClosedFlowDuration = uint64(values[i].(int64) / 1000)
 		}
 	}
 }
