@@ -2,6 +2,8 @@ package codec
 
 import (
 	"encoding/binary"
+	"fmt"
+	"net"
 	"unsafe"
 
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
@@ -34,6 +36,13 @@ func (e *SimpleEncoder) WriteU64(v uint64) {
 	s := [8]byte{}
 	binary.LittleEndian.PutUint64(s[:], v)
 	e.buf = append(e.buf, s[:]...)
+}
+
+func (e *SimpleEncoder) WriteIPv6(v net.IP) {
+	if len(v) != 16 {
+		panic(fmt.Sprintf("Invalid IPv6 Address: %v", v))
+	}
+	e.buf = append(e.buf, v.To16()...)
 }
 
 func (e *SimpleEncoder) WriteString255(v string) {
@@ -134,6 +143,18 @@ func (d *SimpleDecoder) ReadU64() uint64 {
 		return 0
 	}
 	return binary.LittleEndian.Uint64(d.buf[d.offset-8 : d.offset])
+}
+
+func (d *SimpleDecoder) ReadIPv6(v net.IP) {
+	if len(v) != 16 {
+		panic(fmt.Sprintf("IPv6 buffer length invalid: %d", len(v)))
+	}
+	d.offset += 16
+	if d.offset > len(d.buf) {
+		d.err++
+		return
+	}
+	copy(v, d.buf[d.offset-16:d.offset])
 }
 
 func (d *SimpleDecoder) ReadString255() string {
