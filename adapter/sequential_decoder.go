@@ -148,8 +148,7 @@ func (d *SequentialDecoder) decodeEthernet(meta *MetaPacket) {
 		meta.EthType = EthernetTypeARP
 		meta.ParseArp(&d.data)
 	} else if x.headerType < HEADER_TYPE_IPV4 {
-		meta.EthType = EthernetTypeIPv4
-		d.data.Skip(2)
+		meta.EthType = EthernetType(d.data.U16())
 	} else if x.headerType.IsIpv6() {
 		meta.EthType = EthernetTypeIPv6
 		d.decodeIPv6(meta)
@@ -181,10 +180,14 @@ func (d *SequentialDecoder) decodeIPv6(meta *MetaPacket) {
 	if !d.pflags.IsSet(CFLAG_IP1) {
 		x.ip1 = net.IP(d.data.Field(IPV6_ADDR_LEN))
 	}
-	meta.Ip6Src = x.ip0
-	meta.Ip6Dst = x.ip1
-	if !d.forward {
-		meta.Ip6Src, meta.Ip6Dst = meta.Ip6Dst, meta.Ip6Src
+	meta.Ip6Src = make(net.IP, 16)
+	meta.Ip6Dst = make(net.IP, 16)
+	if d.forward {
+		copy(meta.Ip6Src, x.ip0)
+		copy(meta.Ip6Dst, x.ip1)
+	} else {
+		copy(meta.Ip6Src, x.ip1)
+		copy(meta.Ip6Dst, x.ip0)
 	}
 	meta.NextHeader = IPProtocol(d.data.U8())
 	if length := d.data.U8(); length > 0 {
@@ -288,12 +291,18 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 		meta.PortSrc = x.port1
 		meta.PortDst = x.port0
 	}
-	if x.vlan == 0 {
-		meta.PayloadLen = meta.PacketLen - 14 - uint16(x.ihl*4)
+	l3Len := 0
+	if x.headerType.IsIpv6() {
+		l3Len = 40 + len(meta.Options)
 	} else {
-		meta.PayloadLen = meta.PacketLen - 14 - uint16(x.ihl*4) - 4
+		l3Len = int(x.ihl * 4)
 	}
-	if x.headerType == HEADER_TYPE_IPV4_UDP {
+	if x.vlan == 0 {
+		meta.PayloadLen = meta.PacketLen - 14 - uint16(l3Len)
+	} else {
+		meta.PayloadLen = meta.PacketLen - 14 - uint16(l3Len) - 4
+	}
+	if x.headerType == HEADER_TYPE_IPV4_UDP || x.headerType == HEADER_TYPE_IPV6_UDP {
 		meta.Protocol = IPProtocolUDP
 		meta.PayloadLen -= 8
 		return

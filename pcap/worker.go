@@ -1,14 +1,20 @@
 package pcap
 
 import (
+	"container/list"
 	"fmt"
 	"github.com/op/go-logging"
+	"net"
 	"os"
 	"sync"
 	"time"
+	"unsafe"
+
+	. "github.com/google/gopacket/layers"
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 )
 
@@ -20,6 +26,14 @@ const (
 
 type WriterKey uint64
 
+func getWriterIpv6Key(ip net.IP, aclGID datatype.ACLID, tapType zerodoc.TAPTypeEnum) WriterKey {
+	ipHash := uint32(0)
+	for i := 0; i < len(ip); i += 4 {
+		ipHash ^= *(*uint32)(unsafe.Pointer(&ip[i]))
+	}
+	return WriterKey((uint64(ipHash) << 32) | (uint64(aclGID) << 16) | uint64(tapType))
+}
+
 func getWriterKey(ipInt datatype.IPv4Int, aclGID datatype.ACLID, tapType zerodoc.TAPTypeEnum) WriterKey {
 	return WriterKey((uint64(ipInt) << 32) | (uint64(aclGID) << 16) | uint64(tapType))
 }
@@ -30,6 +44,7 @@ type WrappedWriter struct {
 	tapType zerodoc.TAPTypeEnum
 	aclGID  datatype.ACLID
 	ip      datatype.IPv4Int
+	ip6     net.IP
 	mac     datatype.MacInt
 	tid     int
 
@@ -62,7 +77,8 @@ type Worker struct {
 
 	*WorkerCounter
 
-	writers map[WriterKey]*WrappedWriter
+	writers     map[WriterKey]*WrappedWriter
+	writersIpv6 map[WriterKey]*list.List
 
 	writerBufferSize int
 	tcpipChecksum    bool
@@ -85,7 +101,8 @@ func (m *WorkerManager) newWorker(index int) *Worker {
 
 		WorkerCounter: &WorkerCounter{},
 
-		writers: make(map[WriterKey]*WrappedWriter),
+		writers:     make(map[WriterKey]*WrappedWriter),
+		writersIpv6: make(map[WriterKey]*list.List),
 
 		writerBufferSize: m.blockSizeKB << 10,
 		tcpipChecksum:    m.tcpipChecksum,
@@ -130,12 +147,26 @@ func getTempFilename(tapType zerodoc.TAPTypeEnum, mac datatype.MacInt, ip dataty
 	return fmt.Sprintf("%s_%s_%s_%s_.%d.pcap.temp", tapTypeToString(tapType), macToString(mac), ipToString(ip), formatDuration(firstPacketTime), index)
 }
 
+func getTempFilenameByIpv6(tapType zerodoc.TAPTypeEnum, mac datatype.MacInt, ip net.IP, firstPacketTime time.Duration, index int) string {
+	return fmt.Sprintf("%s_%s_%s_%s_.%d.pcap.temp", tapTypeToString(tapType), macToString(mac), ip, formatDuration(firstPacketTime), index)
+}
+
 func (w *WrappedWriter) getTempFilename(base string) string {
-	return fmt.Sprintf("%s/%d/%s", base, w.aclGID, getTempFilename(w.tapType, w.mac, w.ip, w.firstPacketTime, w.tid))
+	if w.ip6 == nil {
+		return fmt.Sprintf("%s/%d/%s", base, w.aclGID, getTempFilename(w.tapType, w.mac, w.ip, w.firstPacketTime, w.tid))
+	} else {
+		return fmt.Sprintf("%s/%d/%s", base, w.aclGID, getTempFilenameByIpv6(w.tapType, w.mac, w.ip6, w.firstPacketTime, w.tid))
+	}
 }
 
 func (w *WrappedWriter) getFilename(base string) string {
-	return fmt.Sprintf("%s/%d/%s_%s_%s_%s_%s.%d.pcap", base, w.aclGID, tapTypeToString(w.tapType), macToString(w.mac), ipToString(w.ip), formatDuration(w.firstPacketTime), formatDuration(w.lastPacketTime), w.tid)
+	ipString := ""
+	if w.ip6 == nil {
+		ipString = ipToString(w.ip)
+	} else {
+		ipString = w.ip6.String()
+	}
+	return fmt.Sprintf("%s/%d/%s_%s_%s_%s_%s.%d.pcap", base, w.aclGID, tapTypeToString(w.tapType), macToString(w.mac), ipString, formatDuration(w.firstPacketTime), formatDuration(w.lastPacketTime), w.tid)
 }
 
 func (w *Worker) shouldCloseFile(writer *WrappedWriter, packet *datatype.MetaPacket) bool {
@@ -171,41 +202,110 @@ func (w *Worker) writePacket(packet *datatype.MetaPacket, tapType zerodoc.TAPTyp
 		exist = false
 	}
 	if !exist {
-		if len(w.writers) >= w.maxConcurrentFiles {
-			if log.IsEnabledFor(logging.DEBUG) {
-				log.Debugf("Max concurrent file (%d files) exceeded", w.maxConcurrentFiles)
-			}
-			w.FileRejections++
-			return
-		}
-		directory := fmt.Sprintf("%s/%d", w.baseDirectory, aclGID)
-		if _, err := os.Stat(directory); os.IsNotExist(err) {
-			os.MkdirAll(directory, os.ModePerm)
-		}
-		writer = &WrappedWriter{
-			tapType:         tapType,
-			aclGID:          aclGID,
-			ip:              ip,
-			mac:             mac,
-			tid:             w.index,
-			firstPacketTime: packet.Timestamp,
-			lastPacketTime:  packet.Timestamp,
-		}
-		writer.tempFilename = writer.getTempFilename(w.baseDirectory)
-		if log.IsEnabledFor(logging.DEBUG) {
-			log.Debugf("Begin to write packets to %s", writer.tempFilename)
-		}
-		var err error
-		if writer.Writer, err = NewWriter(writer.tempFilename, w.writerBufferSize, w.tcpipChecksum); err != nil {
-			if log.IsEnabledFor(logging.DEBUG) {
-				log.Debugf("Failed to create writer for %s: %s", writer.tempFilename, err)
-			}
-			w.FileCreationFailures++
+		writer = w.generateWrappedWriter(IpFromUint32(ip), mac, tapType, aclGID, packet.Timestamp)
+		if writer == nil {
 			return
 		}
 		w.writers[key] = writer
-		w.FileCreations++
 	}
+	if err := writer.Write(packet); err != nil {
+		log.Debugf("Failed to write packet to %s: %s", writer.tempFilename, err)
+		w.FileWritingFailures++
+		return
+	}
+	counter := writer.GetAndResetStats()
+	w.BufferedCount += counter.totalBufferedCount
+	w.WrittenCount += counter.totalWrittenCount
+	w.BufferedBytes += counter.totalBufferedBytes
+	w.WrittenBytes += counter.totalWrittenBytes
+	writer.lastPacketTime = packet.Timestamp
+}
+
+func (w *Worker) generateWrappedWriter(ip net.IP, mac datatype.MacInt, tapType zerodoc.TAPTypeEnum, aclGID datatype.ACLID, timestamp time.Duration) *WrappedWriter {
+	if len(w.writers) >= w.maxConcurrentFiles {
+		if log.IsEnabledFor(logging.DEBUG) {
+			log.Debugf("Max concurrent file (%d files) exceeded", w.maxConcurrentFiles)
+		}
+		w.FileRejections++
+		return nil
+	}
+
+	directory := fmt.Sprintf("%s/%d", w.baseDirectory, aclGID)
+	if _, err := os.Stat(directory); os.IsNotExist(err) {
+		os.MkdirAll(directory, os.ModePerm)
+	}
+	writer := &WrappedWriter{
+		tapType:         tapType,
+		aclGID:          aclGID,
+		mac:             mac,
+		tid:             w.index,
+		firstPacketTime: timestamp,
+		lastPacketTime:  timestamp,
+	}
+	if ip.To4() != nil {
+		writer.ip = IpToUint32(ip)
+	} else {
+		writer.ip6 = ip
+	}
+
+	writer.tempFilename = writer.getTempFilename(w.baseDirectory)
+	if log.IsEnabledFor(logging.DEBUG) {
+		log.Debugf("Begin to write packets to %s", writer.tempFilename)
+	}
+	var err error
+	if writer.Writer, err = NewWriter(writer.tempFilename, w.writerBufferSize, w.tcpipChecksum); err != nil {
+		if log.IsEnabledFor(logging.DEBUG) {
+			log.Debugf("Failed to create writer for %s: %s", writer.tempFilename, err)
+		}
+		w.FileCreationFailures++
+		return nil
+	}
+	w.FileCreations++
+	return writer
+}
+
+func (w *Worker) getWrappedWriter(ip net.IP, mac datatype.MacInt, tapType zerodoc.TAPTypeEnum, aclGID datatype.ACLID, packet *datatype.MetaPacket) *WrappedWriter {
+	var element *list.Element
+	var result *WrappedWriter
+
+	key := getWriterIpv6Key(ip, aclGID, tapType)
+	writerList, exist := w.writersIpv6[key]
+	if exist {
+		for e := writerList.Front(); e != nil; e = e.Next() {
+			writer := e.Value.(*WrappedWriter)
+			if writer.ip6.Equal(ip) {
+				element = e
+				result = writer
+				break
+			}
+		}
+	} else {
+		writerList = list.New()
+		w.writersIpv6[key] = writerList
+	}
+
+	if result != nil && w.shouldCloseFile(result, packet) {
+		newFilename := result.getFilename(w.baseDirectory)
+		w.finishWriter(result, newFilename)
+		writerList.Remove(element)
+		result = nil
+	}
+
+	if result == nil {
+		result = w.generateWrappedWriter(ip, mac, tapType, aclGID, packet.Timestamp)
+		if result != nil {
+			writerList.PushBack(result)
+		}
+	}
+	return result
+}
+
+func (w *Worker) writePacketIpv6(packet *datatype.MetaPacket, tapType zerodoc.TAPTypeEnum, ip net.IP, mac datatype.MacInt, aclGID datatype.ACLID) {
+	writer := w.getWrappedWriter(ip, mac, tapType, aclGID, packet)
+	if writer == nil {
+		return
+	}
+
 	if err := writer.Write(packet); err != nil {
 		log.Debugf("Failed to write packet to %s: %s", writer.tempFilename, err)
 		w.FileWritingFailures++
@@ -223,6 +323,7 @@ func (w *Worker) Process() {
 	elements := make([]interface{}, QUEUE_BATCH_SIZE)
 	ips := make([]datatype.IPv4Int, 0, 2)
 	macs := make([]datatype.MacInt, 0, 2)
+	ip6s := make([]net.IP, 0, 2)
 
 WORKING_LOOP:
 	for !w.exiting {
@@ -240,6 +341,18 @@ WORKING_LOOP:
 						delete(w.writers, key)
 					}
 				}
+
+				for _, writerList := range w.writersIpv6 {
+					for e := writerList.Front(); e != nil; {
+						r, writer := e, e.Value.(*WrappedWriter)
+						e = e.Next()
+						if timeNow-writer.firstPacketTime > w.maxFilePeriod {
+							newFilename := writer.getFilename(w.baseDirectory)
+							w.finishWriter(writer, newFilename)
+							writerList.Remove(r)
+						}
+					}
+				}
 				continue
 			}
 
@@ -253,26 +366,49 @@ WORKING_LOOP:
 
 			ips = ips[:0]
 			macs = macs[:0]
+			ip6s = ip6s[:0]
 			var tapType zerodoc.TAPTypeEnum
 			if isISP(packet.InPort) {
 				tapType = zerodoc.TAPTypeEnum(packet.InPort - 0x10000)
-				if packet.EndpointData.SrcInfo.L3EpcId != 0 && packet.IpSrc != BROADCAST_IP && packet.MacSrc != BROADCAST_MAC {
-					ips = append(ips, packet.IpSrc)
-					macs = append(macs, packet.MacSrc)
-				}
-				if packet.EndpointData.DstInfo.L3EpcId != 0 && packet.IpDst != BROADCAST_IP && packet.MacDst != BROADCAST_MAC {
-					ips = append(ips, packet.IpDst)
-					macs = append(macs, packet.MacDst)
+				if packet.EthType != EthernetTypeIPv6 {
+					if packet.EndpointData.SrcInfo.L3EpcId != 0 && packet.IpSrc != BROADCAST_IP && packet.MacSrc != BROADCAST_MAC {
+						ips = append(ips, packet.IpSrc)
+						macs = append(macs, packet.MacSrc)
+					}
+					if packet.EndpointData.DstInfo.L3EpcId != 0 && packet.IpDst != BROADCAST_IP && packet.MacDst != BROADCAST_MAC {
+						ips = append(ips, packet.IpDst)
+						macs = append(macs, packet.MacDst)
+					}
+				} else {
+					if packet.EndpointData.SrcInfo.L3EpcId != 0 && packet.Ip6Src.IsMulticast() && packet.MacSrc != BROADCAST_MAC {
+						ip6s = append(ip6s, packet.Ip6Src)
+						macs = append(macs, packet.MacSrc)
+					}
+					if packet.EndpointData.DstInfo.L3EpcId != 0 && packet.Ip6Dst.IsMulticast() && packet.MacDst != BROADCAST_MAC {
+						ip6s = append(ip6s, packet.Ip6Dst)
+						macs = append(macs, packet.MacDst)
+					}
 				}
 			} else if isTOR(packet.InPort) {
 				tapType = zerodoc.ToR
-				if packet.EndpointData.SrcInfo.L2End && packet.IpSrc != BROADCAST_IP && packet.MacSrc != BROADCAST_MAC {
-					ips = append(ips, packet.IpSrc)
-					macs = append(macs, packet.MacSrc)
-				}
-				if packet.EndpointData.DstInfo.L2End && packet.IpDst != BROADCAST_IP && packet.MacDst != BROADCAST_MAC {
-					ips = append(ips, packet.IpDst)
-					macs = append(macs, packet.MacDst)
+				if packet.EthType != EthernetTypeIPv6 {
+					if (packet.L2End0 || packet.EndpointData.SrcInfo.L2End) && packet.IpSrc != BROADCAST_IP && packet.MacSrc != BROADCAST_MAC {
+						ips = append(ips, packet.IpSrc)
+						macs = append(macs, packet.MacSrc)
+					}
+					if (packet.L2End1 || packet.EndpointData.DstInfo.L2End) && packet.IpDst != BROADCAST_IP && packet.MacDst != BROADCAST_MAC {
+						ips = append(ips, packet.IpDst)
+						macs = append(macs, packet.MacDst)
+					}
+				} else {
+					if (packet.L2End0 || packet.EndpointData.SrcInfo.L2End) && !packet.Ip6Src.IsMulticast() && packet.MacSrc != BROADCAST_MAC {
+						ip6s = append(ip6s, packet.Ip6Src)
+						macs = append(macs, packet.MacSrc)
+					}
+					if (packet.L2End1 || packet.EndpointData.DstInfo.L2End) && !packet.Ip6Dst.IsMulticast() && packet.MacDst != BROADCAST_MAC {
+						ip6s = append(ip6s, packet.Ip6Dst)
+						macs = append(macs, packet.MacDst)
+					}
 				}
 			} else {
 				datatype.ReleaseMetaPacket(packet)
@@ -284,8 +420,14 @@ WORKING_LOOP:
 					continue
 				}
 				if policy.GetActionFlags()&datatype.ACTION_PACKET_CAPTURING != 0 {
-					for i := range ips {
-						w.writePacket(packet, tapType, ips[i], macs[i], policy.GetACLGID())
+					if packet.EthType != EthernetTypeIPv6 {
+						for i := range ips {
+							w.writePacket(packet, tapType, ips[i], macs[i], policy.GetACLGID())
+						}
+					} else {
+						for i := range ip6s {
+							w.writePacketIpv6(packet, tapType, ip6s[i], macs[i], policy.GetACLGID())
+						}
 					}
 				}
 			}
@@ -297,6 +439,13 @@ WORKING_LOOP:
 	for _, writer := range w.writers {
 		newFilename := writer.getFilename(w.baseDirectory)
 		w.finishWriter(writer, newFilename)
+	}
+	for _, writerList := range w.writersIpv6 {
+		for e := writerList.Front(); e != nil; e = e.Next() {
+			writer := e.Value.(*WrappedWriter)
+			newFilename := writer.getFilename(w.baseDirectory)
+			w.finishWriter(writer, newFilename)
+		}
 	}
 	log.Infof("Stopped pcap worker (%d)", w.index)
 	w.exitWg.Done()
