@@ -40,7 +40,7 @@ message SyncRequest {
     optional TapMode tap_mode = 8 [default = LOCAL];
 
     optional string ctrl_ip = 21;
-    optional string host = 22;
+    optional string host = 22; // 仅作为注册使用
 }
 
 enum Status {
@@ -62,7 +62,6 @@ message Config {
     optional uint32  sync_interval        = 4 [default = 60];
     optional uint32  stats_interval       = 5 [default = 60];
     optional uint64  global_pps_threshold = 6 [default = 100000];
-    optional TapMode tap_mode             = 7 [default = LOCAL];
     optional string  tap_interface_regex  = 8;
     optional string  host                 = 9;  // override statsd host tag
     optional bool    rsyslog_enabled      = 10 [default = false];
