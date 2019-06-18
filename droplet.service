@@ -8,7 +8,7 @@ LimitCORE=infinity
 LimitNOFILE=65536
 WorkingDirectory=/tmp/
 ExecStart=/usr/sbin/droplet
-Restart=on-failure
+Restart=always
 RestartSec=10
 MemoryLimit=20G
 
