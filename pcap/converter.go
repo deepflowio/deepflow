@@ -31,9 +31,11 @@ func (p RawPacket) MetaPacketToRaw(packet *datatype.MetaPacket, tcpipChecksum bo
 		size += p.fillIPv4(packet, size)
 	case layers.EthernetTypeARP:
 		size += p.fillARP(packet, size)
+	case layers.EthernetTypeIPv6:
+		size += p.fillIPv6(packet, size)
 	}
 
-	if packet.EthType == layers.EthernetTypeIPv4 {
+	if packet.EthType == layers.EthernetTypeIPv4 || packet.EthType == layers.EthernetTypeIPv6 {
 		switch packet.Protocol {
 		case layers.IPProtocolICMPv4:
 			size += p.fillICMPv4(packet, size)
@@ -43,9 +45,7 @@ func (p RawPacket) MetaPacketToRaw(packet *datatype.MetaPacket, tcpipChecksum bo
 			size += p.fillUDP(packet, size, l3Offset, tcpipChecksum)
 		}
 	}
-
 	p.fillIpTotalLen(packet, l3Offset+IPV4_TOTAL_LENGTH_OFFSET)
-
 	return size
 }
 
@@ -117,6 +117,7 @@ const (
 
 const (
 	IPV4_VERSION = 4
+	IPV6_VERSION = 6
 )
 
 func (p RawPacket) fillIPv4(packet *datatype.MetaPacket, start int) int {
@@ -149,6 +150,43 @@ func (p RawPacket) fillIPv4(packet *datatype.MetaPacket, start int) int {
 
 func (p RawPacket) fillARP(packet *datatype.MetaPacket, start int) int {
 	return copy(p[start:], packet.RawHeader)
+}
+
+const (
+	IPV6_VERSION_FLOW_LABEL_OFFSET = 0
+	IPV6_PAYLOAD_LENGTH_OFFSET     = 4
+	IPV6_NEXT_HEADER_OFFSET        = 6
+	IPV6_HOP_LIMIT_OFFSET          = 7
+	IPV6_SRC_ADDRESS_OFFSET        = 8
+	IPV6_DST_ADDRESS_OFFSET        = 24
+	IPV6_OPTIONS_OFFSET            = 40
+	IPV6_HEADER_LEN                = 40
+)
+
+func (p RawPacket) getIPv6Payload(packet *datatype.MetaPacket) uint16 {
+	payload := packet.PacketLen - ETHERNET_LEN - IPV6_HEADER_LEN
+	if packet.Vlan > 0 {
+		payload -= VLAN_LEN
+	}
+	return payload
+}
+
+func (p RawPacket) fillIPv6(packet *datatype.MetaPacket, start int) int {
+	base := p[start:]
+	versionAndFlowLabel := uint32(IPV6_VERSION)<<28 | uint32(packet.IHL)<<16 | uint32(packet.IpFlags)
+	payload := p.getIPv6Payload(packet)
+
+	binary.BigEndian.PutUint32(base[IPV6_VERSION_FLOW_LABEL_OFFSET:], versionAndFlowLabel)
+	binary.BigEndian.PutUint16(base[IPV6_PAYLOAD_LENGTH_OFFSET:], payload)
+	base[IPV6_NEXT_HEADER_OFFSET] = byte(packet.NextHeader)
+	base[IPV6_HOP_LIMIT_OFFSET] = packet.TTL
+	copy(base[IPV6_SRC_ADDRESS_OFFSET:], packet.Ip6Src)
+	copy(base[IPV6_DST_ADDRESS_OFFSET:], packet.Ip6Dst)
+	optionsLength := len(packet.Options)
+	if optionsLength > 0 {
+		copy(base[IPV6_OPTIONS_OFFSET:], packet.Options)
+	}
+	return IPV6_HEADER_LEN + optionsLength
 }
 
 func (p RawPacket) fillICMPv4(packet *datatype.MetaPacket, start int) int {
