@@ -198,6 +198,7 @@ func StringToScope(s string) ScopeEnum {
 type Field struct {
 	// 注意字节对齐！
 
+	IP6          net.IP // FIXME: 合并IP6和IP
 	IP           uint32
 	GroupID      int16
 	L2EpcID      int16
@@ -208,6 +209,7 @@ type Field struct {
 	L3DeviceType DeviceType
 	Host         uint32
 
+	IP61          net.IP // FIXME: 合并IP61和IP1
 	IP1           uint32
 	GroupID1      int16
 	L2EpcID1      int16
@@ -225,6 +227,7 @@ type Field struct {
 	ServerPort   uint16
 	SubnetID     uint16
 	SubnetID1    uint16
+	EthType      layers.EthernetType // 与IP/IP6是共生字段
 	TAPType      TAPTypeEnum
 	ACLDirection ACLDirectionEnum
 	CastType     CastTypeEnum
@@ -269,8 +272,21 @@ func (t *Tag) MarshalTo(b []byte) int {
 	// 在InfluxDB的line protocol中，tag紧跟在measurement name之后，总会以逗号开头
 	// 1<<0 ~ 1<<6
 	if t.Code&IP != 0 {
-		offset += copy(b[offset:], ",ip=")
-		offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
+		if t.EthType == layers.EthernetTypeIPv6 {
+			offset += copy(b[offset:], ",eth_type=")
+			offset += copy(b[offset:], strconv.FormatUint(uint64(t.EthType), 10))
+			offset += copy(b[offset:], ",ip=")
+			offset += copy(b[offset:], t.IP6.String())
+			offset += copy(b[offset:], ",ip_bin=") // 用于支持前缀匹配
+			offset += copy(b[offset:], utils.IPv6ToBinary(t.IP6))
+		} else {
+			offset += copy(b[offset:], ",eth_type=")
+			offset += copy(b[offset:], strconv.FormatUint(uint64(layers.EthernetTypeIPv4), 10))
+			offset += copy(b[offset:], ",ip=")
+			offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
+			offset += copy(b[offset:], ",ip_bin=") // 用于支持前缀匹配
+			offset += copy(b[offset:], utils.IPv4ToBinary(t.IP))
+		}
 	}
 	if t.Code&GroupID != 0 {
 		offset += copy(b[offset:], ",group_id=")
@@ -303,10 +319,29 @@ func (t *Tag) MarshalTo(b []byte) int {
 
 	// 1<<16 ~ 1<<22
 	if t.Code&IPPath != 0 {
-		offset += copy(b[offset:], ",ip_0=")
-		offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
-		offset += copy(b[offset:], ",ip_1=")
-		offset += copy(b[offset:], utils.IpFromUint32(t.IP1).String())
+		if t.EthType == layers.EthernetTypeIPv6 {
+			offset += copy(b[offset:], ",eth_type=")
+			offset += copy(b[offset:], strconv.FormatUint(uint64(t.EthType), 10))
+			offset += copy(b[offset:], ",ip_0=")
+			offset += copy(b[offset:], t.IP6.String())
+			offset += copy(b[offset:], ",ip_1=")
+			offset += copy(b[offset:], t.IP61.String())
+			offset += copy(b[offset:], ",ip_bin_0=") // 用于支持前缀匹配
+			offset += copy(b[offset:], utils.IPv6ToBinary(t.IP6))
+			offset += copy(b[offset:], ",ip_bin_1=") // 用于支持前缀匹配
+			offset += copy(b[offset:], utils.IPv6ToBinary(t.IP61))
+		} else {
+			offset += copy(b[offset:], ",eth_type=")
+			offset += copy(b[offset:], strconv.FormatUint(uint64(layers.EthernetTypeIPv4), 10))
+			offset += copy(b[offset:], ",ip_0=")
+			offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
+			offset += copy(b[offset:], ",ip_1=")
+			offset += copy(b[offset:], utils.IpFromUint32(t.IP1).String())
+			offset += copy(b[offset:], ",ip_bin_0=") // 用于支持前缀匹配
+			offset += copy(b[offset:], utils.IPv4ToBinary(t.IP))
+			offset += copy(b[offset:], ",ip_bin_1=") // 用于支持前缀匹配
+			offset += copy(b[offset:], utils.IPv4ToBinary(t.IP1))
+		}
 	}
 	if t.Code&GroupIDPath != 0 {
 		offset += copy(b[offset:], ",group_id_0=")
@@ -448,7 +483,15 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	t.Code = Code(decoder.ReadU64())
 
 	if t.Code&IP != 0 {
-		t.IP = decoder.ReadU32()
+		t.EthType = layers.EthernetType(decoder.ReadU16())
+		if t.EthType == layers.EthernetTypeIPv6 {
+			if t.IP6 == nil {
+				t.IP6 = make([]byte, 16)
+			}
+			decoder.ReadIPv6(t.IP6)
+		} else {
+			t.IP = decoder.ReadU32()
+		}
 	}
 	if t.Code&GroupID != 0 {
 		t.GroupID = int16(decoder.ReadU16())
@@ -472,8 +515,20 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	}
 
 	if t.Code&IPPath != 0 {
-		t.IP = decoder.ReadU32()
-		t.IP1 = decoder.ReadU32()
+		t.EthType = layers.EthernetType(decoder.ReadU16())
+		if t.EthType == layers.EthernetTypeIPv6 {
+			if t.IP6 == nil {
+				t.IP6 = make([]byte, 16)
+			}
+			if t.IP61 == nil {
+				t.IP61 = make([]byte, 16)
+			}
+			decoder.ReadIPv6(t.IP6)
+			decoder.ReadIPv6(t.IP61)
+		} else {
+			t.IP = decoder.ReadU32()
+			t.IP1 = decoder.ReadU32()
+		}
 	}
 	if t.Code&GroupIDPath != 0 {
 		t.GroupID = int16(decoder.ReadU16())
@@ -563,7 +618,13 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU64(uint64(t.Code))
 
 	if t.Code&IP != 0 {
-		encoder.WriteU32(t.IP)
+		if t.EthType == layers.EthernetTypeIPv6 {
+			encoder.WriteU16(uint16(t.EthType))
+			encoder.WriteIPv6(t.IP6)
+		} else {
+			encoder.WriteU16(uint16(layers.EthernetTypeIPv4))
+			encoder.WriteU32(t.IP)
+		}
 	}
 	if t.Code&GroupID != 0 {
 		encoder.WriteU16(uint16(t.GroupID))
@@ -587,8 +648,15 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 	}
 
 	if t.Code&IPPath != 0 {
-		encoder.WriteU32(t.IP)
-		encoder.WriteU32(t.IP1)
+		if t.EthType == layers.EthernetTypeIPv6 {
+			encoder.WriteU16(uint16(t.EthType))
+			encoder.WriteIPv6(t.IP6)
+			encoder.WriteIPv6(t.IP61)
+		} else {
+			encoder.WriteU16(uint16(layers.EthernetTypeIPv4))
+			encoder.WriteU32(t.IP)
+			encoder.WriteU32(t.IP1)
+		}
 	}
 	if t.Code&GroupIDPath != 0 {
 		encoder.WriteU16(uint16(t.GroupID))
@@ -678,6 +746,7 @@ func (t *Tag) SetID(id string) {
 	t.id = id
 }
 
+// FIXME: 不支持IPv6，预计droplet/app在v5.5.5中支持
 func isFastCode(code Code) bool {
 	// 认为所有只包含这四个Code子集的Tag能使用FashID
 	return (code & ^(CodeIndices | ACLGID | IP | L3EpcID | TAPType)) == 0
@@ -685,6 +754,7 @@ func isFastCode(code Code) bool {
 
 // GetFastID 返回uint64的ID，0代表该tag的code不在fast ID的范围内
 // 注意：ID中会忽略TAPType
+// FIXME: 不支持IPv6，预计droplet/app在v5.5.5中支持
 func (t *Tag) GetFastID() uint64 {
 	if !isFastCode(t.Code) || t.Code == 0 {
 		return 0
@@ -839,8 +909,20 @@ func (t *Tag) fillValue(name, value string) (err error) {
 	field := t.Field
 	var i uint64
 	switch name {
+	case "eth_type":
+		i, _ = strconv.ParseUint(value, 10, 16) // 老版本可能未写入EthType字段，忽略err
+		if i == 0 {
+			field.EthType = layers.EthernetTypeIPv4
+		} else {
+			field.EthType = layers.EthernetType(i)
+		}
 	case "ip", "ip_0":
-		field.IP = utils.IpToUint32(net.ParseIP(value).To4())
+		field.IP6 = net.ParseIP(value)
+		if field.IP6.To4() != nil {
+			field.IP = utils.IpToUint32(field.IP6.To4())
+			field.IP6 = nil
+			field.EthType = layers.EthernetTypeIPv4 // 老版本可能未写入EthType字段
+		}
 	case "group_id", "group_id_0":
 		field.GroupID, err = unmarshalUint16WithMinusOne(value)
 	case "l2_epc_id", "l2_epc_id_0":
@@ -864,7 +946,12 @@ func (t *Tag) fillValue(name, value string) (err error) {
 	case "host_1":
 		field.Host1 = utils.IpToUint32(net.ParseIP(value).To4())
 	case "ip_1":
-		field.IP1 = utils.IpToUint32(net.ParseIP(value).To4())
+		field.IP61 = net.ParseIP(value)
+		if field.IP61.To4() != nil {
+			field.IP1 = utils.IpToUint32(field.IP61.To4())
+			field.IP61 = nil
+			field.EthType = layers.EthernetTypeIPv4 // 老版本可能未写入EthType字段
+		}
 	case "group_id_1":
 		field.GroupID1, err = unmarshalUint16WithMinusOne(value)
 	case "l2_epc_id_1":
@@ -918,6 +1005,17 @@ func (t *Tag) fillValue(name, value string) (err error) {
 		case "bwd":
 			field.ACLDirection = ACL_BACKWARD
 		}
+	case "cast_type":
+		switch value {
+		case "unknown":
+			field.CastType = UNKNOWN
+		case "broadcast":
+			field.CastType = BROADCAST
+		case "multicast":
+			field.CastType = MULTICAST
+		case "unicast":
+			field.CastType = UNICAST
+		}
 	case "scope":
 		field.Scope = StringToScope(value)
 	case "country":
@@ -936,8 +1034,11 @@ func (t *Tag) fillValue(name, value string) (err error) {
 }
 
 var TAG_NAMES map[string]uint8 = map[string]uint8{
+	"eth_type":         0,
 	"ip":               0,
+	"ip_bin":           0,
 	"ip_0":             0,
+	"ip_bin_0":         0,
 	"group_id":         0,
 	"group_id_0":       0,
 	"l2_epc_id":        0,
@@ -955,6 +1056,7 @@ var TAG_NAMES map[string]uint8 = map[string]uint8{
 	"host":             0,
 	"host_0":           0,
 	"ip_1":             0,
+	"ip_bin_1":         0,
 	"group_id_1":       0,
 	"l2_epc_id_1":      0,
 	"l3_epc_id_1":      0,
@@ -973,6 +1075,7 @@ var TAG_NAMES map[string]uint8 = map[string]uint8{
 	"tap_type":         0,
 	"subnet_id":        0,
 	"acl_direction":    0,
+	"cast_type":        0,
 	"scope":            0,
 	"country":          0,
 	"region":           0,
