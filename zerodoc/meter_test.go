@@ -54,7 +54,7 @@ func TestGeoMeterFill(t *testing.T) {
 	if f.SumBitRx != uint64(v4) {
 		t.Error("SumBitRx 处理错误")
 	}
-	if f.SumRTTSynClient != time.Duration(v5) {
+	if f.SumRTTSynClient != time.Duration(v5*1000) {
 		t.Error("SumRTTSynClient 处理错误")
 	}
 	if f.SumRTTSynClientFlow != uint64(v6) {
@@ -167,13 +167,13 @@ func TestPerfMeterFill(t *testing.T) {
 	if f.SumRetransCntRx != uint64(v8) {
 		t.Error("SumRetransCntRx 处理错误")
 	}
-	if f.SumRTTSyn != time.Duration(v9) {
-		t.Error("sum_rtt_syn 处理错误")
+	if f.SumRTTSyn != time.Duration(v9)*time.Microsecond {
+		t.Error("SumRTTSyn 处理错误")
 	}
-	if f.SumRTTAvg != time.Duration(v10) {
+	if f.SumRTTAvg != time.Duration(v10)*time.Microsecond {
 		t.Error("SumRTTAvg 处理错误")
 	}
-	if f.SumARTAvg != time.Duration(v11) {
+	if f.SumARTAvg != time.Duration(v11)*time.Microsecond {
 		t.Error("SumARTAvg 处理错误")
 	}
 
@@ -192,22 +192,22 @@ func TestPerfMeterFill(t *testing.T) {
 	if f.SumZeroWndCntRx != uint64(v16) {
 		t.Error("SumZeroWndCntRx 处理错误")
 	}
-	if f.MaxRTTSyn != time.Duration(v17) {
+	if f.MaxRTTSyn != time.Duration(v17)*time.Microsecond {
 		t.Error("MaxRTTSyn 处理错误")
 	}
-	if f.MaxRTTAvg != time.Duration(v18) {
+	if f.MaxRTTAvg != time.Duration(v18)*time.Microsecond {
 		t.Error("MaxRTTAvg 处理错误")
 	}
-	if f.MaxARTAvg != time.Duration(v19) {
+	if f.MaxARTAvg != time.Duration(v19)*time.Microsecond {
 		t.Error("MaxARTAvg 处理错误")
 	}
-	if f.MinRTTSyn != time.Duration(v20) {
+	if f.MinRTTSyn != time.Duration(v20)*time.Microsecond {
 		t.Error("MinRTTSyn 处理错误")
 	}
-	if f.MinRTTAvg != time.Duration(v21) {
+	if f.MinRTTAvg != time.Duration(v21)*time.Microsecond {
 		t.Error("MinRTTAvg 处理错误")
 	}
-	if f.MinARTAvg != time.Duration(v22) {
+	if f.MinARTAvg != time.Duration(v22)*time.Microsecond {
 		t.Error("MinARTAvg 处理错误")
 	}
 }

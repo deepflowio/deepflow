@@ -118,7 +118,7 @@ func (m *GeoMeter) Fill(isTag []bool, names []string, values []interface{}) {
 		case "sum_bit_rx":
 			m.SumBitRx = uint64(values[i].(int64))
 		case "sum_rtt_syn_client":
-			m.SumRTTSynClient = time.Duration(values[i].(int64))
+			m.SumRTTSynClient = time.Duration(values[i].(int64)) * time.Microsecond
 		case "sum_rtt_syn_client_flow":
 			m.SumRTTSynClientFlow = uint64(values[i].(int64))
 		}
