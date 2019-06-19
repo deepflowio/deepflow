@@ -89,6 +89,7 @@ func TestInfluxdbItem(t *testing.T) {
 	c.EXPECT().Query(Any()).Return(newResp(nil, nil), nil)
 	c.EXPECT().Query(Any()).Return(newResp(nil, nil), nil)
 	c.EXPECT().Query(Any()).Return(newResp(nil, nil), nil)
+	c.EXPECT().Query(Any()).Return(newResp(nil, nil), nil)
 
 	c.EXPECT().Ping(Any()).Return(time.Duration(0), "", nil)
 	c.EXPECT().Ping(Any()).Return(time.Duration(0), "", nil)
@@ -106,7 +107,7 @@ func TestInfluxdbItem(t *testing.T) {
 
 	queueCount := 3
 
-	iw, _ := NewInfluxdbWriter([]string{INFLUXDB_HTTP_ADDR}, "item", queueCount)
+	iw, _ := NewInfluxdbWriter(INFLUXDB_HTTP_ADDR, "", "item", "0", queueCount)
 	iw.SetBatchTimeout(0)
 	iw.SetQueueSize(100)
 	iw.Run()
@@ -128,6 +129,7 @@ func TestInfluxdbPoint(t *testing.T) {
 	c.EXPECT().Query(Any()).Return(newResp(nil, nil), nil)
 	c.EXPECT().Query(Any()).Return(newResp(nil, nil), nil)
 	c.EXPECT().Query(Any()).Return(newResp(nil, nil), nil)
+	c.EXPECT().Query(Any()).Return(newResp(nil, nil), nil)
 
 	c.EXPECT().Ping(Any()).Return(time.Duration(0), "", nil)
 	c.EXPECT().Ping(Any()).Return(time.Duration(0), "", nil)
@@ -144,7 +146,7 @@ func TestInfluxdbPoint(t *testing.T) {
 	})
 
 	queueCount := 3
-	iw, _ := NewInfluxdbWriter([]string{INFLUXDB_HTTP_ADDR}, "point", queueCount)
+	iw, _ := NewInfluxdbWriter(INFLUXDB_HTTP_ADDR, "", "point", "0", queueCount)
 	iw.SetBatchTimeout(0)
 	iw.SetQueueSize(100)
 	iw.Run()
