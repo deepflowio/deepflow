@@ -25,6 +25,7 @@ const (
 	L2Device // 1 << 5
 	L3Device
 	Host
+	RegionID
 )
 
 const (
@@ -37,7 +38,7 @@ const (
 	L3DevicePath
 	HostPath
 	SubnetIDPath
-	RegionPath // 只在roze中使用，encode/decode的时候不做处理
+	RegionIDPath
 )
 
 const (
@@ -92,7 +93,7 @@ func (c Code) RemoveIndex() Code {
 // 从不同EndPoint获取的网包字段组成Field，是否可能重复。
 // 注意，不能判断从同样的EndPoint获取的网包字段组成Field可能重复。
 func (c Code) PossibleDuplicate() bool {
-	return c&(CodeIndices|GroupID|L2EpcID|L3EpcID|Host|GroupIDPath|L2EpcIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|TAPType|SubnetID|SubnetIDPath|ACLDirection|Country|Region|ISPCode|Scope) == c
+	return c&(CodeIndices|GroupID|L2EpcID|L3EpcID|Host|RegionID|GroupIDPath|L2EpcIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|TAPType|SubnetID|SubnetIDPath|RegionIDPath|ACLDirection|Country|Region|ISPCode|Scope) == c
 }
 
 // 是否全部取自网包的对称字段（非源、目的字段）
@@ -161,40 +162,6 @@ const (
 	SCOPE_INVALID
 )
 
-func (s ScopeEnum) String() string {
-	switch s {
-	case SCOPE_ALL:
-		return "all"
-	case SCOPE_IN_EPC:
-		return "in_epc"
-	case SCOPE_OUT_EPC:
-		return "out_epc"
-	case SCOPE_IN_SUBNET:
-		return "in_subnet"
-	case SCOPE_OUT_SUBNET:
-		return "out_subnet"
-	default:
-		panic("invalid scope type")
-	}
-}
-
-func StringToScope(s string) ScopeEnum {
-	switch s {
-	case "all":
-		return SCOPE_ALL
-	case "in_epc":
-		return SCOPE_IN_EPC
-	case "out_epc":
-		return SCOPE_OUT_EPC
-	case "in_subnet":
-		return SCOPE_IN_SUBNET
-	case "out_subnet":
-		return SCOPE_OUT_SUBNET
-	default:
-		return SCOPE_INVALID
-	}
-}
-
 type Field struct {
 	// 注意字节对齐！
 
@@ -220,6 +187,9 @@ type Field struct {
 	L3DeviceType1 DeviceType
 	Host1         uint32
 
+	RegionID  uint16
+	RegionID1 uint16
+
 	ACLGID       uint16
 	VLANID       uint16
 	Direction    DirectionEnum
@@ -227,10 +197,10 @@ type Field struct {
 	ServerPort   uint16
 	SubnetID     uint16
 	SubnetID1    uint16
-	EthType      layers.EthernetType // 与IP/IP6是共生字段
 	TAPType      TAPTypeEnum
 	ACLDirection ACLDirectionEnum
 	CastType     CastTypeEnum
+	IsIPv6       uint8 // 与IP/IP6是共生字段
 
 	Scope ScopeEnum
 
@@ -272,16 +242,14 @@ func (t *Tag) MarshalTo(b []byte) int {
 	// 在InfluxDB的line protocol中，tag紧跟在measurement name之后，总会以逗号开头
 	// 1<<0 ~ 1<<6
 	if t.Code&IP != 0 {
-		if t.EthType == layers.EthernetTypeIPv6 {
-			offset += copy(b[offset:], ",eth_type=")
-			offset += copy(b[offset:], strconv.FormatUint(uint64(t.EthType), 10))
+		offset += copy(b[offset:], ",is_ipv6=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.IsIPv6), 10))
+		if t.IsIPv6 != 0 {
 			offset += copy(b[offset:], ",ip=")
 			offset += copy(b[offset:], t.IP6.String())
 			offset += copy(b[offset:], ",ip_bin=") // 用于支持前缀匹配
 			offset += copy(b[offset:], utils.IPv6ToBinary(t.IP6))
 		} else {
-			offset += copy(b[offset:], ",eth_type=")
-			offset += copy(b[offset:], strconv.FormatUint(uint64(layers.EthernetTypeIPv4), 10))
 			offset += copy(b[offset:], ",ip=")
 			offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
 			offset += copy(b[offset:], ",ip_bin=") // 用于支持前缀匹配
@@ -316,12 +284,16 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",host=")
 		offset += copy(b[offset:], utils.IpFromUint32(t.Host).String())
 	}
+	if t.Code&RegionID != 0 {
+		offset += copy(b[offset:], ",region=") // 由于历史原因，此字段和省份同名
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.RegionID), 10))
+	}
 
 	// 1<<16 ~ 1<<22
 	if t.Code&IPPath != 0 {
-		if t.EthType == layers.EthernetTypeIPv6 {
-			offset += copy(b[offset:], ",eth_type=")
-			offset += copy(b[offset:], strconv.FormatUint(uint64(t.EthType), 10))
+		offset += copy(b[offset:], ",is_ipv6=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.IsIPv6), 10))
+		if t.IsIPv6 != 0 {
 			offset += copy(b[offset:], ",ip_0=")
 			offset += copy(b[offset:], t.IP6.String())
 			offset += copy(b[offset:], ",ip_1=")
@@ -331,8 +303,6 @@ func (t *Tag) MarshalTo(b []byte) int {
 			offset += copy(b[offset:], ",ip_bin_1=") // 用于支持前缀匹配
 			offset += copy(b[offset:], utils.IPv6ToBinary(t.IP61))
 		} else {
-			offset += copy(b[offset:], ",eth_type=")
-			offset += copy(b[offset:], strconv.FormatUint(uint64(layers.EthernetTypeIPv4), 10))
 			offset += copy(b[offset:], ",ip_0=")
 			offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
 			offset += copy(b[offset:], ",ip_1=")
@@ -393,6 +363,12 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",subnet_id_1=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.SubnetID1), 10))
 	}
+	if t.Code&RegionIDPath != 0 {
+		offset += copy(b[offset:], ",region_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.RegionID), 10))
+		offset += copy(b[offset:], ",region_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.RegionID1), 10))
+	}
 
 	// 1<<32 ~ 1<<48
 	if t.Code&Direction != 0 {
@@ -449,7 +425,7 @@ func (t *Tag) MarshalTo(b []byte) int {
 	}
 	if t.Code&Scope != 0 {
 		offset += copy(b[offset:], ",scope=")
-		offset += copy(b[offset:], t.Scope.String())
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.Scope), 10))
 	}
 
 	if t.Code&Country != 0 {
@@ -483,8 +459,8 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	t.Code = Code(decoder.ReadU64())
 
 	if t.Code&IP != 0 {
-		t.EthType = layers.EthernetType(decoder.ReadU16())
-		if t.EthType == layers.EthernetTypeIPv6 {
+		t.IsIPv6 = decoder.ReadU8()
+		if t.IsIPv6 != 0 {
 			if t.IP6 == nil {
 				t.IP6 = make([]byte, 16)
 			}
@@ -503,20 +479,23 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 		t.L3EpcID = int16(decoder.ReadU16())
 	}
 	if t.Code&L2Device != 0 {
-		t.L2DeviceID = uint16(decoder.ReadU16())
+		t.L2DeviceID = decoder.ReadU16()
 		t.L2DeviceType = DeviceType(decoder.ReadU8())
 	}
 	if t.Code&L3Device != 0 {
-		t.L3DeviceID = uint16(decoder.ReadU16())
+		t.L3DeviceID = decoder.ReadU16()
 		t.L3DeviceType = DeviceType(decoder.ReadU8())
 	}
 	if t.Code&Host != 0 {
 		t.Host = decoder.ReadU32()
 	}
+	if t.Code&RegionID != 0 {
+		t.RegionID = decoder.ReadU16()
+	}
 
 	if t.Code&IPPath != 0 {
-		t.EthType = layers.EthernetType(decoder.ReadU16())
-		if t.EthType == layers.EthernetTypeIPv6 {
+		t.IsIPv6 = decoder.ReadU8()
+		if t.IsIPv6 != 0 {
 			if t.IP6 == nil {
 				t.IP6 = make([]byte, 16)
 			}
@@ -543,15 +522,15 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 		t.L3EpcID1 = int16(decoder.ReadU16())
 	}
 	if t.Code&L2DevicePath != 0 {
-		t.L2DeviceID = uint16(decoder.ReadU16())
+		t.L2DeviceID = decoder.ReadU16()
 		t.L2DeviceType = DeviceType(decoder.ReadU8())
-		t.L2DeviceID1 = uint16(decoder.ReadU16())
+		t.L2DeviceID1 = decoder.ReadU16()
 		t.L2DeviceType1 = DeviceType(decoder.ReadU8())
 	}
 	if t.Code&L3DevicePath != 0 {
-		t.L3DeviceID = uint16(decoder.ReadU16())
+		t.L3DeviceID = decoder.ReadU16()
 		t.L3DeviceType = DeviceType(decoder.ReadU8())
-		t.L3DeviceID1 = uint16(decoder.ReadU16())
+		t.L3DeviceID1 = decoder.ReadU16()
 		t.L3DeviceType1 = DeviceType(decoder.ReadU8())
 	}
 	if t.Code&HostPath != 0 {
@@ -561,6 +540,10 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&SubnetIDPath != 0 {
 		t.SubnetID = decoder.ReadU16()
 		t.SubnetID1 = decoder.ReadU16()
+	}
+	if t.Code&RegionIDPath != 0 {
+		t.RegionID = decoder.ReadU16()
+		t.RegionID1 = decoder.ReadU16()
 	}
 
 	if t.Code&Direction != 0 {
@@ -618,11 +601,10 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU64(uint64(t.Code))
 
 	if t.Code&IP != 0 {
-		if t.EthType == layers.EthernetTypeIPv6 {
-			encoder.WriteU16(uint16(t.EthType))
+		encoder.WriteU8(t.IsIPv6)
+		if t.IsIPv6 != 0 {
 			encoder.WriteIPv6(t.IP6)
 		} else {
-			encoder.WriteU16(uint16(layers.EthernetTypeIPv4))
 			encoder.WriteU32(t.IP)
 		}
 	}
@@ -646,14 +628,16 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 	if t.Code&Host != 0 {
 		encoder.WriteU32(t.Host)
 	}
+	if t.Code&RegionID != 0 {
+		encoder.WriteU16(t.RegionID)
+	}
 
 	if t.Code&IPPath != 0 {
-		if t.EthType == layers.EthernetTypeIPv6 {
-			encoder.WriteU16(uint16(t.EthType))
+		encoder.WriteU8(t.IsIPv6)
+		if t.IsIPv6 != 0 {
 			encoder.WriteIPv6(t.IP6)
 			encoder.WriteIPv6(t.IP61)
 		} else {
-			encoder.WriteU16(uint16(layers.EthernetTypeIPv4))
 			encoder.WriteU32(t.IP)
 			encoder.WriteU32(t.IP1)
 		}
@@ -689,6 +673,10 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 	if t.Code&SubnetIDPath != 0 {
 		encoder.WriteU16(t.SubnetID)
 		encoder.WriteU16(t.SubnetID1)
+	}
+	if t.Code&RegionIDPath != 0 {
+		encoder.WriteU16(t.RegionID)
+		encoder.WriteU16(t.RegionID1)
 	}
 
 	if t.Code&Direction != 0 {
@@ -909,19 +897,13 @@ func (t *Tag) fillValue(name, value string) (err error) {
 	field := t.Field
 	var i uint64
 	switch name {
-	case "eth_type":
-		i, _ = strconv.ParseUint(value, 10, 16) // 老版本可能未写入EthType字段，忽略err
-		if i == 0 {
-			field.EthType = layers.EthernetTypeIPv4
-		} else {
-			field.EthType = layers.EthernetType(i)
-		}
+	case "is_ipv6":
+		i, _ = strconv.ParseUint(value, 10, 8) // 老版本可能未写入is_ipv6字段，忽略err
+		field.IsIPv6 = uint8(i)
 	case "ip", "ip_0":
 		field.IP6 = net.ParseIP(value)
 		if field.IP6.To4() != nil {
 			field.IP = utils.IpToUint32(field.IP6.To4())
-			field.IP6 = nil
-			field.EthType = layers.EthernetTypeIPv4 // 老版本可能未写入EthType字段
 		}
 	case "group_id", "group_id_0":
 		field.GroupID, err = unmarshalUint16WithMinusOne(value)
@@ -943,14 +925,15 @@ func (t *Tag) fillValue(name, value string) (err error) {
 		field.L3DeviceType = DeviceType(i)
 	case "host", "host_0":
 		field.Host = utils.IpToUint32(net.ParseIP(value).To4())
+	case "region_0":
+		i, err = strconv.ParseUint(value, 10, 16)
+		field.RegionID = uint16(i)
 	case "host_1":
 		field.Host1 = utils.IpToUint32(net.ParseIP(value).To4())
 	case "ip_1":
 		field.IP61 = net.ParseIP(value)
 		if field.IP61.To4() != nil {
 			field.IP1 = utils.IpToUint32(field.IP61.To4())
-			field.IP61 = nil
-			field.EthType = layers.EthernetTypeIPv4 // 老版本可能未写入EthType字段
 		}
 	case "group_id_1":
 		field.GroupID1, err = unmarshalUint16WithMinusOne(value)
@@ -976,6 +959,9 @@ func (t *Tag) fillValue(name, value string) (err error) {
 	case "subnet_id_1":
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.SubnetID1 = uint16(i)
+	case "region_1":
+		i, err = strconv.ParseUint(value, 10, 16)
+		field.RegionID1 = uint16(i)
 	case "direction":
 		switch value {
 		case "c2s":
@@ -996,7 +982,7 @@ func (t *Tag) fillValue(name, value string) (err error) {
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.ServerPort = uint16(i)
 	case "tap_type":
-		i, _ := strconv.ParseUint(value, 10, 8)
+		i, err = strconv.ParseUint(value, 10, 8)
 		field.TAPType = TAPTypeEnum(i)
 	case "acl_direction":
 		switch value {
@@ -1017,11 +1003,21 @@ func (t *Tag) fillValue(name, value string) (err error) {
 			field.CastType = UNICAST
 		}
 	case "scope":
-		field.Scope = StringToScope(value)
+		i, err = strconv.ParseUint(value, 10, 8)
+		field.Scope = ScopeEnum(i)
 	case "country":
 		field.Country = geo.EncodeCountry(value)
 	case "region":
-		field.Region = geo.EncodeRegion(value)
+		// 由于历史原因，这个字段表示两个含义：
+		// 数字：表示云平台所处区域的ID
+		// 非数字：表示中国的省份（仅在df_geo库中有此含义）
+		i, err = strconv.ParseUint(value, 10, 16)
+		if err == nil {
+			field.RegionID = uint16(i)
+		} else {
+			err = nil
+			field.Region = geo.EncodeRegion(value)
+		}
 	case "isp":
 		field.ISP = geo.EncodeISP(value)
 	default:
@@ -1034,7 +1030,7 @@ func (t *Tag) fillValue(name, value string) (err error) {
 }
 
 var TAG_NAMES map[string]uint8 = map[string]uint8{
-	"eth_type":         0,
+	"is_ipv6":          0,
 	"ip":               0,
 	"ip_bin":           0,
 	"ip_0":             0,
@@ -1055,6 +1051,7 @@ var TAG_NAMES map[string]uint8 = map[string]uint8{
 	"l3_device_type_0": 0,
 	"host":             0,
 	"host_0":           0,
+	"region_0":         0,
 	"ip_1":             0,
 	"ip_bin_1":         0,
 	"group_id_1":       0,
@@ -1067,6 +1064,7 @@ var TAG_NAMES map[string]uint8 = map[string]uint8{
 	"host_1":           0,
 	"subnet_id_0":      0,
 	"subnet_id_1":      0,
+	"region_1":         0,
 	"direction":        0,
 	"acl_gid":          0,
 	"vlan_id":          0,

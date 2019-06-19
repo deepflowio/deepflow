@@ -52,7 +52,7 @@ func TestFill1(t *testing.T) {
 		"host": "3.3.3.3", "ip_1": "5.5.5.5", "group_id_1": "-2",
 		"l2_epc_id_1": "21", "l3_epc_id_1": "31", "l2_device_id_1": "22", "l2_device_type_1": "7", "l3_device_id_1": "32", "l3_device_type_1": "9",
 		"host_1": "5.5.5.5", "subnet_id_1": "2000", "direction": "c2s", "acl_gid": "400", "vlan_id": "500",
-		"protocol": "4", "server_port": "9527", "tap_type": "0", "subnet_id": "1001", "acl_direction": "fwd", "scope": "in_epc", "country": "CHN", "region": "北京", "isp": "移动",
+		"protocol": "4", "server_port": "9527", "tap_type": "0", "subnet_id": "1001", "acl_direction": "fwd", "scope": "1", "country": "CHN", "region": "北京", "isp": "移动",
 	}
 
 	tag.Fill(0xffffffffffffffff, tags)
