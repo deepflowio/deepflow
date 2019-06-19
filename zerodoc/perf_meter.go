@@ -116,7 +116,7 @@ func (m *PerfMeter) MarshalTo(b []byte) int {
 
 func (m *PerfMeter) Fill(isTag []bool, names []string, values []interface{}) {
 	for i, name := range names {
-		if isTag[i] {
+		if isTag[i] || values[i] == nil {
 			continue
 		}
 		switch name {
