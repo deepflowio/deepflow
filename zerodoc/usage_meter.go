@@ -86,7 +86,7 @@ func (m *UsageMeter) MarshalTo(b []byte) int {
 
 func (m *UsageMeter) Fill(isTag []bool, names []string, values []interface{}) {
 	for i, name := range names {
-		if isTag[i] {
+		if isTag[i] || values[i] == nil {
 			continue
 		}
 		switch name {
