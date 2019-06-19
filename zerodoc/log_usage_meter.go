@@ -75,7 +75,7 @@ func (m *LogUsageMeter) MarshalTo(b []byte) int {
 
 func (m *LogUsageMeter) Fill(isTag []bool, names []string, values []interface{}) {
 	for i, name := range names {
-		if isTag[i] {
+		if isTag[i] || values[i] == nil {
 			continue
 		}
 		switch name {

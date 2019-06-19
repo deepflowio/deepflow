@@ -963,7 +963,7 @@ func IsTag(names []string) []bool {
 
 func (t *Tag) FillValues(isTag []bool, names []string, values []interface{}) error {
 	for i, name := range names {
-		if isTag[i] {
+		if isTag[i] && values[i] != nil {
 			if err := t.fillValue(name, values[i].(string)); err != nil {
 				return err
 			}
