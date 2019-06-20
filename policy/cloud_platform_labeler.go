@@ -301,10 +301,10 @@ func (l *CloudPlatformLabeler) ModifyPrivateIp(endpoint *EndpointData, key *Look
 		return
 	}
 
-	if endpoint.SrcInfo.L3EpcId == 0 && isPrivateAddress(key.SrcIp) {
+	if endpoint.SrcInfo.L3EpcId == 0 && (isPrivateAddress(key.SrcIp) || key.Src6Ip.IsLinkLocalUnicast()) {
 		endpoint.SrcInfo.L3EpcId = EPC_FROM_DEEPFLOW
 	}
-	if endpoint.DstInfo.L3EpcId == 0 && isPrivateAddress(key.DstIp) {
+	if endpoint.DstInfo.L3EpcId == 0 && (isPrivateAddress(key.DstIp) || key.Dst6Ip.IsLinkLocalUnicast()) {
 		endpoint.DstInfo.L3EpcId = EPC_FROM_DEEPFLOW
 	}
 }
