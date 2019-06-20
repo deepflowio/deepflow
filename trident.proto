@@ -76,6 +76,7 @@ message Config {
     optional uint64  bandwidth_probe_interval = 19 [default = 10];  //second
 
     optional string  analyzer_ip          = 31;
+    optional uint32  max_escape_seconds   = 32;
 }
 
 enum Protocol {
