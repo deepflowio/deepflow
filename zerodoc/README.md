@@ -62,11 +62,10 @@
 | vlan_id           | 34   |                         |                                       |
 | protocol          | 35   |                         |                                       |
 | server_port       | 36   | 服务端端口              |                                       |
-| cast_type         | 37   | 播送类型                | unknown: 单播目的MAC、源目的均不是云平台MAC |
-|                   |      |                         | broadcast: 广播，目的MAC为广播MAC     |
+| cast_type         | 37   | 播送类型                | broadcast: 广播，目的MAC为广播MAC     |
 |                   |      |                         | multicast: 组播，目的MAC为组播MAC     |
 |                   |      |                         | unicast: 单播目的MAC，源目的至少一个为云平台MAC |
-| vtap              | 38   | 采集点                  | 字符串格式的IP `废弃`                 |
+| vtap              | 38   | 采集器控制IP            | 字符串格式的IP                        |
 | tap_type          | 39   | 流量采集点              | 1-2,4-30: 接入网络流量                |
 |                   |      |                         | 3: 虚拟网络流量                       |
 | subnet_id         | 40   | 子网ID                  |                                       |
@@ -226,3 +225,22 @@
 | sum_bit_tx               | 累计发送总比特数               |
 | sum_bit_rx               | 累计接收总比特数               |
 
+### vtap_usage
+
+#### cast_type
+
+若在kvm X上某个虚拟接口上抓到 smac -> dmac 的包，那么：
+
+- dmac是广播
+  - 记录smac对应的虚拟机A及其Region/VPC/Subnet/IP（假设在kvm A上）发送的广播流量
+  - 查询虚拟机A的广播流量，可能会得到2倍+的结果，当所有KVM上有2+个相同VLAN的虚接口时
+  - 查询KVM A的广播流量，可能会得到2倍+的结果，当所有KVM上有2+个相同VLAN的虚接口时
+- dmac是组播
+  - 记录smac对应的虚拟机A及其Region/VPC/Subnet/IP（假设在kvm A上）发送的组播流量
+  - 查询结果和广播一样
+- dmac是单播
+  - 记录smac对应的虚拟机及其Region/VPC/Subnet/IP（假设在kvm A上）发送的单播流量
+  - 记录dmac对应的虚拟机及其Region/VPC/Subnet/IP（假设在kvm B上）接收的单播流量
+  - 查询虚拟机A的单播流量，会得到2倍+的结果
+  - 查询虚拟机B的单播流量，会得到2倍+的结果
+- 如果smac/dmac没有对应的虚拟机，此时不统计
