@@ -44,7 +44,6 @@ type VTAPUsageMeter struct {
 	InEPCUDP    Metrics
 	InSubnetUDP Metrics
 
-	Unknown   Metrics
 	Broadcast Metrics
 	Multicast Metrics
 	Unicast   Metrics
