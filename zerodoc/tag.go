@@ -424,6 +424,8 @@ func (t *Tag) MarshalTo(b []byte) int {
 			offset += copy(b[offset:], ",cast_type=multicast")
 		case UNICAST:
 			offset += copy(b[offset:], ",cast_type=unicast")
+		default:
+			offset += copy(b[offset:], ",cast_type=unknown")
 		}
 	}
 	if t.Code&Scope != 0 {
