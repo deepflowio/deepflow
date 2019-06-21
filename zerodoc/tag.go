@@ -243,15 +243,13 @@ func (t *Tag) MarshalTo(b []byte) int {
 	// 在InfluxDB的line protocol中，tag紧跟在measurement name之后，总会以逗号开头
 	// 1<<0 ~ 1<<6
 	if t.Code&IP != 0 {
-		offset += copy(b[offset:], ",is_ipv6=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.IsIPv6), 10))
 		if t.IsIPv6 != 0 {
-			offset += copy(b[offset:], ",ip=")
+			offset += copy(b[offset:], ",ip_version=6,ip=")
 			offset += copy(b[offset:], t.IP6.String())
 			offset += copy(b[offset:], ",ip_bin=") // 用于支持前缀匹配
 			offset += copy(b[offset:], utils.IPv6ToBinary(t.IP6))
 		} else {
-			offset += copy(b[offset:], ",ip=")
+			offset += copy(b[offset:], ",ip_version=4,ip=")
 			offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
 			offset += copy(b[offset:], ",ip_bin=") // 用于支持前缀匹配
 			offset += copy(b[offset:], utils.IPv4ToBinary(t.IP))
@@ -292,10 +290,8 @@ func (t *Tag) MarshalTo(b []byte) int {
 
 	// 1<<16 ~ 1<<22
 	if t.Code&IPPath != 0 {
-		offset += copy(b[offset:], ",is_ipv6=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.IsIPv6), 10))
 		if t.IsIPv6 != 0 {
-			offset += copy(b[offset:], ",ip_0=")
+			offset += copy(b[offset:], ",ip_version=6,ip_0=")
 			offset += copy(b[offset:], t.IP6.String())
 			offset += copy(b[offset:], ",ip_1=")
 			offset += copy(b[offset:], t.IP61.String())
@@ -304,6 +300,7 @@ func (t *Tag) MarshalTo(b []byte) int {
 			offset += copy(b[offset:], ",ip_bin_1=") // 用于支持前缀匹配
 			offset += copy(b[offset:], utils.IPv6ToBinary(t.IP61))
 		} else {
+			offset += copy(b[offset:], ",ip_version=4,ip_0=")
 			offset += copy(b[offset:], ",ip_0=")
 			offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
 			offset += copy(b[offset:], ",ip_1=")
@@ -908,9 +905,11 @@ func (t *Tag) fillValue(name, value string) (err error) {
 	field := t.Field
 	var i uint64
 	switch name {
-	case "is_ipv6":
-		i, _ = strconv.ParseUint(value, 10, 8) // 老版本可能未写入is_ipv6字段，忽略err
-		field.IsIPv6 = uint8(i)
+	case "ip_version":
+		i, _ = strconv.ParseUint(value, 10, 8) // 老版本可能未写入ip_version字段，忽略err
+		if i == 6 {
+			field.IsIPv6 = 1
+		}
 	case "ip", "ip_0":
 		field.IP6 = net.ParseIP(value)
 		if field.IP6.To4() != nil {
@@ -1041,7 +1040,7 @@ func (t *Tag) fillValue(name, value string) (err error) {
 }
 
 var TAG_NAMES map[string]uint8 = map[string]uint8{
-	"is_ipv6":          0,
+	"ip_version":       0,
 	"ip":               0,
 	"ip_bin":           0,
 	"ip_0":             0,
