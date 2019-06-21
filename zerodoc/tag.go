@@ -301,7 +301,6 @@ func (t *Tag) MarshalTo(b []byte) int {
 			offset += copy(b[offset:], utils.IPv6ToBinary(t.IP61))
 		} else {
 			offset += copy(b[offset:], ",ip_version=4,ip_0=")
-			offset += copy(b[offset:], ",ip_0=")
 			offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
 			offset += copy(b[offset:], ",ip_1=")
 			offset += copy(b[offset:], utils.IpFromUint32(t.IP1).String())
