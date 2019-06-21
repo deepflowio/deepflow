@@ -75,6 +75,6 @@ def init_logger():
         '__main__': logging.DEBUG,
     }
     init(
-        daemon=True, logger_file="/var/log/pcap-rest.log", name_dict=name_dict,
+        daemon=os.getppid() == 1, logger_file="/var/log/pcap-rest.log", name_dict=name_dict,
         module_name='pcap-rest'
     )

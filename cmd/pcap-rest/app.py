@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import datetime
+import ipaddress
 import mimetypes
 import os
 import socket
@@ -20,11 +21,11 @@ FILE_SUFFIX = '.pcap'
 API_VERSION = 'v1'
 API_PREFIX = '/' + API_VERSION
 
-MAC_REGEX = r'(?:[0-9a-zA-Z]{2}[-:]){5}[0-9a-zA-Z]{2}'
-IP_REGEX = r'(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)'
-
 DEFAULT_PCAP_LIST_SIZE = 1000
 
+IP_REGEX = r'(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)'
+# https://stackoverflow.com/a/17871737
+IPV6_REGEX = r'(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))'
 
 app = Bottle()
 
@@ -41,22 +42,9 @@ def read_config():
     HOSTNAME = socket.gethostname()
 
 
-@app.get(API_PREFIX + '/pcaps/<acl_gid:int>/<mac:re:%s>/' % MAC_REGEX)
-def get_files_by_mac(acl_gid, mac):
-    start_ts = int(time.time()) - 600
-    end_ts = int(time.time())
-    if request.query.start_ts != '':
-        start_ts = int(request.query.start_ts)
-    if request.query.end_ts != '':
-        end_ts = int(request.query.end_ts)
-    return {
-        'DATA': get_files(acl_gid, start_ts, end_ts, mac=mac),
-        'OPT_STATUS': 'SUCCESS',
-    }
-
-
 @app.get(API_PREFIX + '/pcaps/<acl_gid:int>/')
 @app.get(API_PREFIX + '/pcaps/<acl_gid:int>/<ip:re:%s>/' % IP_REGEX)
+@app.get(API_PREFIX + '/pcaps/<acl_gid:int>/<ip:re:%s>/' % IPV6_REGEX)
 def get_files_by_ip(acl_gid, ip=None):
     u"""
 按IP查询acl_gid下的pcap文件
@@ -70,6 +58,7 @@ HTTP request args:
   protocol: 协议，可选值为[6, 17]
   port: 端口
   tap_type: 探针点
+  ip_version: ip版本，可选值为[4, 6]
 
 HTTP request body:
 
@@ -83,7 +72,6 @@ HTTP response body:
       "DATA": [
         {
           "start_datetime": "190122155720",
-          "mac": "00:00:0c:07:ac:66",
           "hostname": "analyzer1",
           "end_epoch": 1548144063,
           "end_datetime": "190122160103",
@@ -115,8 +103,20 @@ HTTP response body:
     if request.query.end_ts != '':
         end_ts = int(request.query.end_ts)
     size = int(request.query.size) if request.query.size != '' else None
+    ip_version = int(request.query.ip_version) if request.query.ip_version != '' else None
+    if ip_version is not None and ip_version not in [4, 6]:
+        return {'OPT_STATUS': 'FAILURE', 'DESCRIPTION': 'bad ip version'}
+    if ip:
+        ip = ipaddress.ip_address(unicode(ip))
+        if ip_version is not None and ip.version != ip_version:
+            return {'OPT_STATUS': 'FAILURE', 'DESCRIPTION': 'ip version mismatch'}
+        ip_version = ip.version
+    if ips:
+        ips = [ipaddress.ip_address(unicode(it)) for it in ips]
+        if ip_version is not None and any([it.version != ip_version for it in ips]):
+            return {'OPT_STATUS': 'FAILURE', 'DESCRIPTION': 'ip version mismatch'}
     return {
-        'DATA': get_files(acl_gid, start_ts, end_ts, size=size, ip=ip, ip_filter=ips, protocol=protocol, port=port, tap_type=tap_type),
+        'DATA': get_files(acl_gid, start_ts, end_ts, size=size, ip=ip, ip_filter=ips, protocol=protocol, port=port, tap_type=tap_type, ip_version=ip_version),
         'OPT_STATUS': 'SUCCESS',
     }
 
@@ -141,6 +141,7 @@ HTTP response body:
   octet-stream
     """
     ips = request.query.getlist('ip')
+    ips = [ipaddress.ip_address(unicode(it)) for it in ips]
     protocol = None
     if request.query.protocol != '':
         protocol = int(request.query.protocol)
@@ -171,20 +172,19 @@ def delete_files(acl_gid, pcap_name=None):
 
 # convert ip like 192.168.1.1 to 192168001001
 def _ip_convert(ip):
-    return ''.join(['0' * (3 - len(s)) + s for s in ip.split('.')])
+    return ''.join(['0' * (3 - len(s)) + s for s in str(ip).split('.')])
 
 
 def _ip_convert_back(ip):
-    return '%d.%d.%d.%d' % (int(ip[0:3]), int(ip[3:6]), int(ip[6:9]), int(ip[9:12]))
-
-
-# convert mac like 01:02:03:04:05:06 to 010203040506
-def _mac_convert(mac):
-    return mac.replace(':', '').replace('-', '')
-
-
-def _mac_convert_back(mac):
-    return '%s:%s:%s:%s:%s:%s' % (mac[0:2], mac[2:4], mac[4:6], mac[6:8], mac[8:10], mac[10:12])
+    try:
+        # ipv6
+        return ipaddress.ip_address(unicode(ip))
+    except ValueError:
+        try:
+            # ipv4
+            return ipaddress.ip_address(unicode('%d.%d.%d.%d' % (int(ip[0:3]), int(ip[3:6]), int(ip[6:9]), int(ip[9:12]))))
+        except (IndexError, ValueError):
+            return ipaddress.ip_address(unicode('0.0.0.0'))
 
 
 def _tap_type_to_id(tapType):
@@ -207,7 +207,7 @@ def _time_to_epoch(time_str):
         return 0
 
 
-def get_files(acl_gid, start_ts, end_ts, size=DEFAULT_PCAP_LIST_SIZE, mac=None, ip=None, ip_filter=None, protocol=None, port=None, tap_type=None):
+def get_files(acl_gid, start_ts, end_ts, size=DEFAULT_PCAP_LIST_SIZE, ip=None, ip_filter=None, protocol=None, port=None, tap_type=None, ip_version=None):
     if size < 0:
         size = DEFAULT_PCAP_LIST_SIZE
     if protocol is not None and protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
@@ -217,14 +217,11 @@ def get_files(acl_gid, start_ts, end_ts, size=DEFAULT_PCAP_LIST_SIZE, mac=None, 
     if not os.path.isdir(directory):
         return []
     files = []
-    mac_rep = None
-    ip_rep = None
-    if mac is not None:
-        mac_str = _mac_convert(mac)
-        mac_rep = mac
     if ip is not None:
-        ip_str = _ip_convert(ip)
-        ip_rep = ip
+        if ip_version == 4:
+            ip_str = _ip_convert(ip)
+        else:
+            ip_str = str(ip)
     for file in os.listdir(directory):
         if not file.endswith(FILE_SUFFIX):
             continue
@@ -237,19 +234,13 @@ def get_files(acl_gid, start_ts, end_ts, size=DEFAULT_PCAP_LIST_SIZE, mac=None, 
             continue
         if tap_type is not None and _tap_type_to_id(segs[0]) != tap_type:
             continue
-        if mac is not None and mac_str != segs[1]:
-            continue
         if ip is not None and ip_str != segs[2]:
             continue
-        if mac_rep is None:
-            mac_rep = _mac_convert_back(segs[1])
-        if ip_rep is None:
-            ip_rep = _ip_convert_back(segs[2])
-        if (ip_filter is not None or protocol is not None) and not found_in_pcap(directory + file, ip_filter, protocol, port):
+        ip_rep = _ip_convert_back(segs[2])
+        if (ip_filter or protocol is not None) and not found_in_pcap(directory + file, ip_filter, protocol, port):
             continue
         files.append({
-            'mac': mac_rep,
-            'ip': ip_rep,
+            'ip': str(ip_rep),
             'tap_type': _tap_type_to_id(segs[0]),
             'filename': file,
             'start_epoch': start_epoch,
@@ -258,5 +249,6 @@ def get_files(acl_gid, start_ts, end_ts, size=DEFAULT_PCAP_LIST_SIZE, mac=None, 
             'end_datetime': segs[4],
             'size': os.path.getsize(directory + file),
             'hostname': HOSTNAME,
+            'ip_version': ip_rep.version,
         })
     return sorted(files, key=itemgetter('start_epoch'), reverse=True)[:size]
