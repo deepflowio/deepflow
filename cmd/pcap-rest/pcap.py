@@ -1,6 +1,5 @@
+import ipaddress
 import logging
-import socket
-import struct
 
 LOG = logging.getLogger(__name__)
 
@@ -15,27 +14,40 @@ INCL_LEN_OFFSET = 8
 ETHERNET_HEADER_LEN = 14
 ETHER_TYPE_OFFSET = 12
 ETHER_TYPE_IPV4 = 0x0800
+ETHER_TYPE_IPV6 = 0x86DD
 ETHER_TYPE_ARP = 0x0806
 ETHER_TYPE_VLAN = 0x8100
 VLAN_LEN = 4
 
 IHL_OFFSET = 0
-PROTOCOL_OFFSET = 9
+IPV4_PROTOCOL_OFFSET = 9
+IPV4_SRC_IP_OFFSET = 12
+IPV4_DST_IP_OFFSET = 16
+
+IPV6_NEXT_HEADER_OFFSET = 6
+IPV6_SRC_IP_OFFSET = 8
+IPV6_DST_IP_OFFSET = 24
+
+IPV6_HEADER_LEN = 40
+IPV6_NEXT_HEADER_ICMP6 = 58
+IPV6_NEXT_HEADER_NONXT = 59
+IPV6_NEXT_HEADER_HOPBYHOP = 0
+IPV6_NEXT_HEADER_DESTINATION = 60
+IPV6_NEXT_HEADER_ROUTING = 43
+IPV6_NEXT_HEADER_FRAGMENT = 44
+
 PROTOCOL_TCP = 6
 PROTOCOL_UDP = 17
-SRC_IP_OFFSET = 12
-DST_IP_OFFSET = 16
-
 SRC_PORT_OFFSET = 0
 DST_PORT_OFFSET = 2
 
 import struct
 
 
-def _ip_to_int(addr):
+def _ip_to_bytes(addr):
     try:
-        return struct.unpack("!I", socket.inet_aton(addr))[0]
-    except socket.error:
+        return ipaddress.ip_address(unicode(addr)).packed
+    except ValueError:
         return None
 
 
@@ -48,14 +60,26 @@ def __packet_matches_condition(packet, ips_int, protocol, port):
         off = ETHER_TYPE_OFFSET + VLAN_LEN
         eth_type = struct.unpack('!H', packet[off:off+2])[0]
         l3_offset += VLAN_LEN
-    if eth_type != ETHER_TYPE_IPV4:
+    if eth_type == ETHER_TYPE_IPV4:
+        ip_version = 4
+    elif eth_type == ETHER_TYPE_IPV6:
+        ip_version = 6
+    else:
         return False
 
+    if ip_version == 4:
+        src_ip_offset = IPV4_SRC_IP_OFFSET
+        dst_ip_offset = IPV4_DST_IP_OFFSET
+        ip_length = 4
+    else:
+        src_ip_offset = IPV6_SRC_IP_OFFSET
+        dst_ip_offset = IPV6_DST_IP_OFFSET
+        ip_length = 16
     if ips_int:
-        off = l3_offset+SRC_IP_OFFSET
-        ip_src = struct.unpack('!L', packet[off:off+4])[0]
-        off = l3_offset+DST_IP_OFFSET
-        ip_dst = struct.unpack('!L', packet[off:off+4])[0]
+        off = l3_offset + src_ip_offset
+        ip_src = packet[off:off+ip_length]
+        off = l3_offset + dst_ip_offset
+        ip_dst = packet[off:off+ip_length]
         if len(ips_int) == 1:
             if ips_int[0] != ip_src and ips_int[0] != ip_dst:
                 return False
@@ -65,13 +89,33 @@ def __packet_matches_condition(packet, ips_int, protocol, port):
 
     # ipv4
     if protocol is not None:
-        r_protocol = ord(packet[l3_offset+PROTOCOL_OFFSET])
+        if ip_version == 4:
+            r_protocol = ord(packet[l3_offset + IPV4_PROTOCOL_OFFSET])
+        else:
+            r_protocol = ord(packet[l3_offset + IPV6_NEXT_HEADER_OFFSET])
+            offset = l3_offset + IPV6_HEADER_LEN
+            while True:
+                if r_protocol in [PROTOCOL_TCP, PROTOCOL_UDP, IPV6_NEXT_HEADER_ICMP6, IPV6_NEXT_HEADER_NONXT]:
+                    break
+                elif r_protocol in [IPV6_NEXT_HEADER_HOPBYHOP, IPV6_NEXT_HEADER_DESTINATION, IPV6_NEXT_HEADER_ROUTING]:
+                    r_protocol = ord(packet[offset])
+                    offset += 1
+                    offset += ord(packet[offset])
+                elif r_protocol == IPV6_NEXT_HEADER_FRAGMENT:
+                    r_protocol = ord(packet[offset])
+                    offset += 8
+                else:
+                    LOG.warning('unknown ipv6 extension header id %d' % r_protocol)
+                    break
         if r_protocol != protocol:
             return False
 
     if port is not None:
 
-        l4_offset = l3_offset + ((ord(packet[l3_offset+IHL_OFFSET]) & 0xF) << 2)
+        if ip_version == 4:
+            l4_offset = l3_offset + ((ord(packet[l3_offset+IHL_OFFSET]) & 0xF) << 2)
+        else:
+            l4_offset = offset
 
         # tcp/udp
         off = l4_offset + SRC_PORT_OFFSET
@@ -88,7 +132,7 @@ def found_in_pcap(filename, ips=None, protocol=None, port=None):
     ips_int = []
     if ips is not None:
         for ip in ips:
-            ip_int = _ip_to_int(ip)
+            ip_int = _ip_to_bytes(ip)
             if ip_int is not None:
                 ips_int.append(ip_int)
 
@@ -132,7 +176,7 @@ def filter_pcap(filename, ips=None, protocol=None, port=None):
     ips_int = []
     if ips is not None:
         for ip in ips:
-            ip_int = _ip_to_int(ip)
+            ip_int = _ip_to_bytes(ip)
             if ip_int is not None:
                 ips_int.append(ip_int)
 
