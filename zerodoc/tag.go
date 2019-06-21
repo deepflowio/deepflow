@@ -48,7 +48,7 @@ const (
 	Protocol
 	ServerPort
 	CastType
-	_ // 1 << 38, VTAP
+	VTAP
 	TAPType
 	SubnetID
 	_ // 1 << 41, ACLID
@@ -93,12 +93,12 @@ func (c Code) RemoveIndex() Code {
 // 从不同EndPoint获取的网包字段组成Field，是否可能重复。
 // 注意，不能判断从同样的EndPoint获取的网包字段组成Field可能重复。
 func (c Code) PossibleDuplicate() bool {
-	return c&(CodeIndices|GroupID|L2EpcID|L3EpcID|Host|RegionID|GroupIDPath|L2EpcIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|TAPType|SubnetID|SubnetIDPath|RegionIDPath|ACLDirection|Country|Region|ISPCode|Scope) == c
+	return c&(CodeIndices|GroupID|L2EpcID|L3EpcID|Host|RegionID|GroupIDPath|L2EpcIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|VTAP|TAPType|SubnetID|SubnetIDPath|RegionIDPath|ACLDirection|Country|Region|ISPCode|Scope) == c
 }
 
 // 是否全部取自网包的对称字段（非源、目的字段）
 func (c Code) IsSymmetric() bool {
-	return c&(CodeIndices|ACLGID|VLANID|Protocol|TAPType|ACLDirection|Scope) == c
+	return c&(CodeIndices|ACLGID|VLANID|Protocol|VTAP|TAPType|ACLDirection|Scope) == c
 }
 
 type DeviceType uint8
@@ -197,6 +197,7 @@ type Field struct {
 	ServerPort   uint16
 	SubnetID     uint16
 	SubnetID1    uint16
+	VTAP         uint32
 	TAPType      TAPTypeEnum
 	ACLDirection ACLDirectionEnum
 	CastType     CastTypeEnum
@@ -395,6 +396,10 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",server_port=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ServerPort), 10))
 	}
+	if t.Code&VTAP != 0 {
+		offset += copy(b[offset:], ",vtap=")
+		offset += copy(b[offset:], utils.IpFromUint32(t.VTAP).String())
+	}
 	if t.Code&TAPType != 0 {
 		offset += copy(b[offset:], ",tap_type=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TAPType), 10))
@@ -413,8 +418,6 @@ func (t *Tag) MarshalTo(b []byte) int {
 	}
 	if t.Code&CastType != 0 {
 		switch t.CastType {
-		case UNKNOWN:
-			offset += copy(b[offset:], ",cast_type=unknown")
 		case BROADCAST:
 			offset += copy(b[offset:], ",cast_type=broadcast")
 		case MULTICAST:
@@ -561,6 +564,9 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&ServerPort != 0 {
 		t.ServerPort = decoder.ReadU16()
 	}
+	if t.Code&VTAP != 0 {
+		t.VTAP = decoder.ReadU32()
+	}
 	if t.Code&TAPType != 0 {
 		t.TAPType = TAPTypeEnum(decoder.ReadU8())
 	}
@@ -693,6 +699,9 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 	}
 	if t.Code&ServerPort != 0 {
 		encoder.WriteU16(t.ServerPort)
+	}
+	if t.Code&VTAP != 0 {
+		encoder.WriteU32(t.VTAP)
 	}
 	if t.Code&TAPType != 0 {
 		encoder.WriteU8(uint8(t.TAPType))
@@ -981,6 +990,8 @@ func (t *Tag) fillValue(name, value string) (err error) {
 	case "server_port":
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.ServerPort = uint16(i)
+	case "vtap":
+		field.VTAP = utils.IpToUint32(net.ParseIP(value).To4())
 	case "tap_type":
 		i, err = strconv.ParseUint(value, 10, 8)
 		field.TAPType = TAPTypeEnum(i)
@@ -993,8 +1004,6 @@ func (t *Tag) fillValue(name, value string) (err error) {
 		}
 	case "cast_type":
 		switch value {
-		case "unknown":
-			field.CastType = UNKNOWN
 		case "broadcast":
 			field.CastType = BROADCAST
 		case "multicast":
@@ -1070,6 +1079,7 @@ var TAG_NAMES map[string]uint8 = map[string]uint8{
 	"vlan_id":          0,
 	"protocol":         0,
 	"server_port":      0,
+	"vtap":             0,
 	"tap_type":         0,
 	"subnet_id":        0,
 	"acl_direction":    0,
