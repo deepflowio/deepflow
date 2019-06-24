@@ -28,7 +28,7 @@
 | host              | 7    | 宿主机                  | 字符串格式的IP                        |
 | region            | 8    | 云平台Region ID         | 字符串                                |
 |                   |      |                         |                                       |
-| ip_version        | 0    | IP地址类型              | 4: IPv4；6: IPv6                      |
+| ip_version        | 16   | IP地址类型              | 4: IPv4；6: IPv6                      |
 | ip_0              | 16   | 0端IP                   | 字符串格式的IP                        |
 | ip_1              | 16   | 1端IP                   | 字符串格式的IP                        |
 | ip_bin_0          | 16   | 0端IP                   | 二进制字符串格式的IP                  |
