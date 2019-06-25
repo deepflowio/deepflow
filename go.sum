@@ -3,8 +3,6 @@ cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMT
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/OneOfOne/xxhash v1.2.2 h1:KMrpdQIwFcEqXDklaen+P1axHaj9BSKzvpUUfnHldSE=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
-github.com/OneOfOne/xxhash v1.2.5 h1:zl/OfRA6nftbBK9qTohYBJ5xvw6C/oNKizR7cZGl3cI=
-github.com/OneOfOne/xxhash v1.2.5/go.mod h1:eZbhyaAYD41SGSSsnmcpxVoRiQ/MPUTjUdIIOT9Um7Q=
 github.com/Workiva/go-datastructures v1.0.50 h1:slDmfW6KCHcC7U+LP3DDBbm4fqTwZGn1beOFPfGaLvo=
 github.com/Workiva/go-datastructures v1.0.50/go.mod h1:Z+F2Rca0qCsVYDS8z7bAGm8f3UkzuWYS/oBZz5a7VVA=
 github.com/cespare/xxhash v1.1.0 h1:a6HrQnmkObjyL+Gs60czilIUGqrzKutQD6XZog3p+ko=
@@ -81,8 +79,8 @@ github.com/stretchr/testify v1.3.0 h1:TivCn/peBQ7UY8ooIcPgZFpTNSz0Q2U6UrFlUfqbe0
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/tebeka/strftime v0.0.0-20140926081919-3f9c7761e312 h1:frNEkk4P8mq+47LAMvj9LvhDq01kFDUhpJZzzei8IuM=
 github.com/tebeka/strftime v0.0.0-20140926081919-3f9c7761e312/go.mod h1:o6CrSUtupq/A5hylbvAsdydn0d5yokJExs8VVdx4wwI=
-gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190621084609-f33678524cab h1:F48sfXpMbevfXNy8hx+VTUK0Q1pSQ4shjmABb3dx1oY=
-gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190621084609-f33678524cab/go.mod h1:U/IngsGIDpYQZIlXmhHSULCocNuR/2Np4ltNPoUCqgs=
+gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190625082701-f28bfb649c1e h1:pFvz+TzFvl3cwEMDPbaWD7xqid6Fkj4ImRRoK54Eugk=
+gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190625082701-f28bfb649c1e/go.mod h1:U/IngsGIDpYQZIlXmhHSULCocNuR/2Np4ltNPoUCqgs=
 gitlab.x.lan/yunshan/message v0.0.0-20190530103009-4514077a70b9 h1:AsC/T+P3tZ4shsuaWUcJ7QeD8VLithhoEx1uGxB7ZaM=
 gitlab.x.lan/yunshan/message v0.0.0-20190530103009-4514077a70b9/go.mod h1:R5ZX1w+XLKWpf45DbKsAXvRyklT7rfgBN/WKClV2MP4=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
