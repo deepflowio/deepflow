@@ -157,6 +157,7 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 		field.IP = ips[thisEnd]
 		field.TAPType = TAPTypeFromInPort(flow.InPort)
 		field.Direction = directions[thisEnd]
+		field.ServerPort = flow.PortDst
 		field.ACLDirection = outputtype.ACL_FORWARD // 含ACLDirection字段时仅考虑ACL正向匹配
 		field.IP1 = ips[otherEnd]
 
