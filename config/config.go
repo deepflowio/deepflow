@@ -10,8 +10,6 @@ import (
 
 	"github.com/op/go-logging"
 	"gopkg.in/yaml.v2"
-
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
 var log = logging.MustGetLogger("config")
@@ -23,8 +21,6 @@ type Config struct {
 	LogLevel       string              `yaml:"log-level"`
 	Profiler       bool                `yaml:"profiler"`
 	MaxCPUs        int                 `yaml:"max-cpus"`
-	TapInterfaces  []string            `yaml:"tap-interfaces,flow"`
-	DefaultTapType uint32              `yaml:"default-tap-type"`
 	Stream         string              `yaml:"stream"`
 	StreamPort     uint16              `yaml:"stream-port"`
 	ZeroPorts      []uint16            `yaml:"zero-ports"`
@@ -142,9 +138,6 @@ func (c *Config) Validate() error {
 		return errors.New("Malformed stream")
 	}
 
-	if c.DefaultTapType == 0 {
-		c.DefaultTapType = datatype.PACKET_SOURCE_ISP
-	}
 	if c.Adapter.SocketBufferSize == 0 {
 		c.Adapter.SocketBufferSize = 32 * 1024 * 1024
 	}

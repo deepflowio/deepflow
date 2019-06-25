@@ -12,11 +12,6 @@ log-level: info
 profiler: false
 # maximum usage of cpu cores, 0 means no limit
 max-cpus: 0
-# interfaces for mirrored traffic from ISP or TOR
-tap-interfaces: []
-# where packet is considered to come by default if packet has no qinq with outer vlan pcp == 7
-# ISP: 0x10001, TOR: 0x30000, default value is 0x30000
-default-tap-type: 0x30000
 # conf for connection with outside stream
 stream: 127.0.0.1
 stream-port: 20201

@@ -9,7 +9,7 @@ FLAGS = -ldflags "-X main.RevCount=${REV_COUNT} -X main.Revision=${REVISION} -X 
 .PHONY: all
 all: droplet droplet-ctl
 
-vendor: patch/001-fix-afpacket-dirty-block.patch patch/002-record-logging-modules.patch
+vendor: patch/001-record-logging-modules.patch
 	go mod tidy && go mod vendor
 	test -n "$(shell go list -e -f '{{.Dir}}' ${MESSAGE})"
 	test -n "$(shell go list -e -f '{{.Dir}}' ${DROPLET_LIBS})"
@@ -18,8 +18,7 @@ vendor: patch/001-fix-afpacket-dirty-block.patch patch/002-record-logging-module
 	find vendor -type d -exec chmod +w {} \;
 	cd vendor/${MESSAGE} && go generate ./...
 	cd vendor/${DROPLET_LIBS} && go generate ./...
-	cat patch/001-fix-afpacket-dirty-block.patch | patch -sN -d vendor/github.com/google/gopacket -p1
-	cat patch/002-record-logging-modules.patch | patch -sN -d ./vendor/github.com/op/go-logging -p1
+	cat patch/001-record-logging-modules.patch | patch -sN -d ./vendor/github.com/op/go-logging -p1
 
 .PHONY: test
 test: vendor

@@ -19,7 +19,6 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"gitlab.x.lan/yunshan/droplet/adapter"
-	"gitlab.x.lan/yunshan/droplet/capture"
 	"gitlab.x.lan/yunshan/droplet/config"
 	"gitlab.x.lan/yunshan/droplet/flowgenerator"
 	"gitlab.x.lan/yunshan/droplet/labeler"
@@ -86,14 +85,13 @@ func Start(configPath string) (closers []io.Closer) {
 	if cfg.MaxCPUs > 0 {
 		runtime.GOMAXPROCS(cfg.MaxCPUs)
 	}
-	// L1 - packet source
+	// L1 - packet source from tridentAdapter
 	manager := queue.NewManager()
-	packetSourceCount := 1 + len(cfg.TapInterfaces) // tridentAdapter and capture
 	releaseMetaPacket := func(x interface{}) {
 		datatype.ReleaseMetaPacket(x.(*datatype.MetaPacket))
 	}
 	labelerQueues := manager.NewQueues(
-		"1-meta-packet-to-labeler", cfg.Queue.LabelerQueueSize, cfg.Queue.LabelerQueueCount, packetSourceCount,
+		"1-meta-packet-to-labeler", cfg.Queue.LabelerQueueSize, cfg.Queue.LabelerQueueCount, 1,
 		releaseMetaPacket,
 	)
 
@@ -110,22 +108,6 @@ func Start(configPath string) (closers []io.Closer) {
 	} else if localIp.String() == "127.0.0.1" {
 		log.Error("Invalid ip resolved by hostname")
 		os.Exit(1)
-	}
-	remoteSegmentSet := capture.NewSegmentSet()
-
-	launcher := capture.CaptureLauncher{
-		Ip:             localIp,
-		RemoteSegments: remoteSegmentSet,
-		DefaultTapType: cfg.DefaultTapType,
-		OutputQueue:    labelerQueues,
-	}
-	for tapId, iface := range cfg.TapInterfaces {
-		closer, err := launcher.StartWith(tapId, iface)
-		if err != nil {
-			log.Error(err)
-			os.Exit(1)
-		}
-		closers = append(closers, closer)
 	}
 
 	// L2 - packet labeler
@@ -147,20 +129,6 @@ func Start(configPath string) (closers []io.Closer) {
 	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_PCAP, pcapAppQueues)
 	synchronizer.Register(func(response *trident.SyncResponse) {
 		log.Debug(response)
-		// Capture更新RemoteSegments
-		rpcRemoteSegments := response.GetRemoteSegments()
-		remoteSegments := make([]net.HardwareAddr, 0, len(rpcRemoteSegments))
-		for _, segment := range rpcRemoteSegments {
-			for _, macString := range segment.GetMac() {
-				mac, err := net.ParseMAC(macString)
-				if err != nil {
-					log.Warning("Invalid MAC ", macString)
-					continue
-				}
-				remoteSegments = append(remoteSegments, mac)
-			}
-		}
-		remoteSegmentSet.OnSegmentChange(remoteSegments)
 		// Labeler更新策略信息
 		labelerManager.OnAclDataChange(response)
 	})
