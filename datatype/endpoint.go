@@ -193,6 +193,7 @@ func (i *EndpointInfo) SetL3EndByIp(data *PlatformData, ip net.IP) {
 
 		if ipInfo.RawIp.Equal(ip.Mask(mask)) {
 			i.L3End = true
+			i.SetL3Data(data, ip)
 			break
 		}
 	}
