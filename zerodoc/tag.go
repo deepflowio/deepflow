@@ -904,6 +904,8 @@ func (t *Tag) fillValue(name, value string) (err error) {
 	field := t.Field
 	var i uint64
 	switch name {
+	case "ip_bin", "ip_bin_0", "ip_bin_1":
+		return nil
 	case "ip_version":
 		i, _ = strconv.ParseUint(value, 10, 8) // 老版本可能未写入ip_version字段，忽略err
 		if i == 6 {
