@@ -228,7 +228,7 @@ func (r *Repair) getConfidences() ([]Confidence, error) {
 				db:          v[dbIndex].(string),
 				measurement: v[measurementIndex].(string),
 				shardID:     v[shardIDIndex].(string),
-				timestamp:   uint32(unmarshalInt64(v[0]) / int64(time.Nanosecond)),
+				timestamp:   unmarshalInt64(v[0]),
 				status:      RepairStatus(unmarshalInt64(v[statusIndex])),
 			})
 		}
@@ -245,12 +245,12 @@ func (r *Repair) syncConfidenceData() {
 	isSyncSuccess := make([]bool, len(confidences))
 	for i, c := range confidences {
 		r.checkCreateDatabase(r.replicaClient, r.primaryClient, c.db)
-		syncCount, err := syncData(int64(c.timestamp)*int64(time.Nanosecond), c.db, c.measurement, r.rp, r.primaryClient, r.replicaClient)
+		syncCount, err := syncData(c.timestamp, c.db, c.measurement, r.rp, r.primaryClient, r.replicaClient)
 		if err == nil {
 			r.counter.SyncCount += int64(syncCount)
 			isSyncSuccess[i] = true
 		} else {
-			log.Errorf("sync failed: timestamp=%d db=%s Measurement=%s shardID=%d", c.timestamp, c.db, c.measurement, c.shardID)
+			log.Errorf("sync failed: timestamp=%d db=%s Measurement=%s shardID=%s", c.timestamp, c.db, c.measurement, c.shardID)
 			isSyncSuccess[i] = false
 
 		}
@@ -297,7 +297,7 @@ func (r *Repair) updateConfidences(confidences []Confidence, isSyncSuccess []boo
 			r.deleteConfidence(&c)
 			measurement = CONFIDENCE_MEASUREMENT_SYNCED
 		}
-		if pt, err := client.NewPoint(measurement, tags, fields, time.Unix(int64(c.timestamp), 0)); err == nil {
+		if pt, err := client.NewPoint(measurement, tags, fields, time.Unix(0, c.timestamp)); err == nil {
 			confidenceBP.AddPoint(pt)
 		} else {
 			log.Warning("new NewPoint failed:", err)
@@ -313,7 +313,7 @@ func (r *Repair) updateConfidences(confidences []Confidence, isSyncSuccess []boo
 
 func (r *Repair) deleteConfidence(c *Confidence) error {
 	cmd := fmt.Sprintf("delete from %s where time=%d and %s='%s' and %s='%s' and %s='%s'",
-		CONFIDENCE_MEASUREMENT, int64(c.timestamp)*int64(time.Nanosecond),
+		CONFIDENCE_MEASUREMENT, c.timestamp,
 		TAG_DB, c.db,
 		TAG_MEASUREMENT, c.measurement,
 		TAG_ID, c.shardID)

@@ -51,7 +51,7 @@ type Confidence struct {
 	db          string
 	measurement string
 	shardID     string
-	timestamp   uint32
+	timestamp   int64 // time.Duration
 	status      RepairStatus
 }
 
@@ -485,7 +485,7 @@ func (w *InfluxdbWriter) writeConfidence(bp client.BatchPoints, status RepairSta
 		confidences[Confidence{
 			db:          bp.Database(),
 			measurement: point.Name(),
-			timestamp:   uint32(point.Time().Unix()),
+			timestamp:   point.Time().Unix(),
 			status:      status,
 		}] = 0
 	}
@@ -509,7 +509,7 @@ func (w *InfluxdbWriter) writeConfidence(bp client.BatchPoints, status RepairSta
 			measurement = CONFIDENCE_MEASUREMENT_SYNCED
 		}
 
-		if pt, err := client.NewPoint(measurement, tags, fields, time.Unix(int64(confidence.timestamp), 0)); err == nil {
+		if pt, err := client.NewPoint(measurement, tags, fields, time.Unix(0, confidence.timestamp)); err == nil {
 			confidenceBP.AddPoint(pt)
 		} else {
 			log.Warning("new NewPoint failed:", err)
