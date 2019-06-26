@@ -297,10 +297,6 @@ func isPrivateAddress(ip uint32) bool {
 }
 
 func (l *CloudPlatformLabeler) ModifyPrivateIp(endpoint *EndpointData, key *LookupKey) {
-	if key.Tap != TAP_TOR {
-		return
-	}
-
 	if endpoint.SrcInfo.L3EpcId == 0 && (isPrivateAddress(key.SrcIp) || key.Src6Ip.IsLinkLocalUnicast()) {
 		endpoint.SrcInfo.L3EpcId = EPC_FROM_DEEPFLOW
 	}
