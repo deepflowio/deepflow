@@ -16,7 +16,7 @@ max-cpus: 0
 stream: 127.0.0.1
 stream-port: 20201
 # conf for connection with outside zeroes
-zero-ports: [20211, 20212]
+zero-ports: [20211]
 # trident adapter
 adapter:
   # udp socket buffer size (Bytes) for receiving trident traffic,
