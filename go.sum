@@ -33,8 +33,8 @@ github.com/google/gopacket v1.1.15 h1:M6W3hwQXo5rq1wyhRByGhqOw0m9p+HWtUJ3Bj4/fT6
 github.com/google/gopacket v1.1.15/go.mod h1:UCLx9mCmAwsVbn6qQl1WIEt2SO7Nd2fD0th1TBAsqBw=
 github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
-github.com/influxdata/influxdb v1.6.4 h1:K8wPlkrP02HzHTJbbUQQ1CZ2Hw6LtpG4xbNEgnlhMZU=
-github.com/influxdata/influxdb v1.6.4/go.mod h1:qZna6X/4elxqT3yI9iZYdZrWWdeFOOprn86kgg4+IzY=
+github.com/influxdata/influxdb v1.7.6 h1:8mQ7A/V+3noMGCt/P9pD09ISaiz9XvgCk303UYA3gcs=
+github.com/influxdata/influxdb v1.7.6/go.mod h1:qZna6X/4elxqT3yI9iZYdZrWWdeFOOprn86kgg4+IzY=
 github.com/jehiah/go-strftime v0.0.0-20171201141054-1d33003b3869 h1:IPJ3dvxmJ4uczJe5YQdrYB16oTJlGSC/OyZDqUk9xX4=
 github.com/jehiah/go-strftime v0.0.0-20171201141054-1d33003b3869/go.mod h1:cJ6Cj7dQo+O6GJNiMx+Pa94qKj+TG8ONdKHgMNIyyag=
 github.com/jonboulle/clockwork v0.1.0 h1:VKV+ZcuP6l3yW9doeqz6ziZGgcynBVQO+obU0+0hcPo=
