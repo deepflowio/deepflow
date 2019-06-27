@@ -13,11 +13,11 @@ type VTAPSimpleMeter struct {
 }
 
 func (m *VTAPSimpleMeter) Encode(encoder *codec.SimpleEncoder) {
-	m.Encode(encoder)
+	m.Metrics.Encode(encoder)
 }
 
 func (m *VTAPSimpleMeter) Decode(decoder *codec.SimpleDecoder) {
-	m.Decode(decoder)
+	m.Metrics.Decode(decoder)
 }
 
 func (m *VTAPSimpleMeter) SortKey() uint64 {
