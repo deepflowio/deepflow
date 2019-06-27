@@ -9,15 +9,39 @@ import (
 // influxdb每返回-行数据，打一个VTAPSimpleMeter 的doc
 // 由于用VTAPUsageMeter的结构返回数据太冗余了,故用这个结构即可
 type VTAPSimpleMeter struct {
-	Metrics
+	TxBytes   uint64 `db:"tx_bytes"`
+	RxBytes   uint64 `db:"rx_bytes"`
+	Bytes     uint64 `db:"bytes"`
+	TxPackets uint64 `db:"tx_packets"`
+	RxPackets uint64 `db:"rx_packets"`
+	Packets   uint64 `db:"packets"`
 }
 
 func (m *VTAPSimpleMeter) Encode(encoder *codec.SimpleEncoder) {
-	m.Metrics.Encode(encoder)
+	encoder.WriteU64(m.TxBytes)
+	encoder.WriteU64(m.RxBytes)
+	encoder.WriteU64(m.Bytes)
+	encoder.WriteU64(m.TxPackets)
+	encoder.WriteU64(m.RxPackets)
+	encoder.WriteU64(m.Packets)
 }
 
 func (m *VTAPSimpleMeter) Decode(decoder *codec.SimpleDecoder) {
-	m.Metrics.Decode(decoder)
+	m.TxBytes = decoder.ReadU64()
+	m.RxBytes = decoder.ReadU64()
+	m.Bytes = decoder.ReadU64()
+	m.TxPackets = decoder.ReadU64()
+	m.RxPackets = decoder.ReadU64()
+	m.Packets = decoder.ReadU64()
+}
+
+func (m *VTAPSimpleMeter) Merge(other *VTAPSimpleMeter) {
+	m.TxBytes += other.TxBytes
+	m.RxBytes += other.RxBytes
+	m.Bytes += other.Bytes
+	m.TxPackets += other.TxPackets
+	m.RxPackets += other.RxPackets
+	m.Packets += other.Packets
 }
 
 func (m *VTAPSimpleMeter) SortKey() uint64 {
@@ -39,20 +63,24 @@ func (m *VTAPSimpleMeter) Fill(isTag []bool, names []string, values []interface{
 		}
 		switch name {
 		case "tx_bytes":
-			m.TxBytes = uint32(values[i].(int64))
+			m.TxBytes = uint64(values[i].(int64))
 		case "rx_bytes":
-			m.RxBytes = uint32(values[i].(int64))
+			m.RxBytes = uint64(values[i].(int64))
+		case "bytes":
+			m.Bytes = uint64(values[i].(int64))
 		case "tx_packets":
-			m.TxPackets = uint32(values[i].(int64))
+			m.TxPackets = uint64(values[i].(int64))
 		case "rx_packets":
-			m.RxPackets = uint32(values[i].(int64))
+			m.RxPackets = uint64(values[i].(int64))
+		case "packets":
+			m.Packets = uint64(values[i].(int64))
 		}
 	}
 }
 
 func (m *VTAPSimpleMeter) ConcurrentMerge(other app.Meter) {
 	if other, ok := other.(*VTAPSimpleMeter); ok {
-		m.Merge(&other.Metrics)
+		m.Merge(other)
 	}
 }
 
