@@ -101,6 +101,7 @@ type InfluxdbWriter struct {
 	BatchSize     int
 	FlushTimeout  int64
 	RP            RetentionPolicy
+	wg            sync.WaitGroup
 	exit          bool
 }
 
@@ -289,6 +290,14 @@ func (i *WriterInfo) GetCounter() interface{} {
 	return counter
 }
 
+func (i *WriterInfo) Close() {
+	if i.httpClient != nil {
+		i.httpClient.Close()
+		i.httpClient = nil
+	}
+	i.Closable.Close()
+}
+
 func newPointCache(db, rp string, size int) *PointCache {
 	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
 		Database:        db,
@@ -320,6 +329,8 @@ func (p *PointCache) Reset(db, rp string) {
 func (w *InfluxdbWriter) queueProcess(queueID int) {
 	stats.RegisterCountable(w.Name, w.QueueWriterInfosPrimary[queueID], stats.OptionStatTags{"thread": strconv.Itoa(queueID)})
 	defer w.QueueWriterInfosPrimary[queueID].Close()
+	defer w.wg.Done()
+	w.wg.Add(1)
 
 	rawItems := make([]interface{}, QUEUE_FETCH_MAX_SIZE)
 	for !w.exit {
@@ -461,6 +472,8 @@ func (w *InfluxdbWriter) queueProcessReplica(queueID int) {
 	writerInfo := w.QueueWriterInfosReplica[queueID]
 	stats.RegisterCountable(w.Name+"_replica", writerInfo, stats.OptionStatTags{"thread": strconv.Itoa(queueID)})
 	defer writerInfo.Close()
+	defer w.wg.Done()
+	w.wg.Add(1)
 
 	for !w.exit {
 		item := w.ReplicaQueues.Get(queue.HashKey(queueID))
@@ -525,17 +538,10 @@ func (w *InfluxdbWriter) writeConfidence(bp client.BatchPoints, status RepairSta
 
 func (w *InfluxdbWriter) Close() {
 	w.exit = true
+	w.wg.Wait()
 
 	w.DBCreateCtlReplica.HttpClient.Close()
 	w.DBCreateCtlPrimary.HttpClient.Close()
-
-	for _, writeInfo := range w.QueueWriterInfosPrimary {
-		writeInfo.httpClient.Close()
-	}
-
-	for _, writeInfo := range w.QueueWriterInfosReplica {
-		writeInfo.httpClient.Close()
-	}
 
 	log.Info("Stopped influx writer")
 }
