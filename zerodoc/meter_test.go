@@ -265,23 +265,29 @@ func TestUsageMeterFill(t *testing.T) {
 func TestVTAPSimpleMeterFill(t *testing.T) {
 	f := &VTAPSimpleMeter{}
 
-	isTag := []bool{false, true, false, false, false, false, false}
-	names := []string{"tx_bytes", "ip", "scope", "rx_bytes", "tx_packets", "rx_packets"}
-	var v1, v2, v3, v4 int64
-	v1, v2, v3, v4 = 123, 12345, 1234567890123, 123456789012345
-	values := []interface{}{v1, "ip", "2", v2, v3, v4}
+	isTag := []bool{false, true, false, false, false, false, false, false, false}
+	names := []string{"tx_bytes", "ip", "scope", "rx_bytes", "bytes", "packets", "tx_packets", "rx_packets"}
+	var v1, v2, v3, v4, v5, v6 int64
+	v1, v2, v3, v4, v5, v6 = 123, 12345, 1234567890123, 123456789012345, 234, 56
+	values := []interface{}{v1, "ip", "2", v2, v3, v4, v5, v6}
 	f.Fill(isTag, names, values)
 
-	if f.TxBytes != uint32(v1) {
+	if f.TxBytes != uint64(v1) {
 		t.Error("TxBytes 处理错误")
 	}
-	if f.RxBytes != uint32(v2) {
+	if f.RxBytes != uint64(v2) {
 		t.Error("RxBytes 处理错误")
 	}
-	if f.TxPackets != uint32(v3) {
+	if f.Bytes != uint64(v3) {
+		t.Error("Bytes 处理错误")
+	}
+	if f.Packets != uint64(v4) {
+		t.Error("Packets 处理错误")
+	}
+	if f.TxPackets != uint64(v5) {
 		t.Error("TxPackets 处理错误")
 	}
-	if f.RxPackets != uint32(v4) {
+	if f.RxPackets != uint64(v6) {
 		t.Error("RxPackets 处理错误")
 	}
 }
