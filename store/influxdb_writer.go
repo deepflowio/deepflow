@@ -498,7 +498,7 @@ func (w *InfluxdbWriter) writeConfidence(bp client.BatchPoints, status RepairSta
 		confidences[Confidence{
 			db:          bp.Database(),
 			measurement: point.Name(),
-			timestamp:   point.Time().Unix(),
+			timestamp:   point.Time().UnixNano(),
 			status:      status,
 		}] = 0
 	}
