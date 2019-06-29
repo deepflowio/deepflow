@@ -910,11 +910,16 @@ func (t *Tag) fillValue(name, value string) (err error) {
 		i, _ = strconv.ParseUint(value, 10, 8) // 老版本可能未写入ip_version字段，忽略err
 		if i == 6 {
 			field.IsIPv6 = 1
+		} else {
+			field.IsIPv6 = 0
 		}
 	case "ip", "ip_0":
 		field.IP6 = net.ParseIP(value)
 		if field.IP6.To4() != nil {
 			field.IP = utils.IpToUint32(field.IP6.To4())
+			field.IP6 = nil
+		} else {
+			field.IP = 0
 		}
 	case "group_id", "group_id_0":
 		field.GroupID, err = unmarshalUint16WithMinusOne(value)
@@ -945,6 +950,9 @@ func (t *Tag) fillValue(name, value string) (err error) {
 		field.IP61 = net.ParseIP(value)
 		if field.IP61.To4() != nil {
 			field.IP1 = utils.IpToUint32(field.IP61.To4())
+			field.IP61 = nil
+		} else {
+			field.IP1 = 0
 		}
 	case "group_id_1":
 		field.GroupID1, err = unmarshalUint16WithMinusOne(value)
@@ -979,6 +987,8 @@ func (t *Tag) fillValue(name, value string) (err error) {
 			field.Direction = ClientToServer
 		case "s2c":
 			field.Direction = ServerToClient
+		default:
+			field.Direction = 0
 		}
 	case "acl_gid":
 		i, err = strconv.ParseUint(value, 10, 16)
@@ -1003,6 +1013,8 @@ func (t *Tag) fillValue(name, value string) (err error) {
 			field.ACLDirection = ACL_FORWARD
 		case "bwd":
 			field.ACLDirection = ACL_BACKWARD
+		default:
+			field.ACLDirection = 0
 		}
 	case "cast_type":
 		switch value {
@@ -1012,6 +1024,8 @@ func (t *Tag) fillValue(name, value string) (err error) {
 			field.CastType = MULTICAST
 		case "unicast":
 			field.CastType = UNICAST
+		default:
+			field.CastType = 0
 		}
 	case "scope":
 		i, err = strconv.ParseUint(value, 10, 8)
@@ -1025,8 +1039,10 @@ func (t *Tag) fillValue(name, value string) (err error) {
 		i, err = strconv.ParseUint(value, 10, 16)
 		if err == nil {
 			field.RegionID = uint16(i)
+			field.Region = 0
 		} else {
 			err = nil
+			field.RegionID = 0
 			field.Region = geo.EncodeRegion(value)
 		}
 	case "isp":
