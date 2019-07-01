@@ -297,10 +297,10 @@ func isPrivateAddress(ip uint32) bool {
 }
 
 func (l *CloudPlatformLabeler) ModifyPrivateIp(endpoint *EndpointData, key *LookupKey) {
-	if endpoint.SrcInfo.L3EpcId == 0 && (isPrivateAddress(key.SrcIp) || key.Src6Ip.IsLinkLocalUnicast()) {
+	if endpoint.SrcInfo.L3EpcId == 0 && (isPrivateAddress(key.SrcIp) || (len(key.Src6Ip) == 16 && !key.Src6Ip.IsGlobalUnicast())) {
 		endpoint.SrcInfo.L3EpcId = EPC_FROM_DEEPFLOW
 	}
-	if endpoint.DstInfo.L3EpcId == 0 && (isPrivateAddress(key.DstIp) || key.Dst6Ip.IsLinkLocalUnicast()) {
+	if endpoint.DstInfo.L3EpcId == 0 && (isPrivateAddress(key.DstIp) || (len(key.Dst6Ip) == 16 && !key.Dst6Ip.IsGlobalUnicast())) {
 		endpoint.DstInfo.L3EpcId = EPC_FROM_DEEPFLOW
 	}
 }
