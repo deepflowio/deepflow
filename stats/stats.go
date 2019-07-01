@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -264,12 +265,35 @@ func setHostname(name string) {
 	lock.Unlock()
 }
 
+func winBase(path string) string {
+	// Find the last element
+	if i := strings.LastIndex(path, "\\"); i >= 0 {
+		path = path[i+1:]
+	}
+	// Find the last .exe
+	if i := strings.LastIndex(path, ".exe"); i >= 0 {
+		path = path[:i]
+	}
+	// If empty now, it had only slashes.
+	if path == "" {
+		return "\\"
+	}
+	return path
+}
+
 func init() {
 	if flag.Lookup("test.v") != nil {
 		return
 	}
 	name, _ := os.Hostname()
 	hostname = name
-	processName = path.Base(os.Args[0])
+	if runtime.GOOS == "windows" {
+		processName = winBase(os.Args[0])
+	} else if runtime.GOOS == "linux" {
+		processName = path.Base(os.Args[0])
+	} else {
+
+	}
+
 	go run()
 }
