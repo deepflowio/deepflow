@@ -11,7 +11,7 @@ BuildArch:  x86_64
 Source:     droplet.spec
 
 BuildRequires: golang git
-Requires: libzmq5 bash-completion
+Requires: zeromq bash-completion
 Requires: python-paste
 Requires(post): %{_sbindir}/update-alternatives
 Requires(postun): %{_sbindir}/update-alternatives
