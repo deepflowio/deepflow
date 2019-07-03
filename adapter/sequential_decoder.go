@@ -44,6 +44,9 @@ type Decoded struct {
 	IpID       uint16
 	fragOffset uint16
 
+	// l3 ipv6
+	ip6Src, ip6Dst net.IP
+
 	// l4
 	port0, port1 uint16
 	dataOffset   uint8
@@ -175,19 +178,19 @@ func (d *SequentialDecoder) decodeIPv6(meta *MetaPacket) {
 	}
 	meta.TTL = x.ttl
 	if !d.pflags.IsSet(CFLAG_IP0) {
-		x.ip0 = net.IP(d.data.Field(IPV6_ADDR_LEN))
+		x.ip6Src = net.IP(d.data.Field(IPV6_ADDR_LEN))
 	}
 	if !d.pflags.IsSet(CFLAG_IP1) {
-		x.ip1 = net.IP(d.data.Field(IPV6_ADDR_LEN))
+		x.ip6Dst = net.IP(d.data.Field(IPV6_ADDR_LEN))
 	}
 	meta.Ip6Src = make(net.IP, 16)
 	meta.Ip6Dst = make(net.IP, 16)
 	if d.forward {
-		copy(meta.Ip6Src, x.ip0)
-		copy(meta.Ip6Dst, x.ip1)
+		copy(meta.Ip6Src, x.ip6Src)
+		copy(meta.Ip6Dst, x.ip6Dst)
 	} else {
-		copy(meta.Ip6Src, x.ip1)
-		copy(meta.Ip6Dst, x.ip0)
+		copy(meta.Ip6Src, x.ip6Dst)
+		copy(meta.Ip6Dst, x.ip6Src)
 	}
 	meta.NextHeader = IPProtocol(d.data.U8())
 	if length := d.data.U8(); length > 0 {
