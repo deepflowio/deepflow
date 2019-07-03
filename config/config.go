@@ -23,7 +23,7 @@ type Config struct {
 	MaxCPUs        int                 `yaml:"max-cpus"`
 	Stream         string              `yaml:"stream"`
 	StreamPort     uint16              `yaml:"stream-port"`
-	ZeroPorts      []uint16            `yaml:"zero-ports"`
+	ZeroPort       uint16              `yaml:"zero-port"`
 	Adapter        AdapterConfig       `yaml:"adapter"`
 	Queue          QueueConfig         `yaml:"queue"`
 	Labeler        LabelerConfig       `yaml:"labeler"`
@@ -309,6 +309,10 @@ func (c *Config) Validate() error {
 	}
 	if c.PCap.FileDirectory == "" {
 		c.PCap.FileDirectory = "/var/lib/droplet/pcap"
+	}
+
+	if c.ZeroPort == 0 {
+		c.ZeroPort = 20211
 	}
 	return nil
 }
