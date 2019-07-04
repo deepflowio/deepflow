@@ -80,6 +80,10 @@ type Worker struct {
 	writers     map[WriterKey]*WrappedWriter
 	writersIpv6 map[WriterKey]*list.List
 
+	ips  []datatype.IPv4Int
+	ip6s []net.IP
+	macs []datatype.MacInt
+
 	writerBufferSize int
 	tcpipChecksum    bool
 
@@ -103,6 +107,10 @@ func (m *WorkerManager) newWorker(index int) *Worker {
 
 		writers:     make(map[WriterKey]*WrappedWriter),
 		writersIpv6: make(map[WriterKey]*list.List),
+
+		ips:  make([]datatype.IPv4Int, 0, 2),
+		ip6s: make([]net.IP, 0, 2),
+		macs: make([]datatype.MacInt, 0, 2),
 
 		writerBufferSize: m.blockSizeKB << 10,
 		tcpipChecksum:    m.tcpipChecksum,
@@ -319,11 +327,69 @@ func (w *Worker) writePacketIpv6(packet *datatype.MetaPacket, tapType zerodoc.TA
 	writer.lastPacketTime = packet.Timestamp
 }
 
+func (w *Worker) cleanTimeoutFile(timeNow time.Duration) {
+	for key, writer := range w.writers {
+		if timeNow-writer.firstPacketTime > w.maxFilePeriod {
+			newFilename := writer.getFilename(w.baseDirectory)
+			w.finishWriter(writer, newFilename)
+			delete(w.writers, key)
+		}
+	}
+
+	for _, writerList := range w.writersIpv6 {
+		for e := writerList.Front(); e != nil; {
+			r, writer := e, e.Value.(*WrappedWriter)
+			e = e.Next()
+			if timeNow-writer.firstPacketTime > w.maxFilePeriod {
+				newFilename := writer.getFilename(w.baseDirectory)
+				w.finishWriter(writer, newFilename)
+				writerList.Remove(r)
+			}
+		}
+	}
+}
+
+func (w *Worker) checkWriterPcap(packet *datatype.MetaPacket, direction datatype.DirectionType) zerodoc.TAPTypeEnum {
+	var tapType zerodoc.TAPTypeEnum
+	w.ips = w.ips[0:0]
+	w.ip6s = w.ip6s[0:0]
+	w.macs = w.macs[0:0]
+	ipSrcCheck := packet.IpSrc != BROADCAST_IP && packet.MacSrc != BROADCAST_MAC
+	ipDstCheck := packet.IpDst != BROADCAST_IP && packet.MacDst != BROADCAST_MAC
+	if packet.EthType == EthernetTypeIPv6 {
+		ipSrcCheck = !packet.Ip6Src.IsMulticast() && packet.MacSrc != BROADCAST_MAC
+		ipDstCheck = !packet.Ip6Dst.IsMulticast() && packet.MacDst != BROADCAST_MAC
+	}
+
+	if isISP(packet.InPort) {
+		tapType = zerodoc.TAPTypeEnum(packet.InPort - 0x10000)
+		ipSrcCheck = ipSrcCheck && packet.EndpointData.SrcInfo.L3EpcId != 0
+		ipDstCheck = ipDstCheck && packet.EndpointData.DstInfo.L3EpcId != 0
+	} else if isTOR(packet.InPort) {
+		tapType = zerodoc.ToR
+		ipSrcCheck = ipSrcCheck && (packet.L2End0 || packet.EndpointData.SrcInfo.L2End)
+		ipDstCheck = ipDstCheck && (packet.L2End1 || packet.EndpointData.DstInfo.L2End)
+	} else {
+		return 0
+	}
+
+	// 若action方向为单方向，过略掉一半的PCAP存储,
+	// 若action方向为双方向且l2end都是true, 依然会存储两份流量
+	if (direction&datatype.FORWARD != 0) && ipSrcCheck {
+		w.ips = append(w.ips, packet.IpSrc)
+		w.ip6s = append(w.ip6s, packet.Ip6Src)
+		w.macs = append(w.macs, packet.MacSrc)
+	}
+	if (direction&datatype.BACKWARD != 0) && ipDstCheck {
+		w.ips = append(w.ips, packet.IpDst)
+		w.ip6s = append(w.ip6s, packet.Ip6Dst)
+		w.macs = append(w.macs, packet.MacDst)
+	}
+	return tapType
+}
+
 func (w *Worker) Process() {
 	elements := make([]interface{}, QUEUE_BATCH_SIZE)
-	ips := make([]datatype.IPv4Int, 0, 2)
-	macs := make([]datatype.MacInt, 0, 2)
-	ip6s := make([]net.IP, 0, 2)
 
 WORKING_LOOP:
 	for !w.exiting {
@@ -334,25 +400,7 @@ WORKING_LOOP:
 				if w.exiting {
 					break WORKING_LOOP
 				}
-				for key, writer := range w.writers {
-					if timeNow-writer.firstPacketTime > w.maxFilePeriod {
-						newFilename := writer.getFilename(w.baseDirectory)
-						w.finishWriter(writer, newFilename)
-						delete(w.writers, key)
-					}
-				}
-
-				for _, writerList := range w.writersIpv6 {
-					for e := writerList.Front(); e != nil; {
-						r, writer := e, e.Value.(*WrappedWriter)
-						e = e.Next()
-						if timeNow-writer.firstPacketTime > w.maxFilePeriod {
-							newFilename := writer.getFilename(w.baseDirectory)
-							w.finishWriter(writer, newFilename)
-							writerList.Remove(r)
-						}
-					}
-				}
+				w.cleanTimeoutFile(timeNow)
 				continue
 			}
 
@@ -364,69 +412,19 @@ WORKING_LOOP:
 				continue
 			}
 
-			ips = ips[:0]
-			macs = macs[:0]
-			ip6s = ip6s[:0]
-			var tapType zerodoc.TAPTypeEnum
-			if isISP(packet.InPort) {
-				tapType = zerodoc.TAPTypeEnum(packet.InPort - 0x10000)
-				if packet.EthType != EthernetTypeIPv6 {
-					if packet.EndpointData.SrcInfo.L3EpcId != 0 && packet.IpSrc != BROADCAST_IP && packet.MacSrc != BROADCAST_MAC {
-						ips = append(ips, packet.IpSrc)
-						macs = append(macs, packet.MacSrc)
-					}
-					if packet.EndpointData.DstInfo.L3EpcId != 0 && packet.IpDst != BROADCAST_IP && packet.MacDst != BROADCAST_MAC {
-						ips = append(ips, packet.IpDst)
-						macs = append(macs, packet.MacDst)
-					}
-				} else {
-					if packet.EndpointData.SrcInfo.L3EpcId != 0 && packet.Ip6Src.IsMulticast() && packet.MacSrc != BROADCAST_MAC {
-						ip6s = append(ip6s, packet.Ip6Src)
-						macs = append(macs, packet.MacSrc)
-					}
-					if packet.EndpointData.DstInfo.L3EpcId != 0 && packet.Ip6Dst.IsMulticast() && packet.MacDst != BROADCAST_MAC {
-						ip6s = append(ip6s, packet.Ip6Dst)
-						macs = append(macs, packet.MacDst)
-					}
-				}
-			} else if isTOR(packet.InPort) {
-				tapType = zerodoc.ToR
-				if packet.EthType != EthernetTypeIPv6 {
-					if (packet.L2End0 || packet.EndpointData.SrcInfo.L2End) && packet.IpSrc != BROADCAST_IP && packet.MacSrc != BROADCAST_MAC {
-						ips = append(ips, packet.IpSrc)
-						macs = append(macs, packet.MacSrc)
-					}
-					if (packet.L2End1 || packet.EndpointData.DstInfo.L2End) && packet.IpDst != BROADCAST_IP && packet.MacDst != BROADCAST_MAC {
-						ips = append(ips, packet.IpDst)
-						macs = append(macs, packet.MacDst)
-					}
-				} else {
-					if (packet.L2End0 || packet.EndpointData.SrcInfo.L2End) && !packet.Ip6Src.IsMulticast() && packet.MacSrc != BROADCAST_MAC {
-						ip6s = append(ip6s, packet.Ip6Src)
-						macs = append(macs, packet.MacSrc)
-					}
-					if (packet.L2End1 || packet.EndpointData.DstInfo.L2End) && !packet.Ip6Dst.IsMulticast() && packet.MacDst != BROADCAST_MAC {
-						ip6s = append(ip6s, packet.Ip6Dst)
-						macs = append(macs, packet.MacDst)
-					}
-				}
-			} else {
-				datatype.ReleaseMetaPacket(packet)
-				continue
-			}
-
 			for _, policy := range packet.PolicyData.AclActions {
 				if policy.GetACLGID() <= 0 {
 					continue
 				}
 				if policy.GetActionFlags()&datatype.ACTION_PACKET_CAPTURING != 0 {
+					tapType := w.checkWriterPcap(packet, policy.GetDirections())
 					if packet.EthType != EthernetTypeIPv6 {
-						for i := range ips {
-							w.writePacket(packet, tapType, ips[i], macs[i], policy.GetACLGID())
+						for i := range w.ips {
+							w.writePacket(packet, tapType, w.ips[i], w.macs[i], policy.GetACLGID())
 						}
 					} else {
-						for i := range ip6s {
-							w.writePacketIpv6(packet, tapType, ip6s[i], macs[i], policy.GetACLGID())
+						for i := range w.ip6s {
+							w.writePacketIpv6(packet, tapType, w.ip6s[i], w.macs[i], policy.GetACLGID())
 						}
 					}
 				}
