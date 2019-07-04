@@ -6,10 +6,10 @@ import (
 )
 
 type Metrics struct {
-	TxBytes   uint32
-	RxBytes   uint32
-	TxPackets uint32
-	RxPackets uint32
+	TxBytes   uint64
+	RxBytes   uint64
+	TxPackets uint64
+	RxPackets uint64
 }
 
 type MetricsField uint16
@@ -50,17 +50,17 @@ type VTAPUsageMeter struct {
 }
 
 func (m *Metrics) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU32(m.TxBytes)
-	encoder.WriteU32(m.RxBytes)
-	encoder.WriteU32(m.TxPackets)
-	encoder.WriteU32(m.RxPackets)
+	encoder.WriteU64(m.TxBytes)
+	encoder.WriteU64(m.RxBytes)
+	encoder.WriteU64(m.TxPackets)
+	encoder.WriteU64(m.RxPackets)
 }
 
 func (m *Metrics) Decode(decoder *codec.SimpleDecoder) {
-	m.TxBytes = decoder.ReadU32()
-	m.RxBytes = decoder.ReadU32()
-	m.TxPackets = decoder.ReadU32()
-	m.RxPackets = decoder.ReadU32()
+	m.TxBytes = decoder.ReadU64()
+	m.RxBytes = decoder.ReadU64()
+	m.TxPackets = decoder.ReadU64()
+	m.RxPackets = decoder.ReadU64()
 }
 
 func (m *Metrics) SortKey() uint64 {
