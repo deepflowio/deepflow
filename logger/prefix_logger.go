@@ -9,8 +9,9 @@ type PrefixLogger struct {
 	log    *logging.Logger
 }
 
+// 将logger包装为前缀logger
+// 注意需要自行将ExtraCalldepth加1，以便拿到log文件名，行号等信息
 func WrapWithPrefixLogger(prefix string, logger *logging.Logger) *PrefixLogger {
-	logger.ExtraCalldepth++
 	return &PrefixLogger{prefix, logger}
 }
 
