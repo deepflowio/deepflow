@@ -76,7 +76,7 @@ func NewRepair(addrPrimary, addrReplica, rp, shardID string, start bool, syncSta
 	}
 
 	if !start {
-		log.Infof("Repair not start. Primary: %s, Replica: %s, rp: %s, shardId %d, StartDelay %d, Interval %d, SyncCountOnce %d",
+		log.Infof("Repair not start. Primary: %s, Replica: %s, rp: %s, shardId %s, StartDelay %d, Interval %d, SyncCountOnce %d",
 			addrPrimary, addrReplica, rp, shardID, syncStartDelay, syncInterval, syncCountOnce)
 		return &Repair{start: false}, nil
 	}
@@ -117,7 +117,7 @@ func NewRepair(addrPrimary, addrReplica, rp, shardID string, start bool, syncSta
 		syncCountOnce = SYNC_COUNT_ONCE
 	}
 
-	log.Infof("New repair success. Primary: %s, Replica: %s, rp: %s, shardId %d, StartDelay %d, Interval %d, SyncCountOnce %d",
+	log.Infof("New repair success. Primary: %s, Replica: %s, rp: %s, shardId %s, StartDelay %d, Interval %d, SyncCountOnce %d",
 		addrPrimary, addrReplica, rp, shardID, syncStartDelay, syncInterval, syncCountOnce)
 	return &Repair{
 		shardID:        shardID,
