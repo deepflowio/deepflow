@@ -1120,8 +1120,9 @@ func IsTag(names []string) []bool {
 
 func (t *Tag) FillValues(isTag []bool, names []string, values []interface{}) error {
 	for i, name := range names {
-		if isTag[i] && values[i] != nil {
-			if err := t.fillValue(name, values[i].(string)); err != nil {
+		if isTag[i] {
+			v, _ := values[i].(string)
+			if err := t.fillValue(name, v); err != nil {
 				return err
 			}
 		}
