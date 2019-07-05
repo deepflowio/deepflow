@@ -63,7 +63,7 @@ type PointCache struct {
 }
 
 var bufferPool = pool.NewLockFreePool(func() interface{} {
-	return make([]byte, 0, DEFAULT_BATCH_SIZE+app.MAX_DOC_STRING_LENGTH)
+	return make([]byte, DEFAULT_BATCH_SIZE+app.MAX_DOC_STRING_LENGTH)
 })
 
 func acquireBuffer() []byte {
@@ -72,7 +72,6 @@ func acquireBuffer() []byte {
 
 // 只能realease acquireBuffer出来的 slice
 func releaseBuffer(b []byte) {
-	b = b[:0]
 	bufferPool.Put(b)
 }
 
@@ -209,6 +208,8 @@ func (w *InfluxdbWriter) SetQueueSize(size int) {
 func (w *InfluxdbWriter) SetBatchSize(size int) {
 	if size < DEFAULT_BATCH_SIZE {
 		w.BatchSize = size
+	} else {
+		log.Warningf("batch size must small than %d", DEFAULT_BATCH_SIZE)
 	}
 }
 
