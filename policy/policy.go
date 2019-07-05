@@ -212,10 +212,7 @@ func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData
 		endpoint := t.cloudPlatformLabeler.GetEndpointData(key)
 		store, policy = t.operator.GetPolicyByFirstPath(endpoint, key)
 	}
-	endpoint := store.Endpoints
-	if key.HasFeatureFlag(NPM) {
-		endpoint = t.cloudPlatformLabeler.UpdateEndpointData(store, key)
-	}
+	endpoint := t.cloudPlatformLabeler.UpdateEndpointData(store, key)
 	return endpoint, policy
 }
 
