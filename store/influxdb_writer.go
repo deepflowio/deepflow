@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/client/v2"
+	"github.com/influxdata/influxdb/models"
 	"github.com/op/go-logging"
 
-	"github.com/influxdata/influxdb/models"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
@@ -495,9 +495,15 @@ func (w *InfluxdbWriter) queueProcessReplica(queueID int) {
 func (w *InfluxdbWriter) writeConfidence(bp client.BatchPoints, status RepairStatus) {
 	confidences := make(map[Confidence]uint8)
 	for _, point := range bp.Points() {
+		measurement := point.Name()
+		// measurement 是以x开头跟16个字符的字符串(64位整数的16进制字符串)
+		if len(measurement) == 17 && measurement[0] != 'x' {
+			log.Warningf("db(%s) point(%s) get measurement name failed: %s", bp.Database(), point, measurement)
+			continue
+		}
 		confidences[Confidence{
 			db:          bp.Database(),
-			measurement: point.Name(),
+			measurement: measurement,
 			timestamp:   point.Time().UnixNano(),
 			status:      status,
 		}] = 0
