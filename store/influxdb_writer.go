@@ -12,6 +12,7 @@ import (
 	"github.com/op/go-logging"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
@@ -59,6 +60,39 @@ type PointCache struct {
 	bp     client.BatchPoints
 	buffer []byte
 	offset int
+}
+
+var bufferPool = pool.NewLockFreePool(func() interface{} {
+	return make([]byte, 0, DEFAULT_BATCH_SIZE+app.MAX_DOC_STRING_LENGTH)
+})
+
+func acquireBuffer() []byte {
+	return bufferPool.Get().([]byte)
+}
+
+// 只能realease acquireBuffer出来的 slice
+func releaseBuffer(b []byte) {
+	b = b[:0]
+	bufferPool.Put(b)
+}
+
+var pointCachePool = pool.NewLockFreePool(func() interface{} {
+	return &PointCache{}
+})
+
+func acquirePointCache() *PointCache {
+	return pointCachePool.Get().(*PointCache)
+}
+
+func releasePointCache(p *PointCache) {
+	if p == nil {
+		return
+	}
+	if p.buffer != nil {
+		releaseBuffer(p.buffer)
+	}
+	*p = PointCache{}
+	pointCachePool.Put(p)
 }
 
 type WriterInfo struct {
@@ -159,7 +193,8 @@ func NewInfluxdbWriter(addrPrimary, addrReplica, name, shardID string, queueCoun
 
 		w.ReplicaQueues = queue.NewOverwriteQueues(
 			name+"_replica", queue.HashKey(queueCount), 512,
-			queue.OptionFlushIndicator(time.Second))
+			queue.OptionFlushIndicator(time.Second),
+			queue.OptionRelease(func(p interface{}) { releasePointCache(p.(*PointCache)) }))
 	}
 
 	return w, nil
@@ -172,7 +207,9 @@ func (w *InfluxdbWriter) SetQueueSize(size int) {
 }
 
 func (w *InfluxdbWriter) SetBatchSize(size int) {
-	w.BatchSize = size
+	if size < DEFAULT_BATCH_SIZE {
+		w.BatchSize = size
+	}
 }
 
 func (w *InfluxdbWriter) SetBatchTimeout(timeout int64) {
@@ -298,7 +335,8 @@ func (i *WriterInfo) Close() {
 	i.Closable.Close()
 }
 
-func newPointCache(db, rp string, size int) *PointCache {
+func newPointCache(db, rp string) *PointCache {
+	pc := acquirePointCache()
 	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
 		Database:        db,
 		Precision:       INFLUXDB_PRECISION_S,
@@ -307,23 +345,9 @@ func newPointCache(db, rp string, size int) *PointCache {
 	if err != nil {
 		panic(fmt.Sprintf("create BatchPoints for db %s failed: %s", db, err))
 	}
-
-	buffer := make([]byte, size+app.MAX_DOC_STRING_LENGTH)
-	return &PointCache{
-		bp:     bp,
-		buffer: buffer,
-	}
-}
-
-func (p *PointCache) Reset(db, rp string) {
-	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:        db,
-		Precision:       INFLUXDB_PRECISION_S,
-		RetentionPolicy: rp,
-	})
-	p.bp = bp
-	p.offset = 0
-	return
+	pc.bp = bp
+	pc.buffer = acquireBuffer()
+	return pc
 }
 
 func (w *InfluxdbWriter) queueProcess(queueID int) {
@@ -355,7 +379,7 @@ func (w *InfluxdbWriter) writeCache(queueID int, item InfluxdbItem) bool {
 
 	db := item.GetDBName()
 	if _, ok := pointCache[db]; !ok {
-		pointCache[db] = newPointCache(db, w.RP.name, w.BatchSize)
+		pointCache[db] = newPointCache(db, w.RP.name)
 	}
 	buffer := pointCache[db].buffer
 	offset := pointCache[db].offset
@@ -371,8 +395,8 @@ func (w *InfluxdbWriter) writeCache(queueID int, item InfluxdbItem) bool {
 	item.Release()
 
 	if pointCache[db].offset > w.BatchSize {
-		w.writePrimary(queueID, pointCache[db].bp)
-		pointCache[db].Reset(db, w.RP.name)
+		w.writePrimary(queueID, pointCache[db])
+		pointCache[db] = newPointCache(db, w.RP.name)
 	}
 	return true
 }
@@ -384,8 +408,8 @@ func (w *InfluxdbWriter) flushWriteCache(queueID int) {
 			continue
 		}
 		log.Debugf("flush %d points to %s", len(pc.bp.Points()), db)
-		w.writePrimary(queueID, pc.bp)
-		pc.Reset(db, w.RP.name)
+		w.writePrimary(queueID, pc)
+		pointCache[db] = newPointCache(db, w.RP.name)
 	}
 }
 
@@ -409,7 +433,8 @@ func (w *InfluxdbWriter) createDB(httpClient client.Client, db string) bool {
 	return true
 }
 
-func (w *InfluxdbWriter) writeInfluxdb(writerInfo *WriterInfo, dbCreateCtl *DBCreateCtl, bp client.BatchPoints) bool {
+func (w *InfluxdbWriter) writeInfluxdb(writerInfo *WriterInfo, dbCreateCtl *DBCreateCtl, pc *PointCache) bool {
+	bp := pc.bp
 	writerInfo.writeTime = time.Now().Unix()
 	db := bp.Database()
 
@@ -439,32 +464,38 @@ func (w *InfluxdbWriter) writeInfluxdb(writerInfo *WriterInfo, dbCreateCtl *DBCr
 	return true
 }
 
-func (w *InfluxdbWriter) writePrimary(queueID int, bp client.BatchPoints) bool {
+func (w *InfluxdbWriter) writePrimary(queueID int, pc *PointCache) bool {
 	writerInfo := w.QueueWriterInfosPrimary[queueID]
 
-	if !w.writeInfluxdb(writerInfo, &w.DBCreateCtlPrimary, bp) {
-		w.writeConfidence(bp, PRIMARY_FAILED)
+	if !w.writeInfluxdb(writerInfo, &w.DBCreateCtlPrimary, pc) {
+		w.writeConfidence(pc, PRIMARY_FAILED)
+		releasePointCache(pc)
 		return false
 	}
 
 	if w.ReplicaEnabled {
-		w.ReplicaQueues.Put(queue.HashKey(queueID), bp)
+		w.ReplicaQueues.Put(queue.HashKey(queueID), pc)
+		return true
 	}
+	releasePointCache(pc)
 	return true
 }
 
-func (w *InfluxdbWriter) writeReplica(queueID int, bp client.BatchPoints) bool {
+func (w *InfluxdbWriter) writeReplica(queueID int, pc *PointCache) bool {
 	writerInfo := w.QueueWriterInfosReplica[queueID]
 	if !writerInfo.isConnected {
-		w.writeConfidence(bp, REPLICA_DISCONNECT)
+		w.writeConfidence(pc, REPLICA_DISCONNECT)
+		releasePointCache(pc)
 		return false
 	}
 
-	if !w.writeInfluxdb(writerInfo, &w.DBCreateCtlReplica, bp) {
-		w.writeConfidence(bp, SYNC_FAILED_1)
+	if !w.writeInfluxdb(writerInfo, &w.DBCreateCtlReplica, pc) {
+		w.writeConfidence(pc, SYNC_FAILED_1)
+		releasePointCache(pc)
 		return false
 	}
 
+	releasePointCache(pc)
 	return true
 }
 
@@ -484,15 +515,16 @@ func (w *InfluxdbWriter) queueProcessReplica(queueID int) {
 				writerInfo.isConnected = true
 			}
 			continue
-		} else if bp, ok := item.(client.BatchPoints); ok {
-			w.writeReplica(queueID, bp)
+		} else if pc, ok := item.(*PointCache); ok {
+			w.writeReplica(queueID, pc)
 		} else {
 			log.Warning("get influxdb replica writer queue data type wrong (%T)", item)
 		}
 	}
 }
 
-func (w *InfluxdbWriter) writeConfidence(bp client.BatchPoints, status RepairStatus) {
+func (w *InfluxdbWriter) writeConfidence(pc *PointCache, status RepairStatus) {
+	bp := pc.bp
 	confidences := make(map[Confidence]uint8)
 	for _, point := range bp.Points() {
 		measurement := point.Name()

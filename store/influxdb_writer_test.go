@@ -82,7 +82,7 @@ func newResp(tags map[string]string, fieldNames []string) *client.Response {
 	return resp
 }
 
-func TestInfluxdbItem(t *testing.T) {
+func testInfluxdbItem(t *testing.T) {
 	ctrl := NewController(t)
 	defer ctrl.Finish()
 	c := mock_client.NewMockClient(ctrl)
@@ -122,7 +122,7 @@ func TestInfluxdbItem(t *testing.T) {
 	time.Sleep(5 * time.Second / 3)
 }
 
-func TestInfluxdbPoint(t *testing.T) {
+func testInfluxdbPoint(t *testing.T) {
 	ctrl := NewController(t)
 	defer ctrl.Finish()
 	c := mock_client.NewMockClient(ctrl)
