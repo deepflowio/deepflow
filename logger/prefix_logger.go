@@ -9,12 +9,17 @@ type PrefixLogger struct {
 	log    *logging.Logger
 }
 
+func WrapWithPrefixLogger(prefix string, logger *logging.Logger) *PrefixLogger {
+	logger.ExtraCalldepth++
+	return &PrefixLogger{prefix, logger}
+}
+
 func GetPrefixLogger(module, prefix string) (*PrefixLogger, error) {
 	logger, err := logging.GetLogger(module)
 	if err != nil {
 		return nil, err
 	}
-	logger.ExtraCalldepth = 1
+	logger.ExtraCalldepth++
 	return &PrefixLogger{prefix, logger}, nil
 }
 
