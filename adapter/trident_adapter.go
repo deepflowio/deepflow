@@ -113,7 +113,6 @@ func (a *TridentAdapter) Closed() bool {
 }
 
 func (a *TridentAdapter) cacheClear(data []byte, key uint32, seq uint32) {
-	a.instancesLock.Lock()
 	startSeq := a.instances[key].seq
 	instance := a.instances[key]
 	if instance.cacheCount > 0 {
@@ -138,7 +137,6 @@ func (a *TridentAdapter) cacheClear(data []byte, key uint32, seq uint32) {
 		instance.timestamp = a.decode(data, key)
 		instance.seq = seq
 	}
-	a.instancesLock.Unlock()
 }
 
 func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32) {
@@ -163,7 +161,9 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32) {
 		offset := seq - instance.seq - 1
 		// cache满或乱序超过CACHE_SIZE, 清空cache
 		if int(offset) >= a.cacheSize || int(instance.cacheCount) == a.cacheSize {
+			a.instancesLock.Lock()
 			a.cacheClear(data, key, seq)
+			a.instancesLock.Unlock()
 			return
 		}
 		instance.cache[offset] = data
