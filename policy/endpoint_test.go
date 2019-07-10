@@ -7,6 +7,7 @@ import (
 	. "github.com/google/gopacket/layers"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 // 平台信息有关测试
@@ -1001,7 +1002,7 @@ func BenchmarkGetDataByIp(b *testing.B) {
 	data4 := generatePlatformDataWithGroupId(groupEpc[4], group[4], testMac4, ip4)
 	policy.UpdateInterfaceData([]*PlatformData{data1, data2, data3, data4})
 	for i := 0; i < b.N; i++ {
-		policy.cloudPlatformLabeler.GetDataByIp(queryIp)
+		policy.cloudPlatformLabeler.GetDataByIp(IpFromUint32(queryIp))
 	}
 }
 

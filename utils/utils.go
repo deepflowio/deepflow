@@ -7,6 +7,7 @@ import (
 	"net"
 	"strings"
 	"time"
+	"unsafe"
 )
 
 func UintMin(x, y uint) uint {
@@ -79,6 +80,14 @@ func IpFromUint32(ipInt uint32) net.IP {
 	ip := make([]byte, net.IPv4len)
 	BigEndian.PutUint32(ip, ipInt)
 	return ip
+}
+
+func GetIpHash(ip net.IP) uint32 {
+	ipHash := uint32(0)
+	for i := 0; i < len(ip); i += 4 {
+		ipHash ^= *(*uint32)(unsafe.Pointer(&ip[i]))
+	}
+	return ipHash
 }
 
 func Bool2Int(b bool) int {
