@@ -46,8 +46,7 @@ type tridentInstance struct {
 	timestamp time.Duration
 
 	cache      [][]byte
-	cacheCount uint8
-	cacheMap   uint64
+	cacheCount uint16
 	timeAdjust time.Duration
 }
 
@@ -112,30 +111,22 @@ func (a *TridentAdapter) Closed() bool {
 	return false // FIXME: never close?
 }
 
-func (a *TridentAdapter) cacheClear(data []byte, key uint32, seq uint32) {
-	startSeq := a.instances[key].seq
-	instance := a.instances[key]
+func (a *TridentAdapter) cacheClear(instance *tridentInstance, key uint32) {
 	if instance.cacheCount > 0 {
+		startSeq := instance.seq
 		for i := 0; i < a.cacheSize; i++ {
-			if instance.cacheMap&(1<<uint64(i)) == uint64(1<<uint32(i)) {
-				dataSeq := uint32(i) + startSeq + 1
-				instance.timestamp = a.decode(a.instances[key].cache[i], key)
+			dataSeq := uint32(i) + startSeq + 1
+			if instance.cache[i] != nil {
 				drop := uint64(dataSeq - instance.seq - 1)
 				a.counter.RxDropped += drop
 				a.stats.RxDropped += drop
+
 				instance.seq = dataSeq
+				instance.timestamp = a.decode(instance.cache[i], key)
+				instance.cache[i] = nil
 			}
 		}
 		instance.cacheCount = 0
-		instance.cacheMap = 0
-	}
-
-	if seq > 0 {
-		drop := uint64(seq - instance.seq - 1)
-		a.counter.RxDropped += drop
-		a.stats.RxDropped += drop
-		instance.timestamp = a.decode(data, key)
-		instance.seq = seq
 	}
 }
 
@@ -157,18 +148,29 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32) {
 			log.Warningf("trident(%v) recv seq %d is less than current %d, drop", IpFromUint32(key), seq, instance.seq)
 			return
 		}
-		log.Debugf("trident(%v) cache add seq %d, current seq is %d", IpFromUint32(key), seq, instance.seq)
 		offset := seq - instance.seq - 1
 		// cache满或乱序超过CACHE_SIZE, 清空cache
 		if int(offset) >= a.cacheSize || int(instance.cacheCount) == a.cacheSize {
 			a.instancesLock.Lock()
-			a.cacheClear(data, key, seq)
+			a.cacheClear(instance, key)
 			a.instancesLock.Unlock()
-			return
+
+			offset = seq - instance.seq - 1
+			if offset == 0 {
+				instance.seq = seq
+				instance.timestamp = a.decode(data, key)
+				return
+			} else if int(offset) >= a.cacheSize {
+				drop := uint64(int(offset) - a.cacheSize + 1)
+				a.counter.RxDropped += drop
+				a.stats.RxDropped += drop
+
+				offset = uint32(a.cacheSize) - 1
+				instance.seq = seq - uint32(a.cacheSize)
+			}
 		}
 		instance.cache[offset] = data
 		instance.cacheCount++
-		instance.cacheMap |= 1 << offset
 		a.counter.RxCached++
 		a.stats.RxCached++
 	}
@@ -220,8 +222,8 @@ func (a *TridentAdapter) flushInstance() {
 	a.instancesLock.Lock()
 	for key, instance := range a.instances {
 		if timestamp > int64(instance.timestamp) && timestamp-int64(instance.timestamp) >= int64(TRIDENT_TIMEOUT) {
-			if instance.cacheMap != 0 {
-				a.cacheClear(nil, key, 0)
+			if instance.cacheCount > 0 {
+				a.cacheClear(instance, key)
 			}
 		}
 	}
