@@ -6,7 +6,7 @@ import (
 
 type PrefixLogger struct {
 	prefix string
-	log    *logging.Logger
+	*logging.Logger
 }
 
 // 将logger包装为前缀logger
@@ -25,53 +25,105 @@ func GetPrefixLogger(module, prefix string) (*PrefixLogger, error) {
 }
 
 func (l *PrefixLogger) Error(args ...interface{}) {
-	if l.log.IsEnabledFor(logging.ERROR) {
+	if l.IsEnabledFor(logging.ERROR) {
 		args = append([]interface{}{l.prefix}, args...)
-		l.log.Error(args...)
+		l.Logger.Error(args...)
 	}
 }
 
 func (l *PrefixLogger) Errorf(format string, args ...interface{}) {
-	if l.log.IsEnabledFor(logging.ERROR) {
-		l.log.Errorf(l.prefix+" "+format, args...)
+	if l.IsEnabledFor(logging.ERROR) {
+		l.Logger.Errorf(l.prefix+" "+format, args...)
 	}
 }
 
 func (l *PrefixLogger) Warning(args ...interface{}) {
-	if l.log.IsEnabledFor(logging.WARNING) {
+	if l.IsEnabledFor(logging.WARNING) {
 		args = append([]interface{}{l.prefix}, args...)
-		l.log.Warning(args...)
+		l.Logger.Warning(args...)
 	}
 }
 
 func (l *PrefixLogger) Warningf(format string, args ...interface{}) {
-	if l.log.IsEnabledFor(logging.WARNING) {
-		l.log.Warningf(l.prefix+" "+format, args...)
+	if l.IsEnabledFor(logging.WARNING) {
+		l.Logger.Warningf(l.prefix+" "+format, args...)
+	}
+}
+
+func (l *PrefixLogger) Notice(args ...interface{}) {
+	if l.IsEnabledFor(logging.NOTICE) {
+		args = append([]interface{}{l.prefix}, args...)
+		l.Logger.Notice(args...)
+	}
+}
+
+func (l *PrefixLogger) Noticef(format string, args ...interface{}) {
+	if l.IsEnabledFor(logging.NOTICE) {
+		l.Logger.Noticef(l.prefix+" "+format, args...)
 	}
 }
 
 func (l *PrefixLogger) Info(args ...interface{}) {
-	if l.log.IsEnabledFor(logging.INFO) {
+	if l.IsEnabledFor(logging.INFO) {
 		args = append([]interface{}{l.prefix}, args...)
-		l.log.Info(args...)
+		l.Logger.Info(args...)
 	}
 }
 
 func (l *PrefixLogger) Infof(format string, args ...interface{}) {
-	if l.log.IsEnabledFor(logging.INFO) {
-		l.log.Infof(l.prefix+" "+format, args...)
+	if l.IsEnabledFor(logging.INFO) {
+		l.Logger.Infof(l.prefix+" "+format, args...)
 	}
 }
 
 func (l *PrefixLogger) Debug(args ...interface{}) {
-	if l.log.IsEnabledFor(logging.DEBUG) {
+	if l.IsEnabledFor(logging.DEBUG) {
 		args = append([]interface{}{l.prefix}, args...)
-		l.log.Debug(args...)
+		l.Logger.Debug(args...)
 	}
 }
 
 func (l *PrefixLogger) Debugf(format string, args ...interface{}) {
-	if l.log.IsEnabledFor(logging.DEBUG) {
-		l.log.Debugf(l.prefix+" "+format, args...)
+	if l.IsEnabledFor(logging.DEBUG) {
+		l.Logger.Debugf(l.prefix+" "+format, args...)
+	}
+}
+
+func (l *PrefixLogger) Fatal(args ...interface{}) {
+	if l.IsEnabledFor(logging.CRITICAL) {
+		args = append([]interface{}{l.prefix}, args...)
+		l.Logger.Fatal(args...)
+	}
+}
+
+func (l *PrefixLogger) Fatalf(format string, args ...interface{}) {
+	if l.IsEnabledFor(logging.CRITICAL) {
+		l.Logger.Fatalf(l.prefix+" "+format, args...)
+	}
+}
+
+func (l *PrefixLogger) Panic(args ...interface{}) {
+	if l.IsEnabledFor(logging.CRITICAL) {
+		args = append([]interface{}{l.prefix}, args...)
+		l.Logger.Panic(args...)
+	}
+}
+
+func (l *PrefixLogger) Panicf(format string, args ...interface{}) {
+	if l.IsEnabledFor(logging.CRITICAL) {
+		l.Logger.Panicf(l.prefix+" "+format, args...)
+	}
+}
+
+func (l *PrefixLogger) Critical(args ...interface{}) {
+	if l.IsEnabledFor(logging.CRITICAL) {
+		args = append([]interface{}{l.prefix}, args...)
+		l.Logger.Critical(args...)
+	}
+}
+
+func (l *PrefixLogger) Criticalf(format string, args ...interface{}) {
+	if l.IsEnabledFor(logging.CRITICAL) {
+		l.Logger.Criticalf(l.prefix+" "+format, args...)
 	}
 }
