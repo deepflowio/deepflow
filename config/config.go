@@ -143,8 +143,8 @@ func (c *Config) Validate() error {
 	}
 	if c.Adapter.OrderingCacheSize == 0 {
 		c.Adapter.OrderingCacheSize = 16
-	} else if c.Adapter.OrderingCacheSize > 64 {
-		c.Adapter.OrderingCacheSize = 64
+	} else if c.Adapter.OrderingCacheSize > 256 {
+		c.Adapter.OrderingCacheSize = 256
 	}
 	if c.Queue.QueueSize == 0 {
 		c.Queue.QueueSize = 65536

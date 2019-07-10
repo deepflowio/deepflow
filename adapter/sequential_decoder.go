@@ -1,13 +1,13 @@
 package adapter
 
 import (
+	"encoding/binary"
 	"net"
 	"strings"
 	"time"
 
 	. "github.com/google/gopacket/layers"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
-	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 const (
@@ -33,11 +33,11 @@ type Decoded struct {
 	headerType HeaderType
 
 	// l2
-	mac0, mac1 net.HardwareAddr
+	mac0, mac1 MacInt
 	vlan       uint16
 
 	// l3
-	ip0, ip1   net.IP
+	ip0, ip1   uint32
 	ihl        uint8
 	ttl        uint8
 	flags      uint8
@@ -128,10 +128,10 @@ func decodeTunnel(stream *ByteStream) *TunnelInfo {
 func (d *SequentialDecoder) decodeEthernet(meta *MetaPacket) {
 	x := d.x
 	if !d.pflags.IsSet(CFLAG_MAC0) {
-		x.mac0 = net.HardwareAddr(d.data.Field(MAC_ADDR_LEN))
+		x.mac0 = MacIntFromBytes(d.data.Field(MAC_ADDR_LEN))
 	}
 	if !d.pflags.IsSet(CFLAG_MAC1) {
-		x.mac1 = net.HardwareAddr(d.data.Field(MAC_ADDR_LEN))
+		x.mac1 = MacIntFromBytes(d.data.Field(MAC_ADDR_LEN))
 	}
 	if !d.pflags.IsSet(CFLAG_VLANTAG) {
 		x.vlan = d.data.U16() & 0xFFF
@@ -141,11 +141,11 @@ func (d *SequentialDecoder) decodeEthernet(meta *MetaPacket) {
 	meta.L2End1 = d.pflags.IsSet(PFLAG_DST_ENDPOINT)
 	meta.Vlan = x.vlan
 	if d.forward {
-		meta.MacSrc = MacIntFromBytes(x.mac0)
-		meta.MacDst = MacIntFromBytes(x.mac1)
+		meta.MacSrc = x.mac0
+		meta.MacDst = x.mac1
 	} else {
-		meta.MacSrc = MacIntFromBytes(x.mac1)
-		meta.MacDst = MacIntFromBytes(x.mac0)
+		meta.MacSrc = x.mac1
+		meta.MacDst = x.mac0
 	}
 	if x.headerType == HEADER_TYPE_ARP {
 		meta.EthType = EthernetTypeARP
@@ -226,17 +226,17 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPacket) {
 	meta.TTL = x.ttl
 
 	if !d.pflags.IsSet(CFLAG_IP0) {
-		x.ip0 = net.IP(d.data.Field(IP_ADDR_LEN))
+		x.ip0 = binary.BigEndian.Uint32(d.data.Field(IP_ADDR_LEN))
 	}
 	if !d.pflags.IsSet(CFLAG_IP1) {
-		x.ip1 = net.IP(d.data.Field(IP_ADDR_LEN))
+		x.ip1 = binary.BigEndian.Uint32(d.data.Field(IP_ADDR_LEN))
 	}
 	if d.forward {
-		meta.IpSrc = IpToUint32(x.ip0)
-		meta.IpDst = IpToUint32(x.ip1)
+		meta.IpSrc = x.ip0
+		meta.IpDst = x.ip1
 	} else {
-		meta.IpSrc = IpToUint32(x.ip1)
-		meta.IpDst = IpToUint32(x.ip0)
+		meta.IpSrc = x.ip1
+		meta.IpDst = x.ip0
 	}
 	if x.headerType == HEADER_TYPE_IPV4_ICMP {
 		meta.Protocol = IPProtocolICMPv4
@@ -334,8 +334,10 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 			meta.TcpData.SACKPermitted = true
 		}
 		sackLength := int(optionFlag & TCP_OPT_FLAG_SACK)
-		meta.TcpData.Sack = make([]byte, sackLength)
-		copy(meta.TcpData.Sack, d.data.Field(sackLength))
+		if sackLength > 0 {
+			meta.TcpData.Sack = make([]byte, sackLength)
+			copy(meta.TcpData.Sack, d.data.Field(sackLength))
+		}
 	}
 }
 
