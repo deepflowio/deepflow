@@ -13,8 +13,7 @@ import (
 const (
 	DELTA_TIMESTAMP_LEN = 2
 	PACKET_STREAM_END   = 1<<(DELTA_TIMESTAMP_LEN*8) - 1
-	UDP_BUFFER_SIZE     = 1800
-	PAYLOAD_MAX         = 1500
+	UDP_BUFFER_SIZE     = 1 << 16
 	ICMP_TYPE_CODE      = 2
 	ICMP_ID_SEQ         = 4
 	ICMP_REST           = 28
@@ -365,7 +364,7 @@ func (d *SequentialDecoder) DecodeHeader() (uint32, bool) {
 
 func (d *SequentialDecoder) NextPacket(meta *MetaPacket) bool {
 	delta := d.data.U16()
-	if delta == PACKET_STREAM_END || UDP_BUFFER_SIZE-d.data.Len() > PAYLOAD_MAX {
+	if delta == PACKET_STREAM_END {
 		return true
 	}
 	totalSize := d.data.U16()
