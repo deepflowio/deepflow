@@ -17,20 +17,15 @@ const (
 
 func TestDecoder(t *testing.T) {
 	var buffer bytes.Buffer
-	padding := [UDP_BUFFER_SIZE - PAYLOAD_MAX]byte{0xff, 0xff}
 	f, _ := os.Open("icmp_decode_test.pcap")
 	r, _ := pcapgo.NewReader(f)
 	for {
-		packet, info, err := r.ReadPacketData()
+		packet, _, err := r.ReadPacketData()
 		if err != nil || packet == nil {
 			break
 		}
-		packet = packet[42:]
-		if info.CaptureLength-42 < UDP_BUFFER_SIZE-PAYLOAD_MAX {
-			packet = append(packet, padding[:]...)
-		}
 
-		decoder := NewSequentialDecoder(packet)
+		decoder := NewSequentialDecoder(packet[42:])
 		decoder.DecodeHeader()
 		for {
 			meta := &MetaPacket{}

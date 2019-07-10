@@ -61,7 +61,7 @@ type TridentAdapter struct {
 	itemBatch []interface{}
 	udpPool   sync.Pool
 
-	instancesLock sync.Mutex
+	instancesLock sync.Mutex // 仅用于droplet-ctl打印trident信息
 	instances     map[TridentKey]*tridentInstance
 	counter       *PacketCounter
 	stats         *PacketCounter
@@ -131,9 +131,7 @@ func (a *TridentAdapter) cacheClear(instance *tridentInstance, key uint32) {
 }
 
 func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32) {
-	a.instancesLock.Lock()
 	instance := a.instances[key]
-	a.instancesLock.Unlock()
 	a.counter.RxPackets += 1
 	a.stats.RxPackets += 1
 	// droplet重启或trident重启时，不考虑SEQ
@@ -144,16 +142,26 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32) {
 		if seq <= instance.seq {
 			a.counter.RxErrors += 1
 			a.stats.RxErrors += 1
+
+			decoder := NewSequentialDecoder(data)
+			decoder.DecodeHeader()
+			if decoder.timestamp > instance.timestamp+10*time.Second { // trident故障后10s自动重启
+				log.Infof("trident(%v) restart since timestamp %v > %v + 10s, reset sequence from %d to %d",
+					IpFromUint32(key), decoder.timestamp, instance.timestamp, instance.seq, seq)
+				a.cacheClear(instance, key)
+				instance.seq = seq
+				instance.timestamp = decoder.timestamp
+			} else {
+				log.Warningf("trident(%v) recv seq %d is less than current %d, drop", IpFromUint32(key), seq, instance.seq)
+			}
+
 			a.udpPool.Put(data)
-			log.Warningf("trident(%v) recv seq %d is less than current %d, drop", IpFromUint32(key), seq, instance.seq)
 			return
 		}
 		offset := seq - instance.seq - 1
 		// cache满或乱序超过CACHE_SIZE, 清空cache
 		if int(offset) >= a.cacheSize || int(instance.cacheCount) == a.cacheSize {
-			a.instancesLock.Lock()
 			a.cacheClear(instance, key)
-			a.instancesLock.Unlock()
 
 			offset = seq - instance.seq - 1
 			if offset == 0 {
@@ -177,13 +185,13 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32) {
 }
 
 func (a *TridentAdapter) findAndAdd(data []byte, key uint32, seq uint32) {
-	a.instancesLock.Lock()
 	if a.instances[key] == nil {
 		instance := &tridentInstance{}
 		instance.cache = make([][]byte, a.cacheSize)
+		a.instancesLock.Lock()
 		a.instances[key] = instance
+		a.instancesLock.Unlock()
 	}
-	a.instancesLock.Unlock()
 	a.cacheLookup(data, key, seq)
 }
 
@@ -219,7 +227,6 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) time.Duration {
 
 func (a *TridentAdapter) flushInstance() {
 	timestamp := time.Now().UnixNano()
-	a.instancesLock.Lock()
 	for key, instance := range a.instances {
 		if timestamp > int64(instance.timestamp) && timestamp-int64(instance.timestamp) >= int64(TRIDENT_TIMEOUT) {
 			if instance.cacheCount > 0 {
@@ -227,7 +234,6 @@ func (a *TridentAdapter) flushInstance() {
 			}
 		}
 	}
-	a.instancesLock.Unlock()
 }
 
 func (a *TridentAdapter) run() {
