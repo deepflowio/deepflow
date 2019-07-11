@@ -24,6 +24,14 @@ func GetPrefixLogger(module, prefix string) (*PrefixLogger, error) {
 	return &PrefixLogger{prefix, logger}, nil
 }
 
+func (l *PrefixLogger) GetPrefix() string {
+	return l.prefix
+}
+
+func (l *PrefixLogger) UpdatePrefix(prefix string) {
+	l.prefix = prefix
+}
+
 func (l *PrefixLogger) Error(args ...interface{}) {
 	if l.IsEnabledFor(logging.ERROR) {
 		args = append([]interface{}{l.prefix}, args...)
