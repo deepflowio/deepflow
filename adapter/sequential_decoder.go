@@ -319,23 +319,29 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 	if !d.pflags.IsSet(CFLAG_WIN) {
 		x.win = d.data.U16()
 	}
-	meta.TcpData = &MetaPacketTcpHeader{Seq: seq, Ack: ack, Flags: x.tcpFlags, WinSize: x.win, DataOffset: x.dataOffset}
+	tcpData := AcquireTcpHeader()
+	meta.TcpData = tcpData
+	tcpData.Seq = seq
+	tcpData.Ack = ack
+	tcpData.Flags = x.tcpFlags
+	tcpData.WinSize = x.win
+	tcpData.DataOffset = x.dataOffset
 	if x.dataOffset > 5 {
 		optionFlag := d.data.U8()
 		if optionFlag&TCP_OPT_FLAG_WIN_SCALE > 0 {
-			meta.TcpData.WinScale = d.data.U8()
+			tcpData.WinScale = d.data.U8()
 		}
 		if optionFlag&TCP_OPT_FLAG_MSS > 0 {
-			meta.TcpData.MSS = d.data.U16()
+			tcpData.MSS = d.data.U16()
 		}
 		sackPermit := optionFlag&TCP_OPT_FLAG_SACK_PERMIT > 0
 		if sackPermit {
-			meta.TcpData.SACKPermitted = true
+			tcpData.SACKPermitted = true
 		}
 		sackLength := int(optionFlag & TCP_OPT_FLAG_SACK)
 		if sackLength > 0 {
-			meta.TcpData.Sack = make([]byte, sackLength)
-			copy(meta.TcpData.Sack, d.data.Field(sackLength))
+			tcpData.Sack = make([]byte, sackLength)
+			copy(tcpData.Sack, d.data.Field(sackLength))
 		}
 	}
 }
