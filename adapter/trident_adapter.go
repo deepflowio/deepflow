@@ -77,7 +77,7 @@ func NewTridentAdapter(queues queue.MultiQueueWriter, listenBufferSize, cacheSiz
 
 		queues:    queues,
 		itemKeys:  make([]queue.HashKey, 0, PACKET_MAX+1),
-		itemBatch: make([]interface{}, PACKET_MAX),
+		itemBatch: make([]interface{}, 0, PACKET_MAX),
 		udpPool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, UDP_BUFFER_SIZE)
@@ -115,8 +115,8 @@ func (a *TridentAdapter) cacheClear(instance *tridentInstance, key uint32) {
 	if instance.cacheCount > 0 {
 		startSeq := instance.seq
 		for i := 0; i < a.cacheSize; i++ {
-			dataSeq := uint32(i) + startSeq + 1
 			if instance.cache[i] != nil {
+				dataSeq := uint32(i) + startSeq + 1
 				drop := uint64(dataSeq - instance.seq - 1)
 				a.counter.RxDropped += drop
 				a.stats.RxDropped += drop
@@ -145,7 +145,7 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32) {
 
 			decoder := NewSequentialDecoder(data)
 			decoder.DecodeHeader()
-			if decoder.timestamp > instance.timestamp+10*time.Second { // trident故障后10s自动重启
+			if decoder.timestamp > instance.timestamp+time.Minute { // trident故障后10s自动重启，增加一些Buffer避免误判
 				log.Infof("trident(%v) restart since timestamp %v > %v + 10s, reset sequence from %d to %d",
 					IpFromUint32(key), decoder.timestamp, instance.timestamp, instance.seq, seq)
 				a.cacheClear(instance, key)
@@ -213,6 +213,12 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) time.Duration {
 		a.stats.TxPackets++
 		a.itemKeys = append(a.itemKeys, queue.HashKey(meta.GenerateHash()))
 		a.itemBatch = append(a.itemBatch, meta)
+
+		if len(a.itemBatch) >= cap(a.itemBatch) {
+			a.queues.Puts(a.itemKeys, a.itemBatch)
+			a.itemKeys = a.itemKeys[:1]
+			a.itemBatch = a.itemBatch[:0]
+		}
 	}
 
 	if len(a.itemBatch) > 0 {
