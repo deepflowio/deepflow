@@ -130,7 +130,7 @@ func (a *TridentAdapter) cacheClear(instance *tridentInstance, key uint32) {
 	}
 }
 
-func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32) {
+func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32, timestamp time.Duration) {
 	instance := a.instances[key]
 	a.counter.RxPackets += 1
 	a.stats.RxPackets += 1
@@ -143,14 +143,12 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32) {
 			a.counter.RxErrors += 1
 			a.stats.RxErrors += 1
 
-			decoder := NewSequentialDecoder(data)
-			decoder.DecodeHeader()
-			if decoder.timestamp > instance.timestamp+time.Minute { // trident故障后10s自动重启，增加一些Buffer避免误判
+			if timestamp > instance.timestamp+time.Minute { // trident故障后10s自动重启，增加一些Buffer避免误判
 				log.Infof("trident(%v) restart since timestamp %v > %v + 10s, reset sequence from %d to %d",
-					IpFromUint32(key), decoder.timestamp, instance.timestamp, instance.seq, seq)
+					IpFromUint32(key), timestamp, instance.timestamp, instance.seq, seq)
 				a.cacheClear(instance, key)
 				instance.seq = seq
-				instance.timestamp = decoder.timestamp
+				instance.timestamp = timestamp
 			} else {
 				log.Warningf("trident(%v) recv seq %d is less than current %d, drop", IpFromUint32(key), seq, instance.seq)
 			}
@@ -179,12 +177,13 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32) {
 		}
 		instance.cache[offset] = data
 		instance.cacheCount++
+		instance.timestamp = timestamp
 		a.counter.RxCached++
 		a.stats.RxCached++
 	}
 }
 
-func (a *TridentAdapter) findAndAdd(data []byte, key uint32, seq uint32) {
+func (a *TridentAdapter) findAndAdd(data []byte, key uint32, seq uint32, timestamp time.Duration) {
 	if a.instances[key] == nil {
 		instance := &tridentInstance{}
 		instance.cache = make([][]byte, a.cacheSize)
@@ -192,7 +191,7 @@ func (a *TridentAdapter) findAndAdd(data []byte, key uint32, seq uint32) {
 		a.instances[key] = instance
 		a.instancesLock.Unlock()
 	}
-	a.cacheLookup(data, key, seq)
+	a.cacheLookup(data, key, seq, timestamp)
 }
 
 func (a *TridentAdapter) decode(data []byte, ip uint32) time.Duration {
@@ -264,7 +263,7 @@ func (a *TridentAdapter) run() {
 			a.udpPool.Put(data)
 			continue
 		}
-		a.findAndAdd(data, key, decoder.Seq())
+		a.findAndAdd(data, key, decoder.Seq(), decoder.timestamp)
 	}
 	a.listener.Close()
 	log.Info("Stopped trident adapter")
