@@ -21,9 +21,9 @@ type RawPacket = []byte
 type MetaPacketTcpHeader struct {
 	pool.ReferenceCount
 
-	Flags         uint8
 	Seq           uint32
 	Ack           uint32
+	Flags         uint8
 	DataOffset    uint8
 	WinSize       uint16
 	WinScale      uint8
@@ -32,44 +32,56 @@ type MetaPacketTcpHeader struct {
 	Sack          []byte // sack value
 }
 
-type MetaPacket struct {
-	pool.ReferenceCount
+type PacketDirection uint8
 
-	Timestamp      time.Duration
-	InPort         uint32
-	PacketLen      uint16
-	Exporter       IPv4Int
-	L2End0, L2End1 bool
-	EndpointData   *EndpointData
-	PolicyData     *PolicyData
-	Raw            RawPacket
-	Invalid        bool
-	Hash           uint32
+const (
+	CLIENT_TO_SERVER PacketDirection = iota + 1
+	SERVER_TO_CLIENT
+)
+
+type MetaPacket struct {
+	// 注意字节对齐!
+	RawHeader []byte // total arp, or icmp header
+
+	Timestamp    time.Duration
+	EndpointData *EndpointData
+	PolicyData   *PolicyData
+
+	Hash      uint32
+	InPort    uint32 // (8B)
+	Exporter  IPv4Int
+	PacketLen uint16
+	L2End0    bool
+	L2End1    bool // (8B)
 
 	Tunnel *TunnelInfo
 
-	MacSrc, MacDst MacInt
-	EthType        EthernetType
-	Vlan           uint16
+	MacSrc  MacInt
+	MacDst  MacInt
+	EthType EthernetType
+	Vlan    uint16
 
-	IpSrc, IpDst uint32
-	Protocol     IPProtocol
-	TTL          uint8 // ipv4 ttl or ipv6 hop limit
-	IHL          uint8 // ipv4 ihl or ipv6 fl4b
-	IpID         uint16
-	IpFlags      uint16 // ipv4 Flags and Fragment Offset or ipv6 flow label
-
-	// ip6
-	Ip6Src, Ip6Dst net.IP
-	NextHeader     IPProtocol
-	Options        []byte
+	IHL        uint8  // ipv4 ihl or ipv6 fl4b
+	TTL        uint8  // ipv4 ttl or ipv6 hop limit
+	IpID       uint16 // (8B)
+	IpSrc      uint32
+	IpDst      uint32 // (8B)
+	Ip6Src     net.IP // ipv6
+	Ip6Dst     net.IP // ipv6
+	Options    []byte
+	IpFlags    uint16 // ipv4 Flags and Fragment Offset or ipv6 flow label
+	Protocol   IPProtocol
+	NextHeader IPProtocol // ipv6
 
 	PortSrc    uint16
-	PortDst    uint16
-	PayloadLen uint16
+	PortDst    uint16 // (8B)
 	TcpData    *MetaPacketTcpHeader
+	PayloadLen uint16
 
-	RawHeader []byte // total arp, or icmp header
+	Invalid   bool
+	Direction PacketDirection // flowgenerator负责初始化，表明MetaPacket方向
+
+	pool.ReferenceCount // (8B)
 }
 
 func (p *MetaPacket) GenerateHash() uint32 {
@@ -306,9 +318,9 @@ func (p *MetaPacket) CopyTo(other *MetaPacket) { // XXX: Shallow copy seems unsa
 func (p *MetaPacket) String() string {
 	buffer := bytes.Buffer{}
 	var format string
-	format = "timestamp: %d inport: 0x%x exporter: %v len: %d l2_end: %v, %v invalid: %v\n"
+	format = "timestamp: %d inport: 0x%x exporter: %v len: %d l2_end: %v, %v invalid: %v direction: %v\n"
 	buffer.WriteString(fmt.Sprintf(format, p.Timestamp, p.InPort, IpFromUint32(p.Exporter),
-		p.PacketLen, p.L2End0, p.L2End1, p.Invalid))
+		p.PacketLen, p.L2End0, p.L2End1, p.Invalid, p.Direction))
 	if p.Tunnel != nil {
 		buffer.WriteString(fmt.Sprintf("\ttunnel: %s\n", p.Tunnel))
 	}

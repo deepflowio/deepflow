@@ -7,8 +7,8 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
-type Metering struct {
-	Exporter     IP
+type Metering struct { // FIXME: Deprecated!!!
+	Exporter     IP // 太胖了
 	Timestamp    time.Duration
 	InPort0      uint32
 	VLAN         uint16

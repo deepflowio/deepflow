@@ -173,46 +173,46 @@ type Field struct {
 	IP6          net.IP // FIXME: 合并IP6和IP
 	IP           uint32
 	GroupID      int16
-	L2EpcID      int16
+	L2EpcID      int16 // (8B)
 	L3EpcID      int16
 	L2DeviceID   uint16
 	L3DeviceID   uint16
 	L2DeviceType DeviceType
-	L3DeviceType DeviceType
+	L3DeviceType DeviceType // (8B)
 	Host         uint32
 
+	IP1           uint32 // (8B)
 	IP61          net.IP // FIXME: 合并IP61和IP1
-	IP1           uint32
 	GroupID1      int16
 	L2EpcID1      int16
 	L3EpcID1      int16
-	L2DeviceID1   uint16
+	L2DeviceID1   uint16 // (8B)
+	Host1         uint32
 	L3DeviceID1   uint16
 	L2DeviceType1 DeviceType
-	L3DeviceType1 DeviceType
-	Host1         uint32
+	L3DeviceType1 DeviceType // (8B)
 
 	RegionID  uint16
 	RegionID1 uint16
 
 	ACLGID       uint16
-	VLANID       uint16
+	VLANID       uint16 // (8B)
 	Direction    DirectionEnum
 	Protocol     layers.IPProtocol
 	ServerPort   uint16
 	SubnetID     uint16
-	SubnetID1    uint16
+	SubnetID1    uint16 // (8B)
 	VTAP         uint32
 	TAPType      TAPTypeEnum
 	ACLDirection ACLDirectionEnum
 	CastType     CastTypeEnum
-	IsIPv6       uint8 // 与IP/IP6是共生字段
+	IsIPv6       uint8 // (8B) 与IP/IP6是共生字段
 
 	Scope ScopeEnum
 
 	Country uint8
 	Region  uint8
-	ISP     uint8
+	ISP     uint8 // (+4B = 8B)
 }
 
 type Tag struct {
