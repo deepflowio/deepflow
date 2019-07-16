@@ -43,16 +43,17 @@ type EndpointInfo struct {
 	L2EpcId      int32 // -1表示其它项目
 	L2DeviceType uint32
 	L2DeviceId   uint32
-	L2End        bool
 
 	L3EpcId      int32 // -1表示其它项目
 	L3DeviceType uint32
 	L3DeviceId   uint32
-	L3End        bool
 
+	GroupIds []uint32
 	HostIp   uint32
 	SubnetId uint32
-	GroupIds []uint32
+
+	L2End bool
+	L3End bool
 }
 
 type L3L2End int

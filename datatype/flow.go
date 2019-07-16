@@ -54,9 +54,9 @@ type FlowKey struct {
 	IPSrc IPv4Int
 	IPDst IPv4Int
 	/* L4 */
-	Proto   layers.IPProtocol
 	PortSrc uint16
 	PortDst uint16
+	Proto   layers.IPProtocol
 }
 
 type TcpPerfCountsPeer struct {
@@ -77,16 +77,16 @@ type TcpPerfStats struct {
 	ART          time.Duration
 	TcpPerfCountsPeerSrc
 	TcpPerfCountsPeerDst
-	TotalRetransCount      uint32
-	TotalZeroWinCount      uint32
-	TotalPshUrgCount       uint32
 	PacketIntervalAvg      uint64
 	PacketIntervalVariance uint64
 	PacketSizeVariance     uint64
+	TotalRetransCount      uint32
+	TotalZeroWinCount      uint32
+	TotalPshUrgCount       uint32
 }
 
 type FlowMetricsPeer struct {
-	TCPFlags         uint8
+	// 注意字节对齐!
 	ByteCount        uint64
 	PacketCount      uint64
 	TotalByteCount   uint64
@@ -94,15 +94,16 @@ type FlowMetricsPeer struct {
 	ArrTime0         time.Duration
 	ArrTimeLast      time.Duration
 	SubnetID         uint32
-	L3DeviceType     DeviceType
 	L3DeviceID       uint32
-	L3EpcID          int32
-	Host             uint32
-	EpcID            int32
-	DeviceType       DeviceType
 	DeviceID         uint32
+	L3EpcID          int32
+	EpcID            int32
+	Host             uint32
 	IfIndex          uint32
 	IfType           uint32
+	L3DeviceType     DeviceType
+	DeviceType       DeviceType
+	TCPFlags         uint8
 	IsL2End          bool
 	IsL3End          bool
 }
@@ -112,8 +113,8 @@ type FlowMetricsPeerSrc FlowMetricsPeer
 type FlowMetricsPeerDst FlowMetricsPeer
 
 type Flow struct {
+	// 注意字节对齐!
 	FlowKey
-	CloseType
 	FlowMetricsPeerSrc
 	FlowMetricsPeerDst
 
@@ -139,6 +140,8 @@ type Flow struct {
 	Country uint8
 	Region  uint8
 	ISP     uint8
+
+	CloseType
 }
 
 func (t *TcpPerfStats) String() string {
