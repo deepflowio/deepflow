@@ -27,6 +27,8 @@ const (
 	RP_1S                   = "s1"
 	RP_1M                   = "autogen"
 	RP_10M                  = "m10"
+	DURATION_1S             = "1d" // 自动同步创建的db的RP默认值
+	SHARD_DURATION_1S       = "2h"
 	DURATION_1M             = "10d" // 自动同步创建的db的RP默认值
 	SHARD_DURATION_1M       = "1d"
 	DURATION_10M            = "100d"
@@ -81,8 +83,8 @@ func NewRepair(addrPrimary, addrReplica, rp, shardID string, start bool, syncSta
 		return &Repair{start: false}, nil
 	}
 
-	if rp != RP_1M && rp != RP_10M {
-		str := fmt.Sprintf("rp '%s' is not support, only support rp(%s,%s)", rp, RP_1M, RP_10M)
+	if rp != RP_1S && rp != RP_1M && rp != RP_10M {
+		str := fmt.Sprintf("rp '%s' is not support, only support rp(%s, %s,%s)", rp, RP_1S, RP_1M, RP_10M)
 		log.Error(str)
 		return nil, fmt.Errorf(str)
 	}
@@ -356,6 +358,13 @@ func (r *Repair) checkCreateDatabase(client, clientRP client.Client, dbname stri
 
 	if rp == nil {
 		switch r.rp {
+		case RP_1S:
+			rp = &RetentionPolicy{
+				name:          r.rp,
+				duration:      DURATION_1S,
+				shardDuration: SHARD_DURATION_1S,
+				defaultFlag:   false,
+			}
 		case RP_1M:
 			rp = &RetentionPolicy{
 				name:          r.rp,
