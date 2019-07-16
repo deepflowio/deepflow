@@ -24,10 +24,10 @@ func (t TunnelType) String() string {
 }
 
 type TunnelInfo struct {
-	Type TunnelType
 	Src  IPv4Int
 	Dst  IPv4Int
 	Id   uint32
+	Type TunnelType
 }
 
 func (t *TunnelInfo) String() string {
