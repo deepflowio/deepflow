@@ -1611,6 +1611,39 @@ func TestDdbsPolicyIpv6(t *testing.T) {
 	}
 }
 
+func TestDdbsProtocol(t *testing.T) {
+	acls := []*Acl{}
+	table := generatePolicyTable(DDBS)
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolGRE, 0, vlanAny)
+	acls = append(acls, acl)
+	table.UpdateAcls(acls)
+
+	// 生成匹配策略的key
+	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolGRE, 0, 0)
+
+	_, policyData := table.LookupAllByKey(key)
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestProtocol Check Failed!")
+	}
+
+	// 通过fastPath查询
+	_, policyData = table.operator.GetPolicyByFastPath(key)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestProtocol Check Failed!")
+	}
+
+	// 生成不匹配策略的key
+	key = generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolUDP, 0, 0)
+
+	_, policyData = table.LookupAllByKey(key)
+	if !CheckPolicyResult(t, INVALID_POLICY_DATA, policyData) {
+		t.Error("TestProtocol Check Failed!")
+	}
+}
+
 func BenchmarkDdbsAcl(b *testing.B) {
 	acls := []*Acl{}
 	table := generatePolicyTable(DDBS)

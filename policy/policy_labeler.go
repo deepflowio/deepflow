@@ -1,7 +1,6 @@
 package policy
 
 import (
-	"math"
 	"sync/atomic"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -12,14 +11,8 @@ const (
 	ANY_GROUP = 0
 	ANY_PROTO = 0
 	ANY_PORT  = 0
-)
 
-const (
-	ACL_PROTO_ALL = iota
-	ACL_PROTO_TCP
-	ACL_PROTO_UDP
-	ACL_PROTO_MAX
-	ACL_PROTO_MIN = ACL_PROTO_ALL + 1
+	ACL_PROTO_MAX = 256 // 0 ~ 255
 )
 
 type PolicyLabeler struct {
@@ -27,8 +20,7 @@ type PolicyLabeler struct {
 	InterestTable
 	AclGidMap
 
-	RawAcls     []*Acl
-	aclProtoMap [math.MaxUint8 + 1]uint8
+	RawAcls []*Acl
 
 	FastPathDisable bool // 是否关闭快速路径，只使用慢速路径（FirstPath）
 	queueCount      int
@@ -46,11 +38,7 @@ type PolicyLabeler struct {
 var STANDARD_NETMASK = MaskLenToNetmask(STANDARD_MASK_LEN)
 
 func NewPolicyLabeler(queueCount int, mapSize uint32, fastPathDisable bool) TableOperator {
-	policy := &PolicyLabeler{}
-
-	policy.aclProtoMap[6] = ACL_PROTO_TCP
-	policy.aclProtoMap[17] = ACL_PROTO_UDP
-	policy.queueCount = queueCount
+	policy := &PolicyLabeler{queueCount: queueCount, FastPathDisable: fastPathDisable}
 
 	for i := TAP_MIN; i < TAP_MAX; i++ {
 		policy.GroupVlanPolicyMaps[i] = make(map[uint64]*PolicyData)
@@ -59,7 +47,6 @@ func NewPolicyLabeler(queueCount int, mapSize uint32, fastPathDisable bool) Tabl
 		}
 	}
 
-	policy.FastPathDisable = fastPathDisable
 	policy.AclGidMap.Init()
 	policy.InterestTable.Init()
 	policy.FastPath.Init(mapSize, queueCount, policy.AclGidMap.SrcGroupAclGidMaps, policy.AclGidMap.DstGroupAclGidMaps)
@@ -179,10 +166,6 @@ func generateGroupPortsKeys(acl *Acl, direction DirectionType) []uint64 {
 	return keys
 }
 
-func (l *PolicyLabeler) getAclProto(proto uint8) uint8 {
-	return l.aclProtoMap[proto]
-}
-
 func (l *PolicyLabeler) GenerateGroupPortMaps(acls []*Acl) {
 	portMaps := [TAP_MAX][ACL_PROTO_MAX]map[uint64]*PolicyData{}
 	for i := TAP_MIN; i < TAP_MAX; i++ {
@@ -193,7 +176,7 @@ func (l *PolicyLabeler) GenerateGroupPortMaps(acls []*Acl) {
 
 	for _, acl := range acls {
 		if acl.Type.CheckTapType(acl.Type) && acl.Vlan == 0 {
-			portMap := portMaps[acl.Type][l.getAclProto(acl.Proto)]
+			portMap := portMaps[acl.Type][acl.Proto]
 
 			keys := generateGroupPortsKeys(acl, FORWARD)
 			for _, key := range keys {
@@ -212,7 +195,7 @@ func (l *PolicyLabeler) GenerateGroupPortMaps(acls []*Acl) {
 	for i := TAP_MIN; i < TAP_MAX; i++ {
 		anyPortMap := portMaps[i][ANY_PROTO]
 		for key, value := range anyPortMap {
-			for j := ACL_PROTO_MIN; j < ACL_PROTO_MAX; j++ {
+			for j := 0; j < ACL_PROTO_MAX; j++ {
 				if portMaps[i][j][key] == nil {
 					portMaps[i][j][key] = value
 				} else {
@@ -381,7 +364,7 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 	l.generateInterestKeys(endpointData, packet, true)
 	srcMacSuffix := uint16(packet.SrcMac & 0xffff)
 	dstMacSuffix := uint16(packet.DstMac & 0xffff)
-	portGroup := l.GroupPortPolicyMaps[packet.Tap][l.getAclProto(packet.Proto)]
+	portGroup := l.GroupPortPolicyMaps[packet.Tap][packet.Proto]
 	vlanGroup := l.GroupVlanPolicyMaps[packet.Tap]
 	// 对于内容全为0的findPolicy，统一采用INVALID_POLICY_DATA（同一块内存的数值）
 	portForwardPolicy, portBackwardPolicy, vlanPolicy, findPolicy := INVALID_POLICY_DATA, INVALID_POLICY_DATA, INVALID_POLICY_DATA, INVALID_POLICY_DATA

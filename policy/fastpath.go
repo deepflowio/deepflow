@@ -28,8 +28,6 @@ type VlanAndPortMap struct {
 }
 
 type FastPath struct {
-	aclProtoMap [math.MaxUint8 + 1]uint8
-
 	maskMapFromPlatformData [math.MaxUint16 + 1]uint32
 	maskMapFromIpGroupData  [math.MaxUint16 + 1]uint32
 	IpNetmaskMap            *[math.MaxUint16 + 1]uint32 // 根据IP地址查找对应的最大掩码
@@ -49,9 +47,6 @@ type FastPath struct {
 func (f *FastPath) Init(mapSize uint32, queueCount int, srcGroupAclGidMaps, dstGroupAclGidMaps [TAP_MAX]map[uint32]bool) {
 	f.IpNetmaskMap = &[math.MaxUint16 + 1]uint32{0}
 
-	f.aclProtoMap[6] = ACL_PROTO_TCP
-	f.aclProtoMap[17] = ACL_PROTO_UDP
-
 	f.FastPolicyMaps = make([][]*lru.Cache64, queueCount)
 	f.FastPolicyMapsMini = make([][]*lru.Cache32, queueCount)
 	for i := 0; i < queueCount; i++ {
@@ -70,10 +65,6 @@ func (f *FastPath) Init(mapSize uint32, queueCount int, srcGroupAclGidMaps, dstG
 func (f *FastPath) UpdateGroupAclGidMaps(srcGroupAclGidMaps, dstGroupAclGidMaps [TAP_MAX]map[uint32]bool) {
 	f.SrcGroupAclGidMaps = srcGroupAclGidMaps
 	f.DstGroupAclGidMaps = dstGroupAclGidMaps
-}
-
-func (f *FastPath) getAclProto(proto uint8) uint8 {
-	return f.aclProtoMap[proto]
 }
 
 func (f *FastPath) FlushAcls() {
@@ -96,8 +87,7 @@ func (l *FastPath) getFastVlanPolicy(maps *VlanAndPortMap, srcMacSuffix, dstMacS
 func (l *FastPath) getFastPortPolicy(maps *VlanAndPortMap, srcMacSuffix, dstMacSuffix uint16, packet *LookupKey) (*EndpointStore, *PolicyData) {
 	key := uint64(srcMacSuffix)<<48 | uint64(dstMacSuffix)<<32 | uint64(packet.SrcPort)<<16 | uint64(packet.DstPort)
 	if value := maps.portPolicyMap[key]; value != nil {
-		index := l.aclProtoMap[packet.Proto]
-		if policy := value.protoPolicy[index]; policy != nil {
+		if policy := value.protoPolicy[packet.Proto]; policy != nil {
 			if packet.Timestamp-value.timestamp > FAST_PATH_SOFT_TIMEOUT && packet.Timestamp > value.timestamp {
 				return nil, nil
 			}
@@ -218,20 +208,19 @@ func (f *FastPath) addPortFastPolicy(endpointStore *EndpointStore, packetEndpoin
 		}
 	}
 	key := uint64(srcMacSuffix)<<48 | uint64(dstMacSuffix)<<32 | uint64(packet.SrcPort)<<16 | uint64(packet.DstPort)
-	index := f.aclProtoMap[packet.Proto]
 	if portPolicyValue := mapsForward.portPolicyMap[key]; portPolicyValue == nil {
-		value := &PortPolicyValue{protoPolicy: make([]*PolicyData, 3), timestamp: packet.Timestamp}
+		value := &PortPolicyValue{protoPolicy: make([]*PolicyData, ACL_PROTO_MAX), timestamp: packet.Timestamp}
 		value.endpoint.InitPointer(endpointStore.Endpoints)
 		// 添加forward方向bitmap
 		forward.AddAclGidBitmaps(packet, false, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
-		value.protoPolicy[index] = forward
+		value.protoPolicy[packet.Proto] = forward
 		mapsForward.portPolicyMap[key] = value
 		atomic.AddUint32(&f.FastPathPolicyCount, 1)
 	} else {
 		portPolicyValue.endpoint.InitPointer(endpointStore.Endpoints)
 		// 添加forward方向bitmap
 		forward.AddAclGidBitmaps(packet, false, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
-		portPolicyValue.protoPolicy[index] = forward
+		portPolicyValue.protoPolicy[packet.Proto] = forward
 		portPolicyValue.timestamp = packet.Timestamp
 	}
 
@@ -257,18 +246,18 @@ func (f *FastPath) addPortFastPolicy(endpointStore *EndpointStore, packetEndpoin
 	endpoints := &EndpointData{SrcInfo: endpointStore.Endpoints.DstInfo, DstInfo: endpointStore.Endpoints.SrcInfo}
 	key = uint64(dstMacSuffix)<<48 | uint64(srcMacSuffix)<<32 | uint64(packet.DstPort)<<16 | uint64(packet.SrcPort)
 	if portPolicyValue := mapsBackward.portPolicyMap[key]; portPolicyValue == nil {
-		value := &PortPolicyValue{protoPolicy: make([]*PolicyData, 3), timestamp: packet.Timestamp}
+		value := &PortPolicyValue{protoPolicy: make([]*PolicyData, ACL_PROTO_MAX), timestamp: packet.Timestamp}
 		value.endpoint.InitPointer(endpoints)
 		// 添加backward方向bitmap
 		backward.AddAclGidBitmaps(packet, true, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
-		value.protoPolicy[index] = backward
+		value.protoPolicy[packet.Proto] = backward
 		mapsBackward.portPolicyMap[key] = value
 		atomic.AddUint32(&f.FastPathPolicyCount, 1)
 	} else {
 		portPolicyValue.endpoint.InitPointer(endpoints)
 		// 添加backward方向bitmap
 		backward.AddAclGidBitmaps(packet, true, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
-		portPolicyValue.protoPolicy[index] = backward
+		portPolicyValue.protoPolicy[packet.Proto] = backward
 		portPolicyValue.timestamp = packet.Timestamp
 	}
 
