@@ -67,6 +67,10 @@ func (b *LeakyBucket) SetRate(rate uint64) {
 }
 
 func (b *LeakyBucket) Acquire(size uint64) bool {
+	if b.rate == math.MaxUint64 {
+		return true
+	}
+
 	b.spin.Lock()
 	if b.token < size {
 		b.spin.Unlock()
