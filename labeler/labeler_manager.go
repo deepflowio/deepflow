@@ -1,14 +1,7 @@
 package labeler
 
 import (
-	"bytes"
-	"encoding/gob"
-	"fmt"
-	"math"
-	"net"
 	"reflect"
-	"strings"
-	"time"
 
 	"github.com/op/go-logging"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -17,7 +10,6 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/policy"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
-	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
 	"gitlab.x.lan/yunshan/message/trident"
@@ -287,151 +279,5 @@ func (l *LabelerManager) Stop(wait bool) {
 	if l.running {
 		log.Info("Stop labeler manager")
 		l.running = false
-	}
-}
-
-func (l *LabelerManager) recvDumpPlatform(conn *net.UDPConn, remote *net.UDPAddr, arg *bytes.Buffer) {
-	key := DumpKey{}
-	buffer := bytes.Buffer{}
-
-	decoder := gob.NewDecoder(arg)
-	if err := decoder.Decode(&key); err != nil {
-		log.Error(err)
-		debug.SendToClient(conn, remote, 1, nil)
-		return
-	}
-
-	info := l.policyTable.GetEndpointInfo(key.Mac, IpFromUint32(key.Ip), key.InPort)
-	if info == nil {
-		log.Warningf("GetEndpointInfo(%+v) return nil", key)
-		debug.SendToClient(conn, remote, 1, nil)
-		return
-	}
-	encoder := gob.NewEncoder(&buffer)
-	if err := encoder.Encode(info); err != nil {
-		log.Errorf("encoder.Encode: %s", err)
-		debug.SendToClient(conn, remote, 1, nil)
-		return
-	}
-	debug.SendToClient(conn, remote, 0, &buffer)
-}
-
-func (l *LabelerManager) recvDumpAcl(conn *net.UDPConn, remote *net.UDPAddr, arg *bytes.Buffer, queryType uint16) {
-	key := datatype.LookupKey{}
-	buffer := bytes.Buffer{}
-
-	decoder := gob.NewDecoder(arg)
-	if err := decoder.Decode(&key); err != nil {
-		log.Error(err)
-		debug.SendToClient(conn, remote, 1, nil)
-		return
-	}
-
-	info := make([]string, 0, l.readQueuesCount)
-	switch queryType {
-	case LABELER_CMD_DUMP_ACL:
-		for i := 0; i < l.readQueuesCount; i++ {
-			key.FastIndex = i
-			endpoint, policy := l.policyTable.LookupAllByKey(&key)
-			info = append(info, fmt.Sprintf("GoRoutine-%d: EndPoint: {Src: %+v Dst: %+v} Policy: %+v", i, endpoint.SrcInfo, endpoint.DstInfo, policy))
-		}
-	case LABELER_CMD_DUMP_FIRST_ACL:
-		endpoint, policy := l.policyTable.GetPolicyByFirstPath(&key)
-		info = append(info, fmt.Sprintf("EndPoint: {Src: %+v Dst: %+v} Policy: %+v", endpoint.SrcInfo, endpoint.DstInfo, policy))
-	case LABELER_CMD_DUMP_FAST_ACL:
-		for i := 0; i < l.readQueuesCount; i++ {
-			key.FastIndex = i
-			endpoint, policy := l.policyTable.GetPolicyByFastPath(&key)
-			info = append(info, fmt.Sprintf("GoRoutine-%d: EndPoint: {Src: %+v Dst: %+v} Policy: %+v", i, endpoint.SrcInfo, endpoint.DstInfo, policy))
-		}
-	}
-
-	encoder := gob.NewEncoder(&buffer)
-	if err := encoder.Encode(strings.Join(info, "\n\t")); err != nil {
-		log.Errorf("encoder.Encode: %s", err)
-		debug.SendToClient(conn, remote, 1, nil)
-		return
-	}
-	debug.SendToClient(conn, remote, 0, &buffer)
-}
-
-func (l *LabelerManager) recvShowAcl(conn *net.UDPConn, remote *net.UDPAddr, arg *bytes.Buffer) {
-	acls := l.policyTable.GetAcl()
-
-	first, fast := l.policyTable.GetHitStatus()
-	output := fmt.Sprintf("FirstHits: %d FastHits: %d", first, fast)
-	buffer := bytes.Buffer{}
-	encoder := gob.NewEncoder(&buffer)
-	if err := encoder.Encode(&output); err != nil {
-		log.Errorf("encoder.Encode: %s", err)
-	}
-	debug.SendToClient(conn, remote, 0, &buffer)
-
-	for _, acl := range policy.SortAclsById(acls) {
-		buffer := bytes.Buffer{}
-		encoder := gob.NewEncoder(&buffer)
-		context := acl.String()
-		// gob封装为'String: ' + context
-		if len(context) >= dropletctl.DEBUG_MESSAGE_LEN-8 {
-			context = context[:dropletctl.DEBUG_MESSAGE_LEN-8-3] + "..."
-		}
-
-		if err := encoder.Encode(context); err != nil {
-			log.Errorf("encoder.Encode: %s", err)
-			continue
-		}
-
-		debug.SendToClient(conn, remote, 0, &buffer)
-		time.Sleep(2 * time.Millisecond)
-	}
-	buffer.Reset()
-	encoder.Encode("END")
-	debug.SendToClient(conn, remote, 0, &buffer)
-}
-
-func (l *LabelerManager) recvAddAcl(conn *net.UDPConn, remote *net.UDPAddr, arg *bytes.Buffer) {
-	acl := policy.Acl{}
-
-	decoder := gob.NewDecoder(arg)
-	if err := decoder.Decode(&acl); err != nil {
-		log.Error(err)
-		debug.SendToClient(conn, remote, 1, nil)
-		return
-	}
-	log.Debug("droplet cmd add-acl:", acl)
-	l.policyTable.AddAcl(&acl)
-}
-
-func (l *LabelerManager) recvDelAcl(conn *net.UDPConn, remote *net.UDPAddr, arg *bytes.Buffer) {
-	var id int
-
-	decoder := gob.NewDecoder(arg)
-	if err := decoder.Decode(&id); err != nil {
-		log.Error(err)
-		debug.SendToClient(conn, remote, 1, nil)
-		return
-	}
-	l.policyTable.DelAcl(id)
-}
-
-func (l *LabelerManager) GetParsedIpGroupData() []*policy.IpGroupData {
-	return l.rawIpGroupDatas
-}
-
-func (l *LabelerManager) recvShowIpGroup(conn *net.UDPConn, remote *net.UDPAddr, arg *bytes.Buffer) {
-	ipGroups := l.GetParsedIpGroupData()
-	ipGroup := &policy.IpGroupData{Id: math.MaxUint32, EpcId: math.MaxInt32} //作为命令行判断结束的条件
-	ipGroups = append(ipGroups, ipGroup)
-	for _, ipGroup := range ipGroups {
-		buffer := bytes.Buffer{}
-		encoder := gob.NewEncoder(&buffer)
-
-		if err := encoder.Encode(ipGroup); err != nil {
-			log.Errorf("encoder.Encode: %s", err)
-			continue
-		}
-
-		debug.SendToClient(conn, remote, 0, &buffer)
-		time.Sleep(2 * time.Millisecond)
 	}
 }

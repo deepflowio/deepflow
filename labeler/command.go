@@ -181,20 +181,19 @@ func (c *command) recvShowIpGroup(conn *net.UDPConn, remote *net.UDPAddr, arg *b
 }
 
 func (c *command) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, operate uint16, arg *bytes.Buffer) {
-	label := c.label
 	switch operate {
 	case LABELER_CMD_DUMP_PLATFORM:
-		label.recvDumpPlatform(conn, remote, arg)
+		c.recvDumpPlatform(conn, remote, arg)
 	case LABELER_CMD_DUMP_ACL, LABELER_CMD_DUMP_FIRST_ACL, LABELER_CMD_DUMP_FAST_ACL:
-		label.recvDumpAcl(conn, remote, arg, operate)
+		c.recvDumpAcl(conn, remote, arg, operate)
 	case LABELER_CMD_SHOW_ACL:
-		label.recvShowAcl(conn, remote, arg)
+		c.recvShowAcl(conn, remote, arg)
 	case LABELER_CMD_ADD_ACL:
-		label.recvAddAcl(conn, remote, arg)
+		c.recvAddAcl(conn, remote, arg)
 	case LABELER_CMD_DEL_ACL:
-		label.recvDelAcl(conn, remote, arg)
+		c.recvDelAcl(conn, remote, arg)
 	case LABELER_CMD_SHOW_IPGROUP:
-		label.recvShowIpGroup(conn, remote, arg)
+		c.recvShowIpGroup(conn, remote, arg)
 	}
 }
 
