@@ -77,6 +77,8 @@ message Config {
 
     optional string  analyzer_ip          = 31;
     optional uint32  max_escape_seconds   = 32;
+
+    repeated string  corefile_dirs        = 33;
 }
 
 enum Protocol {
