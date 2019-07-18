@@ -638,11 +638,14 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 		encoder.WriteRawString(t.id) // ID就是序列化bytes，避免重复计算
 		return
 	}
+	t.EncodeByCode(t.Code, encoder)
+}
 
-	encoder.WriteU64(uint64(t.Code))
+func (t *Tag) EncodeByCode(code Code, encoder *codec.SimpleEncoder) {
+	encoder.WriteU64(uint64(code))
 	encoder.WriteU64(uint64(t.GlobalThreadID))
 
-	if t.Code&IP != 0 {
+	if code&IP != 0 {
 		encoder.WriteU8(t.IsIPv6)
 		if t.IsIPv6 != 0 {
 			encoder.WriteIPv6(t.IP6)
@@ -650,31 +653,31 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 			encoder.WriteU32(t.IP)
 		}
 	}
-	if t.Code&GroupID != 0 {
+	if code&GroupID != 0 {
 		encoder.WriteU16(uint16(t.GroupID))
 	}
-	if t.Code&L2EpcID != 0 {
+	if code&L2EpcID != 0 {
 		encoder.WriteU16(uint16(t.L2EpcID))
 	}
-	if t.Code&L3EpcID != 0 {
+	if code&L3EpcID != 0 {
 		encoder.WriteU16(uint16(t.L3EpcID))
 	}
-	if t.Code&L2Device != 0 {
+	if code&L2Device != 0 {
 		encoder.WriteU16(t.L2DeviceID)
 		encoder.WriteU8(uint8(t.L2DeviceType))
 	}
-	if t.Code&L3Device != 0 {
+	if code&L3Device != 0 {
 		encoder.WriteU16(t.L3DeviceID)
 		encoder.WriteU8(uint8(t.L3DeviceType))
 	}
-	if t.Code&Host != 0 {
+	if code&Host != 0 {
 		encoder.WriteU32(t.Host)
 	}
-	if t.Code&RegionID != 0 {
+	if code&RegionID != 0 {
 		encoder.WriteU16(t.RegionID)
 	}
 
-	if t.Code&IPPath != 0 {
+	if code&IPPath != 0 {
 		encoder.WriteU8(t.IsIPv6)
 		if t.IsIPv6 != 0 {
 			encoder.WriteIPv6(t.IP6)
@@ -684,87 +687,87 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 			encoder.WriteU32(t.IP1)
 		}
 	}
-	if t.Code&GroupIDPath != 0 {
+	if code&GroupIDPath != 0 {
 		encoder.WriteU16(uint16(t.GroupID))
 		encoder.WriteU16(uint16(t.GroupID1))
 	}
-	if t.Code&L2EpcIDPath != 0 {
+	if code&L2EpcIDPath != 0 {
 		encoder.WriteU16(uint16(t.L2EpcID))
 		encoder.WriteU16(uint16(t.L2EpcID1))
 	}
-	if t.Code&L3EpcIDPath != 0 {
+	if code&L3EpcIDPath != 0 {
 		encoder.WriteU16(uint16(t.L3EpcID))
 		encoder.WriteU16(uint16(t.L3EpcID1))
 	}
-	if t.Code&L2DevicePath != 0 {
+	if code&L2DevicePath != 0 {
 		encoder.WriteU16(t.L2DeviceID)
 		encoder.WriteU8(uint8(t.L2DeviceType))
 		encoder.WriteU16(t.L2DeviceID1)
 		encoder.WriteU8(uint8(t.L2DeviceType1))
 	}
-	if t.Code&L3DevicePath != 0 {
+	if code&L3DevicePath != 0 {
 		encoder.WriteU16(t.L3DeviceID)
 		encoder.WriteU8(uint8(t.L3DeviceType))
 		encoder.WriteU16(t.L3DeviceID1)
 		encoder.WriteU8(uint8(t.L3DeviceType1))
 	}
-	if t.Code&HostPath != 0 {
+	if code&HostPath != 0 {
 		encoder.WriteU32(t.Host)
 		encoder.WriteU32(t.Host1)
 	}
-	if t.Code&SubnetIDPath != 0 {
+	if code&SubnetIDPath != 0 {
 		encoder.WriteU16(t.SubnetID)
 		encoder.WriteU16(t.SubnetID1)
 	}
-	if t.Code&RegionIDPath != 0 {
+	if code&RegionIDPath != 0 {
 		encoder.WriteU16(t.RegionID)
 		encoder.WriteU16(t.RegionID1)
 	}
 
-	if t.Code&Direction != 0 {
+	if code&Direction != 0 {
 		encoder.WriteU8(uint8(t.Direction))
 	}
-	if t.Code&ACLGID != 0 {
+	if code&ACLGID != 0 {
 		encoder.WriteU16(t.ACLGID)
 	}
-	if t.Code&VLANID != 0 {
+	if code&VLANID != 0 {
 		encoder.WriteU16(t.VLANID)
 	}
-	if t.Code&Protocol != 0 {
+	if code&Protocol != 0 {
 		encoder.WriteU8(uint8(t.Protocol))
 	}
-	if t.Code&ServerPort != 0 {
+	if code&ServerPort != 0 {
 		encoder.WriteU16(t.ServerPort)
 	}
-	if t.Code&VTAP != 0 {
+	if code&VTAP != 0 {
 		encoder.WriteU32(t.VTAP)
 	}
-	if t.Code&TAPType != 0 {
+	if code&TAPType != 0 {
 		encoder.WriteU8(uint8(t.TAPType))
 	}
-	if t.Code&SubnetID != 0 {
+	if code&SubnetID != 0 {
 		encoder.WriteU16(t.SubnetID)
 	}
-	if t.Code&ACLDirection != 0 {
+	if code&ACLDirection != 0 {
 		encoder.WriteU8(uint8(t.ACLDirection))
 	}
-	if t.Code&CastType != 0 {
+	if code&CastType != 0 {
 		encoder.WriteU8(uint8(t.CastType))
 	}
-	if t.Code&TCPFlags != 0 {
+	if code&TCPFlags != 0 {
 		encoder.WriteU8(uint8(t.TCPFlags))
 	}
-	if t.Code&Scope != 0 {
+	if code&Scope != 0 {
 		encoder.WriteU8(uint8(t.Scope))
 	}
 
-	if t.Code&Country != 0 {
+	if code&Country != 0 {
 		encoder.WriteU8(t.Country)
 	}
-	if t.Code&Region != 0 {
+	if code&Region != 0 {
 		encoder.WriteU8(t.Region)
 	}
-	if t.Code&ISPCode != 0 {
+	if code&ISPCode != 0 {
 		encoder.WriteU8(t.ISP)
 	}
 }
@@ -819,6 +822,10 @@ func (t *Tag) GetFastID() uint64 {
 
 func (t *Tag) GetCode() uint64 {
 	return uint64(t.Code)
+}
+
+func (t *Tag) SetCode(code uint64) {
+	t.Code = Code(code)
 }
 
 func (t *Tag) GetTAPType() uint8 {
@@ -939,6 +946,30 @@ func (t *Tag) Fill(code Code, tags map[string]string) error {
 		}
 	}
 	return nil
+}
+
+func (t *Tag) IsMatchPublishPolicy(p *PublishPolicy) bool {
+	if p.Code == 0 {
+		return true
+	}
+
+	if p.Code&FilterTapType != 0 && t.TAPType != p.TAPType {
+		return false
+	}
+	if p.Code&FilterAclGid != 0 && t.ACLGID != p.ACLGID {
+		return false
+	}
+	if p.Code&FilterL3EpcID != 0 && t.L3EpcID != p.L3EpcID {
+		return false
+	}
+	if p.Code&FilterL3DeviceID != 0 && t.L3DeviceID != p.L3DeviceID {
+		return false
+	}
+	if p.Code&FilterL3DeviceType != 0 && t.L3DeviceType != p.L3DeviceType {
+		return false
+	}
+
+	return true
 }
 
 func (t *Tag) fillValue(name, value string) (err error) {
