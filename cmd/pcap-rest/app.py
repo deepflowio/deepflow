@@ -13,7 +13,6 @@ from pcap import PROTOCOL_TCP, PROTOCOL_UDP, filter_pcap
 
 from pcap import found_in_pcap
 
-
 PCAP_DIR = '/var/lib/droplet/pcap'
 HOSTNAME = ''
 DROPLET_CONF = '/etc/droplet.yaml'
@@ -104,21 +103,35 @@ HTTP response body:
     if request.query.end_ts != '':
         end_ts = int(request.query.end_ts)
     size = int(request.query.size) if request.query.size != '' else None
-    ip_version = int(request.query.ip_version) if request.query.ip_version != '' else None
+    ip_version = int(
+        request.query.ip_version
+    ) if request.query.ip_version != '' else None
     peek = bool(request.query.peek) if request.query.peek != '' else False
     if ip_version is not None and ip_version not in [4, 6]:
         return {'OPT_STATUS': 'FAILURE', 'DESCRIPTION': 'bad ip version'}
     if ip:
         ip = ipaddress.ip_address(unicode(ip))
         if ip_version is not None and ip.version != ip_version:
-            return {'OPT_STATUS': 'FAILURE', 'DESCRIPTION': 'ip version mismatch'}
+            return {
+                'OPT_STATUS': 'FAILURE',
+                'DESCRIPTION': 'ip version mismatch'
+            }
         ip_version = ip.version
     if ips:
         ips = [ipaddress.ip_address(unicode(it)) for it in ips]
-        if ip_version is not None and any([it.version != ip_version for it in ips]):
-            return {'OPT_STATUS': 'FAILURE', 'DESCRIPTION': 'ip version mismatch'}
+        if ip_version is not None and any([
+            it.version != ip_version for it in ips
+        ]):
+            return {
+                'OPT_STATUS': 'FAILURE',
+                'DESCRIPTION': 'ip version mismatch'
+            }
     return {
-        'DATA': get_files(acl_gid, start_ts, end_ts, size=size, ip=ip, ip_filter=ips, protocol=protocol, port=port, tap_type=tap_type, ip_version=ip_version, peek=peek),
+        'DATA': get_files(
+            acl_gid, start_ts, end_ts, size=size, ip=ip, ip_filter=ips,
+            protocol=protocol, port=port, tap_type=tap_type,
+            ip_version=ip_version, peek=peek
+        ),
         'OPT_STATUS': 'SUCCESS',
     }
 
@@ -152,8 +165,12 @@ HTTP response body:
         port = int(request.query.port)
     directory = PCAP_DIR + '/' + str(acl_gid) + '/'
     if ips or protocol is not None:
-        headers = {'Content-Disposition': 'attachment; filename="%s"' % pcap_name}
-        return HTTPResponse(filter_pcap(directory + pcap_name, ips, protocol, port), **headers)
+        headers = {
+            'Content-Disposition': 'attachment; filename="%s"' % pcap_name
+        }
+        return HTTPResponse(
+            filter_pcap(directory + pcap_name, ips, protocol, port), **headers
+        )
     else:
         return static_file(pcap_name, root=directory, download=pcap_name)
 
@@ -184,7 +201,12 @@ def _ip_convert_back(ip):
     except ValueError:
         try:
             # ipv4
-            return ipaddress.ip_address(unicode('%d.%d.%d.%d' % (int(ip[0:3]), int(ip[3:6]), int(ip[6:9]), int(ip[9:12]))))
+            return ipaddress.ip_address(
+                unicode(
+                    '%d.%d.%d.%d' %
+                    (int(ip[0:3]), int(ip[3:6]), int(ip[6:9]), int(ip[9:12]))
+                )
+            )
         except (IndexError, ValueError):
             return ipaddress.ip_address(unicode('0.0.0.0'))
 
@@ -204,16 +226,27 @@ def _tap_type_to_id(tapType):
 
 def _time_to_epoch(time_str):
     try:
-        return int(time.mktime(datetime.datetime.strptime(time_str, "%y%m%d%H%M%S").timetuple()))
+        return int(
+            time.mktime(
+                datetime.datetime.strptime(time_str,
+                                           "%y%m%d%H%M%S").timetuple()
+            )
+        )
     except ValueError:
         return 0
 
 
-def get_files(acl_gid, start_ts, end_ts, size=DEFAULT_PCAP_LIST_SIZE, ip=None, ip_filter=None, protocol=None, port=None, tap_type=None, ip_version=None, peek=False):
+def get_files(
+    acl_gid, start_ts, end_ts, size=DEFAULT_PCAP_LIST_SIZE, ip=None,
+    ip_filter=None, protocol=None, port=None, tap_type=None, ip_version=None,
+    peek=False
+):
     if size < 0:
         size = DEFAULT_PCAP_LIST_SIZE
     # 如果protocol不是tcp或udp，认为端口过滤后没有结果
-    if protocol is not None and port is not None and protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
+    if protocol is not None and port is not None and protocol not in [
+        PROTOCOL_TCP, PROTOCOL_UDP
+    ]:
         return []
 
     directory = PCAP_DIR + '/' + str(acl_gid) + '/'
@@ -240,7 +273,9 @@ def get_files(acl_gid, start_ts, end_ts, size=DEFAULT_PCAP_LIST_SIZE, ip=None, i
         if ip is not None and ip_str != segs[2]:
             continue
         ip_rep = _ip_convert_back(segs[2])
-        if (ip_filter or protocol is not None) and not found_in_pcap(directory + file, ip_filter, protocol, port):
+        if (
+            ip_filter or protocol is not None
+        ) and not found_in_pcap(directory + file, ip_filter, protocol, port):
             continue
         files.append({
             'ip': str(ip_rep),

@@ -3,7 +3,6 @@ import logging
 
 LOG = logging.getLogger(__name__)
 
-
 GLOBAL_HEADER_LEN = 24
 MAGIC_NUMBER_OFFSET = 0
 DATA_LINK_TYPE_OFFSET = 20
@@ -54,11 +53,11 @@ def _ip_to_bytes(addr):
 def __packet_matches_condition(packet, ips_int, protocol, port):
     # ethernet
     off = ETHER_TYPE_OFFSET
-    eth_type = struct.unpack('!H', packet[off:off+2])[0]
+    eth_type = struct.unpack('!H', packet[off:off + 2])[0]
     l3_offset = ETHERNET_HEADER_LEN
     if eth_type == ETHER_TYPE_VLAN:
         off = ETHER_TYPE_OFFSET + VLAN_LEN
-        eth_type = struct.unpack('!H', packet[off:off+2])[0]
+        eth_type = struct.unpack('!H', packet[off:off + 2])[0]
         l3_offset += VLAN_LEN
     if eth_type == ETHER_TYPE_IPV4:
         ip_version = 4
@@ -77,9 +76,9 @@ def __packet_matches_condition(packet, ips_int, protocol, port):
         ip_length = 16
     if ips_int:
         off = l3_offset + src_ip_offset
-        ip_src = packet[off:off+ip_length]
+        ip_src = packet[off:off + ip_length]
         off = l3_offset + dst_ip_offset
-        ip_dst = packet[off:off+ip_length]
+        ip_dst = packet[off:off + ip_length]
         if len(ips_int) == 1:
             if ips_int[0] != ip_src and ips_int[0] != ip_dst:
                 return False
@@ -95,9 +94,15 @@ def __packet_matches_condition(packet, ips_int, protocol, port):
             r_protocol = ord(packet[l3_offset + IPV6_NEXT_HEADER_OFFSET])
             offset = l3_offset + IPV6_HEADER_LEN
             while True:
-                if r_protocol in [PROTOCOL_TCP, PROTOCOL_UDP, IPV6_NEXT_HEADER_ICMP6, IPV6_NEXT_HEADER_NONXT]:
+                if r_protocol in [
+                    PROTOCOL_TCP, PROTOCOL_UDP, IPV6_NEXT_HEADER_ICMP6,
+                    IPV6_NEXT_HEADER_NONXT
+                ]:
                     break
-                elif r_protocol in [IPV6_NEXT_HEADER_HOPBYHOP, IPV6_NEXT_HEADER_DESTINATION, IPV6_NEXT_HEADER_ROUTING]:
+                elif r_protocol in [
+                    IPV6_NEXT_HEADER_HOPBYHOP, IPV6_NEXT_HEADER_DESTINATION,
+                    IPV6_NEXT_HEADER_ROUTING
+                ]:
                     r_protocol = ord(packet[offset])
                     offset += 1
                     offset += ord(packet[offset])
@@ -105,7 +110,9 @@ def __packet_matches_condition(packet, ips_int, protocol, port):
                     r_protocol = ord(packet[offset])
                     offset += 8
                 else:
-                    LOG.warning('unknown ipv6 extension header id %d' % r_protocol)
+                    LOG.warning(
+                        'unknown ipv6 extension header id %d' % r_protocol
+                    )
                     break
         if r_protocol != protocol:
             return False
@@ -115,15 +122,17 @@ def __packet_matches_condition(packet, ips_int, protocol, port):
             return False
 
         if ip_version == 4:
-            l4_offset = l3_offset + ((ord(packet[l3_offset+IHL_OFFSET]) & 0xF) << 2)
+            l4_offset = l3_offset + (
+                (ord(packet[l3_offset + IHL_OFFSET]) & 0xF) << 2
+            )
         else:
             l4_offset = offset
 
         # tcp/udp
         off = l4_offset + SRC_PORT_OFFSET
-        port_src = struct.unpack('>H', packet[off:off+2])[0]
+        port_src = struct.unpack('>H', packet[off:off + 2])[0]
         off = l4_offset + DST_PORT_OFFSET
-        port_dst = struct.unpack('>H', packet[off:off+2])[0]
+        port_dst = struct.unpack('>H', packet[off:off + 2])[0]
         if port_src != port and port_dst != port:
             return False
 
@@ -138,7 +147,9 @@ def found_in_pcap(filename, ips=None, protocol=None, port=None):
             if ip_int is not None:
                 ips_int.append(ip_int)
 
-    if protocol is not None and port is not None and protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
+    if protocol is not None and port is not None and protocol not in [
+        PROTOCOL_TCP, PROTOCOL_UDP
+    ]:
         return False
 
     try:
@@ -147,12 +158,17 @@ def found_in_pcap(filename, ips=None, protocol=None, port=None):
             g_header = fp.read(GLOBAL_HEADER_LEN)
             if len(g_header) < GLOBAL_HEADER_LEN:
                 return False
-            magic = struct.unpack('<I', g_header[MAGIC_NUMBER_OFFSET:MAGIC_NUMBER_OFFSET+4])[0]
+            magic = struct.unpack(
+                '<I', g_header[MAGIC_NUMBER_OFFSET:MAGIC_NUMBER_OFFSET + 4]
+            )[0]
             if magic == 0xa1b2c3d4:
                 endian = '<'
             else:
                 endian = '>'
-            network = struct.unpack(endian + 'I', g_header[DATA_LINK_TYPE_OFFSET:DATA_LINK_TYPE_OFFSET+4])[0]
+            network = struct.unpack(
+                endian + 'I',
+                g_header[DATA_LINK_TYPE_OFFSET:DATA_LINK_TYPE_OFFSET + 4]
+            )[0]
             if network != 1:
                 # not ethernet
                 return False
@@ -161,13 +177,14 @@ def found_in_pcap(filename, ips=None, protocol=None, port=None):
                 r_header = fp.read(RECORD_HEADER_LEN)
                 if len(r_header) < RECORD_HEADER_LEN:
                     return False
-                incl_len = struct.unpack(endian + 'I', r_header[INCL_LEN_OFFSET:INCL_LEN_OFFSET+4])[0]
+                incl_len = struct.unpack(
+                    endian + 'I', r_header[INCL_LEN_OFFSET:INCL_LEN_OFFSET + 4]
+                )[0]
                 packet = fp.read(incl_len)
                 if len(packet) != incl_len:
                     return False
                 if __packet_matches_condition(packet, ips_int, protocol, port):
                     return True
-
 
     except IOError as e:
         LOG.warn('read file %s error: %s' % (filename, e))
@@ -182,7 +199,9 @@ def filter_pcap(filename, ips=None, protocol=None, port=None):
             if ip_int is not None:
                 ips_int.append(ip_int)
 
-    if protocol is not None and port is not None and protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
+    if protocol is not None and port is not None and protocol not in [
+        PROTOCOL_TCP, PROTOCOL_UDP
+    ]:
         return
 
     try:
@@ -191,12 +210,17 @@ def filter_pcap(filename, ips=None, protocol=None, port=None):
             g_header = fp.read(GLOBAL_HEADER_LEN)
             if len(g_header) < GLOBAL_HEADER_LEN:
                 return
-            magic = struct.unpack('<I', g_header[MAGIC_NUMBER_OFFSET:MAGIC_NUMBER_OFFSET+4])[0]
+            magic = struct.unpack(
+                '<I', g_header[MAGIC_NUMBER_OFFSET:MAGIC_NUMBER_OFFSET + 4]
+            )[0]
             if magic == 0xa1b2c3d4:
                 endian = '<'
             else:
                 endian = '>'
-            network = struct.unpack(endian + 'I', g_header[DATA_LINK_TYPE_OFFSET:DATA_LINK_TYPE_OFFSET+4])[0]
+            network = struct.unpack(
+                endian + 'I',
+                g_header[DATA_LINK_TYPE_OFFSET:DATA_LINK_TYPE_OFFSET + 4]
+            )[0]
             if network != 1:
                 # not ethernet
                 return
@@ -206,13 +230,14 @@ def filter_pcap(filename, ips=None, protocol=None, port=None):
                 r_header = fp.read(RECORD_HEADER_LEN)
                 if len(r_header) < RECORD_HEADER_LEN:
                     return
-                incl_len = struct.unpack(endian + 'I', r_header[INCL_LEN_OFFSET:INCL_LEN_OFFSET+4])[0]
+                incl_len = struct.unpack(
+                    endian + 'I', r_header[INCL_LEN_OFFSET:INCL_LEN_OFFSET + 4]
+                )[0]
                 packet = fp.read(incl_len)
                 if len(packet) != incl_len:
                     return
                 if __packet_matches_condition(packet, ips_int, protocol, port):
                     yield r_header + packet
-
 
     except IOError as e:
         LOG.warn('read file %s error: %s' % (filename, e))
