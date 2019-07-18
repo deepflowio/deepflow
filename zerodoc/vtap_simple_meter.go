@@ -1,6 +1,8 @@
 package zerodoc
 
 import (
+	"strconv"
+
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
 )
@@ -49,11 +51,38 @@ func (m *VTAPSimpleMeter) SortKey() uint64 {
 }
 
 func (m *VTAPSimpleMeter) ToKVString() string {
-	panic("not supported!")
+	buffer := make([]byte, app.MAX_DOC_STRING_LENGTH)
+	size := m.MarshalTo(buffer)
+	return string(buffer[:size])
 }
 
 func (m *VTAPSimpleMeter) MarshalTo(b []byte) int {
-	panic("not supported!")
+	offset := 0
+	offset += copy(b[offset:], "tx_bytes=")
+	offset += copy(b[offset:], strconv.FormatUint(m.TxBytes, 10))
+	offset += copy(b[offset:], "i,rx_bytes=")
+	offset += copy(b[offset:], strconv.FormatUint(m.RxBytes, 10))
+	offset += copy(b[offset:], "i,bytes=")
+	offset += copy(b[offset:], strconv.FormatUint(m.Bytes, 10))
+	offset += copy(b[offset:], "i,tx_packets=")
+	offset += copy(b[offset:], strconv.FormatUint(m.TxPackets, 10))
+	offset += copy(b[offset:], "i,rx_packets=")
+	offset += copy(b[offset:], strconv.FormatUint(m.RxPackets, 10))
+	offset += copy(b[offset:], "i,packets=")
+	offset += copy(b[offset:], strconv.FormatUint(m.Packets, 10))
+	b[offset] = 'i'
+	offset++
+
+	return offset
+}
+
+func (m *VTAPSimpleMeter) SetValue(s *Metrics) {
+	m.TxBytes = s.TxBytes
+	m.RxBytes = s.RxBytes
+	m.Bytes = s.TxBytes + s.RxBytes
+	m.TxPackets = s.TxPackets
+	m.RxPackets = s.RxPackets
+	m.Packets = s.TxPackets + s.RxPackets
 }
 
 func (m *VTAPSimpleMeter) Fill(isTag []bool, names []string, values []interface{}) {

@@ -82,6 +82,22 @@ func (m *Metrics) Decode(decoder *codec.SimpleDecoder) {
 	m.RxPackets = decoder.ReadU64()
 }
 
+func (m *Metrics) HasValue() bool {
+	return m.TxPackets != 0 || m.RxPackets != 0
+}
+
+// 暂时保留，后续废弃删除
+func (m *Metrics) Sub(s *Metrics) *Metrics {
+	r := &Metrics{}
+	r.TxBytes = m.TxBytes - s.TxBytes
+	r.RxBytes = m.RxBytes - s.RxBytes
+	if m.TxPackets >= s.TxPackets && m.RxPackets >= s.RxPackets {
+		r.TxPackets = m.TxPackets - s.TxPackets
+		r.RxPackets = m.RxPackets - s.RxPackets
+	}
+	return r
+}
+
 func (m *Metrics) SortKey() uint64 {
 	return uint64(m.TxBytes) + uint64(m.RxBytes)
 }
