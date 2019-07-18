@@ -165,6 +165,11 @@ const (
 type Field struct {
 	// 注意字节对齐！
 
+	// 用于区分不同的trident及其不同的pipeline，用于如下场景：
+	//   - trident和roze之间的数据传输
+	//   - roze写入influxdb，作用类似_id，序列化为_tid
+	GlobalThreadID uint64
+
 	IP6          net.IP // FIXME: 合并IP6和IP
 	IP           uint32
 	GroupID      int16
@@ -241,6 +246,12 @@ func (t *Tag) MarshalTo(b []byte) int {
 	offset := 0
 
 	// 在InfluxDB的line protocol中，tag紧跟在measurement name之后，总会以逗号开头
+
+	if t.GlobalThreadID != 0 { // FIXME: zero写入的数据此字段总为0，目前无需该字段
+		offset += copy(b[offset:], ",_tid=")
+		offset += copy(b[offset:], strconv.FormatUint(t.GlobalThreadID, 10))
+	}
+
 	// 1<<0 ~ 1<<6
 	if t.Code&IP != 0 {
 		if t.IsIPv6 != 0 {
@@ -458,6 +469,7 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	offset := decoder.Offset()
 
 	t.Code = Code(decoder.ReadU64())
+	t.GlobalThreadID = decoder.ReadU64()
 
 	if t.Code&IP != 0 {
 		t.IsIPv6 = decoder.ReadU8()
@@ -603,6 +615,7 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 	}
 
 	encoder.WriteU64(uint64(t.Code))
+	encoder.WriteU64(uint64(t.GlobalThreadID))
 
 	if t.Code&IP != 0 {
 		encoder.WriteU8(t.IsIPv6)
@@ -904,7 +917,7 @@ func (t *Tag) fillValue(name, value string) (err error) {
 	field := t.Field
 	var i uint64
 	switch name {
-	case "ip_bin", "ip_bin_0", "ip_bin_1":
+	case "ip_bin", "ip_bin_0", "ip_bin_1", "_id", "_tid":
 		return nil
 	case "ip_version":
 		i, _ = strconv.ParseUint(value, 10, 8) // 老版本可能未写入ip_version字段，忽略err
@@ -1057,6 +1070,8 @@ func (t *Tag) fillValue(name, value string) (err error) {
 }
 
 var TAG_NAMES map[string]uint8 = map[string]uint8{
+	"_id":              0,
+	"_tid":             0,
 	"ip_version":       0,
 	"ip":               0,
 	"ip_bin":           0,
