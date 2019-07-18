@@ -3,11 +3,13 @@ module gitlab.x.lan/yunshan/droplet-libs
 require (
 	bou.ke/monkey v1.0.1
 	github.com/OneOfOne/xxhash v1.2.2
+	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
 	github.com/Workiva/go-datastructures v1.0.50
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/go-units v0.3.3
 	github.com/fastly/go-utils v0.0.0-20180712184237-d95a45783239 // indirect
+	github.com/go-ole/go-ole v1.2.4 // indirect
 	github.com/gogo/protobuf v1.2.1 // indirect
 	github.com/golang/mock v1.2.0
 	github.com/golang/protobuf v1.3.0
@@ -24,6 +26,8 @@ require (
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/pebbe/zmq4 v1.0.0
 	github.com/pkg/errors v0.8.1 // indirect
+	github.com/shirou/gopsutil v2.18.12+incompatible
+	github.com/shirou/w32 v0.0.0-20160930032740-bb4de0191aa4 // indirect
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/pflag v1.0.3 // indirect
 	github.com/stretchr/testify v1.3.0 // indirect
