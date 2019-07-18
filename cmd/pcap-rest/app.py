@@ -55,10 +55,11 @@ HTTP request args:
   end_ts: 结束时间戳，闭区间，默认now
   size: 条目数，默认1000，按start_ts降序排列
   ip: IP地址筛选，可以填写多个
-  protocol: 协议，可选值为[6, 17]
+  protocol: 协议
   port: 端口
   tap_type: 探针点
   ip_version: ip版本，可选值为[4, 6]
+  peek: 若为True，检查是否存在，存在的话返回一条记录
 
 HTTP request body:
 
@@ -104,6 +105,7 @@ HTTP response body:
         end_ts = int(request.query.end_ts)
     size = int(request.query.size) if request.query.size != '' else None
     ip_version = int(request.query.ip_version) if request.query.ip_version != '' else None
+    peek = bool(request.query.peek) if request.query.peek != '' else False
     if ip_version is not None and ip_version not in [4, 6]:
         return {'OPT_STATUS': 'FAILURE', 'DESCRIPTION': 'bad ip version'}
     if ip:
@@ -116,7 +118,7 @@ HTTP response body:
         if ip_version is not None and any([it.version != ip_version for it in ips]):
             return {'OPT_STATUS': 'FAILURE', 'DESCRIPTION': 'ip version mismatch'}
     return {
-        'DATA': get_files(acl_gid, start_ts, end_ts, size=size, ip=ip, ip_filter=ips, protocol=protocol, port=port, tap_type=tap_type, ip_version=ip_version),
+        'DATA': get_files(acl_gid, start_ts, end_ts, size=size, ip=ip, ip_filter=ips, protocol=protocol, port=port, tap_type=tap_type, ip_version=ip_version, peek=peek),
         'OPT_STATUS': 'SUCCESS',
     }
 
@@ -129,7 +131,7 @@ def get_file(acl_gid, pcap_name):
 HTTP request args:
 
   ip: IP地址筛选，可以填写多个
-  protocol: 协议，可选值为[6, 17]
+  protocol: 协议
   port: 端口
 
 HTTP request body:
@@ -207,10 +209,11 @@ def _time_to_epoch(time_str):
         return 0
 
 
-def get_files(acl_gid, start_ts, end_ts, size=DEFAULT_PCAP_LIST_SIZE, ip=None, ip_filter=None, protocol=None, port=None, tap_type=None, ip_version=None):
+def get_files(acl_gid, start_ts, end_ts, size=DEFAULT_PCAP_LIST_SIZE, ip=None, ip_filter=None, protocol=None, port=None, tap_type=None, ip_version=None, peek=False):
     if size < 0:
         size = DEFAULT_PCAP_LIST_SIZE
-    if protocol is not None and protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
+    # 如果protocol不是tcp或udp，认为端口过滤后没有结果
+    if protocol is not None and port is not None and protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
         return []
 
     directory = PCAP_DIR + '/' + str(acl_gid) + '/'
@@ -251,4 +254,6 @@ def get_files(acl_gid, start_ts, end_ts, size=DEFAULT_PCAP_LIST_SIZE, ip=None, i
             'hostname': HOSTNAME,
             'ip_version': ip_rep.version,
         })
+        if peek:
+            break
     return sorted(files, key=itemgetter('start_epoch'), reverse=True)[:size]
