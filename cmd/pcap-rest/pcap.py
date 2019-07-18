@@ -111,6 +111,8 @@ def __packet_matches_condition(packet, ips_int, protocol, port):
             return False
 
     if port is not None:
+        if protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
+            return False
 
         if ip_version == 4:
             l4_offset = l3_offset + ((ord(packet[l3_offset+IHL_OFFSET]) & 0xF) << 2)
@@ -136,7 +138,7 @@ def found_in_pcap(filename, ips=None, protocol=None, port=None):
             if ip_int is not None:
                 ips_int.append(ip_int)
 
-    if protocol is not None and protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
+    if protocol is not None and port is not None and protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
         return False
 
     try:
@@ -180,7 +182,7 @@ def filter_pcap(filename, ips=None, protocol=None, port=None):
             if ip_int is not None:
                 ips_int.append(ip_int)
 
-    if protocol is not None and protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
+    if protocol is not None and port is not None and protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
         return
 
     try:
