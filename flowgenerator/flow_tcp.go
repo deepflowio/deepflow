@@ -18,14 +18,12 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			flowCache.Unlock() // code below does not use flowCache any more
 			atomic.AddInt32(&f.stats.CurrNumFlows, -1)
 			flowExtra.setCurFlowInfo(flowExtra.recentTime, forceReportInterval, reportTolerance)
-			if f.checkTcpServiceReverse(taggedFlow, flowExtra.reversed) {
-				flowExtra.reverseFlow()
-				flowExtra.reversed = true
-			}
 			calcCloseType(taggedFlow, flowExtra.flowState)
-			taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
+			if flowExtra.isFlowAction {
+				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
+				f.flowOutQueue.Put(taggedFlow)
+			}
 			ReleaseFlowExtra(flowExtra)
-			f.flowOutQueue.Put(taggedFlow)
 		} else {
 			// reply is a sign relative to the flow direction, so if the flow is reversed then the sign should be changed
 			if f.checkIfDoFlowPerf(flowExtra) {
@@ -87,12 +85,19 @@ func (f *FlowGenerator) initTcpFlow(meta *MetaPacket) (*FlowExtra, bool, bool) {
 		updatePlatformData(taggedFlow, meta.EndpointData, reply)
 		f.fillGeoInfo(taggedFlow)
 	}
+
+	if f.checkTcpServiceReverse(taggedFlow, flowExtra.reversed) {
+		flowExtra.reverseFlow()
+	}
+	flowExtra.setMetaPacketDirection(meta)
+
 	flags = flags & TCP_FLAG_MASK
 	if f.StatePreprocess(meta, flags) || meta.Invalid {
 		flowExtra.timeout = exceptionTimeout
 		flowExtra.flowState = FLOW_STATE_EXCEPTION
 		return flowExtra, false, reply
 	}
+
 	return flowExtra, f.updateFlowStateMachine(flowExtra, flags, reply), reply
 }
 
@@ -108,7 +113,16 @@ func (f *FlowGenerator) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket, re
 		taggedFlow.FlowMetricsPeerSrc.TCPFlags |= flags
 	}
 	f.updateFlow(flowExtra, meta, reply)
+
+	// 根据SYN|ACK判断方向
 	flags = flags & TCP_FLAG_MASK
+	if flagEqual(flags, TCP_SYN|TCP_ACK) && !reply {
+		reply = true
+		flowExtra.reverseFlow()
+		flowExtra.reversed = true
+	}
+	flowExtra.setMetaPacketDirection(meta)
+
 	if f.StatePreprocess(meta, flags) || meta.Invalid {
 		flowExtra.timeout = exceptionTimeout
 		flowExtra.flowState = FLOW_STATE_EXCEPTION

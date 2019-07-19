@@ -6,7 +6,9 @@ import (
 	"sync"
 	"time"
 
+	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
+
 	"gitlab.x.lan/yunshan/droplet/config"
 )
 
@@ -20,6 +22,9 @@ const (
 )
 
 const TCP_FLAG_MASK = 0x3f
+
+const FLOW_ACTION = ACTION_FLOW_COUNTING | ACTION_FLOW_STORING | ACTION_TCP_FLOW_PERF_COUNTING |
+	ACTION_FLOW_MISC_COUNTING | ACTION_FLOW_COUNT_BROKERING | ACTION_TCP_FLOW_PERF_COUNT_BROKERING | ACTION_GEO_POSITIONING
 
 const (
 	TIMEOUT_OPENING          = 5 * time.Second
@@ -42,6 +47,7 @@ const FLOW_CACHE_CAP = 1024
 const HASH_MAP_SIZE uint64 = 1024 * 256
 const FLOW_OUT_BUFFER_CAP = 1024 * 2
 const TIMEOUT_CLEANER_COUNT uint64 = 4
+const METERING_CACHE_SIZE = 1024 * 16
 
 const IN_PORT_FLOW_ID_MASK uint64 = 0xFF000000
 const TIMER_FLOW_ID_MASK uint64 = 0x00FFFFFF
@@ -114,6 +120,7 @@ type FlowGenerator struct {
 
 	metaPacketHeaderInQueue MultiQueueReader
 	flowOutQueue            QueueWriter
+	meteringOutQueue        MultiQueueWriter
 	stats                   FlowGeneratorStats
 	stateMachineMaster      []map[uint8]*StateValue
 	stateMachineSlave       []map[uint8]*StateValue
@@ -124,6 +131,9 @@ type FlowGenerator struct {
 	cleanRunning            bool
 	index                   int
 	cleanWaitGroup          sync.WaitGroup
+
+	meteringKeys  []HashKey
+	meteringItems []interface{}
 
 	perfCounter FlowPerfCounter
 }

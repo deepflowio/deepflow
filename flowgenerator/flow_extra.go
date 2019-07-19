@@ -33,6 +33,7 @@ type FlowExtra struct {
 	reported     bool
 	reversed     bool
 	circlePktGot bool
+	isFlowAction bool
 }
 
 var flowExtraPool = pool.NewLockFreePool(func() interface{} {

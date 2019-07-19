@@ -40,6 +40,7 @@ func (f *FlowGenerator) initOtherIpFlow(meta *MetaPacket) *FlowExtra {
 	f.fillGeoInfo(taggedFlow)
 	flowExtra.flowState = FLOW_STATE_ESTABLISHED
 	flowExtra.timeout = openingTimeout
+	flowExtra.setMetaPacketDirection(meta)
 	return flowExtra
 }
 
@@ -48,4 +49,5 @@ func (f *FlowGenerator) updateOtherIpFlow(flowExtra *FlowExtra, meta *MetaPacket
 	if reply {
 		flowExtra.timeout = establishedRstTimeout
 	}
+	flowExtra.setMetaPacketDirection(meta)
 }

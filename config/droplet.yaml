@@ -43,7 +43,7 @@ queue:
   # flow generator read queue size, default queue-size
   flow-generator-queue-size: 65536
   # metering app read queue count, default 4
-  # name: 2-meta-packet-to-metering-app
+  # name: 3-meta-packet-to-metering-app
   metering-app-queue-count: 4
   # metering app read queue size, default queue-size
   metering-app-queue-size: 65536
@@ -65,7 +65,7 @@ queue:
   # metering app output queue count, default 1
   metering-app-output-queue-count: 1
   # metering app output queue size, default docs-queue-size << 1
-  # name: 3-metering-doc-to-marshaller
+  # name: 4-metering-doc-to-marshaller
   metering-app-output-queue-size: 0
   # flow app output queue count, default 1
   flow-app-output-queue-count: 1

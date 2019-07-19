@@ -44,6 +44,10 @@ func (f *FlowGenerator) initUdpFlow(meta *MetaPacket) *FlowExtra {
 	getUdpServiceManager(f.index).hitUdpStatus(serviceKey, clientHash, meta.Timestamp)
 	flowExtra.flowState = FLOW_STATE_ESTABLISHED
 	flowExtra.timeout = openingTimeout
+	if f.checkUdpServiceReverse(taggedFlow, flowExtra.reversed, now) {
+		flowExtra.reverseFlow()
+	}
+	flowExtra.setMetaPacketDirection(meta)
 	return flowExtra
 }
 
@@ -52,6 +56,7 @@ func (f *FlowGenerator) updateUdpFlow(flowExtra *FlowExtra, meta *MetaPacket, re
 	if reply {
 		flowExtra.timeout = establishedRstTimeout
 	}
+	flowExtra.setMetaPacketDirection(meta)
 }
 
 func (f *FlowGenerator) checkUdpServiceReverse(taggedFlow *TaggedFlow, reversed bool, now time.Duration) bool {

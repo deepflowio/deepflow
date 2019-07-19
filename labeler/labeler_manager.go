@@ -21,7 +21,6 @@ type QueueType uint8
 
 const (
 	QUEUE_TYPE_FLOW QueueType = iota
-	QUEUE_TYPE_METERING
 	QUEUE_TYPE_PCAP
 	QUEUE_TYPE_MAX
 )
@@ -200,25 +199,18 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *data
 }
 
 func (l *LabelerManager) run(index int) {
-	meteringQueues := l.appQueues[QUEUE_TYPE_METERING]
 	flowQueues := l.appQueues[QUEUE_TYPE_FLOW]
 	captureQueues := l.appQueues[QUEUE_TYPE_PCAP]
 	size := 1024 * 16
 	userId := queue.HashKey(index)
-	meteringKeys := make([]queue.HashKey, 0, size+1)
-	meteringKeys = append(meteringKeys, userId)
 	flowKeys := make([]queue.HashKey, 0, size+1)
 	flowKeys = append(flowKeys, userId)
 	captureKeys := make([]queue.HashKey, 0, size+1)
 	captureKeys = append(captureKeys, userId)
 
-	meteringItemBatch := make([]interface{}, 0, size)
 	flowItemBatch := make([]interface{}, 0, size)
 	captureItemBatch := make([]interface{}, 0, size)
 	itemBatch := make([]interface{}, size)
-
-	flowAppActions := datatype.ACTION_FLOW_COUNTING | datatype.ACTION_FLOW_STORING | datatype.ACTION_TCP_FLOW_PERF_COUNTING |
-		datatype.ACTION_FLOW_MISC_COUNTING | datatype.ACTION_FLOW_COUNT_BROKERING | datatype.ACTION_TCP_FLOW_PERF_COUNT_BROKERING | datatype.ACTION_GEO_POSITIONING
 
 	for l.running {
 		itemCount := l.readQueues.Gets(userId, itemBatch)
@@ -226,29 +218,17 @@ func (l *LabelerManager) run(index int) {
 			metaPacket := item.(*datatype.MetaPacket)
 			action := l.GetPolicy(metaPacket, index)
 
-			if (action.ActionFlags & flowAppActions) != 0 {
-				flowKeys = append(flowKeys, queue.HashKey(metaPacket.Hash))
-				// droplet-ctl、meteringApp和flowApp均不会对metaPacket做修改
-				metaPacket.AddReferenceCount() // 引用计数+1，避免被释放
-				flowItemBatch = append(flowItemBatch, metaPacket)
-			}
-
 			if (action.ActionFlags & datatype.ACTION_PACKET_CAPTURING) != 0 {
 				captureKeys = append(captureKeys, queue.HashKey(metaPacket.Hash))
 				metaPacket.AddReferenceCount() // 引用计数+1，避免被释放
 				captureItemBatch = append(captureItemBatch, metaPacket)
 			}
 
-			// 为了统计平台处理的总流量，所有流量都过meteringApp
-			meteringKeys = append(meteringKeys, queue.HashKey(metaPacket.Hash))
-			meteringItemBatch = append(meteringItemBatch, metaPacket)
+			// 为了获取所以流量方向，所有流量都过flowgenerator
+			flowKeys = append(flowKeys, queue.HashKey(metaPacket.Hash))
+			flowItemBatch = append(flowItemBatch, metaPacket)
 
 			itemBatch[i] = nil
-		}
-		if len(meteringItemBatch) > 0 {
-			meteringQueues.Puts(meteringKeys, meteringItemBatch)
-			meteringKeys = meteringKeys[:1]
-			meteringItemBatch = meteringItemBatch[:0]
 		}
 		if len(flowItemBatch) > 0 {
 			flowQueues.Puts(flowKeys, flowItemBatch)
