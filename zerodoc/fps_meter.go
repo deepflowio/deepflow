@@ -11,9 +11,6 @@ type FPSMeter struct {
 	SumFlowCount       uint64 `db:"sum_flow_count"`
 	SumNewFlowCount    uint64 `db:"sum_new_flow_count"`
 	SumClosedFlowCount uint64 `db:"sum_closed_flow_count"`
-
-	MaxFlowCount    uint64 `db:"max_flow_count"`
-	MaxNewFlowCount uint64 `db:"max_new_flow_count"`
 }
 
 func (m *FPSMeter) SortKey() uint64 {
@@ -24,18 +21,12 @@ func (m *FPSMeter) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(m.SumFlowCount)
 	encoder.WriteVarintU64(m.SumNewFlowCount)
 	encoder.WriteVarintU64(m.SumClosedFlowCount)
-
-	encoder.WriteVarintU64(m.MaxFlowCount)
-	encoder.WriteVarintU64(m.MaxNewFlowCount)
 }
 
 func (m *FPSMeter) Decode(decoder *codec.SimpleDecoder) {
 	m.SumFlowCount = decoder.ReadVarintU64()
 	m.SumNewFlowCount = decoder.ReadVarintU64()
 	m.SumClosedFlowCount = decoder.ReadVarintU64()
-
-	m.MaxFlowCount = decoder.ReadVarintU64()
-	m.MaxNewFlowCount = decoder.ReadVarintU64()
 }
 
 func (m *FPSMeter) ConcurrentMerge(other app.Meter) {
@@ -43,13 +34,10 @@ func (m *FPSMeter) ConcurrentMerge(other app.Meter) {
 		m.SumFlowCount += pm.SumFlowCount
 		m.SumNewFlowCount += pm.SumNewFlowCount
 		m.SumClosedFlowCount += pm.SumClosedFlowCount
-
-		m.MaxFlowCount += pm.MaxFlowCount
-		m.MaxNewFlowCount += pm.MaxNewFlowCount
 	}
 }
 
-// 秒级SumFlowCount/MaxFlowCount计算方法：
+// 秒级SumFlowCount计算方法：
 //
 // 在统计每秒流数量时，为了降低压力，仅对新建和结束的时刻做统计：
 //   设原始数据中当前秒的流数量、新建流数量、结束流数量分别是F1, N1, C1
@@ -81,9 +69,6 @@ func (m *FPSMeter) SequentialMerge(other app.Meter) { // other为下一秒的统
 		m.SumFlowCount = m.SumClosedFlowCount + flowCount
 		m.SumNewFlowCount += pm.SumNewFlowCount
 		m.SumClosedFlowCount += pm.SumClosedFlowCount
-		// 峰值统计量
-		m.MaxFlowCount = maxU64(m.MaxFlowCount, flowCount)
-		m.MaxNewFlowCount = maxU64(m.MaxNewFlowCount, pm.MaxNewFlowCount)
 	}
 }
 
@@ -102,11 +87,6 @@ func (m *FPSMeter) MarshalTo(b []byte) int {
 	offset += copy(b[offset:], strconv.FormatUint(m.SumNewFlowCount, 10))
 	offset += copy(b[offset:], "i,sum_closed_flow_count=")
 	offset += copy(b[offset:], strconv.FormatUint(m.SumClosedFlowCount, 10))
-
-	offset += copy(b[offset:], "i,max_flow_count=")
-	offset += copy(b[offset:], strconv.FormatUint(m.MaxFlowCount, 10))
-	offset += copy(b[offset:], "i,max_new_flow_count=")
-	offset += copy(b[offset:], strconv.FormatUint(m.MaxNewFlowCount, 10))
 	b[offset] = 'i'
 	offset++
 
@@ -125,10 +105,6 @@ func (m *FPSMeter) Fill(isTag []bool, names []string, values []interface{}) {
 			m.SumNewFlowCount = uint64(values[i].(int64))
 		case "sum_closed_flow_count":
 			m.SumClosedFlowCount = uint64(values[i].(int64))
-		case "max_flow_count":
-			m.MaxFlowCount = uint64(values[i].(int64))
-		case "max_new_flow_count":
-			m.MaxNewFlowCount = uint64(values[i].(int64))
 		}
 	}
 }

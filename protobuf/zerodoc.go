@@ -224,11 +224,9 @@ func PBToUsageMeter(m *pb.UsageMeter, meter *UsageMeter) {
 func PerfMeterToPB(m *PerfMeter) *pb.PerfMeter {
 	sum := PerfMeterSumToPB(&m.PerfMeterSum)
 	max := PerfMeterMaxToPB(&m.PerfMeterMax)
-	min := PerfMeterMinToPB(&m.PerfMeterMin)
 	return &pb.PerfMeter{
 		Sum: sum,
 		Max: max,
-		Min: min,
 	}
 }
 
@@ -239,7 +237,6 @@ func PBToPerfMeter(m *pb.PerfMeter, meter *PerfMeter) {
 
 	pbToPerfMeterSum(m.GetSum(), &meter.PerfMeterSum)
 	pbToPerfMeterMax(m.GetMax(), &meter.PerfMeterMax)
-	pbToPerfMeterMin(m.GetMin(), &meter.PerfMeterMin)
 }
 
 func PerfMeterSumToPB(m *PerfMeterSum) *pb.PerfStats {
@@ -300,20 +297,6 @@ func pbToPerfMeterMax(m *pb.RttStats, meter *PerfMeterMax) {
 	meter.MaxARTAvg = time.Duration(m.GetArtAvg())
 }
 
-func PerfMeterMinToPB(m *PerfMeterMin) *pb.RttStats {
-	return &pb.RttStats{
-		RttSyn: proto.Uint64(uint64(m.MinRTTSyn)),
-		RttAvg: proto.Uint64(uint64(m.MinRTTAvg)),
-		ArtAvg: proto.Uint64(uint64(m.MinARTAvg)),
-	}
-}
-
-func pbToPerfMeterMin(m *pb.RttStats, meter *PerfMeterMin) {
-	meter.MinRTTSyn = time.Duration(m.GetRttSyn())
-	meter.MinRTTAvg = time.Duration(m.GetRttAvg())
-	meter.MinARTAvg = time.Duration(m.GetArtAvg())
-}
-
 func GeoMeterToPB(m *GeoMeter) *pb.GeoMeter {
 	return &pb.GeoMeter{
 		SumPacketTx:         proto.Uint64(m.SumPacketTx),
@@ -343,9 +326,6 @@ func FPSMeterToPB(m *FPSMeter) *pb.FpsMeter {
 		SumFlowCount:       proto.Uint64(m.SumFlowCount),
 		SumNewFlowCount:    proto.Uint64(m.SumNewFlowCount),
 		SumClosedFlowCount: proto.Uint64(m.SumClosedFlowCount),
-
-		MaxFlowCount:    proto.Uint64(m.MaxFlowCount),
-		MaxNewFlowCount: proto.Uint64(m.MaxNewFlowCount),
 	}
 }
 
@@ -357,9 +337,6 @@ func PBToFPSMeter(m *pb.FpsMeter, meter *FPSMeter) {
 	meter.SumFlowCount = m.GetSumFlowCount()
 	meter.SumNewFlowCount = m.GetSumNewFlowCount()
 	meter.SumClosedFlowCount = m.GetSumClosedFlowCount()
-
-	meter.MaxFlowCount = m.GetMaxFlowCount()
-	meter.MaxNewFlowCount = m.GetMaxNewFlowCount()
 }
 
 func FlowMeterToPB(m *FlowMeter) *pb.FlowMeter {
