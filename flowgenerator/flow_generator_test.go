@@ -10,6 +10,8 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
+
+	"gitlab.x.lan/yunshan/droplet/queue"
 )
 
 const DEFAULT_QUEUE_LEN = 200
@@ -49,7 +51,9 @@ func flowGeneratorInit() (*FlowGenerator, MultiQueueReader, QueueWriter) {
 	SetTimeout(testTimeoutConfig)
 	metaPacketHeaderInQueue := NewOverwriteQueues("metaPacketHeaderInQueue", 1, DEFAULT_QUEUE_LEN)
 	flowOutQueue := NewOverwriteQueue("flowOutQueue", DEFAULT_QUEUE_LEN)
-	return New(metaPacketHeaderInQueue, flowOutQueue, 64*1024, 1024*1024, 0), metaPacketHeaderInQueue, flowOutQueue
+	manager := queue.NewManager()
+	meteringAppQueues := manager.NewQueues("3-meta-packet-to-metering-app", 1024, 1, 1)
+	return New(metaPacketHeaderInQueue, flowOutQueue, meteringAppQueues, 64*1024, 1024*1024, 0), metaPacketHeaderInQueue, flowOutQueue
 }
 
 func getDefaultPacket() *MetaPacket {
