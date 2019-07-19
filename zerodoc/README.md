@@ -1,6 +1,53 @@
 简介
 ====
 
+存储的所有数据
+---------------
+
+```
+db                       measurement          tag
+------------------------------------------------------------------------------------------------------------------------
+df_usage_acl             TBD                  _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
+df_fps_acl               TBD                  _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
+ x df_flow_acl           x0000008200000000    _id,acl_gid,tap_type
+ x df_flow_acl           x0000008200000001    _id,acl_gid,ip,ip_bin,ip_version,tap_type
+ x df_flow_acl           x0000008a00000000    _id,acl_gid,protocol,tap_type
+ x df_flow_acl           x0000008a00000001    _id,acl_gid,ip,ip_bin,ip_version,protocol,tap_type
+
+df_usage_acl_edge        TBD                  _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
+df_fps_acl_edge          TBD                  _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
+ x df_flow_acl_edge      x0000008200010000    _id,acl_gid,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
+ x df_flow_acl_edge      x0000008a00010000    _id,acl_gid,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,protocol,tap_type
+
+df_usage_acl_edge_port   TBD                  _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,protocol,server_port,tap_type
+ x df_flow_acl_edge_port x0000049a00010000    _id,acl_direction,acl_gid,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,protocol,server_port,tap_type
+
+df_usage_acl_port        TBD                  _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,protocol,server_port,tap_type
+ x df_flow_acl_port      x0000049a00000000    _id,acl_direction,acl_gid,protocol,server_port,tap_type
+ x df_flow_acl_port      x0000049a00000001    _id,acl_direction,acl_gid,ip,ip_bin,ip_version,protocol,server_port,tap_type
+
+df_geo_acl               x2000048300000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,isp,tap_type
+ x df_geo_acl            x2000048300000000    _id,acl_direction,acl_gid,direction,isp,tap_type
+df_geo_acl               x4000048300000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,region,tap_type
+ x df_geo_acl            x4000048300000000    _id,acl_direction,acl_gid,direction,region,tap_type
+df_geo_acl_edge          x2000048300010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,isp,tap_type
+df_geo_acl_edge          x4000048300010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,region,tap_type
+
+df_perf_acl              x0000048300000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
+ x df_perf_acl           x0000048300000000    _id,acl_direction,acl_gid,direction,tap_type
+df_perf_acl_edge         x0000048300010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
+df_perf_acl_edge_port    x0000049b00010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,protocol,server_port,tap_type
+
+df_type_acl              x0000048300000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
+ x df_type_acl           x0000048300000000    _id,acl_direction,acl_gid,direction,tap_type
+df_type_acl_edge         x0000048300010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
+
+vtap_usage               x00000160000001d1    _id,_tid,cast_type,host,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,region,subnet_id,vtap
+vtap_usage               x00000908000001d1    _id,_tid,host,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,protocol,region,scope,subnet_id
+vtap_usage_edge          x0000000803d10000    _id,_tid,host_0,host_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1
+vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,region,server_port,subnet_id
+```
+
 统计数据Tag定义
 ---------------
 
@@ -8,7 +55,11 @@
 
 | 名字              | 位置 | 含义                    | 格式                                  |
 | ----------------- | ---- | ----------------------- | ------------------------------------- |
-| ip_version        | 0    | IP地址类型              | 4: IPv4；6: IPv6                      |
+| \_id              | N/A  | 分析器写入的shard id    | u8数字字符串                          |
+| \_tid             | N/A  | Trient使用的thread id   | u64数字字符串                         |
+|                   |      |                         |                                       |
+| ip_version        | 0    | IP地址类型              | 4: IPv4                               |
+|                   |      |                         | 6: IPv6                               |
 | ip                | 0    | IP                      | 字符串格式的IP                        |
 | ip_bin            | 0    | IP                      | 二进制字符串格式的IP                  |
 | mac               | 1    | MAC地址                 | 字符串格式的MAC地址 `废弃`            |
@@ -28,7 +79,8 @@
 | host              | 7    | 宿主机                  | 字符串格式的IP                        |
 | region            | 8    | 云平台Region ID         | 字符串                                |
 |                   |      |                         |                                       |
-| ip_version        | 16   | IP地址类型              | 4: IPv4；6: IPv6                      |
+| ip_version        | 0    | IP地址类型              | 4: IPv4                               |
+|                   |      |                         | 6: IPv6                               |
 | ip_0              | 16   | 0端IP                   | 字符串格式的IP                        |
 | ip_1              | 16   | 1端IP                   | 字符串格式的IP                        |
 | ip_bin_0          | 16   | 0端IP                   | 二进制字符串格式的IP                  |
@@ -60,7 +112,13 @@
 |                   |      |                         | s2c: ip/ip_0为服务端，ip_1为客户端    |
 | acl_gid           | 33   | ACL组ID                 | APP策略对应的ACL组ID                  |
 | vlan_id           | 34   |                         |                                       |
-| protocol          | 35   |                         |                                       |
+| protocol          | 35   | 协议                    | df\_\*和log\_\*:                      |
+|                   |      |                         |   - 0: 非IP包                         |
+|                   |      |                         |   - 1-255: IP protocol number         |
+|                   |      |                         |   - 当存在server_port时，仅有TCP/UDP  |
+|                   |      |                         | vtap\_\*:                             |
+|                   |      |                         |   - 0: ANY                            |
+|                   |      |                         |   - 6/17: TCP/UDP                     |
 | server_port       | 36   | 服务端端口              |                                       |
 | cast_type         | 37   | 播送类型                | broadcast: 广播，目的MAC为广播MAC     |
 |                   |      |                         | multicast: 组播，目的MAC为组播MAC     |
@@ -69,7 +127,14 @@
 | tap_type          | 39   | 流量采集点              | 1-2,4-30: 接入网络流量                |
 |                   |      |                         | 3: 虚拟网络流量                       |
 | subnet_id         | 40   | 子网ID                  |                                       |
-| acl_id            | 41   | ACL ID                  | `废弃`                                |
+| tcp_flags         | 41   | TCP Flags               | 255: 其它                             |
+|                   |      |                         | 1-31: 统计的TCP Flags组合             |
+|                   |      |                         |   - 2: SYN                            |
+|                   |      |                         |   - 2+16: SYN+ACK                     |
+|                   |      |                         |   - 16: ACK                           |
+|                   |      |                         |   - 8+16: PSH+ACK                     |
+|                   |      |                         |   - 1+16: FIN+ACK                     |
+|                   |      |                         |   - 4+16: RST+ACK                     |
 | acl_direction     | 42   | ACL匹配的方向           | fwd: 正向匹配                         |
 |                   |      |                         | bwd: 反向匹配                         |
 | scope             | 43   |                         | 0: 所有                               |
@@ -88,47 +153,31 @@
 
 ### df_usage
 
-`废弃`
-
 | 统计值                | 说明                         |
 | --------------------- | ---------------------------- |
 | sum_packet_tx         | 累计发送总包数               |
 | sum_packet_rx         | 累计接收总包数               |
-| sum_packet            | 累计发送和接收总包数         |
 | sum_bit_tx            | 累计发送总比特数             |
 | sum_bit_rx            | 累计接收总比特数             |
-| sum_bit               | 累计发送和接收总比特数       |
-|                       |                              |
-| max_packet_tx         | 一秒发送总包数最大值         |
-| max_packet_rx         | 一秒接收总包数最大值         |
-| max_packet            | 一秒发送和接收总包数最大值   |
-| max_bit_tx            | 一秒发送总比特数最大值       |
-| max_bit_rx            | 一秒接收总比特数最大值       |
-| max_bit               | 一秒发送和接收总比特数最大值 |
 
 ### df_fps
-
-`废弃`
 
 | 统计值                    | 说明                                        |
 | ------------------------- | ------------------------------------------- |
 | sum_flow_count            | 累计连接数                                  |
 | sum_new_flow_count        | 累计新建连接数，以start_time为准            |
 | sum_closed_flow_count     | 累计关闭连接数，以end_time为准              |
-|                           |                                             |
-| max_flow_count            | 一秒并发连接数最大值                        |
-| max_new_flow_count        | 一秒新建连接数最大值                        |
 
 ### df_flow
+
+`废弃`
 
 | 统计值                    | 说明                                        |
 | ------------------------- | ------------------------------------------- |
 | sum_packet_tx             | 累计发送总包数，以end_time为准              |
 | sum_packet_rx             | 累计接收总包数，以end_time为准              |
-| sum_packet                | 累计发送和接收总包数，以end_time为准        |
 | sum_bit_tx                | 累计发送总比特数，以end_time为准            |
 | sum_bit_rx                | 累计接收总比特数，以end_time为准            |
-| sum_bit                   | 累计发送和接收总比特数，以end_time为准      |
 |                           |                                             |
 | sum_flow_count            | 累计连接数，以end_time为准                  |
 | sum_new_flow_count        | 累计新建连接数，以`end_time`为准            |
@@ -151,9 +200,9 @@
 
 | 统计值                   | 说明                                                    |
 | ------------------------ | ------------------------------------------------------- |
-| sum_flow_count           | 累计连接数，`仅用于计算流重传率`                        |
-| sum_closed_flow_count    | 累计结束的连接数，`仅用于计算流重传率`                  |
-| sum_retrans_flow_count   | 累计重传连接数                                          |
+| sum_flow_count           | 累计连接数                                              |
+| sum_new_flow_count       | 累计新建连接数，以`end_time`为准                        |
+| sum_closed_flow_count    | 累计结束的连接数                                        |
 | sum_half_open_flow_count | 累计半开连接数，用于计算建立连接成功率                  |
 | sum_packet_tx            | 发送方向累计包数，`仅用于计算包重传率`                  |
 | sum_packet_rx            | 接收方向累计包数，`仅用于计算包重传率`                  |
@@ -164,7 +213,7 @@
 | sum_rtt_syn_flow         | 表示记录rtt_syn的flow数量                               |
 | sum_rtt_avg              | 表示所有系统响应时间 (us，可能为null)                   |
 | sum_rtt_avg_flow         | 表示记录rtt的flow数量                                   |
-| sum_art_avg              | 表示所有应用响应时间(us，可能为null)                    |
+| sum_art_avg              | 表示所有应用响应时间 (us，可能为null)                   |
 | sum_art_avg_flow         | 表示记录art_avg的flow数量                               |
 |                          |                                                         |
 | sum_zero_wnd_cnt_tx      | 发送方向累计零窗次数                                    |
@@ -172,21 +221,20 @@
 |                          |                                                         |
 | max_rtt_syn              | 所有Flow中TCP会话三次握手阶段RTT最大值(可能为null)      |
 | max_rtt_avg              | 所有Flow中TCP会话存活阶段RTT平均值的最大值(可能为null)  |
-|                          |                                                         |
-| min_rtt_syn `TBD`        | 所有Flow中TCP会话三次握手阶段RTT最小值(可能为null)      |
-| min_rtt_avg `TBD`        | 所有Flow中TCP会话存活阶段RTT平均值的最小值(可能为null)  |
+| max_art_avg              | 所有Flow中所有应用响应时间的最大值(可能为null)          |
+| max_rtt_syn_client       | 客户端所有Flow中TCP会话三次握手阶段RTT最大值(可能为null)|
+| max_rtt_syn_server       | 服务端所有Flow中TCP会话三次握手阶段RTT最大值(可能为null)|
 
 ### df_geo
 
 | 统计值                   | 说明                                     |
 | ------------------------ | ---------------------------------------- |
-| sum_closed_flow_count    | 累计结束连接数                           |
-| sum_abnormal_flow_count  | 异常网流总数：已结束但没有正常FIN的TCP   |
-| sum_closed_flow_duration | 已关闭的网流的累积持续时间(us)           |
 | sum_packet_tx            | 累计发送总包数                           |
 | sum_packet_rx            | 累计接收总包数                           |
 | sum_bit_tx               | 累计发送总字节数                         |
 | sum_bit_rx               | 累计接收总字节数                         |
+| max_rtt_syn_client       | 客户端所有Flow中TCP会话三次握手阶段RTT最大值(可能为null)|
+| sum_rtt_syn_client_flow  | 表示记录客户端rtt_syn的flow数量          |
 
 ### df_console_log
 

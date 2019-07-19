@@ -51,7 +51,7 @@ const (
 	VTAP
 	TAPType
 	SubnetID
-	_ // 1 << 41, ACLID
+	TCPFlags
 	ACLDirection
 	Scope
 )
@@ -93,12 +93,12 @@ func (c Code) RemoveIndex() Code {
 // 从不同EndPoint获取的网包字段组成Field，是否可能重复。
 // 注意，不能判断从同样的EndPoint获取的网包字段组成Field可能重复。
 func (c Code) PossibleDuplicate() bool {
-	return c&(CodeIndices|GroupID|L2EpcID|L3EpcID|Host|RegionID|GroupIDPath|L2EpcIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|VTAP|TAPType|SubnetID|SubnetIDPath|RegionIDPath|ACLDirection|Country|Region|ISPCode|Scope) == c
+	return c&(CodeIndices|GroupID|L2EpcID|L3EpcID|Host|RegionID|GroupIDPath|L2EpcIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|TCPFlags|VTAP|TAPType|SubnetID|SubnetIDPath|RegionIDPath|ACLDirection|Country|Region|ISPCode|Scope) == c
 }
 
 // 是否全部取自网包的对称字段（非源、目的字段）
 func (c Code) IsSymmetric() bool {
-	return c&(CodeIndices|ACLGID|VLANID|Protocol|VTAP|TAPType|ACLDirection|Scope) == c
+	return c&(CodeIndices|ACLGID|VLANID|Protocol|TCPFlags|VTAP|TAPType|ACLDirection|Scope) == c
 }
 
 type DeviceType uint8
@@ -139,6 +139,21 @@ type ACLDirectionEnum uint8
 const (
 	ACL_FORWARD ACLDirectionEnum = 1 << iota
 	ACL_BACKWARD
+)
+
+type TCPFlag uint8
+
+const (
+	TCPFlagFIN TCPFlag = 1 << iota
+	TCPFlagSYN
+	TCPFlagRST
+	TCPFlagPSH
+	TCPFlagACK
+
+	TCPFlagFINACK = TCPFlagFIN | TCPFlagACK
+	TCPFlagSYNACK = TCPFlagSYN | TCPFlagACK
+	TCPFlagRSTACK = TCPFlagRST | TCPFlagACK
+	TCPFlagPSHACK = TCPFlagPSH | TCPFlagACK
 )
 
 type CastTypeEnum uint8
@@ -207,12 +222,13 @@ type Field struct {
 	ACLDirection ACLDirectionEnum
 	CastType     CastTypeEnum
 	IsIPv6       uint8 // (8B) 与IP/IP6是共生字段
+	TCPFlags     TCPFlag
 
 	Scope ScopeEnum
 
 	Country uint8
 	Region  uint8
-	ISP     uint8 // (+4B = 8B)
+	ISP     uint8 // (+3B = 8B)
 }
 
 type Tag struct {
@@ -435,6 +451,10 @@ func (t *Tag) MarshalTo(b []byte) int {
 			offset += copy(b[offset:], ",cast_type=unknown")
 		}
 	}
+	if t.Code&TCPFlags != 0 {
+		offset += copy(b[offset:], ",tcp_flags=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TCPFlags), 10))
+	}
 	if t.Code&Scope != 0 {
 		offset += copy(b[offset:], ",scope=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.Scope), 10))
@@ -589,6 +609,9 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&CastType != 0 {
 		t.CastType = CastTypeEnum(decoder.ReadU8())
 	}
+	if t.Code&TCPFlags != 0 {
+		t.TCPFlags = TCPFlag(decoder.ReadU8())
+	}
 	if t.Code&Scope != 0 {
 		t.Scope = ScopeEnum(decoder.ReadU8())
 	}
@@ -725,6 +748,9 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 	}
 	if t.Code&CastType != 0 {
 		encoder.WriteU8(uint8(t.CastType))
+	}
+	if t.Code&TCPFlags != 0 {
+		encoder.WriteU8(uint8(t.TCPFlags))
 	}
 	if t.Code&Scope != 0 {
 		encoder.WriteU8(uint8(t.Scope))
@@ -1040,6 +1066,9 @@ func (t *Tag) fillValue(name, value string) (err error) {
 		default:
 			field.CastType = 0
 		}
+	case "tcp_flags":
+		i, err = strconv.ParseUint(value, 10, 16)
+		field.TCPFlags = TCPFlag(i)
 	case "scope":
 		i, err = strconv.ParseUint(value, 10, 8)
 		field.Scope = ScopeEnum(i)
@@ -1117,6 +1146,7 @@ var TAG_NAMES map[string]uint8 = map[string]uint8{
 	"subnet_id":        0,
 	"acl_direction":    0,
 	"cast_type":        0,
+	"tcp_flags":        0,
 	"scope":            0,
 	"country":          0,
 	"region":           0,
