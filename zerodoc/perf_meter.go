@@ -11,7 +11,6 @@ import (
 type PerfMeter struct {
 	PerfMeterSum
 	PerfMeterMax
-	PerfMeterMin
 }
 
 func (m *PerfMeter) SortKey() uint64 {
@@ -21,20 +20,17 @@ func (m *PerfMeter) SortKey() uint64 {
 func (m *PerfMeter) Encode(encoder *codec.SimpleEncoder) {
 	m.PerfMeterSum.Encode(encoder)
 	m.PerfMeterMax.Encode(encoder)
-	m.PerfMeterMin.Encode(encoder)
 }
 
 func (m *PerfMeter) Decode(decoder *codec.SimpleDecoder) {
 	m.PerfMeterSum.Decode(decoder)
 	m.PerfMeterMax.Decode(decoder)
-	m.PerfMeterMin.Decode(decoder)
 }
 
 func (m *PerfMeter) ConcurrentMerge(other app.Meter) {
 	if pm, ok := other.(*PerfMeter); ok {
 		m.PerfMeterSum.concurrentMerge(&pm.PerfMeterSum)
 		m.PerfMeterMax.concurrentMerge(&pm.PerfMeterMax)
-		m.PerfMeterMin.concurrentMerge(&pm.PerfMeterMin)
 	}
 }
 
@@ -42,7 +38,6 @@ func (m *PerfMeter) SequentialMerge(other app.Meter) {
 	if pm, ok := other.(*PerfMeter); ok {
 		m.PerfMeterSum.sequentialMerge(&pm.PerfMeterSum)
 		m.PerfMeterMax.sequentialMerge(&pm.PerfMeterMax)
-		m.PerfMeterMin.sequentialMerge(&pm.PerfMeterMin)
 	}
 }
 
@@ -104,14 +99,6 @@ func (m *PerfMeter) MarshalTo(b []byte) int {
 	offset += copy(b[offset:], "i,max_rtt_syn_server=")
 	offset += copy(b[offset:], strconv.FormatInt(int64(max.MaxRTTSynServer/time.Microsecond), 10))
 
-	// min
-	min := m.PerfMeterMin
-	offset += copy(b[offset:], "i,min_rtt_syn=")
-	offset += copy(b[offset:], strconv.FormatInt(int64(min.MinRTTSyn/time.Microsecond), 10))
-	offset += copy(b[offset:], "i,min_rtt_avg=")
-	offset += copy(b[offset:], strconv.FormatInt(int64(min.MinRTTAvg/time.Microsecond), 10))
-	offset += copy(b[offset:], "i,min_art_avg=")
-	offset += copy(b[offset:], strconv.FormatInt(int64(min.MinARTAvg/time.Microsecond), 10))
 	b[offset] = 'i'
 	offset++
 
@@ -168,13 +155,6 @@ func (m *PerfMeter) Fill(isTag []bool, names []string, values []interface{}) {
 			m.MaxRTTSynClient = time.Duration(values[i].(int64)) * time.Microsecond
 		case "max_rtt_syn_server":
 			m.MaxRTTSynServer = time.Duration(values[i].(int64)) * time.Microsecond
-
-		case "min_rtt_syn":
-			m.MinRTTSyn = time.Duration(values[i].(int64)) * time.Microsecond
-		case "min_rtt_avg":
-			m.MinRTTAvg = time.Duration(values[i].(int64)) * time.Microsecond
-		case "min_art_avg":
-			m.MinARTAvg = time.Duration(values[i].(int64)) * time.Microsecond
 		}
 	}
 }
@@ -319,33 +299,4 @@ func (m *PerfMeterMax) sequentialMerge(other *PerfMeterMax) {
 	m.MaxARTAvg = maxDuration(m.MaxARTAvg, other.MaxARTAvg)
 	m.MaxRTTSynClient = maxDuration(m.MaxRTTSynClient, other.MaxRTTSynClient)
 	m.MaxRTTSynServer = maxDuration(m.MaxRTTSynServer, other.MaxRTTSynServer)
-}
-
-type PerfMeterMin struct {
-	MinRTTSyn time.Duration `db:"min_rtt_syn"`
-	MinRTTAvg time.Duration `db:"min_rtt_avg"`
-	MinARTAvg time.Duration `db:"min_art_avg"`
-}
-
-func (m *PerfMeterMin) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteVarintU64(uint64(m.MinRTTSyn))
-	encoder.WriteVarintU64(uint64(m.MinRTTAvg))
-	encoder.WriteVarintU64(uint64(m.MinARTAvg))
-}
-
-func (m *PerfMeterMin) Decode(decoder *codec.SimpleDecoder) {
-	m.MinRTTSyn = time.Duration(decoder.ReadVarintU64())
-	m.MinRTTAvg = time.Duration(decoder.ReadVarintU64())
-	m.MinARTAvg = time.Duration(decoder.ReadVarintU64())
-}
-
-func (m *PerfMeterMin) concurrentMerge(other *PerfMeterMin) {
-	m.sequentialMerge(other)
-}
-
-func (m *PerfMeterMin) sequentialMerge(other *PerfMeterMin) {
-	// 注意：若有min之外的操作，需要修改concurrentMerge
-	m.MinRTTSyn = minDuration(m.MinRTTSyn, other.MinRTTSyn)
-	m.MinRTTAvg = minDuration(m.MinRTTAvg, other.MinRTTAvg)
-	m.MinARTAvg = minDuration(m.MinARTAvg, other.MinARTAvg)
 }

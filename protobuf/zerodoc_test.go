@@ -146,11 +146,6 @@ func TestPerfMeterEqual(t *testing.T) {
 			MaxRTTAvg: 28,
 			MaxARTAvg: 31,
 		},
-		PerfMeterMin: PerfMeterMin{
-			MinRTTSyn: 29,
-			MinRTTAvg: 30,
-			MinARTAvg: 32,
-		},
 	}
 	pb := PerfMeterToPB(fromMeter)
 	toMeter := AcquirePerfMeter()
@@ -180,9 +175,6 @@ func TestFPSMeterEqual(t *testing.T) {
 		SumFlowCount:       1,
 		SumNewFlowCount:    2,
 		SumClosedFlowCount: 3,
-
-		MaxFlowCount:    19,
-		MaxNewFlowCount: 20,
 	}
 	pb := FPSMeterToPB(fromMeter)
 	toMeter := AcquireFPSMeter()
