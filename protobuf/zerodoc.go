@@ -199,14 +199,6 @@ func UsageMeterToPB(m *UsageMeter) *pb.UsageMeter {
 			BitRx:    proto.Uint64(m.SumBitRx),
 			Bit:      proto.Uint64(m.SumBitTx + m.SumBitRx),
 		},
-		Max: &pb.UsageStats{
-			PacketTx: proto.Uint64(m.MaxPacketTx),
-			PacketRx: proto.Uint64(m.MaxPacketRx),
-			Packet:   proto.Uint64(m.MaxPacket),
-			BitTx:    proto.Uint64(m.MaxBitTx),
-			BitRx:    proto.Uint64(m.MaxBitRx),
-			Bit:      proto.Uint64(m.MaxBit),
-		},
 	}
 }
 
@@ -220,14 +212,6 @@ func PBToUsageMeter(m *pb.UsageMeter, meter *UsageMeter) {
 	meter.SumPacketRx = sum.GetPacketRx()
 	meter.SumBitTx = sum.GetBitTx()
 	meter.SumBitRx = sum.GetBitRx()
-
-	max := m.GetMax()
-	meter.MaxPacketTx = max.GetPacketTx()
-	meter.MaxPacketRx = max.GetPacketRx()
-	meter.MaxPacket = max.GetPacket()
-	meter.MaxBitTx = max.GetBitTx()
-	meter.MaxBitRx = max.GetBitRx()
-	meter.MaxBit = max.GetBit()
 }
 
 func PerfMeterToPB(m *PerfMeter) *pb.PerfMeter {
@@ -256,7 +240,6 @@ func PerfMeterSumToPB(m *PerfMeterSum) *pb.PerfStats {
 		FlowCount:         proto.Uint64(m.SumFlowCount),
 		NewFlowCount:      proto.Uint64(m.SumNewFlowCount),
 		ClosedFlowCount:   proto.Uint64(m.SumClosedFlowCount),
-		RetransFlowCount:  proto.Uint64(m.SumRetransFlowCount),
 		HalfOpenFlowCount: proto.Uint64(m.SumHalfOpenFlowCount),
 		PacketTx:          proto.Uint64(m.SumPacketTx),
 		PacketRx:          proto.Uint64(m.SumPacketRx),
@@ -279,7 +262,6 @@ func pbToPerfMeterSum(m *pb.PerfStats, meter *PerfMeterSum) {
 	meter.SumFlowCount = m.GetFlowCount()
 	meter.SumNewFlowCount = m.GetNewFlowCount()
 	meter.SumClosedFlowCount = m.GetClosedFlowCount()
-	meter.SumRetransFlowCount = m.GetRetransFlowCount()
 	meter.SumHalfOpenFlowCount = m.GetHalfOpenFlowCount()
 	meter.SumPacketTx = m.GetPacketTx()
 	meter.SumPacketRx = m.GetPacketRx()
@@ -327,15 +309,12 @@ func pbToPerfMeterMin(m *pb.RttStats, meter *PerfMeterMin) {
 
 func GeoMeterToPB(m *GeoMeter) *pb.GeoMeter {
 	return &pb.GeoMeter{
-		SumClosedFlowCount:      proto.Uint64(m.SumClosedFlowCount),
-		SumAbnormalFlowCount:    proto.Uint64(m.SumAbnormalFlowCount),
-		SumClosedFlowDurationUs: proto.Uint64(m.SumClosedFlowDuration * 1000), // us
-		SumPacketTx:             proto.Uint64(m.SumPacketTx),
-		SumPacketRx:             proto.Uint64(m.SumPacketRx),
-		SumBitTx:                proto.Uint64(m.SumBitTx),
-		SumBitRx:                proto.Uint64(m.SumBitRx),
-		SumRttSynClient:         proto.Uint64(uint64(m.SumRTTSynClient)),
-		SumRttSynClientFlow:     proto.Uint64(m.SumRTTSynClientFlow),
+		SumPacketTx:         proto.Uint64(m.SumPacketTx),
+		SumPacketRx:         proto.Uint64(m.SumPacketRx),
+		SumBitTx:            proto.Uint64(m.SumBitTx),
+		SumBitRx:            proto.Uint64(m.SumBitRx),
+		SumRttSynClient:     proto.Uint64(uint64(m.SumRTTSynClient)),
+		SumRttSynClientFlow: proto.Uint64(m.SumRTTSynClientFlow),
 	}
 }
 
@@ -344,9 +323,6 @@ func PBToGeoMeter(m *pb.GeoMeter, meter *GeoMeter) {
 		panic("meter为空")
 	}
 
-	meter.SumClosedFlowCount = m.GetSumClosedFlowCount()
-	meter.SumAbnormalFlowCount = m.GetSumAbnormalFlowCount()
-	meter.SumClosedFlowDuration = m.GetSumClosedFlowDurationUs() / 1000 // ms
 	meter.SumPacketTx = m.GetSumPacketTx()
 	meter.SumPacketRx = m.GetSumPacketRx()
 	meter.SumBitTx = m.GetSumBitTx()
@@ -429,20 +405,6 @@ func PBToConsoleLogMeter(m *pb.ConsoleLogMeter, meter *ConsoleLogMeter) {
 
 func TypeMeterToPB(m *TypeMeter) *pb.TypeMeter {
 	return &pb.TypeMeter{
-		SumCountL_0S1S:  proto.Uint64(m.SumCountL0S1S),
-		SumCountL_1S5S:  proto.Uint64(m.SumCountL1S5S),
-		SumCountL_5S10S: proto.Uint64(m.SumCountL5S10S),
-		SumCountL_10S1M: proto.Uint64(m.SumCountL10S1M),
-		SumCountL_1M1H:  proto.Uint64(m.SumCountL1M1H),
-		SumCountL_1H:    proto.Uint64(m.SumCountL1H),
-
-		SumCountE_0K10K:   proto.Uint64(m.SumCountE0K10K),
-		SumCountE_10K100K: proto.Uint64(m.SumCountE10K100K),
-		SumCountE_100K1M:  proto.Uint64(m.SumCountE100K1M),
-		SumCountE_1M100M:  proto.Uint64(m.SumCountE1M100M),
-		SumCountE_100M1G:  proto.Uint64(m.SumCountE100M1G),
-		SumCountE_1G:      proto.Uint64(m.SumCountE1G),
-
 		SumCountTCRst:       proto.Uint64(m.SumCountTClientRst),
 		SumCountTCHalfOpen:  proto.Uint64(m.SumCountTClientHalfOpen),
 		SumCountTCHalfClose: proto.Uint64(m.SumCountTClientHalfClose),
@@ -456,20 +418,6 @@ func PBToTypeMeter(m *pb.TypeMeter, meter *TypeMeter) {
 	if meter == nil {
 		panic("meter为空")
 	}
-
-	meter.SumCountL0S1S = m.GetSumCountL_0S1S()
-	meter.SumCountL1S5S = m.GetSumCountL_1S5S()
-	meter.SumCountL5S10S = m.GetSumCountL_5S10S()
-	meter.SumCountL10S1M = m.GetSumCountL_10S1M()
-	meter.SumCountL1M1H = m.GetSumCountL_1M1H()
-	meter.SumCountL1H = m.GetSumCountL_1H()
-
-	meter.SumCountE0K10K = m.GetSumCountE_0K10K()
-	meter.SumCountE10K100K = m.GetSumCountE_10K100K()
-	meter.SumCountE100K1M = m.GetSumCountE_100K1M()
-	meter.SumCountE1M100M = m.GetSumCountE_1M100M()
-	meter.SumCountE100M1G = m.GetSumCountE_100M1G()
-	meter.SumCountE1G = m.GetSumCountE_1G()
 
 	meter.SumCountTClientRst = m.GetSumCountTCRst()
 	meter.SumCountTClientHalfOpen = m.GetSumCountTCHalfOpen()

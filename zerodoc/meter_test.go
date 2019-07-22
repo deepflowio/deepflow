@@ -222,43 +222,22 @@ func TestPerfMeterFill(t *testing.T) {
 func TestUsageMeterFill(t *testing.T) {
 	f := &UsageMeter{}
 
-	isTag := []bool{false, true, false, false, false, false, false, false, false, false, false}
-	names := []string{"sum_packet_tx", "ip", "sum_packet_rx", "sum_bit_tx", "sum_bit_rx",
-		"max_packet_tx", "max_packet_rx", "max_packet", "max_bit_tx", "max_bit_rx", "max_bit"}
-	var v1, v2, v3, v4, v5, v6, v7, v8, v9, v10 int64
-	v1, v2, v3, v4, v5, v6, v7, v8, v9, v10 = 123, 12345, 12345678, 1234567890123, 123456789012345, 12345678901234567, 0, 1, 2, 3
-	values := []interface{}{v1, "ip", v2, v3, v4, v5, v6, v7, v8, v9, v10}
+	isTag := []bool{false, true, false, false, false}
+	names := []string{"sum_packet_tx", "ip", "sum_packet_rx", "sum_bit_tx", "sum_bit_rx"}
+	values := []interface{}{int64(123), "ip", int64(12345), int64(12345678), int64(1234567890123)}
 	f.Fill(isTag, names, values)
 
-	if f.SumPacketTx != uint64(v1) {
+	if f.SumPacketTx != uint64(values[0].(int64)) {
 		t.Error("SumPacketTx 处理错误")
 	}
-	if f.SumPacketRx != uint64(v2) {
+	if f.SumPacketRx != uint64(values[2].(int64)) {
 		t.Error("SumPacketRx 处理错误")
 	}
-	if f.SumBitTx != uint64(v3) {
+	if f.SumBitTx != uint64(values[3].(int64)) {
 		t.Error("SumBitTx 处理错误")
 	}
-	if f.SumBitRx != uint64(v4) {
+	if f.SumBitRx != uint64(values[4].(int64)) {
 		t.Error("SumBitRx 处理错误")
-	}
-	if f.MaxPacketTx != uint64(v5) {
-		t.Error("MaxPacketTx 处理错误")
-	}
-	if f.MaxPacketRx != uint64(v6) {
-		t.Error("MaxPacketRx 处理错误")
-	}
-	if f.MaxPacket != uint64(v7) {
-		t.Error("MaxPacket 处理错误")
-	}
-	if f.MaxBitTx != uint64(v8) {
-		t.Error("MaxBitTx 处理错误")
-	}
-	if f.MaxBitRx != uint64(v9) {
-		t.Error("MaxBitRx 处理错误")
-	}
-	if f.MaxBit != uint64(v10) {
-		t.Error("MaxBit 处理错误")
 	}
 }
 

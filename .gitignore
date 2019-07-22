@@ -1,3 +1,4 @@
 /vendor/
 /*.test
 /.test-coverage.txt
+.idea/
