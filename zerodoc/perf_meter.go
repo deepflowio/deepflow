@@ -183,12 +183,9 @@ type PerfMeterSum struct {
 	SumFlowCount         uint64 `db:"sum_flow_count"`
 	SumNewFlowCount      uint64 `db:"sum_new_flow_count"`
 	SumClosedFlowCount   uint64 `db:"sum_closed_flow_count"`
-	SumRetransFlowCount  uint64 `db:"sum_retrans_flow_count"` // 废弃
 	SumHalfOpenFlowCount uint64 `db:"sum_half_open_flow_count"`
 	SumPacketTx          uint64 `db:"sum_packet_tx"`
 	SumPacketRx          uint64 `db:"sum_packet_rx"`
-	SumBitTx             uint64 `db:"sum_bit_tx"` // 废弃
-	SumBitRx             uint64 `db:"sum_bit_rx"` // 废弃
 	SumRetransCntTx      uint64 `db:"sum_retrans_cnt_tx"`
 	SumRetransCntRx      uint64 `db:"sum_retrans_cnt_rx"`
 
@@ -207,12 +204,9 @@ func (m *PerfMeterSum) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(m.SumFlowCount)
 	encoder.WriteVarintU64(m.SumNewFlowCount)
 	encoder.WriteVarintU64(m.SumClosedFlowCount)
-	encoder.WriteVarintU64(m.SumRetransFlowCount)
 	encoder.WriteVarintU64(m.SumHalfOpenFlowCount)
 	encoder.WriteVarintU64(m.SumPacketTx)
 	encoder.WriteVarintU64(m.SumPacketRx)
-	encoder.WriteVarintU64(m.SumBitTx)
-	encoder.WriteVarintU64(m.SumBitRx)
 	encoder.WriteVarintU64(m.SumRetransCntTx)
 	encoder.WriteVarintU64(m.SumRetransCntRx)
 
@@ -231,12 +225,9 @@ func (m *PerfMeterSum) Decode(decoder *codec.SimpleDecoder) {
 	m.SumFlowCount = decoder.ReadVarintU64()
 	m.SumNewFlowCount = decoder.ReadVarintU64()
 	m.SumClosedFlowCount = decoder.ReadVarintU64()
-	m.SumRetransFlowCount = decoder.ReadVarintU64()
 	m.SumHalfOpenFlowCount = decoder.ReadVarintU64()
 	m.SumPacketTx = decoder.ReadVarintU64()
 	m.SumPacketRx = decoder.ReadVarintU64()
-	m.SumBitTx = decoder.ReadVarintU64()
-	m.SumBitRx = decoder.ReadVarintU64()
 	m.SumRetransCntTx = decoder.ReadVarintU64()
 	m.SumRetransCntRx = decoder.ReadVarintU64()
 
@@ -255,12 +246,9 @@ func (m *PerfMeterSum) concurrentMerge(other *PerfMeterSum) {
 	m.SumFlowCount += other.SumFlowCount
 	m.SumNewFlowCount += other.SumNewFlowCount
 	m.SumClosedFlowCount += other.SumClosedFlowCount
-	m.SumRetransFlowCount += other.SumRetransFlowCount
 	m.SumHalfOpenFlowCount += other.SumHalfOpenFlowCount
 	m.SumPacketTx += other.SumPacketTx
 	m.SumPacketRx += other.SumPacketRx
-	m.SumBitTx += other.SumBitTx
-	m.SumBitRx += other.SumBitRx
 	m.SumRetransCntTx += other.SumRetransCntTx
 	m.SumRetransCntRx += other.SumRetransCntRx
 
@@ -279,12 +267,9 @@ func (m *PerfMeterSum) sequentialMerge(other *PerfMeterSum) { // other为后一�
 	m.SumFlowCount = m.SumClosedFlowCount + other.SumFlowCount
 	m.SumNewFlowCount += other.SumNewFlowCount
 	m.SumClosedFlowCount += other.SumClosedFlowCount
-	m.SumRetransFlowCount += other.SumRetransFlowCount
 	m.SumHalfOpenFlowCount += other.SumHalfOpenFlowCount
 	m.SumPacketTx += other.SumPacketTx
 	m.SumPacketRx += other.SumPacketRx
-	m.SumBitTx += other.SumBitTx
-	m.SumBitRx += other.SumBitRx
 	m.SumRetransCntTx += other.SumRetransCntTx
 	m.SumRetransCntRx += other.SumRetransCntRx
 
