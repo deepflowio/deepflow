@@ -17,8 +17,6 @@ import (
 
 var log = logging.MustGetLogger("fps")
 
-// 注意：此应用中请不要加入ServerPort的Tag组合，如有需要加入flow中
-
 const (
 	MINUTE      = 60
 	KEY_SECONDS = 4 // 开始、结束、两个分钟的0秒
@@ -60,12 +58,23 @@ var STAT_CODES_LEN = len(NODE_CODES)
 
 // policy node
 
-var POLICY_NODE_CODES = []outputtype.Code{}
+var POLICY_NODE_CODES = []outputtype.Code{
+	outputtype.IndexToCode(0x00) | outputtype.ACLDirection | outputtype.ACLGID | outputtype.Direction | outputtype.IP | outputtype.TAPType,
+}
 
 var POLICY_NODE_CODES_LEN = len(POLICY_NODE_CODES)
 
+// policy edge
+
+var POLICY_EDGE_CODES = []outputtype.Code{
+	outputtype.IndexToCode(0x01) | outputtype.ACLDirection | outputtype.ACLGID | outputtype.Direction | outputtype.IPPath | outputtype.TAPType,
+}
+
+var POLICY_EDGE_CODES_LEN = len(POLICY_EDGE_CODES)
+
 type FlowToFPSDocumentMapper struct {
 	timestamps  []uint32
+	fields      [2]outputtype.Field
 	meters      []*outputtype.FPSMeter
 	docs        *utils.StructBuffer
 	policyGroup []inputtype.AclAction
@@ -112,8 +121,6 @@ func (p *FlowToFPSDocumentMapper) appendDocs(docMap map[uint64]bool, field *outp
 }
 
 func (p *FlowToFPSDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedTag bool) []interface{} {
-	return p.docs.Slice() // v5.5.3弃用
-
 	p.docs.Reset()
 
 	if rawFlow.EthType != layers.EthernetTypeIPv4 {
@@ -139,6 +146,7 @@ func (p *FlowToFPSDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 	ips := [2]uint32{flow.IPSrc, flow.IPDst}
 	isL2End := [2]bool{flow.FlowMetricsPeerSrc.IsL2End, flow.FlowMetricsPeerDst.IsL2End}
 	isL3End := [2]bool{flow.FlowMetricsPeerSrc.IsL3End, flow.FlowMetricsPeerDst.IsL3End}
+	directions := [2]outputtype.DirectionEnum{outputtype.ClientToServer, outputtype.ServerToClient}
 	startTimestamp := RoundToSecond(flow.StartTime)
 	endTimestamp := RoundToSecond(flow.EndTime)
 
@@ -200,26 +208,20 @@ func (p *FlowToFPSDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 	docMap := make(map[uint64]bool)
 
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
-		field := outputtype.Field{
-			IP:      ips[thisEnd],
-			TAPType: TAPTypeFromInPort(flow.InPort),
-			L3EpcID: int16(l3EpcIDs[thisEnd]),
-		}
+		otherEnd := GetOppositeEndpoint(thisEnd)
 
-		// oneSideCodes
-		for _, code := range oneSideCodes {
-			if IsDupTraffic(flow.InPort, l3EpcIDs[thisEnd], isL2End[thisEnd], isL3End[thisEnd], code) {
-				continue
-			}
-			if IsWrongEndPoint(thisEnd, code) {
-				continue
-			}
-			p.appendDocs(docMap, &field, code, uint32(inputtype.ACTION_FLOW_COUNTING))
-		}
+		field := &p.fields[thisEnd]
+		field.IP = ips[thisEnd]
+		field.IP1 = ips[otherEnd]
+		field.TAPType = TAPTypeFromInPort(flow.InPort)
+		field.ACLDirection = outputtype.ACL_FORWARD // 含ACLDirection字段时仅考虑ACL正向匹配
+		field.Direction = directions[thisEnd]
 
 		// policy
-
 		for _, policy := range p.policyGroup {
+			field.ACLGID = uint16(policy.GetACLGID())
+
+			// node
 			codes := p.codes[:0]
 			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE != 0 {
 				codes = append(codes, POLICY_NODE_CODES...)
@@ -231,9 +233,22 @@ func (p *FlowToFPSDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
 					continue
 				}
-				field.ACLGID = uint16(policy.GetACLGID())
+				p.appendDocs(docMap, field, code, uint32(policy.GetActionFlags()))
+			}
 
-				p.appendDocs(docMap, &field, code, uint32(policy.GetActionFlags()))
+			// edge
+			codes = p.codes[:0]
+			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE != 0 {
+				codes = append(codes, POLICY_EDGE_CODES...)
+			}
+			for _, code := range codes {
+				if IsDupTraffic(flow.InPort, l3EpcIDs[otherEnd], isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧tag用otherEnd判断
+					continue
+				}
+				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
+					continue
+				}
+				p.appendDocs(docMap, field, code, uint32(policy.GetActionFlags()))
 			}
 		}
 	}

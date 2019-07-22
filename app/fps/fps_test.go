@@ -52,7 +52,7 @@ func TestPolicyTags(t *testing.T) {
 		}
 	}
 
-	expectedCodes := len(POLICY_NODE_CODES) * 2
+	expectedCodes := len(POLICY_NODE_CODES)*2 + len(POLICY_EDGE_CODES)
 	if len(policyDocs) != expectedCodes {
 		t.Error("策略Tag不正确", len(policyDocs), expectedCodes, policyDocs)
 	}

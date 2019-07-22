@@ -1,7 +1,9 @@
 package usage
 
 import (
+	"github.com/google/gopacket/layers"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	inputtype "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	outputtype "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
@@ -16,8 +18,9 @@ import (
 
 var log = logging.MustGetLogger("usage")
 
-// 注意：此应用中请不要加入ServerPort的Tag组合，如有需要加入flow中
-// 注意：包统计应用中请不要加入双侧Tag，无法分辨方向
+const (
+	CODES_LEN = 64
+)
 
 // node
 
@@ -27,21 +30,38 @@ var STAT_CODES_LEN = len(NODE_CODES)
 
 // policy node
 
-var POLICY_NODE_CODES = []outputtype.Code{}
+var POLICY_NODE_CODES = []outputtype.Code{
+	outputtype.IndexToCode(0x00) | outputtype.ACLDirection | outputtype.ACLGID | outputtype.Direction | outputtype.IP | outputtype.TAPType,
+}
 
-var POLICY_NODE_CODES_LEN = len(POLICY_NODE_CODES)
+var POLICY_NODE_PORT_CODES = []outputtype.Code{
+	outputtype.IndexToCode(0x01) | outputtype.ACLDirection | outputtype.ACLGID | outputtype.Direction | outputtype.IP | outputtype.Protocol | outputtype.ServerPort | outputtype.TAPType,
+}
+
+var POLICY_NODE_CODES_LEN = len(POLICY_NODE_CODES) + len(POLICY_NODE_PORT_CODES)
+
+// policy edge
+
+var POLICY_EDGE_CODES = []outputtype.Code{
+	outputtype.IndexToCode(0x02) | outputtype.ACLDirection | outputtype.ACLGID | outputtype.Direction | outputtype.IPPath | outputtype.TAPType,
+}
+
+var POLICY_EDGE_PORT_CODES = []outputtype.Code{
+	outputtype.IndexToCode(0x03) | outputtype.ACLDirection | outputtype.ACLGID | outputtype.Direction | outputtype.IPPath | outputtype.Protocol | outputtype.ServerPort | outputtype.TAPType,
+}
+
+var POLICY_EDGE_CODES_LEN = len(POLICY_EDGE_CODES) + len(POLICY_EDGE_PORT_CODES)
 
 type MeteringToUsageDocumentMapper struct {
 	docs        *utils.StructBuffer
 	policyGroup []inputtype.AclAction
 
+	encoder *codec.SimpleEncoder
+	codes   []outputtype.Code
+
+	fields [2]outputtype.Field
 	// 预先计算好包长为0~65535的包、双方向上所有可能的meter
 	meters [1 << 16][2]*outputtype.UsageMeter
-
-	// usage的tag少，使用slice而非map判断tag的重复。
-	//   - 一方面查找更快: https://www.darkcoding.net/software/go-slice-search-vs-map-lookup/
-	//   - 另一方面没有频繁的对象创建和销毁
-	docMap []uint64
 }
 
 func (p *MeteringToUsageDocumentMapper) GetName() string {
@@ -55,6 +75,8 @@ func NewProcessor() app.MeteringProcessor {
 func (p *MeteringToUsageDocumentMapper) Prepare() {
 	p.docs = NewMeterSharedDocBuffer()
 	p.policyGroup = make([]inputtype.AclAction, 0)
+	p.encoder = &codec.SimpleEncoder{}
+	p.codes = make([]outputtype.Code, 0, CODES_LEN)
 
 	for i := range p.meters {
 		p.meters[i][0] = &outputtype.UsageMeter{
@@ -70,52 +92,30 @@ func (p *MeteringToUsageDocumentMapper) Prepare() {
 			SumBitRx:    uint64(i << 3),
 		}
 	}
-
-	p.docMap = make([]uint64, 0, 16) // 预先初始化一块内存
 }
 
-func (p *MeteringToUsageDocumentMapper) fastFillTag(tag *outputtype.Tag, field *outputtype.Field, code outputtype.Code) {
-	if code&^(outputtype.CodeIndices|outputtype.TAPType|outputtype.L3EpcID|outputtype.IP|outputtype.ACLGID) != 0 {
-		panic("添加的Tag Field没有加入fastFillTag中")
-	}
-
-	// MeterSharedDocBuffer的Tag.Field一定非空
-	f := tag.Field
-	f.IP = field.IP
-	f.L3EpcID = field.L3EpcID
-	f.ACLGID = field.ACLGID
-	f.TAPType = field.TAPType
-	tag.Code = code
-	tag.SetID("")
-}
-
-func (p *MeteringToUsageDocumentMapper) appendDoc(timestamp uint32, field *outputtype.Field, code outputtype.Code, meter *outputtype.UsageMeter, actionFlags uint32) {
+func (p *MeteringToUsageDocumentMapper) appendDoc(docMap map[string]bool, timestamp uint32, field *outputtype.Field, code outputtype.Code, meter *outputtype.UsageMeter, actionFlags uint32) {
 	if code.PossibleDuplicate() {
 		tag := &outputtype.Tag{
 			Field: field,
 			Code:  code,
 		}
-		fastID := tag.GetFastID()
-		for _, v := range p.docMap {
-			if v == fastID {
-				return
-			}
+		id := tag.GetID(p.encoder)
+		if _, exists := docMap[id]; exists {
+			return
 		}
-		p.docMap = append(p.docMap, fastID)
+		docMap[id] = true
 	}
 
 	doc := p.docs.Get().(*app.Document)
-	p.fastFillTag(doc.Tag.(*outputtype.Tag), field, code)
+	field.FillTag(code, doc.Tag.(*outputtype.Tag))
 	doc.Meter = meter
 	doc.Timestamp = timestamp
 	doc.ActionFlags = actionFlags
 }
 
 func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket, variedTag bool) []interface{} {
-	return p.docs.Slice() // v5.5.3弃用
-
 	p.docs.Reset()
-	p.docMap = p.docMap[:0]
 
 	actionFlags := metaPacket.PolicyData.ActionFlags
 	interestActions := inputtype.ACTION_PACKET_COUNTING | inputtype.ACTION_PACKET_COUNT_BROKERING
@@ -123,13 +123,13 @@ func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket
 		return p.docs.Slice()
 	}
 
-	statTemplates := GetTagTemplateByActionFlags(metaPacket.PolicyData, interestActions)
 	p.policyGroup = FillPolicyTagTemplate(metaPacket.PolicyData, interestActions, p.policyGroup)
 
 	l3EpcIDs := [2]int32{metaPacket.EndpointData.SrcInfo.L3EpcId, metaPacket.EndpointData.DstInfo.L3EpcId}
 	ips := [2]uint32{metaPacket.IpSrc, metaPacket.IpDst}
 	isL2End := [2]bool{metaPacket.EndpointData.SrcInfo.L2End, metaPacket.EndpointData.DstInfo.L2End}
 	isL3End := [2]bool{metaPacket.EndpointData.SrcInfo.L3End, metaPacket.EndpointData.DstInfo.L3End}
+	directions := [2]outputtype.DirectionEnum{outputtype.ClientToServer, outputtype.ServerToClient}
 	docTimestamp := RoundToSecond(metaPacket.Timestamp)
 
 	for i := range ips {
@@ -138,43 +138,58 @@ func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket
 		}
 	}
 
+	docMap := make(map[string]bool)
+
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
+		otherEnd := GetOppositeEndpoint(thisEnd)
+
 		meter := p.meters[metaPacket.PacketLen][thisEnd]
-		field := outputtype.Field{
-			IP:      ips[thisEnd],
-			TAPType: TAPTypeFromInPort(metaPacket.InPort),
-			L3EpcID: int16(l3EpcIDs[thisEnd]),
-		}
+		field := &p.fields[thisEnd]
+		field.IP = ips[thisEnd]
+		field.IP1 = ips[otherEnd]
+		field.TAPType = TAPTypeFromInPort(metaPacket.InPort)
+		field.Protocol = metaPacket.Protocol
+		field.ServerPort = metaPacket.PortDst
+		field.ACLDirection = outputtype.ACL_FORWARD // 含ACLDirection字段时仅考虑ACL正向匹配
+		field.Direction = directions[thisEnd]
 
-		// node
-		if actionFlags&inputtype.ACTION_PACKET_COUNTING != 0 && statTemplates&inputtype.TEMPLATE_NODE != 0 {
-			for _, code := range NODE_CODES {
+		for _, policy := range p.policyGroup {
+			field.ACLGID = uint16(policy.GetACLGID())
+
+			// node
+			codes := p.codes[:0]
+			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE != 0 {
+				codes = append(codes, POLICY_NODE_CODES...)
+			}
+			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE_PORT != 0 && metaPacket.Protocol == layers.IPProtocolTCP {
+				codes = append(codes, POLICY_NODE_PORT_CODES...)
+			}
+			for _, code := range codes {
 				if IsDupTraffic(metaPacket.InPort, l3EpcIDs[thisEnd], isL2End[thisEnd], isL3End[thisEnd], code) {
-					continue
-				}
-				if IsWrongEndPoint(thisEnd, code) {
-					continue
-				}
-				p.appendDoc(docTimestamp, &field, code, meter, uint32(inputtype.ACTION_PACKET_COUNTING))
-			}
-		}
-
-		// policy: node
-		for _, code := range POLICY_NODE_CODES {
-			if IsDupTraffic(metaPacket.InPort, l3EpcIDs[thisEnd], isL2End[thisEnd], isL3End[thisEnd], code) {
-				continue
-			}
-
-			for _, policy := range p.policyGroup {
-				if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE == 0 {
 					continue
 				}
 				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
 					continue
 				}
-				field.ACLGID = uint16(policy.GetACLGID())
+				p.appendDoc(docMap, docTimestamp, field, code, meter, uint32(policy.GetActionFlags()))
+			}
 
-				p.appendDoc(docTimestamp, &field, code, meter, uint32(policy.GetActionFlags()))
+			// edge
+			codes = p.codes[:0]
+			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE != 0 {
+				codes = append(codes, POLICY_EDGE_CODES...)
+			}
+			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE_PORT != 0 && metaPacket.Protocol == layers.IPProtocolTCP {
+				codes = append(codes, POLICY_EDGE_PORT_CODES...)
+			}
+			for _, code := range codes {
+				if IsDupTraffic(metaPacket.InPort, l3EpcIDs[otherEnd], isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧tag用otherEnd判断
+					continue
+				}
+				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
+					continue
+				}
+				p.appendDoc(docMap, docTimestamp, field, code, meter, uint32(policy.GetActionFlags()))
 			}
 		}
 	}
