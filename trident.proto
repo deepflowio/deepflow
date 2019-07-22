@@ -195,6 +195,19 @@ message FlowAcl {
     repeated NpbAction npb_actions = 11;
 }
 
+message PublishAcl {
+    optional uint32 id = 1;
+    optional string database = 2;
+    optional uint64 measurement = 3;
+    optional uint64 tag_code = 4;
+
+    optional uint32 tap_type = 10; // 3: in_port 0x3****, 0~2/4~30: in_port 0x1****
+    optional uint32 acl_gid = 11;
+    optional uint32 l3_epc_id = 12;
+    optional uint32 l3_device_type = 13;
+    optional uint32 l3_device_id = 14;
+}
+
 message SyncResponse {
     optional Status status = 1;
     optional Config config = 2;
@@ -206,4 +219,5 @@ message SyncResponse {
     repeated Segment remote_segments = 11;
     optional PlatformData platform_data = 12;
     repeated FlowAcl flow_acls = 13;
+    repeated PublishAcl publish_acls = 14;
 }
