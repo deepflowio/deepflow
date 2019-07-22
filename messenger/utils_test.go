@@ -46,20 +46,10 @@ func TestMarshal(t *testing.T) {
 	}
 	tag := f.NewTag(dt.IP | dt.L2EpcID | dt.L3EpcID)
 	meter := &dt.UsageMeter{
-		UsageMeterSum: dt.UsageMeterSum{
-			SumPacketTx: 1,
-			SumPacketRx: 2,
-			SumBitTx:    4,
-			SumBitRx:    5,
-		},
-		UsageMeterMax: dt.UsageMeterMax{
-			MaxPacketTx: 123,
-			MaxPacketRx: 321,
-			MaxPacket:   444,
-			MaxBitTx:    456,
-			MaxBitRx:    654,
-			MaxBit:      1110,
-		},
+		SumPacketTx: 1,
+		SumPacketRx: 2,
+		SumBitTx:    4,
+		SumBitRx:    5,
 	}
 	doc := &app.Document{Timestamp: 0x12345678, Tag: tag, Meter: meter}
 	bytes := utils.AcquireByteBuffer()

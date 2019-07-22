@@ -9,15 +9,12 @@ import (
 )
 
 type GeoMeter struct {
-	SumClosedFlowCount    uint64        `db:"sum_closed_flow_count"`    // 废弃
-	SumAbnormalFlowCount  uint64        `db:"sum_abnormal_flow_count"`  // 废弃
-	SumClosedFlowDuration uint64        `db:"sum_closed_flow_duration"` // ms 废弃
-	SumPacketTx           uint64        `db:"sum_packet_tx"`
-	SumPacketRx           uint64        `db:"sum_packet_rx"`
-	SumBitTx              uint64        `db:"sum_bit_tx"`
-	SumBitRx              uint64        `db:"sum_bit_rx"`
-	SumRTTSynClient       time.Duration `db:"sum_rtt_syn_client"`
-	SumRTTSynClientFlow   uint64        `db:"sum_rtt_syn_client_flow"`
+	SumPacketTx         uint64        `db:"sum_packet_tx"`
+	SumPacketRx         uint64        `db:"sum_packet_rx"`
+	SumBitTx            uint64        `db:"sum_bit_tx"`
+	SumBitRx            uint64        `db:"sum_bit_rx"`
+	SumRTTSynClient     time.Duration `db:"sum_rtt_syn_client"`
+	SumRTTSynClientFlow uint64        `db:"sum_rtt_syn_client_flow"`
 }
 
 func (m *GeoMeter) SortKey() uint64 {
@@ -25,9 +22,6 @@ func (m *GeoMeter) SortKey() uint64 {
 }
 
 func (m *GeoMeter) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteVarintU64(m.SumClosedFlowCount)
-	encoder.WriteVarintU64(m.SumAbnormalFlowCount)
-	encoder.WriteVarintU64(m.SumClosedFlowDuration)
 	encoder.WriteVarintU64(m.SumPacketTx)
 	encoder.WriteVarintU64(m.SumPacketRx)
 	encoder.WriteVarintU64(m.SumBitTx)
@@ -37,9 +31,6 @@ func (m *GeoMeter) Encode(encoder *codec.SimpleEncoder) {
 }
 
 func (m *GeoMeter) Decode(decoder *codec.SimpleDecoder) {
-	m.SumClosedFlowCount = decoder.ReadVarintU64()
-	m.SumAbnormalFlowCount = decoder.ReadVarintU64()
-	m.SumClosedFlowDuration = decoder.ReadVarintU64()
 	m.SumPacketTx = decoder.ReadVarintU64()
 	m.SumPacketRx = decoder.ReadVarintU64()
 	m.SumBitTx = decoder.ReadVarintU64()
@@ -50,9 +41,6 @@ func (m *GeoMeter) Decode(decoder *codec.SimpleDecoder) {
 
 func (m *GeoMeter) ConcurrentMerge(other app.Meter) {
 	if pgm, ok := other.(*GeoMeter); ok {
-		m.SumClosedFlowCount += pgm.SumClosedFlowCount
-		m.SumAbnormalFlowCount += pgm.SumAbnormalFlowCount
-		m.SumClosedFlowDuration += pgm.SumClosedFlowDuration
 		m.SumPacketTx += pgm.SumPacketTx
 		m.SumPacketRx += pgm.SumPacketRx
 		m.SumBitTx += pgm.SumBitTx
@@ -64,9 +52,6 @@ func (m *GeoMeter) ConcurrentMerge(other app.Meter) {
 
 func (m *GeoMeter) SequentialMerge(other app.Meter) {
 	if pgm, ok := other.(*GeoMeter); ok {
-		m.SumClosedFlowCount += pgm.SumClosedFlowCount
-		m.SumAbnormalFlowCount += pgm.SumAbnormalFlowCount
-		m.SumClosedFlowDuration += pgm.SumClosedFlowDuration
 		m.SumPacketTx += pgm.SumPacketTx
 		m.SumPacketRx += pgm.SumPacketRx
 		m.SumBitTx += pgm.SumBitTx

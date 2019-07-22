@@ -107,20 +107,10 @@ func TestPartialTagEqual(t *testing.T) {
 
 func TestUsageMeterEqual(t *testing.T) {
 	fromMeter := &UsageMeter{
-		UsageMeterSum: UsageMeterSum{
-			SumPacketTx: 1,
-			SumPacketRx: 2,
-			SumBitTx:    4,
-			SumBitRx:    5,
-		},
-		UsageMeterMax: UsageMeterMax{
-			MaxPacketTx: 123,
-			MaxPacketRx: 321,
-			MaxPacket:   444,
-			MaxBitTx:    456,
-			MaxBitRx:    654,
-			MaxBit:      1110,
-		},
+		SumPacketTx: 1,
+		SumPacketRx: 2,
+		SumBitTx:    4,
+		SumBitRx:    5,
 	}
 	pb := UsageMeterToPB(fromMeter)
 	toMeter := AcquireUsageMeter()
@@ -135,7 +125,6 @@ func TestPerfMeterEqual(t *testing.T) {
 		PerfMeterSum: PerfMeterSum{
 			SumFlowCount:         1,
 			SumClosedFlowCount:   2,
-			SumRetransFlowCount:  3,
 			SumHalfOpenFlowCount: 4,
 			SumPacketTx:          1234,
 			SumPacketRx:          4321,
@@ -173,13 +162,10 @@ func TestPerfMeterEqual(t *testing.T) {
 
 func TestGeoMeterEqual(t *testing.T) {
 	fromMeter := &GeoMeter{
-		SumClosedFlowCount:    1,
-		SumAbnormalFlowCount:  2,
-		SumClosedFlowDuration: 1,
-		SumPacketTx:           1234,
-		SumPacketRx:           4321,
-		SumBitTx:              12345,
-		SumBitRx:              54321,
+		SumPacketTx: 1234,
+		SumPacketRx: 4321,
+		SumBitTx:    12345,
+		SumBitRx:    54321,
 	}
 	pb := GeoMeterToPB(fromMeter)
 	toMeter := AcquireGeoMeter()
@@ -237,20 +223,6 @@ func TestConsoleLogMeterEqual(t *testing.T) {
 
 func TestTypeMeterEqual(t *testing.T) {
 	fromMeter := &TypeMeter{
-		SumCountL0S1S:  4,
-		SumCountL1S5S:  5,
-		SumCountL5S10S: 6,
-		SumCountL10S1M: 7,
-		SumCountL1M1H:  8,
-		SumCountL1H:    9,
-
-		SumCountE0K10K:   10,
-		SumCountE10K100K: 11,
-		SumCountE100K1M:  12,
-		SumCountE1M100M:  13,
-		SumCountE100M1G:  14,
-		SumCountE1G:      15,
-
 		SumCountTClientRst:       16,
 		SumCountTClientHalfOpen:  17,
 		SumCountTClientHalfClose: 18,
