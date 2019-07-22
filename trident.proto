@@ -81,13 +81,6 @@ message Config {
     repeated string  corefile_dirs        = 33;
 }
 
-enum Protocol {
-    ANY = 0;
-    ICMP = 1;
-    TCP = 6;
-    UDP = 17;
-}
-
 message Segment { // e.g. single LAN area
     optional uint32 id = 1;
     repeated string mac = 2;
@@ -187,7 +180,7 @@ message FlowAcl {
     optional uint32 tap_type = 2; // 3: in_port 0x3****, 0~2/4~30: in_port 0x1****
     optional string src_group_ids = 4;
     optional string dst_group_ids = 5;
-    optional Protocol protocol = 6;
+    optional uint32 protocol = 6;
     optional string src_ports = 7;
     optional string dst_ports = 8;
     optional uint32 vlan = 9;
