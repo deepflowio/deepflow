@@ -22,20 +22,10 @@ func TestStash(t *testing.T) {
 		TAPType: datatype.ToR,
 	}
 	meter := datatype.UsageMeter{
-		UsageMeterSum: datatype.UsageMeterSum{
-			SumPacketTx: 1,
-			SumPacketRx: 2,
-			SumBitTx:    4,
-			SumBitRx:    5,
-		},
-		UsageMeterMax: datatype.UsageMeterMax{
-			MaxPacketTx: 123,
-			MaxPacketRx: 321,
-			MaxPacket:   444,
-			MaxBitTx:    456,
-			MaxBitRx:    654,
-			MaxBit:      1110,
-		},
+		SumPacketTx: 1,
+		SumPacketRx: 2,
+		SumBitTx:    4,
+		SumBitRx:    5,
 	}
 	tag1 := f.NewTag(datatype.IP | datatype.L3EpcID)
 	meter1 := &datatype.UsageMeter{}

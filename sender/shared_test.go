@@ -90,20 +90,10 @@ func init() {
 		TAPType:    dt.ToR,
 	}
 	meter := &dt.UsageMeter{
-		UsageMeterSum: dt.UsageMeterSum{
-			SumPacketTx: 1,
-			SumPacketRx: 2,
-			SumBitTx:    4,
-			SumBitRx:    5,
-		},
-		UsageMeterMax: dt.UsageMeterMax{
-			MaxPacketTx: 123,
-			MaxPacketRx: 321,
-			MaxPacket:   444,
-			MaxBitTx:    456,
-			MaxBitRx:    654,
-			MaxBit:      1110,
-		},
+		SumPacketTx: 1,
+		SumPacketRx: 2,
+		SumBitTx:    4,
+		SumBitRx:    5,
 	}
 	doc1 := app.AcquireDocument()
 	doc1.Timestamp = 0x12345678

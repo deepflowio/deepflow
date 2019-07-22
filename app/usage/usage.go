@@ -58,36 +58,16 @@ func (p *MeteringToUsageDocumentMapper) Prepare() {
 
 	for i := range p.meters {
 		p.meters[i][0] = &outputtype.UsageMeter{
-			UsageMeterSum: outputtype.UsageMeterSum{
-				SumPacketTx: 1,
-				SumPacketRx: 0,
-				SumBitTx:    uint64(i << 3),
-				SumBitRx:    0,
-			},
-			UsageMeterMax: outputtype.UsageMeterMax{
-				MaxPacketTx: 1,
-				MaxPacketRx: 0,
-				MaxPacket:   1,
-				MaxBitTx:    uint64(i << 3),
-				MaxBitRx:    0,
-				MaxBit:      uint64(i << 3),
-			},
+			SumPacketTx: 1,
+			SumPacketRx: 0,
+			SumBitTx:    uint64(i << 3),
+			SumBitRx:    0,
 		}
 		p.meters[i][1] = &outputtype.UsageMeter{
-			UsageMeterSum: outputtype.UsageMeterSum{
-				SumPacketTx: 0,
-				SumPacketRx: 1,
-				SumBitTx:    0,
-				SumBitRx:    uint64(i << 3),
-			},
-			UsageMeterMax: outputtype.UsageMeterMax{
-				MaxPacketTx: 0,
-				MaxPacketRx: 1,
-				MaxPacket:   1,
-				MaxBitTx:    0,
-				MaxBitRx:    uint64(i << 3),
-				MaxBit:      uint64(i << 3),
-			},
+			SumPacketTx: 0,
+			SumPacketRx: 1,
+			SumBitTx:    0,
+			SumBitRx:    uint64(i << 3),
 		}
 	}
 
