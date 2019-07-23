@@ -30,12 +30,12 @@ enum AclDirection {
 }
 
 enum Scope {
-    SCOPE_ALL = 1;
-    SCOPE_IN_EPC = 2;
-    SCOPE_OUT_EPC = 3;
-    SCOPE_IN_SUBNET = 4;
-    SCOPE_OUT_SUBNET = 5;
-    SCOPE_INVALID = 6;
+    SCOPE_ALL = 0;
+    SCOPE_IN_EPC = 1;
+    SCOPE_OUT_EPC = 2;
+    SCOPE_IN_SUBNET = 3;
+    SCOPE_OUT_SUBNET = 4;
+    SCOPE_INVALID = 5;
 }
 
 message Tag {
