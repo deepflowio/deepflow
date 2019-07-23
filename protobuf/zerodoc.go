@@ -97,6 +97,10 @@ func TagToPB(t *Tag) *pb.Tag {
 		tag.AclDirection = pb.AclDirection(t.ACLDirection).Enum()
 	}
 
+	if t.Code&Scope != 0 {
+		tag.Scope = pb.Scope(t.Scope).Enum()
+	}
+
 	return tag
 }
 
@@ -186,6 +190,9 @@ func PBToTag(t *pb.Tag, tag *Tag) {
 	}
 	if tag.Code&ACLDirection != 0 {
 		tag.ACLDirection = ACLDirectionEnum(t.GetAclDirection())
+	}
+	if tag.Code&Scope != 0 {
+		tag.Scope = ScopeEnum(t.GetScope())
 	}
 }
 
@@ -425,4 +432,28 @@ func PBToTypeMeter(m *pb.TypeMeter, meter *TypeMeter) {
 	meter.SumCountTServerRst = m.GetSumCountTSRst()
 	meter.SumCountTServerHalfOpen = m.GetSumCountTSHalfOpen()
 	meter.SumCountTServerHalfClose = m.GetSumCountTSHalfClose()
+}
+
+func VTAPSimpleMeterToPB(m *VTAPSimpleMeter) *pb.VTAPSimpleMeter {
+	return &pb.VTAPSimpleMeter{
+		TxBytes:   proto.Uint64(m.TxBytes),
+		RxBytes:   proto.Uint64(m.RxBytes),
+		Bytes:     proto.Uint64(m.Bytes),
+		TxPackets: proto.Uint64(m.TxPackets),
+		RxPackets: proto.Uint64(m.RxPackets),
+		Packets:   proto.Uint64(m.Packets),
+	}
+}
+
+func PBToVTAPSimpleMeter(m *pb.VTAPSimpleMeter, meter *VTAPSimpleMeter) {
+	if meter == nil {
+		panic("meter为空")
+	}
+
+	meter.TxBytes = m.GetTxBytes()
+	meter.RxBytes = m.GetRxBytes()
+	meter.Bytes = m.GetBytes()
+	meter.TxPackets = m.GetTxPackets()
+	meter.RxPackets = m.GetRxPackets()
+	meter.Packets = m.GetPackets()
 }
