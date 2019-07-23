@@ -14,6 +14,7 @@ service Diagnose {
     rpc GetBridgeMapping(DiagnoseRequest) returns (DiagnoseResponse) {} // grep "^bridge_mappings" /etc/neutron/plugins/ml2/openvswitch.agent.ini
     rpc GetBrctlShow(DiagnoseRequest) returns (DiagnoseResponse) {} // brctl show
     rpc GetIpsetList(DiagnoseRequest) returns (DiagnoseResponse) {} // ipset list
+    rpc GetOvsVersion(DiagnoseRequest) returns (DiagnoseResponse) {} // ovs-vswitchd --version
 
     // ACL
     rpc GetIptablesAcls(DiagnoseRequest) returns (DiagnoseResponse) {} // iptables -w 1 -vnL --line-numbers -x
