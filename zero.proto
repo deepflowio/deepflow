@@ -29,6 +29,15 @@ enum AclDirection {
     BACKWARD = 2;
 }
 
+enum Scope {
+    SCOPE_ALL = 1;
+    SCOPE_IN_EPC = 2;
+    SCOPE_OUT_EPC = 3;
+    SCOPE_IN_SUBNET = 4;
+    SCOPE_OUT_SUBNET = 5;
+    SCOPE_INVALID = 6;
+}
+
 message Tag {
     optional string id = 1;
     optional uint64 code = 2;
@@ -75,6 +84,7 @@ message Tag {
     optional uint32 tap_type = 48;
     optional uint32 subnet_id = 49;
     optional uint32 acl_id = 50;
+    optional Scope  scope = 51;
 
     optional string country = 60;
     optional string region = 61;
@@ -193,6 +203,15 @@ message TypeMeter {
     optional uint64 sum_count_t_s_half_close = 36;
 }
 
+message VTAPSimpleMeter {
+    optional uint64 tx_bytes = 1;
+    optional uint64 rx_bytes = 2;
+    optional uint64 bytes = 3;
+    optional uint64 tx_packets = 4;
+    optional uint64 rx_packets = 5;
+    optional uint64 packets = 6;
+}
+
 message Meter {
     optional UsageMeter usage = 1;
     optional PerfMeter perf = 2;
@@ -201,6 +220,7 @@ message Meter {
     optional ConsoleLogMeter console_log = 6;
     optional TypeMeter type = 8;
     optional FpsMeter fps = 9;
+    optional VTAPSimpleMeter vtap_simple = 10;
 }
 
 message ZeroHeader {
