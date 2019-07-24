@@ -6,20 +6,15 @@ vendor:
 	cp -r $(shell go list -e -f '{{.Dir}}' ${MESSAGE})/* vendor/${MESSAGE}/
 	find vendor -type d -exec chmod +w {} \;
 	cd vendor/${MESSAGE}/ && go generate ./...
-	cd xdppacket/ebpf/; chmod a+x remote-make; ./remote-make
 	go generate ./geo/...
 	go generate ./zerodoc/...
 
-test: vendor
-	go test -mod vendor -short ./... -timeout 30s -coverprofile .test-coverage.txt
-	go tool cover -func=.test-coverage.txt
-
-bench: vendor
-	go test -mod vendor -bench=. ./...
+test: 
+	go build -tags="xdp" -o benchTest main.go
 
 clean:
 	git clean -dfx
 
 .DEFAULT_GOAL := test
 
-.PHONY: test module bench clean
+.PHONY: test module clean
