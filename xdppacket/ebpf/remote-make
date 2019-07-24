@@ -1,0 +1,77 @@
+#!/bin/bash
+
+SCP="scp -4 -r \
+    -o VerifyHostKeyDNS=no \
+    -o StrictHostKeyChecking=no \
+    -o GSSAPIAuthentication=no \
+    -o UserKnownHostsFile=/dev/null \
+    -o LogLevel=ERROR"
+SSH="ssh -4 -a \
+    -o VerifyHostKeyDNS=no \
+    -o StrictHostKeyChecking=no \
+    -o GSSAPIAuthentication=no \
+    -o UserKnownHostsFile=/dev/null \
+    -o LogLevel=ERROR"
+
+usage()
+{
+    echo "Usage: $0 [ <compiler-ip> <compiler-root-passwd> ]"
+    echo "Tips:  $0 10.30.200.9 ******"
+}
+
+parse()
+{
+    if [[ $# -ne 0 ]] && [[ $# -ne 2 ]]; then
+        usage
+        exit 1
+    fi
+}
+
+file_grep()
+{
+    key=$1
+    file=$2
+    grep -w "$key" $file 2>/dev/null | awk -F':' '{print $2}' | grep -o '[^ ]*'
+}
+
+param_init()
+{
+    project=xdpsock
+    sys_ip=10.30.200.9
+    sys_passwd=******
+    SYS=root@$sys_ip
+    SSH_EXEC="sshpass -p $sys_passwd $SSH"
+    SCP_EXEC="sshpass -p $sys_passwd $SCP"
+    t=`date "+%Y%m%d-%H%M%S-%N"`
+    source_file=`ls | grep -v ".*go" | xargs `
+    obj_surfix=_kern.o
+    ROOT_DIR=/tmp/$project-$t
+}
+
+remote_make()
+{
+    check=`$SSH_EXEC $SYS pwd 2>/dev/null`
+    if [[ -z $check ]]; then
+        echo "ERROR: $SYS cannot be accessed"
+        exit 1
+    fi
+
+    $SSH_EXEC $SYS mkdir -p $ROOT_DIR
+    $SCP_EXEC -r $source_file $SYS:$ROOT_DIR
+    $SSH_EXEC $SYS "cd $ROOT_DIR; make clean && make"
+    ret=$?
+    rm -f ../*$obj_surfix
+    $SCP_EXEC -r $SYS:$ROOT_DIR/*$obj_surfix ../
+    $SSH_EXEC $SYS rm -rf $ROOT_DIR
+    return $ret
+}
+
+main()
+{
+    parse $@
+    param_init $@
+    remote_make
+    exit $?
+}
+
+main $@
