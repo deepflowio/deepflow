@@ -165,7 +165,7 @@ func newPolicyData(acl *trident.FlowAcl) *policy.Acl {
 		DstGroups:    datatype.SplitGroup2Int(acl.GetDstGroupIds()),
 		SrcPortRange: datatype.SplitPort2Int(acl.GetSrcPorts()),
 		DstPortRange: datatype.SplitPort2Int(acl.GetDstPorts()),
-		Proto:        uint8(acl.GetProtocol()),
+		Proto:        uint8(acl.GetProtocol() & 0xff),
 		Vlan:         acl.GetVlan() & 0xfff,
 		Action:       newAclAction(datatype.ACLID(acl.GetId()), acl.GetActions()),
 		NpbActions:   newNpbActions(acl.GetNpbActions()),
