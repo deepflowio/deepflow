@@ -15,22 +15,24 @@ type Metrics struct {
 type MetricsField uint32
 
 const (
-	METRICS_ALL MetricsField = 1 << iota
-	METRICS_EPC
-	METRICS_SUBNET
-
-	METRICS_TCP
-	METRICS_EPC_TCP
-	METRICS_SUBNET_TCP
-
-	METRICS_UDP
-	METRICS_EPC_UDP
-	METRICS_SUBNET_UDP
-
-	METRICS_BROADCAST
+	// L2
+	METRICS_BROADCAST MetricsField = 1 << iota
 	METRICS_MULTICAST
 	METRICS_UNICAST
 
+	// L3
+	METRICS_TCP_IN_EPC
+	METRICS_TCP_OUT_EPC
+	METRICS_UDP_IN_EPC
+	METRICS_UDP_OUT_EPC
+	METRICS_OTHERS_IN_EPC
+	METRICS_OTHERS_OUT_EPC
+	// L3, for VTAPUsageEdgeMeter
+	METRICS_TCP
+	METRICS_UDP
+	METRICS_OTHERS
+
+	// TCP
 	METRICS_TCP_FLAG_SYN     // SYN
 	METRICS_TCP_FLAG_SYN_ACK // SYN+ACK
 	METRICS_TCP_FLAG_ACK     // ACK
@@ -43,22 +45,20 @@ const (
 type VTAPUsageMeter struct {
 	Fields MetricsField
 
-	All      Metrics
-	InEPC    Metrics
-	InSubnet Metrics
-
-	TCP         Metrics
-	InEPCTCP    Metrics
-	InSubnetTCP Metrics
-
-	UDP         Metrics
-	InEPCUDP    Metrics
-	InSubnetUDP Metrics
-
+	// L2
 	Broadcast Metrics
 	Multicast Metrics
 	Unicast   Metrics
 
+	// L3
+	TCPInEPC     Metrics
+	TCPOutEPC    Metrics
+	UDPInEPC     Metrics
+	UDPOutEPC    Metrics
+	OthersInEPC  Metrics
+	OthersOutEPC Metrics
+
+	// TCP
 	TCPFlagSYN    Metrics
 	TCPFlagSYNACK Metrics
 	TCPFlagACK    Metrics
@@ -80,22 +80,6 @@ func (m *Metrics) Decode(decoder *codec.SimpleDecoder) {
 	m.RxBytes = decoder.ReadU64()
 	m.TxPackets = decoder.ReadU64()
 	m.RxPackets = decoder.ReadU64()
-}
-
-func (m *Metrics) HasValue() bool {
-	return m.TxPackets != 0 || m.RxPackets != 0
-}
-
-// 暂时保留，后续废弃删除
-func (m *Metrics) Sub(s *Metrics) *Metrics {
-	r := &Metrics{}
-	r.TxBytes = m.TxBytes - s.TxBytes
-	r.RxBytes = m.RxBytes - s.RxBytes
-	if m.TxPackets >= s.TxPackets && m.RxPackets >= s.RxPackets {
-		r.TxPackets = m.TxPackets - s.TxPackets
-		r.RxPackets = m.RxPackets - s.RxPackets
-	}
-	return r
 }
 
 func (m *Metrics) SortKey() uint64 {
@@ -137,33 +121,7 @@ func (m *Metrics) SequentialMerge(other app.Meter) {
 
 func (m *VTAPUsageMeter) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU32(uint32(m.Fields))
-	if m.Fields&METRICS_ALL != 0 {
-		m.All.Encode(encoder)
-	}
-	if m.Fields&METRICS_EPC != 0 {
-		m.InEPC.Encode(encoder)
-	}
-	if m.Fields&METRICS_SUBNET != 0 {
-		m.InSubnet.Encode(encoder)
-	}
-	if m.Fields&METRICS_TCP != 0 {
-		m.TCP.Encode(encoder)
-	}
-	if m.Fields&METRICS_EPC_TCP != 0 {
-		m.InEPCTCP.Encode(encoder)
-	}
-	if m.Fields&METRICS_SUBNET_TCP != 0 {
-		m.InSubnetTCP.Encode(encoder)
-	}
-	if m.Fields&METRICS_UDP != 0 {
-		m.UDP.Encode(encoder)
-	}
-	if m.Fields&METRICS_EPC_UDP != 0 {
-		m.InEPCUDP.Encode(encoder)
-	}
-	if m.Fields&METRICS_SUBNET_UDP != 0 {
-		m.InSubnetUDP.Encode(encoder)
-	}
+
 	if m.Fields&METRICS_BROADCAST != 0 {
 		m.Broadcast.Encode(encoder)
 	}
@@ -173,6 +131,26 @@ func (m *VTAPUsageMeter) Encode(encoder *codec.SimpleEncoder) {
 	if m.Fields&METRICS_UNICAST != 0 {
 		m.Unicast.Encode(encoder)
 	}
+
+	if m.Fields&METRICS_TCP_IN_EPC != 0 {
+		m.TCPInEPC.Encode(encoder)
+	}
+	if m.Fields&METRICS_TCP_OUT_EPC != 0 {
+		m.TCPOutEPC.Encode(encoder)
+	}
+	if m.Fields&METRICS_UDP_IN_EPC != 0 {
+		m.UDPInEPC.Encode(encoder)
+	}
+	if m.Fields&METRICS_UDP_OUT_EPC != 0 {
+		m.UDPOutEPC.Encode(encoder)
+	}
+	if m.Fields&METRICS_OTHERS_IN_EPC != 0 {
+		m.OthersInEPC.Encode(encoder)
+	}
+	if m.Fields&METRICS_OTHERS_OUT_EPC != 0 {
+		m.OthersOutEPC.Encode(encoder)
+	}
+
 	if m.Fields&METRICS_TCP_FLAG_SYN != 0 {
 		m.TCPFlagSYN.Encode(encoder)
 	}
@@ -198,33 +176,7 @@ func (m *VTAPUsageMeter) Encode(encoder *codec.SimpleEncoder) {
 
 func (m *VTAPUsageMeter) Decode(decoder *codec.SimpleDecoder) {
 	m.Fields = MetricsField(decoder.ReadU32())
-	if m.Fields&METRICS_ALL != 0 {
-		m.All.Decode(decoder)
-	}
-	if m.Fields&METRICS_EPC != 0 {
-		m.InEPC.Decode(decoder)
-	}
-	if m.Fields&METRICS_SUBNET != 0 {
-		m.InSubnet.Decode(decoder)
-	}
-	if m.Fields&METRICS_TCP != 0 {
-		m.TCP.Decode(decoder)
-	}
-	if m.Fields&METRICS_EPC_TCP != 0 {
-		m.InEPCTCP.Decode(decoder)
-	}
-	if m.Fields&METRICS_SUBNET_TCP != 0 {
-		m.InSubnetTCP.Decode(decoder)
-	}
-	if m.Fields&METRICS_UDP != 0 {
-		m.UDP.Decode(decoder)
-	}
-	if m.Fields&METRICS_EPC_UDP != 0 {
-		m.InEPCUDP.Decode(decoder)
-	}
-	if m.Fields&METRICS_SUBNET_UDP != 0 {
-		m.InSubnetUDP.Decode(decoder)
-	}
+
 	if m.Fields&METRICS_BROADCAST != 0 {
 		m.Broadcast.Decode(decoder)
 	}
@@ -234,6 +186,26 @@ func (m *VTAPUsageMeter) Decode(decoder *codec.SimpleDecoder) {
 	if m.Fields&METRICS_UNICAST != 0 {
 		m.Unicast.Decode(decoder)
 	}
+
+	if m.Fields&METRICS_TCP_IN_EPC != 0 {
+		m.TCPInEPC.Decode(decoder)
+	}
+	if m.Fields&METRICS_TCP_OUT_EPC != 0 {
+		m.TCPOutEPC.Decode(decoder)
+	}
+	if m.Fields&METRICS_UDP_IN_EPC != 0 {
+		m.UDPInEPC.Decode(decoder)
+	}
+	if m.Fields&METRICS_UDP_OUT_EPC != 0 {
+		m.UDPOutEPC.Decode(decoder)
+	}
+	if m.Fields&METRICS_OTHERS_IN_EPC != 0 {
+		m.OthersInEPC.Decode(decoder)
+	}
+	if m.Fields&METRICS_OTHERS_OUT_EPC != 0 {
+		m.OthersOutEPC.Decode(decoder)
+	}
+
 	if m.Fields&METRICS_TCP_FLAG_SYN != 0 {
 		m.TCPFlagSYN.Decode(decoder)
 	}
@@ -258,7 +230,7 @@ func (m *VTAPUsageMeter) Decode(decoder *codec.SimpleDecoder) {
 }
 
 func (m *VTAPUsageMeter) SortKey() uint64 {
-	return m.All.SortKey()
+	panic("not supported!")
 }
 
 func (m *VTAPUsageMeter) ToKVString() string {
@@ -273,36 +245,6 @@ func (m *VTAPUsageMeter) ConcurrentMerge(other app.Meter) {
 	if other, ok := other.(*VTAPUsageMeter); ok {
 		m.Fields |= other.Fields
 
-		if m.Fields&METRICS_ALL != 0 {
-			m.All.Merge(&other.All)
-		}
-		if m.Fields&METRICS_EPC != 0 {
-			m.InEPC.Merge(&other.InEPC)
-		}
-		if m.Fields&METRICS_SUBNET != 0 {
-			m.InSubnet.Merge(&other.InSubnet)
-		}
-
-		if m.Fields&METRICS_TCP != 0 {
-			m.TCP.Merge(&other.TCP)
-		}
-		if m.Fields&METRICS_EPC_TCP != 0 {
-			m.InEPCTCP.Merge(&other.InEPCTCP)
-		}
-		if m.Fields&METRICS_SUBNET_TCP != 0 {
-			m.InSubnetTCP.Merge(&other.InSubnetTCP)
-		}
-
-		if m.Fields&METRICS_UDP != 0 {
-			m.UDP.Merge(&other.UDP)
-		}
-		if m.Fields&METRICS_EPC_UDP != 0 {
-			m.InEPCUDP.Merge(&other.InEPCUDP)
-		}
-		if m.Fields&METRICS_SUBNET_UDP != 0 {
-			m.InSubnetUDP.Merge(&other.InSubnetUDP)
-		}
-
 		if m.Fields&METRICS_BROADCAST != 0 {
 			m.Broadcast.Merge(&other.Broadcast)
 		}
@@ -311,6 +253,25 @@ func (m *VTAPUsageMeter) ConcurrentMerge(other app.Meter) {
 		}
 		if m.Fields&METRICS_UNICAST != 0 {
 			m.Unicast.Merge(&other.Unicast)
+		}
+
+		if m.Fields&METRICS_TCP_IN_EPC != 0 {
+			m.TCPInEPC.Merge(&other.TCPInEPC)
+		}
+		if m.Fields&METRICS_TCP_OUT_EPC != 0 {
+			m.TCPOutEPC.Merge(&other.TCPOutEPC)
+		}
+		if m.Fields&METRICS_UDP_IN_EPC != 0 {
+			m.UDPInEPC.Merge(&other.UDPInEPC)
+		}
+		if m.Fields&METRICS_UDP_OUT_EPC != 0 {
+			m.UDPOutEPC.Merge(&other.UDPOutEPC)
+		}
+		if m.Fields&METRICS_OTHERS_IN_EPC != 0 {
+			m.OthersInEPC.Merge(&other.OthersInEPC)
+		}
+		if m.Fields&METRICS_OTHERS_OUT_EPC != 0 {
+			m.OthersOutEPC.Merge(&other.OthersOutEPC)
 		}
 
 		if m.Fields&METRICS_TCP_FLAG_SYN != 0 {
