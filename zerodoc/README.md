@@ -112,13 +112,13 @@ vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version
 |                   |      |                         | s2c: ip/ip_0为服务端，ip_1为客户端    |
 | acl_gid           | 33   | ACL组ID                 | APP策略对应的ACL组ID                  |
 | vlan_id           | 34   |                         |                                       |
-| protocol          | 35   | 协议                    | df\_\*, log\_\*:                      |
+| protocol          | 35   | 协议                    | df\_\*和log\_\*:                      |
 |                   |      |                         |   0: 非IP包                           |
 |                   |      |                         |   1-255: IP protocol number           |
 |                   |      |                         |   注意当存在server_port时仅有TCP/UDP  |
 |                   |      |                         | vtap\_\*:                             |
+|                   |      |                         |   0: ANY                              |
 |                   |      |                         |   6/17: TCP/UDP                       |
-|                   |      |                         |   255: 其它                           |
 | server_port       | 36   | 服务端端口              |                                       |
 | cast_type         | 37   | 播送类型                | broadcast: 广播，目的MAC为广播MAC     |
 |                   |      |                         | multicast: 组播，目的MAC为组播MAC     |
@@ -137,8 +137,11 @@ vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version
 |                   |      |                         |   4+16: RST+ACK                       |
 | acl_direction     | 42   | ACL匹配的方向           | fwd: 正向匹配                         |
 |                   |      |                         | bwd: 反向匹配                         |
-| scope             | 43   |                         | 1: VPC内                              |
+| scope             | 43   |                         | 0: 所有                               |
+|                   |      |                         | 1: VPC内                              |
 |                   |      |                         | 2: VPC间                              |
+|                   |      |                         | 3: 子网内                             |
+|                   |      |                         | 4: 子网间                             |
 |                   |      |                         |                                       |
 | CODE_INDEX        | 48-53| 不能使用                | 用于标识Code的Index                   |
 |                   |      |                         |                                       |
