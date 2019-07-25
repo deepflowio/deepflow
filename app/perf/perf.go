@@ -146,11 +146,6 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				MaxRTTSynClient: flow.ClosedRTTSynClient(),
 				MaxRTTSynServer: flow.ClosedRTTSynServer(),
 			},
-			PerfMeterMin: outputtype.PerfMeterMin{
-				MinRTTSyn: flow.ClosedRTTSyn(),
-				MinRTTAvg: flow.GetRTT(),
-				MinARTAvg: flow.GetART(),
-			},
 		}
 
 		field := &p.fields[thisEnd]
