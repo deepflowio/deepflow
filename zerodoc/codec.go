@@ -45,6 +45,8 @@ func Encode(sequence uint32, doc *app.Document, encoder *codec.SimpleEncoder) er
 		msgType = MSG_LOG_USAGE
 	case *VTAPUsageMeter:
 		msgType = MSG_VTAP_USAGE
+	case *VTAPUsageEdgeMeter:
+		msgType = MSG_VTAP_USAGE_EDGE
 	case *VTAPSimpleMeter:
 		msgType = MSG_VTAP_SIMPLE
 	default:
@@ -83,6 +85,8 @@ func Encode(sequence uint32, doc *app.Document, encoder *codec.SimpleEncoder) er
 		meter = doc.Meter.(*LogUsageMeter)
 	case MSG_VTAP_USAGE:
 		meter = doc.Meter.(*VTAPUsageMeter)
+	case MSG_VTAP_USAGE_EDGE:
+		meter = doc.Meter.(*VTAPUsageEdgeMeter)
 	case MSG_VTAP_SIMPLE:
 		meter = doc.Meter.(*VTAPSimpleMeter)
 	}
@@ -149,6 +153,10 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 		doc.Meter = m
 	case MSG_VTAP_USAGE:
 		m := AcquireVTAPUsageMeter()
+		m.Decode(decoder)
+		doc.Meter = m
+	case MSG_VTAP_USAGE_EDGE:
+		m := AcquireVTAPUsageEdgeMeter()
 		m.Decode(decoder)
 		doc.Meter = m
 	case MSG_VTAP_SIMPLE:

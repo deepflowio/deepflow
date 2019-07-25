@@ -170,13 +170,9 @@ const (
 type ScopeEnum uint8
 
 const (
-	SCOPE_ALL ScopeEnum = iota
+	SCOPE_INVALID ScopeEnum = iota
 	SCOPE_IN_EPC
 	SCOPE_OUT_EPC
-	SCOPE_IN_SUBNET
-	SCOPE_OUT_SUBNET
-
-	SCOPE_INVALID
 )
 
 type Field struct {
