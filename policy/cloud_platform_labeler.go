@@ -424,7 +424,7 @@ func (l *CloudPlatformLabeler) ModifyEndpointData(endpointData *EndpointData, ke
 
 func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	srcIp, dstIp := IpFromUint32(key.SrcIp), IpFromUint32(key.DstIp)
-	// 测试用例key.EthType值为填写，需要通过len(key.Src6Ip)
+	// 测试用例key.EthType值未填写，需要通过len(key.Src6Ip)
 	if key.EthType == EthernetTypeIPv6 || len(key.Src6Ip) > 0 {
 		srcIp, dstIp = key.Src6Ip, key.Dst6Ip
 	}
@@ -433,8 +433,8 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
 	l.ModifyEndpointData(endpoint, key)
 	l.ModifyPrivateIp(endpoint, key)
-	l.ipGroup.Populate(key.SrcIp, endpoint.SrcInfo)
-	l.ipGroup.Populate(key.DstIp, endpoint.DstInfo)
+	l.ipGroup.Populate(srcIp, endpoint.SrcInfo)
+	l.ipGroup.Populate(dstIp, endpoint.DstInfo)
 	return endpoint
 }
 

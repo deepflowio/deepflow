@@ -2,6 +2,7 @@ package policy
 
 import (
 	"math"
+	"net"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
@@ -19,6 +20,11 @@ type IpGroupData struct {
 	EpcId int32
 	Type  uint8
 	Ips   []string
+}
+
+type Ip6GroupItem struct {
+	id    uint32
+	ipNet *net.IPNet
 }
 
 type MaskLenGroupData struct {
@@ -39,8 +45,12 @@ type IpResourceGroup struct {
 	maskLenGroupData     *MaskLenGroupData     // 保存大于16掩码的资源组信息
 	maskLenGroupDataMini *MaskLenGroupDataMini // 保存小于等于16掩码的资源组信息
 	anonymousGroupIds    map[uint32]bool       // 匿名资源组相关数据
+	anonymousIp4GroupIds map[uint32]bool       // 匿名资源组相关数据由IPv4数据生成
+	anonymousIp6GroupIds map[uint32]bool       // 匿名资源组相关数据由IPv6数据生成
 	maskLenData          *MaskLenData          // IP资源组涉及到大于16掩码
 	maskLenDataMini      *MaskLenData          // IP资源组涉及到小于等于16掩码
+
+	ip6EpcMap *[math.MaxUint16 + 1][]*Ip6GroupItem
 
 	internetGroupIds []uint32 // internet资源组ID单独存放, 因为是0.0.0.0/0网段匹配所有IP地址
 }
@@ -81,7 +91,8 @@ func NewMaskLenGroupDataMini() *MaskLenGroupDataMini {
 }
 
 func NewIpResourceGroup() *IpResourceGroup {
-	return &IpResourceGroup{NewMaskLenGroupData(), NewMaskLenGroupDataMini(), map[uint32]bool{}, NewMaskLenData(), NewMaskLenData(), nil}
+	return &IpResourceGroup{NewMaskLenGroupData(), NewMaskLenGroupDataMini(), map[uint32]bool{},
+		map[uint32]bool{}, map[uint32]bool{}, NewMaskLenData(), NewMaskLenData(), nil, nil}
 }
 
 func addGroupIdToMap(epcMaskedIpGroupMap map[uint64]*GroupIdData, epcIpKey uint64, id uint32) {
@@ -116,6 +127,26 @@ func addGroupIdToMiniMap(epcMaskedIpGroupMap map[uint32]*GroupIdData, epcIpKey u
 	}
 }
 
+func (g *IpResourceGroup) GenerateIp6NetmaskMap(ipgroupData []*IpGroupData) {
+	var ip6EpcMap [math.MaxUint16 + 1][]*Ip6GroupItem
+	anonymousGroupIds := map[uint32]bool{}
+	for _, group := range ipgroupData {
+		// 建立AnonymousGroupId表
+		g.AddAnonymousGroupId(anonymousGroupIds, group)
+		for _, raw := range group.Ips {
+			_, ipNet, err := net.ParseCIDR(raw)
+			if err != nil || len(ipNet.IP) == 4 {
+				continue
+			}
+			epc := group.EpcId & 0xffff
+			item := &Ip6GroupItem{id: group.Id, ipNet: ipNet}
+			ip6EpcMap[epc] = append(ip6EpcMap[epc], item)
+		}
+	}
+	g.ip6EpcMap = &ip6EpcMap
+	g.anonymousIp6GroupIds = anonymousGroupIds
+}
+
 func (g *IpResourceGroup) GenerateIpNetmaskMap(ipgroupData []*IpGroupData) {
 	maskLenGroupData := NewMaskLenGroupData()
 	maskLenGroupDataMini := NewMaskLenGroupDataMini()
@@ -130,22 +161,23 @@ func (g *IpResourceGroup) GenerateIpNetmaskMap(ipgroupData []*IpGroupData) {
 		id := group.Id
 		for _, raw := range group.Ips {
 			ip, maskLen, err := utils.IpNetmaskFromStringCIDR(raw)
-			if err != nil {
+			if err != nil || len(ip) == 16 {
 				continue
 			}
+			ip4 := utils.IpToUint32(ip)
 			// internet资源组只有这一种即 "{epc: EPC_FROM_INTERNET, ips:"0.0.0.0/0"}", 所以不建立查询map
-			if ip == 0 && maskLen == 0 && epcId == EPC_FROM_INTERNET {
+			if ip4 == 0 && maskLen == 0 && epcId == EPC_FROM_INTERNET {
 				internetGroupIds = append(internetGroupIds, IP_GROUP_ID_FLAG+id)
 				continue
 			}
 
 			mask := utils.MaskLenToNetmask(maskLen)
 			if maskLen > STANDARD_MASK_LEN {
-				epcIpKey := (uint64(epcId) << 32) | uint64(ip&mask)
+				epcIpKey := (uint64(epcId) << 32) | uint64(ip4&mask)
 				addGroupIdToMap(maskLenGroupData.maskLenGroups[maskLen], epcIpKey, id)
 				maskLenData.Add(uint16(maskLen))
 			} else {
-				epcIpKey := uint32(epcId)<<16 | uint32(ip&mask)>>16
+				epcIpKey := uint32(epcId)<<16 | uint32(ip4&mask)>>16
 				addGroupIdToMiniMap(maskLenGroupDataMini.maskLenGroups[maskLen], epcIpKey, id)
 				maskLenDataMini.Add(uint16(maskLen))
 			}
@@ -153,7 +185,7 @@ func (g *IpResourceGroup) GenerateIpNetmaskMap(ipgroupData []*IpGroupData) {
 	}
 	g.maskLenGroupData = maskLenGroupData
 	g.maskLenGroupDataMini = maskLenGroupDataMini
-	g.anonymousGroupIds = anonymousGroupIds
+	g.anonymousIp4GroupIds = anonymousGroupIds
 	g.maskLenData = maskLenData
 	g.maskLenDataMini = maskLenDataMini
 	g.internetGroupIds = internetGroupIds
@@ -184,11 +216,38 @@ func getIpGroupIdFromMiniMap(key uint32, groupIdSlice []uint32, groupIdMap map[u
 	return groupIdSlice
 }
 
+func (g *IpResourceGroup) GetGroupIdsByIpv6(ip net.IP, endpointInfo *EndpointInfo) []uint32 {
+	// 未初始化直接返回
+	if g.ip6EpcMap == nil {
+		return nil
+	}
+	groupIdSlice := make([]uint32, 0, 4)
+	var groupIdMap [math.MaxUint16 + 1]bool
+	if endpointInfo.L3EpcId > 0 {
+		for _, item := range g.ip6EpcMap[endpointInfo.L3EpcId] {
+			if item.ipNet.Contains(ip) && groupIdMap[item.id] == false {
+				groupIdSlice = append(groupIdSlice, item.id)
+				// 避免添加重复的资源组ID
+				groupIdMap[item.id] = true
+			}
+		}
+	}
+	// 查找epc为0的
+	for _, item := range g.ip6EpcMap[0] {
+		if item.ipNet.Contains(ip) && groupIdMap[item.id] == false {
+			groupIdSlice = append(groupIdSlice, item.id)
+			// 避免添加重复的资源组ID
+			groupIdMap[item.id] = true
+		}
+	}
+	return groupIdSlice
+}
+
 func (g *IpResourceGroup) GetGroupIds(ip uint32, endpointInfo *EndpointInfo) []uint32 {
 	var groupIdSlice []uint32
 	groupIdMap := map[uint32]bool{}
 	epcId := uint16(0)
-	if endpointInfo.L3EpcId != -1 {
+	if endpointInfo.L3EpcId > 0 {
 		epcId = uint16(endpointInfo.L3EpcId)
 	}
 	for _, maskLen := range g.maskLenData.maskLenSlice {
@@ -215,8 +274,19 @@ func (g *IpResourceGroup) GetGroupIds(ip uint32, endpointInfo *EndpointInfo) []u
 	return groupIdSlice
 }
 
+func (g *IpResourceGroup) GenerateAnonymousGroupIdMap() {
+	// 合并IPv4和IPv6的anonymousGroupIds
+	anonymousGroupIds := g.anonymousIp4GroupIds
+	for key, value := range g.anonymousIp6GroupIds {
+		anonymousGroupIds[key] = value
+	}
+	g.anonymousGroupIds = anonymousGroupIds
+}
+
 func (g *IpResourceGroup) Update(groups []*IpGroupData) {
 	g.GenerateIpNetmaskMap(groups)
+	g.GenerateIp6NetmaskMap(groups)
+	g.GenerateAnonymousGroupIdMap()
 }
 
 func inDevGroupIds(groupIds []uint32, len int, groupId uint32) bool {
@@ -230,16 +300,25 @@ func inDevGroupIds(groupIds []uint32, len int, groupId uint32) bool {
 }
 
 // Populate fills tags in flow message
-func (g *IpResourceGroup) Populate(ip uint32, endpointInfo *EndpointInfo) {
+func (g *IpResourceGroup) Populate(ip net.IP, endpointInfo *EndpointInfo) {
 	devGroupIdLen := len(endpointInfo.GroupIds)
-	for _, v := range g.GetGroupIds(ip, endpointInfo) {
+	var groupIds []uint32
+	// 查询资源组ID
+	if len(ip) == 4 {
+		groupIds = g.GetGroupIds(utils.IpToUint32(ip), endpointInfo)
+	} else {
+		groupIds = g.GetGroupIdsByIpv6(ip, endpointInfo)
+	}
+
+	// 给资源组打IP_GROUP_ID_FLAG标签
+	for _, v := range groupIds {
 		if !inDevGroupIds(endpointInfo.GroupIds, devGroupIdLen, v) {
 			endpointInfo.GroupIds = append(endpointInfo.GroupIds, uint32(v)+IP_GROUP_ID_FLAG)
 		}
 	}
 	// 当流量未匹配到任何资源组，其为internet网络IP
 	// ip为0时，L2EpcId会赋值给L3EpcId, 是非internet流量
-	if len(endpointInfo.GroupIds) == 0 && endpointInfo.L3EpcId == 0 && ip != 0 {
+	if len(endpointInfo.GroupIds) == 0 && endpointInfo.L3EpcId == 0 && !ip.IsUnspecified() {
 		endpointInfo.GroupIds = append(endpointInfo.GroupIds, g.internetGroupIds...)
 	}
 }
