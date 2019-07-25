@@ -46,6 +46,15 @@ func (m *VTAPSimpleMeter) Merge(other *VTAPSimpleMeter) {
 	m.Packets += other.Packets
 }
 
+func (m *VTAPSimpleMeter) MergeMetrics(other *Metrics) {
+	m.TxBytes += other.TxBytes
+	m.RxBytes += other.RxBytes
+	m.Bytes += other.TxBytes + other.RxBytes
+	m.TxPackets += other.TxPackets
+	m.RxPackets += other.RxPackets
+	m.Packets += other.TxPackets + other.RxPackets
+}
+
 func (m *VTAPSimpleMeter) SortKey() uint64 {
 	panic("not supported!")
 }
