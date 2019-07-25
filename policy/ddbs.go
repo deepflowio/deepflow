@@ -442,7 +442,9 @@ func (d *Ddbs) generateGroupIpMap(data []*IpGroupData) {
 		if data.Id != 0 {
 			groupId := uint16(data.Id & 0xffff)
 			for _, ips := range data.Ips {
-				groupIpMap[groupId] = append(groupIpMap[groupId], newIpSegment(ips, uint16(data.EpcId&0xffff)))
+				if segment, ok := newIpSegment(ips, uint16(data.EpcId&0xffff)); ok {
+					groupIpMap[groupId] = append(groupIpMap[groupId], segment)
+				}
 			}
 		}
 	}

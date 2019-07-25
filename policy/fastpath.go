@@ -333,17 +333,21 @@ func (f *FastPath) GenerateIpNetmaskMapFromIpGroupData(data []*IpGroupData) {
 				log.Warning(err)
 				continue
 			}
+			if len(ip) == 16 {
+				continue
+			}
+			ip4 := IpToUint32(ip)
 			// internet资源因为匹配左右IP, 不需要加在这里
-			if ip == 0 && d.EpcId == 0 && maskSize == 0 {
+			if ip4 == 0 && d.EpcId == 0 && maskSize == 0 {
 				continue
 			}
 
-			minNetIp := ip & STANDARD_NETMASK
+			minNetIp := ip4 & STANDARD_NETMASK
 			maxNetIp := minNetIp
 			mask := uint32(math.MaxUint32) << uint32(32-maskSize)
 			// netmask must be either 0 or STANDARD_NETMASK~math.MaxUint32
 			if mask < STANDARD_NETMASK {
-				minNetIp = ip & mask
+				minNetIp = ip4 & mask
 				maxNetIp = (minNetIp | ^mask) & STANDARD_NETMASK
 				mask = STANDARD_NETMASK
 			}

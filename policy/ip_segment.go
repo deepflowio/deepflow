@@ -14,14 +14,17 @@ var (
 )
 
 // 192.168.10.100/24 -> 192.168.10.0/0xffffff00
-func newIpSegment(ips string, epcId uint16) ipSegment {
+func newIpSegment(ips string, epcId uint16) (ipSegment, bool) {
 	segment := ipSegment{}
-	maskCount := uint32(0)
-	segment.ip, maskCount, _ = IpNetmaskFromStringCIDR(ips)
+	ip, maskCount, _ := IpNetmaskFromStringCIDR(ips)
+	if len(ip) == 16 {
+		return segment, false
+	}
+	segment.ip = IpToUint32(ip)
 	segment.mask = 0xffffffff << (32 - maskCount)
 	segment.ip = segment.ip & segment.mask
 	segment.epcId = epcId
-	return segment
+	return segment, true
 }
 
 func (s *ipSegment) getEpcId() uint16 {
