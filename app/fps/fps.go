@@ -31,26 +31,20 @@ var (
 		SumFlowCount:       1,
 		SumNewFlowCount:    1,
 		SumClosedFlowCount: 1,
-		MaxFlowCount:       1,
-		MaxNewFlowCount:    1,
 	}
 	// 整个生命周期大于1秒的流，于第一个周期内开始时刻的统计量
 	FIRST_METER = outputtype.FPSMeter{
 		SumFlowCount:    1,
 		SumNewFlowCount: 1,
-		MaxFlowCount:    1,
-		MaxNewFlowCount: 1,
 	}
 	// 整个生命周期大于1秒的流，排除第一个周期内开始时刻和最后一个周期内结束时刻，于每分钟第0秒的统计量
 	MIDDLE_METER = outputtype.FPSMeter{
 		SumFlowCount: 1,
-		MaxFlowCount: 1,
 	}
 	// 整个生命周期大于1秒、本次上报周期大于1秒、且已结束的流
 	LAST_METER = outputtype.FPSMeter{
 		SumFlowCount:       1,
 		SumClosedFlowCount: 1,
-		MaxFlowCount:       1,
 	}
 	// 整个生命周期大于1秒、本次上报周期为1秒、且已结束的流
 	RESIDUAL_LAST_METER = outputtype.FPSMeter{
