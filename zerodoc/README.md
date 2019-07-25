@@ -153,6 +153,8 @@ vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version
 
 ### df_usage
 
+存储1s、1m两种粒度的数据，统计量均以包的timestamp为准。
+
 | 统计值                | 说明                         |
 | --------------------- | ---------------------------- |
 | sum_packet_tx         | 累计发送总包数               |
@@ -162,30 +164,36 @@ vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version
 
 ### df_fps
 
+存储1s、1m两种粒度的数据。
+
 | 统计值                    | 说明                                        |
 | ------------------------- | ------------------------------------------- |
-| sum_flow_count            | 累计连接数                                  |
-| sum_new_flow_count        | 累计新建连接数，以start_time为准            |
-| sum_closed_flow_count     | 累计关闭连接数，以end_time为准              |
+| sum_flow_count            | 累计连接，覆盖flow生命周期内所有秒          |
+| sum_new_flow_count        | 累计新建连接数，以flow.start_time为准       |
+| sum_closed_flow_count     | 累计关闭连接数，以flow.end_time为准         |
 
 ### df_flow
 
 `废弃`
 
+存储1m粒度的数据，统计量均以`RountToMinute(flow.start_time)`为准。
+
 | 统计值                    | 说明                                        |
 | ------------------------- | ------------------------------------------- |
-| sum_packet_tx             | 累计发送总包数，以end_time为准              |
-| sum_packet_rx             | 累计接收总包数，以end_time为准              |
-| sum_bit_tx                | 累计发送总比特数，以end_time为准            |
-| sum_bit_rx                | 累计接收总比特数，以end_time为准            |
+| sum_packet_tx             | 累计发送总包数                              |
+| sum_packet_rx             | 累计接收总包数                              |
+| sum_bit_tx                | 累计发送总比特数                            |
+| sum_bit_rx                | 累计接收总比特数                            |
 |                           |                                             |
-| sum_flow_count            | 累计连接数，以end_time为准                  |
-| sum_new_flow_count        | 累计新建连接数，以`end_time`为准            |
-| sum_closed_flow_count     | 累计关闭连接数，以end_time为准              |
-| sum_flow_duration         | 累计连接持续时长(us)，以end_time为准        |
-| sum_closed_flow_duration  | 累计已关闭连接持续时长(us)，以end_time为准  |
+| sum_flow_count            | 累计连接数                                  |
+| sum_new_flow_count        | 累计新建连接数                              |
+| sum_closed_flow_count     | 累计关闭连接数                              |
+| sum_flow_duration         | 累计连接持续时长(us)                        |
+| sum_closed_flow_duration  | 累计已关闭连接持续时长(us)                  |
 
 ### df_type
+
+存储1m粒度的数据，统计量均以`RountToMinute(flow.start_time)`为准。
 
 | 统计值                                   | 说明                             |
 | ---------------------------------------- | -------------------------------- |
@@ -198,10 +206,12 @@ vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version
 
 ### df_perf
 
+存储1m粒度的数据，统计量均以`RountToMinute(flow.start_time)`为准。
+
 | 统计值                   | 说明                                                    |
 | ------------------------ | ------------------------------------------------------- |
 | sum_flow_count           | 累计连接数                                              |
-| sum_new_flow_count       | 累计新建连接数，以`end_time`为准                        |
+| sum_new_flow_count       | 累计新建连接数                                          |
 | sum_closed_flow_count    | 累计结束的连接数                                        |
 | sum_half_open_flow_count | 累计半开连接数，用于计算建立连接成功率                  |
 | sum_packet_tx            | 发送方向累计包数，`仅用于计算包重传率`                  |
@@ -227,6 +237,8 @@ vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version
 
 ### df_geo
 
+存储1m粒度的数据，统计量均以`RountToMinute(flow.start_time)`为准。
+
 | 统计值                   | 说明                                     |
 | ------------------------ | ---------------------------------------- |
 | sum_packet_tx            | 累计发送总包数                           |
@@ -236,29 +248,9 @@ vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version
 | max_rtt_syn_client       | 客户端所有Flow中TCP会话三次握手阶段RTT最大值(可能为null)|
 | sum_rtt_syn_client_flow  | 表示记录客户端rtt_syn的flow数量          |
 
-### df_console_log
-
-`废弃`
-
-仅计算同时满足如下条件的Flow：
-- TCP Flow
-- 结束的Flow：close_type != 5 `增加了这个条件，与5.4.0不同`
-- 服务端端口号port_dst为22/23/3389之一
-
-#### Tag组合
-
-- tap_type, epc_0, epc_1, ip_0, ip_1, server_port, direction=c2s
-
-#### Field列表
-
-| 统计值                   | 说明                           |
-| ------------------------ | ------------------------------ |
-| sum_packet_tx            | 累计发送总包数                 |
-| sum_packet_rx            | 累计接收总包数                 |
-| sum_closed_flow_count    | 累计关闭连接数                 |
-| sum_closed_flow_duration | 已关闭的网流的累积持续时间(us) |
-
 ### log_usage
+
+存储10m粒度的数据，统计量均以`RountToMinute(flow.start_time)`为准。
 
 #### Tag组合
 
@@ -274,6 +266,8 @@ vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version
 | sum_bit_rx               | 累计接收总比特数               |
 
 ### vtap_usage
+
+存储1s粒度的数据，统计量均以包的timestamp为准。
 
 #### cast_type
 
