@@ -423,7 +423,12 @@ func (f *FlowGenerator) processPackets(processBuffer []interface{}) {
 
 	for _, e := range processBuffer {
 		meta := e.(*MetaPacket)
-		// TCP和UDP需要获取方向，没有FLOW_ACTION也会走flow流程
+		// TODO: 当前版本Flow和Metering都不需要IPv6, 直接返回
+		if meta.EthType == layers.EthernetTypeIPv6 {
+			ReleaseMetaPacket(meta)
+			continue
+		}
+		// 需要获取方向，没有FLOW_ACTION也会走flow流程
 		if meta.Protocol == layers.IPProtocolTCP {
 			f.processTcpPacket(meta)
 		} else if meta.Protocol == layers.IPProtocolUDP {
