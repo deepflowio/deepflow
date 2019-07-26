@@ -11,6 +11,7 @@ import (
 // influxdb每返回-行数据，打一个VTAPSimpleMeter 的doc
 // 由于用VTAPUsageMeter的结构返回数据太冗余了,故用这个结构即可
 type VTAPSimpleMeter struct {
+	// FIXME: use Metrics instead of Meter
 	TxBytes   uint64 `db:"tx_bytes"`
 	RxBytes   uint64 `db:"rx_bytes"`
 	Bytes     uint64 `db:"bytes"`
