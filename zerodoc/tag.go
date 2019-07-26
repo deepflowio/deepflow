@@ -1096,7 +1096,7 @@ func (t *Tag) fillValue(name, value string) (err error) {
 			field.CastType = 0
 		}
 	case "tcp_flags":
-		i, err = strconv.ParseUint(value, 10, 16)
+		i, err = strconv.ParseUint(value, 10, 8)
 		field.TCPFlags = TCPFlag(i)
 	case "scope":
 		i, err = strconv.ParseUint(value, 10, 8)
