@@ -19,9 +19,9 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			atomic.AddInt32(&f.stats.CurrNumFlows, -1)
 			flowExtra.setCurFlowInfo(flowExtra.recentTime, forceReportInterval, reportTolerance)
 			calcCloseType(taggedFlow, flowExtra.flowState)
-			if flowExtra.isFlowAction {
+			if flowExtra.hasFlowAction {
 				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
-				f.flowOutQueue.Put(taggedFlow)
+				f.pushFlowOutQueue(taggedFlow, false, int(f.timeoutCleanerCount))
 			} else {
 				ReleaseTaggedFlow(taggedFlow)
 			}
@@ -39,7 +39,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			flowCache.Unlock()
 			return
 		}
-		flowExtra, _, reply = f.initTcpFlow(meta)
+		flowExtra, _, reply = f.initTcpFlow(meta) // Flow不可能结束，忽略第二个返回值
 		f.stats.TotalNumFlows++
 		if f.checkIfDoFlowPerf(flowExtra) {
 			flowExtra.metaFlowPerf.Update(meta, reply, flowExtra, &f.perfCounter)
@@ -50,6 +50,7 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 	}
 }
 
+// FIXME: 此时Flow不可能结束，第二个返回值永远为False
 func (f *FlowGenerator) initTcpFlow(meta *MetaPacket) (*FlowExtra, bool, bool) {
 	now := meta.Timestamp
 	flowExtra := f.initFlow(meta, now)

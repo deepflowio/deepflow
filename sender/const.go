@@ -1,3 +1,3 @@
 package sender
 
-const QUEUE_GET_SIZE = 1024
+const QUEUE_BATCH_SIZE = 1024

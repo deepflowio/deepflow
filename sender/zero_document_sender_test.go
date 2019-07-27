@@ -11,10 +11,14 @@ import (
 func TestZeroDocumentSender(t *testing.T) {
 	inputQueue1 := queue.NewOverwriteQueues("", 1, 1024)
 	inputQueue2 := queue.NewOverwriteQueues("", 1, 1024)
-	NewZeroDocumentSenderBuilder().AddQueue(inputQueue1, 1).AddQueue(inputQueue2, 1).AddListenPorts(20001, 20002).Build().Start(1024)
+	readerQueue1 := []queue.QueueReader{inputQueue1[0]}
+	readerQueue2 := []queue.QueueReader{inputQueue2[0]}
+	writerQueue1 := []queue.QueueWriter{inputQueue1[0]}
+	writerQueue2 := []queue.QueueWriter{inputQueue2[0]}
+	NewZeroDocumentSenderBuilder().AddQueue(readerQueue1).AddQueue(readerQueue2).AddListenPorts(20001, 20002).Build().Start(1024)
 	testData := dupTestData()
-	inputQueue1.Put(queue.HashKey(0), testData[0])
-	inputQueue2.Put(queue.HashKey(0), testData[1])
+	writerQueue1[0].Put(testData[0])
+	writerQueue2[0].Put(testData[1])
 
 	chan1 := make(chan *codec.SimpleEncoder)
 	chan2 := make(chan *codec.SimpleEncoder)

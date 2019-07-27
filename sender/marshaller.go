@@ -15,15 +15,14 @@ const (
 )
 
 type ZeroDocumentMarshaller struct {
-	input    queue.MultiQueueReader
-	hashKey  queue.HashKey
+	input    queue.QueueReader
 	outputs  []queue.QueueWriter
 	sequence uint32
 }
 
 // NewZeroDocumentMarshaller 从input读取app.Document，转换为pb.ZeroDocument结构，复制并推送到每一个outputs里
-func NewZeroDocumentMarshaller(input queue.MultiQueueReader, hashKey queue.HashKey, outputs ...queue.QueueWriter) *ZeroDocumentMarshaller {
-	return &ZeroDocumentMarshaller{input, hashKey, outputs, 1}
+func NewZeroDocumentMarshaller(input queue.QueueReader, outputs ...queue.QueueWriter) *ZeroDocumentMarshaller {
+	return &ZeroDocumentMarshaller{input, outputs, 1}
 }
 
 func (m *ZeroDocumentMarshaller) batchEncode(buffer []interface{}) *codec.SimpleEncoder {
@@ -54,11 +53,11 @@ func (m *ZeroDocumentMarshaller) batchEncode(buffer []interface{}) *codec.Simple
 
 // Start 不停从input接收，发送到outputs
 func (m *ZeroDocumentMarshaller) Start() {
-	buffer := make([]interface{}, QUEUE_GET_SIZE)
-	outBuffer := make([]interface{}, QUEUE_GET_SIZE)
+	buffer := make([]interface{}, QUEUE_BATCH_SIZE)
+	outBuffer := make([]interface{}, QUEUE_BATCH_SIZE)
 
 	for {
-		n := m.input.Gets(m.hashKey, buffer)
+		n := m.input.Gets(buffer)
 		log.Debugf("%d docs received", n)
 		nOut := 0
 		for i := 0; i < n; i += ENCODE_BIND_COUNT {

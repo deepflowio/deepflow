@@ -48,7 +48,7 @@ const (
 
 const FLOW_CACHE_CAP = 1024
 const HASH_MAP_SIZE uint64 = 1024 * 256
-const FLOW_OUT_BUFFER_CAP = 1024 * 2
+const QUEUE_BATCH_SIZE = 1024
 const TIMEOUT_CLEANER_COUNT uint64 = 4
 const METERING_CACHE_SIZE = 1024 * 16
 
@@ -110,35 +110,29 @@ type FlowGeneratorStats struct {
 	cleanRoutineMaxFlowCacheLens []int
 }
 
-type PacketHandler struct {
-	sync.WaitGroup
-
-	recvBuffer    []interface{}
-	processBuffer []interface{}
-}
-
 type FlowGenerator struct {
 	FlowCacheHashMap
 	FlowGeo
 
-	metaPacketHeaderInQueue MultiQueueReader
-	flowOutQueue            QueueWriter
-	meteringOutQueue        MultiQueueWriter
-	stats                   FlowGeneratorStats
-	stateMachineMaster      []map[uint8]*StateValue
-	stateMachineSlave       []map[uint8]*StateValue
-	tcpServiceTable         *ServiceTable
-	udpServiceTable         *ServiceTable
-	packetHandler           *PacketHandler
-	bufferSize              int
-	flowLimitNum            int32
-	handleRunning           bool
-	cleanRunning            bool
-	index                   int
-	cleanWaitGroup          sync.WaitGroup
+	inputPacketQueue   QueueReader
+	meteringAppQueue   QueueWriter
+	flowOutQueue       QueueWriter
+	stats              FlowGeneratorStats
+	stateMachineMaster []map[uint8]*StateValue
+	stateMachineSlave  []map[uint8]*StateValue
+	tcpServiceTable    *ServiceTable
+	udpServiceTable    *ServiceTable
+	recvBuffer         []interface{}
+	bufferSize         int
+	flowLimitNum       int32
+	handleRunning      bool
+	cleanRunning       bool
+	index              int
+	cleanWaitGroup     sync.WaitGroup
 
 	meteringKeys  []HashKey
 	meteringItems []interface{}
+	flowOutBuffer [][]interface{}
 
 	perfCounter FlowPerfCounter
 }
@@ -201,7 +195,7 @@ func SetTimeout(timeout TimeoutConfig) {
 }
 
 func SetFlowGenerator(cfg config.Config) {
-	flowGeneratorCount = uint64(cfg.Queue.FlowGeneratorQueueCount)
+	flowGeneratorCount = uint64(cfg.Queue.PacketQueueCount)
 	forceReportInterval = cfg.FlowGenerator.ForceReportInterval
 	flowCleanInterval = cfg.FlowGenerator.FlowCleanInterval
 	timeoutCleanerCount = cfg.FlowGenerator.TimeoutCleanerCount

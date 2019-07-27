@@ -44,25 +44,25 @@ type AdapterConfig struct {
 }
 
 type QueueConfig struct {
-	QueueSize                   int `yaml:"queue-size"`
-	LabelerQueueCount           int `yaml:"labeler-queue-count"`
-	LabelerQueueSize            int `yaml:"labeler-queue-size"`
-	FlowGeneratorQueueCount     int `yaml:"flow-generator-queue-count"`
-	FlowGeneratorQueueSize      int `yaml:"flow-generator-queue-size"`
-	MeteringAppQueueCount       int `yaml:"metering-app-queue-count"`
-	MeteringAppQueueSize        int `yaml:"metering-app-queue-size"`
-	PCapAppQueueCount           int `yaml:"pcap-app-queue-count"`
-	PCapAppQueueSize            int `yaml:"pcap-app-queue-size"`
-	FlowAppQueueCount           int `yaml:"flow-app-queue-count"`
-	FlowAppQueueSize            int `yaml:"flow-app-queue-size"`
-	FlowDuplicatorQueueSize     int `yaml:"flow-duplicator-queue-size"`
-	DocsQueueSize               int `yaml:"docs-queue-size"`
-	MeteringAppOutputQueueCount int `yaml:"metering-app-output-queue-count"`
-	MeteringAppOutputQueueSize  int `yaml:"metering-app-output-queue-size"`
-	FlowAppOutputQueueCount     int `yaml:"flow-app-output-queue-count"`
-	FlowAppOutputQueueSize      int `yaml:"flow-app-output-queue-size"`
-	FlowSenderQueueSize         int `yaml:"flow-sender-queue-size"`
-	DocSenderQueueSize          int `yaml:"doc_sender_queue_size"`
+	PacketQueueCount int `yaml:"packet-queue-count"`
+	FlowQueueCount   int `yaml:"flow-queue-count"`
+	DocQueueCount    int `yaml:"doc-queue-count"`
+
+	PacketQueueSize int `yaml:"packet-queue-size"`
+	FlowQueueSize   int `yaml:"flow-queue-size"`
+	DocQueueSize    int `yaml:"doc-queue-size"`
+
+	LabelerQueueSize               int `yaml:"labeler-queue-size"`
+	PCapAppQueueSize               int `yaml:"pcap-app-queue-size"`
+	FlowGeneratorQueueSize         int `yaml:"flow-generator-queue-size"`
+	MeteringAppQueueSize           int `yaml:"metering-app-queue-size"`
+	FlowDuplicatorQueueSize        int `yaml:"flow-duplicator-queue-size"`
+	FlowAppQueueSize               int `yaml:"flow-app-queue-size"`
+	MeteringDocMarshallerQueueSize int `yaml:"metering-doc-marshaller-queue-size"`
+	FlowDocMarshallerQueueSize     int `yaml:"flow-doc-marshaller-queue-size"`
+	FlowMarshallerQueueSize        int `yaml:"flow-marshaller-queue-size"`
+	FlowSenderQueueSize            int `yaml:"flow-sender-queue-size"`
+	DocSenderQueueSize             int `yaml:"doc-sender-queue-size"`
 }
 
 type LabelerConfig struct {
@@ -103,6 +103,15 @@ type PCapConfig struct {
 	FileDirectory         string `yaml:"file-directory"`
 }
 
+func minPowerOfTwo(v int) int {
+	for i := uint32(0); i < 30; i++ {
+		if v <= 1<<i {
+			return 1 << i
+		}
+	}
+	return 1
+}
+
 func (c *Config) Validate() error {
 	if len(c.ControllerIps) == 0 {
 		return errors.New("controller-ips is empty")
@@ -137,62 +146,65 @@ func (c *Config) Validate() error {
 	} else if c.Adapter.OrderingCacheSize > 256 {
 		c.Adapter.OrderingCacheSize = 256
 	}
-	if c.Queue.QueueSize == 0 {
-		c.Queue.QueueSize = 65536
+
+	if c.Queue.PacketQueueCount < 1 || c.Queue.PacketQueueCount > 64 {
+		c.Queue.PacketQueueCount = 1
+	} else {
+		c.Queue.PacketQueueCount = minPowerOfTwo(c.Queue.PacketQueueCount)
 	}
-	if c.Queue.LabelerQueueCount == 0 {
-		c.Queue.LabelerQueueCount = 4
+	if c.Queue.FlowQueueCount < 1 || c.Queue.FlowQueueCount > 64 {
+		c.Queue.FlowQueueCount = 1
+	} else {
+		c.Queue.FlowQueueCount = minPowerOfTwo(c.Queue.FlowQueueCount)
 	}
-	if c.Queue.LabelerQueueSize == 0 {
-		c.Queue.LabelerQueueSize = c.Queue.QueueSize
+	if c.Queue.DocQueueCount < 1 || c.Queue.DocQueueCount > 64 {
+		c.Queue.DocQueueCount = 1
+	} else {
+		c.Queue.DocQueueCount = minPowerOfTwo(c.Queue.DocQueueCount)
 	}
-	if c.Queue.FlowGeneratorQueueCount == 0 {
-		c.Queue.FlowGeneratorQueueCount = 4
+
+	if c.Queue.PacketQueueSize < 1<<16 {
+		c.Queue.PacketQueueSize = 1 << 16
 	}
-	if c.Queue.FlowGeneratorQueueSize == 0 {
-		c.Queue.FlowGeneratorQueueSize = c.Queue.QueueSize
+	if c.Queue.FlowQueueSize < 1<<16 {
+		c.Queue.FlowQueueSize = c.Queue.PacketQueueSize << 3
 	}
-	if c.Queue.MeteringAppQueueCount == 0 {
-		c.Queue.MeteringAppQueueCount = 4
+	if c.Queue.DocQueueSize < 1<<16 {
+		c.Queue.DocQueueSize = c.Queue.PacketQueueSize << 3
 	}
-	if c.Queue.MeteringAppQueueSize == 0 {
-		c.Queue.MeteringAppQueueSize = c.Queue.QueueSize
-	}
-	if c.Queue.PCapAppQueueCount <= 0 {
-		c.Queue.PCapAppQueueCount = 1
+
+	if c.Queue.LabelerQueueSize <= 0 {
+		c.Queue.LabelerQueueSize = c.Queue.PacketQueueSize
 	}
 	if c.Queue.PCapAppQueueSize <= 0 {
-		c.Queue.PCapAppQueueSize = c.Queue.QueueSize
+		c.Queue.PCapAppQueueSize = c.Queue.PacketQueueSize
 	}
-	if c.Queue.FlowAppQueueCount == 0 {
-		c.Queue.FlowAppQueueCount = 2
+	if c.Queue.FlowGeneratorQueueSize <= 0 {
+		c.Queue.FlowGeneratorQueueSize = c.Queue.PacketQueueSize
 	}
-	if c.Queue.FlowAppQueueSize == 0 {
-		c.Queue.FlowAppQueueSize = c.Queue.QueueSize << 3
+	if c.Queue.MeteringAppQueueSize <= 0 {
+		c.Queue.MeteringAppQueueSize = c.Queue.PacketQueueSize
 	}
-	if c.Queue.FlowDuplicatorQueueSize == 0 {
-		c.Queue.FlowDuplicatorQueueSize = c.Queue.QueueSize << 3
+	if c.Queue.FlowDuplicatorQueueSize <= 0 {
+		c.Queue.FlowDuplicatorQueueSize = c.Queue.FlowQueueSize
 	}
-	if c.Queue.DocsQueueSize == 0 {
-		c.Queue.DocsQueueSize = 524288
+	if c.Queue.FlowAppQueueSize <= 0 {
+		c.Queue.FlowAppQueueSize = c.Queue.FlowQueueSize
 	}
-	if c.Queue.MeteringAppOutputQueueCount == 0 {
-		c.Queue.MeteringAppOutputQueueCount = 1
+	if c.Queue.MeteringDocMarshallerQueueSize <= 0 {
+		c.Queue.MeteringDocMarshallerQueueSize = c.Queue.DocQueueSize
 	}
-	if c.Queue.MeteringAppOutputQueueSize == 0 {
-		c.Queue.MeteringAppOutputQueueSize = c.Queue.DocsQueueSize << 1
+	if c.Queue.FlowDocMarshallerQueueSize <= 0 {
+		c.Queue.FlowDocMarshallerQueueSize = c.Queue.DocQueueSize
 	}
-	if c.Queue.FlowAppOutputQueueCount == 0 {
-		c.Queue.FlowAppOutputQueueCount = 1
+	if c.Queue.FlowMarshallerQueueSize <= 0 {
+		c.Queue.FlowMarshallerQueueSize = c.Queue.FlowQueueSize
 	}
-	if c.Queue.FlowAppOutputQueueSize == 0 {
-		c.Queue.FlowAppOutputQueueSize = c.Queue.DocsQueueSize << 3
+	if c.Queue.FlowSenderQueueSize <= 0 {
+		c.Queue.FlowSenderQueueSize = c.Queue.FlowQueueSize
 	}
-	if c.Queue.FlowSenderQueueSize == 0 {
-		c.Queue.FlowSenderQueueSize = c.Queue.QueueSize << 3
-	}
-	if c.Queue.DocSenderQueueSize == 0 {
-		c.Queue.DocSenderQueueSize = c.Queue.DocsQueueSize << 1
+	if c.Queue.DocSenderQueueSize <= 0 {
+		c.Queue.DocSenderQueueSize = c.Queue.DocQueueSize
 	}
 
 	if c.Labeler.MapSizeLimit == 0 {
@@ -231,7 +243,7 @@ func (c *Config) Validate() error {
 		c.FlowGenerator.TimeoutCleanerCount = 4
 	}
 	if c.FlowGenerator.HashMapSize == 0 {
-		c.FlowGenerator.HashMapSize = uint64(c.FlowGenerator.FlowCountLimit) / uint64(c.Queue.FlowGeneratorQueueCount) * 4
+		c.FlowGenerator.HashMapSize = uint64(c.FlowGenerator.FlowCountLimit) / uint64(c.Queue.PacketQueueCount) * 4
 	}
 	if c.FlowGenerator.ReportTolerance == 0 {
 		c.FlowGenerator.ReportTolerance = 4 * time.Second

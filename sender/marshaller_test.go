@@ -11,7 +11,7 @@ import (
 const TEST_QUEUES = 10
 
 func TestMarshaller(t *testing.T) {
-	inputQueue := queue.NewOverwriteQueues("", 1, 1024)
+	inputQueues := queue.NewOverwriteQueues("", 1, 1024)
 	outputQueues := make([]queue.QueueReader, TEST_QUEUES)
 	outputWriters := make([]queue.QueueWriter, TEST_QUEUES)
 	for i := 0; i < TEST_QUEUES; i++ {
@@ -19,9 +19,9 @@ func TestMarshaller(t *testing.T) {
 		outputQueues[i] = q
 		outputWriters[i] = q
 	}
-	go NewZeroDocumentMarshaller(inputQueue, queue.HashKey(0), outputWriters...).Start()
+	go NewZeroDocumentMarshaller(inputQueues[0], outputWriters...).Start()
 
-	inputQueue.Put(queue.HashKey(0), dupTestData()...)
+	inputQueues[0].Put(dupTestData()...)
 	for _, q := range outputQueues {
 		bytes := q.Get().(*codec.SimpleEncoder)
 		newDoc, _ := decode(bytes.Bytes())
