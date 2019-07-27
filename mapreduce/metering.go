@@ -5,8 +5,6 @@ import (
 	"strconv"
 	"time"
 
-	"math/rand"
-
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
@@ -15,40 +13,38 @@ import (
 )
 
 func NewMeteringMapProcess(
-	output queue.MultiQueueWriter, input queue.MultiQueueReader,
-	inputCount, docsInBuffer, windowSize, windowMoveMargin int,
+	zmqAppQueues []queue.QueueWriter, packetQueues []queue.QueueReader,
+	docsInBuffer, windowSize, windowMoveMargin int,
 ) *MeteringHandler {
 	return NewMeteringHandler(
-		[]app.MeteringProcessor{usage.NewProcessor()}, output, input,
-		inputCount, docsInBuffer, windowSize, windowMoveMargin)
+		[]app.MeteringProcessor{usage.NewProcessor()}, zmqAppQueues, packetQueues,
+		docsInBuffer, windowSize, windowMoveMargin)
 }
 
 type MeteringHandler struct {
 	numberOfApps int
 	processors   []app.MeteringProcessor
 
-	meteringQueue      queue.MultiQueueReader
-	meteringQueueCount int
-	zmqAppQueue        queue.MultiQueueWriter
-	docsInBuffer       int
-	windowSize         int
-	windowMoveMargin   int
+	packetQueues     []queue.QueueReader
+	zmqAppQueues     []queue.QueueWriter
+	docsInBuffer     int
+	windowSize       int
+	windowMoveMargin int
 }
 
 func NewMeteringHandler(
 	processors []app.MeteringProcessor,
-	output queue.MultiQueueWriter, inputs queue.MultiQueueReader,
-	inputCount, docsInBuffer, windowSize, windowMoveMargin int,
+	zmqAppQueues []queue.QueueWriter, packetQueues []queue.QueueReader,
+	docsInBuffer, windowSize, windowMoveMargin int,
 ) *MeteringHandler {
 	return &MeteringHandler{
-		numberOfApps:       len(processors),
-		processors:         processors,
-		zmqAppQueue:        output,
-		meteringQueue:      inputs,
-		meteringQueueCount: inputCount,
-		docsInBuffer:       docsInBuffer,
-		windowSize:         windowSize,
-		windowMoveMargin:   windowMoveMargin,
+		numberOfApps:     len(processors),
+		processors:       processors,
+		zmqAppQueues:     zmqAppQueues,
+		packetQueues:     packetQueues,
+		docsInBuffer:     docsInBuffer,
+		windowSize:       windowSize,
+		windowMoveMargin: windowMoveMargin,
 	}
 }
 
@@ -58,11 +54,9 @@ type subMeteringHandler struct {
 	processors   []app.MeteringProcessor
 	stashes      []Stash
 
-	meteringQueue queue.MultiQueueReader
-	zmqAppQueue   queue.MultiQueueWriter
-
-	queueIndex int
-	hashKey    queue.HashKey
+	packetQueue  queue.QueueReader
+	zmqAppQueues []queue.QueueWriter
+	nextQueueID  uint8
 
 	lastFlush    time.Duration
 	counterLatch int
@@ -87,11 +81,9 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 		processors:   dupProcessors,
 		stashes:      make([]Stash, h.numberOfApps),
 
-		meteringQueue: h.meteringQueue,
-		zmqAppQueue:   h.zmqAppQueue,
-
-		queueIndex: index,
-		hashKey:    queue.HashKey(rand.Int()),
+		packetQueue:  h.packetQueues[index],
+		zmqAppQueues: h.zmqAppQueues,
+		nextQueueID:  uint8(index),
 
 		lastFlush: time.Duration(time.Now().UnixNano()),
 
@@ -141,11 +133,11 @@ func (h *subMeteringHandler) putToQueue(processorID int) {
 		docs := stash.Dump()
 		for j := 0; j < len(docs); j += QUEUE_BATCH_SIZE {
 			if j+QUEUE_BATCH_SIZE <= len(docs) {
-				h.zmqAppQueue.Put(h.hashKey, docs[j:j+QUEUE_BATCH_SIZE]...)
+				h.zmqAppQueues[h.nextQueueID&uint8(len(h.zmqAppQueues)-1)].Put(docs[j : j+QUEUE_BATCH_SIZE]...)
 			} else {
-				h.zmqAppQueue.Put(h.hashKey, docs[j:]...)
+				h.zmqAppQueues[h.nextQueueID&uint8(len(h.zmqAppQueues)-1)].Put(docs[j:]...)
 			}
-			h.hashKey++
+			h.nextQueueID++
 		}
 		h.processorCounter[h.counterLatch][i].emitCounter += uint64(len(docs))
 		stash.Clear()
@@ -153,7 +145,7 @@ func (h *subMeteringHandler) putToQueue(processorID int) {
 }
 
 func (h *MeteringHandler) Start() {
-	for i := 0; i < h.meteringQueueCount; i++ {
+	for i := 0; i < len(h.packetQueues); i++ {
 		go h.newSubMeteringHandler(i).Process()
 	}
 }
@@ -162,7 +154,7 @@ func (h *subMeteringHandler) Process() error {
 	elements := make([]interface{}, QUEUE_BATCH_SIZE)
 
 	for {
-		n := h.meteringQueue.Gets(queue.HashKey(h.queueIndex), elements)
+		n := h.packetQueue.Gets(elements)
 		for _, e := range elements[:n] {
 			if e == nil { // tick
 				h.Flush(-1)

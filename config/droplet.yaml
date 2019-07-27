@@ -30,53 +30,54 @@ adapter:
   ordering-cache-size: 16
 # internal queues conf
 queue:
-  # queue size, default 65536
-  queue-size: 65536
-  # labeler read queue count, default 4
+  # ----------- 并行度 -----------
+  # 传输网包的队列数量，也是网包处理（以网包作为输入，及flow-duplicator）模块的并行度，默认为1
+  packet-queue-count: 1
+  # 传输网流的队列数量，也是网流处理（以网流作为输入）模块的并行度，默认为1
+  flow-queue-count: 1
+  # 传输统计数据的队列数量，也是网包、网流统计数据序列化模块各自的并行度，默认为1
+  doc-queue-count: 1
+  # ---------- 全局队列长度 -----------
+  # 传输网包的每个队列的长度，默认为65536
+  packet-queue-size: 65536
+  # 传输网流的每个队列的长度，默认为524288或packet-queue-size的8倍
+  flow-queue-size: 524288
+  # 传输统计数据的每个队列的长度，默认为524288或packet-queue-size的8倍
+  doc-queue-size: 524288
+  # ---------- 每个模块的队列长度 ----------
   # name: 1-meta-packet-to-labeler
-  labeler-queue-count: 4
-  # labeler read queue size, default queue-size
+  # labeler read queue size, default packet-queue-size
   labeler-queue-size: 65536
-  # flow generator read queue count, default 4
-  # name: 2-meta-packet-to-flow-generator
-  flow-generator-queue-count: 4
-  # flow generator read queue size, default queue-size
-  flow-generator-queue-size: 65536
-  # metering app read queue count, default 4
-  # name: 3-meta-packet-to-metering-app
-  metering-app-queue-count: 4
-  # metering app read queue size, default queue-size
-  metering-app-queue-size: 65536
-  # pcap app read queue count, default 1
   # name: 2-meta-packet-to-pcap-app
-  pcap-app-queue-count: 1
-  # pcap app read queue size, default queue-size
+  # pcap app read queue size, default packet-queue-size
   pcap-app-queue-size: 65536
-  # flow app read queue count, default 8
-  # 4-tagged-flow-to-flow-app
-  flow-app-queue-count: 2
-  # flow app read queue size, default queue-size << 3
-  flow-app-queue-size: 0
-  # flow duplicator read queue size, default queue-size << 3
+  # name: 2-meta-packet-to-flow-generator
+  # flow generator read queue size, default packet-queue-size
+  flow-generator-queue-size: 65536
+  # name: 3-meta-packet-to-metering-app
+  # metering app read queue size, default packet-queue-size
+  metering-app-queue-size: 65536
   # name: 3-tagged-flow-to-flow-duplicator
-  flow-duplicator-queue-size: 0
-  # mapreduce buffer capacity, default 524288
-  docs-queue-size: 524288
-  # metering app output queue count, default 1
-  metering-app-output-queue-count: 1
-  # metering app output queue size, default docs-queue-size << 1
+  # flow duplicator read queue size, default flow-queue-size
+  flow-duplicator-queue-size: 524288
+  # name: 4-tagged-flow-to-flow-app
+  # flow app read queue size, default flow-queue-size
+  flow-app-queue-size: 524288
   # name: 4-metering-doc-to-marshaller
-  metering-app-output-queue-size: 0
-  # flow app output queue count, default 1
-  flow-app-output-queue-count: 1
-  # flow app output queue size, default docs-queue-size << 3
+  # metering app output queue size, default doc-queue-size
+  metering-doc-marshaller-queue-size: 524288
   # name: 5-flow-doc-to-marshaller
-  flow-app-output-queue-size: 0
-  # flow sender queue size, default queue-size << 3
-  # name: 4-tagged-flow-to-stream
-  flow-sender-queue-size: 0
-  # doc sender queue size, default docs-queue-size << 1
-  doc_sender_queue_size: 0
+  # flow app output queue size, default doc-queue-size
+  flow-doc-marshaller-queue-size: 524288
+  # name: 4-tagged-flow-to-flow-marshaller
+  # flow sender queue size, default flow-queue-size
+  flow-marshaller-queue-size: 524288
+  # name: 5-flow-pb-to-flow-sender
+  # flow sender queue size, default flow-queue-size
+  flow-sender-queue-size: 524288
+  # name: 6-all-doc-to-zero
+  # doc sender queue size, default doc-queue-size
+  doc-sender-queue-size: 524288
 # internal labeler conf
 labeler:
   # whether to use ddbs
@@ -118,8 +119,6 @@ flow-generator:
   ignore-l2-end: false
 #geo-file-location: /opt/droplet/ip_info_mini.json
 map-reduce:
-  # reject varied doc (with edge or port tag) when buffer usage exceed the limit, default queue.docs-queue-size
-  varied-doc-limit: 0
   # 聚合窗口的大小，单位秒，最小值为70，调整时注意考虑report-tolerance
   window-size: 70
   # 窗口移动时，窗口边缘与数据位置的差值。该配置必须小于window-size，否则会被置为0。该配置仅对usage和fps有效

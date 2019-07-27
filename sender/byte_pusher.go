@@ -51,7 +51,7 @@ func (s *ZMQBytePusher) Send(b []byte) {
 
 // QueueForward 不断读取q中的数据，并通过创建的zmq socket向外发送
 func (s *ZMQBytePusher) QueueForward(q queue.QueueReader) {
-	buffer := make([]interface{}, QUEUE_GET_SIZE)
+	buffer := make([]interface{}, QUEUE_BATCH_SIZE)
 	for {
 		n := q.Gets(buffer)
 		log.Debugf("%d byte arrays received", n)

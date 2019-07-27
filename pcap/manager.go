@@ -7,15 +7,14 @@ import (
 	"sync"
 	"time"
 
-	libqueue "gitlab.x.lan/yunshan/droplet-libs/queue"
+	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
-	"gitlab.x.lan/yunshan/droplet/queue"
 )
 
 type WorkerManager struct {
-	inputQueue *queue.MultiQueue
-	nQueues    int
-	workers    []*Worker
+	packetQueueReaders []queue.QueueReader
+	packetQueueWriters []queue.QueueWriter
+	workers            []*Worker
 
 	tcpipChecksum         bool
 	blockSizeKB           int
@@ -29,8 +28,8 @@ type WorkerManager struct {
 }
 
 func NewWorkerManager(
-	inputQueue *queue.MultiQueue,
-	nQueues int,
+	packetQueueReaders []queue.QueueReader,
+	packetQueueWriters []queue.QueueWriter,
 	tcpipChecksum bool,
 	blockSizeKB int,
 	maxConcurrentFiles int,
@@ -42,9 +41,9 @@ func NewWorkerManager(
 	baseDirectory string,
 ) *WorkerManager {
 	return &WorkerManager{
-		inputQueue: inputQueue,
-		nQueues:    nQueues,
-		workers:    make([]*Worker, nQueues),
+		packetQueueReaders: packetQueueReaders,
+		packetQueueWriters: packetQueueWriters,
+		workers:            make([]*Worker, len(packetQueueReaders)),
 
 		tcpipChecksum:         tcpipChecksum,
 		blockSizeKB:           blockSizeKB,
@@ -67,8 +66,8 @@ func (m *WorkerManager) Start() []io.Closer {
 	wg.Wait()
 
 	NewCleaner(int64(m.maxDirectorySizeGB)<<30, int64(m.diskFreeSpaceMarginGB)<<30, time.Duration(m.maxFileKeepDay)*time.Hour*24, m.baseDirectory).Start()
-	for i := 0; i < m.nQueues; i++ {
-		worker := m.newWorker(i)
+	for i := 0; i < len(m.packetQueueReaders); i++ {
+		worker := m.newWorker(queue.HashKey(i))
 		m.workers[i] = worker
 		stats.RegisterCountable("pcap", worker, stats.OptionStatTags{"index": strconv.Itoa(i)})
 		go worker.Process()
@@ -87,8 +86,9 @@ func (m *WorkerManager) Close() error {
 	}
 	time.Sleep(time.Second)
 	for i := range m.workers {
+		// FIXME: 统一用queue发送nil处理所有goroutine的结束，以避免持有QueueWriter
 		// tick the workers
-		m.inputQueue.Put(libqueue.HashKey(i), nil)
+		m.packetQueueWriters[i].Put(nil)
 	}
 	wg.Wait()
 	return nil

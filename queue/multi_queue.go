@@ -8,14 +8,27 @@ import (
 
 type MultiQueue struct {
 	queue.FixedMultiQueue
-	Monitor
+	*Monitor
+
+	readers []queue.QueueReader
+	writers []queue.QueueWriter
 
 	itemBatches [][][]interface{}
 }
 
 func (q *MultiQueue) Init(name string, size, count, userCount int, unmarshaller Unmarshaller, options ...queue.Option) {
+	q.Monitor = &Monitor{}
 	q.Monitor.init(name, unmarshaller)
 	q.FixedMultiQueue = queue.NewOverwriteQueues(name, uint8(count), size, options...)
+
+	q.readers = make([]queue.QueueReader, len(q.FixedMultiQueue))
+	for i := 0; i < len(q.FixedMultiQueue); i++ {
+		q.readers[i] = &Queue{q.FixedMultiQueue[i], q.Monitor}
+	}
+	q.writers = make([]queue.QueueWriter, len(q.FixedMultiQueue))
+	for i := 0; i < len(q.FixedMultiQueue); i++ {
+		q.writers[i] = &Queue{q.FixedMultiQueue[i], q.Monitor}
+	}
 
 	if count > 1 {
 		batchSize := size
@@ -30,6 +43,14 @@ func (q *MultiQueue) Init(name string, size, count, userCount int, unmarshaller 
 			}
 		}
 	}
+}
+
+func (q *MultiQueue) Readers() []queue.QueueReader {
+	return q.readers
+}
+
+func (q *MultiQueue) Writers() []queue.QueueWriter {
+	return q.writers
 }
 
 func (q *MultiQueue) Get(key queue.HashKey) interface{} {

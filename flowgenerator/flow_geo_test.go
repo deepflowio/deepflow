@@ -6,7 +6,6 @@ import (
 	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
-	. "gitlab.x.lan/yunshan/droplet-libs/queue"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
@@ -83,24 +82,24 @@ func TestNegativeL3EpcIDAll(t *testing.T) {
 }
 
 func TestFlowGeoInfo(t *testing.T) {
-	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
+	flowGenerator, inputPacketQueue, flowOutQueue := flowGeneratorInit()
 	flowGenerator.FlowGeo = testFlowGeo
 	forceReportInterval = 60 * time.Second
 
 	packet0 := getDefaultPacket()
 	packet0.EndpointData.SrcInfo.L3EpcId = 5
-	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
+	inputPacketQueue.Put(packet0)
 
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Flags = TCP_RST
 	packet1.Timestamp += DEFAULT_DURATION_MSEC
 	reversePacket(packet1)
 	packet1.EndpointData.SrcInfo.L3EpcId = 0
-	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
+	inputPacketQueue.Put(packet1)
 
 	flowGenerator.Start()
 
-	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
+	taggedFlow := flowOutQueue.Get().(*TaggedFlow)
 	country := uint8(5)
 	region := uint8(34)
 	if taggedFlow.Country != country || taggedFlow.Region != region {

@@ -198,7 +198,7 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, now time.Duration) *FlowExtra
 	flowExtra.reversed = false
 	flowExtra.circlePktGot = true
 	// 获取策略中是否有flow action
-	flowExtra.isFlowAction = meta.PolicyData.ActionFlags&FLOW_ACTION != 0
+	flowExtra.hasFlowAction = meta.PolicyData.ActionFlags&FLOW_ACTION != 0
 
 	return flowExtra
 }
@@ -352,7 +352,7 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 	}
 	// a flow will report every minute and StartTime will be reset, so the value could not be overflow
 	taggedFlow.TimeBitmap |= getBitmap(packetTimestamp)
-	flowExtra.isFlowAction = meta.PolicyData.ActionFlags&FLOW_ACTION != 0
+	flowExtra.hasFlowAction = meta.PolicyData.ActionFlags&FLOW_ACTION != 0
 }
 
 func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireInterval, reportTolerance time.Duration) {
@@ -425,10 +425,14 @@ func calcCloseType(taggedFlow *TaggedFlow, flowState FlowState) {
 }
 
 func (f *FlowGenerator) processPackets(processBuffer []interface{}) {
-	f.meteringKeys = f.meteringKeys[:1]
 	f.meteringItems = f.meteringItems[:0]
 
 	for _, e := range processBuffer {
+		if e == nil { // flush indicator
+			f.pushFlowOutQueue(nil, true, int(f.timeoutCleanerCount))
+			continue
+		}
+
 		meta := e.(*MetaPacket)
 		// TODO: 当前版本Flow和Metering都不需要IPv6, 直接返回
 		if meta.EthType == layers.EthernetTypeIPv6 ||
@@ -447,8 +451,8 @@ func (f *FlowGenerator) processPackets(processBuffer []interface{}) {
 		} else {
 			f.processOtherIpPacket(meta)
 		}
+
 		if meta.PolicyData.ActionFlags&PACKET_ACTION != 0 {
-			f.meteringKeys = append(f.meteringKeys, HashKey(meta.QueueHash))
 			f.meteringItems = append(f.meteringItems, meta)
 		} else {
 			ReleaseMetaPacket(meta)
@@ -456,27 +460,21 @@ func (f *FlowGenerator) processPackets(processBuffer []interface{}) {
 	}
 
 	if len(f.meteringItems) > 0 {
-		f.meteringOutQueue.Puts(f.meteringKeys, f.meteringItems)
-		f.meteringKeys = f.meteringKeys[:1]
+		f.meteringAppQueue.Put(f.meteringItems...)
 		f.meteringItems = f.meteringItems[:0]
 	}
-	f.packetHandler.Done()
 }
 
 func (f *FlowGenerator) handlePackets() {
-	metaPacketInQueue := f.metaPacketHeaderInQueue
-	packetHandler := f.packetHandler
-	recvBuffer := packetHandler.recvBuffer
-	processBuffer := packetHandler.processBuffer
+	f.flowOutBuffer[f.timeoutCleanerCount] = make([]interface{}, 0, QUEUE_BATCH_SIZE)
+	inputPacketQueue := f.inputPacketQueue
+	recvBuffer := f.recvBuffer
 	gotSize := 0
-	hashKey := HashKey(f.index)
-loop:
-	packetHandler.Add(1)
-	go f.processPackets(processBuffer[:gotSize])
-	gotSize = metaPacketInQueue.Gets(hashKey, recvBuffer)
-	packetHandler.Wait()
-	processBuffer, recvBuffer = recvBuffer, processBuffer
-	goto loop
+
+	for {
+		gotSize = inputPacketQueue.Gets(recvBuffer)
+		f.processPackets(recvBuffer[:gotSize])
+	}
 }
 
 func (f *FlowGenerator) reportForClean(flowExtra *FlowExtra, force bool, now time.Duration) *TaggedFlow {
@@ -484,25 +482,38 @@ func (f *FlowGenerator) reportForClean(flowExtra *FlowExtra, force bool, now tim
 	if taggedFlow.Proto == layers.IPProtocolTCP {
 		taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 	}
-	if force {
-		taggedFlow.CloseType = CloseTypeForcedReport
-		return CloneTaggedFlow(taggedFlow)
+
+	if flowExtra.hasFlowAction {
+		if force {
+			taggedFlow.CloseType = CloseTypeForcedReport
+			return CloneTaggedFlow(taggedFlow)
+		} else {
+			calcCloseType(taggedFlow, flowExtra.flowState)
+			ReleaseFlowExtra(flowExtra)
+			return taggedFlow
+		}
+	} else {
+		if !force {
+			ReleaseTaggedFlow(taggedFlow)
+			ReleaseFlowExtra(flowExtra)
+		}
+		return nil
 	}
-	calcCloseType(taggedFlow, flowExtra.flowState)
-	ReleaseFlowExtra(flowExtra)
-	return taggedFlow
 }
 
-func tryCleanBuffer(queue QueueWriter, buffer []interface{}, num int) int {
-	if num >= FLOW_OUT_BUFFER_CAP {
-		queue.Put(buffer[:num]...)
-		return 0
+func (f *FlowGenerator) pushFlowOutQueue(taggedFlow *TaggedFlow, flush bool, cleanerID int) {
+	flowOutBuffer := f.flowOutBuffer[cleanerID]
+	if taggedFlow != nil {
+		flowOutBuffer = append(flowOutBuffer, taggedFlow)
 	}
-	return num
+	if len(flowOutBuffer) >= QUEUE_BATCH_SIZE || (flush && len(flowOutBuffer) > 0) {
+		f.flowOutQueue.Put(flowOutBuffer...)
+		flowOutBuffer = flowOutBuffer[:0]
+	}
+	f.flowOutBuffer[cleanerID] = flowOutBuffer
 }
 
-func reportFlowListTimeout(f *FlowGenerator, list *ListFlowExtra, now, cleanRange time.Duration, buffer []interface{}, num int) int {
-	flowOutQueue := f.flowOutQueue
+func reportFlowListTimeout(f *FlowGenerator, list *ListFlowExtra, now, cleanRange time.Duration, cleanerID int) {
 	cleanCount := 0
 	e := list.Back()
 	for e != nil {
@@ -510,34 +521,28 @@ func reportFlowListTimeout(f *FlowGenerator, list *ListFlowExtra, now, cleanRang
 		if flowExtra.recentTime < cleanRange && flowExtra.recentTime+flowExtra.timeout <= now {
 			flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
 			taggedFlow := f.reportForClean(flowExtra, false, now)
-			if flowExtra.isFlowAction {
-				buffer[num] = taggedFlow
-				num = tryCleanBuffer(flowOutQueue, buffer, num+1)
-			} else {
-				ReleaseTaggedFlow(taggedFlow)
-			}
 			cleanCount++
 			del := e
 			e = e.Prev()
 			list.Remove(del)
-			continue
+			f.pushFlowOutQueue(taggedFlow, false, cleanerID)
+		} else {
+			e = e.Prev()
 		}
-		e = e.Prev()
 	}
 	if cleanCount > 0 {
 		atomic.AddInt32(&f.stats.CurrNumFlows, int32(0-cleanCount))
 	}
-	return num
 }
 
-func reportFlowListGeneral(f *FlowGenerator, list *ListFlowExtra, now, cleanRange time.Duration, buffer []interface{}, num int) int {
-	flowOutQueue := f.flowOutQueue
+func reportFlowListGeneral(f *FlowGenerator, list *ListFlowExtra, now, cleanRange time.Duration, cleanerID int) {
 	cleanCount := 0
 	e := list.Back()
 	var taggedFlow *TaggedFlow
 	for e != nil {
 		flowExtra := e.Value
 		flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
+		taggedFlow = nil
 		if flowExtra.recentTime < cleanRange && flowExtra.recentTime+flowExtra.timeout <= now {
 			taggedFlow = f.reportForClean(flowExtra, false, now)
 			cleanCount++
@@ -549,22 +554,15 @@ func reportFlowListGeneral(f *FlowGenerator, list *ListFlowExtra, now, cleanRang
 			flowExtra.resetCurFlowInfo(now)
 			e = e.Prev()
 		}
-		if flowExtra.isFlowAction {
-			buffer[num] = taggedFlow
-			num = tryCleanBuffer(flowOutQueue, buffer, num+1)
-		} else {
-			ReleaseTaggedFlow(taggedFlow)
-		}
+		f.pushFlowOutQueue(taggedFlow, false, cleanerID)
 	}
 	if cleanCount > 0 {
 		atomic.AddInt32(&f.stats.CurrNumFlows, int32(0-cleanCount))
 	}
-	return num
 }
 
-func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uint64) {
+func (f *FlowGenerator) cleanHashMapByForceBeforeExit(hashMap []*FlowCache, start, end uint64, cleanerID int) {
 	now := toTimestamp(time.Now())
-	flowOutQueue := f.flowOutQueue
 	for _, flowCache := range hashMap[start:end] {
 		if flowCache == nil {
 			continue
@@ -575,18 +573,17 @@ func (f *FlowGenerator) cleanHashMapByForce(hashMap []*FlowCache, start, end uin
 			flowExtra.setCurFlowInfo(now, forceReportInterval, reportTolerance)
 			taggedFlow := f.reportForClean(flowExtra, false, now)
 			atomic.AddInt32(&f.stats.CurrNumFlows, -1)
-			flowOutQueue.Put(taggedFlow)
+			f.pushFlowOutQueue(taggedFlow, false, cleanerID)
 			e = e.Next()
 		}
 		flowCache.flowList.Init()
 		flowCache.Unlock()
 	}
+	f.pushFlowOutQueue(nil, true, cleanerID)
 }
 
-func (f *FlowGenerator) cleanTimeoutHashMap(start, end, index uint64) {
+func (f *FlowGenerator) flowHashMapTimeoutCleaner(start, end uint64, cleanerID int) {
 	hashMap := f.hashMap
-	// temp buffer to write flow
-	flowOutBuffer := [FLOW_OUT_BUFFER_CAP]interface{}{}
 	// vars about time
 	sleepDuration := flowCleanInterval
 	reportFlowList := reportFlowListTimeout
@@ -600,7 +597,6 @@ loop:
 	cleanRange := now - flowCleanInterval
 	nonEmptyFlowCacheNum := 0
 	maxFlowCacheLen := 0
-	num := 0
 	if now > nextGeneralReport {
 		reportFlowList = reportFlowListGeneral
 		nextGeneralReport += forceReportInterval
@@ -619,12 +615,10 @@ loop:
 			maxFlowCacheLen = length
 		}
 		flowCache.Lock()
-		num = reportFlowList(f, flowList, now, cleanRange, flowOutBuffer[:], num)
+		reportFlowList(f, flowList, now, cleanRange, cleanerID)
 		flowCache.Unlock()
 	}
-	if num > 0 {
-		f.flowOutQueue.Put(flowOutBuffer[:num]...)
-	}
+	f.pushFlowOutQueue(nil, true, cleanerID)
 	// calc the next sleep duration
 	endtime := toTimestamp(time.Now())
 	used := endtime - now
@@ -632,15 +626,18 @@ loop:
 		sleepDuration = flowCleanInterval - used
 	} else {
 		sleepDuration = 0
-		log.Debugf("used: %d, clean interval: %d", used, flowCleanInterval)
-		log.Debugf("clean time of generator %d is too long, maybe pressure is heavy", f.index)
+		log.Debugf(
+			"clean time of generator %d-%d is too long (%d>%d), maybe pressure is heavy",
+			f.index, cleanerID, used, flowCleanInterval)
 	}
-	f.stats.cleanRoutineFlowCacheNums[index] = nonEmptyFlowCacheNum
-	f.stats.cleanRoutineMaxFlowCacheLens[index] = maxFlowCacheLen
+	f.stats.cleanRoutineFlowCacheNums[cleanerID] = nonEmptyFlowCacheNum
+	f.stats.cleanRoutineMaxFlowCacheLens[cleanerID] = maxFlowCacheLen
 	if f.cleanRunning {
 		goto loop
 	}
-	f.cleanHashMapByForce(hashMap, start, end)
+
+	// 停止工作
+	f.cleanHashMapByForceBeforeExit(hashMap, start, end, cleanerID)
 	f.cleanWaitGroup.Done()
 }
 
@@ -653,13 +650,14 @@ func (f *FlowGenerator) timeoutReport() {
 		flowCacheNum = f.mapSize / f.timeoutCleanerCount
 	}
 	for i := uint64(0); i < f.timeoutCleanerCount; i++ {
+		f.flowOutBuffer[i] = make([]interface{}, 0, QUEUE_BATCH_SIZE)
 		start := i * flowCacheNum
 		end := start + flowCacheNum
 		if end <= f.mapSize {
-			go f.cleanTimeoutHashMap(start, end, i)
+			go f.flowHashMapTimeoutCleaner(start, end, int(i))
 			log.Infof("clean goroutine %d (hashmap range %d to %d) created", i, start, end)
 		} else {
-			go f.cleanTimeoutHashMap(start, f.mapSize, i)
+			go f.flowHashMapTimeoutCleaner(start, f.mapSize, int(i))
 			log.Infof("clean goroutine %d (hashmap range %d to %d) created", i, start, f.mapSize)
 			break
 		}
@@ -695,29 +693,28 @@ func (f *FlowGenerator) Stop() {
 }
 
 // create a new flow generator
-func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, meteringOutQueue MultiQueueWriter, bufferSize int, flowLimitNum int32, index int) *FlowGenerator {
+func New(inputPacketQueue QueueReader, meteringAppQueue, flowOutQueue QueueWriter, bufferSize int, flowLimitNum int32, index int) *FlowGenerator {
 	flowGenerator := &FlowGenerator{
-		FlowCacheHashMap:        FlowCacheHashMap{make([]*FlowCache, hashMapSize), rand.Uint32(), hashMapSize, timeoutCleanerCount, &TunnelInfo{}},
-		FlowGeo:                 innerFlowGeo,
-		metaPacketHeaderInQueue: metaPacketHeaderInQueue,
-		flowOutQueue:            flowOutQueue,
-		meteringOutQueue:        meteringOutQueue,
-		stats:                   FlowGeneratorStats{cleanRoutineFlowCacheNums: make([]int, timeoutCleanerCount), cleanRoutineMaxFlowCacheLens: make([]int, timeoutCleanerCount)},
-		stateMachineMaster:      make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
-		stateMachineSlave:       make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
-		tcpServiceTable:         NewServiceTable(int(flowLimitNum)),
-		udpServiceTable:         NewServiceTable(int(flowLimitNum)),
-		packetHandler:           &PacketHandler{recvBuffer: make([]interface{}, bufferSize), processBuffer: make([]interface{}, bufferSize)},
-		bufferSize:              bufferSize,
-		flowLimitNum:            flowLimitNum,
-		handleRunning:           false,
-		cleanRunning:            false,
-		index:                   index,
-		meteringKeys:            make([]HashKey, 0, METERING_CACHE_SIZE+1),
-		meteringItems:           make([]interface{}, 0, METERING_CACHE_SIZE),
-		perfCounter:             NewFlowPerfCounter(),
+		FlowCacheHashMap:   FlowCacheHashMap{make([]*FlowCache, hashMapSize), rand.Uint32(), hashMapSize, timeoutCleanerCount, &TunnelInfo{}},
+		FlowGeo:            innerFlowGeo,
+		inputPacketQueue:   inputPacketQueue,
+		meteringAppQueue:   meteringAppQueue,
+		flowOutQueue:       flowOutQueue,
+		stats:              FlowGeneratorStats{cleanRoutineFlowCacheNums: make([]int, timeoutCleanerCount), cleanRoutineMaxFlowCacheLens: make([]int, timeoutCleanerCount)},
+		stateMachineMaster: make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
+		stateMachineSlave:  make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
+		tcpServiceTable:    NewServiceTable(int(flowLimitNum)),
+		udpServiceTable:    NewServiceTable(int(flowLimitNum)),
+		recvBuffer:         make([]interface{}, bufferSize),
+		bufferSize:         bufferSize,
+		flowLimitNum:       flowLimitNum,
+		handleRunning:      false,
+		cleanRunning:       false,
+		index:              index,
+		meteringItems:      make([]interface{}, 0, METERING_CACHE_SIZE),
+		flowOutBuffer:      make([][]interface{}, timeoutCleanerCount+1), // 多余一个给主线程
+		perfCounter:        NewFlowPerfCounter(),
 	}
-	flowGenerator.meteringKeys = append(flowGenerator.meteringKeys, HashKey(index))
 	flowGenerator.initFlowCache()
 	flowGenerator.initStateMachineMaster()
 	flowGenerator.initStateMachineSlave()

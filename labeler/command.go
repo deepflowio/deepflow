@@ -69,10 +69,10 @@ func (c *command) recvDumpAcl(conn *net.UDPConn, remote *net.UDPAddr, arg *bytes
 		return
 	}
 
-	info := make([]string, 0, label.readQueuesCount)
+	info := make([]string, 0, len(label.readQueues))
 	switch queryType {
 	case LABELER_CMD_DUMP_ACL:
-		for i := 0; i < label.readQueuesCount; i++ {
+		for i := 0; i < len(label.readQueues); i++ {
 			key.FastIndex = i
 			endpoint, policy := label.policyTable.LookupAllByKey(&key)
 			info = append(info, fmt.Sprintf("GoRoutine-%d: EndPoint: {Src: %+v Dst: %+v} Policy: %+v", i, endpoint.SrcInfo, endpoint.DstInfo, policy))
@@ -81,7 +81,7 @@ func (c *command) recvDumpAcl(conn *net.UDPConn, remote *net.UDPAddr, arg *bytes
 		endpoint, policy := label.policyTable.GetPolicyByFirstPath(&key)
 		info = append(info, fmt.Sprintf("EndPoint: {Src: %+v Dst: %+v} Policy: %+v", endpoint.SrcInfo, endpoint.DstInfo, policy))
 	case LABELER_CMD_DUMP_FAST_ACL:
-		for i := 0; i < label.readQueuesCount; i++ {
+		for i := 0; i < len(label.readQueues); i++ {
 			key.FastIndex = i
 			endpoint, policy := label.policyTable.GetPolicyByFastPath(&key)
 			info = append(info, fmt.Sprintf("GoRoutine-%d: EndPoint: {Src: %+v Dst: %+v} Policy: %+v", i, endpoint.SrcInfo, endpoint.DstInfo, policy))

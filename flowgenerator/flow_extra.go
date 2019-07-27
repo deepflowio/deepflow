@@ -24,16 +24,16 @@ const (
 )
 
 type FlowExtra struct {
-	taggedFlow   *TaggedFlow
-	metaFlowPerf *MetaFlowPerf
-	flowState    FlowState
-	minArrTime   time.Duration
-	recentTime   time.Duration
-	timeout      time.Duration
-	reported     bool
-	reversed     bool
-	circlePktGot bool
-	isFlowAction bool
+	taggedFlow    *TaggedFlow
+	metaFlowPerf  *MetaFlowPerf
+	minArrTime    time.Duration
+	recentTime    time.Duration
+	timeout       time.Duration
+	flowState     FlowState
+	reported      bool
+	reversed      bool
+	circlePktGot  bool
+	hasFlowAction bool
 }
 
 var flowExtraPool = pool.NewLockFreePool(func() interface{} {

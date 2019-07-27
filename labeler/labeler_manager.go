@@ -1,6 +1,7 @@
 package labeler
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/op/go-logging"
@@ -25,14 +26,17 @@ const (
 	QUEUE_TYPE_MAX
 )
 
+const (
+	QUEUE_BATCH_SIZE = 4096
+)
+
 type LabelerManager struct {
 	command
 
-	policyTable     *policy.PolicyTable
-	readQueues      queue.MultiQueueReader
-	readQueuesCount int
-	appQueues       [QUEUE_TYPE_MAX]queue.MultiQueueWriter
-	running         bool
+	policyTable *policy.PolicyTable
+	readQueues  []queue.QueueReader
+	appQueues   [QUEUE_TYPE_MAX][]queue.QueueWriter
+	running     bool
 
 	lookupKey         []datatype.LookupKey
 	rawPlatformDatas  []*datatype.PlatformData
@@ -60,16 +64,15 @@ type DumpKey struct {
 	InPort uint32
 }
 
-func NewLabelerManager(readQueues queue.MultiQueueReader, count int, size uint32, disable bool, ddbsDisable bool) *LabelerManager {
+func NewLabelerManager(readQueues []queue.QueueReader, mapSize uint32, disable bool, ddbsDisable bool) *LabelerManager {
 	id := policy.DDBS
 	if ddbsDisable {
 		id = policy.NORMAL
 	}
 	labeler := &LabelerManager{
-		lookupKey:       make([]datatype.LookupKey, count),
-		policyTable:     policy.NewPolicyTable(count, size, disable, id),
-		readQueues:      readQueues,
-		readQueuesCount: count,
+		lookupKey:   make([]datatype.LookupKey, len(readQueues)),
+		policyTable: policy.NewPolicyTable(len(readQueues), mapSize, disable, id),
+		readQueues:  readQueues,
 	}
 	labeler.command.init(labeler)
 	debug.Register(dropletctl.DROPLETCTL_LABELER, labeler)
@@ -85,7 +88,10 @@ func (l *LabelerManager) Closed() bool {
 	return false // FIXME: never close?
 }
 
-func (l *LabelerManager) RegisterAppQueue(queueType QueueType, appQueues queue.MultiQueueWriter) {
+func (l *LabelerManager) RegisterAppQueue(queueType QueueType, appQueues []queue.QueueWriter) {
+	if len(appQueues) != len(l.readQueues) {
+		panic(fmt.Sprintf("Queue count (type %d) %d is not equal to input queue count %d.", queueType, len(appQueues), len(l.readQueues)))
+	}
 	l.appQueues[queueType] = appQueues
 }
 
@@ -218,21 +224,16 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *data
 }
 
 func (l *LabelerManager) run(index int) {
-	flowQueues := l.appQueues[QUEUE_TYPE_FLOW]
-	captureQueues := l.appQueues[QUEUE_TYPE_PCAP]
-	size := 1024 * 16
-	userId := queue.HashKey(index)
-	flowKeys := make([]queue.HashKey, 0, size+1)
-	flowKeys = append(flowKeys, userId)
-	captureKeys := make([]queue.HashKey, 0, size+1)
-	captureKeys = append(captureKeys, userId)
+	readQueue := l.readQueues[index]
+	flowQueue := l.appQueues[QUEUE_TYPE_FLOW][index]
+	captureQueue := l.appQueues[QUEUE_TYPE_PCAP][index]
 
-	flowItemBatch := make([]interface{}, 0, size)
-	captureItemBatch := make([]interface{}, 0, size)
-	itemBatch := make([]interface{}, size)
+	itemBatch := make([]interface{}, QUEUE_BATCH_SIZE)
+	flowItemBatch := make([]interface{}, 0, QUEUE_BATCH_SIZE)
+	captureItemBatch := make([]interface{}, 0, QUEUE_BATCH_SIZE)
 
 	for l.running {
-		itemCount := l.readQueues.Gets(userId, itemBatch)
+		itemCount := readQueue.Gets(itemBatch)
 		for i, item := range itemBatch[:itemCount] {
 			metaPacket := item.(*datatype.MetaPacket)
 			action := l.GetPolicy(metaPacket, index)
@@ -242,30 +243,26 @@ func (l *LabelerManager) run(index int) {
 				continue
 			}
 
-			if (action.ActionFlags & datatype.ACTION_PACKET_CAPTURING) != 0 {
+			if action.ActionFlags&datatype.ACTION_PACKET_CAPTURING != 0 {
 				if action.ActionFlags != datatype.ACTION_PACKET_CAPTURING {
 					metaPacket.AddReferenceCount() // 引用计数+1，避免被释放
 				}
-				captureKeys = append(captureKeys, queue.HashKey(metaPacket.QueueHash))
 				captureItemBatch = append(captureItemBatch, metaPacket)
 			}
 
 			if action.ActionFlags != datatype.ACTION_PACKET_CAPTURING {
 				// 为了获取所以流量方向，所有流量都过flowgenerator
-				flowKeys = append(flowKeys, queue.HashKey(metaPacket.QueueHash))
 				flowItemBatch = append(flowItemBatch, metaPacket)
 			}
 
 			itemBatch[i] = nil
 		}
 		if len(flowItemBatch) > 0 {
-			flowQueues.Puts(flowKeys, flowItemBatch)
-			flowKeys = flowKeys[:1]
+			flowQueue.Put(flowItemBatch...)
 			flowItemBatch = flowItemBatch[:0]
 		}
 		if len(captureItemBatch) > 0 {
-			captureQueues.Puts(captureKeys, captureItemBatch)
-			captureKeys = captureKeys[:1]
+			captureQueue.Put(captureItemBatch...)
 			captureItemBatch = captureItemBatch[:0]
 		}
 	}
@@ -277,7 +274,7 @@ func (l *LabelerManager) Start() {
 	if !l.running {
 		l.running = true
 		log.Info("Start labeler manager")
-		for i := 0; i < l.readQueuesCount; i++ {
+		for i := 0; i < len(l.readQueues); i++ {
 			go l.run(i)
 		}
 	}

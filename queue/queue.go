@@ -5,12 +5,14 @@ import (
 )
 
 type Queue struct {
-	queue.OverwriteQueue
-	Monitor
+	*queue.OverwriteQueue
+	*Monitor
 }
 
 func (q *Queue) Init(name string, size int, unmarshaller Unmarshaller, options ...queue.Option) {
+	q.Monitor = &Monitor{}
 	q.Monitor.init(name, unmarshaller)
+	q.OverwriteQueue = &queue.OverwriteQueue{}
 	q.OverwriteQueue.Init(name, size, options...)
 }
 

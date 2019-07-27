@@ -1,7 +1,6 @@
 package mapreduce
 
 import (
-	"math/rand"
 	"reflect"
 	"strconv"
 	"time"
@@ -25,8 +24,8 @@ const (
 const GEO_FILE_LOCATION = "/usr/share/droplet/ip_info_mini.json"
 
 func NewFlowMapProcess(
-	output queue.MultiQueueWriter, input queue.MultiQueueReader,
-	inputCount, docsInBuffer, windowSize, windowMoveMargin int,
+	outputs []queue.QueueWriter, inputs []queue.QueueReader,
+	docsInBuffer, windowSize, windowMoveMargin int,
 ) *FlowHandler {
 	return NewFlowHandler([]app.FlowProcessor{
 		fps.NewProcessor(),
@@ -35,16 +34,15 @@ func NewFlowMapProcess(
 		geo.NewProcessor(GEO_FILE_LOCATION),
 		flowtype.NewProcessor(),
 		logusage.NewProcessor(),
-	}, output, input, inputCount, docsInBuffer, windowSize, windowMoveMargin)
+	}, outputs, inputs, docsInBuffer, windowSize, windowMoveMargin)
 }
 
 type FlowHandler struct {
 	numberOfApps int
 	processors   []app.FlowProcessor
 
-	flowQueue        queue.MultiQueueReader
-	flowQueueCount   int
-	zmqAppQueue      queue.MultiQueueWriter
+	flowQueues       []queue.QueueReader
+	zmqAppQueues     []queue.QueueWriter
 	docsInBuffer     int
 	windowSize       int
 	windowMoveMargin int
@@ -52,15 +50,14 @@ type FlowHandler struct {
 
 func NewFlowHandler(
 	processors []app.FlowProcessor,
-	output queue.MultiQueueWriter, inputs queue.MultiQueueReader,
-	inputCount, docsInBuffer, windowSize, windowMoveMargin int,
+	outputs []queue.QueueWriter, inputs []queue.QueueReader,
+	docsInBuffer, windowSize, windowMoveMargin int,
 ) *FlowHandler {
 	return &FlowHandler{
 		numberOfApps:     len(processors),
 		processors:       processors,
-		zmqAppQueue:      output,
-		flowQueue:        inputs,
-		flowQueueCount:   inputCount,
+		zmqAppQueues:     outputs,
+		flowQueues:       inputs,
 		docsInBuffer:     docsInBuffer,
 		windowSize:       windowSize,
 		windowMoveMargin: windowMoveMargin,
@@ -73,11 +70,9 @@ type subFlowHandler struct {
 	processors   []app.FlowProcessor
 	stashes      []Stash
 
-	flowQueue   queue.MultiQueueReader
-	zmqAppQueue queue.MultiQueueWriter
-
-	queueIndex int
-	hashKey    queue.HashKey
+	flowQueue    queue.QueueReader
+	zmqAppQueues []queue.QueueWriter
+	nextQueueID  uint8
 
 	counterLatch int
 	statItems    []stats.StatItem
@@ -102,11 +97,9 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 		processors:   dupProcessors,
 		stashes:      make([]Stash, h.numberOfApps),
 
-		flowQueue:   h.flowQueue,
-		zmqAppQueue: h.zmqAppQueue,
-
-		queueIndex: index,
-		hashKey:    queue.HashKey(rand.Int()),
+		flowQueue:    h.flowQueues[index],
+		zmqAppQueues: h.zmqAppQueues,
+		nextQueueID:  uint8(index),
 
 		counterLatch: 0,
 		statItems:    make([]stats.StatItem, 0),
@@ -153,18 +146,18 @@ func (h *subFlowHandler) putToQueue(processorID int) {
 	docs := stash.Dump()
 	for j := 0; j < len(docs); j += QUEUE_BATCH_SIZE {
 		if j+QUEUE_BATCH_SIZE <= len(docs) {
-			h.zmqAppQueue.Put(h.hashKey, docs[j:j+QUEUE_BATCH_SIZE]...)
+			h.zmqAppQueues[h.nextQueueID&uint8(len(h.zmqAppQueues)-1)].Put(docs[j : j+QUEUE_BATCH_SIZE]...)
 		} else {
-			h.zmqAppQueue.Put(h.hashKey, docs[j:]...)
+			h.zmqAppQueues[h.nextQueueID&uint8(len(h.zmqAppQueues)-1)].Put(docs[j:]...)
 		}
-		h.hashKey++
+		h.nextQueueID++
 	}
 	h.processorCounter[h.counterLatch][processorID].emitCounter += uint64(len(docs))
 	stash.Clear()
 }
 
 func (h *FlowHandler) Start() {
-	for i := 0; i < h.flowQueueCount; i++ {
+	for i := 0; i < len(h.flowQueues); i++ {
 		go h.newSubFlowHandler(i).Process()
 	}
 }
@@ -200,7 +193,7 @@ func (h *subFlowHandler) Process() error {
 	elements := make([]interface{}, QUEUE_BATCH_SIZE)
 
 	for {
-		n := h.flowQueue.Gets(queue.HashKey(h.queueIndex), elements)
+		n := h.flowQueue.Gets(elements)
 
 		// 当前时间超出窗口右边界时，上个自然分钟的数据已计算完毕，一定能将窗口滑动一次。
 		epoch := uint32(time.Now().Unix())

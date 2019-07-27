@@ -16,6 +16,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/logger"
 	libqueue "gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gopkg.in/yaml.v2"
 
 	"gitlab.x.lan/yunshan/droplet/adapter"
@@ -68,6 +69,8 @@ func Start(configPath string) (closers []io.Closer) {
 	profiler := profiler.NewProfiler(8000)
 
 	if cfg.Profiler {
+		runtime.SetMutexProfileFraction(1)
+		runtime.SetBlockProfileRate(1)
 		profiler.Start()
 	}
 
@@ -91,7 +94,7 @@ func Start(configPath string) (closers []io.Closer) {
 		datatype.ReleaseMetaPacket(x.(*datatype.MetaPacket))
 	}
 	labelerQueues := manager.NewQueues(
-		"1-meta-packet-to-labeler", cfg.Queue.LabelerQueueSize, cfg.Queue.LabelerQueueCount, 1,
+		"1-meta-packet-to-labeler", cfg.Queue.LabelerQueueSize, cfg.Queue.PacketQueueCount, 1,
 		releaseMetaPacket,
 	)
 
@@ -99,7 +102,6 @@ func Start(configPath string) (closers []io.Closer) {
 	if tridentAdapter == nil {
 		return
 	}
-	tridentAdapter.Start()
 
 	localIp, err := getLocalIp()
 	if err != nil {
@@ -112,16 +114,17 @@ func Start(configPath string) (closers []io.Closer) {
 
 	// L2 - packet labeler
 	flowGeneratorQueues := manager.NewQueues(
-		"2-meta-packet-to-flow-generator", cfg.Queue.FlowGeneratorQueueSize, cfg.Queue.FlowGeneratorQueueCount, cfg.Queue.LabelerQueueCount,
-		releaseMetaPacket,
+		"2-meta-packet-to-flow-generator", cfg.Queue.FlowGeneratorQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
+		libqueue.OptionFlushIndicator(cfg.FlowGenerator.FlowCleanInterval*time.Second), releaseMetaPacket,
 	)
 	pcapAppQueues := manager.NewQueues(
-		"2-meta-packet-to-pcap-app", cfg.Queue.PCapAppQueueSize, cfg.Queue.PCapAppQueueCount, cfg.Queue.LabelerQueueCount,
+		"2-meta-packet-to-pcap-app", cfg.Queue.PCapAppQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
 		libqueue.OptionFlushIndicator(time.Second*10), releaseMetaPacket,
 	)
-	labelerManager := labeler.NewLabelerManager(labelerQueues, cfg.Queue.LabelerQueueCount, cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable, cfg.Labeler.FirstPathDdbsDisable)
-	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_FLOW, flowGeneratorQueues)
-	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_PCAP, pcapAppQueues)
+	labelerManager := labeler.NewLabelerManager(
+		labelerQueues.Readers(), cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable, cfg.Labeler.FirstPathDdbsDisable)
+	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_FLOW, flowGeneratorQueues.Writers())
+	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_PCAP, pcapAppQueues.Writers())
 	synchronizer.Register(func(response *trident.SyncResponse) {
 		log.Debug(response)
 		// Labeler更新策略信息
@@ -130,16 +133,18 @@ func Start(configPath string) (closers []io.Closer) {
 	labelerManager.Start()
 
 	// L3 - flow generator & metering marshaller & pcap
-	docsInBuffer := int(cfg.Queue.DocsQueueSize)
+	docsInBuffer := int(cfg.Queue.DocQueueSize)
 	windowSize := int(cfg.MapReduce.WindowSize)
 	windowMoveMargin := int(cfg.MapReduce.WindowMoveMargin)
 	releaseTaggedFlow := func(x interface{}) {
 		datatype.ReleaseTaggedFlow(x.(*datatype.TaggedFlow))
 	}
-	flowDuplicatorQueue := manager.NewQueue("3-tagged-flow-to-flow-duplicator", cfg.Queue.FlowDuplicatorQueueSize, releaseTaggedFlow)
+	flowDuplicatorQueues := manager.NewQueues(
+		"3-tagged-flow-to-flow-duplicator", cfg.Queue.FlowDuplicatorQueueSize, cfg.Queue.PacketQueueCount,
+		cfg.Queue.PacketQueueCount, releaseTaggedFlow)
 	meteringAppQueues := manager.NewQueues(
-		"3-meta-packet-to-metering-app", cfg.Queue.MeteringAppQueueSize, cfg.Queue.MeteringAppQueueCount, cfg.Queue.FlowGeneratorQueueCount,
-		libqueue.OptionFlushIndicator(time.Second*5), releaseMetaPacket,
+		"3-meta-packet-to-metering-app", cfg.Queue.MeteringAppQueueSize, cfg.Queue.PacketQueueCount,
+		cfg.Queue.PacketQueueCount, libqueue.OptionFlushIndicator(time.Second*5), releaseMetaPacket,
 	)
 
 	flowgenerator.SetFlowGenerator(cfg)
@@ -153,19 +158,21 @@ func Start(configPath string) (closers []io.Closer) {
 		SingleDirection: cfg.FlowGenerator.OthersTimeout,
 	}
 	flowgenerator.SetTimeout(timeoutConfig)
-	bufferSize := cfg.Queue.FlowGeneratorQueueSize / cfg.Queue.FlowGeneratorQueueCount
-	flowLimitNum := cfg.FlowGenerator.FlowCountLimit / int32(cfg.Queue.FlowGeneratorQueueCount)
+	bufferSize := cfg.Queue.FlowGeneratorQueueSize / cfg.Queue.PacketQueueCount
+	flowLimitNum := cfg.FlowGenerator.FlowCountLimit / int32(cfg.Queue.PacketQueueCount)
 	if bufferSize > 8192 {
 		bufferSize = 8192
 	}
-	for i := 0; i < cfg.Queue.FlowGeneratorQueueCount; i++ {
-		flowGenerator := flowgenerator.New(flowGeneratorQueues, flowDuplicatorQueue, meteringAppQueues, bufferSize, flowLimitNum, i)
+	for i := 0; i < cfg.Queue.PacketQueueCount; i++ {
+		flowGenerator := flowgenerator.New(
+			flowGeneratorQueues.Readers()[i], meteringAppQueues.Writers()[i],
+			flowDuplicatorQueues.Writers()[i], bufferSize, flowLimitNum, i)
 		flowGenerator.Start()
 	}
 
 	pcapClosers := pcap.NewWorkerManager(
-		pcapAppQueues,
-		cfg.Queue.PCapAppQueueCount,
+		pcapAppQueues.Readers(),
+		pcapAppQueues.Writers(),
 		cfg.PCap.TCPIPChecksum,
 		cfg.PCap.BlockSizeKB,
 		cfg.PCap.MaxConcurrentFiles,
@@ -178,43 +185,58 @@ func Start(configPath string) (closers []io.Closer) {
 	).Start()
 	closers = append(closers, pcapClosers...)
 
-	// L4 - flow duplicator & flow sender
-	flowAppQueue := manager.NewQueues(
-		"4-tagged-flow-to-flow-app", cfg.Queue.FlowAppQueueSize,
-		cfg.Queue.FlowAppQueueCount, cfg.Queue.FlowGeneratorQueueCount, libqueue.OptionFlushIndicator(time.Second*10), releaseTaggedFlow)
-	flowSenderQueue := manager.NewQueue(
-		"4-tagged-flow-to-stream", cfg.Queue.FlowSenderQueueSize, releaseTaggedFlow) // ZMQ发送缓慢，queueSize设置为上游的2倍
-	meteringAppOutputQueue := manager.NewQueues(
+	// L4 - metering app
+	meteringDocMarshallerQueue := manager.NewQueues(
 		"4-metering-doc-to-marshaller",
-		cfg.Queue.MeteringAppOutputQueueSize, cfg.Queue.MeteringAppOutputQueueCount, // MapReduce发送是突发的，且ZMQ发送缓慢，queueSize设置为突发的2倍
-		cfg.Queue.MeteringAppQueueCount,
+		cfg.Queue.MeteringDocMarshallerQueueSize, cfg.Queue.DocQueueCount,
+		cfg.Queue.PacketQueueCount,
 		libqueue.OptionRelease(func(p interface{}) { app.ReleaseDocument(p.(*app.Document)) }),
 	)
-
 	mapreduce.NewMeteringMapProcess(
-		meteringAppOutputQueue, meteringAppQueues, cfg.Queue.MeteringAppQueueCount,
-		docsInBuffer/int(cfg.Queue.MeteringAppQueueCount), windowSize, windowMoveMargin).Start()
+		meteringDocMarshallerQueue.Writers(), meteringAppQueues.Readers(),
+		docsInBuffer/int(cfg.Queue.PacketQueueCount), windowSize, windowMoveMargin).Start()
 
-	flowDuplicator := queue.NewDuplicator(1024, flowDuplicatorQueue, datatype.PseudoCloneTaggedFlowHelper)
-	flowDuplicator.AddMultiQueue(flowAppQueue, cfg.Queue.FlowAppQueueCount).AddQueue(flowSenderQueue).Start()
-	sender.NewFlowSender(flowSenderQueue, cfg.Stream, cfg.StreamPort, cfg.Queue.FlowSenderQueueSize).Start()
+	// L4 - flow duplicator: flow app & flow marshaller
+	flowAppQueues := manager.NewQueues(
+		"4-tagged-flow-to-flow-app", cfg.Queue.FlowAppQueueSize, cfg.Queue.FlowQueueCount,
+		cfg.Queue.PacketQueueCount, libqueue.OptionFlushIndicator(time.Second*10), releaseTaggedFlow)
+	flowMarshallerQueues := manager.NewQueues(
+		"4-tagged-flow-to-flow-marshaller", cfg.Queue.FlowMarshallerQueueSize, cfg.Queue.FlowQueueCount,
+		cfg.Queue.PacketQueueCount, releaseTaggedFlow)
+	// 特殊处理：Duplicator的数量特意设置为PacketQueueCount，使得FlowGenerator所在环境均为单生产单消费
+	for i := 0; i < cfg.Queue.PacketQueueCount; i++ {
+		flowDuplicator := queue.NewDuplicator(i, 1024, flowDuplicatorQueues.Readers()[i], datatype.PseudoCloneTaggedFlowHelper)
+		flowDuplicator.AddMultiQueue(flowAppQueues).AddMultiQueue(flowMarshallerQueues).Start()
+	}
 
-	// L5 - flow doc marshaller
-	flowAppOutputQueue := manager.NewQueues(
+	// L5 - flow sender
+	flowSenderQueue := manager.NewQueue(
+		"5-flow-pb-to-flow-sender", cfg.Queue.FlowSenderQueueSize,
+		libqueue.OptionRelease(func(p interface{}) { utils.ReleaseByteBuffer(p.(*utils.ByteBuffer)) }),
+	)
+	sender.NewFlowSender(
+		flowMarshallerQueues.Readers(), flowSenderQueue, flowSenderQueue,
+		cfg.Stream, cfg.StreamPort, cfg.Queue.FlowSenderQueueSize).Start()
+
+	// L5 - flow app
+	flowDocMarshallerQueue := manager.NewQueues(
 		"5-flow-doc-to-marshaller",
-		cfg.Queue.FlowAppOutputQueueSize, cfg.Queue.FlowAppOutputQueueCount, // MapReduce发送是突发的，且ZMQ发送缓慢，queueSize设置为突发的2倍
-		cfg.Queue.FlowAppQueueCount,
+		cfg.Queue.FlowDocMarshallerQueueSize, cfg.Queue.DocQueueCount,
+		cfg.Queue.FlowQueueCount,
 		libqueue.OptionRelease(func(p interface{}) { app.ReleaseDocument(p.(*app.Document)) }),
 	)
 	mapreduce.NewFlowMapProcess(
-		flowAppOutputQueue, flowAppQueue, cfg.Queue.FlowAppQueueCount,
-		docsInBuffer/int(cfg.Queue.FlowAppQueueCount), windowSize, windowMoveMargin).Start()
+		flowDocMarshallerQueue.Writers(), flowAppQueues.Readers(),
+		docsInBuffer/int(cfg.Queue.FlowQueueCount), windowSize, windowMoveMargin).Start()
 
 	// L6 - flow/metering doc sender
 	builder := sender.NewZeroDocumentSenderBuilder()
-	builder.AddQueue(meteringAppOutputQueue, cfg.Queue.MeteringAppOutputQueueCount)
-	builder.AddQueue(flowAppOutputQueue, cfg.Queue.FlowAppOutputQueueCount)
+	builder.AddQueue(meteringDocMarshallerQueue.Readers())
+	builder.AddQueue(flowDocMarshallerQueue.Readers())
 	builder.AddListenPorts(cfg.ZeroPort)
-	builder.Build().Start(cfg.Queue.DocSenderQueueSize) // MapReduce发送是突发的，且ZMQ发送缓慢，queueSize设置为突发的2倍
+	builder.Build().Start(cfg.Queue.DocSenderQueueSize)
+
+	// 其他所有组件启动完成以后运行TridentAdapter，尽量避免启动过程中队列丢包
+	tridentAdapter.Start()
 	return
 }

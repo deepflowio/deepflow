@@ -66,9 +66,8 @@ type WorkerCounter struct {
 }
 
 type Worker struct {
-	inputQueue queue.MultiQueueReader
-	index      int
-	queueKey   queue.HashKey
+	packetQueue queue.QueueReader
+	index       int
 
 	maxConcurrentFiles int
 	maxFileSize        int64
@@ -92,13 +91,12 @@ type Worker struct {
 	exitWg  *sync.WaitGroup
 }
 
-func (m *WorkerManager) newWorker(index int) *Worker {
+func (m *WorkerManager) newWorker(packetQueueID queue.HashKey) *Worker {
 	return &Worker{
-		inputQueue: m.inputQueue,
-		index:      index,
-		queueKey:   queue.HashKey(uint8(index)),
+		packetQueue: m.packetQueueReaders[packetQueueID],
+		index:       int(packetQueueID),
 
-		maxConcurrentFiles: m.maxConcurrentFiles / m.nQueues,
+		maxConcurrentFiles: m.maxConcurrentFiles / len(m.packetQueueReaders),
 		maxFileSize:        int64(m.maxFileSizeMB) << 20,
 		maxFilePeriod:      time.Duration(m.maxFilePeriodSecond) * time.Second,
 		baseDirectory:      m.baseDirectory,
@@ -393,7 +391,7 @@ func (w *Worker) Process() {
 
 WORKING_LOOP:
 	for !w.exiting {
-		n := w.inputQueue.Gets(w.queueKey, elements)
+		n := w.packetQueue.Gets(elements)
 		timeNow := time.Duration(time.Now().UnixNano())
 		for _, e := range elements[:n] {
 			if e == nil { // tick
