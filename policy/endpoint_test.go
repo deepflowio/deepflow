@@ -12,7 +12,7 @@ import (
 
 // 平台信息有关测试
 func TestGetPlatformData(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	datas := make([]*PlatformData, 0, 2)
 	ipInfo := generateIpNet(ip3, 121, 24)
 	ipInfo1 := generateIpNet(ip4, 122, 25)
@@ -37,7 +37,7 @@ func TestGetPlatformData(t *testing.T) {
 }
 
 func TestGetPlatformDataAboutArp(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	datas := make([]*PlatformData, 0, 2)
 
 	ipInfo := generateIpNet(ip3, 121, 24)
@@ -63,7 +63,7 @@ func TestGetPlatformDataAboutArp(t *testing.T) {
 }
 
 func TestGetGroupData(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	policy.UpdateAcls(nil)
@@ -83,7 +83,7 @@ func TestGetGroupData(t *testing.T) {
 
 //测试全局Pass策略匹配direction==3
 func TestAllPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, protoAny, 0, vlanAny)
@@ -100,7 +100,7 @@ func TestAllPassPolicy(t *testing.T) {
 
 //测试资源组forward策略匹配 direction==1
 func TestGroupForwardPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	// srcGroups: 40
@@ -118,7 +118,7 @@ func TestGroupForwardPassPolicy(t *testing.T) {
 
 //测试资源组backward策略匹配 direction==2
 func TestGroupBackwardPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	// dstGroups: 40
@@ -136,7 +136,7 @@ func TestGroupBackwardPassPolicy(t *testing.T) {
 
 //测试Port策略匹配 acl配置port=0，查询SrcPort=30，DstPort=30，查询到ACl
 func TestAllPortPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	// dstPorts: 30
@@ -154,7 +154,7 @@ func TestAllPortPassPolicy(t *testing.T) {
 
 //测试Port策略匹配 acl配置port=30，查询Srcport=30，查到acl的direction=2
 func TestSrcPortPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	// dstPorts : 30
@@ -174,7 +174,7 @@ func TestSrcPortPassPolicy(t *testing.T) {
 
 //测试Port策略匹配 acl配置port=30，查询Dstport=30，查到acl的direction=1
 func TestDstPortPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	//	dstPorts: 30
@@ -194,7 +194,7 @@ func TestDstPortPassPolicy(t *testing.T) {
 
 //测试Port策略匹配 acl配置port=30，查询SrcPort=30, Dstport=30，查到acl的direction=3
 func TestSrcDstPortPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	//	dstPorts: 30
@@ -214,7 +214,7 @@ func TestSrcDstPortPassPolicy(t *testing.T) {
 
 //测试Vlan策略匹配 acl配置Vlan=30，查询Vlan=30, 查询到Acl
 func TestVlanPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, protoAny, 0, 30)
@@ -233,7 +233,7 @@ func TestVlanPassPolicy(t *testing.T) {
 
 //测试Vlan策略匹配 acl配置Vlan=0，Port=8000,查询Vlan=30,Port=8000 查询到Acl
 func TestVlanPortPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	//	dstPorts: 8000
@@ -253,7 +253,7 @@ func TestVlanPortPassPolicy(t *testing.T) {
 
 //测试Vlan策略匹配 acl配置Proto=6，Port=8000,查询Proto=6,Port=8000 查询到Acl
 func TestPortProtoPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	//	dstPorts: 8000
@@ -273,7 +273,7 @@ func TestPortProtoPassPolicy(t *testing.T) {
 
 //测试两条acl proto为6和17 查询proto=6的acl,proto为6的匹配成功
 func TestAclsPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	//	dstPorts: 8000
@@ -298,7 +298,7 @@ func TestAclsPassPolicy(t *testing.T) {
 
 //测试两条acl vlan为10和0  查询vlan=10的策略，结果两条都能匹配
 func TestVlanAclsPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	// dstPorts: 8000
@@ -324,7 +324,7 @@ func TestVlanAclsPassPolicy(t *testing.T) {
 
 //测试两条acl vlan=10和port=8000  查询vlan=10,port=1000，匹配到vlan=10的策略
 func TestVlanPortAclsPassPolicy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	//	dstPorts: 8000
@@ -348,7 +348,7 @@ func TestVlanPortAclsPassPolicy(t *testing.T) {
 
 //测试两条acl vlan=10和port=8000  查询vlan=10,port=8000，两条策略都匹配到
 func TestVlanPortAclsPassPolicy1(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	// dstPorts: 8000
@@ -372,7 +372,7 @@ func TestVlanPortAclsPassPolicy1(t *testing.T) {
 
 //测试两条acl vlan=10和port=8000  查询port=8000，匹配到port=8000的策略
 func TestVlanPortAclsPassPolicy2(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	//	dstPorts: 8000
@@ -400,7 +400,7 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 
 // l2EpcId0=40,L3EpcId0=40,l2Epcid1=0,L3EpcId1=-1的数据正确性
 func TestModifyEpcIdPolicy1(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpc[4], 4)
 	policy.UpdateInterfaceData([]*PlatformData{platformData1})
 	generateIpgroupData(policy)
@@ -423,7 +423,7 @@ func TestModifyEpcIdPolicy1(t *testing.T) {
 
 // l2EpcId0=40,l3EpcId0=40,l2EpcId1=50,l3EpcId1=50的数据正确性
 func TestModifyEpcIdPolicy2(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpc[4], 4)
 	platformData2 := generatePlatformDataByParam(ip5, mac5, groupEpc[5], 3)
 	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
@@ -447,7 +447,7 @@ func TestModifyEpcIdPolicy2(t *testing.T) {
 
 // l2EpcId0=-1,l3EpcId0=-1,l2Epcid1=0,l3EpcId1=50的数据正确性
 func TestModifyEpcIdPolicy3(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpcAny, 3)
 	platformData2 := generatePlatformDataByParam(ip5, mac5, groupEpc[5], 3)
 	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
@@ -471,7 +471,7 @@ func TestModifyEpcIdPolicy3(t *testing.T) {
 
 // l2EpcId0=40,l3EpcId0=40,l2EpcId1=0,l3EpcId1=-1的数据正确性
 func TestModifyEpcIdPolicy4(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpc[4], 3)
 	platformData2 := generatePlatformDataByParam(ip5, mac5, groupEpcAny, 3)
 	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
@@ -495,7 +495,7 @@ func TestModifyEpcIdPolicy4(t *testing.T) {
 
 // l3EpcId0=-1, l3EpcId1=-1的数据正确性
 func TestModifyEpcIdPolicy5(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpcAny, 4)
 	platformData2 := generatePlatformDataByParam(ip5, mac5, groupEpcAny, 4)
 	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
@@ -539,7 +539,7 @@ func TestModifyEpcIdPolicy5(t *testing.T) {
 // 修正IP范围{10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 255.255.255.255/32}
 // L3EpcId0=0,L3EpcId1=0 修正后-> L3EpcId0=-1,L3EpcId1=-1
 func TestModifyPrivateIp(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	// 192.168.0.0/16
 	key := generateLookupKey(mac1, mac2, vlanAny, ip3, ip4, IPProtocolTCP, 0, 8000)
 	basicData := generateEpcInfo(groupEpc[0], groupEpcOther, groupEpc[0], groupEpcOther)
@@ -598,7 +598,7 @@ func checkEndTestResult(t *testing.T, basicEndInfo *EndInfo, targetEndpointData 
 
 // L2end0=L2end1=false L3end0=L3end1=false
 func TestL2endL3end1(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	key := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, IPProtocolTCP, 0, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 63, l2EndBool[0], l2EndBool[0])
 
@@ -611,7 +611,7 @@ func TestL2endL3end1(t *testing.T) {
 
 // L2end0=L2end1=true L3end0=L3end1=false
 func TestL2endL3end2(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	key := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, IPProtocolTCP, 0, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 63, l2EndBool[1], l2EndBool[1])
 
@@ -624,7 +624,7 @@ func TestL2endL3end2(t *testing.T) {
 
 // L2end0=L2end1=false L3end0=true,L3end1=false
 func TestL2endL3end3(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	key := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, IPProtocolTCP, 0, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, l2EndBool[0], l2EndBool[0])
 
@@ -637,7 +637,7 @@ func TestL2endL3end3(t *testing.T) {
 
 // L2end0=L2end1=true L3end0=true, L3end1=false
 func TestL2endL3end4(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	key := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, IPProtocolTCP, 0, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, l2EndBool[1], l2EndBool[1])
 
@@ -650,7 +650,7 @@ func TestL2endL3end4(t *testing.T) {
 
 // L2end0,L2end1 修正
 func TestModifyL2end(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	key := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, IPProtocolTCP, 0, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, l2EndBool[1], l2EndBool[0])
 	basicEndInfo := generateEndInfo(l2EndBool[1], l3EndBool[1], l2EndBool[0], l3EndBool[0])
@@ -673,7 +673,7 @@ func TestModifyL2end(t *testing.T) {
 // ip包  ip3-->ip4 ttl=63  L2end=L2end1=false L3end0=true,L3end1=true
 // ip包  ip4-->ip3 ttl=63  L2end=L2end1=false L3end0=true,L3end1=true
 func TestL2endL3end5(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 
 	// arp包 ip3-->ip4
 	key1 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 8000)
@@ -705,7 +705,7 @@ func TestL2endL3end5(t *testing.T) {
 }
 
 func TestFastpathEndInfo(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 
 	// arp包 ip3-->ip4 ttl=64  L2end0=L2end1=false L3end0=true,L3end1=false
 	key1 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 0)
@@ -749,7 +749,7 @@ func checkEndpointStore(t *testing.T, store *EndpointStore) bool {
 }
 
 func TestFastpathEndpointStore(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	// l2End0=true, l3End0=false, l2End1=false, l3End1=false
 	key := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 0)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 63, l2EndBool[1], l2EndBool[0])
@@ -761,7 +761,7 @@ func TestFastpathEndpointStore(t *testing.T) {
 }
 
 func TestFastpathL2End(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	// l2End0=true, l3End0=false, l2End1=false, l3End1=false
 	key := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 0)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 63, l2EndBool[1], l2EndBool[0])
@@ -802,7 +802,7 @@ func TestFastpathL2End(t *testing.T) {
 }
 
 func TestFastpathL2L3End(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	// l2End0=true, l3End0=true, l2End1=true, l3End1=false
 	key1 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, protoAny, 80, 0)
 	setEthTypeAndOthers(key1, EthernetTypeIPv4, 64, l2EndBool[1], l2EndBool[1])
@@ -882,7 +882,7 @@ func TestFastpathL2L3End(t *testing.T) {
 }
 
 func TestAnonymousGroupData(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	ipGroup1 := generateIpGroup(group[1], 0, ipGroup6IpNet1)
 	ipGroup1.Type = ANONYMOUS_IP
@@ -910,7 +910,7 @@ func TestAnonymousGroupData(t *testing.T) {
 }
 
 func TestIpNetmaskGroup(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	ipGroup1 := generateIpGroup(group[11], groupEpc[0], ipNet10, ipNet11)
 	ipGroup2 := generateIpGroup(group[12], groupEpc[0], ipNet12)
 	ipGroup3 := generateIpGroup(group[13], groupEpc[0], ipNet13)
@@ -929,7 +929,7 @@ func TestIpNetmaskGroup(t *testing.T) {
 }
 
 func TestIpNetmaskGroup1(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	ipGroup1 := generateIpGroup(group[11], groupEpc[0], ipNet10, ipNet11)
 	ipGroup2 := generateIpGroup(group[12], groupEpc[0], ipNet12)
 	ipGroup3 := generateIpGroup(group[13], groupEpc[0], ipNet13)
@@ -951,7 +951,7 @@ func TestIpNetmaskGroup1(t *testing.T) {
 }
 
 func TestArpProxy(t *testing.T) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	ipGroup1 := generateIpGroup(group[11], groupEpc[1], ipNet1)
 	policy.UpdateIpGroupData([]*IpGroupData{ipGroup1})
 	net1 := generateIpNet(ip3, 123, 32)
@@ -974,7 +974,7 @@ func TestArpProxy(t *testing.T) {
 }
 
 func BenchmarkGetEndpointData(b *testing.B) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	platformData1 := generatePlatformDataByParam(group1Ip1, group1Mac, groupEpc[1], 4)
 	platformData1.GroupIds = append(platformData1.GroupIds, group[1])
 	platformData2 := generatePlatformDataByParam(group2Ip1, group2Mac, groupEpc[2], 4)
@@ -991,7 +991,7 @@ func BenchmarkGetEndpointData(b *testing.B) {
 }
 
 func BenchmarkGetDataByIp(b *testing.B) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	ip1 := generateIpNet(testIp1, 100, 32)
 	data1 := generatePlatformDataWithGroupId(groupEpc[1], group[1], testMac1, ip1)
 	ip2 := generateIpNet(testIp2, 200, 24)
@@ -1007,7 +1007,7 @@ func BenchmarkGetDataByIp(b *testing.B) {
 }
 
 func BenchmarkUpdateEndpointData(b *testing.B) {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	policy := NewPolicyTable(1, 1024, false)
 	ipGroup1 := generateIpGroup(group[11], groupEpc[0], ipNet10, ipNet11)
 	policy.UpdateIpGroupData([]*IpGroupData{ipGroup1})
 	ipNet := generateIpNet(group1Ip1, 123, 32)

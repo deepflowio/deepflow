@@ -85,13 +85,8 @@ type MetaPacket struct {
 }
 
 func (p *MetaPacket) GenerateHash() uint32 {
-	portSrc := uint32(p.PortSrc)
-	portDst := uint32(p.PortDst)
-	if portSrc >= portDst {
-		p.Hash = p.InPort ^ p.IpSrc ^ p.IpDst ^ ((portSrc << 16) | portDst)
-	} else {
-		p.Hash = p.InPort ^ p.IpSrc ^ p.IpDst ^ ((portDst << 16) | portSrc)
-	}
+	// 哈希用于Queue负载均衡，只需低8bit尽量随机即可
+	p.Hash = p.InPort ^ p.IpSrc ^ p.IpDst ^ uint32(p.PortSrc) ^ uint32(p.PortDst)
 	return p.Hash
 }
 
