@@ -21,6 +21,11 @@ service Diagnose {
 
     // FLOW
     rpc GetOvsBridgeFlow(DiagnoseRequest) returns (DiagnoseResponse) {} //ovs-ofctl dump-flows $br
+
+    // Platform Info
+    rpc GetHostname(DiagnoseRequest) returns (DiagnoseResponse) {} //hostname
+    rpc GetVmStates(DiagnoseRequest) returns (DiagnoseResponse) {} //virsh list --all
+    rpc GetVlanConfig(DiagnoseRequest) returns (DiagnoseResponse) {} //cat /proc/net/vlan/config
 }
 
 message DiagnoseRequest {
