@@ -1408,7 +1408,7 @@ func TestDdbsAclGidBitmapFirstPathVsFastPathByVlan(t *testing.T) {
 
 func TestDdbsAclGidBitmapGroup48(t *testing.T) {
 	acls := []*Acl{}
-	table := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false, DDBS)
+	table := NewPolicyTable(1, 1024, false, DDBS)
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	action = action.SetACLGID(100)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
@@ -1489,7 +1489,7 @@ func TestDdbsTapType(t *testing.T) {
 }
 
 func TestDdbsAclGidBitmapByDesignationAcls(t *testing.T) {
-	table := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false, DDBS)
+	table := NewPolicyTable(1, 1024, false, DDBS)
 	action1 := generateAclAction(10, ACTION_PACKET_COUNTING)
 	action1 = action1.SetACLGID(100)
 	action2 := generateAclAction(20, ACTION_PACKET_COUNTING)

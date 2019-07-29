@@ -405,7 +405,7 @@ func generatePlatformData(policy *PolicyTable) {
 
 // 生成特定平台和资源组信息
 func generatePolicyTable(ids ...TableID) *PolicyTable {
-	policy := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false, ids...)
+	policy := NewPolicyTable(1, 1024, false, ids...)
 	datas := make([]*PlatformData, 0, 2)
 	ipGroups := make([]*IpGroupData, 0, 3)
 
@@ -1890,7 +1890,7 @@ func TestAclGidBitmapFirstPathVsFastPathByVlan(t *testing.T) {
 
 func TestAclGidBitmapGroup48(t *testing.T) {
 	acls := []*Acl{}
-	table := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	table := NewPolicyTable(1, 1024, false)
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	action = action.SetACLGID(100)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
@@ -1928,7 +1928,7 @@ func TestAclGidBitmapGroup48(t *testing.T) {
 }
 
 func TestAclGidBitmapByDesignationAcls(t *testing.T) {
-	table := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	table := NewPolicyTable(1, 1024, false)
 	action1 := generateAclAction(10, ACTION_PACKET_COUNTING)
 	action1 = action1.SetACLGID(100)
 	action2 := generateAclAction(20, ACTION_PACKET_COUNTING)
@@ -2003,7 +2003,7 @@ func TestAclGidBitmapByDesignationAcls(t *testing.T) {
 }
 
 func TestGroupRelation(t *testing.T) {
-	table := NewPolicyTable(ACTION_PACKET_COUNTING, 1, 1024, false)
+	table := NewPolicyTable(1, 1024, false)
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	action = action.SetACLGID(100)
 
