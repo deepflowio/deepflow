@@ -121,11 +121,7 @@ func getAvailableMapSize(queueCount int, mapSize uint32) uint32 {
 	return availableMapSize
 }
 
-func NewPolicyTable(actionFlags ActionFlag, queueCount int, mapSize uint32, fastPathDisable bool, ids ...TableID) *PolicyTable { // 传入Protobuf结构体指针
-	// 使用actionFlags过滤，例如
-	// Trident仅关心PACKET_BROKERING和PACKET_CAPTURING，
-	// 那么就不要将EPC等云平台信息进行计算。
-	// droplet关心**几乎**所有，对关心的信息进行计算
+func NewPolicyTable(queueCount int, mapSize uint32, fastPathDisable bool, ids ...TableID) *PolicyTable { // 传入Protobuf结构体指针
 	availableMapSize := getAvailableMapSize(queueCount, mapSize)
 	policyTable := &PolicyTable{
 		cloudPlatformLabeler: NewCloudPlatformLabeler(queueCount, availableMapSize),
