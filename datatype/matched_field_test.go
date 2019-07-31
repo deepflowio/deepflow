@@ -57,7 +57,7 @@ func TestSetGet2(t *testing.T) {
 	if matched.Get(MATCHED_VLAN) != 0xfff {
 		t.Errorf("MATCHED_VLAN Error. %s\n", matched)
 	}
-	if matched.Get(MATCHED_PROTO) != 3 {
+	if matched.Get(MATCHED_PROTO) != 0x7 {
 		t.Errorf("MATCHED_PROTO Error. %s\n", matched)
 	}
 }
@@ -75,7 +75,7 @@ func TestBitZero(t *testing.T) {
 func TestTableIndex(t *testing.T) {
 	matched := newMatchedField(1, 1, 1, 1, 1, 1, 1, 0, 0)
 	maskVector := newMatchedField(1, 0, 1, 0, 0, 0, 0, 0, 0)
-	index := matched.GetTableIndex(&maskVector, 160, 208)
+	index := matched.GetTableIndex(&maskVector, 160, 217)
 	if index != 0x3 {
 		t.Errorf("TestTableIndex Error. %s\n", matched)
 		t.Error("Expect index: 0x3.")
@@ -84,7 +84,7 @@ func TestTableIndex(t *testing.T) {
 
 	matched = newMatchedField(1, 0, 1, 1, 1, 1, 1, 0, 0)
 	maskVector = newMatchedField(1, 1, 1, 0, 0, 0, 0, 0, 0)
-	index = matched.GetTableIndex(&maskVector, 160, 208)
+	index = matched.GetTableIndex(&maskVector, 160, 217)
 	if index != 0x5 {
 		t.Errorf("TestTableIndex Error. %s\n", matched)
 		t.Error("Expect index: 0x5.")
