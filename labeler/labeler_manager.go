@@ -66,7 +66,7 @@ func NewLabelerManager(readQueues queue.MultiQueueReader, count int, size uint32
 	}
 	labeler := &LabelerManager{
 		lookupKey:       make([]datatype.LookupKey, size),
-		policyTable:     policy.NewPolicyTable(datatype.ACTION_FLOW_COUNTING, count, size, disable, id),
+		policyTable:     policy.NewPolicyTable(count, size, disable, id),
 		readQueues:      readQueues,
 		readQueuesCount: count,
 	}
