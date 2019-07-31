@@ -1,6 +1,7 @@
 package zerodoc
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"time"
@@ -95,6 +96,17 @@ func Encode(sequence uint32, doc *app.Document, encoder *codec.SimpleEncoder) er
 	encoder.WriteU32(doc.ActionFlags)
 
 	return nil
+}
+
+// 由于trident等将多个doc合并为1个块进行发送， 只设置第一个doc的sequence即可
+func SetSequence(sequence uint32, chunk []byte) {
+	// 先偏移4个字节的VERSION字段
+	binary.LittleEndian.PutUint32(chunk[4:], sequence)
+}
+
+func GetSequence(chunk []byte) uint32 {
+	// 先偏移4个字节的VERSION字段
+	return binary.LittleEndian.Uint32(chunk[4:])
 }
 
 // The return Document, must call app.ReleaseDocument to release after used
