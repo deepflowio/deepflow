@@ -130,6 +130,15 @@ func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket
 	isL2End := [2]bool{metaPacket.EndpointData.SrcInfo.L2End, metaPacket.EndpointData.DstInfo.L2End}
 	isL3End := [2]bool{metaPacket.EndpointData.SrcInfo.L3End, metaPacket.EndpointData.DstInfo.L3End}
 	directions := [2]outputtype.DirectionEnum{outputtype.ClientToServer, outputtype.ServerToClient}
+	serverPort := metaPacket.PortDst
+	if metaPacket.Direction == inputtype.SERVER_TO_CLIENT {
+		l3EpcIDs[0], l3EpcIDs[1] = l3EpcIDs[1], l3EpcIDs[0]
+		ips[0], ips[1] = ips[1], ips[0]
+		isL2End[0], isL2End[1] = isL2End[1], isL2End[0]
+		isL3End[0], isL3End[1] = isL3End[1], isL3End[0]
+		directions[0], directions[1] = directions[1], directions[0]
+		serverPort = metaPacket.PortSrc
+	}
 	docTimestamp := RoundToSecond(metaPacket.Timestamp)
 
 	for i := range ips {
@@ -149,12 +158,18 @@ func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket
 		field.IP1 = ips[otherEnd]
 		field.TAPType = TAPTypeFromInPort(metaPacket.InPort)
 		field.Protocol = metaPacket.Protocol
-		field.ServerPort = metaPacket.PortDst
+		field.ServerPort = serverPort
 		field.ACLDirection = outputtype.ACL_FORWARD // 含ACLDirection字段时仅考虑ACL正向匹配
 		field.Direction = directions[thisEnd]
 
 		for _, policy := range p.policyGroup {
 			field.ACLGID = uint16(policy.GetACLGID())
+			var policyDirections inputtype.DirectionType
+			if metaPacket.Direction == inputtype.CLIENT_TO_SERVER {
+				policyDirections = policy.GetDirections()
+			} else {
+				policyDirections = policy.ReverseDirection().GetDirections()
+			}
 
 			// node
 			codes := p.codes[:0]
@@ -168,7 +183,7 @@ func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket
 				if IsDupTraffic(metaPacket.InPort, l3EpcIDs[thisEnd], isL2End[thisEnd], isL3End[thisEnd], code) {
 					continue
 				}
-				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
+				if IsWrongEndPointWithACL(thisEnd, policyDirections, code) {
 					continue
 				}
 				p.appendDoc(docMap, docTimestamp, field, code, meter, uint32(policy.GetActionFlags()))
@@ -186,7 +201,7 @@ func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket
 				if IsDupTraffic(metaPacket.InPort, l3EpcIDs[otherEnd], isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧tag用otherEnd判断
 					continue
 				}
-				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
+				if IsWrongEndPointWithACL(thisEnd, policyDirections, code) {
 					continue
 				}
 				p.appendDoc(docMap, docTimestamp, field, code, meter, uint32(policy.GetActionFlags()))
