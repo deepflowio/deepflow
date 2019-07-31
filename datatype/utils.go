@@ -11,6 +11,9 @@ import (
 var MAX_NETMASK = utils.MaskLenToNetmask(MAX_MASK_LEN)
 
 func IpRangeConvert2CIDR(startIp, endIp net.IP) []net.IPNet {
+	if len(startIp) != net.IPv4len || len(endIp) != net.IPv4len {
+		return nil
+	}
 	start := utils.IpToUint32(startIp)
 	end := utils.IpToUint32(endIp)
 	var ips []net.IPNet
