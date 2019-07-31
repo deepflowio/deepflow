@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	MATCHED_FIELD_BITS_LEN = 211 // 5(TapType) + 12(Vlan) + 2(Proto) + 16(Port)*2 + 64(MAC+IP)*2
+	MATCHED_FIELD_BITS_LEN = 217 // 5(TapType) + 12(Vlan) + 8(Proto) + 16(Port)*2 + 64(MAC+IP)*2
 	MATCHED_FIELD_LEN      = 4
 )
 
@@ -41,8 +41,8 @@ var fieldOffset = [...]uint64{
 	MATCHED_SRC_EPC:  176,
 	MATCHED_DST_EPC:  160,
 	MATCHED_PROTO:    192,
-	MATCHED_VLAN:     194,
-	MATCHED_TAP_TYPE: 206,
+	MATCHED_VLAN:     200,
+	MATCHED_TAP_TYPE: 212,
 }
 
 var fieldMask = [...]uint64{
@@ -56,7 +56,7 @@ var fieldMask = [...]uint64{
 	MATCHED_DST_PORT: 0xffff,
 	MATCHED_SRC_EPC:  0xffff,
 	MATCHED_DST_EPC:  0xffff,
-	MATCHED_PROTO:    0x3,
+	MATCHED_PROTO:    0xff,
 	MATCHED_VLAN:     0xfff,
 	MATCHED_TAP_TYPE: 0x1f,
 }
