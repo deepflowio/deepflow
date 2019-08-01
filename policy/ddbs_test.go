@@ -1647,6 +1647,17 @@ func TestDdbsProtocol(t *testing.T) {
 	}
 }
 
+func TestDdbsPeerConnection(t *testing.T) {
+	table := generatePolicyTable(DDBS)
+	// group2Ip1对应EPC有两个分别为12和20，若没有对等连接查询，会查询到12
+	key := generateLookupKey(group1Mac, mac3, vlanAny, group1Ip1, group2Ip1, IPProtocolUDP, 0, 0)
+	endpoints, _ := table.LookupAllByKey(key)
+	if endpoints.DstInfo.L3EpcId != 20 {
+		t.Error(endpoints)
+		t.Error("TestDdbsPeerConnection Check Failed!")
+	}
+}
+
 func BenchmarkDdbsAcl(b *testing.B) {
 	acls := []*Acl{}
 	table := generatePolicyTable(DDBS)

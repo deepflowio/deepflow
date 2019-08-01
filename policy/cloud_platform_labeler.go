@@ -40,12 +40,13 @@ type EpcIpTable struct {
 }
 
 type CloudPlatformLabeler struct {
-	macTable      *MacTable
-	ipTables      [MASK_LEN_NUM]*IpTable
-	ip6Tables     *Ip6Table // TODO: 因为目前IPv6不支持IP资源组类型的，掩码都是128，所以不用建数组
-	epcIpTable    *EpcIpTable
-	ipGroup       *IpResourceGroup
-	netmaskBitmap uint32
+	macTable            *MacTable
+	ipTables            [MASK_LEN_NUM]*IpTable
+	ip6Tables           *Ip6Table // TODO: 因为目前IPv6不支持IP资源组类型的，掩码都是128，所以不用建数组
+	epcIpTable          *EpcIpTable
+	ipGroup             *IpResourceGroup
+	netmaskBitmap       uint32
+	peerConnectionTable map[int32][]int32
 
 	arpMutex        [TAP_MAX]sync.Mutex
 	lastArpSwapTime time.Duration
@@ -78,13 +79,14 @@ func NewCloudPlatformLabeler(queueCount int, mapSize uint32) *CloudPlatformLabel
 		epcIp6Map: make(EpcIp6MapData),
 	}
 	cloud := &CloudPlatformLabeler{
-		macTable:        macTable,
-		ipTables:        ipTables,
-		ip6Tables:       ip6Tables,
-		epcIpTable:      epcIpTable,
-		ipGroup:         NewIpResourceGroup(),
-		netmaskBitmap:   uint32(0),
-		lastArpSwapTime: time.Duration(time.Now().UnixNano()),
+		macTable:            macTable,
+		ipTables:            ipTables,
+		ip6Tables:           ip6Tables,
+		epcIpTable:          epcIpTable,
+		ipGroup:             NewIpResourceGroup(),
+		netmaskBitmap:       uint32(0),
+		peerConnectionTable: make(map[int32][]int32),
+		lastArpSwapTime:     time.Duration(time.Now().UnixNano()),
 	}
 	for i := TAP_MIN; i < TAP_MAX; i++ {
 		cloud.tempArpTable[i] = make(map[MacIpKey]bool)
@@ -266,6 +268,26 @@ func (l *CloudPlatformLabeler) UpdateEpcIpTable(epcIpMap EpcIpMapData, epcIp6Map
 	}
 }
 
+func (l *CloudPlatformLabeler) UpdatePeerConnectionTable(connections []*PeerConnection) {
+	peerConnectionTable := make(map[int32][]int32, 1000)
+	for _, connection := range connections {
+		// local
+		peerEpcs := peerConnectionTable[connection.LocalEpc]
+		if peerEpcs == nil {
+			peerEpcs = make([]int32, 0, 2)
+		}
+		peerConnectionTable[connection.LocalEpc] = append(peerEpcs, connection.RemoteEpc)
+
+		// reomte
+		peerEpcs = peerConnectionTable[connection.RemoteEpc]
+		if peerEpcs == nil {
+			peerEpcs = make([]int32, 0, 2)
+		}
+		peerConnectionTable[connection.RemoteEpc] = append(peerEpcs, connection.LocalEpc)
+	}
+	l.peerConnectionTable = peerConnectionTable
+}
+
 func (l *CloudPlatformLabeler) UpdateInterfaceTable(platformDatas []*PlatformData) {
 	if platformDatas != nil {
 		l.UpdateMacTable(l.GenerateMacData(platformDatas))
@@ -327,10 +349,7 @@ func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType Ta
 			endpointInfo.SetL3DataByMac(platformData)
 		}
 	}
-	if platformData = l.GetDataByEpcIp(endpointInfo.L2EpcId, ip); platformData == nil {
-		platformData = l.GetDataByIp(ip)
-	}
-	if platformData != nil {
+	if platformData = l.GetDataByEpcIp(endpointInfo.L2EpcId, ip); platformData != nil {
 		endpointInfo.SetL3Data(platformData, ip)
 	}
 	return endpointInfo
@@ -422,15 +441,51 @@ func (l *CloudPlatformLabeler) ModifyEndpointData(endpointData *EndpointData, ke
 	}
 }
 
+func (l *CloudPlatformLabeler) peerConnection(ip net.IP, epc int32, endpointInfo *EndpointInfo) {
+	for _, peerEpc := range l.peerConnectionTable[epc] {
+		if platformData := l.GetDataByEpcIp(peerEpc, ip); platformData != nil {
+			endpointInfo.SetL3Data(platformData, ip)
+			return
+		}
+	}
+}
+
+func (l *CloudPlatformLabeler) GetL3ByIp(src, dst net.IP, endpoints *EndpointData) {
+	if endpoints.SrcInfo.L3EpcId <= 0 {
+		if platformData := l.GetDataByIp(src); platformData != nil {
+			endpoints.SrcInfo.SetL3Data(platformData, src)
+		}
+	}
+	if endpoints.DstInfo.L3EpcId <= 0 {
+		if platformData := l.GetDataByIp(dst); platformData != nil {
+			endpoints.DstInfo.SetL3Data(platformData, dst)
+		}
+	}
+}
+
+func (l *CloudPlatformLabeler) GetL3ByPeerConnection(src, dst net.IP, endpoints *EndpointData) {
+	if endpoints.SrcInfo.L3EpcId <= 0 && endpoints.DstInfo.L3EpcId > 0 {
+		l.peerConnection(src, endpoints.DstInfo.L3EpcId, endpoints.SrcInfo)
+	} else if endpoints.DstInfo.L3EpcId <= 0 && endpoints.SrcInfo.L3EpcId > 0 {
+		l.peerConnection(dst, endpoints.SrcInfo.L3EpcId, endpoints.DstInfo)
+	}
+}
+
 func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	srcIp, dstIp := IpFromUint32(key.SrcIp), IpFromUint32(key.DstIp)
 	// 测试用例key.EthType值未填写，需要通过len(key.Src6Ip)
 	if key.EthType == EthernetTypeIPv6 || len(key.Src6Ip) > 0 {
 		srcIp, dstIp = key.Src6Ip, key.Dst6Ip
 	}
+	// l2: mac查询
+	// l3: l2epc+ip查询
 	srcData := l.GetEndpointInfo(key.SrcMac, srcIp, key.Tap)
 	dstData := l.GetEndpointInfo(key.DstMac, dstIp, key.Tap)
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
+	// l3: ip查询
+	l.GetL3ByIp(srcIp, dstIp, endpoint)
+	// l3: peer epc + ip查询
+	l.GetL3ByPeerConnection(srcIp, dstIp, endpoint)
 	l.ModifyEndpointData(endpoint, key)
 	l.ModifyPrivateIp(endpoint, key)
 	l.ipGroup.Populate(srcIp, endpoint.SrcInfo)

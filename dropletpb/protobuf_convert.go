@@ -183,3 +183,21 @@ func Convert2AclData(flowAcls []*trident.FlowAcl) []*policy.Acl {
 
 	return policies
 }
+
+func newPeerConnection(data *trident.PeerConnection) *datatype.PeerConnection {
+	return &datatype.PeerConnection{
+		Id:        data.GetId(),
+		LocalEpc:  int32(data.GetLocalEpcId()),
+		RemoteEpc: int32(data.GetRemoteEpcId()),
+	}
+}
+
+func Convert2PeerConnections(datas []*trident.PeerConnection) []*datatype.PeerConnection {
+	connections := make([]*datatype.PeerConnection, 0, len(datas))
+	for _, data := range datas {
+		if connection := newPeerConnection(data); connection != nil {
+			connections = append(connections, connection)
+		}
+	}
+	return connections
+}
