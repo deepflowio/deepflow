@@ -242,6 +242,14 @@ func generatePlatformDataWithGroupId(epcId int32, groupId uint32, mac uint64, ip
 	return &data
 }
 
+func generatePeerConnection(id uint32, src, dst int32) *PeerConnection {
+	return &PeerConnection{
+		Id:        id,
+		LocalEpc:  src,
+		RemoteEpc: dst,
+	}
+}
+
 func generateAclAction(id ACLID, actionFlags ActionFlag) AclAction {
 	return AclAction(id).AddActionFlags(actionFlags).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
 }
@@ -409,6 +417,7 @@ func generatePolicyTable(ids ...TableID) *PolicyTable {
 	policy := NewPolicyTable(1, 1024, false, ids...)
 	datas := make([]*PlatformData, 0, 2)
 	ipGroups := make([]*IpGroupData, 0, 3)
+	connections := make([]*PeerConnection, 0, 8)
 
 	ip1 := generateIpNet(group1Ip1, 121, 32)
 	ip2 := generateIpNet(group1Ip2, 121, 32)
@@ -422,7 +431,12 @@ func generatePolicyTable(ids ...TableID) *PolicyTable {
 	ip2 = generateIpNet(group2Ip2, 122, 32)
 	ip3 = generateIpNet6(ip13, 122, 128)
 	data3 := generatePlatformDataWithGroupId(groupEpc[2], group[2], group2Mac, ip1, ip2, ip3)
-	datas = append(datas, data1, data2, data3)
+
+	ip1 = generateIpNet(group2Ip1, 110, 32)
+	data4 := generatePlatformDataWithGroupId(groupEpc[10], group[10], mac5, ip1)
+	data4.IfType = 4
+
+	datas = append(datas, data1, data2, data3, data4)
 
 	ip1 = generateIpNet(group3Ip1, 121, 24)
 	ip2 = generateIpNet(group3Ip2, 121, 32)
@@ -438,7 +452,7 @@ func generatePolicyTable(ids ...TableID) *PolicyTable {
 	// group5有epc和无epc ip:group5Ip1 + group5Ip2
 	data3 = generatePlatformDataWithGroupId(groupEpc[5], group[5], group5Mac2, ip1, ip2)
 	groupEpc[5] = groupEpcAny
-	data4 := generatePlatformDataWithGroupId(groupEpc[5], group[5], group5Mac1, ip1, ip2)
+	data4 = generatePlatformDataWithGroupId(groupEpc[5], group[5], group5Mac1, ip1, ip2)
 	datas = append(datas, data1, data2, data3, data4)
 
 	policy.UpdateInterfaceData(datas)
@@ -455,6 +469,10 @@ func generatePolicyTable(ids ...TableID) *PolicyTable {
 
 	policy.UpdateIpGroupData(ipGroups)
 
+	// Peer Connection
+	connection := generatePeerConnection(1, groupEpc[1], groupEpc[2])
+	connections = append(connections, connection)
+	policy.UpdatePeerConnection(connections)
 	return policy
 }
 
@@ -2161,6 +2179,17 @@ func TestProtocol(t *testing.T) {
 	_, policyData = table.LookupAllByKey(key)
 	if !CheckPolicyResult(t, INVALID_POLICY_DATA, policyData) {
 		t.Error("TestProtocol Check Failed!")
+	}
+}
+
+func TestPeerConnection(t *testing.T) {
+	table := generatePolicyTable()
+	// group2Ip1对应EPC有两个分别为12和20，若没有对等连接查询，会查询到12
+	key := generateLookupKey(group1Mac, mac3, vlanAny, group1Ip1, group2Ip1, IPProtocolUDP, 0, 0)
+	endpoints, _ := table.LookupAllByKey(key)
+	if endpoints.DstInfo.L3EpcId != 20 {
+		t.Error(endpoints)
+		t.Error("TestPeerConnection Check Failed!")
 	}
 }
 
