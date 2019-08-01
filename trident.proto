@@ -122,9 +122,16 @@ message Group {
     repeated string ip_ranges = 6;
 }
 
+message PeerConnection {
+    optional uint32 id = 1;
+    optional uint32 local_epc_id = 2;
+    optional uint32 remote_epc_id = 3;
+}
+
 message PlatformData {
     repeated Interface interfaces = 1;
     repeated Group ip_groups = 2;
+    repeated PeerConnection peer_connections = 3;
 }
 
 enum Action {
