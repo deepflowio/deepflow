@@ -222,6 +222,10 @@ func (t *PolicyTable) UpdateIpGroupData(data []*IpGroupData) {
 	t.operator.UpdateIpGroupData(data)
 }
 
+func (t *PolicyTable) UpdatePeerConnection(data []*PeerConnection) {
+	t.cloudPlatformLabeler.UpdatePeerConnectionTable(data)
+}
+
 func (t *PolicyTable) UpdateAclData(data []*Acl, check ...bool) {
 	t.operator.UpdateAcls(data, check...)
 }
