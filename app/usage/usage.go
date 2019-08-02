@@ -95,18 +95,6 @@ func (p *MeteringToUsageDocumentMapper) Prepare() {
 }
 
 func (p *MeteringToUsageDocumentMapper) appendDoc(docMap map[string]bool, timestamp uint32, field *outputtype.Field, code outputtype.Code, meter *outputtype.UsageMeter, actionFlags uint32) {
-	if code.PossibleDuplicate() {
-		tag := &outputtype.Tag{
-			Field: field,
-			Code:  code,
-		}
-		id := tag.GetID(p.encoder)
-		if _, exists := docMap[id]; exists {
-			return
-		}
-		docMap[id] = true
-	}
-
 	doc := p.docs.Get().(*app.Document)
 	field.FillTag(code, doc.Tag.(*outputtype.Tag))
 	doc.Meter = meter
@@ -116,6 +104,10 @@ func (p *MeteringToUsageDocumentMapper) appendDoc(docMap map[string]bool, timest
 
 func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket, variedTag bool) []interface{} {
 	p.docs.Reset()
+
+	if metaPacket.EthType != layers.EthernetTypeIPv4 {
+		return p.docs.Slice()
+	}
 
 	actionFlags := metaPacket.PolicyData.ActionFlags
 	interestActions := inputtype.ACTION_PACKET_COUNTING | inputtype.ACTION_PACKET_COUNT_BROKERING

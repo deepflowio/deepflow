@@ -5,6 +5,7 @@ import (
 	inputtype "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	outputtype "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
+
 	. "gitlab.x.lan/yunshan/droplet/app/common/docbuffer"
 	. "gitlab.x.lan/yunshan/droplet/app/common/doctime"
 	. "gitlab.x.lan/yunshan/droplet/app/common/endpoint"
@@ -12,7 +13,7 @@ import (
 	. "gitlab.x.lan/yunshan/droplet/app/common/policy"
 
 	"github.com/google/gopacket/layers"
-	logging "github.com/op/go-logging"
+	"github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("fps")
@@ -99,18 +100,6 @@ func (p *FlowToFPSDocumentMapper) Prepare() {
 }
 
 func (p *FlowToFPSDocumentMapper) appendDocs(docMap map[uint64]bool, field *outputtype.Field, code outputtype.Code, actionFlags uint32) {
-	if code.PossibleDuplicate() {
-		tag := &outputtype.Tag{
-			Field: field,
-			Code:  code,
-		}
-		fastID := tag.GetFastID()
-		if _, exists := docMap[fastID]; exists {
-			return
-		}
-		docMap[fastID] = true
-	}
-
 	for k := range p.timestamps {
 		doc := p.docs.Get().(*app.Document)
 		field.FillTag(code, doc.Tag.(*outputtype.Tag))
