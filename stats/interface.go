@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	MinInterval = time.Second
+	MinInterval = TICK_CYCLE
 )
 
 type RemoteType = bool
@@ -14,6 +14,7 @@ type RemoteType = bool
 const (
 	REMOTE_TYPE_STATSD   = true
 	REMOTE_TYPE_INFLUXDB = false
+	TICK_CYCLE           = 5 * time.Second
 )
 
 type Option = interface{}
@@ -43,7 +44,10 @@ func (c *Closable) Closed() bool {
 // 限定stats的最少interval，也就是不论注册Countable时
 // 指定的Interval是多少，只要比此值低就优先使用此值
 func SetMinInterval(interval time.Duration) {
-	MinInterval = interval
+	MinInterval = (interval + TICK_CYCLE - 1) / TICK_CYCLE * TICK_CYCLE
+	if MinInterval != interval {
+		log.Error("Bad stats-interval:", interval, ", should be integral multiple of", TICK_CYCLE, ",change to", MinInterval)
+	}
 }
 
 // 指定influxdb远程服务器

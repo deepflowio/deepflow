@@ -59,9 +59,9 @@ func registerCountable(module string, countable Countable, opts ...Option) error
 				source.tags[k] = v
 			}
 		} else if opt, ok := opt.(OptionInterval); ok {
-			source.interval = time.Duration(opt) / time.Second * time.Second
-			if source.interval > time.Second {
-				source.skip = 60 - time.Now().Second()
+			source.interval = time.Duration(opt) / TICK_CYCLE * TICK_CYCLE
+			if source.interval > TICK_CYCLE {
+				source.skip = (60 - time.Now().Second()) / int(TICK_CYCLE/time.Second)
 			}
 		}
 	}
@@ -129,7 +129,7 @@ func collectBatchPoints() client.BatchPoints {
 		if statSource.skip > 0 {
 			continue
 		}
-		statSource.skip = int(max(statSource.interval, MinInterval) / time.Second)
+		statSource.skip = int(max(statSource.interval, MinInterval) / TICK_CYCLE)
 
 		fields := counterToFields(statSource.countable.GetCounter())
 		point, _ := client.NewPoint(processName+"."+statSource.module, statSource.tags, fields, timestamp)
@@ -231,7 +231,7 @@ func runOnce() {
 func run() {
 	time.Sleep(time.Second) // wait logger init
 
-	for range time.NewTicker(time.Second).C {
+	for range time.NewTicker(TICK_CYCLE).C {
 		lock.Lock()
 		hooks := preHooks
 		lock.Unlock()
