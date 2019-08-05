@@ -26,6 +26,14 @@ message PlatformData {
     repeated Subnet subnets = 5;
     repeated Port ports = 6;
     repeated Ip ips = 7;
+
+    optional string raw_hostname = 11;
+    optional string raw_all_vm_xml = 12;
+    optional string raw_vm_states = 13;
+    optional string raw_ovs_interfaces = 14;
+    optional string raw_ovs_ports = 15;
+    optional string raw_brctl_show = 16;
+    optional string raw_vlan_config = 17;
 }
 
 message Host {
