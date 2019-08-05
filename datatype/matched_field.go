@@ -5,11 +5,17 @@ import (
 )
 
 const (
-	MATCHED_FIELD_BITS_LEN = 217 // 5(TapType) + 12(Vlan) + 8(Proto) + 16(Port)*2 + 64(MAC+IP)*2
+	MATCHED_FIELD_BITS_LEN = 219 // 2(ethType) + 5(TapType) + 12(Vlan) + 8(Proto) + 16(Port)*2 + 64(MAC+IP)*2
 	MATCHED_FIELD_LEN      = 4
 )
 
 type MatchFlags uint16
+
+const (
+	ETH_TYPE_ALL = iota
+	ETH_TYPE_IPV4
+	ETH_TYPE_IPV6
+)
 
 const (
 	// fields[0]
@@ -28,6 +34,7 @@ const (
 	MATCHED_PROTO
 	MATCHED_VLAN
 	MATCHED_TAP_TYPE
+	MATCHED_ETH_TYPE
 )
 
 var fieldOffset = [...]uint64{
@@ -43,6 +50,7 @@ var fieldOffset = [...]uint64{
 	MATCHED_PROTO:    192,
 	MATCHED_VLAN:     200,
 	MATCHED_TAP_TYPE: 212,
+	MATCHED_ETH_TYPE: 217,
 }
 
 var fieldMask = [...]uint64{
@@ -59,6 +67,7 @@ var fieldMask = [...]uint64{
 	MATCHED_PROTO:    0xff,
 	MATCHED_VLAN:     0xfff,
 	MATCHED_TAP_TYPE: 0x1f,
+	MATCHED_ETH_TYPE: 0x3,
 }
 
 type MatchedField struct {
@@ -171,9 +180,9 @@ func (f *MatchedField) And(n *MatchedField) MatchedField {
 }
 
 func (f MatchedField) String() string {
-	return fmt.Sprintf("%x:%x:%d -> %x:%x:%d epc: %d -> %d vlan: %d proto: %d tap: %d",
+	return fmt.Sprintf("%x:%x:%d -> %x:%x:%d epc: %d -> %d vlan: %d proto: %d tap: %d ethType: %d",
 		f.Get(MATCHED_SRC_MAC), f.Get(MATCHED_SRC_IP), f.Get(MATCHED_SRC_PORT),
 		f.Get(MATCHED_DST_MAC), f.Get(MATCHED_DST_IP), f.Get(MATCHED_DST_PORT),
 		f.Get(MATCHED_SRC_EPC), f.Get(MATCHED_DST_EPC),
-		f.Get(MATCHED_VLAN), f.Get(MATCHED_PROTO), f.Get(MATCHED_TAP_TYPE))
+		f.Get(MATCHED_VLAN), f.Get(MATCHED_PROTO), f.Get(MATCHED_TAP_TYPE), f.Get(MATCHED_ETH_TYPE))
 }
