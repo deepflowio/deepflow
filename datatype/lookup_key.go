@@ -41,6 +41,11 @@ func (k *LookupKey) generateMatchedField(direction DirectionType, srcEpc, dstEpc
 		srcMac, dstMac = k.DstMac, k.SrcMac
 		matched = &k.BackwardMatched
 	}
+	ethType := ETH_TYPE_IPV4
+	if len(k.Src6Ip) > 0 {
+		ethType = ETH_TYPE_IPV6
+	}
+	matched.Set(MATCHED_ETH_TYPE, uint32(ethType))
 	matched.Set(MATCHED_TAP_TYPE, uint32(k.Tap))
 	matched.Set(MATCHED_PROTO, uint32(k.Proto))
 	matched.Set(MATCHED_VLAN, uint32(k.Vlan))

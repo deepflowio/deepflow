@@ -60,8 +60,8 @@ var (
 var (
 	server = NewIPFromString("172.20.1.1").Int()
 
-	group    = []uint32{0, 10, 20, 30, 40, 50, 60, 70, 2, 3, 4, 11, 12, 13, 14, 15, 16}
-	groupEpc = []int32{0, 10, 20, 0, 40, 50, 0, 70, 40, 11, 12}
+	group    = []uint32{0, 10, 20, 30, 40, 50, 60, 70, 2, 3, 4, 11, 12, 13, 14, 15, 16, 17}
+	groupEpc = []int32{0, 10, 20, 0, 40, 50, 0, 70, 40, 11, 12, 17}
 	ipGroup6 = group[6] + IP_GROUP_ID_FLAG
 
 	group1Ip1Net = "192.168.1.0/24"
@@ -126,6 +126,7 @@ var (
 
 	ipGroup8IpNet1 = "1.1.1.0/24"
 	ipGroup8IpNet2 = "1.1.2.0/24"
+	ipGroup9IpNet  = "0.0.0.0/32"
 )
 
 type EndInfo struct {
@@ -449,7 +450,8 @@ func generatePolicyTable(ids ...TableID) *PolicyTable {
 	ipGroup4 := generateIpGroup(group[7], groupEpc[7], ipGroup7IpNet1, ipGroup7IpNet2)
 	ipGroup5 := generateIpGroup(group[16], groupEpc[1], group1Ip1Net, group2Ip1Net)
 	ipGroup5.Type = 3
-	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3, ipGroup4, ipGroup5)
+	ipGroup6 := generateIpGroup(group[17], groupEpc[0], ipGroup9IpNet)
+	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3, ipGroup4, ipGroup5, ipGroup6)
 
 	policy.UpdateIpGroupData(ipGroups)
 

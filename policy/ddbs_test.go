@@ -1593,8 +1593,11 @@ func TestDdbsPolicyIpv6(t *testing.T) {
 	acls := []*Acl{}
 	table := generatePolicyTable(DDBS)
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	action2 := generateAclAction(20, ACTION_PACKET_BROKERING)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 8000, vlanAny)
-	acls = append(acls, acl)
+	// ip: 0.0.0.0/32, epc: 0
+	acl2 := generatePolicyAcl(table, action2, 20, group[17], groupAny, protoAny, 0, vlanAny)
+	acls = append(acls, acl, acl2)
 	table.UpdateAcls(acls)
 	// 构建查询1-key  1:0->2:8000 tcp
 	key := generateLookupKey6(group1Mac, group2Mac, vlanAny, ip12, ip13, IPProtocolTCP, 0, 8000)
