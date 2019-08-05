@@ -634,12 +634,12 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 		encoder.WriteRawString(t.id) // ID就是序列化bytes，避免重复计算
 		return
 	}
-	t.EncodeByCode(t.Code, encoder)
+	t.EncodeByCodeTID(t.Code, t.GlobalThreadID, encoder)
 }
 
-func (t *Tag) EncodeByCode(code Code, encoder *codec.SimpleEncoder) {
+func (t *Tag) EncodeByCodeTID(code Code, tid uint64, encoder *codec.SimpleEncoder) {
 	encoder.WriteU64(uint64(code))
-	encoder.WriteU64(uint64(t.GlobalThreadID))
+	encoder.WriteU64(tid)
 
 	if code&IP != 0 {
 		encoder.WriteU8(t.IsIPv6)
@@ -822,6 +822,10 @@ func (t *Tag) GetCode() uint64 {
 
 func (t *Tag) SetCode(code uint64) {
 	t.Code = Code(code)
+}
+
+func (t *Tag) SetTID(tid uint64) {
+	t.GlobalThreadID = tid
 }
 
 func (t *Tag) GetTAPType() uint8 {
