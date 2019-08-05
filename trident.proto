@@ -203,7 +203,7 @@ message PublishAcl {
 
     optional uint32 tap_type = 10; // 3: in_port 0x3****, 0~2/4~30: in_port 0x1****
     optional uint32 acl_gid = 11;
-    optional uint32 l3_epc_id = 12;
+    optional int32 l3_epc_id = 12;
     optional uint32 l3_device_type = 13;
     optional uint32 l3_device_id = 14;
 
