@@ -62,7 +62,7 @@ func (a *Acl) getPortRange(rawPorts []uint16) []PortRange {
 	return ranges
 }
 
-func (a *Acl) generateMatchedField(srcMac, dstMac uint32, srcIps, dstIps ipSegment) {
+func (a *Acl) generateMatchedField(srcMac, dstMac uint32, srcIps, dstIps ipSegment, ethType int) {
 	srcSegment := make([]portSegment, 0, 2)
 	dstSegment := make([]portSegment, 0, 2)
 	for _, ports := range a.getPortRange(a.SrcPorts) {
@@ -81,6 +81,7 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint32, srcIps, dstIps ipSegme
 	for _, srcPort := range srcSegment {
 		for _, dstPort := range dstSegment {
 			match := MatchedField{}
+			match.Set(MATCHED_ETH_TYPE, uint32(ethType))
 			match.Set(MATCHED_TAP_TYPE, uint32(a.Type))
 			match.Set(MATCHED_PROTO, uint32(a.Proto))
 			match.Set(MATCHED_VLAN, uint32(a.Vlan))
@@ -95,6 +96,7 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint32, srcIps, dstIps ipSegme
 			a.AllMatched = append(a.AllMatched, match)
 
 			mask := MatchedField{}
+			mask.SetMask(MATCHED_ETH_TYPE, uint32(ethType))
 			mask.SetMask(MATCHED_TAP_TYPE, uint32(a.Type))
 			mask.SetMask(MATCHED_PROTO, uint32(a.Proto))
 			mask.SetMask(MATCHED_VLAN, uint32(a.Vlan))
@@ -114,18 +116,18 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint32, srcIps, dstIps ipSegme
 func (a *Acl) generateMatched(srcMac, dstMac []uint32, srcIps, dstIps []ipSegment) {
 	for _, srcMac := range srcMac {
 		for _, dstMac := range dstMac {
-			a.generateMatchedField(srcMac, dstMac, emptyIpSegment, emptyIpSegment)
+			a.generateMatchedField(srcMac, dstMac, emptyIpSegment, emptyIpSegment, ETH_TYPE_ALL)
 		}
 		for _, dstIp := range dstIps {
-			a.generateMatchedField(srcMac, 0, emptyIpSegment, dstIp)
+			a.generateMatchedField(srcMac, 0, emptyIpSegment, dstIp, ETH_TYPE_IPV4)
 		}
 	}
 	for _, srcIp := range srcIps {
 		for _, dstMac := range dstMac {
-			a.generateMatchedField(0, dstMac, srcIp, emptyIpSegment)
+			a.generateMatchedField(0, dstMac, srcIp, emptyIpSegment, ETH_TYPE_IPV4)
 		}
 		for _, dstIp := range dstIps {
-			a.generateMatchedField(0, 0, srcIp, dstIp)
+			a.generateMatchedField(0, 0, srcIp, dstIp, ETH_TYPE_IPV4)
 		}
 	}
 }
