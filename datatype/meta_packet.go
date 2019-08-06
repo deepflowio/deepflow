@@ -47,8 +47,8 @@ type MetaPacket struct {
 	EndpointData *EndpointData
 	PolicyData   *PolicyData
 
-	Hash      uint32
-	InPort    uint32 // (8B)
+	QueueHash uint8
+	InPort    uint32 // (+3B=8B)
 	Exporter  IPv4Int
 	PacketLen uint16
 	L2End0    bool
@@ -84,10 +84,21 @@ type MetaPacket struct {
 	pool.ReferenceCount // (8B)
 }
 
-func (p *MetaPacket) GenerateHash() uint32 {
+func (p *MetaPacket) GenerateQueueHash() uint8 {
 	// 哈希用于Queue负载均衡，只需低8bit尽量随机即可
-	p.Hash = p.InPort ^ p.IpSrc ^ p.IpDst ^ uint32(p.PortSrc) ^ uint32(p.PortDst)
-	return p.Hash
+	// 为了保证sip和dip之间的通信在存储pcap时保序处理，这里哈希只使用IP
+	// FIXME: 未来若无需做PCAP存储的保序，可将此处加入sport、dport
+	hash := p.InPort ^ p.IpSrc ^ p.IpDst
+	p.QueueHash = uint8(hash>>24) ^ uint8(hash>>16) ^ uint8(hash>>8) ^ uint8(hash)
+	if p.EthType == EthernetTypeIPv6 {
+		for i := range p.Ip6Src {
+			p.QueueHash ^= uint8(p.Ip6Src[i])
+		}
+		for i := range p.Ip6Dst {
+			p.QueueHash ^= uint8(p.Ip6Dst[i])
+		}
+	}
+	return p.QueueHash
 }
 
 func (h *MetaPacketTcpHeader) extractTcpOptions(stream *ByteStream) bool {
@@ -306,10 +317,6 @@ func (p *MetaPacket) ParseL2(packet RawPacket) int {
 	return l2Len
 }
 
-func (p *MetaPacket) CopyTo(other *MetaPacket) { // XXX: Shallow copy seems unsafe
-	*other = *p
-}
-
 func (p *MetaPacket) String() string {
 	buffer := bytes.Buffer{}
 	var format string
@@ -375,12 +382,6 @@ func ReleaseTcpHeader(h *MetaPacketTcpHeader) {
 	tcpHeaderPool.Put(h)
 }
 
-func CloneTcpHeader(h *MetaPacketTcpHeader) *MetaPacketTcpHeader {
-	dup := AcquireTcpHeader()
-	*dup = *h
-	return dup
-}
-
 var metaPacketPool = pool.NewLockFreePool(func() interface{} {
 	return new(MetaPacket)
 })
@@ -402,10 +403,4 @@ func ReleaseMetaPacket(x *MetaPacket) {
 
 	*x = MetaPacket{}
 	metaPacketPool.Put(x)
-}
-
-func CloneMetaPacket(x *MetaPacket) *MetaPacket {
-	dup := AcquireMetaPacket()
-	x.CopyTo(dup)
-	return dup
 }

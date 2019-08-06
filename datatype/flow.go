@@ -120,7 +120,7 @@ type Flow struct {
 
 	FlowID     uint64
 	TimeBitmap uint64
-	Hash       uint32
+	QueueHash  uint8
 
 	/* Timers */
 	StartTime    time.Duration

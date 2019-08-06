@@ -39,6 +39,7 @@ func ReleaseTaggedFlow(taggedFlow *TaggedFlow) {
 func CloneTaggedFlow(taggedFlow *TaggedFlow) *TaggedFlow {
 	newTaggedFlow := AcquireTaggedFlow()
 	*newTaggedFlow = *taggedFlow
+	newTaggedFlow.ReferenceCount.Reset()
 	if taggedFlow.TcpPerfStats != nil {
 		newTaggedFlow.TcpPerfStats = CloneTcpPerfStats(taggedFlow.TcpPerfStats)
 	}

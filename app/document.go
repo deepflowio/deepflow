@@ -16,7 +16,6 @@ type Tag interface {
 	GetID(*codec.SimpleEncoder) string
 	SetID(string)
 	GetCode() uint64
-	GetFastID() uint64
 	GetTAPType() uint8
 	HasVariedField() bool
 	ToKVString() string
