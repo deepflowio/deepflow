@@ -15,6 +15,8 @@ import (
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	it "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
+	"gitlab.x.lan/yunshan/droplet/app/common/tag"
 	"gitlab.x.lan/yunshan/droplet/app/usage"
 )
 
@@ -163,7 +165,7 @@ func main() {
 	start := time.Second * time.Duration(startTs)
 	end := start + time.Minute
 
-	var slots [60]map[uint64]*app.Document
+	var slots [60]map[uint64]map[uint64]*app.Document
 
 	metaPackets := make([]*it.MetaPacket, 0, 8)
 	scanner := bufio.NewScanner(file)
@@ -192,25 +194,35 @@ func main() {
 			doc := d.(*app.Document)
 			dt := doc.Timestamp - startTs
 			if slots[dt] == nil {
-				slots[dt] = make(map[uint64]*app.Document)
+				slots[dt] = make(map[uint64]map[uint64]*app.Document)
 			}
-			fastID := doc.GetFastID()
-			if oldDoc, in := slots[dt][fastID]; in {
-				oldDoc.ConcurrentMerge(doc.Meter)
+			key0, key1 := tag.GetFastID(doc.Tag.(*zerodoc.Tag))
+			if inner, in := slots[dt][key0]; in {
+				if oldDoc, in := inner[key1]; in {
+					oldDoc.ConcurrentMerge(doc.Meter)
+				} else {
+					slots[dt][key0][key1] = app.CloneDocument(doc)
+				}
 			} else {
-				slots[dt][fastID] = app.CloneDocument(doc)
+				slots[dt][key0] = make(map[uint64]*app.Document)
+				slots[dt][key0][key1] = app.CloneDocument(doc)
 			}
 		}
 	}
 
-	aggs := make(map[uint64]*app.Document)
+	aggs := make(map[uint64]map[uint64]*app.Document)
 	for _, slot := range slots {
-		for fastID, doc := range slot {
-			if oldDoc, in := aggs[fastID]; in {
-				oldDoc.SequentialMerge(doc.Meter)
-			} else {
-				aggs[fastID] = app.CloneDocument(doc)
-				aggs[fastID].Timestamp = startTs
+		for key0, inner := range slot {
+			if _, in := aggs[key0]; !in {
+				aggs[key0] = make(map[uint64]*app.Document)
+			}
+			for key1, doc := range inner {
+				if oldDoc, in := aggs[key0][key1]; in {
+					oldDoc.SequentialMerge(doc.Meter)
+				} else {
+					aggs[key0][key1] = app.CloneDocument(doc)
+					aggs[key0][key1].Timestamp = startTs
+				}
 			}
 		}
 	}

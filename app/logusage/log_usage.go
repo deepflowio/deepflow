@@ -50,23 +50,9 @@ func (p *FlowToLogUsageDocumentMapper) Prepare() {
 
 }
 
-func (p *FlowToLogUsageDocumentMapper) appendDoc(docMap map[string]bool, timestamp uint32, field *outputtype.Field, code outputtype.Code, meter *outputtype.LogUsageMeter, actionFlags uint32) {
-	tag := &outputtype.Tag{
-		Field: field,
-		Code:  code,
-	}
-
-	if code.PossibleDuplicate() {
-		id := tag.GetID(p.encoder)
-		if _, exists := docMap[id]; exists {
-			return
-		}
-		docMap[id] = true
-	}
-
+func (p *FlowToLogUsageDocumentMapper) appendDoc(timestamp uint32, field *outputtype.Field, code outputtype.Code, meter *outputtype.LogUsageMeter, actionFlags uint32) {
 	doc := p.docs.Get().(*app.Document)
 	field.FillTag(code, doc.Tag.(*outputtype.Tag))
-	doc.Tag.SetID(tag.GetID(p.encoder))
 	doc.Meter = meter
 	doc.Timestamp = timestamp
 	doc.ActionFlags = actionFlags
@@ -104,8 +90,6 @@ func (p *FlowToLogUsageDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, va
 		}
 	}
 
-	docMap := make(map[string]bool)
-
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
 		otherEnd := GetOppositeEndpoint(thisEnd)
 		meter := outputtype.LogUsageMeter{
@@ -132,7 +116,7 @@ func (p *FlowToLogUsageDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, va
 			if IsWrongEndPoint(thisEnd, code) { // 双侧Tag
 				continue
 			}
-			p.appendDoc(docMap, docTimestamp, &field, code, &meter, uint32(inputtype.ACTION_FLOW_COUNTING))
+			p.appendDoc(docTimestamp, &field, code, &meter, uint32(inputtype.ACTION_FLOW_COUNTING))
 		}
 	}
 	return p.docs.Slice()

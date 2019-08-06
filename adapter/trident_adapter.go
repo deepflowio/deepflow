@@ -211,7 +211,7 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) time.Duration {
 
 		a.counter.TxPackets++
 		a.stats.TxPackets++
-		a.itemKeys = append(a.itemKeys, queue.HashKey(meta.GenerateHash()))
+		a.itemKeys = append(a.itemKeys, queue.HashKey(meta.GenerateQueueHash()))
 		a.itemBatch = append(a.itemBatch, meta)
 
 		if len(a.itemBatch) >= cap(a.itemBatch) {

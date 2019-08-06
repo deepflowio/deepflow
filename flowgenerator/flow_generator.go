@@ -186,7 +186,7 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, now time.Duration) *FlowExtra
 	taggedFlow.CurStartTime = now
 	taggedFlow.VLAN = meta.Vlan
 	taggedFlow.EthType = meta.EthType
-	taggedFlow.Hash = meta.Hash
+	taggedFlow.QueueHash = meta.QueueHash
 	updateFlowTag(taggedFlow, meta)
 
 	flowExtra := AcquireFlowExtra()
@@ -438,7 +438,7 @@ func (f *FlowGenerator) processPackets(processBuffer []interface{}) {
 		} else {
 			f.processOtherIpPacket(meta)
 		}
-		f.meteringKeys = append(f.meteringKeys, HashKey(meta.Hash))
+		f.meteringKeys = append(f.meteringKeys, HashKey(meta.QueueHash))
 		f.meteringItems = append(f.meteringItems, meta)
 	}
 

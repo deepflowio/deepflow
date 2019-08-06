@@ -99,7 +99,7 @@ func (p *FlowToFPSDocumentMapper) Prepare() {
 	p.codes = make([]outputtype.Code, 0, CODES_LEN)
 }
 
-func (p *FlowToFPSDocumentMapper) appendDocs(docMap map[uint64]bool, field *outputtype.Field, code outputtype.Code, actionFlags uint32) {
+func (p *FlowToFPSDocumentMapper) appendDocs(field *outputtype.Field, code outputtype.Code, actionFlags uint32) {
 	for k := range p.timestamps {
 		doc := p.docs.Get().(*app.Document)
 		field.FillTag(code, doc.Tag.(*outputtype.Tag))
@@ -194,8 +194,6 @@ func (p *FlowToFPSDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 	p.timestamps = timestamps
 	p.meters = meters
 
-	docMap := make(map[uint64]bool)
-
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
 		otherEnd := GetOppositeEndpoint(thisEnd)
 
@@ -222,7 +220,7 @@ func (p *FlowToFPSDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
 					continue
 				}
-				p.appendDocs(docMap, field, code, uint32(policy.GetActionFlags()))
+				p.appendDocs(field, code, uint32(policy.GetActionFlags()))
 			}
 
 			// edge
@@ -237,7 +235,7 @@ func (p *FlowToFPSDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
 					continue
 				}
-				p.appendDocs(docMap, field, code, uint32(policy.GetActionFlags()))
+				p.appendDocs(field, code, uint32(policy.GetActionFlags()))
 			}
 		}
 	}

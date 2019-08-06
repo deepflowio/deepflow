@@ -49,16 +49,14 @@ var STAT_EDGE_CODES_LEN = len(EDGE_CODES) + len(TOR_EDGE_CODES)
 var POLICY_NODE_CODES = []outputtype.Code{
 	outputtype.IndexToCode(0x00) | outputtype.ACLGID | outputtype.TAPType,
 	outputtype.IndexToCode(0x01) | outputtype.ACLGID | outputtype.IP | outputtype.TAPType,
-	outputtype.IndexToCode(0x02) | outputtype.ACLGID | outputtype.Protocol | outputtype.TAPType,
-	outputtype.IndexToCode(0x03) | outputtype.ACLGID | outputtype.Protocol | outputtype.IP | outputtype.TAPType,
 }
 
 var POLICY_PORT_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x04) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Protocol | outputtype.ServerPort | outputtype.TAPType,
+	outputtype.IndexToCode(0x02) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Protocol | outputtype.ServerPort | outputtype.TAPType,
 }
 
 var POLICY_NODE_PORT_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x05) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Protocol | outputtype.IP | outputtype.ServerPort | outputtype.TAPType,
+	outputtype.IndexToCode(0x03) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Protocol | outputtype.IP | outputtype.ServerPort | outputtype.TAPType,
 }
 
 var POLICY_NODE_CODES_LEN = len(POLICY_NODE_CODES) + len(POLICY_PORT_CODES) + len(POLICY_NODE_PORT_CODES)
@@ -66,12 +64,11 @@ var POLICY_NODE_CODES_LEN = len(POLICY_NODE_CODES) + len(POLICY_PORT_CODES) + le
 // policy edge
 
 var POLICY_EDGE_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x06) | outputtype.ACLGID | outputtype.IPPath | outputtype.TAPType,
-	outputtype.IndexToCode(0x07) | outputtype.ACLGID | outputtype.Protocol | outputtype.IPPath | outputtype.TAPType,
+	outputtype.IndexToCode(0x04) | outputtype.ACLGID | outputtype.IPPath | outputtype.TAPType,
 }
 
 var POLICY_EDGE_PORT_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x08) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Protocol | outputtype.IPPath | outputtype.ServerPort | outputtype.TAPType,
+	outputtype.IndexToCode(0x05) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Protocol | outputtype.IPPath | outputtype.ServerPort | outputtype.TAPType,
 }
 
 var POLICY_EDGE_CODES_LEN = len(POLICY_EDGE_CODES) + len(POLICY_EDGE_PORT_CODES)

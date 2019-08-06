@@ -219,13 +219,13 @@ func (l *LabelerManager) run(index int) {
 			action := l.GetPolicy(metaPacket, index)
 
 			if (action.ActionFlags & datatype.ACTION_PACKET_CAPTURING) != 0 {
-				captureKeys = append(captureKeys, queue.HashKey(metaPacket.Hash))
+				captureKeys = append(captureKeys, queue.HashKey(metaPacket.QueueHash))
 				metaPacket.AddReferenceCount() // 引用计数+1，避免被释放
 				captureItemBatch = append(captureItemBatch, metaPacket)
 			}
 
 			// 为了获取所以流量方向，所有流量都过flowgenerator
-			flowKeys = append(flowKeys, queue.HashKey(metaPacket.Hash))
+			flowKeys = append(flowKeys, queue.HashKey(metaPacket.QueueHash))
 			flowItemBatch = append(flowItemBatch, metaPacket)
 
 			itemBatch[i] = nil

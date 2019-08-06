@@ -94,7 +94,7 @@ func (p *MeteringToUsageDocumentMapper) Prepare() {
 	}
 }
 
-func (p *MeteringToUsageDocumentMapper) appendDoc(docMap map[string]bool, timestamp uint32, field *outputtype.Field, code outputtype.Code, meter *outputtype.UsageMeter, actionFlags uint32) {
+func (p *MeteringToUsageDocumentMapper) appendDoc(timestamp uint32, field *outputtype.Field, code outputtype.Code, meter *outputtype.UsageMeter, actionFlags uint32) {
 	doc := p.docs.Get().(*app.Document)
 	field.FillTag(code, doc.Tag.(*outputtype.Tag))
 	doc.Meter = meter
@@ -128,7 +128,6 @@ func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket
 		ips[0], ips[1] = ips[1], ips[0]
 		isL2End[0], isL2End[1] = isL2End[1], isL2End[0]
 		isL3End[0], isL3End[1] = isL3End[1], isL3End[0]
-		directions[0], directions[1] = directions[1], directions[0]
 		serverPort = metaPacket.PortSrc
 	}
 	docTimestamp := RoundToSecond(metaPacket.Timestamp)
@@ -139,12 +138,15 @@ func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket
 		}
 	}
 
-	docMap := make(map[string]bool)
-
+	var meter *outputtype.UsageMeter
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
 		otherEnd := GetOppositeEndpoint(thisEnd)
 
-		meter := p.meters[metaPacket.PacketLen][thisEnd]
+		if metaPacket.Direction == inputtype.SERVER_TO_CLIENT {
+			meter = p.meters[metaPacket.PacketLen][otherEnd]
+		} else {
+			meter = p.meters[metaPacket.PacketLen][thisEnd]
+		}
 		field := &p.fields[thisEnd]
 		field.IP = ips[thisEnd]
 		field.IP1 = ips[otherEnd]
@@ -178,7 +180,7 @@ func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket
 				if IsWrongEndPointWithACL(thisEnd, policyDirections, code) {
 					continue
 				}
-				p.appendDoc(docMap, docTimestamp, field, code, meter, uint32(policy.GetActionFlags()))
+				p.appendDoc(docTimestamp, field, code, meter, uint32(policy.GetActionFlags()))
 			}
 
 			// edge
@@ -196,7 +198,7 @@ func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket
 				if IsWrongEndPointWithACL(thisEnd, policyDirections, code) {
 					continue
 				}
-				p.appendDoc(docMap, docTimestamp, field, code, meter, uint32(policy.GetActionFlags()))
+				p.appendDoc(docTimestamp, field, code, meter, uint32(policy.GetActionFlags()))
 			}
 		}
 	}

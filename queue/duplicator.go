@@ -51,7 +51,7 @@ func (d *Duplicator) run() {
 		if d.hasMultiQueue {
 			for i, item := range buffer[:n] {
 				if flow, ok := item.(*datatype.TaggedFlow); ok {
-					hashKeys[i+1] = queue.HashKey(flow.Hash)
+					hashKeys[i+1] = queue.HashKey(flow.QueueHash)
 				}
 			}
 		}

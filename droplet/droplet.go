@@ -131,7 +131,6 @@ func Start(configPath string) (closers []io.Closer) {
 
 	// L3 - flow generator & metering marshaller & pcap
 	docsInBuffer := int(cfg.Queue.DocsQueueSize)
-	variedDocLimit := int(cfg.MapReduce.VariedDocLimit)
 	windowSize := int(cfg.MapReduce.WindowSize)
 	windowMoveMargin := int(cfg.MapReduce.WindowMoveMargin)
 	releaseTaggedFlow := func(x interface{}) {
@@ -194,7 +193,7 @@ func Start(configPath string) (closers []io.Closer) {
 
 	mapreduce.NewMeteringMapProcess(
 		meteringAppOutputQueue, meteringAppQueues, cfg.Queue.MeteringAppQueueCount,
-		docsInBuffer, variedDocLimit, windowSize, windowMoveMargin).Start()
+		docsInBuffer/int(cfg.Queue.MeteringAppQueueCount), windowSize, windowMoveMargin).Start()
 
 	flowDuplicator := queue.NewDuplicator(1024, flowDuplicatorQueue, datatype.PseudoCloneTaggedFlowHelper)
 	flowDuplicator.AddMultiQueue(flowAppQueue, cfg.Queue.FlowAppQueueCount).AddQueue(flowSenderQueue).Start()
@@ -209,7 +208,7 @@ func Start(configPath string) (closers []io.Closer) {
 	)
 	mapreduce.NewFlowMapProcess(
 		flowAppOutputQueue, flowAppQueue, cfg.Queue.FlowAppQueueCount,
-		docsInBuffer, variedDocLimit, windowSize, windowMoveMargin).Start()
+		docsInBuffer/int(cfg.Queue.FlowAppQueueCount), windowSize, windowMoveMargin).Start()
 
 	// L6 - flow/metering doc sender
 	builder := sender.NewZeroDocumentSenderBuilder()

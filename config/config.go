@@ -95,7 +95,6 @@ type FlowGeneratorConfig struct {
 }
 
 type MapReduceConfig struct {
-	VariedDocLimit   uint32 `yaml:"varied-doc-limit"`
 	WindowSize       uint32 `yaml:"window-size"`
 	WindowMoveMargin uint32 `yaml:"window-move-margin"`
 }
@@ -270,9 +269,6 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if c.MapReduce.VariedDocLimit == 0 {
-		c.MapReduce.VariedDocLimit = uint32(c.Queue.DocsQueueSize)
-	}
 	if c.MapReduce.WindowSize < 70 {
 		c.MapReduce.WindowSize = 70
 	}
