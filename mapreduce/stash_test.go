@@ -10,14 +10,11 @@ import (
 
 func TestStash(t *testing.T) {
 	f := datatype.Field{
-		IP:           0x0a2102c8,
-		GroupID:      4,
-		L2EpcID:      2,
-		L3EpcID:      2,
-		L2DeviceID:   3,
-		L2DeviceType: datatype.VGatewayDevice,
-		L3DeviceID:   5,
-		L3DeviceType: datatype.VMDevice,
+		IP:       0x0a2102c8,
+		IP1:      0x0a2102c9,
+		L3EpcID:  2,
+		L3EpcID1: 3,
+		ACLGID:   10,
 
 		TAPType: datatype.ToR,
 	}
@@ -27,27 +24,27 @@ func TestStash(t *testing.T) {
 		SumBitTx:    4,
 		SumBitRx:    5,
 	}
-	tag1 := f.NewTag(datatype.IP | datatype.L3EpcID)
+	tag1 := f.NewTag(datatype.IPPath | datatype.L3EpcIDPath | datatype.Protocol | datatype.ServerPort | datatype.TAPType)
 	meter1 := &datatype.UsageMeter{}
 	*meter1 = meter
 	doc1 := &app.Document{Timestamp: 0x12345678, Tag: tag1, Meter: meter1}
 
-	tag2 := f.NewTag(datatype.L2Device | datatype.L2EpcID)
+	tag2 := f.NewTag(datatype.ACLGID | datatype.ACLDirection | datatype.Direction | datatype.TAPType | datatype.IP)
 	meter2 := &datatype.UsageMeter{}
 	*meter2 = meter
 	doc2 := &app.Document{Timestamp: 0x12345678, Tag: tag2, Meter: meter2}
 
-	tag3 := f.NewTag(datatype.IP | datatype.L3EpcID)
+	tag3 := f.NewTag(datatype.IPPath | datatype.L3EpcIDPath | datatype.Protocol | datatype.ServerPort | datatype.TAPType)
 	meter3 := &datatype.UsageMeter{}
 	*meter3 = meter
 	doc3 := &app.Document{Timestamp: 0x12345678, Tag: tag3, Meter: meter3}
 
-	tag4 := f.NewTag(datatype.L2Device | datatype.L2EpcID)
+	tag4 := f.NewTag(datatype.ACLGID | datatype.ACLDirection | datatype.Direction | datatype.TAPType | datatype.IP)
 	meter4 := &datatype.UsageMeter{}
 	*meter4 = meter
 	doc4 := &app.Document{Timestamp: 0x12345679, Tag: tag4, Meter: meter4}
 
-	stash := NewSlidingStash(100, 100, 30, 0)
+	stash := NewSlidingStash(100, 30, 0)
 	stash.Add([]interface{}{doc1, doc2, doc3, doc4})
 	docs := stash.Dump()
 	if len(docs) != 3 {

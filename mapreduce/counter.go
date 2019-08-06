@@ -13,11 +13,10 @@ type HandlerCounter struct {
 }
 
 type ProcessorCounter struct {
-	docCounter       uint64
-	emitCounter      uint64
-	maxCounter       uint64
-	rejectionCounter uint64
-	flushCounter     uint64
+	docCounter   uint64
+	emitCounter  uint64
+	maxCounter   uint64
+	flushCounter uint64
 }
 
 func FillStatItems(items []stats.StatItem, handlerCounter HandlerCounter, processorNames []string, processorCounters []ProcessorCounter) []stats.StatItem {
@@ -56,11 +55,6 @@ func FillStatItems(items []stats.StatItem, handlerCounter HandlerCounter, proces
 		items = append(items, stats.StatItem{
 			Name:  fmt.Sprintf("%s_max_doc_counter", name),
 			Value: counter.maxCounter,
-		})
-
-		items = append(items, stats.StatItem{
-			Name:  fmt.Sprintf("%s_rejected_doc", name),
-			Value: counter.rejectionCounter,
 		})
 
 		items = append(items, stats.StatItem{

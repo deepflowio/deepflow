@@ -27,7 +27,7 @@ const GEO_FILE_LOCATION = "/usr/share/droplet/ip_info_mini.json"
 
 func NewFlowMapProcess(
 	output queue.MultiQueueWriter, input queue.MultiQueueReader,
-	inputCount, docsInBuffer, variedDocLimit, windowSize, windowMoveMargin int,
+	inputCount, docsInBuffer, windowSize, windowMoveMargin int,
 ) *FlowHandler {
 	return NewFlowHandler([]app.FlowProcessor{
 		fps.NewProcessor(),
@@ -37,7 +37,7 @@ func NewFlowMapProcess(
 		flowtype.NewProcessor(),
 		consolelog.NewProcessor(),
 		logusage.NewProcessor(),
-	}, output, input, inputCount, docsInBuffer, variedDocLimit, windowSize, windowMoveMargin)
+	}, output, input, inputCount, docsInBuffer, windowSize, windowMoveMargin)
 }
 
 type FlowHandler struct {
@@ -48,7 +48,6 @@ type FlowHandler struct {
 	flowQueueCount   int
 	zmqAppQueue      queue.MultiQueueWriter
 	docsInBuffer     int
-	variedDocLimit   int
 	windowSize       int
 	windowMoveMargin int
 }
@@ -56,7 +55,7 @@ type FlowHandler struct {
 func NewFlowHandler(
 	processors []app.FlowProcessor,
 	output queue.MultiQueueWriter, inputs queue.MultiQueueReader,
-	inputCount, docsInBuffer, variedDocLimit, windowSize, windowMoveMargin int,
+	inputCount, docsInBuffer, windowSize, windowMoveMargin int,
 ) *FlowHandler {
 	return &FlowHandler{
 		numberOfApps:     len(processors),
@@ -65,7 +64,6 @@ func NewFlowHandler(
 		flowQueue:        inputs,
 		flowQueueCount:   inputCount,
 		docsInBuffer:     docsInBuffer,
-		variedDocLimit:   variedDocLimit,
 		windowSize:       windowSize,
 		windowMoveMargin: windowMoveMargin,
 	}
@@ -125,7 +123,7 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.names[i] = handler.processors[i].GetName()
-		handler.stashes[i] = NewFixedStash(h.docsInBuffer, h.variedDocLimit, h.windowSize)
+		handler.stashes[i] = NewFixedStash(uint32(h.docsInBuffer), h.windowSize)
 	}
 	stats.RegisterCountable("flow-mapper", &handler, stats.OptionStatTags{"index": strconv.Itoa(index)})
 	return &handler
@@ -233,14 +231,12 @@ func (h *subFlowHandler) Process() error {
 			h.handlerCounter[h.counterLatch].inputCounter++
 			for i, processor := range h.processors {
 				docs := processor.Process(flow, false)
-				rejected := uint64(0)
 				h.processorCounter[h.counterLatch][i].docCounter += uint64(len(docs))
 				if uint64(len(docs)) > h.processorCounter[h.counterLatch][i].maxCounter {
 					h.processorCounter[h.counterLatch][i].maxCounter = uint64(len(docs))
 				}
 				for {
-					docs, rejected = h.stashes[i].Add(docs)
-					h.processorCounter[h.counterLatch][i].rejectionCounter += rejected
+					docs = h.stashes[i].Add(docs)
 					if docs == nil {
 						break
 					}

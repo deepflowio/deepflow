@@ -519,7 +519,7 @@ func BenchmarkShortFlowList(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		meta := getDefaultPacket()
 		meta.IpSrc += uint32(i)
-		meta.GenerateHash()
+		meta.GenerateQueueHash()
 		processBuffer[i] = meta
 	}
 	b.ResetTimer()
@@ -545,7 +545,7 @@ func BenchmarkLongFlowList(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		meta := getDefaultPacket()
 		meta.PortDst += uint16(i)
-		meta.GenerateHash()
+		meta.GenerateQueueHash()
 		processBuffer[i] = meta
 	}
 	b.ResetTimer()

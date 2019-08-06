@@ -16,11 +16,11 @@ import (
 
 func NewMeteringMapProcess(
 	output queue.MultiQueueWriter, input queue.MultiQueueReader,
-	inputCount, docsInBuffer, variedDocLimit, windowSize, windowMoveMargin int,
+	inputCount, docsInBuffer, windowSize, windowMoveMargin int,
 ) *MeteringHandler {
 	return NewMeteringHandler(
 		[]app.MeteringProcessor{usage.NewProcessor()}, output, input,
-		inputCount, docsInBuffer, variedDocLimit, windowSize, windowMoveMargin)
+		inputCount, docsInBuffer, windowSize, windowMoveMargin)
 }
 
 type MeteringHandler struct {
@@ -31,7 +31,6 @@ type MeteringHandler struct {
 	meteringQueueCount int
 	zmqAppQueue        queue.MultiQueueWriter
 	docsInBuffer       int
-	variedDocLimit     int
 	windowSize         int
 	windowMoveMargin   int
 }
@@ -39,7 +38,7 @@ type MeteringHandler struct {
 func NewMeteringHandler(
 	processors []app.MeteringProcessor,
 	output queue.MultiQueueWriter, inputs queue.MultiQueueReader,
-	inputCount, docsInBuffer, variedDocLimit, windowSize, windowMoveMargin int,
+	inputCount, docsInBuffer, windowSize, windowMoveMargin int,
 ) *MeteringHandler {
 	return &MeteringHandler{
 		numberOfApps:       len(processors),
@@ -48,7 +47,6 @@ func NewMeteringHandler(
 		meteringQueue:      inputs,
 		meteringQueueCount: inputCount,
 		docsInBuffer:       docsInBuffer,
-		variedDocLimit:     variedDocLimit,
 		windowSize:         windowSize,
 		windowMoveMargin:   windowMoveMargin,
 	}
@@ -107,7 +105,7 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.names[i] = handler.processors[i].GetName()
-		handler.stashes[i] = NewSlidingStash(h.docsInBuffer, h.variedDocLimit, h.windowSize, h.windowMoveMargin)
+		handler.stashes[i] = NewSlidingStash(uint32(h.docsInBuffer), h.windowSize, h.windowMoveMargin)
 	}
 	stats.RegisterCountable("metering-mapper", &handler, stats.OptionStatTags{"index": strconv.Itoa(index)})
 	return &handler
@@ -189,14 +187,12 @@ func (h *subMeteringHandler) Process() error {
 			h.handlerCounter[h.counterLatch].byteCounter += uint64(metering.PacketLen)
 			for i, processor := range h.processors {
 				docs := processor.Process(metering, false)
-				rejected := uint64(0)
 				h.processorCounter[h.counterLatch][i].docCounter += uint64(len(docs))
 				if uint64(len(docs)) > h.processorCounter[h.counterLatch][i].maxCounter {
 					h.processorCounter[h.counterLatch][i].maxCounter = uint64(len(docs))
 				}
 				for {
-					docs, rejected = h.stashes[i].Add(docs)
-					h.processorCounter[h.counterLatch][i].rejectionCounter += rejected
+					docs = h.stashes[i].Add(docs)
 					if docs == nil {
 						break
 					}

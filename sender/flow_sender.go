@@ -32,7 +32,8 @@ func (s *FlowSender) run() {
 		n := s.input.Gets(buffer)
 		for _, e := range buffer[:n] {
 			if flow, ok := e.(*datatype.TaggedFlow); ok {
-				if s.filter(flow) { // this flow is not created by pool so never release
+				if s.filter(flow) {
+					datatype.ReleaseTaggedFlow(flow)
 					continue
 				}
 				header := &pb.StreamHeader{
