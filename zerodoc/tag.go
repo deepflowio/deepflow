@@ -781,41 +781,6 @@ func (t *Tag) SetID(id string) {
 	t.id = id
 }
 
-// FIXME: 不支持IPv6，预计droplet/app在v5.5.5中支持
-func isFastCode(code Code) bool {
-	// 认为所有只包含这四个Code子集的Tag能使用FashID
-	return (code & ^(CodeIndices | ACLGID | IP | L3EpcID | TAPType)) == 0
-}
-
-// GetFastID 返回uint64的ID，0代表该tag的code不在fast ID的范围内
-// 注意：ID中会忽略TAPType
-// FIXME: 不支持IPv6，预计droplet/app在v5.5.5中支持
-func (t *Tag) GetFastID() uint64 {
-	if !isFastCode(t.Code) || t.Code == 0 {
-		return 0
-	}
-
-	var id uint64
-	// 16b ACLGID + 32b IP + 16b L3EpcID
-	//
-	// 当code不存在的时候，有以下条件使得不同code的tag不会产生相同的fast ID：
-	//   1. L3EpcID 0是不存在的
-	//   2. IP 255.255.255.255不用
-	//   3. ACLGID 0不存在
-	if t.Code&L3EpcID != 0 {
-		id |= uint64(uint16(t.L3EpcID))
-	}
-	if t.Code&IP != 0 {
-		id |= uint64(t.IP) << 16
-	} else {
-		id |= uint64(0xFFFFFFFF) << 16
-	}
-	if t.Code&ACLGID != 0 {
-		id |= uint64(t.ACLGID) << 48
-	}
-	return id
-}
-
 func (t *Tag) GetCode() uint64 {
 	return uint64(t.Code)
 }

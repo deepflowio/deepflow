@@ -25,16 +25,6 @@ func TestFillTag(t *testing.T) {
 	}
 }
 
-func TestFastOrNormalID(t *testing.T) {
-	f := Field{L3EpcID: 3, TAPType: ToR, L2EpcID: 2}
-	if f.NewTag(L3EpcID|TAPType).GetFastID() == 0 {
-		t.Error("FastID没有正确设置")
-	}
-	if f.NewTag(L3EpcID|L2EpcID).GetFastID() != 0 {
-		t.Error("非FastID的Tag被设置了")
-	}
-}
-
 func TestNegativeID(t *testing.T) {
 	a := int16(30000)
 	f := Field{L3EpcID: -1, L2EpcID: int16(a * 2), GroupID: -1}
