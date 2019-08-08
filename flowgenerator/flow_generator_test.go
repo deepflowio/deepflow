@@ -495,6 +495,38 @@ func TestIgnoreL2End(t *testing.T) {
 	}
 }
 
+func TestDoubleFinFromServer(t *testing.T) {
+	SetTimeout(TimeoutConfig{0, 300 * time.Second, 0, 30 * time.Second, 5 * time.Second, 0, time.Millisecond * 10})
+	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
+	// SYN
+	packet0 := getDefaultPacket()
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
+	// SYN | ACK
+	packet1 := getDefaultPacket()
+	packet1.TcpData.Flags = TCP_SYN | TCP_ACK
+	reversePacket(packet1)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
+	// ACK
+	packet2 := getDefaultPacket()
+	packet2.TcpData.Flags = TCP_ACK
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet2)
+	// FIN
+	packet3 := getDefaultPacket()
+	packet3.TcpData.Flags = TCP_FIN
+	reversePacket(packet3)
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet3)
+	// FIN
+	packet4 := &MetaPacket{}
+	*packet4 = *packet3
+	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet4)
+
+	flowGenerator.Start()
+	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
+	if taggedFlow.Flow.CloseType != CloseTypeClientHalfClose { // CloseTypeClientHalfClose是服务端发送FIN,而客户端未发送FIN
+		t.Errorf("taggedFlow.Flow.CloseType is %d, expect %d", taggedFlow.Flow.CloseType, CloseTypeClientHalfClose)
+	}
+}
+
 func BenchmarkCleanHashMap(b *testing.B) {
 	runtime.GOMAXPROCS(4)
 	SetTimeout(TimeoutConfig{0, 300 * time.Second, 0, 30 * time.Second, 5 * time.Second, 0, 0})
