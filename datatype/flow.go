@@ -219,6 +219,7 @@ func (f *Flow) String() string {
 	formatted += fmt.Sprintf("Country: %d ", f.Country)
 	formatted += fmt.Sprintf("Region: %d ", f.Region)
 	formatted += fmt.Sprintf("ISP: %d ", f.ISP)
+	formatted += fmt.Sprintf("GeoEnd: %d ", f.GeoEnd)
 	formatted += fmt.Sprintf("%s\n", f.FlowKey.String())
 	formatted += fmt.Sprintf("\tFlowMetricsPeerSrc: {%s}\n", f.FlowMetricsPeerSrc.String())
 	formatted += fmt.Sprintf("\tFlowMetricsPeerDst: {%s}", f.FlowMetricsPeerDst.String())
