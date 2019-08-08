@@ -274,7 +274,7 @@ func (f *FlowGenerator) initStateMachineSlave() {
 	// for FLOW_STATE_CLOSING_RX1
 	stateMachineSlave[FLOW_STATE_CLOSING_RX1] = make(map[uint8]*StateValue)
 
-	stateMachineSlave[FLOW_STATE_CLOSING_RX1][TCP_FIN] = &StateValue{closingTimeout, FLOW_STATE_CLOSING_RX2, false}
+	stateMachineSlave[FLOW_STATE_CLOSING_RX1][TCP_FIN] = &StateValue{closingTimeout, FLOW_STATE_CLOSING_RX1, false}
 	stateMachineSlave[FLOW_STATE_CLOSING_RX1][TCP_FIN|TCP_ACK] = stateMachineSlave[FLOW_STATE_CLOSING_RX1][TCP_FIN]
 	stateMachineSlave[FLOW_STATE_CLOSING_RX1][TCP_FIN|TCP_PSH|TCP_ACK] = stateMachineSlave[FLOW_STATE_CLOSING_RX1][TCP_FIN]
 
