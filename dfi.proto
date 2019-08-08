@@ -155,15 +155,15 @@ message Flow {
     repeated uint32 group_ids_1 = 135;                         /* 目的端资源组ID */
 
     /* TCP Perf Data */
-    /* tcp会话报文交互过程简图 
+    /* tcp会话报文交互过程简图
     client端         探针点          server端
     |     SYN         t0|                   |
     | ----------------> | ----------------> |
     |     SYN         t1|                   |
-    | ----------------> | ----------------> | 
+    | ----------------> | ----------------> |
     |                   |                   |
     |                   |t2       SYN/ACK   |
-    | <---------------- | <---------------- | 
+    | <---------------- | <---------------- |
     |                   |t3       SYN/ACK   |
     | <---------------- | <---------------- |
     |                   |                   |
@@ -185,7 +185,7 @@ message Flow {
     | ----------------> | ----------------> |
     |                   |t11 DATA/ACK(len>1)|
     | <---------------- | <---------------- | */
-    
+
     optional uint64 rtt_syn = 140 [default = 0];               /* 网络时延(rtt_syn), 单位：ns, tcp三次握手阶段, 每次上报均携带，force-report后不清空.
                                                                   rtt_syn = (t2-t1) + (t4-t3) */
     optional uint64 rtt = 141 [default = 0];                   /* 系统响应时延(rtt/srt), 单位：ns, tcp数据传输阶段, 单个上报周期内rtt的均值. 不包含握手阶段的网络时延.
@@ -227,6 +227,7 @@ message Flow {
     optional uint32 country = 170 [default = 0];               /* Flow非云内IP端国家信息 */
     optional uint32 region = 171 [default = 0];                /* Flow非云内IP端区域信息 */
     optional uint32 isp = 172 [default = 0];                   /* Flow非云内IP端ISP信息 */
+    optional uint32 geo_end = 173 [default = 0];               /* 0：上述地理位置信息对应源端，1：上述地理位置信息对应目的端 */
 }
 
 message Metering {
