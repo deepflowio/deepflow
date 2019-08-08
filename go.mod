@@ -32,7 +32,7 @@ require (
 	github.com/spf13/pflag v1.0.3 // indirect
 	github.com/stretchr/testify v1.3.0 // indirect
 	github.com/tebeka/strftime v0.0.0-20140926081919-3f9c7761e312 // indirect
-	gitlab.x.lan/yunshan/message v0.0.0-20190724071130-f5526af059d8
+	gitlab.x.lan/yunshan/message v0.0.0-20190724071130-ff1f5a373498
 	golang.org/x/net v0.0.0-20190514140710-3ec191127204
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58 // indirect
 	golang.org/x/sys v0.0.0-20190516110030-61b9204099cb // indirect
