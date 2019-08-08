@@ -82,6 +82,7 @@ func MarshalFlow(f *datatype.TaggedFlow, bytes *utils.ByteBuffer) error {
 		Country: proto.Uint32(uint32(f.Country)),
 		Region:  proto.Uint32(uint32(f.Region)),
 		Isp:     proto.Uint32(uint32(f.ISP)),
+		GeoEnd:  proto.Uint32(uint32(f.GeoEnd)),
 	}
 	// TCP Perf Data
 	if f.TcpPerfStats != nil {
