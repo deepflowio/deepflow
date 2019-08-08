@@ -143,8 +143,8 @@ vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version
 | CODE_INDEX        | 48-53| 不能使用                | 用于标识Code的Index                   |
 |                   |      |                         |                                       |
 | isp               | 61   | 运营商（仅大中华）      | 字符串                                |
-| region            | 62   | 省份（仅大中华）        | 字符串 `仅在df_geo中`                 |
-| country           | 63   | 国家                    | 字符串                                |
+| region            | 62   | 省份名前缀（仅大中华）  | 字符串 `注意：仅含两个汉字，例如黑龙` |
+| country           | 63   | 国家三位字符编码        | 字符串 `注意：使用三位字母编码`       |
 
 ## 数据表Field定义
 
