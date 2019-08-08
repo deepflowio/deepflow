@@ -4,6 +4,7 @@ package diagnose;
 option go_package = "diagnose";
 
 service Diagnose {
+    rpc GetTridentStatus(DiagnoseRequest) returns (DiagnoseResponse) {}
     // TOPOLOGY
     rpc GetOvsBridges(DiagnoseRequest) returns (DiagnoseResponse) {} // ovs-vsctl -f csv -d bare list bridge
     rpc GetOvsPorts(DiagnoseRequest) returns (DiagnoseResponse) {} // ovs-vsctl -f csv -d bare list port
