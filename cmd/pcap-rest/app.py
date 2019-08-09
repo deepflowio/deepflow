@@ -3,6 +3,7 @@ import datetime
 import ipaddress
 import mimetypes
 import os
+import shutil
 import socket
 import time
 from operator import itemgetter
@@ -178,12 +179,38 @@ HTTP response body:
 @app.delete(API_PREFIX + '/pcaps/<acl_gid:int>/')
 @app.delete(API_PREFIX + '/pcaps/<acl_gid:int>/<pcap_name>/')
 def delete_files(acl_gid, pcap_name=None):
+    u"""
+删除acl_gid下的pcap文件
+
+HTTP request args:
+
+  idle_time: 目录超时秒数，如果该acl_gid目录超过这个时间进行文件变动，进行删除
+
+HTTP request body:
+
+  None
+
+HTTP response body:
+
+  {
+      "OPT_STATUS": "SUCCESS"
+  }
+    """
+    idle_time = 0
+    if request.query.idle_time != '':
+        idle_time = int(request.query.idle_time)
     directory = PCAP_DIR + '/' + str(acl_gid) + '/'
     if pcap_name is not None:
         os.unlink(directory + pcap_name)
     else:
-        for file in os.listdir(directory):
-            os.unlink(directory + file)
+        if idle_time > 0:
+            now = int(time.time())
+            mtime = os.path.getmtime(directory)
+            if now - mtime <= idle_time:
+                return {
+                    'OPT_STATUS': 'FAILED',
+                }
+        shutil.rmtree(directory)
     return {
         'OPT_STATUS': 'SUCCESS',
     }
