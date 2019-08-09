@@ -34,12 +34,13 @@ type LabelerManager struct {
 	appQueues       [QUEUE_TYPE_MAX]queue.MultiQueueWriter
 	running         bool
 
-	lookupKey        []datatype.LookupKey
-	rawPlatformDatas []*datatype.PlatformData
-	rawIpGroupDatas  []*policy.IpGroupData
-	rawPolicyData    []*policy.Acl
-	enable           bool
-	version          uint64
+	lookupKey         []datatype.LookupKey
+	rawPlatformDatas  []*datatype.PlatformData
+	rawIpGroupDatas   []*policy.IpGroupData
+	rawPeerConnection []*datatype.PeerConnection
+	rawPolicyData     []*policy.Acl
+	enable            bool
+	version           uint64
 }
 
 const (
@@ -111,9 +112,18 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 		} else {
 			l.OnIpGroupDataChange(nil)
 		}
+		if peerConnections := platformData.GetPeerConnections(); peerConnections != nil {
+			peerConnectionData := dropletpb.Convert2PeerConnections(peerConnections)
+			log.Infof("droplet grpc recv %d pieces of peer connection data", len(peerConnectionData))
+			l.OnPeerConnectionChange(peerConnectionData)
+		} else {
+			l.OnPeerConnectionChange(nil)
+		}
+
 	} else {
 		l.OnPlatformDataChange(nil)
 		l.OnIpGroupDataChange(nil)
+		l.OnPeerConnectionChange(nil)
 	}
 
 	if flowAcls := response.GetFlowAcls(); flowAcls != nil {
@@ -149,6 +159,15 @@ func (l *LabelerManager) OnIpGroupDataChange(data []*policy.IpGroupData) {
 	}
 	l.policyTable.UpdateIpGroupData(data)
 	l.rawIpGroupDatas = data
+	l.enable = true
+}
+
+func (l *LabelerManager) OnPeerConnectionChange(data []*datatype.PeerConnection) {
+	if reflect.DeepEqual(l.rawPeerConnection, data) {
+		return
+	}
+	l.policyTable.UpdatePeerConnection(data)
+	l.rawPeerConnection = data
 	l.enable = true
 }
 
