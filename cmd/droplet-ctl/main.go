@@ -10,6 +10,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet/adapter"
 	"gitlab.x.lan/yunshan/droplet/droplet"
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
+	"gitlab.x.lan/yunshan/droplet/dropletctl/loglevel"
 	"gitlab.x.lan/yunshan/droplet/dropletctl/rpc"
 	"gitlab.x.lan/yunshan/droplet/labeler"
 	"gitlab.x.lan/yunshan/droplet/profiler"
@@ -22,7 +23,7 @@ func regiterCommand() {
 	debug.RegisterCommand(dropletctl.DROPLETCTL_LABELER, labeler.RegisterCommand)
 	debug.RegisterCommand(dropletctl.DROPLETCTL_RPC, rpc.RegisterRpcCommand)
 	debug.RegisterCommand(dropletctl.DROPLETCTL_CONFIG, profiler.RegisterProfilerCommand)
-	debug.RegisterCommand(dropletctl.DROPLETCTL_LOGLEVEL, dropletctl.RegisterLoglevelCommand)
+	debug.RegisterCommand(dropletctl.DROPLETCTL_LOGLEVEL, loglevel.RegisterLoglevelCommand)
 }
 
 func main() {

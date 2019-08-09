@@ -1,4 +1,4 @@
-package dropletctl
+package loglevel
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"github.com/op/go-logging"
 	"github.com/spf13/cobra"
 	"gitlab.x.lan/yunshan/droplet-libs/debug"
+	"gitlab.x.lan/yunshan/droplet/dropletctl"
 )
 
 const (
@@ -24,12 +25,12 @@ type LevelInfo struct {
 type LoglevelControl struct {
 }
 
-var log = logging.MustGetLogger("dropletctl")
+var log = logging.MustGetLogger("dropletctl.loglevel")
 
 func NewLoglevelControl() *LoglevelControl {
 	loglevelProcess := &LoglevelControl{}
 	// 服务端注册处理函数
-	debug.Register(DROPLETCTL_LOGLEVEL, loglevelProcess)
+	debug.Register(dropletctl.DROPLETCTL_LOGLEVEL, loglevelProcess)
 	return loglevelProcess
 }
 
@@ -115,7 +116,7 @@ func sendCmd(operate int, levelInfo *LevelInfo) bool {
 		return false
 	}
 
-	_, result, err := debug.SendToServer(DROPLETCTL_LOGLEVEL, debug.ModuleOperate(operate), &buffer)
+	_, result, err := debug.SendToServer(dropletctl.DROPLETCTL_LOGLEVEL, debug.ModuleOperate(operate), &buffer)
 	if err != nil {
 		fmt.Println(err)
 		return false
