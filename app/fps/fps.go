@@ -214,7 +214,7 @@ func (p *FlowToFPSDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 				codes = append(codes, POLICY_NODE_CODES...)
 			}
 			for _, code := range codes {
-				if IsDupTraffic(flow.InPort, l3EpcIDs[thisEnd], isL2End[thisEnd], isL3End[thisEnd], code) {
+				if IsDupTraffic(flow.InPort, isL2End[thisEnd], isL3End[thisEnd], code) {
 					continue
 				}
 				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
@@ -229,7 +229,7 @@ func (p *FlowToFPSDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 				codes = append(codes, POLICY_EDGE_CODES...)
 			}
 			for _, code := range codes {
-				if IsDupTraffic(flow.InPort, l3EpcIDs[otherEnd], isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧tag用otherEnd判断
+				if IsDupTraffic(flow.InPort, isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧tag用otherEnd判断
 					continue
 				}
 				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {

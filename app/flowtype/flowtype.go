@@ -33,12 +33,11 @@ var NODE_CODES = []outputtype.Code{}
 // policy node
 
 var POLICY_NODE_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x00) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.TAPType,
-	outputtype.IndexToCode(0x01) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IP | outputtype.TAPType,
+	outputtype.IndexToCode(0x00) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IP | outputtype.TAPType,
 }
 
 var POLICY_EDGE_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x02) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IPPath | outputtype.TAPType,
+	outputtype.IndexToCode(0x01) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IPPath | outputtype.TAPType,
 }
 
 var POLICY_NODE_CODES_LEN = len(POLICY_NODE_CODES)
@@ -134,8 +133,6 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 		}
 	}
 
-	docMap := make(map[string]bool)
-
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
 		otherEnd := GetOppositeEndpoint(thisEnd)
 
@@ -151,24 +148,15 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 		// node
 		if statTemplates&inputtype.TEMPLATE_NODE != 0 {
 			for _, code := range NODE_CODES {
-				if IsDupTraffic(flow.InPort, l3EpcIDs[thisEnd], isL2End[thisEnd], isL3End[thisEnd], code) {
+				if IsDupTraffic(flow.InPort, isL2End[thisEnd], isL3End[thisEnd], code) {
 					continue
 				}
 				if IsWrongEndPoint(thisEnd, code) {
 					continue
 				}
-				tag := &outputtype.Tag{Field: field, Code: code}
-				if code.PossibleDuplicate() {
-					id := tag.GetID(p.encoder)
-					if _, exists := docMap[id]; exists {
-						continue
-					}
-					docMap[id] = true
-				}
 				doc := p.docs.Get().(*app.Document)
 				doc.Timestamp = docTimestamp
 				field.FillTag(code, doc.Tag.(*outputtype.Tag))
-				doc.Tag.SetID(tag.GetID(p.encoder))
 				doc.Meter = meter
 			}
 		}
@@ -181,25 +169,15 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 			}
 			field.ACLGID = uint16(policy.GetACLGID())
 			for _, code := range codes {
-				if IsDupTraffic(flow.InPort, l3EpcIDs[thisEnd], isL2End[thisEnd], isL3End[thisEnd], code) {
+				if IsDupTraffic(flow.InPort, isL2End[thisEnd], isL3End[thisEnd], code) {
 					continue
 				}
 				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
 					continue
 				}
-				tag := &outputtype.Tag{Field: field, Code: code}
-				if code.PossibleDuplicate() {
-					id := tag.GetID(p.encoder)
-					if _, exists := docMap[id]; exists {
-						continue
-
-					}
-					docMap[id] = true
-				}
 				doc := p.docs.Get().(*app.Document)
 				doc.Timestamp = docTimestamp
 				field.FillTag(code, doc.Tag.(*outputtype.Tag))
-				doc.Tag.SetID(tag.GetID(p.encoder))
 				doc.Meter = meter
 			}
 
@@ -208,25 +186,15 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				codes = append(codes, POLICY_EDGE_CODES...)
 			}
 			for _, code := range codes {
-				if IsDupTraffic(flow.InPort, l3EpcIDs[otherEnd], isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧tag
+				if IsDupTraffic(flow.InPort, isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧tag
 					continue
 				}
 				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) { // 双侧tag
 					continue
 				}
-				tag := &outputtype.Tag{Field: field, Code: code}
-				if code.PossibleDuplicate() {
-					id := tag.GetID(p.encoder)
-					if _, exists := docMap[id]; exists {
-						continue
-
-					}
-					docMap[id] = true
-				}
 				doc := p.docs.Get().(*app.Document)
 				doc.Timestamp = docTimestamp
 				field.FillTag(code, doc.Tag.(*outputtype.Tag))
-				doc.Tag.SetID(tag.GetID(p.encoder))
 				doc.Meter = meter
 			}
 		}

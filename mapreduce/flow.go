@@ -10,7 +10,6 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
-	"gitlab.x.lan/yunshan/droplet/app/consolelog"
 	"gitlab.x.lan/yunshan/droplet/app/flow"
 	"gitlab.x.lan/yunshan/droplet/app/flowtype"
 	"gitlab.x.lan/yunshan/droplet/app/fps"
@@ -35,7 +34,6 @@ func NewFlowMapProcess(
 		perf.NewProcessor(),
 		geo.NewProcessor(GEO_FILE_LOCATION),
 		flowtype.NewProcessor(),
-		consolelog.NewProcessor(),
 		logusage.NewProcessor(),
 	}, output, input, inputCount, docsInBuffer, windowSize, windowMoveMargin)
 }

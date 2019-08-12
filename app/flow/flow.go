@@ -46,30 +46,19 @@ var STAT_EDGE_CODES_LEN = len(EDGE_CODES) + len(TOR_EDGE_CODES)
 
 // policy node
 
-var POLICY_NODE_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x00) | outputtype.ACLGID | outputtype.TAPType,
-	outputtype.IndexToCode(0x01) | outputtype.ACLGID | outputtype.IP | outputtype.TAPType,
-}
+var POLICY_NODE_CODES = []outputtype.Code{}
 
-var POLICY_PORT_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x02) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Protocol | outputtype.ServerPort | outputtype.TAPType,
-}
+var POLICY_PORT_CODES = []outputtype.Code{}
 
-var POLICY_NODE_PORT_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x03) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Protocol | outputtype.IP | outputtype.ServerPort | outputtype.TAPType,
-}
+var POLICY_NODE_PORT_CODES = []outputtype.Code{}
 
 var POLICY_NODE_CODES_LEN = len(POLICY_NODE_CODES) + len(POLICY_PORT_CODES) + len(POLICY_NODE_PORT_CODES)
 
 // policy edge
 
-var POLICY_EDGE_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x04) | outputtype.ACLGID | outputtype.IPPath | outputtype.TAPType,
-}
+var POLICY_EDGE_CODES = []outputtype.Code{}
 
-var POLICY_EDGE_PORT_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x05) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Protocol | outputtype.IPPath | outputtype.ServerPort | outputtype.TAPType,
-}
+var POLICY_EDGE_PORT_CODES = []outputtype.Code{}
 
 var POLICY_EDGE_CODES_LEN = len(POLICY_EDGE_CODES) + len(POLICY_EDGE_PORT_CODES)
 
@@ -120,29 +109,17 @@ func (p *FlowToFlowDocumentMapper) Prepare() {
 	p.aclGroups = [2][]int32{make([]int32, 0, GROUPS_LEN), make([]int32, 0, GROUPS_LEN)}
 }
 
-func (p *FlowToFlowDocumentMapper) appendDoc(docMap map[string]bool, timestamp uint32, field *outputtype.Field, code outputtype.Code, meter *outputtype.FlowMeter, actionFlags uint32) {
-	tag := &outputtype.Tag{
-		Field: field,
-		Code:  code,
-	}
-
-	if code.PossibleDuplicate() {
-		id := tag.GetID(p.encoder)
-		if _, exists := docMap[id]; exists {
-			return
-		}
-		docMap[id] = true
-	}
-
+func (p *FlowToFlowDocumentMapper) appendDoc(timestamp uint32, field *outputtype.Field, code outputtype.Code, meter *outputtype.FlowMeter, actionFlags uint32) {
 	doc := p.docs.Get().(*app.Document)
 	field.FillTag(code, doc.Tag.(*outputtype.Tag))
-	doc.Tag.SetID(tag.GetID(p.encoder))
 	doc.Meter = meter
 	doc.Timestamp = timestamp
 	doc.ActionFlags = actionFlags
 }
 
 func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedTag bool) []interface{} {
+	return p.docs.Slice() // v5.5.5弃用
+
 	p.docs.Reset()
 
 	if rawFlow.EthType != layers.EthernetTypeIPv4 {
@@ -195,8 +172,6 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 		}
 	}
 
-	docMap := make(map[string]bool)
-
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
 		otherEnd := GetOppositeEndpoint(thisEnd)
 
@@ -219,7 +194,7 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 
 		// oneSideCodes
 		for _, code := range oneSideCodes {
-			if IsDupTraffic(flow.InPort, l3EpcIDs[thisEnd], isL2End[thisEnd], isL3End[thisEnd], code) {
+			if IsDupTraffic(flow.InPort, isL2End[thisEnd], isL3End[thisEnd], code) {
 				continue
 			}
 			if IsWrongEndPoint(thisEnd, code) {
@@ -229,18 +204,18 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				// 产品要求：统计服务器内所有虚拟接口流量之和
 				continue
 			}
-			p.appendDoc(docMap, docTimestamp, field, code, meter, uint32(inputtype.ACTION_FLOW_COUNTING))
+			p.appendDoc(docTimestamp, field, code, meter, uint32(inputtype.ACTION_FLOW_COUNTING))
 		}
 
 		// edgeCodes
 		for _, code := range edgeCodes {
-			if IsDupTraffic(flow.InPort, l3EpcIDs[otherEnd], isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧Tag
+			if IsDupTraffic(flow.InPort, isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧Tag
 				continue
 			}
 			if IsWrongEndPoint(thisEnd, code) { // 双侧Tag
 				continue
 			}
-			p.appendDoc(docMap, docTimestamp, field, code, meter, uint32(inputtype.ACTION_FLOW_COUNTING))
+			p.appendDoc(docTimestamp, field, code, meter, uint32(inputtype.ACTION_FLOW_COUNTING))
 		}
 
 		// policy
@@ -259,7 +234,7 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				codes = append(codes, POLICY_NODE_PORT_CODES...)
 			}
 			for _, code := range codes {
-				if IsDupTraffic(flow.InPort, l3EpcIDs[thisEnd], isL2End[thisEnd], isL3End[thisEnd], code) {
+				if IsDupTraffic(flow.InPort, isL2End[thisEnd], isL3End[thisEnd], code) {
 					continue
 				}
 				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
@@ -269,7 +244,7 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 					// 产品要求：统计服务器内所有虚拟接口流量之和
 					continue
 				}
-				p.appendDoc(docMap, docTimestamp, field, code, meter, uint32(policy.GetActionFlags()))
+				p.appendDoc(docTimestamp, field, code, meter, uint32(policy.GetActionFlags()))
 			}
 
 			// edge
@@ -281,13 +256,13 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				codes = append(codes, POLICY_EDGE_PORT_CODES...)
 			}
 			for _, code := range codes {
-				if IsDupTraffic(flow.InPort, l3EpcIDs[otherEnd], isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧Tag
+				if IsDupTraffic(flow.InPort, isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧Tag
 					continue
 				}
 				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) { // 双侧Tag
 					continue
 				}
-				p.appendDoc(docMap, docTimestamp, field, code, meter, uint32(policy.GetActionFlags()))
+				p.appendDoc(docTimestamp, field, code, meter, uint32(policy.GetActionFlags()))
 			}
 		}
 	}

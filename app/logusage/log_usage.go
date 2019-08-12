@@ -110,7 +110,7 @@ func (p *FlowToLogUsageDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, va
 		}
 
 		for _, code := range EDGE_PORT_CODES {
-			if IsDupTraffic(flow.InPort, l3EpcIDs[otherEnd], isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧Tag
+			if IsDupTraffic(flow.InPort, isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧Tag
 				continue
 			}
 			if IsWrongEndPoint(thisEnd, code) { // 双侧Tag
