@@ -348,6 +348,7 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 	}
 	// a flow will report every minute and StartTime will be reset, so the value could not be overflow
 	taggedFlow.TimeBitmap |= getBitmap(packetTimestamp)
+	flowExtra.isFlowAction = meta.PolicyData.ActionFlags&FLOW_ACTION != 0
 }
 
 func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireInterval, reportTolerance time.Duration) {
