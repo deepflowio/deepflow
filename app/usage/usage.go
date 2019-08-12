@@ -174,7 +174,7 @@ func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket
 				codes = append(codes, POLICY_NODE_PORT_CODES...)
 			}
 			for _, code := range codes {
-				if IsDupTraffic(metaPacket.InPort, l3EpcIDs[thisEnd], isL2End[thisEnd], isL3End[thisEnd], code) {
+				if IsDupTraffic(metaPacket.InPort, isL2End[thisEnd], isL3End[thisEnd], code) {
 					continue
 				}
 				if IsWrongEndPointWithACL(thisEnd, policyDirections, code) {
@@ -192,7 +192,7 @@ func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket
 				codes = append(codes, POLICY_EDGE_PORT_CODES...)
 			}
 			for _, code := range codes {
-				if IsDupTraffic(metaPacket.InPort, l3EpcIDs[otherEnd], isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧tag用otherEnd判断
+				if IsDupTraffic(metaPacket.InPort, isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧tag用otherEnd判断
 					continue
 				}
 				if IsWrongEndPointWithACL(thisEnd, policyDirections, code) {

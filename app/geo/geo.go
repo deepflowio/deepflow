@@ -41,10 +41,8 @@ func init() {
 // 注意：此应用中请不要加入ServerPort或XXPath的Tag组合
 
 var POLICY_CHN_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x00) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.ISPCode | outputtype.TAPType,
-	outputtype.IndexToCode(0x01) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.Region | outputtype.TAPType,
-	outputtype.IndexToCode(0x02) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IP | outputtype.ISPCode | outputtype.TAPType,
-	outputtype.IndexToCode(0x03) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IP | outputtype.Region | outputtype.TAPType,
+	outputtype.IndexToCode(0x00) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IP | outputtype.ISPCode | outputtype.TAPType,
+	outputtype.IndexToCode(0x01) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IP | outputtype.Region | outputtype.TAPType,
 }
 
 var POLICY_NON_CHN_CODES = []outputtype.Code{ // 注意：就是POLICY_CHN_CODES中包含Country的部分
@@ -52,8 +50,8 @@ var POLICY_NON_CHN_CODES = []outputtype.Code{ // 注意：就是POLICY_CHN_CODES
 }
 
 var POLICY_CHN_EDGE_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x04) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IPPath | outputtype.ISPCode | outputtype.TAPType,
-	outputtype.IndexToCode(0x05) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IPPath | outputtype.Region | outputtype.TAPType,
+	outputtype.IndexToCode(0x02) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IPPath | outputtype.ISPCode | outputtype.TAPType,
+	outputtype.IndexToCode(0x03) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IPPath | outputtype.Region | outputtype.TAPType,
 }
 
 var POLICY_NON_CHN_EDGE_CODES = []outputtype.Code{ // 注意：就是POLICY_CHN_EDGE_CODES中包含Country的部分
@@ -124,8 +122,6 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 		}
 	}
 
-	docMap := make(map[string]bool)
-
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
 		otherEnd := GetOppositeEndpoint(thisEnd)
 
@@ -161,24 +157,15 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 					codes = POLICY_NON_CHN_CODES[:]
 				}
 				for _, code := range codes {
-					if IsDupTraffic(flow.InPort, l3EpcIDs[thisEnd], isL2End[thisEnd], isL3End[thisEnd], code) {
+					if IsDupTraffic(flow.InPort, isL2End[thisEnd], isL3End[thisEnd], code) {
 						continue
 					}
 					if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
 						continue
 					}
-					tag := &outputtype.Tag{Field: field, Code: code}
-					if code.PossibleDuplicate() {
-						id := tag.GetID(p.encoder)
-						if _, exists := docMap[id]; exists {
-							continue
-						}
-						docMap[id] = true
-					}
 					doc := p.docs.Get().(*app.Document)
 					doc.Timestamp = docTimestamp
 					field.FillTag(code, doc.Tag.(*outputtype.Tag))
-					doc.Tag.SetID(tag.GetID(p.encoder))
 					doc.Meter = meter
 				}
 			}
@@ -191,24 +178,15 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 					codes = POLICY_NON_CHN_EDGE_CODES[:]
 				}
 				for _, code := range codes {
-					if IsDupTraffic(flow.InPort, l3EpcIDs[otherEnd], isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧tag
+					if IsDupTraffic(flow.InPort, isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧tag
 						continue
 					}
 					if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) { // 双侧tag
 						continue
 					}
-					tag := &outputtype.Tag{Field: field, Code: code}
-					if code.PossibleDuplicate() {
-						id := tag.GetID(p.encoder)
-						if _, exists := docMap[id]; exists {
-							continue
-						}
-						docMap[id] = true
-					}
 					doc := p.docs.Get().(*app.Document)
 					doc.Timestamp = docTimestamp
 					field.FillTag(code, doc.Tag.(*outputtype.Tag))
-					doc.Tag.SetID(tag.GetID(p.encoder))
 					doc.Meter = meter
 				}
 			}

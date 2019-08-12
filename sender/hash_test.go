@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
-	"gitlab.x.lan/yunshan/droplet/app/consolelog"
 	"gitlab.x.lan/yunshan/droplet/app/flow"
 	"gitlab.x.lan/yunshan/droplet/app/flowtype"
 	"gitlab.x.lan/yunshan/droplet/app/fps"
@@ -15,8 +14,6 @@ import (
 )
 
 var FLOW_APP_CODES = [][]zerodoc.Code{
-	consolelog.CODES,
-
 	flow.NODE_CODES,
 	flow.NODE_PORT_CODES,
 	flow.EDGE_CODES,
