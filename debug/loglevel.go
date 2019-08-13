@@ -69,7 +69,8 @@ func (l *LogLevelControl) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, op
 				log.Warningf("set logLevel(%s) failed: %s", logLevel, err)
 				SendToClient(conn, remote, 1, nil)
 			} else {
-				SendToClient(conn, remote, 0, arg)
+				enc, _ := encodeLogLevel(logLevel)
+				SendToClient(conn, remote, 0, enc)
 			}
 		}
 	}
