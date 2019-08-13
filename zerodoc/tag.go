@@ -862,6 +862,12 @@ func (t *Tag) IsMatchPublishPolicy(p *PublishPolicy) bool {
 	if p.Code&FilterL3DeviceType != 0 && t.L3DeviceType != p.L3DeviceType {
 		return false
 	}
+	if p.Code&FilterL3EpcID0 != 0 && t.L3EpcID != p.L3EpcID0 {
+		return false
+	}
+	if p.Code&FilterL3EpcID1 != 0 && t.L3EpcID1 != p.L3EpcID1 {
+		return false
+	}
 
 	return true
 }
