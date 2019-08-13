@@ -579,8 +579,12 @@ func (w *InfluxdbWriter) Close() {
 	w.exit = true
 	w.wg.Wait()
 
-	w.DBCreateCtlReplica.HttpClient.Close()
-	w.DBCreateCtlPrimary.HttpClient.Close()
+	if w.DBCreateCtlReplica.HttpClient != nil {
+		w.DBCreateCtlReplica.HttpClient.Close()
+	}
+	if w.DBCreateCtlPrimary.HttpClient != nil {
+		w.DBCreateCtlPrimary.HttpClient.Close()
+	}
 
 	log.Info("Stopped influx writer")
 }
