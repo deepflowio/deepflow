@@ -42,6 +42,38 @@ def read_config():
     HOSTNAME = socket.gethostname()
 
 
+@app.get(API_PREFIX + '/pcaps/aclgids/')
+def get_folders():
+    u"""
+按IP查询acl_gid下的pcap文件
+
+HTTP request args:
+
+  None
+
+HTTP request body:
+
+  None
+
+HTTP response body:
+
+  .. code-block:: javascript
+
+    {
+      "DATA": [1, 3, 45, 234],
+      "OPT_STATUS": "SUCCESS"
+    }
+    """
+    return {
+        'DATA': [
+            int(it)
+            for it in os.listdir(PCAP_DIR)
+            if it.isdigit() and os.path.isdir(os.path.join(PCAP_DIR, it))
+        ],
+        'OPT_STATUS': 'SUCCESS',
+    }
+
+
 @app.get(API_PREFIX + '/pcaps/<acl_gid:int>/')
 @app.get(API_PREFIX + '/pcaps/<acl_gid:int>/<ip:re:%s>/' % IP_REGEX)
 @app.get(API_PREFIX + '/pcaps/<acl_gid:int>/<ip:re:%s>/' % IPV6_REGEX)
