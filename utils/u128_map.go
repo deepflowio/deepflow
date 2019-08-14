@@ -32,8 +32,8 @@ func (n *mapNode) equal(v *mapNode) bool {
 type U128ToU32Map struct {
 	buffer []*mapNode // 使用数组链表实现的冲突链，存储节点
 	next   []int32    // 使用数组链表实现的冲突链，next[i] 表示 buffer[i] 所在链的下一个节点的 buffer 数组下标
-	head   []int32    // 哈希表，head[i] 表示哈希值为 i 的冲突链的第一个节点为 buffer[head[i]]
 	heads  []int32    // 顺次记录 buffer 中各个元素对应的哈希值在 head 中的下标，为了避免 Clear 函数遍历整个 head 数组
+	head   []int32    // 哈希表，head[i] 表示哈希值为 i 的冲突链的第一个节点为 buffer[head[i]]
 	size   int        // 数组链表中存储的节点总数
 	width  int        // 最大冲突链长度
 
@@ -52,16 +52,14 @@ func NewU128ToU32Map(capacity uint32) *U128ToU32Map {
 	capacity = i
 
 	m := &U128ToU32Map{
-		buffer: make([]*mapNode, capacity),
-		next:   make([]int32, capacity),
+		buffer: make([]*mapNode, 0, 256),
+		next:   make([]int32, 0, 256),
+		heads:  make([]int32, 0, 256),
 		head:   make([]int32, capacity),
-		heads:  make([]int32, capacity),
 	}
 
 	for i := uint32(0); i < capacity; i++ {
-		m.next[i] = -1
 		m.head[i] = -1
-		m.heads[i] = -1
 	}
 	return m
 }
@@ -99,10 +97,11 @@ func (m *U128ToU32Map) AddOrGet(key0, key1 uint64, value uint32, overwrite bool)
 		next = m.next[next]
 	}
 
-	m.buffer[m.size] = acquireMapNode()
+	m.buffer = append(m.buffer, acquireMapNode())
 	*m.buffer[m.size] = *node
-	m.next[m.size] = head
-	m.heads[m.size] = int32(slot)
+	m.next = append(m.next, head)
+	m.heads = append(m.heads, int32(slot))
+
 	m.head[slot] = int32(m.size)
 	m.size++
 	if m.width < width+1 {
@@ -134,10 +133,13 @@ func (m *U128ToU32Map) Clear() {
 	for i := 0; i < m.size; i++ {
 		releaseMapNode(m.buffer[i])
 		m.buffer[i] = nil
-		m.next[i] = -1
 		m.head[m.heads[i]] = -1
-		m.heads[i] = -1
 	}
+
+	m.buffer = m.buffer[:0]
+	m.next = m.next[:0]
+	m.heads = m.heads[:0]
+
 	m.size = 0
 	m.width = 0
 }
