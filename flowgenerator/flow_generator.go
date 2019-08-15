@@ -359,9 +359,13 @@ func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireInterval, reportTole
 	} else {
 		taggedFlow.EndTime = now
 	}
-	// FIXME bitmap should be recalculated, 5.5.2
-	pivotalTime := taggedFlow.EndTime - taggedFlow.EndTime%forceReportInterval
-	if taggedFlow.StartTime < pivotalTime && taggedFlow.EndTime > pivotalTime {
+
+	// StartTime和EndTime所在的forceReportInterval中间还隔了一个完整的forceReportInterval
+	// pivotalTime=StartTime的下一个forceReportInterval
+	pivotalTime := taggedFlow.StartTime/forceReportInterval*forceReportInterval + forceReportInterval
+	if pivotalTime+forceReportInterval <= taggedFlow.EndTime {
+		// StartTime矫正至下一个forceReportInterval的开始
+		// FIXME bitmap should be recalculated, 5.5.2
 		taggedFlow.StartTime = pivotalTime
 		if !f.reported {
 			// FIXME maybe we should choose only one ArrTime
@@ -369,6 +373,7 @@ func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireInterval, reportTole
 			taggedFlow.FlowMetricsPeerDst.ArrTime0 = pivotalTime
 		}
 	}
+
 	taggedFlow.Duration = f.recentTime - f.minArrTime
 	f.reported = true
 }
