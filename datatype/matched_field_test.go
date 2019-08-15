@@ -1,6 +1,7 @@
 package datatype
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -98,5 +99,16 @@ func TestTableIndex(t *testing.T) {
 		t.Errorf("TestTableIndex Error. %s\n", matched)
 		t.Error("Expect index: 0x7.")
 		t.Errorf("Actual index: %d.\n", index)
+	}
+}
+
+func TestMatchedFieldGetAllTableIndex(t *testing.T) {
+	// 若matched为0101， vector为0111, mask为1001，返回{001,011,101,111}
+	matched := newMatchedField(1, 2, 3, 10, 20, 30, 40, 5, 60)
+	vector := newMatchedField(0, 0, 0, 0, 0, 0, 0, 7, 0)
+	mask := newMatchedField(0, 0, 0, 0, 0, 0, 0, 9, 0)
+	indexs := matched.GetAllTableIndex(&vector, &mask, 144, 160, []int{144, 145, 146})
+	if !reflect.DeepEqual([]uint16{1, 3, 5, 7}, indexs) {
+		t.Errorf("TestMatchedFieldGetAllTableIndex Error. %+v\n", indexs)
 	}
 }
