@@ -114,19 +114,23 @@ var (
 	ipGroup7Ip2    = NewIPFromString("192.168.20.112").Int()
 	ipGroup7Ip3    = NewIPFromString("192.168.10.123").Int()
 	ipGroup7Mac1   = NewMACAddrFromString("77:77:77:77:77:71").Int()
-	testIp1        = NewIPFromString("10.30.1.21").Int()
-	testMac1       = NewMACAddrFromString("ab:cd:11:11:11:11").Int()
-	testIp2        = NewIPFromString("10.20.30.0").Int()
-	testMac2       = NewMACAddrFromString("ab:cd:22:11:11:11").Int()
-	testIp3        = NewIPFromString("10.10.0.0").Int()
-	testMac3       = NewMACAddrFromString("ab:cd:33:11:11:11").Int()
-	testIp4        = NewIPFromString("20.0.0.0").Int()
-	testMac4       = NewMACAddrFromString("ab:cd:44:11:11:11").Int()
-	queryIp        = NewIPFromString("20.30.1.100").Int()
-
 	ipGroup8IpNet1 = "1.1.1.0/24"
 	ipGroup8IpNet2 = "1.1.2.0/24"
 	ipGroup9IpNet  = "0.0.0.0/32"
+	ipGroup10IpNet = "2002:abcd::123/128"
+	ipGroup10Ip1   = net.ParseIP("2002:abcd::123")
+	ipGroup11IpNet = "2002:abcd::124/128"
+	ipGroup11Ip1   = net.ParseIP("2002:abcd::124")
+
+	testIp1  = NewIPFromString("10.30.1.21").Int()
+	testMac1 = NewMACAddrFromString("ab:cd:11:11:11:11").Int()
+	testIp2  = NewIPFromString("10.20.30.0").Int()
+	testMac2 = NewMACAddrFromString("ab:cd:22:11:11:11").Int()
+	testIp3  = NewIPFromString("10.10.0.0").Int()
+	testMac3 = NewMACAddrFromString("ab:cd:33:11:11:11").Int()
+	testIp4  = NewIPFromString("20.0.0.0").Int()
+	testMac4 = NewMACAddrFromString("ab:cd:44:11:11:11").Int()
+	queryIp  = NewIPFromString("20.30.1.100").Int()
 )
 
 type EndInfo struct {
@@ -463,7 +467,9 @@ func generatePolicyTable(ids ...TableID) *PolicyTable {
 	ipGroup5 := generateIpGroup(group[16], groupEpc[1], group1Ip1Net, group2Ip1Net)
 	ipGroup5.Type = 3
 	ipGroup6 := generateIpGroup(group[17], groupEpc[0], ipGroup9IpNet)
-	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3, ipGroup4, ipGroup5, ipGroup6)
+	ipGroup10 := generateIpGroup(group[10], groupEpc[0], ipGroup10IpNet)
+	ipGroup11 := generateIpGroup(group[11], groupEpc[0], ipGroup11IpNet)
+	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3, ipGroup4, ipGroup5, ipGroup6, ipGroup10, ipGroup11)
 
 	policy.UpdateIpGroupData(ipGroups)
 
@@ -2144,6 +2150,56 @@ func TestPolicyIpv6(t *testing.T) {
 	if !CheckPolicyResult(t, basicPolicyData, policyData) || endpoints.SrcInfo.L3End != true || endpoints.DstInfo.L3End != true {
 		t.Error(endpoints)
 		t.Error("TestPolicyIpv6 Check Failed!")
+	}
+}
+
+func TestPolicyIpv6WithIpGroup(t *testing.T) {
+	acls := []*Acl{}
+	table := generatePolicyTable()
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	// ip6 -> ip6
+	acl := generatePolicyAcl(table, action, 10, group[10], group[11], IPProtocolTCP, 8000, vlanAny)
+	// ip6 -> dev
+	acl2 := generatePolicyAcl(table, action, 20, group[10], group[1], IPProtocolTCP, 8000, vlanAny)
+	// dev -> dev
+	acl3 := generatePolicyAcl(table, action, 30, group[1], group[2], IPProtocolTCP, 8000, vlanAny)
+	acls = append(acls, acl, acl2, acl3)
+	table.UpdateAcls(acls)
+	// 构建查询1-key  8:0->9:8000 tcp ip6 -> ip6
+	key := generateLookupKey6(group3Mac1, group4Mac1, vlanAny, ipGroup10Ip1, ipGroup11Ip1, IPProtocolTCP, 0, 8000)
+
+	// 获取查询first结果
+	_, policyData := table.LookupAllByKey(key)
+	// 构建预期结果
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestDdbsPolicyIpv6WithIpGroup Check Failed!")
+	}
+
+	// 构建查询1-key  8:0->9:8000 tcp ip6 -> dev
+	key = generateLookupKey6(group5Mac1, group1Mac, vlanAny, ipGroup10Ip1, ip12, IPProtocolTCP, 0, 8000)
+
+	_, policyData = table.LookupAllByKey(key)
+	// 构建预期结果
+	basicPolicyData = new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl2.Id)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestDdbsPolicyIpv6WithIpGroup Check Failed!")
+	}
+
+	// 构建查询1-key  8:0->9:8000 tcp dev -> dev
+	key = generateLookupKey6(group1Mac, group2Mac, vlanAny, ip13, ip12, IPProtocolTCP, 0, 8000)
+
+	_, policyData = table.LookupAllByKey(key)
+	// 构建预期结果
+	basicPolicyData = new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl3.Id)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestDdbsPolicyIpv6WithIpGroup Check Failed!")
 	}
 }
 
