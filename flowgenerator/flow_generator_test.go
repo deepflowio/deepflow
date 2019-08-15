@@ -399,26 +399,26 @@ func TestTimeFixAndDuration(t *testing.T) {
 	flowGenerator, metaPacketHeaderInQueue, flowOutQueue := flowGeneratorInit()
 
 	packet0 := getDefaultPacket()
-	packet0.Timestamp -= 60 * time.Second
+	packet0.Timestamp -= forceReportInterval
 	minArrTime := packet0.Timestamp
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
 
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Flags = TCP_SYN | TCP_ACK
-	packet1.Timestamp += 55 * time.Second
+	packet1.Timestamp += forceReportInterval / 2
 	reversePacket(packet1)
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet1)
 
 	packet2 := getDefaultPacket()
 	packet2.TcpData.Flags = TCP_ACK
-	packet2.Timestamp += 60 * time.Second
+	packet2.Timestamp += forceReportInterval
 	recentTime := packet2.Timestamp
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet2)
 
 	flowGenerator.Start()
 
 	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
-	pivotalTime := taggedFlow.EndTime - taggedFlow.EndTime%forceReportInterval
+	pivotalTime := packet0.Timestamp/forceReportInterval*forceReportInterval + forceReportInterval
 	if taggedFlow.StartTime != pivotalTime {
 		t.Errorf("taggedFlow.StartTime is %d, expect %d", taggedFlow.StartTime, pivotalTime)
 	}
