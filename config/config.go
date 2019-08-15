@@ -246,6 +246,7 @@ func (c *Config) Validate() error {
 	} else {
 		c.FlowGenerator.ReportTolerance *= time.Second
 	}
+	c.FlowGenerator.PortStats.Disable = true // FIXME: 目前有性能问题，屏蔽此配置
 	if c.FlowGenerator.PortStats.Disable {
 		c.FlowGenerator.PortStats.Interval = 0
 		c.FlowGenerator.PortStats.SrcEndCount = 0
