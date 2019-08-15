@@ -21,3 +21,25 @@ func TestIpSegmentSimple(t *testing.T) {
 		t.Errorf("Error ipsegment 0.0.0.0/0 ip return 0x%x\n", ips.getIp())
 	}
 }
+
+func TestIpSegmentIp6(t *testing.T) {
+	ips, _ := newIpSegment("aabb:ccdd::1/32", 10)
+	mask0, mask1 := ips.getMask6()
+	ip0, ip1 := ips.getIp6()
+	if mask0 != 0xffffffff00000000 || mask1 != 0 {
+		t.Errorf("Error ipsegment aabb:ccdd::1/32 mask return 0x%x 0x%x\n", mask0, mask1)
+	}
+	if ip0 != 0xaabbccdd00000000 || ip1 != 0 {
+		t.Errorf("Error ipsegment aabb:ccdd::1/32 ip return 0x%x 0x%x\n", ip0, ip1)
+	}
+
+	ips, _ = newIpSegment("fe80::20c:29ff:fe15:a3f/126", 20)
+	mask0, mask1 = ips.getMask6()
+	ip0, ip1 = ips.getIp6()
+	if mask0 != 0xffffffffffffffff || mask1 != 0xfffffffffffffffc {
+		t.Errorf("Error ipsegment fe80::20c:29ff:fe15:a3f/126 mask return 0x%x 0x%x\n", mask0, mask1)
+	}
+	if ip0 != 0xfe80000000000000 || ip1 != 0x020c29fffe150a3c {
+		t.Errorf("Error ipsegment fe80::20c:29ff:fe15:a3f/126 ip return 0x%x 0x%x\n", ip0, ip1)
+	}
+}

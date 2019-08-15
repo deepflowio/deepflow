@@ -1614,6 +1614,56 @@ func TestDdbsPolicyIpv6(t *testing.T) {
 	}
 }
 
+func TestDdbsPolicyIpv6WithIpGroup(t *testing.T) {
+	acls := []*Acl{}
+	table := generatePolicyTable(DDBS)
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	// ip6 -> ip6
+	acl := generatePolicyAcl(table, action, 10, group[10], group[11], IPProtocolTCP, 8000, vlanAny)
+	// ip6 -> dev
+	acl2 := generatePolicyAcl(table, action, 20, group[10], group[1], IPProtocolTCP, 8000, vlanAny)
+	// dev -> dev
+	acl3 := generatePolicyAcl(table, action, 30, group[1], group[2], IPProtocolTCP, 8000, vlanAny)
+	acls = append(acls, acl, acl2, acl3)
+	table.UpdateAcls(acls)
+	// 构建查询1-key  8:0->9:8000 tcp ip6 -> ip6
+	key := generateLookupKey6(group3Mac1, group4Mac1, vlanAny, ipGroup10Ip1, ipGroup11Ip1, IPProtocolTCP, 0, 8000)
+
+	// 获取查询first结果
+	_, policyData := table.LookupAllByKey(key)
+	// 构建预期结果
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestDdbsPolicyIpv6WithIpGroup Check Failed!")
+	}
+
+	// 构建查询1-key  8:0->9:8000 tcp ip6 -> dev
+	key = generateLookupKey6(group5Mac1, group1Mac, vlanAny, ipGroup10Ip1, ip12, IPProtocolTCP, 0, 8000)
+
+	_, policyData = table.LookupAllByKey(key)
+	// 构建预期结果
+	basicPolicyData = new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl2.Id)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestDdbsPolicyIpv6WithIpGroup Check Failed!")
+	}
+
+	// 构建查询1-key  8:0->9:8000 tcp dev -> dev
+	key = generateLookupKey6(group1Mac, group2Mac, vlanAny, ip13, ip12, IPProtocolTCP, 0, 8000)
+
+	_, policyData = table.LookupAllByKey(key)
+	// 构建预期结果
+	basicPolicyData = new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl3.Id)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestDdbsPolicyIpv6WithIpGroup Check Failed!")
+	}
+}
+
 func TestDdbsProtocol(t *testing.T) {
 	acls := []*Acl{}
 	table := generatePolicyTable(DDBS)

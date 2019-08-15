@@ -9,6 +9,12 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
+type Table6Item struct {
+	match, mask MatchedField6
+
+	policy *PolicyRawData
+}
+
 type TableItem struct {
 	match, mask MatchedField
 
@@ -36,10 +42,16 @@ type Ddbs struct {
 	AclHitMax                      uint32
 	UnmatchedPacketCount           uint64
 
-	vectorBits             []int
+	// ipv4
 	maskMinBit, maskMaxBit int
+	vectorBits             []int
 	maskVector             MatchedField              // 根据所有策略计算出的M-Vector, 用于创建查询table
 	table                  *[TABLE_SIZE][]*TableItem // 策略使用计算出的索引从这里查询策略
+	// ipv6
+	mask6MinBit, mask6MaxBit int
+	vector6Bits              []int
+	maskVector6              MatchedField6              // 根据所有策略计算出的M-Vector, 用于创建查询table
+	table6                   *[TABLE_SIZE][]*Table6Item // 策略使用计算出的索引从这里查询策略
 
 	cloudPlatformLabeler *CloudPlatformLabeler
 }
@@ -154,8 +166,40 @@ func (d *Ddbs) generateSortTable(acls []*Acl) *[math.MaxUint16][]int {
 	return &table
 }
 
-func (d *Ddbs) generateMaskVector(acls []*Acl) {
-	table := d.generateSortTable(acls)
+func (d *Ddbs) generateSortTable6(acls []*Acl) *[math.MaxUint16][]int {
+	base := 0
+	for _, acl := range acls {
+		base += len(acl.AllMatched6)
+	}
+	// 计算对应bits匹配0和1的策略差值
+	table := [math.MaxUint16][]int{}
+	for i := 0; i < MATCHED_FIELD6_BITS_LEN; i++ {
+		matched0, matched1 := 0, 0
+		for _, acl := range acls {
+			for j := 0; j < len(acl.AllMatched6); j++ {
+				if acl.AllMatched6Mask[j].IsBitZero(i) {
+					continue
+				}
+				if acl.AllMatched6[j].IsBitZero(i) {
+					matched0++
+				} else {
+					matched1++
+				}
+			}
+		}
+		index := d.getSortTableIndex(matched0, matched1, base)
+		table[index] = append(table[index], i)
+	}
+	return &table
+}
+
+func (d *Ddbs) generateMaskVector(acls []*Acl, isIpv6 bool) {
+	var table *[math.MaxUint16][]int
+	if isIpv6 {
+		table = d.generateSortTable6(acls)
+	} else {
+		table = d.generateSortTable(acls)
+	}
 	vectorSize := d.getVectorSize(len(acls))
 	vectorBits := make([]int, 0, vectorSize)
 	// 使用对应差值最小的10个bit位做为MaskVector
@@ -168,10 +212,31 @@ func (d *Ddbs) generateMaskVector(acls []*Acl) {
 		}
 	}
 	sort.Ints(vectorBits)
-	d.maskVector.SetBits(vectorBits...)
-	d.maskMinBit = vectorBits[0]
-	d.maskMaxBit = vectorBits[vectorSize-1]
-	d.vectorBits = vectorBits
+	if isIpv6 {
+		d.mask6MinBit = vectorBits[0]
+		d.mask6MaxBit = vectorBits[vectorSize-1]
+		d.maskVector6.SetBits(vectorBits...)
+		d.vector6Bits = vectorBits
+	} else {
+		d.mask6MinBit = vectorBits[0]
+		d.mask6MaxBit = vectorBits[vectorSize-1]
+		d.maskVector.SetBits(vectorBits...)
+		d.vectorBits = vectorBits
+	}
+}
+
+func (d *Ddbs) generateVectorTable6(acls []*Acl) {
+	table := &[TABLE_SIZE][]*Table6Item{}
+	for _, acl := range acls {
+		for i, match := range acl.AllMatched6 {
+			index := match.GetAllTableIndex(&d.maskVector6, &acl.AllMatched6Mask[i], d.mask6MinBit, d.mask6MaxBit, d.vector6Bits)
+			for _, index := range index {
+				table[index] = append(table[index], &Table6Item{match, acl.AllMatched6Mask[i], &acl.policy})
+			}
+		}
+	}
+	d.table6 = table
+	runtime.GC()
 }
 
 func (d *Ddbs) generateVectorTable(acls []*Acl) {
@@ -191,8 +256,12 @@ func (d *Ddbs) generateVectorTable(acls []*Acl) {
 func (d *Ddbs) generateDdbsTable(acls []*Acl) {
 	// 生成策略对应的bits
 	d.generateAclBits(acls)
-	d.generateMaskVector(acls)
+	// ipv4
+	d.generateMaskVector(acls, false)
 	d.generateVectorTable(acls)
+	// ipv6
+	d.generateMaskVector(acls, true)
+	d.generateVectorTable6(acls)
 }
 
 func (d *Ddbs) addFastPath(endpointData *EndpointData, packet *LookupKey, policyForward, policyBackward, vlanPolicy *PolicyData) (*EndpointStore, *EndpointData) {
@@ -254,6 +323,26 @@ func (d *Ddbs) getPolicyFromTable(key *MatchedField, direction DirectionType, po
 	return portPolicy, vlanPolicy
 }
 
+func (d *Ddbs) getPolicyFromTable6(key *MatchedField6, direction DirectionType, portPolicy *PolicyData, vlanPolicy *PolicyData) (*PolicyData, *PolicyData) {
+	index := key.GetTableIndex(&d.maskVector6, d.mask6MinBit, d.mask6MaxBit)
+	for _, item := range d.table6[index] {
+		if result := key.And(&item.mask); result.Equal(&item.match) {
+			if portPolicy == INVALID_POLICY_DATA {
+				portPolicy = new(PolicyData)
+			}
+			policy := item.policy
+			portPolicy.Merge(policy.AclActions, policy.NpbActions, policy.ACLID, direction)
+			if item.match.Get(MATCHED_VLAN) > 0 {
+				if vlanPolicy == INVALID_POLICY_DATA {
+					vlanPolicy = new(PolicyData)
+				}
+				vlanPolicy.Merge(policy.AclActions, policy.NpbActions, policy.ACLID, direction)
+			}
+		}
+	}
+	return portPolicy, vlanPolicy
+}
+
 func (d *Ddbs) initGroupIds(endpointData *EndpointData, packet *LookupKey) {
 	packet.SrcAllGroupIds = make([]uint16, 0, len(endpointData.SrcInfo.GroupIds))
 	packet.DstAllGroupIds = make([]uint16, 0, len(endpointData.DstInfo.GroupIds))
@@ -273,11 +362,19 @@ func (d *Ddbs) GetPolicyByFirstPath(endpointData *EndpointData, packet *LookupKe
 
 	vlanPolicy := INVALID_POLICY_DATA
 	keys := [...]*MatchedField{FORWARD: &packet.ForwardMatched, BACKWARD: &packet.BackwardMatched}
+	key6s := [...]*MatchedField6{FORWARD: &packet.ForwardMatched6, BACKWARD: &packet.BackwardMatched6}
 	policys := [...]*PolicyData{FORWARD: INVALID_POLICY_DATA, BACKWARD: INVALID_POLICY_DATA}
 
-	for _, direction := range []DirectionType{FORWARD, BACKWARD} {
-		key := keys[direction]
-		policys[direction], vlanPolicy = d.getPolicyFromTable(key, direction, policys[direction], vlanPolicy)
+	if len(packet.Src6Ip) == 16 {
+		for _, direction := range []DirectionType{FORWARD, BACKWARD} {
+			key := key6s[direction]
+			policys[direction], vlanPolicy = d.getPolicyFromTable6(key, direction, policys[direction], vlanPolicy)
+		}
+	} else {
+		for _, direction := range []DirectionType{FORWARD, BACKWARD} {
+			key := keys[direction]
+			policys[direction], vlanPolicy = d.getPolicyFromTable(key, direction, policys[direction], vlanPolicy)
+		}
 	}
 
 	endpointStore, packetEndpointData := d.addFastPath(endpointData, packet, policys[FORWARD], policys[BACKWARD], vlanPolicy)

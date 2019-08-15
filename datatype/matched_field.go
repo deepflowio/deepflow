@@ -5,7 +5,12 @@ import (
 )
 
 const (
-	MATCHED_FIELD_BITS_LEN = 219 // 2(ethType) + 5(TapType) + 12(Vlan) + 8(Proto) + 16(Port)*2 + 64(MAC+IP)*2
+	NUM_64_OFFSET = 6
+	NUM_64_MASK   = 0x3f
+)
+
+const (
+	MATCHED_FIELD_BITS_LEN = 217 // 5(TapType) + 12(Vlan) + 8(Proto) + 16(L3EPC)*2 + 16(Port)*2 + 64(MAC+IP)*2
 	MATCHED_FIELD_LEN      = 4
 )
 
@@ -34,7 +39,6 @@ const (
 	MATCHED_PROTO
 	MATCHED_VLAN
 	MATCHED_TAP_TYPE
-	MATCHED_ETH_TYPE
 )
 
 var fieldOffset = [...]uint64{
@@ -50,7 +54,6 @@ var fieldOffset = [...]uint64{
 	MATCHED_PROTO:    192,
 	MATCHED_VLAN:     200,
 	MATCHED_TAP_TYPE: 212,
-	MATCHED_ETH_TYPE: 217,
 }
 
 var fieldMask = [...]uint64{
@@ -67,12 +70,15 @@ var fieldMask = [...]uint64{
 	MATCHED_PROTO:    0xff,
 	MATCHED_VLAN:     0xfff,
 	MATCHED_TAP_TYPE: 0x1f,
-	MATCHED_ETH_TYPE: 0x3,
 }
 
 type MatchedField struct {
 	fields [MATCHED_FIELD_LEN]uint64
 }
+
+var (
+	blankMatchedFieldForInit MatchedField = MatchedField{}
+)
 
 func (f *MatchedField) GobEncode() ([]byte, error) {
 	return []byte{}, nil
@@ -83,14 +89,14 @@ func (f *MatchedField) GobDecode(in []byte) error {
 }
 
 func (f *MatchedField) Get(flag MatchFlags) uint32 {
-	index := fieldOffset[flag] >> 6
-	offset := fieldOffset[flag] & 0x3f
+	index := fieldOffset[flag] >> NUM_64_OFFSET // fieldOffset[flag] / 64
+	offset := fieldOffset[flag] & NUM_64_MASK   // fieldOffset[flag] % 64
 	return uint32((f.fields[index] >> offset) & fieldMask[flag])
 }
 
 func (f *MatchedField) Set(flag MatchFlags, value uint32) {
-	index := fieldOffset[flag] >> 6
-	offset := fieldOffset[flag] & 0x3f
+	index := fieldOffset[flag] >> NUM_64_OFFSET // fieldOffset[flag] / 64
+	offset := fieldOffset[flag] & NUM_64_MASK   // fieldOffset[flag] % 64
 	f.fields[index] &= ^(fieldMask[flag] << offset)
 	f.fields[index] |= (uint64(value) << offset)
 }
@@ -103,28 +109,31 @@ func (f *MatchedField) SetMask(flag MatchFlags, value uint32) {
 }
 
 func (f *MatchedField) SetBits(whichs ...int) {
-	f.fields[0] = 0
-	f.fields[1] = 0
-	f.fields[2] = 0
-	f.fields[3] = 0
-
+	// MATCHED_FIELD_LEN是4, 只清理了4个
+	*f = blankMatchedFieldForInit
 	for _, which := range whichs {
-		index := which >> 6
-		offset := uint(which & 0x3f)
+		index := which >> NUM_64_OFFSET     // which / 64
+		offset := uint(which & NUM_64_MASK) // which % 64
 		f.fields[index] |= (1 << offset)
 	}
 }
 
 func (f *MatchedField) GetAllTableIndex(maskVector, mask *MatchedField, min, max int, vectorBits []int) []uint16 {
+	// 若f为0101， maskVector为0111, mask为1001，返回{001,011,101,111}
 	index := f.GetTableIndex(maskVector, min, max)
-	indexOffset := make([]int, 0, 4)
+	indexOffset := make([]int, 0, 4) // indexOffset存储vector对应当前match field中为全采集的位，测试发现大于4的情况很少
 	for i, offset := range vectorBits {
 		// 掩码对应的位为0，表示全采集
 		if mask.IsBitZero(offset) {
 			indexOffset = append(indexOffset, i)
 		}
 	}
-	base := make([]uint16, 0, 16)
+	// index 101 -> 001，将全采集的位至为0
+	for _, offset := range indexOffset {
+		index &= ^(1 << uint16(offset))
+	}
+
+	base := make([]uint16, 0, 16) // 根据indexOffset的大小，2^4为16
 	base = append(base, index)
 	for _, offset := range indexOffset {
 		create := make([]uint16, len(base))
@@ -180,9 +189,9 @@ func (f *MatchedField) And(n *MatchedField) MatchedField {
 }
 
 func (f MatchedField) String() string {
-	return fmt.Sprintf("%x:%x:%d -> %x:%x:%d epc: %d -> %d vlan: %d proto: %d tap: %d ethType: %d",
+	return fmt.Sprintf("%x:%x:%d -> %x:%x:%d epc: %d -> %d vlan: %d proto: %d tap: %d",
 		f.Get(MATCHED_SRC_MAC), f.Get(MATCHED_SRC_IP), f.Get(MATCHED_SRC_PORT),
 		f.Get(MATCHED_DST_MAC), f.Get(MATCHED_DST_IP), f.Get(MATCHED_DST_PORT),
 		f.Get(MATCHED_SRC_EPC), f.Get(MATCHED_DST_EPC),
-		f.Get(MATCHED_VLAN), f.Get(MATCHED_PROTO), f.Get(MATCHED_TAP_TYPE), f.Get(MATCHED_ETH_TYPE))
+		f.Get(MATCHED_VLAN), f.Get(MATCHED_PROTO), f.Get(MATCHED_TAP_TYPE))
 }

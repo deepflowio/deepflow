@@ -24,6 +24,8 @@ type Acl struct {
 	NpbActions        []NpbAction
 	AllMatched        []MatchedField
 	AllMatchedMask    []MatchedField // MatchedMask对应的位为0，表示对应Matched的位为*，0或1都匹配该策略
+	AllMatched6       []MatchedField6
+	AllMatched6Mask   []MatchedField6 // MatchedMask对应的位为0，表示对应Matched的位为*，0或1都匹配该策略
 	policy            PolicyRawData
 }
 
@@ -62,7 +64,7 @@ func (a *Acl) getPortRange(rawPorts []uint16) []PortRange {
 	return ranges
 }
 
-func (a *Acl) generateMatchedField(srcMac, dstMac uint32, srcIps, dstIps ipSegment, ethType int) {
+func (a *Acl) generatePortSegment() ([]portSegment, []portSegment) {
 	srcSegment := make([]portSegment, 0, 2)
 	dstSegment := make([]portSegment, 0, 2)
 	for _, ports := range a.getPortRange(a.SrcPorts) {
@@ -77,11 +79,13 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint32, srcIps, dstIps ipSegme
 	if len(dstSegment) == 0 {
 		dstSegment = append(dstSegment, emptyPortSegment)
 	}
+	return srcSegment, dstSegment
+}
 
-	for _, srcPort := range srcSegment {
-		for _, dstPort := range dstSegment {
+func (a *Acl) generateMatchedField(srcMac, dstMac uint32, srcIps, dstIps ipSegment, srcPorts, dstPorts []portSegment) {
+	for _, srcPort := range srcPorts {
+		for _, dstPort := range dstPorts {
 			match := MatchedField{}
-			match.Set(MATCHED_ETH_TYPE, uint32(ethType))
 			match.Set(MATCHED_TAP_TYPE, uint32(a.Type))
 			match.Set(MATCHED_PROTO, uint32(a.Proto))
 			match.Set(MATCHED_VLAN, uint32(a.Vlan))
@@ -96,7 +100,6 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint32, srcIps, dstIps ipSegme
 			a.AllMatched = append(a.AllMatched, match)
 
 			mask := MatchedField{}
-			mask.SetMask(MATCHED_ETH_TYPE, uint32(ethType))
 			mask.SetMask(MATCHED_TAP_TYPE, uint32(a.Type))
 			mask.SetMask(MATCHED_PROTO, uint32(a.Proto))
 			mask.SetMask(MATCHED_VLAN, uint32(a.Vlan))
@@ -113,21 +116,84 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint32, srcIps, dstIps ipSegme
 	}
 }
 
+func (a *Acl) generateMatchedField6(srcMac, dstMac uint32, srcIps, dstIps ipSegment, srcPorts, dstPorts []portSegment) {
+	for _, srcPort := range srcPorts {
+		for _, dstPort := range dstPorts {
+			match := MatchedField6{}
+			match.Set(MATCHED6_TAP_TYPE, uint64(a.Type))
+			match.Set(MATCHED6_PROTO, uint64(a.Proto))
+			match.Set(MATCHED6_VLAN, uint64(a.Vlan))
+			match.Set(MATCHED6_SRC_MAC, uint64(srcMac))
+			match.Set(MATCHED6_DST_MAC, uint64(dstMac))
+			ip0, ip1 := srcIps.getIp6()
+			match.Set(MATCHED6_SRC_IP0, ip0)
+			match.Set(MATCHED6_SRC_IP1, ip1)
+			match.Set(MATCHED6_SRC_EPC, uint64(srcIps.getEpcId()))
+			ip0, ip1 = dstIps.getIp6()
+			match.Set(MATCHED6_DST_IP0, ip0)
+			match.Set(MATCHED6_DST_IP1, ip1)
+			match.Set(MATCHED6_DST_EPC, uint64(dstIps.getEpcId()))
+			match.Set(MATCHED6_SRC_PORT, uint64(srcPort.port))
+			match.Set(MATCHED6_DST_PORT, uint64(dstPort.port))
+			a.AllMatched6 = append(a.AllMatched6, match)
+
+			mask := MatchedField6{}
+			mask.SetMask(MATCHED6_TAP_TYPE, uint64(a.Type))
+			mask.SetMask(MATCHED6_PROTO, uint64(a.Proto))
+			mask.SetMask(MATCHED6_VLAN, uint64(a.Vlan))
+			mask.SetMask(MATCHED6_SRC_MAC, uint64(srcMac))
+			mask.SetMask(MATCHED6_DST_MAC, uint64(dstMac))
+			mask0, mask1 := srcIps.getMask6()
+			mask.Set(MATCHED6_SRC_IP0, mask0)
+			mask.Set(MATCHED6_SRC_IP1, mask1)
+			mask.SetMask(MATCHED6_SRC_EPC, uint64(srcIps.getEpcId()))
+			mask0, mask1 = dstIps.getMask6()
+			mask.Set(MATCHED6_DST_IP0, mask0)
+			mask.Set(MATCHED6_DST_IP1, mask1)
+			mask.SetMask(MATCHED6_DST_EPC, uint64(dstIps.getEpcId()))
+			mask.Set(MATCHED6_SRC_PORT, uint64(srcPort.mask))
+			mask.Set(MATCHED6_DST_PORT, uint64(dstPort.mask))
+			a.AllMatched6Mask = append(a.AllMatched6Mask, mask)
+		}
+	}
+}
+
 func (a *Acl) generateMatched(srcMac, dstMac []uint32, srcIps, dstIps []ipSegment) {
+	srcPorts, dstPorts := a.generatePortSegment()
 	for _, srcMac := range srcMac {
 		for _, dstMac := range dstMac {
-			a.generateMatchedField(srcMac, dstMac, emptyIpSegment, emptyIpSegment, ETH_TYPE_ALL)
+			// mac + mac分别在ipv4和ipv6表中，避免IPv6需要查询两次
+			a.generateMatchedField(srcMac, dstMac, emptyIpSegment, emptyIpSegment, srcPorts, dstPorts)
+			a.generateMatchedField6(srcMac, dstMac, emptyIpSegment, emptyIpSegment, srcPorts, dstPorts)
 		}
 		for _, dstIp := range dstIps {
-			a.generateMatchedField(srcMac, 0, emptyIpSegment, dstIp, ETH_TYPE_IPV4)
+			if dstIp.isIpv6() {
+				a.generateMatchedField6(srcMac, 0, emptyIpSegment, dstIp, srcPorts, dstPorts)
+			} else {
+				a.generateMatchedField(srcMac, 0, emptyIpSegment, dstIp, srcPorts, dstPorts)
+			}
 		}
 	}
 	for _, srcIp := range srcIps {
 		for _, dstMac := range dstMac {
-			a.generateMatchedField(0, dstMac, srcIp, emptyIpSegment, ETH_TYPE_IPV4)
+			if srcIp.isIpv6() {
+				a.generateMatchedField6(0, dstMac, srcIp, emptyIpSegment, srcPorts, dstPorts)
+			} else {
+				a.generateMatchedField(0, dstMac, srcIp, emptyIpSegment, srcPorts, dstPorts)
+			}
 		}
 		for _, dstIp := range dstIps {
-			a.generateMatchedField(0, 0, srcIp, dstIp, ETH_TYPE_IPV4)
+			if srcIp.isIpv6() != dstIp.isIpv6() {
+				continue
+			}
+
+			if srcIp.isIpv6() {
+				// ipv6 + ipv6
+				a.generateMatchedField6(0, 0, srcIp, dstIp, srcPorts, dstPorts)
+			} else {
+				// ipv4 + ipv4
+				a.generateMatchedField(0, 0, srcIp, dstIp, srcPorts, dstPorts)
+			}
 		}
 	}
 }

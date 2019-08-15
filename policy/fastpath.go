@@ -98,18 +98,30 @@ func (l *FastPath) getFastPortPolicy(maps *VlanAndPortMap, srcMacSuffix, dstMacS
 	return nil, nil
 }
 
+func (f *FastPath) generateMaskedIp(packet *LookupKey) (uint32, uint32, bool) {
+	if len(packet.Src6Ip) == 0 {
+		maskSrc := f.IpNetmaskMap[uint16(packet.SrcIp>>16)]
+		maskDst := f.IpNetmaskMap[uint16(packet.DstIp>>16)]
+		maskedSrcIp := packet.SrcIp & maskSrc
+		maskedDstIp := packet.DstIp & maskDst
+		notMiniMap := maskSrc > STANDARD_NETMASK || maskDst > STANDARD_NETMASK
+		return maskedSrcIp, maskedDstIp, notMiniMap
+	} else {
+		srcIpHash := GetIpHash(packet.Src6Ip)
+		dstIpHash := GetIpHash(packet.Dst6Ip)
+		return srcIpHash, dstIpHash, true
+	}
+}
+
 func (f *FastPath) getVlanAndPortMap(packet *LookupKey, direction DirectionType, create bool, mapsForward *VlanAndPortMap) *VlanAndPortMap {
-	maskSrc := f.IpNetmaskMap[uint16(packet.SrcIp>>16)]
-	maskDst := f.IpNetmaskMap[uint16(packet.DstIp>>16)]
-	maskedSrcIp := packet.SrcIp & maskSrc
-	maskedDstIp := packet.DstIp & maskDst
+	maskedSrcIp, maskedDstIp, notMiniMap := f.generateMaskedIp(packet)
 	if direction == BACKWARD {
 		if maskedSrcIp == maskedDstIp {
 			return mapsForward
 		}
 		maskedSrcIp, maskedDstIp = maskedDstIp, maskedSrcIp
 	}
-	if maskSrc > STANDARD_NETMASK || maskDst > STANDARD_NETMASK {
+	if notMiniMap {
 		key := uint64(maskedSrcIp)<<32 | uint64(maskedDstIp)
 		maps := f.FastPolicyMaps[packet.FastIndex][packet.Tap]
 		if maps == nil {
