@@ -357,22 +357,21 @@ func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType Ta
 
 func (l *CloudPlatformLabeler) ModifyDeviceInfo(endpointInfo *EndpointInfo) {
 	if endpointInfo.L2End && endpointInfo.L3End {
-		if endpointInfo.L2DeviceId == 0 {
-			endpointInfo.L2DeviceId = endpointInfo.L3DeviceId
-		}
-		if endpointInfo.L3DeviceId == 0 {
-			endpointInfo.L3DeviceId = endpointInfo.L2DeviceId
-		}
-		if endpointInfo.L2DeviceType == 0 {
-			endpointInfo.L2DeviceType = endpointInfo.L3DeviceType
-		}
-		if endpointInfo.L3DeviceType == 0 {
-			endpointInfo.L3DeviceType = endpointInfo.L2DeviceType
-		}
 		if endpointInfo.L2EpcId == 0 {
+			if endpointInfo.L2DeviceId == 0 {
+				endpointInfo.L2DeviceId = endpointInfo.L3DeviceId
+			}
+			if endpointInfo.L2DeviceType == 0 {
+				endpointInfo.L2DeviceType = endpointInfo.L3DeviceType
+			}
 			endpointInfo.L2EpcId = endpointInfo.L3EpcId
-		}
-		if endpointInfo.L3EpcId == 0 {
+		} else if endpointInfo.L3EpcId == 0 {
+			if endpointInfo.L3DeviceId == 0 {
+				endpointInfo.L3DeviceId = endpointInfo.L2DeviceId
+			}
+			if endpointInfo.L3DeviceType == 0 {
+				endpointInfo.L3DeviceType = endpointInfo.L2DeviceType
+			}
 			endpointInfo.L3EpcId = endpointInfo.L2EpcId
 		}
 	}
