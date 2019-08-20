@@ -140,7 +140,7 @@ func (a *TridentAdapter) cacheLookup(data []byte, key uint32, seq uint32, timest
 		instance.timestamp = a.decode(data, key)
 	} else {
 		// seq-instance.seq > 0xf0000000条件是为了避免u32环回来，例如0-0xffffffff应该是正常的
-		if seq <= instance.seq && seq-instance.seq > 0xf0000000 {
+		if (seq < instance.seq && seq-instance.seq > 0xf0000000) || seq == instance.seq {
 			a.counter.RxErrors += 1
 			a.stats.RxErrors += 1
 
