@@ -21,15 +21,8 @@ func TagToPB(t *Tag) *pb.Tag {
 	if t.Code&GroupID != 0 {
 		tag.GroupId = proto.Int32(int32(t.GroupID))
 	}
-	if t.Code&L2EpcID != 0 {
-		tag.L2EpcId = proto.Int32(int32(t.L2EpcID))
-	}
 	if t.Code&L3EpcID != 0 {
 		tag.L3EpcId = proto.Int32(int32(t.L3EpcID))
-	}
-	if t.Code&L2Device != 0 {
-		tag.L2DeviceId = proto.Uint32(uint32(t.L2DeviceID))
-		tag.L2DeviceType = pb.DeviceType(t.L2DeviceType).Enum()
 	}
 	if t.Code&L3Device != 0 {
 		tag.L3DeviceId = proto.Uint32(uint32(t.L3DeviceID))
@@ -47,19 +40,9 @@ func TagToPB(t *Tag) *pb.Tag {
 		tag.GroupId_0 = proto.Int32(int32(t.GroupID))
 		tag.GroupId_1 = proto.Int32(int32(t.GroupID1))
 	}
-	if t.Code&L2EpcIDPath != 0 {
-		tag.L2EpcId_0 = proto.Int32(int32(t.L2EpcID))
-		tag.L2EpcId_1 = proto.Int32(int32(t.L2EpcID1))
-	}
 	if t.Code&L3EpcIDPath != 0 {
 		tag.L3EpcId_0 = proto.Int32(int32(t.L3EpcID))
 		tag.L3EpcId_1 = proto.Int32(int32(t.L3EpcID1))
-	}
-	if t.Code&L2DevicePath != 0 {
-		tag.L2DeviceId_0 = proto.Uint32(uint32(t.L2DeviceID))
-		tag.L2DeviceType_0 = pb.DeviceType(t.L2DeviceType).Enum()
-		tag.L2DeviceId_1 = proto.Uint32(uint32(t.L2DeviceID1))
-		tag.L2DeviceType_1 = pb.DeviceType(t.L2DeviceType1).Enum()
 	}
 	if t.Code&L3DevicePath != 0 {
 		tag.L3DeviceId_0 = proto.Uint32(uint32(t.L3DeviceID))
@@ -116,15 +99,8 @@ func PBToTag(t *pb.Tag, tag *Tag) {
 	if tag.Code&GroupID != 0 {
 		tag.GroupID = int16(t.GetGroupId())
 	}
-	if tag.Code&L2EpcID != 0 {
-		tag.L2EpcID = int16(t.GetL2EpcId())
-	}
 	if tag.Code&L3EpcID != 0 {
 		tag.L3EpcID = int16(t.GetL3EpcId())
-	}
-	if tag.Code&L2Device != 0 {
-		tag.L2DeviceID = uint16(t.GetL2DeviceId())
-		tag.L2DeviceType = DeviceType(t.GetL2DeviceType())
 	}
 	if tag.Code&L3Device != 0 {
 		tag.L3DeviceID = uint16(t.GetL3DeviceId())
@@ -142,19 +118,9 @@ func PBToTag(t *pb.Tag, tag *Tag) {
 		tag.GroupID = int16(t.GetGroupId_0())
 		tag.GroupID1 = int16(t.GetGroupId_1())
 	}
-	if tag.Code&L2EpcIDPath != 0 {
-		tag.L2EpcID = int16(t.GetL2EpcId_0())
-		tag.L2EpcID1 = int16(t.GetL2EpcId_1())
-	}
 	if tag.Code&L3EpcIDPath != 0 {
 		tag.L3EpcID = int16(t.GetL3EpcId_0())
 		tag.L3EpcID1 = int16(t.GetL3EpcId_1())
-	}
-	if tag.Code&L2DevicePath != 0 {
-		tag.L2DeviceID = uint16(t.GetL2DeviceId_0())
-		tag.L2DeviceType = DeviceType(t.GetL2DeviceType_0())
-		tag.L2DeviceID1 = uint16(t.GetL2DeviceId_1())
-		tag.L2DeviceType1 = DeviceType(t.GetL2DeviceType_1())
 	}
 	if tag.Code&L3DevicePath != 0 {
 		tag.L3DeviceID = uint16(t.GetL3DeviceId_0())

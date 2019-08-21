@@ -21,21 +21,21 @@ type VTAPSimpleMeter struct {
 }
 
 func (m *VTAPSimpleMeter) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU64(m.TxBytes)
-	encoder.WriteU64(m.RxBytes)
-	encoder.WriteU64(m.Bytes)
-	encoder.WriteU64(m.TxPackets)
-	encoder.WriteU64(m.RxPackets)
-	encoder.WriteU64(m.Packets)
+	encoder.WriteVarintU64(m.TxBytes)
+	encoder.WriteVarintU64(m.RxBytes)
+	encoder.WriteVarintU64(m.Bytes)
+	encoder.WriteVarintU64(m.TxPackets)
+	encoder.WriteVarintU64(m.RxPackets)
+	encoder.WriteVarintU64(m.Packets)
 }
 
 func (m *VTAPSimpleMeter) Decode(decoder *codec.SimpleDecoder) {
-	m.TxBytes = decoder.ReadU64()
-	m.RxBytes = decoder.ReadU64()
-	m.Bytes = decoder.ReadU64()
-	m.TxPackets = decoder.ReadU64()
-	m.RxPackets = decoder.ReadU64()
-	m.Packets = decoder.ReadU64()
+	m.TxBytes = decoder.ReadVarintU64()
+	m.RxBytes = decoder.ReadVarintU64()
+	m.Bytes = decoder.ReadVarintU64()
+	m.TxPackets = decoder.ReadVarintU64()
+	m.RxPackets = decoder.ReadVarintU64()
+	m.Packets = decoder.ReadVarintU64()
 }
 
 func (m *VTAPSimpleMeter) Merge(other *VTAPSimpleMeter) {

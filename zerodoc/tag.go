@@ -20,9 +20,9 @@ const (
 	IP Code = 0x1 << iota
 	_       // 1 << 1, MAC
 	GroupID
-	L2EpcID
+	_
 	L3EpcID
-	L2Device // 1 << 5
+	_
 	L3Device
 	Host
 	RegionID
@@ -32,9 +32,9 @@ const (
 	IPPath Code = 0x10000 << iota // 1 << 16
 	_                             // 1 << 17, MACPath
 	GroupIDPath
-	L2EpcIDPath
+	_
 	L3EpcIDPath
-	L2DevicePath // 1 << 21
+	_
 	L3DevicePath
 	HostPath
 	SubnetIDPath
@@ -81,11 +81,6 @@ func (c Code) HasEdgeTagField() bool {
 	return c&0xffff0000 != 0
 }
 
-func (c Code) HasL2TagField() bool {
-	// FIXME: GroupID、GroupIDPath待定
-	return c&(L2EpcID|L2Device|L2EpcIDPath|L2DevicePath|VLANID|SubnetID) != 0
-}
-
 func (c Code) RemoveIndex() Code {
 	return c &^ CodeIndices
 }
@@ -93,7 +88,7 @@ func (c Code) RemoveIndex() Code {
 // 从不同EndPoint获取的网包字段组成Field，是否可能重复。
 // 注意，不能判断从同样的EndPoint获取的网包字段组成Field可能重复。
 func (c Code) PossibleDuplicate() bool {
-	return c&(CodeIndices|GroupID|L2EpcID|L3EpcID|Host|RegionID|GroupIDPath|L2EpcIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|TCPFlags|VTAP|TAPType|SubnetID|SubnetIDPath|RegionIDPath|ACLDirection|Country|Region|ISPCode|Scope) == c
+	return c&(CodeIndices|GroupID|L3EpcID|Host|RegionID|GroupIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|TCPFlags|VTAP|TAPType|SubnetID|SubnetIDPath|RegionIDPath|ACLDirection|Country|Region|ISPCode|Scope) == c
 }
 
 // 是否全部取自网包的对称字段（非源、目的字段）
@@ -186,24 +181,18 @@ type Field struct {
 	IP6          net.IP // FIXME: 合并IP6和IP
 	IP           uint32
 	GroupID      int16
-	L2EpcID      int16 // (8B)
-	L3EpcID      int16
-	L2DeviceID   uint16
+	L3EpcID      int16 // (8B)
 	L3DeviceID   uint16
-	L2DeviceType DeviceType
-	L3DeviceType DeviceType // (8B)
-	Host         uint32
+	L3DeviceType DeviceType
+	Host         uint32 // (+1B=8B)
 
-	IP1           uint32 // (8B)
 	IP61          net.IP // FIXME: 合并IP61和IP1
+	IP1           uint32
 	GroupID1      int16
-	L2EpcID1      int16
-	L3EpcID1      int16
-	L2DeviceID1   uint16 // (8B)
+	L3EpcID1      int16 // (8B)
 	Host1         uint32
 	L3DeviceID1   uint16
-	L2DeviceType1 DeviceType
-	L3DeviceType1 DeviceType // (8B)
+	L3DeviceType1 DeviceType // (+1B=8B)
 
 	RegionID  uint16
 	RegionID1 uint16
@@ -284,19 +273,9 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",group_id=")
 		offset += copy(b[offset:], marshalUint16WithMinusOne(t.GroupID))
 	}
-	if t.Code&L2EpcID != 0 {
-		offset += copy(b[offset:], ",l2_epc_id=")
-		offset += copy(b[offset:], marshalUint16WithMinusOne(t.L2EpcID))
-	}
 	if t.Code&L3EpcID != 0 {
 		offset += copy(b[offset:], ",l3_epc_id=")
 		offset += copy(b[offset:], marshalUint16WithMinusOne(t.L3EpcID))
-	}
-	if t.Code&L2Device != 0 {
-		offset += copy(b[offset:], ",l2_device_id=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L2DeviceID), 10))
-		offset += copy(b[offset:], ",l2_device_type=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L2DeviceType), 10))
 	}
 	if t.Code&L3Device != 0 {
 		offset += copy(b[offset:], ",l3_device_id=")
@@ -341,27 +320,11 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",group_id_1=")
 		offset += copy(b[offset:], marshalUint16WithMinusOne(t.GroupID1))
 	}
-	if t.Code&L2EpcIDPath != 0 {
-		offset += copy(b[offset:], ",l2_epc_id_0=")
-		offset += copy(b[offset:], marshalUint16WithMinusOne(t.L2EpcID))
-		offset += copy(b[offset:], ",l2_epc_id_1=")
-		offset += copy(b[offset:], marshalUint16WithMinusOne(t.L2EpcID1))
-	}
 	if t.Code&L3EpcIDPath != 0 {
 		offset += copy(b[offset:], ",l3_epc_id_0=")
 		offset += copy(b[offset:], marshalUint16WithMinusOne(t.L3EpcID))
 		offset += copy(b[offset:], ",l3_epc_id_1=")
 		offset += copy(b[offset:], marshalUint16WithMinusOne(t.L3EpcID1))
-	}
-	if t.Code&L2DevicePath != 0 {
-		offset += copy(b[offset:], ",l2_device_id_0=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L2DeviceID), 10))
-		offset += copy(b[offset:], ",l2_device_id_1=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L2DeviceID1), 10))
-		offset += copy(b[offset:], ",l2_device_type_0=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L2DeviceType), 10))
-		offset += copy(b[offset:], ",l2_device_type_1=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L2DeviceType1), 10))
 	}
 	if t.Code&L3DevicePath != 0 {
 		offset += copy(b[offset:], ",l3_device_id_0=")
@@ -503,15 +466,8 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&GroupID != 0 {
 		t.GroupID = int16(decoder.ReadU16())
 	}
-	if t.Code&L2EpcID != 0 {
-		t.L2EpcID = int16(decoder.ReadU16())
-	}
 	if t.Code&L3EpcID != 0 {
 		t.L3EpcID = int16(decoder.ReadU16())
-	}
-	if t.Code&L2Device != 0 {
-		t.L2DeviceID = decoder.ReadU16()
-		t.L2DeviceType = DeviceType(decoder.ReadU8())
 	}
 	if t.Code&L3Device != 0 {
 		t.L3DeviceID = decoder.ReadU16()
@@ -544,19 +500,9 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 		t.GroupID = int16(decoder.ReadU16())
 		t.GroupID1 = int16(decoder.ReadU16())
 	}
-	if t.Code&L2EpcIDPath != 0 {
-		t.L2EpcID = int16(decoder.ReadU16())
-		t.L2EpcID1 = int16(decoder.ReadU16())
-	}
 	if t.Code&L3EpcIDPath != 0 {
 		t.L3EpcID = int16(decoder.ReadU16())
 		t.L3EpcID1 = int16(decoder.ReadU16())
-	}
-	if t.Code&L2DevicePath != 0 {
-		t.L2DeviceID = decoder.ReadU16()
-		t.L2DeviceType = DeviceType(decoder.ReadU8())
-		t.L2DeviceID1 = decoder.ReadU16()
-		t.L2DeviceType1 = DeviceType(decoder.ReadU8())
 	}
 	if t.Code&L3DevicePath != 0 {
 		t.L3DeviceID = decoder.ReadU16()
@@ -652,15 +598,8 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint64, encoder *codec.SimpleEncode
 	if code&GroupID != 0 {
 		encoder.WriteU16(uint16(t.GroupID))
 	}
-	if code&L2EpcID != 0 {
-		encoder.WriteU16(uint16(t.L2EpcID))
-	}
 	if code&L3EpcID != 0 {
 		encoder.WriteU16(uint16(t.L3EpcID))
-	}
-	if code&L2Device != 0 {
-		encoder.WriteU16(t.L2DeviceID)
-		encoder.WriteU8(uint8(t.L2DeviceType))
 	}
 	if code&L3Device != 0 {
 		encoder.WriteU16(t.L3DeviceID)
@@ -687,19 +626,9 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint64, encoder *codec.SimpleEncode
 		encoder.WriteU16(uint16(t.GroupID))
 		encoder.WriteU16(uint16(t.GroupID1))
 	}
-	if code&L2EpcIDPath != 0 {
-		encoder.WriteU16(uint16(t.L2EpcID))
-		encoder.WriteU16(uint16(t.L2EpcID1))
-	}
 	if code&L3EpcIDPath != 0 {
 		encoder.WriteU16(uint16(t.L3EpcID))
 		encoder.WriteU16(uint16(t.L3EpcID1))
-	}
-	if code&L2DevicePath != 0 {
-		encoder.WriteU16(t.L2DeviceID)
-		encoder.WriteU8(uint8(t.L2DeviceType))
-		encoder.WriteU16(t.L2DeviceID1)
-		encoder.WriteU8(uint8(t.L2DeviceType1))
 	}
 	if code&L3DevicePath != 0 {
 		encoder.WriteU16(t.L3DeviceID)
@@ -960,16 +889,8 @@ func (t *Tag) fillValue(name, value string) (err error) {
 		}
 	case "group_id", "group_id_0":
 		field.GroupID, err = unmarshalUint16WithMinusOne(value)
-	case "l2_epc_id", "l2_epc_id_0":
-		field.L2EpcID, err = unmarshalUint16WithMinusOne(value)
 	case "l3_epc_id", "l3_epc_id_0":
 		field.L3EpcID, err = unmarshalUint16WithMinusOne(value)
-	case "l2_device_id", "l2_device_id_0":
-		i, err = strconv.ParseUint(value, 10, 16)
-		field.L2DeviceID = uint16(i)
-	case "l2_device_type", "l2_device_type_0":
-		i, err = strconv.ParseUint(value, 10, 8)
-		field.L2DeviceType = DeviceType(i)
 	case "l3_device_id", "l3_device_id_0":
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.L3DeviceID = uint16(i)
@@ -993,16 +914,8 @@ func (t *Tag) fillValue(name, value string) (err error) {
 		}
 	case "group_id_1":
 		field.GroupID1, err = unmarshalUint16WithMinusOne(value)
-	case "l2_epc_id_1":
-		field.L2EpcID1, err = unmarshalUint16WithMinusOne(value)
 	case "l3_epc_id_1":
 		field.L3EpcID1, err = unmarshalUint16WithMinusOne(value)
-	case "l2_device_id_1":
-		i, err = strconv.ParseUint(value, 10, 16)
-		field.L2DeviceID1 = uint16(i)
-	case "l2_device_type_1":
-		i, err = strconv.ParseUint(value, 10, 8)
-		field.L2DeviceType1 = DeviceType(i)
 	case "l3_device_id_1":
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.L3DeviceID1 = uint16(i)
@@ -1106,14 +1019,8 @@ var TAG_NAMES map[string]uint8 = map[string]uint8{
 	"ip_bin_0":         0,
 	"group_id":         0,
 	"group_id_0":       0,
-	"l2_epc_id":        0,
-	"l2_epc_id_0":      0,
 	"l3_epc_id":        0,
 	"l3_epc_id_0":      0,
-	"l2_device_id":     0,
-	"l2_device_id_0":   0,
-	"l2_device_type":   0,
-	"l2_device_type_0": 0,
 	"l3_device_id":     0,
 	"l3_device_id_0":   0,
 	"l3_device_type":   0,
@@ -1124,10 +1031,7 @@ var TAG_NAMES map[string]uint8 = map[string]uint8{
 	"ip_1":             0,
 	"ip_bin_1":         0,
 	"group_id_1":       0,
-	"l2_epc_id_1":      0,
 	"l3_epc_id_1":      0,
-	"l2_device_id_1":   0,
-	"l2_device_type_1": 0,
 	"l3_device_id_1":   0,
 	"l3_device_type_1": 0,
 	"host_1":           0,
