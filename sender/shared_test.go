@@ -65,20 +65,14 @@ func init() {
 	f := dt.Field{
 		IP:           binary.BigEndian.Uint32([]byte{10, 33, 2, 200}),
 		GroupID:      4,
-		L2EpcID:      2,
 		L3EpcID:      2,
-		L2DeviceID:   3,
-		L2DeviceType: dt.VGatewayDevice,
 		L3DeviceID:   5,
 		L3DeviceType: dt.VMDevice,
 		Host:         binary.BigEndian.Uint32([]byte{172, 16, 1, 153}),
 
 		IP1:           binary.BigEndian.Uint32([]byte{10, 33, 2, 202}),
 		GroupID1:      2,
-		L2EpcID1:      -1,
 		L3EpcID1:      -1,
-		L2DeviceID1:   6,
-		L2DeviceType1: dt.VMDevice,
 		L3DeviceID1:   6,
 		L3DeviceType1: dt.VMDevice,
 		Host1:         binary.BigEndian.Uint32([]byte{172, 16, 1, 154}),
@@ -97,7 +91,7 @@ func init() {
 	}
 	doc1 := app.AcquireDocument()
 	doc1.Timestamp = 0x12345678
-	doc1.Tag = f.NewTag(dt.IP | dt.L2EpcID | dt.L3EpcID)
+	doc1.Tag = f.NewTag(dt.IP | dt.L3EpcID)
 	doc1.Meter = meter.Clone()
 	TEST_DATA = append(TEST_DATA, doc1)
 	doc2 := app.AcquireDocument()
