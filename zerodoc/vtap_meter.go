@@ -18,7 +18,7 @@ const (
 	// L2
 	METRICS_BROADCAST MetricsField = 1 << iota
 	METRICS_MULTICAST
-	METRICS_UNICAST
+	_
 
 	// L3
 	METRICS_TCP_IN_EPC
@@ -48,7 +48,6 @@ type VTAPUsageMeter struct {
 	// L2
 	Broadcast Metrics
 	Multicast Metrics
-	Unicast   Metrics
 
 	// L3
 	TCPInEPC     Metrics
@@ -69,17 +68,17 @@ type VTAPUsageMeter struct {
 }
 
 func (m *Metrics) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU64(m.TxBytes)
-	encoder.WriteU64(m.RxBytes)
-	encoder.WriteU64(m.TxPackets)
-	encoder.WriteU64(m.RxPackets)
+	encoder.WriteVarintU64(m.TxBytes)
+	encoder.WriteVarintU64(m.RxBytes)
+	encoder.WriteVarintU64(m.TxPackets)
+	encoder.WriteVarintU64(m.RxPackets)
 }
 
 func (m *Metrics) Decode(decoder *codec.SimpleDecoder) {
-	m.TxBytes = decoder.ReadU64()
-	m.RxBytes = decoder.ReadU64()
-	m.TxPackets = decoder.ReadU64()
-	m.RxPackets = decoder.ReadU64()
+	m.TxBytes = decoder.ReadVarintU64()
+	m.RxBytes = decoder.ReadVarintU64()
+	m.TxPackets = decoder.ReadVarintU64()
+	m.RxPackets = decoder.ReadVarintU64()
 }
 
 func (m *Metrics) SortKey() uint64 {
@@ -127,9 +126,6 @@ func (m *VTAPUsageMeter) Encode(encoder *codec.SimpleEncoder) {
 	}
 	if m.Fields&METRICS_MULTICAST != 0 {
 		m.Multicast.Encode(encoder)
-	}
-	if m.Fields&METRICS_UNICAST != 0 {
-		m.Unicast.Encode(encoder)
 	}
 
 	if m.Fields&METRICS_TCP_IN_EPC != 0 {
@@ -182,9 +178,6 @@ func (m *VTAPUsageMeter) Decode(decoder *codec.SimpleDecoder) {
 	}
 	if m.Fields&METRICS_MULTICAST != 0 {
 		m.Multicast.Decode(decoder)
-	}
-	if m.Fields&METRICS_UNICAST != 0 {
-		m.Unicast.Decode(decoder)
 	}
 
 	if m.Fields&METRICS_TCP_IN_EPC != 0 {
@@ -250,9 +243,6 @@ func (m *VTAPUsageMeter) ConcurrentMerge(other app.Meter) {
 		}
 		if m.Fields&METRICS_MULTICAST != 0 {
 			m.Multicast.Merge(&other.Multicast)
-		}
-		if m.Fields&METRICS_UNICAST != 0 {
-			m.Unicast.Merge(&other.Unicast)
 		}
 
 		if m.Fields&METRICS_TCP_IN_EPC != 0 {
