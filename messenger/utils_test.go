@@ -20,19 +20,13 @@ func TestMarshal(t *testing.T) {
 	f := dt.Field{
 		IP:           0x0a2102c8,
 		GroupID:      4,
-		L2EpcID:      2,
 		L3EpcID:      2,
-		L2DeviceID:   3,
-		L2DeviceType: dt.VGatewayDevice,
 		L3DeviceID:   5,
 		L3DeviceType: dt.VMDevice,
 
 		IP1:           0x0a2102ca,
 		GroupID1:      2,
-		L2EpcID1:      -1,
 		L3EpcID1:      -1,
-		L2DeviceID1:   6,
-		L2DeviceType1: dt.VMDevice,
 		L3DeviceID1:   6,
 		L3DeviceType1: dt.VMDevice,
 
@@ -44,7 +38,7 @@ func TestMarshal(t *testing.T) {
 		Host:       0xac100197,
 		TAPType:    dt.ToR,
 	}
-	tag := f.NewTag(dt.IP | dt.L2EpcID | dt.L3EpcID)
+	tag := f.NewTag(dt.IP | dt.L3EpcID)
 	meter := &dt.UsageMeter{
 		SumPacketTx: 1,
 		SumPacketRx: 2,
