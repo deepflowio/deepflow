@@ -84,7 +84,7 @@ message Config {
 message Segment { // e.g. single LAN area
     optional uint32 id = 1;
     repeated string mac = 2;
-    optional string tap_mac = 3;
+    optional uint64 tap_mac = 4; //0x0123456789ab = 01:23:45:67:89:ab
 }
 
 message IpResource {
@@ -94,16 +94,14 @@ message IpResource {
 }
 
 message Interface {
-    optional string mac = 1;
     optional uint32 device_type = 2;
     optional uint32 device_id = 3;
     optional uint32 if_type = 4;
-    optional uint32 if_index = 5;
     optional uint32 epc_id = 6;
     optional string launch_server = 7;
     repeated IpResource ip_resources = 8;
-    repeated uint32 group_ids = 9;
     optional uint32 region_id = 10;
+    optional uint64 mac = 11; //0x0123456789ab = 01:23:45:67:89:ab
 }
 
 enum GroupType {
@@ -122,6 +120,10 @@ message Group {
     repeated string ip_ranges = 6;
 }
 
+message Groups {
+    repeated Group groups = 1;
+}
+
 message PeerConnection {
     optional uint32 id = 1;
     optional uint32 local_epc_id = 2;
@@ -130,7 +132,6 @@ message PeerConnection {
 
 message PlatformData {
     repeated Interface interfaces = 1;
-    repeated Group ip_groups = 2;
     repeated PeerConnection peer_connections = 3;
 }
 
@@ -156,7 +157,7 @@ enum TagTemplate {
     ACL_EDGE = 128;
     ACL_EDGE_PORT = 256;
     ACL_PORT = 512;
-    ACL_EDGE_PORT_ALL = 1024; // 白名单需统计所有端口号，无论是否活跃
+
     EDGE_PORT_ALL = 2048; // 资源用量APP专用
 }
 
@@ -182,14 +183,18 @@ message FlowAction {
 message FlowAcl {
     optional uint32 id = 1;
     optional uint32 tap_type = 2; // 3: in_port 0x3****, 0~2/4~30: in_port 0x1****
-    optional string src_group_ids = 4;
-    optional string dst_group_ids = 5;
     optional uint32 protocol = 6;
     optional string src_ports = 7;
     optional string dst_ports = 8;
     optional uint32 vlan = 9;
     repeated FlowAction actions = 10;
     repeated NpbAction npb_actions = 11;
+    repeated int32 src_group_ids = 12;
+    repeated int32 dst_group_ids = 13;
+}
+
+message FlowAcls {
+    repeated FlowAcl flow_acl = 1;
 }
 
 message PublishAcl {
@@ -210,16 +215,24 @@ message PublishAcl {
     optional uint32 protocol = 31;
 }
 
+message PublishAcls {
+    repeated PublishAcl publish_acl = 1;
+}
+
 message SyncResponse {
     optional Status status = 1;
     optional Config config = 2;
-    optional uint64 version = 3 [default = 0]; /* in addition to config field */
     optional string revision = 4; // 指定升级的目标revision
     optional string self_update_url = 5; // 指定升级的URL路径
 
+    optional uint64 version_platform_data = 6 [default = 0]; /* only platform data */
+    optional uint64 version_acls = 7 [default = 0];
+    optional uint64 version_groups = 8 [default = 0];
+
     repeated Segment local_segments = 10;
     repeated Segment remote_segments = 11;
-    optional PlatformData platform_data = 12;
-    repeated FlowAcl flow_acls = 13;
-    repeated PublishAcl publish_acls = 14;
+    optional bytes platform_data = 12;
+    optional bytes flow_acls = 13;
+    optional bytes publish_acls = 14;
+    repeated bytes groups = 15;
 }
