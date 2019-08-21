@@ -97,9 +97,12 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 	}
 
 	l3EpcIDs := [2]int32{flow.FlowMetricsPeerSrc.L3EpcID, flow.FlowMetricsPeerDst.L3EpcID}
+	isNorthSouthTraffic := IsNorthSourceTraffic(l3EpcIDs[0], l3EpcIDs[1])
 	ips := [2]uint32{flow.IPSrc, flow.IPDst}
-	isL2End := [2]bool{flow.FlowMetricsPeerSrc.IsL2End, flow.FlowMetricsPeerDst.IsL2End}
-	isL3End := [2]bool{flow.FlowMetricsPeerSrc.IsL3End, flow.FlowMetricsPeerDst.IsL3End}
+	isL2L3End := [2]bool{
+		flow.FlowMetricsPeerSrc.IsL2End && flow.FlowMetricsPeerSrc.IsL3End,
+		flow.FlowMetricsPeerDst.IsL2End && flow.FlowMetricsPeerDst.IsL3End,
+	}
 	packets := [2]uint64{flow.FlowMetricsPeerSrc.PacketCount, flow.FlowMetricsPeerDst.PacketCount}
 	retransCnt := [2]uint32{flow.RetransCountSrc(), flow.RetransCountDst()}
 	zeroWinCnt := [2]uint32{flow.ZeroWinCountSrc(), flow.ZeroWinCountDst()}
@@ -155,7 +158,7 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 
 		// node
 		for _, code := range oneSideCodes {
-			if IsDupTraffic(flow.InPort, isL2End[thisEnd], isL3End[thisEnd], code) {
+			if IsDupTraffic(flow.InPort, isL2L3End[thisEnd], isL2L3End[otherEnd], isNorthSouthTraffic, code) {
 				continue
 			}
 			if IsWrongEndPoint(thisEnd, code) {
@@ -176,7 +179,7 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 			}
 			field.ACLGID = uint16(policy.GetACLGID())
 			for _, code := range codes {
-				if IsDupTraffic(flow.InPort, isL2End[thisEnd], isL3End[thisEnd], code) {
+				if IsDupTraffic(flow.InPort, isL2L3End[thisEnd], isL2L3End[otherEnd], isNorthSouthTraffic, code) {
 					continue
 				}
 				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
@@ -197,7 +200,7 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				codes = append(codes, POLICY_EDGE_PORT_CODES...)
 			}
 			for _, code := range codes {
-				if IsDupTraffic(flow.InPort, isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧Tag
+				if IsDupTraffic(flow.InPort, isL2L3End[thisEnd], isL2L3End[otherEnd], isNorthSouthTraffic, code) {
 					continue
 				}
 				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) { // 双侧Tag

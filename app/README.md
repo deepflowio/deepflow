@@ -49,10 +49,11 @@ vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version
 | ip_bin            | 0    | IP                      | 二进制字符串格式的IP                  |
 | mac               | 1    | MAC地址                 | 字符串格式的MAC地址 `废弃`            |
 | group_id          | 2    | 资源组ID                |                                       |
-| l2_epc_id         | 3    | 二层项目ID              |                                       |
+| l2_epc_id         | 3    | 二层项目ID              | `废弃`                                |
 | l3_epc_id         | 4    | 三层项目ID              |                                       |
-| l2_device_id      | 5    | 二层设备ID              |                                       |
-| l2_device_type    | 5    | 二层设备类型            | 1: 虚拟机                             |
+| l2_device_id      | 5    | 二层设备ID              | `废弃`                                |
+| l2_device_type    | 5    | 二层设备类型            | `废弃`                                |
+|                   |      |                         | 1: 虚拟机                             |
 |                   |      |                         | 3: 第三方设备                         |
 |                   |      |                         | 5: 虚拟网关                           |
 |                   |      |                         | 6: 服务器                             |
@@ -74,14 +75,14 @@ vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version
 | mac_1             | 17   | 1端MAC                  | `废弃`                                |
 | group_id_0        | 18   |                         |                                       |
 | group_id_1        | 18   |                         |                                       |
-| l2_epc_id_0       | 19   |                         |                                       |
-| l2_epc_id_1       | 19   |                         |                                       |
+| l2_epc_id_0       | 19   |                         | `废弃`                                |
+| l2_epc_id_1       | 19   |                         | `废弃`                                |
 | l3_epc_id_0       | 20   |                         |                                       |
 | l3_epc_id_1       | 20   |                         |                                       |
-| l2_device_id_0    | 21   |                         |                                       |
-| l2_device_type_0  | 21   |                         |                                       |
-| l2_device_id_1    | 21   |                         |                                       |
-| l2_device_type_1  | 21   |                         |                                       |
+| l2_device_id_0    | 21   |                         | `废弃`                                |
+| l2_device_type_0  | 21   |                         | `废弃`                                |
+| l2_device_id_1    | 21   |                         | `废弃`                                |
+| l2_device_type_1  | 21   |                         | `废弃`                                |
 | l3_device_id_0    | 22   |                         |                                       |
 | l3_device_type_0  | 22   |                         |                                       |
 | l3_device_id_1    | 22   |                         |                                       |
@@ -107,7 +108,6 @@ vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version
 | server_port       | 36   | 服务端端口              |                                       |
 | cast_type         | 37   | 播送类型                | broadcast: 广播，目的MAC为广播MAC     |
 |                   |      |                         | multicast: 组播，目的MAC为组播MAC     |
-|                   |      |                         | unicast: 单播目的MAC，源目的至少一个为云平台MAC |
 | vtap              | 38   | 采集器控制IP            | 字符串格式的IP                        |
 | tap_type          | 39   | 流量采集点              | 1-2,4-30: 接入网络流量                |
 |                   |      |                         | 3: 虚拟网络流量                       |
@@ -262,9 +262,4 @@ vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version
 - dmac是组播
   - 记录smac对应的虚拟机A及其Region/VPC/Subnet/IP（假设在kvm A上）发送的组播流量
   - 查询结果和广播一样
-- dmac是单播
-  - 记录smac对应的虚拟机及其Region/VPC/Subnet/IP（假设在kvm A上）发送的单播流量
-  - 记录dmac对应的虚拟机及其Region/VPC/Subnet/IP（假设在kvm B上）接收的单播流量
-  - 查询虚拟机A的单播流量，会得到2倍+的结果
-  - 查询虚拟机B的单播流量，会得到2倍+的结果
-- 如果smac/dmac没有对应的虚拟机，此时不统计
+- 如果smac没有对应的虚拟机，此时不统计

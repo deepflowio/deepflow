@@ -118,16 +118,18 @@ func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket
 	p.policyGroup = FillPolicyTagTemplate(metaPacket.PolicyData, interestActions, p.policyGroup)
 
 	l3EpcIDs := [2]int32{metaPacket.EndpointData.SrcInfo.L3EpcId, metaPacket.EndpointData.DstInfo.L3EpcId}
+	isNorthSouthTraffic := IsNorthSourceTraffic(l3EpcIDs[0], l3EpcIDs[1])
 	ips := [2]uint32{metaPacket.IpSrc, metaPacket.IpDst}
-	isL2End := [2]bool{metaPacket.EndpointData.SrcInfo.L2End, metaPacket.EndpointData.DstInfo.L2End}
-	isL3End := [2]bool{metaPacket.EndpointData.SrcInfo.L3End, metaPacket.EndpointData.DstInfo.L3End}
+	isL2L3End := [2]bool{
+		metaPacket.EndpointData.SrcInfo.L2End && metaPacket.EndpointData.SrcInfo.L3End,
+		metaPacket.EndpointData.DstInfo.L2End && metaPacket.EndpointData.DstInfo.L3End,
+	}
 	directions := [2]outputtype.DirectionEnum{outputtype.ClientToServer, outputtype.ServerToClient}
 	serverPort := metaPacket.PortDst
 	if metaPacket.Direction == inputtype.SERVER_TO_CLIENT {
 		l3EpcIDs[0], l3EpcIDs[1] = l3EpcIDs[1], l3EpcIDs[0]
 		ips[0], ips[1] = ips[1], ips[0]
-		isL2End[0], isL2End[1] = isL2End[1], isL2End[0]
-		isL3End[0], isL3End[1] = isL3End[1], isL3End[0]
+		isL2L3End[0], isL2L3End[1] = isL2L3End[1], isL2L3End[0]
 		serverPort = metaPacket.PortSrc
 	}
 	docTimestamp := RoundToSecond(metaPacket.Timestamp)
@@ -174,7 +176,7 @@ func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket
 				codes = append(codes, POLICY_NODE_PORT_CODES...)
 			}
 			for _, code := range codes {
-				if IsDupTraffic(metaPacket.InPort, isL2End[thisEnd], isL3End[thisEnd], code) {
+				if IsDupTraffic(metaPacket.InPort, isL2L3End[thisEnd], isL2L3End[otherEnd], isNorthSouthTraffic, code) {
 					continue
 				}
 				if IsWrongEndPointWithACL(thisEnd, policyDirections, code) {
@@ -192,7 +194,7 @@ func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket
 				codes = append(codes, POLICY_EDGE_PORT_CODES...)
 			}
 			for _, code := range codes {
-				if IsDupTraffic(metaPacket.InPort, isL2End[otherEnd], isL3End[otherEnd], code) { // 双侧tag用otherEnd判断
+				if IsDupTraffic(metaPacket.InPort, isL2L3End[thisEnd], isL2L3End[otherEnd], isNorthSouthTraffic, code) {
 					continue
 				}
 				if IsWrongEndPointWithACL(thisEnd, policyDirections, code) {

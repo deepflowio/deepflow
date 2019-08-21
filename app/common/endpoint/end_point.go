@@ -80,11 +80,11 @@ func TAPTypeFromInPort(inPort uint32) outputtype.TAPTypeEnum {
 	panic(fmt.Sprintf("InPort %d not in range", inPort))
 }
 
-// 1. 对于单侧Tag，判断点设置为本端，即使用l3EpcID[thisEnd]、isL2End[thisEnd]、isL3End[thisEnd]调用
-// 2. 考虑到当tag含有ServerPort时对端表示服务端，对于双侧Tag，判断点设置为对端，即使用otherEnd调用
-//
-// 虚拟网络判断逻辑：
-//   tagCode不含有L2信息：
+func IsNorthSourceTraffic(l3EpcID0, l3EpcID1 int32) bool {
+	return l3EpcID0 == 0 || l3EpcID1 == 0 // 0: Internet
+}
+
+// 虚拟网络东西向流量判断逻辑：
 //     TAG             IP1 -------> (1)router(2) --------> IP2
 //                         ^     ^               ^      ^          <-- 抓包点
 //     IP1                 -     DUP             DUP    DUP
@@ -92,29 +92,29 @@ func TAPTypeFromInPort(inPort uint32) outputtype.TAPTypeEnum {
 //     IP1->IP2            DUP   DUP             DUP    -
 //     IP2->IP1            -     DUP             DUP    DUP
 //
-//   tagCode含有L2信息：
-//     TAG             IP1 -------> (1)router(2) --------> IP2
-//                         ^     ^               ^      ^          <-- 抓包点
-//     MAC1                -     DUP             N/A    N/A
-//     RouterMAC1          DUP   -               N/A    N/A
-//     RouterMAC2          N/A   N/A             -      DUP
-//     MAC2                N/A   N/A             DUP    -
-//     MAC1->RouterMAC1    DUP   -               N/A    N/A
-//     RouterMAC1->MAC1    -     DUP             N/A    N/A
-//     RouterMAC2->MAC2    N/A   N/A             DUP    -
-//     MAC2->RouterMAC2    N/A   N/A             -      DUP
-//
-func IsDupTraffic(inPort uint32, isL2End, isL3End bool, tagCode outputtype.Code) bool {
+func IsDupTraffic(inPort uint32, isL2L3EndThisEnd, isL2L3EndOtherEnd, isNorthSouthTraffic bool, tagCode outputtype.Code) bool {
 	if ISP.IsPortInRange(inPort) {
 		// 接入网络流量只有一份，不存在Dup
 		return false
 	} else if TOR.IsPortInRange(inPort) {
-		// 虚拟网络存在多份，需要做Dedup:
-		// 1. 经过交换机转发（isL2End）的一侧认为是DupTraffic
-		// 2. tagCode不含有L2信息、且经过路由器转发（isL3End）的一侧认为是DupTraffic
-		return !isL2End || (!tagCode.HasL2TagField() && !isL3End)
+		// 虚拟网络流量可能存在多份，需要忽略交换机和路由器二、三层转发后的流量:
+		// 1. 对于南北向流量，肯定有一端未被采集点覆盖，
+		//    取客户端或服务端所在位置有采集器的流量
+		// 2. 对于东西向流量，认为两段均被采集点覆盖
+		//    2.1. 对于双端统计量，取对端所在位置有采集器的流量，
+		//         但是IsWrongEndPoint会过滤掉对端是客户端的场景
+		//    2.2. 对于单端统计量，取本端所在位置有采集器的流量，
+		//         但是IsWrongEndPoint会过滤掉带ServerPort且本端是客户端的场景
+		if isNorthSouthTraffic {
+			return !(isL2L3EndThisEnd || isL2L3EndOtherEnd)
+		}
+		if tagCode.HasEdgeTagField() {
+			return !isL2L3EndOtherEnd
+		} else {
+			return !isL2L3EndThisEnd
+		}
 	}
-	return false
+	return true // never happen
 }
 
 // 不含ACL的Tag
@@ -123,14 +123,11 @@ func IsWrongEndPoint(thisEnd EndPoint, tagCode outputtype.Code) bool {
 		// 双侧Tag，永远只统计ZERO侧的数据：即统计量表示客户端的Tx/Rx
 		return thisEnd == ONE
 	} else {
-		// 含端口号的单侧Tag，永远只统计ONE侧的数据：
-		//   - 即统计量表示服务端（包统计不会有端口号Tag，目的端即是服务端）的Tx/Rx
+		// 含端口号的单侧Tag，永远只统计ONE侧的数据：即统计量表示服务端的Tx/Rx
 		if tagCode&outputtype.ServerPort != 0 {
 			return thisEnd == ZERO
 		}
-		// 其它情况下：
-		//   - 如果Tag是重复的（对称字段，或非对称字段但重复），通过Tag Field的去重机制，统计量优先表示源端的Tx/Rx（ZERO）
-		//   - 如果Tag是不重复的，只要是通过IsDupTraffic检测的两侧都会有各自的统计量（ZERO及ONE）
+		// 其它单侧统计量，表示本侧的Tx/Rx
 		return false
 	}
 }
