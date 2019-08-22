@@ -124,6 +124,8 @@ type FlowGenerator struct {
 	stats                   FlowGeneratorStats
 	stateMachineMaster      []map[uint8]*StateValue
 	stateMachineSlave       []map[uint8]*StateValue
+	tcpServiceTable         *ServiceTable
+	udpServiceTable         *ServiceTable
 	packetHandler           *PacketHandler
 	bufferSize              int
 	flowLimitNum            int32
@@ -204,16 +206,7 @@ func SetFlowGenerator(cfg config.Config) {
 	reportTolerance = cfg.FlowGenerator.ReportTolerance
 	ignoreTorMac = cfg.FlowGenerator.IgnoreTorMac
 	ignoreL2End = cfg.FlowGenerator.IgnoreL2End
-	portStatsInterval = cfg.FlowGenerator.PortStats.Interval
-	portStatsSrcEndCount = cfg.FlowGenerator.PortStats.SrcEndCount
-	portStatsTimeout = cfg.FlowGenerator.PortStats.Timeout
 
-	innerTcpSMA = make([]*ServiceManager, flowGeneratorCount)
-	innerUdpSMA = make([]*ServiceManager, flowGeneratorCount)
-	for i := uint64(0); i < flowGeneratorCount; i++ {
-		innerTcpSMA[i] = NewServiceManager(32 * 1024)
-		innerUdpSMA[i] = NewServiceManager(32 * 1024)
-	}
 	innerFlowGeo = newFlowGeo()
 }
 

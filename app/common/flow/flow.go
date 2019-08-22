@@ -230,25 +230,6 @@ func (f *Flow) GetART() time.Duration {
 	return f.ART
 }
 
-func (f *Flow) IsInterestWhitelistServerPort() bool {
-	// TCP/UDP
-	return f.Proto == layers.IPProtocolTCP || f.Proto == layers.IPProtocolUDP
-}
-
-func (f *Flow) ServiceNotAlive() bool {
-	// 对于判定为NotAlive的端口号，不统计具体端口
-	if f.Proto == layers.IPProtocolTCP {
-		// Flow的每次输出中：无回复的，或仅有RST / RST+ACK / SYN回复的
-		return f.FlowMetricsPeerDst.PacketCount == 0 ||
-			f.FlowMetricsPeerDst.TCPFlags == RST ||
-			f.FlowMetricsPeerDst.TCPFlags == RSTACK || // 存在对ACK和RST单独出现的误判
-			f.FlowMetricsPeerDst.TCPFlags == SYN
-	} else {
-		// 非TCP端口
-		return true
-	}
-}
-
 func (f *Flow) FillACLGroupID(aclAction data.AclAction, groups [][]int32) {
 	if len(groups) != 2 {
 		panic("长度必须为2")

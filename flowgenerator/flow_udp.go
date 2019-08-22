@@ -2,7 +2,6 @@ package flowgenerator
 
 import (
 	"sync/atomic"
-	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
@@ -39,14 +38,9 @@ func (f *FlowGenerator) initUdpFlow(meta *MetaPacket) *FlowExtra {
 	taggedFlow.FlowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
 	updatePlatformData(taggedFlow, meta.EndpointData, false)
 	f.fillGeoInfo(taggedFlow)
-	clientHash := (uint64(meta.IpSrc) << 16) | uint64(meta.PortSrc)
-	serviceKey := genServiceKey(taggedFlow.FlowMetricsPeerDst.L3EpcID, taggedFlow.IPDst, taggedFlow.PortDst)
-	getUdpServiceManager(f.index).hitUdpStatus(serviceKey, clientHash, meta.Timestamp)
 	flowExtra.flowState = FLOW_STATE_ESTABLISHED
 	flowExtra.timeout = openingTimeout
-	if f.checkUdpServiceReverse(taggedFlow, flowExtra.reversed, now) {
-		flowExtra.reverseFlow()
-	}
+	f.updateUDPDirection(meta, flowExtra, true)
 	flowExtra.setMetaPacketDirection(meta)
 	return flowExtra
 }
@@ -56,24 +50,20 @@ func (f *FlowGenerator) updateUdpFlow(flowExtra *FlowExtra, meta *MetaPacket, re
 	if reply {
 		flowExtra.timeout = establishedRstTimeout
 	}
+	f.updateUDPDirection(meta, flowExtra, false)
 	flowExtra.setMetaPacketDirection(meta)
 }
 
-func (f *FlowGenerator) checkUdpServiceReverse(taggedFlow *TaggedFlow, reversed bool, now time.Duration) bool {
-	if reversed {
-		return false
+func (f *FlowGenerator) updateUDPDirection(meta *MetaPacket, flowExtra *FlowExtra, isFirstPacket bool) {
+	srcKey := ServiceKey(int16(meta.EndpointData.SrcInfo.L3EpcId), meta.IpSrc, meta.PortSrc)
+	dstKey := ServiceKey(int16(meta.EndpointData.DstInfo.L3EpcId), meta.IpDst, meta.PortDst)
+
+	srcScore, dstScore := f.udpServiceTable.GetUDPScore(isFirstPacket, srcKey, dstKey)
+	if meta.MacSrc != flowExtra.taggedFlow.MACSrc {
+		srcScore, dstScore = dstScore, srcScore
 	}
-	serviceKey := genServiceKey(taggedFlow.FlowMetricsPeerSrc.L3EpcID, taggedFlow.IPSrc, taggedFlow.PortSrc)
-	srcOk := getUdpServiceManager(f.index).getUdpStatus(serviceKey, taggedFlow.PortSrc, now)
-	if !srcOk {
-		return false
+	if !IsClientToServer(srcScore, dstScore) {
+		flowExtra.reverseFlow()
 	}
-	serviceKey = genServiceKey(taggedFlow.FlowMetricsPeerDst.L3EpcID, taggedFlow.IPDst, taggedFlow.PortDst)
-	dstOk := getUdpServiceManager(f.index).getUdpStatus(serviceKey, taggedFlow.PortDst, now)
-	if !dstOk {
-		return true
-	} else if taggedFlow.PortDst <= taggedFlow.PortSrc {
-		return false
-	}
-	return true
+	flowExtra.taggedFlow.Flow.IsActiveService = IsActiveService(srcScore, dstScore)
 }

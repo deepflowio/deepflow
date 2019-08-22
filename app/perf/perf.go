@@ -196,7 +196,7 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE != 0 {
 				codes = append(codes, POLICY_EDGE_CODES...)
 			}
-			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE_PORT != 0 && !flow.ServiceNotAlive() { // 含有端口号的，仅统计活跃端口
+			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE_PORT != 0 && flow.IsActiveService { // 含有端口号的，仅统计活跃端口
 				codes = append(codes, POLICY_EDGE_PORT_CODES...)
 			}
 			for _, code := range codes {

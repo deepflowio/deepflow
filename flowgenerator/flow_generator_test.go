@@ -32,17 +32,11 @@ var testTimeoutConfig = TimeoutConfig{
 
 func flowGeneratorInit() (*FlowGenerator, MultiQueueReader, QueueWriter) {
 	flowGeneratorCount = 1
-	innerTcpSMA = make([]*ServiceManager, flowGeneratorCount)
-	innerUdpSMA = make([]*ServiceManager, flowGeneratorCount)
-	for i := uint64(0); i < flowGeneratorCount; i++ {
-		innerTcpSMA[i] = NewServiceManager(32 * 1024)
-		innerUdpSMA[i] = NewServiceManager(32 * 1024)
-	}
 	forceReportInterval = time.Millisecond * 100
 	flowCleanInterval = time.Millisecond * 100
 	timeoutCleanerCount = 4
 	hashMapSize = 1024 * 32
-	reportTolerance = 4 * time.Second
+	reportTolerance = time.Millisecond * 4
 	ignoreTorMac = false
 	ignoreL2End = false
 	portStatsInterval = time.Second
