@@ -237,5 +237,5 @@ message SyncResponse {
     optional bytes platform_data = 12;
     optional bytes flow_acls = 13;
     optional bytes publish_acls = 14;
-    repeated bytes groups = 15;
+    optional bytes groups = 15;
 }
