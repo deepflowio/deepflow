@@ -32,12 +32,15 @@ enum Exception {
 message SyncRequest {
     optional uint32 boot_time = 1;
     optional bool config_accepted = 2 [default = true];
-    optional uint64 version = 3 [default = 0];
     optional State state = 4;
     optional string revision = 5; // trident用于self-update
     optional uint64 exception = 6 [default = 0]; // trident exception status
     optional string process_name = 7;
     optional TapMode tap_mode = 8 [default = LOCAL];
+
+    optional uint64 version_platform_data = 9 [default = 0]; /* only platform data */
+    optional uint64 version_acls = 10 [default = 0];
+    optional uint64 version_groups = 11 [default = 0];
 
     optional string ctrl_ip = 21;
     optional string host = 22; // 仅作为注册使用
