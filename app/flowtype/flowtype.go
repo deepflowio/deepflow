@@ -21,9 +21,8 @@ import (
 var log = logging.MustGetLogger("flowtype")
 
 const (
-	CODES_LEN     = 64
-	GROUPS_LEN    = 16
-	MAX_FLOW_TYPE = inputtype.CloseTypeClientHalfClose + 1
+	CODES_LEN  = 64
+	GROUPS_LEN = 16
 )
 
 // node
@@ -63,7 +62,9 @@ type FlowToTypeDocumentMapper struct {
 	aclGroups [2][]int32
 
 	fields [2]outputtype.Field
-	meters [MAX_FLOW_TYPE]outputtype.TypeMeter
+	meters [inputtype.MaxCloseType]outputtype.TypeMeter
+
+	isInterestCloseType [inputtype.MaxCloseType]bool
 }
 
 func (p *FlowToTypeDocumentMapper) GetName() string {
@@ -81,20 +82,26 @@ func (p *FlowToTypeDocumentMapper) Prepare() {
 	p.codes = make([]outputtype.Code, 0, CODES_LEN)
 	p.aclGroups = [2][]int32{make([]int32, 0, GROUPS_LEN), make([]int32, 0, GROUPS_LEN)}
 
-	for flowType := inputtype.CloseType(0); flowType <= MAX_FLOW_TYPE; flowType++ {
+	for flowType := inputtype.CloseType(0); flowType < inputtype.MaxCloseType; flowType++ {
 		switch flowType {
 		case inputtype.CloseTypeTCPServerRst:
 			p.meters[flowType].SumCountTServerRst = 1
+			p.isInterestCloseType[flowType] = true
 		case inputtype.CloseTypeTCPClientRst:
 			p.meters[flowType].SumCountTClientRst = 1
+			p.isInterestCloseType[flowType] = true
 		case inputtype.CloseTypeServerHalfOpen:
 			p.meters[flowType].SumCountTServerHalfOpen = 1
+			p.isInterestCloseType[flowType] = true
 		case inputtype.CloseTypeClientHalfOpen:
 			p.meters[flowType].SumCountTClientHalfOpen = 1
+			p.isInterestCloseType[flowType] = true
 		case inputtype.CloseTypeServerHalfClose:
 			p.meters[flowType].SumCountTServerHalfClose = 1
+			p.isInterestCloseType[flowType] = true
 		case inputtype.CloseTypeClientHalfClose:
 			p.meters[flowType].SumCountTClientHalfClose = 1
+			p.isInterestCloseType[flowType] = true
 		}
 	}
 }
@@ -113,7 +120,7 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 	if !flow.IsClosedFlow() {
 		return p.docs.Slice()
 	}
-	if flow.CloseType >= MAX_FLOW_TYPE {
+	if flow.CloseType >= inputtype.MaxCloseType || !p.isInterestCloseType[flow.CloseType] {
 		return p.docs.Slice()
 	}
 

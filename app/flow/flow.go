@@ -142,7 +142,7 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 		if statTemplates&inputtype.TEMPLATE_NODE != 0 {
 			oneSideCodes = append(oneSideCodes, NODE_CODES...)
 		}
-		if statTemplates&inputtype.TEMPLATE_NODE_PORT != 0 && !flow.ServiceNotAlive() { // 含有端口号的，仅统计活跃端口
+		if statTemplates&inputtype.TEMPLATE_NODE_PORT != 0 && flow.IsActiveService { // 含有端口号的，仅统计活跃端口
 			oneSideCodes = append(oneSideCodes, NODE_PORT_CODES...)
 		}
 		if statTemplates&inputtype.TEMPLATE_EDGE != 0 {
@@ -151,7 +151,7 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				edgeCodes = append(edgeCodes, TOR_EDGE_CODES...)
 			}
 		}
-		if statTemplates&inputtype.TEMPLATE_EDGE_PORT != 0 && !flow.ServiceNotAlive() && TOR.IsPortInRange(flow.InPort) { // 含有端口号的，仅统计活跃端口
+		if statTemplates&inputtype.TEMPLATE_EDGE_PORT != 0 && flow.IsActiveService && TOR.IsPortInRange(flow.InPort) { // 含有端口号的，仅统计活跃端口
 			edgeCodes = append(edgeCodes, TOR_EDGE_PORT_CODES...)
 		}
 	}
@@ -230,10 +230,10 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE != 0 {
 				codes = append(codes, POLICY_NODE_CODES...)
 			}
-			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_PORT != 0 && !flow.ServiceNotAlive() { // 含有端口号的，仅统计活跃端口
+			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_PORT != 0 && flow.IsActiveService { // 含有端口号的，仅统计活跃端口
 				codes = append(codes, POLICY_PORT_CODES...)
 			}
-			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE_PORT != 0 && !flow.ServiceNotAlive() { // 含有端口号的，仅统计活跃端口
+			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE_PORT != 0 && flow.IsActiveService { // 含有端口号的，仅统计活跃端口
 				codes = append(codes, POLICY_NODE_PORT_CODES...)
 			}
 			for _, code := range codes {
@@ -255,7 +255,7 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE != 0 {
 				codes = append(codes, POLICY_EDGE_CODES...)
 			}
-			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE_PORT != 0 && !flow.ServiceNotAlive() { // 含有端口号的，仅统计活跃端口
+			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE_PORT != 0 && flow.IsActiveService { // 含有端口号的，仅统计活跃端口
 				codes = append(codes, POLICY_EDGE_PORT_CODES...)
 			}
 			for _, code := range codes {

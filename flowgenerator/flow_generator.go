@@ -292,8 +292,10 @@ func (f *FlowExtra) setMetaPacketDirection(meta *MetaPacket) {
 	// taggedFlow存储的方向是CLIENT_TO_SERVER
 	if meta.MacSrc == f.taggedFlow.MACSrc {
 		meta.Direction = CLIENT_TO_SERVER
+		meta.IsActiveService = f.taggedFlow.Flow.IsActiveService
 	} else {
 		meta.Direction = SERVER_TO_CLIENT
+		meta.IsActiveService = f.taggedFlow.Flow.IsActiveService
 	}
 }
 
@@ -360,17 +362,14 @@ func (f *FlowExtra) setCurFlowInfo(now time.Duration, desireInterval, reportTole
 		taggedFlow.EndTime = now
 	}
 
-	// StartTime和EndTime所在的forceReportInterval中间还隔了一个完整的forceReportInterval
-	// pivotalTime=StartTime的下一个forceReportInterval
-	pivotalTime := taggedFlow.StartTime/forceReportInterval*forceReportInterval + forceReportInterval
-	if pivotalTime+forceReportInterval <= taggedFlow.EndTime {
-		// StartTime矫正至下一个forceReportInterval的开始
-		// FIXME bitmap should be recalculated, 5.5.2
-		taggedFlow.StartTime = pivotalTime
+	// 若错过了一次ForceReport，强制将StartTime置为下个周期内的0秒。
+	latestForceReportTime := taggedFlow.StartTime/forceReportInterval*forceReportInterval + forceReportInterval + reportTolerance
+	if taggedFlow.EndTime > latestForceReportTime {
+		taggedFlow.StartTime = latestForceReportTime - reportTolerance
 		if !f.reported {
 			// FIXME maybe we should choose only one ArrTime
-			taggedFlow.FlowMetricsPeerSrc.ArrTime0 = pivotalTime
-			taggedFlow.FlowMetricsPeerDst.ArrTime0 = pivotalTime
+			taggedFlow.FlowMetricsPeerSrc.ArrTime0 = taggedFlow.StartTime
+			taggedFlow.FlowMetricsPeerDst.ArrTime0 = taggedFlow.StartTime
 		}
 	}
 
@@ -434,6 +433,7 @@ func (f *FlowGenerator) processPackets(processBuffer []interface{}) {
 			ReleaseMetaPacket(meta)
 			continue
 		}
+
 		// 需要获取方向，没有FLOW_ACTION也会走flow流程
 		if meta.Protocol == layers.IPProtocolTCP {
 			f.processTcpPacket(meta)
@@ -474,10 +474,6 @@ loop:
 
 func (f *FlowGenerator) reportForClean(flowExtra *FlowExtra, force bool, now time.Duration) *TaggedFlow {
 	taggedFlow := flowExtra.taggedFlow
-	if f.checkL4ServiceReverse(taggedFlow, flowExtra.reversed, now) {
-		flowExtra.reverseFlow()
-		flowExtra.reversed = true
-	}
 	if taggedFlow.Proto == layers.IPProtocolTCP {
 		taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 	}
@@ -698,6 +694,8 @@ func New(metaPacketHeaderInQueue MultiQueueReader, flowOutQueue QueueWriter, met
 		stats:                   FlowGeneratorStats{cleanRoutineFlowCacheNums: make([]int, timeoutCleanerCount), cleanRoutineMaxFlowCacheLens: make([]int, timeoutCleanerCount)},
 		stateMachineMaster:      make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
 		stateMachineSlave:       make([]map[uint8]*StateValue, FLOW_STATE_EXCEPTION+1),
+		tcpServiceTable:         NewServiceTable(int(flowLimitNum)),
+		udpServiceTable:         NewServiceTable(int(flowLimitNum)),
 		packetHandler:           &PacketHandler{recvBuffer: make([]interface{}, bufferSize), processBuffer: make([]interface{}, bufferSize)},
 		bufferSize:              bufferSize,
 		flowLimitNum:            flowLimitNum,
@@ -728,17 +726,5 @@ func (f *FlowGenerator) checkIfDoFlowPerf(flowExtra *FlowExtra) bool {
 		return true
 	}
 
-	return false
-}
-
-func (f *FlowGenerator) checkL4ServiceReverse(taggedFlow *TaggedFlow, reversed bool, now time.Duration) bool {
-	if reversed {
-		return false
-	}
-	if taggedFlow.Proto == layers.IPProtocolTCP {
-		return f.checkTcpServiceReverse(taggedFlow, reversed)
-	} else if taggedFlow.Proto == layers.IPProtocolUDP {
-		return f.checkUdpServiceReverse(taggedFlow, reversed, now)
-	}
 	return false
 }

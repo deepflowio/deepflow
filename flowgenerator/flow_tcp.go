@@ -86,9 +86,7 @@ func (f *FlowGenerator) initTcpFlow(meta *MetaPacket) (*FlowExtra, bool, bool) {
 		f.fillGeoInfo(taggedFlow)
 	}
 
-	if f.checkTcpServiceReverse(taggedFlow, flowExtra.reversed) {
-		flowExtra.reverseFlow()
-	}
+	f.updateTCPDirection(meta, flowExtra, true)
 	flowExtra.setMetaPacketDirection(meta)
 
 	flags = flags & TCP_FLAG_MASK
@@ -121,6 +119,7 @@ func (f *FlowGenerator) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket, re
 		flowExtra.reverseFlow()
 		flowExtra.reversed = true
 	}
+	f.updateTCPDirection(meta, flowExtra, false)
 	flowExtra.setMetaPacketDirection(meta)
 
 	if f.StatePreprocess(meta, flags) || meta.Invalid {
@@ -131,22 +130,16 @@ func (f *FlowGenerator) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket, re
 	return f.updateFlowStateMachine(flowExtra, flags, reply), reply
 }
 
-// return true if a flow should be reversed
-func (f *FlowGenerator) checkTcpServiceReverse(taggedFlow *TaggedFlow, reversed bool) bool {
-	if reversed {
-		return false
+func (f *FlowGenerator) updateTCPDirection(meta *MetaPacket, flowExtra *FlowExtra, isFirstPacket bool) {
+	srcKey := ServiceKey(int16(meta.EndpointData.SrcInfo.L3EpcId), meta.IpSrc, meta.PortSrc)
+	dstKey := ServiceKey(int16(meta.EndpointData.DstInfo.L3EpcId), meta.IpDst, meta.PortDst)
+
+	srcScore, dstScore := f.tcpServiceTable.GetTCPScore(isFirstPacket, meta.TcpData.Flags, srcKey, dstKey)
+	if meta.MacSrc != flowExtra.taggedFlow.MACSrc {
+		srcScore, dstScore = dstScore, srcScore
 	}
-	serviceKey := genServiceKey(taggedFlow.FlowMetricsPeerSrc.L3EpcID, taggedFlow.IPSrc, taggedFlow.PortSrc)
-	srcOk := getTcpServiceManager(f.index).getTcpStatus(serviceKey, taggedFlow.PortSrc)
-	if !srcOk {
-		return false
+	if !IsClientToServer(srcScore, dstScore) {
+		flowExtra.reverseFlow()
 	}
-	serviceKey = genServiceKey(taggedFlow.FlowMetricsPeerDst.L3EpcID, taggedFlow.IPDst, taggedFlow.PortDst)
-	dstOk := getTcpServiceManager(f.index).getTcpStatus(serviceKey, taggedFlow.PortDst)
-	if !dstOk {
-		return true
-	} else if taggedFlow.PortDst <= taggedFlow.PortSrc {
-		return false
-	}
-	return true
+	flowExtra.taggedFlow.Flow.IsActiveService = IsActiveService(srcScore, dstScore)
 }
