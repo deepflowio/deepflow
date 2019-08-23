@@ -47,8 +47,9 @@ type MetaPacket struct {
 	EndpointData *EndpointData
 	PolicyData   *PolicyData
 
+	Invalid   bool
 	QueueHash uint8
-	InPort    uint32 // (+3B=8B)
+	InPort    uint32 // (+2B=8B)
 	Exporter  IPv4Int
 	PacketLen uint16
 	L2End0    bool
@@ -78,8 +79,8 @@ type MetaPacket struct {
 	TcpData    *MetaPacketTcpHeader
 	PayloadLen uint16
 
-	Invalid   bool
-	Direction PacketDirection // flowgenerator负责初始化，表明MetaPacket方向
+	Direction       PacketDirection // flowgenerator负责初始化，表明MetaPacket方向
+	IsActiveService bool            // flowgenerator负责初始化，表明服务端是否活跃
 
 	pool.ReferenceCount // (8B)
 }
