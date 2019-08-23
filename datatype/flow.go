@@ -26,6 +26,7 @@ const (
 	CloseTypeTCPClientRst
 	CloseTypeClientHalfOpen
 	CloseTypeClientHalfClose
+	MaxCloseType
 )
 
 type DeviceType uint8
@@ -142,6 +143,7 @@ type Flow struct {
 	ISP     uint8
 
 	CloseType
+	IsActiveService bool
 }
 
 func (t *TcpPerfStats) String() string {
