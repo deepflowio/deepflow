@@ -128,7 +128,7 @@ func Start(configPath string) (closers []io.Closer) {
 	synchronizer.Register(func(response *trident.SyncResponse, version *config.RpcInfoVersions) {
 		log.Debug(response, version)
 		// Labeler更新策略信息
-		labelerManager.OnAclDataChange(response, version)
+		labelerManager.OnAclDataChange(response)
 	})
 	labelerManager.Start()
 

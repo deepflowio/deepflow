@@ -2,7 +2,6 @@ package labeler
 
 import (
 	"fmt"
-	"reflect"
 
 	"github.com/op/go-logging"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -12,7 +11,6 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 
-	"gitlab.x.lan/yunshan/droplet/config"
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
 	"gitlab.x.lan/yunshan/message/trident"
 )
@@ -41,11 +39,11 @@ type LabelerManager struct {
 
 	lookupKey         []datatype.LookupKey
 	rawPlatformDatas  []*datatype.PlatformData
-	rawIpGroupDatas   []*policy.IpGroupData
 	rawPeerConnection []*datatype.PeerConnection
+	rawIpGroupDatas   []*policy.IpGroupData
 	rawPolicyData     []*policy.Acl
-	enable            bool
-	version           uint64
+
+	platformVersion, aclVersion, groupVersion uint64
 }
 
 const (
@@ -96,147 +94,59 @@ func (l *LabelerManager) RegisterAppQueue(queueType QueueType, appQueues []queue
 	l.appQueues[queueType] = appQueues
 }
 
-func (l *LabelerManager) CheckAndUpdatePlatformData(response *trident.SyncResponse, version uint64) {
-	VersionPlatformData := response.GetVersionPlatformData()
-	log.Debugf("grpc recv platformData with version %d, and current version is %d:",
-		VersionPlatformData, version)
-	if VersionPlatformData <= version {
-		return
-	}
-	log.Infof("droplet grpc recv platformData with version %d (vs. current %d)", VersionPlatformData, version)
-
-	platformData := trident.PlatformData{}
-	if plarformCompressed := response.GetPlatformData(); plarformCompressed != nil {
-		if err := platformData.Unmarshal(plarformCompressed); err != nil {
-			log.Warningf("unmarshal grpc compressed platformData failed as %v", err)
-			return
+func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
+	update := false
+	newVersion := response.GetVersionPlatformData()
+	log.Debugf("droplet grpc recv response with platform version %d, and current version is %d:", newVersion, l.platformVersion)
+	if newVersion != l.platformVersion {
+		log.Infof("droplet grpc recv response with platform version %d (vs. current %d)", newVersion, l.platformVersion)
+		platformData := trident.PlatformData{}
+		if err := platformData.Unmarshal(response.GetPlatformData()); err == nil {
+			l.rawPlatformDatas = dropletpb.Convert2PlatformData(platformData.GetInterfaces())
+			l.rawPeerConnection = dropletpb.Convert2PeerConnections(platformData.GetPeerConnections())
+			log.Infof("droplet grpc recv %d pieces of platform data", len(l.rawPlatformDatas))
+			log.Infof("droplet grpc recv %d pieces of peer connection data", len(l.rawPeerConnection))
+			update = true
 		}
-		if interfaces := platformData.GetInterfaces(); interfaces != nil {
-			platformData := dropletpb.Convert2PlatformData(interfaces)
-			log.Infof("droplet grpc recv %d pieces of platform data", len(platformData))
-			l.OnPlatformDataChange(platformData)
-		} else {
-			l.OnPlatformDataChange(nil)
-		}
-
-		if peerConnections := platformData.GetPeerConnections(); peerConnections != nil {
-			peerConnectionData := dropletpb.Convert2PeerConnections(peerConnections)
-			log.Infof("droplet grpc recv %d pieces of peer connection data", len(peerConnectionData))
-			l.OnPeerConnectionChange(peerConnectionData)
-		} else {
-			l.OnPeerConnectionChange(nil)
-		}
-
-	} else {
-		l.OnPlatformDataChange(nil)
-		l.OnPeerConnectionChange(nil)
-	}
-}
-
-func (l *LabelerManager) CheckAndUpdateGroups(response *trident.SyncResponse, version uint64) {
-	VersionGroups := response.GetVersionGroups()
-	log.Debugf("grpc recv groups with version %d, and current version is %d:",
-		VersionGroups, version)
-	if VersionGroups <= version {
-		return
-	}
-	log.Infof("droplet grpc recv groups with version %d (vs. current %d)", VersionGroups, version)
-
-	groups := trident.Groups{}
-	if groupsCompressed := response.GetGroups(); groupsCompressed != nil {
-		if err := groups.Unmarshal(groupsCompressed); err != nil {
-			log.Warningf("unmarshal grpc compressed groups failed as %v", err)
-			return
-		}
-		if group := groups.GetGroups(); group != nil {
-			ipGroupData := dropletpb.Convert2IpGroupData(group)
-			log.Infof("droplet grpc recv %d pieces of ipgroup data", len(ipGroupData))
-			l.OnIpGroupDataChange(ipGroupData)
-		} else {
-			l.OnIpGroupDataChange(nil)
-		}
-
-	} else {
-		l.OnIpGroupDataChange(nil)
-	}
-}
-
-func (l *LabelerManager) CheckAndUpdateFlowAcls(response *trident.SyncResponse, version uint64) {
-	versionFlowAcls := response.GetVersionAcls()
-	log.Debugf("grpc recv flowAcls with version %d, and current version is %d:",
-		versionFlowAcls, version)
-	if versionFlowAcls <= version {
-		return
-	}
-	log.Infof("droplet grpc recv flowAcls with version %d (vs. current %d)", versionFlowAcls, version)
-
-	flowAcls := trident.FlowAcls{}
-	if flowAclsCompressed := response.GetFlowAcls(); flowAclsCompressed != nil {
-		if err := flowAcls.Unmarshal(flowAclsCompressed); err != nil {
-			return
-		}
-		if flowAcl := flowAcls.GetFlowAcl(); flowAcl != nil {
-			acls := dropletpb.Convert2AclData(flowAcl)
-			log.Infof("droplet grpc recv %d pieces of acl data", len(acls))
-			l.OnPolicyDataChange(acls)
-		} else {
-			l.OnPolicyDataChange(nil)
-		}
-	} else {
-		l.OnPolicyDataChange(nil)
+		l.platformVersion = newVersion
 	}
 
-	if l.enable {
-		log.Info("droplet grpc enable fast-path policy change")
+	newVersion = response.GetVersionGroups()
+	log.Debugf("droplet grpc recv response with ip group version %d, and current version is %d:", newVersion, l.groupVersion)
+	if newVersion != l.groupVersion {
+		log.Infof("droplet grpc recv response with ip group version %d (vs. current %d)", newVersion, l.groupVersion)
+		group := trident.Groups{}
+		if err := group.Unmarshal(response.GetGroups()); err == nil {
+			l.rawIpGroupDatas = dropletpb.Convert2IpGroupData(group.GetGroups())
+			log.Infof("droplet grpc recv %d pieces of ipgroup data", len(l.rawIpGroupDatas))
+			update = true
+		}
+		l.groupVersion = newVersion
+	}
+
+	newVersion = response.GetVersionAcls()
+	log.Debugf("droplet grpc recv response with acl version %d, and current version is %d:", newVersion, l.aclVersion)
+	if newVersion != l.aclVersion {
+		log.Infof("droplet grpc recv response with acl version %d (vs. current %d)", newVersion, l.aclVersion)
+		acls := trident.FlowAcls{}
+		if err := acls.Unmarshal(response.GetFlowAcls()); err == nil {
+			l.rawPolicyData = dropletpb.Convert2AclData(acls.GetFlowAcl())
+			log.Infof("droplet grpc recv %d pieces of acl data", len(l.rawPolicyData))
+			update = true
+		}
+		l.aclVersion = newVersion
+	}
+
+	if update {
+		log.Infof("droplet grpc version ip-groups: %d, interfaces and peer-connections: %d, flow-acls: %d",
+			response.GetVersionGroups(), response.GetVersionPlatformData(), response.GetVersionAcls())
+		l.policyTable.UpdateInterfaceDataAndIpGroupData(l.rawPlatformDatas, l.rawIpGroupDatas)
+		l.policyTable.UpdatePeerConnection(l.rawPeerConnection)
+		l.policyTable.UpdateAclData(l.rawPolicyData)
 		l.policyTable.EnableAclData()
-		l.enable = false
+		log.Info("droplet grpc enable fast-path policy change")
+		log.Info("droplet grpc finish data change")
 	}
-}
-
-func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse, version *config.RpcInfoVersions) {
-	l.CheckAndUpdatePlatformData(response, version.VersionPlatformData)
-	l.CheckAndUpdateGroups(response, version.VersionGroups)
-	l.CheckAndUpdateFlowAcls(response, version.VersionAcls)
-
-	log.Info("droplet grpc finish data change")
-}
-
-func (l *LabelerManager) OnPlatformDataChange(data []*datatype.PlatformData) {
-	if reflect.DeepEqual(l.rawPlatformDatas, data) {
-		return
-	}
-	l.policyTable.UpdateInterfaceData(data)
-	l.rawPlatformDatas = data
-	l.enable = true
-}
-
-func (l *LabelerManager) OnIpGroupDataChange(data []*policy.IpGroupData) {
-	if reflect.DeepEqual(l.rawIpGroupDatas, data) {
-		return
-	}
-	l.policyTable.UpdateIpGroupData(data)
-	l.rawIpGroupDatas = data
-	l.enable = true
-}
-
-func (l *LabelerManager) OnPeerConnectionChange(data []*datatype.PeerConnection) {
-	if reflect.DeepEqual(l.rawPeerConnection, data) {
-		return
-	}
-	l.policyTable.UpdatePeerConnection(data)
-	l.rawPeerConnection = data
-	l.enable = true
-}
-
-func (l *LabelerManager) OnPolicyDataChange(data []*policy.Acl) {
-	// DDBS算法中需要根据资源组查询MAC和IP建立查询表，
-	// 所以当平台数据或IP资源组更新后，即使策略不变也应该重新建立查询表
-	if reflect.DeepEqual(l.rawPolicyData, data) && !l.enable {
-		return
-	}
-	l.policyTable.UpdateAclData(data)
-	l.rawPolicyData = data
-	l.enable = true
 }
 
 func getTTL(packet *datatype.MetaPacket) uint8 {
