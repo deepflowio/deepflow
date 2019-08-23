@@ -76,8 +76,8 @@ github.com/stretchr/testify v1.3.0 h1:TivCn/peBQ7UY8ooIcPgZFpTNSz0Q2U6UrFlUfqbe0
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/tebeka/strftime v0.0.0-20140926081919-3f9c7761e312 h1:frNEkk4P8mq+47LAMvj9LvhDq01kFDUhpJZzzei8IuM=
 github.com/tebeka/strftime v0.0.0-20140926081919-3f9c7761e312/go.mod h1:o6CrSUtupq/A5hylbvAsdydn0d5yokJExs8VVdx4wwI=
-gitlab.x.lan/yunshan/message v0.0.0-20190903020921-decb792bab67 h1:vGtEDkBB1Wnc4vftvkFOoGy2eUjX24KMGTaYEdXfdSU=
-gitlab.x.lan/yunshan/message v0.0.0-20190903020921-decb792bab67/go.mod h1:R5ZX1w+XLKWpf45DbKsAXvRyklT7rfgBN/WKClV2MP4=
+gitlab.x.lan/yunshan/message v0.0.0-20190903024021-7c89d48333cc h1:SLZohxuVy1BYlegW4YoJgnVx+r6+YlUKla5e7LKpEVs=
+gitlab.x.lan/yunshan/message v0.0.0-20190903024021-7c89d48333cc/go.mod h1:R5ZX1w+XLKWpf45DbKsAXvRyklT7rfgBN/WKClV2MP4=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/exp v0.0.0-20190121172915-509febef88a4/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
 golang.org/x/lint v0.0.0-20181026193005-c67002cb31c3/go.mod h1:UVdnD1Gm6xHRNCYTkRU2/jEulfH38KcIWyp/GAMgvoE=

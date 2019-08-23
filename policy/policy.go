@@ -222,6 +222,30 @@ func (t *PolicyTable) UpdateIpGroupData(data []*IpGroupData) {
 	t.operator.UpdateIpGroupData(data)
 }
 
+// NOTICE: 函数参数platforms和ipGroups，都是从GRPC中获取的原始数据
+func (t *PolicyTable) UpdateInterfaceDataAndIpGroupData(platforms []*PlatformData, ipGroups []*IpGroupData) {
+	// 因为不能追踪删除资源组的设备，所以不能修改原始的平台数据, 原始的平台数据由调用者保存
+	platformDatas := make([]*PlatformData, 0, len(platforms))
+	ipGroupMap := make(map[uint16][]uint32, len(ipGroups))
+	for _, ipGroup := range ipGroups {
+		for _, vmId := range ipGroup.VmIds {
+			id := uint16(vmId & 0xffff)
+			ipGroupMap[id] = append(ipGroupMap[id], ipGroup.Id)
+		}
+	}
+
+	for _, raw := range platforms {
+		platform := &PlatformData{}
+		*platform = *raw
+		id := uint16(platform.DeviceId & 0xffff)
+		platform.GroupIds = ipGroupMap[id]
+
+		platformDatas = append(platformDatas, platform)
+	}
+	t.UpdateInterfaceData(platformDatas)
+	t.UpdateIpGroupData(ipGroups)
+}
+
 func (t *PolicyTable) UpdatePeerConnection(data []*PeerConnection) {
 	t.cloudPlatformLabeler.UpdatePeerConnectionTable(data)
 }

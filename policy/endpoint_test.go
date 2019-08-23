@@ -16,13 +16,13 @@ func TestGetPlatformData(t *testing.T) {
 	datas := make([]*PlatformData, 0, 2)
 	ipInfo := generateIpNet(ip3, 121, 24)
 	ipInfo1 := generateIpNet(ip4, 122, 25)
-	// epcId:40 DeviceType:2 DeviceId:3 IfType:3 IfIndex:5 Mac:mac4 HostIp:launchServer1
-	vifData := generatePlatformDataExtension(groupEpc[4], 2, 3, 3, 5, mac4, launchServer1)
+	// epcId:40 DeviceType:2 DeviceId:3 IfType:3 Mac:mac4 HostIp:launchServer1
+	vifData := generatePlatformDataExtension(groupEpc[4], 2, 3, 3, mac4, launchServer1)
 	vifData.Ips = append(vifData.Ips, ipInfo, ipInfo1)
 
 	ipInfo2 := generateIpNet(ip2, 125, 24)
 	ipInfo3 := generateIpNet(ip1, 126, 32)
-	vifData1 := generatePlatformDataExtension(groupEpcAny, 1, 100, 3, 5, mac2, launchServer1)
+	vifData1 := generatePlatformDataExtension(groupEpcAny, 1, 100, 3, mac2, launchServer1)
 	vifData1.Ips = append(vifData1.Ips, ipInfo2, ipInfo3)
 
 	datas = append(datas, vifData, vifData1)
@@ -42,8 +42,8 @@ func TestGetPlatformDataAboutArp(t *testing.T) {
 
 	ipInfo := generateIpNet(ip3, 121, 24)
 	ipInfo1 := generateIpNet(ip4, 122, 25)
-	// epcId:40 DeviceType:2 DeviceId:3 IfType:3 IfIndex:5 Mac:mac4 HostIp:launchServer1
-	vifData := generatePlatformDataExtension(groupEpc[4], 2, 3, 3, 5, mac4, launchServer1)
+	// epcId:40 DeviceType:2 DeviceId:3 IfType:3 Mac:mac4 HostIp:launchServer1
+	vifData := generatePlatformDataExtension(groupEpc[4], 2, 3, 3, mac4, launchServer1)
 	vifData.Ips = append(vifData.Ips, ipInfo, ipInfo1)
 
 	datas = append(datas, vifData)

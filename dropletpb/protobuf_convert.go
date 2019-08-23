@@ -12,11 +12,7 @@ import (
 )
 
 func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
-	macInt := uint64(0)
-	if mac, err := net.ParseMAC(vifData.GetMac()); err == nil {
-		macInt = Mac2Uint64(mac)
-	}
-
+	macInt := vifData.GetMac()
 	hostIp := uint32(0)
 	ip := ParserStringIpV4(vifData.GetLaunchServer())
 	if ip != nil {
@@ -55,10 +51,8 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 		EpcId:      int32(vifData.GetEpcId()),
 		DeviceType: vifData.GetDeviceType(),
 		DeviceId:   vifData.GetDeviceId(),
-		IfIndex:    vifData.GetIfIndex(),
 		IfType:     vifData.GetIfType(),
 		HostIp:     hostIp,
-		GroupIds:   vifData.GetGroupIds(),
 	}
 }
 
@@ -94,11 +88,17 @@ func newIpGroupData(ipGroup *trident.Group) *policy.IpGroupData {
 			}
 		}
 	}
+	vmIds := make([]uint32, 0, len(ipGroup.GetVmIds()))
+	for _, id := range ipGroup.GetVmIds() {
+		vmIds = append(vmIds, id&0xffff)
+	}
+
 	return &policy.IpGroupData{
 		Id:    ipGroup.GetId() & 0xffff,
 		EpcId: int32(ipGroup.GetEpcId()),
 		Type:  uint8(ipGroup.GetType()),
 		Ips:   ips,
+		VmIds: vmIds,
 	}
 }
 

@@ -30,7 +30,6 @@ type PlatformData struct {
 	EpcId      int32
 	DeviceType uint32
 	DeviceId   uint32
-	IfIndex    uint32
 	IfType     uint32
 	HostIp     uint32
 	GroupIds   []uint32
