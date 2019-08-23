@@ -207,13 +207,12 @@ func generateIpGroup(groupId uint32, epcId int32, ip ...string) *IpGroupData {
 	return &ipGroup
 }
 
-func generatePlatformDataExtension(epcId int32, deviceType, deviceId, ifType, ifIndex uint32, mac uint64, hostIp uint32) *PlatformData {
+func generatePlatformDataExtension(epcId int32, deviceType, deviceId, ifType uint32, mac uint64, hostIp uint32) *PlatformData {
 	data := PlatformData{
 		EpcId:      epcId,
 		DeviceType: deviceType,
 		DeviceId:   deviceId,
 		IfType:     ifType,
-		IfIndex:    ifIndex,
 		Mac:        mac,
 		HostIp:     hostIp,
 	}
@@ -222,7 +221,7 @@ func generatePlatformDataExtension(epcId int32, deviceType, deviceId, ifType, if
 
 func generatePlatformDataByParam(ip uint32, mac uint64, epcId int32, Iftype uint32) *PlatformData {
 	ipInfo := generateIpNet(ip, 121, 32)
-	vifData := generatePlatformDataExtension(epcId, 1, 3, Iftype, 5, mac, launchServer1)
+	vifData := generatePlatformDataExtension(epcId, 1, 3, Iftype, mac, launchServer1)
 	vifData.Ips = append(vifData.Ips, ipInfo)
 	return vifData
 }
@@ -233,7 +232,6 @@ func generatePlatformDataWithGroupId(epcId int32, groupId uint32, mac uint64, ip
 		DeviceType: 2,
 		DeviceId:   3,
 		IfType:     3,
-		IfIndex:    5,
 		Mac:        mac,
 		HostIp:     server,
 	}
