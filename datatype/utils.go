@@ -51,14 +51,10 @@ func getLastIp(ip uint32, mask uint8) uint32 {
 	return ip
 }
 
-func SplitGroup2Int(src string) []uint32 {
-	splitSrcGroups := strings.Split(src, ",")
+func SplitGroup2Int(src []int32) []uint32 {
 	groups := make([]uint32, 0, 8)
-	for _, group := range splitSrcGroups {
-		groupInt, err := strconv.Atoi(group)
-		if err == nil {
-			groups = append(groups, uint32(groupInt&0xffff))
-		}
+	for _, group := range src {
+		groups = append(groups, uint32(group&0xffff))
 	}
 
 	return groups
