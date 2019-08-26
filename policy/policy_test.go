@@ -310,7 +310,7 @@ func generatePolicyAcl(table *PolicyTable, action AclAction, aclID ACLID, args .
 		Vlan:         vlan,
 		Action:       []AclAction{action},
 	}
-	if npb != 0 {
+	if npb.TunnelId() != 0 {
 		acl.NpbActions = append(acl.NpbActions, npb)
 		acl.Action = nil
 	}
@@ -1332,10 +1332,10 @@ func TestNpbAction(t *testing.T) {
 
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
 	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
-	npb1 := ToNpbAction(10, 150, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
-	npb2 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
-	npb3 := ToNpbAction(20, 200, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
-	npb := ToNpbAction(10, 150, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
+	npb1 := ToNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
+	npb2 := ToNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
+	npb3 := ToNpbAction(20, 200, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
+	npb := ToNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
 
 	acl1 := generatePolicyAcl(table, action1, 25, groupAny, groupAny, IPProtocolTCP, 1000, vlanAny, npb1)
 	action2 := generateAclAction(26, ACTION_PACKET_BROKERING)
@@ -1386,7 +1386,7 @@ func TestMultiNpbAction1(t *testing.T) {
 	table := generatePolicyTable()
 	action := generateAclAction(25, 0)
 	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
-	npb := ToNpbAction(10, 150, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
+	npb := ToNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
 	// VMA -> ANY SRC
 	acl := generatePolicyAcl(table, action, 25, group[1], groupAny, IPProtocolTCP, 0, vlanAny, npb)
 	// VMB -> ANY SRC
@@ -1512,23 +1512,23 @@ func TestMultiNpbAction1(t *testing.T) {
 
 func TestNpbActionDedup(t *testing.T) {
 	table := generatePolicyTable()
-	npb1 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
-	npb2 := ToNpbAction(10, 150, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
-	npb3 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
-	npb4 := ToNpbAction(20, 100, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
+	npb1 := ToNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
+	npb2 := ToNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
+	npb3 := ToNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
+	npb4 := ToNpbAction(20, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
 	// VM段-A -> ANY, DEV-group2 -> ANY
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
 	acl1 := generatePolicyAcl(table, action1, 25, group[2], groupAny, IPProtocolTCP, 0, vlanAny, npb1)
 	// IP段-A -> ANY, IP-group3 -> ANY
 	action2 := generateAclAction(26, ACTION_PACKET_BROKERING)
-	acl2 := generatePolicyAcl(table, action2, 26, group[3], groupAny, IPProtocolTCP, 0, vlanAny, npb2)
+	acl2 := generatePolicyAcl(table, action2, 26, group[6], groupAny, IPProtocolTCP, 0, vlanAny, npb2)
 	acls := []*Acl{acl1, acl2}
 	table.UpdateAcls(acls)
 
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.MergeNpbAction([]NpbAction{npb1, npb2}, 25)
+	basicPolicyData.MergeNpbAction([]NpbAction{npb1, npb2.ReverseTapSide()}, 25)
 	// key: true:(DEV-group2/IP-group3)group2Ip1:1000 -> true:(DEV-group4/IP-group6)group4Ip1:1023 tcp
-	key := generateLookupKey(group2Mac, group4Mac1, vlanAny, group2Ip1, group4Ip1, IPProtocolTCP, 1000, 1023, NPB)
+	key := generateLookupKey(group2Mac, group4Mac1, vlanAny, group2Ip1, ipGroup6Ip2, IPProtocolTCP, 1000, 1023, NPB)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
 	endpoint := modifyEndpointDataL3End(table, key, l3EndBool[1], l3EndBool[1])
 	policyData := getPolicyByFirstPath(table, endpoint, key)
@@ -1547,7 +1547,7 @@ func TestNpbActionDedup(t *testing.T) {
 	table.UpdateAcls(acls)
 
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.MergeNpbAction([]NpbAction{npb1, npb2, npb4.ReverseTapSide(), npb3.ReverseTapSide()}, acl1.Id)
+	basicPolicyData.MergeNpbAction([]NpbAction{npb1, npb4.ReverseTapSide(), npb3.ReverseTapSide(), npb2.ReverseTapSide()}, acl1.Id)
 	basicPolicyData.FormatNpbAction()
 	// key不变，acl改变
 	policyData = getPolicyByFirstPath(table, endpoint, key)
@@ -1556,7 +1556,7 @@ func TestNpbActionDedup(t *testing.T) {
 	}
 
 	// IP段-A -> IP段-B, IP-group3 -> IP-group6
-	npb5 := ToNpbAction(20, 150, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
+	npb5 := ToNpbAction(20, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
 	action5 := generateAclAction(29, ACTION_PACKET_BROKERING)
 	acl5 := generatePolicyAcl(table, action5, 29, group[6], group[6], IPProtocolTCP, 0, vlanAny, npb5)
 	acls = []*Acl{acl5}
@@ -2196,7 +2196,7 @@ func BenchmarkNpbFirstPath(b *testing.B) {
 
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
 	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
-	npb1 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_IP, TAPSIDE_DST, 100)
+	npb1 := ToNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_DST, 100)
 	acl1 := generatePolicyAcl(table, action1, 25, groupAny, groupAny, IPProtocolTCP, 1000, vlanAny, npb1)
 	acls := []*Acl{acl1}
 	table.UpdateAcls(acls)
@@ -2217,7 +2217,7 @@ func BenchmarkNpbFastPath(b *testing.B) {
 
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
 	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
-	npb1 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_IP, TAPSIDE_DST, 100)
+	npb1 := ToNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_DST, 100)
 	acl1 := generatePolicyAcl(table, action1, 25, groupAny, groupAny, IPProtocolTCP, 1000, vlanAny, npb1)
 	acls := []*Acl{acl1}
 	table.UpdateAcls(acls)
@@ -2234,9 +2234,9 @@ func BenchmarkNpbFastPath(b *testing.B) {
 }
 
 func BenchmarkNpbCheck(b *testing.B) {
-	npb1 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
-	npb2 := ToNpbAction(20, 150, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
-	npb3 := ToNpbAction(30, 150, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
+	npb1 := ToNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
+	npb2 := ToNpbAction(20, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
+	npb3 := ToNpbAction(30, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
 
 	policy := new(PolicyData)
 	policy.MergeNpbAction([]NpbAction{npb1, npb2, npb3}, 25)
@@ -2255,10 +2255,10 @@ func BenchmarkNpbCheck(b *testing.B) {
 func BenchmarkNpbDedup(b *testing.B) {
 	table := generatePolicyTable()
 
-	npb1 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
-	npb2 := ToNpbAction(10, 150, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
-	npb3 := ToNpbAction(10, 100, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
-	npb4 := ToNpbAction(20, 100, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
+	npb1 := ToNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
+	npb2 := ToNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
+	npb3 := ToNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
+	npb4 := ToNpbAction(20, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
 	// VMA -> ANY
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
 	acl1 := generatePolicyAcl(table, action1, 25, group[2], groupAny, IPProtocolTCP, 0, vlanAny, npb1)

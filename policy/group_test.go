@@ -9,12 +9,12 @@ import (
 )
 
 var groups []*IpGroupData = []*IpGroupData{
-	&IpGroupData{Id: 1, EpcId: 1, Type: IP_GROUP, Ips: []string{"1234:1234:1234::1/24"}},
-	&IpGroupData{Id: 2, EpcId: 1, Type: IP_GROUP, Ips: []string{"1234:1134:1234::2/16"}},
-	&IpGroupData{Id: 3, EpcId: 2, Type: VM_GROUP, Ips: []string{"1234:1434:1234::2/16"}},
-	&IpGroupData{Id: 4, EpcId: 2, Type: VM_GROUP, Ips: []string{"1234:1434:1234::2/8"}},
-	&IpGroupData{Id: 5, EpcId: 3, Type: VM_GROUP, Ips: []string{"1234:1234:1234::2/128"}},
-	&IpGroupData{Id: 6, EpcId: 0, Type: VM_GROUP, Ips: []string{"1234:1234:1234::2/128"}}, // EpcId为0，匹配所有EpcId
+	&IpGroupData{Id: 1, EpcId: 1, Type: NAMED, Ips: []string{"1234:1234:1234::1/24"}},
+	&IpGroupData{Id: 2, EpcId: 1, Type: NAMED, Ips: []string{"1234:1134:1234::2/16"}},
+	&IpGroupData{Id: 3, EpcId: 2, Type: NAMED, Ips: []string{"1234:1434:1234::2/16"}},
+	&IpGroupData{Id: 4, EpcId: 2, Type: NAMED, Ips: []string{"1234:1434:1234::2/8"}},
+	&IpGroupData{Id: 5, EpcId: 3, Type: NAMED, Ips: []string{"1234:1234:1234::2/128"}},
+	&IpGroupData{Id: 6, EpcId: 0, Type: NAMED, Ips: []string{"1234:1234:1234::2/128"}}, // EpcId为0，匹配所有EpcId
 }
 
 func generateIpResourceGroup() *IpResourceGroup {

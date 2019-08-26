@@ -14,7 +14,12 @@ var (
 
 type ActionFlag uint16
 
-type NpbAction uint64 // tunnel-ip | tunnel-id | Dep/Ip | TapSide | payload-slice
+type NpbAction uint64 // tunnel-ip | tunnel-type | tunnel-id | Dep/Ip | TapSide | payload-slice
+
+const (
+	NPB_TUNNEL_TYPE_VXLAN = iota
+	NPB_TUNNEL_TYPE_GRE_ERSPAN
+)
 
 const (
 	TAPSIDE_SRC  = 0x1
@@ -71,12 +76,12 @@ func (a NpbAction) TunnelIp() IPv4Int {
 }
 
 func (a NpbAction) TunnelId() uint32 {
-	return uint32((a >> 20) & 0xff)
+	return uint32((a >> 20) & 0x3ff)
 }
 
 func (a *NpbAction) SetTunnelId(id uint32) {
-	*a &= ^NpbAction(0xff << 20)
-	*a |= NpbAction((id & 0xff) << 20)
+	*a &= ^NpbAction(0x3ff << 20)
+	*a |= NpbAction((id & 0x3ff) << 20)
 }
 
 func (a NpbAction) TunnelInfo() uint64 {
@@ -92,12 +97,16 @@ func (a *NpbAction) SetPayloadSlice(payload uint16) {
 	*a |= NpbAction(payload)
 }
 
-func (a NpbAction) String() string {
-	return fmt.Sprintf("{%d@%s slice %d side: %d group: %d}", a.TunnelId(), IpFromUint32(a.TunnelIp()), a.PayloadSlice(), a.TapSide(), a.ResourceGroupType())
+func (a NpbAction) TunnelType() uint8 {
+	return uint8((a >> 30) & 0x3)
 }
 
-func ToNpbAction(ip uint32, id uint8, group, tapSide uint8, slice uint16) NpbAction {
-	return NpbAction(uint64(ip)<<32 | uint64(id)<<20 | (uint64(group)&RESOURCE_GROUP_TYPE_MASK)<<18 | (uint64(tapSide)&TAPSIDE_MASK)<<16 | uint64(slice))
+func (a NpbAction) String() string {
+	return fmt.Sprintf("{%d@%s type: %d slice %d side: %d group: %d}", a.TunnelId(), IpFromUint32(a.TunnelIp()), a.TunnelType(), a.PayloadSlice(), a.TapSide(), a.ResourceGroupType())
+}
+
+func ToNpbAction(ip uint32, id uint16, tunnelType, group, tapSide uint8, slice uint16) NpbAction {
+	return NpbAction(uint64(ip)<<32 | uint64(tunnelType&0x3)<<30 | uint64(id&0x3ff)<<20 | (uint64(group)&RESOURCE_GROUP_TYPE_MASK)<<18 | (uint64(tapSide)&TAPSIDE_MASK)<<16 | uint64(slice))
 }
 
 const (
@@ -477,15 +486,12 @@ func (d *PolicyData) MergeNpbAction(actions []NpbAction, aclID ACLID, directions
 				break
 			}
 
-			if m.TunnelIp() != n.TunnelIp() {
+			if m.TunnelIp() != n.TunnelIp() || m.TunnelId() != n.TunnelId() {
 				continue
 			}
 			if n.PayloadSlice() == 0 ||
 				n.PayloadSlice() > m.PayloadSlice() {
 				d.NpbActions[index].SetPayloadSlice(n.PayloadSlice())
-			}
-			if n.TunnelId() > m.TunnelId() {
-				d.NpbActions[index].SetTunnelId(n.TunnelId())
 			}
 			d.NpbActions[index].AddResourceGroupType(n.ResourceGroupType())
 			if len(directions) > 0 {

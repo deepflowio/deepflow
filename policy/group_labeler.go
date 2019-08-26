@@ -9,10 +9,8 @@ import (
 )
 
 const (
-	VM_GROUP     = 0
-	IP_GROUP     = 1
-	ANONYMOUS_VM = 2
-	ANONYMOUS_IP = 3
+	NAMED     = 0
+	ANONYMOUS = 1
 )
 
 type IpGroupData struct {
@@ -325,7 +323,7 @@ func (g *IpResourceGroup) Populate(ip net.IP, endpointInfo *EndpointInfo) {
 }
 
 func (g *IpResourceGroup) AddAnonymousGroupId(anonymous map[uint32]bool, group *IpGroupData) {
-	if group.Type == ANONYMOUS_IP || group.Type == ANONYMOUS_VM {
+	if group.Type == ANONYMOUS {
 		anonymous[group.Id] = true
 	}
 }
