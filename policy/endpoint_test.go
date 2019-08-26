@@ -837,9 +837,9 @@ func TestAnonymousGroupData(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	ipGroup1 := generateIpGroup(group[1], 0, ipGroup6IpNet1)
-	ipGroup1.Type = ANONYMOUS_IP
+	ipGroup1.Type = ANONYMOUS
 	ipGroup2 := generateIpGroup(group[2], 0, ipGroup6IpNet2)
-	ipGroup2.Type = ANONYMOUS_IP
+	ipGroup2.Type = ANONYMOUS
 	ipGroups := make([]*IpGroupData, 0, 2)
 	ipGroups = append(ipGroups, ipGroup1, ipGroup2)
 	policy.UpdateIpGroupData(ipGroups)
