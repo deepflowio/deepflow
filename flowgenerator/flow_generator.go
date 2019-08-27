@@ -429,7 +429,8 @@ func (f *FlowGenerator) processPackets(processBuffer []interface{}) {
 	for _, e := range processBuffer {
 		meta := e.(*MetaPacket)
 		// TODO: 当前版本Flow和Metering都不需要IPv6, 直接返回
-		if meta.EthType == layers.EthernetTypeIPv6 {
+		if meta.EthType == layers.EthernetTypeIPv6 ||
+			(meta.PolicyData.ActionFlags&(PACKET_ACTION|FLOW_ACTION) == 0) {
 			ReleaseMetaPacket(meta)
 			continue
 		}
@@ -444,8 +445,12 @@ func (f *FlowGenerator) processPackets(processBuffer []interface{}) {
 		} else {
 			f.processOtherIpPacket(meta)
 		}
-		f.meteringKeys = append(f.meteringKeys, HashKey(meta.QueueHash))
-		f.meteringItems = append(f.meteringItems, meta)
+		if meta.PolicyData.ActionFlags&PACKET_ACTION != 0 {
+			f.meteringKeys = append(f.meteringKeys, HashKey(meta.QueueHash))
+			f.meteringItems = append(f.meteringItems, meta)
+		} else {
+			ReleaseMetaPacket(meta)
+		}
 	}
 
 	if len(f.meteringItems) > 0 {
@@ -506,6 +511,8 @@ func reportFlowListTimeout(f *FlowGenerator, list *ListFlowExtra, now, cleanRang
 			if flowExtra.isFlowAction {
 				buffer[num] = taggedFlow
 				num = tryCleanBuffer(flowOutQueue, buffer, num+1)
+			} else {
+				ReleaseTaggedFlow(taggedFlow)
 			}
 			cleanCount++
 			del := e
@@ -543,6 +550,8 @@ func reportFlowListGeneral(f *FlowGenerator, list *ListFlowExtra, now, cleanRang
 		if flowExtra.isFlowAction {
 			buffer[num] = taggedFlow
 			num = tryCleanBuffer(flowOutQueue, buffer, num+1)
+		} else {
+			ReleaseTaggedFlow(taggedFlow)
 		}
 	}
 	if cleanCount > 0 {

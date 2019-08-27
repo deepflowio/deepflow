@@ -236,16 +236,25 @@ func (l *LabelerManager) run(index int) {
 		for i, item := range itemBatch[:itemCount] {
 			metaPacket := item.(*datatype.MetaPacket)
 			action := l.GetPolicy(metaPacket, index)
+			if action.ActionFlags == 0 {
+				datatype.ReleaseMetaPacket(metaPacket)
+				itemBatch[i] = nil
+				continue
+			}
 
 			if (action.ActionFlags & datatype.ACTION_PACKET_CAPTURING) != 0 {
+				if action.ActionFlags != datatype.ACTION_PACKET_CAPTURING {
+					metaPacket.AddReferenceCount() // 引用计数+1，避免被释放
+				}
 				captureKeys = append(captureKeys, queue.HashKey(metaPacket.QueueHash))
-				metaPacket.AddReferenceCount() // 引用计数+1，避免被释放
 				captureItemBatch = append(captureItemBatch, metaPacket)
 			}
 
-			// 为了获取所以流量方向，所有流量都过flowgenerator
-			flowKeys = append(flowKeys, queue.HashKey(metaPacket.QueueHash))
-			flowItemBatch = append(flowItemBatch, metaPacket)
+			if action.ActionFlags != datatype.ACTION_PACKET_CAPTURING {
+				// 为了获取所以流量方向，所有流量都过flowgenerator
+				flowKeys = append(flowKeys, queue.HashKey(metaPacket.QueueHash))
+				flowItemBatch = append(flowItemBatch, metaPacket)
+			}
 
 			itemBatch[i] = nil
 		}

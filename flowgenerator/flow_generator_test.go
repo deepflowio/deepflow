@@ -394,6 +394,7 @@ func TestTimeFixAndDuration(t *testing.T) {
 
 	packet0 := getDefaultPacket()
 	packet0.Timestamp -= forceReportInterval
+	firstPacketTime := packet0.Timestamp
 	minArrTime := packet0.Timestamp
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet0)
 
@@ -412,7 +413,7 @@ func TestTimeFixAndDuration(t *testing.T) {
 	flowGenerator.Start()
 
 	taggedFlow := flowOutQueue.(QueueReader).Get().(*TaggedFlow)
-	pivotalTime := packet0.Timestamp/forceReportInterval*forceReportInterval + forceReportInterval
+	pivotalTime := firstPacketTime/forceReportInterval*forceReportInterval + forceReportInterval
 	if taggedFlow.StartTime != pivotalTime {
 		t.Errorf("taggedFlow.StartTime is %d, expect %d", taggedFlow.StartTime, pivotalTime)
 	}
@@ -510,8 +511,9 @@ func TestDoubleFinFromServer(t *testing.T) {
 	reversePacket(packet3)
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet3)
 	// FIN
-	packet4 := &MetaPacket{}
-	*packet4 = *packet3
+	packet4 := getDefaultPacket()
+	packet4.TcpData.Flags = TCP_FIN
+	reversePacket(packet4)
 	metaPacketHeaderInQueue.(MultiQueueWriter).Put(0, packet4)
 
 	flowGenerator.Start()

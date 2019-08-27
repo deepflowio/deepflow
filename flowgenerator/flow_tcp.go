@@ -22,6 +22,8 @@ func (f *FlowGenerator) processTcpPacket(meta *MetaPacket) {
 			if flowExtra.isFlowAction {
 				taggedFlow.TcpPerfStats = Report(flowExtra.metaFlowPerf, flowExtra.reversed, &f.perfCounter)
 				f.flowOutQueue.Put(taggedFlow)
+			} else {
+				ReleaseTaggedFlow(taggedFlow)
 			}
 			ReleaseFlowExtra(flowExtra)
 		} else {
