@@ -24,16 +24,15 @@ func TestGroupByPolicy(t *testing.T) {
 	p.ActionFlags = datatype.ACTION_TCP_FLOW_PERF_COUNTING
 	p.Merge([]datatype.AclAction{
 		datatype.AclAction(0).SetACLGID(1).AddActionFlags(datatype.ACTION_TCP_FLOW_PERF_COUNTING).AddTagTemplates(3),
-		datatype.AclAction(0).SetACLGID(1).AddActionFlags(datatype.ACTION_TCP_FLOW_PERF_COUNT_BROKERING).AddTagTemplates(5),
+		datatype.AclAction(0).SetACLGID(1).AddActionFlags(datatype.ACTION_TCP_FLOW_PERF_COUNTING).AddTagTemplates(5),
 		datatype.AclAction(0).SetACLGID(2).AddActionFlags(datatype.ACTION_TCP_FLOW_PERF_COUNTING).AddTagTemplates(2),
-		datatype.AclAction(0).SetACLGID(2).AddActionFlags(datatype.ACTION_TCP_FLOW_PERF_COUNT_BROKERING).AddTagTemplates(6),
+		datatype.AclAction(0).SetACLGID(2).AddActionFlags(datatype.ACTION_TCP_FLOW_PERF_COUNTING).AddTagTemplates(6),
 		datatype.AclAction(0).SetACLGID(3).AddActionFlags(datatype.ACTION_TCP_FLOW_PERF_COUNTING).AddTagTemplates(6),
-		datatype.AclAction(0).SetACLGID(3).AddActionFlags(datatype.ACTION_TCP_FLOW_PERF_COUNT_BROKERING).AddTagTemplates(2),
+		datatype.AclAction(0).SetACLGID(3).AddActionFlags(datatype.ACTION_TCP_FLOW_PERF_COUNTING).AddTagTemplates(2),
 		datatype.AclAction(0).SetACLGID(4).AddActionFlags(datatype.ACTION_TCP_FLOW_PERF_COUNTING).AddTagTemplates(2),
-		datatype.AclAction(0).SetACLGID(4).AddActionFlags(datatype.ACTION_TCP_FLOW_PERF_COUNT_BROKERING).AddTagTemplates(2),
 	}, nil, 1)
 	grouped := make([]datatype.AclAction, 0)
-	grouped = FillPolicyTagTemplate(p, datatype.ACTION_TCP_FLOW_PERF_COUNTING|datatype.ACTION_TCP_FLOW_PERF_COUNT_BROKERING, grouped)
+	grouped = FillPolicyTagTemplate(p, datatype.ACTION_TCP_FLOW_PERF_COUNTING, grouped)
 	if len(grouped) != 8 {
 		t.Error("PolicyGroupID长度不正确:", grouped)
 	} else {

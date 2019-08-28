@@ -35,9 +35,9 @@ func TestPolicyTags(t *testing.T) {
 	f.TcpPerfStats = &inputtype.TcpPerfStats{}
 
 	f.PolicyData = &inputtype.PolicyData{}
-	f.PolicyData.ActionFlags = inputtype.ACTION_TCP_FLOW_PERF_COUNT_BROKERING
+	f.PolicyData.ActionFlags = inputtype.ACTION_TCP_FLOW_PERF_COUNTING
 	f.PolicyData.Merge([]inputtype.AclAction{
-		inputtype.AclAction(0).SetACLGID(1).AddActionFlags(inputtype.ACTION_TCP_FLOW_PERF_COUNT_BROKERING).SetDirections(inputtype.FORWARD).SetTagTemplates(0xFFFF),
+		inputtype.AclAction(0).SetACLGID(1).AddActionFlags(inputtype.ACTION_TCP_FLOW_PERF_COUNTING).SetDirections(inputtype.FORWARD).SetTagTemplates(0xFFFF),
 	}, nil, 10)
 
 	processor := NewProcessor()

@@ -110,7 +110,7 @@ func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket
 	}
 
 	actionFlags := metaPacket.PolicyData.ActionFlags
-	interestActions := inputtype.ACTION_PACKET_COUNTING | inputtype.ACTION_PACKET_COUNT_BROKERING
+	interestActions := inputtype.ACTION_PACKET_COUNTING
 	if actionFlags&interestActions == 0 {
 		return p.docs.Slice()
 	}

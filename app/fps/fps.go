@@ -117,7 +117,7 @@ func (p *FlowToFPSDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 	}
 
 	actionFlags := rawFlow.PolicyData.ActionFlags
-	interestActions := inputtype.ACTION_FLOW_COUNTING | inputtype.ACTION_FLOW_COUNT_BROKERING
+	interestActions := inputtype.ACTION_FLOW_COUNTING
 	if actionFlags&interestActions == 0 {
 		return p.docs.Slice()
 	}
@@ -126,7 +126,7 @@ func (p *FlowToFPSDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 	p.policyGroup = FillPolicyTagTemplate(rawFlow.PolicyData, interestActions, p.policyGroup)
 
 	oneSideCodes := make([]outputtype.Code, 0, STAT_CODES_LEN)
-	if actionFlags&inputtype.ACTION_FLOW_COUNTING != 0 && statTemplates&inputtype.TEMPLATE_NODE != 0 {
+	if statTemplates&inputtype.TEMPLATE_NODE != 0 {
 		oneSideCodes = append(oneSideCodes, NODE_CODES...)
 	}
 
