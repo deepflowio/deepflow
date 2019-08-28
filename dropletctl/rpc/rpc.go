@@ -75,8 +75,7 @@ func initCmd(cmd CmdExecute) {
 	}
 
 	synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.ControllerPort, cfg.RpcTimeout)
-	synchronizer.Register(func(response *trident.SyncResponse) {
-		fmt.Println("version:", response.GetVersion())
+	synchronizer.Register(func(response *trident.SyncResponse, version *config.RpcInfoVersions) {
 		cmd(response)
 		fmt.Println("press Ctrl^c to end it !!")
 	})
@@ -111,20 +110,28 @@ func (a SortedAcls) Swap(i, j int) {
 }
 
 func flowAcls(response *trident.SyncResponse) {
-	if flowAcls := response.GetFlowAcls(); flowAcls != nil {
-		sort.Sort(SortedAcls(flowAcls)) // sort by id
-		fmt.Println("acl data:")
-		for index, entry := range flowAcls {
-			JsonFormat(index+1, entry)
+	flowAcls := trident.FlowAcls{}
+	fmt.Println("flow Acls version:", response.GetVersionAcls())
+
+	if flowAclsCompressed := response.GetFlowAcls(); flowAclsCompressed != nil {
+		if err := flowAcls.Unmarshal(flowAclsCompressed); err == nil {
+			sort.Sort(SortedAcls(flowAcls.FlowAcl)) // sort by id
+			fmt.Println("flow Acls:")
+			for index, entry := range flowAcls.FlowAcl {
+				JsonFormat(index+1, entry)
+			}
 		}
 	}
 }
 
 func ipGroups(response *trident.SyncResponse) {
-	if plarformData := response.GetPlatformData(); plarformData != nil {
-		if ipGroups := plarformData.GetIpGroups(); ipGroups != nil {
-			fmt.Println("ipGroups data:")
-			for index, entry := range ipGroups {
+	groups := trident.Groups{}
+	fmt.Println("Groups version:", response.GetVersionGroups())
+
+	if groupsCompressed := response.GetGroups(); groupsCompressed != nil {
+		if err := groups.Unmarshal(groupsCompressed); err == nil {
+			fmt.Println("Groups data:")
+			for index, entry := range groups.Groups {
 				JsonFormat(index+1, entry)
 			}
 		}
@@ -132,10 +139,17 @@ func ipGroups(response *trident.SyncResponse) {
 }
 
 func platformData(response *trident.SyncResponse) {
-	if plarformData := response.GetPlatformData(); plarformData != nil {
-		if interfaces := plarformData.GetInterfaces(); interfaces != nil {
-			fmt.Println("platform data:")
-			for index, entry := range interfaces {
+	platform := trident.PlatformData{}
+	fmt.Println("PlatformData version:", response.GetVersionPlatformData())
+
+	if plarformCompressed := response.GetPlatformData(); plarformCompressed != nil {
+		if err := platform.Unmarshal(plarformCompressed); err == nil {
+			fmt.Println("interfaces:")
+			for index, entry := range platform.Interfaces {
+				JsonFormat(index+1, entry)
+			}
+			fmt.Println("peer connections:")
+			for index, entry := range platform.PeerConnections {
 				JsonFormat(index+1, entry)
 			}
 		}
