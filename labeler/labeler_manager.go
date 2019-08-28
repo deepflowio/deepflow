@@ -12,6 +12,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 
+	"gitlab.x.lan/yunshan/droplet/config"
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
 	"gitlab.x.lan/yunshan/message/trident"
 )
@@ -95,15 +96,21 @@ func (l *LabelerManager) RegisterAppQueue(queueType QueueType, appQueues []queue
 	l.appQueues[queueType] = appQueues
 }
 
-func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
-	newVersion := response.GetVersion()
-	log.Debugf("droplet grpc recv response with version %d, and current version is %d:", newVersion, l.version)
-	if newVersion <= l.version {
+func (l *LabelerManager) CheckAndUpdatePlatformData(response *trident.SyncResponse, version uint64) {
+	VersionPlatformData := response.GetVersionPlatformData()
+	log.Debugf("grpc recv platformData with version %d, and current version is %d:",
+		VersionPlatformData, version)
+	if VersionPlatformData <= version {
 		return
 	}
-	log.Infof("droplet grpc recv response with version %d (vs. current %d)", newVersion, l.version)
+	log.Infof("droplet grpc recv platformData with version %d (vs. current %d)", VersionPlatformData, version)
 
-	if platformData := response.GetPlatformData(); platformData != nil {
+	platformData := trident.PlatformData{}
+	if plarformCompressed := response.GetPlatformData(); plarformCompressed != nil {
+		if err := platformData.XXX_Unmarshal(plarformCompressed); err != nil {
+			log.Warningf("unmarshal grpc compressed platformData failed as %v", err)
+			return
+		}
 		if interfaces := platformData.GetInterfaces(); interfaces != nil {
 			platformData := dropletpb.Convert2PlatformData(interfaces)
 			log.Infof("droplet grpc recv %d pieces of platform data", len(platformData))
@@ -111,13 +118,7 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 		} else {
 			l.OnPlatformDataChange(nil)
 		}
-		if ipGroups := platformData.GetIpGroups(); ipGroups != nil {
-			ipGroupData := dropletpb.Convert2IpGroupData(ipGroups)
-			log.Infof("droplet grpc recv %d pieces of ipgroup data", len(ipGroupData))
-			l.OnIpGroupDataChange(ipGroupData)
-		} else {
-			l.OnIpGroupDataChange(nil)
-		}
+
 		if peerConnections := platformData.GetPeerConnections(); peerConnections != nil {
 			peerConnectionData := dropletpb.Convert2PeerConnections(peerConnections)
 			log.Infof("droplet grpc recv %d pieces of peer connection data", len(peerConnectionData))
@@ -128,14 +129,59 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 
 	} else {
 		l.OnPlatformDataChange(nil)
-		l.OnIpGroupDataChange(nil)
 		l.OnPeerConnectionChange(nil)
 	}
+}
 
-	if flowAcls := response.GetFlowAcls(); flowAcls != nil {
-		acls := dropletpb.Convert2AclData(flowAcls)
-		log.Infof("droplet grpc recv %d pieces of acl data", len(acls))
-		l.OnPolicyDataChange(acls)
+func (l *LabelerManager) CheckAndUpdateGroups(response *trident.SyncResponse, version uint64) {
+	VersionGroups := response.GetVersionGroups()
+	log.Debugf("grpc recv groups with version %d, and current version is %d:",
+		VersionGroups, version)
+	if VersionGroups <= version {
+		return
+	}
+	log.Infof("droplet grpc recv groups with version %d (vs. current %d)", VersionGroups, version)
+
+	groups := trident.Groups{}
+	if groupsCompressed := response.GetGroups(); groupsCompressed != nil {
+		if err := groups.XXX_Unmarshal(groupsCompressed); err != nil {
+			log.Warningf("unmarshal grpc compressed groups failed as %v", err)
+			return
+		}
+		if group := groups.GetGroups(); group != nil {
+			ipGroupData := dropletpb.Convert2IpGroupData(group)
+			log.Infof("droplet grpc recv %d pieces of ipgroup data", len(ipGroupData))
+			l.OnIpGroupDataChange(ipGroupData)
+		} else {
+			l.OnIpGroupDataChange(nil)
+		}
+
+	} else {
+		l.OnIpGroupDataChange(nil)
+	}
+}
+
+func (l *LabelerManager) CheckAndUpdateFlowAcls(response *trident.SyncResponse, version uint64) {
+	versionFlowAcls := response.GetVersionAcls()
+	log.Debugf("grpc recv flowAcls with version %d, and current version is %d:",
+		versionFlowAcls, version)
+	if versionFlowAcls <= version {
+		return
+	}
+	log.Infof("droplet grpc recv flowAcls with version %d (vs. current %d)", versionFlowAcls, version)
+
+	flowAcls := trident.FlowAcls{}
+	if flowAclsCompressed := response.GetFlowAcls(); flowAclsCompressed != nil {
+		if err := flowAcls.XXX_Unmarshal(flowAclsCompressed); err != nil {
+			return
+		}
+		if flowAcl := flowAcls.GetFlowAcl(); flowAcl != nil {
+			acls := dropletpb.Convert2AclData(flowAcl)
+			log.Infof("droplet grpc recv %d pieces of acl data", len(acls))
+			l.OnPolicyDataChange(acls)
+		} else {
+			l.OnPolicyDataChange(nil)
+		}
 	} else {
 		l.OnPolicyDataChange(nil)
 	}
@@ -145,8 +191,13 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 		l.policyTable.EnableAclData()
 		l.enable = false
 	}
+}
 
-	l.version = newVersion
+func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse, version *config.RpcInfoVersions) {
+	l.CheckAndUpdatePlatformData(response, version.VersionPlatformData)
+	l.CheckAndUpdateGroups(response, version.VersionGroups)
+	l.CheckAndUpdateFlowAcls(response, version.VersionAcls)
+
 	log.Info("droplet grpc finish data change")
 }
 
