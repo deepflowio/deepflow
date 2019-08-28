@@ -170,7 +170,13 @@ enum TapSide {
     BOTH = 3;
 }
 
+enum TunnelType {
+    VXLAN = 0;
+    GRE_ERSPAN = 1;
+}
+
 message NpbAction {
+    optional TunnelType tunnel_type = 1 [default = VXLAN];
     optional uint32 tunnel_id = 2;
     optional string tunnel_ip = 3;
     optional TapSide tap_side = 4;
