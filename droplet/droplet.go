@@ -139,7 +139,7 @@ func Start(configPath string) (closers []io.Closer) {
 	flowDuplicatorQueue := manager.NewQueue("3-tagged-flow-to-flow-duplicator", cfg.Queue.FlowDuplicatorQueueSize, releaseTaggedFlow)
 	meteringAppQueues := manager.NewQueues(
 		"3-meta-packet-to-metering-app", cfg.Queue.MeteringAppQueueSize, cfg.Queue.MeteringAppQueueCount, cfg.Queue.FlowGeneratorQueueCount,
-		libqueue.OptionFlushIndicator(time.Second*10), releaseMetaPacket,
+		libqueue.OptionFlushIndicator(time.Second*5), releaseMetaPacket,
 	)
 
 	flowgenerator.SetFlowGenerator(cfg)
