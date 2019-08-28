@@ -18,12 +18,6 @@ const (
 	DEFAULT_PUSH_INTERVAL = 2 * time.Second
 )
 
-type RpcInfoVersions struct {
-	VersionPlatformData uint64
-	VersionAcls         uint64
-	VersionGroups       uint64
-}
-
 type RpcConfigSynchronizer struct {
 	sync.Mutex
 	PollingSession   grpc.GrpcSession
@@ -35,13 +29,7 @@ type RpcConfigSynchronizer struct {
 	handlers       []Handler
 	stop           bool
 	configAccepted bool
-	RpcInfoVersions
-}
-
-func (s *RpcConfigSynchronizer) updateVersions(response *trident.SyncResponse) {
-	s.RpcInfoVersions.VersionPlatformData = response.GetVersionPlatformData()
-	s.RpcInfoVersions.VersionAcls = response.GetVersionAcls()
-	s.RpcInfoVersions.VersionGroups = response.GetVersionGroups()
+	Version        uint64
 }
 
 func (s *RpcConfigSynchronizer) sync() error {
@@ -49,11 +37,9 @@ func (s *RpcConfigSynchronizer) sync() error {
 	err := s.PollingSession.Request(func(ctx context.Context) error {
 		var err error
 		request := trident.SyncRequest{
-			BootTime:            proto.Uint32(uint32(s.bootTime.Unix())),
-			ConfigAccepted:      proto.Bool(s.configAccepted),
-			VersionPlatformData: proto.Uint64(s.VersionPlatformData),
-			VersionAcls:         proto.Uint64(s.VersionAcls),
-			VersionGroups:       proto.Uint64(s.VersionGroups),
+			BootTime:       proto.Uint32(uint32(s.bootTime.Unix())),
+			ConfigAccepted: proto.Bool(s.configAccepted),
+			Version:        proto.Uint64(s.Version),
 		}
 		client := trident.NewSynchronizerClient(s.PollingSession.GetClient())
 		response, err = client.Sync(ctx, &request)
@@ -73,10 +59,10 @@ func (s *RpcConfigSynchronizer) sync() error {
 	s.syncInterval = time.Duration(response.GetConfig().GetSyncInterval()) * time.Second
 	s.Lock()
 	for _, handler := range s.handlers {
-		handler(response, &s.RpcInfoVersions)
+		handler(response)
 	}
 	if len(s.handlers) > 0 {
-		s.updateVersions(response)
+		s.Version = response.GetVersion()
 	}
 	s.Unlock()
 	return nil
@@ -88,11 +74,9 @@ func (s *RpcConfigSynchronizer) pull() error {
 	err := s.triggeredSession.Request(func(ctx context.Context) error {
 		var err error
 		request := trident.SyncRequest{
-			BootTime:            proto.Uint32(uint32(s.bootTime.Unix())),
-			ConfigAccepted:      proto.Bool(s.configAccepted),
-			VersionPlatformData: proto.Uint64(s.VersionPlatformData),
-			VersionAcls:         proto.Uint64(s.VersionAcls),
-			VersionGroups:       proto.Uint64(s.VersionGroups),
+			BootTime:       proto.Uint32(uint32(s.bootTime.Unix())),
+			ConfigAccepted: proto.Bool(s.configAccepted),
+			Version:        proto.Uint64(s.Version),
 		}
 		client := trident.NewSynchronizerClient(s.triggeredSession.GetClient())
 		stream, err = client.Push(context.Background(), &request)
@@ -119,10 +103,10 @@ func (s *RpcConfigSynchronizer) pull() error {
 		}
 		s.Lock()
 		for _, handler := range s.handlers {
-			handler(response, &s.RpcInfoVersions)
+			handler(response)
 		}
 		if len(s.handlers) > 0 {
-			s.updateVersions(response)
+			s.Version = response.GetVersion()
 		}
 		s.Unlock()
 	}

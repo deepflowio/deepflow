@@ -125,10 +125,10 @@ func Start(configPath string) (closers []io.Closer) {
 		labelerQueues.Readers(), cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable, cfg.Labeler.FirstPathDdbsDisable)
 	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_FLOW, flowGeneratorQueues.Writers())
 	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_PCAP, pcapAppQueues.Writers())
-	synchronizer.Register(func(response *trident.SyncResponse, version *config.RpcInfoVersions) {
-		log.Debug(response, version)
+	synchronizer.Register(func(response *trident.SyncResponse) {
+		log.Debug(response)
 		// Labeler更新策略信息
-		labelerManager.OnAclDataChange(response, version)
+		labelerManager.OnAclDataChange(response)
 	})
 	labelerManager.Start()
 
