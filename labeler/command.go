@@ -671,8 +671,8 @@ func RegisterCommand() *cobra.Command {
 			"\tproto              packet ip proto\n" +
 			"\tport               packet port\n" +
 			"\taction             use 'flow|metering|all'\n\n" +
-			"\taction: flow=ACTION_PACKET_COUNTING\n" +
-			"\t        metering=ACTION_FLOW_COUNTING|ACTION_FLOW_STORING",
+			"\taction: metering=ACTION_PACKET_COUNTING\n" +
+			"\t        flow=ACTION_FLOW_COUNTING|ACTION_FLOW_STORING",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
 				fmt.Printf("acl is nil, Example: %s\n", cmd.Example)
