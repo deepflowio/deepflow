@@ -80,7 +80,7 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 	}
 
 	actionFlags := rawFlow.PolicyData.ActionFlags
-	interestActionFlags := inputtype.ACTION_TCP_FLOW_PERF_COUNTING | inputtype.ACTION_TCP_FLOW_PERF_COUNT_BROKERING
+	interestActionFlags := inputtype.ACTION_TCP_FLOW_PERF_COUNTING
 	if actionFlags&interestActionFlags == 0 {
 		return p.docs.Slice()
 	}
@@ -90,10 +90,8 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 	p.policyGroup = FillPolicyTagTemplate(rawFlow.PolicyData, interestActionFlags, p.policyGroup)
 
 	oneSideCodes := make([]outputtype.Code, 0, STAT_NODE_CODES_LEN)
-	if actionFlags&inputtype.ACTION_TCP_FLOW_PERF_COUNTING != 0 {
-		if statTemplates&inputtype.TEMPLATE_NODE != 0 {
-			oneSideCodes = append(oneSideCodes, NODE_CODES...)
-		}
+	if statTemplates&inputtype.TEMPLATE_NODE != 0 {
+		oneSideCodes = append(oneSideCodes, NODE_CODES...)
 	}
 
 	l3EpcIDs := [2]int32{flow.FlowMetricsPeerSrc.L3EpcID, flow.FlowMetricsPeerDst.L3EpcID}

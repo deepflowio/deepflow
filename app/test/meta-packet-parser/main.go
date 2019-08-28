@@ -57,12 +57,6 @@ func parseActionFlags(f string) it.ActionFlag {
 			flag |= it.ACTION_PACKET_CAPTURING
 		case "FMC":
 			flag |= it.ACTION_FLOW_MISC_COUNTING
-		case "PCB":
-			flag |= it.ACTION_PACKET_COUNT_BROKERING
-		case "FCB":
-			flag |= it.ACTION_FLOW_COUNT_BROKERING
-		case "TFPCB":
-			flag |= it.ACTION_TCP_FLOW_PERF_COUNT_BROKERING
 		case "GP":
 			flag |= it.ACTION_GEO_POSITIONING
 		}

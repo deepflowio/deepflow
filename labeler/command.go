@@ -520,9 +520,9 @@ func parseAcl(args []string) *policy.Acl {
 			aclAction := datatype.AclAction(0).AddDirections(datatype.FORWARD | datatype.BACKWARD).AddTagTemplates(0xFFFF)
 			switch keyValue[1] {
 			case "metering":
-				aclAction = aclAction.AddActionFlags(datatype.ACTION_PACKET_COUNTING | datatype.ACTION_PACKET_COUNT_BROKERING)
+				aclAction = aclAction.AddActionFlags(datatype.ACTION_PACKET_COUNTING)
 			case "flow":
-				aclAction = aclAction.AddActionFlags(datatype.ACTION_FLOW_COUNTING | datatype.ACTION_FLOW_COUNT_BROKERING | datatype.ACTION_FLOW_STORING)
+				aclAction = aclAction.AddActionFlags(datatype.ACTION_FLOW_COUNTING | datatype.ACTION_FLOW_STORING)
 			case "all":
 				aclAction = aclAction.AddActionFlags(0xFFFF)
 			default:
@@ -671,8 +671,8 @@ func RegisterCommand() *cobra.Command {
 			"\tproto              packet ip proto\n" +
 			"\tport               packet port\n" +
 			"\taction             use 'flow|metering|all'\n\n" +
-			"\taction: flow=ACTION_PACKET_COUNTING|ACTION_PACKET_COUNT_BROKERING\n" +
-			"\t        metering=ACTION_FLOW_COUNTING|ACTION_FLOW_COUNT_BROKERING|ACTION_FLOW_STORING",
+			"\taction: flow=ACTION_PACKET_COUNTING\n" +
+			"\t        metering=ACTION_FLOW_COUNTING|ACTION_FLOW_STORING",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
 				fmt.Printf("acl is nil, Example: %s\n", cmd.Example)

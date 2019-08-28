@@ -36,10 +36,10 @@ func TestPolicyTags(t *testing.T) {
 	m.Timestamp = 1536746971
 
 	m.PolicyData = &inputtype.PolicyData{}
-	m.PolicyData.ActionFlags = inputtype.ACTION_PACKET_COUNTING | inputtype.ACTION_PACKET_COUNT_BROKERING
+	m.PolicyData.ActionFlags = inputtype.ACTION_PACKET_COUNTING
 	m.PolicyData.Merge([]inputtype.AclAction{
 		inputtype.AclAction(0).SetACLGID(1).AddActionFlags(inputtype.ACTION_PACKET_COUNTING).SetTagTemplates(0xFFFF),
-		inputtype.AclAction(0).SetACLGID(1).AddActionFlags(inputtype.ACTION_PACKET_COUNT_BROKERING).SetTagTemplates(0xFFFF),
+		inputtype.AclAction(0).SetACLGID(1).AddActionFlags(inputtype.ACTION_PACKET_COUNTING).SetTagTemplates(0xFFFF),
 	}, nil, 10)
 
 	processor := NewProcessor()
@@ -85,7 +85,7 @@ func TestPolicyTagTemplate(t *testing.T) {
 	m.Timestamp = 1536746971
 
 	m.PolicyData = &inputtype.PolicyData{}
-	m.PolicyData.ActionFlags = inputtype.ACTION_PACKET_COUNTING | inputtype.ACTION_PACKET_COUNT_BROKERING
+	m.PolicyData.ActionFlags = inputtype.ACTION_PACKET_COUNTING
 	m.PolicyData.Merge([]inputtype.AclAction{
 		inputtype.AclAction(0).SetACLGID(1).AddActionFlags(inputtype.ACTION_PACKET_COUNTING).SetTagTemplates(inputtype.TEMPLATE_ACL_NODE),
 		inputtype.AclAction(0).SetACLGID(1).AddActionFlags(inputtype.ACTION_PACKET_COUNTING).SetTagTemplates(inputtype.TEMPLATE_ACL_PORT),

@@ -128,7 +128,7 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 	flow := Flow(*rawFlow)
 
 	actionFlags := rawFlow.PolicyData.ActionFlags
-	interestActions := inputtype.ACTION_FLOW_COUNTING | inputtype.ACTION_FLOW_COUNT_BROKERING
+	interestActions := inputtype.ACTION_FLOW_COUNTING
 	if actionFlags&interestActions == 0 {
 		return p.docs.Slice()
 	}
@@ -138,22 +138,20 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 
 	oneSideCodes := make([]outputtype.Code, 0, STAT_CODES_LEN)
 	edgeCodes := make([]outputtype.Code, 0, STAT_EDGE_CODES_LEN)
-	if actionFlags&inputtype.ACTION_FLOW_COUNTING != 0 {
-		if statTemplates&inputtype.TEMPLATE_NODE != 0 {
-			oneSideCodes = append(oneSideCodes, NODE_CODES...)
+	if statTemplates&inputtype.TEMPLATE_NODE != 0 {
+		oneSideCodes = append(oneSideCodes, NODE_CODES...)
+	}
+	if statTemplates&inputtype.TEMPLATE_NODE_PORT != 0 && flow.IsActiveService { // 含有端口号的，仅统计活跃端口
+		oneSideCodes = append(oneSideCodes, NODE_PORT_CODES...)
+	}
+	if statTemplates&inputtype.TEMPLATE_EDGE != 0 {
+		edgeCodes = append(edgeCodes, EDGE_CODES...)
+		if TOR.IsPortInRange(flow.InPort) {
+			edgeCodes = append(edgeCodes, TOR_EDGE_CODES...)
 		}
-		if statTemplates&inputtype.TEMPLATE_NODE_PORT != 0 && flow.IsActiveService { // 含有端口号的，仅统计活跃端口
-			oneSideCodes = append(oneSideCodes, NODE_PORT_CODES...)
-		}
-		if statTemplates&inputtype.TEMPLATE_EDGE != 0 {
-			edgeCodes = append(edgeCodes, EDGE_CODES...)
-			if TOR.IsPortInRange(flow.InPort) {
-				edgeCodes = append(edgeCodes, TOR_EDGE_CODES...)
-			}
-		}
-		if statTemplates&inputtype.TEMPLATE_EDGE_PORT != 0 && flow.IsActiveService && TOR.IsPortInRange(flow.InPort) { // 含有端口号的，仅统计活跃端口
-			edgeCodes = append(edgeCodes, TOR_EDGE_PORT_CODES...)
-		}
+	}
+	if statTemplates&inputtype.TEMPLATE_EDGE_PORT != 0 && flow.IsActiveService && TOR.IsPortInRange(flow.InPort) { // 含有端口号的，仅统计活跃端口
+		edgeCodes = append(edgeCodes, TOR_EDGE_PORT_CODES...)
 	}
 
 	l3EpcIDs := [2]int32{flow.FlowMetricsPeerSrc.L3EpcID, flow.FlowMetricsPeerDst.L3EpcID}
