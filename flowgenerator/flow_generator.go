@@ -288,15 +288,17 @@ func reverseFlowTag(taggedFlow *TaggedFlow) {
 	taggedFlow.PolicyData = reversePolicyData(taggedFlow.PolicyData)
 }
 
+func (f *FlowExtra) getMetaPacketDirection(meta *MetaPacket) PacketDirection {
+	if meta.IpSrc == f.taggedFlow.IPSrc {
+		return CLIENT_TO_SERVER
+	}
+	return SERVER_TO_CLIENT
+}
+
 func (f *FlowExtra) setMetaPacketDirection(meta *MetaPacket) {
 	// taggedFlow存储的方向是CLIENT_TO_SERVER
-	if meta.MacSrc == f.taggedFlow.MACSrc {
-		meta.Direction = CLIENT_TO_SERVER
-		meta.IsActiveService = f.taggedFlow.Flow.IsActiveService
-	} else {
-		meta.Direction = SERVER_TO_CLIENT
-		meta.IsActiveService = f.taggedFlow.Flow.IsActiveService
-	}
+	meta.Direction = f.getMetaPacketDirection(meta)
+	meta.IsActiveService = f.taggedFlow.Flow.IsActiveService
 }
 
 func (f *FlowExtra) reverseFlow() {

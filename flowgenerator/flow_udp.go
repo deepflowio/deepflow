@@ -59,7 +59,7 @@ func (f *FlowGenerator) updateUDPDirection(meta *MetaPacket, flowExtra *FlowExtr
 	dstKey := ServiceKey(int16(meta.EndpointData.DstInfo.L3EpcId), meta.IpDst, meta.PortDst)
 
 	srcScore, dstScore := f.udpServiceTable.GetUDPScore(isFirstPacket, srcKey, dstKey)
-	if meta.MacSrc != flowExtra.taggedFlow.MACSrc {
+	if flowExtra.getMetaPacketDirection(meta) == SERVER_TO_CLIENT {
 		srcScore, dstScore = dstScore, srcScore
 	}
 	if !IsClientToServer(srcScore, dstScore) {
