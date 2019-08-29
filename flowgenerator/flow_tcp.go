@@ -61,7 +61,7 @@ func (f *FlowGenerator) initTcpFlow(meta *MetaPacket) (*FlowExtra, bool, bool) {
 	}
 	if flagEqual(flags, TCP_SYN|TCP_ACK) {
 		reply = true
-		flowExtra.reversed = reply
+		flowExtra.reversed = !flowExtra.reversed
 		taggedFlow.MACSrc, taggedFlow.MACDst = taggedFlow.MACDst, taggedFlow.MACSrc
 		taggedFlow.IPSrc, taggedFlow.IPDst = taggedFlow.IPDst, taggedFlow.IPSrc
 		taggedFlow.PortSrc, taggedFlow.PortDst = taggedFlow.PortDst, taggedFlow.PortSrc
@@ -119,7 +119,7 @@ func (f *FlowGenerator) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket, re
 	if flagEqual(flags, TCP_SYN|TCP_ACK) && !reply {
 		reply = true
 		flowExtra.reverseFlow()
-		flowExtra.reversed = true
+		flowExtra.reversed = !flowExtra.reversed
 	}
 	f.updateTCPDirection(meta, flowExtra, false)
 	flowExtra.setMetaPacketDirection(meta)
@@ -137,11 +137,12 @@ func (f *FlowGenerator) updateTCPDirection(meta *MetaPacket, flowExtra *FlowExtr
 	dstKey := ServiceKey(int16(meta.EndpointData.DstInfo.L3EpcId), meta.IpDst, meta.PortDst)
 
 	srcScore, dstScore := f.tcpServiceTable.GetTCPScore(isFirstPacket, meta.TcpData.Flags, srcKey, dstKey)
-	if meta.MacSrc != flowExtra.taggedFlow.MACSrc {
+	if flowExtra.getMetaPacketDirection(meta) == SERVER_TO_CLIENT {
 		srcScore, dstScore = dstScore, srcScore
 	}
 	if !IsClientToServer(srcScore, dstScore) {
 		flowExtra.reverseFlow()
+		flowExtra.reversed = !flowExtra.reversed
 	}
 	flowExtra.taggedFlow.Flow.IsActiveService = IsActiveService(srcScore, dstScore)
 }
