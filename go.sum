@@ -81,8 +81,8 @@ github.com/stretchr/testify v1.3.0 h1:TivCn/peBQ7UY8ooIcPgZFpTNSz0Q2U6UrFlUfqbe0
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/tebeka/strftime v0.0.0-20140926081919-3f9c7761e312 h1:frNEkk4P8mq+47LAMvj9LvhDq01kFDUhpJZzzei8IuM=
 github.com/tebeka/strftime v0.0.0-20140926081919-3f9c7761e312/go.mod h1:o6CrSUtupq/A5hylbvAsdydn0d5yokJExs8VVdx4wwI=
-gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190828104021-b8930ee0fb44 h1:DWKKMxybyk7HC+OtRC2B662o6AHZXiJUTn7vPq9U5aE=
-gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190828104021-b8930ee0fb44/go.mod h1:yB7Nh1nbItxmlPuRMavY3yEr+BtCwN9ulBa/RCl6b40=
+gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190830140720-dda8a566c19c h1:DarPslfl6k6dnXIVD5OOn6l1l38Ohvnk4t1BIccoEKo=
+gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190830140720-dda8a566c19c/go.mod h1:yB7Nh1nbItxmlPuRMavY3yEr+BtCwN9ulBa/RCl6b40=
 gitlab.x.lan/yunshan/message v0.0.0-20190815072351-51f459e0fcfc h1:I+ZuLOU17QWqNnh+FcZQWTDGhUFqrn74FH3cxI95KS8=
 gitlab.x.lan/yunshan/message v0.0.0-20190815072351-51f459e0fcfc/go.mod h1:R5ZX1w+XLKWpf45DbKsAXvRyklT7rfgBN/WKClV2MP4=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
