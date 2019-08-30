@@ -2,7 +2,6 @@ package policy
 
 import (
 	"container/list"
-	"encoding/binary"
 	"math"
 	"net"
 	"sync"
@@ -52,13 +51,6 @@ type CloudPlatformLabeler struct {
 	lastArpSwapTime time.Duration
 	arpTable        [TAP_MAX]map[MacIpKey]bool
 	tempArpTable    [TAP_MAX]map[MacIpKey]bool
-}
-
-var PRIVATE_PREFIXS = [][2]uint32{
-	{binary.BigEndian.Uint32([]byte{10, 0, 0, 0}), 0xff000000},
-	{binary.BigEndian.Uint32([]byte{172, 16, 0, 0}), 0xfff00000},
-	{binary.BigEndian.Uint32([]byte{192, 168, 0, 0}), 0xffff0000},
-	{binary.BigEndian.Uint32([]byte{255, 255, 255, 255}), 0xffffffff},
 }
 
 func NewCloudPlatformLabeler(queueCount int, mapSize uint32) *CloudPlatformLabeler {
@@ -377,24 +369,6 @@ func (l *CloudPlatformLabeler) ModifyDeviceInfo(endpointInfo *EndpointInfo) {
 	}
 }
 
-func isPrivateAddress(ip uint32) bool {
-	for _, prefix := range PRIVATE_PREFIXS {
-		if prefix[0] == (prefix[1] & ip) {
-			return true
-		}
-	}
-	return false
-}
-
-func (l *CloudPlatformLabeler) ModifyPrivateIp(endpoint *EndpointData, key *LookupKey) {
-	if endpoint.SrcInfo.L3EpcId == 0 && (isPrivateAddress(key.SrcIp) || (len(key.Src6Ip) == 16 && !key.Src6Ip.IsGlobalUnicast())) {
-		endpoint.SrcInfo.L3EpcId = EPC_FROM_DEEPFLOW
-	}
-	if endpoint.DstInfo.L3EpcId == 0 && (isPrivateAddress(key.DstIp) || (len(key.Dst6Ip) == 16 && !key.Dst6Ip.IsGlobalUnicast())) {
-		endpoint.DstInfo.L3EpcId = EPC_FROM_DEEPFLOW
-	}
-}
-
 // 检查L2End和L3End是否有可能进行修正
 func (l *CloudPlatformLabeler) CheckEndpointDataIfNeedCopy(store *EndpointStore, key *LookupKey) *EndpointData {
 	srcHash := MacIpKey(calcHashKey(key.SrcMac, key.SrcIp))
@@ -486,7 +460,6 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	// l3: peer epc + ip查询
 	l.GetL3ByPeerConnection(srcIp, dstIp, endpoint)
 	l.ModifyEndpointData(endpoint, key)
-	l.ModifyPrivateIp(endpoint, key)
 	l.ipGroup.Populate(srcIp, endpoint.SrcInfo)
 	l.ipGroup.Populate(dstIp, endpoint.DstInfo)
 	return endpoint
