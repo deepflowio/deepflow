@@ -398,7 +398,7 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 	}
 }
 
-// l2EpcId0=40,L3EpcId0=40,l2Epcid1=0,L3EpcId1=-1的数据正确性
+// l2EpcId0=40,L3EpcId0=40,l2Epcid1=0,L3EpcId1=0的数据正确性
 func TestModifyEpcIdPolicy1(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
 	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpc[4], 4)
@@ -409,7 +409,7 @@ func TestModifyEpcIdPolicy1(t *testing.T) {
 	key := generateLookupKey(mac4, mac2, vlanAny, ip4, ip2, IPProtocolTCP, 0, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[1], l2EndBool[1])
 
-	basicData := generateEpcInfo(groupEpc[4], groupEpc[4], groupEpcAny, groupEpcOther)
+	basicData := generateEpcInfo(groupEpc[4], groupEpc[4], groupEpcAny, groupEpcAny)
 	data, _ := policy.LookupAllByKey(key)
 	if !CheckEpcTestResult(t, basicData, data) {
 		t.Error("TestModifyEpcIdPolicy1 Check Failed!")
@@ -532,54 +532,6 @@ func TestModifyEpcIdPolicy5(t *testing.T) {
 	data, _ = getPolicyByFastPath(policy, key)
 	if !CheckEpcTestResult(t, basicData, data) {
 		t.Error("TestModifyEpcIdPolicy5-2 FastPath Check Failed!")
-	}
-}
-
-// 东西向L3EpcId经过修正后的数据正确性
-// 修正IP范围{10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 255.255.255.255/32}
-// L3EpcId0=0,L3EpcId1=0 修正后-> L3EpcId0=-1,L3EpcId1=-1
-func TestModifyPrivateIp(t *testing.T) {
-	policy := NewPolicyTable(1, 1024, false)
-	// 192.168.0.0/16
-	key := generateLookupKey(mac1, mac2, vlanAny, ip3, ip4, IPProtocolTCP, 0, 8000)
-	basicData := generateEpcInfo(groupEpc[0], groupEpcOther, groupEpc[0], groupEpcOther)
-	data, _ := policy.LookupAllByKey(key)
-	if !CheckEpcTestResult(t, basicData, data) {
-		t.Error("TestModifyPrivateIp Check Failed!")
-	}
-	data, _ = getPolicyByFastPath(policy, key)
-	if !CheckEpcTestResult(t, basicData, data) {
-		t.Error("TestModifyPrivateIp FastPath Check Failed!")
-	}
-	// 10.0.0.0/8
-	key = generateLookupKey(mac2, mac3, vlanAny, ip6, ip8, IPProtocolTCP, 0, 8000)
-	data, _ = policy.LookupAllByKey(key)
-	if !CheckEpcTestResult(t, basicData, data) {
-		t.Error("TestModifyPrivateIp Check Failed!")
-	}
-	data, _ = getPolicyByFastPath(policy, key)
-	if !CheckEpcTestResult(t, basicData, data) {
-		t.Error("TestModifyPrivateIp FastPath Check Failed!")
-	}
-	// 172.16.0.0/12
-	key = generateLookupKey(mac3, mac4, vlanAny, ip9, ip10, IPProtocolTCP, 0, 8000)
-	data, _ = policy.LookupAllByKey(key)
-	if !CheckEpcTestResult(t, basicData, data) {
-		t.Error("TestModifyPrivateIp Check Failed!")
-	}
-	data, _ = getPolicyByFastPath(policy, key)
-	if !CheckEpcTestResult(t, basicData, data) {
-		t.Error("TestModifyPrivateIp FastPath Check Failed!")
-	}
-	// 255.255.255.255/32
-	key = generateLookupKey(mac4, mac5, vlanAny, ip11, ip11, IPProtocolTCP, 0, 8000)
-	data, _ = policy.LookupAllByKey(key)
-	if !CheckEpcTestResult(t, basicData, data) {
-		t.Error("TestModifyPrivateIp Check Failed!")
-	}
-	data, _ = getPolicyByFastPath(policy, key)
-	if !CheckEpcTestResult(t, basicData, data) {
-		t.Error("TestModifyPrivateIp FastPath Check Failed!")
 	}
 }
 
