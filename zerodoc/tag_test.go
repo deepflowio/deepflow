@@ -1,8 +1,10 @@
 package zerodoc
 
 import (
-	"github.com/google/gopacket/layers"
+	"math"
 	"testing"
+
+	"github.com/google/gopacket/layers"
 )
 
 func TestHasEdgeTagField(t *testing.T) {
@@ -25,9 +27,22 @@ func TestFillTag(t *testing.T) {
 	}
 }
 
+func TestInt16Unmarshal(t *testing.T) {
+	for i := math.MinInt16; i <= math.MaxInt16; i++ {
+		v, _ := unmarshalUint16WithSpecialID(marshalUint16WithSpecialID(int16(i)))
+		if int16(i) != v {
+			t.Errorf("序列化反序列化[%d]不正确", i)
+		}
+	}
+}
+
 func TestNegativeID(t *testing.T) {
-	f := Field{L3EpcID: -1, GroupID: -1}
-	if f.NewTag(L3EpcID|GroupID).ToKVString() != ",group_id=-1,l3_epc_id=-1" {
+	f := Field{L3EpcID: -1, GroupID: -2}
+	if f.NewTag(L3EpcID|GroupID).ToKVString() != ",group_id=-2,l3_epc_id=-1" {
+		t.Error("int16值处理得不正确")
+	}
+	f = Field{L3EpcID: 32767, GroupID: -3}
+	if f.NewTag(L3EpcID|GroupID).ToKVString() != ",group_id=65533,l3_epc_id=32767" {
 		t.Error("int16值处理得不正确")
 	}
 }
@@ -36,7 +51,7 @@ func TestFill1(t *testing.T) {
 	f := Field{}
 	tag := &Tag{&f, 0, ""}
 	tags := map[string]string{
-		"ip": "1.1.1.1", "group_id": "0", "l3_epc_id": "-3",
+		"ip": "1.1.1.1", "group_id": "-1", "l3_epc_id": "-3",
 		"l3_device_id": "300", "l3_device_type": "5",
 		"host": "3.3.3.3", "ip_1": "5.5.5.5", "group_id_1": "-2",
 		"l3_epc_id_1": "31", "l3_device_id_1": "32", "l3_device_type_1": "9",
@@ -49,7 +64,7 @@ func TestFill1(t *testing.T) {
 	if tag.IP != 16843009 {
 		t.Error("ip 处理错误")
 	}
-	if tag.GroupID != 0 {
+	if tag.GroupID != -1 {
 		t.Error("GroupID 处理错误")
 	}
 	if tag.L3EpcID != -3 {
