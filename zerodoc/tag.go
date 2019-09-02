@@ -2,6 +2,7 @@ package zerodoc
 
 import (
 	"fmt"
+	"math"
 	"net"
 	"strconv"
 	"strings"
@@ -230,14 +231,22 @@ func (t *Tag) ToKVString() string {
 	return string(buffer[:size])
 }
 
-func marshalUint16WithMinusOne(v int16) string {
-	if v == -1 {
-		return "-1"
+const (
+	ID_OTHER    = -1
+	ID_INTERNET = -2
+)
+
+func marshalUint16WithSpecialID(v int16) string {
+	switch v {
+	case ID_OTHER:
+		fallthrough
+	case ID_INTERNET:
+		return strconv.FormatInt(int64(v), 10)
 	}
-	return strconv.FormatUint(uint64(v)&uint64(^uint16(0)), 10)
+	return strconv.FormatUint(uint64(v)&math.MaxUint16, 10)
 }
 
-func unmarshalUint16WithMinusOne(s string) (int16, error) {
+func unmarshalUint16WithSpecialID(s string) (int16, error) {
 	i, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
 		return -1, err
@@ -271,11 +280,11 @@ func (t *Tag) MarshalTo(b []byte) int {
 	}
 	if t.Code&GroupID != 0 {
 		offset += copy(b[offset:], ",group_id=")
-		offset += copy(b[offset:], marshalUint16WithMinusOne(t.GroupID))
+		offset += copy(b[offset:], marshalUint16WithSpecialID(t.GroupID))
 	}
 	if t.Code&L3EpcID != 0 {
 		offset += copy(b[offset:], ",l3_epc_id=")
-		offset += copy(b[offset:], marshalUint16WithMinusOne(t.L3EpcID))
+		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID))
 	}
 	if t.Code&L3Device != 0 {
 		offset += copy(b[offset:], ",l3_device_id=")
@@ -316,15 +325,15 @@ func (t *Tag) MarshalTo(b []byte) int {
 	}
 	if t.Code&GroupIDPath != 0 {
 		offset += copy(b[offset:], ",group_id_0=")
-		offset += copy(b[offset:], marshalUint16WithMinusOne(t.GroupID))
+		offset += copy(b[offset:], marshalUint16WithSpecialID(t.GroupID))
 		offset += copy(b[offset:], ",group_id_1=")
-		offset += copy(b[offset:], marshalUint16WithMinusOne(t.GroupID1))
+		offset += copy(b[offset:], marshalUint16WithSpecialID(t.GroupID1))
 	}
 	if t.Code&L3EpcIDPath != 0 {
 		offset += copy(b[offset:], ",l3_epc_id_0=")
-		offset += copy(b[offset:], marshalUint16WithMinusOne(t.L3EpcID))
+		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID))
 		offset += copy(b[offset:], ",l3_epc_id_1=")
-		offset += copy(b[offset:], marshalUint16WithMinusOne(t.L3EpcID1))
+		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID1))
 	}
 	if t.Code&L3DevicePath != 0 {
 		offset += copy(b[offset:], ",l3_device_id_0=")
@@ -894,9 +903,9 @@ func (t *Tag) fillValue(name, value string) (err error) {
 			field.IP = 0
 		}
 	case "group_id", "group_id_0":
-		field.GroupID, err = unmarshalUint16WithMinusOne(value)
+		field.GroupID, err = unmarshalUint16WithSpecialID(value)
 	case "l3_epc_id", "l3_epc_id_0":
-		field.L3EpcID, err = unmarshalUint16WithMinusOne(value)
+		field.L3EpcID, err = unmarshalUint16WithSpecialID(value)
 	case "l3_device_id", "l3_device_id_0":
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.L3DeviceID = uint16(i)
@@ -919,9 +928,9 @@ func (t *Tag) fillValue(name, value string) (err error) {
 			field.IP1 = 0
 		}
 	case "group_id_1":
-		field.GroupID1, err = unmarshalUint16WithMinusOne(value)
+		field.GroupID1, err = unmarshalUint16WithSpecialID(value)
 	case "l3_epc_id_1":
-		field.L3EpcID1, err = unmarshalUint16WithMinusOne(value)
+		field.L3EpcID1, err = unmarshalUint16WithSpecialID(value)
 	case "l3_device_id_1":
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.L3DeviceID1 = uint16(i)
