@@ -203,6 +203,8 @@ message PublishAcl {
     optional int32 l3_epc_id = 12;
     optional uint32 l3_device_type = 13;
     optional uint32 l3_device_id = 14;
+    optional uint32 l3_epc_id_0 = 15;
+    optional uint32 l3_epc_id_1 = 16;
 
     optional uint32 scope = 30;
     optional uint32 protocol = 31;
