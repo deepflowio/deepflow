@@ -11,8 +11,8 @@ import (
 
 const (
 	EPC_FROM_DEEPFLOW = -1
-	EPC_FROM_INTERNET = -2
-	GROUP_INTERNET    = -2
+	EPC_FROM_INTERNET = -2 // 当流量在所有平台数据建立的map中都无法查询到对应的epcId时，epc为-2, 在函数ModifyInternetEpcId中修改
+	GROUP_INTERNET    = -2 // Trisolaris下发使用固定值，策略匹配不做特殊处理
 )
 
 var (
@@ -112,7 +112,7 @@ func (i *EndpointInfo) SetL2Data(data *PlatformData) {
 }
 
 func (i *EndpointInfo) SetL3Data(data *PlatformData, ip net.IP) {
-	i.L3EpcId = -1
+	i.L3EpcId = EPC_FROM_DEEPFLOW
 	if data.EpcId != 0 {
 		i.L3EpcId = data.EpcId
 	}

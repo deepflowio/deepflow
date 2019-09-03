@@ -398,7 +398,7 @@ func TestVlanPortAclsPassPolicy2(t *testing.T) {
 	}
 }
 
-// l2EpcId0=40,L3EpcId0=40,l2Epcid1=0,L3EpcId1=0的数据正确性
+// l2EpcId0=40,L3EpcId0=40,l2Epcid1=-2,L3EpcId1=-2的数据正确性
 func TestModifyEpcIdPolicy1(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
 	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpc[4], 4)
@@ -409,7 +409,7 @@ func TestModifyEpcIdPolicy1(t *testing.T) {
 	key := generateLookupKey(mac4, mac2, vlanAny, ip4, ip2, IPProtocolTCP, 0, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[1], l2EndBool[1])
 
-	basicData := generateEpcInfo(groupEpc[4], groupEpc[4], groupEpcAny, groupEpcAny)
+	basicData := generateEpcInfo(groupEpc[4], groupEpc[4], EPC_FROM_INTERNET, EPC_FROM_INTERNET)
 	data, _ := policy.LookupAllByKey(key)
 	if !CheckEpcTestResult(t, basicData, data) {
 		t.Error("TestModifyEpcIdPolicy1 Check Failed!")
@@ -445,7 +445,7 @@ func TestModifyEpcIdPolicy2(t *testing.T) {
 	}
 }
 
-// l2EpcId0=-1,l3EpcId0=-1,l2Epcid1=0,l3EpcId1=50的数据正确性
+// l2EpcId0=-1,l3EpcId0=-1,l2Epcid1=-2,l3EpcId1=50的数据正确性
 func TestModifyEpcIdPolicy3(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
 	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpcAny, 3)
@@ -457,7 +457,7 @@ func TestModifyEpcIdPolicy3(t *testing.T) {
 	key := generateLookupKey(mac2, mac1, vlanAny, ip4, ip5, IPProtocolTCP, 0, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[1], l2EndBool[1])
 
-	basicData := generateEpcInfo(groupEpcOther, groupEpcOther, groupEpcAny, groupEpc[5])
+	basicData := generateEpcInfo(EPC_FROM_DEEPFLOW, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET, groupEpc[5])
 	data, _ := policy.LookupAllByKey(key)
 	if !CheckEpcTestResult(t, basicData, data) {
 		t.Error("TestModifyEpcIdPolicy3 Check Failed!")
@@ -469,7 +469,7 @@ func TestModifyEpcIdPolicy3(t *testing.T) {
 	}
 }
 
-// l2EpcId0=40,l3EpcId0=40,l2EpcId1=0,l3EpcId1=-1的数据正确性
+// l2EpcId0=40,l3EpcId0=40,l2EpcId1=-2,l3EpcId1=-1的数据正确性
 func TestModifyEpcIdPolicy4(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
 	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpc[4], 3)
@@ -481,7 +481,7 @@ func TestModifyEpcIdPolicy4(t *testing.T) {
 	key := generateLookupKey(mac5, mac1, vlanAny, ip4, ip5, IPProtocolTCP, 0, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[1], l2EndBool[1])
 
-	basicData := generateEpcInfo(groupEpc[4], groupEpc[4], groupEpcAny, groupEpcOther)
+	basicData := generateEpcInfo(groupEpc[4], groupEpc[4], EPC_FROM_INTERNET, EPC_FROM_DEEPFLOW)
 	data, _ := policy.LookupAllByKey(key)
 	if !CheckEpcTestResult(t, basicData, data) {
 		t.Error("TestModifyEpcIdPolicy4 Check Failed!")
@@ -493,7 +493,7 @@ func TestModifyEpcIdPolicy4(t *testing.T) {
 	}
 }
 
-// l3EpcId0=-1, l3EpcId1=-1的数据正确性
+// l3EpcId0=-2, l3EpcId1=-2的数据正确性
 func TestModifyEpcIdPolicy5(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
 	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpcAny, 4)
@@ -502,12 +502,12 @@ func TestModifyEpcIdPolicy5(t *testing.T) {
 	generateIpgroupData(policy)
 	generateAclData(policy)
 
-	// l3EpcId0=-1, l3EpcId1=-1, l2EpcId0=0, l2EpcId1=0
+	// l3EpcId0=-2, l3EpcId1=-2, l2EpcId0=-2, l2EpcId1=-2
 
 	key := generateLookupKey(mac2, mac3, vlanAny, ip4, ip5, IPProtocolTCP, 0, 8000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, ttl, l2EndBool[0], l2EndBool[1])
 
-	basicData := generateEpcInfo(groupEpcAny, groupEpcOther, groupEpcAny, groupEpcOther)
+	basicData := generateEpcInfo(EPC_FROM_INTERNET, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET, EPC_FROM_DEEPFLOW)
 	data, _ := policy.LookupAllByKey(key)
 	if !CheckEpcTestResult(t, basicData, data) {
 		t.Error("TestModifyEpcIdPolicy5 Check Failed!")
@@ -518,12 +518,12 @@ func TestModifyEpcIdPolicy5(t *testing.T) {
 		t.Error("TestModifyEpcIdPolicy5 FastPath Check Failed!")
 	}
 
-	// l3EpcId0=-1, l3EpcId1=-1, l2EpcId0=-1, l2EpcId1=-1
+	// l3EpcId0=-2, l3EpcId1=-2, l2EpcId0=-2, l2EpcId1=-2
 	key.SrcMac = mac4
 	key.DstMac = mac5
 	key.L2End0 = true
 
-	basicData = generateEpcInfo(groupEpcOther, groupEpcOther, groupEpcOther, groupEpcOther)
+	basicData = generateEpcInfo(EPC_FROM_DEEPFLOW, EPC_FROM_DEEPFLOW, EPC_FROM_DEEPFLOW, EPC_FROM_DEEPFLOW)
 	data, _ = policy.LookupAllByKey(key)
 	if !CheckEpcTestResult(t, basicData, data) {
 		t.Error("TestModifyEpcIdPolicy5-2 Check Failed!")
@@ -916,7 +916,7 @@ func TestArpProxy(t *testing.T) {
 	endpointData, _ := policy.LookupAllByKey(key)
 	basicData1 := new(EndpointData)
 	basicData1.SrcInfo = generateEndpointInfo(groupEpc[1], groupEpc[1], l2EndBool[1], l3EndBool[1], 123, group[1], group[11]+1e9)
-	basicData1.DstInfo = generateEndpointInfo(0, groupEpc[1], l2EndBool[0], l3EndBool[0], 123, group[11]+1e9)
+	basicData1.DstInfo = generateEndpointInfo(EPC_FROM_INTERNET, groupEpc[1], l2EndBool[0], l3EndBool[0], 123, group[11]+1e9)
 	basicData1.DstInfo.L2DeviceType = 0
 	basicData1.DstInfo.L2DeviceId = 0
 	basicData1.DstInfo.HostIp = server

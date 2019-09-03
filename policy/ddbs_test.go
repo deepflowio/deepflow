@@ -378,7 +378,7 @@ func TestDdbsResourceGroupPolicy(t *testing.T) {
 	table = generatePolicyTable(DDBS)
 	// acl2: dstGroup:group5
 	// acl3: srcGroup:group3-> dstGroup:group5,dstPort=1023,udp
-	// group5: 1.epcId=0,mac=group5Mac1,ips="group5Ip1/24,group5Ip2/32"
+	// group5: 1.epcId=-1,mac=group5Mac1,ips="group5Ip1/24,group5Ip2/32"
 	//         2.epcId=50,mac=group5Mac2,ips="group5Ip1/24,group5Ip2/32"
 	action2 := generateAclAction(18, ACTION_FLOW_COUNTING)
 	acl2 := generatePolicyAcl(table, action2, 18, groupAny, group[5], protoAny, 0, vlanAny)
@@ -726,7 +726,7 @@ func TestDdbsEndpointDataDirection(t *testing.T) {
 	// src: DEV-30, IP-60 dst: DEV-40
 	result := getEndpointData(table, key1)
 	basicData1 := new(EndpointData)
-	basicData1.SrcInfo = generateEndpointInfo(groupEpc[3], groupEpcOther, l2EndBool[0], l3EndBool[0], subnetAny, group[3], ipGroup6)
+	basicData1.SrcInfo = generateEndpointInfo(EPC_FROM_INTERNET, EPC_FROM_DEEPFLOW, l2EndBool[0], l3EndBool[0], subnetAny, group[3], ipGroup6)
 	basicData1.DstInfo = generateEndpointInfo(groupEpc[4], groupEpc[4], l2EndBool[0], l3EndBool[1], 121, group[4])
 	if !CheckEndpointDataResult(t, basicData1, result) {
 		t.Error("key1 EndpointData Check Failed!")
@@ -744,7 +744,7 @@ func TestDdbsEndpointDataDirection(t *testing.T) {
 	result = getEndpointData(table, key2)
 	basicData2 := new(EndpointData)
 	basicData2.SrcInfo = generateEndpointInfo(groupEpc[4], groupEpc[4], l2EndBool[0], l3EndBool[1], 121, group[4])
-	basicData2.DstInfo = generateEndpointInfo(groupEpc[3], groupEpcOther, l2EndBool[0], l3EndBool[0], subnetAny, group[3], ipGroup6)
+	basicData2.DstInfo = generateEndpointInfo(EPC_FROM_INTERNET, EPC_FROM_DEEPFLOW, l2EndBool[0], l3EndBool[0], subnetAny, group[3], ipGroup6)
 	if !CheckEndpointDataResult(t, basicData2, result) {
 		t.Error("key2 EndpointData Check Failed!")
 	}
@@ -762,7 +762,7 @@ func TestDdbsEndpointDataDirection(t *testing.T) {
 	// src: DEV-30, IP-60 dst: DEV-40
 	result = getEndpointData(table, key3)
 	basicData3 := new(EndpointData)
-	basicData3.SrcInfo = generateEndpointInfo(groupEpc[3], groupEpcOther, l2EndBool[0], l3EndBool[0], subnetAny, group[3], ipGroup6)
+	basicData3.SrcInfo = generateEndpointInfo(EPC_FROM_INTERNET, EPC_FROM_DEEPFLOW, l2EndBool[0], l3EndBool[0], subnetAny, group[3], ipGroup6)
 	basicData3.DstInfo = generateEndpointInfo(groupEpc[4], groupEpc[4], l2EndBool[0], l3EndBool[1], 121, group[4])
 	if !CheckEndpointDataResult(t, basicData3, result) {
 		t.Error("key3 EndpointData Check Failed!")
@@ -779,7 +779,7 @@ func TestDdbsEndpointDataDirection(t *testing.T) {
 	result = getEndpointData(table, key4)
 	basicData4 := new(EndpointData)
 	basicData4.SrcInfo = generateEndpointInfo(groupEpc[4], groupEpc[4], l2EndBool[0], l3EndBool[1], 121, group[4])
-	basicData4.DstInfo = generateEndpointInfo(groupEpc[3], groupEpcOther, l2EndBool[0], l3EndBool[0], subnetAny, group[3], ipGroup6)
+	basicData4.DstInfo = generateEndpointInfo(EPC_FROM_INTERNET, EPC_FROM_DEEPFLOW, l2EndBool[0], l3EndBool[0], subnetAny, group[3], ipGroup6)
 	if !CheckEndpointDataResult(t, basicData4, result) {
 		t.Error("key4 EndpointData Check Failed!")
 	}
@@ -1595,11 +1595,11 @@ func TestDdbsPolicyIpv6(t *testing.T) {
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	action2 := generateAclAction(20, ACTION_PACKET_BROKERING)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 8000, vlanAny)
-	// ip: 0.0.0.0/32, epc: 0
+	// ip: 0.0.0.0/32 epc: 0, IP为0的流量, 对于非IP流量会用0来查询策略
 	acl2 := generatePolicyAcl(table, action2, 20, group[17], groupAny, protoAny, 0, vlanAny)
 	acls = append(acls, acl, acl2)
 	table.UpdateAcls(acls)
-	// 构建查询1-key  1:0->2:8000 tcp
+	// 构建查询1-key  1:0->2:8000 tcp, 会匹配acl,不会匹配acl2
 	key := generateLookupKey6(group1Mac, group2Mac, vlanAny, ip12, ip13, IPProtocolTCP, 0, 8000)
 
 	// 获取查询first结果
