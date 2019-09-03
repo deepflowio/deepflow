@@ -10,6 +10,7 @@ import (
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/protobuf"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	dt "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
@@ -26,7 +27,7 @@ func TestMarshal(t *testing.T) {
 
 		IP1:           0x0a2102ca,
 		GroupID1:      2,
-		L3EpcID1:      -1,
+		L3EpcID1:      datatype.EPC_FROM_DEEPFLOW,
 		L3DeviceID1:   6,
 		L3DeviceType1: dt.VMDevice,
 
