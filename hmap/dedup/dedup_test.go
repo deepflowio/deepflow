@@ -9,7 +9,7 @@ import (
 	. "github.com/google/gopacket/layers"
 )
 
-var dedupTable = NewDedupTable("")
+var dedupTable = NewPacketDedupMap("")
 
 func m(mac string) net.HardwareAddr {
 	m, _ := net.ParseMAC(mac)
@@ -176,4 +176,26 @@ func TestOverLimit(t *testing.T) {
 	if !dedupTable.IsDuplicate(middle, 0) {
 		t.Error("Should hit")
 	}
+}
+
+func BenchmarkDedupTable(b *testing.B) {
+	packets := make([][]byte, 0)
+	da := "00:00:00:fc:a4:0b"
+	sa := "00:00:00:25:3f:63"
+	for i := 0; i < 1<<16; i++ {
+		for j := 1; j < 1000; j += 100 {
+			packet := buildStubPacket(da, sa, EthernetType(i), uint32(j))
+			packets = append(packets, packet)
+		}
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		dedupTable.IsDuplicate(packets[i%len(packets)], time.Duration(i)*2*time.Microsecond)
+		if i >= 50000 {
+			dedupTable.IsDuplicate(packets[(i-50000)%len(packets)], time.Duration(i)*2*time.Microsecond)
+			i++
+		}
+	}
+	b.Logf("counter: %v", dedupTable.GetCounter())
 }

@@ -30,7 +30,7 @@ var u320IDMapNodeBlockPool = sync.Pool{New: func() interface{} {
 type U320IDMap struct {
 	buffer []u320IDMapNodeBlock // 存储Map节点，以矩阵的方式组织，提升内存申请释放效率
 
-	slotHead []int32 // 哈希桶，slotHead[i] 表示哈希值为 i 的冲突链的第一个节点为 buffer[[ slotHead[i]] ]]
+	slotHead []int32 // 哈希桶，slotHead[i] 表示哈希值为 i 的冲突链的第一个节点为 buffer[[ slotHead[i] ]]
 	size     int     // buffer中存储的有效节点总数
 	width    int     // 哈希桶中最大冲突链长度
 }
