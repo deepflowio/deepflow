@@ -42,11 +42,11 @@ func (f *FlowGeo) fillGeoInfo(taggedFlow *TaggedFlow) {
 	l3EpcIDs := [2]int32{taggedFlow.FlowMetricsPeerSrc.L3EpcID, taggedFlow.FlowMetricsPeerDst.L3EpcID}
 	// we want to query Src IP as possible so the first check is `ONE` (dst) but not `ZERO` (src)
 	for _, thisEnd := range [...]EndPoint{ONE, ZERO} {
-		if l3EpcIDs[thisEnd] == 0 {
+		if l3EpcIDs[thisEnd] == EPC_FROM_INTERNET {
 			continue
 		}
 		queryEnd := getOppositeEndpoint(thisEnd)
-		if l3EpcIDs[thisEnd] == -1 && l3EpcIDs[queryEnd] > 0 {
+		if l3EpcIDs[thisEnd] == EPC_FROM_DEEPFLOW && l3EpcIDs[queryEnd] > 0 {
 			queryEnd = thisEnd
 		}
 		geoInfo := f.GeoTree.Query(ips[queryEnd])

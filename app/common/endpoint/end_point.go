@@ -21,23 +21,6 @@ const (
 	TOR   DfiInPortRange = 0x30000
 )
 
-func GetIspEndpoints(inPort0 uint32, l3EpcId0 uint32, l3EpcId1 uint32) []EndPoint {
-	endpoints := make([]EndPoint, 2)
-	ispPortRange := DfiInPortRange(ISP)
-	index := 0
-	if ispPortRange.IsPortInRange(inPort0) {
-		if l3EpcId0 != 0 {
-			endpoints[index] = ZERO
-			index++
-		}
-		if l3EpcId1 != 0 {
-			endpoints[index] = ONE
-			index++
-		}
-	}
-	return endpoints[:index]
-}
-
 func GetEpcFlowTopoEndpoints(inPort0 uint32, packetCount uint64) []EndPoint {
 	ispPortRange := DfiInPortRange(ISP)
 	spinePortRange := DfiInPortRange(SPINE)
@@ -81,7 +64,7 @@ func TAPTypeFromInPort(inPort uint32) outputtype.TAPTypeEnum {
 }
 
 func IsNorthSourceTraffic(l3EpcID0, l3EpcID1 int32) bool {
-	return l3EpcID0 == 0 || l3EpcID1 == 0 // 0: Internet
+	return l3EpcID0 == inputtype.EPC_FROM_INTERNET || l3EpcID1 == inputtype.EPC_FROM_INTERNET
 }
 
 // 虚拟网络东西向流量判断逻辑：

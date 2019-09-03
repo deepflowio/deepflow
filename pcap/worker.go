@@ -3,12 +3,13 @@ package pcap
 import (
 	"container/list"
 	"fmt"
-	"github.com/op/go-logging"
 	"net"
 	"os"
 	"sync"
 	"time"
 	"unsafe"
+
+	"github.com/op/go-logging"
 
 	. "github.com/google/gopacket/layers"
 
@@ -361,8 +362,10 @@ func (w *Worker) checkWriterPcap(packet *datatype.MetaPacket, direction datatype
 
 	if isISP(packet.InPort) {
 		tapType = zerodoc.TAPTypeEnum(packet.InPort - 0x10000)
-		ipSrcCheck = ipSrcCheck && packet.EndpointData.SrcInfo.L3EpcId != 0
-		ipDstCheck = ipDstCheck && packet.EndpointData.DstInfo.L3EpcId != 0
+		srcL3EpcId := packet.EndpointData.SrcInfo.L3EpcId
+		ipSrcCheck = ipSrcCheck && srcL3EpcId != 0 && srcL3EpcId != datatype.EPC_FROM_INTERNET
+		dstL3EpcId := packet.EndpointData.DstInfo.L3EpcId
+		ipDstCheck = ipDstCheck && dstL3EpcId != 0 && dstL3EpcId != datatype.EPC_FROM_INTERNET
 	} else if isTOR(packet.InPort) {
 		tapType = zerodoc.ToR
 		ipSrcCheck = ipSrcCheck && (packet.L2End0 || packet.EndpointData.SrcInfo.L2End)

@@ -18,7 +18,7 @@ func TestFillGeoInfo(t *testing.T) {
 	taggedFlow.IPSrc = IpToUint32(net.ParseIP("8.8.8.8").To4())
 	taggedFlow.IPDst = IpToUint32(net.ParseIP("114.114.114.114").To4())
 	taggedFlow.FlowMetricsPeerSrc.L3EpcID = 1
-	taggedFlow.FlowMetricsPeerDst.L3EpcID = 0
+	taggedFlow.FlowMetricsPeerDst.L3EpcID = EPC_FROM_INTERNET
 	taggedFlow.PolicyData = &PolicyData{ActionFlags: ACTION_GEO_POSITIONING}
 	testFlowGeo.fillGeoInfo(taggedFlow)
 	// 查ip_info.go文件获得Country和Region实际值
@@ -88,13 +88,15 @@ func TestFlowGeoInfo(t *testing.T) {
 
 	packet0 := getDefaultPacket()
 	packet0.EndpointData.SrcInfo.L3EpcId = 5
+	packet0.EndpointData.DstInfo.L3EpcId = EPC_FROM_INTERNET
 	inputPacketQueue.Put(packet0)
 
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Flags = TCP_RST
 	packet1.Timestamp += DEFAULT_DURATION_MSEC
 	reversePacket(packet1)
-	packet1.EndpointData.SrcInfo.L3EpcId = 0
+	packet1.EndpointData.SrcInfo.L3EpcId = EPC_FROM_INTERNET
+	packet1.EndpointData.DstInfo.L3EpcId = EPC_FROM_INTERNET
 	inputPacketQueue.Put(packet1)
 
 	flowGenerator.Start()
@@ -113,7 +115,7 @@ func BenchmarkFillGeoInfo(b *testing.B) {
 	taggedFlow.IPSrc = IpToUint32(net.ParseIP("8.8.8.8").To4())
 	taggedFlow.IPDst = IpToUint32(net.ParseIP("114.114.114.114").To4())
 	taggedFlow.FlowMetricsPeerSrc.L3EpcID = 1
-	taggedFlow.FlowMetricsPeerDst.L3EpcID = 0
+	taggedFlow.FlowMetricsPeerDst.L3EpcID = EPC_FROM_INTERNET
 	taggedFlow.PolicyData = &PolicyData{ActionFlags: ACTION_GEO_POSITIONING}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
