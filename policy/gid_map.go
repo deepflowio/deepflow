@@ -35,11 +35,6 @@ func addGroupAclGidsToMap(acl *Acl, enable bool, aclGid uint32, srcMap map[uint3
 	}
 
 	for _, group := range srcGroups {
-		// internet资源组不需要在aclgitbitmap中呈现，所以处理略过
-		if group&0xffff == GROUP_INTERNET&0xffff {
-			continue
-		}
-
 		key := aclGid<<16 | uint32(group)
 		if ok := srcMap[key]; !ok {
 			srcMap[key] = true
@@ -51,11 +46,6 @@ func addGroupAclGidsToMap(acl *Acl, enable bool, aclGid uint32, srcMap map[uint3
 		}
 	}
 	for _, group := range dstGroups {
-		// internet资源组不需要在aclgitbitmap中呈现，所以处理略过
-		if group&0xffff == GROUP_INTERNET&0xffff {
-			continue
-		}
-
 		key := aclGid<<16 | uint32(group)
 		if ok := dstMap[key]; !ok {
 			dstMap[key] = true
