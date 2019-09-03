@@ -349,7 +349,7 @@ func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType Ta
 
 func (l *CloudPlatformLabeler) ModifyDeviceInfo(endpointInfo *EndpointInfo) {
 	if endpointInfo.L2End && endpointInfo.L3End {
-		if endpointInfo.L2EpcId == 0 {
+		if endpointInfo.L2EpcId == EPC_FROM_INTERNET {
 			if endpointInfo.L2DeviceId == 0 {
 				endpointInfo.L2DeviceId = endpointInfo.L3DeviceId
 			}
@@ -357,7 +357,7 @@ func (l *CloudPlatformLabeler) ModifyDeviceInfo(endpointInfo *EndpointInfo) {
 				endpointInfo.L2DeviceType = endpointInfo.L3DeviceType
 			}
 			endpointInfo.L2EpcId = endpointInfo.L3EpcId
-		} else if endpointInfo.L3EpcId == 0 {
+		} else if endpointInfo.L3EpcId == EPC_FROM_INTERNET {
 			if endpointInfo.L3DeviceId == 0 {
 				endpointInfo.L3DeviceId = endpointInfo.L2DeviceId
 			}
@@ -444,6 +444,22 @@ func (l *CloudPlatformLabeler) GetL3ByPeerConnection(src, dst net.IP, endpoints 
 	}
 }
 
+func (l *CloudPlatformLabeler) ModifyInternetEpcId(endpoints *EndpointData) {
+	srcData, dstData := endpoints.SrcInfo, endpoints.DstInfo
+	if srcData.L2EpcId == 0 {
+		srcData.L2EpcId = EPC_FROM_INTERNET
+	}
+	if srcData.L3EpcId == 0 {
+		srcData.L3EpcId = EPC_FROM_INTERNET
+	}
+	if dstData.L2EpcId == 0 {
+		dstData.L2EpcId = EPC_FROM_INTERNET
+	}
+	if dstData.L3EpcId == 0 {
+		dstData.L3EpcId = EPC_FROM_INTERNET
+	}
+}
+
 func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	srcIp, dstIp := IpFromUint32(key.SrcIp), IpFromUint32(key.DstIp)
 	// 测试用例key.EthType值未填写，需要通过len(key.Src6Ip)
@@ -462,6 +478,7 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	l.ModifyEndpointData(endpoint, key)
 	l.ipGroup.Populate(srcIp, endpoint.SrcInfo)
 	l.ipGroup.Populate(dstIp, endpoint.DstInfo)
+	l.ModifyInternetEpcId(endpoint)
 	return endpoint
 }
 
