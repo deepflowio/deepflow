@@ -69,14 +69,14 @@ func getDefaultPacket() *MetaPacket {
 		TcpData:   &MetaPacketTcpHeader{Flags: TCP_SYN},
 		EndpointData: &EndpointData{
 			SrcInfo: &EndpointInfo{
-				L2EpcId:  -1,
+				L2EpcId:  EPC_FROM_DEEPFLOW,
 				L3EpcId:  1,
 				GroupIds: make([]uint32, 0, 10),
 				HostIp:   0x01010101,
 			},
 			DstInfo: &EndpointInfo{
-				L2EpcId:  -1,
-				L3EpcId:  0,
+				L2EpcId:  EPC_FROM_DEEPFLOW,
+				L3EpcId:  EPC_FROM_INTERNET,
 				GroupIds: make([]uint32, 0, 10),
 				HostIp:   0x01010101,
 			},
@@ -201,7 +201,7 @@ func TestPlatformData(t *testing.T) {
 
 	flowGenerator.Start()
 
-	expectEpcID0, expectL3EpcId := int32(-1), int32(1)
+	expectEpcID0, expectL3EpcId := int32(EPC_FROM_DEEPFLOW), int32(1)
 	taggedFlow := flowOutQueue.Get().(*TaggedFlow)
 	if taggedFlow.CloseType != CloseTypeServerHalfOpen {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeServerHalfOpen)

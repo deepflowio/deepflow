@@ -4,11 +4,12 @@ import (
 	"net"
 	"testing"
 
+	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 func TestServiceKey(t *testing.T) {
-	epcID := int16(-1)
+	epcID := int16(EPC_FROM_DEEPFLOW)
 	ip := IpToUint32(net.ParseIP("192.168.1.1").To4())
 	port1 := uint16(80)
 	port2 := uint16(8080)
@@ -20,7 +21,7 @@ func TestServiceKey(t *testing.T) {
 }
 
 func TestGetTCPScore(t *testing.T) {
-	epcID := int16(-1)
+	epcID := int16(EPC_FROM_DEEPFLOW)
 	srcIP := IpToUint32(net.ParseIP("192.168.1.1").To4())
 	srcPort := uint16(1234)
 	dstIP := IpToUint32(net.ParseIP("192.168.1.10").To4())
@@ -68,7 +69,7 @@ func TestGetTCPScore(t *testing.T) {
 }
 
 func TestGetUDPScore(t *testing.T) {
-	epcID := int16(-1)
+	epcID := int16(EPC_FROM_DEEPFLOW)
 	srcIP := IpToUint32(net.ParseIP("192.168.1.1").To4())
 	srcPort := uint16(1234)
 	dstIP := IpToUint32(net.ParseIP("192.168.1.10").To4())

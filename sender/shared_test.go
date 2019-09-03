@@ -10,6 +10,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	dt "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 	"gitlab.x.lan/yunshan/droplet-libs/zmq"
 )
@@ -72,7 +73,7 @@ func init() {
 
 		IP1:           binary.BigEndian.Uint32([]byte{10, 33, 2, 202}),
 		GroupID1:      2,
-		L3EpcID1:      -1,
+		L3EpcID1:      datatype.EPC_FROM_DEEPFLOW,
 		L3DeviceID1:   6,
 		L3DeviceType1: dt.VMDevice,
 		Host1:         binary.BigEndian.Uint32([]byte{172, 16, 1, 154}),
