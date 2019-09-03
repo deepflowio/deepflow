@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/gopacket/layers"
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
@@ -21,7 +22,7 @@ func TestFullEqual(t *testing.T) {
 
 		IP1:           0x0a2102ca,
 		GroupID1:      2,
-		L3EpcID1:      -1,
+		L3EpcID1:      datatype.EPC_FROM_DEEPFLOW,
 		L3DeviceID1:   6,
 		L3DeviceType1: VMDevice,
 		Host1:         0xac100198,
@@ -57,7 +58,7 @@ func TestPartialTagEqual(t *testing.T) {
 
 		IP1:           0x0a2102ca,
 		GroupID1:      2,
-		L3EpcID1:      -1,
+		L3EpcID1:      datatype.EPC_FROM_DEEPFLOW,
 		L3DeviceID1:   6,
 		L3DeviceType1: VMDevice,
 		Host1:         0xac100198,

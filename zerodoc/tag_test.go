@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/google/gopacket/layers"
+
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
 func TestHasEdgeTagField(t *testing.T) {
@@ -37,7 +39,7 @@ func TestInt16Unmarshal(t *testing.T) {
 }
 
 func TestNegativeID(t *testing.T) {
-	f := Field{L3EpcID: -1, GroupID: -2}
+	f := Field{L3EpcID: datatype.EPC_FROM_DEEPFLOW, GroupID: datatype.GROUP_INTERNET}
 	if f.NewTag(L3EpcID|GroupID).ToKVString() != ",group_id=-2,l3_epc_id=-1" {
 		t.Error("int16值处理得不正确")
 	}
@@ -64,7 +66,7 @@ func TestFill1(t *testing.T) {
 	if tag.IP != 16843009 {
 		t.Error("ip 处理错误")
 	}
-	if tag.GroupID != -1 {
+	if tag.GroupID != datatype.EPC_FROM_DEEPFLOW {
 		t.Error("GroupID 处理错误")
 	}
 	if tag.L3EpcID != -3 {

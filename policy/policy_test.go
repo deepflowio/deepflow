@@ -38,7 +38,7 @@ var (
 	ipNet15       = "0.0.0.0/0"
 	ip6Net1       = "1234::abcd/128"
 	ip6Net2       = "abcd::1234/128"
-	groupEpcOther = int32(-1)
+	groupEpcOther = int32(EPC_FROM_DEEPFLOW)
 	groupEpcAny   = int32(0)
 	groupAny      = uint32(0)
 	subnetAny     = uint32(0)

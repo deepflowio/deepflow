@@ -17,13 +17,13 @@ const (
 
 var (
 	INVALID_ENDPOINT_INFO                   = new(EndpointInfo)
-	INVALID_ENDPOINT_INFO_L3EPCID           = &EndpointInfo{L3EpcId: -1}
+	INVALID_ENDPOINT_INFO_L3EPCID           = &EndpointInfo{L3EpcId: EPC_FROM_DEEPFLOW}
 	INVALID_ENDPOINT_INFO_L2END             = &EndpointInfo{L2End: true}
 	INVALID_ENDPOINT_INFO_L3END             = &EndpointInfo{L3End: true}
 	INVALID_ENDPOINT_INFO_L2AND3END         = &EndpointInfo{L2End: true, L3End: true}
-	INVALID_ENDPOINT_INFO_L2END_L3EPCID     = &EndpointInfo{L2End: true, L3EpcId: -1}
-	INVALID_ENDPOINT_INFO_L3END_L3EPCID     = &EndpointInfo{L3End: true, L3EpcId: -1}
-	INVALID_ENDPOINT_INFO_L2AND3END_L3EPCID = &EndpointInfo{L2End: true, L3End: true, L3EpcId: -1}
+	INVALID_ENDPOINT_INFO_L2END_L3EPCID     = &EndpointInfo{L2End: true, L3EpcId: EPC_FROM_DEEPFLOW}
+	INVALID_ENDPOINT_INFO_L3END_L3EPCID     = &EndpointInfo{L3End: true, L3EpcId: EPC_FROM_DEEPFLOW}
+	INVALID_ENDPOINT_INFO_L2AND3END_L3EPCID = &EndpointInfo{L2End: true, L3End: true, L3EpcId: EPC_FROM_DEEPFLOW}
 	INVALID_ENDPOINT_DATA                   = &EndpointData{SrcInfo: INVALID_ENDPOINT_INFO, DstInfo: INVALID_ENDPOINT_INFO}
 	INVALID_ENDPOINT_DATA_L3EPCID           = &EndpointData{SrcInfo: INVALID_ENDPOINT_INFO_L3EPCID, DstInfo: INVALID_ENDPOINT_INFO_L3EPCID}
 )
@@ -40,11 +40,11 @@ const (
 )
 
 type EndpointInfo struct {
-	L2EpcId      int32 // -1表示其它项目
+	L2EpcId      int32 // 负数表示特殊值
 	L2DeviceType uint32
 	L2DeviceId   uint32
 
-	L3EpcId      int32 // -1表示其它项目
+	L3EpcId      int32 // 负数表示特殊值
 	L3DeviceType uint32
 	L3DeviceId   uint32
 
@@ -156,13 +156,13 @@ func (i *EndpointInfo) GetEpc() uint16 {
 	id := uint16(0)
 	if i.L2EpcId > 0 {
 		id = uint16(i.L2EpcId)
-	} else if i.L2EpcId == -1 {
-		// 和L3的EpcId == -1进行区分
+	} else if i.L2EpcId == EPC_FROM_DEEPFLOW {
+		// 和L3的EpcId == EPC_FROM_DEEPFLOW进行区分
 		id = math.MaxUint16 - 1
 	} else if i.L2EpcId == 0 {
 		if i.L3EpcId > 0 {
 			id = uint16(i.L3EpcId)
-		} else if i.L3EpcId == -1 {
+		} else if i.L3EpcId == EPC_FROM_DEEPFLOW {
 			id = math.MaxUint16
 		}
 	}
