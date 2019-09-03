@@ -25,9 +25,7 @@ const (
 )
 
 func IsOuterPublicIp(l3EpcId int32) bool {
-	// 云外公网IP判断条件：
-	//   l3EpcId == 0：IP未出现在ip_resource或vinterface_ip中、且不是RFC中的私有IP
-	return l3EpcId == 0
+	return l3EpcId == data.EPC_FROM_INTERNET
 }
 
 func (f *Flow) IsClosedFlow() bool {
@@ -228,25 +226,4 @@ func (f *Flow) GetART() time.Duration {
 		return 0
 	}
 	return f.ART
-}
-
-func (f *Flow) FillACLGroupID(aclAction data.AclAction, groups [][]int32) {
-	if len(groups) != 2 {
-		panic("长度必须为2")
-	}
-
-	taggedGroups := [2][]uint32{f.GroupIDs0, f.GroupIDs1}
-	l3EpcIDs := [2]int32{f.FlowMetricsPeerSrc.L3EpcID, f.FlowMetricsPeerDst.L3EpcID}
-
-	data.FillGroupID(aclAction, f.PolicyData.AclGidBitmaps, taggedGroups[:], groups)
-	for i := range groups {
-		if len(groups[i]) > 0 {
-			continue
-		}
-		if IsOuterPublicIp(l3EpcIDs[i]) {
-			groups[i] = append(groups[i], 0)
-		} else {
-			groups[i] = append(groups[i], -1)
-		}
-	}
 }

@@ -14,7 +14,7 @@ const (
 	both  = "both"
 	empty = "empty"
 
-	internet = 0
+	internet = inputtype.EPC_FROM_INTERNET
 )
 
 type scenario struct {
