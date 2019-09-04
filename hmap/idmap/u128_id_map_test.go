@@ -1,11 +1,11 @@
-package utils
+package idmap
 
 import (
 	"testing"
 )
 
-func TestU128ToU32MapAddOrGet(t *testing.T) {
-	m := NewU128ToU32Map(1024)
+func TestU128IDMapAddOrGet(t *testing.T) {
+	m := NewU128IDMap(1024)
 
 	exp := true
 	if _, ret := m.AddOrGet(0, 1, 1, false); ret != exp {
@@ -35,8 +35,8 @@ func TestU128ToU32MapAddOrGet(t *testing.T) {
 	}
 }
 
-func TestU128ToU32MapSize(t *testing.T) {
-	m := NewU128ToU32Map(1024)
+func TestU128IDMapSize(t *testing.T) {
+	m := NewU128IDMap(1024)
 
 	if m.Size() != 0 {
 		t.Errorf("当前长度，Expected %v found %v", 0, m.Size())
@@ -60,8 +60,8 @@ func TestU128ToU32MapSize(t *testing.T) {
 	}
 }
 
-func TestU128ToU32MapGet(t *testing.T) {
-	m := NewU128ToU32Map(1024)
+func TestU128IDMapGet(t *testing.T) {
+	m := NewU128IDMap(1024)
 
 	m.AddOrGet(0, 1, 1, false)
 	if _, in := m.Get(0, 1); !in {
@@ -79,8 +79,8 @@ func TestU128ToU32MapGet(t *testing.T) {
 	}
 }
 
-func TestU128ToU32MapClear(t *testing.T) {
-	m := NewU128ToU32Map(4)
+func TestU128IDMapClear(t *testing.T) {
+	m := NewU128IDMap(4)
 
 	m.AddOrGet(0, 1, 1, false)
 	m.AddOrGet(0, 1, 1, false)
@@ -99,8 +99,8 @@ func TestU128ToU32MapClear(t *testing.T) {
 	}
 }
 
-func BenchmarkU128ToU32MapOptimal(b *testing.B) {
-	m := NewU128ToU32Map(1 << 26)
+func BenchmarkU128IDMap(b *testing.B) {
+	m := NewU128IDMap(1 << 26)
 
 	b.ResetTimer()
 	for i := uint64(0); i < uint64(b.N); {
@@ -114,14 +114,14 @@ func BenchmarkU128ToU32MapOptimal(b *testing.B) {
 	b.Logf("size=%d, width=%d", m.Size(), m.Width())
 }
 
-type testMapKey struct {
+type testU128MapKey struct {
 	key0 uint64
 	key1 uint64
 }
 
-func BenchmarkU128ToU32MapNative(b *testing.B) {
-	m := make(map[testMapKey]uint32)
-	key := testMapKey{}
+func BenchmarkNativeStructMap(b *testing.B) {
+	m := make(map[testU128MapKey]uint32)
+	key := testU128MapKey{}
 
 	b.ResetTimer()
 	for i := uint64(0); i < uint64(b.N); {
@@ -146,21 +146,14 @@ func BenchmarkU128ToU32MapNative(b *testing.B) {
 	b.Logf("size=%d", len(m))
 }
 
-func BenchmarkU128ToU32MapNativeWithoutCheck(b *testing.B) {
-	m := make(map[testMapKey]uint32)
-	key := testMapKey{}
+func BenchmarkNativeU64Map(b *testing.B) {
+	m := make(map[uint64]uint32)
 
 	b.ResetTimer()
 	for i := uint64(0); i < uint64(b.N); i++ {
-		key.key0, key.key1 = i, i<<1
-		m[key] = uint32(i << 2)
-		key.key0, key.key1 = i<<1, i
-		m[key] = uint32(i << 2)
-		key.key0, key.key1 = ^i, ^(i << 1)
-		m[key] = uint32(i << 2)
-		key.key0, key.key1 = ^(i << 1), ^i
-		m[key] = uint32(i << 2)
-		i += 4
+		if _, ok := m[i]; !ok {
+			m[i] = uint32(i << 2)
+		}
 	}
 	b.Logf("size=%d", len(m))
 }
