@@ -3,14 +3,14 @@ package mapreduce
 import (
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
+	"gitlab.x.lan/yunshan/droplet-libs/hmap/idmap"
 	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 	"gitlab.x.lan/yunshan/droplet/app/common/tag"
 )
 
 type SlidingStash struct {
 	timestamp     uint32
-	stashLocation []*utils.U128ToU32Map
+	stashLocation []*idmap.U128IDMap
 	slots         int
 	marginSlots   int
 
@@ -24,7 +24,7 @@ type SlidingStash struct {
 func NewSlidingStash(capacity uint32, slots, marginSlots int) Stash {
 	stash := &SlidingStash{
 		timestamp:     0,
-		stashLocation: make([]*utils.U128ToU32Map, slots),
+		stashLocation: make([]*idmap.U128IDMap, slots),
 		slots:         slots,
 		marginSlots:   marginSlots,
 		stash:         make([]interface{}, capacity),
@@ -56,7 +56,7 @@ func (s *SlidingStash) Add(docs []interface{}) []interface{} {
 
 		slotMap := s.stashLocation[slot]
 		if slotMap == nil {
-			slotMap = utils.NewU128ToU32Map(s.capacity)
+			slotMap = idmap.NewU128IDMap(s.capacity)
 			s.stashLocation[slot] = slotMap
 		}
 
