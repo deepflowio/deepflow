@@ -13,19 +13,28 @@ df_usage_acl_edge_port   x0000049b00010000    _id,acl_direction,acl_gid,directio
 df_usage_acl_port        x0000049b00000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,protocol,server_port,tap_type
 
 df_fps_acl               x0000048300000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
+df_fps_acl_port          x0000049b00000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type,protocol,server_port
 df_fps_acl_edge          x0000048300010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
+df_fps_acl_edge_port     x0000049b00010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type,protocol,server_port
 
 df_geo_acl               x2000048300000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,isp,tap_type
 df_geo_acl               x4000048300000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,region,tap_type
+df_geo_acl_port          x2000049b00000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,isp,tap_type,protocol,server_port
+df_geo_acl_port          x4000049b00000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,region,tap_type,protocol,server_port
 df_geo_acl_edge          x2000048300010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,isp,tap_type
 df_geo_acl_edge          x4000048300010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,region,tap_type
+df_geo_acl_edge_port     x2000049b00010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,isp,tap_type,protocol,server_port
+df_geo_acl_edge_port     x4000049b00010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,region,tap_type,protocol,server_port
 
 df_perf_acl              x0000048300000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
+df_perf_acl_port         x0000049b00000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type,protocol,server_port
 df_perf_acl_edge         x0000048300010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
 df_perf_acl_edge_port    x0000049b00010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,protocol,server_port,tap_type
 
 df_type_acl              x0000048300000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
+df_type_acl_port         x0000049b00000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type,protocol,server_port
 df_type_acl_edge         x0000048300010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
+df_type_acl_edge_port    x0000049b00010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type,protocol,server_port
 
 vtap_usage               x00000160000001d1    _id,_tid,cast_type,host,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,region,subnet_id,vtap
 vtap_usage               x00000908000001d1    _id,_tid,host,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,protocol,region,scope,subnet_id
