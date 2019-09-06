@@ -1,5 +1,7 @@
 package usage
 
+//go:generate tmpl -data=@codes.tmpldata -o codes.go ../common/gen/codes.go.tmpl
+
 import (
 	"github.com/google/gopacket/layers"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
@@ -21,36 +23,6 @@ var log = logging.MustGetLogger("usage")
 const (
 	CODES_LEN = 64
 )
-
-// node
-
-var NODE_CODES = []outputtype.Code{}
-
-var STAT_CODES_LEN = len(NODE_CODES)
-
-// policy node
-
-var POLICY_NODE_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x00) | outputtype.ACLDirection | outputtype.ACLGID | outputtype.Direction | outputtype.IP | outputtype.TAPType,
-}
-
-var POLICY_NODE_PORT_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x01) | outputtype.ACLDirection | outputtype.ACLGID | outputtype.Direction | outputtype.IP | outputtype.Protocol | outputtype.ServerPort | outputtype.TAPType,
-}
-
-var POLICY_NODE_CODES_LEN = len(POLICY_NODE_CODES) + len(POLICY_NODE_PORT_CODES)
-
-// policy edge
-
-var POLICY_EDGE_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x02) | outputtype.ACLDirection | outputtype.ACLGID | outputtype.Direction | outputtype.IPPath | outputtype.TAPType,
-}
-
-var POLICY_EDGE_PORT_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x03) | outputtype.ACLDirection | outputtype.ACLGID | outputtype.Direction | outputtype.IPPath | outputtype.Protocol | outputtype.ServerPort | outputtype.TAPType,
-}
-
-var POLICY_EDGE_CODES_LEN = len(POLICY_EDGE_CODES) + len(POLICY_EDGE_PORT_CODES)
 
 type MeteringToUsageDocumentMapper struct {
 	docs        *utils.StructBuffer

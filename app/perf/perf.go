@@ -1,5 +1,7 @@
 package perf
 
+//go:generate tmpl -data=@codes.tmpldata -o codes.go ../common/gen/codes.go.tmpl
+
 import (
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
@@ -21,29 +23,6 @@ const (
 )
 
 // 注意：仅统计TCP流
-
-var NODE_CODES = []outputtype.Code{}
-
-var STAT_NODE_CODES_LEN = len(NODE_CODES)
-
-var POLICY_NODE_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x00) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IP | outputtype.TAPType,
-}
-
-var POLICY_NODE_CODE_LEN = len(POLICY_NODE_CODES)
-
-var POLICY_EDGE_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x01) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IPPath | outputtype.TAPType,
-}
-
-var POLICY_EDGE_PORT_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x02) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.Protocol | outputtype.IPPath | outputtype.ServerPort | outputtype.TAPType,
-}
-
-var POLICY_EDGE_CODE_LEN = len(POLICY_EDGE_PORT_CODES)
-
-var POLICY_GROUP_NODE_CODES = []outputtype.Code{}
-var POLICY_GROUP_EDGE_CODES = []outputtype.Code{}
 
 type FlowToPerfDocumentMapper struct {
 	policyGroup []inputtype.AclAction
@@ -89,7 +68,7 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 	statTemplates := GetTagTemplateByActionFlags(rawFlow.PolicyData, interestActionFlags)
 	p.policyGroup = FillPolicyTagTemplate(rawFlow.PolicyData, interestActionFlags, p.policyGroup)
 
-	oneSideCodes := make([]outputtype.Code, 0, STAT_NODE_CODES_LEN)
+	oneSideCodes := make([]outputtype.Code, 0, NODE_CODES_LEN)
 	if statTemplates&inputtype.TEMPLATE_NODE != 0 {
 		oneSideCodes = append(oneSideCodes, NODE_CODES...)
 	}

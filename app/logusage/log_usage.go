@@ -1,5 +1,7 @@
 package logusage
 
+//go:generate tmpl -data=@codes.tmpldata -o codes.go ../common/gen/codes.go.tmpl
+
 import (
 	"sync"
 
@@ -22,12 +24,6 @@ var log = logging.MustGetLogger("log_usage")
 const (
 	CODES_LEN = 64
 )
-
-var EDGE_PORT_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x01) | outputtype.L3EpcIDPath | outputtype.IPPath | outputtype.Protocol | outputtype.ServerPort | outputtype.TAPType,
-}
-
-var EDGE_CODES_LEN = len(EDGE_PORT_CODES)
 
 type FlowToLogUsageDocumentMapper struct {
 	pool *sync.Pool

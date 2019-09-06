@@ -1,0 +1,7 @@
+{
+    "package": "fps",
+    "codes": [
+        "acl_direction, acl_gid, direction, ip, tap_type",
+	    "acl_direction, acl_gid, direction, ip_path, tap_type"
+    ]
+}
