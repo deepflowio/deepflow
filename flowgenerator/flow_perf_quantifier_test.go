@@ -1,11 +1,115 @@
 package flowgenerator
 
 import (
+	"bytes"
+	"fmt"
+	"io/ioutil"
+	"os"
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/google/gopacket/pcapgo"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
+
+func loadPcap(file string) ([]RawPacket, []uint16, []time.Duration, error) {
+	var f *os.File
+	var err error
+	dirName := "flowgenerator"
+	cwd, _ := os.Getwd()
+	if strings.Contains(cwd, dirName) {
+		f, err = os.Open(file)
+	} else { // dlv
+		f, err = os.Open(dirName + "/" + file)
+	}
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	defer f.Close()
+
+	r, _ := pcapgo.NewReader(f)
+	var packets []RawPacket
+	var packetLens []uint16
+	var packetStamps []time.Duration
+	for {
+		packet, ci, err := r.ReadPacketData()
+		if err != nil || packet == nil {
+			break
+		}
+		packetLens = append(packetLens, uint16(ci.Length))
+		packetStamps = append(packetStamps, time.Duration(ci.Timestamp.UnixNano()))
+		if len(packet) > 128 {
+			packets = append(packets, packet[:128])
+		} else {
+			packets = append(packets, packet)
+		}
+	}
+	return packets, packetLens, packetStamps, err
+}
+
+func getMetaPacketFromPcap(file string) ([]*MetaPacket, error) {
+	raw, lens, ts, err := loadPcap(file)
+	if err != nil {
+		return nil, err
+	}
+
+	packets := make([]*MetaPacket, 0, len(raw))
+	for i, pkt := range raw {
+		meta := &MetaPacket{PacketLen: lens[i], Timestamp: ts[i]}
+		l2Len := meta.ParseL2(pkt)
+		meta.Parse(pkt[l2Len:])
+		packets = append(packets, meta)
+	}
+
+	return packets, nil
+}
+
+func getPacketDirection(first, packet *MetaPacket) bool {
+	if first.IpSrc == packet.IpSrc {
+		return bool(TCP_DIR_CLIENT)
+	}
+	return bool(TCP_DIR_SERVER)
+}
+
+func TestRttSyn(t *testing.T) {
+	var buffer bytes.Buffer
+	counter := NewFlowPerfCounter()
+	flowPerf := AcquireMetaFlowPerf()
+	flowExtra := &FlowExtra{
+		taggedFlow: &TaggedFlow{},
+	}
+
+	packets, err := getMetaPacketFromPcap("rtt_syn_2_ack.pcap")
+	if err != nil {
+		t.Errorf("structure metaPacket faild as %v", err)
+		return
+	}
+	if len(packets) < 2 {
+		t.Logf("calc flow perf need minimum 2 packets")
+		return
+	}
+
+	firstPkt := packets[0]
+	for i, pkt := range packets {
+		if pkt.TcpData == nil {
+			t.Errorf("raw packet not tcp packet, %vth meta_packet is %v", i, pkt)
+		}
+
+		flowPerf.Update(pkt, getPacketDirection(firstPkt, pkt), flowExtra, &counter)
+		buffer.WriteString(fmt.Sprintf("\t%vth perf data:%v", i, flowPerf.perfData))
+	}
+
+	expectFile := "flowPerf_rttSyn_test.result"
+	content, _ := ioutil.ReadFile(expectFile)
+	expected := string(content)
+	actual := buffer.String()
+	if expected != actual {
+		ioutil.WriteFile("actual.txt", []byte(actual), 0644)
+		t.Error(fmt.Sprintf("Inconsistent with %s, written to actual.txt", expectFile))
+	}
+}
 
 func testSeqSegmentIsContinuous(left, right, node *SeqSegment, t *testing.T) {
 	if left == nil || right == nil || node == nil || t == nil {
