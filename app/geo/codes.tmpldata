@@ -1,0 +1,9 @@
+{
+    "package": "geo",
+    "codes": [
+        "acl_gid, acl_direction, direction, ip, isp_code, tap_type",
+        "acl_gid, acl_direction, direction, ip, region, tap_type",
+        "acl_gid, acl_direction, direction, ip_path, isp_code, tap_type",
+        "acl_gid, acl_direction, direction, ip_path, region, tap_type"
+    ]
+}

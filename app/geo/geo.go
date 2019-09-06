@@ -1,5 +1,7 @@
 package geo
 
+//go:generate tmpl -data=@codes.tmpldata -o codes.go ../common/gen/codes.go.tmpl
+
 import (
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
@@ -36,31 +38,6 @@ func init() {
 		panic("国家代码不正确")
 	}
 }
-
-// 注意：仅统计TCP流
-// 注意：此应用中请不要加入ServerPort或XXPath的Tag组合
-
-var POLICY_CHN_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x00) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IP | outputtype.ISPCode | outputtype.TAPType,
-	outputtype.IndexToCode(0x01) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IP | outputtype.Region | outputtype.TAPType,
-}
-
-var POLICY_NON_CHN_CODES = []outputtype.Code{ // 注意：就是POLICY_CHN_CODES中包含Country的部分
-	// v5.5.3：产品没有世界地图需求
-}
-
-var POLICY_CHN_EDGE_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x02) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IPPath | outputtype.ISPCode | outputtype.TAPType,
-	outputtype.IndexToCode(0x03) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IPPath | outputtype.Region | outputtype.TAPType,
-}
-
-var POLICY_NON_CHN_EDGE_CODES = []outputtype.Code{ // 注意：就是POLICY_CHN_EDGE_CODES中包含Country的部分
-	// v5.5.3：产品没有世界地图需求
-}
-
-var POLICY_CHN_GROUP_NODE_CODES = []outputtype.Code{}
-
-var POLICY_NON_CHN_GROUP_NODE_CODES = []outputtype.Code{}
 
 type FlowToGeoDocumentMapper struct {
 	geoFile string

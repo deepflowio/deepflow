@@ -1,5 +1,7 @@
 package flowtype
 
+//go:generate tmpl -data=@codes.tmpldata -o codes.go ../common/gen/codes.go.tmpl
+
 import (
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
@@ -24,34 +26,6 @@ const (
 	CODES_LEN  = 64
 	GROUPS_LEN = 16
 )
-
-// node
-
-var NODE_CODES = []outputtype.Code{}
-
-// policy node
-
-var POLICY_NODE_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x00) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IP | outputtype.TAPType,
-}
-
-var POLICY_EDGE_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x01) | outputtype.ACLGID | outputtype.ACLDirection | outputtype.Direction | outputtype.IPPath | outputtype.TAPType,
-}
-
-var POLICY_NODE_CODES_LEN = len(POLICY_NODE_CODES)
-
-// policy group
-
-var POLICY_GROUP_NODE_CODES = []outputtype.Code{}
-
-var POLICY_GROUP_NODE_CODES_LEN = len(POLICY_GROUP_NODE_CODES)
-
-// policy group edge
-
-var POLICY_GROUP_EDGE_CODES = []outputtype.Code{}
-
-var POLICY_GROUP_EDGE_CODES_LEN = len(POLICY_GROUP_EDGE_CODES)
 
 type FlowToTypeDocumentMapper struct {
 	policyGroup []inputtype.AclAction

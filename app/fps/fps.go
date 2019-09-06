@@ -1,5 +1,7 @@
 package fps
 
+//go:generate tmpl -data=@codes.tmpldata -o codes.go ../common/gen/codes.go.tmpl
+
 import (
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	inputtype "gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -50,28 +52,6 @@ var (
 		SumClosedFlowCount: 1,
 	}
 )
-
-// node
-
-var NODE_CODES = []outputtype.Code{}
-
-var STAT_CODES_LEN = len(NODE_CODES)
-
-// policy node
-
-var POLICY_NODE_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x00) | outputtype.ACLDirection | outputtype.ACLGID | outputtype.Direction | outputtype.IP | outputtype.TAPType,
-}
-
-var POLICY_NODE_CODES_LEN = len(POLICY_NODE_CODES)
-
-// policy edge
-
-var POLICY_EDGE_CODES = []outputtype.Code{
-	outputtype.IndexToCode(0x01) | outputtype.ACLDirection | outputtype.ACLGID | outputtype.Direction | outputtype.IPPath | outputtype.TAPType,
-}
-
-var POLICY_EDGE_CODES_LEN = len(POLICY_EDGE_CODES)
 
 type FlowToFPSDocumentMapper struct {
 	timestamps  []uint32
@@ -125,7 +105,7 @@ func (p *FlowToFPSDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 	statTemplates := GetTagTemplateByActionFlags(rawFlow.PolicyData, interestActions)
 	p.policyGroup = FillPolicyTagTemplate(rawFlow.PolicyData, interestActions, p.policyGroup)
 
-	oneSideCodes := make([]outputtype.Code, 0, STAT_CODES_LEN)
+	oneSideCodes := make([]outputtype.Code, 0, NODE_CODES_LEN)
 	if statTemplates&inputtype.TEMPLATE_NODE != 0 {
 		oneSideCodes = append(oneSideCodes, NODE_CODES...)
 	}

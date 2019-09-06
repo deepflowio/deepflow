@@ -1,5 +1,7 @@
 package flow
 
+//go:generate tmpl -data=@codes.tmpldata -o codes.go ../common/gen/codes.go.tmpl
+
 import (
 	"sync"
 
@@ -23,60 +25,6 @@ const (
 	CODES_LEN  = 64
 	GROUPS_LEN = 16
 )
-
-// node
-
-var NODE_CODES = []outputtype.Code{}
-
-var NODE_PORT_CODES = []outputtype.Code{}
-
-var STAT_CODES_LEN = len(NODE_CODES) + len(NODE_PORT_CODES)
-
-// edge
-
-var EDGE_CODES = []outputtype.Code{}
-
-var TOR_EDGE_PORT_CODES = []outputtype.Code{}
-
-var TOR_EDGE_PORT_CODES_LEN = len(TOR_EDGE_PORT_CODES)
-
-var TOR_EDGE_CODES = []outputtype.Code{}
-
-var STAT_EDGE_CODES_LEN = len(EDGE_CODES) + len(TOR_EDGE_CODES)
-
-// policy node
-
-var POLICY_NODE_CODES = []outputtype.Code{}
-
-var POLICY_PORT_CODES = []outputtype.Code{}
-
-var POLICY_NODE_PORT_CODES = []outputtype.Code{}
-
-var POLICY_NODE_CODES_LEN = len(POLICY_NODE_CODES) + len(POLICY_PORT_CODES) + len(POLICY_NODE_PORT_CODES)
-
-// policy edge
-
-var POLICY_EDGE_CODES = []outputtype.Code{}
-
-var POLICY_EDGE_PORT_CODES = []outputtype.Code{}
-
-var POLICY_EDGE_CODES_LEN = len(POLICY_EDGE_CODES) + len(POLICY_EDGE_PORT_CODES)
-
-// policy group
-
-var POLICY_GROUP_NODE_CODES = []outputtype.Code{}
-
-var POLICY_GROUP_NODE_PORT_CODES = []outputtype.Code{}
-
-var POLICY_GROUP_NODE_CODES_LEN = len(POLICY_GROUP_NODE_CODES) + len(POLICY_GROUP_NODE_PORT_CODES)
-
-// policy group edge
-
-var POLICY_GROUP_EDGE_CODES = []outputtype.Code{}
-
-var POLICY_GROUP_EDGE_PORT_CODES = []outputtype.Code{}
-
-var POLICY_GROUP_EDGE_CODES_LEN = len(POLICY_GROUP_EDGE_CODES) + len(POLICY_GROUP_EDGE_PORT_CODES)
 
 type FlowToFlowDocumentMapper struct {
 	pool        *sync.Pool
@@ -136,8 +84,8 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 	statTemplates := GetTagTemplateByActionFlags(rawFlow.PolicyData, interestActions)
 	p.policyGroup = FillPolicyTagTemplate(rawFlow.PolicyData, interestActions, p.policyGroup)
 
-	oneSideCodes := make([]outputtype.Code, 0, STAT_CODES_LEN)
-	edgeCodes := make([]outputtype.Code, 0, STAT_EDGE_CODES_LEN)
+	oneSideCodes := make([]outputtype.Code, 0, NODE_CODES_LEN)
+	edgeCodes := make([]outputtype.Code, 0, EDGE_CODES_LEN)
 	if statTemplates&inputtype.TEMPLATE_NODE != 0 {
 		oneSideCodes = append(oneSideCodes, NODE_CODES...)
 	}

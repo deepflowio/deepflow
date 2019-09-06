@@ -1,0 +1,130 @@
+package {{ .package }}
+
+import (
+	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
+)
+
+{{ $policy_chn_codes := list }}
+{{ $policy_chn_edge_codes := list }}
+{{ $node_codes := list }}
+{{ $node_port_codes := list }}
+{{ $edge_codes := list }}
+{{ $edge_port_codes := list }}
+{{ $policy_node_codes := list }}
+{{ $policy_node_port_codes := list }}
+{{ $policy_edge_codes := list }}
+{{ $policy_edge_port_codes := list }}
+
+{{ range $id, $code := .codes }}
+
+    {{ $is_edge := contains "_path" $code }}
+    {{ $is_port := contains "server_port" $code }}
+    {{ $is_policy := contains "acl_" $code }}
+    {{ $is_geo := or (contains "isp_code" $code) (contains "region" $code) }}
+
+    {{ if and $is_geo $is_edge $is_policy }}
+        {{ $policy_chn_edge_codes = append $policy_chn_edge_codes $code }}
+    {{ else if and $is_geo (not $is_edge) $is_policy }}
+        {{ $policy_chn_codes = append $policy_chn_codes $code }}
+    {{ else if and $is_edge $is_port $is_policy }}
+        {{ $policy_edge_port_codes = append $policy_edge_port_codes $code }}
+    {{ else if and $is_edge $is_port (not $is_policy) }}
+        {{ $edge_port_codes = append $edge_port_codes $code }}
+    {{ else if and $is_edge (not $is_port) $is_policy }}
+        {{ $policy_edge_codes = append $policy_edge_codes $code }}
+    {{ else if and $is_edge (not $is_port) (not $is_policy) }}
+        {{ $edge_codes = append $edge_codes $code }}
+    {{ else if and (not $is_edge) $is_port $is_policy }}
+        {{ $policy_node_port_codes = append $policy_node_port_codes $code }}
+    {{ else if and (not $is_edge) $is_port (not $is_policy) }}
+        {{ $node_port_codes = append $node_port_codes $code }}
+    {{ else if and (not $is_edge) (not $is_port) $is_policy }}
+        {{ $policy_node_codes = append $policy_node_codes $code }}
+    {{ else if and (not $is_edge) (not $is_port) (not $is_policy) }}
+        {{ $node_codes = append $node_codes $code }}
+    {{ end }}
+
+{{ end }}
+
+{{ define "output" }}
+    {{ $id := .start_index }}
+    {{ printf "var %s = []zerodoc.Code{" .name }}
+        {{- range $_, $code := .codes }}
+            {{- $real_codes := list (printf "zerodoc.IndexToCode(0x%02x)" $id) }}
+            {{- range $_, $c := splitList "," $code }}
+                {{- $ws := list }}
+                {{- $cc := trim $c }}
+                {{- range $_, $s := splitList "_" $cc }}
+                    {{- if or (eq $s "ip") (eq $s "id") (eq $s "acl") (eq $s "gid") (eq $s "vlan") (eq $s "vtap") (eq $s "tap") (eq $s "tcp") (eq $s "isp") }}
+                        {{- $ws = append $ws (upper $s) }}
+                    {{- else }}
+                        {{- $ws = append $ws (title $s) }}
+                    {{- end }}
+                {{- end }}
+                {{- $w := join "" $ws }}
+                {{- $real_codes = append $real_codes (printf "zerodoc.%s" $w) }}
+            {{- end }}
+            {{ printf "%v," (join " | " $real_codes) }}
+            {{- $id = add $id 1 }}
+        {{- end }}
+    {{ print "}" }}
+{{ end }}
+
+{{ $i := 0 }}
+
+{{ if not (eq .package "geo") }}
+
+    // node
+
+    {{ template "output" dict "start_index" $i "name" "NODE_CODES" "codes" $node_codes }}
+    {{ $i = add $i (len $node_codes) }}
+
+    {{ template "output" dict "start_index" $i "name" "NODE_PORT_CODES" "codes" $node_port_codes }}
+    {{ $i = add $i (len $node_port_codes) }}
+
+    // edge
+
+    {{ template "output" dict "start_index" $i "name" "EDGE_CODES" "codes" $edge_codes }}
+    {{ $i = add $i (len $edge_codes) }}
+
+    {{ template "output" dict "start_index" $i "name" "EDGE_PORT_CODES" "codes" $edge_port_codes }}
+    {{ $i = add $i (len $edge_port_codes) }}
+
+    // policy node
+
+    {{ template "output" dict "start_index" $i "name" "POLICY_NODE_CODES" "codes" $policy_node_codes }}
+    {{ $i = add $i (len $policy_node_codes) }}
+
+    {{ template "output" dict "start_index" $i "name" "POLICY_NODE_PORT_CODES" "codes" $policy_node_port_codes }}
+    {{ $i = add $i (len $policy_node_port_codes) }}
+
+    // policy edge
+
+    {{ template "output" dict "start_index" $i "name" "POLICY_EDGE_CODES" "codes" $policy_edge_codes }}
+    {{ $i = add $i (len $policy_edge_codes) }}
+
+    {{ template "output" dict "start_index" $i "name" "POLICY_EDGE_PORT_CODES" "codes" $policy_edge_port_codes }}
+
+    var NODE_CODES_LEN = len(NODE_CODES) + len(NODE_PORT_CODES)
+    var EDGE_CODES_LEN = len(EDGE_CODES) + len(EDGE_PORT_CODES)
+    var POLICY_NODE_CODES_LEN = len(POLICY_NODE_CODES) + len(POLICY_NODE_PORT_CODES)
+    var POLICY_EDGE_CODES_LEN = len(POLICY_EDGE_CODES) + len(POLICY_EDGE_PORT_CODES)
+
+    // no longer used
+    var TOR_EDGE_CODES = []zerodoc.Code{}
+    var TOR_EDGE_PORT_CODES = []zerodoc.Code{}
+    var POLICY_PORT_CODES = []zerodoc.Code{}
+
+{{ else }}
+
+    {{ template "output" dict "start_index" $i "name" "POLICY_CHN_CODES" "codes" $policy_chn_codes }}
+    {{ $i = add $i (len $policy_chn_codes) }}
+
+    {{ template "output" dict "start_index" $i "name" "POLICY_CHN_EDGE_CODES" "codes" $policy_chn_edge_codes }}
+    {{ $i = add $i (len $policy_chn_edge_codes) }}
+
+    // no longer used
+    var POLICY_NON_CHN_CODES = []zerodoc.Code{}
+    var POLICY_NON_CHN_EDGE_CODES = []zerodoc.Code{}
+
+{{ end }}
