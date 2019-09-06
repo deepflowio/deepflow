@@ -76,9 +76,10 @@ type TcpSessionPeer struct {
 	isAckReceived bool // AckRetrans check
 	isSynReceived bool
 
-	isAckPacket bool
-	canCalcRtt  bool
-	canCalcArt  bool
+	isAckPacket   bool
+	canCalcRtt    bool
+	canCalcRttSyn bool
+	canCalcArt    bool
 }
 
 type FlowPacketVariance struct {
@@ -150,6 +151,18 @@ func (p *TcpSessionPeer) resetRttPrecondition() {
 
 func (p *TcpSessionPeer) getArtPrecondition() bool {
 	return p.canCalcArt
+}
+
+func (p *TcpSessionPeer) setRttSynPrecondition() {
+	p.canCalcRttSyn = true
+}
+
+func (p *TcpSessionPeer) resetRttSynPrecondition() {
+	p.canCalcRttSyn = false
+}
+
+func (p *TcpSessionPeer) getRttSynPrecondition() bool {
+	return p.canCalcRttSyn
 }
 
 func (p *TcpSessionPeer) getRttPrecondition() bool {
@@ -448,16 +461,16 @@ func (p *MetaFlowPerf) isInvalidRetransPacket(sameDirection, oppositeDirection *
 	return isInvalid
 }
 
-func isHandshakeAckpacket(sameDirection, oppositeDirection *TcpSessionPeer, header *MetaPacket) bool {
-	return isAckPacket(header) && sameDirection.seqThreshold == header.TcpData.Seq && oppositeDirection.seqThreshold == header.TcpData.Ack
+func isFirstHandshakeAckpacket(sameDirection, oppositeDirection *TcpSessionPeer, header *MetaPacket) bool {
+	return isAckPacket(header) && sameDirection.seq != header.TcpData.Seq && sameDirection.seqThreshold == header.TcpData.Seq && oppositeDirection.seqThreshold == header.TcpData.Ack
 }
 
 func (p *MetaFlowPerf) whenFlowOpening(sameDirection, oppositeDirection *TcpSessionPeer, header *MetaPacket, tcpDirection TCPDirection) bool {
 	isOpeningPkt := false
 
-	if sameDirection.getRttPrecondition() {
+	if sameDirection.getRttSynPrecondition() {
 		// 不考虑SYN, SYN/ACK, PSH/ACK的情况
-		if (tcpDirection == TCP_DIR_CLIENT && isHandshakeAckpacket(sameDirection, oppositeDirection, header)) ||
+		if (tcpDirection == TCP_DIR_CLIENT && isFirstHandshakeAckpacket(sameDirection, oppositeDirection, header)) ||
 			(tcpDirection == TCP_DIR_SERVER && isSynAckPacket(header)) &&
 				oppositeDirection.isReplyPacket(header) {
 			if rttSyn := calcTimeInterval(header.Timestamp, oppositeDirection.timestamp); rttSyn > 0 {
@@ -472,9 +485,11 @@ func (p *MetaFlowPerf) whenFlowOpening(sameDirection, oppositeDirection *TcpSess
 			sameDirection.winScale = WIN_SCALE_FLAG | uint8(Min(int(WIN_SCALE_MAX), int(header.TcpData.WinScale)))
 		}
 
-		oppositeDirection.setRttPrecondition()
+		sameDirection.resetRttSynPrecondition()
+		oppositeDirection.setRttSynPrecondition()
 		sameDirection.resetRttPrecondition()
 		sameDirection.resetArtPrecondition()
+		oppositeDirection.resetRttPrecondition()
 		oppositeDirection.resetArtPrecondition()
 
 		isOpeningPkt = true
