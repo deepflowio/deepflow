@@ -165,27 +165,16 @@ func (h *FlowHandler) Start() {
 func isValidFlow(flow *datatype.TaggedFlow) bool {
 	startTime := flow.StartTime
 	endTime := flow.EndTime
+
 	// we give flow timestamp a tolerance with one minute
 	toleranceCurTime := time.Duration(time.Now().UnixNano()) + time.Minute
-
 	if startTime > toleranceCurTime || endTime > toleranceCurTime {
 		return false
 	}
-	if endTime != 0 && endTime < startTime {
+	if endTime < startTime {
 		return false
 	}
 
-	rightMargin := endTime + 2*time.Minute
-	times := [3]time.Duration{
-		flow.CurStartTime,
-		flow.FlowMetricsPeerSrc.ArrTimeLast,
-		flow.FlowMetricsPeerDst.ArrTimeLast,
-	}
-	for i := 0; i < 3; i++ {
-		if times[i] > rightMargin || times[i] > toleranceCurTime {
-			return false
-		}
-	}
 	return true
 }
 
@@ -219,7 +208,9 @@ func (h *subFlowHandler) Process() error {
 				continue
 			}
 
+			// 统计处理的流数量
 			h.handlerCounter[h.counterLatch].inputCounter++
+
 			for i, processor := range h.processors {
 				docs := processor.Process(flow, false)
 				h.processorCounter[h.counterLatch][i].docCounter += uint64(len(docs))

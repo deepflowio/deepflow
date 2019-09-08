@@ -20,7 +20,7 @@ const (
 )
 
 type ServiceTable struct {
-	m *lru.Cache64
+	m *lru.Cache64 // FIXME: 优化为u32/u64 map
 }
 
 func ServiceKey(epcID int16, ipHash uint32, port uint16) uint64 {

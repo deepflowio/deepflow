@@ -3,7 +3,6 @@ package flowgenerator
 import (
 	"math"
 	"reflect"
-	"sync"
 	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -46,35 +45,24 @@ const (
 	MAC_MATCH_ALL  = 0x11 // match all macs
 )
 
-const FLOW_CACHE_CAP = 1024
-const HASH_MAP_SIZE uint64 = 1024 * 256
-const QUEUE_BATCH_SIZE = 1024
-const TIMEOUT_CLEANER_COUNT uint64 = 4
-const METERING_CACHE_SIZE = 1024 * 16
+const QUEUE_BATCH_SIZE = 4096
 
-const IN_PORT_FLOW_ID_MASK uint64 = 0xFF000000
-const TIMER_FLOW_ID_MASK uint64 = 0x00FFFFFF
-const TOTAL_FLOWS_ID_MASK uint64 = 0x0FFFFFFF
-const FLOW_LIMIT_NUM uint64 = 1024 * 1024
-const FLOW_CLEAN_INTERVAL = time.Second
-const FORCE_REPORT_INTERVAL = 60 * time.Second
-const MIN_FORCE_REPORT_TIME = 5 * time.Second
-const REPORT_TOLERANCE = 4 * time.Second
+const (
+	THREAD_FLOW_ID_MASK  uint64 = 0xFF000000
+	TIMER_FLOW_ID_MASK   uint64 = 0x00FFFFFF
+	COUNTER_FLOW_ID_MASK uint64 = 0x0FFFFFFF
+)
+
 const SECOND_COUNT_PER_MINUTE = 60
 
 // configurations for base flow generator, read only
 var (
-	flowGeneratorCount   uint64
-	timeoutCleanerCount  uint64
-	hashMapSize          uint64
-	forceReportInterval  time.Duration
-	flowCleanInterval    time.Duration
-	reportTolerance      time.Duration
-	ignoreTorMac         bool
-	ignoreL2End          bool
-	portStatsInterval    time.Duration
-	portStatsSrcEndCount int
-	portStatsTimeout     time.Duration
+	flowGeneratorCount  uint64
+	hashMapSize         uint64
+	forceReportInterval time.Duration
+	reportTolerance     time.Duration
+	ignoreTorMac        bool
+	ignoreL2End         bool
 )
 
 // configurations for timeout, read only
@@ -86,7 +74,9 @@ var (
 	exceptionTimeout       time.Duration
 	closedFinTimeout       time.Duration
 	singleDirectionTimeout time.Duration
-	minTimeout             time.Duration
+
+	minTimeout time.Duration
+	maxTimeout time.Duration
 )
 
 // timeout config for outer user
@@ -100,41 +90,13 @@ type TimeoutConfig struct {
 	SingleDirection time.Duration
 }
 
-type FlowGeneratorStats struct {
-	TotalNumFlows                uint64 `statsd:"total_flow"`
-	CurrNumFlows                 int32  `statsd:"current_flow"`
-	FloodDropPackets             uint64 `statsd:"flood_drop_packet"`
-	NonEmptyFlowCacheNum         int    `statsd:"non_empty_flow_cache_num"`
-	MaxFlowCacheLen              int    `statsd:"max_flow_cache_len"`
-	cleanRoutineFlowCacheNums    []int
-	cleanRoutineMaxFlowCacheLens []int
-}
-
 type FlowGenerator struct {
-	FlowCacheHashMap
-	FlowGeo
+	hashBasis uint32
+	flowMap   *FlowMap
 
-	inputPacketQueue   QueueReader
-	meteringAppQueue   QueueWriter
-	flowOutQueue       QueueWriter
-	stats              FlowGeneratorStats
-	stateMachineMaster []map[uint8]*StateValue
-	stateMachineSlave  []map[uint8]*StateValue
-	tcpServiceTable    *ServiceTable
-	udpServiceTable    *ServiceTable
-	recvBuffer         []interface{}
-	bufferSize         int
-	flowLimitNum       int32
-	handleRunning      bool
-	cleanRunning       bool
-	index              int
-	cleanWaitGroup     sync.WaitGroup
-
-	meteringKeys  []HashKey
-	meteringItems []interface{}
-	flowOutBuffer [][]interface{}
-
-	perfCounter FlowPerfCounter
+	inputQueue QueueReader // 注意设置不低于_FLOW_STAT_INTERVAL的FlushIndicator
+	running    bool
+	index      int
 }
 
 func timeMax(a time.Duration, b time.Duration) time.Duration {
@@ -159,26 +121,6 @@ func toTimestamp(t time.Time) time.Duration {
 	return time.Duration(t.UnixNano())
 }
 
-func (f *FlowGenerator) GetCounter() interface{} {
-	nonEmptyFlowCacheNum := 0
-	maxFlowCacheLen := 0
-	for i := 0; i < int(timeoutCleanerCount); i++ {
-		nonEmptyFlowCacheNum += f.stats.cleanRoutineFlowCacheNums[i]
-		if maxFlowCacheLen < f.stats.cleanRoutineMaxFlowCacheLens[i] {
-			maxFlowCacheLen = f.stats.cleanRoutineMaxFlowCacheLens[i]
-		}
-	}
-	f.stats.NonEmptyFlowCacheNum = nonEmptyFlowCacheNum
-	f.stats.MaxFlowCacheLen = maxFlowCacheLen
-	counter := f.stats
-	f.stats.FloodDropPackets = 0
-	return &counter
-}
-
-func (f *FlowGenerator) Closed() bool {
-	return false // FIXME: never close?
-}
-
 func SetTimeout(timeout TimeoutConfig) {
 	openingTimeout = timeout.Opening
 	establishedTimeout = timeout.Established
@@ -187,18 +129,13 @@ func SetTimeout(timeout TimeoutConfig) {
 	exceptionTimeout = timeout.Exception
 	closedFinTimeout = timeout.ClosedFin
 	singleDirectionTimeout = timeout.SingleDirection
-	minTimeout = timeout.minTimeout()
+	minTimeout, maxTimeout = timeout.timeoutRange()
 	log.Infof("flow generator timeout config: %+v", timeout)
-	if flowCleanInterval > minTimeout {
-		log.Warningf("flow-clean-interval (%v) is too large, may cause inaccurate flow time", flowCleanInterval)
-	}
 }
 
 func SetFlowGenerator(cfg config.Config) {
 	flowGeneratorCount = uint64(cfg.Queue.PacketQueueCount)
 	forceReportInterval = cfg.FlowGenerator.ForceReportInterval
-	flowCleanInterval = cfg.FlowGenerator.FlowCleanInterval
-	timeoutCleanerCount = cfg.FlowGenerator.TimeoutCleanerCount
 	hashMapSize = cfg.FlowGenerator.HashMapSize
 	reportTolerance = cfg.FlowGenerator.ReportTolerance
 	ignoreTorMac = cfg.FlowGenerator.IgnoreTorMac
@@ -207,14 +144,18 @@ func SetFlowGenerator(cfg config.Config) {
 	innerFlowGeo = newFlowGeo()
 }
 
-func (t TimeoutConfig) minTimeout() time.Duration {
+func (t TimeoutConfig) timeoutRange() (time.Duration, time.Duration) {
 	valueOf := reflect.ValueOf(t)
 	minTime := time.Duration(math.MaxInt64)
+	maxTime := time.Duration(0)
 	for i := 0; i < valueOf.NumField(); i++ {
 		value := valueOf.Field(i).Interface().(time.Duration)
 		if minTime > value && value != 0 {
 			minTime = value
 		}
+		if maxTime < value {
+			maxTime = value
+		}
 	}
-	return minTime
+	return minTime, maxTime
 }

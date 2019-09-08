@@ -44,8 +44,6 @@ func decode(b []byte) (*app.Document, error) {
 		m = dt.AcquireGeoMeter()
 	case dt.MSG_FLOW:
 		m = dt.AcquireFlowMeter()
-	case dt.MSG_CONSOLE_LOG:
-		m = dt.AcquireConsoleLogMeter()
 	case dt.MSG_TYPE:
 		m = dt.AcquireTypeMeter()
 	case dt.MSG_FPS:

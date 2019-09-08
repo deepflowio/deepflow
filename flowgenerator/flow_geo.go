@@ -17,7 +17,7 @@ const (
 )
 
 var (
-	innerFlowGeo FlowGeo
+	innerFlowGeo FlowGeo // 在base.go中初始化，避免droplet-ctl等cmd做初始化
 )
 
 func newFlowGeo() FlowGeo {

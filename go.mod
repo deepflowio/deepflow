@@ -7,7 +7,7 @@ require (
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/spf13/cobra v0.0.3
-	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190905063350-254ac9c095dd
+	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20190912091947-06751b48c8e8
 	gitlab.x.lan/yunshan/message v0.0.0-20190905034751-8e8cd07383c3
 	golang.org/x/net v0.0.0-20190514140710-3ec191127204
 	google.golang.org/genproto v0.0.0-20190516172635-bb713bdc0e52 // indirect

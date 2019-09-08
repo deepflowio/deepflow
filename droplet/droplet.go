@@ -115,7 +115,7 @@ func Start(configPath string) (closers []io.Closer) {
 	// L2 - packet labeler
 	flowGeneratorQueues := manager.NewQueues(
 		"2-meta-packet-to-flow-generator", cfg.Queue.FlowGeneratorQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
-		libqueue.OptionFlushIndicator(cfg.FlowGenerator.FlowCleanInterval*time.Second), releaseMetaPacket,
+		libqueue.OptionFlushIndicator(time.Second), releaseMetaPacket,
 	)
 	pcapAppQueues := manager.NewQueues(
 		"2-meta-packet-to-pcap-app", cfg.Queue.PCapAppQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
@@ -136,6 +136,7 @@ func Start(configPath string) (closers []io.Closer) {
 	docsInBuffer := int(cfg.Queue.DocQueueSize)
 	windowSize := int(cfg.MapReduce.WindowSize)
 	windowMoveMargin := int(cfg.MapReduce.WindowMoveMargin)
+	flowFlushInterval := time.Second * 5
 	releaseTaggedFlow := func(x interface{}) {
 		datatype.ReleaseTaggedFlow(x.(*datatype.TaggedFlow))
 	}
@@ -143,8 +144,8 @@ func Start(configPath string) (closers []io.Closer) {
 		"3-tagged-flow-to-flow-duplicator", cfg.Queue.FlowDuplicatorQueueSize, cfg.Queue.PacketQueueCount,
 		cfg.Queue.PacketQueueCount, releaseTaggedFlow)
 	meteringAppQueues := manager.NewQueues(
-		"3-meta-packet-to-metering-app", cfg.Queue.MeteringAppQueueSize, cfg.Queue.PacketQueueCount,
-		cfg.Queue.PacketQueueCount, libqueue.OptionFlushIndicator(time.Second*5), releaseMetaPacket,
+		"3-mini-tagged-flow-to-metering-app", cfg.Queue.MeteringAppQueueSize, cfg.Queue.PacketQueueCount,
+		cfg.Queue.PacketQueueCount, libqueue.OptionFlushIndicator(flowFlushInterval), releaseTaggedFlow,
 	)
 
 	flowgenerator.SetFlowGenerator(cfg)
@@ -158,15 +159,11 @@ func Start(configPath string) (closers []io.Closer) {
 		SingleDirection: cfg.FlowGenerator.OthersTimeout,
 	}
 	flowgenerator.SetTimeout(timeoutConfig)
-	bufferSize := cfg.Queue.FlowGeneratorQueueSize / cfg.Queue.PacketQueueCount
-	flowLimitNum := cfg.FlowGenerator.FlowCountLimit / int32(cfg.Queue.PacketQueueCount)
-	if bufferSize > 8192 {
-		bufferSize = 8192
-	}
+	flowLimitNum := int(cfg.FlowGenerator.FlowCountLimit) / cfg.Queue.PacketQueueCount
 	for i := 0; i < cfg.Queue.PacketQueueCount; i++ {
 		flowGenerator := flowgenerator.New(
 			flowGeneratorQueues.Readers()[i], meteringAppQueues.Writers()[i],
-			flowDuplicatorQueues.Writers()[i], bufferSize, flowLimitNum, i)
+			flowDuplicatorQueues.Writers()[i], flowLimitNum, i, flowFlushInterval)
 		flowGenerator.Start()
 	}
 
@@ -199,7 +196,7 @@ func Start(configPath string) (closers []io.Closer) {
 	// L4 - flow duplicator: flow app & flow marshaller
 	flowAppQueues := manager.NewQueues(
 		"4-tagged-flow-to-flow-app", cfg.Queue.FlowAppQueueSize, cfg.Queue.FlowQueueCount,
-		cfg.Queue.PacketQueueCount, libqueue.OptionFlushIndicator(time.Second*10), releaseTaggedFlow)
+		cfg.Queue.PacketQueueCount, libqueue.OptionFlushIndicator(flowFlushInterval), releaseTaggedFlow)
 	flowMarshallerQueues := manager.NewQueues(
 		"4-tagged-flow-to-flow-marshaller", cfg.Queue.FlowMarshallerQueueSize, cfg.Queue.FlowQueueCount,
 		cfg.Queue.PacketQueueCount, releaseTaggedFlow)

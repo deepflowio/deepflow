@@ -639,7 +639,7 @@ func testReport(flowPerf *MetaFlowPerf, t *testing.T) {
 	periodData.art1Count = 1
 	flowData.art1Count += periodData.art1Count
 
-	report = Report(flowPerf, false, &counter)
+	report = copyAndResetPerfData(flowPerf, false, &counter)
 
 	if t != nil {
 		t.Logf("flowperf.perfData:%v\nreport:%v\n", flowPerf.perfData, report)
@@ -655,7 +655,7 @@ func testReport(flowPerf *MetaFlowPerf, t *testing.T) {
 	flowData.rtt0Sum += periodData.rtt0Sum
 	periodData.rtt0Count = 1
 	flowData.rtt0Count += periodData.rtt0Count
-	report = Report(flowPerf, true, &counter)
+	report = copyAndResetPerfData(flowPerf, true, &counter)
 
 	if t != nil {
 		t.Logf("flowperf.perfData:%v\nreport:%v\n", flowPerf.perfData, report)
@@ -692,7 +692,7 @@ func TestVariance(t *testing.T) {
 		Timestamp: 2000,
 	}
 	p.calcVarianceStats(header, 1)
-	perf = Report(p, false, &counter)
+	perf = copyAndResetPerfData(p, false, &counter)
 	t.Log(p.perfData.packetVariance)
 	t.Log(perf)
 
@@ -701,7 +701,7 @@ func TestVariance(t *testing.T) {
 		Timestamp: 6000,
 	}
 	p.calcVarianceStats(header, 2)
-	perf = Report(p, false, &counter)
+	perf = copyAndResetPerfData(p, false, &counter)
 	t.Log(p.perfData.packetVariance)
 	t.Log(perf)
 
@@ -710,7 +710,7 @@ func TestVariance(t *testing.T) {
 		Timestamp: 3000000,
 	}
 	p.calcVarianceStats(header, 3)
-	perf = Report(p, false, &counter)
+	perf = copyAndResetPerfData(p, false, &counter)
 	t.Log(p.perfData.packetVariance)
 	t.Log(perf)
 }
