@@ -6,16 +6,12 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
-func flagEqual(flags, target uint8) bool {
-	return flags == target
-}
-
 func flagContain(flags, target uint8) bool {
 	return flags&target > 0
 }
 
 // return true if unexpected flags got
-func (f *FlowGenerator) StatePreprocess(meta *MetaPacket, flags uint8) bool {
+func (m *FlowMap) StatePreprocess(meta *MetaPacket, flags uint8) bool { // FIXME: 移动位置
 	switch flags {
 	case TCP_SYN:
 		return false
@@ -50,8 +46,8 @@ type StateValue struct {
 	closed    bool
 }
 
-func (f *FlowGenerator) initStateMachineMaster() {
-	stateMachineMaster := f.stateMachineMaster
+func (m *FlowMap) initStateMachineMaster() {
+	stateMachineMaster := m.stateMachineMaster
 
 	// for FLOW_STATE_RAW
 	stateMachineMaster[FLOW_STATE_RAW] = make(map[uint8]*StateValue)
@@ -218,8 +214,8 @@ func (f *FlowGenerator) initStateMachineMaster() {
 	stateMachineMaster[FLOW_STATE_EXCEPTION] = make(map[uint8]*StateValue)
 }
 
-func (f *FlowGenerator) initStateMachineSlave() {
-	stateMachineSlave := f.stateMachineSlave
+func (m *FlowMap) initStateMachineSlave() {
+	stateMachineSlave := m.stateMachineSlave
 
 	// for FLOW_STATE_RAW
 	stateMachineSlave[FLOW_STATE_RAW] = make(map[uint8]*StateValue)

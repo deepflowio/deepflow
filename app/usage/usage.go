@@ -32,8 +32,7 @@ type MeteringToUsageDocumentMapper struct {
 	codes   []outputtype.Code
 
 	fields [2]outputtype.Field
-	// 预先计算好包长为0~65535的包、双方向上所有可能的meter
-	meters [1 << 16][2]*outputtype.UsageMeter
+	meters [2]outputtype.UsageMeter
 }
 
 func (p *MeteringToUsageDocumentMapper) GetName() string {
@@ -49,21 +48,6 @@ func (p *MeteringToUsageDocumentMapper) Prepare() {
 	p.policyGroup = make([]inputtype.AclAction, 0)
 	p.encoder = &codec.SimpleEncoder{}
 	p.codes = make([]outputtype.Code, 0, CODES_LEN)
-
-	for i := range p.meters {
-		p.meters[i][0] = &outputtype.UsageMeter{
-			SumPacketTx: 1,
-			SumPacketRx: 0,
-			SumBitTx:    uint64(i << 3),
-			SumBitRx:    0,
-		}
-		p.meters[i][1] = &outputtype.UsageMeter{
-			SumPacketTx: 0,
-			SumPacketRx: 1,
-			SumBitTx:    0,
-			SumBitRx:    uint64(i << 3),
-		}
-	}
 }
 
 func (p *MeteringToUsageDocumentMapper) appendDoc(timestamp uint32, field *outputtype.Field, code outputtype.Code, meter *outputtype.UsageMeter, actionFlags uint32) {
@@ -74,37 +58,33 @@ func (p *MeteringToUsageDocumentMapper) appendDoc(timestamp uint32, field *outpu
 	doc.ActionFlags = actionFlags
 }
 
-func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket, variedTag bool) []interface{} {
+func (p *MeteringToUsageDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedTag bool) []interface{} {
 	p.docs.Reset()
 
-	if metaPacket.EthType != layers.EthernetTypeIPv4 {
+	if rawFlow.EthType != layers.EthernetTypeIPv4 {
 		return p.docs.Slice()
 	}
 
-	actionFlags := metaPacket.PolicyData.ActionFlags
+	actionFlags := rawFlow.PolicyData.ActionFlags
 	interestActions := inputtype.ACTION_PACKET_COUNTING
 	if actionFlags&interestActions == 0 {
 		return p.docs.Slice()
 	}
 
-	p.policyGroup = FillPolicyTagTemplate(metaPacket.PolicyData, interestActions, p.policyGroup)
+	p.policyGroup = FillPolicyTagTemplate(rawFlow.PolicyData, interestActions, p.policyGroup)
 
-	l3EpcIDs := [2]int32{metaPacket.EndpointData.SrcInfo.L3EpcId, metaPacket.EndpointData.DstInfo.L3EpcId}
+	flow := Flow(*rawFlow)
+	l3EpcIDs := [2]int32{flow.FlowMetricsPeerSrc.L3EpcID, flow.FlowMetricsPeerDst.L3EpcID}
 	isNorthSouthTraffic := IsNorthSourceTraffic(l3EpcIDs[0], l3EpcIDs[1])
-	ips := [2]uint32{metaPacket.IpSrc, metaPacket.IpDst}
+	ips := [2]uint32{flow.IPSrc, flow.IPDst}
 	isL2L3End := [2]bool{
-		metaPacket.EndpointData.SrcInfo.L2End && metaPacket.EndpointData.SrcInfo.L3End,
-		metaPacket.EndpointData.DstInfo.L2End && metaPacket.EndpointData.DstInfo.L3End,
+		flow.FlowMetricsPeerSrc.IsL2End && flow.FlowMetricsPeerSrc.IsL3End,
+		flow.FlowMetricsPeerDst.IsL2End && flow.FlowMetricsPeerDst.IsL3End,
 	}
 	directions := [2]outputtype.DirectionEnum{outputtype.ClientToServer, outputtype.ServerToClient}
-	serverPort := metaPacket.PortDst
-	if metaPacket.Direction == inputtype.SERVER_TO_CLIENT {
-		l3EpcIDs[0], l3EpcIDs[1] = l3EpcIDs[1], l3EpcIDs[0]
-		ips[0], ips[1] = ips[1], ips[0]
-		isL2L3End[0], isL2L3End[1] = isL2L3End[1], isL2L3End[0]
-		serverPort = metaPacket.PortSrc
-	}
-	docTimestamp := RoundToSecond(metaPacket.Timestamp)
+	docTimestamp := RoundToSecond(flow.PacketStatTime)
+	packets := [2]uint64{flow.FlowMetricsPeerSrc.TickPacketCount, flow.FlowMetricsPeerDst.TickPacketCount}
+	bits := [2]uint64{flow.FlowMetricsPeerSrc.TickByteCount << 3, flow.FlowMetricsPeerDst.TickByteCount << 3}
 
 	for i := range ips {
 		if IsOuterPublicIp(l3EpcIDs[i]) {
@@ -112,46 +92,40 @@ func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket
 		}
 	}
 
-	var meter *outputtype.UsageMeter
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
 		otherEnd := GetOppositeEndpoint(thisEnd)
 
-		if metaPacket.Direction == inputtype.SERVER_TO_CLIENT {
-			meter = p.meters[metaPacket.PacketLen][otherEnd]
-		} else {
-			meter = p.meters[metaPacket.PacketLen][thisEnd]
-		}
+		meter := &p.meters[thisEnd]
+		meter.SumPacketTx = packets[thisEnd]
+		meter.SumPacketRx = packets[otherEnd]
+		meter.SumBitTx = bits[thisEnd]
+		meter.SumBitRx = bits[otherEnd]
+
 		field := &p.fields[thisEnd]
 		field.IP = ips[thisEnd]
 		field.IP1 = ips[otherEnd]
-		field.TAPType = TAPTypeFromInPort(metaPacket.InPort)
-		field.Protocol = metaPacket.Protocol
-		field.ServerPort = serverPort
+		field.TAPType = TAPTypeFromInPort(flow.InPort)
+		field.Protocol = flow.Proto
+		field.ServerPort = flow.PortDst
 		field.ACLDirection = outputtype.ACL_FORWARD // 含ACLDirection字段时仅考虑ACL正向匹配
 		field.Direction = directions[thisEnd]
 
 		for _, policy := range p.policyGroup {
 			field.ACLGID = uint16(policy.GetACLGID())
-			var policyDirections inputtype.DirectionType
-			if metaPacket.Direction == inputtype.CLIENT_TO_SERVER {
-				policyDirections = policy.GetDirections()
-			} else {
-				policyDirections = policy.ReverseDirection().GetDirections()
-			}
 
 			// node
 			codes := p.codes[:0]
 			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE != 0 {
 				codes = append(codes, POLICY_NODE_CODES...)
 			}
-			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE_PORT != 0 && metaPacket.IsActiveService { // 含有端口号的，仅统计活跃端口
+			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE_PORT != 0 && flow.IsActiveService { // 含有端口号的，仅统计活跃端口
 				codes = append(codes, POLICY_NODE_PORT_CODES...)
 			}
 			for _, code := range codes {
-				if IsDupTraffic(metaPacket.InPort, isL2L3End[thisEnd], isL2L3End[otherEnd], isNorthSouthTraffic, code) {
+				if IsDupTraffic(flow.InPort, isL2L3End[thisEnd], isL2L3End[otherEnd], isNorthSouthTraffic, code) {
 					continue
 				}
-				if IsWrongEndPointWithACL(thisEnd, policyDirections, code) {
+				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
 					continue
 				}
 				p.appendDoc(docTimestamp, field, code, meter, uint32(policy.GetActionFlags()))
@@ -162,14 +136,14 @@ func (p *MeteringToUsageDocumentMapper) Process(metaPacket *inputtype.MetaPacket
 			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE != 0 {
 				codes = append(codes, POLICY_EDGE_CODES...)
 			}
-			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE_PORT != 0 && metaPacket.IsActiveService { // 含有端口号的，仅统计活跃端口
+			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE_PORT != 0 && flow.IsActiveService { // 含有端口号的，仅统计活跃端口
 				codes = append(codes, POLICY_EDGE_PORT_CODES...)
 			}
 			for _, code := range codes {
-				if IsDupTraffic(metaPacket.InPort, isL2L3End[thisEnd], isL2L3End[otherEnd], isNorthSouthTraffic, code) {
+				if IsDupTraffic(flow.InPort, isL2L3End[thisEnd], isL2L3End[otherEnd], isNorthSouthTraffic, code) {
 					continue
 				}
-				if IsWrongEndPointWithACL(thisEnd, policyDirections, code) {
+				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
 					continue
 				}
 				p.appendDoc(docTimestamp, field, code, meter, uint32(policy.GetActionFlags()))

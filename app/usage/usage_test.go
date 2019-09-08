@@ -11,29 +11,29 @@ import (
 )
 
 func TestPolicyTags(t *testing.T) {
-	m := inputtype.MetaPacket{}
-	m.EndpointData = &inputtype.EndpointData{}
-	m.EndpointData.SrcInfo = &inputtype.EndpointInfo{}
-	m.EndpointData.DstInfo = &inputtype.EndpointInfo{}
-	m.EndpointData.SrcInfo.L3EpcId = 3
-	m.EndpointData.DstInfo.L3EpcId = 4
-	m.EndpointData.SrcInfo.L3DeviceId = 33
-	m.EndpointData.DstInfo.L3DeviceId = 44
-	m.EndpointData.SrcInfo.L3DeviceType = 1
-	m.EndpointData.DstInfo.L3DeviceType = 1
-	m.EndpointData.SrcInfo.L2End = true
-	m.EndpointData.DstInfo.L2End = true
-	m.EndpointData.SrcInfo.L3End = true
-	m.EndpointData.DstInfo.L3End = true
-	m.EndpointData.SrcInfo.GroupIds = []uint32{10, 11}
-	m.EndpointData.DstInfo.GroupIds = []uint32{20, 21}
-	m.IpSrc = binary.BigEndian.Uint32([]byte{10, 10, 10, 2})
-	m.IpDst = binary.BigEndian.Uint32([]byte{10, 10, 10, 3})
+	m := inputtype.TaggedFlow{}
+	m.FlowMetricsPeerSrc.L3EpcID = 3
+	m.FlowMetricsPeerDst.L3EpcID = 4
+	m.FlowMetricsPeerSrc.L3DeviceID = 33
+	m.FlowMetricsPeerDst.L3DeviceID = 44
+	m.FlowMetricsPeerSrc.L3DeviceType = 1
+	m.FlowMetricsPeerDst.L3DeviceType = 1
+	m.FlowMetricsPeerSrc.IsL2End = true
+	m.FlowMetricsPeerDst.IsL2End = true
+	m.FlowMetricsPeerSrc.IsL3End = true
+	m.FlowMetricsPeerDst.IsL3End = true
+	m.FlowMetricsPeerSrc.TickPacketCount = 10
+	m.FlowMetricsPeerDst.TickPacketCount = 20
+	m.FlowMetricsPeerSrc.TickByteCount = 1000
+	m.FlowMetricsPeerDst.TickByteCount = 2000
+	m.GroupIDs0 = []uint32{10, 11}
+	m.GroupIDs1 = []uint32{20, 21}
+	m.IPSrc = binary.BigEndian.Uint32([]byte{10, 10, 10, 2})
+	m.IPDst = binary.BigEndian.Uint32([]byte{10, 10, 10, 3})
 	m.InPort = 0x3beef
-	m.Protocol = layers.IPProtocolTCP
+	m.Proto = layers.IPProtocolTCP
 	m.PortDst = 80
-	m.PacketLen = 123
-	m.Timestamp = 1536746971
+	m.PacketStatTime = 1536746971
 
 	m.PolicyData = &inputtype.PolicyData{}
 	m.PolicyData.ActionFlags = inputtype.ACTION_PACKET_COUNTING
@@ -60,29 +60,29 @@ func TestPolicyTags(t *testing.T) {
 }
 
 func TestPolicyTagTemplate(t *testing.T) {
-	m := inputtype.MetaPacket{}
-	m.EndpointData = &inputtype.EndpointData{}
-	m.EndpointData.SrcInfo = &inputtype.EndpointInfo{}
-	m.EndpointData.DstInfo = &inputtype.EndpointInfo{}
-	m.EndpointData.SrcInfo.L3EpcId = 3
-	m.EndpointData.DstInfo.L3EpcId = 4
-	m.EndpointData.SrcInfo.L3DeviceId = 33
-	m.EndpointData.DstInfo.L3DeviceId = 44
-	m.EndpointData.SrcInfo.L3DeviceType = 1
-	m.EndpointData.DstInfo.L3DeviceType = 1
-	m.EndpointData.SrcInfo.L2End = true
-	m.EndpointData.DstInfo.L2End = true
-	m.EndpointData.SrcInfo.L3End = true
-	m.EndpointData.DstInfo.L3End = true
-	m.EndpointData.SrcInfo.GroupIds = []uint32{10, 11}
-	m.EndpointData.DstInfo.GroupIds = []uint32{20, 21}
-	m.IpSrc = binary.BigEndian.Uint32([]byte{10, 10, 10, 2})
-	m.IpDst = binary.BigEndian.Uint32([]byte{10, 10, 10, 3})
+	m := inputtype.TaggedFlow{}
+	m.FlowMetricsPeerSrc.L3EpcID = 3
+	m.FlowMetricsPeerDst.L3EpcID = 4
+	m.FlowMetricsPeerSrc.L3DeviceID = 33
+	m.FlowMetricsPeerDst.L3DeviceID = 44
+	m.FlowMetricsPeerSrc.L3DeviceType = 1
+	m.FlowMetricsPeerDst.L3DeviceType = 1
+	m.FlowMetricsPeerSrc.IsL2End = true
+	m.FlowMetricsPeerDst.IsL2End = true
+	m.FlowMetricsPeerSrc.IsL3End = true
+	m.FlowMetricsPeerDst.IsL3End = true
+	m.FlowMetricsPeerSrc.TickPacketCount = 10
+	m.FlowMetricsPeerDst.TickPacketCount = 20
+	m.FlowMetricsPeerSrc.TickByteCount = 1000
+	m.FlowMetricsPeerDst.TickByteCount = 2000
+	m.GroupIDs0 = []uint32{10, 11}
+	m.GroupIDs1 = []uint32{20, 21}
+	m.IPSrc = binary.BigEndian.Uint32([]byte{10, 10, 10, 2})
+	m.IPDst = binary.BigEndian.Uint32([]byte{10, 10, 10, 3})
 	m.InPort = 0x3beef
-	m.Protocol = layers.IPProtocolTCP
+	m.Proto = layers.IPProtocolTCP
 	m.PortDst = 80
-	m.PacketLen = 123
-	m.Timestamp = 1536746971
+	m.PacketStatTime = 1536746971
 
 	m.PolicyData = &inputtype.PolicyData{}
 	m.PolicyData.ActionFlags = inputtype.ACTION_PACKET_COUNTING

@@ -772,7 +772,13 @@ func (p *MetaFlowPerf) Update(header *MetaPacket, isFirstPacketDirection bool, f
 	return nil
 }
 
-func Report(flowPerf *MetaFlowPerf, flowReversed bool, perfCounter *FlowPerfCounter) *TcpPerfStats {
+func resetPerfData(flowPerf *MetaFlowPerf) {
+	if flowPerf != nil {
+		flowPerf.perfData.resetPeriodPerfStats()
+	}
+}
+
+func copyAndResetPerfData(flowPerf *MetaFlowPerf, flowReversed bool, perfCounter *FlowPerfCounter) *TcpPerfStats {
 	if flowPerf == nil {
 		return nil
 	}

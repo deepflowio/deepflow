@@ -1,53 +1,30 @@
 package flowgenerator
 
 import (
-	"sync/atomic"
-
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
-func (f *FlowGenerator) processOtherIpPacket(meta *MetaPacket) {
-	hash := f.getQuinTupleHash(meta)
-	flowCache := f.hashMap[hash%hashMapSize]
-	flowCache.Lock()
-	if flowExtra, _ := f.keyMatch(flowCache, meta); flowExtra != nil {
-		f.updateOtherIpFlow(flowExtra, meta)
-	} else {
-		if f.stats.CurrNumFlows >= f.flowLimitNum {
-			f.stats.FloodDropPackets++
-			flowCache.Unlock()
-			return
-		}
-		flowExtra = f.initOtherIpFlow(meta)
-		f.stats.TotalNumFlows++
-		f.addFlow(flowCache, flowExtra)
-		atomic.AddInt32(&f.stats.CurrNumFlows, 1)
-	}
-	flowCache.Unlock()
-}
-
-func (f *FlowGenerator) initOtherIpFlow(meta *MetaPacket) *FlowExtra {
+func (m *FlowMap) initOtherIpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	now := meta.Timestamp
-	flowExtra := f.initFlow(meta, now)
+	m.initFlow(flowExtra, meta, now)
 	taggedFlow := flowExtra.taggedFlow
 	taggedFlow.FlowMetricsPeerSrc.ArrTime0 = now
 	taggedFlow.FlowMetricsPeerSrc.ArrTimeLast = now
 	taggedFlow.FlowMetricsPeerSrc.TotalPacketCount = 1
 	taggedFlow.FlowMetricsPeerSrc.PacketCount = 1
+	taggedFlow.FlowMetricsPeerSrc.TickPacketCount = 1
 	taggedFlow.FlowMetricsPeerSrc.TotalByteCount = uint64(meta.PacketLen)
 	taggedFlow.FlowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
+	taggedFlow.FlowMetricsPeerSrc.TickByteCount = uint64(meta.PacketLen)
 	updatePlatformData(taggedFlow, meta.EndpointData, false)
-	f.fillGeoInfo(taggedFlow)
+	m.fillGeoInfo(taggedFlow)
 	flowExtra.flowState = FLOW_STATE_ESTABLISHED
 	flowExtra.timeout = openingTimeout
-	flowExtra.setMetaPacketActiveService(meta)
-	return flowExtra
 }
 
-func (f *FlowGenerator) updateOtherIpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
-	f.updateFlow(flowExtra, meta)
+func (m *FlowMap) updateOtherIpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
+	m.updateFlow(flowExtra, meta)
 	if flowExtra.taggedFlow.FlowMetricsPeerSrc.PacketCount > 0 && flowExtra.taggedFlow.FlowMetricsPeerDst.PacketCount > 0 {
 		flowExtra.timeout = establishedRstTimeout
 	}
-	flowExtra.setMetaPacketActiveService(meta)
 }

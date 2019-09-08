@@ -161,24 +161,19 @@ func (h *subMeteringHandler) Process() error {
 				continue
 			}
 
-			metering := e.(*datatype.MetaPacket)
-			if metering.PolicyData == nil || metering.EndpointData == nil { // shouldn't happen
-				log.Warningf("drop invalid packet with nil PolicyData or EndpointData %v", metering)
-				datatype.ReleaseMetaPacket(metering)
-				h.handlerCounter[h.counterLatch].dropCounter++
-				continue
-			}
-			now := time.Duration(time.Now().UnixNano())
-			if metering.Timestamp > now+time.Minute {
-				datatype.ReleaseMetaPacket(metering)
+			flow := e.(*datatype.TaggedFlow)
+			if !isValidFlow(flow) {
+				datatype.ReleaseTaggedFlow(flow)
 				h.handlerCounter[h.counterLatch].dropCounter++
 				continue
 			}
 
-			h.handlerCounter[h.counterLatch].inputCounter++
-			h.handlerCounter[h.counterLatch].byteCounter += uint64(metering.PacketLen)
+			// 统计处理的包数量和字节数量
+			h.handlerCounter[h.counterLatch].inputCounter += uint64(flow.FlowMetricsPeerSrc.TickPacketCount) + uint64(flow.FlowMetricsPeerDst.TickPacketCount)
+			h.handlerCounter[h.counterLatch].byteCounter += uint64(flow.FlowMetricsPeerSrc.TickByteCount) + uint64(flow.FlowMetricsPeerDst.TickByteCount)
+
 			for i, processor := range h.processors {
-				docs := processor.Process(metering, false)
+				docs := processor.Process(flow, false)
 				h.processorCounter[h.counterLatch][i].docCounter += uint64(len(docs))
 				if uint64(len(docs)) > h.processorCounter[h.counterLatch][i].maxCounter {
 					h.processorCounter[h.counterLatch][i].maxCounter = uint64(len(docs))
@@ -192,7 +187,7 @@ func (h *subMeteringHandler) Process() error {
 					h.Flush(i)
 				}
 			}
-			datatype.ReleaseMetaPacket(metering)
+			datatype.ReleaseTaggedFlow(flow)
 		}
 		if time.Duration(time.Now().UnixNano())-h.lastFlush >= FLUSH_INTERVAL {
 			h.Flush(-1)

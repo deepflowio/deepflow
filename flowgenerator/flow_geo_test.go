@@ -82,8 +82,8 @@ func TestNegativeL3EpcIDAll(t *testing.T) {
 }
 
 func TestFlowGeoInfo(t *testing.T) {
-	flowGenerator, inputPacketQueue, flowOutQueue := flowGeneratorInit(0)
-	flowGenerator.FlowGeo = testFlowGeo
+	flowGenerator, inputPacketQueue, flowOutQueue, _ := flowGeneratorInit(0, true)
+	flowGenerator.flowMap.FlowGeo = testFlowGeo
 	forceReportInterval = 60 * time.Second
 
 	packet0 := getDefaultPacket()
@@ -101,7 +101,7 @@ func TestFlowGeoInfo(t *testing.T) {
 
 	flowGenerator.Start()
 
-	taggedFlow := flowOutQueue.Get().(*TaggedFlow)
+	taggedFlow := getFromQueue(flowOutQueue).(*TaggedFlow) // 有ticker不能直接Get
 	country := uint8(5)
 	region := uint8(34)
 	if taggedFlow.Country != country || taggedFlow.Region != region {

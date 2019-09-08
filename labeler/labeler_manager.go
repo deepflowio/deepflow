@@ -205,17 +205,16 @@ func (l *LabelerManager) run(index int) {
 			}
 
 			if action.ActionFlags&datatype.ACTION_PACKET_CAPTURING != 0 {
-				if action.ActionFlags != datatype.ACTION_PACKET_CAPTURING {
-					metaPacket.AddReferenceCount() // 引用计数+1，避免被释放
-				}
+				metaPacket.AddReferenceCount()
 				captureItemBatch = append(captureItemBatch, metaPacket)
 			}
 
-			if action.ActionFlags != datatype.ACTION_PACKET_CAPTURING {
-				// 为了获取所以流量方向，所有流量都过flowgenerator
+			if action.ActionFlags != datatype.ACTION_PACKET_CAPTURING { // 包统计、流统计、流存储
+				metaPacket.AddReferenceCount()
 				flowItemBatch = append(flowItemBatch, metaPacket)
 			}
 
+			datatype.ReleaseMetaPacket(metaPacket)
 			itemBatch[i] = nil
 		}
 		if len(flowItemBatch) > 0 {

@@ -72,14 +72,12 @@ type LabelerConfig struct {
 }
 
 type FlowGeneratorConfig struct {
-	FlowCountLimit int32 `yaml:"flow-count-limit"`
+	FlowCountLimit int `yaml:"flow-count-limit"`
 	/* unit of interval and timeout: second */
 	ForceReportInterval time.Duration `yaml:"force-report-interval"`
 	EstablishedTimeout  time.Duration `yaml:"established-timeout"`
 	ClosingRstTimeout   time.Duration `yaml:"closing-rst-timeout"`
 	OthersTimeout       time.Duration `yaml:"others-timeout"`
-	FlowCleanInterval   time.Duration `yaml:"flow-clean-interval"`
-	TimeoutCleanerCount uint64        `yaml:"timeout-cleaner-count"`
 	HashMapSize         uint64        `yaml:"hash-map-size"`
 	ReportTolerance     time.Duration `yaml:"report-tolerance"`
 	IgnoreTorMac        bool          `yaml:"ignore-tor-mac"`
@@ -233,14 +231,6 @@ func (c *Config) Validate() error {
 		c.FlowGenerator.OthersTimeout = 5 * time.Second
 	} else {
 		c.FlowGenerator.OthersTimeout *= time.Second
-	}
-	if c.FlowGenerator.FlowCleanInterval == 0 {
-		c.FlowGenerator.FlowCleanInterval = time.Second
-	} else {
-		c.FlowGenerator.FlowCleanInterval *= time.Second
-	}
-	if c.FlowGenerator.TimeoutCleanerCount == 0 {
-		c.FlowGenerator.TimeoutCleanerCount = 4
 	}
 	if c.FlowGenerator.HashMapSize == 0 {
 		c.FlowGenerator.HashMapSize = uint64(c.FlowGenerator.FlowCountLimit) / uint64(c.Queue.PacketQueueCount) * 4
