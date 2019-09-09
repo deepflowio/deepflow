@@ -333,26 +333,6 @@ func PBToFlowMeter(m *pb.FlowMeter, meter *FlowMeter) {
 	meter.SumBitRx = m.GetSumBitRx()
 }
 
-func ConsoleLogMeterToPB(m *ConsoleLogMeter) *pb.ConsoleLogMeter {
-	return &pb.ConsoleLogMeter{
-		SumPacketTx:             proto.Uint64(m.SumPacketTx),
-		SumPacketRx:             proto.Uint64(m.SumPacketRx),
-		SumClosedFlowCount:      proto.Uint64(m.SumClosedFlowCount),
-		SumClosedFlowDurationUs: proto.Uint64(m.SumClosedFlowDuration * 1000), // us
-	}
-}
-
-func PBToConsoleLogMeter(m *pb.ConsoleLogMeter, meter *ConsoleLogMeter) {
-	if meter == nil {
-		panic("meter为空")
-	}
-
-	meter.SumPacketTx = m.GetSumPacketTx()
-	meter.SumPacketRx = m.GetSumPacketRx()
-	meter.SumClosedFlowCount = m.GetSumClosedFlowCount()
-	meter.SumClosedFlowDuration = m.GetSumClosedFlowDurationUs() / 1000 // ms
-}
-
 func TypeMeterToPB(m *TypeMeter) *pb.TypeMeter {
 	return &pb.TypeMeter{
 		SumCountTCRst:       proto.Uint64(m.SumCountTClientRst),

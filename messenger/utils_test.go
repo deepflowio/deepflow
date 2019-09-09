@@ -100,10 +100,6 @@ func unmarshal(b []byte) (*app.Document, error) {
 		m := dt.AcquireFlowMeter()
 		protobuf.PBToFlowMeter(meter.GetFlow(), m)
 		doc.Meter = m
-	case meter.GetConsoleLog() != nil:
-		m := dt.AcquireConsoleLogMeter()
-		protobuf.PBToConsoleLogMeter(meter.GetConsoleLog(), m)
-		doc.Meter = m
 	case meter.GetType() != nil:
 		m := dt.AcquireTypeMeter()
 		protobuf.PBToTypeMeter(meter.GetType(), m)

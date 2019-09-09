@@ -1,3 +1,3 @@
 package zerodoc
 
-//go:generate python pooled_meters.py
+//go:generate tmpl -data=@pooled_meters.tmpldata pooled_meters.go.tmpl

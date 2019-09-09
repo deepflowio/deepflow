@@ -187,21 +187,6 @@ func TestFlowMeterEqual(t *testing.T) {
 	}
 }
 
-func TestConsoleLogMeterEqual(t *testing.T) {
-	fromMeter := &ConsoleLogMeter{
-		SumPacketTx:           1234,
-		SumPacketRx:           4321,
-		SumClosedFlowCount:    1,
-		SumClosedFlowDuration: 1,
-	}
-	pb := ConsoleLogMeterToPB(fromMeter)
-	toMeter := AcquireConsoleLogMeter()
-	PBToConsoleLogMeter(pb, toMeter)
-	if !reflect.DeepEqual(fromMeter, toMeter) {
-		t.Error("Meter在序列化反序列化之后与原Meter不一致")
-	}
-}
-
 func TestTypeMeterEqual(t *testing.T) {
 	fromMeter := &TypeMeter{
 		SumCountTClientRst:       16,
