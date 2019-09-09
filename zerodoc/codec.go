@@ -36,8 +36,6 @@ func Encode(sequence uint32, doc *app.Document, encoder *codec.SimpleEncoder) er
 		msgType = MSG_GEO
 	case *FlowMeter:
 		msgType = MSG_FLOW
-	case *ConsoleLogMeter:
-		msgType = MSG_CONSOLE_LOG
 	case *TypeMeter:
 		msgType = MSG_TYPE
 	case *FPSMeter:
@@ -76,8 +74,6 @@ func Encode(sequence uint32, doc *app.Document, encoder *codec.SimpleEncoder) er
 		meter = doc.Meter.(*GeoMeter)
 	case MSG_FLOW:
 		meter = doc.Meter.(*FlowMeter)
-	case MSG_CONSOLE_LOG:
-		meter = doc.Meter.(*ConsoleLogMeter)
 	case MSG_TYPE:
 		meter = doc.Meter.(*TypeMeter)
 	case MSG_FPS:
@@ -147,10 +143,6 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 		m := AcquireFlowMeter()
 		m.Decode(decoder)
 		doc.Meter = m
-	case MSG_CONSOLE_LOG:
-		m := AcquireConsoleLogMeter()
-		m.Decode(decoder)
-		doc.Meter = m
 	case MSG_TYPE:
 		m := AcquireTypeMeter()
 		m.Decode(decoder)
@@ -207,8 +199,6 @@ func GetMsgType(db string) (MessageType, error) {
 		msgType = MSG_GEO
 	case "df_flow":
 		msgType = MSG_FLOW
-	case "df_console":
-		msgType = MSG_CONSOLE_LOG
 	case "df_type":
 		msgType = MSG_TYPE
 	case "df_fps":
@@ -264,10 +254,6 @@ func EncodeRow(tag *Tag, msgType MessageType, isTag []bool, columnNames []string
 		m.Encode(encoder)
 	case MSG_FLOW:
 		var m FlowMeter
-		m.Fill(isTag, columnNames, columnValues)
-		m.Encode(encoder)
-	case MSG_CONSOLE_LOG:
-		var m ConsoleLogMeter
 		m.Fill(isTag, columnNames, columnValues)
 		m.Encode(encoder)
 	case MSG_TYPE:

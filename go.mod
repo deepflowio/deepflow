@@ -41,3 +41,5 @@ require (
 	google.golang.org/grpc v1.19.0
 	gopkg.in/alexcesaro/statsd.v2 v2.0.0
 )
+
+go 1.13
