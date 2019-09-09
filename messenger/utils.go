@@ -28,8 +28,6 @@ func Marshal(doc *app.Document, bytes *utils.ByteBuffer) error {
 		msgType = dt.MSG_GEO
 	case *dt.FlowMeter:
 		msgType = dt.MSG_FLOW
-	case *dt.ConsoleLogMeter:
-		msgType = dt.MSG_CONSOLE_LOG
 	case *dt.TypeMeter:
 		msgType = dt.MSG_TYPE
 	case *dt.FPSMeter:
@@ -64,9 +62,6 @@ func Marshal(doc *app.Document, bytes *utils.ByteBuffer) error {
 	case dt.MSG_FLOW:
 		meter := doc.Meter.(*dt.FlowMeter)
 		msg.Meter.Flow = protobuf.FlowMeterToPB(meter)
-	case dt.MSG_CONSOLE_LOG:
-		meter := doc.Meter.(*dt.ConsoleLogMeter)
-		msg.Meter.ConsoleLog = protobuf.ConsoleLogMeterToPB(meter)
 	case dt.MSG_TYPE:
 		meter := doc.Meter.(*dt.TypeMeter)
 		msg.Meter.Type = protobuf.TypeMeterToPB(meter)
