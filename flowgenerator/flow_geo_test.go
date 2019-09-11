@@ -82,7 +82,7 @@ func TestNegativeL3EpcIDAll(t *testing.T) {
 }
 
 func TestFlowGeoInfo(t *testing.T) {
-	flowGenerator, inputPacketQueue, flowOutQueue := flowGeneratorInit()
+	flowGenerator, inputPacketQueue, flowOutQueue := flowGeneratorInit(0)
 	flowGenerator.FlowGeo = testFlowGeo
 	forceReportInterval = 60 * time.Second
 
