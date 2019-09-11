@@ -10,27 +10,29 @@ func (f *FlowGenerator) getNonIpQuinTupleHash(meta *MetaPacket) uint64 {
 	return meta.MacSrc ^ meta.MacDst
 }
 
-func (f *FlowCache) keyMatchForNonIp(meta *MetaPacket) (*FlowExtra, bool) {
+func (f *FlowCache) keyMatchForNonIp(meta *MetaPacket) *FlowExtra {
 	for e := f.flowList.Front(); e != nil; e = e.Next() {
 		flowExtra := e.Value
 		taggedFlow := flowExtra.taggedFlow
 		flowMacSrc, flowMacDst := taggedFlow.MACSrc, taggedFlow.MACDst
 		if flowMacSrc == meta.MacSrc && flowMacDst == meta.MacDst {
-			return flowExtra, false
+			meta.Direction = CLIENT_TO_SERVER
+			return flowExtra
 		}
 		if flowMacSrc == meta.MacDst && flowMacDst == meta.MacSrc {
-			return flowExtra, true
+			meta.Direction = SERVER_TO_CLIENT
+			return flowExtra
 		}
 	}
-	return nil, false
+	return nil
 }
 
 func (f *FlowGenerator) processNonIpPacket(meta *MetaPacket) {
 	hash := f.getNonIpQuinTupleHash(meta)
 	flowCache := f.hashMap[hash%hashMapSize]
 	flowCache.Lock()
-	if flowExtra, reply := flowCache.keyMatchForNonIp(meta); flowExtra != nil {
-		f.updateNonIpFlow(flowExtra, meta, reply)
+	if flowExtra := flowCache.keyMatchForNonIp(meta); flowExtra != nil {
+		f.updateNonIpFlow(flowExtra, meta)
 	} else {
 		if f.stats.CurrNumFlows >= f.flowLimitNum {
 			f.stats.FloodDropPackets++
@@ -59,14 +61,14 @@ func (f *FlowGenerator) initNonIpFlow(meta *MetaPacket) *FlowExtra {
 	f.fillGeoInfo(taggedFlow)
 	flowExtra.flowState = FLOW_STATE_ESTABLISHED
 	flowExtra.timeout = openingTimeout
-	flowExtra.setMetaPacketDirection(meta)
+	flowExtra.setMetaPacketActiveService(meta)
 	return flowExtra
 }
 
-func (f *FlowGenerator) updateNonIpFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) {
-	f.updateFlow(flowExtra, meta, reply)
-	if reply {
+func (f *FlowGenerator) updateNonIpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
+	f.updateFlow(flowExtra, meta)
+	if flowExtra.taggedFlow.FlowMetricsPeerSrc.PacketCount > 0 && flowExtra.taggedFlow.FlowMetricsPeerDst.PacketCount > 0 {
 		flowExtra.timeout = establishedRstTimeout
 	}
-	flowExtra.setMetaPacketDirection(meta)
+	flowExtra.setMetaPacketActiveService(meta)
 }

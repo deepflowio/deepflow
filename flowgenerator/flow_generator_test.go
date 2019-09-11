@@ -329,11 +329,12 @@ func TestReverseInNewCircle(t *testing.T) {
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Flags = TCP_SYN | TCP_ACK
 	reversePacket(packet1)
+	packet1.Direction = SERVER_TO_CLIENT
 	packet1.PolicyData = policyData1
 
 	flowExtra := flowGenerator.initFlow(packet0, packet0.Timestamp)
 	flowExtra.circlePktGot = false
-	flowGenerator.updateFlow(flowExtra, packet1, true)
+	flowGenerator.updateFlow(flowExtra, packet1)
 
 	direction := flowExtra.taggedFlow.PolicyData.AclActions[0].GetDirections()
 	aclid := flowExtra.taggedFlow.PolicyData.ACLID
@@ -532,7 +533,7 @@ func BenchmarkCleanHashMap(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		meta := getDefaultPacket()
-		flowExtra, _, _ := flowGenerator.initTcpFlow(meta)
+		flowExtra, _ := flowGenerator.initTcpFlow(meta)
 		flowGenerator.addFlow(flowCache, flowExtra)
 		flowGenerator.flowHashMapTimeoutCleaner(0, 1, 0)
 	}

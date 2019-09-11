@@ -10,8 +10,8 @@ func (f *FlowGenerator) processOtherIpPacket(meta *MetaPacket) {
 	hash := f.getQuinTupleHash(meta)
 	flowCache := f.hashMap[hash%hashMapSize]
 	flowCache.Lock()
-	if flowExtra, reply, _ := f.keyMatch(flowCache, meta); flowExtra != nil {
-		f.updateOtherIpFlow(flowExtra, meta, reply)
+	if flowExtra, _ := f.keyMatch(flowCache, meta); flowExtra != nil {
+		f.updateOtherIpFlow(flowExtra, meta)
 	} else {
 		if f.stats.CurrNumFlows >= f.flowLimitNum {
 			f.stats.FloodDropPackets++
@@ -40,14 +40,14 @@ func (f *FlowGenerator) initOtherIpFlow(meta *MetaPacket) *FlowExtra {
 	f.fillGeoInfo(taggedFlow)
 	flowExtra.flowState = FLOW_STATE_ESTABLISHED
 	flowExtra.timeout = openingTimeout
-	flowExtra.setMetaPacketDirection(meta)
+	flowExtra.setMetaPacketActiveService(meta)
 	return flowExtra
 }
 
-func (f *FlowGenerator) updateOtherIpFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) {
-	f.updateFlow(flowExtra, meta, reply)
-	if reply {
+func (f *FlowGenerator) updateOtherIpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
+	f.updateFlow(flowExtra, meta)
+	if flowExtra.taggedFlow.FlowMetricsPeerSrc.PacketCount > 0 && flowExtra.taggedFlow.FlowMetricsPeerDst.PacketCount > 0 {
 		flowExtra.timeout = establishedRstTimeout
 	}
-	flowExtra.setMetaPacketDirection(meta)
+	flowExtra.setMetaPacketActiveService(meta)
 }
