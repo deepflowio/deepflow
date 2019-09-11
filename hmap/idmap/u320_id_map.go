@@ -23,7 +23,7 @@ var blankU320MapNodeForInit u320IDMapNode
 type u320IDMapNodeBlock []u320IDMapNode
 
 var u320IDMapNodeBlockPool = sync.Pool{New: func() interface{} {
-	return u320IDMapNodeBlock(make([]u320IDMapNode, blockSize))
+	return u320IDMapNodeBlock(make([]u320IDMapNode, _BLOCK_SIZE))
 }}
 
 // 注意：不是线程安全的
@@ -74,7 +74,7 @@ func (m *U320IDMap) AddOrGet(key []byte, hash uint32, value uint32, overwrite bo
 	next := head
 	for next != -1 {
 		width++
-		node := &m.buffer[next>>blockSizeBits][next&blockSizeMask]
+		node := &m.buffer[next>>_BLOCK_SIZE_BITS][next&_BLOCK_SIZE_MASK]
 		if node.equal(hash, key) {
 			if overwrite {
 				node.value = value
@@ -86,10 +86,10 @@ func (m *U320IDMap) AddOrGet(key []byte, hash uint32, value uint32, overwrite bo
 		next = node.next
 	}
 
-	if m.size >= len(m.buffer)<<blockSizeBits { // expand
+	if m.size >= len(m.buffer)<<_BLOCK_SIZE_BITS { // expand
 		m.buffer = append(m.buffer, u320IDMapNodeBlockPool.Get().(u320IDMapNodeBlock))
 	}
-	node := &m.buffer[m.size>>blockSizeBits][m.size&blockSizeMask]
+	node := &m.buffer[m.size>>_BLOCK_SIZE_BITS][m.size&_BLOCK_SIZE_MASK]
 	copy(node.key[:], key)
 	node.hash = hash
 	node.value = value
@@ -112,7 +112,7 @@ func (m *U320IDMap) Get(key []byte, hash uint32) (uint32, bool) {
 
 	next := head
 	for next != -1 {
-		node := &m.buffer[next>>blockSizeBits][next&blockSizeMask]
+		node := &m.buffer[next>>_BLOCK_SIZE_BITS][next&_BLOCK_SIZE_MASK]
 		if node.equal(hash, key) {
 			return node.value, true
 		}
@@ -122,14 +122,14 @@ func (m *U320IDMap) Get(key []byte, hash uint32) (uint32, bool) {
 }
 
 func (m *U320IDMap) Clear() {
-	for i := 0; i < m.size; i += blockSize {
-		for j := 0; j < blockSize && i+j < m.size; j++ {
-			node := &m.buffer[i>>blockSizeBits][j]
+	for i := 0; i < m.size; i += _BLOCK_SIZE {
+		for j := 0; j < _BLOCK_SIZE && i+j < m.size; j++ {
+			node := &m.buffer[i>>_BLOCK_SIZE_BITS][j]
 			m.slotHead[node.slot] = -1
 			*node = blankU320MapNodeForInit
 		}
-		u320IDMapNodeBlockPool.Put(m.buffer[i>>blockSizeBits])
-		m.buffer[i>>blockSizeBits] = nil
+		u320IDMapNodeBlockPool.Put(m.buffer[i>>_BLOCK_SIZE_BITS])
+		m.buffer[i>>_BLOCK_SIZE_BITS] = nil
 	}
 
 	m.buffer = m.buffer[:0]

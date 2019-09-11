@@ -68,8 +68,6 @@ func MarshalFlow(f *datatype.TaggedFlow, bytes *utils.ByteBuffer) error {
 		DeviceType_1:   proto.Uint32(uint32(f.FlowMetricsPeerDst.DeviceType)),
 		DeviceId_0:     proto.Uint32(f.FlowMetricsPeerSrc.DeviceID),
 		DeviceId_1:     proto.Uint32(f.FlowMetricsPeerDst.DeviceID),
-		IfType_0:       proto.Uint32(f.FlowMetricsPeerSrc.IfType),
-		IfType_1:       proto.Uint32(f.FlowMetricsPeerDst.IfType),
 		IsL2End_0:      proto.Bool(f.FlowMetricsPeerSrc.IsL2End),
 		IsL2End_1:      proto.Bool(f.FlowMetricsPeerDst.IsL2End),
 		IsL3End_0:      proto.Bool(f.FlowMetricsPeerSrc.IsL3End),
