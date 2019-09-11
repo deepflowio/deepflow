@@ -18,15 +18,15 @@ enum State {
 }
 
 enum Exception {
-    NORMAL             = 0;
-    DISK_NOT_ENOUGH    = 1;
-    MEM_NOT_ENOUGH     = 2;
-    COREFILE_TOO_MANY  = 4;
-    NPB_FUSE           = 8;
-    NPB_NO_ROUTE       = 16; //deprecated in DF5.5.4
-    NPB_NO_GW_ARP      = 32;
-    ANALYZER_NO_ROUTE  = 64; //deprecated in DF5.5.4
-    ANALYZER_NO_GW_ARP = 128;
+    NORMAL                     = 0;
+    DISK_NOT_ENOUGH            = 1;
+    MEM_NOT_ENOUGH             = 2;
+    COREFILE_TOO_MANY          = 4;
+    NPB_FUSE                   = 8;
+    NPB_BPS_THRESHOLD_EXCEEDED = 16;
+    NPB_NO_GW_ARP              = 32;
+    ANALYZER_NO_ROUTE          = 64; //deprecated after DF5.5.4
+    ANALYZER_NO_GW_ARP         = 128;
 }
 
 message SyncRequest {
