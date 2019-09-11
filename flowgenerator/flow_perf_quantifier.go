@@ -14,15 +14,9 @@ import (
 type ContinuousFlag uint8
 type TcpConnSession = [2]TcpSessionPeer
 type PacketSeqTypeInSeqList uint8
-type TCPDirection = bool
 
 const (
 	FP_NAME = "flow-perf"
-)
-
-const (
-	TCP_DIR_CLIENT TCPDirection = false
-	TCP_DIR_SERVER              = true
 )
 
 const (
@@ -400,7 +394,7 @@ func calcTimeInterval(currentTime, lastTime time.Duration) time.Duration {
 }
 
 // 判断是否重传或错误
-func (p *MetaFlowPerf) isInvalidRetransPacket(sameDirection, oppositeDirection *TcpSessionPeer, header *MetaPacket, tcpDirection TCPDirection, perfCounter *FlowPerfCounter) bool {
+func (p *MetaFlowPerf) isInvalidRetransPacket(sameDirection, oppositeDirection *TcpSessionPeer, header *MetaPacket, isFirstPacketDirection bool, perfCounter *FlowPerfCounter) bool {
 	isInvalid := false
 
 	// 引入seqThreshold，用于连接建立阶段SYN,SYN/ACK, ACK包重传判断
@@ -410,7 +404,7 @@ func (p *MetaFlowPerf) isInvalidRetransPacket(sameDirection, oppositeDirection *
 			sameDirection.seqThreshold = header.TcpData.Seq + 1
 		} else {
 			if sameDirection.isSynReceived {
-				p.perfData.calcRetransSyn(tcpDirection)
+				p.perfData.calcRetransSyn(isFirstPacketDirection)
 			}
 		}
 		sameDirection.isSynReceived = true
@@ -425,7 +419,7 @@ func (p *MetaFlowPerf) isInvalidRetransPacket(sameDirection, oppositeDirection *
 				oppositeDirection.seqThreshold = header.TcpData.Ack
 			}
 		} else {
-			p.perfData.calcRetransSyn(tcpDirection)
+			p.perfData.calcRetransSyn(isFirstPacketDirection)
 		}
 
 		return isInvalid
@@ -437,7 +431,7 @@ func (p *MetaFlowPerf) isInvalidRetransPacket(sameDirection, oppositeDirection *
 			if sameDirection.isAckReceived == false {
 				sameDirection.isAckReceived = true
 			} else {
-				p.perfData.calcRetransSyn(tcpDirection)
+				p.perfData.calcRetransSyn(isFirstPacketDirection)
 			}
 		}
 
@@ -452,7 +446,7 @@ func (p *MetaFlowPerf) isInvalidRetransPacket(sameDirection, oppositeDirection *
 	r := sameDirection.assertSeqNumber(header.TcpData, payloadLen)
 	if r == SEQ_RETRANS {
 		// established retrans
-		p.perfData.calcRetrans(tcpDirection)
+		p.perfData.calcRetrans(isFirstPacketDirection)
 	} else if r == SEQ_ERROR {
 		isInvalid = true
 		perfCounter.counter.InvalidPacketCount += 1
@@ -465,16 +459,16 @@ func isFirstHandshakeAckpacket(sameDirection, oppositeDirection *TcpSessionPeer,
 	return isAckPacket(header) && sameDirection.seq != header.TcpData.Seq && sameDirection.seqThreshold == header.TcpData.Seq && oppositeDirection.seqThreshold == header.TcpData.Ack
 }
 
-func (p *MetaFlowPerf) whenFlowOpening(sameDirection, oppositeDirection *TcpSessionPeer, header *MetaPacket, tcpDirection TCPDirection) bool {
+func (p *MetaFlowPerf) whenFlowOpening(sameDirection, oppositeDirection *TcpSessionPeer, header *MetaPacket, isFirstPacketDirection bool) bool {
 	isOpeningPkt := false
 
 	if sameDirection.getRttSynPrecondition() {
 		// 不考虑SYN, SYN/ACK, PSH/ACK的情况
-		if (tcpDirection == TCP_DIR_CLIENT && isFirstHandshakeAckpacket(sameDirection, oppositeDirection, header)) ||
-			(tcpDirection == TCP_DIR_SERVER && isSynAckPacket(header)) &&
+		if (isFirstPacketDirection && isFirstHandshakeAckpacket(sameDirection, oppositeDirection, header)) ||
+			(!isFirstPacketDirection && isSynAckPacket(header)) &&
 				oppositeDirection.isReplyPacket(header) {
 			if rttSyn := calcTimeInterval(header.Timestamp, oppositeDirection.timestamp); rttSyn > 0 {
-				p.perfData.calcRttSyn(rttSyn, tcpDirection)
+				p.perfData.calcRttSyn(rttSyn, isFirstPacketDirection)
 			}
 			isOpeningPkt = true
 		}
@@ -500,12 +494,12 @@ func (p *MetaFlowPerf) whenFlowOpening(sameDirection, oppositeDirection *TcpSess
 
 // 根据flag, direction, payloadLen或PSH,seq,ack重建状态机
 // assume：包已经过预处理，无异常flag包，也没有与功能无关包（不关心报文）
-func (p *MetaFlowPerf) whenFlowEstablished(sameDirection, oppositeDirection *TcpSessionPeer, header *MetaPacket, tcpDirection TCPDirection) {
+func (p *MetaFlowPerf) whenFlowEstablished(sameDirection, oppositeDirection *TcpSessionPeer, header *MetaPacket, isFirstPacketDirection bool) {
 	// rtt--用连续的PSH/ACK(payloadLen>0)和反向ACK(payloadLen==0)计算rtt值
 	if sameDirection.getRttPrecondition() {
 		if isAckPacket(header) && oppositeDirection.isReplyPacket(header) {
 			if rtt := adjustRtt(calcTimeInterval(header.Timestamp, oppositeDirection.timestamp)); rtt > 0 {
-				p.perfData.calcRtt(rtt, tcpDirection)
+				p.perfData.calcRtt(rtt, isFirstPacketDirection)
 			}
 		}
 	}
@@ -514,7 +508,7 @@ func (p *MetaFlowPerf) whenFlowEstablished(sameDirection, oppositeDirection *Tcp
 	if sameDirection.getArtPrecondition() {
 		if isValidPayloadPacket(header) && sameDirection.isNextPacket(header) {
 			if art := calcTimeInterval(header.Timestamp, oppositeDirection.timestamp); art > 0 {
-				p.perfData.calcArt(art, tcpDirection)
+				p.perfData.calcArt(art, isFirstPacketDirection)
 			}
 		}
 	}
@@ -543,20 +537,20 @@ func (p *MetaFlowPerf) whenFlowEstablished(sameDirection, oppositeDirection *Tcp
 	}
 	// winSize == 0 or zero window
 	if winSize == 0 {
-		p.perfData.calcZeroWin(tcpDirection)
+		p.perfData.calcZeroWin(isFirstPacketDirection)
 	}
 
 	// PSH/URG
 	if header.TcpData.Flags&TCP_FLAG_MASK == (TCP_ACK | TCP_PSH | TCP_URG) {
-		p.perfData.calcPshUrg(tcpDirection)
+		p.perfData.calcPshUrg(isFirstPacketDirection)
 	}
 }
 
 // 根据flag, direction, payloadLen或PSH,seq,ack重建状态机
 // assume：包已经过预处理，无异常flag包，也没有与功能无关包（不关心报文）
-func (p *MetaFlowPerf) update(sameDirection, oppositeDirection *TcpSessionPeer, header *MetaPacket, tcpDirection TCPDirection, perfCounter *FlowPerfCounter) {
+func (p *MetaFlowPerf) update(sameDirection, oppositeDirection *TcpSessionPeer, header *MetaPacket, isFirstPacketDirection bool, perfCounter *FlowPerfCounter) {
 	// 统计有效重传，识别并排除无效的假重传包
-	if p.isInvalidRetransPacket(sameDirection, oppositeDirection, header, tcpDirection, perfCounter) {
+	if p.isInvalidRetransPacket(sameDirection, oppositeDirection, header, isFirstPacketDirection, perfCounter) {
 		p.ctrlInfo.tcpSession[0].resetRttPrecondition()
 		p.ctrlInfo.tcpSession[0].resetArtPrecondition()
 		p.ctrlInfo.tcpSession[1].resetArtPrecondition()
@@ -565,15 +559,15 @@ func (p *MetaFlowPerf) update(sameDirection, oppositeDirection *TcpSessionPeer, 
 	}
 
 	// 计算RTT, ART
-	if !p.whenFlowOpening(sameDirection, oppositeDirection, header, tcpDirection) {
-		p.whenFlowEstablished(sameDirection, oppositeDirection, header, tcpDirection)
+	if !p.whenFlowOpening(sameDirection, oppositeDirection, header, isFirstPacketDirection) {
+		p.whenFlowEstablished(sameDirection, oppositeDirection, header, isFirstPacketDirection)
 	}
 }
 
 // FIXME: art,rrt均值计算方法，需要增加影响因子
 // 计算art值
-func (i *FlowPerfDataInfo) calcArt(art time.Duration, direction bool) {
-	if direction == TCP_DIR_CLIENT {
+func (i *FlowPerfDataInfo) calcArt(art time.Duration, isFirstPacketDirection bool) {
+	if isFirstPacketDirection {
 		i.periodPerfStats.art0Count += 1
 		i.periodPerfStats.art0Sum += art
 		i.flowPerfStats.art0Count += 1
@@ -587,8 +581,8 @@ func (i *FlowPerfDataInfo) calcArt(art time.Duration, direction bool) {
 }
 
 // 计算rtt值
-func (i *FlowPerfDataInfo) calcRtt(rtt time.Duration, direction bool) {
-	if direction == TCP_DIR_CLIENT {
+func (i *FlowPerfDataInfo) calcRtt(rtt time.Duration, isFirstPacketDirection bool) {
+	if isFirstPacketDirection {
 		i.periodPerfStats.rtt0Sum += rtt
 		i.periodPerfStats.rtt0Count += 1
 		i.flowPerfStats.rtt0Sum += rtt
@@ -602,8 +596,8 @@ func (i *FlowPerfDataInfo) calcRtt(rtt time.Duration, direction bool) {
 }
 
 // 计算rttSyn值
-func (i *FlowPerfDataInfo) calcRttSyn(rtt time.Duration, direction bool) {
-	if direction == TCP_DIR_CLIENT {
+func (i *FlowPerfDataInfo) calcRttSyn(rtt time.Duration, isFirstPacketDirection bool) {
+	if isFirstPacketDirection {
 		i.flowPerfStats.rttSyn0 += rtt
 		i.flowPerfStats.rtt0Count += 1
 	} else {
@@ -613,8 +607,8 @@ func (i *FlowPerfDataInfo) calcRttSyn(rtt time.Duration, direction bool) {
 }
 
 // 计算连接建立syn retrans值
-func (i *FlowPerfDataInfo) calcRetransSyn(direction bool) {
-	if direction == TCP_DIR_CLIENT {
+func (i *FlowPerfDataInfo) calcRetransSyn(isFirstPacketDirection bool) {
+	if isFirstPacketDirection {
 		i.periodPerfStats.retransSyn0 += 1
 		i.flowPerfStats.retransSyn0 += 1
 	} else {
@@ -622,12 +616,12 @@ func (i *FlowPerfDataInfo) calcRetransSyn(direction bool) {
 		i.flowPerfStats.retransSyn1 += 1
 	}
 
-	i.calcRetrans(direction)
+	i.calcRetrans(isFirstPacketDirection)
 }
 
 // 计算retrans值
-func (i *FlowPerfDataInfo) calcRetrans(direction bool) {
-	if direction == TCP_DIR_CLIENT {
+func (i *FlowPerfDataInfo) calcRetrans(isFirstPacketDirection bool) {
+	if isFirstPacketDirection {
 		i.periodPerfStats.retrans0 += 1
 		i.flowPerfStats.retrans0 += 1
 	} else {
@@ -637,8 +631,8 @@ func (i *FlowPerfDataInfo) calcRetrans(direction bool) {
 }
 
 // 计算zero window包数量
-func (i *FlowPerfDataInfo) calcZeroWin(direction bool) {
-	if direction == TCP_DIR_CLIENT {
+func (i *FlowPerfDataInfo) calcZeroWin(isFirstPacketDirection bool) {
+	if isFirstPacketDirection {
 		i.periodPerfStats.zeroWinCount0 += 1
 		i.flowPerfStats.zeroWinCount0 += 1
 	} else {
@@ -648,8 +642,8 @@ func (i *FlowPerfDataInfo) calcZeroWin(direction bool) {
 }
 
 // 计算PSH/URG包数量
-func (i *FlowPerfDataInfo) calcPshUrg(direction bool) {
-	if direction == TCP_DIR_CLIENT {
+func (i *FlowPerfDataInfo) calcPshUrg(isFirstPacketDirection bool) {
+	if isFirstPacketDirection {
 		i.periodPerfStats.pshUrgCount0 += 1
 		i.flowPerfStats.pshUrgCount0 += 1
 
@@ -733,7 +727,7 @@ func (p *MetaFlowPerf) preprocess(header *MetaPacket, perfCounter *FlowPerfCount
 }
 
 // update flow performace quantify state and data
-func (p *MetaFlowPerf) Update(header *MetaPacket, tcpDirection TCPDirection, flowExtra *FlowExtra, perfCounter *FlowPerfCounter) error {
+func (p *MetaFlowPerf) Update(header *MetaPacket, isFirstPacketDirection bool, flowExtra *FlowExtra, perfCounter *FlowPerfCounter) error {
 	var err FlowPerfError
 	var sameDirection, oppositeDirection *TcpSessionPeer
 
@@ -746,12 +740,12 @@ func (p *MetaFlowPerf) Update(header *MetaPacket, tcpDirection TCPDirection, flo
 	p.calcVarianceStats(header, totalPacketCount)
 
 	if valid := p.preprocess(header, perfCounter); valid {
-		if tcpDirection == TCP_DIR_CLIENT {
-			sameDirection = &p.ctrlInfo.tcpSession[Bool2Int(TCP_DIR_CLIENT)]
-			oppositeDirection = &p.ctrlInfo.tcpSession[Bool2Int(TCP_DIR_SERVER)]
+		if isFirstPacketDirection {
+			sameDirection = &p.ctrlInfo.tcpSession[0]
+			oppositeDirection = &p.ctrlInfo.tcpSession[1]
 		} else {
-			sameDirection = &p.ctrlInfo.tcpSession[Bool2Int(TCP_DIR_SERVER)]
-			oppositeDirection = &p.ctrlInfo.tcpSession[Bool2Int(TCP_DIR_CLIENT)]
+			sameDirection = &p.ctrlInfo.tcpSession[1]
+			oppositeDirection = &p.ctrlInfo.tcpSession[0]
 		}
 
 		if time.Duration(header.Timestamp) < sameDirection.timestamp || time.Duration(header.Timestamp) < oppositeDirection.timestamp {
@@ -764,7 +758,7 @@ func (p *MetaFlowPerf) Update(header *MetaPacket, tcpDirection TCPDirection, flo
 
 		// 根据packetHeader, direction重建状态机
 		//p.reestablishFsm(sameDirection, oppositeDirection, header, flow)
-		p.update(sameDirection, oppositeDirection, header, tcpDirection, perfCounter)
+		p.update(sameDirection, oppositeDirection, header, isFirstPacketDirection, perfCounter)
 
 		// 更新包数据
 		sameDirection.updateData(header)
@@ -778,14 +772,14 @@ func (p *MetaFlowPerf) Update(header *MetaPacket, tcpDirection TCPDirection, flo
 	return nil
 }
 
-func Report(flowPerf *MetaFlowPerf, reverse bool, perfCounter *FlowPerfCounter) *TcpPerfStats {
+func Report(flowPerf *MetaFlowPerf, flowReversed bool, perfCounter *FlowPerfCounter) *TcpPerfStats {
 	if flowPerf == nil {
 		return nil
 	}
 
 	current := time.Now()
 	report := AcquireTcpPerfStats()
-	flowPerf.perfData.calcReportFlowPerfStats(report, reverse)
+	flowPerf.perfData.calcReportFlowPerfStats(report, flowReversed)
 	flowPerf.perfData.resetPeriodPerfStats()
 
 	perfCounter.counter.ReportCount++
@@ -795,7 +789,7 @@ func Report(flowPerf *MetaFlowPerf, reverse bool, perfCounter *FlowPerfCounter) 
 	return report
 }
 
-func (i *FlowPerfDataInfo) calcReportFlowPerfStats(report *TcpPerfStats, reverse bool) {
+func (i *FlowPerfDataInfo) calcReportFlowPerfStats(report *TcpPerfStats, flowReversed bool) {
 	period := i.periodPerfStats
 	flow := i.flowPerfStats
 
@@ -822,7 +816,7 @@ func (i *FlowPerfDataInfo) calcReportFlowPerfStats(report *TcpPerfStats, reverse
 	report.PacketIntervalVariance = uint64(i.packetVariance.packetIntervalVariance)
 	report.PacketSizeVariance = uint64(i.packetVariance.packetSizeVariance)
 
-	if !reverse {
+	if !flowReversed {
 		if period.art1Count > 0 {
 			report.ART = period.art1Sum / time.Duration(period.art1Count)
 		}

@@ -105,7 +105,7 @@ func (f *FlowGenerator) TunnelMatch(metaTunnelInfo, flowTunnelInfo *TunnelInfo) 
 	return false
 }
 
-func (f *FlowGenerator) keyMatch(flowCache *FlowCache, meta *MetaPacket) (*FlowExtra, bool, *ElementFlowExtra) {
+func (f *FlowGenerator) keyMatch(flowCache *FlowCache, meta *MetaPacket) (*FlowExtra, *ElementFlowExtra) {
 	for e := flowCache.flowList.Front(); e != nil; e = e.Next() {
 		flowExtra := e.Value
 		taggedFlow := flowExtra.taggedFlow
@@ -125,12 +125,14 @@ func (f *FlowGenerator) keyMatch(flowCache *FlowCache, meta *MetaPacket) (*FlowE
 		flowPortSrc, flowPortDst := taggedFlow.PortSrc, taggedFlow.PortDst
 		metaPortSrc, metaPortDst := meta.PortSrc, meta.PortDst
 		if flowIPSrc == metaIpSrc && flowIPDst == metaIpDst && flowPortSrc == metaPortSrc && flowPortDst == metaPortDst {
-			return flowExtra, false, e
+			meta.Direction = CLIENT_TO_SERVER
+			return flowExtra, e
 		} else if flowIPSrc == metaIpDst && flowIPDst == metaIpSrc && flowPortSrc == metaPortDst && flowPortDst == metaPortSrc {
-			return flowExtra, true, e
+			meta.Direction = SERVER_TO_CLIENT
+			return flowExtra, e
 		}
 	}
-	return nil, false, nil
+	return nil, nil
 }
 
 func (f *FlowGenerator) initFlowCache() bool {
@@ -164,6 +166,8 @@ func updateFlowTag(taggedFlow *TaggedFlow, meta *MetaPacket) {
 }
 
 func (f *FlowGenerator) initFlow(meta *MetaPacket, now time.Duration) *FlowExtra {
+	meta.Direction = CLIENT_TO_SERVER // 初始认为是C2S，流匹配、流方向矫正均会会更新此值
+
 	taggedFlow := AcquireTaggedFlow()
 	taggedFlow.Exporter = meta.Exporter
 	taggedFlow.MACSrc = meta.MacSrc
@@ -203,7 +207,7 @@ func (f *FlowGenerator) initFlow(meta *MetaPacket, now time.Duration) *FlowExtra
 	return flowExtra
 }
 
-func (f *FlowGenerator) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8, reply bool) bool {
+func (f *FlowGenerator) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8, serverToClient bool) bool {
 	taggedFlow := flowExtra.taggedFlow
 	var timeout time.Duration
 	var flowState FlowState
@@ -217,7 +221,7 @@ func (f *FlowGenerator) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8
 		flowState = FLOW_STATE_EXCEPTION
 		closed = false
 	}
-	if reply {
+	if serverToClient {
 		if stateValue, ok := f.stateMachineSlave[flowExtra.flowState][flags]; ok {
 			timeout = stateValue.timeout
 			flowState = stateValue.flowState
@@ -233,13 +237,13 @@ func (f *FlowGenerator) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8
 	return closed
 }
 
-func updatePlatformData(taggedFlow *TaggedFlow, endpointData *EndpointData, reply bool) {
+func updatePlatformData(taggedFlow *TaggedFlow, endpointData *EndpointData, serverToClient bool) {
 	if endpointData == nil {
 		log.Warning("Unexpected nil packet endpointData")
 		return
 	}
 	var srcInfo, dstInfo *EndpointInfo
-	if reply {
+	if serverToClient {
 		srcInfo = endpointData.DstInfo
 		dstInfo = endpointData.SrcInfo
 	} else {
@@ -288,16 +292,7 @@ func reverseFlowTag(taggedFlow *TaggedFlow) {
 	taggedFlow.PolicyData = reversePolicyData(taggedFlow.PolicyData)
 }
 
-func (f *FlowExtra) getMetaPacketDirection(meta *MetaPacket) PacketDirection {
-	if meta.IpSrc == f.taggedFlow.IPSrc {
-		return CLIENT_TO_SERVER
-	}
-	return SERVER_TO_CLIENT
-}
-
-func (f *FlowExtra) setMetaPacketDirection(meta *MetaPacket) {
-	// taggedFlow存储的方向是CLIENT_TO_SERVER
-	meta.Direction = f.getMetaPacketDirection(meta)
+func (f *FlowExtra) setMetaPacketActiveService(meta *MetaPacket) {
 	meta.IsActiveService = f.taggedFlow.Flow.IsActiveService
 }
 
@@ -312,7 +307,7 @@ func (f *FlowExtra) reverseFlow() {
 	reverseFlowTag(taggedFlow)
 }
 
-func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) {
+func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	taggedFlow := flowExtra.taggedFlow
 	bytes := uint64(meta.PacketLen)
 	packetTimestamp := meta.Timestamp
@@ -326,12 +321,12 @@ func (f *FlowGenerator) updateFlow(flowExtra *FlowExtra, meta *MetaPacket, reply
 		// FIXME: if StartTime is fixed, CurStartTime should be recalculated?
 		taggedFlow.CurStartTime = packetTimestamp
 		updateFlowTag(taggedFlow, meta)
-		if reply {
+		if meta.Direction == SERVER_TO_CLIENT {
 			reverseFlowTag(taggedFlow)
 		}
-		updatePlatformData(taggedFlow, meta.EndpointData, reply)
+		updatePlatformData(taggedFlow, meta.EndpointData, meta.Direction == SERVER_TO_CLIENT)
 	}
-	if reply {
+	if meta.Direction == SERVER_TO_CLIENT {
 		if taggedFlow.FlowMetricsPeerDst.TotalPacketCount == 0 {
 			taggedFlow.FlowMetricsPeerDst.ArrTime0 = packetTimestamp
 		}
@@ -434,6 +429,7 @@ func (f *FlowGenerator) processPackets(processBuffer []interface{}) {
 		}
 
 		meta := e.(*MetaPacket)
+
 		// TODO: 当前版本Flow和Metering都不需要IPv6, 直接返回
 		if meta.EthType == layers.EthernetTypeIPv6 ||
 			(meta.PolicyData.ActionFlags&(PACKET_ACTION|FLOW_ACTION) == 0) {

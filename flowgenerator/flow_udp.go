@@ -10,8 +10,8 @@ func (f *FlowGenerator) processUdpPacket(meta *MetaPacket) {
 	hash := f.getQuinTupleHash(meta)
 	flowCache := f.hashMap[hash%hashMapSize]
 	flowCache.Lock()
-	if flowExtra, reply, _ := f.keyMatch(flowCache, meta); flowExtra != nil {
-		f.updateUdpFlow(flowExtra, meta, reply)
+	if flowExtra, _ := f.keyMatch(flowCache, meta); flowExtra != nil {
+		f.updateUdpFlow(flowExtra, meta)
 	} else {
 		if f.stats.CurrNumFlows >= f.flowLimitNum {
 			f.stats.FloodDropPackets++
@@ -41,17 +41,17 @@ func (f *FlowGenerator) initUdpFlow(meta *MetaPacket) *FlowExtra {
 	flowExtra.flowState = FLOW_STATE_ESTABLISHED
 	flowExtra.timeout = openingTimeout
 	f.updateUDPDirection(meta, flowExtra, true)
-	flowExtra.setMetaPacketDirection(meta)
+	flowExtra.setMetaPacketActiveService(meta)
 	return flowExtra
 }
 
-func (f *FlowGenerator) updateUdpFlow(flowExtra *FlowExtra, meta *MetaPacket, reply bool) {
-	f.updateFlow(flowExtra, meta, reply)
-	if reply {
+func (f *FlowGenerator) updateUdpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
+	f.updateFlow(flowExtra, meta)
+	if flowExtra.taggedFlow.FlowMetricsPeerSrc.PacketCount > 0 && flowExtra.taggedFlow.FlowMetricsPeerDst.PacketCount > 0 {
 		flowExtra.timeout = establishedRstTimeout
 	}
 	f.updateUDPDirection(meta, flowExtra, false)
-	flowExtra.setMetaPacketDirection(meta)
+	flowExtra.setMetaPacketActiveService(meta)
 }
 
 func (f *FlowGenerator) updateUDPDirection(meta *MetaPacket, flowExtra *FlowExtra, isFirstPacket bool) {
@@ -59,11 +59,13 @@ func (f *FlowGenerator) updateUDPDirection(meta *MetaPacket, flowExtra *FlowExtr
 	dstKey := ServiceKey(int16(meta.EndpointData.DstInfo.L3EpcId), meta.IpDst, meta.PortDst)
 
 	srcScore, dstScore := f.udpServiceTable.GetUDPScore(isFirstPacket, srcKey, dstKey)
-	if flowExtra.getMetaPacketDirection(meta) == SERVER_TO_CLIENT {
+	if meta.Direction == SERVER_TO_CLIENT {
 		srcScore, dstScore = dstScore, srcScore
 	}
 	if !IsClientToServer(srcScore, dstScore) {
 		flowExtra.reverseFlow()
+		flowExtra.reversed = !flowExtra.reversed
+		meta.Direction = (CLIENT_TO_SERVER + SERVER_TO_CLIENT) - meta.Direction // reverse
 	}
 	flowExtra.taggedFlow.Flow.IsActiveService = IsActiveService(srcScore, dstScore)
 }
