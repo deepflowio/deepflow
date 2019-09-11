@@ -88,20 +88,20 @@ type TcpPerfStats struct {
 
 type FlowMetricsPeer struct {
 	// 注意字节对齐!
-	ByteCount        uint64
-	PacketCount      uint64
-	TotalByteCount   uint64
-	TotalPacketCount uint64
-	ArrTime0         time.Duration
-	ArrTimeLast      time.Duration
+	TickByteCount    uint64        // 每个包统计周期（目前是自然秒）清零
+	TickPacketCount  uint64        // 每个包统计周期（目前是自然秒）清零
+	ByteCount        uint64        // 每个流统计周期（目前是自然分）清零
+	PacketCount      uint64        // 每个流统计周期（目前是自然分）清零
+	TotalByteCount   uint64        // 不清零
+	TotalPacketCount uint64        // 不清零
+	ArrTime0         time.Duration // FIXME: 待删除
+	ArrTimeLast      time.Duration // FIXME: 待删除
 	SubnetID         uint32
 	L3DeviceID       uint32
 	DeviceID         uint32
 	L3EpcID          int32
 	EpcID            int32
 	Host             uint32
-	IfIndex          uint32
-	IfType           uint32
 	L3DeviceType     DeviceType
 	DeviceType       DeviceType
 	TCPFlags         uint8
@@ -121,13 +121,12 @@ type Flow struct {
 
 	FlowID     uint64
 	TimeBitmap uint64
-	QueueHash  uint8
 
 	/* Timers */
-	StartTime    time.Duration
-	CurStartTime time.Duration
-	EndTime      time.Duration
-	Duration     time.Duration
+	StartTime      time.Duration
+	EndTime        time.Duration
+	Duration       time.Duration
+	PacketStatTime time.Duration
 
 	/* L2 */
 	VLAN    uint16
@@ -144,6 +143,7 @@ type Flow struct {
 
 	CloseType
 	IsActiveService bool
+	QueueHash       uint8
 }
 
 func (t *TcpPerfStats) String() string {
@@ -213,9 +213,9 @@ func (f *Flow) String() string {
 	formatted += fmt.Sprintf("CloseType: %d ", f.CloseType)
 	formatted += fmt.Sprintf("TimeBitmap: %d ", f.TimeBitmap)
 	formatted += fmt.Sprintf("StartTime: %d ", f.StartTime)
-	formatted += fmt.Sprintf("CurStartTime: %d ", f.CurStartTime)
 	formatted += fmt.Sprintf("EndTime: %d ", f.EndTime)
-	formatted += fmt.Sprintf("Duration: %d\n", f.Duration)
+	formatted += fmt.Sprintf("Duration: %d ", f.Duration)
+	formatted += fmt.Sprintf("PacketStatTime: %d\n", f.PacketStatTime)
 	formatted += fmt.Sprintf("\tVLAN: %d ", f.VLAN)
 	formatted += fmt.Sprintf("EthType: %d ", f.EthType)
 	formatted += fmt.Sprintf("Country: %d ", f.Country)

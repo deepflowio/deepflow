@@ -21,9 +21,9 @@ const (
 )
 
 const (
-	blockSizeBits = 8 // 不能超过8
-	blockSize     = 1 << blockSizeBits
-	blockSizeMask = blockSize - 1
+	_BLOCK_SIZE_BITS = 8
+	_BLOCK_SIZE      = 1 << _BLOCK_SIZE_BITS
+	_BLOCK_SIZE_MASK = _BLOCK_SIZE - 1
 )
 
 type packetDedupMapNode struct {
@@ -47,7 +47,7 @@ var blankPacketDedupMapNodeForInit packetDedupMapNode
 type packetDedupMapNodeBlock []packetDedupMapNode
 
 var packetDedupMapNodeBlockPool = sync.Pool{New: func() interface{} {
-	return packetDedupMapNodeBlock(make([]packetDedupMapNode, blockSize))
+	return packetDedupMapNodeBlock(make([]packetDedupMapNode, _BLOCK_SIZE))
 }}
 
 // 注意：不是线程安全的，且要求Packet的时间戳是非降序列
@@ -111,11 +111,11 @@ func (m *PacketDedupMap) deleteOrAdd() bool {
 	next := head
 	for next != -1 {
 		width++
-		node := &m.ringBuffer[next>>blockSizeBits][next&blockSizeMask]
+		node := &m.ringBuffer[next>>_BLOCK_SIZE_BITS][next&_BLOCK_SIZE_MASK]
 		if node.equal(&m.lookupNode) {
 			m.counter.Hit++
 			if prev != -1 {
-				prevNode := &m.ringBuffer[prev>>blockSizeBits][prev&blockSizeMask]
+				prevNode := &m.ringBuffer[prev>>_BLOCK_SIZE_BITS][prev&_BLOCK_SIZE_MASK]
 				prevNode.next = node.next
 			} else {
 				m.slotHead[slot] = node.next
@@ -129,8 +129,8 @@ func (m *PacketDedupMap) deleteOrAdd() bool {
 	}
 
 	// 未命中，添加节点
-	row := m.bufferEndIndex >> blockSizeBits
-	col := m.bufferEndIndex & blockSizeMask
+	row := m.bufferEndIndex >> _BLOCK_SIZE_BITS
+	col := m.bufferEndIndex & _BLOCK_SIZE_MASK
 	if m.ringBuffer[row] == nil {
 		m.ringBuffer[row] = packetDedupMapNodeBlockPool.Get().(packetDedupMapNodeBlock)
 	}
@@ -139,14 +139,14 @@ func (m *PacketDedupMap) deleteOrAdd() bool {
 	node.next = -1
 	node.slot = int32(slot)
 	if prev != -1 {
-		prevNode := &m.ringBuffer[prev>>blockSizeBits][prev&blockSizeMask]
+		prevNode := &m.ringBuffer[prev>>_BLOCK_SIZE_BITS][prev&_BLOCK_SIZE_MASK]
 		prevNode.next = m.bufferEndIndex
 	} else {
 		m.slotHead[slot] = int32(m.bufferEndIndex)
 	}
 
 	m.bufferEndIndex++
-	if m.bufferEndIndex>>blockSizeBits >= int32(len(m.ringBuffer)) {
+	if m.bufferEndIndex>>_BLOCK_SIZE_BITS >= int32(len(m.ringBuffer)) {
 		m.bufferEndIndex = 0
 	}
 	m.size++
@@ -160,8 +160,8 @@ func (m *PacketDedupMap) deleteOrAdd() bool {
 func (m *PacketDedupMap) deleteTimeout(timestamp time.Duration) {
 	i := m.bufferStartIndex
 	for i != m.bufferEndIndex {
-		row := i >> blockSizeBits
-		col := i & blockSizeMask
+		row := i >> _BLOCK_SIZE_BITS
+		col := i & _BLOCK_SIZE_MASK
 		node := &m.ringBuffer[row][col]
 
 		if node.slot != -1 {
@@ -180,13 +180,13 @@ func (m *PacketDedupMap) deleteTimeout(timestamp time.Duration) {
 		}
 
 		m.size--
-		if col == blockSizeMask {
+		if col == _BLOCK_SIZE_MASK {
 			packetDedupMapNodeBlockPool.Put(m.ringBuffer[row])
 			m.ringBuffer[row] = nil
 		}
 
 		i++
-		if i>>blockSizeBits == int32(len(m.ringBuffer)) {
+		if i>>_BLOCK_SIZE_BITS == int32(len(m.ringBuffer)) {
 			i = 0
 		}
 	}
