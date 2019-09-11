@@ -36,6 +36,15 @@ func ReleaseTaggedFlow(taggedFlow *TaggedFlow) {
 	taggedFlowPool.Put(taggedFlow)
 }
 
+// 注意：不拷贝TcpPerfStats
+func CloneTaggedFlowForPacketStat(taggedFlow *TaggedFlow) *TaggedFlow {
+	newTaggedFlow := AcquireTaggedFlow()
+	*newTaggedFlow = *taggedFlow
+	newTaggedFlow.TcpPerfStats = nil
+	newTaggedFlow.ReferenceCount.Reset()
+	return newTaggedFlow
+}
+
 func CloneTaggedFlow(taggedFlow *TaggedFlow) *TaggedFlow {
 	newTaggedFlow := AcquireTaggedFlow()
 	*newTaggedFlow = *taggedFlow

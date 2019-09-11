@@ -108,7 +108,7 @@ func (q *OverwriteQueue) releaseOverwritten(overwritten []interface{}) {
 	}
 }
 
-// 放置单个/多个元素，注意不要超过Size
+// 放置单个/多个元素，注意不要超过Size、不能放置空列表
 func (q *OverwriteQueue) Put(items ...interface{}) error {
 	itemSize := uint(len(items))
 	if itemSize > q.size {

@@ -90,7 +90,7 @@ func (m *PacketDedupMap) IsDuplicate(packet []byte, timestamp time.Duration) boo
 
 func NewPacketDedupMap(name string) *PacketDedupMap {
 	m := &PacketDedupMap{
-		ringBuffer: make([]packetDedupMapNodeBlock, (ELEMENTS_LIMIT+blockSize)/blockSize*blockSize+1),
+		ringBuffer: make([]packetDedupMapNodeBlock, (ELEMENTS_LIMIT+_BLOCK_SIZE)/_BLOCK_SIZE*_BLOCK_SIZE+1),
 		slotHead:   make([]int32, HASH_TABLE_SIZE),
 		counter:    &PacketDedupMapCounter{},
 	}

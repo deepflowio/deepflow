@@ -1,7 +1,7 @@
 package idmap
 
 const (
-	blockSizeBits = 8
-	blockSize     = 1 << blockSizeBits
-	blockSizeMask = blockSize - 1
+	_BLOCK_SIZE_BITS = 8
+	_BLOCK_SIZE      = 1 << _BLOCK_SIZE_BITS
+	_BLOCK_SIZE_MASK = _BLOCK_SIZE - 1
 )
