@@ -4,27 +4,7 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
-func (m *FlowGenerator) getNonIpQuinTupleHash(meta *MetaPacket) uint64 {
-	return meta.MacSrc ^ meta.MacDst
-}
-
-func (e *FlowExtra) keyMatchForNonIp(meta *MetaPacket) bool { // FIXME: 移动位置
-	if true { // FIXME: 删除
-		taggedFlow := e.taggedFlow
-		flowMacSrc, flowMacDst := taggedFlow.MACSrc, taggedFlow.MACDst
-		if flowMacSrc == meta.MacSrc && flowMacDst == meta.MacDst {
-			meta.Direction = CLIENT_TO_SERVER
-			return true
-		}
-		if flowMacSrc == meta.MacDst && flowMacDst == meta.MacSrc {
-			meta.Direction = SERVER_TO_CLIENT
-			return true
-		}
-	}
-	return false
-}
-
-func (m *FlowMap) initNonIpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
+func (m *FlowMap) initEthOthersFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	now := meta.Timestamp
 	m.initFlow(flowExtra, meta, now)
 	taggedFlow := flowExtra.taggedFlow
@@ -42,7 +22,7 @@ func (m *FlowMap) initNonIpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	flowExtra.timeout = openingTimeout
 }
 
-func (m *FlowMap) updateNonIpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
+func (m *FlowMap) updateEthOthersFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	m.updateFlow(flowExtra, meta)
 	if flowExtra.taggedFlow.FlowMetricsPeerSrc.PacketCount > 0 && flowExtra.taggedFlow.FlowMetricsPeerDst.PacketCount > 0 {
 		flowExtra.timeout = establishedRstTimeout

@@ -1,8 +1,40 @@
 package flowgenerator
 
 import (
+	"time"
+
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
+
+func (m *FlowMap) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8, serverToClient bool) bool {
+	taggedFlow := flowExtra.taggedFlow
+	var timeout time.Duration
+	var flowState FlowState
+	closed := false
+	if stateValue, ok := m.stateMachineMaster[flowExtra.flowState][flags]; ok {
+		timeout = stateValue.timeout
+		flowState = stateValue.flowState
+		closed = stateValue.closed
+	} else {
+		timeout = exceptionTimeout
+		flowState = FLOW_STATE_EXCEPTION
+		closed = false
+	}
+	if serverToClient { // 若flags对应的包是 服务端->客户端 时，还需要走一下Slave状态机
+		if stateValue, ok := m.stateMachineSlave[flowExtra.flowState][flags]; ok {
+			timeout = stateValue.timeout
+			flowState = stateValue.flowState
+			closed = stateValue.closed
+		}
+	}
+	flowExtra.flowState = flowState
+	if taggedFlow.FlowMetricsPeerSrc.TotalPacketCount == 0 || taggedFlow.FlowMetricsPeerDst.TotalPacketCount == 0 {
+		flowExtra.timeout = singleDirectionTimeout
+	} else {
+		flowExtra.timeout = timeout
+	}
+	return closed
+}
 
 func (m *FlowMap) initTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	now := meta.Timestamp
@@ -28,7 +60,7 @@ func (m *FlowMap) initTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	flowExtra.setMetaPacketActiveService(meta)
 
 	flags = flags & TCP_FLAG_MASK
-	if m.StatePreprocess(meta, flags) || meta.Invalid {
+	if StatePreprocess(meta, flags) || meta.Invalid {
 		flowExtra.timeout = exceptionTimeout
 		flowExtra.flowState = FLOW_STATE_EXCEPTION
 	}
@@ -52,7 +84,7 @@ func (m *FlowMap) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) bool { /
 	m.updateTCPDirection(meta, flowExtra, false)
 	flowExtra.setMetaPacketActiveService(meta)
 
-	if m.StatePreprocess(meta, flags) || meta.Invalid {
+	if StatePreprocess(meta, flags) || meta.Invalid {
 		flowExtra.timeout = exceptionTimeout
 		flowExtra.flowState = FLOW_STATE_EXCEPTION
 		return false

@@ -10,8 +10,40 @@ func flagContain(flags, target uint8) bool {
 	return flags&target > 0
 }
 
+func calcCloseType(taggedFlow *TaggedFlow, flowState FlowState) {
+	switch flowState {
+	case FLOW_STATE_EXCEPTION:
+		taggedFlow.CloseType = CloseTypeUnknown
+	case FLOW_STATE_OPENING_1:
+		taggedFlow.CloseType = CloseTypeServerHalfOpen
+	case FLOW_STATE_OPENING_2:
+		taggedFlow.CloseType = CloseTypeClientHalfOpen
+	case FLOW_STATE_ESTABLISHED:
+		taggedFlow.CloseType = CloseTypeTimeout
+	case FLOW_STATE_CLOSING_TX1:
+		taggedFlow.CloseType = CloseTypeServerHalfClose
+	case FLOW_STATE_CLOSING_RX1:
+		taggedFlow.CloseType = CloseTypeClientHalfClose
+	case FLOW_STATE_CLOSING_TX2:
+		fallthrough
+	case FLOW_STATE_CLOSING_RX2:
+		fallthrough
+	case FLOW_STATE_CLOSED:
+		taggedFlow.CloseType = CloseTypeTCPFin
+	case FLOW_STATE_RESET:
+		if flagContain(taggedFlow.FlowMetricsPeerDst.TCPFlags, TCP_RST) {
+			taggedFlow.CloseType = CloseTypeTCPServerRst
+		} else {
+			taggedFlow.CloseType = CloseTypeTCPClientRst
+		}
+	default:
+		log.Warningf("unexcepted 'unknown' close type, flow id is %d", taggedFlow.FlowID)
+		taggedFlow.CloseType = CloseTypeUnknown
+	}
+}
+
 // return true if unexpected flags got
-func (m *FlowMap) StatePreprocess(meta *MetaPacket, flags uint8) bool { // FIXME: 移动位置
+func StatePreprocess(meta *MetaPacket, flags uint8) bool {
 	switch flags {
 	case TCP_SYN:
 		return false
