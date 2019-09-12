@@ -82,49 +82,49 @@ func (a *Acl) generatePortSegment() ([]portSegment, []portSegment) {
 	return srcSegment, dstSegment
 }
 
-func (a *Acl) generateMatchedField(srcMac, dstMac uint32, srcIps, dstIps ipSegment, srcPorts, dstPorts []portSegment) {
+func (a *Acl) generateMatchedField(srcMac, dstMac uint64, srcIps, dstIps ipSegment, srcPorts, dstPorts []portSegment) {
 	for _, srcPort := range srcPorts {
 		for _, dstPort := range dstPorts {
 			match := MatchedField{}
-			match.Set(MATCHED_TAP_TYPE, uint32(a.Type))
-			match.Set(MATCHED_PROTO, uint32(a.Proto))
-			match.Set(MATCHED_VLAN, uint32(a.Vlan))
+			match.Set(MATCHED_TAP_TYPE, uint64(a.Type))
+			match.Set(MATCHED_PROTO, uint64(a.Proto))
+			match.Set(MATCHED_VLAN, uint64(a.Vlan))
 			match.Set(MATCHED_SRC_MAC, srcMac)
 			match.Set(MATCHED_DST_MAC, dstMac)
-			match.Set(MATCHED_SRC_IP, srcIps.getIp())
-			match.Set(MATCHED_SRC_EPC, uint32(srcIps.getEpcId()))
-			match.Set(MATCHED_DST_IP, dstIps.getIp())
-			match.Set(MATCHED_DST_EPC, uint32(dstIps.getEpcId()))
-			match.Set(MATCHED_SRC_PORT, uint32(srcPort.port))
-			match.Set(MATCHED_DST_PORT, uint32(dstPort.port))
+			match.Set(MATCHED_SRC_IP, uint64(srcIps.getIp()))
+			match.Set(MATCHED_SRC_EPC, uint64(srcIps.getEpcId()))
+			match.Set(MATCHED_DST_IP, uint64(dstIps.getIp()))
+			match.Set(MATCHED_DST_EPC, uint64(dstIps.getEpcId()))
+			match.Set(MATCHED_SRC_PORT, uint64(srcPort.port))
+			match.Set(MATCHED_DST_PORT, uint64(dstPort.port))
 			a.AllMatched = append(a.AllMatched, match)
 
 			mask := MatchedField{}
-			mask.SetMask(MATCHED_TAP_TYPE, uint32(a.Type))
-			mask.SetMask(MATCHED_PROTO, uint32(a.Proto))
-			mask.SetMask(MATCHED_VLAN, uint32(a.Vlan))
+			mask.SetMask(MATCHED_TAP_TYPE, uint64(a.Type))
+			mask.SetMask(MATCHED_PROTO, uint64(a.Proto))
+			mask.SetMask(MATCHED_VLAN, uint64(a.Vlan))
 			mask.SetMask(MATCHED_SRC_MAC, srcMac)
 			mask.SetMask(MATCHED_DST_MAC, dstMac)
-			mask.Set(MATCHED_SRC_IP, srcIps.getMask())
-			mask.SetMask(MATCHED_SRC_EPC, uint32(srcIps.getEpcId()))
-			mask.Set(MATCHED_DST_IP, dstIps.getMask())
-			mask.SetMask(MATCHED_DST_EPC, uint32(dstIps.getEpcId()))
-			mask.Set(MATCHED_SRC_PORT, uint32(srcPort.mask))
-			mask.Set(MATCHED_DST_PORT, uint32(dstPort.mask))
+			mask.Set(MATCHED_SRC_IP, uint64(srcIps.getMask()))
+			mask.SetMask(MATCHED_SRC_EPC, uint64(srcIps.getEpcId()))
+			mask.Set(MATCHED_DST_IP, uint64(dstIps.getMask()))
+			mask.SetMask(MATCHED_DST_EPC, uint64(dstIps.getEpcId()))
+			mask.Set(MATCHED_SRC_PORT, uint64(srcPort.mask))
+			mask.Set(MATCHED_DST_PORT, uint64(dstPort.mask))
 			a.AllMatchedMask = append(a.AllMatchedMask, mask)
 		}
 	}
 }
 
-func (a *Acl) generateMatchedField6(srcMac, dstMac uint32, srcIps, dstIps ipSegment, srcPorts, dstPorts []portSegment) {
+func (a *Acl) generateMatchedField6(srcMac, dstMac uint64, srcIps, dstIps ipSegment, srcPorts, dstPorts []portSegment) {
 	for _, srcPort := range srcPorts {
 		for _, dstPort := range dstPorts {
 			match := MatchedField6{}
 			match.Set(MATCHED6_TAP_TYPE, uint64(a.Type))
 			match.Set(MATCHED6_PROTO, uint64(a.Proto))
 			match.Set(MATCHED6_VLAN, uint64(a.Vlan))
-			match.Set(MATCHED6_SRC_MAC, uint64(srcMac))
-			match.Set(MATCHED6_DST_MAC, uint64(dstMac))
+			match.Set(MATCHED6_SRC_MAC, srcMac)
+			match.Set(MATCHED6_DST_MAC, dstMac)
 			ip0, ip1 := srcIps.getIp6()
 			match.Set(MATCHED6_SRC_IP0, ip0)
 			match.Set(MATCHED6_SRC_IP1, ip1)
@@ -141,8 +141,8 @@ func (a *Acl) generateMatchedField6(srcMac, dstMac uint32, srcIps, dstIps ipSegm
 			mask.SetMask(MATCHED6_TAP_TYPE, uint64(a.Type))
 			mask.SetMask(MATCHED6_PROTO, uint64(a.Proto))
 			mask.SetMask(MATCHED6_VLAN, uint64(a.Vlan))
-			mask.SetMask(MATCHED6_SRC_MAC, uint64(srcMac))
-			mask.SetMask(MATCHED6_DST_MAC, uint64(dstMac))
+			mask.SetMask(MATCHED6_SRC_MAC, srcMac)
+			mask.SetMask(MATCHED6_DST_MAC, dstMac)
 			mask0, mask1 := srcIps.getMask6()
 			mask.Set(MATCHED6_SRC_IP0, mask0)
 			mask.Set(MATCHED6_SRC_IP1, mask1)
@@ -158,7 +158,7 @@ func (a *Acl) generateMatchedField6(srcMac, dstMac uint32, srcIps, dstIps ipSegm
 	}
 }
 
-func (a *Acl) generateMatched(srcMac, dstMac []uint32, srcIps, dstIps []ipSegment) {
+func (a *Acl) generateMatched(srcMac, dstMac []uint64, srcIps, dstIps []ipSegment) {
 	srcPorts, dstPorts := a.generatePortSegment()
 	for _, srcMac := range srcMac {
 		for _, dstMac := range dstMac {
