@@ -1,7 +1,7 @@
 syntax = "proto2";
 
-package authorize;
-option go_package = "app";
+package license;
+option go_package = "license";
 
 
 message License {
