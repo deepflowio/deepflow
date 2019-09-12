@@ -106,7 +106,7 @@ func (m *FlowMap) GetCounter() interface{} {
 }
 
 func (m *FlowMap) Closed() bool {
-	return false // FIXME: never close
+	return false // never close
 }
 
 func (m *FlowMap) incIndex(index int32) int32 {
@@ -386,9 +386,9 @@ func (m *FlowMap) updateNode(node *flowMapNode, nodeIndex int32, meta *datatype.
 	} else if meta.Protocol == layers.IPProtocolUDP {
 		m.updateUdpFlow(flowExtra, meta)
 	} else if meta.EthType != layers.EthernetTypeIPv4 {
-		m.updateNonIpFlow(flowExtra, meta)
+		m.updateEthOthersFlow(flowExtra, meta)
 	} else {
-		m.updateOtherIpFlow(flowExtra, meta)
+		m.updateIpOthersFlow(flowExtra, meta)
 	}
 
 	// 3. 由于包、流统计信息已清零，将节点移动至包对应的时间槽
@@ -429,9 +429,9 @@ func (m *FlowMap) newNode(meta *datatype.MetaPacket, hash uint64) {
 	} else if meta.Protocol == layers.IPProtocolUDP {
 		m.initUdpFlow(flowExtra, meta)
 	} else if meta.EthType != layers.EthernetTypeIPv4 {
-		m.initNonIpFlow(flowExtra, meta)
+		m.initEthOthersFlow(flowExtra, meta)
 	} else {
-		m.initOtherIpFlow(flowExtra, meta)
+		m.initIpOthersFlow(flowExtra, meta)
 	}
 }
 

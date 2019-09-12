@@ -130,21 +130,20 @@ func TestNew(t *testing.T) {
 }
 
 func TestTunnelMatch(t *testing.T) {
-	flowExtra := &FlowExtra{}
 	metaTunnelInfo := &TunnelInfo{Type: 1, Src: 0, Dst: 2, Id: 1}
 	flowTunnelInfo := &TunnelInfo{Type: 1, Src: 1, Dst: 3, Id: 1}
-	if ok := flowExtra.TunnelMatch(metaTunnelInfo, flowTunnelInfo); ok {
-		t.Errorf("FlowExtra.TunnelMatch return %t, expect false", ok)
+	if ok := tunnelMatch(metaTunnelInfo, flowTunnelInfo); ok {
+		t.Errorf("TunnelMatch return %t, expect false", ok)
 	}
 
 	flowTunnelInfo2 := &TunnelInfo{}
-	if ok := flowExtra.TunnelMatch(nil, flowTunnelInfo2); !ok {
-		t.Errorf("FlowExtra.TunnelMatch return %t, expect true", ok)
+	if ok := tunnelMatch(nil, flowTunnelInfo2); !ok {
+		t.Errorf("TunnelMatch return %t, expect true", ok)
 	}
 
 	flowTunnelInfo3 := &TunnelInfo{Type: 1, Src: 1, Dst: 3, Id: 1}
-	if ok := flowExtra.TunnelMatch(nil, flowTunnelInfo3); ok {
-		t.Errorf("FlowExtra.TunnelMatch return %t, expect false", ok)
+	if ok := tunnelMatch(nil, flowTunnelInfo3); ok {
+		t.Errorf("TunnelMatch return %t, expect false", ok)
 	}
 }
 
@@ -418,7 +417,7 @@ func TestUdpShortFlow(t *testing.T) {
 	}
 }
 
-func TestNonIpShortFlow(t *testing.T) {
+func TestEthOthersShortFlow(t *testing.T) {
 	flowGenerator, inputPacketQueue, flowOutQueue, _ := flowGeneratorInit(0, true)
 
 	packet := getDefaultPacket()

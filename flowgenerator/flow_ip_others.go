@@ -4,7 +4,7 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
-func (m *FlowMap) initOtherIpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
+func (m *FlowMap) initIpOthersFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	now := meta.Timestamp
 	m.initFlow(flowExtra, meta, now)
 	taggedFlow := flowExtra.taggedFlow
@@ -22,7 +22,7 @@ func (m *FlowMap) initOtherIpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	flowExtra.timeout = openingTimeout
 }
 
-func (m *FlowMap) updateOtherIpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
+func (m *FlowMap) updateIpOthersFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	m.updateFlow(flowExtra, meta)
 	if flowExtra.taggedFlow.FlowMetricsPeerSrc.PacketCount > 0 && flowExtra.taggedFlow.FlowMetricsPeerDst.PacketCount > 0 {
 		flowExtra.timeout = establishedRstTimeout
