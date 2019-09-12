@@ -46,8 +46,8 @@ func (k *LookupKey) generateMatchedField6(direction DirectionType, srcEpc, dstEp
 	matched.Set(MATCHED6_TAP_TYPE, uint64(k.Tap))
 	matched.Set(MATCHED6_PROTO, uint64(k.Proto))
 	matched.Set(MATCHED6_VLAN, uint64(k.Vlan))
-	matched.Set(MATCHED6_SRC_MAC, uint64(srcMac&0xffffffff))
-	matched.Set(MATCHED6_DST_MAC, uint64(dstMac&0xffffffff))
+	matched.Set(MATCHED6_SRC_MAC, srcMac)
+	matched.Set(MATCHED6_DST_MAC, dstMac)
 	matched.Set(MATCHED6_SRC_IP0, binary.BigEndian.Uint64(srcIp))
 	matched.Set(MATCHED6_SRC_IP1, binary.BigEndian.Uint64(srcIp[8:]))
 	matched.Set(MATCHED6_DST_IP0, binary.BigEndian.Uint64(dstIp))
@@ -69,17 +69,17 @@ func (k *LookupKey) generateMatchedField(direction DirectionType, srcEpc, dstEpc
 		srcMac, dstMac = k.DstMac, k.SrcMac
 		matched = &k.BackwardMatched
 	}
-	matched.Set(MATCHED_TAP_TYPE, uint32(k.Tap))
-	matched.Set(MATCHED_PROTO, uint32(k.Proto))
-	matched.Set(MATCHED_VLAN, uint32(k.Vlan))
-	matched.Set(MATCHED_SRC_MAC, uint32(srcMac&0xffffffff))
-	matched.Set(MATCHED_DST_MAC, uint32(dstMac&0xffffffff))
-	matched.Set(MATCHED_SRC_IP, srcIp)
-	matched.Set(MATCHED_DST_IP, dstIp)
-	matched.Set(MATCHED_SRC_EPC, uint32(srcEpc))
-	matched.Set(MATCHED_DST_EPC, uint32(dstEpc))
-	matched.Set(MATCHED_SRC_PORT, uint32(srcPort))
-	matched.Set(MATCHED_DST_PORT, uint32(dstPort))
+	matched.Set(MATCHED_TAP_TYPE, uint64(k.Tap))
+	matched.Set(MATCHED_PROTO, uint64(k.Proto))
+	matched.Set(MATCHED_VLAN, uint64(k.Vlan))
+	matched.Set(MATCHED_SRC_MAC, srcMac)
+	matched.Set(MATCHED_DST_MAC, dstMac)
+	matched.Set(MATCHED_SRC_IP, uint64(srcIp))
+	matched.Set(MATCHED_DST_IP, uint64(dstIp))
+	matched.Set(MATCHED_SRC_EPC, uint64(srcEpc))
+	matched.Set(MATCHED_DST_EPC, uint64(dstEpc))
+	matched.Set(MATCHED_SRC_PORT, uint64(srcPort))
+	matched.Set(MATCHED_DST_PORT, uint64(dstPort))
 }
 
 func (k *LookupKey) GenerateMatchedField(srcEpc, dstEpc uint16) {

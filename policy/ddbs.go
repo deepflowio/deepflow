@@ -30,7 +30,7 @@ type Ddbs struct {
 	FastPath
 	InterestTable
 	AclGidMap
-	groupMacMap map[uint16][]uint32
+	groupMacMap map[uint16][]uint64
 	groupIpMap  map[uint16][]ipSegment
 
 	FastPathDisable bool
@@ -60,7 +60,7 @@ func NewDdbs(queueCount int, mapSize uint32, fastPathDisable bool) TableOperator
 	ddbs := new(Ddbs)
 	ddbs.queueCount = queueCount
 	ddbs.FastPathDisable = fastPathDisable
-	ddbs.groupMacMap = make(map[uint16][]uint32, 1000)
+	ddbs.groupMacMap = make(map[uint16][]uint64, 1000)
 	ddbs.groupIpMap = make(map[uint16][]ipSegment, 1000)
 	ddbs.AclGidMap.Init()
 	ddbs.InterestTable.Init()
@@ -76,8 +76,8 @@ func (d *Ddbs) GenerateGroupAclGidMaps(acls []*Acl) {
 
 func (d *Ddbs) generateAclBits(acls []*Acl) {
 	for _, acl := range acls {
-		srcMac := make([]uint32, 0, 8)
-		dstMac := make([]uint32, 0, 8)
+		srcMac := make([]uint64, 0, 8)
+		dstMac := make([]uint64, 0, 8)
 		srcIps := make([]ipSegment, 0, 8)
 		dstIps := make([]ipSegment, 0, 8)
 
@@ -523,11 +523,11 @@ func (d *Ddbs) SetCloudPlatform(cloudPlatformLabeler *CloudPlatformLabeler) {
 }
 
 func (d *Ddbs) generateGroupMacMap(data []*PlatformData) {
-	groupMacMap := make(map[uint16][]uint32, 1000)
+	groupMacMap := make(map[uint16][]uint64, 1000)
 	for _, data := range data {
 		for _, group := range data.GroupIds {
 			groupId := uint16(group & 0xffff)
-			groupMacMap[groupId] = append(groupMacMap[groupId], uint32(data.Mac&0xffffffff))
+			groupMacMap[groupId] = append(groupMacMap[groupId], data.Mac)
 		}
 	}
 	d.groupMacMap = groupMacMap

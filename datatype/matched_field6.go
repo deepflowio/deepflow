@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	MATCHED_FIELD6_BITS_LEN = 409 // 5(TapType) + 12(Vlan) + 8(Proto) + 16(L3EPC)*2 + 16(Port)*2 + 32(MAC)*2 + 128(IP)*2
+	MATCHED_FIELD6_BITS_LEN = 441 // 5(TapType) + 12(Vlan) + 8(Proto) + 16(L3EPC)*2 + 64(MAC + Port)*2 + 128(IP)*2
 	MATCHED_FIELD6_LEN      = 7
 )
 
@@ -22,13 +22,15 @@ const (
 	MATCHED6_DST_IP1
 	// fields[4]
 	MATCHED6_SRC_MAC
-	MATCHED6_DST_MAC
-	// fields[5]
 	MATCHED6_SRC_PORT
+
+	// fields[5]
+	MATCHED6_DST_MAC
 	MATCHED6_DST_PORT
+
+	// fields[6]
 	MATCHED6_SRC_EPC
 	MATCHED6_DST_EPC
-	// fields[6]
 	MATCHED6_PROTO
 	MATCHED6_VLAN
 	MATCHED6_TAP_TYPE
@@ -39,17 +41,18 @@ var field6Offset = [...]uint64{
 	MATCHED6_SRC_IP1: 64,
 	MATCHED6_DST_IP0: 128,
 	MATCHED6_DST_IP1: 192,
-	MATCHED6_SRC_MAC: 256,
-	MATCHED6_DST_MAC: 288,
 
-	MATCHED6_SRC_PORT: 320,
-	MATCHED6_DST_PORT: 336,
-	MATCHED6_SRC_EPC:  352,
-	MATCHED6_DST_EPC:  368,
+	MATCHED6_SRC_MAC:  256,
+	MATCHED6_SRC_PORT: 304,
 
-	MATCHED6_PROTO:    384,
-	MATCHED6_VLAN:     392,
-	MATCHED6_TAP_TYPE: 404,
+	MATCHED6_DST_MAC:  320,
+	MATCHED6_DST_PORT: 368,
+
+	MATCHED6_SRC_EPC:  384,
+	MATCHED6_DST_EPC:  400,
+	MATCHED6_PROTO:    416,
+	MATCHED6_VLAN:     424,
+	MATCHED6_TAP_TYPE: 436,
 }
 
 var field6Mask = [...]uint64{
@@ -58,11 +61,12 @@ var field6Mask = [...]uint64{
 	MATCHED6_DST_IP0: 0xffffffffffffffff,
 	MATCHED6_DST_IP1: 0xffffffffffffffff,
 
-	MATCHED6_SRC_MAC: 0xffffffff,
-	MATCHED6_DST_MAC: 0xffffffff,
-
+	MATCHED6_SRC_MAC:  0xffffffffffff,
 	MATCHED6_SRC_PORT: 0xffff,
+
+	MATCHED6_DST_MAC:  0xffffffffffff,
 	MATCHED6_DST_PORT: 0xffff,
+
 	MATCHED6_SRC_EPC:  0xffff,
 	MATCHED6_DST_EPC:  0xffff,
 	MATCHED6_PROTO:    0xff,
@@ -96,12 +100,12 @@ func (f *MatchedField6) Set(flag MatchFlags, value uint64) {
 	index := field6Offset[flag] >> NUM_64_OFFSET // field6Offset[flag] / 64
 	offset := field6Offset[flag] & NUM_64_MASK   // field6Offset[flag] % 64
 	f.fields[index] &= ^(field6Mask[flag] << offset)
-	f.fields[index] |= (uint64(value) << offset)
+	f.fields[index] |= (value << offset)
 }
 
 func (f *MatchedField6) SetMask(flag MatchFlags, value uint64) {
 	if value != 0 {
-		value = uint64(field6Mask[flag])
+		value = field6Mask[flag]
 	}
 	f.Set(flag, value)
 }

@@ -63,7 +63,7 @@ func TestMatchedField6GetAllTableIndex(t *testing.T) {
 	matched := newMatchedField6(1, 2, 3, 10, 20, net.ParseIP("aabb:ccdd::1"), net.ParseIP("1122:3344::2"), 5, 60)
 	vector := newMatchedField6(0, 0, 0, 0, 0, net.ParseIP("::"), net.ParseIP("::"), 7, 0)
 	mask := newMatchedField6(0, 0, 0, 0, 0, net.ParseIP("::"), net.ParseIP("::"), 9, 0)
-	indexs := matched.GetAllTableIndex(&vector, &mask, 320, 336, []int{320, 321, 322})
+	indexs := matched.GetAllTableIndex(&vector, &mask, 304, 320, []int{304, 305, 306})
 	if !reflect.DeepEqual([]uint16{1, 3, 5, 7}, indexs) {
 		t.Errorf("TestMatchedField6GetAllTableIndex Error. %+v\n", indexs)
 	}

@@ -10,61 +10,58 @@ const (
 )
 
 const (
-	MATCHED_FIELD_BITS_LEN = 217 // 5(TapType) + 12(Vlan) + 8(Proto) + 16(L3EPC)*2 + 16(Port)*2 + 64(MAC+IP)*2
+	MATCHED_FIELD_BITS_LEN = 249 // 5(TapType) + 12(Vlan) + 8(Proto) + 16(L3EPC)*2 + 32(IP)*2 + 64(Port+MAC)*2
 	MATCHED_FIELD_LEN      = 4
 )
 
 type MatchFlags uint16
 
 const (
-	ETH_TYPE_ALL = iota
-	ETH_TYPE_IPV4
-	ETH_TYPE_IPV6
-)
-
-const (
 	// fields[0]
 	MATCHED_SRC_MAC MatchFlags = iota
-	MATCHED_SRC_IP
+	MATCHED_SRC_PORT
+
 	// fields[1]
 	MATCHED_DST_MAC
-	MATCHED_DST_IP
+	MATCHED_DST_PORT
 
 	// fields[2]
-	MATCHED_SRC_PORT
-	MATCHED_DST_PORT
+	MATCHED_SRC_IP
+	MATCHED_DST_IP
+
+	// fields[3]
 	MATCHED_SRC_EPC
 	MATCHED_DST_EPC
-	// fields[3]
 	MATCHED_PROTO
 	MATCHED_VLAN
 	MATCHED_TAP_TYPE
 )
 
 var fieldOffset = [...]uint64{
-	MATCHED_SRC_MAC:  98,
-	MATCHED_SRC_IP:   64,
-	MATCHED_DST_MAC:  32,
-	MATCHED_DST_IP:   0,
-	MATCHED_SRC_PORT: 144,
-	MATCHED_DST_PORT: 128,
+	MATCHED_SRC_MAC:  0,
+	MATCHED_SRC_PORT: 48,
+	MATCHED_DST_MAC:  64,
+	MATCHED_DST_PORT: 112,
+	MATCHED_SRC_IP:   128,
+	MATCHED_DST_IP:   160,
 
-	MATCHED_SRC_EPC:  176,
-	MATCHED_DST_EPC:  160,
-	MATCHED_PROTO:    192,
-	MATCHED_VLAN:     200,
-	MATCHED_TAP_TYPE: 212,
+	MATCHED_SRC_EPC:  192,
+	MATCHED_DST_EPC:  208,
+	MATCHED_PROTO:    224,
+	MATCHED_VLAN:     232,
+	MATCHED_TAP_TYPE: 244,
 }
 
 var fieldMask = [...]uint64{
-	MATCHED_SRC_MAC: 0xffffffff,
-	MATCHED_SRC_IP:  0xffffffff,
-
-	MATCHED_DST_MAC: 0xffffffff,
-	MATCHED_DST_IP:  0xffffffff,
-
+	MATCHED_SRC_MAC:  0xffffffffffff,
 	MATCHED_SRC_PORT: 0xffff,
+
+	MATCHED_DST_MAC:  0xffffffffffff,
 	MATCHED_DST_PORT: 0xffff,
+
+	MATCHED_SRC_IP: 0xffffffff,
+	MATCHED_DST_IP: 0xffffffff,
+
 	MATCHED_SRC_EPC:  0xffff,
 	MATCHED_DST_EPC:  0xffff,
 	MATCHED_PROTO:    0xff,
@@ -88,22 +85,22 @@ func (f *MatchedField) GobDecode(in []byte) error {
 	return nil
 }
 
-func (f *MatchedField) Get(flag MatchFlags) uint32 {
+func (f *MatchedField) Get(flag MatchFlags) uint64 {
 	index := fieldOffset[flag] >> NUM_64_OFFSET // fieldOffset[flag] / 64
 	offset := fieldOffset[flag] & NUM_64_MASK   // fieldOffset[flag] % 64
-	return uint32((f.fields[index] >> offset) & fieldMask[flag])
+	return (f.fields[index] >> offset) & fieldMask[flag]
 }
 
-func (f *MatchedField) Set(flag MatchFlags, value uint32) {
+func (f *MatchedField) Set(flag MatchFlags, value uint64) {
 	index := fieldOffset[flag] >> NUM_64_OFFSET // fieldOffset[flag] / 64
 	offset := fieldOffset[flag] & NUM_64_MASK   // fieldOffset[flag] % 64
 	f.fields[index] &= ^(fieldMask[flag] << offset)
-	f.fields[index] |= (uint64(value) << offset)
+	f.fields[index] |= (value << offset)
 }
 
-func (f *MatchedField) SetMask(flag MatchFlags, value uint32) {
+func (f *MatchedField) SetMask(flag MatchFlags, value uint64) {
 	if value != 0 {
-		value = uint32(fieldMask[flag])
+		value = fieldMask[flag]
 	}
 	f.Set(flag, value)
 }
