@@ -66,6 +66,7 @@ func NewDdbs(queueCount int, mapSize uint32, fastPathDisable bool) TableOperator
 	ddbs.InterestTable.Init()
 	ddbs.FastPath.Init(mapSize, queueCount, ddbs.AclGidMap.SrcGroupAclGidMaps, ddbs.AclGidMap.DstGroupAclGidMaps)
 	ddbs.table = &[TABLE_SIZE][]*TableItem{}
+	ddbs.table6 = &[TABLE_SIZE][]*Table6Item{}
 	return ddbs
 }
 
