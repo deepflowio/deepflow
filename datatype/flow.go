@@ -2,6 +2,7 @@ package datatype
 
 import (
 	"fmt"
+	"net"
 	"reflect"
 	"time"
 
@@ -54,6 +55,9 @@ type FlowKey struct {
 	/* L3 */
 	IPSrc IPv4Int
 	IPDst IPv4Int
+	/* L3 IPv6 */
+	IP6Src net.IP
+	IP6Dst net.IP
 	/* L4 */
 	PortSrc uint16
 	PortDst uint16
@@ -168,8 +172,13 @@ func (f *FlowKey) String() string {
 	formatted += fmt.Sprintf("InPort: %d\n", f.InPort)
 	formatted += fmt.Sprintf("\tMACSrc: %s ", Uint64ToMac(f.MACSrc))
 	formatted += fmt.Sprintf("MACDst: %s ", Uint64ToMac(f.MACDst))
-	formatted += fmt.Sprintf("IPSrc: %s ", IpFromUint32(f.IPSrc))
-	formatted += fmt.Sprintf("IPDst: %s ", IpFromUint32(f.IPDst))
+	if len(f.IP6Src) > 0 {
+		formatted += fmt.Sprintf("IP6Src: %s ", f.IP6Src)
+		formatted += fmt.Sprintf("IP6Dst: %s ", f.IP6Dst)
+	} else {
+		formatted += fmt.Sprintf("IPSrc: %s ", IpFromUint32(f.IPSrc))
+		formatted += fmt.Sprintf("IPDst: %s ", IpFromUint32(f.IPDst))
+	}
 	formatted += fmt.Sprintf("Proto: %v ", f.Proto)
 	formatted += fmt.Sprintf("PortSrc: %d ", f.PortSrc)
 	formatted += fmt.Sprintf("PortDst: %d", f.PortDst)
