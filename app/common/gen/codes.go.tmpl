@@ -5,7 +5,9 @@ import (
 )
 
 {{ $policy_chn_codes := list }}
+{{ $policy_chn_port_codes := list }}
 {{ $policy_chn_edge_codes := list }}
+{{ $policy_chn_edge_port_codes := list }}
 {{ $node_codes := list }}
 {{ $node_port_codes := list }}
 {{ $edge_codes := list }}
@@ -22,9 +24,13 @@ import (
     {{ $is_policy := contains "acl_" $code }}
     {{ $is_geo := or (contains "isp_code" $code) (contains "region" $code) }}
 
-    {{ if and $is_geo $is_edge $is_policy }}
+    {{ if and $is_geo $is_edge $is_port $is_policy }}
+        {{ $policy_chn_edge_port_codes = append $policy_chn_edge_port_codes $code }}
+    {{ else if and $is_geo $is_edge (not $is_port) $is_policy }}
         {{ $policy_chn_edge_codes = append $policy_chn_edge_codes $code }}
-    {{ else if and $is_geo (not $is_edge) $is_policy }}
+    {{ else if and $is_geo (not $is_edge) $is_port $is_policy }}
+        {{ $policy_chn_port_codes = append $policy_chn_port_codes $code }}
+    {{ else if and $is_geo (not $is_edge) (not $is_port) $is_policy }}
         {{ $policy_chn_codes = append $policy_chn_codes $code }}
     {{ else if and $is_edge $is_port $is_policy }}
         {{ $policy_edge_port_codes = append $policy_edge_port_codes $code }}
@@ -120,8 +126,14 @@ import (
     {{ template "output" dict "start_index" $i "name" "POLICY_CHN_CODES" "codes" $policy_chn_codes }}
     {{ $i = add $i (len $policy_chn_codes) }}
 
+    {{ template "output" dict "start_index" $i "name" "POLICY_CHN_PORT_CODES" "codes" $policy_chn_port_codes }}
+    {{ $i = add $i (len $policy_chn_port_codes) }}
+
     {{ template "output" dict "start_index" $i "name" "POLICY_CHN_EDGE_CODES" "codes" $policy_chn_edge_codes }}
     {{ $i = add $i (len $policy_chn_edge_codes) }}
+
+    {{ template "output" dict "start_index" $i "name" "POLICY_CHN_EDGE_PORT_CODES" "codes" $policy_chn_edge_port_codes }}
+    {{ $i = add $i (len $policy_chn_edge_port_codes) }}
 
     // no longer used
     var POLICY_NON_CHN_CODES = []zerodoc.Code{}
