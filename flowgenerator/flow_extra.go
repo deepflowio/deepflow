@@ -3,9 +3,8 @@ package flowgenerator
 import (
 	"time"
 
-	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
-
 	"github.com/google/gopacket/layers"
+	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
 type FlowState int
@@ -121,10 +120,9 @@ func requireMacMatch(meta *MetaPacket, ignoreTorMac, ignoreL2End bool) int {
 }
 
 func (e *FlowExtra) Match(meta *MetaPacket) bool {
-	if meta.EthType != layers.EthernetTypeIPv4 { // FIXME: 支持IPv6
+	if meta.EthType != layers.EthernetTypeIPv4 && meta.EthType != layers.EthernetTypeIPv6 {
 		return e.keyMatchForEthOthers(meta)
 	}
-
 	taggedFlow := e.taggedFlow
 	if taggedFlow.Exporter != meta.Exporter || meta.InPort != taggedFlow.InPort {
 		return false
@@ -133,21 +131,35 @@ func (e *FlowExtra) Match(meta *MetaPacket) bool {
 	if macMatchType != MAC_MATCH_NONE && !macMatch(meta, taggedFlow.MACSrc, taggedFlow.MACDst, macMatchType) {
 		return false
 	}
+	if taggedFlow.EthType != meta.EthType {
+		return false
+	}
 	if taggedFlow.Proto != meta.Protocol || !tunnelMatch(meta.Tunnel, &taggedFlow.TunnelInfo) {
 		return false
 	}
 	flowIPSrc, flowIPDst := taggedFlow.IPSrc, taggedFlow.IPDst
 	metaIpSrc, metaIpDst := meta.IpSrc, meta.IpDst
+	flowIP6Src, flowIP6Dst := taggedFlow.IP6Src, taggedFlow.IP6Dst
+	metaIp6Src, metaIp6Dst := meta.Ip6Src, meta.Ip6Dst
 	flowPortSrc, flowPortDst := taggedFlow.PortSrc, taggedFlow.PortDst
 	metaPortSrc, metaPortDst := meta.PortSrc, meta.PortDst
-	if flowIPSrc == metaIpSrc && flowIPDst == metaIpDst && flowPortSrc == metaPortSrc && flowPortDst == metaPortDst {
-		meta.Direction = CLIENT_TO_SERVER
-		return true
-	} else if flowIPSrc == metaIpDst && flowIPDst == metaIpSrc && flowPortSrc == metaPortDst && flowPortDst == metaPortSrc {
-		meta.Direction = SERVER_TO_CLIENT
-		return true
+	if meta.EthType == layers.EthernetTypeIPv4 {
+		if flowIPSrc == metaIpSrc && flowIPDst == metaIpDst && flowPortSrc == metaPortSrc && flowPortDst == metaPortDst {
+			meta.Direction = CLIENT_TO_SERVER
+			return true
+		} else if flowIPSrc == metaIpDst && flowIPDst == metaIpSrc && flowPortSrc == metaPortDst && flowPortDst == metaPortSrc {
+			meta.Direction = SERVER_TO_CLIENT
+			return true
+		}
+	} else {
+		if flowIP6Src.Equal(metaIp6Src) && flowIP6Dst.Equal(metaIp6Dst) && flowPortSrc == metaPortSrc && flowPortDst == metaPortDst {
+			meta.Direction = CLIENT_TO_SERVER
+			return true
+		} else if flowIP6Src.Equal(metaIp6Dst) && flowIP6Dst.Equal(metaIp6Src) && flowPortSrc == metaPortDst && flowPortDst == metaPortSrc {
+			meta.Direction = SERVER_TO_CLIENT
+			return true
+		}
 	}
-
 	return false
 }
 
@@ -160,6 +172,7 @@ func (f *FlowExtra) reverseFlow() {
 	taggedFlow.TunnelInfo.Src, taggedFlow.TunnelInfo.Dst = taggedFlow.TunnelInfo.Dst, taggedFlow.TunnelInfo.Src
 	taggedFlow.MACSrc, taggedFlow.MACDst = taggedFlow.MACDst, taggedFlow.MACSrc
 	taggedFlow.IPSrc, taggedFlow.IPDst = taggedFlow.IPDst, taggedFlow.IPSrc
+	taggedFlow.IP6Src, taggedFlow.IP6Dst = taggedFlow.IP6Dst, taggedFlow.IP6Src
 	taggedFlow.PortSrc, taggedFlow.PortDst = taggedFlow.PortDst, taggedFlow.PortSrc
 	taggedFlow.FlowMetricsPeerSrc, taggedFlow.FlowMetricsPeerDst = FlowMetricsPeerSrc(taggedFlow.FlowMetricsPeerDst), FlowMetricsPeerDst(taggedFlow.FlowMetricsPeerSrc)
 	taggedFlow.GeoEnd ^= 1 // reverse GeoEnd (0: src, 1: dst, others: N/A)
