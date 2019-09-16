@@ -171,6 +171,7 @@ enum TapSide {
 enum TunnelType {
     VXLAN = 0;
     GRE_ERSPAN = 1;
+    PCAP = 2;
 }
 
 message NpbAction {
@@ -179,6 +180,7 @@ message NpbAction {
     optional string tunnel_ip = 3;
     optional TapSide tap_side = 4;
     optional uint32 payload_slice = 5 [default = 65535];
+    optional uint32 npb_acl_group_id = 6; // 仅在tunnel_type为PCAP时，该字段有值
 }
 
 message FlowAction {
