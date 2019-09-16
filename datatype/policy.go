@@ -19,6 +19,7 @@ type NpbAction uint64 // tunnel-ip | tunnel-type | tunnel-id | Dep/Ip | TapSide 
 const (
 	NPB_TUNNEL_TYPE_VXLAN = iota
 	NPB_TUNNEL_TYPE_GRE_ERSPAN
+	NPB_TUNNEL_TYPE_PCAP
 )
 
 const (
@@ -486,7 +487,7 @@ func (d *PolicyData) MergeNpbAction(actions []NpbAction, aclID ACLID, directions
 				break
 			}
 
-			if m.TunnelIp() != n.TunnelIp() || m.TunnelId() != n.TunnelId() {
+			if m.TunnelIp() != n.TunnelIp() || m.TunnelId() != n.TunnelId() || m.TunnelType() != n.TunnelType() {
 				continue
 			}
 			if n.PayloadSlice() == 0 ||
