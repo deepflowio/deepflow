@@ -8,6 +8,7 @@ import (
 	"github.com/op/go-logging"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 var log = logging.MustGetLogger("flowgenerator")
@@ -16,6 +17,10 @@ var log = logging.MustGetLogger("flowgenerator")
 func getKeyL3Hash(meta *MetaPacket, basis uint32) uint64 {
 	ipSrc := uint64(meta.IpSrc)
 	ipDst := uint64(meta.IpDst)
+	if meta.EthType == layers.EthernetTypeIPv6 {
+		ipSrc = uint64(GetIpHash(meta.Ip6Src))
+		ipDst = uint64(GetIpHash(meta.Ip6Dst))
+	}
 	if ipSrc >= ipDst {
 		return ipSrc<<32 | ipDst
 	}
@@ -48,15 +53,8 @@ func (f *FlowGenerator) processPackets(processBuffer []interface{}) {
 		}
 
 		meta := e.(*MetaPacket)
-
-		if meta.EthType == layers.EthernetTypeIPv6 { // FIXME: 当前版本Flow和Metering都不需要IPv6, 直接返回
-			ReleaseMetaPacket(meta)
-			processBuffer[i] = nil
-			continue
-		}
-
 		hash := uint64(0)
-		if meta.EthType != layers.EthernetTypeIPv4 { // FIXME: 支持IPv6
+		if meta.EthType != layers.EthernetTypeIPv4 && meta.EthType != layers.EthernetTypeIPv6 {
 			hash = f.getEthOthersQuinTupleHash(meta)
 		} else {
 			hash = f.getQuinTupleHash(meta)

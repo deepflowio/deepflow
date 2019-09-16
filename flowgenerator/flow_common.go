@@ -3,6 +3,7 @@ package flowgenerator
 import (
 	"time"
 
+	"github.com/google/gopacket/layers"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
@@ -30,6 +31,10 @@ func (m *FlowMap) initFlow(flowExtra *FlowExtra, meta *MetaPacket, now time.Dura
 	taggedFlow.MACDst = meta.MacDst
 	taggedFlow.IPSrc = meta.IpSrc
 	taggedFlow.IPDst = meta.IpDst
+	if meta.EthType == layers.EthernetTypeIPv6 {
+		taggedFlow.IP6Src = meta.Ip6Src
+		taggedFlow.IP6Dst = meta.Ip6Dst
+	}
 	taggedFlow.Proto = meta.Protocol
 	taggedFlow.PortSrc = meta.PortSrc
 	taggedFlow.PortDst = meta.PortDst

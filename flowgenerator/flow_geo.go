@@ -1,6 +1,7 @@
 package flowgenerator
 
 import (
+	"github.com/google/gopacket/layers"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/geo"
 )
@@ -35,7 +36,8 @@ func getOppositeEndpoint(val EndPoint) EndPoint {
 func (f *FlowGeo) fillGeoInfo(taggedFlow *TaggedFlow) {
 	taggedFlow.GeoEnd = uint8(0xFF)
 	actionFlags := taggedFlow.PolicyData.ActionFlags
-	if actionFlags&ACTION_GEO_POSITIONING == 0 {
+	// 目前IPv6准确的位置信息无法获取，直接忽略
+	if actionFlags&ACTION_GEO_POSITIONING == 0 || taggedFlow.EthType == layers.EthernetTypeIPv6 {
 		return
 	}
 	ips := [2]uint32{taggedFlow.IPSrc, taggedFlow.IPDst}

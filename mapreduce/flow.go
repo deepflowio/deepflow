@@ -5,10 +5,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/gopacket/layers"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+
 	"gitlab.x.lan/yunshan/droplet/app/flow"
 	"gitlab.x.lan/yunshan/droplet/app/flowtype"
 	"gitlab.x.lan/yunshan/droplet/app/fps"
@@ -202,7 +204,7 @@ func (h *subFlowHandler) Process() error {
 			}
 
 			flow := e.(*datatype.TaggedFlow)
-			if !isValidFlow(flow) {
+			if !isValidFlow(flow) || flow.EthType == layers.EthernetTypeIPv6 { // FIXME: 支持IPv6
 				datatype.ReleaseTaggedFlow(flow)
 				h.handlerCounter[h.counterLatch].dropCounter++
 				continue
