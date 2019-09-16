@@ -11,7 +11,7 @@ func (m *FlowMap) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8, serv
 	var timeout time.Duration
 	var flowState FlowState
 	closed := false
-	if stateValue, ok := m.stateMachineMaster[flowExtra.flowState][flags]; ok {
+	if stateValue := m.stateMachineMaster[flowExtra.flowState][flags&TCP_FLAG_MASK]; stateValue != nil {
 		timeout = stateValue.timeout
 		flowState = stateValue.flowState
 		closed = stateValue.closed
@@ -21,7 +21,7 @@ func (m *FlowMap) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8, serv
 		closed = false
 	}
 	if serverToClient { // 若flags对应的包是 服务端->客户端 时，还需要走一下Slave状态机
-		if stateValue, ok := m.stateMachineSlave[flowExtra.flowState][flags]; ok {
+		if stateValue := m.stateMachineSlave[flowExtra.flowState][flags&TCP_FLAG_MASK]; stateValue != nil {
 			timeout = stateValue.timeout
 			flowState = stateValue.flowState
 			closed = stateValue.closed
@@ -58,10 +58,9 @@ func (m *FlowMap) initTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	updatePlatformData(taggedFlow, meta.EndpointData, false)
 	m.fillGeoInfo(taggedFlow)
 
-	m.updateTCPDirection(meta, flowExtra, true)
+	m.updateTCPDirection(meta, flags, flowExtra, true)
 	flowExtra.setMetaPacketActiveService(meta)
 
-	flags = flags & TCP_FLAG_MASK
 	if StatePreprocess(meta, flags) || meta.Invalid {
 		flowExtra.timeout = exceptionTimeout
 		flowExtra.flowState = FLOW_STATE_EXCEPTION
@@ -79,7 +78,7 @@ func (m *FlowMap) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) bool { /
 	taggedFlow.FlowMetricsPeers[meta.Direction].TCPFlags |= flags
 	m.updateFlow(flowExtra, meta)
 
-	m.updateTCPDirection(meta, flowExtra, false)
+	m.updateTCPDirection(meta, flags, flowExtra, false)
 	flowExtra.setMetaPacketActiveService(meta)
 
 	if StatePreprocess(meta, flags) || meta.Invalid {
@@ -90,11 +89,11 @@ func (m *FlowMap) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) bool { /
 	return m.updateFlowStateMachine(flowExtra, flags, meta.Direction == SERVER_TO_CLIENT)
 }
 
-func (m *FlowMap) updateTCPDirection(meta *MetaPacket, flowExtra *FlowExtra, isFirstPacket bool) {
+func (m *FlowMap) updateTCPDirection(meta *MetaPacket, flags uint8, flowExtra *FlowExtra, isFirstPacket bool) {
 	srcKey := ServiceKey(int16(meta.EndpointData.SrcInfo.L3EpcId), meta.IpSrc, meta.PortSrc)
 	dstKey := ServiceKey(int16(meta.EndpointData.DstInfo.L3EpcId), meta.IpDst, meta.PortDst)
 
-	srcScore, dstScore := m.tcpServiceTable.GetTCPScore(isFirstPacket, meta.TcpData.Flags, srcKey, dstKey)
+	srcScore, dstScore := m.tcpServiceTable.GetTCPScore(isFirstPacket, flags, srcKey, dstKey)
 	if meta.Direction == SERVER_TO_CLIENT {
 		srcScore, dstScore = dstScore, srcScore
 	}

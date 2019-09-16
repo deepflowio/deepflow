@@ -12,15 +12,6 @@ import (
 type Flow data.TaggedFlow
 
 const (
-	FIN       uint8 = 0x01
-	SYN       uint8 = 0x02
-	RST       uint8 = 0x04
-	ACK       uint8 = 0x10
-	RSTACK          = RST | ACK
-	SYNACKFIN       = SYN | ACK | FIN
-)
-
-const (
 	MAX_GROUP = 1 << 16
 )
 

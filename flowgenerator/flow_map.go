@@ -51,8 +51,9 @@ type FlowMap struct {
 	bufferStartIndex int32              // ringBuffer中的开始下标（二维矩阵下标），闭区间
 	bufferEndIndex   int32              // ringBuffer中的结束下标（二维矩阵下标），开区间
 
-	hashSlots      int // 上取整至2^N，哈希桶个数
-	timeWindowSize int // 上取整至2^N，环形时间桶的槽位个数
+	hashSlots      int32 // 上取整至2^N，哈希桶个数
+	hashSlotBits   int32 // hashSlots中低位连续0比特个数
+	timeWindowSize int32 // 上取整至2^N，环形时间桶的槽位个数
 
 	hashSlotHead []int32 // 哈希桶，hashSlotHead[i] 表示哈希值为 i 的冲突链的第一个节点为 buffer[[ hashSlotHead[i] ]]
 	timeSlotHead []int32 // 时间桶，含义与 hashSlotHead 类似
@@ -68,8 +69,8 @@ type FlowMap struct {
 	flowAppQueueFlush      time.Duration
 	flushInterval          time.Duration
 
-	stateMachineMaster []map[uint8]*StateValue
-	stateMachineSlave  []map[uint8]*StateValue
+	stateMachineMaster [FLOW_STATE_MAX][TCP_FLAG_MASK + 1]*StateValue
+	stateMachineSlave  [FLOW_STATE_MAX][TCP_FLAG_MASK + 1]*StateValue
 	tcpServiceTable    *ServiceTable
 	udpServiceTable    *ServiceTable
 
@@ -129,7 +130,7 @@ func (m *FlowMap) getNode(index int32) *flowMapNode {
 }
 
 func (m *FlowMap) pushNodeToHashList(node *flowMapNode, nodeIndex int32, hash uint64) {
-	hashSlot := int32(hash & uint64(m.hashSlots-1))
+	hashSlot := m.compressHash(hash)
 	node.hash = hash
 	node.hashListNext = m.hashSlotHead[hashSlot]
 	node.hashListPrev = -1
@@ -155,7 +156,7 @@ func (m *FlowMap) removeNodeFromHashList(node *flowMapNode, newNext, newPrev int
 		prevNode := m.getNode(node.hashListPrev)
 		prevNode.hashListNext = newNext
 	} else {
-		m.hashSlotHead[node.hash&uint64(m.hashSlots-1)] = newNext
+		m.hashSlotHead[m.compressHash(node.hash)] = newNext
 	}
 
 	if node.hashListNext != -1 {
@@ -445,7 +446,7 @@ func (m *FlowMap) InjectMetaPacket(hash uint64, meta *datatype.MetaPacket) {
 	// 查找对应Flow所在的节点
 	width := 0
 	next := int32(0)
-	hashHead := m.hashSlotHead[hash&uint64(m.hashSlots-1)]
+	hashHead := m.hashSlotHead[m.compressHash(hash)]
 	for hashListNext := hashHead; hashListNext != -1; hashListNext = next {
 		node := m.getNode(hashListNext)
 		next = node.hashListNext // node可能发生删除或移动，缓存next
@@ -454,6 +455,10 @@ func (m *FlowMap) InjectMetaPacket(hash uint64, meta *datatype.MetaPacket) {
 		if node.hash == hash && node.flowExtra.Match(meta) {
 			m.updateNode(node, hashListNext, meta)
 			next = -1 // 由于会发生节点删除，此时next不再有效
+
+			if m.width < width {
+				m.width = width
+			}
 			return
 		}
 	}
@@ -465,27 +470,32 @@ func (m *FlowMap) InjectMetaPacket(hash uint64, meta *datatype.MetaPacket) {
 	m.newNode(meta, hash)
 }
 
-func minPowerOfTwo(v int) int {
-	for i := uint32(0); i < 30; i++ {
+func minPowerOfTwo(v int) (int, int) {
+	for i := 0; i < 30; i++ {
 		if v <= 1<<i {
-			return 1 << i
+			return 1 << i, i
 		}
 	}
-	return 1
+	return 1, 0
+}
+
+func (m *FlowMap) compressHash(hash uint64) int32 {
+	return int32((((((hash>>m.hashSlotBits)^hash)>>m.hashSlotBits)^hash)>>m.hashSlotBits)^hash) & (m.hashSlots - 1)
 }
 
 func NewFlowMap(hashSlots, capacity, id int, timeWindow, packetDelay, flushInterval time.Duration, packetAppQueue, flowAppQueue queue.QueueWriter) *FlowMap {
-	hashSlots = minPowerOfTwo(hashSlots)
+	hashSlots, hashSlotBits := minPowerOfTwo(hashSlots)
 	if timeWindow < _FLOW_STAT_INTERVAL {
 		timeWindow = _FLOW_STAT_INTERVAL
 	}
-	timeWindowSize := minPowerOfTwo(int((timeWindow + packetDelay + _TIME_SLOT_UNIT) / _TIME_SLOT_UNIT))
+	timeWindowSize, _ := minPowerOfTwo(int((timeWindow + packetDelay + _TIME_SLOT_UNIT) / _TIME_SLOT_UNIT))
 
 	m := &FlowMap{
 		FlowGeo:                innerFlowGeo,
 		ringBuffer:             make([]flowMapNodeBlock, (capacity+_BLOCK_SIZE)/_BLOCK_SIZE*_BLOCK_SIZE+1),
-		hashSlots:              hashSlots,
-		timeWindowSize:         timeWindowSize,
+		hashSlots:              int32(hashSlots),
+		hashSlotBits:           int32(hashSlotBits),
+		timeWindowSize:         int32(timeWindowSize),
 		hashSlotHead:           make([]int32, hashSlots),
 		timeSlotHead:           make([]int32, timeWindowSize),
 		packetDelay:            packetDelay,
@@ -494,10 +504,8 @@ func NewFlowMap(hashSlots, capacity, id int, timeWindow, packetDelay, flushInter
 		packetAppQueue:         packetAppQueue,
 		flowAppQueue:           flowAppQueue,
 		flushInterval:          flushInterval,
-		stateMachineMaster:     make([]map[uint8]*StateValue, FLOW_STATE_MAX), // FIXME: 优化为[][]
-		stateMachineSlave:      make([]map[uint8]*StateValue, FLOW_STATE_MAX), // FIXME: 优化为[][]
-		tcpServiceTable:        NewServiceTable(capacity),
-		udpServiceTable:        NewServiceTable(capacity),
+		tcpServiceTable:        NewServiceTable(hashSlots, capacity),
+		udpServiceTable:        NewServiceTable(hashSlots, capacity),
 		id:                     id,
 		capacity:               capacity,
 		counter:                &FlowMapCounter{},
