@@ -464,9 +464,10 @@ func (p *MetaFlowPerf) whenFlowOpening(sameDirection, oppositeDirection *TcpSess
 
 	if sameDirection.getRttSynPrecondition() {
 		// 不考虑SYN, SYN/ACK, PSH/ACK的情况
-		if (isFirstPacketDirection && isFirstHandshakeAckpacket(sameDirection, oppositeDirection, header)) ||
-			(!isFirstPacketDirection && isSynAckPacket(header)) &&
-				oppositeDirection.isReplyPacket(header) {
+		// rttsyn0 = Time(SYN/ACK) - Time(SYN)
+		// rttSyn1 = Time(SYN/ACK/ACK) - Time(SYN/ACK)
+		if (isFirstHandshakeAckpacket(sameDirection, oppositeDirection, header) || isSynAckPacket(header)) &&
+			oppositeDirection.isReplyPacket(header) { // isReplyPacket检查当前包是否是反方向最近一个包的回包
 			if rttSyn := calcTimeInterval(header.Timestamp, oppositeDirection.timestamp); rttSyn > 0 {
 				p.perfData.calcRttSyn(rttSyn, isFirstPacketDirection)
 			}
@@ -839,6 +840,7 @@ func (i *FlowPerfDataInfo) calcReportFlowPerfStats(report *TcpPerfStats, flowRev
 			report.RTT = period.rtt0Sum / time.Duration(period.rtt0Count)
 		}
 
+		report.RTTSynClient, report.RTTSynServer = report.RTTSynServer, report.RTTSynClient
 		report.TcpPerfCountsPeerSrc, report.TcpPerfCountsPeerDst = TcpPerfCountsPeerSrc(report.TcpPerfCountsPeerDst), TcpPerfCountsPeerDst(report.TcpPerfCountsPeerSrc)
 	}
 }
