@@ -128,6 +128,8 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 		field.Direction = directions[thisEnd]
 		field.ACLDirection = outputtype.ACL_FORWARD // 含ACLDirection字段时仅考虑ACL正向匹配
 		field.IP1 = ips[otherEnd]
+		field.Protocol = flow.Proto
+		field.ServerPort = flow.PortDst
 
 		// node
 		if statTemplates&inputtype.TEMPLATE_NODE != 0 {
@@ -151,6 +153,9 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE != 0 {
 				codes = append(codes, POLICY_NODE_CODES...)
 			}
+			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_PORT != 0 && flow.IsActiveService { // 含有端口号的，仅统计活跃端口
+				codes = append(codes, POLICY_NODE_PORT_CODES...)
+			}
 			field.ACLGID = uint16(policy.GetACLGID())
 			for _, code := range codes {
 				if IsDupTraffic(flow.InPort, isL2L3End[thisEnd], isL2L3End[otherEnd], isNorthSouthTraffic, code) {
@@ -168,6 +173,9 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 			codes = p.codes[:0]
 			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE != 0 {
 				codes = append(codes, POLICY_EDGE_CODES...)
+			}
+			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE_PORT != 0 && flow.IsActiveService { // 含有端口号的，仅统计活跃端口
+				codes = append(codes, POLICY_EDGE_PORT_CODES...)
 			}
 			for _, code := range codes {
 				if IsDupTraffic(flow.InPort, isL2L3End[thisEnd], isL2L3End[otherEnd], isNorthSouthTraffic, code) {

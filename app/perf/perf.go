@@ -129,6 +129,7 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 		field.IP = ips[thisEnd]
 		field.TAPType = TAPTypeFromInPort(flow.InPort)
 		field.Direction = directions[thisEnd]
+		field.Protocol = flow.Proto
 		field.ServerPort = flow.PortDst
 		field.ACLDirection = outputtype.ACL_FORWARD // 含ACLDirection字段时仅考虑ACL正向匹配
 		field.IP1 = ips[otherEnd]
@@ -153,6 +154,9 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 			codes := p.codes[:0]
 			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE != 0 {
 				codes = append(codes, POLICY_NODE_CODES...)
+			}
+			if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_PORT != 0 && flow.IsActiveService { // 含有端口号的，仅统计活跃端口
+				codes = append(codes, POLICY_NODE_PORT_CODES...)
 			}
 			field.ACLGID = uint16(policy.GetACLGID())
 			for _, code := range codes {
