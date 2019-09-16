@@ -1,7 +1,7 @@
 package flowgenerator
 
 import (
-	"gitlab.x.lan/yunshan/droplet-libs/lru"
+	"gitlab.x.lan/yunshan/droplet-libs/hmap/lru"
 )
 
 // 对于TCP流量：
@@ -20,7 +20,7 @@ const (
 )
 
 type ServiceTable struct {
-	m *lru.Cache64 // FIXME: 优化为u32/u64 map
+	m *lru.U64LRU
 }
 
 func ServiceKey(epcID int16, ipHash uint32, port uint16) uint64 {
@@ -35,16 +35,16 @@ func IsActiveService(srcScore, dstScore uint8) bool {
 	return dstScore == MAX_SCORE
 }
 
-func NewServiceTable(capacity int) *ServiceTable {
-	return &ServiceTable{m: lru.NewCache64(capacity)}
+func NewServiceTable(hashSlots, capacity int) *ServiceTable {
+	return &ServiceTable{m: lru.NewU64LRU(hashSlots, capacity)}
 }
 
 func (t *ServiceTable) getFirstPacketScore(srcKey, dstKey uint64) (uint8, uint8) {
 	srcScore, dstScore := MIN_SCORE, MIN_SCORE
-	if r, in := t.m.Peek(srcKey); in {
+	if r, in := t.m.Get(srcKey, true); in {
 		srcScore = r.(uint8)
 	}
-	if r, in := t.m.Peek(dstKey); in {
+	if r, in := t.m.Get(dstKey, true); in {
 		dstScore = r.(uint8)
 	}
 
@@ -72,15 +72,15 @@ func (t *ServiceTable) getFirstPacketScore(srcKey, dstKey uint64) (uint8, uint8)
 func (t *ServiceTable) GetTCPScore(isFirstPacket bool, tcpFlags uint8, srcKey, dstKey uint64) (uint8, uint8) {
 	srcScore, dstScore := MIN_SCORE, MIN_SCORE
 
-	if tcpFlags == TCP_SYN|TCP_ACK { // 一旦发送SYN|ACK，即被认为是服务端，其对侧被认为不可能是服务端
+	if tcpFlags&TCP_FLAG_MASK == TCP_SYN|TCP_ACK { // 一旦发送SYN|ACK，即被认为是服务端，其对侧被认为不可能是服务端
 		srcScore = MAX_SCORE
 		t.m.Add(srcKey, srcScore)
 		dstScore = MIN_SCORE
 		t.m.Remove(dstKey)
-	} else if tcpFlags == TCP_SYN { // 一旦发送SYN，即被认为是客户端
+	} else if tcpFlags&TCP_FLAG_MASK == TCP_SYN { // 一旦发送SYN，即被认为是客户端
 		srcScore = MIN_SCORE
 		t.m.Remove(srcKey)
-		if r, in := t.m.Peek(dstKey); in {
+		if r, in := t.m.Get(dstKey, true); in {
 			dstScore = r.(uint8)
 		}
 		if isFirstPacket && dstScore < MAX_SCORE-1 {
@@ -90,10 +90,10 @@ func (t *ServiceTable) GetTCPScore(isFirstPacket bool, tcpFlags uint8, srcKey, d
 	} else if isFirstPacket {
 		return t.getFirstPacketScore(srcKey, dstKey)
 	} else {
-		if r, in := t.m.Peek(srcKey); in {
+		if r, in := t.m.Get(srcKey, true); in {
 			srcScore = r.(uint8)
 		}
-		if r, in := t.m.Peek(dstKey); in {
+		if r, in := t.m.Get(dstKey, true); in {
 			dstScore = r.(uint8)
 		}
 	}
@@ -107,10 +107,10 @@ func (t *ServiceTable) GetUDPScore(isFirstPacket bool, srcKey, dstKey uint64) (u
 	if isFirstPacket {
 		return t.getFirstPacketScore(srcKey, dstKey)
 	} else {
-		if r, in := t.m.Peek(srcKey); in {
+		if r, in := t.m.Get(srcKey, true); in {
 			srcScore = r.(uint8)
 		}
-		if r, in := t.m.Peek(dstKey); in {
+		if r, in := t.m.Get(dstKey, true); in {
 			dstScore = r.(uint8)
 		}
 	}
