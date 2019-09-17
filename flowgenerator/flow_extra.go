@@ -174,7 +174,9 @@ func (f *FlowExtra) reverseFlow() {
 	taggedFlow.IPSrc, taggedFlow.IPDst = taggedFlow.IPDst, taggedFlow.IPSrc
 	taggedFlow.IP6Src, taggedFlow.IP6Dst = taggedFlow.IP6Dst, taggedFlow.IP6Src
 	taggedFlow.PortSrc, taggedFlow.PortDst = taggedFlow.PortDst, taggedFlow.PortSrc
-	taggedFlow.FlowMetricsPeerSrc, taggedFlow.FlowMetricsPeerDst = FlowMetricsPeerSrc(taggedFlow.FlowMetricsPeerDst), FlowMetricsPeerDst(taggedFlow.FlowMetricsPeerSrc)
+	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
+	*flowMetricsPeerSrc, *flowMetricsPeerDst = *flowMetricsPeerDst, *flowMetricsPeerSrc
 	taggedFlow.GeoEnd ^= 1 // reverse GeoEnd (0: src, 1: dst, others: N/A)
 	reverseFlowTag(taggedFlow)
 }
@@ -190,10 +192,12 @@ func (f *FlowExtra) resetPacketStatInfo() {
 	f.packetInTick = false
 	taggedFlow := f.taggedFlow
 	taggedFlow.PacketStatTime = 0
-	taggedFlow.FlowMetricsPeerSrc.TickPacketCount = 0
-	taggedFlow.FlowMetricsPeerDst.TickPacketCount = 0
-	taggedFlow.FlowMetricsPeerSrc.TickByteCount = 0
-	taggedFlow.FlowMetricsPeerDst.TickByteCount = 0
+	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
+	flowMetricsPeerSrc.TickPacketCount = 0
+	flowMetricsPeerDst.TickPacketCount = 0
+	flowMetricsPeerSrc.TickByteCount = 0
+	flowMetricsPeerDst.TickByteCount = 0
 }
 
 func (f *FlowExtra) resetFlowStatInfo(now time.Duration) {
@@ -202,8 +206,10 @@ func (f *FlowExtra) resetFlowStatInfo(now time.Duration) {
 	taggedFlow.TimeBitmap = 0
 	taggedFlow.StartTime = now
 	taggedFlow.EndTime = now
-	taggedFlow.FlowMetricsPeerSrc.PacketCount = 0
-	taggedFlow.FlowMetricsPeerDst.PacketCount = 0
-	taggedFlow.FlowMetricsPeerSrc.ByteCount = 0
-	taggedFlow.FlowMetricsPeerDst.ByteCount = 0
+	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
+	flowMetricsPeerSrc.PacketCount = 0
+	flowMetricsPeerDst.PacketCount = 0
+	flowMetricsPeerSrc.ByteCount = 0
+	flowMetricsPeerDst.ByteCount = 0
 }

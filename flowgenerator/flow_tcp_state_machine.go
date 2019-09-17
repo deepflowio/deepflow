@@ -31,7 +31,7 @@ func calcCloseType(taggedFlow *TaggedFlow, flowState FlowState) {
 	case FLOW_STATE_CLOSED:
 		taggedFlow.CloseType = CloseTypeTCPFin
 	case FLOW_STATE_RESET:
-		if flagContain(taggedFlow.FlowMetricsPeerDst.TCPFlags, TCP_RST) {
+		if flagContain(taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].TCPFlags, TCP_RST) {
 			taggedFlow.CloseType = CloseTypeTCPServerRst
 		} else {
 			taggedFlow.CloseType = CloseTypeTCPClientRst

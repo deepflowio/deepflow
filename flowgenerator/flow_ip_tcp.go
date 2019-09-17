@@ -28,7 +28,8 @@ func (m *FlowMap) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8, serv
 		}
 	}
 	flowExtra.flowState = flowState
-	if taggedFlow.FlowMetricsPeerSrc.TotalPacketCount == 0 || taggedFlow.FlowMetricsPeerDst.TotalPacketCount == 0 {
+	if taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].TotalPacketCount == 0 ||
+		taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].TotalPacketCount == 0 {
 		flowExtra.timeout = singleDirectionTimeout
 	} else {
 		flowExtra.timeout = timeout
@@ -44,15 +45,16 @@ func (m *FlowMap) initTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	if meta.TcpData != nil {
 		flags = meta.TcpData.Flags
 	}
-	taggedFlow.FlowMetricsPeerSrc.TCPFlags |= flags
-	taggedFlow.FlowMetricsPeerSrc.ArrTime0 = now
-	taggedFlow.FlowMetricsPeerSrc.ArrTimeLast = now
-	taggedFlow.FlowMetricsPeerSrc.TotalPacketCount = 1
-	taggedFlow.FlowMetricsPeerSrc.PacketCount = 1
-	taggedFlow.FlowMetricsPeerSrc.TickPacketCount = 1
-	taggedFlow.FlowMetricsPeerSrc.TotalByteCount = uint64(meta.PacketLen)
-	taggedFlow.FlowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
-	taggedFlow.FlowMetricsPeerSrc.TickByteCount = uint64(meta.PacketLen)
+	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerSrc.TCPFlags |= flags
+	flowMetricsPeerSrc.ArrTime0 = now
+	flowMetricsPeerSrc.ArrTimeLast = now
+	flowMetricsPeerSrc.TotalPacketCount = 1
+	flowMetricsPeerSrc.PacketCount = 1
+	flowMetricsPeerSrc.TickPacketCount = 1
+	flowMetricsPeerSrc.TotalByteCount = uint64(meta.PacketLen)
+	flowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
+	flowMetricsPeerSrc.TickByteCount = uint64(meta.PacketLen)
 	updatePlatformData(taggedFlow, meta.EndpointData, false)
 	m.fillGeoInfo(taggedFlow)
 
@@ -74,11 +76,7 @@ func (m *FlowMap) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) bool { /
 	if meta.TcpData != nil {
 		flags = meta.TcpData.Flags
 	}
-	if meta.Direction == SERVER_TO_CLIENT {
-		taggedFlow.FlowMetricsPeerDst.TCPFlags |= flags
-	} else {
-		taggedFlow.FlowMetricsPeerSrc.TCPFlags |= flags
-	}
+	taggedFlow.FlowMetricsPeers[meta.Direction].TCPFlags |= flags
 	m.updateFlow(flowExtra, meta)
 
 	m.updateTCPDirection(meta, flowExtra, false)

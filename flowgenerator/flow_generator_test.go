@@ -179,9 +179,11 @@ func TestHandleSynRst(t *testing.T) {
 	if taggedFlow.Duration <= DEFAULT_DURATION_MSEC {
 		t.Errorf("taggedFlow.Duration is %d, expect more than %d", taggedFlow.Duration, DEFAULT_DURATION_MSEC)
 	}
-	if taggedFlow.FlowMetricsPeerSrc.TCPFlags != TCP_SYN || taggedFlow.FlowMetricsPeerDst.TCPFlags != TCP_RST {
-		t.Errorf("taggedFlow.TcpFlagsSrc is %d, expect %d", taggedFlow.FlowMetricsPeerSrc.TCPFlags, TCP_SYN)
-		t.Errorf("taggedFlow.TcpFlagsDst is %d, expect %d", taggedFlow.FlowMetricsPeerDst.TCPFlags, TCP_RST)
+	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
+	if flowMetricsPeerSrc.TCPFlags != TCP_SYN || flowMetricsPeerDst.TCPFlags != TCP_RST {
+		t.Errorf("taggedFlow.TcpFlagsSrc is %d, expect %d", flowMetricsPeerSrc.TCPFlags, TCP_SYN)
+		t.Errorf("taggedFlow.TcpFlagsDst is %d, expect %d", flowMetricsPeerDst.TCPFlags, TCP_RST)
 	}
 }
 
@@ -209,10 +211,12 @@ func TestHandleSynFin(t *testing.T) {
 	if taggedFlow.CloseType != CloseTypeClientHalfClose {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeClientHalfClose)
 	}
-	if taggedFlow.FlowMetricsPeerSrc.TCPFlags != TCP_SYN|TCP_PSH|TCP_ACK ||
-		taggedFlow.FlowMetricsPeerDst.TCPFlags != TCP_ACK|TCP_FIN {
-		t.Errorf("taggedFlow.TCPFlags0 is %x, expect %x", taggedFlow.FlowMetricsPeerSrc.TCPFlags, TCP_SYN|TCP_ACK|TCP_PSH)
-		t.Errorf("taggedFlow.TCPFlags1 is %x, expect %x", taggedFlow.FlowMetricsPeerDst.TCPFlags, TCP_ACK|TCP_FIN)
+	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
+	if flowMetricsPeerSrc.TCPFlags != TCP_SYN|TCP_PSH|TCP_ACK ||
+		flowMetricsPeerDst.TCPFlags != TCP_ACK|TCP_FIN {
+		t.Errorf("taggedFlow.TCPFlags0 is %x, expect %x", flowMetricsPeerSrc.TCPFlags, TCP_SYN|TCP_ACK|TCP_PSH)
+		t.Errorf("taggedFlow.TCPFlags1 is %x, expect %x", flowMetricsPeerDst.TCPFlags, TCP_ACK|TCP_FIN)
 	}
 }
 
@@ -233,12 +237,13 @@ func TestPlatformData(t *testing.T) {
 	if taggedFlow.CloseType != CloseTypeServerHalfOpen {
 		t.Errorf("taggedFlow.CloseType is %d, expect %d", taggedFlow.CloseType, CloseTypeServerHalfOpen)
 	}
-	if taggedFlow.FlowMetricsPeerSrc.EpcID != expectEpcID0 || taggedFlow.FlowMetricsPeerSrc.L3EpcID != expectL3EpcId {
-		t.Errorf("taggedFlow.EpcID0 is %d, expect %d", taggedFlow.FlowMetricsPeerSrc.EpcID, expectEpcID0)
-		t.Errorf("taggedFlow.L3EpcID0 is %d, expect %d", taggedFlow.FlowMetricsPeerSrc.L3EpcID, expectL3EpcId)
+	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	if flowMetricsPeerSrc.EpcID != expectEpcID0 || flowMetricsPeerSrc.L3EpcID != expectL3EpcId {
+		t.Errorf("taggedFlow.EpcID0 is %d, expect %d", flowMetricsPeerSrc.EpcID, expectEpcID0)
+		t.Errorf("taggedFlow.L3EpcID0 is %d, expect %d", flowMetricsPeerSrc.L3EpcID, expectL3EpcId)
 	}
-	if taggedFlow.FlowMetricsPeerSrc.Host != 0x01010101 {
-		t.Errorf("taggedFlow.FlowMetricsPeerSrc.Host is %d, expect %d", taggedFlow.FlowMetricsPeerSrc.Host, 0x01010101)
+	if flowMetricsPeerSrc.Host != 0x01010101 {
+		t.Errorf("taggedFlow.FlowMetricsPeerSrc.Host is %d, expect %d", flowMetricsPeerSrc.Host, 0x01010101)
 	}
 }
 
@@ -246,6 +251,7 @@ func TestFlowStateMachine(t *testing.T) {
 	flowGenerator, _, _, _ := flowGeneratorInit(0, true)
 	flowExtra := &FlowExtra{}
 	taggedFlow := &TaggedFlow{}
+	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
 	flowExtra.taggedFlow = taggedFlow
 	var packetFlags uint8
 
@@ -253,7 +259,7 @@ func TestFlowStateMachine(t *testing.T) {
 	flowExtra.flowState = FLOW_STATE_OPENING_1
 
 	// test handshake
-	taggedFlow.FlowMetricsPeerSrc.TCPFlags = TCP_SYN
+	flowMetricsPeerSrc.TCPFlags = TCP_SYN
 	packetFlags = TCP_SYN | TCP_ACK
 	flowGenerator.flowMap.updateFlowStateMachine(flowExtra, packetFlags, true)
 	if flowExtra.flowState != FLOW_STATE_OPENING_2 {
@@ -266,7 +272,7 @@ func TestFlowStateMachine(t *testing.T) {
 	}
 
 	// test fin
-	taggedFlow.FlowMetricsPeerSrc.TCPFlags = TCP_FIN
+	flowMetricsPeerSrc.TCPFlags = TCP_FIN
 	flowExtra.flowState = FLOW_STATE_CLOSING_TX1
 	packetFlags = TCP_ACK
 	flowGenerator.flowMap.updateFlowStateMachine(flowExtra, packetFlags, true)
@@ -452,7 +458,7 @@ func TestInPortEqualTor(t *testing.T) {
 	inputPacketQueue.Put(packet1)
 	flowGenerator.Start()
 	taggedFlow := getFromQueue(flowOutQueue).(*TaggedFlow)
-	if cnt := taggedFlow.FlowMetricsPeerDst.PacketCount; cnt != 1 {
+	if cnt := taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].PacketCount; cnt != 1 {
 		t.Errorf("taggedFlow.FlowMetricsPeerDst.PacketCount is %d, expect 1", cnt)
 	}
 }
@@ -477,7 +483,7 @@ func TestIgnoreL2End(t *testing.T) {
 	inputPacketQueue.Put(packet1)
 	flowGenerator.Start()
 	taggedFlow := getFromQueue(flowOutQueue).(*TaggedFlow)
-	if cnt := taggedFlow.FlowMetricsPeerDst.PacketCount; cnt != 1 {
+	if cnt := taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].PacketCount; cnt != 1 {
 		t.Errorf("taggedFlow.FlowMetricsPeerDst.PacketCount is %d, expect 1", cnt)
 	}
 }
@@ -563,30 +569,36 @@ func TestStatOutput(t *testing.T) {
 
 	// 包统计数据
 	taggedFlow := getFromQueue(meteringAppQueue).(*TaggedFlow)
+	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
 	if taggedFlow.PacketStatTime != timestamp0 ||
-		taggedFlow.FlowMetricsPeerSrc.TickPacketCount != 2 ||
-		taggedFlow.FlowMetricsPeerDst.TickPacketCount != 0 {
+		flowMetricsPeerSrc.TickPacketCount != 2 ||
+		flowMetricsPeerDst.TickPacketCount != 0 {
 		t.Errorf("首个包统计 taggedFlow.PacketStatTime is %dms, expect %dms", taggedFlow.PacketStatTime/_TIME_SLOT_UNIT, timestamp0/_TIME_SLOT_UNIT)
-		t.Errorf("首个包统计 taggedFlow.FlowMetricsPeerSrc.TickPacketCount is %d, expect %d", taggedFlow.FlowMetricsPeerSrc.TickPacketCount, 2)
-		t.Errorf("首个包统计 taggedFlow.FlowMetricsPeerDst.TickPacketCount is %d, expect %d", taggedFlow.FlowMetricsPeerDst.TickPacketCount, 0)
+		t.Errorf("首个包统计 taggedFlow.FlowMetricsPeerSrc.TickPacketCount is %d, expect %d", flowMetricsPeerSrc.TickPacketCount, 2)
+		t.Errorf("首个包统计 taggedFlow.FlowMetricsPeerDst.TickPacketCount is %d, expect %d", flowMetricsPeerDst.TickPacketCount, 0)
 		t.Errorf("%s\n", taggedFlow)
 	}
 	taggedFlow = getFromQueue(meteringAppQueue).(*TaggedFlow)
+	flowMetricsPeerSrc = &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst = &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
 	if taggedFlow.PacketStatTime != timestamp2 ||
-		taggedFlow.FlowMetricsPeerSrc.TickPacketCount != 1 ||
-		taggedFlow.FlowMetricsPeerDst.TickPacketCount != 1 {
+		flowMetricsPeerSrc.TickPacketCount != 1 ||
+		flowMetricsPeerDst.TickPacketCount != 1 {
 		t.Errorf("第二个包统计 taggedFlow.PacketStatTime is %dms, expect %dms", taggedFlow.PacketStatTime/_TIME_SLOT_UNIT, timestamp2/_TIME_SLOT_UNIT)
-		t.Errorf("第二个包统计 taggedFlow.FlowMetricsPeerSrc.TickPacketCount is %d, expect %d", taggedFlow.FlowMetricsPeerSrc.TickPacketCount, 1)
-		t.Errorf("第二个包统计 taggedFlow.FlowMetricsPeerDst.TickPacketCount is %d, expect %d", taggedFlow.FlowMetricsPeerDst.TickPacketCount, 1)
+		t.Errorf("第二个包统计 taggedFlow.FlowMetricsPeerSrc.TickPacketCount is %d, expect %d", flowMetricsPeerSrc.TickPacketCount, 1)
+		t.Errorf("第二个包统计 taggedFlow.FlowMetricsPeerDst.TickPacketCount is %d, expect %d", flowMetricsPeerDst.TickPacketCount, 1)
 		t.Errorf("%s\n", taggedFlow)
 	}
 	taggedFlow = getFromQueue(meteringAppQueue).(*TaggedFlow)
+	flowMetricsPeerSrc = &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst = &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
 	if taggedFlow.PacketStatTime != timestamp4 ||
-		taggedFlow.FlowMetricsPeerSrc.TickPacketCount != 0 ||
-		taggedFlow.FlowMetricsPeerDst.TickPacketCount != 1 {
+		flowMetricsPeerSrc.TickPacketCount != 0 ||
+		flowMetricsPeerDst.TickPacketCount != 1 {
 		t.Errorf("第三个包统计 taggedFlow.PacketStatTime is %dms, expect %dms", taggedFlow.PacketStatTime/_TIME_SLOT_UNIT, timestamp4/_TIME_SLOT_UNIT)
-		t.Errorf("第三个包统计 taggedFlow.FlowMetricsPeerSrc.TickPacketCount is %d, expect %d", taggedFlow.FlowMetricsPeerSrc.TickPacketCount, 0)
-		t.Errorf("第三个包统计 taggedFlow.FlowMetricsPeerDst.TickPacketCount is %d, expect %d", taggedFlow.FlowMetricsPeerDst.TickPacketCount, 1)
+		t.Errorf("第三个包统计 taggedFlow.FlowMetricsPeerSrc.TickPacketCount is %d, expect %d", flowMetricsPeerSrc.TickPacketCount, 0)
+		t.Errorf("第三个包统计 taggedFlow.FlowMetricsPeerDst.TickPacketCount is %d, expect %d", flowMetricsPeerDst.TickPacketCount, 1)
 		t.Errorf("%s\n", taggedFlow)
 	}
 	if meteringAppQueue.Len() != 0 {
@@ -596,23 +608,29 @@ func TestStatOutput(t *testing.T) {
 	// 流统计数据
 	firstForceReportTime := (timestamp0 + _FLOW_STAT_INTERVAL - 1) / _FLOW_STAT_INTERVAL * _FLOW_STAT_INTERVAL
 	taggedFlow = getFromQueue(flowOutQueue).(*TaggedFlow)
+	flowMetricsPeerSrc = &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst = &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
 	if taggedFlow.StartTime != timestamp0 || taggedFlow.EndTime != firstForceReportTime || taggedFlow.CloseType != CloseTypeForcedReport ||
-		taggedFlow.FlowMetricsPeerSrc.PacketCount != 3 || taggedFlow.FlowMetricsPeerDst.PacketCount != 1 {
+		flowMetricsPeerSrc.PacketCount != 3 || flowMetricsPeerDst.PacketCount != 1 {
 		t.Errorf("首个流统计 Expect: StartTime %d, EndTime %d, CloseType %d, PacketCount0 %d, PacketCount1 %d",
 			timestamp0, firstForceReportTime, CloseTypeForcedReport, 3, 1)
 		t.Errorf("timestamp 0/2/4: %d %d %d\n", timestamp0, timestamp2, timestamp4)
 		t.Errorf("%s\n", taggedFlow)
 	}
 	taggedFlow = getFromQueue(flowOutQueue).(*TaggedFlow)
+	flowMetricsPeerSrc = &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst = &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
 	if taggedFlow.StartTime != firstForceReportTime ||
 		taggedFlow.EndTime != firstForceReportTime+_FLOW_STAT_INTERVAL || taggedFlow.CloseType != CloseTypeForcedReport ||
-		taggedFlow.FlowMetricsPeerSrc.PacketCount != 0 || taggedFlow.FlowMetricsPeerDst.PacketCount != 1 {
+		flowMetricsPeerSrc.PacketCount != 0 || flowMetricsPeerDst.PacketCount != 1 {
 		t.Errorf("第二个个流统计 Expect: StartTime %d, EndTime %d, CloseType %d, PacketCount0 %d, PacketCount1 %d",
 			firstForceReportTime, firstForceReportTime+_FLOW_STAT_INTERVAL, CloseTypeForcedReport, 0, 1)
 		t.Errorf("timestamp 0/2/4: %d %d %d\n", timestamp0, timestamp2, timestamp4)
 		t.Errorf("%s\n", taggedFlow)
 	}
 	taggedFlow = getFromQueue(flowOutQueue).(*TaggedFlow)
+	flowMetricsPeerSrc = &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst = &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
 	if taggedFlow.StartTime != firstForceReportTime+_FLOW_STAT_INTERVAL ||
 		taggedFlow.EndTime != timestamp4+testTimeoutConfig.EstablishedRst ||
 		taggedFlow.CloseType != CloseTypeTCPServerRst {

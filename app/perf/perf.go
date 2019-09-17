@@ -64,6 +64,8 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 		return p.docs.Slice()
 	}
 	flow := Flow(*rawFlow)
+	flowMetricsPeerSrc := &flow.FlowMetricsPeers[inputtype.FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst := &flow.FlowMetricsPeers[inputtype.FLOW_METRICS_PEER_DST]
 
 	statTemplates := GetTagTemplateByActionFlags(rawFlow.PolicyData, interestActionFlags)
 	p.policyGroup = FillPolicyTagTemplate(rawFlow.PolicyData, interestActionFlags, p.policyGroup)
@@ -73,14 +75,14 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 		oneSideCodes = append(oneSideCodes, NODE_CODES...)
 	}
 
-	l3EpcIDs := [2]int32{flow.FlowMetricsPeerSrc.L3EpcID, flow.FlowMetricsPeerDst.L3EpcID}
+	l3EpcIDs := [2]int32{flowMetricsPeerSrc.L3EpcID, flowMetricsPeerDst.L3EpcID}
 	isNorthSouthTraffic := IsNorthSourceTraffic(l3EpcIDs[0], l3EpcIDs[1])
 	ips := [2]uint32{flow.IPSrc, flow.IPDst}
 	isL2L3End := [2]bool{
-		flow.FlowMetricsPeerSrc.IsL2End && flow.FlowMetricsPeerSrc.IsL3End,
-		flow.FlowMetricsPeerDst.IsL2End && flow.FlowMetricsPeerDst.IsL3End,
+		flowMetricsPeerSrc.IsL2End && flowMetricsPeerSrc.IsL3End,
+		flowMetricsPeerDst.IsL2End && flowMetricsPeerDst.IsL3End,
 	}
-	packets := [2]uint64{flow.FlowMetricsPeerSrc.PacketCount, flow.FlowMetricsPeerDst.PacketCount}
+	packets := [2]uint64{flowMetricsPeerSrc.PacketCount, flowMetricsPeerDst.PacketCount}
 	retransCnt := [2]uint32{flow.RetransCountSrc(), flow.RetransCountDst()}
 	zeroWinCnt := [2]uint32{flow.ZeroWinCountSrc(), flow.ZeroWinCountDst()}
 

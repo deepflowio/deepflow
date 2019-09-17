@@ -61,6 +61,8 @@ func (p *FlowToLogUsageDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, va
 		return p.docs.Slice()
 	}
 	flow := Flow(*rawFlow)
+	flowMetricsPeerSrc := &flow.FlowMetricsPeers[inputtype.FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst := &flow.FlowMetricsPeers[inputtype.FLOW_METRICS_PEER_DST]
 
 	actionFlags := rawFlow.PolicyData.ActionFlags
 	interestActions := inputtype.ACTION_FLOW_COUNTING // 目前没有告警
@@ -72,16 +74,16 @@ func (p *FlowToLogUsageDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, va
 		return p.docs.Slice()
 	}
 
-	l3EpcIDs := [2]int32{flow.FlowMetricsPeerSrc.L3EpcID, flow.FlowMetricsPeerDst.L3EpcID}
+	l3EpcIDs := [2]int32{flowMetricsPeerSrc.L3EpcID, flowMetricsPeerDst.L3EpcID}
 	isNorthSouthTraffic := IsNorthSourceTraffic(l3EpcIDs[0], l3EpcIDs[1])
 	ips := [2]uint32{flow.IPSrc, flow.IPDst}
 	isL2L3End := [2]bool{
-		flow.FlowMetricsPeerSrc.IsL2End && flow.FlowMetricsPeerSrc.IsL3End,
-		flow.FlowMetricsPeerDst.IsL2End && flow.FlowMetricsPeerDst.IsL3End,
+		flowMetricsPeerSrc.IsL2End && flowMetricsPeerSrc.IsL3End,
+		flowMetricsPeerDst.IsL2End && flowMetricsPeerDst.IsL3End,
 	}
 	docTimestamp := RoundToMinute(flow.StartTime)
-	packets := [2]uint64{flow.FlowMetricsPeerSrc.PacketCount, flow.FlowMetricsPeerDst.PacketCount}
-	bits := [2]uint64{flow.FlowMetricsPeerSrc.ByteCount << 3, flow.FlowMetricsPeerDst.ByteCount << 3}
+	packets := [2]uint64{flowMetricsPeerSrc.PacketCount, flowMetricsPeerDst.PacketCount}
+	bits := [2]uint64{flowMetricsPeerSrc.ByteCount << 3, flowMetricsPeerDst.ByteCount << 3}
 
 	for i := range ips {
 		if IsOuterPublicIp(l3EpcIDs[i]) { // FIXME: 可能要去掉

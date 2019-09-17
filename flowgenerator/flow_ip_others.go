@@ -8,14 +8,15 @@ func (m *FlowMap) initIpOthersFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	now := meta.Timestamp
 	m.initFlow(flowExtra, meta, now)
 	taggedFlow := flowExtra.taggedFlow
-	taggedFlow.FlowMetricsPeerSrc.ArrTime0 = now
-	taggedFlow.FlowMetricsPeerSrc.ArrTimeLast = now
-	taggedFlow.FlowMetricsPeerSrc.TotalPacketCount = 1
-	taggedFlow.FlowMetricsPeerSrc.PacketCount = 1
-	taggedFlow.FlowMetricsPeerSrc.TickPacketCount = 1
-	taggedFlow.FlowMetricsPeerSrc.TotalByteCount = uint64(meta.PacketLen)
-	taggedFlow.FlowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
-	taggedFlow.FlowMetricsPeerSrc.TickByteCount = uint64(meta.PacketLen)
+	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerSrc.ArrTime0 = now
+	flowMetricsPeerSrc.ArrTimeLast = now
+	flowMetricsPeerSrc.TotalPacketCount = 1
+	flowMetricsPeerSrc.PacketCount = 1
+	flowMetricsPeerSrc.TickPacketCount = 1
+	flowMetricsPeerSrc.TotalByteCount = uint64(meta.PacketLen)
+	flowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
+	flowMetricsPeerSrc.TickByteCount = uint64(meta.PacketLen)
 	updatePlatformData(taggedFlow, meta.EndpointData, false)
 	m.fillGeoInfo(taggedFlow)
 	flowExtra.flowState = FLOW_STATE_ESTABLISHED
@@ -24,7 +25,8 @@ func (m *FlowMap) initIpOthersFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 
 func (m *FlowMap) updateIpOthersFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	m.updateFlow(flowExtra, meta)
-	if flowExtra.taggedFlow.FlowMetricsPeerSrc.PacketCount > 0 && flowExtra.taggedFlow.FlowMetricsPeerDst.PacketCount > 0 {
+	if flowExtra.taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].PacketCount > 0 &&
+		flowExtra.taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].PacketCount > 0 {
 		flowExtra.timeout = establishedRstTimeout
 	}
 }

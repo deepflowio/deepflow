@@ -171,8 +171,11 @@ func (h *subMeteringHandler) Process() error {
 			}
 
 			// 统计处理的包数量和字节数量
-			h.handlerCounter[h.counterLatch].inputCounter += uint64(flow.FlowMetricsPeerSrc.TickPacketCount) + uint64(flow.FlowMetricsPeerDst.TickPacketCount)
-			h.handlerCounter[h.counterLatch].byteCounter += uint64(flow.FlowMetricsPeerSrc.TickByteCount) + uint64(flow.FlowMetricsPeerDst.TickByteCount)
+			flowMetricsPeerSrc := &flow.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC]
+			flowMetricsPeerDst := &flow.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST]
+
+			h.handlerCounter[h.counterLatch].inputCounter += uint64(flowMetricsPeerSrc.TickPacketCount) + uint64(flowMetricsPeerDst.TickPacketCount)
+			h.handlerCounter[h.counterLatch].byteCounter += uint64(flowMetricsPeerSrc.TickByteCount) + uint64(flowMetricsPeerDst.TickByteCount)
 
 			for i, processor := range h.processors {
 				docs := processor.Process(flow, false)
