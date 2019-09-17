@@ -49,8 +49,8 @@ func (f *Flow) ClosedFlowDuration() time.Duration {
 }
 
 func (f *Flow) NewFlowCount() uint64 {
-	if RoundToSecond(f.StartTime) == RoundToSecond(f.FlowMetricsPeerSrc.ArrTime0) ||
-		RoundToSecond(f.StartTime) == RoundToSecond(f.FlowMetricsPeerDst.ArrTime0) {
+	if RoundToSecond(f.StartTime) == RoundToSecond(f.FlowMetricsPeers[data.FLOW_METRICS_PEER_SRC].ArrTime0) ||
+		RoundToSecond(f.StartTime) == RoundToSecond(f.FlowMetricsPeers[data.FLOW_METRICS_PEER_DST].ArrTime0) {
 		return 1
 	}
 	return 0

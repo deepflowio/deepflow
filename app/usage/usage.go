@@ -74,17 +74,20 @@ func (p *MeteringToUsageDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, v
 	p.policyGroup = FillPolicyTagTemplate(rawFlow.PolicyData, interestActions, p.policyGroup)
 
 	flow := Flow(*rawFlow)
-	l3EpcIDs := [2]int32{flow.FlowMetricsPeerSrc.L3EpcID, flow.FlowMetricsPeerDst.L3EpcID}
+	flowMetricsPeerSrc := &flow.FlowMetricsPeers[inputtype.FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst := &flow.FlowMetricsPeers[inputtype.FLOW_METRICS_PEER_DST]
+
+	l3EpcIDs := [2]int32{flowMetricsPeerSrc.L3EpcID, flowMetricsPeerDst.L3EpcID}
 	isNorthSouthTraffic := IsNorthSourceTraffic(l3EpcIDs[0], l3EpcIDs[1])
 	ips := [2]uint32{flow.IPSrc, flow.IPDst}
 	isL2L3End := [2]bool{
-		flow.FlowMetricsPeerSrc.IsL2End && flow.FlowMetricsPeerSrc.IsL3End,
-		flow.FlowMetricsPeerDst.IsL2End && flow.FlowMetricsPeerDst.IsL3End,
+		flowMetricsPeerSrc.IsL2End && flowMetricsPeerSrc.IsL3End,
+		flowMetricsPeerDst.IsL2End && flowMetricsPeerDst.IsL3End,
 	}
 	directions := [2]outputtype.DirectionEnum{outputtype.ClientToServer, outputtype.ServerToClient}
 	docTimestamp := RoundToSecond(flow.PacketStatTime)
-	packets := [2]uint64{flow.FlowMetricsPeerSrc.TickPacketCount, flow.FlowMetricsPeerDst.TickPacketCount}
-	bits := [2]uint64{flow.FlowMetricsPeerSrc.TickByteCount << 3, flow.FlowMetricsPeerDst.TickByteCount << 3}
+	packets := [2]uint64{flowMetricsPeerSrc.TickPacketCount, flowMetricsPeerDst.TickPacketCount}
+	bits := [2]uint64{flowMetricsPeerSrc.TickByteCount << 3, flowMetricsPeerDst.TickByteCount << 3}
 
 	for i := range ips {
 		if IsOuterPublicIp(l3EpcIDs[i]) {

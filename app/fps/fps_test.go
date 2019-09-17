@@ -13,16 +13,18 @@ import (
 
 func TestPolicyTags(t *testing.T) {
 	f := inputtype.TaggedFlow{}
-	f.FlowMetricsPeerSrc.L3EpcID = 3
-	f.FlowMetricsPeerDst.L3EpcID = 4
-	f.FlowMetricsPeerSrc.L3DeviceID = 33
-	f.FlowMetricsPeerDst.L3DeviceID = 44
-	f.FlowMetricsPeerSrc.L3DeviceType = 1
-	f.FlowMetricsPeerDst.L3DeviceType = 1
-	f.FlowMetricsPeerSrc.IsL2End = true
-	f.FlowMetricsPeerDst.IsL2End = true
-	f.FlowMetricsPeerSrc.IsL3End = true
-	f.FlowMetricsPeerDst.IsL3End = true
+	flowMetricsPeerSrc := &f.FlowMetricsPeers[inputtype.FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst := &f.FlowMetricsPeers[inputtype.FLOW_METRICS_PEER_DST]
+	flowMetricsPeerSrc.L3EpcID = 3
+	flowMetricsPeerDst.L3EpcID = 4
+	flowMetricsPeerSrc.L3DeviceID = 33
+	flowMetricsPeerDst.L3DeviceID = 44
+	flowMetricsPeerSrc.L3DeviceType = 1
+	flowMetricsPeerDst.L3DeviceType = 1
+	flowMetricsPeerSrc.IsL2End = true
+	flowMetricsPeerDst.IsL2End = true
+	flowMetricsPeerSrc.IsL3End = true
+	flowMetricsPeerDst.IsL3End = true
 	f.GroupIDs0 = []uint32{10, 11}
 	f.GroupIDs1 = []uint32{20, 21}
 	f.IPSrc = binary.BigEndian.Uint32([]byte{10, 10, 10, 2})

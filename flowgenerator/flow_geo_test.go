@@ -17,8 +17,8 @@ func TestFillGeoInfo(t *testing.T) {
 	taggedFlow := &TaggedFlow{}
 	taggedFlow.IPSrc = IpToUint32(net.ParseIP("8.8.8.8").To4())
 	taggedFlow.IPDst = IpToUint32(net.ParseIP("114.114.114.114").To4())
-	taggedFlow.FlowMetricsPeerSrc.L3EpcID = 1
-	taggedFlow.FlowMetricsPeerDst.L3EpcID = EPC_FROM_INTERNET
+	taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].L3EpcID = 1
+	taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].L3EpcID = EPC_FROM_INTERNET
 	taggedFlow.PolicyData = &PolicyData{ActionFlags: ACTION_GEO_POSITIONING}
 	testFlowGeo.fillGeoInfo(taggedFlow)
 	// 查ip_info.go文件获得Country和Region实际值
@@ -34,8 +34,8 @@ func TestNegativeL3EpcIDSrc(t *testing.T) {
 	taggedFlow := &TaggedFlow{}
 	taggedFlow.IPSrc = IpToUint32(net.ParseIP("8.8.8.8").To4())
 	taggedFlow.IPDst = IpToUint32(net.ParseIP("114.114.114.114").To4())
-	taggedFlow.FlowMetricsPeerSrc.L3EpcID = EPC_FROM_DEEPFLOW
-	taggedFlow.FlowMetricsPeerDst.L3EpcID = 5
+	taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].L3EpcID = EPC_FROM_DEEPFLOW
+	taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].L3EpcID = 5
 	taggedFlow.PolicyData = &PolicyData{ActionFlags: ACTION_GEO_POSITIONING}
 	testFlowGeo.fillGeoInfo(taggedFlow)
 	// 查ip_info.go文件获得Country和Region实际值
@@ -51,8 +51,8 @@ func TestNegativeL3EpcIDDst(t *testing.T) {
 	taggedFlow := &TaggedFlow{}
 	taggedFlow.IPSrc = IpToUint32(net.ParseIP("8.8.8.8").To4())
 	taggedFlow.IPDst = IpToUint32(net.ParseIP("114.114.114.114").To4())
-	taggedFlow.FlowMetricsPeerSrc.L3EpcID = 5
-	taggedFlow.FlowMetricsPeerDst.L3EpcID = EPC_FROM_DEEPFLOW
+	taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].L3EpcID = 5
+	taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].L3EpcID = EPC_FROM_DEEPFLOW
 	taggedFlow.PolicyData = &PolicyData{ActionFlags: ACTION_GEO_POSITIONING}
 	testFlowGeo.fillGeoInfo(taggedFlow)
 	// 查ip_info.go文件获得Country和Region实际值
@@ -68,8 +68,8 @@ func TestNegativeL3EpcIDAll(t *testing.T) {
 	taggedFlow := &TaggedFlow{}
 	taggedFlow.IPSrc = IpToUint32(net.ParseIP("8.8.8.8").To4())
 	taggedFlow.IPDst = IpToUint32(net.ParseIP("114.114.114.114").To4())
-	taggedFlow.FlowMetricsPeerSrc.L3EpcID = EPC_FROM_DEEPFLOW
-	taggedFlow.FlowMetricsPeerDst.L3EpcID = EPC_FROM_DEEPFLOW
+	taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].L3EpcID = EPC_FROM_DEEPFLOW
+	taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].L3EpcID = EPC_FROM_DEEPFLOW
 	taggedFlow.PolicyData = &PolicyData{ActionFlags: ACTION_GEO_POSITIONING}
 	testFlowGeo.fillGeoInfo(taggedFlow)
 	// 查ip_info.go文件获得Country和Region实际值
@@ -112,14 +112,16 @@ func TestFlowGeoInfo(t *testing.T) {
 
 func BenchmarkFillGeoInfo(b *testing.B) {
 	taggedFlow := &TaggedFlow{}
+	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
 	taggedFlow.IPSrc = IpToUint32(net.ParseIP("8.8.8.8").To4())
 	taggedFlow.IPDst = IpToUint32(net.ParseIP("114.114.114.114").To4())
-	taggedFlow.FlowMetricsPeerSrc.L3EpcID = 1
-	taggedFlow.FlowMetricsPeerDst.L3EpcID = EPC_FROM_INTERNET
+	flowMetricsPeerSrc.L3EpcID = 1
+	flowMetricsPeerDst.L3EpcID = EPC_FROM_INTERNET
 	taggedFlow.PolicyData = &PolicyData{ActionFlags: ACTION_GEO_POSITIONING}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		taggedFlow.FlowMetricsPeerSrc.L3EpcID, taggedFlow.FlowMetricsPeerDst.L3EpcID = taggedFlow.FlowMetricsPeerDst.L3EpcID, taggedFlow.FlowMetricsPeerSrc.L3EpcID
+		flowMetricsPeerSrc.L3EpcID, flowMetricsPeerDst.L3EpcID = flowMetricsPeerDst.L3EpcID, flowMetricsPeerSrc.L3EpcID
 		testFlowGeo.fillGeoInfo(taggedFlow)
 	}
 }

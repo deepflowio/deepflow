@@ -83,29 +83,17 @@ func (m *FlowMap) updateFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 		}
 		updatePlatformData(taggedFlow, meta.EndpointData, meta.Direction == SERVER_TO_CLIENT)
 	}
-	if meta.Direction == SERVER_TO_CLIENT {
-		if taggedFlow.FlowMetricsPeerDst.TotalPacketCount == 0 {
-			taggedFlow.FlowMetricsPeerDst.ArrTime0 = packetTimestamp
-		}
-		taggedFlow.FlowMetricsPeerDst.ArrTimeLast = packetTimestamp
-		taggedFlow.FlowMetricsPeerDst.TickPacketCount++
-		taggedFlow.FlowMetricsPeerDst.PacketCount++
-		taggedFlow.FlowMetricsPeerDst.TotalPacketCount++
-		taggedFlow.FlowMetricsPeerDst.TickByteCount += bytes
-		taggedFlow.FlowMetricsPeerDst.ByteCount += bytes
-		taggedFlow.FlowMetricsPeerDst.TotalByteCount += bytes
-	} else {
-		if taggedFlow.FlowMetricsPeerSrc.TotalPacketCount == 0 {
-			taggedFlow.FlowMetricsPeerSrc.ArrTime0 = packetTimestamp
-		}
-		taggedFlow.FlowMetricsPeerSrc.ArrTimeLast = packetTimestamp
-		taggedFlow.FlowMetricsPeerSrc.TickPacketCount++
-		taggedFlow.FlowMetricsPeerSrc.PacketCount++
-		taggedFlow.FlowMetricsPeerSrc.TotalPacketCount++
-		taggedFlow.FlowMetricsPeerSrc.TickByteCount += bytes
-		taggedFlow.FlowMetricsPeerSrc.ByteCount += bytes
-		taggedFlow.FlowMetricsPeerSrc.TotalByteCount += bytes
+	flowMetricsPeer := &taggedFlow.FlowMetricsPeers[meta.Direction]
+	if flowMetricsPeer.TotalPacketCount == 0 {
+		flowMetricsPeer.ArrTime0 = packetTimestamp
 	}
+	flowMetricsPeer.ArrTimeLast = packetTimestamp
+	flowMetricsPeer.TickPacketCount++
+	flowMetricsPeer.PacketCount++
+	flowMetricsPeer.TotalPacketCount++
+	flowMetricsPeer.TickByteCount += bytes
+	flowMetricsPeer.ByteCount += bytes
+	flowMetricsPeer.TotalByteCount += bytes
 	// a flow will report every minute and StartTime will be reset, so the value could not be overflow
 	taggedFlow.TimeBitmap |= getBitmap(packetTimestamp)
 }
@@ -123,26 +111,28 @@ func updatePlatformData(taggedFlow *TaggedFlow, endpointData *EndpointData, serv
 		srcInfo = endpointData.SrcInfo
 		dstInfo = endpointData.DstInfo
 	}
-	taggedFlow.FlowMetricsPeerSrc.EpcID = srcInfo.L2EpcId
-	taggedFlow.FlowMetricsPeerSrc.DeviceType = DeviceType(srcInfo.L2DeviceType)
-	taggedFlow.FlowMetricsPeerSrc.DeviceID = srcInfo.L2DeviceId
-	taggedFlow.FlowMetricsPeerSrc.IsL2End = srcInfo.L2End
-	taggedFlow.FlowMetricsPeerSrc.IsL3End = srcInfo.L3End
-	taggedFlow.FlowMetricsPeerSrc.L3EpcID = srcInfo.L3EpcId
-	taggedFlow.FlowMetricsPeerSrc.L3DeviceType = DeviceType(srcInfo.L3DeviceType)
-	taggedFlow.FlowMetricsPeerSrc.L3DeviceID = srcInfo.L3DeviceId
-	taggedFlow.FlowMetricsPeerSrc.Host = srcInfo.HostIp
-	taggedFlow.FlowMetricsPeerSrc.SubnetID = srcInfo.SubnetId
-	taggedFlow.FlowMetricsPeerDst.EpcID = dstInfo.L2EpcId
-	taggedFlow.FlowMetricsPeerDst.DeviceType = DeviceType(dstInfo.L2DeviceType)
-	taggedFlow.FlowMetricsPeerDst.DeviceID = dstInfo.L2DeviceId
-	taggedFlow.FlowMetricsPeerDst.IsL2End = dstInfo.L2End
-	taggedFlow.FlowMetricsPeerDst.IsL3End = dstInfo.L3End
-	taggedFlow.FlowMetricsPeerDst.L3EpcID = dstInfo.L3EpcId
-	taggedFlow.FlowMetricsPeerDst.L3DeviceType = DeviceType(dstInfo.L3DeviceType)
-	taggedFlow.FlowMetricsPeerDst.L3DeviceID = dstInfo.L3DeviceId
-	taggedFlow.FlowMetricsPeerDst.Host = dstInfo.HostIp
-	taggedFlow.FlowMetricsPeerDst.SubnetID = dstInfo.SubnetId
+	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
+	flowMetricsPeerSrc.EpcID = srcInfo.L2EpcId
+	flowMetricsPeerSrc.DeviceType = DeviceType(srcInfo.L2DeviceType)
+	flowMetricsPeerSrc.DeviceID = srcInfo.L2DeviceId
+	flowMetricsPeerSrc.IsL2End = srcInfo.L2End
+	flowMetricsPeerSrc.IsL3End = srcInfo.L3End
+	flowMetricsPeerSrc.L3EpcID = srcInfo.L3EpcId
+	flowMetricsPeerSrc.L3DeviceType = DeviceType(srcInfo.L3DeviceType)
+	flowMetricsPeerSrc.L3DeviceID = srcInfo.L3DeviceId
+	flowMetricsPeerSrc.Host = srcInfo.HostIp
+	flowMetricsPeerSrc.SubnetID = srcInfo.SubnetId
+	flowMetricsPeerDst.EpcID = dstInfo.L2EpcId
+	flowMetricsPeerDst.DeviceType = DeviceType(dstInfo.L2DeviceType)
+	flowMetricsPeerDst.DeviceID = dstInfo.L2DeviceId
+	flowMetricsPeerDst.IsL2End = dstInfo.L2End
+	flowMetricsPeerDst.IsL3End = dstInfo.L3End
+	flowMetricsPeerDst.L3EpcID = dstInfo.L3EpcId
+	flowMetricsPeerDst.L3DeviceType = DeviceType(dstInfo.L3DeviceType)
+	flowMetricsPeerDst.L3DeviceID = dstInfo.L3DeviceId
+	flowMetricsPeerDst.Host = dstInfo.HostIp
+	flowMetricsPeerDst.SubnetID = dstInfo.SubnetId
 }
 
 // reversePolicyData will return a clone of the current PolicyData

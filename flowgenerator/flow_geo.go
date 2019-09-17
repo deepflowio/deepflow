@@ -41,7 +41,7 @@ func (f *FlowGeo) fillGeoInfo(taggedFlow *TaggedFlow) {
 		return
 	}
 	ips := [2]uint32{taggedFlow.IPSrc, taggedFlow.IPDst}
-	l3EpcIDs := [2]int32{taggedFlow.FlowMetricsPeerSrc.L3EpcID, taggedFlow.FlowMetricsPeerDst.L3EpcID}
+	l3EpcIDs := [2]int32{taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].L3EpcID, taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].L3EpcID}
 	// we want to query Src IP as possible so the first check is `ONE` (dst) but not `ZERO` (src)
 	for _, thisEnd := range [...]EndPoint{ONE, ZERO} {
 		if l3EpcIDs[thisEnd] == EPC_FROM_INTERNET {

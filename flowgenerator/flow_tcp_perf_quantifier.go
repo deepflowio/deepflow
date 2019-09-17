@@ -737,7 +737,8 @@ func (p *MetaFlowPerf) Update(header *MetaPacket, isFirstPacketDirection bool, f
 		return err
 	}
 
-	totalPacketCount := int64(flowExtra.taggedFlow.FlowMetricsPeerSrc.TotalPacketCount + flowExtra.taggedFlow.FlowMetricsPeerDst.TotalPacketCount)
+	totalPacketCount := int64(flowExtra.taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].TotalPacketCount +
+		flowExtra.taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].TotalPacketCount)
 	p.calcVarianceStats(header, totalPacketCount)
 
 	if valid := p.preprocess(header, perfCounter); valid {
