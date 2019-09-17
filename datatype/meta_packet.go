@@ -99,6 +99,7 @@ func (p *MetaPacket) GenerateQueueHash() uint8 {
 			p.QueueHash ^= uint8(p.Ip6Dst[i])
 		}
 	}
+	p.QueueHash = (p.QueueHash >> 6) ^ (p.QueueHash >> 4) ^ (p.QueueHash >> 2) ^ p.QueueHash
 	return p.QueueHash
 }
 
