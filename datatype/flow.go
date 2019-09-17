@@ -113,15 +113,16 @@ type FlowMetricsPeer struct {
 	IsL3End          bool
 }
 
-type FlowMetricsPeerSrc FlowMetricsPeer
-
-type FlowMetricsPeerDst FlowMetricsPeer
+const (
+	FLOW_METRICS_PEER_SRC = iota
+	FLOW_METRICS_PEER_DST
+	FLOW_METRICS_PEER_MAX
+)
 
 type Flow struct {
 	// 注意字节对齐!
 	FlowKey
-	FlowMetricsPeerSrc
-	FlowMetricsPeerDst
+	FlowMetricsPeers [FLOW_METRICS_PEER_MAX]FlowMetricsPeer
 
 	FlowID     uint64
 	TimeBitmap uint64
@@ -185,23 +186,7 @@ func (f *FlowKey) String() string {
 	return formatted
 }
 
-func (f *FlowMetricsPeerSrc) String() string {
-	formatted := ""
-	typeOf := reflect.TypeOf(*f)
-	valueOf := reflect.ValueOf(*f)
-	for i := 0; i < typeOf.NumField(); i++ {
-		field := typeOf.Field(i)
-		value := valueOf.Field(i)
-		if field.Type.Name() == "Duration" {
-			formatted += fmt.Sprintf("%v: %d ", field.Name, value.Int())
-		} else {
-			formatted += fmt.Sprintf("%v: %+v ", field.Name, value)
-		}
-	}
-	return formatted
-}
-
-func (f *FlowMetricsPeerDst) String() string {
+func (f *FlowMetricsPeer) String() string {
 	formatted := ""
 	typeOf := reflect.TypeOf(*f)
 	valueOf := reflect.ValueOf(*f)
@@ -232,8 +217,8 @@ func (f *Flow) String() string {
 	formatted += fmt.Sprintf("ISP: %d ", f.ISP)
 	formatted += fmt.Sprintf("GeoEnd: %d ", f.GeoEnd)
 	formatted += fmt.Sprintf("%s\n", f.FlowKey.String())
-	formatted += fmt.Sprintf("\tFlowMetricsPeerSrc: {%s}\n", f.FlowMetricsPeerSrc.String())
-	formatted += fmt.Sprintf("\tFlowMetricsPeerDst: {%s}", f.FlowMetricsPeerDst.String())
+	formatted += fmt.Sprintf("\tFlowMetricsPeerSrc: {%s}\n", f.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].String())
+	formatted += fmt.Sprintf("\tFlowMetricsPeerDst: {%s}", f.FlowMetricsPeers[FLOW_METRICS_PEER_DST].String())
 	if f.TcpPerfStats != nil {
 		formatted += fmt.Sprintf("\n\t%s", f.TcpPerfStats.String())
 	}

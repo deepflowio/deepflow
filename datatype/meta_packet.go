@@ -35,8 +35,8 @@ type MetaPacketTcpHeader struct {
 type PacketDirection uint8
 
 const (
-	CLIENT_TO_SERVER PacketDirection = iota + 1
-	SERVER_TO_CLIENT
+	CLIENT_TO_SERVER PacketDirection = FLOW_METRICS_PEER_SRC
+	SERVER_TO_CLIENT PacketDirection = FLOW_METRICS_PEER_DST
 )
 
 type MetaPacket struct {
