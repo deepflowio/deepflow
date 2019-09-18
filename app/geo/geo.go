@@ -142,7 +142,7 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 				if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE != 0 {
 					p.codes = append(p.codes, POLICY_CHN_CODES...)
 				}
-				if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_PORT != 0 {
+				if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE_PORT != 0 {
 					p.codes = append(p.codes, POLICY_CHN_PORT_CODES...)
 				}
 			}
