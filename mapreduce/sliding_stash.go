@@ -2,35 +2,29 @@ package mapreduce
 
 import (
 	"gitlab.x.lan/yunshan/droplet-libs/app"
-	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/idmap"
-	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
-	"gitlab.x.lan/yunshan/droplet/app/common/tag"
 )
 
 type SlidingStash struct {
-	timestamp     uint32
-	stashLocation []*idmap.U128IDMap
-	slots         int
-	marginSlots   int
+	timestamp   uint32
+	slots       int
+	marginSlots int
 
-	stash      []interface{}
-	entryCount uint32
-	capacity   uint32
-
-	encoder *codec.SimpleEncoder
+	rawStash
 }
 
 func NewSlidingStash(capacity uint32, slots, marginSlots int) Stash {
 	stash := &SlidingStash{
-		timestamp:     0,
-		stashLocation: make([]*idmap.U128IDMap, slots),
-		slots:         slots,
-		marginSlots:   marginSlots,
-		stash:         make([]interface{}, capacity),
-		entryCount:    0,
-		capacity:      capacity,
-		encoder:       &codec.SimpleEncoder{},
+		timestamp:   0,
+		slots:       slots,
+		marginSlots: marginSlots,
+		rawStash: rawStash{
+			u128StashLocation: make([]*idmap.U128IDMap, slots),
+			u320StashLocation: make([]*idmap.U320IDMap, slots),
+			stash:             make([]interface{}, capacity),
+			entryCount:        0,
+			capacity:          capacity,
+		},
 	}
 
 	return stash
@@ -54,43 +48,11 @@ func (s *SlidingStash) Add(docs []interface{}) []interface{} {
 			return docs[i:]
 		}
 
-		slotMap := s.stashLocation[slot]
-		if slotMap == nil {
-			slotMap = idmap.NewU128IDMap(s.capacity)
-			s.stashLocation[slot] = slotMap
-		}
-
-		key0, key1 := tag.GetFastID(doc.Tag.(*zerodoc.Tag))
-		loc, _ := slotMap.AddOrGet(key0, key1, s.entryCount, false)
-		if loc < s.entryCount {
-			s.stash[loc].(*app.Document).ConcurrentMerge(doc.Meter)
-			continue
-		}
-
-		if loc >= s.capacity || slotMap.Width() > MAX_HASHMAP_WIDTH {
+		if !s.rawStash.Add(doc, slot) {
 			return docs[i:]
 		}
-		s.stash[loc] = app.CloneDocument(doc)
-		s.entryCount++
 	}
 	return nil
-}
-
-func (s *SlidingStash) Size() int {
-	return int(s.entryCount)
-}
-
-func (s *SlidingStash) Dump() []interface{} {
-	return s.stash[:s.entryCount]
-}
-
-func (s *SlidingStash) Clear() {
-	for i := range s.stashLocation {
-		if s.stashLocation[i] != nil {
-			s.stashLocation[i].Clear()
-		}
-	}
-	s.entryCount = 0
 }
 
 func (s *SlidingStash) GetWindowRight() uint32 {
