@@ -3,6 +3,8 @@ package usage
 //go:generate tmpl -data=@codes.tmpldata -o codes.go ../common/gen/codes.go.tmpl
 
 import (
+	"net"
+
 	"github.com/google/gopacket/layers"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
@@ -61,7 +63,7 @@ func (p *MeteringToUsageDocumentMapper) appendDoc(timestamp uint32, field *outpu
 func (p *MeteringToUsageDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedTag bool) []interface{} {
 	p.docs.Reset()
 
-	if rawFlow.EthType != layers.EthernetTypeIPv4 {
+	if !(rawFlow.EthType == layers.EthernetTypeIPv4 || rawFlow.EthType == layers.EthernetTypeIPv6) {
 		return p.docs.Slice()
 	}
 
@@ -80,6 +82,7 @@ func (p *MeteringToUsageDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, v
 	l3EpcIDs := [2]int32{flowMetricsPeerSrc.L3EpcID, flowMetricsPeerDst.L3EpcID}
 	isNorthSouthTraffic := IsNorthSourceTraffic(l3EpcIDs[0], l3EpcIDs[1])
 	ips := [2]uint32{flow.IPSrc, flow.IPDst}
+	ip6s := [2]net.IP{flow.IP6Src, flow.IP6Dst}
 	isL2L3End := [2]bool{
 		flowMetricsPeerSrc.IsL2End && flowMetricsPeerSrc.IsL3End,
 		flowMetricsPeerDst.IsL2End && flowMetricsPeerDst.IsL3End,
@@ -105,8 +108,15 @@ func (p *MeteringToUsageDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, v
 		meter.SumBitRx = bits[otherEnd]
 
 		field := &p.fields[thisEnd]
-		field.IP = ips[thisEnd]
-		field.IP1 = ips[otherEnd]
+		if flow.EthType == layers.EthernetTypeIPv4 {
+			field.IsIPv6 = 0
+			field.IP = ips[thisEnd]
+			field.IP1 = ips[otherEnd]
+		} else {
+			field.IsIPv6 = 1
+			field.IP6 = ip6s[thisEnd]
+			field.IP61 = ip6s[otherEnd]
+		}
 		field.TAPType = TAPTypeFromInPort(flow.InPort)
 		field.Protocol = flow.Proto
 		field.ServerPort = flow.PortDst
