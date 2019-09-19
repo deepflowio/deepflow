@@ -19,16 +19,15 @@ const MIRRORED_TRAFFIC = 7
 type RawPacket = []byte
 
 type MetaPacketTcpHeader struct {
-	pool.ReferenceCount
-
+	// 注意字节对齐!
 	Seq           uint32
 	Ack           uint32
+	WinSize       uint16
+	MSS           uint16
 	Flags         uint8
 	DataOffset    uint8
-	WinSize       uint16
 	WinScale      uint8
 	SACKPermitted bool
-	MSS           uint16
 	Sack          []byte // sack value
 }
 
@@ -75,21 +74,32 @@ type MetaPacket struct {
 	NextHeader IPProtocol // ipv6
 
 	PortSrc    uint16
-	PortDst    uint16 // (8B)
-	TcpData    *MetaPacketTcpHeader
+	PortDst    uint16              // (8B)
+	TcpData    MetaPacketTcpHeader // 绝大多数流量是TCP，不使用指针
 	PayloadLen uint16
 
 	Direction       PacketDirection // flowgenerator负责初始化，表明MetaPacket方向
 	IsActiveService bool            // flowgenerator负责初始化，表明服务端是否活跃
-
-	pool.ReferenceCount // (8B)
 }
 
+const (
+	META_PACKET_SIZE_PER_BLOCK = 16
+)
+
+type MetaPacketBlock struct {
+	Metas [META_PACKET_SIZE_PER_BLOCK]MetaPacket
+
+	ActionFlags ActionFlag
+	Count       uint8
+	QueueIndex  uint8
+	pool.ReferenceCount
+}
+
+// FIXME: trident压缩添加Hash字段后，该函数弃用
 func (p *MetaPacket) GenerateQueueHash() uint8 {
 	// 哈希用于Queue负载均衡，只需低8bit尽量随机即可
-	// 为了保证sip和dip之间的通信在存储pcap时保序处理，这里哈希只使用IP
-	// FIXME: 未来若无需做PCAP存储的保序，可将此处加入sport、dport
-	hash := p.InPort ^ p.IpSrc ^ p.IpDst
+	// 为了保证一个MetaPacketBlock中的所有流量都在一个队列中，使用InPort和Exporter
+	hash := p.InPort ^ p.Exporter
 	p.QueueHash = uint8(hash>>24) ^ uint8(hash>>16) ^ uint8(hash>>8) ^ uint8(hash)
 	if p.EthType == EthernetTypeIPv6 {
 		for i := range p.Ip6Src {
@@ -195,7 +205,7 @@ func (p *MetaPacket) ParseL4(stream *ByteStream) {
 			p.Invalid = true
 			return
 		}
-		tcpHeader := AcquireTcpHeader()
+		tcpHeader := &p.TcpData
 		p.PortSrc = stream.U16()
 		p.PortDst = stream.U16()
 		tcpHeader.Seq = stream.U32()
@@ -206,7 +216,6 @@ func (p *MetaPacket) ParseL4(stream *ByteStream) {
 		tcpHeader.WinSize = stream.U16()
 		stream.Skip(4) // skip checksum and URG Pointer
 		p.PayloadLen -= dataOffset
-		p.TcpData = tcpHeader
 
 		optionsLen := int(dataOffset) - MIN_TCP_HEADER_SIZE
 		if optionsLen < 0 || optionsLen > 40 || optionsLen > length-MIN_TCP_HEADER_SIZE {
@@ -215,7 +224,6 @@ func (p *MetaPacket) ParseL4(stream *ByteStream) {
 		}
 		if optionsLen > 0 {
 			p.Invalid = !tcpHeader.extractTcpOptions(&ByteStream{stream.Field(int(optionsLen)), 0})
-			p.TcpData = tcpHeader
 		}
 	} else if p.Protocol == IPProtocolUDP {
 		if stream.Len() < UDP_HEADER_SIZE {
@@ -339,8 +347,8 @@ func (p *MetaPacket) String() string {
 		buffer.WriteString(fmt.Sprintf(format, IpFromUint32(p.IpSrc), p.PortSrc,
 			IpFromUint32(p.IpDst), p.PortDst, p.Protocol, p.TTL, p.IHL, p.IpID, p.IpFlags>>13, p.IpFlags&0x1FFF, p.PayloadLen))
 	}
-	if p.TcpData != nil {
-		buffer.WriteString(fmt.Sprintf("tcp: %v", p.TcpData))
+	if p.Protocol == IPProtocolTCP {
+		buffer.WriteString(fmt.Sprintf("tcp: %v", &p.TcpData))
 	}
 	if p.EndpointData != nil {
 		buffer.WriteString(fmt.Sprintf("\n\tEndpoint: %v", p.EndpointData))
@@ -365,44 +373,29 @@ func (h *MetaPacketTcpHeader) String() string {
 		h.Flags, h.Seq, h.Ack, h.DataOffset, h.WinSize, h.WinScale, h.SACKPermitted, h.MSS, h.Sack)
 }
 
-var tcpHeaderPool = pool.NewLockFreePool(func() interface{} {
-	return new(MetaPacketTcpHeader)
-})
-
-func AcquireTcpHeader() *MetaPacketTcpHeader {
-	h := tcpHeaderPool.Get().(*MetaPacketTcpHeader)
-	h.ReferenceCount.Reset()
-	return h
-}
-
-func ReleaseTcpHeader(h *MetaPacketTcpHeader) {
-	if h.SubReferenceCount() {
-		return
+func (b *MetaPacketBlock) String() string {
+	result := ""
+	for i := uint8(0); i < b.Count; i++ {
+		result += b.Metas[i].String()
 	}
-
-	*h = MetaPacketTcpHeader{}
-	tcpHeaderPool.Put(h)
+	return result
 }
 
-var metaPacketPool = pool.NewLockFreePool(func() interface{} {
-	return new(MetaPacket)
-})
+var metaPacketBlockPool = pool.NewLockFreePool(func() interface{} {
+	return new(MetaPacketBlock)
+}, pool.OptionPoolSizePerCPU(16), pool.OptionInitFullPoolSize(16))
 
-func AcquireMetaPacket() *MetaPacket {
-	m := metaPacketPool.Get().(*MetaPacket)
-	m.ReferenceCount.Reset()
-	return m
+func AcquireMetaPacketBlock() *MetaPacketBlock {
+	b := metaPacketBlockPool.Get().(*MetaPacketBlock)
+	b.ReferenceCount.Reset()
+	return b
 }
 
-func ReleaseMetaPacket(x *MetaPacket) {
+func ReleaseMetaPacketBlock(x *MetaPacketBlock) {
 	if x.SubReferenceCount() {
 		return
 	}
 
-	if x.TcpData != nil {
-		ReleaseTcpHeader(x.TcpData)
-	}
-
-	*x = MetaPacket{}
-	metaPacketPool.Put(x)
+	*x = MetaPacketBlock{}
+	metaPacketBlockPool.Put(x)
 }
