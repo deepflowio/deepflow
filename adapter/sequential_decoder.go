@@ -319,8 +319,7 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 	if !d.pflags.IsSet(CFLAG_WIN) {
 		x.win = d.data.U16()
 	}
-	tcpData := AcquireTcpHeader()
-	meta.TcpData = tcpData
+	tcpData := &meta.TcpData
 	tcpData.Seq = seq
 	tcpData.Ack = ack
 	tcpData.Flags = x.tcpFlags

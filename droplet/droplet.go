@@ -90,12 +90,12 @@ func Start(configPath string) (closers []io.Closer) {
 	}
 	// L1 - packet source from tridentAdapter
 	manager := queue.NewManager()
-	releaseMetaPacket := func(x interface{}) {
-		datatype.ReleaseMetaPacket(x.(*datatype.MetaPacket))
+	releaseMetaPacketBlock := func(x interface{}) {
+		datatype.ReleaseMetaPacketBlock(x.(*datatype.MetaPacketBlock))
 	}
 	labelerQueues := manager.NewQueues(
 		"1-meta-packet-to-labeler", cfg.Queue.LabelerQueueSize, cfg.Queue.PacketQueueCount, 1,
-		releaseMetaPacket,
+		releaseMetaPacketBlock,
 	)
 
 	tridentAdapter := adapter.NewTridentAdapter(labelerQueues, cfg.Adapter.SocketBufferSize, cfg.Adapter.OrderingCacheSize)
@@ -115,11 +115,11 @@ func Start(configPath string) (closers []io.Closer) {
 	// L2 - packet labeler
 	flowGeneratorQueues := manager.NewQueues(
 		"2-meta-packet-to-flow-generator", cfg.Queue.FlowGeneratorQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
-		libqueue.OptionFlushIndicator(time.Second), releaseMetaPacket,
+		libqueue.OptionFlushIndicator(time.Second), releaseMetaPacketBlock,
 	)
 	pcapAppQueues := manager.NewQueues(
 		"2-meta-packet-to-pcap-app", cfg.Queue.PCapAppQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
-		libqueue.OptionFlushIndicator(time.Second*10), releaseMetaPacket,
+		libqueue.OptionFlushIndicator(time.Second*10), releaseMetaPacketBlock,
 	)
 	labelerManager := labeler.NewLabelerManager(
 		labelerQueues.Readers(), cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable, cfg.Labeler.FirstPathDdbsDisable)

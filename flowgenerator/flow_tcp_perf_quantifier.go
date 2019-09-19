@@ -443,7 +443,7 @@ func (p *MetaFlowPerf) isInvalidRetransPacket(sameDirection, oppositeDirection *
 	}
 
 	// 连接建立后，即ESTABLISHED阶段，用SeqList判断包重传
-	r := sameDirection.assertSeqNumber(header.TcpData, payloadLen)
+	r := sameDirection.assertSeqNumber(&(header.TcpData), payloadLen)
 	if r == SEQ_RETRANS {
 		// established retrans
 		p.perfData.calcRetrans(isFirstPacketDirection)
@@ -715,7 +715,7 @@ func (p *MetaFlowPerf) calcVarianceStats(header *MetaPacket, packetCount int64) 
 // 异常flag判断，方向识别，payloadLen计算等
 // 去除功能不相关报文
 func (p *MetaFlowPerf) preprocess(header *MetaPacket, perfCounter *FlowPerfCounter) bool {
-	if header.TcpData == nil { // invalid tcp header
+	if header.TcpData.DataOffset == 0 { // invalid tcp header or ip fragment
 		return false
 	}
 

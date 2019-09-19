@@ -196,25 +196,29 @@ func (l *LabelerManager) run(index int) {
 	for l.running {
 		itemCount := readQueue.Gets(itemBatch)
 		for i, item := range itemBatch[:itemCount] {
-			metaPacket := item.(*datatype.MetaPacket)
-			action := l.GetPolicy(metaPacket, index)
-			if action.ActionFlags == 0 {
-				datatype.ReleaseMetaPacket(metaPacket)
+			block := item.(*datatype.MetaPacketBlock)
+			for i := uint8(0); i < block.Count; i++ {
+				metaPacket := &block.Metas[i]
+				action := l.GetPolicy(metaPacket, index)
+				block.ActionFlags |= action.ActionFlags
+			}
+			if block.ActionFlags == 0 {
+				datatype.ReleaseMetaPacketBlock(block)
 				itemBatch[i] = nil
 				continue
 			}
 
-			if action.ActionFlags&datatype.ACTION_PACKET_CAPTURING != 0 {
-				metaPacket.AddReferenceCount()
-				captureItemBatch = append(captureItemBatch, metaPacket)
+			if block.ActionFlags&datatype.ACTION_PACKET_CAPTURING != 0 {
+				block.AddReferenceCount()
+				captureItemBatch = append(captureItemBatch, block)
 			}
 
-			if action.ActionFlags != datatype.ACTION_PACKET_CAPTURING { // 包统计、流统计、流存储
-				metaPacket.AddReferenceCount()
-				flowItemBatch = append(flowItemBatch, metaPacket)
+			if block.ActionFlags != datatype.ACTION_PACKET_CAPTURING { // 包统计、流统计、流存储
+				block.AddReferenceCount()
+				flowItemBatch = append(flowItemBatch, block)
 			}
 
-			datatype.ReleaseMetaPacket(metaPacket)
+			datatype.ReleaseMetaPacketBlock(block)
 			itemBatch[i] = nil
 		}
 		if len(flowItemBatch) > 0 {
