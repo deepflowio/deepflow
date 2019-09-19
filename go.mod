@@ -10,7 +10,7 @@ require (
 	github.com/docker/go-units v0.3.3
 	github.com/fastly/go-utils v0.0.0-20180712184237-d95a45783239 // indirect
 	github.com/go-ole/go-ole v1.2.4 // indirect
-	github.com/gogo/protobuf v1.2.1 // indirect
+	github.com/gogo/protobuf v1.3.0 // indirect
 	github.com/golang/mock v1.2.0
 	github.com/golang/protobuf v1.3.0
 	github.com/google/go-cmp v0.2.0 // indirect
@@ -32,7 +32,7 @@ require (
 	github.com/spf13/pflag v1.0.3 // indirect
 	github.com/stretchr/testify v1.3.0 // indirect
 	github.com/tebeka/strftime v0.0.0-20140926081919-3f9c7761e312 // indirect
-	gitlab.x.lan/yunshan/message v0.0.0-20190916062053-135b4232aab7
+	gitlab.x.lan/yunshan/message v0.0.0-20190918102752-bb51b27911ca
 	golang.org/x/net v0.0.0-20190514140710-3ec191127204
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58 // indirect
 	golang.org/x/sys v0.0.0-20190516110030-61b9204099cb // indirect

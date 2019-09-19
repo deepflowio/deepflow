@@ -32,6 +32,8 @@ type U128IDMap struct {
 	slotHead []int32 // 哈希桶，slotHead[i] 表示哈希值为 i 的冲突链的第一个节点为 buffer[[ slotHead[i]] ]]
 	size     int     // buffer中存储的有效节点总数
 	width    int     // 哈希桶中最大冲突链长度
+
+	hashSlotBits uint32 // 哈希桶数量总是2^N，记录末尾0比特的数量用于compressHash
 }
 
 func NewU128IDMap(hashSlots uint32) *U128IDMap {
@@ -40,14 +42,14 @@ func NewU128IDMap(hashSlots uint32) *U128IDMap {
 	}
 
 	i := uint32(1)
-	for i < hashSlots {
-		i <<= 1
+	for ; 1<<i < hashSlots; i++ {
 	}
-	hashSlots = i
+	hashSlots = 1 << i
 
 	m := &U128IDMap{
-		buffer:   make([]u128IDMapNodeBlock, 0),
-		slotHead: make([]int32, hashSlots),
+		buffer:       make([]u128IDMapNodeBlock, 0),
+		slotHead:     make([]int32, hashSlots),
+		hashSlotBits: i,
 	}
 
 	for i := uint32(0); i < hashSlots; i++ {
@@ -64,9 +66,13 @@ func (m *U128IDMap) Width() int {
 	return m.width
 }
 
+func (m *U128IDMap) compressHash(hash uint64) int32 {
+	return int32((((((hash>>m.hashSlotBits)^hash)>>m.hashSlotBits)^hash)>>m.hashSlotBits)^hash) & int32(len(m.slotHead)-1)
+}
+
 // 第一个返回值表示value，第二个返回值表示是否进行了Add。若key已存在，指定overwrite=true可覆写value。
 func (m *U128IDMap) AddOrGet(key0, key1 uint64, value uint32, overwrite bool) (uint32, bool) {
-	slot := (uint32(key0>>32) ^ uint32(key0) ^ uint32(key1>>32) ^ uint32(key1)) & uint32(len(m.slotHead)-1)
+	slot := m.compressHash(key0 ^ key1)
 	head := m.slotHead[slot]
 
 	width := 0
@@ -106,7 +112,7 @@ func (m *U128IDMap) AddOrGet(key0, key1 uint64, value uint32, overwrite bool) (u
 }
 
 func (m *U128IDMap) Get(key0, key1 uint64) (uint32, bool) {
-	slot := (uint32(key0>>32) ^ uint32(key0) ^ uint32(key1>>32) ^ uint32(key1)) & uint32(len(m.slotHead)-1)
+	slot := m.compressHash(key0 ^ key1)
 	head := m.slotHead[slot]
 
 	next := head
