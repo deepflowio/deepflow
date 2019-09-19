@@ -56,6 +56,7 @@ type TridentAdapter struct {
 	listenBufferSize int
 	cacheSize        int
 
+	block     *datatype.MetaPacketBlock
 	queues    queue.MultiQueueWriter
 	itemKeys  []queue.HashKey
 	itemBatch []interface{}
@@ -75,6 +76,7 @@ func NewTridentAdapter(queues queue.MultiQueueWriter, listenBufferSize, cacheSiz
 		listenBufferSize: listenBufferSize,
 		cacheSize:        cacheSize,
 
+		block:     datatype.AcquireMetaPacketBlock(),
 		queues:    queues,
 		itemKeys:  make([]queue.HashKey, 0, QUEUE_BATCH_SIZE+1),
 		itemBatch: make([]interface{}, 0, QUEUE_BATCH_SIZE),
@@ -195,29 +197,35 @@ func (a *TridentAdapter) findAndAdd(data []byte, key uint32, seq uint32, timesta
 	a.cacheLookup(data, key, seq, timestamp)
 }
 
+func (a *TridentAdapter) prepareItem(count uint8) {
+	if count > 0 {
+		a.block.Count = count
+		a.counter.TxPackets += uint64(count)
+		a.stats.TxPackets += uint64(count)
+		a.itemKeys = append(a.itemKeys, queue.HashKey(a.block.Metas[0].InPort))
+		a.itemBatch = append(a.itemBatch, a.block)
+		a.block = datatype.AcquireMetaPacketBlock()
+	}
+}
+
 func (a *TridentAdapter) decode(data []byte, ip uint32) time.Duration {
 	decoder := NewSequentialDecoder(data)
 	inPort, _ := decoder.DecodeHeader()
 	timestamp := decoder.timestamp
 
+	i := uint8(0) // 使用a.block.Count, 因为i一定为0，直接赋值0
 	for {
-		meta := datatype.AcquireMetaPacket()
+		meta := &a.block.Metas[i]
 		meta.InPort = inPort
 		meta.Exporter = ip
 		if decoder.NextPacket(meta) {
-			datatype.ReleaseMetaPacket(meta)
+			a.prepareItem(i)
 			break
 		}
-
-		a.counter.TxPackets++
-		a.stats.TxPackets++
-		a.itemKeys = append(a.itemKeys, queue.HashKey(meta.GenerateQueueHash()))
-		a.itemBatch = append(a.itemBatch, meta)
-
-		if len(a.itemBatch) >= QUEUE_BATCH_SIZE {
-			a.queues.Puts(a.itemKeys, a.itemBatch)
-			a.itemKeys = a.itemKeys[:1]
-			a.itemBatch = a.itemBatch[:0]
+		i++
+		if i >= datatype.META_PACKET_SIZE_PER_BLOCK {
+			a.prepareItem(i)
+			i = 0
 		}
 	}
 

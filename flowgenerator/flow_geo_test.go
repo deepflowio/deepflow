@@ -85,11 +85,13 @@ func TestFlowGeoInfo(t *testing.T) {
 	flowGenerator, inputPacketQueue, flowOutQueue, _ := flowGeneratorInit(0, true)
 	flowGenerator.flowMap.FlowGeo = testFlowGeo
 	forceReportInterval = 60 * time.Second
+	block := &MetaPacketBlock{}
 
 	packet0 := getDefaultPacket()
 	packet0.EndpointData.SrcInfo.L3EpcId = 5
 	packet0.EndpointData.DstInfo.L3EpcId = EPC_FROM_INTERNET
-	inputPacketQueue.Put(packet0)
+	block.Metas[block.Count] = *packet0
+	block.Count++
 
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Flags = TCP_RST
@@ -97,7 +99,9 @@ func TestFlowGeoInfo(t *testing.T) {
 	reversePacket(packet1)
 	packet1.EndpointData.SrcInfo.L3EpcId = EPC_FROM_INTERNET
 	packet1.EndpointData.DstInfo.L3EpcId = EPC_FROM_INTERNET
-	inputPacketQueue.Put(packet1)
+	block.Metas[block.Count] = *packet1
+	block.Count++
+	inputPacketQueue.Put(block)
 
 	flowGenerator.Start()
 

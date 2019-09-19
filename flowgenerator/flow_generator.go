@@ -52,16 +52,19 @@ func (f *FlowGenerator) processPackets(processBuffer []interface{}) {
 			continue
 		}
 
-		meta := e.(*MetaPacket)
-		hash := uint64(0)
-		if meta.EthType != layers.EthernetTypeIPv4 && meta.EthType != layers.EthernetTypeIPv6 {
-			hash = f.getEthOthersQuinTupleHash(meta)
-		} else {
-			hash = f.getQuinTupleHash(meta)
+		block := e.(*MetaPacketBlock)
+		for i := uint8(0); i < block.Count; i++ {
+			meta := &block.Metas[i]
+			hash := uint64(0)
+			if meta.EthType != layers.EthernetTypeIPv4 && meta.EthType != layers.EthernetTypeIPv6 {
+				hash = f.getEthOthersQuinTupleHash(meta)
+			} else {
+				hash = f.getQuinTupleHash(meta)
+			}
+			f.flowMap.InjectMetaPacket(hash, meta)
 		}
-		f.flowMap.InjectMetaPacket(hash, meta)
 
-		ReleaseMetaPacket(meta)
+		ReleaseMetaPacketBlock(block)
 		processBuffer[i] = nil
 	}
 }

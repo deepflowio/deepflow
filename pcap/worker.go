@@ -405,33 +405,40 @@ WORKING_LOOP:
 				continue
 			}
 
-			packet := e.(*datatype.MetaPacket)
-
-			if packet.PolicyData == nil || packet.EndpointData == nil { // shouldn't happen
-				log.Warningf("drop invalid packet with nil PolicyData or EndpointData %v", packet)
-				datatype.ReleaseMetaPacket(packet)
+			block := e.(*datatype.MetaPacketBlock)
+			if block.ActionFlags&datatype.ACTION_PACKET_CAPTURING == 0 {
+				datatype.ReleaseMetaPacketBlock(block)
 				continue
 			}
 
-			for _, policy := range packet.PolicyData.AclActions {
-				if policy.GetACLGID() <= 0 {
+			for i := uint8(0); i < block.Count; i++ {
+				packet := &block.Metas[i]
+
+				if packet.PolicyData == nil || packet.EndpointData == nil { // shouldn't happen
+					log.Warningf("drop invalid packet with nil PolicyData or EndpointData %v", packet)
 					continue
 				}
-				if policy.GetActionFlags()&datatype.ACTION_PACKET_CAPTURING != 0 {
-					tapType := w.checkWriterPcap(packet, policy.GetDirections())
-					if packet.EthType != EthernetTypeIPv6 {
-						for i := range w.ips {
-							w.writePacket(packet, tapType, w.ips[i], w.macs[i], policy.GetACLGID())
-						}
-					} else {
-						for i := range w.ip6s {
-							w.writePacketIpv6(packet, tapType, w.ip6s[i], w.macs[i], policy.GetACLGID())
+
+				for _, policy := range packet.PolicyData.AclActions {
+					if policy.GetACLGID() <= 0 {
+						continue
+					}
+					if policy.GetActionFlags()&datatype.ACTION_PACKET_CAPTURING != 0 {
+						tapType := w.checkWriterPcap(packet, policy.GetDirections())
+						if packet.EthType != EthernetTypeIPv6 {
+							for i := range w.ips {
+								w.writePacket(packet, tapType, w.ips[i], w.macs[i], policy.GetACLGID())
+							}
+						} else {
+							for i := range w.ip6s {
+								w.writePacketIpv6(packet, tapType, w.ip6s[i], w.macs[i], policy.GetACLGID())
+							}
 						}
 					}
 				}
 			}
 
-			datatype.ReleaseMetaPacket(packet)
+			datatype.ReleaseMetaPacketBlock(block)
 		}
 	}
 

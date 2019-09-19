@@ -75,7 +75,7 @@ func getDefaultPacket() *MetaPacket {
 		IpDst:     IpToUint32(net.ParseIP("114.114.114.114").To4()),
 		PortSrc:   12345,
 		PortDst:   22,
-		TcpData:   &MetaPacketTcpHeader{Flags: TCP_SYN},
+		TcpData:   MetaPacketTcpHeader{DataOffset: 5, Flags: TCP_SYN},
 		EndpointData: &EndpointData{
 			SrcInfo: &EndpointInfo{
 				L2EpcId:  EPC_FROM_DEEPFLOW,
@@ -97,7 +97,6 @@ func getDefaultPacket() *MetaPacket {
 func getUdpDefaultPacket() *MetaPacket {
 	packet := getDefaultPacket()
 	packet.Protocol = 17
-	packet.TcpData = nil
 	packet.PortSrc = 80
 	packet.PortDst = 8080
 	return packet
@@ -159,15 +158,19 @@ func TestHandleSynRst(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator, inputPacketQueue, flowOutQueue, _ := flowGeneratorInit(0, true)
 	_FLOW_STAT_INTERVAL = 60 * time.Second
+	block := &MetaPacketBlock{}
 
 	packet0 := getDefaultPacket()
-	inputPacketQueue.Put(packet0)
+	block.Metas[block.Count] = *packet0
+	block.Count++
 
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Flags = TCP_RST
 	packet1.Timestamp += DEFAULT_DURATION_MSEC
 	reversePacket(packet1)
-	inputPacketQueue.Put(packet1)
+	block.Metas[block.Count] = *packet1
+	block.Count++
+	inputPacketQueue.Put(block)
 
 	flowGenerator.Start()
 
@@ -191,19 +194,24 @@ func TestHandleSynFin(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator, inputPacketQueue, flowOutQueue, _ := flowGeneratorInit(0, true)
 	_FLOW_STAT_INTERVAL = 60 * time.Second
+	block := &MetaPacketBlock{}
 
 	packet0 := getDefaultPacket()
-	inputPacketQueue.Put(packet0)
+	block.Metas[block.Count] = *packet0
+	block.Count++
 
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Flags = TCP_PSH | TCP_ACK
-	inputPacketQueue.Put(packet1)
+	block.Metas[block.Count] = *packet1
+	block.Count++
 
 	packet2 := getDefaultPacket()
 	packet2.TcpData.Flags = TCP_ACK | TCP_FIN
 	packet2.Timestamp += DEFAULT_DURATION_MSEC
 	reversePacket(packet2)
-	inputPacketQueue.Put(packet2)
+	block.Metas[block.Count] = *packet2
+	block.Count++
+	inputPacketQueue.Put(block)
 
 	flowGenerator.Start()
 
@@ -223,12 +231,15 @@ func TestHandleSynFin(t *testing.T) {
 func TestPlatformData(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator, inputPacketQueue, flowOutQueue, _ := flowGeneratorInit(0, true)
+	block := &MetaPacketBlock{}
 
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Seq = 1111
 	packet1.TcpData.Ack = 112
 	packet1.Timestamp = packet1.Timestamp / _FLOW_STAT_INTERVAL * _FLOW_STAT_INTERVAL // 避免ForceReport
-	inputPacketQueue.Put(packet1)
+	block.Metas[block.Count] = *packet1
+	block.Count++
+	inputPacketQueue.Put(block)
 
 	flowGenerator.Start()
 
@@ -294,12 +305,14 @@ func TestFlowStateMachine(t *testing.T) {
 func TestHandshakePerf(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator, inputPacketQueue, flowOutQueue, _ := flowGeneratorInit(0, true)
+	block := &MetaPacketBlock{}
 
 	packet0 := getDefaultPacket()
 	packet0.TcpData.Flags = TCP_SYN
 	packet0.TcpData.Seq = 111
 	packet0.TcpData.Ack = 0
-	inputPacketQueue.Put(packet0)
+	block.Metas[block.Count] = *packet0
+	block.Count++
 
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Flags = TCP_SYN | TCP_ACK
@@ -307,14 +320,17 @@ func TestHandshakePerf(t *testing.T) {
 	reversePacket(packet1)
 	packet1.TcpData.Seq = 1111
 	packet1.TcpData.Ack = 112
-	inputPacketQueue.Put(packet1)
+	block.Metas[block.Count] = *packet1
+	block.Count++
 
 	packet2 := getDefaultPacket()
 	packet2.TcpData.Flags = TCP_ACK
 	packet2.Timestamp += DEFAULT_DURATION_MSEC * 2
 	packet2.TcpData.Seq = 112
 	packet2.TcpData.Ack = 1112
-	inputPacketQueue.Put(packet2)
+	block.Metas[block.Count] = *packet2
+	block.Count++
+	inputPacketQueue.Put(block)
 
 	flowGenerator.Start()
 	taggedFlow := getFromQueue(flowOutQueue).(*TaggedFlow)
@@ -378,20 +394,25 @@ func TestReverseInNewCycle(t *testing.T) {
 
 func TestForceReport(t *testing.T) {
 	flowGenerator, inputPacketQueue, flowOutQueue, _ := flowGeneratorInit(0, true)
+	block := &MetaPacketBlock{}
 
 	packet0 := getDefaultPacket()
-	inputPacketQueue.Put(packet0)
+	block.Metas[block.Count] = *packet0
+	block.Count++
 
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Flags = TCP_SYN | TCP_ACK
 	packet1.Timestamp += DEFAULT_DURATION_MSEC
 	reversePacket(packet1)
-	inputPacketQueue.Put(packet1)
+	block.Metas[block.Count] = *packet1
+	block.Count++
 
 	packet2 := getDefaultPacket()
 	packet2.TcpData.Flags = TCP_ACK
 	packet2.Timestamp += DEFAULT_DURATION_MSEC
-	inputPacketQueue.Put(packet2)
+	block.Metas[block.Count] = *packet2
+	block.Count++
+	inputPacketQueue.Put(block)
 
 	flowGenerator.Start()
 
@@ -409,10 +430,13 @@ func TestForceReport(t *testing.T) {
 func TestUdpShortFlow(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 	flowGenerator, inputPacketQueue, flowOutQueue, _ := flowGeneratorInit(0, true)
+	block := &MetaPacketBlock{}
 
 	packet := getDefaultPacket()
 	packet.Protocol = layers.IPProtocolUDP
-	inputPacketQueue.Put(packet)
+	block.Metas[block.Count] = *packet
+	block.Count++
+	inputPacketQueue.Put(block)
 	flowGenerator.Start()
 	taggedFlow := getFromQueue(flowOutQueue).(*TaggedFlow)
 	if taggedFlow.CloseType != CloseTypeTimeout {
@@ -425,11 +449,14 @@ func TestUdpShortFlow(t *testing.T) {
 
 func TestEthOthersShortFlow(t *testing.T) {
 	flowGenerator, inputPacketQueue, flowOutQueue, _ := flowGeneratorInit(0, true)
+	block := &MetaPacketBlock{}
 
 	packet := getDefaultPacket()
 	packet.Protocol = 0
 	packet.EthType = layers.EthernetTypeARP
-	inputPacketQueue.Put(packet)
+	block.Metas[block.Count] = *packet
+	block.Count++
+	inputPacketQueue.Put(block)
 	flowGenerator.Start()
 	taggedFlow := getFromQueue(flowOutQueue).(*TaggedFlow)
 	if taggedFlow.CloseType != CloseTypeTimeout {
@@ -444,10 +471,12 @@ func TestInPortEqualTor(t *testing.T) {
 	flowGenerator, inputPacketQueue, flowOutQueue, _ := flowGeneratorInit(0, true)
 	SetTimeout(TimeoutConfig{0, 300 * time.Second, 0, 30 * time.Second, 5 * time.Second, 0, 0})
 	ignoreTorMac = true
+	block := &MetaPacketBlock{}
 
 	packet0 := getDefaultPacket()
 	packet0.InPort = 0x30000
-	inputPacketQueue.Put(packet0)
+	block.Metas[block.Count] = *packet0
+	block.Count++
 
 	packet1 := getDefaultPacket()
 	dst, _ := net.ParseMAC("21:43:65:AA:AA:AA")
@@ -455,7 +484,9 @@ func TestInPortEqualTor(t *testing.T) {
 	packet1.InPort = 0x30000
 	packet1.TcpData.Flags = TCP_RST
 	reversePacket(packet1)
-	inputPacketQueue.Put(packet1)
+	block.Metas[block.Count] = *packet1
+	block.Count++
+	inputPacketQueue.Put(block)
 	flowGenerator.Start()
 	taggedFlow := getFromQueue(flowOutQueue).(*TaggedFlow)
 	if cnt := taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].PacketCount; cnt != 1 {
@@ -467,10 +498,12 @@ func TestIgnoreL2End(t *testing.T) {
 	ignoreL2End = false
 	flowGenerator, inputPacketQueue, flowOutQueue, _ := flowGeneratorInit(0, true)
 	SetTimeout(TimeoutConfig{0, 300 * time.Second, 0, 30 * time.Second, 5 * time.Second, 0, time.Millisecond * 10})
+	block := &MetaPacketBlock{}
 
 	packet0 := getDefaultPacket()
 	packet0.InPort = 0x31234
-	inputPacketQueue.Put(packet0)
+	block.Metas[block.Count] = *packet0
+	block.Count++
 
 	packet1 := getDefaultPacket()
 	dst, _ := net.ParseMAC("21:43:65:AA:AA:AA")
@@ -480,7 +513,9 @@ func TestIgnoreL2End(t *testing.T) {
 	packet1.L2End1 = false
 	packet1.TcpData.Flags = TCP_RST
 	reversePacket(packet1)
-	inputPacketQueue.Put(packet1)
+	block.Metas[block.Count] = *packet1
+	block.Count++
+	inputPacketQueue.Put(block)
 	flowGenerator.Start()
 	taggedFlow := getFromQueue(flowOutQueue).(*TaggedFlow)
 	if cnt := taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].PacketCount; cnt != 1 {
@@ -491,34 +526,41 @@ func TestIgnoreL2End(t *testing.T) {
 func TestDoubleFinFromServer(t *testing.T) {
 	flowGenerator, inputPacketQueue, flowOutQueue, _ := flowGeneratorInit(0, true)
 	SetTimeout(TimeoutConfig{0, 300 * time.Second, 0, 30 * time.Second, 5 * time.Second, 0, time.Millisecond * 10})
+	block := &MetaPacketBlock{}
 	// SYN
 	packet0 := getDefaultPacket()
 	packet0.Timestamp = packet0.Timestamp / _FLOW_STAT_INTERVAL * _FLOW_STAT_INTERVAL // 避免ForceReport
 	packetTimestamp := packet0.Timestamp
-	inputPacketQueue.Put(packet0)
+	block.Metas[block.Count] = *packet0
+	block.Count++
 	// SYN | ACK
 	packet1 := getDefaultPacket()
 	packet1.TcpData.Flags = TCP_SYN | TCP_ACK
 	packet1.Timestamp = packetTimestamp
 	reversePacket(packet1)
-	inputPacketQueue.Put(packet1)
+	block.Metas[block.Count] = *packet1
+	block.Count++
 	// ACK
 	packet2 := getDefaultPacket()
 	packet2.TcpData.Flags = TCP_ACK
 	packet2.Timestamp = packetTimestamp
-	inputPacketQueue.Put(packet2)
+	block.Metas[block.Count] = *packet2
+	block.Count++
 	// FIN
 	packet3 := getDefaultPacket()
 	packet3.TcpData.Flags = TCP_FIN
 	packet3.Timestamp = packetTimestamp
 	reversePacket(packet3)
-	inputPacketQueue.Put(packet3)
+	block.Metas[block.Count] = *packet3
+	block.Count++
 	// FIN
 	packet4 := getDefaultPacket()
 	packet4.TcpData.Flags = TCP_FIN
 	packet4.Timestamp = packetTimestamp
 	reversePacket(packet4)
-	inputPacketQueue.Put(packet4)
+	block.Metas[block.Count] = *packet4
+	block.Count++
+	inputPacketQueue.Put(block)
 
 	flowGenerator.Start()
 	taggedFlow := getFromQueue(flowOutQueue).(*TaggedFlow)
@@ -531,6 +573,7 @@ func TestDoubleFinFromServer(t *testing.T) {
 func TestStatOutput(t *testing.T) {
 	flowGenerator, inputPacketQueue, flowOutQueue, meteringAppQueue := flowGeneratorInit(0, true)
 	_FLOW_STAT_INTERVAL = DEFAULT_DURATION_MSEC
+	block := &MetaPacketBlock{}
 
 	// 两个同样时间槽的同向包
 	packet0 := getDefaultPacket()
@@ -540,8 +583,10 @@ func TestStatOutput(t *testing.T) {
 	packet1 := getDefaultPacket()
 	packet1.Timestamp = timestamp0
 
-	inputPacketQueue.Put(packet0)
-	inputPacketQueue.Put(packet1)
+	block.Metas[block.Count] = *packet0
+	block.Count++
+	block.Metas[block.Count] = *packet1
+	block.Count++
 
 	// 两个同样时间槽的不同向包，时间早于之前的包
 	packet2 := getDefaultPacket()
@@ -554,8 +599,10 @@ func TestStatOutput(t *testing.T) {
 	packet3.TcpData.Flags = TCP_ACK
 	packet3.Timestamp = timestamp2
 
-	inputPacketQueue.Put(packet2)
-	inputPacketQueue.Put(packet3)
+	block.Metas[block.Count] = *packet2
+	block.Count++
+	block.Metas[block.Count] = *packet3
+	block.Count++
 
 	// 一个反向的包，会终结Flow，时间晚于之前的包
 	packet4 := getDefaultPacket()
@@ -563,7 +610,9 @@ func TestStatOutput(t *testing.T) {
 	packet4.Timestamp = timestamp0 + DEFAULT_DURATION_MSEC
 	timestamp4 := packet4.Timestamp
 	reversePacket(packet4)
-	inputPacketQueue.Put(packet4)
+	block.Metas[block.Count] = *packet4
+	block.Count++
+	inputPacketQueue.Put(block)
 
 	flowGenerator.Start()
 
@@ -654,7 +703,6 @@ func BenchmarkFlowMapWithSYNFlood(b *testing.B) {
 		packets[i].Timestamp = packetTemplate.Timestamp + time.Duration(i*100)*time.Nanosecond
 		packets[i].PortSrc = uint16(i & 0xFFFF)
 		packets[i].PortDst = uint16((i >> 16) & 0xFFFF)
-		packets[i].Reset()
 		buffer[i] = &packets[i]
 	}
 	flowGenerator, _, _, _ := flowGeneratorInit(b.N, false)
@@ -680,7 +728,6 @@ func BenchmarkFlowMapWithTenPacketsFlowFlood(b *testing.B) {
 		packets[i].Timestamp = packetTemplate.Timestamp + time.Duration(i*100)*time.Nanosecond
 		packets[i].PortSrc = portSrc
 		packets[i].PortDst = portDst
-		packets[i].Reset()
 		buffer[i] = &packets[i]
 
 		j := i + 1
@@ -690,7 +737,6 @@ func BenchmarkFlowMapWithTenPacketsFlowFlood(b *testing.B) {
 		packets[j].PortSrc = portDst
 		packets[j].PortDst = portSrc
 		packets[j].TcpData.Flags = TCP_SYN | TCP_ACK
-		packets[j].Reset()
 		buffer[j] = &packets[j]
 
 		for k := 2; k < 10; k++ {
@@ -700,7 +746,6 @@ func BenchmarkFlowMapWithTenPacketsFlowFlood(b *testing.B) {
 			packets[j].PortSrc = portSrc
 			packets[j].PortDst = portDst
 			packets[j].TcpData.Flags = TCP_ACK
-			packets[j].Reset()
 			buffer[j] = &packets[j]
 		}
 	}

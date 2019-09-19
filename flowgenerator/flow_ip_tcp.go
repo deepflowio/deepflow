@@ -41,10 +41,7 @@ func (m *FlowMap) initTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	now := meta.Timestamp
 	m.initFlow(flowExtra, meta, now)
 	taggedFlow := flowExtra.taggedFlow
-	flags := uint8(0)
-	if meta.TcpData != nil {
-		flags = meta.TcpData.Flags
-	}
+	flags := meta.TcpData.Flags
 	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
 	flowMetricsPeerSrc.TCPFlags |= flags
 	flowMetricsPeerSrc.ArrTime0 = now
@@ -71,10 +68,7 @@ func (m *FlowMap) initTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 
 func (m *FlowMap) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) bool { // return: closed
 	taggedFlow := flowExtra.taggedFlow
-	flags := uint8(0)
-	if meta.TcpData != nil {
-		flags = meta.TcpData.Flags
-	}
+	flags := meta.TcpData.Flags
 	taggedFlow.FlowMetricsPeers[meta.Direction].TCPFlags |= flags
 	m.updateFlow(flowExtra, meta)
 
