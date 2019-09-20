@@ -2,7 +2,6 @@ package policy
 
 import (
 	"math"
-	"sync/atomic"
 	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -35,7 +34,7 @@ type FastPath struct {
 	FastPolicyMaps     [][]*lru.Cache64 // 快速路径上的Policy映射表，Key为IP掩码对，Value为VlanAndPortMap
 	FastPolicyMapsMini [][]*lru.Cache32 // 同FastPolicyMaps，不过Key为32bit
 
-	FastPathHit, FastPathHitTick          uint64
+	FastPathHit                           uint64
 	FastPathMacCount, FastPathPolicyCount uint32
 
 	MapSize uint32
@@ -74,8 +73,8 @@ func (f *FastPath) FlushAcls() {
 			f.FastPolicyMapsMini[i][j] = lru.NewCache32(int(f.MapSize) >> 3)
 		}
 	}
-	atomic.StoreUint32(&f.FastPathMacCount, 0)
-	atomic.StoreUint32(&f.FastPathPolicyCount, 0)
+	f.FastPathMacCount = 0
+	f.FastPathPolicyCount = 0
 }
 
 func (l *FastPath) getFastVlanPolicy(maps *VlanAndPortMap, srcMacSuffix, dstMacSuffix uint16, packet *LookupKey) *PolicyData {
@@ -167,7 +166,7 @@ func (f *FastPath) addVlanFastPolicy(srcMacSuffix, dstMacSuffix uint16, packet *
 	key := uint64(srcMacSuffix)<<48 | uint64(dstMacSuffix)<<32 | uint64(packet.Vlan)
 	vlanPolicy := mapsForward.vlanPolicyMap[key]
 	if vlanPolicy == nil {
-		atomic.AddUint32(&f.FastPathPolicyCount, 1)
+		f.FastPathPolicyCount++
 		// 添加forward方向bitmap
 		forward.AddAclGidBitmaps(packet, false, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
 		mapsForward.vlanPolicyMap[key] = forward
@@ -188,7 +187,7 @@ func (f *FastPath) addVlanFastPolicy(srcMacSuffix, dstMacSuffix uint16, packet *
 	key = uint64(dstMacSuffix)<<48 | uint64(srcMacSuffix)<<32 | uint64(packet.Vlan)
 	vlanPolicy = mapsBackward.vlanPolicyMap[key]
 	if vlanPolicy == nil {
-		atomic.AddUint32(&f.FastPathPolicyCount, 1)
+		f.FastPathPolicyCount++
 		// 添加backward方向bitmap
 		backward.AddAclGidBitmaps(packet, true, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
 		mapsBackward.vlanPolicyMap[key] = backward
@@ -227,7 +226,7 @@ func (f *FastPath) addPortFastPolicy(endpointStore *EndpointStore, packetEndpoin
 		forward.AddAclGidBitmaps(packet, false, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
 		value.protoPolicy[packet.Proto] = forward
 		mapsForward.portPolicyMap[key] = value
-		atomic.AddUint32(&f.FastPathPolicyCount, 1)
+		f.FastPathPolicyCount++
 	} else {
 		portPolicyValue.endpoint.InitPointer(endpointStore.Endpoints)
 		// 添加forward方向bitmap
@@ -264,7 +263,7 @@ func (f *FastPath) addPortFastPolicy(endpointStore *EndpointStore, packetEndpoin
 		backward.AddAclGidBitmaps(packet, true, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
 		value.protoPolicy[packet.Proto] = backward
 		mapsBackward.portPolicyMap[key] = value
-		atomic.AddUint32(&f.FastPathPolicyCount, 1)
+		f.FastPathPolicyCount++
 	} else {
 		portPolicyValue.endpoint.InitPointer(endpoints)
 		// 添加backward方向bitmap

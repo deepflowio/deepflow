@@ -4,7 +4,6 @@ import (
 	"math"
 	"runtime"
 	"sort"
-	"sync/atomic"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
@@ -38,9 +37,9 @@ type Ddbs struct {
 
 	RawAcls []*Acl
 
-	FirstPathHit, FirstPathHitTick uint64
-	AclHitMax                      uint32
-	UnmatchedPacketCount           uint64
+	FirstPathHit         uint64
+	AclHitMax            uint32
+	UnmatchedPacketCount uint64
 
 	// ipv4
 	maskMinBit, maskMaxBit int
@@ -299,7 +298,7 @@ func (d *Ddbs) mergePolicy(packetEndpointData *EndpointData, packet *LookupKey, 
 			findPolicy.NpbActions = findPolicy.CheckNpbAction(packet, packetEndpointData)
 		}
 	} else {
-		atomic.AddUint64(&d.UnmatchedPacketCount, 1)
+		d.UnmatchedPacketCount++
 	}
 	return findPolicy
 }
@@ -381,11 +380,9 @@ func (d *Ddbs) GetPolicyByFirstPath(endpointData *EndpointData, packet *LookupKe
 	endpointStore, packetEndpointData := d.addFastPath(endpointData, packet, policys[FORWARD], policys[BACKWARD], vlanPolicy)
 	findPolicy := d.mergePolicy(packetEndpointData, packet, policys[FORWARD], policys[BACKWARD], vlanPolicy)
 
-	atomic.AddUint64(&d.FirstPathHit, 1)
-	atomic.AddUint64(&d.FirstPathHitTick, 1)
-	aclHitMax := atomic.LoadUint32(&d.AclHitMax)
-	if aclHit := uint32(len(findPolicy.AclActions) + len(findPolicy.NpbActions)); aclHitMax < aclHit {
-		atomic.CompareAndSwapUint32(&d.AclHitMax, aclHitMax, aclHit)
+	d.FirstPathHit++
+	if aclHit := uint32(len(findPolicy.AclActions) + len(findPolicy.NpbActions)); d.AclHitMax < aclHit {
+		d.AclHitMax = aclHit
 	}
 	return endpointStore, findPolicy
 }
@@ -446,7 +443,7 @@ func (d *Ddbs) UpdateAcls(acls []*Acl, check ...bool) {
 }
 
 func (d *Ddbs) GetHitStatus() (uint64, uint64) {
-	return atomic.LoadUint64(&d.FirstPathHit), atomic.LoadUint64(&d.FastPathHit)
+	return d.FirstPathHit, d.FastPathHit
 }
 
 func (d *Ddbs) GetCounter() interface{} {
@@ -462,12 +459,15 @@ func (d *Ddbs) GetCounter() interface{} {
 	}
 
 	counter.Acl += uint32(len(d.RawAcls))
-	counter.FirstHit = atomic.SwapUint64(&d.FirstPathHitTick, 0)
-	counter.FastHit = atomic.SwapUint64(&d.FastPathHitTick, 0)
-	counter.AclHitMax = atomic.SwapUint32(&d.AclHitMax, 0)
-	counter.FastPathMacCount = atomic.LoadUint32(&d.FastPathMacCount)
-	counter.FastPathPolicyCount = atomic.LoadUint32(&d.FastPathPolicyCount)
-	counter.UnmatchedPacketCount = atomic.LoadUint64(&d.UnmatchedPacketCount)
+	counter.FirstHit = d.FirstPathHit
+	counter.FastHit = d.FastPathHit
+	counter.AclHitMax = d.AclHitMax
+	d.FirstPathHit = 0
+	d.FastPathHit = 0
+	d.AclHitMax = 0
+	counter.FastPathMacCount = d.FastPathMacCount
+	counter.FastPathPolicyCount = d.FastPathPolicyCount
+	counter.UnmatchedPacketCount = d.UnmatchedPacketCount
 	for i := 0; i < d.queueCount; i++ {
 		for j := TAP_MIN; j < TAP_MAX; j++ {
 			maps := d.FastPolicyMaps[i][j]
@@ -485,7 +485,7 @@ func (d *Ddbs) GetCounter() interface{} {
 
 func (d *Ddbs) FlushAcls() {
 	d.FastPath.FlushAcls()
-	atomic.StoreUint64(&d.UnmatchedPacketCount, 0)
+	d.UnmatchedPacketCount = 0
 }
 
 func (d *Ddbs) AddAcl(acl *Acl) {
@@ -608,10 +608,9 @@ func (d *Ddbs) GetPolicyByFastPath(packet *LookupKey) (*EndpointStore, *PolicyDa
 	}
 
 	if policy != nil && policy.ACLID == 0 {
-		atomic.AddUint64(&d.UnmatchedPacketCount, 1)
+		d.UnmatchedPacketCount++
 	}
 
-	atomic.AddUint64(&d.FastPathHit, 1)
-	atomic.AddUint64(&d.FastPathHitTick, 1)
+	d.FastPathHit++
 	return endpoint, policy
 }
