@@ -197,12 +197,12 @@ func (a *TridentAdapter) findAndAdd(data []byte, key uint32, seq uint32, timesta
 	a.cacheLookup(data, key, seq, timestamp)
 }
 
-func (a *TridentAdapter) prepareItem(count uint8) {
+func (a *TridentAdapter) prepareItem(count, index uint8) {
 	if count > 0 {
 		a.block.Count = count
 		a.counter.TxPackets += uint64(count)
 		a.stats.TxPackets += uint64(count)
-		a.itemKeys = append(a.itemKeys, queue.HashKey(a.block.Metas[0].InPort))
+		a.itemKeys = append(a.itemKeys, queue.HashKey(a.block.Metas[0].GenerateQueueHash(index)))
 		a.itemBatch = append(a.itemBatch, a.block)
 		a.block = datatype.AcquireMetaPacketBlock()
 	}
@@ -210,7 +210,7 @@ func (a *TridentAdapter) prepareItem(count uint8) {
 
 func (a *TridentAdapter) decode(data []byte, ip uint32) time.Duration {
 	decoder := NewSequentialDecoder(data)
-	inPort, _ := decoder.DecodeHeader()
+	inPort, index, _ := decoder.DecodeHeader()
 	timestamp := decoder.timestamp
 
 	i := uint8(0) // 使用a.block.Count, 因为i一定为0，直接赋值0
@@ -219,12 +219,12 @@ func (a *TridentAdapter) decode(data []byte, ip uint32) time.Duration {
 		meta.InPort = inPort
 		meta.Exporter = ip
 		if decoder.NextPacket(meta) {
-			a.prepareItem(i)
+			a.prepareItem(i, index)
 			break
 		}
 		i++
 		if i >= datatype.META_PACKET_SIZE_PER_BLOCK {
-			a.prepareItem(i)
+			a.prepareItem(i, index)
 			i = 0
 		}
 	}
@@ -268,7 +268,7 @@ func (a *TridentAdapter) run() {
 		}
 		key := IpToUint32(remote.IP.To4())
 		decoder := NewSequentialDecoder(data)
-		if _, invalid := decoder.DecodeHeader(); invalid {
+		if _, _, invalid := decoder.DecodeHeader(); invalid {
 			a.udpPool.Put(data)
 			continue
 		}
