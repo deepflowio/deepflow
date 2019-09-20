@@ -95,12 +95,12 @@ type MetaPacketBlock struct {
 	pool.ReferenceCount
 }
 
-// FIXME: trident压缩添加Hash字段后，该函数弃用
-func (p *MetaPacket) GenerateQueueHash() uint8 {
+// index为trident dispatcher的index
+func (p *MetaPacket) GenerateQueueHash(index uint8) uint8 {
 	// 哈希用于Queue负载均衡，只需低8bit尽量随机即可
 	// 为了保证一个MetaPacketBlock中的所有流量都在一个队列中，使用InPort和Exporter
 	hash := p.InPort ^ p.Exporter
-	p.QueueHash = uint8(hash>>24) ^ uint8(hash>>16) ^ uint8(hash>>8) ^ uint8(hash)
+	p.QueueHash = uint8(hash>>24) ^ uint8(hash>>16) ^ uint8(hash>>8) ^ uint8(hash) ^ index
 	if p.EthType == EthernetTypeIPv6 {
 		for i := range p.Ip6Src {
 			p.QueueHash ^= uint8(p.Ip6Src[i])
