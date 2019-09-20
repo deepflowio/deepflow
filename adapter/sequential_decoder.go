@@ -345,14 +345,16 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 	}
 }
 
-func (d *SequentialDecoder) DecodeHeader() (uint32, bool) {
+func (d *SequentialDecoder) DecodeHeader() (uint32, uint8, bool) {
 	d.data.Skip(1)
 	version := d.data.U8()
 	if version != 1 {
-		return 0, true
+		return 0, 0, true
 	}
 	d.seq = d.data.U32()
-	d.timestamp = time.Duration(d.data.U64()) * time.Microsecond
+	indexAndTimestamp := d.data.U64()
+	index := uint8(indexAndTimestamp >> 56)
+	d.timestamp = time.Duration(indexAndTimestamp&0xffffffffffffff) * time.Microsecond
 	inPort := d.data.U32()
 	if inPort&ANALYZER_TRIDENT == ANALYZER_TRIDENT {
 		inPort = inPort & ANALYZER_TRIDNET_MASK
@@ -364,7 +366,7 @@ func (d *SequentialDecoder) DecodeHeader() (uint32, bool) {
 	} else {
 		inPort = inPort&TRIDNET_MASK | PACKET_SOURCE_TOR
 	}
-	return inPort, false
+	return inPort, index, false
 }
 
 func (d *SequentialDecoder) NextPacket(meta *MetaPacket) bool {
