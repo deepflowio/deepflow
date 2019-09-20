@@ -1,8 +1,6 @@
 package policy
 
 import (
-	"sync/atomic"
-
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
@@ -28,9 +26,9 @@ type PolicyLabeler struct {
 	GroupPortPolicyMaps [TAP_MAX][ACL_PROTO_MAX]map[uint64]*PolicyData // 慢速路径上资源组+协议+端口到Policy的映射表
 	GroupVlanPolicyMaps [TAP_MAX]map[uint64]*PolicyData                // 慢速路径上资源组+Vlan到Policy的映射表
 
-	FirstPathHit, FirstPathHitTick uint64
-	AclHitMax                      uint32
-	UnmatchedPacketCount           uint64
+	FirstPathHit         uint64
+	AclHitMax            uint32
+	UnmatchedPacketCount uint64
 
 	cloudPlatformLabeler *CloudPlatformLabeler
 }
@@ -58,7 +56,7 @@ func (l *PolicyLabeler) SetCloudPlatform(cloudPlatformLabeler *CloudPlatformLabe
 }
 
 func (l *PolicyLabeler) GetHitStatus() (uint64, uint64) {
-	return atomic.LoadUint64(&l.FirstPathHit), atomic.LoadUint64(&l.FastPathHit)
+	return l.FirstPathHit, l.FastPathHit
 }
 
 func (l *PolicyLabeler) GetCounter() interface{} {
@@ -74,12 +72,15 @@ func (l *PolicyLabeler) GetCounter() interface{} {
 	}
 
 	counter.Acl += uint32(len(l.RawAcls))
-	counter.FirstHit = atomic.SwapUint64(&l.FirstPathHitTick, 0)
-	counter.FastHit = atomic.SwapUint64(&l.FastPathHitTick, 0)
-	counter.AclHitMax = atomic.SwapUint32(&l.AclHitMax, 0)
-	counter.FastPathMacCount = atomic.LoadUint32(&l.FastPathMacCount)
-	counter.FastPathPolicyCount = atomic.LoadUint32(&l.FastPathPolicyCount)
-	counter.UnmatchedPacketCount = atomic.LoadUint64(&l.UnmatchedPacketCount)
+	counter.FirstHit = l.FirstPathHit
+	counter.FastHit = l.FastPathHit
+	counter.AclHitMax = l.AclHitMax
+	l.FirstPathHit = 0
+	l.FastPathHit = 0
+	l.AclHitMax = 0
+	counter.FastPathMacCount = l.FastPathMacCount
+	counter.FastPathPolicyCount = l.FastPathPolicyCount
+	counter.UnmatchedPacketCount = l.UnmatchedPacketCount
 	for i := 0; i < l.queueCount; i++ {
 		for j := TAP_MIN; j < TAP_MAX; j++ {
 			maps := l.FastPolicyMaps[i][j]
@@ -317,7 +318,7 @@ func (l *PolicyLabeler) UpdateAcls(acls []*Acl, _ ...bool) {
 
 func (l *PolicyLabeler) FlushAcls() {
 	l.FastPath.FlushAcls()
-	atomic.StoreUint64(&l.UnmatchedPacketCount, 0)
+	l.UnmatchedPacketCount = 0
 }
 
 func (l *PolicyLabeler) AddAcl(acl *Acl) {
@@ -435,14 +436,12 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 			findPolicy.NpbActions = findPolicy.CheckNpbAction(packet, packetEndpointData)
 		}
 	} else {
-		atomic.AddUint64(&l.UnmatchedPacketCount, 1)
+		l.UnmatchedPacketCount++
 	}
 
-	atomic.AddUint64(&l.FirstPathHit, 1)
-	atomic.AddUint64(&l.FirstPathHitTick, 1)
-	aclHitMax := atomic.LoadUint32(&l.AclHitMax)
-	if aclHit := uint32(len(findPolicy.AclActions) + len(findPolicy.NpbActions)); aclHitMax < aclHit {
-		atomic.CompareAndSwapUint32(&l.AclHitMax, aclHitMax, aclHit)
+	l.FirstPathHit++
+	if aclHit := uint32(len(findPolicy.AclActions) + len(findPolicy.NpbActions)); l.AclHitMax < aclHit {
+		l.AclHitMax = aclHit
 	}
 	return endpointStore, findPolicy
 }
@@ -504,10 +503,9 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointStore, 
 	}
 
 	if policy != nil && policy.ACLID == 0 {
-		atomic.AddUint64(&l.UnmatchedPacketCount, 1)
+		l.UnmatchedPacketCount++
 	}
 
-	atomic.AddUint64(&l.FastPathHit, 1)
-	atomic.AddUint64(&l.FastPathHitTick, 1)
+	l.FastPathHit++
 	return endpoint, policy
 }
