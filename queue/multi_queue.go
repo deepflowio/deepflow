@@ -5,6 +5,7 @@ package queue
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
@@ -39,6 +40,10 @@ func (q FixedMultiQueue) Len(key HashKey) int {
 // count和queueSize要求是2的幂以避免求余计算，如果不是2的幂将会隐式转换为2的幂来构造
 // HashKey要求映射到count范围内，否则MultiQueue只会取低比特位
 func NewOverwriteQueues(module string, count uint8, queueSize int, options ...Option) FixedMultiQueue {
+	if count > MAX_QUEUE_COUNT {
+		panic(fmt.Sprintf("queueCount超出最大限制%d", MAX_QUEUE_COUNT))
+	}
+
 	size := int(count)
 	queues := make([]*OverwriteQueue, size)
 	for i := 0; i < size; i++ {

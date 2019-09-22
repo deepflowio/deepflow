@@ -6,7 +6,7 @@ import (
 )
 
 func TestMultiQueue(t *testing.T) {
-	queue := NewOverwriteQueues("whatever", 17, 1)
+	queue := NewOverwriteQueues("whatever", 15, 1)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -17,7 +17,7 @@ func TestMultiQueue(t *testing.T) {
 	}()
 	queue.Put(7, 10086)
 	wg.Wait()
-	if len(queue) != 32 {
-		t.Errorf("Expected 32, actually %d", len(queue))
+	if len(queue) != 16 {
+		t.Errorf("Expected 16, actually %d", len(queue))
 	}
 }

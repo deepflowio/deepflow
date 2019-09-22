@@ -471,12 +471,8 @@ func (d *Ddbs) GetCounter() interface{} {
 	for i := 0; i < d.queueCount; i++ {
 		for j := TAP_MIN; j < TAP_MAX; j++ {
 			maps := d.FastPolicyMaps[i][j]
-			mapsMini := d.FastPolicyMapsMini[i][j]
 			if maps != nil {
-				counter.FastPath += uint32(maps.Len())
-			}
-			if mapsMini != nil {
-				counter.FastPath += uint32(mapsMini.Len())
+				counter.FastPath += uint32(maps.Size())
 			}
 		}
 	}

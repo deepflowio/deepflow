@@ -95,20 +95,12 @@ type MetaPacketBlock struct {
 	pool.ReferenceCount
 }
 
-// index为trident dispatcher的index
-func (p *MetaPacket) GenerateQueueHash(index uint8) uint8 {
-	// 哈希用于Queue负载均衡，只需低8bit尽量随机即可
-	// 为了保证一个MetaPacketBlock中的所有流量都在一个队列中，使用InPort和Exporter
+// index目前为trident dispatcher的index
+func (p *MetaPacket) GenerateQueueHash(tridentQueueIndex uint8) uint8 {
+	// 为了保证一个MetaPacketBlock中的所有流量都在一个队列中，使用InPort、Exporter、TridentQueueIndex
 	hash := p.InPort ^ p.Exporter
-	p.QueueHash = uint8(hash>>24) ^ uint8(hash>>16) ^ uint8(hash>>8) ^ uint8(hash) ^ index
-	if p.EthType == EthernetTypeIPv6 {
-		for i := range p.Ip6Src {
-			p.QueueHash ^= uint8(p.Ip6Src[i])
-		}
-		for i := range p.Ip6Dst {
-			p.QueueHash ^= uint8(p.Ip6Dst[i])
-		}
-	}
+	p.QueueHash = uint8(hash>>24) ^ uint8(hash>>16) ^ uint8(hash>>8) ^ uint8(hash) ^ tridentQueueIndex
+	// 哈希用于Queue负载均衡，QueueCount最大为16，只需低4bit尽量随机即可
 	p.QueueHash = (p.QueueHash >> 6) ^ (p.QueueHash >> 4) ^ (p.QueueHash >> 2) ^ p.QueueHash
 	return p.QueueHash
 }
