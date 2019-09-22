@@ -6,6 +6,8 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
+const MAX_QUEUE_COUNT = 16
+
 type HashKey = uint8
 
 type Option = interface{}

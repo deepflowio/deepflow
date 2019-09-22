@@ -84,12 +84,8 @@ func (l *PolicyLabeler) GetCounter() interface{} {
 	for i := 0; i < l.queueCount; i++ {
 		for j := TAP_MIN; j < TAP_MAX; j++ {
 			maps := l.FastPolicyMaps[i][j]
-			mapsMini := l.FastPolicyMapsMini[i][j]
 			if maps != nil {
-				counter.FastPath += uint32(maps.Len())
-			}
-			if mapsMini != nil {
-				counter.FastPath += uint32(mapsMini.Len())
+				counter.FastPath += uint32(maps.Size())
 			}
 		}
 	}

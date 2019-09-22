@@ -71,6 +71,33 @@ func TestU64LRU(t *testing.T) {
 	if !ok || value.(uint64) != expect {
 		t.Errorf("key {%d => %d, exist=%v} is not expected", key, expect, ok)
 	}
+
+	// Size和Clear
+	if lru.Size() != capacity/2 {
+		t.Errorf("LRU已满，size %d，预期 %d", lru.Size(), capacity/2)
+	}
+	lru.Clear()
+	if lru.Size() != 0 {
+		t.Errorf("LRU清空后，size %d，预期 %d", lru.Size(), 0)
+	}
+
+	// 添加0~255并Get
+	capacity /= 2
+	for i := 0; i < capacity; i++ {
+		lru.Add(uint64(i), uint64(i))
+	}
+	for i := 0; i < capacity; i++ {
+		value, ok := lru.Get(uint64(i), true)
+		if !ok || value.(uint64) != uint64(i) {
+			t.Errorf("key {%d => %d, exist=%v} is not expected", i, value, ok)
+		}
+	}
+	for i := capacity - 1; i >= 0; i-- {
+		value, ok := lru.Get(uint64(i), false)
+		if !ok || value.(uint64) != uint64(i) {
+			t.Errorf("key {%d => %d, exist=%v} is not expected", i, value, ok)
+		}
+	}
 }
 
 func BenchmarkU64LRUAdd(b *testing.B) {
@@ -122,7 +149,7 @@ func BenchmarkU64LRUPeek(b *testing.B) {
 	}
 }
 
-func BenchmarkOldLRUAdd(b *testing.B) {
+func BenchmarkOld64LRUAdd(b *testing.B) {
 	capacity := 1 << 20
 	lru := oldlru.NewCache64(capacity)
 
@@ -132,7 +159,7 @@ func BenchmarkOldLRUAdd(b *testing.B) {
 	}
 }
 
-func BenchmarkOldLRURemove(b *testing.B) {
+func BenchmarkOld64LRURemove(b *testing.B) {
 	capacity := b.N
 	lru := oldlru.NewCache64(capacity)
 	for i := 0; i < b.N; i++ {
@@ -145,7 +172,7 @@ func BenchmarkOldLRURemove(b *testing.B) {
 	}
 }
 
-func BenchmarkOldLRUGet(b *testing.B) {
+func BenchmarkOld64LRUGet(b *testing.B) {
 	capacity := 1 << 20
 	lru := oldlru.NewCache64(capacity)
 	for i := 0; i < b.N; i++ {
@@ -158,7 +185,7 @@ func BenchmarkOldLRUGet(b *testing.B) {
 	}
 }
 
-func BenchmarkOldLRUPeek(b *testing.B) {
+func BenchmarkOld64LRUPeek(b *testing.B) {
 	capacity := 1 << 20
 	lru := oldlru.NewCache64(capacity)
 	for i := 0; i < b.N; i++ {
@@ -168,5 +195,54 @@ func BenchmarkOldLRUPeek(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		lru.Peek(uint64(i))
+	}
+}
+
+func BenchmarkOld32LRUAdd(b *testing.B) {
+	capacity := 1 << 20
+	lru := oldlru.NewCache32(capacity)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		lru.Add(uint32(i), i)
+	}
+}
+
+func BenchmarkOld32LRURemove(b *testing.B) {
+	capacity := b.N
+	lru := oldlru.NewCache32(capacity)
+	for i := 0; i < b.N; i++ {
+		lru.Add(uint32(i), i)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		lru.Remove(uint32(i))
+	}
+}
+
+func BenchmarkOld32LRUGet(b *testing.B) {
+	capacity := 1 << 20
+	lru := oldlru.NewCache32(capacity)
+	for i := 0; i < b.N; i++ {
+		lru.Add(uint32(i), i)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		lru.Get(uint32(i))
+	}
+}
+
+func BenchmarkOld32LRUPeek(b *testing.B) {
+	capacity := 1 << 20
+	lru := oldlru.NewCache32(capacity)
+	for i := 0; i < b.N; i++ {
+		lru.Add(uint32(i), i)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		lru.Peek(uint32(i))
 	}
 }
