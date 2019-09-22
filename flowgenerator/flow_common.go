@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/gopacket/layers"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 func updateFlowTag(taggedFlow *TaggedFlow, meta *MetaPacket) {
@@ -155,7 +156,7 @@ func reverseFlowTag(taggedFlow *TaggedFlow) {
 	taggedFlow.PolicyData = reversePolicyData(taggedFlow.PolicyData)
 }
 
-func (f *FlowMap) checkIfDoFlowPerf(flowExtra *FlowExtra) bool {
+func (m *FlowMap) checkIfDoFlowPerf(flowExtra *FlowExtra) bool {
 	if flowExtra.taggedFlow.PolicyData != nil && flowExtra.taggedFlow.PolicyData.ActionFlags&FLOW_PERF_ACTION_FLAGS != 0 {
 		if flowExtra.metaFlowPerf == nil {
 			flowExtra.metaFlowPerf = AcquireMetaFlowPerf()
@@ -164,4 +165,36 @@ func (f *FlowMap) checkIfDoFlowPerf(flowExtra *FlowExtra) bool {
 	}
 
 	return false
+}
+
+// hash of the key L3, symmetric
+func getKeyL3Hash(meta *MetaPacket, basis uint32) uint64 {
+	ipSrc := uint64(meta.IpSrc)
+	ipDst := uint64(meta.IpDst)
+	if meta.EthType == layers.EthernetTypeIPv6 {
+		ipSrc = uint64(GetIpHash(meta.Ip6Src))
+		ipDst = uint64(GetIpHash(meta.Ip6Dst))
+	}
+	if ipSrc >= ipDst {
+		return ipSrc<<32 | ipDst
+	}
+	return ipDst<<32 | ipSrc
+}
+
+// hash of the key L4, symmetric
+func getKeyL4Hash(meta *MetaPacket, basis uint32) uint64 {
+	portSrc := uint32(meta.PortSrc)
+	portDst := uint32(meta.PortDst)
+	if portSrc >= portDst {
+		return uint64(hashAdd(basis, (portSrc<<16)|portDst))
+	}
+	return uint64(hashAdd(basis, (portDst<<16)|portSrc))
+}
+
+func (m *FlowMap) getQuinTupleHash(meta *MetaPacket) uint64 {
+	return getKeyL3Hash(meta, m.hashBasis) ^ ((uint64(meta.InPort) << 32) | getKeyL4Hash(meta, m.hashBasis))
+}
+
+func (m *FlowMap) getEthOthersQuinTupleHash(meta *MetaPacket) uint64 {
+	return meta.MacSrc ^ meta.MacDst
 }

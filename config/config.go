@@ -145,17 +145,17 @@ func (c *Config) Validate() error {
 		c.Adapter.OrderingCacheSize = 256
 	}
 
-	if c.Queue.PacketQueueCount < 1 || c.Queue.PacketQueueCount > 64 {
+	if c.Queue.PacketQueueCount < 1 || c.Queue.PacketQueueCount > 16 {
 		c.Queue.PacketQueueCount = 1
 	} else {
 		c.Queue.PacketQueueCount = minPowerOfTwo(c.Queue.PacketQueueCount)
 	}
-	if c.Queue.FlowQueueCount < 1 || c.Queue.FlowQueueCount > 64 {
+	if c.Queue.FlowQueueCount < 1 || c.Queue.FlowQueueCount > 16 {
 		c.Queue.FlowQueueCount = 1
 	} else {
 		c.Queue.FlowQueueCount = minPowerOfTwo(c.Queue.FlowQueueCount)
 	}
-	if c.Queue.DocQueueCount < 1 || c.Queue.DocQueueCount > 64 {
+	if c.Queue.DocQueueCount < 1 || c.Queue.DocQueueCount > 16 {
 		c.Queue.DocQueueCount = 1
 	} else {
 		c.Queue.DocQueueCount = minPowerOfTwo(c.Queue.DocQueueCount)

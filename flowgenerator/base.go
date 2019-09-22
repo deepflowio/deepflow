@@ -91,8 +91,7 @@ type TimeoutConfig struct {
 }
 
 type FlowGenerator struct {
-	hashBasis uint32
-	flowMap   *FlowMap
+	flowMap *FlowMap
 
 	inputQueue QueueReader // 注意设置不低于_FLOW_STAT_INTERVAL的FlushIndicator
 	running    bool
