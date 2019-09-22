@@ -1,6 +1,7 @@
 package flowgenerator
 
 import (
+	"math/rand"
 	"strconv"
 	"sync"
 	"time"
@@ -51,6 +52,7 @@ type FlowMap struct {
 	bufferStartIndex int32              // ringBuffer中的开始下标（二维矩阵下标），闭区间
 	bufferEndIndex   int32              // ringBuffer中的结束下标（二维矩阵下标），开区间
 
+	hashBasis      uint32
 	hashSlots      int32 // 上取整至2^N，哈希桶个数
 	hashSlotBits   int32 // hashSlots中低位连续0比特个数
 	timeWindowSize int32 // 上取整至2^N，环形时间桶的槽位个数
@@ -436,13 +438,29 @@ func (m *FlowMap) newNode(meta *datatype.MetaPacket, hash uint64) {
 	}
 }
 
-func (m *FlowMap) InjectMetaPacket(hash uint64, meta *datatype.MetaPacket) {
-	// 滑动时间窗口
-	if !m.InjectFlushTicker(meta.Timestamp) {
+func (m *FlowMap) InjectMetaPacket(block *datatype.MetaPacketBlock) {
+	if block.Count == 0 {
+		return
+	}
+	// 使用block中的最后一个包滑动时间窗口，一个block一定在trident发送的一个压缩包头中且递增，时间最大只跨越1秒
+	if !m.InjectFlushTicker(block.Metas[block.Count-1].Timestamp) {
 		// 包的时间不在时间窗口中，忽略
 		return
 	}
 
+	for i := uint8(0); i < block.Count; i++ {
+		meta := &block.Metas[i]
+		hash := uint64(0)
+		if meta.EthType != layers.EthernetTypeIPv4 && meta.EthType != layers.EthernetTypeIPv6 {
+			hash = m.getEthOthersQuinTupleHash(meta)
+		} else {
+			hash = m.getQuinTupleHash(meta)
+		}
+		m.injectMetaPacket(hash, meta)
+	}
+}
+
+func (m *FlowMap) injectMetaPacket(hash uint64, meta *datatype.MetaPacket) {
 	// 查找对应Flow所在的节点
 	width := 0
 	next := int32(0)
@@ -493,6 +511,7 @@ func NewFlowMap(hashSlots, capacity, id int, timeWindow, packetDelay, flushInter
 	m := &FlowMap{
 		FlowGeo:                innerFlowGeo,
 		ringBuffer:             make([]flowMapNodeBlock, (capacity+_BLOCK_SIZE)/_BLOCK_SIZE*_BLOCK_SIZE+1),
+		hashBasis:              rand.Uint32(),
 		hashSlots:              int32(hashSlots),
 		hashSlotBits:           int32(hashSlotBits),
 		timeWindowSize:         int32(timeWindowSize),
