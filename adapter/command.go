@@ -14,6 +14,11 @@ import (
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
 )
 
+const (
+	ADAPTER_CMD_SHOW = iota
+	ADAPTER_CMD_STATUS
+)
+
 type command struct {
 	tridentAdapter *TridentAdapter
 }
@@ -28,7 +33,8 @@ func (c *command) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, operate ui
 	switch operate {
 	case ADAPTER_CMD_SHOW:
 		encoder := gob.NewEncoder(&buff)
-		if err := encoder.Encode(adapter.stats); err != nil {
+		counter := adapter.GetStatsCounter().(*PacketCounter)
+		if err := encoder.Encode(counter); err != nil {
 			log.Error(err)
 			return
 		}

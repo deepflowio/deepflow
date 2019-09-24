@@ -93,11 +93,11 @@ func Start(configPath string) (closers []io.Closer) {
 		datatype.ReleaseMetaPacketBlock(x.(*datatype.MetaPacketBlock))
 	}
 	labelerQueues := manager.NewQueues(
-		"1-meta-packet-to-labeler", cfg.Queue.LabelerQueueSize, cfg.Queue.PacketQueueCount, 1,
+		"1-meta-packet-to-labeler", cfg.Queue.LabelerQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
 		libqueue.OptionRelease(releaseMetaPacketBlock),
 	)
 
-	tridentAdapter := adapter.NewTridentAdapter(labelerQueues, cfg.Adapter.SocketBufferSize, cfg.Adapter.OrderingCacheSize)
+	tridentAdapter := adapter.NewTridentAdapter(labelerQueues.Writers(), cfg.Adapter.SocketBufferSize, cfg.Adapter.OrderingCacheSize)
 	if tridentAdapter == nil {
 		return
 	}
