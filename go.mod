@@ -1,6 +1,7 @@
 module gitlab.x.lan/yunshan/droplet
 
 require (
+	github.com/Workiva/go-datastructures v1.0.50
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/golang/protobuf v1.3.1
 	github.com/google/gopacket v1.1.17

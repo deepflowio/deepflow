@@ -61,10 +61,17 @@ type SequentialDecoder struct {
 	forward   bool
 	rx, tx    Decoded
 	x         *Decoded
+
+	inPort       uint32
+	tridentIndex uint8
 }
 
 func NewSequentialDecoder(data []byte) *SequentialDecoder {
 	return &SequentialDecoder{data: NewByteStream(data)}
+}
+
+func (d *SequentialDecoder) initSequentialDecoder(data []byte) {
+	d.data = NewByteStream(data)
 }
 
 var FLAGS_NAME = [...]string{
@@ -345,11 +352,11 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 	}
 }
 
-func (d *SequentialDecoder) DecodeHeader() (uint32, uint8, bool) {
+func (d *SequentialDecoder) DecodeHeader() bool {
 	d.data.Skip(1)
 	version := d.data.U8()
 	if version != 1 {
-		return 0, 0, true
+		return true
 	}
 	d.seq = d.data.U32()
 	indexAndTimestamp := d.data.U64()
@@ -366,7 +373,9 @@ func (d *SequentialDecoder) DecodeHeader() (uint32, uint8, bool) {
 	} else {
 		inPort = inPort&TRIDNET_MASK | PACKET_SOURCE_TOR
 	}
-	return inPort, index, false
+	d.inPort = inPort
+	d.tridentIndex = index
+	return false
 }
 
 func (d *SequentialDecoder) NextPacket(meta *MetaPacket) bool {

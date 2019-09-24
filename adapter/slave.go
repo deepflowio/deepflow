@@ -1,0 +1,104 @@
+package adapter
+
+import (
+	"strconv"
+	"sync"
+
+	ring "github.com/Workiva/go-datastructures/queue"
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/queue"
+	"gitlab.x.lan/yunshan/droplet-libs/stats"
+)
+
+type slave struct {
+	statsCounter
+
+	inQueue   *ring.RingBuffer
+	outQueue  queue.QueueWriter
+	block     *datatype.MetaPacketBlock
+	itemBatch []interface{}
+	udpPool   *sync.Pool
+}
+
+type slaveCounter struct {
+	Size uint32 `statsd:"size,gauge"`
+}
+
+func (s *slave) prepareItem(count, index uint8) {
+	if count > 0 {
+		s.block.Count = count
+		s.counter.TxPackets += uint64(count)
+		s.stats.TxPackets += uint64(count)
+		s.itemBatch = append(s.itemBatch, s.block)
+		s.block = datatype.AcquireMetaPacketBlock()
+	}
+}
+
+func (s *slave) decode(hash uint8, ip uint32, decoder *SequentialDecoder) {
+	inPort, index := decoder.inPort, decoder.tridentIndex
+
+	i := uint8(0) // 使用a.block.Count, 因为i一定为0，直接赋值0
+	for {
+		meta := &s.block.Metas[i]
+		meta.InPort = inPort
+		meta.Exporter = ip
+		meta.QueueHash = hash
+		if decoder.NextPacket(meta) {
+			s.prepareItem(i, index)
+			break
+		}
+		i++
+		if i >= datatype.META_PACKET_SIZE_PER_BLOCK {
+			s.prepareItem(i, index)
+			i = 0
+		}
+	}
+
+	if len(s.itemBatch) > 0 {
+		s.outQueue.Put(s.itemBatch...)
+		s.itemBatch = s.itemBatch[:0]
+	}
+}
+
+func (s *slave) put(packet *packetBuffer) {
+	s.inQueue.Put(packet)
+}
+
+func (s *slave) releasePacketBuffer(packet *packetBuffer) {
+	s.udpPool.Put(packet)
+}
+
+func (s *slave) run() {
+	for {
+		item, _ := s.inQueue.Get()
+		packet := item.(*packetBuffer)
+		s.decode(packet.hash, packet.tridentIp, &packet.decoder)
+		s.releasePacketBuffer(packet)
+	}
+}
+
+func (s *slave) GetCounter() interface{} {
+	counter := &slaveCounter{}
+	counter.Size = uint32(s.inQueue.Len())
+	return counter
+}
+
+func (s *slave) Closed() bool {
+	return false // never close
+}
+
+func (s *slave) init(id int, out queue.QueueWriter, pool *sync.Pool) {
+	s.block = datatype.AcquireMetaPacketBlock()
+	s.outQueue = out
+	s.inQueue = ring.NewRingBuffer(1024)
+	s.itemBatch = make([]interface{}, 0, QUEUE_BATCH_SIZE)
+	s.udpPool = pool
+	s.statsCounter.init()
+	stats.RegisterCountable("slave-queue", s, stats.OptionStatTags{"index": strconv.Itoa(id)})
+}
+
+func newSlave(id int, out queue.QueueWriter, pool *sync.Pool) *slave {
+	s := &slave{}
+	s.init(id, out, pool)
+	return s
+}
