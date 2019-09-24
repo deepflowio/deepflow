@@ -7,6 +7,7 @@ package queue
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -61,7 +62,7 @@ func (q *OverwriteQueue) Init(module string, size int, options ...Option) {
 		case OptionStatsOption: // XXX: interface{}类型，必须放在最后
 			statOptions = append(statOptions, option.(OptionStatsOption))
 		default:
-			continue
+			panic(fmt.Sprintf("Unknown option %v", option))
 		}
 	}
 
