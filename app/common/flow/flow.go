@@ -6,7 +6,6 @@ import (
 	"github.com/google/gopacket/layers"
 
 	data "gitlab.x.lan/yunshan/droplet-libs/datatype"
-	. "gitlab.x.lan/yunshan/droplet/app/common/doctime"
 )
 
 type Flow data.TaggedFlow
@@ -40,8 +39,7 @@ func (f *Flow) ClosedFlowDuration() time.Duration {
 }
 
 func (f *Flow) NewFlowCount() uint64 {
-	if RoundToSecond(f.StartTime) == RoundToSecond(f.FlowMetricsPeers[data.FLOW_METRICS_PEER_SRC].ArrTime0) ||
-		RoundToSecond(f.StartTime) == RoundToSecond(f.FlowMetricsPeers[data.FLOW_METRICS_PEER_DST].ArrTime0) {
+	if f.IsNewFlow {
 		return 1
 	}
 	return 0

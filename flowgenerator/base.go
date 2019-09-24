@@ -57,12 +57,11 @@ const SECOND_COUNT_PER_MINUTE = 60
 
 // configurations for base flow generator, read only
 var (
-	flowGeneratorCount  uint64
-	hashMapSize         uint64
-	forceReportInterval time.Duration
-	reportTolerance     time.Duration
-	ignoreTorMac        bool
-	ignoreL2End         bool
+	flowGeneratorCount uint64
+	hashMapSize        uint64
+	packetDelay        time.Duration
+	ignoreTorMac       bool
+	ignoreL2End        bool
 )
 
 // configurations for timeout, read only
@@ -134,9 +133,8 @@ func SetTimeout(timeout TimeoutConfig) {
 
 func SetFlowGenerator(cfg config.Config) {
 	flowGeneratorCount = uint64(cfg.Queue.PacketQueueCount)
-	forceReportInterval = cfg.FlowGenerator.ForceReportInterval
 	hashMapSize = cfg.FlowGenerator.HashMapSize
-	reportTolerance = cfg.FlowGenerator.ReportTolerance
+	packetDelay = cfg.FlowGenerator.PacketDelay
 	ignoreTorMac = cfg.FlowGenerator.IgnoreTorMac
 	ignoreL2End = cfg.FlowGenerator.IgnoreL2End
 
