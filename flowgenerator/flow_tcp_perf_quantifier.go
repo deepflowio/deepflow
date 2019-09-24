@@ -216,18 +216,20 @@ func isContinuousSeqSegment(left, right, node *SeqSegment) ContinuousFlag {
 	return flag
 }
 
-// 如果把SeqSegment看作是sequence number的集合，retrans可认为是right包含node
-func isRetransSeqSegment(right, node *SeqSegment) bool {
-	if right == nil {
-		return false
-	}
-
-	if node.seqNumber >= right.seqNumber &&
-		right.seqNumber+right.length >= node.seqNumber+node.length {
+func checkRetrans(base, node *SeqSegment) bool {
+	if node.seqNumber >= base.seqNumber &&
+		base.seqNumber+base.length >= node.seqNumber+node.length {
 		return true
 	}
 
 	return false
+}
+
+func isRetransSeqSegment(left, right, node *SeqSegment) bool {
+	if right == nil {
+		return checkRetrans(left, node)
+	}
+	return checkRetrans(right, node)
 }
 
 // 如果把SeqSegment看作是sequence number的集合，error可认为是node与left或right相交
@@ -284,10 +286,10 @@ func (p *TcpSessionPeer) assertSeqNumber(tcpHeader *MetaPacketTcpHeader, payload
 		right = &p.seqArray[rightIndex]
 	}
 
-	if e := isErrorSeqSegment(left, right, &node); e {
-		flag = SEQ_ERROR
-	} else if r := isRetransSeqSegment(right, &node); r {
+	if r := isRetransSeqSegment(left, right, &node); r {
 		flag = SEQ_RETRANS
+	} else if e := isErrorSeqSegment(left, right, &node); e {
+		flag = SEQ_ERROR
 	} else {
 		if c := isContinuousSeqSegment(left, right, &node); c == SEQ_NODE_DISCONTINUOUS {
 			if len(p.seqArray) >= SEQ_LIST_MAX_LEN {
@@ -736,7 +738,6 @@ func (p *MetaFlowPerf) Update(header *MetaPacket, isFirstPacketDirection bool, f
 		err = FlowPerfError{what: "packet header or flow info is nil"}
 		return err
 	}
-
 	totalPacketCount := int64(flowExtra.taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].TotalPacketCount +
 		flowExtra.taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].TotalPacketCount)
 	p.calcVarianceStats(header, totalPacketCount)
