@@ -121,7 +121,11 @@ func (s *RpcConfigSynchronizer) pull() error {
 		for _, handler := range s.handlers {
 			handler(response, &s.RpcInfoVersions)
 		}
-		if len(s.handlers) > 0 {
+		// 因为droplet停止后，trisolaris中对应的版本号不会清除，重启droplet后，trisolaris push
+		// 下发的数据仅有版本号没有实际数据，所以策略和平台数据的初始化必须是由droplet主动请求
+		// 的, sync使用版本号为0的请求会更新trisolaris中对应的版本
+		if len(s.handlers) > 0 &&
+			s.RpcInfoVersions.VersionPlatformData+s.RpcInfoVersions.VersionAcls+s.RpcInfoVersions.VersionGroups > 0 {
 			s.updateVersions(response)
 		}
 		s.Unlock()
