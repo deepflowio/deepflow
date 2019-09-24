@@ -92,14 +92,12 @@ type TcpPerfStats struct {
 
 type FlowMetricsPeer struct {
 	// 注意字节对齐!
-	TickByteCount    uint64        // 每个包统计周期（目前是自然秒）清零
-	TickPacketCount  uint64        // 每个包统计周期（目前是自然秒）清零
-	ByteCount        uint64        // 每个流统计周期（目前是自然分）清零
-	PacketCount      uint64        // 每个流统计周期（目前是自然分）清零
-	TotalByteCount   uint64        // 不清零
-	TotalPacketCount uint64        // 不清零
-	ArrTime0         time.Duration // FIXME: 待删除
-	ArrTimeLast      time.Duration // FIXME: 待删除
+	TickByteCount    uint64 // 每个包统计周期（目前是自然秒）清零
+	TickPacketCount  uint64 // 每个包统计周期（目前是自然秒）清零
+	ByteCount        uint64 // 每个流统计周期（目前是自然分）清零
+	PacketCount      uint64 // 每个流统计周期（目前是自然分）清零
+	TotalByteCount   uint64 // 不清零
+	TotalPacketCount uint64 // 不清零
 	SubnetID         uint32
 	L3DeviceID       uint32
 	DeviceID         uint32
@@ -131,7 +129,8 @@ type Flow struct {
 	StartTime      time.Duration
 	EndTime        time.Duration
 	Duration       time.Duration
-	PacketStatTime time.Duration
+	PacketStatTime time.Duration // 取整至包统计周期的开始
+	FlowStatTime   time.Duration // 取整至流统计周期的开始
 
 	/* L2 */
 	VLAN    uint16
@@ -149,6 +148,7 @@ type Flow struct {
 	CloseType
 	IsActiveService bool
 	QueueHash       uint8
+	IsNewFlow       bool
 }
 
 func (t *TcpPerfStats) String() string {
@@ -209,7 +209,8 @@ func (f *Flow) String() string {
 	formatted += fmt.Sprintf("StartTime: %d ", f.StartTime)
 	formatted += fmt.Sprintf("EndTime: %d ", f.EndTime)
 	formatted += fmt.Sprintf("Duration: %d ", f.Duration)
-	formatted += fmt.Sprintf("PacketStatTime: %d\n", f.PacketStatTime)
+	formatted += fmt.Sprintf("PacketStatTime: %d ", f.PacketStatTime)
+	formatted += fmt.Sprintf("FlowStatTime: %d\n", f.FlowStatTime)
 	formatted += fmt.Sprintf("\tVLAN: %d ", f.VLAN)
 	formatted += fmt.Sprintf("EthType: %d ", f.EthType)
 	formatted += fmt.Sprintf("Country: %d ", f.Country)
