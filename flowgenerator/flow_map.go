@@ -281,7 +281,7 @@ func (m *FlowMap) copyAndOutput(node *flowMapNode, timestamp time.Duration) {
 	taggedFlow := flowExtra.taggedFlow
 
 	// 如果timestamp和上一个包不在一个_PACKET_STAT_INTERVAL，输出Packet统计信息并清零
-	if flowExtra.packetInTick && timestamp/_PACKET_STAT_INTERVAL != taggedFlow.PacketStatTime/_PACKET_STAT_INTERVAL {
+	if flowExtra.packetInTick && (timestamp >= taggedFlow.PacketStatTime+_PACKET_STAT_INTERVAL || timestamp < taggedFlow.PacketStatTime) {
 		if taggedFlow.PolicyData.ActionFlags&PACKET_ACTION != 0 {
 			outputTaggedFlow := datatype.CloneTaggedFlowForPacketStat(taggedFlow)
 			m.pushToPacketStatsQueue(outputTaggedFlow)
@@ -291,7 +291,7 @@ func (m *FlowMap) copyAndOutput(node *flowMapNode, timestamp time.Duration) {
 
 	// 如果timestamp和上一个包不在一个_FLOW_STAT_INTERVAL，输出Flow统计信息并清零
 	// 注意：流统计需要考虑包到达时间的延时容差，即若timestamp落在更靠前的统计周期内时，数据仍然计入当前统计周期
-	if timestamp/_FLOW_STAT_INTERVAL > taggedFlow.StartTime/_FLOW_STAT_INTERVAL {
+	if timestamp >= taggedFlow.FlowStatTime+_FLOW_STAT_INTERVAL {
 		flowExtra.setEndTimeAndDuration(timestamp / _FLOW_STAT_INTERVAL * _FLOW_STAT_INTERVAL)
 		if taggedFlow.PolicyData.ActionFlags&FLOW_ACTION != 0 {
 			outputTaggedFlow := datatype.CloneTaggedFlow(taggedFlow)

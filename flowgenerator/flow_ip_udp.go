@@ -5,12 +5,9 @@ import (
 )
 
 func (m *FlowMap) initUdpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
-	now := meta.Timestamp
-	m.initFlow(flowExtra, meta, now)
+	m.initFlow(flowExtra, meta)
 	taggedFlow := flowExtra.taggedFlow
 	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
-	flowMetricsPeerSrc.ArrTime0 = now
-	flowMetricsPeerSrc.ArrTimeLast = now
 	flowMetricsPeerSrc.TotalPacketCount = 1
 	flowMetricsPeerSrc.PacketCount = 1
 	flowMetricsPeerSrc.TickPacketCount = 1

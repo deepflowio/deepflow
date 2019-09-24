@@ -3,7 +3,6 @@ package flowgenerator
 import (
 	"net"
 	"testing"
-	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
@@ -84,7 +83,6 @@ func TestNegativeL3EpcIDAll(t *testing.T) {
 func TestFlowGeoInfo(t *testing.T) {
 	flowGenerator, inputPacketQueue, flowOutQueue, _ := flowGeneratorInit(0, true)
 	flowGenerator.flowMap.FlowGeo = testFlowGeo
-	forceReportInterval = 60 * time.Second
 	block := &MetaPacketBlock{}
 
 	packet0 := getDefaultPacket()

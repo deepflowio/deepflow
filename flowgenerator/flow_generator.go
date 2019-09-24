@@ -53,7 +53,7 @@ func (f *FlowGenerator) Stop() {
 // create a new flow generator
 func New(inputQueue QueueReader, packetAppQueue, flowAppQueue QueueWriter, flowLimitNum, index int, flushInterval time.Duration) *FlowGenerator {
 	flowGenerator := &FlowGenerator{
-		flowMap:    NewFlowMap(int(hashMapSize), flowLimitNum, index, maxTimeout, reportTolerance, flushInterval, packetAppQueue, flowAppQueue),
+		flowMap:    NewFlowMap(int(hashMapSize), flowLimitNum, index, maxTimeout, packetDelay, flushInterval, packetAppQueue, flowAppQueue),
 		inputQueue: inputQueue,
 		index:      index,
 	}

@@ -23,6 +23,7 @@ type Config struct {
 	MaxCPUs        int                 `yaml:"max-cpus"`
 	Stream         string              `yaml:"stream"`
 	StreamPort     uint16              `yaml:"stream-port"`
+	FlowThrottle   int                 `yaml:"flow-throttle"`
 	ZeroPort       uint16              `yaml:"zero-port"`
 	Adapter        AdapterConfig       `yaml:"adapter"`
 	Queue          QueueConfig         `yaml:"queue"`
@@ -60,7 +61,7 @@ type QueueConfig struct {
 	FlowAppQueueSize               int `yaml:"flow-app-queue-size"`
 	MeteringDocMarshallerQueueSize int `yaml:"metering-doc-marshaller-queue-size"`
 	FlowDocMarshallerQueueSize     int `yaml:"flow-doc-marshaller-queue-size"`
-	FlowMarshallerQueueSize        int `yaml:"flow-marshaller-queue-size"`
+	FlowThrottleQueueSize          int `yaml:"flow-throttle-queue-size"`
 	FlowSenderQueueSize            int `yaml:"flow-sender-queue-size"`
 	DocSenderQueueSize             int `yaml:"doc-sender-queue-size"`
 }
@@ -74,14 +75,13 @@ type LabelerConfig struct {
 type FlowGeneratorConfig struct {
 	FlowCountLimit int `yaml:"flow-count-limit"`
 	/* unit of interval and timeout: second */
-	ForceReportInterval time.Duration `yaml:"force-report-interval"`
-	EstablishedTimeout  time.Duration `yaml:"established-timeout"`
-	ClosingRstTimeout   time.Duration `yaml:"closing-rst-timeout"`
-	OthersTimeout       time.Duration `yaml:"others-timeout"`
-	HashMapSize         uint64        `yaml:"hash-map-size"`
-	ReportTolerance     time.Duration `yaml:"report-tolerance"`
-	IgnoreTorMac        bool          `yaml:"ignore-tor-mac"`
-	IgnoreL2End         bool          `yaml:"ignore-l2-end"`
+	EstablishedTimeout time.Duration `yaml:"established-timeout"`
+	ClosingRstTimeout  time.Duration `yaml:"closing-rst-timeout"`
+	OthersTimeout      time.Duration `yaml:"others-timeout"`
+	HashMapSize        uint64        `yaml:"hash-map-size"`
+	PacketDelay        time.Duration `yaml:"packet-delay"`
+	IgnoreTorMac       bool          `yaml:"ignore-tor-mac"`
+	IgnoreL2End        bool          `yaml:"ignore-l2-end"`
 }
 
 type MapReduceConfig struct {
@@ -134,6 +134,9 @@ func (c *Config) Validate() error {
 
 	if net.ParseIP(c.Stream) == nil {
 		return errors.New("Malformed stream")
+	}
+	if c.FlowThrottle < 1000 || c.FlowThrottle > 100000 {
+		c.FlowThrottle = 2000
 	}
 
 	if c.Adapter.SocketBufferSize == 0 {
@@ -195,8 +198,8 @@ func (c *Config) Validate() error {
 	if c.Queue.FlowDocMarshallerQueueSize <= 0 {
 		c.Queue.FlowDocMarshallerQueueSize = c.Queue.DocQueueSize
 	}
-	if c.Queue.FlowMarshallerQueueSize <= 0 {
-		c.Queue.FlowMarshallerQueueSize = c.Queue.FlowQueueSize
+	if c.Queue.FlowThrottleQueueSize <= 0 {
+		c.Queue.FlowThrottleQueueSize = c.Queue.FlowQueueSize
 	}
 	if c.Queue.FlowSenderQueueSize <= 0 {
 		c.Queue.FlowSenderQueueSize = c.Queue.FlowQueueSize
@@ -211,11 +214,6 @@ func (c *Config) Validate() error {
 
 	if c.FlowGenerator.FlowCountLimit == 0 {
 		c.FlowGenerator.FlowCountLimit = 1024 * 1024
-	}
-	if c.FlowGenerator.ForceReportInterval == 0 {
-		c.FlowGenerator.ForceReportInterval = 60 * time.Second
-	} else {
-		c.FlowGenerator.ForceReportInterval *= time.Second
 	}
 	if c.FlowGenerator.EstablishedTimeout == 0 {
 		c.FlowGenerator.EstablishedTimeout = 300 * time.Second
@@ -235,10 +233,10 @@ func (c *Config) Validate() error {
 	if c.FlowGenerator.HashMapSize == 0 {
 		c.FlowGenerator.HashMapSize = uint64(c.FlowGenerator.FlowCountLimit) / uint64(c.Queue.PacketQueueCount) * 4
 	}
-	if c.FlowGenerator.ReportTolerance == 0 {
-		c.FlowGenerator.ReportTolerance = 4 * time.Second
+	if c.FlowGenerator.PacketDelay < 1 || c.FlowGenerator.PacketDelay > 10 {
+		c.FlowGenerator.PacketDelay = 5 * time.Second
 	} else {
-		c.FlowGenerator.ReportTolerance *= time.Second
+		c.FlowGenerator.PacketDelay *= time.Second
 	}
 
 	if c.MapReduce.WindowSize < 70 {

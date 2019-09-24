@@ -39,7 +39,7 @@ func flowGeneratorInit(queueSize int, flushTicker bool) (*FlowGenerator, QueueWr
 	_PACKET_STAT_INTERVAL = time.Millisecond
 	_FLOW_STAT_INTERVAL = time.Millisecond * 100
 	hashMapSize = uint64(queueSize / 8)
-	reportTolerance = time.Millisecond * 4
+	packetDelay = time.Millisecond * 4
 	ignoreTorMac = false
 	ignoreL2End = false
 	innerFlowGeo = testFlowGeo
@@ -379,7 +379,7 @@ func TestReverseInNewCycle(t *testing.T) {
 	packet1.PolicyData = policyData1
 
 	flowExtra := &FlowExtra{}
-	flowGenerator.flowMap.initFlow(flowExtra, packet0, packet0.Timestamp)
+	flowGenerator.flowMap.initFlow(flowExtra, packet0)
 	flowExtra.packetInCycle = false
 	flowGenerator.flowMap.updateFlow(flowExtra, packet1)
 

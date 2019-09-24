@@ -1,8 +1,6 @@
 package flowgenerator
 
 import (
-	"time"
-
 	"github.com/google/gopacket/layers"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
@@ -23,7 +21,8 @@ func (m *FlowMap) genFlowId(timestamp uint64) uint64 {
 	return ((uint64(m.id) & THREAD_FLOW_ID_MASK) << 32) | ((timestamp & TIMER_FLOW_ID_MASK) << 32) | (m.totalFlow & COUNTER_FLOW_ID_MASK)
 }
 
-func (m *FlowMap) initFlow(flowExtra *FlowExtra, meta *MetaPacket, now time.Duration) {
+func (m *FlowMap) initFlow(flowExtra *FlowExtra, meta *MetaPacket) {
+	now := meta.Timestamp
 	meta.Direction = CLIENT_TO_SERVER // 初始认为是C2S，流匹配、流方向矫正均会会更新此值
 
 	taggedFlow := AcquireTaggedFlow()
@@ -49,17 +48,18 @@ func (m *FlowMap) initFlow(flowExtra *FlowExtra, meta *MetaPacket, now time.Dura
 	taggedFlow.TimeBitmap = getBitmap(now)
 	taggedFlow.StartTime = now
 	taggedFlow.EndTime = now
-	taggedFlow.PacketStatTime = now
+	taggedFlow.PacketStatTime = now / _PACKET_STAT_INTERVAL * _PACKET_STAT_INTERVAL
+	taggedFlow.FlowStatTime = now / _FLOW_STAT_INTERVAL * _FLOW_STAT_INTERVAL
 	taggedFlow.VLAN = meta.Vlan
 	taggedFlow.EthType = meta.EthType
 	taggedFlow.QueueHash = meta.QueueHash
+	taggedFlow.IsNewFlow = true
 	updateFlowTag(taggedFlow, meta)
 
 	flowExtra.taggedFlow = taggedFlow
 	flowExtra.flowState = FLOW_STATE_RAW
 	flowExtra.minArrTime = now
 	flowExtra.recentTime = now
-	flowExtra.reported = false
 	flowExtra.reversed = false
 	flowExtra.packetInTick = true
 	flowExtra.packetInCycle = true
@@ -74,8 +74,10 @@ func (m *FlowMap) updateFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 		packetTimestamp = timeMax(flowExtra.recentTime, startTime)
 	}
 	flowExtra.recentTime = packetTimestamp
-	flowExtra.taggedFlow.PacketStatTime = meta.Timestamp
-	flowExtra.packetInTick = true
+	if !flowExtra.packetInTick { // PacketStatTime取整至包统计时间的开始，只需要赋值一次，且使用包的时间戳
+		flowExtra.packetInTick = true
+		flowExtra.taggedFlow.PacketStatTime = meta.Timestamp / _PACKET_STAT_INTERVAL * _PACKET_STAT_INTERVAL
+	}
 	if !flowExtra.packetInCycle {
 		flowExtra.packetInCycle = true
 		updateFlowTag(taggedFlow, meta)
@@ -85,10 +87,6 @@ func (m *FlowMap) updateFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 		updatePlatformData(taggedFlow, meta.EndpointData, meta.Direction == SERVER_TO_CLIENT)
 	}
 	flowMetricsPeer := &taggedFlow.FlowMetricsPeers[meta.Direction]
-	if flowMetricsPeer.TotalPacketCount == 0 {
-		flowMetricsPeer.ArrTime0 = packetTimestamp
-	}
-	flowMetricsPeer.ArrTimeLast = packetTimestamp
 	flowMetricsPeer.TickPacketCount++
 	flowMetricsPeer.PacketCount++
 	flowMetricsPeer.TotalPacketCount++

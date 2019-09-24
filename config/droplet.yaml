@@ -15,6 +15,8 @@ max-cpus: 0
 # conf for connection with outside stream
 stream: 127.0.0.1
 stream-port: 20201
+# 每秒向stream进程发送的最大Flow数量，默认值2000，允许范围[1000, 100000]
+flow-throttle: 2000
 # conf for connection with outside zero
 zero-port: 20211
 # trident adapter
@@ -69,10 +71,10 @@ queue:
   # name: 5-flow-doc-to-marshaller
   # flow app output queue size, default doc-queue-size
   flow-doc-marshaller-queue-size: 524288
-  # name: 4-tagged-flow-to-flow-marshaller
+  # name: 4-tagged-flow-to-flow-throttle
   # flow sender queue size, default flow-queue-size
-  flow-marshaller-queue-size: 524288
-  # name: 5-flow-pb-to-flow-sender
+  flow-throttle-queue-size: 524288
+  # name: 5-tagged-flow-to-flow-sender
   # flow sender queue size, default flow-queue-size
   flow-sender-queue-size: 524288
   # name: 6-all-doc-to-zero
@@ -92,8 +94,6 @@ labeler:
 flow-generator:
   # concurrent flow count limit
   flow-count-limit: 4194304
-  # hard output interval for long flow, in seconds
-  force-report-interval: 60
   # idle timeout for established tcp flow, in seconds
   established-timeout: 300
   # idle timeout for closing tcp flow,
@@ -110,8 +110,8 @@ flow-generator:
   timeout-cleaner-count: 4
   # hash map size for every generator
   hash-map-size: 262166
-  # report tolerance for the endtime field of a flow, in seconds
-  report-tolerance: 4
+  # 网包时间与当前时间相比的最大delay，单位为秒，可配置[1, 10]，默认为5
+  packet-delay: 5
   # if true, then not check mac for flow match when inport is 0x30000
   ignore-tor-mac: false
   # if true, then not check mac for flow match

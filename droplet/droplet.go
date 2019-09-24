@@ -16,7 +16,6 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/logger"
 	libqueue "gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gopkg.in/yaml.v2"
 
 	"gitlab.x.lan/yunshan/droplet/adapter"
@@ -95,7 +94,7 @@ func Start(configPath string) (closers []io.Closer) {
 	}
 	labelerQueues := manager.NewQueues(
 		"1-meta-packet-to-labeler", cfg.Queue.LabelerQueueSize, cfg.Queue.PacketQueueCount, 1,
-		releaseMetaPacketBlock,
+		libqueue.OptionRelease(releaseMetaPacketBlock),
 	)
 
 	tridentAdapter := adapter.NewTridentAdapter(labelerQueues, cfg.Adapter.SocketBufferSize, cfg.Adapter.OrderingCacheSize)
@@ -115,11 +114,11 @@ func Start(configPath string) (closers []io.Closer) {
 	// L2 - packet labeler
 	flowGeneratorQueues := manager.NewQueues(
 		"2-meta-packet-to-flow-generator", cfg.Queue.FlowGeneratorQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
-		libqueue.OptionFlushIndicator(time.Second), releaseMetaPacketBlock,
+		libqueue.OptionFlushIndicator(time.Second), libqueue.OptionRelease(releaseMetaPacketBlock),
 	)
 	pcapAppQueues := manager.NewQueues(
 		"2-meta-packet-to-pcap-app", cfg.Queue.PCapAppQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
-		libqueue.OptionFlushIndicator(time.Second*10), releaseMetaPacketBlock,
+		libqueue.OptionFlushIndicator(time.Second*10), libqueue.OptionRelease(releaseMetaPacketBlock),
 	)
 	labelerManager := labeler.NewLabelerManager(
 		labelerQueues.Readers(), cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable, cfg.Labeler.FirstPathDdbsDisable)
@@ -142,10 +141,10 @@ func Start(configPath string) (closers []io.Closer) {
 	}
 	flowDuplicatorQueues := manager.NewQueues(
 		"3-tagged-flow-to-flow-duplicator", cfg.Queue.FlowDuplicatorQueueSize, cfg.Queue.PacketQueueCount,
-		cfg.Queue.PacketQueueCount, releaseTaggedFlow)
+		cfg.Queue.PacketQueueCount, libqueue.OptionRelease(releaseTaggedFlow))
 	meteringAppQueues := manager.NewQueues(
 		"3-mini-tagged-flow-to-metering-app", cfg.Queue.MeteringAppQueueSize, cfg.Queue.PacketQueueCount,
-		cfg.Queue.PacketQueueCount, libqueue.OptionFlushIndicator(flowFlushInterval), releaseTaggedFlow,
+		cfg.Queue.PacketQueueCount, libqueue.OptionFlushIndicator(flowFlushInterval), libqueue.OptionRelease(releaseTaggedFlow),
 	)
 
 	flowgenerator.SetFlowGenerator(cfg)
@@ -196,24 +195,22 @@ func Start(configPath string) (closers []io.Closer) {
 	// L4 - flow duplicator: flow app & flow marshaller
 	flowAppQueues := manager.NewQueues(
 		"4-tagged-flow-to-flow-app", cfg.Queue.FlowAppQueueSize, cfg.Queue.FlowQueueCount,
-		cfg.Queue.PacketQueueCount, libqueue.OptionFlushIndicator(flowFlushInterval), releaseTaggedFlow)
-	flowMarshallerQueues := manager.NewQueues(
-		"4-tagged-flow-to-flow-marshaller", cfg.Queue.FlowMarshallerQueueSize, cfg.Queue.FlowQueueCount,
-		cfg.Queue.PacketQueueCount, releaseTaggedFlow)
+		cfg.Queue.PacketQueueCount, libqueue.OptionFlushIndicator(flowFlushInterval), libqueue.OptionRelease(releaseTaggedFlow))
+	flowThrottleQueues := manager.NewQueues(
+		"4-tagged-flow-to-flow-throttle", cfg.Queue.FlowThrottleQueueSize, cfg.Queue.FlowQueueCount,
+		cfg.Queue.PacketQueueCount, libqueue.OptionRelease(releaseTaggedFlow))
 	// 特殊处理：Duplicator的数量特意设置为PacketQueueCount，使得FlowGenerator所在环境均为单生产单消费
 	for i := 0; i < cfg.Queue.PacketQueueCount; i++ {
 		flowDuplicator := queue.NewDuplicator(i, 1024, flowDuplicatorQueues.Readers()[i], datatype.PseudoCloneTaggedFlowHelper)
-		flowDuplicator.AddMultiQueue(flowAppQueues).AddMultiQueue(flowMarshallerQueues).Start()
+		flowDuplicator.AddMultiQueue(flowAppQueues).AddMultiQueue(flowThrottleQueues).Start()
 	}
 
 	// L5 - flow sender
 	flowSenderQueue := manager.NewQueue(
-		"5-flow-pb-to-flow-sender", cfg.Queue.FlowSenderQueueSize,
-		libqueue.OptionRelease(func(p interface{}) { utils.ReleaseByteBuffer(p.(*utils.ByteBuffer)) }),
-	)
+		"5-tagged-flow-to-flow-sender", cfg.Queue.FlowSenderQueueSize, libqueue.OptionRelease(releaseTaggedFlow))
 	sender.NewFlowSender(
-		flowMarshallerQueues.Readers(), flowSenderQueue, flowSenderQueue,
-		cfg.Stream, cfg.StreamPort, cfg.Queue.FlowSenderQueueSize).Start()
+		flowThrottleQueues.Readers(), flowSenderQueue, flowSenderQueue,
+		cfg.Stream, cfg.StreamPort, cfg.FlowThrottle, cfg.Queue.FlowSenderQueueSize).Start()
 
 	// L5 - flow app
 	flowDocMarshallerQueue := manager.NewQueues(

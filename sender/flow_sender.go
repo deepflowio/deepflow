@@ -11,15 +11,23 @@ import (
 )
 
 type FlowSender struct {
-	inputs     []queue.QueueReader
-	sinkWriter queue.QueueWriter
-	sinkReader queue.QueueReader
+	inputs        []queue.QueueReader
+	sinkWriter    queue.QueueWriter
+	sinkReader    queue.QueueReader
+	throttleQueue *ThrottlingQueue
 	*ZMQBytePusher
 	sequence uint32
 }
 
-func NewFlowSender(inputs []queue.QueueReader, sinkWriter queue.QueueWriter, sinkReader queue.QueueReader, ip string, port uint16, zmqHWM int) *FlowSender {
-	return &FlowSender{inputs, sinkWriter, sinkReader, NewZMQBytePusher(ip, port, zmqHWM), 1}
+func NewFlowSender(inputs []queue.QueueReader, sinkWriter queue.QueueWriter, sinkReader queue.QueueReader, ip string, port uint16, throttle, zmqHWM int) *FlowSender {
+	return &FlowSender{
+		inputs:        inputs,
+		sinkWriter:    sinkWriter,
+		sinkReader:    sinkReader,
+		throttleQueue: NewThrottlingQueue(throttle, sinkWriter),
+		ZMQBytePusher: NewZMQBytePusher(ip, port, zmqHWM),
+		sequence:      1,
+	}
 }
 
 // filter 如果流不被存储，返回true
@@ -29,9 +37,7 @@ func (s *FlowSender) filter(flow *datatype.TaggedFlow) bool {
 }
 
 func (s *FlowSender) receive(input queue.QueueReader) {
-	bytes := utils.AcquireByteBuffer()
 	inputBuffer := make([]interface{}, QUEUE_BATCH_SIZE)
-	sinkBuffer := make([]interface{}, 0, QUEUE_BATCH_SIZE)
 
 	for {
 		n := input.Gets(inputBuffer)
@@ -41,6 +47,22 @@ func (s *FlowSender) receive(input queue.QueueReader) {
 					datatype.ReleaseTaggedFlow(flow)
 					continue
 				}
+				s.throttleQueue.Send(flow)
+			} else {
+				log.Warningf("Invalid message type %T, should be *TaggedFlow", e)
+			}
+		}
+	}
+}
+
+func (s *FlowSender) send() {
+	buffer := make([]interface{}, QUEUE_BATCH_SIZE)
+	bytes := utils.AcquireByteBuffer()
+
+	for {
+		n := s.sinkReader.Gets(buffer)
+		for _, e := range buffer[:n] {
+			if flow, ok := e.(*datatype.TaggedFlow); ok {
 				header := &pb.StreamHeader{
 					Timestamp:   proto.Uint32(uint32(flow.StartTime.Seconds())),
 					Sequence:    proto.Uint32(s.sequence),
@@ -58,33 +80,10 @@ func (s *FlowSender) receive(input queue.QueueReader) {
 					continue
 				}
 				datatype.ReleaseTaggedFlow(flow)
-				sinkBuffer = append(sinkBuffer, bytes)
-
-				bytes = utils.AcquireByteBuffer()
+				s.ZMQBytePusher.Send(bytes.Bytes())
 				s.sequence++
 			} else {
 				log.Warningf("Invalid message type %T, should be *TaggedFlow", e)
-			}
-		}
-
-		if len(sinkBuffer) > 0 {
-			s.sinkWriter.Put(sinkBuffer...)
-			sinkBuffer = sinkBuffer[:0]
-		}
-	}
-}
-
-func (s *FlowSender) send() {
-	buffer := make([]interface{}, QUEUE_BATCH_SIZE)
-
-	for {
-		n := s.sinkReader.Gets(buffer)
-		for _, e := range buffer[:n] {
-			if bytes, ok := e.(*utils.ByteBuffer); ok {
-				s.ZMQBytePusher.Send(bytes.Bytes())
-				utils.ReleaseByteBuffer(bytes)
-			} else {
-				log.Warningf("Invalid message type %T, should be *utils.ByteBuffer", e)
 			}
 		}
 	}

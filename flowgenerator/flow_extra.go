@@ -32,7 +32,6 @@ type FlowExtra struct {
 	recentTime   time.Duration // 最近一个Packet的时间戳
 	timeout      time.Duration // 相对超时时间
 	flowState    FlowState
-	reported     bool
 	reversed     bool
 
 	packetInTick  bool // 当前包统计周期（目前是自然秒）是否有包
@@ -185,7 +184,6 @@ func (f *FlowExtra) setEndTimeAndDuration(timestamp time.Duration) {
 	taggedFlow := f.taggedFlow
 	taggedFlow.EndTime = timestamp
 	taggedFlow.Duration = f.recentTime - f.minArrTime // Duration仅使用包的时间计算，不包括超时时间
-	f.reported = true
 }
 
 func (f *FlowExtra) resetPacketStatInfo() {
@@ -206,6 +204,8 @@ func (f *FlowExtra) resetFlowStatInfo(now time.Duration) {
 	taggedFlow.TimeBitmap = 0
 	taggedFlow.StartTime = now
 	taggedFlow.EndTime = now
+	taggedFlow.FlowStatTime = now / _FLOW_STAT_INTERVAL * _FLOW_STAT_INTERVAL
+	taggedFlow.IsNewFlow = false
 	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
 	flowMetricsPeerDst := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
 	flowMetricsPeerSrc.PacketCount = 0

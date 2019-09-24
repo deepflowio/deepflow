@@ -38,14 +38,11 @@ func (m *FlowMap) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8, serv
 }
 
 func (m *FlowMap) initTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
-	now := meta.Timestamp
-	m.initFlow(flowExtra, meta, now)
+	m.initFlow(flowExtra, meta)
 	taggedFlow := flowExtra.taggedFlow
 	flags := meta.TcpData.Flags
 	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
 	flowMetricsPeerSrc.TCPFlags |= flags
-	flowMetricsPeerSrc.ArrTime0 = now
-	flowMetricsPeerSrc.ArrTimeLast = now
 	flowMetricsPeerSrc.TotalPacketCount = 1
 	flowMetricsPeerSrc.PacketCount = 1
 	flowMetricsPeerSrc.TickPacketCount = 1
