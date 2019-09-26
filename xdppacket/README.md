@@ -25,17 +25,19 @@ option说明
 ----------
 
 提供6个对外可配置选项，详细说明如下：
-1. OptNumFrames: 设置创建UMEM的大小，即上述的n，默认值1024, 因此Size(UMEM) = NumFrames * 2048 * 2；
-   - 2048是block的大小，即每个包的最大长度，但由于内核保留了256B，因此每个包最长(2048-256)B；
-   - 2的含义是，前n个block供发包使用，后n个block供收包使用。
+1. OptNumFrames: 设置创建UMEM的大小，即上述的n，默认值1024, 因此Size(UMEM) = NumFrames * 2048 * 2
+   - 2048是block的大小，即每个包的最大长度，但由于内核保留了256B，因此每个包最长(2048-256)B
+   - 2的含义是，前n个block供发包使用，后n个block供收包使用
 2. OptRingSize: 设置fq，cq, rx, tx四个ring的长度，每个ring的长度相同，默认1024
-3. OptXDPMode: 设置xdp的模式，支持XDP_MODE_DRV(默认)和XDP_MODE_SKB这两种模式；
+3. OptXDPMode: 设置xdp的模式，支持XDP_MODE_DRV(默认)和XDP_MODE_SKB这两种模式
    - XDP_MODE_DRV需网卡支持，目前仅支持驱动为ixgbe的网卡
-4. OptQueueCount: 设置使用的网卡队列，范围[0, queueCount)，默认值1，对于非多队列socket，queueCount只能设置为1
-5. OptPollTimeout: 设置poll系统调用的超时时间，仅在nonblock模式下生效，默认值100us
-6. OptIoMode: 设置socket的I/O模式，支持IO_MODE_BLOCK(默认)和IO_MODE_NONBLOCK这两种模式，
-   - IO_MODE_BLOCK模式下，收发包API一直等待，直到有包到达或包发送完成后返回；
-   - IO_MODE_NONBLOCK模式下，若超过PollTimeout时间，仍没有包到达或包无法完成发送，立即返回。
+4. OptQueueCount: 设置使用的网卡队列数量，默认值为1，具体可使用使用队列为[0, queueCount)
+5. OptPollTimeout: 设置poll系统调用的超时时间，仅在nonblock模式下生效，默认值1ms
+6. OptIoMode: 设置socket的I/O模式，支持IO_MODE_NONPOLL(默认)和IO_MODE_POLL这两种模式，
+   - IO_MODE_NONPOLL模式下，收发包API一直等待，直到有包到达或包发送完成后返回
+   - IO_MODE_POLL模式下，若超过PollTimeout时间，仍没有包到达或包无法完成发送，立即返回
+7. OptQueueID: 设置使用的哪一个网卡队列，默认值为0，使用场景是，
+   在一个网卡的n个队列上创建n个单队列socket时，需设置每个单队列socket绑定到哪个队列
 
 代码结构
 --------
@@ -64,8 +66,8 @@ option说明
 编译方法
 -------
 
-* 因xdp特性需要内核版本的支持，特增加了go编译tags限制,
-* 默认情况下，不会编译xdp库；
+* 因xdp特性需要内核版本的支持，特增加了go编译tags限制
+* 默认情况下，不会编译xdp库
 * 如需编译，请增加如下tags选项``go build -tags="xdp"``
 
 API说明
@@ -89,12 +91,12 @@ API说明
    * `func (x *XDPPacket) ReadPacketData() ([]byte, error)`
    * `func (x *XDPPacket) ZeroCopyReadMultiPackets() ([][]byte, []CaptureInfo, error)`
    * 收包接口，区别是:
-     * ReadPacketData内部有一次包拷贝，包已存入新的buffer；
-     * ZeroCopyReadMultiPackets每次尽最大努力收包，最多一次收16个包，
+     * ReadPacketData内部有一次包拷贝，包已存入新的buffer
+     * ZeroCopyReadMultiPackets每次尽最大努力收包，最多一次收16个包
      函数返回后，请使用``len([]CaptureInfo)``获取收包数量
    * 主要做的工作
      1. 在非阻塞模式下，首先调用poll
-     2. 调用ReleaseOneReadPacket将上一个包的地址返还给内核
+     2. 将上一个包的地址返还给内核
      3. 从rx队列获取包的地址，长度
      4. 根据地址，长度信息，从包缓存读取包数据
      5. 将地址返还给内核，写入fq队列
@@ -120,10 +122,15 @@ API说明
 5. 多队列收包接口
    * `func (m *XDPMultiQueue) ReadPacket() ([][]byte, []CaptureInfo, error)`
    * `func (m *XDPMultiQueue) ZeroCopyReadPacket() ([][]byte, []CaptureInfo, error)`
-   * 尝试从xdp-socket的每个队列收一个包，返回实际收到的数据包, 具体收包数量可通过``len([]CaptureInfo)``或
+   * `func (x *XDPMultiQueue) ZeroCopyReadMultiPackets() ([][]byte, []CaptureInfo, error)`
+   * 尝试依次从xdp-socket的每个队列收包，返回实际收到的数据包, 具体收包数量可通过``len([]CaptureInfo)``或
    ``len([][]byte)``获取
    * 在nonblock模式下，若某个队列无包，需等待pollTimeout；因此，极限情况下需`queueCount*pollTimeout`后返回
-
+   * 收包接口，区别是:
+     * ReadPacket内部有一次包拷贝，包已存入新的buffer
+     * ZeroCopyReadPacket每次尽最大努力收包，一个队列一次收1个包
+     * ZeroCopyReadMultiPackets每次尽最大努力收包，一个队列最多一次收16个包
+   
 6. 多队列发包接口
    * `func (m *XDPMutiQueue) WritePacket(pkts [][]byte) (int, error)`
    * 把len(pkts)个包顺序分给每个队列发送
@@ -148,28 +155,127 @@ API说明
     4. 不支持收发jumbo帧, 原因：因内核限制UMEM的block大小范围是: `[2048, PAGE_SIZE]&&is_power_of_2`，
        故一般取值2048或4096，同时需预留256B的保留头部；因此无法支持对jumbo帧的处理
     5. 不支持多个socket共享UMEM，即每个收发包函数只能处于一个线程
-    6. 支持全双工同时收发, 但不能是在同一网卡
+    6. 单队列socket不支持全双工同时收发，特别是在SKB模式下，因内核会对block地址的合法性进行检查，block地址不能超过UMEM的Size
+    7. 注意检查网卡mtu设置，大于1500会导致xdp初始化失败
 
 10. FIXME
     1. 动态加载ebpf程序，或直接用指令实现bpf功能
     2. 用golang实现libbpf库
-    3. 队列大小，包缓存大小关系
-    4. cq队列可能存在无法完成的情况
-    5. 提供一次Read多个包的接口
-    6. Counter避免使用atomic
 
 11. 性能，当前的测试结果：
     1. 测试环境 
-       * CPU: Intel(R) Xeon(R) CPU E5-2630 v4 @ 2.20GHz (40核)
-       * 内存: 256G 
-       * 网卡: Intel Corporation 82599ES 10-Gigabit SFI/SFP+ (驱动ixgbe)
-    2. 单队列单包发送
+      1. 物理服务器
+        * linux 内核版本: 4.19.17
+        * CPU : Intel(R) Xeon(R) CPU E5-2630 v4 @ 2.20GHz (40核)
+        * 内存: 256G 
+        * 网卡: Intel Corporation 82599ES 10-Gigabit SFI/SFP+ (驱动: ixgbe, version: 5.1.0-k)
+      2. vSphere平台虚拟机
+        * linux 内核版本: 4.19.17
+        * CPU核心数: 2
+        * 内存     : 2G 
+        * 网卡驱动 : vmxnet3 (version: 1.4.16.0-k-NAPI)
+    2. 单队列单包发送 
+       XDP模式 | I/O 模式 | 包大小 |  BPs  |  PPs
+       --------|----------|--------|-------|-------
+          DRV  | NONPOLL  | 60B    |  100M |  1.7M 
+          DRV  | POLL     | 60B    |  41M  |  690k 
+          SKB  | NONPOLL  | 60B    |  48M  |  800K 
+          SKB  | NONPOLL  | 1500B  |  545M |  360K 
+          SKB  | POLL     | 60B    |  24M  |  400K (波动较大)
+          SKB  | POLL     | 1500B  |  160M |  110K (波动较大)
     3. 单队列多包发送
+       XDP模式 | I/O 模式 | 包大小 |  BPs  |  PPs
+       --------|----------|--------|-------|-------
+          DRV  | NONPOLL  | 60B    |  720M |  12M 
+          DRV  | POLL     | 60B    |  370M |  6.2M 
+          SKB  | NONPOLL  | 60B    |  47M  |  780K
+          SKB  | NONPOLL  | 1500B  |  530M |  350K
+          SKB  | POLL     | 60B    |  4M   |  70K  (波动较大)
+          SKB  | POLL     | 1500B  |  160M |  110K (波动较大)
     4. 单队列单包接收
+       XDP模式 | I/O 模式 | 包大小 |  BPs  |  PPs
+       --------|----------|--------|-------|-------
+          DRV  | NONPOLL  | 60B    |  300M |  5.0M
+          DRV  | POLL     | 60B    |  50M  |  840K 
+          SKB  | NONPOLL  | 60B    |  40M  |  660K
+          SKB  | POLL     | 60B    |  1.6M |  27K 
     5. 单队列多包接收
+       XDP模式 | I/O 模式 | 包大小 |  BPs  |  PPs
+       --------|----------|--------|-------|-------
+          DRV  | NONPOLL  | 60B    |  720M |  12M 
+          DRV  | POLL     | 60B    |  720M |  12M   
+          SKB  | NONPOLL  | 60B    |  21M  |  350M 
+          SKB  | POLL     | 60B    |  39M  |  660K   
     6. 多队列发送
+       XDP模式 | I/O 模式 | 包大小 |  BPs  |  PPs  | 队列数量
+       --------|----------|--------|-------|-------|----------
+          DRV  | NONPOLL  | 60B    |  100M |  1.7M |     1
+          DRV  | NONPOLL  | 60B    |  96M  |  1.6M |     2
+          DRV  | NONPOLL  | 60B    |  73M  |  1.2M |     4
+          DRV  | POLL     | 60B    |  38M  |  640K |     1    
+          DRV  | POLL     | 60B    |  48M  |  800K |     2    
+          DRV  | POLL     | 60B    |  40M  |  660K |     4 
+          SKB  | NONPOLL  | 60B    |  27M  |  450k |     1
+          SKB  | NONPOLL  | 1500B  |  370M |  250k |     1
+          SKB  | POLL     | 60B    |  6M   |  100k |     1  (波动较大) 
+          SKB  | POLL     | 1500B  |  40M  |  26k  |     1  (波动较大)
     7. 多队列接收
-    8. 多队列单包发送
-    9. 多队列多包发送
-    10. 多队列单包接收
+       XDP模式 | I/O 模式 | 包大小 |  BPs  |  PPs  | 队列数量
+       --------|----------|--------|-------|-------|----------
+          DRV  | NONPOLL  | 60B    |  300M |  5.0M |     1
+          DRV  | NONPOLL  | 60B    |  ---- |  ---  |     2
+          DRV  | NONPOLL  | 60B    |  ---- |  ---  |     4
+          DRV  | POLL     | 60B    |  42M  |  700K |     1
+          DRV  | POLL     | 60B    |  ---  |  ---  |     2
+          DRV  | POLL     | 60B    |  ---  |  ---  |     4
+          SKB  | NONPOLL  | 60B    |  40M  |  660K |     1
+          SKB  | POLL     | 60B    |  40M  |  660K |     1
+    8. 多队列单包发送                    
+       XDP模式 | I/O 模式 | 包大小 |  BPs  |  PPs  | 队列数量
+       --------|----------|--------|-------|-------|----------
+          DRV  | NONPOLL  | 60B    |  100M |  1.7M |     1
+          DRV  | NONPOLL  | 60B    |  230M |  3.8M |     2
+          DRV  | NONPOLL  | 60B    |  360M |  6.0M |     4
+          DRV  | POLL     | 60B    |  41M  |  690K |     1
+          DRV  | POLL     | 60B    |  87M  |  1.4M |     2
+          DRV  | POLL     | 60B    |  156M |  2.6M |     4
+          SKB  | NONPOLL  | 60B    |  40M  |  660K |     1
+          SKB  | NONPOLL  | 1500B  |  530M |  350K |     1
+          SKB  | POLL     | 60B    |  15M  |  260K |     1  (波动较大)
+          SKB  | POLL     | 1500B  |  82M  |  55K  |     1  (波动较大)
+    9. 多队列单包接收
+       XDP模式 | I/O 模式 | 包大小 |  BPs  |  PPs  | 队列数量
+       --------|----------|--------|-------|-------|----------
+          DRV  | NONPOLL  | 60B    |  327M |  5.4M |     1
+          DRV  | NONPOLL  | 60B    |  446M |  7.3M |     2
+          DRV  | NONPOLL  | 60B    |  613M |  10M  |     4 
+          DRV  | POLL     | 60B    |  80M  |  1.3M |     1 
+          DRV  | POLL     | 60B    |  77M  |  1.2M |     2  
+          DRV  | POLL     | 60B    |  124M |  2.0M |     4 
+          SKB  | NONPOLL  | 60B    |  40M  |  660K |     1
+          SKB  | POLL     | 60B    |  770K |  12K  |     1
+    10. 多队列多包发送
+       XDP模式 | I/O 模式 | 包大小 |  BPs  |  PPs  | 队列数量
+       --------|----------|--------|-------|-------|----------
+          DRV  | NONPOLL  | 60B    |  667M |  11M |     1
+          DRV  | NONPOLL  | 60B    |  887M |  14M |     2
+          DRV  | NONPOLL  | 60B    |  887M |  14M |     4
+          DRV  | POLL     | 60B    |  601M |  10M |     1
+          DRV  | POLL     | 60B    |  887M |  14M |     2
+          DRV  | POLL     | 60B    |  887M |  14M |     4
+          DRV  | NONPOLL  | 60B    |  39M  |  660K|     1
+          DRV  | NONPOLL  | 1500B  |  488M |  320K|     1
+          DRV  | POLL     | 60B    |  800K |  14K |     1  (波动较大)
+          DRV  | POLL     | 1500B  |  18M  |  12K |     1  (波动较大)
     11. 多队列多包接收
+       XDP模式 | I/O 模式 | 包大小 |  BPs  |  PPs  | 队列数量
+       --------|----------|--------|-------|-------|----------
+          DRV  | NONPOLL  | 60B    |  847M |  14M  |     1   
+          DRV  | NONPOLL  | 60B    |  847M |  14M  |     2   
+          DRV  | NONPOLL  | 60B    |  847M |  14M  |     4   
+          DRV  | POLL     | 60B    |  797M |  13M  |     1 
+          DRV  | POLL     | 60B    |  797M |  13M  |     2 
+          DRV  | POLL     | 60B    |  797M |  13M  |     4 
+          SKB  | NONPOLL  | 60B    |  40M  |  660K |     1
+          SKB  | POLL     | 60B    |  40M  |  660K |     1
+

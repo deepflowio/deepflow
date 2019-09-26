@@ -22,6 +22,7 @@ package xdppacket
 #include <sys/resource.h>
 #include <bpf/libbpf.h>
 #include <sys/socket.h>
+#include <net/if.h>
 
 #ifndef AF_XDP
 #define AF_XDP 44
@@ -44,16 +45,21 @@ int load_ebpf_prog(int ifindex, int xdp_mode, void *prog_fd, void *xsks_map_fd) 
 	};
 	struct bpf_object *obj = NULL;
 	struct bpf_map *map;
-	int i, ret, key = 0;
-	pthread_t pt;
 	int fd = -1, map_fd = -1;
-	char pwd[256];
+	char file_name[256] = {0}, if_name[64] = {0};
 
 	if (!prog_fd || !xsks_map_fd)
 	{
 		fprintf(stderr, "ERROR: NULL pointer\n");
 		goto failed;
 	}
+
+	if (if_indextoname(ifindex, if_name) == NULL) {
+		fprintf(stderr, "ERROR: if_nametoindex \"%s\"\n",
+		strerror(errno));
+		goto failed;
+	}
+
 	if (setrlimit(RLIMIT_MEMLOCK, &r)) {
 		fprintf(stderr, "ERROR: setrlimit(RLIMIT_MEMLOCK) \"%s\"\n",
 			strerror(errno));
@@ -76,21 +82,17 @@ int load_ebpf_prog(int ifindex, int xdp_mode, void *prog_fd, void *xsks_map_fd) 
 	}
 
 	map = bpf_object__find_map_by_name(obj, "xsks_map");
-	if (!access(SOCK_MAP_PATH, F_OK)) {
-		if(bpf_map__pin(map, SOCK_MAP_PATH)) {
-			fprintf(stderr, "ERROR: pin map xsks_map to xdp/xsks_map\n");
-			goto failed;
-		}
-	}
-	map_fd = bpf_map__fd(map);
+		map_fd = bpf_map__fd(map);
 	if (map_fd < 0) {
 		fprintf(stderr, "ERROR: no xsks map found: %s\n",
 			strerror(map_fd));
         goto failed;
 	}
+	fprintf(stderr, "xsks_map fd: %d\n", map_fd);
 
 	if (bpf_set_link_xdp_fd(ifindex, fd, xdp_mode) < 0) {
-			fprintf(stderr, "ERROR: link set xdp fd failed\n");
+		fprintf(stderr, "ERROR: set xdp(mode:%d) fd(%d) to interface(%d) failed as %s\n",
+		xdp_mode, fd, ifindex, strerror(errno));
         goto failed;
 	}
 
@@ -186,7 +188,11 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
+	"path"
 	"reflect"
+	"regexp"
+	"strconv"
+	"strings"
 	"syscall"
 	"unsafe"
 
@@ -198,9 +204,10 @@ const ERROR_FD = -1
 
 // XDP socket结构
 type XDPSocket struct {
-	sockFd     int
-	ifIndex    int
-	framesBulk []byte // 包缓存
+	sockFd  int
+	ifIndex int
+	// UMEM
+	framesBulk []byte
 	queueId    int
 
 	progFd    int
@@ -319,17 +326,19 @@ func (x *XDPSocket) configQueue(offsets *unix.XDPMmapOffsets, options *XDPOption
 	}
 	x.fq.initQueue(fqAddr, offsets.Fr, ringSize)
 
-	// RX
+	// 初始化fq队列，将umem前ringSize个block地址写入fq队列
+	// 表示已完成对rx队列中全部包的读取
+	// 因内核会对block地址的合法性进行检查，block地址不能超过
+	// umem.Size，故XDP不能支持全双工(同时收发)
 	addrs := make([]uint64, ringSize)
-	baseAddr := ringSize * frameSize
 	for i := 0; i < ringSize; i++ {
-		addrs[i] = uint64(baseAddr + i*frameSize)
+		addrs[i] = uint64(i * frameSize)
 	}
-	log.Debugf("init fq addrs:%v\n", addrs)
 	err = x.fq.enqueue(addrs, uint32(ringSize))
 	if err != nil {
-		return errors.Wrapf(err, "fill rx fill queue failed")
+		return errors.Wrapf(err, "init fill queue failed")
 	}
+	log.Debugf("actual fq info:\n\t%v", x.fq.GetDetail())
 
 	cqAddr, err := unix.Mmap(sockFd, unix.XDP_UMEM_PGOFF_COMPLETION_RING,
 		int(offsets.Cr.Desc)+ringSize*8,
@@ -386,8 +395,9 @@ func (x *XDPSocket) clearQueue() {
 
 // 配置XDP socket内核相关参数，并初始化用户态队列结构
 func (x *XDPSocket) configXDPSocket(options *XDPOptions) error {
+	var umemLen uint64
 	sockFd := x.sockFd
-	umemLen := options.frameSize * options.numFrames * 2
+	umemLen = uint64(options.frameSize) * uint64(options.numFrames)
 	buffer := make([]byte, umemLen)
 	x.framesBulk = buffer
 	ur := &unix.XDPUmemReg{
@@ -466,26 +476,28 @@ func checkXsksMapIsEmpty(xsksMapFd int) (bool, error) {
 // 初始化清理工作
 // mount -t bpf bpffs /sys/fs/bpf/
 func checkIfMountBpffs() bool {
-	cmd := exec.Command("/usr/bin/bash", "-c", "mount | grep bpf")
-	out, _ := cmd.Output()
+	out, err := executeCommand("mount | grep bpf")
 
-	return len(out) > 0
+	return err == nil && len(out) > 0
 }
 
-func checkAndMountBpffs() bool {
+func checkAndMountBpffs() error {
 	isMount := checkIfMountBpffs()
-	if isMount == true {
-		return true
+	if isMount {
+		return nil
 	}
 
-	cmd := exec.Command("/usr/bin/bash", "-c", "mount -t bpf bpffs /sys/fs/bpf/")
-	out, _ := cmd.Output()
-	if len(out) > 0 {
-		return false
+	_, err := executeCommand("mount -t bpf bpffs /sys/fs/bpf/")
+	if err != nil {
+		return err
 	}
+	return nil
+}
 
-	isMount = checkIfMountBpffs()
-	if isMount == false {
+// exist: true; not exist: false
+func checkIfXsksMapFileExist(fileName string) bool {
+	err := syscall.Access(fileName, syscall.F_OK)
+	if err != nil {
 		return false
 	}
 
@@ -493,69 +505,158 @@ func checkAndMountBpffs() bool {
 }
 
 // rm -f /sys/fs/bpf/xsks_map
-func checkIfXsksMapFileExist() bool {
+func clearXsksMapFile(ifName string) bool {
 	xsksMapPath := C.SOCK_MAP_PATH
-	cmd := exec.Command("/usr/bin/bash", "-c", "ls", xsksMapPath)
-	out, _ := cmd.Output()
-	return len(out) > 0
-}
-
-func clearXsksMapFile() bool {
-	xsksMapPath := C.SOCK_MAP_PATH
-	if !checkIfXsksMapFileExist() {
-		cmd := exec.Command("/usr/bin/bash", "-c", "rm -f", xsksMapPath)
-		err := cmd.Run()
+	fileName := path.Join(xsksMapPath, ifName)
+	if !checkIfXsksMapFileExist(fileName) {
+		_, err := executeCommand(fmt.Sprintf("rm -f %s", fileName))
 		return err == nil
 	}
 
 	return true
 }
 
-func setInterfaceRecvQueues(ifName string, queueCount uint32) bool {
-	cmdString := fmt.Sprintf("ethtool --set-rxfh-indir %v equal %v", ifName, queueCount)
-	cmd := exec.Command("/usr/bin/bash", "-c", cmdString)
-	err := cmd.Run()
-	if err != nil {
-		log.Debugf("set interface(%v) rx queues(%v) failed", ifName, queueCount)
-		return false
+func executeCommand(command string) (string, error) {
+	cmd := exec.Command("/usr/bin/bash", "-c", command)
+	output, err := cmd.CombinedOutput()
+
+	if err != nil && len(output) > 0 {
+		err = fmt.Errorf("execute command(%v) failed; result:%v, error:%v", command, string(output), err)
 	}
-	return true
+	log.Debugf("execute command(%v) output: %v", command, string(output))
+
+	return string(output), nil
+}
+
+func getInterfaceChannels(ifName string) (int, error) {
+	cmdString := fmt.Sprintf("ethtool --show-channels %v | tail -n 2 | awk '{print $2}' | head -n 1",
+		ifName)
+	output, err := executeCommand(cmdString)
+	if err != nil {
+		return -1, err
+	}
+
+	actualQueue, err := strconv.Atoi(strings.TrimSuffix(output, "\n"))
+	if err != nil {
+		return -1, err
+	}
+
+	return actualQueue, nil
+}
+
+func getInterfaceRSS(ifName string) (int, error) {
+	cmdString := fmt.Sprintf("ethtool --show-rxfh-indir %v | head -n 1",
+		ifName)
+	output, err := executeCommand(cmdString)
+	if err != nil {
+		return -1, err
+	}
+
+	reg, err := regexp.Compile("indirection table for (.*) with ([0-9]+) RX ring")
+	if err != nil {
+		return -1, err
+	}
+
+	result := reg.FindStringSubmatch(strings.TrimSuffix(output, "\n"))
+	if len(result) < 3 {
+		return -1, fmt.Errorf("\"%v\" match regexp(%v) failed(%v) !!!", output, reg.String(), result)
+	}
+	log.Debugf("reg string: %v", result)
+	name := result[1]
+	rings := result[2]
+	actualQueue, err := strconv.Atoi(strings.TrimSuffix(rings, "\n"))
+	if err != nil {
+		return -1, err
+	}
+
+	if name == ifName {
+		return actualQueue, nil
+	}
+	return -1, fmt.Errorf("error interface name, input(%s) vs. actual(%s)", ifName, name)
+}
+
+func setInterfaceRecvQueues(ifIndex int, queueCount uint32) error {
+	iface, err := net.InterfaceByIndex(ifIndex)
+	if err != nil {
+		return err
+	}
+
+	channels, err := getInterfaceChannels(iface.Name)
+	if err != nil {
+		return err
+	}
+
+	queues, err := getInterfaceRSS(iface.Name)
+	if err != nil {
+		return err
+	}
+
+	if queueCount != uint32(channels) || queues != channels {
+		if uint32(channels) > queueCount {
+			_, err = executeCommand(fmt.Sprintf("ethtool --set-rxfh-indir %v equal %v", iface.Name, queueCount))
+			if err != nil {
+				return err
+			}
+
+			_, err = executeCommand(fmt.Sprintf("ethtool --set-channels %v combined %v", iface.Name, queueCount))
+			if err != nil {
+				return err
+			}
+		} else { // case uint32(channels) < queueCount
+			_, err = executeCommand(fmt.Sprintf("ethtool --set-channels %v combined %v", iface.Name, queueCount))
+			if err != nil {
+				return err
+			}
+
+			_, err = executeCommand(fmt.Sprintf("ethtool --set-rxfh-indir %v equal %v", iface.Name, queueCount))
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	log.Debugf("interface %v rx queues setting: %v", iface.Name, showInterfaceRecvQueues(iface.Name))
+	return nil
 }
 
 func showInterfaceRecvQueues(ifName string) string {
-	cmdString := fmt.Sprintf("ethtool --show-rxfh-indir %v", ifName)
-	cmd := exec.Command("/usr/bin/bash", "-c", cmdString)
-	output, err := cmd.Output()
+	cmdString := fmt.Sprintf("ethtool --show-channels %v", ifName)
+	rings, err := executeCommand(cmdString)
 	if err != nil {
 		log.Debugf("execute command %v failed", cmdString)
 		return ""
 	}
-	return string(output)
+
+	cmdString = fmt.Sprintf("ethtool --show-rxfh-indir %v", ifName)
+	rss, err := executeCommand(cmdString)
+	if err != nil {
+		log.Debugf("execute command %v failed", cmdString)
+		return ""
+	}
+	log.Debugf(string(rings) + string(rss))
+
+	return string(rings) + string(rss)
 }
 
-func initXDPRunningEnv(ifName string, xdpMode OptXDPMode, queueCount uint32) bool {
+func initXDPRunningEnv(ifName string, xdpMode OptXDPMode) error {
 	mode := "xdp"
 	if xdpMode == XDP_MODE_SKB {
 		mode = "xdpgeneric"
 	}
 	cmdString := fmt.Sprintf("ip link set %v %v off", ifName, mode)
-	cmd := exec.Command("/usr/bin/bash", "-c", cmdString)
-	if err := cmd.Run(); err != nil {
-		log.Debugf("command %v execute failed as %v", cmdString, err)
+	_, err := executeCommand(cmdString)
+	if err != nil {
+		return err
 	}
 
-	if !clearXsksMapFile() {
-		log.Debugf("xsks_map file existed")
-		return false
-	}
-
-	if !checkAndMountBpffs() {
+	err = checkAndMountBpffs()
+	if err != nil {
 		log.Debugf("mount bpffs failed")
-		return false
+		return err
 	}
 
 	log.Info("init XDP running environment ok!!!")
-	return true
+	return nil
 }
 
 // 在指定网卡上，创建并配置XDP socket
@@ -574,7 +675,8 @@ func newXDPSocket(ifIndex int, options *XDPOptions, queueId int) (*XDPSocket, er
 		queueId:   queueId,
 		xdpMode:   options.xdpMode,
 	}
-	addr := &unix.SockaddrXDP{} // goto之后不能定义变量，否则编译报错
+	// goto之后不能定义变量，否则编译报错
+	addr := &unix.SockaddrXDP{}
 
 	// 创建AF_XDP类型的socket
 	s.sockFd, err = unix.Socket(unix.AF_XDP, unix.SOCK_RAW, 0)
@@ -591,16 +693,17 @@ func newXDPSocket(ifIndex int, options *XDPOptions, queueId int) (*XDPSocket, er
 	}
 
 	// 将XDP socket绑定到指定端口的特定队列
-	addr.Flags = 0
+	addr.Flags = unix.XDP_ZEROCOPY
 	addr.Ifindex = uint32(s.ifIndex)
 	addr.QueueID = uint32(s.queueId)
 	if s.xdpMode == XDP_MODE_SKB {
-		addr.Flags |= unix.XDP_COPY // 虚拟机使用SKB模式，仅能支持XDP_COPY
+		// 虚拟机使用SKB模式，仅能支持XDP_COPY
+		addr.Flags = unix.XDP_COPY
 	}
 	err = unix.Bind(s.sockFd, addr)
 	if err != nil {
-		err = fmt.Errorf("bind socket(%v) to interface(%v) failed as %v",
-			s.sockFd, s.ifIndex, err)
+		err = fmt.Errorf("bind socket(%v) with addr(Flags:%v, Ifindex:%v, QueueID:%v) to interface(%v) failed as %v",
+			s.sockFd, addr.Flags, addr.Ifindex, addr.QueueID, s.ifIndex, err)
 		goto failed
 	}
 
@@ -634,7 +737,7 @@ func (s *XDPSocket) checkAndSetCombinedSocket(combined *XDPSocket) error {
 	return errors.New("not combined socket")
 }
 
-func (s *XDPSocket) initXDPSocket(loadProg bool, queueCount uint32) error {
+func (s *XDPSocket) initXDPSocket(loadProg bool) error {
 	var err error
 
 	if loadProg {
@@ -650,16 +753,6 @@ func (s *XDPSocket) initXDPSocket(loadProg bool, queueCount uint32) error {
 		return fmt.Errorf("error XDPSocket %v", s)
 	}
 	err = addXDPSocketFdToMap(s.xsksMapFd, s.sockFd, s.queueId)
-
-	iface, err := net.InterfaceByIndex(s.ifIndex)
-	if err != nil {
-		return fmt.Errorf("error interface index(%v) as %v", err)
-	}
-	if !setInterfaceRecvQueues(iface.Name, queueCount) {
-		log.Debugf("set interface(%v) recv queues to [0,%v) failed", iface.Name, queueCount)
-		return fmt.Errorf("set interface(%v) recv queues to [0,%v) failed", iface.Name, queueCount)
-	}
-	log.Debugf("interface %v rx queues setting: %v", iface.Name, showInterfaceRecvQueues(iface.Name))
 
 	return err
 }
@@ -701,7 +794,7 @@ func (s *XDPSocket) clearResource() {
 		s.ifIndex, s.xdpMode, s.ifIndex)
 }
 
-func (s *XDPSocket) checkIfXDPSocketClosed() bool {
+func (s *XDPSocket) CheckIfXDPSocketClosed() bool {
 	return s.sockFd < 0 || s.progFd < 0 || s.xsksMapFd < 0
 }
 

@@ -12,28 +12,38 @@ import (
 
 // 循环队列结构
 type BaseQueue struct {
-	raw        []byte  // Mmap返回值
-	baseAddr   uint64  // 起始地址
-	producer   *uint32 // 生产者指针
-	consumer   *uint32 // 消费者指针
+	// Mmap返回值
+	raw []byte
+	// 对应raw的起始地址
+	baseAddr uint64
+	// 生产者指针
+	producer *uint32
+	// 消费者指针
+	consumer *uint32
+
 	cached_pro uint32
 	cached_con uint32
-	size       uint32 // 队列大小
-	mask       uint32 // 队列大小掩码
+	// 队列大小
+	size uint32
+	// 队列大小掩码
+	mask uint32
 
 	// 内部数据，为优化性能添加
+	i       uint32
 	idx     uint32
 	entries uint32
 }
 
 type XDPUmemQueue struct {
 	BaseQueue
-	ring *uint64 // UMEM起始地址
+	// UMEM实际数据存放的起始地址
+	ring *uint64
 }
 
 type XDPDescQueue struct {
 	BaseQueue
-	ring *unix.XDPDesc // XDPDesc起始地址
+	// XDPDesc实际数据存放起始地址
+	ring *unix.XDPDesc
 }
 
 func getSliceAddr(data []byte) uint64 {
@@ -101,15 +111,15 @@ func (q *XDPDescQueue) dequeueOne(desc *unix.XDPDesc) uint32 {
 func (q *XDPDescQueue) dequeue(desc []unix.XDPDesc, n uint32) uint32 {
 	q.entries = q.getAvailEntries(n)
 
-	for i := uint32(0); i < q.entries; i++ {
+	for q.i = uint32(0); q.i < q.entries; q.i++ {
 		idx := (q.cached_con) & q.mask
 		q.cached_con += 1
-		desc[i] = *(*unix.XDPDesc)(unsafe.Pointer((uintptr(unsafe.Pointer(q.ring)) +
+		desc[q.i] = *(*unix.XDPDesc)(unsafe.Pointer((uintptr(unsafe.Pointer(q.ring)) +
 			uintptr(idx*uint32(unsafe.Sizeof(unix.XDPDesc{}))))))
 	}
 
 	if q.entries > 0 {
-		*q.consumer = q.cached_con
+		atomic.StoreUint32(q.consumer, q.cached_con)
 	}
 
 	return q.entries
@@ -136,8 +146,6 @@ func (q *XDPDescQueue) rollback() (unix.XDPDesc, uint32, uint32) {
 func (q *XDPDescQueue) enqueueOne(desc unix.XDPDesc) error {
 	q.entries = q.freeEntries(1)
 	if q.entries < 1 {
-		log.Debugf("tx queue full when producer:%v, cached_pro:%v, consumer:%v, cached_con:%v",
-			*q.producer, q.cached_pro, *q.consumer, q.cached_con)
 		return ErrTxQueueFull
 	}
 
@@ -159,19 +167,20 @@ func (q *XDPDescQueue) enqueue(descs []unix.XDPDesc, n uint32) error {
 		return ErrTxQueueFull
 	}
 
-	for i := uint32(0); i < q.entries; i++ {
+	for q.i = uint32(0); q.i < q.entries; q.i++ {
 		q.idx = q.cached_pro & q.mask
 		q.cached_pro += 1
 		*(*unix.XDPDesc)(unsafe.Pointer(uintptr(unsafe.Pointer(q.ring)) +
-			uintptr(q.idx*uint32(unsafe.Sizeof(unix.XDPDesc{}))))) = descs[i]
+			uintptr(q.idx*uint32(unsafe.Sizeof(unix.XDPDesc{}))))) = descs[q.i]
 	}
-	*q.producer = q.cached_pro
+	atomic.StoreUint32(q.producer, q.cached_pro)
 
 	return nil
 }
 
 // 从UMEM队列中取一个条目
-func (u *XDPUmemQueue) dequeueOne(index *uint64) uint32 {
+//func (u *XDPUmemQueue) dequeueOne(index *uint64) uint32 {
+func (u *XDPUmemQueue) dequeueOne(index *uint64) {
 	u.entries = u.getAvailEntries(1)
 
 	if u.entries > 0 {
@@ -182,23 +191,21 @@ func (u *XDPUmemQueue) dequeueOne(index *uint64) uint32 {
 
 		atomic.StoreUint32(u.consumer, u.cached_con)
 	}
-
-	return u.entries
 }
 
 // 从UMEM队列中取n个条目，如果队列条目数小于n，则返回当前队列条目数
 func (u *XDPUmemQueue) dequeue(index []uint64, n uint32) uint32 {
 	u.entries = u.getAvailEntries(n)
 
-	for i := uint32(0); i < u.entries; i++ {
+	for u.i = uint32(0); u.i < u.entries; u.i++ {
 		u.idx = (u.cached_con) & u.mask
 		u.cached_con += 1
-		index[i] = *(*uint64)(unsafe.Pointer(uintptr(unsafe.Pointer(u.ring)) +
+		index[u.i] = *(*uint64)(unsafe.Pointer(uintptr(unsafe.Pointer(u.ring)) +
 			uintptr(u.idx*uint32(unsafe.Sizeof(uint64(0))))))
 	}
 
 	if u.entries > 0 {
-		*u.consumer = u.cached_con
+		atomic.StoreUint32(u.consumer, u.cached_con)
 	}
 
 	return u.entries
@@ -230,14 +237,14 @@ func (u *XDPUmemQueue) enqueue(addr []uint64, n uint32) error {
 		return ErrFqQueueFull
 	}
 
-	for i := uint32(0); i < u.entries; i++ {
+	for u.i = uint32(0); u.i < u.entries; u.i++ {
 		u.idx = u.cached_pro & u.mask
 		u.cached_pro += 1
 
 		*(*uint64)(unsafe.Pointer(uintptr(unsafe.Pointer(u.ring)) +
-			uintptr(u.idx*uint32(unsafe.Sizeof(uint64(0)))))) = addr[i]
+			uintptr(u.idx*uint32(unsafe.Sizeof(uint64(0)))))) = addr[u.i]
 	}
-	*u.producer = u.cached_pro
+	atomic.StoreUint32(u.producer, u.cached_pro)
 
 	return nil
 }
@@ -295,4 +302,32 @@ func (d XDPDescQueue) String() string {
 
 func (u XDPUmemQueue) String() string {
 	return fmt.Sprintf("ring:%p, %v", u.ring, u.BaseQueue)
+}
+
+func (q XDPUmemQueue) GetDetail() string {
+	var str string
+	var umemOffset uint64
+	for i := uint32(0); i < q.size; i++ {
+		umemOffset = *(*uint64)(unsafe.Pointer((uintptr(unsafe.Pointer(q.ring)) +
+			uintptr(i*uint32(unsafe.Sizeof(uint64(0)))))))
+		str += fmt.Sprintf("index:%v, offset:0x%x\t", i, umemOffset)
+		if i&0x1 == 0x1 {
+			str += "\n"
+		}
+	}
+	return str
+}
+
+func (q XDPDescQueue) GetDetail() string {
+	var str string
+	var desc unix.XDPDesc
+	for i := uint32(0); i < q.size; i++ {
+		desc = *(*unix.XDPDesc)(unsafe.Pointer((uintptr(unsafe.Pointer(q.ring)) +
+			uintptr(i*uint32(unsafe.Sizeof(unix.XDPDesc{}))))))
+		str += fmt.Sprintf("\tindex:%v, desc--Addr:%v, Len:%v\t", i, desc.Addr, desc.Len)
+		if i&0x1 == 0x1 {
+			str += "\n"
+		}
+	}
+	return str
 }

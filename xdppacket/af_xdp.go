@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -20,8 +21,9 @@ import (
 	. "github.com/google/gopacket"
 	logging "github.com/op/go-logging"
 	"github.com/pkg/errors"
-	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 	"golang.org/x/sys/unix"
+
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 const (
@@ -49,35 +51,39 @@ var ErrMultiWriteFunctionNil = errors.New("multiWrite function is nil")
 var ErrReadFunctionNil = errors.New("read function is nil")
 
 var ErrSocketClosed = errors.New("the socket is closed")
+var ErrSengMsgReWrite = errors.New("need reWrite packet, when EBUSY returned while calling sendmsg")
 
 type XDPStats struct {
 	sync.Once
-	kernelStats unix.XDPStatistics // xdp提供的内核统计
-	polls       uint64             // 调用poll的次数
+	queueID     uint32
+	KernelStats unix.XDPStatistics // xdp提供的内核统计
+	Polls       uint64             // 调用poll的次数
 
-	rxPps uint64
-	rxBps uint64
-	txPps uint64
-	txBps uint64
+	RxPps uint64
+	RxBps uint64
+	TxPps uint64
+	TxBps uint64
 
-	rxEmpty  uint64
-	txFull   uint64
-	fqFull   uint64
-	cqEmpty  uint64
-	sendBusy uint64
+	RxEmpty uint64
+	TxFull  uint64
+	FqFull  uint64
+	CqEmpty uint64
+
+	SendBusy  uint64
+	SendAgain uint64
 }
 
 // 内部收包函数
-type readFunc func(x *XDPPacket) ([]byte, error)
-
-// 内部发包函数
-type writeFunc func(x *XDPPacket, pkt []byte) error
-
-// 内部批量发包函数
-type multiWriteFunc func(x *XDPPacket, pkt [][]byte) (int, int, error)
+type readFunc func()
 
 // 内部批量收包函数
-type multiReadFunc func(x *XDPPacket) (int, error)
+type multiReadFunc func()
+
+// 内部发包函数
+type writeFunc func(pkt []byte)
+
+// 内部批量发包函数
+type multiWriteFunc func(pkt [][]byte) (int, int, error)
 
 type XDPPacket struct {
 	options      *XDPOptions // xdp-lib库所有的配置参数
@@ -85,35 +91,46 @@ type XDPPacket struct {
 	*XDPSocket               // 包含socket，interface, 包缓存，rx,tx,rq,cq队列
 	progRefCount int32       // 多队列模式下不生效
 
+	// common
+	constTs unix.Timespec // 根据pollTimeout设置超时时间
+	ts      unix.Timespec // Ppoll参数，每次调用后需reset
+
+	rxErr error
+	rxFds []unix.PollFd
 	// 内部收包变量, 为了优化性能添加
 	read   readFunc
-	rxFds  []unix.PollFd
 	rxDesc unix.XDPDesc
 	rxAddr uint64
+	rxPkt  []byte
 	ci     CaptureInfo
 
+	// 内部批量收包变量, 为了优化性能添加
+	multiRead multiReadFunc
+	rxDescs   []unix.XDPDesc
+	rxAddrs   []uint64
+	rxPkts    [][]byte
+	cis       []CaptureInfo
+	rxN       int
+
+	txErr error
+	txN   int
+	txFds []unix.PollFd
 	// 内部发包变量, 为了优化性能添加
 	write  writeFunc
-	txFds  []unix.PollFd
 	txDesc unix.XDPDesc
-	txIdx  uint64
+	txIdx  uint32
 	txAddr uint64
 
 	// 内部批量发包变量, 为了优化性能添加
 	multiWrite multiWriteFunc
 	txDescs    []unix.XDPDesc
 	txAddrs    []uint64
-
-	// 内部批量收包变量, 为了优化性能添加
-	multiRead multiReadFunc
-	rxDescs   []unix.XDPDesc
-	rxAddrs   []uint64
-	packets   [][]byte
-	cis       []CaptureInfo
+	txPktsLen  int
+	txPkt      []byte
 }
 
 // just for debug
-func dumpPacket(pkt []byte) string {
+func DumpPacket(pkt []byte) string {
 	return fmt.Sprintf("rx one packet(len:%v):\n%s", len(pkt),
 		hex.Dump(pkt[:Min(len(pkt), 128)]))
 }
@@ -122,178 +139,212 @@ func htons(i uint16) uint16 {
 	return i<<8 | i>>8
 }
 
-func (s *XDPStats) Add(b *XDPStats) *XDPStats {
-	if s == nil || b == nil {
-		return &XDPStats{}
-	}
-	return &XDPStats{
-		kernelStats: unix.XDPStatistics{
-			Rx_dropped:       s.kernelStats.Rx_dropped + b.kernelStats.Rx_dropped,
-			Rx_invalid_descs: s.kernelStats.Rx_invalid_descs + b.kernelStats.Rx_invalid_descs,
-			Tx_invalid_descs: s.kernelStats.Tx_invalid_descs + b.kernelStats.Tx_invalid_descs,
-		},
-		polls: s.polls + b.polls,
-		rxPps: s.rxPps + b.rxPps,
-		rxBps: s.rxBps + b.rxBps,
-		txPps: s.txPps + b.txPps,
-		txBps: s.txBps + b.txBps,
-
-		rxEmpty:  s.rxEmpty + b.rxEmpty,
-		cqEmpty:  s.cqEmpty + b.cqEmpty,
-		fqFull:   s.fqFull + b.fqFull,
-		txFull:   s.txFull + b.txFull,
-		sendBusy: s.sendBusy + b.sendBusy,
-	}
-}
-
-func (s *XDPStats) Minus(b *XDPStats) *XDPStats {
-	if s == nil || b == nil {
-		return nil
-	}
-	return &XDPStats{
-		kernelStats: unix.XDPStatistics{
-			Rx_dropped:       s.kernelStats.Rx_dropped - b.kernelStats.Rx_dropped,
-			Rx_invalid_descs: s.kernelStats.Rx_invalid_descs - b.kernelStats.Rx_invalid_descs,
-			Tx_invalid_descs: s.kernelStats.Tx_invalid_descs - b.kernelStats.Tx_invalid_descs,
-		},
-		polls: s.polls - b.polls,
-		rxPps: s.rxPps - b.rxPps,
-		rxBps: s.rxBps - b.rxBps,
-		txPps: s.txPps - b.txPps,
-		txBps: s.txBps - b.txBps,
-
-		rxEmpty:  s.rxEmpty - b.rxEmpty,
-		cqEmpty:  s.cqEmpty - b.cqEmpty,
-		fqFull:   s.fqFull - b.fqFull,
-		txFull:   s.txFull - b.txFull,
-		sendBusy: s.sendBusy - b.sendBusy,
-	}
-}
-
-func (s *XDPStats) String() string {
+func (s *XDPStats) Add(b XDPStats) XDPStats {
 	if s == nil {
-		return ""
+		return XDPStats{}
 	}
+	return XDPStats{
+		queueID: s.queueID,
+		KernelStats: unix.XDPStatistics{
+			Rx_dropped:       s.KernelStats.Rx_dropped + b.KernelStats.Rx_dropped,
+			Rx_invalid_descs: s.KernelStats.Rx_invalid_descs + b.KernelStats.Rx_invalid_descs,
+			Tx_invalid_descs: s.KernelStats.Tx_invalid_descs + b.KernelStats.Tx_invalid_descs,
+		},
+		Polls: s.Polls + b.Polls,
+		RxPps: s.RxPps + b.RxPps,
+		RxBps: s.RxBps + b.RxBps,
+		TxPps: s.TxPps + b.TxPps,
+		TxBps: s.TxBps + b.TxBps,
+
+		RxEmpty:   s.RxEmpty + b.RxEmpty,
+		CqEmpty:   s.CqEmpty + b.CqEmpty,
+		FqFull:    s.FqFull + b.FqFull,
+		TxFull:    s.TxFull + b.TxFull,
+		SendBusy:  s.SendBusy + b.SendBusy,
+		SendAgain: s.SendAgain + b.SendAgain,
+	}
+}
+
+func (s *XDPStats) Minus(b XDPStats) XDPStats {
+	if s == nil {
+		return XDPStats{}
+	}
+	return XDPStats{
+		queueID: s.queueID,
+		KernelStats: unix.XDPStatistics{
+			Rx_dropped:       s.KernelStats.Rx_dropped - b.KernelStats.Rx_dropped,
+			Rx_invalid_descs: s.KernelStats.Rx_invalid_descs - b.KernelStats.Rx_invalid_descs,
+			Tx_invalid_descs: s.KernelStats.Tx_invalid_descs - b.KernelStats.Tx_invalid_descs,
+		},
+		Polls: s.Polls - b.Polls,
+		RxPps: s.RxPps - b.RxPps,
+		RxBps: s.RxBps - b.RxBps,
+		TxPps: s.TxPps - b.TxPps,
+		TxBps: s.TxBps - b.TxBps,
+
+		RxEmpty:   s.RxEmpty - b.RxEmpty,
+		CqEmpty:   s.CqEmpty - b.CqEmpty,
+		FqFull:    s.FqFull - b.FqFull,
+		TxFull:    s.TxFull - b.TxFull,
+		SendBusy:  s.SendBusy - b.SendBusy,
+		SendAgain: s.SendAgain - b.SendAgain,
+	}
+}
+
+func (s XDPStats) String() string {
 	var titile string
 	s.Do(func() {
-		titile = fmt.Sprintf("%12s\t%12s\t%12s\t%8s\t%8s\t%12s\t%12s\t%12s\t%8s\t%12s\t%12s\t%12s\t%12s\t%12s\n",
-			"RX-BPS", "RX-PPS", "RX-Drop", "RX-INVAL_DESC", "||", "TX-BPS", "TX-PPS", "TX-ERR",
-			"||", "RX-EMPTY", "FQ-FULL", "TX-FULL", "CQ-EMPTY", "SEND-BUSY")
+		titile = fmt.Sprintf("%12s %12s %12s %12s %13s %4s %12s %12s %12s %4s %12s %12s %12s %12s %12s %12s %12s\n",
+			"QID", "RX-BPS", "RX-PPS", "RX-Drop", "RX-INVAL_DESC",
+			"||", "TX-BPS", "TX-PPS", "TX-ERR",
+			"||", "RX-EMPTY", "FQ-FULL", "TX-FULL", "CQ-EMPTY", "SEND-BUSY", "SEND-AGAIN", "POLL-TIMES")
 	})
 
-	stats := fmt.Sprintf("%12d\t%12d\t%12d\t%8d\t%8s\t%12d\t%12d\t%12d\t%8s\t%12d\t%12d\t%12d\t%12d\t%12d\n",
-		s.rxBps, s.rxPps, s.kernelStats.Rx_dropped, s.kernelStats.Rx_invalid_descs,
-		"||", s.txBps, s.txPps, s.kernelStats.Tx_invalid_descs,
-		"||", s.rxEmpty, s.fqFull, s.txFull, s.cqEmpty, s.sendBusy)
+	stats := fmt.Sprintf("%12d %12d %12d %12d %13d %4s %12d %12d %12d %4s %12d %12d %12d %12d %12d %12d %12d\n",
+		s.queueID, s.RxBps, s.RxPps, s.KernelStats.Rx_dropped, s.KernelStats.Rx_invalid_descs,
+		"||", s.TxBps, s.TxPps, s.KernelStats.Tx_invalid_descs,
+		"||", s.RxEmpty, s.FqFull, s.TxFull, s.CqEmpty, s.SendBusy, s.SendAgain, s.Polls)
 
 	return fmt.Sprintf("%v%v", titile, stats)
 }
 
-func (x *XDPPacket) readMultiPackets() (int, error) {
-	entries := int(x.rx.dequeue(x.rxDescs, uint32(x.options.batchSize)))
-	if entries < 1 {
-		x.rxEmpty += 1
-		return 0, ErrRxQueueEmpty
+func (x *XDPPacket) readMultiPackets() {
+	x.rxN = int(x.rx.dequeue(x.rxDescs, uint32(x.options.batchSize)))
+	if x.rxN < 1 {
+		x.RxEmpty += 1
+		x.rxErr = ErrRxQueueEmpty
+		return
 	}
+	x.rxErr = nil
 
-	for i := 0; i < entries; i++ {
+	for i := 0; i < x.rxN; i++ {
 		x.rxDesc = x.rxDescs[i]
-		x.packets[i] = x.framesBulk[x.rxDesc.Addr : x.rxDesc.Addr+uint64(x.rxDesc.Len)]
+		x.rxPkts = append(x.rxPkts, x.framesBulk[x.rxDesc.Addr:x.rxDesc.Addr+uint64(x.rxDesc.Len)])
 		x.rxAddrs = append(x.rxAddrs, x.rxDesc.Addr)
 	}
-
-	return entries, nil
 }
 
 // 非阻塞模式的收包函数
-func nonblockMultiRead(x *XDPPacket) (int, error) {
-	err := x.poll(x.rxFds)
-	if err != nil {
-		return 0, err
+func (x *XDPPacket) nonblockMultiRead() {
+	x.rxErr = x.poll(x.rxFds)
+	if x.rxErr != nil {
+		return
 	}
 
-	return x.readMultiPackets()
+	x.readMultiPackets()
 }
 
 // 阻塞模式的收包函数
-func blockMultiRead(x *XDPPacket) (int, error) {
+func (x *XDPPacket) blockMultiRead() {
 retry:
-	n, err := x.readMultiPackets()
-	if err != nil {
+	x.readMultiPackets()
+	if x.rxErr != nil {
 		goto retry
 	}
+}
 
-	return n, err
+// 混合模式的收包函数
+func (x *XDPPacket) mixMultiRead() {
+	if x.rxErr == ErrRxQueueEmpty {
+		x.rxErr = x.poll(x.rxFds)
+		if x.rxErr != nil {
+			return
+		}
+	}
+
+	x.readMultiPackets()
 }
 
 func (x *XDPPacket) releaseMultiPackets() error {
-	var err error
-	n := len(x.rxAddrs)
-	if n > 0 {
+	if x.rxN > 0 {
 	retry:
-		err = x.fq.enqueue(x.rxAddrs, uint32(n))
-		if err != nil {
-			x.fqFull += 1
+		x.rxErr = x.fq.enqueue(x.rxAddrs, uint32(x.rxN))
+		if x.rxErr != nil {
+			x.FqFull += 1
 			goto retry
 		}
 	}
+	x.rxN = 0
 	x.rxAddrs = x.rxAddrs[:0]
-	x.cis = x.cis[:0]
+	x.rxPkts = x.rxPkts[:0]
+	x.cis = x.cis[:cap(x.cis)]
 	return nil
 }
 
 // 收包接口，零拷贝, 每次尽最大努力收包，最多一次收16个包
 // 函数返回后，请使用len([]CaptureInfo)获取读到的包数
 func (x *XDPPacket) ZeroCopyReadMultiPackets() ([][]byte, []CaptureInfo, error) {
-	if x.multiRead == nil {
-		return nil, x.cis, ErrReadFunctionNil
-	}
-	if x.checkIfXDPSocketClosed() {
-		return nil, x.cis, ErrSocketClosed
+	if x.CheckIfXDPSocketClosed() {
+		return nil, nil, ErrSocketClosed
 	}
 
 	x.releaseMultiPackets()
 
-	n, err := x.multiRead(x)
-	if err == nil {
+	x.multiRead()
+	if x.rxErr == nil {
 		totalBytes := uint32(0)
-		for i := 0; i < n; i++ {
+		x.ci.Timestamp = time.Now()
+		for i := 0; i < x.rxN; i++ {
 			x.rxDesc = x.rxDescs[i]
 			totalBytes += x.rxDesc.Len
-			x.ci.CaptureLength = int(x.rxDesc.Len)
-			x.ci.Timestamp = time.Now()
+			x.cis[i].Timestamp = x.ci.Timestamp
+			x.cis[i].CaptureLength = int(x.rxDesc.Len)
 		}
-		x.rxPps += uint64(n)
-		x.rxBps += uint64(totalBytes)
+		x.cis = x.cis[:x.rxN]
+		x.RxPps += uint64(x.rxN)
+		x.RxBps += uint64(totalBytes)
 	}
 
-	return x.packets, x.cis, err
+	return x.rxPkts, x.cis, x.rxErr
 }
 
 // 从rx队列读取一个包
-func (x *XDPPacket) readOnePacket() ([]byte, error) {
-	entries := x.rx.dequeueOne(&x.rxDesc)
-	if entries < 1 {
-		x.rxEmpty += 1
-		return nil, ErrRxQueueEmpty
+// 流程 enqueue fq --- dequeue rx --- read packet
+func (x *XDPPacket) readOnePacket() {
+	// 将前一个包的地址放回fq队列，供内核使用
+	// 初始时，无地址可放, 故将x.rxAddr设为math.MaxUint64
+	if x.rxAddr != math.MaxUint64 {
+	retry:
+		x.rxErr = x.fq.enqueueOne(x.rxAddr)
+		// x.rxAddr已放回，下次无需重放
+		if x.rxErr == nil {
+			x.rxAddr = math.MaxUint64
+		} else {
+			// 如果fq队列满，则返回，x.rxAddr未改变
+			x.FqFull += 1
+			goto retry
+		}
 	}
 
+	// 如果rx队列为空，则返回，x.rxAddr已重置
+	if x.rx.dequeueOne(&x.rxDesc) < 1 {
+		x.RxEmpty += 1
+		x.rxErr = ErrRxQueueEmpty
+		return
+	}
+
+	// 成功获取包描述后，更新x.rxAddr，并返回包数据
 	x.rxAddr = x.rxDesc.Addr
-	return x.framesBulk[x.rxDesc.Addr : x.rxDesc.Addr+uint64(x.rxDesc.Len)], nil
+	x.rxPkt = x.framesBulk[x.rxAddr : x.rxAddr+uint64(x.rxDesc.Len)]
+	x.rxErr = nil
+	return
 }
 
 func (x *XDPPacket) poll(fds []unix.PollFd) error {
-	timeout := int(x.options.pollTimeout / time.Millisecond)
 retry:
-	n, err := unix.Poll(fds, timeout)
+	x.ts = x.constTs
+	n, err := unix.Ppoll(fds, &x.ts, nil)
+	x.Polls += 1
+	if n > 0 {
+		if fds[0].Revents&unix.POLLERR > 0 {
+			return ErrPoll
+		}
+		return nil
+	}
 	if n == 0 {
 		return ErrTimeout
 	}
 
-	x.polls += 1
-	if fds[0].Revents&unix.POLLERR > 0 {
-		return ErrPoll
-	}
 	if err == syscall.EINTR {
 		goto retry
 	}
@@ -301,52 +352,56 @@ retry:
 }
 
 // 非阻塞模式的收包函数
-func nonblockReadPacket(x *XDPPacket) ([]byte, error) {
-	err := x.poll(x.rxFds)
-	if err != nil {
-		return nil, err
+func (x *XDPPacket) nonblockReadPacket() {
+	x.rxErr = x.poll(x.rxFds)
+	if x.rxErr == nil {
+		x.readOnePacket()
 	}
-
-	return x.readOnePacket()
 }
 
 // 阻塞模式的收包函数
-func blockReadPacket(x *XDPPacket) ([]byte, error) {
+func (x *XDPPacket) blockReadPacket() {
 retry:
-	pkt, err := x.readOnePacket()
-	if err != nil {
+	x.readOnePacket()
+	// readOnePacket仅产生ErrFqQueueFull, ErrRxQueueEmpty这2种错误
+	// 收包失败后，一直重试，直到收包成功
+	if x.rxErr != nil {
 		goto retry
 	}
-
-	return pkt, err
 }
 
-// 调用ZeroCopyReadPacket函数收包后，需要主动调用ReleaseReadPacket()函数释放资源
-// 收包接口，零拷贝
-func (x *XDPPacket) ZeroCopyReadPacket() ([]byte, CaptureInfo, error) {
-	if x.read == nil {
-		return nil, x.ci, ErrReadFunctionNil
+// 混合模式的收包函数
+func (x *XDPPacket) mixReadPacket() {
+	if x.rxErr == ErrRxQueueEmpty {
+		x.rxErr = x.poll(x.rxFds)
+		if x.rxErr != nil {
+			return
+		}
 	}
-	if x.checkIfXDPSocketClosed() {
+	x.readOnePacket()
+}
+
+// 收包接口，零拷贝
+// 当error不为nil时，返回值中slice，CaptureInfo不可用
+func (x *XDPPacket) ZeroCopyReadPacket() ([]byte, CaptureInfo, error) {
+	if x.CheckIfXDPSocketClosed() {
 		return nil, x.ci, ErrSocketClosed
 	}
 
-	x.ReleaseReadPacket()
-
-	pkt, err := x.read(x)
-	if err == nil {
-		x.rxPps += 1
-		x.rxBps += uint64(len(pkt))
+	x.read()
+	// 收包成功后，给包打时间戳，并增加收包统计
+	if x.rxErr == nil {
+		x.RxPps += 1
+		x.RxBps += uint64(len(x.rxPkt))
 		x.ci.CaptureLength = int(x.rxDesc.Len)
 		x.ci.Timestamp = time.Now()
 	}
 	// 打开debug将极大的降低收包性能
-	// log.Debug(dumpPacket(pkt))
+	// log.Debug(DumpPacket(rxPkt))
 
-	return pkt, x.ci, err
+	return x.rxPkt, x.ci, x.rxErr
 }
 
-// 调用ReadPacket函数收包后，无需调用ReleaseReadPacket()函数释放资源
 // 收包接口，内部有一次包拷贝, 如果len(data)小于包长，则ci.CaptureLength=len(data)
 func (x *XDPPacket) ReadPacket(data []byte) (CaptureInfo, error) {
 	if data == nil {
@@ -380,146 +435,125 @@ func sendmsg(s int) (n int, err error) {
 }
 
 func (x *XDPPacket) sendmsg() error {
-	var err error
 retry:
-	_, err = sendmsg(x.sockFd)
-	if err == syscall.EBUSY { // 虚拟机SKB模式出现发包缓慢
-		x.sendBusy += 1
-		if x.xdpMode == XDP_MODE_SKB {
-			time.Sleep(1 * time.Microsecond)
-		}
+	_, x.txErr = sendmsg(x.sockFd)
+
+	if x.txErr == syscall.EAGAIN {
+		x.SendAgain += 1
 		goto retry
+	} else if x.txErr == syscall.EBUSY {
+		// 虚拟机SKB模式出现发包缓慢
+		x.SendBusy += 1
+		x.txErr = ErrSengMsgReWrite
 	}
-	if err == syscall.EAGAIN {
-		x.sendBusy += 1
-		goto retry
-	}
-	return err
+	return x.txErr
 }
 
-// 流程enqueue tx --- copy --- write --- dequeue cq
-// 发送单个包
-func (x *XDPPacket) writeOnePacket(pkt []byte) error {
-	x.txDesc.Addr = (x.txIdx & uint64(x.tx.mask)) << x.options.frameShift
-	x.txDesc.Len = uint32(len(pkt))
+// 将包copy到指定的umem block;然后调用sendmsg将包从网卡发送出去
+func (x *XDPPacket) writeOnePacketToKernel(pkt []byte) {
+	x.txErr = x.tx.enqueueOne(x.txDesc)
+	// 如果tx队列满，则停止发送
+	if x.txErr != nil {
+		x.TxFull += 1
+		return
+	}
 
 	copy(x.framesBulk[x.txDesc.Addr:], pkt)
+	x.sendmsg()
+}
 
-	err := x.tx.enqueueOne(x.txDesc)
-	if err != nil {
-		x.txFull += 1
-		log.Debugf("tx queue is full")
-		return err
+// 流程 dequeue cq --- enqueue tx --- copy --- sendmsg
+// 发送单个包
+func (x *XDPPacket) writeOnePacket(pkt []byte) {
+reWrite:
+	// 初始时，cq,tx队列为空, 无法从cq队列获取umem block为空的地址；
+	// 但可认为umem 前ringSize个block均可用。
+	// 因此, 前ringSize次发送，可依次使用umem的block
+	if x.txIdx < x.options.ringSize {
+		x.txDesc.Addr = uint64(x.txIdx&x.tx.mask) << x.options.frameShift
+		x.txIdx++
+	} else {
+		// 之后，需每次从cq队列获取umem block地址
+		// 如果cq队列为空，则停止发送
+		x.cq.dequeueOne(&x.txAddr)
+		if x.cq.entries < 1 {
+			x.CqEmpty += 1
+			x.txErr = ErrCqQueueEmpty
+			return
+		}
+		x.txDesc.Addr = x.txAddr
 	}
+	x.txDesc.Len = uint32(len(pkt))
 
-	err = x.sendmsg()
-	if err != nil {
-		// rollback
-		desc, n, idx := x.tx.rollback()
-		log.Debugf("send failed(err:%d), rollback (x.Idx:%v, tx.idx:%v, n:%v) desc:%v",
-			err, x.txIdx, idx, n, desc)
-		return fmt.Errorf("sendmsg failed as %v", err)
+	x.writeOnePacketToKernel(pkt)
+	if x.txErr == ErrSengMsgReWrite {
+		goto reWrite
 	}
-	x.txIdx += 1
-
-wait:
-	if x.cq.dequeueOne(&x.txAddr) < 1 {
-		x.cqEmpty += 1
-		goto wait
-	}
-
-	return nil
 }
 
 // 阻塞模式的发包函数
-func blockWrite(x *XDPPacket, pkt []byte) error {
+func (x *XDPPacket) blockWrite(pkt []byte) {
 retry:
-	err := x.writeOnePacket(pkt)
-	if err == ErrTxQueueFull {
+	x.writeOnePacket(pkt)
+	if x.txErr == nil {
+		return
+	} else if x.txErr == ErrCqQueueEmpty {
+		goto retry
+	} else if x.txErr == ErrTxQueueFull {
 		goto retry
 	}
-	return err
 }
 
 // 非阻塞模式的发包函数
-func nonblockWrite(x *XDPPacket, pkt []byte) error {
-	err := x.poll(x.txFds)
-	if err != nil {
-		return err
+func (x *XDPPacket) nonblockWrite(pkt []byte) {
+	if x.txErr = x.poll(x.txFds); x.txErr == nil {
+		x.writeOnePacket(pkt)
 	}
+}
 
-	err = x.writeOnePacket(pkt)
-	return err
+// 混合模式的发包函数
+func (x *XDPPacket) mixWrite(pkt []byte) {
+	if x.txErr != nil {
+		x.txErr = x.poll(x.txFds)
+		if x.txErr != nil {
+			return
+		}
+	}
+	x.writeOnePacket(pkt)
 }
 
 // 发单包接口
 func (x *XDPPacket) WritePacket(pkt []byte) error {
-	if x.write == nil {
-		return ErrWriteFunctionNil
+	if x.CheckIfXDPSocketClosed() {
+		return ErrSocketClosed
 	}
 
-	if x.checkIfXDPSocketClosed() {
-		return errors.New("xdp socket closed")
+	x.write(pkt)
+	if x.txErr == nil {
+		x.TxPps++
+		x.TxBps += uint64(len(pkt))
 	}
 
-	err := x.write(x, pkt)
-	if err == nil || err == ErrCqQueueEmpty {
-		x.txPps += uint64(1)
-		x.txBps += uint64(len(pkt))
-	}
-
-	return err
+	return x.txErr
 }
 
 // 内部批量发送函数，每次发送batchSize个包
 func (x *XDPPacket) writeMultiPacket(pkts [][]byte) (int, int, error) {
-	var err error
-	var nPkt, n uint32
-	var nByte, pktLen int = 0, 0
-
-	pktNum := len(pkts)
-	if pktNum > x.options.batchSize {
-		return 0, 0, fmt.Errorf("too many packets, must <= %v packets", x.options.batchSize)
+	// 因当sendmsg调用失败后，无法确认是哪个包发送失败，
+	// 故为了保证发包的准确性，无法做到调一次sendmsg发送多个包
+	x.txPktsLen = 0
+	for x.txN, x.txPkt = range pkts {
+		x.writeOnePacket(x.txPkt)
+		if x.txErr != nil {
+			return x.txN, x.txPktsLen, x.txErr
+		}
+		x.txPktsLen += len(x.txPkt)
 	}
-
-	txEntries := x.tx.freeEntries(uint32(pktNum))
-	if txEntries < uint32(pktNum) {
-		x.txFull += 1
-		return 0, 0, ErrTxQueueLessThanBatch
-	}
-
-	for i := 0; i < pktNum; i++ {
-		pktLen = len(pkts[i])
-		x.txDescs[i].Addr = (x.txIdx & uint64(x.tx.mask)) << x.options.frameShift
-		x.txDescs[i].Len = uint32(pktLen)
-		copy(x.framesBulk[x.txDescs[i].Addr:], pkts[i])
-
-		x.txIdx += 1
-		nByte += pktLen
-		nPkt += 1
-	}
-
-	err = x.tx.enqueue(x.txDescs, uint32(pktNum))
-	if err != nil {
-		x.txIdx -= uint64(pktNum)
-		return 0, 0, err
-	}
-
-	err = x.sendmsg()
-	if err != nil {
-		return 0, 0, fmt.Errorf("sendmsg failed as %v", err)
-	}
-
-	for n < nPkt {
-		n += x.cq.dequeue(x.txAddrs, nPkt-n)
-		x.cqEmpty += 1
-	}
-
-	return int(nPkt), nByte, err
+	return x.txN + 1, x.txPktsLen, x.txErr
 }
 
 // 阻塞模式的批量发包函数
-func blockMultiWrite(x *XDPPacket, pkts [][]byte) (int, int, error) {
+func (x *XDPPacket) blockMultiWrite(pkts [][]byte) (int, int, error) {
 retry:
 	nPkt, nByte, err := x.writeMultiPacket(pkts)
 	if err != nil && err != ErrCqQueueLessThanBatch {
@@ -529,7 +563,7 @@ retry:
 }
 
 // 非阻塞模式的批量发包函数
-func nonblockMultiWrite(x *XDPPacket, pkts [][]byte) (int, int, error) {
+func (x *XDPPacket) nonblockMultiWrite(pkts [][]byte) (int, int, error) {
 	err := x.poll(x.txFds)
 	if err != nil {
 		return 0, 0, err
@@ -538,55 +572,31 @@ func nonblockMultiWrite(x *XDPPacket, pkts [][]byte) (int, int, error) {
 	return x.writeMultiPacket(pkts)
 }
 
-// 批量发包接口,
-func (x *XDPPacket) WriteMultiPackets(pkts [][]byte) (int, error) {
-	var err error
-	var start, end, pktNum int = 0, 0, 0
-	var nPkt, nByte int = 0, 0
-
-	if x.multiWrite == nil {
-		return 0, ErrMultiWriteFunctionNil
-	}
-
-	if x.checkIfXDPSocketClosed() {
-		return 0, errors.New("xdp socket closed")
-	}
-
-	pktNum = len(pkts)
-	for start = 0; start < pktNum; {
-		end = start + x.options.batchSize
-		if end > pktNum {
-			end = pktNum
+// 混合模式的发包函数
+func (x *XDPPacket) mixMultiWrite(pkts [][]byte) (int, int, error) {
+	if x.txErr != nil {
+		x.txErr = x.poll(x.txFds)
+		if x.txErr != nil {
+			return 0, 0, x.txErr
 		}
-		nPkt, nByte, err = x.multiWrite(x, pkts[start:end])
-		if err == ErrTxQueueLessThanBatch {
-			// FIXME 考虑是否sleep
-			continue
-		} else if err != nil && err != ErrCqQueueLessThanBatch {
-			return start, err
-		}
-
-		x.txPps += uint64(nPkt)
-		x.txBps += uint64(nByte)
-		start += nPkt
 	}
-
-	return pktNum, err
+	return x.writeMultiPacket(pkts)
 }
 
-func (x *XDPPacket) ReleaseReadPacket() error {
-	var err error
-	if x.rxAddr != math.MaxUint64 {
-	retry:
-		err = x.fq.enqueueOne(x.rxAddr)
-		if err != nil {
-			x.fqFull += 1
-			goto retry
-		}
+// 批量发包接口,
+func (x *XDPPacket) WriteMultiPackets(pkts [][]byte) (int, error) {
+	if x.CheckIfXDPSocketClosed() {
+		return 0, ErrSocketClosed
 	}
-	x.rxAddr = math.MaxUint64
-	x.ci = ZEROCI
-	return nil
+
+	x.multiWrite(pkts)
+	if x.txErr == nil {
+		x.txN++
+		x.TxPps += uint64(x.txN)
+		x.TxBps += uint64(x.txPktsLen)
+	}
+
+	return x.txN, x.txErr
 }
 
 func initXDPPacket(ifIndex int, options *XDPOptions, queueId int) (*XDPPacket, error) {
@@ -611,7 +621,7 @@ func initXDPPacket(ifIndex int, options *XDPOptions, queueId int) (*XDPPacket, e
 	xdp := &XDPPacket{
 		options:   options,
 		XDPSocket: socket,
-		XDPStats:  &XDPStats{},
+		XDPStats:  &XDPStats{queueID: options.queueID},
 		ci:        CaptureInfo{InterfaceIndex: ifIndex},
 
 		rxFds:   rxFds,
@@ -622,20 +632,30 @@ func initXDPPacket(ifIndex int, options *XDPOptions, queueId int) (*XDPPacket, e
 		rxAddr:  math.MaxUint64,
 		rxDescs: make([]unix.XDPDesc, options.batchSize),
 		rxAddrs: make([]uint64, options.batchSize),
-		packets: make([][]byte, options.batchSize),
+		rxPkts:  make([][]byte, options.batchSize),
 		cis:     make([]CaptureInfo, options.batchSize),
-	}
 
-	if xdp.options.ioMode == IO_MODE_NONBLOCK {
-		xdp.read = nonblockReadPacket
-		xdp.write = nonblockWrite
-		xdp.multiWrite = nonblockMultiWrite
-		xdp.multiRead = nonblockMultiRead
+		constTs: unix.Timespec{
+			Sec:  int64(options.pollTimeout / time.Second),
+			Nsec: int64(options.pollTimeout % time.Second)},
+	}
+	log.Debugf("poll timeout setting is %v", xdp.constTs)
+
+	if xdp.options.ioMode == IO_MODE_POLL {
+		xdp.read = xdp.nonblockReadPacket
+		xdp.multiRead = xdp.nonblockMultiRead
+		xdp.write = xdp.nonblockWrite
+		xdp.multiWrite = xdp.nonblockMultiWrite
+	} else if xdp.options.ioMode == IO_MODE_NONPOLL {
+		xdp.read = xdp.blockReadPacket
+		xdp.multiRead = xdp.blockMultiRead
+		xdp.write = xdp.blockWrite
+		xdp.multiWrite = xdp.blockMultiWrite
 	} else {
-		xdp.read = blockReadPacket
-		xdp.write = blockWrite
-		xdp.multiWrite = blockMultiWrite
-		xdp.multiRead = blockMultiRead
+		xdp.read = xdp.mixReadPacket
+		xdp.multiRead = xdp.mixMultiRead
+		xdp.write = xdp.mixWrite
+		xdp.multiWrite = xdp.mixMultiWrite
 	}
 
 	log.Debugf("a new xdp packet %v", xdp)
@@ -643,6 +663,7 @@ func initXDPPacket(ifIndex int, options *XDPOptions, queueId int) (*XDPPacket, e
 }
 
 func NewXDPPacket(name string, opts ...interface{}) (*XDPPacket, error) {
+	var config *IfaceConfig = nil
 	iface, err := net.InterfaceByName(name)
 	if err != nil {
 		return nil, fmt.Errorf("error Interface Name(%s) as %v", name, err)
@@ -656,45 +677,108 @@ func NewXDPPacket(name string, opts ...interface{}) (*XDPPacket, error) {
 		}
 	}
 	log.Debugf("XDPOptions:\n%v", options)
-	if options.queueCount != 1 {
-		return nil, errors.New("only support one queue")
-	}
 
-	if !initXDPRunningEnv(name, options.xdpMode, options.queueCount) {
-		return nil, errors.New("an error XDP running environment")
-	}
-
-	// only can use queue 0
-	xdp, err := initXDPPacket(iface.Index, options, int(options.queueCount)-1)
+	loadProg := true
+	exist, err := CheckAndInitIfaceConfigFile(iface.Index)
 	if err != nil {
 		return nil, err
 	}
 
-	err = xdp.initXDPSocket(true, options.queueCount)
+	if !exist {
+		// 如果无网卡XDP config文件, 初始化XDP运行环境
+		err = initXDPRunningEnv(name, options.xdpMode)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		loadProg = false
+		// 否则获取网卡XDP config
+		config, err = GetAndCheckIfaceConfig(iface.Index, int(options.queueID))
+		if err != nil {
+			return nil, err
+		}
+		log.Debugf("interface %v(queueID:%v) xdp current config is:\n%v", name, options.queueID, config)
+	}
+
+	xdp, err := initXDPPacket(iface.Index, options, int(options.queueID))
+	if err != nil {
+		return nil, err
+	}
+
+	if loadProg == false {
+		xdp.progFd = config.BpfFd
+		xdp.xsksMapFd = config.MapFd
+	}
+
+	err = xdp.initXDPSocket(loadProg)
 	if err != nil {
 		xdp.Close()
 		return nil, err
 	}
+
+	if config == nil || config.UsedQueueCount < xdp.options.queueCount {
+		err = xdp.setInterfaceRecvQueues()
+		if err != nil {
+			xdp.Close()
+			return nil, err
+		}
+	}
+
+	if config == nil {
+		config = &IfaceConfig{
+			IfIndex: iface.Index,
+			MapFd:   xdp.xsksMapFd,
+			BpfFd:   xdp.progFd,
+
+			UsedQueueCount: options.queueCount,
+		}
+	} else {
+		config.UsedQueueCount = options.queueCount
+	}
+
+	curConfig, err := UpdateIfaceConfig(config, int(options.queueID))
+	if err != nil {
+		xdp.Close()
+		return nil, err
+	}
+	log.Debugf("current interface (%s) config: %#v", name, curConfig)
+
 	atomic.AddInt32(&xdp.progRefCount, 1)
 
-	log.Debugf("a usable XDPPacket %v", xdp)
+	log.Infof("a usable XDPPacket %v", xdp)
 	return xdp, nil
 }
 
-func (x *XDPPacket) GetStats() *XDPStats {
+func (x *XDPPacket) setInterfaceRecvQueues() error {
+	if x.options.xdpMode == XDP_MODE_SKB {
+		n := uint32(runtime.NumCPU())
+		log.Infof("the number of current host's CPU is %v", n)
+		// 目前测试发现，vSphere虚拟机网卡收包队列数等于CPU核数
+		if x.options.queueCount > n {
+			return fmt.Errorf("interface queue count(%v) more than cpu count(%v) in vSphere vHost",
+				x.options.queueCount, n)
+		}
+		if n == 1 {
+			return nil
+		}
+	}
+	return setInterfaceRecvQueues(x.ifIndex, x.options.queueCount)
+}
+
+func (x *XDPPacket) GetStats() XDPStats {
+	stats := XDPStats{}
 	if x == nil || x.sockFd < 0 {
-		return &XDPStats{}
+		return stats
 	}
 
 	kStats, err := getOptXDPStats(x.sockFd)
 	if err != nil {
 		log.Warning("get XDP socket kernel statistics failed")
-		return nil
+		return stats
 	}
 
-	stats := &XDPStats{}
-	*stats = *x.XDPStats
-	stats.kernelStats = *kStats
+	stats = *x.XDPStats
+	stats.KernelStats = *kStats
 
 	return stats
 }
@@ -705,6 +789,10 @@ func (x *XDPPacket) Close() {
 	if x == nil {
 		return
 	}
+	log.Debug("closing xdppacket !!")
+
+	DeleteIfaceQueue(x.ifIndex, int(x.options.queueID))
+
 	x.close()
 
 	if atomic.LoadInt32(&x.progRefCount) > 0 {
@@ -713,6 +801,8 @@ func (x *XDPPacket) Close() {
 	// 清除ebpf program
 	if atomic.LoadInt32(&x.progRefCount) == 0 {
 		x.clearResource()
+		// 删除config文件
+		DeleteIfaceConfig(x.ifIndex)
 	}
 }
 
@@ -730,5 +820,43 @@ func (x *XDPPacket) ClearEbpfProg() {
 }
 
 func (x *XDPPacket) String() string {
-	return fmt.Sprintf("\n%v%v", x.options.String(), x.XDPSocket.String())
+	return fmt.Sprintf("\n%v%v\n"+
+		"readFunc:%v, writeFunc:%v\n"+
+		"rxAddr:0x%x, txIdx:%v, txAddr:0x%x\n"+
+		"multiWriteFunc:%v, multiReadFunc:%v\n"+
+		"stats-queueID:%v",
+		x.options, x.XDPSocket,
+		x.read, x.write,
+		x.rxAddr, x.txIdx, x.txAddr,
+		x.multiWrite, x.multiRead,
+		x.queueID)
+}
+
+// 清除网卡上残留的XDP资源(map, prog, 配置文件)
+func ClearIfaceResidueXDPResources(ifName string) error {
+	iface, err := net.InterfaceByName(ifName)
+	if err != nil {
+		return fmt.Errorf("clear interface(%v)'s residue XDP resources failed as %v", ifName, err)
+	}
+
+	if CheckIfaceConfigFileExist(iface.Index) {
+		_, err = DeleteIfaceConfig(iface.Index)
+		if err != nil {
+			return fmt.Errorf("clear interface(%v)'s residue XDP resources failed as %v", ifName, err)
+		}
+	}
+
+	cmdString := fmt.Sprintf("ip link show %s | head -1 | grep -o 'xdp[a-z]*'", ifName)
+	mode, err := executeCommand(cmdString)
+	if err != nil {
+		return fmt.Errorf("clear interface(%v)'s residue XDP resources failed as %v", ifName, err)
+	}
+	if mode != "" {
+		cmdString = fmt.Sprintf("ip link set %s down; ip link set %s %s off; ip link set %s up", ifName, ifName, mode, ifName)
+		if err != nil {
+			return fmt.Errorf("clear interface(%v)'s residue XDP resources failed as %v", ifName, err)
+		}
+	}
+
+	return nil
 }

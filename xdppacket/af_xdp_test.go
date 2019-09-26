@@ -21,7 +21,7 @@ func TestOption(t *testing.T) {
 		t.Errorf("default option is %v", defaultOpt)
 	}
 	correctOpts := []interface{}{OptPollTimeout(time.Millisecond),
-		IO_MODE_NONBLOCK, OptQueueCount(1)}
+		IO_MODE_NONPOLL, OptQueueCount(1)}
 	for _, opt := range correctOpts {
 		_, err := parseOptions(opt)
 		if err != nil {
@@ -53,8 +53,9 @@ func TestConfigXDPPacket(t *testing.T) {
 	}
 }
 
-func TestRecvPacket(t *testing.T) {
-}
-
-func TestSendPacket(t *testing.T) {
+func TestClearIfaceResidueXDPResources(t *testing.T) {
+	err := ClearIfaceResidueXDPResources("lo")
+	if err != nil {
+		t.Error(err)
+	}
 }

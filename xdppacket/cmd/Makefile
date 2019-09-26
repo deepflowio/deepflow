@@ -1,20 +1,20 @@
 MESSAGE = gitlab.x.lan/yunshan/message
 
-vendor:
-	go mod tidy && go mod download && go mod vendor
-	test -n "$(shell go list -e -f '{{.Dir}}' ${MESSAGE})"
-	cp -r $(shell go list -e -f '{{.Dir}}' ${MESSAGE})/* vendor/${MESSAGE}/
-	find vendor -type d -exec chmod +w {} \;
-	cd vendor/${MESSAGE}/ && go generate ./...
-	go generate ./geo/...
-	go generate ./zerodoc/...
+afpacket-debug:
+	go build -gcflags 'all=-N -l' -o benchTest_afpacket ./afpacket/main.go
 
-test: 
-	go build -tags="xdp" -o benchTest main.go
+afpacket:
+	go build -o benchTest_afpacket ./afpacket/main.go
+
+xdp-debug: 
+	go build -gcflags 'all=-N -l' -tags="xdp" -o benchTest ./xdp/main.go
+
+xdp: 
+	go build -tags="xdp" -o benchTest ./xdp/main.go
 
 clean:
-	git clean -dfx
+	rm -f benchTest* 
 
-.DEFAULT_GOAL := test
+.DEFAULT_GOAL := xdp
 
-.PHONY: test module clean
+.PHONY: xdp afpacket xdp-debug afpacket-debug clean
