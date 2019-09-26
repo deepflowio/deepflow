@@ -144,12 +144,12 @@ func newAclAction(aclId datatype.ACLID, actions []*trident.FlowAction) []datatyp
 func newNpbActions(npbs []*trident.NpbAction) []datatype.NpbAction {
 	actions := make([]datatype.NpbAction, 0, len(npbs))
 	for _, npb := range npbs {
+		tunnelType := uint8(npb.GetTunnelType())
 		ip := net.ParseIP(npb.GetTunnelIp())
-		if ip == nil {
+		if ip == nil && tunnelType != datatype.NPB_TUNNEL_TYPE_PCAP {
 			continue
 		}
 		tunnelIp := IpToUint32(ip.To4())
-		tunnelType := uint8(npb.GetTunnelType())
 		id := uint16(npb.GetTunnelId())
 		side := uint8(npb.GetTapSide())
 		slice := uint16(npb.GetPayloadSlice())
