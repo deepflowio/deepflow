@@ -105,56 +105,58 @@ func (m *PerfMeter) MarshalTo(b []byte) int {
 	return offset
 }
 
-func (m *PerfMeter) Fill(isTag []bool, names []string, values []interface{}) {
-	for i, name := range names {
-		if isTag[i] || values[i] == nil {
+func (m *PerfMeter) Fill(ids []uint8, values []interface{}) {
+	for i, id := range ids {
+		if id <= _METER_INVALID_ || id >= _METER_MAX_ID_ || values[i] == nil {
 			continue
 		}
-		switch name {
-		case "sum_flow_count":
+		switch id {
+		case _METER_SUM_FLOW_COUNT:
 			m.SumFlowCount = uint64(values[i].(int64))
-		case "sum_new_flow_count":
+		case _METER_SUM_NEW_FLOW_COUNT:
 			m.SumNewFlowCount = uint64(values[i].(int64))
-		case "sum_closed_flow_count":
+		case _METER_SUM_CLOSED_FLOW_COUNT:
 			m.SumClosedFlowCount = uint64(values[i].(int64))
-		case "sum_half_open_flow_count":
+		case _METER_SUM_HALF_OPEN_FLOW_COUNT:
 			m.SumHalfOpenFlowCount = uint64(values[i].(int64))
-		case "sum_packet_tx":
+		case _METER_SUM_PACKET_TX:
 			m.SumPacketTx = uint64(values[i].(int64))
-		case "sum_packet_rx":
+		case _METER_SUM_PACKET_RX:
 			m.SumPacketRx = uint64(values[i].(int64))
-		case "sum_retrans_cnt_tx":
+		case _METER_SUM_RETRANS_CNT_TX:
 			m.SumRetransCntTx = uint64(values[i].(int64))
-		case "sum_retrans_cnt_rx":
+		case _METER_SUM_RETRANS_CNT_RX:
 			m.SumRetransCntRx = uint64(values[i].(int64))
 
-		case "sum_rtt_syn":
+		case _METER_SUM_RTT_SYN:
 			m.SumRTTSyn = time.Duration(values[i].(int64)) * time.Microsecond
-		case "sum_rtt_avg":
+		case _METER_SUM_RTT_AVG:
 			m.SumRTTAvg = time.Duration(values[i].(int64)) * time.Microsecond
-		case "sum_art_avg":
+		case _METER_SUM_ART_AVG:
 			m.SumARTAvg = time.Duration(values[i].(int64)) * time.Microsecond
-		case "sum_rtt_syn_flow":
+		case _METER_SUM_RTT_SYN_FLOW:
 			m.SumRTTSynFlow = uint64(values[i].(int64))
-		case "sum_rtt_avg_flow":
+		case _METER_SUM_RTT_AVG_FLOW:
 			m.SumRTTAvgFlow = uint64(values[i].(int64))
-		case "sum_art_avg_flow":
+		case _METER_SUM_ART_AVG_FLOW:
 			m.SumARTAvgFlow = uint64(values[i].(int64))
-		case "sum_zero_wnd_cnt_tx":
+		case _METER_SUM_ZERO_WND_CNT_TX:
 			m.SumZeroWndCntTx = uint64(values[i].(int64))
-		case "sum_zero_wnd_cnt_rx":
+		case _METER_SUM_ZERO_WND_CNT_RX:
 			m.SumZeroWndCntRx = uint64(values[i].(int64))
 
-		case "max_rtt_syn":
+		case _METER_MAX_RTT_SYN:
 			m.MaxRTTSyn = time.Duration(values[i].(int64)) * time.Microsecond
-		case "max_rtt_avg":
+		case _METER_MAX_RTT_AVG:
 			m.MaxRTTAvg = time.Duration(values[i].(int64)) * time.Microsecond
-		case "max_art_avg":
+		case _METER_MAX_ART_AVG:
 			m.MaxARTAvg = time.Duration(values[i].(int64)) * time.Microsecond
-		case "max_rtt_syn_client":
+		case _METER_MAX_RTT_SYN_CLIENT:
 			m.MaxRTTSynClient = time.Duration(values[i].(int64)) * time.Microsecond
-		case "max_rtt_syn_server":
+		case _METER_MAX_RTT_SYN_SERVER:
 			m.MaxRTTSynServer = time.Duration(values[i].(int64)) * time.Microsecond
+		default:
+			log.Warningf("unsupport meter id=%d", id)
 		}
 	}
 }

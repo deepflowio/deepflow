@@ -93,18 +93,20 @@ func (m *FPSMeter) MarshalTo(b []byte) int {
 	return offset
 }
 
-func (m *FPSMeter) Fill(isTag []bool, names []string, values []interface{}) {
-	for i, name := range names {
-		if isTag[i] || values[i] == nil {
+func (m *FPSMeter) Fill(ids []uint8, values []interface{}) {
+	for i, id := range ids {
+		if id <= _METER_INVALID_ || id >= _METER_MAX_ID_ || values[i] == nil {
 			continue
 		}
-		switch name {
-		case "sum_flow_count":
+		switch id {
+		case _METER_SUM_FLOW_COUNT:
 			m.SumFlowCount = uint64(values[i].(int64))
-		case "sum_new_flow_count":
+		case _METER_SUM_NEW_FLOW_COUNT:
 			m.SumNewFlowCount = uint64(values[i].(int64))
-		case "sum_closed_flow_count":
+		case _METER_SUM_CLOSED_FLOW_COUNT:
 			m.SumClosedFlowCount = uint64(values[i].(int64))
+		default:
+			log.Warningf("unsupport meter id=%d", id)
 		}
 	}
 }
