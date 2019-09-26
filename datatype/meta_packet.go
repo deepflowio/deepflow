@@ -95,14 +95,15 @@ type MetaPacketBlock struct {
 	pool.ReferenceCount
 }
 
-// index目前为trident dispatcher的index
-func (p *MetaPacket) GenerateQueueHash(tridentQueueIndex uint8) uint8 {
-	// 为了保证一个MetaPacketBlock中的所有流量都在一个队列中，使用InPort、Exporter、TridentQueueIndex
-	hash := p.InPort ^ p.Exporter
-	p.QueueHash = uint8(hash>>24) ^ uint8(hash>>16) ^ uint8(hash>>8) ^ uint8(hash) ^ tridentQueueIndex
-	// 哈希用于Queue负载均衡，QueueCount最大为16，只需低4bit尽量随机即可
-	p.QueueHash = (p.QueueHash >> 6) ^ (p.QueueHash >> 4) ^ (p.QueueHash >> 2) ^ p.QueueHash
-	return p.QueueHash
+func (p *MetaPacket) Equal(m *MetaPacket) bool {
+	equal := p.L2End0 == m.L2End0 && p.L2End1 == m.L2End1 &&
+		p.MacSrc == m.MacSrc && p.MacDst == m.MacDst && p.EthType == m.EthType &&
+		p.IpSrc == m.IpSrc && p.IpDst == m.IpDst && p.Protocol == m.Protocol &&
+		p.PortSrc == m.PortSrc && p.PortDst == m.PortDst && p.Vlan == m.Vlan
+	if len(p.Ip6Src) > 0 {
+		return equal && p.Ip6Src.Equal(m.Ip6Src) && p.Ip6Dst.Equal(m.Ip6Dst)
+	}
+	return equal
 }
 
 func (h *MetaPacketTcpHeader) extractTcpOptions(stream *ByteStream) bool {

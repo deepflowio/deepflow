@@ -14,13 +14,17 @@ type InterestTable struct {
 	InterestProtoMaps *[TAP_MAX][math.MaxUint8 + 1]bool
 	InterestPortMaps  *[TAP_MAX][math.MaxUint16 + 1]PortRange
 
-	fromInterestGroupMaps *[TAP_MAX][math.MaxUint16 + 1]uint16
+	fromInterestGroupMaps *[TAP_MAX][math.MaxUint16 + 1]uint16 // 仅用于资源组算法的FirstPath
+	ddbs                  bool
 }
 
-func (t *InterestTable) Init() {
+func (t *InterestTable) Init(ddbs bool) {
 	t.InterestProtoMaps = &[TAP_MAX][math.MaxUint8 + 1]bool{}
 	t.InterestPortMaps = &[TAP_MAX][math.MaxUint16 + 1]PortRange{}
-	t.fromInterestGroupMaps = &[TAP_MAX][math.MaxUint16 + 1]uint16{}
+	t.ddbs = ddbs
+	if !t.ddbs {
+		t.fromInterestGroupMaps = &[TAP_MAX][math.MaxUint16 + 1]uint16{}
+	}
 }
 
 func (t *InterestTable) generateGroupIdMap() {
@@ -55,6 +59,7 @@ func (t *InterestTable) GenerateGroupIdMapByPlatformData(datas []*PlatformData) 
 	t.generateGroupIdMap()
 }
 
+// 仅用于资源组算法的FirstPath
 func (t *InterestTable) generateInterestKeys(endpointData *EndpointData, packet *LookupKey, any bool) {
 	hasAnyGroup := false
 	packet.SrcGroupIds = make([]uint16, 0, len(endpointData.SrcInfo.GroupIds))
@@ -275,8 +280,10 @@ func (t *InterestTable) generateInterestProtoMaps(acls []*Acl) {
 
 func (t *InterestTable) GenerateInterestMaps(acls []*Acl) {
 	t.generateInterestPortMap(acls)
-	t.generateInterestGroupMap(acls)
 	t.generateInterestProtoMaps(acls)
+	if !t.ddbs {
+		t.generateInterestGroupMap(acls)
+	}
 }
 
 func (t *InterestTable) getFastInterestKeys(packet *LookupKey) {
