@@ -1,4 +1,4 @@
-// +build linux,xdp
+// +build linux
 
 package xdppacket
 
@@ -14,6 +14,7 @@ type OptRingSize uint32
 type OptXDPMode uint16
 
 type OptQueueCount uint32
+type OptQueueID uint32
 type OptPollTimeout time.Duration
 type OptIoMode uint32
 
@@ -22,44 +23,68 @@ type XDPOptions struct {
 	ringSize uint32
 	// 包缓存大小
 	numFrames uint32
-	// 不可修改，暂定为2048
-	frameSize uint32 // it must be power of 2, kernel limit 2048 or 4096
-	// zerocopy需网卡支持
-	xdpMode OptXDPMode // copy or zerocopy
+	// 不可修改，4096, it must be power of 2, kernel limit 2048 or 4096
+	frameSize uint32
+	// drv or skb, drv需网卡支持
+	xdpMode OptXDPMode
 
 	// 指定从网卡哪几个队列收包, 取前n个队列[0-queueCount)
-	queueCount  uint32
-	pollTimeout time.Duration // only valid when ioMode is IO_MODE_NONBLOCK
-	ioMode      OptIoMode     // block or poll
+	queueCount uint32
+	// 当前队列ID
+	queueID uint32
+	// only valid when ioMode is IO_MODE_POLL
+	pollTimeout time.Duration
+	ioMode      OptIoMode
 
-	frameShift    uint32 // frameSize = 1<<frameShift
-	frameMask     uint32 // 包大小的掩码
-	frameHeadroom uint32 // reserved
-	batchSize     int    // 批量发送时，每次发送的包数量
+	// frameSize = 1<<frameShift
+	frameShift uint32
+	// 包大小的掩码
+	frameMask uint32
+	// reserved
+	frameHeadroom uint32
+	// 批量发送时，每次发送的包数量
+	batchSize uint32
 }
 
 const (
+	IO_MODE_NONPOLL OptIoMode = iota
+	IO_MODE_POLL
+	IO_MODE_MIX
+
 	XDP_MODE_DRV OptXDPMode = unix.XDP_FLAGS_DRV_MODE
 	XDP_MODE_SKB OptXDPMode = unix.XDP_FLAGS_SKB_MODE
-
-	IO_MODE_BLOCK OptIoMode = iota
-	IO_MODE_NONBLOCK
 
 	MAX_QUEUE_COUNT = 64
 )
 
 const (
-	DFLT_RING_SIZE  = 1024 // 默认队列大小：1024
-	DFLT_NUM_FRAMES = 1024 // 默认包缓存大小：1024
-	DFLT_FRAME_SIZE = 2048 // 默认包大小：2048B
+	// 默认队列大小：1024
+	DFLT_RING_SIZE = 1024
+	// 默认包缓存大小：1024; 不宜过大，可能导致无法分配足够内存
+	DFLT_NUM_FRAMES = 1024
+	// 默认包大小：2048B, 否则会导致无法处理超过1024B的包
+	// 参考：http://gitlab.x.lan/hpn/linux-kernel/wikis/xdp-zc-排查1400的数据包没有接收的问题
+	DFLT_FRAME_SIZE = 4096
+	// 内核网卡驱动headroom大小
+	DFLT_KERNEL_FRAME_HEADROOM = 256
+	// 实际最大可收发包大小
+	DFLT_ACTUAL_FRAME_SIZE_MAX = DFLT_FRAME_HEADROOM - DFLT_KERNEL_FRAME_HEADROOM
 
-	DFLT_IO_MODE      = IO_MODE_BLOCK          // 默认采用轮询模式收发包
-	DFLT_XDP_MODE     = XDP_MODE_DRV           // 默认XDP采用NATIVE模式
-	DFLT_POLL_TIMEOUT = 100 * time.Millisecond // 默认非阻塞IO时的poll超时：100us
+	// 默认采用轮询模式收发包
+	DFLT_IO_MODE = IO_MODE_NONPOLL
+	// 默认XDP采用NATIVE模式
+	DFLT_XDP_MODE = XDP_MODE_DRV
+	// 默认非阻塞IO时的poll超时：1ms
+	DFLT_POLL_TIMEOUT = 1 * time.Millisecond
 
-	DFLT_QUEUE_COUNT    = 1  // 默认在网卡0号队列收包
-	DFLT_FRAME_HEADROOM = 0  // 保留
-	DFLT_BATCH_SIZE     = 16 // 默认批量发送包数量：16
+	// 默认仅使用1个队列收或发所有流量
+	DFLT_QUEUE_COUNT = 1
+	// 默认在网卡0号队列收包
+	DFLT_QUEUE_ID = 0
+	// 保留
+	DFLT_FRAME_HEADROOM = 0
+	// 默认批量发送包数量：16
+	DFLT_BATCH_SIZE = 16
 )
 
 var defaultOpt = XDPOptions{
@@ -69,11 +94,11 @@ var defaultOpt = XDPOptions{
 	xdpMode:   DFLT_XDP_MODE,
 
 	queueCount:  DFLT_QUEUE_COUNT,
+	queueID:     DFLT_QUEUE_ID,
 	pollTimeout: DFLT_POLL_TIMEOUT,
 	ioMode:      DFLT_IO_MODE,
 
-	frameShift: getFrameShift(DFLT_FRAME_SIZE),
-
+	frameShift:    getFrameShift(DFLT_FRAME_SIZE),
 	frameMask:     DFLT_FRAME_SIZE - 1,
 	frameHeadroom: DFLT_FRAME_HEADROOM,
 	batchSize:     DFLT_BATCH_SIZE,
@@ -103,6 +128,7 @@ func parseOptions(options ...interface{}) (*XDPOptions, error) {
 		switch v := opt.(type) {
 		case OptNumFrames:
 			option.numFrames = uint32(v)
+			option.ringSize = option.numFrames
 		case OptRingSize:
 			option.ringSize = uint32(v)
 		case OptXDPMode:
@@ -113,6 +139,8 @@ func parseOptions(options ...interface{}) (*XDPOptions, error) {
 			option.pollTimeout = time.Duration(v)
 		case OptIoMode:
 			option.ioMode = v
+		case OptQueueID:
+			option.queueID = uint32(v)
 		default:
 			return nil, fmt.Errorf("unknown option(%v)", opt)
 		}
@@ -122,6 +150,7 @@ func parseOptions(options ...interface{}) (*XDPOptions, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &option, nil
 }
 
@@ -132,14 +161,18 @@ func (o *XDPOptions) check() error {
 	case !isPowerOfTwo(o.ringSize):
 		return fmt.Errorf("ring size(%d) must be power of 2", o.ringSize)
 	case o.xdpMode != XDP_MODE_SKB && o.xdpMode != XDP_MODE_DRV:
-		return fmt.Errorf("xdp mode(%d) must be \"XDP_MODE_DRV\" or \"XDP_MODE_SKB\"",
-			o.xdpMode)
-	case o.ioMode != IO_MODE_NONBLOCK && o.ioMode != IO_MODE_BLOCK:
-		return fmt.Errorf("I/O mode(%d) must be ", o.ioMode)
-	case o.ioMode == IO_MODE_NONBLOCK && o.pollTimeout < time.Millisecond:
-		return fmt.Errorf("poll timeout(%d) must be greater or eqaul than %v", o.pollTimeout, time.Millisecond)
+		return fmt.Errorf("xdp mode(%d) must be %d or %d",
+			o.xdpMode, XDP_MODE_DRV, XDP_MODE_SKB)
+	case o.ioMode > IO_MODE_MIX || o.ioMode < IO_MODE_NONPOLL:
+		return fmt.Errorf("I/O mode(%d) must be in range of [%d, %d]", o.ioMode,
+			IO_MODE_NONPOLL, IO_MODE_MIX)
+	case o.ioMode != IO_MODE_NONPOLL && o.pollTimeout < time.Millisecond:
+		return fmt.Errorf("poll timeout(%d) must be greater or eqaul than %v",
+			o.pollTimeout, time.Millisecond)
 	case o.queueCount > MAX_QUEUE_COUNT:
 		return fmt.Errorf("queueCount(%d) must be less or eqaul than %v", o.queueCount, MAX_QUEUE_COUNT)
+	case o.queueID >= o.queueCount:
+		return fmt.Errorf("queueID(%d) must be less than queueCount(%d)", o.queueID, o.queueCount)
 	}
 
 	if o.ringSize > o.numFrames {
@@ -160,23 +193,23 @@ func (m OptXDPMode) String() string {
 	return str
 }
 
-func (t OptPollTimeout) String() string {
-	return t.String()
-}
-
 func (m OptIoMode) String() string {
 	var str string
-	if m == IO_MODE_BLOCK {
-		str = fmt.Sprintf("BLOCK")
-	} else if m == IO_MODE_NONBLOCK {
-		str = fmt.Sprintf("NONBLOCK")
+	if m == IO_MODE_NONPOLL {
+		str = fmt.Sprintf("NONPOLL")
+	} else if m == IO_MODE_POLL {
+		str = fmt.Sprintf("POLL")
+	} else if m == IO_MODE_MIX {
+		str = fmt.Sprintf("MIX")
+	} else {
+		str = fmt.Sprintf("error XDP I/O mode")
 	}
 	return str
 }
 
 func (o XDPOptions) String() string {
 	return fmt.Sprintf("XDPOptions:\n\tringSize:%v, numFrames:%v, frameSize:%v, "+
-		"xdpMode:%v, queueCount:%v, pollTimeout:%v, ioMode:%v, frameMask:%v, frameHeadroom:%v, "+
-		"batchSize:%v", o.ringSize, o.numFrames, o.frameSize, o.xdpMode, o.queueCount,
+		"xdpMode:%v, queueCount:%v, queueID:%v, pollTimeout:%v, ioMode:%v, frameMask:%v, frameHeadroom:%v, "+
+		"batchSize:%v", o.ringSize, o.numFrames, o.frameSize, o.xdpMode, o.queueCount, o.queueID,
 		o.pollTimeout, o.ioMode, o.frameMask, o.frameHeadroom, o.batchSize)
 }
