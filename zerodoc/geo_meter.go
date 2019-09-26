@@ -88,24 +88,26 @@ func (m *GeoMeter) MarshalTo(b []byte) int {
 	return offset
 }
 
-func (m *GeoMeter) Fill(isTag []bool, names []string, values []interface{}) {
-	for i, name := range names {
-		if isTag[i] || values[i] == nil {
+func (m *GeoMeter) Fill(ids []uint8, values []interface{}) {
+	for i, id := range ids {
+		if id <= _METER_INVALID_ || id >= _METER_MAX_ID_ || values[i] == nil {
 			continue
 		}
-		switch name {
-		case "sum_packet_tx":
+		switch id {
+		case _METER_SUM_PACKET_TX:
 			m.SumPacketTx = uint64(values[i].(int64))
-		case "sum_packet_rx":
+		case _METER_SUM_PACKET_RX:
 			m.SumPacketRx = uint64(values[i].(int64))
-		case "sum_bit_tx":
+		case _METER_SUM_BIT_TX:
 			m.SumBitTx = uint64(values[i].(int64))
-		case "sum_bit_rx":
+		case _METER_SUM_BIT_RX:
 			m.SumBitRx = uint64(values[i].(int64))
-		case "sum_rtt_syn_client":
+		case _METER_SUM_RTT_SYN_CLIENT:
 			m.SumRTTSynClient = time.Duration(values[i].(int64)) * time.Microsecond
-		case "sum_rtt_syn_client_flow":
+		case _METER_SUM_RTT_SYN_CLIENT_FLOW:
 			m.SumRTTSynClientFlow = uint64(values[i].(int64))
+		default:
+			log.Warningf("unsupport meter id=%d", id)
 		}
 	}
 }

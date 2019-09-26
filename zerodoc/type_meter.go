@@ -87,24 +87,26 @@ func (m *TypeMeter) MarshalTo(b []byte) int {
 	return offset
 }
 
-func (m *TypeMeter) Fill(isTag []bool, names []string, values []interface{}) {
-	for i, name := range names {
-		if isTag[i] || values[i] == nil {
+func (m *TypeMeter) Fill(IDs []uint8, values []interface{}) {
+	for i, id := range IDs {
+		if id <= _METER_INVALID_ || id >= _METER_MAX_ID_ || values[i] == nil {
 			continue
 		}
-		switch name {
-		case "sum_count_t_c_rst":
+		switch id {
+		case _METER_SUM_COUNT_T_C_RST:
 			m.SumCountTClientRst = uint64(values[i].(int64))
-		case "sum_count_t_c_half_open":
+		case _METER_SUM_COUNT_T_C_HALF_OPEN:
 			m.SumCountTClientHalfOpen = uint64(values[i].(int64))
-		case "sum_count_t_c_half_close":
+		case _METER_SUM_COUNT_T_C_HALF_CLOSE:
 			m.SumCountTClientHalfClose = uint64(values[i].(int64))
-		case "sum_count_t_s_rst":
+		case _METER_SUM_COUNT_T_S_RST:
 			m.SumCountTServerRst = uint64(values[i].(int64))
-		case "sum_count_t_s_half_open":
+		case _METER_SUM_COUNT_T_S_HALF_OPEN:
 			m.SumCountTServerHalfOpen = uint64(values[i].(int64))
-		case "sum_count_t_s_half_close":
+		case _METER_SUM_COUNT_T_S_HALF_CLOSE:
 			m.SumCountTServerHalfClose = uint64(values[i].(int64))
+		default:
+			log.Warningf("unsupport meter id=%d", id)
 		}
 	}
 }
