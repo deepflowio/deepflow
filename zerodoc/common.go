@@ -93,7 +93,13 @@ const (
 	_METER_MAX_ID_
 )
 
+const (
+	// influxdb固定有time列, 该ID定义为最大，不属于tag和meter范围, 在EncodeRow中单独处理
+	_TIME uint8 = 255
+)
+
 var COLUMN_IDS map[string]uint8 = map[string]uint8{
+	"time":             _TIME,
 	"_id":              _TAG__ID,
 	"_tid":             _TAG__TID,
 	"ip_version":       _TAG_IP_VERSION,
@@ -183,7 +189,7 @@ func GetColumnIDs(columnNames []string) []uint8 {
 		if id, ok := COLUMN_IDS[name]; ok {
 			b[i] = id
 		} else {
-			log.Warningf("unsupport collumn name(%s)", name)
+			log.Warningf("unsupport column name(%s)", name)
 		}
 	}
 	return b
