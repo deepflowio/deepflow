@@ -10,32 +10,32 @@ import (
 	"sync/atomic"
 
 	. "github.com/google/gopacket"
-	"github.com/pkg/errors"
 )
 
 type XDPMultiQueueStats struct {
 	queueIds []int
-	Stats    []*XDPStats
+	Stats    []XDPStats
 }
 
 type XDPMultiQueue struct {
-	queueCount   int
+	ifIndex      int
+	options      *XDPOptions
+	stats        *XDPStats    // 收发包统计(总量)
 	xsks         []*XDPPacket // 每个队列对应一个XDPPacket
-	batch        [][]byte     // 多队列收包buffer, 根据queueCount申请, 按实际收包返回
+	batch        [][]byte     // 多队列收包buffer, 根据queueCount*batchSize申请, 按实际收包返回
 	cis          []CaptureInfo
 	socketIdx    []int
 	progRefCount int32
 }
 
-func (m *XDPMultiQueue) InitSockets() error {
+func (m *XDPMultiQueue) initSockets() error {
 	var combined *XDPSocket = nil
 	loadProg := true
 
-	queueCount := uint32(m.queueCount)
 	for i, s := range m.xsks {
 		if i == 0 {
 			combined = s.XDPSocket
-		} else { // i > 0
+		} else {
 			err := s.checkAndSetCombinedSocket(combined)
 			if err != nil {
 				m.Close()
@@ -44,7 +44,7 @@ func (m *XDPMultiQueue) InitSockets() error {
 			loadProg = false
 		}
 
-		err := s.initXDPSocket(loadProg, queueCount)
+		err := s.initXDPSocket(loadProg)
 		if err != nil {
 			m.Close()
 			return err
@@ -53,7 +53,7 @@ func (m *XDPMultiQueue) InitSockets() error {
 		atomic.AddInt32(&m.progRefCount, 1)
 	}
 
-	return nil
+	return m.xsks[0].setInterfaceRecvQueues()
 }
 
 // 创建支持多队列的xdp socket，返回各个队列对应的socket, 收发包使用单队列的API
@@ -78,34 +78,39 @@ func NewXDPMultiQueue(name string, opts ...interface{}) (*XDPMultiQueue, error) 
 		}
 	}
 
-	if !initXDPRunningEnv(name, options.xdpMode, options.queueCount) {
-		return nil, errors.New("an error XDP running environment")
+	err = initXDPRunningEnv(name, options.xdpMode)
+	if err != nil {
+		return nil, err
 	}
 
-	m := &XDPMultiQueue{}
-	m.queueCount = int(options.queueCount)
-	m.batch = make([][]byte, 0, m.queueCount)
-	m.socketIdx = make([]int, 0, m.queueCount)
-	m.cis = make([]CaptureInfo, 0, m.queueCount)
+	m := &XDPMultiQueue{ifIndex: ifIndex.Index, options: options, stats: &XDPStats{}}
+	queueCount := int(options.queueCount)
+	batchCount := queueCount * int(options.batchSize)
+	m.batch = make([][]byte, 0, batchCount)
+	m.socketIdx = make([]int, 0, queueCount)
+	m.cis = make([]CaptureInfo, 0, batchCount)
 
-	xsks := make([]*XDPPacket, 0, options.queueCount)
-	for i := 0; i < m.queueCount; i++ {
+	xsks := make([]*XDPPacket, 0, queueCount)
+	for i := 0; i < queueCount; i++ {
 		s, err := initXDPPacket(ifIndex.Index, options, i)
 		if err != nil {
-			log.Debugf("create XDPSocket on queue %v failed as %v", i, err)
-			goto failed
+			log.Errorf("create XDPSocket on queue %v failed as %v", i, err)
+			m.Close()
+			return nil, err
 		}
 		xsks = append(xsks, s)
 		m.xsks = xsks
 	}
 
-	m.InitSockets()
-	log.Debugf("multi queue XDPSockets: %v", m.xsks)
-	return m, nil
+	err = m.initSockets()
+	if err != nil {
+		m.Close()
+		log.Errorf("init multi queue XDPSockets failed as %v", err)
+		return nil, err
+	}
 
-failed:
-	m.Close()
-	return nil, err
+	log.Debugf("multi queue XDPSockets: %v", m.xsks)
+	return m, err
 }
 
 func (m *XDPMultiQueue) Close() {
@@ -136,13 +141,32 @@ func (m *XDPMultiQueue) ZeroCopyReadPacket() ([][]byte, []CaptureInfo, error) {
 		pkt, ci, err = s.ZeroCopyReadPacket()
 		if err != nil {
 			log.Debugf("queue %v ZeroCopyReadPacket failed as %v", s.queueId, err)
-			continue
+			break
 		}
 		m.batch = append(m.batch, pkt)
 		m.cis = append(m.cis, ci)
 		m.socketIdx = append(m.socketIdx, idx)
 	}
-	return m.batch, m.cis, nil
+	return m.batch, m.cis, err
+}
+
+func (m *XDPMultiQueue) ZeroCopyReadMultiPackets() ([][]byte, []CaptureInfo, error) {
+	var err error
+	var pkts [][]byte
+	var cis []CaptureInfo
+
+	m.ReleaseReadPacket()
+	for idx, s := range m.xsks {
+		pkts, cis, err = s.ZeroCopyReadMultiPackets()
+		if err != nil {
+			log.Debugf("queue %v ZeroCopyReadPacket failed as %v", s.queueId, err)
+			break
+		}
+		m.batch = append(m.batch, pkts...)
+		m.cis = append(m.cis, cis...)
+		m.socketIdx = append(m.socketIdx, idx)
+	}
+	return m.batch, m.cis, err
 }
 
 func (m *XDPMultiQueue) ReleaseReadPacket() error {
@@ -175,7 +199,7 @@ func (m *XDPMultiQueue) ReadPacket() ([][]byte, []CaptureInfo, error) {
 
 func (m *XDPMultiQueue) WritePacket(pkts [][]byte) (int, error) {
 	var err error
-	index := 0
+	index := uint32(0)
 	sendPkts := 0
 
 	for _, pkt := range pkts {
@@ -185,29 +209,34 @@ func (m *XDPMultiQueue) WritePacket(pkts [][]byte) (int, error) {
 		}
 		sendPkts += 1
 		index += 1
-		index = index % m.queueCount
+		index = index % m.options.queueCount
 	}
 
 	return sendPkts, nil
 }
 
-func (m *XDPMultiQueue) GetStats() *XDPMultiQueueStats {
-	if m == nil {
-		return nil
+func (m *XDPMultiQueue) GetStats() XDPStats {
+	tmpStats := XDPStats{}
+	for i := 0; i < int(m.options.queueCount); i++ {
+		tmpStats = tmpStats.Add(m.xsks[i].GetStats())
 	}
+	return tmpStats
+}
 
-	queues := make([]int, m.queueCount+1)
-	stats := make([]*XDPStats, m.queueCount+1)
+func (m *XDPMultiQueue) GetStatsDetail() *XDPMultiQueueStats {
+	queueCount := m.options.queueCount
+	queues := make([]int, queueCount+1)
+	stats := make([]XDPStats, queueCount+1)
 	totalQueue := 0
 	totalStats := XDPStats{}
-	for i := 0; i < int(m.queueCount); i++ {
+	for i := 0; i < int(queueCount); i++ {
 		queues[i+1] = m.xsks[i].queueId
 		stats[i+1] = m.xsks[i].GetStats()
 		totalQueue += 1
-		totalStats = *totalStats.Add(stats[i+1])
+		totalStats = totalStats.Add(stats[i+1])
 	}
 	queues[0] = totalQueue
-	stats[0] = &totalStats
+	stats[0] = totalStats
 
 	return &XDPMultiQueueStats{
 		queueIds: queues,
