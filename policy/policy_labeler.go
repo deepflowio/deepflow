@@ -46,7 +46,7 @@ func NewPolicyLabeler(queueCount int, mapSize uint32, fastPathDisable bool) Tabl
 	}
 
 	policy.AclGidMap.Init()
-	policy.InterestTable.Init()
+	policy.InterestTable.Init(false)
 	policy.FastPath.Init(mapSize, queueCount, policy.AclGidMap.SrcGroupAclGidMaps, policy.AclGidMap.DstGroupAclGidMaps)
 	return policy
 }
