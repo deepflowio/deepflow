@@ -841,16 +841,6 @@ func (f *Field) FillTag(c Code, tag *Tag) {
 	tag.id = ""
 }
 
-func (t *Tag) Fill(code Code, tags map[string]string) error {
-	t.Code = code
-	for tagk, tagv := range tags {
-		if err := t.fillValue(tagk, tagv); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (t *Tag) IsMatchPublishPolicy(p *PublishPolicy) bool {
 	if p.Code == 0 {
 		return true
@@ -881,20 +871,20 @@ func (t *Tag) IsMatchPublishPolicy(p *PublishPolicy) bool {
 	return true
 }
 
-func (t *Tag) fillValue(name, value string) (err error) {
+func (t *Tag) fillValue(id uint8, value string) (err error) {
 	field := t.Field
 	var i uint64
-	switch name {
-	case "ip_bin", "ip_bin_0", "ip_bin_1", "_id", "_tid":
+	switch id {
+	case _TAG_IP_BIN, _TAG_IP_BIN_0, _TAG_IP_BIN_1, _TAG__ID, _TAG__TID:
 		return nil
-	case "ip_version":
+	case _TAG_IP_VERSION:
 		i, _ = strconv.ParseUint(value, 10, 8) // 老版本可能未写入ip_version字段，忽略err
 		if i == 6 {
 			field.IsIPv6 = 1
 		} else {
 			field.IsIPv6 = 0
 		}
-	case "ip", "ip_0":
+	case _TAG_IP, _TAG_IP_0:
 		field.IP6 = net.ParseIP(value)
 		if field.IP6.To4() != nil {
 			field.IP = utils.IpToUint32(field.IP6.To4())
@@ -902,24 +892,24 @@ func (t *Tag) fillValue(name, value string) (err error) {
 		} else {
 			field.IP = 0
 		}
-	case "group_id", "group_id_0":
+	case _TAG_GROUP_ID, _TAG_GROUP_ID_0:
 		field.GroupID, err = unmarshalUint16WithSpecialID(value)
-	case "l3_epc_id", "l3_epc_id_0":
+	case _TAG_L3_EPC_ID, _TAG_L3_EPC_ID_0:
 		field.L3EpcID, err = unmarshalUint16WithSpecialID(value)
-	case "l3_device_id", "l3_device_id_0":
+	case _TAG_L3_DEVICE_ID, _TAG_L3_DEVICE_ID_0:
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.L3DeviceID = uint16(i)
-	case "l3_device_type", "l3_device_type_0":
+	case _TAG_L3_DEVICE_TYPE, _TAG_L3_DEVICE_TYPE_0:
 		i, err = strconv.ParseUint(value, 10, 8)
 		field.L3DeviceType = DeviceType(i)
-	case "host", "host_0":
+	case _TAG_HOST, _TAG_HOST_0:
 		field.Host = utils.IpToUint32(net.ParseIP(value).To4())
-	case "region_0":
+	case _TAG_REGION_0:
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.RegionID = uint16(i)
-	case "host_1":
+	case _TAG_HOST_1:
 		field.Host1 = utils.IpToUint32(net.ParseIP(value).To4())
-	case "ip_1":
+	case _TAG_IP_1:
 		field.IP61 = net.ParseIP(value)
 		if field.IP61.To4() != nil {
 			field.IP1 = utils.IpToUint32(field.IP61.To4())
@@ -927,26 +917,26 @@ func (t *Tag) fillValue(name, value string) (err error) {
 		} else {
 			field.IP1 = 0
 		}
-	case "group_id_1":
+	case _TAG_GROUP_ID_1:
 		field.GroupID1, err = unmarshalUint16WithSpecialID(value)
-	case "l3_epc_id_1":
+	case _TAG_L3_EPC_ID_1:
 		field.L3EpcID1, err = unmarshalUint16WithSpecialID(value)
-	case "l3_device_id_1":
+	case _TAG_L3_DEVICE_ID_1:
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.L3DeviceID1 = uint16(i)
-	case "l3_device_type_1":
+	case _TAG_L3_DEVICE_TYPE_1:
 		i, err = strconv.ParseUint(value, 10, 8)
 		field.L3DeviceType1 = DeviceType(i)
-	case "subnet_id", "subnet_id_0":
+	case _TAG_SUBNET_ID, _TAG_SUBNET_ID_0:
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.SubnetID = uint16(i)
-	case "subnet_id_1":
+	case _TAG_SUBNET_ID_1:
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.SubnetID1 = uint16(i)
-	case "region_1":
+	case _TAG_REGION_1:
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.RegionID1 = uint16(i)
-	case "direction":
+	case _TAG_DIRECTION:
 		switch value {
 		case "c2s":
 			field.Direction = ClientToServer
@@ -955,24 +945,24 @@ func (t *Tag) fillValue(name, value string) (err error) {
 		default:
 			field.Direction = 0
 		}
-	case "acl_gid":
+	case _TAG_ACL_GID:
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.ACLGID = uint16(i)
-	case "vlan_id":
+	case _TAG_VLAN_ID:
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.VLANID = uint16(i)
-	case "protocol":
+	case _TAG_PROTOCOL:
 		i, err = strconv.ParseUint(value, 10, 8)
 		field.Protocol = layers.IPProtocol(i)
-	case "server_port":
+	case _TAG_SERVER_PORT:
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.ServerPort = uint16(i)
-	case "vtap":
+	case _TAG_VTAP:
 		field.VTAP = utils.IpToUint32(net.ParseIP(value).To4())
-	case "tap_type":
+	case _TAG_TAP_TYPE:
 		i, err = strconv.ParseUint(value, 10, 8)
 		field.TAPType = TAPTypeEnum(i)
-	case "acl_direction":
+	case _TAG_ACL_DIRECTION:
 		switch value {
 		case "fwd":
 			field.ACLDirection = ACL_FORWARD
@@ -981,7 +971,7 @@ func (t *Tag) fillValue(name, value string) (err error) {
 		default:
 			field.ACLDirection = 0
 		}
-	case "cast_type":
+	case _TAG_CAST_TYPE:
 		switch value {
 		case "broadcast":
 			field.CastType = BROADCAST
@@ -992,15 +982,15 @@ func (t *Tag) fillValue(name, value string) (err error) {
 		default:
 			field.CastType = 0
 		}
-	case "tcp_flags":
+	case _TAG_TCP_FLAGS:
 		i, err = strconv.ParseUint(value, 10, 8)
 		field.TCPFlags = TCPFlag(i)
-	case "scope":
+	case _TAG_SCOPE:
 		i, err = strconv.ParseUint(value, 10, 8)
 		field.Scope = ScopeEnum(i)
-	case "country":
+	case _TAG_COUNTRY:
 		field.Country = geo.EncodeCountry(value)
-	case "region":
+	case _TAG_REGION:
 		// 由于历史原因，这个字段表示两个含义：
 		// 数字：表示云平台所处区域的ID
 		// 非数字：表示中国的省份（仅在df_geo库中有此含义）
@@ -1013,80 +1003,38 @@ func (t *Tag) fillValue(name, value string) (err error) {
 			field.RegionID = 0
 			field.Region = geo.EncodeRegion(value)
 		}
-	case "isp":
+	case _TAG_ISP:
 		field.ISP = geo.EncodeISP(value)
 	default:
-		err = fmt.Errorf("unsupoort tag name %s ", name)
+		err = fmt.Errorf("unsupoort tag id %d ", id)
 	}
 	if err != nil {
-		return fmt.Errorf("fill tag:%s value:%s failed: %s", name, value, err)
+		return fmt.Errorf("fill tag id:%d value:%s failed: %s", id, value, err)
 	}
 	return nil
 }
 
-var TAG_NAMES map[string]uint8 = map[string]uint8{
-	"_id":              0,
-	"_tid":             0,
-	"ip_version":       0,
-	"ip":               0,
-	"ip_bin":           0,
-	"ip_0":             0,
-	"ip_bin_0":         0,
-	"group_id":         0,
-	"group_id_0":       0,
-	"l3_epc_id":        0,
-	"l3_epc_id_0":      0,
-	"l3_device_id":     0,
-	"l3_device_id_0":   0,
-	"l3_device_type":   0,
-	"l3_device_type_0": 0,
-	"host":             0,
-	"host_0":           0,
-	"region_0":         0,
-	"ip_1":             0,
-	"ip_bin_1":         0,
-	"group_id_1":       0,
-	"l3_epc_id_1":      0,
-	"l3_device_id_1":   0,
-	"l3_device_type_1": 0,
-	"host_1":           0,
-	"subnet_id_0":      0,
-	"subnet_id_1":      0,
-	"region_1":         0,
-	"direction":        0,
-	"acl_gid":          0,
-	"vlan_id":          0,
-	"protocol":         0,
-	"server_port":      0,
-	"vtap":             0,
-	"tap_type":         0,
-	"subnet_id":        0,
-	"acl_direction":    0,
-	"cast_type":        0,
-	"tcp_flags":        0,
-	"scope":            0,
-	"country":          0,
-	"region":           0,
-	"isp":              0,
-}
-
-func IsTag(names []string) []bool {
-	b := make([]bool, len(names))
-	for i, name := range names {
-		if _, ok := TAG_NAMES[name]; ok {
-			b[i] = true
-		}
-	}
-	return b
-}
-
-func (t *Tag) FillValues(isTag []bool, names []string, values []interface{}) error {
-	for i, name := range names {
-		if isTag[i] {
+func (t *Tag) FillValues(ids []uint8, values []interface{}) error {
+	for i, id := range ids {
+		if id > _TAG_INVALID_ && id < _TAG_MAX_ID_ {
 			v, _ := values[i].(string)
-			if err := t.fillValue(name, v); err != nil {
+			if err := t.fillValue(id, v); err != nil {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+func (t *Tag) Fill(code Code, tags map[string]string) error {
+	t.Code = code
+	for tagk, tagv := range tags {
+		if id, ok := COLUMN_IDS[tagk]; ok {
+			if err := t.fillValue(id, tagv); err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("unsupport tag name %s\n", tagk)
 		}
 	}
 	return nil

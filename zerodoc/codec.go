@@ -224,7 +224,7 @@ func GetMsgType(db string) (MessageType, error) {
 //     meterType   uint8
 //     meter       Meter (bytes)
 //     actionFlags uint32
-func EncodeRow(tag *Tag, msgType MessageType, isTag []bool, columnNames []string, columnValues []interface{}, encoder *codec.SimpleEncoder) error {
+func EncodeRow(tag *Tag, msgType MessageType, columnIDs []uint8, columnValues []interface{}, encoder *codec.SimpleEncoder) error {
 	encoder.WriteU32(app.VERSION) // version
 	encoder.WriteU32(0)           // sequence
 
@@ -234,7 +234,9 @@ func EncodeRow(tag *Tag, msgType MessageType, isTag []bool, columnNames []string
 		return fmt.Errorf("Unknown timestamp %v", columnValues[0])
 	}
 
-	tag.FillValues(isTag, columnNames, columnValues)
+	if err := tag.FillValues(columnIDs, columnValues); err != nil {
+		return err
+	}
 	tag.Encode(encoder)
 
 	encoder.WriteU8(uint8(msgType))
@@ -242,36 +244,36 @@ func EncodeRow(tag *Tag, msgType MessageType, isTag []bool, columnNames []string
 	switch msgType {
 	case MSG_USAGE:
 		var m UsageMeter
-		m.Fill(isTag, columnNames, columnValues)
+		m.Fill(columnIDs, columnValues)
 		m.Encode(encoder)
 	case MSG_PERF:
 		var m PerfMeter
-		m.Fill(isTag, columnNames, columnValues)
+		m.Fill(columnIDs, columnValues)
 		m.Encode(encoder)
 	case MSG_GEO:
 		var m GeoMeter
-		m.Fill(isTag, columnNames, columnValues)
+		m.Fill(columnIDs, columnValues)
 		m.Encode(encoder)
 	case MSG_FLOW:
 		var m FlowMeter
-		m.Fill(isTag, columnNames, columnValues)
+		m.Fill(columnIDs, columnValues)
 		m.Encode(encoder)
 	case MSG_TYPE:
 		var m TypeMeter
-		m.Fill(isTag, columnNames, columnValues)
+		m.Fill(columnIDs, columnValues)
 		m.Encode(encoder)
 	case MSG_FPS:
 		var m FPSMeter
-		m.Fill(isTag, columnNames, columnValues)
+		m.Fill(columnIDs, columnValues)
 		m.Encode(encoder)
 	case MSG_LOG_USAGE:
 		var m LogUsageMeter
-		m.Fill(isTag, columnNames, columnValues)
+		m.Fill(columnIDs, columnValues)
 		m.Encode(encoder)
 	// 从influxdb streaming读取vtap_usage的数据时，使用MSG_VTAP_SIMPLE消息打包成doc
 	case MSG_VTAP_SIMPLE:
 		var m VTAPSimpleMeter
-		m.Fill(isTag, columnNames, columnValues)
+		m.Fill(columnIDs, columnValues)
 		m.Encode(encoder)
 	default:
 		return fmt.Errorf("Unknown supported msgType %d", msgType)

@@ -95,24 +95,26 @@ func (m *VTAPSimpleMeter) SetValue(s *Metrics) {
 	m.Packets = s.TxPackets + s.RxPackets
 }
 
-func (m *VTAPSimpleMeter) Fill(isTag []bool, names []string, values []interface{}) {
-	for i, name := range names {
-		if isTag[i] || values[i] == nil {
+func (m *VTAPSimpleMeter) Fill(ids []uint8, values []interface{}) {
+	for i, id := range ids {
+		if id <= _METER_INVALID_ || id >= _METER_MAX_ID_ || values[i] == nil {
 			continue
 		}
-		switch name {
-		case "tx_bytes":
+		switch id {
+		case _METER_TX_BYTES:
 			m.TxBytes = uint64(values[i].(int64))
-		case "rx_bytes":
+		case _METER_RX_BYTES:
 			m.RxBytes = uint64(values[i].(int64))
-		case "bytes":
+		case _METER_BYTES:
 			m.Bytes = uint64(values[i].(int64))
-		case "tx_packets":
+		case _METER_TX_PACKETS:
 			m.TxPackets = uint64(values[i].(int64))
-		case "rx_packets":
+		case _METER_RX_PACKETS:
 			m.RxPackets = uint64(values[i].(int64))
-		case "packets":
+		case _METER_PACKETS:
 			m.Packets = uint64(values[i].(int64))
+		default:
+			log.Warningf("unsupport meter id=%d", id)
 		}
 	}
 }

@@ -177,9 +177,8 @@ func TestFillValues(t *testing.T) {
 	f := Field{}
 	tag := &Tag{&f, 0, ""}
 	names := []string{"ip", "sum_packet", "server_port"}
-	isTag := []bool{true, false, true}
 	values := []interface{}{"1.1.1.1", int64(1000), "9527"}
-	tag.FillValues(isTag, names, values)
+	tag.FillValues(GetColumnIDs(names), values)
 	if tag.IP != 16843009 {
 		t.Error("ip 处理错误")
 	}
