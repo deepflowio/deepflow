@@ -136,13 +136,11 @@ func (e *FlowExtra) Match(meta *MetaPacket) bool {
 	if taggedFlow.Proto != meta.Protocol || !tunnelMatch(meta.Tunnel, &taggedFlow.TunnelInfo) {
 		return false
 	}
-	flowIPSrc, flowIPDst := taggedFlow.IPSrc, taggedFlow.IPDst
-	metaIpSrc, metaIpDst := meta.IpSrc, meta.IpDst
-	flowIP6Src, flowIP6Dst := taggedFlow.IP6Src, taggedFlow.IP6Dst
-	metaIp6Src, metaIp6Dst := meta.Ip6Src, meta.Ip6Dst
 	flowPortSrc, flowPortDst := taggedFlow.PortSrc, taggedFlow.PortDst
 	metaPortSrc, metaPortDst := meta.PortSrc, meta.PortDst
 	if meta.EthType == layers.EthernetTypeIPv4 {
+		flowIPSrc, flowIPDst := taggedFlow.IPSrc, taggedFlow.IPDst
+		metaIpSrc, metaIpDst := meta.IpSrc, meta.IpDst
 		if flowIPSrc == metaIpSrc && flowIPDst == metaIpDst && flowPortSrc == metaPortSrc && flowPortDst == metaPortDst {
 			meta.Direction = CLIENT_TO_SERVER
 			return true
@@ -151,6 +149,8 @@ func (e *FlowExtra) Match(meta *MetaPacket) bool {
 			return true
 		}
 	} else {
+		flowIP6Src, flowIP6Dst := taggedFlow.IP6Src, taggedFlow.IP6Dst
+		metaIp6Src, metaIp6Dst := meta.Ip6Src, meta.Ip6Dst
 		if flowIP6Src.Equal(metaIp6Src) && flowIP6Dst.Equal(metaIp6Dst) && flowPortSrc == metaPortSrc && flowPortDst == metaPortDst {
 			meta.Direction = CLIENT_TO_SERVER
 			return true
@@ -160,10 +160,6 @@ func (e *FlowExtra) Match(meta *MetaPacket) bool {
 		}
 	}
 	return false
-}
-
-func (f *FlowExtra) setMetaPacketActiveService(meta *MetaPacket) {
-	meta.IsActiveService = f.taggedFlow.Flow.IsActiveService
 }
 
 func (f *FlowExtra) reverseFlow() {
@@ -198,13 +194,13 @@ func (f *FlowExtra) resetPacketStatInfo() {
 	flowMetricsPeerDst.TickByteCount = 0
 }
 
-func (f *FlowExtra) resetFlowStatInfo(now time.Duration) {
+func (f *FlowExtra) resetFlowStatInfo(nextFlowStatTime time.Duration) {
 	f.packetInCycle = false
 	taggedFlow := f.taggedFlow
 	taggedFlow.TimeBitmap = 0
-	taggedFlow.StartTime = now
-	taggedFlow.EndTime = now
-	taggedFlow.FlowStatTime = now / _FLOW_STAT_INTERVAL * _FLOW_STAT_INTERVAL
+	taggedFlow.StartTime = nextFlowStatTime
+	taggedFlow.EndTime = nextFlowStatTime
+	taggedFlow.FlowStatTime = nextFlowStatTime
 	taggedFlow.IsNewFlow = false
 	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
 	flowMetricsPeerDst := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
