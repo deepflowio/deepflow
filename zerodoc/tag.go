@@ -599,6 +599,9 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint64, encoder *codec.SimpleEncode
 	if code&IP != 0 {
 		encoder.WriteU8(t.IsIPv6)
 		if t.IsIPv6 != 0 {
+			if t.IP6 == nil {
+				t.IP6 = make([]byte, 16)
+			}
 			encoder.WriteIPv6(t.IP6)
 		} else {
 			encoder.WriteU32(t.IP)
@@ -624,6 +627,14 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint64, encoder *codec.SimpleEncode
 	if code&IPPath != 0 {
 		encoder.WriteU8(t.IsIPv6)
 		if t.IsIPv6 != 0 {
+			// 当influxdb打包数据发送给reciter时, 存在code中有IPPath,
+			// 而实际查询结果只要IP6或IP61或都没有, 这时如果对IP6, IP61 进行encode会导致panic
+			if t.IP6 == nil {
+				t.IP6 = make([]byte, 16)
+			}
+			if t.IP61 == nil {
+				t.IP61 = make([]byte, 16)
+			}
 			encoder.WriteIPv6(t.IP6)
 			encoder.WriteIPv6(t.IP61)
 		} else {
