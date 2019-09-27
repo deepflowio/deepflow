@@ -441,8 +441,8 @@ func (d *PolicyData) FormatNpbAction() {
 }
 
 func (d *PolicyData) CheckNpbAction(packet *LookupKey, endpointData *EndpointData) []NpbAction {
-	if len(d.NpbActions) == 0 {
-		return nil
+	if len(d.NpbActions) == 0 || packet.Tap != TAP_TOR {
+		return d.NpbActions
 	}
 
 	validActions := make([]NpbAction, 0, len(d.NpbActions))
@@ -461,7 +461,7 @@ func (d *PolicyData) CheckNpbAction(packet *LookupKey, endpointData *EndpointDat
 }
 
 func (d *PolicyData) CheckNpbPolicy(packet *LookupKey, endpointData *EndpointData) *PolicyData {
-	if len(d.NpbActions) == 0 {
+	if len(d.NpbActions) == 0 || packet.Tap != TAP_TOR {
 		return d
 	}
 	validActions := d.CheckNpbAction(packet, endpointData)
