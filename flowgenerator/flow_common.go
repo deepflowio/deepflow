@@ -196,3 +196,28 @@ func (m *FlowMap) getQuinTupleHash(meta *MetaPacket) uint64 {
 func (m *FlowMap) getEthOthersQuinTupleHash(meta *MetaPacket) uint64 {
 	return meta.MacSrc ^ meta.MacDst
 }
+
+func (m *FlowMap) updateFlowDirection(flowExtra *FlowExtra) {
+	taggedFlow := flowExtra.taggedFlow
+	if taggedFlow.EthType != layers.EthernetTypeIPv4 { // FIXME: 目前仅支持IPv4
+		return
+	}
+
+	srcKey := ServiceKey(int16(taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].L3EpcID), taggedFlow.IPSrc, taggedFlow.PortSrc)
+	dstKey := ServiceKey(int16(taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].L3EpcID), taggedFlow.IPDst, taggedFlow.PortDst)
+
+	srcScore, dstScore := uint8(0), uint8(0)
+	if taggedFlow.Proto == layers.IPProtocolTCP {
+		srcScore, dstScore = m.tcpServiceTable.GetTCPScore(false, 0, srcKey, dstKey)
+	} else if taggedFlow.Proto == layers.IPProtocolUDP {
+		srcScore, dstScore = m.udpServiceTable.GetUDPScore(false, srcKey, dstKey)
+	} else {
+		return
+	}
+
+	if !IsClientToServer(srcScore, dstScore) {
+		flowExtra.reverseFlow()
+		flowExtra.reversed = !flowExtra.reversed
+	}
+	taggedFlow.IsActiveService = IsActiveService(srcScore, dstScore)
+}

@@ -3,6 +3,7 @@ package flowgenerator
 import (
 	"time"
 
+	"github.com/google/gopacket/layers"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
@@ -52,8 +53,8 @@ func (m *FlowMap) initTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	updatePlatformData(taggedFlow, meta.EndpointData, false)
 	m.fillGeoInfo(taggedFlow)
 
-	m.updateTCPDirection(meta, flags, flowExtra, true)
-	flowExtra.setMetaPacketActiveService(meta)
+	m.updateTCPDirection(meta, flags, flowExtra, true) // 新建流时矫正流方向
+	meta.IsActiveService = taggedFlow.IsActiveService
 
 	if StatePreprocess(meta, flags) || meta.Invalid {
 		flowExtra.timeout = exceptionTimeout
@@ -69,8 +70,10 @@ func (m *FlowMap) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) bool { /
 	taggedFlow.FlowMetricsPeers[meta.Direction].TCPFlags |= flags
 	m.updateFlow(flowExtra, meta)
 
-	m.updateTCPDirection(meta, flags, flowExtra, false)
-	flowExtra.setMetaPacketActiveService(meta)
+	if flags&TCP_SYN != 0 { // 有特殊包时矫正流方向：SYN+ACK或SYN
+		m.updateTCPDirection(meta, flags, flowExtra, false)
+	}
+	meta.IsActiveService = taggedFlow.IsActiveService
 
 	if StatePreprocess(meta, flags) || meta.Invalid {
 		flowExtra.timeout = exceptionTimeout
@@ -81,6 +84,10 @@ func (m *FlowMap) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) bool { /
 }
 
 func (m *FlowMap) updateTCPDirection(meta *MetaPacket, flags uint8, flowExtra *FlowExtra, isFirstPacket bool) {
+	if meta.EthType != layers.EthernetTypeIPv4 { // FIXME: 目前仅支持IPv4
+		return
+	}
+
 	srcKey := ServiceKey(int16(meta.EndpointData.SrcInfo.L3EpcId), meta.IpSrc, meta.PortSrc)
 	dstKey := ServiceKey(int16(meta.EndpointData.DstInfo.L3EpcId), meta.IpDst, meta.PortDst)
 
@@ -93,5 +100,5 @@ func (m *FlowMap) updateTCPDirection(meta *MetaPacket, flags uint8, flowExtra *F
 		flowExtra.reversed = !flowExtra.reversed
 		meta.Direction = (CLIENT_TO_SERVER + SERVER_TO_CLIENT) - meta.Direction // reverse
 	}
-	flowExtra.taggedFlow.Flow.IsActiveService = IsActiveService(srcScore, dstScore)
+	flowExtra.taggedFlow.IsActiveService = IsActiveService(srcScore, dstScore)
 }

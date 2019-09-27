@@ -279,10 +279,14 @@ func (m *FlowMap) removeAndOutput(node *flowMapNode, nodeIndex int32, timestamp 
 func (m *FlowMap) copyAndOutput(node *flowMapNode, timestamp time.Duration) {
 	flowExtra := &node.flowExtra
 	taggedFlow := flowExtra.taggedFlow
+	output := false
 
 	// 如果timestamp和上一个包不在一个_PACKET_STAT_INTERVAL，输出Packet统计信息并清零
 	if flowExtra.packetInTick && (timestamp >= taggedFlow.PacketStatTime+_PACKET_STAT_INTERVAL || timestamp < taggedFlow.PacketStatTime) {
 		if taggedFlow.PolicyData.ActionFlags&PACKET_ACTION != 0 {
+			output = true
+			m.updateFlowDirection(flowExtra) // 每个包统计数据输出前矫正流方向
+
 			outputTaggedFlow := datatype.CloneTaggedFlowForPacketStat(taggedFlow)
 			m.pushToPacketStatsQueue(outputTaggedFlow)
 		}
@@ -292,8 +296,13 @@ func (m *FlowMap) copyAndOutput(node *flowMapNode, timestamp time.Duration) {
 	// 如果timestamp和上一个包不在一个_FLOW_STAT_INTERVAL，输出Flow统计信息并清零
 	// 注意：流统计需要考虑包到达时间的延时容差，即若timestamp落在更靠前的统计周期内时，数据仍然计入当前统计周期
 	if timestamp >= taggedFlow.FlowStatTime+_FLOW_STAT_INTERVAL {
-		flowExtra.setEndTimeAndDuration(timestamp / _FLOW_STAT_INTERVAL * _FLOW_STAT_INTERVAL)
+		nextFlowStatTime := timestamp / _FLOW_STAT_INTERVAL * _FLOW_STAT_INTERVAL
+		flowExtra.setEndTimeAndDuration(nextFlowStatTime)
 		if taggedFlow.PolicyData.ActionFlags&FLOW_ACTION != 0 {
+			if !output {
+				m.updateFlowDirection(flowExtra) // 每个流统计数据输出前矫正流方向
+			}
+
 			outputTaggedFlow := datatype.CloneTaggedFlow(taggedFlow)
 			outputTaggedFlow.CloseType = datatype.CloseTypeForcedReport
 			outputTaggedFlow.TcpPerfStats = copyAndResetPerfData(flowExtra.metaFlowPerf, flowExtra.reversed, &m.perfCounter)
@@ -301,7 +310,7 @@ func (m *FlowMap) copyAndOutput(node *flowMapNode, timestamp time.Duration) {
 		} else {
 			resetPerfData(flowExtra.metaFlowPerf)
 		}
-		flowExtra.resetFlowStatInfo(timestamp / _FLOW_STAT_INTERVAL * _FLOW_STAT_INTERVAL) // 清零流统计数据
+		flowExtra.resetFlowStatInfo(nextFlowStatTime) // 清零流统计数据
 	}
 }
 
@@ -356,11 +365,11 @@ func (m *FlowMap) InjectFlushTicker(timestamp time.Duration) bool {
 			m.copyAndOutput(node, timestamp)
 
 			// 由于包、流统计信息已清零，将节点移动至下一个流统计的时间，或者最终超时的时间
-			nextFlowStatOutputTime := timestamp/_FLOW_STAT_INTERVAL*_FLOW_STAT_INTERVAL + _FLOW_STAT_INTERVAL
-			if nextFlowStatOutputTime > timeout {
-				nextFlowStatOutputTime = timeout
+			nextFlowStatTime := timestamp/_FLOW_STAT_INTERVAL*_FLOW_STAT_INTERVAL + _FLOW_STAT_INTERVAL
+			if nextFlowStatTime > timeout {
+				nextFlowStatTime = timeout
 			}
-			m.changeTimeSlot(node, timeListNext, nextFlowStatOutputTime)
+			m.changeTimeSlot(node, timeListNext, nextFlowStatTime)
 		}
 	}
 

@@ -15,7 +15,7 @@ max-cpus: 0
 # conf for connection with outside stream
 stream: 127.0.0.1
 stream-port: 20201
-# 每秒向stream进程发送的最大Flow数量，默认值2000，允许范围[1000, 100000]
+# 单个flow-queue每秒向stream进程发送的最大Flow数量，默认值2000，允许范围[1000, 100000]
 flow-throttle: 2000
 # conf for connection with outside zero
 zero-port: 20211

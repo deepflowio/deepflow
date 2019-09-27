@@ -93,7 +93,7 @@ func Start(configPath string) (closers []io.Closer) {
 		datatype.ReleaseMetaPacketBlock(x.(*datatype.MetaPacketBlock))
 	}
 	labelerQueues := manager.NewQueues(
-		"1-meta-packet-to-labeler", cfg.Queue.LabelerQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
+		"1-meta-packet-block-to-labeler", cfg.Queue.LabelerQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
 		libqueue.OptionRelease(releaseMetaPacketBlock),
 	)
 
@@ -113,11 +113,11 @@ func Start(configPath string) (closers []io.Closer) {
 
 	// L2 - packet labeler
 	flowGeneratorQueues := manager.NewQueues(
-		"2-meta-packet-to-flow-generator", cfg.Queue.FlowGeneratorQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
+		"2-meta-packet-block-to-flow-generator", cfg.Queue.FlowGeneratorQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
 		libqueue.OptionFlushIndicator(time.Second), libqueue.OptionRelease(releaseMetaPacketBlock),
 	)
 	pcapAppQueues := manager.NewQueues(
-		"2-meta-packet-to-pcap-app", cfg.Queue.PCapAppQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
+		"2-meta-packet-block-to-pcap-app", cfg.Queue.PCapAppQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
 		libqueue.OptionFlushIndicator(time.Second*10), libqueue.OptionRelease(releaseMetaPacketBlock),
 	)
 	labelerManager := labeler.NewLabelerManager(

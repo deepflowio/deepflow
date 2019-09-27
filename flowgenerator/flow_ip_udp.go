@@ -1,6 +1,7 @@
 package flowgenerator
 
 import (
+	"github.com/google/gopacket/layers"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
@@ -18,8 +19,8 @@ func (m *FlowMap) initUdpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	m.fillGeoInfo(taggedFlow)
 	flowExtra.flowState = FLOW_STATE_ESTABLISHED
 	flowExtra.timeout = openingTimeout
-	m.updateUDPDirection(meta, flowExtra, true)
-	flowExtra.setMetaPacketActiveService(meta)
+	m.updateUDPDirection(meta, flowExtra, true) // 新建流时矫正流方向
+	meta.IsActiveService = taggedFlow.IsActiveService
 }
 
 func (m *FlowMap) updateUdpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
@@ -28,11 +29,13 @@ func (m *FlowMap) updateUdpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 		flowExtra.taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].PacketCount > 0 {
 		flowExtra.timeout = establishedRstTimeout
 	}
-	m.updateUDPDirection(meta, flowExtra, false)
-	flowExtra.setMetaPacketActiveService(meta)
+	meta.IsActiveService = flowExtra.taggedFlow.IsActiveService
 }
 
 func (m *FlowMap) updateUDPDirection(meta *MetaPacket, flowExtra *FlowExtra, isFirstPacket bool) {
+	if meta.EthType != layers.EthernetTypeIPv4 { // FIXME: 目前仅支持IPv4
+		return
+	}
 	srcKey := ServiceKey(int16(meta.EndpointData.SrcInfo.L3EpcId), meta.IpSrc, meta.PortSrc)
 	dstKey := ServiceKey(int16(meta.EndpointData.DstInfo.L3EpcId), meta.IpDst, meta.PortDst)
 
@@ -45,5 +48,5 @@ func (m *FlowMap) updateUDPDirection(meta *MetaPacket, flowExtra *FlowExtra, isF
 		flowExtra.reversed = !flowExtra.reversed
 		meta.Direction = (CLIENT_TO_SERVER + SERVER_TO_CLIENT) - meta.Direction // reverse
 	}
-	flowExtra.taggedFlow.Flow.IsActiveService = IsActiveService(srcScore, dstScore)
+	flowExtra.taggedFlow.IsActiveService = IsActiveService(srcScore, dstScore)
 }
