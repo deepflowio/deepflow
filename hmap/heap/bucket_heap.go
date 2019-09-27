@@ -4,6 +4,10 @@ import (
 	"fmt"
 )
 
+const (
+	MAX_BUCKET_COUNT = 100000 // 最大的桶数量限制，防止过量扩展桶
+)
+
 type bucketHeapNode struct {
 	value interface{}
 	next  int32 // 值为 nodes[i] 所在链表的下一个节点的 nodes 下标
@@ -23,10 +27,15 @@ type BucketHeap struct {
 }
 
 // 向bucketIndex所在的桶插入一个元素x
-func (s *BucketHeap) Push(bucketIndex int, x interface{}) {
-	if bucketIndex < 0 || bucketIndex >= len(s.bucketHead) {
-		panic(fmt.Sprintf("bucketIndex %d 溢出，上限为 %d", bucketIndex, len(s.bucketHead)-1))
+func (s *BucketHeap) Push(bucketIndex int, x interface{}) error {
+	if bucketIndex < 0 || bucketIndex >= MAX_BUCKET_COUNT {
+		return fmt.Errorf("bucketIndex %d 溢出，上限为 %d", bucketIndex, MAX_BUCKET_COUNT)
 	}
+	// 自动扩展bucket数量
+	for bucketIndex >= len(s.bucketHead) {
+		s.bucketHead = append(s.bucketHead, -1)
+	}
+
 	if bucketIndex < s.minBucket {
 		s.minBucket = bucketIndex
 	}
@@ -38,7 +47,7 @@ func (s *BucketHeap) Push(bucketIndex int, x interface{}) {
 		node.next = s.bucketHead[bucketIndex]
 		s.bucketHead[bucketIndex] = s.freeNodeIndex
 		s.freeNodeIndex = -1
-		return
+		return nil
 	}
 
 	// 使用新的Node存储x
@@ -50,6 +59,7 @@ func (s *BucketHeap) Push(bucketIndex int, x interface{}) {
 	node.next = s.bucketHead[bucketIndex]
 	s.bucketHead[bucketIndex] = s.nodeCount
 	s.nodeCount++
+	return nil
 }
 
 // 返回最小bucket中的一个元素，若没有返回nil
