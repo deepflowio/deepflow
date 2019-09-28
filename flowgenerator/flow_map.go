@@ -67,7 +67,8 @@ type FlowMap struct {
 	flowStatOutputBuffer   []interface{} // 流统计信息输出的缓冲区
 	packetAppQueue         queue.QueueWriter
 	flowAppQueue           queue.QueueWriter
-	lastFlush              time.Duration
+	lastMapFlush           time.Duration
+	lastQueueFlush         time.Duration
 	flowAppQueueFlush      time.Duration
 	flushInterval          time.Duration
 
@@ -220,7 +221,7 @@ func (m *FlowMap) changeTimeSlot(node *flowMapNode, nodeIndex int32, timestamp t
 }
 
 func (m *FlowMap) flushQueue(now time.Duration) {
-	if now-m.lastFlush > m.flushInterval {
+	if now-m.lastQueueFlush > m.flushInterval {
 		if len(m.packetStatOutputBuffer) > 0 {
 			m.packetAppQueue.Put(m.packetStatOutputBuffer...)
 			m.packetStatOutputBuffer = m.packetStatOutputBuffer[:0]
@@ -229,7 +230,7 @@ func (m *FlowMap) flushQueue(now time.Duration) {
 			m.flowAppQueue.Put(m.flowStatOutputBuffer...)
 			m.flowStatOutputBuffer = m.flowStatOutputBuffer[:0]
 		}
-		m.lastFlush = now
+		m.lastQueueFlush = now
 	}
 }
 
@@ -330,8 +331,19 @@ func (m *FlowMap) isTimeInWindow(timestamp time.Duration) bool {
 	return true
 }
 
-// 外部直接调用InjectFlushTicker时，timestamp需设置为now。返回值为false表示传入时间没有落在窗口中。
+// 外部直接调用InjectFlushTicker时，timestamp需设置为0表示使用系统当前时间。
+// 返回值为false表示传入时间没有落在窗口中。
 func (m *FlowMap) InjectFlushTicker(timestamp time.Duration) bool {
+	if timestamp == 0 { // 仅在低负载时使用系统时间（而非包的时间）推动时间窗口
+		timestamp = time.Duration(time.Now().UnixNano())
+		if timestamp-m.lastMapFlush < _TIME_SLOT_UNIT {
+			return true
+		}
+		m.lastMapFlush = timestamp
+	} else {
+		m.lastMapFlush = time.Duration(time.Now().UnixNano())
+	}
+
 	if !m.isTimeInWindow(timestamp) {
 		return false
 	}

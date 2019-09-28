@@ -8,6 +8,7 @@ import (
 
 	"github.com/op/go-logging"
 	"gitlab.x.lan/yunshan/droplet-libs/debug"
+	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
@@ -18,7 +19,7 @@ import (
 const (
 	LISTEN_PORT      = 20033
 	QUEUE_BATCH_SIZE = 4096
-	TRIDENT_TIMEOUT  = 60 * time.Second
+	TRIDENT_TIMEOUT  = 2 * time.Second
 
 	BATCH_SIZE = 128
 )
@@ -52,7 +53,6 @@ type TridentAdapter struct {
 
 	instancesLock sync.Mutex // 仅用于droplet-ctl打印trident信息
 	instances     map[TridentKey]*tridentInstance
-	udpPool       *sync.Pool
 
 	slaveCount uint8
 	slaves     []*slave
@@ -79,24 +79,16 @@ func NewTridentAdapter(queues []queue.QueueWriter, listenBufferSize, cacheSize i
 		log.Error(err)
 		return nil
 	}
-	udpPool := &sync.Pool{
-		New: func() interface{} {
-			packet := new(packetBuffer)
-			packet.buffer = make([]byte, UDP_BUFFER_SIZE)
-			return packet
-		},
-	}
 	adapter := &TridentAdapter{
 		listenBufferSize: listenBufferSize,
 		cacheSize:        cacheSize,
-		udpPool:          udpPool,
 		slaveCount:       uint8(len(queues)),
 		slaves:           make([]*slave, len(queues)),
 
 		instances: make(map[TridentKey]*tridentInstance),
 	}
 	for i := uint8(0); i < adapter.slaveCount; i++ {
-		adapter.slaves[i] = newSlave(int(i), queues[i], udpPool)
+		adapter.slaves[i] = newSlave(int(i), queues[i])
 	}
 	adapter.statsCounter.init()
 	adapter.listener = listener
@@ -180,7 +172,7 @@ func (a *TridentAdapter) cacheLookup(instance *tridentInstance, packet *packetBu
 				log.Warningf("trident(%v) recv seq %d is less than current %d, drop", IpFromUint32(packet.tridentIp), seq, instance.seq)
 			}
 
-			a.udpPool.Put(packet)
+			releasePacketBuffer(packet)
 			return true
 		}
 		offset := seq - instance.seq - 1
@@ -234,8 +226,23 @@ func (a *TridentAdapter) flushInstance() {
 	}
 }
 
-func (a *TridentAdapter) acquirePacketBuffer() *packetBuffer {
-	return a.udpPool.Get().(*packetBuffer)
+var packetBufferPool = pool.NewLockFreePool(
+	func() interface{} {
+		packet := new(packetBuffer)
+		packet.buffer = make([]byte, UDP_BUFFER_SIZE)
+		return packet
+	},
+	pool.OptionPoolSizePerCPU(16),
+	pool.OptionInitFullPoolSize(16),
+)
+
+func acquirePacketBuffer() *packetBuffer {
+	return packetBufferPool.Get().(*packetBuffer)
+}
+
+func releasePacketBuffer(b *packetBuffer) {
+	// 此处无初始化
+	packetBufferPool.Put(b)
 }
 
 func (a *TridentAdapter) run() {
@@ -246,7 +253,7 @@ func (a *TridentAdapter) run() {
 	count := 0
 	for a.running {
 		for i := 0; i < BATCH_SIZE; i++ {
-			packet := a.acquirePacketBuffer()
+			packet := acquirePacketBuffer()
 			_, remote, err := a.listener.ReadFromUDP(packet.buffer)
 			if err != nil {
 				if err.(net.Error).Timeout() {
@@ -263,7 +270,7 @@ func (a *TridentAdapter) run() {
 		}
 		for i := 0; i < count; i++ {
 			if invalid := batch[i].decoder.DecodeHeader(); invalid {
-				a.udpPool.Put(batch[i])
+				releasePacketBuffer(batch[i])
 				continue
 			}
 			if cached := a.findAndAdd(batch[i]); cached {
