@@ -695,15 +695,17 @@ func TestStatOutput(t *testing.T) {
 }
 
 func BenchmarkFlowMapWithSYNFlood(b *testing.B) {
-	packets := make([]MetaPacket, b.N)
-	buffer := make([]interface{}, b.N)
+	blocks := make([]MetaPacketBlock, (b.N+15)/16)
+	buffer := make([]interface{}, (b.N+15)/16)
 	packetTemplate := getDefaultPacket()
 	for i := 0; i < b.N; i++ { // 10Mpps
-		packets[i] = *packetTemplate
-		packets[i].Timestamp = packetTemplate.Timestamp + time.Duration(i*100)*time.Nanosecond
-		packets[i].PortSrc = uint16(i & 0xFFFF)
-		packets[i].PortDst = uint16((i >> 16) & 0xFFFF)
-		buffer[i] = &packets[i]
+		packetTemplate.Timestamp = packetTemplate.Timestamp + time.Duration(i*100)*time.Nanosecond
+		packetTemplate.PortSrc = uint16(i & 0xFFFF)
+		packetTemplate.PortDst = uint16((i >> 16) & 0xFFFF)
+		blocks[i/16].Metas[i%16] = *packetTemplate
+		if i%16 == 0 {
+			buffer[i/16] = &blocks[i/16]
+		}
 	}
 	flowGenerator, _, _, _ := flowGeneratorInit(b.N, false)
 
@@ -718,7 +720,6 @@ func BenchmarkFlowMapWithSYNFlood(b *testing.B) {
 func BenchmarkFlowMapWithTenPacketsFlowFlood(b *testing.B) {
 	N := (b.N + 9) / 10 * 10
 	packets := make([]MetaPacket, N)
-	buffer := make([]interface{}, N)
 	packetTemplate := getDefaultPacket()
 	for i := 0; i < N; i += 10 { // 10Mpps, 1Mfps
 		portSrc := uint16(i & 0xFFFF)
@@ -728,7 +729,6 @@ func BenchmarkFlowMapWithTenPacketsFlowFlood(b *testing.B) {
 		packets[i].Timestamp = packetTemplate.Timestamp + time.Duration(i*100)*time.Nanosecond
 		packets[i].PortSrc = portSrc
 		packets[i].PortDst = portDst
-		buffer[i] = &packets[i]
 
 		j := i + 1
 		packets[j] = *packetTemplate
@@ -737,7 +737,6 @@ func BenchmarkFlowMapWithTenPacketsFlowFlood(b *testing.B) {
 		packets[j].PortSrc = portDst
 		packets[j].PortDst = portSrc
 		packets[j].TcpData.Flags = TCP_SYN | TCP_ACK
-		buffer[j] = &packets[j]
 
 		for k := 2; k < 10; k++ {
 			j = i + k
@@ -746,9 +745,17 @@ func BenchmarkFlowMapWithTenPacketsFlowFlood(b *testing.B) {
 			packets[j].PortSrc = portSrc
 			packets[j].PortDst = portDst
 			packets[j].TcpData.Flags = TCP_ACK
-			buffer[j] = &packets[j]
 		}
 	}
+	blocks := make([]MetaPacketBlock, (N+15)/16)
+	buffer := make([]interface{}, (N+15)/16)
+	for i := 0; i < len(packets); i++ {
+		blocks[i/16].Metas[i%16] = packets[i]
+		if i%16 == 0 {
+			buffer[i/16] = &blocks[i/16]
+		}
+	}
+
 	flowGenerator, _, _, _ := flowGeneratorInit(N, false)
 
 	b.ResetTimer()
