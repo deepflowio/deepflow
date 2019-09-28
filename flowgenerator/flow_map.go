@@ -292,10 +292,12 @@ func (m *FlowMap) copyAndOutput(node *flowMapNode, timestamp time.Duration) {
 			output = true
 			m.updateFlowDirection(flowExtra) // 每个包统计数据输出前矫正流方向
 
-			outputTaggedFlow := datatype.CloneTaggedFlowForPacketStat(taggedFlow)
-			m.pushToPacketStatsQueue(outputTaggedFlow)
+			flowExtra.cow |= FLOW_COW_PACKET_STAT
+			taggedFlow.AddReferenceCount()
+			m.pushToPacketStatsQueue(taggedFlow)
+		} else {
+			flowExtra.resetPacketStatInfo() // 清零包统计数据
 		}
-		flowExtra.resetPacketStatInfo() // 清零包统计数据
 	}
 
 	// 如果timestamp和上一个包不在一个_FLOW_STAT_INTERVAL，输出Flow统计信息并清零
@@ -308,14 +310,15 @@ func (m *FlowMap) copyAndOutput(node *flowMapNode, timestamp time.Duration) {
 				m.updateFlowDirection(flowExtra) // 每个流统计数据输出前矫正流方向
 			}
 
-			outputTaggedFlow := datatype.CloneTaggedFlow(taggedFlow)
-			outputTaggedFlow.CloseType = datatype.CloseTypeForcedReport
-			outputTaggedFlow.TcpPerfStats = copyAndResetPerfData(flowExtra.metaFlowPerf, flowExtra.reversed, &m.perfCounter)
-			m.pushToFlowStatsQueue(outputTaggedFlow)
+			flowExtra.cow |= FLOW_COW_FLOW_STAT
+			taggedFlow.AddReferenceCount()
+			taggedFlow.CloseType = datatype.CloseTypeForcedReport
+			taggedFlow.TcpPerfStats = copyAndResetPerfData(flowExtra.metaFlowPerf, flowExtra.reversed, &m.perfCounter)
+			m.pushToFlowStatsQueue(taggedFlow)
 		} else {
 			resetPerfData(flowExtra.metaFlowPerf)
+			flowExtra.resetFlowStatInfo() // 清零流统计数据
 		}
-		flowExtra.resetFlowStatInfo(nextFlowStatTime) // 清零流统计数据
 	}
 }
 
@@ -333,6 +336,25 @@ func (m *FlowMap) isTimeInWindow(timestamp time.Duration) bool {
 		return false
 	}
 	return true
+}
+
+func (m *FlowMap) flowCopyOnWrite(flowExtra *FlowExtra) {
+	if flowExtra.cow == 0 {
+		return
+	}
+
+	taggedFlow := flowExtra.taggedFlow
+	if taggedFlow.ReferenceCount > 1 {
+		flowExtra.taggedFlow = datatype.CloneTaggedFlow(taggedFlow)
+		datatype.ReleaseTaggedFlow(taggedFlow)
+	}
+	if flowExtra.cow&FLOW_COW_PACKET_STAT != 0 {
+		flowExtra.resetPacketStatInfo() // 清零包统计数据
+	}
+	if flowExtra.cow&FLOW_COW_FLOW_STAT != 0 {
+		flowExtra.resetFlowStatInfo() // 清零流统计数据
+	}
+	flowExtra.cow = 0
 }
 
 // 外部直接调用InjectFlushTicker时，timestamp需设置为0表示使用系统当前时间。
@@ -365,6 +387,9 @@ func (m *FlowMap) InjectFlushTicker(timestamp time.Duration) bool {
 			node := m.getNode(timeListNext)
 			next = node.timeListNext // node可能发生删除或移动，缓存next
 
+			// Copy On Write
+			m.flowCopyOnWrite(&node.flowExtra)
+
 			// 若Flow已经超时，直接输出
 			timeout := node.flowExtra.recentTime + node.flowExtra.timeout
 			if timestamp >= timeout {
@@ -380,7 +405,7 @@ func (m *FlowMap) InjectFlushTicker(timestamp time.Duration) bool {
 			// 输出未超时Flow的统计信息
 			m.copyAndOutput(node, timestamp)
 
-			// 由于包、流统计信息已清零，将节点移动至下一个流统计的时间，或者最终超时的时间
+			// 由于包、流统计信息已输出，将节点移动至下一个流统计的时间，或者最终超时的时间
 			nextFlowStatTime := timestamp/_FLOW_STAT_INTERVAL*_FLOW_STAT_INTERVAL + _FLOW_STAT_INTERVAL
 			if nextFlowStatTime > timeout {
 				nextFlowStatTime = timeout
@@ -398,9 +423,11 @@ func (m *FlowMap) updateNode(node *flowMapNode, nodeIndex int32, meta *datatype.
 	flowExtra := &node.flowExtra
 
 	// 1. 输出上一个统计周期的统计信息
+	m.flowCopyOnWrite(flowExtra)
 	m.copyAndOutput(node, meta.Timestamp)
 
 	// 2. 更新Flow状态，判断是否已结束
+	m.flowCopyOnWrite(flowExtra)
 	if meta.Protocol == layers.IPProtocolTCP {
 		flowClosed := m.updateTcpFlow(flowExtra, meta)
 		if m.checkIfDoFlowPerf(flowExtra) {
@@ -419,7 +446,7 @@ func (m *FlowMap) updateNode(node *flowMapNode, nodeIndex int32, meta *datatype.
 		m.updateIpOthersFlow(flowExtra, meta)
 	}
 
-	// 3. 由于包、流统计信息已清零，将节点移动至包对应的时间槽
+	// 3. 由于包、流统计信息已输出，将节点移动至包对应的时间槽
 	m.changeTimeSlot(node, nodeIndex, meta.Timestamp)
 }
 

@@ -7,7 +7,7 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
-type FlowState int
+type FlowState int32
 
 const (
 	FLOW_STATE_RAW FlowState = iota
@@ -25,6 +25,13 @@ const (
 	FLOW_STATE_MAX
 )
 
+type FlowCOWFlag uint8
+
+const (
+	FLOW_COW_PACKET_STAT FlowCOWFlag = 1 << iota
+	FLOW_COW_FLOW_STAT
+)
+
 type FlowExtra struct {
 	taggedFlow   *TaggedFlow
 	metaFlowPerf *MetaFlowPerf
@@ -36,6 +43,8 @@ type FlowExtra struct {
 
 	packetInTick  bool // 当前包统计周期（目前是自然秒）是否有包
 	packetInCycle bool // 当前流统计周期（目前是自然分）是否有包
+
+	cow FlowCOWFlag // 标记下次改写内容前是否需要拷贝
 }
 
 func macMatch(meta *MetaPacket, flowMacSrc, flowMacDst MacInt, matchType int) bool {
@@ -194,13 +203,13 @@ func (f *FlowExtra) resetPacketStatInfo() {
 	flowMetricsPeerDst.TickByteCount = 0
 }
 
-func (f *FlowExtra) resetFlowStatInfo(nextFlowStatTime time.Duration) {
+func (f *FlowExtra) resetFlowStatInfo() {
 	f.packetInCycle = false
 	taggedFlow := f.taggedFlow
 	taggedFlow.TimeBitmap = 0
-	taggedFlow.StartTime = nextFlowStatTime
-	taggedFlow.EndTime = nextFlowStatTime
-	taggedFlow.FlowStatTime = nextFlowStatTime
+	taggedFlow.FlowStatTime += _FLOW_STAT_INTERVAL
+	taggedFlow.StartTime = taggedFlow.FlowStatTime
+	taggedFlow.EndTime = taggedFlow.FlowStatTime
 	taggedFlow.IsNewFlow = false
 	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
 	flowMetricsPeerDst := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
