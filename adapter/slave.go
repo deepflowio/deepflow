@@ -2,7 +2,6 @@ package adapter
 
 import (
 	"strconv"
-	"sync"
 
 	ring "github.com/Workiva/go-datastructures/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -17,7 +16,6 @@ type slave struct {
 	outQueue  queue.QueueWriter
 	block     *datatype.MetaPacketBlock
 	itemBatch []interface{}
-	udpPool   *sync.Pool
 }
 
 type slaveCounter struct {
@@ -64,16 +62,12 @@ func (s *slave) put(packet *packetBuffer) {
 	s.inQueue.Put(packet)
 }
 
-func (s *slave) releasePacketBuffer(packet *packetBuffer) {
-	s.udpPool.Put(packet)
-}
-
 func (s *slave) run() {
 	for {
 		item, _ := s.inQueue.Get()
 		packet := item.(*packetBuffer)
 		s.decode(packet.hash, packet.tridentIp, &packet.decoder)
-		s.releasePacketBuffer(packet)
+		releasePacketBuffer(packet)
 	}
 }
 
@@ -87,18 +81,17 @@ func (s *slave) Closed() bool {
 	return false // never close
 }
 
-func (s *slave) init(id int, out queue.QueueWriter, pool *sync.Pool) {
+func (s *slave) init(id int, out queue.QueueWriter) {
 	s.block = datatype.AcquireMetaPacketBlock()
 	s.outQueue = out
 	s.inQueue = ring.NewRingBuffer(1024)
 	s.itemBatch = make([]interface{}, 0, QUEUE_BATCH_SIZE)
-	s.udpPool = pool
 	s.statsCounter.init()
 	stats.RegisterCountable("slave-queue", s, stats.OptionStatTags{"index": strconv.Itoa(id)})
 }
 
-func newSlave(id int, out queue.QueueWriter, pool *sync.Pool) *slave {
+func newSlave(id int, out queue.QueueWriter) *slave {
 	s := &slave{}
-	s.init(id, out, pool)
+	s.init(id, out)
 	return s
 }

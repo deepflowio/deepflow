@@ -13,7 +13,7 @@ var log = logging.MustGetLogger("flowgenerator")
 func (f *FlowGenerator) processPackets(processBuffer []interface{}) {
 	for i, e := range processBuffer {
 		if e == nil { // flush indicator
-			f.flowMap.InjectFlushTicker(toTimestamp(time.Now()))
+			f.flowMap.InjectFlushTicker(0)
 			continue
 		}
 
