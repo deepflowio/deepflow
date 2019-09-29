@@ -84,14 +84,18 @@ func (m *FlowMap) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) bool { /
 }
 
 func (m *FlowMap) updateTCPDirection(meta *MetaPacket, flags uint8, flowExtra *FlowExtra, isFirstPacket bool) {
-	if meta.EthType != layers.EthernetTypeIPv4 { // FIXME: 目前仅支持IPv4
-		return
+	srcScore, dstScore := uint8(0), uint8(0)
+	if meta.EthType == layers.EthernetTypeIPv4 {
+		srcKey := ServiceKey(int16(meta.EndpointData.SrcInfo.L3EpcId), meta.IpSrc, meta.PortSrc)
+		dstKey := ServiceKey(int16(meta.EndpointData.DstInfo.L3EpcId), meta.IpDst, meta.PortDst)
+
+		srcScore, dstScore = m.tcpServiceTable.GetTCPScore(isFirstPacket, flags, srcKey, dstKey)
+	} else {
+		ServiceKey6(m.srcServiceKey, int16(meta.EndpointData.SrcInfo.L3EpcId), meta.Ip6Src, meta.PortSrc)
+		ServiceKey6(m.dstServiceKey, int16(meta.EndpointData.DstInfo.L3EpcId), meta.Ip6Dst, meta.PortDst)
+
+		srcScore, dstScore = m.tcpServiceTable6.GetTCPScore(isFirstPacket, flags, m.srcServiceKey, m.dstServiceKey)
 	}
-
-	srcKey := ServiceKey(int16(meta.EndpointData.SrcInfo.L3EpcId), meta.IpSrc, meta.PortSrc)
-	dstKey := ServiceKey(int16(meta.EndpointData.DstInfo.L3EpcId), meta.IpDst, meta.PortDst)
-
-	srcScore, dstScore := m.tcpServiceTable.GetTCPScore(isFirstPacket, flags, srcKey, dstKey)
 	if meta.Direction == SERVER_TO_CLIENT {
 		srcScore, dstScore = dstScore, srcScore
 	}

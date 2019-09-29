@@ -76,6 +76,10 @@ type FlowMap struct {
 	stateMachineSlave  [FLOW_STATE_MAX][TCP_FLAG_MASK + 1]*StateValue
 	tcpServiceTable    *ServiceTable
 	udpServiceTable    *ServiceTable
+	tcpServiceTable6   *ServiceTable6
+	udpServiceTable6   *ServiceTable6
+	srcServiceKey      []byte
+	dstServiceKey      []byte
 
 	capacity  int    // 最大容纳的Flow个数
 	size      int    // 当前容纳的Flow个数
@@ -546,6 +550,10 @@ func NewFlowMap(hashSlots, capacity, id int, timeWindow, packetDelay, flushInter
 		flushInterval:          flushInterval,
 		tcpServiceTable:        NewServiceTable(hashSlots, capacity),
 		udpServiceTable:        NewServiceTable(hashSlots, capacity),
+		tcpServiceTable6:       NewServiceTable6(hashSlots, capacity),
+		udpServiceTable6:       NewServiceTable6(hashSlots, capacity),
+		srcServiceKey:          make([]byte, _KEY_LEN),
+		dstServiceKey:          make([]byte, _KEY_LEN),
 		id:                     id,
 		capacity:               capacity,
 		counter:                &FlowMapCounter{},
