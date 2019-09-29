@@ -369,7 +369,7 @@ func (h *MetaPacketTcpHeader) String() string {
 func (b *MetaPacketBlock) String() string {
 	result := ""
 	for i := uint8(0); i < b.Count; i++ {
-		result += b.Metas[i].String()
+		result += b.Metas[i].String() + "\n"
 	}
 	return result
 }
