@@ -199,20 +199,29 @@ func (m *FlowMap) getEthOthersQuinTupleHash(meta *MetaPacket) uint64 {
 
 func (m *FlowMap) updateFlowDirection(flowExtra *FlowExtra) {
 	taggedFlow := flowExtra.taggedFlow
-	if taggedFlow.EthType != layers.EthernetTypeIPv4 { // FIXME: 目前仅支持IPv4
-		return
-	}
-
-	srcKey := ServiceKey(int16(taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].L3EpcID), taggedFlow.IPSrc, taggedFlow.PortSrc)
-	dstKey := ServiceKey(int16(taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].L3EpcID), taggedFlow.IPDst, taggedFlow.PortDst)
-
 	srcScore, dstScore := uint8(0), uint8(0)
-	if taggedFlow.Proto == layers.IPProtocolTCP {
-		srcScore, dstScore = m.tcpServiceTable.GetTCPScore(false, 0, srcKey, dstKey)
-	} else if taggedFlow.Proto == layers.IPProtocolUDP {
-		srcScore, dstScore = m.udpServiceTable.GetUDPScore(false, srcKey, dstKey)
-	} else {
-		return
+	if taggedFlow.EthType == layers.EthernetTypeIPv4 {
+		srcKey := ServiceKey(int16(taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].L3EpcID), taggedFlow.IPSrc, taggedFlow.PortSrc)
+		dstKey := ServiceKey(int16(taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].L3EpcID), taggedFlow.IPDst, taggedFlow.PortDst)
+
+		if taggedFlow.Proto == layers.IPProtocolTCP {
+			srcScore, dstScore = m.tcpServiceTable.GetTCPScore(false, 0, srcKey, dstKey)
+		} else if taggedFlow.Proto == layers.IPProtocolUDP {
+			srcScore, dstScore = m.udpServiceTable.GetUDPScore(false, srcKey, dstKey)
+		} else {
+			return
+		}
+	} else if taggedFlow.EthType == layers.EthernetTypeIPv6 {
+		ServiceKey6(m.srcServiceKey, int16(taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].L3EpcID), taggedFlow.IP6Src, taggedFlow.PortSrc)
+		ServiceKey6(m.dstServiceKey, int16(taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].L3EpcID), taggedFlow.IP6Dst, taggedFlow.PortDst)
+
+		if taggedFlow.Proto == layers.IPProtocolTCP {
+			srcScore, dstScore = m.tcpServiceTable6.GetTCPScore(false, 0, m.srcServiceKey, m.dstServiceKey)
+		} else if taggedFlow.Proto == layers.IPProtocolUDP {
+			srcScore, dstScore = m.udpServiceTable6.GetUDPScore(false, m.srcServiceKey, m.dstServiceKey)
+		} else {
+			return
+		}
 	}
 
 	if !IsClientToServer(srcScore, dstScore) {

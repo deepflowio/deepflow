@@ -33,16 +33,25 @@ func (m *FlowMap) updateUdpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 }
 
 func (m *FlowMap) updateUDPDirection(meta *MetaPacket, flowExtra *FlowExtra, isFirstPacket bool) {
-	if meta.EthType != layers.EthernetTypeIPv4 { // FIXME: 目前仅支持IPv4
-		return
-	}
-	srcKey := ServiceKey(int16(meta.EndpointData.SrcInfo.L3EpcId), meta.IpSrc, meta.PortSrc)
-	dstKey := ServiceKey(int16(meta.EndpointData.DstInfo.L3EpcId), meta.IpDst, meta.PortDst)
+	srcScore, dstScore := uint8(0), uint8(0)
+	if meta.EthType == layers.EthernetTypeIPv4 {
+		srcKey := ServiceKey(int16(meta.EndpointData.SrcInfo.L3EpcId), meta.IpSrc, meta.PortSrc)
+		dstKey := ServiceKey(int16(meta.EndpointData.DstInfo.L3EpcId), meta.IpDst, meta.PortDst)
 
-	srcScore, dstScore := m.udpServiceTable.GetUDPScore(isFirstPacket, srcKey, dstKey)
-	if meta.Direction == SERVER_TO_CLIENT {
-		srcScore, dstScore = dstScore, srcScore
+		srcScore, dstScore = m.udpServiceTable.GetUDPScore(isFirstPacket, srcKey, dstKey)
+		if meta.Direction == SERVER_TO_CLIENT {
+			srcScore, dstScore = dstScore, srcScore
+		}
+	} else {
+		ServiceKey6(m.srcServiceKey, int16(meta.EndpointData.SrcInfo.L3EpcId), meta.Ip6Src, meta.PortSrc)
+		ServiceKey6(m.dstServiceKey, int16(meta.EndpointData.DstInfo.L3EpcId), meta.Ip6Dst, meta.PortDst)
+
+		srcScore, dstScore = m.udpServiceTable6.GetUDPScore(isFirstPacket, m.srcServiceKey, m.dstServiceKey)
+		if meta.Direction == SERVER_TO_CLIENT {
+			srcScore, dstScore = dstScore, srcScore
+		}
 	}
+
 	if !IsClientToServer(srcScore, dstScore) {
 		flowExtra.reverseFlow()
 		flowExtra.reversed = !flowExtra.reversed
