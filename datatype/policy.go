@@ -434,7 +434,8 @@ func (a AclAction) String() string {
 // 此时只保留TAPSIDE_SRC方向，即对应只处理src为true的tx流量
 func (d *PolicyData) FormatNpbAction() {
 	for index, _ := range d.NpbActions {
-		if d.NpbActions[index].TapSide() == TAPSIDE_ALL {
+		if d.NpbActions[index].TapSide() == TAPSIDE_ALL &&
+			d.NpbActions[index].TunnelType() != NPB_TUNNEL_TYPE_PCAP {
 			d.NpbActions[index].SetTapSide(TAPSIDE_SRC)
 		}
 	}
