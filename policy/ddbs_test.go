@@ -1075,6 +1075,32 @@ func TestDdbsNpbActionDedup(t *testing.T) {
 	}
 }
 
+func TestDdbsPcapNpbAction(t *testing.T) {
+	table := generatePolicyTable(DDBS)
+	acls := []*Acl{}
+
+	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
+	// acl1 Group: 16 -> 16 Port: 0 Proto: TCP vlan: any Tap: any
+	npb := ToNpbAction(10, 150, NPB_TUNNEL_TYPE_PCAP, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
+	acl1 := generatePolicyAcl(table, action1, 25, group[16], group[16], IPProtocolTCP, 0, vlanAny, npb)
+	acl1.Type = 0
+	acls = append(acls, acl1)
+	table.UpdateAcls(acls)
+	// 构建预期结果
+	basicPolicyData := &PolicyData{}
+	npb.AddTapSide(TAPSIDE_DST)
+	basicPolicyData.MergeNpbAction([]NpbAction{npb}, 25)
+
+	// key1: ip4:1000 -> ip3:1023 tcp
+	key1 := generateLookupKey(group1Mac, group1Mac, vlanAny, group1Ip1, group1Ip2, IPProtocolTCP, 1000, 1023, NPB)
+	key1.Tap = TAP_ISP_MIN
+	_, policyData := table.LookupAllByKey(key1)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestDdbsPcapNpbAction Check Failed!")
+	}
+}
+
 func TestDdbsPolicyDoublePort(t *testing.T) {
 	acls := []*Acl{}
 	// 创建 policyTable
