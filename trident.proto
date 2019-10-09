@@ -82,6 +82,7 @@ message Config {
     optional uint32  max_escape_seconds   = 32;
 
     repeated string  corefile_dirs        = 33;
+    optional string  proxy_controller_ip  = 34; // 控制器代理IP
 }
 
 message Segment { // e.g. single LAN area
