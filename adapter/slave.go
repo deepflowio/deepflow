@@ -3,7 +3,6 @@ package adapter
 import (
 	"strconv"
 
-	ring "github.com/Workiva/go-datastructures/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
@@ -12,7 +11,7 @@ import (
 type slave struct {
 	statsCounter
 
-	inQueue   *ring.RingBuffer
+	inQueue   chan *packetBuffer
 	outQueue  queue.QueueWriter
 	block     *datatype.MetaPacketBlock
 	itemBatch []interface{}
@@ -59,13 +58,12 @@ func (s *slave) decode(hash uint8, ip uint32, decoder *SequentialDecoder) {
 }
 
 func (s *slave) put(packet *packetBuffer) {
-	s.inQueue.Put(packet)
+	s.inQueue <- packet
 }
 
 func (s *slave) run() {
 	for {
-		item, _ := s.inQueue.Get()
-		packet := item.(*packetBuffer)
+		packet := <-s.inQueue
 		s.decode(packet.hash, packet.tridentIp, &packet.decoder)
 		releasePacketBuffer(packet)
 	}
@@ -73,7 +71,7 @@ func (s *slave) run() {
 
 func (s *slave) GetCounter() interface{} {
 	counter := &slaveCounter{}
-	counter.Size = uint32(s.inQueue.Len())
+	counter.Size = uint32(len(s.inQueue))
 	return counter
 }
 
@@ -84,7 +82,7 @@ func (s *slave) Closed() bool {
 func (s *slave) init(id int, out queue.QueueWriter) {
 	s.block = datatype.AcquireMetaPacketBlock()
 	s.outQueue = out
-	s.inQueue = ring.NewRingBuffer(1024)
+	s.inQueue = make(chan *packetBuffer, 1024)
 	s.itemBatch = make([]interface{}, 0, QUEUE_BATCH_SIZE)
 	s.statsCounter.init()
 	stats.RegisterCountable("slave-queue", s, stats.OptionStatTags{"index": strconv.Itoa(id)})
