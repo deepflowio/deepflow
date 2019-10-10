@@ -50,7 +50,7 @@ def _ip_to_bytes(addr):
         return None
 
 
-def __packet_matches_condition(packet, ips_int, protocol, port):
+def __packet_matches_condition(packet, ips_int, protocol, ports):
     # ethernet
     off = ETHER_TYPE_OFFSET
     eth_type = struct.unpack('!H', packet[off:off + 2])[0]
@@ -117,7 +117,7 @@ def __packet_matches_condition(packet, ips_int, protocol, port):
         if r_protocol != protocol:
             return False
 
-    if port is not None:
+    if ports:
         if protocol not in [PROTOCOL_TCP, PROTOCOL_UDP]:
             return False
 
@@ -133,13 +133,13 @@ def __packet_matches_condition(packet, ips_int, protocol, port):
         port_src = struct.unpack('>H', packet[off:off + 2])[0]
         off = l4_offset + DST_PORT_OFFSET
         port_dst = struct.unpack('>H', packet[off:off + 2])[0]
-        if port_src != port and port_dst != port:
+        if port_src not in ports and port_dst not in ports:
             return False
 
     return True
 
 
-def found_in_pcap(filename, ips=None, protocol=None, port=None):
+def found_in_pcap(filename, ips=None, protocol=None, ports=None):
     ips_int = []
     if ips is not None:
         for ip in ips:
@@ -147,7 +147,7 @@ def found_in_pcap(filename, ips=None, protocol=None, port=None):
             if ip_int is not None:
                 ips_int.append(ip_int)
 
-    if protocol is not None and port is not None and protocol not in [
+    if protocol is not None and ports and protocol not in [
         PROTOCOL_TCP, PROTOCOL_UDP
     ]:
         return False
@@ -183,7 +183,7 @@ def found_in_pcap(filename, ips=None, protocol=None, port=None):
                 packet = fp.read(incl_len)
                 if len(packet) != incl_len:
                     return False
-                if __packet_matches_condition(packet, ips_int, protocol, port):
+                if __packet_matches_condition(packet, ips_int, protocol, ports):
                     return True
 
     except IOError as e:
@@ -191,7 +191,7 @@ def found_in_pcap(filename, ips=None, protocol=None, port=None):
         return False
 
 
-def filter_pcap(filename, ips=None, protocol=None, port=None):
+def filter_pcap(filename, ips=None, protocol=None, ports=None):
     ips_int = []
     if ips is not None:
         for ip in ips:
@@ -199,7 +199,7 @@ def filter_pcap(filename, ips=None, protocol=None, port=None):
             if ip_int is not None:
                 ips_int.append(ip_int)
 
-    if protocol is not None and port is not None and protocol not in [
+    if protocol is not None and ports and protocol not in [
         PROTOCOL_TCP, PROTOCOL_UDP
     ]:
         return
@@ -236,7 +236,7 @@ def filter_pcap(filename, ips=None, protocol=None, port=None):
                 packet = fp.read(incl_len)
                 if len(packet) != incl_len:
                     return
-                if __packet_matches_condition(packet, ips_int, protocol, port):
+                if __packet_matches_condition(packet, ips_int, protocol, ports):
                     yield r_header + packet
 
     except IOError as e:
