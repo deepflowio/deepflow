@@ -88,7 +88,7 @@ HTTP request args:
   size: 条目数，默认1000，按start_ts降序排列
   ip: IP地址筛选，可以填写多个
   protocol: 协议
-  port: 端口
+  port: 端口，可以填写多个
   tap_type: 探针点
   ip_version: ip版本，可选值为[4, 6]
   peek: 若为True，检查是否存在，存在的话返回一条记录
@@ -121,11 +121,10 @@ HTTP response body:
     """
     ips = request.query.getlist('ip')
     protocol = None
+    ports = None
     if request.query.protocol != '':
         protocol = int(request.query.protocol)
-    port = None
-    if request.query.port != '':
-        port = int(request.query.port)
+        ports = request.query.getlist('port')
     tap_type = None
     if request.query.tap_type != '':
         tap_type = int(request.query.tap_type)
@@ -159,10 +158,18 @@ HTTP response body:
                 'OPT_STATUS': 'FAILURE',
                 'DESCRIPTION': 'ip version mismatch'
             }
+    if ports:
+        try:
+            ports = [int(it) for it in ports]
+        except ValueError:
+            return {
+                'OPT_STATUS': 'FAILURE',
+                'DESCRIPTION': 'bad port'
+            }
     return {
         'DATA': get_files(
             acl_gid, start_ts, end_ts, size=size, ip=ip, ip_filter=ips,
-            protocol=protocol, port=port, tap_type=tap_type,
+            protocol=protocol, port_filter=ports, tap_type=tap_type,
             ip_version=ip_version, peek=peek
         ),
         'OPT_STATUS': 'SUCCESS',
@@ -178,7 +185,7 @@ HTTP request args:
 
   ip: IP地址筛选，可以填写多个
   protocol: 协议
-  port: 端口
+  port: 端口，可以填写多个
 
 HTTP request body:
 
@@ -191,18 +198,22 @@ HTTP response body:
     ips = request.query.getlist('ip')
     ips = [ipaddress.ip_address(unicode(it)) for it in ips]
     protocol = None
+    ports = None
     if request.query.protocol != '':
         protocol = int(request.query.protocol)
-    port = None
-    if request.query.port != '':
-        port = int(request.query.port)
+        ports = request.query.getlist('port')
+    if ports:
+        try:
+            ports = [int(it) for it in ports]
+        except ValueError:
+            return HTTPError(400, 'bad port')
     directory = PCAP_DIR + '/' + str(acl_gid) + '/'
     if ips or protocol is not None:
         headers = {
             'Content-Disposition': 'attachment; filename="%s"' % pcap_name
         }
         return HTTPResponse(
-            filter_pcap(directory + pcap_name, ips, protocol, port), **headers
+            filter_pcap(directory + pcap_name, ips, protocol, ports), **headers
         )
     else:
         return static_file(pcap_name, root=directory, download=pcap_name)
@@ -297,13 +308,13 @@ def _time_to_epoch(time_str):
 
 def get_files(
     acl_gid, start_ts, end_ts, size=DEFAULT_PCAP_LIST_SIZE, ip=None,
-    ip_filter=None, protocol=None, port=None, tap_type=None, ip_version=None,
+    ip_filter=None, protocol=None, port_filter=None, tap_type=None, ip_version=None,
     peek=False
 ):
     if size < 0:
         size = DEFAULT_PCAP_LIST_SIZE
     # 如果protocol不是tcp或udp，认为端口过滤后没有结果
-    if protocol is not None and port is not None and protocol not in [
+    if protocol is not None and port_filter and protocol not in [
         PROTOCOL_TCP, PROTOCOL_UDP
     ]:
         return []
@@ -334,7 +345,7 @@ def get_files(
         ip_rep = _ip_convert_back(segs[2])
         if (
             ip_filter or protocol is not None
-        ) and not found_in_pcap(directory + file, ip_filter, protocol, port):
+        ) and not found_in_pcap(directory + file, ip_filter, protocol, port_filter):
             continue
         files.append({
             'ip': str(ip_rep),
