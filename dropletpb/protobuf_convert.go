@@ -78,8 +78,12 @@ func newIpGroupData(ipGroup *trident.Group) *policy.IpGroupData {
 	}
 	if ipGroup.GetIpRanges() != nil {
 		for _, ipRange := range ipGroup.GetIpRanges() {
-			startIp := ParserStringIpV4(strings.Split(ipRange, "-")[0])
-			endIp := ParserStringIpV4(strings.Split(ipRange, "-")[1])
+			ipPeers := strings.Split(ipRange, "-")
+			if ipPeers == nil || len(ipPeers) != 2 {
+				continue
+			}
+			startIp := ParserStringIp(ipPeers[0])
+			endIp := ParserStringIp(ipPeers[1])
 			if startIp == nil || endIp == nil {
 				continue
 			}
