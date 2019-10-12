@@ -43,19 +43,35 @@ func GetFastID(t *Tag, keys []byte) {
 	switch t.Code & ^CodeIndices {
 	// keyOthers: ACLGID | ACLDirection | Direction | TAPType | ISPCode
 	case ACLGID | ACLDirection | Direction | TAPType | ISPCode | IP: // geo
-		codeID = 1
+		codeID = 0
 		keyOthers = uint64(t.ACLGID&0xFFFF) | uint64(t.ACLDirection&0x3)<<16 | uint64(t.Direction&0x3)<<18 | uint64(t.TAPType&0x1F)<<20 | uint64(t.ISP&0xFF)<<25
 	case ACLGID | ACLDirection | Direction | TAPType | ISPCode | IPPath: // geo
-		codeID = 2
+		codeID = 1
 		keyOthers = uint64(t.ACLGID&0xFFFF) | uint64(t.ACLDirection&0x3)<<16 | uint64(t.Direction&0x3)<<18 | uint64(t.TAPType&0x1F)<<20 | uint64(t.ISP&0xFF)<<25
+
+	// keyOthers: ACLGID | ACLDirection | Direction | TAPType | ISPCode | Protocol | ServerPort
+	case ACLGID | ACLDirection | Direction | TAPType | ISPCode | Protocol | ServerPort | IP: // geo
+		codeID = 2
+		keyOthers = uint64(t.ACLGID&0xFFFF) | uint64(t.ACLDirection&0x3)<<16 | uint64(t.Direction&0x3)<<18 | uint64(t.TAPType&0x1F)<<20 | uint64(t.ISP&0xFF)<<25 | uint64(t.Protocol&0xFF)<<33 | uint64(t.ServerPort&0xFFFF)<<41
+	case ACLGID | ACLDirection | Direction | TAPType | ISPCode | Protocol | ServerPort | IPPath: // geo
+		codeID = 3
+		keyOthers = uint64(t.ACLGID&0xFFFF) | uint64(t.ACLDirection&0x3)<<16 | uint64(t.Direction&0x3)<<18 | uint64(t.TAPType&0x1F)<<20 | uint64(t.ISP&0xFF)<<25 | uint64(t.Protocol&0xFF)<<33 | uint64(t.ServerPort&0xFFFF)<<41
 
 	// keyOthers: ACLGID | ACLDirection | Direction | TAPType | Region
 	case ACLGID | ACLDirection | Direction | TAPType | Region | IP: // geo
-		codeID = 3
-		keyOthers = uint64(t.ACLGID&0xFFFF) | uint64(t.ACLDirection&0x3)<<16 | uint64(t.Direction&0x3)<<18 | uint64(t.TAPType&0x1F)<<20 | uint64(t.Region&0xFF)<<25
-	case ACLGID | ACLDirection | Direction | TAPType | Region | IPPath: // geo
 		codeID = 4
 		keyOthers = uint64(t.ACLGID&0xFFFF) | uint64(t.ACLDirection&0x3)<<16 | uint64(t.Direction&0x3)<<18 | uint64(t.TAPType&0x1F)<<20 | uint64(t.Region&0xFF)<<25
+	case ACLGID | ACLDirection | Direction | TAPType | Region | IPPath: // geo
+		codeID = 5
+		keyOthers = uint64(t.ACLGID&0xFFFF) | uint64(t.ACLDirection&0x3)<<16 | uint64(t.Direction&0x3)<<18 | uint64(t.TAPType&0x1F)<<20 | uint64(t.Region&0xFF)<<25
+
+	// keyOthers: ACLGID | ACLDirection | Direction | TAPType | Region | Protocol | ServerPort
+	case ACLGID | ACLDirection | Direction | TAPType | Region | Protocol | ServerPort | IP: // geo
+		codeID = 6
+		keyOthers = uint64(t.ACLGID&0xFFFF) | uint64(t.ACLDirection&0x3)<<16 | uint64(t.Direction&0x3)<<18 | uint64(t.TAPType&0x1F)<<20 | uint64(t.Region&0xFF)<<25 | uint64(t.Protocol&0xFF)<<33 | uint64(t.ServerPort&0xFFFF)<<41
+	case ACLGID | ACLDirection | Direction | TAPType | Region | Protocol | ServerPort | IPPath: // geo
+		codeID = 7
+		keyOthers = uint64(t.ACLGID&0xFFFF) | uint64(t.ACLDirection&0x3)<<16 | uint64(t.Direction&0x3)<<18 | uint64(t.TAPType&0x1F)<<20 | uint64(t.Region&0xFF)<<25 | uint64(t.Protocol&0xFF)<<33 | uint64(t.ServerPort&0xFFFF)<<41
 
 	// keyOthers: ACLGID | ACLDirection | Direction | TAPType
 	case ACLGID | ACLDirection | Direction | TAPType | IP:
