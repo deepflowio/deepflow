@@ -130,7 +130,7 @@ pcap:
   block-size-kb: 64
   # 同时在写的最大pcap文件数，默认5000
   max-concurrent-files: 5000
-  # 每个pcap文件的最大大小，默认25MB
+  # 每个pcap文件的最大大小，默认25MB，但是1秒内即使超过该值也不会切分文件
   max-file-size-mb: 25
   # 所有pcap文件的最大总大小，默认100GB
   max-directory-size-gb: 100

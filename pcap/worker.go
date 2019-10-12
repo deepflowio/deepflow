@@ -178,7 +178,8 @@ func (w *WrappedWriter) getFilename(base string) string {
 
 func (w *Worker) shouldCloseFile(writer *WrappedWriter, packet *datatype.MetaPacket) bool {
 	// check for file size and time
-	if writer.FileSize()+int64(writer.BufferSize()) >= w.maxFileSize {
+	if packet.Timestamp-writer.firstPacketTime > time.Second && writer.FileSize()+int64(writer.BufferSize()) >= w.maxFileSize {
+		// 距离第一个包时长超过1秒, 且大小超过maxFileSize, 则切换pcap文件
 		return true
 	}
 	if packet.Timestamp-writer.firstPacketTime > w.maxFilePeriod {
