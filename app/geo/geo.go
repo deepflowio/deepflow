@@ -150,10 +150,10 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 			if thisEnd == ONE && flow.Country == CHN_ID {
 				// 产品需求：永远仅统计云外、客户端的地理位置信息，即单侧统计量永远基于服务端视角
 				if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE != 0 {
-					p.codes = append(p.codes, POLICY_CHN_CODES...)
+					codes = append(codes, POLICY_CHN_CODES...)
 				}
 				if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE_PORT != 0 {
-					p.codes = append(p.codes, POLICY_CHN_PORT_CODES...)
+					codes = append(codes, POLICY_CHN_PORT_CODES...)
 				}
 			}
 			for _, code := range codes {
@@ -173,10 +173,10 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 			if thisEnd == ZERO && flow.Country == CHN_ID {
 				// 产品需求：永远仅统计云外、客户端的地理位置信息，即单侧统计量永远基于服务端视角
 				if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE != 0 {
-					p.codes = append(p.codes, POLICY_CHN_EDGE_CODES...)
+					codes = append(codes, POLICY_CHN_EDGE_CODES...)
 				}
 				if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE_PORT != 0 {
-					p.codes = append(p.codes, POLICY_CHN_EDGE_PORT_CODES...)
+					codes = append(codes, POLICY_CHN_EDGE_PORT_CODES...)
 				}
 			}
 			for _, code := range codes {
