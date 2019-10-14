@@ -20,3 +20,7 @@ func (r *ReferenceCount) SubReferenceCount() bool {
 	}
 	return false
 }
+
+func (r *ReferenceCount) GetReferenceCount() int32 {
+	return atomic.LoadInt32((*int32)(r))
+}
