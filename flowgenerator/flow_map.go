@@ -344,7 +344,7 @@ func (m *FlowMap) flowCopyOnWrite(flowExtra *FlowExtra) {
 	}
 
 	taggedFlow := flowExtra.taggedFlow
-	if taggedFlow.ReferenceCount > 1 {
+	if taggedFlow.GetReferenceCount() > 1 {
 		flowExtra.taggedFlow = datatype.CloneTaggedFlow(taggedFlow)
 		datatype.ReleaseTaggedFlow(taggedFlow)
 	}
