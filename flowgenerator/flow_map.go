@@ -562,7 +562,7 @@ func NewFlowMap(hashSlots, capacity, id int, timeWindow, packetDelay, flushInter
 
 	m := &FlowMap{
 		FlowGeo:                innerFlowGeo,
-		ringBuffer:             make([]flowMapNodeBlock, (capacity+_BLOCK_SIZE)/_BLOCK_SIZE*_BLOCK_SIZE+1),
+		ringBuffer:             make([]flowMapNodeBlock, (capacity+_BLOCK_SIZE)/_BLOCK_SIZE+1),
 		hashBasis:              rand.Uint32(),
 		hashSlots:              int32(hashSlots),
 		hashSlotBits:           int32(hashSlotBits),
