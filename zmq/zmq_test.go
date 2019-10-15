@@ -1,14 +1,19 @@
 package zmq
 
 import (
-	"testing"
+	"math/rand"
 	"time"
+
+	"testing"
 )
 
-const SOCKET_RETRIES = 5
+const (
+	SOCKET_RETRIES = 5
+	PORT_MIN       = 1024
+	PORT_MAX       = 65536
+)
 
 func senderRoutine(t *testing.T, b []byte, ch chan int, p Sender) {
-	defer p.Close()
 	t.Log("Starts to send")
 	for {
 		select {
@@ -24,23 +29,27 @@ func senderRoutine(t *testing.T, b []byte, ch chan int, p Sender) {
 }
 
 func receiverRoutine(t *testing.T, ch chan int, out chan []byte, s Receiver) {
-	defer s.Close()
 	t.Log("Read")
 	d, _ := s.Recv()
-	ch <- 1
+	close(ch)
 	out <- d
 }
 
 func TestPubSub(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
 	s := [...]byte{1, 2, 3}
 	c := make(chan int)
 	out := make(chan []byte)
 	var err error
 	var pub Sender
+	var port int
 	for i := 0; i < SOCKET_RETRIES; i++ {
-		pub, err = NewPublisher("*", 12345, 10000, SERVER)
+		port = rand.Intn(PORT_MAX-PORT_MIN) + PORT_MIN
+		pub, err = NewPublisher("*", port, 10000, SERVER)
 		if err == nil {
 			break
+		} else {
+			t.Log(err)
 		}
 		if i == SOCKET_RETRIES-1 {
 			t.FailNow()
@@ -48,9 +57,11 @@ func TestPubSub(t *testing.T) {
 	}
 	var sub Receiver
 	for i := 0; i < SOCKET_RETRIES; i++ {
-		sub, err = NewSubscriber("127.0.0.1", 12345, 1000000, CLIENT)
+		sub, err = NewSubscriber("127.0.0.1", port, 1000000, CLIENT)
 		if err == nil {
 			break
+		} else {
+			t.Log(err)
 		}
 		if i == SOCKET_RETRIES-1 {
 			t.FailNow()
@@ -65,18 +76,25 @@ func TestPubSub(t *testing.T) {
 			break
 		}
 	}
+	pub.Close()
+	sub.Close()
 }
 
 func TestPushPull(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
 	s := [...]byte{1, 2, 3}
 	c := make(chan int)
 	out := make(chan []byte)
 	var err error
 	var push Sender
+	var port int
 	for i := 0; i < SOCKET_RETRIES; i++ {
-		push, err = NewPusher("*", 12345, 10000, SERVER)
+		port = rand.Intn(PORT_MAX-PORT_MIN) + PORT_MIN
+		push, err = NewPusher("*", port, 10000, SERVER)
 		if err == nil {
 			break
+		} else {
+			t.Log(err)
 		}
 		if i == SOCKET_RETRIES-1 {
 			t.FailNow()
@@ -84,9 +102,11 @@ func TestPushPull(t *testing.T) {
 	}
 	var pull Receiver
 	for i := 0; i < SOCKET_RETRIES; i++ {
-		pull, err = NewPuller("127.0.0.1", 12345, 1000000, time.Minute, CLIENT)
+		pull, err = NewPuller("127.0.0.1", port, 1000000, time.Minute, CLIENT)
 		if err == nil {
 			break
+		} else {
+			t.Log(err)
 		}
 		if i == SOCKET_RETRIES-1 {
 			t.FailNow()
@@ -101,4 +121,6 @@ func TestPushPull(t *testing.T) {
 			break
 		}
 	}
+	push.Close()
+	pull.Close()
 }
