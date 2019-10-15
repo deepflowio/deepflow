@@ -279,7 +279,7 @@ func NewU160LRU(hashSlots, capacity int) *U160LRU {
 	hashSlots, hashSlotBits := minPowerOfTwo(hashSlots)
 
 	m := &U160LRU{
-		ringBuffer:   make([]u160LRUNodeBlock, (capacity+_BLOCK_SIZE)/_BLOCK_SIZE*_BLOCK_SIZE+1),
+		ringBuffer:   make([]u160LRUNodeBlock, (capacity+_BLOCK_SIZE)/_BLOCK_SIZE+1),
 		hashSlots:    int32(hashSlots),
 		hashSlotBits: uint32(hashSlotBits),
 		hashSlotHead: make([]int32, hashSlots),
