@@ -225,6 +225,7 @@ func (m *FlowMap) updateFlowDirection(flowExtra *FlowExtra) {
 	}
 
 	if !IsClientToServer(srcScore, dstScore) {
+		srcScore, dstScore = dstScore, srcScore
 		flowExtra.reverseFlow()
 		flowExtra.reversed = !flowExtra.reversed
 	}

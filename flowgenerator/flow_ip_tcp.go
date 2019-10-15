@@ -100,6 +100,7 @@ func (m *FlowMap) updateTCPDirection(meta *MetaPacket, flags uint8, flowExtra *F
 		srcScore, dstScore = dstScore, srcScore
 	}
 	if !IsClientToServer(srcScore, dstScore) {
+		srcScore, dstScore = dstScore, srcScore
 		flowExtra.reverseFlow()
 		flowExtra.reversed = !flowExtra.reversed
 		meta.Direction = (CLIENT_TO_SERVER + SERVER_TO_CLIENT) - meta.Direction // reverse

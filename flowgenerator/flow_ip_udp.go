@@ -39,20 +39,17 @@ func (m *FlowMap) updateUDPDirection(meta *MetaPacket, flowExtra *FlowExtra, isF
 		dstKey := ServiceKey(int16(meta.EndpointData.DstInfo.L3EpcId), meta.IpDst, meta.PortDst)
 
 		srcScore, dstScore = m.udpServiceTable.GetUDPScore(isFirstPacket, srcKey, dstKey)
-		if meta.Direction == SERVER_TO_CLIENT {
-			srcScore, dstScore = dstScore, srcScore
-		}
 	} else {
 		ServiceKey6(m.srcServiceKey, int16(meta.EndpointData.SrcInfo.L3EpcId), meta.Ip6Src, meta.PortSrc)
 		ServiceKey6(m.dstServiceKey, int16(meta.EndpointData.DstInfo.L3EpcId), meta.Ip6Dst, meta.PortDst)
 
 		srcScore, dstScore = m.udpServiceTable6.GetUDPScore(isFirstPacket, m.srcServiceKey, m.dstServiceKey)
-		if meta.Direction == SERVER_TO_CLIENT {
-			srcScore, dstScore = dstScore, srcScore
-		}
 	}
-
+	if meta.Direction == SERVER_TO_CLIENT {
+		srcScore, dstScore = dstScore, srcScore
+	}
 	if !IsClientToServer(srcScore, dstScore) {
+		srcScore, dstScore = dstScore, srcScore
 		flowExtra.reverseFlow()
 		flowExtra.reversed = !flowExtra.reversed
 		meta.Direction = (CLIENT_TO_SERVER + SERVER_TO_CLIENT) - meta.Direction // reverse
