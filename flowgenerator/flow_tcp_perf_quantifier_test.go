@@ -70,7 +70,7 @@ func getPacketDirection(first, packet *MetaPacket) bool {
 	return first.IpSrc == packet.IpSrc
 }
 
-func TestRttSyn(t *testing.T) {
+func perfTestTemplate(t *testing.T, pcapFile string, resultFile string) {
 	var buffer bytes.Buffer
 	counter := NewFlowPerfCounter()
 	flowPerf := AcquireMetaFlowPerf()
@@ -78,7 +78,7 @@ func TestRttSyn(t *testing.T) {
 		taggedFlow: &TaggedFlow{},
 	}
 
-	packets, err := getMetaPacketFromPcap("rtt_syn_2_ack.pcap")
+	packets, err := getMetaPacketFromPcap(pcapFile)
 	if err != nil {
 		t.Errorf("structure metaPacket faild as %v", err)
 		return
@@ -98,14 +98,21 @@ func TestRttSyn(t *testing.T) {
 		buffer.WriteString(fmt.Sprintf("\t%vth perf data:%v", i, flowPerf.perfData))
 	}
 
-	expectFile := "flowPerf_rttSyn_test.result"
-	content, _ := ioutil.ReadFile(expectFile)
+	content, _ := ioutil.ReadFile(resultFile)
 	expected := string(content)
 	actual := buffer.String()
 	if expected != actual {
 		ioutil.WriteFile("actual.txt", []byte(actual), 0644)
-		t.Error(fmt.Sprintf("Inconsistent with %s, written to actual.txt", expectFile))
+		t.Error(fmt.Sprintf("Inconsistent with %s, written to actual.txt", resultFile))
 	}
+}
+
+func TestRttSyn(t *testing.T) {
+	perfTestTemplate(t, "rtt_syn_2_ack.pcap", "flowPerf_rttSyn_test.result")
+}
+
+func TestArt(t *testing.T) {
+	perfTestTemplate(t, "art-continues-payload-len-larger-than-1.pcap", "flowPerf_art_test.result")
 }
 
 func testSeqSegmentIsContinuous(left, right, node *SeqSegment, t *testing.T) {

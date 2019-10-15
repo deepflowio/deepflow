@@ -516,21 +516,26 @@ func (p *MetaFlowPerf) whenFlowEstablished(sameDirection, oppositeDirection *Tcp
 		}
 	}
 
-	// 收到ACK包，仅能用于同向判断是否计算art
 	if isAckPacket(header) {
+		// 收到ACK包，仅能用于同向判断是否计算art
 		sameDirection.resetRttPrecondition()
 
 		oppositeDirection.resetRttPrecondition()
 		oppositeDirection.resetArtPrecondition()
-	}
-
-	// 收到PSH/ACK包，仅可用于反向判断是否计算rtt, art
-	if isPshAckPacket(header) {
+	} else if isPshAckPacket(header) {
+		// 收到PSH/ACK包，仅可用于反向判断是否计算rtt, art
 		sameDirection.resetArtPrecondition()
 		sameDirection.resetRttPrecondition()
 
 		oppositeDirection.setRttPrecondition()
 		oppositeDirection.setArtPrecondition()
+	} else {
+		// 其它包，均为无效包，reset所有前置条件
+		sameDirection.resetArtPrecondition()
+		sameDirection.resetRttPrecondition()
+
+		oppositeDirection.resetRttPrecondition()
+		oppositeDirection.resetArtPrecondition()
 	}
 
 	//zerowin, pshUrgCount0
