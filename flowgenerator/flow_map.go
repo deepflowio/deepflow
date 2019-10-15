@@ -258,6 +258,9 @@ func (m *FlowMap) removeAndOutput(node *flowMapNode, nodeIndex int32, timestamp 
 	flowExtra := &node.flowExtra
 	taggedFlow := flowExtra.taggedFlow
 
+	// 统计数据输出前矫正流方向
+	m.updateFlowDirection(flowExtra)
+
 	// 输出统计数据
 	if taggedFlow.PolicyData.ActionFlags&FLOW_ACTION != 0 {
 		taggedFlow.AddReferenceCount()
