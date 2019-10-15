@@ -205,6 +205,7 @@ func (f *FlowMetricsPeer) String() string {
 func (f *Flow) String() string {
 	formatted := fmt.Sprintf("FlowID: %d ", f.FlowID)
 	formatted += fmt.Sprintf("CloseType: %d ", f.CloseType)
+	formatted += fmt.Sprintf("IsActiveService: %v ", f.IsActiveService)
 	formatted += fmt.Sprintf("TimeBitmap: %d ", f.TimeBitmap)
 	formatted += fmt.Sprintf("StartTime: %d ", f.StartTime)
 	formatted += fmt.Sprintf("EndTime: %d ", f.EndTime)
