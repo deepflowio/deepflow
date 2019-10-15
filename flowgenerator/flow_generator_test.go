@@ -126,6 +126,9 @@ func TestNew(t *testing.T) {
 	if len(flowGenerator.flowMap.hashSlotHead) != int(hashMapSize) {
 		t.Errorf("flowGenerator.flowMap.hashSlotHead len is %d, expect %d", len(flowGenerator.flowMap.hashSlotHead), hashMapSize)
 	}
+	if len(flowGenerator.flowMap.ringBuffer) != 3 {
+		t.Errorf("flowGenerator.flowMap.ringBuffer len is %d, expect %d", len(flowGenerator.flowMap.ringBuffer), 3)
+	}
 }
 
 func TestTunnelMatch(t *testing.T) {
