@@ -2,11 +2,18 @@ package idmap
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 )
 
-type u320IDMapNode struct {
-	key   [40]byte
+{{ range . }}
+
+const (
+	_U{{.}}_KEY_SIZE = {{.}} / 8
+)
+
+type u{{.}}IDMapNode struct {
+	key   [_U{{.}}_KEY_SIZE]byte
 	hash  uint32 // key的hash值
 	value uint32
 
@@ -14,21 +21,21 @@ type u320IDMapNode struct {
 	slot int32 // 记录 node 对应的哈希 slot ，为了避免 Clear 函数遍历整个 slotHead 数组
 }
 
-func (n *u320IDMapNode) equal(hash uint32, key []byte) bool {
+func (n *u{{.}}IDMapNode) equal(hash uint32, key []byte) bool {
 	return n.hash == hash && bytes.Compare(n.key[:], key) == 0
 }
 
-var blankU320MapNodeForInit u320IDMapNode
+var blankU{{.}}MapNodeForInit u{{.}}IDMapNode
 
-type u320IDMapNodeBlock []u320IDMapNode
+type u{{.}}IDMapNodeBlock []u{{.}}IDMapNode
 
-var u320IDMapNodeBlockPool = sync.Pool{New: func() interface{} {
-	return u320IDMapNodeBlock(make([]u320IDMapNode, _BLOCK_SIZE))
+var u{{.}}IDMapNodeBlockPool = sync.Pool{New: func() interface{} {
+	return u{{.}}IDMapNodeBlock(make([]u{{.}}IDMapNode, _BLOCK_SIZE))
 }}
 
 // 注意：不是线程安全的
-type U320IDMap struct {
-	buffer []u320IDMapNodeBlock // 存储Map节点，以矩阵的方式组织，提升内存申请释放效率
+type U{{.}}IDMap struct {
+	buffer []u{{.}}IDMapNodeBlock // 存储Map节点，以矩阵的方式组织，提升内存申请释放效率
 
 	slotHead []int32 // 哈希桶，slotHead[i] 表示哈希值为 i 的冲突链的第一个节点为 buffer[[ slotHead[i] ]]
 	size     int     // buffer中存储的有效节点总数
@@ -37,7 +44,7 @@ type U320IDMap struct {
 	hashSlotBits uint32 // 哈希桶数量总是2^N，记录末尾0比特的数量用于compressHash
 }
 
-func NewU320IDMap(hashSlots uint32) *U320IDMap {
+func NewU{{.}}IDMap(hashSlots uint32) *U{{.}}IDMap {
 	if hashSlots >= 1<<30 {
 		panic("hashSlots is too large")
 	}
@@ -47,8 +54,8 @@ func NewU320IDMap(hashSlots uint32) *U320IDMap {
 	}
 	hashSlots = 1 << i
 
-	m := &U320IDMap{
-		buffer:       make([]u320IDMapNodeBlock, 0),
+	m := &U{{.}}IDMap{
+		buffer:       make([]u{{.}}IDMapNodeBlock, 0),
 		slotHead:     make([]int32, hashSlots),
 		hashSlotBits: i,
 	}
@@ -59,20 +66,24 @@ func NewU320IDMap(hashSlots uint32) *U320IDMap {
 	return m
 }
 
-func (m *U320IDMap) Size() int {
+func (m *U{{.}}IDMap) Size() int {
 	return m.size
 }
 
-func (m *U320IDMap) Width() int {
+func (m *U{{.}}IDMap) Width() int {
 	return m.width
 }
 
-func (m *U320IDMap) compressHash(hash uint32) int32 {
+func (m *U{{.}}IDMap) compressHash(hash uint32) int32 {
 	return int32((hash>>m.hashSlotBits)^hash) & int32(len(m.slotHead)-1)
 }
 
 // 第一个返回值表示value，第二个返回值表示是否进行了Add。若key已存在，指定overwrite=true可覆写value。
-func (m *U320IDMap) AddOrGet(key []byte, hash uint32, value uint32, overwrite bool) (uint32, bool) {
+func (m *U{{.}}IDMap) AddOrGet(key []byte, hash uint32, value uint32, overwrite bool) (uint32, bool) {
+	if len(key) != _U{{.}}_KEY_SIZE {
+		panic(fmt.Sprintf("传入key的长度不等于 %d 字节", _U{{.}}_KEY_SIZE))
+	}
+
 	slot := m.compressHash(hash)
 	head := m.slotHead[slot]
 
@@ -93,7 +104,7 @@ func (m *U320IDMap) AddOrGet(key []byte, hash uint32, value uint32, overwrite bo
 	}
 
 	if m.size >= len(m.buffer)<<_BLOCK_SIZE_BITS { // expand
-		m.buffer = append(m.buffer, u320IDMapNodeBlockPool.Get().(u320IDMapNodeBlock))
+		m.buffer = append(m.buffer, u{{.}}IDMapNodeBlockPool.Get().(u{{.}}IDMapNodeBlock))
 	}
 	node := &m.buffer[m.size>>_BLOCK_SIZE_BITS][m.size&_BLOCK_SIZE_MASK]
 	copy(node.key[:], key)
@@ -112,7 +123,11 @@ func (m *U320IDMap) AddOrGet(key []byte, hash uint32, value uint32, overwrite bo
 	return value, true
 }
 
-func (m *U320IDMap) Get(key []byte, hash uint32) (uint32, bool) {
+func (m *U{{.}}IDMap) Get(key []byte, hash uint32) (uint32, bool) {
+	if len(key) != _U{{.}}_KEY_SIZE {
+		panic(fmt.Sprintf("传入key的长度不等于 %d 字节", _U{{.}}_KEY_SIZE))
+	}
+
 	slot := m.compressHash(hash)
 	head := m.slotHead[slot]
 
@@ -127,14 +142,14 @@ func (m *U320IDMap) Get(key []byte, hash uint32) (uint32, bool) {
 	return 0, false
 }
 
-func (m *U320IDMap) Clear() {
+func (m *U{{.}}IDMap) Clear() {
 	for i := 0; i < m.size; i += _BLOCK_SIZE {
 		for j := 0; j < _BLOCK_SIZE && i+j < m.size; j++ {
 			node := &m.buffer[i>>_BLOCK_SIZE_BITS][j]
 			m.slotHead[node.slot] = -1
-			*node = blankU320MapNodeForInit
+			*node = blankU{{.}}MapNodeForInit
 		}
-		u320IDMapNodeBlockPool.Put(m.buffer[i>>_BLOCK_SIZE_BITS])
+		u{{.}}IDMapNodeBlockPool.Put(m.buffer[i>>_BLOCK_SIZE_BITS])
 		m.buffer[i>>_BLOCK_SIZE_BITS] = nil
 	}
 
@@ -143,3 +158,5 @@ func (m *U320IDMap) Clear() {
 	m.size = 0
 	m.width = 0
 }
+
+{{ end }}

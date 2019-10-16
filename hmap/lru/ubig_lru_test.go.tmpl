@@ -15,9 +15,9 @@ func getU{{.}}(a, b uint64) []byte {
 }
 
 func TestU{{.}}KeySize(t *testing.T) {
-    if _U{{.}}_KEY_SIZE % 4 != 0 {
-        t.Errorf("KEY_SIZE must be divisible by 4 bytes")
-    }
+	if _U{{.}}_KEY_SIZE % 4 != 0 {
+		t.Errorf("KEY_SIZE must be divisible by 4 bytes")
+	}
 }
 
 func TestU{{.}}LRU(t *testing.T) {
