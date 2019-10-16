@@ -9,16 +9,24 @@ const (
 	bytesKeyLen = 40
 )
 
-func newNode(key0, key1 uint64) *u320IDMapNode {
-	node := &u320IDMapNode{}
+{{ range . }}
+
+func newNode(key0, key1 uint64) *u{{.}}IDMapNode {
+	node := &u{{.}}IDMapNode{}
 	BigEndian.PutUint64(node.key[bytesKeyLen-16-8:bytesKeyLen-16], key0)
 	BigEndian.PutUint64(node.key[bytesKeyLen-8:], key1)
 	node.hash = uint32(key0>>32) ^ uint32(key0) ^ uint32(key1>>32) ^ uint32(key1)
 	return node
 }
 
-func TestU320IDMapAddOrGet(t *testing.T) {
-	m := NewU320IDMap(1024)
+func TestU{{.}}KeySize(t *testing.T) {
+	if _U{{.}}_KEY_SIZE % 4 != 0 {
+		t.Errorf("KEY_SIZE must be divisible by 4 bytes")
+	}
+}
+
+func TestU{{.}}IDMapAddOrGet(t *testing.T) {
+	m := NewU{{.}}IDMap(1024)
 
 	exp := true
 	node := newNode(0, 1)
@@ -50,8 +58,8 @@ func TestU320IDMapAddOrGet(t *testing.T) {
 	}
 }
 
-func TestU320IDMapSize(t *testing.T) {
-	m := NewU320IDMap(1024)
+func TestU{{.}}IDMapSize(t *testing.T) {
+	m := NewU{{.}}IDMap(1024)
 	if m.Size() != 0 {
 		t.Errorf("当前长度，Expected %v found %v", 0, m.Size())
 	}
@@ -77,8 +85,8 @@ func TestU320IDMapSize(t *testing.T) {
 	}
 }
 
-func TestU320IDMapGet(t *testing.T) {
-	m := NewU320IDMap(1024)
+func TestU{{.}}IDMapGet(t *testing.T) {
+	m := NewU{{.}}IDMap(1024)
 
 	node := newNode(0, 1)
 	m.AddOrGet(node.key[:], node.hash, 1, false)
@@ -99,8 +107,8 @@ func TestU320IDMapGet(t *testing.T) {
 	}
 }
 
-func TestU320IDMapClear(t *testing.T) {
-	m := NewU320IDMap(4)
+func TestU{{.}}IDMapClear(t *testing.T) {
+	m := NewU{{.}}IDMap(4)
 
 	node := newNode(0, 1)
 	m.AddOrGet(node.key[:], node.hash, 1, false)
@@ -123,9 +131,9 @@ func TestU320IDMapClear(t *testing.T) {
 	}
 }
 
-func BenchmarkU320IDMap(b *testing.B) {
-	m := NewU320IDMap(1 << 26)
-	nodes := make([]*u320IDMapNode, (b.N+3)/4*4)
+func BenchmarkU{{.}}IDMap(b *testing.B) {
+	m := NewU{{.}}IDMap(1 << 26)
+	nodes := make([]*u{{.}}IDMapNode, (b.N+3)/4*4)
 
 	for i := uint64(0); i < uint64(b.N); i += 4 {
 		// 构造哈希冲突
@@ -144,3 +152,5 @@ func BenchmarkU320IDMap(b *testing.B) {
 	}
 	b.Logf("size=%d, width=%d", m.Size(), m.Width())
 }
+
+{{ end }}
