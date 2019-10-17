@@ -62,8 +62,8 @@ type SequentialDecoder struct {
 	rx, tx    Decoded
 	x         *Decoded
 
-	inPort       uint32
-	tridentIndex uint8
+	inPort                 uint32
+	tridentDispatcherIndex uint8
 }
 
 func NewSequentialDecoder(data []byte) *SequentialDecoder {
@@ -374,7 +374,7 @@ func (d *SequentialDecoder) DecodeHeader() bool {
 		inPort = inPort&TRIDNET_MASK | PACKET_SOURCE_TOR
 	}
 	d.inPort = inPort
-	d.tridentIndex = index
+	d.tridentDispatcherIndex = index
 	return false
 }
 

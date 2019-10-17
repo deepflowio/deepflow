@@ -45,8 +45,13 @@ func (c *command) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, operate ui
 		status := ""
 		adapter.instancesLock.Lock()
 		for key, instance := range adapter.instances {
-			status += fmt.Sprintf("Host: %16s Seq: %10d Cache: %2d Timestamp: %30s\n",
-				IpFromUint32(key), instance.seq, instance.cacheCount, time.Unix(int64(instance.timestamp/time.Second), int64(instance.timestamp%time.Second)))
+			for i := 0; i < TRIDENT_DISPATCHER_MAX; i++ {
+				dispatcher := &instance.dispatchers[i]
+				if dispatcher.cache != nil {
+					status += fmt.Sprintf("Host: %16s Index: %2d Seq: %10d Cache: %2d Timestamp: %30s\n",
+						IpFromUint32(key), i, dispatcher.seq, dispatcher.cacheCount, time.Unix(int64(dispatcher.timestamp/time.Second), int64(dispatcher.timestamp%time.Second)))
+				}
+			}
 		}
 		adapter.instancesLock.Unlock()
 
