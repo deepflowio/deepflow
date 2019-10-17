@@ -379,6 +379,14 @@ func (w *InfluxdbWriter) writeCache(queueID int, item InfluxdbItem) bool {
 	pointCache := w.QueueWriterInfosPrimary[queueID].pointCache
 
 	db := item.GetDBName()
+	if db == "" {
+		// FIXME: 在pointCache[db]时小概率出现core，查看core文件db为空, 这里增加保护
+		db = item.GetDBName()
+		log.Errorf("BUG: get db empty, reget db is %s", db)
+		if db == "" {
+			return false
+		}
+	}
 	if _, ok := pointCache[db]; !ok {
 		pointCache[db] = newPointCache(db, w.RP.name)
 	}
