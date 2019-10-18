@@ -111,7 +111,7 @@ func TestIp6RangeConvert(t *testing.T) {
 	start = net.ParseIP("1000:1001:1002:1003::1")
 	end = net.ParseIP("1000:1001:1002:1004::a")
 	ips = IpRangeConvert2CIDR(start, end)
-	if len(ips) != 69 {
+	if len(ips) != 67 {
 		t.Errorf("TestIp6RangeConvert Check Failed! %v", ips)
 	}
 
@@ -133,6 +133,20 @@ func TestIp6RangeConvert(t *testing.T) {
 	end = net.ParseIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
 	ips = IpRangeConvert2CIDR(start, end)
 	if len(ips) != 1 {
+		t.Errorf("TestIp6RangeConvert Check Failed! %v", ips)
+	}
+
+	start = net.ParseIP("1::0")
+	end = net.ParseIP("feaa::1")
+	ips = IpRangeConvert2CIDR(start, end)
+	if len(ips) != 26 {
+		t.Errorf("TestIp6RangeConvert Check Failed! %v", ips)
+	}
+
+	start = net.ParseIP("1::1")
+	end = net.ParseIP("feaa::1")
+	ips = IpRangeConvert2CIDR(start, end)
+	if len(ips) != 137 {
 		t.Errorf("TestIp6RangeConvert Check Failed! %v", ips)
 	}
 }

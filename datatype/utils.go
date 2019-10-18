@@ -66,12 +66,12 @@ func (f *ip6Field) add(n uint64) bool {
 			return true
 		} else {
 			f.ip[0] += 1
-			f.ip[1] = n - diff
+			f.ip[1] = n - diff - 1
 		}
 	} else {
 		f.ip[1] += n
 	}
-	return true
+	return false
 }
 
 func (f *ip6Field) sub(n uint64) {
@@ -80,7 +80,7 @@ func (f *ip6Field) sub(n uint64) {
 	}
 	if n > f.ip[1] {
 		f.ip[0] -= 1
-		f.ip[1] = math.MaxUint64 - n - f.ip[1]
+		f.ip[1] = math.MaxUint64 - n + f.ip[1] + 1
 	} else {
 		f.ip[1] -= n
 	}
@@ -132,7 +132,7 @@ func ipv6RangeConvert(startIp, endIp net.IP) []net.IPNet {
 	ips := make([]net.IPNet, 0, 4)
 	for start.lessOrEqual(end) && !start.makeIp().Equal(_ip6Max) {
 		mask := start.getMask()
-		for ; mask <= 128; mask++ {
+		for ; mask < 128; mask++ {
 			tmp := *start
 			tmp.addbyBitOffsetAndSub(128-mask, 1)
 			if tmp.lessOrEqual(end) {
