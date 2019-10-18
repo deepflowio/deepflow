@@ -57,13 +57,13 @@ type FlowMap struct {
 	hashBasis      uint32
 	hashSlots      int32 // 上取整至2^N，哈希桶个数
 	hashSlotBits   int32 // hashSlots中低位连续0比特个数
-	timeWindowSize int32 // 上取整至2^N，环形时间桶的槽位个数
+	timeWindowSize int64 // 上取整至2^N，环形时间桶的槽位个数
 
 	hashSlotHead []int32 // 哈希桶，hashSlotHead[i] 表示哈希值为 i 的冲突链的第一个节点为 buffer[[ hashSlotHead[i] ]]
 	timeSlotHead []int32 // 时间桶，含义与 hashSlotHead 类似
 
-	timeStart   time.Duration // 时间桶中的最早时间
-	packetDelay time.Duration // Packet到底的最大Delay
+	startTimeInUnit   int64 // 时间桶中的最早时间
+	packetDelayInUnit int64 // Packet到达的最大Delay
 
 	packetStatOutputBuffer []interface{} // 包统计信息输出的缓冲区
 	flowStatOutputBuffer   []interface{} // 流统计信息输出的缓冲区
@@ -95,7 +95,8 @@ type FlowMap struct {
 }
 
 type FlowMapCounter struct {
-	Total     uint64 `statsd:"total,counter"`
+	New       uint64 `statsd:"new,counter"`
+	Closed    uint64 `statsd:"closed,counter"`
 	Size      uint32 `statsd:"size,gauge"`
 	MaxBucket uint32 `statsd:"max_bucket,gauge"`
 
@@ -108,7 +109,6 @@ func (m *FlowMap) GetCounter() interface{} {
 	counter := &FlowMapCounter{}
 	m.counter, counter = counter, m.counter
 
-	counter.Total = m.totalFlow
 	counter.Size = uint32(m.size)
 	counter.MaxBucket = uint32(m.width)
 	m.width = 0
@@ -151,7 +151,7 @@ func (m *FlowMap) pushNodeToHashList(node *flowMapNode, nodeIndex int32, hash ui
 }
 
 func (m *FlowMap) pushNodeToTimeList(node *flowMapNode, nodeIndex int32, timeInUnit int64) {
-	timeSlot := timeInUnit & int64(m.timeWindowSize-1)
+	timeSlot := timeInUnit & (m.timeWindowSize - 1)
 	node.timeInUnit = timeInUnit
 	node.timeListNext = m.timeSlotHead[timeSlot]
 	node.timeListPrev = -1
@@ -180,7 +180,7 @@ func (m *FlowMap) removeNodeFromTimeList(node *flowMapNode, newNext, newPrev int
 		prevNode := m.getNode(node.timeListPrev)
 		prevNode.timeListNext = newNext
 	} else {
-		m.timeSlotHead[node.timeInUnit&int64(m.timeWindowSize-1)] = newNext
+		m.timeSlotHead[node.timeInUnit&(m.timeWindowSize-1)] = newNext
 	}
 
 	if node.timeListNext != -1 {
@@ -216,14 +216,15 @@ func (m *FlowMap) removeNode(node *flowMapNode, nodeIndex int32) {
 	m.bufferStartIndex = m.incIndex(m.bufferStartIndex)
 
 	m.size--
+	m.counter.Closed++
 }
 
-func (m *FlowMap) changeTimeSlot(node *flowMapNode, nodeIndex int32, timestamp time.Duration) {
-	if node.timeInUnit != int64(timestamp/_TIME_SLOT_UNIT) {
+func (m *FlowMap) changeTimeSlot(node *flowMapNode, nodeIndex int32, timeInUnit int64) {
+	if node.timeInUnit != timeInUnit {
 		// 从时间链表中删除
 		m.removeNodeFromTimeList(node, node.timeListNext, node.timeListPrev)
 		// 插入新的时间链表
-		m.pushNodeToTimeList(node, nodeIndex, int64(timestamp/_TIME_SLOT_UNIT))
+		m.pushNodeToTimeList(node, nodeIndex, timeInUnit)
 	}
 }
 
@@ -309,8 +310,7 @@ func (m *FlowMap) copyAndOutput(node *flowMapNode, timestamp time.Duration, meta
 	// 如果timestamp和上一个包不在一个_FLOW_STAT_INTERVAL，输出Flow统计信息并清零
 	// 注意：流统计需要考虑包到达时间的延时容差，即若timestamp落在更靠前的统计周期内时，数据仍然计入当前统计周期
 	if timestamp >= taggedFlow.FlowStatTime+_FLOW_STAT_INTERVAL {
-		nextFlowStatTime := timestamp / _FLOW_STAT_INTERVAL * _FLOW_STAT_INTERVAL
-		flowExtra.setEndTimeAndDuration(nextFlowStatTime)
+		flowExtra.setEndTimeAndDuration(taggedFlow.FlowStatTime + _FLOW_STAT_INTERVAL)
 		if taggedFlow.PolicyData.ActionFlags&FLOW_ACTION != 0 {
 			if !output {
 				m.updateFlowDirection(flowExtra, meta) // 每个流统计数据输出前矫正流方向
@@ -328,16 +328,16 @@ func (m *FlowMap) copyAndOutput(node *flowMapNode, timestamp time.Duration, meta
 	}
 }
 
-func (m *FlowMap) isTimeInWindow(timestamp time.Duration) bool {
-	if m.timeStart == 0 {
-		m.timeStart = timestamp/_TIME_SLOT_UNIT*_TIME_SLOT_UNIT - m.packetDelay
+func (m *FlowMap) isTimeInWindow(timeInUnit int64) bool {
+	if m.startTimeInUnit == 0 {
+		m.startTimeInUnit = timeInUnit - m.packetDelayInUnit
 		return true
 	}
 
-	if timestamp < m.timeStart {
+	if timeInUnit < m.startTimeInUnit {
 		m.counter.DropBeforeWindow++
 		return false
-	} else if timestamp+_TIME_SLOT_UNIT >= m.timeStart+time.Duration(m.timeWindowSize)*_TIME_SLOT_UNIT {
+	} else if timeInUnit+1 >= m.startTimeInUnit+m.timeWindowSize {
 		m.counter.DropAfterWindow++
 		return false
 	}
@@ -376,21 +376,21 @@ func (m *FlowMap) InjectFlushTicker(timestamp time.Duration) bool {
 		m.lastMapFlush = time.Duration(time.Now().UnixNano())
 	}
 
-	if !m.isTimeInWindow(timestamp) {
+	nextStartTimeInUnit := int64(timestamp / _TIME_SLOT_UNIT)
+	if !m.isTimeInWindow(nextStartTimeInUnit) {
 		return false
 	}
-	timestamp -= m.packetDelay // 根据包到达时间的容差调整
-	if timestamp < m.timeStart {
+	nextStartTimeInUnit -= m.packetDelayInUnit // 根据包到达时间的容差调整
+	timestamp = time.Duration(nextStartTimeInUnit)*_TIME_SLOT_UNIT - 1
+	if nextStartTimeInUnit < m.startTimeInUnit {
 		return true
 	}
 
 	next := int32(0)
-	startTimeInUnit := int64(m.timeStart / _TIME_SLOT_UNIT)
-	endTimeInUnit := int64(timestamp / _TIME_SLOT_UNIT)
-	for timeInUnit := startTimeInUnit; timeInUnit < endTimeInUnit; timeInUnit++ { // 扫描过期的时间槽
-		timeHead := m.timeSlotHead[timeInUnit&int64(m.timeWindowSize-1)]
-		for timeListNext := timeHead; timeListNext != -1; timeListNext = next { // 扫描特定时间点的链表
-			node := m.getNode(timeListNext)
+	for timeInUnit := m.startTimeInUnit; timeInUnit < nextStartTimeInUnit; timeInUnit++ { // 扫描过期的时间槽
+		timeHead := m.timeSlotHead[timeInUnit&(m.timeWindowSize-1)]
+		for this := timeHead; this != -1; this = next { // 扫描特定时间点的链表
+			node := m.getNode(this)
 			next = node.timeListNext // node可能发生删除或移动，缓存next
 
 			// Copy On Write
@@ -399,28 +399,32 @@ func (m *FlowMap) InjectFlushTicker(timestamp time.Duration) bool {
 			// 若Flow已经超时，直接输出
 			timeout := node.flowExtra.recentTime + node.flowExtra.timeout
 			if timestamp >= timeout {
-				m.removeAndOutput(node, timeListNext, timeout, nil)
+				m.removeAndOutput(node, this, timeout, nil)
 				// 若next正好指向删掉节点之前的buffer头部，需要将next矫正至node本身
 				// 因为删除机制会将被删除的节点交换至buffer头部进行删除
 				if next == m.decIndex(m.bufferStartIndex) {
-					next = timeListNext
+					next = this
 				}
 				continue
 			}
+			flowStatTime := node.flowExtra.taggedFlow.FlowStatTime
 
 			// 输出未超时Flow的统计信息
 			m.copyAndOutput(node, timestamp, nil)
 
-			// 由于包、流统计信息已输出，将节点移动至下一个流统计的时间，或者最终超时的时间
-			nextFlowStatTime := timestamp/_FLOW_STAT_INTERVAL*_FLOW_STAT_INTERVAL + _FLOW_STAT_INTERVAL
-			if nextFlowStatTime > timeout {
-				nextFlowStatTime = timeout
+			// 若流统计信息已输出，将节点移动至下一个流统计的时间，或者最终超时的时间
+			nextListTime := flowStatTime + _FLOW_STAT_INTERVAL
+			if nextListTime <= timestamp {
+				nextListTime += _FLOW_STAT_INTERVAL
 			}
-			m.changeTimeSlot(node, timeListNext, nextFlowStatTime)
+			if nextListTime > timeout {
+				nextListTime = timeout
+			}
+			m.changeTimeSlot(node, this, int64(nextListTime/_TIME_SLOT_UNIT))
 		}
 	}
 
-	m.timeStart = timestamp / _TIME_SLOT_UNIT * _TIME_SLOT_UNIT
+	m.startTimeInUnit = nextStartTimeInUnit
 	m.flushQueue(timestamp)
 	return true
 }
@@ -453,7 +457,7 @@ func (m *FlowMap) updateNode(node *flowMapNode, nodeIndex int32, meta *datatype.
 	}
 
 	// 3. 由于包、流统计信息已输出，将节点移动至包对应的时间槽
-	m.changeTimeSlot(node, nodeIndex, meta.Timestamp)
+	m.changeTimeSlot(node, nodeIndex, int64(meta.Timestamp/_TIME_SLOT_UNIT))
 }
 
 func (m *FlowMap) newNode(meta *datatype.MetaPacket, hash uint64) {
@@ -470,6 +474,7 @@ func (m *FlowMap) newNode(meta *datatype.MetaPacket, hash uint64) {
 	node := &m.ringBuffer[row][col]
 	m.size++
 	m.totalFlow++
+	m.counter.New++
 
 	// 新节点加入哈希链
 	m.pushNodeToHashList(node, m.bufferEndIndex, hash)
@@ -523,13 +528,13 @@ func (m *FlowMap) injectMetaPacket(hash uint64, meta *datatype.MetaPacket) {
 	width := 0
 	next := int32(0)
 	hashHead := m.hashSlotHead[m.compressHash(hash)]
-	for hashListNext := hashHead; hashListNext != -1; hashListNext = next {
-		node := m.getNode(hashListNext)
+	for this := hashHead; this != -1; this = next {
+		node := m.getNode(this)
 		next = node.hashListNext // node可能发生删除或移动，缓存next
 		width++
 
 		if node.hash == hash && node.flowExtra.Match(meta) {
-			m.updateNode(node, hashListNext, meta)
+			m.updateNode(node, this, meta)
 			next = -1 // 由于会发生节点删除，此时next不再有效
 
 			if m.width < width {
@@ -572,10 +577,10 @@ func NewFlowMap(hashSlots, capacity, id int, timeWindow, packetDelay, flushInter
 		hashBasis:              rand.Uint32(),
 		hashSlots:              int32(hashSlots),
 		hashSlotBits:           int32(hashSlotBits),
-		timeWindowSize:         int32(timeWindowSize),
+		timeWindowSize:         int64(timeWindowSize),
 		hashSlotHead:           make([]int32, hashSlots),
 		timeSlotHead:           make([]int32, timeWindowSize),
-		packetDelay:            packetDelay,
+		packetDelayInUnit:      int64(packetDelay / _TIME_SLOT_UNIT),
 		packetStatOutputBuffer: make([]interface{}, 0, 256),
 		flowStatOutputBuffer:   make([]interface{}, 0, 256),
 		packetAppQueue:         packetAppQueue,
