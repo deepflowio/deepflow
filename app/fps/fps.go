@@ -131,6 +131,7 @@ func (p *FlowToFPSDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 	for i := range ips {
 		if IsOuterPublicIp(l3EpcIDs[i]) {
 			ips[i] = 0
+			ip6s[i] = net.IPv6zero
 		}
 	}
 

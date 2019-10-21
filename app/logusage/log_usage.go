@@ -90,6 +90,7 @@ func (p *FlowToLogUsageDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, va
 	for i := range ips {
 		if IsOuterPublicIp(l3EpcIDs[i]) { // FIXME: 可能要去掉
 			ips[i] = 0
+			ip6s[i] = net.IPv6zero
 		}
 	}
 

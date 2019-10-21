@@ -95,6 +95,7 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 	for i := range ips {
 		if IsOuterPublicIp(l3EpcIDs[i]) {
 			ips[i] = 0
+			ip6s[i] = net.IPv6zero
 		}
 	}
 
