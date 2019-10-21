@@ -40,6 +40,8 @@ PROTOCOL_UDP = 17
 SRC_PORT_OFFSET = 0
 DST_PORT_OFFSET = 2
 
+MAX_VLAN_LAYERS = 2
+
 import struct
 
 
@@ -55,10 +57,12 @@ def __packet_matches_condition(packet, ips_int, protocol, ports):
     off = ETHER_TYPE_OFFSET
     eth_type = struct.unpack('!H', packet[off:off + 2])[0]
     l3_offset = ETHERNET_HEADER_LEN
-    if eth_type == ETHER_TYPE_VLAN:
-        off = ETHER_TYPE_OFFSET + VLAN_LEN
+    vlan_layers = 0
+    while eth_type == ETHER_TYPE_VLAN and vlan_layers < MAX_VLAN_LAYERS:
+        off += VLAN_LEN
         eth_type = struct.unpack('!H', packet[off:off + 2])[0]
         l3_offset += VLAN_LEN
+        vlan_layers += 1
     if eth_type == ETHER_TYPE_IPV4:
         ip_version = 4
     elif eth_type == ETHER_TYPE_IPV6:
