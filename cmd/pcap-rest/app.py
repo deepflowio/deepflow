@@ -342,6 +342,7 @@ def get_files(
             continue
         if ip is not None and ip_str != segs[2]:
             continue
+        mac = segs[1]
         ip_rep = _ip_convert_back(segs[2])
         if (
             ip_filter or protocol is not None
@@ -349,6 +350,7 @@ def get_files(
             continue
         files.append({
             'ip': str(ip_rep),
+            'mac': ':'.join([mac[i:i+2] for i in range(0, len(mac), 2)]),
             'tap_type': _tap_type_to_id(segs[0]),
             'filename': file,
             'start_epoch': start_epoch,
