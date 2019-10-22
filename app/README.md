@@ -47,98 +47,93 @@ vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version
 
 所有的表中，tag均为以下字段的组合，位置相同的字段一定同时出现。
 
-| 名字              | 位置 | 含义                    | 格式                                  |
-| ----------------- | ---- | ----------------------- | ------------------------------------- |
-| \_id              | N/A  | 分析器写入的shard id    | u8数字字符串                          |
-| \_tid             | N/A  | Trient使用的thread id   | u64数字字符串                         |
-|                   |      |                         |                                       |
-| ip_version        | 0    | IP地址类型              | 4: IPv4                               |
-|                   |      |                         | 6: IPv6                               |
-| ip                | 0    | IP                      | 字符串格式的IP                        |
-| ip_bin            | 0    | IP                      | 二进制字符串格式的IP                  |
-| mac               | 1    | MAC地址                 | 字符串格式的MAC地址 `废弃`            |
-| group_id          | 2    | 资源组ID                |                                       |
-| l2_epc_id         | 3    | 二层项目ID              | `废弃`                                |
-| l3_epc_id         | 4    | 三层项目ID              |                                       |
-| l2_device_id      | 5    | 二层设备ID              | `废弃`                                |
-| l2_device_type    | 5    | 二层设备类型            | `废弃`                                |
-|                   |      |                         | 1: 虚拟机                             |
-|                   |      |                         | 3: 第三方设备                         |
-|                   |      |                         | 5: 虚拟网关                           |
-|                   |      |                         | 6: 服务器                             |
-|                   |      |                         | 7: 网络设备                           |
-|                   |      |                         | 8: 浮动IP                             |
-|                   |      |                         | 9: DHCP服务                           |
-| l3_device_id      | 6    | 三层设备ID              | 同上                                  |
-| l3_device_type    | 6    | 三层设备类型            | 同二层设备类型                        |
-| host              | 7    | 宿主机                  | 字符串格式的IP                        |
-| region            | 8    | 云平台Region ID         | 字符串                                |
-|                   |      |                         |                                       |
-| ip_version        | 0    | IP地址类型              | 4: IPv4                               |
-|                   |      |                         | 6: IPv6                               |
-| ip_0              | 16   | 0端IP                   | 字符串格式的IP                        |
-| ip_1              | 16   | 1端IP                   | 字符串格式的IP                        |
-| ip_bin_0          | 16   | 0端IP                   | 二进制字符串格式的IP                  |
-| ip_bin_1          | 16   | 1端IP                   | 二进制字符串格式的IP                  |
-| mac_0             | 17   | 0端MAC                  | `废弃`                                |
-| mac_1             | 17   | 1端MAC                  | `废弃`                                |
-| group_id_0        | 18   |                         |                                       |
-| group_id_1        | 18   |                         |                                       |
-| l2_epc_id_0       | 19   |                         | `废弃`                                |
-| l2_epc_id_1       | 19   |                         | `废弃`                                |
-| l3_epc_id_0       | 20   |                         |                                       |
-| l3_epc_id_1       | 20   |                         |                                       |
-| l2_device_id_0    | 21   |                         | `废弃`                                |
-| l2_device_type_0  | 21   |                         | `废弃`                                |
-| l2_device_id_1    | 21   |                         | `废弃`                                |
-| l2_device_type_1  | 21   |                         | `废弃`                                |
-| l3_device_id_0    | 22   |                         |                                       |
-| l3_device_type_0  | 22   |                         |                                       |
-| l3_device_id_1    | 22   |                         |                                       |
-| l3_device_type_1  | 22   |                         |                                       |
-| host_0            | 23   | 宿主机                  | 源端MAC对应的宿主机                   |
-| host_1            | 23   | 宿主机                  | 目的端MAC对应的宿主机                 |
-| subnet_id_0       | 24   | 0侧子网ID               |                                       |
-| subnet_id_1       | 24   | 1侧子网ID               |                                       |
-| region_0          | 25   | 0侧云平台Region ID      |                                       |
-| region_1          | 25   | 1侧云平台Region ID      |                                       |
-|                   |      |                         |                                       |
-| direction         | 32   | 表征流的方向            | c2s: ip/ip_0为客户端，ip_1为服务端    |
-|                   |      |                         | s2c: ip/ip_0为服务端，ip_1为客户端    |
-| acl_gid           | 33   | ACL组ID                 | APP策略对应的ACL组ID                  |
-| vlan_id           | 34   |                         |                                       |
-| protocol          | 35   | 协议                    | df\_\*, log\_\*:                      |
-|                   |      |                         |   0: 非IP包                           |
-|                   |      |                         |   1-255: IP protocol number           |
-|                   |      |                         |   注意当存在server_port时仅有TCP/UDP  |
-|                   |      |                         | vtap\_\*:                             |
-|                   |      |                         |   6/17: TCP/UDP                       |
-|                   |      |                         |   255: 其它                           |
-| server_port       | 36   | 服务端端口              |                                       |
-| cast_type         | 37   | 播送类型                | broadcast: 广播，目的MAC为广播MAC     |
-|                   |      |                         | multicast: 组播，目的MAC为组播MAC     |
-| vtap              | 38   | 采集器控制IP            | 字符串格式的IP                        |
-| tap_type          | 39   | 流量采集点              | 1-2,4-30: 接入网络流量                |
-|                   |      |                         | 3: 虚拟网络流量                       |
-| subnet_id         | 40   | 子网ID                  |                                       |
-| tcp_flags         | 41   | TCP Flags               | 255: 其它                             |
-|                   |      |                         | 1-31: 统计的TCP Flags组合             |
-|                   |      |                         |   2: SYN                              |
-|                   |      |                         |   2+16: SYN+ACK                       |
-|                   |      |                         |   16: ACK                             |
-|                   |      |                         |   8+16: PSH+ACK                       |
-|                   |      |                         |   1+16: FIN+ACK                       |
-|                   |      |                         |   4+16: RST+ACK                       |
-| acl_direction     | 42   | ACL匹配的方向           | fwd: 正向匹配                         |
-|                   |      |                         | bwd: 反向匹配                         |
-| scope             | 43   |                         | 1: VPC内                              |
-|                   |      |                         | 2: VPC间                              |
-|                   |      |                         |                                       |
-| CODE_INDEX        | 48-53| 不能使用                | 用于标识Code的Index                   |
-|                   |      |                         |                                       |
-| isp               | 61   | 运营商（仅大中华）      | 字符串                                |
-| region            | 62   | 省份名前缀（仅大中华）  | 字符串 `注意：仅含两个汉字，例如黑龙` |
-| country           | 63   | 国家三位字符编码        | 字符串 `注意：使用三位字母编码`       |
+| 名字              | 位置 | 含义                    | 类型         | 取值说明                              |
+| ----------------- | ---- | ----------------------- | ------------ | ------------------------------------- |
+| \_id              | N/A  | 客户端写入的shard id    | 非负整数     | u8                                    |
+| \_tid             | N/A  | Trient使用的thread id   | 正整数       | u64正整数                             |
+|                   |      |                         |              |                                       |
+| ip_version        | 0/16 | IP地址的类型            | 正整数       | 4: IPv4                               |
+|                   |      |                         |              | 6: IPv6                               |
+| ip                | 0    | IP地址                  | IP字符串     | 0.0.0.0或::表示Internet               |
+| ip_bin            | 0    | IP地址                  | 二进制字符串 | 长度为IPv4 32或IPv6 128，值等价于ip   |
+| mac               | 1    | MAC地址                 | MAC字符串    | `废弃`                                |
+| group_id          | 2    | mac/ip对应的资源组ID    | 整数         | -2: Internet                          |
+|                   |      |                         |              | -1: 其它                              |
+|                   |      |                         |              | 0: 不可能存在                         |
+|                   |      |                         |              | >=1: 资源组ID                         |
+| l2_epc_id         | 3    | mac对应的EPC ID         | 整数         | `废弃`                                |
+| l3_epc_id         | 4    | ip对应的EPC ID          | 整数         | -2: Internet                          |
+|                   |      |                         |              | -1: 其它                              |
+|                   |      |                         |              | 0: 不可能存在                         |
+|                   |      |                         |              | >=1: IP对应的EPC ID                   |
+| l2_device_id      | 5    | mac对应的资源ID         | 非负整数     | 0: 未找到 `废弃`                      |
+| l2_device_type    | 5    | mac对应的资源类型       | 非负整数     | `废弃`                                |
+|                   |      |                         |              | 0: 未找到                             |
+|                   |      |                         |              | >=1: 由trisolaris确定含义，1表示VM    |
+| l3_device_id      | 6    | ip对应的资源ID          | 非负整数     | 同l2_device_id                        |
+| l3_device_type    | 6    | ip对应的资源类型        | 非负整数     | 同l2_device_type                      |
+| host              | 7    | ip对应的宿主机          | IP字符串     | 0.0.0.0或::表示未找到                 |
+| region            | 8    | ip对应的云平台区域ID    | 非负整数     | 0: 未找到                             |
+|                   |      |                         |              |                                       |
+| ip_0              | 16   | 0端IP                   | IP字符串     | 0.0.0.0或::表示Internet               |
+| ip_1              | 16   | 1端IP                   | IP字符串     | 0.0.0.0或::表示Internet               |
+| ip_bin_0          | 16   | 0端IP                   | 二进制字符串 | 长度为IPv4 32或IPv6 128，值等价于ip_0 |
+| ip_bin_1          | 16   | 1端IP                   | 二进制字符串 | 长度为IPv4 32或IPv6 128，值等价于ip_1 |
+| mac_0             | 17   | 0端MAC                  | MAC字符串    | `废弃`                                |
+| mac_1             | 17   | 1端MAC                  | MAC字符串    | `废弃`                                |
+| group_id_0        | 18   | mac_0/ip_0对应的资源组ID| 整数         | 取值范围与group_id相同                |
+| group_id_1        | 18   | mac_1/ip_1对应的资源组ID| 整数         | 取值范围与group_id相同                |
+| l2_epc_id_0       | 19   | mac_0对应的EPC ID       | 整数         | `废弃`                                |
+| l2_epc_id_1       | 19   | mac_1对应的EPC ID       | 整数         | `废弃`                                |
+| l3_epc_id_0       | 20   | ip_0对应的EPC ID        | 整数         | 取值范围与l3_epc_id相同               |
+| l3_epc_id_1       | 20   | ip_1对应的EPC ID        | 整数         | 取值范围与l3_epc_id相同               |
+| l2_device_id_0    | 21   | mac_0对应的资源ID       | 非负整数     | `废弃`                                |
+| l2_device_type_0  | 21   | mac_0对应的资源类型     | 非负整数     | `废弃`                                |
+| l2_device_id_1    | 21   | mac_1对应的资源ID       | 非负整数     | `废弃`                                |
+| l2_device_type_1  | 21   | mac_1对应的资源类型     | 非负整数     | `废弃`                                |
+| l3_device_id_0    | 22   | ip_0对应的资源ID        | 非负整数     | 取值范围与l3_device_id相同            |
+| l3_device_type_0  | 22   | ip_0对应的资源类型      | 非负整数     | 取值范围与l3_device_type相同          |
+| l3_device_id_1    | 22   | ip_1对应的资源ID        | 非负整数     | 取值范围与l3_device_id相同            |
+| l3_device_type_1  | 22   | ip_1对应的资源类型      | 非负整数     | 取值范围与l3_device_type相同          |
+| host_0            | 23   | ip_0对应的宿主机        | IP字符串     | 0.0.0.0表示没找到                     |
+| host_1            | 23   | ip_1对应的宿主机        | IP字符串     | 0.0.0.0表示没找到                     |
+| subnet_id_0       | 24   | ip_0对应的VL2 ID        | 非负整数     | 0表示没找到                           |
+| subnet_id_1       | 24   | ip_1对应的VL2 ID        | 非负整数     | 0表示没找到                           |
+| region_0          | 25   | ip_0对应的云平台区域ID  | 非负整数     | 0表示没找到                           |
+| region_1          | 25   | ip_1对应的云平台区域ID  | 非负整数     | 0表示没找到                           |
+|                   |      |                         |              |                                       |
+| direction         | 32   | 统计量对应的流方向      | 字符串       | c2s: ip/ip_0为客户端，ip_1为服务端    |
+|                   |      |                         |              | s2c: ip/ip_0为服务端，ip_1为客户端    |
+| acl_gid           | 33   | ACL组ID                 | 非负整数     | 0: 未找到                             |
+| vlan_id           | 34   | VLAN标签                | 非负整数     | `弃用`                                |
+| protocol          | 35   | 协议                    | 非负整数     | 0: 非IP包                             |
+|                   |      |                         |              | 1-255: IP protocol number             |
+|                   |      |                         |              | 注意当存在server_port时仅有TCP/UDP    |
+| server_port       | 36   | 服务端端口              | 非负整数     | 0-65535，0表示无L4协议号或协议号为0   |
+| cast_type         | 37   | 播送类型                | 字符串       | broadcast: 广播，目的MAC为广播MAC     |
+|                   |      |                         |              | multicast: 组播，目的MAC为组播MAC     |
+| vtap              | 38   | 采集器控制IP            | IP字符串     | 无特殊值                              |
+| tap_type          | 39   | 流量采集点              | 正整数       | 1-2,4-30: 接入网络流量                |
+|                   |      |                         |              | 3: 虚拟网络流量                       |
+| subnet_id         | 40   | ip对应的子网ID          | 非负整数     | 0: 未找到                             |
+| tcp_flags         | 41   | TCP Flags               | 非负整数     | 255: 其它                             |
+|                   |      |                         |              | 1-31中的如下部分: 统计的TCP Flags组合 |
+|                   |      |                         |              |   2: SYN                              |
+|                   |      |                         |              |   2+16: SYN+ACK                       |
+|                   |      |                         |              |   16: ACK                             |
+|                   |      |                         |              |   8+16: PSH+ACK                       |
+|                   |      |                         |              |   1+16: FIN+ACK                       |
+|                   |      |                         |              |   4+16: RST+ACK                       |
+| acl_direction     | 42   | ACL匹配的方向           | 字符串       | fwd: 正向匹配                         |
+|                   |      |                         |              | bwd: 反向匹配                         |
+| scope             | 43   | 源和目的构成的范围      | 正整数       | 1: VPC内                              |
+|                   |      |                         |              | 2: VPC间                              |
+|                   |      |                         |              |                                       |
+| CODE_INDEX        | 48-53| 不能使用                | N/A          | 用于droplet/roze/zero标识Code的Index  |
+|                   |      |                         |              |                                       |
+| isp               | 61   | 运营商（仅大中华）      | 字符串       |                                       |
+| region            | 62   | 省份名前缀（仅大中华）  | 字符串       | `注意：仅含两个汉字，例如黑龙`        |
+| country           | 63   | 国家三位字符编码        | 字符串       | `注意：使用三位字母编码`              |
 
 ## 数据表Field定义
 
