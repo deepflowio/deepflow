@@ -794,6 +794,14 @@ func ReleaseField(field *Field) {
 func CloneField(field *Field) *Field {
 	newField := AcquireField()
 	*newField = *field
+	if field.IP6 != nil {
+		newField.IP6 = make(net.IP, len(field.IP6))
+		copy(newField.IP6, field.IP6)
+	}
+	if field.IP61 != nil {
+		newField.IP61 = make(net.IP, len(field.IP61))
+		copy(newField.IP61, field.IP61)
+	}
 	return newField
 }
 
