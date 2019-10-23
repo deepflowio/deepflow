@@ -2,6 +2,7 @@ package zerodoc
 
 import (
 	"math"
+	"net"
 	"testing"
 
 	"github.com/google/gopacket/layers"
@@ -184,5 +185,24 @@ func TestFillValues(t *testing.T) {
 	}
 	if tag.ServerPort != 9527 {
 		t.Error("ServerPort 处理错误")
+	}
+}
+
+func TestCloneTagWithIPv6Fields(t *testing.T) {
+	var ip [net.IPv6len]byte
+	for i := range ip {
+		ip[i] = byte(i)
+	}
+	tagOrigin := AcquireTag()
+	tagOrigin.Field = AcquireField()
+	tagOrigin.IsIPv6 = 1
+	tagOrigin.IP6 = ip[:net.IPv6len]
+	tagCloned := CloneTag(tagOrigin)
+	if !tagCloned.IP6.Equal(tagOrigin.IP6) {
+		t.Error("CloneTag产生的tag和原tag字段不一致")
+	}
+	tagCloned.IP6[0] = 255
+	if tagCloned.IP6.Equal(tagOrigin.IP6) {
+		t.Error("CloneTag产生的tag和原tag共享了字段")
 	}
 }
