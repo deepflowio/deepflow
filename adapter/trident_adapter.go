@@ -38,11 +38,11 @@ type packetBuffer struct {
 }
 
 type tridentDispatcher struct {
-	timestamp time.Duration
-
 	cache      []*packetBuffer
-	seq        uint32
-	cacheCount uint16
+	timestamp  []time.Duration // 对应cache[i]为nil时，值为后续最近一个包的timestamp
+	dropped    uint64
+	seq        uint32 // cache中的第一个seq
+	startIndex uint32
 }
 
 type tridentInstance struct {
@@ -54,7 +54,7 @@ type TridentAdapter struct {
 	statsCounter
 
 	listenBufferSize int
-	cacheSize        int
+	cacheSize        uint32
 
 	instancesLock sync.Mutex // 仅用于droplet-ctl打印trident信息
 	instances     map[TridentKey]*tridentInstance
@@ -78,7 +78,16 @@ func (p *packetBuffer) calcHash() uint8 {
 	return p.hash
 }
 
-func NewTridentAdapter(queues []queue.QueueWriter, listenBufferSize, cacheSize int) *TridentAdapter {
+func minPowerOfTwo(v uint32) uint32 {
+	for i := 0; i < 30; i++ {
+		if v <= 1<<i {
+			return 1 << i
+		}
+	}
+	return 1 << 30
+}
+
+func NewTridentAdapter(queues []queue.QueueWriter, listenBufferSize int, cacheSize uint32) *TridentAdapter {
 	listener, err := net.ListenUDP("udp4", &net.UDPAddr{Port: LISTEN_PORT})
 	if err != nil {
 		log.Error(err)
@@ -86,7 +95,7 @@ func NewTridentAdapter(queues []queue.QueueWriter, listenBufferSize, cacheSize i
 	}
 	adapter := &TridentAdapter{
 		listenBufferSize: listenBufferSize,
-		cacheSize:        cacheSize,
+		cacheSize:        minPowerOfTwo(cacheSize),
 		slaveCount:       uint8(len(queues)),
 		slaves:           make([]*slave, len(queues)),
 
@@ -127,88 +136,114 @@ func (a *TridentAdapter) Closed() bool {
 	return false // FIXME: never close?
 }
 
-func (a *TridentAdapter) cacheClear(dispatcher *tridentDispatcher, key uint32) {
-	if dispatcher.cacheCount > 0 {
-		startSeq := dispatcher.seq
-		for i := 0; i < a.cacheSize; i++ {
-			if dispatcher.cache[i] != nil {
-				dataSeq := uint32(i) + startSeq + 1
-				drop := uint64(dataSeq - dispatcher.seq - 1)
-				a.counter.RxDropped += drop
-				a.stats.RxDropped += drop
-
-				dispatcher.seq = dataSeq
-
-				packet := dispatcher.cache[i]
-				dispatcher.timestamp = packet.decoder.timestamp
-				index := packet.hash & (a.slaveCount - 1)
-				a.slaves[index].put(packet)
-				dispatcher.cache[i] = nil
-			}
-		}
-		dispatcher.cacheCount = 0
-	}
-}
-
-func (a *TridentAdapter) cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer) bool {
+func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize uint32, slaves []*slave) (uint64, uint64) {
 	decoder := &packet.decoder
 	seq := decoder.Seq()
 	timestamp := decoder.timestamp
-	a.counter.RxPackets += 1
-	a.stats.RxPackets += 1
-	// droplet重启或trident重启时，不考虑SEQ
-	if (dispatcher.cacheCount == 0 && seq-dispatcher.seq == 1) || dispatcher.seq == 0 || seq == 1 {
+
+	// 初始化
+	if dispatcher.seq == 0 {
 		dispatcher.seq = seq
-		dispatcher.timestamp = timestamp
-		return false
-	} else {
-		// seq-dispatcher.seq > 0xf0000000条件是为了避免u32环回来，例如0-0xffffffff应该是正常的
-		if (seq < dispatcher.seq && seq-dispatcher.seq > 0xf0000000) || seq == dispatcher.seq {
-			a.counter.RxErrors += 1
-			a.stats.RxErrors += 1
-
-			if timestamp > dispatcher.timestamp+time.Minute { // trident故障后10s自动重启，增加一些Buffer避免误判
-				log.Infof("trident(%v) restart since timestamp %v > %v + 1m, reset sequence from %d to %d",
-					IpFromUint32(packet.tridentIp), timestamp, dispatcher.timestamp, dispatcher.seq, seq)
-				a.cacheClear(dispatcher, packet.tridentIp)
-				dispatcher.seq = seq
-				dispatcher.timestamp = timestamp
-			} else {
-				log.Warningf("trident(%v) recv seq %d is less than current %d, drop", IpFromUint32(packet.tridentIp), seq, dispatcher.seq)
-			}
-
-			releasePacketBuffer(packet)
-			return true
-		}
-		offset := seq - dispatcher.seq - 1
-		// cache满或乱序超过CACHE_SIZE, 清空cache
-		if int(offset) >= a.cacheSize || int(dispatcher.cacheCount) == a.cacheSize {
-			a.cacheClear(dispatcher, packet.tridentIp)
-
-			offset = seq - dispatcher.seq - 1
-			if offset == 0 {
-				dispatcher.seq = seq
-				dispatcher.timestamp = timestamp
-				return false
-			} else if int(offset) >= a.cacheSize {
-				drop := uint64(int(offset) - a.cacheSize + 1)
-				a.counter.RxDropped += drop
-				a.stats.RxDropped += drop
-
-				offset = uint32(a.cacheSize) - 1
-				dispatcher.seq = seq - uint32(a.cacheSize)
-			}
-		}
-		dispatcher.cache[offset] = packet
-		dispatcher.cacheCount++
-		dispatcher.timestamp = timestamp
-		a.counter.RxCached++
-		a.stats.RxCached++
-		return true
+		log.Infof("receive first packet from trident %v index %d, with seq %d",
+			IpFromUint32(packet.tridentIp), packet.decoder.tridentDispatcherIndex, dispatcher.seq)
 	}
+	dropped := uint64(0)
+
+	// 倒退
+	if seq < dispatcher.seq {
+		if timestamp > dispatcher.timestamp[dispatcher.startIndex] { // 序列号更小但时间更大，认为trident重启但droplet未收到seq=1的包。
+			log.Warningf("trident %v index %d restart but some packets lost, received timestamp %d > %d, reset sequence to max(%d-%d, %d).",
+				IpFromUint32(packet.tridentIp), packet.decoder.tridentDispatcherIndex,
+				timestamp, dispatcher.timestamp[dispatcher.startIndex], seq, cacheSize, 1)
+			// 重启前的包如果还在cache中一定存在丢失的部分，直接抛弃且不计数。
+			for i := uint32(0); i < cacheSize; i++ {
+				if dispatcher.cache[i] != nil {
+					releasePacketBuffer(dispatcher.cache[i])
+					dispatcher.cache[i] = nil
+				}
+				dispatcher.timestamp[i] = 0
+			}
+			// 重启时不记录丢包数，因为重启的影响更大，且已经触发了告警。
+			if seq > cacheSize {
+				dispatcher.seq = seq - cacheSize
+			} else {
+				dispatcher.seq = 1
+			}
+			dispatcher.startIndex = 0
+		} else {
+			// 乱序包，丢弃并返回。注意乱序一定意味着之前已经统计到了丢包。
+			// 乱序接近丢弃说明是真乱序，乱序远比丢弃小说明是真丢包。
+			log.Warningf("trident %v index %d hash seq %d less than current %d, drop packet",
+				IpFromUint32(packet.tridentIp), packet.decoder.tridentDispatcherIndex, seq, dispatcher.seq)
+			releasePacketBuffer(packet)
+			return dropped, uint64(1)
+		}
+	}
+
+	// 尽量flush直至可cache
+	offset := seq - dispatcher.seq
+	for i := uint32(0); i < cacheSize && offset >= cacheSize; i++ {
+		if dispatcher.cache[dispatcher.startIndex] != nil {
+			p := dispatcher.cache[dispatcher.startIndex]
+			slaves[p.hash&uint8(len(slaves)-1)].put(p)
+			dispatcher.cache[dispatcher.startIndex] = nil
+		} else {
+			dropped++
+		}
+		dispatcher.timestamp[i] = 0
+		dispatcher.seq++
+		dispatcher.startIndex = (dispatcher.startIndex + 1) & (cacheSize - 1)
+		offset--
+	}
+	if offset >= cacheSize {
+		gap := uint32(offset-cacheSize) + 1
+		dispatcher.seq += gap
+		dispatcher.startIndex = (dispatcher.startIndex + gap) & (cacheSize - 1)
+		dropped += uint64(gap)
+		offset -= gap
+	}
+
+	// 加入cache
+	current := (dispatcher.startIndex + offset) & (cacheSize - 1)
+	dispatcher.cache[current] = packet
+	dispatcher.timestamp[current] = timestamp
+	for i := current; i != dispatcher.startIndex; { // 设置尚未到达的包的最坏timestamp
+		i := (i - 1) & (cacheSize - 1)
+		if dispatcher.cache[i] != nil {
+			break
+		}
+		dispatcher.timestamp[i] = timestamp
+	}
+
+	// 尽量flush直至有残缺、或超时
+	for i := uint32(0); i < cacheSize; i++ {
+		if dispatcher.cache[dispatcher.startIndex] != nil { // 可以flush
+			p := dispatcher.cache[dispatcher.startIndex]
+			slaves[p.hash&uint8(len(slaves)-1)].put(p)
+			dispatcher.cache[dispatcher.startIndex] = nil
+		} else if dispatcher.timestamp[dispatcher.startIndex] == 0 { // 没有更多packet
+			break
+		} else if timestamp-dispatcher.timestamp[dispatcher.startIndex] > TRIDENT_TIMEOUT { // 超时
+			dropped++
+		} else { // 无法移动窗口
+			break
+		}
+		dispatcher.timestamp[i] = 0
+
+		dispatcher.seq++
+		dispatcher.startIndex = (dispatcher.startIndex + 1) & (cacheSize - 1)
+	}
+
+	// 统计丢包数
+	if dropped > 0 {
+		dispatcher.dropped += dropped
+		log.Warningf("trident %v index %d lost %d packets, packet received with seq %d, now window start with seq %d",
+			IpFromUint32(packet.tridentIp), packet.decoder.tridentDispatcherIndex, dropped, seq, dispatcher.seq)
+	}
+	return dropped, uint64(0)
 }
 
-func (a *TridentAdapter) findAndAdd(packet *packetBuffer) bool {
+func (a *TridentAdapter) findAndAdd(packet *packetBuffer) {
 	var dispatcher *tridentDispatcher
 	instance := a.instances[packet.tridentIp]
 	index := packet.decoder.tridentDispatcherIndex
@@ -216,6 +251,7 @@ func (a *TridentAdapter) findAndAdd(packet *packetBuffer) bool {
 		instance = &tridentInstance{}
 		dispatcher := &instance.dispatchers[index]
 		dispatcher.cache = make([]*packetBuffer, a.cacheSize)
+		dispatcher.timestamp = make([]time.Duration, a.cacheSize)
 		a.instancesLock.Lock()
 		a.instances[packet.tridentIp] = instance
 		a.instancesLock.Unlock()
@@ -223,22 +259,16 @@ func (a *TridentAdapter) findAndAdd(packet *packetBuffer) bool {
 	dispatcher = &instance.dispatchers[index]
 	if dispatcher.cache == nil {
 		dispatcher.cache = make([]*packetBuffer, a.cacheSize)
+		dispatcher.timestamp = make([]time.Duration, a.cacheSize)
 	}
-	return a.cacheLookup(dispatcher, packet)
-}
 
-func (a *TridentAdapter) flushInstance() {
-	timestamp := time.Now().UnixNano()
-	for key, instance := range a.instances {
-		for i := 0; i < TRIDENT_DISPATCHER_MAX; i++ {
-			dispatcher := &instance.dispatchers[i]
-			if timestamp > int64(dispatcher.timestamp) && timestamp-int64(dispatcher.timestamp) >= int64(TRIDENT_TIMEOUT) {
-				if dispatcher.cacheCount > 0 {
-					a.cacheClear(dispatcher, key)
-				}
-			}
-		}
-	}
+	rxDropped, rxErrors := cacheLookup(dispatcher, packet, a.cacheSize, a.slaves)
+	a.counter.RxPackets++
+	a.counter.RxDropped += rxDropped
+	a.counter.RxErrors += rxErrors
+	a.stats.RxPackets++
+	a.stats.RxDropped += rxDropped
+	a.stats.RxErrors += rxErrors
 }
 
 var packetBufferPool = pool.NewLockFreePool(
@@ -273,7 +303,6 @@ func (a *TridentAdapter) run() {
 			if err != nil {
 				if err.(net.Error).Timeout() {
 					a.listener.SetReadDeadline(time.Now().Add(TRIDENT_TIMEOUT))
-					a.flushInstance()
 					break
 				}
 				log.Errorf("trident adapter listener.ReadFromUDP err: %s", err)
@@ -288,12 +317,8 @@ func (a *TridentAdapter) run() {
 				releasePacketBuffer(batch[i])
 				continue
 			}
-			if cached := a.findAndAdd(batch[i]); cached {
-				continue
-			}
-			hash := batch[i].calcHash()
-			index := hash & (a.slaveCount - 1)
-			a.slaves[index].put(batch[i])
+			batch[i].calcHash()
+			a.findAndAdd(batch[i])
 		}
 		count = 0
 	}
