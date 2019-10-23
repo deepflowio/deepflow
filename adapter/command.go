@@ -48,8 +48,9 @@ func (c *command) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, operate ui
 			for i := 0; i < TRIDENT_DISPATCHER_MAX; i++ {
 				dispatcher := &instance.dispatchers[i]
 				if dispatcher.cache != nil {
-					status += fmt.Sprintf("Host: %16s Index: %2d Seq: %10d Cache: %2d Timestamp: %30s\n",
-						IpFromUint32(key), i, dispatcher.seq, dispatcher.cacheCount, time.Unix(int64(dispatcher.timestamp/time.Second), int64(dispatcher.timestamp%time.Second)))
+					status += fmt.Sprintf("Host: %16s Index: %2d Seq: %10d Drop: %10d Timestamp: %30s\n",
+						IpFromUint32(key), i, dispatcher.seq, dispatcher.dropped,
+						time.Unix(int64(dispatcher.timestamp[dispatcher.startIndex]/time.Second), 0))
 				}
 			}
 		}
@@ -97,10 +98,7 @@ func RegisterCommand() *cobra.Command {
 				fmt.Printf("\tRX_PACKETS:           %v\n", count.RxPackets)
 				fmt.Printf("\tRX_DROP:              %v\n", count.RxDropped)
 				fmt.Printf("\tRX_ERROR:             %v\n", count.RxErrors)
-				fmt.Printf("\tRX_CACHE:             %v\n", count.RxCached)
 				fmt.Printf("\tTX_PACKETS:           %v\n", count.TxPackets)
-				fmt.Printf("\tTX_DROP:              %v\n", count.TxDropped)
-				fmt.Printf("\tTX_ERROR:             %v\n", count.TxErrors)
 			}
 		},
 	}
@@ -121,10 +119,7 @@ func RegisterCommand() *cobra.Command {
 			fmt.Printf("\tRX_PACKETS/S:             %v\n", now.RxPackets-last.RxPackets)
 			fmt.Printf("\tRX_DROPPED/S:             %v\n", now.RxDropped-last.RxDropped)
 			fmt.Printf("\tRX_ERRORS/S:              %v\n", now.RxErrors-last.RxErrors)
-			fmt.Printf("\tRX_CACHED/S:              %v\n", now.RxCached-last.RxCached)
 			fmt.Printf("\tTX_PACKETS/S:             %v\n", now.TxPackets-last.TxPackets)
-			fmt.Printf("\tTX_DROPPED/S:             %v\n", now.TxDropped-last.TxDropped)
-			fmt.Printf("\tTX_ERRORS/S:              %v\n", now.TxErrors-last.TxErrors)
 		},
 	}
 	status := &cobra.Command{

@@ -40,8 +40,8 @@ type IpPortConfig struct {
 }
 
 type AdapterConfig struct {
-	SocketBufferSize  int `yaml:"socket-buffer-size"`
-	OrderingCacheSize int `yaml:"ordering-cache-size"`
+	SocketBufferSize  int    `yaml:"socket-buffer-size"`
+	OrderingCacheSize uint32 `yaml:"ordering-cache-size"`
 }
 
 type QueueConfig struct {
@@ -142,10 +142,10 @@ func (c *Config) Validate() error {
 	if c.Adapter.SocketBufferSize == 0 {
 		c.Adapter.SocketBufferSize = 32 * 1024 * 1024
 	}
-	if c.Adapter.OrderingCacheSize == 0 {
-		c.Adapter.OrderingCacheSize = 16
-	} else if c.Adapter.OrderingCacheSize > 256 {
-		c.Adapter.OrderingCacheSize = 256
+	if c.Adapter.OrderingCacheSize < 64 {
+		c.Adapter.OrderingCacheSize = 64
+	} else if c.Adapter.OrderingCacheSize > 1024 {
+		c.Adapter.OrderingCacheSize = 1024
 	}
 
 	if c.Queue.PacketQueueCount < 1 || c.Queue.PacketQueueCount > 16 {

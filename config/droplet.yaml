@@ -27,9 +27,9 @@ adapter:
   # socket-buffer-size and the socket config via sysctl
   socket-buffer-size: 33554432
   # cache size (#) for resuming the order of received trident traffic,
-  # default value is 16
-  # 0 <= value <= 256, value is 256 when value > 256
-  ordering-cache-size: 16
+  # default value is 64,
+  # 64 <= value <= 1024, value is 1024 when value > 1024
+  ordering-cache-size: 64
 # internal queues conf
 queue:
   # ----------- 并行度 -----------
