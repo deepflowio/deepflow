@@ -38,6 +38,7 @@ df_type_acl_edge_port    x0000049b00010000    _id,acl_direction,acl_gid,directio
 
 vtap_usage               x00000160000001d1    _id,_tid,cast_type,host,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,region,subnet_id,vtap
 vtap_usage               x00000908000001d1    _id,_tid,host,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,protocol,region,scope,subnet_id
+vtap_usage               x00000300000001d1    _id,_tid,host,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,region,subnet_id,tcp_flags
 vtap_usage_edge          x0000000803d10000    _id,_tid,host_0,host_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1
 vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,region,server_port,subnet_id
 ```
