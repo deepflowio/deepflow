@@ -5,6 +5,7 @@ require (
 	github.com/golang/protobuf v1.3.1
 	github.com/google/gopacket v1.1.17
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
+	github.com/pebbe/zmq4 v1.0.0
 	github.com/spf13/cobra v0.0.3
 	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200227070458-9894b55fc5e7
 	gitlab.x.lan/yunshan/message v0.0.0-20200220015133-6f18ace3fc96
