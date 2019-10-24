@@ -56,7 +56,7 @@ type Decoded struct {
 type SequentialDecoder struct {
 	timestamp time.Duration
 	data      ByteStream
-	seq       uint32
+	seq       uint64
 	pflags    PacketFlag
 	forward   bool
 	rx, tx    Decoded
@@ -119,7 +119,7 @@ var COMPRESS_SIZE = [...]int{
 	0, 0, 0,
 }
 
-func (d *SequentialDecoder) Seq() uint32 {
+func (d *SequentialDecoder) Seq() uint64 {
 	return d.seq
 }
 
@@ -358,7 +358,7 @@ func (d *SequentialDecoder) DecodeHeader() bool {
 	if version != 1 {
 		return true
 	}
-	d.seq = d.data.U32()
+	d.seq = d.data.U64()
 	indexAndTimestamp := d.data.U64()
 	index := uint8(indexAndTimestamp >> 56)
 	d.timestamp = time.Duration(indexAndTimestamp&0xffffffffffffff) * time.Microsecond

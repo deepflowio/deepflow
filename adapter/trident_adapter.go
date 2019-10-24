@@ -42,8 +42,8 @@ type tridentDispatcher struct {
 	timestamp    []time.Duration // 对应cache[i]为nil时，值为后续最近一个包的timestamp，用于判断超时
 	maxTimestamp time.Duration   // 历史接收包的最大时间戳，用于判断trident重启
 	dropped      uint64
-	seq          uint32 // cache中的第一个seq
-	startIndex   uint32
+	seq          uint64 // cache中的第一个seq
+	startIndex   uint64
 }
 
 type tridentInstance struct {
@@ -55,7 +55,7 @@ type TridentAdapter struct {
 	statsCounter
 
 	listenBufferSize int
-	cacheSize        uint32
+	cacheSize        uint64
 
 	instancesLock sync.Mutex // 仅用于droplet-ctl打印trident信息
 	instances     map[TridentKey]*tridentInstance
@@ -96,7 +96,7 @@ func NewTridentAdapter(queues []queue.QueueWriter, listenBufferSize int, cacheSi
 	}
 	adapter := &TridentAdapter{
 		listenBufferSize: listenBufferSize,
-		cacheSize:        minPowerOfTwo(cacheSize),
+		cacheSize:        uint64(minPowerOfTwo(cacheSize)),
 		slaveCount:       uint8(len(queues)),
 		slaves:           make([]*slave, len(queues)),
 
@@ -137,7 +137,7 @@ func (a *TridentAdapter) Closed() bool {
 	return false // FIXME: never close?
 }
 
-func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize uint32, slaves []*slave) (uint64, uint64) {
+func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize uint64, slaves []*slave) (uint64, uint64) {
 	decoder := &packet.decoder
 	seq := decoder.Seq()
 	timestamp := decoder.timestamp
@@ -157,7 +157,7 @@ func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize 
 				IpFromUint32(packet.tridentIp), packet.decoder.tridentDispatcherIndex,
 				timestamp, dispatcher.maxTimestamp, seq, cacheSize, 1)
 			// 重启前的包如果还在cache中一定存在丢失的部分，直接抛弃且不计数。
-			for i := uint32(0); i < cacheSize; i++ {
+			for i := uint64(0); i < cacheSize; i++ {
 				if dispatcher.cache[i] != nil {
 					releasePacketBuffer(dispatcher.cache[i])
 					dispatcher.cache[i] = nil
@@ -186,7 +186,7 @@ func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize 
 
 	// 尽量flush直至可cache
 	offset := seq - dispatcher.seq
-	for i := uint32(0); i < cacheSize && offset >= cacheSize; i++ {
+	for i := uint64(0); i < cacheSize && offset >= cacheSize; i++ {
 		if dispatcher.cache[dispatcher.startIndex] != nil {
 			p := dispatcher.cache[dispatcher.startIndex]
 			slaves[p.hash&uint8(len(slaves)-1)].put(p)
@@ -200,7 +200,7 @@ func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize 
 		offset--
 	}
 	if offset >= cacheSize {
-		gap := uint32(offset-cacheSize) + 1
+		gap := offset - cacheSize + 1
 		dispatcher.seq += gap
 		dispatcher.startIndex = (dispatcher.startIndex + gap) & (cacheSize - 1)
 		dropped += uint64(gap)
@@ -220,7 +220,7 @@ func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize 
 	}
 
 	// 尽量flush直至有残缺、或超时
-	for i := uint32(0); i < cacheSize; i++ {
+	for i := uint64(0); i < cacheSize; i++ {
 		if dispatcher.cache[dispatcher.startIndex] != nil { // 可以flush
 			p := dispatcher.cache[dispatcher.startIndex]
 			slaves[p.hash&uint8(len(slaves)-1)].put(p)
