@@ -38,11 +38,12 @@ type packetBuffer struct {
 }
 
 type tridentDispatcher struct {
-	cache      []*packetBuffer
-	timestamp  []time.Duration // 对应cache[i]为nil时，值为后续最近一个包的timestamp
-	dropped    uint64
-	seq        uint32 // cache中的第一个seq
-	startIndex uint32
+	cache        []*packetBuffer
+	timestamp    []time.Duration // 对应cache[i]为nil时，值为后续最近一个包的timestamp，用于判断超时
+	maxTimestamp time.Duration   // 历史接收包的最大时间戳，用于判断trident重启
+	dropped      uint64
+	seq          uint32 // cache中的第一个seq
+	startIndex   uint32
 }
 
 type tridentInstance struct {
@@ -151,10 +152,10 @@ func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize 
 
 	// 倒退
 	if seq < dispatcher.seq {
-		if timestamp > dispatcher.timestamp[dispatcher.startIndex] { // 序列号更小但时间更大，认为trident重启但droplet未收到seq=1的包。
+		if timestamp > dispatcher.maxTimestamp { // 序列号更小但时间更大，trident重启
 			log.Warningf("trident %v index %d restart but some packets lost, received timestamp %d > %d, reset sequence to max(%d-%d, %d).",
 				IpFromUint32(packet.tridentIp), packet.decoder.tridentDispatcherIndex,
-				timestamp, dispatcher.timestamp[dispatcher.startIndex], seq, cacheSize, 1)
+				timestamp, dispatcher.maxTimestamp, seq, cacheSize, 1)
 			// 重启前的包如果还在cache中一定存在丢失的部分，直接抛弃且不计数。
 			for i := uint32(0); i < cacheSize; i++ {
 				if dispatcher.cache[i] != nil {
@@ -178,6 +179,9 @@ func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize 
 			releasePacketBuffer(packet)
 			return dropped, uint64(1)
 		}
+	}
+	if timestamp > dispatcher.maxTimestamp {
+		dispatcher.maxTimestamp = timestamp
 	}
 
 	// 尽量flush直至可cache
@@ -237,7 +241,7 @@ func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize 
 	// 统计丢包数
 	if dropped > 0 {
 		dispatcher.dropped += dropped
-		log.Warningf("trident %v index %d lost %d packets, packet received with seq %d, now window start with seq %d",
+		log.Debugf("trident %v index %d lost %d packets, packet received with seq %d, now window start with seq %d",
 			IpFromUint32(packet.tridentIp), packet.decoder.tridentDispatcherIndex, dropped, seq, dispatcher.seq)
 	}
 	return dropped, uint64(0)
