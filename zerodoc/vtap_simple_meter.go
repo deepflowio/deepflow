@@ -11,7 +11,6 @@ import (
 // influxdb每返回-行数据，打一个VTAPSimpleMeter 的doc
 // 由于用VTAPUsageMeter的结构返回数据太冗余了,故用这个结构即可
 type VTAPSimpleMeter struct {
-	// FIXME: use Metrics instead of Meter
 	TxBytes   uint64 `db:"tx_bytes"`
 	RxBytes   uint64 `db:"rx_bytes"`
 	Bytes     uint64 `db:"bytes"`
@@ -47,15 +46,6 @@ func (m *VTAPSimpleMeter) Merge(other *VTAPSimpleMeter) {
 	m.Packets += other.Packets
 }
 
-func (m *VTAPSimpleMeter) MergeMetrics(other *Metrics) {
-	m.TxBytes += other.TxBytes
-	m.RxBytes += other.RxBytes
-	m.Bytes += other.TxBytes + other.RxBytes
-	m.TxPackets += other.TxPackets
-	m.RxPackets += other.RxPackets
-	m.Packets += other.TxPackets + other.RxPackets
-}
-
 func (m *VTAPSimpleMeter) SortKey() uint64 {
 	panic("not supported!")
 }
@@ -84,15 +74,6 @@ func (m *VTAPSimpleMeter) MarshalTo(b []byte) int {
 	offset++
 
 	return offset
-}
-
-func (m *VTAPSimpleMeter) SetValue(s *Metrics) {
-	m.TxBytes = s.TxBytes
-	m.RxBytes = s.RxBytes
-	m.Bytes = s.TxBytes + s.RxBytes
-	m.TxPackets = s.TxPackets
-	m.RxPackets = s.RxPackets
-	m.Packets = s.TxPackets + s.RxPackets
 }
 
 func (m *VTAPSimpleMeter) Fill(ids []uint8, values []interface{}) {

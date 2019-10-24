@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func fillMetrics(hint uint64, m *Metrics) {
+func fillMetrics(hint uint64, m *VTAPUsageMeter) {
 	m.TxBytes = hint * 97
 	m.RxBytes = hint * 89
 	m.TxPackets = hint * 3
@@ -15,7 +15,7 @@ func fillMetrics(hint uint64, m *Metrics) {
 
 func TestVTAPMeterEnDecode(t *testing.T) {
 	m := VTAPUsageMeter{}
-	fillMetrics(1, (*Metrics)(&m))
+	fillMetrics(1, &m)
 	encoder := codec.SimpleEncoder{}
 	m.Encode(&encoder)
 
@@ -31,14 +31,14 @@ func TestVTAPMeterEnDecode(t *testing.T) {
 
 func TestVTAPMeterMerge(t *testing.T) {
 	a := VTAPUsageMeter{}
-	fillMetrics(1, (*Metrics)(&a))
+	fillMetrics(1, &a)
 
 	b := a
-	fillMetrics(2, (*Metrics)(&b))
+	fillMetrics(2, &b)
 	b2 := b
 
 	c := b
-	fillMetrics(3, (*Metrics)(&c))
+	fillMetrics(3, &c)
 
 	b.ConcurrentMerge(&a)
 
