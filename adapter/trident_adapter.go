@@ -212,7 +212,7 @@ func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize 
 	dispatcher.cache[current] = packet
 	dispatcher.timestamp[current] = timestamp
 	for i := current; i != dispatcher.startIndex; { // 设置尚未到达的包的最坏timestamp
-		i := (i - 1) & (cacheSize - 1)
+		i = (i - 1) & (cacheSize - 1)
 		if dispatcher.cache[i] != nil {
 			break
 		}
@@ -266,13 +266,13 @@ func (a *TridentAdapter) findAndAdd(packet *packetBuffer) {
 		dispatcher.timestamp = make([]time.Duration, a.cacheSize)
 	}
 
-	rxDropped, rxErrors := cacheLookup(dispatcher, packet, a.cacheSize, a.slaves)
+	rxDropped, rxExpired := cacheLookup(dispatcher, packet, a.cacheSize, a.slaves)
 	a.counter.RxPackets++
 	a.counter.RxDropped += rxDropped
-	a.counter.RxErrors += rxErrors
+	a.counter.RxExpired += rxExpired
 	a.stats.RxPackets++
 	a.stats.RxDropped += rxDropped
-	a.stats.RxErrors += rxErrors
+	a.stats.RxExpired += rxExpired
 }
 
 var packetBufferPool = pool.NewLockFreePool(
@@ -318,6 +318,8 @@ func (a *TridentAdapter) run() {
 		}
 		for i := 0; i < count; i++ {
 			if invalid := batch[i].decoder.DecodeHeader(); invalid {
+				a.counter.RxErrors++
+				a.stats.RxErrors++
 				releasePacketBuffer(batch[i])
 				continue
 			}
