@@ -266,19 +266,21 @@ func (a *TridentAdapter) findAndAdd(packet *packetBuffer) {
 		dispatcher.timestamp = make([]time.Duration, a.cacheSize)
 	}
 
-	rxDropped, rxExpired := cacheLookup(dispatcher, packet, a.cacheSize, a.slaves)
+	rxDropped, rxErrors := cacheLookup(dispatcher, packet, a.cacheSize, a.slaves)
 	a.counter.RxPackets++
 	a.counter.RxDropped += rxDropped
-	a.counter.RxExpired += rxExpired
+	a.counter.RxErrors += rxErrors
 	a.stats.RxPackets++
 	a.stats.RxDropped += rxDropped
-	a.stats.RxExpired += rxExpired
+	a.stats.RxErrors += rxErrors
 }
 
 var packetBufferPool = pool.NewLockFreePool(
 	func() interface{} {
 		packet := new(packetBuffer)
 		packet.buffer = make([]byte, UDP_BUFFER_SIZE)
+		// Trident最多使用64000字节，且以0xFFFF作为结束符。将末尾字节填充为0xFF防护，避免越界。
+		copy(packet.buffer[UDP_BUFFER_SIZE-len(PACKET_STREAM_END_GUARD):], PACKET_STREAM_END_GUARD)
 		return packet
 	},
 	pool.OptionPoolSizePerCPU(16),
@@ -318,8 +320,8 @@ func (a *TridentAdapter) run() {
 		}
 		for i := 0; i < count; i++ {
 			if invalid := batch[i].decoder.DecodeHeader(); invalid {
-				a.counter.RxErrors++
-				a.stats.RxErrors++
+				a.counter.RxInvalid++
+				a.stats.RxInvalid++
 				releasePacketBuffer(batch[i])
 				continue
 			}

@@ -97,8 +97,8 @@ func RegisterCommand() *cobra.Command {
 				fmt.Println("Trident-Adapter Module Running Status:")
 				fmt.Printf("\tRX_PACKETS:           %v\n", count.RxPackets)
 				fmt.Printf("\tRX_DROP:              %v\n", count.RxDropped)
-				fmt.Printf("\tRX_EXPIRED:           %v\n", count.RxExpired)
 				fmt.Printf("\tRX_ERROR:             %v\n", count.RxErrors)
+				fmt.Printf("\tRX_INVALID:           %v\n", count.RxInvalid)
 				fmt.Printf("\tTX_PACKETS:           %v\n", count.TxPackets)
 			}
 		},
@@ -119,8 +119,8 @@ func RegisterCommand() *cobra.Command {
 			fmt.Println("Trident-Adapter Module Performance:")
 			fmt.Printf("\tRX_PACKETS/S:             %v\n", now.RxPackets-last.RxPackets)
 			fmt.Printf("\tRX_DROPPED/S:             %v\n", now.RxDropped-last.RxDropped)
-			fmt.Printf("\tRX_EXPIRED/S:             %v\n", now.RxExpired-last.RxExpired)
 			fmt.Printf("\tRX_ERRORS/S:              %v\n", now.RxErrors-last.RxErrors)
+			fmt.Printf("\tRX_INVALID/S:             %v\n", now.RxInvalid-last.RxInvalid)
 			fmt.Printf("\tTX_PACKETS/S:             %v\n", now.TxPackets-last.TxPackets)
 		},
 	}
