@@ -355,12 +355,15 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 func (d *SequentialDecoder) DecodeHeader() bool {
 	d.data.Skip(1)
 	version := d.data.U8()
-	if version != 1 {
+	if version != 2 {
 		return true
 	}
 	d.seq = d.data.U64()
 	indexAndTimestamp := d.data.U64()
 	index := uint8(indexAndTimestamp >> 56)
+	if index >= 16 { // Trident最大16个队列[0, 15]
+		return true
+	}
 	d.timestamp = time.Duration(indexAndTimestamp&0xffffffffffffff) * time.Microsecond
 	inPort := d.data.U32()
 	if inPort&ANALYZER_TRIDENT == ANALYZER_TRIDENT {
