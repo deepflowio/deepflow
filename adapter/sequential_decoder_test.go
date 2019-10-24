@@ -26,7 +26,10 @@ func TestDecoder(t *testing.T) {
 		}
 
 		decoder := NewSequentialDecoder(packet[42:])
-		decoder.DecodeHeader()
+		if invalid := decoder.DecodeHeader(); invalid {
+			t.Error(fmt.Sprintf("DecodeHeader failed, invalid header."))
+			continue
+		}
 		for {
 			meta := &MetaPacket{}
 			if decoder.NextPacket(meta) {
@@ -63,7 +66,10 @@ func BenchmarkDecoder(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < MIN_PPS; {
 		decoder := NewSequentialDecoder(packet)
-		decoder.DecodeHeader()
+		if invalid := decoder.DecodeHeader(); invalid {
+			b.Error(fmt.Sprintf("DecodeHeader failed, invalid header."))
+			continue
+		}
 		for {
 			meta := &MetaPacket{}
 			if decoder.NextPacket(meta) {
