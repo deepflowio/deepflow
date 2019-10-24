@@ -15,13 +15,13 @@ import (
 // send to zero
 // Protocol:
 //     version     uint32
-//     sequence    uint32
+//     sequence    uint64
 //     timestamp   uint32
 //     tag         Tag (bytes)
 //     meterType   uint8
 //     meter       Meter (bytes)
 //     actionFlags uint32
-func Encode(sequence uint32, doc *app.Document, encoder *codec.SimpleEncoder) error {
+func Encode(sequence uint64, doc *app.Document, encoder *codec.SimpleEncoder) error {
 	if doc.Tag == nil || doc.Meter == nil {
 		return errors.New("No tag or meter in document")
 	}
@@ -51,7 +51,7 @@ func Encode(sequence uint32, doc *app.Document, encoder *codec.SimpleEncoder) er
 	}
 
 	encoder.WriteU32(app.VERSION)
-	encoder.WriteU32(sequence)
+	encoder.WriteU64(sequence)
 	encoder.WriteU32(doc.Timestamp)
 
 	var tag *Tag
@@ -91,14 +91,14 @@ func Encode(sequence uint32, doc *app.Document, encoder *codec.SimpleEncoder) er
 }
 
 // 由于trident等将多个doc合并为1个块进行发送， 只设置第一个doc的sequence即可
-func SetSequence(sequence uint32, chunk []byte) {
+func SetSequence(sequence uint64, chunk []byte) {
 	// 先偏移4个字节的VERSION字段
-	binary.LittleEndian.PutUint32(chunk[4:], sequence)
+	binary.LittleEndian.PutUint64(chunk[4:], sequence)
 }
 
-func GetSequence(chunk []byte) uint32 {
+func GetSequence(chunk []byte) uint64 {
 	// 先偏移4个字节的VERSION字段
-	return binary.LittleEndian.Uint32(chunk[4:])
+	return binary.LittleEndian.Uint64(chunk[4:])
 }
 
 // The return Document, must call app.ReleaseDocument to release after used
@@ -110,7 +110,7 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 	if version := decoder.ReadU32(); version != app.VERSION {
 		return nil, errors.New(fmt.Sprintf("message version incorrect, expect %d, found %d.", app.VERSION, version))
 	}
-	decoder.ReadU32() // sequence
+	decoder.ReadU64() // sequence
 
 	doc := app.AcquireDocument()
 
@@ -210,7 +210,7 @@ func GetMsgType(db string) (MessageType, error) {
 // send to reciter
 // Protocol:
 //     version     uint32
-//     sequence    uint32
+//     sequence    uint64
 //     timestamp   uint32
 //     tag         Tag (bytes)
 //     meterType   uint8
@@ -218,7 +218,7 @@ func GetMsgType(db string) (MessageType, error) {
 //     actionFlags uint32
 func EncodeRow(tag *Tag, msgType MessageType, columnIDs []uint8, columnValues []interface{}, encoder *codec.SimpleEncoder) error {
 	encoder.WriteU32(app.VERSION) // version
-	encoder.WriteU32(0)           // sequence
+	encoder.WriteU64(0)           // sequence
 
 	if timestamp, ok := columnValues[0].(time.Time); ok {
 		encoder.WriteU32(uint32(timestamp.Unix())) // timestamp

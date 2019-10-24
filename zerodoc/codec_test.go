@@ -5,7 +5,7 @@ import (
 )
 
 func TestSequence(t *testing.T) {
-	chunk := make([]byte, 10)
+	chunk := make([]byte, 12)
 	SetSequence(1234, chunk)
 
 	if GetSequence(chunk) != 1234 {
