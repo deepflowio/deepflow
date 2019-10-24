@@ -7,6 +7,5 @@
     "TypeMeter",
     "UsageMeter",
     "VTAPSimpleMeter",
-    "VTAPUsageEdgeMeter",
     "VTAPUsageMeter"
 ]
