@@ -17,7 +17,7 @@ const (
 type ZeroDocumentMarshaller struct {
 	input    queue.QueueReader
 	outputs  []queue.QueueWriter
-	sequence uint32
+	sequence uint64
 }
 
 // NewZeroDocumentMarshaller 从input读取app.Document，转换为pb.ZeroDocument结构，复制并推送到每一个outputs里

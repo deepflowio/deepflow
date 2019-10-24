@@ -26,7 +26,7 @@ func decode(b []byte) (*app.Document, error) {
 	decoder.Init(b)
 
 	doc := &app.Document{}
-	decoder.ReadU32() // sequence
+	decoder.ReadU64() // sequence
 	decoder.ReadU32() // hash
 	doc.Timestamp = decoder.ReadU32()
 	doc.Tag = dt.AcquireTag()
