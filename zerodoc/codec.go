@@ -12,6 +12,12 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
 )
 
+const (
+	CODEC_VERSION_OFFSET   = 0
+	CODEC_SEQUENCE_OFFSET  = CODEC_VERSION_OFFSET + 32/8
+	CODEC_TIMESTAMP_OFFSET = CODEC_SEQUENCE_OFFSET + 64/8
+)
+
 // send to zero
 // Protocol:
 //     version     uint32
@@ -93,12 +99,16 @@ func Encode(sequence uint64, doc *app.Document, encoder *codec.SimpleEncoder) er
 // 由于trident等将多个doc合并为1个块进行发送， 只设置第一个doc的sequence即可
 func SetSequence(sequence uint64, chunk []byte) {
 	// 先偏移4个字节的VERSION字段
-	binary.LittleEndian.PutUint64(chunk[4:], sequence)
+	binary.LittleEndian.PutUint64(chunk[CODEC_SEQUENCE_OFFSET:], sequence)
 }
 
 func GetSequence(chunk []byte) uint64 {
 	// 先偏移4个字节的VERSION字段
-	return binary.LittleEndian.Uint64(chunk[4:])
+	return binary.LittleEndian.Uint64(chunk[CODEC_SEQUENCE_OFFSET:])
+}
+
+func GetTimestamp(chunk []byte) uint32 {
+	return binary.LittleEndian.Uint32(chunk[CODEC_TIMESTAMP_OFFSET:])
 }
 
 // The return Document, must call app.ReleaseDocument to release after used
