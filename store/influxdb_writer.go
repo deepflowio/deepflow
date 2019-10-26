@@ -206,7 +206,7 @@ func (w *InfluxdbWriter) SetQueueSize(size int) {
 }
 
 func (w *InfluxdbWriter) SetBatchSize(size int) {
-	if size < DEFAULT_BATCH_SIZE {
+	if size <= DEFAULT_BATCH_SIZE {
 		w.BatchSize = size
 	} else {
 		log.Warningf("batch size must small than %d", DEFAULT_BATCH_SIZE)
