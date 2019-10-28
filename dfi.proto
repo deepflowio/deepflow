@@ -89,6 +89,8 @@ message Flow {
     optional uint32 ip_dst = 42;      /* 0x01020304 == 1.2.3.4 */
     optional uint32 ttl_0 = 43;
     optional uint32 ttl_1 = 44;
+    optional bytes  ip6_src = 45;     /* big endian ipv6 address, null if ipv4 */
+    optional bytes  ip6_dst = 46;     /* big endian ipv6 address, null if ipv4  */
 
     /* L4 */
     optional uint32 proto = 51 [default = 0];
@@ -134,8 +136,8 @@ message Flow {
     optional uint32 l3_device_id_1 = 105 [default = 0];       /* deviceid of ip_dst, platform instance ID */
     optional uint32 l3_epc_id_0 = 106 [default = 0];          /* epc_id of device of ip_src, platform project ID */
     optional uint32 l3_epc_id_1 = 107 [default = 0];          /* epc_id of device of ip_dst, platform project ID */
-    optional uint32 host_0 = 108;                             /* host of device of mac_src */
-    optional uint32 host_1 = 109;                             /* host of device of mac_dst */
+    optional uint32 host_0 = 108;                             /* host of device of ip_src */
+    optional uint32 host_1 = 109;                             /* host of device of ip_dst */
 
     optional uint32 epc_id_0 = 120 [default = 0];             /* epc_id of device of mac_src, platform project ID */
     optional uint32 epc_id_1 = 121 [default = 0];             /* epc_id of device of mac_dst, platform project ID */
