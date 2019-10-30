@@ -254,153 +254,16 @@ func unmarshalUint16WithSpecialID(s string) (int16, error) {
 	return int16(i), nil
 }
 
+// 注意: 必须要按tag字段的字典顺序进行处理
 func (t *Tag) MarshalTo(b []byte) int {
 	offset := 0
 
 	// 在InfluxDB的line protocol中，tag紧跟在measurement name之后，总会以逗号开头
-
 	if t.GlobalThreadID != 0 { // FIXME: zero写入的数据此字段总为0，目前无需该字段
 		offset += copy(b[offset:], ",_tid=")
 		offset += copy(b[offset:], strconv.FormatUint(t.GlobalThreadID, 10))
 	}
 
-	// 1<<0 ~ 1<<6
-	if t.Code&IP != 0 {
-		if t.IsIPv6 != 0 {
-			offset += copy(b[offset:], ",ip_version=6,ip=")
-			offset += copy(b[offset:], t.IP6.String())
-			offset += copy(b[offset:], ",ip_bin=") // 用于支持前缀匹配
-			offset += copy(b[offset:], utils.IPv6ToBinary(t.IP6))
-		} else {
-			offset += copy(b[offset:], ",ip_version=4,ip=")
-			offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
-			offset += copy(b[offset:], ",ip_bin=") // 用于支持前缀匹配
-			offset += copy(b[offset:], utils.IPv4ToBinary(t.IP))
-		}
-	}
-	if t.Code&GroupID != 0 {
-		offset += copy(b[offset:], ",group_id=")
-		offset += copy(b[offset:], marshalUint16WithSpecialID(t.GroupID))
-	}
-	if t.Code&L3EpcID != 0 {
-		offset += copy(b[offset:], ",l3_epc_id=")
-		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID))
-	}
-	if t.Code&L3Device != 0 {
-		offset += copy(b[offset:], ",l3_device_id=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L3DeviceID), 10))
-		offset += copy(b[offset:], ",l3_device_type=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L3DeviceType), 10))
-	}
-	if t.Code&Host != 0 {
-		offset += copy(b[offset:], ",host=")
-		offset += copy(b[offset:], utils.IpFromUint32(t.Host).String())
-	}
-	if t.Code&RegionID != 0 {
-		offset += copy(b[offset:], ",region=") // 由于历史原因，此字段和省份同名
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.RegionID), 10))
-	}
-
-	// 1<<16 ~ 1<<22
-	if t.Code&IPPath != 0 {
-		if t.IsIPv6 != 0 {
-			offset += copy(b[offset:], ",ip_version=6,ip_0=")
-			offset += copy(b[offset:], t.IP6.String())
-			offset += copy(b[offset:], ",ip_1=")
-			offset += copy(b[offset:], t.IP61.String())
-			offset += copy(b[offset:], ",ip_bin_0=") // 用于支持前缀匹配
-			offset += copy(b[offset:], utils.IPv6ToBinary(t.IP6))
-			offset += copy(b[offset:], ",ip_bin_1=") // 用于支持前缀匹配
-			offset += copy(b[offset:], utils.IPv6ToBinary(t.IP61))
-		} else {
-			offset += copy(b[offset:], ",ip_version=4,ip_0=")
-			offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
-			offset += copy(b[offset:], ",ip_1=")
-			offset += copy(b[offset:], utils.IpFromUint32(t.IP1).String())
-			offset += copy(b[offset:], ",ip_bin_0=") // 用于支持前缀匹配
-			offset += copy(b[offset:], utils.IPv4ToBinary(t.IP))
-			offset += copy(b[offset:], ",ip_bin_1=") // 用于支持前缀匹配
-			offset += copy(b[offset:], utils.IPv4ToBinary(t.IP1))
-		}
-	}
-	if t.Code&GroupIDPath != 0 {
-		offset += copy(b[offset:], ",group_id_0=")
-		offset += copy(b[offset:], marshalUint16WithSpecialID(t.GroupID))
-		offset += copy(b[offset:], ",group_id_1=")
-		offset += copy(b[offset:], marshalUint16WithSpecialID(t.GroupID1))
-	}
-	if t.Code&L3EpcIDPath != 0 {
-		offset += copy(b[offset:], ",l3_epc_id_0=")
-		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID))
-		offset += copy(b[offset:], ",l3_epc_id_1=")
-		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID1))
-	}
-	if t.Code&L3DevicePath != 0 {
-		offset += copy(b[offset:], ",l3_device_id_0=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L3DeviceID), 10))
-		offset += copy(b[offset:], ",l3_device_id_1=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L3DeviceID1), 10))
-		offset += copy(b[offset:], ",l3_device_type_0=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L3DeviceType), 10))
-		offset += copy(b[offset:], ",l3_device_type_1=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L3DeviceType1), 10))
-	}
-	if t.Code&HostPath != 0 {
-		offset += copy(b[offset:], ",host_0=")
-		offset += copy(b[offset:], utils.IpFromUint32(t.Host).String())
-		offset += copy(b[offset:], ",host_1=")
-		offset += copy(b[offset:], utils.IpFromUint32(t.Host1).String())
-	}
-	if t.Code&SubnetIDPath != 0 {
-		offset += copy(b[offset:], ",subnet_id_0=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.SubnetID), 10))
-		offset += copy(b[offset:], ",subnet_id_1=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.SubnetID1), 10))
-	}
-	if t.Code&RegionIDPath != 0 {
-		offset += copy(b[offset:], ",region_0=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.RegionID), 10))
-		offset += copy(b[offset:], ",region_1=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.RegionID1), 10))
-	}
-
-	// 1<<32 ~ 1<<48
-	if t.Code&Direction != 0 {
-		switch t.Direction {
-		case ClientToServer:
-			offset += copy(b[offset:], ",direction=c2s")
-		case ServerToClient:
-			offset += copy(b[offset:], ",direction=s2c")
-		}
-	}
-	if t.Code&ACLGID != 0 {
-		offset += copy(b[offset:], ",acl_gid=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ACLGID), 10))
-	}
-	if t.Code&VLANID != 0 {
-		offset += copy(b[offset:], ",vlan_id=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.VLANID), 10))
-	}
-	if t.Code&Protocol != 0 {
-		offset += copy(b[offset:], ",protocol=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.Protocol), 10))
-	}
-	if t.Code&ServerPort != 0 {
-		offset += copy(b[offset:], ",server_port=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ServerPort), 10))
-	}
-	if t.Code&VTAP != 0 {
-		offset += copy(b[offset:], ",vtap=")
-		offset += copy(b[offset:], utils.IpFromUint32(t.VTAP).String())
-	}
-	if t.Code&TAPType != 0 {
-		offset += copy(b[offset:], ",tap_type=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TAPType), 10))
-	}
-	if t.Code&SubnetID != 0 {
-		offset += copy(b[offset:], ",subnet_id=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.SubnetID), 10))
-	}
 	if t.Code&ACLDirection != 0 {
 		switch t.ACLDirection {
 		case ACL_FORWARD:
@@ -408,6 +271,10 @@ func (t *Tag) MarshalTo(b []byte) int {
 		case ACL_BACKWARD:
 			offset += copy(b[offset:], ",acl_direction=bwd")
 		}
+	}
+	if t.Code&ACLGID != 0 {
+		offset += copy(b[offset:], ",acl_gid=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ACLGID), 10))
 	}
 	if t.Code&CastType != 0 {
 		switch t.CastType {
@@ -421,26 +288,162 @@ func (t *Tag) MarshalTo(b []byte) int {
 			offset += copy(b[offset:], ",cast_type=unknown")
 		}
 	}
-	if t.Code&TCPFlags != 0 {
-		offset += copy(b[offset:], ",tcp_flags=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TCPFlags), 10))
-	}
-	if t.Code&Scope != 0 {
-		offset += copy(b[offset:], ",scope=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.Scope), 10))
-	}
-
 	if t.Code&Country != 0 {
 		offset += copy(b[offset:], ",country=")
 		offset += copy(b[offset:], geo.DecodeCountry(t.Country))
+	}
+
+	if t.Code&Direction != 0 {
+		switch t.Direction {
+		case ClientToServer:
+			offset += copy(b[offset:], ",direction=c2s")
+		case ServerToClient:
+			offset += copy(b[offset:], ",direction=s2c")
+		}
+	}
+	if t.Code&GroupID != 0 {
+		offset += copy(b[offset:], ",group_id=")
+		offset += copy(b[offset:], marshalUint16WithSpecialID(t.GroupID))
+	}
+	if t.Code&GroupIDPath != 0 {
+		offset += copy(b[offset:], ",group_id_0=")
+		offset += copy(b[offset:], marshalUint16WithSpecialID(t.GroupID))
+		offset += copy(b[offset:], ",group_id_1=")
+		offset += copy(b[offset:], marshalUint16WithSpecialID(t.GroupID1))
+	}
+	if t.Code&Host != 0 {
+		offset += copy(b[offset:], ",host=")
+		offset += copy(b[offset:], utils.IpFromUint32(t.Host).String())
+	}
+	if t.Code&HostPath != 0 {
+		offset += copy(b[offset:], ",host_0=")
+		offset += copy(b[offset:], utils.IpFromUint32(t.Host).String())
+		offset += copy(b[offset:], ",host_1=")
+		offset += copy(b[offset:], utils.IpFromUint32(t.Host1).String())
+	}
+
+	if t.Code&IP != 0 {
+		if t.IsIPv6 != 0 {
+			offset += copy(b[offset:], ",ip=")
+			offset += copy(b[offset:], t.IP6.String())
+			offset += copy(b[offset:], ",ip_bin=") // 用于支持前缀匹配
+			offset += copy(b[offset:], utils.IPv6ToBinary(t.IP6))
+			offset += copy(b[offset:], ",ip_version=6")
+		} else {
+
+			offset += copy(b[offset:], ",ip=")
+			offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
+			offset += copy(b[offset:], ",ip_bin=") // 用于支持前缀匹配
+			offset += copy(b[offset:], utils.IPv4ToBinary(t.IP))
+			offset += copy(b[offset:], ",ip_version=4")
+		}
+	}
+	if t.Code&IPPath != 0 {
+		if t.IsIPv6 != 0 {
+			offset += copy(b[offset:], ",ip_0=")
+			offset += copy(b[offset:], t.IP6.String())
+			offset += copy(b[offset:], ",ip_1=")
+			offset += copy(b[offset:], t.IP61.String())
+			offset += copy(b[offset:], ",ip_bin_0=") // 用于支持前缀匹配
+			offset += copy(b[offset:], utils.IPv6ToBinary(t.IP6))
+			offset += copy(b[offset:], ",ip_bin_1=") // 用于支持前缀匹配
+			offset += copy(b[offset:], utils.IPv6ToBinary(t.IP61))
+			offset += copy(b[offset:], ",ip_version=6")
+		} else {
+			offset += copy(b[offset:], ",ip_0=")
+			offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
+			offset += copy(b[offset:], ",ip_1=")
+			offset += copy(b[offset:], utils.IpFromUint32(t.IP1).String())
+			offset += copy(b[offset:], ",ip_bin_0=") // 用于支持前缀匹配
+			offset += copy(b[offset:], utils.IPv4ToBinary(t.IP))
+			offset += copy(b[offset:], ",ip_bin_1=") // 用于支持前缀匹配
+			offset += copy(b[offset:], utils.IPv4ToBinary(t.IP1))
+			offset += copy(b[offset:], ",ip_version=4")
+		}
+	}
+
+	if t.Code&ISPCode != 0 {
+		offset += copy(b[offset:], ",isp=")
+		offset += copy(b[offset:], geo.DecodeISP(t.ISP))
+	}
+	if t.Code&L3Device != 0 {
+		offset += copy(b[offset:], ",l3_device_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L3DeviceID), 10))
+		offset += copy(b[offset:], ",l3_device_type=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L3DeviceType), 10))
+	}
+	if t.Code&L3DevicePath != 0 {
+		offset += copy(b[offset:], ",l3_device_id_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L3DeviceID), 10))
+		offset += copy(b[offset:], ",l3_device_id_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L3DeviceID1), 10))
+		offset += copy(b[offset:], ",l3_device_type_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L3DeviceType), 10))
+		offset += copy(b[offset:], ",l3_device_type_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L3DeviceType1), 10))
+	}
+	if t.Code&L3EpcID != 0 {
+		offset += copy(b[offset:], ",l3_epc_id=")
+		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID))
+	}
+	if t.Code&L3EpcIDPath != 0 {
+		offset += copy(b[offset:], ",l3_epc_id_0=")
+		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID))
+		offset += copy(b[offset:], ",l3_epc_id_1=")
+		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID1))
+	}
+	if t.Code&Protocol != 0 {
+		offset += copy(b[offset:], ",protocol=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.Protocol), 10))
+	}
+	if t.Code&RegionID != 0 {
+		offset += copy(b[offset:], ",region=") // 由于历史原因，此字段和省份同名
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.RegionID), 10))
 	}
 	if t.Code&Region != 0 {
 		offset += copy(b[offset:], ",region=")
 		offset += copy(b[offset:], geo.DecodeRegion(t.Region))
 	}
-	if t.Code&ISPCode != 0 {
-		offset += copy(b[offset:], ",isp=")
-		offset += copy(b[offset:], geo.DecodeISP(t.ISP))
+	if t.Code&RegionIDPath != 0 {
+		offset += copy(b[offset:], ",region_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.RegionID), 10))
+		offset += copy(b[offset:], ",region_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.RegionID1), 10))
+	}
+	if t.Code&Scope != 0 {
+		offset += copy(b[offset:], ",scope=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.Scope), 10))
+	}
+	if t.Code&ServerPort != 0 {
+		offset += copy(b[offset:], ",server_port=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ServerPort), 10))
+	}
+
+	if t.Code&SubnetID != 0 {
+		offset += copy(b[offset:], ",subnet_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.SubnetID), 10))
+	}
+	if t.Code&SubnetIDPath != 0 {
+		offset += copy(b[offset:], ",subnet_id_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.SubnetID), 10))
+		offset += copy(b[offset:], ",subnet_id_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.SubnetID1), 10))
+	}
+	if t.Code&TAPType != 0 {
+		offset += copy(b[offset:], ",tap_type=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TAPType), 10))
+	}
+	if t.Code&TCPFlags != 0 {
+		offset += copy(b[offset:], ",tcp_flags=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TCPFlags), 10))
+	}
+	if t.Code&VLANID != 0 {
+		offset += copy(b[offset:], ",vlan_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.VLANID), 10))
+	}
+	if t.Code&VTAP != 0 {
+		offset += copy(b[offset:], ",vtap=")
+		offset += copy(b[offset:], utils.IpFromUint32(t.VTAP).String())
 	}
 
 	return offset
