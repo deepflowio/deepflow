@@ -8,7 +8,7 @@ import (
 func TestFpsMeterFill(t *testing.T) {
 	f := &FPSMeter{}
 
-	names := []string{"sum_flow_count", "ip", "sum_new_flow_count", "sum_closed_flow_count", "max_flow_count", "max_new_flow_count"}
+	names := []string{"sum_flow_count", "ip", "sum_new_flow_count", "sum_closed_flow_count"}
 	var v1, v2, v3, v4, v5 int64
 	v1, v2, v3, v4, v5 = 123, 12345, 12345678, 1234567890123, 123456789012345
 	values := []interface{}{v1, "ip", v2, v3, v4, v5}
