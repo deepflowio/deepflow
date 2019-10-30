@@ -34,6 +34,8 @@ message PlatformData {
     optional string raw_ovs_ports = 15;
     optional string raw_brctl_show = 16;
     optional string raw_vlan_config = 17;
+
+    repeated Lldp lldp_info = 20;
 }
 
 message Host {
@@ -88,4 +90,12 @@ message Ip {
     optional uint64 mac = 3;
 
     optional string port_uuid = 9;
+}
+
+message Lldp {
+    optional string interface = 1;
+    optional string system_name = 2;
+    optional string management_address = 5;
+    optional string port_id = 10;
+    optional string port_description = 11;
 }
