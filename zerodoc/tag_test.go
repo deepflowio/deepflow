@@ -3,6 +3,8 @@ package zerodoc
 import (
 	"math"
 	"net"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/google/gopacket/layers"
@@ -204,5 +206,62 @@ func TestCloneTagWithIPv6Fields(t *testing.T) {
 	tagCloned.IP6[0] = 255
 	if tagCloned.IP6.Equal(tagOrigin.IP6) {
 		t.Error("CloneTag产生的tag和原tag共享了字段")
+	}
+}
+
+type Strings []string
+
+func (s Strings) Len() int           { return len(s) }
+func (s Strings) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s Strings) Less(i, j int) bool { return s[i] < s[j] }
+
+func parseTagkeys(b []byte) []string {
+	str := string(b)
+	ret := make([]string, 0)
+	splits := strings.Split(str, ",")
+	for _, s := range splits {
+		if index := strings.Index(s, "="); index != -1 {
+			ret = append(ret, s[:index])
+		}
+	}
+	return ret
+}
+
+func TestMarshallToInfluxdb(t *testing.T) {
+	b := make([]byte, 1024)
+	f := Field{}
+	tag := &Tag{&f, 0, ""}
+	tag.GlobalThreadID = 112345
+	tag.Code = ^(GroupIDPath | HostPath | IPPath | L3DevicePath | L3EpcIDPath | RegionIDPath | SubnetIDPath)
+
+	l := tag.MarshalTo(b)
+	strs := parseTagkeys(b[:l])
+	cloneStrs := make([]string, 0)
+	cloneStrs = append(cloneStrs, strs...)
+	sort.Sort(Strings(strs))
+	if strs[0] < "_id" {
+		t.Error("tag的keys在打包时, 所有key都必须小于'_id', 当前最小的key是:", strs[0])
+	}
+
+	for i, s := range cloneStrs {
+		if s != strs[i] {
+			t.Error("tag的keys在打包时, 没有按字典顺序排序在:", s)
+		}
+	}
+
+	tag.Code = ^(GroupID | Host | IP | L3Device | L3EpcID | RegionID | SubnetID)
+	l = tag.MarshalTo(b)
+	strs = parseTagkeys(b[:l])
+	cloneStrs = cloneStrs[:0]
+	cloneStrs = append(cloneStrs, strs...)
+	sort.Sort(Strings(strs))
+	if strs[0] < "_id" {
+		t.Error("tag的keys在打包时, 所有key都必须小于'_id', 当前最小的key是:", strs[0])
+	}
+
+	for i, s := range cloneStrs {
+		if s != strs[i] {
+			t.Error("tag的keys在打包时, 没有按字典顺序排序在:", s)
+		}
 	}
 }
