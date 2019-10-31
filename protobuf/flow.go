@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/google/gopacket/layers"
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
@@ -84,6 +85,12 @@ func MarshalFlow(f *datatype.TaggedFlow, bytes *utils.ByteBuffer) error {
 		Isp:     proto.Uint32(uint32(f.ISP)),
 		GeoEnd:  proto.Uint32(uint32(f.GeoEnd)),
 	}
+
+	if f.EthType == layers.EthernetTypeIPv6 {
+		flow.Ip6Src = append(flow.Ip6Src, f.IP6Src...)
+		flow.Ip6Dst = append(flow.Ip6Dst, f.IP6Dst...)
+	}
+
 	// TCP Perf Data
 	if f.TcpPerfStats != nil {
 		flow.RttSyn = proto.Uint64(uint64(f.RTTSyn))
