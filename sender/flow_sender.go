@@ -2,7 +2,6 @@ package sender
 
 import (
 	"github.com/golang/protobuf/proto"
-	"github.com/google/gopacket/layers"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/protobuf"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
@@ -35,9 +34,8 @@ func NewFlowSender(inputs []queue.QueueReader, sinkWriter queue.QueueWriter, sin
 }
 
 // filter 如果流不被存储，返回true
-// FIXME: 流为IPv6流量，返回true
 func (s *FlowSender) filter(flow *datatype.TaggedFlow) bool {
-	return flow.PolicyData.ActionFlags&datatype.ACTION_FLOW_STORING == 0 || flow.EthType == layers.EthernetTypeIPv6
+	return flow.PolicyData.ActionFlags&datatype.ACTION_FLOW_STORING == 0
 }
 
 func (s *FlowSender) receive(input queue.QueueReader, throttleQueue *ThrottlingQueue) {
