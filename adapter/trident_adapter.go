@@ -232,7 +232,7 @@ func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize 
 		} else { // 无法移动窗口
 			break
 		}
-		dispatcher.timestamp[i] = 0
+		dispatcher.timestamp[dispatcher.startIndex] = 0
 
 		dispatcher.seq++
 		dispatcher.startIndex = (dispatcher.startIndex + 1) & (cacheSize - 1)

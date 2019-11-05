@@ -50,7 +50,7 @@ func (c *command) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, operate ui
 				if dispatcher.cache != nil {
 					status += fmt.Sprintf("Host: %16s Index: %2d Seq: %10d Drop: %10d Timestamp: %30s\n",
 						IpFromUint32(key), i, dispatcher.seq, dispatcher.dropped,
-						time.Unix(int64(dispatcher.timestamp[dispatcher.startIndex]/time.Second), 0))
+						time.Unix(int64(dispatcher.maxTimestamp/time.Second), 0))
 				}
 			}
 		}
