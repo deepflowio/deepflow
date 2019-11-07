@@ -12,7 +12,6 @@ Source:     droplet.spec
 
 BuildRequires: golang git
 Requires: zeromq bash-completion
-Requires: python-paste
 Requires(post): %{_sbindir}/update-alternatives
 Requires(postun): %{_sbindir}/update-alternatives
 
@@ -35,7 +34,6 @@ mkdir -p $RPM_BUILD_ROOT/etc/
 cp %pwd/config/droplet.yaml $RPM_BUILD_ROOT/etc/
 cp %pwd/config/droplet.yaml $RPM_BUILD_ROOT/etc/droplet.yaml.sample
 mkdir -p $RPM_BUILD_ROOT/usr/share/droplet/
-cp %pwd/assets/ip_info_mini.json $RPM_BUILD_ROOT/usr/share/droplet/
 mkdir -p $RPM_BUILD_ROOT/usr/local/deepflow/pcap-rest
 cp %pwd/cmd/pcap-rest/*.py $RPM_BUILD_ROOT/usr/local/deepflow/pcap-rest/
 cp %pwd/pcap-rest.service $RPM_BUILD_ROOT/lib/systemd/system/
@@ -44,12 +42,9 @@ cp %pwd/pcap-rest.service $RPM_BUILD_ROOT/lib/systemd/system/
 /usr/bin/dlv.droplet
 /usr/bin/droplet-ctl
 /usr/sbin/droplet
-/usr/share/droplet/ip_info_mini.json
 /etc/droplet.yaml.sample
 %config(noreplace) /lib/systemd/system/droplet.service
-%config(noreplace) /lib/systemd/system/pcap-rest.service
 %config(noreplace) /etc/droplet.yaml
-/usr/local/deepflow/pcap-rest/*
 
 %preun
 if [ $1 == 0 ]; then # uninstall
@@ -72,3 +67,13 @@ if [ $1 == 0 ]; then # uninstall
 fi
 
 %changelog
+
+%package -n pcap-rest
+Summary:    deepflow pcap-rest
+
+%description -n pcap-rest
+deepflow pcap restful API agent
+
+%files -n pcap-rest
+/usr/local/deepflow/pcap-rest/*
+%config(noreplace) /lib/systemd/system/pcap-rest.service
