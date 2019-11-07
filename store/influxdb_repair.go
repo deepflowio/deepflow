@@ -71,7 +71,7 @@ type CounterRepair struct {
 	SyncCount int64 `statsd:"sync-count"`
 }
 
-func NewRepair(addrPrimary, addrReplica, rp, shardID string, start bool, syncStartDelay, syncInterval, syncCountOnce int) (*Repair, error) {
+func NewRepair(addrPrimary, addrReplica, httpUsername, httpPassword, rp, shardID string, start bool, syncStartDelay, syncInterval, syncCountOnce int) (*Repair, error) {
 	if addrReplica == "" {
 		log.Info("Replica influxdb is not set， skip repair")
 		start = false
@@ -90,7 +90,9 @@ func NewRepair(addrPrimary, addrReplica, rp, shardID string, start bool, syncSta
 	}
 
 	primaryClient, err := client.NewHTTPClient(client.HTTPConfig{
-		Addr: addrPrimary,
+		Addr:     addrPrimary,
+		Username: httpUsername,
+		Password: httpPassword,
 	})
 	if err != nil {
 		log.Error("create influxdb http client failed:", addrPrimary)
@@ -99,7 +101,9 @@ func NewRepair(addrPrimary, addrReplica, rp, shardID string, start bool, syncSta
 	log.Infof("new influxdb primary client addr(%s)", addrPrimary)
 
 	replicaClient, err := client.NewHTTPClient(client.HTTPConfig{
-		Addr: addrReplica,
+		Addr:     addrReplica,
+		Username: httpUsername,
+		Password: httpPassword,
 	})
 	if err != nil {
 		log.Error("create influxdb http client failed:", addrReplica)
