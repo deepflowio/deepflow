@@ -43,8 +43,6 @@ func init() {
 }
 
 type FlowToGeoDocumentMapper struct {
-	geoFile string
-
 	policyGroup []inputtype.AclAction
 
 	docs      *utils.StructBuffer
@@ -61,8 +59,8 @@ func (p *FlowToGeoDocumentMapper) GetName() string {
 	return "FlowToGeoDocumentMapper"
 }
 
-func NewProcessor(geoFile string) app.FlowProcessor {
-	return &FlowToGeoDocumentMapper{geoFile: geoFile}
+func NewProcessor() app.FlowProcessor {
+	return &FlowToGeoDocumentMapper{}
 }
 
 func (p *FlowToGeoDocumentMapper) Prepare() {
