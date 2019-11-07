@@ -16,6 +16,7 @@ package:
   artifacts:
     paths:
     - x86_64/droplet*.rpm
+    - x86_64/pcap-rest-*.rpm
   only:
     - master
     - /B_LC_RELEASE_.*/
