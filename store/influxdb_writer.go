@@ -138,7 +138,7 @@ type InfluxdbWriter struct {
 	exit          bool
 }
 
-func NewInfluxdbWriter(addrPrimary, addrReplica, name, shardID string, queueCount int) (*InfluxdbWriter, error) {
+func NewInfluxdbWriter(addrPrimary, addrReplica, httpUsername, httpPassword, name, shardID string, queueCount int) (*InfluxdbWriter, error) {
 	w := &InfluxdbWriter{
 		Name:         name,
 		QueueCount:   queueCount,
@@ -147,7 +147,8 @@ func NewInfluxdbWriter(addrPrimary, addrReplica, name, shardID string, queueCoun
 		ShardID:      shardID,
 	}
 
-	httpClient, err := client.NewHTTPClient(client.HTTPConfig{Addr: addrPrimary})
+	primaryHTTPConfig := client.HTTPConfig{Addr: addrPrimary, Username: httpUsername, Password: httpPassword}
+	httpClient, err := client.NewHTTPClient(primaryHTTPConfig)
 	if err != nil {
 		log.Error("create influxdb http client failed:", err)
 		return nil, err
@@ -164,7 +165,7 @@ func NewInfluxdbWriter(addrPrimary, addrReplica, name, shardID string, queueCoun
 		name, queue.HashKey(queueCount), DEFAULT_QUEUE_SIZE,
 		queue.OptionFlushIndicator(time.Second),
 		queue.OptionRelease(func(p interface{}) { p.(InfluxdbItem).Release() }))
-	w.QueueWriterInfosPrimary, err = newWriterInfos(addrPrimary, queueCount)
+	w.QueueWriterInfosPrimary, err = newWriterInfos(primaryHTTPConfig, queueCount)
 	if err != nil {
 		log.Error("create queue writer infos failed:", err)
 		return nil, err
@@ -172,7 +173,8 @@ func NewInfluxdbWriter(addrPrimary, addrReplica, name, shardID string, queueCoun
 
 	if addrReplica != "" {
 		w.ReplicaEnabled = true
-		httpClient, err := client.NewHTTPClient(client.HTTPConfig{Addr: addrReplica})
+		replicaHTTPConfig := client.HTTPConfig{Addr: addrPrimary, Username: httpUsername, Password: httpPassword}
+		httpClient, err := client.NewHTTPClient(replicaHTTPConfig)
 		if err != nil {
 			log.Error("create replica influxdb http client failed:", err)
 			return nil, err
@@ -184,7 +186,7 @@ func NewInfluxdbWriter(addrPrimary, addrReplica, name, shardID string, queueCoun
 		w.DBCreateCtlReplica.HttpClient = httpClient
 		w.DBCreateCtlReplica.ExistDBs = make(map[string]bool)
 
-		w.QueueWriterInfosReplica, err = newWriterInfos(addrReplica, queueCount)
+		w.QueueWriterInfosReplica, err = newWriterInfos(replicaHTTPConfig, queueCount)
 		if err != nil {
 			log.Error("create queue writer infos failed:", err)
 			return nil, err
@@ -299,18 +301,18 @@ func (p *InfluxdbPoint) GetDBName() string {
 func (p *InfluxdbPoint) Release() {
 }
 
-func newWriterInfos(httpAddr string, count int) ([]*WriterInfo, error) {
+func newWriterInfos(httpConfig client.HTTPConfig, count int) ([]*WriterInfo, error) {
 	ws := make([]*WriterInfo, count)
 	for i := 0; i < count; i++ {
-		httpClient, err := client.NewHTTPClient(client.HTTPConfig{Addr: httpAddr})
+		httpClient, err := client.NewHTTPClient(httpConfig)
 		if err != nil {
 			log.Error("create influxdb http client %d failed: ", i, err)
 			return nil, err
 		}
 		if _, _, err = httpClient.Ping(0); err != nil {
-			log.Errorf("http %d connect to influxdb(%s) failed: %s", i, httpAddr, err)
+			log.Errorf("http %d connect to influxdb(%s) failed: %s", i, httpConfig.Addr, err)
 		}
-		log.Infof("new influxdb http client %d: %s", i, httpAddr)
+		log.Infof("new influxdb http client %d: %s", i, httpConfig.Addr)
 		ws[i] = &WriterInfo{
 			httpClient: httpClient,
 			writeTime:  time.Now().Unix(),
