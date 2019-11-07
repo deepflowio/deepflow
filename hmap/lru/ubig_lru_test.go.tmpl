@@ -8,7 +8,7 @@ import (
 {{ range .}}
 
 func getU{{.}}(a, b uint64) []byte {
-	u := [20]byte{}
+	u := [{{.}}/8]byte{}
 	BigEndian.PutUint64(u[:], a)
 	BigEndian.PutUint64(u[8:], b)
 	return u[:]
