@@ -68,9 +68,6 @@ func (l *PolicyLabeler) GetCounter() interface{} {
 	for i := MIN_MASK_LEN; i < MAX_MASK_LEN; i++ {
 		counter.IpTable += uint32(len(l.cloudPlatformLabeler.ipTables[i].ipMap))
 	}
-	for i := TAP_MIN; i < TAP_MAX; i++ {
-		counter.ArpTable += uint32(len(l.cloudPlatformLabeler.arpTable[i]))
-	}
 
 	counter.Acl += uint32(len(l.RawAcls))
 	counter.FirstHit = l.FirstPathHit

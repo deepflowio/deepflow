@@ -169,43 +169,6 @@ func (i *EndpointInfo) GetEpc() uint16 {
 	return id
 }
 
-func IsOriginalTtl(ttl uint8) bool {
-	if ttl == 64 || ttl == 128 || ttl == 255 {
-		return true
-	}
-	return false
-}
-
-func (i *EndpointInfo) GetL3EndByTtl(ttl uint8) bool {
-	if IsOriginalTtl(ttl) {
-		return true
-	}
-	return false
-}
-
-func (i *EndpointInfo) SetL3EndByIp(data *PlatformData, ip net.IP) {
-	for _, ipInfo := range data.Ips {
-		var mask net.IPMask
-		if len(ipInfo.RawIp) == 4 {
-			mask = net.CIDRMask(int(ipInfo.Netmask), 32)
-		} else {
-			mask = net.CIDRMask(int(ipInfo.Netmask), 128)
-		}
-
-		if ipInfo.RawIp.Equal(ip.Mask(mask)) {
-			i.L3End = true
-			i.SetL3Data(data, ip)
-			break
-		}
-	}
-}
-
-func (i *EndpointInfo) SetL3EndByMac(data *PlatformData, mac uint64) {
-	if data.Mac == mac {
-		i.L3End = true
-	}
-}
-
 func GroupIdToString(id uint32) string {
 	if id >= IP_GROUP_ID_FLAG {
 		return fmt.Sprintf("IP-%d", id-IP_GROUP_ID_FLAG)
@@ -231,7 +194,7 @@ func (i *EndpointInfo) String() string {
 	infoValue := reflect.ValueOf(*i)
 	for n := 0; n < infoType.NumField(); n++ {
 		if infoType.Field(n).Name == "GroupIds" {
-			infoString += fmt.Sprintf("%v: [%s]", infoType.Field(n).Name, i.GetGroupIdsString())
+			infoString += fmt.Sprintf("%v: [%s] ", infoType.Field(n).Name, i.GetGroupIdsString())
 		} else {
 			infoString += fmt.Sprintf("%v: %v ", infoType.Field(n).Name, infoValue.Field(n))
 		}
