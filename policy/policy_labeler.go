@@ -303,6 +303,7 @@ func (l *PolicyLabeler) UpdateAcls(acls []*Acl, _ ...bool) {
 				generateAcls = append(generateAcls, generateAcl)
 			}
 		} else {
+			acl.Reset()
 			generateAcls = append(generateAcls, acl)
 		}
 	}
