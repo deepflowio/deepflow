@@ -455,9 +455,6 @@ func (d *Ddbs) GetCounter() interface{} {
 	for i := MIN_MASK_LEN; i < MAX_MASK_LEN; i++ {
 		counter.IpTable += uint32(len(d.cloudPlatformLabeler.ipTables[i].ipMap))
 	}
-	for i := TAP_MIN; i < TAP_MAX; i++ {
-		counter.ArpTable += uint32(len(d.cloudPlatformLabeler.arpTable[i]))
-	}
 
 	counter.Acl += uint32(len(d.RawAcls))
 	counter.FirstHit = d.FirstPathHit

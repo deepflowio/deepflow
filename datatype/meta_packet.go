@@ -48,11 +48,13 @@ type MetaPacket struct {
 
 	Invalid   bool
 	QueueHash uint8
-	InPort    uint32 // (+2B=8B)
-	Exporter  IPv4Int
 	PacketLen uint16
+	InPort    uint32 // (8B)
+	Exporter  IPv4Int
 	L2End0    bool
-	L2End1    bool // (8B)
+	L2End1    bool
+	L3End0    bool
+	L3End1    bool // (8B)
 
 	Tunnel *TunnelInfo
 
@@ -323,9 +325,9 @@ func (p *MetaPacket) ParseL2(packet RawPacket) int {
 func (p *MetaPacket) String() string {
 	buffer := bytes.Buffer{}
 	var format string
-	format = "timestamp: %d inport: 0x%x exporter: %v len: %d l2_end: %v, %v invalid: %v direction: %v\n"
+	format = "timestamp: %d inport: 0x%x exporter: %v len: %d l2_end: %v, %v l3_end: %v, %v invalid: %v direction: %v\n"
 	buffer.WriteString(fmt.Sprintf(format, p.Timestamp, p.InPort, IpFromUint32(p.Exporter),
-		p.PacketLen, p.L2End0, p.L2End1, p.Invalid, p.Direction))
+		p.PacketLen, p.L2End0, p.L2End1, p.L3End0, p.L3End1, p.Invalid, p.Direction))
 	if p.Tunnel != nil {
 		buffer.WriteString(fmt.Sprintf("\ttunnel: %s\n", p.Tunnel))
 	}

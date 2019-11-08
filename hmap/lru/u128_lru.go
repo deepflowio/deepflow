@@ -241,6 +241,16 @@ func (m *U128LRU) compressHash(hash uint64) int32 {
 	return int32((((((hash>>m.hashSlotBits)^hash)>>m.hashSlotBits)^hash)>>m.hashSlotBits)^hash) & (m.hashSlots - 1)
 }
 
+type walkCallback func(key0, key1 uint64, value interface{})
+
+func (m *U128LRU) Walk(callback walkCallback) {
+	for i := m.timeListHead; i != -1; {
+		node := m.getNode(i)
+		callback(node.key0, node.key1, node.value)
+		i = node.timeListNext
+	}
+}
+
 func NewU128LRU(hashSlots, capacity int) *U128LRU {
 	hashSlots, hashSlotBits := minPowerOfTwo(hashSlots)
 

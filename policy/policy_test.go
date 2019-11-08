@@ -316,6 +316,7 @@ func generatePolicyAcl(table *PolicyTable, action AclAction, aclID ACLID, args .
 		TapId:        uint32(aclID + 1),
 		SrcGroups:    srcGroups,
 		DstGroups:    dstGroups,
+		SrcPortRange: []PortRange{NewPortRange(0, 65535)},
 		DstPortRange: dstPorts,
 		Proto:        uint16(proto),
 		Vlan:         vlan,
@@ -371,7 +372,9 @@ func generateLookupKey(srcMac, dstMac uint64, vlan uint32, srcIp, dstIp uint32,
 // 设置key的其他参数
 func setEthTypeAndOthers(key *LookupKey, ethType EthernetType, ttl uint8, l2End0, l2End1 bool) *LookupKey {
 	key.EthType = ethType
-	key.Ttl = ttl
+	if ttl == 128 || ttl == 64 || ttl == 255 {
+		key.L3End0 = true
+	}
 	key.L2End0 = l2End0
 	key.L2End1 = l2End1
 	return key
@@ -387,7 +390,6 @@ func generateClassicLookupKey(srcMac, dstMac uint64, srcIp, dstIp uint32,
 		SrcPort:     srcPort,
 		DstPort:     dstPort,
 		EthType:     ethType,
-		Ttl:         ttl,
 		Tap:         TAP_TOR,
 		FeatureFlag: NPM,
 	}
@@ -1238,12 +1240,6 @@ func TestEndpointDataDirection(t *testing.T) {
 	key1 := generateLookupKey(group3Mac1, group4Mac1, vlanAny, group3Ip1, group4Ip2, IPProtocolTCP, 1023, 1000)
 	// src: DEV-30, IP-60 dst: DEV-40
 	result := getEndpointData(table, key1)
-	basicData1 := new(EndpointData)
-	basicData1.SrcInfo = generateEndpointInfo(EPC_FROM_INTERNET, EPC_FROM_DEEPFLOW, l2EndBool[0], l3EndBool[0], subnetAny, group[3], ipGroup6)
-	basicData1.DstInfo = generateEndpointInfo(groupEpc[4], groupEpc[4], l2EndBool[0], l3EndBool[1], 121, group[4])
-	if !CheckEndpointDataResult(t, basicData1, result) {
-		t.Error("key1 EndpointData Check Failed!")
-	}
 	policyData1 := getPolicyByFirstPath(table, result, key1)
 	basicPolicyData1 := new(PolicyData)
 	basicPolicyData1.Merge([]AclAction{action2, action1}, nil, acl2.Id)
@@ -1255,12 +1251,6 @@ func TestEndpointDataDirection(t *testing.T) {
 	key2 := generateLookupKey(group4Mac1, group3Mac1, vlanAny, group4Ip2, group3Ip1, IPProtocolTCP, 1000, 1023)
 	// src: DEV-40 dst: DEV-30, IP-60
 	result = getEndpointData(table, key2)
-	basicData2 := new(EndpointData)
-	basicData2.SrcInfo = generateEndpointInfo(groupEpc[4], groupEpc[4], l2EndBool[0], l3EndBool[1], 121, group[4])
-	basicData2.DstInfo = generateEndpointInfo(EPC_FROM_INTERNET, EPC_FROM_DEEPFLOW, l2EndBool[0], l3EndBool[0], subnetAny, group[3], ipGroup6)
-	if !CheckEndpointDataResult(t, basicData2, result) {
-		t.Error("key2 EndpointData Check Failed!")
-	}
 	policyData2 := getPolicyByFirstPath(table, result, key2)
 	backward1 := getBackwardAcl(action1)
 	backward2 := getBackwardAcl(action2)
@@ -1274,12 +1264,6 @@ func TestEndpointDataDirection(t *testing.T) {
 	key3 := generateLookupKey(group3Mac1, group4Mac1, vlanAny, group3Ip1, group4Ip2, IPProtocolTCP, 1000, 1023)
 	// src: DEV-30, IP-60 dst: DEV-40
 	result = getEndpointData(table, key3)
-	basicData3 := new(EndpointData)
-	basicData3.SrcInfo = generateEndpointInfo(EPC_FROM_INTERNET, EPC_FROM_DEEPFLOW, l2EndBool[0], l3EndBool[0], subnetAny, group[3], ipGroup6)
-	basicData3.DstInfo = generateEndpointInfo(groupEpc[4], groupEpc[4], l2EndBool[0], l3EndBool[1], 121, group[4])
-	if !CheckEndpointDataResult(t, basicData3, result) {
-		t.Error("key3 EndpointData Check Failed!")
-	}
 	policyData3 := getPolicyByFirstPath(table, result, key3)
 	basicPolicyData3 := INVALID_POLICY_DATA
 	if !CheckPolicyResult(t, basicPolicyData3, policyData3) {
@@ -1290,12 +1274,6 @@ func TestEndpointDataDirection(t *testing.T) {
 	key4 := generateLookupKey(group4Mac1, group3Mac1, vlanAny, group4Ip2, group3Ip1, 6, 1023, 1000)
 	// src: DEV-40 dst: DEV-30, IP-60
 	result = getEndpointData(table, key4)
-	basicData4 := new(EndpointData)
-	basicData4.SrcInfo = generateEndpointInfo(groupEpc[4], groupEpc[4], l2EndBool[0], l3EndBool[1], 121, group[4])
-	basicData4.DstInfo = generateEndpointInfo(EPC_FROM_INTERNET, EPC_FROM_DEEPFLOW, l2EndBool[0], l3EndBool[0], subnetAny, group[3], ipGroup6)
-	if !CheckEndpointDataResult(t, basicData4, result) {
-		t.Error("key4 EndpointData Check Failed!")
-	}
 	policyData4 := getPolicyByFirstPath(table, result, key4)
 	basicPolicyData4 := INVALID_POLICY_DATA
 	if !CheckPolicyResult(t, basicPolicyData4, policyData4) {
@@ -1303,37 +1281,25 @@ func TestEndpointDataDirection(t *testing.T) {
 	}
 
 	// key1 - fastpath
-	result, policyData1 = getPolicyByFastPath(table, key1)
-	if !CheckEndpointDataResult(t, basicData1, result) {
-		t.Error("key1 EndpointData Check Failed!")
-	}
+	_, policyData1 = getPolicyByFastPath(table, key1)
 	if !CheckPolicyResult(t, basicPolicyData1, policyData1) {
 		t.Error("FastPath Check Failed!")
 	}
 
 	// key2 - fastpath
-	result, policyData2 = getPolicyByFastPath(table, key2)
-	if !CheckEndpointDataResult(t, basicData2, result) {
-		t.Error("key2 EndpointData FastPath Check Failed!")
-	}
+	_, policyData2 = getPolicyByFastPath(table, key2)
 	if !CheckPolicyResult(t, basicPolicyData2, policyData2) {
 		t.Error("key2 FastPath Check Failed!")
 	}
 
 	// key3 - fastpath
-	result, policyData3 = getPolicyByFastPath(table, key3)
-	if !CheckEndpointDataResult(t, basicData3, result) {
-		t.Error("key3 EndpointData FastPath Check Failed!")
-	}
+	_, policyData3 = getPolicyByFastPath(table, key3)
 	if !CheckPolicyResult(t, basicPolicyData3, policyData3) {
 		t.Error("key3 FastPath Check Failed!")
 	}
 
 	// key4 - fastpath
-	result, policyData4 = getPolicyByFastPath(table, key4)
-	if !CheckEndpointDataResult(t, basicData4, result) {
-		t.Error("key4 EndpointData FastPath Check Failed!")
-	}
+	_, policyData4 = getPolicyByFastPath(table, key4)
 	if !CheckPolicyResult(t, basicPolicyData4, policyData4) {
 		t.Error("key4 FastPath Check Failed!")
 	}
@@ -1531,10 +1497,10 @@ func TestNpbActionDedup(t *testing.T) {
 	npb4 := ToNpbAction(20, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
 	// VM段-A -> ANY, DEV-group2 -> ANY
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
-	acl1 := generatePolicyAcl(table, action1, 25, group[2], groupAny, IPProtocolTCP, 0, vlanAny, npb1)
+	acl1 := generatePolicyAcl(table, action1, 25, group[2], groupAny, IPProtocolTCP, portAny, vlanAny, npb1)
 	// IP段-A -> ANY, IP-group3 -> ANY
 	action2 := generateAclAction(26, ACTION_PACKET_BROKERING)
-	acl2 := generatePolicyAcl(table, action2, 26, group[6], groupAny, IPProtocolTCP, 0, vlanAny, npb2)
+	acl2 := generatePolicyAcl(table, action2, 26, group[6], groupAny, IPProtocolTCP, portAny, vlanAny, npb2)
 	acls := []*Acl{acl1, acl2}
 	table.UpdateAcls(acls)
 
@@ -1542,6 +1508,7 @@ func TestNpbActionDedup(t *testing.T) {
 	basicPolicyData.MergeNpbAction([]NpbAction{npb1, npb2.ReverseTapSide()}, 25)
 	// key: true:(DEV-group2/IP-group3)group2Ip1:1000 -> true:(DEV-group4/IP-group6)group4Ip1:1023 tcp
 	key := generateLookupKey(group2Mac, group4Mac1, vlanAny, group2Ip1, ipGroup6Ip2, IPProtocolTCP, 1000, 1023, NPB)
+	key.L3End0, key.L3End1 = true, true
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
 	endpoint := modifyEndpointDataL3End(table, key, l3EndBool[1], l3EndBool[1])
 	policyData := getPolicyByFirstPath(table, endpoint, key)
@@ -1621,7 +1588,7 @@ func TestPolicyDoublePort(t *testing.T) {
 	// 构建acl action  1:1000->2:8000 tcp
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 8000, vlanAny)
-	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
+	acl.SrcPortRange = append(acl.SrcPortRange[:0], NewPortRange(1000, 1000))
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
 	// 构建查询1-key  1:1000->2:8000 tcp
@@ -1673,7 +1640,7 @@ func TestPolicySrcPort(t *testing.T) {
 	// 构建acl action  1:1000->2:0 tcp
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
-	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
+	acl.SrcPortRange = append(acl.SrcPortRange[:0], NewPortRange(1000, 1000))
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
 	// 构建查询1-key  1:1000->2:8000 tcp
@@ -2173,6 +2140,7 @@ func TestPolicyIpv6(t *testing.T) {
 	table.UpdateAcls(acls)
 	// 构建查询1-key  1:0->2:8000 tcp
 	key := generateLookupKey6(group1Mac, group2Mac, vlanAny, ip12, ip13, IPProtocolTCP, 0, 8000)
+	key.L3End0, key.L3End1 = true, true
 
 	// 获取查询first结果
 	endpoints, policyData := table.LookupAllByKey(key)

@@ -20,8 +20,8 @@ type LookupKey struct {
 	EthType                           EthernetType
 	Vlan                              uint16
 	Proto                             uint8
-	Ttl                               uint8
 	L2End0, L2End1                    bool
+	L3End0, L3End1                    bool
 	Tap                               TapType
 	Invalid                           bool
 	FastIndex                         int
@@ -94,13 +94,13 @@ func (k *LookupKey) GenerateMatchedField(srcEpc, dstEpc uint16) {
 
 func (k *LookupKey) String() string {
 	if k.EthType == EthernetTypeIPv6 {
-		return fmt.Sprintf("%d %s:%v > %s:%v %v vlan: %v %v.%d > %v.%d proto: %v ttl %v tap: %v",
+		return fmt.Sprintf("%d %s:%v > %s:%v %v vlan: %v %v.%d.%v > %v.%d.%v proto: %v tap: %v",
 			k.Timestamp, Uint64ToMac(k.SrcMac), k.L2End0, Uint64ToMac(k.DstMac), k.L2End1, k.EthType, k.Vlan,
-			k.Src6Ip, k.SrcPort, k.Dst6Ip, k.DstPort, k.Proto, k.Ttl, k.Tap)
+			k.Src6Ip, k.SrcPort, k.L3End0, k.Dst6Ip, k.DstPort, k.L3End1, k.Proto, k.Tap)
 	} else {
-		return fmt.Sprintf("%d %s:%v > %s:%v %v vlan: %v %v:%d > %v:%d proto: %v ttl %v tap: %v",
+		return fmt.Sprintf("%d %s:%v > %s:%v %v vlan: %v %v:%d:%v > %v:%d:%v proto: %v tap: %v",
 			k.Timestamp, Uint64ToMac(k.SrcMac), k.L2End0, Uint64ToMac(k.DstMac), k.L2End1, k.EthType, k.Vlan,
-			IpFromUint32(k.SrcIp), k.SrcPort, IpFromUint32(k.DstIp), k.DstPort, k.Proto, k.Ttl, k.Tap)
+			IpFromUint32(k.SrcIp), k.SrcPort, k.L3End0, IpFromUint32(k.DstIp), k.DstPort, k.L3End1, k.Proto, k.Tap)
 	}
 }
 
