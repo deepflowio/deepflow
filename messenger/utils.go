@@ -34,6 +34,8 @@ func Marshal(doc *app.Document, bytes *utils.ByteBuffer) error {
 		msgType = dt.MSG_FPS
 	case *dt.VTAPSimpleMeter:
 		msgType = dt.MSG_VTAP_SIMPLE
+	case *dt.VTAPUsageMeter:
+		msgType = dt.MSG_VTAP_USAGE
 	default:
 		return fmt.Errorf("Unknown supported type %T", v)
 	}
@@ -71,6 +73,9 @@ func Marshal(doc *app.Document, bytes *utils.ByteBuffer) error {
 	case dt.MSG_VTAP_SIMPLE:
 		meter := doc.Meter.(*dt.VTAPSimpleMeter)
 		msg.Meter.VtapSimple = protobuf.VTAPSimpleMeterToPB(meter)
+	case dt.MSG_VTAP_USAGE:
+		meter := doc.Meter.(*dt.VTAPUsageMeter)
+		msg.Meter.VtapUsage = protobuf.VTAPUsageMeterToPB(meter)
 	}
 	msg.ActionFlags = proto.Uint32(doc.ActionFlags)
 

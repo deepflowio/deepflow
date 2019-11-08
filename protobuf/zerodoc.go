@@ -380,3 +380,23 @@ func PBToVTAPSimpleMeter(m *pb.VTAPSimpleMeter, meter *VTAPSimpleMeter) {
 	meter.RxPackets = m.GetRxPackets()
 	meter.Packets = m.GetPackets()
 }
+
+func VTAPUsageMeterToPB(m *VTAPUsageMeter) *pb.VTAPUsageMeter {
+	return &pb.VTAPUsageMeter{
+		TxBytes:   proto.Uint64(m.TxBytes),
+		RxBytes:   proto.Uint64(m.RxBytes),
+		TxPackets: proto.Uint64(m.TxPackets),
+		RxPackets: proto.Uint64(m.RxPackets),
+	}
+}
+
+func PBToVTAPUsageMeter(m *pb.VTAPUsageMeter, meter *VTAPUsageMeter) {
+	if meter == nil {
+		panic("meter为空")
+	}
+
+	meter.TxBytes = m.GetTxBytes()
+	meter.RxBytes = m.GetRxBytes()
+	meter.TxPackets = m.GetTxPackets()
+	meter.RxPackets = m.GetRxPackets()
+}
