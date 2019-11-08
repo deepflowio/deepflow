@@ -432,6 +432,7 @@ func (d *Ddbs) UpdateAcls(acls []*Acl, check ...bool) {
 				acl.NpbActions[index].AddResourceGroupType(groupType)
 			}
 		}
+		acl.Reset()
 		generateAcls = append(generateAcls, acl)
 	}
 

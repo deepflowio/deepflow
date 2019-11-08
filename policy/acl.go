@@ -35,6 +35,17 @@ func (a *Acl) InitPolicy() {
 	a.policy.NpbActions = a.NpbActions
 }
 
+func (a *Acl) Reset() {
+	a.SrcPorts = a.SrcPorts[:0]
+	a.DstPorts = a.DstPorts[:0]
+	a.SrcGroupRelations = a.SrcGroupRelations[:0]
+	a.DstGroupRelations = a.DstGroupRelations[:0]
+	a.AllMatched = a.AllMatched[:0]
+	a.AllMatchedMask = a.AllMatchedMask[:0]
+	a.AllMatched6 = a.AllMatched6[:0]
+	a.AllMatched6Mask = a.AllMatched6Mask[:0]
+}
+
 func (a *Acl) getPortRange(rawPorts []uint16) []PortRange {
 	ranges := make([]PortRange, 0, 2)
 
