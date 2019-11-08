@@ -117,6 +117,7 @@ flow-generator:
   # if true, then not check mac for flow match
   # when inport is bigger than 0x30000 and l2end is false
   ignore-l2-end: false
+#geo-file-location: /opt/droplet/ip_info_mini.json
 map-reduce:
   # 聚合窗口的大小，单位秒，最小值为70，调整时注意考虑report-tolerance
   window-size: 70
