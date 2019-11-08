@@ -22,6 +22,8 @@ const (
 	perfSlots = 2
 )
 
+const GEO_FILE_LOCATION = "/usr/share/droplet/ip_info_mini.json"
+
 func NewFlowMapProcess(
 	outputs []queue.QueueWriter, inputs []queue.QueueReader,
 	docsInBuffer, windowSize, windowMoveMargin int,
@@ -30,7 +32,7 @@ func NewFlowMapProcess(
 		fps.NewProcessor(),
 		flow.NewProcessor(),
 		perf.NewProcessor(),
-		geo.NewProcessor(),
+		geo.NewProcessor(GEO_FILE_LOCATION),
 		flowtype.NewProcessor(),
 		logusage.NewProcessor(),
 	}, outputs, inputs, docsInBuffer, windowSize, windowMoveMargin)
