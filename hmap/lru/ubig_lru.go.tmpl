@@ -277,6 +277,14 @@ func (m *U{{.}}LRU) compressHash(hash uint32) int32 {
 	return int32((((((hash>>m.hashSlotBits)^hash)>>m.hashSlotBits)^hash)>>m.hashSlotBits)^hash) & (m.hashSlots - 1)
 }
 
+func (m *U{{.}}LRU) Walk(callback func(key [_U{{.}}_KEY_SIZE]byte, value interface{})) {
+	for i := m.timeListHead; i != -1; {
+		node := m.getNode(i)
+		callback(node.key, node.value)
+		i = node.timeListNext
+	}
+}
+
 func NewU{{.}}LRU(hashSlots, capacity int) *U{{.}}LRU {
 	hashSlots, hashSlotBits := minPowerOfTwo(hashSlots)
 

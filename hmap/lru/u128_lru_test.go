@@ -96,6 +96,17 @@ func TestU128LRU(t *testing.T) {
 			t.Errorf("key {%d,%d => %d, exist=%v} is not expected", i, i+100, value, ok)
 		}
 	}
+
+	// 添加10个后walk
+	for i := 0; i < 10; i++ {
+		lru.Add(uint64(i), uint64(i+100), uint64(i))
+	}
+	count := 0
+	callback := func(key0, key1 uint64, value interface{}) { count += 1 }
+	lru.Walk(callback)
+	if count != lru.Size() {
+		t.Errorf("Walk count %d is not expected", count)
+	}
 }
 
 func BenchmarkU128LRUAdd(b *testing.B) {

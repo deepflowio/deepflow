@@ -4,8 +4,6 @@ import (
 	"container/list"
 	"math"
 	"net"
-	"sync"
-	"time"
 
 	. "github.com/google/gopacket/layers"
 
@@ -46,11 +44,6 @@ type CloudPlatformLabeler struct {
 	ipGroup             *IpResourceGroup
 	netmaskBitmap       uint32
 	peerConnectionTable map[int32][]int32
-
-	arpMutex        [TAP_MAX]sync.Mutex
-	lastArpSwapTime time.Duration
-	arpTable        [TAP_MAX]map[MacIpKey]bool
-	tempArpTable    [TAP_MAX]map[MacIpKey]bool
 }
 
 func NewCloudPlatformLabeler(queueCount int, mapSize uint32) *CloudPlatformLabeler {
@@ -78,11 +71,6 @@ func NewCloudPlatformLabeler(queueCount int, mapSize uint32) *CloudPlatformLabel
 		ipGroup:             NewIpResourceGroup(),
 		netmaskBitmap:       uint32(0),
 		peerConnectionTable: make(map[int32][]int32),
-		lastArpSwapTime:     time.Duration(time.Now().UnixNano()),
-	}
-	for i := TAP_MIN; i < TAP_MAX; i++ {
-		cloud.tempArpTable[i] = make(map[MacIpKey]bool)
-		cloud.arpTable[i] = make(map[MacIpKey]bool)
 	}
 	return cloud
 }
@@ -292,50 +280,14 @@ func (l *CloudPlatformLabeler) UpdateGroupTree(ipGroupDatas []*IpGroupData) {
 	l.ipGroup.Update(ipGroupDatas)
 }
 
-func (l *CloudPlatformLabeler) GetArpTable(hash MacIpKey, tapType TapType) bool {
-	return l.arpTable[tapType][hash]
-}
-
-// 只更新源mac+ip的arp
-func (l *CloudPlatformLabeler) CheckAndUpdateArpTable(key *LookupKey, hash MacIpKey, timestamp time.Duration) {
-	if key.EthType == EthernetTypeARP && !key.Invalid {
-		l.arpMutex[key.Tap].Lock()
-		l.tempArpTable[key.Tap][hash] = true
-		l.arpMutex[key.Tap].Unlock()
-	}
-
-	if timestamp-l.lastArpSwapTime >= ARP_VALID_TIME {
-		for i := TAP_MIN; i < TAP_MAX; i++ {
-			table := make(map[MacIpKey]bool)
-			l.arpMutex[i].Lock()
-			l.arpTable[i] = l.tempArpTable[i]
-			l.tempArpTable[i] = table
-			l.arpMutex[i].Unlock()
-		}
-		l.lastArpSwapTime = timestamp
-	}
-}
-
-// 依据arp表和ttl修正L3End，若arp存在mac+ip对应关系L3End为true，ttl只对源mac+ip有效,包含在(64,128,255)则为true
-func (l *CloudPlatformLabeler) GetL3End(endpointInfo *EndpointInfo, key *LookupKey, hash MacIpKey, direction bool) bool {
-	if endpointInfo.L3End {
-		return endpointInfo.L3End
-	}
-	end := l.GetArpTable(hash, key.Tap)
-	if !end {
-		if direction && key.EthType == EthernetTypeIPv4 {
-			end = endpointInfo.GetL3EndByTtl(key.Ttl)
-		}
-	}
-	return end
-}
-
-func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType TapType) *EndpointInfo {
+func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType TapType, l3End bool) *EndpointInfo {
 	endpointInfo := new(EndpointInfo)
 	platformData := l.GetDataByMac(MacKey(mac))
 	if platformData != nil {
 		endpointInfo.SetL2Data(platformData)
-		endpointInfo.SetL3EndByIp(platformData, ip)
+		if l3End {
+			endpointInfo.SetL3Data(platformData, ip)
+		}
 		// IP为0，则取MAC对应的二层数据作为三层数据
 		if ip.IsUnspecified() {
 			endpointInfo.SetL3DataByMac(platformData)
@@ -371,22 +323,9 @@ func (l *CloudPlatformLabeler) ModifyDeviceInfo(endpointInfo *EndpointInfo) {
 
 // 检查L2End和L3End是否有可能进行修正
 func (l *CloudPlatformLabeler) CheckEndpointDataIfNeedCopy(store *EndpointStore, key *LookupKey) *EndpointData {
-	srcHash := MacIpKey(calcHashKey(key.SrcMac, key.SrcIp))
-	dstHash := MacIpKey(calcHashKey(key.DstMac, key.DstIp))
-	l.CheckAndUpdateArpTable(key, srcHash, key.Timestamp)
-	endpoint := store.Endpoints
-	l2End0, l3End0, l2End1, l3End1 := endpoint.SrcInfo.L2End, endpoint.SrcInfo.L3End, endpoint.DstInfo.L2End, endpoint.DstInfo.L3End
-	if key.Tap == TAP_TOR && ((key.L2End0 != endpoint.SrcInfo.L2End) ||
-		(key.L2End1 != endpoint.DstInfo.L2End)) {
-		l2End0, l2End1 = key.L2End0, key.L2End1
-	}
-	// 根据Ttl、Arp request、L2End来判断endpoint是否为最新
-	l3End0 = l.GetL3End(endpoint.SrcInfo, key, srcHash, true)
-	l3End1 = l.GetL3End(endpoint.DstInfo, key, dstHash, false)
-	newEndpoints := store.UpdatePointer(l2End0, l2End1, l3End0, l3End1)
+	newEndpoints := store.UpdatePointer(key.L2End0, key.L2End1, key.L3End0, key.L3End1)
 	l.ModifyDeviceInfo(newEndpoints.SrcInfo)
 	l.ModifyDeviceInfo(newEndpoints.DstInfo)
-
 	return newEndpoints
 }
 
@@ -468,8 +407,8 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	}
 	// l2: mac查询
 	// l3: l2epc+ip查询
-	srcData := l.GetEndpointInfo(key.SrcMac, srcIp, key.Tap)
-	dstData := l.GetEndpointInfo(key.DstMac, dstIp, key.Tap)
+	srcData := l.GetEndpointInfo(key.SrcMac, srcIp, key.Tap, key.L3End0)
+	dstData := l.GetEndpointInfo(key.DstMac, dstIp, key.Tap, key.L3End1)
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
 	// l3: ip查询
 	l.GetL3ByIp(srcIp, dstIp, endpoint)

@@ -258,12 +258,13 @@ func (t *PolicyTable) EnableAclData() {
 	t.operator.FlushAcls()
 }
 
+// 该函数仅用于测试或命令行使用
 func (t *PolicyTable) GetEndpointInfo(mac uint64, ip net.IP, inPort uint32) *EndpointInfo {
 	var endpointInfo *EndpointInfo
 	if PortInDeepflowExporter(inPort) {
-		endpointInfo = t.cloudPlatformLabeler.GetEndpointInfo(mac, ip, TAP_TOR)
+		endpointInfo = t.cloudPlatformLabeler.GetEndpointInfo(mac, ip, TAP_TOR, true)
 	} else {
-		endpointInfo = t.cloudPlatformLabeler.GetEndpointInfo(mac, ip, TAP_ISP_MIN)
+		endpointInfo = t.cloudPlatformLabeler.GetEndpointInfo(mac, ip, TAP_ISP_MIN, true)
 	}
 
 	return endpointInfo
