@@ -212,6 +212,13 @@ message VTAPSimpleMeter {
     optional uint64 packets = 6;
 }
 
+message VTAPUsageMeter {
+    optional uint64 tx_bytes = 1;
+    optional uint64 rx_bytes = 2;
+    optional uint64 tx_packets = 3;
+    optional uint64 rx_packets = 4;
+}
+
 message Meter {
     optional UsageMeter usage = 1;
     optional PerfMeter perf = 2;
@@ -221,6 +228,7 @@ message Meter {
     optional TypeMeter type = 8;
     optional FpsMeter fps = 9;
     optional VTAPSimpleMeter vtap_simple = 10;
+    optional VTAPUsageMeter vtap_usage = 11;
 }
 
 message ZeroHeader {
