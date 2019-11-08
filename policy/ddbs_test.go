@@ -723,6 +723,7 @@ func TestDdbsEndpointDataDirection(t *testing.T) {
 	table.UpdateAcls(acls)
 	// key1: (group3/ipGroup6)group3Ip1:1023 -> (group4)group4Ip2:1000 tcp
 	key1 := generateLookupKey(group3Mac1, group4Mac1, vlanAny, group3Ip1, group4Ip2, IPProtocolTCP, 1023, 1000)
+	key1.L3End1 = true
 	// src: DEV-30, IP-60 dst: DEV-40
 	result := getEndpointData(table, key1)
 	basicData1 := new(EndpointData)
@@ -740,6 +741,7 @@ func TestDdbsEndpointDataDirection(t *testing.T) {
 
 	// key2: (group4)group4Ip2:1000 -> (group3/ipGroup6)group3Ip1:1023 tcp
 	key2 := generateLookupKey(group4Mac1, group3Mac1, vlanAny, group4Ip2, group3Ip1, IPProtocolTCP, 1000, 1023)
+	key2.L3End0 = true
 	// src: DEV-40 dst: DEV-30, IP-60
 	result = getEndpointData(table, key2)
 	basicData2 := new(EndpointData)
@@ -759,6 +761,7 @@ func TestDdbsEndpointDataDirection(t *testing.T) {
 
 	// key3: (group3/ipGroup6)group3Ip1:1000 -> (group4)group4Ip2:1023 tcp
 	key3 := generateLookupKey(group3Mac1, group4Mac1, vlanAny, group3Ip1, group4Ip2, IPProtocolTCP, 1000, 1023)
+	key3.L3End1 = true
 	// src: DEV-30, IP-60 dst: DEV-40
 	result = getEndpointData(table, key3)
 	basicData3 := new(EndpointData)
@@ -775,6 +778,7 @@ func TestDdbsEndpointDataDirection(t *testing.T) {
 
 	// key4: (group4)group4Ip2:1023 -> (group3/ipGroup6)group3Ip1:1000 tcp
 	key4 := generateLookupKey(group4Mac1, group3Mac1, vlanAny, group4Ip2, group3Ip1, 6, 1023, 1000)
+	key4.L3End0 = true
 	// src: DEV-40 dst: DEV-30, IP-60
 	result = getEndpointData(table, key4)
 	basicData4 := new(EndpointData)
@@ -1018,10 +1022,10 @@ func TestDdbsNpbActionDedup(t *testing.T) {
 	npb4 := ToNpbAction(20, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
 	// VM段-A -> ANY, DEV-group2 -> ANY
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
-	acl1 := generatePolicyAcl(table, action1, 25, group[2], groupAny, IPProtocolTCP, 0, vlanAny, npb1)
+	acl1 := generatePolicyAcl(table, action1, 25, group[2], groupAny, IPProtocolTCP, portAny, vlanAny, npb1)
 	// IP段-A -> ANY, IP-group3 -> ANY
 	action2 := generateAclAction(26, ACTION_PACKET_BROKERING)
-	acl2 := generatePolicyAcl(table, action2, 26, group[6], groupAny, IPProtocolTCP, 0, vlanAny, npb2)
+	acl2 := generatePolicyAcl(table, action2, 26, group[6], groupAny, IPProtocolTCP, portAny, vlanAny, npb2)
 	acls := []*Acl{acl1, acl2}
 	table.UpdateAcls(acls)
 
@@ -1029,6 +1033,7 @@ func TestDdbsNpbActionDedup(t *testing.T) {
 	basicPolicyData.MergeNpbAction([]NpbAction{npb1, npb2.ReverseTapSide()}, 25)
 	// key: true:(DEV-group2/IP-group3)group2Ip1:1000 -> true:(DEV-group4/IP-group6)group4Ip1:1023 tcp
 	key := generateLookupKey(group2Mac, group4Mac1, vlanAny, group2Ip1, ipGroup6Ip2, IPProtocolTCP, 1000, 1023, NPB)
+	key.L3End1 = true
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
 	endpoint := modifyEndpointDataL3End(table, key, l3EndBool[1], l3EndBool[1])
 	policyData := getPolicyByFirstPath(table, endpoint, key)
@@ -1108,7 +1113,7 @@ func TestDdbsPolicyDoublePort(t *testing.T) {
 	// 构建acl action  1:1000->2:8000 tcp
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 8000, vlanAny)
-	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
+	acl.SrcPortRange = append(acl.SrcPortRange[:0], NewPortRange(1000, 1000))
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
 	// 构建查询1-key  1:1000->2:8000 tcp
@@ -1157,10 +1162,10 @@ func TestDdbsPolicySrcPort(t *testing.T) {
 	acls := []*Acl{}
 	// 创建 policyTable
 	table := generatePolicyTable(DDBS)
-	// 构建acl action  1:1000->2:0 tcp
+	// 构建acl action  1:1000->2:ANY tcp
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, portAny, vlanAny)
-	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
+	acl.SrcPortRange = append(acl.SrcPortRange[:0], NewPortRange(1000, 1000))
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
 	// 构建查询1-key  1:1000->2:8000 tcp
@@ -1627,6 +1632,7 @@ func TestDdbsPolicyIpv6(t *testing.T) {
 	table.UpdateAcls(acls)
 	// 构建查询1-key  1:0->2:8000 tcp, 会匹配acl,不会匹配acl2
 	key := generateLookupKey6(group1Mac, group2Mac, vlanAny, ip12, ip13, IPProtocolTCP, 0, 8000)
+	key.L3End0, key.L3End1 = true, true
 
 	// 获取查询first结果
 	endpoints, policyData := table.LookupAllByKey(key)
