@@ -357,36 +357,14 @@ func PBToTypeMeter(m *pb.TypeMeter, meter *TypeMeter) {
 	meter.SumCountTServerHalfClose = m.GetSumCountTSHalfClose()
 }
 
-func VTAPSimpleMeterToPB(m *VTAPSimpleMeter) *pb.VTAPSimpleMeter {
-	return &pb.VTAPSimpleMeter{
-		TxBytes:   proto.Uint64(m.TxBytes),
-		RxBytes:   proto.Uint64(m.RxBytes),
-		Bytes:     proto.Uint64(m.Bytes),
-		TxPackets: proto.Uint64(m.TxPackets),
-		RxPackets: proto.Uint64(m.RxPackets),
-		Packets:   proto.Uint64(m.Packets),
-	}
-}
-
-func PBToVTAPSimpleMeter(m *pb.VTAPSimpleMeter, meter *VTAPSimpleMeter) {
-	if meter == nil {
-		panic("meter为空")
-	}
-
-	meter.TxBytes = m.GetTxBytes()
-	meter.RxBytes = m.GetRxBytes()
-	meter.Bytes = m.GetBytes()
-	meter.TxPackets = m.GetTxPackets()
-	meter.RxPackets = m.GetRxPackets()
-	meter.Packets = m.GetPackets()
-}
-
 func VTAPUsageMeterToPB(m *VTAPUsageMeter) *pb.VTAPUsageMeter {
 	return &pb.VTAPUsageMeter{
 		TxBytes:   proto.Uint64(m.TxBytes),
 		RxBytes:   proto.Uint64(m.RxBytes),
+		Bytes:     proto.Uint64(m.TxBytes + m.RxBytes),
 		TxPackets: proto.Uint64(m.TxPackets),
 		RxPackets: proto.Uint64(m.RxPackets),
+		Packets:   proto.Uint64(m.TxPackets + m.RxPackets),
 	}
 }
 
