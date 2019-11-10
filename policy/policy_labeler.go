@@ -48,6 +48,7 @@ func NewPolicyLabeler(queueCount int, mapSize uint32, fastPathDisable bool) Tabl
 	policy.AclGidMap.Init()
 	policy.InterestTable.Init(false)
 	policy.FastPath.Init(mapSize, queueCount, policy.AclGidMap.SrcGroupAclGidMaps, policy.AclGidMap.DstGroupAclGidMaps)
+	log.Warning("policy-group are not support acl with port 0 or protocol 0")
 	return policy
 }
 
@@ -293,6 +294,8 @@ func (l *PolicyLabeler) UpdateAcls(acls []*Acl, _ ...bool) {
 				acl.NpbActions[index].AddResourceGroupType(groupType)
 			}
 		}
+		// 若为全采集256, 取一个字节为0来表示资源组算法的全采集
+		acl.Proto = acl.Proto & 0xff
 
 		if acl.Type == TAP_ANY {
 			// 对于TAP_ANY策略，给其他每一个TAP类型都单独生成一个acl，来避免查找2次

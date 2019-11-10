@@ -14,11 +14,11 @@ type Acl struct {
 	DstGroups         []uint32
 	SrcGroupRelations []uint16
 	DstGroupRelations []uint16
-	SrcPortRange      []PortRange
-	DstPortRange      []PortRange
-	SrcPorts          []uint16
-	DstPorts          []uint16
-	Proto             uint8
+	SrcPortRange      []PortRange // 0仅表示采集端口0
+	DstPortRange      []PortRange // 0仅表示采集端口0
+	SrcPorts          []uint16    // 0仅表示采集端口0
+	DstPorts          []uint16    // 0仅表示采集端口0
+	Proto             uint16      // 256表示全采集, 0表示采集采集协议0
 	Vlan              uint32
 	Action            []AclAction
 	NpbActions        []NpbAction
@@ -28,6 +28,10 @@ type Acl struct {
 	AllMatched6Mask   []MatchedField6 // MatchedMask对应的位为0，表示对应Matched的位为*，0或1都匹配该策略
 	policy            PolicyRawData
 }
+
+const (
+	PROTO_ALL = 256
+)
 
 func (a *Acl) InitPolicy() {
 	a.policy.ACLID = a.Id
@@ -51,7 +55,7 @@ func (a *Acl) getPortRange(rawPorts []uint16) []PortRange {
 
 	min, max := uint16(0), uint16(0)
 	for index, port := range rawPorts {
-		if min == 0 {
+		if index == 0 {
 			min = port
 			max = port
 			if len(rawPorts) == index+1 {
@@ -85,10 +89,10 @@ func (a *Acl) generatePortSegment() ([]portSegment, []portSegment) {
 		dstSegment = append(dstSegment, newPortSegments(ports)...)
 	}
 	if len(srcSegment) == 0 {
-		srcSegment = append(srcSegment, emptyPortSegment)
+		srcSegment = append(srcSegment, allPortSegment)
 	}
 	if len(dstSegment) == 0 {
-		dstSegment = append(dstSegment, emptyPortSegment)
+		dstSegment = append(dstSegment, allPortSegment)
 	}
 	return srcSegment, dstSegment
 }
@@ -96,9 +100,9 @@ func (a *Acl) generatePortSegment() ([]portSegment, []portSegment) {
 func (a *Acl) generateMatchedField(srcMac, dstMac uint64, srcIps, dstIps ipSegment, srcPorts, dstPorts []portSegment) {
 	for _, srcPort := range srcPorts {
 		for _, dstPort := range dstPorts {
-			match := MatchedField{}
+			match, mask := MatchedField{}, MatchedField{}
+
 			match.Set(MATCHED_TAP_TYPE, uint64(a.Type))
-			match.Set(MATCHED_PROTO, uint64(a.Proto))
 			match.Set(MATCHED_VLAN, uint64(a.Vlan))
 			match.Set(MATCHED_SRC_MAC, srcMac)
 			match.Set(MATCHED_DST_MAC, dstMac)
@@ -108,11 +112,8 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint64, srcIps, dstIps ipSegme
 			match.Set(MATCHED_DST_EPC, uint64(dstIps.getEpcId()))
 			match.Set(MATCHED_SRC_PORT, uint64(srcPort.port))
 			match.Set(MATCHED_DST_PORT, uint64(dstPort.port))
-			a.AllMatched = append(a.AllMatched, match)
 
-			mask := MatchedField{}
 			mask.SetMask(MATCHED_TAP_TYPE, uint64(a.Type))
-			mask.SetMask(MATCHED_PROTO, uint64(a.Proto))
 			mask.SetMask(MATCHED_VLAN, uint64(a.Vlan))
 			mask.SetMask(MATCHED_SRC_MAC, srcMac)
 			mask.SetMask(MATCHED_DST_MAC, dstMac)
@@ -122,6 +123,16 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint64, srcIps, dstIps ipSegme
 			mask.SetMask(MATCHED_DST_EPC, uint64(dstIps.getEpcId()))
 			mask.Set(MATCHED_SRC_PORT, uint64(srcPort.mask))
 			mask.Set(MATCHED_DST_PORT, uint64(dstPort.mask))
+
+			if a.Proto == PROTO_ALL {
+				match.Set(MATCHED_PROTO, 0)
+				mask.Set(MATCHED_PROTO, 0)
+			} else {
+				match.Set(MATCHED_PROTO, uint64(a.Proto))
+				mask.SetMask(MATCHED_PROTO, uint64(0xff))
+			}
+
+			a.AllMatched = append(a.AllMatched, match)
 			a.AllMatchedMask = append(a.AllMatchedMask, mask)
 		}
 	}
@@ -130,7 +141,7 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint64, srcIps, dstIps ipSegme
 func (a *Acl) generateMatchedField6(srcMac, dstMac uint64, srcIps, dstIps ipSegment, srcPorts, dstPorts []portSegment) {
 	for _, srcPort := range srcPorts {
 		for _, dstPort := range dstPorts {
-			match := MatchedField6{}
+			match, mask := MatchedField6{}, MatchedField6{}
 			match.Set(MATCHED6_TAP_TYPE, uint64(a.Type))
 			match.Set(MATCHED6_PROTO, uint64(a.Proto))
 			match.Set(MATCHED6_VLAN, uint64(a.Vlan))
@@ -146,9 +157,7 @@ func (a *Acl) generateMatchedField6(srcMac, dstMac uint64, srcIps, dstIps ipSegm
 			match.Set(MATCHED6_DST_EPC, uint64(dstIps.getEpcId()))
 			match.Set(MATCHED6_SRC_PORT, uint64(srcPort.port))
 			match.Set(MATCHED6_DST_PORT, uint64(dstPort.port))
-			a.AllMatched6 = append(a.AllMatched6, match)
 
-			mask := MatchedField6{}
 			mask.SetMask(MATCHED6_TAP_TYPE, uint64(a.Type))
 			mask.SetMask(MATCHED6_PROTO, uint64(a.Proto))
 			mask.SetMask(MATCHED6_VLAN, uint64(a.Vlan))
@@ -164,7 +173,17 @@ func (a *Acl) generateMatchedField6(srcMac, dstMac uint64, srcIps, dstIps ipSegm
 			mask.SetMask(MATCHED6_DST_EPC, uint64(dstIps.getEpcId()))
 			mask.Set(MATCHED6_SRC_PORT, uint64(srcPort.mask))
 			mask.Set(MATCHED6_DST_PORT, uint64(dstPort.mask))
+
+			if a.Proto == PROTO_ALL {
+				match.Set(MATCHED6_PROTO, 0)
+				mask.SetMask(MATCHED6_PROTO, 0)
+			} else {
+				match.Set(MATCHED6_PROTO, uint64(a.Proto))
+				mask.SetMask(MATCHED6_PROTO, uint64(0xff))
+			}
+
 			a.AllMatched6Mask = append(a.AllMatched6Mask, mask)
+			a.AllMatched6 = append(a.AllMatched6, match)
 		}
 	}
 }

@@ -28,7 +28,7 @@ func TestGetPlatformData(t *testing.T) {
 	datas = append(datas, vifData, vifData1)
 	policy.UpdateInterfaceData(datas)
 
-	key := generateLookupKey(mac4, mac2, vlanAny, ip2, ip4, protoAny, 0, 0)
+	key := generateLookupKey(mac4, mac2, vlanAny, ip2, ip4, 0, 0, 0)
 	result, _ := policy.LookupAllByKey(key)
 	if result != nil {
 		t.Log(result.SrcInfo, "\n")
@@ -86,7 +86,7 @@ func TestAllPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, protoAny, 0, vlanAny)
+	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, 0, 0, vlanAny)
 	policy.UpdateAcls([]*Acl{acl1})
 
 	key := generateClassicLookupKey(mac4, mac2, ip4, ip2, 0, 0, EthernetTypeARP)
@@ -104,7 +104,7 @@ func TestGroupForwardPassPolicy(t *testing.T) {
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	// srcGroups: 40
-	acl1 := generatePolicyAcl(policy, forward, 10, group[4], groupAny, protoAny, 0, vlanAny)
+	acl1 := generatePolicyAcl(policy, forward, 10, group[4], groupAny, 0, 0, vlanAny)
 	policy.UpdateAcls([]*Acl{acl1})
 
 	key := generateClassicLookupKey(mac4, mac2, ip4, ip2, 0, 0, EthernetTypeARP)
@@ -122,7 +122,7 @@ func TestGroupBackwardPassPolicy(t *testing.T) {
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	// dstGroups: 40
-	acl1 := generatePolicyAcl(policy, backward, 10, groupAny, group[4], protoAny, 0, vlanAny)
+	acl1 := generatePolicyAcl(policy, backward, 10, groupAny, group[4], 0, 0, vlanAny)
 	policy.UpdateAcls([]*Acl{acl1})
 
 	key := generateClassicLookupKey(mac4, mac2, ip4, ip2, 0, 0, EthernetTypeARP)
@@ -140,7 +140,7 @@ func TestAllPortPassPolicy(t *testing.T) {
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	// dstPorts: 30
-	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, protoAny, 30, vlanAny)
+	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, 0, 30, vlanAny)
 	policy.UpdateAcls([]*Acl{acl1})
 
 	key := generateClassicLookupKey(mac4, mac2, ip4, ip2, 30, 30, EthernetTypeARP)
@@ -158,7 +158,7 @@ func TestSrcPortPassPolicy(t *testing.T) {
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	// dstPorts : 30
-	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, protoAny, 30, vlanAny)
+	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, 0, 30, vlanAny)
 	policy.UpdateAcls([]*Acl{acl1})
 
 	key := generateLookupKey(mac4, mac2, vlanAny, ip4, ip2, IPProtocolTCP, 30, 0)
@@ -178,7 +178,7 @@ func TestDstPortPassPolicy(t *testing.T) {
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	//	dstPorts: 30
-	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, protoAny, 30, vlanAny)
+	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, 0, 30, vlanAny)
 	policy.UpdateAcls([]*Acl{acl1})
 
 	key := generateLookupKey(mac4, mac2, vlanAny, ip4, ip2, IPProtocolTCP, 0, 30)
@@ -198,7 +198,7 @@ func TestSrcDstPortPassPolicy(t *testing.T) {
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	//	dstPorts: 30
-	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, protoAny, 30, vlanAny)
+	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, 0, 30, vlanAny)
 	policy.UpdateAcls([]*Acl{acl1})
 
 	key := generateLookupKey(mac4, mac2, vlanAny, ip4, ip2, IPProtocolTCP, 30, 30)
@@ -217,7 +217,7 @@ func TestVlanPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
-	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, protoAny, 0, 30)
+	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, 0, 0, 30)
 	policy.UpdateAcls([]*Acl{acl1})
 
 	key := generateLookupKey(mac4, mac2, 30, ip4, ip2, IPProtocolTCP, 30, 30)
@@ -237,7 +237,7 @@ func TestVlanPortPassPolicy(t *testing.T) {
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	//	dstPorts: 8000
-	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, protoAny, 8000, vlanAny)
+	acl1 := generatePolicyAcl(policy, forward, 10, groupAny, groupAny, 0, 8000, vlanAny)
 	policy.UpdateAcls([]*Acl{acl1})
 
 	key := generateLookupKey(mac4, mac2, 30, ip4, ip2, IPProtocolTCP, 8000, 30)
@@ -628,11 +628,11 @@ func TestL2endL3end5(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
 
 	// arp包 ip3-->ip4
-	key1 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 8000)
+	key1 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, 0, 0, 8000)
 	setEthTypeAndOthers(key1, EthernetTypeARP, 64, l2EndBool[0], l2EndBool[0])
 	getEndpointData(policy, key1)
 	// arp包 ip4-->ip3
-	key2 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, protoAny, 0, 8000)
+	key2 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, 0, 0, 8000)
 	setEthTypeAndOthers(key2, EthernetTypeARP, 64, l2EndBool[0], l2EndBool[0])
 	getEndpointData(policy, key2)
 
@@ -660,11 +660,11 @@ func TestFastpathEndInfo(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
 
 	// arp包 ip3-->ip4 ttl=64  L2end0=L2end1=false L3end0=true,L3end1=false
-	key1 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 0)
+	key1 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, 0, 0, 0)
 	setEthTypeAndOthers(key1, EthernetTypeARP, 64, l2EndBool[0], l2EndBool[0])
 	policy.LookupAllByKey(key1)
 	// arp包 ip4-->ip3 ttl=64  L2end0=L2end1=false L3end0=true,L3end1=true
-	key2 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, protoAny, 0, 0)
+	key2 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, 0, 0, 0)
 	setEthTypeAndOthers(key2, EthernetTypeARP, 64, l2EndBool[0], l2EndBool[0])
 	policy.LookupAllByKey(key2)
 
@@ -703,7 +703,7 @@ func checkEndpointStore(t *testing.T, store *EndpointStore) bool {
 func TestFastpathEndpointStore(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
 	// l2End0=true, l3End0=false, l2End1=false, l3End1=false
-	key := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 0)
+	key := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, 0, 0, 0)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 63, l2EndBool[1], l2EndBool[0])
 	policy.LookupAllByKey(key)
 	store, _ := policy.operator.GetPolicyByFastPath(key)
@@ -715,7 +715,7 @@ func TestFastpathEndpointStore(t *testing.T) {
 func TestFastpathL2End(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
 	// l2End0=true, l3End0=false, l2End1=false, l3End1=false
-	key := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 0)
+	key := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, 0, 0, 0)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 63, l2EndBool[1], l2EndBool[0])
 	policy.LookupAllByKey(key)
 	endpoint, _ := getPolicyByFastPath(policy, key)
@@ -725,7 +725,7 @@ func TestFastpathL2End(t *testing.T) {
 	}
 
 	// l2End0=false, l3End0=false, l2End1=true, l3End1=false
-	key2 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, protoAny, 0, 0)
+	key2 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, 0, 0, 0)
 	setEthTypeAndOthers(key2, EthernetTypeIPv4, 63, l2EndBool[0], l2EndBool[1])
 	policy.LookupAllByKey(key2)
 	endpoint, _ = getPolicyByFastPath(policy, key2)
@@ -735,7 +735,7 @@ func TestFastpathL2End(t *testing.T) {
 	}
 
 	// l2End0=true, l3End0=false, l2End1=true, l3End1=false
-	key3 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 80)
+	key3 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, 0, 0, 80)
 	setEthTypeAndOthers(key3, EthernetTypeIPv4, 63, l2EndBool[1], l2EndBool[1])
 	endpoint, _ = getPolicyByFastPath(policy, key3)
 	basicEndInfo = generateEndInfo(l2EndBool[1], l3EndBool[0], l2EndBool[1], l3EndBool[0])
@@ -744,7 +744,7 @@ func TestFastpathL2End(t *testing.T) {
 	}
 
 	// l2End0=false, l3End0=false, l2End1=false, l3End1=false
-	key4 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 80)
+	key4 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, 0, 0, 80)
 	setEthTypeAndOthers(key4, EthernetTypeIPv4, 63, l2EndBool[0], l2EndBool[0])
 	endpoint, _ = getPolicyByFastPath(policy, key4)
 	basicEndInfo = generateEndInfo(l2EndBool[0], l3EndBool[0], l2EndBool[0], l3EndBool[0])
@@ -756,7 +756,7 @@ func TestFastpathL2End(t *testing.T) {
 func TestFastpathL2L3End(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
 	// l2End0=true, l3End0=true, l2End1=true, l3End1=false
-	key1 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, protoAny, 80, 0)
+	key1 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, 0, 80, 0)
 	setEthTypeAndOthers(key1, EthernetTypeIPv4, 64, l2EndBool[1], l2EndBool[1])
 	policy.LookupAllByKey(key1)
 	endpoint, _ := getPolicyByFastPath(policy, key1)
@@ -766,7 +766,7 @@ func TestFastpathL2L3End(t *testing.T) {
 	}
 
 	// l2End0=false, l3End0=true, l2End1=false, l3End1=false
-	key2 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 80)
+	key2 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, 0, 0, 80)
 	setEthTypeAndOthers(key2, EthernetTypeIPv4, 64, l2EndBool[0], l2EndBool[0])
 	policy.LookupAllByKey(key2)
 	endpoint, _ = getPolicyByFastPath(policy, key2)
@@ -776,7 +776,7 @@ func TestFastpathL2L3End(t *testing.T) {
 	}
 
 	// l2End0=true, l3End0=true, l2End1=false, l3End1=false
-	key3 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 0, 80)
+	key3 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, 0, 0, 80)
 	setEthTypeAndOthers(key3, EthernetTypeIPv4, 64, l2EndBool[1], l2EndBool[0])
 	endpoint, _ = getPolicyByFastPath(policy, key3)
 	basicEndInfo = generateEndInfo(l2EndBool[1], l3EndBool[1], l2EndBool[0], l3EndBool[0])
@@ -785,7 +785,7 @@ func TestFastpathL2L3End(t *testing.T) {
 	}
 
 	// l2End0=false, l3End0=true, l2End1=true, l3End1=false
-	key4 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, protoAny, 80, 0)
+	key4 := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, 0, 80, 0)
 	setEthTypeAndOthers(key4, EthernetTypeIPv4, 64, l2EndBool[0], l2EndBool[1])
 	endpoint, _ = getPolicyByFastPath(policy, key4)
 	basicEndInfo = generateEndInfo(l2EndBool[0], l3EndBool[1], l2EndBool[1], l3EndBool[0])
@@ -795,7 +795,7 @@ func TestFastpathL2L3End(t *testing.T) {
 
 	generatePlatformData(policy)
 	// l2End0=true, l3End0=true, l2End1=true, l3End1=true
-	key5 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 80, 0)
+	key5 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, 0, 80, 0)
 	setEthTypeAndOthers(key5, EthernetTypeIPv4, 64, l2EndBool[1], l2EndBool[1])
 	policy.LookupAllByKey(key5)
 	endpoint, _ = getPolicyByFastPath(policy, key5)
@@ -805,7 +805,7 @@ func TestFastpathL2L3End(t *testing.T) {
 	}
 
 	// l2End0=false, l3End0=true, l2End1=false, l3End1=true
-	key6 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 80, 0)
+	key6 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, 0, 80, 0)
 	setEthTypeAndOthers(key6, EthernetTypeIPv4, 64, l2EndBool[0], l2EndBool[0])
 	policy.LookupAllByKey(key6)
 	endpoint, _ = getPolicyByFastPath(policy, key6)
@@ -815,7 +815,7 @@ func TestFastpathL2L3End(t *testing.T) {
 	}
 
 	// l2End0=true, l3End0=true, l2End1=false, l3End1=true
-	key7 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 80, 0)
+	key7 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, 0, 80, 0)
 	setEthTypeAndOthers(key7, EthernetTypeIPv4, 64, l2EndBool[1], l2EndBool[0])
 	endpoint, _ = getPolicyByFastPath(policy, key7)
 	basicEndInfo = generateEndInfo(l2EndBool[1], l3EndBool[1], l2EndBool[0], l3EndBool[1])
@@ -824,7 +824,7 @@ func TestFastpathL2L3End(t *testing.T) {
 	}
 
 	// l2End0=false, l3End0=true, l2End1=true, l3End1=true
-	key8 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, protoAny, 80, 0)
+	key8 := generateLookupKey(mac3, mac4, vlanAny, ip3, ip4, 0, 80, 0)
 	setEthTypeAndOthers(key8, EthernetTypeIPv4, 64, l2EndBool[0], l2EndBool[1])
 	endpoint, _ = getPolicyByFastPath(policy, key8)
 	basicEndInfo = generateEndInfo(l2EndBool[0], l3EndBool[1], l2EndBool[1], l3EndBool[1])

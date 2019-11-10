@@ -65,4 +65,10 @@ func TestPortRange(t *testing.T) {
 	if !reflect.DeepEqual(expect, result) {
 		t.Errorf("TestPortRange expect: %+v  return: %+v ", expect, result)
 	}
+
+	expect = []PortRange{NewPortRange(0, 999), NewPortRange(1000, 1000), NewPortRange(1001, 65535)}
+	result = GetPortRanges([]PortRange{NewPortRange(1000, 1000), NewPortRange(0, 65535)})
+	if !reflect.DeepEqual(expect, result) {
+		t.Errorf("TestPortRange expect: %+v  return: %+v ", expect, result)
+	}
 }

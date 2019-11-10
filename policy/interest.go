@@ -264,7 +264,7 @@ func (t *InterestTable) generateInterestProtoMaps(acls []*Acl) {
 	interestProtoMaps := &[TAP_MAX][math.MaxUint8 + 1]bool{}
 
 	for _, acl := range acls {
-		if !acl.Type.CheckTapType(acl.Type) {
+		if !acl.Type.CheckTapType(acl.Type) || acl.Proto == PROTO_ALL {
 			continue
 		}
 		if acl.Type != TAP_ANY {
@@ -288,10 +288,14 @@ func (t *InterestTable) GenerateInterestMaps(acls []*Acl) {
 
 func (t *InterestTable) getFastInterestKeys(packet *LookupKey) {
 	ports := t.InterestPortMaps[packet.Tap][packet.SrcPort]
-	packet.SrcPort = ports.Min()
+	if !ports.IsMatchAny() || !t.ddbs {
+		packet.SrcPort = ports.Min()
+	}
 	ports = t.InterestPortMaps[packet.Tap][packet.DstPort]
-	packet.DstPort = ports.Min()
-	if !t.InterestProtoMaps[packet.Tap][packet.Proto] {
-		packet.Proto = ANY_PROTO
+	if !ports.IsMatchAny() || !t.ddbs {
+		packet.DstPort = ports.Min()
+	}
+	if !t.InterestProtoMaps[packet.Tap][packet.Proto] && !t.ddbs {
+		packet.Proto = ANY_PROTO // 仅用于资源组匹配算法
 	}
 }
