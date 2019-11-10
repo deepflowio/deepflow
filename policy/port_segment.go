@@ -11,7 +11,7 @@ type portSegment struct {
 }
 
 var (
-	emptyPortSegment portSegment = portSegment{}
+	allPortSegment portSegment = portSegment{0, 0}
 )
 
 func calcZeroCount(port uint16) uint16 {
@@ -37,7 +37,7 @@ func calcMask(port, maxPort, count uint16) (uint16, uint16) {
 func newPortSegments(port PortRange) []portSegment {
 	segments := make([]portSegment, 0, 2)
 
-	for i := port.Min(); i <= port.Max() && i != 0; {
+	for i := port.Min(); i <= port.Max(); {
 		segment := portSegment{}
 		n := calcZeroCount(i)
 		mask, n := calcMask(i, port.Max(), n)

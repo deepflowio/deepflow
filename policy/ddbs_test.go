@@ -197,7 +197,7 @@ func TestDdbsFlowVlanAcls(t *testing.T) {
 	acls := []*Acl{}
 	table := generatePolicyTable(DDBS)
 	action := generateAclAction(10, ACTION_FLOW_COUNTING)
-	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, 10)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, portAny, 10)
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
 	// 构建查询key  1->2 tcp vlan:10
@@ -584,7 +584,7 @@ func TestDdbsFirstPathVsFastPath(t *testing.T) {
 	action1 := generateAclAction(24, ACTION_PACKET_COUNTING)
 	acl1 := generatePolicyAcl(table, action1, 24, group[5], groupAny, IPProtocolTCP, 8000, vlanAny)
 	action2 := generateAclAction(25, ACTION_PACKET_COUNTING)
-	acl2 := generatePolicyAcl(table, action2, 25, group[5], groupAny, protoAny, 0, 10)
+	acl2 := generatePolicyAcl(table, action2, 25, group[5], groupAny, protoAny, portAny, 10)
 	acls = append(acls, acl1, acl2)
 	table.UpdateAcls(acls)
 
@@ -888,13 +888,13 @@ func TestDdbsMultiNpbAction1(t *testing.T) {
 	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
 	npb := ToNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
 	// VMA -> ANY SRC
-	acl := generatePolicyAcl(table, action, 25, group[1], groupAny, IPProtocolTCP, 0, vlanAny, npb)
+	acl := generatePolicyAcl(table, action, 25, group[1], groupAny, IPProtocolTCP, portAny, vlanAny, npb)
 	// VMB -> ANY SRC
-	acl2 := generatePolicyAcl(table, action, 25, group[2], groupAny, IPProtocolTCP, 0, vlanAny, npb)
+	acl2 := generatePolicyAcl(table, action, 25, group[2], groupAny, IPProtocolTCP, portAny, vlanAny, npb)
 	// VMA -> VMB SRC
-	acl3 := generatePolicyAcl(table, action, 25, group[1], group[2], IPProtocolTCP, 0, vlanAny, npb)
+	acl3 := generatePolicyAcl(table, action, 25, group[1], group[2], IPProtocolTCP, portAny, vlanAny, npb)
 	// VMB -> VMA SRC
-	acl4 := generatePolicyAcl(table, action, 25, group[2], group[1], IPProtocolTCP, 0, vlanAny, npb)
+	acl4 := generatePolicyAcl(table, action, 25, group[2], group[1], IPProtocolTCP, portAny, vlanAny, npb)
 	acls := []*Acl{acl, acl2, acl3, acl4}
 	table.UpdateAcls(acls)
 	basicPolicyData := &PolicyData{}
@@ -1159,7 +1159,7 @@ func TestDdbsPolicySrcPort(t *testing.T) {
 	table := generatePolicyTable(DDBS)
 	// 构建acl action  1:1000->2:0 tcp
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
-	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, portAny, vlanAny)
 	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
@@ -1214,7 +1214,7 @@ func TestDdbsAclGidBitmap(t *testing.T) {
 	// 构建acl action  1:1000->2:0 tcp
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	action = action.SetACLGID(10)
-	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, portAny, vlanAny)
 	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
@@ -1239,7 +1239,7 @@ func TestDdbsAclGidBitmapMultiGroup(t *testing.T) {
 	// 构建acl action  1:1000->2:0 tcp
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	action = action.SetACLGID(10)
-	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, portAny, vlanAny)
 	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
@@ -1286,7 +1286,7 @@ func TestDdbsAclGidBitmapAnonymousGroupIds(t *testing.T) {
 	// 构建acl action  1:1000->2:0 tcp
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	action = action.SetACLGID(10)
-	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, portAny, vlanAny)
 	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
@@ -1319,9 +1319,9 @@ func TestDdbsAclGidBitmapFirstPathVsFastPath(t *testing.T) {
 	// 构建acl action  1:1000->2:0 tcp
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	action = action.SetACLGID(10)
-	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, portAny, vlanAny)
 	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
-	acl1 := generatePolicyAcl(table, action, 20, group[2], group[1], IPProtocolTCP, 0, vlanAny)
+	acl1 := generatePolicyAcl(table, action, 20, group[2], group[1], IPProtocolTCP, portAny, vlanAny)
 	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(8000, 8000))
 	acls = append(acls, acl, acl1)
 	table.UpdateAcls(acls)
@@ -1364,8 +1364,8 @@ func TestDdbsAclGidBitmapFirstPathVsFastPathByVlan(t *testing.T) {
 	table := generatePolicyTable(DDBS)
 	action := generateAclAction(10, ACTION_PACKET_COUNTING)
 	action = action.SetACLGID(10)
-	acl1 := generatePolicyAcl(table, action, 10, group[1], group[2], protoAny, 0, vlan1)
-	acl2 := generatePolicyAcl(table, action, 20, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	acl1 := generatePolicyAcl(table, action, 10, group[1], group[2], protoAny, portAny, vlan1)
+	acl2 := generatePolicyAcl(table, action, 20, group[1], group[2], IPProtocolTCP, portAny, vlanAny)
 	acls = append(acls, acl1, acl2)
 	table.UpdateAcls(acls)
 	// vlan1策略正向
@@ -1690,39 +1690,6 @@ func TestDdbsPolicyIpv6WithIpGroup(t *testing.T) {
 	}
 }
 
-func TestDdbsProtocol(t *testing.T) {
-	acls := []*Acl{}
-	table := generatePolicyTable(DDBS)
-	action := generateAclAction(10, ACTION_PACKET_COUNTING)
-	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolGRE, 0, vlanAny)
-	acls = append(acls, acl)
-	table.UpdateAcls(acls)
-
-	// 生成匹配策略的key
-	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolGRE, 0, 0)
-
-	_, policyData := table.LookupAllByKey(key)
-	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestProtocol Check Failed!")
-	}
-
-	// 通过fastPath查询
-	_, policyData = table.operator.GetPolicyByFastPath(key)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestProtocol Check Failed!")
-	}
-
-	// 生成不匹配策略的key
-	key = generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolUDP, 0, 0)
-
-	_, policyData = table.LookupAllByKey(key)
-	if !CheckPolicyResult(t, INVALID_POLICY_DATA, policyData) {
-		t.Error("TestProtocol Check Failed!")
-	}
-}
-
 func TestDdbsPeerConnection(t *testing.T) {
 	table := generatePolicyTable(DDBS)
 	// group2Ip1对应EPC有两个分别为12和20，若没有对等连接查询，会查询到12
@@ -1731,6 +1698,90 @@ func TestDdbsPeerConnection(t *testing.T) {
 	if endpoints.DstInfo.L3EpcId != 20 {
 		t.Error(endpoints)
 		t.Error("TestDdbsPeerConnection Check Failed!")
+	}
+}
+
+func TestDdbsPort(t *testing.T) {
+	acls := []*Acl{}
+	// 创建 policyTable
+	table := generatePolicyTable(DDBS)
+	// 构建acl action  1->2 tcp 1000
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 1000, vlanAny)
+	acls = append(acls, acl)
+	table.UpdateAcls(acls)
+
+	// 构建查询1-key  1:0->2:8000 tcp
+	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 8000)
+
+	// 获取查询first结果
+	_, policyData := table.LookupAllByKey(key)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, INVALID_POLICY_DATA, policyData) {
+		t.Error("TestDdbsPort0 Check Failed!")
+	}
+
+	key = generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 1000)
+
+	// 获取查询first结果
+	_, policyData = table.LookupAllByKey(key)
+	// 构建预期结果
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestDdbsPort0 Check Failed!")
+	}
+
+	// 全采集
+	acl = generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, -1, vlanAny)
+	acls = append(acls[0:], acl)
+	table.UpdateAcls(acls)
+	key = generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 8000)
+	_, policyData = table.LookupAllByKey(key)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestDdbsPort0 Check Failed!")
+	}
+}
+
+func TestDdbsProtocol(t *testing.T) {
+	acls := []*Acl{}
+	// 创建 policyTable
+	table := generatePolicyTable(DDBS)
+	// 构建acl action  1->2 tcp 8000
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], 0, 0, vlanAny)
+	acls = append(acls, acl)
+	table.UpdateAcls(acls)
+
+	// 构建查询1-key  1:0->2:8000 tcp
+	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 0)
+	// 获取查询first结果
+	_, policyData := table.LookupAllByKey(key)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, INVALID_POLICY_DATA, policyData) {
+		t.Error("TestDdbsPort0 Check Failed!")
+	}
+
+	key = generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, 0, 0, 0)
+	// 获取查询first结果
+	_, policyData = table.LookupAllByKey(key)
+	// 构建预期结果
+	basicPolicyData := new(PolicyData)
+	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestDdbsPort0 Check Failed!")
+	}
+
+	// 全采集
+	acl = generatePolicyAcl(table, action, 10, group[1], group[2], PROTO_ALL, 0, vlanAny)
+	acls = append(acls[0:], acl)
+	table.UpdateAcls(acls)
+	key = generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 0)
+	_, policyData = table.LookupAllByKey(key)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestDdbsPort0 Check Failed!")
 	}
 }
 
