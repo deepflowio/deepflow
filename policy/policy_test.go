@@ -42,7 +42,8 @@ var (
 	groupEpcAny   = int32(0)
 	groupAny      = uint32(0)
 	subnetAny     = uint32(0)
-	protoAny      = IPProtocol(0)
+	protoAny      = 256
+	portAny       = -1
 	vlanAny       = uint32(0)
 	vlan1         = uint32(10)
 	macAny        = uint64(0)
@@ -262,8 +263,8 @@ func getBackwardAcl(acl AclAction) AclAction {
 
 func generatePolicyAcl(table *PolicyTable, action AclAction, aclID ACLID, args ...interface{}) *Acl {
 	var srcGroupId, dstGroupId, vlan uint32
-	var proto uint8
-	var port uint16
+	var proto uint16
+	var port int
 	var npb NpbAction
 
 	for i, arg := range args {
@@ -273,12 +274,16 @@ func generatePolicyAcl(table *PolicyTable, action AclAction, aclID ACLID, args .
 		case 1:
 			dstGroupId = arg.(uint32)
 		case 2:
-			proto = uint8(arg.(IPProtocol))
-		case 3:
-			if _, ok := arg.(uint16); ok {
-				port = arg.(uint16)
+			if netProto, ok := arg.(IPProtocol); ok {
+				proto = uint16(netProto)
 			} else {
-				port = uint16(arg.(int))
+				proto = uint16(arg.(int))
+			}
+		case 3:
+			if _, ok := arg.(int); ok {
+				port = arg.(int)
+			} else {
+				port = int(arg.(uint16))
 			}
 		case 4:
 			if _, ok := arg.(int); ok {
@@ -300,8 +305,10 @@ func generatePolicyAcl(table *PolicyTable, action AclAction, aclID ACLID, args .
 	if dstGroupId != 0 {
 		dstGroups = append(dstGroups, dstGroupId)
 	}
-	if port != 0 {
-		dstPorts = append(dstPorts, NewPortRange(port, port))
+	if port > 0 {
+		dstPorts = append(dstPorts, NewPortRange(uint16(port), uint16(port)))
+	} else if port < 0 {
+		dstPorts = append(dstPorts, NewPortRange(0, 65535))
 	}
 	acl := &Acl{
 		Id:           aclID,
@@ -310,7 +317,7 @@ func generatePolicyAcl(table *PolicyTable, action AclAction, aclID ACLID, args .
 		SrcGroups:    srcGroups,
 		DstGroups:    dstGroups,
 		DstPortRange: dstPorts,
-		Proto:        uint8(proto),
+		Proto:        uint16(proto),
 		Vlan:         vlan,
 		Action:       []AclAction{action},
 	}
@@ -2326,7 +2333,7 @@ func BenchmarkNpbCheck(b *testing.B) {
 	endpoints.SrcInfo = generateEndpointInfo(10, 10, true, true, 20, 100, 200)
 	endpoints.DstInfo = generateEndpointInfo(10, 10, true, false, 20, 100, 200)
 
-	key := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, protoAny, 0, 0)
+	key := generateLookupKey(mac4, mac3, vlanAny, ip4, ip3, 0, 0, 0)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 63, l2EndBool[1], l2EndBool[1])
 
 	for i := 0; i < b.N; i++ {
