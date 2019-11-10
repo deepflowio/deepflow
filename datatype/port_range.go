@@ -24,6 +24,10 @@ func (p PortRange) Max() uint16 {
 	return uint16(p & 0xffff)
 }
 
+func (p PortRange) IsMatchAny() bool {
+	return p == 0
+}
+
 func (p PortRange) String() string {
 	return fmt.Sprintf("%v-%v", p.Min(), p.Max())
 }
@@ -63,20 +67,20 @@ func createPortStatusTable(raw []PortRange) []PortStatus {
 func createPortRangeByTable(table []PortStatus) []PortRange {
 	portRanges := make([]PortRange, 0, 1000)
 
-	lastPort := 0
-	for port := 1; port <= math.MaxUint16; port++ {
+	lastPort := -1
+	for port := 0; port <= math.MaxUint16; port++ {
 		status := table[port]
 
 		switch status {
 		case RANGE_NONE:
 		case RANGE_EDGE:
-			if lastPort > 0 && lastPort != port && table[lastPort] != RANGE_NONE {
+			if lastPort >= 0 && lastPort != port && table[lastPort] != RANGE_NONE {
 				portRanges = append(portRanges, NewPortRange(uint16(lastPort), uint16(port)-1))
 			}
 			portRanges = append(portRanges, NewPortRange(uint16(port), uint16(port)))
 			lastPort = port + 1
 		case RANGE_LEFT:
-			if lastPort > 0 && lastPort != port && table[lastPort] != RANGE_NONE {
+			if lastPort >= 0 && lastPort != port && table[lastPort] != RANGE_NONE {
 				portRanges = append(portRanges, NewPortRange(uint16(lastPort), uint16(port)-1))
 			}
 			lastPort = port
