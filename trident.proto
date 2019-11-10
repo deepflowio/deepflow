@@ -113,6 +113,7 @@ enum GroupType {
     ANONYMOUS = 1;
 }
 
+// 字段含义查看README
 message Group {
     optional uint32 id = 1;
     optional uint32 epc_id = 2 [default = 0];
@@ -190,10 +191,11 @@ message FlowAction {
     optional uint32 tag_template = 3;
 }
 
+// 字段含义查看README
 message FlowAcl {
     optional uint32 id = 1;
-    optional uint32 tap_type = 2; // 3: in_port 0x3****, 0~2/4~30: in_port 0x1****
-    optional uint32 protocol = 6;
+    optional uint32 tap_type = 2;
+    optional uint32 protocol = 6 [default = 256];
     optional string src_ports = 7;
     optional string dst_ports = 8;
     optional uint32 vlan = 9;
