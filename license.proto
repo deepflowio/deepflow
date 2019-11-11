@@ -22,4 +22,7 @@ message License {
     optional string issuance_time = 13; // 签发时间戳 "2019-09-11 15:43:20"
     optional string sign_server_ip = 14; // 签发服务器IP
     optional string agency = 15; // 代理商
+
+    optional uint32 vtap_count_type4 = 16; // 物理机进程类型采集器
+    optional uint32 vtap_count_type5 = 17; // 专用物理机类型采集器
 }
