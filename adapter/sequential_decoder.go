@@ -3,7 +3,6 @@ package adapter
 import (
 	"encoding/binary"
 	"net"
-	"strings"
 	"time"
 
 	. "github.com/google/gopacket/layers"
@@ -68,8 +67,6 @@ type Decoded struct {
 	// l4
 	port0, port1 uint16
 	dataOffset   uint8
-	win          uint16
-	tcpFlags     uint8
 }
 
 type SequentialDecoder struct {
@@ -91,51 +88,6 @@ func NewSequentialDecoder(data []byte) *SequentialDecoder {
 
 func (d *SequentialDecoder) initSequentialDecoder(data []byte) {
 	d.data = NewByteStream(data)
-}
-
-var FLAGS_NAME = [...]string{
-	"M0",    // mac0
-	"M1",    // mac1
-	"V",     // vlan
-	"H",     // header-type
-	"A0",    // ip0
-	"A1",    // ip1
-	"P0",    // port0
-	"P1",    // port1
-	"TTL",   // ttl
-	"IP_F+", // flags + frags-offset
-	"IHL+",  // ihl + data-offset
-	"WIN",   // win
-	"TCP_F", // tcp flags
-	"S",     // src-endpoint
-	"D",     // dst-endpoint
-	"T",     // tunnel
-}
-
-var SHORTER_FLAGS = strings.NewReplacer(
-	"M0|M1|V", "L2",
-	"M0|M1", "M",
-	"A0|A1|P0|P1", "L3",
-	"A0|A1", "IP",
-	"P0|P1", "P",
-	"S|D", "L", // local packet
-)
-
-var COMPRESS_SIZE = [...]int{
-	MAC_ADDR_LEN,
-	MAC_ADDR_LEN,
-	VLANTAG_LEN,
-	HEADER_TYPE_LEN,
-	IP_ADDR_LEN,
-	IP_ADDR_LEN,
-	PORT_LEN,
-	PORT_LEN,
-	IPV4_TTL_LEN,
-	IPV4_FLAGS_FRAG_OFFSET_LEN,
-	1, // IHL_DATA_OFFSET
-	TCP_WIN_LEN,
-	1, // TCP_FLAGS
-	0, 0, 0,
 }
 
 func (d *SequentialDecoder) Seq() uint64 {
@@ -164,6 +116,8 @@ func (d *SequentialDecoder) decodeEthernet(meta *MetaPacket) {
 
 	meta.L2End0 = d.pflags.IsSet(PFLAG_SRC_ENDPOINT)
 	meta.L2End1 = d.pflags.IsSet(PFLAG_DST_ENDPOINT)
+	meta.L3End0 = d.pflags.IsSet(PFLAG_SRC_L3ENDPOINT)
+	meta.L3End1 = d.pflags.IsSet(PFLAG_DST_L3ENDPOINT)
 	meta.Vlan = x.vlan
 	if d.forward {
 		meta.MacSrc = x.mac0
@@ -337,19 +291,11 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 	}
 	meta.PayloadLen -= uint16(x.dataOffset * 4)
 	meta.Protocol = IPProtocolTCP
-	seq := d.data.U32()
-	ack := d.data.U32()
-	if !d.pflags.IsSet(CFLAG_TCP_FLAGS) {
-		x.tcpFlags = d.data.U8()
-	}
-	if !d.pflags.IsSet(CFLAG_WIN) {
-		x.win = d.data.U16()
-	}
 	tcpData := &meta.TcpData
-	tcpData.Seq = seq
-	tcpData.Ack = ack
-	tcpData.Flags = x.tcpFlags
-	tcpData.WinSize = x.win
+	tcpData.Seq = d.data.U32()
+	tcpData.Ack = d.data.U32()
+	tcpData.Flags = d.data.U8()
+	tcpData.WinSize = d.data.U16()
 	tcpData.DataOffset = x.dataOffset
 	if x.dataOffset > 5 {
 		optionFlag := d.data.U8()
@@ -373,7 +319,7 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 
 func (d *SequentialDecoder) DecodeHeader() bool {
 	version := d.data.U16() // U8 reserved and U8 version
-	if version != 2 {
+	if version != 3 {
 		return true
 	}
 	d.seq = d.data.U64()

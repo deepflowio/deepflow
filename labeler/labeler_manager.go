@@ -149,14 +149,6 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 	}
 }
 
-func getTTL(packet *datatype.MetaPacket) uint8 {
-	if packet.InPort == datatype.PACKET_SOURCE_TOR {
-		return 128
-	}
-
-	return packet.TTL
-}
-
 func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *datatype.PolicyData {
 	key := &l.lookupKey[index]
 
@@ -170,9 +162,10 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *data
 	key.EthType = packet.EthType
 	key.Vlan = packet.Vlan
 	key.Proto = uint8(packet.Protocol)
-	key.Ttl = getTTL(packet)
 	key.L2End0 = packet.L2End0
 	key.L2End1 = packet.L2End1
+	key.L3End0 = packet.L3End0
+	key.L3End1 = packet.L3End1
 	key.Tap = datatype.GetTapType(packet.InPort)
 	key.Invalid = packet.Invalid
 	key.FastIndex = index
