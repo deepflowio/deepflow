@@ -7,6 +7,40 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
+func (m *FlowMap) initTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
+	m.initFlow(flowExtra, meta)
+	flags := meta.TcpData.Flags
+
+	m.updateTCPDirection(meta, flags, flowExtra, true) // 新建流时更新ServiceTable并矫正流方向
+	meta.IsActiveService = flowExtra.taggedFlow.IsActiveService
+
+	if StatePreprocess(meta, flags) || meta.Invalid {
+		flowExtra.timeout = exceptionTimeout
+		flowExtra.flowState = FLOW_STATE_EXCEPTION
+	}
+
+	m.updateFlowStateMachine(flowExtra, flags, meta.Direction == SERVER_TO_CLIENT)
+}
+
+func (m *FlowMap) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) bool { // return: closed
+	taggedFlow := flowExtra.taggedFlow
+	flags := meta.TcpData.Flags
+	taggedFlow.FlowMetricsPeers[meta.Direction].TCPFlags |= flags
+	m.updateFlow(flowExtra, meta)
+
+	if flags&TCP_SYN != 0 { // 有特殊包时更新ServiceTable并矫正流方向：SYN+ACK或SYN
+		m.updateTCPDirection(meta, flags, flowExtra, false)
+	}
+	meta.IsActiveService = taggedFlow.IsActiveService
+
+	if StatePreprocess(meta, flags) || meta.Invalid {
+		flowExtra.timeout = exceptionTimeout
+		flowExtra.flowState = FLOW_STATE_EXCEPTION
+		return false
+	}
+	return m.updateFlowStateMachine(flowExtra, flags, meta.Direction == SERVER_TO_CLIENT)
+}
+
 func (m *FlowMap) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8, serverToClient bool) bool {
 	taggedFlow := flowExtra.taggedFlow
 	var timeout time.Duration
@@ -38,51 +72,6 @@ func (m *FlowMap) updateFlowStateMachine(flowExtra *FlowExtra, flags uint8, serv
 	return closed
 }
 
-func (m *FlowMap) initTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
-	m.initFlow(flowExtra, meta)
-	taggedFlow := flowExtra.taggedFlow
-	flags := meta.TcpData.Flags
-	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
-	flowMetricsPeerSrc.TCPFlags |= flags
-	flowMetricsPeerSrc.TotalPacketCount = 1
-	flowMetricsPeerSrc.PacketCount = 1
-	flowMetricsPeerSrc.TickPacketCount = 1
-	flowMetricsPeerSrc.TotalByteCount = uint64(meta.PacketLen)
-	flowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
-	flowMetricsPeerSrc.TickByteCount = uint64(meta.PacketLen)
-	updatePlatformData(taggedFlow, meta.EndpointData, false)
-	m.fillGeoInfo(taggedFlow)
-
-	m.updateTCPDirection(meta, flags, flowExtra, true) // 新建流时矫正流方向
-	meta.IsActiveService = taggedFlow.IsActiveService
-
-	if StatePreprocess(meta, flags) || meta.Invalid {
-		flowExtra.timeout = exceptionTimeout
-		flowExtra.flowState = FLOW_STATE_EXCEPTION
-	}
-
-	m.updateFlowStateMachine(flowExtra, flags, meta.Direction == SERVER_TO_CLIENT)
-}
-
-func (m *FlowMap) updateTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) bool { // return: closed
-	taggedFlow := flowExtra.taggedFlow
-	flags := meta.TcpData.Flags
-	taggedFlow.FlowMetricsPeers[meta.Direction].TCPFlags |= flags
-	m.updateFlow(flowExtra, meta)
-
-	if flags&TCP_SYN != 0 { // 有特殊包时矫正流方向：SYN+ACK或SYN
-		m.updateTCPDirection(meta, flags, flowExtra, false)
-	}
-	meta.IsActiveService = taggedFlow.IsActiveService
-
-	if StatePreprocess(meta, flags) || meta.Invalid {
-		flowExtra.timeout = exceptionTimeout
-		flowExtra.flowState = FLOW_STATE_EXCEPTION
-		return false
-	}
-	return m.updateFlowStateMachine(flowExtra, flags, meta.Direction == SERVER_TO_CLIENT)
-}
-
 func (m *FlowMap) updateTCPDirection(meta *MetaPacket, flags uint8, flowExtra *FlowExtra, isFirstPacket bool) {
 	srcScore, dstScore := uint8(0), uint8(0)
 	if meta.EthType == layers.EthernetTypeIPv4 {
@@ -101,7 +90,7 @@ func (m *FlowMap) updateTCPDirection(meta *MetaPacket, flags uint8, flowExtra *F
 	}
 	if !IsClientToServer(srcScore, dstScore) {
 		srcScore, dstScore = dstScore, srcScore
-		flowExtra.reverseFlow()
+		reverseFlow(flowExtra.taggedFlow)
 		flowExtra.reversed = !flowExtra.reversed
 		meta.Direction = (CLIENT_TO_SERVER + SERVER_TO_CLIENT) - meta.Direction // reverse
 	}

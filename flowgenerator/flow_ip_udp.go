@@ -7,20 +7,10 @@ import (
 
 func (m *FlowMap) initUdpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	m.initFlow(flowExtra, meta)
-	taggedFlow := flowExtra.taggedFlow
-	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
-	flowMetricsPeerSrc.TotalPacketCount = 1
-	flowMetricsPeerSrc.PacketCount = 1
-	flowMetricsPeerSrc.TickPacketCount = 1
-	flowMetricsPeerSrc.TotalByteCount = uint64(meta.PacketLen)
-	flowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
-	flowMetricsPeerSrc.TickByteCount = uint64(meta.PacketLen)
-	updatePlatformData(taggedFlow, meta.EndpointData, false)
-	m.fillGeoInfo(taggedFlow)
 	flowExtra.flowState = FLOW_STATE_ESTABLISHED
 	flowExtra.timeout = openingTimeout
-	m.updateUDPDirection(meta, flowExtra, true) // 新建流时矫正流方向
-	meta.IsActiveService = taggedFlow.IsActiveService
+	m.updateUDPDirection(meta, flowExtra, true) // 新建流时更新ServiceTable并矫正流方向
+	meta.IsActiveService = flowExtra.taggedFlow.IsActiveService
 }
 
 func (m *FlowMap) updateUdpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
@@ -50,7 +40,7 @@ func (m *FlowMap) updateUDPDirection(meta *MetaPacket, flowExtra *FlowExtra, isF
 	}
 	if !IsClientToServer(srcScore, dstScore) {
 		srcScore, dstScore = dstScore, srcScore
-		flowExtra.reverseFlow()
+		reverseFlow(flowExtra.taggedFlow)
 		flowExtra.reversed = !flowExtra.reversed
 		meta.Direction = (CLIENT_TO_SERVER + SERVER_TO_CLIENT) - meta.Direction // reverse
 	}
