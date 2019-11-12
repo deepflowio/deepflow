@@ -85,9 +85,9 @@ message Port {
 }
 
 message Ip {
-    optional uint32 ip = 1;
     optional uint32 last_seen = 2;
     optional uint64 mac = 3;
+    optional bytes ip = 4;
 
     optional string port_uuid = 9;
 }
