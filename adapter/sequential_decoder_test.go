@@ -54,7 +54,7 @@ func TestDecoder(t *testing.T) {
 
 func BenchmarkDecoder(b *testing.B) {
 	b.StopTimer()
-	f, _ := os.Open("sequential_decoder_test.pcap")
+	f, _ := os.Open("icmp_decode_test.pcap")
 	r, _ := pcapgo.NewReader(f)
 	packet, _, err := r.ReadPacketData()
 	if packet == nil || err != nil {

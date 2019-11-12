@@ -486,7 +486,7 @@ func parseAcl(args []string) *policy.Acl {
 				fmt.Printf("invalid proto %s from %s\n", keyValue[1], args[0])
 				return nil
 			}
-			acl.Proto = uint8(proto)
+			acl.Proto = uint16(proto)
 		case "tap":
 			switch keyValue[1] {
 			case "any":
