@@ -6,17 +6,6 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
-func updateFlowTag(taggedFlow *TaggedFlow, meta *MetaPacket) {
-	taggedFlow.PolicyData = meta.PolicyData
-	endpointdata := meta.EndpointData
-	if endpointdata == nil {
-		log.Warning("Unexpected nil packet endpointData")
-		return
-	}
-	taggedFlow.GroupIDs0 = endpointdata.SrcInfo.GroupIds
-	taggedFlow.GroupIDs1 = endpointdata.DstInfo.GroupIds
-}
-
 func (m *FlowMap) genFlowId(timestamp uint64) uint64 {
 	return ((uint64(m.id) & THREAD_FLOW_ID_MASK) << 32) | ((timestamp & TIMER_FLOW_ID_MASK) << 32) | (m.totalFlow & COUNTER_FLOW_ID_MASK)
 }
@@ -25,6 +14,7 @@ func (m *FlowMap) initFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	now := meta.Timestamp
 	meta.Direction = CLIENT_TO_SERVER // 初始认为是C2S，流匹配、流方向矫正均会会更新此值
 
+	// 基础信息
 	taggedFlow := AcquireTaggedFlow()
 	taggedFlow.Exporter = meta.Exporter
 	taggedFlow.MACSrc = meta.MacSrc
@@ -54,8 +44,22 @@ func (m *FlowMap) initFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	taggedFlow.EthType = meta.EthType
 	taggedFlow.QueueHash = meta.QueueHash
 	taggedFlow.IsNewFlow = true
-	updateFlowTag(taggedFlow, meta)
 
+	// 统计量
+	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerSrc.TCPFlags |= meta.TcpData.Flags // TcpData不是指针
+	flowMetricsPeerSrc.TotalPacketCount = 1
+	flowMetricsPeerSrc.PacketCount = 1
+	flowMetricsPeerSrc.TickPacketCount = 1
+	flowMetricsPeerSrc.TotalByteCount = uint64(meta.PacketLen)
+	flowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
+	flowMetricsPeerSrc.TickByteCount = uint64(meta.PacketLen)
+
+	// 标签
+	updateEndPointAndPolicyData(taggedFlow, meta)
+	m.fillGeoInfo(taggedFlow)
+
+	// FlowMap信息
 	flowExtra.taggedFlow = taggedFlow
 	flowExtra.flowState = FLOW_STATE_RAW
 	flowExtra.minArrTime = now
@@ -80,11 +84,7 @@ func (m *FlowMap) updateFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	}
 	if !flowExtra.packetInCycle {
 		flowExtra.packetInCycle = true
-		updateFlowTag(taggedFlow, meta)
-		if meta.Direction == SERVER_TO_CLIENT {
-			reverseFlowTag(taggedFlow)
-		}
-		updatePlatformData(taggedFlow, meta.EndpointData, meta.Direction == SERVER_TO_CLIENT)
+		updateEndPointAndPolicyData(taggedFlow, meta)
 	}
 	flowMetricsPeer := &taggedFlow.FlowMetricsPeers[meta.Direction]
 	flowMetricsPeer.TickPacketCount++
@@ -97,19 +97,27 @@ func (m *FlowMap) updateFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	taggedFlow.TimeBitmap |= getBitmap(packetTimestamp)
 }
 
-func updatePlatformData(taggedFlow *TaggedFlow, endpointData *EndpointData, serverToClient bool) {
+func updateEndPointAndPolicyData(taggedFlow *TaggedFlow, meta *MetaPacket) {
+	endpointData := meta.EndpointData
 	if endpointData == nil {
 		log.Warning("Unexpected nil packet endpointData")
 		return
 	}
+
 	var srcInfo, dstInfo *EndpointInfo
-	if serverToClient {
+	if meta.Direction == SERVER_TO_CLIENT {
+		taggedFlow.PolicyData = reversePolicyData(meta.PolicyData)
 		srcInfo = endpointData.DstInfo
 		dstInfo = endpointData.SrcInfo
 	} else {
+		taggedFlow.PolicyData = meta.PolicyData
 		srcInfo = endpointData.SrcInfo
 		dstInfo = endpointData.DstInfo
 	}
+
+	taggedFlow.GroupIDs0 = srcInfo.GroupIds
+	taggedFlow.GroupIDs1 = dstInfo.GroupIds
+
 	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
 	flowMetricsPeerDst := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
 	flowMetricsPeerSrc.EpcID = srcInfo.L2EpcId
@@ -149,7 +157,16 @@ func reversePolicyData(policyData *PolicyData) *PolicyData {
 	return newPolicyData
 }
 
-func reverseFlowTag(taggedFlow *TaggedFlow) {
+func reverseFlow(taggedFlow *TaggedFlow) {
+	taggedFlow.TunnelInfo.Src, taggedFlow.TunnelInfo.Dst = taggedFlow.TunnelInfo.Dst, taggedFlow.TunnelInfo.Src
+	taggedFlow.MACSrc, taggedFlow.MACDst = taggedFlow.MACDst, taggedFlow.MACSrc
+	taggedFlow.IPSrc, taggedFlow.IPDst = taggedFlow.IPDst, taggedFlow.IPSrc
+	taggedFlow.IP6Src, taggedFlow.IP6Dst = taggedFlow.IP6Dst, taggedFlow.IP6Src
+	taggedFlow.PortSrc, taggedFlow.PortDst = taggedFlow.PortDst, taggedFlow.PortSrc
+	flowMetricsPeerSrc := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst := &taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
+	*flowMetricsPeerSrc, *flowMetricsPeerDst = *flowMetricsPeerDst, *flowMetricsPeerSrc
+	taggedFlow.GeoEnd ^= 1 // reverse GeoEnd (0: src, 1: dst, others: N/A)
 	taggedFlow.GroupIDs0, taggedFlow.GroupIDs1 = taggedFlow.GroupIDs1, taggedFlow.GroupIDs0
 	taggedFlow.PolicyData = reversePolicyData(taggedFlow.PolicyData)
 }
@@ -228,7 +245,7 @@ func (m *FlowMap) updateFlowDirection(flowExtra *FlowExtra, meta *MetaPacket) {
 
 	if !IsClientToServer(srcScore, dstScore) {
 		srcScore, dstScore = dstScore, srcScore
-		flowExtra.reverseFlow()
+		reverseFlow(flowExtra.taggedFlow)
 		flowExtra.reversed = !flowExtra.reversed
 		if meta != nil {
 			meta.Direction = (CLIENT_TO_SERVER + SERVER_TO_CLIENT) - meta.Direction // reverse
