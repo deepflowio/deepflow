@@ -254,12 +254,12 @@ func (m *FlowMap) pushToFlowStatsQueue(taggedFlow *datatype.TaggedFlow) {
 	}
 }
 
-func (m *FlowMap) removeAndOutput(node *flowMapNode, nodeIndex int32, timestamp time.Duration) {
+func (m *FlowMap) removeAndOutput(node *flowMapNode, nodeIndex int32, timestamp time.Duration, meta *datatype.MetaPacket) {
 	flowExtra := &node.flowExtra
 	taggedFlow := flowExtra.taggedFlow
 
 	// 统计数据输出前矫正流方向
-	m.updateFlowDirection(flowExtra)
+	m.updateFlowDirection(flowExtra, meta)
 
 	// 输出统计数据
 	if taggedFlow.PolicyData.ActionFlags&FLOW_ACTION != 0 {
@@ -284,7 +284,7 @@ func (m *FlowMap) removeAndOutput(node *flowMapNode, nodeIndex int32, timestamp 
 	m.removeNode(node, nodeIndex)
 }
 
-func (m *FlowMap) copyAndOutput(node *flowMapNode, timestamp time.Duration) {
+func (m *FlowMap) copyAndOutput(node *flowMapNode, timestamp time.Duration, meta *datatype.MetaPacket) {
 	flowExtra := &node.flowExtra
 	taggedFlow := flowExtra.taggedFlow
 	output := false
@@ -293,7 +293,7 @@ func (m *FlowMap) copyAndOutput(node *flowMapNode, timestamp time.Duration) {
 	if flowExtra.packetInTick && (timestamp >= taggedFlow.PacketStatTime+_PACKET_STAT_INTERVAL || timestamp < taggedFlow.PacketStatTime) {
 		if taggedFlow.PolicyData.ActionFlags&PACKET_ACTION != 0 {
 			output = true
-			m.updateFlowDirection(flowExtra) // 每个包统计数据输出前矫正流方向
+			m.updateFlowDirection(flowExtra, meta) // 每个包统计数据输出前矫正流方向
 
 			flowExtra.cow |= FLOW_COW_PACKET_STAT
 			taggedFlow.AddReferenceCount()
@@ -310,7 +310,7 @@ func (m *FlowMap) copyAndOutput(node *flowMapNode, timestamp time.Duration) {
 		flowExtra.setEndTimeAndDuration(nextFlowStatTime)
 		if taggedFlow.PolicyData.ActionFlags&FLOW_ACTION != 0 {
 			if !output {
-				m.updateFlowDirection(flowExtra) // 每个流统计数据输出前矫正流方向
+				m.updateFlowDirection(flowExtra, meta) // 每个流统计数据输出前矫正流方向
 			}
 
 			flowExtra.cow |= FLOW_COW_FLOW_STAT
@@ -396,7 +396,7 @@ func (m *FlowMap) InjectFlushTicker(timestamp time.Duration) bool {
 			// 若Flow已经超时，直接输出
 			timeout := node.flowExtra.recentTime + node.flowExtra.timeout
 			if timestamp >= timeout {
-				m.removeAndOutput(node, timeListNext, timeout)
+				m.removeAndOutput(node, timeListNext, timeout, nil)
 				// 若next正好指向删掉节点之前的buffer头部，需要将next矫正至node本身
 				// 因为删除机制会将被删除的节点交换至buffer头部进行删除
 				if next == m.decIndex(m.bufferStartIndex) {
@@ -406,7 +406,7 @@ func (m *FlowMap) InjectFlushTicker(timestamp time.Duration) bool {
 			}
 
 			// 输出未超时Flow的统计信息
-			m.copyAndOutput(node, timestamp)
+			m.copyAndOutput(node, timestamp, nil)
 
 			// 由于包、流统计信息已输出，将节点移动至下一个流统计的时间，或者最终超时的时间
 			nextFlowStatTime := timestamp/_FLOW_STAT_INTERVAL*_FLOW_STAT_INTERVAL + _FLOW_STAT_INTERVAL
@@ -427,7 +427,7 @@ func (m *FlowMap) updateNode(node *flowMapNode, nodeIndex int32, meta *datatype.
 
 	// 1. 输出上一个统计周期的统计信息
 	m.flowCopyOnWrite(flowExtra)
-	m.copyAndOutput(node, meta.Timestamp)
+	m.copyAndOutput(node, meta.Timestamp, meta)
 
 	// 2. 更新Flow状态，判断是否已结束
 	m.flowCopyOnWrite(flowExtra)
@@ -438,7 +438,7 @@ func (m *FlowMap) updateNode(node *flowMapNode, nodeIndex int32, meta *datatype.
 			flowExtra.metaFlowPerf.Update(meta, flowExtra.reversed == serverToClient, flowExtra, &m.perfCounter)
 		}
 		if flowClosed {
-			m.removeAndOutput(node, nodeIndex, meta.Timestamp)
+			m.removeAndOutput(node, nodeIndex, meta.Timestamp, meta)
 			return
 		}
 	} else if meta.Protocol == layers.IPProtocolUDP {

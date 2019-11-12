@@ -197,7 +197,7 @@ func (m *FlowMap) getEthOthersQuinTupleHash(meta *MetaPacket) uint64 {
 	return meta.MacSrc ^ meta.MacDst
 }
 
-func (m *FlowMap) updateFlowDirection(flowExtra *FlowExtra) {
+func (m *FlowMap) updateFlowDirection(flowExtra *FlowExtra, meta *MetaPacket) {
 	taggedFlow := flowExtra.taggedFlow
 	srcScore, dstScore := uint8(0), uint8(0)
 	if taggedFlow.EthType == layers.EthernetTypeIPv4 {
@@ -222,12 +222,17 @@ func (m *FlowMap) updateFlowDirection(flowExtra *FlowExtra) {
 		} else {
 			return
 		}
+	} else {
+		return
 	}
 
 	if !IsClientToServer(srcScore, dstScore) {
 		srcScore, dstScore = dstScore, srcScore
 		flowExtra.reverseFlow()
 		flowExtra.reversed = !flowExtra.reversed
+		if meta != nil {
+			meta.Direction = (CLIENT_TO_SERVER + SERVER_TO_CLIENT) - meta.Direction // reverse
+		}
 	}
 	taggedFlow.IsActiveService = IsActiveService(srcScore, dstScore)
 }
