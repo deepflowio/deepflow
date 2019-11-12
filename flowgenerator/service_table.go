@@ -28,7 +28,7 @@ func ServiceKey(epcID int16, ipHash uint32, port uint16) uint64 {
 }
 
 func IsClientToServer(srcScore, dstScore uint8) bool {
-	return srcScore < dstScore
+	return srcScore <= dstScore // 分数相等也认为是C2S，避免reverseFlow
 }
 
 func IsActiveService(srcScore, dstScore uint8) bool {
