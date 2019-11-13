@@ -17,6 +17,7 @@ from pcap import found_in_pcap
 PCAP_DIR = '/var/lib/droplet/pcap'
 HOSTNAME = ''
 DROPLET_CONF = '/etc/droplet.yaml'
+TRIDENT_CONF = '/etc/trident.yaml'
 FILE_SUFFIX = '.pcap'
 API_VERSION = 'v1'
 API_PREFIX = '/' + API_VERSION
@@ -32,12 +33,16 @@ app = Bottle()
 
 def read_config():
     global PCAP_DIR
-    with open(DROPLET_CONF) as f:
-        for line in f:
-            if line.find('file-directory') >= 0:
-                vs = line.split(':')
-                PCAP_DIR = vs[1].strip()
-                break
+    try:
+        for filename in [DROPLET_CONF, TRIDENT_CONF]:
+            with open(filename) as f:
+                for line in f:
+                    if line.find('file-directory') >= 0:
+                        vs = line.split(':')
+                        PCAP_DIR = vs[1].strip()
+                        break
+    except:
+        pass
     global HOSTNAME
     HOSTNAME = socket.gethostname()
 
