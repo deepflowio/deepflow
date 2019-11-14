@@ -3,6 +3,7 @@ package store
 import (
 	"encoding/binary"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -11,6 +12,8 @@ import (
 	"github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/models"
 	"github.com/op/go-logging"
+	// 需要从gitlab.x.lan获取新的写入接口，然后在Makefile中拷贝到vendor/github.com/influxdata/influxdb/client/v2
+	_ "gitlab.x.lan/platform/influxdb/client/v2"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
@@ -33,6 +36,8 @@ const (
 type InfluxdbItem interface {
 	MarshalToBytes([]byte) int
 	GetDBName() string
+	GetMeasurement() string
+	GetTimestamp() uint32
 	Release()
 }
 
@@ -58,9 +63,15 @@ type Confidence struct {
 }
 
 type PointCache struct {
-	bp     client.BatchPoints
-	buffer []byte
-	offset int
+	buffer      []byte
+	offset      int
+	confidences map[Confidence]uint8
+
+	bp client.BatchPoints
+
+	database string
+	rp       string
+	count    int
 }
 
 var bufferPool = pool.NewLockFreePool(func() interface{} {
@@ -123,6 +134,7 @@ type InfluxdbWriter struct {
 	ReplicaEnabled bool
 	DataQueues     queue.FixedMultiQueue
 	ReplicaQueues  queue.FixedMultiQueue
+	WriteDirect    bool
 
 	Name                    string
 	ShardID                 string
@@ -148,6 +160,7 @@ func NewInfluxdbWriter(addrPrimary, addrReplica, httpUsername, httpPassword, nam
 		BatchSize:    DEFAULT_BATCH_SIZE,
 		FlushTimeout: int64(DEFAULT_FLUSH_TIMEOUT),
 		ShardID:      shardID,
+		WriteDirect:  true,
 	}
 
 	primaryHTTPConfig := client.HTTPConfig{Addr: addrPrimary, Username: httpUsername, Password: httpPassword}
@@ -201,6 +214,7 @@ func NewInfluxdbWriter(addrPrimary, addrReplica, httpUsername, httpPassword, nam
 			queue.OptionRelease(func(p interface{}) { releasePointCache(p.(*PointCache)) }))
 	}
 
+	log.Infof("NewInfluxdbWriter shardID(%s) threads(%d) primary(%s) replica(%s) direct(%v)", shardID, queueCount, addrPrimary, addrReplica, w.WriteDirect)
 	return w, nil
 }
 
@@ -216,6 +230,10 @@ func (w *InfluxdbWriter) SetBatchSize(size int) {
 	} else {
 		log.Warningf("batch size must small than %d", DEFAULT_BATCH_SIZE)
 	}
+}
+
+func (w *InfluxdbWriter) SetWriteDirect(enabled bool) {
+	w.WriteDirect = enabled
 }
 
 func (w *InfluxdbWriter) SetBatchTimeout(timeout int64) {
@@ -274,8 +292,13 @@ func (p *InfluxdbPoint) MarshalToBytes(buffer []byte) int {
 	offset := 0
 	size := copy(buffer[offset+4:], p.measurement)
 
-	for key, value := range p.tag {
-		size += copy(buffer[offset+4+size:], ","+key+"="+value)
+	keys := make([]string, 0, len(p.tag))
+	for key, _ := range p.tag {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		size += copy(buffer[offset+4+size:], ","+key+"="+p.tag[key])
 	}
 
 	binary.BigEndian.PutUint32(buffer[offset:], uint32(size))
@@ -299,6 +322,14 @@ func (p *InfluxdbPoint) MarshalToBytes(buffer []byte) int {
 
 func (p *InfluxdbPoint) GetDBName() string {
 	return p.db
+}
+
+func (p *InfluxdbPoint) GetMeasurement() string {
+	return p.measurement
+}
+
+func (p *InfluxdbPoint) GetTimestamp() uint32 {
+	return p.timestamp
 }
 
 func (p *InfluxdbPoint) Release() {
@@ -341,17 +372,23 @@ func (i *WriterInfo) Close() {
 	i.Closable.Close()
 }
 
-func newPointCache(db, rp string) *PointCache {
+func (w *InfluxdbWriter) newPointCache(db, rp string) *PointCache {
 	pc := acquirePointCache()
-	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:        db,
-		Precision:       INFLUXDB_PRECISION_S,
-		RetentionPolicy: rp,
-	})
-	if err != nil {
-		panic(fmt.Sprintf("create BatchPoints for db %s failed: %s", db, err))
+	if w.WriteDirect {
+		pc.database = db
+		pc.rp = rp
+	} else {
+		bp, err := client.NewBatchPoints(client.BatchPointsConfig{
+			Database:        db,
+			Precision:       INFLUXDB_PRECISION_S,
+			RetentionPolicy: rp,
+		})
+		if err != nil {
+			panic(fmt.Sprintf("create BatchPoints for db %s failed: %s", db, err))
+		}
+		pc.bp = bp
 	}
-	pc.bp = bp
+	pc.confidences = make(map[Confidence]uint8)
 	pc.buffer = acquireBuffer()
 	return pc
 }
@@ -384,33 +421,35 @@ func (w *InfluxdbWriter) writeCache(queueID int, item InfluxdbItem) bool {
 	pointCache := w.QueueWriterInfosPrimary[queueID].pointCache
 
 	db := item.GetDBName()
-	if db == "" {
-		// FIXME: 在pointCache[db]时小概率出现core，查看core文件db为空, 这里增加保护
-		db = item.GetDBName()
-		log.Errorf("BUG: get db empty, reget db is %s", db)
-		if db == "" {
-			return false
-		}
-	}
 	if _, ok := pointCache[db]; !ok {
-		pointCache[db] = newPointCache(db, w.RP.name)
+		pointCache[db] = w.newPointCache(db, w.RP.name)
 	}
 	buffer := pointCache[db].buffer
 	offset := pointCache[db].offset
+
 	size := item.MarshalToBytes(buffer[offset:])
-	point, err := models.NewPointFromBytes(buffer[offset : offset+size])
-	if err != nil {
-		log.Errorf("new model point failed buffer size=%d, err:%s", size, err)
-		return false
+	if !w.WriteDirect {
+		point, err := models.NewPointFromBytes(buffer[offset : offset+size])
+		if err != nil {
+			log.Errorf("new model point failed buffer size=%d, err:%s", size, err)
+			return false
+		}
+		pointCache[db].bp.AddPoint(client.NewPointFrom(point))
 	}
-	pointCache[db].bp.AddPoint(client.NewPointFrom(point))
+	pointCache[db].confidences[Confidence{
+		db:          db,
+		measurement: item.GetMeasurement(),
+		timestamp:   int64(item.GetTimestamp()),
+	}] = 0
+
 	pointCache[db].offset += size
+	pointCache[db].count++
 
 	item.Release()
 
 	if pointCache[db].offset > w.BatchSize {
 		w.writePrimary(queueID, pointCache[db])
-		pointCache[db] = newPointCache(db, w.RP.name)
+		pointCache[db] = w.newPointCache(db, w.RP.name)
 	}
 	return true
 }
@@ -418,12 +457,13 @@ func (w *InfluxdbWriter) writeCache(queueID int, item InfluxdbItem) bool {
 func (w *InfluxdbWriter) flushWriteCache(queueID int) {
 	pointCache := w.QueueWriterInfosPrimary[queueID].pointCache
 	for db, pc := range pointCache {
-		if len(pc.bp.Points()) <= 0 {
+		if pc.count <= 0 {
 			continue
 		}
-		log.Debugf("flush %d points to %s", len(pc.bp.Points()), db)
+		log.Debugf("flush %d bytes to %s", pc.count, db)
+
 		w.writePrimary(queueID, pc)
-		pointCache[db] = newPointCache(db, w.RP.name)
+		pointCache[db] = w.newPointCache(db, w.RP.name)
 	}
 }
 
@@ -448,9 +488,19 @@ func (w *InfluxdbWriter) createDB(httpClient client.Client, db string) bool {
 }
 
 func (w *InfluxdbWriter) writeInfluxdb(writerInfo *WriterInfo, dbCreateCtl *DBCreateCtl, pc *PointCache) error {
-	bp := pc.bp
+	var pointsCount int64
+	var db string
+	var err error
+
 	writerInfo.writeTime = time.Now().Unix()
-	db := bp.Database()
+
+	if w.WriteDirect {
+		db = pc.database
+		pointsCount = int64(pc.count)
+	} else {
+		db = pc.bp.Database()
+		pointsCount = int64(len(pc.bp.Points()))
+	}
 
 	writeFailedCount := &writerInfo.counter.WriteFailedCount
 	writeSuccCount := &writerInfo.counter.WriteSuccessCount
@@ -461,7 +511,7 @@ func (w *InfluxdbWriter) writeInfluxdb(writerInfo *WriterInfo, dbCreateCtl *DBCr
 
 	if !ok {
 		if !w.createDB(writerInfo.httpClient, db) {
-			*writeFailedCount += int64(len(bp.Points()))
+			*writeFailedCount += pointsCount
 			return fmt.Errorf("create database(%s) failed", db)
 		}
 		dbCreateCtl.Lock()
@@ -469,11 +519,18 @@ func (w *InfluxdbWriter) writeInfluxdb(writerInfo *WriterInfo, dbCreateCtl *DBCr
 		dbCreateCtl.Unlock()
 	}
 
-	if err := writerInfo.httpClient.Write(bp); err != nil {
-		*writeFailedCount += int64(len(bp.Points()))
-		return fmt.Errorf("httpclient write db(%s) batch points(%d) failed: %s", db, len(bp.Points()), err)
+	if w.WriteDirect {
+		err = writerInfo.httpClient.WriteDirect(db, pc.rp, pc.buffer[:pc.offset])
+	} else {
+		err = writerInfo.httpClient.Write(pc.bp)
 	}
-	*writeSuccCount += int64(len(bp.Points()))
+	if err != nil {
+		log.Errorf("httpclient write db(%s) batch points(%d) failed: %s", db, pointsCount, err)
+		*writeFailedCount += pointsCount
+		return err
+	}
+
+	*writeSuccCount += pointsCount
 	return nil
 }
 
@@ -543,17 +600,6 @@ func (w *InfluxdbWriter) queueProcessReplica(queueID int) {
 }
 
 func (w *InfluxdbWriter) writeConfidence(pc *PointCache, status RepairStatus) {
-	bp := pc.bp
-	confidences := make(map[Confidence]uint8)
-	for _, point := range bp.Points() {
-		confidences[Confidence{
-			db:          bp.Database(),
-			measurement: point.Name(),
-			timestamp:   point.Time().UnixNano(),
-			status:      status,
-		}] = 0
-	}
-
 	confidenceBP, _ := client.NewBatchPoints(client.BatchPointsConfig{
 		Database:        CONFIDENCE_DB,
 		Precision:       INFLUXDB_PRECISION_S,
@@ -562,18 +608,18 @@ func (w *InfluxdbWriter) writeConfidence(pc *PointCache, status RepairStatus) {
 
 	tags := make(map[string]string)
 	fields := make(map[string]interface{})
-	for confidence, _ := range confidences {
+	for confidence, _ := range pc.confidences {
 		tags[TAG_DB] = confidence.db
 		tags[TAG_MEASUREMENT] = confidence.measurement
 		tags[TAG_ID] = w.ShardID
-		fields[FIELD_STATUS] = int64(confidence.status)
+		fields[FIELD_STATUS] = int64(status)
 
 		measurement := CONFIDENCE_MEASUREMENT
-		if !isStatusNeedRepair(confidence.status) {
+		if !isStatusNeedRepair(status) {
 			measurement = CONFIDENCE_MEASUREMENT_SYNCED
 		}
 
-		if pt, err := client.NewPoint(measurement, tags, fields, time.Unix(0, confidence.timestamp)); err == nil {
+		if pt, err := client.NewPoint(measurement, tags, fields, time.Unix(confidence.timestamp, 0)); err == nil {
 			confidenceBP.AddPoint(pt)
 		} else {
 			log.Warning("new NewPoint failed:", err)
