@@ -23,6 +23,6 @@ message License {
     optional string sign_server_ip = 14; // 签发服务器IP
     optional string agency = 15; // 代理商
 
-    optional uint32 vtap_count_type4 = 16; // 物理机进程类型采集器
-    optional uint32 vtap_count_type5 = 17; // 专用物理机类型采集器
+    optional uint32 vtap_count_type4 = 16 [default = 0]; // 物理机进程类型采集器
+    optional uint32 vtap_count_type5 = 17 [default = 0]; // 专用物理机类型采集器
 }
