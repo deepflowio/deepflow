@@ -34,9 +34,13 @@ type MetaPacketTcpHeader struct {
 type PacketDirection uint8
 
 const (
-	CLIENT_TO_SERVER PacketDirection = FLOW_METRICS_PEER_SRC
-	SERVER_TO_CLIENT PacketDirection = FLOW_METRICS_PEER_DST
+	CLIENT_TO_SERVER PacketDirection = FLOW_METRICS_PEER_SRC // 0
+	SERVER_TO_CLIENT PacketDirection = FLOW_METRICS_PEER_DST // 1
 )
+
+func OppositePacketDirection(d PacketDirection) PacketDirection {
+	return d ^ 1
+}
 
 type MetaPacket struct {
 	// 注意字节对齐!
