@@ -53,9 +53,8 @@ type QueueConfig struct {
 	FlowQueueSize   int `yaml:"flow-queue-size"`
 	DocQueueSize    int `yaml:"doc-queue-size"`
 
-	LabelerQueueSize               int `yaml:"labeler-queue-size"`
-	PCapAppQueueSize               int `yaml:"pcap-app-queue-size"`
 	FlowGeneratorQueueSize         int `yaml:"flow-generator-queue-size"`
+	PCapAppQueueSize               int `yaml:"pcap-app-queue-size"`
 	MeteringAppQueueSize           int `yaml:"metering-app-queue-size"`
 	FlowDuplicatorQueueSize        int `yaml:"flow-duplicator-queue-size"`
 	FlowAppQueueSize               int `yaml:"flow-app-queue-size"`
@@ -174,14 +173,11 @@ func (c *Config) Validate() error {
 		c.Queue.DocQueueSize = c.Queue.PacketQueueSize << 3
 	}
 
-	if c.Queue.LabelerQueueSize <= 0 {
-		c.Queue.LabelerQueueSize = c.Queue.PacketQueueSize
+	if c.Queue.FlowGeneratorQueueSize <= 0 {
+		c.Queue.FlowGeneratorQueueSize = c.Queue.PacketQueueSize
 	}
 	if c.Queue.PCapAppQueueSize <= 0 {
 		c.Queue.PCapAppQueueSize = c.Queue.PacketQueueSize
-	}
-	if c.Queue.FlowGeneratorQueueSize <= 0 {
-		c.Queue.FlowGeneratorQueueSize = c.Queue.PacketQueueSize
 	}
 	if c.Queue.MeteringAppQueueSize <= 0 {
 		c.Queue.MeteringAppQueueSize = c.Queue.PacketQueueSize

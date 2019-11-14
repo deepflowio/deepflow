@@ -47,37 +47,34 @@ queue:
   # 传输统计数据的每个队列的长度，默认为524288或packet-queue-size的8倍
   doc-queue-size: 524288
   # ---------- 每个模块的队列长度 ----------
-  # name: 1-meta-packet-to-labeler
-  # labeler read queue size, default packet-queue-size
-  labeler-queue-size: 65536
-  # name: 2-meta-packet-to-pcap-app
-  # pcap app read queue size, default packet-queue-size
-  pcap-app-queue-size: 65536
-  # name: 2-meta-packet-to-flow-generator
+  # name: 1-meta-packet-block-to-flow-generator
   # flow generator read queue size, default packet-queue-size
   flow-generator-queue-size: 65536
-  # name: 3-meta-packet-to-metering-app
+  # name: 2-meta-packet-block-to-pcap-app
+  # pcap app read queue size, default packet-queue-size
+  pcap-app-queue-size: 65536
+  # name: 2-mini-tagged-flow-to-metering-app
   # metering app read queue size, default packet-queue-size
   metering-app-queue-size: 65536
-  # name: 3-tagged-flow-to-flow-duplicator
+  # name: 2-tagged-flow-to-flow-duplicator
   # flow duplicator read queue size, default flow-queue-size
   flow-duplicator-queue-size: 524288
-  # name: 4-tagged-flow-to-flow-app
+  # name: 3-tagged-flow-to-flow-app
   # flow app read queue size, default flow-queue-size
   flow-app-queue-size: 524288
-  # name: 4-metering-doc-to-marshaller
+  # name: 3-metering-doc-to-marshaller
   # metering app output queue size, default doc-queue-size
   metering-doc-marshaller-queue-size: 524288
-  # name: 5-flow-doc-to-marshaller
-  # flow app output queue size, default doc-queue-size
-  flow-doc-marshaller-queue-size: 524288
-  # name: 4-tagged-flow-to-flow-throttle
+  # name: 3-tagged-flow-to-flow-throttle
   # flow sender queue size, default flow-queue-size
   flow-throttle-queue-size: 524288
-  # name: 5-tagged-flow-to-flow-sender
+  # name: 4-flow-doc-to-marshaller
+  # flow app output queue size, default doc-queue-size
+  flow-doc-marshaller-queue-size: 524288
+  # name: 4-tagged-flow-to-flow-sender
   # flow sender queue size, default flow-queue-size
   flow-sender-queue-size: 524288
-  # name: 6-all-doc-to-zero
+  # name: 5-all-doc-to-zero
   # doc sender queue size, default doc-queue-size
   doc-sender-queue-size: 524288
 # internal labeler conf

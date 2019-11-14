@@ -90,9 +90,8 @@ func (m *FlowMap) updateTCPDirection(meta *MetaPacket, flags uint8, flowExtra *F
 	}
 	if !IsClientToServer(srcScore, dstScore) {
 		srcScore, dstScore = dstScore, srcScore
-		reverseFlow(flowExtra.taggedFlow)
-		flowExtra.reversed = !flowExtra.reversed
-		meta.Direction = (CLIENT_TO_SERVER + SERVER_TO_CLIENT) - meta.Direction // reverse
+		reverseFlow(flowExtra)
+		meta.Direction = OppositePacketDirection(meta.Direction)
 	}
 	flowExtra.taggedFlow.IsActiveService = IsActiveService(srcScore, dstScore)
 }

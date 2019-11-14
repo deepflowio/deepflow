@@ -55,7 +55,7 @@ func (s *ZeroDocumentSender) Start(queueSize int) {
 	queueForwards := make([]queue.QueueWriter, lenOfPorts)
 	for i := 0; i < lenOfPorts; i++ {
 		q := queue.NewOverwriteQueue(
-			"6-all-doc-to-zero", queueSize,
+			"5-all-doc-to-zero", queueSize,
 			queue.OptionRelease(func(p interface{}) { codec.ReleaseSimpleEncoder(p.(*codec.SimpleEncoder)) }),
 			stats.OptionStatTags{"index": strconv.Itoa(i)},
 		)

@@ -743,9 +743,11 @@ func (p *MetaFlowPerf) Update(header *MetaPacket, isFirstPacketDirection bool, f
 		err = FlowPerfError{what: "packet header or flow info is nil"}
 		return err
 	}
-	totalPacketCount := int64(flowExtra.taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].TotalPacketCount +
-		flowExtra.taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].TotalPacketCount)
-	p.calcVarianceStats(header, totalPacketCount)
+
+	// XXX: 统计数据未使用，暂时屏蔽
+	// totalPacketCount := int64(flowExtra.taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].TotalPacketCount +
+	// 	flowExtra.taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].TotalPacketCount)
+	// p.calcVarianceStats(header, totalPacketCount)
 
 	if valid := p.preprocess(header, perfCounter); valid {
 		if isFirstPacketDirection {
@@ -826,9 +828,10 @@ func (i *FlowPerfDataInfo) calcReportFlowPerfStats(report *TcpPerfStats, flowRev
 	report.TcpPerfCountsPeerDst.PshUrgCount = period.pshUrgCount1
 	report.TotalPshUrgCount = flow.pshUrgCount0 + flow.pshUrgCount1
 
-	report.PacketIntervalAvg = uint64(i.packetVariance.packetIntervalAvg)
-	report.PacketIntervalVariance = uint64(i.packetVariance.packetIntervalVariance)
-	report.PacketSizeVariance = uint64(i.packetVariance.packetSizeVariance)
+	// XXX: 统计数据未使用，暂时屏蔽
+	// report.PacketIntervalAvg = uint64(i.packetVariance.packetIntervalAvg)
+	// report.PacketIntervalVariance = uint64(i.packetVariance.packetIntervalVariance)
+	// report.PacketSizeVariance = uint64(i.packetVariance.packetSizeVariance)
 
 	if !flowReversed {
 		if period.art1Count > 0 {
@@ -873,7 +876,7 @@ func (p *MetaFlowPerf) String() string {
 }
 
 func (i FlowPerfDataInfo) String() string {
-	return fmt.Sprintf("periodPerfStats:%v, \nflowPerfStats:%v, \npacketVariance:%#v\n",
+	return fmt.Sprintf("periodPerfStats:%v\nflowPerfStats:%v\npacketVariance:%#v\n",
 		i.periodPerfStats, i.flowPerfStats, i.packetVariance)
 }
 

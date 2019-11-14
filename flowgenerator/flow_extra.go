@@ -35,11 +35,15 @@ const (
 type FlowExtra struct {
 	taggedFlow   *TaggedFlow
 	metaFlowPerf *MetaFlowPerf
-	minArrTime   time.Duration
-	recentTime   time.Duration // 最近一个Packet的时间戳
-	timeout      time.Duration // 相对超时时间
-	flowState    FlowState
-	reversed     bool
+
+	policyDataCache   [2]*PolicyData
+	endpointDataCache [2]*EndpointData
+
+	minArrTime time.Duration
+	recentTime time.Duration // 最近一个Packet的时间戳
+	timeout    time.Duration // 相对超时时间
+	flowState  FlowState
+	reversed   bool
 
 	packetInTick  bool // 当前包统计周期（目前是自然秒）是否有包
 	packetInCycle bool // 当前流统计周期（目前是自然分）是否有包
