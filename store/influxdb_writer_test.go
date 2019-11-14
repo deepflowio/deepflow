@@ -51,6 +51,13 @@ func (w *testInfluxdbWrite) GetDBName() string {
 func (w *testInfluxdbWrite) Release() {
 }
 
+func (w *testInfluxdbWrite) GetMeasurement() string {
+	return w.measurement
+}
+
+func (w *testInfluxdbWrite) GetTimestamp() uint32 {
+	return w.timestamp
+}
 func newWriteItem(db, measurement, tag, field string, timestamp uint32) InfluxdbItem {
 	return &testInfluxdbWrite{
 		db:          db,
