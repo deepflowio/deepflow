@@ -56,6 +56,13 @@ func (m *MockClient) Write(bp v2.BatchPoints) error {
 	return ret0
 }
 
+// Write mocks base method
+func (m *MockClient) WriteDirect(db, rp string, data []byte) error {
+	ret := m.ctrl.Call(m, "WriteDirect", db, rp, data)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
 // Write indicates an expected call of Write
 func (mr *MockClientMockRecorder) Write(bp interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Write", reflect.TypeOf((*MockClient)(nil).Write), bp)
