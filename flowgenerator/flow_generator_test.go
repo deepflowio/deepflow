@@ -33,6 +33,7 @@ func flowGeneratorInit(queueSize int, flushTicker bool) (*FlowGenerator, QueueWr
 	if queueSize <= 0 {
 		queueSize = DEFAULT_QUEUE_LEN
 	}
+	policyGetter := func(meta *MetaPacket, threadIndex int) {}
 
 	flowGeneratorCount = 1
 	_TIME_SLOT_UNIT = time.Millisecond
@@ -46,7 +47,8 @@ func flowGeneratorInit(queueSize int, flushTicker bool) (*FlowGenerator, QueueWr
 	SetTimeout(testTimeoutConfig)
 	manager := queue.NewManager()
 	flowOutQueue := manager.NewQueues("flowOutQueue", queueSize, 1, 1)
-	meteringAppQueues := manager.NewQueues("3-meta-packet-to-metering-app", queueSize, 1, 1)
+	pcapAppQueues := manager.NewQueues("2-meta-packet-block-to-pcap-app", queueSize, 1, 1)
+	meteringAppQueues := manager.NewQueues("2-mini-tagged-flow-to-metering-app", queueSize, 1, 1)
 	var inputPacketQueue *queue.MultiQueue = nil
 	if flushTicker {
 		inputPacketQueue = manager.NewQueues("inputPacketQueue", queueSize, 1, 1, OptionFlushIndicator(time.Millisecond*4))
@@ -54,7 +56,8 @@ func flowGeneratorInit(queueSize int, flushTicker bool) (*FlowGenerator, QueueWr
 		inputPacketQueue = manager.NewQueues("inputPacketQueue", queueSize, 1, 1)
 	}
 	return New(
-		inputPacketQueue.Readers()[0], meteringAppQueues.Writers()[0], flowOutQueue.Writers()[0],
+		policyGetter, inputPacketQueue.Readers()[0],
+		pcapAppQueues.Writers()[0], meteringAppQueues.Writers()[0], flowOutQueue.Writers()[0],
 		queueSize, 0, time.Millisecond,
 	), inputPacketQueue.Writers()[0], flowOutQueue.Readers()[0], meteringAppQueues.Readers()[0]
 }
@@ -383,7 +386,7 @@ func TestReverseInNewCycle(t *testing.T) {
 
 	flowExtra := &FlowExtra{}
 	flowGenerator.flowMap.initFlow(flowExtra, packet0)
-	flowExtra.packetInCycle = false
+	flowExtra.packetInTick = false
 	flowGenerator.flowMap.updateFlow(flowExtra, packet1)
 
 	direction := flowExtra.taggedFlow.PolicyData.AclActions[0].GetDirections()
@@ -700,6 +703,7 @@ func TestStatOutput(t *testing.T) {
 func BenchmarkFlowMapWithSYNFlood(b *testing.B) {
 	blocks := make([]MetaPacketBlock, (b.N+15)/16)
 	buffer := make([]interface{}, (b.N+15)/16)
+	captureBuffer := make([]interface{}, (b.N+15)/16)
 	packetTemplate := getDefaultPacket()
 	for i := 0; i < b.N; i++ { // 10Mpps
 		packetTemplate.Timestamp = packetTemplate.Timestamp + time.Duration(i*100)*time.Nanosecond
@@ -713,7 +717,7 @@ func BenchmarkFlowMapWithSYNFlood(b *testing.B) {
 	flowGenerator, _, _, _ := flowGeneratorInit(b.N, false)
 
 	b.ResetTimer()
-	flowGenerator.processPackets(buffer)
+	flowGenerator.processPackets(buffer, captureBuffer)
 
 	b.Logf("map size=%d, totalFlow=%d, drop_by_capacity=%d, drop_before_window=%d, drop_after_window=%d",
 		flowGenerator.flowMap.size, flowGenerator.flowMap.totalFlow, flowGenerator.flowMap.counter.DropByCapacity,
@@ -752,6 +756,7 @@ func BenchmarkFlowMapWithTenPacketsFlowFlood(b *testing.B) {
 	}
 	blocks := make([]MetaPacketBlock, (N+15)/16)
 	buffer := make([]interface{}, (N+15)/16)
+	captureBuffer := make([]interface{}, (N+15)/16)
 	for i := 0; i < len(packets); i++ {
 		blocks[i/16].Metas[i%16] = packets[i]
 		if i%16 == 0 {
@@ -762,7 +767,7 @@ func BenchmarkFlowMapWithTenPacketsFlowFlood(b *testing.B) {
 	flowGenerator, _, _, _ := flowGeneratorInit(N, false)
 
 	b.ResetTimer()
-	flowGenerator.processPackets(buffer)
+	flowGenerator.processPackets(buffer, captureBuffer)
 
 	b.Logf("b.N=%d map size=%d, width=%d, total=%d, drop_by_capacity=%d, drop_before_window=%d, drop_after_window=%d",
 		b.N, flowGenerator.flowMap.size, flowGenerator.flowMap.width,

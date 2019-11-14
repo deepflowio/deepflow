@@ -1,14 +1,11 @@
 package labeler
 
 import (
-	"fmt"
-
 	"github.com/op/go-logging"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/debug"
 	"gitlab.x.lan/yunshan/droplet-libs/dropletpb"
 	"gitlab.x.lan/yunshan/droplet-libs/policy"
-	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
@@ -17,24 +14,10 @@ import (
 
 var log = logging.MustGetLogger("labeler")
 
-type QueueType uint8
-
-const (
-	QUEUE_TYPE_FLOW QueueType = iota
-	QUEUE_TYPE_PCAP
-	QUEUE_TYPE_MAX
-)
-
-const (
-	QUEUE_BATCH_SIZE = 4096
-)
-
 type LabelerManager struct {
 	command
 
 	policyTable *policy.PolicyTable
-	readQueues  []queue.QueueReader
-	appQueues   [QUEUE_TYPE_MAX][]queue.QueueWriter
 	running     bool
 
 	lookupKey         []datatype.LookupKey
@@ -63,15 +46,14 @@ type DumpKey struct {
 	InPort uint32
 }
 
-func NewLabelerManager(readQueues []queue.QueueReader, mapSize uint32, disable bool, ddbsDisable bool) *LabelerManager {
+func NewLabelerManager(queueCount int, mapSize uint32, disable bool, ddbsDisable bool) *LabelerManager {
 	id := policy.DDBS
 	if ddbsDisable {
 		id = policy.NORMAL
 	}
 	labeler := &LabelerManager{
-		lookupKey:   make([]datatype.LookupKey, len(readQueues)),
-		policyTable: policy.NewPolicyTable(len(readQueues), mapSize, disable, id),
-		readQueues:  readQueues,
+		lookupKey:   make([]datatype.LookupKey, queueCount),
+		policyTable: policy.NewPolicyTable(queueCount, mapSize, disable, id),
 	}
 	labeler.command.init(labeler)
 	debug.Register(dropletctl.DROPLETCTL_LABELER, labeler)
@@ -85,13 +67,6 @@ func (l *LabelerManager) GetCounter() interface{} {
 
 func (l *LabelerManager) Closed() bool {
 	return false // FIXME: never close?
-}
-
-func (l *LabelerManager) RegisterAppQueue(queueType QueueType, appQueues []queue.QueueWriter) {
-	if len(appQueues) != len(l.readQueues) {
-		panic(fmt.Sprintf("Queue count (type %d) %d is not equal to input queue count %d.", queueType, len(appQueues), len(l.readQueues)))
-	}
-	l.appQueues[queueType] = appQueues
 }
 
 func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
@@ -120,6 +95,10 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 			l.rawIpGroupDatas = dropletpb.Convert2IpGroupData(group.GetGroups())
 			log.Infof("droplet grpc recv %d pieces of ipgroup data", len(l.rawIpGroupDatas))
 			update = true
+			// XXX: 目前性能分析、回溯取证已不再关心具体的GroupID，暂时屏蔽。一段时间后可彻底清除
+			for _, g := range l.rawIpGroupDatas {
+				g.Type = policy.ANONYMOUS
+			}
 		}
 		l.groupVersion = newVersion
 	}
@@ -149,7 +128,7 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 	}
 }
 
-func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *datatype.PolicyData {
+func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) {
 	key := &l.lookupKey[index]
 
 	key.Timestamp = packet.Timestamp
@@ -174,66 +153,12 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) *data
 	key.Dst6Ip = packet.Ip6Dst
 
 	packet.EndpointData, packet.PolicyData = l.policyTable.LookupAllByKey(key)
-	return packet.PolicyData
-}
-
-func (l *LabelerManager) run(index int) {
-	readQueue := l.readQueues[index]
-	flowQueue := l.appQueues[QUEUE_TYPE_FLOW][index]
-	captureQueue := l.appQueues[QUEUE_TYPE_PCAP][index]
-
-	itemBatch := make([]interface{}, QUEUE_BATCH_SIZE)
-	flowItemBatch := make([]interface{}, 0, QUEUE_BATCH_SIZE)
-	captureItemBatch := make([]interface{}, 0, QUEUE_BATCH_SIZE)
-
-	for l.running {
-		itemCount := readQueue.Gets(itemBatch)
-		for i, item := range itemBatch[:itemCount] {
-			block := item.(*datatype.MetaPacketBlock)
-			for i := uint8(0); i < block.Count; i++ {
-				metaPacket := &block.Metas[i]
-				action := l.GetPolicy(metaPacket, index)
-				block.ActionFlags |= action.ActionFlags
-			}
-			if block.ActionFlags == 0 {
-				datatype.ReleaseMetaPacketBlock(block)
-				itemBatch[i] = nil
-				continue
-			}
-
-			if block.ActionFlags&datatype.ACTION_PACKET_CAPTURING != 0 {
-				block.AddReferenceCount()
-				captureItemBatch = append(captureItemBatch, block)
-			}
-
-			if block.ActionFlags != datatype.ACTION_PACKET_CAPTURING { // 包统计、流统计、流存储
-				block.AddReferenceCount()
-				flowItemBatch = append(flowItemBatch, block)
-			}
-
-			datatype.ReleaseMetaPacketBlock(block)
-			itemBatch[i] = nil
-		}
-		if len(flowItemBatch) > 0 {
-			flowQueue.Put(flowItemBatch...)
-			flowItemBatch = flowItemBatch[:0]
-		}
-		if len(captureItemBatch) > 0 {
-			captureQueue.Put(captureItemBatch...)
-			captureItemBatch = captureItemBatch[:0]
-		}
-	}
-
-	log.Info("Labeler manager exit")
 }
 
 func (l *LabelerManager) Start() {
 	if !l.running {
 		l.running = true
 		log.Info("Start labeler manager")
-		for i := 0; i < len(l.readQueues); i++ {
-			go l.run(i)
-		}
 	}
 }
 

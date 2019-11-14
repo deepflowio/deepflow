@@ -45,6 +45,8 @@ var flowMapNodeBlockPool = sync.Pool{New: func() interface{} {
 	return flowMapNodeBlock(make([]flowMapNode, _BLOCK_SIZE))
 }}
 
+type PolicyGetter = func(packet *datatype.MetaPacket, threadIndex int)
+
 // 注意：不是线程安全的
 type FlowMap struct {
 	FlowGeo
@@ -78,6 +80,7 @@ type FlowMap struct {
 	udpServiceTable    *ServiceTable
 	tcpServiceTable6   *ServiceTable6
 	udpServiceTable6   *ServiceTable6
+	policyGetter       PolicyGetter
 	srcServiceKey      []byte
 	dstServiceKey      []byte
 
@@ -556,7 +559,7 @@ func (m *FlowMap) compressHash(hash uint64) int32 {
 	return int32((((((hash>>m.hashSlotBits)^hash)>>m.hashSlotBits)^hash)>>m.hashSlotBits)^hash) & (m.hashSlots - 1)
 }
 
-func NewFlowMap(hashSlots, capacity, id int, timeWindow, packetDelay, flushInterval time.Duration, packetAppQueue, flowAppQueue queue.QueueWriter) *FlowMap {
+func NewFlowMap(hashSlots, capacity, id int, timeWindow, packetDelay, flushInterval time.Duration, packetAppQueue, flowAppQueue queue.QueueWriter, policyGetter PolicyGetter) *FlowMap {
 	hashSlots, hashSlotBits := minPowerOfTwo(hashSlots)
 	if timeWindow < _FLOW_STAT_INTERVAL {
 		timeWindow = _FLOW_STAT_INTERVAL
@@ -582,6 +585,7 @@ func NewFlowMap(hashSlots, capacity, id int, timeWindow, packetDelay, flushInter
 		udpServiceTable:        NewServiceTable(hashSlots, capacity),
 		tcpServiceTable6:       NewServiceTable6(hashSlots, capacity),
 		udpServiceTable6:       NewServiceTable6(hashSlots, capacity),
+		policyGetter:           policyGetter,
 		srcServiceKey:          make([]byte, _KEY_LEN),
 		dstServiceKey:          make([]byte, _KEY_LEN),
 		id:                     id,

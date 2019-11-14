@@ -92,12 +92,12 @@ func Start(configPath string) (closers []io.Closer) {
 	releaseMetaPacketBlock := func(x interface{}) {
 		datatype.ReleaseMetaPacketBlock(x.(*datatype.MetaPacketBlock))
 	}
-	labelerQueues := manager.NewQueues(
-		"1-meta-packet-block-to-labeler", cfg.Queue.LabelerQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
-		libqueue.OptionRelease(releaseMetaPacketBlock),
+	flowGeneratorQueues := manager.NewQueues(
+		"1-meta-packet-block-to-flow-generator", cfg.Queue.FlowGeneratorQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
+		libqueue.OptionFlushIndicator(time.Second), libqueue.OptionRelease(releaseMetaPacketBlock),
 	)
 
-	tridentAdapter := adapter.NewTridentAdapter(labelerQueues.Writers(), cfg.Adapter.SocketBufferSize, cfg.Adapter.OrderingCacheSize)
+	tridentAdapter := adapter.NewTridentAdapter(flowGeneratorQueues.Writers(), cfg.Adapter.SocketBufferSize, cfg.Adapter.OrderingCacheSize)
 	if tridentAdapter == nil {
 		return
 	}
@@ -111,19 +111,9 @@ func Start(configPath string) (closers []io.Closer) {
 		os.Exit(1)
 	}
 
-	// L2 - packet labeler
-	flowGeneratorQueues := manager.NewQueues(
-		"2-meta-packet-block-to-flow-generator", cfg.Queue.FlowGeneratorQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
-		libqueue.OptionFlushIndicator(time.Second), libqueue.OptionRelease(releaseMetaPacketBlock),
-	)
-	pcapAppQueues := manager.NewQueues(
-		"2-meta-packet-block-to-pcap-app", cfg.Queue.PCapAppQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
-		libqueue.OptionFlushIndicator(time.Second*10), libqueue.OptionRelease(releaseMetaPacketBlock),
-	)
+	// labeler
 	labelerManager := labeler.NewLabelerManager(
-		labelerQueues.Readers(), cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable, cfg.Labeler.FirstPathDdbsDisable)
-	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_FLOW, flowGeneratorQueues.Writers())
-	labelerManager.RegisterAppQueue(labeler.QUEUE_TYPE_PCAP, pcapAppQueues.Writers())
+		cfg.Queue.PacketQueueCount, cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable, cfg.Labeler.FirstPathDdbsDisable)
 	synchronizer.Register(func(response *trident.SyncResponse, version *config.RpcInfoVersions) {
 		log.Debug(response, version)
 		// Labeler更新策略信息
@@ -139,11 +129,15 @@ func Start(configPath string) (closers []io.Closer) {
 	releaseTaggedFlow := func(x interface{}) {
 		datatype.ReleaseTaggedFlow(x.(*datatype.TaggedFlow))
 	}
+	pcapAppQueues := manager.NewQueues(
+		"2-meta-packet-block-to-pcap-app", cfg.Queue.PCapAppQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
+		libqueue.OptionFlushIndicator(time.Second*10), libqueue.OptionRelease(releaseMetaPacketBlock),
+	)
 	flowDuplicatorQueues := manager.NewQueues(
-		"3-tagged-flow-to-flow-duplicator", cfg.Queue.FlowDuplicatorQueueSize, cfg.Queue.PacketQueueCount,
+		"2-tagged-flow-to-flow-duplicator", cfg.Queue.FlowDuplicatorQueueSize, cfg.Queue.PacketQueueCount,
 		cfg.Queue.PacketQueueCount, libqueue.OptionRelease(releaseTaggedFlow))
 	meteringAppQueues := manager.NewQueues(
-		"3-mini-tagged-flow-to-metering-app", cfg.Queue.MeteringAppQueueSize, cfg.Queue.PacketQueueCount,
+		"2-mini-tagged-flow-to-metering-app", cfg.Queue.MeteringAppQueueSize, cfg.Queue.PacketQueueCount,
 		cfg.Queue.PacketQueueCount, libqueue.OptionFlushIndicator(flowFlushInterval), libqueue.OptionRelease(releaseTaggedFlow),
 	)
 
@@ -159,9 +153,13 @@ func Start(configPath string) (closers []io.Closer) {
 	}
 	flowgenerator.SetTimeout(timeoutConfig)
 	flowLimitNum := int(cfg.FlowGenerator.FlowCountLimit) / cfg.Queue.PacketQueueCount
+	policyGetter := func(meta *datatype.MetaPacket, threadIndex int) {
+		labelerManager.GetPolicy(meta, threadIndex)
+	}
 	for i := 0; i < cfg.Queue.PacketQueueCount; i++ {
 		flowGenerator := flowgenerator.New(
-			flowGeneratorQueues.Readers()[i], meteringAppQueues.Writers()[i],
+			policyGetter, flowGeneratorQueues.Readers()[i],
+			pcapAppQueues.Writers()[i], meteringAppQueues.Writers()[i],
 			flowDuplicatorQueues.Writers()[i], flowLimitNum, i, flowFlushInterval)
 		flowGenerator.Start()
 	}
@@ -183,7 +181,7 @@ func Start(configPath string) (closers []io.Closer) {
 
 	// L4 - metering app
 	meteringDocMarshallerQueue := manager.NewQueues(
-		"4-metering-doc-to-marshaller",
+		"3-metering-doc-to-marshaller",
 		cfg.Queue.MeteringDocMarshallerQueueSize, cfg.Queue.DocQueueCount,
 		cfg.Queue.PacketQueueCount,
 		libqueue.OptionRelease(func(p interface{}) { app.ReleaseDocument(p.(*app.Document)) }),
@@ -194,10 +192,10 @@ func Start(configPath string) (closers []io.Closer) {
 
 	// L4 - flow duplicator: flow app & flow marshaller
 	flowAppQueues := manager.NewQueues(
-		"4-tagged-flow-to-flow-app", cfg.Queue.FlowAppQueueSize, cfg.Queue.FlowQueueCount,
+		"3-tagged-flow-to-flow-app", cfg.Queue.FlowAppQueueSize, cfg.Queue.FlowQueueCount,
 		cfg.Queue.PacketQueueCount, libqueue.OptionFlushIndicator(flowFlushInterval), libqueue.OptionRelease(releaseTaggedFlow))
 	flowThrottleQueues := manager.NewQueues(
-		"4-tagged-flow-to-flow-throttle", cfg.Queue.FlowThrottleQueueSize, cfg.Queue.FlowQueueCount,
+		"3-tagged-flow-to-flow-throttle", cfg.Queue.FlowThrottleQueueSize, cfg.Queue.FlowQueueCount,
 		cfg.Queue.PacketQueueCount, libqueue.OptionRelease(releaseTaggedFlow))
 	// 特殊处理：Duplicator的数量特意设置为PacketQueueCount，使得FlowGenerator所在环境均为单生产单消费
 	for i := 0; i < cfg.Queue.PacketQueueCount; i++ {
@@ -207,14 +205,14 @@ func Start(configPath string) (closers []io.Closer) {
 
 	// L5 - flow sender
 	flowSenderQueue := manager.NewQueue(
-		"5-tagged-flow-to-flow-sender", cfg.Queue.FlowSenderQueueSize, libqueue.OptionRelease(releaseTaggedFlow))
+		"4-tagged-flow-to-flow-sender", cfg.Queue.FlowSenderQueueSize, libqueue.OptionRelease(releaseTaggedFlow))
 	sender.NewFlowSender(
 		flowThrottleQueues.Readers(), flowSenderQueue, flowSenderQueue,
 		cfg.Stream, cfg.StreamPort, cfg.FlowThrottle, cfg.Queue.FlowSenderQueueSize).Start()
 
 	// L5 - flow app
 	flowDocMarshallerQueue := manager.NewQueues(
-		"5-flow-doc-to-marshaller",
+		"4-flow-doc-to-marshaller",
 		cfg.Queue.FlowDocMarshallerQueueSize, cfg.Queue.DocQueueCount,
 		cfg.Queue.FlowQueueCount,
 		libqueue.OptionRelease(func(p interface{}) { app.ReleaseDocument(p.(*app.Document)) }),

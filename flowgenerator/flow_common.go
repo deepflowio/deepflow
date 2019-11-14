@@ -55,10 +55,6 @@ func (m *FlowMap) initFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	flowMetricsPeerSrc.ByteCount = uint64(meta.PacketLen)
 	flowMetricsPeerSrc.TickByteCount = uint64(meta.PacketLen)
 
-	// 标签
-	updateEndPointAndPolicyData(taggedFlow, meta)
-	m.fillGeoInfo(taggedFlow)
-
 	// FlowMap信息
 	flowExtra.taggedFlow = taggedFlow
 	flowExtra.flowState = FLOW_STATE_RAW
@@ -67,6 +63,11 @@ func (m *FlowMap) initFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	flowExtra.reversed = false
 	flowExtra.packetInTick = true
 	flowExtra.packetInCycle = true
+
+	// 标签
+	m.policyGetter(meta, m.id)
+	updateEndpointAndPolicyData(flowExtra, meta)
+	m.fillGeoInfo(taggedFlow)
 }
 
 func (m *FlowMap) updateFlow(flowExtra *FlowExtra, meta *MetaPacket) {
@@ -81,11 +82,12 @@ func (m *FlowMap) updateFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	if !flowExtra.packetInTick { // PacketStatTime取整至包统计时间的开始，只需要赋值一次，且使用包的时间戳
 		flowExtra.packetInTick = true
 		flowExtra.taggedFlow.PacketStatTime = meta.Timestamp / _PACKET_STAT_INTERVAL * _PACKET_STAT_INTERVAL
+		m.policyGetter(meta, m.id)
+		updateEndpointAndPolicyData(flowExtra, meta)
+	} else {
+		copyEndpointAndPolicyData(flowExtra, meta)
 	}
-	if !flowExtra.packetInCycle {
-		flowExtra.packetInCycle = true
-		updateEndPointAndPolicyData(taggedFlow, meta)
-	}
+	flowExtra.packetInCycle = true
 	flowMetricsPeer := &taggedFlow.FlowMetricsPeers[meta.Direction]
 	flowMetricsPeer.TickPacketCount++
 	flowMetricsPeer.PacketCount++
@@ -97,23 +99,15 @@ func (m *FlowMap) updateFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	taggedFlow.TimeBitmap |= getBitmap(packetTimestamp)
 }
 
-func updateEndPointAndPolicyData(taggedFlow *TaggedFlow, meta *MetaPacket) {
-	endpointData := meta.EndpointData
-	if endpointData == nil {
-		log.Warning("Unexpected nil packet endpointData")
-		return
-	}
+func updateEndpointAndPolicyData(flowExtra *FlowExtra, meta *MetaPacket) {
+	flowExtra.policyDataCache[meta.Direction] = meta.PolicyData
+	flowExtra.endpointDataCache[meta.Direction] = meta.EndpointData
+	flowExtra.policyDataCache[OppositePacketDirection(meta.Direction)] = reversePolicyData(meta.PolicyData)
+	flowExtra.endpointDataCache[OppositePacketDirection(meta.Direction)] = meta.EndpointData.ReverseData()
 
-	var srcInfo, dstInfo *EndpointInfo
-	if meta.Direction == SERVER_TO_CLIENT {
-		taggedFlow.PolicyData = reversePolicyData(meta.PolicyData)
-		srcInfo = endpointData.DstInfo
-		dstInfo = endpointData.SrcInfo
-	} else {
-		taggedFlow.PolicyData = meta.PolicyData
-		srcInfo = endpointData.SrcInfo
-		dstInfo = endpointData.DstInfo
-	}
+	taggedFlow := flowExtra.taggedFlow
+	taggedFlow.PolicyData = flowExtra.policyDataCache[CLIENT_TO_SERVER]
+	srcInfo, dstInfo := flowExtra.endpointDataCache[CLIENT_TO_SERVER].SrcInfo, flowExtra.endpointDataCache[CLIENT_TO_SERVER].DstInfo
 
 	taggedFlow.GroupIDs0 = srcInfo.GroupIds
 	taggedFlow.GroupIDs1 = dstInfo.GroupIds
@@ -142,6 +136,11 @@ func updateEndPointAndPolicyData(taggedFlow *TaggedFlow, meta *MetaPacket) {
 	flowMetricsPeerDst.SubnetID = dstInfo.SubnetId
 }
 
+func copyEndpointAndPolicyData(flowExtra *FlowExtra, meta *MetaPacket) {
+	meta.PolicyData = flowExtra.policyDataCache[meta.Direction]
+	meta.EndpointData = flowExtra.endpointDataCache[meta.Direction]
+}
+
 // reversePolicyData will return a clone of the current PolicyData
 func reversePolicyData(policyData *PolicyData) *PolicyData {
 	if policyData == nil {
@@ -157,7 +156,12 @@ func reversePolicyData(policyData *PolicyData) *PolicyData {
 	return newPolicyData
 }
 
-func reverseFlow(taggedFlow *TaggedFlow) {
+func reverseFlow(flowExtra *FlowExtra) {
+	flowExtra.reversed = !flowExtra.reversed
+	flowExtra.policyDataCache[0], flowExtra.policyDataCache[1] = flowExtra.policyDataCache[1], flowExtra.policyDataCache[0]
+	flowExtra.endpointDataCache[0], flowExtra.endpointDataCache[1] = flowExtra.endpointDataCache[1], flowExtra.endpointDataCache[0]
+
+	taggedFlow := flowExtra.taggedFlow
 	taggedFlow.TunnelInfo.Src, taggedFlow.TunnelInfo.Dst = taggedFlow.TunnelInfo.Dst, taggedFlow.TunnelInfo.Src
 	taggedFlow.MACSrc, taggedFlow.MACDst = taggedFlow.MACDst, taggedFlow.MACSrc
 	taggedFlow.IPSrc, taggedFlow.IPDst = taggedFlow.IPDst, taggedFlow.IPSrc
@@ -168,7 +172,7 @@ func reverseFlow(taggedFlow *TaggedFlow) {
 	*flowMetricsPeerSrc, *flowMetricsPeerDst = *flowMetricsPeerDst, *flowMetricsPeerSrc
 	taggedFlow.GeoEnd ^= 1 // reverse GeoEnd (0: src, 1: dst, others: N/A)
 	taggedFlow.GroupIDs0, taggedFlow.GroupIDs1 = taggedFlow.GroupIDs1, taggedFlow.GroupIDs0
-	taggedFlow.PolicyData = reversePolicyData(taggedFlow.PolicyData)
+	taggedFlow.PolicyData = flowExtra.policyDataCache[SERVER_TO_CLIENT]
 }
 
 func (m *FlowMap) checkIfDoFlowPerf(flowExtra *FlowExtra) bool {
@@ -245,10 +249,9 @@ func (m *FlowMap) updateFlowDirection(flowExtra *FlowExtra, meta *MetaPacket) {
 
 	if !IsClientToServer(srcScore, dstScore) {
 		srcScore, dstScore = dstScore, srcScore
-		reverseFlow(flowExtra.taggedFlow)
-		flowExtra.reversed = !flowExtra.reversed
+		reverseFlow(flowExtra)
 		if meta != nil {
-			meta.Direction = (CLIENT_TO_SERVER + SERVER_TO_CLIENT) - meta.Direction // reverse
+			meta.Direction = OppositePacketDirection(meta.Direction)
 		}
 	}
 	taggedFlow.IsActiveService = IsActiveService(srcScore, dstScore)
