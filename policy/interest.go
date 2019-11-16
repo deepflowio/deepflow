@@ -288,13 +288,9 @@ func (t *InterestTable) GenerateInterestMaps(acls []*Acl) {
 
 func (t *InterestTable) getFastInterestKeys(packet *LookupKey) {
 	ports := t.InterestPortMaps[packet.Tap][packet.SrcPort]
-	if !ports.IsMatchAny() || !t.ddbs {
-		packet.SrcPort = ports.Min()
-	}
+	packet.SrcPort = ports.Min()
 	ports = t.InterestPortMaps[packet.Tap][packet.DstPort]
-	if !ports.IsMatchAny() || !t.ddbs {
-		packet.DstPort = ports.Min()
-	}
+	packet.DstPort = ports.Min()
 	if !t.InterestProtoMaps[packet.Tap][packet.Proto] && !t.ddbs {
 		packet.Proto = ANY_PROTO // 仅用于资源组匹配算法
 	}
