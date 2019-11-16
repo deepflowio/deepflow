@@ -24,10 +24,6 @@ func (p PortRange) Max() uint16 {
 	return uint16(p & 0xffff)
 }
 
-func (p PortRange) IsMatchAny() bool {
-	return p == 0
-}
-
 func (p PortRange) String() string {
 	return fmt.Sprintf("%v-%v", p.Min(), p.Max())
 }
