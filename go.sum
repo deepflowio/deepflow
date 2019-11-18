@@ -85,6 +85,8 @@ gitlab.x.lan/yunshan/droplet-libs v0.0.0-20191116120948-27cf78bb6939 h1:sEOoeUWz
 gitlab.x.lan/yunshan/droplet-libs v0.0.0-20191116120948-27cf78bb6939/go.mod h1:/Rt1RN6mxFEzPFVMEb9LGIHxPqZcoADZ7IY8vqrV7l8=
 gitlab.x.lan/yunshan/message v0.0.0-20191108092819-ffaa822be89f h1:V/jUJOkAzuIaxnQCWP+f9Zl06vJXNQm94+NQp7brW20=
 gitlab.x.lan/yunshan/message v0.0.0-20191108092819-ffaa822be89f/go.mod h1:MypsIdfw74oNofgOqe76rOWsVKRDYZxG9+70BJTsSDk=
+gitlab.x.lan/yunshan/message v0.0.0-20191114080316-15c48af4234f h1:tHUVMRekC8SvKC9tAwkgukxrVu1mPCI6ZRCmHFlq/6Q=
+gitlab.x.lan/yunshan/message v0.0.0-20191114080316-15c48af4234f/go.mod h1:MypsIdfw74oNofgOqe76rOWsVKRDYZxG9+70BJTsSDk=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2 h1:VklqNMn3ovrHsnt90PveolxSbWFaJdECFbxSq0Mqo2M=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/exp v0.0.0-20190121172915-509febef88a4/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
