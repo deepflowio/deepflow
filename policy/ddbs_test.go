@@ -255,10 +255,10 @@ func TestDdbsVlanProtoPortAcl(t *testing.T) {
 	table := generatePolicyTable(DDBS)
 	// group1->group2, vlan:10
 	action1 := generateAclAction(11, ACTION_FLOW_COUNTING)
-	acl1 := generatePolicyAcl(table, action1, 11, group[1], group[2], protoAny, 0, 10)
+	acl1 := generatePolicyAcl(table, action1, 11, group[1], group[2], protoAny, -1, 10)
 	// group1->group2, proto:6
 	action2 := generateAclAction(12, ACTION_FLOW_COUNTING)
-	acl2 := generatePolicyAcl(table, action2, 12, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	acl2 := generatePolicyAcl(table, action2, 12, group[1], group[2], IPProtocolTCP, -1, vlanAny)
 	// group1->group2, port:80
 	action3 := generateAclAction(13, ACTION_FLOW_COUNTING)
 	acl3 := generatePolicyAcl(table, action3, 13, group[1], group[2], protoAny, 80, vlanAny)
@@ -314,7 +314,7 @@ func TestDdbsVlanProtoPortAcl(t *testing.T) {
 	acl4 := generatePolicyAcl(table, action4, 14, groupAny, groupAny, protoAny, 80, vlanAny)
 	// group1->group2, proto:6
 	action5 := generateAclAction(15, ACTION_FLOW_COUNTING)
-	acl5 := generatePolicyAcl(table, action5, 15, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	acl5 := generatePolicyAcl(table, action5, 15, group[1], group[2], IPProtocolTCP, -1, vlanAny)
 	acls = append(acls, acl4, acl5)
 	table.UpdateAcls(acls)
 	// 4-key  1:10->2:80 proto:6
@@ -356,7 +356,7 @@ func TestDdbsResourceGroupPolicy(t *testing.T) {
 	// acl1: dstGroup:group1
 	// group1: epcId=10,mac=group1Mac,ips="group1Ip1/24,group1Ip2/25",subnetId=121
 	action1 := generateAclAction(16, ACTION_FLOW_COUNTING)
-	acl1 := generatePolicyAcl(table, action1, 16, groupAny, group[1], protoAny, 0, vlanAny)
+	acl1 := generatePolicyAcl(table, action1, 16, groupAny, group[1], protoAny, -1, vlanAny)
 	acls = append(acls, acl1)
 	table.UpdateAcls(acls)
 	// 构建查询1-key  (group1)group1Ip1:10->(group1)group1Ip2:10 proto:6 vlan:10
@@ -381,7 +381,7 @@ func TestDdbsResourceGroupPolicy(t *testing.T) {
 	// group5: 1.epcId=-1,mac=group5Mac1,ips="group5Ip1/24,group5Ip2/32"
 	//         2.epcId=50,mac=group5Mac2,ips="group5Ip1/24,group5Ip2/32"
 	action2 := generateAclAction(18, ACTION_FLOW_COUNTING)
-	acl2 := generatePolicyAcl(table, action2, 18, groupAny, group[5], protoAny, 0, vlanAny)
+	acl2 := generatePolicyAcl(table, action2, 18, groupAny, group[5], protoAny, -1, vlanAny)
 	action3 := generateAclAction(19, ACTION_FLOW_COUNTING)
 	acl3 := generatePolicyAcl(table, action3, 19, group[3], group[5], IPProtocolUDP, 1023, vlanAny)
 	acls = append(acls, acl2, acl3)
@@ -458,9 +458,9 @@ func TestDdbsSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	// acl1: dstGroup: ipGroup6(IP资源组)，udp
 	// acl2: srcGroup: group3(DEV资源组)，udp
 	action1 := generateAclAction(20, ACTION_PACKET_COUNTING)
-	acl1 := generatePolicyAcl(table, action1, 20, groupAny, group[6], IPProtocolUDP, 0, vlanAny)
+	acl1 := generatePolicyAcl(table, action1, 20, groupAny, group[6], IPProtocolUDP, -1, vlanAny)
 	action2 := generateAclAction(21, ACTION_PACKET_COUNTING)
-	acl2 := generatePolicyAcl(table, action2, 21, group[3], groupAny, IPProtocolUDP, 0, vlanAny)
+	acl2 := generatePolicyAcl(table, action2, 21, group[3], groupAny, IPProtocolUDP, -1, vlanAny)
 	acls = append(acls, acl1, acl2)
 	table.UpdateAcls(acls)
 
@@ -501,9 +501,9 @@ func TestDdbsSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	// acl3: dstGroup: ipGroup7(IP资源组)： 和ipGroup6所含IP相同，但有epc限制 udp
 	// acl4: srcGroup: group4(DEV资源组): 和group3所含IP相同，但有epc限制 udp
 	action3 := generateAclAction(22, ACTION_PACKET_COUNTING)
-	acl3 := generatePolicyAcl(table, action3, 22, groupAny, group[7], IPProtocolUDP, 0, vlanAny)
+	acl3 := generatePolicyAcl(table, action3, 22, groupAny, group[7], IPProtocolUDP, -1, vlanAny)
 	action4 := generateAclAction(23, ACTION_PACKET_COUNTING)
-	acl4 := generatePolicyAcl(table, action4, 23, group[4], groupAny, IPProtocolUDP, 0, vlanAny)
+	acl4 := generatePolicyAcl(table, action4, 23, group[4], groupAny, IPProtocolUDP, -1, vlanAny)
 	acls = append(acls, acl3, acl4)
 	table.UpdateAcls(acls)
 
@@ -1063,7 +1063,7 @@ func TestDdbsNpbActionDedup(t *testing.T) {
 	// IP段-A -> IP段-B, IP-group3 -> IP-group6
 	npb5 := ToNpbAction(20, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
 	action5 := generateAclAction(29, ACTION_PACKET_BROKERING)
-	acl5 := generatePolicyAcl(table, action5, 29, group[6], group[6], IPProtocolTCP, 0, vlanAny, npb5)
+	acl5 := generatePolicyAcl(table, action5, 29, group[6], group[6], IPProtocolTCP, -1, vlanAny, npb5)
 	acls = []*Acl{acl5}
 	table.UpdateAcls(acls)
 
@@ -1087,7 +1087,7 @@ func TestDdbsPcapNpbAction(t *testing.T) {
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
 	// acl1 Group: 16 -> 16 Port: 0 Proto: TCP vlan: any Tap: any
 	npb := ToNpbAction(10, 150, NPB_TUNNEL_TYPE_PCAP, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
-	acl1 := generatePolicyAcl(table, action1, 25, group[16], group[16], IPProtocolTCP, 0, vlanAny, npb)
+	acl1 := generatePolicyAcl(table, action1, 25, group[16], group[16], IPProtocolTCP, -1, vlanAny, npb)
 	acl1.Type = 0
 	acls = append(acls, acl1)
 	table.UpdateAcls(acls)
@@ -1739,13 +1739,45 @@ func TestDdbsPort(t *testing.T) {
 		t.Error("TestDdbsPort0 Check Failed!")
 	}
 
+	key = generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 8000)
+	// 获取查询fast结果
+	_, policyData = table.LookupAllByKey(key)
+	// 查询结果和预期结果比较
+	if !CheckPolicyResult(t, INVALID_POLICY_DATA, policyData) {
+		t.Error("TestDdbsPort0 Check Failed!")
+	}
+
 	// 全采集
 	acl = generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, -1, vlanAny)
-	acls = append(acls[0:], acl)
+	acls = append(acls[:0], acl)
 	table.UpdateAcls(acls)
 	key = generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 8000)
 	_, policyData = table.LookupAllByKey(key)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestDdbsPort0 Check Failed!")
+	}
+
+	// 采集端口0
+	acl = generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
+	acl.SrcPortRange = []PortRange{NewPortRange(200, 200)}
+	acls = append(acls[:0], acl)
+	table.UpdateAcls(acls)
+	key = generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 200, 0)
+	_, policyData = table.LookupAllByKey(key)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestDdbsPort0 Check Failed!")
+	}
+
+	// fast
+	key = generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 200, 0)
+	_, policyData = table.LookupAllByKey(key)
+	if !CheckPolicyResult(t, basicPolicyData, policyData) {
+		t.Error("TestDdbsPort0 Check Failed!")
+	}
+
+	key = generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 200, 8000)
+	_, policyData = table.LookupAllByKey(key)
+	if !CheckPolicyResult(t, INVALID_POLICY_DATA, policyData) {
 		t.Error("TestDdbsPort0 Check Failed!")
 	}
 }

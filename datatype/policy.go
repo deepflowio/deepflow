@@ -441,7 +441,7 @@ func (d *PolicyData) FormatNpbAction() {
 	}
 }
 
-func (d *PolicyData) CheckNpbAction(packet *LookupKey, endpointData *EndpointData) []NpbAction {
+func (d *PolicyData) CheckNpbAction(packet *LookupKey) []NpbAction {
 	if len(d.NpbActions) == 0 || packet.Tap != TAP_TOR {
 		return d.NpbActions
 	}
@@ -452,8 +452,8 @@ func (d *PolicyData) CheckNpbAction(packet *LookupKey, endpointData *EndpointDat
 			(action.TapSideCompare(TAPSIDE_DST) == true && packet.L2End1 == true) {
 			if action.ResourceGroupTypeCompare(RESOURCE_GROUP_TYPE_DEV) {
 				validActions = append(validActions, action)
-			} else if (action.TapSideCompare(TAPSIDE_SRC) == true && endpointData.SrcInfo.L3End == true) ||
-				(action.TapSideCompare(TAPSIDE_DST) == true && endpointData.DstInfo.L3End == true) {
+			} else if (action.TapSideCompare(TAPSIDE_SRC) == true && packet.L3End0 == true) ||
+				(action.TapSideCompare(TAPSIDE_DST) == true && packet.L3End1 == true) {
 				validActions = append(validActions, action)
 			}
 		}
@@ -461,11 +461,11 @@ func (d *PolicyData) CheckNpbAction(packet *LookupKey, endpointData *EndpointDat
 	return validActions
 }
 
-func (d *PolicyData) CheckNpbPolicy(packet *LookupKey, endpointData *EndpointData) *PolicyData {
+func (d *PolicyData) CheckNpbPolicy(packet *LookupKey) *PolicyData {
 	if len(d.NpbActions) == 0 || packet.Tap != TAP_TOR {
 		return d
 	}
-	validActions := d.CheckNpbAction(packet, endpointData)
+	validActions := d.CheckNpbAction(packet)
 	if len(validActions) == 0 && d.ActionFlags == 0 {
 		return INVALID_POLICY_DATA
 	}

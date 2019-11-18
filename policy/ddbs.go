@@ -295,7 +295,7 @@ func (d *Ddbs) mergePolicy(packetEndpointData *EndpointData, packet *LookupKey, 
 			findPolicy.NpbActions = make([]NpbAction, 0, length)
 			findPolicy.MergeNpbAction(append(policyForward.NpbActions, policyBackward.NpbActions...), id)
 			findPolicy.FormatNpbAction()
-			findPolicy.NpbActions = findPolicy.CheckNpbAction(packet, packetEndpointData)
+			findPolicy.NpbActions = findPolicy.CheckNpbAction(packet)
 		}
 	} else {
 		d.UnmatchedPacketCount++
@@ -598,7 +598,7 @@ func (d *Ddbs) GetPolicyByFastPath(packet *LookupKey) (*EndpointStore, *PolicyDa
 	}
 
 	if policy != nil && endpoint != nil {
-		policy = policy.CheckNpbPolicy(packet, endpoint.Endpoints)
+		policy = policy.CheckNpbPolicy(packet)
 	}
 
 	if policy != nil && policy.ACLID == 0 {

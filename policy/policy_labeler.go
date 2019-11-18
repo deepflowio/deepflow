@@ -430,7 +430,7 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 			findPolicy.NpbActions = make([]NpbAction, 0, length)
 			findPolicy.MergeNpbAction(append(portForwardPolicy.NpbActions, portBackwardPolicy.NpbActions...), id)
 			findPolicy.FormatNpbAction()
-			findPolicy.NpbActions = findPolicy.CheckNpbAction(packet, packetEndpointData)
+			findPolicy.NpbActions = findPolicy.CheckNpbAction(packet)
 		}
 	} else {
 		l.UnmatchedPacketCount++
@@ -496,7 +496,7 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointStore, 
 	}
 
 	if policy != nil && endpoint != nil {
-		policy = policy.CheckNpbPolicy(packet, endpoint.Endpoints)
+		policy = policy.CheckNpbPolicy(packet)
 	}
 
 	if policy != nil && policy.ACLID == 0 {
