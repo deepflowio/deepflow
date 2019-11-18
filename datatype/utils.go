@@ -214,6 +214,11 @@ func getPorts(src string) []PortRange {
 
 func SplitPort2Int(src string) []PortRange {
 	ports := make([]PortRange, 0, 8)
+	if len(src) == 0 {
+		ports := append(ports, NewPortRange(0, 65535))
+		return ports
+	}
+
 	splitSrcPorts := strings.Split(src, ",")
 	for _, srcPorts := range splitSrcPorts {
 		ports = append(ports, getPorts(srcPorts)...)

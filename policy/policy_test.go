@@ -305,7 +305,7 @@ func generatePolicyAcl(table *PolicyTable, action AclAction, aclID ACLID, args .
 	if dstGroupId != 0 {
 		dstGroups = append(dstGroups, dstGroupId)
 	}
-	if port > 0 {
+	if port >= 0 {
 		dstPorts = append(dstPorts, NewPortRange(uint16(port), uint16(port)))
 	} else if port < 0 {
 		dstPorts = append(dstPorts, NewPortRange(0, 65535))
@@ -2305,7 +2305,7 @@ func BenchmarkNpbCheck(b *testing.B) {
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 63, l2EndBool[1], l2EndBool[1])
 
 	for i := 0; i < b.N; i++ {
-		policy.CheckNpbPolicy(key, endpoints)
+		policy.CheckNpbPolicy(key)
 	}
 }
 
