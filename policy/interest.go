@@ -120,9 +120,32 @@ func (t *InterestTable) generateInterestPortMap(acls []*Acl) {
 
 		ports = GetPortRanges(ports)
 
-		for _, port := range ports {
+		lastMax, portOther := uint16(0), uint16(0)
+		for index, port := range ports {
+			if index == 0 {
+				lastMax = port.Max()
+			} else if portOther != 0 {
+				if port.Min()-lastMax > 1 {
+					portOther = lastMax + 1
+				}
+				lastMax = port.Max()
+			}
+
 			for i := int(port.Min()); i <= int(port.Max()); i++ {
 				interestPortMaps[tapType][i] = port
+			}
+		}
+		if portOther == 0 && math.MaxUint16-lastMax > 1 {
+			portOther = lastMax + 1
+		}
+
+		if portOther != 0 && t.ddbs {
+			// portOther为非策略端口中的的第一个端口
+			// 为了减少内存，减少fastPath项， 所有不在策略中的端口使用portOther来建立查询fastPath
+			for i := 1; i <= math.MaxUint16; i++ {
+				if 0 == interestPortMaps[tapType][i] {
+					interestPortMaps[tapType][i] = NewPortRange(portOther, portOther)
+				}
 			}
 		}
 	}
