@@ -173,7 +173,7 @@ func NewInfluxdbWriter(addrPrimary, addrReplica, httpUsername, httpPassword, nam
 
 	if addrReplica != "" {
 		w.ReplicaEnabled = true
-		replicaHTTPConfig := client.HTTPConfig{Addr: addrPrimary, Username: httpUsername, Password: httpPassword}
+		replicaHTTPConfig := client.HTTPConfig{Addr: addrReplica, Username: httpUsername, Password: httpPassword}
 		httpClient, err := client.NewHTTPClient(replicaHTTPConfig)
 		if err != nil {
 			log.Error("create replica influxdb http client failed:", err)
