@@ -507,7 +507,10 @@ func (m *FlowMap) InjectMetaPacket(block *datatype.MetaPacketBlock) {
 	}
 	// 使用block中的最后一个包滑动时间窗口，一个block一定在trident发送的一个压缩包头中且递增，时间最大只跨越1秒
 	if !m.InjectFlushTicker(block.Metas[block.Count-1].Timestamp) {
-		// 包的时间不在时间窗口中，忽略
+		// 包的时间不在时间窗口中，仅查询策略（目前仅有PCAP下载需要），忽略流聚合过程
+		for i := uint8(0); i < block.Count; i++ {
+			m.policyGetter(&block.Metas[i], m.id)
+		}
 		return
 	}
 

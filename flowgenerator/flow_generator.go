@@ -24,9 +24,7 @@ func (f *FlowGenerator) processPackets(processBuffer, captureBuffer []interface{
 		f.flowMap.InjectMetaPacket(block)
 
 		for j := uint8(0); j < block.Count; j++ {
-			if block.Metas[j].PolicyData != nil { // 不在时间窗口的Packet不会触发策略匹配
-				block.ActionFlags |= block.Metas[j].PolicyData.ActionFlags
-			}
+			block.ActionFlags |= block.Metas[j].PolicyData.ActionFlags
 		}
 		if block.ActionFlags&ACTION_PACKET_CAPTURING != 0 {
 			captureBuffer = append(captureBuffer, block)
