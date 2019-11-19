@@ -58,6 +58,11 @@ enum TapMode {
     ANALYZER = 2; // 部署在分析器之上，抓取镜像而来的流量
 }
 
+enum IfMacSource {
+    IF_MAC = 0;
+    IF_NAME = 1;
+}
+
 message Config {
     optional bool    enabled              = 1 [default = true];
     optional uint32  max_cpus             = 2 [default = 2];
@@ -77,6 +82,7 @@ message Config {
     optional uint32  platform_interval    = 17;
     optional uint64  server_tx_bandwidth_threshold = 18 [default = 0]; //bps
     optional uint64  bandwidth_probe_interval = 19 [default = 10];  //second
+    optional IfMacSource mac_source     = 20 [default = IF_MAC];
 
     optional string  analyzer_ip          = 31;
     optional uint32  max_escape_seconds   = 32;
