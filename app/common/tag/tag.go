@@ -89,6 +89,11 @@ func GetFastID(t *Tag, keys []byte) {
 		codeID = 4
 		keyOthers = uint64(t.ACLGID&0xFFFF) | uint64(t.ACLDirection&0x3)<<16 | uint64(t.Direction&0x3)<<18 | uint64(t.TAPType&0x1F)<<20 | uint64(t.Protocol&0xFF)<<25 | uint64(t.ServerPort&0xFFFF)<<33
 
+	// keyOthers: ACLGID | ACLDirection | Direction (没有IP)
+	case ACLGID | ACLDirection | Direction:
+		codeID = 5
+		keyOthers = uint64(t.ACLGID&0xFFFF) | uint64(t.ACLDirection&0x3)<<16 | uint64(t.Direction&0x3)<<18
+
 	// keyOthers: L3EpcIDPath | TAPType | Protocol | ServerPort
 	case L3EpcIDPath | TAPType | Protocol | ServerPort | IPPath: // log_usage
 		codeID = 1

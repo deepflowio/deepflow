@@ -7,11 +7,13 @@
 ```
 db                       measurement          tag
 ------------------------------------------------------------------------------------------------------------------------
+df_usage_acl             x0000040300000000    _id,acl_direction,acl_gid,direction
 df_usage_acl             x0000048300000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
 df_usage_acl_edge        x0000048300010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
 df_usage_acl_edge_port   x0000049b00010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,protocol,server_port,tap_type
 df_usage_acl_port        x0000049b00000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,protocol,server_port,tap_type
 
+df_fps_acl               x0000040300000000    _id,acl_direction,acl_gid,direction
 df_fps_acl               x0000048300000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
 df_fps_acl_port          x0000049b00000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type,protocol,server_port
 df_fps_acl_edge          x0000048300010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
@@ -26,6 +28,7 @@ df_geo_acl_edge          x4000048300010000    _id,acl_direction,acl_gid,directio
 df_geo_acl_edge_port     x2000049b00010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,isp,tap_type,protocol,server_port
 df_geo_acl_edge_port     x4000049b00010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,region,tap_type,protocol,server_port
 
+df_perf_acl              x0000040300000000    _id,acl_direction,acl_gid,direction
 df_perf_acl              x0000048300000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
 df_perf_acl_port         x0000049b00000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type,protocol,server_port
 df_perf_acl_edge         x0000048300010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
