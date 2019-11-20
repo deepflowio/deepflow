@@ -172,7 +172,7 @@ func reverseFlow(flowExtra *FlowExtra) {
 	*flowMetricsPeerSrc, *flowMetricsPeerDst = *flowMetricsPeerDst, *flowMetricsPeerSrc
 	taggedFlow.GeoEnd ^= 1 // reverse GeoEnd (0: src, 1: dst, others: N/A)
 	taggedFlow.GroupIDs0, taggedFlow.GroupIDs1 = taggedFlow.GroupIDs1, taggedFlow.GroupIDs0
-	taggedFlow.PolicyData = flowExtra.policyDataCache[SERVER_TO_CLIENT]
+	taggedFlow.PolicyData = flowExtra.policyDataCache[CLIENT_TO_SERVER]
 }
 
 func (m *FlowMap) checkIfDoFlowPerf(flowExtra *FlowExtra) bool {
