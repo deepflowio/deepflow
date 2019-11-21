@@ -82,7 +82,7 @@ message Config {
     optional uint32  platform_interval    = 17;
     optional uint64  server_tx_bandwidth_threshold = 18 [default = 0]; //bps
     optional uint64  bandwidth_probe_interval = 19 [default = 10];  //second
-    optional IfMacSource mac_source     = 20 [default = IF_MAC];
+    optional IfMacSource if_mac_source     = 20 [default = IF_MAC];
 
     optional string  analyzer_ip          = 31;
     optional uint32  max_escape_seconds   = 32;
