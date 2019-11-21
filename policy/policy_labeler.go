@@ -81,7 +81,7 @@ func (l *PolicyLabeler) GetCounter() interface{} {
 	counter.UnmatchedPacketCount = l.UnmatchedPacketCount
 	for i := 0; i < l.queueCount; i++ {
 		for j := TAP_MIN; j < TAP_MAX; j++ {
-			maps := l.FastPolicyMaps[i][j]
+			maps := l.FastPortPolicyMaps[i][j]
 			if maps != nil {
 				counter.FastPath += uint32(maps.Size())
 			}
@@ -360,8 +360,6 @@ func getAclId(ids ...ACLID) ACLID {
 
 func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet *LookupKey) (*EndpointStore, *PolicyData) {
 	l.generateInterestKeys(endpointData, packet, true)
-	srcMacSuffix := uint16(packet.SrcMac & 0xffff)
-	dstMacSuffix := uint16(packet.DstMac & 0xffff)
 	portGroup := l.GroupPortPolicyMaps[packet.Tap][packet.Proto]
 	vlanGroup := l.GroupVlanPolicyMaps[packet.Tap]
 	// 对于内容全为0的findPolicy，统一采用INVALID_POLICY_DATA（同一块内存的数值）
@@ -398,7 +396,7 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 	packetEndpointData := l.cloudPlatformLabeler.UpdateEndpointData(endpointStore, packet)
 
 	// 无论是否查找到policy，都需要向fastPath下发，避免重复走firstPath
-	mapsForward, mapsBackward := l.addPortFastPolicy(endpointStore, packetEndpointData, srcMacSuffix, dstMacSuffix, packet, portForwardPolicy, portBackwardPolicy)
+	l.addPortFastPolicy(endpointStore, packetEndpointData, packet, portForwardPolicy, portBackwardPolicy)
 
 	// 在vlan map中查找单方向的策略
 	if packet.Vlan > 0 {
@@ -412,8 +410,8 @@ func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet 
 				vlanPolicy.Merge(policy.AclActions, policy.NpbActions, policy.ACLID)
 			}
 		}
-		// 无论是否查找到policy，都需要向fastPath下发，避免重复走firstPath
-		l.addVlanFastPolicy(srcMacSuffix, dstMacSuffix, packet, vlanPolicy, endpointData, mapsForward, mapsBackward)
+
+		l.addVlanFastPolicy(packet, vlanPolicy)
 	}
 
 	id := getAclId(vlanPolicy.ACLID, portForwardPolicy.ACLID, portBackwardPolicy.ACLID)
@@ -462,19 +460,16 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointStore, 
 	var portPolicy *PolicyData
 	vlanPolicy, policy := INVALID_POLICY_DATA, INVALID_POLICY_DATA
 
-	if maps := l.getVlanAndPortMap(packet, FORWARD, false, nil); maps != nil {
-		srcMacSuffix, dstMacSuffix := uint16(packet.SrcMac&0xffff), uint16(packet.DstMac&0xffff)
-		// NOTE：会改变packet参数，但firstPath同样需要getFastInterestKeys，所以无影响
-		l.getFastInterestKeys(packet)
-		if endpoint, portPolicy = l.getFastPortPolicy(maps, srcMacSuffix, dstMacSuffix, packet); portPolicy == nil {
+	l.getFastInterestKeys(packet)
+	if endpoint, portPolicy = l.getPortFastPolicy(packet); portPolicy == nil {
+		return nil, nil
+	}
+	if packet.Vlan > 0 && packet.HasFeatureFlag(NPM) {
+		if vlanPolicy = l.getVlanFastPolicy(packet); vlanPolicy == nil {
 			return nil, nil
 		}
-		if packet.Vlan > 0 && packet.HasFeatureFlag(NPM) {
-			if vlanPolicy = l.getFastVlanPolicy(maps, srcMacSuffix, dstMacSuffix, packet); vlanPolicy == nil {
-				return nil, nil
-			}
-		}
 	}
+
 	if vlanPolicy.ACLID == 0 {
 		policy = portPolicy
 	} else if portPolicy.ACLID == 0 {
@@ -495,11 +490,11 @@ func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointStore, 
 		}
 	}
 
-	if policy != nil && endpoint != nil {
+	if packet.HasFeatureFlag(NPB) {
 		policy = policy.CheckNpbPolicy(packet)
 	}
 
-	if policy != nil && policy.ACLID == 0 {
+	if policy.ACLID == 0 {
 		l.UnmatchedPacketCount++
 	}
 
