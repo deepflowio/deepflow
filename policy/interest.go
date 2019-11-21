@@ -314,7 +314,7 @@ func (t *InterestTable) getFastInterestKeys(packet *LookupKey) {
 	packet.SrcPort = ports.Min()
 	ports = t.InterestPortMaps[packet.Tap][packet.DstPort]
 	packet.DstPort = ports.Min()
-	if !t.InterestProtoMaps[packet.Tap][packet.Proto] && !t.ddbs {
+	if !t.ddbs && !t.InterestProtoMaps[packet.Tap][packet.Proto] {
 		packet.Proto = ANY_PROTO // 仅用于资源组匹配算法
 	}
 }

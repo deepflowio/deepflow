@@ -265,16 +265,15 @@ func (d *Ddbs) generateDdbsTable(acls []*Acl) {
 }
 
 func (d *Ddbs) addFastPath(endpointData *EndpointData, packet *LookupKey, policyForward, policyBackward, vlanPolicy *PolicyData) (*EndpointStore, *EndpointData) {
-	srcMacSuffix, dstMacSuffix := uint16(packet.SrcMac&0xffff), uint16(packet.DstMac&0xffff)
 	endpointStore := &EndpointStore{}
 	endpointStore.InitPointer(endpointData)
 
 	d.cloudPlatformLabeler.RemoveAnonymousGroupIds(endpointStore, packet)
 	packetEndpointData := d.cloudPlatformLabeler.UpdateEndpointData(endpointStore, packet)
-	mapsForward, mapsBackward := d.addPortFastPolicy(endpointStore, packetEndpointData, srcMacSuffix, dstMacSuffix, packet, policyForward, policyBackward)
+	d.addPortFastPolicy(endpointStore, packetEndpointData, packet, policyForward, policyBackward)
 
 	if packet.Vlan > 0 {
-		d.addVlanFastPolicy(srcMacSuffix, dstMacSuffix, packet, vlanPolicy, endpointData, mapsForward, mapsBackward)
+		d.addVlanFastPolicy(packet, vlanPolicy)
 	}
 	return endpointStore, packetEndpointData
 }
@@ -468,7 +467,7 @@ func (d *Ddbs) GetCounter() interface{} {
 	counter.UnmatchedPacketCount = d.UnmatchedPacketCount
 	for i := 0; i < d.queueCount; i++ {
 		for j := TAP_MIN; j < TAP_MAX; j++ {
-			maps := d.FastPolicyMaps[i][j]
+			maps := d.FastPortPolicyMaps[i][j]
 			if maps != nil {
 				counter.FastPath += uint32(maps.Size())
 			}
@@ -564,19 +563,16 @@ func (d *Ddbs) GetPolicyByFastPath(packet *LookupKey) (*EndpointStore, *PolicyDa
 	var portPolicy *PolicyData
 	vlanPolicy, policy := INVALID_POLICY_DATA, INVALID_POLICY_DATA
 
-	if maps := d.getVlanAndPortMap(packet, FORWARD, false, nil); maps != nil {
-		srcMacSuffix, dstMacSuffix := uint16(packet.SrcMac&0xffff), uint16(packet.DstMac&0xffff)
-		// NOTE：会改变packet参数，但firstPath同样需要getFastInterestKeys，所以无影响
-		d.getFastInterestKeys(packet)
-		if endpoint, portPolicy = d.getFastPortPolicy(maps, srcMacSuffix, dstMacSuffix, packet); portPolicy == nil {
+	d.getFastInterestKeys(packet)
+	if endpoint, portPolicy = d.getPortFastPolicy(packet); portPolicy == nil {
+		return nil, nil
+	}
+	if packet.Vlan > 0 && packet.HasFeatureFlag(NPM) {
+		if vlanPolicy = d.getVlanFastPolicy(packet); vlanPolicy == nil {
 			return nil, nil
 		}
-		if packet.Vlan > 0 && packet.HasFeatureFlag(NPM) {
-			if vlanPolicy = d.getFastVlanPolicy(maps, srcMacSuffix, dstMacSuffix, packet); vlanPolicy == nil {
-				return nil, nil
-			}
-		}
 	}
+
 	if vlanPolicy.ACLID == 0 {
 		policy = portPolicy
 	} else if portPolicy.ACLID == 0 {
@@ -597,11 +593,11 @@ func (d *Ddbs) GetPolicyByFastPath(packet *LookupKey) (*EndpointStore, *PolicyDa
 		}
 	}
 
-	if policy != nil && endpoint != nil {
+	if packet.HasFeatureFlag(NPB) {
 		policy = policy.CheckNpbPolicy(packet)
 	}
 
-	if policy != nil && policy.ACLID == 0 {
+	if policy.ACLID == 0 {
 		d.UnmatchedPacketCount++
 	}
 

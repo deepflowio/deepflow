@@ -1846,3 +1846,23 @@ func BenchmarkDdbsAcl(b *testing.B) {
 	b.ResetTimer()
 	table.UpdateAcls(acls)
 }
+
+func BenchmarkDdbsFastPath(b *testing.B) {
+	acls := []*Acl{}
+	// 创建 policyTable
+	table := generatePolicyTable(DDBS)
+	// 构建acl action  1->2 tcp 8000
+	action := generateAclAction(10, ACTION_PACKET_COUNTING)
+	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 8000, vlanAny)
+	acls = append(acls, acl)
+	table.UpdateAcls(acls)
+	// 构建查询1-key  1:0->2:8000 tcp
+	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 8000)
+	endpoint := getEndpointData(table, key)
+	table.operator.GetPolicyByFirstPath(endpoint, key)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		table.operator.GetPolicyByFastPath(key)
+	}
+}
