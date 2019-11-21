@@ -3,7 +3,6 @@ package policy
 import (
 	"fmt"
 	"math"
-	"time"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/lru"
@@ -11,14 +10,12 @@ import (
 )
 
 const (
-	MAX_QUEUE_COUNT        = 16
-	FAST_PATH_SOFT_TIMEOUT = 30 * time.Minute
+	MAX_QUEUE_COUNT = 16
 )
 
 type PortPolicyValue struct {
 	endpoint    EndpointStore
 	protoPolicy [ACL_PROTO_MAX]*PolicyData
-	timestamp   time.Duration
 }
 
 type VlanAndPortMap struct {
@@ -34,13 +31,15 @@ type FastPath struct {
 	maskMapFromIpGroupData  [math.MaxUint16 + 1]uint32
 	IpNetmaskMap            [math.MaxUint16 + 1]uint32 // 根据IP地址查找对应的最大掩码
 
-	FastPolicyMaps      [MAX_QUEUE_COUNT + 1][TAP_MAX]*lru.U64LRU // 快速路径上的Policy映射表，Key为IP掩码对，Value为VlanAndPortMap
-	fastPolicyMapsFlush [MAX_QUEUE_COUNT + 1][TAP_MAX]bool        // 标记对应的LRU是否需要Clear
+	FastPortPolicyMaps  [MAX_QUEUE_COUNT + 1][TAP_MAX]*lru.U128LRU // 快速路径上的Policy映射表，Key为IP掩码对 + MAC + PORT，Value为PortPolicyValue
+	FastVlanPolicyMaps  [MAX_QUEUE_COUNT + 1][TAP_MAX]*lru.U128LRU // 快速路径上的Policy映射表，Key为IP掩码对 + MAC + VLAN，Value为PolicyData
+	fastPolicyMapsFlush [MAX_QUEUE_COUNT + 1]bool                  // 标记对应的LRU是否需要Clear
 
 	FastPathHit                           uint64
 	FastPathMacCount, FastPathPolicyCount uint32
 
-	MapSize uint32
+	MapSize                uint32
+	flushCount, queueCount int
 
 	SrcGroupAclGidMaps [TAP_MAX]map[uint32]bool
 	DstGroupAclGidMaps [TAP_MAX]map[uint32]bool
@@ -51,8 +50,15 @@ func (f *FastPath) Init(mapSize uint32, queueCount int, srcGroupAclGidMaps, dstG
 		panic(fmt.Sprintf("queueCount超出最大限制%d", MAX_QUEUE_COUNT))
 	}
 	f.UpdateGroupAclGidMaps(srcGroupAclGidMaps, dstGroupAclGidMaps)
+	for i := 0; i < queueCount; i++ {
+		for j := TapType(0); j < TAP_MAX; j++ {
+			f.FastPortPolicyMaps[i][j] = lru.NewU128LRU(1<<16, int(mapSize))
+			f.FastVlanPolicyMaps[i][j] = lru.NewU128LRU(1<<16, int(mapSize))
+		}
+	}
 
 	f.MapSize = mapSize
+	f.queueCount = queueCount
 }
 
 func (f *FastPath) UpdateGroupAclGidMaps(srcGroupAclGidMaps, dstGroupAclGidMaps [TAP_MAX]map[uint32]bool) {
@@ -61,134 +67,132 @@ func (f *FastPath) UpdateGroupAclGidMaps(srcGroupAclGidMaps, dstGroupAclGidMaps 
 }
 
 func (f *FastPath) FlushAcls() {
-	for i := 0; i < len(f.FastPolicyMaps); i++ {
-		for j := TAP_MIN; j < TAP_MAX; j++ {
-			if f.FastPolicyMaps[i][j] != nil {
-				f.fastPolicyMapsFlush[i][j] = true
-			}
-		}
+	for i := 0; i < f.queueCount; i++ {
+		f.fastPolicyMapsFlush[i] = true
 	}
+	f.flushCount = f.queueCount
 	f.FastPathMacCount = 0
 	f.FastPathPolicyCount = 0
 }
 
-func (l *FastPath) getFastVlanPolicy(maps *VlanAndPortMap, srcMacSuffix, dstMacSuffix uint16, packet *LookupKey) *PolicyData {
-	key := uint64(srcMacSuffix)<<48 | uint64(dstMacSuffix)<<32 | uint64(packet.Vlan)
-	// vlanMap存储的是有方向的policy，在这里不用更改
-	return maps.vlanPolicyMap[key]
+func (f *FastPath) generateMaskedIp(packet *LookupKey, maskedSrcIp, maskedDstIp *uint32) {
+	if len(packet.Src6Ip) == 0 {
+		*maskedSrcIp = packet.SrcIp & f.IpNetmaskMap[uint16(packet.SrcIp>>16)]
+		*maskedDstIp = packet.DstIp & f.IpNetmaskMap[uint16(packet.DstIp>>16)]
+	} else {
+		*maskedSrcIp = GetIpHash(packet.Src6Ip)
+		*maskedDstIp = GetIpHash(packet.Dst6Ip)
+	}
 }
 
-func (l *FastPath) getFastPortPolicy(maps *VlanAndPortMap, srcMacSuffix, dstMacSuffix uint16, packet *LookupKey) (*EndpointStore, *PolicyData) {
-	key := uint64(srcMacSuffix)<<48 | uint64(dstMacSuffix)<<32 | uint64(packet.SrcPort)<<16 | uint64(packet.DstPort)
-	if value := maps.portPolicyMap[key]; value != nil {
-		if policy := value.protoPolicy[packet.Proto]; policy != nil {
-			if packet.Timestamp-value.timestamp > FAST_PATH_SOFT_TIMEOUT && packet.Timestamp > value.timestamp {
-				return nil, nil
-			}
-			value.timestamp = packet.Timestamp
-			return &value.endpoint, policy
+func (f *FastPath) GenerateMapKey(packet *LookupKey, direction DirectionType, vlan bool, key1, key2 *uint64) {
+	maskedSrcIp, maskedDstIp := uint32(0), uint32(0)
+	srcPort, dstPort := uint64(packet.SrcPort), uint64(packet.DstPort)
+	srcMacSuffix, dstMacSuffix := uint64(packet.SrcMac&0xffff), uint64(packet.DstMac&0xffff)
+	f.generateMaskedIp(packet, &maskedSrcIp, &maskedDstIp)
+	if direction == BACKWARD {
+		srcMacSuffix, dstMacSuffix = dstMacSuffix, srcMacSuffix
+		maskedSrcIp, maskedDstIp = maskedDstIp, maskedSrcIp
+		srcPort, dstPort = dstPort, srcPort
+	}
+	if !vlan {
+		*key1 = uint64(maskedSrcIp)<<32 | srcMacSuffix<<16 | srcPort
+		*key2 = uint64(maskedDstIp)<<32 | dstMacSuffix<<16 | dstPort
+	} else {
+		*key1 = uint64(maskedSrcIp)<<32 | srcMacSuffix<<16 | uint64(packet.Vlan)
+		*key2 = uint64(maskedDstIp)<<32 | dstMacSuffix<<16 | uint64(packet.Vlan)
+	}
+}
+
+func (f *FastPath) getPortFastPolicy(packet *LookupKey) (*EndpointStore, *PolicyData) {
+	if f.flushCount > 0 && f.fastPolicyMapsFlush[packet.FastIndex] {
+		for i := TAP_MIN; i < TAP_MAX; i++ {
+			f.FastPortPolicyMaps[packet.FastIndex][i].Clear()
+			f.FastVlanPolicyMaps[packet.FastIndex][i].Clear()
+		}
+		f.flushCount -= 1
+		f.fastPolicyMapsFlush[packet.FastIndex] = false
+		return nil, nil
+	}
+	key1, key2 := uint64(0), uint64(0)
+	f.GenerateMapKey(packet, FORWARD, false, &key1, &key2)
+	value, ok := f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true)
+	if ok {
+		portPolicy := value.(*PortPolicyValue)
+		if policy := portPolicy.protoPolicy[packet.Proto]; policy != nil {
+			return &portPolicy.endpoint, policy
 		}
 	}
 	return nil, nil
 }
 
-func (f *FastPath) generateMaskedIp(packet *LookupKey) (uint32, uint32) {
-	if len(packet.Src6Ip) == 0 {
-		maskSrc := f.IpNetmaskMap[uint16(packet.SrcIp>>16)]
-		maskDst := f.IpNetmaskMap[uint16(packet.DstIp>>16)]
-		maskedSrcIp := packet.SrcIp & maskSrc
-		maskedDstIp := packet.DstIp & maskDst
-		return maskedSrcIp, maskedDstIp
-	} else {
-		srcIpHash := GetIpHash(packet.Src6Ip)
-		dstIpHash := GetIpHash(packet.Dst6Ip)
-		return srcIpHash, dstIpHash
+func (f *FastPath) getVlanFastPolicy(packet *LookupKey) *PolicyData {
+	key1, key2 := uint64(0), uint64(0)
+	f.GenerateMapKey(packet, FORWARD, true, &key1, &key2)
+	value, ok := f.FastVlanPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true)
+	if ok {
+		policy := value.(*PolicyData)
+		return policy
 	}
-}
-
-func (f *FastPath) getVlanAndPortMap(packet *LookupKey, direction DirectionType, create bool, mapsForward *VlanAndPortMap) *VlanAndPortMap {
-	maskedSrcIp, maskedDstIp := f.generateMaskedIp(packet)
-	if direction == BACKWARD {
-		if maskedSrcIp == maskedDstIp {
-			return mapsForward
-		}
-		maskedSrcIp, maskedDstIp = maskedDstIp, maskedSrcIp
-	}
-
-	key := uint64(maskedSrcIp)<<32 | uint64(maskedDstIp)
-	maps := f.FastPolicyMaps[packet.FastIndex][packet.Tap]
-	if maps == nil {
-		maps = lru.NewU64LRU(int(f.MapSize>>2), int(f.MapSize))
-		f.FastPolicyMaps[packet.FastIndex][packet.Tap] = maps
-	} else if f.fastPolicyMapsFlush[packet.FastIndex][packet.Tap] {
-		f.fastPolicyMapsFlush[packet.FastIndex][packet.Tap] = false
-		maps.Clear()
-	}
-	if data, ok := maps.Get(key, false); ok {
-		return data.(*VlanAndPortMap)
-	}
-	if create {
-		value := &VlanAndPortMap{make(map[uint64]*PolicyData), make(map[uint64]*PortPolicyValue)}
-		maps.Add(key, value)
-		return value
-	}
-
 	return nil
 }
 
-func (f *FastPath) addVlanFastPolicy(srcMacSuffix, dstMacSuffix uint16, packet *LookupKey, policy *PolicyData, endpointData *EndpointData, mapsForward, mapsBackward *VlanAndPortMap) {
+func (f *FastPath) addVlanFastPolicy(packet *LookupKey, policy *PolicyData) {
 	forward, backward := INVALID_POLICY_DATA, INVALID_POLICY_DATA
+	key1, key2 := uint64(0), uint64(0)
 
-	if mapsForward == nil || mapsBackward == nil {
-		return
-	}
+	f.GenerateMapKey(packet, FORWARD, true, &key1, &key2)
 
 	if policy.ACLID > 0 {
 		forward = policy
 	}
 
-	key := uint64(srcMacSuffix)<<48 | uint64(dstMacSuffix)<<32 | uint64(packet.Vlan)
-	vlanPolicy := mapsForward.vlanPolicyMap[key]
-	if vlanPolicy == nil {
-		f.FastPathPolicyCount++
-		// 添加forward方向bitmap
-		forward.AddAclGidBitmaps(packet, false, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
-		mapsForward.vlanPolicyMap[key] = forward
+	if value, ok := f.FastVlanPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true); ok {
+		policy := value.(*PolicyData)
+		*policy = *forward
 	} else {
-		// 添加forward方向bitmap
-		forward.AddAclGidBitmaps(packet, false, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
-		*vlanPolicy = *forward
+		f.FastVlanPolicyMaps[packet.FastIndex][packet.Tap].Add(key1, key2, forward)
+		f.FastPathPolicyCount++
 	}
+	// 添加forward方向bitmap
+	forward.AddAclGidBitmaps(packet, false, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
 
-	if mapsBackward == mapsForward && srcMacSuffix == dstMacSuffix {
+	if key1 == key2 {
 		return
 	}
+	key1, key2 = key2, key1
+
 	if policy.ACLID > 0 {
 		backward = new(PolicyData)
 		backward.AclActions = make([]AclAction, 0, len(policy.AclActions))
 		backward.MergeAndSwapDirection(policy.AclActions, policy.NpbActions, policy.ACLID)
 	}
-	key = uint64(dstMacSuffix)<<48 | uint64(srcMacSuffix)<<32 | uint64(packet.Vlan)
-	vlanPolicy = mapsBackward.vlanPolicyMap[key]
-	if vlanPolicy == nil {
-		f.FastPathPolicyCount++
-		// 添加backward方向bitmap
-		backward.AddAclGidBitmaps(packet, true, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
-		mapsBackward.vlanPolicyMap[key] = backward
+
+	if value, ok := f.FastVlanPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true); ok {
+		policy := value.(*PolicyData)
+		*policy = *backward
 	} else {
-		// 添加backward方向bitmap
-		backward.AddAclGidBitmaps(packet, true, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
-		*vlanPolicy = *backward
+		f.FastVlanPolicyMaps[packet.FastIndex][packet.Tap].Add(key1, key2, backward)
+		f.FastPathPolicyCount++
 	}
+	backward.AddAclGidBitmaps(packet, true, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
 }
 
-func (f *FastPath) addPortFastPolicy(endpointStore *EndpointStore, packetEndpointData *EndpointData, srcMacSuffix, dstMacSuffix uint16, packet *LookupKey, policyForward, policyBackward *PolicyData) (*VlanAndPortMap, *VlanAndPortMap) {
-	forward, backward := INVALID_POLICY_DATA, INVALID_POLICY_DATA
-
-	mapsForward := f.getVlanAndPortMap(packet, FORWARD, true, nil)
-	if mapsForward == nil {
-		return nil, nil
+func (f *FastPath) addPortFastPolicy(endpointStore *EndpointStore, packetEndpointData *EndpointData, packet *LookupKey, policyForward, policyBackward *PolicyData) {
+	if f.flushCount > 0 && f.fastPolicyMapsFlush[packet.FastIndex] {
+		for i := TAP_MIN; i < TAP_MAX; i++ {
+			f.FastPortPolicyMaps[packet.FastIndex][i].Clear()
+			f.FastVlanPolicyMaps[packet.FastIndex][i].Clear()
+		}
+		f.flushCount -= 1
+		f.fastPolicyMapsFlush[packet.FastIndex] = false
 	}
+
+	forward, backward := INVALID_POLICY_DATA, INVALID_POLICY_DATA
+	key1, key2 := uint64(0), uint64(0)
+
+	f.GenerateMapKey(packet, FORWARD, false, &key1, &key2)
+
 	id := getAclId(policyForward.ACLID, policyBackward.ACLID)
 	if id > 0 {
 		forward = new(PolicyData)
@@ -202,30 +206,28 @@ func (f *FastPath) addPortFastPolicy(endpointStore *EndpointStore, packetEndpoin
 			forward.FormatNpbAction()
 		}
 	}
-	key := uint64(srcMacSuffix)<<48 | uint64(dstMacSuffix)<<32 | uint64(packet.SrcPort)<<16 | uint64(packet.DstPort)
-	if portPolicyValue := mapsForward.portPolicyMap[key]; portPolicyValue == nil {
-		value := &PortPolicyValue{timestamp: packet.Timestamp}
+
+	if value, ok := f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true); !ok {
+		value := &PortPolicyValue{}
 		value.endpoint.InitPointer(endpointStore.Endpoints)
 		// 添加forward方向bitmap
 		forward.AddAclGidBitmaps(packet, false, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
 		value.protoPolicy[packet.Proto] = forward
-		mapsForward.portPolicyMap[key] = value
+		f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Add(key1, key2, value)
 		f.FastPathPolicyCount++
 	} else {
+		portPolicyValue := value.(*PortPolicyValue)
 		portPolicyValue.endpoint.InitPointer(endpointStore.Endpoints)
 		// 添加forward方向bitmap
 		forward.AddAclGidBitmaps(packet, false, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
 		portPolicyValue.protoPolicy[packet.Proto] = forward
-		portPolicyValue.timestamp = packet.Timestamp
 	}
 
-	mapsBackward := f.getVlanAndPortMap(packet, BACKWARD, true, mapsForward)
-	if mapsBackward == nil {
-		return nil, nil
+	if key1 == key2 {
+		return
 	}
-	if mapsBackward == mapsForward && srcMacSuffix == dstMacSuffix && packet.SrcPort == packet.DstPort {
-		return mapsForward, mapsBackward
-	}
+	key1, key2 = key2, key1
+
 	if id > 0 {
 		backward = new(PolicyData)
 		if packet.HasFeatureFlag(NPM) {
@@ -239,24 +241,21 @@ func (f *FastPath) addPortFastPolicy(endpointStore *EndpointStore, packetEndpoin
 		}
 	}
 	endpoints := &EndpointData{SrcInfo: endpointStore.Endpoints.DstInfo, DstInfo: endpointStore.Endpoints.SrcInfo}
-	key = uint64(dstMacSuffix)<<48 | uint64(srcMacSuffix)<<32 | uint64(packet.DstPort)<<16 | uint64(packet.SrcPort)
-	if portPolicyValue := mapsBackward.portPolicyMap[key]; portPolicyValue == nil {
-		value := &PortPolicyValue{timestamp: packet.Timestamp}
+	if value, ok := f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true); !ok {
+		value := &PortPolicyValue{}
 		value.endpoint.InitPointer(endpoints)
 		// 添加backward方向bitmap
 		backward.AddAclGidBitmaps(packet, true, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
 		value.protoPolicy[packet.Proto] = backward
-		mapsBackward.portPolicyMap[key] = value
+		f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Add(key1, key2, value)
 		f.FastPathPolicyCount++
 	} else {
+		portPolicyValue := value.(*PortPolicyValue)
 		portPolicyValue.endpoint.InitPointer(endpoints)
 		// 添加backward方向bitmap
 		backward.AddAclGidBitmaps(packet, true, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
 		portPolicyValue.protoPolicy[packet.Proto] = backward
-		portPolicyValue.timestamp = packet.Timestamp
 	}
-
-	return mapsForward, mapsBackward
 }
 
 func (f *FastPath) makeIpNetmaskMap() {
