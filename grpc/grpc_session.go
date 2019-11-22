@@ -47,7 +47,11 @@ func (s *GrpcSession) nextServer() error {
 		s.ipIndex = 0
 	}
 	server := fmt.Sprintf("%s:%d", s.ips[s.ipIndex], s.port)
-	clientConn, err := grpc.Dial(server, grpc.WithInsecure(), grpc.WithTimeout(s.syncInterval))
+	size := 1024 * 1024 * 20
+	options := make([]grpc.DialOption, 0, 4)
+	options = append(options, grpc.WithInsecure(), grpc.WithTimeout(s.syncInterval),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(size)), grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(size)))
+	clientConn, err := grpc.Dial(server, options...)
 	if err != nil {
 		return err
 	}
