@@ -162,7 +162,7 @@ func NewInfluxdbWriter(addrPrimary, addrReplica, httpUsername, httpPassword, nam
 	w.DBCreateCtlPrimary.HttpClient = httpClient
 	w.DBCreateCtlPrimary.ExistDBs = make(map[string]bool)
 	w.DataQueues = queue.NewOverwriteQueues(
-		name, queue.HashKey(queueCount), DEFAULT_QUEUE_SIZE,
+		name, queue.HashKey(queueCount), DEFAULT_QUEUE_SIZE, // FIXME: New时带入queueSize
 		queue.OptionFlushIndicator(time.Second),
 		queue.OptionRelease(func(p interface{}) { p.(InfluxdbItem).Release() }))
 	w.QueueWriterInfosPrimary, err = newWriterInfos(primaryHTTPConfig, queueCount)
@@ -193,7 +193,7 @@ func NewInfluxdbWriter(addrPrimary, addrReplica, httpUsername, httpPassword, nam
 		}
 
 		w.ReplicaQueues = queue.NewOverwriteQueues(
-			name+"_replica", queue.HashKey(queueCount), 512,
+			name+"_replica", queue.HashKey(queueCount), 512, // FIXME: New时带入queueSize
 			queue.OptionFlushIndicator(time.Second),
 			queue.OptionRelease(func(p interface{}) { releasePointCache(p.(*PointCache)) }))
 	}
