@@ -40,6 +40,10 @@ type OverwriteQueue struct {
 	counter *Counter
 }
 
+const MAX_BATCH_GET_SIZE = 1 << 16 // FIXME: 修改为合适的长度
+
+var nilArrayForInit [MAX_BATCH_GET_SIZE]interface{}
+
 func NewOverwriteQueue(module string, size int, options ...Option) *OverwriteQueue {
 	queue := &OverwriteQueue{}
 	queue.Init(module, size, options...)
@@ -169,10 +173,12 @@ func (q *OverwriteQueue) Put(items ...interface{}) error {
 }
 
 func (q *OverwriteQueue) get() interface{} {
-	items := q.items[q.firstIndex()]
+	first := q.firstIndex()
+	item := q.items[first]
+	q.items[first] = nil
 	q.pending--
 	q.counter.Out++
-	return items
+	return item
 }
 
 // 获取单个队列中的元素。当队列为空时将会阻塞等待
@@ -196,10 +202,12 @@ func (q *OverwriteQueue) Get() interface{} { // will block
 func (q *OverwriteQueue) gets(output []interface{}) int {
 	size := UintMin(uint(len(output)), q.pending)
 	output = output[:size]
-	first := uint(q.firstIndex())
+	first := q.firstIndex()
 	copied := copy(output, q.items[first:])
+	copy(q.items[first:], nilArrayForInit[:copied])
 	if uint(copied) != size {
-		copy(output[copied:], q.items)
+		copied = copy(output[copied:], q.items)
+		copy(q.items, nilArrayForInit[:copied])
 	}
 	q.pending -= size
 	q.counter.Out += uint64(size)
@@ -209,6 +217,9 @@ func (q *OverwriteQueue) gets(output []interface{}) int {
 // 获取多个队列中的元素，传入的slice会被覆盖写入，队列为空时阻塞等待
 // 写入的数量是slice的length而不是capacity
 func (q *OverwriteQueue) Gets(output []interface{}) int { // will block
+	if len(output) > MAX_BATCH_GET_SIZE {
+		panic("一次获取的数量太多")
+	}
 	q.Lock()
 	if q.pending == 0 {
 		q.reader.Add(1)
