@@ -40,7 +40,7 @@ type OverwriteQueue struct {
 	counter *Counter
 }
 
-const MAX_BATCH_GET_SIZE = 1 << 16 // FIXME: 修改为合适的长度
+const MAX_BATCH_GET_SIZE = 1 << 16
 
 var nilArrayForInit [MAX_BATCH_GET_SIZE]interface{}
 
