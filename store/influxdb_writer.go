@@ -64,7 +64,9 @@ type PointCache struct {
 
 var bufferPool = pool.NewLockFreePool(func() interface{} {
 	return make([]byte, DEFAULT_BATCH_SIZE+app.MAX_DOC_STRING_LENGTH)
-})
+},
+	pool.OptionPoolSizePerCPU(8),
+	pool.OptionInitFullPoolSize(8))
 
 func acquireBuffer() []byte {
 	return bufferPool.Get().([]byte)
