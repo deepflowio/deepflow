@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -446,7 +447,7 @@ func (w *InfluxdbWriter) createDB(httpClient client.Client, db string) bool {
 	return true
 }
 
-func (w *InfluxdbWriter) writeInfluxdb(writerInfo *WriterInfo, dbCreateCtl *DBCreateCtl, pc *PointCache) bool {
+func (w *InfluxdbWriter) writeInfluxdb(writerInfo *WriterInfo, dbCreateCtl *DBCreateCtl, pc *PointCache) error {
 	bp := pc.bp
 	writerInfo.writeTime = time.Now().Unix()
 	db := bp.Database()
@@ -461,7 +462,7 @@ func (w *InfluxdbWriter) writeInfluxdb(writerInfo *WriterInfo, dbCreateCtl *DBCr
 	if !ok {
 		if !w.createDB(writerInfo.httpClient, db) {
 			*writeFailedCount += int64(len(bp.Points()))
-			return false
+			return fmt.Errorf("create database(%s) failed", db)
 		}
 		dbCreateCtl.Lock()
 		dbCreateCtl.ExistDBs[db] = true
@@ -471,16 +472,16 @@ func (w *InfluxdbWriter) writeInfluxdb(writerInfo *WriterInfo, dbCreateCtl *DBCr
 	if err := writerInfo.httpClient.Write(bp); err != nil {
 		log.Errorf("httpclient write db(%s) batch points(%d) failed: %s", db, len(bp.Points()), err)
 		*writeFailedCount += int64(len(bp.Points()))
-		return false
+		return err
 	}
 	*writeSuccCount += int64(len(bp.Points()))
-	return true
+	return nil
 }
 
 func (w *InfluxdbWriter) writePrimary(queueID int, pc *PointCache) bool {
 	writerInfo := w.QueueWriterInfosPrimary[queueID]
 
-	if !w.writeInfluxdb(writerInfo, &w.DBCreateCtlPrimary, pc) {
+	if err := w.writeInfluxdb(writerInfo, &w.DBCreateCtlPrimary, pc); err != nil {
 		w.writeConfidence(pc, PRIMARY_FAILED)
 		releasePointCache(pc)
 		return false
@@ -502,8 +503,12 @@ func (w *InfluxdbWriter) writeReplica(queueID int, pc *PointCache) bool {
 		return false
 	}
 
-	if !w.writeInfluxdb(writerInfo, &w.DBCreateCtlReplica, pc) {
-		w.writeConfidence(pc, SYNC_FAILED_1)
+	if err := w.writeInfluxdb(writerInfo, &w.DBCreateCtlReplica, pc); err != nil {
+		if strings.Contains(err.Error(), "max-series-per-database limit exceeded") {
+			w.writeConfidence(pc, SYNC_FAILED_SERIES_EXCEED)
+		} else {
+			w.writeConfidence(pc, SYNC_FAILED_1)
+		}
 		releasePointCache(pc)
 		return false
 	}

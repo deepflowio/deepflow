@@ -38,12 +38,13 @@ const (
 type RepairStatus uint8
 
 const (
-	PRIMARY_FAILED     RepairStatus = iota // 主写失败，不同步
-	SYNC_SUCCESS                           // 同步成功
-	REPLICA_DISCONNECT                     // 备influxdb无法连接，等待连接成功后, 再尝试同步
-	SYNC_FAILED_1                          // 备同步失败1次
-	SYNC_FAILED_2                          // 备同步失败2次
-	SYNC_FAILED_3                          // 备同步3次失败，不再同步
+	PRIMARY_FAILED            RepairStatus = iota // 主写失败，不同步
+	SYNC_SUCCESS                                  // 同步成功
+	REPLICA_DISCONNECT                            // 备influxdb无法连接，等待连接成功后, 再尝试同步
+	SYNC_FAILED_1                                 // 备同步失败1次
+	SYNC_FAILED_2                                 // 备同步失败2次
+	SYNC_FAILED_3                                 // 备同步3次失败，不再同步
+	SYNC_FAILED_SERIES_EXCEED                     // 备series数量超过限制, 同步失败, 不再同步
 
 	STATUS_INVALID
 )
@@ -170,7 +171,7 @@ func (r *Repair) checkConnectionsOK() bool {
 
 func isStatusNeedRepair(status RepairStatus) bool {
 	switch status {
-	case PRIMARY_FAILED, SYNC_SUCCESS, SYNC_FAILED_3:
+	case PRIMARY_FAILED, SYNC_SUCCESS, SYNC_FAILED_3, SYNC_FAILED_SERIES_EXCEED:
 		return false
 	case REPLICA_DISCONNECT, SYNC_FAILED_1, SYNC_FAILED_2:
 		return true
