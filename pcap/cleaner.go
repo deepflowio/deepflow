@@ -47,7 +47,7 @@ func NewCleaner(maxDirectorySize, diskFreeSpaceMargin int64, timeToLive time.Dur
 
 func (c *Cleaner) work() {
 	var files []File
-	for range time.Tick(CLEAN_PERIOD) {
+	for now := range time.Tick(CLEAN_PERIOD) {
 		files = files[:0]
 		filepath.Walk(c.baseDirectory, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -59,23 +59,17 @@ func (c *Cleaner) work() {
 			if info.IsDir() || !strings.HasSuffix(name, ".pcap") {
 				return nil
 			}
-			segs := strings.Split(name[:strings.IndexByte(name, '.')], "_")
-			if fileTime, err := time.Parse(TIME_FORMAT, segs[len(segs)-1]); err != nil {
-				log.Warningf("Incorrect name for file %s", path)
-			} else {
-				files = append(files, File{
-					location: path,
-					fileTime: fileTime,
-					size:     info.Size(),
-				})
-			}
+			files = append(files, File{
+				location: path,
+				fileTime: info.ModTime(),
+				size:     info.Size(),
+			})
 			return nil
 		})
 		// 用结束写入时间倒排
 		sort.Slice(files, func(i, j int) bool { return files[i].fileTime.Sub(files[j].fileTime) > 0 })
 
 		// check delete
-		now := time.Now()
 		sumSize := int64(0)
 		nDeleted := 0
 		for _, f := range files {
