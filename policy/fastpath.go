@@ -26,21 +26,32 @@ type VlanAndPortMap struct {
 	portPolicyMap map[uint64]*PortPolicyValue
 }
 
+type Padding [8]uint64
+
 type FastPath struct {
 	maskMapFromPlatformData [math.MaxUint16 + 1]uint32
 	maskMapFromIpGroupData  [math.MaxUint16 + 1]uint32
+	padding0                Padding                    // 避免cache miss
 	IpNetmaskMap            [math.MaxUint16 + 1]uint32 // 根据IP地址查找对应的最大掩码
+	padding1                Padding
 
 	FastPortPolicyMaps  [MAX_QUEUE_COUNT + 1][TAP_MAX]*lru.U128LRU // 快速路径上的Policy映射表，Key为IP掩码对 + MAC + PORT，Value为PortPolicyValue
+	padding2            Padding
 	FastVlanPolicyMaps  [MAX_QUEUE_COUNT + 1][TAP_MAX]*lru.U128LRU // 快速路径上的Policy映射表，Key为IP掩码对 + MAC + VLAN，Value为PolicyData
-	fastPolicyMapsFlush [MAX_QUEUE_COUNT + 1]bool                  // 标记对应的LRU是否需要Clear
+	padding3            Padding
+	fastPolicyMapsFlush [MAX_QUEUE_COUNT + 1]bool // 标记对应的LRU是否需要Clear
 
+	padding4                              Padding
 	FastPathHit                           uint64
+	padding5                              Padding
 	FastPathMacCount, FastPathPolicyCount uint32
 
+	padding6               Padding
 	MapSize                uint32
+	padding7               Padding
 	flushCount, queueCount int
 
+	padding8           Padding
 	SrcGroupAclGidMaps [TAP_MAX]map[uint32]bool
 	DstGroupAclGidMaps [TAP_MAX]map[uint32]bool
 }
@@ -50,10 +61,18 @@ func (f *FastPath) Init(mapSize uint32, queueCount int, srcGroupAclGidMaps, dstG
 		panic(fmt.Sprintf("queueCount超出最大限制%d", MAX_QUEUE_COUNT))
 	}
 	f.UpdateGroupAclGidMaps(srcGroupAclGidMaps, dstGroupAclGidMaps)
+	soltSize := 1 << 16
+	if mapSize >= 1<<20 {
+		soltSize = 1 << 20
+	} else if mapSize >= 1<<16 {
+		soltSize = 1 << 16
+	} else {
+		soltSize = 1 << 12
+	}
 	for i := 0; i < queueCount; i++ {
 		for j := TapType(0); j < TAP_MAX; j++ {
-			f.FastPortPolicyMaps[i][j] = lru.NewU128LRU(1<<16, int(mapSize))
-			f.FastVlanPolicyMaps[i][j] = lru.NewU128LRU(1<<16, int(mapSize))
+			f.FastPortPolicyMaps[i][j] = lru.NewU128LRU(soltSize, int(mapSize))
+			f.FastVlanPolicyMaps[i][j] = lru.NewU128LRU(soltSize, int(mapSize))
 		}
 	}
 
