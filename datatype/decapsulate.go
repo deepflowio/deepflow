@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	. "github.com/google/gopacket/layers"
-
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
@@ -44,36 +43,32 @@ func (t *TunnelInfo) Decapsulate(l3Packet []byte) int {
 	if len(l3Packet) < OFFSET_ERSPAN_VER+ERSPANIII_HEADER_SIZE+ERSPANIII_SUBHEADER_SIZE {
 		return 0
 	}
-	_ = l3Packet[OFFSET_VXLAN_VNI-ETH_HEADER_SIZE] // early bound check hint
 
-	assumeIpProtocol := IPProtocol(l3Packet[OFFSET_IP_PROTOCOL-ETH_HEADER_SIZE])
-	assumeDPort := BigEndian.Uint16(l3Packet[OFFSET_DPORT-ETH_HEADER_SIZE:])
-	assumeVxlanFlags := l3Packet[OFFSET_VXLAN_FLAGS-ETH_HEADER_SIZE]
-
-	isUDP := assumeIpProtocol == IPProtocolUDP
-	isVxlanUDP := isUDP && assumeDPort == 4789
-	isVxlan := isVxlanUDP && assumeVxlanFlags == 0x8
-
-	isGRE := assumeIpProtocol == IPProtocolGRE
-
-	if !isVxlan && !isGRE {
-		return 0
-	}
-
-	t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
-	t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
-	if isVxlan {
+	switch IPProtocol(l3Packet[OFFSET_IP_PROTOCOL-ETH_HEADER_SIZE]) {
+	case IPProtocolUDP:
+		if BigEndian.Uint16(l3Packet[OFFSET_DPORT-ETH_HEADER_SIZE:]) != 4789 {
+			return 0
+		}
+		if l3Packet[OFFSET_VXLAN_FLAGS-ETH_HEADER_SIZE] != 0x8 {
+			return 0
+		}
+		t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
+		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
 		t.Type = TUNNEL_TYPE_VXLAN
 		t.Id = BigEndian.Uint32(l3Packet[OFFSET_VXLAN_VNI-ETH_HEADER_SIZE:]) >> 8
 		// return offset start from L3
 		return OFFSET_VXLAN_FLAGS - ETH_HEADER_SIZE + VXLAN_HEADER_SIZE
-	} else {
+	case IPProtocolGRE:
 		greProtocolType := BigEndian.Uint16(l3Packet[OFFSET_GRE_PROTOCOL_TYPE-ETH_HEADER_SIZE:])
 		if greProtocolType == 0x88BE { // ERSPAN II
+			t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
+			t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
 			t.Type = TUNNEL_TYPE_ERSPAN
 			t.Id = BigEndian.Uint32(l3Packet[OFFSET_ERSPAN_VER-ETH_HEADER_SIZE:]) & 0x3ff
 			return OFFSET_ERSPAN_VER - ETH_HEADER_SIZE + ERSPANII_HEADER_SIZE
 		} else if greProtocolType == 0x22EB { // ERSPAN III
+			t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
+			t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
 			t.Type = TUNNEL_TYPE_ERSPAN
 			t.Id = BigEndian.Uint32(l3Packet[OFFSET_ERSPAN_VER-ETH_HEADER_SIZE:]) & 0x3ff
 			oFlag := l3Packet[OFFSET_ERSPAN_VER-ETH_HEADER_SIZE+ERSPANIII_HEADER_SIZE-1] & 0x1
@@ -83,6 +78,8 @@ func (t *TunnelInfo) Decapsulate(l3Packet []byte) int {
 				return OFFSET_ERSPAN_VER - ETH_HEADER_SIZE + ERSPANIII_HEADER_SIZE + ERSPANIII_SUBHEADER_SIZE
 			}
 		}
+	default:
+		return 0
 	}
 
 	return 0

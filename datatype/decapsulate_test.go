@@ -5,6 +5,8 @@ import (
 	"net"
 	"reflect"
 	"testing"
+
+	. "github.com/google/gopacket/layers"
 )
 
 func TestDecapsulateErspanII(t *testing.T) {
@@ -67,5 +69,54 @@ func TestDecapsulateVxlan(t *testing.T) {
 	actual.Decapsulate(packet[l2Len:])
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("expectedVxlan: %+v\n actual: %+v", expected, actual)
+	}
+}
+
+func BenchmarkDecapsulateTCP(b *testing.B) {
+	packet := [256]byte{}
+	tunnel := &TunnelInfo{}
+	packet[OFFSET_IP_PROTOCOL-ETH_HEADER_SIZE] = byte(IPProtocolTCP)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tunnel.Decapsulate(packet[:])
+	}
+}
+
+func BenchmarkDecapsulateUDP(b *testing.B) {
+	packet := [256]byte{}
+	tunnel := &TunnelInfo{}
+	packet[OFFSET_IP_PROTOCOL-ETH_HEADER_SIZE] = byte(IPProtocolUDP)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tunnel.Decapsulate(packet[:])
+	}
+}
+
+func BenchmarkDecapsulateUDP4789(b *testing.B) {
+	packet := [256]byte{}
+	tunnel := &TunnelInfo{}
+	packet[OFFSET_IP_PROTOCOL-ETH_HEADER_SIZE] = byte(IPProtocolUDP)
+	packet[OFFSET_DPORT-ETH_HEADER_SIZE] = 4789 >> 8
+	packet[OFFSET_DPORT-ETH_HEADER_SIZE+1] = 4789 & 0xFF
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tunnel.Decapsulate(packet[:])
+	}
+}
+
+func BenchmarkDecapsulateVXLAN(b *testing.B) {
+	packet := [256]byte{}
+	tunnel := &TunnelInfo{}
+	packet[OFFSET_IP_PROTOCOL-ETH_HEADER_SIZE] = byte(IPProtocolUDP)
+	packet[OFFSET_DPORT-ETH_HEADER_SIZE] = 4789 >> 8
+	packet[OFFSET_DPORT-ETH_HEADER_SIZE+1] = 4789 & 0xFF
+	packet[OFFSET_VXLAN_FLAGS-ETH_HEADER_SIZE] = 0x8
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tunnel.Decapsulate(packet[:])
 	}
 }
