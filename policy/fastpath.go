@@ -3,9 +3,11 @@ package policy
 import (
 	"fmt"
 	"math"
+	"strconv"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/lru"
+	"gitlab.x.lan/yunshan/droplet-libs/stats"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
@@ -69,10 +71,12 @@ func (f *FastPath) Init(mapSize uint32, queueCount int, srcGroupAclGidMaps, dstG
 	} else {
 		soltSize = 1 << 12
 	}
+	index := 0
 	for i := 0; i < queueCount; i++ {
-		for j := TapType(0); j < TAP_MAX; j++ {
-			f.FastPortPolicyMaps[i][j] = lru.NewU128LRU(soltSize, int(mapSize))
-			f.FastVlanPolicyMaps[i][j] = lru.NewU128LRU(soltSize, int(mapSize))
+		for j := TAP_MIN; j < TAP_MAX; j++ {
+			f.FastPortPolicyMaps[i][j] = lru.NewU128LRU("policy-fastpath-port", soltSize, int(mapSize), stats.OptionStatTags{"index": strconv.Itoa(index)})
+			f.FastVlanPolicyMaps[i][j] = lru.NewU128LRU("policy-fastpath-vlan", soltSize, int(mapSize), stats.OptionStatTags{"index": strconv.Itoa(index)})
+			index++
 		}
 	}
 
@@ -135,7 +139,7 @@ func (f *FastPath) getPortFastPolicy(packet *LookupKey) (*EndpointStore, *Policy
 	}
 	key1, key2 := uint64(0), uint64(0)
 	f.GenerateMapKey(packet, FORWARD, false, &key1, &key2)
-	value, ok := f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true)
+	value, ok := f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, false)
 	if ok {
 		portPolicy := value.(*PortPolicyValue)
 		if policy := portPolicy.protoPolicy[packet.Proto]; policy != nil {
@@ -148,7 +152,7 @@ func (f *FastPath) getPortFastPolicy(packet *LookupKey) (*EndpointStore, *Policy
 func (f *FastPath) getVlanFastPolicy(packet *LookupKey) *PolicyData {
 	key1, key2 := uint64(0), uint64(0)
 	f.GenerateMapKey(packet, FORWARD, true, &key1, &key2)
-	value, ok := f.FastVlanPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true)
+	value, ok := f.FastVlanPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, false)
 	if ok {
 		policy := value.(*PolicyData)
 		return policy
