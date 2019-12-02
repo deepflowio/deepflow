@@ -61,6 +61,7 @@ type Repair struct {
 	syncStartDelay  int    // 同步confidence的开始时间相对当前时间的时延，默认是 300 秒
 	syncInterval    int    // 默认是 60秒
 	syncCountOnce   int    // 默认 200
+	syncDBRange     string // 同步的database范围，防止zero和roze同时同步同一组数据
 	repairCondition string
 
 	replicaDBs map[string]bool // 标识是否有数据库，没有的话，需要创建
@@ -72,7 +73,7 @@ type CounterRepair struct {
 	SyncCount int64 `statsd:"sync-count"`
 }
 
-func NewRepair(addrPrimary, addrReplica, httpUsername, httpPassword, rp, shardID string, start bool, syncStartDelay, syncInterval, syncCountOnce int) (*Repair, error) {
+func NewRepair(addrPrimary, addrReplica, httpUsername, httpPassword, rp, shardID, dbRegex string, start bool, syncStartDelay, syncInterval, syncCountOnce int) (*Repair, error) {
 	if addrReplica == "" {
 		log.Info("Replica influxdb is not set， skip repair")
 		start = false
@@ -88,6 +89,11 @@ func NewRepair(addrPrimary, addrReplica, httpUsername, httpPassword, rp, shardID
 		str := fmt.Sprintf("rp '%s' is not support, only support rp(%s, %s,%s)", rp, RP_1S, RP_1M, RP_10M)
 		log.Error(str)
 		return nil, fmt.Errorf(str)
+	}
+
+	syncDBRange := ""
+	if dbRegex != "" {
+		syncDBRange = " and db=~/" + dbRegex + "/"
 	}
 
 	primaryClient, err := client.NewHTTPClient(client.HTTPConfig{
@@ -124,8 +130,8 @@ func NewRepair(addrPrimary, addrReplica, httpUsername, httpPassword, rp, shardID
 		syncCountOnce = SYNC_COUNT_ONCE
 	}
 
-	log.Infof("New repair success. Primary: %s, Replica: %s, rp: %s, shardId %s, StartDelay %d, Interval %d, SyncCountOnce %d",
-		addrPrimary, addrReplica, rp, shardID, syncStartDelay, syncInterval, syncCountOnce)
+	log.Infof("New repair success. Primary: %s, Replica: %s, rp: %s, shardId %s, StartDelay %d, Interval %d, SyncCountOnce %d syncDBRange %s",
+		addrPrimary, addrReplica, rp, shardID, syncStartDelay, syncInterval, syncCountOnce, syncDBRange)
 	return &Repair{
 		shardID:        shardID,
 		primaryClient:  primaryClient,
@@ -135,6 +141,7 @@ func NewRepair(addrPrimary, addrReplica, httpUsername, httpPassword, rp, shardID
 		syncStartDelay: syncStartDelay,
 		syncInterval:   syncInterval,
 		syncCountOnce:  syncCountOnce,
+		syncDBRange:    syncDBRange,
 		replicaDBs:     make(map[string]bool),
 	}, nil
 }
@@ -191,7 +198,7 @@ func (r *Repair) getRepairCondition() string {
 			str = append(str, fmt.Sprintf("%s=%d", FIELD_STATUS, i))
 		}
 	}
-	r.repairCondition = strings.Join(str, " or ")
+	r.repairCondition = "(" + strings.Join(str, " or ") + ")" + r.syncDBRange
 	return r.repairCondition
 }
 
