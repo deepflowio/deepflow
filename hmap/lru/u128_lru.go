@@ -2,7 +2,13 @@ package lru
 
 import (
 	"sync"
+
+	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
+
+type Counter struct {
+	Max int `statsd:"max-bucket"` // 目前仅统计Get扫描到的最大值
+}
 
 type u128LRUNode struct {
 	key0  uint64
@@ -13,6 +19,8 @@ type u128LRUNode struct {
 	hashListPrev int32 // 表示节点所在冲突链的上一个节点的 buffer 数组下标，-1 表示不存在
 	timeListNext int32 // 时间链表，含义与冲突链类似
 	timeListPrev int32 // 时间链表，含义与冲突链类似
+
+	hash int32
 }
 
 var blankU128LRUNodeForInit u128LRUNode
@@ -25,6 +33,8 @@ var u128LRUNodeBlockPool = sync.Pool{New: func() interface{} {
 
 // 注意：不是线程安全的
 type U128LRU struct {
+	stats.Closable
+
 	ringBuffer       []u128LRUNodeBlock // 存储Map节点，以矩阵环的方式组织，提升内存申请释放效率
 	bufferStartIndex int32              // ringBuffer中的开始下标（二维矩阵下标），闭区间
 	bufferEndIndex   int32              // ringBuffer中的结束下标（二维矩阵下标），开区间
@@ -38,6 +48,7 @@ type U128LRU struct {
 
 	capacity int // 最大容纳的Flow个数
 	size     int // 当前容纳的Flow个数
+	width    int
 }
 
 func (m *U128LRU) Size() int {
@@ -89,7 +100,7 @@ func (m *U128LRU) removeNodeFromHashList(node *u128LRUNode, newNext, newPrev int
 		prevNode := m.getNode(node.hashListPrev)
 		prevNode.hashListNext = newNext
 	} else {
-		m.hashSlotHead[m.compressHash(node.key0^node.key1)] = newNext
+		m.hashSlotHead[node.hash] = newNext
 	}
 
 	if node.hashListNext != -1 {
@@ -150,11 +161,17 @@ func (m *U128LRU) updateNode(node *u128LRUNode, nodeIndex int32, value interface
 		// 插入时间链表头部
 		m.pushNodeToTimeList(node, nodeIndex)
 	}
+	if nodeIndex != m.hashSlotHead[node.hash] {
+		// 从hash链表中删除
+		m.removeNodeFromHashList(node, node.hashListNext, node.hashListPrev)
+		// 插入到hash链表头部
+		m.pushNodeToHashList(node, nodeIndex, node.hash)
+	}
 
 	node.value = value
 }
 
-func (m *U128LRU) newNode(key0, key1 uint64, value interface{}) {
+func (m *U128LRU) newNode(key0, key1 uint64, value interface{}, hash int32) {
 	// buffer空间检查
 	if m.size >= m.capacity {
 		node := m.getNode(m.timeListTail)
@@ -169,20 +186,28 @@ func (m *U128LRU) newNode(key0, key1 uint64, value interface{}) {
 	m.size++
 
 	// 新节点加入哈希链
-	m.pushNodeToHashList(node, m.bufferEndIndex, m.compressHash(key0^key1))
+	m.pushNodeToHashList(node, m.bufferEndIndex, hash)
 	// 新节点加入时间链
 	m.pushNodeToTimeList(node, m.bufferEndIndex)
 	// 更新key、value
 	node.key0 = key0
 	node.key1 = key1
 	node.value = value
+	node.hash = hash
 
 	// 更新buffer信息
 	m.bufferEndIndex = m.incIndex(m.bufferEndIndex)
 }
 
+func (m *U128LRU) GetCounter() interface{} {
+	counter := &Counter{m.width}
+	m.width = 0
+	return counter
+}
+
 func (m *U128LRU) Add(key0, key1 uint64, value interface{}) {
-	for hashListNext := m.hashSlotHead[m.compressHash(key0^key1)]; hashListNext != -1; {
+	hash := m.compressHash(key0 ^ key1)
+	for hashListNext := m.hashSlotHead[hash]; hashListNext != -1; {
 		node := m.getNode(hashListNext)
 		if node.key0 == key0 && node.key1 == key1 {
 			m.updateNode(node, hashListNext, value)
@@ -190,7 +215,7 @@ func (m *U128LRU) Add(key0, key1 uint64, value interface{}) {
 		}
 		hashListNext = node.hashListNext
 	}
-	m.newNode(key0, key1, value)
+	m.newNode(key0, key1, value, hash)
 }
 
 func (m *U128LRU) Remove(key0, key1 uint64) {
@@ -205,15 +230,23 @@ func (m *U128LRU) Remove(key0, key1 uint64) {
 }
 
 func (m *U128LRU) Get(key0, key1 uint64, peek bool) (interface{}, bool) {
+	width := 0
 	for hashListNext := m.hashSlotHead[m.compressHash(key0^key1)]; hashListNext != -1; {
 		node := m.getNode(hashListNext)
+		width++
 		if node.key0 == key0 && node.key1 == key1 {
 			if !peek {
 				m.updateNode(node, hashListNext, node.value)
 			}
+			if width > m.width {
+				m.width = width
+			}
 			return node.value, true
 		}
 		hashListNext = node.hashListNext
+	}
+	if width > m.width {
+		m.width = width
 	}
 	return nil, false
 }
@@ -251,7 +284,7 @@ func (m *U128LRU) Walk(callback walkCallback) {
 	}
 }
 
-func NewU128LRU(hashSlots, capacity int) *U128LRU {
+func NewU128LRU(module string, hashSlots, capacity int, opts ...stats.OptionStatTags) *U128LRU {
 	hashSlots, hashSlotBits := minPowerOfTwo(hashSlots)
 
 	m := &U128LRU{
@@ -267,6 +300,11 @@ func NewU128LRU(hashSlots, capacity int) *U128LRU {
 	for i := 0; i < len(m.hashSlotHead); i++ {
 		m.hashSlotHead[i] = -1
 	}
+	statOptions := []stats.Option{stats.OptionStatTags{"module": module}}
+	for _, opt := range opts {
+		statOptions = append(statOptions, opt)
+	}
+	stats.RegisterCountable("lru", m, statOptions...)
 
 	return m
 }
