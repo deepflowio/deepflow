@@ -470,9 +470,8 @@ func (w *InfluxdbWriter) writeInfluxdb(writerInfo *WriterInfo, dbCreateCtl *DBCr
 	}
 
 	if err := writerInfo.httpClient.Write(bp); err != nil {
-		log.Errorf("httpclient write db(%s) batch points(%d) failed: %s", db, len(bp.Points()), err)
 		*writeFailedCount += int64(len(bp.Points()))
-		return err
+		return fmt.Errorf("httpclient write db(%s) batch points(%d) failed: %s", db, len(bp.Points()), err)
 	}
 	*writeSuccCount += int64(len(bp.Points()))
 	return nil
@@ -482,6 +481,7 @@ func (w *InfluxdbWriter) writePrimary(queueID int, pc *PointCache) bool {
 	writerInfo := w.QueueWriterInfosPrimary[queueID]
 
 	if err := w.writeInfluxdb(writerInfo, &w.DBCreateCtlPrimary, pc); err != nil {
+		log.Errorf("write primary failed. %s", err)
 		w.writeConfidence(pc, PRIMARY_FAILED)
 		releasePointCache(pc)
 		return false
@@ -504,6 +504,7 @@ func (w *InfluxdbWriter) writeReplica(queueID int, pc *PointCache) bool {
 	}
 
 	if err := w.writeInfluxdb(writerInfo, &w.DBCreateCtlReplica, pc); err != nil {
+		log.Errorf("write replica failed. %s", err)
 		if strings.Contains(err.Error(), "max-series-per-database limit exceeded") {
 			w.writeConfidence(pc, SYNC_FAILED_SERIES_EXCEED)
 		} else {
