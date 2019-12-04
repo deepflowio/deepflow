@@ -2,9 +2,12 @@ package flowgenerator
 
 import (
 	"encoding/binary"
+	"fmt"
 	"net"
+	"strconv"
 
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/lru"
+	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
 // 和IPv4算法相同
@@ -24,8 +27,10 @@ func ServiceKey6(key []byte, epcID int16, ip net.IP, port uint16) []byte {
 	return key
 }
 
-func NewServiceTable6(hashSlots, capacity int) *ServiceTable6 {
-	return &ServiceTable6{m: lru.NewU160LRU(hashSlots, capacity)}
+func NewServiceTable6(tag string, index, hashSlots, capacity int) *ServiceTable6 {
+	return &ServiceTable6{
+		m: lru.NewU160LRU(fmt.Sprintf("flow_generator_service_table6_%s", tag), hashSlots, capacity, stats.OptionStatTags{"index": strconv.Itoa(index)}),
+	}
 }
 
 func (t *ServiceTable6) getFirstPacketScore(srcKey, dstKey []byte) (uint8, uint8) {
