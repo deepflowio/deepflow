@@ -5,7 +5,7 @@ import (
 )
 
 func TestU128IDMapAddOrGet(t *testing.T) {
-	m := NewU128IDMap(1024)
+	m := NewU128IDMap("test", 1024)
 
 	exp := true
 	if _, ret := m.AddOrGet(0, 1, 1, false); ret != exp {
@@ -36,7 +36,7 @@ func TestU128IDMapAddOrGet(t *testing.T) {
 }
 
 func TestU128IDMapSize(t *testing.T) {
-	m := NewU128IDMap(1024)
+	m := NewU128IDMap("test", 1024)
 
 	if m.Size() != 0 {
 		t.Errorf("当前长度，Expected %v found %v", 0, m.Size())
@@ -61,7 +61,7 @@ func TestU128IDMapSize(t *testing.T) {
 }
 
 func TestU128IDMapGet(t *testing.T) {
-	m := NewU128IDMap(1024)
+	m := NewU128IDMap("test", 1024)
 
 	m.AddOrGet(0, 1, 1, false)
 	if _, in := m.Get(0, 1); !in {
@@ -80,7 +80,7 @@ func TestU128IDMapGet(t *testing.T) {
 }
 
 func TestU128IDMapClear(t *testing.T) {
-	m := NewU128IDMap(4)
+	m := NewU128IDMap("test", 4)
 
 	m.AddOrGet(0, 1, 1, false)
 	m.AddOrGet(0, 1, 1, false)
@@ -100,7 +100,7 @@ func TestU128IDMapClear(t *testing.T) {
 }
 
 func BenchmarkU128IDMap(b *testing.B) {
-	m := NewU128IDMap(1 << 26)
+	m := NewU128IDMap("test", 1<<26)
 
 	b.ResetTimer()
 	for i := uint64(0); i < uint64(b.N); {

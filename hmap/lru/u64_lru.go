@@ -2,6 +2,8 @@ package lru
 
 import (
 	"sync"
+
+	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
 type u64LRUNode struct {
@@ -24,6 +26,8 @@ var u64LRUNodeBlockPool = sync.Pool{New: func() interface{} {
 
 // 注意：不是线程安全的
 type U64LRU struct {
+	stats.Closable
+
 	ringBuffer       []u64LRUNodeBlock // 存储Map节点，以矩阵环的方式组织，提升内存申请释放效率
 	bufferStartIndex int32             // ringBuffer中的开始下标（二维矩阵下标），闭区间
 	bufferEndIndex   int32             // ringBuffer中的结束下标（二维矩阵下标），开区间
@@ -37,6 +41,7 @@ type U64LRU struct {
 
 	capacity int // 最大容纳的Flow个数
 	size     int // 当前容纳的Flow个数
+	maxScan  int
 }
 
 func (m *U64LRU) Size() int {
@@ -179,6 +184,12 @@ func (m *U64LRU) newNode(key uint64, value interface{}) {
 	m.bufferEndIndex = m.incIndex(m.bufferEndIndex)
 }
 
+func (m *U64LRU) GetCounter() interface{} {
+	counter := &Counter{m.maxScan}
+	m.maxScan = 0
+	return counter
+}
+
 func (m *U64LRU) Add(key uint64, value interface{}) {
 	for hashListNext := m.hashSlotHead[m.compressHash(key)]; hashListNext != -1; {
 		node := m.getNode(hashListNext)
@@ -203,15 +214,23 @@ func (m *U64LRU) Remove(key uint64) {
 }
 
 func (m *U64LRU) Get(key uint64, peek bool) (interface{}, bool) {
+	maxScan := 0
 	for hashListNext := m.hashSlotHead[m.compressHash(key)]; hashListNext != -1; {
 		node := m.getNode(hashListNext)
+		maxScan++
 		if node.key == key {
 			if !peek {
 				m.updateNode(node, hashListNext, node.value)
 			}
+			if maxScan > m.maxScan {
+				m.maxScan = maxScan
+			}
 			return node.value, true
 		}
 		hashListNext = node.hashListNext
+	}
+	if maxScan > m.maxScan {
+		m.maxScan = maxScan
 	}
 	return nil, false
 }
@@ -239,7 +258,7 @@ func (m *U64LRU) compressHash(hash uint64) int32 {
 	return int32((((((hash>>m.hashSlotBits)^hash)>>m.hashSlotBits)^hash)>>m.hashSlotBits)^hash) & (m.hashSlots - 1)
 }
 
-func NewU64LRU(hashSlots, capacity int) *U64LRU {
+func NewU64LRU(module string, hashSlots, capacity int, opts ...stats.OptionStatTags) *U64LRU {
 	hashSlots, hashSlotBits := minPowerOfTwo(hashSlots)
 
 	m := &U64LRU{
@@ -255,6 +274,11 @@ func NewU64LRU(hashSlots, capacity int) *U64LRU {
 	for i := 0; i < len(m.hashSlotHead); i++ {
 		m.hashSlotHead[i] = -1
 	}
+	statOptions := []stats.Option{stats.OptionStatTags{"module": module}}
+	for _, opt := range opts {
+		statOptions = append(statOptions, opt)
+	}
+	stats.RegisterCountable("lru", m, statOptions...)
 
 	return m
 }

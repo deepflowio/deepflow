@@ -20,3 +20,7 @@ func minPowerOfTwo(v int) (int, int) {
 	}
 	return 1, 0
 }
+
+type Counter struct {
+	Max int `statsd:"max-bucket"` // 目前仅统计Get扫描到的最大值
+}
