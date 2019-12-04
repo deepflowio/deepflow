@@ -1,7 +1,11 @@
 package flowgenerator
 
 import (
+	"fmt"
+	"strconv"
+
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/lru"
+	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
 // 对于TCP流量：
@@ -35,8 +39,10 @@ func IsActiveService(srcScore, dstScore uint8) bool {
 	return dstScore == MAX_SCORE
 }
 
-func NewServiceTable(hashSlots, capacity int) *ServiceTable {
-	return &ServiceTable{m: lru.NewU64LRU(hashSlots, capacity)}
+func NewServiceTable(tag string, index, hashSlots, capacity int) *ServiceTable {
+	return &ServiceTable{
+		m: lru.NewU64LRU(fmt.Sprintf("flow_generator_service_table_%s", tag), hashSlots, capacity, stats.OptionStatTags{"index": strconv.Itoa(index)}),
+	}
 }
 
 func (t *ServiceTable) getFirstPacketScore(srcKey, dstKey uint64) (uint8, uint8) {

@@ -2,14 +2,18 @@ package mapreduce
 
 import (
 	"encoding/binary"
+	"fmt"
+	"strconv"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/idmap"
+	"gitlab.x.lan/yunshan/droplet-libs/stats"
 	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 	"gitlab.x.lan/yunshan/droplet/app/common/tag"
 )
 
 type Stash interface {
+	SetIndex(tag string, index int)
 	Add(docs []interface{}) []interface{}
 	Size() int
 	Dump() []interface{}
@@ -19,12 +23,20 @@ type Stash interface {
 }
 
 type rawStash struct {
+	tag   string
+	index int
+
 	u128StashLocation []*idmap.U128IDMap
 	u320StashLocation []*idmap.U320IDMap
 
 	stash      []interface{}
 	entryCount uint32
 	capacity   uint32
+}
+
+func (s *rawStash) SetIndex(tag string, index int) {
+	s.tag = tag
+	s.index = index
 }
 
 // Add 添加到stash，会改变doc中meter的内容，成功返回true，否则返回false
@@ -34,7 +46,11 @@ func (s *rawStash) Add(doc *app.Document, slot int) bool {
 	zTag := doc.Tag.(*zerodoc.Tag)
 	if zTag.IsIPv6 != 0 {
 		if s.u320StashLocation[slot] == nil {
-			s.u320StashLocation[slot] = idmap.NewU320IDMap(s.capacity)
+			s.u320StashLocation[slot] = idmap.NewU320IDMap(
+				fmt.Sprintf("mapreduce_u320_stash_location_%s", s.tag),
+				s.capacity,
+				stats.OptionStatTags{"index": strconv.Itoa(s.index)},
+			)
 		}
 		slotMap := s.u320StashLocation[slot]
 		var keys [U320_KEY_LEN]byte
@@ -47,7 +63,11 @@ func (s *rawStash) Add(doc *app.Document, slot int) bool {
 		width = slotMap.Width()
 	} else {
 		if s.u128StashLocation[slot] == nil {
-			s.u128StashLocation[slot] = idmap.NewU128IDMap(s.capacity)
+			s.u128StashLocation[slot] = idmap.NewU128IDMap(
+				fmt.Sprintf("mapreduce_u128_stash_location_%s", s.tag),
+				s.capacity,
+				stats.OptionStatTags{"index": strconv.Itoa(s.index)},
+			)
 		}
 		slotMap := s.u128StashLocation[slot]
 		var keys [U128_KEY_LEN]byte

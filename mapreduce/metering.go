@@ -99,6 +99,7 @@ func (h *MeteringHandler) newSubMeteringHandler(index int) *subMeteringHandler {
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.names[i] = handler.processors[i].GetName()
 		handler.stashes[i] = NewSlidingStash(uint32(h.docsInBuffer), h.windowSize, h.windowMoveMargin)
+		handler.stashes[i].SetIndex(handler.names[i], index)
 	}
 	stats.RegisterCountable("metering-mapper", &handler, stats.OptionStatTags{"index": strconv.Itoa(index)})
 	return &handler

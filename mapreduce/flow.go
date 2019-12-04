@@ -114,6 +114,7 @@ func (h *FlowHandler) newSubFlowHandler(index int) *subFlowHandler {
 	for i := 0; i < handler.numberOfApps; i++ {
 		handler.names[i] = handler.processors[i].GetName()
 		handler.stashes[i] = NewFixedStash(uint32(h.docsInBuffer), h.windowSize)
+		handler.stashes[i].SetIndex(handler.names[i], index)
 	}
 	stats.RegisterCountable("flow-mapper", &handler, stats.OptionStatTags{"index": strconv.Itoa(index)})
 	return &handler

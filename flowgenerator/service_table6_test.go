@@ -33,7 +33,7 @@ func TestGetTCPScore6(t *testing.T) {
 	ServiceKey6(srcKey, epcID, srcIP, srcPort)
 	ServiceKey6(dstKey, epcID, dstIP, dstPort)
 	srcScore, dstScore := MIN_SCORE, MIN_SCORE
-	st := NewServiceTable6(1024, 1024)
+	st := NewServiceTable6("", 0, 1024, 1024)
 
 	srcScore, dstScore = st.GetTCPScore(true, TCP_SYN|TCP_ACK, srcKey, dstKey)
 	if srcScore != MAX_SCORE || dstScore != MIN_SCORE {
@@ -83,7 +83,7 @@ func TestGetUDPScore6(t *testing.T) {
 	ServiceKey6(srcKey, epcID, srcIP, srcPort)
 	ServiceKey6(dstKey, epcID, dstIP, dstPort)
 	srcScore, dstScore := MIN_SCORE, MIN_SCORE
-	st := NewServiceTable6(1024, 1024)
+	st := NewServiceTable6("", 0, 1024, 1024)
 
 	srcScore, dstScore = st.GetUDPScore(true, srcKey, dstKey)
 	if srcScore != MIN_SCORE || dstScore != MIN_SCORE+1 {
