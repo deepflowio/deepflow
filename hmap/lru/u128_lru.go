@@ -6,10 +6,6 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
-type Counter struct {
-	Max int `statsd:"max-bucket"` // 目前仅统计Get扫描到的最大值
-}
-
 type u128LRUNode struct {
 	key0  uint64
 	key1  uint64
@@ -48,7 +44,7 @@ type U128LRU struct {
 
 	capacity int // 最大容纳的Flow个数
 	size     int // 当前容纳的Flow个数
-	width    int
+	maxScan  int
 }
 
 func (m *U128LRU) Size() int {
@@ -200,8 +196,8 @@ func (m *U128LRU) newNode(key0, key1 uint64, value interface{}, hash int32) {
 }
 
 func (m *U128LRU) GetCounter() interface{} {
-	counter := &Counter{m.width}
-	m.width = 0
+	counter := &Counter{m.maxScan}
+	m.maxScan = 0
 	return counter
 }
 
@@ -230,23 +226,23 @@ func (m *U128LRU) Remove(key0, key1 uint64) {
 }
 
 func (m *U128LRU) Get(key0, key1 uint64, peek bool) (interface{}, bool) {
-	width := 0
+	maxScan := 0
 	for hashListNext := m.hashSlotHead[m.compressHash(key0^key1)]; hashListNext != -1; {
 		node := m.getNode(hashListNext)
-		width++
+		maxScan++
 		if node.key0 == key0 && node.key1 == key1 {
 			if !peek {
 				m.updateNode(node, hashListNext, node.value)
 			}
-			if width > m.width {
-				m.width = width
+			if maxScan > m.maxScan {
+				m.maxScan = maxScan
 			}
 			return node.value, true
 		}
 		hashListNext = node.hashListNext
 	}
-	if width > m.width {
-		m.width = width
+	if maxScan > m.maxScan {
+		m.maxScan = maxScan
 	}
 	return nil, false
 }

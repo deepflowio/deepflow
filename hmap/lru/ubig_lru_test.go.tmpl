@@ -22,7 +22,7 @@ func TestU{{.}}KeySize(t *testing.T) {
 
 func TestU{{.}}LRU(t *testing.T) {
 	capacity := 256
-	lru := NewU{{.}}LRU(capacity, capacity)
+	lru := NewU{{.}}LRU("test", capacity, capacity)
 
 	// 添加0~255并Get
 	for i := 0; i < capacity; i++ {
@@ -127,7 +127,7 @@ func TestU{{.}}LRU(t *testing.T) {
 
 func BenchmarkU{{.}}LRUAdd(b *testing.B) {
 	capacity := 1 << 20
-	lru := NewU{{.}}LRU(int(capacity), int(capacity))
+	lru := NewU{{.}}LRU("test", int(capacity), int(capacity))
 	keys := make([][]byte, b.N)
 	for i := 0; i < b.N; i++ {
 		keys[i] = getU{{.}}(uint64(i), uint64(i*2+b.N))
@@ -141,7 +141,7 @@ func BenchmarkU{{.}}LRUAdd(b *testing.B) {
 
 func BenchmarkU{{.}}LRURemove(b *testing.B) {
 	capacity := b.N
-	lru := NewU{{.}}LRU(int(capacity), int(capacity))
+	lru := NewU{{.}}LRU("test", int(capacity), int(capacity))
 	keys := make([][]byte, b.N)
 	for i := 0; i < b.N; i++ {
 		keys[i] = getU{{.}}(uint64(i), uint64(i*2+b.N))
@@ -158,7 +158,7 @@ func BenchmarkU{{.}}LRURemove(b *testing.B) {
 
 func BenchmarkU{{.}}LRUGet(b *testing.B) {
 	capacity := 1 << 20
-	lru := NewU{{.}}LRU(int(capacity), int(capacity))
+	lru := NewU{{.}}LRU("test", int(capacity), int(capacity))
 	keys := make([][]byte, b.N)
 	for i := 0; i < b.N; i++ {
 		keys[i] = getU{{.}}(uint64(i), uint64(i*2+b.N))
@@ -175,7 +175,7 @@ func BenchmarkU{{.}}LRUGet(b *testing.B) {
 
 func BenchmarkU{{.}}LRUPeek(b *testing.B) {
 	capacity := 1 << 20
-	lru := NewU{{.}}LRU(int(capacity), int(capacity))
+	lru := NewU{{.}}LRU("test", int(capacity), int(capacity))
 	keys := make([][]byte, b.N)
 	for i := 0; i < b.N; i++ {
 		keys[i] = getU{{.}}(uint64(i), uint64(i*2+b.N))

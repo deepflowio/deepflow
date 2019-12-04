@@ -2,6 +2,8 @@ package idmap
 
 import (
 	"sync"
+
+	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
 type u128IDMapNode struct {
@@ -27,16 +29,19 @@ var u128IDMapNodeBlockPool = sync.Pool{New: func() interface{} {
 
 // 注意：不是线程安全的
 type U128IDMap struct {
+	stats.Closable
+
 	buffer []u128IDMapNodeBlock // 存储Map节点，以矩阵的方式组织，提升内存申请释放效率
 
 	slotHead []int32 // 哈希桶，slotHead[i] 表示哈希值为 i 的冲突链的第一个节点为 buffer[[ slotHead[i]] ]]
 	size     int     // buffer中存储的有效节点总数
 	width    int     // 哈希桶中最大冲突链长度
+	maxScan  int
 
 	hashSlotBits uint32 // 哈希桶数量总是2^N，记录末尾0比特的数量用于compressHash
 }
 
-func NewU128IDMap(hashSlots uint32) *U128IDMap {
+func NewU128IDMap(module string, hashSlots uint32, opts ...stats.OptionStatTags) *U128IDMap {
 	if hashSlots >= 1<<30 {
 		panic("hashSlots is too large")
 	}
@@ -55,6 +60,11 @@ func NewU128IDMap(hashSlots uint32) *U128IDMap {
 	for i := uint32(0); i < hashSlots; i++ {
 		m.slotHead[i] = -1
 	}
+	statOptions := []stats.Option{stats.OptionStatTags{"module": module}}
+	for _, opt := range opts {
+		statOptions = append(statOptions, opt)
+	}
+	stats.RegisterCountable("idmap", m, statOptions...)
 	return m
 }
 
@@ -107,6 +117,9 @@ func (m *U128IDMap) AddOrGet(key0, key1 uint64, value uint32, overwrite bool) (u
 	if m.width < width+1 {
 		m.width = width + 1
 	}
+	if m.maxScan < width+1 {
+		m.maxScan = width + 1
+	}
 
 	return value, true
 }
@@ -124,6 +137,12 @@ func (m *U128IDMap) Get(key0, key1 uint64) (uint32, bool) {
 		next = node.next
 	}
 	return 0, false
+}
+
+func (m *U128IDMap) GetCounter() interface{} {
+	counter := &Counter{m.maxScan}
+	m.maxScan = 0
+	return counter
 }
 
 func (m *U128IDMap) Clear() {

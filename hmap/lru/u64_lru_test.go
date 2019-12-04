@@ -8,7 +8,7 @@ import (
 
 func TestU64LRU(t *testing.T) {
 	capacity := 256
-	lru := NewU64LRU(capacity, capacity)
+	lru := NewU64LRU("test", capacity, capacity)
 
 	// 添加0~255并Get
 	for i := 0; i < capacity; i++ {
@@ -102,7 +102,7 @@ func TestU64LRU(t *testing.T) {
 
 func BenchmarkU64LRUAdd(b *testing.B) {
 	capacity := 1 << 20
-	lru := NewU64LRU(int(capacity), int(capacity))
+	lru := NewU64LRU("test", int(capacity), int(capacity))
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -112,7 +112,7 @@ func BenchmarkU64LRUAdd(b *testing.B) {
 
 func BenchmarkU64LRURemove(b *testing.B) {
 	capacity := b.N
-	lru := NewU64LRU(int(capacity), int(capacity))
+	lru := NewU64LRU("test", int(capacity), int(capacity))
 	for i := 0; i < b.N; i++ {
 		lru.Add(uint64(i), uint64(i))
 	}
@@ -125,7 +125,7 @@ func BenchmarkU64LRURemove(b *testing.B) {
 
 func BenchmarkU64LRUGet(b *testing.B) {
 	capacity := 1 << 20
-	lru := NewU64LRU(int(capacity), int(capacity))
+	lru := NewU64LRU("test", int(capacity), int(capacity))
 	for i := 0; i < b.N; i++ {
 		lru.Add(uint64(i), uint64(i))
 	}
@@ -138,7 +138,7 @@ func BenchmarkU64LRUGet(b *testing.B) {
 
 func BenchmarkU64LRUPeek(b *testing.B) {
 	capacity := 1 << 20
-	lru := NewU64LRU(int(capacity), int(capacity))
+	lru := NewU64LRU("test", int(capacity), int(capacity))
 	for i := 0; i < b.N; i++ {
 		lru.Add(uint64(i), uint64(i))
 	}
