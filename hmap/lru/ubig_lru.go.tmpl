@@ -5,6 +5,8 @@ import (
 	. "encoding/binary"
 	"fmt"
 	"sync"
+
+	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
 {{ range . }}
@@ -38,6 +40,8 @@ var u{{.}}LRUNodeBlockPool = sync.Pool{New: func() interface{} {
 
 // 注意：不是线程安全的
 type U{{.}}LRU struct {
+	stats.Closable
+
 	ringBuffer       []u{{.}}LRUNodeBlock // 存储Map节点，以矩阵环的方式组织，提升内存申请释放效率
 	bufferStartIndex int32              // ringBuffer中的开始下标（二维矩阵下标），闭区间
 	bufferEndIndex   int32              // ringBuffer中的结束下标（二维矩阵下标），开区间
@@ -51,6 +55,7 @@ type U{{.}}LRU struct {
 
 	capacity int // 最大容纳的Flow个数
 	size     int // 当前容纳的Flow个数
+	maxScan  int
 }
 
 func (m *U{{.}}LRU) Size() int {
@@ -227,21 +232,35 @@ func (m *U{{.}}LRU) Remove(key []byte) {
 	}
 }
 
+func (m *U{{.}}LRU) GetCounter() interface{} {
+	counter := &Counter{m.maxScan}
+	m.maxScan = 0
+	return counter
+}
+
 func (m *U{{.}}LRU) Get(key []byte, peek bool) (interface{}, bool) {
 	if len(key) != _U{{.}}_KEY_SIZE {
 		panic(fmt.Sprintf("传入key的长度不等于 %d 字节", _U{{.}}_KEY_SIZE))
 	}
 
+	maxScan := 0
 	hash := m.genHash(key)
 	for hashListNext := m.hashSlotHead[m.compressHash(hash)]; hashListNext != -1; {
 		node := m.getNode(hashListNext)
+		maxScan++
 		if node.equal(hash, key) {
 			if !peek {
 				m.updateNode(node, hashListNext, node.value)
 			}
+			if maxScan > m.maxScan {
+				m.maxScan = maxScan
+			}
 			return node.value, true
 		}
 		hashListNext = node.hashListNext
+	}
+	if maxScan > m.maxScan {
+		m.maxScan = maxScan
 	}
 	return nil, false
 }
@@ -285,7 +304,7 @@ func (m *U{{.}}LRU) Walk(callback func(key [_U{{.}}_KEY_SIZE]byte, value interfa
 	}
 }
 
-func NewU{{.}}LRU(hashSlots, capacity int) *U{{.}}LRU {
+func NewU{{.}}LRU(module string, hashSlots, capacity int, opts ...stats.OptionStatTags) *U{{.}}LRU {
 	hashSlots, hashSlotBits := minPowerOfTwo(hashSlots)
 
     m := &U{{.}}LRU{
@@ -301,6 +320,11 @@ func NewU{{.}}LRU(hashSlots, capacity int) *U{{.}}LRU {
 	for i := 0; i < len(m.hashSlotHead); i++ {
 		m.hashSlotHead[i] = -1
 	}
+	statOptions := []stats.Option{stats.OptionStatTags{"module": module}}
+	for _, opt := range opts {
+		statOptions = append(statOptions, opt)
+	}
+	stats.RegisterCountable("lru", m, statOptions...)
 
 	return m
 }

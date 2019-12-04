@@ -23,7 +23,7 @@ func TestU{{.}}KeySize(t *testing.T) {
 }
 
 func TestU{{.}}IDMapAddOrGet(t *testing.T) {
-	m := NewU{{.}}IDMap(1024)
+	m := NewU{{.}}IDMap("test", 1024)
 
 	exp := true
 	node := newNode{{.}}(0, 1)
@@ -56,7 +56,7 @@ func TestU{{.}}IDMapAddOrGet(t *testing.T) {
 }
 
 func TestU{{.}}IDMapSize(t *testing.T) {
-	m := NewU{{.}}IDMap(1024)
+	m := NewU{{.}}IDMap("test", 1024)
 	if m.Size() != 0 {
 		t.Errorf("当前长度，Expected %v found %v", 0, m.Size())
 	}
@@ -83,7 +83,7 @@ func TestU{{.}}IDMapSize(t *testing.T) {
 }
 
 func TestU{{.}}IDMapGet(t *testing.T) {
-	m := NewU{{.}}IDMap(1024)
+	m := NewU{{.}}IDMap("test", 1024)
 
 	node := newNode{{.}}(0, 1)
 	m.AddOrGet(node.key[:], node.hash, 1, false)
@@ -105,7 +105,7 @@ func TestU{{.}}IDMapGet(t *testing.T) {
 }
 
 func TestU{{.}}IDMapClear(t *testing.T) {
-	m := NewU{{.}}IDMap(4)
+	m := NewU{{.}}IDMap("test", 4)
 
 	node := newNode{{.}}(0, 1)
 	m.AddOrGet(node.key[:], node.hash, 1, false)
@@ -129,7 +129,7 @@ func TestU{{.}}IDMapClear(t *testing.T) {
 }
 
 func BenchmarkU{{.}}IDMap(b *testing.B) {
-	m := NewU{{.}}IDMap(1 << 26)
+	m := NewU{{.}}IDMap("test", 1 << 26)
 	nodes := make([]*u{{.}}IDMapNode, (b.N+3)/4*4)
 
 	for i := uint64(0); i < uint64(b.N); i += 4 {
