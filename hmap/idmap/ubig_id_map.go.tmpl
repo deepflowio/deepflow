@@ -156,7 +156,7 @@ func (m *U{{.}}IDMap) Get(key []byte, hash uint32) (uint32, bool) {
 }
 
 func (m *U{{.}}IDMap) GetCounter() interface{} {
-	counter := &Counter{m.maxScan}
+	counter := &Counter{m.maxScan, m.size}
 	m.maxScan = 0
 	return counter
 }

@@ -140,7 +140,7 @@ func (m *U128IDMap) Get(key0, key1 uint64) (uint32, bool) {
 }
 
 func (m *U128IDMap) GetCounter() interface{} {
-	counter := &Counter{m.maxScan}
+	counter := &Counter{m.maxScan, m.size}
 	m.maxScan = 0
 	return counter
 }

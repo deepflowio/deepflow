@@ -63,19 +63,15 @@ func (f *FastPath) Init(mapSize uint32, queueCount int, srcGroupAclGidMaps, dstG
 		panic(fmt.Sprintf("queueCount超出最大限制%d", MAX_QUEUE_COUNT))
 	}
 	f.UpdateGroupAclGidMaps(srcGroupAclGidMaps, dstGroupAclGidMaps)
-	soltSize := 1 << 16
-	if mapSize >= 1<<20 {
-		soltSize = 1 << 20
-	} else if mapSize >= 1<<16 {
-		soltSize = 1 << 16
-	} else {
-		soltSize = 1 << 12
-	}
 	index := 0
 	for i := 0; i < queueCount; i++ {
 		for j := TAP_MIN; j < TAP_MAX; j++ {
-			f.FastPortPolicyMaps[i][j] = lru.NewU128LRU("policy-fastpath-port", soltSize, int(mapSize), stats.OptionStatTags{"index": strconv.Itoa(index)})
-			f.FastVlanPolicyMaps[i][j] = lru.NewU128LRU("policy-fastpath-vlan", soltSize, int(mapSize), stats.OptionStatTags{"index": strconv.Itoa(index)})
+			f.FastPortPolicyMaps[i][j] = lru.NewU128LRU(
+				"policy-fastpath-port", int(mapSize/8), int(mapSize),
+				stats.OptionStatTags{"index": strconv.Itoa(index)})
+			f.FastVlanPolicyMaps[i][j] = lru.NewU128LRU(
+				"policy-fastpath-vlan", int(mapSize/8), int(mapSize),
+				stats.OptionStatTags{"index": strconv.Itoa(index)})
 			index++
 		}
 	}

@@ -22,5 +22,6 @@ func minPowerOfTwo(v int) (int, int) {
 }
 
 type Counter struct {
-	Max int `statsd:"max-bucket"` // 目前仅统计Get扫描到的最大值
+	Max  int `statsd:"max-bucket"` // 目前仅统计Get扫描到的最大值
+	Size int `statsd:"size"`
 }
