@@ -82,6 +82,9 @@ type TableOperator interface {
 	GetPolicyByFirstPath(*EndpointData, *LookupKey) (*EndpointStore, *PolicyData)
 	GetPolicyByFastPath(key *LookupKey) (*EndpointStore, *PolicyData)
 
+	// 目前是从statsd监控中移除
+	Close()
+
 	// test
 	generateGroupRelation(acls []*Acl, to *[TAP_MAX][math.MaxUint16 + 1][]uint16, from *[TAP_MAX][math.MaxUint16 + 1]uint16)
 }
@@ -185,6 +188,10 @@ func (ipGroups SortedIpGroups) Swap(i, j int) {
 func SortIpGroupsById(ipGroups []*IpGroupData) []*IpGroupData {
 	sort.Sort(SortedIpGroups(ipGroups))
 	return ipGroups
+}
+
+func (t *PolicyTable) Close() {
+	t.operator.Close()
 }
 
 func (t *PolicyTable) GetCounter() interface{} {
