@@ -196,7 +196,7 @@ func (m *U128LRU) newNode(key0, key1 uint64, value interface{}, hash int32) {
 }
 
 func (m *U128LRU) GetCounter() interface{} {
-	counter := &Counter{m.maxScan}
+	counter := &Counter{m.maxScan, m.size}
 	m.maxScan = 0
 	return counter
 }
