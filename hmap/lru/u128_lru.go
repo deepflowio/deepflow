@@ -267,7 +267,10 @@ func (m *U128LRU) Clear() {
 }
 
 func (m *U128LRU) compressHash(hash uint64) int32 {
-	return int32((((((hash>>m.hashSlotBits)^hash)>>m.hashSlotBits)^hash)>>m.hashSlotBits)^hash) & (m.hashSlots - 1)
+	hash = (hash >> 32) ^ hash
+	hash = (hash >> 16) ^ hash
+	hash = (hash >> 8) ^ hash
+	return int32(hash) & (m.hashSlots - 1)
 }
 
 type walkCallback func(key0, key1 uint64, value interface{})
