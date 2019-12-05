@@ -293,7 +293,9 @@ func (m *U{{.}}LRU) genHash(key []byte) uint32 {
 }
 
 func (m *U{{.}}LRU) compressHash(hash uint32) int32 {
-	return int32((((((hash>>m.hashSlotBits)^hash)>>m.hashSlotBits)^hash)>>m.hashSlotBits)^hash) & (m.hashSlots - 1)
+	hash = (hash >> 16) ^ hash
+	hash = (hash >> 8) ^ hash
+	return int32(hash) & (m.hashSlots - 1)
 }
 
 func (m *U{{.}}LRU) Walk(callback func(key [_U{{.}}_KEY_SIZE]byte, value interface{})) {
