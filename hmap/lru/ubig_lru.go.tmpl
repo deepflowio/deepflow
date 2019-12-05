@@ -233,7 +233,7 @@ func (m *U{{.}}LRU) Remove(key []byte) {
 }
 
 func (m *U{{.}}LRU) GetCounter() interface{} {
-	counter := &Counter{m.maxScan}
+	counter := &Counter{m.maxScan, m.size}
 	m.maxScan = 0
 	return counter
 }
@@ -307,7 +307,7 @@ func (m *U{{.}}LRU) Walk(callback func(key [_U{{.}}_KEY_SIZE]byte, value interfa
 func NewU{{.}}LRU(module string, hashSlots, capacity int, opts ...stats.OptionStatTags) *U{{.}}LRU {
 	hashSlots, hashSlotBits := minPowerOfTwo(hashSlots)
 
-    m := &U{{.}}LRU{
+	m := &U{{.}}LRU{
 		ringBuffer:   make([]u{{.}}LRUNodeBlock, (capacity+_BLOCK_SIZE)/_BLOCK_SIZE+1),
 		hashSlots:    int32(hashSlots),
 		hashSlotBits: uint32(hashSlotBits),
