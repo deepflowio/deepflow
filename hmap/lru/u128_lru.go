@@ -250,6 +250,9 @@ func (m *U128LRU) Get(key0, key1 uint64, peek bool) (interface{}, bool) {
 func (m *U128LRU) Clear() {
 	for i := range m.ringBuffer {
 		if m.ringBuffer[i] != nil {
+			for j := 0; j < len(m.ringBuffer[i]); j++ {
+				m.ringBuffer[i][j].value = nil
+			}
 			u128LRUNodeBlockPool.Put(m.ringBuffer[i])
 			m.ringBuffer[i] = nil
 		}
