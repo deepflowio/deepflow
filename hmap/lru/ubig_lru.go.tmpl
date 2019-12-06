@@ -268,6 +268,9 @@ func (m *U{{.}}LRU) Get(key []byte, peek bool) (interface{}, bool) {
 func (m *U{{.}}LRU) Clear() {
 	for i := range m.ringBuffer {
 		if m.ringBuffer[i] != nil {
+                        for j:=0; j<len(m.ringBuffer[i]); j++ {
+                                m.ringBuffer[i][j].value = nil
+                        }
 			u{{.}}LRUNodeBlockPool.Put(m.ringBuffer[i])
 			m.ringBuffer[i] = nil
 		}

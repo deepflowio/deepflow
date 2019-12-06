@@ -238,6 +238,9 @@ func (m *U64LRU) Get(key uint64, peek bool) (interface{}, bool) {
 func (m *U64LRU) Clear() {
 	for i := range m.ringBuffer {
 		if m.ringBuffer[i] != nil {
+			for j := 0; j < len(m.ringBuffer[i]); j++ {
+				m.ringBuffer[i][j].value = nil
+			}
 			u64LRUNodeBlockPool.Put(m.ringBuffer[i])
 			m.ringBuffer[i] = nil
 		}
