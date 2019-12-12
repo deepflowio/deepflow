@@ -3,6 +3,7 @@ package idmap
 import (
 	"sync"
 
+	jhash "gitlab.x.lan/yunshan/droplet-libs/hmap/hash"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
@@ -77,10 +78,7 @@ func (m *U128IDMap) Width() int {
 }
 
 func (m *U128IDMap) compressHash(hash uint64) int32 {
-	hash = (hash >> 32) ^ hash
-	hash = (hash >> 16) ^ hash
-	hash = (hash >> 8) ^ hash
-	return int32(hash) & int32(len(m.slotHead)-1)
+	return jhash.Jenkins(hash) & int32(len(m.slotHead)-1)
 }
 
 // 第一个返回值表示value，第二个返回值表示是否进行了Add。若key已存在，指定overwrite=true可覆写value。

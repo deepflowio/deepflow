@@ -3,6 +3,7 @@ package lru
 import (
 	"sync"
 
+	jhash "gitlab.x.lan/yunshan/droplet-libs/hmap/hash"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
@@ -270,10 +271,7 @@ func (m *U128LRU) Clear() {
 }
 
 func (m *U128LRU) compressHash(hash uint64) int32 {
-	hash = (hash >> 32) ^ hash
-	hash = (hash >> 16) ^ hash
-	hash = (hash >> 8) ^ hash
-	return int32(hash) & (m.hashSlots - 1)
+	return jhash.Jenkins(hash) & (m.hashSlots - 1)
 }
 
 type walkCallback func(key0, key1 uint64, value interface{})
