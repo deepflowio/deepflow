@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
-	jhash "gitlab.x.lan/yunshan/droplet-libs/hmap/hash"
+	"gitlab.x.lan/yunshan/droplet-libs/hmap/keyhash"
 )
 
 {{ range . }}
@@ -297,7 +297,7 @@ func (m *U{{.}}LRU) genHash(key []byte) uint32 {
 }
 
 func (m *U{{.}}LRU) compressHash(hash uint32) int32 {
-	return jhash.Jenkins32(hash) & (m.hashSlots - 1)
+	return keyhash.Jenkins32(hash) & (m.hashSlots - 1)
 }
 
 func (m *U{{.}}LRU) Walk(callback func(key [_U{{.}}_KEY_SIZE]byte, value interface{})) {

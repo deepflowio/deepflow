@@ -1,4 +1,4 @@
-package hash
+package keyhash
 
 func hashRotate(x uint32, k uint) uint32 {
 	return (x << k) | (x >> (32 - k))

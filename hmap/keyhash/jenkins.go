@@ -1,4 +1,4 @@
-package hash
+package keyhash
 
 // Jenkins Wiki： https://en.wikipedia.org/wiki/Jenkins_hash_function
 // 64位算法： https://blog.csdn.net/yueyedeai/article/details/17025265
@@ -17,7 +17,11 @@ func Jenkins(hash uint64) int32 {
 	hash = (hash + (hash << 2)) + (hash << 4) // hash * 21
 	hash = hash ^ (hash >> 28)
 	hash = hash + (hash << 31)
-	return int32((hash >> 32) ^ hash)
+	return int32(hash)
+}
+
+func Jenkins128(key0, key1 uint64) int32 {
+	return Jenkins(key0) ^ Jenkins(key1)
 }
 
 func Jenkins32(hash uint32) int32 {

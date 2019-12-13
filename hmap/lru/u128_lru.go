@@ -3,7 +3,7 @@ package lru
 import (
 	"sync"
 
-	jhash "gitlab.x.lan/yunshan/droplet-libs/hmap/hash"
+	"gitlab.x.lan/yunshan/droplet-libs/hmap/keyhash"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 )
 
@@ -203,7 +203,7 @@ func (m *U128LRU) GetCounter() interface{} {
 }
 
 func (m *U128LRU) Add(key0, key1 uint64, value interface{}) {
-	hash := m.compressHash(key0 ^ key1)
+	hash := m.compressHash(key0, key1)
 	for hashListNext := m.hashSlotHead[hash]; hashListNext != -1; {
 		node := m.getNode(hashListNext)
 		if node.key0 == key0 && node.key1 == key1 {
@@ -216,7 +216,7 @@ func (m *U128LRU) Add(key0, key1 uint64, value interface{}) {
 }
 
 func (m *U128LRU) Remove(key0, key1 uint64) {
-	for hashListNext := m.hashSlotHead[m.compressHash(key0^key1)]; hashListNext != -1; {
+	for hashListNext := m.hashSlotHead[m.compressHash(key0, key1)]; hashListNext != -1; {
 		node := m.getNode(hashListNext)
 		if node.key0 == key0 && node.key1 == key1 {
 			m.removeNode(node, hashListNext)
@@ -228,7 +228,7 @@ func (m *U128LRU) Remove(key0, key1 uint64) {
 
 func (m *U128LRU) Get(key0, key1 uint64, peek bool) (interface{}, bool) {
 	maxScan := 0
-	for hashListNext := m.hashSlotHead[m.compressHash(key0^key1)]; hashListNext != -1; {
+	for hashListNext := m.hashSlotHead[m.compressHash(key0, key1)]; hashListNext != -1; {
 		node := m.getNode(hashListNext)
 		maxScan++
 		if node.key0 == key0 && node.key1 == key1 {
@@ -270,8 +270,8 @@ func (m *U128LRU) Clear() {
 	m.size = 0
 }
 
-func (m *U128LRU) compressHash(hash uint64) int32 {
-	return jhash.Jenkins(hash) & (m.hashSlots - 1)
+func (m *U128LRU) compressHash(key0, key1 uint64) int32 {
+	return keyhash.Jenkins128(key0, key1) & (m.hashSlots - 1)
 }
 
 type walkCallback func(key0, key1 uint64, value interface{})
