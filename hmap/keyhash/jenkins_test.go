@@ -1,4 +1,4 @@
-package hash
+package keyhash
 
 import (
 	"testing"
@@ -46,6 +46,13 @@ func BenchmarkBaseHash32(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		bashHash32(uint32(i))
+	}
+}
+
+func BenchmarkJenkins128(b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Jenkins128(uint64(i), uint64(i+100))
 	}
 }
 
