@@ -29,15 +29,6 @@ enum AclDirection {
     BACKWARD = 2;
 }
 
-enum Scope {
-    SCOPE_ALL = 0;
-    SCOPE_IN_EPC = 1;
-    SCOPE_OUT_EPC = 2;
-    SCOPE_IN_SUBNET = 3;
-    SCOPE_OUT_SUBNET = 4;
-    SCOPE_INVALID = 5;
-}
-
 message Tag {
     optional string id = 1;
     optional uint64 code = 2;
@@ -84,7 +75,7 @@ message Tag {
     optional uint32 tap_type = 48;
     optional uint32 subnet_id = 49;
     optional uint32 acl_id = 50;
-    optional Scope  scope = 51;
+    optional uint32 pod_node_id = 52;
 
     optional string country = 60;
     optional string region = 61;

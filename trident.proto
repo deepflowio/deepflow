@@ -190,6 +190,7 @@ message NpbAction {
     optional TapSide tap_side = 4;
     optional uint32 payload_slice = 5 [default = 65535];
     optional uint32 npb_acl_group_id = 6; // 仅在tunnel_type为PCAP时，该字段有值
+    optional uint32 tunnel_ip_id = 7; // 分发点id, 限制在64000
 }
 
 message FlowAction {
@@ -220,7 +221,6 @@ message PublishAcl {
     optional uint32 id = 1;
     optional string database = 2;
     optional uint64 measurement = 3;
-    optional uint64 tag_code = 4;
 
     optional uint32 tap_type = 10; // 3: in_port 0x3****, 0~2/4~30: in_port 0x1****
     optional uint32 acl_gid = 11;
@@ -230,7 +230,6 @@ message PublishAcl {
     optional int32 l3_epc_id_0 = 15;
     optional int32 l3_epc_id_1 = 16;
 
-    optional uint32 scope = 30;
     optional uint32 protocol = 31;
 }
 
@@ -241,6 +240,7 @@ message PublishAcls {
 message SyncResponse {
     optional Status status = 1;
     optional Config config = 2;
+    optional uint32 vtap_id = 3;  // 限制在64000
     optional string revision = 4; // 指定升级的目标revision
     optional string self_update_url = 5; // 指定升级的URL路径
 
