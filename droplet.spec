@@ -16,12 +16,15 @@ Requires(post): %{_sbindir}/update-alternatives
 Requires(postun): %{_sbindir}/update-alternatives
 
 %define pwd %(echo $PWD)
+%define pcapdir /usr/local/deepflow/pcap-rest/
 
 %description
 deepflow droplet
 
-%prep
+%build
 (cd %pwd; make clean && make)
+
+%install
 mkdir -p $RPM_BUILD_ROOT/usr/sbin/
 cp %pwd/bin/droplet $RPM_BUILD_ROOT/usr/sbin/
 mkdir -p $RPM_BUILD_ROOT/usr/bin/
@@ -34,8 +37,9 @@ mkdir -p $RPM_BUILD_ROOT/etc/
 cp %pwd/config/droplet.yaml $RPM_BUILD_ROOT/etc/
 cp %pwd/config/droplet.yaml $RPM_BUILD_ROOT/etc/droplet.yaml.sample
 mkdir -p $RPM_BUILD_ROOT/usr/share/droplet/
-mkdir -p $RPM_BUILD_ROOT/usr/local/deepflow/pcap-rest
-cp %pwd/cmd/pcap-rest/*.py $RPM_BUILD_ROOT/usr/local/deepflow/pcap-rest/
+mkdir -p $RPM_BUILD_ROOT%{pcapdir}
+cp %pwd/cmd/pcap-rest/*.py $RPM_BUILD_ROOT%{pcapdir}
+cp %pwd/cmd/pcap-rest/requirements.txt $RPM_BUILD_ROOT%{pcapdir}
 cp %pwd/pcap-rest.service $RPM_BUILD_ROOT/lib/systemd/system/
 
 %files
@@ -58,7 +62,6 @@ fi
 systemctl daemon-reload
 systemctl try-restart droplet
 %{_sbindir}/update-alternatives --install %{_bindir}/dlv dlv %{_bindir}/dlv.droplet 10
-systemctl try-restart pcap-rest
 
 %postun
 systemctl daemon-reload
@@ -75,5 +78,20 @@ Summary:    deepflow pcap-rest
 deepflow pcap restful API agent
 
 %files -n pcap-rest
-/usr/local/deepflow/pcap-rest/*
+%{pcapdir}/*.py*
+%{pcapdir}/requirements.txt
 %config(noreplace) /lib/systemd/system/pcap-rest.service
+
+%post -n pcap-rest
+[ -f %{pcapdir}/requirements.txt ] && python -m pip install -r %{pcapdir}/requirements.txt
+systemctl daemon-reload
+systemctl try-restart pcap-rest
+
+%preun -n pcap-rest
+if [ $1 == 0 ]; then # uninstall
+    systemctl stop pcap-rest
+    systemctl disable pcap-test
+fi
+
+%postun -n pcap-rest
+systemctl daemon-reload
