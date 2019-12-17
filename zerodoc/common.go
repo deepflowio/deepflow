@@ -23,6 +23,8 @@ const (
 	_TAG_L3_DEVICE_TYPE_0
 	_TAG_HOST
 	_TAG_HOST_0
+	_TAG_POD_NODE_ID
+	_TAG_POD_NODE_ID_0
 	_TAG_REGION_0
 	_TAG_IP_1
 	_TAG_IP_BIN_1
@@ -34,18 +36,18 @@ const (
 	_TAG_SUBNET_ID_0
 	_TAG_SUBNET_ID_1
 	_TAG_REGION_1
+	_TAG_POD_NODE_ID_1
 	_TAG_DIRECTION
 	_TAG_ACL_GID
 	_TAG_VLAN_ID
 	_TAG_PROTOCOL
 	_TAG_SERVER_PORT
-	_TAG_VTAP
+	_TAG_VTAP_ID
 	_TAG_TAP_TYPE
 	_TAG_SUBNET_ID
 	_TAG_ACL_DIRECTION
 	_TAG_CAST_TYPE
 	_TAG_TCP_FLAGS
-	_TAG_SCOPE
 	_TAG_COUNTRY
 	_TAG_REGION
 	_TAG_ISP
@@ -115,6 +117,8 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"l3_device_id_0":   _TAG_L3_DEVICE_ID_0,
 	"l3_device_type":   _TAG_L3_DEVICE_TYPE,
 	"l3_device_type_0": _TAG_L3_DEVICE_TYPE_0,
+	"pod_node_id":      _TAG_POD_NODE_ID,
+	"pod_node_id_0":    _TAG_POD_NODE_ID_0,
 	"host":             _TAG_HOST,
 	"host_0":           _TAG_HOST_0,
 	"region_0":         _TAG_REGION_0,
@@ -128,18 +132,18 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"subnet_id_0":      _TAG_SUBNET_ID_0,
 	"subnet_id_1":      _TAG_SUBNET_ID_1,
 	"region_1":         _TAG_REGION_1,
+	"pod_node_id_1":    _TAG_POD_NODE_ID_1,
 	"direction":        _TAG_DIRECTION,
 	"acl_gid":          _TAG_ACL_GID,
 	"vlan_id":          _TAG_VLAN_ID,
 	"protocol":         _TAG_PROTOCOL,
 	"server_port":      _TAG_SERVER_PORT,
-	"vtap":             _TAG_VTAP,
+	"vtap_id":          _TAG_VTAP_ID,
 	"tap_type":         _TAG_TAP_TYPE,
 	"subnet_id":        _TAG_SUBNET_ID,
 	"acl_direction":    _TAG_ACL_DIRECTION,
 	"cast_type":        _TAG_CAST_TYPE,
 	"tcp_flags":        _TAG_TCP_FLAGS,
-	"scope":            _TAG_SCOPE,
 	"country":          _TAG_COUNTRY,
 	"region":           _TAG_REGION,
 	"isp":              _TAG_ISP,
