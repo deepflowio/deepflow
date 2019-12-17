@@ -61,7 +61,7 @@ func TestFill1(t *testing.T) {
 		"host": "3.3.3.3", "ip_1": "5.5.5.5", "group_id_1": "-2",
 		"l3_epc_id_1": "31", "l3_device_id_1": "32", "l3_device_type_1": "9",
 		"host_1": "5.5.5.5", "subnet_id_1": "2000", "direction": "c2s", "acl_gid": "400", "vlan_id": "500",
-		"protocol": "4", "server_port": "9527", "tap_type": "0", "subnet_id": "1001", "acl_direction": "fwd", "scope": "1", "country": "CHN", "region": "北京", "isp": "移动",
+		"protocol": "4", "server_port": "9527", "tap_type": "0", "subnet_id": "1001", "acl_direction": "fwd", "pod_node_id": "1", "country": "CHN", "region": "北京", "isp": "移动",
 	}
 
 	tag.Fill(0xffffffffffffffff, tags)
@@ -129,8 +129,8 @@ func TestFill1(t *testing.T) {
 	if tag.ACLDirection != ACL_FORWARD {
 		t.Error("ACLDirection 处理错误")
 	}
-	if tag.Scope != ScopeEnum(1) {
-		t.Error("Scope 处理错误")
+	if tag.PodNodeID != 1 {
+		t.Error("PodNodeID 处理错误")
 	}
 	if tag.Country != 5 {
 		t.Error("Country 处理错误")
@@ -231,8 +231,8 @@ func TestMarshallToInfluxdb(t *testing.T) {
 	b := make([]byte, 1024)
 	f := Field{}
 	tag := &Tag{&f, 0, ""}
-	tag.GlobalThreadID = 112345
-	tag.Code = ^(GroupIDPath | HostPath | IPPath | L3DevicePath | L3EpcIDPath | RegionIDPath | SubnetIDPath)
+	tag.GlobalThreadID = 112
+	tag.Code = ^(GroupIDPath | HostPath | IPPath | L3DevicePath | L3EpcIDPath | RegionIDPath | SubnetIDPath | PodNodeIDPath)
 
 	l := tag.MarshalTo(b)
 	strs := parseTagkeys(b[:l])
@@ -249,7 +249,7 @@ func TestMarshallToInfluxdb(t *testing.T) {
 		}
 	}
 
-	tag.Code = ^(GroupID | Host | IP | L3Device | L3EpcID | RegionID | SubnetID)
+	tag.Code = ^(GroupID | Host | IP | L3Device | L3EpcID | RegionID | SubnetID | PodNodeID)
 	l = tag.MarshalTo(b)
 	strs = parseTagkeys(b[:l])
 	cloneStrs = cloneStrs[:0]

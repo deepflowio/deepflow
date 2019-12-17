@@ -80,8 +80,8 @@ func TagToPB(t *Tag) *pb.Tag {
 		tag.AclDirection = pb.AclDirection(t.ACLDirection).Enum()
 	}
 
-	if t.Code&Scope != 0 {
-		tag.Scope = pb.Scope(t.Scope).Enum()
+	if t.Code&PodNodeID != 0 {
+		tag.PodNodeId = proto.Uint32(uint32(t.PodNodeID))
 	}
 
 	return tag
@@ -157,8 +157,8 @@ func PBToTag(t *pb.Tag, tag *Tag) {
 	if tag.Code&ACLDirection != 0 {
 		tag.ACLDirection = ACLDirectionEnum(t.GetAclDirection())
 	}
-	if tag.Code&Scope != 0 {
-		tag.Scope = ScopeEnum(t.GetScope())
+	if tag.Code&PodNodeID != 0 {
+		tag.PodNodeID = uint16(t.GetPodNodeId())
 	}
 }
 

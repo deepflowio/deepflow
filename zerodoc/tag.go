@@ -40,6 +40,7 @@ const (
 	HostPath
 	SubnetIDPath
 	RegionIDPath
+	PodNodeIDPath
 )
 
 const (
@@ -49,12 +50,14 @@ const (
 	Protocol
 	ServerPort
 	CastType
-	VTAP
+	_
 	TAPType
 	SubnetID
 	TCPFlags
 	ACLDirection
-	Scope
+	_
+	VTAPID
+	PodNodeID
 )
 
 const (
@@ -89,12 +92,12 @@ func (c Code) RemoveIndex() Code {
 // 从不同EndPoint获取的网包字段组成Field，是否可能重复。
 // 注意，不能判断从同样的EndPoint获取的网包字段组成Field可能重复。
 func (c Code) PossibleDuplicate() bool {
-	return c&(CodeIndices|GroupID|L3EpcID|Host|RegionID|GroupIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|TCPFlags|VTAP|TAPType|SubnetID|SubnetIDPath|RegionIDPath|ACLDirection|Country|Region|ISPCode|Scope) == c
+	return c&(CodeIndices|GroupID|L3EpcID|Host|RegionID|PodNodeID|GroupIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|TCPFlags|VTAPID|TAPType|SubnetID|SubnetIDPath|RegionIDPath|PodNodeIDPath|ACLDirection|Country|Region|ISPCode) == c
 }
 
 // 是否全部取自网包的对称字段（非源、目的字段）
 func (c Code) IsSymmetric() bool {
-	return c&(CodeIndices|ACLGID|VLANID|Protocol|TCPFlags|VTAP|TAPType|ACLDirection|Scope) == c
+	return c&(CodeIndices|ACLGID|VLANID|Protocol|TCPFlags|VTAPID|TAPType|ACLDirection) == c
 }
 
 type DeviceType uint8
@@ -163,21 +166,13 @@ const (
 	UNICAST
 )
 
-type ScopeEnum uint8
-
-const (
-	SCOPE_INVALID ScopeEnum = iota
-	SCOPE_IN_EPC
-	SCOPE_OUT_EPC
-)
-
 type Field struct {
 	// 注意字节对齐！
 
 	// 用于区分不同的trident及其不同的pipeline，用于如下场景：
 	//   - trident和roze之间的数据传输
 	//   - roze写入influxdb，作用类似_id，序列化为_tid
-	GlobalThreadID uint64
+	GlobalThreadID uint8
 
 	IP6          net.IP // FIXME: 合并IP6和IP
 	IP           uint32
@@ -186,6 +181,7 @@ type Field struct {
 	L3DeviceID   uint16
 	L3DeviceType DeviceType
 	Host         uint32 // (+1B=8B)
+	PodNodeID    uint16
 
 	IP61          net.IP // FIXME: 合并IP61和IP1
 	IP1           uint32
@@ -194,6 +190,7 @@ type Field struct {
 	Host1         uint32
 	L3DeviceID1   uint16
 	L3DeviceType1 DeviceType // (+1B=8B)
+	PodNodeID1    uint16
 
 	RegionID  uint16
 	RegionID1 uint16
@@ -205,14 +202,12 @@ type Field struct {
 	ServerPort   uint16
 	SubnetID     uint16
 	SubnetID1    uint16 // (8B)
-	VTAP         uint32
+	VTAPID       uint16
 	TAPType      TAPTypeEnum
 	ACLDirection ACLDirectionEnum
 	CastType     CastTypeEnum
 	IsIPv6       uint8 // (8B) 与IP/IP6是共生字段
 	TCPFlags     TCPFlag
-
-	Scope ScopeEnum
 
 	Country uint8
 	Region  uint8
@@ -261,7 +256,7 @@ func (t *Tag) MarshalTo(b []byte) int {
 	// 在InfluxDB的line protocol中，tag紧跟在measurement name之后，总会以逗号开头
 	if t.GlobalThreadID != 0 { // FIXME: zero写入的数据此字段总为0，目前无需该字段
 		offset += copy(b[offset:], ",_tid=")
-		offset += copy(b[offset:], strconv.FormatUint(t.GlobalThreadID, 10))
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.GlobalThreadID), 10))
 	}
 
 	if t.Code&ACLDirection != 0 {
@@ -392,10 +387,24 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",l3_epc_id_1=")
 		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID1))
 	}
+
+	if t.Code&PodNodeID != 0 {
+		offset += copy(b[offset:], ",pod_node_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.PodNodeID), 10))
+	}
+
+	if t.Code&PodNodeIDPath != 0 {
+		offset += copy(b[offset:], ",pod_node_id_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.PodNodeID), 10))
+		offset += copy(b[offset:], ",pod_node_id_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.PodNodeID1), 10))
+	}
+
 	if t.Code&Protocol != 0 {
 		offset += copy(b[offset:], ",protocol=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.Protocol), 10))
 	}
+
 	if t.Code&RegionID != 0 {
 		offset += copy(b[offset:], ",region=") // 由于历史原因，此字段和省份同名
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.RegionID), 10))
@@ -410,10 +419,7 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",region_1=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.RegionID1), 10))
 	}
-	if t.Code&Scope != 0 {
-		offset += copy(b[offset:], ",scope=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.Scope), 10))
-	}
+
 	if t.Code&ServerPort != 0 {
 		offset += copy(b[offset:], ",server_port=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ServerPort), 10))
@@ -441,9 +447,9 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",vlan_id=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.VLANID), 10))
 	}
-	if t.Code&VTAP != 0 {
-		offset += copy(b[offset:], ",vtap=")
-		offset += copy(b[offset:], utils.IpFromUint32(t.VTAP).String())
+	if t.Code&VTAPID != 0 {
+		offset += copy(b[offset:], ",vtap_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.VTAPID), 10))
 	}
 
 	return offset
@@ -462,7 +468,7 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	offset := decoder.Offset()
 
 	t.Code = Code(decoder.ReadU64())
-	t.GlobalThreadID = decoder.ReadU64()
+	t.GlobalThreadID = decoder.ReadU8()
 
 	if t.Code&IP != 0 {
 		t.IsIPv6 = decoder.ReadU8()
@@ -490,6 +496,9 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	}
 	if t.Code&RegionID != 0 {
 		t.RegionID = decoder.ReadU16()
+	}
+	if t.Code&PodNodeID != 0 {
+		t.PodNodeID = decoder.ReadU16()
 	}
 
 	if t.Code&IPPath != 0 {
@@ -534,6 +543,10 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 		t.RegionID = decoder.ReadU16()
 		t.RegionID1 = decoder.ReadU16()
 	}
+	if t.Code&PodNodeIDPath != 0 {
+		t.PodNodeID = decoder.ReadU16()
+		t.PodNodeID1 = decoder.ReadU16()
+	}
 
 	if t.Code&Direction != 0 {
 		t.Direction = DirectionEnum(decoder.ReadU8())
@@ -550,8 +563,8 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&ServerPort != 0 {
 		t.ServerPort = decoder.ReadU16()
 	}
-	if t.Code&VTAP != 0 {
-		t.VTAP = decoder.ReadU32()
+	if t.Code&VTAPID != 0 {
+		t.VTAPID = decoder.ReadU16()
 	}
 	if t.Code&TAPType != 0 {
 		t.TAPType = TAPTypeEnum(decoder.ReadU8())
@@ -567,9 +580,6 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	}
 	if t.Code&TCPFlags != 0 {
 		t.TCPFlags = TCPFlag(decoder.ReadU8())
-	}
-	if t.Code&Scope != 0 {
-		t.Scope = ScopeEnum(decoder.ReadU8())
 	}
 
 	if t.Code&Country != 0 {
@@ -595,9 +605,9 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 	t.EncodeByCodeTID(t.Code, t.GlobalThreadID, encoder)
 }
 
-func (t *Tag) EncodeByCodeTID(code Code, tid uint64, encoder *codec.SimpleEncoder) {
+func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder) {
 	encoder.WriteU64(uint64(code))
-	encoder.WriteU64(tid)
+	encoder.WriteU8(tid)
 
 	if code&IP != 0 {
 		encoder.WriteU8(t.IsIPv6)
@@ -625,6 +635,9 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint64, encoder *codec.SimpleEncode
 	}
 	if code&RegionID != 0 {
 		encoder.WriteU16(t.RegionID)
+	}
+	if code&PodNodeID != 0 {
+		encoder.WriteU16(t.PodNodeID)
 	}
 
 	if code&IPPath != 0 {
@@ -671,6 +684,10 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint64, encoder *codec.SimpleEncode
 		encoder.WriteU16(t.RegionID)
 		encoder.WriteU16(t.RegionID1)
 	}
+	if code&PodNodeIDPath != 0 {
+		encoder.WriteU16(t.PodNodeID)
+		encoder.WriteU16(t.PodNodeID1)
+	}
 
 	if code&Direction != 0 {
 		encoder.WriteU8(uint8(t.Direction))
@@ -687,8 +704,8 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint64, encoder *codec.SimpleEncode
 	if code&ServerPort != 0 {
 		encoder.WriteU16(t.ServerPort)
 	}
-	if code&VTAP != 0 {
-		encoder.WriteU32(t.VTAP)
+	if code&VTAPID != 0 {
+		encoder.WriteU16(t.VTAPID)
 	}
 	if code&TAPType != 0 {
 		encoder.WriteU8(uint8(t.TAPType))
@@ -705,8 +722,8 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint64, encoder *codec.SimpleEncode
 	if code&TCPFlags != 0 {
 		encoder.WriteU8(uint8(t.TCPFlags))
 	}
-	if code&Scope != 0 {
-		encoder.WriteU8(uint8(t.Scope))
+	if code&PodNodeID != 0 {
+		encoder.WriteU16(t.PodNodeID)
 	}
 
 	if code&Country != 0 {
@@ -741,7 +758,7 @@ func (t *Tag) SetCode(code uint64) {
 	t.Code = Code(code)
 }
 
-func (t *Tag) SetTID(tid uint64) {
+func (t *Tag) SetTID(tid uint8) {
 	t.GlobalThreadID = tid
 }
 
@@ -979,8 +996,9 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 	case _TAG_SERVER_PORT:
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.ServerPort = uint16(i)
-	case _TAG_VTAP:
-		field.VTAP = utils.IpToUint32(net.ParseIP(value).To4())
+	case _TAG_VTAP_ID:
+		i, err = strconv.ParseUint(value, 10, 16)
+		field.VTAPID = uint16(i)
 	case _TAG_TAP_TYPE:
 		i, err = strconv.ParseUint(value, 10, 8)
 		field.TAPType = TAPTypeEnum(i)
@@ -1007,9 +1025,9 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 	case _TAG_TCP_FLAGS:
 		i, err = strconv.ParseUint(value, 10, 8)
 		field.TCPFlags = TCPFlag(i)
-	case _TAG_SCOPE:
-		i, err = strconv.ParseUint(value, 10, 8)
-		field.Scope = ScopeEnum(i)
+	case _TAG_POD_NODE_ID:
+		i, err = strconv.ParseUint(value, 10, 16)
+		field.PodNodeID = uint16(i)
 	case _TAG_COUNTRY:
 		field.Country = geo.EncodeCountry(value)
 	case _TAG_REGION:
