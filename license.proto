@@ -5,8 +5,8 @@ option go_package = "license";
 
 
 message License {
-    optional string activation_time  = 1; // 生效日期 "2019-09-11 15:43:20"
-    optional uint32 expiration_days = 2; // 许可天数
+    optional string activation_time  = 1; // 生效日期 "2019-09-11"
+    optional uint32 expiration_days = 2; // 许可天数, 0表示永久授权
     optional uint32 analyzer_count = 3; // 分析器数量
     optional uint32 vtap_count_type1 = 4; // Trident运行于KVM宿主机上
     optional uint32 vtap_count_type2 = 5; // Trident运行于ESXi/Hyper-V等专用虚拟机上
@@ -15,7 +15,7 @@ message License {
     repeated string controller_hostname = 8; // 控制器主机名
     optional string customer = 9; // 客户名称
 
-    optional string product_name = 10; // 产品名称 deepflow
+    optional string product_name = 10; // 产品名称 DeepFlow
     optional string product_version = 11; // 版本号 V5
 
     optional string signatory = 12; // 签发人
@@ -25,4 +25,5 @@ message License {
 
     optional uint32 vtap_count_type4 = 16 [default = 0]; // 物理机进程类型采集器
     optional uint32 vtap_count_type5 = 17 [default = 0]; // 专用物理机类型采集器
+    optional uint32 vtap_count_type6 = 18 [default = 0]; // 容器节点进程
 }
