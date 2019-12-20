@@ -43,6 +43,8 @@ message Tag {
     optional uint32 l3_device_id = 11;
     optional DeviceType l3_device_type = 12;
     optional uint32 host = 13;
+    optional uint32 is_ipv6 = 14;
+    optional string ip6 = 15;
 
     optional uint32 ip_0 = 16;
     optional uint32 ip_1 = 17;
@@ -64,6 +66,8 @@ message Tag {
     optional DeviceType l3_device_type_1 = 33;
     optional uint32 host_0 = 34;
     optional uint32 host_1 = 35;
+    optional string ip6_0 = 36;
+    optional string ip6_1 = 37;
 
     optional Direction direction = 40;
     optional uint32 acl_gid = 41;
