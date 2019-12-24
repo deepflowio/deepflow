@@ -18,14 +18,14 @@ func TestFullEqual(t *testing.T) {
 		L3EpcID:      2,
 		L3DeviceID:   5,
 		L3DeviceType: VMDevice,
-		Host:         0xac100197,
+		HostID:       197,
 
 		IP1:           0x0a2102ca,
 		GroupID1:      2,
 		L3EpcID1:      datatype.EPC_FROM_DEEPFLOW,
 		L3DeviceID1:   6,
 		L3DeviceType1: VMDevice,
-		Host1:         0xac100198,
+		HostID1:       198,
 
 		Direction:  ClientToServer,
 		ACLGID:     3,
@@ -54,14 +54,14 @@ func TestPartialTagEqual(t *testing.T) {
 		L3EpcID:      2,
 		L3DeviceID:   5,
 		L3DeviceType: VMDevice,
-		Host:         0xac100197,
+		HostID:       197,
 
 		IP1:           0x0a2102ca,
 		GroupID1:      2,
 		L3EpcID1:      datatype.EPC_FROM_DEEPFLOW,
 		L3DeviceID1:   6,
 		L3DeviceType1: VMDevice,
-		Host1:         0xac100198,
+		HostID1:       198,
 
 		Direction:  ClientToServer,
 		ACLGID:     3,
