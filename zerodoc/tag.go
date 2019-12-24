@@ -25,8 +25,9 @@ const (
 	L3EpcID
 	_
 	L3Device
-	Host
+	_
 	RegionID
+	HostID
 )
 
 const (
@@ -37,10 +38,11 @@ const (
 	L3EpcIDPath
 	_
 	L3DevicePath
-	HostPath
+	_
 	SubnetIDPath
 	RegionIDPath
 	PodNodeIDPath
+	HostIDPath
 )
 
 const (
@@ -92,7 +94,7 @@ func (c Code) RemoveIndex() Code {
 // 从不同EndPoint获取的网包字段组成Field，是否可能重复。
 // 注意，不能判断从同样的EndPoint获取的网包字段组成Field可能重复。
 func (c Code) PossibleDuplicate() bool {
-	return c&(CodeIndices|GroupID|L3EpcID|Host|RegionID|PodNodeID|GroupIDPath|L3EpcIDPath|HostPath|ACLGID|VLANID|Protocol|TCPFlags|VTAPID|TAPType|SubnetID|SubnetIDPath|RegionIDPath|PodNodeIDPath|ACLDirection|Country|Region|ISPCode) == c
+	return c&(CodeIndices|GroupID|L3EpcID|HostID|RegionID|PodNodeID|GroupIDPath|L3EpcIDPath|HostIDPath|ACLGID|VLANID|Protocol|TCPFlags|VTAPID|TAPType|SubnetID|SubnetIDPath|RegionIDPath|PodNodeIDPath|ACLDirection|Country|Region|ISPCode) == c
 }
 
 // 是否全部取自网包的对称字段（非源、目的字段）
@@ -180,14 +182,14 @@ type Field struct {
 	L3EpcID      int16 // (8B)
 	L3DeviceID   uint16
 	L3DeviceType DeviceType
-	Host         uint32 // (+1B=8B)
+	HostID       uint16 // (+1B=8B)
 	PodNodeID    uint16
 
 	IP61          net.IP // FIXME: 合并IP61和IP1
 	IP1           uint32
 	GroupID1      int16
 	L3EpcID1      int16 // (8B)
-	Host1         uint32
+	HostID1       uint16
 	L3DeviceID1   uint16
 	L3DeviceType1 DeviceType // (+1B=8B)
 	PodNodeID1    uint16
@@ -306,15 +308,15 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",group_id_1=")
 		offset += copy(b[offset:], marshalUint16WithSpecialID(t.GroupID1))
 	}
-	if t.Code&Host != 0 {
-		offset += copy(b[offset:], ",host=")
-		offset += copy(b[offset:], utils.IpFromUint32(t.Host).String())
+	if t.Code&HostID != 0 {
+		offset += copy(b[offset:], ",host_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.HostID), 10))
 	}
-	if t.Code&HostPath != 0 {
-		offset += copy(b[offset:], ",host_0=")
-		offset += copy(b[offset:], utils.IpFromUint32(t.Host).String())
-		offset += copy(b[offset:], ",host_1=")
-		offset += copy(b[offset:], utils.IpFromUint32(t.Host1).String())
+	if t.Code&HostIDPath != 0 {
+		offset += copy(b[offset:], ",host_id_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.HostID), 10))
+		offset += copy(b[offset:], ",host_id_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.HostID1), 10))
 	}
 
 	if t.Code&IP != 0 {
@@ -491,8 +493,8 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 		t.L3DeviceID = decoder.ReadU16()
 		t.L3DeviceType = DeviceType(decoder.ReadU8())
 	}
-	if t.Code&Host != 0 {
-		t.Host = decoder.ReadU32()
+	if t.Code&HostID != 0 {
+		t.HostID = decoder.ReadU16()
 	}
 	if t.Code&RegionID != 0 {
 		t.RegionID = decoder.ReadU16()
@@ -531,9 +533,9 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 		t.L3DeviceID1 = decoder.ReadU16()
 		t.L3DeviceType1 = DeviceType(decoder.ReadU8())
 	}
-	if t.Code&HostPath != 0 {
-		t.Host = decoder.ReadU32()
-		t.Host1 = decoder.ReadU32()
+	if t.Code&HostIDPath != 0 {
+		t.HostID = decoder.ReadU16()
+		t.HostID1 = decoder.ReadU16()
 	}
 	if t.Code&SubnetIDPath != 0 {
 		t.SubnetID = decoder.ReadU16()
@@ -630,8 +632,8 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 		encoder.WriteU16(t.L3DeviceID)
 		encoder.WriteU8(uint8(t.L3DeviceType))
 	}
-	if code&Host != 0 {
-		encoder.WriteU32(t.Host)
+	if code&HostID != 0 {
+		encoder.WriteU16(t.HostID)
 	}
 	if code&RegionID != 0 {
 		encoder.WriteU16(t.RegionID)
@@ -672,9 +674,9 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 		encoder.WriteU16(t.L3DeviceID1)
 		encoder.WriteU8(uint8(t.L3DeviceType1))
 	}
-	if code&HostPath != 0 {
-		encoder.WriteU32(t.Host)
-		encoder.WriteU32(t.Host1)
+	if code&HostIDPath != 0 {
+		encoder.WriteU16(t.HostID)
+		encoder.WriteU16(t.HostID1)
 	}
 	if code&SubnetIDPath != 0 {
 		encoder.WriteU16(t.SubnetID)
@@ -941,13 +943,15 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 	case _TAG_L3_DEVICE_TYPE, _TAG_L3_DEVICE_TYPE_0:
 		i, err = strconv.ParseUint(value, 10, 8)
 		field.L3DeviceType = DeviceType(i)
-	case _TAG_HOST, _TAG_HOST_0:
-		field.Host = utils.IpToUint32(net.ParseIP(value).To4())
+	case _TAG_HOST_ID, _TAG_HOST_ID_0:
+		i, err = strconv.ParseUint(value, 10, 16)
+		field.HostID = uint16(i)
 	case _TAG_REGION_0:
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.RegionID = uint16(i)
-	case _TAG_HOST_1:
-		field.Host1 = utils.IpToUint32(net.ParseIP(value).To4())
+	case _TAG_HOST_ID_1:
+		i, err = strconv.ParseUint(value, 10, 16)
+		field.HostID1 = uint16(i)
 	case _TAG_IP_1:
 		field.IP61 = net.ParseIP(value)
 		if field.IP61.To4() != nil {

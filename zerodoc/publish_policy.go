@@ -15,6 +15,8 @@ const (
 	FilterL3DeviceID
 	FilterL3EpcID0
 	FilterL3EpcID1
+	FilterACLDirection
+	FilterDirection
 )
 
 type PublishPolicy struct {
@@ -31,6 +33,8 @@ type PublishPolicy struct {
 	L3DeviceType DeviceType
 	L3EpcID0     int16
 	L3EpcID1     int16
+	ACLDirection ACLDirectionEnum
+	Direction    DirectionEnum
 }
 
 // 用于debug 打印
@@ -58,6 +62,12 @@ func (p *PublishPolicy) FilterString() string {
 	}
 	if code&FilterL3EpcID1 != 0 {
 		out = append(out, fmt.Sprintf("l3_epc_id_1=%d", p.L3EpcID1))
+	}
+	if code&FilterACLDirection != 0 {
+		out = append(out, fmt.Sprintf("acl_direction=%d", p.ACLDirection))
+	}
+	if code&FilterDirection != 0 {
+		out = append(out, fmt.Sprintf("direction=%d", p.Direction))
 	}
 
 	return strings.Join(out, ",")
