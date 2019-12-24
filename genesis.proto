@@ -36,6 +36,9 @@ message PlatformData {
     optional string raw_vlan_config = 17;
 
     repeated Lldp lldp_info = 20;
+
+    repeated Container containers = 30;
+    repeated string raw_ip_addrs = 31;
 }
 
 message Host {
@@ -98,4 +101,10 @@ message Lldp {
     optional string management_address = 5;
     optional string port_id = 10;
     optional string port_description = 11;
+}
+
+message Container {
+    optional string name = 1;
+    /* index of ip_addr in platform_data.raw_ip_addrs */
+    optional int32 raw_ip_addr_index = 2;
 }
