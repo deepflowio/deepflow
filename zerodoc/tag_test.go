@@ -58,9 +58,9 @@ func TestFill1(t *testing.T) {
 	tags := map[string]string{
 		"ip": "1.1.1.1", "group_id": "-1", "l3_epc_id": "-3",
 		"l3_device_id": "300", "l3_device_type": "5",
-		"host": "3.3.3.3", "ip_1": "5.5.5.5", "group_id_1": "-2",
+		"host_id": "33", "ip_1": "5.5.5.5", "group_id_1": "-2",
 		"l3_epc_id_1": "31", "l3_device_id_1": "32", "l3_device_type_1": "9",
-		"host_1": "5.5.5.5", "subnet_id_1": "2000", "direction": "c2s", "acl_gid": "400", "vlan_id": "500",
+		"host_id_1": "55", "subnet_id_1": "2000", "direction": "c2s", "acl_gid": "400", "vlan_id": "500",
 		"protocol": "4", "server_port": "9527", "tap_type": "0", "subnet_id": "1001", "acl_direction": "fwd", "pod_node_id": "1", "country": "CHN", "region": "北京", "isp": "移动",
 	}
 
@@ -81,8 +81,8 @@ func TestFill1(t *testing.T) {
 	if tag.L3DeviceType != DeviceType(5) {
 		t.Error("L3DeviceType 处理错误")
 	}
-	if tag.Host != 50529027 {
-		t.Error("Host 处理错误")
+	if tag.HostID != 33 {
+		t.Error("HostID 处理错误")
 	}
 	if tag.IP1 != 84215045 {
 		t.Error("IP1 处理错误")
@@ -99,8 +99,8 @@ func TestFill1(t *testing.T) {
 	if tag.L3DeviceType1 != DeviceType(9) {
 		t.Error("L3DeviceType1 处理错误")
 	}
-	if tag.Host1 != 84215045 {
-		t.Error("Host1 处理错误")
+	if tag.HostID1 != 55 {
+		t.Error("HostID1 处理错误")
 	}
 	if tag.ACLGID != 400 {
 		t.Error("ACLGID 处理错误")
@@ -149,7 +149,7 @@ func TestFill0(t *testing.T) {
 	tags := map[string]string{
 		"ip_0": "2.2.2.2", "group_id_0": "10", "l3_epc_id_0": "30",
 		"l3_device_id_0": "301", "l3_device_type_0": "7",
-		"host_0": "4.4.4.4", "subnet_id_0": "1000",
+		"host_id_0": "4444", "subnet_id_0": "1000",
 	}
 
 	tag.Fill(0xffffffffffffffff, tags)
@@ -171,8 +171,8 @@ func TestFill0(t *testing.T) {
 	if tag.SubnetID != 1000 {
 		t.Error("SubnetID 处理错误")
 	}
-	if tag.Host != 67372036 {
-		t.Error("Host 处理错误")
+	if tag.HostID != 4444 {
+		t.Error("Host ID 处理错误")
 	}
 }
 
@@ -232,7 +232,7 @@ func TestMarshallToInfluxdb(t *testing.T) {
 	f := Field{}
 	tag := &Tag{&f, 0, ""}
 	tag.GlobalThreadID = 112
-	tag.Code = ^(GroupIDPath | HostPath | IPPath | L3DevicePath | L3EpcIDPath | RegionIDPath | SubnetIDPath | PodNodeIDPath)
+	tag.Code = ^(GroupIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | RegionIDPath | SubnetIDPath | PodNodeIDPath)
 
 	l := tag.MarshalTo(b)
 	strs := parseTagkeys(b[:l])
@@ -249,7 +249,7 @@ func TestMarshallToInfluxdb(t *testing.T) {
 		}
 	}
 
-	tag.Code = ^(GroupID | Host | IP | L3Device | L3EpcID | RegionID | SubnetID | PodNodeID)
+	tag.Code = ^(GroupID | HostID | IP | L3Device | L3EpcID | RegionID | SubnetID | PodNodeID)
 	l = tag.MarshalTo(b)
 	strs = parseTagkeys(b[:l])
 	cloneStrs = cloneStrs[:0]

@@ -36,7 +36,7 @@ func TestMarshal(t *testing.T) {
 		VLANID:     123,
 		Protocol:   layers.IPProtocolTCP,
 		ServerPort: 1024,
-		Host:       0xac100197,
+		HostID:     197,
 		TAPType:    dt.ToR,
 	}
 	tag := f.NewTag(dt.IP | dt.L3EpcID)

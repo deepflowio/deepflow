@@ -28,8 +28,8 @@ func TagToPB(t *Tag) *pb.Tag {
 		tag.L3DeviceId = proto.Uint32(uint32(t.L3DeviceID))
 		tag.L3DeviceType = pb.DeviceType(t.L3DeviceType).Enum()
 	}
-	if t.Code&Host != 0 {
-		tag.Host = proto.Uint32(t.Host)
+	if t.Code&HostID != 0 {
+		tag.HostId = proto.Uint32(uint32(t.HostID))
 	}
 
 	if t.Code&IPPath != 0 {
@@ -50,9 +50,9 @@ func TagToPB(t *Tag) *pb.Tag {
 		tag.L3DeviceId_1 = proto.Uint32(uint32(t.L3DeviceID1))
 		tag.L3DeviceType_1 = pb.DeviceType(t.L3DeviceType1).Enum()
 	}
-	if t.Code&HostPath != 0 {
-		tag.Host_0 = proto.Uint32(t.Host)
-		tag.Host_1 = proto.Uint32(t.Host1)
+	if t.Code&HostIDPath != 0 {
+		tag.HostId_0 = proto.Uint32(uint32(t.HostID))
+		tag.HostId_1 = proto.Uint32(uint32(t.HostID1))
 	}
 
 	if t.Code&Direction != 0 {
@@ -106,8 +106,8 @@ func PBToTag(t *pb.Tag, tag *Tag) {
 		tag.L3DeviceID = uint16(t.GetL3DeviceId())
 		tag.L3DeviceType = DeviceType(t.GetL3DeviceType())
 	}
-	if tag.Code&Host != 0 {
-		tag.Host = t.GetHost()
+	if tag.Code&HostID != 0 {
+		tag.HostID = uint16(t.GetHostId())
 	}
 
 	if tag.Code&IPPath != 0 {
@@ -128,9 +128,9 @@ func PBToTag(t *pb.Tag, tag *Tag) {
 		tag.L3DeviceID1 = uint16(t.GetL3DeviceId_1())
 		tag.L3DeviceType1 = DeviceType(t.GetL3DeviceType_1())
 	}
-	if tag.Code&HostPath != 0 {
-		tag.Host = t.GetHost_0()
-		tag.Host1 = t.GetHost_1()
+	if tag.Code&HostIDPath != 0 {
+		tag.HostID = uint16(t.GetHostId_0())
+		tag.HostID1 = uint16(t.GetHostId_1())
 	}
 
 	if tag.Code&Direction != 0 {
