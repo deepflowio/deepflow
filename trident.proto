@@ -230,6 +230,8 @@ message PublishAcl {
     optional uint32 l3_device_id = 14;
     optional int32 l3_epc_id_0 = 15;
     optional int32 l3_epc_id_1 = 16;
+    optional uint32 acl_direction = 17; // 取值范围: 同zero.proto中的AclDirection
+    optional uint32 direction = 18;    // 取值范围: 同zero.proto中的Direction
 
     optional uint32 protocol = 31;
 }
