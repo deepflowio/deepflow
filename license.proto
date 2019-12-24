@@ -25,5 +25,6 @@ message License {
 
     optional uint32 vtap_count_type4 = 16 [default = 0]; // 物理机进程类型采集器
     optional uint32 vtap_count_type5 = 17 [default = 0]; // 专用物理机类型采集器
-    optional uint32 vtap_count_type6 = 18 [default = 0]; // 容器节点进程
+    optional uint32 vtap_count_type6 = 18 [default = 0]; // 虚拟机pod
+    optional uint32 vtap_count_type7 = 19 [default = 0]; // 物理机pod
 }
