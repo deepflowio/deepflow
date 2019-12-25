@@ -20,10 +20,10 @@ const (
 )
 
 const (
-	SEQ_NODE_DISCONTINUOUS   ContinuousFlag = 0
-	SEQ_NODE_LEFT_CONTINUOUS                = 1 << iota
-	SEQ_NODE_RIGHT_CONTINUOUS
-	SEQ_NODE_BOTH_CONTINUOUS = SEQ_NODE_LEFT_CONTINUOUS | SEQ_NODE_RIGHT_CONTINUOUS
+	SEQ_NODE_DISCONTINUOUS ContinuousFlag = 0
+	SEQ_NODE_LT_CONTINUOUS                = 1 << iota
+	SEQ_NODE_GTE_CONTINUOUS
+	SEQ_NODE_BOTH_CONTINUOUS = SEQ_NODE_LT_CONTINUOUS | SEQ_NODE_GTE_CONTINUOUS
 )
 
 const (
@@ -57,7 +57,8 @@ type SeqSegment struct { // 避免乱序，识别重传
 }
 
 type TcpSessionPeer struct {
-	seqArray []SeqSegment
+	seqArray  [SEQ_LIST_MAX_LEN + 1]SeqSegment
+	arraySize int
 
 	timestamp time.Duration
 
@@ -127,6 +128,37 @@ type MetaFlowPerf struct {
 	perfData FlowPerfDataInfo
 }
 
+func (t PacketSeqTypeInSeqList) String() string {
+	typeStr := ""
+	switch t {
+	case SEQ_ERROR:
+		typeStr = "error sequence"
+		break
+	case SEQ_RETRANS:
+		typeStr = "retrans sequence"
+		break
+	case SEQ_NOT_CARE:
+		typeStr = "not care sequence"
+		break
+	case SEQ_MERGE:
+		typeStr = "merge sequence"
+		break
+	case SEQ_DISCONTINUOUS:
+		typeStr = "discontinuous sequence"
+		break
+	case SEQ_CONTINUOUS:
+		typeStr = "continuous sequence"
+		break
+	case SEQ_CONTINUOUS_BOTH:
+		typeStr = "both continuous sequence"
+		break
+	default:
+		typeStr = "error type"
+		break
+	}
+	return typeStr
+}
+
 func (p *TcpSessionPeer) setArtPrecondition() {
 	p.canCalcArt = true
 }
@@ -177,40 +209,63 @@ func (p *TcpSessionPeer) isNextPacket(header *MetaPacket) bool {
 // 忽略调sequence最小的2个node之间的间隔,相当于认为包已收到
 // 其带来的影响是，包被误认为是重传
 func (p *TcpSessionPeer) mergeSeqListNode(at int) {
-	first := p.seqArray[at]
-	second := p.seqArray[at+1]
-	p.seqArray[at].length = second.seqNumber - first.seqNumber + second.length
-	p.seqArray[at].seqNumber = first.seqNumber
+	gte := p.seqArray[at]
+	lt := p.seqArray[at+1]
+	p.seqArray[at].length = gte.seqNumber - lt.seqNumber + gte.length
+	p.seqArray[at].seqNumber = lt.seqNumber
 
-	p.seqArray = append(p.seqArray[:at+1], p.seqArray[at+2:]...)
+	if at < SEQ_LIST_MAX_LEN {
+		copy(p.seqArray[at+1:], p.seqArray[at+2:])
+	}
+	p.arraySize--
 }
 
 // insert node to array[at]
 func (p *TcpSessionPeer) insertSeqListNode(node SeqSegment, at int) {
-	if len(p.seqArray) == at {
-		p.seqArray = append(p.seqArray[:], node)
-	} else {
-		p.seqArray = append(p.seqArray[:at+1], p.seqArray[at:]...)
-		p.seqArray[at] = node
-	}
+	copy(p.seqArray[at+1:], p.seqArray[at:SEQ_LIST_MAX_LEN-1])
+	p.seqArray[at] = node
+	p.arraySize++
 }
 
-// 用于判断SeqSegment node是否与left或right连续
-// 如果把SeqSegment看作是sequence number的集合，continuous可认为是node与left或right相交
-func isContinuousSeqSegment(left, right, node *SeqSegment) ContinuousFlag {
-	flag := SEQ_NODE_DISCONTINUOUS
-
-	if left != nil && left.seqNumber+left.length == node.seqNumber {
-		left.length += node.length
-
-		flag |= SEQ_NODE_LEFT_CONTINUOUS
+// 因数组中每个node.seqNumber默认为0，故seqArray为降序数组；直至找到seqNumber大于或等于node.seqNumber的节点
+// 返回值
+func (p *TcpSessionPeer) Search(node SeqSegment) (lt, gte *SeqSegment, index int) {
+	for index = 0; index < SEQ_LIST_MAX_LEN; index++ {
+		if node.seqNumber > p.seqArray[index].seqNumber { // 查找node在list中的位置
+			break
+		}
 	}
 
-	if right != nil && node.seqNumber+node.length == right.seqNumber {
-		right.seqNumber = node.seqNumber
-		right.length += node.length
+	if index == 0 {
+		gte = nil
+	} else {
+		gte = &p.seqArray[index-1]
+	}
 
-		flag |= SEQ_NODE_RIGHT_CONTINUOUS
+	if index == SEQ_LIST_MAX_LEN-1 {
+		lt = nil
+	} else {
+		lt = &p.seqArray[index]
+	}
+	return
+}
+
+// 用于判断SeqSegment node是否与lt或gte连续
+// 如果把SeqSegment看作是sequence number的集合，continuous可认为是node与lt或gte相
+func isContinuousSeqSegment(lt, gte, node *SeqSegment) ContinuousFlag {
+	flag := SEQ_NODE_DISCONTINUOUS
+
+	if lt != nil && lt.seqNumber+lt.length == node.seqNumber {
+		lt.length += node.length
+
+		flag |= SEQ_NODE_LT_CONTINUOUS
+	}
+
+	if gte != nil && node.seqNumber+node.length == gte.seqNumber {
+		gte.seqNumber = node.seqNumber
+		gte.length += node.length
+
+		flag |= SEQ_NODE_GTE_CONTINUOUS
 	}
 
 	return flag
@@ -225,22 +280,22 @@ func checkRetrans(base, node *SeqSegment) bool {
 	return false
 }
 
-func isRetransSeqSegment(left, right, node *SeqSegment) bool {
-	if right == nil {
-		return checkRetrans(left, node)
+func isRetransSeqSegment(lt, gte, node *SeqSegment) bool {
+	if gte == nil {
+		return checkRetrans(lt, node)
 	}
-	return checkRetrans(right, node)
+	return checkRetrans(gte, node)
 }
 
-// 如果把SeqSegment看作是sequence number的集合，error可认为是node与left或right相交
-func isErrorSeqSegment(left, right, node *SeqSegment) bool {
-	if right != nil &&
-		((node.seqNumber < right.seqNumber && node.seqNumber+node.length > right.seqNumber) ||
-			node.seqNumber+node.length > right.seqNumber+right.length) {
+// 如果把SeqSegment看作是sequence number的集合，error可认为是node与lt或gte相交
+func isErrorSeqSegment(lt, gte, node *SeqSegment) bool {
+	if gte != nil &&
+		((node.seqNumber < gte.seqNumber && node.seqNumber+node.length > gte.seqNumber) ||
+			node.seqNumber+node.length > gte.seqNumber+gte.length) {
 		return true
 	}
 
-	if left != nil && left.seqNumber+left.length > node.seqNumber {
+	if lt != nil && lt.seqNumber+lt.length > node.seqNumber {
 		return true
 	}
 
@@ -252,56 +307,29 @@ func isErrorSeqSegment(left, right, node *SeqSegment) bool {
 // 不连续则添加新节点, 构建升序链表
 func (p *TcpSessionPeer) assertSeqNumber(tcpHeader *MetaPacketTcpHeader, payloadLen uint16) PacketSeqTypeInSeqList {
 	var flag PacketSeqTypeInSeqList
-	var left, right *SeqSegment
-	var rightIndex int
+	var lt, gte *SeqSegment
 
-	if payloadLen == 0 {
+	if payloadLen == 0 || tcpHeader.Seq == 0 {
 		return SEQ_NOT_CARE
 	}
 
 	node := SeqSegment{seqNumber: tcpHeader.Seq, length: uint32(payloadLen)}
-	if p.seqArray == nil {
-		p.seqArray = AcquireSeqSegmentSlice()
-		p.insertSeqListNode(node, 0)
+	lt, gte, ltIndex := p.Search(node)
 
-		return SEQ_NOT_CARE
-	}
-
-	// seqArray为升序数组；直至找到seqNumber小于或等于node.seqNumber的节点
-	for rightIndex = len(p.seqArray); rightIndex > 0; rightIndex-- {
-		if node.seqNumber > p.seqArray[rightIndex-1].seqNumber { // 查找node在list中的位置
-			break
-		}
-	}
-
-	if rightIndex == 0 {
-		left = nil
-	} else {
-		left = &p.seqArray[rightIndex-1]
-	}
-
-	if rightIndex == len(p.seqArray) {
-		right = nil
-	} else {
-		right = &p.seqArray[rightIndex]
-	}
-
-	if r := isRetransSeqSegment(left, right, &node); r {
+	if r := isRetransSeqSegment(lt, gte, &node); r {
 		flag = SEQ_RETRANS
-	} else if e := isErrorSeqSegment(left, right, &node); e {
+	} else if e := isErrorSeqSegment(lt, gte, &node); e {
 		flag = SEQ_ERROR
 	} else {
-		if c := isContinuousSeqSegment(left, right, &node); c == SEQ_NODE_DISCONTINUOUS {
-			if len(p.seqArray) >= SEQ_LIST_MAX_LEN {
-				p.insertSeqListNode(node, rightIndex)
-				p.mergeSeqListNode(0)
+		if c := isContinuousSeqSegment(lt, gte, &node); c == SEQ_NODE_DISCONTINUOUS {
+			p.insertSeqListNode(node, ltIndex)
+			flag = SEQ_DISCONTINUOUS
+			if p.arraySize > SEQ_LIST_MAX_LEN {
+				p.mergeSeqListNode(SEQ_LIST_MAX_LEN - 1)
 				flag = SEQ_MERGE
-			} else {
-				p.insertSeqListNode(node, rightIndex)
-				flag = SEQ_DISCONTINUOUS
 			}
 		} else if c == SEQ_NODE_BOTH_CONTINUOUS {
-			p.mergeSeqListNode(rightIndex - 1)
+			p.mergeSeqListNode(ltIndex - 1)
 			flag = SEQ_CONTINUOUS_BOTH
 		} else {
 			flag = SEQ_CONTINUOUS

@@ -178,11 +178,11 @@ func testMergeSeqListNode(peer *TcpSessionPeer, node *SeqSegment, position int) 
 		peer.insertSeqListNode(*node, 0)
 		peer.mergeSeqListNode(0)
 	case 0:
-		peer.insertSeqListNode(*node, len(peer.seqArray)/2)
-		peer.mergeSeqListNode(len(peer.seqArray) / 2)
+		peer.insertSeqListNode(*node, peer.arraySize/2)
+		peer.mergeSeqListNode(peer.arraySize / 2)
 	case 1:
-		peer.insertSeqListNode(*node, len(peer.seqArray))
-		peer.mergeSeqListNode(len(peer.seqArray) - 2)
+		peer.insertSeqListNode(*node, peer.arraySize-1)
+		peer.mergeSeqListNode(peer.arraySize - 2)
 	default:
 	}
 }
@@ -193,7 +193,7 @@ func TestMergeSeqListNode(t *testing.T) {
 	var node *SeqSegment
 	peer := &TcpSessionPeer{}
 
-	// insert {100, 10}, {200,10}, ... , {(SEQ_LIST_MAX_LEN-1)*100, 10}
+	// insert{100, 10},{200,10}, ... , {(SEQ_LIST_MAX_LEN-1)*100, 10}
 	for i := 1; i <= SEQ_LIST_MAX_LEN; i++ {
 		tcpHeader = &MetaPacketTcpHeader{Seq: uint32(100 * i), Ack: 20}
 		payload = 10
@@ -233,10 +233,12 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// 测试例 payload == 0
 	if flag := peer.assertSeqNumber(&MetaPacketTcpHeader{}, 0); flag != SEQ_NOT_CARE {
 		t.Errorf("result is %v, expected %v", flag, SEQ_NOT_CARE)
+		return
 	}
 
-	if flag := peer.assertSeqNumber(&MetaPacketTcpHeader{}, 1); flag != SEQ_NOT_CARE {
+	if flag := peer.assertSeqNumber(&MetaPacketTcpHeader{Seq: 0}, 1); flag != SEQ_NOT_CARE {
 		t.Errorf("result is %v, expected %v", flag, SEQ_NOT_CARE)
+		return
 	}
 	// {0, 1}
 
@@ -245,17 +247,19 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	payload = 10
 	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_DISCONTINUOUS {
 		t.Errorf("result is %v, expected %v", flag, SEQ_DISCONTINUOUS)
+		t.Errorf("actual is %v, expected {10,10}", peer.String())
+		return
 	}
-	//t.Log(peer.String())
 
 	// {20, 10}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 20}
 	payload = 10
 	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_CONTINUOUS {
 		t.Errorf("result is %v, expected %v", flag, SEQ_CONTINUOUS)
+		t.Errorf("actual is %v, expected {10,20}", peer.String())
+		return
 	}
 	// {10,20}
-	//t.Log(peer.String())
 
 	// right.seqNo+right.payload >= node.seqNo+node.len
 	// input test case {10, 10}
@@ -263,9 +267,10 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	payload = 10
 	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_RETRANS {
 		t.Errorf("result is %v, expected %v", flag, SEQ_RETRANS)
+		t.Errorf("actual is %v, expected {10,20}", peer.String())
+		return
 	}
 	// {10, 20}
-	//t.Log(peer.String())
 
 	// right.seqNo+right.payload >= node.seqNo+node.len
 	// input test case {10, 10}
@@ -273,37 +278,41 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	payload = 10
 	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_RETRANS {
 		t.Errorf("result is %v, expected %v", flag, SEQ_RETRANS)
+		t.Errorf("actual is %v, expected {10,20}", peer.String())
+		return
 	}
 	// {10, 20}
-	//t.Log(peer.String())
 
 	// 测试例 else node.seqNo < right.seqNo+right.len
-	// {40, 20}, 异常情况{10,21}, {29, 5}
+	//{40, 20}, 异常情况{10,21},{29, 5}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 40}
 	payload = 20
 	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_DISCONTINUOUS {
 		t.Errorf("result is %v, expected %v", flag, SEQ_DISCONTINUOUS)
+		t.Errorf("actual is %v, expected{40,20},{10,20}", peer.String())
+		return
 	}
-	// {10,20}, {40,20}
-	//t.Log(peer.String())
+	//{40,20},{10,20}
 
 	tcpHeader = &MetaPacketTcpHeader{Seq: 10}
 	payload = 21
 	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_ERROR {
 		t.Errorf("result is %v, expected %v", flag, SEQ_ERROR)
+		t.Errorf("actual is %v, expected{40,20},{10,20}", peer.String())
+		return
 	}
-	// {10,20}, {40,20}
-	//t.Log(peer.String())
+	//{40,20},{10,20}
 
 	tcpHeader = &MetaPacketTcpHeader{Seq: 29}
 	payload = 5
 	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_ERROR {
 		t.Errorf("result is %v, expected %v", flag, SEQ_ERROR)
+		t.Errorf("actual is %v, expected{40,20},{10,20}", peer.String())
+		return
 	}
-	// {10,20}, {40,20}
-	//t.Log(peer.String())
+	//{40,20},{10,20}
 
-	// {10,20}, {40,20}
+	//{40,20},{10,20}
 	// 测试例 left.seqNo <= node.seqNo
 	// 测试例 node.seqNo+node.payload <= left.seqNo+left.len
 	// {10,20}
@@ -311,9 +320,10 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	payload = 20
 	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_RETRANS {
 		t.Errorf("result is %v, expected %v", flag, SEQ_RETRANS)
+		t.Errorf("actual is %v, expected{40,20},{10,20}", peer.String())
+		return
 	}
-	// {10,20}, {40,20}
-	//t.Log(peer.String())
+	//{40,20},{10,20}
 
 	// 测试例 node.seqNo > left.seqNo+left.payload && node.seqNo+node.payload < right.seqNo
 	// {31,4}
@@ -321,9 +331,10 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	payload = 4
 	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_DISCONTINUOUS {
 		t.Errorf("result is %v, expected %v", flag, SEQ_DISCONTINUOUS)
+		t.Errorf("actual is %v, expected{40,20},{31,4},{10,20}", peer.String())
+		return
 	}
-	// {10,20}, {31,4}, {40,20}
-	//t.Log(peer.String())
+	//{40,20},{31,4},{10,20}
 
 	// 测试例 else node.seqNo == left.seqNo+left.payload || node.seqNo+node.payload == right.seqNo
 	// {30,1}, {35,2}, {39,1}/*异常情况{38, 7}, {10,28}, {35,5}*/
@@ -331,50 +342,56 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	payload = 1
 	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_CONTINUOUS_BOTH {
 		t.Errorf("result is %v, expected %v", flag, SEQ_CONTINUOUS_BOTH)
+		t.Errorf("actual is %v, expected{40,20},{10,25}", peer.String())
+		return
 	}
-	// {10,25}, {40,20}
-	//t.Log(peer.String())
+	//{40,20},{10,25}
 
 	tcpHeader = &MetaPacketTcpHeader{Seq: 35}
 	payload = 2
 	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_CONTINUOUS {
 		t.Errorf("result is %v, expected %v", flag, SEQ_CONTINUOUS)
+		t.Errorf("actual is %v, expected{40,20},{10,27}", peer.String())
+		return
 	}
-	// {10,27}, {40,20}
-	//t.Log(peer.String())
+	//{40,20},{10,27}
 
 	tcpHeader = &MetaPacketTcpHeader{Seq: 39}
 	payload = 1
 	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_CONTINUOUS {
 		t.Errorf("result is %v, expected %v", flag, SEQ_CONTINUOUS)
+		t.Errorf("actual is %v, expected{39,21},{10,27}", peer.String())
+		return
 	}
-	// {10,27}, {39,21}
-	//t.Log(peer.String())
+	//{39,21},{10,27}
 
 	// 异常情况{38, 7}, {10,28}, {35,5}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 38}
 	payload = 7
 	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_ERROR {
 		t.Errorf("result is %v, expected %v", flag, SEQ_ERROR)
+		t.Errorf("actual is %v, expected{39,21},{10,27}", peer.String())
+		return
 	}
-	// {10,27}, {39,21}
-	//t.Log(peer.String())
+	//{39,21},{10,27}
 
 	tcpHeader = &MetaPacketTcpHeader{Seq: 10}
 	payload = 28
 	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_ERROR {
 		t.Errorf("result is %v, expected %v", flag, SEQ_ERROR)
+		t.Errorf("actual is %v, expected{39,21},{10,27}", peer.String())
+		return
 	}
-	// {10,27}, {39,21}
-	//t.Log(peer.String())
+	//{39,21},{10,27}
 
 	tcpHeader = &MetaPacketTcpHeader{Seq: 35}
 	payload = 5
 	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_ERROR {
 		t.Errorf("result is %v, expected %v", flag, SEQ_ERROR)
+		t.Errorf("actual is %v, expected{39,21},{10,27}", peer.String())
+		return
 	}
-	// {10,27}, {39,21}
-	//t.Log(peer.String())
+	//{39,21},{10,27}
 
 	// 测试例 else /*left.seqNo > node.seqNo*/
 	// 测试例 left.seqNo == node.seqNo+node.len
@@ -383,20 +400,22 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	payload = 5
 	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_CONTINUOUS {
 		t.Errorf("result is %v, expected %v", flag, SEQ_CONTINUOUS)
+		t.Errorf("actual is %v, expected{39,21},{5,32}", peer.String())
+		return
 	}
-	// {5,32}, {39,21}
-	//t.Log(peer.String())
+	//{39,21},{5,32}
 
 	// {1,3}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 1}
 	payload = 3
-	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_CONTINUOUS {
-		t.Errorf("result is %v, expected %v", flag, SEQ_CONTINUOUS)
+	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_DISCONTINUOUS {
+		t.Errorf("result is %v, expected %v", flag, SEQ_DISCONTINUOUS)
+		t.Errorf("actual is %v, expected{39,21},{5,32},{1,3}", peer.String())
+		return
 	}
-	// {0,4}, {5,32}, {39,21}
-	//t.Log(peer.String())
+	//{39,21},{5,32},{1,3}
 
-	expected := [3]SeqSegment{{0, 4}, {5, 32}, {39, 21}}
+	expected := [3]SeqSegment{{39, 21}, {5, 32}, {1, 3}}
 	for i, n := range expected {
 		if n.seqNumber != peer.seqArray[i].seqNumber ||
 			n.length != peer.seqArray[i].length {
