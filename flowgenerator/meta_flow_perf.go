@@ -14,9 +14,6 @@ func AcquireMetaFlowPerf() *MetaFlowPerf {
 
 func ReleaseMetaFlowPerf(p *MetaFlowPerf) {
 	if p != nil {
-		ReleaseSeqSegmentSlice(p.ctrlInfo.tcpSession[0].seqArray)
-		ReleaseSeqSegmentSlice(p.ctrlInfo.tcpSession[1].seqArray)
-
 		p.resetMetaFlowPerf()
 		metaFlowPerfPool.Put(p)
 	}
