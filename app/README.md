@@ -1,49 +1,52 @@
 简介
 ====
 
+
 存储的所有数据
 ---------------
 
 ```
-db                       measurement          tag
+db                       measurement       tag
 ------------------------------------------------------------------------------------------------------------------------
-df_usage_acl             x0000040300000000    _id,acl_direction,acl_gid,direction
-df_usage_acl             x0000048300000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
-df_usage_acl_edge        x0000048300010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
-df_usage_acl_edge_port   x0000049b00010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,protocol,server_port,tap_type
-df_usage_acl_port        x0000049b00000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,protocol,server_port,tap_type
+df_usage_acl             mini              _id,acl_direction,acl_gid,direction
+df_usage_acl             main              _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
+df_usage_acl_edge        main              _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
+df_usage_acl_edge_port   main              _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,protocol,server_port,tap_type
+df_usage_acl_port        main              _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,protocol,server_port,tap_type
 
-df_fps_acl               x0000040300000000    _id,acl_direction,acl_gid,direction
-df_fps_acl               x0000048300000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
-df_fps_acl_port          x0000049b00000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type,protocol,server_port
-df_fps_acl_edge          x0000048300010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
-df_fps_acl_edge_port     x0000049b00010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type,protocol,server_port
+df_fps_acl               mini              _id,acl_direction,acl_gid,direction
+df_fps_acl               main              _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
+df_fps_acl_port          main              _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type,protocol,server_port
+df_fps_acl_edge          main              _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
+df_fps_acl_edge_port     main              _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type,protocol,server_port
 
-df_geo_acl               x2000048300000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,isp,tap_type
-df_geo_acl               x4000048300000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,region,tap_type
-df_geo_acl_port          x2000049b00000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,isp,tap_type,protocol,server_port
-df_geo_acl_port          x4000049b00000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,region,tap_type,protocol,server_port
-df_geo_acl_edge          x2000048300010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,isp,tap_type
-df_geo_acl_edge          x4000048300010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,region,tap_type
-df_geo_acl_edge_port     x2000049b00010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,isp,tap_type,protocol,server_port
-df_geo_acl_edge_port     x4000049b00010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,region,tap_type,protocol,server_port
+df_geo_acl               main_isp          _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,isp,tap_type
+df_geo_acl               main_region       _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,region,tap_type
+df_geo_acl_port          main_isp          _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,isp,tap_type,protocol,server_port
+df_geo_acl_port          main_region       _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,region,tap_type,protocol,server_port
+df_geo_acl_edge          main_isp          _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,isp,tap_type
+df_geo_acl_edge          main_region       _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,region,tap_type
+df_geo_acl_edge_port     main_isp          _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,isp,tap_type,protocol,server_port
+df_geo_acl_edge_port     main_regiion      _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,region,tap_type,protocol,server_port
 
-df_perf_acl              x0000040300000000    _id,acl_direction,acl_gid,direction
-df_perf_acl              x0000048300000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
-df_perf_acl_port         x0000049b00000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type,protocol,server_port
-df_perf_acl_edge         x0000048300010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
-df_perf_acl_edge_port    x0000049b00010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,protocol,server_port,tap_type
+df_perf_acl              mini              _id,acl_direction,acl_gid,direction
+df_perf_acl              main              _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
+df_perf_acl_port         main              _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type,protocol,server_port
+df_perf_acl_edge         main              _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
+df_perf_acl_edge_port    main              _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,protocol,server_port,tap_type
 
-df_type_acl              x0000048300000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
-df_type_acl_port         x0000049b00000001    _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type,protocol,server_port
-df_type_acl_edge         x0000048300010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
-df_type_acl_edge_port    x0000049b00010000    _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type,protocol,server_port
+df_type_acl              main              _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
+df_type_acl_port         main              _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type,protocol,server_port
+df_type_acl_edge         main              _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
+df_type_acl_edge_port    main              _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type,protocol,server_port
 
-vtap_usage               x00000160000001d1    _id,_tid,cast_type,host,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,region,subnet_id,vtap
-vtap_usage               x00000908000001d1    _id,_tid,host,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,protocol,region,scope,subnet_id
-vtap_usage               x00000300000001d1    _id,_tid,host,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,region,subnet_id,tcp_flags
-vtap_usage_edge          x0000000803d10000    _id,_tid,host_0,host_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1
-vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,region,server_port,subnet_id
+vtap_usage               main              _id,_tid,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,vtap_id
+vtap_usage               main_cast_type    _id,_tid,cast_type,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,region,subnet_id,vtap_id
+vtap_usage               main_tcp_flags    _id,_tid,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,region,subnet_id,tcp_flags,vtap_id
+vtap_usage_edge          main              _id,_tid,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,vtap_id
+vtap_usage_port          main              _id,_tid,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,region,server_port,subnet_id,vtap_id
+
+log_usage_edge_port      main              _id,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_epc_id_0,l3_epc_id_1,protocol,server_port,tap_type
 ```
 
 统计数据Tag定义
@@ -76,8 +79,9 @@ vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version
 |                   |      |                         |              | >=1: 由trisolaris确定含义，1表示VM    |
 | l3_device_id      | 6    | ip对应的资源ID          | 非负整数     | 同l2_device_id                        |
 | l3_device_type    | 6    | ip对应的资源类型        | 非负整数     | 同l2_device_type                      |
-| host              | 7    | ip对应的宿主机          | IP字符串     | 0.0.0.0或::表示未找到                 |
+| host              | 7    | ip对应的宿主机          | IP字符串     | 0.0.0.0或::表示未找到 `废弃`          |
 | region            | 8    | ip对应的云平台区域ID    | 非负整数     | 0: 未找到                             |
+| host_id           | 9    | ip对应的宿主机ID        | 正整数       | 0表示没找到                           |
 |                   |      |                         |              |                                       |
 | ip_0              | 16   | 0端IP                   | IP字符串     | 0.0.0.0或::表示Internet               |
 | ip_1              | 16   | 1端IP                   | IP字符串     | 0.0.0.0或::表示Internet               |
@@ -99,12 +103,16 @@ vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version
 | l3_device_type_0  | 22   | ip_0对应的资源类型      | 非负整数     | 取值范围与l3_device_type相同          |
 | l3_device_id_1    | 22   | ip_1对应的资源ID        | 非负整数     | 取值范围与l3_device_id相同            |
 | l3_device_type_1  | 22   | ip_1对应的资源类型      | 非负整数     | 取值范围与l3_device_type相同          |
-| host_0            | 23   | ip_0对应的宿主机        | IP字符串     | 0.0.0.0表示没找到                     |
-| host_1            | 23   | ip_1对应的宿主机        | IP字符串     | 0.0.0.0表示没找到                     |
+| host_0            | 23   | ip_0对应的宿主机        | IP字符串     | 0.0.0.0表示没找到 `废弃`              |
+| host_1            | 23   | ip_1对应的宿主机        | IP字符串     | 0.0.0.0表示没找到 `废弃`              |
 | subnet_id_0       | 24   | ip_0对应的VL2 ID        | 非负整数     | 0表示没找到                           |
 | subnet_id_1       | 24   | ip_1对应的VL2 ID        | 非负整数     | 0表示没找到                           |
 | region_0          | 25   | ip_0对应的云平台区域ID  | 非负整数     | 0表示没找到                           |
 | region_1          | 25   | ip_1对应的云平台区域ID  | 非负整数     | 0表示没找到                           |
+| pod_node_id_0     | 27   | ip_0对应的容器节点ID    | 正整数       | 0表示没找到                           |
+| pod_node_id_1     | 27   | ip_1对应的容器节点ID    | 正整数       | 0表示没找到                           |
+| host_id_0         | 28   | ip_0对应的宿主机ID      | 正整数       | 0表示没找到                           |
+| host_id_1         | 28   | ip_1对应的宿主机ID      | 正整数       | 0表示没找到                           |
 |                   |      |                         |              |                                       |
 | direction         | 32   | 统计量对应的流方向      | 字符串       | c2s: ip/ip_0为客户端，ip_1为服务端    |
 |                   |      |                         |              | s2c: ip/ip_0为服务端，ip_1为客户端    |
@@ -116,7 +124,7 @@ vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version
 | server_port       | 36   | 服务端端口              | 非负整数     | 0-65535，0表示无L4协议号或协议号为0   |
 | cast_type         | 37   | 播送类型                | 字符串       | broadcast: 广播，目的MAC为广播MAC     |
 |                   |      |                         |              | multicast: 组播，目的MAC为组播MAC     |
-| vtap              | 38   | 采集器控制IP            | IP字符串     | 无特殊值                              |
+| vtap              | 38   | 采集器控制IP            | IP字符串     | 无特殊值 `废弃`                       |
 | tap_type          | 39   | 流量采集点              | 正整数       | 1-2,4-30: 接入网络流量                |
 |                   |      |                         |              | 3: 虚拟网络流量                       |
 | subnet_id         | 40   | ip对应的子网ID          | 非负整数     | 0: 未找到                             |
@@ -130,8 +138,11 @@ vtap_usage_port          x00000110000001d1    _id,_tid,host,ip,ip_bin,ip_version
 |                   |      |                         |              |   4+16: RST+ACK                       |
 | acl_direction     | 42   | ACL匹配的方向           | 字符串       | fwd: 正向匹配                         |
 |                   |      |                         |              | bwd: 反向匹配                         |
-| scope             | 43   | 源和目的构成的范围      | 正整数       | 1: VPC内                              |
+| scope             | 43   | 源和目的构成的范围      | 正整数       | `废弃`                                |
+|                   |      |                         |              | 1: VPC内                              |
 |                   |      |                         |              | 2: VPC间                              |
+| vtap_id           | 44   | 采集器控制IP的ID        | 正整数       | 无特殊值                              |
+| pod_node_id       | 45   | ip对应的容器节点ID      | 正整数       | 0表示没找到                           |
 |                   |      |                         |              |                                       |
 | CODE_INDEX        | 48-53| 不能使用                | N/A          | 用于droplet/roze/zero标识Code的Index  |
 |                   |      |                         |              |                                       |
