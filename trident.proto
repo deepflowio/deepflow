@@ -89,6 +89,8 @@ message Config {
 
     repeated string  corefile_dirs        = 33;
     optional string  proxy_controller_ip  = 34; // 控制器代理IP
+
+    optional uint32 vtap_id = 40;  // 限制在64000
 }
 
 message Segment { // e.g. single LAN area
@@ -244,7 +246,6 @@ message PublishAcls {
 message SyncResponse {
     optional Status status = 1;
     optional Config config = 2;
-    optional uint32 vtap_id = 3;  // 限制在64000
     optional string revision = 4; // 指定升级的目标revision
     optional string self_update_url = 5; // 指定升级的URL路径
 
