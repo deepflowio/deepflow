@@ -546,15 +546,9 @@ func (w *InfluxdbWriter) writeConfidence(pc *PointCache, status RepairStatus) {
 	bp := pc.bp
 	confidences := make(map[Confidence]uint8)
 	for _, point := range bp.Points() {
-		measurement := point.Name()
-		// measurement 是以x开头跟16个字符的字符串(64位整数的16进制字符串)
-		if len(measurement) == 17 && measurement[0] != 'x' {
-			log.Warningf("db(%s) point(%s) get measurement name failed: %s", bp.Database(), point, measurement)
-			continue
-		}
 		confidences[Confidence{
 			db:          bp.Database(),
-			measurement: measurement,
+			measurement: point.Name(),
 			timestamp:   point.Time().UnixNano(),
 			status:      status,
 		}] = 0
