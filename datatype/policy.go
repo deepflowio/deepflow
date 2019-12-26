@@ -471,7 +471,8 @@ func (d *PolicyData) CheckNpbPolicy(packet *LookupKey) *PolicyData {
 	}
 
 	validPolicyData := new(PolicyData)
-	*validPolicyData = *d
+	validPolicyData.ACLID = d.ACLID
+	validPolicyData.ActionFlags = d.ActionFlags
 	validPolicyData.NpbActions = append(validPolicyData.NpbActions[:0], validActions...)
 	return validPolicyData
 }
