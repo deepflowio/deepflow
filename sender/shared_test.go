@@ -67,14 +67,14 @@ func init() {
 		L3EpcID:      2,
 		L3DeviceID:   5,
 		L3DeviceType: dt.VMDevice,
-		Host:         binary.BigEndian.Uint32([]byte{172, 16, 1, 153}),
+		HostID:       110,
 
 		IP1:           binary.BigEndian.Uint32([]byte{10, 33, 2, 202}),
 		GroupID1:      2,
 		L3EpcID1:      datatype.EPC_FROM_DEEPFLOW,
 		L3DeviceID1:   6,
 		L3DeviceType1: dt.VMDevice,
-		Host1:         binary.BigEndian.Uint32([]byte{172, 16, 1, 154}),
+		HostID1:       111,
 
 		Direction:  dt.ClientToServer,
 		VLANID:     123,
