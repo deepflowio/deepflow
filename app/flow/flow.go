@@ -161,7 +161,7 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 			if IsWrongEndPoint(thisEnd, code) {
 				continue
 			}
-			if code&outputtype.Host != 0 && hosts[thisEnd] == 0 {
+			if code&outputtype.HostID != 0 && hosts[thisEnd] == 0 {
 				// 产品要求：统计服务器内所有虚拟接口流量之和
 				continue
 			}
@@ -201,7 +201,7 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
 					continue
 				}
-				if code&outputtype.Host != 0 && hosts[thisEnd] == 0 {
+				if code&outputtype.HostID != 0 && hosts[thisEnd] == 0 {
 					// 产品要求：统计服务器内所有虚拟接口流量之和
 					continue
 				}
