@@ -64,7 +64,7 @@ func TestFill1(t *testing.T) {
 		"protocol": "4", "server_port": "9527", "tap_type": "0", "subnet_id": "1001", "acl_direction": "fwd", "pod_node_id": "1", "country": "CHN", "region": "北京", "isp": "移动",
 	}
 
-	tag.Fill(0xffffffffffffffff, tags)
+	tag.Fill(tags)
 
 	if tag.IP != 16843009 {
 		t.Error("ip 处理错误")
@@ -152,7 +152,7 @@ func TestFill0(t *testing.T) {
 		"host_id_0": "4444", "subnet_id_0": "1000",
 	}
 
-	tag.Fill(0xffffffffffffffff, tags)
+	tag.Fill(tags)
 	if tag.IP != 33686018 {
 		t.Error("ip 处理错误")
 	}
