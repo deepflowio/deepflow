@@ -27,7 +27,7 @@ df_geo_acl_port          main_region       _id,acl_direction,acl_gid,direction,i
 df_geo_acl_edge          main_isp          _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,isp,tap_type
 df_geo_acl_edge          main_region       _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,region,tap_type
 df_geo_acl_edge_port     main_isp          _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,isp,tap_type,protocol,server_port
-df_geo_acl_edge_port     main_regiion      _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,region,tap_type,protocol,server_port
+df_geo_acl_edge_port     main_region       _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,region,tap_type,protocol,server_port
 
 df_perf_acl              mini              _id,acl_direction,acl_gid,direction
 df_perf_acl              main              _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
