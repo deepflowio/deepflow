@@ -519,6 +519,9 @@ func (d *Ddbs) SetCloudPlatform(cloudPlatformLabeler *CloudPlatformLabeler) {
 func (d *Ddbs) generateGroupMacMap(data []*PlatformData) {
 	groupMacMap := make(map[uint16][]uint64, 1000)
 	for _, data := range data {
+		if data.Mac == 0 {
+			continue
+		}
 		for _, group := range data.GroupIds {
 			groupId := uint16(group & 0xffff)
 			groupMacMap[groupId] = append(groupMacMap[groupId], data.Mac)
