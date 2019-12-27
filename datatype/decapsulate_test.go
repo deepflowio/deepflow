@@ -23,14 +23,17 @@ func TestDecapsulateErspanII(t *testing.T) {
 
 	l2Len := 14
 	actual := &TunnelInfo{}
-	actual.Decapsulate(packet1[l2Len:])
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expectedErspanII: %+v\n actual: %+v", expected, actual)
+	offset := actual.Decapsulate(packet1[l2Len:])
+	expectedOffset := 50 - l2Len
+	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
+		t.Errorf("expectedErspanII: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
+			expected, actual, expectedOffset, offset)
 	}
 	actual = &TunnelInfo{}
 	actual.Decapsulate(packet2[l2Len:])
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expectedErspanII: %+v\n actual: %+v", expected, actual)
+	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
+		t.Errorf("expectedErspanII: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
+			expected, actual, expectedOffset, offset)
 	}
 }
 
@@ -47,9 +50,11 @@ func TestDecapsulateIII(t *testing.T) {
 
 	l2Len := 14
 	actual := &TunnelInfo{}
-	actual.Decapsulate(packet[l2Len:])
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expectedErspanIII: %+v\n actual: %+v", expected, actual)
+	offset := actual.Decapsulate(packet[l2Len:])
+	expectedOffset := 54 - l2Len
+	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
+		t.Errorf("expectedErspanII: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
+			expected, actual, expectedOffset, offset)
 	}
 }
 
@@ -66,9 +71,11 @@ func TestDecapsulateVxlan(t *testing.T) {
 
 	l2Len := 14
 	actual := &TunnelInfo{}
-	actual.Decapsulate(packet[l2Len:])
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expectedVxlan: %+v\n actual: %+v", expected, actual)
+	offset := actual.Decapsulate(packet[l2Len:])
+	expectedOffset := 50 - l2Len
+	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
+		t.Errorf("expectedErspanII: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
+			expected, actual, expectedOffset, offset)
 	}
 }
 
