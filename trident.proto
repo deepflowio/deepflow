@@ -25,7 +25,7 @@ enum Exception {
     NPB_FUSE                   = 8;
     NPB_BPS_THRESHOLD_EXCEEDED = 16;
     NPB_NO_GW_ARP              = 32;
-    ANALYZER_NO_ROUTE          = 64; //deprecated after DF5.5.4
+    RX_PPS_THRESHOLD_EXCEEDED  = 64;
     ANALYZER_NO_GW_ARP         = 128;
 }
 
