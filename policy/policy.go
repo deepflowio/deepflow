@@ -242,6 +242,9 @@ func (t *PolicyTable) UpdateInterfaceDataAndIpGroupData(platforms []*PlatformDat
 	}
 
 	for _, raw := range platforms {
+		if raw.DeviceType != 1 {
+			continue
+		}
 		platform := &PlatformData{}
 		*platform = *raw
 		id := uint16(platform.DeviceId & 0xffff)
