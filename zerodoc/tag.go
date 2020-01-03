@@ -935,6 +935,12 @@ func (t *Tag) IsMatchPublishPolicy(p *PublishPolicy) bool {
 	if p.Code&FilterL3EpcID1 != 0 && t.L3EpcID1 != p.L3EpcID1 {
 		return false
 	}
+	if p.Code&FilterACLDirection != 0 && t.ACLDirection != p.ACLDirection {
+		return false
+	}
+	if p.Code&FilterDirection != 0 && t.Direction != p.Direction {
+		return false
+	}
 
 	return true
 }
