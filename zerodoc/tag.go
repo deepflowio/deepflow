@@ -996,6 +996,11 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		i, err = strconv.ParseUint(value, 10, 8)
 		field.L3DeviceType = DeviceType(i)
 	case _TAG_HOST, _TAG_HOST_0:
+		if id == _TAG_HOST {
+			t.Code |= Host
+		} else {
+			t.Code |= HostPath
+		}
 		field.Host = utils.IpToUint32(net.ParseIP(value).To4())
 	case _TAG_HOST_ID, _TAG_HOST_ID_0:
 		if id == _TAG_HOST_ID {
@@ -1006,6 +1011,7 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		i, err = strconv.ParseUint(value, 10, 16)
 		field.HostID = uint16(i)
 	case _TAG_HOST_1:
+		t.Code |= HostPath
 		field.Host1 = utils.IpToUint32(net.ParseIP(value).To4())
 	case _TAG_HOST_ID_1:
 		t.Code |= HostIDPath
