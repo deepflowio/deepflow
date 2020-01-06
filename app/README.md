@@ -46,6 +46,18 @@ vtap_usage               main_tcp_flags    _id,_tid,host_id,ip,ip_bin,ip_version
 vtap_usage_edge          main              _id,_tid,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,vtap_id
 vtap_usage_port          main              _id,_tid,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,region,server_port,subnet_id,vtap_id
 
+vtap_flow_usage          main              _id,_tid,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,vtap_id
+vtap_flow_usage_edge     main              _id,_tid,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,vtap_id
+
+vtap_flow_fps            main              _id,_tid,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,vtap_id
+vtap_flow_fps_edge       main              _id,_tid,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,vtap_id
+
+vtap_perf_fps            main              _id,_tid,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,vtap_id
+vtap_perf_fps_edge       main              _id,_tid,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,vtap_id
+
+vtap_type_fps            main              _id,_tid,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,vtap_id
+vtap_type_fps_edge       main              _id,_tid,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,vtap_id
+
 log_usage_edge_port      main              _id,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_epc_id_0,l3_epc_id_1,protocol,server_port,tap_type
 ```
 
