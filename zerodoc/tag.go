@@ -911,6 +911,7 @@ func (f *Field) FillTag(c Code, tag *Tag) {
 
 func (t *Tag) IsMatchPublishPolicy(p *PublishPolicy) bool {
 	if p.Code == 0 {
+		p.IsMatched = true
 		return true
 	}
 
@@ -942,6 +943,7 @@ func (t *Tag) IsMatchPublishPolicy(p *PublishPolicy) bool {
 		return false
 	}
 
+	p.IsMatched = true
 	return true
 }
 

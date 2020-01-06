@@ -23,6 +23,7 @@ type PublishPolicy struct {
 	Database    string
 	Measurement uint64
 	TagCode     uint64
+	IsMatched   bool // 若该policy被匹配到，则置为true
 
 	Code FilterCode
 	// 需要和tag.go以及trident.proto的PublishAcl 中定义的一致
