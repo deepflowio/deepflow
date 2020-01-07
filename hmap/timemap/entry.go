@@ -10,6 +10,7 @@ type Entry interface {
 	Hash() uint64
 	Eq(other Entry) bool
 	Merge(other Entry)
+	Clone() Entry
 	Release()
 	fmt.Stringer
 }
