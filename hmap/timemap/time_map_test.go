@@ -181,6 +181,11 @@ func (d *TestDocument) Merge(other Entry) {
 	}
 }
 
+func (e *TestDocument) Clone() Entry {
+	newEntry := *e
+	return &newEntry
+}
+
 func (d *TestDocument) Release() {
 }
 
