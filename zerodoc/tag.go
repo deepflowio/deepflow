@@ -947,6 +947,23 @@ func (t *Tag) IsMatchPublishPolicy(p *PublishPolicy) bool {
 	return true
 }
 
+func (t *Tag) FillPublishPolicy(p *PublishPolicy) {
+	t.Code = Code(p.TagCode)
+	t.TAPType = p.TAPType
+	t.ACLGID = p.ACLGID
+	t.L3DeviceID = p.L3DeviceID
+	t.L3DeviceType = p.L3DeviceType
+
+	if t.Code&L3EpcID != 0 {
+		t.L3EpcID = p.L3EpcID
+	} else {
+		t.L3EpcID = p.L3EpcID0
+	}
+	t.L3EpcID1 = p.L3EpcID1
+	t.ACLDirection = p.ACLDirection
+	t.Direction = p.Direction
+}
+
 func (t *Tag) fillValue(id uint8, value string) (err error) {
 	field := t.Field
 	var i uint64
