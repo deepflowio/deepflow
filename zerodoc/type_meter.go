@@ -18,6 +18,18 @@ type TypeMeter struct {
 	sortKey uint64
 }
 
+func (m *TypeMeter) ID() uint8 {
+	return TYPE_ID
+}
+
+func (m *TypeMeter) Name() string {
+	return MeterDFNames[TYPE_ID]
+}
+
+func (m *TypeMeter) VTAPName() string {
+	return MeterVTAPNames[TYPE_ID]
+}
+
 func (m *TypeMeter) SortKey() uint64 {
 	if m.sortKey == 0 {
 		m.sortKey = 1

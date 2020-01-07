@@ -17,6 +17,18 @@ type GeoMeter struct {
 	SumRTTSynClientFlow uint64        `db:"sum_rtt_syn_client_flow"`
 }
 
+func (m *GeoMeter) ID() uint8 {
+	return GEO_ID
+}
+
+func (m *GeoMeter) Name() string {
+	return MeterDFNames[GEO_ID]
+}
+
+func (m *GeoMeter) VTAPName() string {
+	return MeterVTAPNames[GEO_ID]
+}
+
 func (m *GeoMeter) SortKey() uint64 {
 	return m.SumPacketTx + m.SumPacketRx
 }
