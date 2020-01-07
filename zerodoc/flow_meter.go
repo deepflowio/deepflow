@@ -19,6 +19,18 @@ type FlowMeter struct {
 	SumClosedFlowDuration uint64 `db:"sum_closed_flow_duration"` // ms 废弃
 }
 
+func (m *FlowMeter) ID() uint8 {
+	return FLOW_ID
+}
+
+func (m *FlowMeter) Name() string {
+	return MeterDFNames[FLOW_ID]
+}
+
+func (m *FlowMeter) VTAPName() string {
+	return MeterVTAPNames[FLOW_ID]
+}
+
 func (m *FlowMeter) SortKey() uint64 {
 	return m.SumPacketTx + m.SumPacketRx
 }

@@ -13,6 +13,18 @@ type PerfMeter struct {
 	PerfMeterMax
 }
 
+func (m *PerfMeter) ID() uint8 {
+	return PERF_ID
+}
+
+func (m *PerfMeter) Name() string {
+	return MeterDFNames[PERF_ID]
+}
+
+func (m *PerfMeter) VTAPName() string {
+	return MeterVTAPNames[PERF_ID]
+}
+
 func (m *PerfMeter) SortKey() uint64 {
 	return m.PerfMeterSum.SumPacketTx + m.PerfMeterSum.SumPacketRx
 }

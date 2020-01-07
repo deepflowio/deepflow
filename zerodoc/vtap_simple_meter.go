@@ -19,6 +19,18 @@ type VTAPSimpleMeter struct {
 	Packets   uint64 `db:"packets"`
 }
 
+func (m *VTAPSimpleMeter) ID() uint8 {
+	return VTAP_SIMPLE_ID
+}
+
+func (m *VTAPSimpleMeter) Name() string {
+	return MeterDFNames[VTAP_SIMPLE_ID]
+}
+
+func (m *VTAPSimpleMeter) VTAPName() string {
+	return MeterVTAPNames[VTAP_SIMPLE_ID]
+}
+
 func (m *VTAPSimpleMeter) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(m.TxBytes)
 	encoder.WriteVarintU64(m.RxBytes)

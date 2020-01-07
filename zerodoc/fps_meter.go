@@ -13,6 +13,18 @@ type FPSMeter struct {
 	SumClosedFlowCount uint64 `db:"sum_closed_flow_count"`
 }
 
+func (m *FPSMeter) ID() uint8 {
+	return FPS_ID
+}
+
+func (m *FPSMeter) Name() string {
+	return MeterDFNames[FPS_ID]
+}
+
+func (m *FPSMeter) VTAPName() string {
+	return MeterVTAPNames[FPS_ID]
+}
+
 func (m *FPSMeter) SortKey() uint64 {
 	return m.SumFlowCount
 }

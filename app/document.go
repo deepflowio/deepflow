@@ -26,6 +26,9 @@ type Tag interface {
 }
 
 type Meter interface {
+	ID() uint8
+	Name() string
+	VTAPName() string
 	Encode(*codec.SimpleEncoder)
 	Decode(*codec.SimpleDecoder)
 	ConcurrentMerge(Meter)
