@@ -19,6 +19,10 @@ const (
 )
 
 const (
+	MAX_STRING_LENGTH = 1024
+)
+
+const (
 	FLOW_ID uint8 = iota
 	FPS_ID
 	GEO_ID
@@ -59,6 +63,14 @@ var MeterVTAPNames [MAX_APP_ID]string = [MAX_APP_ID]string{
 	"vtap_simple",
 }
 
-const (
-	MAX_STRING_LENGTH = 1024
-)
+var MeterNamesToID map[string]uint8
+
+func init() {
+	MeterNamesToID = make(map[string]uint8)
+	for id, name := range MeterDFNames {
+		MeterNamesToID[name] = uint8(id)
+	}
+	for id, name := range MeterVTAPNames {
+		MeterNamesToID[name] = uint8(id)
+	}
+}
