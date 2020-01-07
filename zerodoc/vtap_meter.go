@@ -14,6 +14,18 @@ type VTAPUsageMeter struct {
 	RxPackets uint64 `db:"rx_packets"`
 }
 
+func (m *VTAPUsageMeter) ID() uint8 {
+	return VTAP_USAGE_ID
+}
+
+func (m *VTAPUsageMeter) Name() string {
+	return MeterDFNames[VTAP_USAGE_ID]
+}
+
+func (m *VTAPUsageMeter) VTAPName() string {
+	return MeterVTAPNames[VTAP_USAGE_ID]
+}
+
 func (m *VTAPUsageMeter) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(m.TxBytes)
 	encoder.WriteVarintU64(m.RxBytes)

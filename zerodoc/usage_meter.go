@@ -14,6 +14,18 @@ type UsageMeter struct {
 	SumBitRx    uint64 `db:"sum_bit_rx"`
 }
 
+func (m *UsageMeter) ID() uint8 {
+	return USAGE_ID
+}
+
+func (m *UsageMeter) Name() string {
+	return MeterDFNames[USAGE_ID]
+}
+
+func (m *UsageMeter) VTAPName() string {
+	return MeterVTAPNames[USAGE_ID]
+}
+
 func (m *UsageMeter) SortKey() uint64 {
 	return m.SumPacketTx + m.SumPacketRx
 }
