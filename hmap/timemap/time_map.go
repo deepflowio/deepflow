@@ -112,7 +112,7 @@ func (m *TimeMap) flushTimeList(index int) {
 	m.timeLists[index] = _LINK_NIL
 }
 
-// AddOrMerge consumes entry
+// AddOrMerge does not consume entry
 func (m *TimeMap) AddOrMerge(entry Entry) error {
 	timestamp := entry.Timestamp()
 	if timestamp < m.timeRingStartTime {
@@ -126,13 +126,13 @@ func (m *TimeMap) AddOrMerge(entry Entry) error {
 	slot := m.compressHash(keyhash.Jenkins128(uint64(timestamp), entryHash))
 	if oldNode := m.hashLists[slot].find(m.r, &node{hash: entryHash, entry: entry}); oldNode != nil {
 		oldNode.entry.Merge(entry)
-		entry.Release()
 		return nil
 	}
 	if m.entries >= m.capacity {
 		return errors.New("too many entries")
 	}
-	node := m.r.pushBack(entry)
+	newEntry := entry.Clone()
+	node := m.r.pushBack(newEntry)
 	node.hashSlot = slot
 	m.hashLists[slot].pushFront(m.r, node)
 	timeSlot := (int((timestamp-m.timeRingStartTime)/m.timeInterval) + m.timeRingStartIndex) % m.timeSlots

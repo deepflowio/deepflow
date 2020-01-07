@@ -39,6 +39,11 @@ func (e *TestEntry) Merge(other Entry) {
 	}
 }
 
+func (e *TestEntry) Clone() Entry {
+	newEntry := *e
+	return &newEntry
+}
+
 func (e *TestEntry) Release() {
 }
 
