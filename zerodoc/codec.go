@@ -186,24 +186,30 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 
 func GetMsgType(db string) (MessageType, error) {
 	s := strings.Split(db, "_")
-	if len(s) < 2 {
+
+	nPrefixSeg := 2
+	if strings.HasPrefix(db, "vtap_flow") {
+		nPrefixSeg = 3
+	}
+
+	if len(s) < nPrefixSeg {
 		return MSG_INVILID, fmt.Errorf("Unsupport db %s", db)
 	}
-	dbPrefix := strings.Join(s[:2], "_")
+	dbPrefix := strings.Join(s[:nPrefixSeg], "_")
 
 	var msgType MessageType
 	switch dbPrefix {
-	case "df_usage":
+	case "df_usage", "vtap_flow_usage":
 		msgType = MSG_USAGE
-	case "df_perf":
+	case "df_perf", "vtap_flow_perf":
 		msgType = MSG_PERF
 	case "df_geo":
 		msgType = MSG_GEO
 	case "df_flow":
 		msgType = MSG_FLOW
-	case "df_type":
+	case "df_type", "vtap_flow_type":
 		msgType = MSG_TYPE
-	case "df_fps":
+	case "df_fps", "vtap_flow_fps":
 		msgType = MSG_FPS
 	case "log_usage":
 		msgType = MSG_LOG_USAGE
