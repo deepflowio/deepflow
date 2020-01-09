@@ -2,6 +2,7 @@ package timemap
 
 import (
 	"errors"
+	"fmt"
 
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/keyhash"
 )
@@ -116,7 +117,7 @@ func (m *TimeMap) flushTimeList(index int) {
 func (m *TimeMap) AddOrMerge(entry Entry) error {
 	timestamp := entry.Timestamp()
 	if timestamp < m.timeRingStartTime {
-		return errors.New("entry too old")
+		return fmt.Errorf("entry too old, %d < %d", timestamp, m.timeRingStartTime)
 	}
 	timestamp = timestamp / m.timeInterval * m.timeInterval
 	m.AdvanceTime(timestamp)
