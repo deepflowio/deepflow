@@ -27,6 +27,8 @@ service Diagnose {
     rpc GetHostname(DiagnoseRequest) returns (DiagnoseResponse) {} //hostname
     rpc GetVmStates(DiagnoseRequest) returns (DiagnoseResponse) {} //virsh list --all
     rpc GetVlanConfig(DiagnoseRequest) returns (DiagnoseResponse) {} //cat /proc/net/vlan/config
+
+    rpc GetL3Table(L3TableRequest) returns (L3TableResponse) {}
 }
 
 message DiagnoseRequest {
@@ -35,4 +37,30 @@ message DiagnoseRequest {
 
 message DiagnoseResponse {
     optional string result = 1;
+}
+
+message ArpItem {
+    optional string ip = 1;
+    optional uint64 mac = 2;
+    optional uint32 epc_id = 3;
+    optional uint32 tap_type = 4;
+
+    optional uint64 tx_packets = 10;
+    optional uint64 rx_packets = 11;
+    optional uint64 tx_bytes = 12;
+    optional uint64 rx_bytes = 13;
+    optional uint64 tx_last_ns = 14;
+    optional uint64 rx_last_ns = 15;
+}
+
+message L3TableRequest {
+    enum From {
+        FROM_TRAFFIC_TTL = 4;
+        FROM_TRAFFIC_ARP = 8;
+    }
+    optional uint32 item_from = 1;
+}
+
+message L3TableResponse {
+    repeated ArpItem arp_items = 1;
 }
