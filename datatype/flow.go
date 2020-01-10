@@ -92,12 +92,13 @@ type TcpPerfStats struct {
 
 type FlowMetricsPeer struct {
 	// 注意字节对齐!
-	TickByteCount    uint64 // 每个包统计周期（目前是自然秒）清零
-	TickPacketCount  uint64 // 每个包统计周期（目前是自然秒）清零
-	ByteCount        uint64 // 每个流统计周期（目前是自然分）清零
-	PacketCount      uint64 // 每个流统计周期（目前是自然分）清零
-	TotalByteCount   uint64 // 不清零
-	TotalPacketCount uint64 // 不清零
+	TickByteCount    uint64        // 每个包统计周期（目前是自然秒）清零
+	TickPacketCount  uint64        // 每个包统计周期（目前是自然秒）清零
+	ByteCount        uint64        // 每个流统计周期（目前是自然分）清零
+	PacketCount      uint64        // 每个流统计周期（目前是自然分）清零
+	TotalByteCount   uint64        // 不清零
+	TotalPacketCount uint64        // 不清零
+	First, Last      time.Duration // 首包和尾包的时间戳
 	SubnetID         uint32
 	L3DeviceID       uint32
 	DeviceID         uint32
