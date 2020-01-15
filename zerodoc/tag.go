@@ -751,9 +751,6 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 	if code&TCPFlags != 0 {
 		encoder.WriteU8(uint8(t.TCPFlags))
 	}
-	if code&PodNodeID != 0 {
-		encoder.WriteU16(t.PodNodeID)
-	}
 
 	if code&Country != 0 {
 		encoder.WriteU8(t.Country)
