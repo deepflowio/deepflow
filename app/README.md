@@ -121,10 +121,10 @@ log_usage_edge_port      main              _id,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_ve
 | subnet_id_1       | 24   | ip_1对应的VL2 ID        | 非负整数     | 0表示没找到                           |
 | region_0          | 25   | ip_0对应的云平台区域ID  | 非负整数     | 0表示没找到                           |
 | region_1          | 25   | ip_1对应的云平台区域ID  | 非负整数     | 0表示没找到                           |
-| pod_node_id_0     | 27   | ip_0对应的容器节点ID    | 正整数       | 0表示没找到                           |
-| pod_node_id_1     | 27   | ip_1对应的容器节点ID    | 正整数       | 0表示没找到                           |
-| host_id_0         | 28   | ip_0对应的宿主机ID      | 正整数       | 0表示没找到                           |
-| host_id_1         | 28   | ip_1对应的宿主机ID      | 正整数       | 0表示没找到                           |
+| pod_node_id_0     | 26   | ip_0对应的容器节点ID    | 正整数       | 0表示没找到                           |
+| pod_node_id_1     | 26   | ip_1对应的容器节点ID    | 正整数       | 0表示没找到                           |
+| host_id_0         | 27   | ip_0对应的宿主机ID      | 正整数       | 0表示没找到                           |
+| host_id_1         | 27   | ip_1对应的宿主机ID      | 正整数       | 0表示没找到                           |
 |                   |      |                         |              |                                       |
 | direction         | 32   | 统计量对应的流方向      | 字符串       | c2s: ip/ip_0为客户端，ip_1为服务端    |
 |                   |      |                         |              | s2c: ip/ip_0为服务端，ip_1为客户端    |
