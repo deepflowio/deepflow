@@ -40,23 +40,23 @@ df_type_acl_port         main              _id,acl_direction,acl_gid,direction,i
 df_type_acl_edge         main              _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
 df_type_acl_edge_port    main              _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type,protocol,server_port
 
-vtap_usage               main              _id,_tid,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,vtap_id
-vtap_usage               main_cast_type    _id,_tid,cast_type,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,region,subnet_id,vtap_id
-vtap_usage               main_tcp_flags    _id,_tid,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,region,subnet_id,tcp_flags,vtap_id
-vtap_usage_edge          main              _id,_tid,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,vtap_id
-vtap_usage_port          main              _id,_tid,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,region,server_port,subnet_id,vtap_id
+vtap_usage               main              _id,_tid,host,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,tap_type,vtap_id
+vtap_usage               main_cast_type    _id,_tid,cast_type,host,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,region,subnet_id,tap_type,vtap_id
+vtap_usage               main_tcp_flags    _id,_tid,host,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,region,subnet_id,tap_type,tcp_flags,vtap_id
+vtap_usage_edge          main              _id,_tid,host,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,tap_type,vtap_id
+vtap_usage_port          main              _id,_tid,host,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,region,server_port,subnet_id,tap_type,vtap_id
 
-vtap_flow_usage          main              _id,_tid,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,vtap_id
-vtap_flow_usage_edge     main              _id,_tid,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,vtap_id
+vtap_flow_usage          main              _id,_tid,host,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,tap_type,vtap_id
+vtap_flow_usage_edge     main              _id,_tid,host_0,host_1,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,tap_type,vtap_id
 
-vtap_flow_fps            main              _id,_tid,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,vtap_id
-vtap_flow_fps_edge       main              _id,_tid,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,vtap_id
+vtap_flow_fps            main              _id,_tid,host,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,tap_type,vtap_id
+vtap_flow_fps_edge       main              _id,_tid,host_0,host_1,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,tap_type,vtap_id
 
-vtap_flow_perf          main              _id,_tid,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,vtap_id
-vtap_flow_perf_edge     main              _id,_tid,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,vtap_id
+vtap_flow_perf          main              _id,_tid,host,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,tap_type,vtap_id
+vtap_flow_perf_edge     main              _id,_tid,host_0,host_1,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,tap_type,vtap_id
 
-vtap_flow_type          main              _id,_tid,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,vtap_id
-vtap_flow_type_edge     main              _id,_tid,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,vtap_id
+vtap_flow_type          main              _id,_tid,host,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,tap_type,vtap_id
+vtap_flow_type_edge     main              _id,_tid,host_0,host_1,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,tap_type,vtap_id
 
 log_usage_edge_port      main              _id,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_epc_id_0,l3_epc_id_1,protocol,server_port,tap_type
 ```
