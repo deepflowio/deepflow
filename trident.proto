@@ -63,6 +63,11 @@ enum IfMacSource {
     IF_NAME = 1;
 }
 
+enum SocketType {
+    UDP = 0;
+    ZMQ = 1;
+}
+
 message Config {
     optional bool    enabled              = 1 [default = true];
     optional uint32  max_cpus             = 2 [default = 2];
@@ -91,6 +96,8 @@ message Config {
     optional string  proxy_controller_ip  = 34; // 控制器代理IP
 
     optional uint32 vtap_id = 40;  // 限制在64000
+
+    optional SocketType collector_socket_type = 45 [default = UDP];
 }
 
 message Segment { // e.g. single LAN area
