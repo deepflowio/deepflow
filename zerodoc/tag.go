@@ -961,6 +961,13 @@ func (t *Tag) FillPublishPolicy(p *PublishPolicy) {
 	t.Direction = p.Direction
 }
 
+func parseUint(s string, base int, bitSize int) (uint64, error) {
+	if s == "" {
+		return 0, nil
+	}
+	return strconv.ParseUint(s, base, bitSize)
+}
+
 func (t *Tag) fillValue(id uint8, value string) (err error) {
 	field := t.Field
 	var i uint64
@@ -968,7 +975,7 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 	case _TAG_IP_BIN, _TAG_IP_BIN_0, _TAG_IP_BIN_1, _TAG__ID, _TAG__TID:
 		return nil
 	case _TAG_IP_VERSION:
-		i, _ = strconv.ParseUint(value, 10, 8) // 老版本可能未写入ip_version字段，忽略err
+		i, err = parseUint(value, 10, 8)
 		if i == 6 {
 			field.IsIPv6 = 1
 		} else {
@@ -1007,7 +1014,7 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		} else {
 			t.Code |= L3DevicePath
 		}
-		i, err = strconv.ParseUint(value, 10, 16)
+		i, err = parseUint(value, 10, 16)
 		field.L3DeviceID = uint16(i)
 	case _TAG_L3_DEVICE_TYPE, _TAG_L3_DEVICE_TYPE_0:
 		if id == _TAG_L3_DEVICE_TYPE {
@@ -1015,7 +1022,7 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		} else {
 			t.Code |= L3DevicePath
 		}
-		i, err = strconv.ParseUint(value, 10, 8)
+		i, err = parseUint(value, 10, 8)
 		field.L3DeviceType = DeviceType(i)
 	case _TAG_HOST, _TAG_HOST_0:
 		if id == _TAG_HOST {
@@ -1030,14 +1037,14 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		} else {
 			t.Code |= HostIDPath
 		}
-		i, err = strconv.ParseUint(value, 10, 16)
+		i, err = parseUint(value, 10, 16)
 		field.HostID = uint16(i)
 	case _TAG_HOST_1:
 		t.Code |= HostPath
 		field.Host1 = utils.IpToUint32(net.ParseIP(value).To4())
 	case _TAG_HOST_ID_1:
 		t.Code |= HostIDPath
-		i, err = strconv.ParseUint(value, 10, 16)
+		i, err = parseUint(value, 10, 16)
 		field.HostID1 = uint16(i)
 	case _TAG_IP_1:
 		t.Code |= IPPath
@@ -1056,11 +1063,11 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		field.L3EpcID1, err = unmarshalUint16WithSpecialID(value)
 	case _TAG_L3_DEVICE_ID_1:
 		t.Code |= L3DevicePath
-		i, err = strconv.ParseUint(value, 10, 16)
+		i, err = parseUint(value, 10, 16)
 		field.L3DeviceID1 = uint16(i)
 	case _TAG_L3_DEVICE_TYPE_1:
 		t.Code |= L3DevicePath
-		i, err = strconv.ParseUint(value, 10, 8)
+		i, err = parseUint(value, 10, 8)
 		field.L3DeviceType1 = DeviceType(i)
 	case _TAG_SUBNET_ID, _TAG_SUBNET_ID_0:
 		if id == _TAG_SUBNET_ID {
@@ -1068,19 +1075,19 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		} else {
 			t.Code |= SubnetIDPath
 		}
-		i, err = strconv.ParseUint(value, 10, 16)
+		i, err = parseUint(value, 10, 16)
 		field.SubnetID = uint16(i)
 	case _TAG_SUBNET_ID_1:
 		t.Code |= SubnetIDPath
-		i, err = strconv.ParseUint(value, 10, 16)
+		i, err = parseUint(value, 10, 16)
 		field.SubnetID1 = uint16(i)
 	case _TAG_REGION_0:
 		t.Code |= RegionIDPath
-		i, err = strconv.ParseUint(value, 10, 16)
+		i, err = parseUint(value, 10, 16)
 		field.RegionID = uint16(i)
 	case _TAG_REGION_1:
 		t.Code |= RegionIDPath
-		i, err = strconv.ParseUint(value, 10, 16)
+		i, err = parseUint(value, 10, 16)
 		field.RegionID1 = uint16(i)
 	case _TAG_DIRECTION:
 		t.Code |= Direction
@@ -1094,27 +1101,32 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		}
 	case _TAG_ACL_GID:
 		t.Code |= ACLGID
-		i, err = strconv.ParseUint(value, 10, 16)
+		i, err = parseUint(value, 10, 16)
 		field.ACLGID = uint16(i)
 	case _TAG_VLAN_ID:
 		t.Code |= VLANID
-		i, err = strconv.ParseUint(value, 10, 16)
+		i, err = parseUint(value, 10, 16)
 		field.VLANID = uint16(i)
 	case _TAG_PROTOCOL:
 		t.Code |= Protocol
-		i, err = strconv.ParseUint(value, 10, 8)
+		i, err = parseUint(value, 10, 8)
 		field.Protocol = layers.IPProtocol(i)
 	case _TAG_SERVER_PORT:
 		t.Code |= ServerPort
-		i, err = strconv.ParseUint(value, 10, 16)
+		i, err = parseUint(value, 10, 16)
 		field.ServerPort = uint16(i)
 	case _TAG_VTAP_ID:
 		t.Code |= VTAPID
-		i, err = strconv.ParseUint(value, 10, 16)
+		i, err = parseUint(value, 10, 16)
 		field.VTAPID = uint16(i)
 	case _TAG_TAP_TYPE:
 		t.Code |= TAPType
-		i, err = strconv.ParseUint(value, 10, 8)
+		// 在vtap中新增了tap_type字段，读取老版本数据时，若没有该字段返回空，则设置tap_type为3
+		if value == "" {
+			i = 3
+		} else {
+			i, err = parseUint(value, 10, 8)
+		}
 		field.TAPType = TAPTypeEnum(i)
 	case _TAG_ACL_DIRECTION:
 		t.Code |= ACLDirection
@@ -1140,7 +1152,7 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		}
 	case _TAG_TCP_FLAGS:
 		t.Code |= TCPFlags
-		i, err = strconv.ParseUint(value, 10, 8)
+		i, err = parseUint(value, 10, 8)
 		field.TCPFlags = TCPFlag(i)
 	case _TAG_POD_NODE_ID, _TAG_POD_NODE_ID_0:
 		if id == _TAG_POD_NODE_ID {
@@ -1148,11 +1160,11 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		} else {
 			t.Code |= PodNodeIDPath
 		}
-		i, err = strconv.ParseUint(value, 10, 16)
+		i, err = parseUint(value, 10, 16)
 		field.PodNodeID = uint16(i)
 	case _TAG_POD_NODE_ID_1:
 		t.Code |= PodNodeIDPath
-		i, err = strconv.ParseUint(value, 10, 16)
+		i, err = parseUint(value, 10, 16)
 		field.PodNodeID1 = uint16(i)
 	case _TAG_COUNTRY:
 		t.Code |= Country
@@ -1161,7 +1173,7 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		// 由于历史原因，这个字段表示两个含义：
 		// 数字：表示云平台所处区域的ID
 		// 非数字：表示中国的省份（仅在df_geo库中有此含义）
-		i, err = strconv.ParseUint(value, 10, 16)
+		i, err = parseUint(value, 10, 16)
 		if err == nil {
 			t.Code |= RegionID
 			field.RegionID = uint16(i)
