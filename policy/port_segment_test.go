@@ -30,4 +30,21 @@ func TestPortSegmentSimple(t *testing.T) {
 	if !reflect.DeepEqual(ports, expect) {
 		t.Errorf("Error portsegment range(4, 100) return %v\n", ports)
 	}
+
+	ports = newPortSegments(NewPortRange(0, 0))
+	if !reflect.DeepEqual(ports, []portSegment{portSegment{0, 65535}}) {
+		t.Errorf("Error portsegment range(0, 0) return %v\n", ports)
+	}
+	ports = newPortSegments(NewPortRange(0, 3))
+	if !reflect.DeepEqual(ports, []portSegment{portSegment{0, 65532}}) {
+		t.Errorf("Error portsegment range(0, 3) return %v\n", ports)
+	}
+	ports = newPortSegments(NewPortRange(65533, 65535))
+	if !reflect.DeepEqual(ports, []portSegment{portSegment{65533, 65535}, portSegment{65534, 65534}}) {
+		t.Errorf("Error portsegment range(65533, 65535) return %v\n", ports)
+	}
+	ports = newPortSegments(NewPortRange(65535, 65535))
+	if !reflect.DeepEqual(ports, []portSegment{portSegment{65535, 65535}}) {
+		t.Errorf("Error portsegment range(65535, 65535) return %v\n", ports)
+	}
 }
