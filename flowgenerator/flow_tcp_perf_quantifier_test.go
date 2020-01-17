@@ -70,7 +70,7 @@ func getPacketDirection(first, packet *MetaPacket) bool {
 	return first.IpSrc == packet.IpSrc
 }
 
-func perfTestTemplate(t *testing.T, pcapFile string, resultFile string) {
+func perfTestTemplate(t *testing.T, pcapFile string, resultFile string, careSeqList bool) {
 	var buffer bytes.Buffer
 	counter := NewFlowPerfCounter()
 	flowPerf := AcquireMetaFlowPerf()
@@ -96,6 +96,11 @@ func perfTestTemplate(t *testing.T, pcapFile string, resultFile string) {
 
 		flowPerf.Update(pkt, getPacketDirection(firstPkt, pkt), flowExtra, &counter)
 		buffer.WriteString(fmt.Sprintf("\t%vth perf data:%v", i, flowPerf.perfData))
+		if careSeqList {
+			session := flowPerf.ctrlInfo.tcpSession
+			buffer.WriteString(fmt.Sprintf("\t\tclient seqList(len:%v):%v\n\t\tserver seqList(len:%v):%v\n",
+				session[0].arraySize, session[0].seqArray, session[1].arraySize, session[1].seqArray))
+		}
 	}
 
 	content, _ := ioutil.ReadFile(resultFile)
@@ -108,11 +113,15 @@ func perfTestTemplate(t *testing.T, pcapFile string, resultFile string) {
 }
 
 func TestRttSyn(t *testing.T) {
-	perfTestTemplate(t, "rtt_syn_2_ack.pcap", "flowPerf_rttSyn_test.result")
+	perfTestTemplate(t, "rtt_syn_2_ack.pcap", "flowPerf_rttSyn_test.result", false)
 }
 
 func TestArt(t *testing.T) {
-	perfTestTemplate(t, "art-continues-payload-len-larger-than-1.pcap", "flowPerf_art_test.result")
+	perfTestTemplate(t, "art-continues-payload-len-larger-than-1.pcap", "flowPerf_art_test.result", false)
+}
+
+func TestRetrans(t *testing.T) {
+	perfTestTemplate(t, "xiangdao-retrans.pcap", "flowPerf_xiangdao-retrans_test.result", true)
 }
 
 func testSeqSegmentIsContinuous(left, right, node *SeqSegment, t *testing.T) {
@@ -245,7 +254,7 @@ func testTcpSessionPeerSeqNoAssert(t *testing.T) {
 	// {10, 10}
 	tcpHeader = &MetaPacketTcpHeader{Seq: 10, Ack: 20}
 	payload = 10
-	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_DISCONTINUOUS {
+	if flag := peer.assertSeqNumber(tcpHeader, payload); flag != SEQ_NOT_CARE {
 		t.Errorf("result is %v, expected %v", flag, SEQ_DISCONTINUOUS)
 		t.Errorf("actual is %v, expected {10,10}", peer.String())
 		return

@@ -1,0 +1,65 @@
+	0th perf data:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+		client seqList(len:1):[{4294966404 6} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+		server seqList(len:0):[{0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+	1th perf data:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+		client seqList(len:1):[{4294966404 606} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+		server seqList(len:0):[{0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+	2th perf data:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+		client seqList(len:1):[{4294966404 612} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+		server seqList(len:0):[{0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+	3th perf data:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+		client seqList(len:1):[{4294966404 612} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+		server seqList(len:0):[{0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+	4th perf data:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+		client seqList(len:1):[{4294966404 612} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+		server seqList(len:0):[{0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+	5th perf data:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 1},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 1},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+		client seqList(len:1):[{4294966404 612} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+		server seqList(len:0):[{0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+	6th perf data:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 1},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 1},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+		client seqList(len:1):[{339 4} {4294966404 612} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+		server seqList(len:0):[{0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+	7th perf data:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 1},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 1},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+		client seqList(len:1):[{339 10} {4294966404 612} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+		server seqList(len:0):[{0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+	8th perf data:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 2},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 2},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+		client seqList(len:1):[{339 10} {4294966404 612} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+		server seqList(len:0):[{0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+	9th perf data:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 2},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 2},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+		client seqList(len:1):[{339 613} {4294966404 612} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+		server seqList(len:0):[{0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+	10th perf data:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 2},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 2},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+		client seqList(len:1):[{339 613} {4294966404 612} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+		server seqList(len:0):[{0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+	11th perf data:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 2},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 2},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+		client seqList(len:1):[{339 613} {4294966404 612} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+		server seqList(len:0):[{0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+	12th perf data:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 2},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{retrans0: 2},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+		client seqList(len:1):[{339 613} {4294966404 612} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]
+		server seqList(len:0):[{0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0} {0 0}]

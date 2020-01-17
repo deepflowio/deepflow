@@ -16,7 +16,9 @@ type TcpConnSession = [2]TcpSessionPeer
 type PacketSeqTypeInSeqList uint8
 
 const (
-	FP_NAME = "flow-perf"
+	FP_NAME                  = "flow-perf"
+	SEQ_NUMBER_LOW_THREHOLD  = uint32(0x40000000)
+	SEQ_NUMBER_HIGH_THREHOLD = uint32(0xc0000000)
 )
 
 const (
@@ -227,10 +229,48 @@ func (p *TcpSessionPeer) insertSeqListNode(node SeqSegment, at int) {
 	p.arraySize++
 }
 
+// 检查当前node与list中seq最大的node的距离
+func (p *TcpSessionPeer) checkSeqSegment(node SeqSegment) bool {
+	// 检查seqNumber是否循环, 忽略循环包
+	if node.seqNumber+node.length < node.seqNumber {
+		return false
+	}
+
+	if p.arraySize == 0 {
+		p.insertSeqListNode(node, 0)
+		return false
+	}
+
+	// list倒序排序，故最大的seq范围节点index为0
+	lastIdx := 0
+	// 前一个包在seq范围的高3/4, 当前包在seq范围的低1/4
+	// 意味着seq已循环，需清空list
+	if node.seqNumber < SEQ_NUMBER_LOW_THREHOLD &&
+		p.seqArray[lastIdx].seqNumber+p.seqArray[lastIdx].length >
+			SEQ_NUMBER_HIGH_THREHOLD {
+		// 清空list
+		p.arraySize = 0
+		// 插入当前包
+		p.insertSeqListNode(node, 0)
+		return false
+	}
+
+	// 前一个包在seq范围的低1/4, 当前包在seq范围的高3/4
+	// 意味着之前的包重传或乱序了，忽略这类包
+	if node.seqNumber > SEQ_NUMBER_HIGH_THREHOLD &&
+		p.seqArray[lastIdx].seqNumber+p.seqArray[lastIdx].length <
+			SEQ_NUMBER_LOW_THREHOLD {
+		// 忽略当前包
+		return false
+	}
+
+	return true
+}
+
 // 因数组中每个node.seqNumber默认为0，故seqArray为降序数组；直至找到seqNumber大于或等于node.seqNumber的节点
 // 返回值
 func (p *TcpSessionPeer) Search(node SeqSegment) (lt, gte *SeqSegment, index int) {
-	for index = 0; index < SEQ_LIST_MAX_LEN; index++ {
+	for index = 0; index < p.arraySize; index++ {
 		if node.seqNumber > p.seqArray[index].seqNumber { // 查找node在list中的位置
 			break
 		}
@@ -314,8 +354,11 @@ func (p *TcpSessionPeer) assertSeqNumber(tcpHeader *MetaPacketTcpHeader, payload
 	}
 
 	node := SeqSegment{seqNumber: tcpHeader.Seq, length: uint32(payloadLen)}
-	lt, gte, ltIndex := p.Search(node)
+	if p.checkSeqSegment(node) == false {
+		return SEQ_NOT_CARE
+	}
 
+	lt, gte, ltIndex := p.Search(node)
 	if r := isRetransSeqSegment(lt, gte, &node); r {
 		flag = SEQ_RETRANS
 	} else if e := isErrorSeqSegment(lt, gte, &node); e {
