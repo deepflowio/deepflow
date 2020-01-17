@@ -36,7 +36,6 @@ func calcMask(port, maxPort, count uint16) (uint16, uint16) {
 
 func newPortSegments(port PortRange) []portSegment {
 	segments := make([]portSegment, 0, 2)
-
 	for i := port.Min(); i <= port.Max(); {
 		segment := portSegment{}
 		n := calcZeroCount(i)
@@ -44,8 +43,11 @@ func newPortSegments(port PortRange) []portSegment {
 
 		segment.mask = mask
 		segment.port = i
-		i = i + 1<<n
 		segments = append(segments, segment)
+		i = i + 1<<n
+		if i == 0 {
+			break
+		}
 	}
 
 	return segments
