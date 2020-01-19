@@ -65,7 +65,8 @@ enum IfMacSource {
 
 enum SocketType {
     UDP = 0;
-    ZMQ = 1;
+    TCP = 1;
+    ZMQ = 2;
 }
 
 message Config {
