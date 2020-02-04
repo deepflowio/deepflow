@@ -34,3 +34,16 @@ func Jenkins32(hash uint32) int32 {
 	hash = hash + (hash << 16)
 	return int32(hash)
 }
+
+func JenkinsSlice(bs []byte, step int) uint32 {
+	hash := uint32(0)
+	for i := 0; i < len(bs); i += step {
+		hash += uint32(bs[i])
+		hash += hash << 10
+		hash ^= hash >> 6
+	}
+	hash += hash << 3
+	hash ^= hash >> 11
+	hash += hash << 15
+	return hash
+}
