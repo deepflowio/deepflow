@@ -47,7 +47,7 @@ import struct
 
 def _ip_to_bytes(addr):
     try:
-        return ipaddress.ip_address(unicode(addr)).packed
+        return ipaddress.ip_address(addr).packed
     except ValueError:
         return None
 
@@ -93,9 +93,9 @@ def __packet_matches_condition(packet, ips_int, protocol, ports):
     # ipv4
     if protocol is not None:
         if ip_version == 4:
-            r_protocol = ord(packet[l3_offset + IPV4_PROTOCOL_OFFSET])
+            r_protocol = packet[l3_offset + IPV4_PROTOCOL_OFFSET]
         else:
-            r_protocol = ord(packet[l3_offset + IPV6_NEXT_HEADER_OFFSET])
+            r_protocol = packet[l3_offset + IPV6_NEXT_HEADER_OFFSET]
             offset = l3_offset + IPV6_HEADER_LEN
             while True:
                 if r_protocol in [
@@ -107,11 +107,11 @@ def __packet_matches_condition(packet, ips_int, protocol, ports):
                     IPV6_NEXT_HEADER_HOPBYHOP, IPV6_NEXT_HEADER_DESTINATION,
                     IPV6_NEXT_HEADER_ROUTING
                 ]:
-                    r_protocol = ord(packet[offset])
+                    r_protocol = packet[offset]
                     offset += 1
-                    offset += ord(packet[offset])
+                    offset += packet[offset]
                 elif r_protocol == IPV6_NEXT_HEADER_FRAGMENT:
-                    r_protocol = ord(packet[offset])
+                    r_protocol = packet[offset]
                     offset += 8
                 else:
                     LOG.warning(
@@ -126,9 +126,8 @@ def __packet_matches_condition(packet, ips_int, protocol, ports):
             return False
 
         if ip_version == 4:
-            l4_offset = l3_offset + (
-                (ord(packet[l3_offset + IHL_OFFSET]) & 0xF) << 2
-            )
+            l4_offset = l3_offset + ((packet[l3_offset + IHL_OFFSET] & 0xF) <<
+                                     2)
         else:
             l4_offset = offset
 
@@ -187,7 +186,9 @@ def found_in_pcap(filename, ips=None, protocol=None, ports=None):
                 packet = fp.read(incl_len)
                 if len(packet) != incl_len:
                     return False
-                if __packet_matches_condition(packet, ips_int, protocol, ports):
+                if __packet_matches_condition(
+                    packet, ips_int, protocol, ports
+                ):
                     return True
 
     except IOError as e:
@@ -240,7 +241,9 @@ def filter_pcap(filename, ips=None, protocol=None, ports=None):
                 packet = fp.read(incl_len)
                 if len(packet) != incl_len:
                     return
-                if __packet_matches_condition(packet, ips_int, protocol, ports):
+                if __packet_matches_condition(
+                    packet, ips_int, protocol, ports
+                ):
                     yield r_header + packet
 
     except IOError as e:

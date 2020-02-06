@@ -139,7 +139,7 @@ HTTP response body:
         start_ts = int(request.query.start_ts)
     if request.query.end_ts != '':
         end_ts = int(request.query.end_ts)
-    size = int(request.query.size) if request.query.size != '' else None
+    size = int(request.query.size) if request.query.size != '' else DEFAULT_PCAP_LIST_SIZE
     ip_version = int(
         request.query.ip_version
     ) if request.query.ip_version != '' else None
@@ -147,7 +147,7 @@ HTTP response body:
     if ip_version is not None and ip_version not in [4, 6]:
         return {'OPT_STATUS': 'FAILURE', 'DESCRIPTION': 'bad ip version'}
     if ip:
-        ip = ipaddress.ip_address(unicode(ip))
+        ip = ipaddress.ip_address(ip)
         if ip_version is not None and ip.version != ip_version:
             return {
                 'OPT_STATUS': 'FAILURE',
@@ -155,7 +155,7 @@ HTTP response body:
             }
         ip_version = ip.version
     if ips:
-        ips = [ipaddress.ip_address(unicode(it)) for it in ips]
+        ips = [ipaddress.ip_address(it) for it in ips]
         if ip_version is not None and any([
             it.version != ip_version for it in ips
         ]):
@@ -167,10 +167,7 @@ HTTP response body:
         try:
             ports = [int(it) for it in ports]
         except ValueError:
-            return {
-                'OPT_STATUS': 'FAILURE',
-                'DESCRIPTION': 'bad port'
-            }
+            return {'OPT_STATUS': 'FAILURE', 'DESCRIPTION': 'bad port'}
     return {
         'DATA': get_files(
             acl_gid, start_ts, end_ts, size=size, ip=ip, ip_filter=ips,
@@ -201,7 +198,7 @@ HTTP response body:
   octet-stream
     """
     ips = request.query.getlist('ip')
-    ips = [ipaddress.ip_address(unicode(it)) for it in ips]
+    ips = [ipaddress.ip_address(it) for it in ips]
     protocol = None
     ports = None
     if request.query.protocol != '':
@@ -272,18 +269,16 @@ def _ip_convert(ip):
 def _ip_convert_back(ip):
     try:
         # ipv6
-        return ipaddress.ip_address(unicode(ip))
+        return ipaddress.ip_address(ip)
     except ValueError:
         try:
             # ipv4
             return ipaddress.ip_address(
-                unicode(
-                    '%d.%d.%d.%d' %
-                    (int(ip[0:3]), int(ip[3:6]), int(ip[6:9]), int(ip[9:12]))
-                )
+                '%d.%d.%d.%d' %
+                (int(ip[0:3]), int(ip[3:6]), int(ip[6:9]), int(ip[9:12]))
             )
         except (IndexError, ValueError):
-            return ipaddress.ip_address(unicode('0.0.0.0'))
+            return ipaddress.ip_address('0.0.0.0')
 
 
 def _tap_type_to_id(tapType):
@@ -313,8 +308,8 @@ def _time_to_epoch(time_str):
 
 def get_files(
     acl_gid, start_ts, end_ts, size=DEFAULT_PCAP_LIST_SIZE, ip=None,
-    ip_filter=None, protocol=None, port_filter=None, tap_type=None, ip_version=None,
-    peek=False
+    ip_filter=None, protocol=None, port_filter=None, tap_type=None,
+    ip_version=None, peek=False
 ):
     if size < 0:
         size = DEFAULT_PCAP_LIST_SIZE
@@ -349,13 +344,13 @@ def get_files(
             continue
         mac = segs[1]
         ip_rep = _ip_convert_back(segs[2])
-        if (
-            ip_filter or protocol is not None
-        ) and not found_in_pcap(directory + file, ip_filter, protocol, port_filter):
+        if (ip_filter or protocol is not None) and not found_in_pcap(
+            directory + file, ip_filter, protocol, port_filter
+        ):
             continue
         files.append({
             'ip': str(ip_rep),
-            'mac': ':'.join([mac[i:i+2] for i in range(0, len(mac), 2)]),
+            'mac': ':'.join([mac[i:i + 2] for i in range(0, len(mac), 2)]),
             'tap_type': _tap_type_to_id(segs[0]),
             'filename': file,
             'start_epoch': start_epoch,

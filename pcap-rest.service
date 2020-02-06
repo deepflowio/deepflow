@@ -3,7 +3,7 @@ Description=pcap-rest
 After=syslog.target network-online.target
 
 [Service]
-ExecStart=/usr/bin/python /usr/local/deepflow/pcap-rest/pcap-rest.py
+ExecStart=/usr/bin/python3 /usr/local/deepflow/pcap-rest/pcap-rest.py
 ExecStop=/bin/kill $MAINPID
 Restart=on-failure
 RestartSec=60
