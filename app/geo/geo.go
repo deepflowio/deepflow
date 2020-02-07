@@ -151,7 +151,7 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 				if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE != 0 {
 					codes = append(codes, POLICY_CHN_CODES...)
 				}
-				if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE_PORT != 0 {
+				if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_NODE_PORT != 0 && flow.IsActiveService { // 含有端口号的，仅统计活跃端口
 					codes = append(codes, POLICY_CHN_PORT_CODES...)
 				}
 			}
@@ -174,7 +174,7 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 				if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE != 0 {
 					codes = append(codes, POLICY_CHN_EDGE_CODES...)
 				}
-				if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE_PORT != 0 {
+				if policy.GetTagTemplates()&inputtype.TEMPLATE_ACL_EDGE_PORT != 0 && flow.IsActiveService { // 含有端口号的，仅统计活跃端口
 					codes = append(codes, POLICY_CHN_EDGE_PORT_CODES...)
 				}
 			}
