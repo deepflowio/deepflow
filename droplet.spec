@@ -39,7 +39,7 @@ cp %pwd/config/droplet.yaml $RPM_BUILD_ROOT/etc/droplet.yaml.sample
 mkdir -p $RPM_BUILD_ROOT/usr/share/droplet/
 mkdir -p $RPM_BUILD_ROOT%{pcapdir}
 cp %pwd/cmd/pcap-rest/*.py $RPM_BUILD_ROOT%{pcapdir}
-cp %pwd/cmd/pcap-rest/requirements.txt $RPM_BUILD_ROOT%{pcapdir}
+cp %pwd/cmd/pcap-rest/requirements3.txt $RPM_BUILD_ROOT%{pcapdir}
 cp %pwd/pcap-rest.service $RPM_BUILD_ROOT/lib/systemd/system/
 
 %files
@@ -79,11 +79,11 @@ deepflow pcap restful API agent
 
 %files -n pcap-rest
 %{pcapdir}/*.py*
-%{pcapdir}/requirements.txt
+%{pcapdir}/requirements3.txt
 %config(noreplace) /lib/systemd/system/pcap-rest.service
 
 %post -n pcap-rest
-[ -f %{pcapdir}/requirements.txt ] && python -m pip install -r %{pcapdir}/requirements.txt
+[ -f %{pcapdir}/requirements3.txt ] && python -m pip install -r %{pcapdir}/requirements3.txt
 systemctl daemon-reload
 systemctl try-restart pcap-rest
 
