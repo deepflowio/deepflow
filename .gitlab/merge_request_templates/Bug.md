@@ -29,4 +29,4 @@
 
 /assign @xiangyang
 
-/cc @buyi @yuanchao @jinjie @zhuofeng @wangtuo
+/cc @yuanchao @jinjie @zhuofeng @wangtuo
