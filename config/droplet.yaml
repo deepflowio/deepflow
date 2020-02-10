@@ -101,10 +101,6 @@ flow-generator:
   # or tcp flow with exception,
   # or flow with single direction, in seconds
   others-timeout: 5
-  # clean interval for flow, should not be too large, in seconds
-  flow-clean-interval: 1
-  # flow cleaner count for every generator
-  timeout-cleaner-count: 4
   # hash map size for every generator
   hash-map-size: 262166
   # 网包时间与当前时间相比的最大delay，单位为秒，可配置[1, 10]，默认为5
