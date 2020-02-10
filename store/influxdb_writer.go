@@ -31,6 +31,7 @@ const (
 	INFLUXDB_PRECISION_S   = "s"
 	UNIX_TIMESTAMP_TO_TIME = (1969*365 + 1969/4 - 1969/100 + 1969/400) * 24 * 60 * 60
 	TIME_BINARY_LEN        = 15
+	MAX_ERR_MSG_LEN        = 512
 )
 
 type InfluxdbItem interface {
@@ -525,9 +526,12 @@ func (w *InfluxdbWriter) writeInfluxdb(writerInfo *WriterInfo, dbCreateCtl *DBCr
 		err = writerInfo.httpClient.Write(pc.bp)
 	}
 	if err != nil {
-		log.Errorf("httpclient write db(%s) batch points(%d) failed: %s", db, pointsCount, err)
 		*writeFailedCount += pointsCount
-		return err
+		errMsg := err.Error()
+		if len(errMsg) < MAX_ERR_MSG_LEN {
+			return fmt.Errorf("httpclient write db(%s) batch points(%d) failed: %s", db, pointsCount, errMsg)
+		}
+		return fmt.Errorf("httpclient write db(%s) batch points(%d) failed: %s ... %s", db, pointsCount, errMsg[:MAX_ERR_MSG_LEN], errMsg[len(errMsg)-MAX_ERR_MSG_LEN:])
 	}
 
 	*writeSuccCount += pointsCount
