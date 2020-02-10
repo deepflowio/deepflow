@@ -207,6 +207,10 @@ func (d *EndpointData) String() string {
 	return fmt.Sprintf("{Src: %v Dst: %v}", d.SrcInfo, d.DstInfo)
 }
 
+func (d *EndpointData) Valid() bool {
+	return d.SrcInfo != nil
+}
+
 func (d *EndpointData) SetL2End(key *LookupKey) {
 	if key.Tap == TAP_TOR {
 		d.SrcInfo.L2End = key.L2End0

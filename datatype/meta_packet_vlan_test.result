@@ -9,7 +9,7 @@ timestamp: 0 inport: 0x10002 exporter: 0.0.0.0 len: 60 l2_end: false, false l3_e
 	10.92.60.106:50230 -> 10.94.28.9:445 proto: TCP ttl: 124 ihl: 5 id: 1735 flags: 0x2, fragment Offset: 0 payload-len: 0 tcp: &{Flags:16 Seq:3073744204 Ack:38082375 DataOffset:5 WinSize:256 WinScale:0 SACKPermitted:false MSS:0 Sack:[]}
 timestamp: 0 inport: 0x2 exporter: 0.0.0.0 len: 110 l2_end: false, false l3_end: false, false invalid: false direction: 0
 	00:25:45:00:77:40 -> 00:1c:f6:ea:40:00 type: 0800 vlan-id: 0
-	10.73.14.50:50002 -> 10.91.240.136:4172 proto: UDP ttl: 123 ihl: 5 id: 22881 flags: 0x0, fragment Offset: 0 payload-len: 68 
+	10.73.14.50:50002 -> 10.91.240.136:4172 proto: UDP ttl: 123 ihl: 5 id: 22881 flags: 0x0, fragment Offset: 0 payload-len: 68
 timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 64 l2_end: false, false l3_end: false, false invalid: false direction: 0
 	00:03:b2:30:52:c0 -> 00:1c:f6:f8:3b:81 type: 0800 vlan-id: 513
 	202.96.219.40:5061 -> 175.102.15.218:42163 proto: TCP ttl: 126 ihl: 5 id: 3210 flags: 0x2, fragment Offset: 0 payload-len: 0 tcp: &{Flags:16 Seq:1648460715 Ack:3122464936 DataOffset:5 WinSize:251 WinScale:0 SACKPermitted:false MSS:0 Sack:[]}

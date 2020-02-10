@@ -1,18 +1,18 @@
 timestamp: 0 inport: 0x30000 exporter: 0.0.0.0 len: 181 l2_end: false, false l3_end: false, false invalid: false direction: 0
 	00:c2:c6:7b:66:78 -> 33:33:00:00:00:0c type: 86dd vlan-id: 0
-	<nil>.0 -> <nil>.0 proto: IPv6HopByHop hop limit: 0 flow lable: 0 next header: IPv6HopByHop options:  
+	<nil>.0 -> <nil>.0 proto: IPv6HopByHop hop limit: 0 flow lable: 0 next header: IPv6HopByHop options: .
 timestamp: 0 inport: 0x30000 exporter: 0.0.0.0 len: 430 l2_end: false, false l3_end: false, false invalid: false direction: 0
 	a8:5b:78:62:c3:9b -> 33:33:00:00:00:fb type: 86dd vlan-id: 0
-	<nil>.0 -> <nil>.0 proto: IPv6HopByHop hop limit: 0 flow lable: 0 next header: IPv6HopByHop options:  
+	<nil>.0 -> <nil>.0 proto: IPv6HopByHop hop limit: 0 flow lable: 0 next header: IPv6HopByHop options: .
 timestamp: 0 inport: 0x30000 exporter: 0.0.0.0 len: 74 l2_end: false, false l3_end: false, false invalid: false direction: 0
 	c8:3d:d4:f0:28:d5 -> 33:33:00:00:00:fb type: 86dd vlan-id: 0
-	<nil>.0 -> <nil>.0 proto: IPv6HopByHop hop limit: 0 flow lable: 0 next header: IPv6HopByHop options:  
+	<nil>.0 -> <nil>.0 proto: IPv6HopByHop hop limit: 0 flow lable: 0 next header: IPv6HopByHop options: .
 timestamp: 0 inport: 0x30000 exporter: 0.0.0.0 len: 84 l2_end: false, false l3_end: false, false invalid: false direction: 0
 	f8:59:71:50:74:9a -> 33:33:00:01:00:03 type: 86dd vlan-id: 0
-	<nil>.0 -> <nil>.0 proto: IPv6HopByHop hop limit: 0 flow lable: 0 next header: IPv6HopByHop options:  
+	<nil>.0 -> <nil>.0 proto: IPv6HopByHop hop limit: 0 flow lable: 0 next header: IPv6HopByHop options: .
 timestamp: 0 inport: 0x30000 exporter: 0.0.0.0 len: 86 l2_end: false, false l3_end: false, false invalid: false direction: 0
 	60:14:b3:c8:df:a7 -> 52:54:00:33:c4:54 type: 86dd vlan-id: 0
-	<nil>.0 -> <nil>.0 proto: IPv6HopByHop hop limit: 0 flow lable: 0 next header: IPv6HopByHop options:  
+	<nil>.0 -> <nil>.0 proto: IPv6HopByHop hop limit: 0 flow lable: 0 next header: IPv6HopByHop options: .
 timestamp: 0 inport: 0x30000 exporter: 0.0.0.0 len: 93 l2_end: false, false l3_end: false, false invalid: false direction: 0
 	60:14:b3:c8:df:a7 -> 52:54:00:33:c4:54 type: 86dd vlan-id: 0
-	<nil>.0 -> <nil>.0 proto: IPv6HopByHop hop limit: 0 flow lable: 0 next header: IPv6HopByHop options:  
+	<nil>.0 -> <nil>.0 proto: IPv6HopByHop hop limit: 0 flow lable: 0 next header: IPv6HopByHop options: .

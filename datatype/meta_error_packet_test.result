@@ -1,18 +1,18 @@
 timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 13 l2_end: false, false l3_end: false, false invalid: true direction: 0
 	00:00:00:00:00:00 -> 00:00:00:00:00:00 type: 0000 vlan-id: 0
-	0.0.0.0:0 -> 0.0.0.0:0 proto: IPv6HopByHop ttl: 0 ihl: 0 id: 0 flags: 0x0, fragment Offset: 0 payload-len: 0 
+	0.0.0.0:0 -> 0.0.0.0:0 proto: IPv6HopByHop ttl: 0 ihl: 0 id: 0 flags: 0x0, fragment Offset: 0 payload-len: 0
 timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 17 l2_end: false, false l3_end: false, false invalid: false direction: 0
 	00:25:45:00:77:40 -> 00:1c:f6:ea:40:00 type: 8100 vlan-id: 0
-	0.0.0.0:0 -> 0.0.0.0:0 proto: IPv6HopByHop ttl: 0 ihl: 0 id: 0 flags: 0x0, fragment Offset: 0 payload-len: 0 
+	0.0.0.0:0 -> 0.0.0.0:0 proto: IPv6HopByHop ttl: 0 ihl: 0 id: 0 flags: 0x0, fragment Offset: 0 payload-len: 0
 timestamp: 0 inport: 0x2 exporter: 0.0.0.0 len: 17 l2_end: false, false l3_end: false, false invalid: false direction: 0
 	00:25:45:00:77:40 -> 00:1c:f6:ea:40:11 type: 8100 vlan-id: 0
-	0.0.0.0:0 -> 0.0.0.0:0 proto: IPv6HopByHop ttl: 0 ihl: 0 id: 0 flags: 0x0, fragment Offset: 0 payload-len: 0 
+	0.0.0.0:0 -> 0.0.0.0:0 proto: IPv6HopByHop ttl: 0 ihl: 0 id: 0 flags: 0x0, fragment Offset: 0 payload-len: 0
 timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 34 l2_end: false, false l3_end: false, false invalid: false direction: 0
 	60:14:b3:c8:df:a7 -> 52:54:00:33:c4:54 type: 0806 vlan-id: 0
-	0.0.0.0:0 -> 0.0.0.0:0 proto: IPv6HopByHop ttl: 0 ihl: 0 id: 0 flags: 0x0, fragment Offset: 0 payload-len: 0 
+	0.0.0.0:0 -> 0.0.0.0:0 proto: IPv6HopByHop ttl: 0 ihl: 0 id: 0 flags: 0x0, fragment Offset: 0 payload-len: 0
 timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 44 l2_end: false, false l3_end: false, false invalid: false direction: 0
 	00:25:45:00:77:40 -> 00:1c:f6:ea:40:00 type: 0800 vlan-id: 0
-	10.73.14.50:0 -> 10.91.240.136:0 proto: UDP ttl: 123 ihl: 8 id: 22881 flags: 0x0, fragment Offset: 0 payload-len: 0 
+	10.73.14.50:0 -> 10.91.240.136:0 proto: UDP ttl: 123 ihl: 8 id: 22881 flags: 0x0, fragment Offset: 0 payload-len: 0
 timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 64 l2_end: false, false l3_end: false, false invalid: true direction: 0
 	00:03:b2:30:52:c0 -> 00:1c:f6:f8:3b:81 type: 0800 vlan-id: 513
 	202.96.219.40:0 -> 175.102.15.218:0 proto: TCP ttl: 126 ihl: 3 id: 3210 flags: 0x2, fragment Offset: 0 payload-len: 0 tcp: &{Flags:0 Seq:0 Ack:0 DataOffset:0 WinSize:0 WinScale:0 SACKPermitted:false MSS:0 Sack:[]}
@@ -24,30 +24,30 @@ timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 104 l2_end: false, false l3_end:
 	202.96.219.40:0 -> 60.187.15.218:0 proto: TCP ttl: 126 ihl: 15 id: 3210 flags: 0x2, fragment Offset: 0 payload-len: 0 tcp: &{Flags:0 Seq:0 Ack:0 DataOffset:0 WinSize:0 WinScale:0 SACKPermitted:false MSS:0 Sack:[]}
 timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 46 l2_end: false, false l3_end: false, false invalid: false direction: 0
 	88:cf:98:07:04:a8 -> 52:54:00:1e:b3:22 type: 0800 vlan-id: 0
-	115.34.170.88:0 -> 124.205.174.146:0 proto: UDP ttl: 56 ihl: 8 id: 0 flags: 0x2, fragment Offset: 0 payload-len: 0 
+	115.34.170.88:0 -> 124.205.174.146:0 proto: UDP ttl: 56 ihl: 8 id: 0 flags: 0x2, fragment Offset: 0 payload-len: 0
 timestamp: 0 inport: 0x2 exporter: 0.0.0.0 len: 77 l2_end: false, false l3_end: false, false invalid: false direction: 0
 	00:25:45:00:77:40 -> 00:1c:f6:ea:40:00 type: 0800 vlan-id: 0
-	10.73.14.50:50002 -> 10.91.240.136:4172 proto: UDP ttl: 123 ihl: 5 id: 22881 flags: 0x0, fragment Offset: 0 payload-len: 68 
+	10.73.14.50:50002 -> 10.91.240.136:4172 proto: UDP ttl: 123 ihl: 5 id: 22881 flags: 0x0, fragment Offset: 0 payload-len: 68
 timestamp: 0 inport: 0x10002 exporter: 0.0.0.0 len: 60 l2_end: false, false l3_end: false, false invalid: false direction: 0
 	00:25:45:00:77:40 -> 00:1c:f6:ea:40:00 type: 0800 vlan-id: 0
 	10.92.60.106:50230 -> 10.94.28.9:445 proto: TCP ttl: 124 ihl: 5 id: 1735 flags: 0x2, fragment Offset: 0 payload-len: 60 tcp: &{Flags:16 Seq:3073744204 Ack:38082375 DataOffset:5 WinSize:256 WinScale:0 SACKPermitted:false MSS:0 Sack:[]}
 timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 34 l2_end: false, false l3_end: false, false invalid: false direction: 0
 	60:14:b3:c8:df:a7 -> 52:54:00:33:c4:54 type: 86dd vlan-id: 0
-	<nil>.0 -> <nil>.0 proto: IPv6HopByHop hop limit: 0 flow lable: 0 next header: IPv6HopByHop options:  
+	<nil>.0 -> <nil>.0 proto: IPv6HopByHop hop limit: 0 flow lable: 0 next header: IPv6HopByHop options: .
 timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 40 l2_end: false, false l3_end: false, false invalid: true direction: 0
 	60:14:b3:c8:df:a7 -> 52:54:00:33:c4:54 type: 0800 vlan-id: 0
-	10.33.0.177:0 -> 10.30.10.1:0 proto: ICMPv4 ttl: 64 ihl: 5 id: 30771 flags: 0x0, fragment Offset: 0 payload-len: 0 
+	10.33.0.177:0 -> 10.30.10.1:0 proto: ICMPv4 ttl: 64 ihl: 5 id: 30771 flags: 0x0, fragment Offset: 0 payload-len: 0
 timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 42 l2_end: false, false l3_end: false, false invalid: false direction: 0
 	52:54:00:33:c4:54 -> 60:14:b3:c8:df:a7 type: 0800 vlan-id: 0
-	10.0.0.1:0 -> 10.33.0.177:0 proto: ICMPv4 ttl: 63 ihl: 5 id: 37317 flags: 0x0, fragment Offset: 0 payload-len: 0 
+	10.0.0.1:0 -> 10.33.0.177:0 proto: ICMPv4 ttl: 63 ihl: 5 id: 37317 flags: 0x0, fragment Offset: 0 payload-len: 0
 	RawHeader len: 8, RawHeader: 0301000000000000
 timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 58 l2_end: false, false l3_end: false, false invalid: false direction: 0
 	52:54:00:33:c4:54 -> 60:14:b3:c8:df:a7 type: 0800 vlan-id: 0
-	10.0.0.1:0 -> 10.33.0.177:0 proto: ICMPv4 ttl: 63 ihl: 5 id: 37317 flags: 0x0, fragment Offset: 0 payload-len: 0 
+	10.0.0.1:0 -> 10.33.0.177:0 proto: ICMPv4 ttl: 63 ihl: 5 id: 37317 flags: 0x0, fragment Offset: 0 payload-len: 0
 	RawHeader len: 24, RawHeader: 03010000000000004500003c783300003e01e59d0a2100b1
 timestamp: 0 inport: 0x2 exporter: 0.0.0.0 len: 40 l2_end: false, false l3_end: false, false invalid: true direction: 0
 	00:25:45:00:77:40 -> 00:1c:f6:ea:40:00 type: 0800 vlan-id: 0
-	10.73.14.50:0 -> 10.91.240.136:0 proto: UDP ttl: 123 ihl: 5 id: 22881 flags: 0x0, fragment Offset: 0 payload-len: 0 
+	10.73.14.50:0 -> 10.91.240.136:0 proto: UDP ttl: 123 ihl: 5 id: 22881 flags: 0x0, fragment Offset: 0 payload-len: 0
 timestamp: 0 inport: 0x0 exporter: 0.0.0.0 len: 56 l2_end: false, false l3_end: false, false invalid: true direction: 0
 	00:03:b2:30:52:c0 -> 00:1c:f6:f8:3b:81 type: 0800 vlan-id: 513
 	202.96.219.40:0 -> 175.102.15.218:0 proto: TCP ttl: 126 ihl: 5 id: 3210 flags: 0x2, fragment Offset: 0 payload-len: 0 tcp: &{Flags:0 Seq:0 Ack:0 DataOffset:0 WinSize:0 WinScale:0 SACKPermitted:false MSS:0 Sack:[]}

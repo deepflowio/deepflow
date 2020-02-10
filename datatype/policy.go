@@ -430,6 +430,10 @@ func (a AclAction) String() string {
 		a.GetAclGidBitmapCount())
 }
 
+func (d *PolicyData) Valid() bool {
+	return d.ACLID != 0
+}
+
 // 如果双方向都匹配了同一策略，对应的NpbActions Merge后会是TAPSIDE_ALL，
 // 此时只保留TAPSIDE_SRC方向，即对应只处理src为true的tx流量
 func (d *PolicyData) FormatNpbAction() {
