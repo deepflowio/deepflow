@@ -77,6 +77,10 @@ func (p *FlowToLogUsageDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, va
 
 	l3EpcIDs := [2]int32{flowMetricsPeerSrc.L3EpcID, flowMetricsPeerDst.L3EpcID}
 	isNorthSouthTraffic := IsNorthSourceTraffic(l3EpcIDs[0], l3EpcIDs[1])
+	// 不统计接入流量非活跃端口
+	if isNorthSouthTraffic && !flow.IsActiveService {
+		return p.docs.Slice()
+	}
 	ips := [2]uint32{flow.IPSrc, flow.IPDst}
 	ip6s := [2]net.IP{flow.IP6Src, flow.IP6Dst}
 	isL2L3End := [2]bool{
