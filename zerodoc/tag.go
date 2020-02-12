@@ -212,6 +212,7 @@ type Field struct {
 	CastType     CastTypeEnum
 	IsIPv6       uint8 // (8B) 与IP/IP6是共生字段
 	TCPFlags     TCPFlag
+	Side         uint8 // 目前没有对应的code标识，encode，decode均不处理
 
 	Country uint8
 	Region  uint8
@@ -438,6 +439,10 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",server_port=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ServerPort), 10))
 	}
+
+	// 增加side字段，为5.5.8 到后续版本升级做准备
+	offset += copy(b[offset:], ",side=")
+	offset += copy(b[offset:], strconv.FormatUint(uint64(t.Side), 10))
 
 	if t.Code&SubnetID != 0 {
 		offset += copy(b[offset:], ",subnet_id=")
