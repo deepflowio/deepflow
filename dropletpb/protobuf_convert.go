@@ -212,3 +212,29 @@ func Convert2PeerConnections(datas []*trident.PeerConnection) []*datatype.PeerCo
 	}
 	return connections
 }
+
+func newCidr(data *trident.Cidr) *datatype.Cidr {
+	if len(data.GetPrefix()) == 0 {
+		return nil
+	}
+	_, ipNet, err := net.ParseCIDR(data.GetPrefix())
+	if err == nil {
+		return nil
+	}
+
+	return &datatype.Cidr{
+		IpNet: ipNet,
+		EpcId: int32(data.GetEpcId()),
+		Type:  uint8(data.GetType()),
+	}
+}
+
+func Convert2Cidrs(datas []*trident.Cidr) []*datatype.Cidr {
+	cidrs := make([]*datatype.Cidr, 0, len(datas))
+	for _, data := range datas {
+		if cidr := newCidr(data); cidr != nil {
+			cidrs = append(cidrs, cidr)
+		}
+	}
+	return cidrs
+}

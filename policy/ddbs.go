@@ -557,6 +557,10 @@ func (d *Ddbs) UpdateIpGroupData(data []*IpGroupData) {
 	d.generateGroupIpMap(data)
 }
 
+func (d *Ddbs) UpdateCidr(data []*Cidr) {
+	d.cloudPlatformLabeler.UpdateCidr(data)
+}
+
 func (d *Ddbs) GetPolicyByFastPath(packet *LookupKey) (*EndpointStore, *PolicyData) {
 	if d.FastPathDisable {
 		return nil, nil

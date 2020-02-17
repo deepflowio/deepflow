@@ -76,6 +76,7 @@ type TableOperator interface {
 	UpdateAcls(data []*Acl, check ...bool)
 	UpdateInterfaceData(data []*PlatformData)
 	UpdateIpGroupData(data []*IpGroupData)
+	UpdateCidr(data []*Cidr)
 
 	SetCloudPlatform(cloudPlatformLabeler *CloudPlatformLabeler)
 
@@ -257,6 +258,10 @@ func (t *PolicyTable) UpdateInterfaceDataAndIpGroupData(platforms []*PlatformDat
 
 func (t *PolicyTable) UpdatePeerConnection(data []*PeerConnection) {
 	t.cloudPlatformLabeler.UpdatePeerConnectionTable(data)
+}
+
+func (t *PolicyTable) UpdateCidrs(data []*Cidr) {
+	t.cloudPlatformLabeler.UpdateCidr(data)
 }
 
 func (t *PolicyTable) UpdateAclData(data []*Acl, check ...bool) {

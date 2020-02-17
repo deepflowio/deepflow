@@ -44,6 +44,7 @@ type CloudPlatformLabeler struct {
 	ipGroup             *IpResourceGroup
 	netmaskBitmap       uint32
 	peerConnectionTable map[int32][]int32
+	epcCidrMapData      map[int32][]*Cidr
 }
 
 func NewCloudPlatformLabeler(queueCount int, mapSize uint32) *CloudPlatformLabeler {
@@ -280,6 +281,28 @@ func (l *CloudPlatformLabeler) UpdateGroupTree(ipGroupDatas []*IpGroupData) {
 	l.ipGroup.Update(ipGroupDatas)
 }
 
+func (l *CloudPlatformLabeler) UpdateCidr(cidrs []*Cidr) {
+	epcCidr := make(map[int32][]*Cidr, len(cidrs))
+	for _, cidr := range cidrs {
+		cidrs := epcCidr[cidr.EpcId]
+		if cidrs == nil {
+			cidrs = make([]*Cidr, 0, 2)
+		}
+		epcCidr[cidr.EpcId] = append(cidrs, cidr)
+	}
+	l.epcCidrMapData = epcCidr
+}
+
+func (l *CloudPlatformLabeler) setEpcByCidr(ip net.IP, epc int32, endpointInfo *EndpointInfo) bool {
+	for _, cidr := range l.epcCidrMapData[epc] {
+		if cidr.IpNet.Contains(ip) {
+			endpointInfo.L3EpcId = epc
+			return true
+		}
+	}
+	return false
+}
+
 func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType TapType, l3End bool) *EndpointInfo {
 	endpointInfo := new(EndpointInfo)
 	platformData := l.GetDataByMac(MacKey(mac))
@@ -340,15 +363,23 @@ func (l *CloudPlatformLabeler) ModifyEndpointData(endpointData *EndpointData, ke
 		srcIp, dstIp = key.Src6Ip, key.Dst6Ip
 	}
 	// 默认L2End为false时L3EpcId == 0，L2End为true时L2EpcId不为0
-	if dstData.L3EpcId == 0 && srcData.L2EpcId != 0 {
-		if platformData := l.GetDataByEpcIp(srcData.L2EpcId, dstIp); platformData != nil {
+	if dstData.L3EpcId == 0 && srcData.L3EpcId != 0 {
+		if platformData := l.GetDataByEpcIp(srcData.L3EpcId, dstIp); platformData != nil {
+			// 本端IP + 对端EPC查询EPC-IP表
 			dstData.SetL3Data(platformData, dstIp)
+		} else {
+			// 本端IP + 对端EPC查询CIDR表
+			l.setEpcByCidr(dstIp, srcData.L3EpcId, dstData)
 		}
 	}
 
-	if srcData.L3EpcId == 0 && dstData.L2EpcId != 0 {
-		if platformData := l.GetDataByEpcIp(dstData.L2EpcId, srcIp); platformData != nil {
+	if srcData.L3EpcId == 0 && dstData.L3EpcId != 0 {
+		if platformData := l.GetDataByEpcIp(dstData.L3EpcId, srcIp); platformData != nil {
+			// 本端IP + 对端EPC查询EPC-IP表
 			srcData.SetL3Data(platformData, srcIp)
+		} else {
+			// 本端IP + 对端EPC查询CIDR表
+			l.setEpcByCidr(srcIp, dstData.L3EpcId, srcData)
 		}
 	}
 }
@@ -358,6 +389,11 @@ func (l *CloudPlatformLabeler) peerConnection(ip net.IP, epc int32, endpointInfo
 		if platformData := l.GetDataByEpcIp(peerEpc, ip); platformData != nil {
 			endpointInfo.SetL3Data(platformData, ip)
 			return
+		}
+	}
+	for _, peerEpc := range l.peerConnectionTable[epc] {
+		if l.setEpcByCidr(ip, peerEpc, endpointInfo) {
+			break
 		}
 	}
 }
@@ -412,8 +448,13 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
 	// l3: ip查询
 	l.GetL3ByIp(srcIp, dstIp, endpoint)
-	// l3: peer epc + ip查询
+	// l3: 对等连接查询, 以下两种查询
+	// 1). peer epc + ip查询对等连接表
+	// 2). peer epc + ip查询CIDR表
 	l.GetL3ByPeerConnection(srcIp, dstIp, endpoint)
+	// l3: 私有网络 VPC内部路由
+	// 1) 本端IP + 对端EPC查询EPC-IP表
+	// 2) 本端IP + 对端EPC查询CIDR表
 	l.ModifyEndpointData(endpoint, key)
 	l.ipGroup.Populate(srcIp, endpoint.SrcInfo)
 	l.ipGroup.Populate(dstIp, endpoint.DstInfo)
