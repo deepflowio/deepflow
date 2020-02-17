@@ -451,6 +451,10 @@ func (l *PolicyLabeler) UpdateIpGroupData(data []*IpGroupData) {
 	l.GenerateGroupIdMapByIpGroupData(data)
 }
 
+func (l *PolicyLabeler) UpdateCidr(data []*Cidr) {
+	l.cloudPlatformLabeler.UpdateCidr(data)
+}
+
 func (l *PolicyLabeler) GetPolicyByFastPath(packet *LookupKey) (*EndpointStore, *PolicyData) {
 	if l.FastPathDisable {
 		return nil, nil
