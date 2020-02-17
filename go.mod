@@ -16,7 +16,7 @@ require (
 	github.com/shirou/gopsutil v2.18.12+incompatible
 	github.com/spf13/cobra v0.0.3
 	gitlab.x.lan/platform/influxdb v0.0.0-20200109064655-6c1e420280c5
-	gitlab.x.lan/yunshan/message v0.0.0-20191224131206-b5b841dee36a
+	gitlab.x.lan/yunshan/message v0.0.0-20200218040801-ab97b2d05bca
 	golang.org/x/net v0.0.0-20190514140710-3ec191127204
 	golang.org/x/sys v0.0.0-20190516110030-61b9204099cb
 	google.golang.org/grpc v1.19.0
