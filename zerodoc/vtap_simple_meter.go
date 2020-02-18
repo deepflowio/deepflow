@@ -19,6 +19,11 @@ type VTAPSimpleMeter struct {
 	Packets   uint64 `db:"packets"`
 }
 
+func (m *VTAPSimpleMeter) Reverse() {
+	m.TxBytes, m.RxBytes = m.RxBytes, m.TxBytes
+	m.TxPackets, m.RxPackets = m.RxPackets, m.TxPackets
+}
+
 func (m *VTAPSimpleMeter) ID() uint8 {
 	return VTAP_SIMPLE_ID
 }

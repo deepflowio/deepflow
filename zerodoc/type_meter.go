@@ -18,6 +18,8 @@ type TypeMeter struct {
 	sortKey uint64
 }
 
+func (m *TypeMeter) Reverse() {}
+
 func (m *TypeMeter) ID() uint8 {
 	return TYPE_ID
 }
