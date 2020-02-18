@@ -1193,6 +1193,9 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 	case _TAG_ISP:
 		t.Code |= ISPCode
 		field.ISP = geo.EncodeISP(value)
+	case _TAG_SIDE:
+		i, _ = parseUint(value, 10, 16)
+		field.Side = uint8(i)
 	default:
 		err = fmt.Errorf("unsupoort tag id %d ", id)
 	}
