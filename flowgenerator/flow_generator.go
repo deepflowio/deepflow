@@ -5,6 +5,7 @@ import (
 
 	"github.com/op/go-logging"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/possible"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
 )
 
@@ -67,12 +68,12 @@ func (f *FlowGenerator) Stop() {
 }
 
 // create a new flow generator
-func New(policyGetter PolicyGetter, inputQueue QueueReader, pcapAppQueue, packetAppQueue, flowAppQueue QueueWriter, flowLimitNum, index int, flushInterval time.Duration) *FlowGenerator {
+func New(policyGetter PolicyGetter, inputQueue QueueReader, pcapAppQueue, packetAppQueue, flowAppQueue QueueWriter, flowLimitNum, index int, flushInterval time.Duration, possibleHost *possible.PossibleHost) *FlowGenerator {
 	flowGenerator := &FlowGenerator{
 		flowMap: NewFlowMap(
 			int(hashMapSize), flowLimitNum, index,
 			maxTimeout, packetDelay, flushInterval,
-			packetAppQueue, flowAppQueue, policyGetter),
+			packetAppQueue, flowAppQueue, policyGetter, possibleHost),
 		inputQueue:   inputQueue,
 		pcapAppQueue: pcapAppQueue,
 		index:        index,

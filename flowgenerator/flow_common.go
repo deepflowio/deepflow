@@ -240,6 +240,8 @@ func (m *FlowMap) getEthOthersQuinTupleHash(meta *MetaPacket) uint64 {
 func (m *FlowMap) updateFlowDirection(flowExtra *FlowExtra, meta *MetaPacket) {
 	taggedFlow := flowExtra.taggedFlow
 	srcScore, dstScore := uint8(0), uint8(0)
+	m.checkActive(taggedFlow)
+
 	if taggedFlow.EthType == layers.EthernetTypeIPv4 {
 		srcKey := ServiceKey(int16(taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].L3EpcID), taggedFlow.IPSrc, taggedFlow.PortSrc)
 		dstKey := ServiceKey(int16(taggedFlow.FlowMetricsPeers[FLOW_METRICS_PEER_DST].L3EpcID), taggedFlow.IPDst, taggedFlow.PortDst)

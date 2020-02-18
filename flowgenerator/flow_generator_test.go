@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/gopacket/layers"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/possible"
 	. "gitlab.x.lan/yunshan/droplet-libs/queue"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 
@@ -55,10 +56,11 @@ func flowGeneratorInit(queueSize int, flushTicker bool) (*FlowGenerator, QueueWr
 	} else {
 		inputPacketQueue = manager.NewQueues("inputPacketQueue", queueSize, 1, 1)
 	}
+	possibleHost := possible.NewPossibleHost(1 << 16)
 	return New(
 		policyGetter, inputPacketQueue.Readers()[0],
 		pcapAppQueues.Writers()[0], meteringAppQueues.Writers()[0], flowOutQueue.Writers()[0],
-		queueSize, 0, time.Millisecond,
+		queueSize, 0, time.Millisecond, possibleHost,
 	), inputPacketQueue.Writers()[0], flowOutQueue.Readers()[0], meteringAppQueues.Readers()[0]
 }
 

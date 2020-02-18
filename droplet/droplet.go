@@ -14,6 +14,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/debug"
 	"gitlab.x.lan/yunshan/droplet-libs/logger"
+	"gitlab.x.lan/yunshan/droplet-libs/possible"
 	libqueue "gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 	"gopkg.in/yaml.v2"
@@ -141,6 +142,7 @@ func Start(configPath string) (closers []io.Closer) {
 		cfg.Queue.PacketQueueCount, libqueue.OptionFlushIndicator(flowFlushInterval), libqueue.OptionRelease(releaseTaggedFlow),
 	)
 
+	possibleHost := possible.NewPossibleHost(1 << 16)
 	flowgenerator.SetFlowGenerator(cfg)
 	timeoutConfig := flowgenerator.TimeoutConfig{
 		Opening:         cfg.FlowGenerator.OthersTimeout,
@@ -160,7 +162,8 @@ func Start(configPath string) (closers []io.Closer) {
 		flowGenerator := flowgenerator.New(
 			policyGetter, flowGeneratorQueues.Readers()[i],
 			pcapAppQueues.Writers()[i], meteringAppQueues.Writers()[i],
-			flowDuplicatorQueues.Writers()[i], flowLimitNum, i, flowFlushInterval)
+			flowDuplicatorQueues.Writers()[i], flowLimitNum, i, flowFlushInterval,
+			possibleHost)
 		flowGenerator.Start()
 	}
 

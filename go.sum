@@ -174,8 +174,8 @@ github.com/xanzy/ssh-agent v0.2.0/go.mod h1:0NyE30eGUDliuLEHJgYte/zncp2zdTStcOnW
 github.com/xlab/treeprint v0.0.0-20180616005107-d6fb6747feb6/go.mod h1:ce1O1j6UtZfjr22oyGxGLbauSBp2YVXpARAosm7dHBg=
 gitlab.x.lan/platform/influxdb v0.0.0-20200109064655-6c1e420280c5/go.mod h1:60Gw7nMrWje4djy4y8D6bP75WdWAi5s+wtEa7EhfZUU=
 gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200107085540-a487142adbe3/go.mod h1:hKFbiUAZcjAFT5S+t/VRwut6gojAB0jHuKranPKZU3M=
-gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200221100954-12c3c208fbc5 h1:vSA1uIZ48iqrrWbWtXxga96VBdfGZXXWp7RCwMYy9cE=
-gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200221100954-12c3c208fbc5/go.mod h1:QjMbuJg2HtnqoPLSQKh9eV4hYxTrDo4fJxcOMrBD5x4=
+gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200224031022-34e3aabcd14d h1:yljFc5CWe4d8SG3UKj/vwVdQkQgIfb19uCcpz+eK+9k=
+gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200224031022-34e3aabcd14d/go.mod h1:QjMbuJg2HtnqoPLSQKh9eV4hYxTrDo4fJxcOMrBD5x4=
 gitlab.x.lan/yunshan/message v0.0.0-20191224131206-b5b841dee36a h1:p2Fds/yR6TtTuAFyoTYXoQDJ/Uies/b0Lv9euomdjcM=
 gitlab.x.lan/yunshan/message v0.0.0-20191224131206-b5b841dee36a/go.mod h1:MypsIdfw74oNofgOqe76rOWsVKRDYZxG9+70BJTsSDk=
 gitlab.x.lan/yunshan/message v0.0.0-20200218040801-ab97b2d05bca h1:94EQS7OMYLC/vtCjMT8UUI/eIq+ffDTmcn3kEi2q464=
