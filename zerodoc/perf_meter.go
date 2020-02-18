@@ -13,6 +13,11 @@ type PerfMeter struct {
 	PerfMeterMax
 }
 
+func (m *PerfMeter) Reverse() {
+	m.PerfMeterSum.Reverse()
+	m.PerfMeterMax.Reverse()
+}
+
 func (m *PerfMeter) ID() uint8 {
 	return PERF_ID
 }
@@ -194,6 +199,12 @@ type PerfMeterSum struct {
 	SumZeroWndCntRx uint64 `db:"sum_zero_wnd_cnt_rx"`
 }
 
+func (m *PerfMeterSum) Reverse() {
+	m.SumPacketTx, m.SumPacketRx = m.SumPacketRx, m.SumPacketTx
+	m.SumRetransCntTx, m.SumRetransCntRx = m.SumRetransCntRx, m.SumRetransCntTx
+	m.SumZeroWndCntTx, m.SumZeroWndCntRx = m.SumZeroWndCntRx, m.SumZeroWndCntTx
+}
+
 func (m *PerfMeterSum) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(m.SumFlowCount)
 	encoder.WriteVarintU64(m.SumNewFlowCount)
@@ -285,6 +296,8 @@ type PerfMeterMax struct {
 	MaxRTTSynClient time.Duration `db:"max_rtt_syn_client"`
 	MaxRTTSynServer time.Duration `db:"max_rtt_syn_server"`
 }
+
+func (m *PerfMeterMax) Reverse() {}
 
 func (m *PerfMeterMax) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(uint64(m.MaxRTTSyn))
