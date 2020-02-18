@@ -14,6 +14,11 @@ type VTAPUsageMeter struct {
 	RxPackets uint64 `db:"rx_packets"`
 }
 
+func (m *VTAPUsageMeter) Reverse() {
+	m.TxBytes, m.RxBytes = m.RxBytes, m.TxBytes
+	m.TxPackets, m.RxPackets = m.RxPackets, m.TxPackets
+}
+
 func (m *VTAPUsageMeter) ID() uint8 {
 	return VTAP_USAGE_ID
 }

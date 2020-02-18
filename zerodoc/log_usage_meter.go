@@ -14,6 +14,11 @@ type LogUsageMeter struct {
 	SumBitRx    uint64 `db:"sum_bit_rx"`
 }
 
+func (m *LogUsageMeter) Reverse() {
+	m.SumPacketTx, m.SumPacketRx = m.SumPacketRx, m.SumPacketTx
+	m.SumBitTx, m.SumBitRx = m.SumBitRx, m.SumBitTx
+}
+
 func (m *LogUsageMeter) ID() uint8 {
 	return LOG_USAGE_ID
 }

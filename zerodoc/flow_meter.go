@@ -19,6 +19,11 @@ type FlowMeter struct {
 	SumClosedFlowDuration uint64 `db:"sum_closed_flow_duration"` // ms 废弃
 }
 
+func (m *FlowMeter) Reverse() {
+	m.SumPacketTx, m.SumPacketRx = m.SumPacketRx, m.SumPacketTx
+	m.SumBitTx, m.SumBitRx = m.SumBitRx, m.SumBitTx
+}
+
 func (m *FlowMeter) ID() uint8 {
 	return FLOW_ID
 }

@@ -39,4 +39,10 @@ import (
 		Release{{.}}(m)
 	}
 
+	func (m *{{.}}) ToReversed() app.Meter {
+		newMeter := m.Clone()
+		newMeter.Reverse()
+		return newMeter
+	}
+
 {{ end }}

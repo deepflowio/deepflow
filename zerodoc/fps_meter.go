@@ -13,6 +13,8 @@ type FPSMeter struct {
 	SumClosedFlowCount uint64 `db:"sum_closed_flow_count"`
 }
 
+func (m *FPSMeter) Reverse() {}
+
 func (m *FPSMeter) ID() uint8 {
 	return FPS_ID
 }

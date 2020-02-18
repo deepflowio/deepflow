@@ -38,6 +38,8 @@ type Meter interface {
 	SortKey() uint64
 	Clone() Meter
 	Release()
+	Reverse()
+	ToReversed() Meter
 }
 
 type Document struct {

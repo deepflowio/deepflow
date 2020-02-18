@@ -17,6 +17,11 @@ type GeoMeter struct {
 	SumRTTSynClientFlow uint64        `db:"sum_rtt_syn_client_flow"`
 }
 
+func (m *GeoMeter) Reverse() {
+	m.SumPacketTx, m.SumPacketRx = m.SumPacketRx, m.SumPacketTx
+	m.SumBitTx, m.SumBitRx = m.SumBitRx, m.SumBitTx
+}
+
 func (m *GeoMeter) ID() uint8 {
 	return GEO_ID
 }
