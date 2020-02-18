@@ -23,6 +23,7 @@ type LabelerManager struct {
 	lookupKey         []datatype.LookupKey
 	rawPlatformDatas  []*datatype.PlatformData
 	rawPeerConnection []*datatype.PeerConnection
+	rawCidrs          []*datatype.Cidr
 	rawIpGroupDatas   []*policy.IpGroupData
 	rawPolicyData     []*policy.Acl
 
@@ -79,8 +80,10 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 		if err := platformData.Unmarshal(response.GetPlatformData()); err == nil {
 			l.rawPlatformDatas = dropletpb.Convert2PlatformData(platformData.GetInterfaces())
 			l.rawPeerConnection = dropletpb.Convert2PeerConnections(platformData.GetPeerConnections())
+			l.rawCidrs = dropletpb.Convert2Cidrs(platformData.GetCidrs())
 			log.Infof("droplet grpc recv %d pieces of platform data", len(l.rawPlatformDatas))
 			log.Infof("droplet grpc recv %d pieces of peer connection data", len(l.rawPeerConnection))
+			log.Infof("droplet grpc recv %d pieces of cidr data", len(l.rawCidrs))
 			update = true
 		}
 		l.platformVersion = newVersion
@@ -117,10 +120,11 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 	}
 
 	if update {
-		log.Infof("droplet grpc version ip-groups: %d, interfaces and peer-connections: %d, flow-acls: %d",
+		log.Infof("droplet grpc version ip-groups: %d, interfaces peer-connections and cidrs: %d, flow-acls: %d",
 			response.GetVersionGroups(), response.GetVersionPlatformData(), response.GetVersionAcls())
 		l.policyTable.UpdateInterfaceDataAndIpGroupData(l.rawPlatformDatas, l.rawIpGroupDatas)
 		l.policyTable.UpdatePeerConnection(l.rawPeerConnection)
+		l.policyTable.UpdateCidrs(l.rawCidrs)
 		l.policyTable.UpdateAclData(l.rawPolicyData)
 		l.policyTable.EnableAclData()
 		log.Info("droplet grpc enable fast-path policy change")

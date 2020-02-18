@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/possible"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 
@@ -78,6 +79,7 @@ type FlowMap struct {
 	tcpServiceTable6   *ServiceTable6
 	udpServiceTable6   *ServiceTable6
 	policyGetter       PolicyGetter
+	possibleHost       *possible.PossibleHost
 	srcServiceKey      []byte
 	dstServiceKey      []byte
 
@@ -236,6 +238,43 @@ func (m *FlowMap) flushQueue(now time.Duration) {
 		}
 		m.lastQueueFlush = now
 	}
+}
+
+func (m *FlowMap) checkActiveHost(direction int, taggedFlow *datatype.TaggedFlow) {
+	flowMetric := &taggedFlow.FlowMetricsPeers[direction]
+
+	if !flowMetric.IsActiveHost && flowMetric.L3EpcID > 0 {
+		if flowMetric.L3DeviceID == 0 {
+			ip, ip6 := taggedFlow.IPSrc, taggedFlow.IP6Src
+			if direction == datatype.FLOW_METRICS_PEER_DST {
+				ip, ip6 = taggedFlow.IPDst, taggedFlow.IP6Dst
+			}
+
+			if flowMetric.TotalPacketCount > 0 {
+				flowMetric.IsActiveHost = true
+				// 有EPC无Device的场景是通过CIDR获取的，这里需要加入的PossibleHost中
+				if taggedFlow.EthType == layers.EthernetTypeIPv4 {
+					m.possibleHost.Add(ip, flowMetric.L3EpcID)
+				} else if taggedFlow.EthType == layers.EthernetTypeIPv6 {
+					m.possibleHost.Add6(ip6, flowMetric.L3EpcID)
+				}
+			} else {
+				if taggedFlow.EthType == layers.EthernetTypeIPv4 {
+					flowMetric.IsActiveHost = m.possibleHost.Check(ip, flowMetric.L3EpcID)
+				} else if taggedFlow.EthType == layers.EthernetTypeIPv6 {
+					flowMetric.IsActiveHost = m.possibleHost.Check6(ip6, flowMetric.L3EpcID)
+				}
+			}
+		} else if flowMetric.L3DeviceID > 0 {
+			// 有EPC有Device是通过平台数据获取的，无需添加到PossibleHost中
+			flowMetric.IsActiveHost = true
+		}
+	}
+}
+
+func (m *FlowMap) checkActive(taggedFlow *datatype.TaggedFlow) {
+	m.checkActiveHost(datatype.FLOW_METRICS_PEER_SRC, taggedFlow)
+	m.checkActiveHost(datatype.FLOW_METRICS_PEER_DST, taggedFlow)
 }
 
 func (m *FlowMap) pushToPacketStatsQueue(taggedFlow *datatype.TaggedFlow) {
@@ -553,7 +592,7 @@ func (m *FlowMap) initTimeWindow() {
 	m.startTime = time.Duration(m.startTimeInUnit) * _TIME_SLOT_UNIT
 }
 
-func NewFlowMap(hashSlots, capacity, id int, timeWindow, packetDelay, flushInterval time.Duration, packetAppQueue, flowAppQueue queue.QueueWriter, policyGetter PolicyGetter) *FlowMap {
+func NewFlowMap(hashSlots, capacity, id int, timeWindow, packetDelay, flushInterval time.Duration, packetAppQueue, flowAppQueue queue.QueueWriter, policyGetter PolicyGetter, possibleHost *possible.PossibleHost) *FlowMap {
 	hashSlots, _ = minPowerOfTwo(hashSlots)
 	if timeWindow < _FLOW_STAT_INTERVAL {
 		timeWindow = _FLOW_STAT_INTERVAL
@@ -578,6 +617,7 @@ func NewFlowMap(hashSlots, capacity, id int, timeWindow, packetDelay, flushInter
 		tcpServiceTable6:       NewServiceTable6("tcp", id, hashSlots, capacity),
 		udpServiceTable6:       NewServiceTable6("udp", id, hashSlots, capacity),
 		policyGetter:           policyGetter,
+		possibleHost:           possibleHost,
 		srcServiceKey:          make([]byte, _KEY_LEN),
 		dstServiceKey:          make([]byte, _KEY_LEN),
 		id:                     id,
