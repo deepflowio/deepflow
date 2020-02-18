@@ -981,6 +981,7 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		return nil
 	case _TAG_IP_VERSION:
 		i, err = parseUint(value, 10, 8)
+		t.Code |= IP
 		if i == 6 {
 			field.IsIPv6 = 1
 		} else {
