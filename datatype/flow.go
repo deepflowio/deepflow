@@ -110,6 +110,7 @@ type FlowMetricsPeer struct {
 	TCPFlags         uint8
 	IsL2End          bool
 	IsL3End          bool
+	IsActiveHost     bool
 }
 
 const (
