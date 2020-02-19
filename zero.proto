@@ -80,6 +80,7 @@ message Tag {
     optional uint32 subnet_id = 49;
     optional uint32 acl_id = 50;
     optional uint32 pod_node_id = 52;
+    optional uint32 side = 53;
 
     optional string country = 60;
     optional string region = 61;
