@@ -45,11 +45,17 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 		}
 		ips = append(ips, ipinfo)
 	}
+
+	epcId := int32(vifData.GetEpcId())
+	if epcId == 0 {
+		epcId = datatype.EPC_FROM_DEEPFLOW
+	}
+
 	return &datatype.PlatformData{
 		Mac:        macInt,
 		TapMac:     vifData.GetTapMac(),
 		Ips:        ips,
-		EpcId:      int32(vifData.GetEpcId() & 0xffff),
+		EpcId:      epcId & 0xffff,
 		DeviceType: vifData.GetDeviceType(),
 		DeviceId:   vifData.GetDeviceId() & 0xffff,
 		IfType:     vifData.GetIfType(),
@@ -218,13 +224,18 @@ func newCidr(data *trident.Cidr) *datatype.Cidr {
 		return nil
 	}
 	_, ipNet, err := net.ParseCIDR(data.GetPrefix())
-	if err == nil {
+	if err != nil {
 		return nil
+	}
+
+	epcId := int32(data.GetEpcId())
+	if epcId == 0 {
+		epcId = datatype.EPC_FROM_DEEPFLOW
 	}
 
 	return &datatype.Cidr{
 		IpNet: ipNet,
-		EpcId: int32(data.GetEpcId()),
+		EpcId: epcId & 0xffff,
 		Type:  uint8(data.GetType()),
 	}
 }
