@@ -60,6 +60,7 @@ const (
 	_
 	VTAPID
 	PodNodeID
+	Side
 )
 
 const (
@@ -212,7 +213,7 @@ type Field struct {
 	CastType     CastTypeEnum
 	IsIPv6       uint8 // (8B) 与IP/IP6是共生字段
 	TCPFlags     TCPFlag
-	Side         uint8 // 目前没有对应的code标识，encode，decode均不处理
+	Side         uint8
 
 	Country uint8
 	Region  uint8
@@ -440,9 +441,10 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ServerPort), 10))
 	}
 
-	// 增加side字段，为5.5.8 到后续版本升级做准备
-	offset += copy(b[offset:], ",side=")
-	offset += copy(b[offset:], strconv.FormatUint(uint64(t.Side), 10))
+	if t.Code&Side != 0 {
+		offset += copy(b[offset:], ",side=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.Side), 10))
+	}
 
 	if t.Code&SubnetID != 0 {
 		offset += copy(b[offset:], ",subnet_id=")
@@ -608,6 +610,9 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&TCPFlags != 0 {
 		t.TCPFlags = TCPFlag(decoder.ReadU8())
 	}
+	if t.Code&Side != 0 {
+		t.Side = decoder.ReadU8()
+	}
 
 	if t.Code&Country != 0 {
 		t.Country = decoder.ReadU8()
@@ -756,6 +761,9 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 	if code&TCPFlags != 0 {
 		encoder.WriteU8(uint8(t.TCPFlags))
 	}
+	if code&Side != 0 {
+		encoder.WriteU8(t.Side)
+	}
 
 	if code&Country != 0 {
 		encoder.WriteU8(t.Country)
@@ -801,18 +809,18 @@ func (t *Tag) HasVariedField() bool {
 	return t.Code&(ServerPort|Region|Country|ISPCode) != 0 || t.HasEdgeTagField()
 }
 
-var databaseSuffix = [...]string{
-	"",              // 000
-	"acl",           // 001
-	"edge",          // 010
-	"acl_edge",      // 011
-	"port",          // 100
-	"acl_port",      // 101
-	"edge_port",     // 110
-	"acl_edge_port", // 111
+var DatabaseSuffix = [...]string{
+	"",               // 000
+	"_acl",           // 001
+	"_edge",          // 010
+	"_acl_edge",      // 011
+	"_port",          // 100
+	"_acl_port",      // 101
+	"_edge_port",     // 110
+	"_acl_edge_port", // 111
 }
 
-func (t *Tag) DatabaseSuffix() string {
+func (t *Tag) DatabaseSuffixID() int {
 	code := 0
 	if t.Code&ACLGID != 0 {
 		code |= 0x1
@@ -823,7 +831,11 @@ func (t *Tag) DatabaseSuffix() string {
 	if t.Code&ServerPort != 0 {
 		code |= 0x4
 	}
-	return databaseSuffix[code]
+	return code
+}
+
+func (t *Tag) DatabaseSuffix() string {
+	return DatabaseSuffix[t.DatabaseSuffixID()]
 }
 
 var fieldPool = pool.NewLockFreePool(func() interface{} {
@@ -944,6 +956,9 @@ func (t *Tag) IsMatchPublishPolicy(p *PublishPolicy) bool {
 	if p.Code&FilterDirection != 0 && t.Direction != p.Direction {
 		return false
 	}
+	if p.Code&FilterSide != 0 && t.Side != p.Side {
+		return false
+	}
 
 	p.IsMatched = true
 	return true
@@ -964,6 +979,7 @@ func (t *Tag) FillPublishPolicy(p *PublishPolicy) {
 	t.L3EpcID1 = p.L3EpcID1
 	t.ACLDirection = p.ACLDirection
 	t.Direction = p.Direction
+	t.Side = p.Side
 }
 
 func parseUint(s string, base int, bitSize int) (uint64, error) {
@@ -1194,7 +1210,8 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		t.Code |= ISPCode
 		field.ISP = geo.EncodeISP(value)
 	case _TAG_SIDE:
-		i, _ = parseUint(value, 10, 16)
+		t.Code |= Side
+		i, err = parseUint(value, 10, 16)
 		field.Side = uint8(i)
 	default:
 		err = fmt.Errorf("unsupoort tag id %d ", id)

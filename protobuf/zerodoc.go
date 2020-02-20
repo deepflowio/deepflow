@@ -83,6 +83,9 @@ func TagToPB(t *Tag) *pb.Tag {
 	if t.Code&PodNodeID != 0 {
 		tag.PodNodeId = proto.Uint32(uint32(t.PodNodeID))
 	}
+	if t.Code&Side != 0 {
+		tag.Side = proto.Uint32(uint32(t.Side))
+	}
 
 	return tag
 }
@@ -159,6 +162,9 @@ func PBToTag(t *pb.Tag, tag *Tag) {
 	}
 	if tag.Code&PodNodeID != 0 {
 		tag.PodNodeID = uint16(t.GetPodNodeId())
+	}
+	if tag.Code&Side != 0 {
+		tag.Side = uint8(t.GetSide())
 	}
 }
 
