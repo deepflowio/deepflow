@@ -196,25 +196,26 @@ func GetMsgType(db string) (MessageType, error) {
 		return MSG_INVILID, fmt.Errorf("Unsupport db %s", db)
 	}
 	dbPrefix := strings.Join(s[:nPrefixSeg], "_")
+	appID := GetMeterID(dbPrefix)
 
 	var msgType MessageType
-	switch dbPrefix {
-	case "df_usage", "vtap_flow_usage":
+	switch appID {
+	case USAGE_ID:
 		msgType = MSG_USAGE
-	case "df_perf", "vtap_flow_perf":
+	case PERF_ID:
 		msgType = MSG_PERF
-	case "df_geo":
+	case GEO_ID:
 		msgType = MSG_GEO
-	case "df_flow":
+	case FLOW_ID:
 		msgType = MSG_FLOW
-	case "df_type", "vtap_flow_type":
+	case TYPE_ID:
 		msgType = MSG_TYPE
-	case "df_fps", "vtap_flow_fps":
+	case FPS_ID:
 		msgType = MSG_FPS
-	case "log_usage":
+	case LOG_USAGE_ID:
 		msgType = MSG_LOG_USAGE
 	// 从influxdb streaming读取vtap_usage的数据时，会使用MSG_VTAP_SIMPLE消息打包成doc, 而不用MSG_VTAP_USAGE
-	case "vtap_usage":
+	case VTAP_USAGE_ID:
 		msgType = MSG_VTAP_SIMPLE
 	default:
 		return MSG_INVILID, fmt.Errorf("Unknown supported dbPrefix %s", dbPrefix)
