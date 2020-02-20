@@ -100,8 +100,8 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 		return p.docs.Slice()
 	}
 
-	statTemplates := GetTagTemplateByActionFlags(rawFlow.PolicyData, interestActionFlags)
-	p.policyGroup = FillPolicyTagTemplate(rawFlow.PolicyData, interestActionFlags, p.policyGroup)
+	statTemplates := GetTagTemplateByActionFlags(&rawFlow.PolicyData, interestActionFlags)
+	p.policyGroup = FillPolicyTagTemplate(&rawFlow.PolicyData, interestActionFlags, p.policyGroup)
 
 	flowMetricsPeerSrc := &flow.FlowMetricsPeers[inputtype.FLOW_METRICS_PEER_SRC]
 	flowMetricsPeerDst := &flow.FlowMetricsPeers[inputtype.FLOW_METRICS_PEER_DST]

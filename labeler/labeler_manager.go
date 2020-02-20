@@ -152,7 +152,8 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) {
 	key.Src6Ip = packet.Ip6Src
 	key.Dst6Ip = packet.Ip6Dst
 
-	packet.EndpointData, packet.PolicyData = l.policyTable.LookupAllByKey(key)
+	endpoints, policy := l.policyTable.LookupAllByKey(key)
+	packet.EndpointData, packet.PolicyData = *endpoints, *policy
 }
 
 func (l *LabelerManager) Start() {

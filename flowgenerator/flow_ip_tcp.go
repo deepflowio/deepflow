@@ -9,6 +9,7 @@ import (
 
 func (m *FlowMap) initTcpFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	m.initFlow(flowExtra, meta)
+	flowExtra.metaFlowPerf = AcquireMetaFlowPerf()
 	flags := meta.TcpData.Flags
 
 	m.updateTCPDirection(meta, flags, flowExtra, true) // 新建流时更新ServiceTable并矫正流方向

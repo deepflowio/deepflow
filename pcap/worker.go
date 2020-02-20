@@ -415,8 +415,8 @@ WORKING_LOOP:
 			for i := uint8(0); i < block.Count; i++ {
 				packet := &block.Metas[i]
 
-				if packet.PolicyData == nil || packet.EndpointData == nil { // shouldn't happen
-					log.Warningf("drop invalid packet with nil PolicyData or EndpointData %v", packet)
+				if !packet.EndpointData.Valid() { // shouldn't happen
+					log.Warningf("drop invalid packet with nil EndpointData %v", packet)
 					continue
 				}
 

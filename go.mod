@@ -6,8 +6,8 @@ require (
 	github.com/google/gopacket v1.1.17
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/spf13/cobra v0.0.3
-	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200119021853-d4a0e2d5dc8b
-	gitlab.x.lan/yunshan/message v0.0.0-20191224131206-b5b841dee36a
+	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200218131155-7ded87b6923d
+	gitlab.x.lan/yunshan/message v0.0.0-20200218040801-ab97b2d05bca
 	golang.org/x/net v0.0.0-20190514140710-3ec191127204
 	google.golang.org/genproto v0.0.0-20190516172635-bb713bdc0e52 // indirect
 	google.golang.org/grpc v1.20.1 // indirect

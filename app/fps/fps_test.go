@@ -36,7 +36,6 @@ func TestPolicyTags(t *testing.T) {
 	f.EndTime = 1536746971 * time.Second
 	f.EthType = layers.EthernetTypeIPv4
 
-	f.PolicyData = &inputtype.PolicyData{}
 	f.PolicyData.ActionFlags = inputtype.ACTION_FLOW_COUNTING
 	f.PolicyData.Merge([]inputtype.AclAction{
 		inputtype.AclAction(0).SetACLGID(1).AddActionFlags(inputtype.ACTION_FLOW_COUNTING).SetDirections(inputtype.FORWARD).SetTagTemplates(0xFFFF),
