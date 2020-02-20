@@ -70,7 +70,7 @@ func (p *FlowToLogUsageDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, va
 	if actionFlags&interestActions == 0 {
 		return p.docs.Slice()
 	}
-	statTemplates := GetTagTemplateByActionFlags(rawFlow.PolicyData, interestActions)
+	statTemplates := GetTagTemplateByActionFlags(&rawFlow.PolicyData, interestActions)
 	if statTemplates&inputtype.TEMPLATE_EDGE_PORT_ALL == 0 { // LogXXX仅做四维统计
 		return p.docs.Slice()
 	}

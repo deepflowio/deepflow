@@ -85,7 +85,7 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 		return p.docs.Slice()
 	}
 
-	p.policyGroup = FillPolicyTagTemplate(rawFlow.PolicyData, inputtype.ACTION_GEO_POSITIONING, p.policyGroup)
+	p.policyGroup = FillPolicyTagTemplate(&rawFlow.PolicyData, inputtype.ACTION_GEO_POSITIONING, p.policyGroup)
 
 	flow := Flow(*rawFlow)
 	flowMetricsPeerSrc := &flow.FlowMetricsPeers[inputtype.FLOW_METRICS_PEER_SRC]

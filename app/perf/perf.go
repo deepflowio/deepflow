@@ -69,8 +69,8 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 	flowMetricsPeerSrc := &flow.FlowMetricsPeers[inputtype.FLOW_METRICS_PEER_SRC]
 	flowMetricsPeerDst := &flow.FlowMetricsPeers[inputtype.FLOW_METRICS_PEER_DST]
 
-	statTemplates := GetTagTemplateByActionFlags(rawFlow.PolicyData, interestActionFlags)
-	p.policyGroup = FillPolicyTagTemplate(rawFlow.PolicyData, interestActionFlags, p.policyGroup)
+	statTemplates := GetTagTemplateByActionFlags(&rawFlow.PolicyData, interestActionFlags)
+	p.policyGroup = FillPolicyTagTemplate(&rawFlow.PolicyData, interestActionFlags, p.policyGroup)
 
 	oneSideCodes := make([]outputtype.Code, 0, NODE_CODES_LEN)
 	if statTemplates&inputtype.TEMPLATE_NODE != 0 {

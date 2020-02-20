@@ -73,7 +73,7 @@ func (p *MeteringToUsageDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, v
 		return p.docs.Slice()
 	}
 
-	p.policyGroup = FillPolicyTagTemplate(rawFlow.PolicyData, interestActions, p.policyGroup)
+	p.policyGroup = FillPolicyTagTemplate(&rawFlow.PolicyData, interestActions, p.policyGroup)
 
 	flow := Flow(*rawFlow)
 	flowMetricsPeerSrc := &flow.FlowMetricsPeers[inputtype.FLOW_METRICS_PEER_SRC]

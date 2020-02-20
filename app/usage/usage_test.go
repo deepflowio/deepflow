@@ -37,7 +37,6 @@ func TestPolicyTags(t *testing.T) {
 	m.PortDst = 80
 	m.PacketStatTime = 1536746971
 
-	m.PolicyData = &inputtype.PolicyData{}
 	m.PolicyData.ActionFlags = inputtype.ACTION_PACKET_COUNTING
 	m.PolicyData.Merge([]inputtype.AclAction{
 		inputtype.AclAction(0).SetACLGID(1).AddActionFlags(inputtype.ACTION_PACKET_COUNTING).SetTagTemplates(0xFFFF),
@@ -88,7 +87,6 @@ func TestPolicyTagTemplate(t *testing.T) {
 	m.PortDst = 80
 	m.PacketStatTime = 1536746971
 
-	m.PolicyData = &inputtype.PolicyData{}
 	m.PolicyData.ActionFlags = inputtype.ACTION_PACKET_COUNTING
 	m.PolicyData.Merge([]inputtype.AclAction{
 		inputtype.AclAction(0).SetACLGID(1).AddActionFlags(inputtype.ACTION_PACKET_COUNTING).SetTagTemplates(inputtype.TEMPLATE_ACL_NODE),

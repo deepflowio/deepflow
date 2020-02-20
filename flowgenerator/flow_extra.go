@@ -36,8 +36,8 @@ type FlowExtra struct {
 	taggedFlow   *TaggedFlow
 	metaFlowPerf *MetaFlowPerf
 
-	policyDataCache   [2]*PolicyData
-	endpointDataCache [2]*EndpointData
+	policyDataCache   [2]PolicyData
+	endpointDataCache EndpointData
 
 	minArrTime time.Duration
 	recentTime time.Duration // 最近一个Packet的时间戳

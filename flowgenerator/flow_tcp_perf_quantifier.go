@@ -119,7 +119,6 @@ type FlowPerfCounter struct {
 }
 
 type FlowPerfStats struct {
-	ReportCpuPerf      int64 `statsd:"report_cpu"`           // report的平均性能
 	ReportCount        int64 `statsd:"report_count"`         // 每次上报,计数加1
 	IgnorePacketCount  int64 `statsd:"ignore_packet_count"`  // 每个忽略包,计数加1
 	InvalidPacketCount int64 `statsd:"invalid_packet_count"` // 每个异常包,计数加1
@@ -864,21 +863,18 @@ func copyAndResetPerfData(flowPerf *MetaFlowPerf, flowReversed bool, perfCounter
 		return nil
 	}
 
-	current := time.Now()
 	report := AcquireTcpPerfStats()
 	flowPerf.perfData.calcReportFlowPerfStats(report, flowReversed)
 	flowPerf.perfData.resetPeriodPerfStats()
 
 	perfCounter.counter.ReportCount++
-	perfCounter.counter.ReportCpuPerf = calcAvgTime(perfCounter.counter.ReportCpuPerf,
-		time.Since(current).Nanoseconds(), perfCounter.counter.ReportCount)
 
 	return report
 }
 
 func (i *FlowPerfDataInfo) calcReportFlowPerfStats(report *TcpPerfStats, flowReversed bool) {
-	period := i.periodPerfStats
-	flow := i.flowPerfStats
+	period := &i.periodPerfStats
+	flow := &i.flowPerfStats
 
 	report.RTTSyn = flow.rttSyn0 + flow.rttSyn1
 	report.RTTSynClient = flow.rttSyn0

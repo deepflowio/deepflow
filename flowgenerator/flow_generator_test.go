@@ -79,7 +79,7 @@ func getDefaultPacket() *MetaPacket {
 		PortSrc:   12345,
 		PortDst:   22,
 		TcpData:   MetaPacketTcpHeader{DataOffset: 5, Flags: TCP_SYN},
-		EndpointData: &EndpointData{
+		EndpointData: EndpointData{
 			SrcInfo: &EndpointInfo{
 				L2EpcId:  EPC_FROM_DEEPFLOW,
 				L3EpcId:  1,
@@ -93,7 +93,7 @@ func getDefaultPacket() *MetaPacket {
 				HostIp:   0x01010101,
 			},
 		},
-		PolicyData: &PolicyData{ActionFlags: ACTION_GEO_POSITIONING | ACTION_PACKET_COUNTING | ACTION_TCP_FLOW_PERF_COUNTING},
+		PolicyData: PolicyData{ActionFlags: ACTION_GEO_POSITIONING | ACTION_PACKET_COUNTING | ACTION_TCP_FLOW_PERF_COUNTING},
 	}
 }
 
@@ -114,7 +114,7 @@ func reversePacket(packet *MetaPacket) {
 	packet.IpSrc, packet.IpDst = packet.IpDst, packet.IpSrc
 	packet.PortSrc, packet.PortDst = packet.PortDst, packet.PortSrc
 	packet.L2End0, packet.L2End1 = packet.L2End1, packet.L2End0
-	packet.EndpointData = packet.EndpointData.ReverseData()
+	packet.EndpointData.SrcInfo, packet.EndpointData.DstInfo = packet.EndpointData.DstInfo, packet.EndpointData.SrcInfo
 }
 
 func TestNew(t *testing.T) {
@@ -374,7 +374,7 @@ func TestReverseInNewCycle(t *testing.T) {
 	policyData0 := new(PolicyData)
 	policyData0.Merge([]AclAction{generateAclAction(10, ACTION_PACKET_COUNTING)}, nil, 10)
 	packet0 := getDefaultPacket()
-	packet0.PolicyData = policyData0
+	packet0.PolicyData = *policyData0
 
 	policyData1 := new(PolicyData)
 	policyData1.Merge([]AclAction{generateAclAction(11, ACTION_PACKET_COUNTING)}, nil, 11)
@@ -382,7 +382,7 @@ func TestReverseInNewCycle(t *testing.T) {
 	packet1.TcpData.Flags = TCP_SYN | TCP_ACK
 	reversePacket(packet1)
 	packet1.Direction = SERVER_TO_CLIENT
-	packet1.PolicyData = policyData1
+	packet1.PolicyData = *policyData1
 
 	flowExtra := &FlowExtra{}
 	flowGenerator.flowMap.initFlow(flowExtra, packet0)
@@ -719,9 +719,9 @@ func BenchmarkFlowMapWithSYNFlood(b *testing.B) {
 	b.ResetTimer()
 	flowGenerator.processPackets(buffer, captureBuffer)
 
-	b.Logf("map size=%d, totalFlow=%d, drop_by_capacity=%d, drop_before_window=%d, drop_after_window=%d",
+	b.Logf("map size=%d, totalFlow=%d, drop_by_capacity=%d, drop_before_window=%d",
 		flowGenerator.flowMap.size, flowGenerator.flowMap.totalFlow, flowGenerator.flowMap.counter.DropByCapacity,
-		flowGenerator.flowMap.counter.DropBeforeWindow, flowGenerator.flowMap.counter.DropAfterWindow)
+		flowGenerator.flowMap.counter.DropBeforeWindow)
 }
 
 func BenchmarkFlowMapWithTenPacketsFlowFlood(b *testing.B) {
@@ -769,8 +769,8 @@ func BenchmarkFlowMapWithTenPacketsFlowFlood(b *testing.B) {
 	b.ResetTimer()
 	flowGenerator.processPackets(buffer, captureBuffer)
 
-	b.Logf("b.N=%d map size=%d, width=%d, total=%d, drop_by_capacity=%d, drop_before_window=%d, drop_after_window=%d",
+	b.Logf("b.N=%d map size=%d, width=%d, total=%d, drop_by_capacity=%d, drop_before_window=%d",
 		b.N, flowGenerator.flowMap.size, flowGenerator.flowMap.width,
 		flowGenerator.flowMap.totalFlow, flowGenerator.flowMap.counter.DropByCapacity,
-		flowGenerator.flowMap.counter.DropBeforeWindow, flowGenerator.flowMap.counter.DropAfterWindow)
+		flowGenerator.flowMap.counter.DropBeforeWindow)
 }

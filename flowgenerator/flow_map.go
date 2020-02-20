@@ -1,7 +1,6 @@
 package flowgenerator
 
 import (
-	"math/rand"
 	"strconv"
 	"sync"
 	"time"
@@ -54,22 +53,20 @@ type FlowMap struct {
 	bufferStartIndex int32              // ringBuffer中的开始下标（二维矩阵下标），闭区间
 	bufferEndIndex   int32              // ringBuffer中的结束下标（二维矩阵下标），开区间
 
-	hashBasis      uint32
 	hashSlots      int32 // 上取整至2^N，哈希桶个数
-	hashSlotBits   int32 // hashSlots中低位连续0比特个数
 	timeWindowSize int64 // 上取整至2^N，环形时间桶的槽位个数
 
 	hashSlotHead []int32 // 哈希桶，hashSlotHead[i] 表示哈希值为 i 的冲突链的第一个节点为 buffer[[ hashSlotHead[i] ]]
 	timeSlotHead []int32 // 时间桶，含义与 hashSlotHead 类似
 
-	startTimeInUnit   int64 // 时间桶中的最早时间
-	packetDelayInUnit int64 // Packet到达的最大Delay
+	startTime       time.Duration // 时间桶中的最早时间
+	startTimeInUnit int64         // 时间桶中的最早时间，以_TIME_SLOT_UNIT为单位
+	packetDelay     time.Duration // Packet到达的最大Delay
 
 	packetStatOutputBuffer []interface{} // 包统计信息输出的缓冲区
 	flowStatOutputBuffer   []interface{} // 流统计信息输出的缓冲区
 	packetAppQueue         queue.QueueWriter
 	flowAppQueue           queue.QueueWriter
-	lastMapFlush           time.Duration
 	lastQueueFlush         time.Duration
 	flowAppQueueFlush      time.Duration
 	flushInterval          time.Duration
@@ -102,7 +99,6 @@ type FlowMapCounter struct {
 
 	DropByCapacity   uint64 `statsd:"drop_by_capacity,counter"`
 	DropBeforeWindow uint64 `statsd:"drop_before_window,counter"`
-	DropAfterWindow  uint64 `statsd:"drop_after_window,counter"`
 }
 
 func (m *FlowMap) GetCounter() interface{} {
@@ -328,22 +324,6 @@ func (m *FlowMap) copyAndOutput(node *flowMapNode, timestamp time.Duration, meta
 	}
 }
 
-func (m *FlowMap) isTimeInWindow(timeInUnit int64) bool {
-	if m.startTimeInUnit == 0 {
-		m.startTimeInUnit = timeInUnit - m.packetDelayInUnit
-		return true
-	}
-
-	if timeInUnit < m.startTimeInUnit {
-		m.counter.DropBeforeWindow++
-		return false
-	} else if timeInUnit+1 >= m.startTimeInUnit+m.timeWindowSize {
-		m.counter.DropAfterWindow++
-		return false
-	}
-	return true
-}
-
 func (m *FlowMap) flowCopyOnWrite(flowExtra *FlowExtra) {
 	if flowExtra.cow == 0 {
 		return
@@ -368,23 +348,20 @@ func (m *FlowMap) flowCopyOnWrite(flowExtra *FlowExtra) {
 func (m *FlowMap) InjectFlushTicker(timestamp time.Duration) bool {
 	if timestamp == 0 { // 仅在低负载时使用系统时间（而非包的时间）推动时间窗口
 		timestamp = time.Duration(time.Now().UnixNano())
-		if timestamp-m.lastMapFlush < _TIME_SLOT_UNIT {
-			return true
-		}
-		m.lastMapFlush = timestamp
 	} else {
-		m.lastMapFlush = time.Duration(time.Now().UnixNano())
+		if timestamp < m.startTime {
+			m.counter.DropBeforeWindow++
+			return false
+		}
 	}
 
-	nextStartTimeInUnit := int64(timestamp / _TIME_SLOT_UNIT)
-	if !m.isTimeInWindow(nextStartTimeInUnit) {
-		return false
-	}
-	nextStartTimeInUnit -= m.packetDelayInUnit // 根据包到达时间的容差调整
-	timestamp = time.Duration(nextStartTimeInUnit)*_TIME_SLOT_UNIT - 1
-	if nextStartTimeInUnit < m.startTimeInUnit {
+	if timestamp-m.packetDelay-_TIME_SLOT_UNIT < m.startTime { // FlowMap的时间窗口无法推动
 		return true
 	}
+
+	nextStartTimeInUnit := int64((timestamp - m.packetDelay) / _TIME_SLOT_UNIT)
+	m.startTime = time.Duration(nextStartTimeInUnit) * _TIME_SLOT_UNIT
+	timestamp = m.startTime - 1
 
 	next := int32(0)
 	for timeInUnit := m.startTimeInUnit; timeInUnit < nextStartTimeInUnit; timeInUnit++ { // 扫描过期的时间槽
@@ -460,11 +437,11 @@ func (m *FlowMap) updateNode(node *flowMapNode, nodeIndex int32, meta *datatype.
 	m.changeTimeSlot(node, nodeIndex, int64(meta.Timestamp/_TIME_SLOT_UNIT))
 }
 
-func (m *FlowMap) newNode(meta *datatype.MetaPacket, hash uint64) {
+func (m *FlowMap) newNode(meta *datatype.MetaPacket, hash uint64) bool {
 	// buffer空间检查
 	if m.size >= m.capacity {
 		m.counter.DropByCapacity++
-		return
+		return false
 	}
 	row := m.bufferEndIndex >> _BLOCK_SIZE_BITS
 	col := m.bufferEndIndex & _BLOCK_SIZE_MASK
@@ -499,6 +476,7 @@ func (m *FlowMap) newNode(meta *datatype.MetaPacket, hash uint64) {
 	} else {
 		m.initIpOthersFlow(flowExtra, meta)
 	}
+	return true
 }
 
 func (m *FlowMap) InjectMetaPacket(block *datatype.MetaPacketBlock) {
@@ -522,14 +500,13 @@ func (m *FlowMap) InjectMetaPacket(block *datatype.MetaPacketBlock) {
 		} else {
 			hash = m.getQuinTupleHash(meta)
 		}
-		m.injectMetaPacket(hash, meta)
-		if meta.PolicyData == nil { // 补充由于超限导致未查询策略，用于其它流程（如PCAP存储）
+		if !m.injectMetaPacket(hash, meta) { // 补充由于超限导致未查询策略，用于其它流程（如PCAP存储）
 			m.policyGetter(meta, m.id)
 		}
 	}
 }
 
-func (m *FlowMap) injectMetaPacket(hash uint64, meta *datatype.MetaPacket) {
+func (m *FlowMap) injectMetaPacket(hash uint64, meta *datatype.MetaPacket) bool {
 	// 查找对应Flow所在的节点
 	width := 0
 	next := int32(0)
@@ -546,7 +523,7 @@ func (m *FlowMap) injectMetaPacket(hash uint64, meta *datatype.MetaPacket) {
 			if m.width < width {
 				m.width = width
 			}
-			return
+			return true
 		}
 	}
 	if m.width < width+1 {
@@ -554,7 +531,7 @@ func (m *FlowMap) injectMetaPacket(hash uint64, meta *datatype.MetaPacket) {
 	}
 
 	// 未找到Flow，需要插入新的节点
-	m.newNode(meta, hash)
+	return m.newNode(meta, hash)
 }
 
 func minPowerOfTwo(v int) (int, int) {
@@ -567,11 +544,17 @@ func minPowerOfTwo(v int) (int, int) {
 }
 
 func (m *FlowMap) compressHash(hash uint64) int32 {
-	return int32((((((hash>>m.hashSlotBits)^hash)>>m.hashSlotBits)^hash)>>m.hashSlotBits)^hash) & (m.hashSlots - 1)
+	return int32(hash) & (m.hashSlots - 1)
+}
+
+func (m *FlowMap) initTimeWindow() {
+	// startTimeInUnit的计算中减去time.Second避免UT失败
+	m.startTimeInUnit = int64((time.Duration(time.Now().UnixNano()) - m.packetDelay - time.Second) / _TIME_SLOT_UNIT)
+	m.startTime = time.Duration(m.startTimeInUnit) * _TIME_SLOT_UNIT
 }
 
 func NewFlowMap(hashSlots, capacity, id int, timeWindow, packetDelay, flushInterval time.Duration, packetAppQueue, flowAppQueue queue.QueueWriter, policyGetter PolicyGetter) *FlowMap {
-	hashSlots, hashSlotBits := minPowerOfTwo(hashSlots)
+	hashSlots, _ = minPowerOfTwo(hashSlots)
 	if timeWindow < _FLOW_STAT_INTERVAL {
 		timeWindow = _FLOW_STAT_INTERVAL
 	}
@@ -580,13 +563,11 @@ func NewFlowMap(hashSlots, capacity, id int, timeWindow, packetDelay, flushInter
 	m := &FlowMap{
 		FlowGeo:                innerFlowGeo,
 		ringBuffer:             make([]flowMapNodeBlock, (capacity+_BLOCK_SIZE)/_BLOCK_SIZE+1),
-		hashBasis:              rand.Uint32(),
 		hashSlots:              int32(hashSlots),
-		hashSlotBits:           int32(hashSlotBits),
 		timeWindowSize:         int64(timeWindowSize),
 		hashSlotHead:           make([]int32, hashSlots),
 		timeSlotHead:           make([]int32, timeWindowSize),
-		packetDelayInUnit:      int64(packetDelay / _TIME_SLOT_UNIT),
+		packetDelay:            packetDelay,
 		packetStatOutputBuffer: make([]interface{}, 0, 256),
 		flowStatOutputBuffer:   make([]interface{}, 0, 256),
 		packetAppQueue:         packetAppQueue,
@@ -604,6 +585,7 @@ func NewFlowMap(hashSlots, capacity, id int, timeWindow, packetDelay, flushInter
 		counter:                &FlowMapCounter{},
 		perfCounter:            NewFlowPerfCounter(),
 	}
+	m.initTimeWindow()
 	m.initStateMachineMaster()
 	m.initStateMachineSlave()
 	tags := stats.OptionStatTags{"id": strconv.Itoa(id)}

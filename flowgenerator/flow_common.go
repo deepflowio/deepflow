@@ -2,7 +2,9 @@ package flowgenerator
 
 import (
 	"github.com/google/gopacket/layers"
+
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/hmap/keyhash"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
@@ -35,7 +37,8 @@ func (m *FlowMap) initFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 		taggedFlow.TunnelInfo = TunnelInfo{}
 	}
 	taggedFlow.FlowID = m.genFlowId(uint64(now))
-	taggedFlow.TimeBitmap = getBitmap(now)
+	// XXX: TimeBitmap未使用，暂不计算
+	// taggedFlow.TimeBitmap = getBitmap(now)
 	taggedFlow.StartTime = now
 	taggedFlow.EndTime = now
 	taggedFlow.PacketStatTime = now / _PACKET_STAT_INTERVAL * _PACKET_STAT_INTERVAL
@@ -95,19 +98,25 @@ func (m *FlowMap) updateFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 	flowMetricsPeer.TickByteCount += bytes
 	flowMetricsPeer.ByteCount += bytes
 	flowMetricsPeer.TotalByteCount += bytes
+	// XXX: TimeBitmap未使用，暂不计算
 	// a flow will report every minute and StartTime will be reset, so the value could not be overflow
-	taggedFlow.TimeBitmap |= getBitmap(packetTimestamp)
+	// taggedFlow.TimeBitmap |= getBitmap(packetTimestamp)
 }
 
 func updateEndpointAndPolicyData(flowExtra *FlowExtra, meta *MetaPacket) {
 	flowExtra.policyDataCache[meta.Direction] = meta.PolicyData
-	flowExtra.endpointDataCache[meta.Direction] = meta.EndpointData
-	flowExtra.policyDataCache[OppositePacketDirection(meta.Direction)] = reversePolicyData(meta.PolicyData)
-	flowExtra.endpointDataCache[OppositePacketDirection(meta.Direction)] = meta.EndpointData.ReverseData()
+	reversePolicyData(&flowExtra.policyDataCache[OppositePacketDirection(meta.Direction)], &meta.PolicyData)
+	if meta.Direction == CLIENT_TO_SERVER {
+		flowExtra.endpointDataCache.SrcInfo = meta.EndpointData.SrcInfo
+		flowExtra.endpointDataCache.DstInfo = meta.EndpointData.DstInfo
+	} else {
+		flowExtra.endpointDataCache.SrcInfo = meta.EndpointData.DstInfo
+		flowExtra.endpointDataCache.DstInfo = meta.EndpointData.SrcInfo
+	}
 
 	taggedFlow := flowExtra.taggedFlow
 	taggedFlow.PolicyData = flowExtra.policyDataCache[CLIENT_TO_SERVER]
-	srcInfo, dstInfo := flowExtra.endpointDataCache[CLIENT_TO_SERVER].SrcInfo, flowExtra.endpointDataCache[CLIENT_TO_SERVER].DstInfo
+	srcInfo, dstInfo := flowExtra.endpointDataCache.SrcInfo, flowExtra.endpointDataCache.DstInfo
 
 	taggedFlow.GroupIDs0 = srcInfo.GroupIds
 	taggedFlow.GroupIDs1 = dstInfo.GroupIds
@@ -138,28 +147,40 @@ func updateEndpointAndPolicyData(flowExtra *FlowExtra, meta *MetaPacket) {
 
 func copyEndpointAndPolicyData(flowExtra *FlowExtra, meta *MetaPacket) {
 	meta.PolicyData = flowExtra.policyDataCache[meta.Direction]
-	meta.EndpointData = flowExtra.endpointDataCache[meta.Direction]
+	if meta.Direction == CLIENT_TO_SERVER {
+		meta.EndpointData.SrcInfo = flowExtra.endpointDataCache.SrcInfo
+		meta.EndpointData.DstInfo = flowExtra.endpointDataCache.DstInfo
+	} else {
+		meta.EndpointData.SrcInfo = flowExtra.endpointDataCache.DstInfo
+		meta.EndpointData.DstInfo = flowExtra.endpointDataCache.SrcInfo
+	}
 }
 
-// reversePolicyData will return a clone of the current PolicyData
-func reversePolicyData(policyData *PolicyData) *PolicyData {
-	if policyData == nil {
-		return nil
+// 调用者保证reversePolicyData函数入参非nil
+func reversePolicyData(dst, src *PolicyData) {
+	if !src.Valid() {
+		return
 	}
-	newPolicyData := ClonePolicyData(policyData)
-	for i, aclAction := range newPolicyData.AclActions {
-		newPolicyData.AclActions[i] = aclAction.ReverseDirection()
+
+	*dst = *src
+	dst.AclActions = make([]AclAction, len(src.AclActions))
+	dst.AclGidBitmaps = make([]AclGidBitmap, len(src.AclGidBitmaps))
+	copy(dst.AclActions, src.AclActions)
+	copy(dst.AclGidBitmaps, src.AclGidBitmaps)
+
+	for i, aclAction := range dst.AclActions {
+		dst.AclActions[i] = aclAction.ReverseDirection()
 	}
-	for i, _ := range newPolicyData.AclGidBitmaps {
-		newPolicyData.AclGidBitmaps[i].ReverseGroupType()
+	for i, _ := range dst.AclGidBitmaps {
+		dst.AclGidBitmaps[i].ReverseGroupType()
 	}
-	return newPolicyData
 }
 
 func reverseFlow(flowExtra *FlowExtra) {
 	flowExtra.reversed = !flowExtra.reversed
 	flowExtra.policyDataCache[0], flowExtra.policyDataCache[1] = flowExtra.policyDataCache[1], flowExtra.policyDataCache[0]
-	flowExtra.endpointDataCache[0], flowExtra.endpointDataCache[1] = flowExtra.endpointDataCache[1], flowExtra.endpointDataCache[0]
+	flowExtra.endpointDataCache.SrcInfo, flowExtra.endpointDataCache.DstInfo =
+		flowExtra.endpointDataCache.DstInfo, flowExtra.endpointDataCache.SrcInfo
 
 	taggedFlow := flowExtra.taggedFlow
 	taggedFlow.TunnelInfo.Src, taggedFlow.TunnelInfo.Dst = taggedFlow.TunnelInfo.Dst, taggedFlow.TunnelInfo.Src
@@ -176,7 +197,7 @@ func reverseFlow(flowExtra *FlowExtra) {
 }
 
 func (m *FlowMap) checkIfDoFlowPerf(flowExtra *FlowExtra) bool {
-	if flowExtra.taggedFlow.PolicyData != nil && flowExtra.taggedFlow.PolicyData.ActionFlags&FLOW_PERF_ACTION_FLAGS != 0 {
+	if flowExtra.taggedFlow.PolicyData.Valid() && flowExtra.taggedFlow.PolicyData.ActionFlags&FLOW_PERF_ACTION_FLAGS != 0 {
 		if flowExtra.metaFlowPerf == nil {
 			flowExtra.metaFlowPerf = AcquireMetaFlowPerf()
 		}
@@ -187,7 +208,7 @@ func (m *FlowMap) checkIfDoFlowPerf(flowExtra *FlowExtra) bool {
 }
 
 // hash of the key L3, symmetric
-func getKeyL3Hash(meta *MetaPacket, basis uint32) uint64 {
+func getKeyL3Hash(meta *MetaPacket) uint64 {
 	ipSrc := uint64(meta.IpSrc)
 	ipDst := uint64(meta.IpDst)
 	if meta.EthType == layers.EthernetTypeIPv6 {
@@ -201,17 +222,15 @@ func getKeyL3Hash(meta *MetaPacket, basis uint32) uint64 {
 }
 
 // hash of the key L4, symmetric
-func getKeyL4Hash(meta *MetaPacket, basis uint32) uint64 {
-	portSrc := uint32(meta.PortSrc)
-	portDst := uint32(meta.PortDst)
-	if portSrc >= portDst {
-		return uint64(hashAdd(basis, (portSrc<<16)|portDst))
+func getKeyL4Hash(meta *MetaPacket) uint64 {
+	if meta.PortSrc >= meta.PortDst {
+		return uint64(meta.PortSrc)<<16 | uint64(meta.PortDst)
 	}
-	return uint64(hashAdd(basis, (portDst<<16)|portSrc))
+	return uint64(meta.PortDst)<<16 | uint64(meta.PortSrc)
 }
 
 func (m *FlowMap) getQuinTupleHash(meta *MetaPacket) uint64 {
-	return getKeyL3Hash(meta, m.hashBasis) ^ ((uint64(meta.InPort) << 32) | getKeyL4Hash(meta, m.hashBasis))
+	return uint64(keyhash.Jenkins128(getKeyL3Hash(meta), ((uint64(meta.InPort) << 32) | getKeyL4Hash(meta))))
 }
 
 func (m *FlowMap) getEthOthersQuinTupleHash(meta *MetaPacket) uint64 {

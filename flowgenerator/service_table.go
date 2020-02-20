@@ -41,7 +41,9 @@ func IsActiveService(srcScore, dstScore uint8) bool {
 
 func NewServiceTable(tag string, index, hashSlots, capacity int) *ServiceTable {
 	return &ServiceTable{
-		m: lru.NewU64LRU(fmt.Sprintf("flow_generator_service_table_%s", tag), hashSlots, capacity, stats.OptionStatTags{"index": strconv.Itoa(index)}),
+		m: lru.NewU64LRU(
+			fmt.Sprintf("flow_service_%s", tag), hashSlots, capacity,
+			stats.OptionStatTags{"index": strconv.Itoa(index)}),
 	}
 }
 
