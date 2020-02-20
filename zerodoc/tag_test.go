@@ -27,7 +27,7 @@ func TestFillTag(t *testing.T) {
 	f := Field{L3EpcID: 3}
 	tag := &Tag{}
 	f.FillTag(L3EpcID, tag)
-	if tag.ToKVString() != ",l3_epc_id=3,side=0" {
+	if tag.ToKVString() != ",l3_epc_id=3" {
 		t.Error("FillTag处理不正确")
 	}
 }
@@ -43,11 +43,11 @@ func TestInt16Unmarshal(t *testing.T) {
 
 func TestNegativeID(t *testing.T) {
 	f := Field{L3EpcID: datatype.EPC_FROM_DEEPFLOW, GroupID: datatype.GROUP_INTERNET}
-	if f.NewTag(L3EpcID|GroupID).ToKVString() != ",group_id=-2,l3_epc_id=-1,side=0" {
+	if f.NewTag(L3EpcID|GroupID).ToKVString() != ",group_id=-2,l3_epc_id=-1" {
 		t.Error("int16值处理得不正确")
 	}
 	f = Field{L3EpcID: 32767, GroupID: -3}
-	if f.NewTag(L3EpcID|GroupID).ToKVString() != ",group_id=65533,l3_epc_id=32767,side=0" {
+	if f.NewTag(L3EpcID|GroupID).ToKVString() != ",group_id=65533,l3_epc_id=32767" {
 		t.Error("int16值处理得不正确")
 	}
 }

@@ -65,6 +65,44 @@ var MeterVTAPNames [MAX_APP_ID]string = [MAX_APP_ID]string{
 
 var MeterNamesToID map[string]uint8
 
+func GetMeterID(name string) uint8 {
+	if id, exist := MeterNamesToID[name]; exist {
+		return id
+	}
+	log.Errorf("can't get meter(%s) id", name)
+	return MAX_APP_ID
+}
+
+const (
+	MAIN uint8 = iota
+	MINI
+	MAIN_ISP
+	MAIN_REGION
+	MAIN_CAST_TYPE
+	MAIN_TCP_FLAGS
+
+	MAX_MEASUREMENT_ID
+)
+
+var MeasurementNames [MAX_MEASUREMENT_ID]string = [MAX_MEASUREMENT_ID]string{
+	"main",
+	"mini",
+	"main_isp",
+	"main_region",
+	"main_cast_type",
+	"main_tcp_flags",
+}
+
+var MeasurementNamesToID map[string]uint8
+
+func GetMeasurementID(name string) uint8 {
+	if mid, exist := MeasurementNamesToID[name]; exist {
+		return mid
+	}
+	log.Errorf("can't get measurement(%s) id", name)
+	return MAX_MEASUREMENT_ID
+}
+
 func init() {
 	MeterNamesToID = make(map[string]uint8)
 	for id, name := range MeterDFNames {
@@ -72,5 +110,10 @@ func init() {
 	}
 	for id, name := range MeterVTAPNames {
 		MeterNamesToID[name] = uint8(id)
+	}
+
+	MeasurementNamesToID = make(map[string]uint8)
+	for id, name := range MeasurementNames {
+		MeasurementNamesToID[name] = uint8(id)
 	}
 }
