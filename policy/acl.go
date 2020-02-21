@@ -7,7 +7,7 @@ import (
 )
 
 type Acl struct {
-	Id                ACLID
+	Id                uint32
 	Type              TapType
 	TapId             uint32
 	SrcGroups         []uint32
