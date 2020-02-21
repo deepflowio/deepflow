@@ -49,9 +49,9 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 		Mac:        macInt,
 		TapMac:     vifData.GetTapMac(),
 		Ips:        ips,
-		EpcId:      int32(vifData.GetEpcId()),
+		EpcId:      int32(vifData.GetEpcId() & 0xffff),
 		DeviceType: vifData.GetDeviceType(),
-		DeviceId:   vifData.GetDeviceId(),
+		DeviceId:   vifData.GetDeviceId() & 0xffff,
 		IfType:     vifData.GetIfType(),
 		HostIp:     hostIp,
 	}
@@ -100,7 +100,7 @@ func newIpGroupData(ipGroup *trident.Group) *policy.IpGroupData {
 
 	return &policy.IpGroupData{
 		Id:    ipGroup.GetId() & 0xffff,
-		EpcId: int32(ipGroup.GetEpcId()),
+		EpcId: int32(ipGroup.GetEpcId() & 0xffff),
 		Type:  uint8(ipGroup.GetType()),
 		Ips:   ips,
 		VmIds: vmIds,
@@ -119,7 +119,7 @@ func Convert2IpGroupData(ipGroups []*trident.Group) []*policy.IpGroupData {
 	return ipGroupDatas
 }
 
-func newAclAction(aclId datatype.ACLID, actions []*trident.FlowAction) []datatype.AclAction {
+func newAclAction(actions []*trident.FlowAction) []datatype.AclAction {
 	actionSet := make(map[datatype.AclAction]datatype.AclAction)
 	for _, action := range actions {
 		actionFlags := datatype.ActionFlag(1 << uint32(action.GetAction()-1)) // protobuf中的定义从1开始
@@ -170,7 +170,7 @@ func newNpbActions(npbs []*trident.NpbAction) []datatype.NpbAction {
 
 func newPolicyData(acl *trident.FlowAcl) *policy.Acl {
 	return &policy.Acl{
-		Id:           datatype.ACLID(acl.GetId()),
+		Id:           acl.GetId(),
 		Type:         datatype.TapType(acl.GetTapType()),
 		SrcGroups:    datatype.SplitGroup2Int(acl.GetSrcGroupIds()),
 		DstGroups:    datatype.SplitGroup2Int(acl.GetDstGroupIds()),
@@ -178,7 +178,7 @@ func newPolicyData(acl *trident.FlowAcl) *policy.Acl {
 		DstPortRange: datatype.SplitPort2Int(acl.GetDstPorts()),
 		Proto:        uint16(acl.GetProtocol() & 0xffff),
 		Vlan:         acl.GetVlan() & 0xfff,
-		Action:       newAclAction(datatype.ACLID(acl.GetId()), acl.GetActions()),
+		Action:       newAclAction(acl.GetActions()),
 		NpbActions:   newNpbActions(acl.GetNpbActions()),
 	}
 }
@@ -198,8 +198,8 @@ func Convert2AclData(flowAcls []*trident.FlowAcl) []*policy.Acl {
 func newPeerConnection(data *trident.PeerConnection) *datatype.PeerConnection {
 	return &datatype.PeerConnection{
 		Id:        data.GetId(),
-		LocalEpc:  int32(data.GetLocalEpcId()),
-		RemoteEpc: int32(data.GetRemoteEpcId()),
+		LocalEpc:  int32(data.GetLocalEpcId() & 0xffff),
+		RemoteEpc: int32(data.GetRemoteEpcId() & 0xffff),
 	}
 }
 

@@ -261,7 +261,7 @@ func getBackwardAcl(acl AclAction) AclAction {
 	return acl.SetDirections(BACKWARD)
 }
 
-func generatePolicyAcl(table *PolicyTable, action AclAction, aclID ACLID, args ...interface{}) *Acl {
+func generatePolicyAcl(table *PolicyTable, action AclAction, aclID uint32, args ...interface{}) *Acl {
 	var srcGroupId, dstGroupId, vlan uint32
 	var proto uint16
 	var port int
@@ -2427,7 +2427,7 @@ func BenchmarkFirstPathWithMultiGroup(b *testing.B) {
 	srcGroups := []uint32{group[1]}
 	dstGroups := []uint32{group[2]}
 	for i := group[2]; i <= 100; i += 10 {
-		acl := generatePolicyAcl(table, action, ACLID(i), uint32(i), uint32(i+10), IPProtocolTCP, 0, vlanAny)
+		acl := generatePolicyAcl(table, action, uint32(i), uint32(i), uint32(i+10), IPProtocolTCP, 0, vlanAny)
 		acls = append(acls, acl)
 		srcGroups = append(srcGroups, i+10)
 		dstGroups = append(dstGroups, i+10)
