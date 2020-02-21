@@ -45,7 +45,7 @@ const (
 	WIN_SCALE_UNKNOWN = 0x40
 )
 
-const SEQ_LIST_MAX_LEN = 15
+const SEQ_LIST_MAX_LEN = 16
 
 const (
 	RTT_MAX = 10 * time.Second
@@ -59,7 +59,7 @@ type SeqSegment struct { // 避免乱序，识别重传
 }
 
 type TcpSessionPeer struct {
-	seqArray  [SEQ_LIST_MAX_LEN + 1]SeqSegment
+	seqArray  [SEQ_LIST_MAX_LEN]SeqSegment
 	arraySize int
 
 	timestamp time.Duration
@@ -210,12 +210,16 @@ func (p *TcpSessionPeer) isNextPacket(header *MetaPacket) bool {
 // 忽略调sequence最小的2个node之间的间隔,相当于认为包已收到
 // 其带来的影响是，包被误认为是重传
 func (p *TcpSessionPeer) mergeSeqListNode(at int) {
-	gte := p.seqArray[at]
-	lt := p.seqArray[at+1]
-	p.seqArray[at].length = gte.seqNumber - lt.seqNumber + gte.length
-	p.seqArray[at].seqNumber = lt.seqNumber
+	gte := &p.seqArray[at]
+	lt := &p.seqArray[at+1]
+	gte.length = gte.seqNumber - lt.seqNumber + gte.length
+	gte.seqNumber = lt.seqNumber
+	// 合并后，需要reset被合并的node
+	lt.length = 0
+	lt.seqNumber = 0
 
-	if at < SEQ_LIST_MAX_LEN {
+	// 仅当被合并node不是最后一个node时，需要将被合并node之后的node往前移一位
+	if at < p.arraySize-2 {
 		copy(p.seqArray[at+1:], p.seqArray[at+2:])
 	}
 	p.arraySize--
@@ -223,7 +227,12 @@ func (p *TcpSessionPeer) mergeSeqListNode(at int) {
 
 // insert node to array[at]
 func (p *TcpSessionPeer) insertSeqListNode(node SeqSegment, at int) {
-	copy(p.seqArray[at+1:], p.seqArray[at:SEQ_LIST_MAX_LEN-1])
+	// 当插入的位置非末尾时，需将插入位置到末尾的所有node往后移一位
+	// 同时，不会存在，当p.arraySize==16时，执行insert操作的情况，
+	// 因为，当p.arraySize>=16时，需立即执行merge操作，使得p.arraySize始终<=15
+	if at < p.arraySize {
+		copy(p.seqArray[at+1:], p.seqArray[at:])
+	}
 	p.seqArray[at] = node
 	p.arraySize++
 }
@@ -274,14 +283,13 @@ func (p *TcpSessionPeer) Search(node SeqSegment) (lt, gte *SeqSegment, index int
 			break
 		}
 	}
-
 	if index == 0 {
 		gte = nil
 	} else {
 		gte = &p.seqArray[index-1]
 	}
 
-	if index == SEQ_LIST_MAX_LEN-1 {
+	if index == p.arraySize {
 		lt = nil
 	} else {
 		lt = &p.seqArray[index]
@@ -366,8 +374,8 @@ func (p *TcpSessionPeer) assertSeqNumber(tcpHeader *MetaPacketTcpHeader, payload
 		if c := isContinuousSeqSegment(lt, gte, &node); c == SEQ_NODE_DISCONTINUOUS {
 			p.insertSeqListNode(node, ltIndex)
 			flag = SEQ_DISCONTINUOUS
-			if p.arraySize > SEQ_LIST_MAX_LEN {
-				p.mergeSeqListNode(SEQ_LIST_MAX_LEN - 1)
+			if p.arraySize >= SEQ_LIST_MAX_LEN {
+				p.mergeSeqListNode(SEQ_LIST_MAX_LEN - 2)
 				flag = SEQ_MERGE
 			}
 		} else if c == SEQ_NODE_BOTH_CONTINUOUS {
@@ -402,7 +410,7 @@ func (p *TcpSessionPeer) String() string {
 		p.timestamp, p.seq, p.payloadLen,
 		p.winSize, p.winScale, p.canCalcRtt, p.canCalcArt)
 
-	length := len(p.seqArray)
+	length := p.arraySize
 	list = fmt.Sprintf("length:%v", length)
 	if length > 0 {
 		list = fmt.Sprintf("%s, %v", list, p.seqArray)
