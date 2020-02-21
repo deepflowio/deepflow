@@ -479,7 +479,7 @@ func parseAcl(args []string) *policy.Acl {
 				fmt.Printf("invalid id %s from %s\n", keyValue[1], args[0])
 				return nil
 			}
-			acl.Id = datatype.ACLID(id)
+			acl.Id = uint32(id)
 		case "proto":
 			proto, err := strconv.Atoi(keyValue[1])
 			if err != nil || proto < 0 || proto > 255 {
