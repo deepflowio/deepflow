@@ -8,7 +8,7 @@ import (
 
 func TestGroupByActionFlag(t *testing.T) {
 	p := &datatype.PolicyData{}
-	p.ACLID = datatype.ACLID(2)
+	p.ACLID = uint32(2)
 	p.ActionFlags = datatype.ACTION_PACKET_COUNTING
 	p.Merge([]datatype.AclAction{
 		datatype.AclAction(0).AddActionFlags(datatype.ACTION_PACKET_COUNTING).AddTagTemplates(1),
