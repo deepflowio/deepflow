@@ -96,7 +96,7 @@ func BenchmarkDdbsFirstPathWithMultiGroup(b *testing.B) {
 	srcGroups := []uint32{group[1]}
 	dstGroups := []uint32{group[2]}
 	for i := group[2]; i <= 100; i += 10 {
-		acl := generatePolicyAcl(table, action, ACLID(i), uint32(i), uint32(i+10), IPProtocolTCP, 0, vlanAny)
+		acl := generatePolicyAcl(table, action, uint32(i), uint32(i), uint32(i+10), IPProtocolTCP, 0, vlanAny)
 		acls = append(acls, acl)
 		srcGroups = append(srcGroups, i+10)
 		dstGroups = append(dstGroups, i+10)

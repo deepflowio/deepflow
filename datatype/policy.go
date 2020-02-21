@@ -158,7 +158,7 @@ type ACLID uint16
 type PolicyRawData struct {
 	AclActions []AclAction
 	NpbActions []NpbAction
-	ACLID      ACLID // 匹配的第一个ACL
+	ACLID      uint32 // 匹配的第一个ACL
 }
 
 func (d *PolicyRawData) GobEncode() ([]byte, error) {
@@ -173,7 +173,7 @@ type PolicyData struct {
 	AclActions    []AclAction
 	NpbActions    []NpbAction
 	AclGidBitmaps []AclGidBitmap
-	ACLID         ACLID      // 匹配的第一个ACL
+	ACLID         uint32     // 匹配的第一个ACL
 	ActionFlags   ActionFlag // bitwise OR
 }
 
@@ -481,7 +481,7 @@ func (d *PolicyData) CheckNpbPolicy(packet *LookupKey) *PolicyData {
 	return validPolicyData
 }
 
-func (d *PolicyData) MergeNpbAction(actions []NpbAction, aclID ACLID, directions ...DirectionType) {
+func (d *PolicyData) MergeNpbAction(actions []NpbAction, aclID uint32, directions ...DirectionType) {
 	if d.ACLID == 0 {
 		d.ACLID = aclID
 	}
@@ -518,7 +518,7 @@ func (d *PolicyData) MergeNpbAction(actions []NpbAction, aclID ACLID, directions
 	}
 }
 
-func (d *PolicyData) MergeAclAction(actions []AclAction, aclID ACLID, directions ...DirectionType) {
+func (d *PolicyData) MergeAclAction(actions []AclAction, aclID uint32, directions ...DirectionType) {
 	if d.ACLID == 0 {
 		d.ACLID = aclID
 	}
@@ -548,12 +548,12 @@ func (d *PolicyData) MergeAclAction(actions []AclAction, aclID ACLID, directions
 	}
 }
 
-func (d *PolicyData) Merge(aclActions []AclAction, npbActions []NpbAction, aclID ACLID, directions ...DirectionType) {
+func (d *PolicyData) Merge(aclActions []AclAction, npbActions []NpbAction, aclID uint32, directions ...DirectionType) {
 	d.MergeAclAction(aclActions, aclID, directions...)
 	d.MergeNpbAction(npbActions, aclID, directions...)
 }
 
-func (d *PolicyData) MergeNpbAndSwapDirection(actions []NpbAction, aclID ACLID) {
+func (d *PolicyData) MergeNpbAndSwapDirection(actions []NpbAction, aclID uint32) {
 	newNpbActions := make([]NpbAction, len(actions))
 	for i, _ := range actions {
 		newNpbActions[i] = actions[i].ReverseTapSide()
@@ -562,7 +562,7 @@ func (d *PolicyData) MergeNpbAndSwapDirection(actions []NpbAction, aclID ACLID) 
 	d.MergeNpbAction(newNpbActions, aclID)
 }
 
-func (d *PolicyData) MergeAclAndSwapDirection(actions []AclAction, aclID ACLID) {
+func (d *PolicyData) MergeAclAndSwapDirection(actions []AclAction, aclID uint32) {
 	newAclActions := make([]AclAction, len(actions))
 	for i, _ := range actions {
 		newAclActions[i] = actions[i].ReverseDirection()
@@ -571,7 +571,7 @@ func (d *PolicyData) MergeAclAndSwapDirection(actions []AclAction, aclID ACLID) 
 	d.MergeAclAction(newAclActions, aclID)
 }
 
-func (d *PolicyData) MergeAndSwapDirection(aclActions []AclAction, npbActions []NpbAction, aclID ACLID) {
+func (d *PolicyData) MergeAndSwapDirection(aclActions []AclAction, npbActions []NpbAction, aclID uint32) {
 	d.MergeAclAndSwapDirection(aclActions, aclID)
 	d.MergeNpbAndSwapDirection(npbActions, aclID)
 }

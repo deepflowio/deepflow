@@ -349,13 +349,13 @@ func (l *PolicyLabeler) GetAcl() []*Acl {
 	return l.RawAcls
 }
 
-func getAclId(ids ...ACLID) ACLID {
+func getAclId(ids ...uint32) uint32 {
 	for _, id := range ids {
 		if id != 0 {
 			return id
 		}
 	}
-	return ACLID(0)
+	return 0
 }
 
 func (l *PolicyLabeler) GetPolicyByFirstPath(endpointData *EndpointData, packet *LookupKey) (*EndpointStore, *PolicyData) {
