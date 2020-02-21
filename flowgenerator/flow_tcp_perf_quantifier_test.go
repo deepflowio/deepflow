@@ -190,7 +190,7 @@ func testMergeSeqListNode(peer *TcpSessionPeer, node *SeqSegment, position int) 
 		peer.insertSeqListNode(*node, peer.arraySize/2)
 		peer.mergeSeqListNode(peer.arraySize / 2)
 	case 1:
-		peer.insertSeqListNode(*node, peer.arraySize-1)
+		peer.insertSeqListNode(*node, peer.arraySize)
 		peer.mergeSeqListNode(peer.arraySize - 2)
 	default:
 	}
@@ -211,7 +211,7 @@ func TestMergeSeqListNode(t *testing.T) {
 	//t.Log(peer.String())
 
 	// test case {10, 10}
-	node = &SeqSegment{seqNumber: 10, length: 10}
+	node = &SeqSegment{seqNumber: uint32(SEQ_LIST_MAX_LEN*100 + 10), length: 10}
 	testMergeSeqListNode(peer, node, -1)
 	// {10, 100}
 	//t.Log(peer.String())
@@ -223,7 +223,7 @@ func TestMergeSeqListNode(t *testing.T) {
 	//t.Log(peer.String())
 
 	// {SEQ_LIST_MAX_LEN*10+10, 10}
-	node = &SeqSegment{seqNumber: uint32(SEQ_LIST_MAX_LEN*100 + 10), length: 10}
+	node = &SeqSegment{seqNumber: 10, length: 10}
 	testMergeSeqListNode(peer, node, 1)
 	// {10,320}
 	//t.Log(peer.String())
