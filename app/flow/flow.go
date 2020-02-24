@@ -119,8 +119,9 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 	bits := [2]uint64{flowMetricsPeerSrc.ByteCount << 3, flowMetricsPeerDst.ByteCount << 3}
 
 	p.rawSrcGroups = p.rawSrcGroups[:0]
+	isActiveHost := [2]bool{flowMetricsPeerSrc.IsActiveHost, flowMetricsPeerDst.IsActiveHost}
 	for i := range ips {
-		if IsOuterPublicIp(l3EpcIDs[i]) {
+		if !isActiveHost[i] || IsOuterPublicIp(l3EpcIDs[i]) {
 			ips[i] = 0
 			ip6s[i] = net.IPv6zero
 		}
