@@ -117,8 +117,9 @@ func (p *FlowToTypeDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 	directions := [2]outputtype.DirectionEnum{outputtype.ClientToServer, outputtype.ServerToClient}
 	docTimestamp := RoundToMinute(flow.StartTime)
 
+	isActiveHost := [2]bool{flowMetricsPeerSrc.IsActiveHost, flowMetricsPeerDst.IsActiveHost}
 	for i := range ips {
-		if IsOuterPublicIp(l3EpcIDs[i]) {
+		if !isActiveHost[i] || IsOuterPublicIp(l3EpcIDs[i]) {
 			ips[i] = 0
 			ip6s[i] = net.IPv6zero
 		}
