@@ -9,6 +9,7 @@
 package rpc
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -17,9 +18,11 @@ import (
 	"sort"
 
 	"github.com/spf13/cobra"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
+	"gitlab.x.lan/yunshan/message/trident"
+
 	"gitlab.x.lan/yunshan/droplet/config"
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
-	"gitlab.x.lan/yunshan/message/trident"
 )
 
 type CmdExecute func(response *trident.SyncResponse)
@@ -138,6 +141,21 @@ func ipGroups(response *trident.SyncResponse) {
 	}
 }
 
+func formatString(data *trident.Interface) string {
+	buffer := bytes.Buffer{}
+	format := "Mac: %s EpcId: %d DeviceType: %d DeviceId: %d IfType: %d LaunchServer: %s LaunchServerId: %d RegionId: %d "
+	buffer.WriteString(fmt.Sprintf(format, utils.Uint64ToMac(data.GetMac()), data.GetEpcId(),
+		data.GetDeviceType(), data.GetDeviceId(), data.GetIfType(),
+		data.GetLaunchServer(), data.GetLaunchServerId(), data.GetRegionId()))
+	if data.GetPodNodeId() > 0 || data.GetTapMac() != 0 {
+		buffer.WriteString(fmt.Sprintf("PodNodeId: %d TapMac: %s ", data.GetPodNodeId(), utils.Uint64ToMac(data.GetTapMac())))
+	}
+	if len(data.GetIpResources()) > 0 {
+		buffer.WriteString(fmt.Sprintf("IpResources: %v", data.GetIpResources()))
+	}
+	return buffer.String()
+}
+
 func platformData(response *trident.SyncResponse) {
 	platform := trident.PlatformData{}
 	fmt.Println("PlatformData version:", response.GetVersionPlatformData())
@@ -146,7 +164,7 @@ func platformData(response *trident.SyncResponse) {
 		if err := platform.Unmarshal(plarformCompressed); err == nil {
 			fmt.Println("interfaces:")
 			for index, entry := range platform.Interfaces {
-				JsonFormat(index+1, entry)
+				JsonFormat(index+1, formatString(entry))
 			}
 			fmt.Println("peer connections:")
 			for index, entry := range platform.PeerConnections {
