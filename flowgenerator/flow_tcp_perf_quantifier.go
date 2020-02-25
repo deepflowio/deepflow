@@ -98,6 +98,7 @@ type MetaPerfStats struct {
 	art0Count, art1Count, rtt0Count, rtt1Count uint32
 	art0Sum, art1Sum, rtt0Sum, rtt1Sum         time.Duration
 	rttSyn0, rttSyn1                           time.Duration
+	rttSyn0Flag, rttSyn1Flag                   bool
 
 	retrans0, retrans1       uint32
 	retransSyn0, retransSyn1 uint32
@@ -684,11 +685,11 @@ func (i *FlowPerfDataInfo) calcRtt(rtt time.Duration, isFirstPacketDirection boo
 // 计算rttSyn值
 func (i *FlowPerfDataInfo) calcRttSyn(rtt time.Duration, isFirstPacketDirection bool) {
 	if isFirstPacketDirection {
-		i.flowPerfStats.rttSyn0 += rtt
-		i.flowPerfStats.rtt0Count += 1
+		i.flowPerfStats.rttSyn0 = rtt
+		i.flowPerfStats.rttSyn0Flag = true
 	} else {
-		i.flowPerfStats.rttSyn1 += rtt
-		i.flowPerfStats.rtt1Count += 1
+		i.flowPerfStats.rttSyn1 = rtt
+		i.flowPerfStats.rttSyn1Flag = true
 	}
 }
 
@@ -884,9 +885,17 @@ func (i *FlowPerfDataInfo) calcReportFlowPerfStats(report *TcpPerfStats, flowRev
 	period := &i.periodPerfStats
 	flow := &i.flowPerfStats
 
-	report.RTTSyn = flow.rttSyn0 + flow.rttSyn1
-	report.RTTSynClient = flow.rttSyn0
-	report.RTTSynServer = flow.rttSyn1
+	if (flow.rttSyn0Flag || flow.rttSyn1Flag) && flow.rttSyn0 > 0 && flow.rttSyn1 > 0 {
+		report.RTTSyn = flow.rttSyn0 + flow.rttSyn1
+	}
+	if flow.rttSyn0Flag {
+		report.RTTSynClient = flow.rttSyn0
+		flow.rttSyn0Flag = false
+	}
+	if flow.rttSyn1Flag {
+		report.RTTSynServer = flow.rttSyn1
+		flow.rttSyn1Flag = false
+	}
 
 	report.TcpPerfCountsPeerSrc.SynRetransCount = period.retransSyn0
 	report.TcpPerfCountsPeerDst.SynRetransCount = period.retransSyn1

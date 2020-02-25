@@ -642,8 +642,54 @@ func TestMetaFlowPerfUpdate(t *testing.T) {
 	testMetaFlowPerfUpdate(t)
 }
 
-func testReport(flowPerf *MetaFlowPerf, t *testing.T) {
-	var report *TcpPerfStats
+func reportTestTemplate(t *testing.T, pcapFile string, resultFile string,
+	firstReportMoment int, reverseFlow bool, ignoreNthPacket int) {
+	var buffer bytes.Buffer
+	file, err := os.OpenFile(fmt.Sprintf("%s-actual.txt", resultFile), os.O_CREATE|os.O_APPEND|os.O_RDWR, os.ModePerm)
+	if err != nil {
+		t.Error(err)
+	}
+
+	counter := NewFlowPerfCounter()
+	flowPerf := AcquireMetaFlowPerf()
+	flowExtra := &FlowExtra{
+		taggedFlow: &TaggedFlow{},
+	}
+
+	packets, err := getMetaPacketFromPcap(pcapFile)
+	if err != nil {
+		t.Errorf("structure metaPacket faild as %v", err)
+		return
+	}
+	if len(packets) < 2 {
+		t.Logf("calc flow perf need minimum 2 packets")
+		return
+	}
+
+	firstPkt := packets[0]
+	for i, pkt := range packets {
+		if i+1 == ignoreNthPacket {
+			continue
+		}
+		if pkt.TcpData.DataOffset == 0 {
+			t.Errorf("raw packet not tcp packet, %vth meta_packet is %v", i, pkt)
+		}
+		flowPerf.Update(pkt, getPacketDirection(firstPkt, pkt), flowExtra, &counter)
+
+		if firstReportMoment == i+1 {
+			report := copyAndResetPerfData(flowPerf, reverseFlow, &counter)
+			buffer.WriteString(fmt.Sprintf("report after %vth packet:\nflowperf.perfData:%v\nreport:%v\n\n",
+				firstReportMoment, flowPerf.perfData, report))
+		}
+	}
+	report := copyAndResetPerfData(flowPerf, reverseFlow, &counter)
+	buffer.WriteString(fmt.Sprintf("report after last packet:\nflowperf.perfData:%v\nreport:%v\n\n", flowPerf.perfData, report))
+
+	file.WriteString(buffer.String())
+	file.Close()
+}
+
+func testReport(flowPerf *MetaFlowPerf) {
 	var periodData, flowData *MetaPerfStats
 
 	counter := NewFlowPerfCounter()
@@ -658,12 +704,7 @@ func testReport(flowPerf *MetaFlowPerf, t *testing.T) {
 	flowData.art1Sum += periodData.art1Sum
 	periodData.art1Count = 1
 	flowData.art1Count += periodData.art1Count
-
-	report = copyAndResetPerfData(flowPerf, false, &counter)
-
-	if t != nil {
-		t.Logf("flowperf.perfData:%v\nreport:%v\n", flowPerf.perfData, report)
-	}
+	copyAndResetPerfData(flowPerf, false, &counter)
 
 	periodData = &flowPerf.perfData.periodPerfStats
 	flowData = &flowPerf.perfData.flowPerfStats
@@ -675,17 +716,33 @@ func testReport(flowPerf *MetaFlowPerf, t *testing.T) {
 	flowData.rtt0Sum += periodData.rtt0Sum
 	periodData.rtt0Count = 1
 	flowData.rtt0Count += periodData.rtt0Count
-	report = copyAndResetPerfData(flowPerf, true, &counter)
-
-	if t != nil {
-		t.Logf("flowperf.perfData:%v\nreport:%v\n", flowPerf.perfData, report)
-		t.Log(counter.counter)
-	}
+	copyAndResetPerfData(flowPerf, true, &counter)
 }
 
 func TestReport(t *testing.T) {
-	flowPerf := AcquireMetaFlowPerf()
-	testReport(flowPerf, t)
+	resultFile := "flowPerf_report.result"
+	actualFile := fmt.Sprintf("%s-actual.txt", resultFile)
+	pcapFile := "art-continues-payload-len-larger-than-1.pcap"
+	os.Remove(actualFile)
+
+	// flow结束后上报
+	reportTestTemplate(t, pcapFile, resultFile, -1, false, 0)
+	// flow结束后反向上报
+	reportTestTemplate(t, pcapFile, resultFile, -1, true, 0)
+	// 握手成功后第一次上报
+	reportTestTemplate(t, pcapFile, resultFile, 3, false, 0)
+	// 计算出rttSyn1(即syn/ack包之后)后第一次上报
+	reportTestTemplate(t, pcapFile, resultFile, 2, false, 0)
+	// 丢掉第一个包(syn包)，模拟仅计算出rttSyn0后第一次上报
+	reportTestTemplate(t, pcapFile, resultFile, 3, false, 1)
+	// 丢掉第三个包(ack包)，模拟仅计算出rttSyn1后第一次上报
+	reportTestTemplate(t, pcapFile, resultFile, 2, false, 3)
+
+	expected, _ := ioutil.ReadFile(resultFile)
+	actual, _ := ioutil.ReadFile(actualFile)
+	if !bytes.Equal(expected, actual) {
+		t.Error(fmt.Sprintf("Inconsistent with %s, written to %s-actual.txt", resultFile, resultFile))
+	}
 }
 
 func testFlowPerfError(info string) error {
@@ -745,7 +802,7 @@ func BenchmarkReport(b *testing.B) {
 	flowPerf := AcquireMetaFlowPerf()
 
 	for i := 0; i < b.N; i++ {
-		testReport(flowPerf, nil)
+		testReport(flowPerf)
 	}
 }
 

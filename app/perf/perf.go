@@ -113,7 +113,7 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				SumRetransCntTx:      uint64(retransCnt[thisEnd]),
 				SumRetransCntRx:      uint64(retransCnt[otherEnd]),
 
-				SumRTTSyn:     flow.ClosedRTTSyn(),
+				SumRTTSyn:     flow.GetRTTSyn(),
 				SumRTTAvg:     flow.GetRTT(),
 				SumARTAvg:     flow.GetART(),
 				SumRTTSynFlow: flow.RTTSynFlow(),
@@ -124,11 +124,11 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				SumZeroWndCntRx: uint64(zeroWinCnt[otherEnd]),
 			},
 			PerfMeterMax: outputtype.PerfMeterMax{
-				MaxRTTSyn:       flow.ClosedRTTSyn(),
+				MaxRTTSyn:       flow.GetRTTSyn(),
 				MaxRTTAvg:       flow.GetRTT(),
 				MaxARTAvg:       flow.GetART(),
-				MaxRTTSynClient: flow.ClosedRTTSynClient(),
-				MaxRTTSynServer: flow.ClosedRTTSynServer(),
+				MaxRTTSynClient: flow.GetRTTSynClient(),
+				MaxRTTSynServer: flow.GetRTTSynServer(),
 			},
 		}
 

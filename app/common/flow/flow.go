@@ -114,35 +114,11 @@ func (f *Flow) ZeroWinCountDst() uint32 {
 	return f.TcpPerfCountsPeerDst.ZeroWinCount
 }
 
-func (f *Flow) ClosedRTTSyn() time.Duration {
-	if !f.IsClosedFlow() {
-		return 0
-	} else {
-		return f.GetRTTSyn()
-	}
-}
-
-func (f *Flow) ClosedRTTSynClient() time.Duration {
-	if !f.IsClosedFlow() {
-		return 0
-	} else {
-		return f.GetRTTSynClient()
-	}
-}
-
-func (f *Flow) ClosedRTTSynServer() time.Duration {
-	if !f.IsClosedFlow() {
-		return 0
-	} else {
-		return f.GetRTTSynServer()
-	}
-}
-
 func (f *Flow) RTTSynFlow() uint64 {
 	if f.TcpPerfStats == nil {
 		return 0
 	}
-	if f.IsClosedFlow() && f.RTTSyn != 0 {
+	if f.RTTSyn != 0 {
 		return 1
 	} else {
 		return 0
@@ -153,7 +129,7 @@ func (f *Flow) RTTSynClientFlow() uint64 {
 	if f.TcpPerfStats == nil {
 		return 0
 	}
-	if f.IsClosedFlow() && f.RTTSynClient != 0 {
+	if f.RTTSynClient != 0 {
 		return 1
 	} else {
 		return 0
