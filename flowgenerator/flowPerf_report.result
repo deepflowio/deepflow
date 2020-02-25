@@ -1,0 +1,70 @@
+report after last packet:
+flowperf.perfData:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 1},{rtt0Count: 0},{rtt1Count: 1},{art0Sum: 0},{art1Sum: 30358000},{rtt0Sum: 0},{rtt1Sum: 10040000},{rttSyn0: 20322000},{rttSyn1: 10226000},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+
+report:RTTSyn: 30.548ms RTTSynClient: 20.322ms RTTSynServer: 10.226ms RTT: 10.04ms ART: 30.358ms TcpPerfCountsPeerSrc: {0 0 0 0} TcpPerfCountsPeerDst: {0 0 0 0} PacketIntervalAvg: 0 PacketIntervalVariance: 0 PacketSizeVariance: 0 TotalRetransCount: 0 TotalZeroWinCount: 0 TotalPshUrgCount: 0 
+
+report after last packet:
+flowperf.perfData:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 1},{rtt0Count: 0},{rtt1Count: 1},{art0Sum: 0},{art1Sum: 30358000},{rtt0Sum: 0},{rtt1Sum: 10040000},{rttSyn0: 20322000},{rttSyn1: 10226000},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+
+report:RTTSyn: 30.548ms RTTSynClient: 10.226ms RTTSynServer: 20.322ms RTT: 0s ART: 0s TcpPerfCountsPeerSrc: {0 0 0 0} TcpPerfCountsPeerDst: {0 0 0 0} PacketIntervalAvg: 0 PacketIntervalVariance: 0 PacketSizeVariance: 0 TotalRetransCount: 0 TotalZeroWinCount: 0 TotalPshUrgCount: 0 
+
+report after 3th packet:
+flowperf.perfData:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 20322000},{rttSyn1: 10226000},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+
+report:RTTSyn: 30.548ms RTTSynClient: 20.322ms RTTSynServer: 10.226ms RTT: 0s ART: 0s TcpPerfCountsPeerSrc: {0 0 0 0} TcpPerfCountsPeerDst: {0 0 0 0} PacketIntervalAvg: 0 PacketIntervalVariance: 0 PacketSizeVariance: 0 TotalRetransCount: 0 TotalZeroWinCount: 0 TotalPshUrgCount: 0 
+
+report after last packet:
+flowperf.perfData:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 1},{rtt0Count: 0},{rtt1Count: 1},{art0Sum: 0},{art1Sum: 30358000},{rtt0Sum: 0},{rtt1Sum: 10040000},{rttSyn0: 20322000},{rttSyn1: 10226000},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+
+report:RTTSyn: 0s RTTSynClient: 0s RTTSynServer: 0s RTT: 10.04ms ART: 30.358ms TcpPerfCountsPeerSrc: {0 0 0 0} TcpPerfCountsPeerDst: {0 0 0 0} PacketIntervalAvg: 0 PacketIntervalVariance: 0 PacketSizeVariance: 0 TotalRetransCount: 0 TotalZeroWinCount: 0 TotalPshUrgCount: 0 
+
+report after 2th packet:
+flowperf.perfData:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 10226000},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+
+report:RTTSyn: 0s RTTSynClient: 0s RTTSynServer: 10.226ms RTT: 0s ART: 0s TcpPerfCountsPeerSrc: {0 0 0 0} TcpPerfCountsPeerDst: {0 0 0 0} PacketIntervalAvg: 0 PacketIntervalVariance: 0 PacketSizeVariance: 0 TotalRetransCount: 0 TotalZeroWinCount: 0 TotalPshUrgCount: 0 
+
+report after last packet:
+flowperf.perfData:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 1},{rtt0Count: 0},{rtt1Count: 1},{art0Sum: 0},{art1Sum: 30358000},{rtt0Sum: 0},{rtt1Sum: 10040000},{rttSyn0: 20322000},{rttSyn1: 10226000},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+
+report:RTTSyn: 30.548ms RTTSynClient: 20.322ms RTTSynServer: 0s RTT: 10.04ms ART: 30.358ms TcpPerfCountsPeerSrc: {0 0 0 0} TcpPerfCountsPeerDst: {0 0 0 0} PacketIntervalAvg: 0 PacketIntervalVariance: 0 PacketSizeVariance: 0 TotalRetransCount: 0 TotalZeroWinCount: 0 TotalPshUrgCount: 0 
+
+report after 3th packet:
+flowperf.perfData:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 20322000},{rttSyn1: 0},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+
+report:RTTSyn: 0s RTTSynClient: 20.322ms RTTSynServer: 0s RTT: 0s ART: 0s TcpPerfCountsPeerSrc: {0 0 0 0} TcpPerfCountsPeerDst: {0 0 0 0} PacketIntervalAvg: 0 PacketIntervalVariance: 0 PacketSizeVariance: 0 TotalRetransCount: 0 TotalZeroWinCount: 0 TotalPshUrgCount: 0 
+
+report after last packet:
+flowperf.perfData:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 1},{rtt0Count: 0},{rtt1Count: 1},{art0Sum: 0},{art1Sum: 30358000},{rtt0Sum: 0},{rtt1Sum: 10040000},{rttSyn0: 20322000},{rttSyn1: 0},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+
+report:RTTSyn: 0s RTTSynClient: 0s RTTSynServer: 0s RTT: 10.04ms ART: 30.358ms TcpPerfCountsPeerSrc: {0 0 0 0} TcpPerfCountsPeerDst: {0 0 0 0} PacketIntervalAvg: 0 PacketIntervalVariance: 0 PacketSizeVariance: 0 TotalRetransCount: 0 TotalZeroWinCount: 0 TotalPshUrgCount: 0 
+
+report after 2th packet:
+flowperf.perfData:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 10226000},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+
+report:RTTSyn: 0s RTTSynClient: 0s RTTSynServer: 10.226ms RTT: 0s ART: 0s TcpPerfCountsPeerSrc: {0 0 0 0} TcpPerfCountsPeerDst: {0 0 0 0} PacketIntervalAvg: 0 PacketIntervalVariance: 0 PacketSizeVariance: 0 TotalRetransCount: 0 TotalZeroWinCount: 0 TotalPshUrgCount: 0 
+
+report after last packet:
+flowperf.perfData:periodPerfStats:{art0Count: 0},{art1Count: 0},{rtt0Count: 0},{rtt1Count: 0},{art0Sum: 0},{art1Sum: 0},{rtt0Sum: 0},{rtt1Sum: 0},{rttSyn0: 0},{rttSyn1: 0},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+flowPerfStats:{art0Count: 0},{art1Count: 1},{rtt0Count: 0},{rtt1Count: 1},{art0Sum: 0},{art1Sum: 30358000},{rtt0Sum: 0},{rtt1Sum: 10040000},{rttSyn0: 0},{rttSyn1: 10226000},{rttSyn0Flag: false},{rttSyn1Flag: false},{retrans0: 0},{retrans1: 0},{retransSyn0: 0},{retransSyn1: 0},{pshUrgCount0: 0},{pshUrgCount1: 0},{zeroWinCount0: 0},{zeroWinCount1: 0},
+packetVariance:flowgenerator.FlowPacketVariance{packetIntervalAvg:0, packetIntervalVariance:0, packetSizeAvg:0, packetSizeVariance:0, lastPacketTimestamp:0}
+
+report:RTTSyn: 0s RTTSynClient: 0s RTTSynServer: 0s RTT: 10.04ms ART: 30.358ms TcpPerfCountsPeerSrc: {0 0 0 0} TcpPerfCountsPeerDst: {0 0 0 0} PacketIntervalAvg: 0 PacketIntervalVariance: 0 PacketSizeVariance: 0 TotalRetransCount: 0 TotalZeroWinCount: 0 TotalPshUrgCount: 0 
+

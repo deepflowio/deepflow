@@ -120,7 +120,7 @@ func (p *FlowToGeoDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedT
 		meter.SumPacketRx = packets[otherEnd]
 		meter.SumBitTx = bits[thisEnd]
 		meter.SumBitRx = bits[otherEnd]
-		meter.SumRTTSynClient = flow.ClosedRTTSynClient()
+		meter.SumRTTSynClient = flow.GetRTTSynClient()
 		meter.SumRTTSynClientFlow = flow.RTTSynClientFlow()
 
 		field := &p.fields[thisEnd]
