@@ -38,17 +38,15 @@ func (p *PossibleHost) Add6(host net.IP, epcId int32) {
 func (p *PossibleHost) Check(host uint32, epcId int32) bool {
 	key := uint64(epcId&0xffff)<<32 | uint64(host)
 	p.hostMapMutex.RLock()
-	result, _ := p.hostMap.Get(key, true)
+	_, ok := p.hostMap.Get(key, true)
 	p.hostMapMutex.RUnlock()
-	return *result.(*bool)
-
+	return ok
 }
 
 func (p *PossibleHost) Check6(host net.IP, epcId int32) bool {
 	key := uint64(1<<48) | uint64(epcId&0xffff)<<32 | uint64(GetIpHash(host))
 	p.hostMapMutex.RLock()
-	result, _ := p.hostMap.Get(key, true)
+	_, ok := p.hostMap.Get(key, true)
 	p.hostMapMutex.RUnlock()
-	return *result.(*bool)
-
+	return ok
 }
