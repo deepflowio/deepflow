@@ -66,7 +66,6 @@ enum IfMacSource {
 enum SocketType {
     UDP = 0;
     TCP = 1;
-    ZMQ = 2;
 }
 
 message Config {
@@ -99,6 +98,7 @@ message Config {
     optional uint32 vtap_id = 40;  // 限制在64000
 
     optional SocketType collector_socket_type = 45 [default = UDP];
+    optional SocketType compressor_socket_type = 46 [default = UDP];
 }
 
 message Segment { // e.g. single LAN area
