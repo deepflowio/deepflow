@@ -448,7 +448,7 @@ func TestModifyEpcIdPolicy2(t *testing.T) {
 // l2EpcId0=-1,l3EpcId0=-1,l2Epcid1=-2,l3EpcId1=50的数据正确性
 func TestModifyEpcIdPolicy3(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
-	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpcAny, 3)
+	platformData1 := generatePlatformDataByParam(ip4, mac4, EPC_FROM_DEEPFLOW, 3)
 	platformData2 := generatePlatformDataByParam(ip5, mac5, groupEpc[5], 3)
 	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
 	generateIpgroupData(policy)
@@ -473,7 +473,7 @@ func TestModifyEpcIdPolicy3(t *testing.T) {
 func TestModifyEpcIdPolicy4(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
 	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpc[4], 3)
-	platformData2 := generatePlatformDataByParam(ip5, mac5, groupEpcAny, 3)
+	platformData2 := generatePlatformDataByParam(ip5, mac5, EPC_FROM_DEEPFLOW, 3)
 	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
 	generateIpgroupData(policy)
 	generateAclData(policy)
@@ -496,8 +496,8 @@ func TestModifyEpcIdPolicy4(t *testing.T) {
 // l3EpcId0=-2, l3EpcId1=-2的数据正确性
 func TestModifyEpcIdPolicy5(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
-	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpcAny, 4)
-	platformData2 := generatePlatformDataByParam(ip5, mac5, groupEpcAny, 4)
+	platformData1 := generatePlatformDataByParam(ip4, mac4, EPC_FROM_DEEPFLOW, 4)
+	platformData2 := generatePlatformDataByParam(ip5, mac5, EPC_FROM_DEEPFLOW, 4)
 	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
 	generateIpgroupData(policy)
 	generateAclData(policy)
