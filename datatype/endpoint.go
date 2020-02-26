@@ -105,17 +105,16 @@ func (i *EndpointInfo) GetL3L2End() L3L2End {
 }
 
 func (i *EndpointInfo) SetL2Data(data *PlatformData) {
-	i.L2EpcId = data.EpcId
+	if data.EpcId > 0 {
+		i.L2EpcId = data.EpcId
+	}
 	i.L2DeviceType = data.DeviceType
 	i.L2DeviceId = data.DeviceId
 	i.GroupIds = append(i.GroupIds, data.GroupIds...)
 }
 
 func (i *EndpointInfo) SetL3Data(data *PlatformData, ip net.IP) {
-	i.L3EpcId = EPC_FROM_DEEPFLOW
-	if data.EpcId != 0 {
-		i.L3EpcId = data.EpcId
-	}
+	i.L3EpcId = data.EpcId
 	i.L3DeviceType = data.DeviceType
 	i.L3DeviceId = data.DeviceId
 	i.HostIp = data.HostIp
