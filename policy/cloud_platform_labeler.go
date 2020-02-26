@@ -221,12 +221,16 @@ func (l *CloudPlatformLabeler) GenerateEpcIpData(platformDatas []*PlatformData) 
 	epcIp6Map := make(EpcIp6MapData)
 	for _, platformData := range platformDatas {
 		for _, ipData := range platformData.Ips {
+			epcId := uint64(platformData.EpcId)
+			if platformData.EpcId == EPC_FROM_DEEPFLOW {
+				epcId = 0
+			}
 			if len(ipData.RawIp) == 4 {
-				key := EpcIpKey((uint64(platformData.EpcId) << 32) | uint64(IpToUint32(ipData.RawIp)))
+				key := EpcIpKey((epcId << 32) | uint64(IpToUint32(ipData.RawIp)))
 				epcIpMap[key] = platformData
 			} else {
 				hash := GetIpHash(ipData.RawIp)
-				key := EpcIpKey((uint64(platformData.EpcId) << 32) | uint64(hash))
+				key := EpcIpKey((epcId << 32) | uint64(hash))
 				platformList, exist := epcIp6Map[key]
 				if !exist {
 					platformList = list.New()

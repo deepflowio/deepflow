@@ -47,7 +47,9 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	}
 
 	epcId := int32(vifData.GetEpcId())
-	if epcId == 0 {
+	if epcId > 0 {
+		epcId &= 0xffff
+	} else if epcId == 0 {
 		epcId = datatype.EPC_FROM_DEEPFLOW
 	}
 
@@ -55,7 +57,7 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 		Mac:        macInt,
 		TapMac:     vifData.GetTapMac(),
 		Ips:        ips,
-		EpcId:      epcId & 0xffff,
+		EpcId:      epcId,
 		DeviceType: vifData.GetDeviceType(),
 		DeviceId:   vifData.GetDeviceId() & 0xffff,
 		IfType:     vifData.GetIfType(),

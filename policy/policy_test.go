@@ -436,7 +436,7 @@ func generatePolicyTable(ids ...TableID) *PolicyTable {
 	data1 := generatePlatformDataWithGroupId(groupEpc[1], group[1], group1Mac, ip1, ip2, ip3)
 
 	ip1 = generateIpNet(group1Ip3, 121, 32)
-	data2 := generatePlatformDataWithGroupId(groupEpcAny, groupAny, group1Mac2, ip1)
+	data2 := generatePlatformDataWithGroupId(EPC_FROM_DEEPFLOW, groupAny, group1Mac2, ip1)
 
 	ip1 = generateIpNet(group2Ip1, 122, 32)
 	ip2 = generateIpNet(group2Ip2, 122, 32)
@@ -452,7 +452,7 @@ func generatePolicyTable(ids ...TableID) *PolicyTable {
 	ip1 = generateIpNet(group3Ip1, 121, 24)
 	ip2 = generateIpNet(group3Ip2, 121, 32)
 	// group3无epc，group4有epc  ip:group3Ip1/group4Ip1 + group3Ip2/group4Ip2
-	data1 = generatePlatformDataWithGroupId(groupEpc[3], group[3], group3Mac1, ip1, ip2)
+	data1 = generatePlatformDataWithGroupId(EPC_FROM_DEEPFLOW, group[3], group3Mac1, ip1, ip2)
 
 	ip1 = generateIpNet(group4Ip1, 121, 24)
 	ip2 = generateIpNet(group4Ip2, 121, 32)

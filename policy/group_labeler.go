@@ -157,6 +157,9 @@ func (g *IpResourceGroup) GenerateIpNetmaskMap(ipgroupData []*IpGroupData) {
 	for _, group := range ipgroupData {
 		g.AddAnonymousGroupId(anonymousGroupIds, group)
 		epcId := group.EpcId
+		if group.EpcId == EPC_FROM_DEEPFLOW {
+			epcId = 0
+		}
 		id := group.Id
 		for _, raw := range group.Ips {
 			ip, maskLen, err := utils.IpNetmaskFromStringCIDR(raw)
