@@ -231,13 +231,15 @@ func newCidr(data *trident.Cidr) *datatype.Cidr {
 	}
 
 	epcId := int32(data.GetEpcId())
-	if epcId == 0 {
+	if epcId > 0 {
+		epcId &= 0xffff
+	} else if epcId == 0 {
 		epcId = datatype.EPC_FROM_DEEPFLOW
 	}
 
 	return &datatype.Cidr{
 		IpNet: ipNet,
-		EpcId: epcId & 0xffff,
+		EpcId: epcId,
 		Type:  uint8(data.GetType()),
 	}
 }

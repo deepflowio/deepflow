@@ -309,6 +309,7 @@ func (l *CloudPlatformLabeler) setEpcByCidr(ip net.IP, epc int32, endpointInfo *
 
 func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType TapType, l3End bool) *EndpointInfo {
 	endpointInfo := new(EndpointInfo)
+	// step 1: 使用mac查询L2
 	platformData := l.GetDataByMac(MacKey(mac))
 	if platformData != nil {
 		endpointInfo.SetL2Data(platformData)
@@ -320,8 +321,12 @@ func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType Ta
 			endpointInfo.SetL3DataByMac(platformData)
 		}
 	}
+	// step 2: 使用L2EpcId + IP查询L3，如果L2EpcId为0，会查询到DEEPFLOW添加的监控IP
 	if platformData = l.GetDataByEpcIp(endpointInfo.L2EpcId, ip); platformData != nil {
 		endpointInfo.SetL3Data(platformData, ip)
+	} else if endpointInfo.L3EpcId == 0 {
+		// step 3: 查询DEEPFLOW添加的监控网段
+		l.setEpcByCidr(ip, EPC_FROM_DEEPFLOW, endpointInfo)
 	}
 	return endpointInfo
 }
@@ -450,7 +455,7 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	srcData := l.GetEndpointInfo(key.SrcMac, srcIp, key.Tap, key.L3End0)
 	dstData := l.GetEndpointInfo(key.DstMac, dstIp, key.Tap, key.L3End1)
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
-	// l3: ip查询
+	// l3: ip查询, 外网IP查询
 	l.GetL3ByIp(srcIp, dstIp, endpoint)
 	// l3: 对等连接查询, 以下两种查询
 	// 1). peer epc + ip查询对等连接表
