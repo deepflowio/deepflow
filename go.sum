@@ -178,8 +178,8 @@ github.com/xlab/treeprint v0.0.0-20180616005107-d6fb6747feb6/go.mod h1:ce1O1j6Ut
 gitlab.x.lan/platform/influxdb v0.0.0-20200109064655-6c1e420280c5 h1:mbhTrgL5Tauws+m71kwyyKnsxTU6hZ9LXrGWNFMpGok=
 gitlab.x.lan/platform/influxdb v0.0.0-20200109064655-6c1e420280c5/go.mod h1:60Gw7nMrWje4djy4y8D6bP75WdWAi5s+wtEa7EhfZUU=
 gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200107085540-a487142adbe3/go.mod h1:hKFbiUAZcjAFT5S+t/VRwut6gojAB0jHuKranPKZU3M=
-gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200225084253-d1441eed9e76 h1:IUo3c2wJLc88o4ag55uE/gGk9klwZbWu5yvhtxae3fE=
-gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200225084253-d1441eed9e76/go.mod h1:fBQHj6BOzqmxtT8uiB2htm+0k8/Y76GqeqtrvzJ7sTw=
+gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200227070458-9894b55fc5e7 h1:nZPd4/VNU9rvsnEOhnyIJZxSgG/KnB9LPhi6fNkHIJk=
+gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200227070458-9894b55fc5e7/go.mod h1:fBQHj6BOzqmxtT8uiB2htm+0k8/Y76GqeqtrvzJ7sTw=
 gitlab.x.lan/yunshan/message v0.0.0-20191224131206-b5b841dee36a h1:p2Fds/yR6TtTuAFyoTYXoQDJ/Uies/b0Lv9euomdjcM=
 gitlab.x.lan/yunshan/message v0.0.0-20191224131206-b5b841dee36a/go.mod h1:MypsIdfw74oNofgOqe76rOWsVKRDYZxG9+70BJTsSDk=
 gitlab.x.lan/yunshan/message v0.0.0-20200220015133-6f18ace3fc96 h1:FCbieiQz1bQU+TLEvi7C7W75j8mxzpYQa3rBZd0L7a0=
