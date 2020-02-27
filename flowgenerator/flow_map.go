@@ -243,7 +243,7 @@ func (m *FlowMap) flushQueue(now time.Duration) {
 func (m *FlowMap) checkActiveHost(direction int, taggedFlow *datatype.TaggedFlow) {
 	flowMetric := &taggedFlow.FlowMetricsPeers[direction]
 
-	if !flowMetric.IsActiveHost && flowMetric.L3EpcID > 0 {
+	if !flowMetric.IsActiveHost && flowMetric.L3EpcID > datatype.EPC_FROM_INTERNET {
 		if flowMetric.L3DeviceID == 0 {
 			ip, ip6 := taggedFlow.IPSrc, taggedFlow.IP6Src
 			if direction == datatype.FLOW_METRICS_PEER_DST {
