@@ -1,10 +1,10 @@
 {
     "package": "usage",
     "codes": [
-        "acl_gid, acl_direction, direction",
-        "acl_gid, acl_direction, direction, ip, tap_type",
-        "acl_gid, acl_direction, direction, ip_path, tap_type",
-        "acl_gid, acl_direction, direction, protocol, ip, server_port, tap_type",
-        "acl_gid, acl_direction, direction, protocol, ip_path, server_port, tap_type"
+        "acl_gid, direction",
+        "acl_gid, direction, ip, tap_type",
+        "acl_gid, direction, ip_path, tap_type",
+        "acl_gid, direction, protocol, ip, server_port, tap_type",
+        "acl_gid, direction, protocol, ip_path, server_port, tap_type"
     ]
 }

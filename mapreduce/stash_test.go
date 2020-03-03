@@ -24,22 +24,22 @@ func TestStash(t *testing.T) {
 		SumBitTx:    4,
 		SumBitRx:    5,
 	}
-	tag1 := f.NewTag(datatype.IPPath | datatype.L3EpcIDPath | datatype.Protocol | datatype.ServerPort | datatype.TAPType)
+	tag1 := f.NewTag(datatype.Direction | datatype.IPPath | datatype.L3EpcIDPath | datatype.Protocol | datatype.ServerPort | datatype.TAPType)
 	meter1 := &datatype.UsageMeter{}
 	*meter1 = meter
 	doc1 := &app.Document{Timestamp: 0x12345678, Tag: tag1, Meter: meter1}
 
-	tag2 := f.NewTag(datatype.ACLGID | datatype.ACLDirection | datatype.Direction | datatype.TAPType | datatype.IP)
+	tag2 := f.NewTag(datatype.ACLGID | datatype.Direction | datatype.TAPType | datatype.IP)
 	meter2 := &datatype.UsageMeter{}
 	*meter2 = meter
 	doc2 := &app.Document{Timestamp: 0x12345678, Tag: tag2, Meter: meter2}
 
-	tag3 := f.NewTag(datatype.IPPath | datatype.L3EpcIDPath | datatype.Protocol | datatype.ServerPort | datatype.TAPType)
+	tag3 := f.NewTag(datatype.Direction | datatype.IPPath | datatype.L3EpcIDPath | datatype.Protocol | datatype.ServerPort | datatype.TAPType)
 	meter3 := &datatype.UsageMeter{}
 	*meter3 = meter
 	doc3 := &app.Document{Timestamp: 0x12345678, Tag: tag3, Meter: meter3}
 
-	tag4 := f.NewTag(datatype.ACLGID | datatype.ACLDirection | datatype.Direction | datatype.TAPType | datatype.IP)
+	tag4 := f.NewTag(datatype.ACLGID | datatype.Direction | datatype.TAPType | datatype.IP)
 	meter4 := &datatype.UsageMeter{}
 	*meter4 = meter
 	doc4 := &app.Document{Timestamp: 0x12345679, Tag: tag4, Meter: meter4}

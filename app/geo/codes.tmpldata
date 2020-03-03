@@ -1,13 +1,13 @@
 {
     "package": "geo",
     "codes": [
-        "acl_gid, acl_direction, direction, ip, isp_code, tap_type",
-        "acl_gid, acl_direction, direction, ip, region, tap_type",
-        "acl_gid, acl_direction, direction, ip_path, isp_code, tap_type",
-        "acl_gid, acl_direction, direction, ip_path, region, tap_type",
-        "acl_gid, acl_direction, direction, ip, isp_code, tap_type, protocol, server_port",
-        "acl_gid, acl_direction, direction, ip, region, tap_type, protocol, server_port",
-        "acl_gid, acl_direction, direction, ip_path, isp_code, tap_type, protocol, server_port",
-        "acl_gid, acl_direction, direction, ip_path, region, tap_type, protocol, server_port"
+        "acl_gid, direction, ip, isp_code, tap_type",
+        "acl_gid, direction, ip, region, tap_type",
+        "acl_gid, direction, ip_path, isp_code, tap_type",
+        "acl_gid, direction, ip_path, region, tap_type",
+        "acl_gid, direction, ip, isp_code, tap_type, protocol, server_port",
+        "acl_gid, direction, ip, region, tap_type, protocol, server_port",
+        "acl_gid, direction, ip_path, isp_code, tap_type, protocol, server_port",
+        "acl_gid, direction, ip_path, region, tap_type, protocol, server_port"
     ]
 }

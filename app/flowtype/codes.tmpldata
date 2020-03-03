@@ -1,9 +1,9 @@
 {
     "package": "flowtype",
     "codes": [
-        "acl_gid, acl_direction, direction, ip, tap_type",
-        "acl_gid, acl_direction, direction, ip, tap_type, protocol, server_port",
-        "acl_gid, acl_direction, direction, ip_path, tap_type",
-        "acl_gid, acl_direction, direction, ip_path, tap_type, protocol, server_port"
+        "acl_gid, direction, ip, tap_type",
+        "acl_gid, direction, ip, tap_type, protocol, server_port",
+        "acl_gid, direction, ip_path, tap_type",
+        "acl_gid, direction, ip_path, tap_type, protocol, server_port"
     ]
 }

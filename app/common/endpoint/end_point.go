@@ -3,7 +3,6 @@ package endpoint
 import (
 	"fmt"
 
-	inputtype "gitlab.x.lan/yunshan/droplet-libs/datatype"
 	outputtype "gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 )
 
@@ -61,70 +60,4 @@ func TAPTypeFromInPort(inPort uint32) outputtype.TAPTypeEnum {
 		return outputtype.ToR
 	}
 	panic(fmt.Sprintf("InPort %d not in range", inPort))
-}
-
-func IsNorthSourceTraffic(l3EpcID0, l3EpcID1 int32) bool {
-	return l3EpcID0 == inputtype.EPC_FROM_INTERNET || l3EpcID1 == inputtype.EPC_FROM_INTERNET
-}
-
-// 虚拟网络东西向流量判断逻辑：
-//     TAG             IP1 -------> (1)router(2) --------> IP2
-//                         ^     ^               ^      ^          <-- 抓包点
-//     IP1                 -     DUP             DUP    DUP
-//     IP2                 DUP   DUP             DUP    -
-//     IP1->IP2            DUP   DUP             DUP    -
-//     IP2->IP1            -     DUP             DUP    DUP
-//
-func IsDupTraffic(inPort uint32, isL2L3EndThisEnd, isL2L3EndOtherEnd, isNorthSouthTraffic bool, tagCode outputtype.Code) bool {
-	if ISP.IsPortInRange(inPort) {
-		// 接入网络流量只有一份，不存在Dup
-		return false
-	} else if TOR.IsPortInRange(inPort) {
-		// 虚拟网络流量可能存在多份，需要忽略交换机和路由器二、三层转发后的流量:
-		// 1. 对于南北向流量，肯定有一端未被采集点覆盖，
-		//    取客户端或服务端所在位置有采集器的流量
-		// 2. 对于东西向流量，认为两段均被采集点覆盖
-		//    2.1. 对于双端统计量，取对端所在位置有采集器的流量，
-		//         但是IsWrongEndPoint会过滤掉对端是客户端的场景
-		//    2.2. 对于单端统计量，取本端所在位置有采集器的流量，
-		//         但是IsWrongEndPoint会过滤掉带ServerPort且本端是客户端的场景
-		if isNorthSouthTraffic {
-			return !(isL2L3EndThisEnd || isL2L3EndOtherEnd)
-		}
-		if tagCode.HasEdgeTagField() {
-			return !isL2L3EndOtherEnd
-		} else {
-			return !isL2L3EndThisEnd
-		}
-	}
-	return true // never happen
-}
-
-// 不含ACL的Tag
-func IsWrongEndPoint(thisEnd EndPoint, tagCode outputtype.Code) bool {
-	if tagCode.HasEdgeTagField() {
-		// 双侧Tag，永远只统计ZERO侧的数据：即统计量表示客户端的Tx/Rx
-		return thisEnd == ONE
-	} else {
-		// 含端口号的单侧Tag，永远只统计ONE侧的数据：即统计量表示服务端的Tx/Rx
-		if tagCode&outputtype.ServerPort != 0 {
-			return thisEnd == ZERO
-		}
-		// 其它单侧统计量，表示本侧的Tx/Rx
-		return false
-	}
-}
-
-// 含ACL的Tag，仅考虑ACL正向匹配的情况
-func IsWrongEndPointWithACL(thisEnd EndPoint, aclDirection inputtype.DirectionType, tagCode outputtype.Code) bool {
-	if tagCode&outputtype.ACLGID == 0 {
-		panic("Tag必须包含ACLGID字段")
-	}
-	if tagCode&outputtype.ACLDirection == 0 {
-		panic("Tag必须包含ACLDirection字段")
-	}
-	if aclDirection&inputtype.FORWARD == 0 {
-		return true
-	}
-	return IsWrongEndPoint(thisEnd, tagCode)
 }
