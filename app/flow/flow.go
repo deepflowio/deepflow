@@ -106,13 +106,15 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 	flowMetricsPeerSrc := &flow.FlowMetricsPeers[inputtype.FLOW_METRICS_PEER_SRC]
 	flowMetricsPeerDst := &flow.FlowMetricsPeers[inputtype.FLOW_METRICS_PEER_DST]
 	l3EpcIDs := [2]int32{flowMetricsPeerSrc.L3EpcID, flowMetricsPeerDst.L3EpcID}
-	isNorthSouthTraffic := IsNorthSourceTraffic(l3EpcIDs[0], l3EpcIDs[1])
 	ips := [2]uint32{flow.IPSrc, flow.IPDst}
 	ip6s := [2]net.IP{flow.IP6Src, flow.IP6Dst}
 	hosts := [2]uint32{flowMetricsPeerSrc.Host, flowMetricsPeerDst.Host}
-	isL2L3End := [2]bool{
-		flowMetricsPeerSrc.IsL2End && flowMetricsPeerSrc.IsL3End,
-		flowMetricsPeerDst.IsL2End && flowMetricsPeerDst.IsL3End,
+	// 虚拟网络流量用is_l2_end和is_l3_end去重
+	// 接入网络流量只有一份，不去重
+	statsEndpoint := [2]bool{true, true}
+	if TOR.IsPortInRange(flow.InPort) {
+		statsEndpoint[0] = flowMetricsPeerSrc.IsL2End && flowMetricsPeerSrc.IsL3End
+		statsEndpoint[1] = flowMetricsPeerDst.IsL2End && flowMetricsPeerDst.IsL3End
 	}
 	docTimestamp := RoundToMinute(flow.StartTime)
 	packets := [2]uint64{flowMetricsPeerSrc.PacketCount, flowMetricsPeerDst.PacketCount}
@@ -128,6 +130,9 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 	}
 
 	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
+		if !statsEndpoint[thisEnd] {
+			continue
+		}
 		otherEnd := GetOppositeEndpoint(thisEnd)
 
 		meter := &p.meters[thisEnd]
@@ -152,18 +157,14 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 		field.TAPType = TAPTypeFromInPort(flow.InPort)
 		field.Protocol = flow.Proto
 		field.ServerPort = flow.PortDst
-		field.ACLDirection = outputtype.ACL_FORWARD // 含ACLDirection字段时仅考虑ACL正向匹配
 
 		// oneSideCodes
 		for _, code := range oneSideCodes {
-			if IsDupTraffic(flow.InPort, isL2L3End[thisEnd], isL2L3End[otherEnd], isNorthSouthTraffic, code) {
-				continue
-			}
-			if IsWrongEndPoint(thisEnd, code) {
-				continue
-			}
 			if code&outputtype.HostID != 0 && hosts[thisEnd] == 0 {
 				// 产品要求：统计服务器内所有虚拟接口流量之和
+				continue
+			}
+			if thisEnd == ONE && code.IsSymmetric() {
 				continue
 			}
 			p.appendDoc(docTimestamp, field, code, meter, uint32(inputtype.ACTION_FLOW_COUNTING))
@@ -171,12 +172,6 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 
 		// edgeCodes
 		for _, code := range edgeCodes {
-			if IsDupTraffic(flow.InPort, isL2L3End[thisEnd], isL2L3End[otherEnd], isNorthSouthTraffic, code) {
-				continue
-			}
-			if IsWrongEndPoint(thisEnd, code) { // 双侧Tag
-				continue
-			}
 			p.appendDoc(docTimestamp, field, code, meter, uint32(inputtype.ACTION_FLOW_COUNTING))
 		}
 
@@ -196,14 +191,11 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				codes = append(codes, POLICY_NODE_PORT_CODES...)
 			}
 			for _, code := range codes {
-				if IsDupTraffic(flow.InPort, isL2L3End[thisEnd], isL2L3End[otherEnd], isNorthSouthTraffic, code) {
-					continue
-				}
-				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) {
-					continue
-				}
 				if code&outputtype.HostID != 0 && hosts[thisEnd] == 0 {
 					// 产品要求：统计服务器内所有虚拟接口流量之和
+					continue
+				}
+				if thisEnd == ONE && code.IsSymmetric() {
 					continue
 				}
 				p.appendDoc(docTimestamp, field, code, meter, uint32(policy.GetActionFlags()))
@@ -218,12 +210,6 @@ func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				codes = append(codes, POLICY_EDGE_PORT_CODES...)
 			}
 			for _, code := range codes {
-				if IsDupTraffic(flow.InPort, isL2L3End[thisEnd], isL2L3End[otherEnd], isNorthSouthTraffic, code) {
-					continue
-				}
-				if IsWrongEndPointWithACL(thisEnd, policy.GetDirections(), code) { // 双侧Tag
-					continue
-				}
 				p.appendDoc(docTimestamp, field, code, meter, uint32(policy.GetActionFlags()))
 			}
 		}

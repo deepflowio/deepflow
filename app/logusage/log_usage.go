@@ -76,13 +76,16 @@ func (p *FlowToLogUsageDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, va
 	}
 
 	l3EpcIDs := [2]int32{flowMetricsPeerSrc.L3EpcID, flowMetricsPeerDst.L3EpcID}
-	isNorthSouthTraffic := IsNorthSourceTraffic(l3EpcIDs[0], l3EpcIDs[1])
 	ips := [2]uint32{flow.IPSrc, flow.IPDst}
 	ip6s := [2]net.IP{flow.IP6Src, flow.IP6Dst}
-	isL2L3End := [2]bool{
-		flowMetricsPeerSrc.IsL2End && flowMetricsPeerSrc.IsL3End,
-		flowMetricsPeerDst.IsL2End && flowMetricsPeerDst.IsL3End,
+	// 虚拟网络流量用is_l2_end和is_l3_end去重
+	// 接入网络流量只有一份，不去重
+	statsEndpoint := [2]bool{true, true}
+	if TOR.IsPortInRange(flow.InPort) {
+		statsEndpoint[0] = flowMetricsPeerSrc.IsL2End && flowMetricsPeerSrc.IsL3End
+		statsEndpoint[1] = flowMetricsPeerDst.IsL2End && flowMetricsPeerDst.IsL3End
 	}
+	directions := [2]outputtype.DirectionEnum{outputtype.ClientToServer, outputtype.ServerToClient}
 	docTimestamp := RoundToMinute(flow.StartTime)
 	packets := [2]uint64{flowMetricsPeerSrc.PacketCount, flowMetricsPeerDst.PacketCount}
 	bits := [2]uint64{flowMetricsPeerSrc.ByteCount << 3, flowMetricsPeerDst.ByteCount << 3}
@@ -95,41 +98,39 @@ func (p *FlowToLogUsageDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, va
 		}
 	}
 
-	for _, thisEnd := range [...]EndPoint{ZERO, ONE} {
-		otherEnd := GetOppositeEndpoint(thisEnd)
-		meter := outputtype.LogUsageMeter{
-			SumPacketTx: packets[thisEnd],
-			SumPacketRx: packets[otherEnd],
-			SumBitTx:    bits[thisEnd],
-			SumBitRx:    bits[otherEnd],
-		}
-		field := outputtype.Field{
-			TAPType:    TAPTypeFromInPort(flow.InPort),
-			L3EpcID:    int16(l3EpcIDs[thisEnd]),
-			Protocol:   flow.Proto,
-			ServerPort: flow.PortDst,
+	// 带port的edge，只看0侧
+	thisEnd := ZERO
+	if statsEndpoint[thisEnd] {
+		return p.docs.Slice()
+	}
+	otherEnd := GetOppositeEndpoint(thisEnd)
+	meter := outputtype.LogUsageMeter{
+		SumPacketTx: packets[thisEnd],
+		SumPacketRx: packets[otherEnd],
+		SumBitTx:    bits[thisEnd],
+		SumBitRx:    bits[otherEnd],
+	}
+	field := outputtype.Field{
+		TAPType:    TAPTypeFromInPort(flow.InPort),
+		L3EpcID:    int16(l3EpcIDs[thisEnd]),
+		Protocol:   flow.Proto,
+		ServerPort: flow.PortDst,
 
-			L3EpcID1: int16(l3EpcIDs[otherEnd]),
-		}
-		if flow.EthType == layers.EthernetTypeIPv4 {
-			field.IsIPv6 = 0
-			field.IP = ips[thisEnd]
-			field.IP1 = ips[otherEnd]
-		} else {
-			field.IsIPv6 = 1
-			field.IP6 = ip6s[thisEnd]
-			field.IP61 = ip6s[otherEnd]
-		}
+		L3EpcID1:  int16(l3EpcIDs[otherEnd]),
+		Direction: directions[thisEnd],
+	}
+	if flow.EthType == layers.EthernetTypeIPv4 {
+		field.IsIPv6 = 0
+		field.IP = ips[thisEnd]
+		field.IP1 = ips[otherEnd]
+	} else {
+		field.IsIPv6 = 1
+		field.IP6 = ip6s[thisEnd]
+		field.IP61 = ip6s[otherEnd]
+	}
 
-		for _, code := range EDGE_PORT_CODES {
-			if IsDupTraffic(flow.InPort, isL2L3End[thisEnd], isL2L3End[otherEnd], isNorthSouthTraffic, code) {
-				continue
-			}
-			if IsWrongEndPoint(thisEnd, code) { // 双侧Tag
-				continue
-			}
-			p.appendDoc(docTimestamp, &field, code, &meter, uint32(inputtype.ACTION_FLOW_COUNTING))
-		}
+	for _, code := range EDGE_PORT_CODES {
+		p.appendDoc(docTimestamp, &field, code, &meter, uint32(inputtype.ACTION_FLOW_COUNTING))
 	}
 	return p.docs.Slice()
 }
