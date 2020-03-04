@@ -337,15 +337,11 @@ func (t *Tag) MarshalTo(b []byte) int {
 		if t.IsIPv6 != 0 {
 			offset += copy(b[offset:], ",ip=")
 			offset += copy(b[offset:], t.IP6.String())
-			offset += copy(b[offset:], ",ip_bin=") // 用于支持前缀匹配
-			offset += copy(b[offset:], utils.IPv6ToBinary(t.IP6))
 			offset += copy(b[offset:], ",ip_version=6")
 		} else {
 
 			offset += copy(b[offset:], ",ip=")
 			offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
-			offset += copy(b[offset:], ",ip_bin=") // 用于支持前缀匹配
-			offset += copy(b[offset:], utils.IPv4ToBinary(t.IP))
 			offset += copy(b[offset:], ",ip_version=4")
 		}
 	}
@@ -355,20 +351,12 @@ func (t *Tag) MarshalTo(b []byte) int {
 			offset += copy(b[offset:], t.IP6.String())
 			offset += copy(b[offset:], ",ip_1=")
 			offset += copy(b[offset:], t.IP61.String())
-			offset += copy(b[offset:], ",ip_bin_0=") // 用于支持前缀匹配
-			offset += copy(b[offset:], utils.IPv6ToBinary(t.IP6))
-			offset += copy(b[offset:], ",ip_bin_1=") // 用于支持前缀匹配
-			offset += copy(b[offset:], utils.IPv6ToBinary(t.IP61))
 			offset += copy(b[offset:], ",ip_version=6")
 		} else {
 			offset += copy(b[offset:], ",ip_0=")
 			offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
 			offset += copy(b[offset:], ",ip_1=")
 			offset += copy(b[offset:], utils.IpFromUint32(t.IP1).String())
-			offset += copy(b[offset:], ",ip_bin_0=") // 用于支持前缀匹配
-			offset += copy(b[offset:], utils.IPv4ToBinary(t.IP))
-			offset += copy(b[offset:], ",ip_bin_1=") // 用于支持前缀匹配
-			offset += copy(b[offset:], utils.IPv4ToBinary(t.IP1))
 			offset += copy(b[offset:], ",ip_version=4")
 		}
 	}
@@ -993,7 +981,7 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 	field := t.Field
 	var i uint64
 	switch id {
-	case _TAG_IP_BIN, _TAG_IP_BIN_0, _TAG_IP_BIN_1, _TAG__ID, _TAG__TID:
+	case _TAG__ID, _TAG__TID:
 		return nil
 	case _TAG_IP_VERSION:
 		i, err = parseUint(value, 10, 8)
