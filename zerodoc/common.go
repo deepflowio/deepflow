@@ -1,6 +1,6 @@
 package zerodoc
 
-import "github.com/op/go-logging"
+import logging "github.com/op/go-logging"
 
 var log = logging.MustGetLogger("zerodoc")
 
@@ -10,9 +10,7 @@ const (
 	_TAG__TID
 	_TAG_IP_VERSION
 	_TAG_IP
-	_TAG_IP_BIN
 	_TAG_IP_0
-	_TAG_IP_BIN_0
 	_TAG_GROUP_ID
 	_TAG_GROUP_ID_0
 	_TAG_L3_EPC_ID
@@ -29,7 +27,6 @@ const (
 	_TAG_POD_NODE_ID_0
 	_TAG_REGION_0
 	_TAG_IP_1
-	_TAG_IP_BIN_1
 	_TAG_GROUP_ID_1
 	_TAG_L3_EPC_ID_1
 	_TAG_L3_DEVICE_ID_1
@@ -110,9 +107,7 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"_tid":             _TAG__TID,
 	"ip_version":       _TAG_IP_VERSION,
 	"ip":               _TAG_IP,
-	"ip_bin":           _TAG_IP_BIN,
 	"ip_0":             _TAG_IP_0,
-	"ip_bin_0":         _TAG_IP_BIN_0,
 	"group_id":         _TAG_GROUP_ID,
 	"group_id_0":       _TAG_GROUP_ID_0,
 	"l3_epc_id":        _TAG_L3_EPC_ID,
@@ -129,7 +124,6 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"host_id_0":        _TAG_HOST_ID_0,
 	"region_0":         _TAG_REGION_0,
 	"ip_1":             _TAG_IP_1,
-	"ip_bin_1":         _TAG_IP_BIN_1,
 	"group_id_1":       _TAG_GROUP_ID_1,
 	"l3_epc_id_1":      _TAG_L3_EPC_ID_1,
 	"l3_device_id_1":   _TAG_L3_DEVICE_ID_1,
