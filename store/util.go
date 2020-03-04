@@ -98,11 +98,12 @@ func writeFieldData(c client.Client, fieldData *models.Row, db, rp, measurement,
 		RetentionPolicy: rp,
 	})
 
+	timeValue := int64(0)
 	for _, value := range fieldData.Values {
 		tags := map[string]string{}
 		fields := map[string]interface{}{}
 		//get time
-		timeValue := unmarshalInt64(value[0])
+		timeValue = unmarshalInt64(value[0])
 
 		//get tags field
 		for i, columnName := range fieldData.Columns {
@@ -148,7 +149,7 @@ func writeFieldData(c client.Client, fieldData *models.Row, db, rp, measurement,
 		log.Errorf("DB(%s) measurement(%s) write points(%d) error:%s", db, measurement, len(bp.Points()), err.Error())
 		return err
 	}
-	log.Infof("writeFieldData DB(%s) measurement(%s) field(%s) write points(%d) success", db, measurement, fieldName, len(bp.Points()))
+	log.Debugf("Repairing DB(%s) measurement(%s) field(%s) time(%d) write points(%d) success", db, measurement, fieldName, timeValue, len(bp.Points()))
 	return nil
 }
 
