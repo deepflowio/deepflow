@@ -2,19 +2,21 @@ package datatype
 
 import (
 	"fmt"
+	"net"
 
 	"gitlab.x.lan/yunshan/droplet-libs/bit"
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
-	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 var (
 	INVALID_POLICY_DATA = new(PolicyData)
+
+	tunnelIpMap = make(map[uint16]net.IP, 8)
 )
 
 type ActionFlag uint16
 
-type NpbAction uint64 // tunnel-ip | tunnel-type | tunnel-id | Dep/Ip | TapSide | payload-slice
+type NpbAction uint64 // tunnel-ip-index/aclgid | payload-slice | tunnel-type | Dep/Ip  | TapSide |  tunnel-id
 
 const (
 	NPB_TUNNEL_TYPE_VXLAN = iota
@@ -35,21 +37,39 @@ const (
 	RESOURCE_GROUP_TYPE_MASK = RESOURCE_GROUP_TYPE_DEV | RESOURCE_GROUP_TYPE_IP
 )
 
+func UpdateTunnelIps(tunnelIps map[uint16]net.IP) {
+	tunnelIpMap = tunnelIps
+}
+
+func GetTunnelIp(index uint32) net.IP {
+	return tunnelIpMap[uint16(index)]
+}
+
+func GetTunnelIpIndex(ip net.IP) uint32 {
+	for i, tunnelIp := range tunnelIpMap {
+		if tunnelIp.Equal(ip) {
+			return uint32(i)
+		}
+	}
+	log.Errorf("tunnel ip %s not exist.", ip)
+	return 0
+}
+
 func (a NpbAction) TapSideCompare(flag int) bool {
 	return (a.TapSide() & flag) == flag
 }
 
 func (a NpbAction) TapSide() int {
-	return int((a >> 16) & TAPSIDE_MASK)
+	return int((a >> 26) & TAPSIDE_MASK)
 }
 
 func (a *NpbAction) SetTapSide(flag int) {
-	*a &= ^NpbAction(TAPSIDE_MASK << 16)
-	*a |= NpbAction((flag & TAPSIDE_MASK) << 16)
+	*a &= ^NpbAction(TAPSIDE_MASK << 26)
+	*a |= NpbAction((flag & TAPSIDE_MASK) << 26)
 }
 
 func (a *NpbAction) AddTapSide(flag int) {
-	*a |= NpbAction((flag & TAPSIDE_MASK) << 16)
+	*a |= NpbAction((flag & TAPSIDE_MASK) << 26)
 }
 
 func (a *NpbAction) ReverseTapSide() NpbAction {
@@ -57,7 +77,7 @@ func (a *NpbAction) ReverseTapSide() NpbAction {
 		return *a
 	}
 
-	return *a ^ NpbAction(uint64(TAPSIDE_MASK)<<16)
+	return *a ^ NpbAction(uint64(TAPSIDE_MASK)<<26)
 }
 
 func (a NpbAction) ResourceGroupTypeCompare(flag int) bool {
@@ -65,37 +85,48 @@ func (a NpbAction) ResourceGroupTypeCompare(flag int) bool {
 }
 
 func (a *NpbAction) AddResourceGroupType(groupType int) {
-	*a |= ((NpbAction(groupType & RESOURCE_GROUP_TYPE_MASK)) << 18)
+	*a |= ((NpbAction(groupType & RESOURCE_GROUP_TYPE_MASK)) << 28)
 }
 
 func (a NpbAction) ResourceGroupType() int {
-	return int((a >> 18) & RESOURCE_GROUP_TYPE_MASK)
+	return int((a >> 28) & RESOURCE_GROUP_TYPE_MASK)
 }
 
-func (a NpbAction) TunnelIp() IPv4Int {
-	return IPv4Int(a >> 32)
+func (a NpbAction) TunnelGid() uint32 {
+	if a.TunnelType() != NPB_TUNNEL_TYPE_PCAP {
+		return 0
+	}
+	return uint32(a >> 48)
+}
+
+func (a NpbAction) TunnelIpIndex() uint32 {
+	return uint32(a >> 48)
+}
+
+func (a NpbAction) TunnelIp() net.IP {
+	if a.TunnelType() == NPB_TUNNEL_TYPE_PCAP {
+		return nil
+	}
+	index := uint32(a >> 48)
+	return GetTunnelIp(index)
 }
 
 func (a NpbAction) TunnelId() uint32 {
-	return uint32((a >> 20) & 0x3ff)
+	return uint32(a & 0xffffff)
 }
 
 func (a *NpbAction) SetTunnelId(id uint32) {
-	*a &= ^NpbAction(0x3ff << 20)
-	*a |= NpbAction((id & 0x3ff) << 20)
-}
-
-func (a NpbAction) TunnelInfo() uint64 {
-	return uint64(a >> 20)
+	*a &= ^NpbAction(0xffffff)
+	*a |= NpbAction(id & 0xffffff)
 }
 
 func (a NpbAction) PayloadSlice() uint16 {
-	return uint16(a)
+	return uint16((a >> 32) & 0xffff)
 }
 
 func (a *NpbAction) SetPayloadSlice(payload uint16) {
-	*a &= ^NpbAction(0xffff)
-	*a |= NpbAction(payload)
+	*a &= ^NpbAction(0xffff << 32)
+	*a |= NpbAction(uint64(payload) << 32)
 }
 
 func (a NpbAction) TunnelType() uint8 {
@@ -103,11 +134,20 @@ func (a NpbAction) TunnelType() uint8 {
 }
 
 func (a NpbAction) String() string {
-	return fmt.Sprintf("{%d@%s type: %d slice %d side: %d group: %d}", a.TunnelId(), IpFromUint32(a.TunnelIp()), a.TunnelType(), a.PayloadSlice(), a.TapSide(), a.ResourceGroupType())
+	if a.TunnelType() == NPB_TUNNEL_TYPE_PCAP {
+		return fmt.Sprintf("{gid %d type: %d slice %d side: %d group: %d}", a.TunnelGid(), a.TunnelType(), a.PayloadSlice(), a.TapSide(), a.ResourceGroupType())
+	} else {
+		return fmt.Sprintf("{%d@%s type: %d slice %d side: %d group: %d}", a.TunnelId(), a.TunnelIp(), a.TunnelType(), a.PayloadSlice(), a.TapSide(), a.ResourceGroupType())
+	}
 }
 
-func ToNpbAction(ip uint32, id uint16, tunnelType, group, tapSide uint8, slice uint16) NpbAction {
-	return NpbAction(uint64(ip)<<32 | uint64(tunnelType&0x3)<<30 | uint64(id&0x3ff)<<20 | (uint64(group)&RESOURCE_GROUP_TYPE_MASK)<<18 | (uint64(tapSide)&TAPSIDE_MASK)<<16 | uint64(slice))
+func ToNpbAction(ip net.IP, aclGid, id uint32, tunnelType, group, tapSide uint8, slice uint16) NpbAction {
+	gidOrtunnelIpIndex := aclGid
+	if tunnelType != NPB_TUNNEL_TYPE_PCAP {
+		gidOrtunnelIpIndex = GetTunnelIpIndex(ip)
+	}
+	return NpbAction(uint64(gidOrtunnelIpIndex&0xffff)<<48 | uint64(slice)<<32 |
+		uint64(tunnelType&0x3)<<30 | (uint64(group)&RESOURCE_GROUP_TYPE_MASK)<<28 | (uint64(tapSide)&TAPSIDE_MASK)<<26 | uint64(id&0xffffff))
 }
 
 const (
@@ -493,7 +533,7 @@ func (d *PolicyData) MergeNpbAction(actions []NpbAction, aclID uint32, direction
 				break
 			}
 
-			if m.TunnelIp() != n.TunnelIp() || m.TunnelId() != n.TunnelId() || m.TunnelType() != n.TunnelType() {
+			if m.TunnelIpIndex() != n.TunnelIpIndex() || m.TunnelId() != n.TunnelId() || m.TunnelType() != n.TunnelType() {
 				continue
 			}
 			if n.PayloadSlice() == 0 ||

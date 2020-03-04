@@ -836,10 +836,11 @@ func TestDdbsNpbAction(t *testing.T) {
 
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
 	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
-	npb1 := ToNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
-	npb2 := ToNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
-	npb3 := ToNpbAction(20, 200, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
-	npb := ToNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
+	updateTunnelIpMap(10, 20)
+	npb1 := toNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
+	npb2 := toNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
+	npb3 := toNpbAction(20, 200, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
+	npb := toNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
 
 	acl1 := generatePolicyAcl(table, action1, 25, groupAny, groupAny, IPProtocolTCP, 1000, vlanAny, npb1)
 	action2 := generateAclAction(26, ACTION_PACKET_BROKERING)
@@ -889,8 +890,9 @@ func TestDdbsNpbAction(t *testing.T) {
 func TestDdbsMultiNpbAction1(t *testing.T) {
 	table := generatePolicyTable(DDBS)
 	action := generateAclAction(25, 0)
+	updateTunnelIpMap(10)
 	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
-	npb := ToNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
+	npb := toNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
 	// VMA -> ANY SRC
 	acl := generatePolicyAcl(table, action, 25, group[1], groupAny, IPProtocolTCP, portAny, vlanAny, npb)
 	// VMB -> ANY SRC
@@ -1016,10 +1018,11 @@ func TestDdbsMultiNpbAction1(t *testing.T) {
 
 func TestDdbsNpbActionDedup(t *testing.T) {
 	table := generatePolicyTable(DDBS)
-	npb1 := ToNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
-	npb2 := ToNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
-	npb3 := ToNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
-	npb4 := ToNpbAction(20, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
+	updateTunnelIpMap(10, 20)
+	npb1 := toNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
+	npb2 := toNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
+	npb3 := toNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
+	npb4 := toNpbAction(20, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
 	// VM段-A -> ANY, DEV-group2 -> ANY
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
 	acl1 := generatePolicyAcl(table, action1, 25, group[2], groupAny, IPProtocolTCP, portAny, vlanAny, npb1)
@@ -1061,7 +1064,7 @@ func TestDdbsNpbActionDedup(t *testing.T) {
 	}
 
 	// IP段-A -> IP段-B, IP-group3 -> IP-group6
-	npb5 := ToNpbAction(20, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
+	npb5 := toNpbAction(20, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
 	action5 := generateAclAction(29, ACTION_PACKET_BROKERING)
 	acl5 := generatePolicyAcl(table, action5, 29, group[6], group[6], IPProtocolTCP, -1, vlanAny, npb5)
 	acls = []*Acl{acl5}
@@ -1086,7 +1089,7 @@ func TestDdbsPcapNpbAction(t *testing.T) {
 
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
 	// acl1 Group: 16 -> 16 Port: 0 Proto: TCP vlan: any Tap: any
-	npb := ToNpbAction(10, 150, NPB_TUNNEL_TYPE_PCAP, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
+	npb := toPcapAction(10, 150, NPB_TUNNEL_TYPE_PCAP, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
 	acl1 := generatePolicyAcl(table, action1, 25, group[16], group[16], IPProtocolTCP, -1, vlanAny, npb)
 	acl1.Type = 0
 	acls = append(acls, acl1)
