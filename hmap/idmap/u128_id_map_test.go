@@ -1,6 +1,7 @@
 package idmap
 
 import (
+	"encoding/binary"
 	"testing"
 )
 
@@ -110,6 +111,31 @@ func BenchmarkU128IDMap(b *testing.B) {
 		m.AddOrGet(^i, ^(i << 1), uint32(i<<2), false)
 		m.AddOrGet(^(i << 1), ^i, uint32(i<<2), false)
 		i += 4
+	}
+	b.Logf("size=%d, width=%d", m.Size(), m.Width())
+}
+
+func BenchmarkU128IDMapWithSlice(b *testing.B) {
+	m := NewU128IDMap("test", 1<<26)
+	keys := make([][16]byte, b.N*4)
+	for i := uint64(0); i < uint64(b.N); i += 4 {
+		binary.BigEndian.PutUint64(keys[i][:], i)
+		binary.BigEndian.PutUint64(keys[i][8:], i<<1)
+		binary.BigEndian.PutUint64(keys[i+1][:], i<<1)
+		binary.BigEndian.PutUint64(keys[i+1][8:], i)
+		binary.BigEndian.PutUint64(keys[i+2][:], ^i)
+		binary.BigEndian.PutUint64(keys[i+2][8:], ^(i << 1))
+		binary.BigEndian.PutUint64(keys[i+3][:], ^(i << 1))
+		binary.BigEndian.PutUint64(keys[i+3][8:], ^i)
+	}
+
+	b.ResetTimer()
+	for i := uint64(0); i < uint64(b.N); i += 4 {
+		// 构造哈希冲突
+		m.AddOrGetWithSlice(keys[i][:], 0, uint32(i<<2), false)
+		m.AddOrGetWithSlice(keys[i+1][:], 0, uint32(i<<2), false)
+		m.AddOrGetWithSlice(keys[i+2][:], 0, uint32(i<<2), false)
+		m.AddOrGetWithSlice(keys[i+3][:], 0, uint32(i<<2), false)
 	}
 	b.Logf("size=%d, width=%d", m.Size(), m.Width())
 }
