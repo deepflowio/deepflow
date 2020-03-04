@@ -89,8 +89,13 @@ func (m *U{{.}}IDMap) compressHash(hash uint32) int32 {
 	return keyhash.Jenkins32(hash) & int32(len(m.slotHead)-1)
 }
 
-// 第一个返回值表示value，第二个返回值表示是否进行了Add。若key已存在，指定overwrite=true可覆写value。
+// compatible with old code
 func (m *U{{.}}IDMap) AddOrGet(key []byte, hash uint32, value uint32, overwrite bool) (uint32, bool) {
+	return m.AddOrGetWithSlice(key, hash, value, overwrite)
+}
+
+// 第一个返回值表示value，第二个返回值表示是否进行了Add。若key已存在，指定overwrite=true可覆写value。
+func (m *U{{.}}IDMap) AddOrGetWithSlice(key []byte, hash uint32, value uint32, overwrite bool) (uint32, bool) {
 	if len(key) != _U{{.}}_KEY_SIZE {
 		panic(fmt.Sprintf("传入key的长度不等于 %d 字节", _U{{.}}_KEY_SIZE))
 	}
@@ -137,7 +142,12 @@ func (m *U{{.}}IDMap) AddOrGet(key []byte, hash uint32, value uint32, overwrite 
 	return value, true
 }
 
+// compatible with old code
 func (m *U{{.}}IDMap) Get(key []byte, hash uint32) (uint32, bool) {
+	return m.GetWithSlice(key, hash)
+}
+
+func (m *U{{.}}IDMap) GetWithSlice(key []byte, hash uint32) (uint32, bool) {
 	if len(key) != _U{{.}}_KEY_SIZE {
 		panic(fmt.Sprintf("传入key的长度不等于 %d 字节", _U{{.}}_KEY_SIZE))
 	}
@@ -178,5 +188,8 @@ func (m *U{{.}}IDMap) Clear() {
 	m.size = 0
 	m.width = 0
 }
+
+// check interface implemented
+var _ UBigIDMap = &U{{.}}IDMap{}
 
 {{ end }}

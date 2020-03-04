@@ -1,6 +1,7 @@
 package idmap
 
 import (
+	"encoding/binary"
 	"sync"
 
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/keyhash"
@@ -125,6 +126,13 @@ func (m *U128IDMap) AddOrGet(key0, key1 uint64, value uint32, overwrite bool) (u
 	return value, true
 }
 
+func (m *U128IDMap) AddOrGetWithSlice(key []byte, _ uint32, value uint32, overwrite bool) (uint32, bool) {
+	if len(key) != 16 {
+		panic("传入key的长度不等于 16 字节")
+	}
+	return m.AddOrGet(binary.BigEndian.Uint64(key), binary.BigEndian.Uint64(key[8:]), value, overwrite)
+}
+
 func (m *U128IDMap) Get(key0, key1 uint64) (uint32, bool) {
 	slot := m.compressHash(key0, key1)
 	head := m.slotHead[slot]
@@ -138,6 +146,13 @@ func (m *U128IDMap) Get(key0, key1 uint64) (uint32, bool) {
 		next = node.next
 	}
 	return 0, false
+}
+
+func (m *U128IDMap) GetWithSlice(key []byte, _ uint32) (uint32, bool) {
+	if len(key) != 16 {
+		panic("传入key的长度不等于 16 字节")
+	}
+	return m.Get(binary.BigEndian.Uint64(key), binary.BigEndian.Uint64(key[8:]))
 }
 
 func (m *U128IDMap) GetCounter() interface{} {
@@ -162,3 +177,5 @@ func (m *U128IDMap) Clear() {
 	m.size = 0
 	m.width = 0
 }
+
+var _ UBigIDMap = &U128IDMap{}
