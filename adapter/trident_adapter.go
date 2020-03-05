@@ -1,7 +1,7 @@
 package adapter
 
 import (
-	"io"
+	"net"
 	"os"
 	"sync"
 	"time"
@@ -17,6 +17,7 @@ import (
 )
 
 const (
+	LISTEN_PORT      = 20033
 	QUEUE_BATCH_SIZE = 4096
 	TRIDENT_TIMEOUT  = 2 * time.Second
 
@@ -34,7 +35,6 @@ type packetBuffer struct {
 	tridentIp uint32
 	decoder   SequentialDecoder
 	hash      uint8
-	fromUdp   bool
 }
 
 type tridentDispatcher struct {
@@ -53,9 +53,9 @@ type tridentInstance struct {
 type TridentAdapter struct {
 	command
 	statsCounter
-	io.Closer
 
-	cacheSize uint64
+	listenBufferSize int
+	cacheSize        uint64
 
 	instancesLock sync.Mutex // 仅用于droplet-ctl打印trident信息
 	instances     map[TridentKey]*tridentInstance
@@ -64,7 +64,7 @@ type TridentAdapter struct {
 	slaves     []*slave
 
 	running  bool
-	recivers [_MAX_RECIVER]compressReciver
+	listener *net.UDPConn
 }
 
 func (p *packetBuffer) init(ip uint32) {
@@ -89,10 +89,16 @@ func minPowerOfTwo(v uint32) uint32 {
 }
 
 func NewTridentAdapter(queues []queue.QueueWriter, listenBufferSize int, cacheSize uint32) *TridentAdapter {
+	listener, err := net.ListenUDP("udp4", &net.UDPAddr{Port: LISTEN_PORT})
+	if err != nil {
+		log.Error(err)
+		return nil
+	}
 	adapter := &TridentAdapter{
-		cacheSize:  uint64(minPowerOfTwo(cacheSize)),
-		slaveCount: uint8(len(queues)),
-		slaves:     make([]*slave, len(queues)),
+		listenBufferSize: listenBufferSize,
+		cacheSize:        uint64(minPowerOfTwo(cacheSize)),
+		slaveCount:       uint8(len(queues)),
+		slaves:           make([]*slave, len(queues)),
 
 		instances: make(map[TridentKey]*tridentInstance),
 	}
@@ -100,17 +106,10 @@ func NewTridentAdapter(queues []queue.QueueWriter, listenBufferSize int, cacheSi
 		adapter.slaves[i] = newSlave(int(i), queues[i])
 	}
 	adapter.statsCounter.init()
+	adapter.listener = listener
 	adapter.command.init(adapter)
-	adapter.recivers[_UDP_RECIVER] = newUdpReciver(listenBufferSize)
-	adapter.recivers[_ZMQ_RECIVER] = newZmqReciver()
 	stats.RegisterCountable("trident-adapter", adapter)
 	debug.Register(dropletctl.DROPLETCTL_ADAPTER, adapter)
-	for i := 0; i < _MAX_RECIVER; i++ {
-		if adapter.recivers[i] == nil {
-			log.Infof("trident adapter reciver[%d] init error, exit", i)
-			os.Exit(-1)
-		}
-	}
 	return adapter
 }
 
@@ -134,14 +133,9 @@ func (a *TridentAdapter) GetCounter() interface{} {
 	return counter
 }
 
-// io.Closer()
-func (a *TridentAdapter) Close() error {
-	a.running = false
-	return nil
+func (a *TridentAdapter) Closed() bool {
+	return false // FIXME: never close?
 }
-
-// for statsd
-func (a *TridentAdapter) Closed() bool { return true }
 
 func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize uint64, slaves []*slave) (uint64, uint64) {
 	decoder := &packet.decoder
@@ -285,7 +279,6 @@ var packetBufferPool = pool.NewLockFreePool(
 	func() interface{} {
 		packet := new(packetBuffer)
 		packet.buffer = make([]byte, UDP_BUFFER_SIZE)
-		packet.fromUdp = true
 		// Trident最多使用64000字节，且以0xFFFF作为结束符。将末尾字节填充为0xFF防护，避免越界。
 		copy(packet.buffer[UDP_BUFFER_SIZE-len(PACKET_STREAM_END_GUARD):], PACKET_STREAM_END_GUARD)
 		return packet
@@ -298,42 +291,30 @@ func acquirePacketBuffer() *packetBuffer {
 	return packetBufferPool.Get().(*packetBuffer)
 }
 
-var packetBufferPoolForTcp = pool.NewLockFreePool(
-	func() interface{} {
-		packet := new(packetBuffer) // zeromq tcp不需要初始化buffer
-		return packet
-	},
-	pool.OptionPoolSizePerCPU(16),
-	pool.OptionInitFullPoolSize(16),
-)
-
-func acquirePacketBufferForTcp() *packetBuffer {
-	return packetBufferPoolForTcp.Get().(*packetBuffer)
-}
-
 func releasePacketBuffer(b *packetBuffer) {
 	// 此处无初始化
-	if b.fromUdp { // UDP定长
-		packetBufferPool.Put(b)
-	} else { // TCP长度不定
-		packetBufferPoolForTcp.Put(b)
-	}
+	packetBufferPool.Put(b)
 }
 
-func (a *TridentAdapter) run(index int) {
+func (a *TridentAdapter) run() {
+	log.Infof("Starting trident adapter Listenning <%s>", a.listener.LocalAddr())
+	a.listener.SetReadDeadline(time.Now().Add(TRIDENT_TIMEOUT))
+	a.listener.SetReadBuffer(a.listenBufferSize)
 	batch := [BATCH_SIZE]*packetBuffer{}
-	reciver := a.recivers[index]
 	count := 0
 	for a.running {
 		for i := 0; i < BATCH_SIZE; i++ {
-			packet, err := reciver.recv()
+			packet := acquirePacketBuffer()
+			_, remote, err := a.listener.ReadFromUDP(packet.buffer)
 			if err != nil {
-				if errno, ok := err.(reciverError); ok && errno.Timeout() {
+				if err.(net.Error).Timeout() {
+					a.listener.SetReadDeadline(time.Now().Add(TRIDENT_TIMEOUT))
 					break
 				}
-				log.Errorf("trident adapter reicver[%d] err: %s", index, err)
+				log.Errorf("trident adapter listener.ReadFromUDP err: %s", err)
 				os.Exit(1)
 			}
+			packet.init(IpToUint32(remote.IP.To4()))
 			batch[i] = packet
 			count++
 		}
@@ -349,6 +330,8 @@ func (a *TridentAdapter) run(index int) {
 		}
 		count = 0
 	}
+	a.listener.Close()
+	log.Info("Stopped trident adapter")
 }
 
 func (a *TridentAdapter) startSlaves() {
@@ -362,10 +345,7 @@ func (a *TridentAdapter) Start() error {
 		log.Info("Start trident adapter")
 		a.running = true
 		a.startSlaves()
-		for i := 0; i < _MAX_RECIVER; i++ {
-			log.Infof("Start trident adapter reciver[%d]", i)
-			go a.run(i)
-		}
+		go a.run()
 	}
 	return nil
 }
