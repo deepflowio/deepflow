@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"gitlab.x.lan/yunshan/droplet-libs/debug"
-	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
 )
@@ -43,18 +42,17 @@ func (c *command) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, operate ui
 	case ADAPTER_CMD_STATUS:
 		encoder := gob.NewEncoder(&buff)
 		status := ""
-		adapter.instancesLock.Lock()
-		for key, instance := range adapter.instances {
+		instances := adapter.GetInstances()
+		for _, instance := range instances {
 			for i := 0; i < TRIDENT_DISPATCHER_MAX; i++ {
 				dispatcher := &instance.dispatchers[i]
 				if dispatcher.cache != nil {
 					status += fmt.Sprintf("Host: %16s Index: %2d Seq: %10d Drop: %10d Timestamp: %30s\n",
-						IpFromUint32(key), i, dispatcher.seq, dispatcher.dropped,
+						instance.ip, i, dispatcher.seq, dispatcher.dropped,
 						time.Unix(int64(dispatcher.maxTimestamp/time.Second), 0))
 				}
 			}
 		}
-		adapter.instancesLock.Unlock()
 
 		if err := encoder.Encode(status); err != nil {
 			log.Error(err)
