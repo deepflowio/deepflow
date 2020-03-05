@@ -115,6 +115,8 @@ github.com/lestrrat-go/file-rotatelogs v2.2.1-0.20181019123106-4ce522c92b91+inco
 github.com/lestrrat-go/strftime v0.0.0-20180821113735-8b31f9c59b0f h1:/o/LRlB6dBTBNViFglNdGfsDHBjdL8Yvfm7qQE4ZUh0=
 github.com/lestrrat-go/strftime v0.0.0-20180821113735-8b31f9c59b0f/go.mod h1:RMlXygAD3c48Psmr06d2G75L4E4xxzxkIe/+ppX9eAU=
 github.com/lib/pq v1.0.0/go.mod h1:5WUZQaWbwv1U+lTReE5YruASi9Al49XbQIvNi/34Woo=
+github.com/mailru/easygo v0.0.0-20190618140210-3c14a0dc985f h1:4+gHs0jJFJ06bfN8PshnM6cHcxGjRUVRLo5jndDiKRQ=
+github.com/mailru/easygo v0.0.0-20190618140210-3c14a0dc985f/go.mod h1:tHCZHV8b2A90ObojrEAzY0Lb03gxUxjDHr5IJyAh4ew=
 github.com/mattn/go-colorable v0.0.9/go.mod h1:9vuHe8Xs5qXnSaW/c/ABM9alt+Vo+STaOChaDxuIBZU=
 github.com/mattn/go-isatty v0.0.4/go.mod h1:M+lRXTBqGeGNdLjl/ufCoiOlB5xdOkqRJdNxMWT7Zi4=
 github.com/mattn/go-runewidth v0.0.3/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzpuz5H//U1FU=
