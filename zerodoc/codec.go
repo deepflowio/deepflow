@@ -233,15 +233,11 @@ func GetMsgType(db string) (MessageType, error) {
 //     meterType   uint8
 //     meter       Meter (bytes)
 //     actionFlags uint32
-func EncodeRow(tag *Tag, msgType MessageType, columnIDs []uint8, columnValues []interface{}, encoder *codec.SimpleEncoder) error {
+func EncodeRow(tag *Tag, msgType MessageType, columnIDs []uint8, timestamp int64, columnValues []interface{}, encoder *codec.SimpleEncoder) error {
 	encoder.WriteU32(app.VERSION) // version
 	encoder.WriteU64(0)           // sequence
 
-	if timestamp, ok := columnValues[0].(time.Time); ok {
-		encoder.WriteU32(uint32(timestamp.Unix())) // timestamp
-	} else {
-		return fmt.Errorf("Unknown timestamp %v", columnValues[0])
-	}
+	encoder.WriteU32(uint32(timestamp / int64(time.Second))) // timestamp
 
 	if err := tag.FillValues(columnIDs, columnValues); err != nil {
 		return err
