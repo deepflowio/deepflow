@@ -60,7 +60,6 @@ const (
 	_
 	VTAPID
 	PodNodeID
-	Side
 )
 
 const (
@@ -213,7 +212,6 @@ type Field struct {
 	CastType     CastTypeEnum
 	IsIPv6       uint8 // (8B) 与IP/IP6是共生字段
 	TCPFlags     TCPFlag
-	Side         uint8
 
 	Country uint8
 	Region  uint8
@@ -429,11 +427,6 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ServerPort), 10))
 	}
 
-	if t.Code&Side != 0 {
-		offset += copy(b[offset:], ",side=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.Side), 10))
-	}
-
 	if t.Code&SubnetID != 0 {
 		offset += copy(b[offset:], ",subnet_id=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.SubnetID), 10))
@@ -598,9 +591,6 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&TCPFlags != 0 {
 		t.TCPFlags = TCPFlag(decoder.ReadU8())
 	}
-	if t.Code&Side != 0 {
-		t.Side = decoder.ReadU8()
-	}
 
 	if t.Code&Country != 0 {
 		t.Country = decoder.ReadU8()
@@ -748,9 +738,6 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 	}
 	if code&TCPFlags != 0 {
 		encoder.WriteU8(uint8(t.TCPFlags))
-	}
-	if code&Side != 0 {
-		encoder.WriteU8(t.Side)
 	}
 
 	if code&Country != 0 {
@@ -944,9 +931,6 @@ func (t *Tag) IsMatchPublishPolicy(p *PublishPolicy) bool {
 	if p.Code&FilterDirection != 0 && t.Direction != p.Direction {
 		return false
 	}
-	if p.Code&FilterSide != 0 && t.Side != p.Side {
-		return false
-	}
 
 	p.IsMatched = true
 	return true
@@ -967,7 +951,6 @@ func (t *Tag) FillPublishPolicy(p *PublishPolicy) {
 	t.L3EpcID1 = p.L3EpcID1
 	t.ACLDirection = p.ACLDirection
 	t.Direction = p.Direction
-	t.Side = p.Side
 }
 
 func parseUint(s string, base int, bitSize int) (uint64, error) {
@@ -1197,10 +1180,6 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 	case _TAG_ISP:
 		t.Code |= ISPCode
 		field.ISP = geo.EncodeISP(value)
-	case _TAG_SIDE:
-		t.Code |= Side
-		i, err = parseUint(value, 10, 16)
-		field.Side = uint8(i)
 	default:
 		err = fmt.Errorf("unsupoort tag id %d ", id)
 	}

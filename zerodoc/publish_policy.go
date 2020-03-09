@@ -17,7 +17,6 @@ const (
 	FilterL3EpcID1
 	FilterACLDirection
 	FilterDirection
-	FilterSide
 )
 
 type PublishPolicy struct {
@@ -37,7 +36,6 @@ type PublishPolicy struct {
 	L3EpcID1     int16
 	ACLDirection ACLDirectionEnum
 	Direction    DirectionEnum
-	Side         uint8
 }
 
 // 用于debug 打印
@@ -71,9 +69,6 @@ func (p *PublishPolicy) FilterString() string {
 	}
 	if code&FilterDirection != 0 {
 		out = append(out, fmt.Sprintf("direction=%d", p.Direction))
-	}
-	if code&FilterSide != 0 {
-		out = append(out, fmt.Sprintf("side=%d", p.Side))
 	}
 
 	return strings.Join(out, ",")
