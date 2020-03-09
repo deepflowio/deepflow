@@ -51,7 +51,6 @@ const (
 	_TAG_COUNTRY
 	_TAG_REGION
 	_TAG_ISP
-	_TAG_SIDE
 	_TAG_MAX_ID_
 )
 const (
@@ -148,7 +147,6 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"country":          _TAG_COUNTRY,
 	"region":           _TAG_REGION,
 	"isp":              _TAG_ISP,
-	"side":             _TAG_SIDE,
 
 	"bytes":                    _METER_BYTES,
 	"max_art_avg":              _METER_MAX_ART_AVG,
