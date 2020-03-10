@@ -91,7 +91,7 @@ func Encode(sequence uint64, doc *app.Document, encoder *codec.SimpleEncoder) er
 	}
 	meter.Encode(encoder)
 
-	encoder.WriteU32(doc.ActionFlags)
+	encoder.WriteU32(uint32(doc.Flags))
 
 	return nil
 }
@@ -174,7 +174,7 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 		return nil, errors.New(fmt.Sprintf("Error meter type %v", msgType))
 	}
 
-	doc.ActionFlags = decoder.ReadU32()
+	doc.Flags = app.DocumentFlag(decoder.ReadU32())
 
 	if decoder.Failed() {
 		app.ReleaseDocument(doc)
