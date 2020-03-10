@@ -11,7 +11,6 @@
       | ---        | ---  | ---                | ---              | ---      |
       | host       | 删除 | vtap_usage开头的db | all              |  影响5.5.7及以前的版本升级，app查询使用host_id |
       |ip_bin[_0/1]| 删除 | all                | all              |  app修改查询条件                               |
-      | side       | 增加 | all                | all              |  影响5.5.7及以前的版本升级                     |
 
   ## [5.5.8] - 2020-02-12
 
@@ -30,11 +29,6 @@
     | tap_type   | 增加 | vtap_usage开头的db | all              |  老版本无，则默认为3   |
     | vtap       | 删除 | vtap_usage         | main_cast_type   |  暂无                  |
     | scope      | 删除 | vtap_usage         | main             |  暂无                  |
-
-  - 数据库字段变化
-     - 新增加写入side列, 为兼容后续升级
-       - 对于zero写入的数据，如果包含edge，则side为1
-       - 对于roze写入的数据，side都为0
 
   ## [5.5.7] - 2019-11-22
 
