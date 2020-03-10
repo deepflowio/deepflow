@@ -155,8 +155,6 @@ log_usage_edge_port      main              _id,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_ve
 |                   |      |                         |              | 2: VPC间                              |
 | vtap_id           | 44   | 采集器控制IP的ID        | 正整数       | 无特殊值                              |
 | pod_node_id       | 45   | ip对应的容器节点ID      | 非负整数     | 0表示没找到                           |
-| side              | 46   | 流量采集位置            | 非负整数     | 0: 在ip或ip0处采集                    |
-|                   |      |                         |              | 1: 在ip的对端或ip1处采集              |
 |                   |      |                         |              |                                       |
 | CODE_INDEX        | 48-53| 不能使用                | N/A          | 用于droplet/roze/zero标识Code的Index  |
 |                   |      |                         |              |                                       |
