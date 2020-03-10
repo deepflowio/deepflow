@@ -72,7 +72,7 @@ func Marshal(doc *app.Document, bytes *utils.ByteBuffer) error {
 		meter := doc.Meter.(*dt.VTAPUsageMeter)
 		msg.Meter.VtapUsage = protobuf.VTAPUsageMeterToPB(meter)
 	}
-	msg.ActionFlags = proto.Uint32(doc.ActionFlags)
+	msg.ActionFlags = proto.Uint32(uint32(doc.Flags))
 
 	buf := bytes.Use(msg.Size())
 	if _, err := msg.MarshalTo(buf); err != nil {

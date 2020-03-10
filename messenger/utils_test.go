@@ -109,7 +109,7 @@ func unmarshal(b []byte) (*app.Document, error) {
 		protobuf.PBToFPSMeter(meter.GetFps(), m)
 		doc.Meter = m
 	}
-	doc.ActionFlags = msg.GetActionFlags()
+	doc.Flags = app.DocumentFlag(msg.GetActionFlags())
 
 	return doc, nil
 }
