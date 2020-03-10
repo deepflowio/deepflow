@@ -42,18 +42,24 @@ type Meter interface {
 	ToReversed() Meter
 }
 
+type DocumentFlag uint32
+
 type Document struct {
 	pool.ReferenceCount
 
 	Timestamp uint32
 	Tag
 	Meter
-	ActionFlags uint32
+	Flags DocumentFlag
 }
 
+const (
+	FLAG_PER_SECOND_METRICS DocumentFlag = 1 << iota
+)
+
 func (d Document) String() string {
-	return fmt.Sprintf("\n{\n\ttimestamp: %d\tActionFlags: b%b\n\ttag: %s\n\tmeter: %#v\n}\n",
-		d.Timestamp, d.ActionFlags, d.Tag, d.Meter)
+	return fmt.Sprintf("\n{\n\ttimestamp: %d\tFlags: b%b\n\ttag: %s\n\tmeter: %#v\n}\n",
+		d.Timestamp, d.Flags, d.Tag, d.Meter)
 }
 
 var poolDocument = pool.NewLockFreePool(func() interface{} {
@@ -86,7 +92,7 @@ func CloneDocument(doc *Document) *Document {
 	newDoc.Timestamp = doc.Timestamp
 	newDoc.Tag = doc.Tag.Clone()
 	newDoc.Meter = doc.Meter.Clone()
-	newDoc.ActionFlags = doc.ActionFlags
+	newDoc.Flags = doc.Flags
 	return newDoc
 }
 
