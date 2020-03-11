@@ -5,7 +5,8 @@ import (
 )
 
 const (
-	MAX_BUCKET_COUNT = 100000 // 最大的桶数量限制，防止过量扩展桶
+	MAX_BUCKET_COUNT    = 100000 // 最大的桶数量限制，防止过量扩展桶
+	MAX_FREE_NODE_COUNT = 16     // 最大缓存的pop个数，也是支持同时读的线程数
 )
 
 type bucketHeapNode struct {
@@ -21,9 +22,9 @@ type BucketHeap struct {
 	nodes      []bucketHeapNode // 长度为待排序的最大节点数量
 	bucketHead []int32          // 长度为桶的个数，定长
 
-	minBucket     int   // bucketHead中最小非空的桶
-	nodeCount     int32 // nodes中节点的数量
-	freeNodeIndex int32 // 最近一次Pop之后可用的Node
+	minBucket         int     // bucketHead中最小非空的桶
+	nodeCount         int32   // nodes中节点的数量
+	freeNodeIndexList []int32 // Pop之后可重用的Node, 最大不超过MAX_FREE_NODE_COUNT
 }
 
 // 向bucketIndex所在的桶插入一个元素x
@@ -41,12 +42,13 @@ func (s *BucketHeap) Push(bucketIndex int, x interface{}) error {
 	}
 
 	// 使用freeNodeIndex存储x
-	if s.freeNodeIndex != -1 {
-		node := &s.nodes[s.freeNodeIndex]
+	if len(s.freeNodeIndexList) > 0 {
+		freeNodeIndex := s.freeNodeIndexList[len(s.freeNodeIndexList)-1]
+		node := &s.nodes[freeNodeIndex]
 		node.value = x
 		node.next = s.bucketHead[bucketIndex]
-		s.bucketHead[bucketIndex] = s.freeNodeIndex
-		s.freeNodeIndex = -1
+		s.bucketHead[bucketIndex] = freeNodeIndex
+		s.freeNodeIndexList = s.freeNodeIndexList[:len(s.freeNodeIndexList)-1]
 		return nil
 	}
 
@@ -63,7 +65,7 @@ func (s *BucketHeap) Push(bucketIndex int, x interface{}) error {
 }
 
 // 返回最小bucket中的一个元素，若没有返回nil
-// 注意：Pop可能会产生一个未被删除的Node，必须及时Push，否则下一次Pop会导致这个Node被泄漏
+// 注意：Pop最多会产生MAX_FREE_NODE_COUNT个未被删除的Node，须及时Push，否则连续的MAX_FREE_NODE_COUNT+1次Pop会导致这个Node被泄漏
 func (s *BucketHeap) Pop() interface{} {
 	for i := s.minBucket; i < len(s.bucketHead); i++ {
 		if s.bucketHead[i] == -1 {
@@ -72,8 +74,10 @@ func (s *BucketHeap) Pop() interface{} {
 		}
 
 		// 获取到链表头部并从bucketHead链表中删除
-		s.freeNodeIndex = s.bucketHead[i]
-		node := &s.nodes[s.freeNodeIndex]
+		if len(s.freeNodeIndexList) < MAX_FREE_NODE_COUNT {
+			s.freeNodeIndexList = append(s.freeNodeIndexList, s.bucketHead[i])
+		}
+		node := &s.nodes[s.bucketHead[i]]
 		s.bucketHead[i] = node.next
 
 		// 将node清空
@@ -90,9 +94,9 @@ func (s *BucketHeap) Pop() interface{} {
 // capacity：在sorter中驻留的最大节点数量，若已满Push会报错
 func NewBucketHeap(buckets, capacity int) *BucketHeap {
 	s := &BucketHeap{
-		nodes:         make([]bucketHeapNode, capacity),
-		bucketHead:    make([]int32, buckets),
-		freeNodeIndex: -1,
+		nodes:             make([]bucketHeapNode, capacity),
+		bucketHead:        make([]int32, buckets),
+		freeNodeIndexList: make([]int32, 0, MAX_FREE_NODE_COUNT),
 	}
 
 	for i := 0; i < buckets; i++ {
