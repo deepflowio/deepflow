@@ -135,7 +135,7 @@ func (f *FastPath) getPortFastPolicy(packet *LookupKey) (*EndpointStore, *Policy
 		return nil, nil
 	}
 	key1, key2 := f.GenerateMapKey(packet, FORWARD, false)
-	value, ok := f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, false)
+	value, ok := f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true)
 	if ok {
 		portPolicy := value.(*PortPolicyValue)
 		if policy := portPolicy.protoPolicy[packet.Proto]; policy != nil {
@@ -147,7 +147,7 @@ func (f *FastPath) getPortFastPolicy(packet *LookupKey) (*EndpointStore, *Policy
 
 func (f *FastPath) getVlanFastPolicy(packet *LookupKey) *PolicyData {
 	key1, key2 := f.GenerateMapKey(packet, FORWARD, true)
-	value, ok := f.FastVlanPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, false)
+	value, ok := f.FastVlanPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true)
 	if ok {
 		policy := value.(*PolicyData)
 		return policy

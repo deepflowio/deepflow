@@ -370,21 +370,24 @@ func generateLookupKey(srcMac, dstMac uint64, vlan uint32, srcIp, dstIp uint32,
 }
 
 func updateTunnelIpMap(ips ...uint32) {
-	tunnelIps := make(map[uint16]net.IP, 8)
+	aclGids := make([]uint16, 0, len(ips))
+	ipIds := make([]uint16, 0, len(ips))
+	netIps := make([]net.IP, 0, len(ips))
 	for i, ipInt := range ips {
 		ip := IpFromUint32(ipInt)
-		tunnelIps[uint16(i)] = ip
+		aclGids = append(aclGids, uint16(i+1))
+		ipIds = append(ipIds, uint16(i+1))
+		netIps = append(netIps, ip)
 	}
-	UpdateTunnelIps(tunnelIps)
+	UpdateTunnelMaps(aclGids, ipIds, netIps)
 }
 
 func toPcapAction(aclGid, id uint32, tunnelType, group, tapSide uint8, slice uint16) NpbAction {
-	return ToNpbAction(nil, aclGid, id, tunnelType, group, tapSide, slice)
+	return ToNpbAction(aclGid, id, tunnelType, group, tapSide, slice)
 }
 
-func toNpbAction(ipInt, id uint32, tunnelType, group, tapSide uint8, slice uint16) NpbAction {
-	ip := IpFromUint32(ipInt)
-	return ToNpbAction(ip, 0, id, tunnelType, group, tapSide, slice)
+func toNpbAction(aclGid, id uint32, tunnelType, group, tapSide uint8, slice uint16) NpbAction {
+	return ToNpbAction(aclGid, id, tunnelType, group, tapSide, slice)
 }
 
 // 设置key的其他参数

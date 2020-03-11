@@ -47,8 +47,8 @@ const (
 type FlowKey struct {
 	TunnelInfo
 
-	Exporter IPv4Int
-	InPort   uint32
+	VtapId uint16
+	InPort uint32
 	/* L2 */
 	MACSrc MacInt
 	MACDst MacInt
@@ -126,6 +126,7 @@ type Flow struct {
 
 	FlowID     uint64
 	TimeBitmap uint64
+	Exporter   uint32
 
 	/* Timers */
 	StartTime      time.Duration
@@ -171,7 +172,7 @@ func (t *TcpPerfStats) String() string {
 func (f *FlowKey) String() string {
 	formatted := ""
 	formatted += fmt.Sprintf("TunnelInfo: {%s} ", f.TunnelInfo.String())
-	formatted += fmt.Sprintf("Exporter: %s ", IpFromUint32(f.Exporter))
+	formatted += fmt.Sprintf("VtapId: %d ", f.VtapId)
 	formatted += fmt.Sprintf("InPort: %d\n", f.InPort)
 	formatted += fmt.Sprintf("\tMACSrc: %s ", Uint64ToMac(f.MACSrc))
 	formatted += fmt.Sprintf("MACDst: %s ", Uint64ToMac(f.MACDst))
@@ -206,6 +207,7 @@ func (f *FlowMetricsPeer) String() string {
 
 func (f *Flow) String() string {
 	formatted := fmt.Sprintf("FlowID: %d ", f.FlowID)
+	formatted += fmt.Sprintf("Exporter: %s ", IpFromUint32(f.Exporter))
 	formatted += fmt.Sprintf("CloseType: %d ", f.CloseType)
 	formatted += fmt.Sprintf("IsActiveService: %v ", f.IsActiveService)
 	formatted += fmt.Sprintf("QueueHash: %d ", f.QueueHash)
