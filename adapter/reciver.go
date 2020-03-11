@@ -2,13 +2,13 @@ package adapter
 
 import (
 	"encoding/binary"
+	"math"
 	"net"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/mailru/easygo/netpoll"
-	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 	"golang.org/x/sys/unix"
 )
 
@@ -50,7 +50,7 @@ type reciver struct {
 	cacheSize uint64
 
 	instancesLock sync.Mutex // 仅用于droplet-ctl打印trident信息
-	instances     map[TridentKey]*tridentInstance
+	instances     [math.MaxUint16 + 1]*tridentInstance
 }
 
 func (r *reciver) GetStatsCounter() *PacketCounter {
@@ -67,7 +67,9 @@ func (r *reciver) GetInstances() []*tridentInstance {
 	instances := make([]*tridentInstance, 0, 8)
 	r.instancesLock.Lock()
 	for _, instance := range r.instances {
-		instances = append(instances, instance)
+		if instance != nil {
+			instances = append(instances, instance)
+		}
 	}
 	r.instancesLock.Unlock()
 	return instances
@@ -76,27 +78,34 @@ func (r *reciver) GetInstances() []*tridentInstance {
 func (r *reciver) init(cacheSize uint64, slaves []*slave) {
 	r.slaves = slaves
 	r.cacheSize = cacheSize
-	r.instances = make(map[TridentKey]*tridentInstance)
 }
 
-func (r *reciver) deleteInstance(key TridentKey) {
+func (r *reciver) deleteInstance(ip net.IP) {
 	r.instancesLock.Lock()
-	delete(r.instances, key)
+	for i := 0; i < math.MaxUint16; i++ {
+		if r.instances[i] != nil && r.instances[i].ip.Equal(ip) {
+			r.instances[i] = nil
+		}
+	}
 	r.instancesLock.Unlock()
 }
 
-func (r *reciver) addInstance(key TridentKey) *tridentInstance {
-	instance := &tridentInstance{ip: IpFromUint32(key)}
+func (r *reciver) addInstance(vtapId uint16, instance *tridentInstance) {
+	instance.inTable = true
 	r.instancesLock.Lock()
-	r.instances[key] = instance
+	r.instances[vtapId] = instance
 	r.instancesLock.Unlock()
-	return instance
 }
 
-func (r *reciver) cacheInstance(dispatcher *tridentDispatcher, packet *packetBuffer) {
+func (r *reciver) cacheInstance(instance *tridentInstance, packet *packetBuffer) {
+	index := packet.decoder.tridentDispatcherIndex
+	dispatcher := &instance.dispatchers[index]
 	if dispatcher.cache == nil {
 		dispatcher.cache = make([]*packetBuffer, r.cacheSize)
 		dispatcher.timestamp = make([]time.Duration, r.cacheSize)
+	}
+	if !instance.inTable {
+		r.addInstance(packet.vtapId, instance)
 	}
 
 	rxDropped, rxErrors := cacheLookup(dispatcher, packet, r.cacheSize, r.slaves)
@@ -109,19 +118,15 @@ func (r *reciver) cacheInstance(dispatcher *tridentDispatcher, packet *packetBuf
 }
 
 func (r *reciver) findAndAdd(packet *packetBuffer) {
-	instance := r.instances[packet.tridentIp]
-	index := packet.decoder.tridentDispatcherIndex
+	instance := r.instances[packet.vtapId]
 	if instance == nil {
-		instance = &tridentInstance{}
-		instance.ip = IpFromUint32(packet.tridentIp)
-		dispatcher := &instance.dispatchers[index]
-		dispatcher.cache = make([]*packetBuffer, r.cacheSize)
-		dispatcher.timestamp = make([]time.Duration, r.cacheSize)
+		instance = &tridentInstance{inTable: true}
+		instance.ip = packet.tridentIp
 		r.instancesLock.Lock()
-		r.instances[packet.tridentIp] = instance
+		r.instances[packet.vtapId] = instance
 		r.instancesLock.Unlock()
 	}
-	r.cacheInstance(&instance.dispatchers[index], packet)
+	r.cacheInstance(instance, packet)
 }
 
 type udpReciver struct {
@@ -133,7 +138,7 @@ type udpReciver struct {
 func newUdpReciver(bufferSize int, cacheSize uint64, slaves []*slave) compressReciver {
 	reciver := &udpReciver{}
 
-	listener, err := net.ListenUDP("udp4", &net.UDPAddr{Port: _LISTEN_PORT_UDP})
+	listener, err := net.ListenUDP("udp", &net.UDPAddr{Port: _LISTEN_PORT_UDP})
 	if err != nil {
 		log.Error(err)
 		return nil
@@ -161,8 +166,7 @@ func (r *udpReciver) recv() (*packetBuffer, error) {
 		}
 		return nil, err
 	}
-	ip := IpToUint32(remote.IP.To4())
-	packet.init(ip)
+	packet.init(remote.IP)
 	return packet, nil
 }
 
@@ -185,13 +189,14 @@ func (r *udpReciver) start() {
 				count++
 			}
 			for i := 0; i < count; i++ {
-				if invalid, _ := batch[i].decoder.DecodeHeader(); invalid {
+				invalid, _, vtapId := batch[i].decoder.DecodeHeader()
+				if invalid {
 					r.counter.RxInvalid++
 					r.stats.RxInvalid++
 					releasePacketBuffer(batch[i])
 					continue
 				}
-				batch[i].calcHash()
+				batch[i].calcHash(vtapId)
 				r.findAndAdd(batch[i])
 			}
 			count = 0
@@ -204,7 +209,8 @@ type tcpReciver struct {
 }
 
 func listen(port int) (ln int, err error) {
-	ln, err = unix.Socket(unix.AF_INET, unix.O_NONBLOCK|unix.SOCK_STREAM, 0)
+	// 这个连接会同时支持IPv4和IPv6
+	ln, err = unix.Socket(unix.AF_INET6, unix.O_NONBLOCK|unix.SOCK_STREAM, 0)
 	if err != nil {
 		return
 	}
@@ -213,16 +219,11 @@ func listen(port int) (ln int, err error) {
 	// Closed listener could be in TIME_WAIT state some time.
 	unix.SetsockoptInt(ln, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)
 
-	addr := &unix.SockaddrInet4{
-		Port: port,
-		Addr: [4]byte{0, 0, 0, 0},
-	}
-
+	addr := &unix.SockaddrInet6{Port: port}
 	if err = unix.Bind(ln, addr); err != nil {
 		return
 	}
 	err = unix.Listen(ln, 4)
-
 	return
 }
 
@@ -273,17 +274,16 @@ func (r *tcpReciver) start() {
 
 			unix.SetNonblock(conn, true)
 
-			ip := getIp(remote)
-			ipInt := IpToUint32(ip)
-			instance := r.addInstance(ipInt)
-			log.Infof("trident(%s) connect to host, use fd %d", ip, conn)
+			tridentIp := getIp(remote)
+			instance := &tridentInstance{inTable: false, ip: tridentIp}
+			log.Infof("trident(%s) connect to host, use fd %d", tridentIp, conn)
 
 			ep.Add(conn, netpoll.EPOLLIN|netpoll.EPOLLET|netpoll.EPOLLHUP|netpoll.EPOLLRDHUP,
 				func(event netpoll.EpollEvent) {
 					if event != netpoll.EPOLLIN {
 						ep.Del(conn)
 						unix.Close(conn)
-						r.deleteInstance(ipInt)
+						r.deleteInstance(tridentIp)
 						return
 					}
 
@@ -294,8 +294,8 @@ func (r *tcpReciver) start() {
 							releasePacketBuffer(packet)
 							break
 						}
-						packet.init(ipInt)
-						invalid, frameSize := packet.decoder.DecodeHeader()
+						packet.init(tridentIp)
+						invalid, frameSize, vtapId := packet.decoder.DecodeHeader()
 						if invalid {
 							r.counter.RxInvalid++
 							r.stats.RxInvalid++
@@ -303,8 +303,8 @@ func (r *tcpReciver) start() {
 							continue
 						}
 						if n == int(frameSize) {
-							packet.calcHash()
-							r.cacheInstance(&instance.dispatchers[packet.decoder.tridentDispatcherIndex], packet)
+							packet.calcHash(vtapId)
+							r.cacheInstance(instance, packet)
 						} else if n > int(frameSize) {
 							buffer := packet.buffer
 							packets := make([]*packetBuffer, 0, 4)
@@ -316,20 +316,21 @@ func (r *tcpReciver) start() {
 								frameSize = binary.BigEndian.Uint16(buffer[decodeLen:])
 								copy(packet.buffer, buffer[decodeLen:decodeLen+frameSize])
 
-								packet.init(ipInt)
-								if invalid, _ := packet.decoder.DecodeHeader(); invalid {
+								invalid, _, vtapId := packet.decoder.DecodeHeader()
+								if invalid {
 									r.counter.RxInvalid++
 									r.stats.RxInvalid++
 									releasePacketBuffer(packet)
 									continue
 								}
 
+								packet.init(tridentIp)
+								packet.calcHash(vtapId)
 								packets = append(packets, packet)
 							}
 
 							for _, packet := range packets {
-								packet.calcHash()
-								r.cacheInstance(&instance.dispatchers[packet.decoder.tridentDispatcherIndex], packet)
+								r.cacheInstance(instance, packet)
 							}
 						}
 					}

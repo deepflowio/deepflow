@@ -10,7 +10,6 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
-	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
 )
@@ -30,8 +29,9 @@ type TridentKey = uint32
 
 type packetBuffer struct {
 	buffer    []byte
-	tridentIp uint32
 	decoder   SequentialDecoder
+	tridentIp net.IP
+	vtapId    uint16
 	hash      uint8
 }
 
@@ -45,6 +45,9 @@ type tridentDispatcher struct {
 }
 
 type tridentInstance struct {
+	// TCP连接创建的时候无法获取VtapId信息, 所以实例初始不会放在表中
+	// 当接收到实例的第一个压缩报文获取到VtapId信息时, 才会加入到表中
+	inTable     bool
 	ip          net.IP
 	dispatchers [TRIDENT_DISPATCHER_MAX]tridentDispatcher
 }
@@ -60,15 +63,15 @@ type TridentAdapter struct {
 	recivers [_MAX_RECIVER]compressReciver
 }
 
-func (p *packetBuffer) init(ip uint32) {
+func (p *packetBuffer) init(ip net.IP) {
 	p.tridentIp = ip
 	p.decoder.initSequentialDecoder(p.buffer)
 }
 
-func (p *packetBuffer) calcHash() uint8 {
-	hash := p.tridentIp ^ uint32(p.decoder.tridentDispatcherIndex)
-	p.hash = uint8(hash>>24) ^ uint8(hash>>16) ^ uint8(hash>>8) ^ uint8(hash)
-	p.hash = (p.hash >> 6) ^ (p.hash >> 4) ^ (p.hash >> 2) ^ p.hash
+func (p *packetBuffer) calcHash(vtapId uint16) uint8 {
+	hash := uint8(vtapId) ^ uint8(vtapId>>8) ^ uint8(p.decoder.tridentDispatcherIndex)
+	p.hash = (hash >> 6) ^ (hash >> 4) ^ (hash >> 2) ^ hash
+	p.vtapId = vtapId
 	return p.hash
 }
 
@@ -162,7 +165,7 @@ func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize 
 	if dispatcher.seq == 0 {
 		dispatcher.seq = seq
 		log.Infof("receive first packet from trident %v index %d, with seq %d",
-			IpFromUint32(packet.tridentIp), packet.decoder.tridentDispatcherIndex, dispatcher.seq)
+			packet.tridentIp, packet.decoder.tridentDispatcherIndex, dispatcher.seq)
 	}
 	dropped := uint64(0)
 
@@ -170,7 +173,7 @@ func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize 
 	if seq < dispatcher.seq {
 		if timestamp > dispatcher.maxTimestamp { // 序列号更小但时间更大，trident重启
 			log.Warningf("trident %v index %d restart but some packets lost, received timestamp %d > %d, reset sequence to max(%d-%d, %d).",
-				IpFromUint32(packet.tridentIp), packet.decoder.tridentDispatcherIndex,
+				packet.tridentIp, packet.decoder.tridentDispatcherIndex,
 				timestamp, dispatcher.maxTimestamp, seq, cacheSize, 1)
 			// 重启前的包如果还在cache中一定存在丢失的部分，直接抛弃且不计数。
 			for i := uint64(0); i < cacheSize; i++ {
@@ -191,7 +194,7 @@ func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize 
 			// 乱序包，丢弃并返回。注意乱序一定意味着之前已经统计到了丢包。
 			// 乱序接近丢弃说明是真乱序，乱序远比丢弃小说明是真丢包。
 			log.Warningf("trident %v index %d hash seq %d less than current %d, drop packet",
-				IpFromUint32(packet.tridentIp), packet.decoder.tridentDispatcherIndex, seq, dispatcher.seq)
+				packet.tridentIp, packet.decoder.tridentDispatcherIndex, seq, dispatcher.seq)
 			releasePacketBuffer(packet)
 			return dropped, uint64(1)
 		}
@@ -258,7 +261,7 @@ func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize 
 	if dropped > 0 {
 		dispatcher.dropped += dropped
 		log.Debugf("trident %v index %d lost %d packets, packet received with seq %d, now window start with seq %d",
-			IpFromUint32(packet.tridentIp), packet.decoder.tridentDispatcherIndex, dropped, seq, dispatcher.seq)
+			packet.tridentIp, packet.decoder.tridentDispatcherIndex, dropped, seq, dispatcher.seq)
 	}
 	return dropped, uint64(0)
 }

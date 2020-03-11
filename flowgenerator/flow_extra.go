@@ -136,7 +136,7 @@ func (e *FlowExtra) Match(meta *MetaPacket) bool {
 		return e.keyMatchForEthOthers(meta)
 	}
 	taggedFlow := e.taggedFlow
-	if taggedFlow.Exporter != meta.Exporter || meta.InPort != taggedFlow.InPort {
+	if taggedFlow.VtapId != meta.VtapId || meta.InPort != taggedFlow.InPort {
 		return false
 	}
 	macMatchType := requireMacMatch(meta, ignoreTorMac, ignoreL2End)
