@@ -57,6 +57,7 @@ message StreamHeader {
  * is unnecessary to be evaluated, in other words, has_xxx = 0
  */
 message Flow {
+    optional uint32 vtap_id = 1;
     optional uint32 exporter = 2;     /* Control IP for exporter */
     optional uint32 close_type = 7;   /* 0=unknown, 1=tcp-fin, 2=tcp-rst, 3=timeout,
                                          4=flood, 5=forced-report, 6=forced-close,
