@@ -17,7 +17,7 @@ const (
 	ICMP_REST            = 28
 	IPV6_ADDR_LEN        = 16
 	COMPRESS_HEADER_SIZE = 24 // FRAME(2) + RESERVED(1) + VERSION(1) + SEQ(8) + TIMESAMP(8) + IF_MAC(4)
-	VERSION              = 4
+	VERSION              = 5
 )
 
 const (
@@ -342,21 +342,22 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 	}
 }
 
-func (d *SequentialDecoder) DecodeHeader() (bool, uint16) {
+func (d *SequentialDecoder) DecodeHeader() (bool, uint16, uint16) {
 	frameSize := d.U16()
 	if frameSize <= COMPRESS_HEADER_SIZE {
-		return true, 0
+		return true, 0, 0
 	}
 	d.frameSize = frameSize - 2
 	version := d.U16() // U8 reserved and U8 version
-	if version != 4 {
-		return true, 0
+	if version != VERSION {
+		return true, 0, 0
 	}
+	vtapId := d.U16()
 	d.seq = d.U64()
 	indexAndTimestamp := d.U64()
 	index := uint8(indexAndTimestamp >> 56)
 	if index >= 16 { // Trident最大16个队列[0, 15]
-		return true, 0
+		return true, 0, 0
 	}
 	d.timestamp = time.Duration(indexAndTimestamp&0xffffffffffffff) * time.Microsecond
 	inPort := d.U32()
@@ -372,7 +373,7 @@ func (d *SequentialDecoder) DecodeHeader() (bool, uint16) {
 	}
 	d.inPort = inPort
 	d.tridentDispatcherIndex = index
-	return false, frameSize
+	return false, frameSize, vtapId
 }
 
 func (d *SequentialDecoder) NextPacket(meta *MetaPacket) bool {

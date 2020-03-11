@@ -18,7 +18,10 @@ func (m *FlowMap) initFlow(flowExtra *FlowExtra, meta *MetaPacket) {
 
 	// 基础信息
 	taggedFlow := AcquireTaggedFlow()
-	taggedFlow.Exporter = meta.Exporter
+	taggedFlow.VtapId = meta.VtapId
+	if meta.Exporter.To4() != nil {
+		taggedFlow.Exporter = IpToUint32(meta.Exporter)
+	}
 	taggedFlow.MACSrc = meta.MacSrc
 	taggedFlow.MACDst = meta.MacDst
 	taggedFlow.IPSrc = meta.IpSrc
