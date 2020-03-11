@@ -2,6 +2,7 @@ package datatype
 
 import (
 	"fmt"
+	"math"
 	"net"
 
 	"gitlab.x.lan/yunshan/droplet-libs/bit"
@@ -11,12 +12,14 @@ import (
 var (
 	INVALID_POLICY_DATA = new(PolicyData)
 
-	tunnelIpMap = make(map[uint16]net.IP, 8)
+	// 通过aclGid分别查询tunnelIp或tunnelIpId
+	tunnelIpMap   = [math.MaxUint16 + 1]net.IP{}
+	tunnelIpIdMap = [math.MaxUint16 + 1]uint16{}
 )
 
 type ActionFlag uint16
 
-type NpbAction uint64 // tunnel-ip-index/aclgid | payload-slice | tunnel-type | Dep/Ip  | TapSide |  tunnel-id
+type NpbAction uint64 // aclgid | payload-slice | tunnel-type | Dep/Ip  | TapSide |  tunnel-id
 
 const (
 	NPB_TUNNEL_TYPE_VXLAN = iota
@@ -37,22 +40,20 @@ const (
 	RESOURCE_GROUP_TYPE_MASK = RESOURCE_GROUP_TYPE_DEV | RESOURCE_GROUP_TYPE_IP
 )
 
-func UpdateTunnelIps(tunnelIps map[uint16]net.IP) {
-	tunnelIpMap = tunnelIps
-}
-
-func GetTunnelIp(index uint32) net.IP {
-	return tunnelIpMap[uint16(index)]
-}
-
-func GetTunnelIpIndex(ip net.IP) uint32 {
-	for i, tunnelIp := range tunnelIpMap {
-		if tunnelIp.Equal(ip) {
-			return uint32(i)
-		}
+func UpdateTunnelMaps(aclGids, ipIds []uint16, ips []net.IP) {
+	// 数据再次更新后会有残余, 但不影响使用
+	for i, id := range aclGids {
+		tunnelIpMap[id] = ips[i]
+		tunnelIpIdMap[id] = ipIds[i]
 	}
-	log.Errorf("tunnel ip %s not exist.", ip)
-	return 0
+}
+
+func GetTunnelIp(aclGid uint32) net.IP {
+	return tunnelIpMap[uint16(aclGid)]
+}
+
+func GetTunnelIpId(aclGid uint32) uint16 {
+	return tunnelIpIdMap[uint16(aclGid)]
 }
 
 func (a NpbAction) TapSideCompare(flag int) bool {
@@ -93,22 +94,21 @@ func (a NpbAction) ResourceGroupType() int {
 }
 
 func (a NpbAction) TunnelGid() uint32 {
-	if a.TunnelType() != NPB_TUNNEL_TYPE_PCAP {
-		return 0
-	}
 	return uint32(a >> 48)
 }
 
-func (a NpbAction) TunnelIpIndex() uint32 {
-	return uint32(a >> 48)
+func (a NpbAction) TunnelIpId() uint16 {
+	if a.TunnelType() == NPB_TUNNEL_TYPE_PCAP {
+		return 0
+	}
+	return GetTunnelIpId(uint32(a >> 48))
 }
 
 func (a NpbAction) TunnelIp() net.IP {
 	if a.TunnelType() == NPB_TUNNEL_TYPE_PCAP {
 		return nil
 	}
-	index := uint32(a >> 48)
-	return GetTunnelIp(index)
+	return GetTunnelIp(uint32(a >> 48))
 }
 
 func (a NpbAction) TunnelId() uint32 {
@@ -135,18 +135,14 @@ func (a NpbAction) TunnelType() uint8 {
 
 func (a NpbAction) String() string {
 	if a.TunnelType() == NPB_TUNNEL_TYPE_PCAP {
-		return fmt.Sprintf("{gid %d type: %d slice %d side: %d group: %d}", a.TunnelGid(), a.TunnelType(), a.PayloadSlice(), a.TapSide(), a.ResourceGroupType())
+		return fmt.Sprintf("{gid: %d type: %d slice %d side: %d group: %d}", a.TunnelGid(), a.TunnelType(), a.PayloadSlice(), a.TapSide(), a.ResourceGroupType())
 	} else {
-		return fmt.Sprintf("{%d@%s type: %d slice %d side: %d group: %d}", a.TunnelId(), a.TunnelIp(), a.TunnelType(), a.PayloadSlice(), a.TapSide(), a.ResourceGroupType())
+		return fmt.Sprintf("{%d@%s gid: %d type: %d slice %d side: %d group: %d}", a.TunnelId(), a.TunnelIp(), a.TunnelGid(), a.TunnelType(), a.PayloadSlice(), a.TapSide(), a.ResourceGroupType())
 	}
 }
 
-func ToNpbAction(ip net.IP, aclGid, id uint32, tunnelType, group, tapSide uint8, slice uint16) NpbAction {
-	gidOrtunnelIpIndex := aclGid
-	if tunnelType != NPB_TUNNEL_TYPE_PCAP {
-		gidOrtunnelIpIndex = GetTunnelIpIndex(ip)
-	}
-	return NpbAction(uint64(gidOrtunnelIpIndex&0xffff)<<48 | uint64(slice)<<32 |
+func ToNpbAction(aclGid, id uint32, tunnelType, group, tapSide uint8, slice uint16) NpbAction {
+	return NpbAction(uint64(aclGid&0xffff)<<48 | uint64(slice)<<32 |
 		uint64(tunnelType&0x3)<<30 | (uint64(group)&RESOURCE_GROUP_TYPE_MASK)<<28 | (uint64(tapSide)&TAPSIDE_MASK)<<26 | uint64(id&0xffffff))
 }
 
@@ -533,7 +529,7 @@ func (d *PolicyData) MergeNpbAction(actions []NpbAction, aclID uint32, direction
 				break
 			}
 
-			if m.TunnelIpIndex() != n.TunnelIpIndex() || m.TunnelId() != n.TunnelId() || m.TunnelType() != n.TunnelType() {
+			if m.TunnelIpId() != n.TunnelIpId() || m.TunnelId() != n.TunnelId() || m.TunnelType() != n.TunnelType() {
 				continue
 			}
 			if n.PayloadSlice() == 0 ||

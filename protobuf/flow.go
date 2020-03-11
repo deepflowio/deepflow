@@ -16,7 +16,9 @@ const TYPE_MULTI = 100000000
 func MarshalFlow(f *datatype.TaggedFlow, bytes *utils.ByteBuffer) error {
 	flowMetricsPeerSrc := &f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC]
 	flowMetricsPeerDst := &f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST]
+
 	flow := &pb.Flow{
+		VtapId:     proto.Uint32(uint32(f.VtapId)),
 		Exporter:   proto.Uint32(f.Exporter),
 		CloseType:  proto.Uint32(uint32(f.CloseType)),
 		FlowId:     proto.Uint64(f.FlowID),

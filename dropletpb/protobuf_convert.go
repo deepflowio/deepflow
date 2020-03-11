@@ -128,7 +128,9 @@ func Convert2IpGroupData(ipGroups []*trident.Group) []*policy.IpGroupData {
 }
 
 func updateTunnelIpMap(flowAcls []*trident.FlowAcl) {
-	tunnelIps := make(map[uint16]net.IP, 8)
+	aclGids := make([]uint16, 0, len(flowAcls))
+	ipIds := make([]uint16, 0, len(flowAcls))
+	ips := make([]net.IP, 0, len(flowAcls))
 
 	for _, acl := range flowAcls {
 		for _, npb := range acl.GetNpbActions() {
@@ -137,15 +139,18 @@ func updateTunnelIpMap(flowAcls []*trident.FlowAcl) {
 			if ip == nil || tunnelType == datatype.NPB_TUNNEL_TYPE_PCAP {
 				continue
 			}
+			aclGid := uint16(npb.GetNpbAclGroupId())
 			ipId := uint16(npb.GetTunnelIpId() & 0xffff)
 
 			if ip.To4() != nil {
 				ip = ip.To4()
 			}
-			tunnelIps[ipId] = ip
+			aclGids = append(aclGids, aclGid)
+			ipIds = append(ipIds, ipId)
+			ips = append(ips, ip)
 		}
 	}
-	datatype.UpdateTunnelIps(tunnelIps)
+	datatype.UpdateTunnelMaps(aclGids, ipIds, ips)
 }
 
 func newAclAction(actions []*trident.FlowAction) []datatype.AclAction {
@@ -186,11 +191,8 @@ func newNpbActions(npbs []*trident.NpbAction) []datatype.NpbAction {
 		id := uint32(npb.GetTunnelId() & 0xffffff)
 		side := uint8(npb.GetTapSide())
 		slice := uint16(npb.GetPayloadSlice())
-		aclGid := uint32(0)
-		if tunnelType == datatype.NPB_TUNNEL_TYPE_PCAP {
-			aclGid = uint32(npb.GetNpbAclGroupId())
-		}
-		action := datatype.ToNpbAction(ip, aclGid, id, tunnelType, 0, side, slice)
+		aclGid := uint32(npb.GetNpbAclGroupId() & 0xffff)
+		action := datatype.ToNpbAction(aclGid, id, tunnelType, 0, side, slice)
 		actions = append(actions, action)
 	}
 	return actions

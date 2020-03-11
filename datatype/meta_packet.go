@@ -50,15 +50,17 @@ type MetaPacket struct {
 	EndpointData EndpointData
 	PolicyData   PolicyData
 
-	Invalid   bool
-	QueueHash uint8
-	PacketLen uint16
-	InPort    uint32 // (8B)
-	Exporter  IPv4Int
-	L2End0    bool
-	L2End1    bool
-	L3End0    bool
-	L3End1    bool // (8B)
+	Invalid    bool
+	QueueHash  uint8
+	PacketLen  uint16
+	InPort     uint32 // (8B)
+	Exporter   net.IP
+	VtapId     uint16
+	PayloadLen uint16
+	L2End0     bool
+	L2End1     bool
+	L3End0     bool
+	L3End1     bool // (8B)
 
 	Tunnel *TunnelInfo
 
@@ -79,10 +81,9 @@ type MetaPacket struct {
 	Protocol   IPProtocol
 	NextHeader IPProtocol // ipv6
 
-	PortSrc    uint16
-	PortDst    uint16              // (8B)
-	TcpData    MetaPacketTcpHeader // 绝大多数流量是TCP，不使用指针
-	PayloadLen uint16
+	PortSrc uint16
+	PortDst uint16              // (8B)
+	TcpData MetaPacketTcpHeader // 绝大多数流量是TCP，不使用指针
 
 	Direction       PacketDirection // flowgenerator负责初始化，表明MetaPacket方向
 	IsActiveService bool            // flowgenerator负责初始化，表明服务端是否活跃
@@ -329,8 +330,8 @@ func (p *MetaPacket) ParseL2(packet RawPacket) int {
 func (p *MetaPacket) String() string {
 	buffer := bytes.Buffer{}
 	var format string
-	format = "timestamp: %d inport: 0x%x exporter: %v len: %d l2_end: %v, %v l3_end: %v, %v invalid: %v direction: %v\n"
-	buffer.WriteString(fmt.Sprintf(format, p.Timestamp, p.InPort, IpFromUint32(p.Exporter),
+	format = "timestamp: %d inport: 0x%x vtapId: %d exporter: %v len: %d l2_end: %v, %v l3_end: %v, %v invalid: %v direction: %v\n"
+	buffer.WriteString(fmt.Sprintf(format, p.Timestamp, p.InPort, p.VtapId, p.Exporter,
 		p.PacketLen, p.L2End0, p.L2End1, p.L3End0, p.L3End1, p.Invalid, p.Direction))
 	if p.Tunnel != nil {
 		buffer.WriteString(fmt.Sprintf("\ttunnel: %s\n", p.Tunnel))
