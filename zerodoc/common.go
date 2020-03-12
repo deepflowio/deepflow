@@ -25,6 +25,8 @@ const (
 	_TAG_HOST_ID_0
 	_TAG_POD_NODE_ID
 	_TAG_POD_NODE_ID_0
+	_TAG_AZ_ID
+	_TAG_AZ_ID_0
 	_TAG_REGION_0
 	_TAG_IP_1
 	_TAG_GROUP_ID_1
@@ -37,6 +39,7 @@ const (
 	_TAG_SUBNET_ID_1
 	_TAG_REGION_1
 	_TAG_POD_NODE_ID_1
+	_TAG_AZ_ID_1
 	_TAG_DIRECTION
 	_TAG_ACL_GID
 	_TAG_VLAN_ID
@@ -117,6 +120,8 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"l3_device_type_0": _TAG_L3_DEVICE_TYPE_0,
 	"pod_node_id":      _TAG_POD_NODE_ID,
 	"pod_node_id_0":    _TAG_POD_NODE_ID_0,
+	"az_id":            _TAG_AZ_ID,
+	"az_id_0":          _TAG_AZ_ID_0,
 	"host":             _TAG_HOST,
 	"host_0":           _TAG_HOST_0,
 	"host_id":          _TAG_HOST_ID,
@@ -133,6 +138,7 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"subnet_id_1":      _TAG_SUBNET_ID_1,
 	"region_1":         _TAG_REGION_1,
 	"pod_node_id_1":    _TAG_POD_NODE_ID_1,
+	"az_id_1":          _TAG_AZ_ID_1,
 	"direction":        _TAG_DIRECTION,
 	"acl_gid":          _TAG_ACL_GID,
 	"vlan_id":          _TAG_VLAN_ID,
