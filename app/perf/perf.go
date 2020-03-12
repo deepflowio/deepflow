@@ -109,14 +109,10 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 		otherEnd := GetOppositeEndpoint(thisEnd)
 		meter := outputtype.PerfMeter{
 			PerfMeterSum: outputtype.PerfMeterSum{
-				SumFlowCount:         1,
-				SumNewFlowCount:      flow.NewFlowCount(),
-				SumClosedFlowCount:   flow.ClosedFlowCount(),
-				SumHalfOpenFlowCount: flow.HalfOpenFlowCount(),
-				SumPacketTx:          packets[thisEnd],
-				SumPacketRx:          packets[otherEnd],
-				SumRetransCntTx:      uint64(retransCnt[thisEnd]),
-				SumRetransCntRx:      uint64(retransCnt[otherEnd]),
+				SumPacketTx:     packets[thisEnd],
+				SumPacketRx:     packets[otherEnd],
+				SumRetransCntTx: uint64(retransCnt[thisEnd]),
+				SumRetransCntRx: uint64(retransCnt[otherEnd]),
 
 				SumRTTSyn:     flow.GetRTTSyn(),
 				SumRTTAvg:     flow.GetRTT(),
@@ -161,7 +157,7 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 			doc.Timestamp = docTimestamp
 			field.FillTag(code, doc.Tag.(*outputtype.Tag))
 			doc.Meter = &meter
-			doc.ActionFlags = uint32(inputtype.ACTION_TCP_FLOW_PERF_COUNTING)
+			doc.Flags = app.DocumentFlag(inputtype.ACTION_TCP_FLOW_PERF_COUNTING)
 		}
 
 		// policy
@@ -182,7 +178,7 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				doc.Timestamp = docTimestamp
 				field.FillTag(code, doc.Tag.(*outputtype.Tag))
 				doc.Meter = &meter
-				doc.ActionFlags = uint32(policy.GetActionFlags())
+				doc.Flags = app.DocumentFlag(policy.GetActionFlags())
 			}
 
 			codes = p.codes[:0]
@@ -197,7 +193,7 @@ func (p *FlowToPerfDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, varied
 				doc.Timestamp = docTimestamp
 				field.FillTag(code, doc.Tag.(*outputtype.Tag))
 				doc.Meter = &meter
-				doc.ActionFlags = uint32(policy.GetActionFlags())
+				doc.Flags = app.DocumentFlag(policy.GetActionFlags())
 			}
 		}
 	}

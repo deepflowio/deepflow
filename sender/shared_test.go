@@ -51,7 +51,7 @@ func decode(b []byte) (*app.Document, error) {
 	}
 	doc.Meter = m
 	m.Decode(decoder)
-	doc.ActionFlags = decoder.ReadU32()
+	doc.Flags = app.DocumentFlag(decoder.ReadU32())
 
 	if decoder.Failed() {
 		return nil, fmt.Errorf("Unmarshaling protobuf failed")
@@ -108,7 +108,7 @@ func dupTestData() []interface{} {
 		newDoc.Timestamp = doc.Timestamp
 		newDoc.Tag = dt.CloneTag(doc.Tag.(*dt.Tag))
 		newDoc.Meter = doc.Meter.Clone()
-		newDoc.ActionFlags = doc.ActionFlags
+		newDoc.Flags = doc.Flags
 		testData = append(testData, newDoc)
 	}
 	return testData

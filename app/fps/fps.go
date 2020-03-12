@@ -17,7 +17,7 @@ import (
 	. "gitlab.x.lan/yunshan/droplet/app/common/policy"
 
 	"github.com/google/gopacket/layers"
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("fps")
@@ -87,7 +87,7 @@ func (p *FlowToFPSDocumentMapper) appendDocs(field *outputtype.Field, code outpu
 		field.FillTag(code, doc.Tag.(*outputtype.Tag))
 		doc.Meter = p.meters[k]
 		doc.Timestamp = p.timestamps[k]
-		doc.ActionFlags = actionFlags
+		doc.Flags = app.DocumentFlag(actionFlags)
 	}
 }
 
