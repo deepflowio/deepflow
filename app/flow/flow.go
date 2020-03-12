@@ -63,7 +63,7 @@ func (p *FlowToFlowDocumentMapper) appendDoc(timestamp uint32, field *outputtype
 	field.FillTag(code, doc.Tag.(*outputtype.Tag))
 	doc.Meter = meter
 	doc.Timestamp = timestamp
-	doc.ActionFlags = actionFlags
+	doc.Flags = app.DocumentFlag(actionFlags)
 }
 
 func (p *FlowToFlowDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedTag bool) []interface{} {

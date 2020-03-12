@@ -6,59 +6,59 @@
 ---------------
 
 ```
-db                       measurement       tag
-------------------------------------------------------------------------------------------------------------------------
-df_usage_acl             mini              _id,acl_direction,acl_gid,direction
-df_usage_acl             main              _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
-df_usage_acl_edge        main              _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
-df_usage_acl_edge_port   main              _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,protocol,server_port,tap_type
-df_usage_acl_port        main              _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,protocol,server_port,tap_type
+db                     rp           measurement     tag
+---------------------- ----------------------------------------------------------------------------------------------
+df_usage_acl           autogen,s1   mini            _id,acl_direction,acl_gid,direction
+df_usage_acl           autogen,s1   main            _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
+df_usage_acl_edge      autogen,s1   main            _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
+df_usage_acl_edge_port autogen,s1   main            _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,protocol,server_port,tap_type
+df_usage_acl_port      autogen,s1   main            _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,protocol,server_port,tap_type
 
-df_fps_acl               mini              _id,acl_direction,acl_gid,direction
-df_fps_acl               main              _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
-df_fps_acl_port          main              _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type,protocol,server_port
-df_fps_acl_edge          main              _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
-df_fps_acl_edge_port     main              _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type,protocol,server_port
+df_fps_acl             autogen,s1   mini            _id,acl_direction,acl_gid,direction
+df_fps_acl             autogen,s1   main            _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
+df_fps_acl_port        autogen,s1   main            _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type,protocol,server_port
+df_fps_acl_edge        autogen,s1   main            _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
+df_fps_acl_edge_port   autogen,s1   main            _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type,protocol,server_port
 
-df_geo_acl               main_isp          _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,isp,tap_type
-df_geo_acl               main_region       _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,region,tap_type
-df_geo_acl_port          main_isp          _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,isp,tap_type,protocol,server_port
-df_geo_acl_port          main_region       _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,region,tap_type,protocol,server_port
-df_geo_acl_edge          main_isp          _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,isp,tap_type
-df_geo_acl_edge          main_region       _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,region,tap_type
-df_geo_acl_edge_port     main_isp          _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,isp,tap_type,protocol,server_port
-df_geo_acl_edge_port     main_region       _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,region,tap_type,protocol,server_port
+df_geo_acl             autogen      main_isp        _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,isp,tap_type
+df_geo_acl             autogen      main_region     _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,region,tap_type
+df_geo_acl_port        autogen      main_isp        _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,isp,tap_type,protocol,server_port
+df_geo_acl_port        autogen      main_region     _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,region,tap_type,protocol,server_port
+df_geo_acl_edge        autogen      main_isp        _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,isp,tap_type
+df_geo_acl_edge        autogen      main_region     _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,region,tap_type
+df_geo_acl_edge_port   autogen      main_isp        _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,isp,tap_type,protocol,server_port
+df_geo_acl_edge_port   autogen      main_region     _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,region,tap_type,protocol,server_port
 
-df_perf_acl              mini              _id,acl_direction,acl_gid,direction
-df_perf_acl              main              _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
-df_perf_acl_port         main              _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type,protocol,server_port
-df_perf_acl_edge         main              _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
-df_perf_acl_edge_port    main              _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,protocol,server_port,tap_type
+df_perf_acl            autogen      mini            _id,acl_direction,acl_gid,direction
+df_perf_acl            autogen      main            _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
+df_perf_acl_port       autogen      main            _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type,protocol,server_port
+df_perf_acl_edge       autogen      main            _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
+df_perf_acl_edge_port  autogen      main            _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,protocol,server_port,tap_type
 
-df_type_acl              main              _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
-df_type_acl_port         main              _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type,protocol,server_port
-df_type_acl_edge         main              _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
-df_type_acl_edge_port    main              _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type,protocol,server_port
+df_type_acl            autogen      main            _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type
+df_type_acl_port       autogen      main            _id,acl_direction,acl_gid,direction,ip,ip_bin,ip_version,tap_type,protocol,server_port
+df_type_acl_edge       autogen      main            _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type
+df_type_acl_edge_port  autogen      main            _id,acl_direction,acl_gid,direction,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,tap_type,protocol,server_port
 
-vtap_usage               main              _id,_tid,host,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,tap_type,vtap_id
-vtap_usage               main_cast_type    _id,_tid,cast_type,host,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,region,subnet_id,tap_type,vtap_id
-vtap_usage               main_tcp_flags    _id,_tid,host,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,region,subnet_id,tap_type,tcp_flags,vtap_id
-vtap_usage_edge          main              _id,_tid,host,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,tap_type,vtap_id
-vtap_usage_port          main              _id,_tid,host,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,region,server_port,subnet_id,tap_type,vtap_id
+vtap_usage             autogen,s1   main            _id,_tid,az_id,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,tap_type,vtap_id
+vtap_usage             autogen,s1   main_cast_type  _id,_tid,az_id,cast_type,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,region,subnet_id,tap_type,vtap_id
+vtap_usage             autogen,s1   main_tcp_flags  _id,_tid,az_id,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,region,subnet_id,tap_type,tcp_flags,vtap_id
+vtap_usage_edge        autogen,s1   main            _id,_tid,az_id,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,tap_type,vtap_id
+vtap_usage_port        autogen,s1   main            _id,_tid,az_id,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,region,server_port,subnet_id,tap_type,vtap_id
 
-vtap_flow_usage          main              _id,_tid,host,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,tap_type,vtap_id
-vtap_flow_usage_edge     main              _id,_tid,host_0,host_1,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,tap_type,vtap_id
+vtap_flow_usage        autogen      main            _id,_tid,az_id,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,tap_type,vtap_id
+vtap_flow_usage_edge   autogen      main            _id,_tid,az_id_0,az_id_1,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,tap_type,vtap_id
 
-vtap_flow_fps            main              _id,_tid,host,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,tap_type,vtap_id
-vtap_flow_fps_edge       main              _id,_tid,host_0,host_1,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,tap_type,vtap_id
+vtap_flow_fps          autogen,s1   main            _id,_tid,az_id,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,tap_type,vtap_id
+vtap_flow_fps_edge     autogen,s1   main            _id,_tid,az_id_0,az_id_1,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,tap_type,vtap_id
 
-vtap_flow_perf          main              _id,_tid,host,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,tap_type,vtap_id
-vtap_flow_perf_edge     main              _id,_tid,host_0,host_1,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,tap_type,vtap_id
+vtap_flow_perf         autogen      main            _id,_tid,az_id,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,tap_type,vtap_id
+vtap_flow_perf_edge    autogen      main            _id,_tid,az_id_0,az_id_1,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,tap_type,vtap_id
 
-vtap_flow_type          main              _id,_tid,host,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,tap_type,vtap_id
-vtap_flow_type_edge     main              _id,_tid,host_0,host_1,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,tap_type,vtap_id
+vtap_flow_type         autogen       main           _id,_tid,az_id,host_id,ip,ip_bin,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_node_id,protocol,region,subnet_id,tap_type,vtap_id
+vtap_flow_type_edge    autogen       main           _id,_tid,az_id_0,az_id_1,host_id_0,host_id_1,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_node_id_0,pod_node_id_1,protocol,region_0,region_1,subnet_id_0,subnet_id_1,tap_type,vtap_id
 
-log_usage_edge_port      main              _id,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_epc_id_0,l3_epc_id_1,protocol,server_port,tap_type
+log_usage_edge_port    m10           main           _id,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_version,l3_epc_id_0,l3_epc_id_1,protocol,server_port,tap_type
 ```
 
 统计数据Tag定义
@@ -93,7 +93,7 @@ log_usage_edge_port      main              _id,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_ve
 | l3_device_type    | 6    | ip对应的资源类型        | 非负整数     | 同l2_device_type                      |
 | host              | 7    | ip对应的宿主机          | IP字符串     | 0.0.0.0或::表示未找到 `废弃`          |
 | region            | 8    | ip对应的云平台区域ID    | 非负整数     | 0: 未找到                             |
-| host_id           | 9    | ip对应的宿主机ID        | 正整数       | 0表示没找到                           |
+| host_id           | 9    | ip对应的宿主机ID        | 非负整数     | 0表示没找到                           |
 |                   |      |                         |              |                                       |
 | ip_0              | 16   | 0端IP                   | IP字符串     | 0.0.0.0或::表示Internet               |
 | ip_1              | 16   | 1端IP                   | IP字符串     | 0.0.0.0或::表示Internet               |
@@ -121,10 +121,12 @@ log_usage_edge_port      main              _id,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_ve
 | subnet_id_1       | 24   | ip_1对应的VL2 ID        | 非负整数     | 0表示没找到                           |
 | region_0          | 25   | ip_0对应的云平台区域ID  | 非负整数     | 0表示没找到                           |
 | region_1          | 25   | ip_1对应的云平台区域ID  | 非负整数     | 0表示没找到                           |
-| pod_node_id_0     | 26   | ip_0对应的容器节点ID    | 正整数       | 0表示没找到                           |
-| pod_node_id_1     | 26   | ip_1对应的容器节点ID    | 正整数       | 0表示没找到                           |
-| host_id_0         | 27   | ip_0对应的宿主机ID      | 正整数       | 0表示没找到                           |
-| host_id_1         | 27   | ip_1对应的宿主机ID      | 正整数       | 0表示没找到                           |
+| pod_node_id_0     | 26   | ip_0对应的容器节点ID    | 非负整数     | 0表示没找到                           |
+| pod_node_id_1     | 26   | ip_1对应的容器节点ID    | 非负整数     | 0表示没找到                           |
+| host_id_0         | 27   | ip_0对应的宿主机ID      | 非负整数     | 0表示没找到                           |
+| host_id_1         | 27   | ip_1对应的宿主机ID      | 非负整数     | 0表示没找到                           |
+| az_id_0           | 28   | ip_0对应的可用区ID      | 非负整数     | 0表示没找到                           |
+| az_id_1           | 28   | ip_1对应的可用区ID      | 非负整数     | 0表示没找到                           |
 |                   |      |                         |              |                                       |
 | direction         | 32   | 统计量对应的流方向      | 字符串       | c2s: ip/ip_0为客户端，ip_1为服务端    |
 |                   |      |                         |              | s2c: ip/ip_0为服务端，ip_1为客户端    |
@@ -153,8 +155,9 @@ log_usage_edge_port      main              _id,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_ve
 | scope             | 43   | 源和目的构成的范围      | 正整数       | `废弃`                                |
 |                   |      |                         |              | 1: VPC内                              |
 |                   |      |                         |              | 2: VPC间                              |
-| vtap_id           | 44   | 采集器控制IP的ID        | 正整数       | 无特殊值                              |
+| vtap_id           | 44   | 采集器控制IP的ID        | 非负整数     | 无特殊值                              |
 | pod_node_id       | 45   | ip对应的容器节点ID      | 非负整数     | 0表示没找到                           |
+| az_id             | 46   | ip对应的可用区ID        | 非负整数     | 0表示没找到                           |
 |                   |      |                         |              |                                       |
 | CODE_INDEX        | 48-53| 不能使用                | N/A          | 用于droplet/roze/zero标识Code的Index  |
 |                   |      |                         |              |                                       |
@@ -223,10 +226,6 @@ log_usage_edge_port      main              _id,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_ve
 
 | 统计值                   | 说明                                                    |
 | ------------------------ | ------------------------------------------------------- |
-| sum_flow_count           | 累计连接数                                              |
-| sum_new_flow_count       | 累计新建连接数                                          |
-| sum_closed_flow_count    | 累计结束的连接数                                        |
-| sum_half_open_flow_count | 累计半开连接数，用于计算建立连接成功率                  |
 | sum_packet_tx            | 发送方向累计包数，`仅用于计算包重传率`                  |
 | sum_packet_rx            | 接收方向累计包数，`仅用于计算包重传率`                  |
 | sum_retrans_cnt_tx       | 发送方向累计重传次数                                    |
@@ -280,7 +279,7 @@ log_usage_edge_port      main              _id,ip_0,ip_1,ip_bin_0,ip_bin_1,ip_ve
 
 ### vtap_usage
 
-存储1s粒度的数据，统计量均以包的timestamp为准。
+存储1s、1m两种粒度的数据，统计量均以包的timestamp为准。
 
 #### cast_type
 

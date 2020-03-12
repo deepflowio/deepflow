@@ -17,7 +17,7 @@ import (
 	. "gitlab.x.lan/yunshan/droplet/app/common/flow"
 	. "gitlab.x.lan/yunshan/droplet/app/common/policy"
 
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("usage")
@@ -57,7 +57,7 @@ func (p *MeteringToUsageDocumentMapper) appendDoc(timestamp uint32, field *outpu
 	field.FillTag(code, doc.Tag.(*outputtype.Tag))
 	doc.Meter = meter
 	doc.Timestamp = timestamp
-	doc.ActionFlags = actionFlags
+	doc.Flags = app.DocumentFlag(actionFlags)
 }
 
 func (p *MeteringToUsageDocumentMapper) Process(rawFlow *inputtype.TaggedFlow, variedTag bool) []interface{} {
