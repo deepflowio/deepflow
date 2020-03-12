@@ -122,30 +122,17 @@ func TestPerfMeterFill(t *testing.T) {
 	f := &PerfMeter{}
 
 	names := []string{
-		"sum_flow_count", "ip", "sum_new_flow_count", "sum_closed_flow_count", "sum_half_open_flow_count",
+		"ip",
 		"sum_packet_tx", "sum_packet_rx", "sum_retrans_cnt_tx", "sum_retrans_cnt_rx",
 		"sum_rtt_syn", "sum_rtt_avg", "sum_art_avg", "sum_rtt_syn_flow", "sum_rtt_avg_flow", "sum_art_avg_flow",
 		"sum_zero_wnd_cnt_tx", "sum_zero_wnd_cnt_rx",
 		"max_rtt_syn", "max_rtt_avg", "max_art_avg",
 		"max_rtt_syn_client", "max_rtt_syn_server"}
-	var v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21 int64
-	v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21 =
-		123, 12345, 12345678, 1234567890123, 123456789012345, 12345678901234567, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14
-	values := []interface{}{v1, "ip", v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21}
+	var v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21 int64
+	v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21 =
+		123456789012345, 12345678901234567, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14
+	values := []interface{}{"ip", v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21}
 	f.Fill(GetColumnIDs(names), values)
-
-	if f.SumFlowCount != uint64(v1) {
-		t.Error("SumFlowCount 处理错误")
-	}
-	if f.SumNewFlowCount != uint64(v2) {
-		t.Error("SumNewFlowCount 处理错误")
-	}
-	if f.SumClosedFlowCount != uint64(v3) {
-		t.Error("SumClosedFlowCount 处理错误")
-	}
-	if f.SumHalfOpenFlowCount != uint64(v4) {
-		t.Error("SumHalfOpenFlowCount 处理错误")
-	}
 	if f.SumPacketTx != uint64(v5) {
 		t.Error("SumPacketTx 处理错误")
 	}

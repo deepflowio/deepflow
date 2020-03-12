@@ -112,13 +112,10 @@ func TestUsageMeterEqual(t *testing.T) {
 func TestPerfMeterEqual(t *testing.T) {
 	fromMeter := &PerfMeter{
 		PerfMeterSum: PerfMeterSum{
-			SumFlowCount:         1,
-			SumClosedFlowCount:   2,
-			SumHalfOpenFlowCount: 4,
-			SumPacketTx:          1234,
-			SumPacketRx:          4321,
-			SumRetransCntTx:      13,
-			SumRetransCntRx:      14,
+			SumPacketTx:     1234,
+			SumPacketRx:     4321,
+			SumRetransCntTx: 13,
+			SumRetransCntRx: 14,
 
 			SumRTTSyn:     4,
 			SumRTTAvg:     5,

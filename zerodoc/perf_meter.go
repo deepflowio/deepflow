@@ -69,15 +69,7 @@ func (m *PerfMeter) MarshalTo(b []byte) int {
 
 	// sum
 	sum := m.PerfMeterSum
-	offset += copy(b[offset:], "sum_flow_count=")
-	offset += copy(b[offset:], strconv.FormatUint(sum.SumFlowCount, 10))
-	offset += copy(b[offset:], "i,sum_new_flow_count=")
-	offset += copy(b[offset:], strconv.FormatUint(sum.SumNewFlowCount, 10))
-	offset += copy(b[offset:], "i,sum_closed_flow_count=")
-	offset += copy(b[offset:], strconv.FormatUint(sum.SumClosedFlowCount, 10))
-	offset += copy(b[offset:], "i,sum_half_open_flow_count=")
-	offset += copy(b[offset:], strconv.FormatUint(sum.SumHalfOpenFlowCount, 10))
-	offset += copy(b[offset:], "i,sum_packet_tx=")
+	offset += copy(b[offset:], "sum_packet_tx=")
 	offset += copy(b[offset:], strconv.FormatUint(sum.SumPacketTx, 10))
 	offset += copy(b[offset:], "i,sum_packet_rx=")
 	offset += copy(b[offset:], strconv.FormatUint(sum.SumPacketRx, 10))
@@ -128,14 +120,6 @@ func (m *PerfMeter) Fill(ids []uint8, values []interface{}) {
 			continue
 		}
 		switch id {
-		case _METER_SUM_FLOW_COUNT:
-			m.SumFlowCount = uint64(values[i].(int64))
-		case _METER_SUM_NEW_FLOW_COUNT:
-			m.SumNewFlowCount = uint64(values[i].(int64))
-		case _METER_SUM_CLOSED_FLOW_COUNT:
-			m.SumClosedFlowCount = uint64(values[i].(int64))
-		case _METER_SUM_HALF_OPEN_FLOW_COUNT:
-			m.SumHalfOpenFlowCount = uint64(values[i].(int64))
 		case _METER_SUM_PACKET_TX:
 			m.SumPacketTx = uint64(values[i].(int64))
 		case _METER_SUM_PACKET_RX:
@@ -179,14 +163,10 @@ func (m *PerfMeter) Fill(ids []uint8, values []interface{}) {
 }
 
 type PerfMeterSum struct {
-	SumFlowCount         uint64 `db:"sum_flow_count"`
-	SumNewFlowCount      uint64 `db:"sum_new_flow_count"`
-	SumClosedFlowCount   uint64 `db:"sum_closed_flow_count"`
-	SumHalfOpenFlowCount uint64 `db:"sum_half_open_flow_count"`
-	SumPacketTx          uint64 `db:"sum_packet_tx"`
-	SumPacketRx          uint64 `db:"sum_packet_rx"`
-	SumRetransCntTx      uint64 `db:"sum_retrans_cnt_tx"`
-	SumRetransCntRx      uint64 `db:"sum_retrans_cnt_rx"`
+	SumPacketTx     uint64 `db:"sum_packet_tx"`
+	SumPacketRx     uint64 `db:"sum_packet_rx"`
+	SumRetransCntTx uint64 `db:"sum_retrans_cnt_tx"`
+	SumRetransCntRx uint64 `db:"sum_retrans_cnt_rx"`
 
 	SumRTTSyn     time.Duration `db:"sum_rtt_syn"`
 	SumRTTAvg     time.Duration `db:"sum_rtt_avg"`
@@ -206,10 +186,6 @@ func (m *PerfMeterSum) Reverse() {
 }
 
 func (m *PerfMeterSum) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteVarintU64(m.SumFlowCount)
-	encoder.WriteVarintU64(m.SumNewFlowCount)
-	encoder.WriteVarintU64(m.SumClosedFlowCount)
-	encoder.WriteVarintU64(m.SumHalfOpenFlowCount)
 	encoder.WriteVarintU64(m.SumPacketTx)
 	encoder.WriteVarintU64(m.SumPacketRx)
 	encoder.WriteVarintU64(m.SumRetransCntTx)
@@ -227,10 +203,6 @@ func (m *PerfMeterSum) Encode(encoder *codec.SimpleEncoder) {
 }
 
 func (m *PerfMeterSum) Decode(decoder *codec.SimpleDecoder) {
-	m.SumFlowCount = decoder.ReadVarintU64()
-	m.SumNewFlowCount = decoder.ReadVarintU64()
-	m.SumClosedFlowCount = decoder.ReadVarintU64()
-	m.SumHalfOpenFlowCount = decoder.ReadVarintU64()
 	m.SumPacketTx = decoder.ReadVarintU64()
 	m.SumPacketRx = decoder.ReadVarintU64()
 	m.SumRetransCntTx = decoder.ReadVarintU64()
@@ -248,10 +220,6 @@ func (m *PerfMeterSum) Decode(decoder *codec.SimpleDecoder) {
 }
 
 func (m *PerfMeterSum) concurrentMerge(other *PerfMeterSum) {
-	m.SumFlowCount += other.SumFlowCount
-	m.SumNewFlowCount += other.SumNewFlowCount
-	m.SumClosedFlowCount += other.SumClosedFlowCount
-	m.SumHalfOpenFlowCount += other.SumHalfOpenFlowCount
 	m.SumPacketTx += other.SumPacketTx
 	m.SumPacketRx += other.SumPacketRx
 	m.SumRetransCntTx += other.SumRetransCntTx
@@ -269,10 +237,6 @@ func (m *PerfMeterSum) concurrentMerge(other *PerfMeterSum) {
 }
 
 func (m *PerfMeterSum) sequentialMerge(other *PerfMeterSum) { // other为后一个时间的统计量
-	m.SumFlowCount = m.SumClosedFlowCount + other.SumFlowCount
-	m.SumNewFlowCount += other.SumNewFlowCount
-	m.SumClosedFlowCount += other.SumClosedFlowCount
-	m.SumHalfOpenFlowCount += other.SumHalfOpenFlowCount
 	m.SumPacketTx += other.SumPacketTx
 	m.SumPacketRx += other.SumPacketRx
 	m.SumRetransCntTx += other.SumRetransCntTx
