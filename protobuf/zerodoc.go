@@ -207,14 +207,10 @@ func PBToPerfMeter(m *pb.PerfMeter, meter *PerfMeter) {
 
 func PerfMeterSumToPB(m *PerfMeterSum) *pb.PerfStats {
 	return &pb.PerfStats{
-		FlowCount:         proto.Uint64(m.SumFlowCount),
-		NewFlowCount:      proto.Uint64(m.SumNewFlowCount),
-		ClosedFlowCount:   proto.Uint64(m.SumClosedFlowCount),
-		HalfOpenFlowCount: proto.Uint64(m.SumHalfOpenFlowCount),
-		PacketTx:          proto.Uint64(m.SumPacketTx),
-		PacketRx:          proto.Uint64(m.SumPacketRx),
-		RetransCntTx:      proto.Uint64(m.SumRetransCntTx),
-		RetransCntRx:      proto.Uint64(m.SumRetransCntRx),
+		PacketTx:     proto.Uint64(m.SumPacketTx),
+		PacketRx:     proto.Uint64(m.SumPacketRx),
+		RetransCntTx: proto.Uint64(m.SumRetransCntTx),
+		RetransCntRx: proto.Uint64(m.SumRetransCntRx),
 
 		RttSyn:     proto.Uint64(uint64(m.SumRTTSyn)),
 		RttAvg:     proto.Uint64(uint64(m.SumRTTAvg)),
@@ -229,10 +225,6 @@ func PerfMeterSumToPB(m *PerfMeterSum) *pb.PerfStats {
 }
 
 func pbToPerfMeterSum(m *pb.PerfStats, meter *PerfMeterSum) {
-	meter.SumFlowCount = m.GetFlowCount()
-	meter.SumNewFlowCount = m.GetNewFlowCount()
-	meter.SumClosedFlowCount = m.GetClosedFlowCount()
-	meter.SumHalfOpenFlowCount = m.GetHalfOpenFlowCount()
 	meter.SumPacketTx = m.GetPacketTx()
 	meter.SumPacketRx = m.GetPacketRx()
 	meter.SumRetransCntTx = m.GetRetransCntTx()
