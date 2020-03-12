@@ -43,6 +43,7 @@ const (
 	RegionIDPath
 	PodNodeIDPath
 	HostIDPath
+	AZIDPath
 )
 
 const (
@@ -60,6 +61,7 @@ const (
 	_
 	VTAPID
 	PodNodeID
+	AZID
 )
 
 const (
@@ -94,12 +96,12 @@ func (c Code) RemoveIndex() Code {
 // 从不同EndPoint获取的网包字段组成Field，是否可能重复。
 // 注意，不能判断从同样的EndPoint获取的网包字段组成Field可能重复。
 func (c Code) PossibleDuplicate() bool {
-	return c&(CodeIndices|GroupID|L3EpcID|Host|HostID|RegionID|PodNodeID|GroupIDPath|L3EpcIDPath|HostPath|HostIDPath|ACLGID|VLANID|Protocol|TCPFlags|VTAPID|TAPType|SubnetID|SubnetIDPath|RegionIDPath|PodNodeIDPath|ACLDirection|Country|Region|ISPCode) == c
+	return c&(CodeIndices|GroupID|L3EpcID|Host|HostID|RegionID|PodNodeID|AZID|GroupIDPath|L3EpcIDPath|HostPath|HostIDPath|ACLGID|VLANID|Protocol|TCPFlags|VTAPID|TAPType|SubnetID|SubnetIDPath|RegionIDPath|PodNodeIDPath|AZIDPath|ACLDirection|Country|Region|ISPCode) == c
 }
 
 // 是否全部取自网包的对称字段（非源、目的字段）
 func (c Code) IsSymmetric() bool {
-	return c&(CodeIndices|ACLGID|VLANID|Protocol|TCPFlags|VTAPID|TAPType|ACLDirection) == c
+	return c&(CodeIndices|ACLGID|VLANID|Protocol|TCPFlags|VTAPID|TAPType|ACLDirection|AZID) == c
 }
 
 type DeviceType uint8
@@ -185,6 +187,7 @@ type Field struct {
 	Host         uint32 // (+1B=8B)
 	HostID       uint16
 	PodNodeID    uint16
+	AZID         uint16
 
 	IP61          net.IP // FIXME: 合并IP61和IP1
 	IP1           uint32
@@ -195,6 +198,7 @@ type Field struct {
 	L3DeviceID1   uint16
 	L3DeviceType1 DeviceType // (+1B=8B)
 	PodNodeID1    uint16
+	AZID1         uint16
 
 	RegionID  uint16
 	RegionID1 uint16
@@ -274,6 +278,16 @@ func (t *Tag) MarshalTo(b []byte) int {
 	if t.Code&ACLGID != 0 {
 		offset += copy(b[offset:], ",acl_gid=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ACLGID), 10))
+	}
+	if t.Code&AZID != 0 {
+		offset += copy(b[offset:], ",az_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.AZID), 10))
+	}
+	if t.Code&AZIDPath != 0 {
+		offset += copy(b[offset:], ",az_id_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.AZID), 10))
+		offset += copy(b[offset:], ",az_id_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.AZID1), 10))
 	}
 	if t.Code&CastType != 0 {
 		switch t.CastType {
@@ -506,6 +520,9 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&PodNodeID != 0 {
 		t.PodNodeID = decoder.ReadU16()
 	}
+	if t.Code&AZID != 0 {
+		t.AZID = decoder.ReadU16()
+	}
 
 	if t.Code&IPPath != 0 {
 		t.IsIPv6 = decoder.ReadU8()
@@ -556,6 +573,10 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&PodNodeIDPath != 0 {
 		t.PodNodeID = decoder.ReadU16()
 		t.PodNodeID1 = decoder.ReadU16()
+	}
+	if t.Code&AZIDPath != 0 {
+		t.AZID = decoder.ReadU16()
+		t.AZID1 = decoder.ReadU16()
 	}
 
 	if t.Code&Direction != 0 {
@@ -652,6 +673,9 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 	if code&PodNodeID != 0 {
 		encoder.WriteU16(t.PodNodeID)
 	}
+	if code&AZID != 0 {
+		encoder.WriteU16(t.AZID)
+	}
 
 	if code&IPPath != 0 {
 		encoder.WriteU8(t.IsIPv6)
@@ -704,6 +728,10 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 	if code&PodNodeIDPath != 0 {
 		encoder.WriteU16(t.PodNodeID)
 		encoder.WriteU16(t.PodNodeID1)
+	}
+	if code&AZIDPath != 0 {
+		encoder.WriteU16(t.AZID)
+		encoder.WriteU16(t.AZID1)
 	}
 
 	if code&Direction != 0 {
@@ -1159,6 +1187,18 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		t.Code |= PodNodeIDPath
 		i, err = parseUint(value, 10, 16)
 		field.PodNodeID1 = uint16(i)
+	case _TAG_AZ_ID, _TAG_AZ_ID_0:
+		if id == _TAG_AZ_ID {
+			t.Code |= AZID
+		} else {
+			t.Code |= AZIDPath
+		}
+		i, err = parseUint(value, 10, 16)
+		field.AZID = uint16(i)
+	case _TAG_AZ_ID_1:
+		t.Code |= AZIDPath
+		i, err = parseUint(value, 10, 16)
+		field.AZID1 = uint16(i)
 	case _TAG_COUNTRY:
 		t.Code |= Country
 		field.Country = geo.EncodeCountry(value)
