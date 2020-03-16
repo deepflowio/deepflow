@@ -19,8 +19,6 @@ const (
 	_TAG_L3_DEVICE_ID_0
 	_TAG_L3_DEVICE_TYPE
 	_TAG_L3_DEVICE_TYPE_0
-	_TAG_HOST
-	_TAG_HOST_0
 	_TAG_HOST_ID
 	_TAG_HOST_ID_0
 	_TAG_POD_NODE_ID
@@ -33,7 +31,6 @@ const (
 	_TAG_L3_EPC_ID_1
 	_TAG_L3_DEVICE_ID_1
 	_TAG_L3_DEVICE_TYPE_1
-	_TAG_HOST_1
 	_TAG_HOST_ID_1
 	_TAG_SUBNET_ID_0
 	_TAG_SUBNET_ID_1
@@ -122,8 +119,6 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"pod_node_id_0":    _TAG_POD_NODE_ID_0,
 	"az_id":            _TAG_AZ_ID,
 	"az_id_0":          _TAG_AZ_ID_0,
-	"host":             _TAG_HOST,
-	"host_0":           _TAG_HOST_0,
 	"host_id":          _TAG_HOST_ID,
 	"host_id_0":        _TAG_HOST_ID_0,
 	"region_0":         _TAG_REGION_0,
@@ -132,7 +127,6 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"l3_epc_id_1":      _TAG_L3_EPC_ID_1,
 	"l3_device_id_1":   _TAG_L3_DEVICE_ID_1,
 	"l3_device_type_1": _TAG_L3_DEVICE_TYPE_1,
-	"host_1":           _TAG_HOST_1,
 	"host_id_1":        _TAG_HOST_ID_1,
 	"subnet_id_0":      _TAG_SUBNET_ID_0,
 	"subnet_id_1":      _TAG_SUBNET_ID_1,
