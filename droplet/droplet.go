@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/op/go-logging"
-	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/debug"
 	"gitlab.x.lan/yunshan/droplet-libs/logger"
@@ -23,7 +22,6 @@ import (
 	"gitlab.x.lan/yunshan/droplet/config"
 	"gitlab.x.lan/yunshan/droplet/flowgenerator"
 	"gitlab.x.lan/yunshan/droplet/labeler"
-	"gitlab.x.lan/yunshan/droplet/mapreduce"
 	"gitlab.x.lan/yunshan/droplet/pcap"
 	"gitlab.x.lan/yunshan/droplet/profiler"
 	"gitlab.x.lan/yunshan/droplet/queue"
@@ -123,9 +121,6 @@ func Start(configPath string) (closers []io.Closer) {
 	labelerManager.Start()
 
 	// L3 - flow generator & metering marshaller & pcap
-	docsInBuffer := int(cfg.Queue.DocQueueSize)
-	windowSize := int(cfg.MapReduce.WindowSize)
-	windowMoveMargin := int(cfg.MapReduce.WindowMoveMargin)
 	flowFlushInterval := time.Second * 5
 	releaseTaggedFlow := func(x interface{}) {
 		datatype.ReleaseTaggedFlow(x.(*datatype.TaggedFlow))
@@ -182,28 +177,14 @@ func Start(configPath string) (closers []io.Closer) {
 	).Start()
 	closers = append(closers, pcapClosers...)
 
-	// L4 - metering app
-	meteringDocMarshallerQueue := manager.NewQueues(
-		"3-metering-doc-to-marshaller",
-		cfg.Queue.MeteringDocMarshallerQueueSize, cfg.Queue.DocQueueCount,
-		cfg.Queue.PacketQueueCount,
-		libqueue.OptionRelease(func(p interface{}) { app.ReleaseDocument(p.(*app.Document)) }),
-	)
-	mapreduce.NewMeteringMapProcess(
-		meteringDocMarshallerQueue.Writers(), meteringAppQueues.Readers(),
-		docsInBuffer/int(cfg.Queue.PacketQueueCount), windowSize, windowMoveMargin).Start()
-
 	// L4 - flow duplicator: flow app & flow marshaller
-	flowAppQueues := manager.NewQueues(
-		"3-tagged-flow-to-flow-app", cfg.Queue.FlowAppQueueSize, cfg.Queue.FlowQueueCount,
-		cfg.Queue.PacketQueueCount, libqueue.OptionFlushIndicator(flowFlushInterval), libqueue.OptionRelease(releaseTaggedFlow))
 	flowThrottleQueues := manager.NewQueues(
 		"3-tagged-flow-to-flow-throttle", cfg.Queue.FlowThrottleQueueSize, cfg.Queue.FlowQueueCount,
 		cfg.Queue.PacketQueueCount, libqueue.OptionRelease(releaseTaggedFlow))
 	// 特殊处理：Duplicator的数量特意设置为PacketQueueCount，使得FlowGenerator所在环境均为单生产单消费
 	for i := 0; i < cfg.Queue.PacketQueueCount; i++ {
 		flowDuplicator := queue.NewDuplicator(i, 1024, flowDuplicatorQueues.Readers()[i], datatype.PseudoCloneTaggedFlowHelper)
-		flowDuplicator.AddMultiQueue(flowAppQueues).AddMultiQueue(flowThrottleQueues).Start()
+		flowDuplicator.AddMultiQueue(flowThrottleQueues).Start()
 	}
 
 	// L5 - flow sender
@@ -212,24 +193,6 @@ func Start(configPath string) (closers []io.Closer) {
 	sender.NewFlowSender(
 		flowThrottleQueues.Readers(), flowSenderQueue, flowSenderQueue,
 		cfg.Stream, cfg.StreamPort, cfg.FlowThrottle, cfg.Queue.FlowSenderQueueSize).Start()
-
-	// L5 - flow app
-	flowDocMarshallerQueue := manager.NewQueues(
-		"4-flow-doc-to-marshaller",
-		cfg.Queue.FlowDocMarshallerQueueSize, cfg.Queue.DocQueueCount,
-		cfg.Queue.FlowQueueCount,
-		libqueue.OptionRelease(func(p interface{}) { app.ReleaseDocument(p.(*app.Document)) }),
-	)
-	mapreduce.NewFlowMapProcess(
-		flowDocMarshallerQueue.Writers(), flowAppQueues.Readers(),
-		docsInBuffer/int(cfg.Queue.FlowQueueCount), windowSize, windowMoveMargin).Start()
-
-	// L6 - flow/metering doc sender
-	builder := sender.NewZeroDocumentSenderBuilder()
-	builder.AddQueue(meteringDocMarshallerQueue.Readers())
-	builder.AddQueue(flowDocMarshallerQueue.Readers())
-	builder.AddListenPorts(cfg.ZeroPort)
-	builder.Build().Start(cfg.Queue.DocSenderQueueSize)
 
 	// 其他所有组件启动完成以后运行TridentAdapter，尽量避免启动过程中队列丢包
 	tridentAdapter.Start()

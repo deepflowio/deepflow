@@ -1,6 +1,0 @@
-{
-    "package": "logusage",
-    "codes": [
-        "direction, l3_epc_id_path, ip_path, protocol, server_port, tap_type"
-    ]
-}
