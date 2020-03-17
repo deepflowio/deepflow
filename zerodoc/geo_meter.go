@@ -1,7 +1,6 @@
 package zerodoc
 
 import (
-	"strconv"
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
@@ -9,17 +8,17 @@ import (
 )
 
 type GeoMeter struct {
-	SumPacketTx         uint64        `db:"sum_packet_tx"`
-	SumPacketRx         uint64        `db:"sum_packet_rx"`
-	SumBitTx            uint64        `db:"sum_bit_tx"`
-	SumBitRx            uint64        `db:"sum_bit_rx"`
-	SumRTTSynClient     time.Duration `db:"sum_rtt_syn_client"`
-	SumRTTSynClientFlow uint64        `db:"sum_rtt_syn_client_flow"`
+	Traffic
+	TCPLatency
+	TCPPacketAnomaly
+	TCPFlowAnomaly
 }
 
 func (m *GeoMeter) Reverse() {
-	m.SumPacketTx, m.SumPacketRx = m.SumPacketRx, m.SumPacketTx
-	m.SumBitTx, m.SumBitRx = m.SumBitRx, m.SumBitTx
+	m.Traffic.Reverse()
+	m.TCPLatency.Reverse()
+	m.TCPPacketAnomaly.Reverse()
+	m.TCPFlowAnomaly.Reverse()
 }
 
 func (m *GeoMeter) ID() uint8 {
@@ -27,54 +26,46 @@ func (m *GeoMeter) ID() uint8 {
 }
 
 func (m *GeoMeter) Name() string {
-	return MeterDFNames[GEO_ID]
+	return MeterVTAPNames[m.ID()]
 }
 
 func (m *GeoMeter) VTAPName() string {
-	return MeterVTAPNames[GEO_ID]
+	return MeterVTAPNames[m.ID()]
 }
 
 func (m *GeoMeter) SortKey() uint64 {
-	return m.SumPacketTx + m.SumPacketRx
+	return m.PacketTx + m.PacketRx
 }
 
 func (m *GeoMeter) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteVarintU64(m.SumPacketTx)
-	encoder.WriteVarintU64(m.SumPacketRx)
-	encoder.WriteVarintU64(m.SumBitTx)
-	encoder.WriteVarintU64(m.SumBitRx)
-	encoder.WriteVarintU64(uint64(m.SumRTTSynClient))
-	encoder.WriteVarintU64(m.SumRTTSynClientFlow)
+	m.Traffic.Encode(encoder)
+	m.TCPLatency.Encode(encoder)
+	m.TCPPacketAnomaly.Encode(encoder)
+	m.TCPFlowAnomaly.Encode(encoder)
 }
 
 func (m *GeoMeter) Decode(decoder *codec.SimpleDecoder) {
-	m.SumPacketTx = decoder.ReadVarintU64()
-	m.SumPacketRx = decoder.ReadVarintU64()
-	m.SumBitTx = decoder.ReadVarintU64()
-	m.SumBitRx = decoder.ReadVarintU64()
-	m.SumRTTSynClient = time.Duration(decoder.ReadVarintU64())
-	m.SumRTTSynClientFlow = decoder.ReadVarintU64()
+	m.Traffic.Decode(decoder)
+	m.TCPLatency.Decode(decoder)
+	m.TCPPacketAnomaly.Decode(decoder)
+	m.TCPFlowAnomaly.Decode(decoder)
 }
 
 func (m *GeoMeter) ConcurrentMerge(other app.Meter) {
-	if pgm, ok := other.(*GeoMeter); ok {
-		m.SumPacketTx += pgm.SumPacketTx
-		m.SumPacketRx += pgm.SumPacketRx
-		m.SumBitTx += pgm.SumBitTx
-		m.SumBitRx += pgm.SumBitRx
-		m.SumRTTSynClient += pgm.SumRTTSynClient
-		m.SumRTTSynClientFlow += pgm.SumRTTSynClientFlow
+	if pm, ok := other.(*GeoMeter); ok {
+		m.Traffic.ConcurrentMerge(&pm.Traffic)
+		m.TCPLatency.ConcurrentMerge(&pm.TCPLatency)
+		m.TCPPacketAnomaly.ConcurrentMerge(&pm.TCPPacketAnomaly)
+		m.TCPFlowAnomaly.ConcurrentMerge(&pm.TCPFlowAnomaly)
 	}
 }
 
 func (m *GeoMeter) SequentialMerge(other app.Meter) {
-	if pgm, ok := other.(*GeoMeter); ok {
-		m.SumPacketTx += pgm.SumPacketTx
-		m.SumPacketRx += pgm.SumPacketRx
-		m.SumBitTx += pgm.SumBitTx
-		m.SumBitRx += pgm.SumBitRx
-		m.SumRTTSynClient += pgm.SumRTTSynClient
-		m.SumRTTSynClientFlow += pgm.SumRTTSynClientFlow
+	if pm, ok := other.(*GeoMeter); ok {
+		m.Traffic.SequentialMerge(&pm.Traffic)
+		m.TCPLatency.SequentialMerge(&pm.TCPLatency)
+		m.TCPPacketAnomaly.SequentialMerge(&pm.TCPPacketAnomaly)
+		m.TCPFlowAnomaly.SequentialMerge(&pm.TCPFlowAnomaly)
 	}
 }
 
@@ -87,20 +78,22 @@ func (m *GeoMeter) ToKVString() string {
 func (m *GeoMeter) MarshalTo(b []byte) int {
 	offset := 0
 
-	offset += copy(b[offset:], "sum_packet_tx=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumPacketTx, 10))
-	offset += copy(b[offset:], "i,sum_packet_rx=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumPacketRx, 10))
-	offset += copy(b[offset:], "i,sum_bit_tx=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumBitTx, 10))
-	offset += copy(b[offset:], "i,sum_bit_rx=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumBitRx, 10))
-	offset += copy(b[offset:], "i,sum_rtt_syn_client=")
-	offset += copy(b[offset:], strconv.FormatInt(int64(m.SumRTTSynClient/time.Microsecond), 10))
-	offset += copy(b[offset:], "i,sum_rtt_syn_client_flow=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumRTTSynClientFlow, 10))
-	b[offset] = 'i'
-	offset++
+	offset += m.Traffic.MarshalTo(b[offset:])
+	if offset > 0 {
+		b[offset] = ','
+		offset++
+	}
+	offset += m.TCPLatency.MarshalTo(b[offset:])
+	if offset > 0 {
+		b[offset] = ','
+		offset++
+	}
+	offset += m.TCPPacketAnomaly.MarshalTo(b[offset:])
+	if offset > 0 {
+		b[offset] = ','
+		offset++
+	}
+	offset += m.TCPFlowAnomaly.MarshalTo(b[offset:])
 
 	return offset
 }
@@ -111,18 +104,66 @@ func (m *GeoMeter) Fill(ids []uint8, values []interface{}) {
 			continue
 		}
 		switch id {
-		case _METER_SUM_PACKET_TX:
-			m.SumPacketTx = uint64(values[i].(int64))
-		case _METER_SUM_PACKET_RX:
-			m.SumPacketRx = uint64(values[i].(int64))
-		case _METER_SUM_BIT_TX:
-			m.SumBitTx = uint64(values[i].(int64))
-		case _METER_SUM_BIT_RX:
-			m.SumBitRx = uint64(values[i].(int64))
-		case _METER_SUM_RTT_SYN_CLIENT:
-			m.SumRTTSynClient = time.Duration(values[i].(int64)) * time.Microsecond
-		case _METER_SUM_RTT_SYN_CLIENT_FLOW:
-			m.SumRTTSynClientFlow = uint64(values[i].(int64))
+		case _METER_PACKET_TX:
+			m.PacketTx = uint64(values[i].(int64))
+		case _METER_PACKET_RX:
+			m.PacketRx = uint64(values[i].(int64))
+		case _METER_BYTE_TX:
+			m.ByteTx = uint64(values[i].(int64))
+		case _METER_BYTE_RX:
+			m.ByteRx = uint64(values[i].(int64))
+		case _METER_FLOW:
+			m.Flow = uint64(values[i].(int64))
+		case _METER_NEW_FLOW:
+			m.NewFlow = uint64(values[i].(int64))
+		case _METER_CLOSED_FLOW:
+			m.ClosedFlow = uint64(values[i].(int64))
+
+		case _METER_RTT_SUM:
+			m.RTTSum = time.Duration(values[i].(int64))
+		case _METER_RTT_CLIENT_SUM:
+			m.RTTClientSum = time.Duration(values[i].(int64))
+		case _METER_RTT_SERVER_SUM:
+			m.RTTServerSum = time.Duration(values[i].(int64))
+		case _METER_SRT_SUM:
+			m.SRTSum = time.Duration(values[i].(int64))
+		case _METER_ART_SUM:
+			m.ARTSum = time.Duration(values[i].(int64))
+		case _METER_RTT_COUNT:
+			m.RTTCount = uint64(values[i].(int64))
+		case _METER_RTT_CLIENT_COUNT:
+			m.RTTClientCount = uint64(values[i].(int64))
+		case _METER_RTT_SERVER_COUNT:
+			m.RTTServerCount = uint64(values[i].(int64))
+		case _METER_SRT_COUNT:
+			m.SRTCount = uint64(values[i].(int64))
+		case _METER_ART_COUNT:
+			m.ARTCount = uint64(values[i].(int64))
+
+		case _METER_RETRANS_TX:
+			m.RetransTx = uint64(values[i].(int64))
+		case _METER_RETRANS_RX:
+			m.RetransRx = uint64(values[i].(int64))
+		case _METER_ZERO_WIN_TX:
+			m.ZeroWinTx = uint64(values[i].(int64))
+		case _METER_ZERO_WIN_RX:
+			m.ZeroWinRx = uint64(values[i].(int64))
+
+		case _METER_CLIENT_RST_FLOW:
+			m.ClientRstFlow = uint64(values[i].(int64))
+		case _METER_SERVER_RST_FLOW:
+			m.ServerRstFlow = uint64(values[i].(int64))
+		case _METER_CLIENT_HALF_OPEN_FLOW:
+			m.ClientHalfOpenFlow = uint64(values[i].(int64))
+		case _METER_SERVER_HALF_OPEN_FLOW:
+			m.ServerHalfOpenFlow = uint64(values[i].(int64))
+		case _METER_CLIENT_HALF_CLOSE_FLOW:
+			m.ClientHalfCloseFlow = uint64(values[i].(int64))
+		case _METER_SERVER_HALF_CLOSE_FLOW:
+			m.ServerHalfCloseFlow = uint64(values[i].(int64))
+		case _METER_TIMEOUT_TCP_FLOW:
+			m.TimeoutTCPFlow = uint64(values[i].(int64))
+
 		default:
 			log.Warningf("unsupport meter id=%d", id)
 		}

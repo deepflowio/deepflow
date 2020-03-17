@@ -48,50 +48,45 @@ const (
 	_TAG_ACL_DIRECTION
 	_TAG_CAST_TYPE
 	_TAG_TCP_FLAGS
+	_TAG_TUNNEL_IP_ID
 	_TAG_COUNTRY
 	_TAG_REGION
+	_TAG_PROVINCE
 	_TAG_ISP
 	_TAG_MAX_ID_
 )
 const (
 	_METER_INVALID_ uint8 = 128 + iota
-	_METER_BYTES
-	_METER_MAX_ART_AVG
-	_METER_MAX_RTT_AVG
-	_METER_MAX_RTT_SYN
-	_METER_MAX_RTT_SYN_CLIENT
-	_METER_MAX_RTT_SYN_SERVER
-	_METER_PACKETS
-	_METER_RX_BYTES
-	_METER_RX_PACKETS
-	_METER_SUM_ART_AVG
-	_METER_SUM_ART_AVG_FLOW
-	_METER_SUM_BIT_RX
-	_METER_SUM_BIT_TX
-	_METER_SUM_CLOSED_FLOW_COUNT
-	_METER_SUM_COUNT_T_C_HALF_CLOSE
-	_METER_SUM_COUNT_T_C_HALF_OPEN
-	_METER_SUM_COUNT_T_C_RST
-	_METER_SUM_COUNT_T_S_HALF_CLOSE
-	_METER_SUM_COUNT_T_S_HALF_OPEN
-	_METER_SUM_COUNT_T_S_RST
-	_METER_SUM_FLOW_COUNT
-	_METER_SUM_HALF_OPEN_FLOW_COUNT
-	_METER_SUM_NEW_FLOW_COUNT
-	_METER_SUM_PACKET_RX
-	_METER_SUM_PACKET_TX
-	_METER_SUM_RETRANS_CNT_RX
-	_METER_SUM_RETRANS_CNT_TX
-	_METER_SUM_RTT_AVG
-	_METER_SUM_RTT_AVG_FLOW
-	_METER_SUM_RTT_SYN
-	_METER_SUM_RTT_SYN_CLIENT
-	_METER_SUM_RTT_SYN_CLIENT_FLOW
-	_METER_SUM_RTT_SYN_FLOW
-	_METER_SUM_ZERO_WND_CNT_RX
-	_METER_SUM_ZERO_WND_CNT_TX
 	_METER_TX_BYTES
 	_METER_TX_PACKETS
+	_METER_PACKET_TX
+	_METER_PACKET_RX
+	_METER_BYTE_TX
+	_METER_BYTE_RX
+	_METER_FLOW
+	_METER_NEW_FLOW
+	_METER_CLOSED_FLOW
+	_METER_CLIENT_RST_FLOW
+	_METER_SERVER_RST_FLOW
+	_METER_CLIENT_HALF_OPEN_FLOW
+	_METER_SERVER_HALF_OPEN_FLOW
+	_METER_CLIENT_HALF_CLOSE_FLOW
+	_METER_SERVER_HALF_CLOSE_FLOW
+	_METER_TIMEOUT_TCP_FLOW
+	_METER_RTT_SUM
+	_METER_RTT_CLIENT_SUM
+	_METER_RTT_SERVER_SUM
+	_METER_SRT_SUM
+	_METER_ART_SUM
+	_METER_RTT_COUNT
+	_METER_RTT_CLIENT_COUNT
+	_METER_RTT_SERVER_COUNT
+	_METER_SRT_COUNT
+	_METER_ART_COUNT
+	_METER_RETRANS_TX
+	_METER_RETRANS_RX
+	_METER_ZERO_WIN_TX
+	_METER_ZERO_WIN_RX
 	_METER_MAX_ID_
 )
 
@@ -121,6 +116,7 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"az_id_0":          _TAG_AZ_ID_0,
 	"host_id":          _TAG_HOST_ID,
 	"host_id_0":        _TAG_HOST_ID_0,
+	"region":           _TAG_REGION,
 	"region_0":         _TAG_REGION_0,
 	"ip_1":             _TAG_IP_1,
 	"group_id_1":       _TAG_GROUP_ID_1,
@@ -145,46 +141,37 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"cast_type":        _TAG_CAST_TYPE,
 	"tcp_flags":        _TAG_TCP_FLAGS,
 	"country":          _TAG_COUNTRY,
-	"region":           _TAG_REGION,
+	"province":         _TAG_PROVINCE,
 	"isp":              _TAG_ISP,
 
-	"bytes":                    _METER_BYTES,
-	"max_art_avg":              _METER_MAX_ART_AVG,
-	"max_rtt_avg":              _METER_MAX_RTT_AVG,
-	"max_rtt_syn":              _METER_MAX_RTT_SYN,
-	"max_rtt_syn_client":       _METER_MAX_RTT_SYN_CLIENT,
-	"max_rtt_syn_server":       _METER_MAX_RTT_SYN_SERVER,
-	"packets":                  _METER_PACKETS,
-	"rx_bytes":                 _METER_RX_BYTES,
-	"rx_packets":               _METER_RX_PACKETS,
-	"sum_art_avg":              _METER_SUM_ART_AVG,
-	"sum_art_avg_flow":         _METER_SUM_ART_AVG_FLOW,
-	"sum_bit_rx":               _METER_SUM_BIT_RX,
-	"sum_bit_tx":               _METER_SUM_BIT_TX,
-	"sum_closed_flow_count":    _METER_SUM_CLOSED_FLOW_COUNT,
-	"sum_count_t_c_half_close": _METER_SUM_COUNT_T_C_HALF_CLOSE,
-	"sum_count_t_c_half_open":  _METER_SUM_COUNT_T_C_HALF_OPEN,
-	"sum_count_t_c_rst":        _METER_SUM_COUNT_T_C_RST,
-	"sum_count_t_s_half_close": _METER_SUM_COUNT_T_S_HALF_CLOSE,
-	"sum_count_t_s_half_open":  _METER_SUM_COUNT_T_S_HALF_OPEN,
-	"sum_count_t_s_rst":        _METER_SUM_COUNT_T_S_RST,
-	"sum_flow_count":           _METER_SUM_FLOW_COUNT,
-	"sum_half_open_flow_count": _METER_SUM_HALF_OPEN_FLOW_COUNT,
-	"sum_new_flow_count":       _METER_SUM_NEW_FLOW_COUNT,
-	"sum_packet_rx":            _METER_SUM_PACKET_RX,
-	"sum_packet_tx":            _METER_SUM_PACKET_TX,
-	"sum_retrans_cnt_rx":       _METER_SUM_RETRANS_CNT_RX,
-	"sum_retrans_cnt_tx":       _METER_SUM_RETRANS_CNT_TX,
-	"sum_rtt_avg":              _METER_SUM_RTT_AVG,
-	"sum_rtt_avg_flow":         _METER_SUM_RTT_AVG_FLOW,
-	"sum_rtt_syn":              _METER_SUM_RTT_SYN,
-	"sum_rtt_syn_client":       _METER_SUM_RTT_SYN_CLIENT,
-	"sum_rtt_syn_client_flow":  _METER_SUM_RTT_SYN_CLIENT_FLOW,
-	"sum_rtt_syn_flow":         _METER_SUM_RTT_SYN_FLOW,
-	"sum_zero_wnd_cnt_rx":      _METER_SUM_ZERO_WND_CNT_RX,
-	"sum_zero_wnd_cnt_tx":      _METER_SUM_ZERO_WND_CNT_TX,
-	"tx_bytes":                 _METER_TX_BYTES,
-	"tx_packets":               _METER_TX_PACKETS,
+	"packet_tx":              _METER_PACKET_TX,
+	"packet_rx":              _METER_PACKET_RX,
+	"byte_tx":                _METER_BYTE_TX,
+	"byte_rx":                _METER_BYTE_RX,
+	"flow":                   _METER_FLOW,
+	"new_flow":               _METER_NEW_FLOW,
+	"closed_flow":            _METER_CLOSED_FLOW,
+	"client_rst_flow":        _METER_CLIENT_RST_FLOW,
+	"server_rst_flow":        _METER_SERVER_RST_FLOW,
+	"client_half_open_flow":  _METER_CLIENT_HALF_OPEN_FLOW,
+	"server_half_open_flow":  _METER_SERVER_HALF_OPEN_FLOW,
+	"client_half_close_flow": _METER_CLIENT_HALF_CLOSE_FLOW,
+	"server_half_close_flow": _METER_SERVER_HALF_CLOSE_FLOW,
+	"timeout_tcp_flow":       _METER_TIMEOUT_TCP_FLOW,
+	"rtt_sum":                _METER_RTT_SUM,
+	"rtt_client_sum":         _METER_RTT_CLIENT_SUM,
+	"rtt_server_sum":         _METER_RTT_SERVER_SUM,
+	"srt_sum":                _METER_SRT_SUM,
+	"art_sum":                _METER_ART_SUM,
+	"rtt_count":              _METER_RTT_COUNT,
+	"rtt_client_count":       _METER_RTT_CLIENT_COUNT,
+	"rtt_server_count":       _METER_RTT_SERVER_COUNT,
+	"srt_count":              _METER_SRT_COUNT,
+	"art_count":              _METER_ART_COUNT,
+	"retrans_tx":             _METER_RETRANS_TX,
+	"retrans_rx":             _METER_RETRANS_RX,
+	"zero_win_tx":            _METER_ZERO_WIN_TX,
+	"zero_win_rx":            _METER_ZERO_WIN_RX,
 }
 
 func GetColumnIDs(columnNames []string) []uint8 {
