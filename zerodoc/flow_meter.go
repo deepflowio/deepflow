@@ -1,27 +1,134 @@
 package zerodoc
 
 import (
-	"strconv"
+	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
 )
 
+type FlowSecondMeter struct {
+	Traffic
+	TCPFlowAnomaly
+}
+
+func (m *FlowSecondMeter) Reverse() {
+	m.Traffic.Reverse()
+	m.TCPFlowAnomaly.Reverse()
+}
+
+func (m *FlowSecondMeter) ID() uint8 {
+	return FLOW_SECOND_ID
+}
+
+func (m *FlowSecondMeter) Name() string {
+	return MeterVTAPNames[m.ID()]
+}
+
+func (m *FlowSecondMeter) VTAPName() string {
+	return MeterVTAPNames[m.ID()]
+}
+
+func (m *FlowSecondMeter) SortKey() uint64 {
+	return m.PacketTx + m.PacketRx
+}
+
+func (m *FlowSecondMeter) Encode(encoder *codec.SimpleEncoder) {
+	m.Traffic.Encode(encoder)
+	m.TCPFlowAnomaly.Encode(encoder)
+}
+
+func (m *FlowSecondMeter) Decode(decoder *codec.SimpleDecoder) {
+	m.Traffic.Decode(decoder)
+	m.TCPFlowAnomaly.Decode(decoder)
+}
+
+func (m *FlowSecondMeter) ConcurrentMerge(other app.Meter) {
+	if pm, ok := other.(*FlowSecondMeter); ok {
+		m.Traffic.ConcurrentMerge(&pm.Traffic)
+		m.TCPFlowAnomaly.ConcurrentMerge(&pm.TCPFlowAnomaly)
+	}
+}
+
+func (m *FlowSecondMeter) SequentialMerge(other app.Meter) {
+	if pm, ok := other.(*FlowSecondMeter); ok {
+		m.Traffic.SequentialMerge(&pm.Traffic)
+		m.TCPFlowAnomaly.SequentialMerge(&pm.TCPFlowAnomaly)
+	}
+}
+
+func (m *FlowSecondMeter) ToKVString() string {
+	buffer := make([]byte, MAX_STRING_LENGTH)
+	size := m.MarshalTo(buffer)
+	return string(buffer[:size])
+}
+
+func (m *FlowSecondMeter) MarshalTo(b []byte) int {
+	offset := 0
+
+	offset += m.Traffic.MarshalTo(b[offset:])
+	if offset > 0 {
+		b[offset] = ','
+		offset++
+	}
+	offset += m.TCPFlowAnomaly.MarshalTo(b[offset:])
+
+	return offset
+}
+
+func (m *FlowSecondMeter) Fill(ids []uint8, values []interface{}) {
+	for i, id := range ids {
+		if id <= _METER_INVALID_ || id >= _METER_MAX_ID_ || values[i] == nil {
+			continue
+		}
+		switch id {
+		case _METER_PACKET_TX:
+			m.PacketTx = uint64(values[i].(int64))
+		case _METER_PACKET_RX:
+			m.PacketRx = uint64(values[i].(int64))
+		case _METER_BYTE_TX:
+			m.ByteTx = uint64(values[i].(int64))
+		case _METER_BYTE_RX:
+			m.ByteRx = uint64(values[i].(int64))
+		case _METER_FLOW:
+			m.Flow = uint64(values[i].(int64))
+		case _METER_NEW_FLOW:
+			m.NewFlow = uint64(values[i].(int64))
+		case _METER_CLOSED_FLOW:
+			m.ClosedFlow = uint64(values[i].(int64))
+
+		case _METER_CLIENT_RST_FLOW:
+			m.ClientRstFlow = uint64(values[i].(int64))
+		case _METER_SERVER_RST_FLOW:
+			m.ServerRstFlow = uint64(values[i].(int64))
+		case _METER_CLIENT_HALF_OPEN_FLOW:
+			m.ClientHalfOpenFlow = uint64(values[i].(int64))
+		case _METER_SERVER_HALF_OPEN_FLOW:
+			m.ServerHalfOpenFlow = uint64(values[i].(int64))
+		case _METER_CLIENT_HALF_CLOSE_FLOW:
+			m.ClientHalfCloseFlow = uint64(values[i].(int64))
+		case _METER_SERVER_HALF_CLOSE_FLOW:
+			m.ServerHalfCloseFlow = uint64(values[i].(int64))
+		case _METER_TIMEOUT_TCP_FLOW:
+			m.TimeoutTCPFlow = uint64(values[i].(int64))
+		default:
+			log.Warningf("unsupport meter id=%d", id)
+		}
+	}
+}
+
 type FlowMeter struct {
-	SumFlowCount          uint64 `db:"sum_flow_count"`
-	SumNewFlowCount       uint64 `db:"sum_new_flow_count"`
-	SumClosedFlowCount    uint64 `db:"sum_closed_flow_count"`
-	SumPacketTx           uint64 `db:"sum_packet_tx"`
-	SumPacketRx           uint64 `db:"sum_packet_rx"`
-	SumBitTx              uint64 `db:"sum_bit_tx"`
-	SumBitRx              uint64 `db:"sum_bit_rx"`
-	SumFlowDuration       uint64 `db:"sum_flow_duration"`        // ms 废弃
-	SumClosedFlowDuration uint64 `db:"sum_closed_flow_duration"` // ms 废弃
+	Traffic
+	TCPLatency
+	TCPPacketAnomaly
+	TCPFlowAnomaly
 }
 
 func (m *FlowMeter) Reverse() {
-	m.SumPacketTx, m.SumPacketRx = m.SumPacketRx, m.SumPacketTx
-	m.SumBitTx, m.SumBitRx = m.SumBitRx, m.SumBitTx
+	m.Traffic.Reverse()
+	m.TCPLatency.Reverse()
+	m.TCPPacketAnomaly.Reverse()
+	m.TCPFlowAnomaly.Reverse()
 }
 
 func (m *FlowMeter) ID() uint8 {
@@ -29,66 +136,46 @@ func (m *FlowMeter) ID() uint8 {
 }
 
 func (m *FlowMeter) Name() string {
-	return MeterDFNames[FLOW_ID]
+	return MeterVTAPNames[m.ID()]
 }
 
 func (m *FlowMeter) VTAPName() string {
-	return MeterVTAPNames[FLOW_ID]
+	return MeterVTAPNames[m.ID()]
 }
 
 func (m *FlowMeter) SortKey() uint64 {
-	return m.SumPacketTx + m.SumPacketRx
+	return m.PacketTx + m.PacketRx
 }
 
 func (m *FlowMeter) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteVarintU64(m.SumFlowCount)
-	encoder.WriteVarintU64(m.SumNewFlowCount)
-	encoder.WriteVarintU64(m.SumClosedFlowCount)
-	encoder.WriteVarintU64(m.SumPacketTx)
-	encoder.WriteVarintU64(m.SumPacketRx)
-	encoder.WriteVarintU64(m.SumBitTx)
-	encoder.WriteVarintU64(m.SumBitRx)
-	encoder.WriteVarintU64(m.SumFlowDuration)
-	encoder.WriteVarintU64(m.SumClosedFlowDuration)
+	m.Traffic.Encode(encoder)
+	m.TCPLatency.Encode(encoder)
+	m.TCPPacketAnomaly.Encode(encoder)
+	m.TCPFlowAnomaly.Encode(encoder)
 }
 
 func (m *FlowMeter) Decode(decoder *codec.SimpleDecoder) {
-	m.SumFlowCount = decoder.ReadVarintU64()
-	m.SumNewFlowCount = decoder.ReadVarintU64()
-	m.SumClosedFlowCount = decoder.ReadVarintU64()
-	m.SumPacketTx = decoder.ReadVarintU64()
-	m.SumPacketRx = decoder.ReadVarintU64()
-	m.SumBitTx = decoder.ReadVarintU64()
-	m.SumBitRx = decoder.ReadVarintU64()
-	m.SumFlowDuration = decoder.ReadVarintU64()
-	m.SumClosedFlowDuration = decoder.ReadVarintU64()
+	m.Traffic.Decode(decoder)
+	m.TCPLatency.Decode(decoder)
+	m.TCPPacketAnomaly.Decode(decoder)
+	m.TCPFlowAnomaly.Decode(decoder)
 }
 
 func (m *FlowMeter) ConcurrentMerge(other app.Meter) {
 	if pm, ok := other.(*FlowMeter); ok {
-		m.SumFlowCount += pm.SumFlowCount
-		m.SumNewFlowCount += pm.SumNewFlowCount
-		m.SumClosedFlowCount += pm.SumClosedFlowCount
-		m.SumPacketTx += pm.SumPacketTx
-		m.SumPacketRx += pm.SumPacketRx
-		m.SumBitTx += pm.SumBitTx
-		m.SumBitRx += pm.SumBitRx
-		m.SumFlowDuration += pm.SumFlowDuration
-		m.SumClosedFlowDuration += pm.SumClosedFlowDuration
+		m.Traffic.ConcurrentMerge(&pm.Traffic)
+		m.TCPLatency.ConcurrentMerge(&pm.TCPLatency)
+		m.TCPPacketAnomaly.ConcurrentMerge(&pm.TCPPacketAnomaly)
+		m.TCPFlowAnomaly.ConcurrentMerge(&pm.TCPFlowAnomaly)
 	}
 }
 
-func (m *FlowMeter) SequentialMerge(other app.Meter) { // other为后一个时间的统计量
+func (m *FlowMeter) SequentialMerge(other app.Meter) {
 	if pm, ok := other.(*FlowMeter); ok {
-		m.SumFlowCount = m.SumClosedFlowCount + pm.SumFlowCount
-		m.SumNewFlowCount += pm.SumNewFlowCount
-		m.SumClosedFlowCount += pm.SumClosedFlowCount
-		m.SumPacketTx += pm.SumPacketTx
-		m.SumPacketRx += pm.SumPacketRx
-		m.SumBitTx += pm.SumBitTx
-		m.SumBitRx += pm.SumBitRx
-		m.SumFlowDuration += m.SumClosedFlowDuration + pm.SumFlowDuration
-		m.SumClosedFlowDuration += pm.SumClosedFlowDuration
+		m.Traffic.SequentialMerge(&pm.Traffic)
+		m.TCPLatency.SequentialMerge(&pm.TCPLatency)
+		m.TCPPacketAnomaly.SequentialMerge(&pm.TCPPacketAnomaly)
+		m.TCPFlowAnomaly.SequentialMerge(&pm.TCPFlowAnomaly)
 	}
 }
 
@@ -101,26 +188,22 @@ func (m *FlowMeter) ToKVString() string {
 func (m *FlowMeter) MarshalTo(b []byte) int {
 	offset := 0
 
-	offset += copy(b[offset:], "sum_flow_count=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumFlowCount, 10))
-	offset += copy(b[offset:], "i,sum_new_flow_count=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumNewFlowCount, 10))
-	offset += copy(b[offset:], "i,sum_closed_flow_count=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumClosedFlowCount, 10))
-	offset += copy(b[offset:], "i,sum_packet_tx=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumPacketTx, 10))
-	offset += copy(b[offset:], "i,sum_packet_rx=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumPacketRx, 10))
-	offset += copy(b[offset:], "i,sum_packet=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumPacketTx+m.SumPacketRx, 10))
-	offset += copy(b[offset:], "i,sum_bit_tx=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumBitTx, 10))
-	offset += copy(b[offset:], "i,sum_bit_rx=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumBitRx, 10))
-	offset += copy(b[offset:], "i,sum_bit=")
-	offset += copy(b[offset:], strconv.FormatUint(m.SumBitTx+m.SumBitRx, 10))
-	b[offset] = 'i'
-	offset++
+	offset += m.Traffic.MarshalTo(b[offset:])
+	if offset > 0 {
+		b[offset] = ','
+		offset++
+	}
+	offset += m.TCPLatency.MarshalTo(b[offset:])
+	if offset > 0 {
+		b[offset] = ','
+		offset++
+	}
+	offset += m.TCPPacketAnomaly.MarshalTo(b[offset:])
+	if offset > 0 {
+		b[offset] = ','
+		offset++
+	}
+	offset += m.TCPFlowAnomaly.MarshalTo(b[offset:])
 
 	return offset
 }
@@ -131,20 +214,66 @@ func (m *FlowMeter) Fill(ids []uint8, values []interface{}) {
 			continue
 		}
 		switch id {
-		case _METER_SUM_FLOW_COUNT:
-			m.SumFlowCount = uint64(values[i].(int64))
-		case _METER_SUM_NEW_FLOW_COUNT:
-			m.SumNewFlowCount = uint64(values[i].(int64))
-		case _METER_SUM_CLOSED_FLOW_COUNT:
-			m.SumClosedFlowCount = uint64(values[i].(int64))
-		case _METER_SUM_PACKET_TX:
-			m.SumPacketTx = uint64(values[i].(int64))
-		case _METER_SUM_PACKET_RX:
-			m.SumPacketRx = uint64(values[i].(int64))
-		case _METER_SUM_BIT_TX:
-			m.SumBitTx = uint64(values[i].(int64))
-		case _METER_SUM_BIT_RX:
-			m.SumBitRx = uint64(values[i].(int64))
+		case _METER_PACKET_TX:
+			m.PacketTx = uint64(values[i].(int64))
+		case _METER_PACKET_RX:
+			m.PacketRx = uint64(values[i].(int64))
+		case _METER_BYTE_TX:
+			m.ByteTx = uint64(values[i].(int64))
+		case _METER_BYTE_RX:
+			m.ByteRx = uint64(values[i].(int64))
+		case _METER_FLOW:
+			m.Flow = uint64(values[i].(int64))
+		case _METER_NEW_FLOW:
+			m.NewFlow = uint64(values[i].(int64))
+		case _METER_CLOSED_FLOW:
+			m.ClosedFlow = uint64(values[i].(int64))
+
+		case _METER_RTT_SUM:
+			m.RTTSum = time.Duration(values[i].(int64))
+		case _METER_RTT_CLIENT_SUM:
+			m.RTTClientSum = time.Duration(values[i].(int64))
+		case _METER_RTT_SERVER_SUM:
+			m.RTTServerSum = time.Duration(values[i].(int64))
+		case _METER_SRT_SUM:
+			m.SRTSum = time.Duration(values[i].(int64))
+		case _METER_ART_SUM:
+			m.ARTSum = time.Duration(values[i].(int64))
+		case _METER_RTT_COUNT:
+			m.RTTCount = uint64(values[i].(int64))
+		case _METER_RTT_CLIENT_COUNT:
+			m.RTTClientCount = uint64(values[i].(int64))
+		case _METER_RTT_SERVER_COUNT:
+			m.RTTServerCount = uint64(values[i].(int64))
+		case _METER_SRT_COUNT:
+			m.SRTCount = uint64(values[i].(int64))
+		case _METER_ART_COUNT:
+			m.ARTCount = uint64(values[i].(int64))
+
+		case _METER_RETRANS_TX:
+			m.RetransTx = uint64(values[i].(int64))
+		case _METER_RETRANS_RX:
+			m.RetransRx = uint64(values[i].(int64))
+		case _METER_ZERO_WIN_TX:
+			m.ZeroWinTx = uint64(values[i].(int64))
+		case _METER_ZERO_WIN_RX:
+			m.ZeroWinRx = uint64(values[i].(int64))
+
+		case _METER_CLIENT_RST_FLOW:
+			m.ClientRstFlow = uint64(values[i].(int64))
+		case _METER_SERVER_RST_FLOW:
+			m.ServerRstFlow = uint64(values[i].(int64))
+		case _METER_CLIENT_HALF_OPEN_FLOW:
+			m.ClientHalfOpenFlow = uint64(values[i].(int64))
+		case _METER_SERVER_HALF_OPEN_FLOW:
+			m.ServerHalfOpenFlow = uint64(values[i].(int64))
+		case _METER_CLIENT_HALF_CLOSE_FLOW:
+			m.ClientHalfCloseFlow = uint64(values[i].(int64))
+		case _METER_SERVER_HALF_CLOSE_FLOW:
+			m.ServerHalfCloseFlow = uint64(values[i].(int64))
+		case _METER_TIMEOUT_TCP_FLOW:
+			m.TimeoutTCPFlow = uint64(values[i].(int64))
+
 		default:
 			log.Warningf("unsupport meter id=%d", id)
 		}

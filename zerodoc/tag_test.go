@@ -60,12 +60,14 @@ func TestFill1(t *testing.T) {
 		"l3_device_id": "300", "l3_device_type": "5",
 		"host_id": "33", "ip_1": "5.5.5.5", "group_id_1": "-2",
 		"l3_epc_id_1": "31", "l3_device_id_1": "32", "l3_device_type_1": "9",
-		"host_id_1": "55", "subnet_id_1": "2000", "direction": "c2s", "acl_gid": "400", "vlan_id": "500",
-		"protocol": "4", "server_port": "9527", "tap_type": "0", "subnet_id": "1001", "acl_direction": "fwd", "pod_node_id": "1", "az_id": "132",
-		"country": "CHN", "region": "北京", "isp": "移动",
+		"host_id_1": "55", "subnet_id_1": "2000", "direction": "c2s", "acl_gid": "400",
+		"protocol": "4", "server_port": "9527", "tap_type": "0", "subnet_id": "1001", "pod_node_id": "1", "az_id": "132",
+		"country": "CHN", "province": "北京", "isp": "移动",
 	}
 
-	tag.Fill(tags)
+	if err := tag.Fill(tags); err != nil {
+		t.Error(err)
+	}
 
 	if tag.IP != 16843009 {
 		t.Error("ip 处理错误")
@@ -106,9 +108,6 @@ func TestFill1(t *testing.T) {
 	if tag.ACLGID != 400 {
 		t.Error("ACLGID 处理错误")
 	}
-	if tag.VLANID != 500 {
-		t.Error("VLANID 处理错误")
-	}
 	if tag.Direction != ClientToServer {
 		t.Error("Direction 处理错误")
 	}
@@ -127,9 +126,6 @@ func TestFill1(t *testing.T) {
 	if tag.TAPType != TAPTypeEnum(0) {
 		t.Error("TAPType 处理错误")
 	}
-	if tag.ACLDirection != ACL_FORWARD {
-		t.Error("ACLDirection 处理错误")
-	}
 	if tag.PodNodeID != 1 {
 		t.Error("PodNodeID 处理错误")
 	}
@@ -139,8 +135,8 @@ func TestFill1(t *testing.T) {
 	if tag.Country != 5 {
 		t.Error("Country 处理错误")
 	}
-	if tag.Region != 8 {
-		t.Error("Region 处理错误")
+	if tag.Province != 8 {
+		t.Error("Province 处理错误")
 	}
 	if tag.ISP != 8 {
 		t.Error("ISP 处理错误")

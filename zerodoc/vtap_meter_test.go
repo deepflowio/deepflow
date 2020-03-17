@@ -7,10 +7,10 @@ import (
 )
 
 func fillMetrics(hint uint64, m *VTAPUsageMeter) {
-	m.TxBytes = hint * 97
-	m.RxBytes = hint * 89
-	m.TxPackets = hint * 3
-	m.RxPackets = hint * 2
+	m.PacketTx = hint * 3
+	m.PacketRx = hint * 2
+	m.ByteTx = hint * 97
+	m.ByteRx = hint * 89
 }
 
 func TestVTAPMeterEnDecode(t *testing.T) {

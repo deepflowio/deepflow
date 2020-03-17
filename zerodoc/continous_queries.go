@@ -25,22 +25,14 @@ func flatGetDBTagsInStruct(t reflect.Type) []string {
 }
 
 func getCQ(field string) string {
-	if field == "sum_flow_count" {
-		return "sum(sum_closed_flow_count)+last(sum_flow_count)-last(sum_closed_flow_count) AS sum_flow_count"
+	if field == "flow" {
+		return "sum(closed_flow)+last(flow)-last(closed_flow) AS flow"
 	}
 	return fmt.Sprintf("%s(%s) AS %s", field[0:3], field, field)
 }
 
 func GetContinousQueryString(obj app.Meter) string {
 	fields := flatGetDBTagsInStruct(reflect.TypeOf(obj).Elem())
-	switch obj.(type) {
-	case *FlowMeter:
-		fields = append(fields, "sum_packet", "sum_bit")
-	case *PerfMeter:
-		fields = append(fields, "sum_bit")
-	case *UsageMeter:
-		fields = append(fields, "sum_packet", "sum_bit")
-	}
 	queries := make([]string, len(fields))
 	for i, v := range fields {
 		queries[i] = getCQ(v)
