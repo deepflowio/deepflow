@@ -1139,7 +1139,6 @@ func (t *Tag) FillValues(ids []uint8, values []interface{}) error {
 }
 
 func (t *Tag) Fill(tags map[string]string) error {
-	log.Error(tags)
 	for tagk, tagv := range tags {
 		if id, ok := COLUMN_IDS[tagk]; ok {
 			if err := t.fillValue(id, tagv); err != nil {
