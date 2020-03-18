@@ -228,7 +228,7 @@ message NpbAction {
     optional string tunnel_ip = 3;
     optional TapSide tap_side = 4;
     optional uint32 payload_slice = 5 [default = 65535];
-    optional uint32 npb_acl_group_id = 6; // 仅在tunnel_type为PCAP时，该字段有值
+    optional uint32 npb_acl_group_id = 6;
     optional uint32 tunnel_ip_id = 7; // 分发点id, 限制在64000
 }
 
