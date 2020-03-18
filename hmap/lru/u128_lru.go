@@ -12,12 +12,13 @@ type u128LRUNode struct {
 	key1  uint64
 	value interface{}
 
-	hashListNext int32 // 表示节点所在冲突链的下一个节点的 buffer 数组下标，-1 表示不存在
-	hashListPrev int32 // 表示节点所在冲突链的上一个节点的 buffer 数组下标，-1 表示不存在
-	timeListNext int32 // 时间链表，含义与冲突链类似
-	timeListPrev int32 // 时间链表，含义与冲突链类似
+	hashListNext *u128LRUNode // 表示节点所在冲突链的下一个节点的 buffer 数组下标，-1 表示不存在
+	hashListPrev *u128LRUNode // 表示节点所在冲突链的上一个节点的 buffer 数组下标，-1 表示不存在
+	timeListNext *u128LRUNode // 时间链表，含义与冲突链类似
+	timeListPrev *u128LRUNode // 时间链表，含义与冲突链类似
 
-	hash int32
+	hash  int32
+	index int32
 }
 
 var blankU128LRUNodeForInit u128LRUNode
@@ -39,9 +40,9 @@ type U128LRU struct {
 	hashSlots    int32  // 上取整至2^N，哈希桶个数
 	hashSlotBits uint32 // hashSlots中低位连续0比特个数
 
-	hashSlotHead []int32 // 哈希桶，hashSlotHead[i] 表示哈希值为 i 的冲突链的第一个节点为 buffer[[ hashSlotHead[i] ]]
-	timeListHead int32
-	timeListTail int32
+	hashSlotHead []*u128LRUNode // 哈希桶，hashSlotHead[i] 表示哈希值为 i 的冲突链的第一个节点为 buffer[[ hashSlotHead[i] ]]
+	timeListHead *u128LRUNode
+	timeListTail *u128LRUNode
 
 	capacity int // 最大容纳的Flow个数
 	size     int // 当前容纳的Flow个数
@@ -71,70 +72,68 @@ func (m *U128LRU) getNode(index int32) *u128LRUNode {
 	return &m.ringBuffer[index>>_BLOCK_SIZE_BITS][index&_BLOCK_SIZE_MASK]
 }
 
-func (m *U128LRU) pushNodeToHashList(node *u128LRUNode, nodeIndex int32, hash int32) {
+func (m *U128LRU) pushNodeToHashList(node *u128LRUNode, hash int32) {
 	node.hashListNext = m.hashSlotHead[hash]
-	node.hashListPrev = -1
-	if node.hashListNext != -1 {
-		m.getNode(node.hashListNext).hashListPrev = nodeIndex
+	node.hashListPrev = nil
+	if node.hashListNext != nil {
+		node.hashListNext.hashListPrev = node
 	}
-	m.hashSlotHead[hash] = nodeIndex
+	m.hashSlotHead[hash] = node
 }
 
 func (m *U128LRU) pushNodeToTimeList(node *u128LRUNode, nodeIndex int32) {
 	node.timeListNext = m.timeListHead
-	node.timeListPrev = -1
-	if node.timeListNext != -1 {
-		m.getNode(node.timeListNext).timeListPrev = nodeIndex
+	node.timeListPrev = nil
+	if node.timeListNext != nil {
+		node.timeListNext.timeListPrev = node
 	}
-	m.timeListHead = nodeIndex
-	if m.timeListTail == -1 {
-		m.timeListTail = nodeIndex
+	m.timeListHead = node
+	if m.timeListTail == nil {
+		m.timeListTail = node
 	}
 }
 
-func (m *U128LRU) removeNodeFromHashList(node *u128LRUNode, newNext, newPrev int32) {
-	if node.hashListPrev != -1 {
-		prevNode := m.getNode(node.hashListPrev)
-		prevNode.hashListNext = newNext
+func (m *U128LRU) removeNodeFromHashList(node, newNext, newPrev *u128LRUNode) {
+	if node.hashListPrev != nil {
+		node.hashListPrev.hashListNext = newNext
 	} else {
 		m.hashSlotHead[node.hash] = newNext
 	}
 
-	if node.hashListNext != -1 {
-		nextNode := m.getNode(node.hashListNext)
-		nextNode.hashListPrev = newPrev
+	if node.hashListNext != nil {
+		node.hashListNext.hashListPrev = newPrev
 	}
 }
 
-func (m *U128LRU) removeNodeFromTimeList(node *u128LRUNode, newNext, newPrev int32) {
-	if node.timeListPrev != -1 {
-		prevNode := m.getNode(node.timeListPrev)
+func (m *U128LRU) removeNodeFromTimeList(node, newNext, newPrev *u128LRUNode) {
+	prevNode := node.timeListPrev
+	if prevNode != nil {
 		prevNode.timeListNext = newNext
 	} else {
 		m.timeListHead = newNext
 	}
 
-	if node.timeListNext != -1 {
-		nextNode := m.getNode(node.timeListNext)
+	nextNode := node.timeListNext
+	if nextNode != nil {
 		nextNode.timeListPrev = newPrev
 	} else {
 		m.timeListTail = newPrev
 	}
 }
 
-func (m *U128LRU) removeNode(node *u128LRUNode, nodeIndex int32) {
+func (m *U128LRU) removeNode(node *u128LRUNode) {
 	// 从哈希链表、时间链表中删除
 	m.removeNodeFromHashList(node, node.hashListNext, node.hashListPrev)
 	m.removeNodeFromTimeList(node, node.timeListNext, node.timeListPrev)
 
 	// 将节点交换至buffer头部
-	if nodeIndex != m.bufferStartIndex {
+	if node.index != m.bufferStartIndex {
 		firstNode := m.getNode(m.bufferStartIndex)
 		// 将firstNode内容拷贝至node
 		*node = *firstNode
 		// 修改firstNode在哈希链、时间链的上下游指向node
-		m.removeNodeFromHashList(firstNode, nodeIndex, nodeIndex)
-		m.removeNodeFromTimeList(firstNode, nodeIndex, nodeIndex)
+		m.removeNodeFromHashList(firstNode, node, node)
+		m.removeNodeFromTimeList(firstNode, node, node)
 		// 将firstNode初始化
 		*firstNode = blankU128LRUNodeForInit
 	} else {
@@ -151,18 +150,18 @@ func (m *U128LRU) removeNode(node *u128LRUNode, nodeIndex int32) {
 	m.size--
 }
 
-func (m *U128LRU) updateNode(node *u128LRUNode, nodeIndex int32, value interface{}) {
-	if nodeIndex != m.timeListHead {
+func (m *U128LRU) updateNode(node *u128LRUNode, value interface{}) {
+	if node != m.timeListHead {
 		// 从时间链表中删除
 		m.removeNodeFromTimeList(node, node.timeListNext, node.timeListPrev)
 		// 插入时间链表头部
-		m.pushNodeToTimeList(node, nodeIndex)
+		m.pushNodeToTimeList(node, node.index)
 	}
-	if nodeIndex != m.hashSlotHead[node.hash] {
+	if node != m.hashSlotHead[node.hash] {
 		// 从hash链表中删除
 		m.removeNodeFromHashList(node, node.hashListNext, node.hashListPrev)
 		// 插入到hash链表头部
-		m.pushNodeToHashList(node, nodeIndex, node.hash)
+		m.pushNodeToHashList(node, node.hash)
 	}
 
 	node.value = value
@@ -171,8 +170,7 @@ func (m *U128LRU) updateNode(node *u128LRUNode, nodeIndex int32, value interface
 func (m *U128LRU) newNode(key0, key1 uint64, value interface{}, hash int32) {
 	// buffer空间检查
 	if m.size >= m.capacity {
-		node := m.getNode(m.timeListTail)
-		m.removeNode(node, m.timeListTail)
+		m.removeNode(m.timeListTail)
 	}
 	row := m.bufferEndIndex >> _BLOCK_SIZE_BITS
 	col := m.bufferEndIndex & _BLOCK_SIZE_MASK
@@ -183,7 +181,7 @@ func (m *U128LRU) newNode(key0, key1 uint64, value interface{}, hash int32) {
 	m.size++
 
 	// 新节点加入哈希链
-	m.pushNodeToHashList(node, m.bufferEndIndex, hash)
+	m.pushNodeToHashList(node, hash)
 	// 新节点加入时间链
 	m.pushNodeToTimeList(node, m.bufferEndIndex)
 	// 更新key、value
@@ -191,6 +189,7 @@ func (m *U128LRU) newNode(key0, key1 uint64, value interface{}, hash int32) {
 	node.key1 = key1
 	node.value = value
 	node.hash = hash
+	node.index = m.bufferEndIndex
 
 	// 更新buffer信息
 	m.bufferEndIndex = m.incIndex(m.bufferEndIndex)
@@ -204,43 +203,37 @@ func (m *U128LRU) GetCounter() interface{} {
 
 func (m *U128LRU) Add(key0, key1 uint64, value interface{}) {
 	hash := m.compressHash(key0, key1)
-	for hashListNext := m.hashSlotHead[hash]; hashListNext != -1; {
-		node := m.getNode(hashListNext)
+	for node := m.hashSlotHead[hash]; node != nil; node = node.hashListNext {
 		if node.key0 == key0 && node.key1 == key1 {
-			m.updateNode(node, hashListNext, value)
+			m.updateNode(node, value)
 			return
 		}
-		hashListNext = node.hashListNext
 	}
 	m.newNode(key0, key1, value, hash)
 }
 
 func (m *U128LRU) Remove(key0, key1 uint64) {
-	for hashListNext := m.hashSlotHead[m.compressHash(key0, key1)]; hashListNext != -1; {
-		node := m.getNode(hashListNext)
+	for node := m.hashSlotHead[m.compressHash(key0, key1)]; node != nil; node = node.hashListNext {
 		if node.key0 == key0 && node.key1 == key1 {
-			m.removeNode(node, hashListNext)
+			m.removeNode(node)
 			return
 		}
-		hashListNext = node.hashListNext
 	}
 }
 
 func (m *U128LRU) Get(key0, key1 uint64, peek bool) (interface{}, bool) {
 	maxScan := 0
-	for hashListNext := m.hashSlotHead[m.compressHash(key0, key1)]; hashListNext != -1; {
-		node := m.getNode(hashListNext)
+	for node := m.hashSlotHead[m.compressHash(key0, key1)]; node != nil; node = node.hashListNext {
 		maxScan++
 		if node.key0 == key0 && node.key1 == key1 {
 			if !peek {
-				m.updateNode(node, hashListNext, node.value)
+				m.updateNode(node, node.value)
 			}
 			if maxScan > m.maxScan {
 				m.maxScan = maxScan
 			}
 			return node.value, true
 		}
-		hashListNext = node.hashListNext
 	}
 	if maxScan > m.maxScan {
 		m.maxScan = maxScan
@@ -262,10 +255,10 @@ func (m *U128LRU) Clear() {
 	m.bufferEndIndex = 0
 
 	for i := range m.hashSlotHead {
-		m.hashSlotHead[i] = -1
+		m.hashSlotHead[i] = nil
 	}
-	m.timeListHead = -1
-	m.timeListTail = -1
+	m.timeListHead = nil
+	m.timeListTail = nil
 
 	m.size = 0
 }
@@ -277,10 +270,8 @@ func (m *U128LRU) compressHash(key0, key1 uint64) int32 {
 type walkCallback func(key0, key1 uint64, value interface{})
 
 func (m *U128LRU) Walk(callback walkCallback) {
-	for i := m.timeListHead; i != -1; {
-		node := m.getNode(i)
+	for node := m.timeListHead; node != nil; node = node.timeListNext {
 		callback(node.key0, node.key1, node.value)
-		i = node.timeListNext
 	}
 }
 
@@ -291,14 +282,14 @@ func NewU128LRU(module string, hashSlots, capacity int, opts ...stats.OptionStat
 		ringBuffer:   make([]u128LRUNodeBlock, (capacity+_BLOCK_SIZE)/_BLOCK_SIZE+1),
 		hashSlots:    int32(hashSlots),
 		hashSlotBits: uint32(hashSlotBits),
-		hashSlotHead: make([]int32, hashSlots),
-		timeListHead: -1,
-		timeListTail: -1,
+		hashSlotHead: make([]*u128LRUNode, hashSlots),
+		timeListHead: nil,
+		timeListTail: nil,
 		capacity:     capacity,
 	}
 
-	for i := 0; i < len(m.hashSlotHead); i++ {
-		m.hashSlotHead[i] = -1
+	for i := range m.hashSlotHead {
+		m.hashSlotHead[i] = nil
 	}
 	statOptions := []stats.Option{stats.OptionStatTags{"module": module}}
 	for _, opt := range opts {
