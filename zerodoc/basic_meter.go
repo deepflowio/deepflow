@@ -63,30 +63,13 @@ func (t *Traffic) SequentialMerge(other *Traffic) {
 }
 
 func (t *Traffic) MarshalTo(b []byte) int {
-	offset := 0
-
 	fields := []string{
 		"packet_tx=", "packet_rx=", "byte_tx=", "byte_rx=", "flow=", "new_flow=", "closed_flow=",
 	}
 	values := []uint64{
 		t.PacketTx, t.PacketRx, t.ByteTx, t.ByteRx, t.Flow, t.NewFlow, t.ClosedFlow,
 	}
-	for i := range fields {
-		v := values[i]
-		if v == 0 {
-			continue
-		}
-		if offset > 0 {
-			b[offset] = ','
-			offset++
-		}
-		offset += copy(b[offset:], fields[i])
-		offset += copy(b[offset:], strconv.FormatUint(v, 10))
-		b[offset] = 'i'
-		offset++
-	}
-
-	return offset
+	return marshalKeyValues(b, fields, values)
 }
 
 type TCPLatency struct {
@@ -149,8 +132,6 @@ func (l *TCPLatency) SequentialMerge(other *TCPLatency) {
 }
 
 func (l *TCPLatency) MarshalTo(b []byte) int {
-	offset := 0
-
 	fields := []string{
 		"rtt_sum=", "rtt_client_sum=", "rtt_server_sum=", "srt_sum=", "art_sum=",
 		"rtt_count=", "rtt_client_count=", "rtt_server_count=", "srt_count=", "art_count=",
@@ -163,22 +144,7 @@ func (l *TCPLatency) MarshalTo(b []byte) int {
 		uint64(l.ARTSum / time.Microsecond),
 		l.RTTCount, l.RTTClientCount, l.RTTServerCount, l.SRTCount, l.ARTCount,
 	}
-	for i := range fields {
-		v := values[i]
-		if v == 0 {
-			continue
-		}
-		if offset > 0 {
-			b[offset] = ','
-			offset++
-		}
-		offset += copy(b[offset:], fields[i])
-		offset += copy(b[offset:], strconv.FormatUint(v, 10))
-		b[offset] = 'i'
-		offset++
-	}
-
-	return offset
+	return marshalKeyValues(b, fields, values)
 }
 
 type TCPPacketAnomaly struct {
@@ -219,30 +185,13 @@ func (a *TCPPacketAnomaly) SequentialMerge(other *TCPPacketAnomaly) {
 }
 
 func (a *TCPPacketAnomaly) MarshalTo(b []byte) int {
-	offset := 0
-
 	fields := []string{
 		"retrans_tx=", "retrans_rx=", "zero_win_tx=", "zero_win_rx=",
 	}
 	values := []uint64{
 		a.RetransTx, a.RetransRx, a.ZeroWinTx, a.ZeroWinRx,
 	}
-	for i := range fields {
-		v := values[i]
-		if v == 0 {
-			continue
-		}
-		if offset > 0 {
-			b[offset] = ','
-			offset++
-		}
-		offset += copy(b[offset:], fields[i])
-		offset += copy(b[offset:], strconv.FormatUint(v, 10))
-		b[offset] = 'i'
-		offset++
-	}
-
-	return offset
+	return marshalKeyValues(b, fields, values)
 }
 
 type TCPFlowAnomaly struct {
@@ -293,8 +242,6 @@ func (a *TCPFlowAnomaly) SequentialMerge(other *TCPFlowAnomaly) {
 }
 
 func (a *TCPFlowAnomaly) MarshalTo(b []byte) int {
-	offset := 0
-
 	fields := []string{
 		"client_rst_flow=", "server_rst_flow=",
 		"client_half_open_flow=", "server_half_open_flow=",
@@ -307,6 +254,14 @@ func (a *TCPFlowAnomaly) MarshalTo(b []byte) int {
 		a.ClientHalfCloseFlow, a.ServerHalfCloseFlow,
 		a.TimeoutTCPFlow,
 	}
+	return marshalKeyValues(b, fields, values)
+}
+
+func marshalKeyValues(b []byte, fields []string, values []uint64) int {
+	if len(fields) != len(values) {
+		panic("fields和values长度不相等")
+	}
+	offset := 0
 	for i := range fields {
 		v := values[i]
 		if v == 0 {

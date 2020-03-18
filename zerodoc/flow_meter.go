@@ -67,11 +67,14 @@ func (m *FlowSecondMeter) MarshalTo(b []byte) int {
 	offset := 0
 
 	offset += m.Traffic.MarshalTo(b[offset:])
-	if offset > 0 {
+	if offset > 0 && b[offset-1] != ',' {
 		b[offset] = ','
 		offset++
 	}
 	offset += m.TCPFlowAnomaly.MarshalTo(b[offset:])
+	if offset > 0 && b[offset-1] == ',' {
+		offset--
+	}
 
 	return offset
 }
@@ -189,21 +192,24 @@ func (m *FlowMeter) MarshalTo(b []byte) int {
 	offset := 0
 
 	offset += m.Traffic.MarshalTo(b[offset:])
-	if offset > 0 {
+	if offset > 0 && b[offset-1] != ',' {
 		b[offset] = ','
 		offset++
 	}
 	offset += m.TCPLatency.MarshalTo(b[offset:])
-	if offset > 0 {
+	if offset > 0 && b[offset-1] != ',' {
 		b[offset] = ','
 		offset++
 	}
 	offset += m.TCPPacketAnomaly.MarshalTo(b[offset:])
-	if offset > 0 {
+	if offset > 0 && b[offset-1] != ',' {
 		b[offset] = ','
 		offset++
 	}
 	offset += m.TCPFlowAnomaly.MarshalTo(b[offset:])
+	if offset > 0 && b[offset-1] == ',' {
+		offset--
+	}
 
 	return offset
 }
