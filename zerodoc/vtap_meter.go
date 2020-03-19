@@ -63,7 +63,7 @@ func (m *VTAPUsageMeter) MarshalTo(b []byte) int {
 	offset += copy(b[offset:], strconv.FormatUint(m.PacketRx, 10))
 	offset += copy(b[offset:], "i,byte_tx=")
 	offset += copy(b[offset:], strconv.FormatUint(m.ByteTx, 10))
-	offset += copy(b[offset:], "i,bytes_rx=")
+	offset += copy(b[offset:], "i,byte_rx=")
 	offset += copy(b[offset:], strconv.FormatUint(m.ByteRx, 10))
 	b[offset] = 'i'
 	offset++
