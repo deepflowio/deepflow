@@ -10,7 +10,7 @@ const (
 )
 
 const (
-	MATCHED_FIELD_BITS_LEN = 249 // 5(TapType) + 12(Vlan) + 8(Proto) + 16(L3EPC)*2 + 32(IP)*2 + 64(Port+MAC)*2
+	MATCHED_FIELD_BITS_LEN = 252 // 8(TapType) + 12(Vlan) + 8(Proto) + 16(L3EPC)*2 + 32(IP)*2 + 64(Port+MAC)*2
 	MATCHED_FIELD_LEN      = 4
 )
 
@@ -66,7 +66,7 @@ var fieldMask = [...]uint64{
 	MATCHED_DST_EPC:  0xffff,
 	MATCHED_PROTO:    0xff,
 	MATCHED_VLAN:     0xfff,
-	MATCHED_TAP_TYPE: 0x1f,
+	MATCHED_TAP_TYPE: 0xff,
 }
 
 type MatchedField struct {

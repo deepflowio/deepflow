@@ -21,6 +21,12 @@ type ActionFlag uint16
 
 type NpbAction uint64 // aclgid | payload-slice | tunnel-type | Dep/Ip  | TapSide |  tunnel-id
 
+type NpbActions struct {
+	NpbAction
+
+	aclGids []uint16
+}
+
 const (
 	NPB_TUNNEL_TYPE_VXLAN = iota
 	NPB_TUNNEL_TYPE_GRE_ERSPAN
@@ -48,12 +54,12 @@ func UpdateTunnelMaps(aclGids, ipIds []uint16, ips []net.IP) {
 	}
 }
 
-func GetTunnelIp(aclGid uint32) net.IP {
-	return tunnelIpMap[uint16(aclGid)]
+func GetTunnelIp(aclGid uint16) net.IP {
+	return tunnelIpMap[aclGid]
 }
 
-func GetTunnelIpId(aclGid uint32) uint16 {
-	return tunnelIpIdMap[uint16(aclGid)]
+func GetTunnelIpId(aclGid uint16) uint16 {
+	return tunnelIpIdMap[aclGid]
 }
 
 func (a NpbAction) TapSideCompare(flag int) bool {
@@ -93,22 +99,22 @@ func (a NpbAction) ResourceGroupType() int {
 	return int((a >> 28) & RESOURCE_GROUP_TYPE_MASK)
 }
 
-func (a NpbAction) TunnelGid() uint32 {
-	return uint32(a >> 48)
+func (a NpbAction) TunnelGid() uint16 {
+	return uint16(a >> 48)
 }
 
 func (a NpbAction) TunnelIpId() uint16 {
 	if a.TunnelType() == NPB_TUNNEL_TYPE_PCAP {
 		return 0
 	}
-	return GetTunnelIpId(uint32(a >> 48))
+	return GetTunnelIpId(uint16(a >> 48))
 }
 
 func (a NpbAction) TunnelIp() net.IP {
 	if a.TunnelType() == NPB_TUNNEL_TYPE_PCAP {
 		return nil
 	}
-	return GetTunnelIp(uint32(a >> 48))
+	return GetTunnelIp(uint16(a >> 48))
 }
 
 func (a NpbAction) TunnelId() uint32 {
@@ -144,6 +150,41 @@ func (a NpbAction) String() string {
 func ToNpbAction(aclGid, id uint32, tunnelType, group, tapSide uint8, slice uint16) NpbAction {
 	return NpbAction(uint64(aclGid&0xffff)<<48 | uint64(slice)<<32 |
 		uint64(tunnelType&0x3)<<30 | (uint64(group)&RESOURCE_GROUP_TYPE_MASK)<<28 | (uint64(tapSide)&TAPSIDE_MASK)<<26 | uint64(id&0xffffff))
+}
+
+func (a *NpbActions) AddAclGid(aclGids ...uint16) {
+	for _, m := range aclGids {
+		repeat := false
+		for _, n := range a.aclGids {
+			if m == n {
+				repeat = true
+				break
+			}
+		}
+		if !repeat {
+			a.aclGids = append(a.aclGids, m)
+		}
+	}
+}
+
+func (a NpbActions) GetAclGid() []uint16 {
+	return a.aclGids
+}
+
+func (a *NpbActions) ReverseTapSide() NpbActions {
+	action := NpbActions{}
+	action.NpbAction = a.NpbAction.ReverseTapSide()
+	action.aclGids = make([]uint16, len(a.aclGids))
+	copy(action.aclGids, a.aclGids)
+	return action
+}
+
+func (a NpbActions) String() string {
+	return fmt.Sprintf("{%s gids: %v}", a.NpbAction, a.aclGids)
+}
+
+func ToNpbActions(aclGid, id uint32, tunnelType, group, tapSide uint8, slice uint16) NpbActions {
+	return NpbActions{ToNpbAction(aclGid, id, tunnelType, group, tapSide, slice), []uint16{uint16(aclGid)}}
 }
 
 const (
@@ -193,7 +234,7 @@ type ACLID uint16
 
 type PolicyRawData struct {
 	AclActions []AclAction
-	NpbActions []NpbAction
+	NpbActions []NpbActions
 	ACLID      uint32 // 匹配的第一个ACL
 }
 
@@ -207,7 +248,7 @@ func (d *PolicyRawData) GobDecode(in []byte) error {
 
 type PolicyData struct {
 	AclActions    []AclAction
-	NpbActions    []NpbAction
+	NpbActions    []NpbActions
 	AclGidBitmaps []AclGidBitmap
 	ACLID         uint32     // 匹配的第一个ACL
 	ActionFlags   ActionFlag // bitwise OR
@@ -481,12 +522,12 @@ func (d *PolicyData) FormatNpbAction() {
 	}
 }
 
-func (d *PolicyData) CheckNpbAction(packet *LookupKey) []NpbAction {
+func (d *PolicyData) CheckNpbAction(packet *LookupKey) []NpbActions {
 	if len(d.NpbActions) == 0 || packet.Tap != TAP_TOR {
 		return d.NpbActions
 	}
 
-	validActions := make([]NpbAction, 0, len(d.NpbActions))
+	validActions := make([]NpbActions, 0, len(d.NpbActions))
 	for _, action := range d.NpbActions {
 		if (action.TapSideCompare(TAPSIDE_SRC) == true && packet.L2End0 == true) ||
 			(action.TapSideCompare(TAPSIDE_DST) == true && packet.L2End1 == true) {
@@ -517,14 +558,15 @@ func (d *PolicyData) CheckNpbPolicy(packet *LookupKey) *PolicyData {
 	return validPolicyData
 }
 
-func (d *PolicyData) MergeNpbAction(actions []NpbAction, aclID uint32, directions ...DirectionType) {
+func (d *PolicyData) MergeNpbAction(actions []NpbActions, aclID uint32, directions ...DirectionType) {
 	if d.ACLID == 0 {
 		d.ACLID = aclID
 	}
 	for _, n := range actions {
 		repeat := false
 		for index, m := range d.NpbActions {
-			if m == n {
+			if m.NpbAction == n.NpbAction {
+				d.NpbActions[index].AddAclGid(n.GetAclGid()...)
 				repeat = true
 				break
 			}
@@ -542,6 +584,7 @@ func (d *PolicyData) MergeNpbAction(actions []NpbAction, aclID uint32, direction
 			} else {
 				d.NpbActions[index].AddTapSide(n.TapSide())
 			}
+			d.NpbActions[index].AddAclGid(n.GetAclGid()...)
 			repeat = true
 		}
 		if !repeat {
@@ -584,13 +627,13 @@ func (d *PolicyData) MergeAclAction(actions []AclAction, aclID uint32, direction
 	}
 }
 
-func (d *PolicyData) Merge(aclActions []AclAction, npbActions []NpbAction, aclID uint32, directions ...DirectionType) {
+func (d *PolicyData) Merge(aclActions []AclAction, npbActions []NpbActions, aclID uint32, directions ...DirectionType) {
 	d.MergeAclAction(aclActions, aclID, directions...)
 	d.MergeNpbAction(npbActions, aclID, directions...)
 }
 
-func (d *PolicyData) MergeNpbAndSwapDirection(actions []NpbAction, aclID uint32) {
-	newNpbActions := make([]NpbAction, len(actions))
+func (d *PolicyData) MergeNpbAndSwapDirection(actions []NpbActions, aclID uint32) {
+	newNpbActions := make([]NpbActions, len(actions))
 	for i, _ := range actions {
 		newNpbActions[i] = actions[i].ReverseTapSide()
 	}
@@ -607,7 +650,7 @@ func (d *PolicyData) MergeAclAndSwapDirection(actions []AclAction, aclID uint32)
 	d.MergeAclAction(newAclActions, aclID)
 }
 
-func (d *PolicyData) MergeAndSwapDirection(aclActions []AclAction, npbActions []NpbAction, aclID uint32) {
+func (d *PolicyData) MergeAndSwapDirection(aclActions []AclAction, npbActions []NpbActions, aclID uint32) {
 	d.MergeAclAndSwapDirection(aclActions, aclID)
 	d.MergeNpbAndSwapDirection(npbActions, aclID)
 }

@@ -21,7 +21,7 @@ type Acl struct {
 	Proto             uint16      // 256表示全采集, 0表示采集采集协议0
 	Vlan              uint32
 	Action            []AclAction
-	NpbActions        []NpbAction
+	NpbActions        []NpbActions
 	AllMatched        []MatchedField
 	AllMatchedMask    []MatchedField // MatchedMask对应的位为0，表示对应Matched的位为*，0或1都匹配该策略
 	AllMatched6       []MatchedField6

@@ -29,6 +29,7 @@ var (
 	ip11          = NewIPFromString("255.255.255.255").Int()
 	ip12          = net.ParseIP("1234::abcd")
 	ip13          = net.ParseIP("abcd::1234")
+	ip14          = net.ParseIP("abcd::abcd")
 	ipNet1        = "192.168.0.12/24"
 	ipNet10       = "10.90.0.0/16"
 	ipNet11       = "10.90.9.0/24"
@@ -265,7 +266,7 @@ func generatePolicyAcl(table *PolicyTable, action AclAction, aclID uint32, args 
 	var srcGroupId, dstGroupId, vlan uint32
 	var proto uint16
 	var port int
-	var npb NpbAction
+	var npb NpbActions
 
 	for i, arg := range args {
 		switch i {
@@ -292,7 +293,7 @@ func generatePolicyAcl(table *PolicyTable, action AclAction, aclID uint32, args 
 				vlan = arg.(uint32)
 			}
 		case 5:
-			npb = arg.(NpbAction)
+			npb = arg.(NpbActions)
 		}
 	}
 
@@ -369,25 +370,12 @@ func generateLookupKey(srcMac, dstMac uint64, vlan uint32, srcIp, dstIp uint32,
 	return key
 }
 
-func updateTunnelIpMap(ips ...uint32) {
-	aclGids := make([]uint16, 0, len(ips))
-	ipIds := make([]uint16, 0, len(ips))
-	netIps := make([]net.IP, 0, len(ips))
-	for i, ipInt := range ips {
-		ip := IpFromUint32(ipInt)
-		aclGids = append(aclGids, uint16(i+1))
-		ipIds = append(ipIds, uint16(i+1))
-		netIps = append(netIps, ip)
-	}
-	UpdateTunnelMaps(aclGids, ipIds, netIps)
+func toPcapAction(aclGid, id uint32, tunnelType, group, tapSide uint8, slice uint16) NpbActions {
+	return ToNpbActions(aclGid, id, tunnelType, group, tapSide, slice)
 }
 
-func toPcapAction(aclGid, id uint32, tunnelType, group, tapSide uint8, slice uint16) NpbAction {
-	return ToNpbAction(aclGid, id, tunnelType, group, tapSide, slice)
-}
-
-func toNpbAction(aclGid, id uint32, tunnelType, group, tapSide uint8, slice uint16) NpbAction {
-	return ToNpbAction(aclGid, id, tunnelType, group, tapSide, slice)
+func toNpbAction(aclGid, id uint32, tunnelType, group, tapSide uint8, slice uint16) NpbActions {
+	return ToNpbActions(aclGid, id, tunnelType, group, tapSide, slice)
 }
 
 // 设置key的其他参数
@@ -507,6 +495,10 @@ func generatePolicyTable(ids ...TableID) *PolicyTable {
 	connection := generatePeerConnection(1, groupEpc[1], groupEpc[2])
 	connections = append(connections, connection)
 	policy.UpdatePeerConnection(connections)
+
+	UpdateTunnelMaps([]uint16{10, 11, 12, 13, 20, 21, 22, 23, 30},
+		[]uint16{10, 10, 10, 10, 20, 20, 20, 20, 30},
+		[]net.IP{ip12, ip12, ip12, ip12, ip13, ip13, ip13, ip13, ip14})
 	return policy
 }
 
@@ -1331,7 +1323,6 @@ func TestNpbAction(t *testing.T) {
 	acls := []*Acl{}
 
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
-	updateTunnelIpMap(10, 20)
 	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
 	npb1 := toNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
 	npb2 := toNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
@@ -1349,7 +1340,7 @@ func TestNpbAction(t *testing.T) {
 	table.UpdateAcls(acls)
 	// 构建预期结果
 	basicPolicyData := &PolicyData{}
-	basicPolicyData.MergeNpbAction([]NpbAction{npb.ReverseTapSide()}, 25, BACKWARD)
+	basicPolicyData.MergeNpbAction([]NpbActions{npb.ReverseTapSide()}, 25, BACKWARD)
 
 	// key1: ip4:1000 -> ip3:1023 tcp
 	key1 := generateLookupKey(mac2, mac1, vlanAny, group2Ip1, group1Ip1, IPProtocolTCP, 1000, 1023, NPB)
@@ -1365,7 +1356,7 @@ func TestNpbAction(t *testing.T) {
 	setEthTypeAndOthers(key1, EthernetTypeIPv4, 64, true, false)
 	_, policyData = table.LookupAllByKey(key1)
 	basicPolicyData = &PolicyData{}
-	basicPolicyData.MergeNpbAction([]NpbAction{npb}, 25)
+	basicPolicyData.MergeNpbAction([]NpbActions{npb}, 25)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestNpbAction Check Failed!")
@@ -1373,7 +1364,7 @@ func TestNpbAction(t *testing.T) {
 
 	// key2: ip3:1023 -> ip4:1000 udp
 	*basicPolicyData = PolicyData{}
-	basicPolicyData.MergeNpbAction([]NpbAction{npb3, npb2}, 27)
+	basicPolicyData.MergeNpbAction([]NpbActions{npb3, npb2}, 27)
 	key2 := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolUDP, 1023, 1000, NPB)
 	setEthTypeAndOthers(key2, EthernetTypeIPv4, 64, true, true)
 	_, policyData = table.LookupAllByKey(key2)
@@ -1386,7 +1377,6 @@ func TestNpbAction(t *testing.T) {
 func TestMultiNpbAction1(t *testing.T) {
 	table := generatePolicyTable()
 	action := generateAclAction(25, 0)
-	updateTunnelIpMap(10, 20)
 	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
 	npb := toNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
 	// VMA -> ANY SRC
@@ -1400,8 +1390,8 @@ func TestMultiNpbAction1(t *testing.T) {
 	acls := []*Acl{acl, acl2, acl3, acl4}
 	table.UpdateAcls(acls)
 	basicPolicyData := &PolicyData{}
-	basicPolicyData.NpbActions = make([]NpbAction, 0, 1)
-	basicPolicyData.MergeNpbAction([]NpbAction{}, 25)
+	basicPolicyData.NpbActions = make([]NpbActions, 0, 1)
+	basicPolicyData.MergeNpbAction([]NpbActions{}, 25)
 
 	// key: false:ip1:1000 -> true:ip2:1023 tcp
 	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 1023, NPB)
@@ -1418,7 +1408,7 @@ func TestMultiNpbAction1(t *testing.T) {
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, false)
 	_, policyData = table.LookupAllByKey(key)
 	*basicPolicyData = PolicyData{}
-	basicPolicyData.MergeNpbAction([]NpbAction{npb}, 25)
+	basicPolicyData.MergeNpbAction([]NpbActions{npb}, 25)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestMultiNpbAction Check Failed!")
 	}
@@ -1444,7 +1434,7 @@ func TestMultiNpbAction1(t *testing.T) {
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, false)
 	_, policyData = table.LookupAllByKey(key)
 	*basicPolicyData = PolicyData{}
-	basicPolicyData.MergeNpbAction([]NpbAction{npb}, 25)
+	basicPolicyData.MergeNpbAction([]NpbActions{npb}, 25)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestMultiNpbAction Check Failed!")
 	}
@@ -1470,7 +1460,7 @@ func TestMultiNpbAction1(t *testing.T) {
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, false, true)
 	_, policyData = table.LookupAllByKey(key)
 	*basicPolicyData = PolicyData{}
-	basicPolicyData.MergeNpbAction([]NpbAction{npb.ReverseTapSide()}, 25)
+	basicPolicyData.MergeNpbAction([]NpbActions{npb.ReverseTapSide()}, 25)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestMultiNpbAction Check Failed!")
 	}
@@ -1480,7 +1470,7 @@ func TestMultiNpbAction1(t *testing.T) {
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, false)
 	_, policyData = table.LookupAllByKey(key)
 	*basicPolicyData = PolicyData{}
-	basicPolicyData.MergeNpbAction([]NpbAction{npb}, 25)
+	basicPolicyData.MergeNpbAction([]NpbActions{npb}, 25)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestMultiNpbAction Check Failed!")
 	}
@@ -1506,7 +1496,7 @@ func TestMultiNpbAction1(t *testing.T) {
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, false, true)
 	_, policyData = table.LookupAllByKey(key)
 	*basicPolicyData = PolicyData{}
-	basicPolicyData.MergeNpbAction([]NpbAction{npb.ReverseTapSide()}, 25)
+	basicPolicyData.MergeNpbAction([]NpbActions{npb.ReverseTapSide()}, 25)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestMultiNpbAction Check Failed!")
 	}
@@ -1514,10 +1504,9 @@ func TestMultiNpbAction1(t *testing.T) {
 
 func TestNpbActionDedup(t *testing.T) {
 	table := generatePolicyTable()
-	updateTunnelIpMap(10, 20)
 	npb1 := toNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
-	npb2 := toNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
-	npb3 := toNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
+	npb2 := toNpbAction(11, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
+	npb3 := toNpbAction(12, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
 	npb4 := toNpbAction(20, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
 	// VM段-A -> ANY, DEV-group2 -> ANY
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
@@ -1529,7 +1518,7 @@ func TestNpbActionDedup(t *testing.T) {
 	table.UpdateAcls(acls)
 
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.MergeNpbAction([]NpbAction{npb1, npb2.ReverseTapSide()}, 25)
+	basicPolicyData.MergeNpbAction([]NpbActions{npb1, npb2.ReverseTapSide()}, 25)
 	// key: true:(DEV-group2/IP-group3)group2Ip1:1000 -> true:(DEV-group4/IP-group6)group4Ip1:1023 tcp
 	key := generateLookupKey(group2Mac, group4Mac1, vlanAny, group2Ip1, ipGroup6Ip2, IPProtocolTCP, 1000, 1023, NPB)
 	key.L3End0, key.L3End1 = true, true
@@ -1551,7 +1540,7 @@ func TestNpbActionDedup(t *testing.T) {
 	table.UpdateAcls(acls)
 
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.MergeNpbAction([]NpbAction{npb1, npb4.ReverseTapSide(), npb3.ReverseTapSide(), npb2.ReverseTapSide()}, acl1.Id)
+	basicPolicyData.MergeNpbAction([]NpbActions{npb1, npb4.ReverseTapSide(), npb3.ReverseTapSide(), npb2.ReverseTapSide()}, acl1.Id)
 	basicPolicyData.FormatNpbAction()
 	// key不变，acl改变
 	policyData = getPolicyByFirstPath(table, endpoint, key)
@@ -1567,7 +1556,7 @@ func TestNpbActionDedup(t *testing.T) {
 	table.UpdateAcls(acls)
 
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.MergeNpbAction([]NpbAction{npb5, npb5.ReverseTapSide()}, acl5.Id)
+	basicPolicyData.MergeNpbAction([]NpbActions{npb5, npb5.ReverseTapSide()}, acl5.Id)
 	basicPolicyData.FormatNpbAction()
 	// key: true:(IP-group6)ipGroup6Ip2:1000 -> true:(IP-group6)ipGroup6Ip4:1023 tcp
 	key = generateLookupKey(ipGroup6Mac1, ipGroup6Mac1, vlanAny, ipGroup6Ip2, ipGroup6Ip4, IPProtocolTCP, 1000, 1023, NPB)
@@ -1593,7 +1582,7 @@ func TestPcapNpbAction(t *testing.T) {
 	// 构建预期结果
 	basicPolicyData := &PolicyData{}
 	npb.AddTapSide(TAPSIDE_DST)
-	basicPolicyData.MergeNpbAction([]NpbAction{npb}, 25)
+	basicPolicyData.MergeNpbAction([]NpbActions{npb}, 25)
 
 	// key1: ip4:1000 -> ip3:1023 tcp
 	key1 := generateLookupKey(group1Mac, group1Mac, vlanAny, group1Ip1, group1Ip2, IPProtocolTCP, 1000, 1023, NPB)
@@ -2276,7 +2265,6 @@ func BenchmarkNpbFirstPath(b *testing.B) {
 	table := generatePolicyTable()
 
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
-	updateTunnelIpMap(10)
 	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
 	npb1 := toNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_DST, 100)
 	acl1 := generatePolicyAcl(table, action1, 25, groupAny, groupAny, IPProtocolTCP, 1000, vlanAny, npb1)
@@ -2298,7 +2286,6 @@ func BenchmarkNpbFastPath(b *testing.B) {
 	table := generatePolicyTable()
 
 	action1 := generateAclAction(25, ACTION_PACKET_BROKERING)
-	updateTunnelIpMap(10)
 	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
 	npb1 := toNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_DST, 100)
 	acl1 := generatePolicyAcl(table, action1, 25, groupAny, groupAny, IPProtocolTCP, 1000, vlanAny, npb1)
@@ -2317,13 +2304,12 @@ func BenchmarkNpbFastPath(b *testing.B) {
 }
 
 func BenchmarkNpbCheck(b *testing.B) {
-	updateTunnelIpMap(10, 20, 30)
 	npb1 := toNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
 	npb2 := toNpbAction(20, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
 	npb3 := toNpbAction(30, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
 
 	policy := new(PolicyData)
-	policy.MergeNpbAction([]NpbAction{npb1, npb2, npb3}, 25)
+	policy.MergeNpbAction([]NpbActions{npb1, npb2, npb3}, 25)
 	endpoints := new(EndpointData)
 	endpoints.SrcInfo = generateEndpointInfo(10, 10, true, true, 20, 100, 200)
 	endpoints.DstInfo = generateEndpointInfo(10, 10, true, false, 20, 100, 200)
@@ -2339,7 +2325,6 @@ func BenchmarkNpbCheck(b *testing.B) {
 func BenchmarkNpbDedup(b *testing.B) {
 	table := generatePolicyTable()
 
-	updateTunnelIpMap(10, 20)
 	npb1 := toNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV, TAPSIDE_SRC, 100)
 	npb2 := toNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
 	npb3 := toNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
@@ -2361,7 +2346,7 @@ func BenchmarkNpbDedup(b *testing.B) {
 	table.UpdateAcls(acls)
 
 	policyData := new(PolicyData)
-	npbActions := []NpbAction{npb1, npb2, npb4.ReverseTapSide(), npb3.ReverseTapSide()}
+	npbActions := []NpbActions{npb1, npb2, npb4.ReverseTapSide(), npb3.ReverseTapSide()}
 	aclActions := []AclAction{action1, action2, action4.SetDirections(BACKWARD), action3.SetDirections(BACKWARD)}
 	b.ResetTimer()
 

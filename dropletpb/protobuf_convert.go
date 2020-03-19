@@ -180,8 +180,8 @@ func newAclAction(actions []*trident.FlowAction) []datatype.AclAction {
 	return aclActions
 }
 
-func newNpbActions(npbs []*trident.NpbAction) []datatype.NpbAction {
-	actions := make([]datatype.NpbAction, 0, len(npbs))
+func newNpbActions(npbs []*trident.NpbAction) []datatype.NpbActions {
+	actions := make([]datatype.NpbActions, 0, len(npbs))
 	for _, npb := range npbs {
 		tunnelType := uint8(npb.GetTunnelType())
 		ip := net.ParseIP(npb.GetTunnelIp())
@@ -192,7 +192,7 @@ func newNpbActions(npbs []*trident.NpbAction) []datatype.NpbAction {
 		side := uint8(npb.GetTapSide())
 		slice := uint16(npb.GetPayloadSlice())
 		aclGid := uint32(npb.GetNpbAclGroupId() & 0xffff)
-		action := datatype.ToNpbAction(aclGid, id, tunnelType, 0, side, slice)
+		action := datatype.ToNpbActions(aclGid, id, tunnelType, 0, side, slice)
 		actions = append(actions, action)
 	}
 	return actions
@@ -201,7 +201,7 @@ func newNpbActions(npbs []*trident.NpbAction) []datatype.NpbAction {
 func newPolicyData(acl *trident.FlowAcl) *policy.Acl {
 	return &policy.Acl{
 		Id:           acl.GetId(),
-		Type:         datatype.TapType(acl.GetTapType()),
+		Type:         datatype.TapType(acl.GetTapType() & 0xff),
 		SrcGroups:    datatype.SplitGroup2Int(acl.GetSrcGroupIds()),
 		DstGroups:    datatype.SplitGroup2Int(acl.GetDstGroupIds()),
 		SrcPortRange: datatype.SplitPort2Int(acl.GetSrcPorts()),

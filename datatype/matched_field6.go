@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	MATCHED_FIELD6_BITS_LEN = 441 // 5(TapType) + 12(Vlan) + 8(Proto) + 16(L3EPC)*2 + 64(MAC + Port)*2 + 128(IP)*2
+	MATCHED_FIELD6_BITS_LEN = 444 // 8(TapType) + 12(Vlan) + 8(Proto) + 16(L3EPC)*2 + 64(MAC + Port)*2 + 128(IP)*2
 	MATCHED_FIELD6_LEN      = 7
 )
 
@@ -71,7 +71,7 @@ var field6Mask = [...]uint64{
 	MATCHED6_DST_EPC:  0xffff,
 	MATCHED6_PROTO:    0xff,
 	MATCHED6_VLAN:     0xfff,
-	MATCHED6_TAP_TYPE: 0x1f,
+	MATCHED6_TAP_TYPE: 0xff,
 }
 
 type MatchedField6 struct {
