@@ -112,7 +112,7 @@ const (
 	ISP1
 	ISP2
 	ToR
-	// 4~30 ISP
+	// 4~255 ISP
 )
 
 type TCPFlag uint8
@@ -182,7 +182,7 @@ type Field struct {
 	CastType   CastTypeEnum
 	IsIPv6     uint8 // (8B) 与IP/IP6是共生字段
 	TCPFlags   TCPFlag
-	TunnelIPID uint32
+	TunnelIPID uint16
 
 	Country  uint8
 	Province uint8
@@ -549,7 +549,7 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 		t.TCPFlags = TCPFlag(decoder.ReadU8())
 	}
 	if t.Code&TunnelIPID != 0 {
-		t.TunnelIPID = decoder.ReadU32()
+		t.TunnelIPID = decoder.ReadU16()
 	}
 
 	if t.Code&Country != 0 {
@@ -694,7 +694,7 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 		encoder.WriteU8(uint8(t.TCPFlags))
 	}
 	if t.Code&TunnelIPID != 0 {
-		encoder.WriteU32(t.TunnelIPID)
+		encoder.WriteU16(t.TunnelIPID)
 	}
 
 	if code&Country != 0 {
@@ -1083,7 +1083,7 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 	case _TAG_TUNNEL_IP_ID:
 		t.Code |= TunnelIPID
 		i, err = parseUint(value, 10, 32)
-		field.TunnelIPID = uint32(i)
+		field.TunnelIPID = uint16(i)
 	case _TAG_POD_NODE_ID, _TAG_POD_NODE_ID_0:
 		if id == _TAG_POD_NODE_ID {
 			t.Code |= PodNodeID
