@@ -291,7 +291,7 @@ func (d *Ddbs) mergePolicy(packetEndpointData *EndpointData, packet *LookupKey, 
 		}
 		if packet.HasFeatureFlag(NPB) {
 			length := len(policyForward.NpbActions) + len(policyBackward.NpbActions)
-			findPolicy.NpbActions = make([]NpbAction, 0, length)
+			findPolicy.NpbActions = make([]NpbActions, 0, length)
 			findPolicy.MergeNpbAction(append(policyForward.NpbActions, policyBackward.NpbActions...), id)
 			findPolicy.FormatNpbAction()
 			findPolicy.NpbActions = findPolicy.CheckNpbAction(packet)
@@ -594,7 +594,7 @@ func (d *Ddbs) GetPolicyByFastPath(packet *LookupKey) (*EndpointStore, *PolicyDa
 			policy.AddAclGidBitmaps(packet, false, d.AclGidMap.SrcGroupAclGidMaps[packet.Tap], d.AclGidMap.DstGroupAclGidMaps[packet.Tap])
 		}
 		if packet.HasFeatureFlag(NPB) {
-			policy.NpbActions = make([]NpbAction, 0, len(portPolicy.NpbActions))
+			policy.NpbActions = make([]NpbActions, 0, len(portPolicy.NpbActions))
 			policy.MergeNpbAction(portPolicy.NpbActions, id)
 			policy.FormatNpbAction()
 		}
