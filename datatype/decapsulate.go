@@ -6,6 +6,7 @@ import (
 	"unsafe"
 
 	. "github.com/google/gopacket/layers"
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
@@ -37,6 +38,20 @@ type TunnelInfo struct {
 	Dst  IPv4Int
 	Id   uint32
 	Type TunnelType
+}
+
+func (t *TunnelInfo) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteU32(t.Src)
+	encoder.WriteU32(t.Dst)
+	encoder.WriteU32(t.Id)
+	encoder.WriteU8(uint8(t.Type))
+}
+
+func (t *TunnelInfo) Decode(decoder *codec.SimpleDecoder) {
+	t.Src = decoder.ReadU32()
+	t.Dst = decoder.ReadU32()
+	t.Id = decoder.ReadU32()
+	t.Type = TunnelType(decoder.ReadU8())
 }
 
 func (t *TunnelInfo) String() string {
