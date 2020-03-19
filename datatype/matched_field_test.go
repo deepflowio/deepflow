@@ -20,8 +20,8 @@ func newMatchedField(tap TapType, vlan uint32, proto uint8, srcMac, dstMac uint6
 }
 
 func TestSetGet1(t *testing.T) {
-	matched := newMatchedField(1, 2, 3, 10, 30, 20, 40, 50, 60)
-	if matched.Get(MATCHED_TAP_TYPE) != 1 {
+	matched := newMatchedField(66, 2, 3, 10, 30, 20, 40, 50, 60)
+	if matched.Get(MATCHED_TAP_TYPE) != 66 {
 		t.Errorf("MATCHED_TAP_TYPE Error. %v\n", matched)
 	}
 	if matched.Get(MATCHED_VLAN) != 2 {
@@ -51,8 +51,8 @@ func TestSetGet1(t *testing.T) {
 }
 
 func TestSetGet2(t *testing.T) {
-	matched := newMatchedField(0x3f, 0x1fff, 0x7, 10, 30, 20, 40, 50, 60)
-	if matched.Get(MATCHED_TAP_TYPE) != 0x1f {
+	matched := newMatchedField(0xff, 0x1fff, 0x7, 10, 30, 20, 40, 50, 60)
+	if matched.Get(MATCHED_TAP_TYPE) != 0xff {
 		t.Errorf("MATCHED_TAP_TYPE Error. %v\n", matched)
 	}
 	if matched.Get(MATCHED_VLAN) != 0xfff {
