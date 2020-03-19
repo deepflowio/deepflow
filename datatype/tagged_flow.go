@@ -3,7 +3,12 @@ package datatype
 import (
 	"fmt"
 
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
+)
+
+const (
+	VERSION = 20200325
 )
 
 type TaggedFlow struct {
@@ -11,6 +16,20 @@ type TaggedFlow struct {
 	Tag
 
 	pool.ReferenceCount
+}
+
+func (f *TaggedFlow) Encode(encoder *codec.SimpleEncoder) {
+	f.Flow.Encode(encoder)
+	// f.Tag.Encode(encoder)  // 目前无需发送,不encode
+}
+
+func (f *TaggedFlow) Decode(decoder *codec.SimpleDecoder) {
+	f.Flow.Decode(decoder)
+	// f.Tag.Decode(decoder)
+}
+
+func (f *TaggedFlow) Release() {
+	ReleaseTaggedFlow(f)
 }
 
 var taggedFlowPool = pool.NewLockFreePool(func() interface{} {

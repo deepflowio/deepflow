@@ -5,6 +5,7 @@ import (
 	"math"
 	"net"
 
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
 )
 
@@ -59,6 +60,16 @@ func GetTunnelIp(aclGid uint16) net.IP {
 
 func GetTunnelIpId(aclGid uint16) uint16 {
 	return tunnelIpIdMap[aclGid]
+}
+
+func (n *NpbActions) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteU64(uint64(n.NpbAction))
+	encoder.WriteU16Slice(n.aclGids)
+}
+
+func (n *NpbActions) Decode(decoder *codec.SimpleDecoder) {
+	n.NpbAction = NpbAction(decoder.ReadU64())
+	n.aclGids = decoder.ReadU16Slice()
 }
 
 func (a NpbAction) TapSideCompare(flag int) bool {
@@ -252,6 +263,41 @@ type PolicyData struct {
 	ActionFlags ActionFlag // FIXME 删除，如果NPB/PCAP不需要的话，bitwise OR
 }
 
+func (p *PolicyData) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteU32(uint32(len(p.AclActions)))
+	for i := range p.AclActions {
+		p.AclActions[i].Encode(encoder)
+	}
+
+	encoder.WriteU32(uint32(len(p.NpbActions)))
+	for i := range p.NpbActions {
+		p.NpbActions[i].Encode(encoder)
+	}
+
+	encoder.WriteU32(p.ACLID)
+	encoder.WriteU16(uint16(p.ActionFlags))
+}
+
+func (p *PolicyData) Decode(decoder *codec.SimpleDecoder) {
+	l := decoder.ReadU32()
+	if l > 0 {
+		p.AclActions = make([]AclAction, l)
+		for i := range p.AclActions {
+			p.AclActions[i].Decode(decoder)
+		}
+	}
+	l = decoder.ReadU32()
+	if l > 0 {
+		p.NpbActions = make([]NpbActions, l)
+		for i := range p.NpbActions {
+			p.NpbActions[i].Decode(decoder)
+		}
+	}
+
+	p.ACLID = decoder.ReadU32()
+	p.ActionFlags = ActionFlag(decoder.ReadU16())
+}
+
 type DirectionType uint8
 
 const (
@@ -346,6 +392,14 @@ const (
 // DstMapBits: AclGidBitmap在目的资源组相对起始值的偏移量，每个bit是对应一个资源组
 type AclGidBitmap uint64
 
+func (b *AclGidBitmap) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteU64(uint64(*b))
+}
+
+func (b *AclGidBitmap) Decode(decoder *codec.SimpleDecoder) {
+	*b = AclGidBitmap(decoder.ReadU64())
+}
+
 func (b AclGidBitmap) SetSrcAndDstFlag() AclGidBitmap {
 	b |= AclGidBitmap(GROUP_TYPE_ALL << GROUP_TYPE_OFFSET)
 	return b
@@ -413,6 +467,14 @@ func (b AclGidBitmap) String() string {
 
 // keys (16b ACLGID + 16b ActionFlags + ), values (14b AclGidMapOffset + 4b MapCount + 2b Directions + 12b TagTemplates)
 type AclAction uint64
+
+func (a *AclAction) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteU64(uint64(*a))
+}
+
+func (a *AclAction) Decode(decoder *codec.SimpleDecoder) {
+	*a = AclAction(decoder.ReadU64())
+}
 
 func (a AclAction) SetACLGID(aclGID ACLID) AclAction {
 	a &= ^AclAction(0xFFFF << 48)

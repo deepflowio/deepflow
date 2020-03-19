@@ -16,6 +16,14 @@ type SimpleEncoder struct {
 	pool.ReferenceCount
 }
 
+func (e *SimpleEncoder) WriteBool(v bool) {
+	if v {
+		e.buf = append(e.buf, 1)
+	} else {
+		e.buf = append(e.buf, 0)
+	}
+}
+
 func (e *SimpleEncoder) WriteU8(v byte) {
 	e.buf = append(e.buf, v)
 }
@@ -26,10 +34,28 @@ func (e *SimpleEncoder) WriteU16(v uint16) {
 	e.buf = append(e.buf, s[:]...)
 }
 
+func (e *SimpleEncoder) WriteU16Slice(vs []uint16) {
+	e.WriteU32(uint32(len(vs)))
+	s := [2]byte{}
+	for _, v := range vs {
+		binary.LittleEndian.PutUint16(s[:], v)
+		e.buf = append(e.buf, s[:]...)
+	}
+}
+
 func (e *SimpleEncoder) WriteU32(v uint32) {
 	s := [4]byte{}
 	binary.LittleEndian.PutUint32(s[:], v)
 	e.buf = append(e.buf, s[:]...)
+}
+
+func (e *SimpleEncoder) WriteU32Slice(vs []uint32) {
+	e.WriteU32(uint32(len(vs)))
+	s := [4]byte{}
+	for _, v := range vs {
+		binary.LittleEndian.PutUint32(s[:], v)
+		e.buf = append(e.buf, s[:]...)
+	}
 }
 
 func (e *SimpleEncoder) WriteU64(v uint64) {
@@ -123,6 +149,15 @@ func (d *SimpleDecoder) ReadU8() byte {
 	return d.buf[d.offset-1]
 }
 
+func (d *SimpleDecoder) ReadBool() bool {
+	d.offset++
+	if d.offset > len(d.buf) {
+		d.err++
+		return false
+	}
+	return d.buf[d.offset-1] == 1
+}
+
 func (d *SimpleDecoder) ReadU16() uint16 {
 	d.offset += 2
 	if d.offset > len(d.buf) {
@@ -132,6 +167,25 @@ func (d *SimpleDecoder) ReadU16() uint16 {
 	return binary.LittleEndian.Uint16(d.buf[d.offset-2 : d.offset])
 }
 
+func (d *SimpleDecoder) ReadU16Slice() []uint16 {
+	l := int(d.ReadU32())
+	if l == 0 {
+		return nil
+	}
+	d.offset += l * 2
+	if d.offset > len(d.buf) {
+		d.err++
+		return nil
+	}
+
+	ret := make([]uint16, 0, l)
+	for i := l; i > 0; i-- {
+		ret = append(ret, binary.LittleEndian.Uint16(d.buf[d.offset-2*i:d.offset-2*i+2]))
+	}
+
+	return ret
+}
+
 func (d *SimpleDecoder) ReadU32() uint32 {
 	d.offset += 4
 	if d.offset > len(d.buf) {
@@ -139,6 +193,25 @@ func (d *SimpleDecoder) ReadU32() uint32 {
 		return 0
 	}
 	return binary.LittleEndian.Uint32(d.buf[d.offset-4 : d.offset])
+}
+
+func (d *SimpleDecoder) ReadU32Slice() []uint32 {
+	l := int(d.ReadU32())
+	if l == 0 {
+		return nil
+	}
+	d.offset += l * 4
+	if d.offset > len(d.buf) {
+		d.err++
+		return nil
+	}
+
+	ret := make([]uint32, 0, l)
+	for i := l; i > 0; i-- {
+		ret = append(ret, binary.LittleEndian.Uint32(d.buf[d.offset-4*i:d.offset-4*i+4]))
+	}
+
+	return ret
 }
 
 func (d *SimpleDecoder) ReadU64() uint64 {
