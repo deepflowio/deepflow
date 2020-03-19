@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-type TapType uint8
+type TapType uint16
 
 // tapType
 // TAP_ANY(0)              -> ALL
@@ -14,7 +14,7 @@ const (
 	TAP_ANY     = TapType(0)
 	TAP_ISP_MIN = TapType(1)
 	TAP_TOR     = TapType(3)
-	TAP_MAX     = TapType(31)
+	TAP_MAX     = TapType(256)
 
 	TAP_MIN TapType = TAP_ANY + 1
 )
@@ -24,7 +24,7 @@ func GetTapType(inPort uint32) TapType {
 	if PACKET_SOURCE_TOR == ((inPort) & PACKET_SOURCE_TOR) {
 		return TAP_TOR
 	}
-	n := TapType(inPort & 0x1f)
+	n := TapType(inPort & 0xff)
 	if n >= TAP_MAX || n == TAP_ANY || n == TAP_TOR {
 		panic(fmt.Sprintf("GetTapType(): invalid inPort %d", inPort))
 	}

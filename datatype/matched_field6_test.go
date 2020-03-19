@@ -28,8 +28,8 @@ func newMatchedField6(tap TapType, vlan uint32, proto uint8, srcMac, dstMac uint
 }
 
 func TestMatchedField6SetGet1(t *testing.T) {
-	matched := newMatchedField6(1, 2, 3, 10, 20, net.ParseIP("aabb:ccdd::1"), net.ParseIP("1122:3344::2"), 50, 60)
-	if matched.Get(MATCHED6_TAP_TYPE) != 1 {
+	matched := newMatchedField6(231, 2, 3, 10, 20, net.ParseIP("aabb:ccdd::1"), net.ParseIP("1122:3344::2"), 50, 60)
+	if matched.Get(MATCHED6_TAP_TYPE) != 231 {
 		t.Errorf("MATCHED6_TAP_TYPE Error. %v\n", matched)
 	}
 	if matched.Get(MATCHED6_VLAN) != 2 {
