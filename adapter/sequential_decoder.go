@@ -21,8 +21,8 @@ const (
 )
 
 const (
-	ANALYZER_TRIDENT      = 0xffffffe0 // 压缩报文来自analyzer上的trident
-	ANALYZER_TRIDNET_MASK = 0x1f       // 压缩报文来自analyzer上的trident时的掩码
+	ANALYZER_TRIDENT      = 0xffffff00 // 压缩报文来自analyzer上的trident
+	ANALYZER_TRIDNET_MASK = 0xff       // 压缩报文来自analyzer上的trident时的掩码
 	TRIDNET_MASK          = 0xffff     // 压缩报文来自vtap上的trident时的掩码
 )
 

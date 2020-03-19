@@ -7,7 +7,7 @@ require (
 	github.com/mailru/easygo v0.0.0-20190618140210-3c14a0dc985f
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/spf13/cobra v0.0.3
-	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200318061501-527c19b96bb8
+	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200319065456-4eece3a1a0e4
 	gitlab.x.lan/yunshan/message v0.0.0-20200312015005-bfdc0c6a578f
 	golang.org/x/net v0.0.0-20190514140710-3ec191127204
 	golang.org/x/sys v0.0.0-20190516110030-61b9204099cb
