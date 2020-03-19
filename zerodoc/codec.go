@@ -48,7 +48,6 @@ func Encode(sequence uint64, doc *app.Document, encoder *codec.SimpleEncoder) er
 
 	encoder.WriteU32(app.VERSION)
 	encoder.WriteU64(sequence)
-	encoder.WriteU32(uint32(doc.Flags))
 	encoder.WriteU32(doc.Timestamp)
 
 	var tag *Tag
@@ -59,6 +58,7 @@ func Encode(sequence uint64, doc *app.Document, encoder *codec.SimpleEncoder) er
 	tag.Encode(encoder)
 	encoder.WriteU8(uint8(msgType))
 	doc.Meter.Encode(encoder)
+	encoder.WriteU32(uint32(doc.Flags))
 
 	return nil
 }
@@ -90,7 +90,6 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 	decoder.ReadU64() // sequence
 
 	doc := app.AcquireDocument()
-	doc.Flags = app.DocumentFlag(decoder.ReadU32())
 
 	doc.Timestamp = decoder.ReadU32()
 
@@ -114,6 +113,7 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 		return nil, errors.New(fmt.Sprintf("Error meter type %v", msgType))
 	}
 	doc.Meter.Decode(decoder)
+	doc.Flags = app.DocumentFlag(decoder.ReadU32())
 
 	if decoder.Failed() {
 		app.ReleaseDocument(doc)
@@ -123,32 +123,23 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 	return doc, nil
 }
 
-func GetMsgType(db string) (MessageType, error) {
-	s := strings.Split(db, "_")
-
-	nPrefixSeg := 2
-	if strings.HasPrefix(db, "vtap_flow") {
-		nPrefixSeg = 3
-	}
-
-	if len(s) < nPrefixSeg {
-		return MSG_INVILID, fmt.Errorf("Unsupport db %s", db)
-	}
-	dbPrefix := strings.Join(s[:nPrefixSeg], "_")
-	appID := GetMeterID(dbPrefix)
-
+func GetMsgType(db, rp string) (MessageType, error) {
 	var msgType MessageType
-	switch appID {
-	case GEO_ID:
-		msgType = MSG_GEO
-	case FLOW_SECOND_ID:
-		msgType = MSG_FLOW_SECOND
-	case FLOW_ID:
-		msgType = MSG_FLOW
-	case VTAP_USAGE_ID:
+
+	if strings.HasPrefix(db, MeterVTAPNames[VTAP_USAGE_ID]) {
 		msgType = MSG_VTAP_USAGE
-	default:
-		return MSG_INVILID, fmt.Errorf("Unknown supported dbPrefix %s", dbPrefix)
+	} else if strings.HasPrefix(db, MeterVTAPNames[GEO_ID]) {
+		msgType = MSG_GEO
+	} else if strings.HasPrefix(db, MeterVTAPNames[FLOW_ID]) {
+		if rp == "s1" {
+			msgType = MSG_FLOW_SECOND
+		} else if rp == "autogen" {
+			msgType = MSG_FLOW
+		} else {
+			return MSG_INVILID, fmt.Errorf("Unsupport rp %s", rp)
+		}
+	} else {
+		return MSG_INVILID, fmt.Errorf("unsupport db %s", db)
 	}
 
 	return msgType, nil

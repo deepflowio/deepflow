@@ -84,36 +84,40 @@ func (m *FlowSecondMeter) Fill(ids []uint8, values []interface{}) {
 		if id <= _METER_INVALID_ || id >= _METER_MAX_ID_ || values[i] == nil {
 			continue
 		}
+		v, ok := values[i].(int64)
+		if !ok {
+			continue
+		}
 		switch id {
 		case _METER_PACKET_TX:
-			m.PacketTx = uint64(values[i].(int64))
+			m.PacketTx = uint64(v)
 		case _METER_PACKET_RX:
-			m.PacketRx = uint64(values[i].(int64))
+			m.PacketRx = uint64(v)
 		case _METER_BYTE_TX:
-			m.ByteTx = uint64(values[i].(int64))
+			m.ByteTx = uint64(v)
 		case _METER_BYTE_RX:
-			m.ByteRx = uint64(values[i].(int64))
+			m.ByteRx = uint64(v)
 		case _METER_FLOW:
-			m.Flow = uint64(values[i].(int64))
+			m.Flow = uint64(v)
 		case _METER_NEW_FLOW:
-			m.NewFlow = uint64(values[i].(int64))
+			m.NewFlow = uint64(v)
 		case _METER_CLOSED_FLOW:
-			m.ClosedFlow = uint64(values[i].(int64))
+			m.ClosedFlow = uint64(v)
 
 		case _METER_CLIENT_RST_FLOW:
-			m.ClientRstFlow = uint64(values[i].(int64))
+			m.ClientRstFlow = uint64(v)
 		case _METER_SERVER_RST_FLOW:
-			m.ServerRstFlow = uint64(values[i].(int64))
+			m.ServerRstFlow = uint64(v)
 		case _METER_CLIENT_HALF_OPEN_FLOW:
-			m.ClientHalfOpenFlow = uint64(values[i].(int64))
+			m.ClientHalfOpenFlow = uint64(v)
 		case _METER_SERVER_HALF_OPEN_FLOW:
-			m.ServerHalfOpenFlow = uint64(values[i].(int64))
+			m.ServerHalfOpenFlow = uint64(v)
 		case _METER_CLIENT_HALF_CLOSE_FLOW:
-			m.ClientHalfCloseFlow = uint64(values[i].(int64))
+			m.ClientHalfCloseFlow = uint64(v)
 		case _METER_SERVER_HALF_CLOSE_FLOW:
-			m.ServerHalfCloseFlow = uint64(values[i].(int64))
+			m.ServerHalfCloseFlow = uint64(v)
 		case _METER_TIMEOUT_TCP_FLOW:
-			m.TimeoutTCPFlow = uint64(values[i].(int64))
+			m.TimeoutTCPFlow = uint64(v)
 		default:
 			log.Warningf("unsupport meter id=%d", id)
 		}
@@ -219,66 +223,70 @@ func (m *FlowMeter) Fill(ids []uint8, values []interface{}) {
 		if id <= _METER_INVALID_ || id >= _METER_MAX_ID_ || values[i] == nil {
 			continue
 		}
+		v, ok := values[i].(int64)
+		if !ok {
+			continue
+		}
 		switch id {
 		case _METER_PACKET_TX:
-			m.PacketTx = uint64(values[i].(int64))
+			m.PacketTx = uint64(v)
 		case _METER_PACKET_RX:
-			m.PacketRx = uint64(values[i].(int64))
+			m.PacketRx = uint64(v)
 		case _METER_BYTE_TX:
-			m.ByteTx = uint64(values[i].(int64))
+			m.ByteTx = uint64(v)
 		case _METER_BYTE_RX:
-			m.ByteRx = uint64(values[i].(int64))
+			m.ByteRx = uint64(v)
 		case _METER_FLOW:
-			m.Flow = uint64(values[i].(int64))
+			m.Flow = uint64(v)
 		case _METER_NEW_FLOW:
-			m.NewFlow = uint64(values[i].(int64))
+			m.NewFlow = uint64(v)
 		case _METER_CLOSED_FLOW:
-			m.ClosedFlow = uint64(values[i].(int64))
+			m.ClosedFlow = uint64(v)
 
 		case _METER_RTT_SUM:
-			m.RTTSum = time.Duration(values[i].(int64))
+			m.RTTSum = time.Duration(v)
 		case _METER_RTT_CLIENT_SUM:
-			m.RTTClientSum = time.Duration(values[i].(int64))
+			m.RTTClientSum = time.Duration(v)
 		case _METER_RTT_SERVER_SUM:
-			m.RTTServerSum = time.Duration(values[i].(int64))
+			m.RTTServerSum = time.Duration(v)
 		case _METER_SRT_SUM:
-			m.SRTSum = time.Duration(values[i].(int64))
+			m.SRTSum = time.Duration(v)
 		case _METER_ART_SUM:
-			m.ARTSum = time.Duration(values[i].(int64))
+			m.ARTSum = time.Duration(v)
 		case _METER_RTT_COUNT:
-			m.RTTCount = uint64(values[i].(int64))
+			m.RTTCount = uint64(v)
 		case _METER_RTT_CLIENT_COUNT:
-			m.RTTClientCount = uint64(values[i].(int64))
+			m.RTTClientCount = uint64(v)
 		case _METER_RTT_SERVER_COUNT:
-			m.RTTServerCount = uint64(values[i].(int64))
+			m.RTTServerCount = uint64(v)
 		case _METER_SRT_COUNT:
-			m.SRTCount = uint64(values[i].(int64))
+			m.SRTCount = uint64(v)
 		case _METER_ART_COUNT:
-			m.ARTCount = uint64(values[i].(int64))
+			m.ARTCount = uint64(v)
 
 		case _METER_RETRANS_TX:
-			m.RetransTx = uint64(values[i].(int64))
+			m.RetransTx = uint64(v)
 		case _METER_RETRANS_RX:
-			m.RetransRx = uint64(values[i].(int64))
+			m.RetransRx = uint64(v)
 		case _METER_ZERO_WIN_TX:
-			m.ZeroWinTx = uint64(values[i].(int64))
+			m.ZeroWinTx = uint64(v)
 		case _METER_ZERO_WIN_RX:
-			m.ZeroWinRx = uint64(values[i].(int64))
+			m.ZeroWinRx = uint64(v)
 
 		case _METER_CLIENT_RST_FLOW:
-			m.ClientRstFlow = uint64(values[i].(int64))
+			m.ClientRstFlow = uint64(v)
 		case _METER_SERVER_RST_FLOW:
-			m.ServerRstFlow = uint64(values[i].(int64))
+			m.ServerRstFlow = uint64(v)
 		case _METER_CLIENT_HALF_OPEN_FLOW:
-			m.ClientHalfOpenFlow = uint64(values[i].(int64))
+			m.ClientHalfOpenFlow = uint64(v)
 		case _METER_SERVER_HALF_OPEN_FLOW:
-			m.ServerHalfOpenFlow = uint64(values[i].(int64))
+			m.ServerHalfOpenFlow = uint64(v)
 		case _METER_CLIENT_HALF_CLOSE_FLOW:
-			m.ClientHalfCloseFlow = uint64(values[i].(int64))
+			m.ClientHalfCloseFlow = uint64(v)
 		case _METER_SERVER_HALF_CLOSE_FLOW:
-			m.ServerHalfCloseFlow = uint64(values[i].(int64))
+			m.ServerHalfCloseFlow = uint64(v)
 		case _METER_TIMEOUT_TCP_FLOW:
-			m.TimeoutTCPFlow = uint64(values[i].(int64))
+			m.TimeoutTCPFlow = uint64(v)
 
 		default:
 			log.Warningf("unsupport meter id=%d", id)
