@@ -93,15 +93,19 @@ func (m *VTAPUsageMeter) Fill(ids []uint8, values []interface{}) {
 		if id <= _METER_INVALID_ || id >= _METER_MAX_ID_ || values[i] == nil {
 			continue
 		}
+		v, ok := values[i].(int64)
+		if !ok {
+			continue
+		}
 		switch id {
 		case _METER_PACKET_TX:
-			m.PacketTx = uint64(values[i].(int64))
+			m.PacketTx = uint64(v)
 		case _METER_PACKET_RX:
-			m.PacketRx = uint64(values[i].(int64))
+			m.PacketRx = uint64(v)
 		case _METER_BYTE_TX:
-			m.ByteTx = uint64(values[i].(int64))
+			m.ByteTx = uint64(v)
 		case _METER_BYTE_RX:
-			m.ByteRx = uint64(values[i].(int64))
+			m.ByteRx = uint64(v)
 		default:
 			log.Warningf("unsupport meter id=%d", id)
 		}
