@@ -168,8 +168,8 @@ message PeerConnection {
 }
 
 enum CidrType {
-    EPC = 1;
-    SUBNET = 2;
+   WAN = 1;
+   LAN = 2;
 }
 
 message Cidr {
