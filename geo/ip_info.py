@@ -37,6 +37,14 @@ class Encoder(object):
 ITEM_STR = '\t&GeoInfo{{IPStart: {ip_start}, IPEnd: {ip_end}, Country: {country}, Region: {region}, ISP: {isp}}},\n'
 
 
+def fixed_name(s):
+    if s == '黑龙':
+        return '黑龙江'
+    elif s == '内蒙':
+        return '内蒙古'
+    return s
+
+
 def gen_code(file):
 	with open(FILE_NAME, 'w') as wf:
 		country_encoder = Encoder()
@@ -62,9 +70,9 @@ def gen_code(file):
 		wf.write('var COUNTRY_NAMES_MAP map[string]uint8 = map[string]uint8{%s}\n' % ', '.join(['"%s":%d' % (name, idx) for idx, name in enumerate(country_encoder.items)]))
 
 		wf.write('\n')
-		wf.write('var REGION_NAMES = [...]string{%s}\n' % ', '.join(['"%s"' % name for name in region_encoder.items]))
+		wf.write('var REGION_NAMES = [...]string{%s}\n' % ', '.join(['"%s"' % fixed_name(name) for name in region_encoder.items]))
 		wf.write('\n')
-		wf.write('var REGION_NAMES_MAP map[string]uint8 = map[string]uint8{%s}\n' % ', '.join(['"%s":%d' % (name, idx) for idx, name in enumerate(region_encoder.items)]))
+		wf.write('var REGION_NAMES_MAP map[string]uint8 = map[string]uint8{%s}\n' % ', '.join(['"%s":%d' % (fixed_name(name), idx) for idx, name in enumerate(region_encoder.items)]))
 
 		wf.write('\n')
 		wf.write('var ISP_NAMES = [...]string{%s}\n' % ', '.join(['"%s"' % name for name in isp_encoder.items]))
