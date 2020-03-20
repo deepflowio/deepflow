@@ -170,8 +170,6 @@ func (f *FastPath) addVlanFastPolicy(packet *LookupKey, policy *PolicyData) {
 		f.FastVlanPolicyMaps[packet.FastIndex][packet.Tap].Add(key1, key2, forward)
 		f.FastPathPolicyCount++
 	}
-	// 添加forward方向bitmap
-	forward.AddAclGidBitmaps(packet, false, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
 
 	if key1 == key2 {
 		return
@@ -191,7 +189,6 @@ func (f *FastPath) addVlanFastPolicy(packet *LookupKey, policy *PolicyData) {
 		f.FastVlanPolicyMaps[packet.FastIndex][packet.Tap].Add(key1, key2, backward)
 		f.FastPathPolicyCount++
 	}
-	backward.AddAclGidBitmaps(packet, true, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
 }
 
 func (f *FastPath) addPortFastPolicy(endpointStore *EndpointStore, packetEndpointData *EndpointData, packet *LookupKey, policyForward, policyBackward *PolicyData) {
@@ -235,16 +232,12 @@ func (f *FastPath) addPortFastPolicy(endpointStore *EndpointStore, packetEndpoin
 	if value, ok := f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true); !ok {
 		value := &PortPolicyValue{}
 		value.endpoint.InitPointer(endpointStore.Endpoints)
-		// 添加forward方向bitmap
-		forward.AddAclGidBitmaps(packet, false, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
 		value.protoPolicy[packet.Proto] = forward
 		f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Add(key1, key2, value)
 		f.FastPathPolicyCount++
 	} else {
 		portPolicyValue := value.(*PortPolicyValue)
 		portPolicyValue.endpoint.InitPointer(endpointStore.Endpoints)
-		// 添加forward方向bitmap
-		forward.AddAclGidBitmaps(packet, false, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
 		portPolicyValue.protoPolicy[packet.Proto] = forward
 	}
 
@@ -269,16 +262,12 @@ func (f *FastPath) addPortFastPolicy(endpointStore *EndpointStore, packetEndpoin
 	if value, ok := f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true); !ok {
 		value := &PortPolicyValue{}
 		value.endpoint.InitPointer(endpoints)
-		// 添加backward方向bitmap
-		backward.AddAclGidBitmaps(packet, true, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
 		value.protoPolicy[packet.Proto] = backward
 		f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Add(key1, key2, value)
 		f.FastPathPolicyCount++
 	} else {
 		portPolicyValue := value.(*PortPolicyValue)
 		portPolicyValue.endpoint.InitPointer(endpoints)
-		// 添加backward方向bitmap
-		backward.AddAclGidBitmaps(packet, true, f.SrcGroupAclGidMaps[packet.Tap], f.DstGroupAclGidMaps[packet.Tap])
 		portPolicyValue.protoPolicy[packet.Proto] = backward
 	}
 }

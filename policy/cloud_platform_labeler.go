@@ -320,17 +320,15 @@ func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType Ta
 	platformData := l.GetDataByMac(MacKey(mac))
 	if platformData != nil {
 		endpointInfo.SetL2Data(platformData)
-		if l3End {
-			endpointInfo.SetL3Data(platformData, ip)
-		}
 		// IP为0，则取MAC对应的二层数据作为三层数据
-		if ip.IsUnspecified() {
-			endpointInfo.SetL3DataByMac(platformData)
+		if l3End || ip.IsUnspecified() {
+			endpointInfo.SetL3Data(platformData)
+			return endpointInfo
 		}
 	}
 	// step 2: 使用L2EpcId + IP查询L3，如果L2EpcId为0，会查询到DEEPFLOW添加的监控IP
 	if platformData = l.GetDataByEpcIp(endpointInfo.L2EpcId, ip); platformData != nil {
-		endpointInfo.SetL3Data(platformData, ip)
+		endpointInfo.SetL3Data(platformData)
 	} else if endpointInfo.L3EpcId == 0 {
 		// step 3: 查询DEEPFLOW添加的监控网段
 		l.setEpcByCidr(ip, EPC_FROM_DEEPFLOW, endpointInfo)
@@ -338,34 +336,10 @@ func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType Ta
 	return endpointInfo
 }
 
-func (l *CloudPlatformLabeler) ModifyDeviceInfo(endpointInfo *EndpointInfo) {
-	if endpointInfo.L2End && endpointInfo.L3End {
-		if endpointInfo.L2EpcId == EPC_FROM_INTERNET {
-			if endpointInfo.L2DeviceId == 0 {
-				endpointInfo.L2DeviceId = endpointInfo.L3DeviceId
-			}
-			if endpointInfo.L2DeviceType == 0 {
-				endpointInfo.L2DeviceType = endpointInfo.L3DeviceType
-			}
-			endpointInfo.L2EpcId = endpointInfo.L3EpcId
-		} else if endpointInfo.L3EpcId == EPC_FROM_INTERNET {
-			if endpointInfo.L3DeviceId == 0 {
-				endpointInfo.L3DeviceId = endpointInfo.L2DeviceId
-			}
-			if endpointInfo.L3DeviceType == 0 {
-				endpointInfo.L3DeviceType = endpointInfo.L2DeviceType
-			}
-			endpointInfo.L3EpcId = endpointInfo.L2EpcId
-		}
-	}
-}
-
 // 检查L2End和L3End是否有可能进行修正
 func (l *CloudPlatformLabeler) CheckEndpointDataIfNeedCopy(store *EndpointStore, key *LookupKey) *EndpointData {
-	newEndpoints := store.UpdatePointer(key.L2End0, key.L2End1, key.L3End0, key.L3End1)
-	l.ModifyDeviceInfo(newEndpoints.SrcInfo)
-	l.ModifyDeviceInfo(newEndpoints.DstInfo)
-	return newEndpoints
+	// store初始化的时候, 当L2End和L3End为TRUE会修正L3EpcId,
+	return store.UpdatePointer(key.L2End0, key.L2End1, key.L3End0, key.L3End1)
 }
 
 func (l *CloudPlatformLabeler) UpdateEndpointData(endpoint *EndpointStore, key *LookupKey) *EndpointData {
@@ -382,7 +356,7 @@ func (l *CloudPlatformLabeler) ModifyEndpointData(endpointData *EndpointData, ke
 	if dstData.L3EpcId == 0 && srcData.L3EpcId > 0 {
 		if platformData := l.GetDataByEpcIp(srcData.L3EpcId, dstIp); platformData != nil {
 			// 本端IP + 对端EPC查询EPC-IP表
-			dstData.SetL3Data(platformData, dstIp)
+			dstData.SetL3Data(platformData)
 		} else {
 			// 本端IP + 对端EPC查询CIDR表
 			l.setEpcByCidr(dstIp, srcData.L3EpcId, dstData)
@@ -392,7 +366,7 @@ func (l *CloudPlatformLabeler) ModifyEndpointData(endpointData *EndpointData, ke
 	if srcData.L3EpcId == 0 && dstData.L3EpcId > 0 {
 		if platformData := l.GetDataByEpcIp(dstData.L3EpcId, srcIp); platformData != nil {
 			// 本端IP + 对端EPC查询EPC-IP表
-			srcData.SetL3Data(platformData, srcIp)
+			srcData.SetL3Data(platformData)
 		} else {
 			// 本端IP + 对端EPC查询CIDR表
 			l.setEpcByCidr(srcIp, dstData.L3EpcId, srcData)
@@ -403,7 +377,7 @@ func (l *CloudPlatformLabeler) ModifyEndpointData(endpointData *EndpointData, ke
 func (l *CloudPlatformLabeler) peerConnection(ip net.IP, epc int32, endpointInfo *EndpointInfo) {
 	for _, peerEpc := range l.peerConnectionTable[epc] {
 		if platformData := l.GetDataByEpcIp(peerEpc, ip); platformData != nil {
-			endpointInfo.SetL3Data(platformData, ip)
+			endpointInfo.SetL3Data(platformData)
 			return
 		}
 	}
@@ -417,12 +391,12 @@ func (l *CloudPlatformLabeler) peerConnection(ip net.IP, epc int32, endpointInfo
 func (l *CloudPlatformLabeler) GetL3ByIp(src, dst net.IP, endpoints *EndpointData) {
 	if endpoints.SrcInfo.L3EpcId <= 0 {
 		if platformData := l.GetDataByIp(src); platformData != nil {
-			endpoints.SrcInfo.SetL3Data(platformData, src)
+			endpoints.SrcInfo.SetL3Data(platformData)
 		}
 	}
 	if endpoints.DstInfo.L3EpcId <= 0 {
 		if platformData := l.GetDataByIp(dst); platformData != nil {
-			endpoints.DstInfo.SetL3Data(platformData, dst)
+			endpoints.DstInfo.SetL3Data(platformData)
 		}
 	}
 }
@@ -437,14 +411,8 @@ func (l *CloudPlatformLabeler) GetL3ByPeerConnection(src, dst net.IP, endpoints 
 
 func (l *CloudPlatformLabeler) ModifyInternetEpcId(endpoints *EndpointData) {
 	srcData, dstData := endpoints.SrcInfo, endpoints.DstInfo
-	if srcData.L2EpcId == 0 {
-		srcData.L2EpcId = EPC_FROM_INTERNET
-	}
 	if srcData.L3EpcId == 0 {
 		srcData.L3EpcId = EPC_FROM_INTERNET
-	}
-	if dstData.L2EpcId == 0 {
-		dstData.L2EpcId = EPC_FROM_INTERNET
 	}
 	if dstData.L3EpcId == 0 {
 		dstData.L3EpcId = EPC_FROM_INTERNET
@@ -472,21 +440,6 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	// 1) 本端IP + 对端EPC查询EPC-IP表
 	// 2) 本端IP + 对端EPC查询CIDR表
 	l.ModifyEndpointData(endpoint, key)
-	l.ipGroup.Populate(srcIp, endpoint.SrcInfo)
-	l.ipGroup.Populate(dstIp, endpoint.DstInfo)
 	l.ModifyInternetEpcId(endpoint)
 	return endpoint
-}
-
-func (l *CloudPlatformLabeler) RemoveAnonymousGroupIds(store *EndpointStore, key *LookupKey) {
-	if len(l.ipGroup.anonymousGroupIds) == 0 {
-		return
-	}
-	endpoint := store.Endpoints
-	endpoint.SrcInfo.GroupIds, key.SrcAllGroupIds = l.ipGroup.RemoveAnonymousGroupIds(endpoint.SrcInfo.GroupIds, key.SrcAllGroupIds)
-	endpoint.DstInfo.GroupIds, key.DstAllGroupIds = l.ipGroup.RemoveAnonymousGroupIds(endpoint.DstInfo.GroupIds, key.DstAllGroupIds)
-	for i := L3_L2_END_FALSE_FALSE; i < L3_L2_END_MAX; i++ {
-		store.SrcInfos[i].GroupIds = endpoint.SrcInfo.GroupIds
-		store.DstInfos[i].GroupIds = endpoint.DstInfo.GroupIds
-	}
 }

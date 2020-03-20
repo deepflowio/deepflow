@@ -97,11 +97,12 @@ type FlowMetricsPeer struct {
 	TotalByteCount   uint64        // 整个Flow生命周期的统计量
 	TotalPacketCount uint64        // 整个Flow生命周期的统计量
 	First, Last      time.Duration // 整个Flow生命周期首包和尾包的时间戳
-	L3EpcID          int32
 	TCPFlags         uint8
+	L3EpcID          int32
 	IsL2End          bool
 	IsL3End          bool
 	IsActiveHost     bool
+	IsDevice         bool // true表明是从平台数据中获取的
 }
 
 const (

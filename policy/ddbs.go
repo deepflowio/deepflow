@@ -55,6 +55,15 @@ type Ddbs struct {
 	cloudPlatformLabeler *CloudPlatformLabeler
 }
 
+func getAclId(ids ...uint32) uint32 {
+	for _, id := range ids {
+		if id != 0 {
+			return id
+		}
+	}
+	return 0
+}
+
 func NewDdbs(queueCount int, mapSize uint32, fastPathDisable bool) TableOperator {
 	ddbs := new(Ddbs)
 	ddbs.queueCount = queueCount
@@ -62,7 +71,7 @@ func NewDdbs(queueCount int, mapSize uint32, fastPathDisable bool) TableOperator
 	ddbs.groupMacMap = make(map[uint16][]uint64, 1000)
 	ddbs.groupIpMap = make(map[uint16][]ipSegment, 1000)
 	ddbs.AclGidMap.Init()
-	ddbs.InterestTable.Init(true)
+	ddbs.InterestTable.Init()
 	ddbs.FastPath.Init(mapSize, queueCount, ddbs.AclGidMap.SrcGroupAclGidMaps, ddbs.AclGidMap.DstGroupAclGidMaps)
 	ddbs.table = &[TABLE_SIZE][]*TableItem{}
 	ddbs.table6 = &[TABLE_SIZE][]*Table6Item{}
@@ -268,7 +277,6 @@ func (d *Ddbs) addFastPath(endpointData *EndpointData, packet *LookupKey, policy
 	endpointStore := &EndpointStore{}
 	endpointStore.InitPointer(endpointData)
 
-	d.cloudPlatformLabeler.RemoveAnonymousGroupIds(endpointStore, packet)
 	packetEndpointData := d.cloudPlatformLabeler.UpdateEndpointData(endpointStore, packet)
 	d.addPortFastPolicy(endpointStore, packetEndpointData, packet, policyForward, policyBackward)
 
@@ -287,7 +295,6 @@ func (d *Ddbs) mergePolicy(packetEndpointData *EndpointData, packet *LookupKey, 
 			length := len(policyForward.AclActions) + len(policyBackward.AclActions) + len(vlanPolicy.AclActions)
 			findPolicy.AclActions = make([]AclAction, 0, length)
 			findPolicy.MergeAclAction(append(vlanPolicy.AclActions, append(policyForward.AclActions, policyBackward.AclActions...)...), id)
-			findPolicy.AddAclGidBitmaps(packet, false, d.AclGidMap.SrcGroupAclGidMaps[packet.Tap], d.AclGidMap.DstGroupAclGidMaps[packet.Tap])
 		}
 		if packet.HasFeatureFlag(NPB) {
 			length := len(policyForward.NpbActions) + len(policyBackward.NpbActions)
@@ -342,21 +349,9 @@ func (d *Ddbs) getPolicyFromTable6(key *MatchedField6, direction DirectionType, 
 	return portPolicy, vlanPolicy
 }
 
-func (d *Ddbs) initGroupIds(endpointData *EndpointData, packet *LookupKey) {
-	packet.SrcAllGroupIds = make([]uint16, 0, len(endpointData.SrcInfo.GroupIds))
-	packet.DstAllGroupIds = make([]uint16, 0, len(endpointData.DstInfo.GroupIds))
-	for _, id := range endpointData.SrcInfo.GroupIds {
-		packet.SrcAllGroupIds = append(packet.SrcAllGroupIds, uint16(FormatGroupId(id)&0xffff))
-	}
-	for _, id := range endpointData.DstInfo.GroupIds {
-		packet.DstAllGroupIds = append(packet.DstAllGroupIds, uint16(FormatGroupId(id)&0xffff))
-	}
-}
-
 func (d *Ddbs) GetPolicyByFirstPath(endpointData *EndpointData, packet *LookupKey) (*EndpointStore, *PolicyData) {
 	// ddbs不需要资源组相关的优化，只使用端口协议的优化
 	d.getFastInterestKeys(packet)
-	d.initGroupIds(endpointData, packet)
 	packet.GenerateMatchedField(endpointData.SrcInfo.GetL3Epc(), endpointData.DstInfo.GetL3Epc())
 
 	vlanPolicy := INVALID_POLICY_DATA
@@ -588,10 +583,8 @@ func (d *Ddbs) GetPolicyByFastPath(packet *LookupKey) (*EndpointStore, *PolicyDa
 		id := getAclId(vlanPolicy.ACLID, portPolicy.ACLID)
 		policy = new(PolicyData)
 		if packet.HasFeatureFlag(NPM) {
-			d.initGroupIds(endpoint.Endpoints, packet)
 			policy.AclActions = make([]AclAction, 0, len(vlanPolicy.AclActions)+len(portPolicy.AclActions))
 			policy.MergeAclAction(append(vlanPolicy.AclActions, portPolicy.AclActions...), id)
-			policy.AddAclGidBitmaps(packet, false, d.AclGidMap.SrcGroupAclGidMaps[packet.Tap], d.AclGidMap.DstGroupAclGidMaps[packet.Tap])
 		}
 		if packet.HasFeatureFlag(NPB) {
 			policy.NpbActions = make([]NpbActions, 0, len(portPolicy.NpbActions))

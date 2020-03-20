@@ -2,8 +2,6 @@ package datatype
 
 import (
 	"fmt"
-	"math"
-	"net"
 	"reflect"
 
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
@@ -40,20 +38,11 @@ const (
 )
 
 type EndpointInfo struct {
-	L2EpcId      int32  // FIXME 删除 // 负数表示特殊值
-	L2DeviceType uint32 // FIXME 删除
-	L2DeviceId   uint32 // FIXME 删除
-
-	L3EpcId      int32  // FIXME 修改为int16 // 负数表示特殊值
-	L3DeviceType uint32 // FIXME 删除
-	L3DeviceId   uint32 // FIXME 删除
-
-	GroupIds []uint32 // FIXME 删除，若Rciter没有使用
-	HostIp   uint32   // FIXME 删除
-	SubnetId uint32   // FIXME 删除
-
-	L2End bool
-	L3End bool
+	L2EpcId  int32 // 负数表示特殊值
+	L3EpcId  int32 // 负数表示特殊值
+	L2End    bool
+	L3End    bool
+	IsDevice bool
 }
 
 type L3L2End int
@@ -98,6 +87,12 @@ func (i *EndpointInfo) SetL3L2End(ends L3L2End) {
 	if ends >= L3_L2_END_TRUE_FALSE {
 		i.L3End = true
 	}
+	// L3和L2都是TRUE的时候, 更新L3EpcId
+	if ends == L3_L2_END_TRUE_TRUE {
+		if i.L2EpcId != 0 && i.L3EpcId == EPC_FROM_INTERNET {
+			i.L3EpcId = i.L2EpcId
+		}
+	}
 }
 
 func (i *EndpointInfo) GetL3L2End() L3L2End {
@@ -108,39 +103,12 @@ func (i *EndpointInfo) SetL2Data(data *PlatformData) {
 	if data.EpcId > 0 {
 		i.L2EpcId = data.EpcId
 	}
-	i.L2DeviceType = data.DeviceType
-	i.L2DeviceId = data.DeviceId
-	i.GroupIds = append(i.GroupIds, data.GroupIds...)
+	i.IsDevice = true
 }
 
-func (i *EndpointInfo) SetL3Data(data *PlatformData, ip net.IP) {
+func (i *EndpointInfo) SetL3Data(data *PlatformData) {
 	i.L3EpcId = data.EpcId
-	i.L3DeviceType = data.DeviceType
-	i.L3DeviceId = data.DeviceId
-	i.HostIp = data.HostIp
-
-	for _, ipInfo := range data.Ips {
-		var mask net.IPMask
-		if len(ipInfo.RawIp) == 4 {
-			mask = net.CIDRMask(int(ipInfo.Netmask), 32)
-		} else {
-			mask = net.CIDRMask(int(ipInfo.Netmask), 128)
-		}
-		if ipInfo.RawIp.Equal(ip.Mask(mask)) {
-			i.SubnetId = ipInfo.SubnetId
-			break
-		}
-	}
-}
-
-func (i *EndpointInfo) SetL3DataByMac(data *PlatformData) {
-	// 默认MAC对应的SubentId唯一, 取第一个IpNet的SubnetId
-	if len(data.Ips) != 0 {
-		i.SubnetId = data.Ips[0].SubnetId
-	}
-	i.L3EpcId = data.EpcId
-	i.L3DeviceType = data.DeviceType
-	i.L3DeviceId = data.DeviceId
+	i.IsDevice = true
 }
 
 func (i *EndpointInfo) GetL3Epc() uint16 {
@@ -151,23 +119,6 @@ func (i *EndpointInfo) GetL3Epc() uint16 {
 	}
 }
 
-func (i *EndpointInfo) GetEpc() uint16 {
-	id := uint16(0)
-	if i.L2EpcId > 0 {
-		id = uint16(i.L2EpcId)
-	} else if i.L2EpcId == EPC_FROM_DEEPFLOW {
-		// 和L3的EpcId == EPC_FROM_DEEPFLOW进行区分
-		id = math.MaxUint16 - 1
-	} else if i.L2EpcId == 0 {
-		if i.L3EpcId > 0 {
-			id = uint16(i.L3EpcId)
-		} else if i.L3EpcId == EPC_FROM_DEEPFLOW {
-			id = math.MaxUint16
-		}
-	}
-	return id
-}
-
 func GroupIdToString(id uint32) string {
 	if id >= IP_GROUP_ID_FLAG {
 		return fmt.Sprintf("IP-%d", id-IP_GROUP_ID_FLAG)
@@ -176,27 +127,12 @@ func GroupIdToString(id uint32) string {
 	}
 }
 
-func (i *EndpointInfo) GetGroupIdsString() string {
-	str := ""
-	for id, group := range i.GroupIds {
-		if id != 0 {
-			str += " "
-		}
-		str += GroupIdToString(group)
-	}
-	return str
-}
-
 func (i *EndpointInfo) String() string {
 	infoString := "{"
 	infoType := reflect.TypeOf(*i)
 	infoValue := reflect.ValueOf(*i)
 	for n := 0; n < infoType.NumField(); n++ {
-		if infoType.Field(n).Name == "GroupIds" {
-			infoString += fmt.Sprintf("%v: [%s] ", infoType.Field(n).Name, i.GetGroupIdsString())
-		} else {
-			infoString += fmt.Sprintf("%v: %v ", infoType.Field(n).Name, infoValue.Field(n))
-		}
+		infoString += fmt.Sprintf("%v: %v ", infoType.Field(n).Name, infoValue.Field(n))
 	}
 	infoString += "}"
 	return infoString
@@ -268,18 +204,13 @@ func AcquireEndpointInfo() *EndpointInfo {
 }
 
 func ReleaseEndpointInfo(i *EndpointInfo) {
-	if i.GroupIds != nil {
-		i.GroupIds = i.GroupIds[:0]
-	}
-	*i = EndpointInfo{GroupIds: i.GroupIds}
+	*i = EndpointInfo{}
 	endpointInfoPool.Put(i)
 }
 
 func CloneEndpointInfo(i *EndpointInfo) *EndpointInfo {
 	dup := AcquireEndpointInfo()
 	*dup = *i
-	dup.GroupIds = make([]uint32, len(i.GroupIds))
-	copy(dup.GroupIds, i.GroupIds)
 	return dup
 }
 

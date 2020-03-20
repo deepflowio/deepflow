@@ -131,7 +131,6 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint64, srcIps, dstIps ipSegme
 				match.Set(MATCHED_PROTO, uint64(a.Proto))
 				mask.SetMask(MATCHED_PROTO, uint64(0xff))
 			}
-
 			a.AllMatched = append(a.AllMatched, match)
 			a.AllMatchedMask = append(a.AllMatchedMask, mask)
 		}

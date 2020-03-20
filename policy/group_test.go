@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 var groups []*IpGroupData = []*IpGroupData{
@@ -25,28 +26,31 @@ func generateIpResourceGroup() *IpResourceGroup {
 
 func getGroups(finder *IpResourceGroup, ip net.IP, epc int32) []uint32 {
 	endpoint := &EndpointInfo{L3EpcId: epc}
-	finder.Populate(ip, endpoint)
-	return endpoint.GroupIds
+	if ip.To4() == nil {
+		return finder.GetGroupIdsByIpv6(ip, endpoint)
+	} else {
+		return finder.GetGroupIds(IpToUint32(ip), endpoint)
+	}
 }
 
 func TestIp6Group(t *testing.T) {
 	finder := generateIpResourceGroup()
 	result := getGroups(finder, net.ParseIP("1234:1222:1234::3"), 1)
-	expect := []uint32{1 + IP_GROUP_ID_FLAG, 2 + IP_GROUP_ID_FLAG}
+	expect := []uint32{1, 2}
 	if !reflect.DeepEqual(result, expect) {
 		t.Error("TestIp6Group failed!")
 		t.Log("Result:", result, "\n")
 		t.Log("Expect:", expect, "\n")
 	}
 	result = getGroups(finder, net.ParseIP("1234:1222:1234::3"), 2)
-	expect = []uint32{3 + IP_GROUP_ID_FLAG, 4 + IP_GROUP_ID_FLAG}
+	expect = []uint32{3, 4}
 	if !reflect.DeepEqual(result, expect) {
 		t.Error("TestIp6Group failed!")
 		t.Log("Result:", result, "\n")
 		t.Log("Expect:", expect, "\n")
 	}
 	result = getGroups(finder, net.ParseIP("1234:1234:1234::2"), 3)
-	expect = []uint32{5 + IP_GROUP_ID_FLAG, 6 + IP_GROUP_ID_FLAG}
+	expect = []uint32{5, 6}
 	if !reflect.DeepEqual(result, expect) {
 		t.Error("TestIp6Group failed!")
 		t.Log("Result:", result, "\n")
