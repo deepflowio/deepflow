@@ -40,17 +40,17 @@ const (
 )
 
 type EndpointInfo struct {
-	L2EpcId      int32 // 负数表示特殊值
-	L2DeviceType uint32
-	L2DeviceId   uint32
+	L2EpcId      int32  // FIXME 删除 // 负数表示特殊值
+	L2DeviceType uint32 // FIXME 删除
+	L2DeviceId   uint32 // FIXME 删除
 
-	L3EpcId      int32 // 负数表示特殊值
-	L3DeviceType uint32
-	L3DeviceId   uint32
+	L3EpcId      int32  // FIXME 修改为int16 // 负数表示特殊值
+	L3DeviceType uint32 // FIXME 删除
+	L3DeviceId   uint32 // FIXME 删除
 
-	GroupIds []uint32
-	HostIp   uint32
-	SubnetId uint32
+	GroupIds []uint32 // FIXME 删除，若Rciter没有使用
+	HostIp   uint32   // FIXME 删除
+	SubnetId uint32   // FIXME 删除
 
 	L2End bool
 	L3End bool
