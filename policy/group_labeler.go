@@ -291,40 +291,6 @@ func (g *IpResourceGroup) Update(groups []*IpGroupData) {
 	g.GenerateAnonymousGroupIdMap()
 }
 
-func inDevGroupIds(groupIds []uint32, len int, groupId uint32) bool {
-	for i := 0; i < len; i++ {
-		if groupId == groupIds[i] {
-			return true
-		}
-	}
-
-	return false
-}
-
-// Populate fills tags in flow message
-func (g *IpResourceGroup) Populate(ip net.IP, endpointInfo *EndpointInfo) {
-	devGroupIdLen := len(endpointInfo.GroupIds)
-	var groupIds []uint32
-	// 查询资源组ID
-	if len(ip) == 4 {
-		groupIds = g.GetGroupIds(utils.IpToUint32(ip), endpointInfo)
-	} else {
-		groupIds = g.GetGroupIdsByIpv6(ip, endpointInfo)
-	}
-
-	// 给资源组打IP_GROUP_ID_FLAG标签
-	for _, v := range groupIds {
-		if !inDevGroupIds(endpointInfo.GroupIds, devGroupIdLen, v) {
-			endpointInfo.GroupIds = append(endpointInfo.GroupIds, uint32(v)+IP_GROUP_ID_FLAG)
-		}
-	}
-	// l3未匹配到任何设备资源组，其为internet网络IP
-	// ip为0时，L2EpcId会赋值给L3EpcId, 是非internet流量
-	if endpointInfo.L3EpcId == 0 && !ip.IsUnspecified() {
-		endpointInfo.GroupIds = append(endpointInfo.GroupIds, g.internetGroupIds...)
-	}
-}
-
 func (g *IpResourceGroup) AddAnonymousGroupId(anonymous map[uint32]bool, group *IpGroupData) {
 	if group.Type == ANONYMOUS {
 		anonymous[group.Id] = true

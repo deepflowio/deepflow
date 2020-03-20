@@ -1,12 +1,12 @@
 package policy
 
 import (
-	"math"
 	"net"
 	"sort"
 
 	logging "github.com/op/go-logging"
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 type SortedAcls []*Acl
@@ -49,20 +49,22 @@ type PolicyId uint32
 const (
 	MIN_FASTPATH_MAP_LEN = 1 << 10
 	MAX_FASTPATH_MAP_LEN = 1 << 20
+
+	ACL_PROTO_MAX = 256
 )
+
+var STANDARD_NETMASK = MaskLenToNetmask(STANDARD_MASK_LEN)
 
 type TableID int
 
 const (
-	NORMAL TableID = iota
-	DDBS
+	DDBS TableID = iota
 )
 
 type TableCreator func(queueCount int, mapSize uint32, fastPathDisable bool) TableOperator
 
 var tableCreator = [...]TableCreator{
-	NORMAL: NewPolicyLabeler,
-	DDBS:   NewDdbs,
+	DDBS: NewDdbs,
 }
 
 type TableOperator interface {
@@ -85,9 +87,6 @@ type TableOperator interface {
 
 	// 目前是从statsd监控中移除
 	Close()
-
-	// test
-	generateGroupRelation(acls []*Acl, to *[TAP_MAX][math.MaxUint16 + 1][]uint16, from *[TAP_MAX][math.MaxUint16 + 1]uint16)
 }
 
 type PolicyTable struct {
@@ -132,7 +131,7 @@ func NewPolicyTable(queueCount int, mapSize uint32, fastPathDisable bool, ids ..
 		queueCount:           queueCount,
 	}
 
-	id := NORMAL
+	id := DDBS
 	if len(ids) > 0 {
 		id = ids[0]
 	}
