@@ -86,33 +86,6 @@ func BenchmarkDdbsFirstPath(b *testing.B) {
 	}
 }
 
-func BenchmarkDdbsFirstPathWithMultiGroup(b *testing.B) {
-	acls := []*Acl{}
-	table := generatePolicyTable(DDBS)
-	action := generateAclAction(10, ACTION_PACKET_COUNTING)
-
-	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
-	acls = append(acls, acl)
-	srcGroups := []uint32{group[1]}
-	dstGroups := []uint32{group[2]}
-	for i := group[2]; i <= 100; i += 10 {
-		acl := generatePolicyAcl(table, action, uint32(i), uint32(i), uint32(i+10), IPProtocolTCP, 0, vlanAny)
-		acls = append(acls, acl)
-		srcGroups = append(srcGroups, i+10)
-		dstGroups = append(dstGroups, i+10)
-	}
-	table.UpdateAcls(acls)
-
-	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 8000)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		endpoint := getEndpointData(table, key)
-		endpoint.SrcInfo.GroupIds = srcGroups
-		endpoint.DstInfo.GroupIds = dstGroups
-		table.operator.GetPolicyByFirstPath(endpoint, key)
-	}
-}
-
 func TestDdbsPolicyEpcPolicy(t *testing.T) {
 	acls := []*Acl{}
 	// 创建 policyTable
@@ -459,7 +432,7 @@ func TestDdbsSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	// acl2: srcGroup: group3(DEV资源组)，udp
 	action1 := generateAclAction(20, ACTION_PACKET_COUNTING)
 	acl1 := generatePolicyAcl(table, action1, 20, groupAny, group[6], IPProtocolUDP, -1, vlanAny)
-	action2 := generateAclAction(21, ACTION_PACKET_COUNTING)
+	action2 := generateAclAction(21, ACTION_FLOW_COUNTING)
 	acl2 := generatePolicyAcl(table, action2, 21, group[3], groupAny, IPProtocolUDP, -1, vlanAny)
 	acls = append(acls, acl1, acl2)
 	table.UpdateAcls(acls)
@@ -727,8 +700,8 @@ func TestDdbsEndpointDataDirection(t *testing.T) {
 	// src: DEV-30, IP-60 dst: DEV-40
 	result := getEndpointData(table, key1)
 	basicData1 := new(EndpointData)
-	basicData1.SrcInfo = generateEndpointInfo(EPC_FROM_INTERNET, EPC_FROM_DEEPFLOW, l2EndBool[0], l3EndBool[0], subnetAny, group[3], ipGroup6)
-	basicData1.DstInfo = generateEndpointInfo(groupEpc[4], groupEpc[4], l2EndBool[0], l3EndBool[1], 121, group[4])
+	basicData1.SrcInfo = generateEndpointInfo(groupEpc[3], EPC_FROM_DEEPFLOW, l2EndBool[0], l3EndBool[0], true)
+	basicData1.DstInfo = generateEndpointInfo(groupEpc[4], groupEpc[4], l2EndBool[0], l3EndBool[1], true)
 	if !CheckEndpointDataResult(t, basicData1, result) {
 		t.Error("key1 EndpointData Check Failed!")
 	}
@@ -745,8 +718,8 @@ func TestDdbsEndpointDataDirection(t *testing.T) {
 	// src: DEV-40 dst: DEV-30, IP-60
 	result = getEndpointData(table, key2)
 	basicData2 := new(EndpointData)
-	basicData2.SrcInfo = generateEndpointInfo(groupEpc[4], groupEpc[4], l2EndBool[0], l3EndBool[1], 121, group[4])
-	basicData2.DstInfo = generateEndpointInfo(EPC_FROM_INTERNET, EPC_FROM_DEEPFLOW, l2EndBool[0], l3EndBool[0], subnetAny, group[3], ipGroup6)
+	basicData2.SrcInfo = generateEndpointInfo(groupEpc[4], groupEpc[4], l2EndBool[0], l3EndBool[1], true)
+	basicData2.DstInfo = generateEndpointInfo(groupEpc[3], EPC_FROM_DEEPFLOW, l2EndBool[0], l3EndBool[0], true)
 	if !CheckEndpointDataResult(t, basicData2, result) {
 		t.Error("key2 EndpointData Check Failed!")
 	}
@@ -765,8 +738,8 @@ func TestDdbsEndpointDataDirection(t *testing.T) {
 	// src: DEV-30, IP-60 dst: DEV-40
 	result = getEndpointData(table, key3)
 	basicData3 := new(EndpointData)
-	basicData3.SrcInfo = generateEndpointInfo(EPC_FROM_INTERNET, EPC_FROM_DEEPFLOW, l2EndBool[0], l3EndBool[0], subnetAny, group[3], ipGroup6)
-	basicData3.DstInfo = generateEndpointInfo(groupEpc[4], groupEpc[4], l2EndBool[0], l3EndBool[1], 121, group[4])
+	basicData3.SrcInfo = generateEndpointInfo(groupEpc[3], EPC_FROM_DEEPFLOW, l2EndBool[0], l3EndBool[0], true)
+	basicData3.DstInfo = generateEndpointInfo(groupEpc[4], groupEpc[4], l2EndBool[0], l3EndBool[1], true)
 	if !CheckEndpointDataResult(t, basicData3, result) {
 		t.Error("key3 EndpointData Check Failed!")
 	}
@@ -782,8 +755,8 @@ func TestDdbsEndpointDataDirection(t *testing.T) {
 	// src: DEV-40 dst: DEV-30, IP-60
 	result = getEndpointData(table, key4)
 	basicData4 := new(EndpointData)
-	basicData4.SrcInfo = generateEndpointInfo(groupEpc[4], groupEpc[4], l2EndBool[0], l3EndBool[1], 121, group[4])
-	basicData4.DstInfo = generateEndpointInfo(EPC_FROM_INTERNET, EPC_FROM_DEEPFLOW, l2EndBool[0], l3EndBool[0], subnetAny, group[3], ipGroup6)
+	basicData4.SrcInfo = generateEndpointInfo(groupEpc[4], groupEpc[4], l2EndBool[0], l3EndBool[1], true)
+	basicData4.DstInfo = generateEndpointInfo(groupEpc[3], EPC_FROM_DEEPFLOW, l2EndBool[0], l3EndBool[0], true)
 	if !CheckEndpointDataResult(t, basicData4, result) {
 		t.Error("key4 EndpointData Check Failed!")
 	}
@@ -911,8 +884,8 @@ func TestDdbsMultiNpbAction1(t *testing.T) {
 	_, policyData := table.LookupAllByKey(key)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestMultiNpbAction Check Failed!")
-		t.Error(cap(basicPolicyData.AclActions), cap(basicPolicyData.NpbActions), cap(basicPolicyData.AclGidBitmaps))
-		t.Error(cap(policyData.AclActions), cap(policyData.NpbActions), cap(policyData.AclGidBitmaps))
+		t.Error(cap(basicPolicyData.AclActions), cap(basicPolicyData.NpbActions))
+		t.Error(cap(policyData.AclActions), cap(policyData.NpbActions))
 	}
 
 	// key: true:ip2:1023 -> false:ip1:1000 tcp
@@ -1032,7 +1005,7 @@ func TestDdbsNpbActionDedup(t *testing.T) {
 	basicPolicyData := new(PolicyData)
 	basicPolicyData.MergeNpbAction([]NpbActions{npb1, npb2.ReverseTapSide()}, 25)
 	// key: true:(DEV-group2/IP-group3)group2Ip1:1000 -> true:(DEV-group4/IP-group6)group4Ip1:1023 tcp
-	key := generateLookupKey(group2Mac, group4Mac1, vlanAny, group2Ip1, ipGroup6Ip2, IPProtocolTCP, 1000, 1023, NPB)
+	key := generateLookupKey(group2Mac, group4Mac1, vlanAny, group3Ip3, ipGroup6Ip2, IPProtocolTCP, 1000, 1023, NPB)
 	key.L3End1 = true
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
 	endpoint := modifyEndpointDataL3End(table, key, l3EndBool[1], l3EndBool[1])
@@ -1043,16 +1016,16 @@ func TestDdbsNpbActionDedup(t *testing.T) {
 
 	// IP段-B -> VMA, IP-group6 -> DEV-group2
 	action3 := generateAclAction(27, ACTION_PACKET_BROKERING)
-	acl3 := generatePolicyAcl(table, action3, 27, group[6], group[2], IPProtocolTCP, 0, vlanAny, npb3)
+	acl3 := generatePolicyAcl(table, action3, 27, group[6], group[2], IPProtocolTCP, portAny, vlanAny, npb3)
 	// VMB -> IP段-A, DEV-group4 -> IP-group3
 	action4 := generateAclAction(28, ACTION_PACKET_BROKERING)
-	acl4 := generatePolicyAcl(table, action4, 28, group[4], group[3], IPProtocolTCP, 0, vlanAny, npb4)
+	acl4 := generatePolicyAcl(table, action4, 28, group[4], group[3], IPProtocolTCP, portAny, vlanAny, npb4)
 
 	acls = append(acls, acl3, acl4)
 	table.UpdateAcls(acls)
 
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.MergeNpbAction([]NpbActions{npb1, npb2.ReverseTapSide(), npb4.ReverseTapSide(), npb3.ReverseTapSide()}, acl1.Id)
+	basicPolicyData.MergeNpbAction([]NpbActions{npb1, npb2.ReverseTapSide(), npb3.ReverseTapSide(), npb4.ReverseTapSide()}, acl1.Id)
 	basicPolicyData.FormatNpbAction()
 	// key不变，acl改变
 	policyData = getPolicyByFirstPath(table, endpoint, key)
@@ -1249,270 +1222,6 @@ func TestDdbsPolicySrcPort(t *testing.T) {
 	}
 }
 
-func TestDdbsAclGidBitmap(t *testing.T) {
-	acls := []*Acl{}
-	// 创建 policyTable
-	table := generatePolicyTable(DDBS)
-	// 构建acl action  1:1000->2:0 tcp
-	action := generateAclAction(10, ACTION_PACKET_COUNTING)
-	action = action.SetACLGID(10)
-	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, portAny, vlanAny)
-	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
-	acls = append(acls, acl)
-	table.UpdateAcls(acls)
-	// 构建查询1-key  1:1000->2:8000 tcp
-	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 8000)
-	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
-	_, policyData := table.LookupAllByKey(key)
-	aclGidBitmap := AclGidBitmap(0).SetSrcAndDstFlag().SetSrcMapBits(0).SetDstMapBits(0)
-	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
-	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(1)
-	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidBitmap)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmap Check Failed!")
-	}
-}
-
-func TestDdbsAclGidBitmapMultiGroup(t *testing.T) {
-	acls := []*Acl{}
-	// 创建 policyTable
-	table := generatePolicyTable(DDBS)
-	// 构建acl action  1:1000->2:0 tcp
-	action := generateAclAction(10, ACTION_PACKET_COUNTING)
-	action = action.SetACLGID(10)
-	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, portAny, vlanAny)
-	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
-	acls = append(acls, acl)
-	table.UpdateAcls(acls)
-
-	// 构建查询1-key  1:1000->2:8000 tcp
-	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 8000)
-	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
-	endpoint := getEndpointData(table, key)
-
-	// endpoint中匹配策略的资源组和不匹配策略的资源组相交叉
-	endpoint.SrcInfo.GroupIds = append(endpoint.SrcInfo.GroupIds[:0], group[1], 100, group[1])
-	endpoint.DstInfo.GroupIds = append(endpoint.DstInfo.GroupIds[:0], group[2], 200, group[2])
-	policyData := getPolicyByFirstPath(table, endpoint, key)
-	aclGidBitmap := AclGidBitmap(0).SetSrcAndDstFlag().SetSrcMapBits(0).SetDstMapBits(0)
-	aclGidBitmap = aclGidBitmap.SetSrcMapBits(2).SetDstMapBits(2)
-	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
-	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(1)
-	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidBitmap)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmap Check Failed!")
-	}
-
-	// endpoint中匹配策略的资源组在不匹配策略的资源组的后面
-	key = generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 8000)
-	endpoint.SrcInfo.GroupIds = append(endpoint.SrcInfo.GroupIds[:0], 100, group[1])
-	endpoint.DstInfo.GroupIds = append(endpoint.DstInfo.GroupIds[:0], 200, group[2])
-	policyData = getPolicyByFirstPath(table, endpoint, key)
-
-	aclGidBitmap = AclGidBitmap(0).SetSrcAndDstFlag().SetSrcMapBits(1).SetDstMapBits(1)
-	basicPolicyData = new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
-	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(1)
-	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidBitmap)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmap Check Failed!")
-	}
-}
-
-func TestDdbsAclGidBitmapAnonymousGroupIds(t *testing.T) {
-	acls := []*Acl{}
-	// 创建 policyTable
-	table := generatePolicyTable(DDBS)
-	// 构建acl action  1:1000->2:0 tcp
-	action := generateAclAction(10, ACTION_PACKET_COUNTING)
-	action = action.SetACLGID(10)
-	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, portAny, vlanAny)
-	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
-	acls = append(acls, acl)
-	table.UpdateAcls(acls)
-
-	// 构建查询1-key  1:1000->2:8000 tcp
-	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 8000)
-	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
-	endpoint := getEndpointData(table, key)
-
-	// endpoint中匹配策略的资源组和不匹配策略的资源组相交叉
-	endpoint.SrcInfo.GroupIds = append(endpoint.SrcInfo.GroupIds[:0], group[1], 100, 300, group[1])
-	endpoint.DstInfo.GroupIds = append(endpoint.DstInfo.GroupIds[:0], group[2], 200, 300, group[2])
-	table.cloudPlatformLabeler.ipGroup.anonymousGroupIds[300] = true
-	policyData := getPolicyByFirstPath(table, endpoint, key)
-	aclGidbitmap := AclGidBitmap(0).SetSrcAndDstFlag().SetSrcMapBits(0).SetDstMapBits(0)
-	aclGidbitmap = aclGidbitmap.SetSrcMapBits(2).SetDstMapBits(2)
-	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
-	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(1)
-	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidbitmap)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmap Check Failed!")
-	}
-}
-
-func TestDdbsAclGidBitmapFirstPathVsFastPath(t *testing.T) {
-	acls := []*Acl{}
-	// 创建 policyTable
-	table := generatePolicyTable(DDBS)
-	// 构建acl action  1:1000->2:0 tcp
-	action := generateAclAction(10, ACTION_PACKET_COUNTING)
-	action = action.SetACLGID(10)
-	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, portAny, vlanAny)
-	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(1000, 1000))
-	acl1 := generatePolicyAcl(table, action, 20, group[2], group[1], IPProtocolTCP, portAny, vlanAny)
-	acl.SrcPortRange = append(acl.SrcPortRange, NewPortRange(8000, 8000))
-	acls = append(acls, acl, acl1)
-	table.UpdateAcls(acls)
-	// 构建查询1-key  1:1000->2:8000 tcp
-	key1 := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 8000)
-	setEthTypeAndOthers(key1, EthernetTypeIPv4, 64, true, true)
-	result := getEndpointData(table, key1)
-	policyData := getPolicyByFirstPath(table, result, key1)
-	aclGidBitmap := AclGidBitmap(0).SetSrcAndDstFlag().SetSrcMapBits(0).SetDstMapBits(0)
-	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
-	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].AddDirections(BACKWARD)
-	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(1)
-	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidBitmap)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmapFirstPathVsFastPath FirstPath Check Failed!")
-	}
-	_, policyData = getPolicyByFastPath(table, key1)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmapFirstPathVsFastPath FastPath Check Failed!")
-	}
-
-	key2 := generateLookupKey(group2Mac, group1Mac, vlanAny, group2Ip1, group1Ip1, IPProtocolTCP, 8000, 1000)
-	setEthTypeAndOthers(key2, EthernetTypeIPv4, 64, true, true)
-	basicPolicyData.ACLID = 20
-	result = getEndpointData(table, key2)
-	policyData = getPolicyByFirstPath(table, result, key2)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmapFirstPathVsFastPath FirstPath Check Failed!")
-	}
-	_, policyData = getPolicyByFastPath(table, key2)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmapFirstPathVsFastPath FastPath Check Failed!")
-	}
-}
-
-func TestDdbsAclGidBitmapFirstPathVsFastPathByVlan(t *testing.T) {
-	acls := []*Acl{}
-	// 创建 policyTable
-	table := generatePolicyTable(DDBS)
-	action := generateAclAction(10, ACTION_PACKET_COUNTING)
-	action = action.SetACLGID(10)
-	acl1 := generatePolicyAcl(table, action, 10, group[1], group[2], protoAny, portAny, vlan1)
-	acl2 := generatePolicyAcl(table, action, 20, group[1], group[2], IPProtocolTCP, portAny, vlanAny)
-	acls = append(acls, acl1, acl2)
-	table.UpdateAcls(acls)
-	// vlan1策略正向
-	key1 := generateLookupKey(group1Mac, group2Mac, vlan1, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 8000)
-	setEthTypeAndOthers(key1, EthernetTypeIPv4, 64, true, true)
-	result := getEndpointData(table, key1)
-	policyData := getPolicyByFirstPath(table, result, key1)
-	aclGidBitmap := AclGidBitmap(0).SetSrcAndDstFlag().SetSrcMapBits(0).SetDstMapBits(0)
-	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl1.Id)
-	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(1)
-	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidBitmap)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FirstPath Check Failed!")
-	}
-	key1.SrcAllGroupIds = nil
-	key1.DstAllGroupIds = nil
-	_, policyData = getPolicyByFastPath(table, key1)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FastPath Check Failed!")
-	}
-	// vlan1策略反向
-	key2 := generateLookupKey(group2Mac, group1Mac, vlan1, group2Ip1, group1Ip1, IPProtocolTCP, 8000, 1000)
-	setEthTypeAndOthers(key2, EthernetTypeIPv4, 64, true, true)
-	result = getEndpointData(table, key2)
-	policyData = getPolicyByFirstPath(table, result, key2)
-	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetDirections(BACKWARD)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FirstPath Check Failed!")
-	}
-	key2.SrcAllGroupIds = nil
-	key2.DstAllGroupIds = nil
-	_, policyData = getPolicyByFastPath(table, key2)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FastPath Check Failed!")
-	}
-	// vlanAny策略正向
-	key3 := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 8000)
-	setEthTypeAndOthers(key3, EthernetTypeIPv4, 64, true, true)
-	result = getEndpointData(table, key3)
-	policyData = getPolicyByFirstPath(table, result, key3)
-	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetDirections(FORWARD)
-	basicPolicyData.ACLID = 20
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FirstPath Check Failed!")
-	}
-	_, policyData = getPolicyByFastPath(table, key3)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FastPath Check Failed!")
-	}
-	// vlanAny策略反向
-	key4 := generateLookupKey(group2Mac, group1Mac, vlanAny, group2Ip1, group1Ip1, IPProtocolTCP, 8000, 1000)
-	setEthTypeAndOthers(key3, EthernetTypeIPv4, 64, true, true)
-	result = getEndpointData(table, key4)
-	policyData = getPolicyByFirstPath(table, result, key4)
-	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetDirections(BACKWARD)
-	basicPolicyData.ACLID = 20
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FirstPath Check Failed!")
-	}
-	_, policyData = getPolicyByFastPath(table, key4)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmapFirstPathVsFastPathByVlan FastPath Check Failed!")
-	}
-}
-
-func TestDdbsAclGidBitmapGroup48(t *testing.T) {
-	acls := []*Acl{}
-	table := NewPolicyTable(1, 1024, false, DDBS)
-	action := generateAclAction(10, ACTION_PACKET_COUNTING)
-	action = action.SetACLGID(100)
-	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
-	for i := 102; i < 150; i++ {
-		acl.SrcGroups = append(acl.SrcGroups, uint32(i))
-		acl.DstGroups = append(acl.DstGroups, uint32(i))
-	}
-	acls = append(acls, acl)
-	ipGroups := make([]*IpGroupData, 0, 48)
-	// internet资源组
-	for i := 102; i < 150; i++ {
-		ipGroups = append(ipGroups, generateIpGroup(uint32(i), 0, "0.0.0.0/0"))
-	}
-	table.UpdateIpGroupData(ipGroups)
-	table.UpdateAclData(acls, false)
-	key := generateLookupKey(group1Mac, group2Mac, vlanAny, testIp4, queryIp, IPProtocolTCP, 0, 0)
-	_, policyData := table.LookupAllByKey(key)
-	aclGidBitmap0 := AclGidBitmap(0).SetSrcAndDstFlag()
-	aclGidBitmap1 := AclGidBitmap(0).SetSrcAndDstFlag()
-	for i := 0; i < 24; i++ {
-		aclGidBitmap0 = aclGidBitmap0.SetSrcMapBits(uint32(i)).SetDstMapBits(uint32(i))
-	}
-	aclGidBitmap1 = aclGidBitmap1.SetSrcMapOffset(24).SetDstMapOffset(24)
-	for i := 24; i < 48; i++ {
-		aclGidBitmap1 = aclGidBitmap1.SetSrcMapBits(uint32(i)).SetDstMapBits(uint32(i))
-	}
-	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
-	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].AddDirections(BACKWARD)
-	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(2)
-	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidBitmap0, aclGidBitmap1)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestDdbsAclGidBitmapGroup48 Check Failed!")
-	}
-}
-
 func TestDdbsTapType(t *testing.T) {
 	acls := []*Acl{}
 	// 创建 policyTable
@@ -1553,81 +1262,6 @@ func TestDdbsTapType(t *testing.T) {
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestDdbsTapType Check Failed!")
-	}
-}
-
-func TestDdbsAclGidBitmapByDesignationAcls(t *testing.T) {
-	table := NewPolicyTable(1, 1024, false, DDBS)
-	action1 := generateAclAction(10, ACTION_PACKET_COUNTING)
-	action1 = action1.SetACLGID(100)
-	action2 := generateAclAction(20, ACTION_PACKET_COUNTING)
-	action2 = action2.SetACLGID(200)
-	action3 := generateAclAction(30, ACTION_PACKET_COUNTING)
-	action3 = action3.SetACLGID(300)
-	action4 := generateAclAction(30, ACTION_PACKET_COUNTING)
-	action4 = action4.SetACLGID(400)
-	// 10->20
-	acl1 := generatePolicyAcl(table, action1, 10, group[1], group[2], IPProtocolTCP, 0, vlanAny)
-	// any->20
-	acl2 := generatePolicyAcl(table, action2, 20, groupAny, group[2], IPProtocolTCP, 0, vlanAny)
-	// 10->any
-	acl3 := generatePolicyAcl(table, action3, 30, group[1], groupAny, IPProtocolTCP, 0, vlanAny)
-	// any->any
-	acl4 := generatePolicyAcl(table, action4, 40, groupAny, groupAny, IPProtocolTCP, 0, vlanAny)
-	ipGroups := make([]*IpGroupData, 0, 100)
-	ipGroups = append(ipGroups, generateIpGroup(group[1], 0, group1Ip1Net))
-	ipGroups = append(ipGroups, generateIpGroup(group[2], 0, group2Ip1Net))
-	table.UpdateIpGroupData(ipGroups)
-	acls := []*Acl{}
-	acls = append(acls, acl1, acl2, acl3, acl4)
-	table.UpdateAcls(acls)
-	// group1Ip1 -> group2Ip1
-	key := generateLookupKey(group1Mac, group2Mac, vlanAny, group1Ip1, group2Ip1, IPProtocolTCP, 0, 0)
-	_, policyData := table.LookupAllByKey(key)
-	aclGidBitmap1 := AclGidBitmap(0).SetSrcAndDstFlag()
-	aclGidBitmap1 = aclGidBitmap1.SetSrcMapOffset(0).SetSrcMapBits(0)
-	aclGidBitmap1 = aclGidBitmap1.SetDstMapOffset(0).SetDstMapBits(0)
-	aclGidBitmap2 := AclGidBitmap(0).SetSrcAndDstFlag()
-	aclGidBitmap2 = aclGidBitmap2.SetDstMapOffset(0).SetDstMapBits(0)
-	aclGidBitmap3 := AclGidBitmap(0).SetSrcAndDstFlag()
-	aclGidBitmap3 = aclGidBitmap3.SetSrcMapOffset(0).SetSrcMapBits(0)
-
-	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action1, action2, action3, action4}, nil, acl1.Id)
-	basicPolicyData.AclActions[3] = basicPolicyData.AclActions[3].AddDirections(BACKWARD)
-	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(1)
-	basicPolicyData.AclActions[1] = basicPolicyData.AclActions[1].SetAclGidBitmapOffset(1).SetAclGidBitmapCount(1)
-	basicPolicyData.AclActions[2] = basicPolicyData.AclActions[2].SetAclGidBitmapOffset(2).SetAclGidBitmapCount(1)
-	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidBitmap1, aclGidBitmap2, aclGidBitmap3)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmap Check Failed!")
-	}
-	// group1Ip1 -> group3Ip1
-	key1 := generateLookupKey(group1Mac, group3Mac1, vlanAny, group1Ip1, group3Ip1, IPProtocolTCP, 0, 0)
-	_, policyData = table.LookupAllByKey(key1)
-	aclGidBitmap1 = AclGidBitmap(0).SetSrcAndDstFlag()
-	aclGidBitmap1 = aclGidBitmap1.SetSrcMapOffset(0).SetSrcMapBits(0)
-	basicPolicyData = new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action3, action4}, nil, acl3.Id)
-	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(1)
-	basicPolicyData.AclActions[1] = basicPolicyData.AclActions[1].AddDirections(BACKWARD)
-	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidBitmap1)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmap Check Failed!")
-	}
-	// group2Ip1 -> group3Ip1
-	key2 := generateLookupKey(group2Mac, group3Mac1, vlanAny, group2Ip1, group3Ip1, IPProtocolTCP, 0, 0)
-	_, policyData = table.LookupAllByKey(key2)
-	aclGidBitmap1 = AclGidBitmap(0).SetSrcAndDstFlag()
-	aclGidBitmap1 = aclGidBitmap1.SetSrcMapOffset(0).SetSrcMapBits(0)
-	basicPolicyData = new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action4, action2}, nil, acl4.Id)
-	basicPolicyData.AclActions[0] = basicPolicyData.AclActions[0].AddDirections(BACKWARD)
-	basicPolicyData.AclActions[1] = basicPolicyData.AclActions[1].SetDirections(BACKWARD)
-	basicPolicyData.AclActions[1] = basicPolicyData.AclActions[1].SetAclGidBitmapOffset(0).SetAclGidBitmapCount(1)
-	basicPolicyData.AclGidBitmaps = append(basicPolicyData.AclGidBitmaps, aclGidBitmap1)
-	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestAclGidBitmap Check Failed!")
 	}
 }
 
