@@ -288,11 +288,16 @@ func (l *CloudPlatformLabeler) UpdateGroupTree(ipGroupDatas []*IpGroupData) {
 func (l *CloudPlatformLabeler) UpdateCidr(cidrs []*Cidr) {
 	epcCidr := make(map[int32][]*Cidr, len(cidrs))
 	for _, cidr := range cidrs {
-		cidrs := epcCidr[cidr.EpcId]
+		epc := cidr.EpcId
+		// WAN的CIDR都存在EPC_FROM_DEEPFLOW表中
+		if cidr.Type == CIDR_TYPE_WAN {
+			epc = EPC_FROM_DEEPFLOW
+		}
+		cidrs := epcCidr[epc]
 		if cidrs == nil {
 			cidrs = make([]*Cidr, 0, 2)
 		}
-		epcCidr[cidr.EpcId] = append(cidrs, cidr)
+		epcCidr[epc] = append(cidrs, cidr)
 	}
 	l.epcCidrMapData = epcCidr
 }
@@ -300,7 +305,9 @@ func (l *CloudPlatformLabeler) UpdateCidr(cidrs []*Cidr) {
 func (l *CloudPlatformLabeler) setEpcByCidr(ip net.IP, epc int32, endpointInfo *EndpointInfo) bool {
 	for _, cidr := range l.epcCidrMapData[epc] {
 		if cidr.IpNet.Contains(ip) {
-			endpointInfo.L3EpcId = epc
+			// 获取的EPC以CIDR实际存储的为主
+			// 使用EPC_FROM_DEEPFLOW查表, 会获取WAN的CIDR, 但是其EPC可能不是EPC_FROM_DEEPFLOW
+			endpointInfo.L3EpcId = cidr.EpcId
 			return true
 		}
 	}
@@ -372,7 +379,7 @@ func (l *CloudPlatformLabeler) ModifyEndpointData(endpointData *EndpointData, ke
 		srcIp, dstIp = key.Src6Ip, key.Dst6Ip
 	}
 	// 默认L2End为false时L3EpcId == 0，L2End为true时L2EpcId不为0
-	if dstData.L3EpcId == 0 && srcData.L3EpcId != 0 {
+	if dstData.L3EpcId == 0 && srcData.L3EpcId > 0 {
 		if platformData := l.GetDataByEpcIp(srcData.L3EpcId, dstIp); platformData != nil {
 			// 本端IP + 对端EPC查询EPC-IP表
 			dstData.SetL3Data(platformData, dstIp)
@@ -382,7 +389,7 @@ func (l *CloudPlatformLabeler) ModifyEndpointData(endpointData *EndpointData, ke
 		}
 	}
 
-	if srcData.L3EpcId == 0 && dstData.L3EpcId != 0 {
+	if srcData.L3EpcId == 0 && dstData.L3EpcId > 0 {
 		if platformData := l.GetDataByEpcIp(dstData.L3EpcId, srcIp); platformData != nil {
 			// 本端IP + 对端EPC查询EPC-IP表
 			srcData.SetL3Data(platformData, srcIp)
