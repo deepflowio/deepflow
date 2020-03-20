@@ -18,14 +18,13 @@ func MarshalFlow(f *datatype.TaggedFlow, bytes *utils.ByteBuffer) error {
 	flowMetricsPeerDst := &f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST]
 
 	flow := &pb.Flow{
-		VtapId:     proto.Uint32(uint32(f.VtapId)),
-		Exporter:   proto.Uint32(f.Exporter),
-		CloseType:  proto.Uint32(uint32(f.CloseType)),
-		FlowId:     proto.Uint64(f.FlowID),
-		StartTime:  proto.Uint32(uint32(f.StartTime.Seconds())),
-		EndTime:    proto.Uint32(uint32(f.EndTime.Seconds())),
-		Duration:   proto.Uint64(uint64(f.Duration / time.Microsecond)),
-		TimeBitmap: proto.Uint64(f.TimeBitmap),
+		VtapId:    proto.Uint32(uint32(f.VtapId)),
+		Exporter:  proto.Uint32(f.Exporter),
+		CloseType: proto.Uint32(uint32(f.CloseType)),
+		FlowId:    proto.Uint64(f.FlowID),
+		StartTime: proto.Uint32(uint32(f.StartTime.Seconds())),
+		EndTime:   proto.Uint32(uint32(f.EndTime.Seconds())),
+		Duration:  proto.Uint64(uint64(f.Duration / time.Microsecond)),
 		// L1
 		InPort_0: proto.Uint32(f.InPort),
 		// L2
@@ -57,35 +56,12 @@ func MarshalFlow(f *datatype.TaggedFlow, bytes *utils.ByteBuffer) error {
 		TotalPktCnt_0:  proto.Uint64(flowMetricsPeerSrc.TotalPacketCount),
 		TotalPktCnt_1:  proto.Uint64(flowMetricsPeerDst.TotalPacketCount),
 		// Platform Data
-		SubnetId_0:     proto.Uint32(flowMetricsPeerSrc.SubnetID),
-		SubnetId_1:     proto.Uint32(flowMetricsPeerDst.SubnetID),
-		L3DeviceType_0: proto.Uint32(uint32(flowMetricsPeerSrc.L3DeviceType)),
-		L3DeviceType_1: proto.Uint32(uint32(flowMetricsPeerDst.L3DeviceType)),
-		L3DeviceId_0:   proto.Uint32(flowMetricsPeerSrc.L3DeviceID),
-		L3DeviceId_1:   proto.Uint32(flowMetricsPeerDst.L3DeviceID),
-		L3EpcId_0:      proto.Uint32(uint32(flowMetricsPeerSrc.L3EpcID)),
-		L3EpcId_1:      proto.Uint32(uint32(flowMetricsPeerDst.L3EpcID)),
-		Host_0:         proto.Uint32(flowMetricsPeerSrc.Host),
-		Host_1:         proto.Uint32(flowMetricsPeerDst.Host),
-		EpcId_0:        proto.Uint32(uint32(flowMetricsPeerSrc.EpcID)),
-		EpcId_1:        proto.Uint32(uint32(flowMetricsPeerDst.EpcID)),
-		DeviceType_0:   proto.Uint32(uint32(flowMetricsPeerSrc.DeviceType)),
-		DeviceType_1:   proto.Uint32(uint32(flowMetricsPeerDst.DeviceType)),
-		DeviceId_0:     proto.Uint32(flowMetricsPeerSrc.DeviceID),
-		DeviceId_1:     proto.Uint32(flowMetricsPeerDst.DeviceID),
-		IsL2End_0:      proto.Bool(flowMetricsPeerSrc.IsL2End),
-		IsL2End_1:      proto.Bool(flowMetricsPeerDst.IsL2End),
-		IsL3End_0:      proto.Bool(flowMetricsPeerSrc.IsL3End),
-		IsL3End_1:      proto.Bool(flowMetricsPeerDst.IsL3End),
-		GroupIds_0:     f.GroupIDs0,
-		GroupIds_1:     f.GroupIDs1,
-		AclId:          proto.Uint32(uint32(f.PolicyData.ACLID)),
-		AclGids:        getACLGIDs(f),
-		// Geo Info
-		Country: proto.Uint32(uint32(f.Country)),
-		Region:  proto.Uint32(uint32(f.Region)),
-		Isp:     proto.Uint32(uint32(f.ISP)),
-		GeoEnd:  proto.Uint32(uint32(f.GeoEnd)),
+		L3EpcId_0: proto.Uint32(uint32(flowMetricsPeerSrc.L3EpcID)),
+		L3EpcId_1: proto.Uint32(uint32(flowMetricsPeerDst.L3EpcID)),
+		IsL2End_0: proto.Bool(flowMetricsPeerSrc.IsL2End),
+		IsL2End_1: proto.Bool(flowMetricsPeerDst.IsL2End),
+		IsL3End_0: proto.Bool(flowMetricsPeerSrc.IsL3End),
+		IsL3End_1: proto.Bool(flowMetricsPeerDst.IsL3End),
 	}
 
 	if f.EthType == layers.EthernetTypeIPv6 {
@@ -95,23 +71,16 @@ func MarshalFlow(f *datatype.TaggedFlow, bytes *utils.ByteBuffer) error {
 
 	// TCP Perf Data
 	if f.TcpPerfStats != nil {
-		flow.RttSyn = proto.Uint64(uint64(f.RTTSyn))
-		flow.RttSynClient = proto.Uint64(uint64(f.RTTSynClient))
-		flow.RttSynServer = proto.Uint64(uint64(f.RTTSynServer))
-		flow.Rtt = proto.Uint64(uint64(f.RTT))
-		flow.SynRetransCnt_0 = proto.Uint64(uint64(f.TcpPerfCountsPeerSrc.SynRetransCount))
-		flow.SynRetransCnt_1 = proto.Uint64(uint64(f.TcpPerfCountsPeerDst.SynRetransCount))
+		flow.RttSyn = proto.Uint64(uint64(f.RTTSum / f.RTTCount))
+		flow.RttSynClient = proto.Uint64(uint64(f.RTTClientSum / f.RTTClientCount))
+		flow.RttSynServer = proto.Uint64(uint64(f.RTTServerSum / f.RTTServerCount))
+		flow.Rtt = proto.Uint64(uint64(f.SRTSum / f.SRTCount))
+		flow.ArtAvg = proto.Uint64(uint64(f.ARTSum / f.ARTCount))
 		flow.RetransCnt_0 = proto.Uint64(uint64(f.TcpPerfCountsPeerSrc.RetransCount))
 		flow.RetransCnt_1 = proto.Uint64(uint64(f.TcpPerfCountsPeerDst.RetransCount))
 		flow.ZeroWndCnt_0 = proto.Uint64(uint64(f.TcpPerfCountsPeerSrc.ZeroWinCount))
 		flow.ZeroWndCnt_1 = proto.Uint64(uint64(f.TcpPerfCountsPeerDst.ZeroWinCount))
 		flow.TotalRetransCnt = proto.Uint64(uint64(f.TotalRetransCount))
-		flow.PshUrgCnt_0 = proto.Uint64(uint64(f.TcpPerfCountsPeerSrc.PshUrgCount))
-		flow.PshUrgCnt_1 = proto.Uint64(uint64(f.TcpPerfCountsPeerSrc.PshUrgCount))
-		flow.ArtAvg = proto.Uint64(uint64(f.ART))
-		flow.AvgPktInterval = proto.Uint64(f.PacketIntervalAvg)
-		flow.PktIntervalVariance = proto.Uint64(f.PacketIntervalVariance)
-		flow.PktSizeVariance = proto.Uint64(f.PacketSizeVariance)
 	}
 
 	buf := bytes.Use(flow.Size())
