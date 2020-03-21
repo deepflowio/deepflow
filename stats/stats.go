@@ -2,6 +2,7 @@ package stats
 
 import (
 	"flag"
+	"fmt"
 	"net"
 	"os"
 	"path"
@@ -31,6 +32,14 @@ type StatSource struct {
 	countable Countable
 	tags      OptionStatTags
 	skip      int
+}
+
+func (s *StatSource) Equal(other *StatSource) bool {
+	return s.module == other.module && reflect.DeepEqual(s.tags, other.tags)
+}
+
+func (s *StatSource) String() string {
+	return fmt.Sprintf("%s-%v", s.module, s.tags)
 }
 
 var (
@@ -70,6 +79,14 @@ func registerCountable(module string, countable Countable, opts ...Option) error
 	}
 	source.tags["host"] = hostname
 	lock.Lock()
+	statSources.Remove(func(x interface{}) bool {
+		closed := x.(*StatSource).countable.Closed()
+		equal := x.(*StatSource).Equal(&source)
+		if !closed && equal {
+			log.Warningf("Possible memory leak! countable %v is not correctly closed.", &source)
+		}
+		return closed || equal
+	})
 	statSources.PushBack(&source)
 	lock.Unlock()
 	return nil

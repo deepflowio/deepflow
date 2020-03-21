@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/lru"
+	"gitlab.x.lan/yunshan/droplet-libs/stats"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
@@ -49,4 +50,8 @@ func (p *PossibleHost) Check6(host net.IP, epcId int32) bool {
 	_, ok := p.hostMap.Get(key, true)
 	p.hostMapMutex.RUnlock()
 	return ok
+}
+
+func (p *PossibleHost) StatsClosables() []*stats.Closable {
+	return []*stats.Closable{&p.hostMap.Closable}
 }
