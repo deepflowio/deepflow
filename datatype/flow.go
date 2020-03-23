@@ -65,27 +65,29 @@ type FlowKey struct {
 }
 
 type TcpPerfCountsPeer struct {
-	RetransCount uint32
-	ZeroWinCount uint32
+	SynRetransCount uint32
+	RetransCount    uint32
+	ZeroWinCount    uint32
+	PshUrgCount     uint32
 }
 
 type TcpPerfCountsPeerSrc TcpPerfCountsPeer
 type TcpPerfCountsPeerDst TcpPerfCountsPeer
 
-type TcpPerfStats struct { // 除特殊说明外，均为每个流统计周期（目前是自然分）清零
-	RTTSum         uint32 // us
-	RTTClientSum   uint32 // us
-	RTTServerSum   uint32 // us
-	SRTSum         uint32 // us
-	ARTSum         uint32 // us
-	RTTCount       uint32
-	RTTClientCount uint32
-	RTTServerCount uint32
-	SRTCount       uint32
-	ARTCount       uint32
+type TcpPerfStats struct {
+	RTTSyn       time.Duration
+	RTTSynClient time.Duration
+	RTTSynServer time.Duration
+	RTT          time.Duration
+	ART          time.Duration
 	TcpPerfCountsPeerSrc
 	TcpPerfCountsPeerDst
-	TotalRetransCount uint32 // 整个Flow生命周期的统计量
+	PacketIntervalAvg      uint64
+	PacketIntervalVariance uint64
+	PacketSizeVariance     uint64
+	TotalRetransCount      uint32
+	TotalZeroWinCount      uint32
+	TotalPshUrgCount       uint32
 }
 
 type FlowMetricsPeer struct {
@@ -94,10 +96,17 @@ type FlowMetricsPeer struct {
 	TickPacketCount  uint64        // 每个包统计周期（目前是自然秒）清零
 	ByteCount        uint64        // 每个流统计周期（目前是自然分）清零
 	PacketCount      uint64        // 每个流统计周期（目前是自然分）清零
-	TotalByteCount   uint64        // 整个Flow生命周期的统计量
-	TotalPacketCount uint64        // 整个Flow生命周期的统计量
-	First, Last      time.Duration // 整个Flow生命周期首包和尾包的时间戳
+	TotalByteCount   uint64        // 不清零
+	TotalPacketCount uint64        // 不清零
+	First, Last      time.Duration // 首包和尾包的时间戳
+	SubnetID         uint32
+	L3DeviceID       uint32
+	DeviceID         uint32
 	L3EpcID          int32
+	EpcID            int32
+	Host             uint32
+	L3DeviceType     DeviceType
+	DeviceType       DeviceType
 	TCPFlags         uint8
 	IsL2End          bool
 	IsL3End          bool
@@ -115,8 +124,9 @@ type Flow struct {
 	FlowKey
 	FlowMetricsPeers [FLOW_METRICS_PEER_MAX]FlowMetricsPeer
 
-	FlowID   uint64
-	Exporter uint32
+	FlowID     uint64
+	TimeBitmap uint64
+	Exporter   uint32
 
 	/* Timers */
 	StartTime      time.Duration
@@ -131,6 +141,12 @@ type Flow struct {
 
 	/* TCP Perf Data */
 	*TcpPerfStats
+
+	/* Flow Geo Info */
+	GeoEnd  uint8
+	Country uint8
+	Region  uint8
+	ISP     uint8
 
 	CloseType
 	IsActiveService bool
@@ -199,9 +215,14 @@ func (f *Flow) String() string {
 	formatted += fmt.Sprintf("FlowStatTime: %d\n", f.FlowStatTime/time.Second)
 	formatted += fmt.Sprintf("\tStartTime: %d ", f.StartTime)
 	formatted += fmt.Sprintf("EndTime: %d ", f.EndTime)
-	formatted += fmt.Sprintf("Duration: %d\n", f.Duration)
+	formatted += fmt.Sprintf("Duration: %d ", f.Duration)
+	formatted += fmt.Sprintf("TimeBitmap: b%b\n", f.TimeBitmap)
 	formatted += fmt.Sprintf("\tVLAN: %d ", f.VLAN)
 	formatted += fmt.Sprintf("EthType: %d ", f.EthType)
+	formatted += fmt.Sprintf("Country: %d ", f.Country)
+	formatted += fmt.Sprintf("Region: %d ", f.Region)
+	formatted += fmt.Sprintf("ISP: %d ", f.ISP)
+	formatted += fmt.Sprintf("GeoEnd: %d ", f.GeoEnd)
 	formatted += fmt.Sprintf("%s\n", f.FlowKey.String())
 	formatted += fmt.Sprintf("\tFlowMetricsPeerSrc: {%s}\n", f.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].String())
 	formatted += fmt.Sprintf("\tFlowMetricsPeerDst: {%s}", f.FlowMetricsPeers[FLOW_METRICS_PEER_DST].String())
