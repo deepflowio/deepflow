@@ -249,9 +249,9 @@ func (d *PolicyRawData) GobDecode(in []byte) error {
 type PolicyData struct {
 	AclActions    []AclAction
 	NpbActions    []NpbActions
-	AclGidBitmaps []AclGidBitmap // FIXME 删除，如果Reciter不需要的话
-	ACLID         uint32         // FIXME 删除，匹配的第一个ACL
-	ActionFlags   ActionFlag     // FIXME 删除，如果NPB/PCAP不需要的话，bitwise OR
+	AclGidBitmaps []AclGidBitmap
+	ACLID         uint32     // 匹配的第一个ACL
+	ActionFlags   ActionFlag // bitwise OR
 }
 
 type DirectionType uint8
