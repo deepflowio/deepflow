@@ -12,14 +12,6 @@ log-level: info
 profiler: false
 # maximum usage of cpu cores, 0 means no limit
 max-cpus: 0
-# conf for connection with outside stream
-stream: 127.0.0.1
-stream-port: 20201
-# 单个flow-queue每秒向stream进程发送的最大Flow数量，默认值2000，允许范围[1000, 100000]
-flow-throttle: 2000
-# conf for connection with outside zero
-zero-port: 20211
-# trident adapter
 adapter:
   # udp socket buffer size (Bytes) for receiving trident traffic,
   # default 32MB, and maximum 2GB
@@ -33,88 +25,17 @@ adapter:
 # internal queues conf
 queue:
   # ----------- 并行度 -----------
-  # 传输网包的队列数量，也是网包处理（以网包作为输入，及flow-duplicator）模块的并行度，默认为1，最大16
+  # 传输网包的队列数量，也是网包处理（以网包作为输入）模块的并行度，默认为1，最大16
   packet-queue-count: 1
-  # 传输网流的队列数量，也是网流处理（以网流作为输入）模块的并行度，默认为1，最大16
-  flow-queue-count: 1
-  # 传输统计数据的队列数量，也是网包、网流统计数据序列化模块各自的并行度，默认为1，最大16
-  doc-queue-count: 1
-  # ---------- 全局队列长度 -----------
   # 传输网包的每个队列的长度，默认为65536
   packet-queue-size: 65536
-  # 传输网流的每个队列的长度，默认为524288或packet-queue-size的8倍
-  flow-queue-size: 524288
-  # 传输统计数据的每个队列的长度，默认为524288或packet-queue-size的8倍
-  doc-queue-size: 524288
-  # ---------- 每个模块的队列长度 ----------
-  # name: 1-meta-packet-block-to-flow-generator
-  # flow generator read queue size, default packet-queue-size
-  flow-generator-queue-size: 65536
-  # name: 2-meta-packet-block-to-pcap-app
-  # pcap app read queue size, default packet-queue-size
-  pcap-app-queue-size: 65536
-  # name: 2-mini-tagged-flow-to-metering-app
-  # metering app read queue size, default packet-queue-size
-  metering-app-queue-size: 65536
-  # name: 2-tagged-flow-to-flow-duplicator
-  # flow duplicator read queue size, default flow-queue-size
-  flow-duplicator-queue-size: 524288
-  # name: 3-tagged-flow-to-flow-app
-  # flow app read queue size, default flow-queue-size
-  flow-app-queue-size: 524288
-  # name: 3-metering-doc-to-marshaller
-  # metering app output queue size, default doc-queue-size
-  metering-doc-marshaller-queue-size: 524288
-  # name: 3-tagged-flow-to-flow-throttle
-  # flow sender queue size, default flow-queue-size
-  flow-throttle-queue-size: 524288
-  # name: 4-flow-doc-to-marshaller
-  # flow app output queue size, default doc-queue-size
-  flow-doc-marshaller-queue-size: 524288
-  # name: 4-tagged-flow-to-flow-sender
-  # flow sender queue size, default flow-queue-size
-  flow-sender-queue-size: 524288
-  # name: 5-all-doc-to-zero
-  # doc sender queue size, default doc-queue-size
-  doc-sender-queue-size: 524288
-# internal labeler conf
 labeler:
-  # whether to use ddbs
-  first-path-ddbs-disable: false
   # whether to use first-path processing only
   fast-path-disable: false
   # size of policy fast-path map, and
   # map-size-limit >= filter-queue-count*1024
   # map-size-limit <= filter-queue-count*1048576
   map-size-limit: 1048576
-# internal flow generator conf
-flow-generator:
-  # concurrent flow count limit
-  flow-count-limit: 4194304
-  # idle timeout for established tcp flow, in seconds
-  established-timeout: 300
-  # idle timeout for closing tcp flow,
-  # or tcp flow with rst after established,
-  # or non-tcp flow with dual direction, in seconds
-  closing-rst-timeout: 35
-  # idle timeout for opening tcp flow,
-  # or tcp flow with exception,
-  # or flow with single direction, in seconds
-  others-timeout: 5
-  # hash map size for every generator
-  hash-map-size: 262166
-  # 网包时间与当前时间相比的最大delay，单位为秒，可配置[1, 10]，默认为5
-  packet-delay: 5
-  # if true, then not check mac for flow match when inport is 0x30000
-  ignore-tor-mac: false
-  # if true, then not check mac for flow match
-  # when inport is bigger than 0x30000 and l2end is false
-  ignore-l2-end: false
-map-reduce:
-  # 聚合窗口的大小，单位秒，最小值为70，调整时注意考虑report-tolerance
-  window-size: 70
-  # 窗口移动时，窗口边缘与数据位置的差值。该配置必须小于window-size，否则会被置为0。该配置仅对usage和fps有效
-  window-move-margin: 3
 pcap:
   # 计算TCP/IP checksum，默认不计算
   tcpip-checksum: false

@@ -6,10 +6,12 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/debug"
 	"gitlab.x.lan/yunshan/droplet-libs/dropletpb"
 	"gitlab.x.lan/yunshan/droplet-libs/policy"
+	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
-
-	"gitlab.x.lan/yunshan/droplet/dropletctl"
 	"gitlab.x.lan/yunshan/message/trident"
+
+	. "gitlab.x.lan/yunshan/droplet/common"
+	"gitlab.x.lan/yunshan/droplet/dropletctl"
 )
 
 var log = logging.MustGetLogger("labeler")
@@ -18,7 +20,6 @@ type LabelerManager struct {
 	command
 
 	policyTable *policy.PolicyTable
-	running     bool
 
 	lookupKey         []datatype.LookupKey
 	rawPlatformDatas  []*datatype.PlatformData
@@ -28,6 +29,11 @@ type LabelerManager struct {
 	rawPolicyData     []*policy.Acl
 
 	platformVersion, aclVersion, groupVersion uint64
+
+	packetQueueReaders []queue.QueueReader
+	packetQueueWriters []queue.QueueWriter
+
+	running bool
 }
 
 const (
@@ -47,14 +53,12 @@ type DumpKey struct {
 	InPort uint32
 }
 
-func NewLabelerManager(queueCount int, mapSize uint32, disable bool, ddbsDisable bool) *LabelerManager {
-	id := policy.DDBS
-	if ddbsDisable {
-		id = policy.NORMAL
-	}
+func NewLabelerManager(packetQueueReaders []queue.QueueReader, packetQueueWriters []queue.QueueWriter, queueCount int, mapSize uint32, disable bool) *LabelerManager {
 	labeler := &LabelerManager{
-		lookupKey:   make([]datatype.LookupKey, queueCount),
-		policyTable: policy.NewPolicyTable(queueCount, mapSize, disable, id),
+		packetQueueReaders: packetQueueReaders,
+		packetQueueWriters: packetQueueWriters,
+		lookupKey:          make([]datatype.LookupKey, queueCount),
+		policyTable:        policy.NewPolicyTable(queueCount, mapSize, disable),
 	}
 	labeler.command.init(labeler)
 	debug.Register(dropletctl.DROPLETCTL_LABELER, labeler)
@@ -160,9 +164,30 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) {
 	packet.EndpointData, packet.PolicyData = *endpoints, *policy
 }
 
+func (l *LabelerManager) run(id int) {
+	in := l.packetQueueReaders[id]
+	out := l.packetQueueWriters[id]
+	elements := make([]interface{}, QUEUE_BATCH_SIZE)
+
+	for l.running {
+		n := in.Gets(elements)
+		for _, e := range elements[:n] {
+			block := e.(*datatype.MetaPacketBlock)
+			for i := uint8(0); i < block.Count; i++ {
+				packet := &block.Metas[i]
+				l.GetPolicy(packet, id)
+			}
+			out.Put(block)
+		}
+	}
+}
+
 func (l *LabelerManager) Start() {
 	if !l.running {
 		l.running = true
+		for i := 0; i < len(l.packetQueueReaders); i++ {
+			go l.run(i)
+		}
 		log.Info("Start labeler manager")
 	}
 }
