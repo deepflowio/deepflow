@@ -7,6 +7,8 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+
+	. "gitlab.x.lan/yunshan/droplet/common"
 )
 
 type slave struct {

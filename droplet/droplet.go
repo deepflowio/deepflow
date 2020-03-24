@@ -13,19 +13,16 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/debug"
 	"gitlab.x.lan/yunshan/droplet-libs/logger"
-	"gitlab.x.lan/yunshan/droplet-libs/possible"
 	libqueue "gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 	"gopkg.in/yaml.v2"
 
 	"gitlab.x.lan/yunshan/droplet/adapter"
 	"gitlab.x.lan/yunshan/droplet/config"
-	"gitlab.x.lan/yunshan/droplet/flowgenerator"
 	"gitlab.x.lan/yunshan/droplet/labeler"
 	"gitlab.x.lan/yunshan/droplet/pcap"
 	"gitlab.x.lan/yunshan/droplet/profiler"
 	"gitlab.x.lan/yunshan/droplet/queue"
-	"gitlab.x.lan/yunshan/droplet/sender"
 	"gitlab.x.lan/yunshan/message/trident"
 )
 
@@ -91,12 +88,12 @@ func Start(configPath string) (closers []io.Closer) {
 	releaseMetaPacketBlock := func(x interface{}) {
 		datatype.ReleaseMetaPacketBlock(x.(*datatype.MetaPacketBlock))
 	}
-	flowGeneratorQueues := manager.NewQueues(
-		"1-meta-packet-block-to-flow-generator", cfg.Queue.FlowGeneratorQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
-		libqueue.OptionFlushIndicator(time.Second), libqueue.OptionRelease(releaseMetaPacketBlock),
+	labelerQueues := manager.NewQueues(
+		"1-meta-packet-block-to-labeler", cfg.Queue.PacketQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
+		libqueue.OptionRelease(releaseMetaPacketBlock),
 	)
 
-	tridentAdapter := adapter.NewTridentAdapter(flowGeneratorQueues.Writers(), cfg.Adapter.SocketBufferSize, cfg.Adapter.OrderingCacheSize)
+	tridentAdapter := adapter.NewTridentAdapter(labelerQueues.Writers(), cfg.Adapter.SocketBufferSize, cfg.Adapter.OrderingCacheSize)
 	if tridentAdapter == nil {
 		return
 	}
@@ -110,57 +107,20 @@ func Start(configPath string) (closers []io.Closer) {
 		os.Exit(1)
 	}
 
+	pcapAppQueues := manager.NewQueues(
+		"2-meta-packet-block-to-pcap-app", cfg.Queue.PacketQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
+		libqueue.OptionFlushIndicator(time.Second*10), libqueue.OptionRelease(releaseMetaPacketBlock),
+	)
+
 	// labeler
-	labelerManager := labeler.NewLabelerManager(
-		cfg.Queue.PacketQueueCount, cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable, cfg.Labeler.FirstPathDdbsDisable)
+	labelerManager := labeler.NewLabelerManager(labelerQueues.Readers(), pcapAppQueues.Writers(),
+		cfg.Queue.PacketQueueCount, cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable)
 	synchronizer.Register(func(response *trident.SyncResponse, version *config.RpcInfoVersions) {
 		log.Debug(response, version)
 		// Labeler更新策略信息
 		labelerManager.OnAclDataChange(response)
 	})
 	labelerManager.Start()
-
-	// L3 - flow generator & metering marshaller & pcap
-	flowFlushInterval := time.Second * 5
-	releaseTaggedFlow := func(x interface{}) {
-		datatype.ReleaseTaggedFlow(x.(*datatype.TaggedFlow))
-	}
-	pcapAppQueues := manager.NewQueues(
-		"2-meta-packet-block-to-pcap-app", cfg.Queue.PCapAppQueueSize, cfg.Queue.PacketQueueCount, cfg.Queue.PacketQueueCount,
-		libqueue.OptionFlushIndicator(time.Second*10), libqueue.OptionRelease(releaseMetaPacketBlock),
-	)
-	flowDuplicatorQueues := manager.NewQueues(
-		"2-tagged-flow-to-flow-duplicator", cfg.Queue.FlowDuplicatorQueueSize, cfg.Queue.PacketQueueCount,
-		cfg.Queue.PacketQueueCount, libqueue.OptionRelease(releaseTaggedFlow))
-	meteringAppQueues := manager.NewQueues(
-		"2-mini-tagged-flow-to-metering-app", cfg.Queue.MeteringAppQueueSize, cfg.Queue.PacketQueueCount,
-		cfg.Queue.PacketQueueCount, libqueue.OptionFlushIndicator(flowFlushInterval), libqueue.OptionRelease(releaseTaggedFlow),
-	)
-
-	possibleHost := possible.NewPossibleHost(1 << 16)
-	flowgenerator.SetFlowGenerator(cfg)
-	timeoutConfig := flowgenerator.TimeoutConfig{
-		Opening:         cfg.FlowGenerator.OthersTimeout,
-		Established:     cfg.FlowGenerator.EstablishedTimeout,
-		Closing:         cfg.FlowGenerator.OthersTimeout,
-		EstablishedRst:  cfg.FlowGenerator.ClosingRstTimeout,
-		Exception:       cfg.FlowGenerator.OthersTimeout,
-		ClosedFin:       0,
-		SingleDirection: cfg.FlowGenerator.OthersTimeout,
-	}
-	flowgenerator.SetTimeout(timeoutConfig)
-	flowLimitNum := int(cfg.FlowGenerator.FlowCountLimit) / cfg.Queue.PacketQueueCount
-	policyGetter := func(meta *datatype.MetaPacket, threadIndex int) {
-		labelerManager.GetPolicy(meta, threadIndex)
-	}
-	for i := 0; i < cfg.Queue.PacketQueueCount; i++ {
-		flowGenerator := flowgenerator.New(
-			policyGetter, flowGeneratorQueues.Readers()[i],
-			pcapAppQueues.Writers()[i], meteringAppQueues.Writers()[i],
-			flowDuplicatorQueues.Writers()[i], flowLimitNum, i, flowFlushInterval,
-			possibleHost)
-		flowGenerator.Start()
-	}
 
 	pcapClosers := pcap.NewWorkerManager(
 		pcapAppQueues.Readers(),
@@ -176,24 +136,6 @@ func Start(configPath string) (closers []io.Closer) {
 		cfg.PCap.FileDirectory,
 	).Start()
 	closers = append(closers, pcapClosers...)
-
-	// L4 - flow duplicator: flow app & flow marshaller
-	flowThrottleQueues := manager.NewQueues(
-		"3-tagged-flow-to-flow-throttle", cfg.Queue.FlowThrottleQueueSize, cfg.Queue.FlowQueueCount,
-		cfg.Queue.PacketQueueCount, libqueue.OptionRelease(releaseTaggedFlow))
-	// 特殊处理：Duplicator的数量特意设置为PacketQueueCount，使得FlowGenerator所在环境均为单生产单消费
-	for i := 0; i < cfg.Queue.PacketQueueCount; i++ {
-		flowDuplicator := queue.NewDuplicator(i, 1024, flowDuplicatorQueues.Readers()[i], datatype.PseudoCloneTaggedFlowHelper)
-		flowDuplicator.AddMultiQueue(flowThrottleQueues).Start()
-	}
-
-	// L5 - flow sender
-	flowSenderQueue := manager.NewQueue(
-		"4-tagged-flow-to-flow-sender", cfg.Queue.FlowSenderQueueSize, libqueue.OptionRelease(releaseTaggedFlow))
-	sender.NewFlowSender(
-		flowThrottleQueues.Readers(), flowSenderQueue, flowSenderQueue,
-		cfg.Stream, cfg.StreamPort, cfg.FlowThrottle, cfg.Queue.FlowSenderQueueSize).Start()
-
 	// 其他所有组件启动完成以后运行TridentAdapter，尽量避免启动过程中队列丢包
 	tridentAdapter.Start()
 	return

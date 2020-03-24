@@ -15,23 +15,17 @@ import (
 var log = logging.MustGetLogger("config")
 
 type Config struct {
-	ControllerIps  []string            `yaml:"controller-ips,flow"`
-	ControllerPort uint16              `yaml:"controller-port"`
-	LogFile        string              `yaml:"log-file"`
-	LogLevel       string              `yaml:"log-level"`
-	Profiler       bool                `yaml:"profiler"`
-	MaxCPUs        int                 `yaml:"max-cpus"`
-	Stream         string              `yaml:"stream"`
-	StreamPort     uint16              `yaml:"stream-port"`
-	FlowThrottle   int                 `yaml:"flow-throttle"`
-	ZeroPort       uint16              `yaml:"zero-port"`
-	Adapter        AdapterConfig       `yaml:"adapter"`
-	Queue          QueueConfig         `yaml:"queue"`
-	Labeler        LabelerConfig       `yaml:"labeler"`
-	FlowGenerator  FlowGeneratorConfig `yaml:"flow-generator"`
-	MapReduce      MapReduceConfig     `yaml:"map-reduce"`
-	RpcTimeout     time.Duration       `yaml:"rpc-timeout"`
-	PCap           PCapConfig          `yaml:"pcap"`
+	ControllerIps  []string      `yaml:"controller-ips,flow"`
+	ControllerPort uint16        `yaml:"controller-port"`
+	LogFile        string        `yaml:"log-file"`
+	LogLevel       string        `yaml:"log-level"`
+	Profiler       bool          `yaml:"profiler"`
+	MaxCPUs        int           `yaml:"max-cpus"`
+	Adapter        AdapterConfig `yaml:"adapter"`
+	Labeler        LabelerConfig `yaml:"labeler"`
+	Queue          QueueConfig   `yaml:"queue"`
+	RpcTimeout     time.Duration `yaml:"rpc-timeout"`
+	PCap           PCapConfig    `yaml:"pcap"`
 }
 
 type IpPortConfig struct {
@@ -44,48 +38,14 @@ type AdapterConfig struct {
 	OrderingCacheSize uint32 `yaml:"ordering-cache-size"`
 }
 
+type LabelerConfig struct {
+	FastPathDisable bool   `yaml:"fast-path-disable"`
+	MapSizeLimit    uint32 `yaml:"map-size-limit"`
+}
+
 type QueueConfig struct {
 	PacketQueueCount int `yaml:"packet-queue-count"`
-	FlowQueueCount   int `yaml:"flow-queue-count"`
-	DocQueueCount    int `yaml:"doc-queue-count"`
-
-	PacketQueueSize int `yaml:"packet-queue-size"`
-	FlowQueueSize   int `yaml:"flow-queue-size"`
-	DocQueueSize    int `yaml:"doc-queue-size"`
-
-	FlowGeneratorQueueSize         int `yaml:"flow-generator-queue-size"`
-	PCapAppQueueSize               int `yaml:"pcap-app-queue-size"`
-	MeteringAppQueueSize           int `yaml:"metering-app-queue-size"`
-	FlowDuplicatorQueueSize        int `yaml:"flow-duplicator-queue-size"`
-	FlowAppQueueSize               int `yaml:"flow-app-queue-size"`
-	MeteringDocMarshallerQueueSize int `yaml:"metering-doc-marshaller-queue-size"`
-	FlowDocMarshallerQueueSize     int `yaml:"flow-doc-marshaller-queue-size"`
-	FlowThrottleQueueSize          int `yaml:"flow-throttle-queue-size"`
-	FlowSenderQueueSize            int `yaml:"flow-sender-queue-size"`
-	DocSenderQueueSize             int `yaml:"doc-sender-queue-size"`
-}
-
-type LabelerConfig struct {
-	FastPathDisable      bool   `yaml:"fast-path-disable"`
-	FirstPathDdbsDisable bool   `yaml:"first-path-ddbs-disable"`
-	MapSizeLimit         uint32 `yaml:"map-size-limit"`
-}
-
-type FlowGeneratorConfig struct {
-	FlowCountLimit int `yaml:"flow-count-limit"`
-	/* unit of interval and timeout: second */
-	EstablishedTimeout time.Duration `yaml:"established-timeout"`
-	ClosingRstTimeout  time.Duration `yaml:"closing-rst-timeout"`
-	OthersTimeout      time.Duration `yaml:"others-timeout"`
-	HashMapSize        uint64        `yaml:"hash-map-size"`
-	PacketDelay        time.Duration `yaml:"packet-delay"`
-	IgnoreTorMac       bool          `yaml:"ignore-tor-mac"`
-	IgnoreL2End        bool          `yaml:"ignore-l2-end"`
-}
-
-type MapReduceConfig struct {
-	WindowSize       uint32 `yaml:"window-size"`
-	WindowMoveMargin uint32 `yaml:"window-move-margin"`
+	PacketQueueSize  int `yaml:"packet-queue-size"`
 }
 
 type PCapConfig struct {
@@ -131,13 +91,6 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if net.ParseIP(c.Stream) == nil {
-		return errors.New("Malformed stream")
-	}
-	if c.FlowThrottle < 1000 || c.FlowThrottle > 100000 {
-		c.FlowThrottle = 2000
-	}
-
 	if c.Adapter.SocketBufferSize == 0 {
 		c.Adapter.SocketBufferSize = 32 * 1024 * 1024
 	}
@@ -147,103 +100,19 @@ func (c *Config) Validate() error {
 		c.Adapter.OrderingCacheSize = 1024
 	}
 
+	if c.Labeler.MapSizeLimit == 0 {
+		c.Labeler.MapSizeLimit = 1024 * 1024
+	}
+
 	if c.Queue.PacketQueueCount < 1 || c.Queue.PacketQueueCount > 16 {
 		c.Queue.PacketQueueCount = 1
 	} else {
 		c.Queue.PacketQueueCount = minPowerOfTwo(c.Queue.PacketQueueCount)
 	}
-	if c.Queue.FlowQueueCount < 1 || c.Queue.FlowQueueCount > 16 {
-		c.Queue.FlowQueueCount = 1
-	} else {
-		c.Queue.FlowQueueCount = minPowerOfTwo(c.Queue.FlowQueueCount)
-	}
-	if c.Queue.DocQueueCount < 1 || c.Queue.DocQueueCount > 16 {
-		c.Queue.DocQueueCount = 1
-	} else {
-		c.Queue.DocQueueCount = minPowerOfTwo(c.Queue.DocQueueCount)
-	}
-
 	if c.Queue.PacketQueueSize < 1<<16 {
 		c.Queue.PacketQueueSize = 1 << 16
 	}
-	if c.Queue.FlowQueueSize < 1<<16 {
-		c.Queue.FlowQueueSize = c.Queue.PacketQueueSize << 3
-	}
-	if c.Queue.DocQueueSize < 1<<16 {
-		c.Queue.DocQueueSize = c.Queue.PacketQueueSize << 3
-	}
 
-	if c.Queue.FlowGeneratorQueueSize <= 0 {
-		c.Queue.FlowGeneratorQueueSize = c.Queue.PacketQueueSize
-	}
-	if c.Queue.PCapAppQueueSize <= 0 {
-		c.Queue.PCapAppQueueSize = c.Queue.PacketQueueSize
-	}
-	if c.Queue.MeteringAppQueueSize <= 0 {
-		c.Queue.MeteringAppQueueSize = c.Queue.PacketQueueSize
-	}
-	if c.Queue.FlowDuplicatorQueueSize <= 0 {
-		c.Queue.FlowDuplicatorQueueSize = c.Queue.FlowQueueSize
-	}
-	if c.Queue.FlowAppQueueSize <= 0 {
-		c.Queue.FlowAppQueueSize = c.Queue.FlowQueueSize
-	}
-	if c.Queue.MeteringDocMarshallerQueueSize <= 0 {
-		c.Queue.MeteringDocMarshallerQueueSize = c.Queue.DocQueueSize
-	}
-	if c.Queue.FlowDocMarshallerQueueSize <= 0 {
-		c.Queue.FlowDocMarshallerQueueSize = c.Queue.DocQueueSize
-	}
-	if c.Queue.FlowThrottleQueueSize <= 0 {
-		c.Queue.FlowThrottleQueueSize = c.Queue.FlowQueueSize
-	}
-	if c.Queue.FlowSenderQueueSize <= 0 {
-		c.Queue.FlowSenderQueueSize = c.Queue.FlowQueueSize
-	}
-	if c.Queue.DocSenderQueueSize <= 0 {
-		c.Queue.DocSenderQueueSize = c.Queue.DocQueueSize
-	}
-
-	if c.Labeler.MapSizeLimit == 0 {
-		c.Labeler.MapSizeLimit = 1024 * 1024
-	}
-
-	if c.FlowGenerator.FlowCountLimit == 0 {
-		c.FlowGenerator.FlowCountLimit = 1024 * 1024
-	}
-	if c.FlowGenerator.EstablishedTimeout == 0 {
-		c.FlowGenerator.EstablishedTimeout = 300 * time.Second
-	} else {
-		c.FlowGenerator.EstablishedTimeout *= time.Second
-	}
-	if c.FlowGenerator.ClosingRstTimeout == 0 {
-		c.FlowGenerator.ClosingRstTimeout = 35 * time.Second
-	} else {
-		c.FlowGenerator.ClosingRstTimeout *= time.Second
-	}
-	if c.FlowGenerator.OthersTimeout == 0 {
-		c.FlowGenerator.OthersTimeout = 5 * time.Second
-	} else {
-		c.FlowGenerator.OthersTimeout *= time.Second
-	}
-	if c.FlowGenerator.HashMapSize == 0 {
-		c.FlowGenerator.HashMapSize = uint64(c.FlowGenerator.FlowCountLimit) / uint64(c.Queue.PacketQueueCount) * 4
-	}
-	if c.FlowGenerator.PacketDelay < 1 || c.FlowGenerator.PacketDelay > 10 {
-		c.FlowGenerator.PacketDelay = 5 * time.Second
-	} else {
-		c.FlowGenerator.PacketDelay *= time.Second
-	}
-
-	if c.MapReduce.WindowSize < 70 {
-		c.MapReduce.WindowSize = 70
-	}
-	if c.MapReduce.WindowMoveMargin == 0 {
-		c.MapReduce.WindowMoveMargin = 3
-	}
-	if c.MapReduce.WindowMoveMargin >= c.MapReduce.WindowSize {
-		c.MapReduce.WindowMoveMargin = 0
-	}
 	if c.RpcTimeout > 0 {
 		c.RpcTimeout *= time.Second
 	}
@@ -271,10 +140,6 @@ func (c *Config) Validate() error {
 	}
 	if c.PCap.FileDirectory == "" {
 		c.PCap.FileDirectory = "/var/lib/droplet/pcap"
-	}
-
-	if c.ZeroPort == 0 {
-		c.ZeroPort = 20211
 	}
 	return nil
 }

@@ -15,8 +15,7 @@ import (
 )
 
 const (
-	QUEUE_BATCH_SIZE = 4096
-	TRIDENT_TIMEOUT  = 2 * time.Second
+	TRIDENT_TIMEOUT = 2 * time.Second
 
 	BATCH_SIZE = 128
 
