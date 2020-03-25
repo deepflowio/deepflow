@@ -1,0 +1,16 @@
+syntax = "proto2";
+
+package common;
+option go_package = "gitlab.x.lan/yunshan/message/common";
+
+enum TridentType {
+    // 1: process 2: vm 3: public cloud 4: analyzer 5: physical machine 6: dedicated physical machine 7: host pod 8: vm pod
+    TT_PROCESS = 1;
+    TT_VM = 2;
+    TT_PUBLIC_CLOUD = 3;
+    TT_ANALYZER = 4;
+    TT_PHYSICAL_MACHINE = 5;
+    TT_DEDICATED_PHYSICAL_MACHINE = 6;
+    TT_HOST_POD = 7;
+    TT_VM_POD = 8;
+}

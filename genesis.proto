@@ -3,6 +3,8 @@ syntax = "proto2";
 package genesis;
 option go_package = "genesis";
 
+import "common.proto";
+
 service Synchronizer {
     rpc Sync (SyncRequest) returns (SyncResponse) {}
     rpc Push (stream SyncRequest) returns (SyncResponse) {}
@@ -39,6 +41,8 @@ message PlatformData {
 
     repeated Container containers = 30;
     repeated string raw_ip_addrs = 31;
+
+    optional common.TridentType trident_type = 40;
 }
 
 message Host {
