@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -106,6 +106,7 @@ func (s *GrpcSession) Stop() {
 }
 
 func (s *GrpcSession) Close() {
+	s.stop = true
 	if s.clientConn != nil {
 		s.clientConn.Close()
 		s.clientConn = nil
