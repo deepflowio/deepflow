@@ -114,9 +114,8 @@ func testInfluxdbItem(t *testing.T) {
 
 	queueCount := 3
 
-	iw, _ := NewInfluxdbWriter(INFLUXDB_HTTP_ADDR, "", "", "", "item", "0", queueCount)
+	iw, _ := NewInfluxdbWriter(INFLUXDB_HTTP_ADDR, "", "", "", "item", "0", queueCount, 100)
 	iw.SetBatchTimeout(0)
-	iw.SetQueueSize(100)
 	iw.Run()
 	for i := 0; i < 100; i++ {
 		item := newWriteItem(fmt.Sprintf("db%d", i%queueCount),
@@ -153,9 +152,8 @@ func testInfluxdbPoint(t *testing.T) {
 	})
 
 	queueCount := 3
-	iw, _ := NewInfluxdbWriter(INFLUXDB_HTTP_ADDR, "", "", "", "point", "0", queueCount)
+	iw, _ := NewInfluxdbWriter(INFLUXDB_HTTP_ADDR, "", "", "", "point", "0", queueCount, 100)
 	iw.SetBatchTimeout(0)
-	iw.SetQueueSize(100)
 	iw.Run()
 	for i := 0; i < 100; i++ {
 		tag := make(map[string]string)

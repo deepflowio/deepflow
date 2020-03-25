@@ -11,7 +11,8 @@ import (
 
 	"github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/models"
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
+
 	// 需要从gitlab.x.lan获取新的写入接口，然后在Makefile中拷贝到vendor/github.com/influxdata/influxdb/client/v2
 	_ "gitlab.x.lan/platform/influxdb/client/v2"
 
@@ -154,7 +155,7 @@ type InfluxdbWriter struct {
 	exit          bool
 }
 
-func NewInfluxdbWriter(addrPrimary, addrReplica, httpUsername, httpPassword, name, shardID string, queueCount int) (*InfluxdbWriter, error) {
+func NewInfluxdbWriter(addrPrimary, addrReplica, httpUsername, httpPassword, name, shardID string, queueCount, queueSize int) (*InfluxdbWriter, error) {
 	w := &InfluxdbWriter{
 		Name:         name,
 		QueueCount:   queueCount,
@@ -179,7 +180,7 @@ func NewInfluxdbWriter(addrPrimary, addrReplica, httpUsername, httpPassword, nam
 	w.DBCreateCtlPrimary.HttpClient = httpClient
 	w.DBCreateCtlPrimary.ExistDBs = make(map[string]bool)
 	w.DataQueues = queue.NewOverwriteQueues(
-		name, queue.HashKey(queueCount), DEFAULT_QUEUE_SIZE, // FIXME: New时带入queueSize
+		name, queue.HashKey(queueCount), queueSize,
 		queue.OptionFlushIndicator(time.Second),
 		queue.OptionRelease(func(p interface{}) { p.(InfluxdbItem).Release() }))
 	w.QueueWriterInfosPrimary, err = newWriterInfos(primaryHTTPConfig, queueCount)
@@ -217,12 +218,6 @@ func NewInfluxdbWriter(addrPrimary, addrReplica, httpUsername, httpPassword, nam
 
 	log.Infof("NewInfluxdbWriter shardID(%s) threads(%d) primary(%s) replica(%s) direct(%v)", shardID, queueCount, addrPrimary, addrReplica, w.WriteDirect)
 	return w, nil
-}
-
-func (w *InfluxdbWriter) SetQueueSize(size int) {
-	w.DataQueues = queue.NewOverwriteQueues(w.Name, queue.HashKey(w.QueueCount), size,
-		queue.OptionFlushIndicator(time.Second),
-		queue.OptionRelease(func(p interface{}) { p.(InfluxdbItem).Release() }))
 }
 
 func (w *InfluxdbWriter) SetBatchSize(size int) {
