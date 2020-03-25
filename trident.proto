@@ -3,6 +3,8 @@ syntax = "proto2";
 package trident;
 option go_package = "trident";
 
+import "common.proto";
+
 service Synchronizer {
     rpc Sync (SyncRequest) returns (SyncResponse) {}
     rpc Push (SyncRequest) returns (stream SyncResponse) {}
@@ -69,18 +71,6 @@ enum SocketType {
     TCP = 1;
 }
 
-enum TridentType {
-    // 1: process 2: vm 3: public cloud 4: analyzer 5: physical machine 6: dedicated physical machine 7: host pod 8: vm pod
-    TT_PROCESS = 1;
-    TT_VM = 2;
-    TT_PUBLIC_CLOUD = 3;
-    TT_ANALYZER = 4;
-    TT_PHYSICAL_MACHINE = 5;
-    TT_DEDICATED_PHYSICAL_MACHINE = 6;
-    TT_HOST_POD = 7;
-    TT_VM_POD = 8;
-}
-
 message Config {
     optional bool    enabled              = 1 [default = true];
     optional uint32  max_cpus             = 2 [default = 2];
@@ -109,7 +99,7 @@ message Config {
     optional string  proxy_controller_ip  = 34; // 控制器代理IP
 
     optional uint32 vtap_id = 40;  // 限制在64000
-    optional TridentType trident_type = 41;
+    optional common.TridentType trident_type = 41;
 
     optional SocketType collector_socket_type = 45 [default = UDP];
     optional SocketType compressor_socket_type = 46 [default = UDP];
