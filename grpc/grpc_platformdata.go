@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/message/trident"
 )
@@ -39,9 +40,20 @@ type Info struct {
 	AZID       uint32
 }
 
+type CidrInfo struct {
+	Cidr     *net.IPNet
+	EpcID    int32
+	RegionID uint32
+	SubnetID uint32
+	AZID     uint32
+}
+
 type PlatformInfoTable struct {
 	epcIDIPV4Infos map[uint64]*Info
 	epcIDIPV6Infos map[EpcIDIPV6]*Info
+
+	epcIDIPV4CidrInfos map[int32][]*CidrInfo
+	epcIDIPV6CidrInfos map[int32][]*CidrInfo
 
 	bootTime            uint32
 	processName         string
@@ -89,35 +101,67 @@ func NewPlatformInfoTable(ips []net.IP, port int, processName string) *PlatformI
 	return table
 }
 
-func (t *PlatformInfoTable) QueryIPV4Infos(epcID int16, ipv4 uint32) *Info {
-	if info, ok := t.epcIDIPV4Infos[uint64(epcID)<<32|uint64(ipv4)]; ok {
-		return info
+func (t *PlatformInfoTable) QueryIPV4Infos(epcID int16, ipv4 uint32) (info *Info) {
+	var ok bool
+	key := uint64(epcID)<<32 | uint64(ipv4)
+	t.lock.RLock()
+	if info, ok = t.epcIDIPV4Infos[key]; !ok {
+		info = t.QueryIPV4Cidr(epcID, ipv4)
+		t.lock.RUnlock()
+		t.lock.Lock()
+		t.epcIDIPV4Infos[key] = info
+		t.lock.Unlock()
+	} else {
+		t.lock.RUnlock()
 	}
-	return nil
+	return
 }
 
 // 需要一起查询, 防止查询时，平台信息更新
 func (t *PlatformInfoTable) QueryIPV4InfosPair(epcID0 int16, ipv40 uint32, epcID1 int16, ipv41 uint32) (info0 *Info, info1 *Info) {
+	var ok0, ok1 bool
+	key0 := uint64(epcID0)<<32 | uint64(ipv40)
+	key1 := uint64(epcID1)<<32 | uint64(ipv41)
 	t.lock.RLock()
-	if info, ok := t.epcIDIPV4Infos[uint64(epcID0)<<32|uint64(ipv40)]; ok {
-		info0 = info
+	if info0, ok0 = t.epcIDIPV4Infos[key0]; !ok0 {
+		info0 = t.QueryIPV4Cidr(epcID0, ipv40)
 	}
-	if info, ok := t.epcIDIPV4Infos[uint64(epcID1)<<32|uint64(ipv41)]; ok {
-		info1 = info
+	if info1, ok1 = t.epcIDIPV4Infos[key1]; !ok1 {
+		info1 = t.QueryIPV4Cidr(epcID1, ipv41)
 	}
 	t.lock.RUnlock()
+
+	if !ok0 {
+		// 加入到map中，下次查该ip，无需遍历cidr
+		t.lock.Lock()
+		t.epcIDIPV4Infos[key0] = info0
+		t.lock.Unlock()
+	}
+	if !ok1 {
+		t.lock.Lock()
+		t.epcIDIPV4Infos[key1] = info1
+		t.lock.Unlock()
+	}
 	return
 }
 
-func (t *PlatformInfoTable) QueryIPV6Infos(epcID int16, ipv6 net.IP) *Info {
+func (t *PlatformInfoTable) QueryIPV6Infos(epcID int16, ipv6 net.IP) (info *Info) {
+	var ok bool
 	epcIDIP := EpcIDIPV6{}
 	epcIDIP.EpcID = uint32(epcID)
 	copy(epcIDIP.IP[:], ipv6)
 
-	if info, ok := t.epcIDIPV6Infos[epcIDIP]; ok {
-		return info
+	t.lock.RLock()
+	if info, ok = t.epcIDIPV6Infos[epcIDIP]; !ok {
+		info = t.QueryIPV6Cidr(epcID, ipv6)
+		t.lock.RUnlock()
+		t.lock.Lock()
+		t.epcIDIPV6Infos[epcIDIP] = info
+		t.lock.Unlock()
+	} else {
+		t.lock.RUnlock()
 	}
-	return nil
+	return
 }
 
 func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID1 int16, ipv61 net.IP) (info0 *Info, info1 *Info) {
@@ -127,15 +171,66 @@ func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID
 	epcIDIP1.EpcID = uint32(epcID1)
 	copy(epcIDIP1.IP[:], ipv61)
 
+	var ok0, ok1 bool
 	t.lock.RLock()
-	if info, ok := t.epcIDIPV6Infos[epcIDIP0]; ok {
-		info0 = info
+	if info0, ok0 = t.epcIDIPV6Infos[epcIDIP0]; !ok0 {
+		info0 = t.QueryIPV6Cidr(epcID0, ipv60)
 	}
-	if info, ok := t.epcIDIPV6Infos[epcIDIP1]; ok {
-		info1 = info
+
+	if info1, ok1 = t.epcIDIPV6Infos[epcIDIP1]; !ok1 {
+		info1 = t.QueryIPV6Cidr(epcID1, ipv61)
 	}
 	t.lock.RUnlock()
+
+	if !ok0 {
+		// 加入到map中，下次查该ip，无需遍历cidr
+		t.lock.Lock()
+		t.epcIDIPV6Infos[epcIDIP0] = info0
+		t.lock.Unlock()
+	}
+	if !ok1 {
+		t.lock.Lock()
+		t.epcIDIPV6Infos[epcIDIP1] = info1
+		t.lock.Unlock()
+	}
 	return
+}
+
+// 查询Cidr之前，需要先查询过epcip表, 否则会覆盖epcip表的内容
+func (t *PlatformInfoTable) QueryIPV4Cidr(epcID int16, ipv4 uint32) *Info {
+	var info *Info
+	if cidrInfos, exist := t.epcIDIPV4CidrInfos[int32(epcID)]; exist {
+		ip := utils.IpFromUint32(ipv4)
+		for _, cidrInfo := range cidrInfos {
+			if cidrInfo.Cidr.Contains(ip) {
+				info = &Info{
+					SubnetID: cidrInfo.SubnetID,
+					RegionID: cidrInfo.RegionID,
+					AZID:     cidrInfo.AZID,
+				}
+				break
+			}
+		}
+	}
+	return info
+}
+
+// 查询Cidr之前，需要先查询过epcip表, 否则会覆盖epcip表的内容
+func (t *PlatformInfoTable) QueryIPV6Cidr(epcID int16, ipv6 net.IP) *Info {
+	var info *Info
+	if cidrInfos, exist := t.epcIDIPV6CidrInfos[int32(epcID)]; exist {
+		for _, cidrInfo := range cidrInfos {
+			if cidrInfo.Cidr.Contains(ipv6) {
+				info = &Info{
+					SubnetID: cidrInfo.SubnetID,
+					RegionID: cidrInfo.RegionID,
+					AZID:     cidrInfo.AZID,
+				}
+				break
+			}
+		}
+	}
+	return info
 }
 
 func (t *PlatformInfoTable) String() string {
@@ -143,7 +238,7 @@ func (t *PlatformInfoTable) String() string {
 	t.lock.RLock()
 
 	if len(t.epcIDIPV4Infos) > 0 {
-		sb.WriteString("\nepcid   ipv4              host            hostID  regionID  deviceType  deviceID    subnetID  podNodeID azID\n")
+		sb.WriteString("\nepcID   ipv4              host            hostID  regionID  deviceType  deviceID    subnetID  podNodeID azID\n")
 		sb.WriteString("-------------------------------------------------------------------------------------------------------------------\n")
 	}
 	epcIP4s := make([]uint64, 0)
@@ -161,7 +256,7 @@ func (t *PlatformInfoTable) String() string {
 
 	if len(t.epcIDIPV6Infos) > 0 {
 		sb.WriteString("\n\n")
-		sb.WriteString("epcid   ipv6                                       host            hostID  regionID deviceType  deviceID subnetID  podNodeID azID\n")
+		sb.WriteString("epcID   ipv6                                       host            hostID  regionID deviceType  deviceID subnetID  podNodeID azID\n")
 		sb.WriteString("--------------------------------------------------------------------------------------------------------------------------------- \n")
 	}
 	epcIP6s := make([]EpcIDIPV6, 0)
@@ -173,8 +268,28 @@ func (t *PlatformInfoTable) String() string {
 	})
 	for _, epcIP := range epcIP6s {
 		info := t.epcIDIPV6Infos[epcIP]
-		fmt.Fprintf(sb, "%-6d  %-40s   %-15s %-6d  %-7d  %-10d  %-7d  %-8d  %-9d %d\n", epcIP.EpcID, net.IP(epcIP.IP[:]).String(),
+		fmt.Fprintf(sb, "%-6d  %-44s   %-15s %-6d  %-7d  %-10d  %-7d  %-8d  %-9d %d\n", epcIP.EpcID, net.IP(epcIP.IP[:]).String(),
 			utils.IpFromUint32(info.Host).String(), info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.AZID)
+	}
+
+	if len(t.epcIDIPV4CidrInfos) > 0 || len(t.epcIDIPV6CidrInfos) > 0 {
+		sb.WriteString("\nepcID   cidr                                           regionID  subnetID   azID\n")
+		sb.WriteString("-------------------------------------------------------------------------------------\n")
+	}
+	CidrInfos := make([]*CidrInfo, 0)
+	for _, cidrInfo := range t.epcIDIPV4CidrInfos {
+		CidrInfos = append(CidrInfos, cidrInfo...)
+	}
+	for _, cidrInfo := range t.epcIDIPV6CidrInfos {
+		CidrInfos = append(CidrInfos, cidrInfo...)
+	}
+
+	sort.Slice(CidrInfos, func(i, j int) bool {
+		return CidrInfos[i].EpcID < CidrInfos[j].EpcID
+	})
+	for _, cidrInfo := range CidrInfos {
+		fmt.Fprintf(sb, "%-6d  %-44s   %-7d   %-8d   %d\n",
+			cidrInfo.EpcID, cidrInfo.Cidr, cidrInfo.RegionID, cidrInfo.SubnetID, cidrInfo.AZID)
 	}
 
 	t.lock.RUnlock()
@@ -220,12 +335,19 @@ func (t *PlatformInfoTable) Reload() error {
 
 	newEpcIDIPV4Infos := make(map[uint64]*Info)
 	newEpcIDIPV6Infos := make(map[EpcIDIPV6]*Info)
-	t.lock.Lock()
+	newEpcIDIPV4CidrInfos := make(map[int32][]*CidrInfo)
+	newEpcIDIPV6CidrInfos := make(map[int32][]*CidrInfo)
 	for _, intf := range platformData.GetInterfaces() {
-		updatePlatformInfos(newEpcIDIPV4Infos, newEpcIDIPV6Infos, intf)
+		updateInterfaceInfos(newEpcIDIPV4Infos, newEpcIDIPV6Infos, intf)
 	}
+	for _, cidr := range platformData.GetCidrs() {
+		updateCidrInfos(newEpcIDIPV4CidrInfos, newEpcIDIPV6CidrInfos, cidr)
+	}
+	t.lock.Lock()
 	t.epcIDIPV4Infos = newEpcIDIPV4Infos
 	t.epcIDIPV6Infos = newEpcIDIPV6Infos
+	t.epcIDIPV4CidrInfos = newEpcIDIPV4CidrInfos
+	t.epcIDIPV6CidrInfos = newEpcIDIPV6CidrInfos
 	t.lock.Unlock()
 	return nil
 }
@@ -242,8 +364,46 @@ func isIPV4(ipStr string) bool {
 	return false
 }
 
-func updatePlatformInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[EpcIDIPV6]*Info, intf *trident.Interface) {
+func updateCidrInfos(IPV4CidrInfos, IPV6CidrInfos map[int32][]*CidrInfo, tridentCidr *trident.Cidr) {
+	prefix := tridentCidr.GetPrefix()
+	_, cidr, err := net.ParseCIDR(prefix)
+	if err != nil {
+		log.Warningf("parse cidr(%s) failed. err=%s", err)
+		return
+	}
+
+	epcID := tridentCidr.GetEpcId()
+	// 由于doc中epcID为-1，对应trisolaris的epcID为0.故在此统一将收到epcID为0的，修改为-1，便于doc数据查找
+	if epcID == 0 {
+		epcID = datatype.EPC_FROM_DEEPFLOW
+	}
+	cidrInfo := &CidrInfo{
+		Cidr:     cidr,
+		EpcID:    epcID,
+		AZID:     tridentCidr.GetAzId(),
+		RegionID: tridentCidr.GetRegionId(),
+		SubnetID: tridentCidr.GetSubnetId(),
+	}
+	if isIPV4(prefix) {
+		if _, ok := IPV4CidrInfos[epcID]; !ok {
+			IPV4CidrInfos[epcID] = make([]*CidrInfo, 0, 1)
+		}
+		IPV4CidrInfos[epcID] = append(IPV4CidrInfos[epcID], cidrInfo)
+	} else {
+		if _, ok := IPV6CidrInfos[epcID]; !ok {
+			IPV6CidrInfos[epcID] = make([]*CidrInfo, 0, 1)
+		}
+		IPV6CidrInfos[epcID] = append(IPV6CidrInfos[epcID], cidrInfo)
+	}
+}
+
+func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[EpcIDIPV6]*Info, intf *trident.Interface) {
 	epcID := intf.GetEpcId()
+	// 由于doc中epcID为-1，对应trisolaris的epcID为0.故在此统一将收到epcID为0的，修改为-1，便于doc数据查找
+	if epcID == 0 {
+		tmp := datatype.EPC_FROM_DEEPFLOW
+		epcID = uint32(tmp)
+	}
 	deviceType := intf.GetDeviceType()
 	deviceID := intf.GetDeviceId()
 	podNodeID := intf.GetPodNodeId()
