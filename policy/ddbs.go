@@ -11,13 +11,13 @@ import (
 type Table6Item struct {
 	match, mask MatchedField6
 
-	policy *PolicyRawData
+	policy *PolicyData
 }
 
 type TableItem struct {
 	match, mask MatchedField
 
-	policy *PolicyRawData
+	policy *PolicyData
 }
 
 const (
@@ -28,7 +28,6 @@ const (
 type Ddbs struct {
 	FastPath
 	InterestTable
-	AclGidMap
 	groupMacMap map[uint16][]uint64
 	groupIpMap  map[uint16][]ipSegment
 
@@ -70,17 +69,11 @@ func NewDdbs(queueCount int, mapSize uint32, fastPathDisable bool) TableOperator
 	ddbs.FastPathDisable = fastPathDisable
 	ddbs.groupMacMap = make(map[uint16][]uint64, 1000)
 	ddbs.groupIpMap = make(map[uint16][]ipSegment, 1000)
-	ddbs.AclGidMap.Init()
 	ddbs.InterestTable.Init()
-	ddbs.FastPath.Init(mapSize, queueCount, ddbs.AclGidMap.SrcGroupAclGidMaps, ddbs.AclGidMap.DstGroupAclGidMaps)
+	ddbs.FastPath.Init(mapSize, queueCount)
 	ddbs.table = &[TABLE_SIZE][]*TableItem{}
 	ddbs.table6 = &[TABLE_SIZE][]*Table6Item{}
 	return ddbs
-}
-
-func (d *Ddbs) GenerateGroupAclGidMaps(acls []*Acl) {
-	d.AclGidMap.GenerateGroupAclGidMaps(acls, false)
-	d.FastPath.UpdateGroupAclGidMaps(d.AclGidMap.SrcGroupAclGidMaps, d.AclGidMap.DstGroupAclGidMaps)
 }
 
 func (d *Ddbs) generateAclBits(acls []*Acl) {
@@ -273,43 +266,37 @@ func (d *Ddbs) generateDdbsTable(acls []*Acl) {
 	d.generateVectorTable6(acls)
 }
 
-func (d *Ddbs) addFastPath(endpointData *EndpointData, packet *LookupKey, policyForward, policyBackward, vlanPolicy *PolicyData) (*EndpointStore, *EndpointData) {
+func (d *Ddbs) addFastPath(endpointData *EndpointData, packet *LookupKey, policyForward, policyBackward *PolicyData) (*EndpointStore, *EndpointData) {
 	endpointStore := &EndpointStore{}
 	endpointStore.InitPointer(endpointData)
 
 	packetEndpointData := d.cloudPlatformLabeler.UpdateEndpointData(endpointStore, packet)
 	d.addPortFastPolicy(endpointStore, packetEndpointData, packet, policyForward, policyBackward)
-
-	if packet.Vlan > 0 {
-		d.addVlanFastPolicy(packet, vlanPolicy)
-	}
 	return endpointStore, packetEndpointData
 }
 
-func (d *Ddbs) mergePolicy(packetEndpointData *EndpointData, packet *LookupKey, policyForward, policyBackward, vlanPolicy *PolicyData) *PolicyData {
-	findPolicy := INVALID_POLICY_DATA
-	id := getAclId(vlanPolicy.ACLID, policyForward.ACLID, policyBackward.ACLID)
+func (d *Ddbs) mergePolicy(packetEndpointData *EndpointData, packet *LookupKey, findPolicy, policyForward, policyBackward *PolicyData) {
+	id := getAclId(policyForward.AclId, policyBackward.AclId)
 	if id > 0 {
-		findPolicy = new(PolicyData)
 		if packet.HasFeatureFlag(NPM) {
-			length := len(policyForward.AclActions) + len(policyBackward.AclActions) + len(vlanPolicy.AclActions)
+			length := len(policyForward.AclActions) + len(policyBackward.AclActions)
 			findPolicy.AclActions = make([]AclAction, 0, length)
-			findPolicy.MergeAclAction(append(vlanPolicy.AclActions, append(policyForward.AclActions, policyBackward.AclActions...)...), id)
+			findPolicy.MergeAclAction(append(policyForward.AclActions, policyBackward.AclActions...), id)
 		}
 		if packet.HasFeatureFlag(NPB) {
 			length := len(policyForward.NpbActions) + len(policyBackward.NpbActions)
 			findPolicy.NpbActions = make([]NpbActions, 0, length)
 			findPolicy.MergeNpbAction(append(policyForward.NpbActions, policyBackward.NpbActions...), id)
 			findPolicy.FormatNpbAction()
-			findPolicy.NpbActions = findPolicy.CheckNpbAction(packet)
+			findPolicy.Dedup(packet)
 		}
 	} else {
+		*findPolicy = *INVALID_POLICY_DATA
 		d.UnmatchedPacketCount++
 	}
-	return findPolicy
 }
 
-func (d *Ddbs) getPolicyFromTable(key *MatchedField, direction DirectionType, portPolicy *PolicyData, vlanPolicy *PolicyData) (*PolicyData, *PolicyData) {
+func (d *Ddbs) getPolicyFromTable(key *MatchedField, direction DirectionType, portPolicy *PolicyData) *PolicyData {
 	index := key.GetTableIndex(&d.maskVector, d.maskMinBit, d.maskMaxBit)
 	for _, item := range d.table[index] {
 		if result := key.And(&item.mask); result.Equal(&item.match) {
@@ -317,19 +304,13 @@ func (d *Ddbs) getPolicyFromTable(key *MatchedField, direction DirectionType, po
 				portPolicy = new(PolicyData)
 			}
 			policy := item.policy
-			portPolicy.Merge(policy.AclActions, policy.NpbActions, policy.ACLID, direction)
-			if item.match.Get(MATCHED_VLAN) > 0 {
-				if vlanPolicy == INVALID_POLICY_DATA {
-					vlanPolicy = new(PolicyData)
-				}
-				vlanPolicy.Merge(policy.AclActions, policy.NpbActions, policy.ACLID, direction)
-			}
+			portPolicy.Merge(policy.AclActions, policy.NpbActions, policy.AclId, direction)
 		}
 	}
-	return portPolicy, vlanPolicy
+	return portPolicy
 }
 
-func (d *Ddbs) getPolicyFromTable6(key *MatchedField6, direction DirectionType, portPolicy *PolicyData, vlanPolicy *PolicyData) (*PolicyData, *PolicyData) {
+func (d *Ddbs) getPolicyFromTable6(key *MatchedField6, direction DirectionType, portPolicy *PolicyData) *PolicyData {
 	index := key.GetTableIndex(&d.maskVector6, d.mask6MinBit, d.mask6MaxBit)
 	for _, item := range d.table6[index] {
 		if result := key.And(&item.mask); result.Equal(&item.match) {
@@ -337,24 +318,17 @@ func (d *Ddbs) getPolicyFromTable6(key *MatchedField6, direction DirectionType, 
 				portPolicy = new(PolicyData)
 			}
 			policy := item.policy
-			portPolicy.Merge(policy.AclActions, policy.NpbActions, policy.ACLID, direction)
-			if item.match.Get(MATCHED_VLAN) > 0 {
-				if vlanPolicy == INVALID_POLICY_DATA {
-					vlanPolicy = new(PolicyData)
-				}
-				vlanPolicy.Merge(policy.AclActions, policy.NpbActions, policy.ACLID, direction)
-			}
+			portPolicy.Merge(policy.AclActions, policy.NpbActions, policy.AclId, direction)
 		}
 	}
-	return portPolicy, vlanPolicy
+	return portPolicy
 }
 
-func (d *Ddbs) GetPolicyByFirstPath(endpointData *EndpointData, packet *LookupKey) (*EndpointStore, *PolicyData) {
+func (d *Ddbs) GetPolicyByFirstPath(packet *LookupKey, findPolicy *PolicyData, endpointData *EndpointData) *EndpointStore {
 	// ddbs不需要资源组相关的优化，只使用端口协议的优化
 	d.getFastInterestKeys(packet)
 	packet.GenerateMatchedField(endpointData.SrcInfo.GetL3Epc(), endpointData.DstInfo.GetL3Epc())
 
-	vlanPolicy := INVALID_POLICY_DATA
 	keys := [...]*MatchedField{FORWARD: &packet.ForwardMatched, BACKWARD: &packet.BackwardMatched}
 	key6s := [...]*MatchedField6{FORWARD: &packet.ForwardMatched6, BACKWARD: &packet.BackwardMatched6}
 	policys := [...]*PolicyData{FORWARD: INVALID_POLICY_DATA, BACKWARD: INVALID_POLICY_DATA}
@@ -362,23 +336,23 @@ func (d *Ddbs) GetPolicyByFirstPath(endpointData *EndpointData, packet *LookupKe
 	if len(packet.Src6Ip) == 16 {
 		for _, direction := range []DirectionType{FORWARD, BACKWARD} {
 			key := key6s[direction]
-			policys[direction], vlanPolicy = d.getPolicyFromTable6(key, direction, policys[direction], vlanPolicy)
+			policys[direction] = d.getPolicyFromTable6(key, direction, policys[direction])
 		}
 	} else {
 		for _, direction := range []DirectionType{FORWARD, BACKWARD} {
 			key := keys[direction]
-			policys[direction], vlanPolicy = d.getPolicyFromTable(key, direction, policys[direction], vlanPolicy)
+			policys[direction] = d.getPolicyFromTable(key, direction, policys[direction])
 		}
 	}
 
-	endpointStore, packetEndpointData := d.addFastPath(endpointData, packet, policys[FORWARD], policys[BACKWARD], vlanPolicy)
-	findPolicy := d.mergePolicy(packetEndpointData, packet, policys[FORWARD], policys[BACKWARD], vlanPolicy)
+	endpointStore, packetEndpointData := d.addFastPath(endpointData, packet, policys[FORWARD], policys[BACKWARD])
+	d.mergePolicy(packetEndpointData, packet, findPolicy, policys[FORWARD], policys[BACKWARD])
 
 	d.FirstPathHit++
 	if aclHit := uint32(len(findPolicy.AclActions) + len(findPolicy.NpbActions)); d.AclHitMax < aclHit {
 		d.AclHitMax = aclHit
 	}
-	return endpointStore, findPolicy
+	return endpointStore
 }
 
 func (d *Ddbs) checkAcl(acl *Acl, check ...bool) bool {
@@ -432,7 +406,6 @@ func (d *Ddbs) UpdateAcls(acls []*Acl, check ...bool) {
 
 	// 生成策略InterestMap,更新策略
 	d.GenerateInterestMaps(generateAcls)
-	d.GenerateGroupAclGidMaps(generateAcls)
 	// 生成Ddbs查询表
 	d.generateDdbsTable(generateAcls)
 }
@@ -556,51 +529,29 @@ func (d *Ddbs) UpdateCidr(data []*Cidr) {
 	d.cloudPlatformLabeler.UpdateCidr(data)
 }
 
-func (d *Ddbs) GetPolicyByFastPath(packet *LookupKey) (*EndpointStore, *PolicyData) {
+func (d *Ddbs) GetPolicyByFastPath(packet *LookupKey, policy *PolicyData) *EndpointStore {
 	if d.FastPathDisable {
-		return nil, nil
+		return nil
 	}
 
 	var endpoint *EndpointStore
 	var portPolicy *PolicyData
-	vlanPolicy, policy := INVALID_POLICY_DATA, INVALID_POLICY_DATA
 
 	d.getFastInterestKeys(packet)
 	if endpoint, portPolicy = d.getPortFastPolicy(packet); portPolicy == nil {
-		return nil, nil
-	}
-	if packet.Vlan > 0 && packet.HasFeatureFlag(NPM) {
-		if vlanPolicy = d.getVlanFastPolicy(packet); vlanPolicy == nil {
-			return nil, nil
-		}
+		return nil
 	}
 
-	if vlanPolicy.ACLID == 0 {
-		policy = portPolicy
-	} else if portPolicy.ACLID == 0 {
-		policy = vlanPolicy
-	} else {
-		id := getAclId(vlanPolicy.ACLID, portPolicy.ACLID)
-		policy = new(PolicyData)
-		if packet.HasFeatureFlag(NPM) {
-			policy.AclActions = make([]AclAction, 0, len(vlanPolicy.AclActions)+len(portPolicy.AclActions))
-			policy.MergeAclAction(append(vlanPolicy.AclActions, portPolicy.AclActions...), id)
-		}
-		if packet.HasFeatureFlag(NPB) {
-			policy.NpbActions = make([]NpbActions, 0, len(portPolicy.NpbActions))
-			policy.MergeNpbAction(portPolicy.NpbActions, id)
-			policy.FormatNpbAction()
-		}
-	}
-
+	*policy = *portPolicy
 	if packet.HasFeatureFlag(NPB) {
-		policy = policy.CheckNpbPolicy(packet)
+		// Dedup会修改策略
+		policy.Dedup(packet)
 	}
 
-	if policy.ACLID == 0 {
+	if policy.AclId == 0 {
 		d.UnmatchedPacketCount++
 	}
 
 	d.FastPathHit++
-	return endpoint, policy
+	return endpoint
 }

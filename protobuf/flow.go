@@ -89,18 +89,3 @@ func MarshalFlow(f *datatype.TaggedFlow, bytes *utils.ByteBuffer) error {
 	}
 	return nil
 }
-
-func getACLGIDs(f *datatype.TaggedFlow) []uint32 {
-	set := make(map[datatype.ACLID]bool)
-	for _, aclAction := range f.PolicyData.AclActions {
-		g := aclAction.GetACLGID()
-		if g > 0 {
-			set[g] = true
-		}
-	}
-	aclGIDs := make([]uint32, 0, len(set))
-	for id := range set {
-		aclGIDs = append(aclGIDs, uint32(id))
-	}
-	return aclGIDs
-}

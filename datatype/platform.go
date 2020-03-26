@@ -32,6 +32,5 @@ type PlatformData struct {
 	DeviceType uint32
 	DeviceId   uint32
 	IfType     uint32
-	HostIp     uint32
 	GroupIds   []uint32
 }

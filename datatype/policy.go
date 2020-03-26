@@ -181,6 +181,10 @@ func (a NpbActions) GetAclGid() []uint16 {
 	return a.aclGids
 }
 
+func (a NpbActions) doCompress() bool {
+	return a.TunnelType() == NPB_TUNNEL_TYPE_PCAP && a.PayloadSlice() == 0
+}
+
 func (a *NpbActions) ReverseTapSide() NpbActions {
 	action := NpbActions{}
 	action.NpbAction = a.NpbAction.ReverseTapSide()
@@ -198,69 +202,29 @@ func ToNpbActions(aclGid, id uint32, tunnelType, group, tapSide uint8, slice uin
 }
 
 const (
-	ACTION_PACKET_COUNTING ActionFlag = 1 << iota
-	ACTION_FLOW_COUNTING
-	ACTION_FLOW_STORING
-	ACTION_TCP_FLOW_PERF_COUNTING
-	ACTION_PACKET_CAPTURING
-	ACTION_FLOW_MISC_COUNTING
-	ACTION_PACKET_BROKERING
+	ACTION_PACKET_CAPTURING ActionFlag = 1 << iota
 	_
 	_
 	_
-	ACTION_GEO_POSITIONING
+	ACTION_COMPRESS_HEADER
 )
 
 func (f ActionFlag) String() string {
 	s := "|"
-	if f&ACTION_PACKET_COUNTING != 0 {
-		s += "PC|"
-	}
-	if f&ACTION_FLOW_COUNTING != 0 {
-		s += "FC|"
-	}
-	if f&ACTION_FLOW_STORING != 0 {
-		s += "FS|"
-	}
-	if f&ACTION_TCP_FLOW_PERF_COUNTING != 0 {
-		s += "TFPC|"
-	}
 	if f&ACTION_PACKET_CAPTURING != 0 {
-		s += "PC2|"
+		s += "PCAP|"
 	}
-	if f&ACTION_FLOW_MISC_COUNTING != 0 {
-		s += "FMC|"
-	}
-	if f&ACTION_PACKET_BROKERING != 0 {
-		s += "PB|"
-	}
-	if f&ACTION_GEO_POSITIONING != 0 {
-		s += "GP|"
+	if f&ACTION_COMPRESS_HEADER != 0 {
+		s += "COMPRESS|"
 	}
 	return s
-}
-
-type ACLID uint16
-
-type PolicyRawData struct {
-	AclActions []AclAction
-	NpbActions []NpbActions
-	ACLID      uint32 // 匹配的第一个ACL
-}
-
-func (d *PolicyRawData) GobEncode() ([]byte, error) {
-	return []byte{}, nil
-}
-
-func (d *PolicyRawData) GobDecode(in []byte) error {
-	return nil
 }
 
 type PolicyData struct {
 	AclActions  []AclAction
 	NpbActions  []NpbActions
-	ACLID       uint32     // FIXME 删除，匹配的第一个ACL
-	ActionFlags ActionFlag // FIXME 删除，如果NPB/PCAP不需要的话，bitwise OR
+	AclId       uint32
+	ActionFlags ActionFlag
 }
 
 func (p *PolicyData) Encode(encoder *codec.SimpleEncoder) {
@@ -274,7 +238,7 @@ func (p *PolicyData) Encode(encoder *codec.SimpleEncoder) {
 		p.NpbActions[i].Encode(encoder)
 	}
 
-	encoder.WriteU32(p.ACLID)
+	encoder.WriteU32(p.AclId)
 	encoder.WriteU16(uint16(p.ActionFlags))
 }
 
@@ -294,7 +258,7 @@ func (p *PolicyData) Decode(decoder *codec.SimpleDecoder) {
 		}
 	}
 
-	p.ACLID = decoder.ReadU32()
+	p.AclId = decoder.ReadU32()
 	p.ActionFlags = ActionFlag(decoder.ReadU16())
 }
 
@@ -309,163 +273,7 @@ const (
 	BACKWARD
 )
 
-type TagTemplate uint16
-
-const (
-	TEMPLATE_NODE TagTemplate = 1 << iota
-	TEMPLATE_NODE_PORT
-	TEMPLATE_EDGE
-	TEMPLATE_EDGE_PORT
-	TEMPLATE_PORT
-	TEMPLATE_ACL_NODE
-	TEMPLATE_ACL_NODE_PORT
-	TEMPLATE_ACL_EDGE
-	TEMPLATE_ACL_EDGE_PORT
-	TEMPLATE_ACL_PORT
-	TEMPLATE_ACL_EDGE_PORT_ALL
-	TEMPLATE_EDGE_PORT_ALL
-)
-
-func (t TagTemplate) String() string {
-	s := "|"
-	if t&TEMPLATE_NODE != 0 {
-		s += "N|"
-	}
-	if t&TEMPLATE_NODE_PORT != 0 {
-		s += "NP|"
-	}
-	if t&TEMPLATE_EDGE != 0 {
-		s += "E|"
-	}
-	if t&TEMPLATE_EDGE_PORT != 0 {
-		s += "EP|"
-	}
-	if t&TEMPLATE_PORT != 0 {
-		s += "P|"
-	}
-	if t&TEMPLATE_ACL_NODE != 0 {
-		s += "AN|"
-	}
-	if t&TEMPLATE_ACL_NODE_PORT != 0 {
-		s += "ANP|"
-	}
-	if t&TEMPLATE_ACL_EDGE != 0 {
-		s += "AE|"
-	}
-	if t&TEMPLATE_ACL_EDGE_PORT != 0 {
-		s += "AEP|"
-	}
-	if t&TEMPLATE_ACL_PORT != 0 {
-		s += "AP|"
-	}
-	if t&TEMPLATE_ACL_EDGE_PORT_ALL != 0 {
-		s += "AEP+|"
-	}
-	if t&TEMPLATE_EDGE_PORT_ALL != 0 {
-		s += "EP+|"
-	}
-	return s
-}
-
-const (
-	GROUP_TYPE_OFFSET         = 62
-	GROUP_TYPE_ALL            = 0x2
-	GROUP_SRC_MAPOFFSET_SHIFT = 55
-	GROUP_DST_MAPOFFSET_SHIFT = 48
-	GROUP_SRC_MAPBITS_SHIFT   = 24
-	GROUP_DST_MAPBITS_SHIFT   = 24
-	GROUP_MAPBITS_CNT         = 24
-	GROUP_ALL_MAPOFFSET_MASK  = 0x7f
-	GROUP_ALL_MAPBITS_MASK    = 0xFFFFFF
-	GROUP_TYPE_SRC            = 0x0
-	GROUP_TYPE_DST            = 0x1
-)
-
-//  MSB       62             55            48           24            0
-//  +---------+--------------+--------------+------------+------------+
-//  | SRC/DST | SrcMapOffset | DstMapOffset | SrcMapBits | DstMapBits |
-//  +-----------------------------------------------------------------+
-// SRC/DST: 源或目的资源组，源目的资源组混合
-// SrcMapOffset: AclGidBitmap在源资源组的起始偏移量
-// DstMapOffset: AclGidBitmap在目的资源组的起始偏移量
-// SrcMapBits: AclGidBitmap在源资源组相对起始值的偏移量，每个bit是对应一个资源组
-// DstMapBits: AclGidBitmap在目的资源组相对起始值的偏移量，每个bit是对应一个资源组
-type AclGidBitmap uint64
-
-func (b *AclGidBitmap) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU64(uint64(*b))
-}
-
-func (b *AclGidBitmap) Decode(decoder *codec.SimpleDecoder) {
-	*b = AclGidBitmap(decoder.ReadU64())
-}
-
-func (b AclGidBitmap) SetSrcAndDstFlag() AclGidBitmap {
-	b |= AclGidBitmap(GROUP_TYPE_ALL << GROUP_TYPE_OFFSET)
-	return b
-}
-
-func (b AclGidBitmap) SetSrcMapOffset(offset uint32) AclGidBitmap {
-	realOffset := offset / GROUP_MAPBITS_CNT
-	b &= ^(AclGidBitmap(GROUP_ALL_MAPOFFSET_MASK) << GROUP_SRC_MAPOFFSET_SHIFT)
-	b |= AclGidBitmap(realOffset&GROUP_ALL_MAPOFFSET_MASK) << GROUP_SRC_MAPOFFSET_SHIFT
-	return b
-}
-
-func (b AclGidBitmap) SetDstMapOffset(offset uint32) AclGidBitmap {
-	realOffset := offset / GROUP_MAPBITS_CNT
-	b &= ^(AclGidBitmap(GROUP_ALL_MAPOFFSET_MASK) << GROUP_DST_MAPOFFSET_SHIFT)
-	b |= AclGidBitmap(realOffset&GROUP_ALL_MAPOFFSET_MASK) << GROUP_DST_MAPOFFSET_SHIFT
-	return b
-}
-
-func (b AclGidBitmap) SetSrcMapBits(offset uint32) AclGidBitmap {
-	realOffset := offset % GROUP_SRC_MAPBITS_SHIFT
-	b |= AclGidBitmap(1) << (realOffset + GROUP_SRC_MAPBITS_SHIFT)
-	return b
-}
-
-func (b AclGidBitmap) SetDstMapBits(offset uint32) AclGidBitmap {
-	realOffset := offset % GROUP_DST_MAPBITS_SHIFT
-	b |= AclGidBitmap(1) << realOffset
-	return b
-}
-
-func (b AclGidBitmap) GetSrcAndDstFlag() uint8 {
-	return uint8((b >> GROUP_TYPE_OFFSET) & GROUP_TYPE_ALL)
-}
-
-func (b AclGidBitmap) GetSrcMapOffset() uint32 {
-	return uint32((b>>GROUP_SRC_MAPOFFSET_SHIFT)&GROUP_ALL_MAPOFFSET_MASK) * GROUP_SRC_MAPBITS_SHIFT
-}
-
-func (b AclGidBitmap) GetDstMapOffset() uint32 {
-	return uint32((b>>GROUP_DST_MAPOFFSET_SHIFT)&GROUP_ALL_MAPOFFSET_MASK) * GROUP_DST_MAPBITS_SHIFT
-}
-
-func (b AclGidBitmap) GetSrcMapBits() uint32 {
-	return uint32((uint64(b) >> GROUP_SRC_MAPBITS_SHIFT) & GROUP_ALL_MAPBITS_MASK)
-}
-
-func (b AclGidBitmap) GetDstMapBits() uint32 {
-	return uint32(uint64(b) & GROUP_ALL_MAPBITS_MASK)
-}
-
-func (b *AclGidBitmap) ReverseGroupType() {
-	rAclGidBitmap := AclGidBitmap(0).SetSrcAndDstFlag()
-	rAclGidBitmap = rAclGidBitmap.SetSrcMapOffset(b.GetDstMapOffset())
-	rAclGidBitmap = rAclGidBitmap.SetDstMapOffset(b.GetSrcMapOffset())
-	rAclGidBitmap |= AclGidBitmap(b.GetSrcMapBits())
-	rAclGidBitmap |= AclGidBitmap(b.GetDstMapBits() << GROUP_DST_MAPBITS_SHIFT)
-	*b = rAclGidBitmap
-}
-
-func (b AclGidBitmap) String() string {
-	return fmt.Sprintf("{Type: %d, SrcMapOffset: %d, SrcMapBitOffset: 0x%x, DstMapOffset: %d, DstMapBitOffset: 0x%x,RAW: 0x%x}",
-		b.GetSrcAndDstFlag(), b.GetSrcMapOffset(), b.GetSrcMapBits(), b.GetDstMapOffset(), b.GetDstMapBits(), uint64(b))
-}
-
-// keys (16b ACLGID + 16b ActionFlags + ), values (14b AclGidMapOffset + 4b MapCount + 2b Directions + 12b TagTemplates)
+// keys (16b ACLGID + 16b ActionFlags + ), values (2b Directions)
 type AclAction uint64
 
 func (a *AclAction) Encode(encoder *codec.SimpleEncoder) {
@@ -476,7 +284,7 @@ func (a *AclAction) Decode(decoder *codec.SimpleDecoder) {
 	*a = AclAction(decoder.ReadU64())
 }
 
-func (a AclAction) SetACLGID(aclGID ACLID) AclAction {
+func (a AclAction) SetACLGID(aclGID uint16) AclAction {
 	a &= ^AclAction(0xFFFF << 48)
 	a |= AclAction(aclGID&0xFFFF) << 48
 	return a
@@ -504,18 +312,6 @@ func (a AclAction) AddDirections(directions DirectionType) AclAction {
 	return a
 }
 
-func (a AclAction) SetAclGidBitmapOffset(offset uint16) AclAction {
-	a &= ^AclAction(0x3FFF << 18)
-	a |= AclAction(offset&0x3FFF) << 18
-	return a
-}
-
-func (a AclAction) SetAclGidBitmapCount(count uint8) AclAction {
-	a &= ^AclAction(0xF << 14)
-	a |= AclAction(count&0xF) << 14
-	return a
-}
-
 func (a AclAction) ReverseDirection() AclAction {
 	switch a.GetDirections() {
 	case FORWARD:
@@ -526,19 +322,8 @@ func (a AclAction) ReverseDirection() AclAction {
 	return a
 }
 
-func (a AclAction) SetTagTemplates(tagTemplates TagTemplate) AclAction {
-	a &= ^AclAction(0xFFF)
-	a |= AclAction(tagTemplates & 0xFFF)
-	return a
-}
-
-func (a AclAction) AddTagTemplates(tagTemplates TagTemplate) AclAction {
-	a |= AclAction(tagTemplates & 0xFFF)
-	return a
-}
-
-func (a AclAction) GetACLGID() ACLID {
-	return ACLID((a >> 48) & 0xFFFF)
+func (a AclAction) GetACLGID() uint16 {
+	return uint16(((a >> 48) & 0xFFFF))
 }
 
 func (a AclAction) GetActionFlags() ActionFlag {
@@ -549,26 +334,21 @@ func (a AclAction) GetDirections() DirectionType {
 	return DirectionType((a >> 12) & 0x3)
 }
 
-func (a AclAction) GetTagTemplates() TagTemplate {
-	return TagTemplate(a & 0xFFF)
-}
-
-func (a AclAction) GetAclGidBitmapOffset() uint16 {
-	return uint16(a>>18) & 0x3FF
-}
-
-func (a AclAction) GetAclGidBitmapCount() uint8 {
-	return uint8(a>>14) & 0xF
-}
-
 func (a AclAction) String() string {
-	return fmt.Sprintf("{GID: %d ActionFlags: %s Directions: %d TagTemplates: %s GidMapOffset: %d, GidMapCount: %d}",
-		a.GetACLGID(), a.GetActionFlags().String(), a.GetDirections(), a.GetTagTemplates().String(), a.GetAclGidBitmapOffset(),
-		a.GetAclGidBitmapCount())
+	return fmt.Sprintf("{GID: %d ActionFlags: %s Directions: %d}",
+		a.GetACLGID(), a.GetActionFlags().String(), a.GetDirections())
+}
+
+func (d *PolicyData) GobEncode() ([]byte, error) {
+	return []byte{}, nil
+}
+
+func (d *PolicyData) GobDecode(in []byte) error {
+	return nil
 }
 
 func (d *PolicyData) Valid() bool {
-	return d.ACLID != 0
+	return d.AclId != 0
 }
 
 // 如果双方向都匹配了同一策略，对应的NpbActions Merge后会是TAPSIDE_ALL，
@@ -582,7 +362,7 @@ func (d *PolicyData) FormatNpbAction() {
 	}
 }
 
-func (d *PolicyData) CheckNpbAction(packet *LookupKey) []NpbActions {
+func (d *PolicyData) dedupNpbAction(packet *LookupKey) []NpbActions {
 	if len(d.NpbActions) == 0 || packet.Tap != TAP_TOR {
 		return d.NpbActions
 	}
@@ -602,25 +382,21 @@ func (d *PolicyData) CheckNpbAction(packet *LookupKey) []NpbActions {
 	return validActions
 }
 
-func (d *PolicyData) CheckNpbPolicy(packet *LookupKey) *PolicyData {
+func (d *PolicyData) Dedup(packet *LookupKey) {
 	if len(d.NpbActions) == 0 || packet.Tap != TAP_TOR {
-		return d
+		return
 	}
-	validActions := d.CheckNpbAction(packet)
+	validActions := d.dedupNpbAction(packet)
 	if len(validActions) == 0 && d.ActionFlags == 0 {
-		return INVALID_POLICY_DATA
+		*d = *INVALID_POLICY_DATA
+		return
 	}
-
-	validPolicyData := new(PolicyData)
-	validPolicyData.ACLID = d.ACLID
-	validPolicyData.ActionFlags = d.ActionFlags
-	validPolicyData.NpbActions = append(validPolicyData.NpbActions[:0], validActions...)
-	return validPolicyData
+	d.NpbActions = validActions
 }
 
 func (d *PolicyData) MergeNpbAction(actions []NpbActions, aclID uint32, directions ...DirectionType) {
-	if d.ACLID == 0 {
-		d.ACLID = aclID
+	if d.AclId == 0 {
+		d.AclId = aclID
 	}
 	for _, n := range actions {
 		repeat := false
@@ -652,14 +428,18 @@ func (d *PolicyData) MergeNpbAction(actions []NpbActions, aclID uint32, directio
 			if len(directions) > 0 {
 				npbAction.SetTapSide(int(directions[0]))
 			}
+			// 只有PCAP会有ACTION_COMPRESS_HEADER, 并且不会被去重
+			if npbAction.doCompress() {
+				d.ActionFlags |= ACTION_COMPRESS_HEADER
+			}
 			d.NpbActions = append(d.NpbActions, npbAction)
 		}
 	}
 }
 
 func (d *PolicyData) MergeAclAction(actions []AclAction, aclID uint32, directions ...DirectionType) {
-	if d.ACLID == 0 {
-		d.ACLID = aclID
+	if d.AclId == 0 {
+		d.AclId = aclID
 	}
 	for _, newAclAction := range actions {
 		if len(directions) > 0 {
@@ -668,8 +448,7 @@ func (d *PolicyData) MergeAclAction(actions []AclAction, aclID uint32, direction
 
 		exist := false
 		for j, existAclAction := range d.AclActions { // 按ACLGID和TagTemplates合并
-			if newAclAction.GetACLGID() == existAclAction.GetACLGID() &&
-				newAclAction.GetTagTemplates() == existAclAction.GetTagTemplates() {
+			if newAclAction.GetACLGID() == existAclAction.GetACLGID() {
 				exist = true
 				d.AclActions[j] = existAclAction.AddDirections(newAclAction.GetDirections()).
 					AddActionFlags(newAclAction.GetActionFlags())
@@ -725,8 +504,8 @@ func (d *PolicyData) ReverseData() *PolicyData {
 }
 
 func (d *PolicyData) String() string {
-	return fmt.Sprintf("{ACLID: %d ActionFlags: %v AclActions: %v NpbActions: %v}",
-		d.ACLID, d.ActionFlags, d.AclActions, d.NpbActions)
+	return fmt.Sprintf("{AclId: %d ActionFlags: %v AclActions: %v NpbActions: %v}",
+		d.AclId, d.ActionFlags, d.AclActions, d.NpbActions)
 }
 
 var policyDataPool = pool.NewLockFreePool(func() interface{} {

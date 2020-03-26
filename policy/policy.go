@@ -82,8 +82,8 @@ type TableOperator interface {
 
 	SetCloudPlatform(cloudPlatformLabeler *CloudPlatformLabeler)
 
-	GetPolicyByFirstPath(*EndpointData, *LookupKey) (*EndpointStore, *PolicyData)
-	GetPolicyByFastPath(key *LookupKey) (*EndpointStore, *PolicyData)
+	GetPolicyByFirstPath(*LookupKey, *PolicyData, *EndpointData) *EndpointStore
+	GetPolicyByFastPath(*LookupKey, *PolicyData) *EndpointStore
 
 	// 目前是从statsd监控中移除
 	Close()
@@ -198,25 +198,19 @@ func (t *PolicyTable) GetCounter() interface{} {
 	return t.operator.GetCounter()
 }
 
-// River用于PACKET_BROKERING，Stream用于PACKET_CAPTURING
-func (t *PolicyTable) LookupActionByPolicyId(policyId PolicyId) *PolicyData {
-	// FIXME
-	return nil
-}
-
-// Droplet用于*_COUNTING、PACKET_BROKERING、PACKET_CAPTURING
-// FIXME: tricky argument
-func (t *PolicyTable) LookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData) {
+func (t *PolicyTable) LookupAllByKey(key *LookupKey, policy *PolicyData, endpoint *EndpointData) {
 	if !key.Tap.CheckTapType(key.Tap) {
-		return INVALID_ENDPOINT_DATA, INVALID_POLICY_DATA
+		*policy = *INVALID_POLICY_DATA
+		*endpoint = *INVALID_ENDPOINT_DATA
+		return
 	}
-	store, policy := t.operator.GetPolicyByFastPath(key)
-	if policy == nil {
+	store := t.operator.GetPolicyByFastPath(key, policy)
+	if store == nil {
 		endpoint := t.cloudPlatformLabeler.GetEndpointData(key)
-		store, policy = t.operator.GetPolicyByFirstPath(endpoint, key)
+		store = t.operator.GetPolicyByFirstPath(key, policy, endpoint)
 	}
-	endpoint := t.cloudPlatformLabeler.UpdateEndpointData(store, key)
-	return endpoint, policy
+	result := t.cloudPlatformLabeler.UpdateEndpointData(store, key)
+	*endpoint = *result
 }
 
 func (t *PolicyTable) UpdateInterfaceData(data []*PlatformData) {
@@ -283,16 +277,27 @@ func (t *PolicyTable) GetEndpointInfo(mac uint64, ip net.IP, inPort uint32) *End
 	return endpointInfo
 }
 
+// 测试使用
 func (t *PolicyTable) GetPolicyByFastPath(key *LookupKey) (*EndpointData, *PolicyData) {
-	endpoint, policy := t.operator.GetPolicyByFastPath(key)
+	policy := new(PolicyData)
+	endpoint := t.operator.GetPolicyByFastPath(key, policy)
 	if endpoint == nil {
 		return INVALID_ENDPOINT_DATA, INVALID_POLICY_DATA
 	}
 	return endpoint.Endpoints, policy
 }
 
+// 测试使用
 func (t *PolicyTable) GetPolicyByFirstPath(key *LookupKey) (*EndpointData, *PolicyData) {
+	policy := new(PolicyData)
 	endpoint := t.cloudPlatformLabeler.GetEndpointData(key)
-	store, policy := t.operator.GetPolicyByFirstPath(endpoint, key)
+	store := t.operator.GetPolicyByFirstPath(key, policy, endpoint)
 	return store.Endpoints, policy
+}
+
+// 测试使用
+func (t *PolicyTable) lookupAllByKey(key *LookupKey) (*EndpointData, *PolicyData) {
+	policy, endpoint := &PolicyData{}, &EndpointData{}
+	t.LookupAllByKey(key, policy, endpoint)
+	return endpoint, policy
 }

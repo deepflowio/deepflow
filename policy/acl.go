@@ -9,7 +9,6 @@ import (
 type Acl struct {
 	Id                uint32
 	Type              TapType
-	TapId             uint32
 	SrcGroups         []uint32
 	DstGroups         []uint32
 	SrcGroupRelations []uint16
@@ -19,14 +18,13 @@ type Acl struct {
 	SrcPorts          []uint16    // 0仅表示采集端口0
 	DstPorts          []uint16    // 0仅表示采集端口0
 	Proto             uint16      // 256表示全采集, 0表示采集采集协议0
-	Vlan              uint32
 	Action            []AclAction
 	NpbActions        []NpbActions
 	AllMatched        []MatchedField
 	AllMatchedMask    []MatchedField // MatchedMask对应的位为0，表示对应Matched的位为*，0或1都匹配该策略
 	AllMatched6       []MatchedField6
 	AllMatched6Mask   []MatchedField6 // MatchedMask对应的位为0，表示对应Matched的位为*，0或1都匹配该策略
-	policy            PolicyRawData
+	policy            PolicyData
 }
 
 const (
@@ -34,9 +32,7 @@ const (
 )
 
 func (a *Acl) InitPolicy() {
-	a.policy.ACLID = a.Id
-	a.policy.AclActions = a.Action
-	a.policy.NpbActions = a.NpbActions
+	a.policy.Merge(a.Action, a.NpbActions, a.Id)
 }
 
 func (a *Acl) Reset() {
@@ -103,7 +99,6 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint64, srcIps, dstIps ipSegme
 			match, mask := MatchedField{}, MatchedField{}
 
 			match.Set(MATCHED_TAP_TYPE, uint64(a.Type))
-			match.Set(MATCHED_VLAN, uint64(a.Vlan))
 			match.Set(MATCHED_SRC_MAC, srcMac)
 			match.Set(MATCHED_DST_MAC, dstMac)
 			match.Set(MATCHED_SRC_IP, uint64(srcIps.getIp()))
@@ -114,7 +109,6 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint64, srcIps, dstIps ipSegme
 			match.Set(MATCHED_DST_PORT, uint64(dstPort.port))
 
 			mask.SetMask(MATCHED_TAP_TYPE, uint64(a.Type))
-			mask.SetMask(MATCHED_VLAN, uint64(a.Vlan))
 			mask.SetMask(MATCHED_SRC_MAC, srcMac)
 			mask.SetMask(MATCHED_DST_MAC, dstMac)
 			mask.Set(MATCHED_SRC_IP, uint64(srcIps.getMask()))
@@ -143,7 +137,6 @@ func (a *Acl) generateMatchedField6(srcMac, dstMac uint64, srcIps, dstIps ipSegm
 			match, mask := MatchedField6{}, MatchedField6{}
 			match.Set(MATCHED6_TAP_TYPE, uint64(a.Type))
 			match.Set(MATCHED6_PROTO, uint64(a.Proto))
-			match.Set(MATCHED6_VLAN, uint64(a.Vlan))
 			match.Set(MATCHED6_SRC_MAC, srcMac)
 			match.Set(MATCHED6_DST_MAC, dstMac)
 			ip0, ip1 := srcIps.getIp6()
@@ -159,7 +152,6 @@ func (a *Acl) generateMatchedField6(srcMac, dstMac uint64, srcIps, dstIps ipSegm
 
 			mask.SetMask(MATCHED6_TAP_TYPE, uint64(a.Type))
 			mask.SetMask(MATCHED6_PROTO, uint64(a.Proto))
-			mask.SetMask(MATCHED6_VLAN, uint64(a.Vlan))
 			mask.SetMask(MATCHED6_SRC_MAC, srcMac)
 			mask.SetMask(MATCHED6_DST_MAC, dstMac)
 			mask0, mask1 := srcIps.getMask6()
@@ -259,6 +251,6 @@ func (a *Acl) getPorts(rawPorts []uint16) string {
 }
 
 func (a *Acl) String() string {
-	return fmt.Sprintf("Id:%v Type:%v TapId:%v SrcGroups:%v DstGroups:%v SrcPortRange:[%v] SrcPorts:[%s] DstPortRange:[%v] DstPorts:[%s] Proto:%v Vlan:%v Action:%v NpbActions:%s",
-		a.Id, a.Type, a.TapId, a.SrcGroups, a.DstGroups, a.SrcPortRange, a.getPorts(a.SrcPorts), a.DstPortRange, a.getPorts(a.DstPorts), a.Proto, a.Vlan, a.Action, a.NpbActions)
+	return fmt.Sprintf("Id:%v Type:%v SrcGroups:%v DstGroups:%v SrcPortRange:[%v] SrcPorts:[%s] DstPortRange:[%v] DstPorts:[%s] Proto:%v Action:%v NpbActions:%s",
+		a.Id, a.Type, a.SrcGroups, a.DstGroups, a.SrcPortRange, a.getPorts(a.SrcPorts), a.DstPortRange, a.getPorts(a.DstPorts), a.Proto, a.Action, a.NpbActions)
 }

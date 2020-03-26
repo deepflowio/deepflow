@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	MATCHED_FIELD6_BITS_LEN = 444 // 8(TapType) + 12(Vlan) + 8(Proto) + 16(L3EPC)*2 + 64(MAC + Port)*2 + 128(IP)*2
+	MATCHED_FIELD6_BITS_LEN = 432 // 8(TapType) + 8(Proto) + 16(L3EPC)*2 + 64(MAC + Port)*2 + 128(IP)*2
 	MATCHED_FIELD6_LEN      = 7
 )
 
@@ -32,7 +32,6 @@ const (
 	MATCHED6_SRC_EPC
 	MATCHED6_DST_EPC
 	MATCHED6_PROTO
-	MATCHED6_VLAN
 	MATCHED6_TAP_TYPE
 )
 
@@ -51,8 +50,7 @@ var field6Offset = [...]uint64{
 	MATCHED6_SRC_EPC:  384,
 	MATCHED6_DST_EPC:  400,
 	MATCHED6_PROTO:    416,
-	MATCHED6_VLAN:     424,
-	MATCHED6_TAP_TYPE: 436,
+	MATCHED6_TAP_TYPE: 424,
 }
 
 var field6Mask = [...]uint64{
@@ -70,7 +68,6 @@ var field6Mask = [...]uint64{
 	MATCHED6_SRC_EPC:  0xffff,
 	MATCHED6_DST_EPC:  0xffff,
 	MATCHED6_PROTO:    0xff,
-	MATCHED6_VLAN:     0xfff,
 	MATCHED6_TAP_TYPE: 0xff,
 }
 
@@ -208,9 +205,9 @@ func (f MatchedField6) String() string {
 	binary.BigEndian.PutUint64(srcIp[8:], f.Get(MATCHED6_SRC_IP1))
 	binary.BigEndian.PutUint64(dstIp, f.Get(MATCHED6_DST_IP0))
 	binary.BigEndian.PutUint64(dstIp[8:], f.Get(MATCHED6_DST_IP1))
-	return fmt.Sprintf("%x.%s.%d -> %x.%s.%d epc: %d -> %d vlan: %d proto: %d tap: %d",
+	return fmt.Sprintf("%x.%s.%d -> %x.%s.%d epc: %d -> %d proto: %d tap: %d",
 		f.Get(MATCHED6_SRC_MAC), srcIp, f.Get(MATCHED6_SRC_PORT),
 		f.Get(MATCHED6_DST_MAC), dstIp, f.Get(MATCHED6_DST_PORT),
 		f.Get(MATCHED6_SRC_EPC), f.Get(MATCHED6_DST_EPC),
-		f.Get(MATCHED6_VLAN), f.Get(MATCHED6_PROTO), f.Get(MATCHED6_TAP_TYPE))
+		f.Get(MATCHED6_PROTO), f.Get(MATCHED6_TAP_TYPE))
 }

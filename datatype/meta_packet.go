@@ -50,19 +50,18 @@ type MetaPacket struct {
 	EndpointData EndpointData
 	PolicyData   PolicyData
 
-	Invalid    bool
-	QueueHash  uint8
-	PacketLen  uint16
-	InPort     uint32 // (8B)
+	Tunnel *TunnelInfo
+
 	Exporter   net.IP
-	VtapId     uint16
+	PacketLen  uint16
 	PayloadLen uint16
+	InPort     uint32 // (8B)
+	VtapId     uint16
+	QueueHash  uint8
 	L2End0     bool
 	L2End1     bool
 	L3End0     bool
-	L3End1     bool // (8B)
-
-	Tunnel *TunnelInfo
+	L3End1     bool // (7B)
 
 	MacSrc  MacInt
 	MacDst  MacInt
@@ -102,237 +101,12 @@ type MetaPacketBlock struct {
 	pool.ReferenceCount
 }
 
-func (p *MetaPacket) Equal(m *MetaPacket) bool {
-	equal := p.L2End0 == m.L2End0 && p.L2End1 == m.L2End1 &&
-		p.MacSrc == m.MacSrc && p.MacDst == m.MacDst && p.EthType == m.EthType &&
-		p.IpSrc == m.IpSrc && p.IpDst == m.IpDst && p.Protocol == m.Protocol &&
-		p.PortSrc == m.PortSrc && p.PortDst == m.PortDst && p.Vlan == m.Vlan
-	if len(p.Ip6Src) > 0 {
-		return equal && p.Ip6Src.Equal(m.Ip6Src) && p.Ip6Dst.Equal(m.Ip6Dst)
-	}
-	return equal
-}
-
-func (h *MetaPacketTcpHeader) extractTcpOptions(stream *ByteStream) bool {
-	for stream.Len() >= 2 { // 如果不足2B，那么只可能是NOP或END
-		switch TCPOptionKind(stream.U8()) {
-		case TCPOptionKindEndList:
-			return true
-		case TCPOptionKindNop:
-			continue
-		case TCPOptionKindWindowScale:
-			stream.Skip(1)
-			if stream.Len() < 1 {
-				return false
-			}
-			h.WinScale = stream.U8()
-		case TCPOptionKindSACKPermitted:
-			stream.Skip(1)
-			h.SACKPermitted = true
-		case TCPOptionKindMSS:
-			stream.Skip(1)
-			if stream.Len() < 2 {
-				return false
-			}
-			h.MSS = stream.U16()
-		case TCPOptionKindSACK:
-			sackLen := int(stream.U8()) - 2
-			if sackLen <= 0 || sackLen > 40 || stream.Len() < sackLen {
-				return false
-			}
-			h.Sack = make([]byte, sackLen)
-			copy(h.Sack, stream.Field(sackLen))
-		default: // others
-			otherLen := int(stream.U8()) - 2
-			if otherLen < 0 || otherLen > 40 || stream.Len() < otherLen {
-				return false
-			}
-			stream.Skip(otherLen)
-		}
-	}
-	return true
-}
-
-func isVlanTagged(ethType EthernetType) bool {
-	return ethType == EthernetTypeQinQ || ethType == EthernetTypeDot1Q
-}
-
-func (p *MetaPacket) ParseArp(stream *ByteStream) {
-	p.RawHeader = make([]byte, ARP_HEADER_SIZE)
-	copy(p.RawHeader, stream.Slice())
-
-	stream.Skip(6)
-	op := stream.U16()
-	p.Invalid = op == ARPReply // arp reply有代传，MAC和IP地址不对应，所以为无效包
-	stream.Skip(MAC_ADDR_LEN)
-	p.IpSrc = stream.U32()
-	stream.Skip(MAC_ADDR_LEN)
-	p.IpDst = stream.U32()
-}
-
-func (p *MetaPacket) ParseIcmp(stream *ByteStream) {
-	p.RawHeader = make([]byte, 0, ICMP_HEADER_SIZE+MIN_IPV4_HEADER_SIZE)
-	p.RawHeader = append(p.RawHeader, stream.Slice()[:2]...)
-	icmpType := stream.U8()
-	stream.Skip(3)
-	switch icmpType {
-	case ICMPv4TypeDestinationUnreachable:
-		fallthrough
-	case ICMPv4TypeSourceQuench:
-		fallthrough
-	case ICMPv4TypeRedirect:
-		fallthrough
-	case ICMPv4TypeTimeExceeded:
-		fallthrough
-	case ICMPv4TypeParameterProblem:
-		dataLen := MIN_IPV4_HEADER_SIZE
-		if stream.Len() < MIN_IPV4_HEADER_SIZE {
-			dataLen = stream.Len()
-		}
-		p.RawHeader = append(p.RawHeader[:4], stream.Field(dataLen)...)
-		return
-	default:
-		p.RawHeader = append(p.RawHeader[:4], stream.Field(4)...)
-		return
-	}
-}
-
-func (p *MetaPacket) ParseL4(stream *ByteStream) {
-	if p.Protocol == IPProtocolTCP {
-		length := stream.Len()
-		if length < MIN_TCP_HEADER_SIZE {
-			p.PayloadLen = 0
-			p.Invalid = true
-			return
-		}
-		tcpHeader := &p.TcpData
-		p.PortSrc = stream.U16()
-		p.PortDst = stream.U16()
-		tcpHeader.Seq = stream.U32()
-		tcpHeader.Ack = stream.U32()
-		dataOffset := uint16(stream.U8()&0xF0) >> 2
-		tcpHeader.DataOffset = uint8(dataOffset >> 2)
-		tcpHeader.Flags = stream.U8()
-		tcpHeader.WinSize = stream.U16()
-		stream.Skip(4) // skip checksum and URG Pointer
-		p.PayloadLen -= dataOffset
-
-		optionsLen := int(dataOffset) - MIN_TCP_HEADER_SIZE
-		if optionsLen < 0 || optionsLen > 40 || optionsLen > length-MIN_TCP_HEADER_SIZE {
-			p.Invalid = true
-			return
-		}
-		if optionsLen > 0 {
-			p.Invalid = !tcpHeader.extractTcpOptions(&ByteStream{stream.Field(int(optionsLen)), 0})
-		}
-	} else if p.Protocol == IPProtocolUDP {
-		if stream.Len() < UDP_HEADER_SIZE {
-			p.Invalid = true
-			return
-		}
-		p.PortSrc = stream.U16()
-		p.PortDst = stream.U16()
-		p.PayloadLen = stream.U16() - UDP_HEADER_SIZE
-	} else if p.Protocol == IPProtocolICMPv4 {
-		if stream.Len() < ICMP_HEADER_SIZE {
-			p.Invalid = true
-			return
-		}
-		p.ParseIcmp(stream)
-	}
-}
-
-func (p *MetaPacket) ParseIp(stream *ByteStream) {
-	ihl := (stream.U8() & 0xF)
-	p.IHL = ihl
-	stream.Skip(1) // skip tos
-	totalLength := stream.U16()
-	p.IpID = stream.U16()
-	p.IpFlags = stream.U16()
-	fragmentOffset := p.IpFlags & 0x1FFF
-	p.TTL = stream.U8()
-	p.Protocol = IPProtocol(stream.U8())
-	stream.Skip(2) // skip checksum
-	p.IpSrc = stream.U32()
-	p.IpDst = stream.U32()
-	if ihl < 5 || totalLength < MIN_IPV4_HEADER_SIZE || totalLength < uint16(ihl*4) {
-		p.Invalid = true
-		return
-	}
-
-	ipOptionsSize := int(ihl)*4 - MIN_IPV4_HEADER_SIZE
-	if stream.Len() <= ipOptionsSize || fragmentOffset > 0 { // no more header
-		return
-	}
-	stream.Skip(ipOptionsSize) // skip options
-	payloadLength := uint16(Min(stream.Len(), int(totalLength)-int(ihl)*4))
-	if p.Protocol == IPProtocolTCP {
-		p.PayloadLen = totalLength - uint16(ihl*4)
-	}
-	p.ParseL4(&ByteStream{stream.Slice()[:payloadLength], 0})
-}
-
-// TODO: 一个合法ip报文应当至少有30B的长度(不考虑非ip情形)
-//       因此如果我们能够减少长度的判断，想必能够提升不少的性能
-func (p *MetaPacket) Parse(l3Packet RawPacket) bool {
-	stream := ByteStream{l3Packet, 0}
-
-	// L3
-	if p.EthType == EthernetTypeIPv4 && stream.Len() >= MIN_IPV4_HEADER_SIZE {
-		p.ParseIp(&stream)
-	} else if p.EthType == EthernetTypeARP && stream.Len() >= ARP_HEADER_SIZE {
-		p.ParseArp(&stream)
-	}
-
-	return true
-}
-
-func (p *MetaPacket) ParseL2(packet RawPacket) int {
-	stream := ByteStream{packet, 0}
-	inPort := uint32(0)
-	l2Len := 0
-
-	if stream.Len() < ETH_HEADER_SIZE {
-		p.Invalid = true
-		return l2Len
-	}
-
-	p.MacDst = MacIntFromBytes(stream.Field(MAC_ADDR_LEN))
-	p.MacSrc = MacIntFromBytes(stream.Field(MAC_ADDR_LEN))
-	p.EthType = EthernetType(stream.U16())
-	l2Len += ETH_HEADER_SIZE
-	if isVlanTagged(p.EthType) && stream.Len() > VLANTAG_LEN+ETH_TYPE_LEN {
-		vlanTag := stream.U16()
-		vid := vlanTag & VLAN_ID_MASK
-		if pcp := (vlanTag >> 13) & 0x7; pcp == MIRRORED_TRAFFIC {
-			inPort = (uint32(vid&0xF00) << 8) | uint32(vid&0xFF)
-			if p.PacketLen > 0 {
-				p.PacketLen -= (VLANTAG_LEN + ETH_TYPE_LEN)
-			}
-		} else {
-			p.Vlan = vid
-		}
-		p.EthType = EthernetType(stream.U16())
-		l2Len += VLANTAG_LEN + ETH_TYPE_LEN
-	}
-	if p.EthType == EthernetTypeDot1Q && stream.Len() > VLANTAG_LEN+ETH_TYPE_LEN {
-		p.Vlan = stream.U16() & VLAN_ID_MASK
-		p.EthType = EthernetType(stream.U16())
-		l2Len += VLANTAG_LEN + ETH_TYPE_LEN
-	}
-
-	if p.InPort == 0 {
-		p.InPort = inPort
-	}
-	return l2Len
-}
-
 func (p *MetaPacket) String() string {
 	buffer := bytes.Buffer{}
 	var format string
-	format = "timestamp: %d inport: 0x%x vtapId: %d exporter: %v len: %d l2_end: %v, %v l3_end: %v, %v invalid: %v direction: %v\n"
+	format = "timestamp: %d inport: 0x%x vtapId: %d exporter: %v len: %d l2_end: %v, %v l3_end: %v, %v direction: %v\n"
 	buffer.WriteString(fmt.Sprintf(format, p.Timestamp, p.InPort, p.VtapId, p.Exporter,
-		p.PacketLen, p.L2End0, p.L2End1, p.L3End0, p.L3End1, p.Invalid, p.Direction))
+		p.PacketLen, p.L2End0, p.L2End1, p.L3End0, p.L3End1, p.Direction))
 	if p.Tunnel != nil {
 		buffer.WriteString(fmt.Sprintf("\ttunnel: %s\n", p.Tunnel))
 	}

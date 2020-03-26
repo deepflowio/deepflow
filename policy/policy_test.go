@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	forward       = AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
-	backward      = AclAction(0).AddActionFlags(ACTION_PACKET_COUNTING).AddDirections(BACKWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
+	forward       = AclAction(0).AddActionFlags(ACTION_PACKET_CAPTURING).AddDirections(FORWARD)
+	backward      = AclAction(0).AddActionFlags(ACTION_PACKET_CAPTURING).AddDirections(BACKWARD)
 	ttl           = uint8(64)
 	ip1           = NewIPFromString("192.168.2.12").Int()
 	ip2           = NewIPFromString("192.168.2.0").Int()
@@ -52,15 +52,12 @@ var (
 	mac3          = NewMACAddrFromString("08:00:27:a4:2b:fb").Int()
 	mac4          = NewMACAddrFromString("08:00:27:a4:2b:fc").Int()
 	mac5          = NewMACAddrFromString("08:00:27:a4:2b:fd").Int()
-	launchServer1 = NewIPFromString("10.10.10.10").Int()
 	l2EndBool     = []bool{false, true}
 	l3EndBool     = []bool{false, true}
 )
 
 // 和云平台结合起来的测试例所需常量定义
 var (
-	server = NewIPFromString("172.20.1.1").Int()
-
 	group    = []uint32{0, 10, 20, 30, 40, 50, 60, 70, 2, 3, 4, 11, 12, 13, 14, 15, 16, 17}
 	groupEpc = []int32{0, 10, 20, 0, 40, 50, 0, 70, 40, 11, 12, 17}
 	ipGroup6 = group[6] + IP_GROUP_ID_FLAG
@@ -216,21 +213,20 @@ func generateIpGroup(groupId uint32, epcId int32, ip ...string) *IpGroupData {
 	return &ipGroup
 }
 
-func generatePlatformDataExtension(epcId int32, deviceType, deviceId, ifType uint32, mac uint64, hostIp uint32) *PlatformData {
+func generatePlatformDataExtension(epcId int32, deviceType, deviceId, ifType uint32, mac uint64) *PlatformData {
 	data := PlatformData{
 		EpcId:      epcId,
 		DeviceType: deviceType,
 		DeviceId:   deviceId,
 		IfType:     ifType,
 		Mac:        mac,
-		HostIp:     hostIp,
 	}
 	return &data
 }
 
 func generatePlatformDataByParam(ip uint32, mac uint64, epcId int32, Iftype uint32) *PlatformData {
 	ipInfo := generateIpNet(ip, 121, 32)
-	vifData := generatePlatformDataExtension(epcId, 1, 3, Iftype, mac, launchServer1)
+	vifData := generatePlatformDataExtension(epcId, 1, 3, Iftype, mac)
 	vifData.Ips = append(vifData.Ips, ipInfo)
 	return vifData
 }
@@ -242,7 +238,6 @@ func generatePlatformDataWithGroupId(epcId int32, groupId uint32, mac uint64, ip
 		DeviceId:   3,
 		IfType:     3,
 		Mac:        mac,
-		HostIp:     server,
 	}
 	if epcId == 0 {
 		data.EpcId = EPC_FROM_DEEPFLOW
@@ -260,8 +255,8 @@ func generatePeerConnection(id uint32, src, dst int32) *PeerConnection {
 	}
 }
 
-func generateAclAction(id ACLID, actionFlags ActionFlag) AclAction {
-	return AclAction(id).AddActionFlags(actionFlags).AddDirections(FORWARD).AddTagTemplates(TEMPLATE_EDGE_PORT)
+func generateAclAction(id uint32, actionFlags ActionFlag) AclAction {
+	return AclAction(0).SetACLGID(uint16(id)).AddActionFlags(actionFlags).AddDirections(FORWARD)
 }
 
 func getBackwardAcl(acl AclAction) AclAction {
@@ -269,7 +264,7 @@ func getBackwardAcl(acl AclAction) AclAction {
 }
 
 func generatePolicyAcl(table *PolicyTable, action AclAction, aclID uint32, args ...interface{}) *Acl {
-	var srcGroupId, dstGroupId, vlan uint32
+	var srcGroupId, dstGroupId uint32
 	var proto uint16
 	var port int
 	var npb NpbActions
@@ -293,12 +288,6 @@ func generatePolicyAcl(table *PolicyTable, action AclAction, aclID uint32, args 
 				port = int(arg.(uint16))
 			}
 		case 4:
-			if _, ok := arg.(int); ok {
-				vlan = uint32(arg.(int))
-			} else {
-				vlan = arg.(uint32)
-			}
-		case 5:
 			npb = arg.(NpbActions)
 		}
 	}
@@ -320,13 +309,11 @@ func generatePolicyAcl(table *PolicyTable, action AclAction, aclID uint32, args 
 	acl := &Acl{
 		Id:           aclID,
 		Type:         TAP_TOR,
-		TapId:        uint32(aclID + 1),
 		SrcGroups:    srcGroups,
 		DstGroups:    dstGroups,
 		SrcPortRange: []PortRange{NewPortRange(0, 65535)},
 		DstPortRange: dstPorts,
 		Proto:        uint16(proto),
-		Vlan:         vlan,
 		Action:       []AclAction{action},
 	}
 	if npb.TunnelId() != 0 {
@@ -336,7 +323,7 @@ func generatePolicyAcl(table *PolicyTable, action AclAction, aclID uint32, args 
 	return acl
 }
 
-func generateLookupKey6(srcMac, dstMac uint64, vlan uint32, srcIp, dstIp net.IP,
+func generateLookupKey6(srcMac, dstMac uint64, srcIp, dstIp net.IP,
 	proto IPProtocol, srcPort, dstPort uint16, flags ...FeatureFlags) *LookupKey {
 	key := &LookupKey{
 		SrcMac:      srcMac,
@@ -346,7 +333,6 @@ func generateLookupKey6(srcMac, dstMac uint64, vlan uint32, srcIp, dstIp net.IP,
 		Proto:       uint8(proto),
 		SrcPort:     srcPort,
 		DstPort:     dstPort,
-		Vlan:        uint16(vlan),
 		Tap:         TAP_TOR,
 		FeatureFlag: NPM,
 	}
@@ -356,7 +342,7 @@ func generateLookupKey6(srcMac, dstMac uint64, vlan uint32, srcIp, dstIp net.IP,
 	return key
 }
 
-func generateLookupKey(srcMac, dstMac uint64, vlan uint32, srcIp, dstIp uint32,
+func generateLookupKey(srcMac, dstMac uint64, srcIp, dstIp uint32,
 	proto IPProtocol, srcPort, dstPort uint16, flags ...FeatureFlags) *LookupKey {
 	key := &LookupKey{
 		SrcMac:      srcMac,
@@ -366,7 +352,6 @@ func generateLookupKey(srcMac, dstMac uint64, vlan uint32, srcIp, dstIp uint32,
 		Proto:       uint8(proto),
 		SrcPort:     srcPort,
 		DstPort:     dstPort,
-		Vlan:        uint16(vlan),
 		Tap:         TAP_TOR,
 		FeatureFlag: NPM,
 	}
@@ -511,10 +496,10 @@ func generatePolicyTable(ids ...TableID) *PolicyTable {
 // 生成特定Acl规则
 func generateAclData(policy *PolicyTable) {
 	dstPorts := []uint16{0, 8000}
-	aclAction1 := generateAclAction(10, ACTION_PACKET_COUNTING)
-	acl1 := generatePolicyAcl(policy, aclAction1, 10, groupAny, groupAny, IPProtocolTCP, dstPorts[1], vlanAny)
-	aclAction2 := generateAclAction(20, ACTION_PACKET_COUNTING)
-	acl2 := generatePolicyAcl(policy, aclAction2, 20, groupAny, groupAny, IPProtocolTCP, dstPorts[0], 10)
+	aclAction1 := generateAclAction(10, ACTION_PACKET_CAPTURING)
+	acl1 := generatePolicyAcl(policy, aclAction1, 10, groupAny, groupAny, IPProtocolTCP, dstPorts[1])
+	aclAction2 := generateAclAction(20, ACTION_PACKET_CAPTURING)
+	acl2 := generatePolicyAcl(policy, aclAction2, 20, groupAny, groupAny, IPProtocolTCP, dstPorts[0])
 	policy.UpdateAcls([]*Acl{acl1, acl2})
 }
 
@@ -538,7 +523,8 @@ func modifyEndpointDataL3End(table *PolicyTable, key *LookupKey, l3End0, l3End1 
 }
 
 func getPolicyByFastPath(table *PolicyTable, key *LookupKey) (*EndpointData, *PolicyData) {
-	store, policy := table.operator.GetPolicyByFastPath(key)
+	policy := new(PolicyData)
+	store := table.operator.GetPolicyByFastPath(key, policy)
 	if store != nil {
 		endpoint := table.cloudPlatformLabeler.UpdateEndpointData(store, key)
 		return endpoint, policy
@@ -547,7 +533,8 @@ func getPolicyByFastPath(table *PolicyTable, key *LookupKey) (*EndpointData, *Po
 }
 
 func getPolicyByFirstPath(table *PolicyTable, endpoint *EndpointData, key *LookupKey) *PolicyData {
-	_, policy := table.operator.GetPolicyByFirstPath(endpoint, key)
+	policy := new(PolicyData)
+	table.operator.GetPolicyByFirstPath(key, policy, endpoint)
 	return policy
 }
 

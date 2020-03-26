@@ -13,11 +13,6 @@ import (
 
 func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	macInt := vifData.GetMac()
-	hostIp := uint32(0)
-	ip := ParserStringIpV4(vifData.GetLaunchServer())
-	if ip != nil {
-		hostIp = IpToUint32(ip)
-	}
 
 	ips := make([]*datatype.IpNet, 0, 1024)
 	for _, ipResource := range vifData.IpResources {
@@ -61,7 +56,6 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 		DeviceType: vifData.GetDeviceType(),
 		DeviceId:   vifData.GetDeviceId() & 0xffff,
 		IfType:     vifData.GetIfType(),
-		HostIp:     hostIp,
 	}
 }
 
@@ -154,27 +148,11 @@ func updateTunnelIpMap(flowAcls []*trident.FlowAcl) {
 }
 
 func newAclAction(actions []*trident.FlowAction) []datatype.AclAction {
-	actionSet := make(map[datatype.AclAction]datatype.AclAction)
+	aclActions := make([]datatype.AclAction, 0, len(actions))
 	for _, action := range actions {
 		actionFlags := datatype.ActionFlag(1 << uint32(action.GetAction()-1)) // protobuf中的定义从1开始
-		tagTemplates := datatype.TagTemplate(action.GetTagTemplate())
-		key := datatype.AclAction(0).SetACLGID(0).AddActionFlags(actionFlags)
-		if aclAction, find := actionSet[key]; find {
-			actionSet[key] = aclAction.AddTagTemplates(tagTemplates)
-		} else {
-			actionSet[key] = datatype.AclAction(0).SetACLGID(0).AddActionFlags(actionFlags).AddTagTemplates(tagTemplates)
-		}
-		for _, aclGID := range action.GetPolicyAclGroupId() {
-			key = datatype.AclAction(0).SetACLGID(datatype.ACLID(aclGID)).AddActionFlags(actionFlags)
-			if aclAction, find := actionSet[key]; find {
-				actionSet[key] = aclAction.AddTagTemplates(tagTemplates)
-			} else {
-				actionSet[key] = datatype.AclAction(0).SetACLGID(datatype.ACLID(aclGID)).AddActionFlags(actionFlags).AddTagTemplates(tagTemplates)
-			}
-		}
-	}
-	aclActions := make([]datatype.AclAction, 0, len(actionSet))
-	for _, aclAction := range actionSet {
+		aclGID := action.GetPolicyAclGroupId()
+		aclAction := datatype.AclAction(0).SetACLGID(uint16(aclGID)).AddActionFlags(actionFlags)
 		aclActions = append(aclActions, aclAction)
 	}
 	return aclActions
@@ -207,7 +185,6 @@ func newPolicyData(acl *trident.FlowAcl) *policy.Acl {
 		SrcPortRange: datatype.SplitPort2Int(acl.GetSrcPorts()),
 		DstPortRange: datatype.SplitPort2Int(acl.GetDstPorts()),
 		Proto:        uint16(acl.GetProtocol() & 0xffff),
-		Vlan:         acl.GetVlan() & 0xfff,
 		Action:       newAclAction(acl.GetActions()),
 		NpbActions:   newNpbActions(acl.GetNpbActions()),
 	}
