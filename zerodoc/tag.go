@@ -46,40 +46,19 @@ const (
 	ACLGID
 	Protocol
 	ServerPort
-	CastType
+	_
 	TAPType
-	TCPFlags
+	_
 	VTAPID
-	TunnelIPID
 )
 
 const (
-	Country  Code = 1 << 63
-	Province Code = 1 << 62
-	ISPCode  Code = 1 << 61
-
-	CodeIndexBits uint32 = 6 // 修改此值需更新zero
-	MaxCodeIndex  uint32 = (1 << CodeIndexBits) - 1
-	CodeIndices   Code   = Code(MaxCodeIndex) << 48 // 1<<48 ~ 1<<53: code index
+	TagType  Code = 1 << 62
+	TagValue Code = 1 << 63
 )
-
-func IndexToCode(i uint32) Code {
-	if i > MaxCodeIndex {
-		panic(fmt.Sprintf("目前支持的最大CodeIndex为%d", MaxCodeIndex))
-	}
-	return Code(i) << 48
-}
-
-func CodeToIndex(c Code) uint32 {
-	return uint32(c>>48) & MaxCodeIndex
-}
 
 func (c Code) HasEdgeTagField() bool {
 	return c&0xffff0000 != 0
-}
-
-func (c Code) RemoveIndex() Code {
-	return c &^ CodeIndices
 }
 
 type DeviceType uint8
@@ -113,6 +92,13 @@ const (
 	ISP2
 	ToR
 	// 4~255 ISP
+)
+
+const (
+	TAG_TYPE_PROVINCE = 1 + iota
+	TAG_TYPE_TCP_FLAG
+	TAG_TYPE_CAST_TYPE
+	TAG_TYPE_TUNNEL_IP_ID
 )
 
 type TCPFlag uint8
@@ -179,14 +165,10 @@ type Field struct {
 	ServerPort uint16
 	VTAPID     uint16
 	TAPType    TAPTypeEnum
-	CastType   CastTypeEnum
 	IsIPv6     uint8 // (8B) 与IP/IP6是共生字段
-	TCPFlags   TCPFlag
-	TunnelIPID uint16
 
-	Country  uint8
-	Province uint8
-	ISP      uint8 // (+3B = 8B)
+	TagType  uint8
+	TagValue uint16
 }
 
 type Tag struct {
@@ -248,22 +230,6 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",az_id_1=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.AZID1), 10))
 	}
-	if t.Code&CastType != 0 {
-		switch t.CastType {
-		case BROADCAST:
-			offset += copy(b[offset:], ",cast_type=broadcast")
-		case MULTICAST:
-			offset += copy(b[offset:], ",cast_type=multicast")
-		case UNICAST:
-			offset += copy(b[offset:], ",cast_type=unicast")
-		default:
-			offset += copy(b[offset:], ",cast_type=unknown")
-		}
-	}
-	if t.Code&Country != 0 {
-		offset += copy(b[offset:], ",country=")
-		offset += copy(b[offset:], geo.DecodeCountry(t.Country))
-	}
 
 	if t.Code&Direction != 0 {
 		switch t.Direction {
@@ -322,10 +288,6 @@ func (t *Tag) MarshalTo(b []byte) int {
 		}
 	}
 
-	if t.Code&ISPCode != 0 {
-		offset += copy(b[offset:], ",isp=")
-		offset += copy(b[offset:], geo.DecodeISP(t.ISP))
-	}
 	if t.Code&L3Device != 0 {
 		offset += copy(b[offset:], ",l3_device_id=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L3DeviceID), 10))
@@ -370,11 +332,6 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.Protocol), 10))
 	}
 
-	if t.Code&Province != 0 {
-		offset += copy(b[offset:], ",province=")
-		offset += copy(b[offset:], geo.DecodeRegion(t.Province))
-	}
-
 	if t.Code&RegionID != 0 {
 		offset += copy(b[offset:], ",region=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.RegionID), 10))
@@ -401,17 +358,39 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",subnet_id_1=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.SubnetID1), 10))
 	}
+	if t.Code&TagType != 0 && t.Code&TagValue != 0 {
+		offset += copy(b[offset:], ",tag_type=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagType), 10))
+		switch t.TagType {
+		case TAG_TYPE_PROVINCE:
+			offset += copy(b[offset:], ",tag_value=")
+			offset += copy(b[offset:], geo.DecodeRegion(uint8(t.TagValue)))
+		// offset += copy(b[offset:], ",isp=")
+		// offset += copy(b[offset:], geo.DecodeISP(t.ISP))
+		// offset += copy(b[offset:], ",country=")
+		// offset += copy(b[offset:], geo.DecodeCountry(t.Country))
+		case TAG_TYPE_TCP_FLAG:
+			offset += copy(b[offset:], ",tag_value=")
+			offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagValue), 10))
+		case TAG_TYPE_CAST_TYPE:
+			switch CastTypeEnum(t.TagValue) {
+			case BROADCAST:
+				offset += copy(b[offset:], ",tag_value=broadcast")
+			case MULTICAST:
+				offset += copy(b[offset:], ",tag_value=multicast")
+			case UNICAST:
+				offset += copy(b[offset:], ",tag_value=unicast")
+			default:
+				offset += copy(b[offset:], ",tag_value=unknown")
+			}
+		case TAG_TYPE_TUNNEL_IP_ID:
+			offset += copy(b[offset:], ",tag_value=")
+			offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagValue), 10))
+		}
+	}
 	if t.Code&TAPType != 0 {
 		offset += copy(b[offset:], ",tap_type=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TAPType), 10))
-	}
-	if t.Code&TCPFlags != 0 {
-		offset += copy(b[offset:], ",tcp_flags=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TCPFlags), 10))
-	}
-	if t.Code&TunnelIPID != 0 {
-		offset += copy(b[offset:], ",tunnel_ip_id=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TunnelIPID), 10))
 	}
 	if t.Code&VTAPID != 0 {
 		offset += copy(b[offset:], ",vtap_id=")
@@ -542,24 +521,12 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&SubnetID != 0 {
 		t.SubnetID = decoder.ReadU16()
 	}
-	if t.Code&CastType != 0 {
-		t.CastType = CastTypeEnum(decoder.ReadU8())
-	}
-	if t.Code&TCPFlags != 0 {
-		t.TCPFlags = TCPFlag(decoder.ReadU8())
-	}
-	if t.Code&TunnelIPID != 0 {
-		t.TunnelIPID = decoder.ReadU16()
-	}
 
-	if t.Code&Country != 0 {
-		t.Country = decoder.ReadU8()
+	if t.Code&TagType != 0 {
+		t.TagType = decoder.ReadU8()
 	}
-	if t.Code&Province != 0 {
-		t.Province = decoder.ReadU8()
-	}
-	if t.Code&ISPCode != 0 {
-		t.ISP = decoder.ReadU8()
+	if t.Code&TagValue != 0 {
+		t.TagValue = decoder.ReadU16()
 	}
 
 	if !decoder.Failed() {
@@ -687,24 +654,12 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 	if code&SubnetID != 0 {
 		encoder.WriteU16(t.SubnetID)
 	}
-	if code&CastType != 0 {
-		encoder.WriteU8(uint8(t.CastType))
-	}
-	if code&TCPFlags != 0 {
-		encoder.WriteU8(uint8(t.TCPFlags))
-	}
-	if t.Code&TunnelIPID != 0 {
-		encoder.WriteU16(t.TunnelIPID)
-	}
 
-	if code&Country != 0 {
-		encoder.WriteU8(t.Country)
+	if code&TagType != 0 {
+		encoder.WriteU8(t.TagType)
 	}
-	if code&Province != 0 {
-		encoder.WriteU8(t.Province)
-	}
-	if code&ISPCode != 0 {
-		encoder.WriteU8(t.ISP)
+	if code&TagValue != 0 {
+		encoder.WriteU16(t.TagValue)
 	}
 }
 
@@ -735,10 +690,6 @@ func (t *Tag) SetTID(tid uint8) {
 
 func (t *Tag) GetTAPType() uint8 {
 	return uint8(t.TAPType)
-}
-
-func (t *Tag) HasVariedField() bool {
-	return t.Code&(ServerPort|Province|Country|ISPCode) != 0 || t.HasEdgeTagField()
 }
 
 var DatabaseSuffix = [...]string{
@@ -853,57 +804,6 @@ func (f *Field) FillTag(c Code, tag *Tag) {
 	}
 	tag.Code = c
 	tag.id = ""
-}
-
-func (t *Tag) IsMatchPublishPolicy(p *PublishPolicy) bool {
-	if p.Code == 0 {
-		p.IsMatched = true
-		return true
-	}
-
-	if p.Code&FilterTapType != 0 && t.TAPType != p.TAPType {
-		return false
-	}
-	if p.Code&FilterAclGid != 0 && t.ACLGID != p.ACLGID {
-		return false
-	}
-	if p.Code&FilterL3EpcID != 0 && t.L3EpcID != p.L3EpcID {
-		return false
-	}
-	if p.Code&FilterL3DeviceID != 0 && t.L3DeviceID != p.L3DeviceID {
-		return false
-	}
-	if p.Code&FilterL3DeviceType != 0 && t.L3DeviceType != p.L3DeviceType {
-		return false
-	}
-	if p.Code&FilterL3EpcID0 != 0 && t.L3EpcID != p.L3EpcID0 {
-		return false
-	}
-	if p.Code&FilterL3EpcID1 != 0 && t.L3EpcID1 != p.L3EpcID1 {
-		return false
-	}
-	if p.Code&FilterDirection != 0 && t.Direction != p.Direction {
-		return false
-	}
-
-	p.IsMatched = true
-	return true
-}
-
-func (t *Tag) FillPublishPolicy(p *PublishPolicy) {
-	t.Code = Code(p.TagCode)
-	t.TAPType = p.TAPType
-	t.ACLGID = p.ACLGID
-	t.L3DeviceID = p.L3DeviceID
-	t.L3DeviceType = p.L3DeviceType
-
-	if t.Code&L3EpcID != 0 {
-		t.L3EpcID = p.L3EpcID
-	} else {
-		t.L3EpcID = p.L3EpcID0
-	}
-	t.L3EpcID1 = p.L3EpcID1
-	t.Direction = p.Direction
 }
 
 func parseUint(s string, base int, bitSize int) (uint64, error) {
@@ -1064,26 +964,6 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 			i, err = parseUint(value, 10, 8)
 		}
 		field.TAPType = TAPTypeEnum(i)
-	case _TAG_CAST_TYPE:
-		t.Code |= CastType
-		switch value {
-		case "broadcast":
-			field.CastType = BROADCAST
-		case "multicast":
-			field.CastType = MULTICAST
-		case "unicast":
-			field.CastType = UNICAST
-		default:
-			field.CastType = 0
-		}
-	case _TAG_TCP_FLAGS:
-		t.Code |= TCPFlags
-		i, err = parseUint(value, 10, 8)
-		field.TCPFlags = TCPFlag(i)
-	case _TAG_TUNNEL_IP_ID:
-		t.Code |= TunnelIPID
-		i, err = parseUint(value, 10, 32)
-		field.TunnelIPID = uint16(i)
 	case _TAG_POD_NODE_ID, _TAG_POD_NODE_ID_0:
 		if id == _TAG_POD_NODE_ID {
 			t.Code |= PodNodeID
@@ -1108,15 +988,37 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		t.Code |= AZIDPath
 		i, err = parseUint(value, 10, 16)
 		field.AZID1 = uint16(i)
-	case _TAG_COUNTRY:
-		t.Code |= Country
-		field.Country = geo.EncodeCountry(value)
-	case _TAG_PROVINCE:
-		t.Code |= Province
-		field.Province = geo.EncodeRegion(value)
-	case _TAG_ISP:
-		t.Code |= ISPCode
-		field.ISP = geo.EncodeISP(value)
+	case _TAG_TAG_TYPE:
+		t.Code |= TagType
+		i, err = parseUint(value, 10, 8)
+		field.TagType = uint8(i)
+	case _TAG_TAG_VALUE: // FIXME: 目前要求该字段出现之前TagType一定要有值
+		t.Code |= TagValue
+		switch field.TagType {
+		case TAG_TYPE_PROVINCE:
+			field.TagValue = uint16(geo.EncodeRegion(value))
+		// field.ISP = geo.EncodeISP(value)
+		// field.Country = geo.EncodeCountry(value)
+		case TAG_TYPE_TCP_FLAG:
+			i, err = parseUint(value, 10, 8)
+			field.TagValue = uint16(i)
+		case TAG_TYPE_CAST_TYPE:
+			switch value {
+			case "broadcast":
+				field.TagValue = uint16(BROADCAST)
+			case "multicast":
+				field.TagValue = uint16(MULTICAST)
+			case "unicast":
+				field.TagValue = uint16(UNICAST)
+			default:
+				field.TagValue = 0
+			}
+		case TAG_TYPE_TUNNEL_IP_ID:
+			i, err = parseUint(value, 10, 32)
+			field.TagValue = uint16(i)
+		default:
+			field.TagValue = 0
+		}
 	default:
 		err = fmt.Errorf("unsupoort tag id %d ", id)
 	}

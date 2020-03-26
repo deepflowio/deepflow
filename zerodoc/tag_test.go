@@ -62,7 +62,7 @@ func TestFill1(t *testing.T) {
 		"l3_epc_id_1": "31", "l3_device_id_1": "32", "l3_device_type_1": "9",
 		"host_id_1": "55", "subnet_id_1": "2000", "direction": "c2s", "acl_gid": "400",
 		"protocol": "4", "server_port": "9527", "tap_type": "0", "subnet_id": "1001", "pod_node_id": "1", "az_id": "132",
-		"country": "CHN", "province": "北京", "isp": "移动",
+		"tag_type": "1", "tag_value": "北京",
 	}
 
 	if err := tag.Fill(tags); err != nil {
@@ -132,14 +132,11 @@ func TestFill1(t *testing.T) {
 	if tag.AZID != 132 {
 		t.Error("AZID 处理错误")
 	}
-	if tag.Country != 5 {
-		t.Error("Country 处理错误")
+	if tag.TagType != 1 {
+		t.Error("TagType 处理错误")
 	}
-	if tag.Province != 8 {
-		t.Error("Province 处理错误")
-	}
-	if tag.ISP != 8 {
-		t.Error("ISP 处理错误")
+	if tag.TagValue != 8 {
+		t.Error("TagValue 处理错误:", tag.TagValue)
 	}
 }
 
