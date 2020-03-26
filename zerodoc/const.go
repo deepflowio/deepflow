@@ -6,7 +6,7 @@ const (
 	MSG_FLOW_SECOND MessageType = iota
 	MSG_FLOW
 	MSG_GEO
-	MSG_VTAP_USAGE
+	MSG_PACKET
 
 	MSG_INVILID
 )
@@ -19,7 +19,7 @@ const (
 	FLOW_SECOND_ID uint8 = iota
 	FLOW_ID
 	GEO_ID
-	VTAP_USAGE_ID
+	PACKET_ID
 
 	MAX_APP_ID
 )
@@ -28,7 +28,7 @@ var MeterVTAPNames [MAX_APP_ID]string = [MAX_APP_ID]string{
 	"vtap_360",
 	"vtap_360",
 	"vtap_360_geo",
-	"vtap_usage",
+	"vtap_packet",
 }
 
 var MeterNamesToID map[string]uint8
@@ -56,10 +56,6 @@ const (
 var MeasurementNames [MAX_MEASUREMENT_ID]string = [MAX_MEASUREMENT_ID]string{
 	"main",
 	"mini",
-	"main_isp",
-	"main_region",
-	"main_cast_type",
-	"main_tcp_flags",
 }
 
 var MeasurementNamesToID map[string]uint8

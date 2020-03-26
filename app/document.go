@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	VERSION               = 20200319 // 修改Document的序列化结构时需同步修改此常量
+	VERSION               = 20200326 // 修改Document的序列化结构时需同步修改此常量
 	MAX_DOC_STRING_LENGTH = 1024
 )
 
@@ -17,7 +17,6 @@ type Tag interface {
 	SetID(string)
 	GetCode() uint64
 	GetTAPType() uint8
-	HasVariedField() bool
 	ToKVString() string
 	MarshalTo([]byte) int
 	String() string
