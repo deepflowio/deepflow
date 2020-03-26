@@ -178,29 +178,7 @@ message PlatformData {
 }
 
 enum Action {
-    PACKET_COUNTING               = 1;  // 包统计
-    FLOW_COUNTING                 = 2;  // 流统计
-    FLOW_STORING                  = 3;  // 流存储
-    TCP_FLOW_PERF_COUNTING        = 4;  // TCP性能量化统计
-    PACKET_CAPTURING              = 5;  // 包存储（pcap）
-    FLOW_MISC_COUNTING            = 6;  // 流杂项统计
-    PACKET_BROKERING              = 7;  // 包分发
-    GEO_POSITIONING               = 11; // 地理定位
-}
-
-enum TagTemplate {
-    NODE = 1;
-    NODE_PORT = 2;
-    EDGE = 4;
-    EDGE_PORT = 8;
-    PORT = 16;
-    ACL_NODE = 32;
-    ACL_NODE_PORT = 64;
-    ACL_EDGE = 128;
-    ACL_EDGE_PORT = 256;
-    ACL_PORT = 512;
-
-    EDGE_PORT_ALL = 2048; // 资源用量APP专用
+    PACKET_CAPTURING              = 1;  // 包存储（pcap）
 }
 
 enum TapSide {
@@ -227,8 +205,7 @@ message NpbAction {
 
 message FlowAction {
     optional Action action = 1;
-    repeated uint32 policy_acl_group_id = 2;
-    optional uint32 tag_template = 3;
+    optional uint32 policy_acl_group_id = 2;
 }
 
 // 字段含义查看README
@@ -247,29 +224,6 @@ message FlowAcl {
 
 message FlowAcls {
     repeated FlowAcl flow_acl = 1;
-}
-
-message PublishAcl {
-    optional uint32 id = 1;
-    optional string database = 2;
-    optional string measurement = 3;
-
-    optional uint32 tap_type = 10; // 3: in_port 0x3****, 0~2/4~30: in_port 0x1****
-    optional uint32 acl_gid = 11;
-    optional int32 l3_epc_id = 12;
-    optional uint32 l3_device_type = 13;
-    optional uint32 l3_device_id = 14;
-    optional int32 l3_epc_id_0 = 15;
-    optional int32 l3_epc_id_1 = 16;
-    optional uint32 acl_direction = 17; // 取值范围: 同zero.proto中的AclDirection
-    optional uint32 direction = 18;    // 取值范围: 同zero.proto中的Direction
-    optional uint32 side = 19;
-
-    optional uint32 protocol = 31;
-}
-
-message PublishAcls {
-    repeated PublishAcl publish_acl = 1;
 }
 
 message SyncResponse {
