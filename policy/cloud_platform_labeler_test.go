@@ -64,14 +64,14 @@ func getCloudLabeler() *CloudPlatformLabeler {
 func TestCidr(t *testing.T) {
 	labeler := getCloudLabeler()
 	// 对等连接
-	key := generateLookupKey(cidrSrcMac, 0, 0, cidrSrcIp, cidrPeerDstIp, 0, 0, 0)
+	key := generateLookupKey(cidrSrcMac, 0, cidrSrcIp, cidrPeerDstIp, 0, 0, 0)
 	endpointData := labeler.GetEndpointData(key)
 	if endpointData.DstInfo.L3EpcId != cidrPeerDstEpc {
 		t.Errorf("Dst L3EpcId error: %v", endpointData)
 	}
 
 	// 私有网络内部路由
-	key = generateLookupKey(cidrSrcMac, 0, 0, cidrSrcIp, cidrDstIp, 0, 0, 0)
+	key = generateLookupKey(cidrSrcMac, 0, cidrSrcIp, cidrDstIp, 0, 0, 0)
 	endpointData = labeler.GetEndpointData(key)
 	if endpointData.DstInfo.L3EpcId != cidrSrcEpc {
 		t.Errorf("Dst L3EpcId error: %v", endpointData)

@@ -3,11 +3,44 @@ package datatype
 import (
 	. "encoding/binary"
 	"net"
+	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	. "github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcapgo"
 )
+
+type PacketLen = int
+
+func loadPcap(file string) ([]RawPacket, []PacketLen) {
+	var f *os.File
+	cwd, _ := os.Getwd()
+	if strings.Contains(cwd, "datatype") {
+		f, _ = os.Open(file)
+	} else { // dlv
+		f, _ = os.Open("datatype/" + file)
+	}
+	defer f.Close()
+
+	r, _ := pcapgo.NewReader(f)
+	var packets []RawPacket
+	var packetLens []PacketLen
+	for {
+		packet, ci, err := r.ReadPacketData()
+		if err != nil || packet == nil {
+			break
+		}
+		packetLens = append(packetLens, ci.Length)
+		if len(packet) > 128 {
+			packets = append(packets, packet[:128])
+		} else {
+			packets = append(packets, packet)
+		}
+	}
+	return packets, packetLens
+}
 
 func TestDecapsulateErspanII(t *testing.T) {
 	expected := &TunnelInfo{

@@ -21,9 +21,6 @@ type PortPolicyValue struct {
 }
 
 type VlanAndPortMap struct {
-	// 使用源目的MAC的后两个字节（共4字节）和vlan作为查询key
-	// FIXME: 为什么没有EndpointStore和timestamp，timestamp作用域EndpointStore还是PolicyData
-	vlanPolicyMap map[uint64]*PolicyData
 	// 使用源目的MAC的后两个字节（共4字节）和源目的端口作为查询key
 	portPolicyMap map[uint64]*PortPolicyValue
 }
@@ -39,37 +36,25 @@ type FastPath struct {
 
 	FastPortPolicyMaps  [MAX_QUEUE_COUNT + 1][TAP_MAX]*lru.U128LRU // 快速路径上的Policy映射表，Key为IP掩码对 + MAC + PORT，Value为PortPolicyValue
 	padding2            Padding
-	FastVlanPolicyMaps  [MAX_QUEUE_COUNT + 1][TAP_MAX]*lru.U128LRU // 快速路径上的Policy映射表，Key为IP掩码对 + MAC + VLAN，Value为PolicyData
-	padding3            Padding
 	fastPolicyMapsFlush [MAX_QUEUE_COUNT + 1]bool // 标记对应的LRU是否需要Clear
 
-	padding4                              Padding
+	padding3                              Padding
 	FastPathHit                           uint64
-	padding5                              Padding
+	padding4                              Padding
 	FastPathMacCount, FastPathPolicyCount uint32
 
-	padding6               Padding
+	padding5               Padding
 	MapSize                uint32
-	padding7               Padding
+	padding6               Padding
 	flushCount, queueCount int
-
-	padding8           Padding
-	SrcGroupAclGidMaps [TAP_MAX]map[uint32]bool
-	DstGroupAclGidMaps [TAP_MAX]map[uint32]bool
 }
 
-func (f *FastPath) Init(mapSize uint32, queueCount int, srcGroupAclGidMaps, dstGroupAclGidMaps [TAP_MAX]map[uint32]bool) {
+func (f *FastPath) Init(mapSize uint32, queueCount int) {
 	if queueCount > MAX_QUEUE_COUNT {
 		panic(fmt.Sprintf("queueCount超出最大限制%d", MAX_QUEUE_COUNT))
 	}
-	f.UpdateGroupAclGidMaps(srcGroupAclGidMaps, dstGroupAclGidMaps)
 	f.MapSize = mapSize
 	f.queueCount = queueCount
-}
-
-func (f *FastPath) UpdateGroupAclGidMaps(srcGroupAclGidMaps, dstGroupAclGidMaps [TAP_MAX]map[uint32]bool) {
-	f.SrcGroupAclGidMaps = srcGroupAclGidMaps
-	f.DstGroupAclGidMaps = dstGroupAclGidMaps
 }
 
 func (f *FastPath) FlushAcls() {
@@ -81,36 +66,29 @@ func (f *FastPath) FlushAcls() {
 	f.FastPathPolicyCount = 0
 }
 
-func (f *FastPath) generateMaskedIp(packet *LookupKey, maskedSrcIp, maskedDstIp *uint32) {
+func (f *FastPath) generateMaskedIp(packet *LookupKey) (uint32, uint32) {
 	if len(packet.Src6Ip) == 0 {
-		*maskedSrcIp = packet.SrcIp & f.IpNetmaskMap[uint16(packet.SrcIp>>16)]
-		*maskedDstIp = packet.DstIp & f.IpNetmaskMap[uint16(packet.DstIp>>16)]
+		maskedSrcIp := packet.SrcIp & f.IpNetmaskMap[uint16(packet.SrcIp>>16)]
+		maskedDstIp := packet.DstIp & f.IpNetmaskMap[uint16(packet.DstIp>>16)]
+		return maskedSrcIp, maskedDstIp
 	} else {
-		*maskedSrcIp = GetIpHash(packet.Src6Ip)
-		*maskedDstIp = GetIpHash(packet.Dst6Ip)
+		return GetIpHash(packet.Src6Ip), GetIpHash(packet.Dst6Ip)
 	}
 }
 
-func (f *FastPath) GenerateMapKey(packet *LookupKey, direction DirectionType, vlan bool) (uint64, uint64) {
-	maskedSrcIp, maskedDstIp := uint32(0), uint32(0)
+func (f *FastPath) GenerateMapKey(packet *LookupKey, direction DirectionType) (uint64, uint64) {
+	maskedSrcIp, maskedDstIp := f.generateMaskedIp(packet)
 	srcPort, dstPort := uint64(packet.SrcPort), uint64(packet.DstPort)
 	srcMacSuffix, dstMacSuffix := uint64(packet.SrcMac&0xffff), uint64(packet.DstMac&0xffff)
-	f.generateMaskedIp(packet, &maskedSrcIp, &maskedDstIp)
 	if direction == BACKWARD {
 		srcMacSuffix, dstMacSuffix = dstMacSuffix, srcMacSuffix
 		maskedSrcIp, maskedDstIp = maskedDstIp, maskedSrcIp
 		srcPort, dstPort = dstPort, srcPort
 	}
 
-	if !vlan {
-		key1 := uint64(maskedSrcIp)<<32 | srcMacSuffix<<16 | srcPort
-		key2 := uint64(maskedDstIp)<<32 | dstMacSuffix<<16 | dstPort
-		return key1, key2
-	} else {
-		key1 := uint64(maskedSrcIp)<<32 | srcMacSuffix<<16 | uint64(packet.Vlan)
-		key2 := uint64(maskedDstIp)<<32 | dstMacSuffix<<16 | uint64(packet.Vlan)
-		return key1, key2
-	}
+	key1 := uint64(maskedSrcIp)<<32 | srcMacSuffix<<16 | srcPort
+	key2 := uint64(maskedDstIp)<<32 | dstMacSuffix<<16 | dstPort
+	return key1, key2
 }
 
 func (f *FastPath) getPortFastPolicy(packet *LookupKey) (*EndpointStore, *PolicyData) {
@@ -118,7 +96,6 @@ func (f *FastPath) getPortFastPolicy(packet *LookupKey) (*EndpointStore, *Policy
 		for i := TAP_MIN; i < TAP_MAX; i++ {
 			if f.FastPortPolicyMaps[packet.FastIndex][i] != nil {
 				f.FastPortPolicyMaps[packet.FastIndex][i].Clear()
-				f.FastVlanPolicyMaps[packet.FastIndex][i].Clear()
 			}
 		}
 		f.flushCount -= 1
@@ -129,12 +106,9 @@ func (f *FastPath) getPortFastPolicy(packet *LookupKey) (*EndpointStore, *Policy
 		f.FastPortPolicyMaps[packet.FastIndex][packet.Tap] = lru.NewU128LRU(
 			"policy-fastpath-port", int(f.MapSize/8), int(f.MapSize),
 			stats.OptionStatTags{"index": strconv.Itoa((packet.FastIndex * int(TAP_MAX-1)) + int(packet.Tap))})
-		f.FastVlanPolicyMaps[packet.FastIndex][packet.Tap] = lru.NewU128LRU(
-			"policy-fastpath-vlan", int(f.MapSize/8), int(f.MapSize),
-			stats.OptionStatTags{"index": strconv.Itoa((packet.FastIndex * int(TAP_MAX-1)) + int(packet.Tap))})
 		return nil, nil
 	}
-	key1, key2 := f.GenerateMapKey(packet, FORWARD, false)
+	key1, key2 := f.GenerateMapKey(packet, FORWARD)
 	value, ok := f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true)
 	if ok {
 		portPolicy := value.(*PortPolicyValue)
@@ -145,58 +119,11 @@ func (f *FastPath) getPortFastPolicy(packet *LookupKey) (*EndpointStore, *Policy
 	return nil, nil
 }
 
-func (f *FastPath) getVlanFastPolicy(packet *LookupKey) *PolicyData {
-	key1, key2 := f.GenerateMapKey(packet, FORWARD, true)
-	value, ok := f.FastVlanPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true)
-	if ok {
-		policy := value.(*PolicyData)
-		return policy
-	}
-	return nil
-}
-
-func (f *FastPath) addVlanFastPolicy(packet *LookupKey, policy *PolicyData) {
-	forward, backward := INVALID_POLICY_DATA, INVALID_POLICY_DATA
-	key1, key2 := f.GenerateMapKey(packet, FORWARD, true)
-
-	if policy.ACLID > 0 {
-		forward = policy
-	}
-
-	if value, ok := f.FastVlanPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true); ok {
-		policy := value.(*PolicyData)
-		*policy = *forward
-	} else {
-		f.FastVlanPolicyMaps[packet.FastIndex][packet.Tap].Add(key1, key2, forward)
-		f.FastPathPolicyCount++
-	}
-
-	if key1 == key2 {
-		return
-	}
-	key1, key2 = key2, key1
-
-	if policy.ACLID > 0 {
-		backward = new(PolicyData)
-		backward.AclActions = make([]AclAction, 0, len(policy.AclActions))
-		backward.MergeAndSwapDirection(policy.AclActions, policy.NpbActions, policy.ACLID)
-	}
-
-	if value, ok := f.FastVlanPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true); ok {
-		policy := value.(*PolicyData)
-		*policy = *backward
-	} else {
-		f.FastVlanPolicyMaps[packet.FastIndex][packet.Tap].Add(key1, key2, backward)
-		f.FastPathPolicyCount++
-	}
-}
-
 func (f *FastPath) addPortFastPolicy(endpointStore *EndpointStore, packetEndpointData *EndpointData, packet *LookupKey, policyForward, policyBackward *PolicyData) {
 	if f.flushCount > 0 && f.fastPolicyMapsFlush[packet.FastIndex] {
 		for i := TAP_MIN; i < TAP_MAX; i++ {
 			if f.FastPortPolicyMaps[packet.FastIndex][i] != nil {
 				f.FastPortPolicyMaps[packet.FastIndex][i].Clear()
-				f.FastVlanPolicyMaps[packet.FastIndex][i].Clear()
 			}
 		}
 		f.flushCount -= 1
@@ -207,15 +134,12 @@ func (f *FastPath) addPortFastPolicy(endpointStore *EndpointStore, packetEndpoin
 		f.FastPortPolicyMaps[packet.FastIndex][packet.Tap] = lru.NewU128LRU(
 			"policy-fastpath-port", int(f.MapSize/8), int(f.MapSize),
 			stats.OptionStatTags{"index": strconv.Itoa((packet.FastIndex * int(TAP_MAX-1)) + int(packet.Tap))})
-		f.FastVlanPolicyMaps[packet.FastIndex][packet.Tap] = lru.NewU128LRU(
-			"policy-fastpath-vlan", int(f.MapSize/8), int(f.MapSize),
-			stats.OptionStatTags{"index": strconv.Itoa((packet.FastIndex * int(TAP_MAX-1)) + int(packet.Tap))})
 	}
 
 	forward, backward := INVALID_POLICY_DATA, INVALID_POLICY_DATA
-	key1, key2 := f.GenerateMapKey(packet, FORWARD, false)
+	key1, key2 := f.GenerateMapKey(packet, FORWARD)
 
-	id := getAclId(policyForward.ACLID, policyBackward.ACLID)
+	id := getAclId(policyForward.AclId, policyBackward.AclId)
 	if id > 0 {
 		forward = new(PolicyData)
 		if packet.HasFeatureFlag(NPM) {
@@ -375,9 +299,6 @@ func (f *FastPath) Close() {
 		for j := TAP_MIN; j < TAP_MAX; j++ {
 			if f.FastPortPolicyMaps[i][j] != nil {
 				f.FastPortPolicyMaps[i][j].Close()
-			}
-			if f.FastVlanPolicyMaps[i][j] != nil {
-				f.FastVlanPolicyMaps[i][j].Close()
 			}
 		}
 	}
