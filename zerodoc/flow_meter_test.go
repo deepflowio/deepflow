@@ -2,7 +2,6 @@ package zerodoc
 
 import (
 	"testing"
-	"time"
 )
 
 func TestMarshalFlowSecondMeter(t *testing.T) {
@@ -52,7 +51,7 @@ func TestMarshalFlowMeter(t *testing.T) {
 
 	m2 := FlowMeter{
 		TCPLatency: TCPLatency{
-			RTTClientSum:   time.Millisecond,
+			RTTClientSum:   uint64(1000),
 			RTTClientCount: 2,
 		},
 	}

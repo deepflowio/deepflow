@@ -2,7 +2,6 @@ package zerodoc
 
 import (
 	"testing"
-	"time"
 )
 
 func TestMarshalGeoMeter(t *testing.T) {
@@ -27,7 +26,7 @@ func TestMarshalGeoMeter(t *testing.T) {
 
 	m2 := GeoMeter{
 		TCPLatency: TCPLatency{
-			RTTClientSum:   time.Millisecond,
+			RTTClientSum:   uint64(1000),
 			RTTClientCount: 2,
 		},
 	}

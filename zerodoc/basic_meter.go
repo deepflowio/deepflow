@@ -2,7 +2,6 @@ package zerodoc
 
 import (
 	"strconv"
-	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
 )
@@ -73,27 +72,27 @@ func (t *Traffic) MarshalTo(b []byte) int {
 }
 
 type TCPLatency struct {
-	RTTSum         time.Duration `db:"rtt_sum"`
-	RTTClientSum   time.Duration `db:"rtt_client_sum"`
-	RTTServerSum   time.Duration `db:"rtt_server_sum"`
-	SRTSum         time.Duration `db:"srt_sum"`
-	ARTSum         time.Duration `db:"art_sum"`
-	RTTCount       uint64        `db:"rtt_count"`
-	RTTClientCount uint64        `db:"rtt_client_count"`
-	RTTServerCount uint64        `db:"rtt_server_count"`
-	SRTCount       uint64        `db:"srt_count"`
-	ARTCount       uint64        `db:"art_count"`
+	RTTSum         uint64 `db:"rtt_sum"`        // us
+	RTTClientSum   uint64 `db:"rtt_client_sum"` // us
+	RTTServerSum   uint64 `db:"rtt_server_sum"` // us
+	SRTSum         uint64 `db:"srt_sum"`        // us
+	ARTSum         uint64 `db:"art_sum"`        // us
+	RTTCount       uint64 `db:"rtt_count"`
+	RTTClientCount uint64 `db:"rtt_client_count"`
+	RTTServerCount uint64 `db:"rtt_server_count"`
+	SRTCount       uint64 `db:"srt_count"`
+	ARTCount       uint64 `db:"art_count"`
 }
 
 func (_ *TCPLatency) Reverse() {
 }
 
 func (l *TCPLatency) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteVarintU64(uint64(l.RTTSum))
-	encoder.WriteVarintU64(uint64(l.RTTClientSum))
-	encoder.WriteVarintU64(uint64(l.RTTServerSum))
-	encoder.WriteVarintU64(uint64(l.SRTSum))
-	encoder.WriteVarintU64(uint64(l.ARTSum))
+	encoder.WriteVarintU64(l.RTTSum)
+	encoder.WriteVarintU64(l.RTTClientSum)
+	encoder.WriteVarintU64(l.RTTServerSum)
+	encoder.WriteVarintU64(l.SRTSum)
+	encoder.WriteVarintU64(l.ARTSum)
 	encoder.WriteVarintU64(l.RTTCount)
 	encoder.WriteVarintU64(l.RTTClientCount)
 	encoder.WriteVarintU64(l.RTTServerCount)
@@ -102,11 +101,11 @@ func (l *TCPLatency) Encode(encoder *codec.SimpleEncoder) {
 }
 
 func (l *TCPLatency) Decode(decoder *codec.SimpleDecoder) {
-	l.RTTSum = time.Duration(decoder.ReadVarintU64())
-	l.RTTClientSum = time.Duration(decoder.ReadVarintU64())
-	l.RTTServerSum = time.Duration(decoder.ReadVarintU64())
-	l.SRTSum = time.Duration(decoder.ReadVarintU64())
-	l.ARTSum = time.Duration(decoder.ReadVarintU64())
+	l.RTTSum = decoder.ReadVarintU64()
+	l.RTTClientSum = decoder.ReadVarintU64()
+	l.RTTServerSum = decoder.ReadVarintU64()
+	l.SRTSum = decoder.ReadVarintU64()
+	l.ARTSum = decoder.ReadVarintU64()
 	l.RTTCount = decoder.ReadVarintU64()
 	l.RTTClientCount = decoder.ReadVarintU64()
 	l.RTTServerCount = decoder.ReadVarintU64()
@@ -137,11 +136,11 @@ func (l *TCPLatency) MarshalTo(b []byte) int {
 		"rtt_count=", "rtt_client_count=", "rtt_server_count=", "srt_count=", "art_count=",
 	}
 	values := []uint64{
-		uint64(l.RTTSum / time.Microsecond),
-		uint64(l.RTTClientSum / time.Microsecond),
-		uint64(l.RTTServerSum / time.Microsecond),
-		uint64(l.SRTSum / time.Microsecond),
-		uint64(l.ARTSum / time.Microsecond),
+		l.RTTSum,
+		l.RTTClientSum,
+		l.RTTServerSum,
+		l.SRTSum,
+		l.ARTSum,
 		l.RTTCount, l.RTTClientCount, l.RTTServerCount, l.SRTCount, l.ARTCount,
 	}
 	return marshalKeyValues(b, fields, values)
