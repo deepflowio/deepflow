@@ -1,8 +1,6 @@
 package zerodoc
 
 import (
-	"time"
-
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
 )
@@ -127,15 +125,15 @@ func (m *GeoMeter) Fill(ids []uint8, values []interface{}) {
 			m.ClosedFlow = uint64(v)
 
 		case _METER_RTT_SUM:
-			m.RTTSum = time.Duration(v)
+			m.RTTSum = uint64(v)
 		case _METER_RTT_CLIENT_SUM:
-			m.RTTClientSum = time.Duration(v)
+			m.RTTClientSum = uint64(v)
 		case _METER_RTT_SERVER_SUM:
-			m.RTTServerSum = time.Duration(v)
+			m.RTTServerSum = uint64(v)
 		case _METER_SRT_SUM:
-			m.SRTSum = time.Duration(v)
+			m.SRTSum = uint64(v)
 		case _METER_ART_SUM:
-			m.ARTSum = time.Duration(v)
+			m.ARTSum = uint64(v)
 		case _METER_RTT_COUNT:
 			m.RTTCount = uint64(v)
 		case _METER_RTT_CLIENT_COUNT:
