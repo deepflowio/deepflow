@@ -166,6 +166,9 @@ message Cidr {
     optional string prefix = 1;
     optional CidrType type = 2;
     optional int32 epc_id = 3;
+    optional uint32 subnet_id = 4;
+    optional uint32 region_id = 5;
+    optional uint32 az_id = 6;
 }
 
 message PlatformData {
