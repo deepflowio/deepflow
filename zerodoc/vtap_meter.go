@@ -20,7 +20,7 @@ func (m *VTAPUsageMeter) Reverse() {
 }
 
 func (m *VTAPUsageMeter) ID() uint8 {
-	return VTAP_USAGE_ID
+	return PACKET_ID
 }
 
 func (m *VTAPUsageMeter) Name() string {

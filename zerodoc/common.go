@@ -46,13 +46,9 @@ const (
 	_TAG_TAP_TYPE
 	_TAG_SUBNET_ID
 	_TAG_ACL_DIRECTION
-	_TAG_CAST_TYPE
-	_TAG_TCP_FLAGS
-	_TAG_TUNNEL_IP_ID
-	_TAG_COUNTRY
 	_TAG_REGION
-	_TAG_PROVINCE
-	_TAG_ISP
+	_TAG_TAG_TYPE
+	_TAG_TAG_VALUE
 	_TAG_MAX_ID_
 )
 const (
@@ -136,11 +132,8 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"tap_type":         _TAG_TAP_TYPE,
 	"subnet_id":        _TAG_SUBNET_ID,
 	"acl_direction":    _TAG_ACL_DIRECTION,
-	"cast_type":        _TAG_CAST_TYPE,
-	"tcp_flags":        _TAG_TCP_FLAGS,
-	"country":          _TAG_COUNTRY,
-	"province":         _TAG_PROVINCE,
-	"isp":              _TAG_ISP,
+	"tag_type":         _TAG_TAG_TYPE,
+	"tag_value":        _TAG_TAG_VALUE,
 
 	"packet_tx":              _METER_PACKET_TX,
 	"packet_rx":              _METER_PACKET_RX,
