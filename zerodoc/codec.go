@@ -41,7 +41,7 @@ func Encode(sequence uint64, doc *app.Document, encoder *codec.SimpleEncoder) er
 	case *FlowMeter:
 		msgType = MSG_FLOW
 	case *VTAPUsageMeter:
-		msgType = MSG_VTAP_USAGE
+		msgType = MSG_PACKET
 	default:
 		return fmt.Errorf("Unknown supported type %T", v)
 	}
@@ -106,7 +106,7 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 		doc.Meter = AcquireFlowSecondMeter()
 	case MSG_FLOW:
 		doc.Meter = AcquireFlowMeter()
-	case MSG_VTAP_USAGE:
+	case MSG_PACKET:
 		doc.Meter = AcquireVTAPUsageMeter()
 	default:
 		app.ReleaseDocument(doc)
@@ -126,8 +126,8 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 func GetMsgType(db, rp string) (MessageType, error) {
 	var msgType MessageType
 
-	if strings.HasPrefix(db, MeterVTAPNames[VTAP_USAGE_ID]) {
-		msgType = MSG_VTAP_USAGE
+	if strings.HasPrefix(db, MeterVTAPNames[PACKET_ID]) {
+		msgType = MSG_PACKET
 	} else if strings.HasPrefix(db, MeterVTAPNames[GEO_ID]) {
 		msgType = MSG_GEO
 	} else if strings.HasPrefix(db, MeterVTAPNames[FLOW_ID]) {
@@ -180,7 +180,7 @@ func EncodeRow(tag *Tag, msgType MessageType, columnIDs []uint8, timestamp int64
 		var m FlowMeter
 		m.Fill(columnIDs, columnValues)
 		m.Encode(encoder)
-	case MSG_VTAP_USAGE:
+	case MSG_PACKET:
 		var m VTAPUsageMeter
 		m.Fill(columnIDs, columnValues)
 		m.Encode(encoder)
