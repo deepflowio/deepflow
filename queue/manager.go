@@ -224,15 +224,8 @@ func RegisterCommand() *cobra.Command {
 		Use:   "monitor {name}",
 		Short: "monitor queue put data",
 		ValidArgs: []string{
-			"1-meta-packet-block-to-flow-generator",
+			"1-meta-packet-block-to-labeler",
 			"2-meta-packet-block-to-pcap-app",
-			"2-mini-tagged-flow-to-metering-app",
-			"2-tagged-flow-to-flow-duplicator",
-			"3-metering-doc-to-marshaller",
-			"3-tagged-flow-to-flow-app",
-			"3-tagged-flow-to-flow-throttle",
-			"4-flow-doc-to-marshaller",
-			"4-tagged-flow-to-flow-sender",
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) != 1 {

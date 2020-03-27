@@ -69,7 +69,7 @@ func (p RawPacket) fillIpTotalLen(packet *datatype.MetaPacket, at int) {
 		}
 		ipTotalLen += uint16(len(packet.RawHeader))
 	case layers.IPProtocolTCP:
-		if packet.Invalid || packet.TcpData.DataOffset == 0 {
+		if packet.TcpData.DataOffset == 0 {
 			return
 		}
 		ipTotalLen += uint16(packet.TcpData.DataOffset << 2)
@@ -215,7 +215,7 @@ const (
 )
 
 func (p RawPacket) fillTCP(packet *datatype.MetaPacket, start, ipv4Offset int, checksum bool) int {
-	if packet.Invalid || packet.TcpData.DataOffset == 0 {
+	if packet.TcpData.DataOffset == 0 {
 		return 0
 	}
 
