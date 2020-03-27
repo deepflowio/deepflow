@@ -74,7 +74,8 @@ func (c *command) recvDumpAcl(conn *net.UDPConn, remote *net.UDPAddr, arg *bytes
 	case LABELER_CMD_DUMP_ACL:
 		for i := 0; i < len(label.lookupKey); i++ {
 			key.FastIndex = i
-			endpoint, policy := label.policyTable.LookupAllByKey(&key)
+			endpoint, policy := &datatype.EndpointData{}, &datatype.PolicyData{}
+			label.policyTable.LookupAllByKey(&key, policy, endpoint)
 			info = append(info, fmt.Sprintf("GoRoutine-%d: EndPoint: {Src: %+v Dst: %+v} Policy: %+v", i, endpoint.SrcInfo, endpoint.DstInfo, policy))
 		}
 	case LABELER_CMD_DUMP_FIRST_ACL:
@@ -248,13 +249,6 @@ func newLookupKey(cmdLine string) (*datatype.LookupKey, uint16) {
 				return nil, queryType
 			}
 			key.DstMac = Mac2Uint64(mac)
-		case "vlan":
-			vlan, err := strconv.Atoi(parts[1])
-			if err != nil {
-				fmt.Printf("unknown vlan from: %s[%v]\n", cmdLine, err)
-				return nil, queryType
-			}
-			key.Vlan = uint16(vlan)
 		case "eth_type":
 			ethType, err := strconv.Atoi(parts[1])
 			if err != nil {
@@ -501,13 +495,6 @@ func parseAcl(args []string) *policy.Acl {
 				}
 				acl.Type = datatype.TapType(typeId)
 			}
-		case "vlan":
-			vlan, err := strconv.Atoi(keyValue[1])
-			if err != nil || vlan > 4096 || vlan < 0 {
-				fmt.Printf("invalid vlan %s from %s\n", keyValue[1], args[0])
-				return nil
-			}
-			acl.Vlan = uint32(vlan)
 		case "port":
 			port, err := strconv.Atoi(keyValue[1])
 			if err != nil || port > 65535 || port < 0 {
@@ -517,18 +504,8 @@ func parseAcl(args []string) *policy.Acl {
 			acl.DstPorts = make([]uint16, 0)
 			acl.DstPorts = append(acl.DstPorts, uint16(port))
 		case "action":
-			aclAction := datatype.AclAction(0).AddDirections(datatype.FORWARD | datatype.BACKWARD).AddTagTemplates(0xFFFF)
-			switch keyValue[1] {
-			case "metering":
-				aclAction = aclAction.AddActionFlags(datatype.ACTION_PACKET_COUNTING)
-			case "flow":
-				aclAction = aclAction.AddActionFlags(datatype.ACTION_FLOW_COUNTING | datatype.ACTION_FLOW_STORING)
-			case "all":
-				aclAction = aclAction.AddActionFlags(0xFFFF)
-			default:
-				fmt.Printf("invalid tap %s from %s\n", keyValue[1], args[0])
-				return nil
-			}
+			aclAction := datatype.AclAction(0).AddDirections(datatype.FORWARD | datatype.BACKWARD).
+				AddActionFlags(datatype.ACTION_PACKET_CAPTURING)
 			acl.Action = append(acl.Action, aclAction)
 		default:
 			fmt.Printf("invalid key from %s\n", args[0])

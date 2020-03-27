@@ -17,7 +17,7 @@ const (
 	ICMP_REST            = 28
 	IPV6_ADDR_LEN        = 16
 	COMPRESS_HEADER_SIZE = 24 // FRAME(2) + RESERVED(1) + VERSION(1) + SEQ(8) + TIMESAMP(8) + IF_MAC(4)
-	VERSION              = 5
+	_VERSION             = 5
 )
 
 const (
@@ -118,10 +118,7 @@ func (d *SequentialDecoder) decodeArp(meta *MetaPacket) {
 	meta.RawHeader = make([]byte, ARP_HEADER_SIZE)
 	copy(meta.RawHeader, d.data.Slice())
 
-	d.Skip(6)
-	op := d.U16()
-	meta.Invalid = op == ARPReply // arp reply有代传，MAC和IP地址不对应，所以为无效包
-	d.Skip(MAC_ADDR_LEN)
+	d.Skip(8 + MAC_ADDR_LEN)
 	meta.IpSrc = d.U32()
 	d.Skip(MAC_ADDR_LEN)
 	meta.IpDst = d.U32()
@@ -349,7 +346,7 @@ func (d *SequentialDecoder) DecodeHeader() (bool, uint16, uint16) {
 	}
 	d.frameSize = frameSize - 2
 	version := d.U16() // U8 reserved and U8 version
-	if version != VERSION {
+	if version != _VERSION {
 		return true, 0, 0
 	}
 	vtapId := d.U16()

@@ -147,21 +147,18 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) {
 	key.SrcPort = packet.PortSrc
 	key.DstPort = packet.PortDst
 	key.EthType = packet.EthType
-	key.Vlan = packet.Vlan
 	key.Proto = uint8(packet.Protocol)
 	key.L2End0 = packet.L2End0
 	key.L2End1 = packet.L2End1
 	key.L3End0 = packet.L3End0
 	key.L3End1 = packet.L3End1
 	key.Tap = datatype.GetTapType(packet.InPort)
-	key.Invalid = packet.Invalid
 	key.FastIndex = index
 	key.FeatureFlag = datatype.NPM
 	key.Src6Ip = packet.Ip6Src
 	key.Dst6Ip = packet.Ip6Dst
 
-	endpoints, policy := l.policyTable.LookupAllByKey(key)
-	packet.EndpointData, packet.PolicyData = *endpoints, *policy
+	l.policyTable.LookupAllByKey(key, &packet.PolicyData, &packet.EndpointData)
 }
 
 func (l *LabelerManager) run(id int) {

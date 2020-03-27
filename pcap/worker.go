@@ -27,7 +27,7 @@ const (
 
 type WriterKey uint64
 
-func getWriterIpv6Key(ip net.IP, aclGID datatype.ACLID, tapType zerodoc.TAPTypeEnum) WriterKey {
+func getWriterIpv6Key(ip net.IP, aclGID uint16, tapType zerodoc.TAPTypeEnum) WriterKey {
 	ipHash := uint32(0)
 	for i := 0; i < len(ip); i += 4 {
 		ipHash ^= *(*uint32)(unsafe.Pointer(&ip[i]))
@@ -35,7 +35,7 @@ func getWriterIpv6Key(ip net.IP, aclGID datatype.ACLID, tapType zerodoc.TAPTypeE
 	return WriterKey((uint64(ipHash) << 32) | (uint64(aclGID) << 16) | uint64(tapType))
 }
 
-func getWriterKey(ipInt datatype.IPv4Int, aclGID datatype.ACLID, tapType zerodoc.TAPTypeEnum) WriterKey {
+func getWriterKey(ipInt datatype.IPv4Int, aclGID uint16, tapType zerodoc.TAPTypeEnum) WriterKey {
 	return WriterKey((uint64(ipInt) << 32) | (uint64(aclGID) << 16) | uint64(tapType))
 }
 
@@ -43,7 +43,7 @@ type WrappedWriter struct {
 	*Writer
 
 	tapType zerodoc.TAPTypeEnum
-	aclGID  datatype.ACLID
+	aclGID  uint16
 	ip      datatype.IPv4Int
 	ip6     net.IP
 	mac     datatype.MacInt
@@ -200,7 +200,7 @@ func (w *Worker) finishWriter(writer *WrappedWriter, newFilename string) {
 	w.FileCloses++
 }
 
-func (w *Worker) writePacket(packet *datatype.MetaPacket, tapType zerodoc.TAPTypeEnum, ip datatype.IPv4Int, mac datatype.MacInt, aclGID datatype.ACLID) {
+func (w *Worker) writePacket(packet *datatype.MetaPacket, tapType zerodoc.TAPTypeEnum, ip datatype.IPv4Int, mac datatype.MacInt, aclGID uint16) {
 	key := getWriterKey(ip, aclGID, tapType)
 	writer, exist := w.writers[key]
 	if exist && w.shouldCloseFile(writer, packet) {
@@ -229,7 +229,7 @@ func (w *Worker) writePacket(packet *datatype.MetaPacket, tapType zerodoc.TAPTyp
 	writer.lastPacketTime = packet.Timestamp
 }
 
-func (w *Worker) generateWrappedWriter(ip net.IP, mac datatype.MacInt, tapType zerodoc.TAPTypeEnum, aclGID datatype.ACLID, timestamp time.Duration) *WrappedWriter {
+func (w *Worker) generateWrappedWriter(ip net.IP, mac datatype.MacInt, tapType zerodoc.TAPTypeEnum, aclGID uint16, timestamp time.Duration) *WrappedWriter {
 	if len(w.writers) >= w.maxConcurrentFiles {
 		if log.IsEnabledFor(logging.DEBUG) {
 			log.Debugf("Max concurrent file (%d files) exceeded", w.maxConcurrentFiles)
@@ -272,7 +272,7 @@ func (w *Worker) generateWrappedWriter(ip net.IP, mac datatype.MacInt, tapType z
 	return writer
 }
 
-func (w *Worker) getWrappedWriter(ip net.IP, mac datatype.MacInt, tapType zerodoc.TAPTypeEnum, aclGID datatype.ACLID, packet *datatype.MetaPacket) *WrappedWriter {
+func (w *Worker) getWrappedWriter(ip net.IP, mac datatype.MacInt, tapType zerodoc.TAPTypeEnum, aclGID uint16, packet *datatype.MetaPacket) *WrappedWriter {
 	var element *list.Element
 	var result *WrappedWriter
 
@@ -308,7 +308,7 @@ func (w *Worker) getWrappedWriter(ip net.IP, mac datatype.MacInt, tapType zerodo
 	return result
 }
 
-func (w *Worker) writePacketIpv6(packet *datatype.MetaPacket, tapType zerodoc.TAPTypeEnum, ip net.IP, mac datatype.MacInt, aclGID datatype.ACLID) {
+func (w *Worker) writePacketIpv6(packet *datatype.MetaPacket, tapType zerodoc.TAPTypeEnum, ip net.IP, mac datatype.MacInt, aclGID uint16) {
 	writer := w.getWrappedWriter(ip, mac, tapType, aclGID, packet)
 	if writer == nil {
 		return
