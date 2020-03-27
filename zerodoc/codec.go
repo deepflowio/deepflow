@@ -126,6 +126,9 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 func GetMsgType(db, rp string) (MessageType, error) {
 	var msgType MessageType
 
+	if db == "vtap_360_acl" {
+		return MSG_PACKET, nil
+	}
 	if strings.HasPrefix(db, MeterVTAPNames[PACKET_ID]) {
 		msgType = MSG_PACKET
 	} else if strings.HasPrefix(db, MeterVTAPNames[GEO_ID]) {
