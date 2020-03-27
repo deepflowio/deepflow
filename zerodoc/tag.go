@@ -992,7 +992,7 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		t.Code |= TagType
 		i, err = parseUint(value, 10, 8)
 		field.TagType = uint8(i)
-	case _TAG_TAG_VALUE: // FIXME: 目前要求该字段出现之前TagType一定要有值
+	case _TAG_TAG_VALUE:
 		t.Code |= TagValue
 		switch field.TagType {
 		case TAG_TYPE_PROVINCE:
@@ -1041,13 +1041,23 @@ func (t *Tag) FillValues(ids []uint8, values []interface{}) error {
 }
 
 func (t *Tag) Fill(tags map[string]string) error {
+	var tagValue string
 	for tagk, tagv := range tags {
 		if id, ok := COLUMN_IDS[tagk]; ok {
+			if id == _TAG_TAG_VALUE {
+				tagValue = tagv
+				continue
+			}
 			if err := t.fillValue(id, tagv); err != nil {
 				return err
 			}
 		} else {
 			return fmt.Errorf("unsupport tag name %s\n", tagk)
+		}
+	}
+	if t.TagType != 0 {
+		if err := t.fillValue(_TAG_TAG_VALUE, tagValue); err != nil {
+			return err
 		}
 	}
 	return nil
