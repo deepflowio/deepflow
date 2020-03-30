@@ -18,9 +18,10 @@ type TaggedFlow struct {
 	pool.ReferenceCount
 }
 
-func (f *TaggedFlow) Encode(encoder *codec.SimpleEncoder) {
+func (f *TaggedFlow) Encode(encoder *codec.SimpleEncoder) error {
 	f.Flow.Encode(encoder)
 	// f.Tag.Encode(encoder)  // 目前无需发送,不encode
+	return nil
 }
 
 func (f *TaggedFlow) Decode(decoder *codec.SimpleDecoder) {
