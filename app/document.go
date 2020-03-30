@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
@@ -8,13 +9,14 @@ import (
 )
 
 const (
-	VERSION               = 20200326 // 修改Document的序列化结构时需同步修改此常量
+	VERSION               = 20200330 // 修改Document的序列化结构时需同步修改此常量
 	MAX_DOC_STRING_LENGTH = 1024
 )
 
 type Tag interface {
 	GetID(*codec.SimpleEncoder) string
 	SetID(string)
+	Encode(*codec.SimpleEncoder)
 	GetCode() uint64
 	GetTAPType() uint8
 	ToKVString() string
@@ -97,4 +99,20 @@ func CloneDocument(doc *Document) *Document {
 
 func PseudoCloneDocument(doc *Document) {
 	doc.AddReferenceCount()
+}
+
+func (d *Document) Release() {
+	ReleaseDocument(d)
+}
+
+func (d *Document) Encode(encoder *codec.SimpleEncoder) error {
+	if d.Tag == nil || d.Meter == nil {
+		return errors.New("No tag or meter in document")
+	}
+	encoder.WriteU32(d.Timestamp)
+	d.Tag.Encode(encoder)
+	encoder.WriteU8(d.Meter.ID())
+	d.Meter.Encode(encoder)
+	encoder.WriteU32(uint32(d.Flags))
+	return nil
 }
