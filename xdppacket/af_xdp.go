@@ -211,7 +211,7 @@ func (s XDPStats) String() string {
 func (x *XDPPacket) readMultiPackets() {
 	x.rxN = int(x.rx.dequeue(x.rxDescs, uint32(x.options.batchSize)))
 	if x.rxN < 1 {
-		x.RxEmpty += 1
+		x.RxEmpty++
 		x.rxErr = ErrRxQueueEmpty
 		return
 	}
@@ -260,7 +260,7 @@ func (x *XDPPacket) releaseMultiPackets() error {
 	retry:
 		x.rxErr = x.fq.enqueue(x.rxAddrs, uint32(x.rxN))
 		if x.rxErr != nil {
-			x.FqFull += 1
+			x.FqFull++
 			goto retry
 		}
 	}
@@ -311,14 +311,14 @@ func (x *XDPPacket) readOnePacket() {
 			x.rxAddr = math.MaxUint64
 		} else {
 			// 如果fq队列满，则返回，x.rxAddr未改变
-			x.FqFull += 1
+			x.FqFull++
 			goto retry
 		}
 	}
 
 	// 如果rx队列为空，则返回，x.rxAddr已重置
 	if x.rx.dequeueOne(&x.rxDesc) < 1 {
-		x.RxEmpty += 1
+		x.RxEmpty++
 		x.rxErr = ErrRxQueueEmpty
 		return
 	}
@@ -334,7 +334,7 @@ func (x *XDPPacket) poll(fds []unix.PollFd) error {
 retry:
 	x.ts = x.constTs
 	n, err := unix.Ppoll(fds, &x.ts, nil)
-	x.Polls += 1
+	x.Polls++
 	if n > 0 {
 		if fds[0].Revents&unix.POLLERR > 0 {
 			return ErrPoll
@@ -391,7 +391,7 @@ func (x *XDPPacket) ZeroCopyReadPacket() ([]byte, CaptureInfo, error) {
 	x.read()
 	// 收包成功后，给包打时间戳，并增加收包统计
 	if x.rxErr == nil {
-		x.RxPps += 1
+		x.RxPps++
 		x.RxBps += uint64(len(x.rxPkt))
 		x.ci.CaptureLength = int(x.rxDesc.Len)
 		x.ci.Timestamp = time.Now()
@@ -439,11 +439,11 @@ retry:
 	_, x.txErr = sendmsg(x.sockFd)
 
 	if x.txErr == syscall.EAGAIN {
-		x.SendAgain += 1
+		x.SendAgain++
 		goto retry
 	} else if x.txErr == syscall.EBUSY {
 		// 虚拟机SKB模式出现发包缓慢
-		x.SendBusy += 1
+		x.SendBusy++
 		x.txErr = ErrSengMsgReWrite
 	}
 	return x.txErr
@@ -454,7 +454,7 @@ func (x *XDPPacket) writeOnePacketToKernel(pkt []byte) {
 	x.txErr = x.tx.enqueueOne(x.txDesc)
 	// 如果tx队列满，则停止发送
 	if x.txErr != nil {
-		x.TxFull += 1
+		x.TxFull++
 		return
 	}
 
@@ -477,7 +477,7 @@ reWrite:
 		// 如果cq队列为空，则停止发送
 		x.cq.dequeueOne(&x.txAddr)
 		if x.cq.entries < 1 {
-			x.CqEmpty += 1
+			x.CqEmpty++
 			x.txErr = ErrCqQueueEmpty
 			return
 		}

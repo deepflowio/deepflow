@@ -171,6 +171,8 @@ github.com/stretchr/testify v1.3.0 h1:TivCn/peBQ7UY8ooIcPgZFpTNSz0Q2U6UrFlUfqbe0
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/tebeka/strftime v0.0.0-20140926081919-3f9c7761e312 h1:frNEkk4P8mq+47LAMvj9LvhDq01kFDUhpJZzzei8IuM=
 github.com/tebeka/strftime v0.0.0-20140926081919-3f9c7761e312/go.mod h1:o6CrSUtupq/A5hylbvAsdydn0d5yokJExs8VVdx4wwI=
+github.com/textnode/fencer v0.0.0-20121219195347-6baed0e5ef9a h1:nLqlJjMRYhG0n0/As6hBX1CiDbENjnVjXVjVS6zNIGc=
+github.com/textnode/fencer v0.0.0-20121219195347-6baed0e5ef9a/go.mod h1:czP5eUhb9SHWyi097DaeQWEoQypb6KrEkdMSGcaGdbc=
 github.com/tinylib/msgp v1.1.0/go.mod h1:+d+yLhGm8mzTaHzB+wgMYrodPfmZrzkirds8fDWklFE=
 github.com/willf/bitset v1.1.10/go.mod h1:RjeCKbqT1RxIR/KWY6phxZiaY1IyutSBfGjNPySAYV4=
 github.com/xanzy/ssh-agent v0.2.0/go.mod h1:0NyE30eGUDliuLEHJgYte/zncp2zdTStcOnWhgSqHD8=
