@@ -395,19 +395,26 @@ func (x *XDPSocket) clearQueue() {
 
 // 配置XDP socket内核相关参数，并初始化用户态队列结构
 func (x *XDPSocket) configXDPSocket(options *XDPOptions) error {
-	var umemLen uint64
+	var err error
+
 	sockFd := x.sockFd
-	umemLen = uint64(options.frameSize) * uint64(options.numFrames)
-	buffer := make([]byte, umemLen)
-	x.framesBulk = buffer
+	umemLen := int(options.frameSize) * int(options.numFrames)
+
+	// 不直接用make slice，避免将go的堆暴露给OS、避免受GC影响
+	x.framesBulk, err = unix.Mmap(-1, 0, umemLen,
+		unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED|unix.MAP_ANONYMOUS)
+	if err != nil {
+		return errors.Wrap(err, "mmap UMEM failed")
+	}
+
 	ur := &unix.XDPUmemReg{
-		Addr:     uint64(reflect.ValueOf(buffer).Pointer()),
+		Addr:     uint64(reflect.ValueOf(x.framesBulk).Pointer()),
 		Len:      uint64(umemLen),
 		Size:     options.frameSize,
 		Headroom: options.frameHeadroom,
 	}
 
-	err := setOptUmemreg(sockFd, ur)
+	err = setOptUmemreg(sockFd, ur)
 	if err != nil {
 		return errors.Wrap(err, "set umem reg sockopt failed")
 	}
@@ -809,6 +816,8 @@ func (s *XDPSocket) close() {
 	}
 
 	s.clearXsksMap()
+
+	unix.Munmap(s.framesBulk)
 
 	// 关闭socket
 	unix.Close(s.sockFd)

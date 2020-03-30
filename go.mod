@@ -15,6 +15,7 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/shirou/gopsutil v2.18.12+incompatible
 	github.com/spf13/cobra v0.0.3
+	github.com/textnode/fencer v0.0.0-20121219195347-6baed0e5ef9a
 	gitlab.x.lan/platform/influxdb v0.0.0-20200109064655-6c1e420280c5
 	gitlab.x.lan/yunshan/message v0.0.0-20200331085954-09e4f43245f8
 	golang.org/x/net v0.0.0-20190514140710-3ec191127204

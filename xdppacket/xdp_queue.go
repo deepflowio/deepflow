@@ -4,9 +4,9 @@ package xdppacket
 
 import (
 	"fmt"
-	"sync/atomic"
 	"unsafe"
 
+	"github.com/textnode/fencer"
 	"golang.org/x/sys/unix"
 )
 
@@ -29,7 +29,6 @@ type BaseQueue struct {
 	mask uint32
 
 	// 内部数据，为优化性能添加
-	i       uint32
 	idx     uint32
 	entries uint32
 }
@@ -73,7 +72,7 @@ func (q *BaseQueue) freeEntries(n uint32) uint32 {
 	if q.cachedFreeEntries() >= n {
 		return n
 	}
-	q.cached_con = atomic.LoadUint32(q.consumer)
+	q.cached_con = *q.consumer
 
 	return Uint32Min(q.cachedFreeEntries(), n)
 }
@@ -84,9 +83,21 @@ func (q *BaseQueue) getAvailEntries(n uint32) uint32 {
 	if q.cachedAvailEntries() >= n {
 		return n
 	}
-	q.cached_pro = atomic.LoadUint32(q.producer)
+	q.cached_pro = *q.producer
 
 	return Uint32Min(q.cachedAvailEntries(), n)
+}
+
+func ringProdSubmit(producer *uint32, cached_pro uint32) {
+	// wmb()
+	fencer.SFence()
+	*producer = cached_pro
+}
+
+func ringConsRelease(consumer *uint32, cached_con uint32) {
+	// rwmb()
+	fencer.LFence()
+	*consumer = cached_con
 }
 
 // 从DESC队列中取一个条目
@@ -96,12 +107,12 @@ func (q *XDPDescQueue) dequeueOne(desc *unix.XDPDesc) uint32 {
 	if q.entries > 0 {
 		q.idx = q.cached_con & q.mask
 
-		q.cached_con += 1
+		q.cached_con++
 
 		*desc = *(*unix.XDPDesc)(unsafe.Pointer((uintptr(unsafe.Pointer(q.ring)) +
 			uintptr(q.idx*uint32(unsafe.Sizeof(*desc))))))
 
-		atomic.StoreUint32(q.consumer, q.cached_con)
+		ringConsRelease(q.consumer, q.cached_con)
 	}
 
 	return q.entries
@@ -111,15 +122,15 @@ func (q *XDPDescQueue) dequeueOne(desc *unix.XDPDesc) uint32 {
 func (q *XDPDescQueue) dequeue(desc []unix.XDPDesc, n uint32) uint32 {
 	q.entries = q.getAvailEntries(n)
 
-	for q.i = uint32(0); q.i < q.entries; q.i++ {
+	for i := uint32(0); i < q.entries; i++ {
 		idx := (q.cached_con) & q.mask
-		q.cached_con += 1
-		desc[q.i] = *(*unix.XDPDesc)(unsafe.Pointer((uintptr(unsafe.Pointer(q.ring)) +
+		q.cached_con++
+		desc[i] = *(*unix.XDPDesc)(unsafe.Pointer((uintptr(unsafe.Pointer(q.ring)) +
 			uintptr(idx*uint32(unsafe.Sizeof(unix.XDPDesc{}))))))
 	}
 
 	if q.entries > 0 {
-		atomic.StoreUint32(q.consumer, q.cached_con)
+		ringConsRelease(q.consumer, q.cached_con)
 	}
 
 	return q.entries
@@ -130,13 +141,13 @@ func (q *XDPDescQueue) rollback() (unix.XDPDesc, uint32, uint32) {
 	q.entries = q.getAvailEntries(1)
 
 	if q.entries > 0 {
-		q.cached_pro -= 1
+		q.cached_pro--
 		q.idx = q.cached_pro & q.mask
 
 		desc = *(*unix.XDPDesc)(unsafe.Pointer((uintptr(unsafe.Pointer(q.ring)) +
 			uintptr(q.idx*uint32(unsafe.Sizeof(desc))))))
 
-		atomic.StoreUint32(q.producer, q.cached_pro)
+		ringProdSubmit(q.producer, q.cached_pro)
 	}
 
 	return desc, q.entries, q.idx
@@ -150,11 +161,11 @@ func (q *XDPDescQueue) enqueueOne(desc unix.XDPDesc) error {
 	}
 
 	q.idx = q.cached_pro & q.mask
-	q.cached_pro += 1
+	q.cached_pro++
 	*(*unix.XDPDesc)(unsafe.Pointer(uintptr(unsafe.Pointer(q.ring)) +
 		uintptr(q.idx*uint32(unsafe.Sizeof(desc))))) = desc
 
-	atomic.StoreUint32(q.producer, q.cached_pro)
+	ringProdSubmit(q.producer, q.cached_pro)
 
 	return nil
 }
@@ -167,13 +178,13 @@ func (q *XDPDescQueue) enqueue(descs []unix.XDPDesc, n uint32) error {
 		return ErrTxQueueFull
 	}
 
-	for q.i = uint32(0); q.i < q.entries; q.i++ {
+	for i := uint32(0); i < q.entries; i++ {
 		q.idx = q.cached_pro & q.mask
-		q.cached_pro += 1
+		q.cached_pro++
 		*(*unix.XDPDesc)(unsafe.Pointer(uintptr(unsafe.Pointer(q.ring)) +
-			uintptr(q.idx*uint32(unsafe.Sizeof(unix.XDPDesc{}))))) = descs[q.i]
+			uintptr(q.idx*uint32(unsafe.Sizeof(unix.XDPDesc{}))))) = descs[i]
 	}
-	atomic.StoreUint32(q.producer, q.cached_pro)
+	ringProdSubmit(q.producer, q.cached_pro)
 
 	return nil
 }
@@ -185,11 +196,11 @@ func (u *XDPUmemQueue) dequeueOne(index *uint64) {
 
 	if u.entries > 0 {
 		u.idx = u.cached_con & u.mask
-		u.cached_con += 1
+		u.cached_con++
 		*index = *(*uint64)(unsafe.Pointer(uintptr(unsafe.Pointer(u.ring)) +
 			uintptr(u.idx*uint32(unsafe.Sizeof(uint64(0))))))
 
-		atomic.StoreUint32(u.consumer, u.cached_con)
+		ringConsRelease(u.consumer, u.cached_con)
 	}
 }
 
@@ -197,15 +208,15 @@ func (u *XDPUmemQueue) dequeueOne(index *uint64) {
 func (u *XDPUmemQueue) dequeue(index []uint64, n uint32) uint32 {
 	u.entries = u.getAvailEntries(n)
 
-	for u.i = uint32(0); u.i < u.entries; u.i++ {
+	for i := uint32(0); i < u.entries; i++ {
 		u.idx = (u.cached_con) & u.mask
-		u.cached_con += 1
-		index[u.i] = *(*uint64)(unsafe.Pointer(uintptr(unsafe.Pointer(u.ring)) +
+		u.cached_con++
+		index[i] = *(*uint64)(unsafe.Pointer(uintptr(unsafe.Pointer(u.ring)) +
 			uintptr(u.idx*uint32(unsafe.Sizeof(uint64(0))))))
 	}
 
 	if u.entries > 0 {
-		atomic.StoreUint32(u.consumer, u.cached_con)
+		ringConsRelease(u.consumer, u.cached_con)
 	}
 
 	return u.entries
@@ -219,12 +230,12 @@ func (u *XDPUmemQueue) enqueueOne(addr uint64) error {
 	}
 
 	u.idx = u.cached_pro & u.mask
-	u.cached_pro += 1
+	u.cached_pro++
 
 	*(*uint64)(unsafe.Pointer(uintptr(unsafe.Pointer(u.ring)) +
 		uintptr(u.idx*uint32(unsafe.Sizeof(uint64(0)))))) = addr
 
-	atomic.StoreUint32(u.producer, u.cached_pro)
+	ringProdSubmit(u.producer, u.cached_pro)
 
 	return nil
 }
@@ -237,14 +248,15 @@ func (u *XDPUmemQueue) enqueue(addr []uint64, n uint32) error {
 		return ErrFqQueueFull
 	}
 
-	for u.i = uint32(0); u.i < u.entries; u.i++ {
+	for i := uint32(0); i < u.entries; i++ {
 		u.idx = u.cached_pro & u.mask
-		u.cached_pro += 1
+		u.cached_pro++
 
 		*(*uint64)(unsafe.Pointer(uintptr(unsafe.Pointer(u.ring)) +
-			uintptr(u.idx*uint32(unsafe.Sizeof(uint64(0)))))) = addr[u.i]
+			uintptr(u.idx*uint32(unsafe.Sizeof(uint64(0)))))) = addr[i]
 	}
-	atomic.StoreUint32(u.producer, u.cached_pro)
+
+	ringProdSubmit(u.producer, u.cached_pro)
 
 	return nil
 }
