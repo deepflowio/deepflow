@@ -333,13 +333,13 @@ func (t *Tag) MarshalTo(b []byte) int {
 	}
 
 	if t.Code&RegionID != 0 {
-		offset += copy(b[offset:], ",region=")
+		offset += copy(b[offset:], ",region_id=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.RegionID), 10))
 	}
 	if t.Code&RegionIDPath != 0 {
-		offset += copy(b[offset:], ",region_0=")
+		offset += copy(b[offset:], ",region_id_0=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.RegionID), 10))
-		offset += copy(b[offset:], ",region_1=")
+		offset += copy(b[offset:], ",region_id_1=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.RegionID1), 10))
 	}
 
@@ -917,15 +917,15 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		t.Code |= SubnetIDPath
 		i, err = parseUint(value, 10, 16)
 		field.SubnetID1 = uint16(i)
-	case _TAG_REGION:
+	case _TAG_REGION_ID:
 		t.Code |= RegionID
 		i, err = parseUint(value, 10, 16)
 		field.RegionID = uint16(i)
-	case _TAG_REGION_0:
+	case _TAG_REGION_ID_0:
 		t.Code |= RegionIDPath
 		i, err = parseUint(value, 10, 16)
 		field.RegionID = uint16(i)
-	case _TAG_REGION_1:
+	case _TAG_REGION_ID_1:
 		t.Code |= RegionIDPath
 		i, err = parseUint(value, 10, 16)
 		field.RegionID1 = uint16(i)
