@@ -25,7 +25,7 @@ const (
 	_TAG_POD_NODE_ID_0
 	_TAG_AZ_ID
 	_TAG_AZ_ID_0
-	_TAG_REGION_0
+	_TAG_REGION_ID_0
 	_TAG_IP_1
 	_TAG_GROUP_ID_1
 	_TAG_L3_EPC_ID_1
@@ -34,7 +34,7 @@ const (
 	_TAG_HOST_ID_1
 	_TAG_SUBNET_ID_0
 	_TAG_SUBNET_ID_1
-	_TAG_REGION_1
+	_TAG_REGION_ID_1
 	_TAG_POD_NODE_ID_1
 	_TAG_AZ_ID_1
 	_TAG_DIRECTION
@@ -46,7 +46,7 @@ const (
 	_TAG_TAP_TYPE
 	_TAG_SUBNET_ID
 	_TAG_ACL_DIRECTION
-	_TAG_REGION
+	_TAG_REGION_ID
 	_TAG_TAG_TYPE
 	_TAG_TAG_VALUE
 	_TAG_MAX_ID_
@@ -110,8 +110,8 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"az_id_0":          _TAG_AZ_ID_0,
 	"host_id":          _TAG_HOST_ID,
 	"host_id_0":        _TAG_HOST_ID_0,
-	"region":           _TAG_REGION,
-	"region_0":         _TAG_REGION_0,
+	"region_id":        _TAG_REGION_ID,
+	"region_id_0":      _TAG_REGION_ID_0,
 	"ip_1":             _TAG_IP_1,
 	"group_id_1":       _TAG_GROUP_ID_1,
 	"l3_epc_id_1":      _TAG_L3_EPC_ID_1,
@@ -120,7 +120,7 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"host_id_1":        _TAG_HOST_ID_1,
 	"subnet_id_0":      _TAG_SUBNET_ID_0,
 	"subnet_id_1":      _TAG_SUBNET_ID_1,
-	"region_1":         _TAG_REGION_1,
+	"region_id_1":      _TAG_REGION_ID_1,
 	"pod_node_id_1":    _TAG_POD_NODE_ID_1,
 	"az_id_1":          _TAG_AZ_ID_1,
 	"direction":        _TAG_DIRECTION,
