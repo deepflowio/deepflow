@@ -1,16 +1,5 @@
 package zerodoc
 
-type MessageType uint8
-
-const (
-	MSG_FLOW_SECOND MessageType = iota
-	MSG_FLOW
-	MSG_GEO
-	MSG_PACKET
-
-	MSG_INVILID
-)
-
 const (
 	MAX_STRING_LENGTH = 1024
 )
