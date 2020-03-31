@@ -23,7 +23,6 @@ const (
 const (
 	ANALYZER_TRIDENT      = 0xffffff00 // 压缩报文来自analyzer上的trident
 	ANALYZER_TRIDNET_MASK = 0xff       // 压缩报文来自analyzer上的trident时的掩码
-	TRIDNET_MASK          = 0xffff     // 压缩报文来自vtap上的trident时的掩码
 )
 
 type Decoded struct {
@@ -59,7 +58,8 @@ type SequentialDecoder struct {
 	rx, tx    Decoded
 	x         *Decoded
 
-	inPort                 uint32
+	tapPort                uint32
+	tapType                TapType
 	frameSize              uint16
 	tridentDispatcherIndex uint8
 }
@@ -359,16 +359,11 @@ func (d *SequentialDecoder) DecodeHeader() (bool, uint16, uint16) {
 	d.timestamp = time.Duration(indexAndTimestamp&0xffffffffffffff) * time.Microsecond
 	inPort := d.U32()
 	if inPort&ANALYZER_TRIDENT == ANALYZER_TRIDENT {
-		inPort = inPort & ANALYZER_TRIDNET_MASK
-		if TapType(inPort) == TAP_TOR {
-			inPort = PACKET_SOURCE_TOR
-		} else {
-			inPort = PACKET_SOURCE_ISP | inPort
-		}
+		d.tapType = TapType(inPort & ANALYZER_TRIDNET_MASK)
 	} else {
-		inPort = inPort&TRIDNET_MASK | PACKET_SOURCE_TOR
+		d.tapType = TAP_TOR
+		d.tapPort = inPort
 	}
-	d.inPort = inPort
 	d.tridentDispatcherIndex = index
 	return false, frameSize, vtapId
 }
