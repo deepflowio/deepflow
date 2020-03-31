@@ -363,7 +363,7 @@ func (d *PolicyData) FormatNpbAction() {
 }
 
 func (d *PolicyData) dedupNpbAction(packet *LookupKey) []NpbActions {
-	if len(d.NpbActions) == 0 || packet.Tap != TAP_TOR {
+	if len(d.NpbActions) == 0 || packet.TapType != TAP_TOR {
 		return d.NpbActions
 	}
 
@@ -383,7 +383,7 @@ func (d *PolicyData) dedupNpbAction(packet *LookupKey) []NpbActions {
 }
 
 func (d *PolicyData) Dedup(packet *LookupKey) {
-	if len(d.NpbActions) == 0 || packet.Tap != TAP_TOR {
+	if len(d.NpbActions) == 0 || packet.TapType != TAP_TOR {
 		return
 	}
 	validActions := d.dedupNpbAction(packet)
