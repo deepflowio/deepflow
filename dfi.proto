@@ -77,7 +77,7 @@ message Flow {
     optional uint64 time_bitmap = 14; /* The packet time distribution in one minitue */
 
     /* L1 */
-    optional uint32 tap = 21 [default = 0];/* 3=虚拟网络, 1~250=接入网络 */
+    optional uint32 tap_type = 21 [default = 0];/* 3=虚拟网络, 1~250=接入网络 */
     optional uint32 tap_port = 22 [default = 0];
 
     /* L2 */
@@ -237,7 +237,7 @@ message Flow {
 message Metering {
         optional uint32 exporter = 1;
         optional uint32 timestamp = 2;
-        optional uint32 tap = 3 [default = 0];
+        optional uint32 tap_type = 3 [default = 0];
         optional uint32 tap_port = 4 [default = 0];
         optional uint32 vlan = 11 [default = 0];
         optional uint32 ip_src = 21 [default = 0];
