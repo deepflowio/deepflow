@@ -45,7 +45,7 @@ message ArpItem {
     optional uint64 mac = 2;
     optional uint32 epc_id = 3;
     optional uint32 tap_type = 4;
-    optional uint32 in_port = 5;
+    optional uint32 tap_port = 5;
 
     optional uint64 tx_packets = 10;
     optional uint64 rx_packets = 11;
@@ -76,7 +76,7 @@ message FlowItem {
     optional uint32 protocol = 6;
     optional uint32 src_port = 7;
     optional uint32 dst_port = 8;
-    optional uint32 in_port = 9;
+    optional uint32 tap_port = 9;
 
     optional uint64 tx_packets = 20;
     optional uint64 rx_packets = 21;
