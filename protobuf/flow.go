@@ -26,7 +26,8 @@ func MarshalFlow(f *datatype.TaggedFlow, bytes *utils.ByteBuffer) error {
 		EndTime:   proto.Uint32(uint32(f.EndTime.Seconds())),
 		Duration:  proto.Uint64(uint64(f.Duration / time.Microsecond)),
 		// L1
-		InPort_0: proto.Uint32(f.InPort),
+		TapType: proto.Uint32(uint32(f.TapType)),
+		TapPort: proto.Uint32(f.TapPort),
 		// L2
 		Vlan:    proto.Uint32(uint32(f.VLAN)),
 		EthType: proto.Uint32(uint32(f.EthType)),

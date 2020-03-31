@@ -427,8 +427,8 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	}
 	// l2: mac查询
 	// l3: l2epc+ip查询
-	srcData := l.GetEndpointInfo(key.SrcMac, srcIp, key.Tap, key.L3End0)
-	dstData := l.GetEndpointInfo(key.DstMac, dstIp, key.Tap, key.L3End1)
+	srcData := l.GetEndpointInfo(key.SrcMac, srcIp, key.TapType, key.L3End0)
+	dstData := l.GetEndpointInfo(key.DstMac, dstIp, key.TapType, key.L3End1)
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
 	// l3: ip查询, 外网IP查询
 	l.GetL3ByIp(srcIp, dstIp, endpoint)

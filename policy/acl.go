@@ -8,7 +8,7 @@ import (
 
 type Acl struct {
 	Id                uint32
-	Type              TapType
+	TapType           TapType
 	SrcGroups         []uint32
 	DstGroups         []uint32
 	SrcGroupRelations []uint16
@@ -98,7 +98,7 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint64, srcIps, dstIps ipSegme
 		for _, dstPort := range dstPorts {
 			match, mask := MatchedField{}, MatchedField{}
 
-			match.Set(MATCHED_TAP_TYPE, uint64(a.Type))
+			match.Set(MATCHED_TAP_TYPE, uint64(a.TapType))
 			match.Set(MATCHED_SRC_MAC, srcMac)
 			match.Set(MATCHED_DST_MAC, dstMac)
 			match.Set(MATCHED_SRC_IP, uint64(srcIps.getIp()))
@@ -108,7 +108,7 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint64, srcIps, dstIps ipSegme
 			match.Set(MATCHED_SRC_PORT, uint64(srcPort.port))
 			match.Set(MATCHED_DST_PORT, uint64(dstPort.port))
 
-			mask.SetMask(MATCHED_TAP_TYPE, uint64(a.Type))
+			mask.SetMask(MATCHED_TAP_TYPE, uint64(a.TapType))
 			mask.SetMask(MATCHED_SRC_MAC, srcMac)
 			mask.SetMask(MATCHED_DST_MAC, dstMac)
 			mask.Set(MATCHED_SRC_IP, uint64(srcIps.getMask()))
@@ -135,7 +135,7 @@ func (a *Acl) generateMatchedField6(srcMac, dstMac uint64, srcIps, dstIps ipSegm
 	for _, srcPort := range srcPorts {
 		for _, dstPort := range dstPorts {
 			match, mask := MatchedField6{}, MatchedField6{}
-			match.Set(MATCHED6_TAP_TYPE, uint64(a.Type))
+			match.Set(MATCHED6_TAP_TYPE, uint64(a.TapType))
 			match.Set(MATCHED6_PROTO, uint64(a.Proto))
 			match.Set(MATCHED6_SRC_MAC, srcMac)
 			match.Set(MATCHED6_DST_MAC, dstMac)
@@ -150,7 +150,7 @@ func (a *Acl) generateMatchedField6(srcMac, dstMac uint64, srcIps, dstIps ipSegm
 			match.Set(MATCHED6_SRC_PORT, uint64(srcPort.port))
 			match.Set(MATCHED6_DST_PORT, uint64(dstPort.port))
 
-			mask.SetMask(MATCHED6_TAP_TYPE, uint64(a.Type))
+			mask.SetMask(MATCHED6_TAP_TYPE, uint64(a.TapType))
 			mask.SetMask(MATCHED6_PROTO, uint64(a.Proto))
 			mask.SetMask(MATCHED6_SRC_MAC, srcMac)
 			mask.SetMask(MATCHED6_DST_MAC, dstMac)
@@ -251,6 +251,6 @@ func (a *Acl) getPorts(rawPorts []uint16) string {
 }
 
 func (a *Acl) String() string {
-	return fmt.Sprintf("Id:%v Type:%v SrcGroups:%v DstGroups:%v SrcPortRange:[%v] SrcPorts:[%s] DstPortRange:[%v] DstPorts:[%s] Proto:%v Action:%v NpbActions:%s",
-		a.Id, a.Type, a.SrcGroups, a.DstGroups, a.SrcPortRange, a.getPorts(a.SrcPorts), a.DstPortRange, a.getPorts(a.DstPorts), a.Proto, a.Action, a.NpbActions)
+	return fmt.Sprintf("Id:%v TapType:%v SrcGroups:%v DstGroups:%v SrcPortRange:[%v] SrcPorts:[%s] DstPortRange:[%v] DstPorts:[%s] Proto:%v Action:%v NpbActions:%s",
+		a.Id, a.TapType, a.SrcGroups, a.DstGroups, a.SrcPortRange, a.getPorts(a.SrcPorts), a.DstPortRange, a.getPorts(a.DstPorts), a.Proto, a.Action, a.NpbActions)
 }
