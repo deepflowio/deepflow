@@ -256,7 +256,7 @@ func (t *PlatformInfoTable) String() string {
 
 	if len(t.epcIDIPV6Infos) > 0 {
 		sb.WriteString("\n\n")
-		sb.WriteString("epcID   ipv6                                       host            hostID  regionID deviceType  deviceID subnetID  podNodeID azID\n")
+		sb.WriteString("epcID   ipv6                                    host            hostID  regionID deviceType  deviceID subnetID  podNodeID azID\n")
 		sb.WriteString("--------------------------------------------------------------------------------------------------------------------------------- \n")
 	}
 	epcIP6s := make([]EpcIDIPV6, 0)
@@ -394,6 +394,23 @@ func updateCidrInfos(IPV4CidrInfos, IPV6CidrInfos map[int32][]*CidrInfo, trident
 			IPV6CidrInfos[epcID] = make([]*CidrInfo, 0, 1)
 		}
 		IPV6CidrInfos[epcID] = append(IPV6CidrInfos[epcID], cidrInfo)
+	}
+
+	// 对结果排序，如果存在相同的网络，保证先匹配到小网段，再匹配大网段
+	// 例如, 优先匹配 192.168.0.0/24 再匹配 192.168.0.0/16
+	for _, cidrs := range IPV4CidrInfos {
+		sort.Slice(cidrs, func(i, j int) bool {
+			ci, _ := cidrs[i].Cidr.Mask.Size()
+			cj, _ := cidrs[j].Cidr.Mask.Size()
+			return ci > cj
+		})
+	}
+	for _, cidrs := range IPV6CidrInfos {
+		sort.Slice(cidrs, func(i, j int) bool {
+			ci, _ := cidrs[i].Cidr.Mask.Size()
+			cj, _ := cidrs[j].Cidr.Mask.Size()
+			return ci > cj
+		})
 	}
 }
 
