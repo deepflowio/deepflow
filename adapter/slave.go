@@ -35,12 +35,13 @@ func (s *slave) prepareItem(count, index uint8) {
 }
 
 func (s *slave) decode(hash uint8, vtapId uint16, ip net.IP, decoder *SequentialDecoder) {
-	inPort, index := decoder.inPort, decoder.tridentDispatcherIndex
+	tapType, tapPort, index := decoder.tapType, decoder.tapPort, decoder.tridentDispatcherIndex
 
 	i := uint8(0) // 使用a.block.Count, 因为i一定为0，直接赋值0
 	for {
 		meta := &s.block.Metas[i]
-		meta.InPort = inPort
+		meta.TapType = tapType
+		meta.TapPort = tapPort
 		meta.Exporter = ip
 		meta.VtapId = vtapId
 		meta.QueueHash = hash

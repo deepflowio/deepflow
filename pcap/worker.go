@@ -361,18 +361,16 @@ func (w *Worker) checkWriterPcap(packet *datatype.MetaPacket, direction datatype
 		ipDstCheck = !packet.Ip6Dst.IsMulticast() && packet.MacDst != BROADCAST_MAC
 	}
 
-	if isISP(packet.InPort) {
-		tapType = zerodoc.TAPTypeEnum(packet.InPort - 0x10000)
+	if packet.TapType != datatype.TAP_TOR {
+		tapType = zerodoc.TAPTypeEnum(packet.TapType)
 		srcL3EpcId := packet.EndpointData.SrcInfo.L3EpcId
 		ipSrcCheck = ipSrcCheck && srcL3EpcId != 0 && srcL3EpcId != datatype.EPC_FROM_INTERNET
 		dstL3EpcId := packet.EndpointData.DstInfo.L3EpcId
 		ipDstCheck = ipDstCheck && dstL3EpcId != 0 && dstL3EpcId != datatype.EPC_FROM_INTERNET
-	} else if isTOR(packet.InPort) {
+	} else {
 		tapType = zerodoc.ToR
 		ipSrcCheck = ipSrcCheck && (packet.L2End0 || packet.EndpointData.SrcInfo.L2End)
 		ipDstCheck = ipDstCheck && (packet.L2End1 || packet.EndpointData.DstInfo.L2End)
-	} else {
-		return 0
 	}
 
 	// 若action方向为单方向，过略掉一半的PCAP存储,

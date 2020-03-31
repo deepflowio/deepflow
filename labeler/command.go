@@ -229,9 +229,9 @@ func newLookupKey(cmdLine string) (*datatype.LookupKey, uint16) {
 	for _, keyValue := range keyValues {
 		parts := strings.Split(keyValue, "=")
 		switch parts[0] {
-		case "tap":
-			key.Tap = parseTapType(parts[1])
-			if key.Tap >= datatype.TAP_MAX {
+		case "tap_type":
+			key.TapType = parseTapType(parts[1])
+			if key.TapType >= datatype.TAP_MAX {
 				fmt.Printf("unknown tap type from: %s\n", cmdLine)
 				return nil, queryType
 			}
@@ -481,19 +481,19 @@ func parseAcl(args []string) *policy.Acl {
 				return nil
 			}
 			acl.Proto = uint16(proto)
-		case "tap":
+		case "tap_type":
 			switch keyValue[1] {
 			case "any":
-				acl.Type = datatype.TAP_ANY
+				acl.TapType = datatype.TAP_ANY
 			case "tor":
-				acl.Type = datatype.TAP_TOR
+				acl.TapType = datatype.TAP_TOR
 			default:
 				typeId, err := strconv.Atoi(keyValue[1])
 				if err != nil {
-					fmt.Printf("invalid tap %s from %s\n", keyValue[1], args[0])
+					fmt.Printf("invalid tap_type %s from %s\n", keyValue[1], args[0])
 					return nil
 				}
-				acl.Type = datatype.TapType(typeId)
+				acl.TapType = datatype.TapType(typeId)
 			}
 		case "port":
 			port, err := strconv.Atoi(keyValue[1])
@@ -598,7 +598,7 @@ func RegisterCommand() *cobra.Command {
 		Short: "search policy and endpoint",
 		Long: "droplet-ctl labeler dump-acl {[key=value]+}\n" +
 			"key list:\n" +
-			"\ttap         use '[1-2,4-30]|tor'\n" +
+			"\ttap_type         use '[1-2,4-30]|tor'\n" +
 			"\tsmac/dmac   packet mac address\n" +
 			"\teth_type    packet eth type\n" +
 			"\tvlan        packet vlan\n" +
@@ -606,7 +606,7 @@ func RegisterCommand() *cobra.Command {
 			"\tproto       packet ip proto\n" +
 			"\tsport/dport packet port\n" +
 			"\ttype        use query type 'normal|first|fast' default normal",
-		Example: "droplet-ctl labeler dump-acl tap=tor,smac=12:34:56:78:9a:bc,sip=127.0.0.1",
+		Example: "droplet-ctl labeler dump-acl tap_type=tor,smac=12:34:56:78:9a:bc,sip=127.0.0.1",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
 				fmt.Printf("filter is nil, Example: %s\n", cmd.Example)
@@ -642,7 +642,7 @@ func RegisterCommand() *cobra.Command {
 		Long: "droplet-ctl labeler add-acl {[key=value]+}\n" +
 			"key list:\n" +
 			"\tid                 acl id and action id\n" +
-			"\ttap                use '[1-2,4-30]|tor|any'\n" +
+			"\ttap_type                use '[1-2,4-30]|tor|any'\n" +
 			"\tvlan               packet vlan\n" +
 			"\tsgroup/dgroup      group id\n" +
 			"\tproto              packet ip proto\n" +
