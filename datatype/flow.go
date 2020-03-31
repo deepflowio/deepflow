@@ -48,8 +48,9 @@ const (
 type FlowKey struct {
 	TunnelInfo
 
-	VtapId uint16
-	InPort uint32
+	VtapId  uint16
+	TapType TapType
+	TapPort uint32
 	/* L2 */
 	MACSrc MacInt
 	MACDst MacInt
@@ -69,7 +70,8 @@ func (f *FlowKey) Encode(encoder *codec.SimpleEncoder) {
 	f.TunnelInfo.Encode(encoder)
 
 	encoder.WriteU16(f.VtapId)
-	encoder.WriteU32(f.InPort)
+	encoder.WriteU8(uint8(f.TapType))
+	encoder.WriteU32(f.TapPort)
 
 	encoder.WriteU64(f.MACSrc)
 	encoder.WriteU64(f.MACDst)
@@ -93,7 +95,8 @@ func (f *FlowKey) Decode(decoder *codec.SimpleDecoder) {
 	f.TunnelInfo.Decode(decoder)
 
 	f.VtapId = decoder.ReadU16()
-	f.InPort = decoder.ReadU32()
+	f.TapType = TapType(decoder.ReadU8())
+	f.TapPort = decoder.ReadU32()
 
 	f.MACSrc = decoder.ReadU64()
 	f.MACDst = decoder.ReadU64()
@@ -376,7 +379,8 @@ func (f *FlowKey) String() string {
 	formatted := ""
 	formatted += fmt.Sprintf("TunnelInfo: {%s} ", f.TunnelInfo.String())
 	formatted += fmt.Sprintf("VtapId: %d ", f.VtapId)
-	formatted += fmt.Sprintf("InPort: %d\n", f.InPort)
+	formatted += fmt.Sprintf("TapType: %d\n", f.TapType)
+	formatted += fmt.Sprintf("TapPort: 0x%x\n", f.TapPort)
 	formatted += fmt.Sprintf("\tMACSrc: %s ", Uint64ToMac(f.MACSrc))
 	formatted += fmt.Sprintf("MACDst: %s ", Uint64ToMac(f.MACDst))
 	if len(f.IP6Src) > 0 {

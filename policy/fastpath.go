@@ -102,14 +102,14 @@ func (f *FastPath) getPortFastPolicy(packet *LookupKey) (*EndpointStore, *Policy
 		f.fastPolicyMapsFlush[packet.FastIndex] = false
 		return nil, nil
 	}
-	if f.FastPortPolicyMaps[packet.FastIndex][packet.Tap] == nil {
-		f.FastPortPolicyMaps[packet.FastIndex][packet.Tap] = lru.NewU128LRU(
+	if f.FastPortPolicyMaps[packet.FastIndex][packet.TapType] == nil {
+		f.FastPortPolicyMaps[packet.FastIndex][packet.TapType] = lru.NewU128LRU(
 			"policy-fastpath-port", int(f.MapSize/8), int(f.MapSize),
-			stats.OptionStatTags{"index": strconv.Itoa((packet.FastIndex * int(TAP_MAX-1)) + int(packet.Tap))})
+			stats.OptionStatTags{"index": strconv.Itoa((packet.FastIndex * int(TAP_MAX-1)) + int(packet.TapType))})
 		return nil, nil
 	}
 	key1, key2 := f.GenerateMapKey(packet, FORWARD)
-	value, ok := f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true)
+	value, ok := f.FastPortPolicyMaps[packet.FastIndex][packet.TapType].Get(key1, key2, true)
 	if ok {
 		portPolicy := value.(*PortPolicyValue)
 		if policy := portPolicy.protoPolicy[packet.Proto]; policy != nil {
@@ -130,10 +130,10 @@ func (f *FastPath) addPortFastPolicy(endpointStore *EndpointStore, packetEndpoin
 		f.fastPolicyMapsFlush[packet.FastIndex] = false
 	}
 
-	if f.FastPortPolicyMaps[packet.FastIndex][packet.Tap] == nil {
-		f.FastPortPolicyMaps[packet.FastIndex][packet.Tap] = lru.NewU128LRU(
+	if f.FastPortPolicyMaps[packet.FastIndex][packet.TapType] == nil {
+		f.FastPortPolicyMaps[packet.FastIndex][packet.TapType] = lru.NewU128LRU(
 			"policy-fastpath-port", int(f.MapSize/8), int(f.MapSize),
-			stats.OptionStatTags{"index": strconv.Itoa((packet.FastIndex * int(TAP_MAX-1)) + int(packet.Tap))})
+			stats.OptionStatTags{"index": strconv.Itoa((packet.FastIndex * int(TAP_MAX-1)) + int(packet.TapType))})
 	}
 
 	forward, backward := INVALID_POLICY_DATA, INVALID_POLICY_DATA
@@ -153,11 +153,11 @@ func (f *FastPath) addPortFastPolicy(endpointStore *EndpointStore, packetEndpoin
 		}
 	}
 
-	if value, ok := f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true); !ok {
+	if value, ok := f.FastPortPolicyMaps[packet.FastIndex][packet.TapType].Get(key1, key2, true); !ok {
 		value := &PortPolicyValue{}
 		value.endpoint.InitPointer(endpointStore.Endpoints)
 		value.protoPolicy[packet.Proto] = forward
-		f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Add(key1, key2, value)
+		f.FastPortPolicyMaps[packet.FastIndex][packet.TapType].Add(key1, key2, value)
 		f.FastPathPolicyCount++
 	} else {
 		portPolicyValue := value.(*PortPolicyValue)
@@ -183,11 +183,11 @@ func (f *FastPath) addPortFastPolicy(endpointStore *EndpointStore, packetEndpoin
 		}
 	}
 	endpoints := &EndpointData{SrcInfo: endpointStore.Endpoints.DstInfo, DstInfo: endpointStore.Endpoints.SrcInfo}
-	if value, ok := f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Get(key1, key2, true); !ok {
+	if value, ok := f.FastPortPolicyMaps[packet.FastIndex][packet.TapType].Get(key1, key2, true); !ok {
 		value := &PortPolicyValue{}
 		value.endpoint.InitPointer(endpoints)
 		value.protoPolicy[packet.Proto] = backward
-		f.FastPortPolicyMaps[packet.FastIndex][packet.Tap].Add(key1, key2, value)
+		f.FastPortPolicyMaps[packet.FastIndex][packet.TapType].Add(key1, key2, value)
 		f.FastPathPolicyCount++
 	} else {
 		portPolicyValue := value.(*PortPolicyValue)

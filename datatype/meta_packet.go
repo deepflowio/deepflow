@@ -55,13 +55,14 @@ type MetaPacket struct {
 	Exporter   net.IP
 	PacketLen  uint16
 	PayloadLen uint16
-	InPort     uint32 // (8B)
 	VtapId     uint16
-	QueueHash  uint8
+	TapType    TapType // (8B)
+	TapPort    uint32
 	L2End0     bool
 	L2End1     bool
 	L3End0     bool
-	L3End1     bool // (7B)
+	L3End1     bool // (8B)
+	QueueHash  uint8
 
 	MacSrc  MacInt
 	MacDst  MacInt
@@ -104,8 +105,8 @@ type MetaPacketBlock struct {
 func (p *MetaPacket) String() string {
 	buffer := bytes.Buffer{}
 	var format string
-	format = "timestamp: %d inport: 0x%x vtapId: %d exporter: %v len: %d l2_end: %v, %v l3_end: %v, %v direction: %v\n"
-	buffer.WriteString(fmt.Sprintf(format, p.Timestamp, p.InPort, p.VtapId, p.Exporter,
+	format = "timestamp: %d tapType: %d tapPort: 0x%x vtapId: %d exporter: %v len: %d l2_end: %v, %v l3_end: %v, %v direction: %v\n"
+	buffer.WriteString(fmt.Sprintf(format, p.Timestamp, p.TapType, p.TapPort, p.VtapId, p.Exporter,
 		p.PacketLen, p.L2End0, p.L2End1, p.L3End0, p.L3End1, p.Direction))
 	if p.Tunnel != nil {
 		buffer.WriteString(fmt.Sprintf("\ttunnel: %s\n", p.Tunnel))

@@ -894,7 +894,7 @@ func TestDdbsPcapNpbAction(t *testing.T) {
 	// acl1 Group: 16 -> 16 Port: 0 Proto: TCP vlan: any Tap: any
 	npb := toPcapAction(10, 150, NPB_TUNNEL_TYPE_PCAP, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 0)
 	acl1 := generatePolicyAcl(table, action1, 25, group[16], group[16], IPProtocolTCP, -1, npb)
-	acl1.Type = 0
+	acl1.TapType = 0
 	acls = append(acls, acl1)
 	table.UpdateAcls(acls)
 	// 构建预期结果
@@ -904,7 +904,7 @@ func TestDdbsPcapNpbAction(t *testing.T) {
 
 	// key1: ip4:1000 -> ip3:1023 tcp
 	key1 := generateLookupKey(group1Mac, group1Mac, group1Ip1, group1Ip2, IPProtocolTCP, 1000, 1023, NPB)
-	key1.Tap = TAP_ISP_MIN
+	key1.TapType = TAP_ISP_MIN
 	_, policyData := table.lookupAllByKey(key1)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
@@ -920,12 +920,12 @@ func TestDdbsNpbActionAclGids(t *testing.T) {
 	npb1 := toNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 100)
 	action1 := generateAclAction(25, ACTION_PACKET_CAPTURING)
 	acl1 := generatePolicyAcl(table, action1, 25, groupAny, groupAny, IPProtocolTCP, 1000, npb1)
-	acl1.Type = 223
+	acl1.TapType = 223
 	// acl2 Group: 0 -> 0 Port: 1000 Proto: 0 vlan: any
 	npb2 := toNpbAction(11, 150, NPB_TUNNEL_TYPE_VXLAN, RESOURCE_GROUP_TYPE_DEV|RESOURCE_GROUP_TYPE_IP, TAPSIDE_SRC, 200)
 	action2 := generateAclAction(26, ACTION_PACKET_CAPTURING)
 	acl2 := generatePolicyAcl(table, action2, 26, groupAny, groupAny, protoAny, 1000, npb2)
-	acl2.Type = 223
+	acl2.TapType = 223
 	acls = append(acls, acl1, acl2)
 	table.UpdateAcls(acls)
 	// 构建预期结果
@@ -934,7 +934,7 @@ func TestDdbsNpbActionAclGids(t *testing.T) {
 
 	// key1: ip4:1000 -> ip3:1023 tcp
 	key1 := generateLookupKey(mac2, mac1, group2Ip1, group1Ip1, IPProtocolTCP, 1000, 1023, NPB)
-	key1.Tap = 223
+	key1.TapType = 223
 	setEthTypeAndOthers(key1, EthernetTypeIPv4, 64, false, true)
 	_, policyData := table.lookupAllByKey(key1)
 	// 查询结果和预期结果比较
@@ -1063,15 +1063,15 @@ func TestDdbsTapType(t *testing.T) {
 	action := generateAclAction(10, ACTION_PACKET_CAPTURING)
 	action2 := generateAclAction(100, ACTION_PACKET_CAPTURING)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 8000)
-	acl.Type = 1
+	acl.TapType = 1
 	acl2 := generatePolicyAcl(table, action2, 100, group[1], group[2], IPProtocolTCP, 8000)
-	acl2.Type = 0
+	acl2.TapType = 0
 	acls = append(acls, acl, acl2)
 	table.UpdateAcls(acls)
 
 	// 构建查询1-key  1:0->2:8000 tcp tapType=1
 	key := generateLookupKey(group1Mac, group2Mac, group1Ip1, group2Ip1, IPProtocolTCP, 0, 8000)
-	key.Tap = GetTapType(0x10001)
+	key.TapType = GetTapType(0x10001)
 
 	// 获取查询first结果
 	_, policyData := table.lookupAllByKey(key)
@@ -1085,7 +1085,7 @@ func TestDdbsTapType(t *testing.T) {
 
 	// 构建查询1-key  1:0->2:8000 tcp tapType=2
 	key = generateLookupKey(group1Mac, group2Mac, group1Ip1, group2Ip1, IPProtocolTCP, 0, 8000)
-	key.Tap = GetTapType(0x10002)
+	key.TapType = GetTapType(0x10002)
 
 	// 获取查询first结果
 	_, policyData = table.lookupAllByKey(key)

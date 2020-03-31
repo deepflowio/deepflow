@@ -147,7 +147,7 @@ func (d *EndpointData) Valid() bool {
 }
 
 func (d *EndpointData) SetL2End(key *LookupKey) {
-	if key.Tap == TAP_TOR {
+	if key.TapType == TAP_TOR {
 		d.SrcInfo.L2End = key.L2End0
 		d.DstInfo.L2End = key.L2End1
 	}

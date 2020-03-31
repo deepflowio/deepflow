@@ -21,7 +21,7 @@ type LookupKey struct {
 	Proto                             uint8
 	L2End0, L2End1                    bool
 	L3End0, L3End1                    bool
-	Tap                               TapType
+	TapType                           TapType
 	SrcGroupIds, DstGroupIds          []uint16 //资源组的再分组ID, 没有重复用于策略匹配
 	SrcAllGroupIds, DstAllGroupIds    []uint16 //资源组的再分组ID，有重复用于aclgid bitmap生成
 	FeatureFlag                       FeatureFlags
@@ -41,7 +41,7 @@ func (k *LookupKey) generateMatchedField6(direction DirectionType, srcEpc, dstEp
 		srcMac, dstMac = k.DstMac, k.SrcMac
 		matched = &k.BackwardMatched6
 	}
-	matched.Set(MATCHED6_TAP_TYPE, uint64(k.Tap))
+	matched.Set(MATCHED6_TAP_TYPE, uint64(k.TapType))
 	matched.Set(MATCHED6_PROTO, uint64(k.Proto))
 	matched.Set(MATCHED6_SRC_MAC, srcMac)
 	matched.Set(MATCHED6_DST_MAC, dstMac)
@@ -66,7 +66,7 @@ func (k *LookupKey) generateMatchedField(direction DirectionType, srcEpc, dstEpc
 		srcMac, dstMac = k.DstMac, k.SrcMac
 		matched = &k.BackwardMatched
 	}
-	matched.Set(MATCHED_TAP_TYPE, uint64(k.Tap))
+	matched.Set(MATCHED_TAP_TYPE, uint64(k.TapType))
 	matched.Set(MATCHED_PROTO, uint64(k.Proto))
 	matched.Set(MATCHED_SRC_MAC, srcMac)
 	matched.Set(MATCHED_DST_MAC, dstMac)
@@ -90,13 +90,13 @@ func (k *LookupKey) GenerateMatchedField(srcEpc, dstEpc uint16) {
 
 func (k *LookupKey) String() string {
 	if k.EthType == EthernetTypeIPv6 {
-		return fmt.Sprintf("%d %s:%v > %s:%v eth_type: %v %v.%d.%v > %v.%d.%v proto: %v tap: %v",
+		return fmt.Sprintf("%d %s:%v > %s:%v ethType: %v %v.%d.%v > %v.%d.%v proto: %v tapType: %v",
 			k.Timestamp, Uint64ToMac(k.SrcMac), k.L2End0, Uint64ToMac(k.DstMac), k.L2End1, k.EthType,
-			k.Src6Ip, k.SrcPort, k.L3End0, k.Dst6Ip, k.DstPort, k.L3End1, k.Proto, k.Tap)
+			k.Src6Ip, k.SrcPort, k.L3End0, k.Dst6Ip, k.DstPort, k.L3End1, k.Proto, k.TapType)
 	} else {
-		return fmt.Sprintf("%d %s:%v > %s:%v eth_type: %v %v:%d:%v > %v:%d:%v proto: %v tap: %v",
+		return fmt.Sprintf("%d %s:%v > %s:%v ethType: %v %v:%d:%v > %v:%d:%v proto: %v tapType: %v",
 			k.Timestamp, Uint64ToMac(k.SrcMac), k.L2End0, Uint64ToMac(k.DstMac), k.L2End1, k.EthType,
-			IpFromUint32(k.SrcIp), k.SrcPort, k.L3End0, IpFromUint32(k.DstIp), k.DstPort, k.L3End1, k.Proto, k.Tap)
+			IpFromUint32(k.SrcIp), k.SrcPort, k.L3End0, IpFromUint32(k.DstIp), k.DstPort, k.L3End1, k.Proto, k.TapType)
 	}
 }
 
