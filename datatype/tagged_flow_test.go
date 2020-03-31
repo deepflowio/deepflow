@@ -18,7 +18,8 @@ func TestTaggedFlowEncodeDecode(t *testing.T) {
 	FlowKey := FlowKey{
 		TunnelInfo: TunnelInfo,
 		VtapId:     200,
-		InPort:     201,
+		TapType:    3,
+		TapPort:    201,
 		MACSrc:     20000000002,
 		MACDst:     20000000003,
 

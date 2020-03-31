@@ -199,7 +199,7 @@ func (t *PolicyTable) GetCounter() interface{} {
 }
 
 func (t *PolicyTable) LookupAllByKey(key *LookupKey, policy *PolicyData, endpoint *EndpointData) {
-	if !key.Tap.CheckTapType(key.Tap) {
+	if !key.TapType.CheckTapType(key.TapType) {
 		*policy = *INVALID_POLICY_DATA
 		*endpoint = *INVALID_ENDPOINT_DATA
 		return

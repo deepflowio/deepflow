@@ -179,7 +179,7 @@ func newNpbActions(npbs []*trident.NpbAction) []datatype.NpbActions {
 func newPolicyData(acl *trident.FlowAcl) *policy.Acl {
 	return &policy.Acl{
 		Id:           acl.GetId(),
-		Type:         datatype.TapType(acl.GetTapType() & 0xff),
+		TapType:      datatype.TapType(acl.GetTapType() & 0xff),
 		SrcGroups:    datatype.SplitGroup2Int(acl.GetSrcGroupIds()),
 		DstGroups:    datatype.SplitGroup2Int(acl.GetDstGroupIds()),
 		SrcPortRange: datatype.SplitPort2Int(acl.GetSrcPorts()),
