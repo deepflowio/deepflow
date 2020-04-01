@@ -105,6 +105,7 @@ func GetDbMeterID(db, rp string) (uint8, error) {
 }
 
 func EncodeTsdbRow(encoder *codec.SimpleEncoder, timestamp uint32, meterID uint8, columnIDs []uint8, columnValues []interface{}) error {
+	encoder.WriteU32(app.VERSION)
 	encoder.WriteU32(timestamp)
 
 	tag := &Tag{}
@@ -138,4 +139,12 @@ func EncodeTsdbRow(encoder *codec.SimpleEncoder, timestamp uint32, meterID uint8
 	encoder.WriteU32(0) // Flags
 
 	return nil
+}
+
+func DecodeTsdbRow(decoder *codec.SimpleDecoder) (*app.Document, error) {
+	version := decoder.ReadU32()
+	if version != app.VERSION {
+		return nil, fmt.Errorf("message version incorrect, expect %d, found %d.", app.VERSION, version)
+	}
+	return Decode(decoder)
 }
