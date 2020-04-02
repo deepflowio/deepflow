@@ -33,18 +33,14 @@ type LookupKey struct {
 func (k *LookupKey) generateMatchedField6(direction DirectionType, srcEpc, dstEpc uint16) {
 	srcPort, dstPort := k.SrcPort, k.DstPort
 	srcIp, dstIp := k.Src6Ip, k.Dst6Ip
-	srcMac, dstMac := k.SrcMac, k.DstMac
 	matched := &k.ForwardMatched6
 	if direction == BACKWARD {
 		srcPort, dstPort = k.DstPort, k.SrcPort
 		srcIp, dstIp = k.Dst6Ip, k.Src6Ip
-		srcMac, dstMac = k.DstMac, k.SrcMac
 		matched = &k.BackwardMatched6
 	}
 	matched.Set(MATCHED6_TAP_TYPE, uint64(k.TapType))
 	matched.Set(MATCHED6_PROTO, uint64(k.Proto))
-	matched.Set(MATCHED6_SRC_MAC, srcMac)
-	matched.Set(MATCHED6_DST_MAC, dstMac)
 	matched.Set(MATCHED6_SRC_IP0, binary.BigEndian.Uint64(srcIp))
 	matched.Set(MATCHED6_SRC_IP1, binary.BigEndian.Uint64(srcIp[8:]))
 	matched.Set(MATCHED6_DST_IP0, binary.BigEndian.Uint64(dstIp))
@@ -58,18 +54,14 @@ func (k *LookupKey) generateMatchedField6(direction DirectionType, srcEpc, dstEp
 func (k *LookupKey) generateMatchedField(direction DirectionType, srcEpc, dstEpc uint16) {
 	srcPort, dstPort := k.SrcPort, k.DstPort
 	srcIp, dstIp := k.SrcIp, k.DstIp
-	srcMac, dstMac := k.SrcMac, k.DstMac
 	matched := &k.ForwardMatched
 	if direction == BACKWARD {
 		srcPort, dstPort = k.DstPort, k.SrcPort
 		srcIp, dstIp = k.DstIp, k.SrcIp
-		srcMac, dstMac = k.DstMac, k.SrcMac
 		matched = &k.BackwardMatched
 	}
 	matched.Set(MATCHED_TAP_TYPE, uint64(k.TapType))
 	matched.Set(MATCHED_PROTO, uint64(k.Proto))
-	matched.Set(MATCHED_SRC_MAC, srcMac)
-	matched.Set(MATCHED_DST_MAC, dstMac)
 	matched.Set(MATCHED_SRC_IP, uint64(srcIp))
 	matched.Set(MATCHED_DST_IP, uint64(dstIp))
 	matched.Set(MATCHED_SRC_EPC, uint64(srcEpc))

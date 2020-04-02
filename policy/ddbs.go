@@ -28,8 +28,7 @@ const (
 type Ddbs struct {
 	FastPath
 	InterestTable
-	groupMacMap map[uint16][]uint64
-	groupIpMap  map[uint16][]ipSegment
+	groupIpMap map[uint16][]ipSegment
 
 	FastPathDisable bool
 	queueCount      int
@@ -67,7 +66,6 @@ func NewDdbs(queueCount int, mapSize uint32, fastPathDisable bool) TableOperator
 	ddbs := new(Ddbs)
 	ddbs.queueCount = queueCount
 	ddbs.FastPathDisable = fastPathDisable
-	ddbs.groupMacMap = make(map[uint16][]uint64, 1000)
 	ddbs.groupIpMap = make(map[uint16][]ipSegment, 1000)
 	ddbs.InterestTable.Init()
 	ddbs.FastPath.Init(mapSize, queueCount)
@@ -78,29 +76,25 @@ func NewDdbs(queueCount int, mapSize uint32, fastPathDisable bool) TableOperator
 
 func (d *Ddbs) generateAclBits(acls []*Acl) {
 	for _, acl := range acls {
-		srcMac := make([]uint64, 0, 8)
-		dstMac := make([]uint64, 0, 8)
 		srcIps := make([]ipSegment, 0, 8)
 		dstIps := make([]ipSegment, 0, 8)
 
 		for _, group := range acl.SrcGroups {
-			srcMac = append(srcMac, d.groupMacMap[uint16(group)]...)
 			srcIps = append(srcIps, d.groupIpMap[uint16(group)]...)
 		}
 		for _, group := range acl.DstGroups {
-			dstMac = append(dstMac, d.groupMacMap[uint16(group)]...)
 			dstIps = append(dstIps, d.groupIpMap[uint16(group)]...)
 		}
 		// 当配置策略为ANY->B时，源端为全采集
-		if len(srcMac) == 0 && len(srcIps) == 0 {
-			srcMac = append(srcMac, 0)
+		if len(srcIps) == 0 {
+			srcIps = append(srcIps, emptyIpSegment, emptyIp6Segment)
 		}
 		// 当配置策略为B->ANY时，目的端为全采集
-		if len(dstMac) == 0 && len(dstIps) == 0 {
-			dstMac = append(dstMac, 0)
+		if len(dstIps) == 0 {
+			dstIps = append(dstIps, emptyIpSegment, emptyIp6Segment)
 		}
 		// 根据策略字段生成对应的bits
-		acl.generateMatched(srcMac, dstMac, srcIps, dstIps)
+		acl.generateMatched(srcIps, dstIps)
 		acl.InitPolicy()
 	}
 }
@@ -362,14 +356,14 @@ func (d *Ddbs) checkAcl(acl *Acl, check ...bool) bool {
 
 	// 若策略的资源组中任何一个未在云平台数据和IP资源组中查找到，算作无效策略
 	for _, group := range acl.SrcGroups {
-		if len(d.groupMacMap[uint16(group)]) == 0 && len(d.groupIpMap[uint16(group)]) == 0 {
+		if len(d.groupIpMap[uint16(group)]) == 0 {
 			log.Warningf("invalid acl by group(%d): %s\n", group, acl)
 			return true
 		}
 	}
 
 	for _, group := range acl.DstGroups {
-		if len(d.groupMacMap[uint16(group)]) == 0 && len(d.groupIpMap[uint16(group)]) == 0 {
+		if len(d.groupIpMap[uint16(group)]) == 0 {
 			log.Warningf("invalid acl by group(%d): %s\n", group, acl)
 			return true
 		}
@@ -385,20 +379,6 @@ func (d *Ddbs) UpdateAcls(acls []*Acl, check ...bool) {
 		invalid := d.checkAcl(acl, check...)
 		if invalid {
 			continue
-		}
-		// acl需要根据groupIdMaps更新里面的NpbActions
-		if len(acl.NpbActions) > 0 {
-			groupType := RESOURCE_GROUP_TYPE_IP | RESOURCE_GROUP_TYPE_DEV
-			for _, id := range append(acl.SrcGroups, acl.DstGroups...) {
-				// 带NPB的acl，资源组类型为全DEV或全IP两种情况
-				if id != 0 && d.groupIdMaps[id] != 0 {
-					groupType = d.groupIdMaps[id]
-				}
-				break
-			}
-			for index, _ := range acl.NpbActions {
-				acl.NpbActions[index].AddResourceGroupType(groupType)
-			}
 		}
 		acl.Reset()
 		generateAcls = append(generateAcls, acl)
@@ -484,20 +464,6 @@ func (d *Ddbs) SetCloudPlatform(cloudPlatformLabeler *CloudPlatformLabeler) {
 	d.cloudPlatformLabeler = cloudPlatformLabeler
 }
 
-func (d *Ddbs) generateGroupMacMap(data []*PlatformData) {
-	groupMacMap := make(map[uint16][]uint64, 1000)
-	for _, data := range data {
-		if data.Mac == 0 {
-			continue
-		}
-		for _, group := range data.GroupIds {
-			groupId := uint16(group & 0xffff)
-			groupMacMap[groupId] = append(groupMacMap[groupId], data.Mac)
-		}
-	}
-	d.groupMacMap = groupMacMap
-}
-
 func (d *Ddbs) generateGroupIpMap(data []*IpGroupData) {
 	groupIpMap := make(map[uint16][]ipSegment, 1000)
 	for _, data := range data {
@@ -515,13 +481,10 @@ func (d *Ddbs) generateGroupIpMap(data []*IpGroupData) {
 
 func (d *Ddbs) UpdateInterfaceData(data []*PlatformData) {
 	d.GenerateIpNetmaskMapFromPlatformData(data)
-	d.GenerateGroupIdMapByPlatformData(data)
-	d.generateGroupMacMap(data)
 }
 
 func (d *Ddbs) UpdateIpGroupData(data []*IpGroupData) {
 	d.GenerateIpNetmaskMapFromIpGroupData(data)
-	d.GenerateGroupIdMapByIpGroupData(data)
 	d.generateGroupIpMap(data)
 }
 
