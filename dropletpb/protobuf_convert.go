@@ -49,13 +49,11 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	}
 
 	return &datatype.PlatformData{
-		Mac:        macInt,
-		TapMac:     vifData.GetTapMac(),
-		Ips:        ips,
-		EpcId:      epcId,
-		DeviceType: vifData.GetDeviceType(),
-		DeviceId:   vifData.GetDeviceId() & 0xffff,
-		IfType:     vifData.GetIfType(),
+		Mac:    macInt,
+		TapMac: vifData.GetTapMac(),
+		Ips:    ips,
+		EpcId:  epcId,
+		IfType: uint8(vifData.GetIfType()),
 	}
 }
 
@@ -95,17 +93,12 @@ func newIpGroupData(ipGroup *trident.Group) *policy.IpGroupData {
 			}
 		}
 	}
-	vmIds := make([]uint32, 0, len(ipGroup.GetVmIds()))
-	for _, id := range ipGroup.GetVmIds() {
-		vmIds = append(vmIds, id&0xffff)
-	}
 
 	return &policy.IpGroupData{
 		Id:    ipGroup.GetId() & 0xffff,
 		EpcId: int32(ipGroup.GetEpcId() & 0xffff),
 		Type:  uint8(ipGroup.GetType()),
 		Ips:   ips,
-		VmIds: vmIds,
 	}
 }
 
@@ -170,7 +163,7 @@ func newNpbActions(npbs []*trident.NpbAction) []datatype.NpbActions {
 		side := uint8(npb.GetTapSide())
 		slice := uint16(npb.GetPayloadSlice())
 		aclGid := uint32(npb.GetNpbAclGroupId() & 0xffff)
-		action := datatype.ToNpbActions(aclGid, id, tunnelType, 0, side, slice)
+		action := datatype.ToNpbActions(aclGid, id, tunnelType, side, slice)
 		actions = append(actions, action)
 	}
 	return actions
