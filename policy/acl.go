@@ -7,24 +7,22 @@ import (
 )
 
 type Acl struct {
-	Id                uint32
-	TapType           TapType
-	SrcGroups         []uint32
-	DstGroups         []uint32
-	SrcGroupRelations []uint16
-	DstGroupRelations []uint16
-	SrcPortRange      []PortRange // 0仅表示采集端口0
-	DstPortRange      []PortRange // 0仅表示采集端口0
-	SrcPorts          []uint16    // 0仅表示采集端口0
-	DstPorts          []uint16    // 0仅表示采集端口0
-	Proto             uint16      // 256表示全采集, 0表示采集采集协议0
-	Action            []AclAction
-	NpbActions        []NpbActions
-	AllMatched        []MatchedField
-	AllMatchedMask    []MatchedField // MatchedMask对应的位为0，表示对应Matched的位为*，0或1都匹配该策略
-	AllMatched6       []MatchedField6
-	AllMatched6Mask   []MatchedField6 // MatchedMask对应的位为0，表示对应Matched的位为*，0或1都匹配该策略
-	policy            PolicyData
+	Id              uint32
+	TapType         TapType
+	SrcGroups       []uint32
+	DstGroups       []uint32
+	SrcPortRange    []PortRange // 0仅表示采集端口0
+	DstPortRange    []PortRange // 0仅表示采集端口0
+	SrcPorts        []uint16    // 0仅表示采集端口0
+	DstPorts        []uint16    // 0仅表示采集端口0
+	Proto           uint16      // 256表示全采集, 0表示采集采集协议0
+	Action          []AclAction
+	NpbActions      []NpbActions
+	AllMatched      []MatchedField
+	AllMatchedMask  []MatchedField // MatchedMask对应的位为0，表示对应Matched的位为*，0或1都匹配该策略
+	AllMatched6     []MatchedField6
+	AllMatched6Mask []MatchedField6 // MatchedMask对应的位为0，表示对应Matched的位为*，0或1都匹配该策略
+	policy          PolicyData
 }
 
 const (
@@ -38,8 +36,6 @@ func (a *Acl) InitPolicy() {
 func (a *Acl) Reset() {
 	a.SrcPorts = a.SrcPorts[:0]
 	a.DstPorts = a.DstPorts[:0]
-	a.SrcGroupRelations = a.SrcGroupRelations[:0]
-	a.DstGroupRelations = a.DstGroupRelations[:0]
 	a.AllMatched = a.AllMatched[:0]
 	a.AllMatchedMask = a.AllMatchedMask[:0]
 	a.AllMatched6 = a.AllMatched6[:0]
