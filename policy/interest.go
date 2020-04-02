@@ -7,10 +7,6 @@ import (
 )
 
 type InterestTable struct {
-	groupIdMaps         map[uint32]int
-	groupIdFromPlatform []uint32
-	groupIdFromIpGroup  []uint32
-
 	InterestProtoMaps *[TAP_MAX][math.MaxUint8 + 1]bool
 	InterestPortMaps  *[TAP_MAX][math.MaxUint16 + 1]PortRange
 }
@@ -18,38 +14,6 @@ type InterestTable struct {
 func (t *InterestTable) Init() {
 	t.InterestProtoMaps = &[TAP_MAX][math.MaxUint8 + 1]bool{}
 	t.InterestPortMaps = &[TAP_MAX][math.MaxUint16 + 1]PortRange{}
-}
-
-func (t *InterestTable) generateGroupIdMap() {
-	groupIdMaps := make(map[uint32]int, len(t.groupIdFromPlatform)+len(t.groupIdFromIpGroup))
-
-	for _, id := range t.groupIdFromPlatform {
-		groupIdMaps[id] = RESOURCE_GROUP_TYPE_DEV
-	}
-
-	// 资源组ID一致的情况，设备资源组优先
-	for _, id := range t.groupIdFromIpGroup {
-		if groupIdMaps[id] != RESOURCE_GROUP_TYPE_DEV {
-			groupIdMaps[id] = RESOURCE_GROUP_TYPE_IP
-		}
-	}
-	t.groupIdMaps = groupIdMaps
-}
-
-func (t *InterestTable) GenerateGroupIdMapByIpGroupData(datas []*IpGroupData) {
-	t.groupIdFromIpGroup = make([]uint32, len(datas))
-	for _, data := range datas {
-		t.groupIdFromIpGroup = append(t.groupIdFromIpGroup, data.Id)
-	}
-	t.generateGroupIdMap()
-}
-
-func (t *InterestTable) GenerateGroupIdMapByPlatformData(datas []*PlatformData) {
-	t.groupIdFromPlatform = make([]uint32, 1024)
-	for _, data := range datas {
-		t.groupIdFromPlatform = append(t.groupIdFromPlatform, data.GroupIds...)
-	}
-	t.generateGroupIdMap()
 }
 
 func (t *InterestTable) generateInterestPortMap(acls []*Acl) {
