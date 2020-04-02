@@ -17,12 +17,12 @@ func TestGetPlatformData(t *testing.T) {
 	ipInfo := generateIpNet(ip3, 121, 24)
 	ipInfo1 := generateIpNet(ip4, 122, 25)
 	// epcId:40 DeviceType:2 DeviceId:3 IfType:3 Mac:mac4
-	vifData := generatePlatformDataExtension(groupEpc[4], 2, 3, 3, mac4)
+	vifData := generatePlatformDataExtension(groupEpc[4], 3, mac4)
 	vifData.Ips = append(vifData.Ips, ipInfo, ipInfo1)
 
 	ipInfo2 := generateIpNet(ip2, 125, 24)
 	ipInfo3 := generateIpNet(ip1, 126, 32)
-	vifData1 := generatePlatformDataExtension(groupEpcAny, 1, 100, 3, mac2)
+	vifData1 := generatePlatformDataExtension(groupEpcAny, 3, mac2)
 	vifData1.Ips = append(vifData1.Ips, ipInfo2, ipInfo3)
 
 	datas = append(datas, vifData, vifData1)
@@ -43,7 +43,7 @@ func TestGetPlatformDataAboutArp(t *testing.T) {
 	ipInfo := generateIpNet(ip3, 121, 24)
 	ipInfo1 := generateIpNet(ip4, 122, 25)
 	// epcId:40 DeviceType:2 DeviceId:3 IfType:3 Mac:mac4
-	vifData := generatePlatformDataExtension(groupEpc[4], 2, 3, 3, mac4)
+	vifData := generatePlatformDataExtension(groupEpc[4], 3, mac4)
 	vifData.Ips = append(vifData.Ips, ipInfo, ipInfo1)
 
 	datas = append(datas, vifData)
@@ -464,55 +464,10 @@ func TestFastpathEndpointStore(t *testing.T) {
 	}
 }
 
-/*
-func TestIpNetmaskGroup(t *testing.T) {
-	policy := NewPolicyTable(1, 1024, false)
-	ipGroup1 := generateIpGroup(group[11], groupEpc[0], ipNet10, ipNet11)
-	ipGroup2 := generateIpGroup(group[12], groupEpc[0], ipNet12)
-	ipGroup3 := generateIpGroup(group[13], groupEpc[0], ipNet13)
-	ipGroup4 := generateIpGroup(group[14], groupEpc[0], ipNet14)
-	ipGroups := make([]*IpGroupData, 0, 4)
-	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3, ipGroup4)
-	policy.UpdateIpGroupData(ipGroups)
-	srcIp := NewIPFromString("10.90.1.12").Int()
-	dstIp := NewIPFromString("10.90.9.123").Int()
-	key := generateLookupKey(mac1, mac2,  srcIp, dstIp, IPProtocolTCP, 50, 60)
-	data, _ := policy.lookupAllByKey(key)
-	if len(data.SrcInfo.GroupIds) != 3 ||
-		len(data.DstInfo.GroupIds) != 4 {
-		t.Error("TestIpNetmaskGroup Check Failed!")
-	}
-}
-
-func TestIpNetmaskGroup1(t *testing.T) {
-	policy := NewPolicyTable(1, 1024, false)
-	ipGroup1 := generateIpGroup(group[11], groupEpc[0], ipNet10, ipNet11)
-	ipGroup2 := generateIpGroup(group[12], groupEpc[0], ipNet12)
-	ipGroup3 := generateIpGroup(group[13], groupEpc[0], ipNet13)
-	ipGroup4 := generateIpGroup(group[14], groupEpc[0], ipNet14)
-	ipGroups := make([]*IpGroupData, 0, 5)
-	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3, ipGroup4)
-	policy.UpdateIpGroupData(ipGroups)
-	srcIp := NewIPFromString("10.90.1.12").Int()
-	dstIp := NewIPFromString("10.90.9.123").Int()
-	ipNet := generateIpNet(srcIp, 123, 32)
-	data1 := generatePlatformDataWithGroupId(groupEpc[1], group[1], group1Mac, ipNet)
-	policy.UpdateInterfaceData([]*PlatformData{data1})
-	key := generateLookupKey(group1Mac, mac2,  srcIp, dstIp, IPProtocolTCP, 50, 60)
-	data, _ := policy.lookupAllByKey(key)
-	if len(data.SrcInfo.GroupIds) != 4 ||
-		len(data.DstInfo.GroupIds) != 4 {
-		t.Error("TestIpNetmaskGroup Check Failed!")
-	}
-}
-*/
-
 func BenchmarkGetEndpointData(b *testing.B) {
 	policy := NewPolicyTable(1, 1024, false)
 	platformData1 := generatePlatformDataByParam(group1Ip1, group1Mac, groupEpc[1], 4)
-	platformData1.GroupIds = append(platformData1.GroupIds, group[1])
 	platformData2 := generatePlatformDataByParam(group2Ip1, group2Mac, groupEpc[2], 4)
-	platformData2.GroupIds = append(platformData2.GroupIds, group[2])
 	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
 	generateIpgroupData(policy)
 	generateAclData(policy)
@@ -527,13 +482,13 @@ func BenchmarkGetEndpointData(b *testing.B) {
 func BenchmarkGetDataByIp(b *testing.B) {
 	policy := NewPolicyTable(1, 1024, false)
 	ip1 := generateIpNet(testIp1, 100, 32)
-	data1 := generatePlatformDataWithGroupId(groupEpc[1], group[1], testMac1, ip1)
+	data1 := generatePlatformDataByIp(groupEpc[1], testMac1, ip1)
 	ip2 := generateIpNet(testIp2, 200, 24)
-	data2 := generatePlatformDataWithGroupId(groupEpc[2], group[2], testMac2, ip2)
+	data2 := generatePlatformDataByIp(groupEpc[2], testMac2, ip2)
 	ip3 := generateIpNet(testIp3, 300, 16)
-	data3 := generatePlatformDataWithGroupId(groupEpc[3], group[3], testMac3, ip3)
+	data3 := generatePlatformDataByIp(groupEpc[3], testMac3, ip3)
 	ip4 := generateIpNet(testIp4, 300, 8)
-	data4 := generatePlatformDataWithGroupId(groupEpc[4], group[4], testMac4, ip4)
+	data4 := generatePlatformDataByIp(groupEpc[4], testMac4, ip4)
 	policy.UpdateInterfaceData([]*PlatformData{data1, data2, data3, data4})
 	for i := 0; i < b.N; i++ {
 		policy.cloudPlatformLabeler.GetDataByIp(IpFromUint32(queryIp))
@@ -545,7 +500,7 @@ func BenchmarkUpdateEndpointData(b *testing.B) {
 	ipGroup1 := generateIpGroup(group[11], groupEpc[0], ipNet10, ipNet11)
 	policy.UpdateIpGroupData([]*IpGroupData{ipGroup1})
 	ipNet := generateIpNet(group1Ip1, 123, 32)
-	data1 := generatePlatformDataWithGroupId(groupEpc[1], group[1], group1Mac, ipNet)
+	data1 := generatePlatformDataByIp(groupEpc[1], group1Mac, ipNet)
 	policy.UpdateInterfaceData([]*PlatformData{data1})
 	key := generateLookupKey(group1Mac, group1Mac2, group1Ip1, group1Ip2, IPProtocolTCP, 50, 60)
 	endpointData, _ := policy.lookupAllByKey(key)

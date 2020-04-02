@@ -95,8 +95,6 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint64, srcIps, dstIps ipSegme
 			match, mask := MatchedField{}, MatchedField{}
 
 			match.Set(MATCHED_TAP_TYPE, uint64(a.TapType))
-			match.Set(MATCHED_SRC_MAC, srcMac)
-			match.Set(MATCHED_DST_MAC, dstMac)
 			match.Set(MATCHED_SRC_IP, uint64(srcIps.getIp()))
 			match.Set(MATCHED_SRC_EPC, uint64(srcIps.getEpcId()))
 			match.Set(MATCHED_DST_IP, uint64(dstIps.getIp()))
@@ -105,8 +103,6 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint64, srcIps, dstIps ipSegme
 			match.Set(MATCHED_DST_PORT, uint64(dstPort.port))
 
 			mask.SetMask(MATCHED_TAP_TYPE, uint64(a.TapType))
-			mask.SetMask(MATCHED_SRC_MAC, srcMac)
-			mask.SetMask(MATCHED_DST_MAC, dstMac)
 			mask.Set(MATCHED_SRC_IP, uint64(srcIps.getMask()))
 			mask.SetMask(MATCHED_SRC_EPC, uint64(srcIps.getEpcId()))
 			mask.Set(MATCHED_DST_IP, uint64(dstIps.getMask()))
@@ -133,8 +129,6 @@ func (a *Acl) generateMatchedField6(srcMac, dstMac uint64, srcIps, dstIps ipSegm
 			match, mask := MatchedField6{}, MatchedField6{}
 			match.Set(MATCHED6_TAP_TYPE, uint64(a.TapType))
 			match.Set(MATCHED6_PROTO, uint64(a.Proto))
-			match.Set(MATCHED6_SRC_MAC, srcMac)
-			match.Set(MATCHED6_DST_MAC, dstMac)
 			ip0, ip1 := srcIps.getIp6()
 			match.Set(MATCHED6_SRC_IP0, ip0)
 			match.Set(MATCHED6_SRC_IP1, ip1)
@@ -148,8 +142,6 @@ func (a *Acl) generateMatchedField6(srcMac, dstMac uint64, srcIps, dstIps ipSegm
 
 			mask.SetMask(MATCHED6_TAP_TYPE, uint64(a.TapType))
 			mask.SetMask(MATCHED6_PROTO, uint64(a.Proto))
-			mask.SetMask(MATCHED6_SRC_MAC, srcMac)
-			mask.SetMask(MATCHED6_DST_MAC, dstMac)
 			mask0, mask1 := srcIps.getMask6()
 			mask.Set(MATCHED6_SRC_IP0, mask0)
 			mask.Set(MATCHED6_SRC_IP1, mask1)
@@ -175,30 +167,9 @@ func (a *Acl) generateMatchedField6(srcMac, dstMac uint64, srcIps, dstIps ipSegm
 	}
 }
 
-func (a *Acl) generateMatched(srcMac, dstMac []uint64, srcIps, dstIps []ipSegment) {
+func (a *Acl) generateMatched(srcIps, dstIps []ipSegment) {
 	srcPorts, dstPorts := a.generatePortSegment()
-	for _, srcMac := range srcMac {
-		for _, dstMac := range dstMac {
-			// mac + mac分别在ipv4和ipv6表中，避免IPv6需要查询两次
-			a.generateMatchedField(srcMac, dstMac, emptyIpSegment, emptyIpSegment, srcPorts, dstPorts)
-			a.generateMatchedField6(srcMac, dstMac, emptyIpSegment, emptyIpSegment, srcPorts, dstPorts)
-		}
-		for _, dstIp := range dstIps {
-			if dstIp.isIpv6() {
-				a.generateMatchedField6(srcMac, 0, emptyIpSegment, dstIp, srcPorts, dstPorts)
-			} else {
-				a.generateMatchedField(srcMac, 0, emptyIpSegment, dstIp, srcPorts, dstPorts)
-			}
-		}
-	}
 	for _, srcIp := range srcIps {
-		for _, dstMac := range dstMac {
-			if srcIp.isIpv6() {
-				a.generateMatchedField6(0, dstMac, srcIp, emptyIpSegment, srcPorts, dstPorts)
-			} else {
-				a.generateMatchedField(0, dstMac, srcIp, emptyIpSegment, srcPorts, dstPorts)
-			}
-		}
 		for _, dstIp := range dstIps {
 			if srcIp.isIpv6() != dstIp.isIpv6() {
 				continue

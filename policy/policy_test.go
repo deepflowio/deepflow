@@ -63,6 +63,7 @@ var (
 	ipGroup6 = group[6] + IP_GROUP_ID_FLAG
 
 	group1Ip1Net = "192.168.1.0/24"
+	group1Ip2Net = "1234::abcd/128"
 	group1Ip1    = NewIPFromString("192.168.1.10").Int()
 	group1Ip2    = NewIPFromString("192.168.1.20").Int()
 	group1Ip3    = NewIPFromString("102.168.33.22").Int()
@@ -70,30 +71,32 @@ var (
 	group1Mac2   = NewMACAddrFromString("11:11:11:11:11:12").Int()
 
 	group2Ip1Net = "10.30.1.0/24"
+	group2Ip2Net = "abcd::1234/128"
 	group2Ip1    = NewIPFromString("10.30.1.10").Int()
 	group2Ip2    = NewIPFromString("10.30.1.20").Int()
 	group2Mac    = NewMACAddrFromString("22:22:22:22:22:22").Int()
 
-	group3Ip1  = NewIPFromString("192.168.20.112").Int() // group3/group4
-	group3Ip2  = NewIPFromString("172.16.1.200").Int()   // group3/group4
-	group3Ip3  = NewIPFromString("10.30.1.100").Int()    // group3
-	group3Mac1 = NewMACAddrFromString("33:33:33:33:33:31").Int()
+	group3Ip1      = NewIPFromString("192.168.20.112").Int() // group3/group4
+	group3Ip2      = NewIPFromString("172.16.1.200").Int()   // group3/group4
+	group3Ip3      = NewIPFromString("10.30.1.100").Int()    // group3
+	group3Mac1     = NewMACAddrFromString("33:33:33:33:33:31").Int()
+	ipGroup3IpNet1 = "10.25.1.2/24"
+	ipGroup3IpNet2 = "10.30.1.2/24"
+	ipGroup3IpNet3 = "192.168.20.112/32"
 
-	group4Ip1  = NewIPFromString("192.168.20.112").Int() // group3/group4
-	group4Ip2  = NewIPFromString("172.16.1.200").Int()   // group3/group4
-	group4Mac1 = NewMACAddrFromString("44:44:44:44:44:41").Int()
+	group4Ip1      = NewIPFromString("192.168.20.112").Int() // group3/group4
+	group4Ip2      = NewIPFromString("172.16.1.200").Int()   // group3/group4
+	group4Mac1     = NewMACAddrFromString("44:44:44:44:44:41").Int()
+	ipGroup4IpNet1 = "172.16.1.200/32"
 
 	group5Ip1  = NewIPFromString("172.16.2.100").Int()
 	group5Ip2  = NewIPFromString("10.33.1.10").Int()
 	group5Mac1 = NewMACAddrFromString("55:55:55:55:55:51").Int()
 	group5Mac2 = NewMACAddrFromString("55:55:55:55:55:52").Int()
 
-	group16Ip1 = NewIPFromString("1.1.1.2").Int()
-
-	ipGroup3IpNet1 = "10.25.1.2/24"
-	ipGroup3IpNet2 = "10.30.1.2/24"
-
 	ipGroup5IpNet1 = "192.168.10.10/24" // ipGroup5/ipGroup6/ipGroup7
+	ipGroup5IpNet2 = "10.33.1.10/32"
+	ipGroup5IpNet3 = "172.16.2.100/32"
 	ipGroup5Ip1    = NewIPFromString("192.168.10.10").Int()
 	ipGroup5Ip2    = NewIPFromString("192.168.10.123").Int()
 	ipGroup5Mac1   = NewMACAddrFromString("55:55:55:55:55:51").Int()
@@ -120,6 +123,8 @@ var (
 	ipGroup10Ip1   = net.ParseIP("2002:abcd::123")
 	ipGroup11IpNet = "2002:abcd::124/128"
 	ipGroup11Ip1   = net.ParseIP("2002:abcd::124")
+
+	group16Ip1 = NewIPFromString("1.1.1.2").Int()
 
 	testIp1  = NewIPFromString("10.30.1.21").Int()
 	testMac1 = NewMACAddrFromString("ab:cd:11:11:11:11").Int()
@@ -213,38 +218,29 @@ func generateIpGroup(groupId uint32, epcId int32, ip ...string) *IpGroupData {
 	return &ipGroup
 }
 
-func generatePlatformDataExtension(epcId int32, deviceType, deviceId, ifType uint32, mac uint64) *PlatformData {
+func generatePlatformDataByIp(epcId int32, mac uint64, ip ...*IpNet) *PlatformData {
 	data := PlatformData{
-		EpcId:      epcId,
-		DeviceType: deviceType,
-		DeviceId:   deviceId,
-		IfType:     ifType,
-		Mac:        mac,
+		EpcId: epcId,
+		Mac:   mac,
+		Ips:   ip,
 	}
 	return &data
 }
 
-func generatePlatformDataByParam(ip uint32, mac uint64, epcId int32, Iftype uint32) *PlatformData {
+func generatePlatformDataExtension(epcId int32, ifType uint8, mac uint64) *PlatformData {
+	data := PlatformData{
+		EpcId:  epcId,
+		IfType: ifType,
+		Mac:    mac,
+	}
+	return &data
+}
+
+func generatePlatformDataByParam(ip uint32, mac uint64, epcId int32, Iftype uint8) *PlatformData {
 	ipInfo := generateIpNet(ip, 121, 32)
-	vifData := generatePlatformDataExtension(epcId, 1, 3, Iftype, mac)
+	vifData := generatePlatformDataExtension(epcId, Iftype, mac)
 	vifData.Ips = append(vifData.Ips, ipInfo)
 	return vifData
-}
-
-func generatePlatformDataWithGroupId(epcId int32, groupId uint32, mac uint64, ips ...*IpNet) *PlatformData {
-	data := PlatformData{
-		EpcId:      epcId,
-		DeviceType: 2,
-		DeviceId:   3,
-		IfType:     3,
-		Mac:        mac,
-	}
-	if epcId == 0 {
-		data.EpcId = EPC_FROM_DEEPFLOW
-	}
-	data.Ips = append(data.Ips, ips...)
-	data.GroupIds = append(data.GroupIds, groupId)
-	return &data
 }
 
 func generatePeerConnection(id uint32, src, dst int32) *PeerConnection {
@@ -361,12 +357,12 @@ func generateLookupKey(srcMac, dstMac uint64, srcIp, dstIp uint32,
 	return key
 }
 
-func toPcapAction(aclGid, id uint32, tunnelType, group, tapSide uint8, slice uint16) NpbActions {
-	return ToNpbActions(aclGid, id, tunnelType, group, tapSide, slice)
+func toPcapAction(aclGid, id uint32, tunnelType, tapSide uint8, slice uint16) NpbActions {
+	return ToNpbActions(aclGid, id, tunnelType, tapSide, slice)
 }
 
-func toNpbAction(aclGid, id uint32, tunnelType, group, tapSide uint8, slice uint16) NpbActions {
-	return ToNpbActions(aclGid, id, tunnelType, group, tapSide, slice)
+func toNpbAction(aclGid, id uint32, tunnelType, tapSide uint8, slice uint16) NpbActions {
+	return ToNpbActions(aclGid, id, tunnelType, tapSide, slice)
 }
 
 // 设置key的其他参数
@@ -433,18 +429,18 @@ func generatePolicyTable(ids ...TableID) *PolicyTable {
 	ip1 := generateIpNet(group1Ip1, 121, 32)
 	ip2 := generateIpNet(group1Ip2, 121, 32)
 	ip3 := generateIpNet6(ip12, 121, 128)
-	data1 := generatePlatformDataWithGroupId(groupEpc[1], group[1], group1Mac, ip1, ip2, ip3)
+	data1 := generatePlatformDataByIp(groupEpc[1], group1Mac, ip1, ip2, ip3)
 
 	ip1 = generateIpNet(group1Ip3, 121, 32)
-	data2 := generatePlatformDataWithGroupId(EPC_FROM_DEEPFLOW, groupAny, group1Mac2, ip1)
+	data2 := generatePlatformDataByIp(EPC_FROM_DEEPFLOW, group1Mac2, ip1)
 
 	ip1 = generateIpNet(group2Ip1, 122, 32)
 	ip2 = generateIpNet(group2Ip2, 122, 32)
 	ip3 = generateIpNet6(ip13, 122, 128)
-	data3 := generatePlatformDataWithGroupId(groupEpc[2], group[2], group2Mac, ip1, ip2, ip3)
+	data3 := generatePlatformDataByIp(groupEpc[2], group2Mac, ip1, ip2, ip3)
 
 	ip1 = generateIpNet(group2Ip1, 110, 32)
-	data4 := generatePlatformDataWithGroupId(groupEpc[10], group[10], mac5, ip1)
+	data4 := generatePlatformDataByIp(groupEpc[10], mac5, ip1)
 	data4.IfType = 4
 
 	datas = append(datas, data1, data2, data3, data4)
@@ -452,33 +448,37 @@ func generatePolicyTable(ids ...TableID) *PolicyTable {
 	ip1 = generateIpNet(group3Ip1, 121, 24)
 	ip2 = generateIpNet(group3Ip2, 121, 32)
 	// group3无epc，group4有epc  ip:group3Ip1/group4Ip1 + group3Ip2/group4Ip2
-	data1 = generatePlatformDataWithGroupId(groupEpc[3], group[3], group3Mac1, ip1, ip2)
+	data1 = generatePlatformDataByIp(groupEpc[3], group3Mac1, ip1, ip2)
 
 	ip1 = generateIpNet(group4Ip1, 121, 24)
 	ip2 = generateIpNet(group4Ip2, 121, 32)
-	data2 = generatePlatformDataWithGroupId(groupEpc[4], group[4], group4Mac1, ip1, ip2)
+	data2 = generatePlatformDataByIp(groupEpc[4], group4Mac1, ip1, ip2)
 
 	ip1 = generateIpNet(group5Ip1, 121, 24)
 	ip2 = generateIpNet(group5Ip2, 121, 32)
 	// group5有epc和无epc ip:group5Ip1 + group5Ip2
-	data3 = generatePlatformDataWithGroupId(groupEpc[5], group[5], group5Mac2, ip1, ip2)
+	data3 = generatePlatformDataByIp(groupEpc[5], group5Mac2, ip1, ip2)
 	groupEpc[5] = groupEpcAny
-	data4 = generatePlatformDataWithGroupId(groupEpc[5], group[5], group5Mac1, ip1, ip2)
+	data4 = generatePlatformDataByIp(groupEpc[5], group5Mac1, ip1, ip2)
 	datas = append(datas, data1, data2, data3, data4)
 
 	policy.UpdateInterfaceData(datas)
 
-	ipGroup1 := generateIpGroup(group[3], groupEpc[3], ipGroup3IpNet1, ipGroup3IpNet2)
-	ipGroup2 := generateIpGroup(group[5], groupEpc[5], ipGroup5IpNet1)
+	ipGroup1 := generateIpGroup(group[1], groupEpc[1], group1Ip1Net, group1Ip2Net)
+	ipGroup2 := generateIpGroup(group[2], groupEpc[2], group2Ip1Net, group2Ip2Net)
+	ipGroup3 := generateIpGroup(group[3], groupEpc[3], ipGroup3IpNet1, ipGroup3IpNet2, ipGroup3IpNet3)
+	ipGroup4 := generateIpGroup(group[4], groupEpc[4], ipGroup4IpNet1)
+	ipGroup5 := generateIpGroup(group[5], groupEpc[5], ipGroup5IpNet1, ipGroup5IpNet2, ipGroup5IpNet3)
 	groupEpc[5] = 50
-	ipGroup3 := generateIpGroup(group[6], groupEpc[6], ipGroup6IpNet1, ipGroup6IpNet2, ipGroup6IpNet3)
-	ipGroup4 := generateIpGroup(group[7], groupEpc[7], ipGroup7IpNet1, ipGroup7IpNet2)
-	ipGroup5 := generateIpGroup(group[16], groupEpc[1], group1Ip1Net, group2Ip1Net)
+	ipGroup6 := generateIpGroup(group[6], groupEpc[6], ipGroup6IpNet1, ipGroup6IpNet2, ipGroup6IpNet3)
+	ipGroup7 := generateIpGroup(group[7], groupEpc[7], ipGroup7IpNet1, ipGroup7IpNet2)
+	ipGroup16 := generateIpGroup(group[16], groupEpc[1], group1Ip1Net, group2Ip1Net)
 	ipGroup5.Type = 3
-	ipGroup6 := generateIpGroup(group[17], groupEpc[0], ipGroup9IpNet)
+	ipGroup17 := generateIpGroup(group[17], groupEpc[0], ipGroup9IpNet)
 	ipGroup10 := generateIpGroup(group[10], groupEpc[0], ipGroup10IpNet)
 	ipGroup11 := generateIpGroup(group[11], groupEpc[0], ipGroup11IpNet)
-	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3, ipGroup4, ipGroup5, ipGroup6, ipGroup10, ipGroup11)
+	ipGroups = append(ipGroups, ipGroup1, ipGroup2, ipGroup3, ipGroup4,
+		ipGroup5, ipGroup6, ipGroup7, ipGroup16, ipGroup17, ipGroup10, ipGroup11)
 
 	policy.UpdateIpGroupData(ipGroups)
 

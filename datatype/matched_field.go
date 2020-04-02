@@ -10,58 +10,48 @@ const (
 )
 
 const (
-	MATCHED_FIELD_BITS_LEN = 240 // 8(TapType) + 8(Proto) + 16(L3EPC)*2 + 32(IP)*2 + 64(Port+MAC)*2
-	MATCHED_FIELD_LEN      = 4
+	MATCHED_FIELD_BITS_LEN = 144 // 8(TapType) + 8(Proto) + 16(Port)*2 + 16(L3EPC)*2 + 32(IP)*2
+	MATCHED_FIELD_LEN      = 3
 )
 
 type MatchFlags uint16
 
 const (
 	// fields[0]
-	MATCHED_SRC_MAC MatchFlags = iota
-	MATCHED_SRC_PORT
-
-	// fields[1]
-	MATCHED_DST_MAC
-	MATCHED_DST_PORT
-
-	// fields[2]
-	MATCHED_SRC_IP
+	MATCHED_SRC_IP MatchFlags = iota
 	MATCHED_DST_IP
-
-	// fields[3]
+	// fields[1]
 	MATCHED_SRC_EPC
 	MATCHED_DST_EPC
+	MATCHED_SRC_PORT
+	MATCHED_DST_PORT
+	// fields[2]
 	MATCHED_PROTO
 	MATCHED_TAP_TYPE
 )
 
 var fieldOffset = [...]uint64{
-	MATCHED_SRC_MAC:  0,
-	MATCHED_SRC_PORT: 48,
-	MATCHED_DST_MAC:  64,
-	MATCHED_DST_PORT: 112,
-	MATCHED_SRC_IP:   128,
-	MATCHED_DST_IP:   160,
+	MATCHED_SRC_IP: 0,
+	MATCHED_DST_IP: 32,
 
-	MATCHED_SRC_EPC:  192,
-	MATCHED_DST_EPC:  208,
-	MATCHED_PROTO:    224,
-	MATCHED_TAP_TYPE: 232,
+	MATCHED_SRC_EPC:  64,
+	MATCHED_DST_EPC:  80,
+	MATCHED_SRC_PORT: 96,
+	MATCHED_DST_PORT: 112,
+
+	MATCHED_PROTO:    128,
+	MATCHED_TAP_TYPE: 136,
 }
 
 var fieldMask = [...]uint64{
-	MATCHED_SRC_MAC:  0xffffffffffff,
-	MATCHED_SRC_PORT: 0xffff,
-
-	MATCHED_DST_MAC:  0xffffffffffff,
-	MATCHED_DST_PORT: 0xffff,
-
 	MATCHED_SRC_IP: 0xffffffff,
 	MATCHED_DST_IP: 0xffffffff,
 
 	MATCHED_SRC_EPC:  0xffff,
 	MATCHED_DST_EPC:  0xffff,
+	MATCHED_SRC_PORT: 0xffff,
+	MATCHED_DST_PORT: 0xffff,
+
 	MATCHED_PROTO:    0xff,
 	MATCHED_TAP_TYPE: 0xff,
 }
@@ -161,7 +151,7 @@ func (f *MatchedField) IsBitZero(offset int) bool {
 }
 
 func (f *MatchedField) Equal(n *MatchedField) bool {
-	return f.fields[0] == n.fields[0] && f.fields[1] == n.fields[1] && f.fields[2] == n.fields[2] && f.fields[3] == n.fields[3]
+	return f.fields[0] == n.fields[0] && f.fields[1] == n.fields[1] && f.fields[2] == n.fields[2]
 }
 
 func (f *MatchedField) Or(n *MatchedField) MatchedField {
@@ -169,7 +159,6 @@ func (f *MatchedField) Or(n *MatchedField) MatchedField {
 	result.fields[0] = f.fields[0] | n.fields[0]
 	result.fields[1] = f.fields[1] | n.fields[1]
 	result.fields[2] = f.fields[2] | n.fields[2]
-	result.fields[3] = f.fields[3] | n.fields[3]
 	return result
 }
 
@@ -178,14 +167,13 @@ func (f *MatchedField) And(n *MatchedField) MatchedField {
 	result.fields[0] = f.fields[0] & n.fields[0]
 	result.fields[1] = f.fields[1] & n.fields[1]
 	result.fields[2] = f.fields[2] & n.fields[2]
-	result.fields[3] = f.fields[3] & n.fields[3]
 	return result
 }
 
 func (f MatchedField) String() string {
-	return fmt.Sprintf("%x:%x:%d -> %x:%x:%d epc: %d -> %d proto: %d tap: %d",
-		f.Get(MATCHED_SRC_MAC), f.Get(MATCHED_SRC_IP), f.Get(MATCHED_SRC_PORT),
-		f.Get(MATCHED_DST_MAC), f.Get(MATCHED_DST_IP), f.Get(MATCHED_DST_PORT),
+	return fmt.Sprintf("%x:%d -> %x:%d epc: %d -> %d proto: %d tap: %d",
+		f.Get(MATCHED_SRC_IP), f.Get(MATCHED_SRC_PORT),
+		f.Get(MATCHED_DST_IP), f.Get(MATCHED_DST_PORT),
 		f.Get(MATCHED_SRC_EPC), f.Get(MATCHED_DST_EPC),
 		f.Get(MATCHED_PROTO), f.Get(MATCHED_TAP_TYPE))
 }

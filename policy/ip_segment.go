@@ -19,7 +19,8 @@ type ipSegment struct {
 }
 
 var (
-	emptyIpSegment ipSegment = ipSegment{}
+	emptyIpSegment  ipSegment = ipSegment{}
+	emptyIp6Segment ipSegment = ipSegment{ipv6: true}
 )
 
 // 192.168.10.100/24 -> 192.168.10.0/0xffffff00

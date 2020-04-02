@@ -19,7 +19,7 @@ var (
 
 type ActionFlag uint16
 
-type NpbAction uint64 // aclgid | payload-slice | tunnel-type | Dep/Ip  | TapSide |  tunnel-id
+type NpbAction uint64 // aclgid | payload-slice | tunnel-type | TapSide |  tunnel-id
 
 type NpbActions struct {
 	NpbAction
@@ -38,12 +38,6 @@ const (
 	TAPSIDE_DST  = 0x2
 	TAPSIDE_MASK = TAPSIDE_SRC | TAPSIDE_DST
 	TAPSIDE_ALL  = TAPSIDE_SRC | TAPSIDE_DST
-)
-
-const (
-	RESOURCE_GROUP_TYPE_DEV  = 0x1
-	RESOURCE_GROUP_TYPE_IP   = 0x2
-	RESOURCE_GROUP_TYPE_MASK = RESOURCE_GROUP_TYPE_DEV | RESOURCE_GROUP_TYPE_IP
 )
 
 func UpdateTunnelMaps(aclGids, ipIds []uint16, ips []net.IP) {
@@ -97,18 +91,6 @@ func (a *NpbAction) ReverseTapSide() NpbAction {
 	return *a ^ NpbAction(uint64(TAPSIDE_MASK)<<26)
 }
 
-func (a NpbAction) ResourceGroupTypeCompare(flag int) bool {
-	return (a.ResourceGroupType() & flag) == flag
-}
-
-func (a *NpbAction) AddResourceGroupType(groupType int) {
-	*a |= ((NpbAction(groupType & RESOURCE_GROUP_TYPE_MASK)) << 28)
-}
-
-func (a NpbAction) ResourceGroupType() int {
-	return int((a >> 28) & RESOURCE_GROUP_TYPE_MASK)
-}
-
 func (a NpbAction) TunnelGid() uint16 {
 	return uint16(a >> 48)
 }
@@ -151,15 +133,15 @@ func (a NpbAction) TunnelType() uint8 {
 
 func (a NpbAction) String() string {
 	if a.TunnelType() == NPB_TUNNEL_TYPE_PCAP {
-		return fmt.Sprintf("{gid: %d type: %d slice %d side: %d group: %d}", a.TunnelGid(), a.TunnelType(), a.PayloadSlice(), a.TapSide(), a.ResourceGroupType())
+		return fmt.Sprintf("{gid: %d type: %d slice %d side: %d}", a.TunnelGid(), a.TunnelType(), a.PayloadSlice(), a.TapSide())
 	} else {
-		return fmt.Sprintf("{%d@%s gid: %d type: %d slice %d side: %d group: %d}", a.TunnelId(), a.TunnelIp(), a.TunnelGid(), a.TunnelType(), a.PayloadSlice(), a.TapSide(), a.ResourceGroupType())
+		return fmt.Sprintf("{%d@%s gid: %d type: %d slice %d side: %d}", a.TunnelId(), a.TunnelIp(), a.TunnelGid(), a.TunnelType(), a.PayloadSlice(), a.TapSide())
 	}
 }
 
-func ToNpbAction(aclGid, id uint32, tunnelType, group, tapSide uint8, slice uint16) NpbAction {
+func ToNpbAction(aclGid, id uint32, tunnelType, tapSide uint8, slice uint16) NpbAction {
 	return NpbAction(uint64(aclGid&0xffff)<<48 | uint64(slice)<<32 |
-		uint64(tunnelType&0x3)<<30 | (uint64(group)&RESOURCE_GROUP_TYPE_MASK)<<28 | (uint64(tapSide)&TAPSIDE_MASK)<<26 | uint64(id&0xffffff))
+		uint64(tunnelType&0x3)<<30 | (uint64(tapSide)&TAPSIDE_MASK)<<26 | uint64(id&0xffffff))
 }
 
 func (a *NpbActions) AddAclGid(aclGids ...uint16) {
@@ -197,8 +179,8 @@ func (a NpbActions) String() string {
 	return fmt.Sprintf("{%s gids: %v}", a.NpbAction, a.aclGids)
 }
 
-func ToNpbActions(aclGid, id uint32, tunnelType, group, tapSide uint8, slice uint16) NpbActions {
-	return NpbActions{ToNpbAction(aclGid, id, tunnelType, group, tapSide, slice), []uint16{uint16(aclGid)}}
+func ToNpbActions(aclGid, id uint32, tunnelType, tapSide uint8, slice uint16) NpbActions {
+	return NpbActions{ToNpbAction(aclGid, id, tunnelType, tapSide, slice), []uint16{uint16(aclGid)}}
 }
 
 const (
@@ -369,14 +351,9 @@ func (d *PolicyData) dedupNpbAction(packet *LookupKey) []NpbActions {
 
 	validActions := make([]NpbActions, 0, len(d.NpbActions))
 	for _, action := range d.NpbActions {
-		if (action.TapSideCompare(TAPSIDE_SRC) == true && packet.L2End0 == true) ||
-			(action.TapSideCompare(TAPSIDE_DST) == true && packet.L2End1 == true) {
-			if action.ResourceGroupTypeCompare(RESOURCE_GROUP_TYPE_DEV) {
-				validActions = append(validActions, action)
-			} else if (action.TapSideCompare(TAPSIDE_SRC) == true && packet.L3End0 == true) ||
-				(action.TapSideCompare(TAPSIDE_DST) == true && packet.L3End1 == true) {
-				validActions = append(validActions, action)
-			}
+		if (action.TapSideCompare(TAPSIDE_SRC) && packet.L2End0 && packet.L3End0) ||
+			(action.TapSideCompare(TAPSIDE_DST) && packet.L2End1 && packet.L3End1) {
+			validActions = append(validActions, action)
 		}
 	}
 	return validActions
@@ -414,7 +391,6 @@ func (d *PolicyData) MergeNpbAction(actions []NpbActions, aclID uint32, directio
 				n.PayloadSlice() > m.PayloadSlice() {
 				d.NpbActions[index].SetPayloadSlice(n.PayloadSlice())
 			}
-			d.NpbActions[index].AddResourceGroupType(n.ResourceGroupType())
 			if len(directions) > 0 {
 				d.NpbActions[index].SetTapSide(int(directions[0]))
 			} else {
