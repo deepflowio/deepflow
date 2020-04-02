@@ -143,7 +143,6 @@ message Group {
     optional uint32 id = 1;
     optional uint32 epc_id = 2 [default = 0];
     optional GroupType type = 3;
-    repeated uint32 vm_ids = 4;
     repeated string ips = 5;
     repeated string ip_ranges = 6;
 }
