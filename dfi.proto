@@ -74,8 +74,6 @@ message Flow {
                                          2. For others, equals to
                                              max(arr_time_0_last, arr_time_1_last) -
                                                  time_of_the_first_packet_in_the_flow */
-    optional uint64 time_bitmap = 14; /* The packet time distribution in one minitue */
-
     /* L1 */
     optional uint32 tap_type = 21 [default = 0];/* 3=虚拟网络, 1~250=接入网络 */
     optional uint32 tap_port = 22 [default = 0];
@@ -89,8 +87,6 @@ message Flow {
     /* L3 */
     optional uint32 ip_src = 41;      /* 0x01020304 == 1.2.3.4 */
     optional uint32 ip_dst = 42;      /* 0x01020304 == 1.2.3.4 */
-    optional uint32 ttl_0 = 43;
-    optional uint32 ttl_1 = 44;
     optional bytes  ip6_src = 45;     /* big endian ipv6 address, null if ipv4 */
     optional bytes  ip6_dst = 46;     /* big endian ipv6 address, null if ipv4  */
 
@@ -147,16 +143,10 @@ message Flow {
     optional uint32 device_type_1 = 123 [default = 0];        /* devicetype of mac_dst, platform VM/VGW/TPD instance */
     optional uint32 device_id_0 = 124 [default = 0];          /* deviceid of mac_src, platform instance ID */
     optional uint32 device_id_1 = 125 [default = 0];          /* deviceid of mac_dst, platform instance ID */
-    optional uint32 if_type_0 = 128 [default = 0];            /* 不存：iftype of mac_src, platform instance WAN/LAN/Ctrl NIC */
-    optional uint32 if_type_1 = 129 [default = 0];            /* 不存：iftype of mac_dst, platform instance WAN/LAN/Ctrl NIC */
-
     optional bool is_l2_end_0 = 130 [default = false];        /* 网流mac_src对应的实例和网流被采集的Exporter是否在同一宿主机上 */
     optional bool is_l2_end_1 = 131 [default = false];        /* 网流mac_dst对应的实例和网流被采集的Exporter是否在同一宿主机上 */
     optional bool is_l3_end_0 = 132 [default = false];        /* 网流mac_src和ip_src对应的同一实例和网流被采集的Exporter是否在同一宿主机上 */
     optional bool is_l3_end_1 = 133 [default = false];        /* 网流mac_dst和ip_dst对应的同一实例和网流被采集的Exporter是否在同一宿主机上 */
-
-    repeated uint32 group_ids_0 = 134;                         /* 源端资源组ID */
-    repeated uint32 group_ids_1 = 135;                         /* 目的端资源组ID */
 
     /* TCP Perf Data */
     /* tcp会话报文交互过程简图
@@ -190,48 +180,33 @@ message Flow {
     |                   |t11 DATA/ACK(len>1)|
     | <---------------- | <---------------- | */
 
-    optional uint64 rtt_syn = 140 [default = 0];               /* 网络时延(rtt_syn), 单位：ns, tcp三次握手阶段, 每次上报均携带，force-report后不清空.
-                                                                  rtt_syn = (t2-t1) + (t4-t3) */
-    optional uint64 rtt = 141 [default = 0];                   /* 系统响应时延(rtt/srt), 单位：ns, tcp数据传输阶段, 单个上报周期内rtt的均值. 不包含握手阶段的网络时延.
-                                                                  rtt_Nth = t8 - t7
-                                                                  rtt = (rtt_1st + rtt_2nd + ... + rtt_Nth) / N, or
-                                                                  rtt = (rtt * (N - 1) + rtt_Nth) / N */
-    optional uint64 rtt_avg = 142 [default = 0];               /* 未提供, Discarded*/
-    optional uint64 syn_retrans_cnt_0 = 143 [default = 0];     /* 重传计数(syn_retrans_client), tcp三次握手阶段, client端发生的重传包数量, 每次上报均携带，force-report后不清空. */
-    optional uint64 syn_retrans_cnt_1 = 144 [default = 0];     /* 重传计数(syn_retrans_server), tcp三次握手阶段, server端发生的重传包数量, 每次上报均携带，force-report后不清空. */
+    optional uint64 rtt_avg = 142 [default = 0];               /* 往返时延(rtt), 单位：ns, tcp三次握手阶段
+                                                                    rtt_syn = (t2-t1) + (t4-t3) */
+    optional uint64 srt_avg = 143 [default = 0];               /* 系统响应时延(srt), 单位：ns, tcp数据传输阶段, 单个上报周期内stt的均值. 不包含握手阶段的网络时延.
+                                                                    rtt_Nth = t8 - t7
+                                                                    rtt = (rtt_1st + rtt_2nd + ... + rtt_Nth) / N, or
+                                                                    rtt = (rtt * (N - 1) + rtt_Nth) / N */
     optional uint64 retrans_cnt_0 = 145 [default = 0];         /* 重传计数(retrans_client), tcp数据传输阶段, 单个上报周期内, client端的重传包数量, 不包含握手阶段重传数量 */
     optional uint64 retrans_cnt_1 = 146 [default = 0];         /* 重传计数(retrans_server), tcp数据传输阶段, 单个上报周期内, server端的重传包数量, 不包含握手阶段重传数量 */
     optional uint64 total_retrans_cnt = 147 [default = 0];     /* 重传计数(retrans), tcp数据传输阶段, 整条流client与server端的重传包数量之和, 不包含握手阶段重传数量 */
     optional uint64 zero_wnd_cnt_0 = 148 [default = 0];        /* 零窗口(zero_window_client), 单个上报周期内，client端零窗口包数量, 包含握手阶段零窗数量 */
     optional uint64 zero_wnd_cnt_1 = 149 [default = 0];        /* 零窗口(zero_window_server), 单个上报周期内，server端零窗口包数量, 包含握手阶段零窗数量 */
-    optional uint64 psh_urg_cnt_0 = 154 [default = 0];         /* 紧急标志(psh_urg_client), 单个上报周期内，client端psh,urg标志被置位的包数量, 包含握手阶段计数 */
-    optional uint64 psh_urg_cnt_1 = 155 [default = 0];         /* 紧急标志(psh_urg_client), 单个上报周期内，server端psh,urg标志被置位的包数量, 包含握手阶段计数 */
     optional uint64 art_avg = 157 [default = 0];               /* 应用响应时延(art), 单位：ns, tcp数据传输阶段, 单个上报周期内, art的均值，不包含握手阶段的网络时延.
                                                                   art_Nth = t11 - t10
                                                                   art = (art_1st + art_2nd + ... + art_Nth) / N, or
                                                                   art = (art * (N - 1) + art_Nth) / N */
-    optional uint64 avg_pkt_interval = 160 [default = 0];      /* 包间隔均值, 单条流相邻2个包到达时间间隔的均值 */
-    optional uint64 pkt_interval_variance = 161 [default = 0]; /* 包间隔方差, 单条流相邻2个包到达时间间隔的方差 */
-    optional uint64 pkt_size_variance = 162 [default = 0];     /* 包大小方差, 单条流每个包包长的方差 */
 
-    optional uint32 acl_id = 163;
-
-    repeated uint32 acl_gids = 164;
-
-    optional uint64 rtt_syn_client = 165 [default = 0];        /* The RTT in the handshake phase of the flow.
+    optional uint64 rtt_client_avg = 165 [default = 0];        /* The RTT in the handshake phase of the flow.
                                                                   When pkt_cnt_0 >= 2 && pkt_cnt_1 >= 1,
                                                                   SYN/ACK -> ACK,
                                                                   rtt_syn = arr_time_0_1 (ACK) - arr_time_1_0 (SYN/ACK) */
-    optional uint64 rtt_syn_server = 166 [default = 0];        /* The RTT in the handshake phase of the flow.
+    optional uint64 rtt_server_avg = 166 [default = 0];        /* The RTT in the handshake phase of the flow.
                                                                   When pkt_cnt_0 >= 1 && pkt_cnt_1 >= 1,
                                                                   SYN -> SYN/ACK,
                                                                   rtt_syn = arr_time_1_0 (SYN/ACK) - arr_time_0_0 (SYN) */
-
     /* Geo Info */
-    optional uint32 country = 170 [default = 0];               /* Flow非云内IP端国家信息 */
-    optional uint32 region = 171 [default = 0];                /* Flow非云内IP端区域信息 */
-    optional uint32 isp = 172 [default = 0];                   /* Flow非云内IP端ISP信息 */
-    optional uint32 geo_end = 173 [default = 0];               /* 0：上述地理位置信息对应源端，1：上述地理位置信息对应目的端 */
+    optional uint32 province_src = 174 [default = 0];           /* 源IP端对应省份 */
+    optional uint32 province_dst = 175 [default = 0];           /* 目的IP对应省份 */
 }
 
 message Metering {
