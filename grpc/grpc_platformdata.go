@@ -29,9 +29,17 @@ type EpcIDIPV6 struct {
 	IP    [net.IPv6len]byte
 }
 
+type L2Info struct {
+	L2EpcID    uint32
+	DeviceType uint32
+	DeviceID   uint32
+}
+
 type Info struct {
 	Host       uint32
+	HostStr    string
 	HostID     uint32
+	Mac        uint64
 	RegionID   uint32
 	DeviceType uint32
 	DeviceID   uint32
@@ -51,6 +59,7 @@ type CidrInfo struct {
 type PlatformInfoTable struct {
 	epcIDIPV4Infos map[uint64]*Info
 	epcIDIPV6Infos map[EpcIDIPV6]*Info
+	macL2Infos     map[uint64]*L2Info
 
 	epcIDIPV4CidrInfos map[int32][]*CidrInfo
 	epcIDIPV6CidrInfos map[int32][]*CidrInfo
@@ -65,6 +74,14 @@ type PlatformInfoTable struct {
 
 func ClosePlatformInfoTable() {
 	platformInfoTable.Close()
+}
+
+func QueryMacL2Info(mac uint64) *L2Info {
+	return platformInfoTable.QueryMacL2Info(mac)
+}
+
+func QueryMacL2InfosPair(mac0, mac1 uint64) (*L2Info, *L2Info) {
+	return platformInfoTable.QueryMacL2InfosPair(mac0, mac1)
 }
 
 func QueryIPV4Infos(epcID int16, ipv4 uint32) *Info {
@@ -114,6 +131,29 @@ func (t *PlatformInfoTable) QueryIPV4Infos(epcID int16, ipv4 uint32) (info *Info
 	} else {
 		t.lock.RUnlock()
 	}
+	return
+}
+
+// 只有当l3_epc_id为正数时，才能查到l2Info
+func (t *PlatformInfoTable) QueryMacL2Info(mac uint64) *L2Info {
+	t.lock.RLock()
+	l2Info, ok := t.macL2Infos[mac]
+	if !ok {
+		log.Infof("can't find l2Info from mac(%x)", mac)
+	}
+	return l2Info
+}
+
+func (t *PlatformInfoTable) QueryMacL2InfosPair(mac0, mac1 uint64) (l2Info0 *L2Info, l2Info1 *L2Info) {
+	var ok0, ok1 bool
+	t.lock.RLock()
+	if l2Info0, ok0 = t.macL2Infos[mac0]; !ok0 {
+		log.Infof("can't find l2Info0 from mac(%x)", mac0)
+	}
+	if l2Info1, ok1 = t.macL2Infos[mac1]; !ok1 {
+		log.Infof("can't find l2Info1 from mac(%x)", mac1)
+	}
+	t.lock.RUnlock()
 	return
 }
 
@@ -238,8 +278,8 @@ func (t *PlatformInfoTable) String() string {
 	t.lock.RLock()
 
 	if len(t.epcIDIPV4Infos) > 0 {
-		sb.WriteString("\nepcID   ipv4              host            hostID  regionID  deviceType  deviceID    subnetID  podNodeID azID\n")
-		sb.WriteString("-------------------------------------------------------------------------------------------------------------------\n")
+		sb.WriteString("\nepcID   ipv4            mac          host            hostID  regionID  deviceType  deviceID    subnetID  podNodeID azID\n")
+		sb.WriteString("----------------------------------------------------------------------------------------------------------------------------\n")
 	}
 	epcIP4s := make([]uint64, 0)
 	for epcIP, _ := range t.epcIDIPV4Infos {
@@ -250,14 +290,14 @@ func (t *PlatformInfoTable) String() string {
 	})
 	for _, epcIP := range epcIP4s {
 		info := t.epcIDIPV4Infos[epcIP]
-		fmt.Fprintf(sb, "%-6d  %-15s   %-15s %-6d  %-7d   %-10d   %-7d    %-8d  %-9d %d\n", epcIP>>32, utils.IpFromUint32(uint32(epcIP)).String(),
-			utils.IpFromUint32(info.Host).String(), info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.AZID)
+		fmt.Fprintf(sb, "%-6d  %-15s %-12x %-15s %-6d  %-7d   %-10d   %-7d    %-8d  %-9d %d\n", epcIP>>32, utils.IpFromUint32(uint32(epcIP)).String(),
+			info.Mac, info.HostStr, info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.AZID)
 	}
 
 	if len(t.epcIDIPV6Infos) > 0 {
 		sb.WriteString("\n\n")
-		sb.WriteString("epcID   ipv6                                    host            hostID  regionID deviceType  deviceID subnetID  podNodeID azID\n")
-		sb.WriteString("--------------------------------------------------------------------------------------------------------------------------------- \n")
+		sb.WriteString("epcID   ipv6                                         mac          host            hostID  regionID deviceType  deviceID subnetID  podNodeID azID\n")
+		sb.WriteString("------------------------------------------------------------------------------------------------------------------------------------------------ \n")
 	}
 	epcIP6s := make([]EpcIDIPV6, 0)
 	for epcIP, _ := range t.epcIDIPV6Infos {
@@ -268,8 +308,8 @@ func (t *PlatformInfoTable) String() string {
 	})
 	for _, epcIP := range epcIP6s {
 		info := t.epcIDIPV6Infos[epcIP]
-		fmt.Fprintf(sb, "%-6d  %-44s   %-15s %-6d  %-7d  %-10d  %-7d  %-8d  %-9d %d\n", epcIP.EpcID, net.IP(epcIP.IP[:]).String(),
-			utils.IpFromUint32(info.Host).String(), info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.AZID)
+		fmt.Fprintf(sb, "%-6d  %-44s %-12x %-15s %-6d  %-7d  %-10d  %-7d  %-8d  %-9d %d\n", epcIP.EpcID, net.IP(epcIP.IP[:]).String(),
+			info.Mac, info.HostStr, info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.AZID)
 	}
 
 	if len(t.epcIDIPV4CidrInfos) > 0 || len(t.epcIDIPV6CidrInfos) > 0 {
@@ -335,10 +375,11 @@ func (t *PlatformInfoTable) Reload() error {
 
 	newEpcIDIPV4Infos := make(map[uint64]*Info)
 	newEpcIDIPV6Infos := make(map[EpcIDIPV6]*Info)
+	newMacL2Infos := make(map[uint64]*L2Info)
 	newEpcIDIPV4CidrInfos := make(map[int32][]*CidrInfo)
 	newEpcIDIPV6CidrInfos := make(map[int32][]*CidrInfo)
 	for _, intf := range platformData.GetInterfaces() {
-		updateInterfaceInfos(newEpcIDIPV4Infos, newEpcIDIPV6Infos, intf)
+		updateInterfaceInfos(newEpcIDIPV4Infos, newEpcIDIPV6Infos, newMacL2Infos, intf)
 	}
 	for _, cidr := range platformData.GetCidrs() {
 		updateCidrInfos(newEpcIDIPV4CidrInfos, newEpcIDIPV6CidrInfos, cidr)
@@ -346,6 +387,7 @@ func (t *PlatformInfoTable) Reload() error {
 	t.lock.Lock()
 	t.epcIDIPV4Infos = newEpcIDIPV4Infos
 	t.epcIDIPV6Infos = newEpcIDIPV6Infos
+	t.macL2Infos = newMacL2Infos
 	t.epcIDIPV4CidrInfos = newEpcIDIPV4CidrInfos
 	t.epcIDIPV6CidrInfos = newEpcIDIPV6CidrInfos
 	t.lock.Unlock()
@@ -414,7 +456,7 @@ func updateCidrInfos(IPV4CidrInfos, IPV6CidrInfos map[int32][]*CidrInfo, trident
 	}
 }
 
-func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[EpcIDIPV6]*Info, intf *trident.Interface) {
+func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[EpcIDIPV6]*Info, macL2Infos map[uint64]*L2Info, intf *trident.Interface) {
 	epcID := intf.GetEpcId()
 	// 由于doc中epcID为-1，对应trisolaris的epcID为0.故在此统一将收到epcID为0的，修改为-1，便于doc数据查找
 	if epcID == 0 {
@@ -426,6 +468,13 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[Ep
 	podNodeID := intf.GetPodNodeId()
 	azID := intf.GetAzId()
 	regionID := intf.GetRegionId()
+	mac := intf.GetMac()
+	macL2Infos[mac] = &L2Info{
+		L2EpcID:    epcID,
+		DeviceType: deviceType,
+		DeviceID:   deviceID,
+	}
+
 	hostStr := intf.GetLaunchServer()
 	host := uint32(0)
 	if hostStr != "" {
@@ -441,7 +490,9 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[Ep
 			ipU32 := utils.IpToUint32(utils.ParserStringIpV4(ipStr))
 			epcIDIPV4Infos[uint64(epcID)<<32|uint64(ipU32)] = &Info{
 				Host:       host,
+				HostStr:    hostStr,
 				HostID:     hostID,
+				Mac:        mac,
 				RegionID:   regionID,
 				DeviceType: deviceType,
 				DeviceID:   deviceID,
@@ -459,7 +510,9 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[Ep
 			copy(epcIDIPV6.IP[:], netIP)
 			epcIDIPV6Infos[epcIDIPV6] = &Info{
 				Host:       host,
+				HostStr:    hostStr,
 				HostID:     hostID,
+				Mac:        mac,
 				RegionID:   regionID,
 				DeviceType: deviceType,
 				DeviceID:   deviceID,
