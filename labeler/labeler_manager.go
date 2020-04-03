@@ -126,7 +126,8 @@ func (l *LabelerManager) OnAclDataChange(response *trident.SyncResponse) {
 	if update {
 		log.Infof("droplet grpc version ip-groups: %d, interfaces peer-connections and cidrs: %d, flow-acls: %d",
 			response.GetVersionGroups(), response.GetVersionPlatformData(), response.GetVersionAcls())
-		l.policyTable.UpdateInterfaceDataAndIpGroupData(l.rawPlatformDatas, l.rawIpGroupDatas)
+		l.policyTable.UpdateInterfaceData(l.rawPlatformDatas)
+		l.policyTable.UpdateIpGroupData(l.rawIpGroupDatas)
 		l.policyTable.UpdatePeerConnection(l.rawPeerConnection)
 		l.policyTable.UpdateCidrs(l.rawCidrs)
 		l.policyTable.UpdateAclData(l.rawPolicyData)
