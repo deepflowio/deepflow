@@ -70,7 +70,7 @@ func (f *FlowKey) Encode(encoder *codec.SimpleEncoder) {
 	f.TunnelInfo.Encode(encoder)
 
 	encoder.WriteU16(f.VtapId)
-	encoder.WriteU8(uint8(f.TapType))
+	encoder.WriteU16(uint16(f.TapType))
 	encoder.WriteU32(f.TapPort)
 
 	encoder.WriteU64(f.MACSrc)
@@ -95,7 +95,7 @@ func (f *FlowKey) Decode(decoder *codec.SimpleDecoder) {
 	f.TunnelInfo.Decode(decoder)
 
 	f.VtapId = decoder.ReadU16()
-	f.TapType = TapType(decoder.ReadU8())
+	f.TapType = TapType(decoder.ReadU16())
 	f.TapPort = decoder.ReadU32()
 
 	f.MACSrc = decoder.ReadU64()
