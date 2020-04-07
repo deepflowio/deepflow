@@ -71,6 +71,23 @@ enum SocketType {
     TCP = 1;
 }
 
+enum PacketType {
+    PACKET = 0;
+    SFLOW  = 1;
+    NETFLOW_V5   = 2;
+    NETSTREAM_V5 = 3;
+    NETFLOW_V9   = 4;
+    NETSTREAM_V9 = 5;
+}
+
+message TapType {
+    optional uint32 tap_type = 1;
+    optional PacketType packet_type = 2;
+    optional uint32 vlan      = 3;
+    optional string source_ip = 4;
+    optional uint32 tap_port  = 5;
+}
+
 message Config {
     optional bool    enabled              = 1 [default = true];
     optional uint32  max_cpus             = 2 [default = 2];
@@ -238,8 +255,8 @@ message SyncResponse {
 
     repeated Segment local_segments = 10;
     repeated Segment remote_segments = 11;
-    optional bytes platform_data = 12;
-    optional bytes flow_acls = 13;
-    optional bytes publish_acls = 14;
-    optional bytes groups = 15;
+    optional bytes platform_data = 12;  // 仅变化时下发
+    optional bytes flow_acls = 13;      // 仅变化时下发
+    optional bytes groups = 15;         // 仅变化时下发
+    repeated TapType tap_types = 16;
 }
