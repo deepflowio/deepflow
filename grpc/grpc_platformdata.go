@@ -141,6 +141,7 @@ func (t *PlatformInfoTable) QueryMacL2Info(mac uint64) *L2Info {
 	if !ok {
 		log.Infof("can't find l2Info from mac(%x)", mac)
 	}
+	t.lock.RUnlock()
 	return l2Info
 }
 
