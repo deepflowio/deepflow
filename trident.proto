@@ -72,12 +72,12 @@ enum SocketType {
 }
 
 enum PacketType {
-    PACKET = 0;
-    SFLOW  = 1;
-    NETFLOW_V5   = 2;
-    NETSTREAM_V5 = 3;
-    NETFLOW_V9   = 4;
-    NETSTREAM_V9 = 5;
+    PACKET = 1;
+    SFLOW  = 2;
+    NETFLOW_V5   = 3;
+    NETSTREAM_V5 = 4;
+    NETFLOW_V9   = 5;
+    NETSTREAM_V9 = 6;
 }
 
 message TapType {
