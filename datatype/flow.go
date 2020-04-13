@@ -67,6 +67,7 @@ type FlowKey struct {
 }
 
 func (_ *FlowKey) SequentialMerge(_ *FlowKey) {
+	// 所有字段均无需改变
 }
 
 func (f *FlowKey) Encode(encoder *codec.SimpleEncoder) {
@@ -175,6 +176,12 @@ func (f *TcpPerfStats) SequentialMerge(rhs *TcpPerfStats) {
 	f.TcpPerfCountsPeers[0].SequentialMerge(&rhs.TcpPerfCountsPeers[0])
 	f.TcpPerfCountsPeers[1].SequentialMerge(&rhs.TcpPerfCountsPeers[1])
 	f.TotalRetransCount = rhs.TotalRetransCount
+}
+
+func (f *TcpPerfStats) Reverse() {
+	f.RTTClientSum, f.RTTServerSum = f.RTTServerSum, f.RTTClientSum
+	f.RTTClientCount, f.RTTServerCount = f.RTTServerCount, f.RTTClientCount
+	f.TcpPerfCountsPeers[0], f.TcpPerfCountsPeers[1] = f.TcpPerfCountsPeers[1], f.TcpPerfCountsPeers[0]
 }
 
 func (f *TcpPerfStats) Encode(encoder *codec.SimpleEncoder) {
@@ -312,6 +319,8 @@ type Flow struct {
 	Reversed        bool
 }
 
+// FIXME 注意：由于FlowGenerator中TcpPerfStats在Flow方向调整之后才获取到，
+// 因此这里不包含对TcpPerfStats的反向。
 func (f *Flow) Reverse() {
 	f.Reversed = !f.Reversed
 	f.TunnelInfo.Src, f.TunnelInfo.Dst = f.TunnelInfo.Dst, f.TunnelInfo.Src
@@ -328,6 +337,8 @@ func (f *Flow) SequentialMerge(rhs *Flow) {
 	f.FlowKey.SequentialMerge(&rhs.FlowKey)
 	f.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].SequentialMerge(&rhs.FlowMetricsPeers[FLOW_METRICS_PEER_SRC])
 	f.FlowMetricsPeers[FLOW_METRICS_PEER_DST].SequentialMerge(&rhs.FlowMetricsPeers[FLOW_METRICS_PEER_DST])
+
+	f.Duration = rhs.Duration
 
 	f.TcpPerfStats.SequentialMerge(rhs.TcpPerfStats)
 
