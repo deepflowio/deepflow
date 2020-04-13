@@ -8,6 +8,7 @@ import "common.proto";
 service Synchronizer {
     rpc Sync (SyncRequest) returns (SyncResponse) {}
     rpc Push (SyncRequest) returns (stream SyncResponse) {}
+    rpc AnalyzerSync (SyncRequest) returns (SyncResponse) {}
 }
 
 enum State {
