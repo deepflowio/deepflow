@@ -45,6 +45,27 @@ const (
 	FloatingIP
 )
 
+type FlowSource uint8
+
+const (
+	FLOW_SOURCE_NORMAL FlowSource = iota
+	FLOW_SOURCE_SFLOW
+	FLOW_SOURCE_NETFLOW
+)
+
+func (t FlowSource) String() string {
+	switch t {
+	case FLOW_SOURCE_NORMAL:
+		return "normal"
+	case FLOW_SOURCE_SFLOW:
+		return "sflow"
+	case FLOW_SOURCE_NETFLOW:
+		return "netflow"
+	default:
+		return "unkown flow source"
+	}
+}
+
 type FlowKey struct {
 	TunnelInfo
 
@@ -313,6 +334,7 @@ type Flow struct {
 	*TcpPerfStats
 
 	CloseType
+	FlowSource
 	IsActiveService bool
 	QueueHash       uint8
 	IsNewFlow       bool
@@ -372,6 +394,7 @@ func (f *Flow) Encode(encoder *codec.SimpleEncoder) {
 	}
 
 	encoder.WriteU8(uint8(f.CloseType))
+	encoder.WriteU8(uint8(f.FlowSource))
 	encoder.WriteBool(f.IsActiveService)
 	// encoder.WriteU8(f.QueueHash)
 	// encoder.WriteBool(f.IsNewFlow)
@@ -403,6 +426,7 @@ func (f *Flow) Decode(decoder *codec.SimpleDecoder) {
 	}
 
 	f.CloseType = CloseType(decoder.ReadU8())
+	f.FlowSource = FlowSource(decoder.ReadU8())
 	f.IsActiveService = decoder.ReadBool()
 	// f.QueueHash = decoder.ReadU8()
 	// f.IsNewFlow = decoder.ReadBool()
@@ -466,6 +490,7 @@ func (f *FlowMetricsPeer) String() string {
 
 func (f *Flow) String() string {
 	formatted := fmt.Sprintf("FlowID: %d ", f.FlowID)
+	formatted += fmt.Sprintf("FlowSource: %s ", f.FlowSource.String())
 	formatted += fmt.Sprintf("Exporter: %s ", IpFromUint32(f.Exporter))
 	formatted += fmt.Sprintf("CloseType: %d ", f.CloseType)
 	formatted += fmt.Sprintf("IsActiveService: %v ", f.IsActiveService)
