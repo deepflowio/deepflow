@@ -18,6 +18,11 @@ type TaggedFlow struct {
 	pool.ReferenceCount
 }
 
+func (f *TaggedFlow) SequentialMerge(rhs *TaggedFlow) {
+	f.Flow.SequentialMerge(&rhs.Flow)
+	// f.Tag.SequentialMerge(rhs.Tag)  // 目前无需发送,不merge
+}
+
 func (f *TaggedFlow) Encode(encoder *codec.SimpleEncoder) error {
 	f.Flow.Encode(encoder)
 	// f.Tag.Encode(encoder)  // 目前无需发送,不encode

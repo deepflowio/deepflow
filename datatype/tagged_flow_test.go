@@ -48,15 +48,14 @@ func TestTaggedFlowEncodeDecode(t *testing.T) {
 		IsActiveHost:     true,
 	}
 
-	TcpPerfCountsPeer := TcpPerfCountsPeer{
+	tcpPerfCountsPeer := TcpPerfCountsPeer{
 		RetransCount: 601,
 		ZeroWinCount: 602,
 	}
 
 	TcpPerfStats := TcpPerfStats{
-		TcpPerfCountsPeerSrc: TcpPerfCountsPeerSrc(TcpPerfCountsPeer),
-		TcpPerfCountsPeerDst: TcpPerfCountsPeerDst(TcpPerfCountsPeer),
-		TotalRetransCount:    508,
+		TcpPerfCountsPeers: [2]TcpPerfCountsPeer{tcpPerfCountsPeer, tcpPerfCountsPeer},
+		TotalRetransCount:  508,
 	}
 
 	Flow := Flow{
@@ -104,12 +103,12 @@ func TestTaggedFlowEncodeDecodeiNul(t *testing.T) {
 		IP6Dst: []byte{3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3},
 	}
 
-	TcpPerfCountsPeer := TcpPerfCountsPeer{
+	tcpPerfCountsPeer := TcpPerfCountsPeer{
 		ZeroWinCount: 603,
 	}
 
 	TcpPerfStats := TcpPerfStats{
-		TcpPerfCountsPeerSrc: TcpPerfCountsPeerSrc(TcpPerfCountsPeer),
+		TcpPerfCountsPeers: [2]TcpPerfCountsPeer{tcpPerfCountsPeer},
 	}
 
 	Flow := Flow{

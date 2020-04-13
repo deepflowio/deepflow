@@ -77,10 +77,10 @@ func MarshalFlow(f *datatype.TaggedFlow, bytes *utils.ByteBuffer) error {
 		flow.RttServerAvg = proto.Uint64(uint64(f.RTTServerSum / f.RTTServerCount))
 		flow.SrtAvg = proto.Uint64(uint64(f.SRTSum / f.SRTCount))
 		flow.ArtAvg = proto.Uint64(uint64(f.ARTSum / f.ARTCount))
-		flow.RetransCnt_0 = proto.Uint64(uint64(f.TcpPerfCountsPeerSrc.RetransCount))
-		flow.RetransCnt_1 = proto.Uint64(uint64(f.TcpPerfCountsPeerDst.RetransCount))
-		flow.ZeroWndCnt_0 = proto.Uint64(uint64(f.TcpPerfCountsPeerSrc.ZeroWinCount))
-		flow.ZeroWndCnt_1 = proto.Uint64(uint64(f.TcpPerfCountsPeerDst.ZeroWinCount))
+		flow.RetransCnt_0 = proto.Uint64(uint64(f.TcpPerfCountsPeers[0].RetransCount))
+		flow.RetransCnt_1 = proto.Uint64(uint64(f.TcpPerfCountsPeers[0].RetransCount))
+		flow.ZeroWndCnt_0 = proto.Uint64(uint64(f.TcpPerfCountsPeers[1].ZeroWinCount))
+		flow.ZeroWndCnt_1 = proto.Uint64(uint64(f.TcpPerfCountsPeers[1].ZeroWinCount))
 		flow.TotalRetransCnt = proto.Uint64(uint64(f.TotalRetransCount))
 	}
 

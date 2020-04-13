@@ -66,6 +66,9 @@ type FlowKey struct {
 	Proto   layers.IPProtocol
 }
 
+func (_ *FlowKey) SequentialMerge(_ *FlowKey) {
+}
+
 func (f *FlowKey) Encode(encoder *codec.SimpleEncoder) {
 	f.TunnelInfo.Encode(encoder)
 
@@ -127,6 +130,11 @@ type TcpPerfCountsPeer struct {
 	ZeroWinCount uint32
 }
 
+func (f *TcpPerfCountsPeer) SequentialMerge(rhs *TcpPerfCountsPeer) {
+	f.RetransCount += rhs.RetransCount
+	f.ZeroWinCount += rhs.ZeroWinCount
+}
+
 func (t *TcpPerfCountsPeer) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU32(t.RetransCount)
 	encoder.WriteVarintU32(t.ZeroWinCount)
@@ -135,25 +143,6 @@ func (t *TcpPerfCountsPeer) Encode(encoder *codec.SimpleEncoder) {
 func (t *TcpPerfCountsPeer) Decode(decoder *codec.SimpleDecoder) {
 	t.RetransCount = decoder.ReadVarintU32()
 	t.ZeroWinCount = decoder.ReadVarintU32()
-}
-
-type TcpPerfCountsPeerSrc TcpPerfCountsPeer
-type TcpPerfCountsPeerDst TcpPerfCountsPeer
-
-func (t *TcpPerfCountsPeerSrc) Encode(encoder *codec.SimpleEncoder) {
-	(*TcpPerfCountsPeer)(t).Encode(encoder)
-}
-
-func (t *TcpPerfCountsPeerSrc) Decode(decoder *codec.SimpleDecoder) {
-	(*TcpPerfCountsPeer)(t).Decode(decoder)
-}
-
-func (t *TcpPerfCountsPeerDst) Encode(encoder *codec.SimpleEncoder) {
-	(*TcpPerfCountsPeer)(t).Encode(encoder)
-}
-
-func (t *TcpPerfCountsPeerDst) Decode(decoder *codec.SimpleDecoder) {
-	(*TcpPerfCountsPeer)(t).Decode(decoder)
 }
 
 type TcpPerfStats struct { // 除特殊说明外，均为每个流统计周期（目前是自然分）清零
@@ -167,9 +156,25 @@ type TcpPerfStats struct { // 除特殊说明外，均为每个流统计周期�
 	RTTServerCount uint32
 	SRTCount       uint32
 	ARTCount       uint32
-	TcpPerfCountsPeerSrc
-	TcpPerfCountsPeerDst
-	TotalRetransCount uint32 // 整个Flow生命周期的统计量
+
+	TcpPerfCountsPeers [2]TcpPerfCountsPeer
+	TotalRetransCount  uint32 // 整个Flow生命周期的统计量
+}
+
+func (f *TcpPerfStats) SequentialMerge(rhs *TcpPerfStats) {
+	f.RTTSum += rhs.RTTSum
+	f.RTTClientSum += rhs.RTTClientSum
+	f.RTTServerSum += rhs.RTTServerSum
+	f.SRTSum += rhs.SRTSum
+	f.ARTSum += rhs.ARTSum
+	f.RTTCount += rhs.RTTCount
+	f.RTTClientCount += rhs.RTTClientCount
+	f.RTTServerCount += rhs.RTTServerCount
+	f.SRTCount += rhs.SRTCount
+	f.ARTCount += rhs.ARTCount
+	f.TcpPerfCountsPeers[0].SequentialMerge(&rhs.TcpPerfCountsPeers[0])
+	f.TcpPerfCountsPeers[1].SequentialMerge(&rhs.TcpPerfCountsPeers[1])
+	f.TotalRetransCount = rhs.TotalRetransCount
 }
 
 func (f *TcpPerfStats) Encode(encoder *codec.SimpleEncoder) {
@@ -184,8 +189,8 @@ func (f *TcpPerfStats) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU32(f.SRTCount)
 	encoder.WriteVarintU32(f.ARTCount)
 
-	f.TcpPerfCountsPeerSrc.Encode(encoder)
-	f.TcpPerfCountsPeerDst.Encode(encoder)
+	f.TcpPerfCountsPeers[0].Encode(encoder)
+	f.TcpPerfCountsPeers[1].Encode(encoder)
 
 	encoder.WriteVarintU32(f.TotalRetransCount)
 }
@@ -202,18 +207,16 @@ func (f *TcpPerfStats) Decode(decoder *codec.SimpleDecoder) {
 	f.SRTCount = decoder.ReadVarintU32()
 	f.ARTCount = decoder.ReadVarintU32()
 
-	f.TcpPerfCountsPeerSrc.Decode(decoder)
-	f.TcpPerfCountsPeerDst.Decode(decoder)
+	f.TcpPerfCountsPeers[0].Decode(decoder)
+	f.TcpPerfCountsPeers[1].Decode(decoder)
 
 	f.TotalRetransCount = decoder.ReadVarintU32()
 }
 
 type FlowMetricsPeer struct {
 	// 注意字节对齐!
-	TickByteCount    uint64        // 每个包统计周期（目前是自然秒）清零
-	TickPacketCount  uint64        // 每个包统计周期（目前是自然秒）清零
-	ByteCount        uint64        // 每个流统计周期（目前是自然分）清零
-	PacketCount      uint64        // 每个流统计周期（目前是自然分）清零
+	ByteCount        uint64        // 每个流统计周期（目前是自然秒）清零
+	PacketCount      uint64        // 每个流统计周期（目前是自然秒）清零
 	TotalByteCount   uint64        // 整个Flow生命周期的统计量
 	TotalPacketCount uint64        // 整个Flow生命周期的统计量
 	First, Last      time.Duration // 整个Flow生命周期首包和尾包的时间戳
@@ -225,9 +228,22 @@ type FlowMetricsPeer struct {
 	IsDevice         bool // true表明是从平台数据中获取的
 }
 
+func (f *FlowMetricsPeer) SequentialMerge(rhs *FlowMetricsPeer) {
+	f.ByteCount += rhs.ByteCount
+	f.PacketCount += rhs.PacketCount
+	f.TotalByteCount = rhs.TotalByteCount
+	f.TotalPacketCount = rhs.TotalPacketCount
+	f.First = rhs.First
+	f.Last = rhs.Last
+	f.TCPFlags |= rhs.TCPFlags
+	f.L3EpcID = rhs.L3EpcID
+	f.IsL2End = rhs.IsL2End
+	f.IsL3End = rhs.IsL3End
+	f.IsActiveHost = rhs.IsActiveHost
+	f.IsDevice = rhs.IsDevice
+}
+
 func (f *FlowMetricsPeer) Encode(encoder *codec.SimpleEncoder) {
-	// encoder.WriteVarintU64(f.TickByteCount)
-	// encoder.WriteVarintU64(f.TickPacketCount)
 	encoder.WriteVarintU64(f.ByteCount)
 	encoder.WriteVarintU64(f.PacketCount)
 	encoder.WriteVarintU64(f.TotalByteCount)
@@ -245,8 +261,6 @@ func (f *FlowMetricsPeer) Encode(encoder *codec.SimpleEncoder) {
 }
 
 func (f *FlowMetricsPeer) Decode(decoder *codec.SimpleDecoder) {
-	// f.TickByteCount = decoder.ReadVarintU64()
-	// f.TickPacketCount = decoder.ReadVarintU64()
 	f.ByteCount = decoder.ReadVarintU64()
 	f.PacketCount = decoder.ReadVarintU64()
 	f.TotalByteCount = decoder.ReadVarintU64()
@@ -279,11 +293,10 @@ type Flow struct {
 	Exporter uint32
 
 	/* Timers */
-	StartTime      time.Duration
-	EndTime        time.Duration
-	Duration       time.Duration
-	PacketStatTime time.Duration // 取整至包统计周期的开始
-	FlowStatTime   time.Duration // 取整至流统计周期的开始
+	StartTime    time.Duration
+	EndTime      time.Duration
+	Duration     time.Duration
+	FlowStatTime time.Duration // 取整至流统计周期的开始
 
 	/* L2 */
 	VLAN    uint16
@@ -296,6 +309,31 @@ type Flow struct {
 	IsActiveService bool
 	QueueHash       uint8
 	IsNewFlow       bool
+	Reversed        bool
+}
+
+func (f *Flow) Reverse() {
+	f.Reversed = !f.Reversed
+	f.TunnelInfo.Src, f.TunnelInfo.Dst = f.TunnelInfo.Dst, f.TunnelInfo.Src
+	f.MACSrc, f.MACDst = f.MACDst, f.MACSrc
+	f.IPSrc, f.IPDst = f.IPDst, f.IPSrc
+	f.IP6Src, f.IP6Dst = f.IP6Dst, f.IP6Src
+	f.PortSrc, f.PortDst = f.PortDst, f.PortSrc
+	flowMetricsPeerSrc := &f.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst := &f.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
+	*flowMetricsPeerSrc, *flowMetricsPeerDst = *flowMetricsPeerDst, *flowMetricsPeerSrc
+}
+
+func (f *Flow) SequentialMerge(rhs *Flow) {
+	f.FlowKey.SequentialMerge(&rhs.FlowKey)
+	f.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].SequentialMerge(&rhs.FlowMetricsPeers[FLOW_METRICS_PEER_SRC])
+	f.FlowMetricsPeers[FLOW_METRICS_PEER_DST].SequentialMerge(&rhs.FlowMetricsPeers[FLOW_METRICS_PEER_DST])
+
+	f.TcpPerfStats.SequentialMerge(rhs.TcpPerfStats)
+
+	f.CloseType = rhs.CloseType
+	f.IsActiveService = rhs.IsActiveService
+	f.Reversed = rhs.Reversed
 }
 
 func (f *Flow) Encode(encoder *codec.SimpleEncoder) {
@@ -310,8 +348,7 @@ func (f *Flow) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU64(uint64(f.StartTime))
 	encoder.WriteU64(uint64(f.EndTime))
 	encoder.WriteU64(uint64(f.Duration))
-	// encoder.WriteU64(uint64(f.PacketStatTime)) // 目前无需发送，不用encode(下面注释掉的，同理)
-	// encoder.WriteU64(uint64(f.FlowStatTime))
+	// encoder.WriteU64(uint64(f.FlowStatTime)) // 目前无需发送，不用encode(下面注释掉的，同理)
 
 	// encoder.WriteU16(f.VLAN)
 	encoder.WriteU16(uint16(f.EthType))
@@ -327,6 +364,7 @@ func (f *Flow) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteBool(f.IsActiveService)
 	// encoder.WriteU8(f.QueueHash)
 	// encoder.WriteBool(f.IsNewFlow)
+	// encoder.WriteBool(f.Reversed)
 }
 
 func (f *Flow) Decode(decoder *codec.SimpleDecoder) {
@@ -341,7 +379,6 @@ func (f *Flow) Decode(decoder *codec.SimpleDecoder) {
 	f.StartTime = time.Duration(decoder.ReadU64())
 	f.EndTime = time.Duration(decoder.ReadU64())
 	f.Duration = time.Duration(decoder.ReadU64())
-	// f.PacketStatTime = time.Duration(decoder.ReadU64())
 	// f.FlowStatTime = time.Duration(decoder.ReadU64())
 
 	// f.VLAN = decoder.ReadU16()
@@ -358,6 +395,7 @@ func (f *Flow) Decode(decoder *codec.SimpleDecoder) {
 	f.IsActiveService = decoder.ReadBool()
 	// f.QueueHash = decoder.ReadU8()
 	// f.IsNewFlow = decoder.ReadBool()
+	// f.Reversed = decoder.ReadBool()
 }
 
 func (t *TcpPerfStats) String() string {
@@ -370,7 +408,10 @@ func (t *TcpPerfStats) String() string {
 	typeOf := reflect.TypeOf(*t)
 	valueOf := reflect.ValueOf(*t)
 	for i := 0; i < typeOf.NumField(); i++ {
-		formatted += fmt.Sprintf("%v: %v ", typeOf.Field(i).Name, valueOf.Field(i))
+		if i > 0 {
+			formatted += " "
+		}
+		formatted += fmt.Sprintf("%v: %v", typeOf.Field(i).Name, valueOf.Field(i))
 	}
 	return formatted
 }
@@ -379,7 +420,7 @@ func (f *FlowKey) String() string {
 	formatted := ""
 	formatted += fmt.Sprintf("TunnelInfo: {%s} ", f.TunnelInfo.String())
 	formatted += fmt.Sprintf("VtapId: %d ", f.VtapId)
-	formatted += fmt.Sprintf("TapType: %d\n", f.TapType)
+	formatted += fmt.Sprintf("TapType: %d ", f.TapType)
 	formatted += fmt.Sprintf("TapPort: 0x%x\n", f.TapPort)
 	formatted += fmt.Sprintf("\tMACSrc: %s ", Uint64ToMac(f.MACSrc))
 	formatted += fmt.Sprintf("MACDst: %s ", Uint64ToMac(f.MACDst))
@@ -417,14 +458,15 @@ func (f *Flow) String() string {
 	formatted += fmt.Sprintf("Exporter: %s ", IpFromUint32(f.Exporter))
 	formatted += fmt.Sprintf("CloseType: %d ", f.CloseType)
 	formatted += fmt.Sprintf("IsActiveService: %v ", f.IsActiveService)
+	formatted += fmt.Sprintf("IsNewFlow: %v ", f.IsNewFlow)
 	formatted += fmt.Sprintf("QueueHash: %d ", f.QueueHash)
-	formatted += fmt.Sprintf("PacketStatTime: %d ", f.PacketStatTime/time.Second)
 	formatted += fmt.Sprintf("FlowStatTime: %d\n", f.FlowStatTime/time.Second)
 	formatted += fmt.Sprintf("\tStartTime: %d ", f.StartTime)
 	formatted += fmt.Sprintf("EndTime: %d ", f.EndTime)
 	formatted += fmt.Sprintf("Duration: %d\n", f.Duration)
 	formatted += fmt.Sprintf("\tVLAN: %d ", f.VLAN)
 	formatted += fmt.Sprintf("EthType: %d ", f.EthType)
+	formatted += fmt.Sprintf("Reversed: %v ", f.Reversed)
 	formatted += fmt.Sprintf("%s\n", f.FlowKey.String())
 	formatted += fmt.Sprintf("\tFlowMetricsPeerSrc: {%s}\n", f.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].String())
 	formatted += fmt.Sprintf("\tFlowMetricsPeerDst: {%s}", f.FlowMetricsPeers[FLOW_METRICS_PEER_DST].String())
