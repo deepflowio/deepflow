@@ -50,7 +50,6 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 
 	return &datatype.PlatformData{
 		Mac:    macInt,
-		TapMac: vifData.GetTapMac(),
 		Ips:    ips,
 		EpcId:  epcId,
 		IfType: uint8(vifData.GetIfType()),
