@@ -131,3 +131,5 @@ func TestTaggedFlowEncodeDecodeiNul(t *testing.T) {
 		t.Errorf("flow encode和decode结果不一致 \nencode=%s  \ndecode=%s", ef, df)
 	}
 }
+
+// FIXME: 测试SequencialMerge和Reverse
