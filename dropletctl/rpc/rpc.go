@@ -147,8 +147,8 @@ func formatString(data *trident.Interface) string {
 	buffer.WriteString(fmt.Sprintf(format, utils.Uint64ToMac(data.GetMac()), data.GetEpcId(),
 		data.GetDeviceType(), data.GetDeviceId(), data.GetIfType(),
 		data.GetLaunchServer(), data.GetLaunchServerId(), data.GetRegionId()))
-	if data.GetPodNodeId() > 0 || data.GetTapMac() != 0 {
-		buffer.WriteString(fmt.Sprintf("PodNodeId: %d TapMac: %s ", data.GetPodNodeId(), utils.Uint64ToMac(data.GetTapMac())))
+	if data.GetPodNodeId() > 0 {
+		buffer.WriteString(fmt.Sprintf("PodNodeId: %d", data.GetPodNodeId()))
 	}
 	if len(data.GetIpResources()) > 0 {
 		buffer.WriteString(fmt.Sprintf("IpResources: %v", data.GetIpResources()))
