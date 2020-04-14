@@ -56,7 +56,7 @@ func (s *RpcConfigSynchronizer) sync() error {
 			VersionGroups:       proto.Uint64(s.VersionGroups),
 		}
 		client := trident.NewSynchronizerClient(s.PollingSession.GetClient())
-		response, err = client.Sync(ctx, &request)
+		response, err = client.AnalyzerSync(ctx, &request)
 
 		return err
 	})
