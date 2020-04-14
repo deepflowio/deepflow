@@ -360,6 +360,7 @@ func (f *Flow) SequentialMerge(rhs *Flow) {
 	f.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].SequentialMerge(&rhs.FlowMetricsPeers[FLOW_METRICS_PEER_SRC])
 	f.FlowMetricsPeers[FLOW_METRICS_PEER_DST].SequentialMerge(&rhs.FlowMetricsPeers[FLOW_METRICS_PEER_DST])
 
+	f.EndTime = rhs.EndTime
 	f.Duration = rhs.Duration
 
 	f.TcpPerfStats.SequentialMerge(rhs.TcpPerfStats)
