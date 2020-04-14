@@ -348,7 +348,8 @@ func (t *PlatformInfoTable) Reload() error {
 			ProcessName:         proto.String(t.processName),
 		}
 		client := trident.NewSynchronizerClient(t.GetClient())
-		response, err = client.Sync(ctx, &request)
+		// 分析器请求消息接口，用于stream, roze
+		response, err = client.AnalyzerSync(ctx, &request)
 		return err
 	})
 	if err != nil {
