@@ -111,7 +111,7 @@ message Config {
     optional IfMacSource if_mac_source     = 20 [default = IF_MAC];
     optional bool    flow_store_enabled   = 21 [default = false];
 
-    optional string  analyzer_ip          = 31;
+    optional string  analyzer_ip          = 31 [default = "127.0.0.1"];
     optional uint32  max_escape_seconds   = 32;
 
     repeated string  corefile_dirs        = 33;
