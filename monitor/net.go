@@ -6,6 +6,7 @@ import (
 	"github.com/shirou/gopsutil/net"
 
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 var (
@@ -26,7 +27,7 @@ type NetCounter struct {
 }
 
 type NetworkMonitor struct {
-	stats.Closable
+	utils.Closable
 
 	old, new net.IOCountersStat
 }

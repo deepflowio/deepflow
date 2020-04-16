@@ -20,6 +20,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 var log = logging.MustGetLogger("store")
@@ -116,7 +117,7 @@ type WriterInfo struct {
 	writeTime   int64
 	pointCache  map[string]*PointCache
 	counter     *Counter
-	stats.Closable
+	utils.Closable
 }
 
 type DBCreateCtl struct {

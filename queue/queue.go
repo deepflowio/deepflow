@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
-	. "gitlab.x.lan/yunshan/droplet-libs/utils"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 var OverflowError = errors.New("Requested size is larger than capacity")
@@ -25,7 +25,7 @@ type Counter struct {
 }
 
 type OverwriteQueue struct {
-	stats.Closable
+	utils.Closable
 	sync.Mutex
 
 	writeLock     sync.Mutex
@@ -85,6 +85,9 @@ func (q *OverwriteQueue) Init(module string, size int, options ...Option) {
 		go func() {
 			for range time.NewTicker(flushIndicator).C {
 				q.Put(nil)
+				if q.Closed() {
+					break
+				}
 			}
 		}()
 	}
@@ -156,7 +159,7 @@ func (q *OverwriteQueue) Put(items ...interface{}) error {
 	if !locked {
 		q.Lock()
 	}
-	q.pending = UintMin(q.pending+itemSize, q.size)
+	q.pending = utils.UintMin(q.pending+itemSize, q.size)
 	q.writeCursor = (q.writeCursor + itemSize) & (q.size - 1)
 	q.Unlock()
 
@@ -200,7 +203,7 @@ func (q *OverwriteQueue) Get() interface{} { // will block
 }
 
 func (q *OverwriteQueue) gets(output []interface{}) int {
-	size := UintMin(uint(len(output)), q.pending)
+	size := utils.UintMin(uint(len(output)), q.pending)
 	output = output[:size]
 	first := q.firstIndex()
 	copied := copy(output, q.items[first:])
