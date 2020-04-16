@@ -3,10 +3,12 @@ package stats
 import (
 	"runtime"
 	"time"
+
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 type GcMonitor struct {
-	Closable
+	utils.Closable
 
 	lastPauseDuration uint64
 }

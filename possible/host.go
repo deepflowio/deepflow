@@ -5,8 +5,7 @@ import (
 	"sync"
 
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/lru"
-	"gitlab.x.lan/yunshan/droplet-libs/stats"
-	. "gitlab.x.lan/yunshan/droplet-libs/utils"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 type PossibleHost struct {
@@ -29,7 +28,7 @@ func (p *PossibleHost) Add(host uint32, epcId int32) {
 }
 
 func (p *PossibleHost) Add6(host net.IP, epcId int32) {
-	key := uint64(1<<48) | uint64(epcId&0xffff)<<32 | uint64(GetIpHash(host))
+	key := uint64(1<<48) | uint64(epcId&0xffff)<<32 | uint64(utils.GetIpHash(host))
 	value := true
 	p.hostMapMutex.Lock()
 	p.hostMap.Add(key, &value)
@@ -45,13 +44,13 @@ func (p *PossibleHost) Check(host uint32, epcId int32) bool {
 }
 
 func (p *PossibleHost) Check6(host net.IP, epcId int32) bool {
-	key := uint64(1<<48) | uint64(epcId&0xffff)<<32 | uint64(GetIpHash(host))
+	key := uint64(1<<48) | uint64(epcId&0xffff)<<32 | uint64(utils.GetIpHash(host))
 	p.hostMapMutex.RLock()
 	_, ok := p.hostMap.Get(key, true)
 	p.hostMapMutex.RUnlock()
 	return ok
 }
 
-func (p *PossibleHost) StatsClosables() []*stats.Closable {
-	return []*stats.Closable{&p.hostMap.Closable}
+func (p *PossibleHost) Closables() []*utils.Closable {
+	return []*utils.Closable{&p.hostMap.Closable}
 }

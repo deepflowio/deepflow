@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 const (
@@ -52,7 +52,7 @@ var packetDedupMapNodeBlockPool = sync.Pool{New: func() interface{} {
 
 // 注意：不是线程安全的，且要求Packet的时间戳是非降序列
 type PacketDedupMap struct {
-	stats.Closable
+	utils.Closable
 	counter *PacketDedupMapCounter
 
 	ignoreTTL        bool                      // 比较包头内容时，是否忽略TTL的差异

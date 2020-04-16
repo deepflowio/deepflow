@@ -5,6 +5,7 @@ import (
 
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/keyhash"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 type u64LRUNode struct {
@@ -27,7 +28,7 @@ var u64LRUNodeBlockPool = sync.Pool{New: func() interface{} {
 
 // 注意：不是线程安全的
 type U64LRU struct {
-	stats.Closable
+	utils.Closable
 
 	ringBuffer       []u64LRUNodeBlock // 存储Map节点，以矩阵环的方式组织，提升内存申请释放效率
 	bufferStartIndex int32             // ringBuffer中的开始下标（二维矩阵下标），闭区间

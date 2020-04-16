@@ -1,10 +1,11 @@
-package utils
+package timedtagmap
 
 import (
 	"strconv"
 
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 type TagID int32
@@ -39,7 +40,7 @@ type TagIDPair struct {
 }
 
 type TimedTagMap struct {
-	stats.Closable
+	utils.Closable
 
 	tagIDMap   map[string][]TagID
 	tagIDPairs [][]TagIDPair

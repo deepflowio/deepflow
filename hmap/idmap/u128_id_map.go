@@ -6,6 +6,7 @@ import (
 
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/keyhash"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 type u128IDMapNode struct {
@@ -31,7 +32,7 @@ var u128IDMapNodeBlockPool = sync.Pool{New: func() interface{} {
 
 // 注意：不是线程安全的
 type U128IDMap struct {
-	stats.Closable
+	utils.Closable
 
 	buffer []u128IDMapNodeBlock // 存储Map节点，以矩阵的方式组织，提升内存申请释放效率
 

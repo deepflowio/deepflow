@@ -8,6 +8,7 @@ import (
 
 	"github.com/influxdata/influxdb/client/v2"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 const (
@@ -66,7 +67,7 @@ type Repair struct {
 
 	replicaDBs map[string]bool // 标识是否有数据库，没有的话，需要创建
 	counter    CounterRepair
-	stats.Closable
+	utils.Closable
 }
 
 type CounterRepair struct {

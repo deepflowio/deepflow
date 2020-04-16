@@ -4,10 +4,11 @@ import (
 	"github.com/shirou/gopsutil/load"
 
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
 type LoadMonitor struct {
-	stats.Closable
+	utils.Closable
 }
 
 func (m *LoadMonitor) GetCounter() interface{} {
