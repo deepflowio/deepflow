@@ -363,7 +363,10 @@ func (f *Flow) SequentialMerge(rhs *Flow) {
 	f.EndTime = rhs.EndTime
 	f.Duration = rhs.Duration
 
-	if f.TcpPerfStats != nil && rhs.TcpPerfStats != nil {
+	if rhs.TcpPerfStats != nil {
+		if f.TcpPerfStats == nil {
+			f.TcpPerfStats = AcquireTcpPerfStats()
+		}
 		f.TcpPerfStats.SequentialMerge(rhs.TcpPerfStats)
 	}
 
