@@ -363,7 +363,9 @@ func (f *Flow) SequentialMerge(rhs *Flow) {
 	f.EndTime = rhs.EndTime
 	f.Duration = rhs.Duration
 
-	f.TcpPerfStats.SequentialMerge(rhs.TcpPerfStats)
+	if f.TcpPerfStats != nil && rhs.TcpPerfStats != nil {
+		f.TcpPerfStats.SequentialMerge(rhs.TcpPerfStats)
+	}
 
 	f.CloseType = rhs.CloseType
 	f.IsActiveService = rhs.IsActiveService
