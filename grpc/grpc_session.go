@@ -47,6 +47,9 @@ func (s *GrpcSession) nextServer() error {
 		s.ipIndex = 0
 	}
 	server := fmt.Sprintf("%s:%d", s.ips[s.ipIndex], s.port)
+	if s.ips[s.ipIndex].To4() == nil {
+		server = fmt.Sprintf("[%s]:%d", s.ips[s.ipIndex], s.port)
+	}
 	size := 1024 * 1024 * 20
 	options := make([]grpc.DialOption, 0, 4)
 	options = append(options, grpc.WithInsecure(), grpc.WithTimeout(s.syncInterval),
