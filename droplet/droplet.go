@@ -1,11 +1,9 @@
 package droplet
 
 import (
-	"errors"
 	"io"
 	"net"
 	_ "net/http/pprof"
-	"os"
 	"runtime"
 	"time"
 
@@ -34,25 +32,6 @@ const (
 	DEBUG_LISTEN_PORT   = 9527
 )
 
-func getLocalIp() (net.IP, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, err
-	}
-
-	addrs, err := net.LookupHost(hostname)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, addr := range addrs {
-		if ip := net.ParseIP(addr).To4(); ip != nil {
-			return ip, nil
-		}
-	}
-	return nil, errors.New("Unable to resolve local ip by hostname")
-}
-
 func Start(configPath string) (closers []io.Closer) {
 	cfg := config.Load(configPath)
 	logger.EnableFileLog(cfg.LogFile)
@@ -75,7 +54,12 @@ func Start(configPath string) (closers []io.Closer) {
 
 	controllers := make([]net.IP, len(cfg.ControllerIps))
 	for i, ipString := range cfg.ControllerIps {
-		controllers[i] = net.ParseIP(ipString).To4()
+		ip := net.ParseIP(ipString)
+		if ipv4 := ip.To4(); ipv4 == nil {
+			controllers[i] = ip
+		} else {
+			controllers[i] = ipv4
+		}
 	}
 	synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.ControllerPort, cfg.RpcTimeout)
 	synchronizer.Start()
@@ -96,15 +80,6 @@ func Start(configPath string) (closers []io.Closer) {
 	tridentAdapter := adapter.NewTridentAdapter(labelerQueues.Writers(), cfg.Adapter.SocketBufferSize, cfg.Adapter.OrderingCacheSize)
 	if tridentAdapter == nil {
 		return
-	}
-
-	localIp, err := getLocalIp()
-	if err != nil {
-		log.Error(err)
-		return
-	} else if localIp.String() == "127.0.0.1" {
-		log.Error("Invalid ip resolved by hostname")
-		os.Exit(1)
 	}
 
 	pcapAppQueues := manager.NewQueues(
