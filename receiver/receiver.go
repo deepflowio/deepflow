@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	RECV_BUFSIZE              = 16 << 10 // 默认trident发送时，不会超过MTU的大小, 除非某个DOC超过了MTU，可能收到大的包
+	RECV_BUFSIZE              = 1 << 16 // 默认trident发送时，不会超过MTU的大小,当local发送时, MTU是64k
 	QUEUE_CACHE_FLUSH_TIMEOUT = 3
 	SOCKET_READ_BUFFER_SIZE   = 32 << 20
 	DROP_DETECT_WINDOW_SIZE   = 1024
