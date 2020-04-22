@@ -40,6 +40,7 @@ type U128IDMap struct {
 	size     int     // buffer中存储的有效节点总数
 	width    int     // 哈希桶中最大冲突链长度
 	maxScan  int
+	maxSize  int
 
 	hashSlotBits uint32 // 哈希桶数量总是2^N，记录末尾0比特的数量用于compressHash
 }
@@ -123,6 +124,9 @@ func (m *U128IDMap) AddOrGet(key0, key1 uint64, value uint32, overwrite bool) (u
 	if m.maxScan < width+1 {
 		m.maxScan = width + 1
 	}
+	if m.maxSize < m.size {
+		m.maxSize = m.size
+	}
 
 	return value, true
 }
@@ -157,8 +161,9 @@ func (m *U128IDMap) GetWithSlice(key []byte, _ uint32) (uint32, bool) {
 }
 
 func (m *U128IDMap) GetCounter() interface{} {
-	counter := &Counter{m.maxScan, m.size}
+	counter := &Counter{m.maxScan, m.maxSize}
 	m.maxScan = 0
+	m.maxSize = m.size
 	return counter
 }
 
