@@ -34,10 +34,14 @@ func NewPusher(ip string, port int, hwm int, mode ClientOrServer) (Sender, error
 		return nil, err
 	}
 
+	if err := s.SetIpv6(true); err != nil {
+		return nil, err
+	}
+
 	if mode == CLIENT {
-		err = s.Connect(fmt.Sprintf("tcp://%s:%d", ip, port))
+		err = s.Connect(fmt.Sprintf("tcp://%s:%d", ipFormat(ip), port))
 	} else {
-		err = s.Bind(fmt.Sprintf("tcp://%s:%d", ip, port))
+		err = s.Bind(fmt.Sprintf("tcp://%s:%d", ipFormat(ip), port))
 	}
 	if err != nil {
 		return nil, err
