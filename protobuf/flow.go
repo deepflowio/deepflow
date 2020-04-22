@@ -18,13 +18,14 @@ func MarshalFlow(f *datatype.TaggedFlow, bytes *utils.ByteBuffer) error {
 	flowMetricsPeerDst := &f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST]
 
 	flow := &pb.Flow{
-		VtapId:    proto.Uint32(uint32(f.VtapId)),
-		Exporter:  proto.Uint32(f.Exporter),
-		CloseType: proto.Uint32(uint32(f.CloseType)),
-		FlowId:    proto.Uint64(f.FlowID),
-		StartTime: proto.Uint32(uint32(f.StartTime.Seconds())),
-		EndTime:   proto.Uint32(uint32(f.EndTime.Seconds())),
-		Duration:  proto.Uint64(uint64(f.Duration / time.Microsecond)),
+		VtapId:     proto.Uint32(uint32(f.VtapId)),
+		Exporter:   proto.Uint32(f.Exporter),
+		CloseType:  proto.Uint32(uint32(f.CloseType)),
+		FlowId:     proto.Uint64(f.FlowID),
+		FlowSource: proto.Uint32(uint32(f.FlowSource)),
+		StartTime:  proto.Uint32(uint32(f.StartTime.Seconds())),
+		EndTime:    proto.Uint32(uint32(f.EndTime.Seconds())),
+		Duration:   proto.Uint64(uint64(f.Duration / time.Microsecond)),
 		// L1
 		TapType: proto.Uint32(uint32(f.TapType)),
 		TapPort: proto.Uint32(f.TapPort),
