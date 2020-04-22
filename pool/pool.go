@@ -2,7 +2,11 @@ package pool
 
 import (
 	"sync"
+
+	logging "github.com/op/go-logging"
 )
+
+var log = logging.MustGetLogger("pool")
 
 type Option = interface{}
 type OptionPoolSizePerCPU int

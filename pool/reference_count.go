@@ -18,6 +18,9 @@ func (r *ReferenceCount) SubReferenceCount() bool {
 	if atomic.AddInt32((*int32)(r), -1) > 0 {
 		return true
 	}
+	if *r != 0 {
+		log.Errorf("reference(%d) maybe double released", *r)
+	}
 	return false
 }
 
