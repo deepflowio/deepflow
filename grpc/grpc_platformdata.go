@@ -93,18 +93,34 @@ func QueryMacL2InfosPair(mac0, mac1 uint64) (*L2Info, *L2Info) {
 }
 
 func QueryIPV4Infos(epcID int16, ipv4 uint32) *Info {
+	if epcID == datatype.EPC_FROM_INTERNET {
+		return nil
+	}
 	return platformInfoTable.QueryIPV4Infos(epcID, ipv4)
 }
 
 func QueryIPV6Infos(epcID int16, ipv6 net.IP) *Info {
+	if epcID == datatype.EPC_FROM_INTERNET {
+		return nil
+	}
 	return platformInfoTable.QueryIPV6Infos(epcID, ipv6)
 }
 
 func QueryIPV4InfosPair(epcID0 int16, ipv40 uint32, epcID1 int16, ipv41 uint32) (info0 *Info, info1 *Info) {
+	if epcID0 == datatype.EPC_FROM_INTERNET {
+		return nil, QueryIPV4Infos(epcID1, ipv41)
+	} else if epcID1 == datatype.EPC_FROM_INTERNET {
+		return QueryIPV4Infos(epcID0, ipv40), nil
+	}
 	return platformInfoTable.QueryIPV4InfosPair(epcID0, ipv40, epcID1, ipv41)
 }
 
 func QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID1 int16, ipv61 net.IP) (info0 *Info, info1 *Info) {
+	if epcID0 == datatype.EPC_FROM_INTERNET {
+		return nil, QueryIPV6Infos(epcID1, ipv61)
+	} else if epcID1 == datatype.EPC_FROM_INTERNET {
+		return QueryIPV6Infos(epcID0, ipv60), nil
+	}
 	return platformInfoTable.QueryIPV6InfosPair(epcID0, ipv60, epcID1, ipv61)
 }
 
