@@ -105,16 +105,13 @@ message Config {
     optional bool    collector_enabled    = 14 [default = false];
     optional bool    packet_header_enabled = 15 [default = true];
     optional bool    platform_enabled     = 16 [default = false];
-    optional uint32  platform_interval    = 17;
     optional uint64  server_tx_bandwidth_threshold = 18 [default = 0]; //bps
     optional uint64  bandwidth_probe_interval = 19 [default = 10];  //second
-    optional IfMacSource if_mac_source     = 20 [default = IF_MAC];
     optional bool    flow_store_enabled   = 21 [default = false];
 
     optional string  analyzer_ip          = 31 [default = "127.0.0.1"];
     optional uint32  max_escape_seconds   = 32;
 
-    repeated string  corefile_dirs        = 33;
     optional string  proxy_controller_ip  = 34; // 控制器代理IP
 
     optional uint32 vtap_id = 40;  // 限制在64000
