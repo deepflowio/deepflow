@@ -41,7 +41,7 @@ func (s *GrpcSession) SetSyncInterval(syncInterval time.Duration) {
 }
 
 func (s *GrpcSession) nextServer() error {
-	s.Close()
+	s.CloseConnection()
 	s.ipIndex++
 	if s.ipIndex >= len(s.ips) {
 		s.ipIndex = 0
@@ -97,19 +97,18 @@ func (s *GrpcSession) run() {
 		s.runOnce()
 		time.Sleep(s.syncInterval)
 	}
-	s.Close()
+	s.CloseConnection()
 }
 
 func (s *GrpcSession) Start() {
 	go s.run()
 }
 
-func (s *GrpcSession) Stop() {
+func (s *GrpcSession) Close() {
 	s.stop = true
 }
 
-func (s *GrpcSession) Close() {
-	s.stop = true
+func (s *GrpcSession) CloseConnection() {
 	if s.clientConn != nil {
 		s.clientConn.Close()
 		s.clientConn = nil
