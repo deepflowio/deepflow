@@ -145,8 +145,8 @@ func (s *RpcConfigSynchronizer) Start() {
 }
 
 func (s *RpcConfigSynchronizer) Stop() {
-	s.PollingSession.Stop()
-	s.triggeredSession.Stop()
+	s.PollingSession.Close()
+	s.triggeredSession.Close()
 }
 
 func NewRpcConfigSynchronizer(ips []net.IP, port uint16, timeout time.Duration) ConfigSynchronizer {
