@@ -129,6 +129,7 @@ func NewPlatformInfoTable(ips []net.IP, port int, processName string) *PlatformI
 		bootTime:           uint32(time.Now().Unix()),
 		GrpcSession:        &GrpcSession{},
 		lock:               &sync.RWMutex{},
+		statLock:           &sync.RWMutex{},
 		epcIDIPV4Infos:     make(map[uint64]*Info),
 		epcIDIPV6Infos:     make(map[EpcIDIPV6]*Info),
 		macL2Infos:         make(map[uint64]*L2Info),
