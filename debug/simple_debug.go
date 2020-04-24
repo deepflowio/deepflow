@@ -32,7 +32,7 @@ func ServerRegisterSimple(module ModuleId, process CommandSimpleProcess) {
 }
 
 // client注册命令
-func ClentRegisterSimple(moduleId ModuleId, module CmdHelper, operates []CmdHelper) *cobra.Command {
+func ClientRegisterSimple(moduleId ModuleId, module CmdHelper, operates []CmdHelper) *cobra.Command {
 	command := &cobra.Command{
 		Use:   module.Cmd,
 		Short: module.Helper,
