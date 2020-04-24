@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 	"github.com/spf13/cobra"
 )
 
@@ -24,6 +24,7 @@ type CommandLineProcess interface {
 const (
 	DEFAULT_LISTEN_PORT = 9528
 	UDP_MAXLEN          = 9710
+	MAX_PAYLOAD_LEN     = UDP_MAXLEN - 128 //发送时会封装为DebugMessage，净荷为DebugMessage的Args
 	MODULE_MAX          = 32
 )
 
@@ -84,7 +85,13 @@ func SendToServer(module ModuleId, operate ModuleOperate, args *bytes.Buffer) (*
 	}
 
 	conn.Write(sendBuffer.Bytes())
-	recv, err := RecvFromServer(conn.(*net.UDPConn))
+
+	var recv *bytes.Buffer
+	if module > MODULE_MAX {
+		recv, err = RecvFromServerMulti(conn.(*net.UDPConn))
+	} else {
+		recv, err = RecvFromServer(conn.(*net.UDPConn))
+	}
 	return conn.(*net.UDPConn), recv, err
 }
 
@@ -101,7 +108,7 @@ func SendToClient(conn *net.UDPConn, remote *net.UDPAddr, result uint32, args *b
 	}
 
 	if buffer.Len() > UDP_MAXLEN {
-		log.Warningf("buffer.Len() > %v", UDP_MAXLEN)
+		log.Warningf("data.Len=%d buffer.Len=%d > %d", len(msg.Args), buffer.Len(), UDP_MAXLEN)
 		return
 	}
 	conn.WriteToUDP(buffer.Bytes(), remote)
@@ -122,8 +129,24 @@ func process(conn *net.UDPConn) {
 		log.Error(err)
 		return
 	}
-	if recvHandlers[msg.Module] != nil {
+	if msg.Module < MODULE_MAX && recvHandlers[msg.Module] != nil {
 		recvHandlers[msg.Module].RecvCommand(conn, remote, msg.Operate, bytes.NewBuffer(msg.Args[:]))
+		return
+	}
+	if simpleHandlers[msg.Module] != nil {
+		result := simpleHandlers[msg.Module].HandleSimpleCommand(msg.Operate)
+		for i := 0; i < len(result); i += MAX_PAYLOAD_LEN {
+			if i+MAX_PAYLOAD_LEN > len(result) {
+				SendToClient(conn, remote, 0, bytes.NewBufferString(result[i:]))
+			} else {
+				SendToClient(conn, remote, 0, bytes.NewBufferString(result[i:i+MAX_PAYLOAD_LEN]))
+			}
+		}
+		// 补充发送"\n"用来指示客户端只要收到小于MAX_PAYLOAD_LEN的数据，就认为接收结束了
+		if len(result) > 0 && len(result)%MAX_PAYLOAD_LEN == 0 {
+			SendToClient(conn, remote, 0, bytes.NewBufferString("\n"))
+		}
+		return
 	}
 }
 
