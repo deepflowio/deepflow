@@ -1,6 +1,8 @@
 package grpc
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"sort"
@@ -14,6 +16,7 @@ import (
 	"golang.org/x/net/context"
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/hmap/lru"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/message/trident"
 )
@@ -23,12 +26,10 @@ var platformInfoTable *PlatformInfoTable = &PlatformInfoTable{lock: &sync.RWMute
 
 const (
 	DEFAULT_SYNC_INTERVAL = time.Minute
+	EpcIDIPV6_LEN         = 20
+	LruSlotSize           = 1 << 14
+	LruCap                = 1 << 17
 )
-
-type EpcIDIPV6 struct {
-	EpcID uint32
-	IP    [net.IPv6len]byte
-}
 
 type L2Info struct {
 	L2EpcID    uint32
@@ -48,7 +49,7 @@ type Info struct {
 	SubnetID   uint32
 	PodNodeID  uint32
 	AZID       uint32
-	HitCount   uint64
+	HitCount   *uint64
 }
 
 type CidrInfo struct {
@@ -57,19 +58,20 @@ type CidrInfo struct {
 	RegionID uint32
 	SubnetID uint32
 	AZID     uint32
+	HitCount *uint64
 }
 
 type PlatformInfoTable struct {
-	epcIDIPV4Infos map[uint64]*Info
-	epcIDIPV6Infos map[EpcIDIPV6]*Info
-	macL2Infos     map[uint64]*L2Info
+	epcIDIPV4Lru *lru.U64LRU
+	epcIDIPV6Lru *lru.U160LRU
 
-	epcIDIPV4MissCount map[uint64]*uint64
-	epcIDIPV6MissCount map[EpcIDIPV6]*uint64
-	macL2MissCount     map[uint64]*uint64
-
+	epcIDIPV4Infos     map[uint64]*Info
+	epcIDIPV6Infos     map[[EpcIDIPV6_LEN]byte]*Info
 	epcIDIPV4CidrInfos map[int32][]*CidrInfo
 	epcIDIPV6CidrInfos map[int32][]*CidrInfo
+
+	macL2Infos     map[uint64]*L2Info
+	macL2MissCount map[uint64]*uint64
 
 	bootTime            uint32
 	processName         string
@@ -124,18 +126,21 @@ func QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID1 int16, ipv61 net.IP) 
 	return platformInfoTable.QueryIPV6InfosPair(epcID0, ipv60, epcID1, ipv61)
 }
 
+// 单例模式，只启动一次
 func NewPlatformInfoTable(ips []net.IP, port int, processName string) *PlatformInfoTable {
 	table := &PlatformInfoTable{
 		bootTime:           uint32(time.Now().Unix()),
 		GrpcSession:        &GrpcSession{},
 		lock:               &sync.RWMutex{},
 		statLock:           &sync.RWMutex{},
+		epcIDIPV4Lru:       lru.NewU64LRU("epcIDIPV4", LruSlotSize, LruCap),
+		epcIDIPV6Lru:       lru.NewU160LRU("epcIDIPV6", LruSlotSize, LruCap),
 		epcIDIPV4Infos:     make(map[uint64]*Info),
-		epcIDIPV6Infos:     make(map[EpcIDIPV6]*Info),
+		epcIDIPV6Infos:     make(map[[EpcIDIPV6_LEN]byte]*Info),
 		macL2Infos:         make(map[uint64]*L2Info),
-		epcIDIPV4MissCount: make(map[uint64]*uint64),
-		epcIDIPV6MissCount: make(map[EpcIDIPV6]*uint64),
 		macL2MissCount:     make(map[uint64]*uint64),
+		epcIDIPV4CidrInfos: make(map[int32][]*CidrInfo),
+		epcIDIPV6CidrInfos: make(map[int32][]*CidrInfo),
 	}
 	runOnce := func() {
 		if err := table.Reload(); err != nil {
@@ -147,38 +152,45 @@ func NewPlatformInfoTable(ips []net.IP, port int, processName string) *PlatformI
 	return table
 }
 
-func (t *PlatformInfoTable) IPV4InfoFirstStat(info *Info, key uint64) {
+func (t *PlatformInfoTable) IPV4InfoAddLru(info *Info, key uint64) {
 	if info != nil {
-		atomic.AddUint64(&info.HitCount, 1)
+		t.epcIDIPV4Lru.Add(key, info)
+		atomic.AddUint64(info.HitCount, 1)
 		return
 	}
 	var missCount uint64 = 1
 	// 可能导致并行时覆盖写，比正常统计结果少一
-	t.epcIDIPV4MissCount[key] = &missCount
+	t.epcIDIPV4Lru.Add(key, &missCount)
 	log.Infof("can't find IPV4Info from epcID(%d) ip(%s)", key>>32, utils.IpFromUint32(uint32(key)).String())
 }
 
-func (t *PlatformInfoTable) IPV4InfoStat(info *Info, key uint64) {
-	if info != nil {
-		atomic.AddUint64(&info.HitCount, 1)
-	} else {
-		atomic.AddUint64(t.epcIDIPV4MissCount[key], 1)
+func (t *PlatformInfoTable) IPV4InfoStat(lruItem interface{}) {
+	switch t := lruItem.(type) {
+	case *Info:
+		atomic.AddUint64(lruItem.(*Info).HitCount, 1)
+	case *uint64:
+		atomic.AddUint64(lruItem.(*uint64), 1)
+	default:
+		log.Warningf("Unexpected type %T\n", t)
 	}
 }
 
 func (t *PlatformInfoTable) QueryIPV4Infos(epcID int16, ipv4 uint32) (info *Info) {
 	var ok bool
+	var lruValue interface{}
 	key := uint64(epcID)<<32 | uint64(ipv4)
 	t.lock.RLock()
-	if info, ok = t.epcIDIPV4Infos[key]; !ok {
-		info = t.QueryIPV4Cidr(epcID, ipv4)
+	if lruValue, ok = t.epcIDIPV4Lru.Get(key, false); !ok {
+		if info, ok = t.epcIDIPV4Infos[key]; !ok {
+			info = t.QueryIPV4Cidr(epcID, ipv4)
+		}
 		t.lock.RUnlock()
 		t.lock.Lock()
-		t.epcIDIPV4Infos[key] = info
-		t.IPV4InfoFirstStat(info, key)
+		t.IPV4InfoAddLru(info, key)
 		t.lock.Unlock()
 	} else {
-		t.IPV4InfoStat(info, key)
+		t.IPV4InfoStat(lruValue)
+		info, _ = lruValue.(*Info)
 		t.lock.RUnlock()
 	}
 	return
@@ -233,111 +245,126 @@ func (t *PlatformInfoTable) QueryMacL2InfosPair(mac0, mac1 uint64) (l2Info0 *L2I
 // 需要一起查询, 防止查询时，平台信息更新
 func (t *PlatformInfoTable) QueryIPV4InfosPair(epcID0 int16, ipv40 uint32, epcID1 int16, ipv41 uint32) (info0 *Info, info1 *Info) {
 	var ok0, ok1 bool
+	var lruValue0, lruValue1 interface{}
 	key0 := uint64(epcID0)<<32 | uint64(ipv40)
 	key1 := uint64(epcID1)<<32 | uint64(ipv41)
 	t.lock.RLock()
-	if info0, ok0 = t.epcIDIPV4Infos[key0]; !ok0 {
-		info0 = t.QueryIPV4Cidr(epcID0, ipv40)
+	if lruValue0, ok0 = t.epcIDIPV4Lru.Get(key0, false); !ok0 {
+		if info0, ok0 = t.epcIDIPV4Infos[key0]; !ok0 {
+			info0 = t.QueryIPV4Cidr(epcID0, ipv40)
+		}
 	} else {
-		t.IPV4InfoStat(info0, key0)
+		t.IPV4InfoStat(lruValue0)
+		info0, _ = lruValue0.(*Info)
 	}
-	if info1, ok1 = t.epcIDIPV4Infos[key1]; !ok1 {
-		info1 = t.QueryIPV4Cidr(epcID1, ipv41)
+	if lruValue1, ok1 = t.epcIDIPV4Lru.Get(key1, false); !ok1 {
+		if info1, ok1 = t.epcIDIPV4Infos[key1]; !ok1 {
+			info1 = t.QueryIPV4Cidr(epcID1, ipv41)
+		}
 	} else {
-		t.IPV4InfoStat(info1, key1)
+		t.IPV4InfoStat(lruValue1)
+		info1, _ = lruValue1.(*Info)
 	}
 	t.lock.RUnlock()
 
 	if !ok0 {
-		// 加入到map中，下次查该ip，无需遍历cidr
 		t.lock.Lock()
-		t.epcIDIPV4Infos[key0] = info0
-		t.IPV4InfoFirstStat(info0, key0)
+		t.IPV4InfoAddLru(info0, key0)
 		t.lock.Unlock()
 	}
 	if !ok1 {
 		t.lock.Lock()
-		t.epcIDIPV4Infos[key1] = info1
-		t.IPV4InfoFirstStat(info1, key1)
+		t.IPV4InfoAddLru(info1, key1)
 		t.lock.Unlock()
 	}
 
 	return
 }
 
-func (t *PlatformInfoTable) IPV6InfoFirstStat(info *Info, key *EpcIDIPV6) {
+func (t *PlatformInfoTable) IPV6InfoAddLru(info *Info, key []byte) {
 	if info != nil {
-		atomic.AddUint64(&info.HitCount, 1)
+		t.epcIDIPV6Lru.Add(key, info)
+		atomic.AddUint64(info.HitCount, 1)
 		return
 	}
 	var missCount uint64 = 1
 	// 可能导致并行时覆盖写，比正常统计结果少一
-	t.epcIDIPV6MissCount[*key] = &missCount
-	log.Infof("can't find IPV6Info from epcID(%d) ip(%s)", key.EpcID, net.IP(key.IP[:]).String())
+	t.epcIDIPV6Lru.Add(key, &missCount)
+	log.Infof("can't find IPV6Info from epcID(%d) ip(%s)", int32(binary.LittleEndian.Uint16(key[:4])), net.IP(key[4:]).String())
 }
 
-func (t *PlatformInfoTable) IPV6InfoStat(info *Info, key *EpcIDIPV6) {
-	if info != nil {
-		atomic.AddUint64(&info.HitCount, 1)
-	} else {
-		atomic.AddUint64(t.epcIDIPV6MissCount[*key], 1)
+func (t *PlatformInfoTable) IPV6InfoStat(lruItem interface{}) {
+	switch t := lruItem.(type) {
+	case *Info:
+		atomic.AddUint64(lruItem.(*Info).HitCount, 1)
+	case *uint64:
+		atomic.AddUint64(lruItem.(*uint64), 1)
+	default:
+		log.Warningf("Unexpected type %T\n", t)
 	}
 }
 
 func (t *PlatformInfoTable) QueryIPV6Infos(epcID int16, ipv6 net.IP) (info *Info) {
 	var ok bool
-	epcIDIP := EpcIDIPV6{}
-	epcIDIP.EpcID = uint32(epcID)
-	copy(epcIDIP.IP[:], ipv6)
+	var lruValue interface{}
+	var key [EpcIDIPV6_LEN]byte
+	binary.LittleEndian.PutUint32(key[:], uint32(epcID))
+	copy(key[4:], ipv6)
 
 	t.lock.RLock()
-	if info, ok = t.epcIDIPV6Infos[epcIDIP]; !ok {
-		info = t.QueryIPV6Cidr(epcID, ipv6)
+	if lruValue, ok = t.epcIDIPV6Lru.Get(key[:], false); !ok {
+		if info, ok = t.epcIDIPV6Infos[key]; !ok {
+			info = t.QueryIPV6Cidr(epcID, ipv6)
+		}
 		t.lock.RUnlock()
 		t.lock.Lock()
-		t.epcIDIPV6Infos[epcIDIP] = info
-		t.IPV6InfoFirstStat(info, &epcIDIP)
+		t.IPV6InfoAddLru(info, key[:])
 		t.lock.Unlock()
 	} else {
-		t.IPV6InfoStat(info, &epcIDIP)
+		t.IPV6InfoStat(lruValue)
 		t.lock.RUnlock()
 	}
 	return
 }
 
 func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID1 int16, ipv61 net.IP) (info0 *Info, info1 *Info) {
-	epcIDIP0, epcIDIP1 := EpcIDIPV6{}, EpcIDIPV6{}
-	epcIDIP0.EpcID = uint32(epcID0)
-	copy(epcIDIP0.IP[:], ipv60)
-	epcIDIP1.EpcID = uint32(epcID1)
-	copy(epcIDIP1.IP[:], ipv61)
+	var key0, key1 [EpcIDIPV6_LEN]byte
+	binary.LittleEndian.PutUint32(key0[:], uint32(epcID0))
+	copy(key0[4:], ipv60)
+	binary.LittleEndian.PutUint32(key1[:], uint32(epcID1))
+	copy(key1[4:], ipv61)
 
 	var ok0, ok1 bool
+	var lruValue0, lruValue1 interface{}
 	t.lock.RLock()
-	if info0, ok0 = t.epcIDIPV6Infos[epcIDIP0]; !ok0 {
-		info0 = t.QueryIPV6Cidr(epcID0, ipv60)
+	if lruValue0, ok0 = t.epcIDIPV6Lru.Get(key0[:], false); !ok0 {
+		if info0, ok0 = t.epcIDIPV6Infos[key0]; !ok0 {
+			info0 = t.QueryIPV6Cidr(epcID0, ipv60)
+		}
 	} else {
-		t.IPV6InfoStat(info0, &epcIDIP0)
+		t.IPV6InfoStat(lruValue0)
+		info0, _ = lruValue0.(*Info)
 	}
 
-	if info1, ok1 = t.epcIDIPV6Infos[epcIDIP1]; !ok1 {
-		info1 = t.QueryIPV6Cidr(epcID1, ipv61)
+	if lruValue1, ok1 = t.epcIDIPV6Lru.Get(key1[:], false); !ok1 {
+		if info1, ok1 = t.epcIDIPV6Infos[key1]; !ok1 {
+			info1 = t.QueryIPV6Cidr(epcID1, ipv61)
+		}
 	} else {
-		t.IPV6InfoStat(info1, &epcIDIP1)
+		t.IPV6InfoStat(lruValue1)
+		info1, _ = lruValue1.(*Info)
 	}
 	t.lock.RUnlock()
 
 	if !ok0 {
 		// 加入到map中，下次查该ip，无需遍历cidr
 		t.lock.Lock()
-		t.epcIDIPV6Infos[epcIDIP0] = info0
-		t.IPV6InfoFirstStat(info0, &epcIDIP0)
+		t.IPV6InfoAddLru(info0, key0[:])
 		t.lock.Unlock()
 	}
 	if !ok1 {
 		t.lock.Lock()
-		t.epcIDIPV6Infos[epcIDIP1] = info1
-		t.IPV6InfoFirstStat(info1, &epcIDIP1)
+		t.IPV6InfoAddLru(info1, key1[:])
 		t.lock.Unlock()
 	}
 	return
@@ -354,6 +381,7 @@ func (t *PlatformInfoTable) QueryIPV4Cidr(epcID int16, ipv4 uint32) *Info {
 					SubnetID: cidrInfo.SubnetID,
 					RegionID: cidrInfo.RegionID,
 					AZID:     cidrInfo.AZID,
+					HitCount: cidrInfo.HitCount,
 				}
 				break
 			}
@@ -372,6 +400,7 @@ func (t *PlatformInfoTable) QueryIPV6Cidr(epcID int16, ipv6 net.IP) *Info {
 					SubnetID: cidrInfo.SubnetID,
 					RegionID: cidrInfo.RegionID,
 					AZID:     cidrInfo.AZID,
+					HitCount: cidrInfo.HitCount,
 				}
 				break
 			}
@@ -401,7 +430,7 @@ func (t *PlatformInfoTable) String() string {
 			continue
 		}
 		fmt.Fprintf(sb, "%-6d  %-15s %-12x %-15s %-6d  %-7d   %-10d   %-7d    %-8d  %-9d %-4d %d\n", epcIP>>32, utils.IpFromUint32(uint32(epcIP)).String(),
-			info.Mac, info.HostStr, info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.AZID, info.HitCount)
+			info.Mac, info.HostStr, info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.AZID, *info.HitCount)
 	}
 
 	if len(t.epcIDIPV6Infos) > 0 {
@@ -409,24 +438,23 @@ func (t *PlatformInfoTable) String() string {
 		sb.WriteString("epcID   ipv6                                         mac          host            hostID  regionID deviceType  deviceID subnetID  podNodeID azID hitCount\n")
 		sb.WriteString("---------------------------------------------------------------------------------------------------------------------------------------------------------- \n")
 	}
-	epcIP6s := make([]EpcIDIPV6, 0)
+	epcIP6s := make([][EpcIDIPV6_LEN]byte, 0)
 	for epcIP, _ := range t.epcIDIPV6Infos {
 		epcIP6s = append(epcIP6s, epcIP)
 	}
 	sort.Slice(epcIP6s, func(i, j int) bool {
-		return epcIP6s[i].EpcID < epcIP6s[j].EpcID
+		return bytes.Compare(epcIP6s[i][:4], epcIP6s[j][:4]) < 0
 	})
 	for _, epcIP := range epcIP6s {
 		info := t.epcIDIPV6Infos[epcIP]
 		if info == nil {
 			continue
 		}
-		fmt.Fprintf(sb, "%-6d  %-44s %-12x %-15s %-6d  %-7d  %-10d  %-7d  %-8d  %-9d %-4d %d\n", epcIP.EpcID, net.IP(epcIP.IP[:]).String(),
-			info.Mac, info.HostStr, info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.AZID, info.HitCount)
+		fmt.Fprintf(sb, "%-6d  %-44s %-12x %-15s %-6d  %-7d  %-10d  %-7d  %-8d  %-9d %-4d %d\n", int32(binary.LittleEndian.Uint32(epcIP[:4])), net.IP(epcIP[4:]).String(),
+			info.Mac, info.HostStr, info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.AZID, *info.HitCount)
 	}
-
 	if len(t.epcIDIPV4CidrInfos) > 0 || len(t.epcIDIPV6CidrInfos) > 0 {
-		sb.WriteString("\nepcID   cidr                                           regionID  subnetID   azID\n")
+		sb.WriteString("\nepcID   cidr                                           regionID  subnetID   azID  hitCount\n")
 		sb.WriteString("-------------------------------------------------------------------------------------\n")
 	}
 	CidrInfos := make([]*CidrInfo, 0)
@@ -441,38 +469,41 @@ func (t *PlatformInfoTable) String() string {
 		return CidrInfos[i].EpcID < CidrInfos[j].EpcID
 	})
 	for _, cidrInfo := range CidrInfos {
-		fmt.Fprintf(sb, "%-6d  %-44s   %-7d   %-8d   %d\n",
-			cidrInfo.EpcID, cidrInfo.Cidr, cidrInfo.RegionID, cidrInfo.SubnetID, cidrInfo.AZID)
+		fmt.Fprintf(sb, "%-6d  %-44s   %-7d   %-8d   %-5d %d\n",
+			cidrInfo.EpcID, cidrInfo.Cidr, cidrInfo.RegionID, cidrInfo.SubnetID, cidrInfo.AZID, *cidrInfo.HitCount)
 	}
 
-	if len(t.epcIDIPV4MissCount) > 0 || len(t.epcIDIPV6MissCount) > 0 {
-		sb.WriteString("\nepcID   ip                                           miss\n")
-		sb.WriteString("-------------------------------------------------------------\n")
-	}
-	epcIP4s = make([]uint64, 0)
-	for epcIP, _ := range t.epcIDIPV4MissCount {
-		epcIP4s = append(epcIP4s, epcIP)
-	}
+	sb.WriteString("\nepcID   ip                                           miss\n")
+	sb.WriteString("-------------------------------------------------------------\n")
+	epcIP4s = epcIP4s[:0]
+	t.epcIDIPV4Lru.Walk(func(key uint64, value interface{}) {
+		if _, ok := value.(*uint64); ok {
+			epcIP4s = append(epcIP4s, key)
+		}
+	})
 	sort.Slice(epcIP4s, func(i, j int) bool {
 		return epcIP4s[i] < epcIP4s[j]
 	})
 	for _, epcIP := range epcIP4s {
-		info := t.epcIDIPV4MissCount[epcIP]
-		fmt.Fprintf(sb, "%-6d  %-44s %d\n", epcIP>>32, utils.IpFromUint32(uint32(epcIP)).String(), *info)
+		info, _ := t.epcIDIPV4Lru.Get(epcIP, true)
+		missCount, _ := info.(*uint64)
+		fmt.Fprintf(sb, "%-6d  %-44s %d\n", epcIP>>32, utils.IpFromUint32(uint32(epcIP)).String(), *missCount)
 	}
 
-	epcIP6s = make([]EpcIDIPV6, 0)
-	for epcIP, _ := range t.epcIDIPV6MissCount {
-		epcIP6s = append(epcIP6s, epcIP)
-	}
+	epcIP6s = make([][EpcIDIPV6_LEN]byte, 0)
+	t.epcIDIPV6Lru.Walk(func(key [EpcIDIPV6_LEN]byte, value interface{}) {
+		if _, ok := value.(*uint64); ok {
+			epcIP6s = append(epcIP6s, key)
+		}
+	})
+
 	sort.Slice(epcIP6s, func(i, j int) bool {
-		return epcIP6s[i].EpcID < epcIP6s[j].EpcID
+		return bytes.Compare(epcIP6s[i][:4], epcIP6s[j][:4]) < 0
 	})
 	for _, epcIP := range epcIP6s {
-		info := t.epcIDIPV6MissCount[epcIP]
-		fmt.Fprintf(sb, "%-6d  %-44s %d\n", int(epcIP.EpcID), net.IP(epcIP.IP[:]).String(), *info)
+		info, _ := t.epcIDIPV6Lru.Get(epcIP[:], true)
+		fmt.Fprintf(sb, "%-6d  %-44s %d\n", int(binary.LittleEndian.Uint32(epcIP[:4])), net.IP(epcIP[4:]).String(), *(info.(*uint64)))
 	}
-
 	if len(t.macL2MissCount) > 0 {
 		sb.WriteString("\nmac              miss\n")
 		sb.WriteString("------------------------\n")
@@ -528,7 +559,7 @@ func (t *PlatformInfoTable) Reload() error {
 	t.versionPlatformData = newVersion
 
 	newEpcIDIPV4Infos := make(map[uint64]*Info)
-	newEpcIDIPV6Infos := make(map[EpcIDIPV6]*Info)
+	newEpcIDIPV6Infos := make(map[[EpcIDIPV6_LEN]byte]*Info)
 	newMacL2Infos := make(map[uint64]*L2Info)
 	newEpcIDIPV4CidrInfos := make(map[int32][]*CidrInfo)
 	newEpcIDIPV6CidrInfos := make(map[int32][]*CidrInfo)
@@ -544,10 +575,9 @@ func (t *PlatformInfoTable) Reload() error {
 	t.epcIDIPV4Infos = newEpcIDIPV4Infos
 	t.epcIDIPV6Infos = newEpcIDIPV6Infos
 	t.macL2Infos = newMacL2Infos
-
-	t.epcIDIPV4MissCount = make(map[uint64]*uint64)
-	t.epcIDIPV6MissCount = make(map[EpcIDIPV6]*uint64)
 	t.macL2MissCount = make(map[uint64]*uint64)
+
+	t.epcIDIPV4Lru.Clear()
 	t.lock.Unlock()
 	return nil
 }
@@ -583,6 +613,7 @@ func updateCidrInfos(IPV4CidrInfos, IPV6CidrInfos map[int32][]*CidrInfo, trident
 		AZID:     tridentCidr.GetAzId(),
 		RegionID: tridentCidr.GetRegionId(),
 		SubnetID: tridentCidr.GetSubnetId(),
+		HitCount: new(uint64),
 	}
 	if isIPV4(prefix) {
 		if _, ok := IPV4CidrInfos[epcID]; !ok {
@@ -614,7 +645,7 @@ func updateCidrInfos(IPV4CidrInfos, IPV6CidrInfos map[int32][]*CidrInfo, trident
 	}
 }
 
-func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[EpcIDIPV6]*Info, macL2Infos map[uint64]*L2Info, intf *trident.Interface) {
+func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[EpcIDIPV6_LEN]byte]*Info, macL2Infos map[uint64]*L2Info, intf *trident.Interface) {
 	epcID := intf.GetEpcId()
 	// 由于doc中epcID为-1，对应trisolaris的epcID为0.故在此统一将收到epcID为0的，修改为-1，便于doc数据查找
 	if epcID == 0 {
@@ -640,7 +671,7 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[Ep
 	}
 	hostID := intf.GetLaunchServerId()
 
-	epcIDIPV6 := EpcIDIPV6{}
+	var epcIDIPV6 [EpcIDIPV6_LEN]byte
 	for _, ipRes := range intf.GetIpResources() {
 		subnetID := ipRes.GetSubnetId()
 		ipStr := ipRes.GetIp()
@@ -657,6 +688,7 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[Ep
 				SubnetID:   subnetID,
 				PodNodeID:  podNodeID,
 				AZID:       azID,
+				HitCount:   new(uint64),
 			}
 		} else {
 			netIP := net.ParseIP(ipStr)
@@ -664,8 +696,8 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[Ep
 				log.Warningf("IP(%s) parse failed", ipStr)
 				continue
 			}
-			epcIDIPV6.EpcID = epcID
-			copy(epcIDIPV6.IP[:], netIP)
+			binary.LittleEndian.PutUint32(epcIDIPV6[:4], epcID)
+			copy(epcIDIPV6[4:], netIP)
 			epcIDIPV6Infos[epcIDIPV6] = &Info{
 				Host:       host,
 				HostStr:    hostStr,
@@ -677,6 +709,7 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[Ep
 				SubnetID:   subnetID,
 				PodNodeID:  podNodeID,
 				AZID:       azID,
+				HitCount:   new(uint64),
 			}
 		}
 	}

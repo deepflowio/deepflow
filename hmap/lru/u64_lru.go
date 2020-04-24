@@ -237,6 +237,14 @@ func (m *U64LRU) Get(key uint64, peek bool) (interface{}, bool) {
 	return nil, false
 }
 
+func (m *U64LRU) Walk(callback func(key uint64, value interface{})) {
+	for i := m.timeListHead; i != -1; {
+		node := m.getNode(i)
+		callback(node.key, node.value)
+		i = node.timeListNext
+	}
+}
+
 func (m *U64LRU) Clear() {
 	for i := range m.ringBuffer {
 		if m.ringBuffer[i] != nil {
