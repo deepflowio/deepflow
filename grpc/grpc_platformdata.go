@@ -485,6 +485,10 @@ func (t *PlatformInfoTable) String() string {
 	return sb.String()
 }
 
+func (t *PlatformInfoTable) HandleSimpleCommand(op uint16) string {
+	return t.String()
+}
+
 func (t *PlatformInfoTable) Reload() error {
 	var response *trident.SyncResponse
 	err := t.Request(func(ctx context.Context) error {
