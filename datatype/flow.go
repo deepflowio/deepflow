@@ -50,7 +50,8 @@ type FlowSource uint8
 const (
 	FLOW_SOURCE_NORMAL FlowSource = iota
 	FLOW_SOURCE_SFLOW
-	FLOW_SOURCE_NETFLOW
+	FLOW_SOURCE_NETFLOW_V5
+	FLOW_SOURCE_NETFLOW_V9
 )
 
 func (t FlowSource) String() string {
@@ -59,8 +60,10 @@ func (t FlowSource) String() string {
 		return "normal"
 	case FLOW_SOURCE_SFLOW:
 		return "sflow"
-	case FLOW_SOURCE_NETFLOW:
-		return "netflow"
+	case FLOW_SOURCE_NETFLOW_V5:
+		return "netflow-v5"
+	case FLOW_SOURCE_NETFLOW_V9:
+		return "netflow-v9"
 	default:
 		return "unkown flow source"
 	}
