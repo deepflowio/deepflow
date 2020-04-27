@@ -65,7 +65,7 @@ message Flow {
     optional uint64 flow_id = 8;      /* 不存：The forcefully reported flow is still kept in
                                          exporter and this tuple (host, thread_index, flow_id)
                                          can be used to identify the flow in poseidon */
-    optional uint32 flow_source = 9;  /* 流的来源  0: 包统计
+    optional uint32 flow_source = 9;  /* 流的来源  0: 镜像, 分光
                                                    1: sflow
                                                    2: netflow/netstream v5 */
     optional uint32 start_time = 11;  /* 1. First report: the time when the first packet arrives
