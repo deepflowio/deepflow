@@ -36,4 +36,13 @@ func TestDropdetection(t *testing.T) {
 	if counter.Dropped != 2 || counter.Disorder != 1 || counter.DisorderSize != 4 {
 		t.Errorf("TestDropdetection dropped error: %v", counter)
 	}
+
+	d.Detect(3, 1, 1)
+	d.Detect(3, 3, 3)     // dropped + 1
+	d.Detect(3, 5, 5)     // dropped + 1
+	d.Detect(3, 100, 100) // dropped + 31
+	d.Detect(3, 35, 130)
+	if counter.Dropped != 2 || counter.Disorder != 1 || counter.DisorderSize != 4 {
+		t.Errorf("TestDropdetection dropped error: %v", counter)
+	}
 }
