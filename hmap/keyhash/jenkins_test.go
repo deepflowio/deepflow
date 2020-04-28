@@ -35,6 +35,27 @@ func TestJenkins(t *testing.T) {
 	}
 }
 
+var testData32 = []uint32{0x4ce667, 0x4ce465, 0x4ce564, 0x4ce766}
+
+func TestJenkins32(t *testing.T) {
+	table := make(map[int32]int)
+	jTable := make(map[int32]int)
+	for _, data := range testData32 {
+		hash := bashHash32(data) & 0xff
+		table[hash]++
+		hash = Jenkins32(data) & 0xff
+		jTable[hash]++
+	}
+
+	//jenkins hash计算时没有与数值的顺序绑定，输入值的位值变化就会输出不同的key具有很好的散列性
+	//bashHash32 当输入值高8位相同时，其计算的hask key相同，均挂在map的同一table上，散列性不好
+	if len(table) > len(jTable) {
+		t.Error("Jenkins32 hash error.")
+		t.Errorf("jenkins: %v", jTable)
+		t.Errorf("base: %v", table)
+	}
+}
+
 func BenchmarkBaseHash(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

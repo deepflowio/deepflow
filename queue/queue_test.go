@@ -29,6 +29,9 @@ func TestQueue(t *testing.T) {
 		wg.Done()
 	}()
 	queue.Put(10086)
+	if queue.Len() < 0 {
+		t.Errorf("Get len error")
+	}
 	wg.Wait()
 }
 
