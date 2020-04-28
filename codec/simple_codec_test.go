@@ -193,6 +193,16 @@ func TestReset(t *testing.T) {
 	}
 }
 
+func TestWriteBool(t *testing.T) {
+	e := &SimpleEncoder{}
+	e.WriteBool(true)
+	exp := uint8(1)
+
+	if e.buf[0] != exp {
+		t.Errorf("Expected %T found %T", e.buf[0], exp)
+	}
+}
+
 func BenchmarkEncodeU32(b *testing.B) {
 	u32s := []uint32{}
 	for i := 0; i < b.N; i++ {

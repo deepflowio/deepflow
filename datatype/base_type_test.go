@@ -4,6 +4,7 @@ import "testing"
 
 func TestIP(t *testing.T) {
 	ipAddr := NewIPFromString("127.0.0.1")
+	ipAddr1 := NewIPFromString("127.0.0.2")
 	if ipAddr == nil {
 		t.Error("解析IP string失败")
 	}
@@ -23,10 +24,15 @@ func TestIP(t *testing.T) {
 	if ipAddr.Int() != 4294967295 {
 		t.Error("IP转uint32失败，应为4294967295，实为", ipAddr.Int())
 	}
+	if ipAddr.Equals(ipAddr1) {
+		t.Error("Equals 实现不正确")
+	}
 }
 
 func TestMAC(t *testing.T) {
 	macAddr := NewMACAddrFromString("11:22:33:44:55:66")
+	macAddr1 := NewMACAddrFromString("22:33:44:55:66:77")
+
 	if macAddr == nil {
 		t.Error("解析MAC string失败")
 	}
@@ -45,5 +51,24 @@ func TestMAC(t *testing.T) {
 	}
 	if macAddr.Int() != 4294967295 {
 		t.Error("MAC转uint64失败，应为4294967295，实为", macAddr.Int())
+	}
+	if macAddr.Equals(macAddr1) {
+		t.Error("Equals实现不正确 ")
+	}
+}
+
+func TestEncodeAndDecode(t *testing.T) {
+	ipAddr := NewIPFromString("127.0.0.1")
+	buf, errno := ipAddr.GobEncode()
+
+	if errno != nil {
+		t.Error("GobEncode实现不正确 ")
+	}
+
+	ipAddr1 := &IP{}
+	errno = ipAddr1.GobDecode(buf)
+
+	if errno != nil {
+		t.Error("GobDecode实现不正确 ")
 	}
 }

@@ -80,3 +80,42 @@ func TestMarshalFlowMeter(t *testing.T) {
 		t.Error("MarshalTo()实现不正确")
 	}
 }
+
+func TestFlowMeterRelease(t *testing.T) {
+	m1 := FlowMeter{
+		Traffic: Traffic{
+			PacketTx:   1,
+			PacketRx:   2,
+			ByteTx:     3,
+			ByteRx:     4,
+			Flow:       5,
+			NewFlow:    6,
+			ClosedFlow: 7,
+		},
+	}
+	m1.Release()
+	m2 := FlowMeter{}
+	if m1 != m2 {
+		t.Error("Release()实现不正确")
+	}
+}
+
+func TestFlowMeterClone(t *testing.T) {
+	m1 := FlowMeter{
+		Traffic: Traffic{
+			PacketTx:   1,
+			PacketRx:   2,
+			ByteTx:     3,
+			ByteRx:     4,
+			Flow:       5,
+			NewFlow:    6,
+			ClosedFlow: 7,
+		},
+	}
+
+	m2 := CloneFlowMeter(&m1)
+
+	if *m2 != m1 {
+		t.Error("CloneFlowMeter()实现不正确")
+	}
+}

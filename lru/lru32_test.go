@@ -4,27 +4,28 @@ import (
 	"testing"
 )
 
-func TestKeys(t *testing.T) {
+func TestU32Keys(t *testing.T) {
 	capacity := 100
-	lru := NewCache(capacity)
+	lru := NewCache32(capacity)
 	for i := 0; i < capacity; i++ {
-		lru.Add(i, i)
+		lru.Add(uint32(i), uint32(i))
 	}
 	keys := lru.Keys()
 	for index, key := range keys {
-		if key != index {
+		if key != uint32(index) {
 			t.Errorf("key %d is not expected", key)
 			return
 		}
+
 		index++
 	}
 }
 
-func TestValues(t *testing.T) {
+func TestU32Values(t *testing.T) {
 	capacity := 100
-	lru := NewCache(capacity)
+	lru := NewCache32(capacity)
 	for i := 0; i < capacity; i++ {
-		lru.Add(i, i)
+		lru.Add(uint32(i), i)
 	}
 	values := lru.Values()
 	for index, value := range values {
@@ -35,11 +36,11 @@ func TestValues(t *testing.T) {
 	}
 }
 
-func TestClear(t *testing.T) {
+func TestU32Clear(t *testing.T) {
 	capacity := 100
-	lru := NewCache(capacity)
+	lru := NewCache32(capacity)
 	for i := 0; i < capacity; i++ {
-		lru.Add(i, i)
+		lru.Add(uint32(i), i)
 	}
 	lru.Clear()
 	if lru.lruList != nil || lru.cache != nil {
@@ -47,11 +48,11 @@ func TestClear(t *testing.T) {
 	}
 }
 
-func TestRemoveAndContain(t *testing.T) {
+func TestU32RemoveAndContain(t *testing.T) {
 	capacity := 100
-	lru := NewCache(capacity)
+	lru := NewCache32(capacity)
 	for i := 0; i < capacity; i++ {
-		lru.Add(i, i)
+		lru.Add(uint32(i), i)
 	}
 	lru.Remove(3)
 	if lru.Len() != 99 {

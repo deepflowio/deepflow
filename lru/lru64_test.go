@@ -4,42 +4,44 @@ import (
 	"testing"
 )
 
-func TestKeys(t *testing.T) {
+func TestU64Keys(t *testing.T) {
 	capacity := 100
-	lru := NewCache(capacity)
+	lru := NewCache64(capacity)
 	for i := 0; i < capacity; i++ {
-		lru.Add(i, i)
+		lru.Add(uint64(i), uint64(i))
 	}
 	keys := lru.Keys()
 	for index, key := range keys {
-		if key != index {
+		if key != uint64(index) {
 			t.Errorf("key %d is not expected", key)
 			return
 		}
+
 		index++
 	}
 }
 
-func TestValues(t *testing.T) {
+func TestU64Values(t *testing.T) {
 	capacity := 100
-	lru := NewCache(capacity)
+	lru := NewCache64(capacity)
 	for i := 0; i < capacity; i++ {
-		lru.Add(i, i)
+		lru.Add(uint64(i), i)
 	}
 	values := lru.Values()
 	for index, value := range values {
-		if value != index {
-			t.Errorf("value %d is not expected", value)
+		v := value.(int)
+		if v != index {
+			t.Errorf("value %d is not expected", v)
 			return
 		}
 	}
 }
 
-func TestClear(t *testing.T) {
+func TestU64Clear(t *testing.T) {
 	capacity := 100
-	lru := NewCache(capacity)
+	lru := NewCache64(capacity)
 	for i := 0; i < capacity; i++ {
-		lru.Add(i, i)
+		lru.Add(uint64(i), i)
 	}
 	lru.Clear()
 	if lru.lruList != nil || lru.cache != nil {
@@ -47,11 +49,11 @@ func TestClear(t *testing.T) {
 	}
 }
 
-func TestRemoveAndContain(t *testing.T) {
+func TestU64RemoveAndContain(t *testing.T) {
 	capacity := 100
-	lru := NewCache(capacity)
+	lru := NewCache64(capacity)
 	for i := 0; i < capacity; i++ {
-		lru.Add(i, i)
+		lru.Add(uint64(i), i)
 	}
 	lru.Remove(3)
 	if lru.Len() != 99 {
