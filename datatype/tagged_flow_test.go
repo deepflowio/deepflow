@@ -132,4 +132,63 @@ func TestTaggedFlowEncodeDecodeiNul(t *testing.T) {
 	}
 }
 
+func TestCloneTaggedFlow(t *testing.T) {
+	FlowKey := FlowKey{
+		IP6Src: []byte{},
+		IP6Dst: []byte{3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3},
+	}
+
+	tcpPerfCountsPeer := TcpPerfCountsPeer{
+		ZeroWinCount: 603,
+	}
+
+	TcpPerfStats := TcpPerfStats{
+		TcpPerfCountsPeers: [2]TcpPerfCountsPeer{tcpPerfCountsPeer},
+	}
+
+	Flow := Flow{
+		FlowKey:      FlowKey,
+		TcpPerfStats: &TcpPerfStats,
+	}
+
+	ef := &TaggedFlow{
+		Flow: Flow,
+	}
+
+	eff := CloneTaggedFlow(ef)
+	if ef.String() != eff.String() {
+		t.Error("CloneTaggedFlow()实现不正确")
+	}
+}
+
+func TestTaggedFlowRelease(t *testing.T) {
+	FlowKey := FlowKey{
+		IP6Src: []byte{},
+		IP6Dst: []byte{3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3},
+	}
+
+	tcpPerfCountsPeer := TcpPerfCountsPeer{
+		ZeroWinCount: 603,
+	}
+
+	TcpPerfStats := TcpPerfStats{
+		TcpPerfCountsPeers: [2]TcpPerfCountsPeer{tcpPerfCountsPeer},
+	}
+
+	Flow := Flow{
+		FlowKey:      FlowKey,
+		TcpPerfStats: &TcpPerfStats,
+	}
+
+	f := &TaggedFlow{
+		Flow: Flow,
+	}
+	ff := &TaggedFlow{}
+	f.Release()
+
+	if f.String() != ff.String() {
+		t.Error("Release()实现不正确")
+	}
+}
+
 // FIXME: 测试SequencialMerge和Reverse
