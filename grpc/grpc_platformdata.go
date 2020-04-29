@@ -228,17 +228,22 @@ func (t *PlatformInfoTable) QueryMacL2Info(mac uint64) *L2Info {
 func (t *PlatformInfoTable) QueryMacL2InfosPair(mac0, mac1 uint64) (l2Info0 *L2Info, l2Info1 *L2Info) {
 	var ok0, ok1 bool
 	t.macLock.RLock()
-	if l2Info0, ok0 = t.macL2Infos[mac0]; !ok0 {
-		t.L2InfoMissStat(mac0)
-	} else {
+	if l2Info0, ok0 = t.macL2Infos[mac0]; ok0 {
 		atomic.AddUint64(&l2Info0.HitCount, 1)
 	}
-	if l2Info1, ok1 = t.macL2Infos[mac1]; !ok1 {
-		t.L2InfoMissStat(mac1)
-	} else {
+	if l2Info1, ok1 = t.macL2Infos[mac1]; ok1 {
 		atomic.AddUint64(&l2Info1.HitCount, 1)
 	}
 	t.macLock.RUnlock()
+
+	if !ok0 {
+		t.L2InfoMissStat(mac0)
+	}
+
+	if !ok1 {
+		t.L2InfoMissStat(mac1)
+	}
+
 	return
 }
 
