@@ -225,11 +225,6 @@ message NpbAction {
     optional uint32 tunnel_ip_id = 7; // 分发点id, 限制在64000
 }
 
-message FlowAction {
-    optional Action action = 1;
-    optional uint32 policy_acl_group_id = 2;
-}
-
 // 字段含义查看README
 message FlowAcl {
     optional uint32 id = 1;
@@ -238,7 +233,6 @@ message FlowAcl {
     optional string src_ports = 7;
     optional string dst_ports = 8;
     optional uint32 vlan = 9;
-    repeated FlowAction actions = 10;
     repeated NpbAction npb_actions = 11;
     repeated int32 src_group_ids = 12;
     repeated int32 dst_group_ids = 13;
