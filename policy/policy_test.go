@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	forward       = AclAction(0).AddActionFlags(ACTION_PACKET_CAPTURING).AddDirections(FORWARD)
-	backward      = AclAction(0).AddActionFlags(ACTION_PACKET_CAPTURING).AddDirections(BACKWARD)
+	forward       = toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
+	backward      = toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_DST, 0)
 	ttl           = uint8(64)
 	ip1           = NewIPFromString("192.168.2.12").Int()
 	ip2           = NewIPFromString("192.168.2.0").Int()
@@ -251,19 +251,10 @@ func generatePeerConnection(id uint32, src, dst int32) *PeerConnection {
 	}
 }
 
-func generateAclAction(id uint32, actionFlags ActionFlag) AclAction {
-	return AclAction(0).SetACLGID(uint16(id)).AddActionFlags(actionFlags).AddDirections(FORWARD)
-}
-
-func getBackwardAcl(acl AclAction) AclAction {
-	return acl.SetDirections(BACKWARD)
-}
-
-func generatePolicyAcl(table *PolicyTable, action AclAction, aclID uint32, args ...interface{}) *Acl {
+func generatePolicyAcl(table *PolicyTable, action NpbActions, aclID uint32, args ...interface{}) *Acl {
 	var srcGroupId, dstGroupId uint32
 	var proto uint16
 	var port int
-	var npb NpbActions
 
 	for i, arg := range args {
 		switch i {
@@ -283,8 +274,6 @@ func generatePolicyAcl(table *PolicyTable, action AclAction, aclID uint32, args 
 			} else {
 				port = int(arg.(uint16))
 			}
-		case 4:
-			npb = arg.(NpbActions)
 		}
 	}
 
@@ -310,11 +299,7 @@ func generatePolicyAcl(table *PolicyTable, action AclAction, aclID uint32, args 
 		SrcPortRange: []PortRange{NewPortRange(0, 65535)},
 		DstPortRange: dstPorts,
 		Proto:        uint16(proto),
-		Action:       []AclAction{action},
-	}
-	if npb.TunnelId() != 0 {
-		acl.NpbActions = append(acl.NpbActions, npb)
-		acl.Action = nil
+		NpbActions:   []NpbActions{action},
 	}
 	return acl
 }
@@ -496,10 +481,10 @@ func generatePolicyTable(ids ...TableID) *PolicyTable {
 // 生成特定Acl规则
 func generateAclData(policy *PolicyTable) {
 	dstPorts := []uint16{0, 8000}
-	aclAction1 := generateAclAction(10, ACTION_PACKET_CAPTURING)
-	acl1 := generatePolicyAcl(policy, aclAction1, 10, groupAny, groupAny, IPProtocolTCP, dstPorts[1])
-	aclAction2 := generateAclAction(20, ACTION_PACKET_CAPTURING)
-	acl2 := generatePolicyAcl(policy, aclAction2, 20, groupAny, groupAny, IPProtocolTCP, dstPorts[0])
+	action1 := toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, 0, 0)
+	acl1 := generatePolicyAcl(policy, action1, 10, groupAny, groupAny, IPProtocolTCP, dstPorts[1])
+	action2 := toNpbAction(20, 0, NPB_TUNNEL_TYPE_PCAP, 0, 0)
+	acl2 := generatePolicyAcl(policy, action2, 20, groupAny, groupAny, IPProtocolTCP, dstPorts[0])
 	policy.UpdateAcls([]*Acl{acl1, acl2})
 }
 
