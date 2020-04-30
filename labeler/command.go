@@ -503,19 +503,16 @@ func parseAcl(args []string) *policy.Acl {
 			}
 			acl.DstPorts = make([]uint16, 0)
 			acl.DstPorts = append(acl.DstPorts, uint16(port))
-		case "action":
-			aclAction := datatype.AclAction(0).AddDirections(datatype.FORWARD | datatype.BACKWARD).
-				AddActionFlags(datatype.ACTION_PACKET_CAPTURING)
-			acl.Action = append(acl.Action, aclAction)
 		default:
 			fmt.Printf("invalid key from %s\n", args[0])
 			return nil
 		}
 	}
-	if acl.Id == 0 || len(acl.Action) == 0 {
+	if acl.Id == 0 {
 		fmt.Printf("invalid input %s\n", args[0])
 		return nil
 	}
+	acl.NpbActions = append(acl.NpbActions, datatype.ToNpbActions(acl.Id, 0, datatype.NPB_TUNNEL_TYPE_PCAP, 0, 0))
 	return acl
 }
 
@@ -646,10 +643,7 @@ func RegisterCommand() *cobra.Command {
 			"\tvlan               packet vlan\n" +
 			"\tsgroup/dgroup      group id\n" +
 			"\tproto              packet ip proto\n" +
-			"\tport               packet port\n" +
-			"\taction             use 'flow|metering|all'\n\n" +
-			"\taction: metering=ACTION_PACKET_COUNTING\n" +
-			"\t        flow=ACTION_FLOW_COUNTING|ACTION_FLOW_STORING",
+			"\tport               packet port\n\n",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
 				fmt.Printf("acl is nil, Example: %s\n", cmd.Example)
