@@ -50,6 +50,11 @@ type U128LRU struct {
 	maxScan  int
 }
 
+func (m *U128LRU) NoStats() *U128LRU {
+	m.Close()
+	return m
+}
+
 func (m *U128LRU) Size() int {
 	return m.size
 }
