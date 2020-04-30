@@ -72,6 +72,11 @@ func NewU128IDMap(module string, hashSlots uint32, opts ...stats.OptionStatTags)
 	return m
 }
 
+func (m *U128IDMap) NoStats() *U128IDMap {
+	m.Close()
+	return m
+}
+
 func (m *U128IDMap) Size() int {
 	return m.size
 }
