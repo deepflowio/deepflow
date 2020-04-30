@@ -405,10 +405,6 @@ WORKING_LOOP:
 			}
 
 			block := e.(*datatype.MetaPacketBlock)
-			if block.ActionFlags&datatype.ACTION_PACKET_CAPTURING == 0 {
-				datatype.ReleaseMetaPacketBlock(block)
-				continue
-			}
 
 			for i := uint8(0); i < block.Count; i++ {
 				packet := &block.Metas[i]
@@ -418,20 +414,19 @@ WORKING_LOOP:
 					continue
 				}
 
-				for _, policy := range packet.PolicyData.AclActions {
-					if policy.GetACLGID() <= 0 {
+				for _, policy := range packet.PolicyData.NpbActions {
+					// NOTICE: PCAP存储必须满足TunnelType是NPB_TUNNEL_TYPE_PCAP, 因为策略是NPB_TUNNEL_TYPE_PCAP类型，这里的判断去掉了
+					if policy.TunnelGid() <= 0 {
 						continue
 					}
-					if policy.GetActionFlags()&datatype.ACTION_PACKET_CAPTURING != 0 {
-						tapType := w.checkWriterPcap(packet, policy.GetDirections())
-						if packet.EthType != EthernetTypeIPv6 {
-							for i := range w.ips {
-								w.writePacket(packet, tapType, w.ips[i], w.macs[i], policy.GetACLGID())
-							}
-						} else {
-							for i := range w.ip6s {
-								w.writePacketIpv6(packet, tapType, w.ip6s[i], w.macs[i], policy.GetACLGID())
-							}
+					tapType := w.checkWriterPcap(packet, policy.GetDirections())
+					if packet.EthType != EthernetTypeIPv6 {
+						for i := range w.ips {
+							w.writePacket(packet, tapType, w.ips[i], w.macs[i], policy.TunnelGid())
+						}
+					} else {
+						for i := range w.ip6s {
+							w.writePacketIpv6(packet, tapType, w.ip6s[i], w.macs[i], policy.TunnelGid())
 						}
 					}
 				}
