@@ -6,7 +6,6 @@ import (
 	"net"
 
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
-	"gitlab.x.lan/yunshan/droplet-libs/pool"
 )
 
 var (
@@ -72,6 +71,10 @@ func (a NpbAction) TapSideCompare(flag int) bool {
 
 func (a NpbAction) TapSide() int {
 	return int((a >> 26) & TAPSIDE_MASK)
+}
+
+func (a NpbAction) GetDirections() DirectionType {
+	return DirectionType(a.TapSide())
 }
 
 func (a *NpbAction) SetTapSide(flag int) {
@@ -203,18 +206,12 @@ func (f ActionFlag) String() string {
 }
 
 type PolicyData struct {
-	AclActions  []AclAction
 	NpbActions  []NpbActions
 	AclId       uint32
 	ActionFlags ActionFlag
 }
 
 func (p *PolicyData) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU32(uint32(len(p.AclActions)))
-	for i := range p.AclActions {
-		p.AclActions[i].Encode(encoder)
-	}
-
 	encoder.WriteU32(uint32(len(p.NpbActions)))
 	for i := range p.NpbActions {
 		p.NpbActions[i].Encode(encoder)
@@ -226,13 +223,6 @@ func (p *PolicyData) Encode(encoder *codec.SimpleEncoder) {
 
 func (p *PolicyData) Decode(decoder *codec.SimpleDecoder) {
 	l := decoder.ReadU32()
-	if l > 0 {
-		p.AclActions = make([]AclAction, l)
-		for i := range p.AclActions {
-			p.AclActions[i].Decode(decoder)
-		}
-	}
-	l = decoder.ReadU32()
 	if l > 0 {
 		p.NpbActions = make([]NpbActions, l)
 		for i := range p.NpbActions {
@@ -254,72 +244,6 @@ const (
 	FORWARD DirectionType = 1 << iota
 	BACKWARD
 )
-
-// keys (16b ACLGID + 16b ActionFlags + ), values (2b Directions)
-type AclAction uint64
-
-func (a *AclAction) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU64(uint64(*a))
-}
-
-func (a *AclAction) Decode(decoder *codec.SimpleDecoder) {
-	*a = AclAction(decoder.ReadU64())
-}
-
-func (a AclAction) SetACLGID(aclGID uint16) AclAction {
-	a &= ^AclAction(0xFFFF << 48)
-	a |= AclAction(aclGID&0xFFFF) << 48
-	return a
-}
-
-func (a AclAction) SetActionFlags(actionFlags ActionFlag) AclAction {
-	a &= ^AclAction(0xFFFF << 32)
-	a |= AclAction(actionFlags&0xFFFF) << 32
-	return a
-}
-
-func (a AclAction) AddActionFlags(actionFlags ActionFlag) AclAction {
-	a |= AclAction(actionFlags&0xFFFF) << 32
-	return a
-}
-
-func (a AclAction) SetDirections(directions DirectionType) AclAction {
-	a &= ^AclAction(0x3 << 12)
-	a |= AclAction(directions&0x3) << 12
-	return a
-}
-
-func (a AclAction) AddDirections(directions DirectionType) AclAction {
-	a |= AclAction(directions&0x3) << 12
-	return a
-}
-
-func (a AclAction) ReverseDirection() AclAction {
-	switch a.GetDirections() {
-	case FORWARD:
-		return a.SetDirections(BACKWARD)
-	case BACKWARD:
-		return a.SetDirections(FORWARD)
-	}
-	return a
-}
-
-func (a AclAction) GetACLGID() uint16 {
-	return uint16(((a >> 48) & 0xFFFF))
-}
-
-func (a AclAction) GetActionFlags() ActionFlag {
-	return ActionFlag((a >> 32) & 0xFFFF)
-}
-
-func (a AclAction) GetDirections() DirectionType {
-	return DirectionType((a >> 12) & 0x3)
-}
-
-func (a AclAction) String() string {
-	return fmt.Sprintf("{GID: %d ActionFlags: %s Directions: %d}",
-		a.GetACLGID(), a.GetActionFlags().String(), a.GetDirections())
-}
 
 func (d *PolicyData) GobEncode() ([]byte, error) {
 	return []byte{}, nil
@@ -384,7 +308,7 @@ func (d *PolicyData) MergeNpbAction(actions []NpbActions, aclID uint32, directio
 				break
 			}
 
-			if m.TunnelIpId() != n.TunnelIpId() || m.TunnelId() != n.TunnelId() || m.TunnelType() != n.TunnelType() {
+			if m.TunnelIpId() != n.TunnelIpId() || m.TunnelId() != n.TunnelId() || m.TunnelType() != n.TunnelType() || n.TunnelType() == NPB_TUNNEL_TYPE_PCAP {
 				continue
 			}
 			if n.PayloadSlice() == 0 ||
@@ -413,37 +337,7 @@ func (d *PolicyData) MergeNpbAction(actions []NpbActions, aclID uint32, directio
 	}
 }
 
-func (d *PolicyData) MergeAclAction(actions []AclAction, aclID uint32, directions ...DirectionType) {
-	if d.AclId == 0 {
-		d.AclId = aclID
-	}
-	for _, newAclAction := range actions {
-		if len(directions) > 0 {
-			newAclAction = newAclAction.SetDirections(directions[0])
-		}
-
-		exist := false
-		for j, existAclAction := range d.AclActions { // 按ACLGID和TagTemplates合并
-			if newAclAction.GetACLGID() == existAclAction.GetACLGID() {
-				exist = true
-				d.AclActions[j] = existAclAction.AddDirections(newAclAction.GetDirections()).
-					AddActionFlags(newAclAction.GetActionFlags())
-				d.ActionFlags |= newAclAction.GetActionFlags()
-				break
-			}
-		}
-		if exist {
-			continue
-		}
-		// 无需再按照ACLGID和ActionFlags合并，因为他们的TagTemplates肯定相同
-
-		d.AclActions = append(d.AclActions, newAclAction)
-		d.ActionFlags |= newAclAction.GetActionFlags()
-	}
-}
-
-func (d *PolicyData) Merge(aclActions []AclAction, npbActions []NpbActions, aclID uint32, directions ...DirectionType) {
-	d.MergeAclAction(aclActions, aclID, directions...)
+func (d *PolicyData) Merge(npbActions []NpbActions, aclID uint32, directions ...DirectionType) {
 	d.MergeNpbAction(npbActions, aclID, directions...)
 }
 
@@ -456,54 +350,11 @@ func (d *PolicyData) MergeNpbAndSwapDirection(actions []NpbActions, aclID uint32
 	d.MergeNpbAction(newNpbActions, aclID)
 }
 
-func (d *PolicyData) MergeAclAndSwapDirection(actions []AclAction, aclID uint32) {
-	newAclActions := make([]AclAction, len(actions))
-	for i, _ := range actions {
-		newAclActions[i] = actions[i].ReverseDirection()
-	}
-
-	d.MergeAclAction(newAclActions, aclID)
-}
-
-func (d *PolicyData) MergeAndSwapDirection(aclActions []AclAction, npbActions []NpbActions, aclID uint32) {
-	d.MergeAclAndSwapDirection(aclActions, aclID)
+func (d *PolicyData) MergeAndSwapDirection(npbActions []NpbActions, aclID uint32) {
 	d.MergeNpbAndSwapDirection(npbActions, aclID)
 }
 
-// ReverseData will return a reversed replica of the current PolicyData
-func (d *PolicyData) ReverseData() *PolicyData {
-	newPolicyData := ClonePolicyData(d)
-	for i, aclAction := range newPolicyData.AclActions {
-		newPolicyData.AclActions[i] = aclAction.ReverseDirection()
-	}
-	return newPolicyData
-}
-
 func (d *PolicyData) String() string {
-	return fmt.Sprintf("{AclId: %d ActionFlags: %v AclActions: %v NpbActions: %v}",
-		d.AclId, d.ActionFlags, d.AclActions, d.NpbActions)
-}
-
-var policyDataPool = pool.NewLockFreePool(func() interface{} {
-	return new(PolicyData)
-})
-
-func AcquirePolicyData() *PolicyData {
-	return policyDataPool.Get().(*PolicyData)
-}
-
-func ReleasePolicyData(d *PolicyData) {
-	if d.AclActions != nil {
-		d.AclActions = d.AclActions[:0]
-	}
-	*d = PolicyData{AclActions: d.AclActions}
-	policyDataPool.Put(d)
-}
-
-func ClonePolicyData(d *PolicyData) *PolicyData {
-	dup := AcquirePolicyData()
-	*dup = *d
-	dup.AclActions = make([]AclAction, len(d.AclActions))
-	copy(dup.AclActions, d.AclActions)
-	return dup
+	return fmt.Sprintf("{AclId: %d ActionFlags: %v NpbActions: %v}",
+		d.AclId, d.ActionFlags, d.NpbActions)
 }

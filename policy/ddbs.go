@@ -272,15 +272,10 @@ func (d *Ddbs) addFastPath(endpointData *EndpointData, packet *LookupKey, policy
 func (d *Ddbs) mergePolicy(packetEndpointData *EndpointData, packet *LookupKey, findPolicy, policyForward, policyBackward *PolicyData) {
 	id := getAclId(policyForward.AclId, policyBackward.AclId)
 	if id > 0 {
-		if packet.HasFeatureFlag(NPM) {
-			length := len(policyForward.AclActions) + len(policyBackward.AclActions)
-			findPolicy.AclActions = make([]AclAction, 0, length)
-			findPolicy.MergeAclAction(append(policyForward.AclActions, policyBackward.AclActions...), id)
-		}
+		length := len(policyForward.NpbActions) + len(policyBackward.NpbActions)
+		findPolicy.NpbActions = make([]NpbActions, 0, length)
+		findPolicy.MergeNpbAction(append(policyForward.NpbActions, policyBackward.NpbActions...), id)
 		if packet.HasFeatureFlag(NPB) {
-			length := len(policyForward.NpbActions) + len(policyBackward.NpbActions)
-			findPolicy.NpbActions = make([]NpbActions, 0, length)
-			findPolicy.MergeNpbAction(append(policyForward.NpbActions, policyBackward.NpbActions...), id)
 			findPolicy.FormatNpbAction()
 			findPolicy.Dedup(packet)
 		}
@@ -298,7 +293,7 @@ func (d *Ddbs) getPolicyFromTable(key *MatchedField, direction DirectionType, po
 				portPolicy = new(PolicyData)
 			}
 			policy := item.policy
-			portPolicy.Merge(policy.AclActions, policy.NpbActions, policy.AclId, direction)
+			portPolicy.Merge(policy.NpbActions, policy.AclId, direction)
 		}
 	}
 	return portPolicy
@@ -312,7 +307,7 @@ func (d *Ddbs) getPolicyFromTable6(key *MatchedField6, direction DirectionType, 
 				portPolicy = new(PolicyData)
 			}
 			policy := item.policy
-			portPolicy.Merge(policy.AclActions, policy.NpbActions, policy.AclId, direction)
+			portPolicy.Merge(policy.NpbActions, policy.AclId, direction)
 		}
 	}
 	return portPolicy
@@ -343,7 +338,7 @@ func (d *Ddbs) GetPolicyByFirstPath(packet *LookupKey, findPolicy *PolicyData, e
 	d.mergePolicy(packetEndpointData, packet, findPolicy, policys[FORWARD], policys[BACKWARD])
 
 	d.FirstPathHit++
-	if aclHit := uint32(len(findPolicy.AclActions) + len(findPolicy.NpbActions)); d.AclHitMax < aclHit {
+	if aclHit := uint32(len(findPolicy.NpbActions)); d.AclHitMax < aclHit {
 		d.AclHitMax = aclHit
 	}
 	return endpointStore
