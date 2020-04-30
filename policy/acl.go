@@ -16,7 +16,6 @@ type Acl struct {
 	SrcPorts        []uint16    // 0仅表示采集端口0
 	DstPorts        []uint16    // 0仅表示采集端口0
 	Proto           uint16      // 256表示全采集, 0表示采集采集协议0
-	Action          []AclAction
 	NpbActions      []NpbActions
 	AllMatched      []MatchedField
 	AllMatchedMask  []MatchedField // MatchedMask对应的位为0，表示对应Matched的位为*，0或1都匹配该策略
@@ -30,7 +29,7 @@ const (
 )
 
 func (a *Acl) InitPolicy() {
-	a.policy.Merge(a.Action, a.NpbActions, a.Id)
+	a.policy.Merge(a.NpbActions, a.Id)
 }
 
 func (a *Acl) Reset() {
@@ -218,6 +217,6 @@ func (a *Acl) getPorts(rawPorts []uint16) string {
 }
 
 func (a *Acl) String() string {
-	return fmt.Sprintf("Id:%v TapType:%v SrcGroups:%v DstGroups:%v SrcPortRange:[%v] SrcPorts:[%s] DstPortRange:[%v] DstPorts:[%s] Proto:%v Action:%v NpbActions:%s",
-		a.Id, a.TapType, a.SrcGroups, a.DstGroups, a.SrcPortRange, a.getPorts(a.SrcPorts), a.DstPortRange, a.getPorts(a.DstPorts), a.Proto, a.Action, a.NpbActions)
+	return fmt.Sprintf("Id:%v TapType:%v SrcGroups:%v DstGroups:%v SrcPortRange:[%v] SrcPorts:[%s] DstPortRange:[%v] DstPorts:[%s] Proto:%v NpbActions:%s",
+		a.Id, a.TapType, a.SrcGroups, a.DstGroups, a.SrcPortRange, a.getPorts(a.SrcPorts), a.DstPortRange, a.getPorts(a.DstPorts), a.Proto, a.NpbActions)
 }

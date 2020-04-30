@@ -12,7 +12,7 @@ func TestDdbsSimple(t *testing.T) {
 	// 创建 policyTable
 	table := generatePolicyTable(DDBS)
 	// 构建acl action  1->2 tcp 8000
-	action := generateAclAction(10, ACTION_PACKET_CAPTURING)
+	action := toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 8000)
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
@@ -24,7 +24,7 @@ func TestDdbsSimple(t *testing.T) {
 	_, policyData := table.lookupAllByKey(key)
 	// 构建预期结果
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	basicPolicyData.Merge([]NpbActions{action}, acl.Id)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestDdbsSimple Check Failed!")
@@ -33,9 +33,9 @@ func TestDdbsSimple(t *testing.T) {
 	// 构建查询2-key  2:8000->1:0 tcp
 	key = generateLookupKey(group2Mac, group1Mac, group2Ip1, group1Ip1, IPProtocolTCP, 8000, 0)
 	// key和acl方向相反，构建反向的action
-	backward := getBackwardAcl(action)
+	backward := action.ReverseTapSide()
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.Merge([]AclAction{backward}, nil, acl.Id)
+	basicPolicyData.Merge([]NpbActions{backward}, acl.Id)
 	// 查询结果和预期结果比较
 	_, policyData = table.lookupAllByKey(key)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
@@ -52,12 +52,12 @@ func TestDdbsSimple(t *testing.T) {
 	}
 
 	// 测试同样的key, 匹配两条action
-	action2 := generateAclAction(12, ACTION_PACKET_CAPTURING)
+	action2 := toNpbAction(12, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl2 := generatePolicyAcl(table, action2, 12, group[1], group[2], IPProtocolTCP, 8000)
 	acls = append(acls, acl2)
 	table.UpdateAcls(acls)
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action, action2}, nil, acl.Id)
+	basicPolicyData.Merge([]NpbActions{action, action2}, acl.Id)
 
 	// 4-key
 	key = generateLookupKey(group1Mac, group2Mac, group1Ip1, group2Ip1, IPProtocolTCP, 0, 8000)
@@ -72,7 +72,7 @@ func BenchmarkDdbsFirstPath(b *testing.B) {
 	// 创建 policyTable
 	table := generatePolicyTable(DDBS)
 	// 构建acl action  1->2 tcp 8000
-	action := generateAclAction(10, ACTION_PACKET_CAPTURING)
+	action := toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, 0, 0)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 8000)
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
@@ -92,7 +92,7 @@ func TestDdbsPolicyEpcPolicy(t *testing.T) {
 	// 创建 policyTable
 	table := generatePolicyTable(DDBS)
 	// 构建acl action  1->2 tcp 8000
-	action := generateAclAction(10, ACTION_PACKET_CAPTURING)
+	action := toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl := generatePolicyAcl(table, action, 10, group[1], groupAny, IPProtocolTCP, 8000)
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
@@ -103,22 +103,22 @@ func TestDdbsPolicyEpcPolicy(t *testing.T) {
 	_, policyData := table.lookupAllByKey(key)
 	// 构建预期结果
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	basicPolicyData.Merge([]NpbActions{action}, acl.Id)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestPolicyEpcPolicy Check Failed!")
+		t.Error("TestDdbsPolicyEpcPolicy Check Failed!")
 	}
 
 	_, policyData = getPolicyByFastPath(table, key)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
-		t.Error("TestPolicyEpcPolicy FastPath Check Failed!")
+		t.Error("TestDdbsPolicyEpcPolicy FastPath Check Failed!")
 	}
 
-	backward := getBackwardAcl(action)
+	backward := action.ReverseTapSide()
 	key = generateLookupKey(group1Mac2, group1Mac, group1Ip3, group1Ip1, IPProtocolTCP, 8000, 0)
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.Merge([]AclAction{backward}, nil, acl.Id)
+	basicPolicyData.Merge([]NpbActions{backward}, acl.Id)
 	_, policyData = getPolicyByFastPath(table, key)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
@@ -146,7 +146,7 @@ func TestDdbsPolicyEpcIpGroup(t *testing.T) {
 	// 创建 policyTable
 	table := generatePolicyTable(DDBS)
 	// 构建acl action  1->2 tcp 8000
-	action := generateAclAction(10, ACTION_PACKET_CAPTURING)
+	action := toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl := generatePolicyAcl(table, action, 10, group[16], groupAny, IPProtocolTCP, 8000)
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
@@ -155,7 +155,7 @@ func TestDdbsPolicyEpcIpGroup(t *testing.T) {
 	_, policyData := table.lookupAllByKey(key)
 	// 构建预期结果
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	basicPolicyData.Merge([]NpbActions{action}, acl.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestDdbsPolicyEpcIpGroup Check Failed!")
 	}
@@ -171,19 +171,19 @@ func TestDdbsIpGroupPortAcl(t *testing.T) {
 	acls := []*Acl{}
 	table := generatePolicyTable(DDBS)
 	// group1->group2,tcp,vlan:10,dstport:20
-	action := generateAclAction(10, ACTION_PACKET_CAPTURING)
+	action := toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 20)
 	// group2->group1,tcp,vlan:10,dstport:21
-	action2 := generateAclAction(12, ACTION_PACKET_CAPTURING)
+	action2 := toNpbAction(12, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl2 := generatePolicyAcl(table, action2, 12, group[2], group[1], IPProtocolTCP, 21)
 	acls = append(acls, acl, acl2)
 	table.UpdateAcls(acls)
 	// 构建查询key  1:21->2:20 tcp vlan:10 ,匹配两条acl
 	key := generateLookupKey(group1Mac, group2Mac, group1Ip1, group2Ip1, IPProtocolTCP, 21, 20)
 	_, policyData := table.lookupAllByKey(key)
-	backward := getBackwardAcl(action2)
+	backward := action2.ReverseTapSide()
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action, backward}, nil, acl.Id)
+	basicPolicyData.Merge([]NpbActions{action, backward}, acl.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestIpGroupPortAcl Check Failed!")
 	}
@@ -194,17 +194,17 @@ func TestDdbsResourceGroupPolicy(t *testing.T) {
 	table := generatePolicyTable(DDBS)
 	// acl1: dstGroup:group1
 	// group1: epcId=10,mac=group1Mac,ips="group1Ip1/24,group1Ip2/25",subnetId=121
-	action1 := generateAclAction(16, ACTION_PACKET_CAPTURING)
+	action1 := toNpbAction(16, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl1 := generatePolicyAcl(table, action1, 16, groupAny, group[1], protoAny, -1)
 	acls = append(acls, acl1)
 	table.UpdateAcls(acls)
 	// 构建查询1-key  (group1)group1Ip1:10->(group1)group1Ip2:10 proto:6
 	key := generateLookupKey(group1Mac, group1Mac, group1Ip1, group1Ip2, IPProtocolTCP, 10, 10)
 	_, policyData := table.lookupAllByKey(key)
-	backward := getBackwardAcl(action1)
+	backward := action1.ReverseTapSide()
 	// 可匹配acl1，direction=3
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action1, backward}, nil, acl1.Id)
+	basicPolicyData.Merge([]NpbActions{action1, backward}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy Check Failed!")
 	}
@@ -219,19 +219,19 @@ func TestDdbsResourceGroupPolicy(t *testing.T) {
 	// acl3: srcGroup:group3-> dstGroup:group5,dstPort=1023,udp
 	// group5: 1.epcId=-1,mac=group5Mac1,ips="group5Ip1/24,group5Ip2/32"
 	//         2.epcId=50,mac=group5Mac2,ips="group5Ip1/24,group5Ip2/32"
-	action2 := generateAclAction(18, ACTION_PACKET_CAPTURING)
+	action2 := toNpbAction(18, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl2 := generatePolicyAcl(table, action2, 18, groupAny, group[5], protoAny, -1)
-	action3 := generateAclAction(19, ACTION_PACKET_CAPTURING)
+	action3 := toNpbAction(19, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl3 := generatePolicyAcl(table, action3, 19, group[3], group[5], IPProtocolUDP, 1023)
 	acls = append(acls, acl2, acl3)
 	table.UpdateAcls(acls)
 	// 2-key  (group5)group5Ip1:1000->(group5)group5Ip2:1023 udp
 	key = generateLookupKey(group5Mac1, group5Mac1, group5Ip1, group5Ip2, IPProtocolUDP, 1000, 1023)
 	_, policyData = table.lookupAllByKey(key)
-	backward = getBackwardAcl(action2)
+	backward = action2.ReverseTapSide()
 	// 匹配action2及backward，但不匹配action3
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action2, backward}, nil, acl2.Id)
+	basicPolicyData.Merge([]NpbActions{action2, backward}, acl2.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy: 2-key Check Failed!")
 	}
@@ -244,7 +244,7 @@ func TestDdbsResourceGroupPolicy(t *testing.T) {
 	key = generateLookupKey(macAny, group5Mac1, ip5, group5Ip1, IPProtocolUDP, 1000, 1023)
 	_, policyData = table.lookupAllByKey(key)
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action2}, nil, acl2.Id)
+	basicPolicyData.Merge([]NpbActions{action2}, acl2.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy: 3-key Check Failed!")
 	}
@@ -256,7 +256,7 @@ func TestDdbsResourceGroupPolicy(t *testing.T) {
 	key = generateLookupKey(macAny, group5Mac1, ip1, group5Ip2, IPProtocolUDP, 1000, 1023)
 	_, policyData = table.lookupAllByKey(key)
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action2}, nil, acl2.Id)
+	basicPolicyData.Merge([]NpbActions{action2}, acl2.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy: 4-key Check Failed!")
 	}
@@ -268,7 +268,7 @@ func TestDdbsResourceGroupPolicy(t *testing.T) {
 	key = generateLookupKey(group3Mac1, group5Mac1, ip6, ip7, IPProtocolUDP, 1000, 1023)
 	_, policyData = table.lookupAllByKey(key)
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action2, action3}, nil, acl2.Id)
+	basicPolicyData.Merge([]NpbActions{action2, action3}, acl2.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy: 5-key Check Failed!")
 	}
@@ -283,9 +283,9 @@ func TestDdbsSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	acls := []*Acl{}
 	// acl1: dstGroup: ipGroup6(IP资源组)，udp
 	// acl2: srcGroup: group3(DEV资源组)，udp
-	action1 := generateAclAction(20, ACTION_PACKET_CAPTURING)
+	action1 := toNpbAction(20, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl1 := generatePolicyAcl(table, action1, 20, groupAny, group[6], IPProtocolUDP, -1)
-	action2 := generateAclAction(21, ACTION_PACKET_CAPTURING)
+	action2 := toNpbAction(21, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl2 := generatePolicyAcl(table, action2, 21, group[3], groupAny, IPProtocolUDP, -1)
 	acls = append(acls, acl1, acl2)
 	table.UpdateAcls(acls)
@@ -294,9 +294,9 @@ func TestDdbsSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	key1 := generateLookupKey(group3Mac1, ipGroup6Mac1, group3Ip1, ipGroup6Ip3, IPProtocolUDP, 0, 0)
 	result := getEndpointData(table, key1)
 	policyData := getPolicyByFirstPath(table, result, key1)
-	backward1 := getBackwardAcl(action1)
+	backward1 := action1.ReverseTapSide()
 	basicPolicyData1 := new(PolicyData)
-	basicPolicyData1.Merge([]AclAction{action1, action2, backward1}, nil, acl1.Id) // 可以匹配backward1
+	basicPolicyData1.Merge([]NpbActions{action1, action2, backward1}, acl1.Id) // 可以匹配backward1
 	if !CheckPolicyResult(t, basicPolicyData1, policyData) {
 		t.Error("key1 FirstPath Check Failed!")
 	}
@@ -305,9 +305,9 @@ func TestDdbsSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	key2 := generateLookupKey(group3Mac1, ipGroup6Mac1, group3Ip2, group3Ip1, IPProtocolUDP, 0, 0)
 	result = getEndpointData(table, key2)
 	policyData = getPolicyByFirstPath(table, result, key2)
-	backward2 := getBackwardAcl(action2)
+	backward2 := action2.ReverseTapSide()
 	basicPolicyData2 := new(PolicyData)
-	basicPolicyData2.Merge([]AclAction{action1, backward2}, nil, acl1.Id)
+	basicPolicyData2.Merge([]NpbActions{action1, backward2}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData2, policyData) {
 		t.Error("key2 FirstPath Check Failed!")
 	}
@@ -326,9 +326,9 @@ func TestDdbsSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 
 	// acl3: dstGroup: ipGroup7(IP资源组)： 和ipGroup6所含IP相同，但有epc限制 udp
 	// acl4: srcGroup: group4(DEV资源组): 和group3所含IP相同，但有epc限制 udp
-	action3 := generateAclAction(22, ACTION_PACKET_CAPTURING)
+	action3 := toNpbAction(22, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl3 := generatePolicyAcl(table, action3, 22, groupAny, group[7], IPProtocolUDP, -1)
-	action4 := generateAclAction(23, ACTION_PACKET_CAPTURING)
+	action4 := toNpbAction(23, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl4 := generatePolicyAcl(table, action4, 23, group[4], groupAny, IPProtocolUDP, -1)
 	acls = append(acls, acl3, acl4)
 	table.UpdateAcls(acls)
@@ -339,7 +339,7 @@ func TestDdbsSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	// 匹配ipGroup6、group3，ipGroup7有epc限制，group4mac不符
 	policyData = getPolicyByFirstPath(table, result, key3)
 	basicPolicyData3 := new(PolicyData)
-	basicPolicyData3.Merge([]AclAction{action1, backward1, action2}, nil, acl1.Id)
+	basicPolicyData3.Merge([]NpbActions{action1, action2, backward1}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData3, policyData) {
 		t.Error("key3 FirstPath Check Failed!")
 	}
@@ -350,7 +350,7 @@ func TestDdbsSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	// 源端匹配group4不匹配group3，目的端匹配ipGroup6不匹配ipGroup7
 	policyData = getPolicyByFirstPath(table, result, key4)
 	basicPolicyData4 := new(PolicyData)
-	basicPolicyData4.Merge([]AclAction{action1, action4}, nil, acl1.Id)
+	basicPolicyData4.Merge([]NpbActions{action1, action4}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData4, policyData) {
 		t.Error("key4 FirstPath Check Failed!")
 	}
@@ -361,7 +361,7 @@ func TestDdbsSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	// 源端匹配group4不匹配group3,目的端匹配ipGroup6不匹配ipGroup7
 	policyData = getPolicyByFirstPath(table, result, key5)
 	basicPolicyData5 := new(PolicyData)
-	basicPolicyData5.Merge([]AclAction{action1, action4}, nil, acl1.Id)
+	basicPolicyData5.Merge([]NpbActions{action1, action4}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData5, policyData) {
 		t.Error("key5 FirstPath Check Failed!")
 	}
@@ -372,7 +372,7 @@ func TestDdbsSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	// 源端不匹配group3/group4,目的端匹配ipGroup6，不匹配ipGroup7
 	policyData = getPolicyByFirstPath(table, result, key6)
 	basicPolicyData6 := new(PolicyData)
-	basicPolicyData6.Merge([]AclAction{action1}, nil, acl1.Id)
+	basicPolicyData6.Merge([]NpbActions{action1}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData6, policyData) {
 		t.Error("key6 FirstPath Check Failed!")
 	}
@@ -407,9 +407,9 @@ func TestDdbsFirstPathVsFastPath(t *testing.T) {
 	acls := []*Acl{}
 	// acl1: srcGroup: group5, dstPort:8000 tcp
 	// acl2: srcGroup: group5, vlan:10
-	action1 := generateAclAction(24, ACTION_PACKET_CAPTURING)
+	action1 := toNpbAction(24, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl1 := generatePolicyAcl(table, action1, 24, group[5], groupAny, IPProtocolTCP, 8000)
-	action2 := generateAclAction(25, ACTION_PACKET_CAPTURING)
+	action2 := toNpbAction(25, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl2 := generatePolicyAcl(table, action2, 25, group[5], groupAny, protoAny, portAny)
 	acls = append(acls, acl1, acl2)
 	table.UpdateAcls(acls)
@@ -419,11 +419,11 @@ func TestDdbsFirstPathVsFastPath(t *testing.T) {
 	result := getEndpointData(table, key1)
 	policyData := getPolicyByFirstPath(table, result, key1)
 	// 可匹配acl1，direction=3; 可匹配acl2，direction=1
-	backward1 := getBackwardAcl(action1)
-	backward2 := getBackwardAcl(action2)
+	backward1 := action1.ReverseTapSide()
+	backward2 := action2.ReverseTapSide()
 	basicPolicyData1 := new(PolicyData)
-	basicPolicyData1.AclActions = make([]AclAction, 0, 2)
-	basicPolicyData1.Merge([]AclAction{action1, action2, backward2}, nil, acl1.Id)
+	basicPolicyData1.NpbActions = make([]NpbActions, 0, 2)
+	basicPolicyData1.Merge([]NpbActions{action1, action2, backward2}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData1, policyData) {
 		t.Error("key1 FirstPath Check Failed! ", result)
 	}
@@ -434,7 +434,7 @@ func TestDdbsFirstPathVsFastPath(t *testing.T) {
 	policyData = getPolicyByFirstPath(table, result, key2)
 	// 不能匹配acl1
 	basicPolicyData2 := new(PolicyData)
-	basicPolicyData2.Merge([]AclAction{backward2}, nil, acl2.Id)
+	basicPolicyData2.Merge([]NpbActions{backward2}, acl2.Id)
 	if !CheckPolicyResult(t, basicPolicyData2, policyData) {
 		t.Error("key2 FirstPath Check Failed!")
 	}
@@ -445,8 +445,8 @@ func TestDdbsFirstPathVsFastPath(t *testing.T) {
 	policyData = getPolicyByFirstPath(table, result, key3)
 	// 可匹配acl1，direction=3；可匹配acl2，direction=3
 	basicPolicyData3 := new(PolicyData)
-	basicPolicyData3.AclActions = make([]AclAction, 0, 4)
-	basicPolicyData3.Merge([]AclAction{action1, action2, backward2, backward1}, nil, acl1.Id)
+	basicPolicyData3.NpbActions = make([]NpbActions, 0, 4)
+	basicPolicyData3.Merge([]NpbActions{action1, action2, backward1, backward2}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData3, policyData) {
 		t.Error("key3 FirstPath Check Failed!")
 	}
@@ -457,7 +457,7 @@ func TestDdbsFirstPathVsFastPath(t *testing.T) {
 	policyData = getPolicyByFirstPath(table, result, key4)
 	// udp协议，不匹配acl1
 	basicPolicyData4 := new(PolicyData)
-	basicPolicyData4.Merge([]AclAction{action2}, nil, acl2.Id)
+	basicPolicyData4.Merge([]NpbActions{action2}, acl2.Id)
 	if !CheckPolicyResult(t, basicPolicyData4, policyData) {
 		t.Error("key4 FirstPath Check Failed!")
 	}
@@ -468,7 +468,7 @@ func TestDdbsFirstPathVsFastPath(t *testing.T) {
 	policyData = getPolicyByFirstPath(table, result, key5)
 	// port不一致，不匹配acl1
 	basicPolicyData5 := new(PolicyData)
-	basicPolicyData5.Merge([]AclAction{action2}, nil, acl2.Id)
+	basicPolicyData5.Merge([]NpbActions{action2}, acl2.Id)
 	if !CheckPolicyResult(t, basicPolicyData5, policyData) {
 		t.Error("key5 FirstPath Check Failed!")
 	}
@@ -509,9 +509,9 @@ func TestDdbsEndpointDataDirection(t *testing.T) {
 	acls := []*Acl{}
 	// acl1: dstGroup:group4, dstPort:1000 tcp
 	// acl2: srcGroup:group3, dstPort:1000 tcp
-	action1 := generateAclAction(25, ACTION_PACKET_CAPTURING)
+	action1 := toNpbAction(25, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl1 := generatePolicyAcl(table, action1, 25, groupAny, group[4], IPProtocolTCP, 1000)
-	action2 := generateAclAction(26, ACTION_PACKET_CAPTURING)
+	action2 := toNpbAction(26, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl2 := generatePolicyAcl(table, action2, 26, group[3], groupAny, IPProtocolTCP, 1000)
 	acls = append(acls, acl1, acl2)
 	table.UpdateAcls(acls)
@@ -529,7 +529,7 @@ func TestDdbsEndpointDataDirection(t *testing.T) {
 
 	policyData1 := getPolicyByFirstPath(table, result, key1)
 	basicPolicyData1 := new(PolicyData)
-	basicPolicyData1.Merge([]AclAction{action1, action2}, nil, acl1.Id)
+	basicPolicyData1.Merge([]NpbActions{action1, action2}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData1, policyData1) {
 		t.Error("key1 FirstPath Check Failed!")
 	}
@@ -546,10 +546,10 @@ func TestDdbsEndpointDataDirection(t *testing.T) {
 		t.Error("key2 EndpointData Check Failed!")
 	}
 	policyData2 := getPolicyByFirstPath(table, result, key2)
-	backward1 := getBackwardAcl(action1)
-	backward2 := getBackwardAcl(action2)
+	backward1 := action1.ReverseTapSide()
+	backward2 := action2.ReverseTapSide()
 	basicPolicyData2 := new(PolicyData)
-	basicPolicyData2.Merge([]AclAction{backward1, backward2}, nil, acl1.Id)
+	basicPolicyData2.Merge([]NpbActions{backward1, backward2}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData2, policyData2) {
 		t.Error("key2 FirstPath Check Failed!")
 	}
@@ -629,20 +629,17 @@ func TestDdbsNpbAction(t *testing.T) {
 	table := generatePolicyTable(DDBS)
 	acls := []*Acl{}
 
-	action1 := generateAclAction(25, ACTION_PACKET_CAPTURING)
 	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
 	npb1 := toNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, TAPSIDE_SRC, 100)
 	npb2 := toNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, TAPSIDE_SRC, 200)
 	npb3 := toNpbAction(20, 200, NPB_TUNNEL_TYPE_VXLAN, TAPSIDE_SRC, 200)
 	npb := toNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, TAPSIDE_SRC, 200)
 
-	acl1 := generatePolicyAcl(table, action1, 25, groupAny, groupAny, IPProtocolTCP, 1000, npb1)
-	action2 := generateAclAction(26, ACTION_PACKET_CAPTURING)
+	acl1 := generatePolicyAcl(table, npb1, 25, groupAny, groupAny, IPProtocolTCP, 1000)
 	// acl2 Group: 0 -> 0 Port: 1000 Proto: 0 vlan: any
-	acl2 := generatePolicyAcl(table, action2, 26, groupAny, groupAny, protoAny, 1000, npb2)
-	action3 := generateAclAction(27, ACTION_PACKET_CAPTURING)
+	acl2 := generatePolicyAcl(table, npb2, 26, groupAny, groupAny, protoAny, 1000)
 	// acl3 Group: 0 -> 0 Port: 0 Proto: 6 vlan: any
-	acl3 := generatePolicyAcl(table, action3, 27, groupAny, groupAny, IPProtocolUDP, 1000, npb3)
+	acl3 := generatePolicyAcl(table, npb3, 27, groupAny, groupAny, IPProtocolUDP, 1000)
 	acls = append(acls, acl1, acl2, acl3)
 	table.UpdateAcls(acls)
 	// 构建预期结果
@@ -684,17 +681,16 @@ func TestDdbsNpbAction(t *testing.T) {
 
 func TestDdbsMultiNpbAction1(t *testing.T) {
 	table := generatePolicyTable(DDBS)
-	action := generateAclAction(25, 0)
 	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
 	npb := toNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, TAPSIDE_SRC, 100)
 	// VMA -> ANY SRC
-	acl := generatePolicyAcl(table, action, 25, group[1], groupAny, IPProtocolTCP, portAny, npb)
+	acl := generatePolicyAcl(table, npb, 25, group[1], groupAny, IPProtocolTCP, portAny)
 	// VMB -> ANY SRC
-	acl2 := generatePolicyAcl(table, action, 25, group[2], groupAny, IPProtocolTCP, portAny, npb)
+	acl2 := generatePolicyAcl(table, npb, 25, group[2], groupAny, IPProtocolTCP, portAny)
 	// VMA -> VMB SRC
-	acl3 := generatePolicyAcl(table, action, 25, group[1], group[2], IPProtocolTCP, portAny, npb)
+	acl3 := generatePolicyAcl(table, npb, 25, group[1], group[2], IPProtocolTCP, portAny)
 	// VMB -> VMA SRC
-	acl4 := generatePolicyAcl(table, action, 25, group[2], group[1], IPProtocolTCP, portAny, npb)
+	acl4 := generatePolicyAcl(table, npb, 25, group[2], group[1], IPProtocolTCP, portAny)
 	acls := []*Acl{acl, acl2, acl3, acl4}
 	table.UpdateAcls(acls)
 	basicPolicyData := &PolicyData{}
@@ -706,8 +702,8 @@ func TestDdbsMultiNpbAction1(t *testing.T) {
 	_, policyData := table.lookupAllByKey(key)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestMultiNpbAction Check Failed!")
-		t.Error(cap(basicPolicyData.AclActions), cap(basicPolicyData.NpbActions))
-		t.Error(cap(policyData.AclActions), cap(policyData.NpbActions))
+		t.Error(cap(basicPolicyData.NpbActions))
+		t.Error(cap(policyData.NpbActions))
 	}
 
 	// key: true:ip2:1023 -> false:ip1:1000 tcp
@@ -816,11 +812,9 @@ func TestDdbsNpbActionDedup(t *testing.T) {
 	npb1 := toNpbAction(10, 100, NPB_TUNNEL_TYPE_VXLAN, TAPSIDE_SRC, 100)
 	npb2 := toNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, TAPSIDE_SRC, 0)
 	// VM段-A -> ANY, DEV-group2 -> ANY
-	action1 := generateAclAction(25, ACTION_PACKET_CAPTURING)
-	acl1 := generatePolicyAcl(table, action1, 25, group[2], groupAny, IPProtocolTCP, portAny, npb1)
+	acl1 := generatePolicyAcl(table, npb1, 25, group[2], groupAny, IPProtocolTCP, portAny)
 	// IP段-A -> ANY, IP-group3 -> ANY
-	action2 := generateAclAction(26, ACTION_PACKET_CAPTURING)
-	acl2 := generatePolicyAcl(table, action2, 26, group[6], groupAny, IPProtocolTCP, portAny, npb2)
+	acl2 := generatePolicyAcl(table, npb2, 26, group[6], groupAny, IPProtocolTCP, portAny)
 	acls := []*Acl{acl1, acl2}
 	table.UpdateAcls(acls)
 
@@ -838,8 +832,7 @@ func TestDdbsNpbActionDedup(t *testing.T) {
 
 	// IP段-A -> IP段-B, IP-group3 -> IP-group6
 	npb5 := toNpbAction(20, 150, NPB_TUNNEL_TYPE_VXLAN, TAPSIDE_SRC, 100)
-	action5 := generateAclAction(29, ACTION_PACKET_CAPTURING)
-	acl5 := generatePolicyAcl(table, action5, 29, group[6], group[6], IPProtocolTCP, -1, npb5)
+	acl5 := generatePolicyAcl(table, npb5, 29, group[6], group[6], IPProtocolTCP, -1)
 	acls = []*Acl{acl5}
 	table.UpdateAcls(acls)
 
@@ -860,17 +853,15 @@ func TestDdbsPcapNpbAction(t *testing.T) {
 	table := generatePolicyTable(DDBS)
 	acls := []*Acl{}
 
-	action1 := generateAclAction(25, ACTION_PACKET_CAPTURING)
 	// acl1 Group: 16 -> 16 Port: 0 Proto: TCP vlan: any Tap: any
 	npb := toPcapAction(10, 150, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
-	acl1 := generatePolicyAcl(table, action1, 25, group[16], group[16], IPProtocolTCP, -1, npb)
+	acl1 := generatePolicyAcl(table, npb, 25, group[16], group[16], IPProtocolTCP, -1)
 	acl1.TapType = 0
 	acls = append(acls, acl1)
 	table.UpdateAcls(acls)
 	// 构建预期结果
 	basicPolicyData := &PolicyData{}
-	npb.AddTapSide(TAPSIDE_DST)
-	basicPolicyData.MergeNpbAction([]NpbActions{npb}, 25)
+	basicPolicyData.MergeNpbAction([]NpbActions{npb, npb.ReverseTapSide()}, 25)
 
 	// key1: ip4:1000 -> ip3:1023 tcp
 	key1 := generateLookupKey(group1Mac, group1Mac, group1Ip1, group1Ip2, IPProtocolTCP, 1000, 1023, NPB)
@@ -888,13 +879,11 @@ func TestDdbsNpbActionAclGids(t *testing.T) {
 
 	// acl1 Group: 0 -> 0 Port: 0 Proto: 17 vlan: any
 	npb1 := toNpbAction(10, 150, NPB_TUNNEL_TYPE_VXLAN, TAPSIDE_SRC, 100)
-	action1 := generateAclAction(25, ACTION_PACKET_CAPTURING)
-	acl1 := generatePolicyAcl(table, action1, 25, groupAny, groupAny, IPProtocolTCP, 1000, npb1)
+	acl1 := generatePolicyAcl(table, npb1, 25, groupAny, groupAny, IPProtocolTCP, 1000)
 	acl1.TapType = 223
 	// acl2 Group: 0 -> 0 Port: 1000 Proto: 0 vlan: any
 	npb2 := toNpbAction(11, 150, NPB_TUNNEL_TYPE_VXLAN, TAPSIDE_SRC, 200)
-	action2 := generateAclAction(26, ACTION_PACKET_CAPTURING)
-	acl2 := generatePolicyAcl(table, action2, 26, groupAny, groupAny, protoAny, 1000, npb2)
+	acl2 := generatePolicyAcl(table, npb2, 26, groupAny, groupAny, protoAny, 1000)
 	acl2.TapType = 223
 	acls = append(acls, acl1, acl2)
 	table.UpdateAcls(acls)
@@ -924,7 +913,7 @@ func TestDdbsPolicyDoublePort(t *testing.T) {
 	// 创建 policyTable
 	table := generatePolicyTable(DDBS)
 	// 构建acl action  1:1000->2:8000 tcp
-	action := generateAclAction(10, ACTION_PACKET_CAPTURING)
+	action := toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 8000)
 	acl.SrcPortRange = append(acl.SrcPortRange[:0], NewPortRange(1000, 1000))
 	acls = append(acls, acl)
@@ -937,7 +926,7 @@ func TestDdbsPolicyDoublePort(t *testing.T) {
 	_, policyData := table.lookupAllByKey(key)
 	// 构建预期结果
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	basicPolicyData.Merge([]NpbActions{action}, acl.Id)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestPolicyDoubulePort Check Failed!")
@@ -947,9 +936,9 @@ func TestDdbsPolicyDoublePort(t *testing.T) {
 	key = generateLookupKey(group2Mac, group1Mac, group2Ip1, group1Ip1, IPProtocolTCP, 8000, 1000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
 	_, policyData = table.lookupAllByKey(key)
-	backward := getBackwardAcl(action)
+	backward := action.ReverseTapSide()
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.Merge([]AclAction{backward}, nil, acl.Id)
+	basicPolicyData.Merge([]NpbActions{backward}, acl.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestPolicyDoubulePort Check Failed!")
 	}
@@ -976,7 +965,7 @@ func TestDdbsPolicySrcPort(t *testing.T) {
 	// 创建 policyTable
 	table := generatePolicyTable(DDBS)
 	// 构建acl action  1:1000->2:ANY tcp
-	action := generateAclAction(10, ACTION_PACKET_CAPTURING)
+	action := toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, portAny)
 	acl.SrcPortRange = append(acl.SrcPortRange[:0], NewPortRange(1000, 1000))
 	acls = append(acls, acl)
@@ -989,7 +978,7 @@ func TestDdbsPolicySrcPort(t *testing.T) {
 	_, policyData := table.lookupAllByKey(key)
 	// 构建预期结果
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	basicPolicyData.Merge([]NpbActions{action}, acl.Id)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestPolicySrcPort Check Failed!")
@@ -999,9 +988,9 @@ func TestDdbsPolicySrcPort(t *testing.T) {
 	key = generateLookupKey(group2Mac, group1Mac, group2Ip1, group1Ip1, IPProtocolTCP, 8000, 1000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
 	_, policyData = table.lookupAllByKey(key)
-	backward := getBackwardAcl(action)
+	backward := action.ReverseTapSide()
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.Merge([]AclAction{backward}, nil, acl.Id)
+	basicPolicyData.Merge([]NpbActions{backward}, acl.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestPolicySrcPort Check Failed!")
 	}
@@ -1018,7 +1007,7 @@ func TestDdbsPolicySrcPort(t *testing.T) {
 	key = generateLookupKey(group1Mac, group2Mac, group1Ip1, group2Ip1, IPProtocolTCP, 1000, 7000)
 	setEthTypeAndOthers(key, EthernetTypeIPv4, 64, true, true)
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	basicPolicyData.Merge([]NpbActions{action}, acl.Id)
 	_, policyData = table.lookupAllByKey(key)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestPolicySrcPort Check Failed!")
@@ -1030,8 +1019,8 @@ func TestDdbsTapType(t *testing.T) {
 	// 创建 policyTable
 	table := generatePolicyTable(DDBS)
 	// 构建acl action  1->2 tcp 8000 tapType=0|1
-	action := generateAclAction(10, ACTION_PACKET_CAPTURING)
-	action2 := generateAclAction(100, ACTION_PACKET_CAPTURING)
+	action := toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
+	action2 := toNpbAction(100, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 8000)
 	acl.TapType = 1
 	acl2 := generatePolicyAcl(table, action2, 100, group[1], group[2], IPProtocolTCP, 8000)
@@ -1047,7 +1036,7 @@ func TestDdbsTapType(t *testing.T) {
 	_, policyData := table.lookupAllByKey(key)
 	// 构建预期结果
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action, action2}, nil, acl.Id)
+	basicPolicyData.Merge([]NpbActions{action, action2}, acl.Id)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestDdbsTapType Check Failed!")
@@ -1061,7 +1050,7 @@ func TestDdbsTapType(t *testing.T) {
 	_, policyData = table.lookupAllByKey(key)
 	// 构建预期结果
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action2}, nil, acl2.Id)
+	basicPolicyData.Merge([]NpbActions{action2}, acl2.Id)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestDdbsTapType Check Failed!")
@@ -1072,7 +1061,7 @@ func TestDdbsInternet(t *testing.T) {
 	// 创建 policyTable
 	table := generatePolicyTable(DDBS)
 	// 构建acl action  1->2 tcp 8000
-	action := generateAclAction(10, ACTION_PACKET_CAPTURING)
+	action := toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acls := []*Acl{}
 	acl := generatePolicyAcl(table, action, 10, group[1], uint32(GROUP_INTERNET&0xffff), IPProtocolTCP, 8000)
 	acls = append(acls, acl)
@@ -1088,7 +1077,7 @@ func TestDdbsInternet(t *testing.T) {
 	_, policyData := table.lookupAllByKey(key)
 	// 构建预期结果
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	basicPolicyData.Merge([]NpbActions{action}, acl.Id)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestDdbsInternet Check Failed!")
@@ -1098,8 +1087,8 @@ func TestDdbsInternet(t *testing.T) {
 func TestDdbsPolicyIpv6(t *testing.T) {
 	acls := []*Acl{}
 	table := generatePolicyTable(DDBS)
-	action := generateAclAction(10, ACTION_PACKET_CAPTURING)
-	action2 := generateAclAction(20, ACTION_PACKET_CAPTURING)
+	action := toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
+	action2 := toNpbAction(20, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 8000)
 	// ip: 0.0.0.0/32 epc: 0, IP为0的流量, 对于非IP流量会用0来查询策略
 	acl2 := generatePolicyAcl(table, action2, 20, group[17], groupAny, protoAny, 0)
@@ -1113,7 +1102,7 @@ func TestDdbsPolicyIpv6(t *testing.T) {
 	endpoints, policyData := table.lookupAllByKey(key)
 	// 构建预期结果
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	basicPolicyData.Merge([]NpbActions{action}, acl.Id)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) || endpoints.SrcInfo.L3End != true || endpoints.DstInfo.L3End != true {
 		t.Error(endpoints)
@@ -1124,7 +1113,7 @@ func TestDdbsPolicyIpv6(t *testing.T) {
 func TestDdbsPolicyIpv6WithIpGroup(t *testing.T) {
 	acls := []*Acl{}
 	table := generatePolicyTable(DDBS)
-	action := generateAclAction(10, ACTION_PACKET_CAPTURING)
+	action := toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	// ip6 -> ip6
 	acl := generatePolicyAcl(table, action, 10, group[10], group[11], IPProtocolTCP, 8000)
 	// ip6 -> dev
@@ -1140,7 +1129,7 @@ func TestDdbsPolicyIpv6WithIpGroup(t *testing.T) {
 	_, policyData := table.lookupAllByKey(key)
 	// 构建预期结果
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	basicPolicyData.Merge([]NpbActions{action}, acl.Id)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestDdbsPolicyIpv6WithIpGroup Check Failed!")
@@ -1152,7 +1141,7 @@ func TestDdbsPolicyIpv6WithIpGroup(t *testing.T) {
 	_, policyData = table.lookupAllByKey(key)
 	// 构建预期结果
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl2.Id)
+	basicPolicyData.Merge([]NpbActions{action}, acl2.Id)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestDdbsPolicyIpv6WithIpGroup Check Failed!")
@@ -1164,7 +1153,7 @@ func TestDdbsPolicyIpv6WithIpGroup(t *testing.T) {
 	_, policyData = table.lookupAllByKey(key)
 	// 构建预期结果
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl3.Id)
+	basicPolicyData.Merge([]NpbActions{action}, acl3.Id)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestDdbsPolicyIpv6WithIpGroup Check Failed!")
@@ -1187,7 +1176,7 @@ func TestDdbsPort(t *testing.T) {
 	// 创建 policyTable
 	table := generatePolicyTable(DDBS)
 	// 构建acl action  1->2 tcp 1000
-	action := generateAclAction(10, ACTION_PACKET_CAPTURING)
+	action := toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 1000)
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
@@ -1208,7 +1197,7 @@ func TestDdbsPort(t *testing.T) {
 	_, policyData = table.lookupAllByKey(key)
 	// 构建预期结果
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	basicPolicyData.Merge([]NpbActions{action}, acl.Id)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestDdbsPort0 Check Failed!")
@@ -1262,7 +1251,7 @@ func TestDdbsProtocol(t *testing.T) {
 	// 创建 policyTable
 	table := generatePolicyTable(DDBS)
 	// 构建acl action  1->2 tcp 8000
-	action := generateAclAction(10, ACTION_PACKET_CAPTURING)
+	action := toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], 0, 0)
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
@@ -1281,7 +1270,7 @@ func TestDdbsProtocol(t *testing.T) {
 	_, policyData = table.lookupAllByKey(key)
 	// 构建预期结果
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{action}, nil, acl.Id)
+	basicPolicyData.Merge([]NpbActions{action}, acl.Id)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestDdbsPort0 Check Failed!")
@@ -1301,7 +1290,7 @@ func TestDdbsProtocol(t *testing.T) {
 func BenchmarkDdbsAcl(b *testing.B) {
 	acls := []*Acl{}
 	table := generatePolicyTable(DDBS)
-	action := generateAclAction(10, ACTION_PACKET_CAPTURING)
+	action := toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 
 	for i := uint16(1); i <= 1000; i++ {
 		acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 0)
@@ -1314,7 +1303,6 @@ func BenchmarkDdbsAcl(b *testing.B) {
 			acl.SrcGroups = append(acl.SrcGroups, uint32(j))
 			acl.DstGroups = append(acl.DstGroups, uint32(j))
 		}
-		acl.Action[0].SetACLGID(10)
 
 		acls = append(acls, acl)
 	}
@@ -1327,7 +1315,7 @@ func BenchmarkDdbsFastPath(b *testing.B) {
 	// 创建 policyTable
 	table := generatePolicyTable(DDBS)
 	// 构建acl action  1->2 tcp 8000
-	action := generateAclAction(10, ACTION_PACKET_CAPTURING)
+	action := toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
 	acl := generatePolicyAcl(table, action, 10, group[1], group[2], IPProtocolTCP, 8000)
 	acls = append(acls, acl)
 	table.UpdateAcls(acls)
