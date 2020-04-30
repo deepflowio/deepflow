@@ -8,8 +8,9 @@ import (
 
 func TestTagEncodeAndDecode(t *testing.T) {
 	p := new(PolicyData)
-	p.AclActions = make([]AclAction, 0, 2)
-	p.AclActions = append(p.AclActions, AclAction(0).AddActionFlags(ACTION_PACKET_CAPTURING).AddDirections(FORWARD))
+	action := ToNpbActions(10, 100, NPB_TUNNEL_TYPE_PCAP, 0, 0)
+	p.NpbActions = make([]NpbActions, 0, 2)
+	p.NpbActions = append(p.NpbActions, action)
 	p.AclId = 10
 	p.ActionFlags = ACTION_COMPRESS_HEADER
 	t1 := Tag{

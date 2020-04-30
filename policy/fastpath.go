@@ -142,13 +142,9 @@ func (f *FastPath) addPortFastPolicy(endpointStore *EndpointStore, packetEndpoin
 	id := getAclId(policyForward.AclId, policyBackward.AclId)
 	if id > 0 {
 		forward = new(PolicyData)
-		if packet.HasFeatureFlag(NPM) {
-			forward.AclActions = make([]AclAction, 0, len(policyForward.AclActions)+len(policyBackward.AclActions))
-			forward.MergeAclAction(append(policyForward.AclActions, policyBackward.AclActions...), id)
-		}
+		forward.NpbActions = make([]NpbActions, 0, len(policyForward.NpbActions)+len(policyBackward.NpbActions))
+		forward.MergeNpbAction(append(policyForward.NpbActions, policyBackward.NpbActions...), id)
 		if packet.HasFeatureFlag(NPB) {
-			forward.NpbActions = make([]NpbActions, 0, len(policyForward.NpbActions)+len(policyBackward.NpbActions))
-			forward.MergeNpbAction(append(policyForward.NpbActions, policyBackward.NpbActions...), id)
 			forward.FormatNpbAction()
 		}
 	}
@@ -172,13 +168,9 @@ func (f *FastPath) addPortFastPolicy(endpointStore *EndpointStore, packetEndpoin
 
 	if id > 0 {
 		backward = new(PolicyData)
-		if packet.HasFeatureFlag(NPM) {
-			backward.AclActions = make([]AclAction, 0, len(policyForward.AclActions)+len(policyBackward.AclActions))
-			backward.MergeAclAndSwapDirection(append(policyForward.AclActions, policyBackward.AclActions...), id)
-		}
+		backward.NpbActions = make([]NpbActions, 0, len(policyForward.NpbActions)+len(policyBackward.NpbActions))
+		backward.MergeNpbAndSwapDirection(append(policyForward.NpbActions, policyBackward.NpbActions...), id)
 		if packet.HasFeatureFlag(NPB) {
-			backward.NpbActions = make([]NpbActions, 0, len(policyForward.NpbActions)+len(policyBackward.NpbActions))
-			backward.MergeNpbAndSwapDirection(append(policyForward.NpbActions, policyBackward.NpbActions...), id)
 			backward.FormatNpbAction()
 		}
 	}

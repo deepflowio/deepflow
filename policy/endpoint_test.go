@@ -92,7 +92,7 @@ func TestAllPassPolicy(t *testing.T) {
 	key := generateClassicLookupKey(mac4, mac2, ip4, ip2, 0, 0, EthernetTypeARP)
 	_, policyData := policy.lookupAllByKey(key)
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{forward, backward}, nil, acl1.Id)
+	basicPolicyData.Merge([]NpbActions{forward, backward}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestAllPassPolicy Check failed!")
 	}
@@ -110,7 +110,7 @@ func TestGroupForwardPassPolicy(t *testing.T) {
 	key := generateClassicLookupKey(mac4, mac2, ip4, ip2, 0, 0, EthernetTypeARP)
 	_, policyData := policy.lookupAllByKey(key)
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{forward}, nil, acl1.Id)
+	basicPolicyData.Merge([]NpbActions{forward}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestGroupForwardPassPolicy Check Failed!")
 	}
@@ -128,7 +128,7 @@ func TestGroupBackwardPassPolicy(t *testing.T) {
 	key := generateClassicLookupKey(mac4, mac2, ip4, ip2, 0, 0, EthernetTypeARP)
 	_, policyData := policy.lookupAllByKey(key)
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{backward}, nil, acl1.Id)
+	basicPolicyData.Merge([]NpbActions{backward}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestGroupBackwardPassPolicy Check Failed!")
 	}
@@ -146,7 +146,7 @@ func TestAllPortPassPolicy(t *testing.T) {
 	key := generateClassicLookupKey(mac4, mac2, ip4, ip2, 30, 30, EthernetTypeARP)
 	_, policyData := policy.lookupAllByKey(key)
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{forward, backward}, nil, acl1.Id)
+	basicPolicyData.Merge([]NpbActions{forward, backward}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestAllPortPassPolicy Check Failed!")
 	}
@@ -166,7 +166,7 @@ func TestSrcPortPassPolicy(t *testing.T) {
 
 	_, policyData := policy.lookupAllByKey(key)
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{backward}, nil, acl1.Id)
+	basicPolicyData.Merge([]NpbActions{backward}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestSrcPortPassPolicy Check Failed!")
 	}
@@ -186,7 +186,7 @@ func TestDstPortPassPolicy(t *testing.T) {
 
 	_, policyData := policy.lookupAllByKey(key)
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{forward}, nil, acl1.Id)
+	basicPolicyData.Merge([]NpbActions{forward}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestDstPortPassPolicy Check Failed!")
 	}
@@ -206,7 +206,7 @@ func TestSrcDstPortPassPolicy(t *testing.T) {
 
 	_, policyData := policy.lookupAllByKey(key)
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{forward, backward}, nil, acl1.Id)
+	basicPolicyData.Merge([]NpbActions{forward, backward}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestSrcDstPortPassPolicy Check Failed!")
 	}
@@ -218,10 +218,10 @@ func TestAclsPassPolicy(t *testing.T) {
 	generatePlatformData(policy)
 	generateIpgroupData(policy)
 	//	dstPorts: 8000
-	aclAction1 := generateAclAction(10, ACTION_PACKET_CAPTURING)
-	acl1 := generatePolicyAcl(policy, aclAction1, 10, groupAny, groupAny, IPProtocolTCP, 8000)
-	aclAction2 := generateAclAction(20, ACTION_PACKET_CAPTURING)
-	acl2 := generatePolicyAcl(policy, aclAction2, 20, groupAny, groupAny, IPProtocolUDP, 8000)
+	action1 := toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
+	acl1 := generatePolicyAcl(policy, action1, 10, groupAny, groupAny, IPProtocolTCP, 8000)
+	action2 := toNpbAction(20, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
+	acl2 := generatePolicyAcl(policy, action2, 20, groupAny, groupAny, IPProtocolUDP, 8000)
 	policy.UpdateAcls([]*Acl{acl1, acl2})
 
 	key := generateLookupKey(mac4, mac2, ip4, ip2, IPProtocolTCP, 8000, 8000)
@@ -229,9 +229,9 @@ func TestAclsPassPolicy(t *testing.T) {
 
 	_, policyData := policy.lookupAllByKey(key)
 
-	backward1 := getBackwardAcl(aclAction1)
+	backward1 := action1.ReverseTapSide()
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]AclAction{aclAction1, backward1}, nil, acl1.Id)
+	basicPolicyData.Merge([]NpbActions{action1, backward1}, acl1.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestAclsPassPolicy Check Failed!")
 	}

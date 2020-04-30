@@ -139,17 +139,6 @@ func updateTunnelIpMap(flowAcls []*trident.FlowAcl) {
 	datatype.UpdateTunnelMaps(aclGids, ipIds, ips)
 }
 
-func newAclAction(actions []*trident.FlowAction) []datatype.AclAction {
-	aclActions := make([]datatype.AclAction, 0, len(actions))
-	for _, action := range actions {
-		actionFlags := datatype.ActionFlag(1 << uint32(action.GetAction()-1)) // protobuf中的定义从1开始
-		aclGID := action.GetPolicyAclGroupId()
-		aclAction := datatype.AclAction(0).SetACLGID(uint16(aclGID)).AddActionFlags(actionFlags)
-		aclActions = append(aclActions, aclAction)
-	}
-	return aclActions
-}
-
 func newNpbActions(npbs []*trident.NpbAction) []datatype.NpbActions {
 	actions := make([]datatype.NpbActions, 0, len(npbs))
 	for _, npb := range npbs {
@@ -177,7 +166,6 @@ func newPolicyData(acl *trident.FlowAcl) *policy.Acl {
 		SrcPortRange: datatype.SplitPort2Int(acl.GetSrcPorts()),
 		DstPortRange: datatype.SplitPort2Int(acl.GetDstPorts()),
 		Proto:        uint16(acl.GetProtocol() & 0xffff),
-		Action:       newAclAction(acl.GetActions()),
 		NpbActions:   newNpbActions(acl.GetNpbActions()),
 	}
 }
