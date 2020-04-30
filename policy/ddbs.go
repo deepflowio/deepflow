@@ -21,8 +21,9 @@ type TableItem struct {
 }
 
 const (
-	MASK_VECTOR_SIZE = 10
-	TABLE_SIZE       = 1 << MASK_VECTOR_SIZE
+	MASK_VECTOR_MAX_SIZE = 16
+	MASK_VECTOR_MIN_SIZE = 4
+	TABLE_SIZE           = 1 << MASK_VECTOR_MAX_SIZE
 )
 
 type Ddbs struct {
@@ -106,16 +107,16 @@ func abs(a, b int) int {
 	return b - a
 }
 
-func (d *Ddbs) getVectorSize(aclNum int) int {
-	vectorSize := MASK_VECTOR_SIZE
-	if aclNum < 100 {
-		vectorSize = MASK_VECTOR_SIZE - 4
-	} else if aclNum < 300 {
-		vectorSize = MASK_VECTOR_SIZE - 3
-	} else if aclNum < 500 {
-		vectorSize = MASK_VECTOR_SIZE - 2
-	} else if aclNum < 10240 {
-		vectorSize = MASK_VECTOR_SIZE - 1
+func (d *Ddbs) getVectorSize(acls []*Acl) int {
+	matchedSum := 0
+	for _, acl := range acls {
+		matchedSum += len(acl.AllMatched) + len(acl.AllMatched6)
+	}
+	vectorSize := 0
+	for vectorSize = MASK_VECTOR_MAX_SIZE; vectorSize > MASK_VECTOR_MIN_SIZE; vectorSize-- {
+		if matchedSum>>2 >= 1<<vectorSize {
+			break
+		}
 	}
 	return vectorSize
 }
@@ -196,7 +197,7 @@ func (d *Ddbs) generateMaskVector(acls []*Acl, isIpv6 bool) {
 	} else {
 		table = d.generateSortTable(acls)
 	}
-	vectorSize := d.getVectorSize(len(acls))
+	vectorSize := d.getVectorSize(acls)
 	vectorBits := make([]int, 0, vectorSize)
 	// 使用对应差值最小的10个bit位做为MaskVector
 	for i := 0; i < math.MaxUint16 && len(vectorBits) < vectorSize; i++ {
