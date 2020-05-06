@@ -116,6 +116,7 @@ message Config {
     optional bool    flow_store_enabled   = 21 [default = false];
     optional VlanMode npb_vlan_mode       = 22 [default = NONE];
     repeated uint32  flow_store_tap_types = 23;
+    optional bool    npb_dedup_enabled    = 24 [default = true];
 
     optional string  analyzer_ip          = 31 [default = "127.0.0.1"];
     optional uint32  max_escape_seconds   = 32;
