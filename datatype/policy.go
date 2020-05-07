@@ -170,6 +170,10 @@ func (a NpbActions) doCompress() bool {
 	return a.TunnelType() == NPB_TUNNEL_TYPE_PCAP && a.PayloadSlice() == 0
 }
 
+func (a NpbActions) doTridentPcap() bool {
+	return a.TunnelType() == NPB_TUNNEL_TYPE_PCAP && a.PayloadSlice() > 0
+}
+
 func (a *NpbActions) ReverseTapSide() NpbActions {
 	action := NpbActions{}
 	action.NpbAction = a.NpbAction.ReverseTapSide()
@@ -187,17 +191,14 @@ func ToNpbActions(aclGid, id uint32, tunnelType, tapSide uint8, slice uint16) Np
 }
 
 const (
-	ACTION_PACKET_CAPTURING ActionFlag = 1 << iota
-	_
-	_
-	_
+	ACTION_TRIDENT_PCAP ActionFlag = 1 << iota
 	ACTION_COMPRESS_HEADER
 )
 
 func (f ActionFlag) String() string {
 	s := "|"
-	if f&ACTION_PACKET_CAPTURING != 0 {
-		s += "PCAP|"
+	if f&ACTION_TRIDENT_PCAP != 0 {
+		s += "TPCAP|"
 	}
 	if f&ACTION_COMPRESS_HEADER != 0 {
 		s += "COMPRESS|"
@@ -331,6 +332,8 @@ func (d *PolicyData) MergeNpbAction(actions []NpbActions, aclID uint32, directio
 			// 只有PCAP会有ACTION_COMPRESS_HEADER, 并且不会被去重
 			if npbAction.doCompress() {
 				d.ActionFlags |= ACTION_COMPRESS_HEADER
+			} else if npbAction.doTridentPcap() {
+				d.ActionFlags |= ACTION_TRIDENT_PCAP
 			}
 			d.NpbActions = append(d.NpbActions, npbAction)
 		}
