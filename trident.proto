@@ -117,6 +117,7 @@ message Config {
     optional VlanMode npb_vlan_mode       = 22 [default = NONE];
     repeated uint32  flow_store_tap_types = 23;
     optional bool    npb_dedup_enabled    = 24 [default = true];
+    optional IfMacSource if_mac_source = 25 [default = IF_MAC];
 
     optional string  analyzer_ip          = 31 [default = "127.0.0.1"];
     optional uint32  max_escape_seconds   = 32;
