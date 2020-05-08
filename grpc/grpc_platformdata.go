@@ -322,6 +322,7 @@ func (t *PlatformInfoTable) QueryIPV6Infos(epcID int16, ipv6 net.IP) (info *Info
 	} else {
 		t.ipv6Lock.Unlock()
 		t.IPV6InfoStat(lruValue)
+		info, _ = lruValue.(*Info)
 	}
 	return
 }
