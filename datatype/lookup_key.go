@@ -22,8 +22,6 @@ type LookupKey struct {
 	L2End0, L2End1                    bool
 	L3End0, L3End1                    bool
 	TapType                           TapType
-	SrcGroupIds, DstGroupIds          []uint16 //资源组的再分组ID, 没有重复用于策略匹配
-	SrcAllGroupIds, DstAllGroupIds    []uint16 //资源组的再分组ID，有重复用于aclgid bitmap生成
 	FeatureFlag                       FeatureFlags
 	ForwardMatched, BackwardMatched   MatchedField
 	ForwardMatched6, BackwardMatched6 MatchedField6
