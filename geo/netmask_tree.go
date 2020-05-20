@@ -7,7 +7,7 @@ type maxMask [1 << MIN_MASKLEN]uint8
 
 type netmaskTree struct {
 	maxMask
-	cache map[uint32]*GeoInfo
+	cache map[uint32]uint16
 }
 
 var maskLenToNetmask [MAX_MASKLEN + 1]uint32
@@ -60,12 +60,12 @@ func NewNetmaskGeoTree() GeoTree {
 		nTree.maxMask.updateMask(geoInfo.IPStart, geoInfo.IPEnd)
 	}
 
-	cache := make(map[uint32]*GeoInfo)
+	cache := make(map[uint32]uint16)
 	for _, e := range GEO_ENTRIES {
 		for ip := e.IPStart; ip <= e.IPEnd && ip > 0; {
 			mask := nTree.maxMask.getMask(ip)
 			key := ip & maskLenToNetmask[mask]
-			cache[key] = e
+			cache[key] = uint16(e.Region)<<8 | uint16(e.ISP)
 			ip += 1 << (MAX_MASKLEN - uint32(mask))
 		}
 	}
@@ -75,11 +75,11 @@ func NewNetmaskGeoTree() GeoTree {
 	return nTree
 }
 
-func (t *netmaskTree) Query(ip uint32) *GeoInfo {
+func (t *netmaskTree) Query(ip uint32) (uint8, uint8) {
 	maxMask := t.maxMask.getMask(ip)
 	cacheKey := ip & maskLenToNetmask[maxMask]
 	if v, in := t.cache[cacheKey]; in {
-		return v
+		return uint8(v >> 8), uint8(v & 0xff)
 	}
-	return nil
+	return 0, 0
 }
