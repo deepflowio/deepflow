@@ -35,12 +35,12 @@ func TestGetFirstMask(t *testing.T) {
 
 func TestNetmaskGeoTree(t *testing.T) {
 	tree := NewNetmaskGeoTree()
-	result := tree.Query(3748071168)
-	if DecodeCountry(result.Country) != "CHN" || DecodeRegion(result.Region) != "天津" || DecodeISP(result.ISP) != "移动" {
+	region, isp := tree.Query(3748071168)
+	if DecodeRegion(region) != "天津" || DecodeISP(isp) != "移动" {
 		t.Error("查询结果不正确")
 	}
-	result = tree.Query(3748071168)
-	if DecodeCountry(result.Country) != "CHN" || DecodeRegion(result.Region) != "天津" || DecodeISP(result.ISP) != "移动" {
+	region, isp = tree.Query(3748071168)
+	if DecodeRegion(region) != "天津" || DecodeISP(isp) != "移动" {
 		t.Error("查询结果不正确")
 	}
 }
