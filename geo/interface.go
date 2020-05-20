@@ -9,5 +9,5 @@ type GeoInfo struct {
 }
 
 type GeoTree interface {
-	Query(ip uint32) *GeoInfo
+	Query(ip uint32) (uint8, uint8)
 }
