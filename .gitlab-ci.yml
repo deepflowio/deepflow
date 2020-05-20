@@ -3,6 +3,8 @@ stages:
 
 verify:
   stage: verify
+  tags:
+    - x64
   script:
     - make clean
     - go mod tidy
