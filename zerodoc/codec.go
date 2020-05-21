@@ -104,7 +104,7 @@ func GetDbMeterID(db, rp string) (uint8, error) {
 	return MAX_APP_ID, fmt.Errorf("unsupport db %s", db)
 }
 
-func EncodeTsdbRow(encoder *codec.SimpleEncoder, timestamp uint32, meterID uint8, columnIDs []uint8, columnValues []interface{}) error {
+func EncodeTsdbRow(db string, encoder *codec.SimpleEncoder, timestamp uint32, meterID uint8, columnIDs []uint8, columnValues []interface{}) error {
 	encoder.WriteU32(app.VERSION)
 	encoder.WriteU32(timestamp)
 
@@ -113,6 +113,18 @@ func EncodeTsdbRow(encoder *codec.SimpleEncoder, timestamp uint32, meterID uint8
 	if err := tag.FillValues(columnIDs, columnValues); err != nil {
 		return err
 	}
+
+	if tag.Code&IP != 0 || tag.Code&IPPath != 0 {
+		// 根据db名中是否包含'_edge'
+		if strings.Contains(db, DatabaseSuffix[2]) {
+			tag.Code &= ^IP
+			tag.Code |= IPPath
+		} else {
+			tag.Code &= ^IPPath
+			tag.Code |= IP
+		}
+	}
+
 	tag.Encode(encoder)
 
 	encoder.WriteU8(meterID)

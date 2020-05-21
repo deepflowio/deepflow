@@ -821,6 +821,7 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		return nil
 	case _TAG_IP_VERSION:
 		i, err = parseUint(value, 10, 8)
+		// Code先设置为IP，在EncodeTsdbRow时需要根据DB名称确认是否修改为IPPath
 		t.Code |= IP
 		if i == 6 {
 			field.IsIPv6 = 1
