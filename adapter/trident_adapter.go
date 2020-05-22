@@ -10,6 +10,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
 )
@@ -54,6 +55,7 @@ type tridentInstance struct {
 type TridentAdapter struct {
 	command
 	io.Closer
+	utils.Closable
 
 	slaveCount uint8
 	slaves     []*slave
@@ -151,9 +153,6 @@ func (a *TridentAdapter) Close() error {
 	a.running = false
 	return nil
 }
-
-// for statsd
-func (a *TridentAdapter) Closed() bool { return true }
 
 func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize uint64, slaves []*slave) (uint64, uint64) {
 	decoder := &packet.decoder
