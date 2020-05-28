@@ -1,7 +1,7 @@
 package adapter
 
 import (
-	"encoding/binary"
+	. "encoding/binary"
 	"math"
 	"net"
 	"os"
@@ -277,6 +277,8 @@ func (r *tcpReciver) start() {
 			tridentIp := getIp(remote)
 			instance := &tridentInstance{inTable: false, ip: tridentIp}
 			log.Infof("trident(%s) connect to host, use fd %d", tridentIp, conn)
+			var packet *packetBuffer
+			var offset int
 
 			ep.Add(conn, netpoll.EPOLLIN|netpoll.EPOLLET|netpoll.EPOLLHUP|netpoll.EPOLLRDHUP,
 				func(event netpoll.EpollEvent) {
@@ -288,51 +290,38 @@ func (r *tcpReciver) start() {
 					}
 
 					for {
-						packet := acquirePacketBuffer()
-						n, _ := unix.Read(conn, packet.buffer)
-						if n <= 0 {
-							releasePacketBuffer(packet)
-							break
+						if packet == nil {
+							packet = acquirePacketBuffer()
+
+							n, _ := unix.Read(conn, packet.buffer[:2])
+							if n < 2 {
+								releasePacketBuffer(packet)
+								packet = nil
+								break
+							}
+							offset = 2
+						}
+						frameSize := BigEndian.Uint16(packet.buffer)
+
+						var n int
+						for ; offset < int(frameSize); offset += n {
+							n, _ = unix.Read(conn, packet.buffer[offset:frameSize])
+							if n <= 0 {
+								return
+							}
 						}
 						packet.init(tridentIp)
-						invalid, frameSize, vtapId := packet.decoder.DecodeHeader()
+						invalid, _, vtapId := packet.decoder.DecodeHeader()
 						if invalid {
 							r.counter.RxInvalid++
 							r.stats.RxInvalid++
 							releasePacketBuffer(packet)
-							continue
+							packet = nil
+							break
 						}
-						if n == int(frameSize) {
-							packet.calcHash(vtapId)
-							r.cacheInstance(instance, packet)
-						} else if n > int(frameSize) {
-							buffer := packet.buffer
-							packets := make([]*packetBuffer, 0, 4)
-							packets = append(packets, packet)
-
-							for decodeLen := frameSize; int(decodeLen) < n; decodeLen += frameSize {
-								packet := acquirePacketBuffer()
-
-								frameSize = binary.BigEndian.Uint16(buffer[decodeLen:])
-								copy(packet.buffer, buffer[decodeLen:decodeLen+frameSize])
-
-								invalid, _, vtapId := packet.decoder.DecodeHeader()
-								if invalid {
-									r.counter.RxInvalid++
-									r.stats.RxInvalid++
-									releasePacketBuffer(packet)
-									continue
-								}
-
-								packet.init(tridentIp)
-								packet.calcHash(vtapId)
-								packets = append(packets, packet)
-							}
-
-							for _, packet := range packets {
-								r.cacheInstance(instance, packet)
-							}
-						}
+						packet.calcHash(vtapId)
+						r.cacheInstance(instance, packet)
+						packet = nil
 					}
 				})
 		})
