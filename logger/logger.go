@@ -7,7 +7,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/lestrrat-go/file-rotatelogs"
+	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"github.com/op/go-logging"
 )
 
@@ -16,6 +16,7 @@ const (
 	LOG_MAX_AGE           = 365 * 24 * time.Hour // every year
 	LOG_FORMAT            = "%{time:2006-01-02 15:04:05.000} [%{level:.4s}] %{shortfile} %{message}"
 	LOG_COLOR_FORMAT      = "%{color}%{time:2006-01-02 15:04:05.000} [%{level:.4s}]%{color:reset} %{shortfile} %{message}"
+	SYSLOG_FORMAT         = "[%{level:.4s}] %{shortfile} %{message}"
 )
 
 var (
