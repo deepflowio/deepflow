@@ -39,7 +39,10 @@ func EnableRsyslog(remotes ...string) error {
 		if err != nil {
 			return err
 		}
-		backend := &logging.SyslogBackend{Writer: rsyslogWriter}
+		backend := logging.NewBackendFormatter(
+			&logging.SyslogBackend{Writer: rsyslogWriter},
+			logging.MustStringFormatter(SYSLOG_FORMAT),
+		)
 		rsyslogBackends = append(rsyslogBackends, backend)
 	}
 	applyBackendChange()
