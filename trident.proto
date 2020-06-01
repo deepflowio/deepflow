@@ -68,8 +68,9 @@ enum IfMacSource {
 }
 
 enum SocketType {
-    UDP = 0;
+    RAW_UDP = 0;
     TCP = 1;
+    UDP = 2;
 }
 
 enum PacketType {
@@ -128,7 +129,8 @@ message Config {
     optional common.TridentType trident_type = 41;
 
     optional SocketType collector_socket_type = 45 [default = UDP];
-    optional SocketType compressor_socket_type = 46 [default = UDP];
+    optional SocketType compressor_socket_type = 46 [default = RAW_UDP];
+    optional SocketType npb_socket_type = 47 [default = RAW_UDP];
 }
 
 message Segment { // e.g. single LAN area
