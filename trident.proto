@@ -30,6 +30,7 @@ enum Exception {
     NPB_NO_GW_ARP              = 32;
     RX_PPS_THRESHOLD_EXCEEDED  = 64;
     ANALYZER_NO_GW_ARP         = 128;
+    INVALID_CONFIGURATION      = 256;
 }
 
 message SyncRequest {
