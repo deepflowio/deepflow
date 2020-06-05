@@ -212,7 +212,7 @@ func NewInfluxdbWriter(addrPrimary, addrReplica, httpUsername, httpPassword, nam
 		}
 
 		w.ReplicaQueues = queue.NewOverwriteQueues(
-			name+"_replica", queue.HashKey(queueCount), 512, // FIXME: New时带入queueSize
+			name+"_replica", queue.HashKey(queueCount), 1024, // FIXME: New时带入queueSize
 			queue.OptionFlushIndicator(time.Second),
 			queue.OptionRelease(func(p interface{}) { releasePointCache(p.(*PointCache)) }))
 	}
