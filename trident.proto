@@ -148,7 +148,7 @@ message IpResource {
 
 message Interface {
     optional uint32 device_type = 2;
-    optional uint32 device_id = 3; // POD环境的Interface信息统一使用1
+    optional uint32 device_id = 3;
     optional uint32 if_type = 4;
     optional uint32 epc_id = 6;
     optional string launch_server = 7;
@@ -158,6 +158,7 @@ message Interface {
     optional uint64 mac = 11; //0x0123456789ab = 01:23:45:67:89:ab
     optional uint32 pod_node_id = 21;
     optional uint32 az_id = 22;
+    optional uint32 pod_group_id = 23;
 }
 
 enum GroupType {
