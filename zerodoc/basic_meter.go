@@ -131,17 +131,15 @@ func (l *TCPLatency) SequentialMerge(other *TCPLatency) {
 }
 
 func (l *TCPLatency) MarshalTo(b []byte) int {
-	fields := []string{
-		"rtt_sum=", "rtt_client_sum=", "rtt_server_sum=", "srt_sum=", "art_sum=",
-		"rtt_count=", "rtt_client_count=", "rtt_server_count=", "srt_count=", "art_count=",
-	}
-	values := []uint64{
-		l.RTTSum,
-		l.RTTClientSum,
-		l.RTTServerSum,
-		l.SRTSum,
-		l.ARTSum,
-		l.RTTCount, l.RTTClientCount, l.RTTServerCount, l.SRTCount, l.ARTCount,
+	fields := []string{"rtt=", "rtt_client=", "rtt_server=", "srt=", "art="}
+	dividends := []uint64{l.RTTSum, l.RTTClientSum, l.RTTServerSum, l.SRTSum, l.ARTSum}
+	divisors := []uint64{l.RTTCount, l.RTTClientCount, l.RTTServerCount, l.SRTCount, l.ARTCount}
+	values := make([]uint64, len(dividends))
+	for i, divisor := range divisors {
+		if divisor == 0 {
+			continue
+		}
+		values[i] = dividends[i] / divisor
 	}
 	return marshalKeyValues(b, fields, values)
 }
