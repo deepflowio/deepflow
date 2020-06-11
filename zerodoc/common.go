@@ -71,16 +71,11 @@ const (
 	_METER_CLIENT_HALF_CLOSE_FLOW
 	_METER_SERVER_HALF_CLOSE_FLOW
 	_METER_TIMEOUT_TCP_FLOW
-	_METER_RTT_SUM
-	_METER_RTT_CLIENT_SUM
-	_METER_RTT_SERVER_SUM
-	_METER_SRT_SUM
-	_METER_ART_SUM
-	_METER_RTT_COUNT
-	_METER_RTT_CLIENT_COUNT
-	_METER_RTT_SERVER_COUNT
-	_METER_SRT_COUNT
-	_METER_ART_COUNT
+	_METER_RTT
+	_METER_RTT_CLIENT
+	_METER_RTT_SERVER
+	_METER_SRT
+	_METER_ART
 	_METER_RETRANS_TX
 	_METER_RETRANS_RX
 	_METER_ZERO_WIN_TX
@@ -157,16 +152,11 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"client_half_close_flow": _METER_CLIENT_HALF_CLOSE_FLOW,
 	"server_half_close_flow": _METER_SERVER_HALF_CLOSE_FLOW,
 	"timeout_tcp_flow":       _METER_TIMEOUT_TCP_FLOW,
-	"rtt_sum":                _METER_RTT_SUM,
-	"rtt_client_sum":         _METER_RTT_CLIENT_SUM,
-	"rtt_server_sum":         _METER_RTT_SERVER_SUM,
-	"srt_sum":                _METER_SRT_SUM,
-	"art_sum":                _METER_ART_SUM,
-	"rtt_count":              _METER_RTT_COUNT,
-	"rtt_client_count":       _METER_RTT_CLIENT_COUNT,
-	"rtt_server_count":       _METER_RTT_SERVER_COUNT,
-	"srt_count":              _METER_SRT_COUNT,
-	"art_count":              _METER_ART_COUNT,
+	"rtt":                    _METER_RTT,
+	"rtt_client":             _METER_RTT_CLIENT,
+	"rtt_server":             _METER_RTT_SERVER,
+	"srt":                    _METER_SRT,
+	"art":                    _METER_ART,
 	"retrans_tx":             _METER_RETRANS_TX,
 	"retrans_rx":             _METER_RETRANS_RX,
 	"zero_win_tx":            _METER_ZERO_WIN_TX,

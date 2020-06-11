@@ -56,7 +56,7 @@ func TestMarshalFlowMeter(t *testing.T) {
 		},
 	}
 	l = m2.MarshalTo(buffer[:])
-	if string(buffer[:l]) != "rtt_client_sum=1000i,rtt_client_count=2i" {
+	if string(buffer[:l]) != "rtt_client=500i" {
 		t.Error("MarshalTo()实现不正确")
 	}
 

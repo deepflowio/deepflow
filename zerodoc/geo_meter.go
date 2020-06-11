@@ -124,26 +124,21 @@ func (m *GeoMeter) Fill(ids []uint8, values []interface{}) {
 		case _METER_CLOSED_FLOW:
 			m.ClosedFlow = uint64(v)
 
-		case _METER_RTT_SUM:
+		case _METER_RTT:
 			m.RTTSum = uint64(v)
-		case _METER_RTT_CLIENT_SUM:
+			m.RTTCount = 1
+		case _METER_RTT_CLIENT:
 			m.RTTClientSum = uint64(v)
-		case _METER_RTT_SERVER_SUM:
+			m.RTTClientCount = 1
+		case _METER_RTT_SERVER:
 			m.RTTServerSum = uint64(v)
-		case _METER_SRT_SUM:
+			m.RTTServerCount = 1
+		case _METER_SRT:
 			m.SRTSum = uint64(v)
-		case _METER_ART_SUM:
+			m.SRTCount = 1
+		case _METER_ART:
 			m.ARTSum = uint64(v)
-		case _METER_RTT_COUNT:
-			m.RTTCount = uint64(v)
-		case _METER_RTT_CLIENT_COUNT:
-			m.RTTClientCount = uint64(v)
-		case _METER_RTT_SERVER_COUNT:
-			m.RTTServerCount = uint64(v)
-		case _METER_SRT_COUNT:
-			m.SRTCount = uint64(v)
-		case _METER_ART_COUNT:
-			m.ARTCount = uint64(v)
+			m.ARTCount = 1
 
 		case _METER_RETRANS_TX:
 			m.RetransTx = uint64(v)
