@@ -13,8 +13,7 @@ func TestGeoMeterFill(t *testing.T) {
 
 	fields := []string{
 		"packet_tx", "packet_rx", "byte_tx", "byte_rx", "flow", "new_flow", "closed_flow",
-		"rtt_sum", "rtt_client_sum", "rtt_server_sum", "srt_sum", "art_sum",
-		"rtt_count", "rtt_client_count", "rtt_server_count", "srt_count", "art_count",
+		"rtt", "rtt_client", "rtt_server", "srt", "art",
 		"retrans_tx", "retrans_rx", "zero_win_tx", "zero_win_rx",
 		"client_rst_flow", "server_rst_flow", "client_half_open_flow", "server_half_open_flow",
 		"client_half_close_flow", "server_half_close_flow", "timeout_tcp_flow",
@@ -33,7 +32,6 @@ func TestGeoMeterFill(t *testing.T) {
 	results := []interface{}{
 		f.PacketTx, f.PacketRx, f.ByteTx, f.ByteRx, f.Flow, f.NewFlow, f.ClosedFlow,
 		f.RTTSum, f.RTTClientSum, f.RTTServerSum, f.SRTSum, f.ARTSum,
-		f.RTTCount, f.RTTClientCount, f.RTTServerCount, f.SRTCount, f.ARTCount,
 		f.RetransTx, f.RetransRx, f.ZeroWinTx, f.ZeroWinRx,
 		f.ClientRstFlow, f.ServerRstFlow, f.ClientHalfOpenFlow, f.ServerHalfOpenFlow,
 		f.ClientHalfCloseFlow, f.ServerHalfCloseFlow, f.TimeoutTCPFlow,
@@ -51,6 +49,9 @@ func TestGeoMeterFill(t *testing.T) {
 				t.FailNow()
 			}
 		}
+	}
+	if f.RTTCount+f.RTTClientCount+f.RTTServerCount+f.SRTCount+f.ARTCount != 5 {
+		t.Error("FlowMinuteMeter fill不正确")
 	}
 }
 
@@ -91,8 +92,7 @@ func TestFlowMinuteMeterFill(t *testing.T) {
 
 	fields := []string{
 		"packet_tx", "packet_rx", "byte_tx", "byte_rx", "flow", "new_flow", "closed_flow",
-		"rtt_sum", "rtt_client_sum", "rtt_server_sum", "srt_sum", "art_sum",
-		"rtt_count", "rtt_client_count", "rtt_server_count", "srt_count", "art_count",
+		"rtt", "rtt_client", "rtt_server", "srt", "art",
 		"retrans_tx", "retrans_rx", "zero_win_tx", "zero_win_rx",
 		"client_rst_flow", "server_rst_flow", "client_half_open_flow", "server_half_open_flow",
 		"client_half_close_flow", "server_half_close_flow", "timeout_tcp_flow",
@@ -111,7 +111,6 @@ func TestFlowMinuteMeterFill(t *testing.T) {
 	results := []interface{}{
 		f.PacketTx, f.PacketRx, f.ByteTx, f.ByteRx, f.Flow, f.NewFlow, f.ClosedFlow,
 		f.RTTSum, f.RTTClientSum, f.RTTServerSum, f.SRTSum, f.ARTSum,
-		f.RTTCount, f.RTTClientCount, f.RTTServerCount, f.SRTCount, f.ARTCount,
 		f.RetransTx, f.RetransRx, f.ZeroWinTx, f.ZeroWinRx,
 		f.ClientRstFlow, f.ServerRstFlow, f.ClientHalfOpenFlow, f.ServerHalfOpenFlow,
 		f.ClientHalfCloseFlow, f.ServerHalfCloseFlow, f.TimeoutTCPFlow,
@@ -129,6 +128,9 @@ func TestFlowMinuteMeterFill(t *testing.T) {
 				t.FailNow()
 			}
 		}
+	}
+	if f.RTTCount+f.RTTClientCount+f.RTTServerCount+f.SRTCount+f.ARTCount != 5 {
+		t.Error("FlowMinuteMeter fill不正确")
 	}
 }
 
