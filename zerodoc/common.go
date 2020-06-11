@@ -49,6 +49,9 @@ const (
 	_TAG_REGION_ID
 	_TAG_TAG_TYPE
 	_TAG_TAG_VALUE
+	_TAG_POD_GROUP_ID
+	_TAG_POD_GROUP_ID_0
+	_TAG_POD_GROUP_ID_1
 	_TAG_MAX_ID_
 )
 const (
@@ -134,6 +137,9 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"acl_direction":    _TAG_ACL_DIRECTION,
 	"tag_type":         _TAG_TAG_TYPE,
 	"tag_value":        _TAG_TAG_VALUE,
+	"pod_group_id":     _TAG_POD_GROUP_ID,
+	"pod_group_id_0":   _TAG_POD_GROUP_ID_0,
+	"pod_group_id_1":   _TAG_POD_GROUP_ID_1,
 
 	"packet_tx":              _METER_PACKET_TX,
 	"packet_rx":              _METER_PACKET_RX,
