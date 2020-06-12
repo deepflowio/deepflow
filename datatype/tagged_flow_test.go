@@ -53,7 +53,7 @@ func TestTaggedFlowEncodeDecode(t *testing.T) {
 		ZeroWinCount: 602,
 	}
 
-	TcpPerfStats := TcpPerfStats{
+	TCPPerfStats := TCPPerfStats{
 		TcpPerfCountsPeers: [2]TcpPerfCountsPeer{tcpPerfCountsPeer, tcpPerfCountsPeer},
 		TotalRetransCount:  508,
 	}
@@ -74,7 +74,7 @@ func TestTaggedFlowEncodeDecode(t *testing.T) {
 		// VLAN:    409,
 		EthType: layers.EthernetTypeIPv4,
 
-		TcpPerfStats:    &TcpPerfStats,
+		FlowPerfStats:   &FlowPerfStats{L4Protocol: L4_PROTOCOL_TCP, TCPPerfStats: TCPPerfStats},
 		CloseType:       CloseTypeTCPServerRst,
 		IsActiveService: false,
 		//	QueueHash:       104,
@@ -107,13 +107,13 @@ func TestTaggedFlowEncodeDecodeiNul(t *testing.T) {
 		ZeroWinCount: 603,
 	}
 
-	TcpPerfStats := TcpPerfStats{
+	TCPPerfStats := TCPPerfStats{
 		TcpPerfCountsPeers: [2]TcpPerfCountsPeer{tcpPerfCountsPeer},
 	}
 
 	Flow := Flow{
-		FlowKey:      FlowKey,
-		TcpPerfStats: &TcpPerfStats,
+		FlowKey:       FlowKey,
+		FlowPerfStats: &FlowPerfStats{L4Protocol: L4_PROTOCOL_TCP, TCPPerfStats: TCPPerfStats},
 	}
 
 	ef := &TaggedFlow{
@@ -142,13 +142,13 @@ func TestCloneTaggedFlow(t *testing.T) {
 		ZeroWinCount: 603,
 	}
 
-	TcpPerfStats := TcpPerfStats{
+	TCPPerfStats := TCPPerfStats{
 		TcpPerfCountsPeers: [2]TcpPerfCountsPeer{tcpPerfCountsPeer},
 	}
 
 	Flow := Flow{
-		FlowKey:      FlowKey,
-		TcpPerfStats: &TcpPerfStats,
+		FlowKey:       FlowKey,
+		FlowPerfStats: &FlowPerfStats{L4Protocol: L4_PROTOCOL_TCP, TCPPerfStats: TCPPerfStats},
 	}
 
 	ef := &TaggedFlow{
@@ -171,13 +171,13 @@ func TestTaggedFlowRelease(t *testing.T) {
 		ZeroWinCount: 603,
 	}
 
-	TcpPerfStats := TcpPerfStats{
+	TCPPerfStats := TCPPerfStats{
 		TcpPerfCountsPeers: [2]TcpPerfCountsPeer{tcpPerfCountsPeer},
 	}
 
 	Flow := Flow{
-		FlowKey:      FlowKey,
-		TcpPerfStats: &TcpPerfStats,
+		FlowKey:       FlowKey,
+		FlowPerfStats: &FlowPerfStats{L4Protocol: L4_PROTOCOL_TCP, TCPPerfStats: TCPPerfStats},
 	}
 
 	f := &TaggedFlow{

@@ -53,19 +53,19 @@ func ReleaseTaggedFlow(taggedFlow *TaggedFlow) {
 		return
 	}
 
-	if taggedFlow.TcpPerfStats != nil {
-		ReleaseTcpPerfStats(taggedFlow.TcpPerfStats)
-		taggedFlow.TcpPerfStats = nil
+	if taggedFlow.FlowPerfStats != nil {
+		ReleaseFlowPerfStats(taggedFlow.FlowPerfStats)
+		taggedFlow.FlowPerfStats = nil
 	}
 	*taggedFlow = TaggedFlow{}
 	taggedFlowPool.Put(taggedFlow)
 }
 
-// 注意：不拷贝TcpPerfStats
+// 注意：不拷贝FlowPerfStats
 func CloneTaggedFlowForPacketStat(taggedFlow *TaggedFlow) *TaggedFlow {
 	newTaggedFlow := AcquireTaggedFlow()
 	*newTaggedFlow = *taggedFlow
-	newTaggedFlow.TcpPerfStats = nil
+	newTaggedFlow.FlowPerfStats = nil
 	newTaggedFlow.ReferenceCount.Reset()
 	return newTaggedFlow
 }
@@ -74,8 +74,8 @@ func CloneTaggedFlow(taggedFlow *TaggedFlow) *TaggedFlow {
 	newTaggedFlow := AcquireTaggedFlow()
 	*newTaggedFlow = *taggedFlow
 	newTaggedFlow.ReferenceCount.Reset()
-	if taggedFlow.TcpPerfStats != nil {
-		newTaggedFlow.TcpPerfStats = CloneTcpPerfStats(taggedFlow.TcpPerfStats)
+	if taggedFlow.FlowPerfStats != nil {
+		newTaggedFlow.FlowPerfStats = CloneFlowPerfStats(taggedFlow.FlowPerfStats)
 	}
 	return newTaggedFlow
 }
