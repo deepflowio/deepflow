@@ -52,6 +52,7 @@ const (
 	TAPType
 	_
 	VTAPID
+	TAPSide
 )
 
 const (
@@ -84,6 +85,13 @@ const (
 	_ DirectionEnum = iota
 	ClientToServer
 	ServerToClient
+)
+
+type TAPSideEnum uint8
+
+const (
+	Client TAPSideEnum = iota
+	Server
 )
 
 type TAPTypeEnum uint8
@@ -196,6 +204,7 @@ type Field struct {
 	Protocol   layers.IPProtocol
 	ServerPort uint16
 	VTAPID     uint16
+	TAPSide    TAPSideEnum
 	TAPType    TAPTypeEnum
 	IsIPv6     uint8 // (8B) 与IP/IP6是共生字段
 
@@ -236,6 +245,24 @@ func unmarshalUint16WithSpecialID(s string) (int16, error) {
 		return -1, err
 	}
 	return int16(i), nil
+}
+
+// 只在Encode时调用
+// 5.6.1 对于双端数据，存储时去掉direction并使用tap_side替代。
+//   老数据中的 xx_0=A, xx_1=B, direction=c2s 等于新数据中的 xx_0=A, xx_1=B, tap_side=0
+//   老数据中的 xx_0=A, xx_1=B, direction=s2c 等于新数据中的 xx_0=B, xx_1=A, tap_side=1
+func (t *Tag) reverseEdgeByDireciton() {
+	if t.Code&Direction != 0 && t.Code&TAPSide == 0 && t.Code.HasEdgeTagField() {
+		t.Code |= TAPSide
+		t.Code &= ^Direction
+		if t.Direction == ClientToServer {
+			t.TAPSide = Client
+		} else {
+			t.TAPSide = Server
+			t.IP, t.IP1 = t.IP1, t.IP
+			t.L3EpcID, t.L3EpcID1 = t.L3EpcID1, t.L3EpcID
+		}
+	}
 }
 
 // 注意: 必须要按tag字段的字典顺序进行处理
@@ -432,6 +459,14 @@ func (t *Tag) MarshalTo(b []byte) int {
 			offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagValue), 10))
 		}
 	}
+	if t.Code&TAPSide != 0 {
+		switch t.TAPSide {
+		case Client:
+			offset += copy(b[offset:], ",tap_side=c")
+		case Server:
+			offset += copy(b[offset:], ",tap_side=s")
+		}
+	}
 	if t.Code&TAPType != 0 {
 		offset += copy(b[offset:], ",tap_type=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TAPType), 10))
@@ -566,6 +601,9 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&VTAPID != 0 {
 		t.VTAPID = decoder.ReadU16()
 	}
+	if t.Code&TAPSide != 0 {
+		t.TAPSide = TAPSideEnum(decoder.ReadU8())
+	}
 	if t.Code&TAPType != 0 {
 		t.TAPType = TAPTypeEnum(decoder.ReadU8())
 	}
@@ -590,6 +628,7 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 		encoder.WriteRawString(t.id) // ID就是序列化bytes，避免重复计算
 		return
 	}
+	t.reverseEdgeByDireciton()
 	t.EncodeByCodeTID(t.Code, t.GlobalThreadID, encoder)
 }
 
@@ -705,6 +744,9 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 	}
 	if code&VTAPID != 0 {
 		encoder.WriteU16(t.VTAPID)
+	}
+	if code&TAPSide != 0 {
+		encoder.WriteU8(uint8(t.TAPSide))
 	}
 	if code&TAPType != 0 {
 		encoder.WriteU8(uint8(t.TAPType))
@@ -1014,6 +1056,16 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		t.Code |= VTAPID
 		i, err = parseUint(value, 10, 16)
 		field.VTAPID = uint16(i)
+	case _TAG_TAP_SIDE:
+		t.Code |= TAPSide
+		switch value {
+		case "c":
+			field.TAPSide = Client
+		case "s":
+			field.TAPSide = Server
+		default:
+			err = fmt.Errorf("unknow TAPSide(%s)", value)
+		}
 	case _TAG_TAP_TYPE:
 		t.Code |= TAPType
 		// 在vtap中新增了tap_type字段，读取老版本数据时，若没有该字段返回空，则设置tap_type为3
