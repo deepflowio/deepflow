@@ -235,6 +235,18 @@ func (d *SimpleDecoder) ReadIPv6(v net.IP) {
 	copy(v, d.buf[d.offset-16:d.offset])
 }
 
+func (d *SimpleDecoder) ReadIPv4(v net.IP) {
+	if len(v) != 4 {
+		panic(fmt.Sprintf("IPv4 buffer length invalid: %d", len(v)))
+	}
+	d.offset += 4
+	if d.offset > len(d.buf) {
+		d.err++
+		return
+	}
+	copy(v, d.buf[d.offset-4:d.offset])
+}
+
 func (d *SimpleDecoder) ReadString255() string {
 	l := int(d.ReadU8())
 	d.offset += l
