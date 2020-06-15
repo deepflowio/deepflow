@@ -455,6 +455,10 @@ func (t *Tag) MarshalTo(b []byte) int {
 				offset += copy(b[offset:], ",tag_value=unknown")
 			}
 		case TAG_TYPE_TUNNEL_IP_ID:
+			fallthrough
+		case TAG_TYPE_TTL:
+			fallthrough
+		case TAG_TYPE_PACKET_SIZE:
 			offset += copy(b[offset:], ",tag_value=")
 			offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagValue), 10))
 		}
