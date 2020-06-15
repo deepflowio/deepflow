@@ -43,6 +43,7 @@ const (
 	_TAG_PROTOCOL
 	_TAG_SERVER_PORT
 	_TAG_VTAP_ID
+	_TAG_TAP_SIDE
 	_TAG_TAP_TYPE
 	_TAG_SUBNET_ID
 	_TAG_ACL_DIRECTION
@@ -132,6 +133,7 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"protocol":         _TAG_PROTOCOL,
 	"server_port":      _TAG_SERVER_PORT,
 	"vtap_id":          _TAG_VTAP_ID,
+	"tap_side":         _TAG_TAP_SIDE,
 	"tap_type":         _TAG_TAP_TYPE,
 	"subnet_id":        _TAG_SUBNET_ID,
 	"acl_direction":    _TAG_ACL_DIRECTION,

@@ -60,7 +60,7 @@ func TestFill1(t *testing.T) {
 		"l3_device_id": "300", "l3_device_type": "5",
 		"host_id": "33", "ip_1": "5.5.5.5", "group_id_1": "-2",
 		"l3_epc_id_1": "31", "l3_device_id_1": "32", "l3_device_type_1": "9",
-		"host_id_1": "55", "subnet_id_1": "2000", "direction": "c2s", "acl_gid": "400",
+		"host_id_1": "55", "subnet_id_1": "2000", "direction": "c2s", "tap_side": "c", "acl_gid": "400",
 		"protocol": "4", "server_port": "9527", "tap_type": "0", "subnet_id": "1001", "pod_node_id": "1", "az_id": "132",
 		"tag_type": "1", "tag_value": "北京",
 	}
@@ -110,6 +110,9 @@ func TestFill1(t *testing.T) {
 	}
 	if tag.Direction != ClientToServer {
 		t.Error("Direction 处理错误")
+	}
+	if tag.TAPSide != Client {
+		t.Error("TAPSide 处理错误")
 	}
 	if tag.Protocol != layers.IPProtocol(4) {
 		t.Error("Protocol 处理错误")
