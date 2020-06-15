@@ -247,24 +247,6 @@ func unmarshalUint16WithSpecialID(s string) (int16, error) {
 	return int16(i), nil
 }
 
-// 只在Encode时调用
-// 5.6.1 对于双端数据，存储时去掉direction并使用tap_side替代。
-//   老数据中的 xx_0=A, xx_1=B, direction=c2s 等于新数据中的 xx_0=A, xx_1=B, tap_side=0
-//   老数据中的 xx_0=A, xx_1=B, direction=s2c 等于新数据中的 xx_0=B, xx_1=A, tap_side=1
-func (t *Tag) reverseEdgeByDireciton() {
-	if t.Code&Direction != 0 && t.Code&TAPSide == 0 && t.Code.HasEdgeTagField() {
-		t.Code |= TAPSide
-		t.Code &= ^Direction
-		if t.Direction == ClientToServer {
-			t.TAPSide = Client
-		} else {
-			t.TAPSide = Server
-			t.IP, t.IP1 = t.IP1, t.IP
-			t.L3EpcID, t.L3EpcID1 = t.L3EpcID1, t.L3EpcID
-		}
-	}
-}
-
 // 注意: 必须要按tag字段的字典顺序进行处理
 func (t *Tag) MarshalTo(b []byte) int {
 	offset := 0
@@ -632,7 +614,6 @@ func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
 		encoder.WriteRawString(t.id) // ID就是序列化bytes，避免重复计算
 		return
 	}
-	t.reverseEdgeByDireciton()
 	t.EncodeByCodeTID(t.Code, t.GlobalThreadID, encoder)
 }
 
