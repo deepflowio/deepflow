@@ -87,9 +87,7 @@ func GetDbMeterID(db, rp string) (uint8, error) {
 	} else if strings.HasPrefix(db, MeterVTAPNames[GEO_ID]) {
 		return GEO_ID, nil
 	} else if strings.HasPrefix(db, MeterVTAPNames[FLOW_ID]) {
-		if rp == "s1" {
-			return FLOW_ID, nil
-		} else if rp == "autogen" {
+		if rp == "rp_1m" {
 			// 对于写入vtap_360_acl的数据，使用的是PACKET_ID
 			if strings.HasSuffix(db, DatabaseSuffix[1]) {
 				return PACKET_ID, nil
@@ -97,7 +95,7 @@ func GetDbMeterID(db, rp string) (uint8, error) {
 				return FLOW_ID, nil
 			}
 		} else {
-			return MAX_APP_ID, fmt.Errorf("unsupport rp %s", rp)
+			return FLOW_ID, nil
 		}
 	}
 
