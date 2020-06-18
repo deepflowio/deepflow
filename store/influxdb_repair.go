@@ -25,9 +25,8 @@ const (
 	SYNC_START_DELAY        = 300  // 同步HB的开始时间相对当前时间的时延
 	SYNC_FAILED_RETRY_TIMES = 3    // 同步失败，重试次数,
 	MAX_BATCH_WRITE_POINTS  = 1024 // 批量写influxdb的数量
-	RP_1S                   = "s1"
-	RP_1M                   = "autogen"
-	RP_10M                  = "m10"
+	RP_1S                   = "rp_1s"
+	RP_1M                   = "rp_1m"
 	DURATION_1S             = "1d" // 自动同步创建的db的RP默认值
 	SHARD_DURATION_1S       = "2h"
 	DURATION_1M             = "10d" // 自动同步创建的db的RP默认值
@@ -86,8 +85,8 @@ func NewRepair(addrPrimary, addrReplica, httpUsername, httpPassword, rp, shardID
 		return &Repair{start: false}, nil
 	}
 
-	if rp != RP_1S && rp != RP_1M && rp != RP_10M {
-		str := fmt.Sprintf("rp '%s' is not support, only support rp(%s, %s,%s)", rp, RP_1S, RP_1M, RP_10M)
+	if rp != RP_1S && rp != RP_1M {
+		str := fmt.Sprintf("rp '%s' is not support, only support rp(%s, %s)", rp, RP_1S, RP_1M)
 		log.Error(str)
 		return nil, fmt.Errorf(str)
 	}
@@ -384,13 +383,6 @@ func (r *Repair) checkCreateDatabase(client, clientRP client.Client, dbname stri
 				duration:      DURATION_1M,
 				shardDuration: SHARD_DURATION_1M,
 				defaultFlag:   true,
-			}
-		case RP_10M:
-			rp = &RetentionPolicy{
-				name:          r.rp,
-				duration:      DURATION_10M,
-				shardDuration: SHARD_DURATION_10M,
-				defaultFlag:   false,
 			}
 		default:
 			log.Errorf("not support the retention policy %s", r.rp)
