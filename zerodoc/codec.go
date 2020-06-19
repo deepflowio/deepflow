@@ -32,7 +32,7 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 		doc.Meter = AcquireFlowSecondMeter()
 	case FLOW_ID:
 		doc.Meter = AcquireFlowMeter()
-	case PACKET_ID:
+	case PACKET_ID, ACL_ID:
 		doc.Meter = AcquireVTAPUsageMeter()
 	default:
 		doc.Release()
@@ -67,7 +67,7 @@ func DecodeForQueueMonitor(decoder *codec.SimpleDecoder) (*app.Document, error) 
 		doc.Meter = &FlowSecondMeter{}
 	case FLOW_ID:
 		doc.Meter = &FlowMeter{}
-	case PACKET_ID:
+	case PACKET_ID, ACL_ID:
 		doc.Meter = &VTAPUsageMeter{}
 	default:
 		return nil, errors.New(fmt.Sprintf("Error meter ID %d", meterID))
@@ -82,23 +82,11 @@ func DecodeForQueueMonitor(decoder *codec.SimpleDecoder) (*app.Document, error) 
 }
 
 func GetDbMeterID(db, rp string) (uint8, error) {
-	if strings.HasPrefix(db, MeterVTAPNames[PACKET_ID]) {
-		return PACKET_ID, nil
-	} else if strings.HasPrefix(db, MeterVTAPNames[GEO_ID]) {
-		return GEO_ID, nil
-	} else if strings.HasPrefix(db, MeterVTAPNames[FLOW_ID]) {
-		if rp == "rp_1m" {
-			// 对于写入vtap_360_acl的数据，使用的是PACKET_ID
-			if strings.HasSuffix(db, DatabaseSuffix[1]) {
-				return PACKET_ID, nil
-			} else {
-				return FLOW_ID, nil
-			}
-		} else {
-			return FLOW_ID, nil
+	for meterID := FLOW_SECOND_ID; meterID < MAX_APP_ID; meterID++ {
+		if strings.HasPrefix(db, MeterVTAPNames[meterID]) {
+			return meterID, nil
 		}
 	}
-
 	return MAX_APP_ID, fmt.Errorf("unsupport db %s", db)
 }
 
@@ -139,7 +127,7 @@ func EncodeTsdbRow(db string, encoder *codec.SimpleEncoder, timestamp uint32, me
 		var m FlowMeter
 		m.Fill(columnIDs, columnValues)
 		m.Encode(encoder)
-	case PACKET_ID:
+	case PACKET_ID, ACL_ID:
 		var m VTAPUsageMeter
 		m.Fill(columnIDs, columnValues)
 		m.Encode(encoder)

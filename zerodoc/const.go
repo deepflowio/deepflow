@@ -9,21 +9,23 @@ const (
 	FLOW_ID
 	GEO_ID
 	PACKET_ID
+	ACL_ID // 目前meter的ACL_ID和PACKET_ID内容一致
 
 	MAX_APP_ID
 )
 
 var MeterVTAPNames [MAX_APP_ID]string = [MAX_APP_ID]string{
-	"vtap_360",
-	"vtap_360",
-	"vtap_360_geo",
+	"vtap_flow",
+	"vtap_flow",
+	"vtap_wan",
 	"vtap_packet",
+	"vtap_acl",
 }
 
 var MeterNamesToID map[string]uint8
 
 func GetMeterID(name string) uint8 {
-	// TODO: fix this: cannot produce FLOW_ID from "vtap_360"
+	// TODO: fix this: cannot produce FLOW_ID from "vtap_flow"
 	if id, exist := MeterNamesToID[name]; exist {
 		return id
 	}
@@ -33,18 +35,12 @@ func GetMeterID(name string) uint8 {
 
 const (
 	MAIN uint8 = iota
-	MINI
-	MAIN_ISP
-	MAIN_REGION
-	MAIN_CAST_TYPE
-	MAIN_TCP_FLAGS
 
 	MAX_MEASUREMENT_ID
 )
 
 var MeasurementNames [MAX_MEASUREMENT_ID]string = [MAX_MEASUREMENT_ID]string{
 	"main",
-	"mini",
 }
 
 var MeasurementNamesToID map[string]uint8
