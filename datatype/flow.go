@@ -28,6 +28,15 @@ const (
 	CloseTypeTCPClientRst
 	CloseTypeClientHalfOpen
 	CloseTypeClientHalfClose
+
+	CloseTypeClientSYNRepeat    = CloseTypeServerHalfOpen
+	CloseTypeServerSYNACKRepeat = CloseTypeClientHalfOpen
+	CloseTypeClientNoResponse   = iota
+	CloseTypeClientSourcePortReuse
+	CloseTypeClientSYNRetryLack
+	CloseTypeServerReset
+	CloseTypeServerNoResponse
+	CloseTypeServerQueueLack
 	MaxCloseType
 )
 
