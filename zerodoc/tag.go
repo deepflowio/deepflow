@@ -115,18 +115,18 @@ const (
 
 type CastTypeEnum uint8
 
-// 作为TagValue值，UNKNOWN无效，取值范围是0~2
+// 作为TagValue值使用字符串;统计数据UNKNOWN无效，Index取值范围是1~3
 const (
 	UNKNOWN CastTypeEnum = iota
 	BROADCAST
 	MULTICAST
 	UNICAST
-	_MAX_CAST_TYPE = 3
+	_MAX_CAST_TYPE = 4
 )
 
 type TCPFlag uint8
 
-// 作为TagValue值，取值范围是3~9
+// TagValue使用具体的Flags值，统计时映射的Index取值范围是4~10
 const (
 	TCP_FLAG_FIN TCPFlag = 1 << iota
 	TCP_FLAG_SYN
@@ -144,7 +144,7 @@ const (
 	_MAX_TCP_FLAGS = 7
 )
 
-// 作为TagValue值，取值范围是10~20
+// 作为TagValue值和统计数据的Index，取值范围是11~21
 const (
 	TTL_1 = iota + _MAX_CAST_TYPE + _MAX_TCP_FLAGS
 	TTL_2
@@ -160,7 +160,7 @@ const (
 	_MAX_TTL
 )
 
-// 作为TagValue值，取值范围是21~29
+// 作为TagValue值和统计数据的Index，取值范围是21~29
 const (
 	PACKET_SIZE_0_64 = iota + _MAX_TTL
 	PACKET_SIZE_65_128
