@@ -464,24 +464,24 @@ func (w *InfluxdbWriter) flushWriteCache(queueID int) {
 	}
 }
 
-func (w *InfluxdbWriter) createDB(httpClient client.Client, db string) bool {
+func (w *InfluxdbWriter) createDB(httpClient client.Client, db string) error {
 	log.Infof("database %s no exists, create database now.", db)
 	res, err := httpClient.Query(client.NewQuery(
 		fmt.Sprintf("CREATE DATABASE %s", db), "", ""))
 	if err := checkResponse(res, err); err != nil {
 		log.Errorf("Create database %s failed, error info: %s", db, err)
-		return false
+		return err
 	}
 
 	if w.RP.name != "" {
 		if retentionPolicyExists(httpClient, db, w.RP.name) {
-			return alterRetentionPolicy(httpClient, db, &w.RP)
+			return nil
 		} else {
 			return createRetentionPolicy(httpClient, db, &w.RP)
 		}
 	}
 
-	return true
+	return nil
 }
 
 func (w *InfluxdbWriter) writeInfluxdb(writerInfo *WriterInfo, dbCreateCtl *DBCreateCtl, pc *PointCache) error {
@@ -507,9 +507,9 @@ func (w *InfluxdbWriter) writeInfluxdb(writerInfo *WriterInfo, dbCreateCtl *DBCr
 	dbCreateCtl.RUnlock()
 
 	if !ok {
-		if !w.createDB(writerInfo.httpClient, db) {
+		if err := w.createDB(writerInfo.httpClient, db); err != nil {
 			*writeFailedCount += pointsCount
-			return fmt.Errorf("create database(%s) failed", db)
+			return fmt.Errorf("create database(%s) failed: %s", db, err)
 		}
 		dbCreateCtl.Lock()
 		dbCreateCtl.ExistDBs[db] = true

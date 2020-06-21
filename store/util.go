@@ -210,7 +210,7 @@ func unmarshalInt64(i interface{}) int64 {
 	}
 }
 
-func createRetentionPolicy(httpClient client.Client, dbName string, rp *RetentionPolicy) bool {
+func createRetentionPolicy(httpClient client.Client, dbName string, rp *RetentionPolicy) error {
 	setDefault := ""
 	if rp.defaultFlag {
 		setDefault = "default"
@@ -222,11 +222,11 @@ func createRetentionPolicy(httpClient client.Client, dbName string, rp *Retentio
 		cmd, dbName, ""))
 	if err := checkResponse(res, err); err != nil {
 		log.Errorf("DB(%s) create retention policy(%s) failed, error info: %s", dbName, rp.name, err)
-		return false
+		return err
 	}
 
 	log.Infof("DB(%s) create retention policy(%s)", dbName, cmd)
-	return true
+	return nil
 }
 
 func retentionPolicyExists(httpClient client.Client, db, rpName string) bool {
@@ -251,7 +251,7 @@ func retentionPolicyExists(httpClient client.Client, db, rpName string) bool {
 			}
 		}
 	}
-	log.Warningf("DB(%s) retention policy(%s) not exist", db, rpName)
+	log.Infof("DB(%s) retention policy(%s) not exist", db, rpName)
 
 	return false
 }
@@ -295,7 +295,7 @@ func getRetentionPolicy(httpClient client.Client, db, rpName string) *RetentionP
 	return nil
 }
 
-func alterRetentionPolicy(httpClient client.Client, dbName string, rp *RetentionPolicy) bool {
+func alterRetentionPolicy(httpClient client.Client, dbName string, rp *RetentionPolicy) error {
 	setDefault := ""
 	if rp.defaultFlag {
 		setDefault = "default"
@@ -307,11 +307,26 @@ func alterRetentionPolicy(httpClient client.Client, dbName string, rp *Retention
 		cmd, dbName, ""))
 	if err := checkResponse(res, err); err != nil {
 		log.Errorf("DB(%s) alter retention policy(%s) failed, error info: %s", dbName, rp.name, err)
-		return false
+		return err
 	}
 
 	log.Infof("DB(%s) alter retention policy(%s)", dbName, cmd)
-	return true
+	return nil
+}
+
+func alterRetentionPolicyDuration(httpClient client.Client, dbName, rpName, duration string) error {
+	cmd := fmt.Sprintf("ALTER RETENTION POLICY %s ON %s DURATION %s ",
+		rpName, dbName, duration)
+
+	res, err := httpClient.Query(client.NewQuery(
+		cmd, dbName, ""))
+	if err := checkResponse(res, err); err != nil {
+		log.Errorf("DB(%s) alter retention policy(%s) failed, error info: %s", dbName, rpName, err)
+		return err
+	}
+
+	log.Infof("DB(%s) alter retention policy(%s)", dbName, cmd)
+	return nil
 }
 
 func checkResponse(response *client.Response, err error) error {
