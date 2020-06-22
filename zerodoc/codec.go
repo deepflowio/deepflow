@@ -82,7 +82,8 @@ func DecodeForQueueMonitor(decoder *codec.SimpleDecoder) (*app.Document, error) 
 }
 
 func GetDbMeterID(db, rp string) (uint8, error) {
-	for meterID := FLOW_SECOND_ID; meterID < MAX_APP_ID; meterID++ {
+	// vtap_flow数据库，不使用flow_second_id返回数据
+	for meterID := FLOW_ID; meterID < MAX_APP_ID; meterID++ {
 		if strings.HasPrefix(db, MeterVTAPNames[meterID]) {
 			return meterID, nil
 		}
