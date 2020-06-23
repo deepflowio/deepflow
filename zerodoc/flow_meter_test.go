@@ -4,31 +4,6 @@ import (
 	"testing"
 )
 
-func TestMarshalFlowSecondMeter(t *testing.T) {
-	var buffer [1024]byte
-	var l int
-
-	m1 := FlowSecondMeter{
-		Traffic: Traffic{
-			PacketTx:   1,
-			PacketRx:   2,
-			ByteTx:     3,
-			ByteRx:     4,
-			Flow:       5,
-			NewFlow:    6,
-			ClosedFlow: 7,
-		},
-		TCPFlowAnomaly: TCPFlowAnomaly{
-			ClientRstFlow:      1,
-			ClientHalfOpenFlow: 1,
-		},
-	}
-	l = m1.MarshalTo(buffer[:])
-	if string(buffer[:l]) != "packet_tx=1i,packet_rx=2i,byte_tx=3i,byte_rx=4i,flow=5i,new_flow=6i,closed_flow=7i,client_rst_flow=1i,client_half_open_flow=1i" {
-		t.Error("MarshalTo()实现不正确")
-	}
-}
-
 func TestMarshalFlowMeter(t *testing.T) {
 	var buffer [1024]byte
 	var l int
@@ -50,7 +25,7 @@ func TestMarshalFlowMeter(t *testing.T) {
 	}
 
 	m2 := FlowMeter{
-		TCPLatency: TCPLatency{
+		Latency: Latency{
 			RTTClientSum:   uint64(1000),
 			RTTClientCount: 2,
 		},
@@ -70,13 +45,13 @@ func TestMarshalFlowMeter(t *testing.T) {
 			NewFlow:    6,
 			ClosedFlow: 7,
 		},
-		TCPFlowAnomaly: TCPFlowAnomaly{
+		Anomaly: Anomaly{
 			ClientRstFlow:      1,
-			ClientHalfOpenFlow: 1,
+			ServerSYNACKRepeat: 1,
 		},
 	}
 	l = m3.MarshalTo(buffer[:])
-	if string(buffer[:l]) != "packet_tx=1i,packet_rx=2i,byte_tx=3i,byte_rx=4i,flow=5i,new_flow=6i,closed_flow=7i,client_rst_flow=1i,client_half_open_flow=1i" {
+	if string(buffer[:l]) != "packet_tx=1i,packet_rx=2i,byte_tx=3i,byte_rx=4i,flow=5i,new_flow=6i,closed_flow=7i,client_rst_flow=1i,server_syn_ack_repeat=1i" {
 		t.Error("MarshalTo()实现不正确")
 	}
 }

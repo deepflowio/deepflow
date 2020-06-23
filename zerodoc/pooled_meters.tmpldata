@@ -1,5 +1,4 @@
 [
-    "FlowSecondMeter",
     "FlowMeter",
     "GeoMeter",
     "VTAPUsageMeter"

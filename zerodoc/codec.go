@@ -28,8 +28,6 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 	switch meterID {
 	case GEO_ID:
 		doc.Meter = AcquireGeoMeter()
-	case FLOW_SECOND_ID:
-		doc.Meter = AcquireFlowSecondMeter()
 	case FLOW_ID:
 		doc.Meter = AcquireFlowMeter()
 	case PACKET_ID, ACL_ID:
@@ -63,8 +61,6 @@ func DecodeForQueueMonitor(decoder *codec.SimpleDecoder) (*app.Document, error) 
 	switch meterID {
 	case GEO_ID:
 		doc.Meter = &GeoMeter{}
-	case FLOW_SECOND_ID:
-		doc.Meter = &FlowSecondMeter{}
 	case FLOW_ID:
 		doc.Meter = &FlowMeter{}
 	case PACKET_ID, ACL_ID:
@@ -118,10 +114,6 @@ func EncodeTsdbRow(db string, encoder *codec.SimpleEncoder, timestamp uint32, me
 	switch meterID {
 	case GEO_ID:
 		var m GeoMeter
-		m.Fill(columnIDs, columnValues)
-		m.Encode(encoder)
-	case FLOW_SECOND_ID:
-		var m FlowSecondMeter
 		m.Fill(columnIDs, columnValues)
 		m.Encode(encoder)
 	case FLOW_ID:
