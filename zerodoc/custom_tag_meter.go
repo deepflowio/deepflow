@@ -1,0 +1,196 @@
+package zerodoc
+
+import (
+	"sort"
+
+	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/codec"
+	"gitlab.x.lan/yunshan/droplet-libs/pool"
+)
+
+type CustomTagMeterMeta struct {
+	Tag   CustomTagMeta
+	Meter CustomMeterMeta
+}
+
+func (t *CustomTagMeterMeta) Decode(decoder *codec.SimpleDecoder) {
+	tagLen := int(decoder.ReadU8())
+	t.Tag.Names = t.Tag.Names[:0]
+	for i := 0; i < tagLen; i++ {
+		t.Tag.Names = append(t.Tag.Names, decoder.ReadString255())
+	}
+	meterLen := int(decoder.ReadU8())
+	t.Meter.Names = t.Meter.Names[:0]
+	t.Meter.Types = t.Meter.Types[:0]
+	for i := 0; i < meterLen; i++ {
+		t.Meter.Names = append(t.Meter.Names, decoder.ReadString255())
+		t.Meter.Types = append(t.Meter.Types, CustomMeterType(decoder.ReadU8()))
+	}
+}
+
+func (t *CustomTagMeterMeta) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteU8(uint8(len(t.Tag.Names)))
+	for _, name := range t.Tag.Names {
+		encoder.WriteString255(name)
+	}
+	encoder.WriteU8(uint8(len(t.Meter.Names)))
+	for i, name := range t.Meter.Names {
+		encoder.WriteString255(name)
+		encoder.WriteU8(uint8(t.Meter.Types[i]))
+	}
+}
+
+type CustomTagMeta struct {
+	Names []string
+
+	NameToIndex map[string]int
+}
+
+type CustomMeterType uint8
+
+const (
+	CUSTOM_METER_U64 CustomMeterType = iota
+	CUSTOM_METER_U32
+)
+
+type CustomMeterMeta struct {
+	Names []string
+	Types []CustomMeterType
+
+	NameToIndex map[string]int
+}
+
+type CustomTag struct {
+	Meta *CustomTagMeta
+
+	id     string
+	Values []string
+	// 每一位表示对应index下的Values[i]有意义
+	// 如 Code=3时Values[0]和Values[1]有意义
+	Code uint64
+}
+
+var customTagPool = pool.NewLockFreePool(func() interface{} {
+	return &CustomTag{}
+})
+
+func AcquireCustomTag() *CustomTag {
+	return customTagPool.Get().(*CustomTag)
+}
+
+func (t *CustomTag) Clone() app.Tag {
+	panic("not implemented")
+}
+
+func (t *CustomTag) Release() {
+	*t = CustomTag{Values: t.Values[:0]}
+	customTagPool.Put(t)
+}
+
+func (t *CustomTag) Decode(decoder *codec.SimpleDecoder) {
+	t.Values = t.Values[:0]
+	offset := decoder.Offset()
+	t.Code = decoder.ReadU64()
+	code := t.Code
+	for code > 0 {
+		if code&1 == 0 {
+			t.Values = append(t.Values, "")
+		} else {
+			t.Values = append(t.Values, decoder.ReadString255())
+		}
+		code >>= 1
+	}
+
+	if !decoder.Failed() {
+		t.id = string(decoder.Bytes()[offset:decoder.Offset()]) // Encode内容就是它的id
+	}
+}
+
+func (t *CustomTag) Encode(encoder *codec.SimpleEncoder) {
+	if t.id != "" {
+		encoder.WriteRawString(t.id) // ID就是序列化bytes，避免重复计算
+		return
+	}
+	encoder.WriteU64(t.Code)
+	for i, value := range t.Values {
+		if t.Code&(1<<i) != 0 {
+			encoder.WriteString255(value)
+		}
+	}
+}
+
+func (t *CustomTag) GetCode() uint64 {
+	return t.Code
+}
+
+func (t *CustomTag) GetID(encoder *codec.SimpleEncoder) string {
+	if t.id == "" {
+		encoder.Reset()
+		t.Encode(encoder)
+		t.id = encoder.String()
+	}
+	return t.id
+}
+
+func (t *CustomTag) SetID(id string) {
+	t.id = id
+}
+
+func (t *CustomTag) GetTAPType() uint8 {
+	panic("not implemented")
+}
+
+func (t *CustomTag) MarshalTo(b []byte) int {
+	Names := make([]string, len(t.Meta.Names))
+	copy(Names, t.Meta.Names)
+	sort.Strings(Names)
+	offset := 0
+	for _, name := range Names {
+		index := t.Meta.NameToIndex[name]
+		if t.Code&(1<<index) == 0 {
+			continue
+		}
+		if offset > 0 {
+			b[offset] = ','
+			offset++
+		}
+		offset += copy(b[offset:], name)
+		b[offset] = '='
+		offset++
+		offset += copy(b[offset:], t.Values[index])
+	}
+	return offset
+}
+
+func (t *CustomTag) ToKVString() string {
+	buffer := make([]byte, app.MAX_DOC_STRING_LENGTH)
+	size := t.MarshalTo(buffer)
+	return string(buffer[:size])
+}
+
+func (t *CustomTag) String() string {
+	return t.ToKVString()
+}
+
+var _ app.Tag = &CustomTag{}
+
+type CustomMeter struct {
+	Meta *CustomMeterMeta
+
+	Values []uint64
+}
+
+func (m *CustomMeter) Decode(decoder *codec.SimpleDecoder) {
+	m.Values = m.Values[:0]
+	length := int(decoder.ReadU8())
+	for i := 0; i < length; i++ {
+		m.Values = append(m.Values, decoder.ReadU64())
+	}
+}
+
+func (m *CustomMeter) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteU8(uint8(len(m.Values)))
+	for _, value := range m.Values {
+		encoder.WriteU64(value)
+	}
+}
