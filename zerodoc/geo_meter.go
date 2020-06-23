@@ -7,16 +7,16 @@ import (
 
 type GeoMeter struct {
 	Traffic
-	TCPLatency
-	TCPPacketAnomaly
-	TCPFlowAnomaly
+	Latency
+	Performance
+	Anomaly
 }
 
 func (m *GeoMeter) Reverse() {
 	m.Traffic.Reverse()
-	m.TCPLatency.Reverse()
-	m.TCPPacketAnomaly.Reverse()
-	m.TCPFlowAnomaly.Reverse()
+	m.Latency.Reverse()
+	m.Performance.Reverse()
+	m.Anomaly.Reverse()
 }
 
 func (m *GeoMeter) ID() uint8 {
@@ -37,33 +37,33 @@ func (m *GeoMeter) SortKey() uint64 {
 
 func (m *GeoMeter) Encode(encoder *codec.SimpleEncoder) {
 	m.Traffic.Encode(encoder)
-	m.TCPLatency.Encode(encoder)
-	m.TCPPacketAnomaly.Encode(encoder)
-	m.TCPFlowAnomaly.Encode(encoder)
+	m.Latency.Encode(encoder)
+	m.Performance.Encode(encoder)
+	m.Anomaly.Encode(encoder)
 }
 
 func (m *GeoMeter) Decode(decoder *codec.SimpleDecoder) {
 	m.Traffic.Decode(decoder)
-	m.TCPLatency.Decode(decoder)
-	m.TCPPacketAnomaly.Decode(decoder)
-	m.TCPFlowAnomaly.Decode(decoder)
+	m.Latency.Decode(decoder)
+	m.Performance.Decode(decoder)
+	m.Anomaly.Decode(decoder)
 }
 
 func (m *GeoMeter) ConcurrentMerge(other app.Meter) {
 	if pm, ok := other.(*GeoMeter); ok {
 		m.Traffic.ConcurrentMerge(&pm.Traffic)
-		m.TCPLatency.ConcurrentMerge(&pm.TCPLatency)
-		m.TCPPacketAnomaly.ConcurrentMerge(&pm.TCPPacketAnomaly)
-		m.TCPFlowAnomaly.ConcurrentMerge(&pm.TCPFlowAnomaly)
+		m.Latency.ConcurrentMerge(&pm.Latency)
+		m.Performance.ConcurrentMerge(&pm.Performance)
+		m.Anomaly.ConcurrentMerge(&pm.Anomaly)
 	}
 }
 
 func (m *GeoMeter) SequentialMerge(other app.Meter) {
 	if pm, ok := other.(*GeoMeter); ok {
 		m.Traffic.SequentialMerge(&pm.Traffic)
-		m.TCPLatency.SequentialMerge(&pm.TCPLatency)
-		m.TCPPacketAnomaly.SequentialMerge(&pm.TCPPacketAnomaly)
-		m.TCPFlowAnomaly.SequentialMerge(&pm.TCPFlowAnomaly)
+		m.Latency.SequentialMerge(&pm.Latency)
+		m.Performance.SequentialMerge(&pm.Performance)
+		m.Anomaly.SequentialMerge(&pm.Anomaly)
 	}
 }
 
@@ -81,17 +81,17 @@ func (m *GeoMeter) MarshalTo(b []byte) int {
 		b[offset] = ','
 		offset++
 	}
-	offset += m.TCPLatency.MarshalTo(b[offset:])
+	offset += m.Latency.MarshalTo(b[offset:])
 	if offset > 0 && b[offset-1] != ',' {
 		b[offset] = ','
 		offset++
 	}
-	offset += m.TCPPacketAnomaly.MarshalTo(b[offset:])
+	offset += m.Performance.MarshalTo(b[offset:])
 	if offset > 0 && b[offset-1] != ',' {
 		b[offset] = ','
 		offset++
 	}
-	offset += m.TCPFlowAnomaly.MarshalTo(b[offset:])
+	offset += m.Anomaly.MarshalTo(b[offset:])
 	if offset > 0 && b[offset-1] == ',' {
 		offset--
 	}
@@ -154,15 +154,13 @@ func (m *GeoMeter) Fill(ids []uint8, values []interface{}) {
 		case _METER_SERVER_RST_FLOW:
 			m.ServerRstFlow = uint64(v)
 		case _METER_CLIENT_HALF_OPEN_FLOW:
-			m.ClientHalfOpenFlow = uint64(v)
+			m.ServerSYNACKRepeat = uint64(v)
 		case _METER_SERVER_HALF_OPEN_FLOW:
-			m.ServerHalfOpenFlow = uint64(v)
+			m.ClientSynRepeat = uint64(v)
 		case _METER_CLIENT_HALF_CLOSE_FLOW:
 			m.ClientHalfCloseFlow = uint64(v)
 		case _METER_SERVER_HALF_CLOSE_FLOW:
 			m.ServerHalfCloseFlow = uint64(v)
-		case _METER_TIMEOUT_TCP_FLOW:
-			m.TimeoutTCPFlow = uint64(v)
 
 		default:
 			log.Warningf("unsupport meter id=%d", id)
