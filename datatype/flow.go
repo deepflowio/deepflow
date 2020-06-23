@@ -23,15 +23,13 @@ const (
 	CloseTypeFlood
 	CloseTypeForcedReport
 	// CloseTypeFoecedClose is not used any more, so skip it
-	CloseTypeServerHalfOpen CloseType = iota + 1
+	CloseTypeClientSYNRepeat CloseType = iota + 1
 	CloseTypeServerHalfClose
 	CloseTypeTCPClientRst
-	CloseTypeClientHalfOpen
+	CloseTypeServerSYNACKRepeat
 	CloseTypeClientHalfClose
 
-	CloseTypeClientSYNRepeat    = CloseTypeServerHalfOpen
-	CloseTypeServerSYNACKRepeat = CloseTypeClientHalfOpen
-	CloseTypeClientNoResponse   = iota
+	CloseTypeClientNoResponse
 	CloseTypeClientSourcePortReuse
 	CloseTypeClientSYNRetryLack
 	CloseTypeServerReset
