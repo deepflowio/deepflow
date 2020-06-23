@@ -16,7 +16,7 @@ func TestGeoMeterFill(t *testing.T) {
 		"rtt", "rtt_client", "rtt_server", "srt", "art",
 		"retrans_tx", "retrans_rx", "zero_win_tx", "zero_win_rx",
 		"client_rst_flow", "server_rst_flow", "client_half_open_flow", "server_half_open_flow",
-		"client_half_close_flow", "server_half_close_flow", "timeout_tcp_flow",
+		"client_half_close_flow", "server_half_close_flow",
 	}
 	var values []interface{}
 	for i := range fields {
@@ -33,8 +33,8 @@ func TestGeoMeterFill(t *testing.T) {
 		f.PacketTx, f.PacketRx, f.ByteTx, f.ByteRx, f.Flow, f.NewFlow, f.ClosedFlow,
 		f.RTTSum, f.RTTClientSum, f.RTTServerSum, f.SRTSum, f.ARTSum,
 		f.RetransTx, f.RetransRx, f.ZeroWinTx, f.ZeroWinRx,
-		f.ClientRstFlow, f.ServerRstFlow, f.ClientHalfOpenFlow, f.ServerHalfOpenFlow,
-		f.ClientHalfCloseFlow, f.ServerHalfCloseFlow, f.TimeoutTCPFlow,
+		f.ClientRstFlow, f.ServerRstFlow, f.ServerSYNACKRepeat, f.ClientSynRepeat,
+		f.ClientHalfCloseFlow, f.ServerHalfCloseFlow,
 	}
 	for i, r := range results {
 		switch r.(type) {
@@ -55,38 +55,6 @@ func TestGeoMeterFill(t *testing.T) {
 	}
 }
 
-func TestFlowSecondMeterFill(t *testing.T) {
-	f := &FlowSecondMeter{}
-
-	fields := []string{
-		"packet_tx", "packet_rx", "byte_tx", "byte_rx", "flow", "new_flow", "closed_flow",
-		"client_rst_flow", "server_rst_flow", "client_half_open_flow", "server_half_open_flow",
-		"client_half_close_flow", "server_half_close_flow", "timeout_tcp_flow",
-	}
-	var values []interface{}
-	for i := range fields {
-		values = append(values, int64(i+1))
-	}
-	mixLocation := len(fields) / 3
-	mixedKeys := append(fields[:mixLocation+1], fields[mixLocation:]...)
-	mixedKeys[mixLocation] = "ip"
-	mixedValues := append(values[:mixLocation+1], values[mixLocation:]...)
-	mixedValues[mixLocation] = "ip"
-	f.Fill(GetColumnIDs(mixedKeys), mixedValues)
-
-	results := []interface{}{
-		f.PacketTx, f.PacketRx, f.ByteTx, f.ByteRx, f.Flow, f.NewFlow, f.ClosedFlow,
-		f.ClientRstFlow, f.ServerRstFlow, f.ClientHalfOpenFlow, f.ServerHalfOpenFlow,
-		f.ClientHalfCloseFlow, f.ServerHalfCloseFlow, f.TimeoutTCPFlow,
-	}
-	for i, r := range results {
-		if uint64(i+1) != r.(uint64) {
-			t.Error("FlowSecondMeter fill不正确")
-			t.FailNow()
-		}
-	}
-}
-
 func TestFlowMinuteMeterFill(t *testing.T) {
 	f := &FlowMeter{}
 
@@ -95,7 +63,7 @@ func TestFlowMinuteMeterFill(t *testing.T) {
 		"rtt", "rtt_client", "rtt_server", "srt", "art",
 		"retrans_tx", "retrans_rx", "zero_win_tx", "zero_win_rx",
 		"client_rst_flow", "server_rst_flow", "client_half_open_flow", "server_half_open_flow",
-		"client_half_close_flow", "server_half_close_flow", "timeout_tcp_flow",
+		"client_half_close_flow", "server_half_close_flow",
 	}
 	var values []interface{}
 	for i := range fields {
@@ -112,8 +80,8 @@ func TestFlowMinuteMeterFill(t *testing.T) {
 		f.PacketTx, f.PacketRx, f.ByteTx, f.ByteRx, f.Flow, f.NewFlow, f.ClosedFlow,
 		f.RTTSum, f.RTTClientSum, f.RTTServerSum, f.SRTSum, f.ARTSum,
 		f.RetransTx, f.RetransRx, f.ZeroWinTx, f.ZeroWinRx,
-		f.ClientRstFlow, f.ServerRstFlow, f.ClientHalfOpenFlow, f.ServerHalfOpenFlow,
-		f.ClientHalfCloseFlow, f.ServerHalfCloseFlow, f.TimeoutTCPFlow,
+		f.ClientRstFlow, f.ServerRstFlow, f.ServerSYNACKRepeat, f.ClientSynRepeat,
+		f.ClientHalfCloseFlow, f.ServerHalfCloseFlow,
 	}
 	for i, r := range results {
 		switch r.(type) {
@@ -158,7 +126,7 @@ func TestVTAPUsageMeterFill(t *testing.T) {
 }
 
 func TestMeterReverse(t *testing.T) {
-	meters := []app.Meter{&FlowSecondMeter{}, &FlowMeter{}, &GeoMeter{}, &VTAPUsageMeter{}}
+	meters := []app.Meter{&FlowMeter{}, &GeoMeter{}, &VTAPUsageMeter{}}
 	interestedFieldPairs := [][]string{
 		{"PacketTx", "PacketRx"},
 		{"ByteTx", "ByteRx"},
