@@ -179,7 +179,7 @@ func (l *Latency) SequentialMerge(other *Latency) {
 }
 
 func (l *Latency) MarshalTo(b []byte) int {
-	fields := []string{"rtt=", "rtt_client=", "rtt_server=", "srt=", "art=", "http=", "dns="}
+	fields := []string{"rtt=", "rtt_client=", "rtt_server=", "srt=", "art=", "http_rrt=", "dns_rrt="}
 	dividends := []uint64{l.RTTSum, l.RTTClientSum, l.RTTServerSum, l.SRTSum, l.ARTSum, l.HTTPRRTSum, l.DNSRRTSum}
 	divisors := []uint64{l.RTTCount, l.RTTClientCount, l.RTTServerCount, l.SRTCount, l.ARTCount, l.HTTPRRTCount, l.DNSRRTCount}
 	values := make([]uint64, len(dividends))
