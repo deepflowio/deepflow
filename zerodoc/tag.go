@@ -28,6 +28,7 @@ const (
 	HostID
 	AZID
 	PodGroupID
+	PodNSID
 )
 
 const (
@@ -41,6 +42,7 @@ const (
 	HostIDPath
 	AZIDPath
 	PodGroupIDPath
+	PodNSIDPath
 )
 
 const (
@@ -198,6 +200,7 @@ type Field struct {
 	PodNodeID    uint16
 	AZID         uint16
 	PodGroupID   int16
+	PodNSID      uint16
 
 	IP61          net.IP // FIXME: 合并IP61和IP1
 	IP1           uint32
@@ -211,6 +214,7 @@ type Field struct {
 	PodNodeID1    uint16
 	AZID1         uint16
 	PodGroupID1   int16
+	PodNSID1      uint16
 
 	ACLGID     uint16
 	Direction  DirectionEnum
@@ -393,6 +397,18 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.PodNodeID1), 10))
 	}
 
+	if t.Code&PodNSID != 0 {
+		offset += copy(b[offset:], ",pod_ns_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.PodNSID), 10))
+	}
+
+	if t.Code&PodNSIDPath != 0 {
+		offset += copy(b[offset:], ",pod_ns_id_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.PodNSID), 10))
+		offset += copy(b[offset:], ",pod_ns_id_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.PodNSID1), 10))
+	}
+
 	if t.Code&Protocol != 0 {
 		offset += copy(b[offset:], ",protocol=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.Protocol), 10))
@@ -523,6 +539,9 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&PodNodeID != 0 {
 		t.PodNodeID = decoder.ReadU16()
 	}
+	if t.Code&PodNSID != 0 {
+		t.PodNSID = decoder.ReadU16()
+	}
 	if t.Code&AZID != 0 {
 		t.AZID = decoder.ReadU16()
 	}
@@ -575,6 +594,10 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&PodNodeIDPath != 0 {
 		t.PodNodeID = decoder.ReadU16()
 		t.PodNodeID1 = decoder.ReadU16()
+	}
+	if t.Code&PodNSIDPath != 0 {
+		t.PodNSID = decoder.ReadU16()
+		t.PodNSID1 = decoder.ReadU16()
 	}
 	if t.Code&AZIDPath != 0 {
 		t.AZID = decoder.ReadU16()
@@ -664,6 +687,9 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 	if code&PodNodeID != 0 {
 		encoder.WriteU16(t.PodNodeID)
 	}
+	if code&PodNSID != 0 {
+		encoder.WriteU16(t.PodNSID)
+	}
 	if code&AZID != 0 {
 		encoder.WriteU16(t.AZID)
 	}
@@ -718,6 +744,10 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 	if code&PodNodeIDPath != 0 {
 		encoder.WriteU16(t.PodNodeID)
 		encoder.WriteU16(t.PodNodeID1)
+	}
+	if code&PodNSIDPath != 0 {
+		encoder.WriteU16(t.PodNSID)
+		encoder.WriteU16(t.PodNSID1)
 	}
 	if code&AZIDPath != 0 {
 		encoder.WriteU16(t.AZID)
@@ -1085,6 +1115,18 @@ func (t *Tag) fillValue(id uint8, value string) (err error) {
 		t.Code |= PodNodeIDPath
 		i, err = parseUint(value, 10, 16)
 		field.PodNodeID1 = uint16(i)
+	case _TAG_POD_NS_ID, _TAG_POD_NS_ID_0:
+		if id == _TAG_POD_NS_ID {
+			t.Code |= PodNSID
+		} else {
+			t.Code |= PodNSIDPath
+		}
+		i, err = parseUint(value, 10, 16)
+		field.PodNSID = uint16(i)
+	case _TAG_POD_NS_ID_1:
+		t.Code |= PodNSIDPath
+		i, err = parseUint(value, 10, 16)
+		field.PodNSID1 = uint16(i)
 	case _TAG_POD_GROUP_ID, _TAG_POD_GROUP_ID_0:
 		if id == _TAG_POD_GROUP_ID {
 			t.Code |= PodGroupID

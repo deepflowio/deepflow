@@ -17,7 +17,7 @@ require (
 	github.com/spf13/cobra v0.0.3
 	github.com/textnode/fencer v0.0.0-20121219195347-6baed0e5ef9a
 	gitlab.x.lan/platform/influxdb v0.0.0-20200109064655-6c1e420280c5
-	gitlab.x.lan/yunshan/message v0.0.0-20200610023447-f5f1f9500f0b
+	gitlab.x.lan/yunshan/message v0.0.0-20200628050801-659fb22311f4
 	golang.org/x/net v0.0.0-20190514140710-3ec191127204
 	golang.org/x/sys v0.0.0-20190516110030-61b9204099cb
 	google.golang.org/grpc v1.19.0

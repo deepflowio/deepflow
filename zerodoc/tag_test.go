@@ -64,7 +64,7 @@ func TestFill1(t *testing.T) {
 		"l3_epc_id_1": "31", "l3_device_id_1": "32", "l3_device_type_1": "9",
 		"host_id_1": "55", "subnet_id_1": "2000", "direction": "c2s", "tap_side": "c", "acl_gid": "400",
 		"protocol": "4", "server_port": "9527", "tap_type": "0", "subnet_id": "1001", "pod_node_id": "1", "az_id": "132",
-		"tag_type": "1", "tag_value": "北京",
+		"tag_type": "1", "tag_value": "北京", "pod_ns_id": "10",
 	}
 
 	if err := tag.Fill(tags); err != nil {
@@ -142,6 +142,9 @@ func TestFill1(t *testing.T) {
 	}
 	if tag.TagValue != 8 {
 		t.Error("TagValue 处理错误:", tag.TagValue)
+	}
+	if tag.PodNSID != 10 {
+		t.Error("PodNSID 处理错误")
 	}
 }
 
@@ -234,7 +237,7 @@ func TestMarshallToInfluxdb(t *testing.T) {
 	f := Field{}
 	tag := &Tag{&f, 0, ""}
 	tag.GlobalThreadID = 112
-	tag.Code = ^(GroupIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | RegionIDPath | SubnetIDPath | PodNodeIDPath | AZIDPath | PodGroupIDPath)
+	tag.Code = ^(GroupIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | RegionIDPath | SubnetIDPath | PodNodeIDPath | AZIDPath | PodGroupIDPath | PodNSIDPath)
 
 	l := tag.MarshalTo(b)
 	strs := parseTagkeys(b[:l])
@@ -251,7 +254,7 @@ func TestMarshallToInfluxdb(t *testing.T) {
 		}
 	}
 
-	tag.Code = ^(GroupID | HostID | IP | L3Device | L3EpcID | RegionID | SubnetID | PodNodeID | AZID | PodGroupID)
+	tag.Code = ^(GroupID | HostID | IP | L3Device | L3EpcID | RegionID | SubnetID | PodNodeID | AZID | PodGroupID | PodNSID)
 	l = tag.MarshalTo(b)
 	strs = parseTagkeys(b[:l])
 	cloneStrs = cloneStrs[:0]
