@@ -68,6 +68,8 @@ type CustomTag struct {
 	// 每一位表示对应index下的Values[i]有意义
 	// 如 Code=3时Values[0]和Values[1]有意义
 	Code uint64
+
+	pool.ReferenceCount
 }
 
 var customTagPool = pool.NewLockFreePool(func() interface{} {
@@ -79,10 +81,24 @@ func AcquireCustomTag() *CustomTag {
 }
 
 func (t *CustomTag) Clone() app.Tag {
-	panic("not implemented")
+	newTag := AcquireCustomTag()
+	newTag.Meta = t.Meta
+	newTag.id = t.id
+	newTag.Values = append(newTag.Values[:0], t.Values...)
+	newTag.Code = t.Code
+	newTag.Reset()
+	return newTag
+}
+
+func (t *CustomTag) PseudoClone() app.Tag {
+	t.AddReferenceCount()
+	return t
 }
 
 func (t *CustomTag) Release() {
+	if t.SubReferenceCount() {
+		return
+	}
 	*t = CustomTag{Values: t.Values[:0]}
 	customTagPool.Put(t)
 }
