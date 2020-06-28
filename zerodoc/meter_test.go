@@ -15,7 +15,7 @@ func TestGeoMeterFill(t *testing.T) {
 		"packet_tx", "packet_rx", "byte_tx", "byte_rx", "flow", "new_flow", "closed_flow",
 		"rtt", "rtt_client", "rtt_server", "srt", "art",
 		"retrans_tx", "retrans_rx", "zero_win_tx", "zero_win_rx",
-		"client_rst_flow", "server_rst_flow", "client_half_open_flow", "server_half_open_flow",
+		"client_rst_flow", "server_rst_flow", "server_syn_ack_repeat", "client_syn_repeat",
 		"client_half_close_flow", "server_half_close_flow",
 	}
 	var values []interface{}
@@ -62,7 +62,7 @@ func TestFlowMinuteMeterFill(t *testing.T) {
 		"packet_tx", "packet_rx", "byte_tx", "byte_rx", "flow", "new_flow", "closed_flow",
 		"rtt", "rtt_client", "rtt_server", "srt", "art",
 		"retrans_tx", "retrans_rx", "zero_win_tx", "zero_win_rx",
-		"client_rst_flow", "server_rst_flow", "client_half_open_flow", "server_half_open_flow",
+		"client_rst_flow", "server_rst_flow", "server_syn_ack_repeat", "client_syn_repeat",
 		"client_half_close_flow", "server_half_close_flow",
 	}
 	var values []interface{}
