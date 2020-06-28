@@ -48,6 +48,7 @@ type Info struct {
 	DeviceID   uint32
 	SubnetID   uint32
 	PodNodeID  uint32
+	PodNSID    uint32
 	PodGroupID uint32
 	AZID       uint32
 	HitCount   *uint64
@@ -411,8 +412,8 @@ func (t *PlatformInfoTable) String() string {
 
 	t.ipv4Lock.RLock()
 	if len(t.epcIDIPV4Infos) > 0 {
-		sb.WriteString("\nepcID   ipv4            mac          host            hostID  regionID  deviceType  deviceID    subnetID  podNodeID podGroupID azID hitCount\n")
-		sb.WriteString("------------------------------------------------------------------------------------------------------------------------------------\n")
+		sb.WriteString("\nepcID   ipv4            mac          host            hostID  regionID  deviceType  deviceID    subnetID  podNodeID podNSID podGroupID azID hitCount\n")
+		sb.WriteString("--------------------------------------------------------------------------------------------------------------------------------------------\n")
 	}
 	epcIP4s := make([]uint64, 0)
 	for epcIP, _ := range t.epcIDIPV4Infos {
@@ -426,16 +427,16 @@ func (t *PlatformInfoTable) String() string {
 		if info == nil {
 			continue
 		}
-		fmt.Fprintf(sb, "%-6d  %-15s %-12x %-15s %-6d  %-7d   %-10d   %-7d    %-8d  %-9d %-10d %-4d %d\n", epcIP>>32, utils.IpFromUint32(uint32(epcIP)).String(),
-			info.Mac, info.HostStr, info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.PodGroupID, info.AZID, *info.HitCount)
+		fmt.Fprintf(sb, "%-6d  %-15s %-12x %-15s %-6d  %-7d   %-10d   %-7d    %-8d  %-9d %-7d %-10d %-4d %d\n", epcIP>>32, utils.IpFromUint32(uint32(epcIP)).String(),
+			info.Mac, info.HostStr, info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.PodNSID, info.PodGroupID, info.AZID, *info.HitCount)
 	}
 	t.ipv4Lock.RUnlock()
 
 	t.ipv6Lock.RLock()
 	if len(t.epcIDIPV6Infos) > 0 {
 		sb.WriteString("\n\n")
-		sb.WriteString("epcID   ipv6                                         mac          host            hostID  regionID deviceType  deviceID subnetID  podNodeID podGroupID azID hitCount\n")
-		sb.WriteString("---------------------------------------------------------------------------------------------------------------------------------------------------------- \n")
+		sb.WriteString("epcID   ipv6                                         mac          host            hostID  regionID deviceType  deviceID subnetID  podNodeID podNSID podGroupID azID hitCount\n")
+		sb.WriteString("------------------------------------------------------------------------------------------------------------------------------------------------------------------ \n")
 	}
 	epcIP6s := make([][EpcIDIPV6_LEN]byte, 0)
 	for epcIP, _ := range t.epcIDIPV6Infos {
@@ -449,8 +450,8 @@ func (t *PlatformInfoTable) String() string {
 		if info == nil {
 			continue
 		}
-		fmt.Fprintf(sb, "%-6d  %-44s %-12x %-15s %-6d  %-7d  %-10d  %-7d  %-8d  %-9d %-10d %-4d %d\n", int32(binary.LittleEndian.Uint32(epcIP[:4])), net.IP(epcIP[4:]).String(),
-			info.Mac, info.HostStr, info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.PodGroupID, info.AZID, *info.HitCount)
+		fmt.Fprintf(sb, "%-6d  %-44s %-12x %-15s %-6d  %-7d  %-10d  %-7d  %-8d  %-9d %-7d %-10d %-4d %d\n", int32(binary.LittleEndian.Uint32(epcIP[:4])), net.IP(epcIP[4:]).String(),
+			info.Mac, info.HostStr, info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.PodNSID, info.PodGroupID, info.AZID, *info.HitCount)
 	}
 	t.ipv6Lock.RUnlock()
 	if len(t.epcIDIPV4CidrInfos) > 0 || len(t.epcIDIPV6CidrInfos) > 0 {
@@ -673,6 +674,7 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 	deviceType := intf.GetDeviceType()
 	deviceID := intf.GetDeviceId()
 	podNodeID := intf.GetPodNodeId()
+	podNSID := intf.GetPodNsId()
 	podGroupID := intf.GetPodGroupId()
 	azID := intf.GetAzId()
 	regionID := intf.GetRegionId()
@@ -706,6 +708,7 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 				DeviceID:   deviceID,
 				SubnetID:   subnetID,
 				PodNodeID:  podNodeID,
+				PodNSID:    podNSID,
 				PodGroupID: podGroupID,
 				AZID:       azID,
 				HitCount:   new(uint64),
@@ -728,6 +731,7 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 				DeviceID:   deviceID,
 				SubnetID:   subnetID,
 				PodNodeID:  podNodeID,
+				PodNSID:    podNSID,
 				PodGroupID: podGroupID,
 				AZID:       azID,
 				HitCount:   new(uint64),
