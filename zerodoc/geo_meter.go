@@ -153,9 +153,9 @@ func (m *GeoMeter) Fill(ids []uint8, values []interface{}) {
 			m.ClientRstFlow = uint64(v)
 		case _METER_SERVER_RST_FLOW:
 			m.ServerRstFlow = uint64(v)
-		case _METER_CLIENT_HALF_OPEN_FLOW:
+		case _METER_SERVER_SYN_ACK_REPEAT:
 			m.ServerSYNACKRepeat = uint64(v)
-		case _METER_SERVER_HALF_OPEN_FLOW:
+		case _METER_CLIENT_SYN_REPEAT:
 			m.ClientSynRepeat = uint64(v)
 		case _METER_CLIENT_HALF_CLOSE_FLOW:
 			m.ClientHalfCloseFlow = uint64(v)

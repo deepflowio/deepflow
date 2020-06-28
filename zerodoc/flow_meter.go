@@ -123,6 +123,14 @@ func (m *FlowMeter) Fill(ids []uint8, values []interface{}) {
 			m.NewFlow = uint64(v)
 		case _METER_CLOSED_FLOW:
 			m.ClosedFlow = uint64(v)
+		case _METER_HTTP_REQUEST:
+			m.HTTPRequest = uint64(v)
+		case _METER_HTTP_RESPONSE:
+			m.HTTPResponse = uint64(v)
+		case _METER_DNS_REQUEST:
+			m.DNSRequest = uint64(v)
+		case _METER_DNS_RESPONSE:
+			m.DNSResponse = uint64(v)
 
 		case _METER_RTT:
 			m.RTTSum = uint64(v)
@@ -139,6 +147,12 @@ func (m *FlowMeter) Fill(ids []uint8, values []interface{}) {
 		case _METER_ART:
 			m.ARTSum = uint64(v)
 			m.ARTCount = 1
+		case _METER_HTTP_RRT:
+			m.HTTPRRTSum = uint64(v)
+			m.HTTPRRTCount = 1
+		case _METER_DNS_RRT:
+			m.DNSRRTSum = uint64(v)
+			m.DNSRRTCount = 1
 
 		case _METER_RETRANS_TX:
 			m.RetransTx = uint64(v)
@@ -153,14 +167,37 @@ func (m *FlowMeter) Fill(ids []uint8, values []interface{}) {
 			m.ClientRstFlow = uint64(v)
 		case _METER_SERVER_RST_FLOW:
 			m.ServerRstFlow = uint64(v)
-		case _METER_CLIENT_HALF_OPEN_FLOW:
+		case _METER_SERVER_SYN_ACK_REPEAT:
 			m.ServerSYNACKRepeat = uint64(v)
-		case _METER_SERVER_HALF_OPEN_FLOW:
+		case _METER_CLIENT_SYN_REPEAT:
 			m.ClientSynRepeat = uint64(v)
 		case _METER_CLIENT_HALF_CLOSE_FLOW:
 			m.ClientHalfCloseFlow = uint64(v)
 		case _METER_SERVER_HALF_CLOSE_FLOW:
 			m.ServerHalfCloseFlow = uint64(v)
+
+		case _METER_CLIENT_NO_RESPONSE:
+			m.ClientNoResponse = uint64(v)
+		case _METER_CLIENT_SOURCE_PORT_REUSE:
+			m.ClientSourcePortReuse = uint64(v)
+		case _METER_CLIENT_SYN_RETRY_LACK:
+			m.ClientSYNRetryLack = uint64(v)
+		case _METER_SERVER_RESET:
+			m.ServerReset = uint64(v)
+		case _METER_SERVER_NO_RESPONSE:
+			m.ServerNoResponse = uint64(v)
+		case _METER_SERVER_QUEUE_LACK:
+			m.ServerQueueLack = uint64(v)
+
+		case _METER_HTTP_CLIENT_ERROR:
+			m.HTTPClientError = uint64(v)
+		case _METER_HTTP_SERVER_ERROR:
+			m.HTTPServerError = uint64(v)
+		case _METER_DNS_CLIENT_ERROR:
+			m.DNSClientError = uint64(v)
+		case _METER_DNS_SERVER_ERROR:
+			m.DNSServerError = uint64(v)
+
 		default:
 			log.Warningf("unsupport meter id=%d", id)
 		}
