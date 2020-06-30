@@ -43,7 +43,20 @@ func (t *CustomTagMeterMeta) Encode(encoder *codec.SimpleEncoder) {
 type CustomTagMeta struct {
 	Names []string
 
-	NameToIndex map[string]int
+	nameToIndex map[string]int
+}
+
+func (m *CustomTagMeta) IndexOf(name string) int {
+	if m.nameToIndex == nil {
+		m.nameToIndex = make(map[string]int)
+		for i, name := range m.Names {
+			m.nameToIndex[name] = i
+		}
+	}
+	if id, in := m.nameToIndex[name]; in {
+		return id
+	}
+	return -1
 }
 
 type CustomMeterType uint8
@@ -57,7 +70,20 @@ type CustomMeterMeta struct {
 	Names []string
 	Types []CustomMeterType
 
-	NameToIndex map[string]int
+	nameToIndex map[string]int
+}
+
+func (m *CustomMeterMeta) IndexOf(name string) int {
+	if m.nameToIndex == nil {
+		m.nameToIndex = make(map[string]int)
+		for i, name := range m.Names {
+			m.nameToIndex[name] = i
+		}
+	}
+	if id, in := m.nameToIndex[name]; in {
+		return id
+	}
+	return -1
 }
 
 type CustomTag struct {
@@ -162,7 +188,7 @@ func (t *CustomTag) MarshalTo(b []byte) int {
 	sort.Strings(Names)
 	offset := 0
 	for _, name := range Names {
-		index := t.Meta.NameToIndex[name]
+		index := t.Meta.IndexOf(name)
 		if t.Code&(1<<index) == 0 {
 			continue
 		}
