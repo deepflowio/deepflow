@@ -199,16 +199,20 @@ func NewCLIHandler(httpAddr, user, password, dbGroup, action, baseRP, newRP, agg
 func (c *CLIHandler) Run() (string, error) {
 	ret := SUCCESS
 	for i, rpHandler := range c.rpHandlers {
+		cqHandlers := c.cqHandlers[i]
 		switch c.action {
 		case ADD:
+			if err := createDefaultRPIfNotExist(cqHandlers.client, cqHandlers.db, cqHandlers.srcRP); err != nil {
+				return FAILED, err
+			}
 			if err := rpHandler.Add(); err != nil {
 				return FAILED, err
 			}
-			if err := c.cqHandlers[i].Add(); err != nil {
+			if err := cqHandlers.Add(); err != nil {
 				return FAILED, err
 			}
 		case DEL:
-			if err := c.cqHandlers[i].Del(); err != nil {
+			if err := cqHandlers.Del(); err != nil {
 				return FAILED, err
 			}
 			if err := rpHandler.Del(); err != nil {
@@ -220,7 +224,7 @@ func (c *CLIHandler) Run() (string, error) {
 			}
 		case SHOW:
 			ret += rpHandler.Show()
-			ret += c.cqHandlers[i].Show()
+			ret += cqHandlers.Show()
 		default:
 			return FAILED, fmt.Errorf("Invilid rp action %d", c.action)
 		}
@@ -325,9 +329,6 @@ func createDefaultRPIfNotExist(client client.Client, db, rp string) error {
 }
 
 func (c *CQHandler) Add() error {
-	if err := createDefaultRPIfNotExist(c.client, c.db, c.srcRP); err != nil {
-		return err
-	}
 	fields := getFields(c.db)
 	if len(fields) == 0 {
 		return fmt.Errorf("get db(%s) fields faild", c.db)
