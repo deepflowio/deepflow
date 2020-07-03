@@ -1,6 +1,9 @@
 package zerodoc
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestMarshalTraffic(t *testing.T) {
 	var buffer [1024]byte
@@ -66,5 +69,58 @@ func TestReverse(t *testing.T) {
 	t1.Reverse()
 	if t1 != t2 {
 		t.Error("Reverse()实现不正确")
+	}
+}
+
+func initMeter(m interface{}, n uint64) {
+	v := reflect.ValueOf(m)
+	if v.IsNil() {
+		return
+	}
+
+	v = reflect.Indirect(v)
+	for i := 0; i < v.NumField(); i++ {
+		f := v.Field(i)
+		switch f.Kind() {
+		case reflect.Uint64:
+			f.SetUint(n)
+		default:
+			continue
+		}
+	}
+}
+
+func TestMerge(t *testing.T) {
+	t1, t2 := &Traffic{}, &Traffic{}
+	initMeter(t1, 1)
+	initMeter(t2, 2)
+	t.Log(t1)
+	t1.ConcurrentMerge(t1)
+	if *t1 != *t2 {
+		t.Errorf("Traffic ConcurrentMerge failed, expected:%v, actual:%v", t2, t1)
+	}
+
+	l1, l2 := &Latency{}, &Latency{}
+	initMeter(l1, 1)
+	initMeter(l2, 2)
+	l1.ConcurrentMerge(l1)
+	if *l1 != *l2 {
+		t.Errorf("Latency ConcurrentMerge failed, expected:%v, actual:%v", l2, l1)
+	}
+
+	p1, p2 := &Performance{}, &Performance{}
+	initMeter(p1, 1)
+	initMeter(p2, 2)
+	p1.ConcurrentMerge(p1)
+	if *p1 != *p2 {
+		t.Errorf("Performance ConcurrentMerge failed, expected:%v, actual:%v", p2, p1)
+	}
+
+	a1, a2 := &Anomaly{}, &Anomaly{}
+	initMeter(a1, 1)
+	initMeter(a2, 2)
+	a1.ConcurrentMerge(a1)
+	if *a1 != *a2 {
+		t.Errorf("Anomaly ConcurrentMerge failed, expected:%v, actual:%v", a2, a1)
 	}
 }

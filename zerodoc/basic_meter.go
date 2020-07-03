@@ -320,10 +320,10 @@ func (a *Anomaly) ConcurrentMerge(other *Anomaly) {
 	a.ServerNoResponse += other.ServerNoResponse
 	a.ServerQueueLack += other.ServerQueueLack
 
-	a.HTTPClientError = other.HTTPClientError
-	a.HTTPServerError = other.HTTPServerError
-	a.DNSClientError = other.DNSClientError
-	a.DNSServerError = other.DNSServerError
+	a.HTTPClientError += other.HTTPClientError
+	a.HTTPServerError += other.HTTPServerError
+	a.DNSClientError += other.DNSClientError
+	a.DNSServerError += other.DNSServerError
 }
 
 func (a *Anomaly) SequentialMerge(other *Anomaly) {
