@@ -1,16 +1,13 @@
 package zerodoc
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
-	"net"
 
 	"strings"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
-	"gitlab.x.lan/yunshan/droplet-libs/receiver"
 )
 
 // The return Document, must call app.ReleaseDocument to release after used
@@ -143,37 +140,17 @@ func DecodeTsdbRow(decoder *codec.SimpleDecoder) (*app.Document, error) {
 	return Decode(decoder)
 }
 
-const (
-	QueryIDLen = 8
-	SQLLenLen  = 2
-)
-
 // TCP连接下发查询语句
-type Query struct {
-	QueryID uint64
-	SQL     string
+func EncodeQuery(encoder *codec.SimpleEncoder, queryID uint64, SQL string) {
+	encoder.WriteU64(queryID)
+	encoder.WriteBytes([]byte(SQL))
 }
 
-func EncodeQuery(encoder *codec.SimpleEncoder, query *Query) {
-	encoder.WriteU64(query.QueryID)
-	encoder.WriteU16(uint16(len(query.SQL)))
-	encoder.WriteRawString(query.SQL)
-}
-
-func DecodeQuery(conn net.Conn) (*Query, error) {
-	buf := make([]byte, QueryIDLen+SQLLenLen)
-	if err := receiver.ReadN(conn, buf); err != nil {
-		return nil, err
+func DecodeQuey(decoder *codec.SimpleDecoder) (uint64, string, error) {
+	queryID := decoder.ReadU64()
+	SQL := decoder.ReadBytes()
+	if decoder.Failed() {
+		return 0, "", fmt.Errorf("decode failed")
 	}
-	queryID := binary.LittleEndian.Uint64(buf[:QueryIDLen])
-	SQLLen := binary.LittleEndian.Uint16(buf[QueryIDLen:])
-	SQLBuf := make([]byte, SQLLen)
-	if err := receiver.ReadN(conn, SQLBuf); err != nil {
-		return nil, err
-	}
-
-	return &Query{
-		QueryID: queryID,
-		SQL:     string(SQLBuf),
-	}, nil
+	return queryID, string(SQL), nil
 }
