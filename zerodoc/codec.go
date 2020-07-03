@@ -143,6 +143,11 @@ func DecodeTsdbRow(decoder *codec.SimpleDecoder) (*app.Document, error) {
 	return Decode(decoder)
 }
 
+const (
+	QueryIDLen = 8
+	SQLLenLen  = 2
+)
+
 // TCP连接下发查询语句
 type Query struct {
 	QueryID uint64
@@ -156,12 +161,12 @@ func EncodeQuery(encoder *codec.SimpleEncoder, query *Query) {
 }
 
 func DecodeQuery(conn net.Conn) (*Query, error) {
-	buf := make([]byte, 10)
+	buf := make([]byte, QueryIDLen+SQLLenLen)
 	if err := receiver.ReadN(conn, buf); err != nil {
 		return nil, err
 	}
-	queryID := binary.LittleEndian.Uint64(buf[:8])
-	SQLLen := binary.LittleEndian.Uint16(buf[8:])
+	queryID := binary.LittleEndian.Uint64(buf[:QueryIDLen])
+	SQLLen := binary.LittleEndian.Uint16(buf[QueryIDLen:])
 	SQLBuf := make([]byte, SQLLen)
 	if err := receiver.ReadN(conn, SQLBuf); err != nil {
 		return nil, err
