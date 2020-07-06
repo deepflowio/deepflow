@@ -1,6 +1,7 @@
 package zerodoc
 
 import (
+	"encoding/binary"
 	"sort"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
@@ -235,4 +236,38 @@ func (m *CustomMeter) Encode(encoder *codec.SimpleEncoder) {
 	for _, value := range m.Values {
 		encoder.WriteU64(value)
 	}
+}
+
+func EncodeTSDBRow(encoder *codec.SimpleEncoder, timestamp uint64, columnValues []interface{}, isTag []bool) {
+	encoder.WriteU64(timestamp)
+	code := uint64(0)
+	offset := len(encoder.Bytes())
+	encoder.WriteU64(0)
+	for i, v := range columnValues {
+		if isTag[i] {
+			code = (code << 1) | 1
+			if str, ok := v.(string); ok {
+				encoder.WriteString255(str)
+			} else {
+				encoder.WriteString255("")
+			}
+		}
+	}
+	// 写入code
+	binary.LittleEndian.PutUint64(encoder.Bytes()[offset:], code)
+
+	l := byte(0)
+	offset = len(encoder.Bytes())
+	encoder.WriteU8(0)
+	for i, v := range columnValues {
+		if !isTag[i] {
+			l++
+			if i64, ok := v.(int64); ok {
+				encoder.WriteU64(uint64(i64))
+			} else {
+				encoder.WriteU64(0)
+			}
+		}
+	}
+	encoder.Bytes()[offset] = l
 }
