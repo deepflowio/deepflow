@@ -27,13 +27,13 @@ var log = logging.MustGetLogger(execName())
 var configPath = flag.String("f", "/etc/droplet.yaml", "Specify config file location")
 var version = flag.Bool("v", false, "Display the version")
 
-var RevCount, Revision, CommitDate string
+var RevCount, Revision, CommitDate, goVersion string
 
 func main() {
 	logger.EnableStdoutLog()
 	flag.Parse()
 	if *version {
-		fmt.Printf("%s-%s %s\n", RevCount, Revision, CommitDate)
+		fmt.Printf("%s %s %s\n%s\n", RevCount, Revision, CommitDate, goVersion)
 		os.Exit(0)
 	}
 
