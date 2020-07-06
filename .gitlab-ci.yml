@@ -13,7 +13,7 @@ verify-x64:
     - make
     - make test
 
-package64:
+package-x64:
   stage: package
   tags:
     - x64
@@ -37,7 +37,7 @@ verify-arm64:
     - go fmt ./...; [[ -z $(git status -s --ignore-submodule) ]] || exit -1
     - make
 
-packagearm64:
+package-arm64:
   stage: package
   tags:
     - arm64
