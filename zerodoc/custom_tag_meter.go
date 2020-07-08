@@ -27,6 +27,9 @@ func (t *CustomTagMeterMeta) Decode(decoder *codec.SimpleDecoder) {
 		t.Meter.Names = append(t.Meter.Names, decoder.ReadString255())
 		t.Meter.Types = append(t.Meter.Types, CustomMeterType(decoder.ReadU8()))
 	}
+
+	t.Tag.PopulateCache()
+	t.Meter.PopulateCache()
 }
 
 func (t *CustomTagMeterMeta) Encode(encoder *codec.SimpleEncoder) {
@@ -47,12 +50,16 @@ type CustomTagMeta struct {
 	nameToIndex map[string]int
 }
 
+func (m *CustomTagMeta) PopulateCache() {
+	m.nameToIndex = make(map[string]int)
+	for i, name := range m.Names {
+		m.nameToIndex[name] = i
+	}
+}
+
 func (m *CustomTagMeta) IndexOf(name string) int {
 	if m.nameToIndex == nil {
-		m.nameToIndex = make(map[string]int)
-		for i, name := range m.Names {
-			m.nameToIndex[name] = i
-		}
+		m.PopulateCache()
 	}
 	if id, in := m.nameToIndex[name]; in {
 		return id
@@ -74,12 +81,16 @@ type CustomMeterMeta struct {
 	nameToIndex map[string]int
 }
 
+func (m *CustomMeterMeta) PopulateCache() {
+	m.nameToIndex = make(map[string]int)
+	for i, name := range m.Names {
+		m.nameToIndex[name] = i
+	}
+}
+
 func (m *CustomMeterMeta) IndexOf(name string) int {
 	if m.nameToIndex == nil {
-		m.nameToIndex = make(map[string]int)
-		for i, name := range m.Names {
-			m.nameToIndex[name] = i
-		}
+		m.PopulateCache()
 	}
 	if id, in := m.nameToIndex[name]; in {
 		return id
