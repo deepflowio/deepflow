@@ -17,6 +17,8 @@ func TestCustomTagMeterMetaEncodeDecode(t *testing.T) {
 			Types: []CustomMeterType{CUSTOM_METER_U32, CUSTOM_METER_U64, CUSTOM_METER_U64},
 		},
 	}
+	orig.Tag.PopulateCache()
+	orig.Meter.PopulateCache()
 	encoder := codec.SimpleEncoder{}
 	orig.Encode(&encoder)
 	decoder := codec.SimpleDecoder{}
