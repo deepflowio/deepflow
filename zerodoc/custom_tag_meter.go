@@ -115,7 +115,9 @@ var customTagPool = pool.NewLockFreePool(func() interface{} {
 })
 
 func AcquireCustomTag() *CustomTag {
-	return customTagPool.Get().(*CustomTag)
+	t := customTagPool.Get().(*CustomTag)
+	t.Reset()
+	return t
 }
 
 func (t *CustomTag) Clone() app.Tag {
