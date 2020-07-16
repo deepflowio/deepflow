@@ -79,14 +79,14 @@ var (
 	group3Ip1      = NewIPFromString("192.168.20.112").Int() // group3/group4
 	group3Ip2      = NewIPFromString("172.16.1.200").Int()   // group3/group4
 	group3Ip3      = NewIPFromString("10.30.1.100").Int()    // group3
-	group3Mac1     = NewMACAddrFromString("33:33:33:33:33:31").Int()
+	group3Mac1     = NewMACAddrFromString("00:33:33:33:33:31").Int()
 	ipGroup3IpNet1 = "10.25.1.2/24"
 	ipGroup3IpNet2 = "10.30.1.2/24"
 	ipGroup3IpNet3 = "192.168.20.112/32"
 
 	group4Ip1      = NewIPFromString("192.168.20.112").Int() // group3/group4
 	group4Ip2      = NewIPFromString("172.16.1.200").Int()   // group3/group4
-	group4Mac1     = NewMACAddrFromString("44:44:44:44:44:41").Int()
+	group4Mac1     = NewMACAddrFromString("00:44:44:44:44:41").Int()
 	ipGroup4IpNet1 = "172.16.1.200/32"
 
 	group5Ip1  = NewIPFromString("172.16.2.100").Int()

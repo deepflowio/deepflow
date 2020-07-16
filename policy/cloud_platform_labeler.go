@@ -12,6 +12,11 @@ import (
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
 
+const (
+	_BROADCAST_MAC = uint64(0xffffffffffff)
+	_MULTICAST_MAC = uint64(0x010000000000)
+)
+
 type IpMapDatas []map[IpKey]*PlatformData
 type IpMapData map[IpKey]*PlatformData
 type Ip6MapData map[IpKey]*list.List
@@ -354,7 +359,11 @@ func (l *CloudPlatformLabeler) ModifyEndpointData(endpointData *EndpointData, ke
 	}
 	// 默认L2End为false时L3EpcId == 0，L2End为true时L2EpcId不为0
 	if dstData.L3EpcId == 0 && srcData.L3EpcId > 0 {
-		if platformData := l.GetDataByEpcIp(srcData.L3EpcId, dstIp); platformData != nil {
+		if key.DstMac == _BROADCAST_MAC || key.DstMac&_MULTICAST_MAC == _MULTICAST_MAC {
+			dstData.L3EpcId = srcData.L3EpcId
+			dstData.L2EpcId = srcData.L2EpcId
+			dstData.IsDevice = true
+		} else if platformData := l.GetDataByEpcIp(srcData.L3EpcId, dstIp); platformData != nil {
 			// 本端IP + 对端EPC查询EPC-IP表
 			dstData.SetL3Data(platformData)
 		} else {
