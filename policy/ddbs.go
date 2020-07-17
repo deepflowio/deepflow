@@ -130,7 +130,7 @@ func (d *Ddbs) getSortTableIndex(matched0, matched1, base int) int {
 		factor = float32(math.MaxUint16 / 2)
 	}
 	index += int(factor * perCent)
-	if index >= math.MaxUint16 || (matched0 == 0 && matched1 == 0) {
+	if index >= math.MaxUint16 || index < 0 || (matched0 == 0 && matched1 == 0) {
 		index = math.MaxUint16 - 1
 	}
 	return index
