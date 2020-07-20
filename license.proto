@@ -27,4 +27,7 @@ message License {
     optional uint32 vtap_count_type5 = 17 [default = 0]; // 专用物理机类型采集器
     optional uint32 vtap_count_type6 = 18 [default = 0]; // 虚拟机pod
     optional uint32 vtap_count_type7 = 19 [default = 0]; // 物理机pod
+    optional uint32 crm_id = 20; //CRM ID
+    optional uint32 contract_no = 21; //合同编号
+    optional bool   controller_cluster = 22; //控制器集群，仅当拥有此授权时，控制器才能扩容为集群；无此授权时，控制器只能独立运行
 }
