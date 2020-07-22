@@ -277,6 +277,8 @@ func EncodeTSDBRow(encoder *codec.SimpleEncoder, timestamp uint64, columnValues 
 			l++
 			if i64, ok := v.(int64); ok {
 				encoder.WriteU64(uint64(i64))
+			} else if f64, ok := v.(float64); ok {
+				encoder.WriteU64(uint64(f64))
 			} else {
 				encoder.WriteU64(0)
 			}
