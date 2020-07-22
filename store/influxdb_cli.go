@@ -353,13 +353,17 @@ func (c *CQHandler) genCQCommand(field string) string {
 	if unsumableFieldsMap[field] {
 		aggr = c.aggrUnsumable
 	}
+	aggrFunc := fmt.Sprintf("%s(%s)", aggr, field)
+	if aggr == AVG {
+		aggrFunc = fmt.Sprintf("floor(%s(%s))", aggr, field)
+	}
 	return fmt.Sprintf(
 		"CREATE CONTINUOUS QUERY %s ON %s "+
 			"BEGIN "+
-			"SELECT %s(%s) AS %s  INTO %s.%s.main FROM %s.main GROUP BY time(%s), * TZ('Asia/Shanghai')"+
+			"SELECT %s AS %s  INTO %s.%s.main FROM %s.main GROUP BY time(%s), * TZ('Asia/Shanghai')"+
 			"END",
 		c.CQName(field), c.db,
-		aggr, field, field, c.db, c.dstRP, c.srcRP, c.internal)
+		aggrFunc, field, c.db, c.dstRP, c.srcRP, c.internal)
 }
 
 func (c *CQHandler) Del() error {
