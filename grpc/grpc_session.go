@@ -17,7 +17,7 @@ const (
 
 var log = logging.MustGetLogger("grpc")
 
-type SyncFunction func(context.Context) error
+type SyncFunction func(context.Context, net.IP) error
 
 type GrpcSession struct {
 	ips          []net.IP
@@ -74,7 +74,7 @@ func (s *GrpcSession) Request(syncFunction SyncFunction) error {
 	}
 	for i := 0; i < len(s.ips); i++ {
 		ctx, _ := context.WithTimeout(context.Background(), timeout)
-		if err := syncFunction(ctx); err != nil {
+		if err := syncFunction(ctx, s.ips[i]); err != nil {
 			if s.synchronized {
 				s.synchronized = false
 				log.Warningf("Sync from server %s failed, reason: %s", s.ips[s.ipIndex], err.Error())
