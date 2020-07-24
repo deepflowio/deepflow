@@ -13,6 +13,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
+	"github.com/vishvananda/netlink"
 	"golang.org/x/net/context"
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -532,14 +533,33 @@ func (t *PlatformInfoTable) HandleSimpleCommand(op uint16) string {
 	return t.String()
 }
 
+func lookup(host net.IP) (net.IP, error) {
+	routes, err := netlink.RouteGet(host)
+	if err != nil {
+		return nil, fmt.Errorf("RouteGet %v %s", host, err)
+	}
+	route := routes[0]
+	src := route.Src
+	if route.Src.To4() != nil {
+		src = route.Src.To4()
+	}
+	return src, nil
+}
+
 func (t *PlatformInfoTable) Reload() error {
 	var response *trident.SyncResponse
-	err := t.Request(func(ctx context.Context) error {
+	err := t.Request(func(ctx context.Context, remote net.IP) error {
 		var err error
+		var local net.IP
+		// 根据remote ip获取本端ip
+		if local, err = lookup(remote); err != nil {
+			return err
+		}
+
 		request := trident.SyncRequest{
 			BootTime:            proto.Uint32(t.bootTime),
 			VersionPlatformData: proto.Uint64(t.versionPlatformData),
-			CtrlIp:              proto.String("127.0.0.1"),
+			CtrlIp:              proto.String(local.String()),
 			ProcessName:         proto.String(t.processName),
 		}
 		client := trident.NewSynchronizerClient(t.GetClient())
