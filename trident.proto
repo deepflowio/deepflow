@@ -120,6 +120,8 @@ message Config {
     repeated uint32  flow_store_tap_types = 23;
     optional bool    npb_dedup_enabled    = 24 [default = true];
     optional IfMacSource if_mac_source = 25 [default = IF_MAC];
+    optional bool    vtap_packet_1s_enabled = 26 [default = true];
+    optional bool    vtap_flow_1s_enabled   = 27 [default = true];
 
     optional string  analyzer_ip          = 31 [default = "127.0.0.1"];
     optional uint32  max_escape_seconds   = 32;
