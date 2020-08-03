@@ -39,6 +39,11 @@ type L2Info struct {
 	HitCount   uint64
 }
 
+type BaseInfo struct {
+	RegionID uint32
+	HitCount uint64
+}
+
 type Info struct {
 	Host       uint32
 	HostStr    string
@@ -76,18 +81,30 @@ type PlatformInfoTable struct {
 	macL2Infos     map[uint64]*L2Info
 	macL2MissCount map[uint64]*uint64
 
+	epcIDBaseInfos     map[int32]*BaseInfo
+	epcIDBaseMissCount map[int32]*uint64
+
 	bootTime            uint32
 	processName         string
 	versionPlatformData uint64
 
 	*GrpcSession
-	ipv4Lock *sync.RWMutex
-	ipv6Lock *sync.RWMutex
-	macLock  *sync.RWMutex
+	ipv4Lock  *sync.RWMutex
+	ipv6Lock  *sync.RWMutex
+	macLock   *sync.RWMutex
+	epcIDLock *sync.RWMutex
 }
 
 func ClosePlatformInfoTable() {
 	platformInfoTable.Close()
+}
+
+func QueryEpcIDBaseInfo(epcID int32) *BaseInfo {
+	return platformInfoTable.QueryEpcIDBaseInfo(epcID)
+}
+
+func QueryEpcIDBaseInfosPair(epcID0, epcID1 int32) (*BaseInfo, *BaseInfo) {
+	return platformInfoTable.QueryEpcIDBaseInfosPair(epcID0, epcID1)
 }
 
 func QueryMacL2Info(mac uint64) *L2Info {
@@ -102,14 +119,36 @@ func QueryIPV4Infos(epcID int16, ipv4 uint32) *Info {
 	if epcID == datatype.EPC_FROM_INTERNET {
 		return nil
 	}
-	return platformInfoTable.QueryIPV4Infos(epcID, ipv4)
+	info := platformInfoTable.QueryIPV4Infos(epcID, ipv4)
+	if info != nil {
+		return info
+	}
+
+	baseInfo := QueryEpcIDBaseInfo(int32(epcID))
+	if baseInfo == nil {
+		return nil
+	}
+	return &Info{
+		RegionID: baseInfo.RegionID,
+	}
 }
 
 func QueryIPV6Infos(epcID int16, ipv6 net.IP) *Info {
 	if epcID == datatype.EPC_FROM_INTERNET {
 		return nil
 	}
-	return platformInfoTable.QueryIPV6Infos(epcID, ipv6)
+	info := platformInfoTable.QueryIPV6Infos(epcID, ipv6)
+	if info != nil {
+		return info
+	}
+
+	baseInfo := QueryEpcIDBaseInfo(int32(epcID))
+	if baseInfo == nil {
+		return nil
+	}
+	return &Info{
+		RegionID: baseInfo.RegionID,
+	}
 }
 
 func QueryIPV4InfosPair(epcID0 int16, ipv40 uint32, epcID1 int16, ipv41 uint32) (info0 *Info, info1 *Info) {
@@ -118,7 +157,22 @@ func QueryIPV4InfosPair(epcID0 int16, ipv40 uint32, epcID1 int16, ipv41 uint32) 
 	} else if epcID1 == datatype.EPC_FROM_INTERNET {
 		return QueryIPV4Infos(epcID0, ipv40), nil
 	}
-	return platformInfoTable.QueryIPV4InfosPair(epcID0, ipv40, epcID1, ipv41)
+	info0, info1 = platformInfoTable.QueryIPV4InfosPair(epcID0, ipv40, epcID1, ipv41)
+	if info0 == nil {
+		if baseInfo := QueryEpcIDBaseInfo(int32(epcID0)); baseInfo != nil {
+			info0 = &Info{
+				RegionID: baseInfo.RegionID,
+			}
+		}
+	}
+	if info1 == nil {
+		if baseInfo := QueryEpcIDBaseInfo(int32(epcID1)); baseInfo != nil {
+			info1 = &Info{
+				RegionID: baseInfo.RegionID,
+			}
+		}
+	}
+	return
 }
 
 func QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID1 int16, ipv61 net.IP) (info0 *Info, info1 *Info) {
@@ -127,7 +181,22 @@ func QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID1 int16, ipv61 net.IP) 
 	} else if epcID1 == datatype.EPC_FROM_INTERNET {
 		return QueryIPV6Infos(epcID0, ipv60), nil
 	}
-	return platformInfoTable.QueryIPV6InfosPair(epcID0, ipv60, epcID1, ipv61)
+	info0, info1 = platformInfoTable.QueryIPV6InfosPair(epcID0, ipv60, epcID1, ipv61)
+	if info0 == nil {
+		if baseInfo := QueryEpcIDBaseInfo(int32(epcID0)); baseInfo != nil {
+			info0 = &Info{
+				RegionID: baseInfo.RegionID,
+			}
+		}
+	}
+	if info1 == nil {
+		if baseInfo := QueryEpcIDBaseInfo(int32(epcID1)); baseInfo != nil {
+			info1 = &Info{
+				RegionID: baseInfo.RegionID,
+			}
+		}
+	}
+	return
 }
 
 // 单例模式，只启动一次
@@ -138,6 +207,7 @@ func NewPlatformInfoTable(ips []net.IP, port int, processName string) *PlatformI
 		ipv4Lock:           &sync.RWMutex{},
 		ipv6Lock:           &sync.RWMutex{},
 		macLock:            &sync.RWMutex{},
+		epcIDLock:          &sync.RWMutex{},
 		epcIDIPV4Lru:       lru.NewU64LRU("epcIDIPV4", LruSlotSize, LruCap),
 		epcIDIPV6Lru:       lru.NewU160LRU("epcIDIPV6", LruSlotSize, LruCap),
 		epcIDIPV4Infos:     make(map[uint64]*Info),
@@ -146,6 +216,8 @@ func NewPlatformInfoTable(ips []net.IP, port int, processName string) *PlatformI
 		macL2MissCount:     make(map[uint64]*uint64),
 		epcIDIPV4CidrInfos: make(map[int32][]*CidrInfo),
 		epcIDIPV6CidrInfos: make(map[int32][]*CidrInfo),
+		epcIDBaseInfos:     make(map[int32]*BaseInfo),
+		epcIDBaseMissCount: make(map[int32]*uint64),
 	}
 	runOnce := func() {
 		if err := table.Reload(); err != nil {
@@ -245,6 +317,56 @@ func (t *PlatformInfoTable) QueryMacL2InfosPair(mac0, mac1 uint64) (l2Info0 *L2I
 
 	if !ok1 {
 		t.L2InfoMissStat(mac1)
+	}
+
+	return
+}
+
+func (t *PlatformInfoTable) BaseInfoMissStat(epcID int32) {
+	t.epcIDLock.RLock()
+	if missCountAddr, exist := t.epcIDBaseMissCount[epcID]; exist {
+		t.epcIDLock.RUnlock()
+		atomic.AddUint64(missCountAddr, 1)
+	} else {
+		t.epcIDLock.RUnlock()
+		var missCount uint64 = 1
+		t.epcIDLock.Lock()
+		// 可能导致并行时覆盖写，比正常统计结果少一
+		t.epcIDBaseMissCount[epcID] = &missCount
+		t.epcIDLock.Unlock()
+		log.Infof("can't find baseInfo from epcID(%d)", epcID)
+	}
+}
+
+func (t *PlatformInfoTable) QueryEpcIDBaseInfo(epcID int32) *BaseInfo {
+	t.epcIDLock.RLock()
+	baseInfo, ok := t.epcIDBaseInfos[epcID]
+	t.epcIDLock.RUnlock()
+	if !ok {
+		t.BaseInfoMissStat(epcID)
+	} else {
+		atomic.AddUint64(&baseInfo.HitCount, 1)
+	}
+	return baseInfo
+}
+
+func (t *PlatformInfoTable) QueryEpcIDBaseInfosPair(epcID0, epcID1 int32) (baseInfo0 *BaseInfo, baseInfo1 *BaseInfo) {
+	var ok0, ok1 bool
+	t.epcIDLock.RLock()
+	if baseInfo0, ok0 = t.epcIDBaseInfos[epcID0]; ok0 {
+		atomic.AddUint64(&baseInfo0.HitCount, 1)
+	}
+	if baseInfo1, ok1 = t.epcIDBaseInfos[epcID1]; ok1 {
+		atomic.AddUint64(&baseInfo1.HitCount, 1)
+	}
+	t.epcIDLock.RUnlock()
+
+	if !ok0 {
+		t.BaseInfoMissStat(epcID0)
+	}
+
+	if !ok1 {
+		t.BaseInfoMissStat(epcID1)
 	}
 
 	return
@@ -516,6 +638,7 @@ func (t *PlatformInfoTable) String() string {
 		fmt.Fprintf(sb, "%-6d  %-44s %d\n", int(binary.LittleEndian.Uint32(epcIP[:4])), net.IP(epcIP[4:]).String(), *(info.(*uint64)))
 	}
 	t.ipv6Lock.RUnlock()
+
 	if len(t.macL2MissCount) > 0 {
 		sb.WriteString("\nmac              miss\n")
 		sb.WriteString("------------------------\n")
@@ -524,8 +647,35 @@ func (t *PlatformInfoTable) String() string {
 	for mac, missCount := range t.macL2MissCount {
 		fmt.Fprintf(sb, "%-15x  %d\n", mac, *missCount)
 	}
-
 	t.macLock.RUnlock()
+
+	if len(t.epcIDBaseInfos) > 0 {
+		sb.WriteString("\nepcID            regionID  hitcount\n")
+		sb.WriteString("-------------------------------------\n")
+		t.epcIDLock.RLock()
+		epcIDs := make([]int32, 0, len(t.epcIDBaseInfos))
+		for epcID, _ := range t.epcIDBaseInfos {
+			epcIDs = append(epcIDs, epcID)
+		}
+		sort.Slice(epcIDs, func(i, j int) bool {
+			return epcIDs[i] < epcIDs[j]
+		})
+		for _, epcID := range epcIDs {
+			fmt.Fprintf(sb, "%-15d  %-8d  %-8d\n", epcID, t.epcIDBaseInfos[epcID].RegionID, t.epcIDBaseInfos[epcID].HitCount)
+		}
+		t.epcIDLock.RUnlock()
+	}
+
+	if len(t.epcIDBaseMissCount) > 0 {
+		sb.WriteString("\nepcID         miss\n")
+		sb.WriteString("------------------------\n")
+	}
+	t.epcIDLock.RLock()
+	for epcID, missCount := range t.epcIDBaseMissCount {
+		fmt.Fprintf(sb, "%-15d  %d\n", epcID, *missCount)
+	}
+	t.epcIDLock.RUnlock()
+
 	return sb.String()
 }
 
@@ -593,13 +743,14 @@ func (t *PlatformInfoTable) Reload() error {
 	newEpcIDIPV4Infos := make(map[uint64]*Info)
 	newEpcIDIPV6Infos := make(map[[EpcIDIPV6_LEN]byte]*Info)
 	newMacL2Infos := make(map[uint64]*L2Info)
+	newEpcIDBaseInfos := make(map[int32]*BaseInfo)
 	newEpcIDIPV4CidrInfos := make(map[int32][]*CidrInfo)
 	newEpcIDIPV6CidrInfos := make(map[int32][]*CidrInfo)
 	for _, intf := range platformData.GetInterfaces() {
-		updateInterfaceInfos(newEpcIDIPV4Infos, newEpcIDIPV6Infos, newMacL2Infos, intf)
+		updateInterfaceInfos(newEpcIDIPV4Infos, newEpcIDIPV6Infos, newMacL2Infos, newEpcIDBaseInfos, intf)
 	}
 	for _, cidr := range platformData.GetCidrs() {
-		updateCidrInfos(newEpcIDIPV4CidrInfos, newEpcIDIPV6CidrInfos, cidr)
+		updateCidrInfos(newEpcIDIPV4CidrInfos, newEpcIDIPV6CidrInfos, newEpcIDBaseInfos, cidr)
 	}
 	t.ipv4Lock.Lock()
 	t.epcIDIPV4Infos = newEpcIDIPV4Infos
@@ -618,6 +769,11 @@ func (t *PlatformInfoTable) Reload() error {
 	t.macL2MissCount = make(map[uint64]*uint64)
 	t.macLock.Unlock()
 
+	t.epcIDLock.Lock()
+	t.epcIDBaseInfos = newEpcIDBaseInfos
+	t.epcIDBaseMissCount = make(map[int32]*uint64)
+	t.epcIDLock.Unlock()
+
 	return nil
 }
 
@@ -633,7 +789,7 @@ func isIPV4(ipStr string) bool {
 	return false
 }
 
-func updateCidrInfos(IPV4CidrInfos, IPV6CidrInfos map[int32][]*CidrInfo, tridentCidr *trident.Cidr) {
+func updateCidrInfos(IPV4CidrInfos, IPV6CidrInfos map[int32][]*CidrInfo, epcIDBaseInfos map[int32]*BaseInfo, tridentCidr *trident.Cidr) {
 	prefix := tridentCidr.GetPrefix()
 	_, cidr, err := net.ParseCIDR(prefix)
 	if err != nil {
@@ -653,6 +809,11 @@ func updateCidrInfos(IPV4CidrInfos, IPV6CidrInfos map[int32][]*CidrInfo, trident
 		RegionID: tridentCidr.GetRegionId(),
 		SubnetID: tridentCidr.GetSubnetId(),
 		HitCount: new(uint64),
+	}
+	if _, exist := epcIDBaseInfos[int32(epcID)]; !exist {
+		epcIDBaseInfos[int32(epcID)] = &BaseInfo{
+			RegionID: tridentCidr.GetRegionId(),
+		}
 	}
 	if isIPV4(prefix) {
 		if _, ok := IPV4CidrInfos[epcID]; !ok {
@@ -684,7 +845,7 @@ func updateCidrInfos(IPV4CidrInfos, IPV6CidrInfos map[int32][]*CidrInfo, trident
 	}
 }
 
-func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[EpcIDIPV6_LEN]byte]*Info, macL2Infos map[uint64]*L2Info, intf *trident.Interface) {
+func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[EpcIDIPV6_LEN]byte]*Info, macL2Infos map[uint64]*L2Info, epcIDBaseInfos map[int32]*BaseInfo, intf *trident.Interface) {
 	epcID := intf.GetEpcId()
 	// 由于doc中epcID为-1，对应trisolaris的epcID为0.故在此统一将收到epcID为0的，修改为-1，便于doc数据查找
 	if epcID == 0 {
@@ -703,6 +864,11 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 		L2EpcID:    epcID,
 		DeviceType: deviceType,
 		DeviceID:   deviceID,
+	}
+	if _, exist := epcIDBaseInfos[int32(epcID)]; !exist {
+		epcIDBaseInfos[int32(epcID)] = &BaseInfo{
+			RegionID: regionID,
+		}
 	}
 
 	hostStr := intf.GetLaunchServer()
