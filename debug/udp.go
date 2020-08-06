@@ -141,6 +141,8 @@ func process(conn *net.UDPConn) {
 			} else {
 				SendToClient(conn, remote, 0, bytes.NewBufferString(result[i:i+MAX_PAYLOAD_LEN]))
 			}
+			// upd发送太快，对端接收不及时，会导致丢包，调试结果无法显示
+			time.Sleep(10 * time.Millisecond)
 		}
 		// 补充发送"\n"用来指示客户端只要收到小于MAX_PAYLOAD_LEN的数据，就认为接收结束了
 		if len(result) > 0 && len(result)%MAX_PAYLOAD_LEN == 0 {
