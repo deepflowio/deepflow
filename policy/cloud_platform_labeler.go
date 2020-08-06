@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"math"
 	"net"
+	"sort"
 
 	. "github.com/google/gopacket/layers"
 
@@ -304,6 +305,14 @@ func (l *CloudPlatformLabeler) UpdateCidr(cidrs []*Cidr) {
 		}
 		epcCidr[epc] = append(cidrs, cidr)
 	}
+
+	for _, cidrs := range epcCidr {
+		sort.SliceStable(cidrs, func(i, j int) bool {
+			n, _ := cidrs[i].IpNet.Mask.Size()
+			m, _ := cidrs[j].IpNet.Mask.Size()
+			return n > m
+		})
+	}
 	l.epcCidrMapData = epcCidr
 }
 
@@ -335,8 +344,13 @@ func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType Ta
 	if platformData = l.GetDataByEpcIp(endpointInfo.L2EpcId, ip); platformData != nil {
 		endpointInfo.SetL3Data(platformData)
 	} else if endpointInfo.L3EpcId == 0 {
-		// step 3: 查询DEEPFLOW添加的监控网段
-		l.setEpcByCidr(ip, EPC_FROM_DEEPFLOW, endpointInfo)
+		// step 3: 查询平台数据WAN接口
+		if platformData := l.GetDataByIp(ip); platformData != nil {
+			endpointInfo.SetL3Data(platformData)
+		} else {
+			// step 4: 查询DEEPFLOW添加的WAN监控网段(cidr)
+			l.setEpcByCidr(ip, EPC_FROM_DEEPFLOW, endpointInfo)
+		}
 	}
 	return endpointInfo
 }
@@ -436,11 +450,11 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	}
 	// l2: mac查询
 	// l3: l2epc+ip查询
+	// l3: ip查询平台数据WAN接口
+	// l3: ip查询DEEPFLOW添加的WAN监控网段(cidr)
 	srcData := l.GetEndpointInfo(key.SrcMac, srcIp, key.TapType, key.L3End0)
 	dstData := l.GetEndpointInfo(key.DstMac, dstIp, key.TapType, key.L3End1)
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
-	// l3: ip查询, 外网IP查询
-	l.GetL3ByIp(srcIp, dstIp, endpoint)
 	// l3: 对等连接查询, 以下两种查询
 	// 1). peer epc + ip查询对等连接表
 	// 2). peer epc + ip查询CIDR表
