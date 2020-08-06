@@ -147,6 +147,9 @@ func NewRepair(addrPrimary, addrReplica, httpUsername, httpPassword, rp, shardID
 }
 
 func (r *Repair) Run() {
+	if !r.start {
+		return
+	}
 	stats.RegisterCountable("repair", r,
 		stats.OptionStatTags{"rp": r.rp},
 		stats.OptionStatTags{"shard_id": r.shardID})
