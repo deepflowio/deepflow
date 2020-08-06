@@ -46,7 +46,7 @@ func (s *RpcConfigSynchronizer) updateVersions(response *trident.SyncResponse) {
 
 func (s *RpcConfigSynchronizer) sync() error {
 	var response *trident.SyncResponse
-	err := s.PollingSession.Request(func(ctx context.Context) error {
+	err := s.PollingSession.Request(func(ctx context.Context, _ net.IP) error {
 		var err error
 		request := trident.SyncRequest{
 			BootTime:            proto.Uint32(uint32(s.bootTime.Unix())),
@@ -85,7 +85,7 @@ func (s *RpcConfigSynchronizer) sync() error {
 func (s *RpcConfigSynchronizer) pull() error {
 	var stream trident.Synchronizer_PushClient
 	var response *trident.SyncResponse
-	err := s.triggeredSession.Request(func(ctx context.Context) error {
+	err := s.triggeredSession.Request(func(ctx context.Context, _ net.IP) error {
 		var err error
 		request := trident.SyncRequest{
 			BootTime:            proto.Uint32(uint32(s.bootTime.Unix())),

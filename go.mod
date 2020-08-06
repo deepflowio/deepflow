@@ -7,10 +7,10 @@ require (
 	github.com/mailru/easygo v0.0.0-20190618140210-3c14a0dc985f
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/spf13/cobra v0.0.3
-	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200508061336-01cefe2193dd
-	gitlab.x.lan/yunshan/message v0.0.0-20200430025415-efe48e52b156
+	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200806033212-9854ddf07d78
+	gitlab.x.lan/yunshan/message v0.0.0-20200628050801-659fb22311f4
 	golang.org/x/net v0.0.0-20190514140710-3ec191127204
-	golang.org/x/sys v0.0.0-20190516110030-61b9204099cb
+	golang.org/x/sys v0.0.0-20190606203320-7fc4e5ec1444
 	google.golang.org/genproto v0.0.0-20190516172635-bb713bdc0e52 // indirect
 	google.golang.org/grpc v1.20.1 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
