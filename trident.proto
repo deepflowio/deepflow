@@ -49,7 +49,6 @@ message SyncRequest {
     optional string ctrl_ip = 21;
     optional string host = 22; // 仅作为注册使用
     repeated string host_ips = 23; // 仅作为注册使用
-    optional string host_name = 24;
 }
 
 enum Status {
