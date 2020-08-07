@@ -123,6 +123,7 @@ func NewCLIHandler(httpAddr, user, password, dbGroup, action, baseRP, newRP, agg
 		return nil, fmt.Errorf("unsupport action: %s", action)
 	}
 	actionEnum := actionsMap[action]
+	RPDuration += 2 // 默认多加2小时，防止CQ时数据未写入
 
 	shardDuration := 24
 	if actionEnum == ADD {
@@ -277,6 +278,19 @@ func (r *RPHandler) Mod() error {
 		}
 		return alterRetentionPolicyDuration(r.client, r.db, r.rp, fmt.Sprintf("%dh", r.duration))
 	} else {
+		if r.rp == RP_1M || r.rp == RP_1S {
+			log.Infof("create and mod retention policy db(%s) rp(%s) duration=%dh", r.db, r.rp, r.duration)
+			dbs := getCurrentDBs(r.client)
+			if !dbs[r.db] {
+				if err := createDB(r.client, r.db); err != nil {
+					return err
+				}
+			}
+			if err := createDefaultRPIfNotExist(r.client, r.db, r.rp); err != nil {
+				return err
+			}
+			return r.Mod()
+		}
 		return fmt.Errorf("rp(%s) is not exist", r.rp)
 	}
 }
@@ -312,11 +326,11 @@ func createDefaultRPIfNotExist(client client.Client, db, rp string) error {
 	log.Infof("create default db(%s) rp(%s)", db, rp)
 
 	defaultFlag := false
-	duration := "36h"
+	duration := "26h"
 	shardDuration := "1h"
 	if rp == RP_1M {
 		defaultFlag = true
-		duration = "168h"
+		duration = "170h"
 		shardDuration = "17h"
 	}
 	RP := &RetentionPolicy{

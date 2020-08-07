@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -218,6 +219,7 @@ func NewPlatformInfoTable(ips []net.IP, port int, processName string) *PlatformI
 		epcIDIPV6CidrInfos: make(map[int32][]*CidrInfo),
 		epcIDBaseInfos:     make(map[int32]*BaseInfo),
 		epcIDBaseMissCount: make(map[int32]*uint64),
+		processName:        processName,
 	}
 	runOnce := func() {
 		if err := table.Reload(); err != nil {
@@ -706,11 +708,17 @@ func (t *PlatformInfoTable) Reload() error {
 			return err
 		}
 
+		hostname, err := os.Hostname()
+		if err != nil {
+			log.Infof("get hostname failed. %s", err)
+		}
+
 		request := trident.SyncRequest{
 			BootTime:            proto.Uint32(t.bootTime),
 			VersionPlatformData: proto.Uint64(t.versionPlatformData),
 			CtrlIp:              proto.String(local.String()),
 			ProcessName:         proto.String(t.processName),
+			Host:                proto.String(hostname),
 		}
 		client := trident.NewSynchronizerClient(t.GetClient())
 		// 分析器请求消息接口，用于stream, roze
