@@ -9,6 +9,7 @@ service Synchronizer {
     rpc Sync (SyncRequest) returns (SyncResponse) {}
     rpc Push (SyncRequest) returns (stream SyncResponse) {}
     rpc AnalyzerSync (SyncRequest) returns (SyncResponse) {}
+    rpc Upgrade (SyncRequest) returns (stream UpgradeResponse) {}
 }
 
 enum State {
@@ -268,4 +269,12 @@ message SyncResponse {
     optional bytes flow_acls = 13;      // 仅变化时下发
     optional bytes groups = 15;         // 仅变化时下发
     repeated TapType tap_types = 16;
+}
+
+message UpgradeResponse  {
+    optional Status status = 1;     // 调用是否成功
+    optional bytes content = 2;     // 数据
+    optional string md5 = 3;        // 文件MD5
+    optional uint64 total_len = 4;  // 数据总长
+    optional uint32 pkt_count = 5;  // 包总个数
 }
