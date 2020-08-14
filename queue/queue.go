@@ -29,7 +29,7 @@ type OverwriteQueue struct {
 	sync.Mutex
 
 	writeLock     sync.Mutex
-	readerWaiting bool
+	readerWaiting int
 	reader        sync.WaitGroup
 	items         []interface{}
 	size          uint // power of 2
@@ -161,16 +161,18 @@ func (q *OverwriteQueue) Put(items ...interface{}) error {
 	}
 	q.pending = utils.UintMin(q.pending+itemSize, q.size)
 	q.writeCursor = (q.writeCursor + itemSize) & (q.size - 1)
-	q.Unlock()
+	if q.readerWaiting > 0 {
+		q.readerWaiting--
+		q.Unlock()
+		q.reader.Done()
+	} else {
+		q.Unlock()
+	}
 
 	if q.counter.Pending < uint64(q.pending) {
 		q.counter.Pending = uint64(q.pending)
 	}
 
-	if q.readerWaiting {
-		q.readerWaiting = false
-		q.reader.Done()
-	}
 	q.writeLock.Unlock()
 	return nil
 }
@@ -189,7 +191,7 @@ func (q *OverwriteQueue) Get() interface{} { // will block
 	q.Lock()
 	if q.pending == 0 {
 		q.reader.Add(1)
-		q.readerWaiting = true
+		q.readerWaiting++
 		q.Unlock()
 		q.reader.Wait()
 		q.Lock()
@@ -226,7 +228,7 @@ func (q *OverwriteQueue) Gets(output []interface{}) int { // will block
 	q.Lock()
 	if q.pending == 0 {
 		q.reader.Add(1)
-		q.readerWaiting = true
+		q.readerWaiting++
 		q.Unlock()
 		q.reader.Wait()
 		q.Lock()
