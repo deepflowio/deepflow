@@ -354,6 +354,42 @@ func (a *Anomaly) MarshalTo(b []byte) int {
 	return marshalKeyValues(b, fields, values)
 }
 
+type FlowLoad struct {
+	Max uint64 `db:"flow_load_max"`
+	Min uint64 `db:"flow_load_min"`
+}
+
+func (l *FlowLoad) Reverse() {}
+
+func (l *FlowLoad) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteVarintU64(l.Max)
+	encoder.WriteVarintU64(l.Min)
+}
+
+func (l *FlowLoad) Decode(decoder *codec.SimpleDecoder) {
+	l.Max = decoder.ReadVarintU64()
+	l.Min = decoder.ReadVarintU64()
+}
+
+func (l *FlowLoad) ConcurrentMerge(other *FlowLoad) {
+	l.Max += other.Max
+	l.Min += other.Min
+}
+
+func (l *FlowLoad) SequentialMerge(other *FlowLoad) {
+	l.ConcurrentMerge(other)
+}
+
+func (l *FlowLoad) MarshalTo(b []byte) int {
+	fields := []string{
+		"flow_load_max=", "flow_load_min=",
+	}
+	values := []uint64{
+		l.Max, l.Min,
+	}
+	return marshalKeyValues(b, fields, values)
+}
+
 func marshalKeyValues(b []byte, fields []string, values []uint64) int {
 	if len(fields) != len(values) {
 		panic("fields和values长度不相等")
