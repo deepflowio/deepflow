@@ -10,6 +10,7 @@ type FlowMeter struct {
 	Latency
 	Performance
 	Anomaly
+	FlowLoad
 }
 
 func (m *FlowMeter) Reverse() {
@@ -17,6 +18,7 @@ func (m *FlowMeter) Reverse() {
 	m.Latency.Reverse()
 	m.Performance.Reverse()
 	m.Anomaly.Reverse()
+	m.FlowLoad.Reverse()
 }
 
 func (m *FlowMeter) ID() uint8 {
@@ -40,6 +42,7 @@ func (m *FlowMeter) Encode(encoder *codec.SimpleEncoder) {
 	m.Latency.Encode(encoder)
 	m.Performance.Encode(encoder)
 	m.Anomaly.Encode(encoder)
+	m.FlowLoad.Encode(encoder)
 }
 
 func (m *FlowMeter) Decode(decoder *codec.SimpleDecoder) {
@@ -47,6 +50,7 @@ func (m *FlowMeter) Decode(decoder *codec.SimpleDecoder) {
 	m.Latency.Decode(decoder)
 	m.Performance.Decode(decoder)
 	m.Anomaly.Decode(decoder)
+	m.FlowLoad.Decode(decoder)
 }
 
 func (m *FlowMeter) ConcurrentMerge(other app.Meter) {
@@ -55,6 +59,7 @@ func (m *FlowMeter) ConcurrentMerge(other app.Meter) {
 		m.Latency.ConcurrentMerge(&pm.Latency)
 		m.Performance.ConcurrentMerge(&pm.Performance)
 		m.Anomaly.ConcurrentMerge(&pm.Anomaly)
+		m.FlowLoad.ConcurrentMerge(&pm.FlowLoad)
 	}
 }
 
@@ -64,6 +69,7 @@ func (m *FlowMeter) SequentialMerge(other app.Meter) {
 		m.Latency.SequentialMerge(&pm.Latency)
 		m.Performance.SequentialMerge(&pm.Performance)
 		m.Anomaly.SequentialMerge(&pm.Anomaly)
+		m.FlowLoad.SequentialMerge(&pm.FlowLoad)
 	}
 }
 
@@ -92,6 +98,11 @@ func (m *FlowMeter) MarshalTo(b []byte) int {
 		offset++
 	}
 	offset += m.Anomaly.MarshalTo(b[offset:])
+	if offset > 0 && b[offset-1] != ',' {
+		b[offset] = ','
+		offset++
+	}
+	offset += m.FlowLoad.MarshalTo(b[offset:])
 	if offset > 0 && b[offset-1] == ',' {
 		offset--
 	}
@@ -197,6 +208,11 @@ func (m *FlowMeter) Fill(ids []uint8, values []interface{}) {
 			m.DNSClientError = uint64(v)
 		case _METER_DNS_SERVER_ERROR:
 			m.DNSServerError = uint64(v)
+
+		case _METER_FLOW_LOAD_MAX:
+			m.Max = uint64(v)
+		case _METER_FLOW_LOAD_MIN:
+			m.Min = uint64(v)
 
 		default:
 			log.Warningf("unsupport meter id=%d", id)
