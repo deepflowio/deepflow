@@ -162,6 +162,7 @@ message Interface {
     optional uint32 az_id = 22;
     optional uint32 pod_group_id = 23;
     optional uint32 pod_ns_id = 24;
+    optional uint32 pod_id = 25;
 }
 
 enum GroupType {
