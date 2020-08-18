@@ -29,6 +29,7 @@ const (
 	AZID
 	PodGroupID
 	PodNSID
+	PodID
 )
 
 const (
@@ -43,6 +44,7 @@ const (
 	AZIDPath
 	PodGroupIDPath
 	PodNSIDPath
+	PodIDPath
 )
 
 const (
@@ -224,6 +226,7 @@ type Field struct {
 	AZID         uint16
 	PodGroupID   int16
 	PodNSID      uint16
+	PodID        uint16
 
 	IP61          net.IP // FIXME: 合并IP61和IP1
 	IP1           uint32
@@ -238,6 +241,7 @@ type Field struct {
 	AZID1         uint16
 	PodGroupID1   int16
 	PodNSID1      uint16
+	PodID1        uint16
 
 	ACLGID     uint16
 	Direction  DirectionEnum
@@ -408,6 +412,18 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], marshalUint16WithSpecialID(t.PodGroupID1))
 	}
 
+	if t.Code&PodID != 0 {
+		offset += copy(b[offset:], ",pod_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.PodID), 10))
+	}
+
+	if t.Code&PodIDPath != 0 {
+		offset += copy(b[offset:], ",pod_id_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.PodID), 10))
+		offset += copy(b[offset:], ",pod_id_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.PodID1), 10))
+	}
+
 	if t.Code&PodNodeID != 0 {
 		offset += copy(b[offset:], ",pod_node_id=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.PodNodeID), 10))
@@ -570,6 +586,9 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&PodNSID != 0 {
 		t.PodNSID = decoder.ReadU16()
 	}
+	if t.Code&PodID != 0 {
+		t.PodID = decoder.ReadU16()
+	}
 	if t.Code&AZID != 0 {
 		t.AZID = decoder.ReadU16()
 	}
@@ -626,6 +645,10 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&PodNSIDPath != 0 {
 		t.PodNSID = decoder.ReadU16()
 		t.PodNSID1 = decoder.ReadU16()
+	}
+	if t.Code&PodIDPath != 0 {
+		t.PodID = decoder.ReadU16()
+		t.PodID1 = decoder.ReadU16()
 	}
 	if t.Code&AZIDPath != 0 {
 		t.AZID = decoder.ReadU16()
@@ -718,6 +741,9 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 	if code&PodNSID != 0 {
 		encoder.WriteU16(t.PodNSID)
 	}
+	if code&PodID != 0 {
+		encoder.WriteU16(t.PodID)
+	}
 	if code&AZID != 0 {
 		encoder.WriteU16(t.AZID)
 	}
@@ -776,6 +802,10 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 	if code&PodNSIDPath != 0 {
 		encoder.WriteU16(t.PodNSID)
 		encoder.WriteU16(t.PodNSID1)
+	}
+	if code&PodIDPath != 0 {
+		encoder.WriteU16(t.PodID)
+		encoder.WriteU16(t.PodID1)
 	}
 	if code&AZIDPath != 0 {
 		encoder.WriteU16(t.AZID)
