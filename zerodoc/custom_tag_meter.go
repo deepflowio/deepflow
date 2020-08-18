@@ -162,17 +162,21 @@ func (t *CustomTag) Decode(decoder *codec.SimpleDecoder) {
 	}
 }
 
+func (t *CustomTag) EncodeWithCode(code uint64, encoder *codec.SimpleEncoder) {
+	encoder.WriteU64(code)
+	for i, value := range t.Values {
+		if code&(1<<i) != 0 {
+			encoder.WriteString255(value)
+		}
+	}
+}
+
 func (t *CustomTag) Encode(encoder *codec.SimpleEncoder) {
 	if t.id != "" {
 		encoder.WriteRawString(t.id) // ID就是序列化bytes，避免重复计算
 		return
 	}
-	encoder.WriteU64(t.Code)
-	for i, value := range t.Values {
-		if t.Code&(1<<i) != 0 {
-			encoder.WriteString255(value)
-		}
-	}
+	t.EncodeWithCode(t.Code, encoder)
 }
 
 func (t *CustomTag) GetCode() uint64 {
