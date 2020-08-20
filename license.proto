@@ -7,10 +7,10 @@ option go_package = "license";
 message License {
     optional string activation_time  = 1; // 生效日期 "2019-09-11"
     optional uint32 expiration_days = 2; // 许可天数, 0表示永久授权
-    optional uint32 analyzer_count = 3; // 分析器数量
-    optional uint32 vtap_count_type1 = 4; // Trident运行于KVM宿主机上
-    optional uint32 vtap_count_type2 = 5; // Trident运行于ESXi/Hyper-V等专用虚拟机上
-    optional uint32 vtap_count_type3 =6; // Trident运行于客户的虚拟机内部
+    optional int32 analyzer_count = 3; // 分析器数量
+    optional int32 vtap_count_type1 = 4; // Trident运行于KVM宿主机上
+    optional int32 vtap_count_type2 = 5; // Trident运行于ESXi/Hyper-V等专用虚拟机上
+    optional int32 vtap_count_type3 =6; // Trident运行于客户的虚拟机内部
     repeated string controller_public_ip = 7; // 控制器IP
     repeated string controller_hostname = 8; // 控制器主机名
     optional string customer = 9; // 客户名称
@@ -23,12 +23,12 @@ message License {
     optional string sign_server_ip = 14; // 签发服务器IP
     optional string agency = 15; // 代理商
 
-    optional uint32 vtap_count_type4 = 16 [default = 0]; // 物理机进程类型采集器
-    optional uint32 vtap_count_type5 = 17 [default = 0]; // 专用物理机类型采集器
-    optional uint32 vtap_count_type6 = 18 [default = 0]; // 虚拟机pod
-    optional uint32 vtap_count_type7 = 19 [default = 0]; // 物理机pod
+    optional int32 vtap_count_type4 = 16 [default = 0]; // 物理机进程类型采集器
+    optional int32 vtap_count_type5 = 17 [default = 0]; // 专用物理机类型采集器
+    optional int32 vtap_count_type6 = 18 [default = 0]; // 虚拟机pod
+    optional int32 vtap_count_type7 = 19 [default = 0]; // 物理机pod
     optional uint32 crm_id = 20; //CRM ID
     optional string contract_no = 21; //合同编号
     optional bool   controller_cluster = 22 [default = true]; //控制器集群，仅当拥有此授权时，控制器才能扩容为集群；无此授权时，控制器只能独立运行
-    optional uint32 controller_count = 23; //控制器数量
+    optional int32 controller_count = 23; //控制器数量
 }
