@@ -9,7 +9,7 @@ service Synchronizer {
     rpc Sync (SyncRequest) returns (SyncResponse) {}
     rpc Push (SyncRequest) returns (stream SyncResponse) {}
     rpc AnalyzerSync (SyncRequest) returns (SyncResponse) {}
-    rpc Upgrade (SyncRequest) returns (stream UpgradeResponse) {}
+    rpc Upgrade (UpgradeRequest) returns (stream UpgradeResponse) {}
 }
 
 enum State {
@@ -271,6 +271,10 @@ message SyncResponse {
     repeated TapType tap_types = 16;
 }
 
+message UpgradeRequest  {
+    optional string ctrl_ip = 1;
+    optional uint32 trident_os = 2; // 0:linux, 1:windows
+}
 message UpgradeResponse  {
     optional Status status = 1;     // 调用是否成功
     optional bytes content = 2;     // 数据
