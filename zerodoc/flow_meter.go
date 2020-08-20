@@ -128,6 +128,10 @@ func (m *FlowMeter) Fill(ids []uint8, values []interface{}) {
 			m.ByteTx = uint64(v)
 		case _METER_BYTE_RX:
 			m.ByteRx = uint64(v)
+		case _METER_L3_BYTE_TX:
+			m.L3ByteTx = uint64(v)
+		case _METER_L3_BYTE_RX:
+			m.L3ByteRx = uint64(v)
 		case _METER_FLOW:
 			m.Flow = uint64(v)
 		case _METER_NEW_FLOW:

@@ -11,6 +11,8 @@ type Traffic struct {
 	PacketRx   uint64 `db:"packet_rx"`
 	ByteTx     uint64 `db:"byte_tx"`
 	ByteRx     uint64 `db:"byte_rx"`
+	L3ByteTx   uint64 `db:"l3_byte_tx"`
+	L3ByteRx   uint64 `db:"l3_byte_rx"`
 	Flow       uint64 `db:"flow"`
 	NewFlow    uint64 `db:"new_flow"`
 	ClosedFlow uint64 `db:"closed_flow"`
@@ -24,6 +26,7 @@ type Traffic struct {
 func (t *Traffic) Reverse() {
 	t.PacketTx, t.PacketRx = t.PacketRx, t.PacketTx
 	t.ByteTx, t.ByteRx = t.ByteRx, t.ByteTx
+	t.L3ByteTx, t.L3ByteRx = t.L3ByteRx, t.L3ByteTx
 }
 
 func (t *Traffic) Encode(encoder *codec.SimpleEncoder) {
@@ -31,6 +34,8 @@ func (t *Traffic) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(t.PacketRx)
 	encoder.WriteVarintU64(t.ByteTx)
 	encoder.WriteVarintU64(t.ByteRx)
+	encoder.WriteVarintU64(t.L3ByteTx)
+	encoder.WriteVarintU64(t.L3ByteRx)
 	encoder.WriteVarintU64(t.Flow)
 	encoder.WriteVarintU64(t.NewFlow)
 	encoder.WriteVarintU64(t.ClosedFlow)
@@ -46,6 +51,8 @@ func (t *Traffic) Decode(decoder *codec.SimpleDecoder) {
 	t.PacketRx = decoder.ReadVarintU64()
 	t.ByteTx = decoder.ReadVarintU64()
 	t.ByteRx = decoder.ReadVarintU64()
+	t.L3ByteTx = decoder.ReadVarintU64()
+	t.L3ByteRx = decoder.ReadVarintU64()
 	t.Flow = decoder.ReadVarintU64()
 	t.NewFlow = decoder.ReadVarintU64()
 	t.ClosedFlow = decoder.ReadVarintU64()
@@ -61,6 +68,8 @@ func (t *Traffic) ConcurrentMerge(other *Traffic) {
 	t.PacketRx += other.PacketRx
 	t.ByteTx += other.ByteTx
 	t.ByteRx += other.ByteRx
+	t.L3ByteTx += other.L3ByteTx
+	t.L3ByteRx += other.L3ByteRx
 	t.Flow += other.Flow
 	t.NewFlow += other.NewFlow
 	t.ClosedFlow += other.ClosedFlow
@@ -76,6 +85,8 @@ func (t *Traffic) SequentialMerge(other *Traffic) {
 	t.PacketRx += other.PacketRx
 	t.ByteTx += other.ByteTx
 	t.ByteRx += other.ByteRx
+	t.L3ByteTx += other.L3ByteTx
+	t.L3ByteRx += other.L3ByteRx
 	t.Flow = t.ClosedFlow + other.Flow
 	t.NewFlow += other.NewFlow
 	t.ClosedFlow += other.ClosedFlow
@@ -88,11 +99,11 @@ func (t *Traffic) SequentialMerge(other *Traffic) {
 
 func (t *Traffic) MarshalTo(b []byte) int {
 	fields := []string{
-		"packet_tx=", "packet_rx=", "byte_tx=", "byte_rx=", "flow=", "new_flow=", "closed_flow=",
+		"packet_tx=", "packet_rx=", "byte_tx=", "byte_rx=", "l3_byte_tx=", "l3_byte_rx=", "flow=", "new_flow=", "closed_flow=",
 		"http_request=", "http_response=", "dns_request=", "dns_response=",
 	}
 	values := []uint64{
-		t.PacketTx, t.PacketRx, t.ByteTx, t.ByteRx, t.Flow, t.NewFlow, t.ClosedFlow,
+		t.PacketTx, t.PacketRx, t.ByteTx, t.ByteRx, t.L3ByteTx, t.L3ByteRx, t.Flow, t.NewFlow, t.ClosedFlow,
 		t.HTTPRequest, t.HTTPResponse, t.DNSRequest, t.DNSResponse,
 	}
 	return marshalKeyValues(b, fields, values)
