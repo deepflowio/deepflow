@@ -64,6 +64,8 @@ const (
 	_METER_PACKET_RX
 	_METER_BYTE_TX
 	_METER_BYTE_RX
+	_METER_L3_BYTE_TX
+	_METER_L3_BYTE_RX
 	_METER_FLOW
 	_METER_NEW_FLOW
 	_METER_CLOSED_FLOW
@@ -168,6 +170,8 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"packet_rx":   _METER_PACKET_RX,
 	"byte_tx":     _METER_BYTE_TX,
 	"byte_rx":     _METER_BYTE_RX,
+	"l3_byte_tx":  _METER_L3_BYTE_TX,
+	"l3_byte_rx":  _METER_L3_BYTE_RX,
 	"flow":        _METER_FLOW,
 	"new_flow":    _METER_NEW_FLOW,
 	"closed_flow": _METER_CLOSED_FLOW,

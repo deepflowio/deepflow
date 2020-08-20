@@ -11,6 +11,8 @@ func fillMetrics(hint uint64, m *VTAPUsageMeter) {
 	m.PacketRx = hint * 2
 	m.ByteTx = hint * 97
 	m.ByteRx = hint * 89
+	m.L3ByteTx = hint * 96
+	m.L3ByteRx = hint * 88
 }
 
 func TestVTAPMeterEnDecode(t *testing.T) {
