@@ -169,8 +169,6 @@ func (t *MiniTag) MarshalTo(b []byte) int {
 		case TAG_TYPE_TTL:
 			fallthrough
 		case TAG_TYPE_PACKET_SIZE:
-			fallthrough
-		case TAG_TYPE_L3_BYTES:
 			offset += copy(b[offset:], ",tag_value=")
 			offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagValue), 10))
 		}
