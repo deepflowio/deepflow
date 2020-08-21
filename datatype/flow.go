@@ -129,12 +129,17 @@ type FlowMetricsPeer struct {
 	TotalByteCount   uint64        // 整个Flow生命周期的统计量
 	TotalPacketCount uint64        // 整个Flow生命周期的统计量
 	First, Last      time.Duration // 整个Flow生命周期首包和尾包的时间戳
-	TCPFlags         uint8
 	L3EpcID          int32
 	IsL2End          bool
 	IsL3End          bool
 	IsActiveHost     bool
-	IsDevice         bool // true表明是从平台数据中获取的
+	IsDevice         bool  // true表明是从平台数据中获取的
+	TCPFlags         uint8 // 所有TCP的Flags或运算
+
+	CastTypeMap   uint8  // 仅包含TSDB中的几个CastType标志位选项
+	TCPFlagsMap   uint16 // 仅包含TSDB中的几个TCP标志位选项
+	TTLMap        uint16 // 仅包含TSDB中的几个TTL标志位选项
+	PacketSizeMap uint16 // 仅包含TSDB中的几个PacketSize标志位选项
 }
 
 const (
@@ -364,6 +369,10 @@ func (f *FlowMetricsPeer) SequentialMerge(rhs *FlowMetricsPeer) {
 	f.IsL3End = rhs.IsL3End
 	f.IsActiveHost = rhs.IsActiveHost
 	f.IsDevice = rhs.IsDevice
+	f.CastTypeMap |= rhs.CastTypeMap
+	f.TCPFlagsMap |= rhs.TCPFlagsMap
+	f.TTLMap |= rhs.TTLMap
+	f.PacketSizeMap |= rhs.PacketSizeMap
 }
 
 func (f *FlowMetricsPeer) Encode(encoder *codec.SimpleEncoder) {
@@ -382,6 +391,11 @@ func (f *FlowMetricsPeer) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteBool(f.IsL3End)
 	encoder.WriteBool(f.IsActiveHost)
 	encoder.WriteBool(f.IsDevice)
+
+	encoder.WriteU8(f.CastTypeMap)
+	encoder.WriteU16(f.TCPFlagsMap)
+	encoder.WriteU16(f.TTLMap)
+	encoder.WriteU16(f.PacketSizeMap)
 }
 
 func (f *FlowMetricsPeer) Decode(decoder *codec.SimpleDecoder) {
@@ -400,6 +414,11 @@ func (f *FlowMetricsPeer) Decode(decoder *codec.SimpleDecoder) {
 	f.IsL3End = decoder.ReadBool()
 	f.IsActiveHost = decoder.ReadBool()
 	f.IsDevice = decoder.ReadBool()
+
+	f.CastTypeMap = decoder.ReadU8()
+	f.TCPFlagsMap = decoder.ReadU16()
+	f.TTLMap = decoder.ReadU16()
+	f.PacketSizeMap = decoder.ReadU16()
 }
 
 // FIXME 注意：由于FlowGenerator中TCPPerfStats在Flow方向调整之后才获取到，

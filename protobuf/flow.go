@@ -64,6 +64,15 @@ func MarshalFlow(f *datatype.TaggedFlow, bytes *utils.ByteBuffer) error {
 		IsL2End_1: proto.Bool(flowMetricsPeerDst.IsL2End),
 		IsL3End_0: proto.Bool(flowMetricsPeerSrc.IsL3End),
 		IsL3End_1: proto.Bool(flowMetricsPeerDst.IsL3End),
+		// Other
+		CastTypeMap_0:   proto.Uint32(uint32(flowMetricsPeerSrc.CastTypeMap)),
+		CastTypeMap_1:   proto.Uint32(uint32(flowMetricsPeerDst.CastTypeMap)),
+		TcpFlagsMap_0:   proto.Uint32(uint32(flowMetricsPeerSrc.TCPFlagsMap)),
+		TcpFlagsMap_1:   proto.Uint32(uint32(flowMetricsPeerDst.TCPFlagsMap)),
+		TtlMap_0:        proto.Uint32(uint32(flowMetricsPeerSrc.TTLMap)),
+		TtlMap_1:        proto.Uint32(uint32(flowMetricsPeerDst.TTLMap)),
+		PacketSizeMap_0: proto.Uint32(uint32(flowMetricsPeerSrc.PacketSizeMap)),
+		PacketSizeMap_1: proto.Uint32(uint32(flowMetricsPeerDst.PacketSizeMap)),
 	}
 
 	if f.EthType == layers.EthernetTypeIPv6 {
