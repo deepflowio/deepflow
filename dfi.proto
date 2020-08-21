@@ -210,6 +210,15 @@ message Flow {
     /* Geo Info */
     optional uint32 province_src = 174 [default = 0];           /* 源IP端对应省份 */
     optional uint32 province_dst = 175 [default = 0];           /* 目的IP对应省份 */
+    /* Other */
+    optional uint32 cast_type_map_0   = 200 [default = 0];      /* 仅包含TSDB中的几个CastType标志位选项 */
+    optional uint32 cast_type_map_1   = 201 [default = 0];      /* 仅包含TSDB中的几个CastType标志位选项 */
+    optional uint32 tcp_flags_map_0   = 202 [default = 0];      /* 仅包含TSDB中的几个TCP标志位选项 */
+    optional uint32 tcp_flags_map_1   = 203 [default = 0];      /* 仅包含TSDB中的几个TCP标志位选项 */
+    optional uint32 ttl_map_0         = 204 [default = 0];      /* 仅包含TSDB中的几个TTL标志位选项 */
+    optional uint32 ttl_map_1         = 205 [default = 0];      /* 仅包含TSDB中的几个TTL标志位选项 */
+    optional uint32 packet_size_map_0 = 206 [default = 0];      /* 仅包含TSDB中的几个PacketSize标志位选项 */
+    optional uint32 packet_size_map_1 = 207 [default = 0];      /* 仅包含TSDB中的几个PacketSize标志位选项 */
 }
 
 message Metering {
