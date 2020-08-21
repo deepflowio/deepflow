@@ -164,7 +164,7 @@ const (
 	_MAX_TTL
 )
 
-// 作为TagValue值和统计数据的Index，取值范围是21~29
+// 作为TagValue值和统计数据的Index，取值范围是22~30
 const (
 	PACKET_SIZE_0_64 = iota + _MAX_TTL
 	PACKET_SIZE_65_128
