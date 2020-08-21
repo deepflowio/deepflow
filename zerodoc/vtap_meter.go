@@ -12,14 +12,11 @@ type VTAPUsageMeter struct {
 	PacketRx uint64 `db:"packet_rx"`
 	ByteTx   uint64 `db:"byte_tx"`
 	ByteRx   uint64 `db:"byte_rx"`
-	L3ByteTx uint64 `db:"l3_byte_tx"`
-	L3ByteRx uint64 `db:"l3_byte_rx"`
 }
 
 func (m *VTAPUsageMeter) Reverse() {
 	m.PacketTx, m.PacketRx = m.PacketRx, m.PacketTx
 	m.ByteTx, m.ByteRx = m.ByteRx, m.ByteTx
-	m.L3ByteTx, m.L3ByteRx = m.L3ByteRx, m.L3ByteTx
 }
 
 func (m *VTAPUsageMeter) ID() uint8 {
@@ -39,8 +36,6 @@ func (m *VTAPUsageMeter) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(m.PacketRx)
 	encoder.WriteVarintU64(m.ByteTx)
 	encoder.WriteVarintU64(m.ByteRx)
-	encoder.WriteVarintU64(m.L3ByteTx)
-	encoder.WriteVarintU64(m.L3ByteRx)
 }
 
 func (m *VTAPUsageMeter) Decode(decoder *codec.SimpleDecoder) {
@@ -48,8 +43,6 @@ func (m *VTAPUsageMeter) Decode(decoder *codec.SimpleDecoder) {
 	m.PacketRx = decoder.ReadVarintU64()
 	m.ByteTx = decoder.ReadVarintU64()
 	m.ByteRx = decoder.ReadVarintU64()
-	m.L3ByteTx = decoder.ReadVarintU64()
-	m.L3ByteRx = decoder.ReadVarintU64()
 }
 
 func (m *VTAPUsageMeter) SortKey() uint64 {
@@ -72,10 +65,6 @@ func (m *VTAPUsageMeter) MarshalTo(b []byte) int {
 	offset += copy(b[offset:], strconv.FormatUint(m.ByteTx, 10))
 	offset += copy(b[offset:], "i,byte_rx=")
 	offset += copy(b[offset:], strconv.FormatUint(m.ByteRx, 10))
-	offset += copy(b[offset:], "i,l3_byte_tx=")
-	offset += copy(b[offset:], strconv.FormatUint(m.L3ByteTx, 10))
-	offset += copy(b[offset:], "i,l3_byte_rx=")
-	offset += copy(b[offset:], strconv.FormatUint(m.L3ByteRx, 10))
 	b[offset] = 'i'
 	offset++
 
@@ -87,8 +76,6 @@ func (m *VTAPUsageMeter) Merge(other *VTAPUsageMeter) {
 	m.PacketRx += other.PacketRx
 	m.ByteTx += other.ByteTx
 	m.ByteRx += other.ByteRx
-	m.L3ByteTx += other.L3ByteTx
-	m.L3ByteRx += other.L3ByteRx
 }
 
 func (m *VTAPUsageMeter) ConcurrentMerge(other app.Meter) {
@@ -119,10 +106,6 @@ func (m *VTAPUsageMeter) Fill(ids []uint8, values []interface{}) {
 			m.ByteTx = uint64(v)
 		case _METER_BYTE_RX:
 			m.ByteRx = uint64(v)
-		case _METER_L3_BYTE_TX:
-			m.L3ByteTx = uint64(v)
-		case _METER_L3_BYTE_RX:
-			m.L3ByteRx = uint64(v)
 		default:
 			log.Warningf("unsupport meter id=%d", id)
 		}
