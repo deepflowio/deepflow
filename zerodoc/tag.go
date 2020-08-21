@@ -188,7 +188,7 @@ const (
 	N_METERS = _MAX_L3_BYTES
 )
 
-var TTL_PACKET_SIZE [N_METERS]string = [N_METERS]string{
+var TTL_PACKET_SIZE [_MAX_PACKET_SIZE]string = [_MAX_PACKET_SIZE]string{
 	TTL_1:                   "1",
 	TTL_2:                   "2",
 	TTL_3:                   "3",
@@ -209,7 +209,6 @@ var TTL_PACKET_SIZE [N_METERS]string = [N_METERS]string{
 	PACKET_SIZE_1501_9000:   "1501-9000",
 	PACKET_SIZE_9001_30000:  "9001-30000",
 	PACKET_SIZE_30001_65535: "30001-65535",
-	L3_BYTES:                "l3_bytes",
 }
 
 type Field struct {
@@ -520,7 +519,7 @@ func (t *Tag) MarshalTo(b []byte) int {
 			fallthrough
 		case TAG_TYPE_L3_BYTES:
 			offset += copy(b[offset:], ",tag_value=")
-			if t.TagValue < _MAX_L3_BYTES && t.TagValue >= TTL_1 {
+			if t.TagValue < _MAX_PACKET_SIZE && t.TagValue >= TTL_1 {
 				offset += copy(b[offset:], TTL_PACKET_SIZE[t.TagValue])
 			} else {
 				offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagValue), 10))
