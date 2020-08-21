@@ -115,7 +115,6 @@ const (
 	TAG_TYPE_TUNNEL_IP_ID
 	TAG_TYPE_TTL
 	TAG_TYPE_PACKET_SIZE
-	TAG_TYPE_L3_BYTES
 )
 
 type CastTypeEnum uint8
@@ -180,12 +179,7 @@ const (
 )
 
 const (
-	L3_BYTES = iota + _MAX_PACKET_SIZE
-	_MAX_L3_BYTES
-)
-
-const (
-	N_METERS = _MAX_L3_BYTES
+	N_METERS = _MAX_PACKET_SIZE
 )
 
 var TTL_PACKET_SIZE [_MAX_PACKET_SIZE]string = [_MAX_PACKET_SIZE]string{
@@ -516,8 +510,6 @@ func (t *Tag) MarshalTo(b []byte) int {
 		case TAG_TYPE_TTL:
 			fallthrough
 		case TAG_TYPE_PACKET_SIZE:
-			fallthrough
-		case TAG_TYPE_L3_BYTES:
 			offset += copy(b[offset:], ",tag_value=")
 			if t.TagValue < _MAX_PACKET_SIZE && t.TagValue >= TTL_1 {
 				offset += copy(b[offset:], TTL_PACKET_SIZE[t.TagValue])
