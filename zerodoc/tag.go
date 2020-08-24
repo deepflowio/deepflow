@@ -125,7 +125,7 @@ const (
 	BROADCAST
 	MULTICAST
 	UNICAST
-	_MAX_CAST_TYPE = 4
+	MAX_CAST_TYPE //  4
 )
 
 type TCPFlag uint8
@@ -148,7 +148,7 @@ const (
 
 // TCP Flags统计时映射的Index取值范围是4~10
 const (
-	TCP_FLAG_SYN_INDEX = iota + _MAX_CAST_TYPE
+	TCP_FLAG_SYN_INDEX = iota + MAX_CAST_TYPE
 	TCP_FLAG_SYN_ACK_INDEX
 	TCP_FLAG_ACK_INDEX
 	TCP_FLAG_PSH_ACK_INDEX
@@ -156,10 +156,10 @@ const (
 	TCP_FLAG_RST_ACK_INDEX
 	TCP_FLAG_OTHERS_INDEX
 
-	_MAX_TCP_FLAGS_INDEX
+	MAX_TCP_FLAGS_INDEX
 )
 
-var tcpIndexToFlags = [_MAX_TCP_FLAGS_INDEX]TCPFlag{
+var TCPIndexToFlags = [MAX_TCP_FLAGS_INDEX]TCPFlag{
 	TCP_FLAG_SYN_INDEX:     TCP_FLAG_SYN,
 	TCP_FLAG_SYN_ACK_INDEX: TCP_FLAG_SYN_ACK,
 	TCP_FLAG_ACK_INDEX:     TCP_FLAG_ACK,
@@ -171,7 +171,7 @@ var tcpIndexToFlags = [_MAX_TCP_FLAGS_INDEX]TCPFlag{
 
 // 作为TagValue值和统计数据的Index，取值范围是11~21
 const (
-	TTL_1 = iota + _MAX_TCP_FLAGS_INDEX
+	TTL_1 = iota + MAX_TCP_FLAGS_INDEX
 	TTL_2
 	TTL_3
 	TTL_4
@@ -182,12 +182,12 @@ const (
 	TTL_128
 	TTL_255
 	TTL_OTHER
-	_MAX_TTL
+	MAX_TTL
 )
 
 // 作为TagValue值和统计数据的Index，取值范围是22~30
 const (
-	PACKET_SIZE_0_64 = iota + _MAX_TTL
+	PACKET_SIZE_0_64 = iota + MAX_TTL
 	PACKET_SIZE_65_128
 	PACKET_SIZE_129_256
 	PACKET_SIZE_257_512
@@ -196,14 +196,14 @@ const (
 	PACKET_SIZE_1501_9000
 	PACKET_SIZE_9001_30000
 	PACKET_SIZE_30001_65535
-	_MAX_PACKET_SIZE
+	MAX_PACKET_SIZE
 )
 
 const (
-	N_METERS = _MAX_PACKET_SIZE
+	N_METERS = MAX_PACKET_SIZE
 )
 
-var TTL_PACKET_SIZE [_MAX_PACKET_SIZE]string = [_MAX_PACKET_SIZE]string{
+var TTL_PACKET_SIZE [MAX_PACKET_SIZE]string = [MAX_PACKET_SIZE]string{
 	TTL_1:                   "1",
 	TTL_2:                   "2",
 	TTL_3:                   "3",
@@ -532,7 +532,7 @@ func (t *Tag) MarshalTo(b []byte) int {
 			fallthrough
 		case TAG_TYPE_PACKET_SIZE:
 			offset += copy(b[offset:], ",tag_value=")
-			if t.TagValue < _MAX_PACKET_SIZE && t.TagValue >= TTL_1 {
+			if t.TagValue < uint16(MAX_PACKET_SIZE) && t.TagValue >= uint16(TTL_1) {
 				offset += copy(b[offset:], TTL_PACKET_SIZE[t.TagValue])
 			} else {
 				offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagValue), 10))
