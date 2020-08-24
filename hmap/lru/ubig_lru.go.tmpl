@@ -306,10 +306,12 @@ func (m *U{{.}}LRU) compressHash(hash uint32) int32 {
 	return keyhash.Jenkins32(hash) & (m.hashSlots - 1)
 }
 
-func (m *U{{.}}LRU) Walk(callback func(key [_U{{.}}_KEY_SIZE]byte, value interface{})) {
+func (m *U{{.}}LRU) Walk(callback func(key [_U{{.}}_KEY_SIZE]byte, value interface{}) bool) {
 	for i := m.timeListHead; i != -1; {
 		node := m.getNode(i)
-		callback(node.key, node.value)
+		if exit := callback(node.key, node.value); exit {
+			break
+		}
 		i = node.timeListNext
 	}
 }

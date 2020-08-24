@@ -118,7 +118,7 @@ func TestU{{.}}LRU(t *testing.T) {
 		lru.Add(getU{{.}}(uint64(i), uint64(i+100)), uint64(i))
 	}
 	count := 0
-	callback := func(key [_U{{.}}_KEY_SIZE]byte, value interface{}) { count += 1 }
+	callback := func(key [_U{{.}}_KEY_SIZE]byte, value interface{}) bool { count += 1;  return false }
 	lru.Walk(callback)
 	if count != lru.Size() {
 		t.Errorf("Walk count %d is not expected", count)
