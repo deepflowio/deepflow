@@ -376,25 +376,21 @@ func (a *Anomaly) MarshalTo(b []byte) int {
 }
 
 type FlowLoad struct {
-	Max uint64 `db:"flow_load_max"`
-	Min uint64 `db:"flow_load_min"`
+	Load uint64 `db:"flow_load"`
 }
 
 func (l *FlowLoad) Reverse() {}
 
 func (l *FlowLoad) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteVarintU64(l.Max)
-	encoder.WriteVarintU64(l.Min)
+	encoder.WriteVarintU64(l.Load)
 }
 
 func (l *FlowLoad) Decode(decoder *codec.SimpleDecoder) {
-	l.Max = decoder.ReadVarintU64()
-	l.Min = decoder.ReadVarintU64()
+	l.Load = decoder.ReadVarintU64()
 }
 
 func (l *FlowLoad) ConcurrentMerge(other *FlowLoad) {
-	l.Max += other.Max
-	l.Min += other.Min
+	l.Load += other.Load
 }
 
 func (l *FlowLoad) SequentialMerge(other *FlowLoad) {
@@ -402,12 +398,8 @@ func (l *FlowLoad) SequentialMerge(other *FlowLoad) {
 }
 
 func (l *FlowLoad) MarshalTo(b []byte) int {
-	fields := []string{
-		"flow_load_max=", "flow_load_min=",
-	}
-	values := []uint64{
-		l.Max, l.Min,
-	}
+	fields := []string{"flow_load="}
+	values := []uint64{l.Load}
 	return marshalKeyValues(b, fields, values)
 }
 

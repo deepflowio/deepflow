@@ -213,10 +213,8 @@ func (m *FlowMeter) Fill(ids []uint8, values []interface{}) {
 		case _METER_DNS_SERVER_ERROR:
 			m.DNSServerError = uint64(v)
 
-		case _METER_FLOW_LOAD_MAX:
-			m.Max = uint64(v)
-		case _METER_FLOW_LOAD_MIN:
-			m.Min = uint64(v)
+		case _METER_FLOW_LOAD:
+			m.Load = uint64(v)
 
 		default:
 			log.Warningf("unsupport meter id=%d", id)

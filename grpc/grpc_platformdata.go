@@ -627,10 +627,11 @@ func (t *PlatformInfoTable) String() string {
 
 	epcIP6s = make([][EpcIDIPV6_LEN]byte, 0)
 	t.ipv6Lock.RLock()
-	t.epcIDIPV6Lru.Walk(func(key [EpcIDIPV6_LEN]byte, value interface{}) {
+	t.epcIDIPV6Lru.Walk(func(key [EpcIDIPV6_LEN]byte, value interface{}) bool {
 		if _, ok := value.(*uint64); ok {
 			epcIP6s = append(epcIP6s, key)
 		}
+		return false
 	})
 
 	sort.Slice(epcIP6s, func(i, j int) bool {
