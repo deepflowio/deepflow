@@ -50,6 +50,7 @@ message SyncRequest {
     optional string ctrl_ip = 21;
     optional string host = 22; // 仅作为注册使用
     repeated string host_ips = 23; // 仅作为注册使用
+    optional bool   is_virtual_machine = 24 [default = false];  
 }
 
 enum Status {
