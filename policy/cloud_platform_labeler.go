@@ -51,6 +51,7 @@ type CloudPlatformLabeler struct {
 	netmaskBitmap       uint32
 	peerConnectionTable map[int32][]int32
 	epcCidrMapData      map[int32][]*Cidr
+	tunnelIdCidrMapData map[uint32][]*Cidr
 }
 
 func NewCloudPlatformLabeler(queueCount int, mapSize uint32) *CloudPlatformLabeler {
@@ -293,6 +294,7 @@ func (l *CloudPlatformLabeler) UpdateGroupTree(ipGroupDatas []*IpGroupData) {
 
 func (l *CloudPlatformLabeler) UpdateCidr(cidrs []*Cidr) {
 	epcCidr := make(map[int32][]*Cidr, len(cidrs))
+	tunnelCidr := make(map[uint32][]*Cidr, len(cidrs))
 	for _, cidr := range cidrs {
 		epc := cidr.EpcId
 		// WAN的CIDR都存在EPC_FROM_DEEPFLOW表中
@@ -304,6 +306,14 @@ func (l *CloudPlatformLabeler) UpdateCidr(cidrs []*Cidr) {
 			cidrs = make([]*Cidr, 0, 2)
 		}
 		epcCidr[epc] = append(cidrs, cidr)
+
+		if cidr.TunnelId > 0 {
+			cidrs := tunnelCidr[cidr.TunnelId]
+			if cidrs == nil {
+				cidrs = make([]*Cidr, 0, 2)
+			}
+			tunnelCidr[cidr.TunnelId] = append(cidrs, cidr)
+		}
 	}
 
 	for _, cidrs := range epcCidr {
@@ -313,7 +323,16 @@ func (l *CloudPlatformLabeler) UpdateCidr(cidrs []*Cidr) {
 			return n > m
 		})
 	}
+
+	for _, cidrs := range tunnelCidr {
+		sort.SliceStable(cidrs, func(i, j int) bool {
+			n, _ := cidrs[i].IpNet.Mask.Size()
+			m, _ := cidrs[j].IpNet.Mask.Size()
+			return n > m
+		})
+	}
 	l.epcCidrMapData = epcCidr
+	l.tunnelIdCidrMapData = tunnelCidr
 }
 
 func (l *CloudPlatformLabeler) setEpcByCidr(ip net.IP, epc int32, endpointInfo *EndpointInfo) bool {
@@ -328,8 +347,28 @@ func (l *CloudPlatformLabeler) setEpcByCidr(ip net.IP, epc int32, endpointInfo *
 	return false
 }
 
-func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType TapType, l3End bool) *EndpointInfo {
+func (l *CloudPlatformLabeler) setEpcByTunnelCidr(ip net.IP, tunnelId uint32, endpointInfo *EndpointInfo) bool {
+	for _, cidr := range l.tunnelIdCidrMapData[tunnelId] {
+		if cidr.IpNet.Contains(ip) {
+			endpointInfo.L3EpcId = cidr.EpcId
+			return true
+		}
+	}
+	return false
+}
+
+func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType TapType, l3End bool, tunnelId uint32) *EndpointInfo {
 	endpointInfo := new(EndpointInfo)
+	// 腾讯的GRE场景，MAC为0
+	if tunnelId > 0 {
+		// step 1: 查询DEEPFLOW添加的WAN监控网段(cidr)
+		l.setEpcByCidr(ip, EPC_FROM_DEEPFLOW, endpointInfo)
+		if endpointInfo.L3EpcId == 0 {
+			// step 2: 查询tunnelID监控网段(cidr)
+			l.setEpcByTunnelCidr(ip, tunnelId, endpointInfo)
+		}
+		return endpointInfo
+	}
 	// step 1: 使用mac查询L2
 	platformData := l.GetDataByMac(MacKey(mac))
 	if platformData != nil {
@@ -452,8 +491,8 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	// l3: l2epc+ip查询
 	// l3: ip查询平台数据WAN接口
 	// l3: ip查询DEEPFLOW添加的WAN监控网段(cidr)
-	srcData := l.GetEndpointInfo(key.SrcMac, srcIp, key.TapType, key.L3End0)
-	dstData := l.GetEndpointInfo(key.DstMac, dstIp, key.TapType, key.L3End1)
+	srcData := l.GetEndpointInfo(key.SrcMac, srcIp, key.TapType, key.L3End0, key.TunnelId)
+	dstData := l.GetEndpointInfo(key.DstMac, dstIp, key.TapType, key.L3End1, key.TunnelId)
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
 	// l3: 对等连接查询, 以下两种查询
 	// 1). peer epc + ip查询对等连接表
