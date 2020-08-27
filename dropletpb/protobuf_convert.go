@@ -219,9 +219,10 @@ func newCidr(data *trident.Cidr) *datatype.Cidr {
 	}
 
 	return &datatype.Cidr{
-		IpNet: ipNet,
-		EpcId: epcId,
-		Type:  uint8(data.GetType()),
+		IpNet:    ipNet,
+		EpcId:    epcId,
+		Type:     uint8(data.GetType()),
+		TunnelId: data.GetTunnelId(),
 	}
 }
 

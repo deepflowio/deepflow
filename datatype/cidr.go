@@ -12,7 +12,8 @@ const (
 )
 
 type Cidr struct {
-	IpNet *net.IPNet
-	EpcId int32
-	Type  uint8
+	IpNet    *net.IPNet
+	EpcId    int32
+	Type     uint8
+	TunnelId uint32
 }
