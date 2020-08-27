@@ -25,7 +25,7 @@ func TestMarshalTraffic(t *testing.T) {
 		DNSResponse:  11,
 	}
 	l = t1.MarshalTo(buffer[:])
-	if string(buffer[:l]) != "byte_tx=3i,packet_tx=1i,packet_rx=2i,byte_rx=4i,l3_byte_tx=12i,l3_byte_rx=13i,flow=5i,new_flow=6i,closed_flow=7i"+
+	if string(buffer[:l]) != "byte_tx=3i,packet_tx=1i,packet_rx=2i,packet=3i,byte_rx=4i,byte=7i,l3_byte_tx=12i,l3_byte_rx=13i,flow=5i,new_flow=6i,closed_flow=7i"+
 		",http_request=8i,http_response=9i,dns_request=10i,dns_response=11i" {
 		t.Error("MarshalTo()实现不正确")
 	}
@@ -35,7 +35,7 @@ func TestMarshalTraffic(t *testing.T) {
 		NewFlow: 4,
 	}
 	l = t2.MarshalTo(buffer[:])
-	if string(buffer[:l]) != "byte_tx=3i,new_flow=4i" {
+	if string(buffer[:l]) != "byte_tx=3i,byte=3i,new_flow=4i" {
 		t.Error("MarshalTo()实现不正确")
 	}
 }

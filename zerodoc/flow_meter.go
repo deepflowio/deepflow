@@ -203,15 +203,21 @@ func (m *FlowMeter) Fill(ids []uint8, values []interface{}) {
 			m.ServerNoResponse = uint64(v)
 		case _METER_SERVER_QUEUE_LACK:
 			m.ServerQueueLack = uint64(v)
+		case _METER_TCP_TIMEOUT:
+			m.TCPTimeout = uint64(v)
 
 		case _METER_HTTP_CLIENT_ERROR:
 			m.HTTPClientError = uint64(v)
 		case _METER_HTTP_SERVER_ERROR:
 			m.HTTPServerError = uint64(v)
+		case _METER_HTTP_TIMEOUT:
+			m.HTTPTimeout = uint64(v)
 		case _METER_DNS_CLIENT_ERROR:
 			m.DNSClientError = uint64(v)
 		case _METER_DNS_SERVER_ERROR:
 			m.DNSServerError = uint64(v)
+		case _METER_DNS_TIMEOUT:
+			m.DNSTimeout = uint64(v)
 
 		case _METER_FLOW_LOAD:
 			m.Load = uint64(v)

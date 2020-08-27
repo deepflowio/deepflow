@@ -20,7 +20,7 @@ func TestMarshalGeoMeter(t *testing.T) {
 		},
 	}
 	l = m1.MarshalTo(buffer[:])
-	if string(buffer[:l]) != "byte_tx=3i,packet_tx=1i,packet_rx=2i,byte_rx=4i,flow=5i,new_flow=6i,closed_flow=7i" {
+	if string(buffer[:l]) != "byte_tx=3i,packet_tx=1i,packet_rx=2i,packet=3i,byte_rx=4i,byte=7i,flow=5i,new_flow=6i,closed_flow=7i" {
 		t.Error("MarshalTo()实现不正确")
 	}
 
@@ -51,7 +51,7 @@ func TestMarshalGeoMeter(t *testing.T) {
 		},
 	}
 	l = m3.MarshalTo(buffer[:])
-	if string(buffer[:l]) != "byte_tx=3i,packet_tx=1i,packet_rx=2i,byte_rx=4i,flow=5i,new_flow=6i,closed_flow=7i,client_rst_flow=1i,server_syn_ack_repeat=1i" {
+	if string(buffer[:l]) != "byte_tx=3i,packet_tx=1i,packet_rx=2i,packet=3i,byte_rx=4i,byte=7i,flow=5i,new_flow=6i,closed_flow=7i,client_rst_flow=1i,server_syn_ack_repeat=1i" {
 		t.Error("MarshalTo()实现不正确")
 	}
 }
