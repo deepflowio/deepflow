@@ -105,11 +105,11 @@ func (t *Traffic) MarshalTo(b []byte) int {
 	offset += copy(b[offset:], "i,") // 先加',',若后续若没有增加数据，需要去除
 
 	fields := []string{
-		"packet_tx=", "packet_rx=", "byte_rx=", "l3_byte_tx=", "l3_byte_rx=", "flow=", "new_flow=", "closed_flow=",
+		"packet_tx=", "packet_rx=", "packet=", "byte_rx=", "byte=", "l3_byte_tx=", "l3_byte_rx=", "flow=", "new_flow=", "closed_flow=",
 		"http_request=", "http_response=", "dns_request=", "dns_response=",
 	}
 	values := []uint64{
-		t.PacketTx, t.PacketRx, t.ByteRx, t.L3ByteTx, t.L3ByteRx, t.Flow, t.NewFlow, t.ClosedFlow,
+		t.PacketTx, t.PacketRx, t.PacketTx + t.PacketRx, t.ByteRx, t.ByteTx + t.ByteRx, t.L3ByteTx, t.L3ByteRx, t.Flow, t.NewFlow, t.ClosedFlow,
 		t.HTTPRequest, t.HTTPResponse, t.DNSRequest, t.DNSResponse,
 	}
 	n := marshalKeyValues(b[offset:], fields, values)
@@ -252,10 +252,10 @@ func (a *Performance) SequentialMerge(other *Performance) {
 
 func (a *Performance) MarshalTo(b []byte) int {
 	fields := []string{
-		"retrans_tx=", "retrans_rx=", "zero_win_tx=", "zero_win_rx=",
+		"retrans_tx=", "retrans_rx=", "retrans=", "zero_win_tx=", "zero_win_rx=",
 	}
 	values := []uint64{
-		a.RetransTx, a.RetransRx, a.ZeroWinTx, a.ZeroWinRx,
+		a.RetransTx, a.RetransRx, a.RetransTx + a.RetransRx, a.ZeroWinTx, a.ZeroWinRx,
 	}
 	return marshalKeyValues(b, fields, values)
 }
@@ -274,11 +274,14 @@ type Anomaly struct {
 	ServerReset           uint64 `db:"server_reset"`
 	ServerNoResponse      uint64 `db:"server_no_response"`
 	ServerQueueLack       uint64 `db:"server_queue_lack"`
+	TCPTimeout            uint64 `db:"tcp_timeout"`
 
 	HTTPClientError uint64 `db:"http_client_error"`
 	HTTPServerError uint64 `db:"http_server_error"`
+	HTTPTimeout     uint64 `db:"http_timeout"`
 	DNSClientError  uint64 `db:"dns_client_error"`
 	DNSServerError  uint64 `db:"dns_server_error"`
+	DNSTimeout      uint64 `db:"dns_timeout"`
 }
 
 func (_ *Anomaly) Reverse() {
@@ -298,11 +301,14 @@ func (a *Anomaly) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(a.ServerReset)
 	encoder.WriteVarintU64(a.ServerNoResponse)
 	encoder.WriteVarintU64(a.ServerQueueLack)
+	encoder.WriteVarintU64(a.TCPTimeout)
 
 	encoder.WriteVarintU64(a.HTTPClientError)
 	encoder.WriteVarintU64(a.HTTPServerError)
+	encoder.WriteVarintU64(a.HTTPTimeout)
 	encoder.WriteVarintU64(a.DNSClientError)
 	encoder.WriteVarintU64(a.DNSServerError)
+	encoder.WriteVarintU64(a.DNSTimeout)
 }
 
 func (a *Anomaly) Decode(decoder *codec.SimpleDecoder) {
@@ -319,11 +325,14 @@ func (a *Anomaly) Decode(decoder *codec.SimpleDecoder) {
 	a.ServerReset = decoder.ReadVarintU64()
 	a.ServerNoResponse = decoder.ReadVarintU64()
 	a.ServerQueueLack = decoder.ReadVarintU64()
+	a.TCPTimeout = decoder.ReadVarintU64()
 
 	a.HTTPClientError = decoder.ReadVarintU64()
 	a.HTTPServerError = decoder.ReadVarintU64()
+	a.HTTPTimeout = decoder.ReadVarintU64()
 	a.DNSClientError = decoder.ReadVarintU64()
 	a.DNSServerError = decoder.ReadVarintU64()
+	a.DNSTimeout = decoder.ReadVarintU64()
 }
 
 func (a *Anomaly) ConcurrentMerge(other *Anomaly) {
@@ -340,11 +349,15 @@ func (a *Anomaly) ConcurrentMerge(other *Anomaly) {
 	a.ServerReset += other.ServerReset
 	a.ServerNoResponse += other.ServerNoResponse
 	a.ServerQueueLack += other.ServerQueueLack
+	a.TCPTimeout += other.TCPTimeout
 
 	a.HTTPClientError += other.HTTPClientError
 	a.HTTPServerError += other.HTTPServerError
+	a.HTTPTimeout += other.HTTPTimeout
+
 	a.DNSClientError += other.DNSClientError
 	a.DNSServerError += other.DNSServerError
+	a.DNSTimeout += other.DNSTimeout
 }
 
 func (a *Anomaly) SequentialMerge(other *Anomaly) {
@@ -358,9 +371,10 @@ func (a *Anomaly) MarshalTo(b []byte) int {
 		"client_half_close_flow=", "server_half_close_flow=",
 		"client_no_response=", "client_source_port_reuse=",
 		"client_syn_retry_lack=", "server_reset=",
-		"server_no_response=", "server_queue_lack=",
-		"http_client_error=", "http_server_error=",
-		"dns_client_error=", "dns_server_error=",
+		"server_no_response=", "server_queue_lack=", "tcp_timeout=",
+		"client_establish_fail=", "server_establish_fail=", "tcp_establish_fail=",
+		"http_client_error=", "http_server_error=", "http_timeout=", "http_error=",
+		"dns_client_error=", "dns_server_error=", "dns_timeout=", "dns_error=",
 	}
 	values := []uint64{
 		a.ClientRstFlow, a.ServerRstFlow,
@@ -368,9 +382,10 @@ func (a *Anomaly) MarshalTo(b []byte) int {
 		a.ClientHalfCloseFlow, a.ServerHalfCloseFlow,
 		a.ClientNoResponse, a.ClientSourcePortReuse,
 		a.ClientSYNRetryLack, a.ServerReset,
-		a.ServerNoResponse, a.ServerQueueLack,
-		a.HTTPClientError, a.HTTPServerError,
-		a.DNSClientError, a.DNSServerError,
+		a.ServerNoResponse, a.ServerQueueLack, a.TCPTimeout,
+		0, 0, 0, //FIXME:客户端建连失败， 服务端建连失败， TCP建连失败统计
+		a.HTTPClientError, a.HTTPServerError, a.HTTPTimeout, a.HTTPClientError + a.HTTPServerError + a.HTTPTimeout,
+		a.DNSClientError, a.DNSServerError, a.DNSTimeout, a.DNSClientError + a.DNSServerError + a.DNSTimeout,
 	}
 	return marshalKeyValues(b, fields, values)
 }
