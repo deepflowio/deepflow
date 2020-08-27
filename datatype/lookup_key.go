@@ -18,14 +18,15 @@ type LookupKey struct {
 	Src6Ip, Dst6Ip                    net.IP
 	SrcPort, DstPort                  uint16
 	EthType                           EthernetType
-	Proto                             uint8
 	L2End0, L2End1                    bool
 	L3End0, L3End1                    bool
+	Proto                             uint8
 	TapType                           TapType
 	FeatureFlag                       FeatureFlags
 	ForwardMatched, BackwardMatched   MatchedField
 	ForwardMatched6, BackwardMatched6 MatchedField6
 	FastIndex                         int
+	TunnelId                          uint32 // 目前仅是腾讯GRE的key，用来查询L3EpcID
 }
 
 func (k *LookupKey) generateMatchedField6(direction DirectionType, srcEpc, dstEpc uint16) {
@@ -80,13 +81,13 @@ func (k *LookupKey) GenerateMatchedField(srcEpc, dstEpc uint16) {
 
 func (k *LookupKey) String() string {
 	if k.EthType == EthernetTypeIPv6 {
-		return fmt.Sprintf("%d %s:%v > %s:%v ethType: %v %v.%d.%v > %v.%d.%v proto: %v tapType: %v",
+		return fmt.Sprintf("%d %s:%v > %s:%v ethType: %v %v.%d.%v > %v.%d.%v proto: %v tapType: %v tunnel id: %d",
 			k.Timestamp, Uint64ToMac(k.SrcMac), k.L2End0, Uint64ToMac(k.DstMac), k.L2End1, k.EthType,
-			k.Src6Ip, k.SrcPort, k.L3End0, k.Dst6Ip, k.DstPort, k.L3End1, k.Proto, k.TapType)
+			k.Src6Ip, k.SrcPort, k.L3End0, k.Dst6Ip, k.DstPort, k.L3End1, k.Proto, k.TapType, k.TunnelId)
 	} else {
-		return fmt.Sprintf("%d %s:%v > %s:%v ethType: %v %v:%d:%v > %v:%d:%v proto: %v tapType: %v",
+		return fmt.Sprintf("%d %s:%v > %s:%v ethType: %v %v:%d:%v > %v:%d:%v proto: %v tapType: %v tunnel id: %d",
 			k.Timestamp, Uint64ToMac(k.SrcMac), k.L2End0, Uint64ToMac(k.DstMac), k.L2End1, k.EthType,
-			IpFromUint32(k.SrcIp), k.SrcPort, k.L3End0, IpFromUint32(k.DstIp), k.DstPort, k.L3End1, k.Proto, k.TapType)
+			IpFromUint32(k.SrcIp), k.SrcPort, k.L3End0, IpFromUint32(k.DstIp), k.DstPort, k.L3End1, k.Proto, k.TapType, k.TunnelId)
 	}
 }
 

@@ -58,6 +58,7 @@ const (
 	ETH_HEADER_SIZE          = MAC_ADDR_LEN*2 + ETH_TYPE_LEN
 	ARP_HEADER_SIZE          = 28
 	VXLAN_HEADER_SIZE        = 8
+	IP_HEADER_SIZE           = 20
 	UDP_HEADER_SIZE          = 8
 	GRE_HEADER_SIZE          = 8
 	ERSPANII_HEADER_SIZE     = 8
@@ -84,10 +85,24 @@ const (
 	OFFSET_SIP               = 26
 	OFFSET_DIP               = 30
 	OFFSET_DPORT             = 36
+	OFFSET_GRE_FLAGS         = 34 // ver & c & k & s
 	OFFSET_GRE_PROTOCOL_TYPE = 36
+	OFFSET_GRE_KEY           = 38 // no csum
 	OFFSET_VXLAN_FLAGS       = 42
 	OFFSET_VXLAN_VNI         = 46
 	OFFSET_ERSPAN_VER        = 42
+)
+
+const (
+	GRE_FLAGS_VER_MASK  = 0x7
+	GRE_FLAGS_SEQ_MASK  = 1 << 12
+	GRE_FLAGS_KEY_MASK  = 1 << 13
+	GRE_FLAGS_CSUM_MASK = 1 << 15
+)
+
+const (
+	GRE_CSUM_LEN = 4 // csum + reserved1
+	GRE_SEQ_LEN  = 4
 )
 
 const (
