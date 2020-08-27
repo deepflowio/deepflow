@@ -86,10 +86,13 @@ const (
 	_METER_SERVER_RESET
 	_METER_SERVER_NO_RESPONSE
 	_METER_SERVER_QUEUE_LACK
+	_METER_TCP_TIMEOUT
 	_METER_HTTP_CLIENT_ERROR
 	_METER_HTTP_SERVER_ERROR
+	_METER_HTTP_TIMEOUT
 	_METER_DNS_CLIENT_ERROR
 	_METER_DNS_SERVER_ERROR
+	_METER_DNS_TIMEOUT
 
 	_METER_RTT
 	_METER_RTT_CLIENT
@@ -193,10 +196,14 @@ var COLUMN_IDS map[string]uint8 = map[string]uint8{
 	"server_reset":             _METER_SERVER_RESET,
 	"server_no_response":       _METER_SERVER_NO_RESPONSE,
 	"server_queue_lack":        _METER_SERVER_QUEUE_LACK,
-	"http_client_error":        _METER_HTTP_CLIENT_ERROR,
-	"http_server_error":        _METER_HTTP_SERVER_ERROR,
-	"dns_client_error":         _METER_DNS_CLIENT_ERROR,
-	"dns_server_error":         _METER_DNS_SERVER_ERROR,
+	"tcp_timeout":              _METER_TCP_TIMEOUT,
+
+	"http_client_error": _METER_HTTP_CLIENT_ERROR,
+	"http_server_error": _METER_HTTP_SERVER_ERROR,
+	"http_timeout":      _METER_HTTP_TIMEOUT,
+	"dns_client_error":  _METER_DNS_CLIENT_ERROR,
+	"dns_server_error":  _METER_DNS_SERVER_ERROR,
+	"dns_timeout":       _METER_DNS_TIMEOUT,
 
 	"rtt":        _METER_RTT,
 	"rtt_client": _METER_RTT_CLIENT,
