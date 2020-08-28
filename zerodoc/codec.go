@@ -141,16 +141,18 @@ func DecodeTsdbRow(decoder *codec.SimpleDecoder) (*app.Document, error) {
 }
 
 // TCP连接下发查询语句
-func EncodeQuery(encoder *codec.SimpleEncoder, queryID uint64, SQL string) {
+func EncodeQuery(encoder *codec.SimpleEncoder, queryID uint64, tracing string, SQL string) {
 	encoder.WriteU64(queryID)
+	encoder.WriteBytes([]byte(tracing))
 	encoder.WriteBytes([]byte(SQL))
 }
 
-func DecodeQuey(decoder *codec.SimpleDecoder) (uint64, string, error) {
+func DecodeQuey(decoder *codec.SimpleDecoder) (uint64, string, string, error) {
 	queryID := decoder.ReadU64()
+	tracing := decoder.ReadBytes()
 	SQL := decoder.ReadBytes()
 	if decoder.Failed() {
-		return 0, "", fmt.Errorf("decode failed")
+		return 0, "", "", fmt.Errorf("decode failed")
 	}
-	return queryID, string(SQL), nil
+	return queryID, string(tracing), string(SQL), nil
 }
