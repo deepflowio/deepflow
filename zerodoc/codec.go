@@ -87,51 +87,6 @@ func GetDbMeterID(db, rp string) (uint8, error) {
 	return MAX_APP_ID, fmt.Errorf("unsupport db %s", db)
 }
 
-func EncodeTsdbRow(db string, encoder *codec.SimpleEncoder, timestamp uint32, meterID uint8, columnIDs []uint8, columnValues []interface{}) error {
-	encoder.WriteU32(app.VERSION)
-	encoder.WriteU32(timestamp)
-
-	tag := &Tag{}
-	tag.Field = &Field{}
-	if err := tag.FillValues(columnIDs, columnValues); err != nil {
-		return err
-	}
-
-	if tag.Code&IP != 0 || tag.Code&IPPath != 0 {
-		// 根据db名中是否包含'_edge'
-		if strings.Contains(db, DatabaseSuffix[2]) {
-			tag.Code &= ^IP
-			tag.Code |= IPPath
-		} else {
-			tag.Code &= ^IPPath
-			tag.Code |= IP
-		}
-	}
-
-	tag.Encode(encoder)
-
-	encoder.WriteU8(meterID)
-	switch meterID {
-	case GEO_ID:
-		var m GeoMeter
-		m.Fill(columnIDs, columnValues)
-		m.Encode(encoder)
-	case FLOW_ID:
-		var m FlowMeter
-		m.Fill(columnIDs, columnValues)
-		m.Encode(encoder)
-	case PACKET_ID, ACL_ID:
-		var m VTAPUsageMeter
-		m.Fill(columnIDs, columnValues)
-		m.Encode(encoder)
-	default:
-		return fmt.Errorf("Unknown supported meterID %d", meterID)
-	}
-	encoder.WriteU32(0) // Flags
-
-	return nil
-}
-
 func DecodeTsdbRow(decoder *codec.SimpleDecoder) (*app.Document, error) {
 	version := decoder.ReadU32()
 	if version != app.VERSION {
