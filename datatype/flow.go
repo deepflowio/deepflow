@@ -520,21 +520,88 @@ func (f *Flow) Decode(decoder *codec.SimpleDecoder) {
 	// f.Reversed = decoder.ReadBool()
 }
 
-func (t *TCPPerfStats) String() string {
+func formatStruct(s interface{}) string {
 	formatted := ""
-
-	if t == nil {
+	t := reflect.TypeOf(s)
+	formatted += fmt.Sprintf("formatted kind:%v,%v;", t.Kind(), t.NumField())
+	if t.Kind() != reflect.Struct {
 		return ""
 	}
 
-	typeOf := reflect.TypeOf(*t)
-	valueOf := reflect.ValueOf(*t)
-	for i := 0; i < typeOf.NumField(); i++ {
+	v := reflect.ValueOf(s)
+	for i := 0; i < t.NumField(); i++ {
 		if i > 0 {
 			formatted += " "
 		}
-		formatted += fmt.Sprintf("%v: %v", typeOf.Field(i).Name, valueOf.Field(i))
+		formatted += fmt.Sprintf("%v: %v", t.Field(i).Name, v.Field(i))
 	}
+	return formatted
+}
+
+func (p *L7Protocol) String() string {
+	formatted := ""
+	switch *p {
+	case L7_PROTOCOL_HTTP:
+		formatted = "http"
+	case L7_PROTOCOL_DNS:
+		formatted = "dns"
+	}
+	return formatted
+}
+
+func (p *L4Protocol) String() string {
+	formatted := ""
+	switch *p {
+	case L4_PROTOCOL_TCP:
+		formatted = "tcp"
+	case L4_PROTOCOL_UDP:
+		formatted = "udp"
+	}
+	return formatted
+}
+
+func (p *L7PerfStats) String() string {
+	formatted := ""
+	formatted += fmt.Sprintf("RequestCount:%v ", p.RequestCount)
+	formatted += fmt.Sprintf("ResponseCount:%v ", p.ResponseCount)
+	formatted += fmt.Sprintf("ErrClientCount:%v ", p.ErrClientCount)
+	formatted += fmt.Sprintf("ErrServerCount:%v ", p.ErrServerCount)
+	formatted += fmt.Sprintf("ErrTimeout:%v ", p.ErrTimeout)
+	formatted += fmt.Sprintf("RTTCount:%v ", p.RRTCount)
+	formatted += fmt.Sprintf("RTTSum:%v", p.RRTSum)
+	return formatted
+}
+
+func (p *TCPPerfStats) String() string {
+	formatted := ""
+	formatted += fmt.Sprintf("RTTSum:%v ", p.RTTSum)
+	formatted += fmt.Sprintf("RTTClientSum:%v ", p.RTTClientSum)
+	formatted += fmt.Sprintf("RTTServerSum:%v ", p.RTTServerSum)
+	formatted += fmt.Sprintf("SRTSum:%v ", p.SRTSum)
+	formatted += fmt.Sprintf("ARTSum:%v ", p.ARTSum)
+	formatted += fmt.Sprintf("RTTClientCount:%v ", p.RTTClientCount)
+	formatted += fmt.Sprintf("RTTServerCount:%v ", p.RTTServerCount)
+	formatted += fmt.Sprintf("SRTCount:%v ", p.SRTCount)
+	formatted += fmt.Sprintf("ARTCount:%v ", p.ARTCount)
+	formatted += fmt.Sprintf("RetransCountSrc:%v ", p.TcpPerfCountsPeers[0].RetransCount)
+	formatted += fmt.Sprintf("ZeroWinCountSrc:%v ", p.TcpPerfCountsPeers[0].ZeroWinCount)
+	formatted += fmt.Sprintf("RetransCountDst:%v ", p.TcpPerfCountsPeers[1].RetransCount)
+	formatted += fmt.Sprintf("ZeroWinCountDst:%v ", p.TcpPerfCountsPeers[1].ZeroWinCount)
+	formatted += fmt.Sprintf("TotalRetransCount:%v", p.TotalRetransCount)
+
+	return formatted
+}
+
+func (p *FlowPerfStats) String() string {
+	if p == nil {
+		return ""
+	}
+
+	formatted := ""
+	formatted += fmt.Sprintf("L4Protocol:%s ", p.L4Protocol.String())
+	formatted += fmt.Sprintf("TCPPerfStats:{%s} ", p.TCPPerfStats.String())
+	formatted += fmt.Sprintf("\n\tL7Protocol:%s ", p.L7Protocol.String())
+	formatted += fmt.Sprintf("L7PerfStats:{%s}", p.L7PerfStats.String())
 	return formatted
 }
 
@@ -594,7 +661,7 @@ func (f *Flow) String() string {
 	formatted += fmt.Sprintf("\tFlowMetricsPeerSrc: {%s}\n", f.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].String())
 	formatted += fmt.Sprintf("\tFlowMetricsPeerDst: {%s}", f.FlowMetricsPeers[FLOW_METRICS_PEER_DST].String())
 	if f.FlowPerfStats != nil {
-		formatted += fmt.Sprintf("\n\t%s", f.TCPPerfStats.String())
+		formatted += fmt.Sprintf("\n\t%s", f.FlowPerfStats.String())
 	}
 	return formatted
 }
