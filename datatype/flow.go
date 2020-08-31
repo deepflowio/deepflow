@@ -103,12 +103,13 @@ const (
 	L7_PROTOCOL_MAX
 )
 
-// size = 6 * 4B = 24B
+// size = 7 * 4B = 28B
 type L7PerfStats struct {
 	RequestCount   uint32
 	ResponseCount  uint32
 	ErrClientCount uint32 // client端原因导致的响应异常数量
 	ErrServerCount uint32 // server端原因导致的响应异常数量
+	ErrTimeout     uint32 // request请求timeout数量
 	RRTCount       uint32
 	RRTSum         uint32 // us RRT(Request Response Time)
 }
@@ -623,6 +624,7 @@ func (p *L7PerfStats) Decode(decoder *codec.SimpleDecoder) {
 	p.ResponseCount = decoder.ReadVarintU32()
 	p.ErrClientCount = decoder.ReadVarintU32()
 	p.ErrServerCount = decoder.ReadVarintU32()
+	p.ErrTimeout = decoder.ReadVarintU32()
 	p.RRTCount = decoder.ReadVarintU32()
 	p.RRTSum = decoder.ReadVarintU32()
 }
@@ -632,6 +634,7 @@ func (p *L7PerfStats) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU32(p.ResponseCount)
 	encoder.WriteVarintU32(p.ErrClientCount)
 	encoder.WriteVarintU32(p.ErrServerCount)
+	encoder.WriteVarintU32(p.ErrTimeout)
 	encoder.WriteVarintU32(p.RRTCount)
 	encoder.WriteVarintU32(p.RRTSum)
 }
@@ -641,6 +644,7 @@ func (p *L7PerfStats) SequentialMerge(rhs *L7PerfStats) {
 	p.ResponseCount += rhs.ResponseCount
 	p.ErrClientCount += rhs.ErrClientCount
 	p.ErrServerCount += rhs.ErrServerCount
+	p.ErrTimeout += rhs.ErrTimeout
 	p.RRTCount += rhs.RRTCount
 	p.RRTSum += rhs.RRTSum
 }
