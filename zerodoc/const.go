@@ -1,5 +1,9 @@
 package zerodoc
 
+import logging "github.com/op/go-logging"
+
+var log = logging.MustGetLogger("zerodoc")
+
 const (
 	MAX_STRING_LENGTH = 1024
 )
