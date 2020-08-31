@@ -100,16 +100,16 @@ func (t *Traffic) SequentialMerge(other *Traffic) {
 func (t *Traffic) MarshalTo(b []byte) int {
 	// 保证byte_tx一定会写入，用于查询时，若只查tag不查field，则需要默认查询field 'byte_tx'
 	offset := 0
-	offset += copy(b[offset:], "byte_tx=")
-	offset += copy(b[offset:], strconv.FormatUint(t.ByteTx, 10))
+	offset += copy(b[offset:], "packet=")
+	offset += copy(b[offset:], strconv.FormatUint(t.PacketTx+t.PacketRx, 10))
 	offset += copy(b[offset:], "i,") // 先加',',若后续若没有增加数据，需要去除
 
 	fields := []string{
-		"packet_tx=", "packet_rx=", "packet=", "byte_rx=", "byte=", "l3_byte_tx=", "l3_byte_rx=", "flow=", "new_flow=", "closed_flow=",
+		"packet_tx=", "packet_rx=", "byte_tx=", "byte_rx=", "byte=", "l3_byte_tx=", "l3_byte_rx=", "flow=", "new_flow=", "closed_flow=",
 		"http_request=", "http_response=", "dns_request=", "dns_response=",
 	}
 	values := []uint64{
-		t.PacketTx, t.PacketRx, t.PacketTx + t.PacketRx, t.ByteRx, t.ByteTx + t.ByteRx, t.L3ByteTx, t.L3ByteRx, t.Flow, t.NewFlow, t.ClosedFlow,
+		t.PacketTx, t.PacketRx, t.ByteTx, t.ByteRx, t.ByteTx + t.ByteRx, t.L3ByteTx, t.L3ByteRx, t.Flow, t.NewFlow, t.ClosedFlow,
 		t.HTTPRequest, t.HTTPResponse, t.DNSRequest, t.DNSResponse,
 	}
 	n := marshalKeyValues(b[offset:], fields, values)
