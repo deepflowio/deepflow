@@ -98,7 +98,7 @@ func (t *Traffic) SequentialMerge(other *Traffic) {
 }
 
 func (t *Traffic) MarshalTo(b []byte) int {
-	// 保证byte_tx一定会写入，用于查询时，若只查tag不查field，则需要默认查询field 'byte_tx'
+	// 保证packet一定会写入，用于查询时，若只查tag不查field，则需要默认查询field 'packet'
 	offset := 0
 	offset += copy(b[offset:], "packet=")
 	offset += copy(b[offset:], strconv.FormatUint(t.PacketTx+t.PacketRx, 10))

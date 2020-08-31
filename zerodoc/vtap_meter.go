@@ -104,31 +104,3 @@ func (m *VTAPUsageMeter) ConcurrentMerge(other app.Meter) {
 func (m *VTAPUsageMeter) SequentialMerge(other app.Meter) {
 	m.ConcurrentMerge(other)
 }
-
-func (m *VTAPUsageMeter) Fill(ids []uint8, values []interface{}) {
-	for i, id := range ids {
-		if id <= _METER_INVALID_ || id >= _METER_MAX_ID_ || values[i] == nil {
-			continue
-		}
-		v, ok := values[i].(int64)
-		if !ok {
-			continue
-		}
-		switch id {
-		case _METER_PACKET_TX:
-			m.PacketTx = uint64(v)
-		case _METER_PACKET_RX:
-			m.PacketRx = uint64(v)
-		case _METER_BYTE_TX:
-			m.ByteTx = uint64(v)
-		case _METER_BYTE_RX:
-			m.ByteRx = uint64(v)
-		case _METER_L3_BYTE_TX:
-			m.L3ByteTx = uint64(v)
-		case _METER_L3_BYTE_RX:
-			m.L3ByteRx = uint64(v)
-		default:
-			log.Warningf("unsupport meter id=%d", id)
-		}
-	}
-}
