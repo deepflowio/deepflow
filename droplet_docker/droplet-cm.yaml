@@ -1,9 +1,0 @@
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: tridentconf
-  namespace: yunshan-deepflow
-data:
-  # The CNI network configuration to install on each node.  The special
-  # values in this config will be automatically populated.
-  droplet.yaml: |-
