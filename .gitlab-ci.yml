@@ -20,7 +20,6 @@ package-x64:
 
   script:
     - rpmbuild -bb droplet.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
-    - rpmbuild -bb droplet_docker.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
   artifacts:
     paths:
     - x86_64/droplet*.rpm
@@ -28,6 +27,21 @@ package-x64:
     - master
     - /B_LC_RELEASE_.*/
     - /feature-.*/
+
+docker-x64:
+  stage: package
+  tags:
+    - x64
+  script:
+    - mkdir -p ./tmp
+    - cp config/droplet.yaml ./tmp
+    - cd tmp
+    - docker build --add-host nexus.x.lan:10.30.2.201 -t droplet:$CI_COMMIT_REF_NAME ./
+    - docker tag droplet:$CI_COMMIT_REF_NAME nexus.x.lan:5000/droplet:$CI_COMMIT_REF_NAME
+    - docker push nexus.x.lan:5000/droplet:$CI_COMMIT_REF_NAME
+  only:
+    - master
+    - /B_LC_RELEASE_.*/
 
 verify-arm64:
   stage: verify
@@ -46,7 +60,6 @@ package-arm64:
 
   script:
     - rpmbuild -bb droplet.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
-    - rpmbuild -bb droplet_docker.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
   artifacts:
     paths:
     - aarch64/droplet*.rpm
@@ -54,3 +67,4 @@ package-arm64:
     - master
     - /B_LC_RELEASE_.*/
     - /feature-.*/
+
