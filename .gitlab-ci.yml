@@ -18,7 +18,9 @@ package-x64:
   tags:
     - x64
 
-  script: rpmbuild -bb droplet.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
+  script:
+    - rpmbuild -bb droplet.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
+    - rpmbuild -bb droplet_docker.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
   artifacts:
     paths:
     - x86_64/droplet*.rpm
@@ -42,7 +44,9 @@ package-arm64:
   tags:
     - arm64
 
-  script: rpmbuild -bb droplet.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
+  script:
+    - rpmbuild -bb droplet.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
+    - rpmbuild -bb droplet_docker.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
   artifacts:
     paths:
     - aarch64/droplet*.rpm
