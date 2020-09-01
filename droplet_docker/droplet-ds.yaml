@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: droplet
+  namespace: yunshan-deepflow
+spec:
+  selector:
+    matchLabels:
+      app: droplet
+  template:
+    metadata:
+      name: droplet
+      namespace: yunshan-deepflow
+      labels:
+        app: droplet
+    spec:
+      hostNetwork: true
+      hostPID: true
+      containers:
+        - name: droplet
+          image: droplet
+          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: triconf
+              mountPath: /etc/droplet/
+      volumes:
+        - name: triconf
+          configMap:
+            name: dropletconf
