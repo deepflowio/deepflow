@@ -51,7 +51,8 @@ func TestMarshalGeoMeter(t *testing.T) {
 		},
 	}
 	l = m3.MarshalTo(buffer[:])
-	if string(buffer[:l]) != "packet=3i,packet_tx=1i,packet_rx=2i,byte_tx=3i,byte_rx=4i,byte=7i,flow=5i,new_flow=6i,closed_flow=7i,client_rst_flow=1i,server_syn_ack_repeat=1i" {
-		t.Error("MarshalTo()实现不正确")
+	expected := "packet=3i,packet_tx=1i,packet_rx=2i,byte_tx=3i,byte_rx=4i,byte=7i,flow=5i,new_flow=6i,closed_flow=7i,client_rst_flow=1i,server_syn_ack_repeat=1i,server_establish_fail=1i,tcp_establish_fail=1i"
+	if string(buffer[:l]) != expected {
+		t.Error("MarshalTo()实现不正确", "\nactual is", string(buffer[:l]), "\nexpected is", expected)
 	}
 }

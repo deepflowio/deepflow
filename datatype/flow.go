@@ -21,20 +21,22 @@ const (
 	CloseTypeTCPServerRst
 	CloseTypeTimeout
 	CloseTypeFlood
-	CloseTypeForcedReport
-	// CloseTypeFoecedClose is not used any more, so skip it
-	CloseTypeClientSYNRepeat CloseType = iota + 1
+	CloseTypeForcedReport // 5
+	_                     // CloseTypeFoecedClose is not used any more, so skip it
+	CloseTypeClientSYNRepeat
 	CloseTypeServerHalfClose
 	CloseTypeTCPClientRst
-	CloseTypeServerSYNACKRepeat
+	CloseTypeServerSYNACKRepeat // 10
 	CloseTypeClientHalfClose
 
-	CloseTypeClientNoResponse
+	_ // CloseTypeClientNoResponse is not used any more
 	CloseTypeClientSourcePortReuse
-	CloseTypeClientSYNRetryLack
-	CloseTypeServerReset
-	CloseTypeServerNoResponse
+	_                    // CloseTypeClientSYNRetryLack is not used any more
+	CloseTypeServerReset // 15
+	_                    // CloseTypeServerNoResponse is not used any more
 	CloseTypeServerQueueLack
+	CloseTypeClientEstablishReset
+	CloseTypeServerEstablishReset
 	MaxCloseType
 )
 
