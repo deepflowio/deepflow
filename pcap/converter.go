@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	MAX_PACKET_LEN  = 128
-	MAC_ADDRESS_LEN = 6
-	IP_ADDRESS_LEN  = 4
+	SLICE_PAYLOAD_LEN = 2
+	MAX_HEADER_LEN    = 128
+	MAC_ADDRESS_LEN   = 6
+	IP_ADDRESS_LEN    = 4
 )
 
 type RawPacket []byte
@@ -43,6 +44,8 @@ func (p RawPacket) MetaPacketToRaw(packet *datatype.MetaPacket, tcpipChecksum bo
 			size += p.fillTCP(packet, size, l3Offset, tcpipChecksum)
 		case layers.IPProtocolUDP:
 			size += p.fillUDP(packet, size, l3Offset, tcpipChecksum)
+		default:
+			size += p.fillOthers(packet, size)
 		}
 	}
 	p.fillIpTotalLen(packet, l3Offset+IPV4_TOTAL_LENGTH_OFFSET)
@@ -267,6 +270,10 @@ func (p RawPacket) fillTCP(packet *datatype.MetaPacket, start, ipv4Offset int, c
 		binary.BigEndian.PutUint16(base[TCP_CHECKSUM_OFFSET:], 0)
 	}
 
+	if packet.PayloadLen > 0 {
+		length += copy(base[length:], packet.RawHeader)
+	}
+
 	return length
 }
 
@@ -281,16 +288,21 @@ const (
 func (p RawPacket) fillUDP(packet *datatype.MetaPacket, start, ipv4Offset int, checksum bool) int {
 	base := p[start:]
 
+	length := UDP_LEN
+	if packet.PayloadLen > 0 {
+		length += copy(base[UDP_LEN:], packet.RawHeader)
+	}
+
 	binary.BigEndian.PutUint16(base[UDP_SPORT_OFFSET:], packet.PortSrc)
 	binary.BigEndian.PutUint16(base[UDP_DPORT_OFFSET:], packet.PortDst)
-	binary.BigEndian.PutUint16(base[UDP_LENGTH_OFFSET:], UDP_LEN)
+	binary.BigEndian.PutUint16(base[UDP_LENGTH_OFFSET:], uint16(length))
 	if checksum {
 		binary.BigEndian.PutUint16(base[UDP_CHECKSUM_OFFSET:], p.tcpIPChecksum(layers.IPProtocolUDP, ipv4Offset, start, UDP_LEN))
 	} else {
 		binary.BigEndian.PutUint16(base[UDP_CHECKSUM_OFFSET:], 0)
 	}
 
-	return UDP_LEN
+	return length
 }
 
 func (p RawPacket) tcpIPChecksum(protocol layers.IPProtocol, ipv4Offset, tcpIPOffset int, length int) uint16 {
@@ -325,4 +337,14 @@ func min(x, y int) int {
 func macIntToBytes(macInt datatype.MacInt, mac []byte) {
 	binary.BigEndian.PutUint16(mac, uint16(macInt>>32))
 	binary.BigEndian.PutUint32(mac[2:], uint32(macInt))
+}
+
+func (p RawPacket) fillOthers(packet *datatype.MetaPacket, start int) int {
+	base := p[start:]
+
+	length := 0
+	if packet.PayloadLen > 0 {
+		length += copy(base, packet.RawHeader)
+	}
+	return length
 }
