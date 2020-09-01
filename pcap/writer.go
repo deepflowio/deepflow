@@ -80,6 +80,13 @@ func (w *Writer) init(filename string) error {
 }
 
 func (w *Writer) Write(packet *datatype.MetaPacket) error {
+	maxPacketSize := RECORD_HEADER_LEN + MAX_HEADER_LEN + SLICE_PAYLOAD_LEN + int(packet.PayloadLen)
+	if w.bufferSize-w.offset < maxPacketSize {
+		if err := w.Flush(); err != nil {
+			return err
+		}
+	}
+
 	header := NewRecordHeader(w.buffer[w.latch][w.offset:])
 	w.offset += RECORD_HEADER_LEN
 	size := NewRawPacket(w.buffer[w.latch][w.offset:]).MetaPacketToRaw(packet, w.tcpipChecksum)
@@ -89,11 +96,6 @@ func (w *Writer) Write(packet *datatype.MetaPacket) error {
 	header.SetInclLen(size)
 	w.totalBufferedCount++
 	w.totalBufferedBytes += uint64(RECORD_HEADER_LEN + size)
-	if w.bufferSize-w.offset < RECORD_HEADER_LEN+MAX_PACKET_LEN {
-		if err := w.Flush(); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
