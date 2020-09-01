@@ -268,12 +268,11 @@ type Anomaly struct {
 	ClientHalfCloseFlow uint64 `db:"client_half_close_flow"`
 	ServerHalfCloseFlow uint64 `db:"server_half_close_flow"`
 
-	ClientNoResponse      uint64 `db:"client_no_response"`
 	ClientSourcePortReuse uint64 `db:"client_source_port_reuse"`
-	ClientSYNRetryLack    uint64 `db:"client_syn_retry_lack"`
+	ClientEstablishReset  uint64 `db:"client_establish_other_rst"`
 	ServerReset           uint64 `db:"server_reset"`
-	ServerNoResponse      uint64 `db:"server_no_response"`
 	ServerQueueLack       uint64 `db:"server_queue_lack"`
+	ServerEstablishReset  uint64 `db:"server_establish_other_rst"`
 	TCPTimeout            uint64 `db:"tcp_timeout"`
 
 	HTTPClientError uint64 `db:"http_client_error"`
@@ -295,12 +294,11 @@ func (a *Anomaly) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(a.ClientHalfCloseFlow)
 	encoder.WriteVarintU64(a.ServerHalfCloseFlow)
 
-	encoder.WriteVarintU64(a.ClientNoResponse)
 	encoder.WriteVarintU64(a.ClientSourcePortReuse)
-	encoder.WriteVarintU64(a.ClientSYNRetryLack)
+	encoder.WriteVarintU64(a.ClientEstablishReset)
 	encoder.WriteVarintU64(a.ServerReset)
-	encoder.WriteVarintU64(a.ServerNoResponse)
 	encoder.WriteVarintU64(a.ServerQueueLack)
+	encoder.WriteVarintU64(a.ServerEstablishReset)
 	encoder.WriteVarintU64(a.TCPTimeout)
 
 	encoder.WriteVarintU64(a.HTTPClientError)
@@ -319,12 +317,11 @@ func (a *Anomaly) Decode(decoder *codec.SimpleDecoder) {
 	a.ClientHalfCloseFlow = decoder.ReadVarintU64()
 	a.ServerHalfCloseFlow = decoder.ReadVarintU64()
 
-	a.ClientNoResponse = decoder.ReadVarintU64()
 	a.ClientSourcePortReuse = decoder.ReadVarintU64()
-	a.ClientSYNRetryLack = decoder.ReadVarintU64()
+	a.ClientEstablishReset = decoder.ReadVarintU64()
 	a.ServerReset = decoder.ReadVarintU64()
-	a.ServerNoResponse = decoder.ReadVarintU64()
 	a.ServerQueueLack = decoder.ReadVarintU64()
+	a.ServerEstablishReset = decoder.ReadVarintU64()
 	a.TCPTimeout = decoder.ReadVarintU64()
 
 	a.HTTPClientError = decoder.ReadVarintU64()
@@ -343,12 +340,11 @@ func (a *Anomaly) ConcurrentMerge(other *Anomaly) {
 	a.ClientHalfCloseFlow += other.ClientHalfCloseFlow
 	a.ServerHalfCloseFlow += other.ServerHalfCloseFlow
 
-	a.ClientNoResponse += other.ClientNoResponse
 	a.ClientSourcePortReuse += other.ClientSourcePortReuse
-	a.ClientSYNRetryLack += other.ClientSYNRetryLack
+	a.ClientEstablishReset += other.ClientEstablishReset
 	a.ServerReset += other.ServerReset
-	a.ServerNoResponse += other.ServerNoResponse
 	a.ServerQueueLack += other.ServerQueueLack
+	a.ServerEstablishReset += other.ServerEstablishReset
 	a.TCPTimeout += other.TCPTimeout
 
 	a.HTTPClientError += other.HTTPClientError
@@ -369,21 +365,23 @@ func (a *Anomaly) MarshalTo(b []byte) int {
 		"client_rst_flow=", "server_rst_flow=",
 		"client_syn_repeat=", "server_syn_ack_repeat=",
 		"client_half_close_flow=", "server_half_close_flow=",
-		"client_no_response=", "client_source_port_reuse=",
-		"client_syn_retry_lack=", "server_reset=",
-		"server_no_response=", "server_queue_lack=", "tcp_timeout=",
+		"client_source_port_reuse=", "server_reset=", "server_queue_lack=",
+		"client_establish_other_rst", "server_establish_other_rst",
+		"tcp_timeout=",
 		"client_establish_fail=", "server_establish_fail=", "tcp_establish_fail=",
 		"http_client_error=", "http_server_error=", "http_timeout=", "http_error=",
 		"dns_client_error=", "dns_server_error=", "dns_timeout=", "dns_error=",
 	}
+	clientFail := a.ClientSynRepeat + a.ClientSourcePortReuse + a.ClientEstablishReset
+	serverFail := a.ServerSYNACKRepeat + a.ServerReset + a.ServerQueueLack + a.ServerEstablishReset
 	values := []uint64{
 		a.ClientRstFlow, a.ServerRstFlow,
 		a.ClientSynRepeat, a.ServerSYNACKRepeat,
 		a.ClientHalfCloseFlow, a.ServerHalfCloseFlow,
-		a.ClientNoResponse, a.ClientSourcePortReuse,
-		a.ClientSYNRetryLack, a.ServerReset,
-		a.ServerNoResponse, a.ServerQueueLack, a.TCPTimeout,
-		0, 0, 0, //FIXME:客户端建连失败， 服务端建连失败， TCP建连失败统计
+		a.ClientSourcePortReuse, a.ServerReset, a.ServerQueueLack,
+		a.ClientEstablishReset, a.ServerEstablishReset,
+		a.TCPTimeout,
+		clientFail, serverFail, clientFail + serverFail,
 		a.HTTPClientError, a.HTTPServerError, a.HTTPTimeout, a.HTTPClientError + a.HTTPServerError + a.HTTPTimeout,
 		a.DNSClientError, a.DNSServerError, a.DNSTimeout, a.DNSClientError + a.DNSServerError + a.DNSTimeout,
 	}
