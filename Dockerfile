@@ -4,6 +4,7 @@ FROM centos
 
 MAINTAINER yuanchao@yunshan.net
 
-COPY droplet /bin/
-COPY droplet.yaml /etc/
+COPY ./config/droplet.yaml /etc/
+COPY ./bin/droplet /bin/
+
 CMD /bin/droplet
