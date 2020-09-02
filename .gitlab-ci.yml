@@ -33,15 +33,14 @@ docker-x64:
   tags:
     - x64
   script:
-    - mkdir -p ./tmp
-    - cp config/droplet.yaml ./tmp
-    - cd tmp
+    - make droplet
     - docker build --add-host nexus.x.lan:10.30.2.201 -t droplet:$CI_COMMIT_REF_NAME ./
     - docker tag droplet:$CI_COMMIT_REF_NAME nexus.x.lan:5000/droplet:$CI_COMMIT_REF_NAME
     - docker push nexus.x.lan:5000/droplet:$CI_COMMIT_REF_NAME
   only:
     - master
     - /B_LC_RELEASE_.*/
+    - /feature-.*/
 
 verify-arm64:
   stage: verify
