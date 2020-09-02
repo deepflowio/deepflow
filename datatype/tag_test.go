@@ -12,7 +12,7 @@ func TestTagEncodeAndDecode(t *testing.T) {
 	p.NpbActions = make([]NpbActions, 0, 2)
 	p.NpbActions = append(p.NpbActions, action)
 	p.AclId = 10
-	p.ActionFlags = ACTION_COMPRESS_HEADER
+	p.ActionFlags = ACTION_PCAP
 	t1 := Tag{
 		PolicyData: *p,
 	}
