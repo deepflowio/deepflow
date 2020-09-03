@@ -1,14 +1,17 @@
 package logger
 
 import (
+	"bytes"
 	"compress/gzip"
 	"io"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"github.com/op/go-logging"
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
 const (
@@ -114,4 +117,28 @@ func applyBackendChange() {
 	level := logging.GetLevel("")
 	logging.SetBackend(backends...)
 	logging.SetLevel(level, "")
+}
+
+func EnableRsyslog(remotes ...string) error {
+	rsyslogBackends = rsyslogBackends[:0]
+	for _, remote := range remotes {
+		if !strings.Contains(remote, ":") {
+			remote += ":" + datatype.DROPLET_PORT
+		}
+
+		// 消息头包括FrameSize和Type，UDP时FrameSize无用
+		header := bytes.NewBuffer([]byte{0, 0, datatype.MESSAGE_TYPE_SYSLOG})
+		ioWriter, err := NewRsyslogWriter("udp", remote, path.Base(os.Args[0]), header.String())
+		if err != nil {
+			return err
+		}
+
+		backend := logging.NewBackendFormatter(
+			logging.NewLogBackend(ioWriter, "", 0),
+			logging.MustStringFormatter(SYSLOG_FORMAT),
+		)
+		rsyslogBackends = append(rsyslogBackends, backend)
+	}
+	applyBackendChange()
+	return nil
 }
