@@ -6,7 +6,6 @@ import (
 	"log/syslog"
 	"os"
 	"path"
-	"strings"
 
 	"github.com/op/go-logging"
 )
@@ -25,26 +24,6 @@ func EnableSyslog() error {
 		return err
 	}
 	syslogBackend = &logging.SyslogBackend{Writer: syslogWriter}
-	applyBackendChange()
-	return nil
-}
-
-func EnableRsyslog(remotes ...string) error {
-	rsyslogBackends = rsyslogBackends[:0]
-	for _, remote := range remotes {
-		if !strings.Contains(remote, ":") {
-			remote += ":514"
-		}
-		rsyslogWriter, err := syslog.Dial("udp", remote, SYSLOG_PRIORITY, path.Base(os.Args[0]))
-		if err != nil {
-			return err
-		}
-		backend := logging.NewBackendFormatter(
-			&logging.SyslogBackend{Writer: rsyslogWriter},
-			logging.MustStringFormatter(SYSLOG_FORMAT),
-		)
-		rsyslogBackends = append(rsyslogBackends, backend)
-	}
 	applyBackendChange()
 	return nil
 }
