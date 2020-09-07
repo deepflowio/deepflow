@@ -436,6 +436,15 @@ func flatGetDBTagsInStruct(t reflect.Type) []string {
 	return ret
 }
 
+func containsString(array []string, str string) bool {
+	for _, v := range array {
+		if v == str {
+			return true
+		}
+	}
+	return false
+}
+
 func getFields(db string) []string {
 	var meter app.Meter
 	if strings.HasPrefix(db, zerodoc.MeterVTAPNames[zerodoc.FLOW_ID]) {
@@ -467,5 +476,18 @@ func getFields(db string) []string {
 			newFields = append(newFields, field)
 		}
 	}
+	// 如果有 byte_tx,而没有byte，需要加上byte
+	if !containsString(newFields, "byte") && containsString(newFields, "byte_tx") {
+		newFields = append(newFields, "byte")
+	}
+	// 如果有 packet_tx,而没有packet，需要加上packet
+	if !containsString(newFields, "packet") && containsString(newFields, "packet_tx") {
+		newFields = append(newFields, "packet")
+	}
+	// 如果有 retrans_tx,而没有retrans，需要加上retrans
+	if !containsString(newFields, "retrans") && containsString(newFields, "retrans_tx") {
+		newFields = append(newFields, "retrans")
+	}
+
 	return newFields
 }
