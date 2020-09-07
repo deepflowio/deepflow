@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mailru/easygo/netpoll"
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"golang.org/x/sys/unix"
 )
 
@@ -129,10 +130,15 @@ func (r *reciver) findAndAdd(packet *packetBuffer) {
 	r.cacheInstance(instance, packet)
 }
 
+type udpDecoder interface {
+	decode(packet *packetBuffer)
+}
+
 type udpReciver struct {
 	reciver
 
 	listener *net.UDPConn
+	decoders [datatype.MESSAGE_TYPE_MAX]udpDecoder
 }
 
 func newUdpReciver(bufferSize int, cacheSize uint64, slaves []*slave) compressReciver {
@@ -149,6 +155,8 @@ func newUdpReciver(bufferSize int, cacheSize uint64, slaves []*slave) compressRe
 
 	reciver.statsCounter.init()
 	reciver.reciver.init(cacheSize, slaves)
+
+	reciver.decoders[datatype.MESSAGE_TYPE_SYSLOG] = newSyslogWriter()
 	return reciver
 }
 
@@ -158,7 +166,7 @@ func (r *udpReciver) updateTimeout() {
 
 func (r *udpReciver) recv() (*packetBuffer, error) {
 	packet := acquirePacketBuffer()
-	_, remote, err := r.listener.ReadFromUDP(packet.buffer)
+	n, remote, err := r.listener.ReadFromUDP(packet.buffer)
 	if err != nil {
 		if err.(net.Error).Timeout() {
 			r.updateTimeout()
@@ -166,8 +174,33 @@ func (r *udpReciver) recv() (*packetBuffer, error) {
 		}
 		return nil, err
 	}
+	packet.buffer = packet.buffer[:n]
 	packet.init(remote.IP)
 	return packet, nil
+}
+
+func (r *udpReciver) decodeCompress(packet *packetBuffer) {
+	invalid, _, vtapId := packet.decoder.DecodeHeader()
+	if invalid {
+		r.counter.RxInvalid++
+		r.stats.RxInvalid++
+		releasePacketBuffer(packet)
+		return
+	}
+
+	packet.calcHash(vtapId)
+	r.findAndAdd(packet)
+}
+
+func (r *udpReciver) decode(packet *packetBuffer) {
+	messageType := packet.buffer[datatype.MESSAGE_TYPE_OFFSET]
+
+	switch messageType {
+	case datatype.MESSAGE_TYPE_COMPRESS:
+		r.decodeCompress(packet)
+	default: // TODO
+		r.decoders[messageType].decode(packet)
+	}
 }
 
 func (r *udpReciver) start() {
@@ -189,15 +222,7 @@ func (r *udpReciver) start() {
 				count++
 			}
 			for i := 0; i < count; i++ {
-				invalid, _, vtapId := batch[i].decoder.DecodeHeader()
-				if invalid {
-					r.counter.RxInvalid++
-					r.stats.RxInvalid++
-					releasePacketBuffer(batch[i])
-					continue
-				}
-				batch[i].calcHash(vtapId)
-				r.findAndAdd(batch[i])
+				r.decode(batch[i])
 			}
 			count = 0
 		}
@@ -245,6 +270,30 @@ func newTcpReciver(cacheSize uint64, slaves []*slave) compressReciver {
 	reciver.statsCounter.init()
 	reciver.reciver.init(cacheSize, slaves)
 	return reciver
+}
+
+func (r *tcpReciver) decodeCompress(tridentIp net.IP, instance *tridentInstance, packet *packetBuffer) {
+	packet.init(tridentIp)
+	invalid, _, vtapId := packet.decoder.DecodeHeader()
+	if invalid {
+		r.counter.RxInvalid++
+		r.stats.RxInvalid++
+		releasePacketBuffer(packet)
+		return
+	}
+	packet.calcHash(vtapId)
+	r.cacheInstance(instance, packet)
+}
+
+func (r *tcpReciver) decode(tridentIp net.IP, instance *tridentInstance, packet *packetBuffer) {
+	messageType := packet.buffer[datatype.MESSAGE_TYPE_OFFSET]
+
+	switch messageType {
+	case datatype.MESSAGE_TYPE_COMPRESS:
+		r.decodeCompress(tridentIp, instance, packet)
+	default:
+		return
+	}
 }
 
 func (r *tcpReciver) start() {
@@ -310,17 +359,7 @@ func (r *tcpReciver) start() {
 								return
 							}
 						}
-						packet.init(tridentIp)
-						invalid, _, vtapId := packet.decoder.DecodeHeader()
-						if invalid {
-							r.counter.RxInvalid++
-							r.stats.RxInvalid++
-							releasePacketBuffer(packet)
-							packet = nil
-							break
-						}
-						packet.calcHash(vtapId)
-						r.cacheInstance(instance, packet)
+						r.decode(tridentIp, instance, packet)
 						packet = nil
 					}
 				})
