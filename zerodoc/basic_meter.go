@@ -366,7 +366,7 @@ func (a *Anomaly) MarshalTo(b []byte) int {
 		"client_syn_repeat=", "server_syn_ack_repeat=",
 		"client_half_close_flow=", "server_half_close_flow=",
 		"client_source_port_reuse=", "server_reset=", "server_queue_lack=",
-		"client_establish_other_rst", "server_establish_other_rst",
+		"client_establish_other_rst=", "server_establish_other_rst=",
 		"tcp_timeout=",
 		"client_establish_fail=", "server_establish_fail=", "tcp_establish_fail=",
 		"http_client_error=", "http_server_error=", "http_timeout=", "http_error=",

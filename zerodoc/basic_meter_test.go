@@ -130,3 +130,22 @@ func TestMerge(t *testing.T) {
 		t.Errorf("Anomaly ConcurrentMerge failed, expected:%v, actual:%v", a2, a1)
 	}
 }
+
+func TestMarshalAnomaly(t *testing.T) {
+	a := Anomaly{}
+	initMeter(&a, 1)
+	actual := make([]byte, 1000)
+	n := a.MarshalTo(actual)
+	expected := "client_rst_flow=1i,server_rst_flow=1i," +
+		"client_syn_repeat=1i,server_syn_ack_repeat=1i," +
+		"client_half_close_flow=1i,server_half_close_flow=1i," +
+		"client_source_port_reuse=1i,server_reset=1i,server_queue_lack=1i," +
+		"client_establish_other_rst=1i,server_establish_other_rst=1i," +
+		"tcp_timeout=1i," +
+		"client_establish_fail=3i,server_establish_fail=4i,tcp_establish_fail=7i," +
+		"http_client_error=1i,http_server_error=1i,http_timeout=1i,http_error=3i," +
+		"dns_client_error=1i,dns_server_error=1i,dns_timeout=1i,dns_error=3i"
+	if string(actual[:n]) != expected {
+		t.Errorf("Anomaly MarshalTo failed, \n\texpected:%v\n\tactual:  %v\n", expected, string(actual[:n]))
+	}
+}
