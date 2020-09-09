@@ -28,11 +28,12 @@ var log = logging.MustGetLogger("trident_adapter")
 type TridentKey = uint32
 
 type packetBuffer struct {
-	buffer    []byte
-	decoder   SequentialDecoder
-	tridentIp net.IP
-	vtapId    uint16
-	hash      uint8
+	buffer       []byte
+	bufferLength int
+	decoder      SequentialDecoder
+	tridentIp    net.IP
+	vtapId       uint16
+	hash         uint8
 }
 
 type tridentDispatcher struct {

@@ -174,7 +174,7 @@ func (r *udpReciver) recv() (*packetBuffer, error) {
 		}
 		return nil, err
 	}
-	packet.buffer = packet.buffer[:n]
+	packet.bufferLength = n
 	packet.init(remote.IP)
 	return packet, nil
 }
