@@ -476,17 +476,17 @@ func getFields(db string) []string {
 			newFields = append(newFields, field)
 		}
 	}
-	// 如果有 byte_tx,而没有byte，需要加上byte
-	if !containsString(newFields, "byte") && containsString(newFields, "byte_tx") {
-		newFields = append(newFields, "byte")
-	}
-	// 如果有 packet_tx,而没有packet，需要加上packet
-	if !containsString(newFields, "packet") && containsString(newFields, "packet_tx") {
-		newFields = append(newFields, "packet")
-	}
-	// 如果有 retrans_tx,而没有retrans，需要加上retrans
-	if !containsString(newFields, "retrans") && containsString(newFields, "retrans_tx") {
-		newFields = append(newFields, "retrans")
+	// 如果存在rawFields，则需要增加extraFields
+	rawFields := []string{"byte_tx", "packet_tx", "retrans_tx", "http_client_error", "dns_client_error",
+		"client_syn_repeat", "server_syn_ack_repeat", "client_establish_fail"}
+	// 组合的字段，需要额外增加
+	extraFields := []string{"byte", "packet", "retrans", "http_error", "dns_error",
+		"client_establish_fail", "server_establish_fail", "tcp_establish_fail"}
+
+	for i, _ := range rawFields {
+		if !containsString(newFields, extraFields[i]) && containsString(newFields, rawFields[i]) {
+			newFields = append(newFields, extraFields[i])
+		}
 	}
 
 	return newFields
