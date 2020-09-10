@@ -4,7 +4,8 @@ FROM centos
 
 MAINTAINER yuanchao@yunshan.net
 
-COPY ./config/droplet.yaml /etc/
+RUN mkdir -p /etc/droplet/
+COPY ./config/droplet.yaml /etc/droplet/
 COPY ./bin/droplet /bin/
 
-CMD /bin/droplet
+CMD /bin/droplet -f /etc/droplet/droplet.yaml
