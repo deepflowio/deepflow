@@ -23,7 +23,7 @@ type RSyslogWriter struct {
 func (w *RSyslogWriter) connect() (err error) {
 	if w.conn != nil {
 		// ignore err from close, it makes sense to continue anyway
-		w.Close()
+		w.conn.Close()
 		w.conn = nil
 	}
 
@@ -98,7 +98,7 @@ func (w *RSyslogWriter) writeString(hostname, tag, msg, nl string) error {
 	return err
 }
 
-func NewRsyslogWriter(network, raddr string, tag, header string) (*RSyslogWriter, error) {
+func NewRsyslogWriter(network, raddr string, tag, header string) *RSyslogWriter {
 	if tag == "" {
 		tag = os.Args[0]
 	}
@@ -111,13 +111,5 @@ func NewRsyslogWriter(network, raddr string, tag, header string) (*RSyslogWriter
 		raddr:    raddr,
 		header:   header,
 	}
-
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	err := w.connect()
-	if err != nil {
-		return nil, err
-	}
-	return w, err
+	return w
 }
