@@ -128,10 +128,7 @@ func EnableRsyslog(remotes ...string) error {
 
 		// 消息头包括FrameSize和Type，UDP时FrameSize无用
 		header := bytes.NewBuffer([]byte{0, 0, datatype.MESSAGE_TYPE_SYSLOG})
-		ioWriter, err := NewRsyslogWriter("udp", remote, path.Base(os.Args[0]), header.String())
-		if err != nil {
-			return err
-		}
+		ioWriter := NewRsyslogWriter("udp", remote, path.Base(os.Args[0]), header.String())
 
 		backend := logging.NewBackendFormatter(
 			logging.NewLogBackend(ioWriter, "", 0),
