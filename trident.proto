@@ -137,6 +137,8 @@ message Config {
     optional SocketType collector_socket_type = 45 [default = UDP];
     optional SocketType compressor_socket_type = 46 [default = RAW_UDP];
     optional SocketType npb_socket_type = 47 [default = RAW_UDP];
+
+    optional uint32 pcap_data_retention = 51 [default = 7]; // uint: day
 }
 
 message Segment { // e.g. single LAN area
