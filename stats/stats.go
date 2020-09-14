@@ -22,8 +22,6 @@ import (
 
 var log = logging.MustGetLogger("stats")
 
-const STATSD_PORT = 20040
-
 var remoteType = REMOTE_TYPE_INFLUXDB
 
 type StatSource struct {
@@ -172,10 +170,10 @@ func newStatsdClient(remote net.UDPAddr) *statsd.Client {
 func sendStatsd(bp client.BatchPoints) {
 	for i, remote := range remotes {
 		if len(statsdClients) <= i {
-			statsdClients = append(statsdClients, newStatsdClient(net.UDPAddr{remote.IP, STATSD_PORT, ""}))
+			statsdClients = append(statsdClients, newStatsdClient(net.UDPAddr{remote.IP, remote.Port, ""}))
 		}
 		if statsdClients[i] == nil {
-			statsdClients[i] = newStatsdClient(net.UDPAddr{remote.IP, STATSD_PORT, ""})
+			statsdClients[i] = newStatsdClient(net.UDPAddr{remote.IP, remote.Port, ""})
 		}
 	}
 
