@@ -252,10 +252,10 @@ func (a *Performance) SequentialMerge(other *Performance) {
 
 func (a *Performance) MarshalTo(b []byte) int {
 	fields := []string{
-		"retrans_tx=", "retrans_rx=", "retrans=", "zero_win_tx=", "zero_win_rx=",
+		"retrans_tx=", "retrans_rx=", "retrans=", "zero_win_tx=", "zero_win_rx=", "zero_win=",
 	}
 	values := []uint64{
-		a.RetransTx, a.RetransRx, a.RetransTx + a.RetransRx, a.ZeroWinTx, a.ZeroWinRx,
+		a.RetransTx, a.RetransRx, a.RetransTx + a.RetransRx, a.ZeroWinTx, a.ZeroWinRx, a.ZeroWinTx + a.ZeroWinRx,
 	}
 	return marshalKeyValues(b, fields, values)
 }
