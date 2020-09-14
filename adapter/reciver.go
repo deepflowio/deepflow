@@ -157,6 +157,7 @@ func newUdpReciver(bufferSize int, cacheSize uint64, slaves []*slave) compressRe
 	reciver.reciver.init(cacheSize, slaves)
 
 	reciver.decoders[datatype.MESSAGE_TYPE_SYSLOG] = newSyslogWriter()
+	reciver.decoders[datatype.MESSAGE_TYPE_STATSD] = newStatsdWriter()
 	return reciver
 }
 
@@ -198,8 +199,10 @@ func (r *udpReciver) decode(packet *packetBuffer) {
 	switch messageType {
 	case datatype.MESSAGE_TYPE_COMPRESS:
 		r.decodeCompress(packet)
-	default: // TODO
-		r.decoders[messageType].decode(packet)
+	default:
+		if messageType < datatype.MESSAGE_TYPE_MAX {
+			r.decoders[messageType].decode(packet)
+		}
 	}
 }
 
@@ -291,7 +294,7 @@ func (r *tcpReciver) decode(tridentIp net.IP, instance *tridentInstance, packet 
 	switch messageType {
 	case datatype.MESSAGE_TYPE_COMPRESS:
 		r.decodeCompress(tridentIp, instance, packet)
-	default:
+	default: // TODO
 		return
 	}
 }

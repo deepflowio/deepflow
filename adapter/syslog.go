@@ -40,9 +40,11 @@ func (w *syslogWriter) create(packet *packetBuffer) *fileWriter {
 }
 
 func (w *syslogWriter) write(writer *fileWriter, packet *packetBuffer) {
-	buffer := bytes.NewBuffer(packet.buffer[datatype.MESSAGE_VALUE_OFFSET:packet.bufferLength])
-	writer.fileBuffer.WriteString(buffer.String())
-	writer.feed = _FILE_FEED
+	if packet.bufferLength > datatype.MESSAGE_VALUE_OFFSET {
+		buffer := bytes.NewBuffer(packet.buffer[datatype.MESSAGE_VALUE_OFFSET:packet.bufferLength])
+		writer.fileBuffer.WriteString(buffer.String())
+		writer.feed = _FILE_FEED
+	}
 }
 
 func (w *syslogWriter) run() {
