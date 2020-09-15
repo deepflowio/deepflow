@@ -11,6 +11,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/debug"
 	"gitlab.x.lan/yunshan/droplet-libs/logger"
+	libpcap "gitlab.x.lan/yunshan/droplet-libs/pcap"
 	libqueue "gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 	"gopkg.in/yaml.v2"
@@ -64,6 +65,9 @@ func Start(configPath string) (closers []io.Closer) {
 	synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.ControllerPort, cfg.RpcTimeout)
 	synchronizer.Start()
 
+	cleaner := libpcap.NewCleaner(5*time.Minute, int64(cfg.PCap.MaxDirectorySizeGB)<<30, int64(cfg.PCap.DiskFreeSpaceMarginGB)<<30, cfg.PCap.FileDirectory)
+	cleaner.Start()
+
 	if cfg.MaxCPUs > 0 {
 		runtime.GOMAXPROCS(cfg.MaxCPUs)
 	}
@@ -92,6 +96,7 @@ func Start(configPath string) (closers []io.Closer) {
 		cfg.Queue.PacketQueueCount, cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable)
 	synchronizer.Register(func(response *trident.SyncResponse, version *config.RpcInfoVersions) {
 		log.Debug(response, version)
+		cleaner.UpdatePcapDataRetention(time.Duration(response.Config.GetPcapDataRetention()) * time.Hour * 24)
 		// Labeler更新策略信息
 		labelerManager.OnAclDataChange(response)
 	})
@@ -107,7 +112,6 @@ func Start(configPath string) (closers []io.Closer) {
 		cfg.PCap.MaxFilePeriodSecond,
 		cfg.PCap.MaxDirectorySizeGB,
 		cfg.PCap.DiskFreeSpaceMarginGB,
-		cfg.PCap.MaxFileKeepDay,
 		cfg.PCap.FileDirectory,
 	).Start()
 	closers = append(closers, pcapClosers...)

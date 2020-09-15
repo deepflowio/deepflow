@@ -1,14 +1,23 @@
 package pcap
 
 import (
+	"encoding/binary"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
+)
+
+var (
+	EXAMPLE_TEMPNAME        = getTempFilename(zerodoc.ISP1, 0, 0, time.Duration(time.Now().UnixNano()), 0)
+	EXAMPLE_TEMPNAME_SPLITS = len(strings.Split(EXAMPLE_TEMPNAME, "_"))
 )
 
 type WorkerManager struct {
@@ -23,7 +32,6 @@ type WorkerManager struct {
 	maxFilePeriodSecond   int
 	maxDirectorySizeGB    int
 	diskFreeSpaceMarginGB int
-	maxFileKeepDay        int
 	baseDirectory         string
 }
 
@@ -37,7 +45,6 @@ func NewWorkerManager(
 	maxFilePeriodSecond int,
 	maxDirectorySizeGB int,
 	diskFreeSpaceMarginGB int,
-	maxFileKeepDay int,
 	baseDirectory string,
 ) *WorkerManager {
 	return &WorkerManager{
@@ -52,7 +59,6 @@ func NewWorkerManager(
 		maxFilePeriodSecond:   maxFilePeriodSecond,
 		maxDirectorySizeGB:    maxDirectorySizeGB,
 		diskFreeSpaceMarginGB: diskFreeSpaceMarginGB,
-		maxFileKeepDay:        maxFileKeepDay,
 		baseDirectory:         baseDirectory,
 	}
 }
@@ -65,7 +71,6 @@ func (m *WorkerManager) Start() []io.Closer {
 	go markAndCleanTempFiles(m.baseDirectory, wg)
 	wg.Wait()
 
-	NewCleaner(int64(m.maxDirectorySizeGB)<<30, int64(m.diskFreeSpaceMarginGB)<<30, time.Duration(m.maxFileKeepDay)*time.Hour*24, m.baseDirectory).Start()
 	for i := 0; i < len(m.packetQueueReaders); i++ {
 		worker := m.newWorker(queue.HashKey(i))
 		m.workers[i] = worker
@@ -92,4 +97,69 @@ func (m *WorkerManager) Close() error {
 	}
 	wg.Wait()
 	return nil
+}
+
+func findLastRecordTime(file string) time.Duration {
+	fp, err := os.Open(file)
+	if err != nil {
+		log.Debugf("Open %s failed: %s", file, err)
+		return 0
+	}
+	defer fp.Close()
+
+	if info, err := fp.Stat(); err != nil || info.Size() <= GLOBAL_HEADER_LEN+RECORD_HEADER_LEN {
+		log.Debugf("Invalid content in file %s", file)
+		return 0
+	}
+
+	buffer := make([]byte, RECORD_HEADER_LEN)
+	lastRecordTime := uint32(0)
+
+	fp.Seek(GLOBAL_HEADER_LEN, io.SeekStart)
+	for {
+		if n, err := fp.Read(buffer); err != nil || n != RECORD_HEADER_LEN {
+			break
+		}
+		second := binary.LittleEndian.Uint32(buffer[TS_SEC_OFFSET:])
+		length := binary.LittleEndian.Uint32(buffer[INCL_LEN_OFFSET:])
+		if second > lastRecordTime {
+			lastRecordTime = second
+		}
+		fp.Seek(int64(length), io.SeekCurrent)
+	}
+
+	return time.Duration(lastRecordTime) * time.Second
+}
+
+func isTempFilename(name string) bool {
+	return strings.HasSuffix(name, ".pcap.temp") && len(strings.Split(name, "_")) == EXAMPLE_TEMPNAME_SPLITS
+}
+
+func markAndCleanTempFiles(baseDirectory string, scanWg *sync.WaitGroup) {
+	var files []string
+	filepath.Walk(baseDirectory, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		name := info.Name()
+		if info.IsDir() || !isTempFilename(name) {
+			return nil
+		}
+		files = append(files, path)
+		return nil
+	})
+	scanWg.Done()
+
+	// finish files gracefully
+	for _, path := range files {
+		lastPacketTime := findLastRecordTime(path)
+		if lastPacketTime == 0 {
+			log.Debugf("Remove empty or corrupted file %s", path)
+			os.Remove(path)
+			continue
+		}
+		firstDotIndex := strings.IndexByte(path, '.')
+		newFilename := path[:firstDotIndex] + formatDuration(lastPacketTime) + path[firstDotIndex:strings.Index(path, ".temp")]
+		os.Rename(path, newFilename)
+	}
 }
