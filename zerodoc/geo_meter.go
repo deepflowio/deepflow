@@ -98,9 +98,13 @@ func (m *GeoMeter) MarshalTo(b []byte) int {
 		offset++
 	}
 	offset += m.Anomaly.MarshalTo(b[offset:])
+	if offset > 0 && b[offset-1] != ',' {
+		b[offset] = ','
+		offset++
+	}
+	offset += m.FlowLoad.MarshalTo(b[offset:])
 	if offset > 0 && b[offset-1] == ',' {
 		offset--
 	}
-
 	return offset
 }
