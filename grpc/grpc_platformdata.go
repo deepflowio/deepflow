@@ -72,6 +72,7 @@ type CidrInfo struct {
 }
 
 type PlatformInfoTable struct {
+	regionID     uint32
 	epcIDIPV4Lru *lru.U64LRU
 	epcIDIPV6Lru *lru.U160LRU
 
@@ -99,6 +100,10 @@ type PlatformInfoTable struct {
 
 func ClosePlatformInfoTable() {
 	platformInfoTable.Close()
+}
+
+func QueryRegionID() uint32 {
+	return platformInfoTable.regionID
 }
 
 func QueryEpcIDBaseInfo(epcID int32) *BaseInfo {
@@ -536,6 +541,7 @@ func (t *PlatformInfoTable) QueryIPV6Cidr(epcID int16, ipv6 net.IP) *Info {
 func (t *PlatformInfoTable) String() string {
 	sb := &strings.Builder{}
 
+	sb.WriteString(fmt.Sprintf("RegionID: %d\n", t.regionID))
 	t.ipv4Lock.RLock()
 	if len(t.epcIDIPV4Infos) > 0 {
 		sb.WriteString("\nepcID   ipv4            mac          host            hostID  regionID  deviceType  deviceID    subnetID  podNodeID podNSID podGroupID podID azID hitCount\n")
@@ -747,7 +753,14 @@ func (t *PlatformInfoTable) Reload() error {
 			return err
 		}
 	}
-	log.Infof("Update rpc platformdata version %d -> %d", t.versionPlatformData, newVersion)
+
+	if config := response.GetConfig(); config != nil {
+		t.regionID = config.GetRegionId()
+	} else {
+		log.Warning("get regionID failed")
+	}
+
+	log.Infof("Update rpc platformdata version %d -> %d  regionID=%d", t.versionPlatformData, newVersion, t.regionID)
 	t.versionPlatformData = newVersion
 
 	newEpcIDIPV4Infos := make(map[uint64]*Info)
