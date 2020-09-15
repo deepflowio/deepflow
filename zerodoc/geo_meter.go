@@ -10,6 +10,7 @@ type GeoMeter struct {
 	Latency
 	Performance
 	Anomaly
+	FlowLoad
 }
 
 func (m *GeoMeter) Reverse() {
@@ -17,6 +18,7 @@ func (m *GeoMeter) Reverse() {
 	m.Latency.Reverse()
 	m.Performance.Reverse()
 	m.Anomaly.Reverse()
+	m.FlowLoad.Reverse()
 }
 
 func (m *GeoMeter) ID() uint8 {
@@ -40,6 +42,7 @@ func (m *GeoMeter) Encode(encoder *codec.SimpleEncoder) {
 	m.Latency.Encode(encoder)
 	m.Performance.Encode(encoder)
 	m.Anomaly.Encode(encoder)
+	m.FlowLoad.Encode(encoder)
 }
 
 func (m *GeoMeter) Decode(decoder *codec.SimpleDecoder) {
@@ -47,6 +50,7 @@ func (m *GeoMeter) Decode(decoder *codec.SimpleDecoder) {
 	m.Latency.Decode(decoder)
 	m.Performance.Decode(decoder)
 	m.Anomaly.Decode(decoder)
+	m.FlowLoad.Decode(decoder)
 }
 
 func (m *GeoMeter) ConcurrentMerge(other app.Meter) {
@@ -55,6 +59,7 @@ func (m *GeoMeter) ConcurrentMerge(other app.Meter) {
 		m.Latency.ConcurrentMerge(&pm.Latency)
 		m.Performance.ConcurrentMerge(&pm.Performance)
 		m.Anomaly.ConcurrentMerge(&pm.Anomaly)
+		m.FlowLoad.ConcurrentMerge(&pm.FlowLoad)
 	}
 }
 
@@ -64,6 +69,7 @@ func (m *GeoMeter) SequentialMerge(other app.Meter) {
 		m.Latency.SequentialMerge(&pm.Latency)
 		m.Performance.SequentialMerge(&pm.Performance)
 		m.Anomaly.SequentialMerge(&pm.Anomaly)
+		m.FlowLoad.SequentialMerge(&pm.FlowLoad)
 	}
 }
 
