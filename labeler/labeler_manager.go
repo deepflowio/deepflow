@@ -1,6 +1,8 @@
 package labeler
 
 import (
+	"time"
+
 	"github.com/op/go-logging"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/debug"
@@ -32,6 +34,8 @@ type LabelerManager struct {
 
 	packetQueueReaders []queue.QueueReader
 	packetQueueWriters []queue.QueueWriter
+
+	PcapDataRetention time.Duration
 
 	running bool
 }

@@ -51,7 +51,5 @@ pcap:
   disk-free-space-margin-gb: 10
   # 每个pcap文件的最大时间，默认300秒
   max-file-period-second: 300
-  # 每个pcap文件的保留时间，默认7天
-  max-file-keep-day: 7
   # pcap文件存储的文件夹
   file-directory: /var/lib/droplet/pcap

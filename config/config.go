@@ -56,7 +56,6 @@ type PCapConfig struct {
 	MaxFilePeriodSecond   int    `yaml:"max-file-period-second"`
 	MaxDirectorySizeGB    int    `yaml:"max-directory-size-gb"`
 	DiskFreeSpaceMarginGB int    `yaml:"disk-free-space-margin-gb"`
-	MaxFileKeepDay        int    `yaml:"max-file-keep-day"`
 	FileDirectory         string `yaml:"file-directory"`
 }
 
@@ -134,9 +133,6 @@ func (c *Config) Validate() error {
 	}
 	if c.PCap.DiskFreeSpaceMarginGB <= 0 {
 		c.PCap.DiskFreeSpaceMarginGB = 10
-	}
-	if c.PCap.MaxFileKeepDay <= 0 {
-		c.PCap.MaxFileKeepDay = 7
 	}
 	if c.PCap.FileDirectory == "" {
 		c.PCap.FileDirectory = "/var/lib/droplet/pcap"
