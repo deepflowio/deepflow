@@ -899,27 +899,37 @@ func (t *Tag) GetTAPType() uint8 {
 	return uint8(t.TAPType)
 }
 
+const (
+	SUFFIX_ACL = 1 + iota
+	SUFFIX_EDGE
+	SUFFIX_ACL_EDGE
+	SUFFIX_PORT
+	SUFFIX_ACL_PORT
+	SUFFIX_EDGE_PORT
+	SUFFIX_ACL_EDGE_PORT
+)
+
 var DatabaseSuffix = [...]string{
-	"",               // 000
-	"_acl",           // 001
-	"_edge",          // 010
-	"_acl_edge",      // 011
-	"_port",          // 100
-	"_acl_port",      // 101
-	"_edge_port",     // 110
-	"_acl_edge_port", // 111
+	0:                    "",               // 000
+	SUFFIX_ACL:           "_acl",           // 001
+	SUFFIX_EDGE:          "_edge",          // 010
+	SUFFIX_ACL_EDGE:      "_acl_edge",      // 011
+	SUFFIX_PORT:          "_port",          // 100
+	SUFFIX_ACL_PORT:      "_acl_port",      // 101
+	SUFFIX_EDGE_PORT:     "_edge_port",     // 110
+	SUFFIX_ACL_EDGE_PORT: "_acl_edge_port", // 111
 }
 
 func (t *Tag) DatabaseSuffixID() int {
 	code := 0
 	if t.Code&ACLGID != 0 {
-		code |= 0x1
+		code |= SUFFIX_ACL // 0x1
 	}
 	if t.Code.HasEdgeTagField() {
-		code |= 0x2
+		code |= SUFFIX_EDGE // 0x2
 	}
 	if t.Code&ServerPort != 0 {
-		code |= 0x4
+		code |= SUFFIX_PORT // 0x4
 	}
 	return code
 }
