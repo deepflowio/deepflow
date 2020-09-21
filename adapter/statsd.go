@@ -40,7 +40,7 @@ func (w *statsdWriter) forward(packet *packetBuffer) {
 func (w *statsdWriter) run() {
 	for {
 		packet := <-w.in
-		// statsdWriter将statsd数据转发给influxdb-relay
+		// statsdWriter将statsd数据转发给telegraf
 		w.forward(packet)
 		releasePacketBuffer(packet)
 	}
