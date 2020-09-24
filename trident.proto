@@ -34,6 +34,11 @@ enum Exception {
     INVALID_CONFIGURATION      = 256;
 }
 
+message CommunicationVtap {
+    optional uint32 vtap_id = 1; // 限制在64000
+    optional uint32 last_active_time = 2; // 单位：秒
+}
+
 message SyncRequest {
     optional uint32 boot_time = 1;
     optional bool config_accepted = 2 [default = true];
@@ -51,6 +56,8 @@ message SyncRequest {
     optional string host = 22; // 仅作为注册使用
     repeated string host_ips = 23; // 仅作为注册使用
     optional bool   is_virtual_machine = 24 [default = false];
+
+    repeated CommunicationVtap communication_vtaps = 31; // 仅对数据节点有意义
 }
 
 enum Status {
