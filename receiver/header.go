@@ -9,10 +9,11 @@ import (
 )
 
 const (
-	HEADER_LEN             = 14
+	HEADER_LEN             = 16
 	HEADER_VERSION_OFFSET  = 0
 	HEADER_SEQUENCE_OFFSET = HEADER_VERSION_OFFSET + 4
-	HEADER_LENGTH_OFFSET   = HEADER_SEQUENCE_OFFSET + 8
+	HEADER_VTAPID_OFFSET   = HEADER_SEQUENCE_OFFSET + 8
+	HEADER_LENGTH_OFFSET   = HEADER_VTAPID_OFFSET + 2
 )
 
 type DataType byte
@@ -26,18 +27,21 @@ const (
 type Header struct {
 	Version  uint32 // 用来校验encode和decode是否配套
 	Sequence uint64 // udp发送时，用来校验是否丢包
+	VTAPID   uint16 // trident的ID
 	Length   uint16 // tcp发送时，需要按此长度收齐数据后，再decode
 }
 
 func (h *Header) Encode(chunk []byte) {
 	binary.LittleEndian.PutUint32(chunk[HEADER_VERSION_OFFSET:], h.Version)
 	binary.LittleEndian.PutUint64(chunk[HEADER_SEQUENCE_OFFSET:], h.Sequence)
+	binary.LittleEndian.PutUint16(chunk[HEADER_VTAPID_OFFSET:], h.VTAPID)
 	binary.LittleEndian.PutUint16(chunk[HEADER_LENGTH_OFFSET:], h.Length)
 }
 
 func (h *Header) Decode(buf []byte) {
 	h.Version = binary.LittleEndian.Uint32(buf[HEADER_VERSION_OFFSET:])
 	h.Sequence = binary.LittleEndian.Uint64(buf[HEADER_SEQUENCE_OFFSET:])
+	h.VTAPID = binary.LittleEndian.Uint16(buf[HEADER_VTAPID_OFFSET:])
 	h.Length = binary.LittleEndian.Uint16(buf[HEADER_LENGTH_OFFSET:])
 }
 
