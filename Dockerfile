@@ -1,6 +1,6 @@
 # droplet
 
-FROM centos
+FROM centos:7.8.2003
 
 MAINTAINER yuanchao@yunshan.net
 
