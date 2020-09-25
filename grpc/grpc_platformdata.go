@@ -19,6 +19,7 @@ import (
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/lru"
+	"gitlab.x.lan/yunshan/droplet-libs/receiver"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/message/trident"
 )
@@ -72,6 +73,7 @@ type CidrInfo struct {
 }
 
 type PlatformInfoTable struct {
+	receiver     *receiver.Receiver
 	regionID     uint32
 	epcIDIPV4Lru *lru.U64LRU
 	epcIDIPV6Lru *lru.U160LRU
@@ -207,8 +209,9 @@ func QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID1 int16, ipv61 net.IP) 
 }
 
 // 单例模式，只启动一次
-func NewPlatformInfoTable(ips []net.IP, port int, processName string) *PlatformInfoTable {
+func NewPlatformInfoTable(ips []net.IP, port int, processName string, receiver *receiver.Receiver) *PlatformInfoTable {
 	table := &PlatformInfoTable{
+		receiver:           receiver,
 		bootTime:           uint32(time.Now().Unix()),
 		GrpcSession:        &GrpcSession{},
 		ipv4Lock:           &sync.RWMutex{},
@@ -721,12 +724,24 @@ func (t *PlatformInfoTable) Reload() error {
 			log.Infof("get hostname failed. %s", err)
 		}
 
+		var communicationVtaps []*trident.CommunicationVtap
+		if t.receiver != nil {
+			status := t.receiver.GetTridentStatus()
+			for _, s := range status {
+				communicationVtaps = append(communicationVtaps, &trident.CommunicationVtap{
+					VtapId:         proto.Uint32(uint32(s.VTAPID)),
+					LastActiveTime: proto.Uint32(s.LastLocalTimestamp),
+				})
+			}
+		}
+
 		request := trident.SyncRequest{
 			BootTime:            proto.Uint32(t.bootTime),
 			VersionPlatformData: proto.Uint64(t.versionPlatformData),
 			CtrlIp:              proto.String(local.String()),
 			ProcessName:         proto.String(t.processName),
 			Host:                proto.String(hostname),
+			CommunicationVtaps:  communicationVtaps,
 		}
 		client := trident.NewSynchronizerClient(t.GetClient())
 		// 分析器请求消息接口，用于stream, roze
@@ -961,7 +976,7 @@ func RegisterPlatformDataCommand(ips []net.IP, port int) *cobra.Command {
 		Use:   "platformData",
 		Short: "get platformData from controller",
 		Run: func(cmd *cobra.Command, args []string) {
-			table := NewPlatformInfoTable(ips, port, "debug")
+			table := NewPlatformInfoTable(ips, port, "debug", nil)
 			table.Reload()
 			fmt.Println(table)
 		},

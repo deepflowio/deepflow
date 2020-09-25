@@ -22,14 +22,14 @@ func (c *Receiver) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, operate u
 	switch operate {
 	case ADAPTER_CMD_STATUS:
 		encoder := gob.NewEncoder(&buff)
-		status := fmt.Sprintf("TridentIP                                Type Drop LastSeq  LastRemoteTimestamp LastLocalTimestamp  LastDelay LastRecvFromNow FirstSeq FirstRemoteTimestamp FirstLocalTimestamp\n")
-		status += fmt.Sprintf("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
+		status := fmt.Sprintf("VTAPID TridentIP                                Type Drop LastSeq  LastRemoteTimestamp LastLocalTimestamp  LastDelay LastRecvFromNow FirstSeq FirstRemoteTimestamp FirstLocalTimestamp\n")
+		status += fmt.Sprintf("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
 		c.statusLock.Lock()
 		for _, instance := range c.status {
-			status += fmt.Sprintf("%-40s %-4s %-4d %-8d %-19.19s %-19.19s %-9d %-15d %-8d %-19.19s  %-19.19s\n",
-				instance.ip, instance.serverType, c.counter.UDPDropped,
-				instance.lastSeq, time.Unix(int64(instance.lastRemoteTimestamp), 0), time.Unix(int64(instance.lastLocalTimestamp), 0),
-				instance.lastLocalTimestamp-instance.lastRemoteTimestamp, uint32(time.Now().Unix())-instance.lastLocalTimestamp,
+			status += fmt.Sprintf("%-6d %-40s %-4s %-4d %-8d %-19.19s %-19.19s %-9d %-15d %-8d %-19.19s  %-19.19s\n",
+				instance.VTAPID, instance.ip, instance.serverType, c.counter.UDPDropped,
+				instance.lastSeq, time.Unix(int64(instance.lastRemoteTimestamp), 0), time.Unix(int64(instance.LastLocalTimestamp), 0),
+				instance.LastLocalTimestamp-instance.lastRemoteTimestamp, uint32(time.Now().Unix())-instance.LastLocalTimestamp,
 				instance.firstSeq, time.Unix(int64(instance.firstRemoteTimestamp), 0), time.Unix(int64(instance.firstLocalTimestamp), 0))
 		}
 		c.statusLock.Unlock()

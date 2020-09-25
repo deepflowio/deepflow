@@ -82,6 +82,7 @@ func (s ServerType) String() string {
 }
 
 type Status struct {
+	VTAPID               uint16
 	serverType           ServerType
 	ip                   net.IP
 	firstSeq             uint64
@@ -89,7 +90,7 @@ type Status struct {
 	firstRemoteTimestamp uint32 // 第一次收到数据时数据中的时间戳
 	firstLocalTimestamp  uint32 // 第一次收到数据时的本地时间
 	lastRemoteTimestamp  uint32 // 最后一次收到数据时数据中的时间戳
-	lastLocalTimestamp   uint32 // 最后一次收到数据时的本地时间
+	LastLocalTimestamp   uint32 // 最后一次收到数据时的本地时间
 }
 
 type Receiver struct {
@@ -113,7 +114,7 @@ type Receiver struct {
 	counter *ReceiverCounter
 
 	statusLock sync.Mutex
-	status     map[uint32]*Status
+	status     map[uint16]*Status
 }
 
 type ReceiverCounter struct {
@@ -147,7 +148,7 @@ func NewReceiver(
 		UDPAddress:       &net.UDPAddr{Port: listenPort},
 		TCPAddress:       fmt.Sprintf("0.0.0.0:%d", listenPort),
 		counter:          &ReceiverCounter{},
-		status:           make(map[uint32]*Status),
+		status:           make(map[uint16]*Status),
 	}
 
 	debug.Register(TRIDENT_ADAPTER_STATUS_CMD, receiver)
@@ -198,7 +199,7 @@ func (r *Receiver) flushPutQueues() {
 	}
 }
 
-func (r *Receiver) tridentStatus(ipHash uint32, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) {
+func (r *Receiver) tridentStatus(vtapID uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) {
 	now := uint32(time.Now().Unix())
 	delay := int64(now) - int64(timestamp)
 	if r.counter.MaxDelay < delay {
@@ -208,26 +209,38 @@ func (r *Receiver) tridentStatus(ipHash uint32, ip net.IP, seq uint64, timestamp
 		r.counter.MinDelay = delay
 	}
 	r.statusLock.Lock()
-	if status, ok := r.status[ipHash]; ok {
+	if status, ok := r.status[vtapID]; ok {
 		r.statusLock.Unlock()
+		status.VTAPID = vtapID
 		status.ip = ip
 		status.lastSeq = seq
 		status.lastRemoteTimestamp = timestamp
-		status.lastLocalTimestamp = now
+		status.LastLocalTimestamp = now
 		status.serverType = serverType
 	} else {
-		r.status[ipHash] = &Status{
+		r.status[vtapID] = &Status{
 			serverType:           serverType,
+			VTAPID:               vtapID,
 			ip:                   ip,
 			lastSeq:              seq,
 			lastRemoteTimestamp:  timestamp,
-			lastLocalTimestamp:   now,
+			LastLocalTimestamp:   now,
 			firstSeq:             seq,
 			firstRemoteTimestamp: timestamp,
 			firstLocalTimestamp:  now,
 		}
 		r.statusLock.Unlock()
 	}
+}
+
+func (r *Receiver) GetTridentStatus() []*Status {
+	r.statusLock.Lock()
+	status := make([]*Status, 0, len(r.status))
+	for _, s := range r.status {
+		status = append(status, s)
+	}
+	r.statusLock.Unlock()
+	return status
 }
 
 func (r *Receiver) ProcessUDPServer() {
@@ -258,7 +271,7 @@ func (r *Receiver) ProcessUDPServer() {
 		timestamp := r.getTimestamp(recvBuffer[HEADER_LEN:])
 		ipHash := getIpHash(remoteAddr.IP)
 		r.DropDetection.Detect(ipHash, header.Sequence, timestamp)
-		r.tridentStatus(ipHash, remoteAddr.IP, header.Sequence, timestamp, UDP)
+		r.tridentStatus(header.VTAPID, remoteAddr.IP, header.Sequence, timestamp, UDP)
 
 		r.putQueue(queue.HashKey(uint32(r.counter.RxPackets)%(uint32(r.nQueues))), recvBuffer[HEADER_LEN:size])
 	}
@@ -326,7 +339,6 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 	defer conn.Close()
 
 	ip := parseRemoteIP(conn)
-	ipHash := getIpHash(ip)
 
 	recvBuffer := make([]byte, RECV_BUFSIZE)
 	header := &Header{}
@@ -355,7 +367,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 			return
 		}
 
-		r.tridentStatus(ipHash, ip,
+		r.tridentStatus(header.VTAPID, ip,
 			header.Sequence,
 			r.getTimestamp(recvBuffer),
 			TCP)
