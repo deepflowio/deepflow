@@ -159,6 +159,7 @@ message IpResource {
     optional string ip = 1;
     optional uint32 masklen = 2 [default = 32];
     optional uint32 subnet_id = 3 [default = 0];
+    optional bool is_vip = 4 [default = false];
 }
 
 message Interface {
