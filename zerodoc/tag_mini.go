@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	MINI_FIELD_FULL_CODES = IP | IPPath | L3EpcID | L3EpcIDPath | VTAPID | Protocol | ServerPort | Direction | TAPType | ACLGID | TagType | TagValue
+	MINI_FIELD_FULL_CODES = IP | IPPath | L3EpcID | L3EpcIDPath | VTAPID | Protocol | ServerPort |
+		MAC | MACPath | Direction | TAPType | ACLGID | TagType | TagValue
 )
 
 type MiniField struct {
@@ -32,6 +33,7 @@ type MiniField struct {
 	L3EpcID        int16
 	L3EpcID1       int16
 
+	MAC, MAC1  uint64
 	Direction  DirectionEnum
 	Protocol   layers.IPProtocol // (8B)
 	ACLGID     uint16
@@ -101,7 +103,6 @@ func (t *MiniTag) MarshalTo(b []byte) int {
 			offset += copy(b[offset:], ",direction=s2c")
 		}
 	}
-
 	if t.Code&IP != 0 {
 		offset += copy(b[offset:], ",ip=")
 		offset += copy(b[offset:], t.IP().String())
@@ -132,6 +133,18 @@ func (t *MiniTag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID))
 		offset += copy(b[offset:], ",l3_epc_id_1=")
 		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID1))
+	}
+	if t.Code&MAC != 0 {
+		// 不存入tsdb中
+		//offset += copy(b[offset:], ",mac=")
+		//offset += copy(b[offset:], utils.Uint64ToMac(t.MAC).String())
+	}
+	if t.Code&MACPath != 0 {
+		// 不存入tsdb中
+		//offset += copy(b[offset:], ",mac_0=")
+		//offset += copy(b[offset:], utils.Uint64ToMac(t.MAC).String())
+		//offset += copy(b[offset:], ",mac_1=")
+		//offset += copy(b[offset:], utils.Uint64ToMac(t.MAC1).String())
 	}
 
 	if t.Code&Protocol != 0 {
@@ -208,6 +221,7 @@ func (t *MiniTag) Encode(encoder *codec.SimpleEncoder) {
 
 func (t *MiniTag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder) {
 	srcIP, dstIP := t.IP(), t.IP1()
+	srcMAC, dstMAC := t.MAC, t.MAC1
 	srcEpc, dstEpc := t.L3EpcID, t.L3EpcID1
 	var tapSide TAPSideEnum
 	// 5.6.1 对于双端数据，存储时去掉direction并使用tap_side替代。
@@ -222,11 +236,15 @@ func (t *MiniTag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEnc
 			tapSide = Server
 			srcIP, dstIP = dstIP, srcIP
 			srcEpc, dstEpc = dstEpc, srcEpc
+			srcMAC, dstMAC = dstMAC, srcMAC
 		}
 	}
 	encoder.WriteU64(uint64(code))
 	encoder.WriteU8(tid)
 
+	if code&MAC != 0 {
+		encoder.WriteU64(srcMAC)
+	}
 	if code&IP != 0 {
 		encoder.WriteU8(t.IsIPv6)
 		if t.IsIPv6 != 0 {
@@ -239,6 +257,10 @@ func (t *MiniTag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEnc
 		encoder.WriteU16(uint16(srcEpc))
 	}
 
+	if code&MACPath != 0 {
+		encoder.WriteU64(srcMAC)
+		encoder.WriteU64(dstMAC)
+	}
 	if code&IPPath != 0 {
 		encoder.WriteU8(t.IsIPv6)
 		if t.IsIPv6 != 0 {
