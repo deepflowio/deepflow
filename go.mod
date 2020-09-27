@@ -18,7 +18,7 @@ require (
 	github.com/textnode/fencer v0.0.0-20121219195347-6baed0e5ef9a
 	github.com/vishvananda/netlink v1.1.0
 	gitlab.x.lan/platform/influxdb v0.0.0-20200109064655-6c1e420280c5
-	gitlab.x.lan/yunshan/message v0.0.0-20200925014307-c58a7c74d1c9
+	gitlab.x.lan/yunshan/message v0.0.0-20200929023343-b7dd08603631
 	golang.org/x/net v0.0.0-20190514140710-3ec191127204
 	golang.org/x/sys v0.0.0-20190606203320-7fc4e5ec1444
 	google.golang.org/grpc v1.19.0

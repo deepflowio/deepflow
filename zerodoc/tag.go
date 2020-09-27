@@ -30,6 +30,7 @@ const (
 	PodGroupID
 	PodNSID
 	PodID
+	MAC
 )
 
 const (
@@ -45,6 +46,7 @@ const (
 	PodGroupIDPath
 	PodNSIDPath
 	PodIDPath
+	MACPath
 )
 
 const (
@@ -235,6 +237,7 @@ type Field struct {
 	GlobalThreadID uint8
 
 	IP6          net.IP // FIXME: 合并IP6和IP
+	MAC          uint64
 	IP           uint32
 	GroupID      int16
 	L3EpcID      int16 // (8B)
@@ -249,6 +252,7 @@ type Field struct {
 	PodNSID      uint16
 	PodID        uint16
 
+	MAC1          uint64
 	IP61          net.IP // FIXME: 合并IP61和IP1
 	IP1           uint32
 	GroupID1      int16
@@ -365,7 +369,6 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",host_id_1=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.HostID1), 10))
 	}
-
 	if t.Code&IP != 0 {
 		if t.IsIPv6 != 0 {
 			offset += copy(b[offset:], ",ip=")
@@ -419,6 +422,18 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID))
 		offset += copy(b[offset:], ",l3_epc_id_1=")
 		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID1))
+	}
+	if t.Code&MAC != 0 {
+		// 不存入tsdb中
+		//offset += copy(b[offset:], ",mac=")
+		//offset += copy(b[offset:], utils.Uint64ToMac(t.MAC).String())
+	}
+	if t.Code&MACPath != 0 {
+		// 不存入tsdb中
+		//offset += copy(b[offset:], ",mac_0=")
+		//offset += copy(b[offset:], utils.Uint64ToMac(t.MAC).String())
+		//offset += copy(b[offset:], ",mac_1=")
+		//offset += copy(b[offset:], utils.Uint64ToMac(t.MAC1).String())
 	}
 
 	if t.Code&PodGroupID != 0 {
@@ -574,6 +589,9 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	t.Code = Code(decoder.ReadU64())
 	t.GlobalThreadID = decoder.ReadU8()
 
+	if t.Code&MAC != 0 {
+		t.MAC = decoder.ReadU64()
+	}
 	if t.Code&IP != 0 {
 		t.IsIPv6 = decoder.ReadU8()
 		if t.IsIPv6 != 0 {
@@ -617,6 +635,10 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 		t.PodGroupID = int16(decoder.ReadU16())
 	}
 
+	if t.Code&MACPath != 0 {
+		t.MAC = decoder.ReadU64()
+		t.MAC1 = decoder.ReadU64()
+	}
 	if t.Code&IPPath != 0 {
 		t.IsIPv6 = decoder.ReadU8()
 		if t.IsIPv6 != 0 {
@@ -729,6 +751,9 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 	encoder.WriteU64(uint64(code))
 	encoder.WriteU8(tid)
 
+	if code&MAC != 0 {
+		encoder.WriteU64(t.MAC)
+	}
 	if code&IP != 0 {
 		encoder.WriteU8(t.IsIPv6)
 		if t.IsIPv6 != 0 {
@@ -772,6 +797,10 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 		encoder.WriteU16(uint16(t.PodGroupID))
 	}
 
+	if code&MACPath != 0 {
+		encoder.WriteU64(t.MAC)
+		encoder.WriteU64(t.MAC1)
+	}
 	if code&IPPath != 0 {
 		encoder.WriteU8(t.IsIPv6)
 		if t.IsIPv6 != 0 {
