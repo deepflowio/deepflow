@@ -15,6 +15,7 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	macInt := vifData.GetMac()
 
 	ips := make([]*datatype.IpNet, 0, 1024)
+	isVIPDevice := false
 	for _, ipResource := range vifData.IpResources {
 		fixIp := ParserStringIp(ipResource.GetIp())
 		if fixIp == nil {
@@ -31,6 +32,9 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 			netmask = max
 		} else if netmask < min {
 			netmask = min
+		}
+		if ipResource.GetIsVip() {
+			isVIPDevice = true
 		}
 
 		ipinfo := &datatype.IpNet{
@@ -49,10 +53,11 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	}
 
 	return &datatype.PlatformData{
-		Mac:    macInt,
-		Ips:    ips,
-		EpcId:  epcId,
-		IfType: uint8(vifData.GetIfType()),
+		Mac:         macInt,
+		Ips:         ips,
+		EpcId:       epcId,
+		IfType:      uint8(vifData.GetIfType()),
+		IsVIPDevice: isVIPDevice,
 	}
 }
 

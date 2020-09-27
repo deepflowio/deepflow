@@ -25,8 +25,9 @@ type IpNet struct {
 }
 
 type PlatformData struct {
-	Mac    uint64
-	Ips    []*IpNet
-	EpcId  int32
-	IfType uint8
+	Mac         uint64
+	Ips         []*IpNet
+	EpcId       int32
+	IfType      uint8
+	IsVIPDevice bool
 }
