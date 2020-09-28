@@ -382,8 +382,8 @@ func (a *Anomaly) MarshalTo(b []byte) int {
 		a.ClientEstablishReset, a.ServerEstablishReset,
 		a.TCPTimeout,
 		clientFail, serverFail, clientFail + serverFail,
-		a.HTTPClientError, a.HTTPServerError, a.HTTPTimeout, a.HTTPClientError + a.HTTPServerError + a.HTTPTimeout,
-		a.DNSClientError, a.DNSServerError, a.DNSTimeout, a.DNSClientError + a.DNSServerError + a.DNSTimeout,
+		a.HTTPClientError, a.HTTPServerError, a.HTTPTimeout, a.HTTPClientError + a.HTTPServerError,
+		a.DNSClientError, a.DNSServerError, a.DNSTimeout, a.DNSClientError + a.DNSServerError,
 	}
 	return marshalKeyValues(b, fields, values)
 }
