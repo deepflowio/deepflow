@@ -143,8 +143,8 @@ func TestMarshalAnomaly(t *testing.T) {
 		"client_establish_other_rst=1i,server_establish_other_rst=1i," +
 		"tcp_timeout=1i," +
 		"client_establish_fail=3i,server_establish_fail=4i,tcp_establish_fail=7i," +
-		"http_client_error=1i,http_server_error=1i,http_timeout=1i,http_error=3i," +
-		"dns_client_error=1i,dns_server_error=1i,dns_timeout=1i,dns_error=3i"
+		"http_client_error=1i,http_server_error=1i,http_timeout=1i,http_error=2i," +
+		"dns_client_error=1i,dns_server_error=1i,dns_timeout=1i,dns_error=2i"
 	if string(actual[:n]) != expected {
 		t.Errorf("Anomaly MarshalTo failed, \n\texpected:%v\n\tactual:  %v\n", expected, string(actual[:n]))
 	}
