@@ -138,6 +138,7 @@ type FlowMetricsPeer struct {
 	IsActiveHost     bool
 	IsDevice         bool  // true表明是从平台数据中获取的
 	TCPFlags         uint8 // 所有TCP的Flags或运算
+	IsVIPDevice      bool
 
 	CastTypeMap   uint8  // 仅包含TSDB中的几个CastType标志位选项
 	TCPFlagsMap   uint16 // 仅包含TSDB中的几个TCP标志位选项
@@ -394,6 +395,7 @@ func (f *FlowMetricsPeer) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteBool(f.IsL3End)
 	encoder.WriteBool(f.IsActiveHost)
 	encoder.WriteBool(f.IsDevice)
+	encoder.WriteBool(f.IsVIPDevice)
 
 	encoder.WriteU8(f.CastTypeMap)
 	encoder.WriteU16(f.TCPFlagsMap)
@@ -417,6 +419,7 @@ func (f *FlowMetricsPeer) Decode(decoder *codec.SimpleDecoder) {
 	f.IsL3End = decoder.ReadBool()
 	f.IsActiveHost = decoder.ReadBool()
 	f.IsDevice = decoder.ReadBool()
+	f.IsVIPDevice = decoder.ReadBool()
 
 	f.CastTypeMap = decoder.ReadU8()
 	f.TCPFlagsMap = decoder.ReadU16()
