@@ -578,6 +578,17 @@ func (t *Tag) String() string {
 	var buf strings.Builder
 	buf.WriteString("fields:")
 	buf.WriteString(t.ToKVString())
+	if t.Code&MAC != 0 {
+		buf.WriteString(",mac=")
+		buf.WriteString(utils.Uint64ToMac(t.MAC).String())
+	}
+	if t.Code&MACPath != 0 {
+		buf.WriteString(",mac_0=")
+		buf.WriteString(utils.Uint64ToMac(t.MAC).String())
+		buf.WriteString(",mac_1=")
+		buf.WriteString(utils.Uint64ToMac(t.MAC1).String())
+	}
+
 	buf.WriteString(" code:")
 	buf.WriteString(fmt.Sprintf("x%016x", t.Code))
 	return buf.String()
