@@ -63,6 +63,9 @@ func syncData(timestamp int64, database, measurement, rp string, primaryClient, 
 			log.Errorf("primaryClient get(%s:%s:%s) field(%s) data failed: %s", database, rp, measurement, fieldName, err)
 			return syncCount, err
 		}
+		if rows == nil {
+			continue
+		}
 
 		err = writeFieldData(replicaClient, rows, database, rp, measurement, fieldName)
 		if err != nil {
@@ -86,9 +89,8 @@ func getFieldData(client client.Client, db, rp, measurement, field string, times
 
 	if len(rows) > 0 {
 		return &rows[0], nil
-	} else {
-		return nil, fmt.Errorf("getFieldData is empty")
 	}
+	return nil, nil
 }
 
 func writeFieldData(c client.Client, fieldData *models.Row, db, rp, measurement, fieldName string) error {
