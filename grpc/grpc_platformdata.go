@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -749,6 +750,7 @@ func (t *PlatformInfoTable) Reload() error {
 			ProcessName:         proto.String(t.processName),
 			Host:                proto.String(hostname),
 			CommunicationVtaps:  communicationVtaps,
+			CpuNum:              proto.Uint32(uint32(runtime.NumCPU())),
 		}
 		client := trident.NewSynchronizerClient(t.GetClient())
 		// 分析器请求消息接口，用于stream, roze
