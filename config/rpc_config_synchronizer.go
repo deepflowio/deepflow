@@ -54,6 +54,7 @@ func (s *RpcConfigSynchronizer) sync() error {
 			VersionPlatformData: proto.Uint64(s.VersionPlatformData),
 			VersionAcls:         proto.Uint64(s.VersionAcls),
 			VersionGroups:       proto.Uint64(s.VersionGroups),
+			ProcessName:         proto.String("droplet"),
 		}
 		client := trident.NewSynchronizerClient(s.PollingSession.GetClient())
 		response, err = client.AnalyzerSync(ctx, &request)
