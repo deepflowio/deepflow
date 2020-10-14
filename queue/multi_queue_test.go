@@ -82,4 +82,7 @@ func TestMultipleQueueMultipleUserPuts(t *testing.T) {
 	if count := queue.Gets(2, outBatch); count != userCount*3 {
 		t.Errorf("Expected %d values, actually %d values", userCount*3, count)
 	}
+	// Add test coverage
+	queue.Readers()
+	queue.Writers()
 }
