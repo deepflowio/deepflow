@@ -17,7 +17,7 @@ const (
 
 func TestDecoder(t *testing.T) {
 	var buffer bytes.Buffer
-	f, _ := os.Open("icmp_decode_test.pcap") // 目前使用的时IPv6传输的
+	f, _ := os.Open("icmp_decode_test.pcap") // 目前使用的时IPv4传输的
 	r, _ := pcapgo.NewReader(f)
 	for {
 		packet, _, err := r.ReadPacketData()
@@ -25,7 +25,7 @@ func TestDecoder(t *testing.T) {
 			break
 		}
 
-		decoder := NewSequentialDecoder(packet[62:]) // 因为pcap是IPv6 + UDP, 所以这里是 14 + 40 + 8 = 62
+		decoder := NewSequentialDecoder(packet[42:]) // 因为pcap是IPv4 + UDP, 所以这里是 14 + 20 + 8 = 42
 		if invalid, _, _ := decoder.DecodeHeader(); invalid {
 			t.Error(fmt.Sprintf("DecodeHeader failed, invalid header."))
 			continue
