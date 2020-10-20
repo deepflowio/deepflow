@@ -148,6 +148,8 @@ message Config {
     optional SocketType npb_socket_type = 47 [default = RAW_UDP];
 
     optional uint32 pcap_data_retention = 51 [default = 7]; // uint: day
+    optional uint32 capture_packet_size = 52 [default = 65535];
+    optional bool inactive_server_port_enabled = 53 [default = true];
 }
 
 message Segment { // e.g. single LAN area
