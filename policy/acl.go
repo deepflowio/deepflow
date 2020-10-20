@@ -127,7 +127,6 @@ func (a *Acl) generateMatchedField6(srcMac, dstMac uint64, srcIps, dstIps ipSegm
 		for _, dstPort := range dstPorts {
 			match, mask := MatchedField6{}, MatchedField6{}
 			match.Set(MATCHED6_TAP_TYPE, uint64(a.TapType))
-			match.Set(MATCHED6_PROTO, uint64(a.Proto))
 			ip0, ip1 := srcIps.getIp6()
 			match.Set(MATCHED6_SRC_IP0, ip0)
 			match.Set(MATCHED6_SRC_IP1, ip1)
@@ -140,7 +139,6 @@ func (a *Acl) generateMatchedField6(srcMac, dstMac uint64, srcIps, dstIps ipSegm
 			match.Set(MATCHED6_DST_PORT, uint64(dstPort.port))
 
 			mask.SetMask(MATCHED6_TAP_TYPE, uint64(a.TapType))
-			mask.SetMask(MATCHED6_PROTO, uint64(a.Proto))
 			mask0, mask1 := srcIps.getMask6()
 			mask.Set(MATCHED6_SRC_IP0, mask0)
 			mask.Set(MATCHED6_SRC_IP1, mask1)
