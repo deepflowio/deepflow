@@ -70,12 +70,12 @@ func minPowerOfTwo(v int) int {
 
 func (c *Config) Validate() error {
 	if len(c.ControllerIps) == 0 {
-		return errors.New("controller-ips is empty")
-	}
-
-	for _, ipString := range c.ControllerIps {
-		if net.ParseIP(ipString) == nil {
-			return errors.New("controller-ips invalid")
+		log.Warning("controller-ips is empty")
+	} else {
+		for _, ipString := range c.ControllerIps {
+			if net.ParseIP(ipString) == nil {
+				return errors.New("controller-ips invalid")
+			}
 		}
 	}
 
@@ -142,11 +142,12 @@ func (c *Config) Validate() error {
 
 func Load(path string) Config {
 	configBytes, err := ioutil.ReadFile(path)
-	if err != nil {
-		log.Error("Read config file error:", err)
-		os.Exit(1)
-	}
 	config := Config{}
+	if err != nil {
+		config.Validate()
+		log.Warning("Read config file error:", err)
+		return config
+	}
 	if err = yaml.Unmarshal(configBytes, &config); err != nil {
 		log.Error("Unmarshal yaml error:", err)
 		os.Exit(1)

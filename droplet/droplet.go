@@ -62,8 +62,6 @@ func Start(configPath string) (closers []io.Closer) {
 			controllers[i] = ipv4
 		}
 	}
-	synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.ControllerPort, cfg.RpcTimeout)
-	synchronizer.Start()
 
 	cleaner := libpcap.NewCleaner(5*time.Minute, int64(cfg.PCap.MaxDirectorySizeGB)<<30, int64(cfg.PCap.DiskFreeSpaceMarginGB)<<30, cfg.PCap.FileDirectory)
 	cleaner.Start()
@@ -94,13 +92,18 @@ func Start(configPath string) (closers []io.Closer) {
 	// labeler
 	labelerManager := labeler.NewLabelerManager(labelerQueues.Readers(), pcapAppQueues.Writers(),
 		cfg.Queue.PacketQueueCount, cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable)
-	synchronizer.Register(func(response *trident.SyncResponse, version *config.RpcInfoVersions) {
-		log.Debug(response, version)
-		cleaner.UpdatePcapDataRetention(time.Duration(response.Config.GetPcapDataRetention()) * time.Hour * 24)
-		// Labeler更新策略信息
-		labelerManager.OnAclDataChange(response)
-	})
 	labelerManager.Start()
+
+	if len(controllers) > 0 {
+		synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.ControllerPort, cfg.RpcTimeout)
+		synchronizer.Register(func(response *trident.SyncResponse, version *config.RpcInfoVersions) {
+			log.Debug(response, version)
+			cleaner.UpdatePcapDataRetention(time.Duration(response.Config.GetPcapDataRetention()) * time.Hour * 24)
+			// Labeler更新策略信息
+			labelerManager.OnAclDataChange(response)
+		})
+		synchronizer.Start()
+	}
 
 	pcapClosers := pcap.NewWorkerManager(
 		pcapAppQueues.Readers(),
