@@ -7,5 +7,6 @@ MAINTAINER yuanchao@yunshan.net
 RUN mkdir -p /etc/droplet/
 COPY ./config/droplet.yaml /etc/droplet/
 COPY ./bin/droplet /bin/
+COPY start_docker.sh  /bin/
 
-CMD /bin/droplet -f /etc/droplet/droplet.yaml
+CMD /bin/start_docker.sh

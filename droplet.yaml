@@ -1,0 +1,179 @@
+# controller 默认值不渲染，用来判断是否处于单独的控制器
+# 若处于单独的控制器，则droplet只处理 syslog和statsd
+# controller-ips:
+###   - 127.0.0.1
+
+# controller listening port
+# controller-port: 20035
+
+# logfile path
+# log-file: /var/log/droplet/droplet.log
+
+# loglevel: "debug/info/warn/error"
+# log-level: info
+
+# profiler
+# profiler: false
+
+# maximum usage of cpu cores, 0 means no limit
+# max-cpus: 0
+
+# udp socket receiver buffer: 32M
+# udp-read-buffer: 33554432
+
+############################ droplet ##########################################
+# Rpc synchronization timeout default 8s
+# rpc-timeout: 8
+
+# adapter:
+  # cache size (#) for resuming the order of received trident traffic,
+  # default value is 64,
+  # 64 <= value <= 1024, value is 1024 when value > 1024
+#  ordering-cache-size: 64
+
+# internal queues conf
+# queue:
+  # ----------- 并行度 -----------
+  # 传输网包的队列数量，也是网包处理（以网包作为输入）模块的并行度，默认为1，最大16
+#  packet-queue-count: 1
+
+  # 传输网包的每个队列的长度，默认为65536
+#  packet-queue-size: 65536
+
+  # syslog 接收队列长度, 默认为65536
+#  syslog-queue-size: 65536
+
+  # statsd 接收队列长度, 默认为65536
+#  statsd-queue-size: 65536
+
+  # 压缩包头接收队列长度, 默认为65536
+#  compressed-queue-size: 65536
+
+# labeler:
+  # whether to use first-path processing only
+#   fast-path-disable: false
+
+  # size of policy fast-path map, and
+  # map-size-limit >= filter-queue-count*1024
+  # map-size-limit <= filter-queue-count*1048576
+#   map-size-limit: 1048576
+
+# pcap:
+  # 计算TCP/IP checksum，默认不计算
+#  tcpip-checksum: false
+
+  # 单次写入文件的块大小，默认64KB
+#  block-size-kb: 64
+
+  # 同时在写的最大pcap文件数，默认5000
+#  max-concurrent-files: 5000
+
+  # 每个pcap文件的最大大小，默认25MB，但是1秒内即使超过该值也不会切分文件
+#  max-file-size-mb: 25
+
+  # 所有pcap文件的最大总大小，默认100GB
+#  max-directory-size-gb: 100
+
+  # 磁盘剩余空间不足该数值时进行删除，默认10GB
+#  disk-free-space-margin-gb: 10
+
+  # 每个pcap文件的最大时间，默认300秒
+#  max-file-period-second: 300
+
+  # pcap文件存储的文件夹
+#  file-directory: /var/lib/droplet/pcap
+
+############################# roze #############################################
+# set cluster shard id
+# shard-id: 0
+
+# Add connection of influxdb http addr
+# tsdb:
+#  primary: http://127.0.0.1:20044
+#  replica:   # optional
+
+# 使用配置的用户名密码访问influxdb
+# tsdb-auth:
+#  username:
+#  password:
+
+# 是否不写入秒级数据: 默认: false(写入)
+# disable-second-write: false
+
+# 是否不写秒级数据的replica: 默认: true(不写)
+# disable-second-write-replica: true
+
+# parallelism of unmarshall, defaults to 4
+# unmarshall-queue-count: 4
+
+# size of unmarshall queue, defaults to 1024
+# unmarshall-queue-size: 1024
+
+# parallelism of store, defaults to 4
+# store-queue-count: 4
+
+# size of store queue, defaults to 131072
+# store-queue-size: 131072
+
+# size of store batch buffer, defaults to 65536
+# store-batch-buffer-size: 65536
+
+# duration, shard-duration: for "autogen" retention policy
+# duration-s1, shard-duration-s1: for "s1" retention policy
+# default: duration: 170h, shard-duration: 1d
+# default: duration-s1: 26h, shard-duration-s1: 3h
+# the duration unit: w week, d day, h hour
+# influxdb-default-retention-policy:
+#  duration: 170h
+#  shard-duration: 1d
+#  duration-s1: 26h
+#  shard-duration-s1: 1h
+
+# Set for turn on/off repair, choice from [true, false] default: true
+# repair-enabled: true
+
+# 距离当前多长时间的confidence不同步, 默认: 300 (秒)
+# repair-keep-time: 300
+
+# set repair runing interval time,  defult: 60 (seconds)
+# repair-interval: 60
+
+# 每次同步多少条confidence, 默认值: 200 (条)
+# repair-sync-count-once: 200
+
+# Receiver判断丢包的缓冲区大小，默认值：1024，范围64到64k
+# receiver-window-size: 1024
+
+############################ stream ############################################
+# es-host-port:
+#  - 127.0.0.1:20042
+
+# es-auth:
+#   user:
+#   password:
+
+# es writer queue limit max size
+# throttle: 30000
+
+# es writer denominator for sleep time
+# op-load-factor: 10
+
+# rp-split-size: 86400
+
+# rp-slots: 7322
+
+# rp-alive-slots: 31
+
+# decoder-queue-count: 4
+
+# decoder-queue-size: 100000
+
+# broker-queue-size: 10000
+
+# broker-zmq-ip: "127.0.0.1"
+
+#broker-zmq-port: 20204
+
+# broker-zmq-hwm: 1000
+
+# broker-enabled: false

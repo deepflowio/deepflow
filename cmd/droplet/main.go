@@ -4,17 +4,32 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/debug"
 	"gitlab.x.lan/yunshan/droplet-libs/logger"
+	"gitlab.x.lan/yunshan/droplet-libs/receiver"
+	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	yaml "gopkg.in/yaml.v2"
 
-	"gitlab.x.lan/yunshan/droplet/droplet"
-	"gitlab.x.lan/yunshan/droplet/dropletctl/loglevel"
+	"gitlab.x.lan/yunshan/droplet/config"
+	dropletcfg "gitlab.x.lan/yunshan/droplet/droplet/config"
+	"gitlab.x.lan/yunshan/droplet/droplet/droplet"
+	"gitlab.x.lan/yunshan/droplet/droplet/profiler"
+	"gitlab.x.lan/yunshan/droplet/dropletctl"
+	rozecfg "gitlab.x.lan/yunshan/droplet/roze/config"
+	"gitlab.x.lan/yunshan/droplet/roze/roze"
+	streamcfg "gitlab.x.lan/yunshan/droplet/stream/config"
+	"gitlab.x.lan/yunshan/droplet/stream/stream"
 )
 
 func execName() string {
@@ -29,6 +44,11 @@ var version = flag.Bool("v", false, "Display the version")
 
 var RevCount, Revision, CommitDate, goVersion string
 
+const (
+	INFLUXDB_RELAY_PORT = 20048
+	PROFILER_PORT       = 9526
+)
+
 func main() {
 	logger.EnableStdoutLog()
 	flag.Parse()
@@ -37,8 +57,61 @@ func main() {
 		os.Exit(0)
 	}
 
-	closers := droplet.Start(*configPath)
-	loglevel.NewLoglevelControl()
+	cfg := config.Load(*configPath)
+	logger.EnableFileLog(cfg.LogFile)
+	logLevel, _ := logging.LogLevel(cfg.LogLevel)
+	logging.SetLevel(logLevel, "")
+	bytes, _ := yaml.Marshal(cfg)
+	log.Infof("base config:\n%s", string(bytes))
+
+	debug.SetIpAndPort(dropletctl.DEBUG_LISTEN_IP, dropletctl.DEBUG_LISTEN_PORT)
+	debug.NewLogLevelControl()
+
+	profiler := profiler.NewProfiler(PROFILER_PORT)
+	if cfg.Profiler {
+		runtime.SetMutexProfileFraction(1)
+		runtime.SetBlockProfileRate(1)
+		profiler.Start()
+	}
+
+	if cfg.MaxCPUs > 0 {
+		runtime.GOMAXPROCS(cfg.MaxCPUs)
+	}
+
+	stats.RegisterGcMonitor()
+	stats.SetMinInterval(10 * time.Second)
+	stats.SetRemotes(net.UDPAddr{net.ParseIP("127.0.0.1").To4(), INFLUXDB_RELAY_PORT, ""})
+
+	dropletConfig := dropletcfg.Load(*configPath)
+	bytes, _ = yaml.Marshal(dropletConfig)
+	log.Infof("droplet config:\n%s", string(bytes))
+
+	receiver := receiver.NewReceiver(datatype.DROPLET_PORT, cfg.UDPReadBuffer)
+	receiver.Start()
+
+	closers := droplet.Start(dropletConfig, receiver)
+
+	if len(cfg.ControllerIps) > 0 {
+		rozeConfig := rozecfg.Load(*configPath)
+		bytes, _ = yaml.Marshal(rozeConfig)
+		log.Infof("roze config:\n%s", string(bytes))
+
+		streamConfig := streamcfg.Load(*configPath)
+		bytes, _ = yaml.Marshal(streamConfig)
+		log.Infof("stream config:\n%s", string(bytes))
+
+		roze, err := roze.NewRoze(rozeConfig, receiver)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		roze.Start()
+		defer roze.Close()
+
+		stream := stream.NewStream(streamConfig, receiver)
+		stream.Start()
+		defer stream.Close()
+	}
 
 	// setup system signal
 	signalChannel := make(chan os.Signal, 1)
@@ -54,4 +127,5 @@ func main() {
 		}(closer)
 	}
 	wg.Wait()
+	receiver.Close()
 }

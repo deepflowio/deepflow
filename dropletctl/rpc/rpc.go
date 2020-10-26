@@ -21,7 +21,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/message/trident"
 
-	"gitlab.x.lan/yunshan/droplet/config"
+	"gitlab.x.lan/yunshan/droplet/droplet/config"
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
 )
 
@@ -60,6 +60,7 @@ func RegisterRpcCommand() *cobra.Command {
 		Use:   "rpc",
 		Short: "pull policy from controller by rpc",
 	}
+
 	cmds := regiterCommand()
 	for _, handler := range cmds {
 		root.AddCommand(handler)

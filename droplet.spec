@@ -5,7 +5,7 @@ Summary:    deepflow droplet
 
 Group:      Applications/File
 Vendor:     Yunshan Networks
-License:    Copyright (c) 2012-2018 Yunshan Networks
+License:    Copyright (c) 2012-2021 Yunshan Networks
 URL:        http://yunshan.net
 Source:     droplet.spec
 
