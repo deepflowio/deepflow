@@ -10,17 +10,17 @@ FLAGS = -gcflags "-l -l" -ldflags "-X main.RevCount=${REV_COUNT} -X main.Revisio
 .PHONY: all
 all: droplet droplet-ctl
 
-vendor: patch/001-record-logging-modules.patch
+vendor:
 	go mod tidy && go mod vendor
 	test -n "$(shell go list -e -f '{{.Dir}}' ${MESSAGE})"
 	test -n "$(shell go list -e -f '{{.Dir}}' ${DROPLET_LIBS})"
 	cp -r $(shell go list -e -f '{{.Dir}}' ${MESSAGE})/* vendor/${MESSAGE}/
 	cp -r $(shell go list -e -f '{{.Dir}}' ${DROPLET_LIBS})/* vendor/${DROPLET_LIBS}/
+	cp -f vendor/gitlab.x.lan/platform/influxdb/client/v2/* vendor/github.com/influxdata/influxdb/client/v2/
 	find vendor -type d -exec chmod +w {} \;
 	cd vendor/${MESSAGE} && go generate ./...
 	cd vendor/${DROPLET_LIBS} && go generate ./...
 	go generate ./...
-	cat patch/001-record-logging-modules.patch | patch -sN -d ./vendor/github.com/op/go-logging -p1
 
 .PHONY: test
 test: vendor
@@ -39,10 +39,14 @@ debug: vendor
 droplet: vendor
 	go build -mod vendor ${FLAGS} -o bin/droplet cmd/droplet/main.go
 
+es-tester: vendor
+	go build -mod vendor ${FLAGS} -o bin/es-tester cmd/es-tester/main.go
+
 .PHONY: droplet-ctl
 droplet-ctl: vendor
 	go build -mod vendor ${FLAGS} -o bin/droplet-ctl cmd/droplet-ctl/main.go
 
 .PHONY: clean
 clean:
-	git clean -dfx
+	rm -rf vendor
+	rm -rf bin

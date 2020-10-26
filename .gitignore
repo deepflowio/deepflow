@@ -3,3 +3,4 @@
 /*.test
 /.test-coverage.txt
 .idea/
+.*.swp
