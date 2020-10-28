@@ -16,7 +16,7 @@ import (
 type ModuleId uint16
 type ModuleOperate uint16
 
-type RegisterCommmandLine func() *cobra.Command
+type RegisterCommmandLine func(moduleId ModuleId) *cobra.Command
 type CommandLineProcess interface {
 	RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, operate uint16, arg *bytes.Buffer)
 }
@@ -168,6 +168,7 @@ func debugListener() {
 	}()
 }
 
+// server端注册命令处理
 func Register(module ModuleId, process CommandLineProcess) {
 	recvHandlers[module] = process
 	if running == false {
@@ -176,17 +177,7 @@ func Register(module ModuleId, process CommandLineProcess) {
 	}
 }
 
-func RegisterCommand(module ModuleId, cmd RegisterCommmandLine) {
-	registerHandlers[module] = cmd
-}
-
-func GenerateCommand() []*cobra.Command {
-	commands := make([]*cobra.Command, 0, len(registerHandlers))
-	for _, handler := range registerHandlers {
-		if handler != nil {
-			command := handler()
-			commands = append(commands, command)
-		}
-	}
-	return commands
+// client注册命令处理
+func RegisterCommand(root *cobra.Command, moduleId ModuleId, handle RegisterCommmandLine) {
+	root.AddCommand(handle(moduleId))
 }
