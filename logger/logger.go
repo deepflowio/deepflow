@@ -3,6 +3,7 @@ package logger
 import (
 	"bytes"
 	"compress/gzip"
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -10,7 +11,7 @@ import (
 	"time"
 
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 )
 
@@ -123,7 +124,7 @@ func EnableRsyslog(remotes ...string) error {
 	rsyslogBackends = rsyslogBackends[:0]
 	for _, remote := range remotes {
 		if !strings.Contains(remote, ":") {
-			remote += ":" + datatype.DROPLET_PORT
+			remote += fmt.Sprintf(":%d", datatype.DROPLET_PORT)
 		}
 
 		// 消息头包括FrameSize和Type，UDP时FrameSize无用

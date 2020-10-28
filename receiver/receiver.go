@@ -12,7 +12,9 @@ import (
 
 	logging "github.com/op/go-logging"
 
+	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/cache"
+	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/debug"
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
@@ -22,43 +24,58 @@ import (
 
 const (
 	RECV_BUFSIZE              = 1 << 16 // 默认trident发送时，不会超过MTU的大小,当local发送时, MTU是64k
+	RECV_TIMEOUT              = 30 * time.Second
 	QUEUE_CACHE_FLUSH_TIMEOUT = 3
-	SOCKET_READ_BUFFER_SIZE   = 32 << 20
 	DROP_DETECT_WINDOW_SIZE   = 1024
+	QUEUE_BATCH_NUM           = 16
+	LOG_INTERVAL              = 3
 )
 
 var log = logging.MustGetLogger("receiver")
 
-type RecvBytes []byte
-
-// 实现空接口，仅用于队列调试打印
-func (r RecvBytes) AddReferenceCount() {
+type RecvBuffer struct {
+	Begin  int // 开始位置
+	End    int
+	Buffer []byte
+	IP     net.IP // 保存消息的发送方IP
 }
 
-func (r RecvBytes) SubReferenceCount() bool {
+// 实现空接口，仅用于队列调试打印
+func (r *RecvBuffer) AddReferenceCount() {
+}
+
+func (r *RecvBuffer) SubReferenceCount() bool {
 	return false
+}
+
+func (r *RecvBuffer) String() string {
+	return fmt.Sprintf("IP:%s %s\n", r.IP, string(r.Buffer))
 }
 
 var recvBufferPool = pool.NewLockFreePool(
 	func() interface{} {
-		return make([]byte, 0, RECV_BUFSIZE)
+		return &RecvBuffer{
+			Buffer: make([]byte, RECV_BUFSIZE),
+		}
 	},
-	pool.OptionPoolSizePerCPU(8),
-	pool.OptionInitFullPoolSize(8),
+	pool.OptionPoolSizePerCPU(32),
+	pool.OptionInitFullPoolSize(32),
 )
 
-func AcquireRecvBuffer() []byte {
-	return recvBufferPool.Get().([]byte)
+func AcquireRecvBuffer() *RecvBuffer {
+	return recvBufferPool.Get().(*RecvBuffer)
 }
 
-func ReleaseRecvBuffer(b []byte) {
-	b = b[:0]
+func ReleaseRecvBuffer(b *RecvBuffer) {
+	b.Begin = 0
+	b.End = 0
+	b.IP = nil
 	recvBufferPool.Put(b)
 }
 
 type QueueCache struct {
 	sync.Mutex
-	values    []byte
+	values    []interface{}
 	timestamp int64
 }
 
@@ -93,20 +110,30 @@ type Status struct {
 	LastLocalTimestamp   uint32 // 最后一次收到数据时的本地时间
 }
 
+type Handler struct {
+	msgType        uint8 // 在datatype/droplet-message.go中定义
+	queues         queue.MultiQueueWriter
+	nQueues        int
+	queueUDPCaches []QueueCache // UDP单线程处理，免锁
+	queueTCPCaches []QueueCache // TCP多线程处理，需加锁
+}
+
 type Receiver struct {
 	cache.DropDetection
 
-	dataType DataType
+	handlers []*Handler
 
-	outQueues        queue.MultiQueueWriter
-	nQueues          int
-	queueBatchCaches []QueueCache
-
-	serverType  ServerType
-	UDPAddress  *net.UDPAddr
-	UDPConn     *net.UDPConn
-	TCPListener net.Listener
-	TCPAddress  string
+	serverType       ServerType
+	UDPAddress       *net.UDPAddr
+	UDPConn          *net.UDPConn
+	UDPReadBuffer    int
+	TCPListener      net.Listener
+	TCPAddress       string
+	lastUDPFlushTime int64
+	lastTCPFlushTime int64
+	timeNow          int64
+	lastLogTime      int64
+	dropLogCount     int64
 
 	exit   bool
 	closed bool
@@ -129,31 +156,40 @@ type ReceiverCounter struct {
 }
 
 func NewReceiver(
-	dataType DataType, // 目前支持ZeroDoc和TaggedFlow 处理上不同点 1, 版本校验  2, 时间戳获取方式
-	listenPort int, // 监听端口，默认同时监听tcp和upd的端口
-	outQueues queue.MultiQueueWriter,
-	nQueues int) *Receiver {
-
-	queueBatchCaches := make([]QueueCache, nQueues)
-	for i := 0; i < nQueues; i++ {
-		queueBatchCaches[i].values = AcquireRecvBuffer()
-	}
-
+	listenPort, UDPReadBuffer int, // 监听端口，默认同时监听tcp和upd的端口
+) *Receiver {
 	receiver := &Receiver{
-		dataType:         dataType,
-		outQueues:        outQueues,
-		nQueues:          nQueues,
-		queueBatchCaches: queueBatchCaches,
-		serverType:       BOTH,
-		UDPAddress:       &net.UDPAddr{Port: listenPort},
-		TCPAddress:       fmt.Sprintf("0.0.0.0:%d", listenPort),
-		counter:          &ReceiverCounter{},
-		status:           make(map[uint16]*Status),
+		handlers:      make([]*Handler, datatype.MESSAGE_TYPE_MAX),
+		serverType:    BOTH,
+		UDPAddress:    &net.UDPAddr{Port: listenPort},
+		UDPReadBuffer: UDPReadBuffer,
+		TCPAddress:    fmt.Sprintf("0.0.0.0:%d", listenPort),
+		counter:       &ReceiverCounter{},
+		status:        make(map[uint16]*Status),
 	}
 
 	debug.Register(TRIDENT_ADAPTER_STATUS_CMD, receiver)
 	receiver.DropDetection.Init("receiver", DROP_DETECT_WINDOW_SIZE)
+	go receiver.timeNowTicker()
 	return receiver
+}
+
+// 注册处理函数，收到msgType的数据，放到outQueues中
+func (r *Receiver) RegistHandler(msgType uint8, outQueues queue.MultiQueueWriter, nQueues int) error {
+	queueUDPCaches := make([]QueueCache, nQueues)
+	queueTCPCaches := make([]QueueCache, nQueues)
+	for i := 0; i < nQueues; i++ {
+		queueUDPCaches[i].values = make([]interface{}, 0, QUEUE_BATCH_NUM)
+		queueTCPCaches[i].values = make([]interface{}, 0, QUEUE_BATCH_NUM)
+	}
+	r.handlers[msgType] = &Handler{
+		msgType:        msgType,
+		queues:         outQueues,
+		nQueues:        nQueues,
+		queueUDPCaches: queueUDPCaches,
+		queueTCPCaches: queueTCPCaches,
+	}
+	return nil
 }
 
 func (r *Receiver) SetServerType(serverType ServerType) {
@@ -171,32 +207,90 @@ func (r *Receiver) GetCounter() interface{} {
 	return counter
 }
 
-func (r *Receiver) putQueue(hashKey queue.HashKey, bytes []byte) {
-	queueCache := &r.queueBatchCaches[hashKey]
+func (r *Receiver) timeNowTicker() {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
 
-	now := time.Now().Unix()
-	queueCache.Lock() // 存在多个tcp连接同时put，故需要加锁
-	if len(queueCache.values)+len(bytes) >= RECV_BUFSIZE || now-queueCache.timestamp > QUEUE_CACHE_FLUSH_TIMEOUT {
-		queueCache.timestamp = now
+	for range ticker.C {
+		if r.exit {
+			return
+		}
+		r.timeNow = time.Now().Unix()
+	}
+}
+
+func (r *Receiver) putUDPQueue(hash int, handler *Handler, buffer *RecvBuffer) {
+	hashKey := hash % handler.nQueues
+
+	queueCache := &handler.queueUDPCaches[hashKey]
+	if len(queueCache.values) >= QUEUE_BATCH_NUM || r.timeNow-queueCache.timestamp > QUEUE_CACHE_FLUSH_TIMEOUT {
+		queueCache.timestamp = r.timeNow
 		if len(queueCache.values) > 0 {
-			r.outQueues.Put(hashKey, RecvBytes(queueCache.values))
-			queueCache.values = AcquireRecvBuffer()
+			handler.queues.Put(queue.HashKey(hashKey), queueCache.values...)
+			queueCache.values = queueCache.values[:0]
 		}
 	}
+	queueCache.values = append(queueCache.values, buffer)
+}
 
-	queueCache.values = append(queueCache.values, bytes...)
+func (r *Receiver) putTCPQueue(hash int, handler *Handler, buffer *RecvBuffer) {
+	hashKey := hash % handler.nQueues
+
+	queueCache := &handler.queueTCPCaches[hashKey]
+	queueCache.Lock() // 存在多个tcp连接同时put，故需要加锁
+	if len(queueCache.values) >= QUEUE_BATCH_NUM || r.timeNow-queueCache.timestamp > QUEUE_CACHE_FLUSH_TIMEOUT {
+		queueCache.timestamp = r.timeNow
+		if len(queueCache.values) > 0 {
+			handler.queues.Put(queue.HashKey(hashKey), queueCache.values...)
+			queueCache.values = queueCache.values[:0]
+		}
+	}
+	queueCache.values = append(queueCache.values, buffer)
 	queueCache.Unlock()
 }
 
-func (r *Receiver) flushPutQueues() {
-	for i := 0; i < r.nQueues; i++ {
-		queueCache := &r.queueBatchCaches[i]
-		if len(queueCache.values) > 0 {
-			queueCache.timestamp = time.Now().Unix()
-			r.outQueues.Put(queue.HashKey(i), RecvBytes(queueCache.values))
-			queueCache.values = AcquireRecvBuffer()
+func (r *Receiver) flushPutUDPQueues() {
+	// 防止频繁flush
+	if r.timeNow-r.lastUDPFlushTime < QUEUE_CACHE_FLUSH_TIMEOUT {
+		return
+	}
+	for _, handler := range r.handlers {
+		if handler == nil {
+			continue
+		}
+		for i := 0; i < handler.nQueues; i++ {
+			queueCache := &handler.queueUDPCaches[i]
+			if len(queueCache.values) > 0 {
+				queueCache.timestamp = time.Now().Unix()
+				handler.queues.Put(queue.HashKey(i), queueCache.values...)
+				queueCache.values = queueCache.values[:0]
+			}
 		}
 	}
+	r.lastUDPFlushTime = r.timeNow
+}
+
+func (r *Receiver) flushPutTCPQueues() {
+	// 防止频繁flush
+	if r.timeNow-r.lastTCPFlushTime < QUEUE_CACHE_FLUSH_TIMEOUT {
+		return
+	}
+	for _, handler := range r.handlers {
+		if handler == nil {
+			continue
+		}
+		for i := 0; i < handler.nQueues; i++ {
+			queueCache := &handler.queueTCPCaches[i]
+			queueCache.Lock()
+			if len(queueCache.values) > 0 {
+				queueCache.timestamp = time.Now().Unix()
+				handler.queues.Put(queue.HashKey(i), queueCache.values...)
+				queueCache.values = queueCache.values[:0]
+			}
+			queueCache.Unlock()
+		}
+	}
+	r.lastTCPFlushTime = r.timeNow
 }
 
 func (r *Receiver) tridentStatus(vtapID uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) {
@@ -233,6 +327,7 @@ func (r *Receiver) tridentStatus(vtapID uint16, ip net.IP, seq uint64, timestamp
 	}
 }
 
+// 用来上报trisolaris, trident最后的活跃时间
 func (r *Receiver) GetTridentStatus() []*Status {
 	r.statusLock.Lock()
 	status := make([]*Status, 0, len(r.status))
@@ -243,37 +338,111 @@ func (r *Receiver) GetTridentStatus() []*Status {
 	return status
 }
 
+// 由于引用了app，导致递归引用,不能在datatype中定义类函数，故放到这里
+func ValidateFlowVersion(t uint8, version uint32) error {
+	var expectVersion uint32
+	switch t {
+	case datatype.MESSAGE_TYPE_METRICS:
+		expectVersion = app.VERSION
+	case datatype.MESSAGE_TYPE_TAGGEDFLOW:
+		expectVersion = datatype.VERSION
+	default:
+		return fmt.Errorf("invalid message type %d", t)
+	}
+
+	if version != expectVersion {
+		return fmt.Errorf("message version incorrect, expect %d, found %d.", expectVersion, version)
+	}
+	return nil
+}
+
+func (r *Receiver) setUDPTimeout() {
+	// 每隔RECV_TIMEOUT 时间触发一次timeout，保证队列的数据都flush出去
+	r.UDPConn.SetReadDeadline(time.Now().Add(RECV_TIMEOUT))
+}
+
+func (r *Receiver) logReceiveError(size int, remoteAddr *net.UDPAddr, err error) {
+	atomic.AddUint64(&r.counter.Invalid, 1)
+	// 防止日志刷屏
+	if r.timeNow-r.lastLogTime < LOG_INTERVAL {
+		r.dropLogCount++
+		return
+	}
+	r.lastLogTime = r.timeNow
+
+	if remoteAddr != nil {
+		log.Warningf("UDP socket recv size %d from %s, %s, already drop log count %d", size, remoteAddr.IP, err, r.dropLogCount)
+	} else {
+		log.Warningf("UDP socket recv size %d, %s, already drop log count %d", size, err, r.dropLogCount)
+	}
+}
+
 func (r *Receiver) ProcessUDPServer() {
 	defer r.UDPConn.Close()
-	recvBuffer := make([]byte, RECV_BUFSIZE)
-	header := &Header{}
+	baseHeader := &datatype.BaseHeader{}
+	flowHeader := &datatype.FlowHeader{}
+	r.setUDPTimeout()
 	for !r.exit {
-		size, remoteAddr, err := r.UDPConn.ReadFromUDP(recvBuffer)
-		if err != nil || size < HEADER_LEN {
-			log.Warningf("recv from udp socket failed: size=%d, %s", size, err)
-			r.flushPutQueues()
-			time.Sleep(10 * time.Second)
+		recvBuffer := AcquireRecvBuffer()
+		size, remoteAddr, err := r.UDPConn.ReadFromUDP(recvBuffer.Buffer)
+		if err != nil || size < datatype.MESSAGE_HEADER_LEN {
+			ReleaseRecvBuffer(recvBuffer)
+			r.flushPutUDPQueues()
+			if err == nil {
+				r.logReceiveError(size, remoteAddr, err)
+				continue
+			}
+			if netErr, ok := err.(net.Error); ok {
+				if netErr.Timeout() {
+					r.setUDPTimeout()
+					continue
+				}
+			}
+			r.logReceiveError(size, remoteAddr, err)
+			time.Sleep(time.Second)
 			continue
 		}
 
-		header.Decode(recvBuffer)
-		if err := header.CheckVersion(r.dataType); err != nil {
-			atomic.AddUint64(&r.counter.Invalid, 1)
-			if remoteAddr != nil {
-				log.Warningf("recv from %s, %s", remoteAddr.IP, err)
-			} else {
-				log.Warning(err)
-			}
+		if err := baseHeader.Decode(recvBuffer.Buffer); err != nil {
+			ReleaseRecvBuffer(recvBuffer)
+			r.logReceiveError(size, remoteAddr, err)
 			continue
+		}
+		if r.handlers[baseHeader.Type] == nil {
+			ReleaseRecvBuffer(recvBuffer)
+			r.logReceiveError(size, remoteAddr, fmt.Errorf("unregist message type %d", baseHeader.Type))
+			continue
+		}
+
+		headerLen := datatype.MESSAGE_HEADER_LEN
+		// 对Metrics和TaggedFlow处理
+		if baseHeader.Type == datatype.MESSAGE_TYPE_METRICS ||
+			baseHeader.Type == datatype.MESSAGE_TYPE_TAGGEDFLOW {
+			flowHeader.Decode(recvBuffer.Buffer[datatype.MESSAGE_HEADER_LEN:])
+			headerLen += datatype.FLOW_HEADER_LEN
+
+			if err := ValidateFlowVersion(baseHeader.Type, flowHeader.Version); err != nil {
+				ReleaseRecvBuffer(recvBuffer)
+				r.logReceiveError(size, remoteAddr, err)
+				continue
+			}
+
+			if baseHeader.Type == datatype.MESSAGE_TYPE_METRICS {
+				timestamp := r.getMetricsTimestamp(recvBuffer.Buffer[headerLen:])
+				ipHash := getIpHash(remoteAddr.IP)
+				r.DropDetection.Detect(ipHash, flowHeader.Sequence, timestamp)
+				r.tridentStatus(flowHeader.VTAPID, remoteAddr.IP, flowHeader.Sequence, timestamp, UDP)
+			}
 		}
 		atomic.AddUint64(&r.counter.RxPackets, 1)
 
-		timestamp := r.getTimestamp(recvBuffer[HEADER_LEN:])
-		ipHash := getIpHash(remoteAddr.IP)
-		r.DropDetection.Detect(ipHash, header.Sequence, timestamp)
-		r.tridentStatus(header.VTAPID, remoteAddr.IP, header.Sequence, timestamp, UDP)
-
-		r.putQueue(queue.HashKey(uint32(r.counter.RxPackets)%(uint32(r.nQueues))), recvBuffer[HEADER_LEN:size])
+		recvBuffer.Begin = headerLen
+		recvBuffer.End = size // syslog,statsd数据的FrameSize长度是0,需要以实际长度为准
+		if baseHeader.Type == datatype.MESSAGE_TYPE_COMPRESS {
+			recvBuffer.End = int(baseHeader.FrameSize) // 可能收到的包长会大于FrameSize, 以FrameSize为准
+		}
+		recvBuffer.IP = remoteAddr.IP
+		r.putUDPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], recvBuffer)
 	}
 }
 
@@ -283,7 +452,7 @@ func (r *Receiver) ProcessTCPServer() {
 		conn, err := r.TCPListener.Accept()
 		if err != nil {
 			log.Errorf("Accept error.%s ", err.Error())
-			time.Sleep(10 * time.Second)
+			time.Sleep(3 * time.Second)
 			continue
 		}
 		log.Infof("TCP client(%s) connect success.", conn.RemoteAddr().String())
@@ -314,8 +483,8 @@ func getIpHash(ip net.IP) uint32 {
 	return GetIpHash(ip)
 }
 
-func (r *Receiver) getTimestamp(buffer []byte) uint32 {
-	if r.dataType == ZeroDoc {
+func (r *Receiver) getMetricsTimestamp(buffer []byte) uint32 {
+	if len(buffer) >= 4 {
 		return binary.LittleEndian.Uint32(buffer) // doc的前4个字节是时间
 	} else {
 		return uint32(time.Now().Unix())
@@ -337,43 +506,68 @@ func ReadN(conn net.Conn, buffer []byte) error {
 
 func (r *Receiver) handleTCPConnection(conn net.Conn) {
 	defer conn.Close()
-
+	defer r.flushPutTCPQueues()
 	ip := parseRemoteIP(conn)
 
-	recvBuffer := make([]byte, RECV_BUFSIZE)
-	header := &Header{}
-	headerBuffer := make([]byte, HEADER_LEN)
+	baseHeader := &datatype.BaseHeader{}
+	baseHeaderBuffer := make([]byte, datatype.MESSAGE_HEADER_LEN)
+	flowHeader := &datatype.FlowHeader{}
+	flowHeaderBuffer := make([]byte, datatype.FLOW_HEADER_LEN)
 	for !r.exit {
-		if err := ReadN(conn, headerBuffer); err != nil {
-			log.Errorf("TCP client(%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
+		if err := ReadN(conn, baseHeaderBuffer); err != nil {
+			log.Warningf("TCP client(%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
 			return
 		}
 
-		header.Decode(headerBuffer)
-		if err := header.CheckVersion(r.dataType); err != nil {
+		if err := baseHeader.Decode(baseHeaderBuffer); err != nil {
+			log.Warningf("TCP client(%s) decode error.%s", conn.RemoteAddr().String(), err.Error())
+			return
+
+		}
+		if r.handlers[baseHeader.Type] == nil {
 			atomic.AddUint64(&r.counter.Invalid, 1)
-			log.Warningf("recv from %s, %s", conn.RemoteAddr().String(), err)
-			continue
-		}
-
-		dataLen := int(header.Length)
-		if dataLen > len(recvBuffer) {
-			log.Errorf("data len is(%d) exceed(%d)", dataLen, len(recvBuffer))
+			log.Warningf("recv from %s, unregist message type %d", conn.RemoteAddr().String(), baseHeader.Type)
 			return
 		}
 
-		if err := ReadN(conn, recvBuffer[:dataLen]); err != nil {
-			log.Errorf("TCP client(%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
+		headerLen := datatype.MESSAGE_HEADER_LEN
+		// 对metrics和TaggedFlow处理
+		if baseHeader.Type == datatype.MESSAGE_TYPE_METRICS || baseHeader.Type == datatype.MESSAGE_TYPE_TAGGEDFLOW {
+			if err := ReadN(conn, flowHeaderBuffer); err != nil {
+				atomic.AddUint64(&r.counter.Invalid, 1)
+				log.Warningf("TCP client(%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
+				return
+			}
+			flowHeader.Decode(flowHeaderBuffer)
+			headerLen += datatype.FLOW_HEADER_LEN
+
+			if err := ValidateFlowVersion(baseHeader.Type, flowHeader.Version); err != nil {
+				atomic.AddUint64(&r.counter.Invalid, 1)
+				log.Warningf("recv from %s, %s", conn.RemoteAddr().String(), err)
+				return
+			}
+		}
+
+		recvBuffer := AcquireRecvBuffer()
+		if err := ReadN(conn, recvBuffer.Buffer[:int(baseHeader.FrameSize)-headerLen]); err != nil {
+			atomic.AddUint64(&r.counter.Invalid, 1)
+			ReleaseRecvBuffer(recvBuffer)
+			log.Warningf("TCP client(%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
 			return
 		}
 
-		r.tridentStatus(header.VTAPID, ip,
-			header.Sequence,
-			r.getTimestamp(recvBuffer),
-			TCP)
+		if baseHeader.Type == datatype.MESSAGE_TYPE_METRICS {
+			r.tridentStatus(flowHeader.VTAPID, ip,
+				flowHeader.Sequence,
+				r.getMetricsTimestamp(recvBuffer.Buffer),
+				TCP)
+		}
 
 		atomic.AddUint64(&r.counter.RxPackets, 1)
-		r.putQueue(queue.HashKey(uint32(r.counter.RxPackets)%(uint32(r.nQueues))), recvBuffer[:dataLen])
+		recvBuffer.Begin = 0
+		recvBuffer.End = int(baseHeader.FrameSize) - headerLen
+		recvBuffer.IP = ip
+		r.putTCPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], recvBuffer)
 	}
 }
 
@@ -384,7 +578,7 @@ func (r *Receiver) Start() {
 			log.Errorf("UDP listen at %s failed: %s", r.UDPAddress, err)
 			os.Exit(-1)
 		}
-		r.UDPConn.SetReadBuffer(SOCKET_READ_BUFFER_SIZE)
+		r.UDPConn.SetReadBuffer(r.UDPReadBuffer)
 		go r.ProcessUDPServer()
 	}
 	if r.serverType == TCP || r.serverType == BOTH {

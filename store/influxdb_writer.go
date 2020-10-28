@@ -175,7 +175,6 @@ func NewInfluxdbWriter(addrPrimary, addrReplica, httpUsername, httpPassword, nam
 
 	if _, _, err = httpClient.Ping(0); err != nil {
 		log.Errorf("http connect to influxdb(%s) failed: %s", addrPrimary, err)
-		return nil, err
 	}
 	w.PrimaryClient = httpClient
 	w.DBCreateCtlPrimary.HttpClient = httpClient
