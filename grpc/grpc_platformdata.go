@@ -97,40 +97,40 @@ type PlatformInfoTable struct {
 	epcIDLock *sync.RWMutex
 }
 
-func ClosePlatformInfoTable() {
-	platformInfoTable.Close()
+func (t *PlatformInfoTable) ClosePlatformInfoTable() {
+	t.Close()
 }
 
-func QueryRegionID() uint32 {
-	return platformInfoTable.regionID
+func (t *PlatformInfoTable) QueryRegionID() uint32 {
+	return t.regionID
 }
 
-func QueryEpcIDBaseInfo(epcID int32) *BaseInfo {
-	return platformInfoTable.QueryEpcIDBaseInfo(epcID)
+func (t *PlatformInfoTable) QueryEpcIDBaseInfo(epcID int32) *BaseInfo {
+	return t.queryEpcIDBaseInfo(epcID)
 }
 
-func QueryEpcIDBaseInfosPair(epcID0, epcID1 int32) (*BaseInfo, *BaseInfo) {
-	return platformInfoTable.QueryEpcIDBaseInfosPair(epcID0, epcID1)
+func (t *PlatformInfoTable) QueryEpcIDBaseInfosPair(epcID0, epcID1 int32) (*BaseInfo, *BaseInfo) {
+	return t.queryEpcIDBaseInfosPair(epcID0, epcID1)
 }
 
-func QueryMacInfo(mac uint64) *Info {
-	return platformInfoTable.QueryMacInfo(mac)
+func (t *PlatformInfoTable) QueryMacInfo(mac uint64) *Info {
+	return t.queryMacInfo(mac)
 }
 
-func QueryMacInfosPair(mac0, mac1 uint64) (*Info, *Info) {
-	return platformInfoTable.QueryMacInfosPair(mac0, mac1)
+func (t *PlatformInfoTable) QueryMacInfosPair(mac0, mac1 uint64) (*Info, *Info) {
+	return t.queryMacInfosPair(mac0, mac1)
 }
 
-func QueryIPV4Infos(epcID int16, ipv4 uint32) *Info {
+func (t *PlatformInfoTable) QueryIPV4Infos(epcID int16, ipv4 uint32) *Info {
 	if epcID == datatype.EPC_FROM_INTERNET {
 		return nil
 	}
-	info := platformInfoTable.QueryIPV4Infos(epcID, ipv4)
+	info := t.queryIPV4Infos(epcID, ipv4)
 	if info != nil {
 		return info
 	}
 
-	baseInfo := QueryEpcIDBaseInfo(int32(epcID))
+	baseInfo := t.queryEpcIDBaseInfo(int32(epcID))
 	if baseInfo == nil {
 		return nil
 	}
@@ -139,16 +139,16 @@ func QueryIPV4Infos(epcID int16, ipv4 uint32) *Info {
 	}
 }
 
-func QueryIPV6Infos(epcID int16, ipv6 net.IP) *Info {
+func (t *PlatformInfoTable) QueryIPV6Infos(epcID int16, ipv6 net.IP) *Info {
 	if epcID == datatype.EPC_FROM_INTERNET {
 		return nil
 	}
-	info := platformInfoTable.QueryIPV6Infos(epcID, ipv6)
+	info := t.queryIPV6Infos(epcID, ipv6)
 	if info != nil {
 		return info
 	}
 
-	baseInfo := QueryEpcIDBaseInfo(int32(epcID))
+	baseInfo := t.queryEpcIDBaseInfo(int32(epcID))
 	if baseInfo == nil {
 		return nil
 	}
@@ -157,22 +157,22 @@ func QueryIPV6Infos(epcID int16, ipv6 net.IP) *Info {
 	}
 }
 
-func QueryIPV4InfosPair(epcID0 int16, ipv40 uint32, epcID1 int16, ipv41 uint32) (info0 *Info, info1 *Info) {
+func (t *PlatformInfoTable) QueryIPV4InfosPair(epcID0 int16, ipv40 uint32, epcID1 int16, ipv41 uint32) (info0 *Info, info1 *Info) {
 	if epcID0 == datatype.EPC_FROM_INTERNET {
-		return nil, QueryIPV4Infos(epcID1, ipv41)
+		return nil, t.QueryIPV4Infos(epcID1, ipv41)
 	} else if epcID1 == datatype.EPC_FROM_INTERNET {
-		return QueryIPV4Infos(epcID0, ipv40), nil
+		return t.QueryIPV4Infos(epcID0, ipv40), nil
 	}
-	info0, info1 = platformInfoTable.QueryIPV4InfosPair(epcID0, ipv40, epcID1, ipv41)
+	info0, info1 = t.queryIPV4InfosPair(epcID0, ipv40, epcID1, ipv41)
 	if info0 == nil {
-		if baseInfo := QueryEpcIDBaseInfo(int32(epcID0)); baseInfo != nil {
+		if baseInfo := t.queryEpcIDBaseInfo(int32(epcID0)); baseInfo != nil {
 			info0 = &Info{
 				RegionID: baseInfo.RegionID,
 			}
 		}
 	}
 	if info1 == nil {
-		if baseInfo := QueryEpcIDBaseInfo(int32(epcID1)); baseInfo != nil {
+		if baseInfo := t.queryEpcIDBaseInfo(int32(epcID1)); baseInfo != nil {
 			info1 = &Info{
 				RegionID: baseInfo.RegionID,
 			}
@@ -181,22 +181,22 @@ func QueryIPV4InfosPair(epcID0 int16, ipv40 uint32, epcID1 int16, ipv41 uint32) 
 	return
 }
 
-func QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID1 int16, ipv61 net.IP) (info0 *Info, info1 *Info) {
+func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID1 int16, ipv61 net.IP) (info0 *Info, info1 *Info) {
 	if epcID0 == datatype.EPC_FROM_INTERNET {
-		return nil, QueryIPV6Infos(epcID1, ipv61)
+		return nil, t.QueryIPV6Infos(epcID1, ipv61)
 	} else if epcID1 == datatype.EPC_FROM_INTERNET {
-		return QueryIPV6Infos(epcID0, ipv60), nil
+		return t.QueryIPV6Infos(epcID0, ipv60), nil
 	}
-	info0, info1 = platformInfoTable.QueryIPV6InfosPair(epcID0, ipv60, epcID1, ipv61)
+	info0, info1 = t.queryIPV6InfosPair(epcID0, ipv60, epcID1, ipv61)
 	if info0 == nil {
-		if baseInfo := QueryEpcIDBaseInfo(int32(epcID0)); baseInfo != nil {
+		if baseInfo := t.queryEpcIDBaseInfo(int32(epcID0)); baseInfo != nil {
 			info0 = &Info{
 				RegionID: baseInfo.RegionID,
 			}
 		}
 	}
 	if info1 == nil {
-		if baseInfo := QueryEpcIDBaseInfo(int32(epcID1)); baseInfo != nil {
+		if baseInfo := t.queryEpcIDBaseInfo(int32(epcID1)); baseInfo != nil {
 			info1 = &Info{
 				RegionID: baseInfo.RegionID,
 			}
@@ -215,8 +215,8 @@ func NewPlatformInfoTable(ips []net.IP, port int, processName string, receiver *
 		ipv6Lock:           &sync.RWMutex{},
 		macLock:            &sync.RWMutex{},
 		epcIDLock:          &sync.RWMutex{},
-		epcIDIPV4Lru:       lru.NewU64LRU("epcIDIPV4", LruSlotSize, LruCap),
-		epcIDIPV6Lru:       lru.NewU160LRU("epcIDIPV6", LruSlotSize, LruCap),
+		epcIDIPV4Lru:       lru.NewU64LRU("epcIDIPV4_"+processName, LruSlotSize, LruCap),
+		epcIDIPV6Lru:       lru.NewU160LRU("epcIDIPV6_"+processName, LruSlotSize, LruCap),
 		epcIDIPV4Infos:     make(map[uint64]*Info),
 		epcIDIPV6Infos:     make(map[[EpcIDIPV6_LEN]byte]*Info),
 		macInfos:           make(map[uint64]*Info),
@@ -260,14 +260,14 @@ func (t *PlatformInfoTable) IPV4InfoStat(lruItem interface{}) {
 	}
 }
 
-func (t *PlatformInfoTable) QueryIPV4Infos(epcID int16, ipv4 uint32) (info *Info) {
+func (t *PlatformInfoTable) queryIPV4Infos(epcID int16, ipv4 uint32) (info *Info) {
 	var ok bool
 	var lruValue interface{}
 	key := uint64(epcID)<<32 | uint64(ipv4)
 	t.ipv4Lock.Lock()
 	if lruValue, ok = t.epcIDIPV4Lru.Get(key, false); !ok {
 		if info, ok = t.epcIDIPV4Infos[key]; !ok {
-			info = t.QueryIPV4Cidr(epcID, ipv4)
+			info = t.queryIPV4Cidr(epcID, ipv4)
 		}
 		t.IPV4InfoAddLru(info, key)
 		t.ipv4Lock.Unlock()
@@ -296,7 +296,7 @@ func (t *PlatformInfoTable) InfoMissStat(mac uint64) {
 }
 
 // 只有当l3_epc_id为正数时，才能查到info
-func (t *PlatformInfoTable) QueryMacInfo(mac uint64) *Info {
+func (t *PlatformInfoTable) queryMacInfo(mac uint64) *Info {
 	t.macLock.RLock()
 	info, ok := t.macInfos[mac]
 	t.macLock.RUnlock()
@@ -308,7 +308,7 @@ func (t *PlatformInfoTable) QueryMacInfo(mac uint64) *Info {
 	return info
 }
 
-func (t *PlatformInfoTable) QueryMacInfosPair(mac0, mac1 uint64) (info0 *Info, info1 *Info) {
+func (t *PlatformInfoTable) queryMacInfosPair(mac0, mac1 uint64) (info0 *Info, info1 *Info) {
 	var ok0, ok1 bool
 	t.macLock.RLock()
 	if info0, ok0 = t.macInfos[mac0]; ok0 {
@@ -330,7 +330,7 @@ func (t *PlatformInfoTable) QueryMacInfosPair(mac0, mac1 uint64) (info0 *Info, i
 	return
 }
 
-func (t *PlatformInfoTable) BaseInfoMissStat(epcID int32) {
+func (t *PlatformInfoTable) baseInfoMissStat(epcID int32) {
 	t.epcIDLock.RLock()
 	if missCountAddr, exist := t.epcIDBaseMissCount[epcID]; exist {
 		t.epcIDLock.RUnlock()
@@ -346,19 +346,19 @@ func (t *PlatformInfoTable) BaseInfoMissStat(epcID int32) {
 	}
 }
 
-func (t *PlatformInfoTable) QueryEpcIDBaseInfo(epcID int32) *BaseInfo {
+func (t *PlatformInfoTable) queryEpcIDBaseInfo(epcID int32) *BaseInfo {
 	t.epcIDLock.RLock()
 	baseInfo, ok := t.epcIDBaseInfos[epcID]
 	t.epcIDLock.RUnlock()
 	if !ok {
-		t.BaseInfoMissStat(epcID)
+		t.baseInfoMissStat(epcID)
 	} else {
 		atomic.AddUint64(&baseInfo.HitCount, 1)
 	}
 	return baseInfo
 }
 
-func (t *PlatformInfoTable) QueryEpcIDBaseInfosPair(epcID0, epcID1 int32) (baseInfo0 *BaseInfo, baseInfo1 *BaseInfo) {
+func (t *PlatformInfoTable) queryEpcIDBaseInfosPair(epcID0, epcID1 int32) (baseInfo0 *BaseInfo, baseInfo1 *BaseInfo) {
 	var ok0, ok1 bool
 	t.epcIDLock.RLock()
 	if baseInfo0, ok0 = t.epcIDBaseInfos[epcID0]; ok0 {
@@ -370,18 +370,18 @@ func (t *PlatformInfoTable) QueryEpcIDBaseInfosPair(epcID0, epcID1 int32) (baseI
 	t.epcIDLock.RUnlock()
 
 	if !ok0 {
-		t.BaseInfoMissStat(epcID0)
+		t.baseInfoMissStat(epcID0)
 	}
 
 	if !ok1 {
-		t.BaseInfoMissStat(epcID1)
+		t.baseInfoMissStat(epcID1)
 	}
 
 	return
 }
 
 // 需要一起查询, 防止查询时，平台信息更新
-func (t *PlatformInfoTable) QueryIPV4InfosPair(epcID0 int16, ipv40 uint32, epcID1 int16, ipv41 uint32) (info0 *Info, info1 *Info) {
+func (t *PlatformInfoTable) queryIPV4InfosPair(epcID0 int16, ipv40 uint32, epcID1 int16, ipv41 uint32) (info0 *Info, info1 *Info) {
 	var ok0, ok1 bool
 	var lruValue0, lruValue1 interface{}
 	key0 := uint64(epcID0)<<32 | uint64(ipv40)
@@ -389,7 +389,7 @@ func (t *PlatformInfoTable) QueryIPV4InfosPair(epcID0 int16, ipv40 uint32, epcID
 	t.ipv4Lock.Lock()
 	if lruValue0, ok0 = t.epcIDIPV4Lru.Get(key0, false); !ok0 {
 		if info0, ok0 = t.epcIDIPV4Infos[key0]; !ok0 {
-			info0 = t.QueryIPV4Cidr(epcID0, ipv40)
+			info0 = t.queryIPV4Cidr(epcID0, ipv40)
 		}
 	} else {
 		t.IPV4InfoStat(lruValue0)
@@ -397,7 +397,7 @@ func (t *PlatformInfoTable) QueryIPV4InfosPair(epcID0 int16, ipv40 uint32, epcID
 	}
 	if lruValue1, ok1 = t.epcIDIPV4Lru.Get(key1, false); !ok1 {
 		if info1, ok1 = t.epcIDIPV4Infos[key1]; !ok1 {
-			info1 = t.QueryIPV4Cidr(epcID1, ipv41)
+			info1 = t.queryIPV4Cidr(epcID1, ipv41)
 		}
 	} else {
 		t.IPV4InfoStat(lruValue1)
@@ -438,7 +438,7 @@ func (t *PlatformInfoTable) IPV6InfoStat(lruItem interface{}) {
 	}
 }
 
-func (t *PlatformInfoTable) QueryIPV6Infos(epcID int16, ipv6 net.IP) (info *Info) {
+func (t *PlatformInfoTable) queryIPV6Infos(epcID int16, ipv6 net.IP) (info *Info) {
 	var ok bool
 	var lruValue interface{}
 	var key [EpcIDIPV6_LEN]byte
@@ -448,7 +448,7 @@ func (t *PlatformInfoTable) QueryIPV6Infos(epcID int16, ipv6 net.IP) (info *Info
 	t.ipv6Lock.Lock()
 	if lruValue, ok = t.epcIDIPV6Lru.Get(key[:], false); !ok {
 		if info, ok = t.epcIDIPV6Infos[key]; !ok {
-			info = t.QueryIPV6Cidr(epcID, ipv6)
+			info = t.queryIPV6Cidr(epcID, ipv6)
 		}
 		t.IPV6InfoAddLru(info, key[:])
 		t.ipv6Lock.Unlock()
@@ -460,7 +460,7 @@ func (t *PlatformInfoTable) QueryIPV6Infos(epcID int16, ipv6 net.IP) (info *Info
 	return
 }
 
-func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID1 int16, ipv61 net.IP) (info0 *Info, info1 *Info) {
+func (t *PlatformInfoTable) queryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID1 int16, ipv61 net.IP) (info0 *Info, info1 *Info) {
 	var key0, key1 [EpcIDIPV6_LEN]byte
 	binary.LittleEndian.PutUint32(key0[:], uint32(epcID0))
 	copy(key0[4:], ipv60)
@@ -472,7 +472,7 @@ func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID
 	t.ipv6Lock.Lock()
 	if lruValue0, ok0 = t.epcIDIPV6Lru.Get(key0[:], false); !ok0 {
 		if info0, ok0 = t.epcIDIPV6Infos[key0]; !ok0 {
-			info0 = t.QueryIPV6Cidr(epcID0, ipv60)
+			info0 = t.queryIPV6Cidr(epcID0, ipv60)
 		}
 	} else {
 		t.IPV6InfoStat(lruValue0)
@@ -481,7 +481,7 @@ func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID
 
 	if lruValue1, ok1 = t.epcIDIPV6Lru.Get(key1[:], false); !ok1 {
 		if info1, ok1 = t.epcIDIPV6Infos[key1]; !ok1 {
-			info1 = t.QueryIPV6Cidr(epcID1, ipv61)
+			info1 = t.queryIPV6Cidr(epcID1, ipv61)
 		}
 	} else {
 		t.IPV6InfoStat(lruValue1)
@@ -500,7 +500,7 @@ func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID
 }
 
 // 查询Cidr之前，需要先查询过epcip表, 否则会覆盖epcip表的内容
-func (t *PlatformInfoTable) QueryIPV4Cidr(epcID int16, ipv4 uint32) *Info {
+func (t *PlatformInfoTable) queryIPV4Cidr(epcID int16, ipv4 uint32) *Info {
 	var info *Info
 	if cidrInfos, exist := t.epcIDIPV4CidrInfos[int32(epcID)]; exist {
 		ip := utils.IpFromUint32(ipv4)
@@ -520,7 +520,7 @@ func (t *PlatformInfoTable) QueryIPV4Cidr(epcID int16, ipv4 uint32) *Info {
 }
 
 // 查询Cidr之前，需要先查询过epcip表, 否则会覆盖epcip表的内容
-func (t *PlatformInfoTable) QueryIPV6Cidr(epcID int16, ipv6 net.IP) *Info {
+func (t *PlatformInfoTable) queryIPV6Cidr(epcID int16, ipv6 net.IP) *Info {
 	var info *Info
 	if cidrInfos, exist := t.epcIDIPV6CidrInfos[int32(epcID)]; exist {
 		for _, cidrInfo := range cidrInfos {
