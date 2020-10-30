@@ -87,7 +87,7 @@ func TestMarshallToInfluxdb(t *testing.T) {
 	f := Field{}
 	tag := &Tag{&f, 0, ""}
 	tag.GlobalThreadID = 112
-	tag.Code = ^(GroupIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | RegionIDPath | SubnetIDPath | PodNodeIDPath | AZIDPath | PodGroupIDPath | PodNSIDPath | PodIDPath)
+	tag.Code = ^(GroupIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | RegionIDPath | SubnetIDPath | PodNodeIDPath | AZIDPath | PodGroupIDPath | PodNSIDPath | PodIDPath | PodClusterIDPath)
 
 	l := tag.MarshalTo(b)
 	strs := parseTagkeys(b[:l])
@@ -104,7 +104,7 @@ func TestMarshallToInfluxdb(t *testing.T) {
 		}
 	}
 
-	tag.Code = ^(GroupID | HostID | IP | L3Device | L3EpcID | RegionID | SubnetID | PodNodeID | AZID | PodGroupID | PodNSID | PodID)
+	tag.Code = ^(GroupID | HostID | IP | L3Device | L3EpcID | RegionID | SubnetID | PodNodeID | AZID | PodGroupID | PodNSID | PodID | PodClusterID)
 	l = tag.MarshalTo(b)
 	strs = parseTagkeys(b[:l])
 	cloneStrs = cloneStrs[:0]
