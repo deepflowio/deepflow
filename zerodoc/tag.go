@@ -31,6 +31,7 @@ const (
 	PodNSID
 	PodID
 	MAC
+	PodClusterID
 )
 
 const (
@@ -47,6 +48,7 @@ const (
 	PodNSIDPath
 	PodIDPath
 	MACPath
+	PodClusterIDPath
 )
 
 const (
@@ -251,6 +253,7 @@ type Field struct {
 	PodGroupID   int16
 	PodNSID      uint16
 	PodID        uint16
+	PodClusterID uint16
 
 	MAC1          uint64
 	IP61          net.IP // FIXME: 合并IP61和IP1
@@ -267,6 +270,7 @@ type Field struct {
 	PodGroupID1   int16
 	PodNSID1      uint16
 	PodID1        uint16
+	PodClusterID1 uint16
 
 	ACLGID     uint16
 	Direction  DirectionEnum
@@ -434,6 +438,18 @@ func (t *Tag) MarshalTo(b []byte) int {
 		//offset += copy(b[offset:], utils.Uint64ToMac(t.MAC).String())
 		//offset += copy(b[offset:], ",mac_1=")
 		//offset += copy(b[offset:], utils.Uint64ToMac(t.MAC1).String())
+	}
+
+	if t.Code&PodClusterID != 0 {
+		offset += copy(b[offset:], ",pod_cluster_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.PodClusterID), 10))
+	}
+
+	if t.Code&PodClusterIDPath != 0 {
+		offset += copy(b[offset:], ",pod_cluster_id_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.PodClusterID), 10))
+		offset += copy(b[offset:], ",pod_cluster_id_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.PodClusterID1), 10))
 	}
 
 	if t.Code&PodGroupID != 0 {
@@ -645,6 +661,9 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&PodGroupID != 0 {
 		t.PodGroupID = int16(decoder.ReadU16())
 	}
+	if t.Code&PodClusterID != 0 {
+		t.PodClusterID = decoder.ReadU16()
+	}
 
 	if t.Code&MACPath != 0 {
 		t.MAC = decoder.ReadU64()
@@ -711,6 +730,10 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&PodGroupIDPath != 0 {
 		t.PodGroupID = int16(decoder.ReadU16())
 		t.PodGroupID1 = int16(decoder.ReadU16())
+	}
+	if t.Code&PodClusterIDPath != 0 {
+		t.PodClusterID = decoder.ReadU16()
+		t.PodClusterID1 = decoder.ReadU16()
 	}
 
 	if t.Code&Direction != 0 {
@@ -807,6 +830,9 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 	if code&PodGroupID != 0 {
 		encoder.WriteU16(uint16(t.PodGroupID))
 	}
+	if code&PodClusterID != 0 {
+		encoder.WriteU16(t.PodClusterID)
+	}
 
 	if code&MACPath != 0 {
 		encoder.WriteU64(t.MAC)
@@ -875,6 +901,10 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 	if code&PodGroupIDPath != 0 {
 		encoder.WriteU16(uint16(t.PodGroupID))
 		encoder.WriteU16(uint16(t.PodGroupID1))
+	}
+	if code&PodClusterIDPath != 0 {
+		encoder.WriteU16(t.PodClusterID)
+		encoder.WriteU16(t.PodClusterID1)
 	}
 
 	if code&Direction != 0 {
