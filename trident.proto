@@ -10,6 +10,7 @@ service Synchronizer {
     rpc Push (SyncRequest) returns (stream SyncResponse) {}
     rpc AnalyzerSync (SyncRequest) returns (SyncResponse) {}
     rpc Upgrade (UpgradeRequest) returns (stream UpgradeResponse) {}
+    rpc Query (NtpRequest) returns (NtpResponse) {}
 }
 
 enum State {
@@ -299,4 +300,13 @@ message UpgradeResponse  {
     optional string md5 = 3;        // 文件MD5
     optional uint64 total_len = 4;  // 数据总长
     optional uint32 pkt_count = 5;  // 包总个数
+}
+
+message NtpRequest {
+    optional string ctrl_ip = 1; // 请求端的控制口IP
+    optional bytes request = 10; // 数据
+}
+
+message NtpResponse {
+    optional bytes response = 1; // 数据
 }
