@@ -4,6 +4,7 @@ package trident;
 option go_package = "trident";
 
 import "common.proto";
+import "genesis.proto";
 
 service Synchronizer {
     rpc Sync (SyncRequest) returns (SyncResponse) {}
@@ -11,6 +12,7 @@ service Synchronizer {
     rpc AnalyzerSync (SyncRequest) returns (SyncResponse) {}
     rpc Upgrade (UpgradeRequest) returns (stream UpgradeResponse) {}
     rpc Query (NtpRequest) returns (NtpResponse) {}
+    rpc GenesisProxySync (genesis.SyncRequest) returns (genesis.SyncResponse) {}
 }
 
 enum State {
