@@ -59,7 +59,13 @@ message SyncRequest {
     optional bool   is_virtual_machine = 24 [default = false];
 
     repeated CommunicationVtap communication_vtaps = 31; // 仅对数据节点有意义
-    optional uint32 cpu_num = 32; // 仅对数据节点有意义
+
+    // 运行环境基本信息
+    optional uint32 cpu_num = 32;
+    optional uint32 memory_size = 33; // 单位：Bytes
+    optional string arch = 34;
+    optional string os = 35;
+    optional string kernel_version = 36;
 }
 
 enum Status {
