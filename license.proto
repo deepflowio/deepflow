@@ -29,7 +29,7 @@ message License {
     optional int32 vtap_count_type7 = 19 [default = 0]; // 物理机pod
     optional uint32 crm_id = 20; //CRM ID
     optional string contract_no = 21; //合同编号
-    // optional bool   controller_cluster = 22 [default = true]; //控制器集群 - 20201102废弃
+    optional bool   controller_cluster = 22 [default = true]; //控制器集群 - 20201102废弃 暂不删除
     optional int32 controller_count = 23; //控制器数量
     optional int32 controller_count_multi_region_feature = 24; //跨区域时，多区域Feature授权的数量
 }
