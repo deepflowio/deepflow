@@ -64,7 +64,7 @@ message SyncRequest {
 
     // 运行环境基本信息
     optional uint32 cpu_num = 32;
-    optional uint32 memory_size = 33; // 单位：Bytes
+    optional uint64 memory_size = 33; // 单位：Bytes
     optional string arch = 34;
     optional string os = 35;
     optional string kernel_version = 36;
