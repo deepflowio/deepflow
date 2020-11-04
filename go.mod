@@ -14,13 +14,14 @@ require (
 	github.com/pebbe/zmq4 v1.0.0
 	github.com/pkg/errors v0.8.1
 	github.com/shirou/gopsutil v2.18.12+incompatible
+	github.com/shirou/gopsutil/v3 v3.20.10
 	github.com/spf13/cobra v0.0.3
 	github.com/textnode/fencer v0.0.0-20121219195347-6baed0e5ef9a
 	github.com/vishvananda/netlink v1.1.0
 	gitlab.x.lan/platform/influxdb v0.0.0-20200109064655-6c1e420280c5
-	gitlab.x.lan/yunshan/message v0.0.0-20201029103313-30acf81efdf6
+	gitlab.x.lan/yunshan/message v0.0.0-20201110053615-ab745eb1eb17
 	golang.org/x/net v0.0.0-20190514140710-3ec191127204
-	golang.org/x/sys v0.0.0-20190606203320-7fc4e5ec1444
+	golang.org/x/sys v0.0.0-20201024232916-9f70ab9862d5
 	google.golang.org/grpc v1.19.0
 	gopkg.in/alexcesaro/statsd.v2 v2.0.0
 )
