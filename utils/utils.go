@@ -5,9 +5,13 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"runtime"
 	"strings"
 	"time"
 	"unsafe"
+
+	"github.com/shirou/gopsutil/v3/host"
+	"github.com/shirou/gopsutil/v3/mem"
 )
 
 func UintMin(x, y uint) uint {
@@ -157,4 +161,34 @@ func IPv6ToBinary(ip net.IP) string {
 		}
 	}
 	return string(buf[:])
+}
+
+// 运行环境信息
+type RuntimeEnv struct {
+	CpuNum     uint32
+	MemorySize uint64
+
+	// linux下为uname中Machine字段, 参照 https://en.wikipedia.org/wiki/Uname 和 https://stackoverflow.com/questions/45125516/possible-values-for-uname-m
+	Arch string // 如 x86_64, aarch64, ppc64, armv7l, amd64, i686, i386, mips, sun4u
+
+	// OS名称+版本号, 参照 github.com/shirou/gopsutil/v3/host/host_linux.go:PlatformInformationWithContext
+	OS string // 如 ubuntu 11.04, centos 7.5.1804, fedora 19, redhat xx, linuxmint xx等
+
+	// linux下为uname的Release字段
+	KernelVersion string // 如 4.19.17
+}
+
+func GetRuntimeEnv() RuntimeEnv {
+	env := RuntimeEnv{
+		CpuNum: uint32(runtime.NumCPU()),
+	}
+	if v, err := mem.VirtualMemory(); err == nil {
+		env.MemorySize = v.Total
+	}
+	if info, err := host.Info(); err == nil {
+		env.Arch = info.KernelArch
+		env.OS = info.Platform + " " + info.PlatformVersion
+		env.KernelVersion = strings.Split(info.KernelVersion, "-")[0]
+	}
+	return env
 }
