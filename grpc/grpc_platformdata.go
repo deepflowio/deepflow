@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -87,8 +86,13 @@ type PlatformInfoTable struct {
 	epcIDBaseMissCount map[int32]*uint64
 
 	bootTime            uint32
-	processName         string
+	moduleName          string
 	versionPlatformData uint64
+	ctlIP               string
+	hostname            string
+	runtimeEnv          utils.RuntimeEnv
+	tsdbShardID         uint32
+	tsdbReplicaIP       string
 
 	*GrpcSession
 	ipv4Lock  *sync.RWMutex
@@ -206,7 +210,7 @@ func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID
 }
 
 // 单例模式，只启动一次
-func NewPlatformInfoTable(ips []net.IP, port int, processName string, receiver *receiver.Receiver) *PlatformInfoTable {
+func NewPlatformInfoTable(ips []net.IP, port int, moduleName string, tsdbShardID uint32, tsdbReplicaIP string, receiver *receiver.Receiver) *PlatformInfoTable {
 	table := &PlatformInfoTable{
 		receiver:           receiver,
 		bootTime:           uint32(time.Now().Unix()),
@@ -215,8 +219,8 @@ func NewPlatformInfoTable(ips []net.IP, port int, processName string, receiver *
 		ipv6Lock:           &sync.RWMutex{},
 		macLock:            &sync.RWMutex{},
 		epcIDLock:          &sync.RWMutex{},
-		epcIDIPV4Lru:       lru.NewU64LRU("epcIDIPV4_"+processName, LruSlotSize, LruCap),
-		epcIDIPV6Lru:       lru.NewU160LRU("epcIDIPV6_"+processName, LruSlotSize, LruCap),
+		epcIDIPV4Lru:       lru.NewU64LRU("epcIDIPV4_"+moduleName, LruSlotSize, LruCap),
+		epcIDIPV6Lru:       lru.NewU160LRU("epcIDIPV6_"+moduleName, LruSlotSize, LruCap),
 		epcIDIPV4Infos:     make(map[uint64]*Info),
 		epcIDIPV6Infos:     make(map[[EpcIDIPV6_LEN]byte]*Info),
 		macInfos:           make(map[uint64]*Info),
@@ -225,7 +229,10 @@ func NewPlatformInfoTable(ips []net.IP, port int, processName string, receiver *
 		epcIDIPV6CidrInfos: make(map[int32][]*CidrInfo),
 		epcIDBaseInfos:     make(map[int32]*BaseInfo),
 		epcIDBaseMissCount: make(map[int32]*uint64),
-		processName:        processName,
+		moduleName:         moduleName,
+		runtimeEnv:         utils.GetRuntimeEnv(),
+		tsdbShardID:        tsdbShardID,
+		tsdbReplicaIP:      tsdbReplicaIP,
 	}
 	runOnce := func() {
 		if err := table.Reload(); err != nil {
@@ -541,7 +548,8 @@ func (t *PlatformInfoTable) queryIPV6Cidr(epcID int16, ipv6 net.IP) *Info {
 func (t *PlatformInfoTable) String() string {
 	sb := &strings.Builder{}
 
-	sb.WriteString(fmt.Sprintf("RegionID: %d\n", t.regionID))
+	sb.WriteString(fmt.Sprintf("moduleName:%s ctlIP:%s hostname:%s RegionID:%d tsdbShardID:%d tsdbReplicaIP:%s  ARCH:%s OS:%s Kernel:%s CPUNum:%d MemorySize:%d\n",
+		t.moduleName, t.ctlIP, t.hostname, t.regionID, t.tsdbShardID, t.tsdbReplicaIP, t.runtimeEnv.Arch, t.runtimeEnv.OS, t.runtimeEnv.KernelVersion, t.runtimeEnv.CpuNum, t.runtimeEnv.MemorySize))
 	t.ipv4Lock.RLock()
 	if len(t.epcIDIPV4Infos) > 0 {
 		sb.WriteString("\nepcID   ipv4            mac          host            hostID  regionID  deviceType  deviceID    subnetID  podNodeID podNSID podGroupID podID podClusterID azID isVip hitCount\n")
@@ -727,11 +735,13 @@ func (t *PlatformInfoTable) Reload() error {
 		if local, err = lookup(remote); err != nil {
 			return err
 		}
+		t.ctlIP = local.String()
 
 		hostname, err := os.Hostname()
 		if err != nil {
 			log.Infof("get hostname failed. %s", err)
 		}
+		t.hostname = hostname
 
 		var communicationVtaps []*trident.CommunicationVtap
 		if t.receiver != nil {
@@ -748,10 +758,16 @@ func (t *PlatformInfoTable) Reload() error {
 			BootTime:            proto.Uint32(t.bootTime),
 			VersionPlatformData: proto.Uint64(t.versionPlatformData),
 			CtrlIp:              proto.String(local.String()),
-			ProcessName:         proto.String(t.processName),
+			ProcessName:         proto.String(t.moduleName),
 			Host:                proto.String(hostname),
 			CommunicationVtaps:  communicationVtaps,
-			CpuNum:              proto.Uint32(uint32(runtime.NumCPU())),
+			CpuNum:              proto.Uint32(t.runtimeEnv.CpuNum),
+			MemorySize:          proto.Uint64(t.runtimeEnv.MemorySize),
+			Arch:                proto.String(t.runtimeEnv.Arch),
+			Os:                  proto.String(t.runtimeEnv.OS),
+			KernelVersion:       proto.String(t.runtimeEnv.KernelVersion),
+			TsdbShardId:         proto.Uint32(t.tsdbShardID),
+			TsdbReplicaIp:       proto.String(t.tsdbReplicaIP), // 没有replica则上报空
 		}
 		client := trident.NewSynchronizerClient(t.GetClient())
 		// 分析器请求消息接口，用于stream, roze
@@ -1006,7 +1022,7 @@ func RegisterPlatformDataCommand(ips []net.IP, port int) *cobra.Command {
 		Use:   "platformData",
 		Short: "get platformData from controller",
 		Run: func(cmd *cobra.Command, args []string) {
-			table := NewPlatformInfoTable(ips, port, "debug", nil)
+			table := NewPlatformInfoTable(ips, port, "debug", 65535, "", nil)
 			table.Reload()
 			fmt.Println(table)
 		},
