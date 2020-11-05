@@ -1,3 +1,3 @@
 package genesis
 
-//go:generate protoc --gofast_out=plugins=grpc:. -I.. ../genesis.proto
+//go:generate protoc --go_opt=paths=source_relative --go_out=plugins=grpc:. -I.. ../genesis.proto
