@@ -417,6 +417,10 @@ message GenesisSyncRequest {
     optional common.TridentType trident_type = 2;
 
     optional GenesisPlatformData platform_data = 9;
+
+    /* the ip address where this request is being sent */
+    /* should be populated by proxy server */
+    optional string source_ip = 3;
 }
 
 message GenesisSyncResponse {
