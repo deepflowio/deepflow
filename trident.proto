@@ -4,7 +4,6 @@ package trident;
 option go_package = "trident";
 
 import "common.proto";
-import "genesis.proto";
 
 service Synchronizer {
     rpc Sync (SyncRequest) returns (SyncResponse) {}
@@ -12,7 +11,7 @@ service Synchronizer {
     rpc AnalyzerSync (SyncRequest) returns (SyncResponse) {}
     rpc Upgrade (UpgradeRequest) returns (stream UpgradeResponse) {}
     rpc Query (NtpRequest) returns (NtpResponse) {}
-    rpc GenesisProxySync (genesis.SyncRequest) returns (genesis.SyncResponse) {}
+    rpc GenesisSync (GenesisSyncRequest) returns (GenesisSyncResponse) {}
 }
 
 enum State {
@@ -319,4 +318,107 @@ message NtpRequest {
 
 message NtpResponse {
     optional bytes response = 1; // 数据
+}
+
+message GenesisPlatformData {
+    optional Host host = 1;
+    repeated Vm vms = 2;
+    repeated Vpc vpcs = 3;
+    repeated Network networks = 4;
+    repeated Subnet subnets = 5;
+    repeated Port ports = 6;
+    repeated Ip ips = 7;
+
+    optional string raw_hostname = 11;
+    optional string raw_all_vm_xml = 12;
+    optional string raw_vm_states = 13;
+    optional string raw_ovs_interfaces = 14;
+    optional string raw_ovs_ports = 15;
+    optional string raw_brctl_show = 16;
+    optional string raw_vlan_config = 17;
+
+    repeated Lldp lldp_info = 20;
+
+    repeated Container containers = 30;
+    repeated string raw_ip_addrs = 31;
+}
+
+message Host {
+    optional string hostname = 1;
+}
+
+enum VmState {
+    VM_OTHER = 0;
+    VM_RUNNING = 1;
+    VM_PAUSED = 2;
+    VM_SHUTOFF = 3;
+}
+
+message Vm {
+    optional string uuid = 1;
+    optional string name = 2;
+    optional string label = 3;
+    optional string launch_server = 4;
+    optional VmState state = 5;
+
+    optional string vpc_uuid = 9;
+}
+
+message Vpc {
+    optional string uuid = 1;
+    optional string name = 2;
+}
+
+message Network {
+    optional string uuid = 1;
+    optional uint32 segmentation_id = 5;
+}
+
+message Subnet {
+    optional string cidr = 1;
+    optional uint32 last_seen = 2;
+
+    optional string network_uuid = 9;
+}
+
+message Port {
+    optional string uuid = 1;
+    optional uint64 mac = 2;
+    optional string device_uuid = 4;
+
+    optional string network_uuid = 9;
+}
+
+message Ip {
+    optional uint32 last_seen = 2;
+    optional uint64 mac = 3;
+    optional bytes ip = 4;
+
+    optional string port_uuid = 9;
+}
+
+message Lldp {
+    optional string interface = 1;
+    optional string system_name = 2;
+    optional string management_address = 5;
+    optional string port_id = 10;
+    optional string port_description = 11;
+}
+
+message Container {
+    optional string name = 1;
+    /* index of ip_addr in platform_data.raw_ip_addrs */
+    optional int32 raw_ip_addr_index = 2;
+}
+
+message GenesisSyncRequest {
+    optional uint64 version = 1 [default = 0];
+
+    optional common.TridentType trident_type = 2;
+
+    optional GenesisPlatformData platform_data = 9;
+}
+
+message GenesisSyncResponse {
+    optional uint64 version = 1 [default = 0];
 }
