@@ -33,7 +33,7 @@ docker-x64:
   tags:
     - x64
   script:
-    - make droplet
+    - make
     - docker rmi nexus.x.lan:5000/droplet:$(echo ${CI_COMMIT_REF_NAME//B_LC_RELEASE_} | tr '_' '.' | sed 's/master/latest/') || true
     - docker build --add-host nexus.x.lan:10.30.2.201 -t nexus.x.lan:5000/droplet:$(echo ${CI_COMMIT_REF_NAME//B_LC_RELEASE_} | tr '_' '.' | sed 's/master/latest/') ./
     - docker push nexus.x.lan:5000/droplet:$(echo ${CI_COMMIT_REF_NAME//B_LC_RELEASE_} | tr '_' '.' | sed 's/master/latest/')
