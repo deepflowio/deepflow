@@ -32,8 +32,8 @@ cp $(go env GOPATH)/bin/dlv $RPM_BUILD_ROOT/usr/bin/dlv.droplet
 mkdir -p $RPM_BUILD_ROOT/lib/systemd/system/
 cp %pwd/droplet.service $RPM_BUILD_ROOT/lib/systemd/system/
 mkdir -p $RPM_BUILD_ROOT/etc/
-cp %pwd/config/droplet.yaml $RPM_BUILD_ROOT/etc/
-cp %pwd/config/droplet.yaml $RPM_BUILD_ROOT/etc/droplet.yaml.sample
+cp %pwd/droplet.yaml $RPM_BUILD_ROOT/etc/
+cp %pwd/droplet.yaml $RPM_BUILD_ROOT/etc/droplet.yaml.sample
 mkdir -p $RPM_BUILD_ROOT/usr/share/droplet/
 mkdir -p $RPM_BUILD_ROOT%{pcapdir}
 
