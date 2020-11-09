@@ -341,6 +341,7 @@ message GenesisPlatformData {
 
     repeated Container containers = 30;
     repeated string raw_ip_addrs = 31;
+    repeated InterfaceInfo interfaces = 32;
 }
 
 message Host {
@@ -409,6 +410,11 @@ message Container {
     optional string name = 1;
     /* index of ip_addr in platform_data.raw_ip_addrs */
     optional int32 raw_ip_addr_index = 2;
+}
+
+message InterfaceInfo {
+    optional uint64 mac = 1;
+    repeated string ip = 2;
 }
 
 message GenesisSyncRequest {
