@@ -66,4 +66,3 @@ package-arm64:
     - master
     - /B_LC_RELEASE_.*/
     - /feature-.*/
-
