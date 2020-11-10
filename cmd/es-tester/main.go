@@ -134,7 +134,7 @@ func main() {
 	geo.NewGeoTree()
 	fmt.Println("starting")
 
-	platformDataTable := grpc.NewPlatformInfoTable([]net.IP{net.ParseIP(*trisolarisAddr).To4()}, 20035, "stream-tester", nil)
+	platformDataTable := grpc.NewPlatformInfoTable([]net.IP{net.ParseIP(*trisolarisAddr).To4()}, 20035, "stream-tester", 65535, "", nil)
 	platformDataTable.Start()
 
 	esWriterQueues := queue.NewOverwriteQueues("es_writer_queues", uint8(*threads), 1024*1024)
