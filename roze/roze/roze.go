@@ -4,6 +4,7 @@ import (
 	"net"
 	_ "net/http/pprof"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -37,6 +38,21 @@ type Roze struct {
 	datasource       *datasource.DatasourceManager
 }
 
+// http://x.x.x.x:20044  http://[x:x:x:x]:20044
+func parseTsdbIP(httpURL string) string {
+	headIndex, tailIndex := strings.Index(httpURL, "http://"), strings.Index(httpURL, ":20044")
+	if tailIndex > headIndex && headIndex > -1 {
+		// ipv6
+		leftBracket, rightBracket := strings.Index(httpURL, "["), strings.Index(httpURL, "]")
+		if rightBracket > leftBracket && leftBracket > -1 {
+			return httpURL[leftBracket+1 : rightBracket]
+		}
+		// ipv4
+		return httpURL[headIndex+len("http://") : tailIndex]
+	}
+	return ""
+}
+
 func NewRoze(cfg *config.Config, recv *receiver.Receiver) (*Roze, error) {
 	roze := Roze{}
 
@@ -58,7 +74,7 @@ func NewRoze(cfg *config.Config, recv *receiver.Receiver) (*Roze, error) {
 
 	recv.RegistHandler(datatype.MESSAGE_TYPE_METRICS, unmarshallQueues, unmarshallQueueCount)
 
-	platformdata.New(controllers, cfg.ControllerPort, "roze", recv)
+	platformdata.New(controllers, cfg.ControllerPort, "roze", uint32(cfg.ShardID), parseTsdbIP(cfg.TSDB.Replica), recv)
 
 	var err error
 	roze.InfluxdbWriter, err = store.NewInfluxdbWriter(cfg.TSDB.Primary, cfg.TSDB.Replica, cfg.TSDBAuth.Username, cfg.TSDBAuth.Password, "influxdb_writer", strconv.Itoa(cfg.ShardID), cfg.StoreQueueCount, cfg.StoreQueueSize)
