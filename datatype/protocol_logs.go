@@ -5,7 +5,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/google/gopacket/layers"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
@@ -15,7 +14,6 @@ type LogProtoType uint8
 
 const (
 	PROTO_UNKOWN LogProtoType = iota
-	PROTO_ICMP
 	PROTO_HTTP
 	PROTO_DNS
 )
@@ -27,8 +25,6 @@ func (t *LogProtoType) String() string {
 		formatted = "HTTP"
 	case PROTO_DNS:
 		formatted = "DNS"
-	case PROTO_ICMP:
-		formatted = "ICMP"
 	default:
 		formatted = "UNKOWN"
 	}
@@ -57,13 +53,16 @@ func (t *LogMessageType) String() string {
 
 type AppProtoHead struct {
 	Proto   LogProtoType
-	MsgType LogMessageType // HTTP,DNS: request/response, ICMP: 0-255
-	Code    uint16         // HTTP状态码:1xx-5xx, DNS状态码:0-7, ICMP code:0-255
+	MsgType LogMessageType // HTTP，DNS: request/response
+	Code    uint16         // HTTP状态码: 1xx-5xx, DNS状态码: 0-7
+	RRT     time.Duration  // HTTP，DNS时延: response-request
 }
 
 type AppProtoLogsBaseInfo struct {
 	Timestamp time.Duration // packet时间戳
-	FlowID    uint64        // 对应flow的ID
+	FlowId    uint64        // 对应flow的ID
+	VtapId    uint16
+	TapType   uint16
 	AppProtoHead
 
 	/* L3 */
@@ -83,10 +82,13 @@ type AppProtoLogsBaseInfo struct {
 func (i *AppProtoLogsBaseInfo) String() string {
 	formatted := ""
 	formatted += fmt.Sprintf("Timestamp: %v ", i.Timestamp)
-	formatted += fmt.Sprintf("FlowID: %v ", i.FlowID)
+	formatted += fmt.Sprintf("FlowId: %v ", i.FlowId)
+	formatted += fmt.Sprintf("VtapId: %v ", i.VtapId)
+	formatted += fmt.Sprintf("TapType: %v ", i.TapType)
 	formatted += fmt.Sprintf("Proto: %s ", i.Proto.String())
 	formatted += fmt.Sprintf("MsgType: %s ", i.MsgType.String())
 	formatted += fmt.Sprintf("Code: %v ", i.Code)
+	formatted += fmt.Sprintf("RRT: %v ", i.RRT)
 
 	if len(i.IP6Src) > 0 {
 		formatted += fmt.Sprintf("IP6Src: %s ", i.IP6Src)
@@ -104,7 +106,6 @@ func (i *AppProtoLogsBaseInfo) String() string {
 	return formatted
 }
 
-// TODO String方法
 type AppProtoLogsData struct {
 	AppProtoLogsBaseInfo
 	Detail ProtoSpecialInfo
@@ -150,10 +151,13 @@ func (l *AppProtoLogsData) Release() {
 
 func (l *AppProtoLogsData) Encode(encoder *codec.SimpleEncoder) error {
 	encoder.WriteU64(uint64(l.Timestamp))
-	encoder.WriteU64(l.FlowID)
+	encoder.WriteU64(l.FlowId)
+	encoder.WriteU16(l.VtapId)
+	encoder.WriteU16(l.TapType)
 	encoder.WriteU8(byte(l.Proto))
 	encoder.WriteU8(byte(l.MsgType))
 	encoder.WriteU16(l.Code)
+	encoder.WriteU64(uint64(l.RRT))
 
 	if len(l.IP6Src) > 0 {
 		encoder.WriteBool(true) // 额外encode bool, decode时需要根据该bool, 来判断是否decode ipv6
@@ -173,10 +177,13 @@ func (l *AppProtoLogsData) Encode(encoder *codec.SimpleEncoder) error {
 
 func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
 	l.Timestamp = time.Duration(decoder.ReadU64())
-	l.FlowID = decoder.ReadU64()
+	l.FlowId = decoder.ReadU64()
+	l.VtapId = decoder.ReadU16()
+	l.TapType = decoder.ReadU16()
 	l.Proto = LogProtoType(decoder.ReadU8())
 	l.MsgType = LogMessageType(decoder.ReadU8())
 	l.Code = decoder.ReadU16()
+	l.RRT = time.Duration(decoder.ReadU64())
 
 	if decoder.ReadBool() {
 		decoder.ReadIPv6(l.IP6Src)
@@ -202,35 +209,46 @@ type ProtoSpecialInfo interface {
 
 // HTTPv2根据需要添加
 type HTTPInfo struct {
-	StreamID uint32 // HTTPv2
-	Method   string
-	URI      string
-	Host     string
+	StreamID      uint32 // HTTPv2
+	ContentLength uint64
+	Version       string
+	Method        string
+	URI           string
+	Host          string
+	ClientIP      string
+	TraceID       string
 }
 
 func (h *HTTPInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, code uint16) {
 	encoder.WriteU32(h.StreamID)
+	encoder.WriteU64(h.ContentLength)
+	encoder.WriteString255(h.Version)
 	if msgType == MSG_T_REQUEST {
 		encoder.WriteString255(h.URI)
 		encoder.WriteString255(h.Host)
+		encoder.WriteString255(h.ClientIP)
 	} else {
 		encoder.WriteString255(h.Method)
 	}
+	encoder.WriteString255(h.TraceID)
 }
 
 func (h *HTTPInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, code uint16) {
 	h.StreamID = decoder.ReadU32()
+	h.ContentLength = decoder.ReadU64()
+	h.Version = decoder.ReadString255()
 	if msgType == MSG_T_REQUEST {
 		h.URI = decoder.ReadString255()
 		h.Host = decoder.ReadString255()
+		h.ClientIP = decoder.ReadString255()
 	} else {
 		h.Method = decoder.ReadString255()
 	}
+	h.TraceID = decoder.ReadString255()
 }
 
 func (h *HTTPInfo) String() string {
 	return fmt.Sprintf("%#v", h)
-	// TODO
 }
 
 // | type | 查询类型 | 说明|
@@ -279,71 +297,4 @@ func (d *DNSInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, c
 
 func (d *DNSInfo) String() string {
 	return fmt.Sprintf("%#v", d)
-	// TODO
-}
-
-// 根据ICMP TYPE + CODE不同而不同
-// 可能为空，如type(0) + code(0)
-type ICMPInfo struct {
-	Proto   layers.IPProtocol
-	IPSrc   net.IP
-	IPDst   net.IP
-	PortSrc uint16
-	PortDst uint16
-}
-
-// | 类型 | 代码  | 描述  |
-// | ---  | ---   | --- |
-// | 0    |0      |回显应答 |
-// | 3    |0      |网络不可达 |
-// |      |1      |主机不可达 |
-// |      |2      |协议不可达 |
-// |      |3      |端口不可达 |
-// |      |4      |不可分片 |
-// |      |5      |源站选路失败 |
-// |      |6      |目的网络不认识 |
-// |      |7      |目的主机不认识 |
-// |      |8      |源主机被隔离 |
-// |      |9      |目的网络被强制禁止 |
-// |      |10     |目的主机被强制禁止 |
-// |      |11     |服务类型TOS，网络不可达 |
-// |      |12     |服务类型TOS，主机不可达 |
-// |      |13     |过滤，通信被强制禁止 |
-// |      |14     |主机越权 |
-// |      |15     |优先权中止生效 |
-// | 4    |0      |源端被关闭 |
-// | 5    |0      |网络重定向 |
-// |      |1      |主机重定向 |
-// |      |2      |服务类型和网络重定向 |
-// |      |3      |服务类型和主机重定向 |
-// | 8    |0      |请求回显 |
-// | 9    |0      |路由器通告 |
-// | 10   |0      |路由器请求 |
-// | 11   |0      |传输期间TTL为0 |
-// |      |1      |数据包组装期间TTL为 0 |
-// | 12   |0      |IP首部异常 |
-// |      |1      |缺少必需的选项 |
-// | 13   |0      |时间戳请求 |
-// | 14   |0      |时间戳应答 |
-// | 17   |0      |地址掩码请求 |
-// | 18   |0      |地址掩码应答 |
-func (i *ICMPInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, code uint16) {
-	notifyCode := uint16(msgType)<<16 + code
-	switch notifyCode {
-	// TODO
-	//		case :
-	}
-}
-
-func (i *ICMPInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, code uint16) {
-	notifyCode := uint16(msgType)<<16 + code
-	switch notifyCode {
-	// TODO
-	//		case :
-	}
-}
-
-func (i *ICMPInfo) String() string {
-	return fmt.Sprintf("%#v", i)
-	// TODO
 }
