@@ -6,6 +6,9 @@
 # controller listening port
 # controller-port: 20035
 
+# stream,roze模块是启用
+# stream-roze-enabled: false
+
 # logfile path
 # log-file: /var/log/droplet/droplet.log
 
@@ -18,8 +21,8 @@
 # maximum usage of cpu cores, 0 means no limit
 # max-cpus: 0
 
-# udp socket receiver buffer: 32M
-# udp-read-buffer: 33554432
+# udp socket receiver buffer: 64M
+# udp-read-buffer: 67108864
 
 ############################ droplet ##########################################
 # Rpc synchronization timeout default 8s

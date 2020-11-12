@@ -14,13 +14,14 @@ import (
 var log = logging.MustGetLogger("config")
 
 type Config struct {
-	ControllerIps  []string `yaml:"controller-ips,flow"`
-	ControllerPort uint16   `yaml:"controller-port"`
-	UDPReadBuffer  int      `yaml:"udp-read-buffer"`
-	LogFile        string   `yaml:"log-file"`
-	LogLevel       string   `yaml:"log-level"`
-	Profiler       bool     `yaml:"profiler"`
-	MaxCPUs        int      `yaml:"max-cpus"`
+	ControllerIps     []string `yaml:"controller-ips,flow"`
+	ControllerPort    uint16   `yaml:"controller-port"`
+	StreamRozeEnabled bool     `yaml:"stream-roze-enabled"`
+	UDPReadBuffer     int      `yaml:"udp-read-buffer"`
+	LogFile           string   `yaml:"log-file"`
+	LogLevel          string   `yaml:"log-level"`
+	Profiler          bool     `yaml:"profiler"`
+	MaxCPUs           int      `yaml:"max-cpus"`
 }
 
 func (c *Config) Validate() error {
@@ -49,7 +50,7 @@ func Load(path string) Config {
 	configBytes, err := ioutil.ReadFile(path)
 	config := Config{
 		ControllerPort: 20035,
-		UDPReadBuffer:  32 << 20,
+		UDPReadBuffer:  64 << 20,
 		LogFile:        "/var/log/droplet/droplet.log",
 	}
 	if err != nil {

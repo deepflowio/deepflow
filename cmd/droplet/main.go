@@ -91,7 +91,7 @@ func main() {
 
 	closers := droplet.Start(dropletConfig, receiver)
 
-	if len(cfg.ControllerIps) > 0 {
+	if cfg.StreamRozeEnabled {
 		rozeConfig := rozecfg.Load(*configPath)
 		bytes, _ = yaml.Marshal(rozeConfig)
 		log.Infof("roze config:\n%s", string(bytes))
