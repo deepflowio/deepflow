@@ -56,6 +56,7 @@ type Config struct {
 	TSDBAuth                  Auth            `yaml:"tsdb-auth"`
 	DisableSecondWrite        bool            `yaml:"disable-second-write"`
 	DisableSecondWriteReplica bool            `yaml:"disable-second-write-replica"`
+	DisableVtapPacket         bool            `yaml:"disable-vtap-packet"`
 	StoreQueueCount           int             `yaml:"store-queue-count"`
 	StoreQueueSize            int             `yaml:"store-queue-size"`
 	StoreBatchBufferSize      int             `yaml:"store-batch-buffer-size"`

@@ -65,6 +65,7 @@ type Counter struct {
 type Unmarshaller struct {
 	index              int
 	disableSecondWrite bool
+	disableVtapPacket  bool
 	unmarshallQueue    queue.QueueReader
 	influxdbWriter     *store.InfluxdbWriter
 	influxdbWriterS1   *store.InfluxdbWriter
@@ -77,7 +78,7 @@ type Unmarshaller struct {
 	utils.Closable
 }
 
-func NewUnmarshaller(index int, disableSecondWrite bool, unmarshallQueue queue.QueueReader, influxdbWriter, influxdbWriterS1 *store.InfluxdbWriter, storeQueueNum int) *Unmarshaller {
+func NewUnmarshaller(index int, disableSecondWrite, disableVtapPacket bool, unmarshallQueue queue.QueueReader, influxdbWriter, influxdbWriterS1 *store.InfluxdbWriter, storeQueueNum int) *Unmarshaller {
 	queueBatchCaches := make([]QueueCache, storeQueueNum)
 	queueBatchCachesS1 := make([]QueueCache, storeQueueNum)
 	queueAggrCaches := make([]QueueCache, storeQueueNum)
@@ -90,6 +91,7 @@ func NewUnmarshaller(index int, disableSecondWrite bool, unmarshallQueue queue.Q
 	return &Unmarshaller{
 		index:              index,
 		disableSecondWrite: disableSecondWrite,
+		disableVtapPacket:  disableVtapPacket,
 		unmarshallQueue:    unmarshallQueue,
 		storeQueueNum:      storeQueueNum,
 		queueBatchCaches:   queueBatchCaches,
@@ -284,7 +286,15 @@ func (u *Unmarshaller) QueueProcess() {
 						app.ReleaseDocument(doc)
 						continue
 					}
-					u.dbCounter[rd.DatabaseIndex()]++
+					DBIndex := rd.DatabaseIndex()
+					u.dbCounter[DBIndex]++
+
+					if u.disableVtapPacket &&
+						(DBIndex == msg.VTAP_PACKET ||
+							DBIndex == msg.VTAP_PACKET_EDGE) {
+						msg.ReleaseRozeDocument(rd)
+						continue
+					}
 
 					hashKey := uint32(GetDocHashValue(doc, encoder)) % uint32(u.storeQueueNum)
 					u.putStoreQueue(hashKey, rd)
