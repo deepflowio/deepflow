@@ -111,7 +111,7 @@ func NewRoze(cfg *config.Config, recv *receiver.Receiver) (*Roze, error) {
 
 	roze.unmarshallers = make([]*unmarshaller.Unmarshaller, unmarshallQueueCount)
 	for i := 0; i < unmarshallQueueCount; i++ {
-		roze.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, cfg.DisableSecondWrite, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), roze.InfluxdbWriter, roze.InfluxdbWriterS1, cfg.StoreQueueCount)
+		roze.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, cfg.DisableSecondWrite, cfg.DisableVtapPacket, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), roze.InfluxdbWriter, roze.InfluxdbWriterS1, cfg.StoreQueueCount)
 	}
 	roze.datasource = datasource.NewDatasourceManager(DATASOURCE_PORT, cfg.TSDB.Primary, cfg.TSDBAuth.Username, cfg.TSDBAuth.Password)
 

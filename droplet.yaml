@@ -106,6 +106,9 @@
 # 是否不写秒级数据的replica: 默认: true(不写)
 # disable-second-write-replica: true
 
+# 是否不写包统计数据: 默认: false(写入)
+# disable-vtap-packet: false
+
 # parallelism of unmarshall, defaults to 4
 # unmarshall-queue-count: 4
 
