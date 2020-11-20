@@ -18,6 +18,10 @@ type RSyslogWriter struct {
 
 	mu   sync.Mutex // guards conn
 	conn net.Conn
+
+	threshold  uint32
+	count      uint32
+	timeInHour int
 }
 
 func (w *RSyslogWriter) connect() (err error) {
@@ -55,7 +59,31 @@ func (w *RSyslogWriter) Close() error {
 
 // Write sends a log message to the syslog daemon.
 func (w *RSyslogWriter) Write(b []byte) (int, error) {
-	return w.writeAndRetry(string(b))
+	if w.threshold == 0 {
+		return w.writeAndRetry(string(b))
+	}
+
+	nowInHour := time.Now().Hour()
+	if w.timeInHour != nowInHour {
+		w.timeInHour = nowInHour
+		if w.count > w.threshold {
+			w.writeAndRetry(fmt.Sprintf("[WARN] Log threshold is exceeded, lost %d logs.", w.count-w.threshold))
+		}
+		w.count = 0
+	}
+
+	if w.count > w.threshold {
+		return len(b), nil
+	}
+	context := string(b)
+	if w.count == w.threshold {
+		context = fmt.Sprintf("[WARN] Log threshold is exceeded, current config is %d.", w.threshold)
+	}
+	n, err := w.writeAndRetry(context)
+	if err == nil {
+		w.count++
+	}
+	return n, err
 }
 
 func (w *RSyslogWriter) writeAndRetry(s string) (int, error) {
@@ -96,6 +124,10 @@ func (w *RSyslogWriter) writeString(hostname, tag, msg, nl string) error {
 		timestamp, hostname,
 		tag, os.Getpid(), msg, nl)
 	return err
+}
+
+func (w *RSyslogWriter) SetThreshold(value uint32) {
+	w.threshold = value
 }
 
 func NewRsyslogWriter(network, raddr string, tag, header string) *RSyslogWriter {
