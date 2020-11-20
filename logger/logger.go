@@ -28,6 +28,7 @@ var (
 	fileBackend     logging.Backend
 	syslogBackend   logging.Backend
 	rsyslogBackends []logging.Backend
+	rsyslogWriters  []*RSyslogWriter
 )
 
 func EnableStdoutLog() {
@@ -122,6 +123,7 @@ func applyBackendChange() {
 
 func EnableRsyslog(remotes ...string) error {
 	rsyslogBackends = rsyslogBackends[:0]
+	rsyslogWriters = rsyslogWriters[:0]
 	for _, remote := range remotes {
 		if !strings.Contains(remote, ":") {
 			remote += fmt.Sprintf(":%d", datatype.DROPLET_PORT)
@@ -130,6 +132,7 @@ func EnableRsyslog(remotes ...string) error {
 		// 消息头包括FrameSize和Type，UDP时FrameSize无用
 		header := bytes.NewBuffer([]byte{0, 0, datatype.MESSAGE_TYPE_SYSLOG})
 		ioWriter := NewRsyslogWriter("udp", remote, path.Base(os.Args[0]), header.String())
+		rsyslogWriters = append(rsyslogWriters, ioWriter)
 
 		backend := logging.NewBackendFormatter(
 			logging.NewLogBackend(ioWriter, "", 0),
@@ -139,4 +142,10 @@ func EnableRsyslog(remotes ...string) error {
 	}
 	applyBackendChange()
 	return nil
+}
+
+func RsyslogSetThreshold(value uint32) {
+	for _, w := range rsyslogWriters {
+		w.SetThreshold(value)
+	}
 }
