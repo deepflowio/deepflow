@@ -73,6 +73,7 @@ func (w *RSyslogWriter) Write(b []byte) (int, error) {
 	}
 
 	if w.count > w.threshold {
+		w.count++
 		return len(b), nil
 	}
 	context := string(b)
