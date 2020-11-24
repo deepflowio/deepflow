@@ -91,7 +91,6 @@ func (c *Config) Validate() error {
 }
 
 func Load(path string) *Config {
-	configBytes, err := ioutil.ReadFile(path)
 	config := &Config{
 		ControllerPort:            DefaultControllerPort,
 		TSDB:                      TSDBAddrs{DefaultPrimaryInfluxdbHTTPAddr, ""},
@@ -108,6 +107,11 @@ func Load(path string) *Config {
 		ReceiverWindowSize:        DefaultReceiverWindowSize,
 		DisableSecondWriteReplica: true,
 	}
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		log.Info("no config file, use defaults")
+		return config
+	}
+	configBytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Warningf("Read config file error:", err)
 		config.Validate()
