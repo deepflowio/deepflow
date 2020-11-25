@@ -166,7 +166,7 @@ message Config {
     optional uint32  max_escape_seconds   = 32;
 
     optional string  proxy_controller_ip  = 34; // 控制器代理IP
-    optional uint32  region_id            = 35 [default = 0]; // 数据节点所在区域ID
+    optional uint32  region_id            = 35 [default = 0]; // 采集器所在区域ID或数据节点所在区域ID
 
     optional uint32 vtap_id               = 40;  // 限制在64000
     optional common.TridentType trident_type = 41;
@@ -205,17 +205,17 @@ message Config {
 message Segment { // e.g. single LAN area
     optional uint32 id = 1;
     repeated string mac = 2;
-    optional uint64 tap_mac = 4; //0x0123456789ab = 01:23:45:67:89:ab
+    repeated uint32 interface_id = 3; // mac对应的Interface id
 }
 
 message IpResource {
     optional string ip = 1;
     optional uint32 masklen = 2 [default = 32];
     optional uint32 subnet_id = 3 [default = 0];
-    optional bool is_vip = 4 [default = false];
 }
 
 message Interface {
+    optional uint32 id = 1;
     optional uint32 device_type = 2;
     optional uint32 device_id = 3;
     optional uint32 if_type = 4;
@@ -224,13 +224,15 @@ message Interface {
     repeated IpResource ip_resources = 8;
     optional uint32 launch_server_id = 9;
     optional uint32 region_id = 10;
-    optional uint64 mac = 11; //0x0123456789ab = 01:23:45:67:89:ab
+    optional uint64 mac = 11; // 0x0123456789ab = 01:23:45:67:89:ab, 为0时if_type为WAN的数据
     optional uint32 pod_node_id = 21;
     optional uint32 az_id = 22;
     optional uint32 pod_group_id = 23;
     optional uint32 pod_ns_id = 24;
     optional uint32 pod_id = 25;
     optional uint32 pod_cluster_id = 26;
+
+    optional bool is_vip_interface = 100 [default = false]; // 目前仅微软MUX设配为true
 }
 
 enum GroupType {
@@ -270,6 +272,8 @@ message Cidr {
     optional uint32 region_id = 5;
     optional uint32 az_id = 6;
     optional uint32 tunnel_id = 7;
+
+    optional bool is_vip = 20 [default = false];
 }
 
 message PlatformData {
