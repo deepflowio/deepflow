@@ -134,7 +134,7 @@ func process(conn *net.UDPConn) {
 		return
 	}
 	if simpleHandlers[msg.Module] != nil {
-		result := simpleHandlers[msg.Module].HandleSimpleCommand(msg.Operate)
+		result := simpleHandlers[msg.Module].HandleSimpleCommand(msg.Operate, string(msg.Args))
 		for i := 0; i < len(result); i += MAX_PAYLOAD_LEN {
 			if i+MAX_PAYLOAD_LEN > len(result) {
 				SendToClient(conn, remote, 0, bytes.NewBufferString(result[i:]))

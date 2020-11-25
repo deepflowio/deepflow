@@ -8,9 +8,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// 增加简单的命令接口
+// 增加简单的命令接口, 支持一个字符串输入参数
 type CommandSimpleProcess interface {
-	HandleSimpleCommand(operate uint16) string
+	HandleSimpleCommand(operate uint16, arg string) string
 }
 
 type CmdHelper struct {
@@ -38,7 +38,11 @@ func ClientRegisterSimple(moduleId ModuleId, module CmdHelper, operates []CmdHel
 		Short: module.Helper,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(operates) == 0 {
-				result, err := CommmandGetResult(moduleId, 0)
+				arg := ""
+				if len(args) > 0 {
+					arg = args[0]
+				}
+				result, err := CommmandGetResult(moduleId, 0, arg)
 				if err != nil {
 					fmt.Println("Get result failed", err)
 					return
@@ -59,7 +63,11 @@ func ClientRegisterSimple(moduleId ModuleId, module CmdHelper, operates []CmdHel
 			Use:   operate.Cmd,
 			Short: operate.Helper,
 			Run: func(cmd *cobra.Command, args []string) {
-				result, err := CommmandGetResult(moduleId, i)
+				arg := ""
+				if len(args) > 0 {
+					arg = args[0]
+				}
+				result, err := CommmandGetResult(moduleId, i, arg)
 				if err != nil {
 					fmt.Println("Get result failed", err)
 					return
@@ -92,8 +100,8 @@ func RecvFromServerMulti(conn *net.UDPConn) (*bytes.Buffer, error) {
 	return ret, nil
 }
 
-func CommmandGetResult(mid ModuleId, operate int) (string, error) {
-	_, result, err := SendToServer(mid, ModuleOperate(operate), nil)
+func CommmandGetResult(mid ModuleId, operate int, arg string) (string, error) {
+	_, result, err := SendToServer(mid, ModuleOperate(operate), bytes.NewBuffer([]byte(arg)))
 	if err != nil {
 		log.Warning(err)
 		return "", err
