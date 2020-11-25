@@ -38,12 +38,13 @@ const (
 )
 
 type EndpointInfo struct {
-	L2EpcId     int32 // 负数表示特殊值
-	L3EpcId     int32 // 负数表示特殊值
-	L2End       bool
-	L3End       bool
-	IsDevice    bool
-	IsVIPDevice bool
+	L2EpcId        int32 // 负数表示特殊值
+	L3EpcId        int32 // 负数表示特殊值
+	L2End          bool
+	L3End          bool
+	IsDevice       bool
+	IsVIPInterface bool
+	IsVIP          bool
 }
 
 type L3L2End int
@@ -96,7 +97,7 @@ func (i *EndpointInfo) SetL3L2End(ends L3L2End) {
 	}
 	// L2End不是true, 一定不是VIP设备采集的流量
 	if !i.L2End {
-		i.IsVIPDevice = false
+		i.IsVIPInterface = false
 	}
 }
 

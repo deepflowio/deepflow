@@ -206,8 +206,17 @@ func (t *PolicyTable) LookupAllByKey(key *LookupKey, policy *PolicyData, endpoin
 	}
 	store := t.operator.GetPolicyByFastPath(key, policy)
 	if store == nil {
-		endpoint := t.cloudPlatformLabeler.GetEndpointData(key)
-		store = t.operator.GetPolicyByFirstPath(key, policy, endpoint)
+		var endpointData *EndpointData
+		if key.L3EpcId0 != 0 {
+			// 目前droplet使用该场景，droplet目前不关注VIP Device等信息，这里不做初始化
+			endpointData = &EndpointData{
+				SrcInfo: &EndpointInfo{L2End: key.L2End0, L3End: key.L3End0, L3EpcId: int32(int16(key.L3EpcId0))},
+				DstInfo: &EndpointInfo{L2End: key.L2End1, L3End: key.L3End1, L3EpcId: int32(int16(key.L3EpcId1))}}
+		} else {
+			endpointData = t.cloudPlatformLabeler.GetEndpointData(key)
+		}
+
+		store = t.operator.GetPolicyByFirstPath(key, policy, endpointData)
 	}
 	result := t.cloudPlatformLabeler.UpdateEndpointData(store, key)
 	*endpoint = *result

@@ -138,7 +138,8 @@ type FlowMetricsPeer struct {
 	IsActiveHost     bool
 	IsDevice         bool  // true表明是从平台数据中获取的
 	TCPFlags         uint8 // 所有TCP的Flags或运算
-	IsVIPDevice      bool
+	IsVIPInterface   bool  // 目前仅支持微软Mux设备，从grpc Interface中获取
+	IsVIP            bool  // 从grpc cidr中获取
 
 	CastTypeMap   uint8  // 仅包含TSDB中的几个CastType标志位选项
 	TCPFlagsMap   uint16 // 仅包含TSDB中的几个TCP标志位选项
@@ -153,8 +154,6 @@ const (
 )
 
 type FlowKey struct {
-	TunnelInfo
-
 	VtapId  uint16
 	TapType TapType
 	TapPort uint32
@@ -173,11 +172,48 @@ type FlowKey struct {
 	Proto   layers.IPProtocol
 }
 
+type TunnelField struct {
+	TxIP0, TxIP1 IPv4Int // 对应发送方向的源目的隧道IP
+	RxIP0, RxIP1 IPv4Int // 对应接收方向的源目的隧道IP
+	Id           uint32
+	Type         TunnelType
+	Tier         uint8
+}
+
+func (f *TunnelField) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteU32(f.TxIP0)
+	encoder.WriteU32(f.TxIP1)
+	encoder.WriteU32(f.RxIP0)
+	encoder.WriteU32(f.RxIP1)
+	encoder.WriteU32(f.Id)
+	encoder.WriteU8(uint8(f.Type))
+	encoder.WriteU8(f.Tier)
+}
+
+func (f *TunnelField) Decode(decoder *codec.SimpleDecoder) {
+	f.TxIP0 = decoder.ReadU32()
+	f.TxIP1 = decoder.ReadU32()
+	f.RxIP0 = decoder.ReadU32()
+	f.RxIP1 = decoder.ReadU32()
+	f.Id = decoder.ReadU32()
+	f.Type = TunnelType(decoder.ReadU8())
+	f.Tier = decoder.ReadU8()
+}
+
+func (t *TunnelField) String() string {
+	return fmt.Sprintf("type: %s, id: %d, tier: %d, tx_ip_0: %s, tx_ip_1: %s, rx_ip_0: %s, rx_ip_1: %s ",
+		t.Type, t.Id, t.Tier,
+		IpFromUint32(t.TxIP0), IpFromUint32(t.TxIP1),
+		IpFromUint32(t.RxIP0), IpFromUint32(t.RxIP1))
+}
+
 // 结构或顺序变化，需要同步修改Encode和Decode
 type Flow struct {
 	// 注意字节对齐!
 	FlowKey
 	FlowMetricsPeers [FLOW_METRICS_PEER_MAX]FlowMetricsPeer
+
+	Tunnel TunnelField
 
 	FlowID   uint64
 	Exporter uint32
@@ -221,8 +257,6 @@ func (_ *FlowKey) SequentialMerge(_ *FlowKey) {
 }
 
 func (f *FlowKey) Encode(encoder *codec.SimpleEncoder) {
-	f.TunnelInfo.Encode(encoder)
-
 	encoder.WriteU16(f.VtapId)
 	encoder.WriteU16(uint16(f.TapType))
 	encoder.WriteU32(f.TapPort)
@@ -246,8 +280,6 @@ func (f *FlowKey) Encode(encoder *codec.SimpleEncoder) {
 }
 
 func (f *FlowKey) Decode(decoder *codec.SimpleDecoder) {
-	f.TunnelInfo.Decode(decoder)
-
 	f.VtapId = decoder.ReadU16()
 	f.TapType = TapType(decoder.ReadU16())
 	f.TapPort = decoder.ReadU32()
@@ -395,7 +427,8 @@ func (f *FlowMetricsPeer) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteBool(f.IsL3End)
 	encoder.WriteBool(f.IsActiveHost)
 	encoder.WriteBool(f.IsDevice)
-	encoder.WriteBool(f.IsVIPDevice)
+	encoder.WriteBool(f.IsVIPInterface)
+	encoder.WriteBool(f.IsVIP)
 
 	encoder.WriteU8(f.CastTypeMap)
 	encoder.WriteU16(f.TCPFlagsMap)
@@ -419,7 +452,8 @@ func (f *FlowMetricsPeer) Decode(decoder *codec.SimpleDecoder) {
 	f.IsL3End = decoder.ReadBool()
 	f.IsActiveHost = decoder.ReadBool()
 	f.IsDevice = decoder.ReadBool()
-	f.IsVIPDevice = decoder.ReadBool()
+	f.IsVIPInterface = decoder.ReadBool()
+	f.IsVIP = decoder.ReadBool()
 
 	f.CastTypeMap = decoder.ReadU8()
 	f.TCPFlagsMap = decoder.ReadU16()
@@ -431,7 +465,7 @@ func (f *FlowMetricsPeer) Decode(decoder *codec.SimpleDecoder) {
 // 因此这里不包含对TCPPerfStats的反向。
 func (f *Flow) Reverse() {
 	f.Reversed = !f.Reversed
-	f.TunnelInfo.Src, f.TunnelInfo.Dst = f.TunnelInfo.Dst, f.TunnelInfo.Src
+	f.Tunnel.TxIP0, f.Tunnel.TxIP1, f.Tunnel.RxIP0, f.Tunnel.RxIP1 = f.Tunnel.RxIP0, f.Tunnel.RxIP1, f.Tunnel.TxIP0, f.Tunnel.TxIP1
 	f.MACSrc, f.MACDst = f.MACDst, f.MACSrc
 	f.IPSrc, f.IPDst = f.IPDst, f.IPSrc
 	f.IP6Src, f.IP6Dst = f.IP6Dst, f.IP6Src
@@ -466,6 +500,7 @@ func (f *Flow) Encode(encoder *codec.SimpleEncoder) {
 	for i := 0; i < FLOW_METRICS_PEER_MAX; i++ {
 		f.FlowMetricsPeers[i].Encode(encoder)
 	}
+	f.Tunnel.Encode(encoder)
 
 	encoder.WriteU64(f.FlowID)
 	encoder.WriteU32(f.Exporter)
@@ -488,9 +523,6 @@ func (f *Flow) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU8(uint8(f.CloseType))
 	encoder.WriteU8(uint8(f.FlowSource))
 	encoder.WriteBool(f.IsActiveService)
-	// encoder.WriteU8(f.QueueHash)
-	// encoder.WriteBool(f.IsNewFlow)
-	// encoder.WriteBool(f.Reversed)
 }
 
 func (f *Flow) Decode(decoder *codec.SimpleDecoder) {
@@ -498,6 +530,7 @@ func (f *Flow) Decode(decoder *codec.SimpleDecoder) {
 	for i := 0; i < FLOW_METRICS_PEER_MAX; i++ {
 		f.FlowMetricsPeers[i].Decode(decoder)
 	}
+	f.Tunnel.Decode(decoder)
 
 	f.FlowID = decoder.ReadU64()
 	f.Exporter = decoder.ReadU32()
@@ -520,9 +553,6 @@ func (f *Flow) Decode(decoder *codec.SimpleDecoder) {
 	f.CloseType = CloseType(decoder.ReadU8())
 	f.FlowSource = FlowSource(decoder.ReadU8())
 	f.IsActiveService = decoder.ReadBool()
-	// f.QueueHash = decoder.ReadU8()
-	// f.IsNewFlow = decoder.ReadBool()
-	// f.Reversed = decoder.ReadBool()
 }
 
 func formatStruct(s interface{}) string {
@@ -612,7 +642,6 @@ func (p *FlowPerfStats) String() string {
 
 func (f *FlowKey) String() string {
 	formatted := ""
-	formatted += fmt.Sprintf("TunnelInfo: {%s} ", f.TunnelInfo.String())
 	formatted += fmt.Sprintf("VtapId: %d ", f.VtapId)
 	formatted += fmt.Sprintf("TapType: %d ", f.TapType)
 	formatted += fmt.Sprintf("TapPort: 0x%x\n", f.TapPort)

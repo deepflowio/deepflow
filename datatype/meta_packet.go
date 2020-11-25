@@ -62,6 +62,8 @@ type MetaPacket struct {
 	L2End1     bool
 	L3End0     bool
 	L3End1     bool // (8B)
+	L3EpcId0   uint16
+	L3EpcId1   uint16
 	QueueHash  uint8
 
 	MacSrc  MacInt

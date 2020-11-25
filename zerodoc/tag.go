@@ -103,12 +103,12 @@ const (
 	ServerToClient
 
 	// 以下类型为转换tapside而增加，在写入db时均记为c2s或s2c
-	ClientNodeToServer       = ClientToServer | DirectionEnum(NodeSide)
-	ServerNodeToClient       = ServerToClient | DirectionEnum(NodeSide)
-	ClientHypervisorToServer = ClientToServer | DirectionEnum(HypervisorSide)
-	ServerHypervisorToClient = ServerToClient | DirectionEnum(HypervisorSide)
-	ClientGatewayToServer    = ClientToServer | DirectionEnum(GatewaySide)
-	ServerGatewayToClient    = ServerToClient | DirectionEnum(GatewaySide)
+	ClientNodeToServer       = ClientToServer | DirectionEnum(NodeSide)       // 客户端容器节点，路由、SNAT、隧道
+	ServerNodeToClient       = ServerToClient | DirectionEnum(NodeSide)       // 服务端容器节点，路由、SNAT、隧道
+	ClientHypervisorToServer = ClientToServer | DirectionEnum(HypervisorSide) // 客户端宿主机，隧道
+	ServerHypervisorToClient = ServerToClient | DirectionEnum(HypervisorSide) // 服务端宿主机，隧道
+	ClientGatewayToServer    = ClientToServer | DirectionEnum(GatewaySide)    // 客户端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
+	ServerGatewayToClient    = ServerToClient | DirectionEnum(GatewaySide)    // 服务端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
 )
 
 func (d DirectionEnum) IsClientToServer() bool {
