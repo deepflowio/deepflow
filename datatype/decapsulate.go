@@ -6,17 +6,19 @@ import (
 	"unsafe"
 
 	. "github.com/google/gopacket/layers"
-	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
+	pb "gitlab.x.lan/yunshan/message/trident"
 )
 
 type TunnelType uint8
 
 const (
-	TUNNEL_TYPE_NONE TunnelType = iota
-	TUNNEL_TYPE_VXLAN
-	TUNNEL_TYPE_ERSPAN
-	TUNNEL_TYPE_TENCENT_GRE // GRE.ver=1 GRE.protoType=IPv4/IPv6
+	TUNNEL_TYPE_NONE   = TunnelType(pb.DecapType_DECAP_TYPE_NONE)
+	TUNNEL_TYPE_VXLAN  = TunnelType(pb.DecapType_DECAP_TYPE_VXLAN)
+	TUNNEL_TYPE_ERSPAN = TunnelType(pb.DecapType_DECAP_TYPE_ERSPAN)
+	// GRE.ver=1 GRE.protoType=IPv4/IPv6
+	TUNNEL_TYPE_TENCENT_GRE = TunnelType(pb.DecapType_DECAP_TYPE_TENCENT)
+	TUNNEL_TYPE_VXLAN_VXLAN = TunnelType(pb.DecapType_DECAP_TYPE_VXLAN_VXLAN)
 
 	LE_IPV4_PROTO_TYPE_I     = 0x0008 // 0x0008's LittleEndian
 	LE_IPV6_PROTO_TYPE_I     = 0xDD86 // 0x86dd's LittleEndian
@@ -43,20 +45,7 @@ type TunnelInfo struct {
 	Dst  IPv4Int
 	Id   uint32
 	Type TunnelType
-}
-
-func (t *TunnelInfo) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU32(t.Src)
-	encoder.WriteU32(t.Dst)
-	encoder.WriteU32(t.Id)
-	encoder.WriteU8(uint8(t.Type))
-}
-
-func (t *TunnelInfo) Decode(decoder *codec.SimpleDecoder) {
-	t.Src = decoder.ReadU32()
-	t.Dst = decoder.ReadU32()
-	t.Id = decoder.ReadU32()
-	t.Type = TunnelType(decoder.ReadU8())
+	Tier uint8
 }
 
 func (t *TunnelInfo) String() string {
@@ -79,6 +68,7 @@ func (t *TunnelInfo) DecapsulateVxlan(l3Packet []byte) int {
 	t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
 	t.Type = TUNNEL_TYPE_VXLAN
 	t.Id = BigEndian.Uint32(l3Packet[OFFSET_VXLAN_VNI-ETH_HEADER_SIZE:]) >> 8
+	t.Tier++
 	// return offset start from L3
 	return OFFSET_VXLAN_FLAGS - ETH_HEADER_SIZE + VXLAN_HEADER_SIZE
 }
@@ -90,12 +80,14 @@ func (t *TunnelInfo) DecapsulateGre(l3Packet []byte) int {
 		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
 		t.Type = TUNNEL_TYPE_ERSPAN
 		t.Id = BigEndian.Uint32(l3Packet[OFFSET_ERSPAN_VER-ETH_HEADER_SIZE:]) & 0x3ff
+		t.Tier++
 		return OFFSET_ERSPAN_VER - ETH_HEADER_SIZE + ERSPANII_HEADER_SIZE
 	} else if greProtocolType == LE_ERSPAN_PROTO_TYPE_III { // ERSPAN III
 		t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
 		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
 		t.Type = TUNNEL_TYPE_ERSPAN
 		t.Id = BigEndian.Uint32(l3Packet[OFFSET_ERSPAN_VER-ETH_HEADER_SIZE:]) & 0x3ff
+		t.Tier++
 		oFlag := l3Packet[OFFSET_ERSPAN_VER-ETH_HEADER_SIZE+ERSPANIII_HEADER_SIZE-1] & 0x1
 		if oFlag == 0 {
 			return OFFSET_ERSPAN_VER - ETH_HEADER_SIZE + ERSPANIII_HEADER_SIZE
@@ -117,6 +109,7 @@ func (t *TunnelInfo) DecapsulateGre(l3Packet []byte) int {
 			greKeyOffset += GRE_CSUM_LEN
 		}
 		t.Id = BigEndian.Uint32(l3Packet[greKeyOffset:])
+		t.Tier++
 		if flags&GRE_FLAGS_SEQ_MASK != 0 {
 			tunnelHeader += GRE_SEQ_LEN
 		}
@@ -147,34 +140,21 @@ func (t *TunnelInfo) DecapsulateGre(l3Packet []byte) int {
 	return 0
 }
 
-func (t *TunnelInfo) Decapsulate(l3Packet []byte) int {
+func (t *TunnelInfo) Decapsulate(l3Packet []byte, tunnelType TunnelType) int {
+	if tunnelType == TUNNEL_TYPE_NONE {
+		return 0
+	}
 	t.Type = TUNNEL_TYPE_NONE
 	// 通过ERSPANIII_HEADER_SIZE(12 bytes)+ERSPANIII_SUBHEADER_SIZE(8 bytes)判断，保证不会数组越界
 	if len(l3Packet) < OFFSET_ERSPAN_VER+ERSPANIII_HEADER_SIZE+ERSPANIII_SUBHEADER_SIZE {
 		return 0
 	}
-
-	switch IPProtocol(l3Packet[OFFSET_IP_PROTOCOL-ETH_HEADER_SIZE]) {
-	case IPProtocolUDP:
-		if *(*uint16)(unsafe.Pointer(&l3Packet[OFFSET_DPORT-ETH_HEADER_SIZE])) != LE_VXLAN_PROTO_UDP_DPORT {
-			return 0
-		}
-		if l3Packet[OFFSET_VXLAN_FLAGS-ETH_HEADER_SIZE] != VXLAN_FLAGS {
-			return 0
-		}
-
-		t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
-		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
-		t.Type = TUNNEL_TYPE_VXLAN
-		t.Id = BigEndian.Uint32(l3Packet[OFFSET_VXLAN_VNI-ETH_HEADER_SIZE:]) >> 8
-		// return offset start from L3
-		return OFFSET_VXLAN_FLAGS - ETH_HEADER_SIZE + VXLAN_HEADER_SIZE
-	case IPProtocolGRE:
+	protocol := IPProtocol(l3Packet[OFFSET_IP_PROTOCOL-ETH_HEADER_SIZE])
+	if protocol == IPProtocolUDP && (tunnelType == TUNNEL_TYPE_VXLAN || tunnelType == TUNNEL_TYPE_VXLAN_VXLAN) {
+		return t.DecapsulateVxlan(l3Packet)
+	} else if protocol == IPProtocolGRE && (tunnelType == TUNNEL_TYPE_TENCENT_GRE || tunnelType == TUNNEL_TYPE_ERSPAN) {
 		return t.DecapsulateGre(l3Packet)
-	default:
-		return 0
 	}
-
 	return 0
 }
 

@@ -20,6 +20,8 @@ type LookupKey struct {
 	EthType                           EthernetType
 	L2End0, L2End1                    bool
 	L3End0, L3End1                    bool
+	IsVIP0, IsVIP1                    bool
+	L3EpcId0, L3EpcId1                uint16 // 目前仅droplet使用
 	Proto                             uint8
 	TapType                           TapType
 	FeatureFlag                       FeatureFlags
