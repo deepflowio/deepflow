@@ -69,10 +69,11 @@ type CidrInfo struct {
 }
 
 type PlatformInfoTable struct {
-	receiver     *receiver.Receiver
-	regionID     uint32
-	epcIDIPV4Lru *lru.U64LRU
-	epcIDIPV6Lru *lru.U160LRU
+	receiver         *receiver.Receiver
+	regionID         uint32
+	otherRegionCount int64
+	epcIDIPV4Lru     *lru.U64LRU
+	epcIDIPV6Lru     *lru.U160LRU
 
 	epcIDIPV4Infos     map[uint64]*Info
 	epcIDIPV6Infos     map[[EpcIDIPV6_LEN]byte]*Info
@@ -107,6 +108,11 @@ func (t *PlatformInfoTable) ClosePlatformInfoTable() {
 
 func (t *PlatformInfoTable) QueryRegionID() uint32 {
 	return t.regionID
+}
+
+// 统计收到其他region的数据
+func (t *PlatformInfoTable) AddOtherRegion() {
+	atomic.AddInt64(&t.otherRegionCount, 1)
 }
 
 func (t *PlatformInfoTable) QueryEpcIDBaseInfo(epcID int32) *BaseInfo {
@@ -548,6 +554,7 @@ func (t *PlatformInfoTable) queryIPV6Cidr(epcID int16, ipv6 net.IP) *Info {
 func (t *PlatformInfoTable) String() string {
 	sb := &strings.Builder{}
 
+	sb.WriteString(fmt.Sprintf("RegionID:%d   Drop Other RegionID Data Count:%d\n", t.regionID, t.otherRegionCount))
 	sb.WriteString(fmt.Sprintf("moduleName:%s ctlIP:%s hostname:%s RegionID:%d tsdbShardID:%d tsdbReplicaIP:%s  ARCH:%s OS:%s Kernel:%s CPUNum:%d MemorySize:%d\n",
 		t.moduleName, t.ctlIP, t.hostname, t.regionID, t.tsdbShardID, t.tsdbReplicaIP, t.runtimeEnv.Arch, t.runtimeEnv.OS, t.runtimeEnv.KernelVersion, t.runtimeEnv.CpuNum, t.runtimeEnv.MemorySize))
 	t.ipv4Lock.RLock()
@@ -709,8 +716,37 @@ func (t *PlatformInfoTable) String() string {
 	return sb.String()
 }
 
-func (t *PlatformInfoTable) HandleSimpleCommand(op uint16) string {
-	return t.String()
+func (t *PlatformInfoTable) HandleSimpleCommand(op uint16, arg string) string {
+	all := t.String()
+	lines := strings.Split(all, "\n")
+	if arg != "" { // 按arg过滤返回
+		filterLines := make([]string, 0, 10)
+		for _, line := range lines {
+			if strings.Contains(line, arg) ||
+				strings.Contains(line, "epcID") ||
+				strings.Contains(line, "mac") ||
+				strings.Contains(line, "Region") ||
+				strings.Contains(line, "------") ||
+				line == "" {
+				filterLines = append(filterLines, line)
+			}
+		}
+		return strings.Join(filterLines, "\n")
+	}
+
+	rePrintLineIndex := 0
+	newLines := make([]string, 0, 200)
+	for i, line := range lines {
+		if strings.Contains(line, "-----") && i > 0 {
+			rePrintLineIndex = i - 1
+		}
+		newLines = append(newLines, line)
+		if i%20 == 0 && len(lines)-i > 10 && lines[i+1] != "" && i-rePrintLineIndex > 10 {
+			newLines = append(newLines, lines[rePrintLineIndex])
+		}
+	}
+
+	return strings.Join(newLines, "\n")
 }
 
 func lookup(host net.IP) (net.IP, error) {
@@ -803,6 +839,7 @@ func (t *PlatformInfoTable) Reload() error {
 
 	log.Infof("Update rpc platformdata version %d -> %d  regionID=%d", t.versionPlatformData, newVersion, t.regionID)
 	t.versionPlatformData = newVersion
+	t.otherRegionCount = 0
 
 	newEpcIDIPV4Infos := make(map[uint64]*Info)
 	newEpcIDIPV6Infos := make(map[[EpcIDIPV6_LEN]byte]*Info)
