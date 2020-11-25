@@ -95,6 +95,7 @@ func DocToRozeDocuments(doc *app.Document) *msg.RozeDocument {
 			if myRegionID != 0 && t.RegionID1 != 0 {
 				if t.TAPSide == zerodoc.Server && t.RegionID1 != myRegionID { // 对于双端 的统计值，需要去掉 tap_side 对应的一侧与自身region_id 不匹配的内容。
 					releaseRozeDocument(rd)
+					pf.PlatformData.AddOtherRegion()
 					return nil
 				}
 			}
@@ -145,11 +146,13 @@ func DocToRozeDocuments(doc *app.Document) *msg.RozeDocument {
 			if t.Code&EdgeCode == EdgeCode { // 对于双端 的统计值，需要去掉 tap_side 对应的一侧与自身region_id 不匹配的内容。
 				if t.TAPSide == zerodoc.Client && t.RegionID != myRegionID {
 					releaseRozeDocument(rd)
+					pf.PlatformData.AddOtherRegion()
 					return nil
 				}
 			} else { // 对于单端的统计值，需要去掉与自身region_id不匹配的内容
 				if t.RegionID != myRegionID {
 					releaseRozeDocument(rd)
+					pf.PlatformData.AddOtherRegion()
 					return nil
 				}
 			}

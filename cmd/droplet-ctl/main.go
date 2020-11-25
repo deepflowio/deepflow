@@ -71,13 +71,13 @@ func main() {
 	dropletCmd.AddCommand(rpc.RegisterRpcCommand())
 
 	rozeCmd.AddCommand(queue.RegisterCommand(dropletctl.DROPLETCTL_ROZE_QUEUE, []string{"1-recv-unmarshall"}))
-	rozeCmd.AddCommand(debug.ClientRegisterSimple(roze.CMD_PLATFORMDATA, debug.CmdHelper{"platformData", "show roze platform data statistics"}, nil))
+	rozeCmd.AddCommand(debug.ClientRegisterSimple(roze.CMD_PLATFORMDATA, debug.CmdHelper{"platformData [filter]", "show roze platform data statistics"}, nil))
 	rozeCmd.AddCommand(receiver.RegisterTridentStatusCommand())
 
 	streamCmd.AddCommand(queue.RegisterCommand(dropletctl.DROPLETCTL_STREAM_QUEUE, []string{
 		"1-receive-to-decode",
 		"2-decode-to-es-writer-queue"}))
-	streamCmd.AddCommand(debug.ClientRegisterSimple(stream.CMD_PLATFORMDATA, debug.CmdHelper{"platformData", "show stream platform data statistics"}, nil))
+	streamCmd.AddCommand(debug.ClientRegisterSimple(stream.CMD_PLATFORMDATA, debug.CmdHelper{"platformData [filter]", "show stream platform data statistics"}, nil))
 
 	root.GenBashCompletionFile("/usr/share/bash-completion/completions/droplet-ctl")
 	root.SetArgs(os.Args[1:])
