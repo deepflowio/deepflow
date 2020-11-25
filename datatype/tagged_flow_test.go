@@ -8,20 +8,21 @@ import (
 )
 
 func TestTaggedFlowEncodeDecode(t *testing.T) {
-	TunnelInfo := TunnelInfo{
-		Src:  100,
-		Dst:  101,
-		Id:   102,
-		Type: TUNNEL_TYPE_VXLAN,
+	TunnelField := TunnelField{
+		TxIP0: 100,
+		TxIP1: 200,
+		RxIP0: 200,
+		RxIP1: 300,
+		Id:    102,
+		Type:  TUNNEL_TYPE_VXLAN,
 	}
 
 	FlowKey := FlowKey{
-		TunnelInfo: TunnelInfo,
-		VtapId:     200,
-		TapType:    3,
-		TapPort:    201,
-		MACSrc:     20000000002,
-		MACDst:     20000000003,
+		VtapId:  200,
+		TapType: 3,
+		TapPort: 201,
+		MACSrc:  20000000002,
+		MACDst:  20000000003,
 
 		IPSrc:   204,
 		IPDst:   205,
@@ -62,6 +63,7 @@ func TestTaggedFlowEncodeDecode(t *testing.T) {
 	Flow := Flow{
 		FlowKey:          FlowKey,
 		FlowMetricsPeers: [FLOW_METRICS_PEER_MAX]FlowMetricsPeer{FlowM, FlowM},
+		Tunnel:           TunnelField,
 
 		FlowID:   401,
 		Exporter: 403,

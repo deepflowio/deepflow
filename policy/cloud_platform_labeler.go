@@ -109,6 +109,10 @@ func (l *CloudPlatformLabeler) UpdateMacTable(macmap MacMapData) {
 func (l *CloudPlatformLabeler) GenerateMacData(platformDatas []*PlatformData) MacMapData {
 	macMap := make(MacMapData)
 	for _, platformData := range platformDatas {
+		if platformData.SkipMac {
+			continue
+		}
+
 		if platformData.Mac != 0 {
 			macMap[MacKey(platformData.Mac)] = platformData
 		}
@@ -374,7 +378,7 @@ func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType Ta
 	if platformData != nil {
 		endpointInfo.SetL2Data(platformData)
 		// L2End为真时，可通过流量中的Mac判断是否为VIP设备
-		endpointInfo.IsVIPDevice = platformData.IsVIPDevice
+		endpointInfo.IsVIPInterface = platformData.IsVIPInterface
 		// IP为0，则取MAC对应的二层数据作为三层数据
 		if l3End || ip.IsUnspecified() {
 			endpointInfo.SetL3Data(platformData)
@@ -495,6 +499,8 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	// l3: ip查询DEEPFLOW添加的WAN监控网段(cidr)
 	srcData := l.GetEndpointInfo(key.SrcMac, srcIp, key.TapType, key.L3End0, key.TunnelId)
 	dstData := l.GetEndpointInfo(key.DstMac, dstIp, key.TapType, key.L3End1, key.TunnelId)
+	// ip地址是否为VIP
+	srcData.IsVIP, dstData.IsVIP = key.IsVIP0, key.IsVIP1
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
 	// l3: 对等连接查询, 以下两种查询
 	// 1). peer epc + ip查询对等连接表

@@ -15,7 +15,6 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	macInt := vifData.GetMac()
 
 	ips := make([]*datatype.IpNet, 0, 1024)
-	isVIPDevice := false
 	for _, ipResource := range vifData.IpResources {
 		fixIp := ParserStringIp(ipResource.GetIp())
 		if fixIp == nil {
@@ -32,9 +31,6 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 			netmask = max
 		} else if netmask < min {
 			netmask = min
-		}
-		if ipResource.GetIsVip() {
-			isVIPDevice = true
 		}
 
 		ipinfo := &datatype.IpNet{
@@ -53,11 +49,13 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	}
 
 	return &datatype.PlatformData{
-		Mac:         macInt,
-		Ips:         ips,
-		EpcId:       epcId,
-		IfType:      uint8(vifData.GetIfType()),
-		IsVIPDevice: isVIPDevice,
+		Id:             vifData.GetId(),
+		Mac:            macInt,
+		Ips:            ips,
+		EpcId:          epcId,
+		IfType:         uint8(vifData.GetIfType()),
+		IsVIPInterface: vifData.GetIsVipInterface(),
+		RegionId:       vifData.GetRegionId(),
 	}
 }
 
@@ -70,6 +68,23 @@ func Convert2PlatformData(interfaces []*trident.Interface) []*datatype.PlatformD
 		}
 	}
 	return platformDatas
+}
+
+func Convert2Vips(datas []string) ([]net.IP, []net.IP) {
+	ipv4s := make([]net.IP, 0, len(datas))
+	ipv6s := make([]net.IP, 0, len(datas))
+	for _, data := range datas {
+		ip := net.ParseIP(data)
+		if ip == nil {
+			continue
+		}
+		if ipv4 := ip.To4(); ipv4 != nil {
+			ipv4s = append(ipv4s, ipv4)
+		} else {
+			ipv6s = append(ipv6s, ip)
+		}
+	}
+	return ipv4s, ipv6s
 }
 
 func newIpGroupData(ipGroup *trident.Group) *policy.IpGroupData {
@@ -228,6 +243,7 @@ func newCidr(data *trident.Cidr) *datatype.Cidr {
 		EpcId:    epcId,
 		Type:     uint8(data.GetType()),
 		TunnelId: data.GetTunnelId(),
+		IsVIP:    data.GetIsVip(),
 	}
 }
 
