@@ -25,9 +25,14 @@ type IpNet struct {
 }
 
 type PlatformData struct {
-	Mac         uint64
-	Ips         []*IpNet
-	EpcId       int32
-	IfType      uint8
-	IsVIPDevice bool
+	Mac            uint64
+	Ips            []*IpNet
+	EpcId          int32
+	Id             uint32
+	RegionId       uint32
+	IfType         uint8
+	IsVIPInterface bool
+	// 适配windows hyper-v场景出现的在不同Region存在相同MAC，PlatformData查询GRPC下发的Region id,
+	// PlatformData不在同一Region中，该字段为True, 若为true不会创建mac表
+	SkipMac bool
 }

@@ -983,7 +983,6 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 		if firstSubnetID == 0 {
 			firstSubnetID = subnetID
 		}
-		isVip := ipRes.GetIsVip()
 		ipStr := ipRes.GetIp()
 		if isIPV4(ipStr) {
 			ipU32 := utils.IpToUint32(utils.ParserStringIpV4(ipStr))
@@ -1002,7 +1001,6 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 				PodID:        podID,
 				PodClusterID: podClusterID,
 				AZID:         azID,
-				IsVip:        isVip,
 				HitCount:     new(uint64),
 			}
 		} else {
@@ -1028,7 +1026,6 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 				PodID:        podID,
 				PodClusterID: podClusterID,
 				AZID:         azID,
-				IsVip:        isVip,
 				HitCount:     new(uint64),
 			}
 		}
