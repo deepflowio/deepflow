@@ -13,4 +13,5 @@ enum TridentType {
     TT_DEDICATED_PHYSICAL_MACHINE = 6;
     TT_HOST_POD = 7;
     TT_VM_POD = 8;
+    TT_TUNNEL_DECAPSULATION = 9;
 }
