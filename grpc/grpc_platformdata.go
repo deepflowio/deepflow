@@ -665,24 +665,24 @@ func (t *PlatformInfoTable) String() string {
 	t.ipv6Lock.RUnlock()
 
 	if len(t.macInfos) > 0 {
-		sb.WriteString("\nmac              hit\n")
-		sb.WriteString("------------------------\n")
+		sb.WriteString("\nepcID  Mac         hit\n")
+		sb.WriteString("---------------------------\n")
 	}
 	t.macLock.RLock()
 	for mac, hitCount := range t.macInfos {
 		if *hitCount.HitCount > 0 {
-			fmt.Fprintf(sb, "%-15x  %d\n", mac, *hitCount.HitCount)
+			fmt.Fprintf(sb, "%-5d  %-12x  %d\n", mac>>48, mac&0xffffffffffff, *hitCount.HitCount)
 		}
 	}
 	t.macLock.RUnlock()
 
 	if len(t.macMissCount) > 0 {
-		sb.WriteString("\nmac              miss\n")
-		sb.WriteString("------------------------\n")
+		sb.WriteString("\nepcID  Mac        miss\n")
+		sb.WriteString("----------------------------\n")
 	}
 	t.macLock.RLock()
 	for mac, missCount := range t.macMissCount {
-		fmt.Fprintf(sb, "%-15x  %d\n", mac, *missCount)
+		fmt.Fprintf(sb, "%-5d  %-12x  %d\n", mac>>48, mac&0xffffffffffff, *missCount)
 	}
 	t.macLock.RUnlock()
 
@@ -741,7 +741,7 @@ func (t *PlatformInfoTable) HandleSimpleCommand(op uint16, arg string) string {
 			rePrintLineIndex = i - 1
 		}
 		newLines = append(newLines, line)
-		if i%20 == 0 && len(lines)-i > 10 && lines[i+1] != "" && i-rePrintLineIndex > 10 {
+		if i%20 == 0 && len(lines)-i > 10 && lines[i+1] != "" && !strings.Contains(lines[i+1], "-----") && i-rePrintLineIndex > 10 {
 			newLines = append(newLines, lines[rePrintLineIndex])
 		}
 	}
@@ -1033,7 +1033,8 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 			}
 		}
 	}
-	macInfos[mac] = &Info{
+	l3EpcMac := mac | uint64(epcID)<<48 // 取l3EpcID的低16位和Mac组成新的Mac，防止mac跨AZ冲突
+	macInfos[l3EpcMac] = &Info{
 		L2EpcID:      epcID,
 		DeviceType:   deviceType,
 		DeviceID:     deviceID,
