@@ -293,11 +293,12 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool) {
 	l3EpcID0, l3EpcID1 := f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].L3EpcID, f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].L3EpcID
 	isVip0, isVip1 := f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].IsVIPDevice, f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].IsVIPDevice
 	mac0, mac1 := f.FlowKey.MACSrc, f.FlowKey.MACDst
+	l3EpcMac0, l3EpcMac1 := mac0|uint64(l3EpcID0)<<48, mac1|uint64(l3EpcID1)<<48 // 使用l3EpcID和mac查找，防止跨AZ mac冲突
 
 	if isVip0 && isVip1 {
-		info0, info1 = pf.PlatformData.QueryMacInfosPair(mac0, mac1)
+		info0, info1 = pf.PlatformData.QueryMacInfosPair(l3EpcMac0, l3EpcMac1)
 	} else if isVip0 {
-		info0 = pf.PlatformData.QueryMacInfo(mac0)
+		info0 = pf.PlatformData.QueryMacInfo(l3EpcMac0)
 		if isIPV6 {
 			info1 = pf.PlatformData.QueryIPV6Infos(int16(l3EpcID1), f.IP6Dst)
 		} else {
@@ -309,7 +310,7 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool) {
 		} else {
 			info0 = pf.PlatformData.QueryIPV4Infos(int16(l3EpcID0), uint32(f.IPSrc))
 		}
-		info1 = pf.PlatformData.QueryMacInfo(mac1)
+		info1 = pf.PlatformData.QueryMacInfo(l3EpcMac1)
 	} else if isIPV6 {
 		info0, info1 = pf.PlatformData.QueryIPV6InfosPair(int16(l3EpcID0), f.IP6Src, int16(l3EpcID1), f.IP6Dst)
 	} else {
@@ -318,11 +319,11 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool) {
 
 	var l2Info0, l2Info1 *grpc.Info
 	if l3EpcID0 > 0 && l3EpcID1 > 0 {
-		l2Info0, l2Info1 = pf.PlatformData.QueryMacInfosPair(mac0, mac1)
+		l2Info0, l2Info1 = pf.PlatformData.QueryMacInfosPair(l3EpcMac0, l3EpcMac1)
 	} else if l3EpcID0 > 0 {
-		l2Info0 = pf.PlatformData.QueryMacInfo(mac0)
+		l2Info0 = pf.PlatformData.QueryMacInfo(l3EpcMac0)
 	} else if l3EpcID1 > 0 {
-		l2Info1 = pf.PlatformData.QueryMacInfo(mac1)
+		l2Info1 = pf.PlatformData.QueryMacInfo(l3EpcMac1)
 	}
 
 	if info0 != nil {
