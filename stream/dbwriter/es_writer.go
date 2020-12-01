@@ -10,12 +10,10 @@ import (
 
 	"math/rand"
 
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/droplet/stream/common"
-	"gitlab.x.lan/yunshan/droplet/stream/jsonify"
 )
 
 var log = logging.MustGetLogger("es_writer")
@@ -32,6 +30,11 @@ type Counter struct {
 	TotalWriteCount int64 `statsd:"total-write-count"`
 }
 
+type ESItem interface {
+	EndTime() time.Duration
+	Release()
+}
+
 type ESWriter struct {
 	utils.Closable
 
@@ -46,7 +49,7 @@ type ESWriter struct {
 	ESQueue           queue.QueueReader
 	client            *elastic.Client
 	lastIndexTime     time.Duration
-	bulkFlow          []*jsonify.FlowLogger
+	bulkFlow          []ESItem
 	lastBulkTime      time.Duration
 	maxExecTime       time.Duration
 	avgExecTime       time.Duration
@@ -77,7 +80,7 @@ func (esWriter *ESWriter) getURL() []string {
 
 func (esWriter *ESWriter) releaseBulkFlow() {
 	for _, flow := range esWriter.bulkFlow {
-		jsonify.ReleaseFlowLogger(flow)
+		flow.Release()
 	}
 	esWriter.bulkFlow = esWriter.bulkFlow[:0]
 }
@@ -91,19 +94,16 @@ func (esWriter *ESWriter) Do() {
 		if item == nil {
 			continue
 		}
-		flow, ok := item.(*datatype.TaggedFlow)
+		flow, ok := item.(ESItem)
 		if !ok {
-			log.Warning("invalid type")
-			return
+			log.Warningf("item type invalid %T", item)
+			continue
 		}
-		flowJson := jsonify.TaggedFlowToLogger(flow)
 		// 防止异常的时间戳，导致误删除数据
-		if flow.EndTime < timestamp+time.Hour && flow.EndTime > timestamp-time.Hour {
-			timestamp = flow.EndTime
+		if flow.EndTime() < timestamp+time.Hour && flow.EndTime() > timestamp-time.Hour {
+			timestamp = flow.EndTime()
 		}
-		flow.Release()
-
-		esWriter.bulkFlow = append(esWriter.bulkFlow, flowJson)
+		esWriter.bulkFlow = append(esWriter.bulkFlow, flow)
 	}
 
 	timeNow := time.Now().Unix()
@@ -111,8 +111,6 @@ func (esWriter *ESWriter) Do() {
 	startTime := time.Duration(time.Now().UnixNano())
 
 	index := esWriter.RetentionPolicy.GetAppIndex(esWriter.AppName, timestamp)
-
-	dataType := esWriter.DataType
 
 	var count = 0
 
@@ -127,8 +125,8 @@ func (esWriter *ESWriter) Do() {
 			return
 		}
 		bulkRequest := esWriter.client.Bulk()
-		for i := 0; i < len(esWriter.bulkFlow); i++ {
-			indexReq := elastic.NewBulkIndexRequest().Index(index).Type(dataType).Doc(esWriter.bulkFlow[i])
+		for _, item := range esWriter.bulkFlow {
+			indexReq := elastic.NewBulkIndexRequest().Index(index).Type(esWriter.DataType).Doc(item)
 			bulkRequest.Add(indexReq)
 			count++
 		}

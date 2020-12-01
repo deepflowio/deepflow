@@ -31,60 +31,73 @@ const (
 
 type Stream struct {
 	StreamConfig *config.Config
-	Decoders     []*decoder.Decoder
-	Throttlers   []*throttler.ThrottlingQueue
-	ESWriters    []*dbwriter.ESWriter
-	Broker       *pusher.FlowSender
+	FlowLogger   *Logger
+	ProtoLogger  *Logger
+}
+
+type Logger struct {
+	Config     *config.Config
+	Decoders   []*decoder.Decoder
+	Throttlers []*throttler.ThrottlingQueue
+	ESWriters  []*dbwriter.ESWriter
+	Broker     *pusher.FlowSender
 }
 
 func NewStream(config *config.Config, recv *receiver.Receiver) *Stream {
 	manager := dropletqueue.NewManager(dropletctl.DROPLETCTL_STREAM_QUEUE)
-
-	decodeQueues := manager.NewQueues(
-		"1-receive-to-decode",
-		config.DecoderQueueSize,
-		config.DecoderQueueCount,
-		1)
-
-	recv.RegistHandler(datatype.MESSAGE_TYPE_TAGGEDFLOW, decodeQueues, config.DecoderQueueCount)
-
-	queueCount := config.DecoderQueueCount
-	throttle := config.Throttle / queueCount
-	esWriterQueues := manager.NewQueues(
-		"2-decode-to-es-writer-queue", (throttler.THROTTLE_BUCKET+1)*throttle, queueCount, 1,
-		queue.OptionFlushIndicator((throttler.THROTTLE_BUCKET-1)*time.Second),
-	)
-
-	throttlers := make([]*throttler.ThrottlingQueue, queueCount)
-	esWriters := make([]*dbwriter.ESWriter, queueCount)
-	for i := 0; i < queueCount; i++ {
-		throttlers[i] = throttler.NewThrottlingQueue(
-			throttle,
-			queue.QueueWriter(esWriterQueues.FixedMultiQueue[i]),
-		)
-
-		esWriters[i] = &dbwriter.ESWriter{
-			AppName:   "l4_flow_log",
-			DataType:  "flow",
-			Addresses: config.ESHostPorts,
-			User:      config.ESAuth.User,
-			Password:  config.ESAuth.Password,
-			RetentionPolicy: common.RetentionPolicy{
-				Interval:   common.ZERO,
-				SplitSize:  common.Interval(time.Duration(config.RPSplitSize) * time.Second),
-				Slots:      config.RPSlots,
-				AliveSlots: config.RPAliveSlots,
-			},
-			OpLoadFactor: config.OpLoadFactor,
-			ESQueue:      queue.QueueReader(esWriterQueues.FixedMultiQueue[i]),
+	controllers := make([]net.IP, len(config.ControllerIPs))
+	for i, ipString := range config.ControllerIPs {
+		controllers[i] = net.ParseIP(ipString)
+		if controllers[i].To4() != nil {
+			controllers[i] = controllers[i].To4()
 		}
 	}
+	platformdata.New(controllers, config.ControllerPort, "stream", nil)
+	geo.NewGeoTree()
+
+	flowLogger := NewFlowLogger(config, manager, recv)
+	protoLogger := NewProtoLogger(config, manager, recv)
+	return &Stream{
+		StreamConfig: config,
+		FlowLogger:   flowLogger,
+		ProtoLogger:  protoLogger,
+	}
+}
+
+func newESWriter(config *config.Config, appName string, esQueue queue.QueueReader) *dbwriter.ESWriter {
+	return &dbwriter.ESWriter{
+		AppName:   appName,
+		DataType:  "flow",
+		Addresses: config.ESHostPorts,
+		User:      config.ESAuth.User,
+		Password:  config.ESAuth.Password,
+		RetentionPolicy: common.RetentionPolicy{
+			Interval:   common.ZERO,
+			SplitSize:  common.Interval(time.Duration(config.RPSplitSize) * time.Second),
+			Slots:      config.RPSlots,
+			AliveSlots: config.RPAliveSlots,
+		},
+		OpLoadFactor: config.OpLoadFactor,
+		ESQueue:      esQueue,
+	}
+}
+
+func NewFlowLogger(config *config.Config, manager *dropletqueue.Manager, recv *receiver.Receiver) *Logger {
+	msgType := datatype.MESSAGE_TYPE_TAGGEDFLOW
+	queueCount := config.DecoderQueueCount
+	queueSuffix := "-l4"
+	decodeQueues := manager.NewQueues(
+		"1-receive-to-decode"+queueSuffix,
+		config.DecoderQueueSize,
+		queueCount,
+		1)
+	recv.RegistHandler(uint8(msgType), decodeQueues, queueCount)
 
 	var broker *pusher.FlowSender
 	var brokerQueue *dropletqueue.Queue
 	if config.BrokerEnabled {
 		brokerQueue = manager.NewQueue(
-			"2-broker_queue",
+			"2-broker-queue"+queueSuffix,
 			config.BrokerQueueSize,
 		)
 		zmqBytePusher := zmq.NewZMQBytePusher(
@@ -96,46 +109,120 @@ func NewStream(config *config.Config, recv *receiver.Receiver) *Stream {
 		broker = pusher.NewFlowSender(zmqBytePusher, brokerQueue)
 	}
 
-	decoders := make([]*decoder.Decoder, 0)
-	for i := 0; i < config.DecoderQueueCount; i++ {
-		decoder := decoder.NewDecoder(
+	throttle := config.Throttle / queueCount
+	esWriterQueues := manager.NewQueues(
+		"2-decode-to-es-writer-queue"+queueSuffix, (throttler.THROTTLE_BUCKET+1)*throttle, queueCount, 1,
+		queue.OptionFlushIndicator((throttler.THROTTLE_BUCKET-1)*time.Second),
+	)
+
+	throttlers := make([]*throttler.ThrottlingQueue, queueCount)
+	esWriters := make([]*dbwriter.ESWriter, queueCount)
+	decoders := make([]*decoder.Decoder, queueCount)
+
+	for i := 0; i < queueCount; i++ {
+		throttlers[i] = throttler.NewThrottlingQueue(
+			throttle,
+			queue.QueueWriter(esWriterQueues.FixedMultiQueue[i]),
+		)
+		esWriters[i] = newESWriter(config, "l4_flow_log", queue.QueueReader(esWriterQueues.FixedMultiQueue[i]))
+		decoders[i] = decoder.NewDecoder(
 			i,
+			msgType,
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			throttlers[i],
+			nil,
+			nil,
 			config.BrokerEnabled,
 			brokerQueue,
 		)
-		decoders = append(decoders, decoder)
+	}
+	return &Logger{
+		Config:     config,
+		Decoders:   decoders,
+		Throttlers: throttlers,
+		ESWriters:  esWriters,
+		Broker:     broker,
 	}
 
-	controllers := make([]net.IP, len(config.ControllerIPs))
-	for i, ipString := range config.ControllerIPs {
-		controllers[i] = net.ParseIP(ipString)
-		if controllers[i].To4() != nil {
-			controllers[i] = controllers[i].To4()
-		}
-	}
-	platformdata.New(controllers, config.ControllerPort, "stream", nil)
+}
 
-	geo.NewGeoTree()
-	return &Stream{
-		StreamConfig: config,
-		Decoders:     decoders,
-		Throttlers:   throttlers,
-		ESWriters:    esWriters,
-		Broker:       broker,
+func NewProtoLogger(config *config.Config, manager *dropletqueue.Manager, recv *receiver.Receiver) *Logger {
+	queueSuffix := "-l7"
+	queueCount := config.DecoderQueueCount
+	msgType := datatype.MESSAGE_TYPE_PROTOCOLLOG
+
+	decodeQueues := manager.NewQueues(
+		"1-receive-to-decode"+queueSuffix,
+		config.DecoderQueueSize,
+		queueCount,
+		1)
+
+	recv.RegistHandler(uint8(msgType), decodeQueues, queueCount)
+
+	throttle := config.Throttle / queueCount
+	httpEsWriterQueues := manager.NewQueues(
+		"2-decode-to-es-writer-http"+queueSuffix, (throttler.THROTTLE_BUCKET+1)*throttle, queueCount, 1,
+		queue.OptionFlushIndicator((throttler.THROTTLE_BUCKET-1)*time.Second),
+	)
+	dnsEsWriterQueues := manager.NewQueues(
+		"2-decode-to-es-writer-dns"+queueSuffix, (throttler.THROTTLE_BUCKET+1)*throttle, queueCount, 1,
+		queue.OptionFlushIndicator((throttler.THROTTLE_BUCKET-1)*time.Second),
+	)
+
+	httpThrottlers := make([]*throttler.ThrottlingQueue, queueCount)
+	dnsThrottlers := make([]*throttler.ThrottlingQueue, queueCount)
+	httpEsWriters := make([]*dbwriter.ESWriter, queueCount)
+	dnsEsWriters := make([]*dbwriter.ESWriter, queueCount)
+
+	decoders := make([]*decoder.Decoder, queueCount)
+	for i := 0; i < queueCount; i++ {
+		httpThrottlers[i] = throttler.NewThrottlingQueue(
+			throttle,
+			queue.QueueWriter(httpEsWriterQueues.FixedMultiQueue[i]),
+		)
+		dnsThrottlers[i] = throttler.NewThrottlingQueue(
+			throttle,
+			queue.QueueWriter(dnsEsWriterQueues.FixedMultiQueue[i]),
+		)
+		httpEsWriters[i] = newESWriter(config, "l7_http_log", queue.QueueReader(httpEsWriterQueues.FixedMultiQueue[i]))
+		dnsEsWriters[i] = newESWriter(config, "l7_dns_log", queue.QueueReader(dnsEsWriterQueues.FixedMultiQueue[i]))
+		decoders[i] = decoder.NewDecoder(
+			i,
+			msgType,
+			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
+			nil,
+			httpThrottlers[i],
+			dnsThrottlers[i],
+			false,
+			nil,
+		)
+	}
+
+	return &Logger{
+		Config:     config,
+		Decoders:   decoders,
+		Throttlers: append(httpThrottlers, dnsThrottlers...),
+		ESWriters:  append(httpEsWriters, dnsEsWriters...),
+	}
+}
+
+func (l *Logger) Start() {
+	for _, decoder := range l.Decoders {
+		go decoder.Run()
+	}
+
+	for i, esWriter := range l.ESWriters {
+		esWriter.Open(stats.OptionStatTags{"thread": strconv.Itoa(i), "app": esWriter.AppName})
+		go esWriter.Run()
 	}
 }
 
 func (s *Stream) Start() {
-	for i := 0; i < s.StreamConfig.DecoderQueueCount; i++ {
-		go s.Decoders[i].Run()
-		s.ESWriters[i].Open(stats.OptionStatTags{"thread": strconv.Itoa(i)})
-		go s.ESWriters[i].Run()
+	s.FlowLogger.Start()
+	s.ProtoLogger.Start()
 
-	}
 	if s.StreamConfig.BrokerEnabled {
-		go s.Broker.Run()
+		go s.FlowLogger.Broker.Run()
 	}
 	platformdata.Start()
 }

@@ -429,6 +429,18 @@ func (m *Metrics) Fill(f *datatype.TaggedFlow) {
 	}
 }
 
+func (f *FlowLogger) Release() {
+	ReleaseFlowLogger(f)
+}
+
+func (f *FlowLogger) EndTime() time.Duration {
+	return time.Duration(f.FlowInfo.EndTime) * time.Second
+}
+
+func (f *FlowLogger) String() string {
+	return fmt.Sprintf("flow: %+v\n", *f)
+}
+
 var poolFlowLogger = pool.NewLockFreePool(func() interface{} {
 	l := new(FlowLogger)
 	l.CastTypes0 = make([]string, 0)

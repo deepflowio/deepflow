@@ -157,8 +157,8 @@
 #  user:
 #  password:
 
-## es writer queue limit max size
-#throttle: 30000
+## es writer all queue limit max size
+#throttle: 1000
 
 ## es writer denominator for sleep time
 #op-load-factor: 10
@@ -169,7 +169,7 @@
 
 #rp-alive-slots: 31
 
-#decoder-queue-count: 4
+#decoder-queue-count: 2
 
 #decoder-queue-size: 100000
 
