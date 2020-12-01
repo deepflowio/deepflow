@@ -344,7 +344,7 @@ func ValidateFlowVersion(t uint8, version uint32) error {
 	switch t {
 	case datatype.MESSAGE_TYPE_METRICS:
 		expectVersion = app.VERSION
-	case datatype.MESSAGE_TYPE_TAGGEDFLOW:
+	case datatype.MESSAGE_TYPE_TAGGEDFLOW, datatype.MESSAGE_TYPE_PROTOCOLLOG:
 		expectVersion = datatype.VERSION
 	default:
 		return fmt.Errorf("invalid message type %d", t)
@@ -415,9 +415,10 @@ func (r *Receiver) ProcessUDPServer() {
 		}
 
 		headerLen := datatype.MESSAGE_HEADER_LEN
-		// 对Metrics和TaggedFlow处理
+		// 对Metrics和TaggedFlow,AppProtoLogData处理
 		if baseHeader.Type == datatype.MESSAGE_TYPE_METRICS ||
-			baseHeader.Type == datatype.MESSAGE_TYPE_TAGGEDFLOW {
+			baseHeader.Type == datatype.MESSAGE_TYPE_TAGGEDFLOW ||
+			baseHeader.Type == datatype.MESSAGE_TYPE_PROTOCOLLOG {
 			flowHeader.Decode(recvBuffer.Buffer[datatype.MESSAGE_HEADER_LEN:])
 			headerLen += datatype.FLOW_HEADER_LEN
 
@@ -532,7 +533,9 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 
 		headerLen := datatype.MESSAGE_HEADER_LEN
 		// 对metrics和TaggedFlow处理
-		if baseHeader.Type == datatype.MESSAGE_TYPE_METRICS || baseHeader.Type == datatype.MESSAGE_TYPE_TAGGEDFLOW {
+		if baseHeader.Type == datatype.MESSAGE_TYPE_METRICS ||
+			baseHeader.Type == datatype.MESSAGE_TYPE_TAGGEDFLOW ||
+			baseHeader.Type == datatype.MESSAGE_TYPE_PROTOCOLLOG {
 			if err := ReadN(conn, flowHeaderBuffer); err != nil {
 				atomic.AddUint64(&r.counter.Invalid, 1)
 				log.Warningf("TCP client(%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
