@@ -5,13 +5,16 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 )
 
 const (
 	THROTTLE_BUCKET = 10 // 由于发送方是有突发的，需要累积一定时间做采样
 )
+
+type throttleItem interface {
+	Release()
+}
 
 type ThrottlingQueue struct {
 	EsQueue queue.QueueWriter
@@ -40,7 +43,7 @@ func (thq *ThrottlingQueue) flush() {
 	}
 }
 
-func (thq *ThrottlingQueue) Send(flow *datatype.TaggedFlow) {
+func (thq *ThrottlingQueue) Send(flow interface{}) {
 	now := time.Now().Unix()
 	thq.Lock()
 	if now/THROTTLE_BUCKET != thq.lastFlush/THROTTLE_BUCKET {
@@ -62,7 +65,14 @@ func (thq *ThrottlingQueue) Send(flow *datatype.TaggedFlow) {
 	} else {
 		r := rand.Intn(thq.periodCount)
 		if r < thq.Throttle {
+			if tItem, ok := thq.sampleItems[r].(throttleItem); ok {
+				tItem.Release()
+			}
 			thq.sampleItems[r] = flow
+		} else {
+			if tItem, ok := flow.(throttleItem); ok {
+				tItem.Release()
+			}
 		}
 	}
 	thq.Unlock()

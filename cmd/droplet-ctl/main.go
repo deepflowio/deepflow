@@ -75,8 +75,12 @@ func main() {
 	rozeCmd.AddCommand(receiver.RegisterTridentStatusCommand())
 
 	streamCmd.AddCommand(queue.RegisterCommand(dropletctl.DROPLETCTL_STREAM_QUEUE, []string{
-		"1-receive-to-decode",
-		"2-decode-to-es-writer-queue"}))
+		"1-receive-to-decode-l4",
+		"1-receive-to-decode-l7",
+		"2-decode-to-es-writer-queue-l4",
+		"2-decode-to-es-writer-http-l7",
+		"2-decode-to-es-writer-dns-l7",
+	}))
 	streamCmd.AddCommand(debug.ClientRegisterSimple(stream.CMD_PLATFORMDATA, debug.CmdHelper{"platformData [filter]", "show stream platform data statistics"}, nil))
 
 	root.GenBashCompletionFile("/usr/share/bash-completion/completions/droplet-ctl")

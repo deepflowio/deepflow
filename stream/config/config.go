@@ -16,12 +16,12 @@ const (
 	DefaultControllerIP      = "127.0.0.1"
 	DefaultControllerPort    = 20035
 	DefaultESHostPort        = "127.0.0.1:20042"
-	DefaultThrottle          = 30000
+	DefaultThrottle          = 1000
 	DefaultOpLoadFactor      = 10
 	DefaultRPSplitSize       = 86400 // 1天
 	DefaultRPSlots           = 7322
 	DefaultRPAliveSlots      = 31
-	DefaultDecoderQueueCount = 4
+	DefaultDecoderQueueCount = 2
 	DefaultDecoderQueueSize  = 100000
 	DefaultBrokerQueueSize   = 10000
 	DefaultBrokerZMQIP       = "127.0.0.1"
