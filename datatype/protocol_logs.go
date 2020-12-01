@@ -113,6 +113,32 @@ type AppProtoLogsData struct {
 	pool.ReferenceCount
 }
 
+var httpInfoPool = pool.NewLockFreePool(func() interface{} {
+	return new(HTTPInfo)
+})
+
+func AcquireHTTPInfo() *HTTPInfo {
+	return httpInfoPool.Get().(*HTTPInfo)
+}
+
+func ReleaseHTTPInfo(h *HTTPInfo) {
+	*h = HTTPInfo{}
+	httpInfoPool.Put(h)
+}
+
+var dnsInfoPool = pool.NewLockFreePool(func() interface{} {
+	return new(DNSInfo)
+})
+
+func AcquireDNSInfo() *DNSInfo {
+	return dnsInfoPool.Get().(*DNSInfo)
+}
+
+func ReleaseDNSInfo(d *DNSInfo) {
+	*d = DNSInfo{}
+	dnsInfoPool.Put(d)
+}
+
 var appProtoLogsDataPool = pool.NewLockFreePool(func() interface{} {
 	return new(AppProtoLogsData)
 })
@@ -127,6 +153,12 @@ func AcquireAppProtoLogsData() *AppProtoLogsData {
 func ReleaseAppProtoLogsData(d *AppProtoLogsData) {
 	if d.SubReferenceCount() {
 		return
+	}
+
+	if d.Proto == PROTO_HTTP {
+		ReleaseHTTPInfo(d.Detail.(*HTTPInfo))
+	} else if d.Proto == PROTO_DNS {
+		ReleaseDNSInfo(d.Detail.(*DNSInfo))
 	}
 
 	*d = zeroAppProtoLogsData
@@ -197,7 +229,16 @@ func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
 	l.PortSrc = decoder.ReadU16()
 	l.PortDst = decoder.ReadU16()
 
-	l.Detail.Decode(decoder, l.MsgType, l.Code)
+	if l.Proto == PROTO_HTTP {
+		httpInfo := AcquireHTTPInfo()
+		httpInfo.Decode(decoder, l.MsgType, l.Code)
+		l.Detail = httpInfo
+	} else if l.Proto == PROTO_DNS {
+		dnsInfo := AcquireDNSInfo()
+		dnsInfo.Decode(decoder, l.MsgType, l.Code)
+		l.Detail = dnsInfo
+	}
+
 	return nil
 }
 
