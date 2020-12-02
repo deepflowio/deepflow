@@ -213,7 +213,7 @@ type HTTPInfo struct {
 	ContentLength uint64
 	Version       string
 	Method        string
-	URI           string
+	Path          string
 	Host          string
 	ClientIP      string
 	TraceID       string
@@ -224,7 +224,7 @@ func (h *HTTPInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, 
 	encoder.WriteU64(h.ContentLength)
 	encoder.WriteString255(h.Version)
 	if msgType == MSG_T_REQUEST {
-		encoder.WriteString255(h.URI)
+		encoder.WriteString255(h.Path)
 		encoder.WriteString255(h.Host)
 		encoder.WriteString255(h.ClientIP)
 	} else {
@@ -238,7 +238,7 @@ func (h *HTTPInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, 
 	h.ContentLength = decoder.ReadU64()
 	h.Version = decoder.ReadString255()
 	if msgType == MSG_T_REQUEST {
-		h.URI = decoder.ReadString255()
+		h.Path = decoder.ReadString255()
 		h.Host = decoder.ReadString255()
 		h.ClientIP = decoder.ReadString255()
 	} else {
