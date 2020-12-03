@@ -25,3 +25,10 @@ type Counter struct {
 	Max  int `statsd:"max-bucket"` // 目前仅统计Get扫描到的最大值
 	Size int `statsd:"size"`
 }
+
+type DoubleKeyLRUCounter struct {
+	Max            int `statsd:"max-bucket"`       // 目前仅统计Get扫描到的最大冲突值
+	MaxShortBucket int `statsd:"max-short-bucket"` // 目前仅统计GetByShortKey扫描到的最大冲突值
+	Size           int `statsd:"size"`
+	MaxLongBucket  int `statsd:"max-long-bucket"` // 目前通过shortKey删除的含有最多的成员数值
+}
