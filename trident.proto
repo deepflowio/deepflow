@@ -146,6 +146,7 @@ message Config {
     optional bool    vtap_flow_1s_enabled   = 27 [default = true];
     optional bool    debug_enabled   = 28 [default = true];
     optional uint32  log_threshold = 29 [default = 300];
+    optional string  log_level = 30 [default = "info"];
 
     optional string  analyzer_ip          = 31 [default = "127.0.0.1"];
     optional uint32  max_escape_seconds   = 32;
