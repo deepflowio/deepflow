@@ -157,6 +157,8 @@ func (l *LabelerManager) GetPolicy(packet *datatype.MetaPacket, index int) {
 	key.L2End1 = packet.L2End1
 	key.L3End0 = packet.L3End0
 	key.L3End1 = packet.L3End1
+	key.L3EpcId0 = packet.L3EpcId0
+	key.L3EpcId1 = packet.L3EpcId1
 	key.TapType = packet.TapType
 	key.FastIndex = index
 	key.FeatureFlag = datatype.NPM
