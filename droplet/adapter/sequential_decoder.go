@@ -40,6 +40,8 @@ type Decoded struct {
 	flags      uint8
 	IpID       uint16
 	fragOffset uint16
+	l3EpcId0   uint16
+	l3EpcId1   uint16
 
 	// l3 ipv6
 	ip6Src, ip6Dst net.IP
@@ -180,18 +182,22 @@ func (d *SequentialDecoder) decodeIPv6(meta *MetaPacket) {
 	meta.TTL = x.ttl
 	if !d.pflags.IsSet(CFLAG_IP0) {
 		x.ip6Src = net.IP(d.Field(IPV6_ADDR_LEN))
+		x.l3EpcId0 = d.U16()
 	}
 	if !d.pflags.IsSet(CFLAG_IP1) {
 		x.ip6Dst = net.IP(d.Field(IPV6_ADDR_LEN))
+		x.l3EpcId1 = d.U16()
 	}
 	meta.Ip6Src = make(net.IP, 16)
 	meta.Ip6Dst = make(net.IP, 16)
 	if d.forward {
 		copy(meta.Ip6Src, x.ip6Src)
 		copy(meta.Ip6Dst, x.ip6Dst)
+		meta.L3EpcId0, meta.L3EpcId1 = x.l3EpcId0, x.l3EpcId1
 	} else {
 		copy(meta.Ip6Src, x.ip6Dst)
 		copy(meta.Ip6Dst, x.ip6Src)
+		meta.L3EpcId0, meta.L3EpcId1 = x.l3EpcId1, x.l3EpcId0
 	}
 	meta.NextHeader = IPProtocol(d.U8())
 	if length := d.U8(); length > 0 {
@@ -229,16 +235,20 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPacket) {
 
 	if !d.pflags.IsSet(CFLAG_IP0) {
 		x.ip0 = binary.BigEndian.Uint32(d.Field(IP_ADDR_LEN))
+		x.l3EpcId0 = d.U16()
 	}
 	if !d.pflags.IsSet(CFLAG_IP1) {
 		x.ip1 = binary.BigEndian.Uint32(d.Field(IP_ADDR_LEN))
+		x.l3EpcId1 = d.U16()
 	}
 	if d.forward {
 		meta.IpSrc = x.ip0
 		meta.IpDst = x.ip1
+		meta.L3EpcId0, meta.L3EpcId1 = x.l3EpcId0, x.l3EpcId1
 	} else {
 		meta.IpSrc = x.ip1
 		meta.IpDst = x.ip0
+		meta.L3EpcId0, meta.L3EpcId1 = x.l3EpcId1, x.l3EpcId0
 	}
 	if x.headerType == HEADER_TYPE_IPV4_ICMP {
 		meta.Protocol = IPProtocolICMPv4
