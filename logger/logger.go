@@ -149,3 +149,9 @@ func RsyslogSetThreshold(value uint32) {
 		w.SetThreshold(value)
 	}
 }
+
+func RsyslogSetHostname(value string) {
+	for _, w := range rsyslogWriters {
+		w.SetHostname(value)
+	}
+}

@@ -10,11 +10,12 @@ import (
 )
 
 type RSyslogWriter struct {
-	tag      string
-	hostname string
-	network  string
-	raddr    string
-	header   string
+	tag       string
+	hostname  string
+	network   string
+	raddr     string
+	header    string
+	infoMutex sync.RWMutex
 
 	mu   sync.Mutex // guards conn
 	conn net.Conn
@@ -36,8 +37,14 @@ func (w *RSyslogWriter) connect() (err error) {
 		c, err = net.Dial(w.network, w.raddr)
 		if err == nil {
 			w.conn = c
+			w.infoMutex.RLock()
 			if w.hostname == "" {
+				w.infoMutex.RUnlock()
+				w.infoMutex.Lock()
 				w.hostname = c.LocalAddr().String()
+				w.infoMutex.Unlock()
+			} else {
+				w.infoMutex.RUnlock()
 			}
 		}
 	}
@@ -109,7 +116,11 @@ func (w *RSyslogWriter) write(msg string) (int, error) {
 		nl = "\n"
 	}
 
-	err := w.writeString(w.hostname, w.tag, msg, nl)
+	w.infoMutex.RLock()
+	hostname := w.hostname
+	w.infoMutex.RUnlock()
+
+	err := w.writeString(hostname, w.tag, msg, nl)
 	if err != nil {
 		return 0, err
 	}
@@ -129,6 +140,12 @@ func (w *RSyslogWriter) writeString(hostname, tag, msg, nl string) error {
 
 func (w *RSyslogWriter) SetThreshold(value uint32) {
 	w.threshold = value
+}
+
+func (w *RSyslogWriter) SetHostname(value string) {
+	w.infoMutex.Lock()
+	w.hostname = value
+	w.infoMutex.Unlock()
 }
 
 func NewRsyslogWriter(network, raddr string, tag, header string) *RSyslogWriter {
