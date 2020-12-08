@@ -119,6 +119,13 @@ enum VlanMode {
     QINQ = 2;
 }
 
+enum PacketDataType {
+    CAST_TYPE = 0;
+    TCP_FLAG = 1;
+    TTL = 2;
+    PACKET_SIZE = 3;
+}
+
 message Config {
     optional bool    enabled              = 1 [default = true];
     optional uint32  max_cpus             = 2 [default = 2];
@@ -137,35 +144,53 @@ message Config {
     optional bool    platform_enabled     = 16 [default = false];
     optional uint64  server_tx_bandwidth_threshold = 18 [default = 0]; //bps
     optional uint64  bandwidth_probe_interval = 19 [default = 10];  //second
-    optional bool    flow_store_enabled   = 21 [default = false];
+
+    optional bool    l4_log_store_enabled = 21 [default = false];
     optional VlanMode npb_vlan_mode       = 22 [default = NONE];
-    repeated uint32  flow_store_tap_types = 23;
+    repeated uint32  l4_log_tap_types     = 23;
     optional bool    npb_dedup_enabled    = 24 [default = true];
-    optional IfMacSource if_mac_source = 25 [default = IF_MAC];
+    optional IfMacSource if_mac_source    = 25 [default = IF_MAC];
     optional bool    vtap_packet_1s_enabled = 26 [default = true];
     optional bool    vtap_flow_1s_enabled   = 27 [default = true];
-    optional bool    debug_enabled   = 28 [default = true];
-    optional uint32  log_threshold = 29 [default = 300];
-    optional string  log_level = 30 [default = "info"];
+    optional bool    debug_enabled        = 28 [default = true];
 
     optional string  analyzer_ip          = 31 [default = "127.0.0.1"];
     optional uint32  max_escape_seconds   = 32;
 
     optional string  proxy_controller_ip  = 34; // 控制器代理IP
-    optional uint32  region_id = 35 [default = 0]; // 数据节点所在区域ID
+    optional uint32  region_id            = 35 [default = 0]; // 数据节点所在区域ID
 
-    optional uint32 vtap_id = 40;  // 限制在64000
+    optional uint32 vtap_id               = 40;  // 限制在64000
     optional common.TridentType trident_type = 41;
 
     optional SocketType collector_socket_type = 45 [default = UDP];
     optional SocketType compressor_socket_type = 46 [default = RAW_UDP];
-    optional SocketType npb_socket_type = 47 [default = RAW_UDP];
+    optional SocketType npb_socket_type   = 47 [default = RAW_UDP];
 
-    optional uint32 pcap_data_retention = 51 [default = 7]; // uint: day
-    optional uint32 capture_packet_size = 52 [default = 65535];
+    optional uint32 pcap_data_retention   = 51 [default = 7]; // uint: day
+    optional uint32 capture_packet_size   = 52 [default = 65535];
     optional bool inactive_server_port_enabled = 53 [default = true];
 
-    optional string libvirt_xml_path = 60 [default = "/etc/libvirt/qemu"];
+    optional string libvirt_xml_path      = 60 [default = "/etc/libvirt/qemu"];
+
+    // 新增资源限制
+    optional uint32  log_threshold        = 101 [default = 300];
+    optional string  log_level            = 102 [default = "INFO"];
+
+    // 新增基础配置参数
+    optional uint32  log_retention        = 201 [default = 30]; // uint: day
+
+    // 新增全景图配置参数
+    optional string  http_log_proxy_client = 301 [default = 'X-Forwarded-For'];
+    optional string  http_log_trace_id    = 302 [default = 'X-B3-TraceId'];
+    optional uint32  l7_log_packet_size   = 303 [default = 256];
+    optional uint64  l4_log_collect_nps_threshold = 304 [default = 10000];
+    optional uint64  l7_log_collect_nps_threshold = 305 [default = 10000];
+
+    // 新增全景图功能开关
+    optional uint32  l7_metrics_enabled   = 401 [default = 1];
+    repeated PacketDataType packet_data_types = 402;
+    repeated uint32  l7_log_store_tap_types = 403;
 }
 
 message Segment { // e.g. single LAN area
