@@ -251,7 +251,7 @@ type ProtoSpecialInfo interface {
 // HTTPv2根据需要添加
 type HTTPInfo struct {
 	StreamID      uint32 // HTTPv2
-	ContentLength uint64
+	ContentLength int64
 	Version       string
 	Method        string
 	Path          string
@@ -262,28 +262,26 @@ type HTTPInfo struct {
 
 func (h *HTTPInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, code uint16) {
 	encoder.WriteU32(h.StreamID)
-	encoder.WriteU64(h.ContentLength)
+	encoder.WriteU64(uint64(h.ContentLength))
 	encoder.WriteString255(h.Version)
 	if msgType == MSG_T_REQUEST {
+		encoder.WriteString255(h.Method)
 		encoder.WriteString255(h.Path)
 		encoder.WriteString255(h.Host)
 		encoder.WriteString255(h.ClientIP)
-	} else {
-		encoder.WriteString255(h.Method)
 	}
 	encoder.WriteString255(h.TraceID)
 }
 
 func (h *HTTPInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, code uint16) {
 	h.StreamID = decoder.ReadU32()
-	h.ContentLength = decoder.ReadU64()
+	h.ContentLength = int64(decoder.ReadU64())
 	h.Version = decoder.ReadString255()
 	if msgType == MSG_T_REQUEST {
+		h.Method = decoder.ReadString255()
 		h.Path = decoder.ReadString255()
 		h.Host = decoder.ReadString255()
 		h.ClientIP = decoder.ReadString255()
-	} else {
-		h.Method = decoder.ReadString255()
 	}
 	h.TraceID = decoder.ReadString255()
 }
