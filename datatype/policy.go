@@ -268,7 +268,8 @@ func (d *PolicyData) dedupNpbAction(packet *LookupKey) []NpbActions {
 
 	validActions := make([]NpbActions, 0, len(d.NpbActions))
 	for _, action := range d.NpbActions {
-		if (action.TapSideCompare(TAPSIDE_SRC) && packet.L2End0 && packet.L3End0) ||
+		if action.TunnelType() == NPB_TUNNEL_TYPE_PCAP ||
+			(action.TapSideCompare(TAPSIDE_SRC) && packet.L2End0 && packet.L3End0) ||
 			(action.TapSideCompare(TAPSIDE_DST) && packet.L2End1 && packet.L3End1) {
 			validActions = append(validActions, action)
 		}
