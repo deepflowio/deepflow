@@ -21,7 +21,7 @@ const (
 	DefaultStoreBatchBufferSize    = 65536
 	DefaultControllerPort          = 20035
 	DefaultUnmarshallQueueCount    = 4
-	DefaultUnmarshallQueueSize     = 1024
+	DefaultUnmarshallQueueSize     = 10240
 	DefaultDuration                = "170h" // 1w + 2h
 	DefaultShardDuration           = "1d"
 	DefaultDurationS1              = "26h"
