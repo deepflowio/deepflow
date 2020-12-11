@@ -71,6 +71,7 @@ func (d *Decoder) Run() {
 			} else if d.msgType == datatype.MESSAGE_TYPE_TAGGEDFLOW {
 				d.handleTaggedFlow(decoder)
 			}
+			receiver.ReleaseRecvBuffer(recvBytes)
 		}
 	}
 }
