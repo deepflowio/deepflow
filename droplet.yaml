@@ -111,8 +111,8 @@
 ## parallelism of unmarshall, defaults to 4
 #unmarshall-queue-count: 4
 
-## size of unmarshall queue, defaults to 1024
-#unmarshall-queue-size: 1024
+## size of unmarshall queue, defaults to 10240
+#unmarshall-queue-size: 10240
 
 ## parallelism of store, defaults to 4
 #store-queue-count: 4
