@@ -91,7 +91,7 @@ type DNSLogger struct {
 	ID         uint16 `json:"id"`
 	DomainName string `json:"domain_name,omitempty"`
 	QueryType  uint16 `json:"query_type,omitempty"`
-	AnswerCode uint16 `json:"answer_code,omitempty"`
+	AnswerCode uint16 `json:"answer_code"`
 	AnswerAddr string `json:"answer_addr,omitempty"`
 
 	// 指标量
