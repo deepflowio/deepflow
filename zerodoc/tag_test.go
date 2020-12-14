@@ -322,3 +322,45 @@ func TestEncodeMiniTag(t *testing.T) {
 		t.Error("mini tag:", edgeMiniTag)
 	}
 }
+
+func TestDirectionEnum(t *testing.T) {
+	clients := []DirectionEnum{ClientToServer, ClientNodeToServer, ClientHypervisorToServer, ClientGatewayToServer}
+	for _, c := range clients {
+		if !c.IsClientToServer() {
+			t.Errorf("%v is client to server", c)
+		}
+		if c.IsServerToClient() {
+			t.Errorf("%v is not server to client", c)
+		}
+	}
+
+	servers := []DirectionEnum{ServerToClient, ServerNodeToClient, ServerHypervisorToClient, ServerGatewayToClient}
+	for _, c := range servers {
+		if !c.IsServerToClient() {
+			t.Errorf("%v is server to client", c)
+		}
+		if c.IsClientToServer() {
+			t.Errorf("%v is not client to server", c)
+		}
+	}
+}
+
+func TestDirectionToTAPSide(t *testing.T) {
+	directions := []DirectionEnum{
+		ClientToServer, ServerToClient,
+		ClientNodeToServer, ServerNodeToClient,
+		ClientHypervisorToServer, ServerHypervisorToClient,
+		ClientGatewayToServer, ServerGatewayToClient,
+	}
+	tapSides := []TAPSideEnum{
+		Client, Server,
+		ClientNode, ServerNode,
+		ClientHypervisor, ServerHypervisor,
+		ClientGateway, ServerGateway,
+	}
+	for i, d := range directions {
+		if to := d.ToTAPSide(); to != tapSides[i] {
+			t.Errorf("direction %v to tapSide %v error, should be %v", d, to, tapSides[i])
+		}
+	}
+}

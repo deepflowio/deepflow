@@ -87,20 +87,57 @@ const (
 	DHCPDevice
 )
 
+type SideType uint8
+
+const (
+	NodeSide SideType = (iota + 1) << 2
+	HypervisorSide
+	GatewaySide
+)
+
 type DirectionEnum uint8
 
 const (
 	_ DirectionEnum = iota
 	ClientToServer
 	ServerToClient
+
+	// 以下类型为转换tapside而增加，在写入db时均记为c2s或s2c
+	ClientNodeToServer       = ClientToServer | DirectionEnum(NodeSide)
+	ServerNodeToClient       = ServerToClient | DirectionEnum(NodeSide)
+	ClientHypervisorToServer = ClientToServer | DirectionEnum(HypervisorSide)
+	ServerHypervisorToClient = ServerToClient | DirectionEnum(HypervisorSide)
+	ClientGatewayToServer    = ClientToServer | DirectionEnum(GatewaySide)
+	ServerGatewayToClient    = ServerToClient | DirectionEnum(GatewaySide)
 )
+
+func (d DirectionEnum) IsClientToServer() bool {
+	return d&0x3 == ClientToServer
+}
+
+func (d DirectionEnum) IsServerToClient() bool {
+	return d&0x3 == ServerToClient
+}
 
 type TAPSideEnum uint8
 
 const (
 	Client TAPSideEnum = iota
 	Server
+	ClientNode       = Client | TAPSideEnum(NodeSide)
+	ServerNode       = Server | TAPSideEnum(NodeSide)
+	ClientHypervisor = Client | TAPSideEnum(HypervisorSide)
+	ServerHypervisor = Server | TAPSideEnum(HypervisorSide)
+	ClientGateway    = Client | TAPSideEnum(GatewaySide)
+	ServerGateway    = Server | TAPSideEnum(GatewaySide)
 )
+
+func (d DirectionEnum) ToTAPSide() TAPSideEnum {
+	if uint8(d) == 0 {
+		panic("invalid direction")
+	}
+	return TAPSideEnum(d - 1)
+}
 
 type TAPTypeEnum uint8
 
@@ -346,10 +383,9 @@ func (t *Tag) MarshalTo(b []byte) int {
 	}
 
 	if t.Code&Direction != 0 {
-		switch t.Direction {
-		case ClientToServer:
+		if t.Direction.IsClientToServer() {
 			offset += copy(b[offset:], ",direction=c2s")
-		case ServerToClient:
+		} else if t.Direction.IsServerToClient() {
 			offset += copy(b[offset:], ",direction=s2c")
 		}
 	}
@@ -576,6 +612,18 @@ func (t *Tag) MarshalTo(b []byte) int {
 			offset += copy(b[offset:], ",tap_side=c")
 		case Server:
 			offset += copy(b[offset:], ",tap_side=s")
+		case ClientNode:
+			offset += copy(b[offset:], ",tap_side=c-nd")
+		case ServerNode:
+			offset += copy(b[offset:], ",tap_side=s-nd")
+		case ClientHypervisor:
+			offset += copy(b[offset:], ",tap_side=c-hv")
+		case ServerHypervisor:
+			offset += copy(b[offset:], ",tap_side=s-hv")
+		case ClientGateway:
+			offset += copy(b[offset:], ",tap_side=c-gw")
+		case ServerGateway:
+			offset += copy(b[offset:], ",tap_side=s-gw")
 		}
 	}
 	if t.Code&TAPType != 0 {
