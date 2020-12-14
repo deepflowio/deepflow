@@ -96,10 +96,9 @@ func (t *MiniTag) MarshalTo(b []byte) int {
 	}
 
 	if t.Code&Direction != 0 {
-		switch t.Direction {
-		case ClientToServer:
+		if t.Direction.IsClientToServer() {
 			offset += copy(b[offset:], ",direction=c2s")
-		case ServerToClient:
+		} else if t.Direction.IsServerToClient() {
 			offset += copy(b[offset:], ",direction=s2c")
 		}
 	}
@@ -230,14 +229,12 @@ func (t *MiniTag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEnc
 	if code&Direction != 0 && code.HasEdgeTagField() {
 		code |= TAPSide
 		code &= ^Direction
-		if t.Direction == ClientToServer {
-			tapSide = Client
-		} else {
-			tapSide = Server
+		if t.Direction.IsServerToClient() {
 			srcIP, dstIP = dstIP, srcIP
 			srcEpc, dstEpc = dstEpc, srcEpc
 			srcMAC, dstMAC = dstMAC, srcMAC
 		}
+		tapSide = t.Direction.ToTAPSide()
 	}
 	encoder.WriteU64(uint64(code))
 	encoder.WriteU8(tid)
