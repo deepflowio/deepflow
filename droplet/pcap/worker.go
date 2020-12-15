@@ -109,10 +109,7 @@ func tapTypeToString(tapType zerodoc.TAPTypeEnum) string {
 	if tapType == 3 {
 		return "tor"
 	}
-	if tapType >= 0 && tapType <= 30 {
-		return fmt.Sprintf("isp%d", tapType)
-	}
-	panic(fmt.Sprintf("unsupported tap type %d", tapType))
+	return fmt.Sprintf("isp%d", tapType)
 }
 
 func formatDuration(d time.Duration) string {
