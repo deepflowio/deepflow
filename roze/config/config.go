@@ -74,6 +74,12 @@ type Config struct {
 
 func (c *Config) Validate() error {
 	for _, ipString := range c.ControllerIPs {
+		// 如果controller-ip设置为127.0.0.1，则roze会以127.0.0.1上报分析器IP，trisolaris无法识别出实际的IP，无法注册数据节点
+		if ipString == "127.0.0.1" { // 限制controller-ip，不能设置为'127.0.0.1'(如果非要设置，可写为‘127.0.00.1’)
+			err := errors.New("'controller-ips' is not allowed set to '127.0.0.1'")
+			log.Error(err)
+			return err
+		}
 		if net.ParseIP(string(ipString)) == nil {
 			return errors.New("controller-ips invalid")
 		}
