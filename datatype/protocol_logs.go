@@ -198,10 +198,12 @@ func (l *AppProtoLogsData) Encode(encoder *codec.SimpleEncoder) error {
 	} else {
 		encoder.WriteBool(false)
 		encoder.WriteU32(uint32(l.IPSrc))
-		encoder.WriteU32(uint32(l.IPSrc))
+		encoder.WriteU32(uint32(l.IPDst))
 	}
 	encoder.WriteU16(l.PortSrc)
 	encoder.WriteU16(l.PortDst)
+	encoder.WriteU32(uint32(l.L3EpcIDSrc))
+	encoder.WriteU32(uint32(l.L3EpcIDDst))
 
 	l.Detail.Encode(encoder, l.MsgType, l.Code)
 	return nil
@@ -222,12 +224,14 @@ func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
 		decoder.ReadIPv6(l.IP6Dst)
 	} else {
 		l.IPSrc = decoder.ReadU32()
-		l.IPSrc = decoder.ReadU32()
+		l.IPDst = decoder.ReadU32()
 		l.IP6Src = nil
 		l.IP6Dst = nil
 	}
 	l.PortSrc = decoder.ReadU16()
 	l.PortDst = decoder.ReadU16()
+	l.L3EpcIDSrc = int32(decoder.ReadU32())
+	l.L3EpcIDDst = int32(decoder.ReadU32())
 
 	if l.Proto == PROTO_HTTP {
 		httpInfo := AcquireHTTPInfo()
