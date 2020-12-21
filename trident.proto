@@ -214,6 +214,25 @@ message IpResource {
     optional uint32 subnet_id = 3 [default = 0];
 }
 
+enum DeviceType {
+    DEVICE_TYPE_UNKNOWN = 0;
+    DEVICE_TYPE_VM = 1;
+    DEVICE_TYPE_VGW= 2;
+    DEVICE_TYPE_THIRD_PARTY_DEVICE= 3;
+    DEVICE_TYPE_VMWAF = 4;
+    DEVICE_TYPE_NSP_VGATEWAY= 5;
+    DEVICE_TYPE_HOST_DEVICE = 6;
+    DEVICE_TYPE_NETWORK_DEVICE = 7;
+    DEVICE_TYPE_DHCP_PORT = 9;
+    DEVICE_TYPE_POD = 10;
+    DEVICE_TYPE_POD_SERVICE= 11;
+    DEVICE_TYPE_REDIS_INSTANCE= 12;
+    DEVICE_TYPE_RDS_INSTANCE = 13;
+    DEVICE_TYPE_POD_NODE= 14;
+    DEVICE_TYPE_LOAD_BALANCE= 15;
+    DEVICE_TYPE_NAT_GATEWAY= 16;
+}
+
 message Interface {
     optional uint32 id = 1;
     optional uint32 device_type = 2;
