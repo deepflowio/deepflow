@@ -64,10 +64,13 @@ func (t *TunnelInfo) DecapsulateVxlan(l3Packet []byte) int {
 		return 0
 	}
 
-	t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
-	t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
-	t.Type = TUNNEL_TYPE_VXLAN
-	t.Id = BigEndian.Uint32(l3Packet[OFFSET_VXLAN_VNI-ETH_HEADER_SIZE:]) >> 8
+	// 仅保存最外层的隧道信息
+	if t.Tier == 0 {
+		t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
+		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
+		t.Type = TUNNEL_TYPE_VXLAN
+		t.Id = BigEndian.Uint32(l3Packet[OFFSET_VXLAN_VNI-ETH_HEADER_SIZE:]) >> 8
+	}
 	t.Tier++
 	// return offset start from L3
 	return OFFSET_VXLAN_FLAGS - ETH_HEADER_SIZE + VXLAN_HEADER_SIZE
@@ -76,17 +79,23 @@ func (t *TunnelInfo) DecapsulateVxlan(l3Packet []byte) int {
 func (t *TunnelInfo) DecapsulateGre(l3Packet []byte) int {
 	greProtocolType := *(*uint16)(unsafe.Pointer(&l3Packet[OFFSET_GRE_PROTOCOL_TYPE-ETH_HEADER_SIZE]))
 	if greProtocolType == LE_ERSPAN_PROTO_TYPE_II { // ERSPAN II
-		t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
-		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
-		t.Type = TUNNEL_TYPE_ERSPAN
-		t.Id = BigEndian.Uint32(l3Packet[OFFSET_ERSPAN_VER-ETH_HEADER_SIZE:]) & 0x3ff
+		// 仅保存最外层的隧道信息
+		if t.Tier == 0 {
+			t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
+			t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
+			t.Type = TUNNEL_TYPE_ERSPAN
+			t.Id = BigEndian.Uint32(l3Packet[OFFSET_ERSPAN_VER-ETH_HEADER_SIZE:]) & 0x3ff
+		}
 		t.Tier++
 		return OFFSET_ERSPAN_VER - ETH_HEADER_SIZE + ERSPANII_HEADER_SIZE
 	} else if greProtocolType == LE_ERSPAN_PROTO_TYPE_III { // ERSPAN III
-		t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
-		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
-		t.Type = TUNNEL_TYPE_ERSPAN
-		t.Id = BigEndian.Uint32(l3Packet[OFFSET_ERSPAN_VER-ETH_HEADER_SIZE:]) & 0x3ff
+		// 仅保存最外层的隧道信息
+		if t.Tier == 0 {
+			t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
+			t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
+			t.Type = TUNNEL_TYPE_ERSPAN
+			t.Id = BigEndian.Uint32(l3Packet[OFFSET_ERSPAN_VER-ETH_HEADER_SIZE:]) & 0x3ff
+		}
 		t.Tier++
 		oFlag := l3Packet[OFFSET_ERSPAN_VER-ETH_HEADER_SIZE+ERSPANIII_HEADER_SIZE-1] & 0x1
 		if oFlag == 0 {
@@ -101,18 +110,22 @@ func (t *TunnelInfo) DecapsulateGre(l3Packet []byte) int {
 		}
 		tunnelHeader := GRE_HEADER_SIZE
 		greKeyOffset := OFFSET_GRE_KEY - ETH_HEADER_SIZE
-		t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
-		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
-		t.Type = TUNNEL_TYPE_TENCENT_GRE
 		if flags&GRE_FLAGS_CSUM_MASK != 0 {
 			tunnelHeader += GRE_CSUM_LEN
 			greKeyOffset += GRE_CSUM_LEN
 		}
-		t.Id = BigEndian.Uint32(l3Packet[greKeyOffset:])
-		t.Tier++
 		if flags&GRE_FLAGS_SEQ_MASK != 0 {
 			tunnelHeader += GRE_SEQ_LEN
 		}
+
+		// 仅保存最外层的隧道信息
+		if t.Tier == 0 {
+			t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
+			t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
+			t.Type = TUNNEL_TYPE_TENCENT_GRE
+			t.Id = BigEndian.Uint32(l3Packet[greKeyOffset:])
+		}
+		t.Tier++
 		overlayOffset := tunnelHeader + IP_HEADER_SIZE - ETH_HEADER_SIZE // 这里伪造L2层信息
 
 		// NOTICE:
