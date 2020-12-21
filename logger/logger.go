@@ -66,7 +66,7 @@ func compressFile(filename string) error {
 	return nil
 }
 
-func EnableFileLog(logPath string) error {
+func EnableFileLogWithMaxAge(logPath string, maxAge time.Duration) error {
 	dir := path.Dir(logPath)
 	if _, err := os.Stat(dir); err != nil {
 		if os.IsNotExist(err) {
@@ -88,7 +88,7 @@ func EnableFileLog(logPath string) error {
 	ioWriter, err := rotatelogs.New(
 		logPath+".%Y-%m-%d",
 		rotatelogs.WithLinkName(logPath),
-		rotatelogs.WithMaxAge(LOG_MAX_AGE),
+		rotatelogs.WithMaxAge(maxAge),
 		rotatelogs.WithRotationTime(LOG_ROTATION_INTERVAL),
 		rotatelogs.WithHandler(rotationHandler),
 	)
@@ -102,6 +102,10 @@ func EnableFileLog(logPath string) error {
 	)
 	applyBackendChange()
 	return nil
+}
+
+func EnableFileLog(logPath string) error {
+	return EnableFileLogWithMaxAge(logPath, LOG_MAX_AGE)
 }
 
 func applyBackendChange() {
