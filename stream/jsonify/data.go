@@ -39,18 +39,21 @@ type DataLinkLayer struct {
 }
 
 type NetworkLayer struct {
-	IP0        string   `json:"ip_0"` // 广域网IP为0.0.0.0或::
-	IP1        string   `json:"ip_1"`
-	RealIP0    string   `json:"real_ip_0"`
-	RealIP1    string   `json:"real_ip_1"`
-	IPVersion  uint16   `json:"ip_version,omitempty"`
-	Protocol   uint16   `json:"protocol"`
-	TunnelType uint16   `json:"tunnel_type,omitempty"`
-	TunnelID   uint32   `json:"tunnel_id,omitempty"`
-	TunnelIP0  string   `json:"tunnel_ip_0,omitempty"`
-	TunnelIP1  string   `json:"tunnel_ip_1,omitempty"`
-	TTLs0      []string `json:"ttls_0"`
-	TTLs1      []string `json:"ttls_1"`
+	IP0         string   `json:"ip_0"` // 广域网IP为0.0.0.0或::
+	IP1         string   `json:"ip_1"`
+	RealIP0     string   `json:"real_ip_0"`
+	RealIP1     string   `json:"real_ip_1"`
+	IPVersion   uint16   `json:"ip_version,omitempty"`
+	Protocol    uint16   `json:"protocol"`
+	TunnelTier  uint8    `json:"tunnel_tier,omitempty"`
+	TunnelType  uint16   `json:"tunnel_type,omitempty"`
+	TunnelID    uint32   `json:"tunnel_id,omitempty"`
+	TunnelTxIP0 string   `json:"tunnel_tx_ip_0,omitempty"`
+	TunnelTxIP1 string   `json:"tunnel_tx_ip_1,omitempty"`
+	TunnelRxIP0 string   `json:"tunnel_rx_ip_0,omitempty"`
+	TunnelRxIP1 string   `json:"tunnel_rx_ip_1,omitempty"`
+	TTLs0       []string `json:"ttls_0"`
+	TTLs1       []string `json:"ttls_1"`
 }
 
 type TransportLayer struct {
@@ -252,11 +255,14 @@ func (n *NetworkLayer) Fill(f *datatype.TaggedFlow, isIPV6 bool) {
 	}
 
 	n.Protocol = uint16(f.Proto)
-	if f.FlowKey.TunnelInfo.Id != 0 {
-		n.TunnelID = f.FlowKey.TunnelInfo.Id
-		n.TunnelIP0 = IPIntToString(f.FlowKey.TunnelInfo.Src)
-		n.TunnelIP1 = IPIntToString(f.FlowKey.TunnelInfo.Dst)
-		n.TunnelType = uint16(f.FlowKey.TunnelInfo.Type)
+	if f.Tunnel.Id != 0 {
+		n.TunnelTier = f.Tunnel.Tier
+		n.TunnelID = f.Tunnel.Id
+		n.TunnelType = uint16(f.Tunnel.Type)
+		n.TunnelTxIP0 = IPIntToString(f.Tunnel.TxIP0)
+		n.TunnelTxIP1 = IPIntToString(f.Tunnel.TxIP1)
+		n.TunnelRxIP0 = IPIntToString(f.Tunnel.RxIP0)
+		n.TunnelRxIP1 = IPIntToString(f.Tunnel.RxIP1)
 	}
 	n.TTLs0 = getTTLs(f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].TTLMap, n.TTLs0)
 	n.TTLs1 = getTTLs(f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].TTLMap, n.TTLs1)
@@ -291,7 +297,7 @@ func (i *Internet) Fill(f *datatype.TaggedFlow) {
 func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool) {
 	var info0, info1 *grpc.Info
 	l3EpcID0, l3EpcID1 := f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].L3EpcID, f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].L3EpcID
-	isVip0, isVip1 := f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].IsVIPDevice, f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].IsVIPDevice
+	isVip0, isVip1 := f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].IsVIPInterface, f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].IsVIPInterface
 	mac0, mac1 := f.FlowKey.MACSrc, f.FlowKey.MACDst
 	l3EpcMac0, l3EpcMac1 := mac0|uint64(l3EpcID0)<<48, mac1|uint64(l3EpcID1)<<48 // 使用l3EpcID和mac查找，防止跨AZ mac冲突
 
