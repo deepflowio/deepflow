@@ -153,7 +153,6 @@ message Config {
     optional uint64  server_tx_bandwidth_threshold = 18 [default = 0]; //bps
     optional uint64  bandwidth_probe_interval = 19 [default = 10];  //second
 
-    optional bool    l4_log_store_enabled = 21 [default = false];
     optional VlanMode npb_vlan_mode       = 22 [default = NONE];
     repeated uint32  l4_log_tap_types     = 23;
     optional bool    npb_dedup_enabled    = 24 [default = true];
