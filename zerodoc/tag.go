@@ -92,6 +92,7 @@ type SideType uint8
 const (
 	NodeSide SideType = (iota + 1) << 2
 	HypervisorSide
+	GatewayHypervisorSide
 	GatewaySide
 )
 
@@ -103,12 +104,14 @@ const (
 	ServerToClient
 
 	// 以下类型为转换tapside而增加，在写入db时均记为c2s或s2c
-	ClientNodeToServer       = ClientToServer | DirectionEnum(NodeSide)       // 客户端容器节点，路由、SNAT、隧道
-	ServerNodeToClient       = ServerToClient | DirectionEnum(NodeSide)       // 服务端容器节点，路由、SNAT、隧道
-	ClientHypervisorToServer = ClientToServer | DirectionEnum(HypervisorSide) // 客户端宿主机，隧道
-	ServerHypervisorToClient = ServerToClient | DirectionEnum(HypervisorSide) // 服务端宿主机，隧道
-	ClientGatewayToServer    = ClientToServer | DirectionEnum(GatewaySide)    // 客户端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
-	ServerGatewayToClient    = ServerToClient | DirectionEnum(GatewaySide)    // 服务端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
+	ClientNodeToServer              = ClientToServer | DirectionEnum(NodeSide)              // 客户端容器节点，路由、SNAT、隧道
+	ServerNodeToClient              = ServerToClient | DirectionEnum(NodeSide)              // 服务端容器节点，路由、SNAT、隧道
+	ClientHypervisorToServer        = ClientToServer | DirectionEnum(HypervisorSide)        // 客户端宿主机，隧道
+	ServerHypervisorToClient        = ServerToClient | DirectionEnum(HypervisorSide)        // 服务端宿主机，隧道
+	ClientGatewayHypervisorToServer = ClientToServer | DirectionEnum(GatewayHypervisorSide) // 客户端网关宿主机
+	ServerGatewayHypervisorToClient = ServerToClient | DirectionEnum(GatewayHypervisorSide) // 服务端网关宿主机
+	ClientGatewayToServer           = ClientToServer | DirectionEnum(GatewaySide)           // 客户端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
+	ServerGatewayToClient           = ServerToClient | DirectionEnum(GatewaySide)           // 服务端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
 )
 
 func (d DirectionEnum) IsClientToServer() bool {
@@ -124,12 +127,14 @@ type TAPSideEnum uint8
 const (
 	Client TAPSideEnum = iota
 	Server
-	ClientNode       = Client | TAPSideEnum(NodeSide)
-	ServerNode       = Server | TAPSideEnum(NodeSide)
-	ClientHypervisor = Client | TAPSideEnum(HypervisorSide)
-	ServerHypervisor = Server | TAPSideEnum(HypervisorSide)
-	ClientGateway    = Client | TAPSideEnum(GatewaySide)
-	ServerGateway    = Server | TAPSideEnum(GatewaySide)
+	ClientNode              = Client | TAPSideEnum(NodeSide)
+	ServerNode              = Server | TAPSideEnum(NodeSide)
+	ClientHypervisor        = Client | TAPSideEnum(HypervisorSide)
+	ServerHypervisor        = Server | TAPSideEnum(HypervisorSide)
+	ClientGatewayHypervisor = Client | TAPSideEnum(GatewayHypervisorSide)
+	ServerGatewayHypervisor = Server | TAPSideEnum(GatewayHypervisorSide)
+	ClientGateway           = Client | TAPSideEnum(GatewaySide)
+	ServerGateway           = Server | TAPSideEnum(GatewaySide)
 )
 
 func (d DirectionEnum) ToTAPSide() TAPSideEnum {
@@ -620,6 +625,10 @@ func (t *Tag) MarshalTo(b []byte) int {
 			offset += copy(b[offset:], ",tap_side=c-hv")
 		case ServerHypervisor:
 			offset += copy(b[offset:], ",tap_side=s-hv")
+		case ClientGatewayHypervisor:
+			offset += copy(b[offset:], ",tap_side=c-gw-hv")
+		case ServerGatewayHypervisor:
+			offset += copy(b[offset:], ",tap_side=s-gw-hv")
 		case ClientGateway:
 			offset += copy(b[offset:], ",tap_side=c-gw")
 		case ServerGateway:
