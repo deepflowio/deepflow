@@ -36,6 +36,8 @@ func (t TunnelType) String() string {
 		return "erspan"
 	} else if t == TUNNEL_TYPE_TENCENT_GRE {
 		return "tencent-gre"
+	} else if t == TUNNEL_TYPE_VXLAN_VXLAN {
+		return "vxlan-vxlan"
 	}
 
 	return "none"
