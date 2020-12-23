@@ -20,12 +20,13 @@ const (
 	TUNNEL_TYPE_TENCENT_GRE = TunnelType(pb.DecapType_DECAP_TYPE_TENCENT)
 	TUNNEL_TYPE_VXLAN_VXLAN = TunnelType(pb.DecapType_DECAP_TYPE_VXLAN_VXLAN)
 
-	LE_IPV4_PROTO_TYPE_I     = 0x0008 // 0x0008's LittleEndian
-	LE_IPV6_PROTO_TYPE_I     = 0xDD86 // 0x86dd's LittleEndian
-	LE_ERSPAN_PROTO_TYPE_II  = 0xBE88 // 0x88BE's LittleEndian
-	LE_ERSPAN_PROTO_TYPE_III = 0xEB22 // 0x22EB's LittleEndian
-	LE_VXLAN_PROTO_UDP_DPORT = 0xB512 // 0x12B5(4789)'s LittleEndian
-	VXLAN_FLAGS              = 8
+	LE_IPV4_PROTO_TYPE_I      = 0x0008 // 0x0008's LittleEndian
+	LE_IPV6_PROTO_TYPE_I      = 0xDD86 // 0x86dd's LittleEndian
+	LE_ERSPAN_PROTO_TYPE_II   = 0xBE88 // 0x88BE's LittleEndian
+	LE_ERSPAN_PROTO_TYPE_III  = 0xEB22 // 0x22EB's LittleEndian
+	LE_VXLAN_PROTO_UDP_DPORT  = 0xB512 // 0x12B5(4789)'s LittleEndian
+	LE_VXLAN_PROTO_UDP_DPORT2 = 0x1821 // 0x2118(8472)'s LittleEndian
+	VXLAN_FLAGS               = 8
 )
 
 func (t TunnelType) String() string {
@@ -56,8 +57,8 @@ func (t *TunnelInfo) DecapsulateVxlan(l3Packet []byte) int {
 	if len(l3Packet) < OFFSET_VXLAN_FLAGS+VXLAN_HEADER_SIZE {
 		return 0
 	}
-
-	if *(*uint16)(unsafe.Pointer(&l3Packet[OFFSET_DPORT-ETH_HEADER_SIZE])) != LE_VXLAN_PROTO_UDP_DPORT {
+	dstPort := *(*uint16)(unsafe.Pointer(&l3Packet[OFFSET_DPORT-ETH_HEADER_SIZE]))
+	if dstPort != LE_VXLAN_PROTO_UDP_DPORT && dstPort != LE_VXLAN_PROTO_UDP_DPORT2 {
 		return 0
 	}
 	if l3Packet[OFFSET_VXLAN_FLAGS-ETH_HEADER_SIZE] != VXLAN_FLAGS {
