@@ -73,6 +73,8 @@ func (t *TunnelInfo) DecapsulateVxlan(l3Packet []byte) int {
 		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
 		t.Type = TUNNEL_TYPE_VXLAN
 		t.Id = BigEndian.Uint32(l3Packet[OFFSET_VXLAN_VNI-ETH_HEADER_SIZE:]) >> 8
+	} else {
+		t.Type = TUNNEL_TYPE_VXLAN_VXLAN
 	}
 	t.Tier++
 	// return offset start from L3
