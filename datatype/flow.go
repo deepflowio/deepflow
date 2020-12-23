@@ -679,6 +679,7 @@ func (f *FlowMetricsPeer) String() string {
 func (f *Flow) String() string {
 	formatted := fmt.Sprintf("FlowID: %d ", f.FlowID)
 	formatted += fmt.Sprintf("FlowSource: %s ", f.FlowSource.String())
+	formatted += fmt.Sprintf("Tunnel: %s ", f.Tunnel.String())
 	formatted += fmt.Sprintf("Exporter: %s ", IpFromUint32(f.Exporter))
 	formatted += fmt.Sprintf("CloseType: %d ", f.CloseType)
 	formatted += fmt.Sprintf("IsActiveService: %v ", f.IsActiveService)
