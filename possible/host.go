@@ -51,6 +51,6 @@ func (p *PossibleHost) Check6(host net.IP, epcId int32) bool {
 	return ok
 }
 
-func (p *PossibleHost) Closables() []*utils.Closable {
-	return []*utils.Closable{&p.hostMap.Closable}
+func (p *PossibleHost) Close() error {
+	return p.hostMap.Close()
 }
