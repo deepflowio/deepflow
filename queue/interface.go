@@ -20,21 +20,25 @@ type QueueReader interface {
 	Get() interface{}
 	Gets([]interface{}) int
 	Len() int
+	Close() error
 }
 
 type QueueWriter interface {
 	Put(...interface{}) error
 	Len() int
+	Close() error
 }
 
 type MultiQueueReader interface {
 	Get(HashKey) interface{}
 	Gets(HashKey, []interface{}) int
 	Len(HashKey) int
+	Close() error
 }
 
 type MultiQueueWriter interface {
 	Put(HashKey, ...interface{}) error
 	Puts([]HashKey, []interface{}) error
 	Len(HashKey) int
+	Close() error
 }
