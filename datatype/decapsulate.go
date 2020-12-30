@@ -82,17 +82,29 @@ func (t *TunnelInfo) DecapsulateVxlan(l3Packet []byte) int {
 }
 
 func (t *TunnelInfo) DecapsulateGre(l3Packet []byte) int {
+	flags := BigEndian.Uint16(l3Packet[OFFSET_GRE_FLAGS-ETH_HEADER_SIZE:])
 	greProtocolType := *(*uint16)(unsafe.Pointer(&l3Packet[OFFSET_GRE_PROTOCOL_TYPE-ETH_HEADER_SIZE]))
-	if greProtocolType == LE_ERSPAN_PROTO_TYPE_II { // ERSPAN II
-		// 仅保存最外层的隧道信息
-		if t.Tier == 0 {
-			t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
-			t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
-			t.Type = TUNNEL_TYPE_ERSPAN
-			t.Id = BigEndian.Uint32(l3Packet[OFFSET_ERSPAN_VER-ETH_HEADER_SIZE:]) & 0x3ff
+	if greProtocolType == LE_ERSPAN_PROTO_TYPE_II { // ERSPAN II && ERSPAN I
+		if flags == 0 { // ERSPAN I
+			// 仅保存最外层的隧道信息
+			if t.Tier == 0 {
+				t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
+				t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
+				t.Type = TUNNEL_TYPE_ERSPAN
+			}
+			t.Tier++
+			return OFFSET_ERSPAN_VER - ETH_HEADER_SIZE
+		} else { // ERSPAN II
+			// 仅保存最外层的隧道信息
+			if t.Tier == 0 {
+				t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
+				t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
+				t.Type = TUNNEL_TYPE_ERSPAN
+				t.Id = BigEndian.Uint32(l3Packet[OFFSET_ERSPAN_VER-ETH_HEADER_SIZE:]) & 0x3ff
+			}
+			t.Tier++
+			return OFFSET_ERSPAN_VER - ETH_HEADER_SIZE + ERSPANII_HEADER_SIZE
 		}
-		t.Tier++
-		return OFFSET_ERSPAN_VER - ETH_HEADER_SIZE + ERSPANII_HEADER_SIZE
 	} else if greProtocolType == LE_ERSPAN_PROTO_TYPE_III { // ERSPAN III
 		// 仅保存最外层的隧道信息
 		if t.Tier == 0 {
@@ -109,7 +121,6 @@ func (t *TunnelInfo) DecapsulateGre(l3Packet []byte) int {
 			return OFFSET_ERSPAN_VER - ETH_HEADER_SIZE + ERSPANIII_HEADER_SIZE + ERSPANIII_SUBHEADER_SIZE
 		}
 	} else if greProtocolType == LE_IPV4_PROTO_TYPE_I || greProtocolType == LE_IPV6_PROTO_TYPE_I {
-		flags := BigEndian.Uint16(l3Packet[OFFSET_GRE_FLAGS-ETH_HEADER_SIZE:])
 		if flags&GRE_FLAGS_VER_MASK != 1 || flags&GRE_FLAGS_KEY_MASK == 0 { // 未知的GRE
 			return 0
 		}
