@@ -13,6 +13,8 @@ type Traffic struct {
 	ByteRx     uint64 `db:"byte_rx"`
 	L3ByteTx   uint64 `db:"l3_byte_tx"`
 	L3ByteRx   uint64 `db:"l3_byte_rx"`
+	L4ByteTx   uint64 `db:"l4_byte_tx"`
+	L4ByteRx   uint64 `db:"l4_byte_rx"`
 	Flow       uint64 `db:"flow"`
 	NewFlow    uint64 `db:"new_flow"`
 	ClosedFlow uint64 `db:"closed_flow"`
@@ -27,6 +29,7 @@ func (t *Traffic) Reverse() {
 	t.PacketTx, t.PacketRx = t.PacketRx, t.PacketTx
 	t.ByteTx, t.ByteRx = t.ByteRx, t.ByteTx
 	t.L3ByteTx, t.L3ByteRx = t.L3ByteRx, t.L3ByteTx
+	t.L4ByteTx, t.L4ByteRx = t.L4ByteRx, t.L4ByteTx
 }
 
 func (t *Traffic) Encode(encoder *codec.SimpleEncoder) {
@@ -36,6 +39,8 @@ func (t *Traffic) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(t.ByteRx)
 	encoder.WriteVarintU64(t.L3ByteTx)
 	encoder.WriteVarintU64(t.L3ByteRx)
+	encoder.WriteVarintU64(t.L4ByteTx)
+	encoder.WriteVarintU64(t.L4ByteRx)
 	encoder.WriteVarintU64(t.Flow)
 	encoder.WriteVarintU64(t.NewFlow)
 	encoder.WriteVarintU64(t.ClosedFlow)
@@ -53,6 +58,8 @@ func (t *Traffic) Decode(decoder *codec.SimpleDecoder) {
 	t.ByteRx = decoder.ReadVarintU64()
 	t.L3ByteTx = decoder.ReadVarintU64()
 	t.L3ByteRx = decoder.ReadVarintU64()
+	t.L4ByteTx = decoder.ReadVarintU64()
+	t.L4ByteRx = decoder.ReadVarintU64()
 	t.Flow = decoder.ReadVarintU64()
 	t.NewFlow = decoder.ReadVarintU64()
 	t.ClosedFlow = decoder.ReadVarintU64()
@@ -70,6 +77,8 @@ func (t *Traffic) ConcurrentMerge(other *Traffic) {
 	t.ByteRx += other.ByteRx
 	t.L3ByteTx += other.L3ByteTx
 	t.L3ByteRx += other.L3ByteRx
+	t.L4ByteTx += other.L4ByteTx
+	t.L4ByteRx += other.L4ByteRx
 	t.Flow += other.Flow
 	t.NewFlow += other.NewFlow
 	t.ClosedFlow += other.ClosedFlow
@@ -87,6 +96,8 @@ func (t *Traffic) SequentialMerge(other *Traffic) {
 	t.ByteRx += other.ByteRx
 	t.L3ByteTx += other.L3ByteTx
 	t.L3ByteRx += other.L3ByteRx
+	t.L4ByteTx += other.L4ByteTx
+	t.L4ByteRx += other.L4ByteRx
 	t.Flow = t.ClosedFlow + other.Flow
 	t.NewFlow += other.NewFlow
 	t.ClosedFlow += other.ClosedFlow
@@ -105,11 +116,11 @@ func (t *Traffic) MarshalTo(b []byte) int {
 	offset += copy(b[offset:], "i,") // 先加',',若后续若没有增加数据，需要去除
 
 	fields := []string{
-		"packet_tx=", "packet_rx=", "byte_tx=", "byte_rx=", "byte=", "l3_byte_tx=", "l3_byte_rx=", "flow=", "new_flow=", "closed_flow=",
+		"packet_tx=", "packet_rx=", "byte_tx=", "byte_rx=", "byte=", "l3_byte_tx=", "l3_byte_rx=", "l4_byte_tx=", "l4_byte_rx=", "flow=", "new_flow=", "closed_flow=",
 		"http_request=", "http_response=", "dns_request=", "dns_response=",
 	}
 	values := []uint64{
-		t.PacketTx, t.PacketRx, t.ByteTx, t.ByteRx, t.ByteTx + t.ByteRx, t.L3ByteTx, t.L3ByteRx, t.Flow, t.NewFlow, t.ClosedFlow,
+		t.PacketTx, t.PacketRx, t.ByteTx, t.ByteRx, t.ByteTx + t.ByteRx, t.L3ByteTx, t.L3ByteRx, t.L4ByteTx, t.L4ByteRx, t.Flow, t.NewFlow, t.ClosedFlow,
 		t.HTTPRequest, t.HTTPResponse, t.DNSRequest, t.DNSResponse,
 	}
 	n := marshalKeyValues(b[offset:], fields, values)
