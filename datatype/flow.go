@@ -128,6 +128,7 @@ type FlowMetricsPeer struct {
 	// 注意字节对齐!
 	ByteCount        uint64        // 每个流统计周期（目前是自然秒）清零
 	L3ByteCount      uint64        // 每个流统计周期的L3载荷量
+	L4ByteCount      uint64        // 每个流统计周期的L4载荷量
 	PacketCount      uint64        // 每个流统计周期（目前是自然秒）清零
 	TotalByteCount   uint64        // 整个Flow生命周期的统计量
 	TotalPacketCount uint64        // 整个Flow生命周期的统计量
@@ -394,6 +395,7 @@ func (f *TCPPerfStats) Decode(decoder *codec.SimpleDecoder, l4Protocol L4Protoco
 func (f *FlowMetricsPeer) SequentialMerge(rhs *FlowMetricsPeer) {
 	f.ByteCount += rhs.ByteCount
 	f.L3ByteCount += rhs.L3ByteCount
+	f.L4ByteCount += rhs.L4ByteCount
 	f.PacketCount += rhs.PacketCount
 	f.TotalByteCount = rhs.TotalByteCount
 	f.TotalPacketCount = rhs.TotalPacketCount
@@ -414,6 +416,7 @@ func (f *FlowMetricsPeer) SequentialMerge(rhs *FlowMetricsPeer) {
 func (f *FlowMetricsPeer) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(f.ByteCount)
 	encoder.WriteVarintU64(f.L3ByteCount)
+	encoder.WriteVarintU64(f.L4ByteCount)
 	encoder.WriteVarintU64(f.PacketCount)
 	encoder.WriteVarintU64(f.TotalByteCount)
 	encoder.WriteVarintU64(f.TotalPacketCount)
@@ -439,6 +442,7 @@ func (f *FlowMetricsPeer) Encode(encoder *codec.SimpleEncoder) {
 func (f *FlowMetricsPeer) Decode(decoder *codec.SimpleDecoder) {
 	f.ByteCount = decoder.ReadVarintU64()
 	f.L3ByteCount = decoder.ReadVarintU64()
+	f.L4ByteCount = decoder.ReadVarintU64()
 	f.PacketCount = decoder.ReadVarintU64()
 	f.TotalByteCount = decoder.ReadVarintU64()
 	f.TotalPacketCount = decoder.ReadVarintU64()

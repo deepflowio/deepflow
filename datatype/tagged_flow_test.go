@@ -38,6 +38,7 @@ func TestTaggedFlowEncodeDecode(t *testing.T) {
 		//	TickPacketCount:  302,
 		ByteCount:        303,
 		L3ByteCount:      310,
+		L4ByteCount:      311,
 		PacketCount:      304,
 		TotalByteCount:   305,
 		TotalPacketCount: 306,
