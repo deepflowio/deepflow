@@ -16,6 +16,8 @@ func TestMarshalTraffic(t *testing.T) {
 		ByteRx:       4,
 		L3ByteTx:     12,
 		L3ByteRx:     13,
+		L4ByteTx:     14,
+		L4ByteRx:     15,
 		Flow:         5,
 		NewFlow:      6,
 		ClosedFlow:   7,
@@ -25,7 +27,7 @@ func TestMarshalTraffic(t *testing.T) {
 		DNSResponse:  11,
 	}
 	l = t1.MarshalTo(buffer[:])
-	if string(buffer[:l]) != "packet=3i,packet_tx=1i,packet_rx=2i,byte_tx=3i,byte_rx=4i,byte=7i,l3_byte_tx=12i,l3_byte_rx=13i,flow=5i,new_flow=6i,closed_flow=7i"+
+	if string(buffer[:l]) != "packet=3i,packet_tx=1i,packet_rx=2i,byte_tx=3i,byte_rx=4i,byte=7i,l3_byte_tx=12i,l3_byte_rx=13i,l4_byte_tx=14i,l4_byte_rx=15i,flow=5i,new_flow=6i,closed_flow=7i"+
 		",http_request=8i,http_response=9i,dns_request=10i,dns_response=11i" {
 		t.Error("MarshalTo()实现不正确")
 	}
@@ -55,6 +57,8 @@ func TestReverse(t *testing.T) {
 		DNSResponse:  11,
 		L3ByteTx:     12,
 		L3ByteRx:     13,
+		L4ByteTx:     14,
+		L4ByteRx:     15,
 	}
 	t2 := Traffic{
 		PacketTx:     2,
@@ -70,6 +74,8 @@ func TestReverse(t *testing.T) {
 		DNSResponse:  11,
 		L3ByteTx:     13,
 		L3ByteRx:     12,
+		L4ByteTx:     15,
+		L4ByteRx:     14,
 	}
 
 	t1.Reverse()

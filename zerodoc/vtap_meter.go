@@ -14,12 +14,15 @@ type VTAPUsageMeter struct {
 	ByteRx   uint64 `db:"byte_rx"`
 	L3ByteTx uint64 `db:"l3_byte_tx"`
 	L3ByteRx uint64 `db:"l3_byte_rx"`
+	L4ByteTx uint64 `db:"l4_byte_tx"`
+	L4ByteRx uint64 `db:"l4_byte_rx"`
 }
 
 func (m *VTAPUsageMeter) Reverse() {
 	m.PacketTx, m.PacketRx = m.PacketRx, m.PacketTx
 	m.ByteTx, m.ByteRx = m.ByteRx, m.ByteTx
 	m.L3ByteTx, m.L3ByteRx = m.L3ByteRx, m.L3ByteTx
+	m.L4ByteTx, m.L4ByteRx = m.L4ByteRx, m.L4ByteTx
 }
 
 func (m *VTAPUsageMeter) ID() uint8 {
@@ -41,6 +44,8 @@ func (m *VTAPUsageMeter) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(m.ByteRx)
 	encoder.WriteVarintU64(m.L3ByteTx)
 	encoder.WriteVarintU64(m.L3ByteRx)
+	encoder.WriteVarintU64(m.L4ByteTx)
+	encoder.WriteVarintU64(m.L4ByteRx)
 }
 
 func (m *VTAPUsageMeter) Decode(decoder *codec.SimpleDecoder) {
@@ -50,6 +55,8 @@ func (m *VTAPUsageMeter) Decode(decoder *codec.SimpleDecoder) {
 	m.ByteRx = decoder.ReadVarintU64()
 	m.L3ByteTx = decoder.ReadVarintU64()
 	m.L3ByteRx = decoder.ReadVarintU64()
+	m.L4ByteTx = decoder.ReadVarintU64()
+	m.L4ByteRx = decoder.ReadVarintU64()
 }
 
 func (m *VTAPUsageMeter) SortKey() uint64 {
@@ -80,6 +87,10 @@ func (m *VTAPUsageMeter) MarshalTo(b []byte) int {
 	offset += copy(b[offset:], strconv.FormatUint(m.L3ByteTx, 10))
 	offset += copy(b[offset:], "i,l3_byte_rx=")
 	offset += copy(b[offset:], strconv.FormatUint(m.L3ByteRx, 10))
+	offset += copy(b[offset:], "i,l4_byte_tx=")
+	offset += copy(b[offset:], strconv.FormatUint(m.L4ByteTx, 10))
+	offset += copy(b[offset:], "i,l4_byte_rx=")
+	offset += copy(b[offset:], strconv.FormatUint(m.L4ByteRx, 10))
 	b[offset] = 'i'
 	offset++
 
@@ -93,6 +104,8 @@ func (m *VTAPUsageMeter) Merge(other *VTAPUsageMeter) {
 	m.ByteRx += other.ByteRx
 	m.L3ByteTx += other.L3ByteTx
 	m.L3ByteRx += other.L3ByteRx
+	m.L4ByteTx += other.L4ByteTx
+	m.L4ByteRx += other.L4ByteRx
 }
 
 func (m *VTAPUsageMeter) ConcurrentMerge(other app.Meter) {
