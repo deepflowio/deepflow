@@ -116,13 +116,15 @@ func (p *MetaPacket) String() string {
 	format = "\t%s -> %s type: %04x vlan-id: %d\n"
 	buffer.WriteString(fmt.Sprintf(format, Uint64ToMac(p.MacSrc), Uint64ToMac(p.MacDst), uint16(p.EthType), p.Vlan))
 	if p.EthType == EthernetTypeIPv6 {
-		format = "\t%v.%d -> %v.%d proto: %v hop limit: %d flow lable: %d next header: %v options: %+x."
+		format = "\t%v.%d -> %v.%d l3EpcId: %d -> %d proto: %v hop limit: %d flow lable: %d next header: %v options: %+x."
 		buffer.WriteString(fmt.Sprintf(format, p.Ip6Src, p.PortSrc,
-			p.Ip6Dst, p.PortDst, p.Protocol, p.TTL, uint32(p.IpFlags)|uint32(p.IHL)<<16, p.NextHeader, p.Options))
+			p.Ip6Dst, p.PortDst, p.L3EpcId0, p.L3EpcId1, p.Protocol,
+			p.TTL, uint32(p.IpFlags)|uint32(p.IHL)<<16, p.NextHeader, p.Options))
 	} else {
-		format = "\t%v:%d -> %v:%d proto: %v ttl: %d ihl: %d id: %d flags: 0x%01x, fragment Offset: %d payload-len: %d"
+		format = "\t%v:%d -> %v:%d l3EpcId: %d -> %d proto: %v ttl: %d ihl: %d id: %d flags: 0x%01x, fragment Offset: %d payload-len: %d"
 		buffer.WriteString(fmt.Sprintf(format, IpFromUint32(p.IpSrc), p.PortSrc,
-			IpFromUint32(p.IpDst), p.PortDst, p.Protocol, p.TTL, p.IHL, p.IpID, p.IpFlags>>13, p.IpFlags&0x1FFF, p.PayloadLen))
+			IpFromUint32(p.IpDst), p.PortDst, p.L3EpcId0, p.L3EpcId1, p.Protocol,
+			p.TTL, p.IHL, p.IpID, p.IpFlags>>13, p.IpFlags&0x1FFF, p.PayloadLen))
 	}
 	if p.Protocol == IPProtocolTCP {
 		buffer.WriteString(fmt.Sprintf(" tcp: %v", &p.TcpData))
