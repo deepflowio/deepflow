@@ -17,7 +17,7 @@ const (
 	ICMP_REST            = 28
 	IPV6_ADDR_LEN        = 16
 	COMPRESS_HEADER_SIZE = 21 // VERSION(1) + SEQ(8) + TIMESAMP(8) + IF_MAC(4)
-	_VERSION             = 6
+	_VERSION             = 7
 )
 
 const (
@@ -124,6 +124,8 @@ func (d *SequentialDecoder) decodeArp(meta *MetaPacket) {
 	meta.IpSrc = d.U32()
 	d.Skip(MAC_ADDR_LEN)
 	meta.IpDst = d.U32()
+	meta.L3EpcId0 = d.U16()
+	meta.L3EpcId1 = d.U16()
 }
 
 func (d *SequentialDecoder) decodeEthernet(meta *MetaPacket) {
