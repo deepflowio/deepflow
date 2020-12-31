@@ -89,6 +89,8 @@ func GenData(id int, out queue.QueueWriter) {
 		f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].ByteCount = uint64(rand.Intn(0xffffff))
 		f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].L3ByteCount = uint64(rand.Intn(0xffffff))
 		f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].L3ByteCount = uint64(rand.Intn(0xffffff))
+		f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].L4ByteCount = uint64(rand.Intn(0xffffff))
+		f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].L4ByteCount = uint64(rand.Intn(0xffffff))
 		f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].TotalPacketCount = uint64(rand.Intn(0xffffff))
 		f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].TotalPacketCount = uint64(rand.Intn(0xffffff))
 		f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].TotalByteCount = uint64(rand.Intn(0xffffff))

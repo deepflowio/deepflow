@@ -128,6 +128,8 @@ type Metrics struct {
 	ByteRx          uint64 `json:"byte_rx,omitempty"`
 	L3ByteTx        uint64 `json:"l3_byte_tx,omitempty"`
 	L3ByteRx        uint64 `json:"l3_byte_rx,omitempty"`
+	L4ByteTx        uint64 `json:"l4_byte_tx,omitempty"`
+	L4ByteRx        uint64 `json:"l4_byte_rx,omitempty"`
 	TotalPacketTx   uint64 `json:"total_packet_tx,omitempty"`
 	TotalPacketRx   uint64 `json:"total_packet_rx,omitempty"`
 	TotalByteTx     uint64 `json:"total_byte_tx,omitempty"`
@@ -392,6 +394,8 @@ func (m *Metrics) Fill(f *datatype.TaggedFlow) {
 	m.ByteRx = f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].ByteCount
 	m.L3ByteTx = f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].L3ByteCount
 	m.L3ByteRx = f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].L3ByteCount
+	m.L4ByteTx = f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].L4ByteCount
+	m.L4ByteRx = f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].L4ByteCount
 
 	m.TotalPacketTx = f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].TotalPacketCount
 	m.TotalPacketRx = f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].TotalPacketCount
