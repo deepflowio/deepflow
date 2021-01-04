@@ -289,9 +289,9 @@ func (m *U64DoubleKeyLRU) Remove(key uint64) {
 }
 
 // 通过shortKey进行删除
-func (m *U64DoubleKeyLRU) RemoveByShortKey(key uint64) {
+func (m *U64DoubleKeyLRU) RemoveByShortKey(key uint64) int {
 	bakHashListNext := int32(0)
-	maxDel := 0
+	delCount := 0
 	var node *u64DoubleKeyLRUNode
 
 	for relationHashListNext := m.relationHashSlotHead[m.compressRelationHash(key)]; relationHashListNext != -1; {
@@ -304,13 +304,14 @@ func (m *U64DoubleKeyLRU) RemoveByShortKey(key uint64) {
 			if nextNodeIndex != -1 {
 				relationHashListNext = nextNodeIndex
 			}
-			maxDel++
+			delCount++
 		}
 	}
 
-	if m.maxDelByshortKey < maxDel {
-		m.maxDelByshortKey = maxDel
+	if m.maxDelByshortKey < delCount {
+		m.maxDelByshortKey = delCount
 	}
+	return delCount
 }
 
 func (m *U64DoubleKeyLRU) Get(key uint64, peek bool) (interface{}, bool) {
