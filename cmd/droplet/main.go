@@ -50,7 +50,10 @@ const (
 )
 
 func main() {
-	logger.EnableStdoutLog()
+	if os.Getppid() != 1 {
+		logger.EnableStdoutLog()
+	}
+
 	flag.Parse()
 	if *version {
 		fmt.Printf("%s %s %s\n%s\n", RevCount, Revision, CommitDate, goVersion)
