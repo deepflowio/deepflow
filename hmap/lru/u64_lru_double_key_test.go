@@ -84,7 +84,11 @@ func TestU64LRUAddAndRemoveByShortKey(t *testing.T) {
 	}
 
 	// 删除奇数类型数据
-	lru.RemoveByShortKey(_ODD_NUMBER_KEY)
+	delCount := lru.RemoveByShortKey(_ODD_NUMBER_KEY)
+	if delCount != len(oddValues) {
+		t.Errorf("lru RemoveByShortKey is not expected, delCount is %v", delCount)
+	}
+
 	actualValues, ok = lru.PeekByShortKey(_ODD_NUMBER_KEY)
 	if ok {
 		t.Errorf("lru RemoveByShortKey is not expected, actualValues %v is not deleted", actualValues)
