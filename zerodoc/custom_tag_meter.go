@@ -67,6 +67,10 @@ func (m *CustomTagMeta) IndexOf(name string) int {
 	return -1
 }
 
+func (m *CustomTagMeta) Validate(ct *CustomTag) bool {
+	return len(m.Names) == len(ct.Values)
+}
+
 type CustomMeterType uint8
 
 const (
@@ -96,6 +100,10 @@ func (m *CustomMeterMeta) IndexOf(name string) int {
 		return id
 	}
 	return -1
+}
+
+func (m *CustomMeterMeta) Validate(cm *CustomMeter) bool {
+	return len(m.Names) == len(cm.Values)
 }
 
 type CustomTag struct {
