@@ -1,11 +1,19 @@
-## trisolaris的ips, 默认值为空, 表示处于单独的控制器，只处理syslog和statsd
+## trisolaris的ips, 默认值为空
 #controller-ips:
-#  - 127.0.0.1
+#  - x.x.x.x
 
 ## controller listening port
 #controller-port: 20035
 
-## stream,roze模块是否启用，默认不启用
+## es的相关的配置stream和droplet都需要
+#es-host-port:
+#  - 127.0.0.1:20042
+
+#es-auth:
+#  user:
+#  password:
+
+## stream,roze模块是否启用，默认不启用(处于单独的控制器)
 #stream-roze-enabled: false
 
 ## logfile path
@@ -150,13 +158,6 @@
 #receiver-window-size: 1024
 
 ## ########################## stream config ############################################
-#es-host-port:
-#  - 127.0.0.1:20042
-
-#es-auth:
-#  user:
-#  password:
-
 ## es writer all queue limit max size
 #throttle: 1000
 

@@ -13,9 +13,20 @@ import (
 
 var log = logging.MustGetLogger("config")
 
+const (
+	DefaultESHostPort = "127.0.0.1:20042"
+)
+
+type ESAuth struct {
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+}
+
 type Config struct {
 	ControllerIps  []string      `yaml:"controller-ips,flow"`
 	ControllerPort uint16        `yaml:"controller-port"`
+	ESHostPorts    []string      `yaml:"es-host-port"`
+	ESAuth         ESAuth        `yaml:"es-auth"`
 	Adapter        AdapterConfig `yaml:"adapter"`
 	Labeler        LabelerConfig `yaml:"labeler"`
 	Queue          QueueConfig   `yaml:"queue"`
@@ -131,6 +142,7 @@ func Load(path string) *Config {
 	configBytes, err := ioutil.ReadFile(path)
 	config := &Config{
 		ControllerPort: 20035,
+		ESHostPorts:    []string{DefaultESHostPort},
 		RpcTimeout:     8,
 	}
 	if err != nil {
