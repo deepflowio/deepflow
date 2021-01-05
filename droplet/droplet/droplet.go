@@ -20,13 +20,12 @@ import (
 	"gitlab.x.lan/yunshan/droplet/droplet/statsd"
 	"gitlab.x.lan/yunshan/droplet/droplet/syslog"
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
-	streamconfig "gitlab.x.lan/yunshan/droplet/stream/config"
 	"gitlab.x.lan/yunshan/message/trident"
 )
 
 var log = logging.MustGetLogger("droplet")
 
-func Start(cfg *config.Config, streamConfig *streamconfig.Config, recv *receiver.Receiver) (closers []io.Closer) {
+func Start(cfg *config.Config, recv *receiver.Receiver) (closers []io.Closer) {
 
 	controllers := make([]net.IP, len(cfg.ControllerIps))
 	for i, ipString := range cfg.ControllerIps {
@@ -64,7 +63,7 @@ func Start(cfg *config.Config, streamConfig *streamconfig.Config, recv *receiver
 	recv.RegistHandler(datatype.MESSAGE_TYPE_STATSD, statsdRecvQueues, 1)
 	recv.RegistHandler(datatype.MESSAGE_TYPE_COMPRESS, compressedPacketRecvQueues, 1)
 
-	syslog.NewSyslogWriter(syslogRecvQueues.Readers()[0], streamConfig.ESHostPorts, streamConfig.ESAuth.User, streamConfig.ESAuth.Password)
+	syslog.NewSyslogWriter(syslogRecvQueues.Readers()[0], cfg.ESHostPorts, cfg.ESAuth.User, cfg.ESAuth.Password)
 	statsd.NewStatsdWriter(statsdRecvQueues.Readers()[0])
 
 	releaseMetaPacketBlock := func(x interface{}) {

@@ -89,20 +89,20 @@ func main() {
 	bytes, _ = yaml.Marshal(dropletConfig)
 	log.Infof("droplet config:\n%s", string(bytes))
 
-	streamConfig := streamcfg.Load(*configPath)
-	bytes, _ = yaml.Marshal(streamConfig)
-	log.Infof("stream config:\n%s", string(bytes))
-
-	rozeConfig := rozecfg.Load(*configPath)
-	bytes, _ = yaml.Marshal(rozeConfig)
-	log.Infof("roze config:\n%s", string(bytes))
-
 	receiver := receiver.NewReceiver(datatype.DROPLET_PORT, cfg.UDPReadBuffer)
 	receiver.Start()
 
-	closers := droplet.Start(dropletConfig, streamConfig, receiver)
+	closers := droplet.Start(dropletConfig, receiver)
 
 	if cfg.StreamRozeEnabled {
+		streamConfig := streamcfg.Load(*configPath)
+		bytes, _ = yaml.Marshal(streamConfig)
+		log.Infof("stream config:\n%s", string(bytes))
+
+		rozeConfig := rozecfg.Load(*configPath)
+		bytes, _ = yaml.Marshal(rozeConfig)
+		log.Infof("roze config:\n%s", string(bytes))
+
 		roze, err := roze.NewRoze(rozeConfig, receiver)
 		if err != nil {
 			fmt.Println(err)
