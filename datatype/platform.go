@@ -39,4 +39,7 @@ type PlatformData struct {
 	// 适配windows hyper-v场景出现的在不同Region存在相同MAC，PlatformData查询GRPC下发的Region id,
 	// PlatformData不在同一Region中，该字段为True, 若为true不会创建mac表
 	SkipMac bool
+	// 当kvm内的虚拟机为k8s node时，不采集该虚拟的流量，虚拟机流量由k8s node内的trident采集
+	// 目前通过pod_node_id>0 && pod_cluster_id>0判定
+	SkipTapInterface bool
 }
