@@ -85,6 +85,9 @@ func (d *Decoder) handleTaggedFlow(decoder *codec.SimpleDecoder) {
 			log.Errorf("flow decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
 			return
 		}
+		if flow.StartTime == 0 { // 存在小概率starttime为0的异常数据
+			log.Warningf("invalid flow starttime %s", flow)
+		}
 		d.sendFlow(flow)
 	}
 }
