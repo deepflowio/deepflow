@@ -2,7 +2,6 @@ package throttler
 
 import (
 	"math/rand"
-	"sync"
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
@@ -18,7 +17,6 @@ type throttleItem interface {
 
 type ThrottlingQueue struct {
 	EsQueue queue.QueueWriter
-	sync.RWMutex
 
 	Throttle        int
 	lastFlush       int64
@@ -43,9 +41,8 @@ func (thq *ThrottlingQueue) flush() {
 	}
 }
 
-func (thq *ThrottlingQueue) Send(flow interface{}) {
+func (thq *ThrottlingQueue) Send(flow interface{}) bool {
 	now := time.Now().Unix()
-	thq.Lock()
 	if now/THROTTLE_BUCKET != thq.lastFlush/THROTTLE_BUCKET {
 		thq.flush()
 		thq.lastFlush = now
@@ -53,8 +50,7 @@ func (thq *ThrottlingQueue) Send(flow interface{}) {
 		thq.periodEmitCount = 0
 	}
 	if flow == nil {
-		thq.Unlock()
-		return
+		return false
 	}
 
 	// Reservoir Sampling
@@ -62,6 +58,7 @@ func (thq *ThrottlingQueue) Send(flow interface{}) {
 	if thq.periodEmitCount < thq.Throttle {
 		thq.sampleItems[thq.periodEmitCount] = flow
 		thq.periodEmitCount++
+		return true
 	} else {
 		r := rand.Intn(thq.periodCount)
 		if r < thq.Throttle {
@@ -74,6 +71,6 @@ func (thq *ThrottlingQueue) Send(flow interface{}) {
 				tItem.Release()
 			}
 		}
+		return false
 	}
-	thq.Unlock()
 }
