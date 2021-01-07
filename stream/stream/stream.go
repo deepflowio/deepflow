@@ -110,6 +110,9 @@ func NewFlowLogger(config *config.Config, manager *dropletqueue.Manager, recv *r
 	}
 
 	throttle := config.Throttle / queueCount
+	if config.L4Throttle != 0 {
+		throttle = config.L4Throttle / queueCount
+	}
 	esWriterQueues := manager.NewQueues(
 		"2-decode-to-es-writer-queue"+queueSuffix, (throttler.THROTTLE_BUCKET+1)*throttle, queueCount, 1,
 		queue.OptionFlushIndicator((throttler.THROTTLE_BUCKET-1)*time.Second),
@@ -159,13 +162,20 @@ func NewProtoLogger(config *config.Config, manager *dropletqueue.Manager, recv *
 
 	recv.RegistHandler(uint8(msgType), decodeQueues, queueCount)
 
-	throttle := config.Throttle / queueCount
+	httpThrottle := config.Throttle / queueCount
+	if config.L7HTTPThrottle != 0 {
+		httpThrottle = config.L7HTTPThrottle / queueCount
+	}
+	dnsThrottle := config.Throttle / queueCount
+	if config.L7DNSThrottle != 0 {
+		dnsThrottle = config.L7DNSThrottle / queueCount
+	}
 	httpEsWriterQueues := manager.NewQueues(
-		"2-decode-to-es-writer-http"+queueSuffix, (throttler.THROTTLE_BUCKET+1)*throttle, queueCount, 1,
+		"2-decode-to-es-writer-http"+queueSuffix, (throttler.THROTTLE_BUCKET+1)*httpThrottle, queueCount, 1,
 		queue.OptionFlushIndicator((throttler.THROTTLE_BUCKET-1)*time.Second),
 	)
 	dnsEsWriterQueues := manager.NewQueues(
-		"2-decode-to-es-writer-dns"+queueSuffix, (throttler.THROTTLE_BUCKET+1)*throttle, queueCount, 1,
+		"2-decode-to-es-writer-dns"+queueSuffix, (throttler.THROTTLE_BUCKET+1)*dnsThrottle, queueCount, 1,
 		queue.OptionFlushIndicator((throttler.THROTTLE_BUCKET-1)*time.Second),
 	)
 
@@ -177,11 +187,11 @@ func NewProtoLogger(config *config.Config, manager *dropletqueue.Manager, recv *
 	decoders := make([]*decoder.Decoder, queueCount)
 	for i := 0; i < queueCount; i++ {
 		httpThrottlers[i] = throttler.NewThrottlingQueue(
-			throttle,
+			httpThrottle,
 			queue.QueueWriter(httpEsWriterQueues.FixedMultiQueue[i]),
 		)
 		dnsThrottlers[i] = throttler.NewThrottlingQueue(
-			throttle,
+			dnsThrottle,
 			queue.QueueWriter(dnsEsWriterQueues.FixedMultiQueue[i]),
 		)
 		httpEsWriters[i] = newESWriter(config, "l7_http_log", queue.QueueReader(httpEsWriterQueues.FixedMultiQueue[i]))

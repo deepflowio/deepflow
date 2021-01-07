@@ -40,6 +40,9 @@ type Config struct {
 	ESHostPorts       []string `yaml:"es-host-port"`
 	ESAuth            ESAuth   `yaml:"es-auth"`
 	Throttle          int      `yaml:"throttle"`
+	L4Throttle        int      `yaml:"l4-throttle"`
+	L7HTTPThrottle    int      `yaml:"l7-http-throttle"`
+	L7DNSThrottle     int      `yaml:"l7-dns-throttle"`
 	OpLoadFactor      int      `yaml:"op-load-factor"`
 	RPSplitSize       int      `yaml:"rp-split-size"`
 	RPSlots           int      `yaml:"rp-slots"`

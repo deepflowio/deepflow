@@ -161,6 +161,11 @@
 ## es writer all queue limit max size
 #throttle: 1000
 
+## 分别控制l4流日志, http流日志，dns流日志的写入限速。默认值为0，表示使用throttle的设置值.若非0，则使用设置值
+#l4-throttle: 0
+#l7-http-throttle: 0
+#l7-dns-throttle: 0
+
 ## es writer denominator for sleep time
 #op-load-factor: 10
 
