@@ -36,4 +36,5 @@ trident.proto
      is_vip_interface | 是      | 是
      pod_node_id      | 是      | 是
      pod_cluster_id   | 是      | 是
+     if_type          | 是      | 是
      其他             | 否      | 是
