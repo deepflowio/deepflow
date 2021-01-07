@@ -26,14 +26,14 @@ trident.proto
 
 * Interface字段对应程序，为否可以不发送
 
-     字段             | trident | droplet | roze
-     -----------------|---------|---------|-------
-     id               | 是      | 是      | 是
-     epc_id           | 是      | 是      | 是
-     ip_resources     | 是      | 是      | 是
-     region_id        | 是      | 是      | 是
-     mac              | 是      | 是      | 是
-     is_vip_interface | 是      | 是      | 是
-     pod_node_id      | 是      | 是      | 是
-     pod_cluster_id   | 是      | 是      | 是
-     其他             | 否      | 是      | 是
+     字段             | trident | droplet、roze和stream
+     -----------------|---------|------------------------
+     id               | 是      | 是
+     epc_id           | 是      | 是
+     ip_resources     | 是      | 是
+     region_id        | 是      | 是
+     mac              | 是      | 是
+     is_vip_interface | 是      | 是
+     pod_node_id      | 是      | 是
+     pod_cluster_id   | 是      | 是
+     其他             | 否      | 是
