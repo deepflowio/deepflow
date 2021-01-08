@@ -60,7 +60,8 @@ const (
 	VXLAN_HEADER_SIZE        = 8
 	IP_HEADER_SIZE           = 20
 	UDP_HEADER_SIZE          = 8
-	GRE_HEADER_SIZE          = 8
+	GRE_HEADER_SIZE          = 4
+	ERSPANI_HEADER_SIZE      = 0
 	ERSPANII_HEADER_SIZE     = 8
 	ERSPANIII_HEADER_SIZE    = 12
 	ERSPANIII_SUBHEADER_SIZE = 8
@@ -78,31 +79,37 @@ const (
 )
 
 const (
-	OFFSET_DA                = 0
-	OFFSET_SA                = OFFSET_DA + MAC_ADDR_LEN
-	OFFSET_ETH_TYPE          = OFFSET_SA + MAC_ADDR_LEN
-	OFFSET_IP_PROTOCOL       = 23
-	OFFSET_SIP               = 26
-	OFFSET_DIP               = 30
-	OFFSET_DPORT             = 36
-	OFFSET_GRE_FLAGS         = 34 // ver & c & k & s
-	OFFSET_GRE_PROTOCOL_TYPE = 36
-	OFFSET_GRE_KEY           = 38 // no csum
-	OFFSET_VXLAN_FLAGS       = 42
-	OFFSET_VXLAN_VNI         = 46
-	OFFSET_ERSPAN_VER        = 42
+	OFFSET_DA          = 0
+	OFFSET_SA          = OFFSET_DA + MAC_ADDR_LEN
+	OFFSET_ETH_TYPE    = OFFSET_SA + MAC_ADDR_LEN
+	OFFSET_IP_PROTOCOL = 23
+	OFFSET_SIP         = 26
+	OFFSET_DIP         = 30
+	OFFSET_DPORT       = 36
+	OFFSET_VXLAN_FLAGS = 42
+	OFFSET_VXLAN_VNI   = 46
 )
 
 const (
+	GRE_FLAGS_OFFSET    = 0
+	GRE_PROTOCOL_OFFSET = 2
+	GRE_KEY_OFFSET      = 4
+
 	GRE_FLAGS_VER_MASK  = 0x7
 	GRE_FLAGS_SEQ_MASK  = 1 << 12
 	GRE_FLAGS_KEY_MASK  = 1 << 13
 	GRE_FLAGS_CSUM_MASK = 1 << 15
+
+	GRE_CSUM_LEN = 4 // csum + reserved1
+	GRE_SEQ_LEN  = 4
+	GRE_KEY_LEN  = 4
 )
 
 const (
-	GRE_CSUM_LEN = 4 // csum + reserved1
-	GRE_SEQ_LEN  = 4
+	IP_IHL_OFFSET = 0
+
+	ERSPAN_ID_OFFSET       = 0 // erspan2和3共用，4字节取0x3ff
+	ERSPANIII_FLAGS_OFFSET = 11
 )
 
 const (
