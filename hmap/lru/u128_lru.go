@@ -47,7 +47,8 @@ type U128LRU struct {
 
 	capacity int // 最大容纳的Flow个数
 	size     int // 当前容纳的Flow个数
-	maxScan  int
+
+	counter *Counter
 }
 
 func (m *U128LRU) NoStats() *U128LRU {
@@ -202,8 +203,12 @@ func (m *U128LRU) newNode(key0, key1 uint64, value interface{}, hash int32) {
 }
 
 func (m *U128LRU) GetCounter() interface{} {
-	counter := &Counter{m.maxScan, m.size}
-	m.maxScan = 0
+	var counter *Counter
+	counter, m.counter = m.counter, &Counter{}
+	if counter.scanTimes != 0 {
+		counter.AvgScan = counter.totalScan / counter.scanTimes
+	}
+	counter.Size = m.size
 	return counter
 }
 
@@ -228,21 +233,24 @@ func (m *U128LRU) Remove(key0, key1 uint64) {
 }
 
 func (m *U128LRU) Get(key0, key1 uint64, peek bool) (interface{}, bool) {
-	maxScan := 0
+	m.counter.scanTimes++
+	scan := 0
 	for node := m.hashSlotHead[m.compressHash(key0, key1)]; node != nil; node = node.hashListNext {
-		maxScan++
+		scan++
 		if node.key0 == key0 && node.key1 == key1 {
 			if !peek {
 				m.updateNode(node, node.value)
 			}
-			if maxScan > m.maxScan {
-				m.maxScan = maxScan
+			m.counter.totalScan += scan
+			if scan > m.counter.Max {
+				m.counter.Max = scan
 			}
 			return node.value, true
 		}
 	}
-	if maxScan > m.maxScan {
-		m.maxScan = maxScan
+	m.counter.totalScan += scan
+	if scan > m.counter.Max {
+		m.counter.Max = scan
 	}
 	return nil, false
 }
@@ -292,6 +300,7 @@ func NewU128LRU(module string, hashSlots, capacity int, opts ...stats.OptionStat
 		timeListHead: nil,
 		timeListTail: nil,
 		capacity:     capacity,
+		counter:      &Counter{},
 	}
 
 	for i := range m.hashSlotHead {

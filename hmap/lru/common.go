@@ -1,7 +1,7 @@
 package lru
 
 import (
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("lru")
@@ -22,8 +22,11 @@ func minPowerOfTwo(v int) (int, int) {
 }
 
 type Counter struct {
-	Max  int `statsd:"max-bucket"` // 目前仅统计Get扫描到的最大值
-	Size int `statsd:"size"`
+	Max     int `statsd:"max-bucket"` // 统计Get扫描到的最大值
+	Size    int `statsd:"size"`
+	AvgScan int `statsd:"avg-scan"` // 平均扫描次数
+
+	totalScan, scanTimes int
 }
 
 type DoubleKeyLRUCounter struct {
