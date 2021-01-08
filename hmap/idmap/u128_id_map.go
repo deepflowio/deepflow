@@ -39,10 +39,10 @@ type U128IDMap struct {
 	slotHead []int32 // 哈希桶，slotHead[i] 表示哈希值为 i 的冲突链的第一个节点为 buffer[[ slotHead[i]] ]]
 	size     int     // buffer中存储的有效节点总数
 	width    int     // 哈希桶中最大冲突链长度
-	maxScan  int
-	maxSize  int
 
 	hashSlotBits uint32 // 哈希桶数量总是2^N，记录末尾0比特的数量用于compressHash
+
+	counter *Counter
 }
 
 func NewU128IDMap(module string, hashSlots uint32, opts ...stats.OptionStatTags) *U128IDMap {
@@ -59,6 +59,7 @@ func NewU128IDMap(module string, hashSlots uint32, opts ...stats.OptionStatTags)
 		buffer:       make([]u128IDMapNodeBlock, 0),
 		slotHead:     make([]int32, hashSlots),
 		hashSlotBits: i,
+		counter:      &Counter{},
 	}
 
 	for i := uint32(0); i < hashSlots; i++ {
@@ -94,6 +95,7 @@ func (m *U128IDMap) AddOrGet(key0, key1 uint64, value uint32, overwrite bool) (u
 	slot := m.compressHash(key0, key1)
 	head := m.slotHead[slot]
 
+	m.counter.scanTimes++
 	width := 0
 	next := head
 	for next != -1 {
@@ -104,6 +106,10 @@ func (m *U128IDMap) AddOrGet(key0, key1 uint64, value uint32, overwrite bool) (u
 				node.value = value
 			} else {
 				value = node.value
+			}
+			m.counter.totalScan += width
+			if m.width < width {
+				m.width = width
 			}
 			return value, false
 		}
@@ -123,14 +129,16 @@ func (m *U128IDMap) AddOrGet(key0, key1 uint64, value uint32, overwrite bool) (u
 	m.slotHead[slot] = int32(m.size)
 	m.size++
 
-	if m.width < width+1 {
-		m.width = width + 1
+	width++
+	m.counter.totalScan += width
+	if m.width < width {
+		m.width = width
 	}
-	if m.maxScan < width+1 {
-		m.maxScan = width + 1
+	if m.counter.Max < width {
+		m.counter.Max = width
 	}
-	if m.maxSize < m.size {
-		m.maxSize = m.size
+	if m.counter.Size < m.size {
+		m.counter.Size = m.size
 	}
 
 	return value, true
@@ -147,13 +155,24 @@ func (m *U128IDMap) Get(key0, key1 uint64) (uint32, bool) {
 	slot := m.compressHash(key0, key1)
 	head := m.slotHead[slot]
 
+	m.counter.scanTimes++
+	width := 0
 	next := head
 	for next != -1 {
+		width++
 		node := &m.buffer[next>>_BLOCK_SIZE_BITS][next&_BLOCK_SIZE_MASK]
 		if node.equal(key0, key1) {
+			m.counter.totalScan += width
+			if m.counter.Max < width {
+				m.counter.Max = width
+			}
 			return node.value, true
 		}
 		next = node.next
+	}
+	m.counter.totalScan += width
+	if m.counter.Max < width {
+		m.counter.Max = width
 	}
 	return 0, false
 }
@@ -166,9 +185,11 @@ func (m *U128IDMap) GetWithSlice(key []byte, _ uint32) (uint32, bool) {
 }
 
 func (m *U128IDMap) GetCounter() interface{} {
-	counter := &Counter{m.maxScan, m.maxSize}
-	m.maxScan = 0
-	m.maxSize = m.size
+	var counter *Counter
+	counter, m.counter = m.counter, &Counter{Size: m.size}
+	if counter.scanTimes != 0 {
+		counter.AvgScan = counter.totalScan / counter.scanTimes
+	}
 	return counter
 }
 
