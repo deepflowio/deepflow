@@ -58,7 +58,7 @@ func TestDecapsulateErspanI(t *testing.T) {
 	l2Len := 18
 	actual := &TunnelInfo{}
 	offset := actual.Decapsulate(packet1[l2Len:], TUNNEL_TYPE_ERSPAN)
-	expectedOffset := 20 + 8 // IP_HEADER_SIZE + GRE_HEADER_SIZE
+	expectedOffset := IP_HEADER_SIZE + GRE_HEADER_SIZE
 	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
 		t.Errorf("expectedErspanI: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
 			expected, actual, expectedOffset, offset)
@@ -97,6 +97,8 @@ func TestDecapsulateErspanII(t *testing.T) {
 	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
 		t.Errorf("expectedErspanII: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
 			expected, actual, expectedOffset, offset)
+		t.Error(expected)
+		t.Error(actual)
 	}
 }
 
@@ -141,6 +143,37 @@ func TestDecapsulateVxlan(t *testing.T) {
 	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
 		t.Errorf("expectedErspanII: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
 			expected, actual, expectedOffset, offset)
+	}
+}
+
+func TestDecapsulateTencentGre(t *testing.T) {
+	expected := &TunnelInfo{
+		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.19.0.21").To4())),
+		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.21.64.5").To4())),
+		Id:   0x10285,
+		Type: TUNNEL_TYPE_TENCENT_GRE,
+		Tier: 1,
+	}
+	expectedOverlay := []byte{
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x51, 0x67,
+		0x08, 0x00,
+		0x45, 0x00, 0x00, 0x28, 0x87, 0x93,
+		0x40, 0x00, 0x40, 0x06, 0xa8, 0xe7,
+		0x0a, 0x01, 0xfb, 0x29, 0x0a, 0x01, 0xfb, 0x29}
+
+	packets, _ := loadPcap("tencent-gre.pcap")
+	packet := packets[0]
+
+	l2Len := 14
+	actual := &TunnelInfo{}
+	offset := actual.Decapsulate(packet[l2Len:], TUNNEL_TYPE_TENCENT_GRE)
+	expectedOffset := 18
+	if !reflect.DeepEqual(expected, actual) ||
+		offset != expectedOffset ||
+		!reflect.DeepEqual(expectedOverlay, packet[l2Len+expectedOffset:l2Len+expectedOffset+34]) {
+		t.Errorf("expectedTencentGre: \n\ttunnel: %+v\n\tactual: %+v\n\toffset: %v\n\tactual: %v\n\toverlay: %x\n\tactual: %x",
+			expected, actual, expectedOffset, offset, expectedOverlay, packet[l2Len+18:l2Len+18+34])
 	}
 }
 
