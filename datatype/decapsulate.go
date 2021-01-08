@@ -199,6 +199,48 @@ func (t *TunnelInfo) Decapsulate(l3Packet []byte, tunnelType TunnelType) int {
 	return 0
 }
 
+func (t *TunnelInfo) Decapsulate6Vxlan(l3Packet []byte) int {
+	if len(l3Packet) < OFFSET_VXLAN_FLAGS+VXLAN_HEADER_SIZE {
+		return 0
+	}
+	dstPort := *(*uint16)(unsafe.Pointer(&l3Packet[IP6_HEADER_SIZE+UDP_DPORT_OFFSET]))
+	if dstPort != LE_VXLAN_PROTO_UDP_DPORT && dstPort != LE_VXLAN_PROTO_UDP_DPORT2 {
+		return 0
+	}
+	if l3Packet[IP6_HEADER_SIZE+UDP_HEADER_SIZE+VXLAN_FLAGS_OFFSET] != VXLAN_FLAGS {
+		return 0
+	}
+
+	// 仅保存最外层的隧道信息
+	if t.Tier == 0 {
+		t.Src = IPv4Int(BigEndian.Uint32(l3Packet[IP6_SIP_OFFSET:]))
+		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[IP6_DIP_OFFSET:]))
+		t.Type = TUNNEL_TYPE_VXLAN
+		t.Id = BigEndian.Uint32(l3Packet[IP6_HEADER_SIZE+UDP_HEADER_SIZE+VXLAN_VNI_OFFSET:]) >> 8
+	} else {
+		t.Type = TUNNEL_TYPE_VXLAN_VXLAN
+	}
+	t.Tier++
+	// return offset start from L3
+	return IP6_HEADER_SIZE + UDP_HEADER_SIZE + VXLAN_HEADER_SIZE
+}
+
+func (t *TunnelInfo) Decapsulate6(l3Packet []byte, tunnelType TunnelType) int {
+	if tunnelType == TUNNEL_TYPE_NONE {
+		return 0
+	}
+	t.Type = TUNNEL_TYPE_NONE
+	// 通过ERSPANIII_HEADER_SIZE(12 bytes)+ERSPANIII_SUBHEADER_SIZE(8 bytes)判断，保证不会数组越界
+	if len(l3Packet) < IP6_HEADER_SIZE+GRE_HEADER_SIZE+ERSPANIII_HEADER_SIZE+ERSPANIII_SUBHEADER_SIZE {
+		return 0
+	}
+	protocol := IPProtocol(l3Packet[IP6_PROTO_OFFSET])
+	if protocol == IPProtocolUDP && (tunnelType == TUNNEL_TYPE_VXLAN || tunnelType == TUNNEL_TYPE_VXLAN_VXLAN) {
+		return t.Decapsulate6Vxlan(l3Packet)
+	}
+	return 0
+}
+
 func (t *TunnelInfo) Valid() bool {
 	return t.Type != TUNNEL_TYPE_NONE
 }
