@@ -177,6 +177,28 @@ func TestDecapsulateTencentGre(t *testing.T) {
 	}
 }
 
+func TestDecapsulateIp6Vxlan(t *testing.T) {
+	expected := &TunnelInfo{
+		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("0.0.2.63").To4())),
+		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("0.0.2.61").To4())),
+		Id:   27,
+		Type: TUNNEL_TYPE_VXLAN,
+		Tier: 1,
+	}
+	packets, _ := loadPcap("ip6-vxlan.pcap")
+	packet := packets[0]
+
+	l2Len := 14
+	actual := &TunnelInfo{}
+	offset := actual.Decapsulate6(packet[l2Len:], TUNNEL_TYPE_VXLAN)
+	expectedOffset := IP6_HEADER_SIZE + UDP_HEADER_SIZE + VXLAN_HEADER_SIZE
+	if !reflect.DeepEqual(expected, actual) ||
+		offset != expectedOffset {
+		t.Errorf("expectedIp6Vxlan: \n\ttunnel: %+v\n\tactual: %+v\n\toffset: %v\n\tactual: %v\n",
+			expected, actual, expectedOffset, offset)
+	}
+}
+
 func BenchmarkDecapsulateTCP(b *testing.B) {
 	packet := [256]byte{}
 	tunnel := &TunnelInfo{}
