@@ -59,6 +59,7 @@ const (
 	ARP_HEADER_SIZE          = 28
 	VXLAN_HEADER_SIZE        = 8
 	IP_HEADER_SIZE           = 20
+	IP6_HEADER_SIZE          = 40
 	UDP_HEADER_SIZE          = 8
 	GRE_HEADER_SIZE          = 4
 	ERSPANI_HEADER_SIZE      = 0
@@ -107,6 +108,14 @@ const (
 
 const (
 	IP_IHL_OFFSET = 0
+
+	IP6_PROTO_OFFSET = 6
+	IP6_SIP_OFFSET   = 20 // 用于解析tunnel，仅使用后四个字节
+	IP6_DIP_OFFSET   = 36 // 用于解析tunnel，仅使用后四个字节
+	UDP_DPORT_OFFSET = 2
+
+	VXLAN_FLAGS_OFFSET = 0
+	VXLAN_VNI_OFFSET   = 4
 
 	ERSPAN_ID_OFFSET       = 0 // erspan2和3共用，4字节取0x3ff
 	ERSPANIII_FLAGS_OFFSET = 11
