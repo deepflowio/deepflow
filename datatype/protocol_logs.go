@@ -220,7 +220,13 @@ func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
 	l.RRT = time.Duration(decoder.ReadU64())
 
 	if decoder.ReadBool() {
+		if l.IP6Src == nil {
+			l.IP6Src = make([]byte, 16)
+		}
 		decoder.ReadIPv6(l.IP6Src)
+		if l.IP6Dst == nil {
+			l.IP6Dst = make([]byte, 16)
+		}
 		decoder.ReadIPv6(l.IP6Dst)
 	} else {
 		l.IPSrc = decoder.ReadU32()
