@@ -2,7 +2,6 @@ package policy
 
 import (
 	"math"
-	"runtime"
 	"sort"
 
 	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -233,7 +232,6 @@ func (d *Ddbs) generateVectorTable6(acls []*Acl) {
 		}
 	}
 	d.table6 = table
-	runtime.GC()
 }
 
 func (d *Ddbs) generateVectorTable(acls []*Acl) {
@@ -247,7 +245,6 @@ func (d *Ddbs) generateVectorTable(acls []*Acl) {
 		}
 	}
 	d.table = table
-	runtime.GC()
 }
 
 func (d *Ddbs) generateDdbsTable(acls []*Acl) {
