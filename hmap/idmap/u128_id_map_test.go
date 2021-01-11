@@ -1,6 +1,7 @@
 package idmap
 
 import (
+	"bytes"
 	"encoding/binary"
 	"testing"
 )
@@ -182,4 +183,32 @@ func BenchmarkNativeU64Map(b *testing.B) {
 		}
 	}
 	b.Logf("size=%d", len(m))
+}
+
+func TestU128IDMapCollisionChain(t *testing.T) {
+	m := NewU128IDMap("test", 1).NoStats()
+	m.SetCollisionChainDebugThreshold(5)
+
+	for i := 0; i < 10; i++ {
+		m.AddOrGet(0, uint64(i), 0, false)
+	}
+	expected := []byte{
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	}
+	if !bytes.Equal(m.GetCollisionChain(), expected) {
+		t.Error("冲突链获取不正确")
+	}
+
+	m.Clear()
+	m.SetCollisionChainDebugThreshold(10)
+	for i := 0; i < 10; i++ {
+		m.AddOrGet(0, uint64(i), 0, false)
+	}
+	if len(m.GetCollisionChain()) > 0 {
+		t.Error("冲突链获取不正确")
+	}
 }

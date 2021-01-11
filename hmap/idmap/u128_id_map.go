@@ -3,6 +3,7 @@ package idmap
 import (
 	"encoding/binary"
 	"sync"
+	"sync/atomic"
 
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/keyhash"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
@@ -43,6 +44,9 @@ type U128IDMap struct {
 	hashSlotBits uint32 // 哈希桶数量总是2^N，记录末尾0比特的数量用于compressHash
 
 	counter *Counter
+
+	collisionChainDebugThreshold uint32 // scan宽度超过该值时保留冲突链信息，为0时不保存
+	debugChainSlotIndex          int
 }
 
 func NewU128IDMap(module string, hashSlots uint32, opts ...stats.OptionStatTags) *U128IDMap {
@@ -56,10 +60,11 @@ func NewU128IDMap(module string, hashSlots uint32, opts ...stats.OptionStatTags)
 	hashSlots = 1 << i
 
 	m := &U128IDMap{
-		buffer:       make([]u128IDMapNodeBlock, 0),
-		slotHead:     make([]int32, hashSlots),
-		hashSlotBits: i,
-		counter:      &Counter{},
+		buffer:              make([]u128IDMapNodeBlock, 0),
+		slotHead:            make([]int32, hashSlots),
+		hashSlotBits:        i,
+		counter:             &Counter{},
+		debugChainSlotIndex: -1,
 	}
 
 	for i := uint32(0); i < hashSlots; i++ {
@@ -71,6 +76,10 @@ func NewU128IDMap(module string, hashSlots uint32, opts ...stats.OptionStatTags)
 	}
 	stats.RegisterCountable("idmap", m, statOptions...)
 	return m
+}
+
+func (m *U128IDMap) KeySize() int {
+	return 128 / 8
 }
 
 func (m *U128IDMap) NoStats() *U128IDMap {
@@ -90,8 +99,7 @@ func (m *U128IDMap) compressHash(key0, key1 uint64) int32 {
 	return keyhash.Jenkins128(key0, key1) & int32(len(m.slotHead)-1)
 }
 
-// 第一个返回值表示value，第二个返回值表示是否进行了Add。若key已存在，指定overwrite=true可覆写value。
-func (m *U128IDMap) AddOrGet(key0, key1 uint64, value uint32, overwrite bool) (uint32, bool) {
+func (m *U128IDMap) find(key0, key1 uint64, isAdd bool) (*u128IDMapNode, int) {
 	slot := m.compressHash(key0, key1)
 	head := m.slotHead[slot]
 
@@ -102,24 +110,74 @@ func (m *U128IDMap) AddOrGet(key0, key1 uint64, value uint32, overwrite bool) (u
 		width++
 		node := &m.buffer[next>>_BLOCK_SIZE_BITS][next&_BLOCK_SIZE_MASK]
 		if node.equal(key0, key1) {
-			if overwrite {
-				node.value = value
-			} else {
-				value = node.value
-			}
 			m.counter.totalScan += width
-			if m.width < width {
-				m.width = width
+			if m.counter.Max < width {
+				m.counter.Max = width
 			}
-			return value, false
+			if m.debugChainSlotIndex == -1 {
+				if threshold := int(atomic.LoadUint32(&m.collisionChainDebugThreshold)); threshold > 0 && width >= threshold {
+					m.debugChainSlotIndex = int(slot)
+				}
+			}
+			return node, width
 		}
 		next = node.next
 	}
+	m.counter.totalScan += width
+	if m.counter.Max < width {
+		m.counter.Max = width
+	}
+	if m.debugChainSlotIndex == -1 {
+		if isAdd {
+			width++
+		}
+		if threshold := int(atomic.LoadUint32(&m.collisionChainDebugThreshold)); threshold > 0 && width >= threshold {
+			m.debugChainSlotIndex = int(slot)
+		}
+	}
+	return nil, width
+}
+
+// 需要在和AddOrGet同一线程中调用
+func (m *U128IDMap) GetCollisionChain() []byte {
+	if m.debugChainSlotIndex == -1 {
+		return nil
+	}
+	chain := make([]byte, 0, m.KeySize()*m.width)
+	nodeID := m.slotHead[m.debugChainSlotIndex]
+	var key [16]byte
+	for nodeID != -1 {
+		node := &m.buffer[nodeID>>_BLOCK_SIZE_BITS][nodeID&_BLOCK_SIZE_MASK]
+		binary.BigEndian.PutUint64(key[:], node.key0)
+		binary.BigEndian.PutUint64(key[8:], node.key1)
+		chain = append(chain, key[:]...)
+		nodeID = node.next
+	}
+	m.debugChainSlotIndex = -1
+	return chain
+}
+
+func (m *U128IDMap) SetCollisionChainDebugThreshold(t uint32) {
+	atomic.StoreUint32(&m.collisionChainDebugThreshold, t)
+}
+
+// 第一个返回值表示value，第二个返回值表示是否进行了Add。若key已存在，指定overwrite=true可覆写value。
+func (m *U128IDMap) AddOrGet(key0, key1 uint64, value uint32, overwrite bool) (uint32, bool) {
+	node, width := m.find(key0, key1, true)
+	if node != nil {
+		if overwrite {
+			node.value = value
+		}
+		return node.value, false
+	}
+
+	slot := m.compressHash(key0, key1)
+	head := m.slotHead[slot]
 
 	if m.size >= len(m.buffer)<<_BLOCK_SIZE_BITS { // expand
 		m.buffer = append(m.buffer, u128IDMapNodeBlockPool.Get().(u128IDMapNodeBlock))
 	}
-	node := &m.buffer[m.size>>_BLOCK_SIZE_BITS][m.size&_BLOCK_SIZE_MASK]
+	node = &m.buffer[m.size>>_BLOCK_SIZE_BITS][m.size&_BLOCK_SIZE_MASK]
 	node.key0 = key0
 	node.key1 = key1
 	node.value = value
@@ -130,7 +188,6 @@ func (m *U128IDMap) AddOrGet(key0, key1 uint64, value uint32, overwrite bool) (u
 	m.size++
 
 	width++
-	m.counter.totalScan += width
 	if m.width < width {
 		m.width = width
 	}
@@ -152,27 +209,8 @@ func (m *U128IDMap) AddOrGetWithSlice(key []byte, _ uint32, value uint32, overwr
 }
 
 func (m *U128IDMap) Get(key0, key1 uint64) (uint32, bool) {
-	slot := m.compressHash(key0, key1)
-	head := m.slotHead[slot]
-
-	m.counter.scanTimes++
-	width := 0
-	next := head
-	for next != -1 {
-		width++
-		node := &m.buffer[next>>_BLOCK_SIZE_BITS][next&_BLOCK_SIZE_MASK]
-		if node.equal(key0, key1) {
-			m.counter.totalScan += width
-			if m.counter.Max < width {
-				m.counter.Max = width
-			}
-			return node.value, true
-		}
-		next = node.next
-	}
-	m.counter.totalScan += width
-	if m.counter.Max < width {
-		m.counter.Max = width
+	if node, _ := m.find(key0, key1, false); node != nil {
+		return node.value, true
 	}
 	return 0, false
 }
@@ -208,6 +246,8 @@ func (m *U128IDMap) Clear() {
 
 	m.size = 0
 	m.width = 0
+
+	m.debugChainSlotIndex = -1
 }
 
 var _ UBigIDMap = &U128IDMap{}
