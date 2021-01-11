@@ -185,7 +185,6 @@ func (t *TunnelInfo) Decapsulate(l3Packet []byte, tunnelType TunnelType) int {
 	if tunnelType == TUNNEL_TYPE_NONE {
 		return 0
 	}
-	t.Type = TUNNEL_TYPE_NONE
 	// 通过ERSPANIII_HEADER_SIZE(12 bytes)+ERSPANIII_SUBHEADER_SIZE(8 bytes)判断，保证不会数组越界
 	if len(l3Packet) < IP_HEADER_SIZE+GRE_HEADER_SIZE+ERSPANIII_HEADER_SIZE+ERSPANIII_SUBHEADER_SIZE {
 		return 0
