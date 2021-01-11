@@ -73,12 +73,13 @@ func (e *SimpleEncoder) WriteIPv6(v net.IP) {
 
 // 注意：将会截断至255字节
 func (e *SimpleEncoder) WriteString255(v string) {
-	e.buf = append(e.buf, byte(len(v)))
-	if len(v) > 255 {
-		e.buf = append(e.buf, []byte(v)[:255]...)
-	} else {
-		e.buf = append(e.buf, []byte(v)...)
+	length := len(v)
+	if length > 255 {
+		length = 255
 	}
+
+	e.buf = append(e.buf, byte(length))
+	e.buf = append(e.buf, []byte(v)[:length]...)
 }
 
 func (e *SimpleEncoder) WriteRawString(v string) {
