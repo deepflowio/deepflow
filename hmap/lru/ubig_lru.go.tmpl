@@ -5,6 +5,7 @@ import (
 	. "encoding/binary"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
@@ -59,6 +60,13 @@ type U{{.}}LRU struct {
 	size     int // 当前容纳的Flow个数
 
 	counter *Counter
+
+	collisionChainDebugThreshold uint32 // scan宽度超过该值时保留冲突链信息，为0时不保存
+	debugChainSlotIndex          int
+}
+
+func (m *U{{.}}LRU) KeySize() int {
+	return _U{{.}}_KEY_SIZE
 }
 
 func (m *U{{.}}LRU) NoStats() *U{{.}}LRU {
@@ -213,13 +221,10 @@ func (m *U{{.}}LRU) Add(key []byte, value interface{}) {
 	}
 
 	hash := m.genHash(key)
-	for hashListNext := m.hashSlotHead[m.compressHash(hash)]; hashListNext != -1; {
-		node := m.getNode(hashListNext)
-		if node.equal(hash, key) {
-			m.updateNode(node, hashListNext, value)
-			return
-		}
-		hashListNext = node.hashListNext
+	node, hashIndex := m.find(hash, key, true)
+	if node != nil {
+		m.updateNode(node, hashIndex, value)
+		return
 	}
 	m.newNode(hash, key, value)
 }
@@ -240,6 +245,61 @@ func (m *U{{.}}LRU) Remove(key []byte) {
 	}
 }
 
+func (m *U{{.}}LRU) find(hash uint32, key []byte, isAdd bool) (*u{{.}}LRUNode, int32) {
+	m.counter.scanTimes++
+	width := 0
+	slot := m.compressHash(hash)
+	for hashListNext := m.hashSlotHead[slot]; hashListNext != -1; {
+		width++
+		node := m.getNode(hashListNext)
+		if node.equal(hash, key) {
+			m.counter.totalScan += width
+			if width > m.counter.Max {
+				m.counter.Max = width
+			}
+			m.updateDebugChainSlotIndex(width, slot)
+			return node, hashListNext
+		}
+		hashListNext = node.hashListNext
+	}
+	m.counter.totalScan += width
+	if isAdd {
+		width++
+	}
+	if width > m.counter.Max {
+		m.counter.Max = width
+	}
+	m.updateDebugChainSlotIndex(width, slot)
+	return nil, -1
+}
+
+func (m *U{{.}}LRU) updateDebugChainSlotIndex(width int, slot int32) {
+	if m.debugChainSlotIndex == -1 {
+		if threshold := int(atomic.LoadUint32(&m.collisionChainDebugThreshold)); threshold > 0 && width >= threshold {
+			m.debugChainSlotIndex = int(slot)
+		}
+	}
+}
+
+// 需要在和AddOrGet同一线程中调用
+func (m *U{{.}}LRU) GetCollisionChain() []byte {
+	if m.debugChainSlotIndex == -1 {
+		return nil
+	}
+	chain := make([]byte, 0, m.KeySize()*m.counter.Max)
+	for hashListNext := m.hashSlotHead[m.debugChainSlotIndex]; hashListNext != -1; {
+		node := m.getNode(hashListNext)
+		chain = append(chain, node.key[:]...)
+		hashListNext = node.hashListNext
+	}
+	m.debugChainSlotIndex = -1
+	return chain
+}
+
+func (m *U{{.}}LRU) SetCollisionChainDebugThreshold(t uint32) {
+	atomic.StoreUint32(&m.collisionChainDebugThreshold, t)
+}
+
 func (m *U{{.}}LRU) GetCounter() interface{} {
 	var counter *Counter
 	counter, m.counter = m.counter, &Counter{}
@@ -255,27 +315,13 @@ func (m *U{{.}}LRU) Get(key []byte, peek bool) (interface{}, bool) {
 		panic(fmt.Sprintf("传入key的长度不等于 %d 字节", _U{{.}}_KEY_SIZE))
 	}
 
-	m.counter.scanTimes++
-	scan := 0
 	hash := m.genHash(key)
-	for hashListNext := m.hashSlotHead[m.compressHash(hash)]; hashListNext != -1; {
-		node := m.getNode(hashListNext)
-		scan++
-		if node.equal(hash, key) {
-			if !peek {
-				m.updateNode(node, hashListNext, node.value)
-			}
-			m.counter.totalScan += scan
-			if scan > m.counter.Max {
-				m.counter.Max = scan
-			}
-			return node.value, true
+	node, hashIndex := m.find(hash, key, false)
+	if node != nil {
+		if !peek {
+			m.updateNode(node, hashIndex, node.value)
 		}
-		hashListNext = node.hashListNext
-	}
-	m.counter.totalScan += scan
-	if scan > m.counter.Max {
-		m.counter.Max = scan
+		return node.value, true
 	}
 	return nil, false
 }
@@ -336,6 +382,7 @@ func NewU{{.}}LRU(module string, hashSlots, capacity int, opts ...stats.OptionSt
 		timeListTail: -1,
 		capacity:     capacity,
 		counter:      &Counter{},
+		debugChainSlotIndex: -1,
 	}
 
 	for i := 0; i < len(m.hashSlotHead); i++ {

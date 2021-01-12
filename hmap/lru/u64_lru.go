@@ -1,7 +1,9 @@
 package lru
 
 import (
+	"encoding/binary"
 	"sync"
+	"sync/atomic"
 
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/keyhash"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
@@ -45,6 +47,13 @@ type U64LRU struct {
 	size     int // 当前容纳的Flow个数
 
 	counter *Counter
+
+	collisionChainDebugThreshold uint32 // scan宽度超过该值时保留冲突链信息，为0时不保存
+	debugChainSlotIndex          int
+}
+
+func (m *U64LRU) KeySize() int {
+	return 64 / 8
 }
 
 func (m *U64LRU) NoStats() *U64LRU {
@@ -72,6 +81,7 @@ func (m *U64LRU) decIndex(index int32) int32 {
 }
 
 func (m *U64LRU) getNode(index int32) *u64LRUNode {
+
 	return &m.ringBuffer[index>>_BLOCK_SIZE_BITS][index&_BLOCK_SIZE_MASK]
 }
 
@@ -203,13 +213,10 @@ func (m *U64LRU) GetCounter() interface{} {
 }
 
 func (m *U64LRU) Add(key uint64, value interface{}) {
-	for hashListNext := m.hashSlotHead[m.compressHash(key)]; hashListNext != -1; {
-		node := m.getNode(hashListNext)
-		if node.key == key {
-			m.updateNode(node, hashListNext, value)
-			return
-		}
-		hashListNext = node.hashListNext
+	node, hashIndex := m.find(key, true)
+	if node != nil {
+		m.updateNode(node, hashIndex, value)
+		return
 	}
 	m.newNode(key, value)
 }
@@ -225,27 +232,70 @@ func (m *U64LRU) Remove(key uint64) {
 	}
 }
 
-func (m *U64LRU) Get(key uint64, peek bool) (interface{}, bool) {
+func (m *U64LRU) find(key uint64, isAdd bool) (*u64LRUNode, int32) {
 	m.counter.scanTimes++
-	scan := 0
-	for hashListNext := m.hashSlotHead[m.compressHash(key)]; hashListNext != -1; {
+	width := 0
+	slot := m.compressHash(key)
+	for hashListNext := m.hashSlotHead[slot]; hashListNext != -1; {
+		width++
 		node := m.getNode(hashListNext)
-		scan++
 		if node.key == key {
-			if !peek {
-				m.updateNode(node, hashListNext, node.value)
+			m.counter.totalScan += width
+			if width > m.counter.Max {
+				m.counter.Max = width
 			}
-			m.counter.totalScan += scan
-			if scan > m.counter.Max {
-				m.counter.Max = scan
-			}
-			return node.value, true
+			m.updateDebugChainSlotIndex(width, slot)
+			return node, hashListNext
 		}
 		hashListNext = node.hashListNext
 	}
-	m.counter.totalScan += scan
-	if scan > m.counter.Max {
-		m.counter.Max = scan
+	m.counter.totalScan += width
+	if isAdd {
+		width++
+	}
+	if width > m.counter.Max {
+		m.counter.Max = width
+	}
+	m.updateDebugChainSlotIndex(width, slot)
+	return nil, -1
+}
+
+func (m *U64LRU) updateDebugChainSlotIndex(width int, slot int32) {
+	if m.debugChainSlotIndex == -1 {
+		if threshold := int(atomic.LoadUint32(&m.collisionChainDebugThreshold)); threshold > 0 && width >= threshold {
+			m.debugChainSlotIndex = int(slot)
+		}
+	}
+}
+
+// 需要在和AddOrGet同一线程中调用
+func (m *U64LRU) GetCollisionChain() []byte {
+	if m.debugChainSlotIndex == -1 {
+		return nil
+	}
+	chain := make([]byte, 0, m.KeySize()*m.counter.Max)
+	var key [8]byte
+	for hashListNext := m.hashSlotHead[m.debugChainSlotIndex]; hashListNext != -1; {
+		node := m.getNode(hashListNext)
+		binary.BigEndian.PutUint64(key[:], node.key)
+		chain = append(chain, key[:]...)
+		hashListNext = node.hashListNext
+	}
+	m.debugChainSlotIndex = -1
+	return chain
+}
+
+func (m *U64LRU) SetCollisionChainDebugThreshold(t uint32) {
+	atomic.StoreUint32(&m.collisionChainDebugThreshold, t)
+}
+
+func (m *U64LRU) Get(key uint64, peek bool) (interface{}, bool) {
+	node, hashIndex := m.find(key, false)
+	if node != nil {
+		if !peek {
+			m.updateNode(node, hashIndex, node.value)
+		}
+		return node.value, true
 	}
 	return nil, false
 }
@@ -288,14 +338,15 @@ func NewU64LRU(module string, hashSlots, capacity int, opts ...stats.OptionStatT
 	hashSlots, hashSlotBits := minPowerOfTwo(hashSlots)
 
 	m := &U64LRU{
-		ringBuffer:   make([]u64LRUNodeBlock, (capacity+_BLOCK_SIZE)/_BLOCK_SIZE+1),
-		hashSlots:    int32(hashSlots),
-		hashSlotBits: uint32(hashSlotBits),
-		hashSlotHead: make([]int32, hashSlots),
-		timeListHead: -1,
-		timeListTail: -1,
-		capacity:     capacity,
-		counter:      &Counter{},
+		ringBuffer:          make([]u64LRUNodeBlock, (capacity+_BLOCK_SIZE)/_BLOCK_SIZE+1),
+		hashSlots:           int32(hashSlots),
+		hashSlotBits:        uint32(hashSlotBits),
+		hashSlotHead:        make([]int32, hashSlots),
+		timeListHead:        -1,
+		timeListTail:        -1,
+		capacity:            capacity,
+		counter:             &Counter{},
+		debugChainSlotIndex: -1,
 	}
 
 	for i := 0; i < len(m.hashSlotHead); i++ {

@@ -1,7 +1,9 @@
 package lru
 
 import (
+	"encoding/binary"
 	"sync"
+	"sync/atomic"
 
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/keyhash"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
@@ -49,6 +51,13 @@ type U128LRU struct {
 	size     int // 当前容纳的Flow个数
 
 	counter *Counter
+
+	collisionChainDebugThreshold uint32 // scan宽度超过该值时保留冲突链信息，为0时不保存
+	debugChainSlotIndex          int
+}
+
+func (m *U128LRU) KeySize() int {
+	return 128 / 8
 }
 
 func (m *U128LRU) NoStats() *U128LRU {
@@ -213,14 +222,12 @@ func (m *U128LRU) GetCounter() interface{} {
 }
 
 func (m *U128LRU) Add(key0, key1 uint64, value interface{}) {
-	hash := m.compressHash(key0, key1)
-	for node := m.hashSlotHead[hash]; node != nil; node = node.hashListNext {
-		if node.key0 == key0 && node.key1 == key1 {
-			m.updateNode(node, value)
-			return
-		}
+	node, slot := m.find(key0, key1, true)
+	if node != nil {
+		m.updateNode(node, value)
+		return
 	}
-	m.newNode(key0, key1, value, hash)
+	m.newNode(key0, key1, value, slot)
 }
 
 func (m *U128LRU) Remove(key0, key1 uint64) {
@@ -232,25 +239,67 @@ func (m *U128LRU) Remove(key0, key1 uint64) {
 	}
 }
 
-func (m *U128LRU) Get(key0, key1 uint64, peek bool) (interface{}, bool) {
+func (m *U128LRU) find(key0, key1 uint64, isAdd bool) (*u128LRUNode, int32) {
 	m.counter.scanTimes++
-	scan := 0
-	for node := m.hashSlotHead[m.compressHash(key0, key1)]; node != nil; node = node.hashListNext {
-		scan++
+	width := 0
+	slot := m.compressHash(key0, key1)
+	for node := m.hashSlotHead[slot]; node != nil; node = node.hashListNext {
+		width++
 		if node.key0 == key0 && node.key1 == key1 {
-			if !peek {
-				m.updateNode(node, node.value)
+			m.counter.totalScan += width
+			if width > m.counter.Max {
+				m.counter.Max = width
 			}
-			m.counter.totalScan += scan
-			if scan > m.counter.Max {
-				m.counter.Max = scan
-			}
-			return node.value, true
+			m.updateDebugChainSlotIndex(width, slot)
+			return node, slot
 		}
 	}
-	m.counter.totalScan += scan
-	if scan > m.counter.Max {
-		m.counter.Max = scan
+	m.counter.totalScan += width
+	if isAdd {
+		width++
+	}
+	if width > m.counter.Max {
+		m.counter.Max = width
+	}
+	m.updateDebugChainSlotIndex(width, slot)
+	return nil, slot
+}
+
+func (m *U128LRU) updateDebugChainSlotIndex(width int, slot int32) {
+	if m.debugChainSlotIndex == -1 {
+		if threshold := int(atomic.LoadUint32(&m.collisionChainDebugThreshold)); threshold > 0 && width >= threshold {
+			m.debugChainSlotIndex = int(slot)
+		}
+	}
+}
+
+// 需要在和AddOrGet同一线程中调用
+func (m *U128LRU) GetCollisionChain() []byte {
+	if m.debugChainSlotIndex == -1 {
+		return nil
+	}
+	chain := make([]byte, 0, m.KeySize()*m.counter.Max)
+	var key [16]byte
+	for node := m.hashSlotHead[m.debugChainSlotIndex]; node != nil; node = node.hashListNext {
+		binary.BigEndian.PutUint64(key[:], node.key0)
+		binary.BigEndian.PutUint64(key[8:], node.key1)
+		chain = append(chain, key[:]...)
+	}
+	m.debugChainSlotIndex = -1
+	return chain
+}
+
+func (m *U128LRU) SetCollisionChainDebugThreshold(t uint32) {
+	atomic.StoreUint32(&m.collisionChainDebugThreshold, t)
+}
+
+func (m *U128LRU) Get(key0, key1 uint64, peek bool) (interface{}, bool) {
+	node, _ := m.find(key0, key1, false)
+	if node != nil {
+		if !peek {
+			m.updateNode(node, node.value)
+		}
+		return node.value, true
 	}
 	return nil, false
 }
@@ -293,14 +342,15 @@ func NewU128LRU(module string, hashSlots, capacity int, opts ...stats.OptionStat
 	hashSlots, hashSlotBits := minPowerOfTwo(hashSlots)
 
 	m := &U128LRU{
-		ringBuffer:   make([]u128LRUNodeBlock, (capacity+_BLOCK_SIZE)/_BLOCK_SIZE+1),
-		hashSlots:    int32(hashSlots),
-		hashSlotBits: uint32(hashSlotBits),
-		hashSlotHead: make([]*u128LRUNode, hashSlots),
-		timeListHead: nil,
-		timeListTail: nil,
-		capacity:     capacity,
-		counter:      &Counter{},
+		ringBuffer:          make([]u128LRUNodeBlock, (capacity+_BLOCK_SIZE)/_BLOCK_SIZE+1),
+		hashSlots:           int32(hashSlots),
+		hashSlotBits:        uint32(hashSlotBits),
+		hashSlotHead:        make([]*u128LRUNode, hashSlots),
+		timeListHead:        nil,
+		timeListTail:        nil,
+		capacity:            capacity,
+		counter:             &Counter{},
+		debugChainSlotIndex: -1,
 	}
 
 	for i := range m.hashSlotHead {

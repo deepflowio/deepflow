@@ -1,6 +1,7 @@
 package lru
 
 import (
+	"bytes"
 	. "encoding/binary"
 	"testing"
 )
@@ -187,6 +188,35 @@ func BenchmarkU{{.}}LRUPeek(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		lru.Get(keys[i], true)
+	}
+}
+
+func TestU{{.}}LRUCollisionChain(t *testing.T) {
+	m := NewU{{.}}LRU("test", 2, 100).NoStats()
+	m.SetCollisionChainDebugThreshold(5)
+
+	for i := 0; i < 10; i++ {
+		m.Add(getU{{.}}(uint64(i), 0), 0)
+	}
+	expected := []byte{}
+	expected = append(expected, getU{{.}}(uint64(8), 0)...)
+	expected = append(expected, getU{{.}}(uint64(5), 0)...)
+	expected = append(expected, getU{{.}}(uint64(4), 0)...)
+	expected = append(expected, getU{{.}}(uint64(3), 0)...)
+	expected = append(expected, getU{{.}}(uint64(2), 0)...)
+	expected = append(expected, getU{{.}}(uint64(1), 0)...)
+	expected = append(expected, getU{{.}}(uint64(0), 0)...)
+	if !bytes.Equal(m.GetCollisionChain(), expected) {
+		t.Error("冲突链获取不正确")
+	}
+
+	m.Clear()
+	m.SetCollisionChainDebugThreshold(10)
+	for i := 0; i < 10; i++ {
+		m.Add(getU{{.}}(uint64(i), 0), 0)
+	}
+	if len(m.GetCollisionChain()) > 0 {
+		t.Error("冲突链获取不正确")
 	}
 }
 
