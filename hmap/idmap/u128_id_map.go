@@ -99,7 +99,7 @@ func (m *U128IDMap) compressHash(key0, key1 uint64) int32 {
 	return keyhash.Jenkins128(key0, key1) & int32(len(m.slotHead)-1)
 }
 
-func (m *U128IDMap) find(key0, key1 uint64, isAdd bool) (*u128IDMapNode, int) {
+func (m *U128IDMap) find(key0, key1 uint64, isAdd bool) *u128IDMapNode {
 	slot := m.compressHash(key0, key1)
 	head := m.slotHead[slot]
 
@@ -119,23 +119,26 @@ func (m *U128IDMap) find(key0, key1 uint64, isAdd bool) (*u128IDMapNode, int) {
 					m.debugChainSlotIndex = int(slot)
 				}
 			}
-			return node, width
+			return node
 		}
 		next = node.next
 	}
 	m.counter.totalScan += width
+	if isAdd {
+		width++
+	}
+	if m.width < width {
+		m.width = width
+	}
 	if m.counter.Max < width {
 		m.counter.Max = width
 	}
 	if m.debugChainSlotIndex == -1 {
-		if isAdd {
-			width++
-		}
 		if threshold := int(atomic.LoadUint32(&m.collisionChainDebugThreshold)); threshold > 0 && width >= threshold {
 			m.debugChainSlotIndex = int(slot)
 		}
 	}
-	return nil, width
+	return nil
 }
 
 // 需要在和AddOrGet同一线程中调用
@@ -163,7 +166,7 @@ func (m *U128IDMap) SetCollisionChainDebugThreshold(t int) {
 
 // 第一个返回值表示value，第二个返回值表示是否进行了Add。若key已存在，指定overwrite=true可覆写value。
 func (m *U128IDMap) AddOrGet(key0, key1 uint64, value uint32, overwrite bool) (uint32, bool) {
-	node, width := m.find(key0, key1, true)
+	node := m.find(key0, key1, true)
 	if node != nil {
 		if overwrite {
 			node.value = value
@@ -187,13 +190,6 @@ func (m *U128IDMap) AddOrGet(key0, key1 uint64, value uint32, overwrite bool) (u
 	m.slotHead[slot] = int32(m.size)
 	m.size++
 
-	width++
-	if m.width < width {
-		m.width = width
-	}
-	if m.counter.Max < width {
-		m.counter.Max = width
-	}
 	if m.counter.Size < m.size {
 		m.counter.Size = m.size
 	}
@@ -209,7 +205,7 @@ func (m *U128IDMap) AddOrGetWithSlice(key []byte, _ uint32, value uint32, overwr
 }
 
 func (m *U128IDMap) Get(key0, key1 uint64) (uint32, bool) {
-	if node, _ := m.find(key0, key1, false); node != nil {
+	if node := m.find(key0, key1, false); node != nil {
 		return node.value, true
 	}
 	return 0, false
