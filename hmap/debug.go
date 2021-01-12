@@ -8,6 +8,7 @@ import (
 type Debug interface {
 	KeySize() int
 	GetCollisionChain() []byte
+	SetCollisionChainDebugThreshold(int)
 }
 
 func dumpHexBytes(bs []byte) string {
@@ -34,6 +35,9 @@ func dumpHexBytes(bs []byte) string {
 
 func DumpCollisionChain(d Debug) string {
 	chain := d.GetCollisionChain()
+	if len(chain) == 0 {
+		return ""
+	}
 	keySize := d.KeySize()
 	nKeys := len(chain) / keySize
 	keys := make([]string, 0, nKeys)
@@ -45,4 +49,16 @@ func DumpCollisionChain(d Debug) string {
 		}
 	}
 	return strings.Join(keys, "-")
+}
+
+var debugItems []Debug
+
+func RegisterForDebug(d ...Debug) {
+	debugItems = append(debugItems, d...)
+}
+
+func SetCollisionChainDebugThreshold(t int) {
+	for _, d := range debugItems {
+		d.SetCollisionChainDebugThreshold(t)
+	}
 }
