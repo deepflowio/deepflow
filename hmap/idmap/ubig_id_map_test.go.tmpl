@@ -1,6 +1,7 @@
 package idmap
 
 import (
+	"bytes"
 	. "encoding/binary"
 	"testing"
 )
@@ -148,6 +149,37 @@ func BenchmarkU{{.}}IDMap(b *testing.B) {
 		m.AddOrGet(nodes[i+3].key[:], nodes[i+3].hash, uint32(i<<2), false)
 	}
 	b.Logf("size=%d, width=%d", m.Size(), m.Width())
+}
+
+func TestU{{.}}IDMapCollisionChain(t *testing.T) {
+	m := NewU{{.}}IDMap("test", 1).NoStats()
+	m.SetCollisionChainDebugThreshold(5)
+	nodes := make([]*u{{.}}IDMapNode, 10)
+
+	for i := 0; i < 10; i++ {
+		nodes[i] = newNode{{.}}(0, uint64(i))
+		m.AddOrGet(nodes[i].key[:], nodes[i].hash, 0, false)
+	}
+	expected := []byte{}
+	expected = append(expected, nodes[8].key[:]...)
+	expected = append(expected, nodes[5].key[:]...)
+	expected = append(expected, nodes[4].key[:]...)
+	expected = append(expected, nodes[3].key[:]...)
+	expected = append(expected, nodes[2].key[:]...)
+	expected = append(expected, nodes[1].key[:]...)
+	expected = append(expected, nodes[0].key[:]...)
+	if !bytes.Equal(m.GetCollisionChain(), expected) {
+		t.Error("冲突链获取不正确")
+	}
+
+	m.Clear()
+	m.SetCollisionChainDebugThreshold(10)
+	for i := 0; i < 10; i++ {
+		m.AddOrGet(nodes[i].key[:], nodes[i].hash, 0, false)
+	}
+	if len(m.GetCollisionChain()) > 0 {
+		t.Error("冲突链获取不正确")
+	}
 }
 
 {{ end }}
