@@ -157,8 +157,8 @@ func (m *U128IDMap) GetCollisionChain() []byte {
 	return chain
 }
 
-func (m *U128IDMap) SetCollisionChainDebugThreshold(t uint32) {
-	atomic.StoreUint32(&m.collisionChainDebugThreshold, t)
+func (m *U128IDMap) SetCollisionChainDebugThreshold(t int) {
+	atomic.StoreUint32(&m.collisionChainDebugThreshold, uint32(t))
 }
 
 // 第一个返回值表示value，第二个返回值表示是否进行了Add。若key已存在，指定overwrite=true可覆写value。
