@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path"
 	"strings"
@@ -125,24 +126,28 @@ func applyBackendChange() {
 	logging.SetLevel(level, "")
 }
 
+func getRemoteAddress(remote string) string {
+	if ip := net.ParseIP(remote); ip != nil {
+		// 不带端口的v4/v6地址
+		if ip.To4() != nil {
+			return fmt.Sprintf("%s:%d", remote, datatype.DROPLET_PORT)
+		} else {
+			return fmt.Sprintf("[%s]:%d", remote, datatype.DROPLET_PORT)
+		}
+	} else if !strings.Contains(remote, ":") {
+		// 不带端口的域名
+		return fmt.Sprintf("%s:%d", remote, datatype.DROPLET_PORT)
+	}
+	return remote
+}
+
 func EnableRsyslog(remotes ...string) error {
 	rsyslogBackends = rsyslogBackends[:0]
 	rsyslogWriters = rsyslogWriters[:0]
 	for _, remote := range remotes {
-		if strings.Contains(remote, ".") {
-			// v4 address
-			if !strings.Contains(remote, ":") {
-				remote += fmt.Sprintf(":%d", datatype.DROPLET_PORT)
-			}
-		} else {
-			if !strings.Contains(remote, "]") {
-				remote = fmt.Sprintf("[%s]:%d", remote, datatype.DROPLET_PORT)
-			}
-		}
-
 		// 消息头包括FrameSize和Type，UDP时FrameSize无用
 		header := bytes.NewBuffer([]byte{0, 0, datatype.MESSAGE_TYPE_SYSLOG})
-		ioWriter := NewRsyslogWriter("udp", remote, path.Base(os.Args[0]), header.String())
+		ioWriter := NewRsyslogWriter("udp", getRemoteAddress(remote), path.Base(os.Args[0]), header.String())
 		rsyslogWriters = append(rsyslogWriters, ioWriter)
 
 		backend := logging.NewBackendFormatter(
