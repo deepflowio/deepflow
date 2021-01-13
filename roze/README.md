@@ -9,18 +9,18 @@ Roze是用于接收trident包头统计数据的daemon
 ```
 db                     rp            measurement   tag
 --------------------------------------------------------------------------------------------------------------------
-vtap_flow              rp_1m,rp_1s   main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_group_id,pod_node_id,pod_ns_id,protocol,region_id,subnet_id,tap_type,vtap_id
-vtap_flow_port         rp_1m,rp_1s   main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_group_id,pod_node_id,pod_ns_id,protocol,region_id,server_port,subnet_id,tap_type,vtap_id
-vtap_flow_edge         rp_1m,rp_1s   main          _id,_tid,az_id,az_id_0,az_id_1,host_id,host_id_0,host_id_1,ip,ip_0,ip_1,ip_version,l3_device_id,l3_device_id_0,l3_device_id_1,l3_device_type,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_group_id,pod_group_id_0,pod_group_id_1,pod_node_id,pod_node_id_0,pod_node_id_1,pod_ns_id,pod_ns_id_0,pod_ns_id_1,protocol,region_id,region_id_0,region_id_1,subnet_id,subnet_id_0,subnet_id_1,tag_type,tag_value,tap_side,tap_type,vtap_id
-vtap_flow_edge_port    rp_1m,rp_1s   main          _id,_tid,az_id,az_id_0,az_id_1,group_id,host_id,host_id_0,host_id_1,ip_0,ip_1,ip_version,l3_device_id,l3_device_id_0,l3_device_id_1,l3_device_type,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_group_id,pod_group_id_0,pod_group_id_1,pod_node_id,pod_node_id_0,pod_node_id_1,pod_ns_id_0,pod_ns_id_1,protocol,region_id,region_id_0,region_id_1,server_port,subnet_id,subnet_id_0,subnet_id_1,tap_side,tap_type,vtap_id
+vtap_flow              rp_1m,rp_1s   main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_cluster_id,pod_group_id,pod_id,pod_node_id,pod_ns_id,protocol,region_id,subnet_id,tap_type,vtap_id
+vtap_flow_port         rp_1m,rp_1s   main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_cluster_id,pod_group_id,pod_id,pod_node_id,pod_ns_id,protocol,region_id,server_port,subnet_id,tap_type,vtap_id
+vtap_flow_edge         rp_1m,rp_1s   main          _id,_tid,az_id_0,az_id_1,host_id_0,host_id_1,ip_0,ip_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_cluster_id_0,pod_cluster_id_1,pod_group_id_0,pod_group_id_1,pod_id_0,pod_id_1,pod_node_id_0,pod_node_id_1,pod_ns_id_0,pod_ns_id_1,protocol,region_id_0,region_id_1,subnet_id_0,subnet_id_1,tap_side,tap_type,vtap_id
+vtap_flow_edge_port    rp_1m,rp_1s   main          _id,_tid,az_id_0,az_id_1,host_id_0,host_id_1,ip_0,ip_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_cluster_id_0,pod_cluster_id_1,pod_group_id_0,pod_group_id_1,pod_id_0,pod_id_1,pod_node_id_0,pod_node_id_1,pod_ns_id_0,pod_ns_id_1,protocol,region_id_0,region_id_1,server_port,subnet_id_0,subnet_id_1,tap_side,tap_type,vtap_id
 
 vtap_acl               rp_1m         main          _id,_tid,acl_gid,tag_type,tag_value,vtap_id
 
-vtap_wan               rp_1m         main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_group_id,pod_node_id,pod_ns_id,protocol,region_id,subnet_id,tag_type,tag_value,tap_type,vtap_id
-vtap_wan_port          rp_1m         main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_group_id,pod_node_id,pod_ns_id,protocol,region_id,server_port,subnet_id,tag_type,tag_value,tap_type,vtap_id
+vtap_wan               rp_1m         main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_cluster_id,pod_group_id,pod_id,pod_node_id,pod_ns_id,protocol,region_id,subnet_id,tag_type,tag_value,tap_type,vtap_id
+vtap_wan_port          rp_1m         main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_cluster_id,pod_group_id,pod_id,pod_node_id,pod_ns_id,protocol,region_id,server_port,subnet_id,tag_type,tag_value,tap_type,vtap_id
 
-vtap_packet            rp_1m,rp_1s   main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_group_id,pod_node_id,pod_ns_id,region_id,subnet_id,tag_type,tag_value,tap_type,vtap_id
-vtap_packet_edge       rp_1m,rp_1s   main          _id,_tid,az_id,az_id_0,az_id_1,group_id_0,group_id_1,host_id,host_id_0,host_id_1,ip,ip_0,ip_1,ip_version,l3_device_id,l3_device_id_0,l3_device_id_1,l3_device_type,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_group_id,pod_group_id_0,pod_group_id_1,pod_node_id,pod_node_id_0,pod_node_id_1,pod_ns_id_0,pod_ns_id_1,protocol,region_id,region_id_0,region_id_1,subnet_id,subnet_id_0,subnet_id_1,tag_type,tag_value,tap_side,tap_type,vtap_id
+vtap_packet            rp_1m,rp_1s   main          _id,_tid,az_id,direction,host_id,ip,ip_version,l3_device_id,l3_device_type,l3_epc_id,pod_cluster_id,pod_group_id,pod_id,pod_node_id,pod_ns_id,region_id,subnet_id,tag_type,tag_value,tap_type,vtap_id
+vtap_packet_edge       rp_1m,rp_1s   main          _id,_tid,az_id_0,az_id_1,host_id_0,host_id_1,ip_0,ip_1,ip_version,l3_device_id_0,l3_device_id_1,l3_device_type_0,l3_device_type_1,l3_epc_id_0,l3_epc_id_1,pod_cluster_id_0,pod_cluster_id_1,pod_group_id_0,pod_group_id_1,pod_id_0,pod_id_1,pod_node_id_0,pod_node_id_1,pod_ns_id_0,pod_ns_id_1,region_id_0,region_id_1,subnet_id_0,subnet_id_1,tag_type,tag_value,tap_side,tap_type,vtap_id
 ```
 
 `注意：所有双端（带edge的数据库）中tx、rx均是以客户端为视角的统计量`
@@ -70,6 +70,10 @@ vtap_packet_edge       rp_1m,rp_1s   main          _id,_tid,az_id,az_id_0,az_id_
 | pod_group_id_1    | 26   | ip_1对应的容器组ID      | 非负整数     | 0表示没找到                           |
 | pod_ns_id_0       | 26   | ip_0对应的容器命名空间ID| 非负整数     | 0表示没找到                           |
 | pod_ns_id_1       | 26   | ip_1对应的容器命名空间ID| 非负整数     | 0表示没找到                           |
+| pod_id_0          | 26   | ip_1对应的容器ID        | 非负整数     | 0表示没找到                           |
+| pod_id_1          | 26   | ip_1对应的容器ID        | 非负整数     | 0表示没找到                           |
+| pod_cluster_id_0  | 26   | ip_1对应的容器集群ID    | 非负整数     | 0表示没找到                           |
+| pod_cluster_id_1  | 26   | ip_1对应的容器集群ID    | 非负整数     | 0表示没找到                           |
 | host_id_0         | 27   | ip_0对应的宿主机ID      | 非负整数     | 0表示没找到                           |
 | host_id_1         | 27   | ip_1对应的宿主机ID      | 非负整数     | 0表示没找到                           |
 | az_id_0           | 28   | ip_0对应的可用区ID      | 非负整数     | 0表示没找到                           |
@@ -93,6 +97,8 @@ vtap_packet_edge       rp_1m,rp_1s   main          _id,_tid,az_id,az_id_0,az_id_
 | pod_node_id       | 45   | ip对应的容器节点ID      | 非负整数     | 0表示没找到                           |
 | pod_group_id      | 45   | ip对应的容器组ID        | 非负整数     | 0表示没找到                           |
 | pod_ns_id         | 45   | ip对应的容器命名空间ID  | 非负整数     | 0表示没找到                           |
+| pod_id            | 26   | ip对应的容器ID          | 非负整数     | 0表示没找到                           |
+| pod_cluster_id    | 26   | ip对应的容器集群ID      | 非负整数     | 0表示没找到                           |
 | az_id             | 46   | ip对应的可用区ID        | 非负整数     | 0表示没找到                           |
 |                   |      |                         |              |                                       |
 | CODE_INDEX        | 48-53| 不能使用                | N/A          | 用于droplet/roze/zero标识Code的Index  |
@@ -135,6 +141,9 @@ vtap_packet_edge       rp_1m,rp_1s   main          _id,_tid,az_id,az_id_0,az_id_
 | byte                  | 累计总字节数                          | 1m, 1s       | 字节 |
 | l3_byte_tx            | 累计发送网络层负载总字节数            | 1m, 1s       | 字节 |
 | l3_byte_rx            | 累计接收网络层负载总字节数            | 1m, 1s       | 字节 |
+| l4_byte_tx            | 累计发送四层负载总字节数              | 1m, 1s       | 字节 |
+| l4_byte_rx            | 累计接收四层负载总字节数              | 1m, 1s       | 字节 |
+| flow                  | 累计连接数                            | 1m, 1s       | 个   |
 | flow_load             | 累计并发连接数                        | 1m, 1s       | 个   |
 | new_flow              | 累计新建连接数，以flow.start_time为准 | 1m, 1s       | 个   |
 | closed_flow           | 累计关闭连接数，以flow.start_time为准 | 1m, 1s       | 个   |
@@ -214,6 +223,8 @@ vtap_packet_edge       rp_1m,rp_1s   main          _id,_tid,az_id,az_id_0,az_id_
 | byte                  | 累计总字节数                          | 1m           | 字节 |
 | l3_byte_tx            | 累计发送网络层负载总字节数            | 1m, 1s       | 字节 |
 | l3_byte_rx            | 累计接收网络层负载总字节数            | 1m, 1s       | 字节 |
+| l4_byte_tx            | 累计发送四层负载总字节数              | 1m, 1s       | 字节 |
+| l4_byte_rx            | 累计接收四层负载总字节数              | 1m, 1s       | 字节 |
 
 ## 4.2 关于cast_type
 
