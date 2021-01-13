@@ -49,7 +49,7 @@ type HTTPLogger struct {
 
 	// 指标量
 	ContentLength int64  `json:"content_length"`
-	Duration      uint64 `json:"duration"` // us
+	Duration      uint64 `json:"duration,omitempty"` // us
 }
 
 func (h *HTTPLogger) Fill(l *datatype.AppProtoLogsData) {
@@ -95,7 +95,7 @@ type DNSLogger struct {
 	AnswerAddr string `json:"answer_addr,omitempty"`
 
 	// 指标量
-	Duration uint64 `json:"duration"` // us
+	Duration uint64 `json:"duration,omitempty"` // us
 }
 
 func (d *DNSLogger) Fill(l *datatype.AppProtoLogsData) {
