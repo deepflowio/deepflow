@@ -176,7 +176,7 @@ type FlowKey struct {
 type TunnelField struct {
 	TxIP0, TxIP1 IPv4Int // 对应发送方向的源目的隧道IP
 	RxIP0, RxIP1 IPv4Int // 对应接收方向的源目的隧道IP
-	Id           uint32
+	TxId, RxId   uint32
 	Type         TunnelType
 	Tier         uint8
 }
@@ -186,7 +186,8 @@ func (f *TunnelField) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU32(f.TxIP1)
 	encoder.WriteU32(f.RxIP0)
 	encoder.WriteU32(f.RxIP1)
-	encoder.WriteU32(f.Id)
+	encoder.WriteU32(f.TxId)
+	encoder.WriteU32(f.RxId)
 	encoder.WriteU8(uint8(f.Type))
 	encoder.WriteU8(f.Tier)
 }
@@ -196,14 +197,18 @@ func (f *TunnelField) Decode(decoder *codec.SimpleDecoder) {
 	f.TxIP1 = decoder.ReadU32()
 	f.RxIP0 = decoder.ReadU32()
 	f.RxIP1 = decoder.ReadU32()
-	f.Id = decoder.ReadU32()
+	f.TxId = decoder.ReadU32()
+	f.RxId = decoder.ReadU32()
 	f.Type = TunnelType(decoder.ReadU8())
 	f.Tier = decoder.ReadU8()
 }
 
 func (t *TunnelField) String() string {
-	return fmt.Sprintf("type: %s, id: %d, tier: %d, tx_ip_0: %s, tx_ip_1: %s, rx_ip_0: %s, rx_ip_1: %s ",
-		t.Type, t.Id, t.Tier,
+	if t.Type == TUNNEL_TYPE_NONE {
+		return "none "
+	}
+	return fmt.Sprintf("type: %s, tx_id: %d, rx_id: %d, tier: %d, tx_ip_0: %s, tx_ip_1: %s, rx_ip_0: %s, rx_ip_1: %s ",
+		t.Type, t.TxId, t.RxId, t.Tier,
 		IpFromUint32(t.TxIP0), IpFromUint32(t.TxIP1),
 		IpFromUint32(t.RxIP0), IpFromUint32(t.RxIP1))
 }
@@ -470,6 +475,7 @@ func (f *FlowMetricsPeer) Decode(decoder *codec.SimpleDecoder) {
 func (f *Flow) Reverse() {
 	f.Reversed = !f.Reversed
 	f.Tunnel.TxIP0, f.Tunnel.TxIP1, f.Tunnel.RxIP0, f.Tunnel.RxIP1 = f.Tunnel.RxIP0, f.Tunnel.RxIP1, f.Tunnel.TxIP0, f.Tunnel.TxIP1
+	f.Tunnel.TxId, f.Tunnel.RxId = f.Tunnel.RxId, f.Tunnel.TxId
 	f.MACSrc, f.MACDst = f.MACDst, f.MACSrc
 	f.IPSrc, f.IPDst = f.IPDst, f.IPSrc
 	f.IP6Src, f.IP6Dst = f.IP6Dst, f.IP6Src

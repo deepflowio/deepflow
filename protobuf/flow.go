@@ -44,12 +44,13 @@ func MarshalFlow(f *datatype.TaggedFlow, bytes *utils.ByteBuffer) error {
 		TcpFlags_0: proto.Uint32(uint32(flowMetricsPeerSrc.TCPFlags)),
 		TcpFlags_1: proto.Uint32(uint32(flowMetricsPeerDst.TCPFlags)),
 		// Tunnel
-		TunId:     proto.Uint64(uint64(f.Tunnel.Id)),
+		TunTxId:   proto.Uint32(f.Tunnel.TxId),
 		TunTxIp_0: proto.Uint32(f.Tunnel.TxIP0),
 		TunTxIp_1: proto.Uint32(f.Tunnel.TxIP1),
+		TunRxId:   proto.Uint32(f.Tunnel.RxId),
 		TunRxIp_0: proto.Uint32(f.Tunnel.RxIP0),
 		TunRxIp_1: proto.Uint32(f.Tunnel.RxIP1),
-		TunType:   proto.Uint64(uint64(f.Tunnel.Type)),
+		TunType:   proto.Uint32(uint32(f.Tunnel.Type)),
 		TunTier:   proto.Uint32(uint32(f.Tunnel.Tier)),
 		// Packet Counters
 		ByteCnt_0:      proto.Uint64(flowMetricsPeerSrc.ByteCount),
