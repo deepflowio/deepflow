@@ -47,7 +47,8 @@ type NetworkLayer struct {
 	Protocol    uint16   `json:"protocol"`
 	TunnelTier  uint8    `json:"tunnel_tier,omitempty"`
 	TunnelType  uint16   `json:"tunnel_type,omitempty"`
-	TunnelID    uint32   `json:"tunnel_id,omitempty"`
+	TunnelTxID  uint32   `json:"tunnel_tx_id,omitempty"`
+	TunnelRxID  uint32   `json:"tunnel_rx_id,omitempty"`
 	TunnelTxIP0 string   `json:"tunnel_tx_ip_0,omitempty"`
 	TunnelTxIP1 string   `json:"tunnel_tx_ip_1,omitempty"`
 	TunnelRxIP0 string   `json:"tunnel_rx_ip_0,omitempty"`
@@ -257,9 +258,10 @@ func (n *NetworkLayer) Fill(f *datatype.TaggedFlow, isIPV6 bool) {
 	}
 
 	n.Protocol = uint16(f.Proto)
-	if f.Tunnel.Id != 0 {
+	if f.Tunnel.TxId != 0 || f.Tunnel.RxId != 0 {
 		n.TunnelTier = f.Tunnel.Tier
-		n.TunnelID = f.Tunnel.Id
+		n.TunnelTxID = f.Tunnel.TxId
+		n.TunnelRxID = f.Tunnel.RxId
 		n.TunnelType = uint16(f.Tunnel.Type)
 		n.TunnelTxIP0 = IPIntToString(f.Tunnel.TxIP0)
 		n.TunnelTxIP1 = IPIntToString(f.Tunnel.TxIP1)
