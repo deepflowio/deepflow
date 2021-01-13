@@ -101,10 +101,10 @@ message Flow {
     optional uint32 tcp_flags_1 = 55 [default = 0];
 
     /* Tunnel */
-    optional uint64 tun_tx_id = 61 [default = 0];      /* Tunnel index where the flow is encapped, i.e., vl2_id */
+    optional uint32 tun_tx_id = 61 [default = 0];      /* Tunnel index where the flow is encapped, i.e., vl2_id */
     optional uint32 tun_tx_ip_0 = 62 [default = 0];  /* Tunnel source vtep IP where the flow is encapped */
     optional uint32 tun_tx_ip_1 = 63 [default = 0];  /* Tunnel destination vtep IP where the flow is encapped */
-    optional uint64 tun_type = 64 [default = 0];    /* Tunnel type where the flow is encapped,
+    optional uint32 tun_type = 64 [default = 0];    /* Tunnel type where the flow is encapped,
                                                        1=VXLAN, 2=NVGRE, 3=GENEVE */
     optional uint32 tun_rx_ip_0 = 65 [default = 0];
     optional uint32 tun_rx_ip_1 = 66 [default = 0];
