@@ -13,7 +13,8 @@ func TestTaggedFlowEncodeDecode(t *testing.T) {
 		TxIP1: 200,
 		RxIP0: 200,
 		RxIP1: 300,
-		Id:    102,
+		TxId:  102,
+		RxId:  102,
 		Type:  TUNNEL_TYPE_VXLAN,
 	}
 
