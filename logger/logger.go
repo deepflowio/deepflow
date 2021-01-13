@@ -129,8 +129,15 @@ func EnableRsyslog(remotes ...string) error {
 	rsyslogBackends = rsyslogBackends[:0]
 	rsyslogWriters = rsyslogWriters[:0]
 	for _, remote := range remotes {
-		if !strings.Contains(remote, ":") {
-			remote += fmt.Sprintf(":%d", datatype.DROPLET_PORT)
+		if strings.Contains(remote, ".") {
+			// v4 address
+			if !strings.Contains(remote, ":") {
+				remote += fmt.Sprintf(":%d", datatype.DROPLET_PORT)
+			}
+		} else {
+			if !strings.Contains(remote, "]") {
+				remote = fmt.Sprintf("[%s]:%d", remote, datatype.DROPLET_PORT)
+			}
 		}
 
 		// 消息头包括FrameSize和Type，UDP时FrameSize无用
