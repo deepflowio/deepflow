@@ -285,8 +285,8 @@ func (m *U64LRU) GetCollisionChain() []byte {
 	return chain
 }
 
-func (m *U64LRU) SetCollisionChainDebugThreshold(t uint32) {
-	atomic.StoreUint32(&m.collisionChainDebugThreshold, t)
+func (m *U64LRU) SetCollisionChainDebugThreshold(t int) {
+	atomic.StoreUint32(&m.collisionChainDebugThreshold, uint32(t))
 }
 
 func (m *U64LRU) Get(key uint64, peek bool) (interface{}, bool) {
