@@ -29,6 +29,7 @@ const (
 	DROP_DETECT_WINDOW_SIZE   = 1024
 	QUEUE_BATCH_NUM           = 16
 	LOG_INTERVAL              = 3
+	RECORD_STATUS_TIMEOUT     = 30 // 每30秒记录下trident的活跃信息，platformData模块每分钟会上报trisolaris
 )
 
 var log = logging.MustGetLogger("receiver")
@@ -99,15 +100,187 @@ func (s ServerType) String() string {
 }
 
 type Status struct {
+	msgType              uint8
 	VTAPID               uint16
 	serverType           ServerType
 	ip                   net.IP
-	firstSeq             uint64
 	lastSeq              uint64
-	firstRemoteTimestamp uint32 // 第一次收到数据时数据中的时间戳
-	firstLocalTimestamp  uint32 // 第一次收到数据时的本地时间
 	lastRemoteTimestamp  uint32 // 最后一次收到数据时数据中的时间戳
 	LastLocalTimestamp   uint32 // 最后一次收到数据时的本地时间
+	firstSeq             uint64
+	firstRemoteTimestamp uint32 // 第一次收到数据时数据中的时间戳
+	firstLocalTimestamp  uint32 // 第一次收到数据时的本地时间
+}
+
+func NewStatus(now uint32, msgType uint8, vtapID uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) *Status {
+	return &Status{
+		msgType:              msgType,
+		serverType:           serverType,
+		VTAPID:               vtapID,
+		ip:                   ip,
+		lastSeq:              seq,
+		lastRemoteTimestamp:  timestamp,
+		LastLocalTimestamp:   now,
+		firstSeq:             seq,
+		firstRemoteTimestamp: timestamp,
+		firstLocalTimestamp:  now,
+	}
+}
+
+func (s *Status) update(now uint32, msgType uint8, vtapID uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) {
+	s.msgType = msgType
+	s.VTAPID = vtapID
+	s.ip = ip
+	s.lastSeq = seq
+	s.lastRemoteTimestamp = timestamp
+	s.LastLocalTimestamp = now
+	s.serverType = serverType
+}
+
+type AdapterStatus struct {
+	lastUDPUpdate   uint32 // 记录更新时间
+	lastTCPUpdate   uint32
+	UDPMetrisStatus []*Status // 定期获取trident遥测数据的活跃信息,上报trisolaris
+	TCPMetrisStatus []*Status
+	UDPStatusLocks  [datatype.MESSAGE_TYPE_MAX]sync.Mutex
+	TCPStatusLocks  [datatype.MESSAGE_TYPE_MAX]sync.RWMutex
+	UDPStatusFlow   [datatype.MESSAGE_TYPE_MAX]map[uint16]*Status
+	TCPStatusFlow   [datatype.MESSAGE_TYPE_MAX]map[uint16]*Status // vtapID非0, 使用vtapID作为key: 遥测数据，l4流日志数据，l7-http-dns流日志数据
+	UDPStatusOthers [datatype.MESSAGE_TYPE_MAX]map[string]*Status
+	TCPStatusOthers [datatype.MESSAGE_TYPE_MAX]map[string]*Status // vtapID为0, 使用IP作为key: pcap数据，系统日志数据，statd统计数据
+}
+
+func (s *AdapterStatus) init() {
+	for i := 0; i < datatype.MESSAGE_TYPE_MAX; i++ {
+		s.TCPStatusFlow[i] = make(map[uint16]*Status)
+		s.UDPStatusFlow[i] = make(map[uint16]*Status)
+		s.TCPStatusOthers[i] = make(map[string]*Status)
+		s.UDPStatusOthers[i] = make(map[string]*Status)
+	}
+}
+
+func (s *AdapterStatus) Update(now uint32, msgType uint8, vtapID uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) {
+	if serverType == UDP { // UDP大部分时间无锁，只有在更新map时加锁, 防止调试命令读取时可能导致异常
+		if vtapID != 0 {
+			if status, ok := s.UDPStatusFlow[msgType][vtapID]; ok {
+				status.update(now, msgType, vtapID, ip, seq, timestamp, serverType)
+			} else {
+				s.UDPStatusLocks[msgType].Lock()
+				s.UDPStatusFlow[msgType][vtapID] = NewStatus(now, msgType, vtapID, ip, seq, timestamp, serverType)
+				s.UDPStatusLocks[msgType].Unlock()
+			}
+		} else {
+			if status, ok := s.UDPStatusOthers[msgType][ip.String()]; ok {
+				status.update(now, msgType, vtapID, ip, seq, timestamp, serverType)
+			} else {
+				s.UDPStatusLocks[msgType].Lock()
+				s.UDPStatusOthers[msgType][ip.String()] = NewStatus(now, msgType, vtapID, ip, seq, timestamp, serverType)
+				s.UDPStatusLocks[msgType].Unlock()
+			}
+		}
+		// 定期获取trident活跃信息，上报trisolaris
+		if now-s.lastUDPUpdate > RECORD_STATUS_TIMEOUT {
+			s.lastUDPUpdate = now
+			UDPStatus := make([]*Status, 0, len(s.UDPStatusFlow))
+			for _, status := range s.UDPStatusFlow[datatype.MESSAGE_TYPE_METRICS] {
+				UDPStatus = append(UDPStatus, status)
+			}
+			s.UDPMetrisStatus = UDPStatus
+		}
+
+	} else { // TCP有锁,主要是读锁，但并行处理，基本不影响接收性能
+		if vtapID != 0 {
+			s.TCPStatusLocks[msgType].RLock()
+			status, ok := s.TCPStatusFlow[msgType][vtapID]
+			s.TCPStatusLocks[msgType].RUnlock()
+			if ok {
+				status.update(now, msgType, vtapID, ip, seq, timestamp, serverType)
+			} else {
+				newStatus := NewStatus(now, msgType, vtapID, ip, seq, timestamp, serverType)
+				s.TCPStatusLocks[msgType].Lock()
+				s.TCPStatusFlow[msgType][vtapID] = newStatus
+				s.TCPStatusLocks[msgType].Unlock()
+			}
+
+		} else {
+			s.TCPStatusLocks[msgType].RLock()
+			status, ok := s.TCPStatusOthers[msgType][ip.String()]
+			s.TCPStatusLocks[msgType].RUnlock()
+			if ok {
+				status.update(now, msgType, vtapID, ip, seq, timestamp, serverType)
+			} else {
+				newStatus := NewStatus(now, msgType, vtapID, ip, seq, timestamp, serverType)
+				s.TCPStatusLocks[msgType].Lock()
+				s.TCPStatusOthers[msgType][ip.String()] = newStatus
+				s.TCPStatusLocks[msgType].Unlock()
+			}
+		}
+		// 定期获取trident活跃信息，上报trisolaris
+		if now-s.lastTCPUpdate > RECORD_STATUS_TIMEOUT {
+			s.lastTCPUpdate = now
+			TCPStatus := make([]*Status, 0, len(s.UDPStatusFlow))
+			s.TCPStatusLocks[datatype.MESSAGE_TYPE_METRICS].Lock()
+			for _, status := range s.UDPStatusFlow[datatype.MESSAGE_TYPE_METRICS] {
+				TCPStatus = append(TCPStatus, status)
+			}
+			s.TCPStatusLocks[datatype.MESSAGE_TYPE_METRICS].Unlock()
+			s.TCPMetrisStatus = TCPStatus
+		}
+	}
+}
+
+func (s *AdapterStatus) GetStatus(msgType int) string {
+	if msgType == datatype.MESSAGE_TYPE_METRICS ||
+		msgType == datatype.MESSAGE_TYPE_TAGGEDFLOW ||
+		msgType == datatype.MESSAGE_TYPE_PROTOCOLLOG {
+		UDPStatus := s.UDPStatusFlow[msgType]
+		TCPStatus := s.TCPStatusFlow[msgType]
+		allStatus := make([]*Status, 0, len(UDPStatus)+len(TCPStatus))
+		s.UDPStatusLocks[msgType].Lock()
+		for _, instance := range UDPStatus {
+			allStatus = append(allStatus, instance)
+		}
+		s.UDPStatusLocks[msgType].Unlock()
+		s.TCPStatusLocks[msgType].RLock()
+		for _, instance := range TCPStatus {
+			allStatus = append(allStatus, instance)
+		}
+		s.TCPStatusLocks[msgType].RUnlock()
+		status := fmt.Sprintf("MsgType VTAPID TridentIP                                Type LastSeq  LastRemoteTimestamp LastLocalTimestamp  LastDelay LastRecvFromNow FirstSeq FirstRemoteTimestamp FirstLocalTimestamp\n")
+		status += fmt.Sprintf("------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
+		for _, instance := range allStatus {
+			status += fmt.Sprintf("%-7s %-6d %-40s %-4s %-8d %-19.19s %-19.19s %-9d %-15d %-8d %-19.19s  %-19.19s\n",
+				datatype.MessageTypeString[int(instance.msgType)], instance.VTAPID, instance.ip, instance.serverType,
+				instance.lastSeq, time.Unix(int64(instance.lastRemoteTimestamp), 0), time.Unix(int64(instance.LastLocalTimestamp), 0),
+				instance.LastLocalTimestamp-instance.lastRemoteTimestamp, uint32(time.Now().Unix())-instance.LastLocalTimestamp,
+				instance.firstSeq, time.Unix(int64(instance.firstRemoteTimestamp), 0), time.Unix(int64(instance.firstLocalTimestamp), 0))
+		}
+		return status
+	}
+
+	UDPStatus := s.UDPStatusOthers[msgType]
+	TCPStatus := s.TCPStatusOthers[msgType]
+	allStatus := make([]*Status, 0, len(UDPStatus)+len(TCPStatus))
+	s.UDPStatusLocks[msgType].Lock()
+	for _, instance := range UDPStatus {
+		allStatus = append(allStatus, instance)
+	}
+	s.UDPStatusLocks[msgType].Unlock()
+	s.TCPStatusLocks[msgType].RLock()
+	for _, instance := range TCPStatus {
+		allStatus = append(allStatus, instance)
+	}
+	s.TCPStatusLocks[msgType].RUnlock()
+	status := fmt.Sprintf("MsgType TridentIP                                Type LastLocalTimestamp LastRecvFromNow FirstLocalTimestamp\n")
+	status += fmt.Sprintf("-----------------------------------------------------------------------------------------------------\n")
+	for _, instance := range allStatus {
+		status += fmt.Sprintf("%-7s %-40s %-4s %-19.19s %-15d %-19.19s\n",
+			datatype.MessageTypeString[int(instance.msgType)], instance.ip, instance.serverType,
+			time.Unix(int64(instance.LastLocalTimestamp), 0),
+			uint32(time.Now().Unix())-instance.LastLocalTimestamp,
+			time.Unix(int64(instance.firstLocalTimestamp), 0))
+	}
+	return status
 }
 
 type Handler struct {
@@ -140,8 +313,7 @@ type Receiver struct {
 
 	counter *ReceiverCounter
 
-	statusLock sync.Mutex
-	status     map[uint16]*Status
+	status *AdapterStatus
 }
 
 type ReceiverCounter struct {
@@ -164,11 +336,13 @@ func NewReceiver(
 		UDPAddress:    &net.UDPAddr{Port: listenPort},
 		UDPReadBuffer: UDPReadBuffer,
 		TCPAddress:    fmt.Sprintf("0.0.0.0:%d", listenPort),
+		timeNow:       time.Now().Unix(),
 		counter:       &ReceiverCounter{},
-		status:        make(map[uint16]*Status),
+		status:        &AdapterStatus{},
 	}
+	receiver.status.init()
 
-	debug.Register(TRIDENT_ADAPTER_STATUS_CMD, receiver)
+	debug.ServerRegisterSimple(TRIDENT_ADAPTER_STATUS_CMD, receiver)
 	receiver.DropDetection.Init("receiver", DROP_DETECT_WINDOW_SIZE)
 	go receiver.timeNowTicker()
 	return receiver
@@ -192,6 +366,21 @@ func (r *Receiver) RegistHandler(msgType uint8, outQueues queue.MultiQueueWriter
 	return nil
 }
 
+func (r *Receiver) HandleSimpleCommand(op uint16, arg string) string {
+	if op < datatype.MESSAGE_TYPE_MAX {
+		return r.status.GetStatus(int(op))
+	}
+	if op == datatype.MESSAGE_TYPE_MAX { // 兼容原来的status参数
+		return r.status.GetStatus(datatype.MESSAGE_TYPE_METRICS)
+	}
+	ret := ""
+	for i := 0; i < datatype.MESSAGE_TYPE_MAX; i++ {
+		ret += r.status.GetStatus(i)
+		ret += "\n"
+	}
+	return ret
+}
+
 func (r *Receiver) SetServerType(serverType ServerType) {
 	r.serverType = serverType
 }
@@ -205,6 +394,16 @@ func (r *Receiver) GetCounter() interface{} {
 	counter.UDPDisorder = dropCounter.Disorder
 	counter.UDPDisorderSize = dropCounter.DisorderSize
 	return counter
+}
+
+func (r *Receiver) updateCounter(metriTimestamp uint32) {
+	delay := r.timeNow - int64(metriTimestamp)
+	if r.counter.MaxDelay < delay {
+		r.counter.MaxDelay = delay
+	}
+	if r.counter.MinDelay > delay {
+		r.counter.MinDelay = delay
+	}
 }
 
 func (r *Receiver) timeNowTicker() {
@@ -293,48 +492,41 @@ func (r *Receiver) flushPutTCPQueues() {
 	r.lastTCPFlushTime = r.timeNow
 }
 
-func (r *Receiver) tridentStatus(vtapID uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) {
-	now := uint32(time.Now().Unix())
-	delay := int64(now) - int64(timestamp)
-	if r.counter.MaxDelay < delay {
-		r.counter.MaxDelay = delay
-	}
-	if r.counter.MinDelay > delay {
-		r.counter.MinDelay = delay
-	}
-	r.statusLock.Lock()
-	if status, ok := r.status[vtapID]; ok {
-		r.statusLock.Unlock()
-		status.VTAPID = vtapID
-		status.ip = ip
-		status.lastSeq = seq
-		status.lastRemoteTimestamp = timestamp
-		status.LastLocalTimestamp = now
-		status.serverType = serverType
-	} else {
-		r.status[vtapID] = &Status{
-			serverType:           serverType,
-			VTAPID:               vtapID,
-			ip:                   ip,
-			lastSeq:              seq,
-			lastRemoteTimestamp:  timestamp,
-			LastLocalTimestamp:   now,
-			firstSeq:             seq,
-			firstRemoteTimestamp: timestamp,
-			firstLocalTimestamp:  now,
-		}
-		r.statusLock.Unlock()
-	}
-}
-
 // 用来上报trisolaris, trident最后的活跃时间
 func (r *Receiver) GetTridentStatus() []*Status {
-	r.statusLock.Lock()
-	status := make([]*Status, 0, len(r.status))
-	for _, s := range r.status {
-		status = append(status, s)
+	UDPStatus, TCPStatus := r.status.UDPMetrisStatus, r.status.TCPMetrisStatus
+	status := make([]*Status, 0, len(UDPStatus)+len(TCPStatus))
+	for _, us := range UDPStatus {
+		find := false
+		for _, ts := range TCPStatus {
+			if us.VTAPID == ts.VTAPID {
+				find = true
+				if us.lastRemoteTimestamp > ts.lastRemoteTimestamp {
+					status = append(status, us)
+				} else {
+					status = append(status, ts)
+				}
+				break
+			}
+		}
+		if !find {
+			status = append(status, us)
+		}
 	}
-	r.statusLock.Unlock()
+
+	for _, ts := range TCPStatus {
+		find := false
+		for _, us := range UDPStatus {
+			if ts.VTAPID == us.VTAPID {
+				find = true
+				break
+			}
+		}
+		if !find {
+			status = append(status, ts)
+		}
+	}
+
 	return status
 }
 
@@ -415,6 +607,7 @@ func (r *Receiver) ProcessUDPServer() {
 		}
 
 		headerLen := datatype.MESSAGE_HEADER_LEN
+		metricsTimestamp, vtapID, sequence := uint32(0), uint16(0), uint64(0)
 		// 对Metrics和TaggedFlow,AppProtoLogData处理
 		if baseHeader.Type == datatype.MESSAGE_TYPE_METRICS ||
 			baseHeader.Type == datatype.MESSAGE_TYPE_TAGGEDFLOW ||
@@ -428,14 +621,15 @@ func (r *Receiver) ProcessUDPServer() {
 				continue
 			}
 
+			vtapID = flowHeader.VTAPID
+			sequence = flowHeader.Sequence
 			if baseHeader.Type == datatype.MESSAGE_TYPE_METRICS {
-				timestamp := r.getMetricsTimestamp(recvBuffer.Buffer[headerLen:])
-				ipHash := getIpHash(remoteAddr.IP)
-				r.DropDetection.Detect(ipHash, flowHeader.Sequence, timestamp)
-				r.tridentStatus(flowHeader.VTAPID, remoteAddr.IP, flowHeader.Sequence, timestamp, UDP)
+				metricsTimestamp = r.getMetricsTimestamp(recvBuffer.Buffer[headerLen:])
+				r.updateCounter(metricsTimestamp)
+				r.DropDetection.Detect(getIpHash(remoteAddr.IP), flowHeader.Sequence, metricsTimestamp)
 			}
 		}
-		atomic.AddUint64(&r.counter.RxPackets, 1)
+		r.status.Update(uint32(r.timeNow), baseHeader.Type, vtapID, remoteAddr.IP, sequence, metricsTimestamp, UDP)
 
 		recvBuffer.Begin = headerLen
 		recvBuffer.End = size // syslog,statsd数据的FrameSize长度是0,需要以实际长度为准
@@ -532,6 +726,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 		}
 
 		headerLen := datatype.MESSAGE_HEADER_LEN
+		metricsTimestamp, vtapID, sequence := uint32(0), uint16(0), uint64(0)
 		// 对metrics和TaggedFlow处理
 		if baseHeader.Type == datatype.MESSAGE_TYPE_METRICS ||
 			baseHeader.Type == datatype.MESSAGE_TYPE_TAGGEDFLOW ||
@@ -549,6 +744,8 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 				log.Warningf("recv from %s, %s", conn.RemoteAddr().String(), err)
 				return
 			}
+			vtapID = flowHeader.VTAPID
+			sequence = flowHeader.Sequence
 		}
 
 		recvBuffer := AcquireRecvBuffer()
@@ -560,13 +757,12 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 		}
 
 		if baseHeader.Type == datatype.MESSAGE_TYPE_METRICS {
-			r.tridentStatus(flowHeader.VTAPID, ip,
-				flowHeader.Sequence,
-				r.getMetricsTimestamp(recvBuffer.Buffer),
-				TCP)
+			metricsTimestamp = r.getMetricsTimestamp(recvBuffer.Buffer)
+			r.updateCounter(metricsTimestamp)
 		}
-
+		r.status.Update(uint32(r.timeNow), baseHeader.Type, vtapID, ip, sequence, metricsTimestamp, TCP)
 		atomic.AddUint64(&r.counter.RxPackets, 1)
+
 		recvBuffer.Begin = 0
 		recvBuffer.End = int(baseHeader.FrameSize) - headerLen
 		recvBuffer.IP = ip

@@ -22,6 +22,15 @@ const (
 	MESSAGE_TYPE_MAX
 )
 
+var MessageTypeString = [MESSAGE_TYPE_MAX]string{
+	"pcap",
+	"syslog",
+	"statsd",
+	"metrics",
+	"l4_log",
+	"l7_log",
+}
+
 const (
 	DROPLET_PORT = 20033
 )
