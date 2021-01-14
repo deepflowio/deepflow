@@ -59,6 +59,7 @@ func ClientRegisterSimple(moduleId ModuleId, module CmdHelper, operates []CmdHel
 	}
 
 	for i, operate := range operates {
+		op := i
 		sub := &cobra.Command{
 			Use:   operate.Cmd,
 			Short: operate.Helper,
@@ -67,7 +68,7 @@ func ClientRegisterSimple(moduleId ModuleId, module CmdHelper, operates []CmdHel
 				if len(args) > 0 {
 					arg = args[0]
 				}
-				result, err := CommmandGetResult(moduleId, i, arg)
+				result, err := CommmandGetResult(moduleId, op, arg)
 				if err != nil {
 					fmt.Println("Get result failed", err)
 					return
