@@ -3,6 +3,7 @@ package hmap
 import (
 	"fmt"
 	"strings"
+	"sync"
 )
 
 type Debug interface {
@@ -51,14 +52,40 @@ func DumpCollisionChain(d Debug) string {
 	return strings.Join(keys, "-")
 }
 
+var debugItemMutex sync.Mutex
 var debugItems []Debug
 
 func RegisterForDebug(d ...Debug) {
+	debugItemMutex.Lock()
 	debugItems = append(debugItems, d...)
+	debugItemMutex.Unlock()
+}
+
+func DeregisterForDebug(d Debug) {
+	debugItemMutex.Lock()
+	index := -1
+	for i, item := range debugItems {
+		if item == d {
+			index = i
+			break
+		}
+	}
+	if index == -1 {
+		debugItemMutex.Unlock()
+		return
+	}
+	length := len(debugItems)
+	if index < length-1 {
+		copy(debugItems[index:], debugItems[index+1:])
+	}
+	debugItems = debugItems[:length-1]
+	debugItemMutex.Unlock()
 }
 
 func SetCollisionChainDebugThreshold(t int) {
+	debugItemMutex.Lock()
 	for _, d := range debugItems {
 		d.SetCollisionChainDebugThreshold(t)
 	}
+	debugItemMutex.Unlock()
 }
