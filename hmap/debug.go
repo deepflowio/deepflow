@@ -61,24 +61,25 @@ func RegisterForDebug(d ...Debug) {
 	debugItemMutex.Unlock()
 }
 
-func DeregisterForDebug(d Debug) {
+func DeregisterForDebug(ds ...Debug) {
 	debugItemMutex.Lock()
-	index := -1
-	for i, item := range debugItems {
-		if item == d {
-			index = i
-			break
+	for _, d := range ds {
+		index := -1
+		for i, item := range debugItems {
+			if item == d {
+				index = i
+				break
+			}
 		}
+		if index == -1 {
+			continue
+		}
+		length := len(debugItems)
+		if index < length-1 {
+			copy(debugItems[index:], debugItems[index+1:])
+		}
+		debugItems = debugItems[:length-1]
 	}
-	if index == -1 {
-		debugItemMutex.Unlock()
-		return
-	}
-	length := len(debugItems)
-	if index < length-1 {
-		copy(debugItems[index:], debugItems[index+1:])
-	}
-	debugItems = debugItems[:length-1]
 	debugItemMutex.Unlock()
 }
 
