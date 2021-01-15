@@ -95,11 +95,9 @@ func (t *TunnelInfo) calcGreOptionSize(flags uint16) int {
 	return size
 }
 
-func (t *TunnelInfo) DecapsulateGre(l3Packet []byte, decapTencentGre bool) int {
-	ipHeaderSize := int((l3Packet[IP_IHL_OFFSET] & 0xf) << 2)
-	flags := BigEndian.Uint16(l3Packet[ipHeaderSize+GRE_FLAGS_OFFSET:])
-	greProtocolType := *(*uint16)(unsafe.Pointer(&l3Packet[ipHeaderSize+GRE_PROTOCOL_OFFSET]))
-	if greProtocolType == LE_ERSPAN_PROTO_TYPE_II { // ERSPAN II && ERSPAN I
+func (t *TunnelInfo) DecapsulateErspan(l3Packet []byte, flags, greProtocolType uint16, ipHeaderSize int) int {
+	switch greProtocolType {
+	case LE_ERSPAN_PROTO_TYPE_II:
 		if flags == 0 { // ERSPAN I
 			// 仅保存最外层的隧道信息
 			if t.Tier == 0 {
@@ -121,7 +119,7 @@ func (t *TunnelInfo) DecapsulateGre(l3Packet []byte, decapTencentGre bool) int {
 			t.Tier++
 			return ipHeaderSize + greHeaderSize + ERSPANII_HEADER_SIZE
 		}
-	} else if greProtocolType == LE_ERSPAN_PROTO_TYPE_III { // ERSPAN III
+	case LE_ERSPAN_PROTO_TYPE_III: // ERSPAN III
 		greHeaderSize := GRE_HEADER_SIZE + t.calcGreOptionSize(flags)
 		// 仅保存最外层的隧道信息
 		if t.Tier == 0 {
@@ -137,51 +135,67 @@ func (t *TunnelInfo) DecapsulateGre(l3Packet []byte, decapTencentGre bool) int {
 		} else {
 			return ipHeaderSize + greHeaderSize + ERSPANIII_HEADER_SIZE + ERSPANIII_SUBHEADER_SIZE
 		}
-	} else if decapTencentGre && (greProtocolType == LE_IPV4_PROTO_TYPE_I || greProtocolType == LE_IPV6_PROTO_TYPE_I) {
-		if flags&GRE_FLAGS_VER_MASK != 1 || flags&GRE_FLAGS_KEY_MASK == 0 { // 未知的GRE
-			return 0
-		}
-		greHeaderSize := GRE_HEADER_SIZE + t.calcGreOptionSize(flags)
-		greKeyOffset := GRE_KEY_OFFSET
-		if flags&GRE_FLAGS_CSUM_MASK != 0 {
-			greKeyOffset += GRE_CSUM_LEN
-		}
-		// 仅保存最外层的隧道信息
-		if t.Tier == 0 {
-			t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
-			t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
-			t.Type = TUNNEL_TYPE_TENCENT_GRE
-			t.Id = BigEndian.Uint32(l3Packet[ipHeaderSize+greKeyOffset:])
-		}
-		t.Tier++
-		overlayOffset := greHeaderSize + ipHeaderSize - ETH_HEADER_SIZE // 这里伪造L2层信息
-
-		// NOTICE:
-		//     这里需要将TunnelID封装为Mac Suffix，策略FastPath需要不同的MAC区分不同的VPC。
-		// 腾讯GRE流量是通过TunnelID来确认其对应的EPC ID的，这个将TunnelID用作MAC后缀，同
-		// 样能在FastPath里面区分不同的VPC
-		srcMacSuffix, dstMacSuffix := [2]byte{}, [2]byte{}
-		copy(srcMacSuffix[:], l3Packet[greKeyOffset:greKeyOffset+2])
-		copy(dstMacSuffix[:], l3Packet[greKeyOffset+2:greKeyOffset+4])
-
-		// 目的MAC
-		copy(l3Packet[overlayOffset:], []byte{0, 0, 0, 0})
-		copy(l3Packet[overlayOffset+4:], dstMacSuffix[:])
-		// 源MAC
-		copy(l3Packet[overlayOffset+MAC_ADDR_LEN:], []byte{0, 0, 0, 0})
-		copy(l3Packet[overlayOffset+MAC_ADDR_LEN+4:], srcMacSuffix[:])
-
-		if greProtocolType == LE_IPV4_PROTO_TYPE_I {
-			copy(l3Packet[overlayOffset+MAC_ADDR_LEN*2:], []byte{0x8, 0x0})
-		} else {
-			copy(l3Packet[overlayOffset+MAC_ADDR_LEN*2:], []byte{0x86, 0xdd})
-		}
-		return overlayOffset
+	default:
+		return 0
 	}
 	return 0
 }
 
-func (t *TunnelInfo) Decapsulate(l3Packet []byte, tunnelType TunnelType) int {
+func (t *TunnelInfo) DecapsulateTencentGre(l3Packet []byte, flags, greProtocolType uint16, ipHeaderSize int) int {
+	if flags&GRE_FLAGS_VER_MASK != 1 || flags&GRE_FLAGS_KEY_MASK == 0 { // 未知的GRE
+		return 0
+	}
+	greHeaderSize := GRE_HEADER_SIZE + t.calcGreOptionSize(flags)
+	greKeyOffset := GRE_KEY_OFFSET
+	if flags&GRE_FLAGS_CSUM_MASK != 0 {
+		greKeyOffset += GRE_CSUM_LEN
+	}
+	// 仅保存最外层的隧道信息
+	if t.Tier == 0 {
+		t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
+		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
+		t.Type = TUNNEL_TYPE_TENCENT_GRE
+		t.Id = BigEndian.Uint32(l3Packet[ipHeaderSize+greKeyOffset:])
+	}
+	t.Tier++
+	overlayOffset := greHeaderSize + ipHeaderSize - ETH_HEADER_SIZE // 这里伪造L2层信息
+
+	// NOTICE:
+	//     这里需要将TunnelID封装为Mac Suffix，策略FastPath需要不同的MAC区分不同的VPC。
+	// 腾讯GRE流量是通过TunnelID来确认其对应的EPC ID的，这个将TunnelID用作MAC后缀，同
+	// 样能在FastPath里面区分不同的VPC
+	srcMacSuffix, dstMacSuffix := [2]byte{}, [2]byte{}
+	copy(srcMacSuffix[:], l3Packet[greKeyOffset:greKeyOffset+2])
+	copy(dstMacSuffix[:], l3Packet[greKeyOffset+2:greKeyOffset+4])
+
+	// 目的MAC
+	copy(l3Packet[overlayOffset:], []byte{0, 0, 0, 0})
+	copy(l3Packet[overlayOffset+4:], dstMacSuffix[:])
+	// 源MAC
+	copy(l3Packet[overlayOffset+MAC_ADDR_LEN:], []byte{0, 0, 0, 0})
+	copy(l3Packet[overlayOffset+MAC_ADDR_LEN+4:], srcMacSuffix[:])
+
+	if greProtocolType == LE_IPV4_PROTO_TYPE_I {
+		copy(l3Packet[overlayOffset+MAC_ADDR_LEN*2:], []byte{0x8, 0x0})
+	} else {
+		copy(l3Packet[overlayOffset+MAC_ADDR_LEN*2:], []byte{0x86, 0xdd})
+	}
+	return overlayOffset
+}
+
+func (t *TunnelInfo) DecapsulateGre(l3Packet []byte, decapErspan, decapTencentGre bool) int {
+	ipHeaderSize := int((l3Packet[IP_IHL_OFFSET] & 0xf) << 2)
+	flags := BigEndian.Uint16(l3Packet[ipHeaderSize+GRE_FLAGS_OFFSET:])
+	greProtocolType := *(*uint16)(unsafe.Pointer(&l3Packet[ipHeaderSize+GRE_PROTOCOL_OFFSET]))
+	if decapErspan && (greProtocolType == LE_ERSPAN_PROTO_TYPE_II || greProtocolType == LE_ERSPAN_PROTO_TYPE_III) { // ERSPAN
+		return t.DecapsulateErspan(l3Packet, flags, greProtocolType, ipHeaderSize)
+	} else if decapTencentGre && (greProtocolType == LE_IPV4_PROTO_TYPE_I || greProtocolType == LE_IPV6_PROTO_TYPE_I) {
+		return t.DecapsulateTencentGre(l3Packet, flags, greProtocolType, ipHeaderSize)
+	}
+	return 0
+}
+
+func (t *TunnelInfo) Decapsulate(l3Packet []byte, tunnelType TunnelType, decapErspan bool) int {
 	// 通过ERSPANIII_HEADER_SIZE(12 bytes)+ERSPANIII_SUBHEADER_SIZE(8 bytes)判断，保证不会数组越界
 	if len(l3Packet) < IP_HEADER_SIZE+GRE_HEADER_SIZE+ERSPANIII_HEADER_SIZE+ERSPANIII_SUBHEADER_SIZE {
 		return 0
@@ -189,8 +203,8 @@ func (t *TunnelInfo) Decapsulate(l3Packet []byte, tunnelType TunnelType) int {
 	protocol := IPProtocol(l3Packet[OFFSET_IP_PROTOCOL-ETH_HEADER_SIZE])
 	if protocol == IPProtocolUDP && (tunnelType == TUNNEL_TYPE_VXLAN || tunnelType == TUNNEL_TYPE_VXLAN_VXLAN) {
 		return t.DecapsulateVxlan(l3Packet)
-	} else if protocol == IPProtocolGRE && t.Tier == 0 { // 剥离外层的erspan，若vxlan中有erspan仅剥离vxlan
-		return t.DecapsulateGre(l3Packet, tunnelType == TUNNEL_TYPE_TENCENT_GRE)
+	} else if protocol == IPProtocolGRE {
+		return t.DecapsulateGre(l3Packet, decapErspan, tunnelType == TUNNEL_TYPE_TENCENT_GRE)
 	}
 	return 0
 }
