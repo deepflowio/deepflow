@@ -61,6 +61,7 @@ const (
 	_
 	VTAPID
 	TAPSide
+	TAPPort
 )
 
 const (
@@ -319,6 +320,7 @@ type Field struct {
 	Protocol   layers.IPProtocol
 	ServerPort uint16
 	VTAPID     uint16
+	TAPPort    uint32
 	TAPSide    TAPSideEnum
 	TAPType    TAPTypeEnum
 	IsIPv6     uint8 // (8B) 与IP/IP6是共生字段
@@ -611,6 +613,10 @@ func (t *Tag) MarshalTo(b []byte) int {
 			}
 		}
 	}
+	if t.Code&TAPPort != 0 {
+		offset += copy(b[offset:], ",tap_port=")
+		offset += putTAPPort(b[offset:], t.TAPPort)
+	}
 	if t.Code&TAPSide != 0 {
 		switch t.TAPSide {
 		case Client:
@@ -645,6 +651,15 @@ func (t *Tag) MarshalTo(b []byte) int {
 	}
 
 	return offset
+}
+
+const TAP_PORT_STR_LEN = 8
+
+func putTAPPort(bs []byte, tapPort uint32) int {
+	copy(bs, "00000000")
+	s := strconv.FormatUint(uint64(tapPort), 16)
+	copy(bs[TAP_PORT_STR_LEN-len(s):], s)
+	return TAP_PORT_STR_LEN
 }
 
 func (t *Tag) String() string {
@@ -807,6 +822,9 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	}
 	if t.Code&VTAPID != 0 {
 		t.VTAPID = decoder.ReadU16()
+	}
+	if t.Code&TAPPort != 0 {
+		t.TAPPort = decoder.ReadU32()
 	}
 	if t.Code&TAPSide != 0 {
 		t.TAPSide = TAPSideEnum(decoder.ReadU8())
@@ -978,6 +996,9 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 	}
 	if code&VTAPID != 0 {
 		encoder.WriteU16(t.VTAPID)
+	}
+	if code&TAPPort != 0 {
+		encoder.WriteU32(t.TAPPort)
 	}
 	if code&TAPSide != 0 {
 		encoder.WriteU8(uint8(t.TAPSide))

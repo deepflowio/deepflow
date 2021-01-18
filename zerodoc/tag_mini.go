@@ -39,6 +39,7 @@ type MiniField struct {
 	ACLGID     uint16
 	ServerPort uint16
 	VTAPID     uint16
+	TAPPort    uint32
 	TAPType    TAPTypeEnum
 
 	TagType  uint8 // (8B)
@@ -185,6 +186,10 @@ func (t *MiniTag) MarshalTo(b []byte) int {
 			offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagValue), 10))
 		}
 	}
+	if t.Code&TAPPort != 0 {
+		offset += copy(b[offset:], ",tap_port=")
+		offset += putTAPPort(b[offset:], t.TAPPort)
+	}
 	if t.Code&TAPType != 0 {
 		offset += copy(b[offset:], ",tap_type=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TAPType), 10))
@@ -287,6 +292,9 @@ func (t *MiniTag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEnc
 	}
 	if code&VTAPID != 0 {
 		encoder.WriteU16(t.VTAPID)
+	}
+	if code&TAPPort != 0 {
+		encoder.WriteU32(t.TAPPort)
 	}
 	if code&TAPSide != 0 {
 		encoder.WriteU8(uint8(tapSide))

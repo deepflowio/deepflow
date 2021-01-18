@@ -366,3 +366,22 @@ func TestDirectionToTAPSide(t *testing.T) {
 		}
 	}
 }
+
+func TestPutTAPPort(t *testing.T) {
+	bs := make([]byte, 16)
+	for _, tc := range []struct {
+		input  uint32
+		output string
+	}{
+		{0, "00000000"},
+		{1, "00000001"},
+		{15, "0000000f"},
+		{65535, "0000ffff"},
+		{65535 << 8, "00ffff00"},
+	} {
+		putTAPPort(bs, tc.input)
+		if string(bs[:TAP_PORT_STR_LEN]) != tc.output {
+			t.Errorf("putTAPPort(%d)应为%s实为%s", tc.input, tc.output, bs[:TAP_PORT_STR_LEN])
+		}
+	}
+}
