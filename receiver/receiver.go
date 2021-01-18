@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -246,6 +247,9 @@ func (s *AdapterStatus) GetStatus(msgType int) string {
 			allStatus = append(allStatus, instance)
 		}
 		s.TCPStatusLocks[msgType].RUnlock()
+		sort.Slice(allStatus, func(i, j int) bool {
+			return allStatus[i].ip.String() < allStatus[j].ip.String()
+		})
 		status := fmt.Sprintf("MsgType VTAPID TridentIP                                Type LastSeq  LastRemoteTimestamp LastLocalTimestamp  LastDelay LastRecvFromNow FirstSeq FirstRemoteTimestamp FirstLocalTimestamp\n")
 		status += fmt.Sprintf("------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
 		for _, instance := range allStatus {
@@ -271,6 +275,9 @@ func (s *AdapterStatus) GetStatus(msgType int) string {
 		allStatus = append(allStatus, instance)
 	}
 	s.TCPStatusLocks[msgType].RUnlock()
+	sort.Slice(allStatus, func(i, j int) bool {
+		return allStatus[i].ip.String() < allStatus[j].ip.String()
+	})
 	status := fmt.Sprintf("MsgType TridentIP                                Type LastLocalTimestamp LastRecvFromNow FirstLocalTimestamp\n")
 	status += fmt.Sprintf("-----------------------------------------------------------------------------------------------------\n")
 	for _, instance := range allStatus {
@@ -563,7 +570,7 @@ func (r *Receiver) logReceiveError(size int, remoteAddr *net.UDPAddr, err error)
 	r.lastLogTime = r.timeNow
 
 	if remoteAddr != nil {
-		log.Warningf("UDP socket recv size %d from %s, %s, already drop log count %d", size, remoteAddr.IP, err, r.dropLogCount)
+		log.Warningf("UDP socket recv size %d from %s:%d, err:%s, already drop log count %d", size, remoteAddr.IP, remoteAddr.Port, err, r.dropLogCount)
 	} else {
 		log.Warningf("UDP socket recv size %d, %s, already drop log count %d", size, err, r.dropLogCount)
 	}
