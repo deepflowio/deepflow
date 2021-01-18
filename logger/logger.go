@@ -48,10 +48,10 @@ func compressFile(filename string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
 
 	gzfile, err := os.OpenFile(filename+".gz", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
+		file.Close()
 		return err
 	}
 	defer gzfile.Close()
@@ -60,8 +60,10 @@ func compressFile(filename string) error {
 	defer gzWriter.Close()
 
 	if _, err := io.Copy(gzWriter, file); err != nil {
+		file.Close()
 		return err // probably disk full
 	}
+	file.Close()
 
 	os.Remove(filename)
 	return nil
