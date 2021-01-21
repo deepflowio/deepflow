@@ -109,7 +109,7 @@ type FlowInfo struct {
 	FlowSource uint16 `json:"flow_source"`
 	FlowIDStr  string `json:"flow_id_str"`
 	TapType    uint16 `json:"tap_type"`
-	TapPort    string `json:"tap_port"` // 显示为0x+固定八个字符的16进制如0x01234567
+	TapPort    string `json:"tap_port"` // 显示为固定八个字符的16进制如'01234567'
 	VtapID     uint16 `json:"vtap_id"`
 	TapSide0   bool   `json:"tap_side_0,omitempty"`
 	TapSide1   bool   `json:"tap_side_1,omitempty"`
@@ -376,7 +376,7 @@ func (i *FlowInfo) Fill(f *datatype.TaggedFlow) {
 	i.FlowSource = uint16(f.FlowSource)
 	i.FlowIDStr = strconv.FormatInt(int64(f.FlowID), 10)
 	i.TapType = uint16(f.TapType)
-	i.TapPort = fmt.Sprintf("0x%08x", f.TapPort)
+	i.TapPort = fmt.Sprintf("%08x", f.TapPort)
 	i.VtapID = f.VtapId
 
 	i.L2End0 = f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].IsL2End
