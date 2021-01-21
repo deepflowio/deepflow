@@ -155,8 +155,8 @@ func TestDecapsulateTencentGre(t *testing.T) {
 		Tier: 1,
 	}
 	expectedOverlay := []byte{
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x51, 0x67,
+		0x00, 0x00, 0x00, 0x00, 0x02, 0x85,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
 		0x08, 0x00,
 		0x45, 0x00, 0x00, 0x28, 0x87, 0x93,
 		0x40, 0x00, 0x40, 0x06, 0xa8, 0xe7,
@@ -172,7 +172,7 @@ func TestDecapsulateTencentGre(t *testing.T) {
 	if !reflect.DeepEqual(expected, actual) ||
 		offset != expectedOffset ||
 		!reflect.DeepEqual(expectedOverlay, packet[l2Len+expectedOffset:l2Len+expectedOffset+34]) {
-		t.Errorf("expectedTencentGre: \n\ttunnel: %+v\n\tactual: %+v\n\toffset: %v\n\tactual: %v\n\toverlay: %x\n\tactual: %x",
+		t.Errorf("expectedTencentGre: \n\ttunnel: %+v\n\tactual: %+v\n\toffset: %v\n\tactual: %v\n\toverlay: %x\n\tactual:  %x",
 			expected, actual, expectedOffset, offset, expectedOverlay, packet[l2Len+18:l2Len+18+34])
 	}
 }
