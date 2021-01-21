@@ -165,8 +165,8 @@ func (t *TunnelInfo) DecapsulateTencentGre(l3Packet []byte, flags, greProtocolTy
 	// 腾讯GRE流量是通过TunnelID来确认其对应的EPC ID的，这个将TunnelID用作MAC后缀，同
 	// 样能在FastPath里面区分不同的VPC
 	srcMacSuffix, dstMacSuffix := [2]byte{}, [2]byte{}
-	copy(srcMacSuffix[:], l3Packet[greKeyOffset:greKeyOffset+2])
-	copy(dstMacSuffix[:], l3Packet[greKeyOffset+2:greKeyOffset+4])
+	copy(srcMacSuffix[:], l3Packet[ipHeaderSize+greKeyOffset:ipHeaderSize+greKeyOffset+2])
+	copy(dstMacSuffix[:], l3Packet[ipHeaderSize+greKeyOffset+2:ipHeaderSize+greKeyOffset+4])
 
 	// 目的MAC
 	copy(l3Packet[overlayOffset:], []byte{0, 0, 0, 0})
