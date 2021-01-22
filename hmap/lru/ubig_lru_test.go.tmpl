@@ -4,6 +4,8 @@ import (
 	"bytes"
 	. "encoding/binary"
 	"testing"
+
+	"gitlab.x.lan/yunshan/droplet-libs/hmap"
 )
 
 {{ range .}}
@@ -124,6 +126,8 @@ func TestU{{.}}LRU(t *testing.T) {
 	if count != lru.Size() {
 		t.Errorf("Walk count %d is not expected", count)
 	}
+
+	lru.Close()
 }
 
 func BenchmarkU{{.}}LRUAdd(b *testing.B) {
@@ -138,6 +142,8 @@ func BenchmarkU{{.}}LRUAdd(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		lru.Add(keys[i], uint64(i))
 	}
+
+	lru.Close()
 }
 
 func BenchmarkU{{.}}LRURemove(b *testing.B) {
@@ -155,6 +161,8 @@ func BenchmarkU{{.}}LRURemove(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		lru.Remove(keys[i])
 	}
+
+	lru.Close()
 }
 
 func BenchmarkU{{.}}LRUGet(b *testing.B) {
@@ -172,6 +180,8 @@ func BenchmarkU{{.}}LRUGet(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		lru.Get(keys[i], false)
 	}
+
+	lru.Close()
 }
 
 func BenchmarkU{{.}}LRUPeek(b *testing.B) {
@@ -189,25 +199,25 @@ func BenchmarkU{{.}}LRUPeek(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		lru.Get(keys[i], true)
 	}
+
+	lru.Close()
 }
 
 func TestU{{.}}LRUCollisionChain(t *testing.T) {
-	m := NewU{{.}}LRU("test", 2, 100).NoStats()
+	m := NewU{{.}}LRU("test", 2, 100)
 	m.SetCollisionChainDebugThreshold(5)
 
 	for i := 0; i < 10; i++ {
 		m.Add(getU{{.}}(uint64(i), 0), 0)
 	}
 	expected := []byte{}
-	expected = append(expected, getU{{.}}(uint64(8), 0)...)
-	expected = append(expected, getU{{.}}(uint64(5), 0)...)
 	expected = append(expected, getU{{.}}(uint64(4), 0)...)
 	expected = append(expected, getU{{.}}(uint64(3), 0)...)
 	expected = append(expected, getU{{.}}(uint64(2), 0)...)
 	expected = append(expected, getU{{.}}(uint64(1), 0)...)
 	expected = append(expected, getU{{.}}(uint64(0), 0)...)
-	if !bytes.Equal(m.GetCollisionChain(), expected) {
-		t.Error("冲突链获取不正确")
+	if chain := m.GetCollisionChain(); !bytes.Equal(chain, expected) {
+		t.Errorf("冲突链获取不正确, 应为%v, 实为%v", hmap.DumpHexBytesGrouped(expected, m.KeySize()), hmap.DumpHexBytesGrouped(chain, m.KeySize()))
 	}
 
 	m.Clear()
@@ -218,6 +228,8 @@ func TestU{{.}}LRUCollisionChain(t *testing.T) {
 	if len(m.GetCollisionChain()) > 0 {
 		t.Error("冲突链获取不正确")
 	}
+
+	m.Close()
 }
 
 {{ end }}

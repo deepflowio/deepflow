@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"gitlab.x.lan/yunshan/droplet-libs/hmap"
 	oldlru "gitlab.x.lan/yunshan/droplet-libs/lru"
 )
 
@@ -109,6 +110,8 @@ func BenchmarkU64LRUAdd(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		lru.Add(uint64(i), uint64(i))
 	}
+
+	lru.Close()
 }
 
 func BenchmarkU64LRURemove(b *testing.B) {
@@ -122,6 +125,7 @@ func BenchmarkU64LRURemove(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		lru.Remove(uint64(i))
 	}
+	lru.Close()
 }
 
 func BenchmarkU64LRUGet(b *testing.B) {
@@ -135,6 +139,7 @@ func BenchmarkU64LRUGet(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		lru.Get(uint64(i), false)
 	}
+	lru.Close()
 }
 
 func BenchmarkU64LRUPeek(b *testing.B) {
@@ -148,6 +153,7 @@ func BenchmarkU64LRUPeek(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		lru.Get(uint64(i), true)
 	}
+	lru.Close()
 }
 
 func BenchmarkOld64LRUAdd(b *testing.B) {
@@ -249,7 +255,7 @@ func BenchmarkOld32LRUPeek(b *testing.B) {
 }
 
 func TestU64LRUCollisionChain(t *testing.T) {
-	m := NewU64LRU("test", 2, 100).NoStats()
+	m := NewU64LRU("test", 2, 100)
 	m.SetCollisionChainDebugThreshold(5)
 
 	for i := 0; i < 10; i++ {
@@ -262,8 +268,8 @@ func TestU64LRUCollisionChain(t *testing.T) {
 		0, 0, 0, 0, 0, 0, 0, 1,
 		0, 0, 0, 0, 0, 0, 0, 0,
 	}
-	if !bytes.Equal(m.GetCollisionChain(), expected) {
-		t.Error("冲突链获取不正确")
+	if chain := m.GetCollisionChain(); !bytes.Equal(chain, expected) {
+		t.Errorf("冲突链获取不正确, 应为%v, 实为%v", hmap.DumpHexBytesGrouped(expected, m.KeySize()), hmap.DumpHexBytesGrouped(chain, m.KeySize()))
 	}
 
 	m.Clear()
@@ -274,4 +280,6 @@ func TestU64LRUCollisionChain(t *testing.T) {
 	if len(m.GetCollisionChain()) > 0 {
 		t.Error("冲突链获取不正确")
 	}
+
+	m.Close()
 }

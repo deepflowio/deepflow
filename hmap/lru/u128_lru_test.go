@@ -3,6 +3,8 @@ package lru
 import (
 	"bytes"
 	"testing"
+
+	"gitlab.x.lan/yunshan/droplet-libs/hmap"
 )
 
 func TestU128LRU(t *testing.T) {
@@ -108,6 +110,8 @@ func TestU128LRU(t *testing.T) {
 	if count != lru.Size() {
 		t.Errorf("Walk count %d is not expected", count)
 	}
+
+	lru.Close()
 }
 
 func BenchmarkU128LRUAdd(b *testing.B) {
@@ -118,6 +122,8 @@ func BenchmarkU128LRUAdd(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		lru.Add(uint64(i), uint64(i*2+b.N), uint64(i))
 	}
+
+	lru.Close()
 }
 
 func BenchmarkU128LRURemove(b *testing.B) {
@@ -131,6 +137,8 @@ func BenchmarkU128LRURemove(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		lru.Remove(uint64(i), uint64(i*2+b.N))
 	}
+
+	lru.Close()
 }
 
 func BenchmarkU128LRUGet(b *testing.B) {
@@ -144,6 +152,8 @@ func BenchmarkU128LRUGet(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		lru.Get(uint64(i), uint64(i*2+b.N), false)
 	}
+
+	lru.Close()
 }
 
 func BenchmarkU128LRUPeek(b *testing.B) {
@@ -157,10 +167,12 @@ func BenchmarkU128LRUPeek(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		lru.Get(uint64(i), uint64(i*2+b.N), true)
 	}
+
+	lru.Close()
 }
 
 func TestU128LRUCollisionChain(t *testing.T) {
-	m := NewU128LRU("test", 2, 100).NoStats()
+	m := NewU128LRU("test", 2, 100)
 	m.SetCollisionChainDebugThreshold(5)
 
 	for i := 0; i < 10; i++ {
@@ -173,8 +185,8 @@ func TestU128LRUCollisionChain(t *testing.T) {
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	}
-	if !bytes.Equal(m.GetCollisionChain(), expected) {
-		t.Error("冲突链获取不正确")
+	if chain := m.GetCollisionChain(); !bytes.Equal(chain, expected) {
+		t.Errorf("冲突链获取不正确, 应为%v, 实为%v", hmap.DumpHexBytesGrouped(expected, m.KeySize()), hmap.DumpHexBytesGrouped(chain, m.KeySize()))
 	}
 
 	m.Clear()
@@ -185,4 +197,6 @@ func TestU128LRUCollisionChain(t *testing.T) {
 	if len(m.GetCollisionChain()) > 0 {
 		t.Error("冲突链获取不正确")
 	}
+
+	m.Close()
 }

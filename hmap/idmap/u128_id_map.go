@@ -5,6 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"gitlab.x.lan/yunshan/droplet-libs/hmap"
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/keyhash"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
@@ -35,6 +36,8 @@ var u128IDMapNodeBlockPool = sync.Pool{New: func() interface{} {
 type U128IDMap struct {
 	utils.Closable
 
+	id string
+
 	buffer []u128IDMapNodeBlock // 存储Map节点，以矩阵的方式组织，提升内存申请释放效率
 
 	slotHead []int32 // 哈希桶，slotHead[i] 表示哈希值为 i 的冲突链的第一个节点为 buffer[[ slotHead[i]] ]]
@@ -45,11 +48,24 @@ type U128IDMap struct {
 
 	counter *Counter
 
-	collisionChainDebugThreshold uint32 // scan宽度超过该值时保留冲突链信息，为0时不保存
-	debugChainSlotIndex          int
+	collisionChainDebugThreshold uint32       // scan宽度超过该值时保留冲突链信息，为0时不保存
+	debugChain                   atomic.Value // 冲突链，类型为[]byte
+	debugChainRead               uint32       // 冲突链是否已读，如果已读替换为新的 (atomic.Value无法清空)
 }
 
 func NewU128IDMap(module string, hashSlots uint32, opts ...stats.OptionStatTags) *U128IDMap {
+	m := NewU128IDMapNoStats(module, hashSlots)
+
+	statOptions := []stats.Option{stats.OptionStatTags{"module": module}}
+	for _, opt := range opts {
+		statOptions = append(statOptions, opt)
+	}
+	stats.RegisterCountable("idmap", m, statOptions...)
+	hmap.RegisterForDebug(m)
+	return m
+}
+
+func NewU128IDMapNoStats(module string, hashSlots uint32) *U128IDMap {
 	if hashSlots >= 1<<30 {
 		panic("hashSlots is too large")
 	}
@@ -60,26 +76,31 @@ func NewU128IDMap(module string, hashSlots uint32, opts ...stats.OptionStatTags)
 	hashSlots = 1 << i
 
 	m := &U128IDMap{
-		buffer:              make([]u128IDMapNodeBlock, 0),
-		slotHead:            make([]int32, hashSlots),
-		hashSlotBits:        i,
-		counter:             &Counter{},
-		debugChainSlotIndex: -1,
+		buffer:       make([]u128IDMapNodeBlock, 0),
+		slotHead:     make([]int32, hashSlots),
+		hashSlotBits: i,
+		counter:      &Counter{},
+		id:           "idmap128-" + module,
 	}
 
 	for i := uint32(0); i < hashSlots; i++ {
 		m.slotHead[i] = -1
 	}
-	statOptions := []stats.Option{stats.OptionStatTags{"module": module}}
-	for _, opt := range opts {
-		statOptions = append(statOptions, opt)
-	}
-	stats.RegisterCountable("idmap", m, statOptions...)
+
 	return m
+}
+
+func (m *U128IDMap) ID() string {
+	return m.id
 }
 
 func (m *U128IDMap) KeySize() int {
 	return 128 / 8
+}
+
+func (m *U128IDMap) Close() error {
+	hmap.DeregisterForDebug(m)
+	return m.Closable.Close()
 }
 
 func (m *U128IDMap) NoStats() *U128IDMap {
@@ -114,9 +135,13 @@ func (m *U128IDMap) find(key0, key1 uint64, isAdd bool) *u128IDMapNode {
 			if m.counter.Max < width {
 				m.counter.Max = width
 			}
-			if m.debugChainSlotIndex == -1 {
+			if atomic.LoadUint32(&m.debugChainRead) == 1 {
+				// 已读，构造新的chain
 				if threshold := int(atomic.LoadUint32(&m.collisionChainDebugThreshold)); threshold > 0 && width >= threshold {
-					m.debugChainSlotIndex = int(slot)
+					chain := make([]byte, m.KeySize()*width)
+					m.generateCollisionChainIn(chain, slot)
+					m.debugChain.Store(chain)
+					atomic.StoreUint32(&m.debugChainRead, 0)
 				}
 			}
 			return node
@@ -133,35 +158,54 @@ func (m *U128IDMap) find(key0, key1 uint64, isAdd bool) *u128IDMapNode {
 	if m.counter.Max < width {
 		m.counter.Max = width
 	}
-	if m.debugChainSlotIndex == -1 {
+	if atomic.LoadUint32(&m.debugChainRead) == 1 {
+		// 已读，构造新的chain
 		if threshold := int(atomic.LoadUint32(&m.collisionChainDebugThreshold)); threshold > 0 && width >= threshold {
-			m.debugChainSlotIndex = int(slot)
+			chain := make([]byte, m.KeySize()*width)
+			offset := 0
+			if isAdd {
+				binary.BigEndian.PutUint64(chain, key0)
+				binary.BigEndian.PutUint64(chain[8:], key1)
+				offset += m.KeySize()
+			}
+			m.generateCollisionChainIn(chain[offset:], slot)
+			m.debugChain.Store(chain)
+			atomic.StoreUint32(&m.debugChainRead, 0)
 		}
 	}
 	return nil
 }
 
-// 需要在和AddOrGet同一线程中调用
-func (m *U128IDMap) GetCollisionChain() []byte {
-	if m.debugChainSlotIndex == -1 {
-		return nil
-	}
-	chain := make([]byte, 0, m.KeySize()*m.width)
-	nodeID := m.slotHead[m.debugChainSlotIndex]
-	var key [16]byte
+func (m *U128IDMap) generateCollisionChainIn(bs []byte, index int32) {
+	nodeID := m.slotHead[index]
+	offset := 0
 	for nodeID != -1 {
 		node := &m.buffer[nodeID>>_BLOCK_SIZE_BITS][nodeID&_BLOCK_SIZE_MASK]
-		binary.BigEndian.PutUint64(key[:], node.key0)
-		binary.BigEndian.PutUint64(key[8:], node.key1)
-		chain = append(chain, key[:]...)
+		binary.BigEndian.PutUint64(bs[offset:], node.key0)
+		binary.BigEndian.PutUint64(bs[offset+8:], node.key1)
+		offset += m.KeySize()
 		nodeID = node.next
 	}
-	m.debugChainSlotIndex = -1
-	return chain
+}
+
+func (m *U128IDMap) GetCollisionChain() []byte {
+	if atomic.LoadUint32(&m.debugChainRead) == 1 {
+		return nil
+	}
+	chain := m.debugChain.Load()
+	atomic.StoreUint32(&m.debugChainRead, 1)
+	if chain == nil {
+		return nil
+	}
+	return chain.([]byte)
 }
 
 func (m *U128IDMap) SetCollisionChainDebugThreshold(t int) {
 	atomic.StoreUint32(&m.collisionChainDebugThreshold, uint32(t))
+	// 标记为已读，刷新链
+	if t > 0 {
+		atomic.StoreUint32(&m.debugChainRead, 1)
+	}
 }
 
 // 第一个返回值表示value，第二个返回值表示是否进行了Add。若key已存在，指定overwrite=true可覆写value。
@@ -243,7 +287,7 @@ func (m *U128IDMap) Clear() {
 	m.size = 0
 	m.width = 0
 
-	m.debugChainSlotIndex = -1
+	atomic.StoreUint32(&m.debugChainRead, 1)
 }
 
 var _ UBigIDMap = &U128IDMap{}
