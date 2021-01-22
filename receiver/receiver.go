@@ -31,6 +31,7 @@ const (
 	QUEUE_BATCH_NUM           = 16
 	LOG_INTERVAL              = 3
 	RECORD_STATUS_TIMEOUT     = 30 // 每30秒记录下trident的活跃信息，platformData模块每分钟会上报trisolaris
+	SOCKET_READ_ERROR         = "maybe trident restart."
 )
 
 var log = logging.MustGetLogger("receiver")
@@ -570,7 +571,11 @@ func (r *Receiver) logReceiveError(size int, remoteAddr *net.UDPAddr, err error)
 	r.lastLogTime = r.timeNow
 
 	if remoteAddr != nil {
-		log.Warningf("UDP socket recv size %d from %s:%d, err:%s, already drop log count %d", size, remoteAddr.IP, remoteAddr.Port, err, r.dropLogCount)
+		if err == nil && size == 0 {
+			log.Infof("UDP socket recv size %d from %s:%d, %s Already drop log count %d", size, remoteAddr.IP, remoteAddr.Port, SOCKET_READ_ERROR, r.dropLogCount)
+		} else {
+			log.Warningf("UDP socket recv size %d from %s:%d, err:%s, already drop log count %d", size, remoteAddr.IP, remoteAddr.Port, err, r.dropLogCount)
+		}
 	} else {
 		log.Warningf("UDP socket recv size %d, %s, already drop log count %d", size, err, r.dropLogCount)
 	}
@@ -699,6 +704,9 @@ func ReadN(conn net.Conn, buffer []byte) error {
 	for total < len(buffer) {
 		n, err := conn.Read(buffer[total:])
 		if err != nil {
+			if err.Error() == "EOF" {
+				return fmt.Errorf("%s, %s", err.Error(), SOCKET_READ_ERROR)
+			}
 			return err
 		}
 		total += n
@@ -749,6 +757,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 			if err := ValidateFlowVersion(baseHeader.Type, flowHeader.Version); err != nil {
 				atomic.AddUint64(&r.counter.Invalid, 1)
 				log.Warningf("recv from %s, %s", conn.RemoteAddr().String(), err)
+				time.Sleep(10 * time.Second) // 等待10秒，防止日志刷屏
 				return
 			}
 			vtapID = flowHeader.VTAPID
