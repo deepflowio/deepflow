@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"testing"
+
+	"gitlab.x.lan/yunshan/droplet-libs/hmap"
 )
 
 func TestU128IDMapAddOrGet(t *testing.T) {
@@ -35,6 +37,8 @@ func TestU128IDMapAddOrGet(t *testing.T) {
 	if m.Size() != 2 {
 		t.Errorf("当前长度，Expected %v found %v", 2, m.Size())
 	}
+
+	m.Close()
 }
 
 func TestU128IDMapSize(t *testing.T) {
@@ -60,6 +64,8 @@ func TestU128IDMapSize(t *testing.T) {
 	if m.Size() != 3 {
 		t.Errorf("当前长度，Expected %v found %v", 3, m.Size())
 	}
+
+	m.Close()
 }
 
 func TestU128IDMapGet(t *testing.T) {
@@ -79,6 +85,8 @@ func TestU128IDMapGet(t *testing.T) {
 	if _, in := m.Get(1, 0); !in {
 		t.Errorf("查找失败")
 	}
+
+	m.Close()
 }
 
 func TestU128IDMapClear(t *testing.T) {
@@ -99,6 +107,8 @@ func TestU128IDMapClear(t *testing.T) {
 	if m.Size() != 1 {
 		t.Errorf("当前长度，Expected %v found %v", 1, m.Size())
 	}
+
+	m.Close()
 }
 
 func BenchmarkU128IDMap(b *testing.B) {
@@ -114,6 +124,8 @@ func BenchmarkU128IDMap(b *testing.B) {
 		i += 4
 	}
 	b.Logf("size=%d, width=%d", m.Size(), m.Width())
+
+	m.Close()
 }
 
 func BenchmarkU128IDMapWithSlice(b *testing.B) {
@@ -139,6 +151,8 @@ func BenchmarkU128IDMapWithSlice(b *testing.B) {
 		m.AddOrGetWithSlice(keys[i+3][:], 0, uint32(i<<2), false)
 	}
 	b.Logf("size=%d, width=%d", m.Size(), m.Width())
+
+	m.Close()
 }
 
 type testU128MapKey struct {
@@ -186,7 +200,7 @@ func BenchmarkNativeU64Map(b *testing.B) {
 }
 
 func TestU128IDMapCollisionChain(t *testing.T) {
-	m := NewU128IDMap("test", 1).NoStats()
+	m := NewU128IDMap("test", 1)
 	m.SetCollisionChainDebugThreshold(5)
 
 	for i := 0; i < 10; i++ {
@@ -199,8 +213,8 @@ func TestU128IDMapCollisionChain(t *testing.T) {
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	}
-	if !bytes.Equal(m.GetCollisionChain(), expected) {
-		t.Error("冲突链获取不正确")
+	if chain := m.GetCollisionChain(); !bytes.Equal(chain, expected) {
+		t.Errorf("冲突链获取不正确, 应为%v, 实为%v", hmap.DumpHexBytesGrouped(expected, m.KeySize()), hmap.DumpHexBytesGrouped(chain, m.KeySize()))
 	}
 
 	m.Clear()
@@ -211,4 +225,6 @@ func TestU128IDMapCollisionChain(t *testing.T) {
 	if len(m.GetCollisionChain()) > 0 {
 		t.Error("冲突链获取不正确")
 	}
+
+	m.Close()
 }

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	. "encoding/binary"
 	"testing"
+
+	"gitlab.x.lan/yunshan/droplet-libs/hmap"
 )
 
 {{ range . }}
@@ -54,6 +56,8 @@ func TestU{{.}}IDMapAddOrGet(t *testing.T) {
 	if m.Size() != 2 {
 		t.Errorf("当前长度，Expected %v found %v", 2, m.Size())
 	}
+
+	m.Close()
 }
 
 func TestU{{.}}IDMapSize(t *testing.T) {
@@ -81,6 +85,8 @@ func TestU{{.}}IDMapSize(t *testing.T) {
 	if m.Size() != 3 {
 		t.Errorf("当前长度，Expected %v found %v", 3, m.Size())
 	}
+
+	m.Close()
 }
 
 func TestU{{.}}IDMapGet(t *testing.T) {
@@ -103,6 +109,8 @@ func TestU{{.}}IDMapGet(t *testing.T) {
 	if _, in := m.Get(node.key[:], node.hash); !in {
 		t.Errorf("查找失败")
 	}
+
+	m.Close()
 }
 
 func TestU{{.}}IDMapClear(t *testing.T) {
@@ -127,6 +135,8 @@ func TestU{{.}}IDMapClear(t *testing.T) {
 	if m.Size() != 1 {
 		t.Errorf("当前长度，Expected %v found %v", 1, m.Size())
 	}
+
+	m.Close()
 }
 
 func BenchmarkU{{.}}IDMap(b *testing.B) {
@@ -149,10 +159,12 @@ func BenchmarkU{{.}}IDMap(b *testing.B) {
 		m.AddOrGet(nodes[i+3].key[:], nodes[i+3].hash, uint32(i<<2), false)
 	}
 	b.Logf("size=%d, width=%d", m.Size(), m.Width())
+
+	m.Close()
 }
 
 func TestU{{.}}IDMapCollisionChain(t *testing.T) {
-	m := NewU{{.}}IDMap("test", 1).NoStats()
+	m := NewU{{.}}IDMap("test", 1)
 	m.SetCollisionChainDebugThreshold(5)
 	nodes := make([]*u{{.}}IDMapNode, 10)
 
@@ -161,15 +173,13 @@ func TestU{{.}}IDMapCollisionChain(t *testing.T) {
 		m.AddOrGet(nodes[i].key[:], nodes[i].hash, 0, false)
 	}
 	expected := []byte{}
-	expected = append(expected, nodes[8].key[:]...)
-	expected = append(expected, nodes[5].key[:]...)
 	expected = append(expected, nodes[4].key[:]...)
 	expected = append(expected, nodes[3].key[:]...)
 	expected = append(expected, nodes[2].key[:]...)
 	expected = append(expected, nodes[1].key[:]...)
 	expected = append(expected, nodes[0].key[:]...)
-	if !bytes.Equal(m.GetCollisionChain(), expected) {
-		t.Error("冲突链获取不正确")
+	if chain := m.GetCollisionChain(); !bytes.Equal(chain, expected) {
+		t.Errorf("冲突链获取不正确, 应为%v, 实为%v", hmap.DumpHexBytesGrouped(expected, m.KeySize()), hmap.DumpHexBytesGrouped(chain, m.KeySize()))
 	}
 
 	m.Clear()
@@ -180,6 +190,8 @@ func TestU{{.}}IDMapCollisionChain(t *testing.T) {
 	if len(m.GetCollisionChain()) > 0 {
 		t.Error("冲突链获取不正确")
 	}
+
+	m.Close()
 }
 
 {{ end }}

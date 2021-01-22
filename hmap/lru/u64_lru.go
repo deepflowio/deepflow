@@ -5,6 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"gitlab.x.lan/yunshan/droplet-libs/hmap"
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/keyhash"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
@@ -32,6 +33,8 @@ var u64LRUNodeBlockPool = sync.Pool{New: func() interface{} {
 type U64LRU struct {
 	utils.Closable
 
+	id string
+
 	ringBuffer       []u64LRUNodeBlock // 存储Map节点，以矩阵环的方式组织，提升内存申请释放效率
 	bufferStartIndex int32             // ringBuffer中的开始下标（二维矩阵下标），闭区间
 	bufferEndIndex   int32             // ringBuffer中的结束下标（二维矩阵下标），开区间
@@ -48,12 +51,22 @@ type U64LRU struct {
 
 	counter *Counter
 
-	collisionChainDebugThreshold uint32 // scan宽度超过该值时保留冲突链信息，为0时不保存
-	debugChainSlotIndex          int
+	collisionChainDebugThreshold uint32       // scan宽度超过该值时保留冲突链信息，为0时不保存
+	debugChain                   atomic.Value // 冲突链，类型为[]byte
+	debugChainRead               uint32       // 冲突链是否已读，如果已读替换为新的 (atomic.Value无法清空)
+}
+
+func (m *U64LRU) ID() string {
+	return m.id
 }
 
 func (m *U64LRU) KeySize() int {
 	return 64 / 8
+}
+
+func (m *U64LRU) Close() error {
+	hmap.DeregisterForDebug(m)
+	return m.Closable.Close()
 }
 
 func (m *U64LRU) NoStats() *U64LRU {
@@ -244,7 +257,15 @@ func (m *U64LRU) find(key uint64, isAdd bool) (*u64LRUNode, int32) {
 			if width > m.counter.Max {
 				m.counter.Max = width
 			}
-			m.updateDebugChainSlotIndex(width, slot)
+			if atomic.LoadUint32(&m.debugChainRead) == 1 {
+				// 已读，构造新的chain
+				if threshold := int(atomic.LoadUint32(&m.collisionChainDebugThreshold)); threshold > 0 && width >= threshold {
+					chain := make([]byte, m.KeySize()*width)
+					m.generateCollisionChainIn(chain, slot)
+					m.debugChain.Store(chain)
+					atomic.StoreUint32(&m.debugChainRead, 0)
+				}
+			}
 			return node, hashListNext
 		}
 		hashListNext = node.hashListNext
@@ -256,37 +277,51 @@ func (m *U64LRU) find(key uint64, isAdd bool) (*u64LRUNode, int32) {
 	if width > m.counter.Max {
 		m.counter.Max = width
 	}
-	m.updateDebugChainSlotIndex(width, slot)
+	if atomic.LoadUint32(&m.debugChainRead) == 1 {
+		// 已读，构造新的chain
+		if threshold := int(atomic.LoadUint32(&m.collisionChainDebugThreshold)); threshold > 0 && width >= threshold {
+			chain := make([]byte, m.KeySize()*width)
+			offset := 0
+			if isAdd {
+				binary.BigEndian.PutUint64(chain, key)
+				offset += m.KeySize()
+			}
+			m.generateCollisionChainIn(chain[offset:], slot)
+			m.debugChain.Store(chain)
+			atomic.StoreUint32(&m.debugChainRead, 0)
+		}
+	}
 	return nil, -1
 }
 
-func (m *U64LRU) updateDebugChainSlotIndex(width int, slot int32) {
-	if m.debugChainSlotIndex == -1 {
-		if threshold := int(atomic.LoadUint32(&m.collisionChainDebugThreshold)); threshold > 0 && width >= threshold {
-			m.debugChainSlotIndex = int(slot)
-		}
+func (m *U64LRU) generateCollisionChainIn(bs []byte, index int32) {
+	offset := 0
+	for hashListNext := m.hashSlotHead[index]; hashListNext != -1; {
+		node := m.getNode(hashListNext)
+		binary.BigEndian.PutUint64(bs[offset:], node.key)
+		offset += m.KeySize()
+		hashListNext = node.hashListNext
 	}
 }
 
-// 需要在和AddOrGet同一线程中调用
 func (m *U64LRU) GetCollisionChain() []byte {
-	if m.debugChainSlotIndex == -1 {
+	if atomic.LoadUint32(&m.debugChainRead) == 1 {
 		return nil
 	}
-	chain := make([]byte, 0, m.KeySize()*m.counter.Max)
-	var key [8]byte
-	for hashListNext := m.hashSlotHead[m.debugChainSlotIndex]; hashListNext != -1; {
-		node := m.getNode(hashListNext)
-		binary.BigEndian.PutUint64(key[:], node.key)
-		chain = append(chain, key[:]...)
-		hashListNext = node.hashListNext
+	chain := m.debugChain.Load()
+	atomic.StoreUint32(&m.debugChainRead, 1)
+	if chain == nil {
+		return nil
 	}
-	m.debugChainSlotIndex = -1
-	return chain
+	return chain.([]byte)
 }
 
 func (m *U64LRU) SetCollisionChainDebugThreshold(t int) {
 	atomic.StoreUint32(&m.collisionChainDebugThreshold, uint32(t))
+	// 标记为已读，刷新链
+	if t > 0 {
+		atomic.StoreUint32(&m.debugChainRead, 1)
+	}
 }
 
 func (m *U64LRU) Get(key uint64, peek bool) (interface{}, bool) {
@@ -328,6 +363,8 @@ func (m *U64LRU) Clear() {
 	m.timeListTail = -1
 
 	m.size = 0
+
+	atomic.StoreUint32(&m.debugChainRead, 1)
 }
 
 func (m *U64LRU) compressHash(hash uint64) int32 {
@@ -335,28 +372,37 @@ func (m *U64LRU) compressHash(hash uint64) int32 {
 }
 
 func NewU64LRU(module string, hashSlots, capacity int, opts ...stats.OptionStatTags) *U64LRU {
-	hashSlots, hashSlotBits := minPowerOfTwo(hashSlots)
+	m := NewU64LRUNoStats(module, hashSlots, capacity)
 
-	m := &U64LRU{
-		ringBuffer:          make([]u64LRUNodeBlock, (capacity+_BLOCK_SIZE)/_BLOCK_SIZE+1),
-		hashSlots:           int32(hashSlots),
-		hashSlotBits:        uint32(hashSlotBits),
-		hashSlotHead:        make([]int32, hashSlots),
-		timeListHead:        -1,
-		timeListTail:        -1,
-		capacity:            capacity,
-		counter:             &Counter{},
-		debugChainSlotIndex: -1,
-	}
-
-	for i := 0; i < len(m.hashSlotHead); i++ {
-		m.hashSlotHead[i] = -1
-	}
 	statOptions := []stats.Option{stats.OptionStatTags{"module": module}}
 	for _, opt := range opts {
 		statOptions = append(statOptions, opt)
 	}
 	stats.RegisterCountable("lru", m, statOptions...)
+
+	hmap.RegisterForDebug(m)
+
+	return m
+}
+
+func NewU64LRUNoStats(module string, hashSlots, capacity int) *U64LRU {
+	hashSlots, hashSlotBits := minPowerOfTwo(hashSlots)
+
+	m := &U64LRU{
+		ringBuffer:   make([]u64LRUNodeBlock, (capacity+_BLOCK_SIZE)/_BLOCK_SIZE+1),
+		hashSlots:    int32(hashSlots),
+		hashSlotBits: uint32(hashSlotBits),
+		hashSlotHead: make([]int32, hashSlots),
+		timeListHead: -1,
+		timeListTail: -1,
+		capacity:     capacity,
+		counter:      &Counter{},
+		id:           "lru64-" + module,
+	}
+
+	for i := 0; i < len(m.hashSlotHead); i++ {
+		m.hashSlotHead[i] = -1
+	}
 
 	return m
 }
