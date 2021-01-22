@@ -21,7 +21,9 @@ bench: vendor
 	go test -mod vendor -bench=. ./...
 
 clean:
-	git clean -dfx
+	rm -rf vendor
+	rm -rf bin
+	rm -rf x86_64
 
 .DEFAULT_GOAL := test
 
