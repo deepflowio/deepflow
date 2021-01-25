@@ -133,6 +133,8 @@ enum DecapType {
     DECAP_TYPE_ERSPAN      = 2;
     DECAP_TYPE_TENCENT     = 3;
     DECAP_TYPE_VXLAN_VXLAN = 4;
+    DECAP_TYPE_IPIP        = 5;
+    DECAP_TYPE_VXLAN_IPIP  = 6;
 }
 
 message Config {
