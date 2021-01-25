@@ -130,11 +130,10 @@ enum PacketDataType {
 enum DecapType {
     DECAP_TYPE_NONE        = 0;
     DECAP_TYPE_VXLAN       = 1;
-    DECAP_TYPE_ERSPAN      = 2;
+    DECAP_TYPE_IPIP        = 2;
     DECAP_TYPE_TENCENT     = 3;
-    DECAP_TYPE_VXLAN_VXLAN = 4;
-    DECAP_TYPE_IPIP        = 5;
-    DECAP_TYPE_VXLAN_IPIP  = 6;
+    DECAP_TYPE_VXLAN_VXLAN = 257; // (DECAP_TYPE_VXLAN << 8) | DECAP_TYPE_VXLAN
+    DECAP_TYPE_VXLAN_IPIP  = 258; // (DECAP_TYPE_VXLAN << 8) | DECAP_TYPE_IPIP
 }
 
 message Config {
