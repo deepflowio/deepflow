@@ -57,14 +57,14 @@ func TestDecapsulateErspanI(t *testing.T) {
 
 	l2Len := 18
 	actual := &TunnelInfo{}
-	offset := actual.Decapsulate(packet1[l2Len:], TUNNEL_TYPE_ERSPAN, true)
+	offset := actual.Decapsulate(packet1, l2Len, TUNNEL_TYPE_ERSPAN, true)
 	expectedOffset := IP_HEADER_SIZE + GRE_HEADER_SIZE
 	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
 		t.Errorf("expectedErspanI: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
 			expected, actual, expectedOffset, offset)
 	}
 	actual = &TunnelInfo{}
-	actual.Decapsulate(packet2[l2Len:], TUNNEL_TYPE_ERSPAN, true)
+	actual.Decapsulate(packet2, l2Len, TUNNEL_TYPE_ERSPAN, true)
 	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
 		t.Errorf("expectedErspanI: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
 			expected, actual, expectedOffset, offset)
@@ -86,14 +86,14 @@ func TestDecapsulateErspanII(t *testing.T) {
 
 	l2Len := 14
 	actual := &TunnelInfo{}
-	offset := actual.Decapsulate(packet1[l2Len:], TUNNEL_TYPE_ERSPAN, true)
+	offset := actual.Decapsulate(packet1, l2Len, TUNNEL_TYPE_ERSPAN, true)
 	expectedOffset := 50 - l2Len
 	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
 		t.Errorf("expectedErspanII: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
 			expected, actual, expectedOffset, offset)
 	}
 	actual = &TunnelInfo{}
-	actual.Decapsulate(packet2[l2Len:], TUNNEL_TYPE_ERSPAN, true)
+	actual.Decapsulate(packet2, l2Len, TUNNEL_TYPE_ERSPAN, true)
 	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
 		t.Errorf("expectedErspanII: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
 			expected, actual, expectedOffset, offset)
@@ -116,7 +116,7 @@ func TestDecapsulateIII(t *testing.T) {
 
 	l2Len := 14
 	actual := &TunnelInfo{}
-	offset := actual.Decapsulate(packet[l2Len:], TUNNEL_TYPE_ERSPAN, true)
+	offset := actual.Decapsulate(packet, l2Len, TUNNEL_TYPE_ERSPAN, true)
 	expectedOffset := 54 - l2Len
 	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
 		t.Errorf("expectedErspanII: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
@@ -138,7 +138,7 @@ func TestDecapsulateVxlan(t *testing.T) {
 
 	l2Len := 14
 	actual := &TunnelInfo{}
-	offset := actual.Decapsulate(packet[l2Len:], TUNNEL_TYPE_VXLAN, true)
+	offset := actual.Decapsulate(packet, l2Len, TUNNEL_TYPE_VXLAN, true)
 	expectedOffset := 50 - l2Len
 	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
 		t.Errorf("expectedErspanII: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
@@ -167,7 +167,7 @@ func TestDecapsulateTencentGre(t *testing.T) {
 
 	l2Len := 14
 	actual := &TunnelInfo{}
-	offset := actual.Decapsulate(packet[l2Len:], TUNNEL_TYPE_TENCENT_GRE, true)
+	offset := actual.Decapsulate(packet, l2Len, TUNNEL_TYPE_TENCENT_GRE, true)
 	expectedOffset := 18
 	if !reflect.DeepEqual(expected, actual) ||
 		offset != expectedOffset ||
@@ -190,7 +190,7 @@ func TestDecapsulateIp6Vxlan(t *testing.T) {
 
 	l2Len := 14
 	actual := &TunnelInfo{}
-	offset := actual.Decapsulate6(packet[l2Len:], TUNNEL_TYPE_VXLAN)
+	offset := actual.Decapsulate6(packet, l2Len, TUNNEL_TYPE_VXLAN)
 	expectedOffset := IP6_HEADER_SIZE + UDP_HEADER_SIZE + VXLAN_HEADER_SIZE
 	if !reflect.DeepEqual(expected, actual) ||
 		offset != expectedOffset {
@@ -206,7 +206,7 @@ func BenchmarkDecapsulateTCP(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		tunnel.Decapsulate(packet[:], TUNNEL_TYPE_VXLAN, true)
+		tunnel.Decapsulate(packet[:], 0, TUNNEL_TYPE_VXLAN, true)
 	}
 }
 
@@ -217,7 +217,7 @@ func BenchmarkDecapsulateUDP(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		tunnel.Decapsulate(packet[:], TUNNEL_TYPE_VXLAN, true)
+		tunnel.Decapsulate(packet[:], 0, TUNNEL_TYPE_VXLAN, true)
 	}
 }
 
@@ -230,7 +230,7 @@ func BenchmarkDecapsulateUDP4789(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		tunnel.Decapsulate(packet[:], TUNNEL_TYPE_VXLAN, true)
+		tunnel.Decapsulate(packet[:], 0, TUNNEL_TYPE_VXLAN, true)
 	}
 }
 
@@ -244,6 +244,6 @@ func BenchmarkDecapsulateVXLAN(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		tunnel.Decapsulate(packet[:], TUNNEL_TYPE_VXLAN, true)
+		tunnel.Decapsulate(packet[:], 0, TUNNEL_TYPE_VXLAN, true)
 	}
 }
