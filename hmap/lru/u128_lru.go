@@ -283,7 +283,6 @@ func (m *U128LRU) find(key0, key1 uint64, isAdd bool) (*u128LRUNode, int32) {
 		m.counter.Max = width
 	}
 	if atomic.LoadUint32(&m.debugChainRead) == 1 {
-		log.Error(key0, key1)
 		// 已读，构造新的chain
 		if threshold := int(atomic.LoadUint32(&m.collisionChainDebugThreshold)); threshold > 0 && width >= threshold {
 			chain := make([]byte, m.KeySize()*width)
