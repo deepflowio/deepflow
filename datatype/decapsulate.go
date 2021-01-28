@@ -279,7 +279,7 @@ func (t *TunnelInfo) Decapsulate6(packet []byte, l2Len int, tunnelType TunnelTyp
 		}
 	} else if protocol == IPProtocolIPv4 {
 		if tunnelType&TUNNEL_TYPE_TIER1_MASK == TUNNEL_TYPE_IPIP {
-			offset = t.DecapsulateIPIP(packet, l2Len, IP_HEADER_SIZE)
+			offset = t.DecapsulateIPIP(packet, l2Len, IP6_HEADER_SIZE)
 		}
 	} else if protocol == IPProtocolIPv6 {
 		if tunnelType&TUNNEL_TYPE_TIER1_MASK == TUNNEL_TYPE_IPIP {
@@ -298,8 +298,13 @@ func (t *TunnelInfo) DecapsulateIPIP(packet []byte, l2Len int, size int) int {
 	l3Packet := packet[l2Len:]
 
 	if t.Tier == 0 {
-		t.Src = BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:])
-		t.Dst = BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:])
+		if size == IP6_HEADER_SIZE {
+			t.Src = BigEndian.Uint32(l3Packet[IP6_SIP_OFFSET:])
+			t.Dst = BigEndian.Uint32(l3Packet[IP6_DIP_OFFSET:])
+		} else {
+			t.Src = BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:])
+			t.Dst = BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:])
+		}
 		t.Type = TUNNEL_TYPE_IPIP
 		t.Id = 0
 	} else {
@@ -322,8 +327,13 @@ func (t *TunnelInfo) Decapsulate6IPIP(packet []byte, l2Len int, size int) int {
 	l3Packet := packet[l2Len:]
 
 	if t.Tier == 0 {
-		t.Src = BigEndian.Uint32(l3Packet[IP6_SIP_OFFSET:])
-		t.Dst = BigEndian.Uint32(l3Packet[IP6_DIP_OFFSET:])
+		if size == IP6_HEADER_SIZE {
+			t.Src = BigEndian.Uint32(l3Packet[IP6_SIP_OFFSET:])
+			t.Dst = BigEndian.Uint32(l3Packet[IP6_DIP_OFFSET:])
+		} else {
+			t.Src = BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:])
+			t.Dst = BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:])
+		}
 		t.Type = TUNNEL_TYPE_IPIP
 		t.Id = 0
 	} else {
