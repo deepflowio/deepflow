@@ -97,30 +97,42 @@ const (
 	GatewaySide
 )
 
+const (
+	// 用于DirectionEnum，标记是否需要颠倒IP等字段
+	// 大部分场景Server端需要颠倒，GateWay场景特殊因为实际流量采集点和对应的主机类型相反，所以Client端需要颠倒
+	_EDGE_TAG_FIELD_NEED_REVERSE uint8 = 1 << 7
+)
+
 type DirectionEnum uint8
 
 const (
 	_ DirectionEnum = iota
-	ClientToServer
-	ServerToClient
+	_ClientToServer
+	_ServerToClient
 
+	ClientToServer = _ClientToServer
+	ServerToClient = _ServerToClient | DirectionEnum(_EDGE_TAG_FIELD_NEED_REVERSE)
 	// 以下类型为转换tapside而增加，在写入db时均记为c2s或s2c
-	ClientNodeToServer              = ClientToServer | DirectionEnum(NodeSide)              // 客户端容器节点，路由、SNAT、隧道
-	ServerNodeToClient              = ServerToClient | DirectionEnum(NodeSide)              // 服务端容器节点，路由、SNAT、隧道
-	ClientHypervisorToServer        = ClientToServer | DirectionEnum(HypervisorSide)        // 客户端宿主机，隧道
-	ServerHypervisorToClient        = ServerToClient | DirectionEnum(HypervisorSide)        // 服务端宿主机，隧道
-	ClientGatewayHypervisorToServer = ClientToServer | DirectionEnum(GatewayHypervisorSide) // 客户端网关宿主机
-	ServerGatewayHypervisorToClient = ServerToClient | DirectionEnum(GatewayHypervisorSide) // 服务端网关宿主机
-	ClientGatewayToServer           = ClientToServer | DirectionEnum(GatewaySide)           // 客户端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
-	ServerGatewayToClient           = ServerToClient | DirectionEnum(GatewaySide)           // 服务端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
+	ClientNodeToServer              = _ClientToServer | DirectionEnum(NodeSide)                                                            // 客户端容器节点，路由、SNAT、隧道
+	ServerNodeToClient              = _ServerToClient | DirectionEnum(NodeSide) | DirectionEnum(_EDGE_TAG_FIELD_NEED_REVERSE)              // 服务端容器节点，路由、SNAT、隧道
+	ClientHypervisorToServer        = _ClientToServer | DirectionEnum(HypervisorSide)                                                      // 客户端宿主机，隧道
+	ServerHypervisorToClient        = _ServerToClient | DirectionEnum(HypervisorSide) | DirectionEnum(_EDGE_TAG_FIELD_NEED_REVERSE)        // 服务端宿主机，隧道
+	ClientGatewayHypervisorToServer = _ClientToServer | DirectionEnum(GatewayHypervisorSide) | DirectionEnum(_EDGE_TAG_FIELD_NEED_REVERSE) // 客户端网关宿主机
+	ServerGatewayHypervisorToClient = _ServerToClient | DirectionEnum(GatewayHypervisorSide)                                               // 服务端网关宿主机
+	ClientGatewayToServer           = _ClientToServer | DirectionEnum(GatewaySide) | DirectionEnum(_EDGE_TAG_FIELD_NEED_REVERSE)           // 客户端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
+	ServerGatewayToClient           = _ServerToClient | DirectionEnum(GatewaySide)                                                         // 服务端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
 )
 
 func (d DirectionEnum) IsClientToServer() bool {
-	return d&0x3 == ClientToServer
+	return d&0x3 == _ClientToServer
 }
 
 func (d DirectionEnum) IsServerToClient() bool {
-	return d&0x3 == ServerToClient
+	return d&0x3 == _ServerToClient
+}
+
+func (d DirectionEnum) EdgeTagFieldNeedReverse() bool {
+	return uint8(d)&_EDGE_TAG_FIELD_NEED_REVERSE == _EDGE_TAG_FIELD_NEED_REVERSE
 }
 
 type TAPSideEnum uint8
@@ -139,6 +151,7 @@ const (
 )
 
 func (d DirectionEnum) ToTAPSide() TAPSideEnum {
+	d &= DirectionEnum(^_EDGE_TAG_FIELD_NEED_REVERSE)
 	if uint8(d) == 0 {
 		panic("invalid direction")
 	}
