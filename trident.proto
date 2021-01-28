@@ -478,7 +478,12 @@ message Container {
 
 message InterfaceInfo {
     optional uint64 mac = 1;
+    // ip/masklen
     repeated string ip = 2;
+    optional string name = 3;
+    optional string device_id = 4;
+
+    optional uint32 tap_index = 5;
 }
 
 message GenesisSyncRequest {
