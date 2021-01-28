@@ -228,13 +228,12 @@ func (t *MiniTag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEnc
 	srcMAC, dstMAC := t.MAC, t.MAC1
 	srcEpc, dstEpc := t.L3EpcID, t.L3EpcID1
 	var tapSide TAPSideEnum
-	// 5.6.1 对于双端数据，存储时去掉direction并使用tap_side替代。
-	//   老数据中的 xx_0=A, xx_1=B, direction=c2s 等于新数据中的 xx_0=A, xx_1=B, tap_side=0
-	//   老数据中的 xx_0=A, xx_1=B, direction=s2c 等于新数据中的 xx_0=B, xx_1=A, tap_side=1
+	// 对于底层存储的数据，0方向为客户端，1方向为服务端，而Minitag中的数据方向为采集端到其他主机，
+	// 这里根据Direction判断是否需要颠倒统计字段
 	if code&Direction != 0 && code.HasEdgeTagField() {
 		code |= TAPSide
 		code &= ^Direction
-		if t.Direction.IsServerToClient() {
+		if t.Direction.EdgeTagFieldNeedReverse() {
 			srcIP, dstIP = dstIP, srcIP
 			srcEpc, dstEpc = dstEpc, srcEpc
 			srcMAC, dstMAC = dstMAC, srcMAC
