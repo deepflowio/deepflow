@@ -314,9 +314,11 @@ func (t *TunnelInfo) DecapsulateIPIP(packet []byte, l2Len int, size int) int {
 
 	if size == IP_HEADER_SIZE {
 		copy(packet[IP_HEADER_SIZE:], packet[:ETH_HEADER_SIZE])
+		BigEndian.PutUint16(packet[IP_HEADER_SIZE+MAC_ADDR_LEN*2:], uint16(EthernetTypeIPv4))
 		return IP_HEADER_SIZE - ETH_HEADER_SIZE
 	} else if size == IP6_HEADER_SIZE {
 		copy(packet[IP6_HEADER_SIZE:], packet[:ETH_HEADER_SIZE])
+		BigEndian.PutUint16(packet[IP6_HEADER_SIZE+MAC_ADDR_LEN*2:], uint16(EthernetTypeIPv4))
 		return IP6_HEADER_SIZE - ETH_HEADER_SIZE
 	}
 
@@ -343,9 +345,11 @@ func (t *TunnelInfo) Decapsulate6IPIP(packet []byte, l2Len int, size int) int {
 
 	if size == IP_HEADER_SIZE {
 		copy(packet[IP_HEADER_SIZE:], packet[:ETH_HEADER_SIZE])
+		BigEndian.PutUint16(packet[IP_HEADER_SIZE+MAC_ADDR_LEN*2:], uint16(EthernetTypeIPv6))
 		return IP_HEADER_SIZE - ETH_HEADER_SIZE
 	} else if size == IP6_HEADER_SIZE {
 		copy(packet[IP6_HEADER_SIZE:], packet[:ETH_HEADER_SIZE])
+		BigEndian.PutUint16(packet[IP6_HEADER_SIZE+MAC_ADDR_LEN*2:], uint16(EthernetTypeIPv6))
 		return IP6_HEADER_SIZE - ETH_HEADER_SIZE
 	}
 
