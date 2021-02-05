@@ -82,7 +82,8 @@ enum Status {
 enum TapMode {
     LOCAL  = 0; // 部署在宿主机之上，抓取本地虚拟接口流量
     MIRROR = 1; // 部署在虚拟机之上，抓取镜像而来的流量
-    ANALYZER = 2; // 部署在分析器之上，抓取镜像而来的流量
+    ANALYZER = 2; // 部署在专属服务器采集器之上
+    DECAP = 3; //隧道解封装采集器
 }
 
 enum IfMacSource {
