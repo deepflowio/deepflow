@@ -183,7 +183,9 @@ func (m *U{{.}}IDMap) find(key []byte, hash uint32, isAdd bool) *u{{.}}IDMapNode
 func (m *U{{.}}IDMap) generateCollisionChainIn(bs []byte, index int32) {
 	nodeID := m.slotHead[index]
 	offset := 0
-	for nodeID != -1 {
+	bsLen := len(bs)
+
+	for nodeID != -1 && offset < bsLen {
 		node := &m.buffer[nodeID>>_BLOCK_SIZE_BITS][nodeID&_BLOCK_SIZE_MASK]
 		offset += copy(bs[offset:], node.key[:])
 		nodeID = node.next

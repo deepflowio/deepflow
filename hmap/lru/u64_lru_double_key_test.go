@@ -1,6 +1,11 @@
 package lru
 
-import "testing"
+import (
+	"bytes"
+	"testing"
+
+	"gitlab.x.lan/yunshan/droplet-libs/hmap"
+)
 
 const (
 	_EVEN_NUMBER_KEY = uint64(100)
@@ -141,4 +146,49 @@ func TestU64LRUAddAndRemoveByOneShortKey(t *testing.T) {
 		t.Errorf("lru RemoveByShortKey is not expected, the shortkey %v is not exist", _NOT_EXIST_KEY)
 	}
 
+}
+
+func TestU64DoubleKeyLRUCollisionChain(t *testing.T) {
+	m := NewU64DoubleKeyLRU("test", _SHORT_KEY_SORTS, _SHORT_KEY_SORTS, _CAPACITY)
+	m.SetCollisionChainDebugThreshold(5)
+
+	// 添加0~9
+	for i := 0; i < _CAPACITY; i++ {
+		if i%2 == 0 {
+			m.Add(uint64(i), _EVEN_NUMBER_KEY, uint64(i+10))
+		} else {
+			m.Add(uint64(i), _ODD_NUMBER_KEY, uint64(i+10))
+		}
+	}
+	expected := []byte{
+		0, 0, 0, 0, 0, 0, 0, 6,
+		0, 0, 0, 0, 0, 0, 0, 5,
+		0, 0, 0, 0, 0, 0, 0, 2,
+		0, 0, 0, 0, 0, 0, 0, 1,
+		0, 0, 0, 0, 0, 0, 0, 0,
+	}
+	if chain := m.GetCollisionChain(); !bytes.Equal(chain, expected) {
+		t.Errorf("冲突链获取不正确, 应为%v, 实为%v", hmap.DumpHexBytesGrouped(expected, m.KeySize()), hmap.DumpHexBytesGrouped(chain, m.KeySize()))
+	}
+
+	m.SetCollisionChainDebugThreshold(10)
+	if len(m.GetCollisionChain()) > 0 {
+		t.Error("冲突链获取不正确")
+	}
+
+	m.SetCollisionChainDebugThreshold(5)
+	expected = []byte{
+		0, 0, 0, 0, 0, 0, 0, 100,
+		0, 0, 0, 0, 0, 0, 0, 100,
+		0, 0, 0, 0, 0, 0, 0, 100,
+		0, 0, 0, 0, 0, 0, 0, 100,
+		0, 0, 0, 0, 0, 0, 0, 100,
+	}
+	m.PeekByShortKey(_EVEN_NUMBER_KEY)
+	if chain := m.GetCollisionChain(); !bytes.Equal(chain, expected) {
+		t.Errorf("冲突链获取不正确, 应为%v, 实为%v", hmap.DumpHexBytesGrouped(expected, m.KeySize()), hmap.DumpHexBytesGrouped(chain, m.KeySize()))
+	}
+
+	m.Clear()
+	m.Close()
 }
