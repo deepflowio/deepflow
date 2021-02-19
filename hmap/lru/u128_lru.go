@@ -302,7 +302,9 @@ func (m *U128LRU) find(key0, key1 uint64, isAdd bool) (*u128LRUNode, int32) {
 
 func (m *U128LRU) generateCollisionChainIn(bs []byte, index int32) {
 	offset := 0
-	for node := m.hashSlotHead[index]; node != nil; node = node.hashListNext {
+	bsLen := len(bs)
+
+	for node := m.hashSlotHead[index]; node != nil && offset < bsLen; node = node.hashListNext {
 		binary.BigEndian.PutUint64(bs[offset:], node.key0)
 		binary.BigEndian.PutUint64(bs[offset+8:], node.key1)
 		offset += m.KeySize()
