@@ -179,7 +179,9 @@ func (m *U128IDMap) find(key0, key1 uint64, isAdd bool) *u128IDMapNode {
 func (m *U128IDMap) generateCollisionChainIn(bs []byte, index int32) {
 	nodeID := m.slotHead[index]
 	offset := 0
-	for nodeID != -1 {
+	bsLen := len(bs)
+
+	for nodeID != -1 && offset < bsLen {
 		node := &m.buffer[nodeID>>_BLOCK_SIZE_BITS][nodeID&_BLOCK_SIZE_MASK]
 		binary.BigEndian.PutUint64(bs[offset:], node.key0)
 		binary.BigEndian.PutUint64(bs[offset+8:], node.key1)

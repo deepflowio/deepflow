@@ -1,8 +1,11 @@
 package lru
 
 import (
+	"encoding/binary"
 	"sync"
+	"sync/atomic"
 
+	"gitlab.x.lan/yunshan/droplet-libs/hmap"
 	"gitlab.x.lan/yunshan/droplet-libs/hmap/keyhash"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
@@ -36,6 +39,8 @@ var u128u64DoubleKeyLRUNodeBlockPool = sync.Pool{New: func() interface{} {
 type U128U64DoubleKeyLRU struct {
 	utils.Closable
 
+	id string
+
 	ringBuffer       []u128u64DoubleKeyLRUNodeBlock // 存储Map节点，以矩阵环的方式组织，提升内存申请释放效率
 	bufferStartIndex int32                          // ringBuffer中的开始下标（二维矩阵下标），闭区间
 	bufferEndIndex   int32                          // ringBuffer中的结束下标（二维矩阵下标），开区间
@@ -51,11 +56,22 @@ type U128U64DoubleKeyLRU struct {
 	timeListHead int32
 	timeListTail int32
 
-	capacity          int
-	size              int
-	maxScan           int
-	maxScanByShortKey int
-	maxDelByshortKey  int // 当前通过shortKey删除的含有最多的成员数值
+	capacity int
+	size     int
+
+	counter *DoubleKeyLRUCounter
+
+	collisionChainDebugThreshold uint32       // scan宽度超过该值时保留冲突链信息，为0时不保存
+	debugChain                   atomic.Value // 冲突链，类型为[]byte
+	debugChainRead               uint32       // 冲突链是否已读，如果已读替换为新的 (atomic.Value无法清空)
+}
+
+func (m *U128U64DoubleKeyLRU) ID() string {
+	return m.id
+}
+
+func (m *U128U64DoubleKeyLRU) KeySize() int {
+	return 128 / 8
 }
 
 func (m *U128U64DoubleKeyLRU) NoStats() *U128U64DoubleKeyLRU {
@@ -247,23 +263,22 @@ func (m *U128U64DoubleKeyLRU) newNode(longKey0, longKey1, shortKey uint64, value
 }
 
 func (m *U128U64DoubleKeyLRU) GetCounter() interface{} {
-	counter := &DoubleKeyLRUCounter{m.maxScan, m.maxScanByShortKey, m.size, m.maxDelByshortKey}
-	m.maxScan = 0
-	m.maxScanByShortKey = 0
-	m.maxDelByshortKey = 0
+	var counter *DoubleKeyLRUCounter
+	counter, m.counter = m.counter, &DoubleKeyLRUCounter{}
+	if counter.scanTimes != 0 {
+		counter.AvgScan = counter.totalScan / counter.scanTimes
+	}
+	counter.Size = m.size
 	return counter
 }
 
 // 通过longKey进行添加
 func (m *U128U64DoubleKeyLRU) Add(longKey0, longKey1, shortKey uint64, value interface{}) {
 	longKeyHash := m.compressHash(longKey0, longKey1)
-	for hashListNext := m.hashSlotHead[longKeyHash]; hashListNext != -1; {
-		node := m.getNode(hashListNext)
-		if node.longKey0 == longKey0 && node.longKey1 == longKey1 {
-			m.updateNode(node, hashListNext, value)
-			return
-		}
-		hashListNext = node.hashListNext
+	node, hashIndex := m.find(longKey0, longKey1, longKeyHash, true)
+	if node != nil {
+		m.updateNode(node, hashIndex, value)
+		return
 	}
 	m.newNode(longKey0, longKey1, shortKey, value, longKeyHash)
 }
@@ -293,6 +308,7 @@ func (m *U128U64DoubleKeyLRU) Remove(longKey0, longKey1 uint64) {
 
 // 通过shortKey进行删除
 func (m *U128U64DoubleKeyLRU) RemoveByShortKey(shortKey uint64) int {
+	maxScan := 0
 	bakHashListNext := int32(0)
 	delCount := 0
 	var node *u128u64DoubleKeyLRUNode
@@ -301,7 +317,7 @@ func (m *U128U64DoubleKeyLRU) RemoveByShortKey(shortKey uint64) int {
 		bakHashListNext = relationHashListNext
 		node = m.getNode(relationHashListNext)
 		relationHashListNext = node.relationHashListNext
-
+		maxScan++
 		if node.shortKey == shortKey {
 			nextNodeIndex := m.removeNode(node, bakHashListNext)
 			if nextNodeIndex != -1 {
@@ -310,31 +326,120 @@ func (m *U128U64DoubleKeyLRU) RemoveByShortKey(shortKey uint64) int {
 			delCount++
 		}
 	}
-
-	if m.maxDelByshortKey < delCount {
-		m.maxDelByshortKey = delCount
+	if maxScan > m.counter.MaxShortBucket {
+		m.counter.MaxShortBucket = maxScan
+	}
+	if m.counter.MaxLongBucket < delCount {
+		m.counter.MaxLongBucket = delCount
 	}
 	return delCount
 }
 
-func (m *U128U64DoubleKeyLRU) Get(longKey0, longKey1 uint64, peek bool) (interface{}, bool) {
-	maxScan := 0
-	for hashListNext := m.hashSlotHead[m.compressHash(longKey0, longKey1)]; hashListNext != -1; {
+func (m *U128U64DoubleKeyLRU) find(longKey0, longKey1 uint64, slot int32, isAdd bool) (*u128u64DoubleKeyLRUNode, int32) {
+	m.counter.scanTimes++
+	width := 0
+
+	for hashListNext := m.hashSlotHead[slot]; hashListNext != -1; {
+		width++
 		node := m.getNode(hashListNext)
-		maxScan++
 		if node.longKey0 == longKey0 && node.longKey1 == longKey1 {
-			if !peek {
-				m.updateNode(node, hashListNext, node.value)
+			m.counter.totalScan += width
+			if width > m.counter.Max {
+				m.counter.Max = width
 			}
-			if maxScan > m.maxScan {
-				m.maxScan = maxScan
+
+			if atomic.LoadUint32(&m.debugChainRead) == 1 {
+				// 已读，构造新的chain
+				if threshold := int(atomic.LoadUint32(&m.collisionChainDebugThreshold)); threshold > 0 && width >= threshold {
+					chain := make([]byte, m.KeySize()*width)
+					m.generateCollisionChainInLongKey(chain, slot)
+					m.debugChain.Store(chain)
+					atomic.StoreUint32(&m.debugChainRead, 0)
+				}
 			}
-			return node.value, true
+			return node, hashListNext
 		}
 		hashListNext = node.hashListNext
 	}
-	if maxScan > m.maxScan {
-		m.maxScan = maxScan
+	m.counter.totalScan += width
+	if isAdd {
+		width++
+	}
+	if width > m.counter.Max {
+		m.counter.Max = width
+	}
+
+	if atomic.LoadUint32(&m.debugChainRead) == 1 {
+		// 已读，构造新的chain
+		if threshold := int(atomic.LoadUint32(&m.collisionChainDebugThreshold)); threshold > 0 && width >= threshold {
+			chain := make([]byte, m.KeySize()*width)
+			offset := 0
+			if isAdd {
+				binary.BigEndian.PutUint64(chain, longKey0)
+				binary.BigEndian.PutUint64(chain[8:], longKey1)
+				offset += m.KeySize()
+			}
+			m.generateCollisionChainInLongKey(chain[offset:], slot)
+			m.debugChain.Store(chain)
+			atomic.StoreUint32(&m.debugChainRead, 0)
+		}
+	}
+	return nil, -1
+}
+
+func (m *U128U64DoubleKeyLRU) generateCollisionChainInLongKey(bs []byte, index int32) {
+	offset := 0
+	bsLen := len(bs)
+
+	for hashListNext := m.hashSlotHead[index]; hashListNext != -1 && offset < bsLen; {
+		node := m.getNode(hashListNext)
+		binary.BigEndian.PutUint64(bs[offset:], node.longKey0)
+		binary.BigEndian.PutUint64(bs[offset+8:], node.longKey1)
+		offset += m.KeySize()
+		hashListNext = node.hashListNext
+	}
+}
+
+func (m *U128U64DoubleKeyLRU) generateCollisionChainInShortKey(bs []byte, index int32) {
+	offset := 0
+	bsLen := len(bs)
+
+	for relationHashListNext := m.relationHashSlotHead[index]; relationHashListNext != -1 && offset < bsLen; {
+		node := m.getNode(relationHashListNext)
+		binary.BigEndian.PutUint64(bs[offset:], node.shortKey)
+		offset += m.KeySize()
+		relationHashListNext = node.relationHashListNext
+	}
+}
+
+func (m *U128U64DoubleKeyLRU) GetCollisionChain() []byte {
+	if atomic.LoadUint32(&m.debugChainRead) == 1 {
+		return nil
+	}
+	chain := m.debugChain.Load()
+	atomic.StoreUint32(&m.debugChainRead, 1)
+	if chain == nil {
+		return nil
+	}
+	return chain.([]byte)
+}
+
+func (m *U128U64DoubleKeyLRU) SetCollisionChainDebugThreshold(t int) {
+	atomic.StoreUint32(&m.collisionChainDebugThreshold, uint32(t))
+	// 标记为已读，刷新链
+	if t > 0 {
+		atomic.StoreUint32(&m.debugChainRead, 1)
+	}
+}
+
+func (m *U128U64DoubleKeyLRU) Get(longKey0, longKey1 uint64, peek bool) (interface{}, bool) {
+	longKeyHash := m.compressHash(longKey0, longKey1)
+	node, hashIndex := m.find(longKey0, longKey1, longKeyHash, false)
+	if node != nil {
+		if !peek {
+			m.updateNode(node, hashIndex, node.value)
+		}
+		return node.value, true
 	}
 	return nil, false
 }
@@ -342,8 +447,9 @@ func (m *U128U64DoubleKeyLRU) Get(longKey0, longKey1 uint64, peek bool) (interfa
 func (m *U128U64DoubleKeyLRU) PeekByShortKey(shortKey uint64) ([]interface{}, bool) {
 	maxScan := 0
 	values := []interface{}{}
+	slot := m.compressRelationHash(shortKey)
 
-	for relationHashListNext := m.relationHashSlotHead[m.compressRelationHash(shortKey)]; relationHashListNext != -1; {
+	for relationHashListNext := m.relationHashSlotHead[slot]; relationHashListNext != -1; {
 		node := m.getNode(relationHashListNext)
 		maxScan++
 		if node.shortKey == shortKey {
@@ -351,9 +457,17 @@ func (m *U128U64DoubleKeyLRU) PeekByShortKey(shortKey uint64) ([]interface{}, bo
 		}
 		relationHashListNext = node.relationHashListNext
 	}
-	if maxScan > m.maxScanByShortKey {
-		m.maxScanByShortKey = maxScan
+	if maxScan > m.counter.MaxShortBucket {
+		m.counter.MaxShortBucket = maxScan
 	}
+
+	if threshold := int(atomic.LoadUint32(&m.collisionChainDebugThreshold)); threshold > 0 && maxScan >= threshold {
+		chain := make([]byte, m.KeySize()*maxScan)
+		m.generateCollisionChainInShortKey(chain, slot)
+		m.debugChain.Store(chain)
+		atomic.StoreUint32(&m.debugChainRead, 0)
+	}
+
 	if len(values) > 0 {
 		return values, true
 	}
@@ -393,6 +507,8 @@ func (m *U128U64DoubleKeyLRU) Clear() {
 	m.timeListTail = -1
 
 	m.size = 0
+
+	atomic.StoreUint32(&m.debugChainRead, 1)
 }
 
 func (m *U128U64DoubleKeyLRU) compressHash(longKey0, longKey1 uint64) int32 {
@@ -420,6 +536,7 @@ func NewU128U64DoubleKeyLRU(module string, hashSlots, relationHashSlots, capacit
 		timeListHead: -1,
 		timeListTail: -1,
 		capacity:     capacity,
+		counter:      &DoubleKeyLRUCounter{},
 	}
 
 	for i := 0; i < len(m.hashSlotHead); i++ {
@@ -435,6 +552,7 @@ func NewU128U64DoubleKeyLRU(module string, hashSlots, relationHashSlots, capacit
 		statOptions = append(statOptions, opt)
 	}
 	stats.RegisterCountable("double_key_lru", m, statOptions...)
+	hmap.RegisterForDebug(m)
 
 	return m
 }

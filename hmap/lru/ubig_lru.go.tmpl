@@ -308,7 +308,9 @@ func (m *U{{.}}LRU) find(hash uint32, key []byte, isAdd bool) (*u{{.}}LRUNode, i
 
 func (m *U{{.}}LRU) generateCollisionChainIn(bs []byte, index int32) {
 	offset := 0
-	for hashListNext := m.hashSlotHead[index]; hashListNext != -1; {
+	bsLen := len(bs)
+
+	for hashListNext := m.hashSlotHead[index]; hashListNext != -1 && offset < bsLen; {
 		node := m.getNode(hashListNext)
 		offset += copy(bs[offset:], node.key[:])
 		hashListNext = node.hashListNext
