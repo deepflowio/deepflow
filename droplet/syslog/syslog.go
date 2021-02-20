@@ -124,10 +124,10 @@ func parseSyslog(bs []byte) (*ESLog, error) {
 	return &esLog, nil
 }
 
-func NewSyslogWriter(in queue.QueueReader, esAddresses []string, esUsername, esPassword string) *syslogWriter {
-	esLogger, err := NewESLogger(esAddresses, esUsername, esPassword)
-	if err != nil {
-		log.Warning("elasticsearch rsyslog writer not enabled:", err)
+func NewSyslogWriter(in queue.QueueReader, esEnabled bool, esAddresses []string, esUsername, esPassword string) *syslogWriter {
+	var esLogger *ESLogger
+	if esEnabled {
+		esLogger = NewESLogger(esAddresses, esUsername, esPassword)
 	}
 	writer := &syslogWriter{
 		fileMap:  make(map[uint32]*fileWriter, 8),

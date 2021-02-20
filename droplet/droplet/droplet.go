@@ -63,7 +63,7 @@ func Start(cfg *config.Config, recv *receiver.Receiver) (closers []io.Closer) {
 	recv.RegistHandler(datatype.MESSAGE_TYPE_STATSD, statsdRecvQueues, 1)
 	recv.RegistHandler(datatype.MESSAGE_TYPE_COMPRESS, compressedPacketRecvQueues, 1)
 
-	syslog.NewSyslogWriter(syslogRecvQueues.Readers()[0], cfg.ESHostPorts, cfg.ESAuth.User, cfg.ESAuth.Password)
+	syslog.NewSyslogWriter(syslogRecvQueues.Readers()[0], cfg.ESSyslog, cfg.ESHostPorts, cfg.ESAuth.User, cfg.ESAuth.Password)
 	statsd.NewStatsdWriter(statsdRecvQueues.Readers()[0])
 
 	releaseMetaPacketBlock := func(x interface{}) {
