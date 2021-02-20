@@ -13,6 +13,8 @@ const (
 	ES_TYPE = "events"
 
 	BULK_SIZE = 8192
+
+	RECONNECT_INTERVAL = time.Minute
 )
 
 type ESLog struct {
@@ -26,24 +28,48 @@ type ESLog struct {
 }
 
 type ESLogger struct {
-	client *elastic.Client
-	bulk   *elastic.BulkService
+	addresses []string
+	username  string
+	password  string
+
+	client        *elastic.Client
+	lastReconnect time.Time
+
+	bulk *elastic.BulkService
 }
 
-func NewESLogger(addresses []string, username, password string) (*ESLogger, error) {
-	urls := make([]string, 0, len(addresses))
-	for _, a := range addresses {
+func NewESLogger(addresses []string, username, password string) *ESLogger {
+	return &ESLogger{addresses: addresses, username: username, password: password}
+}
+
+func (l *ESLogger) connect() error {
+	// 第一次连上之后客户端会自动保活，不需要再处理
+	urls := make([]string, 0, len(l.addresses))
+	for _, a := range l.addresses {
 		urls = append(urls, "http://"+a)
 	}
-	log.Debugf("Syslog ESWriter connects to %s", strings.Join(urls, ", "))
-	client, err := elastic.NewClient(elastic.SetURL(urls...), elastic.SetBasicAuth(username, password))
+	log.Infof("Syslog ESWriter connects to %s", strings.Join(urls, ", "))
+	var err error
+	l.client, err = elastic.NewClient(elastic.SetURL(urls...), elastic.SetBasicAuth(l.username, l.password))
 	if err != nil {
-		return nil, err
+		l.client = nil
+		log.Warning("failed connecting to elasticsearch:", err)
+		return err
 	}
-	return &ESLogger{client: client}, nil
+	return nil
 }
 
 func (l *ESLogger) Log(esLog *ESLog) {
+	if l.client == nil {
+		now := time.Now()
+		if now.Sub(l.lastReconnect) < RECONNECT_INTERVAL {
+			return
+		}
+		l.lastReconnect = now
+		if l.connect() != nil {
+			return
+		}
+	}
 	if l.bulk == nil {
 		l.bulk = l.client.Bulk().Type(ES_TYPE)
 	}

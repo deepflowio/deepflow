@@ -16,6 +16,9 @@
 ## stream,roze模块是否启用，默认不启用(处于单独的控制器)
 #stream-roze-enabled: false
 
+## syslog是否写入elasticsearch，默认启用
+#es-syslog: true
+
 ## logfile path
 #log-file: /var/log/droplet/droplet.log
 

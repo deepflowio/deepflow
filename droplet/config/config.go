@@ -32,6 +32,7 @@ type Config struct {
 	Queue          QueueConfig   `yaml:"queue"`
 	RpcTimeout     time.Duration `yaml:"rpc-timeout"`
 	PCap           PCapConfig    `yaml:"pcap"`
+	ESSyslog       bool          `yaml:"es-syslog"`
 }
 
 type AdapterConfig struct {
@@ -144,6 +145,7 @@ func Load(path string) *Config {
 		ControllerPort: 20035,
 		ESHostPorts:    []string{DefaultESHostPort},
 		RpcTimeout:     8,
+		ESSyslog:       true,
 	}
 	if err != nil {
 		log.Warningf("Read config file error:", err)
