@@ -258,7 +258,7 @@ func (n *NetworkLayer) Fill(f *datatype.TaggedFlow, isIPV6 bool) {
 	}
 
 	n.Protocol = uint16(f.Proto)
-	if f.Tunnel.TxId != 0 || f.Tunnel.RxId != 0 {
+	if f.Tunnel.Type != datatype.TUNNEL_TYPE_NONE {
 		n.TunnelTier = f.Tunnel.Tier
 		n.TunnelTxID = f.Tunnel.TxId
 		n.TunnelRxID = f.Tunnel.RxId
