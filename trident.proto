@@ -41,6 +41,13 @@ message CommunicationVtap {
     optional uint32 last_active_time = 2; // 单位：秒
 }
 
+message TsdbReportInfo {
+    optional uint32 tsdb_shard_id = 1;
+    optional string tsdb_replica_ip = 2;
+    optional string tsdb_data_mount_path = 3;
+    optional string pcap_data_mount_path = 4;
+}
+
 message SyncRequest {
     optional uint32 boot_time = 1;
     optional bool config_accepted = 2 [default = true];
@@ -70,8 +77,7 @@ message SyncRequest {
     optional string os = 35;
     optional string kernel_version = 36;
 
-    optional uint32 tsdb_shard_id = 41; // 仅对数据节点有意义
-    optional string tsdb_replica_ip = 42; // 仅对数据节点有意义
+    optional TsdbReportInfo tsdb_report_info = 43; // 仅对数据节点有意义
 }
 
 enum Status {
