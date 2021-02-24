@@ -195,8 +195,8 @@ gitlab.x.lan/platform/influxdb v0.0.0-20200109064655-6c1e420280c5/go.mod h1:60Gw
 gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200107085540-a487142adbe3/go.mod h1:hKFbiUAZcjAFT5S+t/VRwut6gojAB0jHuKranPKZU3M=
 gitlab.x.lan/yunshan/message v0.0.0-20191224131206-b5b841dee36a h1:p2Fds/yR6TtTuAFyoTYXoQDJ/Uies/b0Lv9euomdjcM=
 gitlab.x.lan/yunshan/message v0.0.0-20191224131206-b5b841dee36a/go.mod h1:MypsIdfw74oNofgOqe76rOWsVKRDYZxG9+70BJTsSDk=
-gitlab.x.lan/yunshan/message v0.0.0-20210209090237-31660ff380e3 h1:dIMBvG2ryyErLLobA+KFzofY6tN+UDFyCAyYoMdokTg=
-gitlab.x.lan/yunshan/message v0.0.0-20210209090237-31660ff380e3/go.mod h1:MypsIdfw74oNofgOqe76rOWsVKRDYZxG9+70BJTsSDk=
+gitlab.x.lan/yunshan/message v0.0.0-20210223150003-ce2f342acee5 h1:DcFurl4kIYrigLxpIaXoQczAeKUFIhLKqmXaZePMMeI=
+gitlab.x.lan/yunshan/message v0.0.0-20210223150003-ce2f342acee5/go.mod h1:MypsIdfw74oNofgOqe76rOWsVKRDYZxG9+70BJTsSDk=
 go.uber.org/atomic v1.3.2/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
 go.uber.org/multierr v1.1.0/go.mod h1:wR5kodmAFQ0UK8QlbwjlSNy0Z68gJhDJUG5sjR94q/0=
 go.uber.org/zap v1.9.1/go.mod h1:vwi/ZaCAaUcBkycHslxD9B2zi4UTXhF60s6SWpuDF0Q=
