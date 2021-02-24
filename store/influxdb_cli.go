@@ -3,7 +3,9 @@ package store
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/influxdata/influxdb/client/v2"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
@@ -23,13 +25,17 @@ var dbGroupsMap = map[string][]string{
 
 // zerodoc 的 Latency 结构中的字段都是 非累加聚合
 var unsumableFieldsMap = map[string]bool{
-	"rtt":        true,
-	"rtt_client": true,
-	"rtt_server": true,
-	"srt":        true,
-	"art":        true,
-	"http_rrt":   true,
-	"dns_rrt":    true,
+	"rtt":            true,
+	"rtt_client":     true,
+	"rtt_server":     true,
+	"srt":            true,
+	"art":            true,
+	"rtt_client_max": true,
+	"rtt_server_max": true,
+	"srt_max":        true,
+	"art_max":        true,
+	"http_rrt":       true,
+	"dns_rrt":        true,
 }
 
 type ActionEnum uint8
@@ -39,13 +45,15 @@ const (
 	DEL
 	MOD
 	SHOW
+	UPDATE // 若版本升级，新增field，支持更新CQ
 )
 
 var actionsMap = map[string]ActionEnum{
-	"add":  ADD,
-	"del":  DEL,
-	"mod":  MOD,
-	"show": SHOW,
+	"add":    ADD,
+	"del":    DEL,
+	"mod":    MOD,
+	"show":   SHOW,
+	"update": UPDATE,
 }
 
 type AggrEnum uint8
@@ -94,13 +102,211 @@ type RPHandler struct {
 }
 
 type CQHandler struct {
-	client        client.Client
-	db            string
-	srcRP         string
-	dstRP         string
-	internal      string // 分钟 <xx>m
-	aggrSumable   AggrEnum
-	aggrUnsumable AggrEnum
+	client         client.Client
+	db             string
+	srcRP          string
+	dstRP          string
+	interval       string // 分钟 <xx>m
+	aggrSummable   AggrEnum
+	aggrUnsummable AggrEnum
+}
+
+func initHttpClient(httpAddr, user, password string) (client.Client, error) {
+	HTTPConfig := client.HTTPConfig{Addr: httpAddr, Username: user, Password: password}
+	httpClient, err := client.NewHTTPClient(HTTPConfig)
+	if err != nil {
+		log.Error("create influxdb http client failed:", err)
+		return nil, err
+	}
+
+	if _, _, err = httpClient.Ping(0); err != nil {
+		log.Errorf("http connect to influxdb(%s) failed: %s", httpAddr, err)
+		return nil, err
+	}
+	return httpClient, nil
+}
+
+type CQInfo struct {
+	db      string
+	name    string
+	content string
+}
+
+func GetCQInfos(httpClient client.Client) ([]CQInfo, error) {
+	rows, err := queryRows(httpClient, "", "", "show continuous queries")
+	if err != nil {
+		return nil, err
+	}
+
+	cqInfos := make([]CQInfo, 0)
+	for _, row := range rows {
+		for _, values := range row.Values {
+			if len(values) < 2 {
+				continue
+			}
+			cqInfos = append(cqInfos, CQInfo{
+				db:      row.Name,
+				name:    values[0].(string),
+				content: values[1].(string),
+			})
+		}
+	}
+	return cqInfos, nil
+}
+
+func GetRetentionPolicies(httpClient client.Client, db string) ([]string, error) {
+	response, err := httpClient.Query(client.Query{Command: fmt.Sprintf("SHOW RETENTION POLICIES ON %q", db)})
+	if err := checkResponse(response, err); err != nil {
+		log.Warningf("DB(%s) get retention policies failed: %s", db, err)
+		return nil, err
+	}
+
+	rps := make([]string, 0, 4)
+	for _, result := range response.Results {
+		for _, row := range result.Series {
+			for _, values := range row.Values {
+				if len(values) > 0 {
+					rps = append(rps, values[0].(string))
+				}
+			}
+		}
+	}
+	return rps, nil
+}
+
+// CREATE CONTINUOUS QUERY cq_rp_1h__packet_rx ON vtap_flow_port BEGIN SELECT sum(packet_rx) AS packet_rx INTO vtap_flow_port.rp_1h.main FROM vtap_flow_port.rp_1m.main GROUP BY time(1h), * TZ('Asia/Shanghai') END
+func parseCqContent(cq string) (aggr string, srcRP string, interval string, err error) {
+	sections := strings.Split(cq, " ")
+	sections = append(sections, "") //增加一个空段，不用匹配
+
+	for i, key := range sections {
+		// 最后一个不匹配
+		if i+1 == len(sections) {
+			break
+		}
+		value := sections[i+1]
+		switch key {
+		case "SELECT":
+			for k, v := range aggrsMap {
+				if strings.Index(value, v.String()+"(") > -1 {
+					aggr = k
+					break
+				}
+			}
+		case "FROM":
+			srcRP = strings.Split(value, ".")[1]
+		case "BY":
+			begin := strings.Index(value, "(")
+			end := strings.Index(value, ")")
+			intervalDuration, e := time.ParseDuration(value[begin+1 : end])
+			if e != nil {
+				err = fmt.Errorf("parse interval(%s) failed(%s)", value, e)
+				return
+			}
+			// 转化为分钟
+			interval = strconv.Itoa(int(intervalDuration / time.Minute))
+		}
+	}
+	return
+}
+
+func GetCQParams(cqInfos []CQInfo, db, rp string) *CQHandler {
+	summableCqName := "cq_" + rp + "__packet_rx"
+	unsummableCqName := "cq_" + rp + "__rtt"
+	var srcRP, interval, aggrSummable, aggrUnsummable string
+	var err error
+	for _, cqInfo := range cqInfos {
+		if cqInfo.db == db && cqInfo.name == summableCqName {
+			aggrSummable, srcRP, interval, err = parseCqContent(cqInfo.content)
+			if err != nil {
+				return nil
+			}
+			if aggrUnsummable != "" {
+				break
+			}
+		}
+		if cqInfo.db == db && cqInfo.name == unsummableCqName {
+			aggrUnsummable, _, _, err = parseCqContent(cqInfo.content)
+			if err != nil {
+				return nil
+			}
+			if aggrSummable != "" {
+				break
+			}
+		}
+	}
+	if aggrSummable == "" {
+		return nil
+	}
+	return &CQHandler{
+		db:             db,
+		srcRP:          srcRP,
+		dstRP:          rp,
+		interval:       interval,
+		aggrSummable:   aggrsMap[aggrSummable],
+		aggrUnsummable: aggrsMap[aggrUnsummable],
+	}
+}
+
+/* 提供给droplet-ctl调用, 实现更新CQ:
+   1, 查询vtap_flow, vtap_packet, vtap_wan数据库的RP和CQ信息，提取CQ的参数
+     - 包括原RP，目的RP，聚合时长，可累加聚合信息（以packet_rx为准），不可累加聚合(以rtt的处理为准)
+   2，对所有的数据库根据获取的CQ参数和当前的field信息再次下发CQ，
+     - 若有新增field，则会对新增的field增加CQ命令
+     - 若无新增field，则对已有的CQ重复下发，若和原来的CQ参数不一致，则报错。
+*/
+func UpdateCQs(httpAddr, user, password string) error {
+	httpClient, err := initHttpClient(httpAddr, user, password)
+	if err != nil {
+		return err
+	}
+
+	cqInfos, err := GetCQInfos(httpClient)
+	if err != nil {
+		return err
+	}
+
+	for db, _ := range dbGroupsMap {
+		rps, err := GetRetentionPolicies(httpClient, db)
+		if err != nil {
+			return err
+		}
+
+		for _, rp := range rps {
+			if rp == "rp_1s" || rp == "rp_1m" || rp == "autogen" {
+				continue
+			}
+			if !strings.HasPrefix(rp, "rp_") {
+				continue
+			}
+
+			cqHandler := GetCQParams(cqInfos, db, rp)
+			if cqHandler == nil {
+				continue
+			}
+			interval, _ := strconv.Atoi(cqHandler.interval)
+			aggrSummable := cqHandler.aggrSummable.String()
+			if aggrSummable == "mean" {
+				aggrSummable = "avg"
+			}
+			aggrUnsummable := cqHandler.aggrUnsummable.String()
+			if aggrUnsummable == "mean" {
+				aggrUnsummable = "avg"
+			}
+			cli, err := NewCLIHandler(httpAddr, user, password, db, "update",
+				cqHandler.srcRP, cqHandler.dstRP, aggrSummable, aggrUnsummable, "", interval, 168)
+			log.Info("CQ update:", db, cqHandler.srcRP, cqHandler.dstRP, aggrSummable, aggrUnsummable, interval)
+			fmt.Printf("CQ update: db:%s srcRP:%s dstRP:%s aggrSummable:%s aggrUnsummable:%s interval:%dm\n", db, cqHandler.srcRP, cqHandler.dstRP, aggrSummable, aggrUnsummable, interval)
+			if err != nil {
+				return err
+			}
+			_, err = cli.Run()
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func NewCLIHandler(httpAddr, user, password, dbGroup, action, baseRP, newRP, aggrSummable, aggrUnsummable, RPPrefix string, CQInterval, RPDuration int) (*CLIHandler, error) {
@@ -126,7 +332,7 @@ func NewCLIHandler(httpAddr, user, password, dbGroup, action, baseRP, newRP, agg
 	RPDuration += 2 // 默认多加2小时，防止CQ时数据未写入
 
 	shardDuration := 24
-	if actionEnum == ADD {
+	if actionEnum == ADD || actionEnum == UPDATE {
 		if baseRP == "" {
 			return nil, fmt.Errorf("src rp name is empty")
 		}
@@ -137,7 +343,7 @@ func NewCLIHandler(httpAddr, user, password, dbGroup, action, baseRP, newRP, agg
 			return nil, fmt.Errorf("unsupport aggr unsummable: %s", aggrUnsummable)
 		}
 		if CQInterval < 1 {
-			return nil, fmt.Errorf("CQ internal(%d) must bigger than 0. ", CQInterval)
+			return nil, fmt.Errorf("CQ interval(%d) must bigger than 0. ", CQInterval)
 		}
 		if RPDuration < 0 {
 			return nil, fmt.Errorf("RPDuration(%d) must not smaller than 0. ", RPDuration)
@@ -180,13 +386,13 @@ func NewCLIHandler(httpAddr, user, password, dbGroup, action, baseRP, newRP, agg
 			shardDuration: shardDuration,
 		}
 		cqHandlers[i] = &CQHandler{
-			client:        httpClient,
-			db:            db,
-			srcRP:         baseRP,
-			dstRP:         newRP,
-			internal:      fmt.Sprintf("%dm", CQInterval),
-			aggrSumable:   aggrsMap[aggrSummable],
-			aggrUnsumable: aggrsMap[aggrUnsummable],
+			client:         httpClient,
+			db:             db,
+			srcRP:          baseRP,
+			dstRP:          newRP,
+			interval:       fmt.Sprintf("%dm", CQInterval),
+			aggrSummable:   aggrsMap[aggrSummable],
+			aggrUnsummable: aggrsMap[aggrUnsummable],
 		}
 	}
 
@@ -209,6 +415,10 @@ func (c *CLIHandler) Run() (string, error) {
 			if err := rpHandler.Add(); err != nil {
 				return FAILED, err
 			}
+			if err := cqHandlers.Add(); err != nil {
+				return FAILED, err
+			}
+		case UPDATE:
 			if err := cqHandlers.Add(); err != nil {
 				return FAILED, err
 			}
@@ -363,9 +573,9 @@ func (c *CQHandler) CQName(field string) string {
 }
 
 func (c *CQHandler) genCQCommand(field string) string {
-	aggr := c.aggrSumable
+	aggr := c.aggrSummable
 	if unsumableFieldsMap[field] {
-		aggr = c.aggrUnsumable
+		aggr = c.aggrUnsummable
 	}
 	aggrFunc := fmt.Sprintf("%s(%s)", aggr, field)
 	if aggr == AVG {
@@ -377,7 +587,7 @@ func (c *CQHandler) genCQCommand(field string) string {
 			"SELECT %s AS %s  INTO %s.%s.main FROM %s.main GROUP BY time(%s), * TZ('Asia/Shanghai')"+
 			"END",
 		c.CQName(field), c.db,
-		aggrFunc, field, c.db, c.dstRP, c.srcRP, c.internal)
+		aggrFunc, field, c.db, c.dstRP, c.srcRP, c.interval)
 }
 
 func (c *CQHandler) Del() error {
@@ -454,7 +664,7 @@ func getFields(db string) []string {
 	} else if strings.HasPrefix(db, zerodoc.MeterVTAPNames[zerodoc.PACKET_ID]) {
 		meter = &zerodoc.VTAPUsageMeter{}
 	} else {
-		log.Errorf("db(%s) unsuppor get fields", db)
+		log.Errorf("db(%s) unsupport get fields", db)
 		return nil
 	}
 
