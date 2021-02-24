@@ -31,6 +31,8 @@ const (
 	DefaultRepairInterval          = 60
 	DefaultRepairSyncCountOnce     = 200
 	DefaultReceiverWindowSize      = 1024
+	DefaultTSDBDataPath            = "/var/lib/influxdb"
+	DefaultPcapDataPath            = "/var/lib/pcap"
 )
 
 type RetentionPolicy struct {
@@ -50,9 +52,15 @@ type Auth struct {
 	Password string `yaml:"password"`
 }
 
+type PCapConfig struct {
+	FileDirectory string `yaml:"file-directory"`
+}
+
 type Config struct {
 	ShardID                   int             `yaml:"shard-id"`
 	TSDB                      TSDBAddrs       `yaml:"tsdb"`
+	TSDBDataPath              string          `yaml:"tsdb-data-path"`
+	Pcap                      PCapConfig      `yaml:"pcap"`
 	TSDBAuth                  Auth            `yaml:"tsdb-auth"`
 	DisableSecondWrite        bool            `yaml:"disable-second-write"`
 	DisableSecondWriteReplica bool            `yaml:"disable-second-write-replica"`
@@ -112,6 +120,8 @@ func Load(path string) *Config {
 		RepairSyncCountOnce:       DefaultRepairSyncCountOnce,
 		ReceiverWindowSize:        DefaultReceiverWindowSize,
 		DisableSecondWriteReplica: true,
+		TSDBDataPath:              DefaultTSDBDataPath,
+		Pcap:                      PCapConfig{DefaultPcapDataPath},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		log.Info("no config file, use defaults")
