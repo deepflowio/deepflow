@@ -388,14 +388,6 @@ func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType Ta
 	// step 2: 使用L2EpcId + IP查询L3，如果L2EpcId为0，会查询到DEEPFLOW添加的监控IP
 	if platformData = l.GetDataByEpcIp(endpointInfo.L2EpcId, ip); platformData != nil {
 		endpointInfo.SetL3Data(platformData)
-	} else if endpointInfo.L3EpcId == 0 {
-		// step 3: 查询平台数据WAN接口
-		if platformData := l.GetDataByIp(ip); platformData != nil {
-			endpointInfo.SetL3Data(platformData)
-		} else {
-			// step 4: 查询DEEPFLOW添加的WAN监控网段(cidr)
-			l.setEpcByCidr(ip, EPC_FROM_DEEPFLOW, endpointInfo)
-		}
 	}
 	return endpointInfo
 }
@@ -487,6 +479,32 @@ func (l *CloudPlatformLabeler) ModifyInternetEpcId(endpoints *EndpointData) {
 	}
 }
 
+func (l *CloudPlatformLabeler) GetL3ByWanIp(srcIp, dstIp net.IP, endpointData *EndpointData) bool {
+	srcData, dstData := endpointData.SrcInfo, endpointData.DstInfo
+	found := false
+	if srcData.L3EpcId == 0 {
+		// step 1: 查询平台数据WAN接口
+		if platformData := l.GetDataByIp(srcIp); platformData != nil {
+			srcData.SetL3Data(platformData)
+			found = true
+		} else {
+			// step 2: 查询DEEPFLOW添加的WAN监控网段(cidr)
+			found = l.setEpcByCidr(srcIp, EPC_FROM_DEEPFLOW, srcData) || found
+		}
+	}
+	if dstData.L3EpcId == 0 {
+		// step 1: 查询平台数据WAN接口
+		if platformData := l.GetDataByIp(dstIp); platformData != nil {
+			dstData.SetL3Data(platformData)
+			found = true
+		} else {
+			// step 2: 查询DEEPFLOW添加的WAN监控网段(cidr)
+			found = l.setEpcByCidr(dstIp, EPC_FROM_DEEPFLOW, dstData) || found
+		}
+	}
+	return found
+}
+
 func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	srcIp, dstIp := IpFromUint32(key.SrcIp), IpFromUint32(key.DstIp)
 	// 测试用例key.EthType值未填写，需要通过len(key.Src6Ip)
@@ -495,21 +513,28 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	}
 	// l2: mac查询
 	// l3: l2epc+ip查询
-	// l3: ip查询平台数据WAN接口
-	// l3: ip查询DEEPFLOW添加的WAN监控网段(cidr)
 	srcData := l.GetEndpointInfo(key.SrcMac, srcIp, key.TapType, key.L3End0, key.TunnelId)
 	dstData := l.GetEndpointInfo(key.DstMac, dstIp, key.TapType, key.L3End1, key.TunnelId)
 	// ip地址是否为VIP
 	srcData.IsVIP, dstData.IsVIP = key.IsVIP0, key.IsVIP1
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
-	// l3: 对等连接查询, 以下两种查询
-	// 1). peer epc + ip查询对等连接表
-	// 2). peer epc + ip查询CIDR表
-	l.GetL3ByPeerConnection(srcIp, dstIp, endpoint)
 	// l3: 私有网络 VPC内部路由
 	// 1) 本端IP + 对端EPC查询EPC-IP表
 	// 2) 本端IP + 对端EPC查询CIDR表
 	l.ModifyEndpointData(endpoint, key)
+	// l3: 对等连接查询, 以下两种查询
+	// 1) peer epc + ip查询对等连接表
+	// 2) peer epc + ip查询CIDR表
+	l.GetL3ByPeerConnection(srcIp, dstIp, endpoint)
+	// l3: WAN查询，包括以下两种查询
+	// 1) ip查询平台数据WAN接口
+	// 2) ip查询DEEPFLOW添加的WAN监控网段(cidr)
+	ok := l.GetL3ByWanIp(srcIp, dstIp, endpoint)
+	if ok {
+		// 成功查询到WAN后，重新在内部路由和对等连接中查询
+		l.ModifyEndpointData(endpoint, key)
+		l.GetL3ByPeerConnection(srcIp, dstIp, endpoint)
+	}
 	l.ModifyInternetEpcId(endpoint)
 	return endpoint
 }
