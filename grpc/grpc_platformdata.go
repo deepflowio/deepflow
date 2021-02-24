@@ -94,6 +94,8 @@ type PlatformInfoTable struct {
 	runtimeEnv          utils.RuntimeEnv
 	tsdbShardID         uint32
 	tsdbReplicaIP       string
+	tsdbDataMountPath   string
+	pcapDataMountPath   string
 
 	*GrpcSession
 	ipv4Lock  *sync.RWMutex
@@ -216,7 +218,7 @@ func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID
 }
 
 // 单例模式，只启动一次
-func NewPlatformInfoTable(ips []net.IP, port int, moduleName string, tsdbShardID uint32, tsdbReplicaIP string, receiver *receiver.Receiver) *PlatformInfoTable {
+func NewPlatformInfoTable(ips []net.IP, port int, moduleName string, tsdbShardID uint32, tsdbReplicaIP, tsdbDataPath, pcapDataPath string, receiver *receiver.Receiver) *PlatformInfoTable {
 	table := &PlatformInfoTable{
 		receiver:           receiver,
 		bootTime:           uint32(time.Now().Unix()),
@@ -239,6 +241,8 @@ func NewPlatformInfoTable(ips []net.IP, port int, moduleName string, tsdbShardID
 		runtimeEnv:         utils.GetRuntimeEnv(),
 		tsdbShardID:        tsdbShardID,
 		tsdbReplicaIP:      tsdbReplicaIP,
+		tsdbDataMountPath:  utils.Mountpoint(tsdbDataPath),
+		pcapDataMountPath:  utils.Mountpoint(pcapDataPath),
 	}
 	runOnce := func() {
 		if err := table.Reload(); err != nil {
@@ -555,8 +559,9 @@ func (t *PlatformInfoTable) String() string {
 	sb := &strings.Builder{}
 
 	sb.WriteString(fmt.Sprintf("RegionID:%d   Drop Other RegionID Data Count:%d\n", t.regionID, t.otherRegionCount))
-	sb.WriteString(fmt.Sprintf("moduleName:%s ctlIP:%s hostname:%s RegionID:%d tsdbShardID:%d tsdbReplicaIP:%s  ARCH:%s OS:%s Kernel:%s CPUNum:%d MemorySize:%d\n",
-		t.moduleName, t.ctlIP, t.hostname, t.regionID, t.tsdbShardID, t.tsdbReplicaIP, t.runtimeEnv.Arch, t.runtimeEnv.OS, t.runtimeEnv.KernelVersion, t.runtimeEnv.CpuNum, t.runtimeEnv.MemorySize))
+	sb.WriteString(fmt.Sprintf("moduleName:%s ctlIP:%s hostname:%s RegionID:%d tsdbShardID:%d tsdbReplicaIP:%s tsdbDataMountPath:%s pcapDataMountPath:%s\n",
+		t.moduleName, t.ctlIP, t.hostname, t.regionID, t.tsdbShardID, t.tsdbReplicaIP, t.tsdbDataMountPath, t.pcapDataMountPath))
+	sb.WriteString(fmt.Sprintf("ARCH:%s OS:%s Kernel:%s CPUNum:%d MemorySize:%d\n", t.runtimeEnv.Arch, t.runtimeEnv.OS, t.runtimeEnv.KernelVersion, t.runtimeEnv.CpuNum, t.runtimeEnv.MemorySize))
 	t.ipv4Lock.RLock()
 	if len(t.epcIDIPV4Infos) > 0 {
 		sb.WriteString("\nepcID   ipv4            mac          host            hostID  regionID  deviceType  deviceID    subnetID  podNodeID podNSID podGroupID podID podClusterID azID isVip hitCount\n")
@@ -802,8 +807,12 @@ func (t *PlatformInfoTable) Reload() error {
 			Arch:                proto.String(t.runtimeEnv.Arch),
 			Os:                  proto.String(t.runtimeEnv.OS),
 			KernelVersion:       proto.String(t.runtimeEnv.KernelVersion),
-			TsdbShardId:         proto.Uint32(t.tsdbShardID),
-			TsdbReplicaIp:       proto.String(t.tsdbReplicaIP), // 没有replica则上报空
+			TsdbReportInfo: &trident.TsdbReportInfo{
+				TsdbShardId:       proto.Uint32(t.tsdbShardID),
+				TsdbReplicaIp:     proto.String(t.tsdbReplicaIP),     // 没有replica则上报空
+				TsdbDataMountPath: proto.String(t.tsdbDataMountPath), // 没有取到，则上报空
+				PcapDataMountPath: proto.String(t.pcapDataMountPath),
+			},
 		}
 		client := trident.NewSynchronizerClient(t.GetClient())
 		// 分析器请求消息接口，用于stream, roze
@@ -1057,7 +1066,7 @@ func RegisterPlatformDataCommand(ips []net.IP, port int) *cobra.Command {
 		Use:   "platformData",
 		Short: "get platformData from controller",
 		Run: func(cmd *cobra.Command, args []string) {
-			table := NewPlatformInfoTable(ips, port, "debug", 65535, "", nil)
+			table := NewPlatformInfoTable(ips, port, "debug", 65535, "", "", "", nil)
 			table.Reload()
 			fmt.Println(table)
 		},
