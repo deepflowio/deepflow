@@ -15,7 +15,7 @@ const (
 )
 
 func New(ips []net.IP, port int, processName string, receiver *receiver.Receiver) {
-	PlatformData = grpc.NewPlatformInfoTable(ips, port, processName, 65535, "", receiver)
+	PlatformData = grpc.NewPlatformInfoTable(ips, port, processName, 65535, "", "", "", receiver)
 	debug.ServerRegisterSimple(CMD_PLATFORMDATA, PlatformData)
 }
 
