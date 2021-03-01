@@ -26,13 +26,32 @@ func init() {
 	}
 }
 
+type Query struct {
+	SQL string `json:"sql"`
+
+	IPMaskLen  int `json:"ip_mask_len"`
+	IPMaskLen0 int `json:"ip_mask_len_0"`
+	IPMaskLen1 int `json:"ip_mask_len_1"`
+
+	GroupIDMap []GroupIDMap `json:"group_id_map"`
+	TagIDMap   []TagIDMap   `json:"tag_id_map"`
+
+	NewTagFilters []NewTagFilter `json:"new_tag_filters"`
+
+	CustomTagMap []KeyValuePair `json:"custom_tag_map"`
+
+	GroupByTags []AdaptiveGroupBy `json:"group_by_tags"`
+}
+
 type QueryData struct {
 	QueryID        uint32   `json:"query_id"`
 	DBPort         uint16   `json:"db_port"`
-	SQL            string   `json:"sql"`
 	Reciters       []string `json:"reciters"`
 	ThisReciter    int      `json:"this_reciter"`
 	ReduceReciters []string `json:"reduce_reciters"`
+
+	/* 老查询结构体, 逐步废弃 */
+	SQL string `json:"sql"`
 
 	IPMaskLen  int `json:"ip_mask_len"`
 	IPMaskLen0 int `json:"ip_mask_len_0"`
@@ -47,7 +66,12 @@ type QueryData struct {
 
 	GroupByTags         []TagName         `json:"group_by_tags"`
 	AdaptiveGroupByTags []AdaptiveGroupBy `json:"adaptive_group_by_tags"`
-	GroupByTime         `json:"group_by_time"`
+	/* 老查询结构体 */
+
+	/* 新查询结构体 */
+	Queries []Query `json:"queries"`
+
+	GroupByTime `json:"group_by_time"`
 	// 时间单位，默认值ms，毫秒
 	TimeUnit `json:"time_unit"`
 
