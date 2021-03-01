@@ -228,16 +228,9 @@ func (t *MiniTag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEnc
 	srcMAC, dstMAC := t.MAC, t.MAC1
 	srcEpc, dstEpc := t.L3EpcID, t.L3EpcID1
 	var tapSide TAPSideEnum
-	// 对于底层存储的数据，0方向为客户端，1方向为服务端，而Minitag中的数据方向为采集端到其他主机，
-	// 这里根据Direction判断是否需要颠倒统计字段
 	if code&Direction != 0 && code.HasEdgeTagField() {
 		code |= TAPSide
 		code &= ^Direction
-		if t.Direction.EdgeTagFieldNeedReverse() {
-			srcIP, dstIP = dstIP, srcIP
-			srcEpc, dstEpc = dstEpc, srcEpc
-			srcMAC, dstMAC = dstMAC, srcMAC
-		}
 		tapSide = t.Direction.ToTAPSide()
 	}
 	encoder.WriteU64(uint64(code))

@@ -122,7 +122,6 @@ func TestMarshallToInfluxdb(t *testing.T) {
 }
 
 func checkTagAndMiniTagEqual(tag *Tag, miniTag *MiniTag) bool {
-	reversed := false
 	if miniTag.Code&Direction != 0 && miniTag.HasEdgeTagField() || tag.Code&TAPSide != 0 {
 		if miniTag.Code&Direction == 0 || !miniTag.HasEdgeTagField() {
 			return false
@@ -133,7 +132,6 @@ func checkTagAndMiniTagEqual(tag *Tag, miniTag *MiniTag) bool {
 		if tag.Code & ^TAPSide != miniTag.Code & ^Direction {
 			return false
 		}
-		reversed = tag.TAPSide == Server
 	} else if tag.Code != miniTag.Code {
 		return false
 	}
@@ -143,10 +141,6 @@ func checkTagAndMiniTagEqual(tag *Tag, miniTag *MiniTag) bool {
 
 	srcIP, dstIP := miniTag.IP(), miniTag.IP1()
 	srcEpc, dstEpc := miniTag.L3EpcID, miniTag.L3EpcID1
-	if reversed {
-		srcIP, dstIP = dstIP, srcIP
-		srcEpc, dstEpc = dstEpc, srcEpc
-	}
 
 	code := tag.Code
 
