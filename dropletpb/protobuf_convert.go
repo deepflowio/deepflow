@@ -4,12 +4,15 @@ import (
 	"net"
 	"strings"
 
+	logging "github.com/op/go-logging"
 	"gitlab.x.lan/yunshan/message/trident"
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/policy"
 	. "gitlab.x.lan/yunshan/droplet-libs/utils"
 )
+
+var log = logging.MustGetLogger("dropletpb")
 
 func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	macInt := vifData.GetMac()
@@ -18,6 +21,7 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	for _, ipResource := range vifData.IpResources {
 		fixIp := ParserStringIp(ipResource.GetIp())
 		if fixIp == nil {
+			log.Warningf("Platform(%v) has invalid ip-resource(%s).", vifData, ipResource.GetIp())
 			continue
 		}
 
@@ -77,6 +81,7 @@ func Convert2Vips(datas []string) ([]net.IP, []net.IP) {
 	for _, data := range datas {
 		ip := net.ParseIP(data)
 		if ip == nil {
+			log.Warningf("Vip has invalid ip(%s).", data)
 			continue
 		}
 		if ipv4 := ip.To4(); ipv4 != nil {
@@ -90,6 +95,7 @@ func Convert2Vips(datas []string) ([]net.IP, []net.IP) {
 
 func newIpGroupData(ipGroup *trident.Group) *policy.IpGroupData {
 	if ipGroup == nil || (ipGroup.GetIps() == nil && ipGroup.GetIpRanges() == nil) {
+		log.Warningf("IpGroup(%v) is invalid.", ipGroup)
 		return nil
 	}
 
@@ -101,11 +107,13 @@ func newIpGroupData(ipGroup *trident.Group) *policy.IpGroupData {
 		for _, ipRange := range ipGroup.GetIpRanges() {
 			ipPeers := strings.Split(ipRange, "-")
 			if ipPeers == nil || len(ipPeers) != 2 {
+				log.Warningf("IpGroup(%v) has invalid ip-range(%s).", ipGroup, ipRange)
 				continue
 			}
 			startIp := ParserStringIp(ipPeers[0])
 			endIp := ParserStringIp(ipPeers[1])
 			if startIp == nil || endIp == nil {
+				log.Warningf("IpGroup(%v) has invalid ip-range(%s).", ipGroup, ipRange)
 				continue
 			}
 			for _, ip := range datatype.IpRangeConvert2CIDR(startIp, endIp) {
@@ -225,10 +233,12 @@ func Convert2PeerConnections(datas []*trident.PeerConnection) []*datatype.PeerCo
 
 func newCidr(data *trident.Cidr) *datatype.Cidr {
 	if len(data.GetPrefix()) == 0 {
+		log.Warningf("Cidr(%v) is invalid.", data)
 		return nil
 	}
 	_, ipNet, err := net.ParseCIDR(data.GetPrefix())
 	if err != nil {
+		log.Warningf("Cidr(%v) has invalid prefix(%s).", data, data.GetPrefix())
 		return nil
 	}
 
