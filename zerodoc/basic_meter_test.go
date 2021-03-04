@@ -94,7 +94,7 @@ func initMeter(m interface{}, n uint64) {
 	for i := 0; i < v.NumField(); i++ {
 		f := v.Field(i)
 		switch f.Kind() {
-		case reflect.Uint64:
+		case reflect.Uint64, reflect.Uint32:
 			f.SetUint(n)
 		default:
 			continue
@@ -112,9 +112,8 @@ func TestMerge(t *testing.T) {
 		t.Errorf("Traffic ConcurrentMerge failed, expected:%v, actual:%v", t2, t1)
 	}
 
-	l1, l2 := &Latency{}, &Latency{}
+	l1, l2 := &Latency{}, &Latency{1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2}
 	initMeter(l1, 1)
-	initMeter(l2, 2)
 	l1.ConcurrentMerge(l1)
 	if *l1 != *l2 {
 		t.Errorf("Latency ConcurrentMerge failed, expected:%v, actual:%v", l2, l1)
