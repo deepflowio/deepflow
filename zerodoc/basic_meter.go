@@ -131,6 +131,14 @@ func (t *Traffic) MarshalTo(b []byte) int {
 }
 
 type Latency struct {
+	RTTMax       uint32 `db:"rtt_max"`        // us，Trident保证时延最大值不会超过3600s，能容纳在u32内
+	RTTClientMax uint32 `db:"rtt_client_max"` // us
+	RTTServerMax uint32 `db:"rtt_server_max"` // us
+	SRTMax       uint32 `db:"srt_max"`        // us
+	ARTMax       uint32 `db:"art_max"`        // us
+	HTTPRRTMax   uint32 `db:"http_rrt_max"`   // us
+	DNSRRTMax    uint32 `db:"dns_rrt_max"`    // us
+
 	RTTSum       uint64 `db:"rtt_sum"`        // us
 	RTTClientSum uint64 `db:"rtt_client_sum"` // us
 	RTTServerSum uint64 `db:"rtt_server_sum"` // us
@@ -139,7 +147,7 @@ type Latency struct {
 	HTTPRRTSum   uint64 `db:"http_rrt_sum"`   // us
 	DNSRRTSum    uint64 `db:"dns_rrt_sum"`    // us
 
-	RTTCount       uint64 `db:"rtt_count"`
+	RTTCount       uint64 `db:"rtt_count"` // XXX：考虑优化为u32，因为1分钟内时延计算量预期应该在40亿次以内
 	RTTClientCount uint64 `db:"rtt_client_count"`
 	RTTServerCount uint64 `db:"rtt_server_count"`
 	SRTCount       uint64 `db:"srt_count"`
@@ -152,6 +160,14 @@ func (_ *Latency) Reverse() {
 }
 
 func (l *Latency) Encode(encoder *codec.SimpleEncoder) {
+	encoder.WriteVarintU32(l.RTTMax)
+	encoder.WriteVarintU32(l.RTTClientMax)
+	encoder.WriteVarintU32(l.RTTServerMax)
+	encoder.WriteVarintU32(l.SRTMax)
+	encoder.WriteVarintU32(l.ARTMax)
+	encoder.WriteVarintU32(l.HTTPRRTMax)
+	encoder.WriteVarintU32(l.DNSRRTMax)
+
 	encoder.WriteVarintU64(l.RTTSum)
 	encoder.WriteVarintU64(l.RTTClientSum)
 	encoder.WriteVarintU64(l.RTTServerSum)
@@ -170,6 +186,14 @@ func (l *Latency) Encode(encoder *codec.SimpleEncoder) {
 }
 
 func (l *Latency) Decode(decoder *codec.SimpleDecoder) {
+	l.RTTMax = decoder.ReadVarintU32()
+	l.RTTClientMax = decoder.ReadVarintU32()
+	l.RTTServerMax = decoder.ReadVarintU32()
+	l.SRTMax = decoder.ReadVarintU32()
+	l.ARTMax = decoder.ReadVarintU32()
+	l.HTTPRRTMax = decoder.ReadVarintU32()
+	l.DNSRRTMax = decoder.ReadVarintU32()
+
 	l.RTTSum = decoder.ReadVarintU64()
 	l.RTTClientSum = decoder.ReadVarintU64()
 	l.RTTServerSum = decoder.ReadVarintU64()
@@ -188,6 +212,28 @@ func (l *Latency) Decode(decoder *codec.SimpleDecoder) {
 }
 
 func (l *Latency) ConcurrentMerge(other *Latency) {
+	if l.RTTMax < other.RTTMax {
+		l.RTTMax = other.RTTMax
+	}
+	if l.RTTClientMax < other.RTTClientMax {
+		l.RTTClientMax = other.RTTClientMax
+	}
+	if l.RTTServerMax < other.RTTServerMax {
+		l.RTTServerMax = other.RTTServerMax
+	}
+	if l.SRTMax < other.SRTMax {
+		l.SRTMax = other.SRTMax
+	}
+	if l.ARTMax < other.ARTMax {
+		l.ARTMax = other.ARTMax
+	}
+	if l.HTTPRRTMax < other.HTTPRRTMax {
+		l.HTTPRRTMax = other.HTTPRRTMax
+	}
+	if l.DNSRRTMax < other.DNSRRTMax {
+		l.DNSRRTMax = other.DNSRRTMax
+	}
+
 	l.RTTSum += other.RTTSum
 	l.RTTClientSum += other.RTTClientSum
 	l.RTTServerSum += other.RTTServerSum
@@ -211,7 +257,7 @@ func (l *Latency) SequentialMerge(other *Latency) {
 }
 
 func (l *Latency) MarshalTo(b []byte) int {
-	fields := []string{"rtt=", "rtt_client=", "rtt_server=", "srt=", "art=", "http_rrt=", "dns_rrt="}
+	fields := []string{"rtt=", "rtt_client=", "rtt_server=", "srt=", "art=", "http_rrt=", "dns_rrt=", "rtt_max=", "rtt_client_max=", "rtt_server_max=", "srt_max=", "art_max=", "http_rrt_max=", "dns_rrt_max="}
 	dividends := []uint64{l.RTTSum, l.RTTClientSum, l.RTTServerSum, l.SRTSum, l.ARTSum, l.HTTPRRTSum, l.DNSRRTSum}
 	divisors := []uint64{l.RTTCount, l.RTTClientCount, l.RTTServerCount, l.SRTCount, l.ARTCount, l.HTTPRRTCount, l.DNSRRTCount}
 	values := make([]uint64, len(dividends))
@@ -221,6 +267,11 @@ func (l *Latency) MarshalTo(b []byte) int {
 		}
 		values[i] = dividends[i] / divisor
 	}
+	rrtMaxValues := []uint64{
+		uint64(l.RTTMax), uint64(l.RTTClientMax), uint64(l.RTTServerMax), uint64(l.SRTMax), uint64(l.ARTMax), uint64(l.HTTPRRTMax), uint64(l.DNSRRTMax),
+	}
+	values = append(values, rrtMaxValues...)
+
 	return marshalKeyValues(b, fields, values)
 }
 
