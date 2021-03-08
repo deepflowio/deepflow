@@ -86,9 +86,7 @@ func MarshalFlow(f *datatype.TaggedFlow, bytes *utils.ByteBuffer) error {
 
 	// TCP Perf Data
 	if f.FlowPerfStats != nil {
-		if f.RTTCount > 0 {
-			flow.RttAvg = proto.Uint64(uint64(f.RTTSum / f.RTTCount))
-		}
+		flow.RttAvg = proto.Uint64(uint64(f.RTT))
 		if f.RTTClientCount > 0 {
 			flow.RttClientAvg = proto.Uint64(uint64(f.RTTClientSum / f.RTTClientCount))
 		}
