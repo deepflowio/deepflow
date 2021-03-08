@@ -80,7 +80,6 @@ type TCPPerfStats struct { // 除特殊说明外，均为每个流统计周期�
 	RTTServerSum   uint32 // us
 	SRTSum         uint32 // us
 	ARTSum         uint32 // us，UDP复用
-	RTTCount       uint32
 	RTTClientCount uint32
 	RTTServerCount uint32
 	SRTCount       uint32
@@ -110,19 +109,19 @@ const (
 	L7_PROTOCOL_MAX
 )
 
-// size = 10 * 4B = 40B
+// size = 9 * 4B = 36B
 type L7PerfStats struct {
 	RequestCount   uint32
 	ResponseCount  uint32
 	ErrClientCount uint32 // client端原因导致的响应异常数量
 	ErrServerCount uint32 // server端原因导致的响应异常数量
 	ErrTimeout     uint32 // request请求timeout数量
-	RRTCount       uint64
+	RRTCount       uint32 // u32可记录40000M时延，一条流在一分钟内的请求数远无法达到此数值
 	RRTSum         uint64 // us RRT(Request Response Time)
 	RRTMax         uint32 // us RRT(Request Response Time)，Trident保证在3600s以内
 }
 
-// size = 80B + 40B + 2B = 122B
+// size = 80B + 36B + 2B = 118B
 type FlowPerfStats struct {
 	TCPPerfStats
 	L7PerfStats
@@ -772,7 +771,7 @@ func (p *L7PerfStats) Decode(decoder *codec.SimpleDecoder) {
 	p.ErrClientCount = decoder.ReadVarintU32()
 	p.ErrServerCount = decoder.ReadVarintU32()
 	p.ErrTimeout = decoder.ReadVarintU32()
-	p.RRTCount = decoder.ReadVarintU64()
+	p.RRTCount = decoder.ReadVarintU32()
 	p.RRTSum = decoder.ReadVarintU64()
 	p.RRTMax = decoder.ReadVarintU32()
 }
@@ -783,7 +782,7 @@ func (p *L7PerfStats) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU32(p.ErrClientCount)
 	encoder.WriteVarintU32(p.ErrServerCount)
 	encoder.WriteVarintU32(p.ErrTimeout)
-	encoder.WriteVarintU64(p.RRTCount)
+	encoder.WriteVarintU32(p.RRTCount)
 	encoder.WriteVarintU64(p.RRTSum)
 	encoder.WriteVarintU32(p.RRTMax)
 }
