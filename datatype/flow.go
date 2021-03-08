@@ -70,14 +70,13 @@ type TcpPerfCountsPeer struct {
 // size = 20 * 4B = 80Byte
 // UDPPerfStats仅有2个字段，复用ARTSum, ARTCount
 type TCPPerfStats struct { // 除特殊说明外，均为每个流统计周期（目前是自然分）清零
-	RTTMax       uint32 // us，Trident保证时延最大值不会超过3600s，能容纳在u32内
-	RTTClientMax uint32 // us
+	RTTClientMax uint32 // us，Trident保证时延最大值不会超过3600s，能容纳在u32内
 	RTTServerMax uint32 // us
 	SRTMax       uint32 // us
 	ARTMax       uint32 // us，UDP复用
 
-	RTTSum         uint32 // us，假定一条流在一分钟内的时延加和不会超过u32
-	RTTClientSum   uint32 // us
+	RTT            uint32 // us，TCP建连过程，只会计算出一个RTT
+	RTTClientSum   uint32 // us，假定一条流在一分钟内的时延加和不会超过u32
 	RTTServerSum   uint32 // us
 	SRTSum         uint32 // us
 	ARTSum         uint32 // us，UDP复用
@@ -337,9 +336,6 @@ func (t *TcpPerfCountsPeer) Decode(decoder *codec.SimpleDecoder) {
 }
 
 func (f *TCPPerfStats) SequentialMerge(rhs *TCPPerfStats) {
-	if f.RTTMax < rhs.RTTMax {
-		f.RTTMax = rhs.RTTMax
-	}
 	if f.RTTClientMax < rhs.RTTClientMax {
 		f.RTTClientMax = rhs.RTTClientMax
 	}
@@ -353,12 +349,13 @@ func (f *TCPPerfStats) SequentialMerge(rhs *TCPPerfStats) {
 		f.ARTMax = rhs.ARTMax
 	}
 
-	f.RTTSum += rhs.RTTSum
+	if f.RTT < rhs.RTT {
+		f.RTT = rhs.RTT
+	}
 	f.RTTClientSum += rhs.RTTClientSum
 	f.RTTServerSum += rhs.RTTServerSum
 	f.SRTSum += rhs.SRTSum
 	f.ARTSum += rhs.ARTSum
-	f.RTTCount += rhs.RTTCount
 	f.RTTClientCount += rhs.RTTClientCount
 	f.RTTServerCount += rhs.RTTServerCount
 	f.SRTCount += rhs.SRTCount
@@ -376,18 +373,16 @@ func (f *TCPPerfStats) Reverse() {
 
 func (f *TCPPerfStats) Encode(encoder *codec.SimpleEncoder, l4Protocol L4Protocol) {
 	if l4Protocol == L4_PROTOCOL_TCP {
-		encoder.WriteVarintU32(f.RTTMax)
 		encoder.WriteVarintU32(f.RTTClientMax)
 		encoder.WriteVarintU32(f.RTTServerMax)
 		encoder.WriteVarintU32(f.SRTMax)
 		encoder.WriteVarintU32(f.ARTMax)
 
-		encoder.WriteVarintU32(f.RTTSum)
+		encoder.WriteVarintU32(f.RTT)
 		encoder.WriteVarintU32(f.RTTClientSum)
 		encoder.WriteVarintU32(f.RTTServerSum)
 		encoder.WriteVarintU32(f.SRTSum)
 		encoder.WriteVarintU32(f.ARTSum)
-		encoder.WriteVarintU32(f.RTTCount)
 		encoder.WriteVarintU32(f.RTTClientCount)
 		encoder.WriteVarintU32(f.RTTServerCount)
 		encoder.WriteVarintU32(f.SRTCount)
@@ -406,18 +401,16 @@ func (f *TCPPerfStats) Encode(encoder *codec.SimpleEncoder, l4Protocol L4Protoco
 
 func (f *TCPPerfStats) Decode(decoder *codec.SimpleDecoder, l4Protocol L4Protocol) {
 	if l4Protocol == L4_PROTOCOL_TCP {
-		f.RTTMax = decoder.ReadVarintU32()
 		f.RTTClientMax = decoder.ReadVarintU32()
 		f.RTTServerMax = decoder.ReadVarintU32()
 		f.SRTMax = decoder.ReadVarintU32()
 		f.ARTMax = decoder.ReadVarintU32()
 
-		f.RTTSum = decoder.ReadVarintU32()
+		f.RTT = decoder.ReadVarintU32()
 		f.RTTClientSum = decoder.ReadVarintU32()
 		f.RTTServerSum = decoder.ReadVarintU32()
 		f.SRTSum = decoder.ReadVarintU32()
 		f.ARTSum = decoder.ReadVarintU32()
-		f.RTTCount = decoder.ReadVarintU32()
 		f.RTTClientCount = decoder.ReadVarintU32()
 		f.RTTServerCount = decoder.ReadVarintU32()
 		f.SRTCount = decoder.ReadVarintU32()
@@ -657,12 +650,11 @@ func (p *L7PerfStats) String() string {
 
 func (p *TCPPerfStats) String() string {
 	formatted := ""
-	formatted += fmt.Sprintf("RTTMax:%v ", p.RTTMax)
 	formatted += fmt.Sprintf("RTTClientMax:%v ", p.RTTClientMax)
 	formatted += fmt.Sprintf("RTTServerMax:%v ", p.RTTServerMax)
 	formatted += fmt.Sprintf("SRTMax:%v ", p.SRTMax)
 	formatted += fmt.Sprintf("ARTMax:%v ", p.ARTMax)
-	formatted += fmt.Sprintf("RTTSum:%v ", p.RTTSum)
+	formatted += fmt.Sprintf("RTT:%v ", p.RTT)
 	formatted += fmt.Sprintf("RTTClientSum:%v ", p.RTTClientSum)
 	formatted += fmt.Sprintf("RTTServerSum:%v ", p.RTTServerSum)
 	formatted += fmt.Sprintf("SRTSum:%v ", p.SRTSum)
