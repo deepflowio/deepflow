@@ -7,11 +7,14 @@ import (
 	"os"
 	"strconv"
 	"time"
+	"unicode"
 
+	logging "github.com/op/go-logging"
 	"github.com/spf13/cobra"
 	"gitlab.x.lan/yunshan/droplet-libs/debug"
 	"gitlab.x.lan/yunshan/droplet-libs/grpc"
 	"gitlab.x.lan/yunshan/droplet-libs/receiver"
+	"gitlab.x.lan/yunshan/droplet-libs/store"
 	"gitlab.x.lan/yunshan/droplet/droplet/adapter"
 
 	"gitlab.x.lan/yunshan/droplet/config"
@@ -20,6 +23,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet/droplet/queue"
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
 	"gitlab.x.lan/yunshan/droplet/dropletctl/rpc"
+	rozecfg "gitlab.x.lan/yunshan/droplet/roze/config"
 	roze "gitlab.x.lan/yunshan/droplet/roze/platformdata"
 	stream "gitlab.x.lan/yunshan/droplet/stream/platformdata"
 )
@@ -58,6 +62,9 @@ func main() {
 	root.AddCommand(debug.RegisterLogLevelCommand())
 	root.AddCommand(RegisterTimeConvertCommand())
 	root.AddCommand(grpc.RegisterPlatformDataCommand(controllers, int(cfg.ControllerPort)))
+	rozeconfig := rozecfg.Load(dropletctl.ConfigPath)
+
+	root.AddCommand(RegisterUpdateCQCommand(rozeconfig.TSDBAuth.Username, rozeconfig.TSDBAuth.Password))
 
 	dropletCmd.AddCommand(queue.RegisterCommand(dropletctl.DROPLETCTL_QUEUE, []string{
 		"1-receiver-to-statsd",
@@ -88,6 +95,36 @@ func main() {
 	root.Execute()
 }
 
+// 从字符串中解析出所有时间(大于100000000)
+func getTimeInts(ts string) []time.Time {
+	ints := make([]string, 0)
+	j := 0
+	for i := 0; i < len(ts); i++ {
+		if unicode.IsDigit(rune(ts[i])) {
+			if len(ints) <= j {
+				ints = append(ints, "")
+			}
+			ints[j] = ints[j] + ts[i:i+1]
+		} else {
+			if len(ints) > j {
+				j++
+			}
+		}
+	}
+	times := make([]time.Time, 0)
+	for _, k := range ints {
+		timeInt, err := strconv.ParseInt(k, 10, 64)
+		if err == nil && timeInt > 100000000 {
+			if timeInt > 100000000000000000 {
+				times = append(times, time.Unix(0, timeInt))
+			} else {
+				times = append(times, time.Unix(timeInt, 0))
+			}
+		}
+	}
+	return times
+}
+
 func RegisterTimeConvertCommand() *cobra.Command {
 	eg := "time format eg: '2020-03-27T07:06:00Z', '1585292760000000000', '1585292760'"
 	cmd := &cobra.Command{
@@ -110,8 +147,16 @@ func RegisterTimeConvertCommand() *cobra.Command {
 			} else {
 				err = ts.UnmarshalText([]byte(timeToConvert))
 				if err != nil {
-					fmt.Printf("unsupport time format '%s'\n", timeToConvert)
-					fmt.Println(eg)
+					times := getTimeInts(timeToConvert)
+					if len(times) == 0 {
+						fmt.Printf("unsupport time format '%s'\n", timeToConvert)
+						fmt.Println(eg)
+					} else {
+						fmt.Printf("'%s' is convert to:\n", timeToConvert)
+						for _, t := range times {
+							fmt.Printf("Unix:     %d\nUnixNano: %d\nString:   %s\n\n", t.Unix(), t.UnixNano(), t)
+						}
+					}
 					return
 				}
 			}
@@ -119,5 +164,22 @@ func RegisterTimeConvertCommand() *cobra.Command {
 		},
 	}
 
+	return cmd
+}
+
+func RegisterUpdateCQCommand(tsdbUser, tsdbPassword string) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "cq-update",
+		Short: "update continuous queries",
+		Run: func(cmd *cobra.Command, args []string) {
+			logging.SetLevel(logging.WARNING, "")
+			err := store.UpdateCQs("http://127.0.0.1:20044", tsdbUser, tsdbPassword)
+			if err != nil {
+				fmt.Println("failed", err)
+			} else {
+				fmt.Println("success")
+			}
+		},
+	}
 	return cmd
 }
