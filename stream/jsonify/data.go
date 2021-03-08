@@ -137,12 +137,17 @@ type Metrics struct {
 	TotalByteRx     uint64 `json:"total_byte_rx,omitempty"`
 	L7Request       uint32 `json:"l7_request,omitempty"`
 	L7Response      uint32 `json:"l7_response,omitempty"`
-	RTTClient       uint32 `json:"rtt_client,omitempty"` // us
-	RTTServer       uint32 `json:"rtt_server,omitempty"` // us
-	RTT             uint32 `json:"rtt,omitempty"`        // us
-	SRT             uint32 `json:"srt,omitempty"`        // us
-	ART             uint32 `json:"art,omitempty"`        // us
-	RRT             uint32 `json:"rrt,omitempty"`        // us
+	RTTClient       uint32 `json:"rtt_client,omitempty"`     // us
+	RTTServer       uint32 `json:"rtt_server,omitempty"`     // us
+	RTT             uint32 `json:"rtt,omitempty"`            // us
+	SRT             uint32 `json:"srt,omitempty"`            // us
+	ART             uint32 `json:"art,omitempty"`            // us
+	RRT             uint32 `json:"rrt,omitempty"`            // us
+	RTTClientMax    uint32 `json:"rtt_client_max,omitempty"` // us
+	RTTServerMax    uint32 `json:"rtt_server_max,omitempty"` // us
+	SRTMax          uint32 `json:"srt_max,omitempty"`        // us
+	ARTMax          uint32 `json:"art_max,omitempty"`        // us
+	RRTMax          uint32 `json:"rrt_max,omitempty"`        // us
 	RetransTx       uint32 `json:"retrans_tx,omitempty"`
 	RetransRx       uint32 `json:"retrans_rx,omitempty"`
 	ZeroWinTx       uint32 `json:"zero_win_tx,omitempty"`
@@ -418,9 +423,7 @@ func (m *Metrics) Fill(f *datatype.TaggedFlow) {
 			m.RTTServer = f.TCPPerfStats.RTTServerSum / f.TCPPerfStats.RTTServerCount
 		}
 
-		if f.TCPPerfStats.RTTCount != 0 {
-			m.RTT = f.TCPPerfStats.RTTSum / f.TCPPerfStats.RTTCount
-		}
+		m.RTT = f.TCPPerfStats.RTT
 		if f.TCPPerfStats.SRTCount != 0 {
 			m.SRT = f.TCPPerfStats.SRTSum / f.TCPPerfStats.SRTCount
 		}
@@ -428,8 +431,13 @@ func (m *Metrics) Fill(f *datatype.TaggedFlow) {
 			m.ART = f.TCPPerfStats.ARTSum / f.TCPPerfStats.ARTCount
 		}
 		if f.L7PerfStats.RRTCount != 0 {
-			m.RRT = f.L7PerfStats.RRTSum / f.L7PerfStats.RRTCount
+			m.RRT = uint32(f.L7PerfStats.RRTSum / uint64(f.L7PerfStats.RRTCount))
 		}
+		m.RTTClientMax = f.TCPPerfStats.RTTClientMax
+		m.RTTServerMax = f.TCPPerfStats.RTTServerMax
+		m.SRTMax = f.TCPPerfStats.SRTMax
+		m.ARTMax = f.TCPPerfStats.ARTMax
+		m.RRTMax = f.L7PerfStats.RRTMax
 
 		m.RetransTx = f.TCPPerfStats.TcpPerfCountsPeers[0].RetransCount
 		m.RetransRx = f.TCPPerfStats.TcpPerfCountsPeers[1].RetransCount
