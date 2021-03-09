@@ -34,4 +34,5 @@ message License {
     optional int32 controller_count_multi_region_feature = 24; //跨区域时，多区域Feature授权的数量
     optional int32 vtap_count_type8 = 25 [default = 0]; // 隧道解封装类型采集器
     optional int32 vtap_count_type9 = 26 [default = 0]; // Hyper-V采集器
+    optional int32 vtap_count_typec = 27 [default = 0]; // C类采集器
 }
