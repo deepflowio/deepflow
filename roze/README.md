@@ -169,6 +169,13 @@ vtap_packet_edge       rp_1m,rp_1s   main          _id,_tid,az_id_0,az_id_1,host
 | art                   | 表示所有应用响应时间均值              | 1m           | us   |
 | http_rrt              | 表示所有HTTP请求响应时延均值          | 1m           | us   |
 | dns_rrt               | 表示所有DNS请求响应时延均值           | 1m           | us   |
+| rtt_max               | 表示建立连接RTT最大值                 | 1m           | us   |
+| rtt_client_max        | 表示客户端建立连接RTT最大值           | 1m           | us   |
+| rtt_server_max        | 表示服务端建立连接RTT最大值           | 1m           | us   |
+| srt_max               | 表示所有系统响应时间最大值            | 1m           | us   |
+| art_max               | 表示所有应用响应时间最大值            | 1m           | us   |
+| http_rrt_max          | 表示所有HTTP请求响应时延最大值        | 1m           | us   |
+| dns_rrt_max           | 表示所有DNS请求响应时延最大值         | 1m           | us   |
 
 ## 3.3. TCP包异常
 
