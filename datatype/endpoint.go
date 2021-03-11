@@ -2,6 +2,7 @@ package datatype
 
 import (
 	"fmt"
+	"net"
 	"reflect"
 
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
@@ -38,8 +39,9 @@ const (
 )
 
 type EndpointInfo struct {
-	L2EpcId        int32 // 负数表示特殊值
-	L3EpcId        int32 // 负数表示特殊值
+	RealIP         net.IP // IsVIP为true时，该字段有值
+	L2EpcId        int32  // 负数表示特殊值
+	L3EpcId        int32  // 负数表示特殊值
 	L2End          bool
 	L3End          bool
 	IsDevice       bool

@@ -252,9 +252,9 @@ func (t *PolicyTable) EnableAclData() {
 func (t *PolicyTable) GetEndpointInfo(mac uint64, ip net.IP, inPort uint32) *EndpointInfo {
 	var endpointInfo *EndpointInfo
 	if PortInDeepflowExporter(inPort) {
-		endpointInfo = t.cloudPlatformLabeler.GetEndpointInfo(mac, ip, TAP_TOR, true, 0)
+		endpointInfo = t.cloudPlatformLabeler.GetEndpointInfo(mac, ip, TAP_TOR, true, false, 0)
 	} else {
-		endpointInfo = t.cloudPlatformLabeler.GetEndpointInfo(mac, ip, TAP_ISP_MIN, true, 0)
+		endpointInfo = t.cloudPlatformLabeler.GetEndpointInfo(mac, ip, TAP_ISP_MIN, true, false, 0)
 	}
 
 	return endpointInfo
