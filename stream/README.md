@@ -25,7 +25,7 @@ Flow原始数据
 Flow：预处理模块（DFI）通过采集网包生成双向网流（连接），实时分析模块（Poseidon）进行了部分字段的格式转换。
 最终存储到Elasticsearch的原始数据，
 
-字段列表（原则是英文命名和TSDB一致）：
+字段列表（原则是英文命名和TSDB一致, 中文命名尽量和WEB页面展示的一致）：
 
 | 区块     | 显示字段名           | 存储字段名      | 类型     | 索引 | 列表 | 说明                                             |
 | -------- | -------------------- | ----------------| -------  | ---- | ---- | ------------------------------------------------ |
@@ -138,17 +138,17 @@ Flow：预处理模块（DFI）通过采集网包生成双向网流（连接）�
 |          | 客户端累计接收字节   | total_byte_rx   | long     |      |      |                                                  |
 |          | L7请求数             | l7_request      | integer  |      |      |                                                  |
 |          | L7响应数             | l7_response     | integer  |      |      |                                                  |
-|          | 客户端TCP建连时延    | rtt_client      | integer  |      |      | 表示client端TCP会话三次握手阶段计算的往返时延，长流的情况下只会上报一次(可能为null) (单位：微秒) |
-|          | 服务端TCP建连时延    | rtt_server      | integer  |      |      | 表示server端TCP会话三次握手阶段计算的往返时延，长流的情况下只会上报一次(可能为null) (单位：微秒) |
-|          | TCP建连时延          | rtt             | integer  |      |      | 表示TCP会话三次握手阶段计算的往返时延平均值，长流的情况下只会上报一次(可能为null) (单位：微秒) |
-|          | TCP系统时延          | srt             | integer  |      |      | 表示TCP会话数据传输阶段计算的往返时延平均值(可能为null)，长流的情况下表示每force_report周期内的往返时延平均值 (单位：微秒) |
-|          | L4应用时延           | art             | integer  |      |      | 表示TCP连接存活时间内的应用响应时间平均值 (单位：微秒) |
-|          | L7应用时延           | rrt             | integer  |      |      |                                                  |
-|          | 客户端TCP建连最大时延| rtt_client_max  | integer  |      |      | 表示client端TCP会话三次握手阶段计算的往返时延，长流的情况下只会上报一次(可能为null) (单位：微秒) |
-|          | 服务端TCP建连最大时延| rtt_server_max  | integer  |      |      | 表示server端TCP会话三次握手阶段计算的往返时延，长流的情况下只会上报一次(可能为null) (单位：微秒) |
-|          | TCP系统最大时延      | srt_max         | integer  |      |      | 表示TCP会话数据传输阶段计算的往返时延平均值(可能为null)，长流的情况下表示每force_report周期内的往返时延平均值 (单位：微秒) |
-|          | L4应用最大时延       | art_max         | integer  |      |      | 表示TCP连接存活时间内的应用响应时间平均值 (单位：微秒) |
-|          | L7应用最大时延       | rrt_max         | integer  |      |      |                                                  |
+|          | 平均客户端TCP建连时延| rtt_client      | integer  |      |      | 表示client端TCP会话三次握手阶段计算的往返时延，长流的情况下只会上报一次(可能为null) (单位：微秒) |
+|          | 平均服务端TCP建连时延| rtt_server      | integer  |      |      | 表示server端TCP会话三次握手阶段计算的往返时延，长流的情况下只会上报一次(可能为null) (单位：微秒) |
+|          | 平均TCP建连时延      | rtt             | integer  |      |      | 表示TCP会话三次握手阶段计算的往返时延平均值，长流的情况下只会上报一次(可能为null) (单位：微秒) |
+|          | 平均TCP系统时延      | srt             | integer  |      |      | 表示TCP会话数据传输阶段计算的往返时延平均值(可能为null)，长流的情况下表示每force_report周期内的往返时延平均值 (单位：微秒) |
+|          | 平均传输层应用时延   | art             | integer  |      |      | 表示TCP连接存活时间内的应用响应时间平均值 (单位：微秒) |
+|          | 平均应用层应用时延   | rrt             | integer  |      |      |                                                  |
+|          | 最大客户端TCP建连时延| rtt_client_max  | integer  |      |      | 表示client端TCP会话三次握手阶段计算的往返时延，长流的情况下只会上报一次(可能为null) (单位：微秒) |
+|          | 最大服务端TCP建连时延| rtt_server_max  | integer  |      |      | 表示server端TCP会话三次握手阶段计算的往返时延，长流的情况下只会上报一次(可能为null) (单位：微秒) |
+|          | 最大TCP系统时延      | srt_max         | integer  |      |      | 表示TCP会话数据传输阶段计算的往返时延最大值(可能为null)，长流的情况下表示每force_report周期内的往返时延最大值 (单位：微秒) |
+|          | 最大传输层应用时延   | art_max         | integer  |      |      | 表示TCP连接存活时间内的应用响应时延最大值 (单位：微秒) |
+|          | 最大应用层应用时延   | rrt_max         | integer  |      |      |                                                  |
 |          | 客户端TCP重传        | retans_tx       | integer  |      |      | 长流的情况下表示每force_report周期内的重传次数   |
 |          | 服务端TCP重传        | retrans_rx      | integer  |      |      |                                                  |
 |          | 客户端TCP零窗        | zero_win_tx     | integer  |      |      | 长流的情况下表示每force_report周期内的零窗次数   |
