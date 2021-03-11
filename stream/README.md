@@ -144,6 +144,11 @@ Flow：预处理模块（DFI）通过采集网包生成双向网流（连接）�
 |          | TCP系统时延          | srt             | integer  |      |      | 表示TCP会话数据传输阶段计算的往返时延平均值(可能为null)，长流的情况下表示每force_report周期内的往返时延平均值 (单位：微秒) |
 |          | L4应用时延           | art             | integer  |      |      | 表示TCP连接存活时间内的应用响应时间平均值 (单位：微秒) |
 |          | L7应用时延           | rrt             | integer  |      |      |                                                  |
+|          | 客户端TCP建连最大时延| rtt_client_max  | integer  |      |      | 表示client端TCP会话三次握手阶段计算的往返时延，长流的情况下只会上报一次(可能为null) (单位：微秒) |
+|          | 服务端TCP建连最大时延| rtt_server_max  | integer  |      |      | 表示server端TCP会话三次握手阶段计算的往返时延，长流的情况下只会上报一次(可能为null) (单位：微秒) |
+|          | TCP系统最大时延      | srt_max         | integer  |      |      | 表示TCP会话数据传输阶段计算的往返时延平均值(可能为null)，长流的情况下表示每force_report周期内的往返时延平均值 (单位：微秒) |
+|          | L4应用最大时延       | art_max         | integer  |      |      | 表示TCP连接存活时间内的应用响应时间平均值 (单位：微秒) |
+|          | L7应用最大时延       | rrt_max         | integer  |      |      |                                                  |
 |          | 客户端TCP重传        | retans_tx       | integer  |      |      | 长流的情况下表示每force_report周期内的重传次数   |
 |          | 服务端TCP重传        | retrans_rx      | integer  |      |      |                                                  |
 |          | 客户端TCP零窗        | zero_win_tx     | integer  |      |      | 长流的情况下表示每force_report周期内的零窗次数   |
