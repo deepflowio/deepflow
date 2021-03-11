@@ -24,6 +24,7 @@ type Ip6MapData map[IpKey]*list.List
 type MacMapData map[MacKey]*PlatformData
 type EpcIpMapData map[EpcIpKey]*PlatformData
 type EpcIp6MapData map[EpcIpKey]*list.List
+type MacForIpTable map[uint64]net.IP
 
 type MacTable struct {
 	macMap MacMapData
@@ -44,6 +45,7 @@ type EpcIpTable struct {
 
 type CloudPlatformLabeler struct {
 	macTable            *MacTable
+	macForIpTable       MacForIpTable
 	ipTables            [MASK_LEN_NUM]*IpTable
 	ip6Tables           *Ip6Table // TODO: 因为目前IPv6不支持IP资源组类型的，掩码都是128，所以不用建数组
 	epcIpTable          *EpcIpTable
@@ -73,6 +75,7 @@ func NewCloudPlatformLabeler(queueCount int, mapSize uint32) *CloudPlatformLabel
 	}
 	cloud := &CloudPlatformLabeler{
 		macTable:            macTable,
+		macForIpTable:       make(MacForIpTable),
 		ipTables:            ipTables,
 		ip6Tables:           ip6Tables,
 		epcIpTable:          epcIpTable,
@@ -118,6 +121,53 @@ func (l *CloudPlatformLabeler) GenerateMacData(platformDatas []*PlatformData) Ma
 		}
 	}
 	return macMap
+}
+
+func (l *CloudPlatformLabeler) GetRealIpByMac(mac uint64, isIpv6 bool) net.IP {
+	key := mac
+	if isIpv6 {
+		key |= 1 << 56
+	}
+	if ip, ok := l.macForIpTable[key]; ok {
+		return ip
+	}
+	return nil
+}
+
+func (l *CloudPlatformLabeler) GenerateMacForIpTable(platformDatas []*PlatformData) MacForIpTable {
+	macForIpTable := make(MacForIpTable)
+	for _, platformData := range platformDatas {
+		if platformData.SkipMac {
+			continue
+		}
+
+		if platformData.Mac != 0 {
+			hasIpv4, hasIpv6 := false, false
+			for _, ipNet := range platformData.Ips {
+				ipLength := len(ipNet.RawIp) // platformData中保证IPv4地址但是长度为16的已经转化为长度4
+				if !hasIpv4 && ipLength == net.IPv4len {
+					key := platformData.Mac
+					macForIpTable[key] = ipNet.RawIp
+					hasIpv4 = true
+				}
+				if !hasIpv6 && ipLength == net.IPv6len {
+					key := uint64(1<<56) | platformData.Mac
+					macForIpTable[key] = ipNet.RawIp
+					hasIpv6 = true
+				}
+				if hasIpv4 && hasIpv6 {
+					break
+				}
+			}
+		}
+	}
+	return macForIpTable
+}
+
+func (l *CloudPlatformLabeler) UpdateMacForIpTable(macForIpTable MacForIpTable) {
+	if macForIpTable != nil {
+		l.macForIpTable = macForIpTable
+	}
 }
 
 func IfHasNetmaskBit(bitmap uint32, k uint32) bool {
@@ -289,6 +339,7 @@ func (l *CloudPlatformLabeler) UpdateInterfaceTable(platformDatas []*PlatformDat
 		l.UpdateMacTable(l.GenerateMacData(platformDatas))
 		l.UpdateIpTable(l.GenerateIpData(platformDatas))
 		l.UpdateEpcIpTable(l.GenerateEpcIpData(platformDatas))
+		l.UpdateMacForIpTable(l.GenerateMacForIpTable(platformDatas))
 	}
 }
 
@@ -361,8 +412,13 @@ func (l *CloudPlatformLabeler) setEpcByTunnelCidr(ip net.IP, tunnelId uint32, en
 	return false
 }
 
-func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType TapType, l3End bool, tunnelId uint32) *EndpointInfo {
+func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType TapType, l3End, isVIP bool, tunnelId uint32) *EndpointInfo {
 	endpointInfo := new(EndpointInfo)
+	if isVIP {
+		// ip地址是否为VIP
+		endpointInfo.IsVIP = isVIP
+		endpointInfo.RealIP = l.GetRealIpByMac(mac, ip.To4() == nil)
+	}
 	// 腾讯的GRE场景，MAC为0
 	if tunnelId > 0 {
 		// step 1: 查询DEEPFLOW添加的WAN监控网段(cidr)
@@ -511,12 +567,11 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	if key.EthType == EthernetTypeIPv6 || len(key.Src6Ip) > 0 {
 		srcIp, dstIp = key.Src6Ip, key.Dst6Ip
 	}
+	// vip: vip查询mac对应的实际IP
 	// l2: mac查询
 	// l3: l2epc+ip查询
-	srcData := l.GetEndpointInfo(key.SrcMac, srcIp, key.TapType, key.L3End0, key.TunnelId)
-	dstData := l.GetEndpointInfo(key.DstMac, dstIp, key.TapType, key.L3End1, key.TunnelId)
-	// ip地址是否为VIP
-	srcData.IsVIP, dstData.IsVIP = key.IsVIP0, key.IsVIP1
+	srcData := l.GetEndpointInfo(key.SrcMac, srcIp, key.TapType, key.L3End0, key.IsVIP0, key.TunnelId)
+	dstData := l.GetEndpointInfo(key.DstMac, dstIp, key.TapType, key.L3End1, key.IsVIP1, key.TunnelId)
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
 	// l3: 私有网络 VPC内部路由
 	// 1) 本端IP + 对端EPC查询EPC-IP表

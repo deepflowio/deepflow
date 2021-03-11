@@ -131,6 +131,8 @@ type FlowPerfStats struct {
 
 type FlowMetricsPeer struct {
 	// 注意字节对齐!
+	NatRealIp net.IP // IsVIP为true，通过MAC查询对应的IP
+
 	ByteCount        uint64        // 每个流统计周期（目前是自然秒）清零
 	L3ByteCount      uint64        // 每个流统计周期的L3载荷量
 	L4ByteCount      uint64        // 每个流统计周期的L4载荷量
@@ -138,14 +140,15 @@ type FlowMetricsPeer struct {
 	TotalByteCount   uint64        // 整个Flow生命周期的统计量
 	TotalPacketCount uint64        // 整个Flow生命周期的统计量
 	First, Last      time.Duration // 整个Flow生命周期首包和尾包的时间戳
-	L3EpcID          int32
-	IsL2End          bool
-	IsL3End          bool
-	IsActiveHost     bool
-	IsDevice         bool  // true表明是从平台数据中获取的
-	TCPFlags         uint8 // 所有TCP的Flags或运算
-	IsVIPInterface   bool  // 目前仅支持微软Mux设备，从grpc Interface中获取
-	IsVIP            bool  // 从grpc cidr中获取
+
+	L3EpcID        int32
+	IsL2End        bool
+	IsL3End        bool
+	IsActiveHost   bool
+	IsDevice       bool  // true表明是从平台数据中获取的
+	TCPFlags       uint8 // 所有TCP的Flags或运算
+	IsVIPInterface bool  // 目前仅支持微软Mux设备，从grpc Interface中获取
+	IsVIP          bool  // 从grpc cidr中获取
 
 	CastTypeMap   uint8  // 仅包含TSDB中的几个CastType标志位选项
 	TCPFlagsMap   uint16 // 仅包含TSDB中的几个TCP标志位选项
