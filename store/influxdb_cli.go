@@ -30,12 +30,15 @@ var unsumableFieldsMap = map[string]bool{
 	"rtt_server":     true,
 	"srt":            true,
 	"art":            true,
+	"http_rrt":       true,
+	"dns_rrt":        true,
+	"rtt_max":        true,
 	"rtt_client_max": true,
 	"rtt_server_max": true,
 	"srt_max":        true,
 	"art_max":        true,
-	"http_rrt":       true,
-	"dns_rrt":        true,
+	"http_rrt_max":   true,
+	"dns_rrt_max":    true,
 }
 
 type ActionEnum uint8
