@@ -623,7 +623,7 @@ func (c *CQHandler) Show() string {
 }
 
 func createDB(httpClient client.Client, db string) error {
-	log.Infof("database %s no exists, create database now.", db)
+	log.Infof("Create database %s if not exist.", db)
 	res, e := httpClient.Query(client.NewQuery(
 		fmt.Sprintf("CREATE DATABASE %s", db), "", ""))
 	if err := checkResponse(res, e); err != nil {
