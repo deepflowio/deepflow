@@ -3,11 +3,10 @@ package pusher
 import (
 	logging "github.com/op/go-logging"
 
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
-	"gitlab.x.lan/yunshan/droplet-libs/protobuf"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/droplet-libs/zmq"
+	"gitlab.x.lan/yunshan/droplet/stream/jsonify"
 )
 
 var log = logging.MustGetLogger("stream.pusher")
@@ -25,20 +24,46 @@ func NewFlowSender(zmqBytePusher *zmq.ZMQBytePusher, queue queue.QueueReader) *F
 }
 
 func (flowSend *FlowSender) Run() {
+	flows := make([]interface{}, 1024)
 	bytes := utils.AcquireByteBuffer()
 	for {
-		flow, ok := flowSend.queue.Get().(*datatype.TaggedFlow)
-		if !ok {
-			log.Warningf("Get queue message type failed, should be *TaggedFlow")
-			continue
+		n := flowSend.queue.Gets(flows)
+		for _, flow := range flows[:n] {
+			if flow == nil {
+				continue
+			}
+			bytes.Reset()
+			switch t := flow.(type) {
+			case (*jsonify.FlowLogger):
+				f := flow.(*jsonify.FlowLogger)
+				if err := jsonify.MarshalL4Flow(f, bytes); err != nil {
+					f.Release()
+					log.Warningf("Marshalling flow failed: %s", err)
+					continue
+				}
+				f.Release()
+			case (*jsonify.HTTPLogger):
+				f := flow.(*jsonify.HTTPLogger)
+				if err := jsonify.MarshalL7HTTP(f, bytes); err != nil {
+					f.Release()
+					log.Warningf("Marshalling l7HTTP flow failed: %s", err)
+					continue
+				}
+				f.Release()
+
+			case (*jsonify.DNSLogger):
+				f := flow.(*jsonify.DNSLogger)
+				if err := jsonify.MarshalL7DNS(f, bytes); err != nil {
+					f.Release()
+					log.Warningf("Marshalling l7DNS flow failed: %s", err)
+					continue
+				}
+				f.Release()
+			default:
+				log.Warningf("flow type(%T) unsupport", t)
+				continue
+			}
+			flowSend.zmqBytePusher.Send(bytes.Bytes())
 		}
-		bytes.Reset()
-		if err := protobuf.MarshalFlow(flow, bytes); err != nil {
-			datatype.ReleaseTaggedFlow(flow)
-			log.Warningf("Marshalling flow failed: %s", err)
-			continue
-		}
-		datatype.ReleaseTaggedFlow(flow)
-		flowSend.zmqBytePusher.Send(bytes.Bytes())
 	}
 }

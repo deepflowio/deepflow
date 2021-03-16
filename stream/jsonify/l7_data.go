@@ -36,6 +36,7 @@ type L7Base struct {
 }
 
 type HTTPLogger struct {
+	pool.ReferenceCount
 	L7Base
 
 	// http应用层
@@ -86,6 +87,7 @@ func (h *HTTPLogger) String() string {
 }
 
 type DNSLogger struct {
+	pool.ReferenceCount
 	L7Base
 
 	// DNS应用层
@@ -221,11 +223,16 @@ var poolHTTPLogger = pool.NewLockFreePool(func() interface{} {
 })
 
 func AcquireHTTPLogger() *HTTPLogger {
-	return poolHTTPLogger.Get().(*HTTPLogger)
+	l := poolHTTPLogger.Get().(*HTTPLogger)
+	l.ReferenceCount.Reset()
+	return l
 }
 
 func ReleaseHTTPLogger(l *HTTPLogger) {
 	if l == nil {
+		return
+	}
+	if l.SubReferenceCount() {
 		return
 	}
 	*l = HTTPLogger{}
@@ -243,11 +250,16 @@ var poolDNSLogger = pool.NewLockFreePool(func() interface{} {
 })
 
 func AcquireDNSLogger() *DNSLogger {
-	return poolDNSLogger.Get().(*DNSLogger)
+	l := poolDNSLogger.Get().(*DNSLogger)
+	l.ReferenceCount.Reset()
+	return l
 }
 
 func ReleaseDNSLogger(l *DNSLogger) {
 	if l == nil {
+		return
+	}
+	if l.SubReferenceCount() {
 		return
 	}
 	*l = DNSLogger{}

@@ -17,6 +17,8 @@ import (
 )
 
 type FlowLogger struct {
+	pool.ReferenceCount
+
 	DataLinkLayer
 	NetworkLayer
 	TransportLayer
@@ -60,8 +62,8 @@ type NetworkLayer struct {
 type TransportLayer struct {
 	ClientPort   uint16   `json:"client_port"`
 	ServerPort   uint16   `json:"server_port"`
-	TCPFlags0    []uint16 `json:"tcp_flags_0"`
-	TCPFlags1    []uint16 `json:"tcp_flags_1"`
+	TCPFlags0    []uint32 `json:"tcp_flags_0"`
+	TCPFlags1    []uint32 `json:"tcp_flags_1"`
 	TCPFlagsBit0 uint16   `json:"tcp_flags_bit_0,omitempty"`
 	TCPFlagsBit1 uint16   `json:"tcp_flags_bit_1,omitempty"`
 }
@@ -209,10 +211,11 @@ func getTTLs(TTLMap uint16, TTLs []string) []string {
 	}
 	return TTLs
 }
-func getTCPFlags(TCPFlagsMap uint16, TCPFlags []uint16) []uint16 {
+
+func getTCPFlags(TCPFlagsMap uint16, TCPFlags []uint32) []uint32 {
 	for i := 0; i < int(zerodoc.MAX_TCP_FLAGS_INDEX-zerodoc.TCP_FLAG_SYN_INDEX); i++ {
 		if TCPFlagsMap&(1<<i) != 0 {
-			TCPFlags = append(TCPFlags, uint16(zerodoc.TCPIndexToFlags[i+int(zerodoc.TCP_FLAG_SYN_INDEX)]))
+			TCPFlags = append(TCPFlags, uint32(zerodoc.TCPIndexToFlags[i+int(zerodoc.TCP_FLAG_SYN_INDEX)]))
 		}
 	}
 	return TCPFlags
@@ -466,17 +469,22 @@ var poolFlowLogger = pool.NewLockFreePool(func() interface{} {
 	l.PacketSizes1 = make([]string, 0)
 	l.TTLs0 = make([]string, 0)
 	l.TTLs1 = make([]string, 0)
-	l.TCPFlags0 = make([]uint16, 0)
-	l.TCPFlags1 = make([]uint16, 0)
+	l.TCPFlags0 = make([]uint32, 0)
+	l.TCPFlags1 = make([]uint32, 0)
 	return l
 })
 
 func AcquireFlowLogger() *FlowLogger {
-	return poolFlowLogger.Get().(*FlowLogger)
+	l := poolFlowLogger.Get().(*FlowLogger)
+	l.ReferenceCount.Reset()
+	return l
 }
 
 func ReleaseFlowLogger(l *FlowLogger) {
 	if l == nil {
+		return
+	}
+	if l.SubReferenceCount() {
 		return
 	}
 	castType0 := l.CastTypes0
