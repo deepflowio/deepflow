@@ -144,13 +144,13 @@ func (d *Decoder) sendFlow(flow *datatype.TaggedFlow) {
 	if d.debugEnabled {
 		log.Debugf("decoder %d recv flow: %s", d.index, flow)
 	}
-	if d.brokerEnabled {
-		flow.AddReferenceCount()
-		d.outBrokerQueue.Put(flow)
-	}
-
 	d.counter.L4Count++
-	if !d.flowThrottler.Send(jsonify.TaggedFlowToLogger(flow)) {
+	l := jsonify.TaggedFlowToLogger(flow)
+	if d.brokerEnabled {
+		l.AddReferenceCount()
+		d.outBrokerQueue.Put(l)
+	}
+	if !d.flowThrottler.Send(l) {
 		d.counter.L4DropCount++
 	}
 	flow.Release()
@@ -162,12 +162,22 @@ func (d *Decoder) sendProto(proto *datatype.AppProtoLogsData) {
 	}
 	if proto.Proto == datatype.PROTO_HTTP {
 		d.counter.L7HTTPCount++
-		if !d.httpThrottler.Send(jsonify.ProtoLogToHTTPLogger(proto)) {
+		l := jsonify.ProtoLogToHTTPLogger(proto)
+		if d.brokerEnabled {
+			l.AddReferenceCount()
+			d.outBrokerQueue.Put(l)
+		}
+		if !d.httpThrottler.Send(l) {
 			d.counter.L7HTTPDropCount++
 		}
 	} else if proto.Proto == datatype.PROTO_DNS {
 		d.counter.L7DNSCount++
-		if !d.dnsThrottler.Send(jsonify.ProtoLogToDNSLogger(proto)) {
+		l := jsonify.ProtoLogToDNSLogger(proto)
+		if d.brokerEnabled {
+			l.AddReferenceCount()
+			d.outBrokerQueue.Put(l)
+		}
+		if !d.dnsThrottler.Send(l) {
 			d.counter.L7DNSDropCount++
 		}
 	}

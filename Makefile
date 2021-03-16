@@ -11,6 +11,7 @@ FLAGS = -gcflags "-l -l" -ldflags "-X main.RevCount=${REV_COUNT} -X main.Revisio
 all: droplet droplet-ctl
 
 vendor:
+	go generate ./...
 	go mod tidy && go mod vendor
 	test -n "$(shell go list -e -f '{{.Dir}}' ${MESSAGE})"
 	test -n "$(shell go list -e -f '{{.Dir}}' ${DROPLET_LIBS})"

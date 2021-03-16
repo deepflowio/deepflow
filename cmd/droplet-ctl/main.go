@@ -15,6 +15,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/grpc"
 	"gitlab.x.lan/yunshan/droplet-libs/receiver"
 	"gitlab.x.lan/yunshan/droplet-libs/store"
+	"gitlab.x.lan/yunshan/droplet-libs/zmq"
 	"gitlab.x.lan/yunshan/droplet/droplet/adapter"
 
 	"gitlab.x.lan/yunshan/droplet/config"
@@ -25,6 +26,8 @@ import (
 	"gitlab.x.lan/yunshan/droplet/dropletctl/rpc"
 	rozecfg "gitlab.x.lan/yunshan/droplet/roze/config"
 	roze "gitlab.x.lan/yunshan/droplet/roze/platformdata"
+	streamcfg "gitlab.x.lan/yunshan/droplet/stream/config"
+	"gitlab.x.lan/yunshan/droplet/stream/jsonify/dfi"
 	stream "gitlab.x.lan/yunshan/droplet/stream/platformdata"
 )
 
@@ -89,6 +92,7 @@ func main() {
 		"2-decode-to-es-writer-dns-l7",
 	}))
 	streamCmd.AddCommand(debug.ClientRegisterSimple(stream.CMD_PLATFORMDATA, debug.CmdHelper{"platformData [filter]", "show stream platform data statistics"}, nil))
+	streamCmd.AddCommand(RegisterReceiveFlowLogCommand())
 
 	root.GenBashCompletionFile("/usr/share/bash-completion/completions/droplet-ctl")
 	root.SetArgs(os.Args[1:])
@@ -179,6 +183,35 @@ func RegisterUpdateCQCommand(tsdbUser, tsdbPassword string) *cobra.Command {
 			} else {
 				fmt.Println("success")
 			}
+		},
+	}
+	return cmd
+}
+
+func RegisterReceiveFlowLogCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "flow-print",
+		Short: "print publishing flow",
+		Run: func(cmd *cobra.Command, args []string) {
+			sub, err := zmq.NewSubscriber("127.0.0.1", streamcfg.DefaultBrokerZMQPort, 1000000, zmq.CLIENT)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			for {
+				bytes, err := sub.Recv()
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				flow := &dfi.Flow{}
+				if e := flow.Unmarshal(bytes); e != nil {
+					fmt.Println(err)
+					return
+				}
+				fmt.Println(flow)
+			}
+			return
 		},
 	}
 	return cmd
