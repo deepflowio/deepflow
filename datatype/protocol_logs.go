@@ -69,8 +69,8 @@ type AppProtoLogsBaseInfo struct {
 	IPSrc IPv4Int
 	IPDst IPv4Int
 	/* L3 IPv6 */
-	IP6Src net.IP
-	IP6Dst net.IP
+	IP6Src [net.IPv6len]byte
+	IP6Dst [net.IPv6len]byte
 	/* L4 */
 	PortSrc uint16
 	PortDst uint16
@@ -193,8 +193,8 @@ func (l *AppProtoLogsData) Encode(encoder *codec.SimpleEncoder) error {
 
 	if len(l.IP6Src) > 0 {
 		encoder.WriteBool(true) // 额外encode bool, decode时需要根据该bool, 来判断是否decode ipv6
-		encoder.WriteIPv6(l.IP6Src)
-		encoder.WriteIPv6(l.IP6Dst)
+		encoder.WriteIPv6(l.IP6Src[:])
+		encoder.WriteIPv6(l.IP6Dst[:])
 	} else {
 		encoder.WriteBool(false)
 		encoder.WriteU32(uint32(l.IPSrc))
@@ -220,19 +220,11 @@ func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
 	l.RRT = time.Duration(decoder.ReadU64())
 
 	if decoder.ReadBool() {
-		if l.IP6Src == nil {
-			l.IP6Src = make([]byte, 16)
-		}
-		decoder.ReadIPv6(l.IP6Src)
-		if l.IP6Dst == nil {
-			l.IP6Dst = make([]byte, 16)
-		}
-		decoder.ReadIPv6(l.IP6Dst)
+		decoder.ReadIPv6(l.IP6Src[:])
+		decoder.ReadIPv6(l.IP6Dst[:])
 	} else {
 		l.IPSrc = decoder.ReadU32()
 		l.IPDst = decoder.ReadU32()
-		l.IP6Src = nil
-		l.IP6Dst = nil
 	}
 	l.PortSrc = decoder.ReadU16()
 	l.PortDst = decoder.ReadU16()
