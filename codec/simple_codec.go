@@ -64,11 +64,11 @@ func (e *SimpleEncoder) WriteU64(v uint64) {
 	e.buf = append(e.buf, s[:]...)
 }
 
-func (e *SimpleEncoder) WriteIPv6(v net.IP) {
+func (e *SimpleEncoder) WriteIPv6(v []byte) {
 	if len(v) != 16 {
 		panic(fmt.Sprintf("Invalid IPv6 Address: %v", v))
 	}
-	e.buf = append(e.buf, v.To16()...)
+	e.buf = append(e.buf, v...)
 }
 
 // 注意：将会截断至255字节
@@ -229,7 +229,7 @@ func (d *SimpleDecoder) ReadU64() uint64 {
 	return binary.LittleEndian.Uint64(d.buf[d.offset-8 : d.offset])
 }
 
-func (d *SimpleDecoder) ReadIPv6(v net.IP) {
+func (d *SimpleDecoder) ReadIPv6(v []byte) {
 	if len(v) != 16 {
 		panic(fmt.Sprintf("IPv6 buffer length invalid: %d", len(v)))
 	}
