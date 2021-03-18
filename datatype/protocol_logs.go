@@ -63,6 +63,7 @@ type AppProtoLogsBaseInfo struct {
 	FlowId    uint64        // 对应flow的ID
 	VtapId    uint16
 	TapType   uint16
+	IsIPv6    bool
 	AppProtoHead
 
 	/* L3 */
@@ -191,8 +192,8 @@ func (l *AppProtoLogsData) Encode(encoder *codec.SimpleEncoder) error {
 	encoder.WriteU16(l.Code)
 	encoder.WriteU64(uint64(l.RRT))
 
-	if len(l.IP6Src) > 0 {
-		encoder.WriteBool(true) // 额外encode bool, decode时需要根据该bool, 来判断是否decode ipv6
+	if l.IsIPv6 {
+		encoder.WriteBool(true)
 		encoder.WriteIPv6(l.IP6Src[:])
 		encoder.WriteIPv6(l.IP6Dst[:])
 	} else {
@@ -220,9 +221,11 @@ func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
 	l.RRT = time.Duration(decoder.ReadU64())
 
 	if decoder.ReadBool() {
+		l.IsIPv6 = true
 		decoder.ReadIPv6(l.IP6Src[:])
 		decoder.ReadIPv6(l.IP6Dst[:])
 	} else {
+		l.IsIPv6 = false
 		l.IPSrc = decoder.ReadU32()
 		l.IPDst = decoder.ReadU32()
 	}
