@@ -58,8 +58,8 @@ type NetworkLayer struct {
 }
 
 type TransportLayer struct {
-	ClientPort   uint16   `json:"client_port,omitempty"`
-	ServerPort   uint16   `json:"server_port,omitempty"`
+	ClientPort   uint16   `json:"client_port"`
+	ServerPort   uint16   `json:"server_port"`
 	TCPFlags0    []uint16 `json:"tcp_flags_0"`
 	TCPFlags1    []uint16 `json:"tcp_flags_1"`
 	TCPFlagsBit0 uint16   `json:"tcp_flags_bit_0,omitempty"`
