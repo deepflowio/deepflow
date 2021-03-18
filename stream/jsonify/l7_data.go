@@ -19,8 +19,8 @@ type L7Base struct {
 	RealIP1 string `json:"real_ip_1"`
 
 	// 传输层
-	ClientPort uint16 `json:"client_port,omitempty"`
-	ServerPort uint16 `json:"server_port,omitempty"`
+	ClientPort uint16 `json:"client_port"`
+	ServerPort uint16 `json:"server_port"`
 
 	// 知识图谱
 	KnowledgeGraph
