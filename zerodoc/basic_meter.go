@@ -30,6 +30,8 @@ func (t *Traffic) Reverse() {
 	t.ByteTx, t.ByteRx = t.ByteRx, t.ByteTx
 	t.L3ByteTx, t.L3ByteRx = t.L3ByteRx, t.L3ByteTx
 	t.L4ByteTx, t.L4ByteRx = t.L4ByteRx, t.L4ByteTx
+
+	// HTTP、DNS统计量以客户端、服务端为视角，无需Reverse
 }
 
 func (t *Traffic) Encode(encoder *codec.SimpleEncoder) {
@@ -90,22 +92,7 @@ func (t *Traffic) ConcurrentMerge(other *Traffic) {
 }
 
 func (t *Traffic) SequentialMerge(other *Traffic) {
-	t.PacketTx += other.PacketTx
-	t.PacketRx += other.PacketRx
-	t.ByteTx += other.ByteTx
-	t.ByteRx += other.ByteRx
-	t.L3ByteTx += other.L3ByteTx
-	t.L3ByteRx += other.L3ByteRx
-	t.L4ByteTx += other.L4ByteTx
-	t.L4ByteRx += other.L4ByteRx
-	t.Flow = t.ClosedFlow + other.Flow
-	t.NewFlow += other.NewFlow
-	t.ClosedFlow += other.ClosedFlow
-
-	t.HTTPRequest = other.HTTPRequest
-	t.HTTPResponse = other.HTTPResponse
-	t.DNSRequest = other.DNSRequest
-	t.DNSResponse = other.DNSResponse
+	t.ConcurrentMerge(other)
 }
 
 func (t *Traffic) MarshalTo(b []byte) int {
@@ -157,6 +144,7 @@ type Latency struct {
 }
 
 func (_ *Latency) Reverse() {
+	// 时延统计量以客户端、服务端为视角，无需Reverse
 }
 
 func (l *Latency) Encode(encoder *codec.SimpleEncoder) {
@@ -283,8 +271,7 @@ type Performance struct {
 }
 
 func (a *Performance) Reverse() {
-	a.RetransTx, a.RetransRx = a.RetransRx, a.RetransTx
-	a.ZeroWinTx, a.ZeroWinRx = a.ZeroWinRx, a.ZeroWinTx
+	// 性能统计量以客户端、服务端为视角，无需Reverse
 }
 
 func (a *Performance) Encode(encoder *codec.SimpleEncoder) {
@@ -346,6 +333,7 @@ type Anomaly struct {
 }
 
 func (_ *Anomaly) Reverse() {
+	// 异常统计量以客户端、服务端为视角，无需Reverse
 }
 
 func (a *Anomaly) Encode(encoder *codec.SimpleEncoder) {
@@ -454,7 +442,9 @@ type FlowLoad struct {
 	Load uint64 `db:"flow_load"`
 }
 
-func (l *FlowLoad) Reverse() {}
+func (l *FlowLoad) Reverse() {
+	// 负载统计量无方向，无需Reverse
+}
 
 func (l *FlowLoad) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(l.Load)

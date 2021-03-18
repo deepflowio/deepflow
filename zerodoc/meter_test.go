@@ -12,8 +12,8 @@ func TestMeterReverse(t *testing.T) {
 	interestedFieldPairs := [][]string{
 		{"PacketTx", "PacketRx"},
 		{"ByteTx", "ByteRx"},
-		{"RetransTx", "RetransRx"},
-		{"ZeroWndTx", "ZeroWndRx"},
+		{"L4PacketTx", "L4PacketRx"},
+		{"L4ByteTx", "L4ByteRx"},
 	}
 	set := func(meter app.Meter, field string, value uint64) bool {
 		tp := reflect.ValueOf(meter).Elem()
