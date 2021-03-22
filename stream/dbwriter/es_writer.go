@@ -3,6 +3,7 @@ package dbwriter
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/olivere/elastic"
@@ -227,7 +228,11 @@ func (esWriter *ESWriter) checkIndex(timestamp time.Duration, index string) bool
 			createIndexStart := time.Now()
 			res, err := esWriter.client.CreateIndex(index).Body(esWriter.Mapping).Do(context.TODO())
 			if err != nil {
-				log.Errorf("create index(cost time: %s) error: %v", time.Since(createIndexStart), err)
+				if strings.Contains(err.Error(), "already exists") {
+					log.Infof("create index(cost time: %s) info: %v", time.Since(createIndexStart), err)
+				} else {
+					log.Errorf("create index(cost time: %s) error: %v", time.Since(createIndexStart), err)
+				}
 			} else if res == nil {
 				log.Warningf("create index(cost time: %s) %v failed", time.Since(createIndexStart), index)
 			} else {
