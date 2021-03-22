@@ -2,6 +2,7 @@ package jsonify
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"time"
 
@@ -131,19 +132,19 @@ func (d *DNSLogger) String() string {
 
 func (b *L7Base) Fill(l *datatype.AppProtoLogsData) {
 	// 网络层
-	if len(l.IP6Src) > 0 {
+	if l.IsIPv6 {
 		if datatype.EPC_FROM_INTERNET == l.L3EpcIDSrc {
 			b.IP0 = "::"
 		} else {
-			b.IP0 = l.IP6Src.String()
+			b.IP0 = net.IP(l.IP6Src[:]).String()
 		}
 		if datatype.EPC_FROM_INTERNET == l.L3EpcIDDst {
 			b.IP1 = "::"
 		} else {
-			b.IP1 = l.IP6Dst.String()
+			b.IP1 = net.IP(l.IP6Dst[:]).String()
 		}
-		b.RealIP0 = l.IP6Src.String()
-		b.RealIP1 = l.IP6Dst.String()
+		b.RealIP0 = net.IP(l.IP6Src[:]).String()
+		b.RealIP1 = net.IP(l.IP6Dst[:]).String()
 	} else {
 		if datatype.EPC_FROM_INTERNET == l.L3EpcIDSrc {
 			b.IP0 = "0.0.0.0"
@@ -178,8 +179,8 @@ func (k *KnowledgeGraph) FillL7(l *datatype.AppProtoLogsData) {
 	var info0, info1 *grpc.Info
 	l3EpcID0, l3EpcID1 := l.L3EpcIDSrc, l.L3EpcIDDst
 
-	if len(l.IP6Src) > 0 {
-		info0, info1 = pf.PlatformData.QueryIPV6InfosPair(int16(l3EpcID0), l.IP6Src, int16(l3EpcID1), l.IP6Dst)
+	if l.IsIPv6 {
+		info0, info1 = pf.PlatformData.QueryIPV6InfosPair(int16(l3EpcID0), net.IP(l.IP6Src[:]), int16(l3EpcID1), net.IP(l.IP6Dst[:]))
 	} else {
 		info0, info1 = pf.PlatformData.QueryIPV4InfosPair(int16(l3EpcID0), uint32(l.IPSrc), int16(l3EpcID1), uint32(l.IPDst))
 	}
