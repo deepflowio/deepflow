@@ -299,7 +299,7 @@ func UpdateCQs(httpAddr, user, password string) error {
 			cli, err := NewCLIHandler(httpAddr, user, password, db, "update",
 				cqHandler.srcRP, cqHandler.dstRP, aggrSummable, aggrUnsummable, "", interval, 168)
 			log.Info("CQ update:", db, cqHandler.srcRP, cqHandler.dstRP, aggrSummable, aggrUnsummable, interval)
-			fmt.Printf("CQ update: db:%s srcRP:%s dstRP:%s aggrSummable:%s aggrUnsummable:%s interval:%dm\n", db, cqHandler.srcRP, cqHandler.dstRP, aggrSummable, aggrUnsummable, interval)
+			fmt.Printf("CQ update: dbGroup:%s srcRP:%s dstRP:%s aggrSummable:%s aggrUnsummable:%s interval:%dm\n", db, cqHandler.srcRP, cqHandler.dstRP, aggrSummable, aggrUnsummable, interval)
 			if err != nil {
 				return err
 			}
@@ -422,7 +422,7 @@ func (c *CLIHandler) Run() (string, error) {
 				return FAILED, err
 			}
 		case UPDATE:
-			if err := cqHandlers.Add(); err != nil {
+			if err := cqHandlers.Update(); err != nil {
 				return FAILED, err
 			}
 		case DEL:
@@ -564,6 +564,35 @@ func (c *CQHandler) Add() error {
 	for _, field := range fields {
 		cqCmd := c.genCQCommand(field)
 		log.Info(cqCmd)
+		if _, err := queryResponse(c.client, c.db, c.srcRP, cqCmd); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func isCQExist(db, cqName string, cqInfos []CQInfo) bool {
+	for _, cqInfo := range cqInfos {
+		if cqInfo.db == db && cqInfo.name == cqName {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *CQHandler) Update() error {
+	cqInfos, err := GetCQInfos(c.client)
+	if err != nil {
+		return err
+	}
+	fields := getFields(c.db)
+	for _, field := range fields {
+		if isCQExist(c.db, c.CQName(field), cqInfos) {
+			continue
+		}
+		cqCmd := c.genCQCommand(field)
+		log.Info(cqCmd)
+		fmt.Println("new CQ: ", cqCmd)
 		if _, err := queryResponse(c.client, c.db, c.srcRP, cqCmd); err != nil {
 			return err
 		}
