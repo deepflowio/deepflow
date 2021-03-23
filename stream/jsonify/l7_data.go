@@ -29,6 +29,7 @@ type L7Base struct {
 	// 流信息
 	FlowIDStr   string `json:"flow_id_str"`
 	TapType     uint16 `json:"tap_type"`
+	TapPort     string `json:"tap_port"` // 显示为固定八个字符的16进制如'01234567'
 	VtapID      uint16 `json:"vtap_id"`
 	Timestamp   uint64 `json:"timestamp"`    // us
 	TimestampMs uint64 `json:"timestamp_ms"` // ms, kibana不支持微秒的展示，增加毫秒字段
@@ -170,6 +171,7 @@ func (b *L7Base) Fill(l *datatype.AppProtoLogsData) {
 	// 流信息
 	b.FlowIDStr = strconv.FormatInt(int64(l.FlowId), 10)
 	b.TapType = l.TapType
+	b.TapPort = fmt.Sprintf("%08x", l.TapPort)
 	b.VtapID = l.VtapId
 	b.Timestamp = uint64(l.Timestamp / time.Microsecond)
 	b.TimestampMs = uint64(l.Timestamp / time.Millisecond)
