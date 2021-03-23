@@ -63,6 +63,7 @@ type AppProtoLogsBaseInfo struct {
 	FlowId    uint64        // 对应flow的ID
 	VtapId    uint16
 	TapType   uint16
+	TapPort   uint32
 	IsIPv6    bool
 	AppProtoHead
 
@@ -86,6 +87,7 @@ func (i *AppProtoLogsBaseInfo) String() string {
 	formatted += fmt.Sprintf("FlowId: %v ", i.FlowId)
 	formatted += fmt.Sprintf("VtapId: %v ", i.VtapId)
 	formatted += fmt.Sprintf("TapType: %v ", i.TapType)
+	formatted += fmt.Sprintf("TapPort: %v ", i.TapPort)
 	formatted += fmt.Sprintf("Proto: %s ", i.Proto.String())
 	formatted += fmt.Sprintf("MsgType: %s ", i.MsgType.String())
 	formatted += fmt.Sprintf("Code: %v ", i.Code)
@@ -187,6 +189,7 @@ func (l *AppProtoLogsData) Encode(encoder *codec.SimpleEncoder) error {
 	encoder.WriteU64(l.FlowId)
 	encoder.WriteU16(l.VtapId)
 	encoder.WriteU16(l.TapType)
+	encoder.WriteU32(l.TapPort)
 	encoder.WriteU8(byte(l.Proto))
 	encoder.WriteU8(byte(l.MsgType))
 	encoder.WriteU16(l.Code)
@@ -215,6 +218,7 @@ func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
 	l.FlowId = decoder.ReadU64()
 	l.VtapId = decoder.ReadU16()
 	l.TapType = decoder.ReadU16()
+	l.TapPort = decoder.ReadU32()
 	l.Proto = LogProtoType(decoder.ReadU8())
 	l.MsgType = LogMessageType(decoder.ReadU8())
 	l.Code = decoder.ReadU16()
