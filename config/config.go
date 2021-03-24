@@ -18,6 +18,7 @@ type Config struct {
 	ControllerPort    uint16   `yaml:"controller-port"`
 	StreamRozeEnabled bool     `yaml:"stream-roze-enabled"`
 	UDPReadBuffer     int      `yaml:"udp-read-buffer"`
+	TCPReadBuffer     int      `yaml:"tcp-read-buffer"`
 	LogFile           string   `yaml:"log-file"`
 	LogLevel          string   `yaml:"log-level"`
 	Profiler          bool     `yaml:"profiler"`
@@ -51,6 +52,7 @@ func Load(path string) Config {
 	config := Config{
 		ControllerPort: 20035,
 		UDPReadBuffer:  64 << 20,
+		TCPReadBuffer:  4 << 20,
 		LogFile:        "/var/log/droplet/droplet.log",
 	}
 	if err != nil {
