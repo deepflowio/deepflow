@@ -308,6 +308,7 @@ type Receiver struct {
 	UDPAddress       *net.UDPAddr
 	UDPConn          *net.UDPConn
 	UDPReadBuffer    int
+	TCPReadBuffer    int
 	TCPListener      net.Listener
 	TCPAddress       string
 	lastUDPFlushTime int64
@@ -336,13 +337,14 @@ type ReceiverCounter struct {
 }
 
 func NewReceiver(
-	listenPort, UDPReadBuffer int, // 监听端口，默认同时监听tcp和upd的端口
+	listenPort, UDPReadBuffer, TCPReadBuffer int, // 监听端口，默认同时监听tcp和upd的端口
 ) *Receiver {
 	receiver := &Receiver{
 		handlers:      make([]*Handler, datatype.MESSAGE_TYPE_MAX),
 		serverType:    BOTH,
 		UDPAddress:    &net.UDPAddr{Port: listenPort},
 		UDPReadBuffer: UDPReadBuffer,
+		TCPReadBuffer: TCPReadBuffer,
 		TCPAddress:    fmt.Sprintf("0.0.0.0:%d", listenPort),
 		timeNow:       time.Now().Unix(),
 		counter:       &ReceiverCounter{},
@@ -662,7 +664,15 @@ func (r *Receiver) ProcessTCPServer() {
 			time.Sleep(3 * time.Second)
 			continue
 		}
-		log.Infof("TCP client(%s) connect success.", conn.RemoteAddr().String())
+		if tcpConn, ok := conn.(*net.TCPConn); ok {
+			if err := tcpConn.SetReadBuffer(r.TCPReadBuffer); err != nil {
+				log.Warningf("TCP client(%s) set read buffer failed, err: %s", conn.RemoteAddr().String(), err)
+			} else {
+				log.Infof("TCP client(%s) connect success, set read buffer %d.", conn.RemoteAddr().String(), r.TCPReadBuffer)
+			}
+		} else {
+			log.Infof("TCP client(%s) connect success.", conn.RemoteAddr().String())
+		}
 		go r.handleTCPConnection(conn)
 	}
 }
