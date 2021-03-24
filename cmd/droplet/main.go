@@ -89,7 +89,7 @@ func main() {
 	bytes, _ = yaml.Marshal(dropletConfig)
 	log.Infof("droplet config:\n%s", string(bytes))
 
-	receiver := receiver.NewReceiver(datatype.DROPLET_PORT, cfg.UDPReadBuffer)
+	receiver := receiver.NewReceiver(datatype.DROPLET_PORT, cfg.UDPReadBuffer, cfg.TCPReadBuffer)
 	receiver.Start()
 
 	closers := droplet.Start(dropletConfig, receiver)

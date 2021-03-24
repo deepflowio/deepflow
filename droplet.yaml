@@ -34,6 +34,9 @@
 ## udp socket receiver buffer: 64M
 #udp-read-buffer: 67108864
 
+## tcp socket receiver buffer: 4M
+#tcp-read-buffer: 4194304
+
 ## ########################## droplet config ##########################################
 ## Rpc synchronization timeout default 8s
 #rpc-timeout: 8
