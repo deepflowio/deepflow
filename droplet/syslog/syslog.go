@@ -3,8 +3,9 @@ package syslog
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"log/syslog"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -34,6 +35,8 @@ type fileWriter struct {
 }
 
 type syslogWriter struct {
+	directory string
+
 	index   int
 	fileMap map[uint32]*fileWriter
 	in      queue.QueueReader
@@ -42,7 +45,7 @@ type syslogWriter struct {
 }
 
 func (w *syslogWriter) create(packet *receiver.RecvBuffer) *fileWriter {
-	fileName := fmt.Sprintf("/var/log/trident/%s.log", packet.IP)
+	fileName := filepath.Join(w.directory, packet.IP.String()+".log")
 	return &fileWriter{NewRotateWriter(fileName), _FILE_FEED}
 }
 
@@ -124,15 +127,20 @@ func parseSyslog(bs []byte) (*ESLog, error) {
 	return &esLog, nil
 }
 
-func NewSyslogWriter(in queue.QueueReader, esEnabled bool, esAddresses []string, esUsername, esPassword string) *syslogWriter {
+func NewSyslogWriter(in queue.QueueReader, directory string, esEnabled bool, esAddresses []string, esUsername, esPassword string) *syslogWriter {
+	if err := os.MkdirAll(directory, os.ModePerm); err != nil {
+		log.Warningf("cannot output syslog to directory %s: %v", directory, err)
+		return &syslogWriter{}
+	}
 	var esLogger *ESLogger
 	if esEnabled {
 		esLogger = NewESLogger(esAddresses, esUsername, esPassword)
 	}
 	writer := &syslogWriter{
-		fileMap:  make(map[uint32]*fileWriter, 8),
-		in:       in,
-		esLogger: esLogger,
+		directory: directory,
+		fileMap:   make(map[uint32]*fileWriter, 8),
+		in:        in,
+		esLogger:  esLogger,
 	}
 
 	go writer.run()

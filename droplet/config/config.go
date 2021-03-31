@@ -14,7 +14,8 @@ import (
 var log = logging.MustGetLogger("config")
 
 const (
-	DefaultESHostPort = "127.0.0.1:20042"
+	DefaultESHostPort      = "127.0.0.1:20042"
+	DefaultSyslogDirectory = "/var/log/trident"
 )
 
 type ESAuth struct {
@@ -23,16 +24,17 @@ type ESAuth struct {
 }
 
 type Config struct {
-	ControllerIps  []string      `yaml:"controller-ips,flow"`
-	ControllerPort uint16        `yaml:"controller-port"`
-	ESHostPorts    []string      `yaml:"es-host-port"`
-	ESAuth         ESAuth        `yaml:"es-auth"`
-	Adapter        AdapterConfig `yaml:"adapter"`
-	Labeler        LabelerConfig `yaml:"labeler"`
-	Queue          QueueConfig   `yaml:"queue"`
-	RpcTimeout     time.Duration `yaml:"rpc-timeout"`
-	PCap           PCapConfig    `yaml:"pcap"`
-	ESSyslog       bool          `yaml:"es-syslog"`
+	ControllerIps   []string      `yaml:"controller-ips,flow"`
+	ControllerPort  uint16        `yaml:"controller-port"`
+	ESHostPorts     []string      `yaml:"es-host-port"`
+	ESAuth          ESAuth        `yaml:"es-auth"`
+	Adapter         AdapterConfig `yaml:"adapter"`
+	Labeler         LabelerConfig `yaml:"labeler"`
+	Queue           QueueConfig   `yaml:"queue"`
+	RpcTimeout      time.Duration `yaml:"rpc-timeout"`
+	PCap            PCapConfig    `yaml:"pcap"`
+	SyslogDirectory string        `yaml:"syslog-directory"`
+	ESSyslog        bool          `yaml:"es-syslog"`
 }
 
 type AdapterConfig struct {
@@ -135,6 +137,10 @@ func (c *Config) Validate() error {
 	}
 	if c.PCap.FileDirectory == "" {
 		c.PCap.FileDirectory = "/var/lib/droplet/pcap"
+	}
+
+	if c.SyslogDirectory == "" {
+		c.SyslogDirectory = DefaultSyslogDirectory
 	}
 	return nil
 }
