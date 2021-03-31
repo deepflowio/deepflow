@@ -5,7 +5,7 @@ import logging "github.com/op/go-logging"
 var log = logging.MustGetLogger("zerodoc")
 
 const (
-	MAX_STRING_LENGTH = 1024
+	MAX_STRING_LENGTH = 2048
 )
 
 const (
