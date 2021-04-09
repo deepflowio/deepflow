@@ -46,9 +46,9 @@ func DocToRozeDocuments(doc *app.Document) *msg.RozeDocument {
 
 		// 当MAC/MAC1非0时，通过MAC来获取资源信息
 		if t.MAC != 0 && t.MAC1 != 0 {
-			info, info1 = pf.PlatformData.QueryMacInfosPair(t.MAC, t.MAC1)
+			info, info1 = pf.PlatformData.QueryMacInfosPair(t.MAC|uint64(t.L3EpcID)<<48, t.MAC1|uint64(t.L3EpcID1)<<48)
 		} else if t.MAC != 0 {
-			info = pf.PlatformData.QueryMacInfo(t.MAC)
+			info = pf.PlatformData.QueryMacInfo(t.MAC | uint64(t.L3EpcID)<<48)
 			if t.IsIPv6 != 0 {
 				info1 = pf.PlatformData.QueryIPV6Infos(t.L3EpcID1, t.IP61)
 			} else {
@@ -60,7 +60,7 @@ func DocToRozeDocuments(doc *app.Document) *msg.RozeDocument {
 			} else {
 				info = pf.PlatformData.QueryIPV4Infos(t.L3EpcID, t.IP)
 			}
-			info1 = pf.PlatformData.QueryMacInfo(t.MAC1)
+			info1 = pf.PlatformData.QueryMacInfo(t.MAC1 | uint64(t.L3EpcID1)<<48)
 		} else if t.IsIPv6 != 0 {
 			info, info1 = pf.PlatformData.QueryIPV6InfosPair(t.L3EpcID, t.IP6, t.L3EpcID1, t.IP61)
 		} else {
@@ -107,7 +107,7 @@ func DocToRozeDocuments(doc *app.Document) *msg.RozeDocument {
 		}
 
 		if t.MAC != 0 {
-			info = pf.PlatformData.QueryMacInfo(t.MAC)
+			info = pf.PlatformData.QueryMacInfo(t.MAC | uint64(t.L3EpcID)<<48)
 		} else if t.IsIPv6 != 0 {
 			info = pf.PlatformData.QueryIPV6Infos(t.L3EpcID, t.IP6)
 		} else {
