@@ -564,8 +564,8 @@ func (t *PlatformInfoTable) String() string {
 	sb.WriteString(fmt.Sprintf("ARCH:%s OS:%s Kernel:%s CPUNum:%d MemorySize:%d\n", t.runtimeEnv.Arch, t.runtimeEnv.OS, t.runtimeEnv.KernelVersion, t.runtimeEnv.CpuNum, t.runtimeEnv.MemorySize))
 	t.ipv4Lock.RLock()
 	if len(t.epcIDIPV4Infos) > 0 {
-		sb.WriteString("\nepcID   ipv4            mac          host            hostID  regionID  deviceType  deviceID    subnetID  podNodeID podNSID podGroupID podID podClusterID azID isVip hitCount\n")
-		sb.WriteString("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
+		sb.WriteString("\n1 *epcID  *ipv4           mac          host            hostID  regionID  deviceType  deviceID    subnetID  podNodeID podNSID podGroupID podID podClusterID azID isVip hitCount (ipv4平台信息)\n")
+		sb.WriteString("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
 	}
 	epcIP4s := make([]uint64, 0)
 	for epcIP, _ := range t.epcIDIPV4Infos {
@@ -579,7 +579,7 @@ func (t *PlatformInfoTable) String() string {
 		if info == nil {
 			continue
 		}
-		fmt.Fprintf(sb, "%-6d  %-15s %-12x %-15s %-6d  %-7d   %-10d   %-7d    %-8d  %-9d %-7d %-10d %-5d %-12d %-4d %-5t %d\n", epcIP>>32, utils.IpFromUint32(uint32(epcIP)).String(),
+		fmt.Fprintf(sb, "  %-6d  %-15s %-12x %-15s %-6d  %-7d   %-10d   %-7d    %-8d  %-9d %-7d %-10d %-5d %-12d %-4d %-5t %d\n", epcIP>>32, utils.IpFromUint32(uint32(epcIP)).String(),
 			info.Mac, info.HostStr, info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.PodNSID, info.PodGroupID, info.PodID, info.PodClusterID, info.AZID, info.IsVip, *info.HitCount)
 	}
 	t.ipv4Lock.RUnlock()
@@ -587,8 +587,8 @@ func (t *PlatformInfoTable) String() string {
 	t.ipv6Lock.RLock()
 	if len(t.epcIDIPV6Infos) > 0 {
 		sb.WriteString("\n\n")
-		sb.WriteString("epcID   ipv6                                         mac          host            hostID  regionID deviceType  deviceID subnetID  podNodeID podNSID podGroupID podID podClusterID azID isVip hitCount\n")
-		sb.WriteString("------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
+		sb.WriteString("2 *epcID  *ipv6                                        mac          host            hostID  regionID deviceType  deviceID subnetID  podNodeID podNSID podGroupID podID podClusterID azID isVip hitCount (ipv6平台信息)\n")
+		sb.WriteString("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
 	}
 	epcIP6s := make([][EpcIDIPV6_LEN]byte, 0)
 	for epcIP, _ := range t.epcIDIPV6Infos {
@@ -602,13 +602,13 @@ func (t *PlatformInfoTable) String() string {
 		if info == nil {
 			continue
 		}
-		fmt.Fprintf(sb, "%-6d  %-44s %-12x %-15s %-6d  %-7d  %-10d  %-7d  %-8d  %-9d %-7d %-10d %-5d %-12d %-4d %-5t %d\n", int32(binary.LittleEndian.Uint32(epcIP[:4])), net.IP(epcIP[4:]).String(),
+		fmt.Fprintf(sb, "  %-6d  %-44s %-12x %-15s %-6d  %-7d  %-10d  %-7d  %-8d  %-9d %-7d %-10d %-5d %-12d %-4d %-5t %d\n", int32(binary.LittleEndian.Uint32(epcIP[:4])), net.IP(epcIP[4:]).String(),
 			info.Mac, info.HostStr, info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.PodNSID, info.PodGroupID, info.PodID, info.PodClusterID, info.AZID, info.IsVip, *info.HitCount)
 	}
 	t.ipv6Lock.RUnlock()
 	if len(t.epcIDIPV4CidrInfos) > 0 || len(t.epcIDIPV6CidrInfos) > 0 {
-		sb.WriteString("\nepcID   cidr                                           regionID  subnetID   azID  hitCount\n")
-		sb.WriteString("--------------------------------------------------------------------------------------------\n")
+		sb.WriteString("\n3 *epcID  *cidr                                          regionID  subnetID   azID  hitCount (cidr平台信息) \n")
+		sb.WriteString("------------------------------------------------------------------------------------------------\n")
 	}
 
 	CidrInfos := make([]*CidrInfo, 0)
@@ -628,12 +628,12 @@ func (t *PlatformInfoTable) String() string {
 		return CidrInfos[i].EpcID < CidrInfos[j].EpcID
 	})
 	for _, cidrInfo := range CidrInfos {
-		fmt.Fprintf(sb, "%-6d  %-44s   %-7d   %-8d   %-5d %d\n",
+		fmt.Fprintf(sb, "  %-6d  %-44s   %-7d   %-8d   %-5d %d\n",
 			cidrInfo.EpcID, cidrInfo.Cidr, cidrInfo.RegionID, cidrInfo.SubnetID, cidrInfo.AZID, *cidrInfo.HitCount)
 	}
 
-	sb.WriteString("\nepcID   ip                                           miss\n")
-	sb.WriteString("-------------------------------------------------------------\n")
+	sb.WriteString("\n4 *epcID  *ip                                          miss  (epcID和IP无法匹配到1,2,3表的统计)\n")
+	sb.WriteString("---------------------------------------------------------------\n")
 	epcIP4s = epcIP4s[:0]
 	t.ipv4Lock.RLock()
 	t.epcIDIPV4Lru.Walk(func(key uint64, value interface{}) {
@@ -647,7 +647,7 @@ func (t *PlatformInfoTable) String() string {
 	for _, epcIP := range epcIP4s {
 		info, _ := t.epcIDIPV4Lru.Get(epcIP, true)
 		missCount, _ := info.(*uint64)
-		fmt.Fprintf(sb, "%-6d  %-44s %d\n", epcIP>>32, utils.IpFromUint32(uint32(epcIP)).String(), *missCount)
+		fmt.Fprintf(sb, "  %-6d  %-44s %d\n", epcIP>>32, utils.IpFromUint32(uint32(epcIP)).String(), *missCount)
 	}
 	t.ipv4Lock.RUnlock()
 
@@ -665,35 +665,35 @@ func (t *PlatformInfoTable) String() string {
 	})
 	for _, epcIP := range epcIP6s {
 		info, _ := t.epcIDIPV6Lru.Get(epcIP[:], true)
-		fmt.Fprintf(sb, "%-6d  %-44s %d\n", int(binary.LittleEndian.Uint32(epcIP[:4])), net.IP(epcIP[4:]).String(), *(info.(*uint64)))
+		fmt.Fprintf(sb, "  %-6d  %-44s %d\n", int(binary.LittleEndian.Uint32(epcIP[:4])), net.IP(epcIP[4:]).String(), *(info.(*uint64)))
 	}
 	t.ipv6Lock.RUnlock()
 
 	if len(t.macInfos) > 0 {
-		sb.WriteString("\nepcID  Mac         hit\n")
-		sb.WriteString("---------------------------\n")
+		sb.WriteString("\n5 *epcID *Mac        hit  (epcID和MAC匹配到平台信息的统计, 优先级最高)\n")
+		sb.WriteString("-----------------------------\n")
 	}
 	t.macLock.RLock()
 	for mac, hitCount := range t.macInfos {
 		if *hitCount.HitCount > 0 {
-			fmt.Fprintf(sb, "%-5d  %-12x  %d\n", mac>>48, mac&0xffffffffffff, *hitCount.HitCount)
+			fmt.Fprintf(sb, "  %-5d  %-12x  %d\n", mac>>48, mac&0xffffffffffff, *hitCount.HitCount)
 		}
 	}
 	t.macLock.RUnlock()
 
 	if len(t.macMissCount) > 0 {
-		sb.WriteString("\nepcID  Mac        miss\n")
-		sb.WriteString("----------------------------\n")
+		sb.WriteString("\n6 *epcID *Mac       miss  (epcID和MAC匹配不到平台信息的统计)\n")
+		sb.WriteString("------------------------------\n")
 	}
 	t.macLock.RLock()
 	for mac, missCount := range t.macMissCount {
-		fmt.Fprintf(sb, "%-5d  %-12x  %d\n", mac>>48, mac&0xffffffffffff, *missCount)
+		fmt.Fprintf(sb, "  %-5d  %-12x  %d\n", mac>>48, mac&0xffffffffffff, *missCount)
 	}
 	t.macLock.RUnlock()
 
 	if len(t.epcIDBaseInfos) > 0 {
-		sb.WriteString("\nepcID            regionID  hitcount\n")
-		sb.WriteString("-------------------------------------\n")
+		sb.WriteString("\n7 *epcID           regionID  hitcount (若1,2,3都无法匹配到平台信息，则只使用epcID匹配到Region信息的统计)\n")
+		sb.WriteString("---------------------------------------\n")
 		t.epcIDLock.RLock()
 		epcIDs := make([]int32, 0, len(t.epcIDBaseInfos))
 		for epcID, _ := range t.epcIDBaseInfos {
@@ -703,18 +703,18 @@ func (t *PlatformInfoTable) String() string {
 			return epcIDs[i] < epcIDs[j]
 		})
 		for _, epcID := range epcIDs {
-			fmt.Fprintf(sb, "%-15d  %-8d  %-8d\n", epcID, t.epcIDBaseInfos[epcID].RegionID, t.epcIDBaseInfos[epcID].HitCount)
+			fmt.Fprintf(sb, "  %-15d  %-8d  %-8d\n", epcID, t.epcIDBaseInfos[epcID].RegionID, t.epcIDBaseInfos[epcID].HitCount)
 		}
 		t.epcIDLock.RUnlock()
 	}
 
 	if len(t.epcIDBaseMissCount) > 0 {
-		sb.WriteString("\nepcID         miss\n")
-		sb.WriteString("------------------------\n")
+		sb.WriteString("\n8 *epcID         miss  (只使用epcID也无法匹配到region信息的统计)\n")
+		sb.WriteString("--------------------------\n")
 	}
 	t.epcIDLock.RLock()
 	for epcID, missCount := range t.epcIDBaseMissCount {
-		fmt.Fprintf(sb, "%-15d  %d\n", epcID, *missCount)
+		fmt.Fprintf(sb, "  %-15d  %d\n", epcID, *missCount)
 	}
 	t.epcIDLock.RUnlock()
 
