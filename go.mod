@@ -14,7 +14,7 @@ require (
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/pebbe/zmq4 v1.0.0
 	github.com/spf13/cobra v0.0.5
-	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20210331101334-fe03a794e7fb
+	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20210409090340-1c895503f1e7
 	gitlab.x.lan/yunshan/message v0.0.0-20210223150508-58c505ce970f
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859
 	google.golang.org/genproto v0.0.0-20190626174449-989357319d63 // indirect
