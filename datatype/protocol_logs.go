@@ -38,14 +38,20 @@ type LogMessageType uint8
 const (
 	MSG_T_REQUEST LogMessageType = iota
 	MSG_T_RESPONSE
+	MSG_T_SESSION
 )
 
 func (t *LogMessageType) String() string {
 	formatted := ""
-	if *t == MSG_T_REQUEST {
+	switch *t {
+	case MSG_T_SESSION:
+		formatted = "SESSION"
+	case MSG_T_REQUEST:
 		formatted = "REQUEST"
-	} else {
+	case MSG_T_RESPONSE:
 		formatted = "RESPONSE"
+	default:
+		formatted = "UNKOWN"
 	}
 
 	return formatted
@@ -273,7 +279,7 @@ func (h *HTTPInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, 
 	encoder.WriteU32(h.StreamID)
 	encoder.WriteU64(uint64(h.ContentLength))
 	encoder.WriteString255(h.Version)
-	if msgType == MSG_T_REQUEST {
+	if msgType == MSG_T_SESSION || msgType == MSG_T_REQUEST {
 		encoder.WriteString255(h.Method)
 		encoder.WriteString255(h.Path)
 		encoder.WriteString255(h.Host)
@@ -286,7 +292,7 @@ func (h *HTTPInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, 
 	h.StreamID = decoder.ReadU32()
 	h.ContentLength = int64(decoder.ReadU64())
 	h.Version = decoder.ReadString255()
-	if msgType == MSG_T_REQUEST {
+	if msgType == MSG_T_SESSION || msgType == MSG_T_REQUEST {
 		h.Method = decoder.ReadString255()
 		h.Path = decoder.ReadString255()
 		h.Host = decoder.ReadString255()
@@ -326,9 +332,10 @@ type DNSInfo struct {
 func (d *DNSInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, code uint16) {
 	encoder.WriteU16(d.TransID)
 	encoder.WriteU16(d.QueryType)
-	if msgType == MSG_T_REQUEST {
+	if msgType == MSG_T_SESSION || msgType == MSG_T_REQUEST {
 		encoder.WriteString255(d.QueryName)
-	} else {
+	}
+	if msgType == MSG_T_SESSION || msgType == MSG_T_RESPONSE {
 		encoder.WriteString255(d.Answers)
 	}
 }
@@ -336,9 +343,10 @@ func (d *DNSInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, c
 func (d *DNSInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, code uint16) {
 	d.TransID = decoder.ReadU16()
 	d.QueryType = decoder.ReadU16()
-	if msgType == MSG_T_REQUEST {
+	if msgType == MSG_T_SESSION || msgType == MSG_T_REQUEST {
 		d.QueryName = decoder.ReadString255()
-	} else {
+	}
+	if msgType == MSG_T_SESSION || msgType == MSG_T_RESPONSE {
 		d.Answers = decoder.ReadString255()
 	}
 }
