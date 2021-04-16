@@ -8,6 +8,7 @@ import (
 
 	"github.com/olivere/elastic"
 	logging "github.com/op/go-logging"
+	"github.com/spf13/cobra"
 
 	"math/rand"
 
@@ -44,6 +45,8 @@ type ESWriter struct {
 	Mapping           string
 	Addresses         []string
 	User, Password    string
+	Replica           int
+	Tiering           bool
 	RetentionPolicy   common.RetentionPolicy
 	OpLoadFactor      int
 	RawFlowEsTemplate string
@@ -55,6 +58,7 @@ type ESWriter struct {
 	maxExecTime       time.Duration
 	avgExecTime       time.Duration
 	totalWriteCount   int64
+	newIndex          string
 }
 
 // Open es初始化连接
@@ -112,6 +116,10 @@ func (esWriter *ESWriter) Do() {
 	startTime := time.Duration(time.Now().UnixNano())
 
 	index := esWriter.RetentionPolicy.GetAppIndex(esWriter.AppName, timestamp)
+	// 如果升级创建了newIndex，则写入newIndex
+	if index < esWriter.newIndex && strings.HasPrefix(esWriter.newIndex, index) {
+		index = esWriter.newIndex
+	}
 
 	var count = 0
 
@@ -169,9 +177,135 @@ func (esWriter *ESWriter) Do() {
 }
 
 func (esWriter *ESWriter) Run() {
+	// 每次启动先创建template
+	for !esWriter.createTemplate() {
+		time.Sleep(time.Minute)
+	}
+	// 判断当前的index mappings和template是否匹配，若不匹配则创建新的index
+	esWriter.createNewIndexIfNeed()
+
 	for {
 		esWriter.Do()
 	}
+}
+
+// 若当前的index和template不匹配，则新建index名为原index + 后缀"_[0-9][0-9]"
+// 当多主机，多线程同时执行时，都是从index开始依次匹配后缀"_[0-9][0-9]"的index，并判断是否和template一致,几种情况
+//   - 存在， 但不匹配，查找下一个INDEX
+//   - 不存在, 再次put template，并创建新的INDEX
+//   - 存在且匹配，结束
+//  存在的风险: 如果存在一个旧版本的droplet最后复位了，且没有升级成功。会导致template变为老的，导致其他节点建立的index错误。
+//     - 解决方法: 需要保证最终的droplet版本都一致
+func (esWriter *ESWriter) createNewIndexIfNeed() {
+	var i int
+	index := esWriter.RetentionPolicy.GetAppIndex(esWriter.AppName, time.Duration(time.Duration(time.Now().UnixNano())))
+	newIndex := index
+	for {
+		if i != 0 {
+			newIndex = index + fmt.Sprintf("_%02d", i)
+		}
+		exist, err := esWriter.client.IndexExists(newIndex).Do(context.TODO())
+		if err != nil {
+			log.Warningf("check index(%s) is exist failed: %s", newIndex, err)
+			time.Sleep(time.Minute)
+			continue
+		}
+
+		if exist {
+			// 如果存在就判断是否匹配
+			match, err := esWriter.checkTemplateMatchIndexMappings(newIndex)
+			if err != nil {
+				log.Warningf("check index(%s) mappings failed: %s", newIndex, err)
+				time.Sleep(time.Minute)
+				continue
+			}
+			if match {
+				if newIndex == index {
+					return
+				}
+				esWriter.newIndex = newIndex
+				log.Infof("New index is(%s)", newIndex)
+				return
+			} else {
+				// 若不匹配，则判断下一个index
+				i++
+			}
+		} else {
+			// 再put一次template，防止被其他进程put了老的template
+			if !esWriter.createTemplate() {
+				time.Sleep(time.Second * 20)
+				continue
+			}
+			// 不存在就建立一个，再判断是否匹配
+			if _, err := esWriter.client.CreateIndex(newIndex).Body(esWriter.Mapping).Do(context.TODO()); err != nil {
+				log.Warningf("create index(%s) failed: %s", newIndex, err)
+				time.Sleep(time.Minute)
+				continue
+			}
+			log.Infof("create index(%s)", newIndex)
+		}
+	}
+}
+
+func (esWriter *ESWriter) checkTemplateMatchIndexMappings(index string) (bool, error) {
+	indexMappings, err := esWriter.client.GetMapping().Index(index).Do(context.TODO())
+	if err != nil {
+		log.Warningf("get index(%s) mappings failed: %s", index, err)
+		return false, err
+	}
+	mps, ok := indexMappings[index].(map[string]interface{})
+	if !ok {
+		log.Infof("index(%s) mappings is not exist", index)
+		return false, nil
+	}
+	mp, ok := mps["mappings"].(map[string]interface{})
+	if !ok {
+		log.Info("Index mappings not contains 'mappings'")
+		return false, nil
+	}
+
+	if checkMappingsContainsSubmappings(mp, DFMappingsJson[esWriter.AppName]) {
+		log.Infof("index(%s) mappings contains template(%s)", index, esWriter.AppName)
+		return true, nil
+	}
+	return false, nil
+}
+
+func checkMappingsContainsSubmappings(mappings, submappings map[string]interface{}) bool {
+	flow := submappings["flow"].(map[string]interface{})
+	properties := flow["properties"].(map[string]interface{})
+	for k, v := range properties {
+		if !checkMappingsContainsProperty(mappings, k, v.(map[string]interface{})) {
+			return false
+		}
+	}
+	return true
+}
+
+func checkMappingsContainsProperty(mappings map[string]interface{}, key string, value map[string]interface{}) bool {
+	flow, ok := mappings["flow"].(map[string]interface{})
+	if !ok {
+		log.Info("Index mappings not contains 'flow'")
+		return false
+	}
+	properties, ok := flow["properties"].(map[string]interface{})
+	if !ok {
+		log.Info("Index mappings not contains 'properties'")
+		return false
+	}
+	property, ok := properties[key].(map[string]interface{})
+	if !ok {
+		log.Infof("template key(%s) is not in index mappings", key)
+		return false
+	}
+
+	if property["type"] == value["type"] &&
+		property["index"] == value["index"] &&
+		property["store"] == value["store"] {
+		return true
+	}
+	log.Infof("template key(%s) value(%+v) is not equal index mappings value(%+v)", key, value, property)
+	return false
 }
 
 // 检查index是否存在
@@ -201,7 +335,7 @@ func (esWriter *ESWriter) checkIndex(timestamp time.Duration, index string) bool
 				}
 				if !existRes {
 					log.Warningf("index %v not exist", expiredIndex)
-					break
+					continue
 				}
 
 				deleteRes, err := esWriter.client.DeleteIndex(expiredIndex).Do(context.TODO())
@@ -220,9 +354,11 @@ func (esWriter *ESWriter) checkIndex(timestamp time.Duration, index string) bool
 		/* create new index */
 		if !indexExists {
 			if !esWriter.checkTemplate() {
-				time.Sleep(time.Second * 60)
-				log.Warning("no index template exist, sleep 60s")
-				return false
+				if !esWriter.createTemplate() {
+					time.Sleep(time.Second * 60)
+					log.Warning("no index template exist, sleep 60s")
+					return false
+				}
 			}
 
 			createIndexStart := time.Now()
@@ -246,15 +382,25 @@ func (esWriter *ESWriter) checkIndex(timestamp time.Duration, index string) bool
 }
 
 func (esWriter *ESWriter) checkTemplate() bool {
-	getresp, err := esWriter.client.IndexGetTemplate().Name(esWriter.AppName).Do(context.TODO())
+	_, err := esWriter.client.IndexGetTemplate().Name(esWriter.AppName).Do(context.TODO())
 	if err != nil {
 		log.Errorf("get template error: %v", err)
 		return false
 	}
-	if getresp == nil {
-		log.Warningf("get mapping of %v failed")
+	return true
+}
+
+func (esWriter *ESWriter) createTemplate() bool {
+	putTemplate := esWriter.client.IndexPutTemplate(esWriter.AppName)
+	data := buildJsonBody(esWriter.AppName, esWriter.Replica, esWriter.Tiering)
+	putTemplate.BodyString(data)
+
+	resp, err := putTemplate.Do(context.TODO())
+	if err != nil {
+		log.Errorf("create template error: %v data:%s", err, data)
 		return false
 	}
+	log.Infof("create template(%s) result(%+v)", esWriter.AppName, resp)
 	return true
 }
 
@@ -268,4 +414,96 @@ func (esWriter *ESWriter) GetCounter() interface{} {
 	esWriter.avgExecTime = 0
 	esWriter.totalWriteCount = 0
 	return &counter
+}
+
+func getMismatchIndexs(client *elastic.Client, name string) ([]string, error) {
+	// 获取index的所有mappings
+	allMappings, err := client.GetMapping().Index(name + common.LOG_SUFFIX).Do(context.TODO())
+	if err != nil {
+		log.Warningf("Get mappings(%s) failed: %s", name+common.LOG_SUFFIX, err)
+		return nil, err
+	}
+
+	mismatchIndexs := make([]string, 0)
+	for index, mappings := range allMappings {
+		mapping, ok := mappings.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		theMapping, ok := mapping["mappings"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		if !checkMappingsContainsSubmappings(theMapping, DFMappingsJson[name]) {
+			mismatchIndexs = append(mismatchIndexs, index)
+		}
+	}
+	if len(mismatchIndexs) == 0 {
+		log.Infof("All indexs(%s) mappings is matched.", name)
+		return nil, nil
+	}
+	log.Infof("Mismatch indexs(%v)", mismatchIndexs)
+	return mismatchIndexs, nil
+}
+
+func deleteIndexs(client *elastic.Client, indexs []string) error {
+	for _, index := range indexs {
+		if _, err := client.DeleteIndex(index).Do(context.TODO()); err != nil {
+			log.Warningf("delete index(%s) failed: %s", index, err)
+			return err
+		}
+		log.Infof("Delete index(%s)", index)
+	}
+	return nil
+}
+
+func RegisterESIndexHandleCommand(esHostPorts []string, esUser, esPassword string) *cobra.Command {
+	esURLs := []string{}
+	for _, hp := range esHostPorts {
+		esURLs = append(esURLs, "http://"+hp)
+	}
+	cmd := &cobra.Command{
+		Use:   "es-mismatch-indexs",
+		Short: "show/delete mismatch indexs",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("please run with arguments 'show | del'.\n")
+		},
+	}
+	show := &cobra.Command{
+		Use:   "show",
+		Short: "show mismatch indexs",
+		Run: func(cmd *cobra.Command, args []string) {
+			client, err := elastic.NewClient(elastic.SetURL(esURLs...), elastic.SetBasicAuth(esUser, esPassword))
+			if err != nil {
+				fmt.Println("Show mismatch index failed: ", err)
+				return
+			}
+			for name, _ := range DFMappings {
+				getMismatchIndexs(client, name)
+			}
+		},
+	}
+	del := &cobra.Command{
+		Use:   "del",
+		Short: "del mismatch indexs",
+		Run: func(cmd *cobra.Command, args []string) {
+			client, err := elastic.NewClient(elastic.SetURL(esURLs...), elastic.SetBasicAuth(esUser, esPassword))
+			if err != nil {
+				fmt.Println("Delete mismatch indexs failed: ", err)
+				return
+			}
+			for name, _ := range DFMappings {
+				misMismatchs, err := getMismatchIndexs(client, name)
+				if err != nil {
+					fmt.Printf("get index(%s) misMismatchMappings failed: %s", name, err)
+					continue
+				}
+				deleteIndexs(client, misMismatchs)
+			}
+		},
+	}
+	cmd.AddCommand(show)
+	cmd.AddCommand(del)
+	return cmd
 }

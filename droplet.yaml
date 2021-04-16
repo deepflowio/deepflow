@@ -173,6 +173,12 @@
 ## es writer all queue limit max size
 #throttle: 1000
 
+## set es index.number_of_replicas
+#es-number-of-replica: 0
+
+# if true will set 'index.routing.allocation.require.box_type' to 'warm'
+#es-tiering: false
+
 ## 分别控制l4流日志, http流日志，dns流日志的写入限速。默认值为0，表示使用throttle的设置值.若非0，则使用设置值
 #l4-throttle: 0
 #l7-http-throttle: 0
