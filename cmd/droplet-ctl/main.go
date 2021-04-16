@@ -27,6 +27,7 @@ import (
 	rozecfg "gitlab.x.lan/yunshan/droplet/roze/config"
 	roze "gitlab.x.lan/yunshan/droplet/roze/platformdata"
 	streamcfg "gitlab.x.lan/yunshan/droplet/stream/config"
+	"gitlab.x.lan/yunshan/droplet/stream/dbwriter"
 	"gitlab.x.lan/yunshan/droplet/stream/jsonify/dfi"
 	stream "gitlab.x.lan/yunshan/droplet/stream/platformdata"
 )
@@ -93,6 +94,8 @@ func main() {
 	}))
 	streamCmd.AddCommand(debug.ClientRegisterSimple(stream.CMD_PLATFORMDATA, debug.CmdHelper{"platformData [filter]", "show stream platform data statistics"}, nil))
 	streamCmd.AddCommand(RegisterReceiveFlowLogCommand())
+	streamconfig := streamcfg.Load(dropletctl.ConfigPath)
+	streamCmd.AddCommand(dbwriter.RegisterESIndexHandleCommand(streamconfig.ESHostPorts, streamconfig.ESAuth.User, streamconfig.ESAuth.Password))
 
 	root.GenBashCompletionFile("/usr/share/bash-completion/completions/droplet-ctl")
 	root.SetArgs(os.Args[1:])
@@ -211,7 +214,6 @@ func RegisterReceiveFlowLogCommand() *cobra.Command {
 				}
 				fmt.Println(flow)
 			}
-			return
 		},
 	}
 	return cmd

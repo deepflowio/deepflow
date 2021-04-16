@@ -71,6 +71,8 @@ func newESWriter(config *config.Config, appName string, esQueue queue.QueueReade
 		Addresses: config.ESHostPorts,
 		User:      config.ESAuth.User,
 		Password:  config.ESAuth.Password,
+		Replica:   config.ESReplica,
+		Tiering:   config.ESTiering,
 		RetentionPolicy: common.RetentionPolicy{
 			Interval:   common.ZERO,
 			SplitSize:  common.Interval(time.Duration(config.RPSplitSize) * time.Second),
@@ -127,7 +129,7 @@ func NewFlowLogger(config *config.Config, manager *dropletqueue.Manager, recv *r
 			throttle,
 			queue.QueueWriter(esWriterQueues.FixedMultiQueue[i]),
 		)
-		esWriters[i] = newESWriter(config, "l4_flow_log", queue.QueueReader(esWriterQueues.FixedMultiQueue[i]))
+		esWriters[i] = newESWriter(config, common.L4_FLOW_LOG, queue.QueueReader(esWriterQueues.FixedMultiQueue[i]))
 		decoders[i] = decoder.NewDecoder(
 			i,
 			msgType,
@@ -194,8 +196,8 @@ func NewProtoLogger(config *config.Config, manager *dropletqueue.Manager, recv *
 			dnsThrottle,
 			queue.QueueWriter(dnsEsWriterQueues.FixedMultiQueue[i]),
 		)
-		httpEsWriters[i] = newESWriter(config, "l7_http_log", queue.QueueReader(httpEsWriterQueues.FixedMultiQueue[i]))
-		dnsEsWriters[i] = newESWriter(config, "l7_dns_log", queue.QueueReader(dnsEsWriterQueues.FixedMultiQueue[i]))
+		httpEsWriters[i] = newESWriter(config, common.L7_HTTP_LOG, queue.QueueReader(httpEsWriterQueues.FixedMultiQueue[i]))
+		dnsEsWriters[i] = newESWriter(config, common.L7_DNS_LOG, queue.QueueReader(dnsEsWriterQueues.FixedMultiQueue[i]))
 		decoders[i] = decoder.NewDecoder(
 			i,
 			msgType,

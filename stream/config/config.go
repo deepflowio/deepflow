@@ -39,6 +39,8 @@ type Config struct {
 	ControllerPort    int      `yaml:"controller-port"`
 	ESHostPorts       []string `yaml:"es-host-port"`
 	ESAuth            ESAuth   `yaml:"es-auth"`
+	ESReplica         int      `yaml:"es-number-of-replica"`
+	ESTiering         bool     `yaml:"es-tiering"`
 	Throttle          int      `yaml:"throttle"`
 	L4Throttle        int      `yaml:"l4-throttle"`
 	L7HTTPThrottle    int      `yaml:"l7-http-throttle"`
