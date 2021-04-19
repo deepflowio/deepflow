@@ -112,7 +112,6 @@ type CQHandler struct {
 	interval       string // 分钟 <xx>m
 	aggrSummable   AggrEnum
 	aggrUnsummable AggrEnum
-	batchCount     int // 同时对几个field进行聚合
 }
 
 func initHttpClient(httpAddr, user, password string) (client.Client, error) {
@@ -215,10 +214,12 @@ func parseCqContent(cq string) (aggr string, srcRP string, interval string, err 
 }
 
 func GetCQParams(cqInfos []CQInfo, db, rp string) *CQHandler {
+	summableCqName := "cq_" + rp + "__packet_rx"
+	unsummableCqName := "cq_" + rp + "__rtt"
 	var srcRP, interval, aggrSummable, aggrUnsummable string
 	var err error
 	for _, cqInfo := range cqInfos {
-		if cqInfo.db == db && strings.Contains(cqInfo.name, "__packet_rx") {
+		if cqInfo.db == db && cqInfo.name == summableCqName {
 			aggrSummable, srcRP, interval, err = parseCqContent(cqInfo.content)
 			if err != nil {
 				return nil
@@ -227,7 +228,7 @@ func GetCQParams(cqInfos []CQInfo, db, rp string) *CQHandler {
 				break
 			}
 		}
-		if cqInfo.db == db && strings.Contains(cqInfo.name, "__rtt") {
+		if cqInfo.db == db && cqInfo.name == unsummableCqName {
 			aggrUnsummable, _, _, err = parseCqContent(cqInfo.content)
 			if err != nil {
 				return nil
@@ -251,12 +252,13 @@ func GetCQParams(cqInfos []CQInfo, db, rp string) *CQHandler {
 }
 
 /* 提供给droplet-ctl调用, 实现更新CQ:
-   1, 查询vtap数据库的RP和CQ信息，提取CQ的参数
+   1, 查询vtap_flow, vtap_packet, vtap_wan数据库的RP和CQ信息，提取CQ的参数
      - 包括原RP，目的RP，聚合时长，可累加聚合信息（以packet_rx为准），不可累加聚合(以rtt的处理为准)
    2，对所有的数据库根据获取的CQ参数和当前的field信息再次下发CQ，
      - 若有新增field，则会对新增的field增加CQ命令
+     - 若无新增field，则对已有的CQ重复下发，若和原来的CQ参数不一致，则报错。
 */
-func UpdateCQs(httpAddr, user, password string, batchCount int) error {
+func UpdateCQs(httpAddr, user, password string) error {
 	httpClient, err := initHttpClient(httpAddr, user, password)
 	if err != nil {
 		return err
@@ -267,95 +269,50 @@ func UpdateCQs(httpAddr, user, password string, batchCount int) error {
 		return err
 	}
 
-	for _, dbs := range dbGroupsMap {
-		for _, db := range dbs {
-			rps, err := GetRetentionPolicies(httpClient, db)
+	for db, _ := range dbGroupsMap {
+		rps, err := GetRetentionPolicies(httpClient, db)
+		if err != nil {
+			return err
+		}
+
+		for _, rp := range rps {
+			if rp == "rp_1s" || rp == "rp_1m" || rp == "autogen" {
+				continue
+			}
+			if !strings.HasPrefix(rp, "rp_") {
+				continue
+			}
+
+			cqHandler := GetCQParams(cqInfos, db, rp)
+			if cqHandler == nil {
+				continue
+			}
+			interval, _ := strconv.Atoi(cqHandler.interval)
+			aggrSummable := cqHandler.aggrSummable.String()
+			if aggrSummable == "mean" {
+				aggrSummable = "avg"
+			}
+			aggrUnsummable := cqHandler.aggrUnsummable.String()
+			if aggrUnsummable == "mean" {
+				aggrUnsummable = "avg"
+			}
+			cli, err := NewCLIHandler(httpAddr, user, password, db, "update",
+				cqHandler.srcRP, cqHandler.dstRP, aggrSummable, aggrUnsummable, "", interval, 168)
+			log.Info("CQ update:", db, cqHandler.srcRP, cqHandler.dstRP, aggrSummable, aggrUnsummable, interval)
+			fmt.Printf("CQ update: dbGroup:%s srcRP:%s dstRP:%s aggrSummable:%s aggrUnsummable:%s interval:%dm\n", db, cqHandler.srcRP, cqHandler.dstRP, aggrSummable, aggrUnsummable, interval)
 			if err != nil {
 				return err
 			}
-
-			for _, rp := range rps {
-				if rp == "rp_1s" || rp == "rp_1m" || rp == "autogen" {
-					continue
-				}
-				if !strings.HasPrefix(rp, "rp_") {
-					continue
-				}
-
-				cqHandler := GetCQParams(cqInfos, db, rp)
-				if cqHandler == nil {
-					continue
-				}
-				interval, _ := strconv.Atoi(cqHandler.interval)
-				aggrSummable := cqHandler.aggrSummable.String()
-				if aggrSummable == "mean" {
-					aggrSummable = "avg"
-				}
-				aggrUnsummable := cqHandler.aggrUnsummable.String()
-				if aggrUnsummable == "mean" {
-					aggrUnsummable = "avg"
-				}
-				cli, err := NewCLIHandler(httpAddr, user, password, "update",
-					cqHandler.srcRP, cqHandler.dstRP, aggrSummable, aggrUnsummable, "", []string{db}, interval, 168, batchCount)
-				log.Info("CQ update:", db, cqHandler.srcRP, cqHandler.dstRP, aggrSummable, aggrUnsummable, interval)
-				fmt.Printf("CQ update: db:%s srcRP:%s dstRP:%s aggrSummable:%s aggrUnsummable:%s interval:%dm\n", db, cqHandler.srcRP, cqHandler.dstRP, aggrSummable, aggrUnsummable, interval)
-				if err != nil {
-					return err
-				}
-				_, err = cli.Run()
-				if err != nil {
-					return err
-				}
+			_, err = cli.Run()
+			if err != nil {
+				return err
 			}
 		}
 	}
 	return nil
 }
 
-/* 提供给droplet-ctl调用, 实现删除指定DB,RP的CQ.
-   由于默认会对vtap_flow组的所有DB，下发CQ，有些场景没有必要对所有db都做CQ，
-   减少一些DB的CQ，能降低系统负载
-*/
-func DelCQs(httpAddr, user, password, db, dstRP string) error {
-	httpClient, err := initHttpClient(httpAddr, user, password)
-	if err != nil {
-		return err
-	}
-	c := &CQHandler{
-		client: httpClient,
-		db:     db,
-		dstRP:  dstRP,
-	}
-	return c.Del()
-}
-
-func ShowCQs(httpAddr, user, password, db, dstRP string) string {
-	httpClient, err := initHttpClient(httpAddr, user, password)
-	if err != nil {
-		return err.Error()
-	}
-	cqInfos, err := GetCQInfos(httpClient)
-	if err != nil {
-		return err.Error()
-	}
-
-	lines := []string{}
-	if dstRP == "" {
-		lines = append(lines, fmt.Sprintf("DB: %s", db))
-	} else {
-		lines = append(lines, fmt.Sprintf("DB: %s   RP: %s", db, dstRP))
-	}
-	lines = append(lines, "name                                          content                                            ")
-	lines = append(lines, "--------------------------------------------------------------------------------------------")
-	for _, cq := range cqInfos {
-		if cq.db == db && (dstRP == "" || strings.Contains(cq.name, "_"+dstRP+"__")) {
-			lines = append(lines, fmt.Sprintf("%-45s %s", cq.name, cq.content))
-		}
-	}
-	return strings.Join(lines, "\n")
-}
-
-func NewCLIHandler(httpAddr, user, password, action, baseRP, newRP, aggrSummable, aggrUnsummable, RPPrefix string, dbs []string, CQInterval, RPDuration, batchCount int) (*CLIHandler, error) {
+func NewCLIHandler(httpAddr, user, password, dbGroup, action, baseRP, newRP, aggrSummable, aggrUnsummable, RPPrefix string, CQInterval, RPDuration int) (*CLIHandler, error) {
 	HTTPConfig := client.HTTPConfig{Addr: httpAddr, Username: user, Password: password}
 	httpClient, err := client.NewHTTPClient(HTTPConfig)
 	if err != nil {
@@ -367,8 +324,9 @@ func NewCLIHandler(httpAddr, user, password, action, baseRP, newRP, aggrSummable
 		log.Errorf("http connect to influxdb(%s) failed: %s", httpAddr, err)
 		return nil, err
 	}
-	if len(dbs) == 0 {
-		return nil, fmt.Errorf("input dbs is empty")
+	dbs, ok := dbGroupsMap[dbGroup]
+	if !ok {
+		return nil, fmt.Errorf("unsupport dbGroup: %s", dbGroup)
 	}
 	if _, ok := actionsMap[action]; !ok {
 		return nil, fmt.Errorf("unsupport action: %s", action)
@@ -411,9 +369,6 @@ func NewCLIHandler(httpAddr, user, password, action, baseRP, newRP, aggrSummable
 		if baseRP == newRP {
 			return nil, fmt.Errorf("base-rp(%s) should not the same as the rpname(%s)", baseRP, newRP)
 		}
-		if actionEnum == ADD && batchCount == 0 {
-			return nil, fmt.Errorf("cq batch field count must > 0")
-		}
 	}
 
 	if actionEnum != SHOW && newRP == "" {
@@ -441,7 +396,6 @@ func NewCLIHandler(httpAddr, user, password, action, baseRP, newRP, aggrSummable
 			interval:       fmt.Sprintf("%dm", CQInterval),
 			aggrSummable:   aggrsMap[aggrSummable],
 			aggrUnsummable: aggrsMap[aggrUnsummable],
-			batchCount:     batchCount,
 		}
 	}
 
@@ -601,13 +555,14 @@ func createDefaultRPIfNotExist(client client.Client, db, rp string) error {
 	return createRetentionPolicy(client, db, RP)
 }
 
-func (c *CQHandler) addCQ(fields []string) error {
-	for i := 0; i < len(fields); i += c.batchCount {
-		end := i + c.batchCount
-		if end > len(fields) {
-			end = len(fields)
-		}
-		cqCmd := c.genCQCommand(fields[i:end])
+func (c *CQHandler) Add() error {
+	fields := getFields(c.db)
+	if len(fields) == 0 {
+		return fmt.Errorf("get db(%s) fields faild", c.db)
+	}
+
+	for _, field := range fields {
+		cqCmd := c.genCQCommand(field)
 		log.Info(cqCmd)
 		if _, err := queryResponse(c.client, c.db, c.srcRP, cqCmd); err != nil {
 			return err
@@ -616,25 +571,10 @@ func (c *CQHandler) addCQ(fields []string) error {
 	return nil
 }
 
-func (c *CQHandler) Add() error {
-	summableFields, unsummableFields := getFields(c.db)
-	if len(summableFields) == 0 && len(unsummableFields) == 0 {
-		return fmt.Errorf("get db(%s) fields faild", c.db)
-	}
-	if err := c.addCQ(summableFields); err != nil {
-		return err
-	}
-	return c.addCQ(unsummableFields)
-}
-
-func isCQExist(db, field string, cqInfos []CQInfo) bool {
+func isCQExist(db, cqName string, cqInfos []CQInfo) bool {
 	for _, cqInfo := range cqInfos {
-		if cqInfo.db == db {
-			for _, cqField := range strings.Split(cqInfo.name, "__") {
-				if cqField == field {
-					return true
-				}
-			}
+		if cqInfo.db == db && cqInfo.name == cqName {
+			return true
 		}
 	}
 	return false
@@ -645,91 +585,53 @@ func (c *CQHandler) Update() error {
 	if err != nil {
 		return err
 	}
-	if c.batchCount != 0 {
-		// 先删除CQ，再按新的batchCount增加CQ
-		if err := c.Del(); err != nil {
+	fields := getFields(c.db)
+	for _, field := range fields {
+		if isCQExist(c.db, c.CQName(field), cqInfos) {
+			continue
+		}
+		cqCmd := c.genCQCommand(field)
+		log.Info(cqCmd)
+		fmt.Println("new CQ: ", cqCmd)
+		if _, err := queryResponse(c.client, c.db, c.srcRP, cqCmd); err != nil {
 			return err
 		}
-		return c.Add()
 	}
-	// 按batchCount为1，对新增加的field增加CQ
-	c.batchCount = 1
-	summableFields, unsummableFields := getFields(c.db)
-	newSummableFields, newUnsummableFields := []string{}, []string{}
-	for _, field := range summableFields {
-		if isCQExist(c.db, field, cqInfos) {
-			continue
-		}
-		newSummableFields = append(newSummableFields, field)
-	}
-	for _, field := range unsummableFields {
-		if isCQExist(c.db, field, cqInfos) {
-			continue
-		}
-		newUnsummableFields = append(newUnsummableFields, field)
-	}
-	if len(newSummableFields) > 0 || len(newUnsummableFields) > 0 {
-		fmt.Printf("DB: %s  RP: %s\n", c.db, c.dstRP)
-		fmt.Println("  Add summable field CQ:", newSummableFields)
-		fmt.Println("  Add unsummable field CQ:", newUnsummableFields)
-	}
-	if err := c.addCQ(newSummableFields); err != nil {
-		return err
-	}
-	return c.addCQ(newUnsummableFields)
+	return nil
 }
 
-func (c *CQHandler) CQName(fields []string) string {
-	name := "cq_" + c.dstRP
-	for _, field := range fields {
-		name += "__" + field
-	}
-	return name
+func (c *CQHandler) CQName(field string) string {
+	return "cq_" + c.dstRP + "__" + field
 }
 
-func (c *CQHandler) CQNamePrefix() string {
-	return "cq_" + c.dstRP + "__"
-}
-
-func (c *CQHandler) genCQCommand(fields []string) string {
+func (c *CQHandler) genCQCommand(field string) string {
 	aggr := c.aggrSummable
-	if unsumableFieldsMap[fields[0]] {
+	if unsumableFieldsMap[field] {
 		aggr = c.aggrUnsummable
 	}
-	columns := ""
-	for _, field := range fields {
-		aggrFunc := fmt.Sprintf("%s(%s)", aggr, field)
-		if aggr == AVG {
-			aggrFunc = fmt.Sprintf("floor(%s(%s))", aggr, field)
-		}
-		if columns != "" {
-			columns += ","
-		}
-		columns += aggrFunc + " AS " + field
+	aggrFunc := fmt.Sprintf("%s(%s)", aggr, field)
+	if aggr == AVG {
+		aggrFunc = fmt.Sprintf("floor(%s(%s))", aggr, field)
 	}
 	return fmt.Sprintf(
 		"CREATE CONTINUOUS QUERY %s ON %s "+
 			"BEGIN "+
-			"SELECT %s INTO %s.%s.main FROM %s.main GROUP BY time(%s), * TZ('Asia/Shanghai')"+
+			"SELECT %s AS %s  INTO %s.%s.main FROM %s.main GROUP BY time(%s), * TZ('Asia/Shanghai')"+
 			"END",
-		c.CQName(fields), c.db,
-		columns, c.db, c.dstRP, c.srcRP, c.interval)
+		c.CQName(field), c.db,
+		aggrFunc, field, c.db, c.dstRP, c.srcRP, c.interval)
 }
 
 func (c *CQHandler) Del() error {
-	CQInfos, err := GetCQInfos(c.client)
-	if err != nil {
-		return err
-	}
-	for _, CQInfo := range CQInfos {
-		if CQInfo.db == c.db && strings.HasPrefix(CQInfo.name, c.CQNamePrefix()) {
-			cmd := fmt.Sprintf("drop continuous query %s on %s", CQInfo.name, c.db)
-			log.Info(cmd)
-			if _, err := queryResponse(c.client, c.db, c.dstRP, cmd); err != nil {
-				return err
-			}
+	fields := getFields(c.db)
+	for _, field := range fields {
+		cmd := fmt.Sprintf("drop continuous query %s on %s", c.CQName(field), c.db)
+		log.Info(cmd)
+		if _, err := queryResponse(c.client, c.db, c.dstRP, cmd); err != nil {
+			return err
 		}
 	}
+
 	return nil
 }
 
@@ -785,7 +687,7 @@ func containsString(array []string, str string) bool {
 	return false
 }
 
-func getFields(db string) ([]string, []string) {
+func getFields(db string) []string {
 	var meter app.Meter
 	if strings.HasPrefix(db, zerodoc.MeterVTAPNames[zerodoc.FLOW_ID]) {
 		meter = &zerodoc.FlowMeter{}
@@ -795,7 +697,7 @@ func getFields(db string) ([]string, []string) {
 		meter = &zerodoc.VTAPUsageMeter{}
 	} else {
 		log.Errorf("db(%s) unsupport get fields", db)
-		return nil, nil
+		return nil
 	}
 
 	// 对于 latency 对应的field，需要去除sum和count后缀,并去重
@@ -829,15 +731,5 @@ func getFields(db string) ([]string, []string) {
 		}
 	}
 
-	summableFields := []string{}
-	unsummableFields := []string{}
-	for _, field := range newFields {
-		if unsumableFieldsMap[field] {
-			unsummableFields = append(unsummableFields, field)
-		} else {
-			summableFields = append(summableFields, field)
-		}
-	}
-
-	return summableFields, unsummableFields
+	return newFields
 }
