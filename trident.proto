@@ -12,6 +12,7 @@ service Synchronizer {
     rpc Upgrade (UpgradeRequest) returns (stream UpgradeResponse) {}
     rpc Query (NtpRequest) returns (NtpResponse) {}
     rpc GenesisSync (GenesisSyncRequest) returns (GenesisSyncResponse) {}
+    rpc KubernetesAPISync (KubernetesAPISyncRequest) returns (KubernetesAPISyncResponse) {}
 }
 
 enum State {
@@ -78,6 +79,8 @@ message SyncRequest {
     optional string kernel_version = 36;
 
     optional TsdbReportInfo tsdb_report_info = 43; // 仅对数据节点有意义
+
+    optional string kubernetes_cluster_id = 45; // 仅对容器类型的采集器有意义
 }
 
 enum Status {
@@ -457,4 +460,21 @@ message GenesisSyncRequest {
 
 message GenesisSyncResponse {
     optional uint64 version = 1 [default = 0];
+}
+
+message KubernetesAPIInfo {
+    optional string type = 1;
+    optional string info = 2;
+}
+
+message KubernetesAPISyncRequest {
+    optional string cluster_id = 1;
+    optional uint64 version = 2;
+    optional string error_msg = 3;
+    optional uint32 vtap_id = 4;
+    repeated KubernetesAPIInfo entries = 10;
+}
+
+message KubernetesAPISyncResponse {
+    optional uint64 version = 1;
 }
