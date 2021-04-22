@@ -148,7 +148,7 @@ func EnableRsyslog(remotes ...string) error {
 	rsyslogWriters = rsyslogWriters[:0]
 	for _, remote := range remotes {
 		// 消息头包括FrameSize和Type，UDP时FrameSize无用
-		header := bytes.NewBuffer([]byte{0, 0, datatype.MESSAGE_TYPE_SYSLOG})
+		header := bytes.NewBuffer([]byte{0, 0, 0, 0, datatype.MESSAGE_TYPE_SYSLOG})
 		ioWriter := NewRsyslogWriter("udp", getRemoteAddress(remote), path.Base(os.Args[0]), header.String())
 		rsyslogWriters = append(rsyslogWriters, ioWriter)
 
