@@ -10,7 +10,7 @@ import (
 //     2. MessageType标注消息类型
 //     3. MessageValue为具体的消息内容
 // --------------------------------------------------------
-// | FrameSize(2B) | MessageType(1B) |  MessageValue(...) |
+// | FrameSize(4B) | MessageType(1B) |  MessageValue(...) |
 // --------------------------------------------------------
 const (
 	MESSAGE_TYPE_COMPRESS = iota
@@ -33,11 +33,14 @@ var MessageTypeString = [MESSAGE_TYPE_MAX]string{
 
 const (
 	DROPLET_PORT = 20033
+
+	// pcap压缩包头发送时最大长度为：MESSAGE_HEADER_LEN + compressor header + 14 + 4 * n + 65535, 这里取整使用66000
+	MESSAGE_FRAME_SIZE_MAX = 66000
 )
 
 const (
 	MESSAGE_FRAME_SIZE_OFFSET = 0
-	MESSAGE_TYPE_OFFSET       = MESSAGE_FRAME_SIZE_OFFSET + 2
+	MESSAGE_TYPE_OFFSET       = MESSAGE_FRAME_SIZE_OFFSET + 4
 	MESSAGE_VALUE_OFFSET      = MESSAGE_TYPE_OFFSET + 1
 	MESSAGE_HEADER_LEN        = MESSAGE_VALUE_OFFSET
 )
@@ -50,17 +53,17 @@ const (
 )
 
 type BaseHeader struct {
-	FrameSize uint16 // tcp发送时，需要按此长度收齐数据后，再decode (FrameSize总长度，包含了 BaseHeader的长度)
+	FrameSize uint32 // tcp发送时，需要按此长度收齐数据后，再decode (FrameSize总长度，包含了 BaseHeader的长度)
 	Type      uint8  // 消息类型
 }
 
 func (h *BaseHeader) Encode(chunk []byte) {
-	binary.BigEndian.PutUint16(chunk[MESSAGE_FRAME_SIZE_OFFSET:], h.FrameSize)
+	binary.BigEndian.PutUint32(chunk[MESSAGE_FRAME_SIZE_OFFSET:], h.FrameSize)
 	chunk[MESSAGE_TYPE_OFFSET] = uint8(h.Type)
 }
 
 func (h *BaseHeader) Decode(buf []byte) error {
-	h.FrameSize = binary.BigEndian.Uint16(buf[MESSAGE_FRAME_SIZE_OFFSET:])
+	h.FrameSize = binary.BigEndian.Uint32(buf[MESSAGE_FRAME_SIZE_OFFSET:])
 	h.Type = uint8(buf[MESSAGE_TYPE_OFFSET])
 
 	switch h.Type {

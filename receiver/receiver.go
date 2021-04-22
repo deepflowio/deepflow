@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	RECV_BUFSIZE              = 1 << 16 // 默认trident发送时，不会超过MTU的大小,当local发送时, MTU是64k
+	RECV_BUFSIZE              = datatype.MESSAGE_FRAME_SIZE_MAX
 	RECV_TIMEOUT              = 30 * time.Second
 	QUEUE_CACHE_FLUSH_TIMEOUT = 3
 	DROP_DETECT_WINDOW_SIZE   = 1024
