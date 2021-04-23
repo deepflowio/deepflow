@@ -67,8 +67,7 @@ func TestTaggedFlowEncodeDecode(t *testing.T) {
 		FlowMetricsPeers: [FLOW_METRICS_PEER_MAX]FlowMetricsPeer{FlowM, FlowM},
 		Tunnel:           TunnelField,
 
-		FlowID:   401,
-		Exporter: 403,
+		FlowID: 401,
 
 		StartTime: 404,
 		EndTime:   405,
