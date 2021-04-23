@@ -1,7 +1,6 @@
 package adapter
 
 import (
-	"net"
 	"strconv"
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
@@ -32,7 +31,7 @@ func (s *slave) prepareItem(count, index uint8) {
 	}
 }
 
-func (s *slave) decode(hash uint8, vtapId uint16, ip net.IP, decoder *SequentialDecoder) {
+func (s *slave) decode(hash uint8, vtapId uint16, decoder *SequentialDecoder) {
 	tapType, tapPort, index := decoder.tapType, decoder.tapPort, decoder.tridentDispatcherIndex
 
 	i := uint8(0) // 使用a.block.Count, 因为i一定为0，直接赋值0
@@ -40,7 +39,6 @@ func (s *slave) decode(hash uint8, vtapId uint16, ip net.IP, decoder *Sequential
 		meta := &s.block.Metas[i]
 		meta.TapType = tapType
 		meta.TapPort = tapPort
-		meta.Exporter = ip
 		meta.VtapId = vtapId
 		meta.QueueHash = hash
 		if decoder.NextPacket(meta) {
@@ -67,7 +65,7 @@ func (s *slave) put(packet *packetBuffer) {
 func (s *slave) run() {
 	for {
 		packet := <-s.inQueue
-		s.decode(packet.hash, packet.vtapId, packet.tridentIp, &packet.decoder)
+		s.decode(packet.hash, packet.vtapId, &packet.decoder)
 		releasePacketBuffer(packet)
 	}
 }
