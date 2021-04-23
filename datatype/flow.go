@@ -229,8 +229,7 @@ type Flow struct {
 
 	Tunnel TunnelField
 
-	FlowID   uint64
-	Exporter uint32
+	FlowID uint64
 
 	/* Timers */
 	StartTime    time.Duration
@@ -545,7 +544,6 @@ func (f *Flow) Encode(encoder *codec.SimpleEncoder) {
 	f.Tunnel.Encode(encoder)
 
 	encoder.WriteU64(f.FlowID)
-	encoder.WriteU32(f.Exporter)
 
 	encoder.WriteU64(uint64(f.StartTime))
 	encoder.WriteU64(uint64(f.EndTime))
@@ -575,7 +573,6 @@ func (f *Flow) Decode(decoder *codec.SimpleDecoder) {
 	f.Tunnel.Decode(decoder)
 
 	f.FlowID = decoder.ReadU64()
-	f.Exporter = decoder.ReadU32()
 
 	f.StartTime = time.Duration(decoder.ReadU64())
 	f.EndTime = time.Duration(decoder.ReadU64())
@@ -727,7 +724,6 @@ func (f *Flow) String() string {
 	formatted := fmt.Sprintf("FlowID: %d ", f.FlowID)
 	formatted += fmt.Sprintf("FlowSource: %s ", f.FlowSource.String())
 	formatted += fmt.Sprintf("Tunnel: %s ", f.Tunnel.String())
-	formatted += fmt.Sprintf("Exporter: %s ", IpFromUint32(f.Exporter))
 	formatted += fmt.Sprintf("CloseType: %d ", f.CloseType)
 	formatted += fmt.Sprintf("IsActiveService: %v ", f.IsActiveService)
 	formatted += fmt.Sprintf("IsNewFlow: %v ", f.IsNewFlow)
