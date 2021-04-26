@@ -472,6 +472,7 @@ message KubernetesAPISyncRequest {
     optional uint64 version = 2;
     optional string error_msg = 3;
     optional uint32 vtap_id = 4;
+    optional string source_ip = 5;
     repeated KubernetesAPIInfo entries = 10;
 }
 
