@@ -435,7 +435,7 @@ var AggOpMap = map[string]AggOp{
 	"max_max":            AGG_OP_MAX,
 	"min_min":            AGG_OP_MIN,
 	"avg_avg":            AGG_OP_AVG,
-	"avg_sum":            AGG_OP_SUM,
+	"avg_sum":            AGG_OP_AVG_SUM,
 	"last_sum":           AGG_OP_LAST_SUM,
 	"max_sum":            AGG_OP_MAX_SUM,
 	"min_sum":            AGG_OP_MIN_SUM,
