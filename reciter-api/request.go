@@ -400,8 +400,9 @@ const (
 )
 
 type AdaptiveGroupBy struct {
-	Tags      []TagName `json:"tags"`
-	AlterTags []TagName `json:"alter_tags"`
+	Tags       []TagName   `json:"tags"`
+	AlterTags  []TagName   `json:"alter_tags"`
+	TieredTags [][]TagName `json:"tiered_tags"`
 }
 
 type AggOp uint8
