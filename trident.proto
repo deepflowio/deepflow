@@ -465,6 +465,7 @@ message GenesisSyncResponse {
 message KubernetesAPIInfo {
     optional string type = 1;
     optional string info = 2;
+    optional bytes compressed_info = 3;
 }
 
 message KubernetesAPISyncRequest {
