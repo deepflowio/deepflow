@@ -419,15 +419,24 @@ func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType Ta
 		endpointInfo.IsVIP = isVIP
 		endpointInfo.RealIP = l.GetRealIpByMac(mac, ip.To4() == nil)
 	}
-	// 腾讯的GRE场景，MAC为0
+	// 如下场景无法直接查询隧道内层的MAC地址确定EPC：
+	// 1. 腾讯TCE：使用GRE做隧道封装，内层没有MAC
+	// 2. 使用VXLAN隧道但内层MAC已无法识别
+	//    目前发现青云私有云属于这种情况，VXLAN内层的MAC可能不是任何一个实际存在的虚拟网卡MAC
+	// 采集器并不关心具体的云平台差异，只要控制器下发隧道ID，都会优先使用它进行查询
 	if tunnelId > 0 {
-		// step 1: 查询DEEPFLOW添加的WAN监控网段(cidr)
-		l.setEpcByCidr(ip, EPC_FROM_DEEPFLOW, endpointInfo)
-		if endpointInfo.L3EpcId == 0 {
-			// step 2: 查询tunnelID监控网段(cidr)
-			l.setEpcByTunnelCidr(ip, tunnelId, endpointInfo)
+		// step 1: 查询tunnelID监控网段(cidr)
+		l.setEpcByTunnelCidr(ip, tunnelId, endpointInfo)
+		if IsGrePseudoInnerMac(mac) {
+			// 腾讯TCE使用GRE封装场景下，此处拿到是伪造MAC，无法用于查询云平台信息，直接在此分支中返回即可
+			if endpointInfo.L3EpcId == 0 {
+				// step 2: 查询DEEPFLOW添加的WAN监控网段(cidr)
+				l.setEpcByCidr(ip, EPC_FROM_DEEPFLOW, endpointInfo)
+			}
+			return endpointInfo
+		} else {
+			// 其他云如果使用TunnelID没有查询到，还需要继续用MAC查询
 		}
-		return endpointInfo
 	}
 	// step 1: 使用mac查询L2
 	platformData := l.GetDataByMac(MacKey(mac))

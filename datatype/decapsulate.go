@@ -150,6 +150,10 @@ func (t *TunnelInfo) DecapsulateErspan(l3Packet []byte, flags, greProtocolType u
 	return 0
 }
 
+func IsGrePseudoInnerMac(mac uint64) bool {
+	return mac>>16 == 0
+}
+
 func (t *TunnelInfo) DecapsulateTencentGre(l3Packet []byte, flags, greProtocolType uint16, ipHeaderSize int) int {
 	if flags&GRE_FLAGS_VER_MASK != 1 || flags&GRE_FLAGS_KEY_MASK == 0 { // 未知的GRE
 		return 0
@@ -172,7 +176,8 @@ func (t *TunnelInfo) DecapsulateTencentGre(l3Packet []byte, flags, greProtocolTy
 	// NOTICE:
 	//     这里需要将TunnelID封装为Mac Suffix，策略FastPath需要不同的MAC区分不同的VPC。
 	// 腾讯GRE流量是通过TunnelID来确认其对应的EPC ID的，这个将TunnelID用作MAC后缀，同
-	// 样能在FastPath里面区分不同的VPC
+	// 样能在FastPath里面区分不同的VPC。
+	//     这样的伪造MAC可以通过IsGrePseudoInnerMac函数判断
 	srcMacSuffix, dstMacSuffix := [2]byte{}, [2]byte{}
 	copy(srcMacSuffix[:], l3Packet[ipHeaderSize+greKeyOffset:ipHeaderSize+greKeyOffset+2])
 	copy(dstMacSuffix[:], l3Packet[ipHeaderSize+greKeyOffset+2:ipHeaderSize+greKeyOffset+4])
