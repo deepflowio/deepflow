@@ -126,7 +126,8 @@ func (d DirectionEnum) IsServerToClient() bool {
 type TAPSideEnum uint8
 
 const (
-	Client TAPSideEnum = iota
+	Rest TAPSideEnum = iota
+	Client
 	Server
 	ClientNode              = Client | TAPSideEnum(NodeSide)
 	ServerNode              = Server | TAPSideEnum(NodeSide)
@@ -139,10 +140,7 @@ const (
 )
 
 func (d DirectionEnum) ToTAPSide() TAPSideEnum {
-	if uint8(d) == 0 {
-		panic("invalid direction")
-	}
-	return TAPSideEnum(d - 1)
+	return TAPSideEnum(d)
 }
 
 type TAPTypeEnum uint8
@@ -619,6 +617,8 @@ func (t *Tag) MarshalTo(b []byte) int {
 	}
 	if t.Code&TAPSide != 0 {
 		switch t.TAPSide {
+		case Rest:
+			offset += copy(b[offset:], ",tap_side=rest")
 		case Client:
 			offset += copy(b[offset:], ",tap_side=c")
 		case Server:
