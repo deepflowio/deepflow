@@ -47,6 +47,7 @@ type EndpointInfo struct {
 	IsDevice       bool
 	IsVIPInterface bool
 	IsVIP          bool
+	IsLocalMac     bool // 对应平台数据中的IsLocalMac字段
 }
 
 type L3L2End int
@@ -112,6 +113,7 @@ func (i *EndpointInfo) SetL2Data(data *PlatformData) {
 		i.L2EpcId = data.EpcId
 	}
 	i.IsDevice = true
+	i.IsLocalMac = data.IsLocalMac
 }
 
 func (i *EndpointInfo) SetL3Data(data *PlatformData) {
