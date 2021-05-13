@@ -261,6 +261,7 @@ func (l *CloudPlatformLabeler) GetDataByEpcIp(epc int32, ip net.IP) *PlatformDat
 			return info
 		}
 	} else {
+		var value *PlatformData
 		hash := GetIpHash(ip)
 		key := EpcIpKey((uint64(epc) << 32) | uint64(hash))
 		if platformList, ok := l.epcIpTable.epcIp6Map[key]; ok {
@@ -268,11 +269,17 @@ func (l *CloudPlatformLabeler) GetDataByEpcIp(epc int32, ip net.IP) *PlatformDat
 				platformData := e.Value.(*PlatformData)
 				for _, ipData := range platformData.Ips {
 					if ipData.RawIp.Equal(ip) {
-						return platformData
+						value = platformData
+						break
 					}
+				}
+				// LB可能存在多个LB主机，对应的相同的epc+ip可能有多个，这里优先返回本地的以获取IsLocal
+				if value != nil && value.IsLocal {
+					return value
 				}
 			}
 		}
+		return value
 	}
 	return nil
 }
@@ -288,7 +295,11 @@ func (l *CloudPlatformLabeler) GenerateEpcIpData(platformDatas []*PlatformData) 
 			}
 			if len(ipData.RawIp) == 4 {
 				key := EpcIpKey((epcId << 32) | uint64(IpToUint32(ipData.RawIp)))
-				epcIpMap[key] = platformData
+				// LB可能存在多个LB主机，对应的相同的epc+ip可能有多个，本地的优先存储以获取IsLocal
+				value, exist := epcIpMap[key]
+				if !exist || !value.IsLocal {
+					epcIpMap[key] = platformData
+				}
 			} else {
 				hash := GetIpHash(ipData.RawIp)
 				key := EpcIpKey((epcId << 32) | uint64(hash))
