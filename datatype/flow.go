@@ -151,6 +151,7 @@ type FlowMetricsPeer struct {
 	IsVIPInterface bool // 目前仅支持微软Mux设备，从grpc Interface中获取
 	IsVIP          bool // 从grpc cidr中获取
 	IsLocalMac     bool // 同EndpointInfo中的IsLocalMac, 流日志中不需要存储
+	IsLocalIp      bool // 同EndpointInfo中的IsLocalIp, 流日志中不需要存储
 
 	CastTypeMap   uint8  // 仅包含TSDB中的几个CastType标志位选项
 	TCPFlagsMap   uint16 // 仅包含TSDB中的几个TCP标志位选项
@@ -448,6 +449,7 @@ func (f *FlowMetricsPeer) SequentialMerge(rhs *FlowMetricsPeer) {
 	f.IsVIPInterface = rhs.IsVIPInterface
 	f.IsVIP = rhs.IsVIP
 	f.IsLocalMac = rhs.IsLocalMac
+	f.IsLocalIp = rhs.IsLocalIp
 	f.CastTypeMap |= rhs.CastTypeMap
 	f.TCPFlagsMap |= rhs.TCPFlagsMap
 	f.TTLMap |= rhs.TTLMap

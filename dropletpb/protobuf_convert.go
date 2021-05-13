@@ -255,6 +255,7 @@ func newCidr(data *trident.Cidr) *datatype.Cidr {
 		Type:     uint8(data.GetType()),
 		TunnelId: data.GetTunnelId(),
 		IsVIP:    data.GetIsVip(),
+		RegionId: data.GetRegionId(),
 	}
 }
 
