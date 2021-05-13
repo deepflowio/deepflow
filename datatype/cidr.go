@@ -18,4 +18,5 @@ type Cidr struct {
 	EpcId    int32
 	Type     uint8
 	IsVIP    bool
+	RegionId uint32
 }
