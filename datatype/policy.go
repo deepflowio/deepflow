@@ -302,7 +302,7 @@ func (d *PolicyData) MergeNpbAction(actions []NpbActions, aclID uint32, directio
 				break
 			}
 
-			if m.TunnelIpId() != n.TunnelIpId() || m.TunnelId() != n.TunnelId() || m.TunnelType() != n.TunnelType() || n.TunnelType() == NPB_TUNNEL_TYPE_PCAP {
+			if m.TunnelIpId() != n.TunnelIpId() || m.TunnelId() != n.TunnelId() || m.TunnelType() != n.TunnelType() {
 				continue
 			}
 			if n.PayloadSlice() == 0 ||
