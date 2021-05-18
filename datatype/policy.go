@@ -305,6 +305,22 @@ func (d *PolicyData) MergeNpbAction(actions []NpbActions, aclID uint32, directio
 			if m.TunnelIpId() != n.TunnelIpId() || m.TunnelId() != n.TunnelId() || m.TunnelType() != n.TunnelType() {
 				continue
 			}
+			// PCAP相同aclgid的合并为一个，不同aclgid的不能合并
+			if n.TunnelType() == NPB_TUNNEL_TYPE_PCAP {
+				// 应该有且仅有一个
+				aclGid := n.GetAclGid()[0]
+				repeatPcapAclGid := false
+				for _, id := range m.GetAclGid() {
+					if id == aclGid {
+						repeatPcapAclGid = true
+						break
+					}
+				}
+				if !repeatPcapAclGid {
+					continue
+				}
+			}
+
 			if n.PayloadSlice() == 0 ||
 				n.PayloadSlice() > m.PayloadSlice() {
 				d.NpbActions[index].SetPayloadSlice(n.PayloadSlice())
