@@ -17,7 +17,7 @@ var log = logging.MustGetLogger("dropletpb")
 func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 	macInt := vifData.GetMac()
 
-	ips := make([]*datatype.IpNet, 0, 1024)
+	ips := make([]*datatype.IpNet, 0, 1)
 	for _, ipResource := range vifData.IpResources {
 		fixIp := ParserStringIp(ipResource.GetIp())
 		if fixIp == nil {
