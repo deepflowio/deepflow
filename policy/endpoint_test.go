@@ -13,7 +13,7 @@ import (
 // 平台信息有关测试
 func TestGetPlatformData(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
-	datas := make([]*PlatformData, 0, 2)
+	datas := make([]PlatformData, 0, 2)
 	ipInfo := generateIpNet(ip3, 121, 24)
 	ipInfo1 := generateIpNet(ip4, 122, 25)
 	// epcId:40 DeviceType:2 DeviceId:3 IfType:3 Mac:mac4
@@ -38,7 +38,7 @@ func TestGetPlatformData(t *testing.T) {
 
 func TestGetPlatformDataAboutArp(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
-	datas := make([]*PlatformData, 0, 2)
+	datas := make([]PlatformData, 0, 2)
 
 	ipInfo := generateIpNet(ip3, 121, 24)
 	ipInfo1 := generateIpNet(ip4, 122, 25)
@@ -241,7 +241,7 @@ func TestAclsPassPolicy(t *testing.T) {
 func TestModifyEpcIdPolicy1(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
 	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpc[4], 4)
-	policy.UpdateInterfaceData([]*PlatformData{platformData1})
+	policy.UpdateInterfaceData([]PlatformData{platformData1})
 	generateIpgroupData(policy)
 	generateAclData(policy)
 
@@ -265,7 +265,7 @@ func TestModifyEpcIdPolicy2(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
 	platformData1 := generatePlatformDataByParam(ip4, mac4, groupEpc[4], 4)
 	platformData2 := generatePlatformDataByParam(ip5, mac5, groupEpc[5], 3)
-	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
+	policy.UpdateInterfaceData([]PlatformData{platformData1, platformData2})
 	generateIpgroupData(policy)
 	generateAclData(policy)
 
@@ -289,7 +289,7 @@ func TestModifyEpcIdPolicy3(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
 	platformData1 := generatePlatformDataByParam(ip4, mac4, EPC_FROM_DEEPFLOW, 3)
 	platformData2 := generatePlatformDataByParam(ip5, mac5, groupEpc[5], 3)
-	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
+	policy.UpdateInterfaceData([]PlatformData{platformData1, platformData2})
 	generateIpgroupData(policy)
 	generateAclData(policy)
 
@@ -313,7 +313,7 @@ func TestModifyEpcIdPolicy5(t *testing.T) {
 	policy := NewPolicyTable(1, 1024, false)
 	platformData1 := generatePlatformDataByParam(ip4, mac4, EPC_FROM_DEEPFLOW, 4)
 	platformData2 := generatePlatformDataByParam(ip5, mac5, EPC_FROM_DEEPFLOW, 4)
-	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
+	policy.UpdateInterfaceData([]PlatformData{platformData1, platformData2})
 	generateIpgroupData(policy)
 	generateAclData(policy)
 
@@ -468,7 +468,7 @@ func BenchmarkGetEndpointData(b *testing.B) {
 	policy := NewPolicyTable(1, 1024, false)
 	platformData1 := generatePlatformDataByParam(group1Ip1, group1Mac, groupEpc[1], 4)
 	platformData2 := generatePlatformDataByParam(group2Ip1, group2Mac, groupEpc[2], 4)
-	policy.UpdateInterfaceData([]*PlatformData{platformData1, platformData2})
+	policy.UpdateInterfaceData([]PlatformData{platformData1, platformData2})
 	generateIpgroupData(policy)
 	generateAclData(policy)
 	key := generateLookupKey(group1Mac, group2Mac, group1Ip1, group2Ip1, IPProtocolTCP, 0, 8000)
@@ -489,7 +489,7 @@ func BenchmarkGetDataByIp(b *testing.B) {
 	data3 := generatePlatformDataByIp(groupEpc[3], testMac3, ip3)
 	ip4 := generateIpNet(testIp4, 300, 8)
 	data4 := generatePlatformDataByIp(groupEpc[4], testMac4, ip4)
-	policy.UpdateInterfaceData([]*PlatformData{data1, data2, data3, data4})
+	policy.UpdateInterfaceData([]PlatformData{data1, data2, data3, data4})
 	for i := 0; i < b.N; i++ {
 		policy.cloudPlatformLabeler.GetDataByIp(IpFromUint32(queryIp))
 	}
@@ -501,7 +501,7 @@ func BenchmarkUpdateEndpointData(b *testing.B) {
 	policy.UpdateIpGroupData([]*IpGroupData{ipGroup1})
 	ipNet := generateIpNet(group1Ip1, 123, 32)
 	data1 := generatePlatformDataByIp(groupEpc[1], group1Mac, ipNet)
-	policy.UpdateInterfaceData([]*PlatformData{data1})
+	policy.UpdateInterfaceData([]PlatformData{data1})
 	key := generateLookupKey(group1Mac, group1Mac2, group1Ip1, group1Ip2, IPProtocolTCP, 50, 60)
 	endpointData, _ := policy.lookupAllByKey(key)
 	key.L3End0 = true

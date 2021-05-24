@@ -199,7 +199,7 @@ func (f *FastPath) makeIpNetmaskMap() {
 	}
 }
 
-func (f *FastPath) GenerateIpNetmaskMapFromPlatformData(data []*PlatformData) {
+func (f *FastPath) GenerateIpNetmaskMapFromPlatformData(data []PlatformData) {
 	maskMap := &f.maskMapFromPlatformData
 	for key, _ := range maskMap {
 		maskMap[key] = 0

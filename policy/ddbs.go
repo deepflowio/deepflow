@@ -472,7 +472,7 @@ func (d *Ddbs) generateGroupIpMap(data []*IpGroupData) {
 	d.groupIpMap = groupIpMap
 }
 
-func (d *Ddbs) UpdateInterfaceData(data []*PlatformData) {
+func (d *Ddbs) UpdateInterfaceData(data []PlatformData) {
 	d.GenerateIpNetmaskMapFromPlatformData(data)
 }
 

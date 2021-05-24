@@ -26,7 +26,7 @@ type IpNet struct {
 
 type PlatformData struct {
 	Mac            uint64
-	Ips            []*IpNet
+	Ips            []IpNet
 	EpcId          int32
 	Id             uint32
 	RegionId       uint32

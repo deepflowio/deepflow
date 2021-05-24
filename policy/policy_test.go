@@ -191,22 +191,22 @@ func generateEndpointInfo(l2EpcId, l3EpcId int32, l2End, l3End bool, isDevice bo
 	return basicEndpointInfo
 }
 
-func generateIpNet6(ip net.IP, subnetId uint32, mask uint32) *IpNet {
+func generateIpNet6(ip net.IP, subnetId uint32, mask uint32) IpNet {
 	ipInfo := IpNet{
 		RawIp:    ip,
 		SubnetId: subnetId,
 		Netmask:  mask,
 	}
-	return &ipInfo
+	return ipInfo
 }
 
-func generateIpNet(ip uint32, subnetId uint32, mask uint32) *IpNet {
+func generateIpNet(ip uint32, subnetId uint32, mask uint32) IpNet {
 	ipInfo := IpNet{
 		RawIp:    IpFromUint32(ip).To4(),
 		SubnetId: subnetId,
 		Netmask:  mask,
 	}
-	return &ipInfo
+	return ipInfo
 }
 
 func generateIpGroup(groupId uint32, epcId int32, ip ...string) *IpGroupData {
@@ -218,25 +218,25 @@ func generateIpGroup(groupId uint32, epcId int32, ip ...string) *IpGroupData {
 	return &ipGroup
 }
 
-func generatePlatformDataByIp(epcId int32, mac uint64, ip ...*IpNet) *PlatformData {
+func generatePlatformDataByIp(epcId int32, mac uint64, ip ...IpNet) PlatformData {
 	data := PlatformData{
 		EpcId: epcId,
 		Mac:   mac,
 		Ips:   ip,
 	}
-	return &data
+	return data
 }
 
-func generatePlatformDataExtension(epcId int32, ifType uint8, mac uint64) *PlatformData {
+func generatePlatformDataExtension(epcId int32, ifType uint8, mac uint64) PlatformData {
 	data := PlatformData{
 		EpcId:  epcId,
 		IfType: ifType,
 		Mac:    mac,
 	}
-	return &data
+	return data
 }
 
-func generatePlatformDataByParam(ip uint32, mac uint64, epcId int32, Iftype uint8) *PlatformData {
+func generatePlatformDataByParam(ip uint32, mac uint64, epcId int32, Iftype uint8) PlatformData {
 	ipInfo := generateIpNet(ip, 121, 32)
 	vifData := generatePlatformDataExtension(epcId, Iftype, mac)
 	vifData.Ips = append(vifData.Ips, ipInfo)
@@ -397,7 +397,7 @@ func generateIpgroupData(policy *PolicyTable) {
 // 生成特定平台信息
 func generatePlatformData(policy *PolicyTable) {
 	// epcId:40 IfType:4
-	datas := make([]*PlatformData, 0, 2)
+	datas := make([]PlatformData, 0, 2)
 	vifData := generatePlatformDataByParam(ip4, mac4, groupEpc[4], 4)
 	datas = append(datas, vifData)
 
@@ -407,7 +407,7 @@ func generatePlatformData(policy *PolicyTable) {
 // 生成特定平台和资源组信息
 func generatePolicyTable(ids ...TableID) *PolicyTable {
 	policy := NewPolicyTable(1, 1024, false, ids...)
-	datas := make([]*PlatformData, 0, 2)
+	datas := make([]PlatformData, 0, 2)
 	ipGroups := make([]*IpGroupData, 0, 3)
 	connections := make([]*PeerConnection, 0, 8)
 
@@ -433,19 +433,19 @@ func generatePolicyTable(ids ...TableID) *PolicyTable {
 	ip1 = generateIpNet(group3Ip1, 121, 24)
 	ip2 = generateIpNet(group3Ip2, 121, 32)
 	// group3无epc，group4有epc  ip:group3Ip1/group4Ip1 + group3Ip2/group4Ip2
-	data1 = generatePlatformDataByIp(groupEpc[3], group3Mac1, ip1, ip2)
+	data5 := generatePlatformDataByIp(groupEpc[3], group3Mac1, ip1, ip2)
 
 	ip1 = generateIpNet(group4Ip1, 121, 24)
 	ip2 = generateIpNet(group4Ip2, 121, 32)
-	data2 = generatePlatformDataByIp(groupEpc[4], group4Mac1, ip1, ip2)
+	data6 := generatePlatformDataByIp(groupEpc[4], group4Mac1, ip1, ip2)
 
 	ip1 = generateIpNet(group5Ip1, 121, 24)
 	ip2 = generateIpNet(group5Ip2, 121, 32)
 	// group5有epc和无epc ip:group5Ip1 + group5Ip2
-	data3 = generatePlatformDataByIp(groupEpc[5], group5Mac2, ip1, ip2)
+	data7 := generatePlatformDataByIp(groupEpc[5], group5Mac2, ip1, ip2)
 	groupEpc[5] = groupEpcAny
-	data4 = generatePlatformDataByIp(groupEpc[5], group5Mac1, ip1, ip2)
-	datas = append(datas, data1, data2, data3, data4)
+	data8 := generatePlatformDataByIp(groupEpc[5], group5Mac1, ip1, ip2)
+	datas = append(datas, data5, data6, data7, data8)
 
 	policy.UpdateInterfaceData(datas)
 
