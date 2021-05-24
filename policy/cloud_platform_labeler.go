@@ -109,9 +109,10 @@ func (l *CloudPlatformLabeler) UpdateMacTable(macmap MacMapData) {
 	}
 }
 
-func (l *CloudPlatformLabeler) GenerateMacData(platformDatas []*PlatformData) MacMapData {
+func (l *CloudPlatformLabeler) GenerateMacData(platformDatas []PlatformData) MacMapData {
 	macMap := make(MacMapData)
-	for _, platformData := range platformDatas {
+	for i, _ := range platformDatas {
+		platformData := &platformDatas[i]
 		if platformData.SkipMac {
 			continue
 		}
@@ -134,16 +135,18 @@ func (l *CloudPlatformLabeler) GetRealIpByMac(mac uint64, isIpv6 bool) net.IP {
 	return nil
 }
 
-func (l *CloudPlatformLabeler) GenerateMacForIpTable(platformDatas []*PlatformData) MacForIpTable {
+func (l *CloudPlatformLabeler) GenerateMacForIpTable(platformDatas []PlatformData) MacForIpTable {
 	macForIpTable := make(MacForIpTable)
-	for _, platformData := range platformDatas {
+	for i, _ := range platformDatas {
+		platformData := &platformDatas[i]
 		if platformData.SkipMac {
 			continue
 		}
 
 		if platformData.Mac != 0 {
 			hasIpv4, hasIpv6 := false, false
-			for _, ipNet := range platformData.Ips {
+			for i, _ := range platformData.Ips {
+				ipNet := &platformData.Ips[i]
 				ipLength := len(ipNet.RawIp) // platformData中保证IPv4地址但是长度为16的已经转化为长度4
 				if !hasIpv4 && ipLength == net.IPv4len {
 					key := platformData.Mac
@@ -210,14 +213,15 @@ func (l *CloudPlatformLabeler) GetDataByIp(ip net.IP) *PlatformData {
 	}
 }
 
-func (l *CloudPlatformLabeler) GenerateIpData(platformDatas []*PlatformData) (IpMapDatas, Ip6MapData) {
+func (l *CloudPlatformLabeler) GenerateIpData(platformDatas []PlatformData) (IpMapDatas, Ip6MapData) {
 	ips := make(IpMapDatas, MASK_LEN_NUM)
 	ip6s := make(Ip6MapData)
 
 	for i := uint32(MIN_MASK_LEN); i <= MAX_MASK_LEN; i++ {
 		ips[i] = make(IpMapData)
 	}
-	for _, platformData := range platformDatas {
+	for i, _ := range platformDatas {
+		platformData := &platformDatas[i]
 		if platformData.IfType != IF_TYPE_WAN {
 			continue
 		}
@@ -284,10 +288,11 @@ func (l *CloudPlatformLabeler) GetDataByEpcIp(epc int32, ip net.IP) *PlatformDat
 	return nil
 }
 
-func (l *CloudPlatformLabeler) GenerateEpcIpData(platformDatas []*PlatformData) (EpcIpMapData, EpcIp6MapData) {
+func (l *CloudPlatformLabeler) GenerateEpcIpData(platformDatas []PlatformData) (EpcIpMapData, EpcIp6MapData) {
 	epcIpMap := make(EpcIpMapData)
 	epcIp6Map := make(EpcIp6MapData)
-	for _, platformData := range platformDatas {
+	for i, _ := range platformDatas {
+		platformData := &platformDatas[i]
 		for _, ipData := range platformData.Ips {
 			epcId := uint64(platformData.EpcId)
 			if platformData.EpcId == EPC_FROM_DEEPFLOW {
@@ -345,7 +350,7 @@ func (l *CloudPlatformLabeler) UpdatePeerConnectionTable(connections []*PeerConn
 	l.peerConnectionTable = peerConnectionTable
 }
 
-func (l *CloudPlatformLabeler) UpdateInterfaceTable(platformDatas []*PlatformData) {
+func (l *CloudPlatformLabeler) UpdateInterfaceTable(platformDatas []PlatformData) {
 	if platformDatas != nil {
 		l.UpdateMacTable(l.GenerateMacData(platformDatas))
 		l.UpdateIpTable(l.GenerateIpData(platformDatas))
