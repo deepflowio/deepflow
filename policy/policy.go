@@ -76,7 +76,7 @@ type TableOperator interface {
 	GetAcl() []*Acl
 	FlushAcls()
 	UpdateAcls(data []*Acl, check ...bool)
-	UpdateInterfaceData(data []*PlatformData)
+	UpdateInterfaceData(data []PlatformData)
 	UpdateIpGroupData(data []*IpGroupData)
 	UpdateCidr(data []*Cidr)
 
@@ -222,7 +222,7 @@ func (t *PolicyTable) LookupAllByKey(key *LookupKey, policy *PolicyData, endpoin
 	*endpoint = *result
 }
 
-func (t *PolicyTable) UpdateInterfaceData(data []*PlatformData) {
+func (t *PolicyTable) UpdateInterfaceData(data []PlatformData) {
 	t.cloudPlatformLabeler.UpdateInterfaceTable(data)
 	t.operator.UpdateInterfaceData(data)
 }

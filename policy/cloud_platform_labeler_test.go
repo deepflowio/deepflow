@@ -39,7 +39,7 @@ func getCloudLabeler() *CloudPlatformLabeler {
 	labeler := NewCloudPlatformLabeler(1, 1024)
 
 	// platform
-	platforms := make([]*PlatformData, 0, 2)
+	platforms := make([]PlatformData, 0, 2)
 	platform := generatePlatformDataByParam(cidrSrcIp, cidrSrcMac, cidrSrcEpc, 4)
 	platforms = append(platforms, platform)
 	labeler.UpdateInterfaceTable(platforms)
@@ -81,7 +81,7 @@ func TestCidr(t *testing.T) {
 func TestEpcOrder(t *testing.T) {
 	labeler := NewCloudPlatformLabeler(1, 1024)
 	// platform
-	platforms := make([]*PlatformData, 0, 2)
+	platforms := make([]PlatformData, 0, 2)
 	platform := generatePlatformDataByParam(cidrSrcIp, cidrSrcMac, cidrSrcEpc, 4) // EPC: 10
 	platforms = append(platforms, platform)
 	platform = generatePlatformDataByParam(cidrPeerDstIp, 0, cidrPeerDstEpc, 4) // EPC: 20
