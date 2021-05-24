@@ -14,10 +14,9 @@ import (
 
 var log = logging.MustGetLogger("dropletpb")
 
-func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
+func newPlatformData(vifData *trident.Interface, platform *datatype.PlatformData, ipNets []datatype.IpNet) {
 	macInt := vifData.GetMac()
-
-	ips := make([]*datatype.IpNet, 0, 1)
+	ipNetsCount := 0
 	for _, ipResource := range vifData.IpResources {
 		fixIp := ParserStringIp(ipResource.GetIp())
 		if fixIp == nil {
@@ -37,12 +36,10 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 			netmask = min
 		}
 
-		ipinfo := &datatype.IpNet{
-			RawIp:    fixIp,
-			Netmask:  netmask,
-			SubnetId: ipResource.GetSubnetId(),
-		}
-		ips = append(ips, ipinfo)
+		ipNets[ipNetsCount].RawIp = fixIp
+		ipNets[ipNetsCount].Netmask = netmask
+		ipNets[ipNetsCount].SubnetId = ipResource.GetSubnetId()
+		ipNetsCount++
 	}
 
 	epcId := int32(vifData.GetEpcId())
@@ -52,25 +49,33 @@ func newPlatformData(vifData *trident.Interface) *datatype.PlatformData {
 		epcId = datatype.EPC_FROM_DEEPFLOW
 	}
 
-	return &datatype.PlatformData{
-		Id:               vifData.GetId(),
-		Mac:              macInt,
-		Ips:              ips,
-		EpcId:            epcId,
-		IfType:           uint8(vifData.GetIfType()),
-		IsVIPInterface:   vifData.GetIsVipInterface(),
-		RegionId:         vifData.GetRegionId(),
-		SkipTapInterface: vifData.GetPodNodeId() > 0 && vifData.GetPodClusterId() > 0,
+	platform.Id = vifData.GetId()
+	platform.Mac = macInt
+	if ipNetsCount > 0 {
+		platform.Ips = ipNets[:ipNetsCount]
 	}
+	platform.EpcId = epcId
+	platform.IfType = uint8(vifData.GetIfType())
+	platform.IsVIPInterface = vifData.GetIsVipInterface()
+	platform.RegionId = vifData.GetRegionId()
+	platform.SkipTapInterface = vifData.GetPodNodeId() > 0 && vifData.GetPodClusterId() > 0
 }
 
 // response.GetPlatformData().GetInterfaces()
-func Convert2PlatformData(interfaces []*trident.Interface) []*datatype.PlatformData {
-	platformDatas := make([]*datatype.PlatformData, 0, len(interfaces))
+func Convert2PlatformData(interfaces []*trident.Interface) []datatype.PlatformData {
+	// 因为这里的数据在用户场景比较多，对GC影响比较大，这里内存一次申请
+	platformDatas := make([]datatype.PlatformData, len(interfaces))
+
+	ipNetsCount := 0
 	for _, data := range interfaces {
-		if newData := newPlatformData(data); newData != nil {
-			platformDatas = append(platformDatas, newData)
-		}
+		ipNetsCount += len(data.IpResources)
+	}
+	ipNets := make([]datatype.IpNet, ipNetsCount)
+
+	ipNetsIndex := 0
+	for i, data := range interfaces {
+		newPlatformData(data, &platformDatas[i], ipNets[ipNetsIndex:])
+		ipNetsIndex += len(data.IpResources)
 	}
 	return platformDatas
 }
