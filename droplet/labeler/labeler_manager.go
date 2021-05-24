@@ -24,7 +24,7 @@ type LabelerManager struct {
 	policyTable *policy.PolicyTable
 
 	lookupKey         []datatype.LookupKey
-	rawPlatformDatas  []*datatype.PlatformData
+	rawPlatformDatas  []datatype.PlatformData
 	rawPeerConnection []*datatype.PeerConnection
 	rawCidrs          []*datatype.Cidr
 	rawIpGroupDatas   []*policy.IpGroupData
