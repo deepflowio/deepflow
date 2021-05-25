@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"gitlab.x.lan/yunshan/droplet-libs/ckdb"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
 )
@@ -41,6 +42,7 @@ type Meter interface {
 	Release()
 	Reverse()
 	ToReversed() Meter
+	WriteBlock(block *ckdb.Block) error // 写入clickhouse的block
 }
 
 type DocumentFlag uint32

@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/gopacket/layers"
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/ckdb"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	"gitlab.x.lan/yunshan/droplet-libs/geo"
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
@@ -141,6 +142,24 @@ const (
 	ClientGateway           = Client | TAPSideEnum(GatewaySide)
 	ServerGateway           = Server | TAPSideEnum(GatewaySide)
 )
+
+var TAPSideEnumsString = []string{
+	Rest:                    "rest",
+	Client:                  "c",
+	Server:                  "s",
+	ClientNode:              "c-nd",
+	ServerNode:              "s-nd",
+	ClientHypervisor:        "c-hv",
+	ServerHypervisor:        "s-hv",
+	ClientGatewayHypervisor: "c-gw-hv",
+	ServerGatewayHypervisor: "s-gw-hv",
+	ClientGateway:           "c-gw",
+	ServerGateway:           "s-gw",
+}
+
+func (s TAPSideEnum) String() string {
+	return TAPSideEnumsString[s]
+}
 
 func (d DirectionEnum) ToTAPSide() TAPSideEnum {
 	return TAPSideEnum(d)
@@ -333,6 +352,164 @@ type Field struct {
 	TagValue uint16
 }
 
+func newMetricsMinuteTable(id MetricsDBID, engine ckdb.EngineType) *ckdb.Table {
+	timeKey := "time"
+	cluster := ckdb.DF_CLUSTER
+	if engine == ckdb.ReplicatedMergeTree {
+		cluster = ckdb.DF_REPLICATED_CLUSTER
+	}
+
+	var orderKeys []string
+	code := metricsDBCodes[id]
+	if code&L3EpcID != 0 {
+		orderKeys = []string{"l3_epc_id", "ip4", "ip6"}
+	} else if code&L3EpcIDPath != 0 {
+		orderKeys = []string{"l3_epc_id_1", "ip4_1", "ip6_1", "l3_epc_id_0", "ip4_0", "ip6_0"}
+	} else if code&ACLGID != 0 {
+		orderKeys = []string{"acl_gid"}
+	}
+	if code&ServerPort != 0 {
+		orderKeys = append(orderKeys, "server_port")
+	}
+	orderKeys = append(orderKeys, timeKey)
+
+	var meterColumns []*ckdb.Column
+	switch id {
+	case VTAP_FLOW, VTAP_FLOW_PORT, VTAP_FLOW_EDGE, VTAP_FLOW_EDGE_PORT:
+		meterColumns = FlowMeterColumns()
+	case VTAP_PACKET, VTAP_PACKET_EDGE, VTAP_ACL:
+		meterColumns = UsageMeterColumns()
+	case VTAP_WAN, VTAP_WAN_PORT:
+		meterColumns = GeoMeterColumns()
+	}
+
+	return &ckdb.Table{
+		ID:              uint8(id),
+		Database:        id.DBName(),
+		LocalName:       ckdb.LOCAL_1M,
+		GlobalName:      ckdb.GLOBAL_1M,
+		Columns:         append(genTagColumns(metricsDBCodes[id]), meterColumns...),
+		TimeKey:         timeKey,
+		TTL:             7, // 分钟数据默认保留7天
+		PartitionFunc:   ckdb.TimeFuncDay,
+		Engine:          engine,
+		Cluster:         cluster,
+		OrderKeys:       orderKeys,
+		PrimaryKeyCount: len(orderKeys),
+	}
+}
+
+// 由分钟表生成秒表
+func newMetricsSecondTable(minuteTable *ckdb.Table) *ckdb.Table {
+	t := *minuteTable
+	t.ID = minuteTable.ID + uint8(VTAP_FLOW_1S)
+	t.LocalName = ckdb.LOCAL_1S
+	t.GlobalName = ckdb.GLOBAL_1S
+	t.TTL = 1 // 秒数据默认保存1天
+	t.PartitionFunc = ckdb.TimeFuncFourHour
+	t.Engine = ckdb.MergeTree // 秒级数据不用支持使用replica
+	t.Cluster = ckdb.DF_CLUSTER
+
+	return &t
+}
+
+var metricsTables []*ckdb.Table
+
+func GetMetricsTables(engine ckdb.EngineType) []*ckdb.Table {
+	if metricsTables != nil {
+		return metricsTables
+	}
+
+	minuteTables := []*ckdb.Table{}
+	for i := VTAP_FLOW; i < VTAP_FLOW_1S; i++ {
+		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine))
+	}
+	secondTables := []*ckdb.Table{}
+	for i := VTAP_FLOW_1S; i < VTAP_DB_ID_MAX; i++ {
+		secondTables = append(secondTables, newMetricsSecondTable(minuteTables[i-VTAP_FLOW_1S]))
+	}
+	metricsTables = append(minuteTables, secondTables...)
+	return metricsTables
+}
+
+type MetricsDBID uint8
+
+const (
+	VTAP_FLOW MetricsDBID = iota
+	VTAP_FLOW_PORT
+	VTAP_FLOW_EDGE
+	VTAP_FLOW_EDGE_PORT
+	VTAP_PACKET
+	VTAP_PACKET_EDGE
+
+	VTAP_WAN
+	VTAP_WAN_PORT
+	VTAP_ACL
+
+	VTAP_FLOW_1S
+	VTAP_FLOW_PORT_1S
+	VTAP_FLOW_EDGE_1S
+	VTAP_FLOW_EDGE_PORT_1S
+	VTAP_PACKET_1S
+	VTAP_PACKET_EDGE_1S
+
+	VTAP_DB_ID_MAX
+)
+
+func (i MetricsDBID) DBName() string {
+	if i >= VTAP_FLOW_1S {
+		return metricsDBNames[i-VTAP_FLOW_1S]
+	}
+	return metricsDBNames[i]
+}
+
+func (i MetricsDBID) DBCode() Code {
+	if i >= VTAP_FLOW_1S {
+		return metricsDBCodes[i-VTAP_FLOW_1S]
+	}
+	return metricsDBCodes[i]
+}
+
+var metricsDBNames = []string{
+	VTAP_FLOW:           "vtap_flow",
+	VTAP_FLOW_PORT:      "vtap_flow_port",
+	VTAP_FLOW_EDGE:      "vtap_flow_edge",
+	VTAP_FLOW_EDGE_PORT: "vtap_flow_edge_port",
+	VTAP_PACKET:         "vtap_packet",
+	VTAP_PACKET_EDGE:    "vtap_packet_edge",
+
+	VTAP_WAN:      "vtap_wan",
+	VTAP_WAN_PORT: "vtap_wan_port",
+	VTAP_ACL:      "vtap_acl",
+}
+
+func MetricsDBNameToID(name string) MetricsDBID {
+	for i, n := range metricsDBNames {
+		if n == name {
+			return MetricsDBID(i)
+		}
+	}
+	return VTAP_DB_ID_MAX
+}
+
+const (
+	BaseCode     = AZID | HostID | IP | L3Device | L3EpcID | PodClusterID | PodGroupID | PodID | PodNodeID | PodNSID | RegionID | SubnetID | TAPType | VTAPID | BusinessIDs | GroupIDs
+	BasePathCode = AZIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | PodClusterIDPath | PodGroupIDPath | PodIDPath | PodNodeIDPath | PodNSIDPath | RegionIDPath | SubnetIDPath | TAPSide | TAPType | VTAPID | BusinessIDsPath | GroupIDsPath
+	BasePortCode = Protocol | ServerPort | IsKeyService
+)
+
+var metricsDBCodes = []Code{
+	VTAP_FLOW:           BaseCode | Direction | Protocol,
+	VTAP_FLOW_PORT:      BaseCode | BasePortCode | Direction,
+	VTAP_FLOW_EDGE:      BasePathCode | Protocol | TAPPort,
+	VTAP_FLOW_EDGE_PORT: BasePathCode | BasePortCode | TAPPort,
+	VTAP_PACKET:         BaseCode | Direction | TagType | TagValue,
+	VTAP_PACKET_EDGE:    BasePathCode | TagType | TagValue,
+	VTAP_WAN:            BaseCode | Direction | Protocol | TagType | TagValue,
+	VTAP_WAN_PORT:       BaseCode | BasePortCode | Direction | TagType | TagValue,
+	VTAP_ACL:            ACLGID | TagType | TagValue | VTAPID,
+}
+
 type Tag struct {
 	*Field
 	Code
@@ -368,28 +545,18 @@ func unmarshalUint16WithSpecialID(s string) (int16, error) {
 	return int16(i), nil
 }
 
-func marshalUint16sWithSpecialID(vs []int16) string {
-	var buf strings.Builder
-	for i, v := range vs {
-		buf.WriteString(marshalUint16WithSpecialID(v))
-		if i < len(vs)-1 {
-			buf.WriteString("|")
-		}
+func marshalInt32WithSpecialID(v int16) int32 {
+	switch v {
+	case ID_OTHER:
+		fallthrough
+	case ID_INTERNET:
+		return int32(v)
 	}
-	return buf.String()
+	return int32(uint64(v) & math.MaxUint16)
 }
 
-func unmarshalUint16sWithSpecialID(s string) ([]int16, error) {
-	int16s := []int16{}
-	vs := strings.Split(s, "|")
-	for _, v := range vs {
-		if i16, err := unmarshalUint16WithSpecialID(v); err != nil {
-			return int16s, err
-		} else {
-			int16s = append(int16s, i16)
-		}
-	}
-	return int16s, nil
+func unmarshalInt32WithSpecialID(v int32) int16 {
+	return int16(v)
 }
 
 func marshalUint16s(vs []uint16) string {
@@ -722,6 +889,575 @@ func (t *Tag) MarshalTo(b []byte) int {
 	}
 
 	return offset
+}
+
+func (t *Tag) TableID(isSecond bool) (uint8, error) {
+	for i, code := range metricsDBCodes {
+		if t.Code == code {
+			if isSecond {
+				return uint8(i) + uint8(VTAP_FLOW_1S), nil
+			}
+			return uint8(i), nil
+		}
+	}
+	return 0, fmt.Errorf("not match table, tag code is 0x%x is second %v", t.Code, isSecond)
+}
+
+// 顺序需要和WriteBlock中一致, 目前time排第一位，其他按字段名字典排序
+func genTagColumns(code Code) []*ckdb.Column {
+	columns := []*ckdb.Column{}
+	columns = append(columns, ckdb.NewColumnWithGroupBy("time", ckdb.DateTime))
+	columns = append(columns, ckdb.NewColumn("_tid", ckdb.UInt8))
+	if code&ACLGID != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("acl_gid", ckdb.UInt16).SetComment("ACL组ID"))
+	}
+	if code&AZID != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("az_id", ckdb.UInt16).SetComment("可用区ID"))
+	}
+	if code&AZIDPath != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("az_id_0", ckdb.UInt16))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("az_id_1", ckdb.UInt16))
+	}
+
+	if code&BusinessIDs != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("business_ids", ckdb.ArrayUInt16))
+	}
+	if code&BusinessIDsPath != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("business_ids_0", ckdb.ArrayUInt16))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("business_ids_1", ckdb.ArrayUInt16))
+	}
+
+	if code&Direction != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("direction", ckdb.String).SetComment("统计量对应的流方向.c2s: ip/ip_0为客户端,ip_1为服务端. s2c: ip/ip_0为服务端,ip_1为客户端"))
+	}
+
+	if code&GroupIDs != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("group_ids", ckdb.ArrayUInt16))
+	}
+	if code&GroupIDsPath != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("group_ids_0", ckdb.ArrayUInt16))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("group_ids_1", ckdb.ArrayUInt16))
+	}
+
+	if code&HostID != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("host_id", ckdb.UInt16).SetComment("宿主机ID"))
+	}
+	if code&HostIDPath != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("host_id_0", ckdb.UInt16))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("host_id_1", ckdb.UInt16))
+	}
+	if code&IP != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("ip4", ckdb.IPv4))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("ip6", ckdb.IPv6))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("is_ipv4", ckdb.UInt8))
+	}
+	if code&IPPath != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("ip4_0", ckdb.IPv4))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("ip4_1", ckdb.IPv4))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("ip6_0", ckdb.IPv6))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("ip6_1", ckdb.IPv6))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("is_ipv4", ckdb.UInt8))
+	}
+
+	if code&IsKeyService != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("is_key_service", ckdb.UInt8))
+	}
+
+	if code&L3Device != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_device_id", ckdb.UInt32).SetComment("ip对应的资源ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_device_type", ckdb.UInt8).SetComment("ip对应的资源类型"))
+	}
+
+	if code&L3DevicePath != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_device_id_0", ckdb.UInt32))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_device_id_1", ckdb.UInt32))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_device_type_0", ckdb.UInt8))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_device_type_1", ckdb.UInt8))
+	}
+
+	if code&L3EpcID != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_epc_id", ckdb.Int32).SetComment("ip对应的EPC ID"))
+	}
+	if code&L3EpcIDPath != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_epc_id_0", ckdb.Int32))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_epc_id_1", ckdb.Int32))
+	}
+
+	if code&MAC != 0 {
+		// 不存
+		// columns = append(columns, ckdb.NewColumnWithGroupBy("mac", UInt64))
+	}
+	if code&MACPath != 0 {
+		// 不存
+		// columns = append(columns, ckdb.NewColumnWithGroupBy("mac_0", UInt64))
+		// columns = append(columns, ckdb.NewColumnWithGroupBy("mac_1", UInt64))
+	}
+
+	if code&PodClusterID != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_cluster_id", ckdb.UInt16).SetComment("ip对应的容器集群ID"))
+	}
+
+	if code&PodClusterIDPath != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_cluster_id_0", ckdb.UInt16))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_cluster_id_1", ckdb.UInt16))
+	}
+
+	if code&PodGroupID != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_group_id", ckdb.UInt32).SetComment("ip对应的容器组ID"))
+	}
+
+	if code&PodGroupIDPath != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_group_id_0", ckdb.UInt32))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_group_id_1", ckdb.UInt32))
+	}
+
+	if code&PodID != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_id", ckdb.UInt32).SetComment("ip对应的容器ID"))
+	}
+
+	if code&PodIDPath != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_id_0", ckdb.UInt32))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_id_1", ckdb.UInt32))
+	}
+
+	if code&PodNodeID != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_node_id", ckdb.UInt32).SetComment("ip对应的节点ID"))
+	}
+
+	if code&PodNodeIDPath != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_node_id_0", ckdb.UInt32))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_node_id_1", ckdb.UInt32))
+	}
+
+	if code&PodNSID != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_ns_id", ckdb.UInt16).SetComment("ip对应的容器命名空间ID"))
+	}
+
+	if code&PodNSIDPath != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_ns_id_0", ckdb.UInt16))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_ns_id_1", ckdb.UInt16))
+	}
+
+	if code&Protocol != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("protocol", ckdb.UInt8).SetComment("0: 非IP包 1-255: ip协议号(其中 1:icmp 6:tcp 17:udp)"))
+	}
+
+	if code&RegionID != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("region_id", ckdb.UInt16).SetComment("ip对应的云平台区域ID"))
+	}
+	if code&RegionIDPath != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("region_id_0", ckdb.UInt16))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("region_id_1", ckdb.UInt16))
+	}
+
+	if code&ServerPort != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("server_port", ckdb.UInt16).SetComment("服务端端口"))
+	}
+
+	if code&SubnetID != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("subnet_id", ckdb.UInt16).SetComment("ip对应的子网ID(0: 未找到)"))
+	}
+	if code&SubnetIDPath != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("subnet_id_0", ckdb.UInt16))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("subnet_id_1", ckdb.UInt16))
+	}
+	if code&TagType != 0 && code&TagValue != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("tag_type", ckdb.UInt8).SetComment("1: 省份(仅针对geo库) 2: TCP Flag(仅针对packet库) 3: 播送类型(仅针对packet库) 4: 隧道分发点ID(仅针对flow库)"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("tag_value", ckdb.String).SetComment("tag_type对应的具体值. tag_type=1: 省份 tag_type=2: TCP包头的Flag字段 tag_type=3: 播送类性(broadcast: 广播 multicast: 组播 unicast: 未知单播) tag_type=4: 隧道分发点ID "))
+	}
+	if code&TAPPort != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_port", ckdb.UInt32).SetComment("采集网口标识 若tap_type为3: 虚拟网络流量源, 表示虚拟接口MAC地址低4字节 00000000~FFFFFFFF"))
+	}
+	if code&TAPSide != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_side", ckdb.String).SetComment("流量采集位置(c: 客户端(0侧)采集 s: 服务端(1侧)采集)"))
+	}
+	if code&TAPType != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_type", ckdb.UInt8).SetComment("流量采集点(1-2,4-30: 接入网络流量 3: 虚拟网络流量)"))
+	}
+	if code&VTAPID != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("vtap_id", ckdb.UInt16).SetComment("采集器控制IP的ID"))
+	}
+
+	return columns
+}
+
+// 顺序需要和genTagColumns的一致
+func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
+	code := t.Code
+
+	if err := block.WriteUInt32(time); err != nil {
+		return err
+	}
+
+	if err := block.WriteUInt8(t.GlobalThreadID); err != nil {
+		return err
+	}
+
+	if code&ACLGID != 0 {
+		if err := block.WriteUInt16(t.ACLGID); err != nil {
+			return err
+		}
+	}
+	if code&AZID != 0 {
+		if err := block.WriteUInt16(t.AZID); err != nil {
+			return err
+		}
+	}
+
+	if code&AZIDPath != 0 {
+		if err := block.WriteUInt16(t.AZID); err != nil {
+			return err
+		}
+		if err := block.WriteUInt16(t.AZID1); err != nil {
+			return err
+		}
+	}
+
+	if code&BusinessIDs != 0 {
+		if err := block.WriteArray(t.BusinessIDs); err != nil {
+			return err
+		}
+	}
+	if code&BusinessIDsPath != 0 {
+		if err := block.WriteArray(t.BusinessIDs); err != nil {
+			return err
+		}
+		if err := block.WriteArray(t.BusinessIDs1); err != nil {
+			return err
+		}
+	}
+
+	if code&Direction != 0 {
+		if t.Direction.IsClientToServer() {
+			if err := block.WriteString("c2s"); err != nil {
+				return err
+			}
+		} else {
+			if err := block.WriteString("s2c"); err != nil {
+				return err
+			}
+		}
+	}
+
+	if code&GroupIDs != 0 {
+		if err := block.WriteArray(t.GroupIDs); err != nil {
+			return err
+		}
+	}
+	if code&GroupIDsPath != 0 {
+		if err := block.WriteArray(t.GroupIDs); err != nil {
+			return err
+		}
+		if err := block.WriteArray(t.GroupIDs1); err != nil {
+			return err
+		}
+	}
+
+	if code&HostID != 0 {
+		if err := block.WriteUInt16(t.HostID); err != nil {
+			return err
+		}
+	}
+	if code&HostIDPath != 0 {
+		if err := block.WriteUInt16(t.HostID); err != nil {
+			return err
+		}
+		if err := block.WriteUInt16(t.HostID1); err != nil {
+			return err
+		}
+	}
+	if code&IP != 0 {
+		if err := block.WriteUInt32(t.IP); err != nil {
+			return err
+		}
+		if len(t.IP6) == 0 {
+			t.IP6 = net.IPv6zero
+		}
+		if err := block.WriteIP(t.IP6); err != nil {
+			return err
+		}
+		if err := block.WriteUInt8(1 - t.IsIPv6); err != nil {
+			return err
+		}
+	}
+	if code&IPPath != 0 {
+		if err := block.WriteUInt32(t.IP); err != nil {
+			return err
+		}
+		if err := block.WriteUInt32(t.IP1); err != nil {
+			return err
+		}
+		if len(t.IP6) == 0 {
+			t.IP6 = net.IPv6zero
+		}
+		if err := block.WriteIP(t.IP6); err != nil {
+			return err
+		}
+		if len(t.IP61) == 0 {
+			t.IP61 = net.IPv6zero
+		}
+		if err := block.WriteIP(t.IP61); err != nil {
+			return err
+		}
+		if err := block.WriteUInt8(1 - t.IsIPv6); err != nil {
+			return err
+		}
+	}
+
+	if code&IsKeyService != 0 {
+		if err := block.WriteUInt8(t.IsKeyService); err != nil {
+			return err
+		}
+	}
+
+	if code&L3Device != 0 {
+		if err := block.WriteUInt32(t.L3DeviceID); err != nil {
+			return err
+		}
+		if err := block.WriteUInt8(uint8(t.L3DeviceType)); err != nil {
+			return err
+		}
+	}
+	if code&L3DevicePath != 0 {
+		if err := block.WriteUInt32(t.L3DeviceID); err != nil {
+			return err
+		}
+		if err := block.WriteUInt32(t.L3DeviceID1); err != nil {
+			return err
+		}
+		if err := block.WriteUInt8(uint8(t.L3DeviceType)); err != nil {
+			return err
+		}
+		if err := block.WriteUInt8(uint8(t.L3DeviceType1)); err != nil {
+			return err
+		}
+	}
+
+	if code&L3EpcID != 0 {
+		if err := block.WriteInt32(marshalInt32WithSpecialID(t.L3EpcID)); err != nil {
+			return err
+		}
+	}
+	if code&L3EpcIDPath != 0 {
+		if err := block.WriteInt32(marshalInt32WithSpecialID(t.L3EpcID)); err != nil {
+			return err
+		}
+
+		if err := block.WriteInt32(marshalInt32WithSpecialID(t.L3EpcID1)); err != nil {
+			return err
+		}
+	}
+
+	if code&MAC != 0 {
+		// 不存
+		// if err := block.WriteUInt64(t.MAC); err != nil {
+		//     return err
+		// }
+		//
+	}
+	if code&MACPath != 0 {
+		// 不存
+		// if err := block.WriteUInt64(t.MAC); err != nil {
+		//     return err
+		// }
+		//
+		// if err := block.WriteUInt64(t.MAC1); err != nil {
+		//     return err
+		// }
+		//
+	}
+
+	if code&PodClusterID != 0 {
+		if err := block.WriteUInt16(t.PodClusterID); err != nil {
+			return err
+		}
+	}
+
+	if code&PodClusterIDPath != 0 {
+		if err := block.WriteUInt16(t.PodClusterID); err != nil {
+			return err
+		}
+
+		if err := block.WriteUInt16(t.PodClusterID1); err != nil {
+			return err
+		}
+	}
+
+	if code&PodGroupID != 0 {
+		if err := block.WriteUInt32(t.PodGroupID); err != nil {
+			return err
+		}
+	}
+
+	if code&PodGroupIDPath != 0 {
+		if err := block.WriteUInt32(t.PodGroupID); err != nil {
+			return err
+		}
+
+		if err := block.WriteUInt32(t.PodGroupID1); err != nil {
+			return err
+		}
+	}
+
+	if code&PodID != 0 {
+		if err := block.WriteUInt32(t.PodID); err != nil {
+			return err
+		}
+	}
+
+	if code&PodIDPath != 0 {
+		if err := block.WriteUInt32(t.PodID); err != nil {
+			return err
+		}
+
+		if err := block.WriteUInt32(t.PodID1); err != nil {
+			return err
+		}
+	}
+
+	if code&PodNodeID != 0 {
+		if err := block.WriteUInt32(t.PodNodeID); err != nil {
+			return err
+		}
+	}
+
+	if code&PodNodeIDPath != 0 {
+		if err := block.WriteUInt32(t.PodNodeID); err != nil {
+			return err
+		}
+
+		if err := block.WriteUInt32(t.PodNodeID1); err != nil {
+			return err
+		}
+	}
+
+	if code&PodNSID != 0 {
+		if err := block.WriteUInt16(t.PodNSID); err != nil {
+			return err
+		}
+	}
+	if code&PodNSIDPath != 0 {
+		if err := block.WriteUInt16(t.PodNSID); err != nil {
+			return err
+		}
+
+		if err := block.WriteUInt16(t.PodNSID1); err != nil {
+			return err
+		}
+	}
+	if code&Protocol != 0 {
+		if err := block.WriteUInt8(uint8(t.Protocol)); err != nil {
+			return err
+		}
+	}
+
+	if code&RegionID != 0 {
+		if err := block.WriteUInt16(t.RegionID); err != nil {
+			return err
+		}
+	}
+	if code&RegionIDPath != 0 {
+		if err := block.WriteUInt16(t.RegionID); err != nil {
+			return err
+		}
+
+		if err := block.WriteUInt16(t.RegionID1); err != nil {
+			return err
+		}
+	}
+	if code&ServerPort != 0 {
+		if err := block.WriteUInt16(t.ServerPort); err != nil {
+			return err
+		}
+	}
+
+	if code&SubnetID != 0 {
+		if err := block.WriteUInt16(t.SubnetID); err != nil {
+			return err
+		}
+	}
+	if code&SubnetIDPath != 0 {
+		if err := block.WriteUInt16(t.SubnetID); err != nil {
+			return err
+		}
+		if err := block.WriteUInt16(t.SubnetID1); err != nil {
+			return err
+		}
+	}
+	if code&TagType != 0 && code&TagValue != 0 {
+		if err := block.WriteUInt8(t.TagType); err != nil {
+			return err
+		}
+
+		switch t.TagType {
+		case TAG_TYPE_PROVINCE:
+			if err := block.WriteString(geo.DecodeRegion(uint8(t.TagValue))); err != nil {
+				return err
+			}
+		case TAG_TYPE_TCP_FLAG:
+			if err := block.WriteString(strconv.FormatUint(uint64(t.TagValue), 10)); err != nil {
+				return err
+			}
+		case TAG_TYPE_CAST_TYPE:
+			switch CastTypeEnum(t.TagValue) {
+			case BROADCAST:
+				if err := block.WriteString("broadcast"); err != nil {
+					return err
+				}
+			case MULTICAST:
+				if err := block.WriteString("multicast"); err != nil {
+					return err
+				}
+			case UNICAST:
+				if err := block.WriteString("unicast"); err != nil {
+					return err
+				}
+			default:
+				if err := block.WriteString("unknown"); err != nil {
+					return err
+				}
+			}
+		case TAG_TYPE_TUNNEL_IP_ID:
+			if err := block.WriteString(strconv.FormatUint(uint64(t.TagValue), 10)); err != nil {
+				return err
+			}
+		case TAG_TYPE_TTL:
+			fallthrough
+		case TAG_TYPE_PACKET_SIZE:
+			if t.TagValue < uint16(MAX_PACKET_SIZE) && t.TagValue >= uint16(TTL_1) {
+				if err := block.WriteString(TTL_PACKET_SIZE[t.TagValue]); err != nil {
+					return err
+				}
+
+			} else {
+				if err := block.WriteString(strconv.FormatUint(uint64(t.TagValue), 10)); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	if code&TAPPort != 0 {
+		if err := block.WriteUInt32(t.TAPPort); err != nil {
+			return err
+		}
+	}
+	if code&TAPSide != 0 {
+		if err := block.WriteString(t.TAPSide.String()); err != nil {
+			return err
+		}
+	}
+	if code&TAPType != 0 {
+		if err := block.WriteUInt8(uint8(t.TAPType)); err != nil {
+			return err
+		}
+	}
+	if code&VTAPID != 0 {
+		if err := block.WriteUInt16(t.VTAPID); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 const TAP_PORT_STR_LEN = 8

@@ -2,6 +2,7 @@ module gitlab.x.lan/yunshan/droplet-libs
 
 require (
 	bou.ke/monkey v1.0.1
+	github.com/ClickHouse/clickhouse-go v1.4.5
 	github.com/OneOfOne/xxhash v1.2.2
 	github.com/Workiva/go-datastructures v1.0.50
 	github.com/docker/go-units v0.3.3

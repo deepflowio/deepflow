@@ -2,6 +2,7 @@ package zerodoc
 
 import (
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/ckdb"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
 )
 
@@ -108,4 +109,34 @@ func (m *FlowMeter) MarshalTo(b []byte) int {
 	}
 
 	return offset
+}
+
+func FlowMeterColumns() []*ckdb.Column {
+	columns := []*ckdb.Column{}
+	columns = append(columns, TrafficColumns()...)
+	columns = append(columns, LatencyColumns()...)
+	columns = append(columns, PerformanceColumns()...)
+	columns = append(columns, AnomalyColumns()...)
+	columns = append(columns, FlowLoadColumns()...)
+	return columns
+}
+
+func (m *FlowMeter) WriteBlock(block *ckdb.Block) error {
+	if err := m.Traffic.WriteBlock(block); err != nil {
+		return err
+	}
+	if err := m.Latency.WriteBlock(block); err != nil {
+		return err
+	}
+	if err := m.Performance.WriteBlock(block); err != nil {
+		return err
+	}
+	if err := m.Anomaly.WriteBlock(block); err != nil {
+		return err
+	}
+	if err := m.FlowLoad.WriteBlock(block); err != nil {
+		return err
+	}
+
+	return nil
 }

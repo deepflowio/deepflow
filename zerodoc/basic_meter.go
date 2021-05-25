@@ -3,6 +3,7 @@ package zerodoc
 import (
 	"strconv"
 
+	"gitlab.x.lan/yunshan/droplet-libs/ckdb"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
 )
 
@@ -111,6 +112,89 @@ func (t *Traffic) MarshalTo(b []byte) int {
 		offset-- // 去除','
 	}
 	return offset + n
+}
+
+const (
+	TRAFFIC_PACKET_TX = iota
+	TRAFFIC_PACKET_RX
+	TRAFFIC_PACKET
+
+	TRAFFIC_BYTE_TX
+	TRAFFIC_BYTE_RX
+	TRAFFIC_BYTE
+
+	TRAFFIC_L3_BYTE_TX
+	TRAFFIC_L3_BYTE_RX
+	TRAFFIC_L4_BYTE_TX
+	TRAFFIC_L4_BYTE_RX
+
+	TRAFFIC_NEW_FLOW
+	TRAFFIC_CLOSED_FLOW
+
+	TRAFFIC_HTTP_REQUEST
+	TRAFFIC_HTTP_RESPONSE
+	TRAFFIC_DNS_REQUEST
+	TRAFFIC_DNS_RESPONSE
+)
+
+// Columns列和WriteBlock的列需要按顺序一一对应
+func TrafficColumns() []*ckdb.Column {
+	return ckdb.NewColumnsWithComment(
+		[][2]string{
+			TRAFFIC_PACKET_TX: {"packet_tx", "累计发送总包数"},
+			TRAFFIC_PACKET_RX: {"packet_rx", "累计接收总包数"},
+			TRAFFIC_PACKET:    {"packet", "累计总包数"},
+
+			TRAFFIC_BYTE_TX: {"byte_tx", "累计发送总字节数"},
+			TRAFFIC_BYTE_RX: {"byte_rx", "累计接收总字节数"},
+			TRAFFIC_BYTE:    {"byte", "累计总字节数"},
+
+			TRAFFIC_L3_BYTE_TX: {"l3_byte_tx", "累计发送网络层负载总字节数"},
+			TRAFFIC_L3_BYTE_RX: {"l3_byte_rx", "累计接收网络层负载总字节数"},
+			TRAFFIC_L4_BYTE_TX: {"l4_byte_tx", "累计发送应用层负载总字节数"},
+			TRAFFIC_L4_BYTE_RX: {"l4_byte_rx", "累计接收应用层负载总字节数"},
+
+			TRAFFIC_NEW_FLOW:    {"new_flow", "累计新建连接数"},
+			TRAFFIC_CLOSED_FLOW: {"closed_flow", "累计关闭连接数"},
+
+			TRAFFIC_HTTP_REQUEST:  {"http_request", "累计HTTP请求包数"},
+			TRAFFIC_HTTP_RESPONSE: {"http_response", "累计HTTP响应包数"},
+			TRAFFIC_DNS_REQUEST:   {"dns_request", "累计DNS请求包数"},
+			TRAFFIC_DNS_RESPONSE:  {"dns_response", "累计DNS响应包数"},
+		},
+		ckdb.UInt64)
+}
+
+// WriteBlock的列需和Columns 按顺序一一对应
+func (t *Traffic) WriteBlock(block *ckdb.Block) error {
+	values := []uint64{
+		TRAFFIC_PACKET_TX: t.PacketTx,
+		TRAFFIC_PACKET_RX: t.PacketRx,
+		TRAFFIC_PACKET:    t.PacketTx + t.PacketRx,
+
+		TRAFFIC_BYTE_TX: t.ByteTx,
+		TRAFFIC_BYTE_RX: t.ByteRx,
+		TRAFFIC_BYTE:    t.ByteTx + t.ByteRx,
+
+		TRAFFIC_L3_BYTE_TX: t.L3ByteTx,
+		TRAFFIC_L3_BYTE_RX: t.L3ByteRx,
+		TRAFFIC_L4_BYTE_TX: t.L4ByteTx,
+		TRAFFIC_L4_BYTE_RX: t.L4ByteRx,
+
+		TRAFFIC_NEW_FLOW:    t.NewFlow,
+		TRAFFIC_CLOSED_FLOW: t.ClosedFlow,
+
+		TRAFFIC_HTTP_REQUEST:  t.HTTPRequest,
+		TRAFFIC_HTTP_RESPONSE: t.HTTPResponse,
+		TRAFFIC_DNS_REQUEST:   t.DNSRequest,
+		TRAFFIC_DNS_RESPONSE:  t.DNSResponse,
+	}
+	for _, v := range values {
+		if err := block.WriteUInt64(v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type Latency struct {
@@ -252,6 +336,103 @@ func (l *Latency) MarshalTo(b []byte) int {
 	return marshalKeyValues(b, fields, values)
 }
 
+const (
+	LATENCY_RTT = iota
+	LATENCY_RTT_CLIENT
+	LATENCY_RTT_SERVER
+	LATENCY_SRT
+	LATENCY_ART
+	LATENCY_HTTP_RRT
+	LATENCY_DNS_RRT
+)
+
+// Columns列和WriteBlock的列需要按顺序一一对应
+func LatencyColumns() []*ckdb.Column {
+	sumColumns := ckdb.NewColumnsWithComment(
+		[][2]string{
+			LATENCY_RTT:        {"rtt_sum", "累计建立连接RTT"},
+			LATENCY_RTT_CLIENT: {"rtt_client_sum", "客户端累计建立连接RTT"},
+			LATENCY_RTT_SERVER: {"rtt_server_sum", "服务端累计建立连接RTT"},
+			LATENCY_SRT:        {"srt_sum", "累计所有系统响应时延"},
+			LATENCY_ART:        {"art_sum", "累计所有应用响应时延"},
+			LATENCY_HTTP_RRT:   {"http_rrt_sum", "累计所有HTTP请求响应时延"},
+			LATENCY_DNS_RRT:    {"dns_rrt_sum", "累计所有DNS请求响应时延"},
+		},
+		ckdb.Float64)
+	counterColumns := ckdb.NewColumnsWithComment(
+		[][2]string{
+			LATENCY_RTT:        {"rtt_count", "建立连接时延计算次数"},
+			LATENCY_RTT_CLIENT: {"rtt_client_count", "客户端建立连接时延计算次数"},
+			LATENCY_RTT_SERVER: {"rtt_server_count", "服务端建立连接时延计算次数"},
+			LATENCY_SRT:        {"srt_count", "系统响应时延计算次数"},
+			LATENCY_ART:        {"art_count", "应用响应时延计算次数"},
+			LATENCY_HTTP_RRT:   {"http_rrt_count", "HTTP请求响应时延计算次数"},
+			LATENCY_DNS_RRT:    {"dns_rrt_count", "DNS请求响应时延计算次数"},
+		},
+		ckdb.UInt64)
+	maxColumns := ckdb.NewColumnsWithComment(
+		[][2]string{
+			LATENCY_RTT:        {"rtt_max", "建立连接RTT最大值"},
+			LATENCY_RTT_CLIENT: {"rtt_client_max", "客户端建立连接RTT最大值"},
+			LATENCY_RTT_SERVER: {"rtt_server_max", "服务端建立连接RTT最大值"},
+			LATENCY_SRT:        {"srt_max", "所有系统响应时延最大值"},
+			LATENCY_ART:        {"art_max", "所有应用响应时延最大值"},
+			LATENCY_HTTP_RRT:   {"http_rrt_max", "所有HTTP请求响应时延最大值"},
+			LATENCY_DNS_RRT:    {"dns_rrt_max", "所有DNS请求响应时延最大值"},
+		}, ckdb.UInt32)
+	columns := []*ckdb.Column{}
+	columns = append(columns, sumColumns...)
+	columns = append(columns, counterColumns...)
+	columns = append(columns, maxColumns...)
+	return columns
+}
+
+// WriteBlock和LatencyColumns的列需要按顺序一一对应
+func (l *Latency) WriteBlock(block *ckdb.Block) error {
+	sumValues := []float64{
+		LATENCY_RTT:        float64(l.RTTSum),
+		LATENCY_RTT_CLIENT: float64(l.RTTClientSum),
+		LATENCY_RTT_SERVER: float64(l.RTTServerSum),
+		LATENCY_SRT:        float64(l.SRTSum),
+		LATENCY_ART:        float64(l.ARTSum),
+		LATENCY_HTTP_RRT:   float64(l.HTTPRRTSum),
+		LATENCY_DNS_RRT:    float64(l.DNSRRTSum)}
+	counterValues := []uint64{
+		LATENCY_RTT:        l.RTTCount,
+		LATENCY_RTT_CLIENT: l.RTTClientCount,
+		LATENCY_RTT_SERVER: l.RTTServerCount,
+		LATENCY_SRT:        l.SRTCount,
+		LATENCY_ART:        l.ARTCount,
+		LATENCY_HTTP_RRT:   l.HTTPRRTCount,
+		LATENCY_DNS_RRT:    l.DNSRRTCount}
+	maxValues := []uint32{
+		LATENCY_RTT:        l.RTTMax,
+		LATENCY_RTT_CLIENT: l.RTTClientMax,
+		LATENCY_RTT_SERVER: l.RTTServerMax,
+		LATENCY_SRT:        l.SRTMax,
+		LATENCY_ART:        l.ARTMax,
+		LATENCY_HTTP_RRT:   l.HTTPRRTMax,
+		LATENCY_DNS_RRT:    l.DNSRRTMax}
+	for _, v := range sumValues {
+		if err := block.WriteFloat64(v); err != nil {
+			return err
+		}
+	}
+
+	for _, v := range counterValues {
+		if err := block.WriteUInt64(v); err != nil {
+			return err
+		}
+	}
+
+	for _, v := range maxValues {
+		if err := block.WriteUInt32(v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type Performance struct {
 	RetransTx uint64 `db:"retrans_tx"`
 	RetransRx uint64 `db:"retrans_rx"`
@@ -296,6 +477,45 @@ func (a *Performance) MarshalTo(b []byte) int {
 		a.RetransTx, a.RetransRx, a.RetransTx + a.RetransRx, a.ZeroWinTx, a.ZeroWinRx, a.ZeroWinTx + a.ZeroWinRx,
 	}
 	return marshalKeyValues(b, fields, values)
+}
+
+const (
+	PERF_RETRANS_TX = iota
+	PERF_RETRANS_RX
+	PERF_RETRANS
+
+	PERF_ZERO_WIN_TX
+	PERF_ZERO_WIN_RX
+	PERF_ZERO_WIN
+)
+
+// Columns列和WriteBlock的列需要按顺序一一对应
+func PerformanceColumns() []*ckdb.Column {
+	return ckdb.NewColumnsWithComment(
+		[][2]string{
+			PERF_RETRANS_TX: {"retrans_tx", "客户端累计重传次数"},
+			PERF_RETRANS_RX: {"retrans_rx", "服务端累计重传次数"},
+			PERF_RETRANS:    {"retrans", "累计重传次数"},
+
+			PERF_ZERO_WIN_TX: {"zero_win_tx", "客户端累计零窗次数"},
+			PERF_ZERO_WIN_RX: {"zero_win_rx", "服务端累计零窗次数"},
+			PERF_ZERO_WIN:    {"zero_win", "累计零窗次数"},
+		},
+		ckdb.UInt64)
+}
+
+// WriteBlock的列和PerformanceColumns需要按顺序一一对应
+func (a *Performance) WriteBlock(block *ckdb.Block) error {
+	values := []uint64{
+		a.RetransTx, a.RetransRx, a.RetransTx + a.RetransRx,
+		a.ZeroWinTx, a.ZeroWinRx, a.ZeroWinTx + a.ZeroWinRx,
+	}
+	for _, v := range values {
+		if err := block.WriteUInt64(v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type Anomaly struct {
@@ -427,6 +647,123 @@ func (a *Anomaly) MarshalTo(b []byte) int {
 	return marshalKeyValues(b, fields, values)
 }
 
+const (
+	ANOMALY_CLIENT_RST_FLOW = iota
+	ANOMALY_SERVER_RST_FLOW
+
+	ANOMALY_CLIENT_SYN_REPEAT
+	ANOMALY_SERVER_SYN_ACK_REPEAT
+
+	ANOMALY_CLIENT_HALF_CLOSE_FLOW
+	ANOMALY_SERVER_HALF_CLOSE_FLOW
+
+	ANOMALY_CLIENT_SOURCE_PORT_REUSE
+	ANOMALY_SERVER_RESET
+	ANOMALY_SERVER_QUEUE_LACK
+
+	ANOMALY_CLIENT_ESTABLISH_OTHER_RST
+	ANOMALY_SERVER_ESTABLISH_OTHER_RST
+
+	ANOMALY_TCP_TIMEOUT
+
+	ANOMALY_CLIENT_ESTABLISH_FAIL
+	ANOMALY_SERVER_ESTABLISH_FAIL
+	ANOMALY_TCP_ESTABLISH_FAIL
+
+	ANOMALY_HTTP_CLIENT_ERROR
+	ANOMALY_HTTP_SERVER_ERROR
+	ANOMALY_HTTP_TIMEOUT
+	ANOMALY_HTTP_ERROR
+
+	ANOMALY_DNS_CLIENT_ERROR
+	ANOMALY_DNS_SERVER_ERROR
+	ANOMALY_DNS_TIMEOUT
+	ANOMALY_DNS_ERROR
+)
+
+// Columns列和WriteBlock的列需要按顺序一一对应
+func AnomalyColumns() []*ckdb.Column {
+	return ckdb.NewColumnsWithComment(
+		[][2]string{
+			ANOMALY_CLIENT_RST_FLOW: {"client_rst_flow", "传输-客户端重置"},
+			ANOMALY_SERVER_RST_FLOW: {"server_rst_flow", "传输-服务端重置"},
+
+			ANOMALY_CLIENT_SYN_REPEAT:     {"client_syn_repeat", "建连-客户端SYN结束"},
+			ANOMALY_SERVER_SYN_ACK_REPEAT: {"server_syn_ack_repeat", "建连-服务端SYN结束"},
+
+			ANOMALY_CLIENT_HALF_CLOSE_FLOW: {"client_half_close_flow", "断连-客户端半关"},
+			ANOMALY_SERVER_HALF_CLOSE_FLOW: {"server_half_close_flow", "断连-服务端半关"},
+
+			ANOMALY_CLIENT_SOURCE_PORT_REUSE: {"client_source_port_reuse", "建连-客户端端口复用"},
+			ANOMALY_SERVER_RESET:             {"server_reset", "建连-服务端直接重置"},
+			ANOMALY_SERVER_QUEUE_LACK:        {"server_queue_lack", "传输-服务端队列溢出"},
+
+			ANOMALY_CLIENT_ESTABLISH_OTHER_RST: {"client_establish_other_rst", "建连-客户端其他重置"},
+			ANOMALY_SERVER_ESTABLISH_OTHER_RST: {"server_establish_other_rst", "建连-服务端其他重置"},
+
+			ANOMALY_TCP_TIMEOUT: {"tcp_timeout", "TCP连接超时次数"},
+
+			ANOMALY_CLIENT_ESTABLISH_FAIL: {"client_establish_fail", "TCP客户端建连失败次数"},
+			ANOMALY_SERVER_ESTABLISH_FAIL: {"server_establish_fail", "TCP服务端建连失败次数"},
+			ANOMALY_TCP_ESTABLISH_FAIL:    {"tcp_establish_fail", "TCP建连失败次数"},
+
+			ANOMALY_HTTP_CLIENT_ERROR: {"http_client_error", "HTTP客户端异常次数"},
+			ANOMALY_HTTP_SERVER_ERROR: {"http_server_error", "HTTP服务端异常次数"},
+			ANOMALY_HTTP_TIMEOUT:      {"http_timeout", "HTTP请求超时次数"},
+			ANOMALY_HTTP_ERROR:        {"http_error", "HTTP异常次数"},
+
+			ANOMALY_DNS_CLIENT_ERROR: {"dns_client_error", "DNS客户端错误次数"},
+			ANOMALY_DNS_SERVER_ERROR: {"dns_server_error", "DNS服务端错误次数"},
+			ANOMALY_DNS_TIMEOUT:      {"dns_timeout", "DNS请求超时次数"},
+			ANOMALY_DNS_ERROR:        {"dns_error", "DNS异常次数"},
+		}, ckdb.UInt64)
+}
+
+// WriteBlock的列和AnomalyColumns需要按顺序一一对应
+func (a *Anomaly) WriteBlock(block *ckdb.Block) error {
+	clientFail := a.ClientSynRepeat + a.ClientSourcePortReuse + a.ClientEstablishReset
+	serverFail := a.ServerSYNACKRepeat + a.ServerReset + a.ServerQueueLack + a.ServerEstablishReset
+	values := []uint64{
+		ANOMALY_CLIENT_RST_FLOW: a.ClientRstFlow,
+		ANOMALY_SERVER_RST_FLOW: a.ServerRstFlow,
+
+		ANOMALY_CLIENT_SYN_REPEAT:     a.ClientSynRepeat,
+		ANOMALY_SERVER_SYN_ACK_REPEAT: a.ServerSYNACKRepeat,
+
+		ANOMALY_CLIENT_HALF_CLOSE_FLOW: a.ClientHalfCloseFlow,
+		ANOMALY_SERVER_HALF_CLOSE_FLOW: a.ServerHalfCloseFlow,
+
+		ANOMALY_CLIENT_SOURCE_PORT_REUSE: a.ClientSourcePortReuse,
+		ANOMALY_SERVER_RESET:             a.ServerReset,
+		ANOMALY_SERVER_QUEUE_LACK:        a.ServerQueueLack,
+
+		ANOMALY_CLIENT_ESTABLISH_OTHER_RST: a.ClientEstablishReset,
+		ANOMALY_SERVER_ESTABLISH_OTHER_RST: a.ServerEstablishReset,
+
+		ANOMALY_TCP_TIMEOUT: a.TCPTimeout,
+
+		ANOMALY_CLIENT_ESTABLISH_FAIL: clientFail,
+		ANOMALY_SERVER_ESTABLISH_FAIL: serverFail,
+		ANOMALY_TCP_ESTABLISH_FAIL:    clientFail + serverFail,
+
+		ANOMALY_HTTP_CLIENT_ERROR: a.HTTPClientError,
+		ANOMALY_HTTP_SERVER_ERROR: a.HTTPServerError,
+		ANOMALY_HTTP_TIMEOUT:      a.HTTPTimeout,
+		ANOMALY_HTTP_ERROR:        a.HTTPClientError + a.HTTPServerError,
+
+		ANOMALY_DNS_CLIENT_ERROR: a.DNSClientError,
+		ANOMALY_DNS_SERVER_ERROR: a.DNSServerError,
+		ANOMALY_DNS_TIMEOUT:      a.DNSTimeout,
+		ANOMALY_DNS_ERROR:        a.DNSClientError + a.DNSServerError,
+	}
+	for _, v := range values {
+		if err := block.WriteUInt64(v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type FlowLoad struct {
 	Load uint64 `db:"flow_load"`
 }
@@ -455,6 +792,26 @@ func (l *FlowLoad) MarshalTo(b []byte) int {
 	fields := []string{"flow_load="}
 	values := []uint64{l.Load}
 	return marshalKeyValues(b, fields, values)
+}
+
+const (
+	FLOW_LOAD = iota
+)
+
+func FlowLoadColumns() []*ckdb.Column {
+	return ckdb.NewColumnsWithComment([][2]string{FLOW_LOAD: {"flow_load", "累计活跃连接数"}}, ckdb.UInt64)
+}
+
+func (l *FlowLoad) WriteBlock(block *ckdb.Block) error {
+	values := []uint64{
+		FLOW_LOAD: l.Load,
+	}
+	for _, v := range values {
+		if err := block.WriteUInt64(v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func marshalKeyValues(b []byte, fields []string, values []uint64) int {

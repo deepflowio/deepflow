@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func fillMetrics(hint uint64, m *VTAPUsageMeter) {
+func fillMetrics(hint uint64, m *UsageMeter) {
 	m.PacketTx = hint * 3
 	m.PacketRx = hint * 2
 	m.ByteTx = hint * 97
@@ -18,14 +18,14 @@ func fillMetrics(hint uint64, m *VTAPUsageMeter) {
 }
 
 func TestVTAPMeterEnDecode(t *testing.T) {
-	m := VTAPUsageMeter{}
+	m := UsageMeter{}
 	fillMetrics(1, &m)
 	encoder := codec.SimpleEncoder{}
 	m.Encode(&encoder)
 
 	decoder := codec.SimpleDecoder{}
 	decoder.Init(encoder.Bytes())
-	decoded := VTAPUsageMeter{}
+	decoded := UsageMeter{}
 	decoded.Decode(&decoder)
 
 	if m != decoded {
@@ -34,7 +34,7 @@ func TestVTAPMeterEnDecode(t *testing.T) {
 }
 
 func TestVTAPMeterMerge(t *testing.T) {
-	a := VTAPUsageMeter{}
+	a := UsageMeter{}
 	fillMetrics(1, &a)
 
 	b := a
