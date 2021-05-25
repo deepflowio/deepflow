@@ -29,7 +29,11 @@ func TestInt16Unmarshal(t *testing.T) {
 	for i := math.MinInt16; i <= math.MaxInt16; i++ {
 		v, _ := unmarshalUint16WithSpecialID(marshalUint16WithSpecialID(int16(i)))
 		if int16(i) != v {
-			t.Errorf("序列化反序列化[%d]不正确", i)
+			t.Errorf("Int16序列化反序列化[%d]不正确", i)
+		}
+		v = unmarshalInt32WithSpecialID(marshalInt32WithSpecialID(int16(i)))
+		if int16(i) != v {
+			t.Errorf("Int32序列化反序列化[%d]不正确", i)
 		}
 	}
 }
