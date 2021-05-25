@@ -694,7 +694,7 @@ func getFields(db string) []string {
 	} else if strings.HasPrefix(db, zerodoc.MeterVTAPNames[zerodoc.GEO_ID]) {
 		meter = &zerodoc.GeoMeter{}
 	} else if strings.HasPrefix(db, zerodoc.MeterVTAPNames[zerodoc.PACKET_ID]) {
-		meter = &zerodoc.VTAPUsageMeter{}
+		meter = &zerodoc.UsageMeter{}
 	} else {
 		log.Errorf("db(%s) unsupport get fields", db)
 		return nil
