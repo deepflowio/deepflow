@@ -536,8 +536,12 @@ func (w *InfluxdbWriter) writeInfluxdb(writerInfo *WriterInfo, dbCreateCtl *DBCr
 func (w *InfluxdbWriter) writePrimary(queueID int, pc *PointCache) bool {
 	writerInfo := w.QueueWriterInfosPrimary[queueID]
 
+	writeFailedCount := writerInfo.counter.WriteFailedCount
 	if err := w.writeInfluxdb(writerInfo, &w.DBCreateCtlPrimary, pc); err != nil {
-		log.Errorf("write primary failed. %s", err)
+		// 防止写失败不断打印日志
+		if writeFailedCount == 0 {
+			log.Errorf("write primary failed. %s", err)
+		}
 		w.writeConfidence(pc, PRIMARY_FAILED)
 		releasePointCache(pc)
 		return false
@@ -559,8 +563,12 @@ func (w *InfluxdbWriter) writeReplica(queueID int, pc *PointCache) bool {
 		return false
 	}
 
+	writeFailedCount := writerInfo.counter.WriteFailedCount
 	if err := w.writeInfluxdb(writerInfo, &w.DBCreateCtlReplica, pc); err != nil {
-		log.Errorf("write replica failed. %s", err)
+		// 防止写失败不断打印日志
+		if writeFailedCount == 0 {
+			log.Errorf("write replica failed. %s", err)
+		}
 		if strings.Contains(err.Error(), "max-series-per-database limit exceeded") {
 			w.writeConfidence(pc, SYNC_FAILED_SERIES_EXCEED)
 		} else {
@@ -627,7 +635,10 @@ func (w *InfluxdbWriter) writeConfidence(pc *PointCache, status RepairStatus) {
 
 	if len(confidenceBP.Points()) > 0 {
 		if err := w.PrimaryClient.Write(confidenceBP); err != nil {
-			log.Errorf("httpclient  db(%s) write batch point failed: %s", CONFIDENCE_DB, err)
+			// 写主失败, 不打印写confidence失败日志
+			if status != PRIMARY_FAILED {
+				log.Errorf("httpclient  db(%s) write batch point failed: %s", CONFIDENCE_DB, err)
+			}
 		}
 	}
 }
