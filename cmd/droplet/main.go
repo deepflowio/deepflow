@@ -65,6 +65,7 @@ func main() {
 	logLevel, _ := logging.LogLevel(cfg.LogLevel)
 	logging.SetLevel(logLevel, "")
 	bytes, _ := yaml.Marshal(cfg)
+	log.Info("============================== Launching YUNSHAN DeepFlow Droplet ==============================")
 	log.Infof("base config:\n%s", string(bytes))
 
 	debug.SetIpAndPort(dropletctl.DEBUG_LISTEN_IP, dropletctl.DEBUG_LISTEN_PORT)
