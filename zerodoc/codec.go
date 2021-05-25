@@ -31,7 +31,7 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 	case FLOW_ID:
 		doc.Meter = AcquireFlowMeter()
 	case PACKET_ID, ACL_ID:
-		doc.Meter = AcquireVTAPUsageMeter()
+		doc.Meter = AcquireUsageMeter()
 	default:
 		doc.Release()
 		return nil, errors.New(fmt.Sprintf("Error meter ID %v", meterID))
@@ -64,7 +64,7 @@ func DecodeForQueueMonitor(decoder *codec.SimpleDecoder) (*app.Document, error) 
 	case FLOW_ID:
 		doc.Meter = &FlowMeter{}
 	case PACKET_ID, ACL_ID:
-		doc.Meter = &VTAPUsageMeter{}
+		doc.Meter = &UsageMeter{}
 	default:
 		return nil, errors.New(fmt.Sprintf("Error meter ID %d", meterID))
 	}
