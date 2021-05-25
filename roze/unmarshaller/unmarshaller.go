@@ -16,6 +16,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/store"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
+	"gitlab.x.lan/yunshan/droplet/roze/dbwriter"
 	"gitlab.x.lan/yunshan/droplet/roze/msg"
 )
 
@@ -69,6 +70,7 @@ type Unmarshaller struct {
 	unmarshallQueue    queue.QueueReader
 	influxdbWriter     *store.InfluxdbWriter
 	influxdbWriterS1   *store.InfluxdbWriter
+	dbwriter           *dbwriter.DbWriter
 	storeQueueNum      int
 	queueBatchCaches   []QueueCache
 	queueBatchCachesS1 []QueueCache
@@ -78,7 +80,7 @@ type Unmarshaller struct {
 	utils.Closable
 }
 
-func NewUnmarshaller(index int, disableSecondWrite, disableVtapPacket bool, unmarshallQueue queue.QueueReader, influxdbWriter, influxdbWriterS1 *store.InfluxdbWriter, storeQueueNum int) *Unmarshaller {
+func NewUnmarshaller(index int, disableSecondWrite, disableVtapPacket bool, unmarshallQueue queue.QueueReader, influxdbWriter, influxdbWriterS1 *store.InfluxdbWriter, dbwriter *dbwriter.DbWriter, storeQueueNum int) *Unmarshaller {
 	queueBatchCaches := make([]QueueCache, storeQueueNum)
 	queueBatchCachesS1 := make([]QueueCache, storeQueueNum)
 	queueAggrCaches := make([]QueueCache, storeQueueNum)
@@ -100,6 +102,7 @@ func NewUnmarshaller(index int, disableSecondWrite, disableVtapPacket bool, unma
 		counter:            &Counter{MaxDelay: -3600, MinDelay: 3600},
 		influxdbWriter:     influxdbWriter,
 		influxdbWriterS1:   influxdbWriterS1,
+		dbwriter:           dbwriter,
 	}
 }
 
@@ -177,10 +180,16 @@ func (u *Unmarshaller) putStoreQueue(index uint32, si *msg.RozeDocument) {
 		writer = u.influxdbWriter
 	}
 
+	if u.dbwriter != nil {
+		si.AddReferenceCount()
+	}
 	queueCache.values = append(queueCache.values, si)
 
 	if len(queueCache.values) >= QUEUE_BATCH_SIZE {
 		writer.Put(int(index), queueCache.values...)
+		if u.dbwriter != nil {
+			u.dbwriter.Put(queueCache.values...)
+		}
 		queueCache.values = queueCache.values[:0]
 	}
 }
@@ -191,10 +200,16 @@ func (u *Unmarshaller) flushStoreQueues() {
 		queueCacheS1 := &u.queueBatchCachesS1[i]
 		if len(queueCache.values) > 0 {
 			u.influxdbWriter.Put(i, queueCache.values...)
+			if u.dbwriter != nil {
+				u.dbwriter.Put(queueCache.values...)
+			}
 			queueCache.values = queueCache.values[:0]
 		}
 		if len(queueCacheS1.values) > 0 {
 			u.influxdbWriterS1.Put(i, queueCacheS1.values...)
+			if u.dbwriter != nil {
+				u.dbwriter.Put(queueCache.values...)
+			}
 			queueCacheS1.values = queueCacheS1.values[:0]
 		}
 	}

@@ -1,8 +1,45 @@
 package common
 
 const (
-	L4_FLOW_LOG = "l4_flow_log"
-	L7_HTTP_LOG = "l7_http_log"
-	L7_DNS_LOG  = "l7_dns_log"
+	FLOW_LOG_DB = "flow_log"
 	LOG_SUFFIX  = "__0_*"
 )
+
+type FlowLogID uint8
+
+const (
+	L4_FLOW_ID FlowLogID = iota
+	L7_HTTP_ID
+	L7_DNS_ID
+	FLOWLOG_ID_MAX
+)
+
+var flowLogNames = []string{
+	L4_FLOW_ID: "l4_flow_log",
+	L7_HTTP_ID: "l7_http_log",
+	L7_DNS_ID:  "l7_dns_log",
+}
+
+var flowLogTimeKey = []string{
+	L4_FLOW_ID: "start_time",
+	L7_HTTP_ID: "time",
+	L7_DNS_ID:  "time",
+}
+
+func (l FlowLogID) String() string {
+	return flowLogNames[l]
+}
+
+func (l FlowLogID) TimeKey() string {
+	return flowLogTimeKey[l]
+}
+
+func FlowLogNameToID(name string) FlowLogID {
+	for i, n := range flowLogNames {
+		if name == n {
+			return FlowLogID(i)
+		}
+	}
+
+	return FLOWLOG_ID_MAX
+}

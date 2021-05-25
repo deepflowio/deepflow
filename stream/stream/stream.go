@@ -36,14 +36,15 @@ type Stream struct {
 }
 
 type Logger struct {
-	Config     *config.Config
-	Decoders   []*decoder.Decoder
-	Throttlers []*throttler.ThrottlingQueue
-	ESWriters  []*dbwriter.ESWriter
-	Broker     *pusher.FlowSender
+	Config        *config.Config
+	Decoders      []*decoder.Decoder
+	Throttlers    []*throttler.ThrottlingQueue
+	ESWriters     []*dbwriter.ESWriter
+	Broker        *pusher.FlowSender
+	FlowLogWriter *dbwriter.FlowLogWriter
 }
 
-func NewStream(config *config.Config, recv *receiver.Receiver) *Stream {
+func NewStream(config *config.Config, recv *receiver.Receiver) (*Stream, error) {
 	manager := dropletqueue.NewManager(dropletctl.DROPLETCTL_STREAM_QUEUE)
 	controllers := make([]net.IP, len(config.ControllerIPs))
 	for i, ipString := range config.ControllerIPs {
@@ -55,13 +56,18 @@ func NewStream(config *config.Config, recv *receiver.Receiver) *Stream {
 	platformdata.New(controllers, config.ControllerPort, "stream", nil)
 	geo.NewGeoTree()
 
-	flowLogger := NewFlowLogger(config, manager, recv)
-	protoLogger := NewProtoLogger(config, manager, recv)
+	flowLogWriter, err := dbwriter.NewFlowLogWriter(config.CKDB.Primary, config.CKDB.Secondary, config.CKAuth.User, config.CKAuth.Password, config.ReplicaEnabled, config.CKWriterConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	flowLogger, err := NewFlowLogger(config, manager, recv, flowLogWriter)
+	protoLogger := NewProtoLogger(config, manager, recv, flowLogWriter)
 	return &Stream{
 		StreamConfig: config,
 		FlowLogger:   flowLogger,
 		ProtoLogger:  protoLogger,
-	}
+	}, nil
 }
 
 func newESWriter(config *config.Config, appName string, esQueue queue.QueueReader) *dbwriter.ESWriter {
@@ -84,7 +90,7 @@ func newESWriter(config *config.Config, appName string, esQueue queue.QueueReade
 	}
 }
 
-func NewFlowLogger(config *config.Config, manager *dropletqueue.Manager, recv *receiver.Receiver) *Logger {
+func NewFlowLogger(config *config.Config, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter) (*Logger, error) {
 	msgType := datatype.MESSAGE_TYPE_TAGGEDFLOW
 	queueCount := config.DecoderQueueCount
 	queueSuffix := "-l4"
@@ -128,10 +134,12 @@ func NewFlowLogger(config *config.Config, manager *dropletqueue.Manager, recv *r
 		throttlers[i] = throttler.NewThrottlingQueue(
 			throttle,
 			queue.QueueWriter(esWriterQueues.FixedMultiQueue[i]),
+			flowLogWriter,
 		)
-		esWriters[i] = newESWriter(config, common.L4_FLOW_LOG, queue.QueueReader(esWriterQueues.FixedMultiQueue[i]))
+		esWriters[i] = newESWriter(config, common.L4_FLOW_ID.String(), queue.QueueReader(esWriterQueues.FixedMultiQueue[i]))
 		decoders[i] = decoder.NewDecoder(
 			i,
+			config.ShardID,
 			msgType,
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			throttlers[i],
@@ -142,16 +150,17 @@ func NewFlowLogger(config *config.Config, manager *dropletqueue.Manager, recv *r
 		)
 	}
 	return &Logger{
-		Config:     config,
-		Decoders:   decoders,
-		Throttlers: throttlers,
-		ESWriters:  esWriters,
-		Broker:     broker,
-	}
+		Config:        config,
+		Decoders:      decoders,
+		Throttlers:    throttlers,
+		ESWriters:     esWriters,
+		FlowLogWriter: flowLogWriter,
+		Broker:        broker,
+	}, nil
 
 }
 
-func NewProtoLogger(config *config.Config, manager *dropletqueue.Manager, recv *receiver.Receiver) *Logger {
+func NewProtoLogger(config *config.Config, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter) *Logger {
 	queueSuffix := "-l7"
 	queueCount := config.DecoderQueueCount
 	msgType := datatype.MESSAGE_TYPE_PROTOCOLLOG
@@ -191,15 +200,18 @@ func NewProtoLogger(config *config.Config, manager *dropletqueue.Manager, recv *
 		httpThrottlers[i] = throttler.NewThrottlingQueue(
 			httpThrottle,
 			queue.QueueWriter(httpEsWriterQueues.FixedMultiQueue[i]),
+			flowLogWriter,
 		)
 		dnsThrottlers[i] = throttler.NewThrottlingQueue(
 			dnsThrottle,
 			queue.QueueWriter(dnsEsWriterQueues.FixedMultiQueue[i]),
+			flowLogWriter,
 		)
-		httpEsWriters[i] = newESWriter(config, common.L7_HTTP_LOG, queue.QueueReader(httpEsWriterQueues.FixedMultiQueue[i]))
-		dnsEsWriters[i] = newESWriter(config, common.L7_DNS_LOG, queue.QueueReader(dnsEsWriterQueues.FixedMultiQueue[i]))
+		httpEsWriters[i] = newESWriter(config, common.L7_HTTP_ID.String(), queue.QueueReader(httpEsWriterQueues.FixedMultiQueue[i]))
+		dnsEsWriters[i] = newESWriter(config, common.L7_DNS_ID.String(), queue.QueueReader(dnsEsWriterQueues.FixedMultiQueue[i]))
 		decoders[i] = decoder.NewDecoder(
 			i,
+			config.ShardID,
 			msgType,
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			nil,

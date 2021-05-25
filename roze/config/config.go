@@ -16,6 +16,7 @@ var ShardID string
 
 const (
 	DefaultPrimaryInfluxdbHTTPAddr = "http://127.0.0.1:20044"
+	DefaultCKPrimaryAddr           = "tcp://127.0.0.1:9000"
 	DefaultStoreQueueCount         = 4
 	DefaultStoreQueueSize          = 131072
 	DefaultStoreBatchBufferSize    = 65536
@@ -42,9 +43,14 @@ type RetentionPolicy struct {
 	ShardDurationS1 string `yaml:"shard-duration-s1"`
 }
 
-type TSDBAddrs struct {
+type DBAddrs struct {
 	Primary string `yaml:"primary"`
 	Replica string `yaml:"replica"`
+}
+
+type CKAddrs struct {
+	Primary   string `yaml:"primary"`
+	Secondary string `yaml:"secondary"` // 既可以是primary也可以是replica
 }
 
 type Auth struct {
@@ -56,9 +62,20 @@ type PCapConfig struct {
 	FileDirectory string `yaml:"file-directory"`
 }
 
+type CKWriterConfig struct {
+	QueueCount   int `yaml:"queue-count"`
+	QueueSize    int `yaml:"queue-size"`
+	BatchSize    int `yaml:"batch-size"`
+	FlushTimeout int `yaml:"flush-timeout"`
+}
+
 type Config struct {
 	ShardID                   int             `yaml:"shard-id"`
-	TSDB                      TSDBAddrs       `yaml:"tsdb"`
+	TSDB                      DBAddrs         `yaml:"tsdb"`
+	CKDB                      CKAddrs         `yaml:"ckdb"`
+	CKDBAuth                  Auth            `yaml:"ckdb-auth"`
+	ReplicaEnabled            bool            `yaml:"metrics-replica-enabled"`
+	CKWriterConfig            CKWriterConfig  `yaml:"metrics-ck-wirter"`
 	TSDBDataPath              string          `yaml:"tsdb-data-path"`
 	Pcap                      PCapConfig      `yaml:"pcap"`
 	TSDBAuth                  Auth            `yaml:"tsdb-auth"`
@@ -97,6 +114,10 @@ func (c *Config) Validate() error {
 		return errors.New("in 'tsdb' config, 'primary' is equal to 'replica', it is not allowed")
 	}
 
+	if c.ReplicaEnabled && c.CKDB.Secondary == "" {
+		return errors.New("'metrics-replica-enabled' is true, but 'ckdb.secondary' is empty")
+	}
+
 	if c.ReceiverWindowSize < 64 || c.ReceiverWindowSize > 64*1024 {
 		c.ReceiverWindowSize = DefaultReceiverWindowSize
 	}
@@ -107,7 +128,9 @@ func (c *Config) Validate() error {
 func Load(path string) *Config {
 	config := &Config{
 		ControllerPort:            DefaultControllerPort,
-		TSDB:                      TSDBAddrs{DefaultPrimaryInfluxdbHTTPAddr, ""},
+		TSDB:                      DBAddrs{DefaultPrimaryInfluxdbHTTPAddr, ""},
+		CKDB:                      CKAddrs{DefaultCKPrimaryAddr, ""},
+		CKWriterConfig:            CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
 		UnmarshallQueueCount:      DefaultUnmarshallQueueCount,
 		UnmarshallQueueSize:       DefaultUnmarshallQueueSize,
 		StoreQueueCount:           DefaultStoreQueueCount,

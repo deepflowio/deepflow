@@ -14,8 +14,9 @@ import (
 
 const (
 	EdgeCode    = zerodoc.IPPath | zerodoc.L3EpcIDPath
-	MainAddCode = zerodoc.RegionID | zerodoc.HostID | zerodoc.L3Device | zerodoc.SubnetID | zerodoc.PodNodeID | zerodoc.AZID | zerodoc.PodGroupID | zerodoc.PodNSID | zerodoc.PodID | zerodoc.PodClusterID
-	EdgeAddCode = zerodoc.RegionIDPath | zerodoc.HostIDPath | zerodoc.L3DevicePath | zerodoc.SubnetIDPath | zerodoc.PodNodeIDPath | zerodoc.AZIDPath | zerodoc.PodGroupIDPath | zerodoc.PodNSIDPath | zerodoc.PodIDPath | zerodoc.PodClusterIDPath
+	MainAddCode = zerodoc.RegionID | zerodoc.HostID | zerodoc.L3Device | zerodoc.SubnetID | zerodoc.PodNodeID | zerodoc.AZID | zerodoc.PodGroupID | zerodoc.PodNSID | zerodoc.PodID | zerodoc.PodClusterID | zerodoc.BusinessIDs | zerodoc.GroupIDs
+	EdgeAddCode = zerodoc.RegionIDPath | zerodoc.HostIDPath | zerodoc.L3DevicePath | zerodoc.SubnetIDPath | zerodoc.PodNodeIDPath | zerodoc.AZIDPath | zerodoc.PodGroupIDPath | zerodoc.PodNSIDPath | zerodoc.PodIDPath | zerodoc.PodClusterIDPath | zerodoc.BusinessIDsPath | zerodoc.GroupIDsPath
+	PortAddCode = zerodoc.IsKeyService
 )
 
 func releaseRozeDocument(rd *msg.RozeDocument) {
@@ -37,6 +38,9 @@ func DocToRozeDocuments(doc *app.Document) *msg.RozeDocument {
 
 	var info, info1 *grpc.Info
 	myRegionID := uint16(pf.PlatformData.QueryRegionID())
+	if t.Code&zerodoc.ServerPort == zerodoc.ServerPort {
+		t.Code |= PortAddCode
+	}
 	if t.Code&EdgeCode == EdgeCode {
 		t.Code |= EdgeAddCode
 
@@ -69,15 +73,19 @@ func DocToRozeDocuments(doc *app.Document) *msg.RozeDocument {
 		if info1 != nil {
 			t.RegionID1 = uint16(info1.RegionID)
 			t.HostID1 = uint16(info1.HostID)
-			t.L3DeviceID1 = uint16(info1.DeviceID)
+			t.L3DeviceID1 = info1.DeviceID
 			t.L3DeviceType1 = zerodoc.DeviceType(info1.DeviceType)
 			t.SubnetID1 = uint16(info1.SubnetID)
-			t.PodNodeID1 = uint16(info1.PodNodeID)
+			t.PodNodeID1 = info1.PodNodeID
 			t.PodNSID1 = uint16(info1.PodNSID)
 			t.AZID1 = uint16(info1.AZID)
-			t.PodGroupID1 = int16(info1.PodGroupID)
-			t.PodID1 = uint16(info1.PodID)
+			t.PodGroupID1 = info1.PodGroupID
+			t.PodID1 = info1.PodID
 			t.PodClusterID1 = uint16(info1.PodClusterID)
+			// FIXME 后续补充
+			t.BusinessIDs1 = []uint16{1, 2}
+			t.GroupIDs1 = []uint16{2, 3}
+			t.IsKeyService = 1
 			if info == nil {
 				var ip0 net.IP
 				if t.IsIPv6 != 0 {
@@ -118,15 +126,19 @@ func DocToRozeDocuments(doc *app.Document) *msg.RozeDocument {
 	if info != nil {
 		t.RegionID = uint16(info.RegionID)
 		t.HostID = uint16(info.HostID)
-		t.L3DeviceID = uint16(info.DeviceID)
+		t.L3DeviceID = info.DeviceID
 		t.L3DeviceType = zerodoc.DeviceType(info.DeviceType)
 		t.SubnetID = uint16(info.SubnetID)
-		t.PodNodeID = uint16(info.PodNodeID)
+		t.PodNodeID = info.PodNodeID
 		t.PodNSID = uint16(info.PodNSID)
 		t.AZID = uint16(info.AZID)
-		t.PodGroupID = int16(info.PodGroupID)
-		t.PodID = uint16(info.PodID)
+		t.PodGroupID = info.PodGroupID
+		t.PodID = info.PodID
 		t.PodClusterID = uint16(info.PodClusterID)
+		// FIXME 后续补充
+		t.BusinessIDs = []uint16{1, 2, 3}
+		t.GroupIDs = []uint16{2, 3, 4}
+		t.IsKeyService = 0
 		if info1 == nil && (t.Code&EdgeCode == EdgeCode) {
 			var ip1 net.IP
 			if t.IsIPv6 != 0 {

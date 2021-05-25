@@ -8,6 +8,7 @@ import (
 	logging "github.com/op/go-logging"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.x.lan/yunshan/droplet-libs/ckdb"
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	"gitlab.x.lan/yunshan/droplet-libs/store"
 	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
@@ -226,6 +227,21 @@ func (rd *RozeDocument) MarshalToBytes(buffer []byte) int {
 
 func (rd *RozeDocument) Release() {
 	ReleaseRozeDocument(rd)
+}
+
+func (rd *RozeDocument) WriteBlock(block *ckdb.Block) error {
+	if err := rd.Tag.(*zerodoc.Tag).WriteBlock(block, rd.Timestamp); err != nil {
+		return err
+	}
+	if err := rd.Meter.WriteBlock(block); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (rd *RozeDocument) TableID() (uint8, error) {
+	tag, _ := rd.Tag.(*zerodoc.Tag)
+	return tag.TableID((rd.Document.Flags & app.FLAG_PER_SECOND_METRICS) == 1)
 }
 
 func (rd *RozeDocument) GetShardID() string {
