@@ -3,6 +3,7 @@ module gitlab.x.lan/yunshan/droplet
 go 1.13
 
 require (
+	github.com/ClickHouse/clickhouse-go v1.4.5
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/fortytw2/leaktest v1.3.0 // indirect
 	github.com/gogo/protobuf v1.3.0
@@ -15,8 +16,8 @@ require (
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/pebbe/zmq4 v1.0.0
 	github.com/spf13/cobra v0.0.5
-	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20210610075558-4c8f20f0f52e
-	gitlab.x.lan/yunshan/message v0.0.0-20210223150508-58c505ce970f
+	gitlab.x.lan/yunshan/droplet-libs v0.0.0-20210630031241-c02bf004024b
+	gitlab.x.lan/yunshan/message v0.0.0-20210615073017-15a80f4cae31
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859
 	google.golang.org/genproto v0.0.0-20190626174449-989357319d63 // indirect
 	google.golang.org/grpc v1.21.1

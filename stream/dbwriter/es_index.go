@@ -54,14 +54,15 @@ var simple_long_property = map[string]interface{}{"type": "long", "store": true,
 var simple_integer_property = map[string]interface{}{"type": "integer", "store": true, "index": false}
 var simple_string_property = map[string]interface{}{"type": "keyword", "store": true, "index": false}
 var simple_boolean_property = map[string]interface{}{"type": "boolean", "store": true, "index": false}
+var simple_ip_property = map[string]interface{}{"type": "ip", "store": true, "index": false}
 
 var DFMappings = make(map[string]string)
 var DFMappingsJson = make(map[string]map[string]interface{})
 
 func init() {
-	DFMappingsJson[common.L4_FLOW_LOG] = DFI_FLOW
-	DFMappingsJson[common.L7_HTTP_LOG] = DFI_HTTP
-	DFMappingsJson[common.L7_DNS_LOG] = DFI_DNS
+	DFMappingsJson[common.L4_FLOW_ID.String()] = DFI_FLOW
+	DFMappingsJson[common.L7_HTTP_ID.String()] = DFI_HTTP
+	DFMappingsJson[common.L7_DNS_ID.String()] = DFI_DNS
 
 	for k, v := range DFMappingsJson {
 		if jsonStr, err := json.Marshal(v); err != nil {
@@ -80,21 +81,17 @@ var DFI_FLOW = map[string]interface{}{
 		"dynamic": true,
 		"properties": map[string]interface{}{
 			// 链路层
-			"mac_0":          simple_string_property,
-			"mac_1":          simple_string_property,
-			"eth_type":       integer_property,
-			"cast_types_0":   string_property,
-			"cast_types_1":   string_property,
-			"packet_sizes_0": string_property,
-			"packet_sizes_1": string_property,
-			"vlan":           simple_integer_property,
+			"mac_0":    simple_long_property,
+			"mac_1":    simple_long_property,
+			"eth_type": integer_property,
+			"vlan":     simple_integer_property,
 
 			// 网络层
-			"ip_0":           ip_property,
-			"ip_1":           ip_property,
-			"real_ip_0":      simple_string_property,
-			"real_ip_1":      simple_string_property,
-			"ip_version":     integer_property,
+			"ip4_0":          ip_property,
+			"ip4_1":          ip_property,
+			"ip6_0":          ip_property,
+			"ip6_1":          ip_property,
+			"is_ipv4":        boolean_property,
 			"protocol":       integer_property,
 			"tunnel_tier":    simple_integer_property,
 			"tunnel_type":    simple_integer_property,
@@ -104,19 +101,15 @@ var DFI_FLOW = map[string]interface{}{
 			"tunnel_rx_id":   simple_integer_property,
 			"tunnel_rx_ip_0": simple_string_property,
 			"tunnel_rx_ip_1": simple_string_property,
-			"ttls_0":         string_property,
-			"ttls_1":         string_property,
 
 			// 传输层
 			"client_port":     integer_property,
 			"server_port":     integer_property,
-			"tcp_flags_0":     integer_property,
-			"tcp_flags_1":     integer_property,
 			"tcp_flags_bit_0": simple_integer_property,
 			"tcp_flags_bit_1": simple_integer_property,
 
 			// 应用层
-			"l7_protocol": string_property,
+			"l7_protocol": integer_property,
 
 			// 广域网
 			"province_0": string_property,
@@ -153,12 +146,10 @@ var DFI_FLOW = map[string]interface{}{
 			// 流信息
 			"close_type":  integer_property,
 			"flow_source": simple_integer_property,
-			"flow_id_str": string_property,
+			"flow_id_str": long_property,
 			"tap_type":    integer_property,
-			"tap_port":    string_property,
+			"tap_port":    integer_property,
 			"vtap_id":     integer_property,
-			"tap_side_0":  boolean_property,
-			"tap_side_1":  boolean_property,
 			"l2_end_0":    simple_boolean_property,
 			"l2_end_1":    simple_boolean_property,
 			"l3_end_0":    simple_boolean_property,
@@ -212,10 +203,10 @@ var DFI_HTTP = map[string]interface{}{
 		"dynamic": true,
 		"properties": map[string]interface{}{
 			// 网络层
-			"ip_0":      ip_property,
-			"ip_1":      ip_property,
-			"real_ip_0": simple_string_property,
-			"real_ip_1": simple_string_property,
+			"ip4_0": ip_property,
+			"ip4_1": ip_property,
+			"ip6_0": ip_property,
+			"ip6_1": ip_property,
 
 			// 传输层
 			"client_port": integer_property,
@@ -250,23 +241,25 @@ var DFI_HTTP = map[string]interface{}{
 			"subnet_id_1":      integer_property,
 
 			// 流信息
-			"flow_id_str":  string_property,
-			"tap_type":     integer_property,
-			"tap_port":     string_property,
-			"vtap_id":      integer_property,
-			"timestamp":    long_property,
-			"timestamp_ms": epoch_millis_property,
+			"flow_id_str": long_property,
+			"tap_type":    integer_property,
+			"tap_port":    string_property,
+			"vtap_id":     integer_property,
+			"timestamp":   long_property,
+			"time":        epoch_property,
 
 			// 应用层HTTP
-			"type":        simple_string_property,
-			"version":     simple_string_property,
-			"method":      simple_string_property,
-			"client_ip":   simple_string_property,
-			"host":        simple_string_property,
-			"path":        simple_string_property,
-			"stream_id":   simple_long_property,
-			"trace_id":    simple_string_property,
-			"status_code": simple_integer_property,
+			"type":           simple_integer_property,
+			"version":        simple_integer_property,
+			"method":         simple_string_property,
+			"client_ip4":     simple_ip_property,
+			"client_ip6":     simple_ip_property,
+			"client_is_ipv4": simple_boolean_property,
+			"host":           simple_string_property,
+			"path":           simple_string_property,
+			"stream_id":      simple_long_property,
+			"trace_id":       simple_string_property,
+			"status_code":    simple_integer_property,
 
 			// 指标量
 			"content_length": simple_long_property,
@@ -283,10 +276,11 @@ var DFI_DNS = map[string]interface{}{
 		"dynamic": true,
 		"properties": map[string]interface{}{
 			// 网络层
-			"ip_0":      ip_property,
-			"ip_1":      ip_property,
-			"real_ip_0": simple_string_property,
-			"real_ip_1": simple_string_property,
+			"ip4_0":   ip_property,
+			"ip4_1":   ip_property,
+			"ip6_0":   ip_property,
+			"ip6_1":   ip_property,
+			"is_ipv4": boolean_property,
 
 			// 传输层
 			"client_port": integer_property,
@@ -321,15 +315,15 @@ var DFI_DNS = map[string]interface{}{
 			"subnet_id_1":      integer_property,
 
 			// 留信息
-			"flow_id_str":  string_property,
-			"tap_type":     integer_property,
-			"tap_port":     string_property,
-			"vtap_id":      integer_property,
-			"timestamp":    long_property,
-			"timestamp_ms": epoch_millis_property,
+			"flow_id_str": string_property,
+			"tap_type":    integer_property,
+			"tap_port":    integer_property,
+			"vtap_id":     integer_property,
+			"timestamp":   long_property,
+			"time":        epoch_property,
 
 			// 应用层DNS
-			"type":        simple_string_property,
+			"type":        simple_integer_property,
 			"id":          simple_integer_property,
 			"domain_name": simple_string_property,
 			"query_type":  simple_integer_property,

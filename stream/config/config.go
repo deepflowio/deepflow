@@ -16,6 +16,7 @@ const (
 	DefaultControllerIP      = "127.0.0.1"
 	DefaultControllerPort    = 20035
 	DefaultESHostPort        = "127.0.0.1:20042"
+	DefaultCKPrimaryAddr     = "tcp://127.0.0.1:9000"
 	DefaultThrottle          = 1000
 	DefaultOpLoadFactor      = 10
 	DefaultRPSplitSize       = 86400 // 1天
@@ -29,33 +30,54 @@ const (
 	DefaultBrokerZMQHWM      = 1000
 )
 
-type ESAuth struct {
+type Auth struct {
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
 }
+type DBAddr struct {
+	Primary string `yaml:"primary"`
+	Replica string `yaml:"replica"`
+}
+
+type CKAddr struct {
+	Primary   string `yaml:"primary"`
+	Secondary string `yaml:"secondary"`
+}
+
+type CKWriterConfig struct {
+	QueueCount   int `yaml:"queue-count"`
+	QueueSize    int `yaml:"queue-size"`
+	BatchSize    int `yaml:"batch-size"`
+	FlushTimeout int `yaml:"flush-timeout"`
+}
 
 type Config struct {
-	ControllerIPs     []string `yaml:"controller-ips"`
-	ControllerPort    int      `yaml:"controller-port"`
-	ESHostPorts       []string `yaml:"es-host-port"`
-	ESAuth            ESAuth   `yaml:"es-auth"`
-	ESReplica         int      `yaml:"es-number-of-replica"`
-	ESTiering         bool     `yaml:"es-tiering"`
-	Throttle          int      `yaml:"throttle"`
-	L4Throttle        int      `yaml:"l4-throttle"`
-	L7HTTPThrottle    int      `yaml:"l7-http-throttle"`
-	L7DNSThrottle     int      `yaml:"l7-dns-throttle"`
-	OpLoadFactor      int      `yaml:"op-load-factor"`
-	RPSplitSize       int      `yaml:"rp-split-size"`
-	RPSlots           int      `yaml:"rp-slots"`
-	RPAliveSlots      int      `yaml:"rp-alive-slots"`
-	DecoderQueueCount int      `yaml:"decoder-queue-count"`
-	DecoderQueueSize  int      `yaml:"decoder-queue-size"`
-	BrokerQueueSize   int      `yaml:"broker-queue-size"`
-	BrokerZMQIP       string   `yaml:"broker-zmq-ip"`
-	BrokerZMQPort     int      `yaml:"broker-zmq-port"`
-	BrokerZMQHWM      int      `yaml:"broker-zmq-hwm"`
-	BrokerEnabled     bool     `yaml:"broker-enabled"`
+	ShardID           int            `yaml:"shard-id"`
+	ControllerIPs     []string       `yaml:"controller-ips"`
+	ControllerPort    int            `yaml:"controller-port"`
+	ESHostPorts       []string       `yaml:"es-host-port"`
+	ESAuth            Auth           `yaml:"es-auth"`
+	ESReplica         int            `yaml:"es-number-of-replica"`
+	CKDB              CKAddr         `yaml:"ckdb"`
+	CKAuth            Auth           `yaml:"ck-auth"`
+	ReplicaEnabled    bool           `yaml:"flowlog-replica-enabled"`
+	CKWriterConfig    CKWriterConfig `yaml:"metrics-ck-wirter"`
+	ESTiering         bool           `yaml:"es-tiering"`
+	Throttle          int            `yaml:"throttle"`
+	L4Throttle        int            `yaml:"l4-throttle"`
+	L7HTTPThrottle    int            `yaml:"l7-http-throttle"`
+	L7DNSThrottle     int            `yaml:"l7-dns-throttle"`
+	OpLoadFactor      int            `yaml:"op-load-factor"`
+	RPSplitSize       int            `yaml:"rp-split-size"`
+	RPSlots           int            `yaml:"rp-slots"`
+	RPAliveSlots      int            `yaml:"rp-alive-slots"`
+	DecoderQueueCount int            `yaml:"decoder-queue-count"`
+	DecoderQueueSize  int            `yaml:"decoder-queue-size"`
+	BrokerQueueSize   int            `yaml:"broker-queue-size"`
+	BrokerZMQIP       string         `yaml:"broker-zmq-ip"`
+	BrokerZMQPort     int            `yaml:"broker-zmq-port"`
+	BrokerZMQHWM      int            `yaml:"broker-zmq-hwm"`
+	BrokerEnabled     bool           `yaml:"broker-enabled"`
 }
 
 func (c *Config) Validate() error {
@@ -69,6 +91,10 @@ func (c *Config) Validate() error {
 		c.DecoderQueueCount = DefaultDecoderQueueCount
 	}
 
+	if c.ReplicaEnabled && c.CKDB.Secondary == "" {
+		return errors.New("'flowlog-replica-enabled' is 'true', but 'ckdb.secondary' is empty")
+	}
+
 	return nil
 }
 
@@ -76,6 +102,7 @@ func Load(path string) *Config {
 	config := &Config{
 		ControllerPort:    DefaultControllerPort,
 		ESHostPorts:       []string{DefaultESHostPort},
+		CKDB:              CKAddr{DefaultCKPrimaryAddr, ""},
 		Throttle:          DefaultThrottle,
 		OpLoadFactor:      DefaultOpLoadFactor,
 		RPSplitSize:       int(DefaultRPSplitSize),
@@ -87,6 +114,7 @@ func Load(path string) *Config {
 		BrokerZMQIP:       DefaultBrokerZMQIP,
 		BrokerZMQPort:     DefaultBrokerZMQPort,
 		BrokerZMQHWM:      DefaultBrokerZMQHWM,
+		CKWriterConfig:    CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		log.Info("no config file, use defaults")

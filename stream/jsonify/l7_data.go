@@ -4,64 +4,273 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
+	"gitlab.x.lan/yunshan/droplet-libs/ckdb"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/grpc"
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
+	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	pf "gitlab.x.lan/yunshan/droplet/stream/platformdata"
 )
 
 type L7Base struct {
+	// 知识图谱
+	KnowledgeGraph
+
 	// 网络层
-	IP0     string `json:"ip_0"` // 广域网IP为0.0.0.0或::
-	IP1     string `json:"ip_1"`
-	RealIP0 string `json:"real_ip_0"`
-	RealIP1 string `json:"real_ip_1"`
+	IP40   uint32 `json:"ip4_0"`
+	IP41   uint32 `json:"ip4_1"`
+	IP60   net.IP `json:"ip6_0"`
+	IP61   net.IP `json:"ip6_1"`
+	IsIPv4 bool   `json:"is_ipv4"`
 
 	// 传输层
 	ClientPort uint16 `json:"client_port"`
 	ServerPort uint16 `json:"server_port"`
 
-	// 知识图谱
-	KnowledgeGraph
-
 	// 流信息
-	FlowIDStr   string `json:"flow_id_str"`
-	TapType     uint16 `json:"tap_type"`
-	TapPort     string `json:"tap_port"` // 显示为固定八个字符的16进制如'01234567'
-	VtapID      uint16 `json:"vtap_id"`
-	Timestamp   uint64 `json:"timestamp"`    // us
-	TimestampMs uint64 `json:"timestamp_ms"` // ms, kibana不支持微秒的展示，增加毫秒字段
+	FlowIDStr uint64 `json:"flow_id_str"`
+	TapType   uint16 `json:"tap_type"`
+	TapPort   uint32 `json:"tap_port"` // 显示为固定八个字符的16进制如'01234567'
+	VtapID    uint16 `json:"vtap_id"`
+	Timestamp uint64 `json:"timestamp"` // us
+	Time      uint32 `json:"time"`      // 秒，用来淘汰过期数据
+}
+
+func L7BaseColumns() []*ckdb.Column {
+	columns := []*ckdb.Column{}
+	// 知识图谱
+	columns = append(columns, KnowledgeGraphColumns...)
+	columns = append(columns,
+		// 网络层
+		ckdb.NewColumn("ip4_0", ckdb.IPv4),
+		ckdb.NewColumn("ip4_1", ckdb.IPv4),
+		ckdb.NewColumn("ip6_0", ckdb.IPv6),
+		ckdb.NewColumn("ip6_1", ckdb.IPv6),
+		ckdb.NewColumn("is_ipv4", ckdb.UInt8),
+
+		// 传输层
+		ckdb.NewColumn("client_port", ckdb.UInt16),
+		ckdb.NewColumn("server_port", ckdb.UInt16),
+
+		// 流信息
+		ckdb.NewColumn("flow_id_str", ckdb.UInt64),
+		ckdb.NewColumn("tap_type", ckdb.UInt16),
+		ckdb.NewColumn("tap_port", ckdb.UInt32),
+		ckdb.NewColumn("vtap_id", ckdb.UInt16),
+		ckdb.NewColumn("timestamp", ckdb.UInt64).SetCodec(ckdb.CodecDoubleDelta),
+		ckdb.NewColumn("time", ckdb.DateTime),
+	)
+
+	return columns
+}
+
+func (f *L7Base) WriteBlock(block *ckdb.Block) error {
+	if err := f.KnowledgeGraph.WriteBlock(block); err != nil {
+		return err
+	}
+
+	if err := block.WriteUInt32(f.IP40); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(f.IP41); err != nil {
+		return err
+	}
+	if len(f.IP60) == 0 {
+		f.IP60 = net.IPv6zero
+	}
+	if err := block.WriteIP(f.IP60); err != nil {
+		return err
+	}
+	if len(f.IP61) == 0 {
+		f.IP61 = net.IPv6zero
+	}
+	if err := block.WriteIP(f.IP61); err != nil {
+		return err
+	}
+
+	if err := block.WriteBool(f.IsIPv4); err != nil {
+		return err
+	}
+
+	if err := block.WriteUInt16(f.ClientPort); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(f.ServerPort); err != nil {
+		return err
+	}
+
+	if err := block.WriteUInt64(f.FlowIDStr); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(f.TapType); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(f.TapPort); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(f.VtapID); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(f.Timestamp); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(f.Time); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type HTTPLogger struct {
 	pool.ReferenceCount
+	_id uint64
+
 	L7Base
 
 	// http应用层
-	Type       string `json:"type"` // 0: request  1: response
-	Version    string `json:"version"`
-	Method     string `json:"method,omitempty"`
-	ClientIP   string `json:"client_ip,omitempty"`
-	Host       string `json:"host,omitempty"`
-	Path       string `json:"path,omitempty"`
-	StreamID   uint32 `json:"stream_id,omitempty"`
-	TraceID    string `json:"trace_id,omitempty"`
-	StatusCode uint16 `json:"status_code,omitempty"`
+	Type         uint8  `json:"type"` // 0: request  1: response 2: session
+	Version      uint8  `json:"version"`
+	Method       string `json:"method,omitempty"`
+	ClientIP4    uint32 `json:"client_ip4,omitempty"`
+	ClientIP6    net.IP `json:"client_ip6,omitempty"`
+	ClientIsIPv4 bool   `json:"client_is_ipv4"`
+	Host         string `json:"host,omitempty"`
+	Path         string `json:"path,omitempty"`
+	StreamID     uint32 `json:"stream_id,omitempty"`
+	TraceID      string `json:"trace_id,omitempty"`
+	StatusCode   uint16 `json:"status_code,omitempty"`
 
 	// 指标量
 	ContentLength int64  `json:"content_length"`
 	Duration      uint64 `json:"duration,omitempty"` // us
 }
 
+func HTTPLoggerColumns() []*ckdb.Column {
+	httpColumns := []*ckdb.Column{}
+	httpColumns = append(httpColumns, ckdb.NewColumn("_id", ckdb.UInt64).SetCodec(ckdb.CodecDoubleDelta))
+	httpColumns = append(httpColumns, L7BaseColumns()...)
+	httpColumns = append(httpColumns,
+		// 应用层HTTP
+		ckdb.NewColumn("type", ckdb.UInt8),
+		ckdb.NewColumn("version", ckdb.UInt8),
+		ckdb.NewColumn("method", ckdb.String),
+		ckdb.NewColumn("client_ip4", ckdb.IPv4),
+		ckdb.NewColumn("client_ip6", ckdb.IPv6),
+		ckdb.NewColumn("client_is_ipv4", ckdb.UInt8),
+
+		ckdb.NewColumn("host", ckdb.String),
+		ckdb.NewColumn("path", ckdb.String),
+		ckdb.NewColumn("stream_id", ckdb.UInt32),
+		ckdb.NewColumn("trace_id", ckdb.String),
+		ckdb.NewColumn("status_code", ckdb.UInt16),
+
+		// 指标量
+		ckdb.NewColumn("content_length", ckdb.Int64),
+		ckdb.NewColumn("duration", ckdb.UInt64),
+	)
+	return httpColumns
+}
+
+func (h *HTTPLogger) WriteBlock(block *ckdb.Block) error {
+	index := 0
+	err := block.WriteUInt64(h._id)
+	if err != nil {
+		return err
+	}
+	index++
+
+	if err := h.L7Base.WriteBlock(block); err != nil {
+		return nil
+	}
+
+	if err := block.WriteUInt8(h.Type); err != nil {
+		return err
+	}
+	if err := block.WriteUInt8(h.Version); err != nil {
+		return err
+	}
+	if err := block.WriteString(h.Method); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(h.ClientIP4); err != nil {
+		return err
+	}
+	if len(h.ClientIP6) == 0 {
+		h.ClientIP6 = net.IPv6zero
+	}
+	if err := block.WriteIP(h.ClientIP6); err != nil {
+		return err
+	}
+	if err := block.WriteBool(h.ClientIsIPv4); err != nil {
+		return err
+	}
+
+	if err := block.WriteString(h.Host); err != nil {
+		return err
+	}
+	if err := block.WriteString(h.Path); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(h.StreamID); err != nil {
+		return err
+	}
+	if err := block.WriteString(h.TraceID); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(h.StatusCode); err != nil {
+		return err
+	}
+	if err := block.WriteInt64(h.ContentLength); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(h.Duration); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func parseIP(ipStr string) (uint32, net.IP, bool) {
+	var ip4 uint32
+	var ip6 net.IP
+	isIPv4 := true
+
+	ip := net.ParseIP(ipStr)
+	if ip != nil {
+		to4 := ip.To4()
+		if to4 != nil {
+			isIPv4 = true
+			ip4 = utils.IpToUint32(to4)
+		} else {
+			isIPv4 = false
+			ip6 = ip
+		}
+	}
+
+	return ip4, ip6, isIPv4
+}
+
+func parseVersion(str string) uint8 {
+	// 对于1.0,1.1 解析为 10, 11
+	rmDot := strings.ReplaceAll(str, ".", "")
+	v, _ := strconv.Atoi(rmDot)
+	// 对于 2，需要解析为20
+	if v < 10 {
+		v = v * 10
+	}
+	return uint8(v)
+}
+
 func (h *HTTPLogger) Fill(l *datatype.AppProtoLogsData) {
 	h.L7Base.Fill(l)
 	if l.Proto == datatype.PROTO_HTTP {
 		if httpInfo, ok := l.Detail.(*datatype.HTTPInfo); ok {
-			h.Version = httpInfo.Version
-			h.Method = httpInfo.Method
-			h.ClientIP = httpInfo.ClientIP
+			h.Version = parseVersion(httpInfo.Version)
+			h.Method = strings.ToUpper(httpInfo.Method)
+			h.ClientIP4, h.ClientIP6, h.ClientIsIPv4 = parseIP(httpInfo.ClientIP)
 			h.Host = httpInfo.Host
 			h.Path = httpInfo.Path
 			h.StreamID = httpInfo.StreamID
@@ -69,7 +278,7 @@ func (h *HTTPLogger) Fill(l *datatype.AppProtoLogsData) {
 			h.ContentLength = int64(httpInfo.ContentLength)
 		}
 	}
-	h.Type = l.MsgType.String()
+	h.Type = uint8(l.MsgType)
 	h.StatusCode = l.Code
 	h.Duration = uint64(l.RRT / time.Microsecond)
 }
@@ -88,10 +297,12 @@ func (h *HTTPLogger) String() string {
 
 type DNSLogger struct {
 	pool.ReferenceCount
+	_id uint64
+
 	L7Base
 
 	// DNS应用层
-	Type       string `json:"type"` // 0: request  1: response
+	Type       uint8  `json:"type"` // 0: request  1: response 2: session
 	ID         uint16 `json:"id"`
 	DomainName string `json:"domain_name,omitempty"`
 	QueryType  uint16 `json:"query_type,omitempty"`
@@ -100,6 +311,59 @@ type DNSLogger struct {
 
 	// 指标量
 	Duration uint64 `json:"duration,omitempty"` // us
+}
+
+func DNSLoggerColumns() []*ckdb.Column {
+	dnsColumns := []*ckdb.Column{}
+	dnsColumns = append(dnsColumns, ckdb.NewColumn("_id", ckdb.UInt64).SetCodec(ckdb.CodecDoubleDelta))
+	dnsColumns = append(dnsColumns, L7BaseColumns()...)
+	dnsColumns = append(dnsColumns,
+		// 应用层DNS
+		ckdb.NewColumn("type", ckdb.UInt8).SetComment("0: request 1: response 2: session"),
+		ckdb.NewColumn("id", ckdb.UInt16),
+		ckdb.NewColumn("domain_name", ckdb.String),
+		ckdb.NewColumn("query_type", ckdb.UInt16),
+		ckdb.NewColumn("answer_code", ckdb.UInt16),
+		ckdb.NewColumn("answer_addr", ckdb.String),
+
+		// 指标量
+		ckdb.NewColumn("duration", ckdb.UInt64),
+	)
+	return dnsColumns
+}
+
+func (d *DNSLogger) WriteBlock(block *ckdb.Block) error {
+	if err := block.WriteUInt64(d._id); err != nil {
+		return err
+	}
+
+	if err := d.L7Base.WriteBlock(block); err != nil {
+		return nil
+	}
+
+	if err := block.WriteUInt8(d.Type); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(d.ID); err != nil {
+		return err
+	}
+	if err := block.WriteString(d.DomainName); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(d.QueryType); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(d.AnswerCode); err != nil {
+		return err
+	}
+	if err := block.WriteString(d.AnswerAddr); err != nil {
+		return err
+	}
+
+	if err := block.WriteUInt64(d.Duration); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (d *DNSLogger) Fill(l *datatype.AppProtoLogsData) {
@@ -114,7 +378,7 @@ func (d *DNSLogger) Fill(l *datatype.AppProtoLogsData) {
 			d.AnswerAddr = dnsInfo.Answers
 		}
 	}
-	d.Type = l.MsgType.String()
+	d.Type = uint8(l.MsgType)
 	d.AnswerCode = l.Code
 
 	// 指标量
@@ -136,31 +400,13 @@ func (d *DNSLogger) String() string {
 func (b *L7Base) Fill(l *datatype.AppProtoLogsData) {
 	// 网络层
 	if l.IsIPv6 {
-		if datatype.EPC_FROM_INTERNET == l.L3EpcIDSrc {
-			b.IP0 = "::"
-		} else {
-			b.IP0 = net.IP(l.IP6Src[:]).String()
-		}
-		if datatype.EPC_FROM_INTERNET == l.L3EpcIDDst {
-			b.IP1 = "::"
-		} else {
-			b.IP1 = net.IP(l.IP6Dst[:]).String()
-		}
-		b.RealIP0 = net.IP(l.IP6Src[:]).String()
-		b.RealIP1 = net.IP(l.IP6Dst[:]).String()
+		b.IsIPv4 = false
+		b.IP60 = l.IP6Src[:]
+		b.IP61 = l.IP6Dst[:]
 	} else {
-		if datatype.EPC_FROM_INTERNET == l.L3EpcIDSrc {
-			b.IP0 = "0.0.0.0"
-		} else {
-			b.IP0 = IPIntToString(uint32(l.IPSrc))
-		}
-		if datatype.EPC_FROM_INTERNET == l.L3EpcIDDst {
-			b.IP1 = "0.0.0.0"
-		} else {
-			b.IP1 = IPIntToString(uint32(l.IPDst))
-		}
-		b.RealIP0 = IPIntToString(uint32(l.IPSrc))
-		b.RealIP1 = IPIntToString(uint32(l.IPDst))
+		b.IsIPv4 = true
+		b.IP40 = l.IPSrc
+		b.IP41 = l.IPDst
 	}
 
 	// 传输层
@@ -171,12 +417,12 @@ func (b *L7Base) Fill(l *datatype.AppProtoLogsData) {
 	b.KnowledgeGraph.FillL7(l)
 
 	// 流信息
-	b.FlowIDStr = strconv.FormatInt(int64(l.FlowId), 10)
+	b.FlowIDStr = l.FlowId
 	b.TapType = l.TapType
-	b.TapPort = fmt.Sprintf("%08x", l.TapPort)
+	b.TapPort = l.TapPort
 	b.VtapID = l.VtapId
 	b.Timestamp = uint64(l.Timestamp / time.Microsecond)
-	b.TimestampMs = uint64(l.Timestamp / time.Millisecond)
+	b.Time = uint32(l.Timestamp / time.Second)
 }
 
 func (k *KnowledgeGraph) FillL7(l *datatype.AppProtoLogsData) {
@@ -190,30 +436,30 @@ func (k *KnowledgeGraph) FillL7(l *datatype.AppProtoLogsData) {
 	}
 
 	if info0 != nil {
-		k.RegionID0 = info0.RegionID
-		k.AZID0 = info0.AZID
-		k.HostID0 = info0.HostID
-		k.L3DeviceType0 = info0.DeviceType
+		k.RegionID0 = uint16(info0.RegionID)
+		k.AZID0 = uint16(info0.AZID)
+		k.HostID0 = uint16(info0.HostID)
+		k.L3DeviceType0 = uint8(info0.DeviceType)
 		k.L3DeviceID0 = info0.DeviceID
 		k.PodNodeID0 = info0.PodNodeID
-		k.PodNSID0 = info0.PodNSID
+		k.PodNSID0 = uint16(info0.PodNSID)
 		k.PodGroupID0 = info0.PodGroupID
 		k.PodID0 = info0.PodID
-		k.PodClusterID0 = info0.PodClusterID
-		k.SubnetID0 = info0.SubnetID
+		k.PodClusterID0 = uint16(info0.PodClusterID)
+		k.SubnetID0 = uint16(info0.SubnetID)
 	}
 	if info1 != nil {
-		k.RegionID1 = info1.RegionID
-		k.AZID1 = info1.AZID
-		k.HostID1 = info1.HostID
-		k.L3DeviceType1 = info1.DeviceType
+		k.RegionID1 = uint16(info1.RegionID)
+		k.AZID1 = uint16(info1.AZID)
+		k.HostID1 = uint16(info1.HostID)
+		k.L3DeviceType1 = uint8(info1.DeviceType)
 		k.L3DeviceID1 = info1.DeviceID
 		k.PodNodeID1 = info1.PodNodeID
-		k.PodNSID1 = info1.PodNSID
+		k.PodNSID1 = uint16(info1.PodNSID)
 		k.PodGroupID1 = info1.PodGroupID
 		k.PodID1 = info1.PodID
-		k.PodClusterID1 = info1.PodClusterID
-		k.SubnetID1 = info1.SubnetID
+		k.PodClusterID1 = uint16(info1.PodClusterID)
+		k.SubnetID1 = uint16(info1.SubnetID)
 	}
 	k.L3EpcID0, k.L3EpcID1 = l3EpcID0, l3EpcID1
 }
@@ -239,8 +485,11 @@ func ReleaseHTTPLogger(l *HTTPLogger) {
 	poolHTTPLogger.Put(l)
 }
 
-func ProtoLogToHTTPLogger(l *datatype.AppProtoLogsData) *HTTPLogger {
+var L7HTTPCounter uint32
+
+func ProtoLogToHTTPLogger(l *datatype.AppProtoLogsData, shardID int) *HTTPLogger {
 	h := AcquireHTTPLogger()
+	h._id = genID(uint32(l.Timestamp/time.Microsecond), &L7HTTPCounter, shardID)
 	h.Fill(l)
 	return h
 }
@@ -266,8 +515,11 @@ func ReleaseDNSLogger(l *DNSLogger) {
 	poolDNSLogger.Put(l)
 }
 
-func ProtoLogToDNSLogger(l *datatype.AppProtoLogsData) *DNSLogger {
+var L7DNSCounter uint32
+
+func ProtoLogToDNSLogger(l *datatype.AppProtoLogsData, shardID int) *DNSLogger {
 	h := AcquireDNSLogger()
+	h._id = genID(uint32(l.Timestamp/time.Microsecond), &L7DNSCounter, shardID)
 	h.Fill(l)
 	return h
 }

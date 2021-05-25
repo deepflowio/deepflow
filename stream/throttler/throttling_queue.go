@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
+	"gitlab.x.lan/yunshan/droplet/stream/dbwriter"
 )
 
 const (
@@ -13,10 +14,12 @@ const (
 
 type throttleItem interface {
 	Release()
+	AddReferenceCount()
 }
 
 type ThrottlingQueue struct {
-	EsQueue queue.QueueWriter
+	EsQueue       queue.QueueWriter
+	flowLogWriter *dbwriter.FlowLogWriter
 
 	Throttle        int
 	lastFlush       int64
@@ -26,10 +29,11 @@ type ThrottlingQueue struct {
 	sampleItems []interface{}
 }
 
-func NewThrottlingQueue(throttle int, esQueue queue.QueueWriter) *ThrottlingQueue {
+func NewThrottlingQueue(throttle int, esQueue queue.QueueWriter, flowLogWriter *dbwriter.FlowLogWriter) *ThrottlingQueue {
 	thq := &ThrottlingQueue{
-		Throttle: throttle * THROTTLE_BUCKET,
-		EsQueue:  esQueue,
+		Throttle:      throttle * THROTTLE_BUCKET,
+		EsQueue:       esQueue,
+		flowLogWriter: flowLogWriter,
 	}
 	thq.sampleItems = make([]interface{}, thq.Throttle)
 	return thq
@@ -37,7 +41,11 @@ func NewThrottlingQueue(throttle int, esQueue queue.QueueWriter) *ThrottlingQueu
 
 func (thq *ThrottlingQueue) flush() {
 	if thq.periodEmitCount > 0 {
+		for _, item := range thq.sampleItems[:thq.periodEmitCount] {
+			item.(throttleItem).AddReferenceCount()
+		}
 		thq.EsQueue.Put(thq.sampleItems[:thq.periodEmitCount]...)
+		thq.flowLogWriter.Put(thq.sampleItems[:thq.periodEmitCount]...)
 	}
 }
 

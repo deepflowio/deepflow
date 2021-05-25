@@ -10,31 +10,29 @@ import (
 
 	"github.com/gorilla/mux"
 	logging "github.com/op/go-logging"
-	"gitlab.x.lan/yunshan/droplet-libs/store"
 )
 
-var log = logging.MustGetLogger("roze.datasource")
+var log = logging.MustGetLogger("datasource")
 
 const (
-	RP_PREFIX = "rp_"
+	DATASOURCE_PORT = 20106
 )
 
 type DatasourceManager struct {
-	influxdbAddr     string
-	influxdbUser     string
-	influxdbPassword string
-	port             int
-	server           *http.Server
+	ckAddrs  []string // 需要修改数据源的clickhouse地址, 支持多个
+	user     string
+	password string
+
+	server *http.Server
 }
 
-func NewDatasourceManager(port int, influxdbAddr, influxdbUser, influxdbPassword string) *DatasourceManager {
+func NewDatasourceManager(ckAddrs []string, user, password string) *DatasourceManager {
 	return &DatasourceManager{
-		influxdbAddr:     influxdbAddr,
-		influxdbUser:     influxdbUser,
-		influxdbPassword: influxdbPassword,
-		port:             port,
+		ckAddrs:  ckAddrs,
+		user:     user,
+		password: password,
 		server: &http.Server{
-			Addr:    ":" + strconv.Itoa(port),
+			Addr:    ":" + strconv.Itoa(DATASOURCE_PORT),
 			Handler: mux.NewRouter(),
 		},
 	}
@@ -98,16 +96,11 @@ func (m *DatasourceManager) rpAdd(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Infof("receive rpadd request: %+v", b)
 
-	cli, err := store.NewCLIHandler(m.influxdbAddr, m.influxdbUser, m.influxdbPassword, b.DB, "add", b.BaseRP, b.Name, b.SummableOP, b.UnsummableOP, RP_PREFIX, b.Interval, b.Duration)
+	err = DatasourceHandle(m.ckAddrs, m.user, m.password, b.DB, "add", b.BaseRP, b.Name, b.SummableOP, b.UnsummableOP, b.Interval, b.Duration)
 	if err != nil {
 		respFailed(w, err.Error())
 		return
 	}
-	if _, err := cli.Run(); err != nil {
-		respFailed(w, err.Error())
-		return
-	}
-
 	respSuccess(w)
 }
 
@@ -126,12 +119,8 @@ func (m *DatasourceManager) rpMod(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Infof("receive rpmod request: %+v", b)
 
-	cli, err := store.NewCLIHandler(m.influxdbAddr, m.influxdbUser, m.influxdbPassword, b.DB, "mod", "", b.Name, "", "", RP_PREFIX, 0, b.Duration)
+	err = DatasourceHandle(m.ckAddrs, m.user, m.password, b.DB, "mod", "", b.Name, "", "", 0, b.Duration)
 	if err != nil {
-		respFailed(w, err.Error())
-		return
-	}
-	if _, err := cli.Run(); err != nil {
 		respFailed(w, err.Error())
 		return
 	}
@@ -154,16 +143,11 @@ func (m *DatasourceManager) rpDel(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Infof("receive rpdel request: %+v", b)
 
-	cli, err := store.NewCLIHandler(m.influxdbAddr, m.influxdbUser, m.influxdbPassword, b.DB, "del", "", b.Name, "", "", RP_PREFIX, 0, 0)
+	err = DatasourceHandle(m.ckAddrs, m.user, m.password, b.DB, "del", "", b.Name, "", "", 0, 0)
 	if err != nil {
 		respFailed(w, err.Error())
 		return
 	}
-	if _, err := cli.Run(); err != nil {
-		respFailed(w, err.Error())
-		return
-	}
-
 	respSuccess(w)
 }
 

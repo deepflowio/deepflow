@@ -12,46 +12,43 @@ option go_package = "dfi";
 
 
 message DataLinkLayer {
-	optional  string mac_0 = 1;
-	optional  string mac_1 = 2;
+	optional  uint64 mac_0 = 1;
+	optional  uint64 mac_1 = 2;
 	optional  uint32 eth_type = 3;
-	repeated  string cast_types_0 = 4;
-	repeated  string cast_types_1 = 5;
-	repeated  string packet_sizes_0 = 6;
-	repeated  string packet_sizes_1 = 7;
-	optional  uint32 vlan = 8;
+	optional  uint32 vlan = 4;
 }
 
 message NetworkLayer {
-	optional string ip_0 = 1;
-	optional string ip_1 = 2;
-	optional string real_ip_0 = 3;
-	optional string real_ip_1 = 4;
-	optional uint32 ip_version = 5;
+	optional uint32 ip4_0 = 1;
+	optional uint32 ip4_1 = 2;
+	optional bytes ip6_0 = 3;
+	optional bytes ip6_1 = 4;
+	optional bool is_ipv4 = 5;
 	optional uint32 protocol = 6;
 	optional uint32 tunnel_tier = 7;
 	optional uint32 tunnel_type = 8 ;
 	optional uint32 tunnel_tx_id = 9;
 	optional uint32 tunnel_rx_id = 10;
-	optional string tunnel_tx_ip_0 = 11;
-	optional string tunnel_tx_ip_1 = 12;
-	optional string tunnel_rx_ip_0 = 13;
-	optional string tunnel_rx_ip_1 = 14;
-	repeated string ttls_0 = 15;
-	repeated string ttls_1 = 16;
+	optional uint32 tunnel_tx_ip4_0 = 11;
+	optional uint32 tunnel_tx_ip4_1 = 12;
+	optional uint32 tunnel_rx_ip4_0 = 13;
+	optional uint32 tunnel_rx_ip4_1 = 14;
+	optional bytes tunnel_tx_ip6_0 = 15;
+	optional bytes tunnel_tx_ip6_1 = 16;
+	optional bytes tunnel_rx_ip6_0 = 17;
+	optional bytes tunnel_rx_ip6_1 = 18;
+	optional bool tunnel_is_ipv4  = 19;
 }
 
 message TransportLayer {
 	optional uint32 client_port = 1;
 	optional uint32 server_port = 2;
-	repeated uint32 tcp_flags_0 = 3;
-	repeated uint32 tcp_flags_1 = 4;
-	optional uint32 tcp_flags_bit_0 = 5;
-	optional uint32 tcp_flags_bit_1 = 6;
+	optional uint32 tcp_flags_bit_0 = 3;
+	optional uint32 tcp_flags_bit_1 = 4;
 }
 
 message ApplicationLayer {
-	optional string l7_protocol  = 1;
+	optional uint32 l7_protocol  = 1;
 }
 
 message Internet {
@@ -91,18 +88,16 @@ message KnowledgeGraph {
 message FlowInfo {
 	optional uint32 close_type = 1;
 	optional uint32 flow_source = 2;
-	optional string flow_id_str = 3;
+	optional uint64 flow_id_str = 3;
 	optional uint32 tap_type = 4;
-	optional string tap_port = 5;
+	optional uint32 tap_port = 5;
 	optional uint32 vtap_id = 6;
-	optional bool   tap_side_0 = 7;
-	optional bool   tap_side_1 = 8;
 	optional bool   l2_end_0 = 9;
 	optional bool   l2_end_1 = 10;
 	optional bool   l3_end_0 = 11;
 	optional bool   l3_end_1 = 12;
-	optional uint64 start_time = 13;
-	optional uint64 end_time = 14;
+	optional uint32 start_time = 13;
+	optional uint32 end_time = 14;
 	optional uint64 duration = 15;
 
 }
@@ -122,24 +117,29 @@ message Metrics {
 	optional uint64 total_byte_rx = 12;
 	optional uint32 l7_request = 13;
 	optional uint32 l7_response = 14;
-	optional uint32 rtt_client = 15;
-	optional uint32 rtt_server = 16;
-	optional uint32 rtt = 17;
-	optional uint32 srt = 18;
-	optional uint32 art = 19;
-	optional uint32 rrt = 20;
-	optional uint32 rtt_client_max = 21;
-	optional uint32 rtt_server_max = 22;
-	optional uint32 srt_max = 23;
-	optional uint32 art_max = 24;
-	optional uint32 rrt_max = 25;
-	optional uint32 retrans_tx = 26;
-	optional uint32 retrans_rx = 27;
-	optional uint32 zero_win_tx = 28;
-	optional uint32 zero_win_rx = 29;
-	optional uint32 l7_client_error = 30;
-	optional uint32 l7_server_error = 31;
-	optional uint32 l7_server_timeout = 32;
+	optional uint32 rtt = 15;
+	optional uint32 rtt_client_sum = 16;
+	optional uint32 rtt_server_sum = 17;
+	optional uint32 srt_sum = 18;
+	optional uint32 art_sum = 19;
+	optional uint64 rrt_sum = 20;
+	optional uint32 rtt_client_count = 21;
+	optional uint32 rtt_server_count = 22;
+	optional uint32 srt_count = 23;
+	optional uint32 art_count = 24;
+	optional uint32 rrt_count = 25;
+	optional uint32 rtt_client_max = 26;
+	optional uint32 rtt_server_max = 27;
+	optional uint32 srt_max = 28;
+	optional uint32 art_max = 29;
+	optional uint32 rrt_max = 30;
+	optional uint32 retrans_tx = 31;
+	optional uint32 retrans_rx = 32;
+	optional uint32 zero_win_tx = 33;
+	optional uint32 zero_win_rx = 34;
+	optional uint32 l7_client_error = 35;
+	optional uint32 l7_server_error = 36;
+	optional uint32 l7_server_timeout = 37;
 }
 
 message L4Flow {
@@ -153,38 +153,41 @@ message L4Flow {
 }
 
 message L7Base {
-	optional string ip_0 = 1;
-	optional string ip_1 = 2;
-	optional string real_ip_0 = 3;
-	optional string real_ip_1 = 4;
-	optional uint32 client_port = 5;
-	optional uint32 server_port = 6;
-	optional KnowledgeGraph knowledge_graph = 7;
-	optional string flow_id_str = 8;
-	optional uint32 tap_type = 9;
-	optional string tap_port = 10;
-	optional uint32 vtap_id = 11;
-	optional uint64 timestamp = 12;
+	optional uint32 ip4_0 = 1;
+	optional uint32 ip4_1 = 2;
+	optional bytes ip6_0 = 3;
+	optional bytes ip6_1 = 4;
+	optional bool is_ipv4= 5;
+	optional uint32 client_port = 6;
+	optional uint32 server_port = 7;
+	optional KnowledgeGraph knowledge_graph = 8;
+	optional uint64 flow_id_str = 9;
+	optional uint32 tap_type = 10;
+	optional uint32 tap_port = 11;
+	optional uint32 vtap_id = 12;
+	optional uint64 timestamp = 13;
 }
 
 message L7HTTP {
 	optional L7Base base = 1;
-	optional string type = 2;
-	optional string version = 3;
+	optional uint32 type = 2;
+	optional uint32 version = 3;
 	optional string method = 4;
-	optional string client_ip = 5;
-	optional string host = 6;
-	optional string path = 7;
-	optional uint32 stream_id = 8;
-	optional string trace_id = 9;
-	optional uint32 status_code = 10;
-	optional int64  content_length = 11;
-	optional uint64 duration = 12;
+	optional uint32 client_ip4 = 5;
+	optional bytes client_ip6 = 6;
+	optional bool client_is_ipv4= 7;
+	optional string host = 8;
+	optional string path = 9;
+	optional uint32 stream_id = 10;
+	optional string trace_id = 11;
+	optional uint32 status_code = 12;
+	optional int64  content_length = 13;
+	optional uint64 duration = 14;
 }
 
 message L7DNS {
 	optional L7Base base = 1;
-	optional string type = 2;
+	optional uint32 type = 2;
 	optional uint32 id = 3;
 	optional string domain_name = 4;
 	optional uint32 query_type = 5;

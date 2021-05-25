@@ -13,6 +13,29 @@
 #  user:
 #  password:
 
+#ckdb-auth:
+#  user:
+#  password:
+ckdb:
+  primary: tcp://127.0.0.1:9000
+# secondary:          // 如果配置2个地址，xxx-replica-enabled 为false，则作为primary写入, xxx-replica-enabled 为true 作为replica写入
+#metrics-replica-enabled: false
+#flowlog-replica-enabled: false
+
+# 遥测数据写入配置
+#metrics-ck-writer:
+#  queue-count: 1      # 每个表并行写数量
+#  queue-size: 1000000 # 数据队列长度
+#  batch-size: 512000  # 多少行数据同时写入
+#  flush-timeout: 10   # 超时写入时间
+
+## 流日志写入配置
+#flowlog-ck-writer:
+#  queue-count: 1      # 每个表并行写数量
+#  queue-size: 1000000 # 数据队列长度
+#  batch-size: 512000  # 多少行数据同时写入
+#  flush-timeout: 10   # 超时写入时间
+
 ## stream,roze模块是否启用，默认不启用(处于单独的控制器)
 #stream-roze-enabled: false
 

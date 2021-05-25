@@ -13,18 +13,19 @@ import (
 	libqueue "gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/receiver"
 	"gitlab.x.lan/yunshan/droplet-libs/store"
+
+	// "gitlab.x.lan/yunshan/droplet/common/datasource"
 	"gitlab.x.lan/yunshan/droplet/droplet/queue"
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
 	"gitlab.x.lan/yunshan/droplet/roze/config"
-	"gitlab.x.lan/yunshan/droplet/roze/datasource"
+	"gitlab.x.lan/yunshan/droplet/roze/dbwriter"
 	"gitlab.x.lan/yunshan/droplet/roze/platformdata"
 	"gitlab.x.lan/yunshan/droplet/roze/unmarshaller"
 )
 
 const (
-	DATASOURCE_PORT = 20106
-	INFLUXDB_RP_1M  = "rp_1m"
-	INFLUXDB_RP_1S  = "rp_1s"
+	INFLUXDB_RP_1M = "rp_1m"
+	INFLUXDB_RP_1S = "rp_1s"
 )
 
 var log = logging.MustGetLogger("roze")
@@ -35,7 +36,7 @@ type Roze struct {
 	InfluxdbWriterS1 *store.InfluxdbWriter
 	Repair           *store.Repair
 	RepairS1         *store.Repair
-	datasource       *datasource.DatasourceManager
+	dbwriter         *dbwriter.DbWriter
 }
 
 // http://x.x.x.x:20044  http://[x:x:x:x]:20044
@@ -109,11 +110,16 @@ func NewRoze(cfg *config.Config, recv *receiver.Receiver) (*Roze, error) {
 		return nil, err
 	}
 
+	roze.dbwriter, err = dbwriter.NewDbWriter(cfg.CKDB.Primary, cfg.CKDB.Secondary, cfg.CKDBAuth.Username, cfg.CKDBAuth.Password, cfg.ReplicaEnabled, cfg.CKWriterConfig)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
 	roze.unmarshallers = make([]*unmarshaller.Unmarshaller, unmarshallQueueCount)
 	for i := 0; i < unmarshallQueueCount; i++ {
-		roze.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, cfg.DisableSecondWrite, cfg.DisableVtapPacket, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), roze.InfluxdbWriter, roze.InfluxdbWriterS1, cfg.StoreQueueCount)
+		roze.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, cfg.DisableSecondWrite, cfg.DisableVtapPacket, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), roze.InfluxdbWriter, roze.InfluxdbWriterS1, roze.dbwriter, cfg.StoreQueueCount)
 	}
-	roze.datasource = datasource.NewDatasourceManager(DATASOURCE_PORT, cfg.TSDB.Primary, cfg.TSDBAuth.Username, cfg.TSDBAuth.Password)
 
 	return &roze, nil
 }
@@ -130,11 +136,9 @@ func (r *Roze) Start() {
 	r.InfluxdbWriterS1.Run()
 	r.Repair.Run()
 	r.RepairS1.Run()
-	r.datasource.Start()
 }
 
 func (r *Roze) Close() error {
-	r.datasource.Close()
 	platformdata.Close()
 	wg := sync.WaitGroup{}
 	wg.Add(1)

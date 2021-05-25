@@ -35,6 +35,7 @@ type Counter struct {
 type Decoder struct {
 	index          int
 	msgType        int
+	shardID        int
 	inQueue        queue.QueueReader
 	flowThrottler  *throttler.ThrottlingQueue
 	httpThrottler  *throttler.ThrottlingQueue
@@ -48,6 +49,7 @@ type Decoder struct {
 }
 
 func NewDecoder(index, msgType int,
+	shardID int,
 	inQueue queue.QueueReader,
 	flowThrottler *throttler.ThrottlingQueue,
 	httpThrottler *throttler.ThrottlingQueue,
@@ -57,6 +59,7 @@ func NewDecoder(index, msgType int,
 ) *Decoder {
 	return &Decoder{
 		index:          index,
+		shardID:        shardID,
 		msgType:        msgType,
 		inQueue:        inQueue,
 		flowThrottler:  flowThrottler,
@@ -145,7 +148,7 @@ func (d *Decoder) sendFlow(flow *datatype.TaggedFlow) {
 		log.Debugf("decoder %d recv flow: %s", d.index, flow)
 	}
 	d.counter.L4Count++
-	l := jsonify.TaggedFlowToLogger(flow)
+	l := jsonify.TaggedFlowToLogger(flow, d.shardID)
 	if d.brokerEnabled {
 		l.AddReferenceCount()
 		d.outBrokerQueue.Put(l)
@@ -162,7 +165,7 @@ func (d *Decoder) sendProto(proto *datatype.AppProtoLogsData) {
 	}
 	if proto.Proto == datatype.PROTO_HTTP {
 		d.counter.L7HTTPCount++
-		l := jsonify.ProtoLogToHTTPLogger(proto)
+		l := jsonify.ProtoLogToHTTPLogger(proto, d.shardID)
 		if d.brokerEnabled {
 			l.AddReferenceCount()
 			d.outBrokerQueue.Put(l)
@@ -172,7 +175,7 @@ func (d *Decoder) sendProto(proto *datatype.AppProtoLogsData) {
 		}
 	} else if proto.Proto == datatype.PROTO_DNS {
 		d.counter.L7DNSCount++
-		l := jsonify.ProtoLogToDNSLogger(proto)
+		l := jsonify.ProtoLogToDNSLogger(proto, d.shardID)
 		if d.brokerEnabled {
 			l.AddReferenceCount()
 			d.outBrokerQueue.Put(l)

@@ -48,10 +48,6 @@ func GenData(id int, out queue.QueueWriter) {
 		f.FlowKey.MACSrc = datatype.MacInt(rand.Intn(100))
 		f.FlowKey.MACDst = datatype.MacInt(rand.Intn(100))
 		f.EthType = layers.EthernetTypeIPv4
-		f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].CastTypeMap = uint8(rand.Intn(64))
-		f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].CastTypeMap = uint8(rand.Intn(64))
-		f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].PacketSizeMap = uint16(rand.Intn(128))
-		f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].PacketSizeMap = uint16(rand.Intn(128))
 		f.VLAN = uint16(rand.Intn(1024))
 
 		f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].L3EpcID = int32(rand.Intn(64) - 2)
@@ -60,8 +56,6 @@ func GenData(id int, out queue.QueueWriter) {
 		f.IPDst = datatype.IPv4Int(rand.Intn(0xfff))
 
 		f.Proto = layers.IPProtocolIPv4
-		f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].TTLMap = uint16(rand.Intn(256))
-		f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].TTLMap = uint16(rand.Intn(256))
 
 		f.PortSrc = uint16(rand.Intn(1000) + 30000)
 		f.PortDst = uint16(rand.Intn(1000))

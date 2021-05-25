@@ -18,7 +18,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet/stream/common"
 )
 
-var log = logging.MustGetLogger("es_writer")
+var log = logging.MustGetLogger("db_writer")
 
 const (
 	BULK_SIZE               = 8192

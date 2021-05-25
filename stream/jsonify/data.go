@@ -3,21 +3,22 @@ package jsonify
 import (
 	"fmt"
 	"math"
-	"strconv"
+	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/gopacket/layers"
+	"gitlab.x.lan/yunshan/droplet-libs/ckdb"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
 	"gitlab.x.lan/yunshan/droplet-libs/grpc"
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
-	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 	"gitlab.x.lan/yunshan/droplet/stream/geo"
 	pf "gitlab.x.lan/yunshan/droplet/stream/platformdata"
 )
 
 type FlowLogger struct {
 	pool.ReferenceCount
+	_id uint64 // 用来标记全局(多节点)唯一的记录
 
 	DataLinkLayer
 	NetworkLayer
@@ -30,46 +31,207 @@ type FlowLogger struct {
 }
 
 type DataLinkLayer struct {
-	MAC0         string   `json:"mac_0"`
-	MAC1         string   `json:"mac_1"`
-	EthType      uint16   `json:"eth_type"`
-	CastTypes0   []string `json:"cast_types_0"`
-	CastTypes1   []string `json:"cast_types_1"`
-	PacketSizes0 []string `json:"packet_sizes_0"`
-	PacketSizes1 []string `json:"packet_sizes_1"`
-	VLAN         uint16   `json:"vlan,omitempty"`
+	MAC0    uint64 `json:"mac_0"`
+	MAC1    uint64 `json:"mac_1"`
+	EthType uint16 `json:"eth_type"`
+	VLAN    uint16 `json:"vlan,omitempty"`
+}
+
+var DataLinkLayerColumns = []*ckdb.Column{
+	ckdb.NewColumn("mac_0", ckdb.UInt64),
+	ckdb.NewColumn("mac_1", ckdb.UInt64),
+	ckdb.NewColumn("eth_type", ckdb.UInt16),
+	ckdb.NewColumn("vlan", ckdb.UInt16),
+}
+
+func (f *DataLinkLayer) WriteBlock(block *ckdb.Block) error {
+	if err := block.WriteUInt64(f.MAC0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(f.MAC1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(f.EthType); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(f.VLAN); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type NetworkLayer struct {
-	IP0         string   `json:"ip_0"` // 广域网IP为0.0.0.0或::
-	IP1         string   `json:"ip_1"`
-	RealIP0     string   `json:"real_ip_0"`
-	RealIP1     string   `json:"real_ip_1"`
-	IPVersion   uint16   `json:"ip_version,omitempty"`
-	Protocol    uint16   `json:"protocol"`
-	TunnelTier  uint8    `json:"tunnel_tier,omitempty"`
-	TunnelType  uint16   `json:"tunnel_type,omitempty"`
-	TunnelTxID  uint32   `json:"tunnel_tx_id,omitempty"`
-	TunnelRxID  uint32   `json:"tunnel_rx_id,omitempty"`
-	TunnelTxIP0 string   `json:"tunnel_tx_ip_0,omitempty"`
-	TunnelTxIP1 string   `json:"tunnel_tx_ip_1,omitempty"`
-	TunnelRxIP0 string   `json:"tunnel_rx_ip_0,omitempty"`
-	TunnelRxIP1 string   `json:"tunnel_rx_ip_1,omitempty"`
-	TTLs0       []string `json:"ttls_0"`
-	TTLs1       []string `json:"ttls_1"`
+	IP40         uint32 `json: "ip4_0"`
+	IP41         uint32 `json: "ip4_1"`
+	IP60         net.IP `json: "ip6_0"`
+	IP61         net.IP `json: "ip6_1"`
+	IsIPv4       bool   `json:"is_ipv4"`
+	Protocol     uint8  `json:"protocol"`
+	TunnelTier   uint8  `json:"tunnel_tier,omitempty"`
+	TunnelType   uint16 `json:"tunnel_type,omitempty"`
+	TunnelTxID   uint32 `json:"tunnel_tx_id,omitempty"`
+	TunnelRxID   uint32 `json:"tunnel_rx_id,omitempty"`
+	TunnelTxIP40 uint32 `json:"tunnel_tx_ip4_0,omitempty"`
+	TunnelTxIP41 uint32 `json:"tunnel_tx_ip4_1,omitempty"`
+	TunnelRxIP40 uint32 `json:"tunnel_rx_ip4_0,omitempty"`
+	TunnelRxIP41 uint32 `json:"tunnel_rx_ip4_1,omitempty"`
+	TunnelTxIP60 net.IP `json:"tunnel_tx_ip6_0,omitempty"`
+	TunnelTxIP61 net.IP `json:"tunnel_tx_ip6_1,omitempty"`
+	TunnelRxIP60 net.IP `json:"tunnel_rx_ip6_0,omitempty"`
+	TunnelRxIP61 net.IP `json:"tunnel_rx_ip6_1,omitempty"`
+	TunnelIsIPv4 bool   `json:"tunnel_is_ipv4"`
+}
+
+var NetworkLayerColumns = []*ckdb.Column{
+	ckdb.NewColumn("ip4_0", ckdb.IPv4),
+	ckdb.NewColumn("ip4_1", ckdb.IPv4),
+	ckdb.NewColumn("ip6_0", ckdb.IPv6),
+	ckdb.NewColumn("ip6_1", ckdb.IPv6),
+	ckdb.NewColumn("is_ipv4", ckdb.UInt8),
+	ckdb.NewColumn("protocol", ckdb.UInt8),
+	ckdb.NewColumn("tunnel_tier", ckdb.UInt8),
+	ckdb.NewColumn("tunnel_type", ckdb.UInt16),
+	ckdb.NewColumn("tunnel_tx_id", ckdb.UInt32),
+	ckdb.NewColumn("tunnel_rx_id", ckdb.UInt32),
+	ckdb.NewColumn("tunnel_tx_ip4_0", ckdb.IPv4),
+	ckdb.NewColumn("tunnel_tx_ip4_1", ckdb.IPv4),
+	ckdb.NewColumn("tunnel_rx_ip4_0", ckdb.IPv4),
+	ckdb.NewColumn("tunnel_rx_ip4_1", ckdb.IPv4),
+	ckdb.NewColumn("tunnel_tx_ip6_0", ckdb.IPv6),
+	ckdb.NewColumn("tunnel_tx_ip6_1", ckdb.IPv6),
+	ckdb.NewColumn("tunnel_rx_ip6_0", ckdb.IPv6),
+	ckdb.NewColumn("tunnel_rx_ip6_1", ckdb.IPv6),
+	ckdb.NewColumn("tunnel_is_ipv4", ckdb.UInt8),
+}
+
+func (n *NetworkLayer) WriteBlock(block *ckdb.Block) error {
+	if err := block.WriteUInt32(n.IP40); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(n.IP41); err != nil {
+		return err
+	}
+	if len(n.IP60) == 0 {
+		n.IP60 = net.IPv6zero
+	}
+	if err := block.WriteIP(n.IP60); err != nil {
+		return err
+	}
+	if len(n.IP61) == 0 {
+		n.IP61 = net.IPv6zero
+	}
+	if err := block.WriteIP(n.IP61); err != nil {
+		return err
+	}
+
+	if err := block.WriteBool(n.IsIPv4); err != nil {
+		return err
+	}
+
+	if err := block.WriteUInt8(n.Protocol); err != nil {
+		return err
+	}
+	if err := block.WriteUInt8(n.TunnelTier); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(n.TunnelType); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(n.TunnelTxID); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(n.TunnelRxID); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(n.TunnelTxIP40); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(n.TunnelTxIP41); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(n.TunnelRxIP40); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(n.TunnelRxIP41); err != nil {
+		return err
+	}
+	if len(n.TunnelTxIP60) == 0 {
+		n.TunnelTxIP60 = net.IPv6zero
+	}
+	if len(n.TunnelTxIP61) == 0 {
+		n.TunnelTxIP61 = net.IPv6zero
+	}
+	if len(n.TunnelRxIP60) == 0 {
+		n.TunnelRxIP60 = net.IPv6zero
+	}
+	if len(n.TunnelRxIP61) == 0 {
+		n.TunnelRxIP61 = net.IPv6zero
+	}
+	if err := block.WriteIP(n.TunnelTxIP60); err != nil {
+		return err
+	}
+	if err := block.WriteIP(n.TunnelTxIP61); err != nil {
+		return err
+	}
+	if err := block.WriteIP(n.TunnelRxIP60); err != nil {
+		return err
+	}
+	if err := block.WriteIP(n.TunnelRxIP61); err != nil {
+		return err
+	}
+	if err := block.WriteBool(n.TunnelIsIPv4); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type TransportLayer struct {
-	ClientPort   uint16   `json:"client_port"`
-	ServerPort   uint16   `json:"server_port"`
-	TCPFlags0    []uint32 `json:"tcp_flags_0"`
-	TCPFlags1    []uint32 `json:"tcp_flags_1"`
-	TCPFlagsBit0 uint16   `json:"tcp_flags_bit_0,omitempty"`
-	TCPFlagsBit1 uint16   `json:"tcp_flags_bit_1,omitempty"`
+	ClientPort   uint16 `json:"client_port"`
+	ServerPort   uint16 `json:"server_port"`
+	TCPFlagsBit0 uint16 `json:"tcp_flags_bit_0,omitempty"`
+	TCPFlagsBit1 uint16 `json:"tcp_flags_bit_1,omitempty"`
+}
+
+var TransportLayerColumns = []*ckdb.Column{
+	// 传输层
+	ckdb.NewColumn("client_port", ckdb.UInt16),
+	ckdb.NewColumn("server_port", ckdb.UInt16),
+	ckdb.NewColumn("tcp_flags_bit_0", ckdb.UInt16),
+	ckdb.NewColumn("tcp_flags_bit_1", ckdb.UInt16),
+}
+
+func (t *TransportLayer) WriteBlock(block *ckdb.Block) error {
+	if err := block.WriteUInt16(t.ClientPort); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(t.ServerPort); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(t.TCPFlagsBit0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(t.TCPFlagsBit1); err != nil {
+		return err
+	}
+	return nil
 }
 
 type ApplicationLayer struct {
-	L7Protocol string `json:"l7_protocol,omitempty"` // HTTP, DNS, others
+	L7Protocol uint8 `json:"l7_protocol,omitempty"` // HTTP, DNS, others
+}
+
+var ApplicationLayerColumns = []*ckdb.Column{
+	// 应用层
+	ckdb.NewColumn("l7_protocol", ckdb.UInt8),
+}
+
+func (a *ApplicationLayer) WriteBlock(block *ckdb.Block) error {
+	if err := block.WriteUInt8(a.L7Protocol); err != nil {
+		return err
+	}
+	return nil
 }
 
 type Internet struct {
@@ -77,79 +239,296 @@ type Internet struct {
 	Province1 string `json:"province_1"`
 }
 
+var InternetColumns = []*ckdb.Column{
+	// 广域网
+	ckdb.NewColumn("province_0", ckdb.String),
+	ckdb.NewColumn("province_1", ckdb.String),
+}
+
+func (i *Internet) WriteBlock(block *ckdb.Block) error {
+	if err := block.WriteString(i.Province0); err != nil {
+		return err
+	}
+	if err := block.WriteString(i.Province1); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 type KnowledgeGraph struct {
-	RegionID0     uint32 `json:"region_id_0"`
-	RegionID1     uint32 `json:"region_id_1"`
-	AZID0         uint32 `json:"az_id_0"`
-	AZID1         uint32 `json:"az_id_1"`
-	HostID0       uint32 `json:"host_id_0"`
-	HostID1       uint32 `json:"host_id_1"`
-	L3DeviceType0 uint32 `json:"l3_device_type_0"`
-	L3DeviceType1 uint32 `json:"l3_device_type_1"`
-	L3DeviceID0   uint32 `json:"l3_device_id_0"`
-	L3DeviceID1   uint32 `json:"l3_device_id_1"`
-	PodNodeID0    uint32 `json:"pod_node_id_0"`
-	PodNodeID1    uint32 `json:"pod_node_id_1"`
-	PodNSID0      uint32 `json:"pod_ns_id_0"`
-	PodNSID1      uint32 `json:"pod_ns_id_1"`
-	PodGroupID0   uint32 `json:"pod_group_id_0"`
-	PodGroupID1   uint32 `json:"pod_group_id_1"`
-	PodID0        uint32 `json:"pod_id_0"`
-	PodID1        uint32 `json:"pod_id_1"`
-	PodClusterID0 uint32 `json:"pod_cluster_id_0"`
-	PodClusterID1 uint32 `json:"pod_cluster_id_1"`
-	L3EpcID0      int32  `json:"l3_epc_id_0"`
-	L3EpcID1      int32  `json:"l3_epc_id_1"`
-	EpcID0        int32  `json:"epc_id_0"`
-	EpcID1        int32  `json:"epc_id_1"`
-	SubnetID0     uint32 `json:"subnet_id_0"`
-	SubnetID1     uint32 `json:"subnet_id_1"`
+	RegionID0     uint16   `json:"region_id_0"`
+	RegionID1     uint16   `json:"region_id_1"`
+	AZID0         uint16   `json:"az_id_0"`
+	AZID1         uint16   `json:"az_id_1"`
+	HostID0       uint16   `json:"host_id_0"`
+	HostID1       uint16   `json:"host_id_1"`
+	L3DeviceType0 uint8    `json:"l3_device_type_0"`
+	L3DeviceType1 uint8    `json:"l3_device_type_1"`
+	L3DeviceID0   uint32   `json:"l3_device_id_0"`
+	L3DeviceID1   uint32   `json:"l3_device_id_1"`
+	PodNodeID0    uint32   `json:"pod_node_id_0"`
+	PodNodeID1    uint32   `json:"pod_node_id_1"`
+	PodNSID0      uint16   `json:"pod_ns_id_0"`
+	PodNSID1      uint16   `json:"pod_ns_id_1"`
+	PodGroupID0   uint32   `json:"pod_group_id_0"`
+	PodGroupID1   uint32   `json:"pod_group_id_1"`
+	PodID0        uint32   `json:"pod_id_0"`
+	PodID1        uint32   `json:"pod_id_1"`
+	PodClusterID0 uint16   `json:"pod_cluster_id_0"`
+	PodClusterID1 uint16   `json:"pod_cluster_id_1"`
+	L3EpcID0      int32    `json:"l3_epc_id_0"`
+	L3EpcID1      int32    `json:"l3_epc_id_1"`
+	EpcID0        int32    `json:"epc_id_0"`
+	EpcID1        int32    `json:"epc_id_1"`
+	SubnetID0     uint16   `json:"subnet_id_0"`
+	SubnetID1     uint16   `json:"subnet_id_1"`
+	GroupIDs0     []uint16 `json:"group_ids_0"`
+	GroupIDs1     []uint16 `json:"group_ids_1"`
+	BusinessIDs0  []uint16 `json:"business_ids_0"`
+	BusinessIDs1  []uint16 `json:"business_ids_1"`
+}
+
+var KnowledgeGraphColumns = []*ckdb.Column{
+	// 知识图谱
+	ckdb.NewColumn("region_id_0", ckdb.UInt16),
+	ckdb.NewColumn("region_id_1", ckdb.UInt16),
+	ckdb.NewColumn("az_id_0", ckdb.UInt16),
+	ckdb.NewColumn("az_id_1", ckdb.UInt16),
+	ckdb.NewColumn("host_id_0", ckdb.UInt16),
+	ckdb.NewColumn("host_id_1", ckdb.UInt16),
+	ckdb.NewColumn("l3_device_type_0", ckdb.UInt8),
+	ckdb.NewColumn("l3_device_type_1", ckdb.UInt8),
+	ckdb.NewColumn("l3_device_id_0", ckdb.UInt32),
+	ckdb.NewColumn("l3_device_id_1", ckdb.UInt32),
+	ckdb.NewColumn("pod_node_id_0", ckdb.UInt32),
+	ckdb.NewColumn("pod_node_id_1", ckdb.UInt32),
+	ckdb.NewColumn("pod_ns_id_0", ckdb.UInt16),
+	ckdb.NewColumn("pod_ns_id_1", ckdb.UInt16),
+	ckdb.NewColumn("pod_group_id_0", ckdb.UInt32),
+	ckdb.NewColumn("pod_group_id_1", ckdb.UInt32),
+	ckdb.NewColumn("pod_id_0", ckdb.UInt32),
+	ckdb.NewColumn("pod_id_1", ckdb.UInt32),
+	ckdb.NewColumn("pod_cluster_id_0", ckdb.UInt16),
+	ckdb.NewColumn("pod_cluster_id_1", ckdb.UInt16),
+	ckdb.NewColumn("l3_epc_id_0", ckdb.Int32),
+	ckdb.NewColumn("l3_epc_id_1", ckdb.Int32),
+	ckdb.NewColumn("epc_id_0", ckdb.Int32),
+	ckdb.NewColumn("epc_id_1", ckdb.Int32),
+	ckdb.NewColumn("subnet_id_0", ckdb.UInt16),
+	ckdb.NewColumn("subnet_id_1", ckdb.UInt16),
+	ckdb.NewColumn("group_ids_0", ckdb.ArrayUInt16),
+	ckdb.NewColumn("group_ids_1", ckdb.ArrayUInt16),
+	ckdb.NewColumn("business_ids_0", ckdb.ArrayUInt16),
+	ckdb.NewColumn("business_ids_1", ckdb.ArrayUInt16),
+}
+
+func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) error {
+	if err := block.WriteUInt16(k.RegionID0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(k.RegionID1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(k.AZID0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(k.AZID1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(k.HostID0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(k.HostID1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt8(k.L3DeviceType0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt8(k.L3DeviceType1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(k.L3DeviceID0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(k.L3DeviceID1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(k.PodNodeID0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(k.PodNodeID1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(k.PodNSID0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(k.PodNSID1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(k.PodGroupID0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(k.PodGroupID1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(k.PodID0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(k.PodID1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(k.PodClusterID0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(k.PodClusterID1); err != nil {
+		return err
+	}
+	if err := block.WriteInt32(k.L3EpcID0); err != nil {
+		return err
+	}
+	if err := block.WriteInt32(k.L3EpcID1); err != nil {
+		return err
+	}
+	if err := block.WriteInt32(k.EpcID0); err != nil {
+		return err
+	}
+	if err := block.WriteInt32(k.EpcID1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(k.SubnetID0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(k.SubnetID1); err != nil {
+		return err
+	}
+	if err := block.WriteArray(k.GroupIDs0); err != nil {
+		return err
+	}
+	if err := block.WriteArray(k.GroupIDs1); err != nil {
+		return err
+	}
+	if err := block.WriteArray(k.BusinessIDs0); err != nil {
+		return err
+	}
+	if err := block.WriteArray(k.BusinessIDs1); err != nil {
+		return err
+	}
+	return nil
 }
 
 type FlowInfo struct {
 	CloseType  uint16 `json:"close_type"`
 	FlowSource uint16 `json:"flow_source"`
-	FlowIDStr  string `json:"flow_id_str"`
+	FlowIDStr  uint64 `json:"flow_id_str"`
 	TapType    uint16 `json:"tap_type"`
-	TapPort    string `json:"tap_port"` // 显示为固定八个字符的16进制如'01234567'
+	TapPort    uint32 `json:"tap_port"` // 显示为固定八个字符的16进制如'01234567'
 	VtapID     uint16 `json:"vtap_id"`
-	TapSide0   bool   `json:"tap_side_0,omitempty"`
-	TapSide1   bool   `json:"tap_side_1,omitempty"`
 	L2End0     bool   `json:"l2_end_0"`
 	L2End1     bool   `json:"l2_end_1"`
 	L3End0     bool   `json:"l3_end_0"`
 	L3End1     bool   `json:"l3_end_1"`
-	StartTime  uint64 `json:"start_time"` // s
-	EndTime    uint64 `json:"end_time"`   // s
+	StartTime  uint32 `json:"start_time"` // s
+	EndTime    uint32 `json:"end_time"`   // s
 	Duration   uint64 `json:"duration"`   // us
 }
 
+var FlowInfoColumns = []*ckdb.Column{
+	// 流信息
+	ckdb.NewColumn("close_type", ckdb.UInt16),
+	ckdb.NewColumn("flow_source", ckdb.UInt16),
+	ckdb.NewColumn("flow_id_str", ckdb.UInt64),
+	ckdb.NewColumn("tap_type", ckdb.UInt16),
+	ckdb.NewColumn("tap_port", ckdb.UInt32),
+	ckdb.NewColumn("vtap_id", ckdb.UInt16),
+	ckdb.NewColumn("l2_end_0", ckdb.UInt8),
+	ckdb.NewColumn("l2_end_1", ckdb.UInt8),
+	ckdb.NewColumn("l3_end_0", ckdb.UInt8),
+	ckdb.NewColumn("l3_end_1", ckdb.UInt8),
+	ckdb.NewColumn("start_time", ckdb.DateTime),
+	ckdb.NewColumn("end_time", ckdb.DateTime),
+	ckdb.NewColumn("duration", ckdb.UInt64),
+}
+
+func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
+	if err := block.WriteUInt16(f.CloseType); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(f.FlowSource); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(f.FlowIDStr); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(f.TapType); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(f.TapPort); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(f.VtapID); err != nil {
+		return err
+	}
+	if err := block.WriteBool(f.L2End0); err != nil {
+		return err
+	}
+	if err := block.WriteBool(f.L2End1); err != nil {
+		return err
+	}
+	if err := block.WriteBool(f.L3End0); err != nil {
+		return err
+	}
+	if err := block.WriteBool(f.L3End1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(f.StartTime); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(f.EndTime); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(f.Duration); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 type Metrics struct {
-	PacketTx        uint64 `json:"packet_tx,omitempty"`
-	PacketRx        uint64 `json:"packet_rx,omitempty"`
-	ByteTx          uint64 `json:"byte_tx,omitempty"`
-	ByteRx          uint64 `json:"byte_rx,omitempty"`
-	L3ByteTx        uint64 `json:"l3_byte_tx,omitempty"`
-	L3ByteRx        uint64 `json:"l3_byte_rx,omitempty"`
-	L4ByteTx        uint64 `json:"l4_byte_tx,omitempty"`
-	L4ByteRx        uint64 `json:"l4_byte_rx,omitempty"`
-	TotalPacketTx   uint64 `json:"total_packet_tx,omitempty"`
-	TotalPacketRx   uint64 `json:"total_packet_rx,omitempty"`
-	TotalByteTx     uint64 `json:"total_byte_tx,omitempty"`
-	TotalByteRx     uint64 `json:"total_byte_rx,omitempty"`
-	L7Request       uint32 `json:"l7_request,omitempty"`
-	L7Response      uint32 `json:"l7_response,omitempty"`
-	RTTClient       uint32 `json:"rtt_client,omitempty"`     // us
-	RTTServer       uint32 `json:"rtt_server,omitempty"`     // us
-	RTT             uint32 `json:"rtt,omitempty"`            // us
-	SRT             uint32 `json:"srt,omitempty"`            // us
-	ART             uint32 `json:"art,omitempty"`            // us
-	RRT             uint32 `json:"rrt,omitempty"`            // us
-	RTTClientMax    uint32 `json:"rtt_client_max,omitempty"` // us
-	RTTServerMax    uint32 `json:"rtt_server_max,omitempty"` // us
-	SRTMax          uint32 `json:"srt_max,omitempty"`        // us
-	ARTMax          uint32 `json:"art_max,omitempty"`        // us
-	RRTMax          uint32 `json:"rrt_max,omitempty"`        // us
+	PacketTx      uint64 `json:"packet_tx,omitempty"`
+	PacketRx      uint64 `json:"packet_rx,omitempty"`
+	ByteTx        uint64 `json:"byte_tx,omitempty"`
+	ByteRx        uint64 `json:"byte_rx,omitempty"`
+	L3ByteTx      uint64 `json:"l3_byte_tx,omitempty"`
+	L3ByteRx      uint64 `json:"l3_byte_rx,omitempty"`
+	L4ByteTx      uint64 `json:"l4_byte_tx,omitempty"`
+	L4ByteRx      uint64 `json:"l4_byte_rx,omitempty"`
+	TotalPacketTx uint64 `json:"total_packet_tx,omitempty"`
+	TotalPacketRx uint64 `json:"total_packet_rx,omitempty"`
+	TotalByteTx   uint64 `json:"total_byte_tx,omitempty"`
+	TotalByteRx   uint64 `json:"total_byte_rx,omitempty"`
+	L7Request     uint32 `json:"l7_request,omitempty"`
+	L7Response    uint32 `json:"l7_response,omitempty"`
+
+	RTT          uint32 `json:"rtt,omitempty"` // us
+	RTTClientSum uint32 `json:"rtt_client_sum,omitempty"`
+	RTTServerSum uint32 `json:"rtt_server_sum,omitempty"`
+	SRTSum       uint32 `json:"srt_sum,omitempty"`
+	ARTSum       uint32 `json:"art_sum,omitempty"`
+	RRTSum       uint64 `json:"rrt_sum,omitempty"`
+
+	RTTClientCount uint32 `json:"rtt_client_count,omitempty"`
+	RTTServerCount uint32 `json:"rtt_server_count,omitempty"`
+	SRTCount       uint32 `json:"srt_count,omitempty"`
+	ARTCount       uint32 `json:"art_count,omitempty"`
+	RRTCount       uint32 `json:"rrt_count,omitempty"`
+
+	RTTClientMax uint32 `json:"rtt_client_max,omitempty"` // us
+	RTTServerMax uint32 `json:"rtt_server_max,omitempty"` // us
+	SRTMax       uint32 `json:"srt_max,omitempty"`        // us
+	ARTMax       uint32 `json:"art_max,omitempty"`        // us
+	RRTMax       uint32 `json:"rrt_max,omitempty"`        // us
+
 	RetransTx       uint32 `json:"retrans_tx,omitempty"`
 	RetransRx       uint32 `json:"retrans_rx,omitempty"`
 	ZeroWinTx       uint32 `json:"zero_win_tx,omitempty"`
@@ -157,6 +536,170 @@ type Metrics struct {
 	L7ClientError   uint32 `json:"l7_client_error,omitempty"`
 	L7ServerError   uint32 `json:"l7_server_error,omitempty"`
 	L7ServerTimeout uint32 `json:"l7_server_timeout,omitempty"`
+}
+
+var MetricsColumns = []*ckdb.Column{
+	// 指标量
+	ckdb.NewColumn("packet_tx", ckdb.UInt64),
+	ckdb.NewColumn("packet_rx", ckdb.UInt64),
+	ckdb.NewColumn("byte_tx", ckdb.UInt64),
+	ckdb.NewColumn("byte_rx", ckdb.UInt64),
+	ckdb.NewColumn("l3_byte_tx", ckdb.UInt64),
+	ckdb.NewColumn("l3_byte_rx", ckdb.UInt64),
+	ckdb.NewColumn("l4_byte_tx", ckdb.UInt64),
+	ckdb.NewColumn("l4_byte_rx", ckdb.UInt64),
+	ckdb.NewColumn("total_packet_tx", ckdb.UInt64),
+	ckdb.NewColumn("total_packet_rx", ckdb.UInt64),
+	ckdb.NewColumn("total_byte_tx", ckdb.UInt64),
+	ckdb.NewColumn("total_byte_rx", ckdb.UInt64),
+	ckdb.NewColumn("l7_request", ckdb.UInt32),
+	ckdb.NewColumn("l7_response", ckdb.UInt32),
+
+	ckdb.NewColumn("rtt", ckdb.Float64),
+	ckdb.NewColumn("rtt_client_sum", ckdb.Float64),
+	ckdb.NewColumn("rtt_server_sum", ckdb.Float64),
+	ckdb.NewColumn("srt_sum", ckdb.Float64),
+	ckdb.NewColumn("art_sum", ckdb.Float64),
+	ckdb.NewColumn("rrt_sum", ckdb.Float64),
+
+	ckdb.NewColumn("rtt_client_count", ckdb.UInt64),
+	ckdb.NewColumn("rtt_server_count", ckdb.UInt64),
+	ckdb.NewColumn("srt_count", ckdb.UInt64),
+	ckdb.NewColumn("art_count", ckdb.UInt64),
+	ckdb.NewColumn("rrt_count", ckdb.UInt64),
+
+	ckdb.NewColumn("rtt_client_max", ckdb.UInt32),
+	ckdb.NewColumn("rtt_server_max", ckdb.UInt32),
+	ckdb.NewColumn("srt_max", ckdb.UInt32),
+	ckdb.NewColumn("art_max", ckdb.UInt32),
+	ckdb.NewColumn("rrt_max", ckdb.UInt32),
+
+	ckdb.NewColumn("retans_tx", ckdb.UInt32),
+	ckdb.NewColumn("retrans_rx", ckdb.UInt32),
+	ckdb.NewColumn("zero_win_tx", ckdb.UInt32),
+	ckdb.NewColumn("zero_win_rx", ckdb.UInt32),
+	ckdb.NewColumn("l7_client_error", ckdb.UInt32),
+	ckdb.NewColumn("l7_server_error", ckdb.UInt32),
+	ckdb.NewColumn("l7_server_timeout", ckdb.UInt32),
+}
+
+func (m *Metrics) WriteBlock(block *ckdb.Block) error {
+	if err := block.WriteUInt64(m.PacketTx); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(m.PacketRx); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(m.ByteTx); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(m.ByteRx); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(m.L3ByteTx); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(m.L3ByteRx); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(m.L4ByteTx); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(m.L4ByteRx); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(m.TotalPacketTx); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(m.TotalPacketRx); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(m.TotalByteTx); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(m.TotalByteRx); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(m.L7Request); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(m.L7Response); err != nil {
+		return err
+	}
+
+	if err := block.WriteFloat64(float64(m.RTT)); err != nil {
+		return err
+	}
+	if err := block.WriteFloat64(float64(m.RTTClientSum)); err != nil {
+		return err
+	}
+	if err := block.WriteFloat64(float64(m.RTTServerSum)); err != nil {
+		return err
+	}
+	if err := block.WriteFloat64(float64(m.SRTSum)); err != nil {
+		return err
+	}
+	if err := block.WriteFloat64(float64(m.ARTSum)); err != nil {
+		return err
+	}
+	if err := block.WriteFloat64(float64(m.RRTSum)); err != nil {
+		return err
+	}
+
+	if err := block.WriteUInt64(uint64(m.RTTClientCount)); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(uint64(m.RTTServerCount)); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(uint64(m.SRTCount)); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(uint64(m.ARTCount)); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(uint64(m.RRTCount)); err != nil {
+		return err
+	}
+
+	if err := block.WriteUInt32(m.RTTClientMax); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(m.RTTServerMax); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(m.SRTMax); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(m.ARTMax); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(m.RRTMax); err != nil {
+		return err
+	}
+
+	if err := block.WriteUInt32(m.RetransTx); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(m.RetransRx); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(m.ZeroWinTx); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(m.ZeroWinRx); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(m.L7ClientError); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(m.L7ServerError); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(m.L7ServerTimeout); err != nil {
+		return err
+	}
+	return nil
 }
 
 func parseUint32EpcID(v uint32) int32 {
@@ -169,115 +712,37 @@ func parseUint32EpcID(v uint32) int32 {
 	return int32(math.MaxUint16 & v)
 }
 
-func castTypeToString(castType uint8) string {
-	switch zerodoc.CastTypeEnum(castType) {
-	case zerodoc.BROADCAST:
-		return "broadcast"
-	case zerodoc.MULTICAST:
-		return "multicast"
-	case zerodoc.UNICAST:
-		return "unicast"
-	default:
-		return "unknown"
-	}
-
-}
-
-func getCastTypes(castTypeMap uint8, castTypes []string) []string {
-	// 不记录zerodoc.UNKNOWN(已知单播)
-	for i := int(zerodoc.UNKNOWN) + 1; i < int(zerodoc.MAX_CAST_TYPE); i++ {
-		castType := castTypeMap & (1 << i)
-		if castType != 0 {
-			castTypes = append(castTypes, castTypeToString(uint8(i)))
-		}
-	}
-	return castTypes
-}
-
-func getPacketSizes(packetSizeMap uint16, packetSizes []string) []string {
-	for i := 0; i < int(zerodoc.MAX_PACKET_SIZE-zerodoc.PACKET_SIZE_0_64); i++ {
-		if packetSizeMap&(1<<i) != 0 {
-			packetSizes = append(packetSizes, zerodoc.TTL_PACKET_SIZE[i+int(zerodoc.PACKET_SIZE_0_64)])
-		}
-	}
-	return packetSizes
-}
-
-func getTTLs(TTLMap uint16, TTLs []string) []string {
-	for i := 0; i < int(zerodoc.MAX_TTL-zerodoc.TTL_1); i++ {
-		if TTLMap&(1<<i) != 0 {
-			TTLs = append(TTLs, zerodoc.TTL_PACKET_SIZE[i+int(zerodoc.TTL_1)])
-		}
-	}
-	return TTLs
-}
-
-func getTCPFlags(TCPFlagsMap uint16, TCPFlags []uint32) []uint32 {
-	for i := 0; i < int(zerodoc.MAX_TCP_FLAGS_INDEX-zerodoc.TCP_FLAG_SYN_INDEX); i++ {
-		if TCPFlagsMap&(1<<i) != 0 {
-			TCPFlags = append(TCPFlags, uint32(zerodoc.TCPIndexToFlags[i+int(zerodoc.TCP_FLAG_SYN_INDEX)]))
-		}
-	}
-	return TCPFlags
-
-}
-
 func (d *DataLinkLayer) Fill(f *datatype.TaggedFlow) {
-	d.MAC0 = utils.Uint64ToMac(f.MACSrc).String()
-	d.MAC1 = utils.Uint64ToMac(f.MACDst).String()
+	d.MAC0 = f.MACSrc
+	d.MAC1 = f.MACDst
 	d.EthType = uint16(f.EthType)
-	d.CastTypes0 = getCastTypes(f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].CastTypeMap, d.CastTypes0)
-	d.CastTypes1 = getCastTypes(f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].CastTypeMap, d.CastTypes1)
-	d.PacketSizes0 = getPacketSizes(f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].PacketSizeMap, d.PacketSizes0)
-	d.PacketSizes1 = getPacketSizes(f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].PacketSizeMap, d.PacketSizes1)
 	d.VLAN = f.VLAN
 }
 
 func (n *NetworkLayer) Fill(f *datatype.TaggedFlow, isIPV6 bool) {
 	// 广域网IP为0.0.0.0或::
 	if isIPV6 {
-		n.IPVersion = 6
-		if datatype.EPC_FROM_INTERNET == f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].L3EpcID {
-			n.IP0 = "::"
-		} else {
-			n.IP0 = f.IP6Src.String()
-		}
-		if datatype.EPC_FROM_INTERNET == f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].L3EpcID {
-			n.IP1 = "::"
-		} else {
-			n.IP1 = f.IP6Dst.String()
-		}
-		n.RealIP0 = f.IP6Src.String()
-		n.RealIP1 = f.IP6Dst.String()
+		n.IsIPv4 = false
+		n.IP60 = f.IP6Src
+		n.IP61 = f.IP6Dst
 	} else {
-		n.IPVersion = 4
-		if datatype.EPC_FROM_INTERNET == f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].L3EpcID {
-			n.IP0 = "0.0.0.0"
-		} else {
-			n.IP0 = IPIntToString(uint32(f.IPSrc))
-		}
-		if datatype.EPC_FROM_INTERNET == f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].L3EpcID {
-			n.IP1 = "0.0.0.0"
-		} else {
-			n.IP1 = IPIntToString(uint32(f.IPDst))
-		}
-		n.RealIP0 = IPIntToString(uint32(f.IPSrc))
-		n.RealIP1 = IPIntToString(uint32(f.IPDst))
+		n.IsIPv4 = true
+		n.IP40 = f.IPSrc
+		n.IP41 = f.IPDst
 	}
 
-	n.Protocol = uint16(f.Proto)
+	n.Protocol = uint8(f.Proto)
 	if f.Tunnel.Type != datatype.TUNNEL_TYPE_NONE {
 		n.TunnelTier = f.Tunnel.Tier
 		n.TunnelTxID = f.Tunnel.TxId
 		n.TunnelRxID = f.Tunnel.RxId
 		n.TunnelType = uint16(f.Tunnel.Type)
-		n.TunnelTxIP0 = IPIntToString(f.Tunnel.TxIP0)
-		n.TunnelTxIP1 = IPIntToString(f.Tunnel.TxIP1)
-		n.TunnelRxIP0 = IPIntToString(f.Tunnel.RxIP0)
-		n.TunnelRxIP1 = IPIntToString(f.Tunnel.RxIP1)
+		n.TunnelTxIP40 = f.Tunnel.TxIP0
+		n.TunnelTxIP41 = f.Tunnel.TxIP1
+		n.TunnelRxIP40 = f.Tunnel.RxIP0
+		n.TunnelRxIP41 = f.Tunnel.RxIP1
+		n.TunnelIsIPv4 = true
 	}
-	n.TTLs0 = getTTLs(f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].TTLMap, n.TTLs0)
-	n.TTLs1 = getTTLs(f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].TTLMap, n.TTLs1)
 }
 
 func (t *TransportLayer) Fill(f *datatype.TaggedFlow) {
@@ -285,19 +750,11 @@ func (t *TransportLayer) Fill(f *datatype.TaggedFlow) {
 	t.ServerPort = f.PortDst
 	t.TCPFlagsBit0 = uint16(f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].TCPFlags)
 	t.TCPFlagsBit1 = uint16(f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].TCPFlags)
-
-	t.TCPFlags0 = getTCPFlags(f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].TCPFlagsMap, t.TCPFlags0)
-	t.TCPFlags1 = getTCPFlags(f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].TCPFlagsMap, t.TCPFlags1)
 }
 
 func (a *ApplicationLayer) Fill(f *datatype.TaggedFlow) {
-	a.L7Protocol = "others" // HTTP, DNS, others
 	if f.FlowPerfStats != nil {
-		if f.FlowPerfStats.L7Protocol == datatype.L7_PROTOCOL_HTTP {
-			a.L7Protocol = "HTTP"
-		} else if f.FlowPerfStats.L7Protocol == datatype.L7_PROTOCOL_DNS {
-			a.L7Protocol = "DNS"
-		}
+		a.L7Protocol = uint8(f.FlowPerfStats.L7Protocol)
 	}
 }
 
@@ -345,30 +802,30 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool) {
 	}
 
 	if info0 != nil {
-		k.RegionID0 = info0.RegionID
-		k.AZID0 = info0.AZID
-		k.HostID0 = info0.HostID
-		k.L3DeviceType0 = info0.DeviceType
+		k.RegionID0 = uint16(info0.RegionID)
+		k.AZID0 = uint16(info0.AZID)
+		k.HostID0 = uint16(info0.HostID)
+		k.L3DeviceType0 = uint8(info0.DeviceType)
 		k.L3DeviceID0 = info0.DeviceID
 		k.PodNodeID0 = info0.PodNodeID
-		k.PodNSID0 = info0.PodNSID
+		k.PodNSID0 = uint16(info0.PodNSID)
 		k.PodGroupID0 = info0.PodGroupID
 		k.PodID0 = info0.PodID
-		k.PodClusterID0 = info0.PodClusterID
-		k.SubnetID0 = info0.SubnetID
+		k.PodClusterID0 = uint16(info0.PodClusterID)
+		k.SubnetID0 = uint16(info0.SubnetID)
 	}
 	if info1 != nil {
-		k.RegionID1 = info1.RegionID
-		k.AZID1 = info1.AZID
-		k.HostID1 = info1.HostID
-		k.L3DeviceType1 = info1.DeviceType
+		k.RegionID1 = uint16(info1.RegionID)
+		k.AZID1 = uint16(info1.AZID)
+		k.HostID1 = uint16(info1.HostID)
+		k.L3DeviceType1 = uint8(info1.DeviceType)
 		k.L3DeviceID1 = info1.DeviceID
 		k.PodNodeID1 = info1.PodNodeID
-		k.PodNSID1 = info1.PodNSID
+		k.PodNSID1 = uint16(info1.PodNSID)
 		k.PodGroupID1 = info1.PodGroupID
 		k.PodID1 = info1.PodID
-		k.PodClusterID1 = info1.PodClusterID
-		k.SubnetID1 = info1.SubnetID
+		k.PodClusterID1 = uint16(info1.PodClusterID)
+		k.SubnetID1 = uint16(info1.SubnetID)
 	}
 	k.L3EpcID0, k.L3EpcID1 = l3EpcID0, l3EpcID1
 	if l2Info0 != nil {
@@ -377,14 +834,20 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool) {
 	if l2Info1 != nil {
 		k.EpcID1 = parseUint32EpcID(l2Info1.L2EpcID)
 	}
+
+	// fix me 目前默认写1
+	k.GroupIDs0 = []uint16{1}
+	k.GroupIDs1 = []uint16{1}
+	k.BusinessIDs0 = []uint16{1}
+	k.BusinessIDs1 = []uint16{1}
 }
 
 func (i *FlowInfo) Fill(f *datatype.TaggedFlow) {
 	i.CloseType = uint16(f.CloseType)
 	i.FlowSource = uint16(f.FlowSource)
-	i.FlowIDStr = strconv.FormatInt(int64(f.FlowID), 10)
+	i.FlowIDStr = f.FlowID
 	i.TapType = uint16(f.TapType)
-	i.TapPort = fmt.Sprintf("%08x", f.TapPort)
+	i.TapPort = f.TapPort
 	i.VtapID = f.VtapId
 
 	i.L2End0 = f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].IsL2End
@@ -392,8 +855,8 @@ func (i *FlowInfo) Fill(f *datatype.TaggedFlow) {
 	i.L3End0 = f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].IsL3End
 	i.L3End1 = f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].IsL3End
 
-	i.StartTime = uint64(f.StartTime / time.Second)
-	i.EndTime = uint64(f.EndTime / time.Second)
+	i.StartTime = uint32(f.StartTime / time.Second)
+	i.EndTime = uint32(f.EndTime / time.Second)
 	i.Duration = uint64(f.Duration / time.Microsecond)
 }
 
@@ -419,23 +882,22 @@ func (m *Metrics) Fill(f *datatype.TaggedFlow) {
 		m.L7ServerError = f.L7PerfStats.ErrServerCount
 		m.L7ServerTimeout = f.L7PerfStats.ErrTimeout
 
-		if f.TCPPerfStats.RTTClientCount != 0 {
-			m.RTTClient = f.TCPPerfStats.RTTClientSum / f.TCPPerfStats.RTTClientCount
-		}
-		if f.TCPPerfStats.RTTServerCount != 0 {
-			m.RTTServer = f.TCPPerfStats.RTTServerSum / f.TCPPerfStats.RTTServerCount
-		}
-
 		m.RTT = f.TCPPerfStats.RTT
-		if f.TCPPerfStats.SRTCount != 0 {
-			m.SRT = f.TCPPerfStats.SRTSum / f.TCPPerfStats.SRTCount
-		}
-		if f.TCPPerfStats.ARTCount != 0 {
-			m.ART = f.TCPPerfStats.ARTSum / f.TCPPerfStats.ARTCount
-		}
-		if f.L7PerfStats.RRTCount != 0 {
-			m.RRT = uint32(f.L7PerfStats.RRTSum / uint64(f.L7PerfStats.RRTCount))
-		}
+		m.RTTClientSum = f.TCPPerfStats.RTTClientSum
+		m.RTTClientCount = f.TCPPerfStats.RTTClientCount
+
+		m.RTTServerSum = f.TCPPerfStats.RTTServerSum
+		m.RTTServerCount = f.TCPPerfStats.RTTServerCount
+
+		m.SRTSum = f.TCPPerfStats.SRTSum
+		m.SRTCount = f.TCPPerfStats.SRTCount
+
+		m.ARTSum = f.TCPPerfStats.ARTSum
+		m.ARTCount = f.TCPPerfStats.ARTCount
+
+		m.RRTSum = f.L7PerfStats.RRTSum
+		m.RRTCount = f.L7PerfStats.RRTCount
+
 		m.RTTClientMax = f.TCPPerfStats.RTTClientMax
 		m.RTTServerMax = f.TCPPerfStats.RTTServerMax
 		m.SRTMax = f.TCPPerfStats.SRTMax
@@ -453,6 +915,60 @@ func (f *FlowLogger) Release() {
 	ReleaseFlowLogger(f)
 }
 
+func FlowLoggerColumns() []*ckdb.Column {
+	columns := []*ckdb.Column{}
+	columns = append(columns, ckdb.NewColumn("_id", ckdb.UInt64).SetCodec(ckdb.CodecDoubleDelta))
+	columns = append(columns, DataLinkLayerColumns...)
+	columns = append(columns, KnowledgeGraphColumns...)
+	columns = append(columns, NetworkLayerColumns...)
+	columns = append(columns, TransportLayerColumns...)
+	columns = append(columns, ApplicationLayerColumns...)
+	columns = append(columns, InternetColumns...)
+	columns = append(columns, FlowInfoColumns...)
+	columns = append(columns, MetricsColumns...)
+	return columns
+}
+
+func (f *FlowLogger) WriteBlock(block *ckdb.Block) error {
+	if err := block.WriteUInt64(f._id); err != nil {
+		return err
+	}
+
+	if err := f.DataLinkLayer.WriteBlock(block); err != nil {
+		return err
+	}
+
+	if err := f.KnowledgeGraph.WriteBlock(block); err != nil {
+		return err
+	}
+
+	if err := f.NetworkLayer.WriteBlock(block); err != nil {
+		return err
+	}
+
+	if err := f.TransportLayer.WriteBlock(block); err != nil {
+		return err
+	}
+
+	if err := f.ApplicationLayer.WriteBlock(block); err != nil {
+		return err
+	}
+
+	if err := f.Internet.WriteBlock(block); err != nil {
+		return err
+	}
+
+	if err := f.FlowInfo.WriteBlock(block); err != nil {
+		return err
+	}
+
+	if err := f.Metrics.WriteBlock(block); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (f *FlowLogger) EndTime() time.Duration {
 	return time.Duration(f.FlowInfo.EndTime) * time.Second
 }
@@ -463,14 +979,6 @@ func (f *FlowLogger) String() string {
 
 var poolFlowLogger = pool.NewLockFreePool(func() interface{} {
 	l := new(FlowLogger)
-	l.CastTypes0 = make([]string, 0)
-	l.CastTypes1 = make([]string, 0)
-	l.PacketSizes0 = make([]string, 0)
-	l.PacketSizes1 = make([]string, 0)
-	l.TTLs0 = make([]string, 0)
-	l.TTLs1 = make([]string, 0)
-	l.TCPFlags0 = make([]uint32, 0)
-	l.TCPFlags1 = make([]uint32, 0)
 	return l
 })
 
@@ -487,30 +995,23 @@ func ReleaseFlowLogger(l *FlowLogger) {
 	if l.SubReferenceCount() {
 		return
 	}
-	castType0 := l.CastTypes0
-	castType1 := l.CastTypes1
-	packetSizes0 := l.PacketSizes0
-	packetSizes1 := l.PacketSizes1
-	TTLs0 := l.TTLs0
-	TTLs1 := l.TTLs1
-	TCPFlags0 := l.TCPFlags0
-	TCPFlags1 := l.TCPFlags1
 	*l = FlowLogger{}
-	l.CastTypes0 = castType0[:0]
-	l.CastTypes1 = castType1[:0]
-	l.PacketSizes0 = packetSizes0[:0]
-	l.PacketSizes1 = packetSizes1[:0]
-	l.TTLs0 = TTLs0[:0]
-	l.TTLs1 = TTLs1[:0]
-	l.TCPFlags0 = TCPFlags0[:0]
-	l.TCPFlags1 = TCPFlags1[:0]
 	poolFlowLogger.Put(l)
 }
 
-func TaggedFlowToLogger(f *datatype.TaggedFlow) *FlowLogger {
+var L4FlowCounter uint32
+
+func genID(time uint32, counter *uint32, shardID int) uint64 {
+	count := atomic.AddUint32(counter, 1)
+	// 高32位时间，24-32位 表示 shardid, 低24位是counter
+	return uint64(time)<<32 | (uint64(shardID) << 24) | (uint64(count) & 0xffffff)
+}
+
+func TaggedFlowToLogger(f *datatype.TaggedFlow, shardID int) *FlowLogger {
 	isIPV6 := f.EthType == layers.EthernetTypeIPv6
 
 	s := AcquireFlowLogger()
+	s._id = genID(uint32(f.StartTime/time.Second), &L4FlowCounter, shardID)
 	s.DataLinkLayer.Fill(f)
 	s.NetworkLayer.Fill(f, isIPV6)
 	s.TransportLayer.Fill(f)

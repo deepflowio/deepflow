@@ -19,6 +19,7 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/logger"
 	"gitlab.x.lan/yunshan/droplet-libs/receiver"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.x.lan/yunshan/droplet/datasource"
 	yaml "gopkg.in/yaml.v2"
 
 	"gitlab.x.lan/yunshan/droplet/config"
@@ -104,6 +105,7 @@ func main() {
 		bytes, _ = yaml.Marshal(rozeConfig)
 		log.Infof("roze config:\n%s", string(bytes))
 
+		// 写遥测数据
 		roze, err := roze.NewRoze(rozeConfig, receiver)
 		if err != nil {
 			fmt.Println(err)
@@ -112,9 +114,20 @@ func main() {
 		roze.Start()
 		defer roze.Close()
 
-		stream := stream.NewStream(streamConfig, receiver)
+		// 写流日志数据
+		stream, err := stream.NewStream(streamConfig, receiver)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 		stream.Start()
 		defer stream.Close()
+
+		// 创建、修改、删除数据源及其存储时长
+		ds := datasource.NewDatasourceManager([]string{rozeConfig.CKDB.Primary, rozeConfig.CKDB.Secondary},
+			rozeConfig.CKDBAuth.Username, rozeConfig.CKDBAuth.Password)
+		ds.Start()
+		defer ds.Close()
 	}
 
 	// setup system signal

@@ -36,7 +36,7 @@ func TestZeroToNull(t *testing.T) {
 	pf.New(nil, 0, "stream", nil)
 	taggedFlow := datatype.TaggedFlow{}
 
-	flow := TaggedFlowToLogger(&taggedFlow)
+	flow := TaggedFlowToLogger(&taggedFlow, 0)
 
 	flowByte, _ := json.Marshal(flow)
 
@@ -80,7 +80,7 @@ func TestProtoLogToHTTPLogger(t *testing.T) {
 	appData.Proto = datatype.PROTO_HTTP
 	appData.Detail = &datatype.HTTPInfo{}
 
-	httpData := ProtoLogToHTTPLogger(appData)
+	httpData := ProtoLogToHTTPLogger(appData, 0)
 	if httpData.VtapID != 123 {
 		t.Errorf("expect 123, result %v", httpData.VtapID)
 	}
@@ -98,7 +98,7 @@ func TestProtoLogToDNSLogger(t *testing.T) {
 	appData.Proto = datatype.PROTO_HTTP
 	appData.Detail = &datatype.DNSInfo{}
 
-	dnsData := ProtoLogToDNSLogger(appData)
+	dnsData := ProtoLogToDNSLogger(appData, 0)
 	if dnsData.TapType != 3 {
 		t.Errorf("expect 3, result %v", dnsData.TapType)
 	}
