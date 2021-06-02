@@ -220,9 +220,9 @@ func (s *AdapterStatus) Update(now uint32, msgType uint8, vtapID uint16, ip net.
 		// 定期获取trident活跃信息，上报trisolaris
 		if now-s.lastTCPUpdate > RECORD_STATUS_TIMEOUT {
 			s.lastTCPUpdate = now
-			TCPStatus := make([]*Status, 0, len(s.UDPStatusFlow))
+			TCPStatus := make([]*Status, 0, len(s.TCPStatusFlow))
 			s.TCPStatusLocks[datatype.MESSAGE_TYPE_METRICS].Lock()
-			for _, status := range s.UDPStatusFlow[datatype.MESSAGE_TYPE_METRICS] {
+			for _, status := range s.TCPStatusFlow[datatype.MESSAGE_TYPE_METRICS] {
 				TCPStatus = append(TCPStatus, status)
 			}
 			s.TCPStatusLocks[datatype.MESSAGE_TYPE_METRICS].Unlock()
