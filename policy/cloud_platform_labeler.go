@@ -49,7 +49,6 @@ type CloudPlatformLabeler struct {
 	ipTables            [MASK_LEN_NUM]*IpTable
 	ip6Tables           *Ip6Table // TODO: 因为目前IPv6不支持IP资源组类型的，掩码都是128，所以不用建数组
 	epcIpTable          *EpcIpTable
-	ipGroup             *IpResourceGroup
 	netmaskBitmap       uint32
 	peerConnectionTable map[int32][]int32
 	epcCidrMapData      map[int32][]*Cidr
@@ -79,7 +78,6 @@ func NewCloudPlatformLabeler(queueCount int, mapSize uint32) *CloudPlatformLabel
 		ipTables:            ipTables,
 		ip6Tables:           ip6Tables,
 		epcIpTable:          epcIpTable,
-		ipGroup:             NewIpResourceGroup(),
 		netmaskBitmap:       uint32(0),
 		peerConnectionTable: make(map[int32][]int32),
 	}
@@ -357,10 +355,6 @@ func (l *CloudPlatformLabeler) UpdateInterfaceTable(platformDatas []PlatformData
 		l.UpdateEpcIpTable(l.GenerateEpcIpData(platformDatas))
 		l.UpdateMacForIpTable(l.GenerateMacForIpTable(platformDatas))
 	}
-}
-
-func (l *CloudPlatformLabeler) UpdateGroupTree(ipGroupDatas []*IpGroupData) {
-	l.ipGroup.Update(ipGroupDatas)
 }
 
 func (l *CloudPlatformLabeler) UpdateCidr(cidrs []*Cidr) {

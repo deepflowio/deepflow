@@ -30,6 +30,7 @@ type Padding [8]uint64
 type FastPath struct {
 	maskMapFromPlatformData [math.MaxUint16 + 1]uint32
 	maskMapFromIpGroupData  [math.MaxUint16 + 1]uint32
+	maskMapFromCidrData     [math.MaxUint16 + 1]uint32
 	padding0                Padding                    // 避免cache miss
 	IpNetmaskMap            [math.MaxUint16 + 1]uint32 // 根据IP地址查找对应的最大掩码
 	padding1                Padding
@@ -196,6 +197,9 @@ func (f *FastPath) makeIpNetmaskMap() {
 		if f.IpNetmaskMap[i] < f.maskMapFromIpGroupData[i] {
 			f.IpNetmaskMap[i] = f.maskMapFromIpGroupData[i]
 		}
+		if f.IpNetmaskMap[i] < f.maskMapFromCidrData[i] {
+			f.IpNetmaskMap[i] = f.maskMapFromCidrData[i]
+		}
 	}
 }
 
@@ -278,6 +282,53 @@ func (f *FastPath) GenerateIpNetmaskMapFromIpGroupData(data []*IpGroupData) {
 				if maskMap[uint16(netIp>>16)] < mask {
 					maskMap[uint16(netIp>>16)] = mask
 				}
+			}
+		}
+	}
+
+	f.makeIpNetmaskMap()
+}
+
+func (f *FastPath) GenerateIpNetmaskMapFromCidrData(data []*Cidr) {
+	maskMap := &f.maskMapFromCidrData
+	for key, _ := range maskMap {
+		maskMap[key] = 0
+	}
+	for _, d := range data {
+		ip := d.IpNet.IP
+		netmask := d.IpNet.Mask
+
+		if ip = ip.To4(); ip == nil {
+			// IPv6不支持
+			continue
+		}
+		maskSize, bits := netmask.Size()
+		if maskSize == 0 && bits == 0 {
+			continue
+		}
+
+		ip4 := IpToUint32(ip)
+		if ip4 == 0 {
+			continue
+		}
+
+		minNetIp := ip4 & STANDARD_NETMASK
+		maxNetIp := minNetIp
+		mask := uint32(math.MaxUint32) << uint32(32-maskSize)
+		// netmask must be either 0 or STANDARD_NETMASK~math.MaxUint32
+		if mask < STANDARD_NETMASK {
+			minNetIp = ip4 & mask
+			maxNetIp = (minNetIp | ^mask) & STANDARD_NETMASK
+			mask = STANDARD_NETMASK
+		}
+		count := 0
+		for netIp := minNetIp; netIp <= maxNetIp && netIp >= minNetIp; netIp += 0x10000 {
+			if count > 0xffff {
+				break
+			}
+			count++
+			if maskMap[uint16(netIp>>16)] < mask {
+				maskMap[uint16(netIp>>16)] = mask
 			}
 		}
 	}
