@@ -477,12 +477,13 @@ func (d *Ddbs) UpdateInterfaceData(data []PlatformData) {
 }
 
 func (d *Ddbs) UpdateIpGroupData(data []*IpGroupData) {
-	d.GenerateIpNetmaskMapFromIpGroupData(data)
 	d.generateGroupIpMap(data)
+	d.GenerateIpNetmaskMapFromIpGroupData(data)
 }
 
 func (d *Ddbs) UpdateCidr(data []*Cidr) {
 	d.cloudPlatformLabeler.UpdateCidr(data)
+	d.GenerateIpNetmaskMapFromCidrData(data)
 }
 
 func (d *Ddbs) GetPolicyByFastPath(packet *LookupKey, policy *PolicyData) *EndpointStore {
