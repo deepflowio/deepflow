@@ -228,7 +228,6 @@ func (t *PolicyTable) UpdateInterfaceData(data []PlatformData) {
 }
 
 func (t *PolicyTable) UpdateIpGroupData(data []*IpGroupData) {
-	t.cloudPlatformLabeler.UpdateGroupTree(data)
 	t.operator.UpdateIpGroupData(data)
 }
 
@@ -237,7 +236,7 @@ func (t *PolicyTable) UpdatePeerConnection(data []*PeerConnection) {
 }
 
 func (t *PolicyTable) UpdateCidrs(data []*Cidr) {
-	t.cloudPlatformLabeler.UpdateCidr(data)
+	t.operator.UpdateCidr(data)
 }
 
 func (t *PolicyTable) UpdateAclData(data []*Acl, check ...bool) {
