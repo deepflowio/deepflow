@@ -1287,6 +1287,27 @@ func TestDdbsProtocol(t *testing.T) {
 	}
 }
 
+func TestDdbsCidr(t *testing.T) {
+	// 创建 policyTable
+	table := NewPolicyTable(1, 1024, false, DDBS)
+	cidr := generateCidr(10, 1, "192.168.2.12/24")
+	table.UpdateCidrs([]*Cidr{cidr})
+
+	// 192.168.2.12 > 192.168.10.10
+	key := generateLookupKey(0, 0, ip1, ip7, IPProtocolTCP, 0, 0)
+	endpointData, _ := table.lookupAllByKey(key)
+	if endpointData.SrcInfo.L3EpcId != 10 {
+		t.Error(endpointData)
+	}
+
+	// 192.168.0.12 > 192.168.10.10
+	key1 := generateLookupKey(0, 0, ip4, ip7, IPProtocolTCP, 0, 0)
+	endpointData, _ = table.lookupAllByKey(key1)
+	if endpointData.SrcInfo.L3EpcId == 10 {
+		t.Error(endpointData)
+	}
+}
+
 func BenchmarkDdbsAcl(b *testing.B) {
 	acls := []*Acl{}
 	table := generatePolicyTable(DDBS)
