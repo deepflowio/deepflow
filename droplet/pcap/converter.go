@@ -22,6 +22,11 @@ func NewRawPacket(buffer []byte) RawPacket {
 }
 
 func (p RawPacket) MetaPacketToRaw(packet *datatype.MetaPacket, tcpipChecksum bool) int {
+	if packet.RawHeaderSize > 0 {
+		copy(p, packet.RawHeader)
+		return int(packet.RawHeaderSize)
+	}
+
 	size := 0
 
 	size += p.fillEthernet(packet, size)
@@ -80,7 +85,6 @@ func (p RawPacket) fillIpTotalLen(packet *datatype.MetaPacket, at int) {
 		ipTotalLen += 8
 	}
 
-	ipTotalLen += packet.PayloadLen
 	binary.BigEndian.PutUint16(p[at:], ipTotalLen)
 }
 
@@ -193,7 +197,7 @@ func (p RawPacket) fillIPv6(packet *datatype.MetaPacket, start int) int {
 }
 
 func (p RawPacket) fillICMPv4(packet *datatype.MetaPacket, start int) int {
-	return copy(p[start:], packet.RawHeader)
+	return copy(p[start:], packet.RawIcmp)
 }
 
 const (
@@ -270,10 +274,6 @@ func (p RawPacket) fillTCP(packet *datatype.MetaPacket, start, ipv4Offset int, c
 		binary.BigEndian.PutUint16(base[TCP_CHECKSUM_OFFSET:], 0)
 	}
 
-	if packet.PayloadLen > 0 {
-		length += copy(base[length:], packet.RawHeader)
-	}
-
 	return length
 }
 
@@ -289,10 +289,6 @@ func (p RawPacket) fillUDP(packet *datatype.MetaPacket, start, ipv4Offset int, c
 	base := p[start:]
 
 	length := UDP_LEN
-	if packet.PayloadLen > 0 {
-		length += copy(base[UDP_LEN:], packet.RawHeader)
-	}
-
 	binary.BigEndian.PutUint16(base[UDP_SPORT_OFFSET:], packet.PortSrc)
 	binary.BigEndian.PutUint16(base[UDP_DPORT_OFFSET:], packet.PortDst)
 	binary.BigEndian.PutUint16(base[UDP_LENGTH_OFFSET:], uint16(length))
@@ -343,7 +339,7 @@ func (p RawPacket) fillOthers(packet *datatype.MetaPacket, start int) int {
 	base := p[start:]
 
 	length := 0
-	if packet.PayloadLen > 0 {
+	if packet.RawHeaderSize > 0 {
 		length += copy(base, packet.RawHeader)
 	}
 	return length

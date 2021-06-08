@@ -80,7 +80,10 @@ func (w *Writer) init(filename string) error {
 }
 
 func (w *Writer) Write(packet *datatype.MetaPacket) error {
-	maxPacketSize := RECORD_HEADER_LEN + MAX_HEADER_LEN + SLICE_PAYLOAD_LEN + int(packet.PayloadLen)
+	maxPacketSize := RECORD_HEADER_LEN + MAX_HEADER_LEN
+	if packet.RawHeaderSize > 0 {
+		maxPacketSize = RECORD_HEADER_LEN + int(packet.RawHeaderSize)
+	}
 	if w.bufferSize-w.offset < maxPacketSize {
 		if err := w.Flush(); err != nil {
 			return err
