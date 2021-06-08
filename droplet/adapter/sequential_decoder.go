@@ -17,7 +17,7 @@ const (
 	ICMP_REST            = 28
 	IPV6_ADDR_LEN        = 16
 	COMPRESS_HEADER_SIZE = 21 // VERSION(1) + SEQ(8) + TIMESAMP(8) + IF_MAC(4)
-	_VERSION             = 7
+	_VERSION             = 8
 )
 
 const (
@@ -207,7 +207,7 @@ func (d *SequentialDecoder) decodeIPv6(meta *MetaPacket) {
 	}
 	if x.headerType == HEADER_TYPE_IPV6 {
 		meta.Protocol = meta.NextHeader
-		d.decodePayload(meta)
+		d.decodePacket(meta)
 		return
 	}
 	d.decodeL4(meta)
@@ -259,7 +259,7 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPacket) {
 	} else if x.headerType == HEADER_TYPE_IPV4 {
 		proto := d.U8()
 		meta.Protocol = IPProtocol(proto)
-		d.decodePayload(meta)
+		d.decodePacket(meta)
 		return
 	}
 	d.decodeL4(meta)
@@ -267,10 +267,10 @@ func (d *SequentialDecoder) decodeIPv4(meta *MetaPacket) {
 
 func (d *SequentialDecoder) decodeICMP(meta *MetaPacket) {
 	stream := &d.data
-	meta.RawHeader = make([]byte, ICMP_HEADER_SIZE+ICMP_REST)
+	meta.RawIcmp = make([]byte, ICMP_HEADER_SIZE+ICMP_REST)
 	icmpType, icmpCode := d.U8(), d.U8()
-	meta.RawHeader[0] = icmpType
-	meta.RawHeader[1] = icmpCode
+	meta.RawIcmp[0] = icmpType
+	meta.RawIcmp[1] = icmpCode
 	dataLen := 0
 	switch icmpType {
 	case ICMPv4TypeDestinationUnreachable:
@@ -286,15 +286,13 @@ func (d *SequentialDecoder) decodeICMP(meta *MetaPacket) {
 		if stream.Len() < dataLen {
 			dataLen = stream.Len()
 		}
-		meta.RawHeader = append(meta.RawHeader[:4], d.Field(dataLen)...)
+		meta.RawIcmp = append(meta.RawIcmp[:4], d.Field(dataLen)...)
 		dataLen += 4
 	default:
 		dataLen = 4 + ICMP_ID_SEQ
-		meta.RawHeader = append(meta.RawHeader[:4], d.Field(ICMP_ID_SEQ)...)
+		meta.RawIcmp = append(meta.RawIcmp[:4], d.Field(ICMP_ID_SEQ)...)
 	}
-	if slicedPayloadSize := d.U16(); slicedPayloadSize > 0 {
-		meta.RawHeader = append(meta.RawHeader[:dataLen], d.Field(int(slicedPayloadSize))...)
-	}
+	d.decodePacket(meta)
 }
 
 func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
@@ -315,7 +313,7 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 	}
 	if x.headerType == HEADER_TYPE_IPV4_UDP || x.headerType == HEADER_TYPE_IPV6_UDP {
 		meta.Protocol = IPProtocolUDP
-		d.decodePayload(meta)
+		d.decodePacket(meta)
 		return
 	}
 	meta.Protocol = IPProtocolTCP
@@ -344,7 +342,7 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 		}
 	}
 
-	d.decodePayload(meta)
+	d.decodePacket(meta)
 }
 
 func (d *SequentialDecoder) DecodeHeader(frameSize uint16) (bool, uint16) {
@@ -402,10 +400,10 @@ func (d *SequentialDecoder) NextPacket(meta *MetaPacket) bool {
 	return false
 }
 
-func (d *SequentialDecoder) decodePayload(meta *MetaPacket) {
-	meta.PayloadLen = d.U16()
-	if meta.PayloadLen > 0 {
-		meta.RawHeader = make([]byte, meta.PayloadLen)
-		copy(meta.RawHeader, d.Field(int(meta.PayloadLen)))
+func (d *SequentialDecoder) decodePacket(meta *MetaPacket) {
+	meta.RawHeaderSize = d.U16()
+	if meta.RawHeaderSize > 0 {
+		meta.RawHeader = make([]byte, meta.RawHeaderSize)
+		copy(meta.RawHeader, d.Field(int(meta.RawHeaderSize)))
 	}
 }

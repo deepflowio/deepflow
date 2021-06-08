@@ -26,9 +26,9 @@ func TestDecoder(t *testing.T) {
 			break
 		}
 
-		l := binary.BigEndian.Uint16(packet[42:])
-		decoder := NewSequentialDecoder(packet[45:])            // 因为pcap是IPv4 + UDP, 所以这里是 14 + 20 + 8 = 42
-		if invalid, _ := decoder.DecodeHeader(l - 3); invalid { // -3是因为需要去除 length 2字节  和 type 1 字节
+		l := binary.BigEndian.Uint32(packet[42:])
+		decoder := NewSequentialDecoder(packet[47:])                    // 因为pcap是IPv4 + UDP, 所以这里是 14 + 20 + 8 = 42
+		if invalid, _ := decoder.DecodeHeader(uint16(l - 5)); invalid { // -5是因为需要去除 length 4字节  和 type 1 字节
 			t.Error(fmt.Sprintf("DecodeHeader failed, invalid header."))
 			continue
 		}
@@ -37,8 +37,8 @@ func TestDecoder(t *testing.T) {
 			if decoder.NextPacket(meta) {
 				break
 			}
-			if len(meta.RawHeader) > 0 {
-				buffer.Write(meta.RawHeader)
+			if len(meta.RawIcmp) > 0 {
+				buffer.Write(meta.RawIcmp)
 			}
 		}
 	}
@@ -67,9 +67,9 @@ func BenchmarkDecoder(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < MIN_PPS; {
-		l := binary.BigEndian.Uint16(packet[42:])
-		decoder := NewSequentialDecoder(packet[45:])
-		if invalid, _ := decoder.DecodeHeader(l - 3); invalid {
+		l := binary.BigEndian.Uint32(packet[42:])
+		decoder := NewSequentialDecoder(packet[47:])
+		if invalid, _ := decoder.DecodeHeader(uint16(l - 5)); invalid {
 			b.Error(fmt.Sprintf("DecodeHeader failed, invalid header."))
 			continue
 		}
