@@ -44,7 +44,8 @@ func OppositePacketDirection(d PacketDirection) PacketDirection {
 
 type MetaPacket struct {
 	// 注意字节对齐!
-	RawHeader []byte // total arp, or icmp header
+	RawHeader []byte // total packet
+	RawIcmp   []byte // icmp header
 
 	Timestamp    time.Duration
 	EndpointData EndpointData
@@ -52,18 +53,18 @@ type MetaPacket struct {
 
 	Tunnel *TunnelInfo
 
-	PacketLen  uint16
-	PayloadLen uint16
-	VtapId     uint16
-	TapType    TapType // (8B)
-	TapPort    uint32
-	L2End0     bool
-	L2End1     bool
-	L3End0     bool
-	L3End1     bool // (8B)
-	L3EpcId0   uint16
-	L3EpcId1   uint16
-	QueueHash  uint8
+	PacketLen     uint16
+	RawHeaderSize uint16
+	VtapId        uint16
+	TapType       TapType // (8B)
+	TapPort       uint32
+	L2End0        bool
+	L2End1        bool
+	L3End0        bool
+	L3End1        bool // (8B)
+	L3EpcId0      uint16
+	L3EpcId1      uint16
+	QueueHash     uint8
 
 	MacSrc  MacInt
 	MacDst  MacInt
@@ -123,7 +124,7 @@ func (p *MetaPacket) String() string {
 		format = "\t%v:%d -> %v:%d l3EpcId: %d -> %d proto: %v ttl: %d ihl: %d id: %d flags: 0x%01x, fragment Offset: %d payload-len: %d"
 		buffer.WriteString(fmt.Sprintf(format, IpFromUint32(p.IpSrc), p.PortSrc,
 			IpFromUint32(p.IpDst), p.PortDst, p.L3EpcId0, p.L3EpcId1, p.Protocol,
-			p.TTL, p.IHL, p.IpID, p.IpFlags>>13, p.IpFlags&0x1FFF, p.PayloadLen))
+			p.TTL, p.IHL, p.IpID, p.IpFlags>>13, p.IpFlags&0x1FFF, p.RawHeaderSize))
 	}
 	if p.Protocol == IPProtocolTCP {
 		buffer.WriteString(fmt.Sprintf(" tcp: %v", &p.TcpData))
@@ -138,6 +139,10 @@ func (p *MetaPacket) String() string {
 	if len(p.RawHeader) > 0 {
 		endIndex := Min(len(p.RawHeader), 64)
 		buffer.WriteString(fmt.Sprintf("\n\tRawHeader len: %v, RawHeader: %v", len(p.RawHeader), hex.EncodeToString(p.RawHeader[:endIndex])))
+	}
+	if len(p.RawIcmp) > 0 {
+		endIndex := Min(len(p.RawIcmp), 64)
+		buffer.WriteString(fmt.Sprintf("\n\tRawIcmp len: %v, RawIcmp: %v", len(p.RawIcmp), hex.EncodeToString(p.RawIcmp[:endIndex])))
 	}
 
 	return buffer.String()
