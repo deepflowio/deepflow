@@ -58,6 +58,8 @@ func newPlatformData(vifData *trident.Interface, platform *datatype.PlatformData
 	platform.IfType = uint8(vifData.GetIfType())
 	platform.IsVIPInterface = vifData.GetIsVipInterface()
 	platform.RegionId = vifData.GetRegionId()
+	platform.PodClusterId = vifData.GetPodClusterId()
+	platform.PodNodeId = vifData.GetPodNodeId()
 	platform.SkipTapInterface = vifData.GetPodNodeId() > 0 && vifData.GetPodClusterId() > 0
 }
 
