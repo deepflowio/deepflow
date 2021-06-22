@@ -15,7 +15,6 @@ type Traffic struct {
 	L3ByteRx   uint64 `db:"l3_byte_rx"`
 	L4ByteTx   uint64 `db:"l4_byte_tx"`
 	L4ByteRx   uint64 `db:"l4_byte_rx"`
-	Flow       uint64 `db:"flow"`
 	NewFlow    uint64 `db:"new_flow"`
 	ClosedFlow uint64 `db:"closed_flow"`
 
@@ -43,7 +42,6 @@ func (t *Traffic) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(t.L3ByteRx)
 	encoder.WriteVarintU64(t.L4ByteTx)
 	encoder.WriteVarintU64(t.L4ByteRx)
-	encoder.WriteVarintU64(t.Flow)
 	encoder.WriteVarintU64(t.NewFlow)
 	encoder.WriteVarintU64(t.ClosedFlow)
 
@@ -62,7 +60,6 @@ func (t *Traffic) Decode(decoder *codec.SimpleDecoder) {
 	t.L3ByteRx = decoder.ReadVarintU64()
 	t.L4ByteTx = decoder.ReadVarintU64()
 	t.L4ByteRx = decoder.ReadVarintU64()
-	t.Flow = decoder.ReadVarintU64()
 	t.NewFlow = decoder.ReadVarintU64()
 	t.ClosedFlow = decoder.ReadVarintU64()
 
@@ -81,7 +78,6 @@ func (t *Traffic) ConcurrentMerge(other *Traffic) {
 	t.L3ByteRx += other.L3ByteRx
 	t.L4ByteTx += other.L4ByteTx
 	t.L4ByteRx += other.L4ByteRx
-	t.Flow += other.Flow
 	t.NewFlow += other.NewFlow
 	t.ClosedFlow += other.ClosedFlow
 
@@ -103,11 +99,11 @@ func (t *Traffic) MarshalTo(b []byte) int {
 	offset += copy(b[offset:], "i,") // 先加',',若后续若没有增加数据，需要去除
 
 	fields := []string{
-		"packet_tx=", "packet_rx=", "byte_tx=", "byte_rx=", "byte=", "l3_byte_tx=", "l3_byte_rx=", "l4_byte_tx=", "l4_byte_rx=", "flow=", "new_flow=", "closed_flow=",
+		"packet_tx=", "packet_rx=", "byte_tx=", "byte_rx=", "byte=", "l3_byte_tx=", "l3_byte_rx=", "l4_byte_tx=", "l4_byte_rx=", "new_flow=", "closed_flow=",
 		"http_request=", "http_response=", "dns_request=", "dns_response=",
 	}
 	values := []uint64{
-		t.PacketTx, t.PacketRx, t.ByteTx, t.ByteRx, t.ByteTx + t.ByteRx, t.L3ByteTx, t.L3ByteRx, t.L4ByteTx, t.L4ByteRx, t.Flow, t.NewFlow, t.ClosedFlow,
+		t.PacketTx, t.PacketRx, t.ByteTx, t.ByteRx, t.ByteTx + t.ByteRx, t.L3ByteTx, t.L3ByteRx, t.L4ByteTx, t.L4ByteRx, t.NewFlow, t.ClosedFlow,
 		t.HTTPRequest, t.HTTPResponse, t.DNSRequest, t.DNSResponse,
 	}
 	n := marshalKeyValues(b[offset:], fields, values)
@@ -245,21 +241,14 @@ func (l *Latency) SequentialMerge(other *Latency) {
 }
 
 func (l *Latency) MarshalTo(b []byte) int {
-	fields := []string{"rtt=", "rtt_client=", "rtt_server=", "srt=", "art=", "http_rrt=", "dns_rrt=", "rtt_max=", "rtt_client_max=", "rtt_server_max=", "srt_max=", "art_max=", "http_rrt_max=", "dns_rrt_max="}
-	dividends := []uint64{l.RTTSum, l.RTTClientSum, l.RTTServerSum, l.SRTSum, l.ARTSum, l.HTTPRRTSum, l.DNSRRTSum}
-	divisors := []uint64{l.RTTCount, l.RTTClientCount, l.RTTServerCount, l.SRTCount, l.ARTCount, l.HTTPRRTCount, l.DNSRRTCount}
-	values := make([]uint64, len(dividends))
-	for i, divisor := range divisors {
-		if divisor == 0 {
-			continue
-		}
-		values[i] = dividends[i] / divisor
-	}
-	rrtMaxValues := []uint64{
+	fields := []string{"rtt_sum=", "rtt_client_sum=", "rtt_server_sum=", "srt_sum=", "art_sum=", "http_rrt_sum=", "dns_rrt_sum=",
+		"rtt_count=", "rtt_client_count=", "rtt_server_count=", "srt_count=", "art_count=", "http_rrt_count=", "dns_rrt_count=",
+		"rtt_max=", "rtt_client_max=", "rtt_server_max=", "srt_max=", "art_max=", "http_rrt_max=", "dns_rrt_max="}
+	values := []uint64{
+		l.RTTSum, l.RTTClientSum, l.RTTServerSum, l.SRTSum, l.ARTSum, l.HTTPRRTSum, l.DNSRRTSum,
+		l.RTTCount, l.RTTClientCount, l.RTTServerCount, l.SRTCount, l.ARTCount, l.HTTPRRTCount, l.DNSRRTCount,
 		uint64(l.RTTMax), uint64(l.RTTClientMax), uint64(l.RTTServerMax), uint64(l.SRTMax), uint64(l.ARTMax), uint64(l.HTTPRRTMax), uint64(l.DNSRRTMax),
 	}
-	values = append(values, rrtMaxValues...)
-
 	return marshalKeyValues(b, fields, values)
 }
 

@@ -152,11 +152,6 @@ type FlowMetricsPeer struct {
 	IsVIP          bool // 从grpc cidr中获取
 	IsLocalMac     bool // 同EndpointInfo中的IsLocalMac, 流日志中不需要存储
 	IsLocalIp      bool // 同EndpointInfo中的IsLocalIp, 流日志中不需要存储
-
-	CastTypeMap   uint8  // 仅包含TSDB中的几个CastType标志位选项
-	TCPFlagsMap   uint16 // 仅包含TSDB中的几个TCP标志位选项
-	TTLMap        uint16 // 仅包含TSDB中的几个TTL标志位选项
-	PacketSizeMap uint16 // 仅包含TSDB中的几个PacketSize标志位选项
 }
 
 const (
@@ -450,10 +445,6 @@ func (f *FlowMetricsPeer) SequentialMerge(rhs *FlowMetricsPeer) {
 	f.IsVIP = rhs.IsVIP
 	f.IsLocalMac = rhs.IsLocalMac
 	f.IsLocalIp = rhs.IsLocalIp
-	f.CastTypeMap |= rhs.CastTypeMap
-	f.TCPFlagsMap |= rhs.TCPFlagsMap
-	f.TTLMap |= rhs.TTLMap
-	f.PacketSizeMap |= rhs.PacketSizeMap
 }
 
 func (f *FlowMetricsPeer) Encode(encoder *codec.SimpleEncoder) {
@@ -475,11 +466,6 @@ func (f *FlowMetricsPeer) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteBool(f.IsDevice)
 	encoder.WriteBool(f.IsVIPInterface)
 	encoder.WriteBool(f.IsVIP)
-
-	encoder.WriteU8(f.CastTypeMap)
-	encoder.WriteU16(f.TCPFlagsMap)
-	encoder.WriteU16(f.TTLMap)
-	encoder.WriteU16(f.PacketSizeMap)
 }
 
 func (f *FlowMetricsPeer) Decode(decoder *codec.SimpleDecoder) {
@@ -501,11 +487,6 @@ func (f *FlowMetricsPeer) Decode(decoder *codec.SimpleDecoder) {
 	f.IsDevice = decoder.ReadBool()
 	f.IsVIPInterface = decoder.ReadBool()
 	f.IsVIP = decoder.ReadBool()
-
-	f.CastTypeMap = decoder.ReadU8()
-	f.TCPFlagsMap = decoder.ReadU16()
-	f.TTLMap = decoder.ReadU16()
-	f.PacketSizeMap = decoder.ReadU16()
 }
 
 // FIXME 注意：由于FlowGenerator中TCPPerfStats在Flow方向调整之后才获取到，

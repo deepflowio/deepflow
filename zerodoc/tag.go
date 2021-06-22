@@ -19,7 +19,6 @@ type Code uint64
 
 const (
 	IP Code = 0x1 << iota
-	GroupID
 	L3EpcID
 	L3Device
 	SubnetID
@@ -32,11 +31,12 @@ const (
 	PodID
 	MAC
 	PodClusterID
+	BusinessIDs
+	GroupIDs
 )
 
 const (
 	IPPath Code = 0x10000 << iota // 1 << 16
-	GroupIDPath
 	L3EpcIDPath
 	L3DevicePath
 	SubnetIDPath
@@ -49,6 +49,8 @@ const (
 	PodIDPath
 	MACPath
 	PodClusterIDPath
+	BusinessIDsPath
+	GroupIDsPath
 )
 
 const (
@@ -62,6 +64,7 @@ const (
 	VTAPID
 	TAPSide
 	TAPPort
+	IsKeyService
 )
 
 const (
@@ -282,46 +285,49 @@ type Field struct {
 	IP6          net.IP // FIXME: 合并IP6和IP
 	MAC          uint64
 	IP           uint32
-	GroupID      int16
 	L3EpcID      int16 // (8B)
-	L3DeviceID   uint16
+	L3DeviceID   uint32
 	L3DeviceType DeviceType
 	RegionID     uint16
 	SubnetID     uint16
 	HostID       uint16
-	PodNodeID    uint16
+	PodNodeID    uint32
 	AZID         uint16
-	PodGroupID   int16
+	PodGroupID   uint32
 	PodNSID      uint16
-	PodID        uint16
+	PodID        uint32
 	PodClusterID uint16
+	BusinessIDs  []uint16
+	GroupIDs     []uint16
 
 	MAC1          uint64
 	IP61          net.IP // FIXME: 合并IP61和IP1
 	IP1           uint32
-	GroupID1      int16
 	L3EpcID1      int16 // (8B)
-	L3DeviceID1   uint16
+	L3DeviceID1   uint32
 	L3DeviceType1 DeviceType // (+1B=8B)
 	RegionID1     uint16
 	SubnetID1     uint16 // (8B)
 	HostID1       uint16
-	PodNodeID1    uint16
+	PodNodeID1    uint32
 	AZID1         uint16
-	PodGroupID1   int16
+	PodGroupID1   uint32
 	PodNSID1      uint16
-	PodID1        uint16
+	PodID1        uint32
 	PodClusterID1 uint16
+	BusinessIDs1  []uint16
+	GroupIDs1     []uint16
 
-	ACLGID     uint16
-	Direction  DirectionEnum
-	Protocol   layers.IPProtocol
-	ServerPort uint16
-	VTAPID     uint16
-	TAPPort    uint32
-	TAPSide    TAPSideEnum
-	TAPType    TAPTypeEnum
-	IsIPv6     uint8 // (8B) 与IP/IP6是共生字段
+	ACLGID       uint16
+	Direction    DirectionEnum
+	Protocol     layers.IPProtocol
+	ServerPort   uint16
+	VTAPID       uint16
+	TAPPort      uint32
+	TAPSide      TAPSideEnum
+	TAPType      TAPTypeEnum
+	IsIPv6       uint8 // (8B) 与IP/IP6是共生字段
+	IsKeyService uint8
 
 	TagType  uint8
 	TagValue uint16
@@ -362,6 +368,54 @@ func unmarshalUint16WithSpecialID(s string) (int16, error) {
 	return int16(i), nil
 }
 
+func marshalUint16sWithSpecialID(vs []int16) string {
+	var buf strings.Builder
+	for i, v := range vs {
+		buf.WriteString(marshalUint16WithSpecialID(v))
+		if i < len(vs)-1 {
+			buf.WriteString("|")
+		}
+	}
+	return buf.String()
+}
+
+func unmarshalUint16sWithSpecialID(s string) ([]int16, error) {
+	int16s := []int16{}
+	vs := strings.Split(s, "|")
+	for _, v := range vs {
+		if i16, err := unmarshalUint16WithSpecialID(v); err != nil {
+			return int16s, err
+		} else {
+			int16s = append(int16s, i16)
+		}
+	}
+	return int16s, nil
+}
+
+func marshalUint16s(vs []uint16) string {
+	var buf strings.Builder
+	for i, v := range vs {
+		buf.WriteString(strconv.FormatUint(uint64(v), 10))
+		if i < len(vs)-1 {
+			buf.WriteString("|")
+		}
+	}
+	return buf.String()
+}
+
+func unmarshalUint16s(s string) ([]uint16, error) {
+	uint16s := []uint16{}
+	vs := strings.Split(s, "|")
+	for _, v := range vs {
+		i, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return uint16s, err
+		}
+		uint16s = append(uint16s, uint16(i))
+	}
+	return uint16s, nil
+}
+
 // 注意: 必须要按tag字段的字典顺序进行处理
 func (t *Tag) MarshalTo(b []byte) int {
 	offset := 0
@@ -386,6 +440,16 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",az_id_1=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.AZID1), 10))
 	}
+	if t.Code&BusinessIDs != 0 {
+		offset += copy(b[offset:], ",business_ids=")
+		offset += copy(b[offset:], marshalUint16s(t.BusinessIDs))
+	}
+	if t.Code&BusinessIDsPath != 0 {
+		offset += copy(b[offset:], ",business_ids_0=")
+		offset += copy(b[offset:], marshalUint16s(t.BusinessIDs))
+		offset += copy(b[offset:], ",business_ids_1=")
+		offset += copy(b[offset:], marshalUint16s(t.BusinessIDs1))
+	}
 
 	if t.Code&Direction != 0 {
 		if t.Direction.IsClientToServer() {
@@ -394,15 +458,15 @@ func (t *Tag) MarshalTo(b []byte) int {
 			offset += copy(b[offset:], ",direction=s2c")
 		}
 	}
-	if t.Code&GroupID != 0 {
-		offset += copy(b[offset:], ",group_id=")
-		offset += copy(b[offset:], marshalUint16WithSpecialID(t.GroupID))
+	if t.Code&GroupIDs != 0 {
+		offset += copy(b[offset:], ",group_ids=")
+		offset += copy(b[offset:], marshalUint16s(t.GroupIDs))
 	}
-	if t.Code&GroupIDPath != 0 {
-		offset += copy(b[offset:], ",group_id_0=")
-		offset += copy(b[offset:], marshalUint16WithSpecialID(t.GroupID))
-		offset += copy(b[offset:], ",group_id_1=")
-		offset += copy(b[offset:], marshalUint16WithSpecialID(t.GroupID1))
+	if t.Code&GroupIDsPath != 0 {
+		offset += copy(b[offset:], ",group_ids_0=")
+		offset += copy(b[offset:], marshalUint16s(t.GroupIDs))
+		offset += copy(b[offset:], ",group_ids_1=")
+		offset += copy(b[offset:], marshalUint16s(t.GroupIDs1))
 	}
 	if t.Code&HostID != 0 {
 		offset += copy(b[offset:], ",host_id=")
@@ -416,29 +480,36 @@ func (t *Tag) MarshalTo(b []byte) int {
 	}
 	if t.Code&IP != 0 {
 		if t.IsIPv6 != 0 {
-			offset += copy(b[offset:], ",ip=")
+			offset += copy(b[offset:], ",ip6=")
 			offset += copy(b[offset:], t.IP6.String())
-			offset += copy(b[offset:], ",ip_version=6")
+			offset += copy(b[offset:], ",is_ipv4=0")
 		} else {
-
-			offset += copy(b[offset:], ",ip=")
+			offset += copy(b[offset:], ",ip4=")
 			offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
-			offset += copy(b[offset:], ",ip_version=4")
+			offset += copy(b[offset:], ",is_ipv4=1")
 		}
 	}
 	if t.Code&IPPath != 0 {
 		if t.IsIPv6 != 0 {
-			offset += copy(b[offset:], ",ip_0=")
+			offset += copy(b[offset:], ",ip6_0=")
 			offset += copy(b[offset:], t.IP6.String())
-			offset += copy(b[offset:], ",ip_1=")
+			offset += copy(b[offset:], ",ip6_1=")
 			offset += copy(b[offset:], t.IP61.String())
-			offset += copy(b[offset:], ",ip_version=6")
+			offset += copy(b[offset:], ",is_ipv4=0")
 		} else {
-			offset += copy(b[offset:], ",ip_0=")
+			offset += copy(b[offset:], ",ip4_0=")
 			offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
-			offset += copy(b[offset:], ",ip_1=")
+			offset += copy(b[offset:], ",ip4_1=")
 			offset += copy(b[offset:], utils.IpFromUint32(t.IP1).String())
-			offset += copy(b[offset:], ",ip_version=4")
+			offset += copy(b[offset:], ",is_ipv4=1")
+		}
+	}
+
+	if t.Code&IsKeyService != 0 {
+		if t.IsKeyService == 1 {
+			offset += copy(b[offset:], ",is_key_service=1")
+		} else {
+			offset += copy(b[offset:], ",is_key_service=0")
 		}
 	}
 
@@ -495,14 +566,14 @@ func (t *Tag) MarshalTo(b []byte) int {
 
 	if t.Code&PodGroupID != 0 {
 		offset += copy(b[offset:], ",pod_group_id=")
-		offset += copy(b[offset:], marshalUint16WithSpecialID(t.PodGroupID))
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.PodGroupID), 10))
 	}
 
 	if t.Code&PodGroupIDPath != 0 {
 		offset += copy(b[offset:], ",pod_group_id_0=")
-		offset += copy(b[offset:], marshalUint16WithSpecialID(t.PodGroupID))
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.PodGroupID), 10))
 		offset += copy(b[offset:], ",pod_group_id_1=")
-		offset += copy(b[offset:], marshalUint16WithSpecialID(t.PodGroupID1))
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.PodGroupID1), 10))
 	}
 
 	if t.Code&PodID != 0 {
@@ -702,14 +773,18 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 			t.IP = decoder.ReadU32()
 		}
 	}
-	if t.Code&GroupID != 0 {
-		t.GroupID = int16(decoder.ReadU16())
+
+	if t.Code&BusinessIDs != 0 {
+		t.BusinessIDs = decoder.ReadU16Slice()
+	}
+	if t.Code&GroupIDs != 0 {
+		t.GroupIDs = decoder.ReadU16Slice()
 	}
 	if t.Code&L3EpcID != 0 {
 		t.L3EpcID = int16(decoder.ReadU16())
 	}
 	if t.Code&L3Device != 0 {
-		t.L3DeviceID = decoder.ReadU16()
+		t.L3DeviceID = decoder.ReadU32()
 		t.L3DeviceType = DeviceType(decoder.ReadU8())
 	}
 	if t.Code&HostID != 0 {
@@ -719,19 +794,19 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 		t.RegionID = decoder.ReadU16()
 	}
 	if t.Code&PodNodeID != 0 {
-		t.PodNodeID = decoder.ReadU16()
+		t.PodNodeID = decoder.ReadU32()
 	}
 	if t.Code&PodNSID != 0 {
 		t.PodNSID = decoder.ReadU16()
 	}
 	if t.Code&PodID != 0 {
-		t.PodID = decoder.ReadU16()
+		t.PodID = decoder.ReadU32()
 	}
 	if t.Code&AZID != 0 {
 		t.AZID = decoder.ReadU16()
 	}
 	if t.Code&PodGroupID != 0 {
-		t.PodGroupID = int16(decoder.ReadU16())
+		t.PodGroupID = decoder.ReadU32()
 	}
 	if t.Code&PodClusterID != 0 {
 		t.PodClusterID = decoder.ReadU16()
@@ -757,18 +832,22 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 			t.IP1 = decoder.ReadU32()
 		}
 	}
-	if t.Code&GroupIDPath != 0 {
-		t.GroupID = int16(decoder.ReadU16())
-		t.GroupID1 = int16(decoder.ReadU16())
+	if t.Code&BusinessIDsPath != 0 {
+		t.BusinessIDs = decoder.ReadU16Slice()
+		t.BusinessIDs1 = decoder.ReadU16Slice()
+	}
+	if t.Code&GroupIDsPath != 0 {
+		t.GroupIDs = decoder.ReadU16Slice()
+		t.GroupIDs1 = decoder.ReadU16Slice()
 	}
 	if t.Code&L3EpcIDPath != 0 {
 		t.L3EpcID = int16(decoder.ReadU16())
 		t.L3EpcID1 = int16(decoder.ReadU16())
 	}
 	if t.Code&L3DevicePath != 0 {
-		t.L3DeviceID = decoder.ReadU16()
+		t.L3DeviceID = decoder.ReadU32()
 		t.L3DeviceType = DeviceType(decoder.ReadU8())
-		t.L3DeviceID1 = decoder.ReadU16()
+		t.L3DeviceID1 = decoder.ReadU32()
 		t.L3DeviceType1 = DeviceType(decoder.ReadU8())
 	}
 	if t.Code&HostIDPath != 0 {
@@ -784,24 +863,24 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 		t.RegionID1 = decoder.ReadU16()
 	}
 	if t.Code&PodNodeIDPath != 0 {
-		t.PodNodeID = decoder.ReadU16()
-		t.PodNodeID1 = decoder.ReadU16()
+		t.PodNodeID = decoder.ReadU32()
+		t.PodNodeID1 = decoder.ReadU32()
 	}
 	if t.Code&PodNSIDPath != 0 {
 		t.PodNSID = decoder.ReadU16()
 		t.PodNSID1 = decoder.ReadU16()
 	}
 	if t.Code&PodIDPath != 0 {
-		t.PodID = decoder.ReadU16()
-		t.PodID1 = decoder.ReadU16()
+		t.PodID = decoder.ReadU32()
+		t.PodID1 = decoder.ReadU32()
 	}
 	if t.Code&AZIDPath != 0 {
 		t.AZID = decoder.ReadU16()
 		t.AZID1 = decoder.ReadU16()
 	}
 	if t.Code&PodGroupIDPath != 0 {
-		t.PodGroupID = int16(decoder.ReadU16())
-		t.PodGroupID1 = int16(decoder.ReadU16())
+		t.PodGroupID = decoder.ReadU32()
+		t.PodGroupID1 = decoder.ReadU32()
 	}
 	if t.Code&PodClusterIDPath != 0 {
 		t.PodClusterID = decoder.ReadU16()
@@ -842,6 +921,9 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if t.Code&TagValue != 0 {
 		t.TagValue = decoder.ReadU16()
 	}
+	if t.Code&IsKeyService != 0 {
+		t.IsKeyService = decoder.ReadU8()
+	}
 
 	if !decoder.Failed() {
 		t.id = string(decoder.Bytes()[offset:decoder.Offset()]) // Encode内容就是它的id
@@ -874,14 +956,17 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 			encoder.WriteU32(t.IP)
 		}
 	}
-	if code&GroupID != 0 {
-		encoder.WriteU16(uint16(t.GroupID))
+	if code&BusinessIDs != 0 {
+		encoder.WriteU16Slice(t.BusinessIDs)
+	}
+	if code&GroupIDs != 0 {
+		encoder.WriteU16Slice(t.GroupIDs)
 	}
 	if code&L3EpcID != 0 {
 		encoder.WriteU16(uint16(t.L3EpcID))
 	}
 	if code&L3Device != 0 {
-		encoder.WriteU16(t.L3DeviceID)
+		encoder.WriteU32(t.L3DeviceID)
 		encoder.WriteU8(uint8(t.L3DeviceType))
 	}
 	if code&HostID != 0 {
@@ -891,13 +976,13 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 		encoder.WriteU16(t.RegionID)
 	}
 	if code&PodNodeID != 0 {
-		encoder.WriteU16(t.PodNodeID)
+		encoder.WriteU32(t.PodNodeID)
 	}
 	if code&PodNSID != 0 {
 		encoder.WriteU16(t.PodNSID)
 	}
 	if code&PodID != 0 {
-		encoder.WriteU16(t.PodID)
+		encoder.WriteU32(t.PodID)
 	}
 	if code&AZID != 0 {
 		encoder.WriteU16(t.AZID)
@@ -931,18 +1016,22 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 			encoder.WriteU32(t.IP1)
 		}
 	}
-	if code&GroupIDPath != 0 {
-		encoder.WriteU16(uint16(t.GroupID))
-		encoder.WriteU16(uint16(t.GroupID1))
+	if code&BusinessIDsPath != 0 {
+		encoder.WriteU16Slice(t.BusinessIDs)
+		encoder.WriteU16Slice(t.BusinessIDs1)
+	}
+	if code&GroupIDsPath != 0 {
+		encoder.WriteU16Slice(t.GroupIDs)
+		encoder.WriteU16Slice(t.GroupIDs1)
 	}
 	if code&L3EpcIDPath != 0 {
 		encoder.WriteU16(uint16(t.L3EpcID))
 		encoder.WriteU16(uint16(t.L3EpcID1))
 	}
 	if code&L3DevicePath != 0 {
-		encoder.WriteU16(t.L3DeviceID)
+		encoder.WriteU32(t.L3DeviceID)
 		encoder.WriteU8(uint8(t.L3DeviceType))
-		encoder.WriteU16(t.L3DeviceID1)
+		encoder.WriteU32(t.L3DeviceID1)
 		encoder.WriteU8(uint8(t.L3DeviceType1))
 	}
 	if code&HostIDPath != 0 {
@@ -958,16 +1047,16 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 		encoder.WriteU16(t.RegionID1)
 	}
 	if code&PodNodeIDPath != 0 {
-		encoder.WriteU16(t.PodNodeID)
-		encoder.WriteU16(t.PodNodeID1)
+		encoder.WriteU32(t.PodNodeID)
+		encoder.WriteU32(t.PodNodeID1)
 	}
 	if code&PodNSIDPath != 0 {
 		encoder.WriteU16(t.PodNSID)
 		encoder.WriteU16(t.PodNSID1)
 	}
 	if code&PodIDPath != 0 {
-		encoder.WriteU16(t.PodID)
-		encoder.WriteU16(t.PodID1)
+		encoder.WriteU32(t.PodID)
+		encoder.WriteU32(t.PodID1)
 	}
 	if code&AZIDPath != 0 {
 		encoder.WriteU16(t.AZID)
@@ -1015,6 +1104,9 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 	}
 	if code&TagValue != 0 {
 		encoder.WriteU16(t.TagValue)
+	}
+	if code&IsKeyService != 0 {
+		encoder.WriteU8(t.IsKeyService)
 	}
 }
 
