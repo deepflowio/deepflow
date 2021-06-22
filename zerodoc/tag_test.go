@@ -35,12 +35,12 @@ func TestInt16Unmarshal(t *testing.T) {
 }
 
 func TestNegativeID(t *testing.T) {
-	f := Field{L3EpcID: datatype.EPC_FROM_DEEPFLOW, GroupID: datatype.GROUP_INTERNET}
-	if f.NewTag(L3EpcID|GroupID).ToKVString() != ",group_id=-2,l3_epc_id=-1" {
+	f := Field{L3EpcID: datatype.EPC_FROM_DEEPFLOW, GroupIDs: []uint16{100, 3}}
+	if f.NewTag(L3EpcID|GroupIDs).ToKVString() != ",group_ids=100|3,l3_epc_id=-1" {
 		t.Error("int16值处理得不正确")
 	}
-	f = Field{L3EpcID: 32767, GroupID: -3}
-	if f.NewTag(L3EpcID|GroupID).ToKVString() != ",group_id=65533,l3_epc_id=32767" {
+	f = Field{L3EpcID: 32767, GroupIDs: []uint16{300, 10}}
+	if f.NewTag(L3EpcID|GroupIDs).ToKVString() != ",group_ids=300|10,l3_epc_id=32767" {
 		t.Error("int16值处理得不正确")
 	}
 }
@@ -87,7 +87,7 @@ func TestMarshallToInfluxdb(t *testing.T) {
 	f := Field{}
 	tag := &Tag{&f, 0, ""}
 	tag.GlobalThreadID = 112
-	tag.Code = ^(GroupIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | RegionIDPath | SubnetIDPath | PodNodeIDPath | AZIDPath | PodGroupIDPath | PodNSIDPath | PodIDPath | PodClusterIDPath)
+	tag.Code = ^(GroupIDsPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | RegionIDPath | SubnetIDPath | PodNodeIDPath | AZIDPath | PodGroupIDPath | PodNSIDPath | PodIDPath | PodClusterIDPath | BusinessIDsPath)
 
 	l := tag.MarshalTo(b)
 	strs := parseTagkeys(b[:l])
@@ -104,7 +104,7 @@ func TestMarshallToInfluxdb(t *testing.T) {
 		}
 	}
 
-	tag.Code = ^(GroupID | HostID | IP | L3Device | L3EpcID | RegionID | SubnetID | PodNodeID | AZID | PodGroupID | PodNSID | PodID | PodClusterID)
+	tag.Code = ^(GroupIDs | HostID | IP | L3Device | L3EpcID | RegionID | SubnetID | PodNodeID | AZID | PodGroupID | PodNSID | PodID | PodClusterID | BusinessIDs)
 	l = tag.MarshalTo(b)
 	strs = parseTagkeys(b[:l])
 	cloneStrs = cloneStrs[:0]
