@@ -288,10 +288,20 @@ message Group {
     optional GroupType type = 3;
     repeated string ips = 5;
     repeated string ip_ranges = 6;
+    optional uint32 business_id = 7;
+}
+
+message Service {
+    optional uint32 epc_id = 2 [default = 0];
+    repeated string ips = 5;
+    repeated string ip_ranges = 6;
+    optional uint32 protocol = 7 [default = 256];
+    optional string server_ports = 8; // 格式: 22,80,22-80
 }
 
 message Groups {
     repeated Group groups = 1;
+    repeated Service svcs = 2; // 仅下发给数据节点
 }
 
 message PeerConnection {
