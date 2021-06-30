@@ -220,9 +220,10 @@ github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:
 gitlab.x.lan/platform/influxdb v0.0.0-20200109064655-6c1e420280c5 h1:mbhTrgL5Tauws+m71kwyyKnsxTU6hZ9LXrGWNFMpGok=
 gitlab.x.lan/platform/influxdb v0.0.0-20200109064655-6c1e420280c5/go.mod h1:60Gw7nMrWje4djy4y8D6bP75WdWAi5s+wtEa7EhfZUU=
 gitlab.x.lan/yunshan/droplet-libs v0.0.0-20200107085540-a487142adbe3/go.mod h1:hKFbiUAZcjAFT5S+t/VRwut6gojAB0jHuKranPKZU3M=
-gitlab.x.lan/yunshan/droplet-libs v0.0.0-20210630031241-c02bf004024b h1:ABNEayjrQ5rTzgtjW5Wbzf4GlwFKFoQ3g8F8WQFxz0o=
-gitlab.x.lan/yunshan/droplet-libs v0.0.0-20210630031241-c02bf004024b/go.mod h1:pbCRXLK48TXlW2V16TLvHqNANu4tufKfWR2z09tBAjs=
+gitlab.x.lan/yunshan/droplet-libs v0.0.0-20210630121405-c34663c4a15f h1:abVds2iS8KCq8C5Q36sIbMo5rPAelRWAz4GYLNMaGBs=
+gitlab.x.lan/yunshan/droplet-libs v0.0.0-20210630121405-c34663c4a15f/go.mod h1:XC9k+vTK88YkoUkL74DYAg+igkEQwfo5RdSFQwRWCcU=
 gitlab.x.lan/yunshan/message v0.0.0-20191224131206-b5b841dee36a/go.mod h1:MypsIdfw74oNofgOqe76rOWsVKRDYZxG9+70BJTsSDk=
+gitlab.x.lan/yunshan/message v0.0.0-20210615072923-5e0996023707/go.mod h1:MypsIdfw74oNofgOqe76rOWsVKRDYZxG9+70BJTsSDk=
 gitlab.x.lan/yunshan/message v0.0.0-20210615073017-15a80f4cae31 h1:2uNTxx/dMLdBqwmRuNnE0Xs8qCqrUFUqud80x4yV2fY=
 gitlab.x.lan/yunshan/message v0.0.0-20210615073017-15a80f4cae31/go.mod h1:MypsIdfw74oNofgOqe76rOWsVKRDYZxG9+70BJTsSDk=
 go.uber.org/atomic v1.3.2/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
