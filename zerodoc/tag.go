@@ -647,28 +647,28 @@ func (t *Tag) MarshalTo(b []byte) int {
 	}
 	if t.Code&IP != 0 {
 		if t.IsIPv6 != 0 {
-			offset += copy(b[offset:], ",ip6=")
+			offset += copy(b[offset:], ",ip=")
 			offset += copy(b[offset:], t.IP6.String())
-			offset += copy(b[offset:], ",is_ipv4=0")
+			offset += copy(b[offset:], ",ip_version=6")
 		} else {
-			offset += copy(b[offset:], ",ip4=")
+			offset += copy(b[offset:], ",ip=")
 			offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
-			offset += copy(b[offset:], ",is_ipv4=1")
+			offset += copy(b[offset:], ",ip_version=4")
 		}
 	}
 	if t.Code&IPPath != 0 {
 		if t.IsIPv6 != 0 {
-			offset += copy(b[offset:], ",ip6_0=")
+			offset += copy(b[offset:], ",ip_0=")
 			offset += copy(b[offset:], t.IP6.String())
-			offset += copy(b[offset:], ",ip6_1=")
+			offset += copy(b[offset:], ",ip_1=")
 			offset += copy(b[offset:], t.IP61.String())
-			offset += copy(b[offset:], ",is_ipv4=0")
+			offset += copy(b[offset:], ",is_version=6")
 		} else {
-			offset += copy(b[offset:], ",ip4_0=")
+			offset += copy(b[offset:], ",ip_0=")
 			offset += copy(b[offset:], utils.IpFromUint32(t.IP).String())
-			offset += copy(b[offset:], ",ip4_1=")
+			offset += copy(b[offset:], ",ip_1=")
 			offset += copy(b[offset:], utils.IpFromUint32(t.IP1).String())
-			offset += copy(b[offset:], ",is_ipv4=1")
+			offset += copy(b[offset:], ",ip_version=4")
 		}
 	}
 
@@ -907,7 +907,7 @@ func (t *Tag) TableID(isSecond bool) (uint8, error) {
 func genTagColumns(code Code) []*ckdb.Column {
 	columns := []*ckdb.Column{}
 	columns = append(columns, ckdb.NewColumnWithGroupBy("time", ckdb.DateTime))
-	columns = append(columns, ckdb.NewColumn("_tid", ckdb.UInt8))
+	columns = append(columns, ckdb.NewColumn("_tid", ckdb.UInt8).SetComment("用于区分trident不同的pipeline"))
 	if code&ACLGID != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("acl_gid", ckdb.UInt16).SetComment("ACL组ID"))
 	}
@@ -920,7 +920,7 @@ func genTagColumns(code Code) []*ckdb.Column {
 	}
 
 	if code&BusinessIDs != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("business_ids", ckdb.ArrayUInt16))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("business_ids", ckdb.ArrayUInt16).SetComment("ip对应的业务ID列表"))
 	}
 	if code&BusinessIDsPath != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("business_ids_0", ckdb.ArrayUInt16))
@@ -928,11 +928,11 @@ func genTagColumns(code Code) []*ckdb.Column {
 	}
 
 	if code&Direction != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("direction", ckdb.String).SetComment("统计量对应的流方向.c2s: ip/ip_0为客户端,ip_1为服务端. s2c: ip/ip_0为服务端,ip_1为客户端"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("direction", ckdb.LowCardinalityString).SetComment("统计量对应的流方向.c2s: ip/ip_0为客户端,ip_1为服务端. s2c: ip/ip_0为服务端,ip_1为客户端"))
 	}
 
 	if code&GroupIDs != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("group_ids", ckdb.ArrayUInt16))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("group_ids", ckdb.ArrayUInt16).SetComment("ip对应的资源组ID列表"))
 	}
 	if code&GroupIDsPath != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("group_ids_0", ckdb.ArrayUInt16))
@@ -947,20 +947,20 @@ func genTagColumns(code Code) []*ckdb.Column {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("host_id_1", ckdb.UInt16))
 	}
 	if code&IP != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("ip4", ckdb.IPv4))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("ip6", ckdb.IPv6))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("is_ipv4", ckdb.UInt8))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("ip4", ckdb.IPv4).SetComment("IPv4地址"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("ip6", ckdb.IPv6).SetComment("IPV6地址"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("is_ipv4", ckdb.UInt8).SetIndex(ckdb.IndexMinmax).SetComment("是否IPV4地址 0: 否，ip6字段有效 1: 是，ip4字段有效"))
 	}
 	if code&IPPath != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("ip4_0", ckdb.IPv4))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("ip4_1", ckdb.IPv4))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("ip6_0", ckdb.IPv6))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("ip6_1", ckdb.IPv6))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("is_ipv4", ckdb.UInt8))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("is_ipv4", ckdb.UInt8).SetIndex(ckdb.IndexMinmax))
 	}
 
 	if code&IsKeyService != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("is_key_service", ckdb.UInt8))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("is_key_service", ckdb.UInt8).SetComment("是否属于关键服务0: 否 1: 是").SetIndex(ckdb.IndexMinmax))
 	}
 
 	if code&L3Device != 0 {
@@ -1051,7 +1051,7 @@ func genTagColumns(code Code) []*ckdb.Column {
 	}
 
 	if code&ServerPort != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("server_port", ckdb.UInt16).SetComment("服务端端口"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("server_port", ckdb.UInt16).SetIndex(ckdb.IndexSet).SetComment("服务端端口"))
 	}
 
 	if code&SubnetID != 0 {
@@ -1063,13 +1063,13 @@ func genTagColumns(code Code) []*ckdb.Column {
 	}
 	if code&TagType != 0 && code&TagValue != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("tag_type", ckdb.UInt8).SetComment("1: 省份(仅针对geo库) 2: TCP Flag(仅针对packet库) 3: 播送类型(仅针对packet库) 4: 隧道分发点ID(仅针对flow库)"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("tag_value", ckdb.String).SetComment("tag_type对应的具体值. tag_type=1: 省份 tag_type=2: TCP包头的Flag字段 tag_type=3: 播送类性(broadcast: 广播 multicast: 组播 unicast: 未知单播) tag_type=4: 隧道分发点ID "))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("tag_value", ckdb.LowCardinalityString).SetComment("tag_type对应的具体值. tag_type=1: 省份 tag_type=2: TCP包头的Flag字段 tag_type=3: 播送类性(broadcast: 广播 multicast: 组播 unicast: 未知单播) tag_type=4: 隧道分发点ID "))
 	}
 	if code&TAPPort != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_port", ckdb.UInt32).SetComment("采集网口标识 若tap_type为3: 虚拟网络流量源, 表示虚拟接口MAC地址低4字节 00000000~FFFFFFFF"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_port", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("采集网口标识 若tap_type为3: 虚拟网络流量源, 表示虚拟接口MAC地址低4字节 00000000~FFFFFFFF"))
 	}
 	if code&TAPSide != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_side", ckdb.String).SetComment("流量采集位置(c: 客户端(0侧)采集 s: 服务端(1侧)采集)"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_side", ckdb.LowCardinalityString).SetComment("流量采集位置(c: 客户端(0侧)采集 s: 服务端(1侧)采集)"))
 	}
 	if code&TAPType != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_type", ckdb.UInt8).SetComment("流量采集点(1-2,4-30: 接入网络流量 3: 虚拟网络流量)"))

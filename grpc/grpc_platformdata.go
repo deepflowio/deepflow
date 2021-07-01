@@ -218,7 +218,7 @@ func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID
 }
 
 // 单例模式，只启动一次
-func NewPlatformInfoTable(ips []net.IP, port int, moduleName string, tsdbShardID uint32, tsdbReplicaIP, tsdbDataPath, pcapDataPath string, receiver *receiver.Receiver) *PlatformInfoTable {
+func NewPlatformInfoTable(ips []net.IP, port int, moduleName string, pcapDataPath string, receiver *receiver.Receiver) *PlatformInfoTable {
 	table := &PlatformInfoTable{
 		receiver:           receiver,
 		bootTime:           uint32(time.Now().Unix()),
@@ -239,9 +239,6 @@ func NewPlatformInfoTable(ips []net.IP, port int, moduleName string, tsdbShardID
 		epcIDBaseMissCount: make(map[int32]*uint64),
 		moduleName:         moduleName,
 		runtimeEnv:         utils.GetRuntimeEnv(),
-		tsdbShardID:        tsdbShardID,
-		tsdbReplicaIP:      tsdbReplicaIP,
-		tsdbDataMountPath:  utils.Mountpoint(tsdbDataPath),
 		pcapDataMountPath:  utils.Mountpoint(pcapDataPath),
 	}
 	runOnce := func() {
@@ -1063,7 +1060,7 @@ func RegisterPlatformDataCommand(ips []net.IP, port int) *cobra.Command {
 		Use:   "platformData",
 		Short: "get platformData from controller",
 		Run: func(cmd *cobra.Command, args []string) {
-			table := NewPlatformInfoTable(ips, port, "debug", 65535, "", "", "", nil)
+			table := NewPlatformInfoTable(ips, port, "debug", "", nil)
 			table.Reload()
 			fmt.Println(table)
 		},
