@@ -65,7 +65,8 @@ type AppProtoHead struct {
 }
 
 type AppProtoLogsBaseInfo struct {
-	Timestamp time.Duration // packet时间戳
+	StartTime time.Duration // 开始时间, packet的时间戳
+	EndTime   time.Duration // 结束时间, 初始化时等于开始时间
 	FlowId    uint64        // 对应flow的ID
 	VtapId    uint16
 	TapType   uint16
@@ -89,7 +90,8 @@ type AppProtoLogsBaseInfo struct {
 
 func (i *AppProtoLogsBaseInfo) String() string {
 	formatted := ""
-	formatted += fmt.Sprintf("Timestamp: %v ", i.Timestamp)
+	formatted += fmt.Sprintf("StartTime: %v ", i.StartTime)
+	formatted += fmt.Sprintf("EndTime: %v ", i.EndTime)
 	formatted += fmt.Sprintf("FlowId: %v ", i.FlowId)
 	formatted += fmt.Sprintf("VtapId: %v ", i.VtapId)
 	formatted += fmt.Sprintf("TapType: %v ", i.TapType)
@@ -191,7 +193,8 @@ func (l *AppProtoLogsData) Release() {
 }
 
 func (l *AppProtoLogsData) Encode(encoder *codec.SimpleEncoder) error {
-	encoder.WriteU64(uint64(l.Timestamp))
+	encoder.WriteU64(uint64(l.StartTime))
+	encoder.WriteU64(uint64(l.EndTime))
 	encoder.WriteU64(l.FlowId)
 	encoder.WriteU16(l.VtapId)
 	encoder.WriteU16(l.TapType)
@@ -220,7 +223,8 @@ func (l *AppProtoLogsData) Encode(encoder *codec.SimpleEncoder) error {
 }
 
 func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
-	l.Timestamp = time.Duration(decoder.ReadU64())
+	l.StartTime = time.Duration(decoder.ReadU64())
+	l.EndTime = time.Duration(decoder.ReadU64())
 	l.FlowId = decoder.ReadU64()
 	l.VtapId = decoder.ReadU16()
 	l.TapType = decoder.ReadU16()

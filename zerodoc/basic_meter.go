@@ -350,13 +350,13 @@ const (
 func LatencyColumns() []*ckdb.Column {
 	sumColumns := ckdb.NewColumnsWithComment(
 		[][2]string{
-			LATENCY_RTT:        {"rtt_sum", "累计建立连接RTT"},
-			LATENCY_RTT_CLIENT: {"rtt_client_sum", "客户端累计建立连接RTT"},
-			LATENCY_RTT_SERVER: {"rtt_server_sum", "服务端累计建立连接RTT"},
-			LATENCY_SRT:        {"srt_sum", "累计所有系统响应时延"},
-			LATENCY_ART:        {"art_sum", "累计所有应用响应时延"},
-			LATENCY_HTTP_RRT:   {"http_rrt_sum", "累计所有HTTP请求响应时延"},
-			LATENCY_DNS_RRT:    {"dns_rrt_sum", "累计所有DNS请求响应时延"},
+			LATENCY_RTT:        {"rtt_sum", "累计建立连接RTT(us)"},
+			LATENCY_RTT_CLIENT: {"rtt_client_sum", "客户端累计建立连接RTT(us)"},
+			LATENCY_RTT_SERVER: {"rtt_server_sum", "服务端累计建立连接RTT(us)"},
+			LATENCY_SRT:        {"srt_sum", "累计所有系统响应时延(us)"},
+			LATENCY_ART:        {"art_sum", "累计所有应用响应时延(us)"},
+			LATENCY_HTTP_RRT:   {"http_rrt_sum", "累计所有HTTP请求响应时延(us)"},
+			LATENCY_DNS_RRT:    {"dns_rrt_sum", "累计所有DNS请求响应时延(us)"},
 		},
 		ckdb.Float64)
 	counterColumns := ckdb.NewColumnsWithComment(
@@ -372,14 +372,17 @@ func LatencyColumns() []*ckdb.Column {
 		ckdb.UInt64)
 	maxColumns := ckdb.NewColumnsWithComment(
 		[][2]string{
-			LATENCY_RTT:        {"rtt_max", "建立连接RTT最大值"},
-			LATENCY_RTT_CLIENT: {"rtt_client_max", "客户端建立连接RTT最大值"},
-			LATENCY_RTT_SERVER: {"rtt_server_max", "服务端建立连接RTT最大值"},
-			LATENCY_SRT:        {"srt_max", "所有系统响应时延最大值"},
-			LATENCY_ART:        {"art_max", "所有应用响应时延最大值"},
-			LATENCY_HTTP_RRT:   {"http_rrt_max", "所有HTTP请求响应时延最大值"},
-			LATENCY_DNS_RRT:    {"dns_rrt_max", "所有DNS请求响应时延最大值"},
+			LATENCY_RTT:        {"rtt_max", "建立连接RTT最大值(us)"},
+			LATENCY_RTT_CLIENT: {"rtt_client_max", "客户端建立连接RTT最大值(us)"},
+			LATENCY_RTT_SERVER: {"rtt_server_max", "服务端建立连接RTT最大值(us)"},
+			LATENCY_SRT:        {"srt_max", "所有系统响应时延最大值(us)"},
+			LATENCY_ART:        {"art_max", "所有应用响应时延最大值(us)"},
+			LATENCY_HTTP_RRT:   {"http_rrt_max", "所有HTTP请求响应时延最大值(us)"},
+			LATENCY_DNS_RRT:    {"dns_rrt_max", "所有DNS请求响应时延最大值(us)"},
 		}, ckdb.UInt32)
+	for _, c := range maxColumns {
+		c.SetIndex(ckdb.IndexNone)
+	}
 	columns := []*ckdb.Column{}
 	columns = append(columns, sumColumns...)
 	columns = append(columns, counterColumns...)
