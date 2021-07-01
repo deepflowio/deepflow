@@ -139,8 +139,8 @@ func NewFlowLogger(config *config.Config, manager *dropletqueue.Manager, recv *r
 		esWriters[i] = newESWriter(config, common.L4_FLOW_ID.String(), queue.QueueReader(esWriterQueues.FixedMultiQueue[i]))
 		decoders[i] = decoder.NewDecoder(
 			i,
-			config.ShardID,
 			msgType,
+			config.ShardID,
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			throttlers[i],
 			nil,
@@ -211,8 +211,8 @@ func NewProtoLogger(config *config.Config, manager *dropletqueue.Manager, recv *
 		dnsEsWriters[i] = newESWriter(config, common.L7_DNS_ID.String(), queue.QueueReader(dnsEsWriterQueues.FixedMultiQueue[i]))
 		decoders[i] = decoder.NewDecoder(
 			i,
-			config.ShardID,
 			msgType,
+			config.ShardID,
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			nil,
 			httpThrottlers[i],
