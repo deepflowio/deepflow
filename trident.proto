@@ -43,9 +43,6 @@ message CommunicationVtap {
 }
 
 message TsdbReportInfo {
-    optional uint32 tsdb_shard_id = 1;
-    optional string tsdb_replica_ip = 2;
-    optional string tsdb_data_mount_path = 3;
     optional string pcap_data_mount_path = 4;
 }
 
