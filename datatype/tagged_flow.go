@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	VERSION = 20210622
+	VERSION = 20210702
 )
 
 type TaggedFlow struct {

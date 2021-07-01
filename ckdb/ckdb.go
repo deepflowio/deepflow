@@ -44,6 +44,14 @@ func (b *Block) WriteUInt16(v uint16) error {
 	return nil
 }
 
+func (b *Block) WriteUInt16Nullable(v *uint16) error {
+	if err := b.Block.WriteUInt16Nullable(b.index, v); err != nil {
+		return err
+	}
+	b.index++
+	return nil
+}
+
 func (b *Block) WriteUInt32(v uint32) error {
 	if err := b.Block.WriteUInt32(b.index, v); err != nil {
 		return err
@@ -52,8 +60,24 @@ func (b *Block) WriteUInt32(v uint32) error {
 	return nil
 }
 
+func (b *Block) WriteUInt32Nullable(v *uint32) error {
+	if err := b.Block.WriteUInt32Nullable(b.index, v); err != nil {
+		return err
+	}
+	b.index++
+	return nil
+}
+
 func (b *Block) WriteUInt64(v uint64) error {
 	if err := b.Block.WriteUInt64(b.index, v); err != nil {
+		return err
+	}
+	b.index++
+	return nil
+}
+
+func (b *Block) WriteUInt64Nullable(v *uint64) error {
+	if err := b.Block.WriteUInt64Nullable(b.index, v); err != nil {
 		return err
 	}
 	b.index++
@@ -84,6 +108,14 @@ func (b *Block) WriteInt32(v int32) error {
 	return nil
 }
 
+func (b *Block) WriteInt32Nullable(v *int32) error {
+	if err := b.Block.WriteInt32Nullable(b.index, v); err != nil {
+		return err
+	}
+	b.index++
+	return nil
+}
+
 func (b *Block) WriteInt64(v int64) error {
 	if err := b.Block.WriteInt64(b.index, v); err != nil {
 		return err
@@ -92,8 +124,24 @@ func (b *Block) WriteInt64(v int64) error {
 	return nil
 }
 
+func (b *Block) WriteInt64Nullable(v *int64) error {
+	if err := b.Block.WriteInt64Nullable(b.index, v); err != nil {
+		return err
+	}
+	b.index++
+	return nil
+}
+
 func (b *Block) WriteFloat64(v float64) error {
 	if err := b.Block.WriteFloat64(b.index, v); err != nil {
+		return err
+	}
+	b.index++
+	return nil
+}
+
+func (b *Block) WriteFloat64Nullable(v *float64) error {
+	if err := b.Block.WriteFloat64Nullable(b.index, v); err != nil {
 		return err
 	}
 	b.index++
@@ -136,14 +184,20 @@ type ColumnType uint8
 
 const (
 	UInt64 ColumnType = iota
+	UInt64Nullable
 	UInt32
+	UInt32Nullable
 	UInt16
+	UInt16Nullable
 	UInt8
 	Int64
+	Int64Nullable
 	Int32
+	Int32Nullable
 	Int16
 	Int8
 	Float64
+	Float64Nullable
 	String
 	IPv6
 	IPv4
@@ -155,29 +209,37 @@ const (
 	DateTime64ms
 	DateTime64us
 	FixString8
+	LowCardinalityString
 )
 
 var cloumnTypeString = []string{
-	UInt64:       "UInt64",
-	UInt32:       "UInt32",
-	UInt16:       "UInt16",
-	UInt8:        "UInt8",
-	Int64:        "Int64",
-	Int32:        "Int32",
-	Int16:        "Int16",
-	Int8:         "Int8",
-	Float64:      "Float64",
-	String:       "String",
-	IPv6:         "IPv6",
-	IPv4:         "IPv4",
-	ArrayString:  "Array(String)",
-	ArrayUInt16:  "Array(UInt16)",
-	ArrayUInt32:  "Array(UInt32)",
-	DateTime:     "DateTime('Asia/Shanghai')",
-	DateTime64:   "DateTime64(0, 'Asia/Shanghai')",
-	DateTime64ms: "DateTime64(3, 'Asia/Shanghai')",
-	DateTime64us: "DateTime64(6, 'Asia/Shanghai')",
-	FixString8:   "FixedString(8)",
+	UInt64:               "UInt64",
+	UInt64Nullable:       "Nullable(UInt64)",
+	UInt32:               "UInt32",
+	UInt32Nullable:       "Nullable(UInt32)",
+	UInt16:               "UInt16",
+	UInt16Nullable:       "Nullable(UInt16)",
+	UInt8:                "UInt8",
+	Int64:                "Int64",
+	Int64Nullable:        "Nullable(Int64)",
+	Int32:                "Int32",
+	Int32Nullable:        "Nullable(Int32)",
+	Int16:                "Int16",
+	Int8:                 "Int8",
+	Float64:              "Float64",
+	Float64Nullable:      "Nullable(Float64)",
+	String:               "String",
+	IPv6:                 "IPv6",
+	IPv4:                 "IPv4",
+	ArrayString:          "Array(String)",
+	ArrayUInt16:          "Array(UInt16)",
+	ArrayUInt32:          "Array(UInt32)",
+	DateTime:             "DateTime('Asia/Shanghai')",
+	DateTime64:           "DateTime64(0, 'Asia/Shanghai')",
+	DateTime64ms:         "DateTime64(3, 'Asia/Shanghai')",
+	DateTime64us:         "DateTime64(6, 'Asia/Shanghai')",
+	FixString8:           "FixedString(8)",
+	LowCardinalityString: "LowCardinality(String)",
 }
 
 func (t ColumnType) String() string {
@@ -226,7 +288,7 @@ const (
 var indexTypeString = []string{
 	IndexNone:        "",
 	IndexMinmax:      "minmax",
-	IndexSet:         "set",
+	IndexSet:         "set(300)",
 	IndexBloomfilter: "bloom_filter",
 }
 
@@ -339,16 +401,22 @@ func (c *Column) SetComment(comment string) *Column {
 }
 
 func NewColumn(name string, t ColumnType) *Column {
+	index := IndexNone
 	codec := CodecDefault
 	switch t {
+	case UInt8: // u8默认设置set的二级索引
+		index = IndexSet
+	case UInt16, UInt32, Int32, IPv4, IPv6: // 默认设置minmax的二级索引
+		index = IndexMinmax
 	case UInt64, Int64:
 		codec = CodecT64
 	case DateTime, DateTime64ms, DateTime64us:
 		codec = CodecDoubleDelta
+		index = IndexMinmax // 时间默认设置minmax的二级索引
 	case Float64:
 		codec = CodecGorilla
 	}
-	return &Column{name, t, codec, IndexNone, false, ""}
+	return &Column{name, t, codec, index, false, ""}
 }
 
 func NewColumnWithGroupBy(name string, t ColumnType) *Column {
