@@ -96,7 +96,7 @@ func NewFlowInfo(f *FlowLogger) *dfi.FlowInfo {
 	return &dfi.FlowInfo{
 		CloseType:  proto.Uint32(uint32(f.CloseType)),
 		FlowSource: proto.Uint32(uint32(f.FlowSource)),
-		FlowIdStr:  proto.Uint64(f.FlowIDStr),
+		FlowId:     proto.Uint64(f.FlowID),
 		TapType:    proto.Uint32(uint32(f.TapType)),
 		TapPort:    proto.Uint32(f.TapPort),
 		VtapId:     proto.Uint32(uint32(f.VtapID)),
@@ -104,8 +104,8 @@ func NewFlowInfo(f *FlowLogger) *dfi.FlowInfo {
 		L2End_1:    proto.Bool(f.L2End1),
 		L3End_0:    proto.Bool(f.L3End0),
 		L3End_1:    proto.Bool(f.L3End1),
-		StartTime:  proto.Uint32(f.StartTime),
-		EndTime:    proto.Uint32(f.FlowInfo.EndTime),
+		StartTime:  proto.Uint64(f.FlowInfo.StartTime),
+		EndTime:    proto.Uint64(f.FlowInfo.EndTime),
 		Duration:   proto.Uint64(f.Duration),
 	}
 }
@@ -175,11 +175,12 @@ func NewL7Base(f *L7Base) *dfi.L7Base {
 		ClientPort:     proto.Uint32(uint32(f.ClientPort)),
 		ServerPort:     proto.Uint32(uint32(f.ServerPort)),
 		KnowledgeGraph: NewKnowledgeGraph(&f.KnowledgeGraph),
-		FlowIdStr:      proto.Uint64(f.FlowIDStr),
+		FlowId:         proto.Uint64(f.FlowID),
 		TapType:        proto.Uint32(uint32(f.TapType)),
 		TapPort:        proto.Uint32(f.TapPort),
 		VtapId:         proto.Uint32(uint32(f.VtapID)),
-		Timestamp:      proto.Uint64(f.Timestamp),
+		StartTime:      proto.Uint64(f.StartTime),
+		EndTime:        proto.Uint64(f.EndTime),
 	}
 }
 

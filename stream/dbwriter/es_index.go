@@ -146,7 +146,7 @@ var DFI_FLOW = map[string]interface{}{
 			// 流信息
 			"close_type":  integer_property,
 			"flow_source": simple_integer_property,
-			"flow_id_str": long_property,
+			"flow_id":     long_property,
 			"tap_type":    integer_property,
 			"tap_port":    integer_property,
 			"vtap_id":     integer_property,
@@ -241,12 +241,12 @@ var DFI_HTTP = map[string]interface{}{
 			"subnet_id_1":      integer_property,
 
 			// 流信息
-			"flow_id_str": long_property,
-			"tap_type":    integer_property,
-			"tap_port":    string_property,
-			"vtap_id":     integer_property,
-			"timestamp":   long_property,
-			"time":        epoch_property,
+			"flow_id":   long_property,
+			"tap_type":  integer_property,
+			"tap_port":  string_property,
+			"vtap_id":   integer_property,
+			"timestamp": long_property,
+			"time":      epoch_property,
 
 			// 应用层HTTP
 			"type":           simple_integer_property,
@@ -315,12 +315,12 @@ var DFI_DNS = map[string]interface{}{
 			"subnet_id_1":      integer_property,
 
 			// 留信息
-			"flow_id_str": string_property,
-			"tap_type":    integer_property,
-			"tap_port":    integer_property,
-			"vtap_id":     integer_property,
-			"timestamp":   long_property,
-			"time":        epoch_property,
+			"flow_id":   long_property,
+			"tap_type":  integer_property,
+			"tap_port":  integer_property,
+			"vtap_id":   integer_property,
+			"timestamp": long_property,
+			"time":      epoch_property,
 
 			// 应用层DNS
 			"type":        simple_integer_property,

@@ -77,6 +77,7 @@ func initTable(addr, user, password string, t *ckdb.Table) error {
 	if err != nil {
 		return err
 	}
+
 	if err := ExecSQL(ck, fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", t.Database)); err != nil {
 		return err
 	}

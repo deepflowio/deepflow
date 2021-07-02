@@ -134,9 +134,6 @@ ckdb:
 #  primary: http://127.0.0.1:20044
 #  replica:   # optional
 
-## influxdb文件存储的文件夹, 上报trisolaris，用于监控磁盘空间
-#tsdb-data-path: /var/lib/influxdb
-
 ## 使用配置的用户名密码访问influxdb
 #tsdb-auth:
 #  username:

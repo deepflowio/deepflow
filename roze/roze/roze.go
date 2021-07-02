@@ -75,7 +75,7 @@ func NewRoze(cfg *config.Config, recv *receiver.Receiver) (*Roze, error) {
 
 	recv.RegistHandler(datatype.MESSAGE_TYPE_METRICS, unmarshallQueues, unmarshallQueueCount)
 
-	platformdata.New(controllers, cfg.ControllerPort, "roze", uint32(cfg.ShardID), parseTsdbIP(cfg.TSDB.Replica), cfg.TSDBDataPath, cfg.Pcap.FileDirectory, recv)
+	platformdata.New(controllers, cfg.ControllerPort, "roze", cfg.Pcap.FileDirectory, recv)
 
 	var err error
 	roze.InfluxdbWriter, err = store.NewInfluxdbWriter(cfg.TSDB.Primary, cfg.TSDB.Replica, cfg.TSDBAuth.Username, cfg.TSDBAuth.Password, "influxdb_writer", strconv.Itoa(cfg.ShardID), cfg.StoreQueueCount, cfg.StoreQueueSize)

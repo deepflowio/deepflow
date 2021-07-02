@@ -20,18 +20,12 @@ var flowLogNames = []string{
 	L7_DNS_ID:  "l7_dns_log",
 }
 
-var flowLogTimeKey = []string{
-	L4_FLOW_ID: "start_time",
-	L7_HTTP_ID: "time",
-	L7_DNS_ID:  "time",
-}
-
 func (l FlowLogID) String() string {
 	return flowLogNames[l]
 }
 
 func (l FlowLogID) TimeKey() string {
-	return flowLogTimeKey[l]
+	return "time"
 }
 
 func FlowLogNameToID(name string) FlowLogID {

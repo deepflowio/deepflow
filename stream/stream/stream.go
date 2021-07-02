@@ -60,7 +60,6 @@ func NewStream(config *config.Config, recv *receiver.Receiver) (*Stream, error) 
 	if err != nil {
 		return nil, err
 	}
-
 	flowLogger, err := NewFlowLogger(config, manager, recv, flowLogWriter)
 	protoLogger := NewProtoLogger(config, manager, recv, flowLogWriter)
 	return &Stream{
