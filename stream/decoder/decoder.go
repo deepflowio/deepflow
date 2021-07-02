@@ -48,8 +48,8 @@ type Decoder struct {
 	utils.Closable
 }
 
-func NewDecoder(index, msgType int,
-	shardID int,
+func NewDecoder(
+	index, msgType, shardID int,
 	inQueue queue.QueueReader,
 	flowThrottler *throttler.ThrottlingQueue,
 	httpThrottler *throttler.ThrottlingQueue,
@@ -59,8 +59,8 @@ func NewDecoder(index, msgType int,
 ) *Decoder {
 	return &Decoder{
 		index:          index,
-		shardID:        shardID,
 		msgType:        msgType,
+		shardID:        shardID,
 		inQueue:        inQueue,
 		flowThrottler:  flowThrottler,
 		httpThrottler:  httpThrottler,

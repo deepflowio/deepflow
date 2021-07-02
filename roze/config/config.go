@@ -32,7 +32,6 @@ const (
 	DefaultRepairInterval          = 60
 	DefaultRepairSyncCountOnce     = 200
 	DefaultReceiverWindowSize      = 1024
-	DefaultTSDBDataPath            = "/var/lib/influxdb"
 	DefaultPcapDataPath            = "/var/lib/pcap"
 )
 
@@ -76,7 +75,6 @@ type Config struct {
 	CKDBAuth                  Auth            `yaml:"ckdb-auth"`
 	ReplicaEnabled            bool            `yaml:"metrics-replica-enabled"`
 	CKWriterConfig            CKWriterConfig  `yaml:"metrics-ck-wirter"`
-	TSDBDataPath              string          `yaml:"tsdb-data-path"`
 	Pcap                      PCapConfig      `yaml:"pcap"`
 	TSDBAuth                  Auth            `yaml:"tsdb-auth"`
 	DisableSecondWrite        bool            `yaml:"disable-second-write"`
@@ -143,7 +141,6 @@ func Load(path string) *Config {
 		RepairSyncCountOnce:       DefaultRepairSyncCountOnce,
 		ReceiverWindowSize:        DefaultReceiverWindowSize,
 		DisableSecondWriteReplica: true,
-		TSDBDataPath:              DefaultTSDBDataPath,
 		Pcap:                      PCapConfig{DefaultPcapDataPath},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {

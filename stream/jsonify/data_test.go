@@ -76,7 +76,7 @@ func TestParseUint32EpcID(t *testing.T) {
 func TestProtoLogToHTTPLogger(t *testing.T) {
 	appData := &datatype.AppProtoLogsData{}
 	appData.VtapId = 123
-	appData.Timestamp = 10 * time.Microsecond
+	appData.EndTime = 10 * time.Microsecond
 	appData.Proto = datatype.PROTO_HTTP
 	appData.Detail = &datatype.HTTPInfo{}
 
@@ -94,7 +94,7 @@ func TestProtoLogToHTTPLogger(t *testing.T) {
 func TestProtoLogToDNSLogger(t *testing.T) {
 	appData := &datatype.AppProtoLogsData{}
 	appData.TapType = 3
-	appData.Timestamp = 10 * time.Microsecond
+	appData.EndTime = 10 * time.Microsecond
 	appData.Proto = datatype.PROTO_HTTP
 	appData.Detail = &datatype.DNSInfo{}
 

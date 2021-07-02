@@ -14,8 +14,8 @@ const (
 	CMD_PLATFORMDATA = 33
 )
 
-func New(ips []net.IP, port int, processName string, shardID uint32, replicaIP, tsdbDataPath, pcapDataPath string, receiver *receiver.Receiver) {
-	PlatformData = grpc.NewPlatformInfoTable(ips, port, processName, shardID, replicaIP, tsdbDataPath, pcapDataPath, receiver)
+func New(ips []net.IP, port int, processName string, pcapDataPath string, receiver *receiver.Receiver) {
+	PlatformData = grpc.NewPlatformInfoTable(ips, port, processName, pcapDataPath, receiver)
 	debug.ServerRegisterSimple(CMD_PLATFORMDATA, PlatformData)
 }
 

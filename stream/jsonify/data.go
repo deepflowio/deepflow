@@ -16,6 +16,10 @@ import (
 	pf "gitlab.x.lan/yunshan/droplet/stream/platformdata"
 )
 
+const (
+	US_TO_S_DEVISOR = 1000000 // 微秒转化为秒的除数
+)
+
 type FlowLogger struct {
 	pool.ReferenceCount
 	_id uint64 // 用来标记全局(多节点)唯一的记录
@@ -40,8 +44,8 @@ type DataLinkLayer struct {
 var DataLinkLayerColumns = []*ckdb.Column{
 	ckdb.NewColumn("mac_0", ckdb.UInt64),
 	ckdb.NewColumn("mac_1", ckdb.UInt64),
-	ckdb.NewColumn("eth_type", ckdb.UInt16),
-	ckdb.NewColumn("vlan", ckdb.UInt16),
+	ckdb.NewColumn("eth_type", ckdb.UInt16).SetIndex(ckdb.IndexSet),
+	ckdb.NewColumn("vlan", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 }
 
 func (f *DataLinkLayer) WriteBlock(block *ckdb.Block) error {
@@ -196,8 +200,8 @@ type TransportLayer struct {
 
 var TransportLayerColumns = []*ckdb.Column{
 	// 传输层
-	ckdb.NewColumn("client_port", ckdb.UInt16),
-	ckdb.NewColumn("server_port", ckdb.UInt16),
+	ckdb.NewColumn("client_port", ckdb.UInt16).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("server_port", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 	ckdb.NewColumn("tcp_flags_bit_0", ckdb.UInt16),
 	ckdb.NewColumn("tcp_flags_bit_1", ckdb.UInt16),
 }
@@ -420,7 +424,7 @@ func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) error {
 type FlowInfo struct {
 	CloseType  uint16 `json:"close_type"`
 	FlowSource uint16 `json:"flow_source"`
-	FlowIDStr  uint64 `json:"flow_id_str"`
+	FlowID     uint64 `json:"flow_id"`
 	TapType    uint16 `json:"tap_type"`
 	TapPort    uint32 `json:"tap_port"` // 显示为固定八个字符的16进制如'01234567'
 	VtapID     uint16 `json:"vtap_id"`
@@ -428,8 +432,8 @@ type FlowInfo struct {
 	L2End1     bool   `json:"l2_end_1"`
 	L3End0     bool   `json:"l3_end_0"`
 	L3End1     bool   `json:"l3_end_1"`
-	StartTime  uint32 `json:"start_time"` // s
-	EndTime    uint32 `json:"end_time"`   // s
+	StartTime  uint64 `json:"start_time"` // us
+	EndTime    uint64 `json:"end_time"`   // us
 	Duration   uint64 `json:"duration"`   // us
 }
 
@@ -437,17 +441,19 @@ var FlowInfoColumns = []*ckdb.Column{
 	// 流信息
 	ckdb.NewColumn("close_type", ckdb.UInt16),
 	ckdb.NewColumn("flow_source", ckdb.UInt16),
-	ckdb.NewColumn("flow_id_str", ckdb.UInt64),
+	ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 	ckdb.NewColumn("tap_type", ckdb.UInt16),
 	ckdb.NewColumn("tap_port", ckdb.UInt32),
-	ckdb.NewColumn("vtap_id", ckdb.UInt16),
+	ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 	ckdb.NewColumn("l2_end_0", ckdb.UInt8),
 	ckdb.NewColumn("l2_end_1", ckdb.UInt8),
 	ckdb.NewColumn("l3_end_0", ckdb.UInt8),
 	ckdb.NewColumn("l3_end_1", ckdb.UInt8),
-	ckdb.NewColumn("start_time", ckdb.DateTime),
-	ckdb.NewColumn("end_time", ckdb.DateTime),
-	ckdb.NewColumn("duration", ckdb.UInt64),
+	ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
+	ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
+	ckdb.NewColumn("time", ckdb.DateTime).SetComment("精度: 秒"),
+	ckdb.NewColumn("end_time_s", ckdb.DateTime).SetComment("精度: 秒"),
+	ckdb.NewColumn("duration", ckdb.UInt64).SetComment("单位: 微秒"),
 }
 
 func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
@@ -457,7 +463,7 @@ func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt16(f.FlowSource); err != nil {
 		return err
 	}
-	if err := block.WriteUInt64(f.FlowIDStr); err != nil {
+	if err := block.WriteUInt64(f.FlowID); err != nil {
 		return err
 	}
 	if err := block.WriteUInt16(f.TapType); err != nil {
@@ -481,10 +487,16 @@ func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteBool(f.L3End1); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(f.StartTime); err != nil {
+	if err := block.WriteUInt64(f.StartTime); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(f.EndTime); err != nil {
+	if err := block.WriteUInt64(f.EndTime); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(uint32(f.StartTime / US_TO_S_DEVISOR)); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(uint32(f.EndTime / US_TO_S_DEVISOR)); err != nil {
 		return err
 	}
 	if err := block.WriteUInt64(f.Duration); err != nil {
@@ -555,7 +567,7 @@ var MetricsColumns = []*ckdb.Column{
 	ckdb.NewColumn("l7_request", ckdb.UInt32),
 	ckdb.NewColumn("l7_response", ckdb.UInt32),
 
-	ckdb.NewColumn("rtt", ckdb.Float64),
+	ckdb.NewColumn("rtt", ckdb.Float64).SetComment("单位: 微秒"),
 	ckdb.NewColumn("rtt_client_sum", ckdb.Float64),
 	ckdb.NewColumn("rtt_server_sum", ckdb.Float64),
 	ckdb.NewColumn("srt_sum", ckdb.Float64),
@@ -568,19 +580,19 @@ var MetricsColumns = []*ckdb.Column{
 	ckdb.NewColumn("art_count", ckdb.UInt64),
 	ckdb.NewColumn("rrt_count", ckdb.UInt64),
 
-	ckdb.NewColumn("rtt_client_max", ckdb.UInt32),
-	ckdb.NewColumn("rtt_server_max", ckdb.UInt32),
-	ckdb.NewColumn("srt_max", ckdb.UInt32),
-	ckdb.NewColumn("art_max", ckdb.UInt32),
-	ckdb.NewColumn("rrt_max", ckdb.UInt32),
+	ckdb.NewColumn("rtt_client_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
+	ckdb.NewColumn("rtt_server_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
+	ckdb.NewColumn("srt_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
+	ckdb.NewColumn("art_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
+	ckdb.NewColumn("rrt_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
 
-	ckdb.NewColumn("retans_tx", ckdb.UInt32),
-	ckdb.NewColumn("retrans_rx", ckdb.UInt32),
-	ckdb.NewColumn("zero_win_tx", ckdb.UInt32),
-	ckdb.NewColumn("zero_win_rx", ckdb.UInt32),
-	ckdb.NewColumn("l7_client_error", ckdb.UInt32),
-	ckdb.NewColumn("l7_server_error", ckdb.UInt32),
-	ckdb.NewColumn("l7_server_timeout", ckdb.UInt32),
+	ckdb.NewColumn("retans_tx", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("retrans_rx", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("zero_win_tx", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("zero_win_rx", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("l7_client_error", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("l7_server_error", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("l7_server_timeout", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 }
 
 func (m *Metrics) WriteBlock(block *ckdb.Block) error {
@@ -845,7 +857,7 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool) {
 func (i *FlowInfo) Fill(f *datatype.TaggedFlow) {
 	i.CloseType = uint16(f.CloseType)
 	i.FlowSource = uint16(f.FlowSource)
-	i.FlowIDStr = f.FlowID
+	i.FlowID = f.FlowID
 	i.TapType = uint16(f.TapType)
 	i.TapPort = f.TapPort
 	i.VtapID = f.VtapId
@@ -855,8 +867,8 @@ func (i *FlowInfo) Fill(f *datatype.TaggedFlow) {
 	i.L3End0 = f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].IsL3End
 	i.L3End1 = f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].IsL3End
 
-	i.StartTime = uint32(f.StartTime / time.Second)
-	i.EndTime = uint32(f.EndTime / time.Second)
+	i.StartTime = uint64(f.StartTime / time.Microsecond)
+	i.EndTime = uint64(f.EndTime / time.Microsecond)
 	i.Duration = uint64(f.Duration / time.Microsecond)
 }
 

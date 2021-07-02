@@ -31,12 +31,12 @@ type L7Base struct {
 	ServerPort uint16 `json:"server_port"`
 
 	// 流信息
-	FlowIDStr uint64 `json:"flow_id_str"`
+	FlowID    uint64 `json:"flow_id"`
 	TapType   uint16 `json:"tap_type"`
 	TapPort   uint32 `json:"tap_port"` // 显示为固定八个字符的16进制如'01234567'
 	VtapID    uint16 `json:"vtap_id"`
-	Timestamp uint64 `json:"timestamp"` // us
-	Time      uint32 `json:"time"`      // 秒，用来淘汰过期数据
+	StartTime uint64 `json:"start_time"` // us
+	EndTime   uint64 `json:"end_time"`   // us
 }
 
 func L7BaseColumns() []*ckdb.Column {
@@ -49,19 +49,21 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("ip4_1", ckdb.IPv4),
 		ckdb.NewColumn("ip6_0", ckdb.IPv6),
 		ckdb.NewColumn("ip6_1", ckdb.IPv6),
-		ckdb.NewColumn("is_ipv4", ckdb.UInt8),
+		ckdb.NewColumn("is_ipv4", ckdb.UInt8).SetIndex(ckdb.IndexMinmax),
 
 		// 传输层
-		ckdb.NewColumn("client_port", ckdb.UInt16),
-		ckdb.NewColumn("server_port", ckdb.UInt16),
+		ckdb.NewColumn("client_port", ckdb.UInt16).SetIndex(ckdb.IndexNone),
+		ckdb.NewColumn("server_port", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 
 		// 流信息
-		ckdb.NewColumn("flow_id_str", ckdb.UInt64),
-		ckdb.NewColumn("tap_type", ckdb.UInt16),
-		ckdb.NewColumn("tap_port", ckdb.UInt32),
-		ckdb.NewColumn("vtap_id", ckdb.UInt16),
-		ckdb.NewColumn("timestamp", ckdb.UInt64).SetCodec(ckdb.CodecDoubleDelta),
-		ckdb.NewColumn("time", ckdb.DateTime),
+		ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
+		ckdb.NewColumn("tap_type", ckdb.UInt16).SetIndex(ckdb.IndexSet),
+		ckdb.NewColumn("tap_port", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
+		ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
+		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
+		ckdb.NewColumn("time", ckdb.DateTime).SetComment("精度: 秒"),
+		ckdb.NewColumn("end_time_s", ckdb.DateTime).SetComment("精度: 秒"),
 	)
 
 	return columns
@@ -102,7 +104,7 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 
-	if err := block.WriteUInt64(f.FlowIDStr); err != nil {
+	if err := block.WriteUInt64(f.FlowID); err != nil {
 		return err
 	}
 	if err := block.WriteUInt16(f.TapType); err != nil {
@@ -114,10 +116,16 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt16(f.VtapID); err != nil {
 		return err
 	}
-	if err := block.WriteUInt64(f.Timestamp); err != nil {
+	if err := block.WriteUInt64(f.StartTime); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(f.Time); err != nil {
+	if err := block.WriteUInt64(f.EndTime); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(uint32(f.StartTime / US_TO_S_DEVISOR)); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(uint32(f.EndTime / US_TO_S_DEVISOR)); err != nil {
 		return err
 	}
 
@@ -154,21 +162,21 @@ func HTTPLoggerColumns() []*ckdb.Column {
 	httpColumns = append(httpColumns, L7BaseColumns()...)
 	httpColumns = append(httpColumns,
 		// 应用层HTTP
-		ckdb.NewColumn("type", ckdb.UInt8),
+		ckdb.NewColumn("type", ckdb.UInt8).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("version", ckdb.UInt8),
-		ckdb.NewColumn("method", ckdb.String),
+		ckdb.NewColumn("method", ckdb.LowCardinalityString),
 		ckdb.NewColumn("client_ip4", ckdb.IPv4),
 		ckdb.NewColumn("client_ip6", ckdb.IPv6),
-		ckdb.NewColumn("client_is_ipv4", ckdb.UInt8),
+		ckdb.NewColumn("client_is_ipv4", ckdb.UInt8).SetIndex(ckdb.IndexNone),
 
 		ckdb.NewColumn("host", ckdb.String),
 		ckdb.NewColumn("path", ckdb.String),
-		ckdb.NewColumn("stream_id", ckdb.UInt32),
+		ckdb.NewColumn("stream_id", ckdb.UInt32Nullable),
 		ckdb.NewColumn("trace_id", ckdb.String),
-		ckdb.NewColumn("status_code", ckdb.UInt16),
+		ckdb.NewColumn("status_code", ckdb.UInt16Nullable),
 
 		// 指标量
-		ckdb.NewColumn("content_length", ckdb.Int64),
+		ckdb.NewColumn("content_length", ckdb.Int64Nullable),
 		ckdb.NewColumn("duration", ckdb.UInt64),
 	)
 	return httpColumns
@@ -214,16 +222,28 @@ func (h *HTTPLogger) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteString(h.Path); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(h.StreamID); err != nil {
+	streamID := &(h.StreamID)
+	if h.StreamID == 0 {
+		streamID = nil
+	}
+	if err := block.WriteUInt32Nullable(streamID); err != nil {
 		return err
 	}
 	if err := block.WriteString(h.TraceID); err != nil {
 		return err
 	}
-	if err := block.WriteUInt16(h.StatusCode); err != nil {
+	statusCode := &(h.StatusCode)
+	if h.StatusCode == 0 {
+		statusCode = nil
+	}
+	if err := block.WriteUInt16Nullable(statusCode); err != nil {
 		return err
 	}
-	if err := block.WriteInt64(h.ContentLength); err != nil {
+	contentLength := &(h.ContentLength)
+	if h.ContentLength == -1 { // contentLength解析失败时会赋值为-1，需要按无意义处理
+		contentLength = nil
+	}
+	if err := block.WriteInt64Nullable(contentLength); err != nil {
 		return err
 	}
 	if err := block.WriteUInt64(h.Duration); err != nil {
@@ -288,7 +308,7 @@ func (h *HTTPLogger) Release() {
 }
 
 func (h *HTTPLogger) EndTime() time.Duration {
-	return time.Duration(h.Timestamp) * time.Microsecond
+	return time.Duration(h.L7Base.EndTime) * time.Microsecond
 }
 
 func (h *HTTPLogger) String() string {
@@ -322,12 +342,12 @@ func DNSLoggerColumns() []*ckdb.Column {
 		ckdb.NewColumn("type", ckdb.UInt8).SetComment("0: request 1: response 2: session"),
 		ckdb.NewColumn("id", ckdb.UInt16),
 		ckdb.NewColumn("domain_name", ckdb.String),
-		ckdb.NewColumn("query_type", ckdb.UInt16),
-		ckdb.NewColumn("answer_code", ckdb.UInt16),
+		ckdb.NewColumn("query_type", ckdb.UInt16Nullable),
+		ckdb.NewColumn("answer_code", ckdb.UInt16Nullable),
 		ckdb.NewColumn("answer_addr", ckdb.String),
 
 		// 指标量
-		ckdb.NewColumn("duration", ckdb.UInt64),
+		ckdb.NewColumn("duration", ckdb.UInt64).SetComment(" 单位: 微秒"),
 	)
 	return dnsColumns
 }
@@ -350,10 +370,18 @@ func (d *DNSLogger) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteString(d.DomainName); err != nil {
 		return err
 	}
-	if err := block.WriteUInt16(d.QueryType); err != nil {
+	queryType := &(d.QueryType)
+	if d.QueryType == 0 {
+		queryType = nil
+	}
+	if err := block.WriteUInt16Nullable(queryType); err != nil {
 		return err
 	}
-	if err := block.WriteUInt16(d.AnswerCode); err != nil {
+	answerCode := &(d.AnswerCode)
+	if d.Type == 0 {
+		answerCode = nil
+	}
+	if err := block.WriteUInt16Nullable(answerCode); err != nil {
 		return err
 	}
 	if err := block.WriteString(d.AnswerAddr); err != nil {
@@ -390,7 +418,7 @@ func (d *DNSLogger) Release() {
 }
 
 func (d *DNSLogger) EndTime() time.Duration {
-	return time.Duration(d.Timestamp) * time.Microsecond
+	return time.Duration(d.L7Base.EndTime) * time.Microsecond
 }
 
 func (d *DNSLogger) String() string {
@@ -417,12 +445,12 @@ func (b *L7Base) Fill(l *datatype.AppProtoLogsData) {
 	b.KnowledgeGraph.FillL7(l)
 
 	// 流信息
-	b.FlowIDStr = l.FlowId
+	b.FlowID = l.FlowId
 	b.TapType = l.TapType
 	b.TapPort = l.TapPort
 	b.VtapID = l.VtapId
-	b.Timestamp = uint64(l.Timestamp / time.Microsecond)
-	b.Time = uint32(l.Timestamp / time.Second)
+	b.StartTime = uint64(l.StartTime / time.Microsecond)
+	b.EndTime = uint64(l.EndTime / time.Microsecond)
 }
 
 func (k *KnowledgeGraph) FillL7(l *datatype.AppProtoLogsData) {
@@ -489,7 +517,7 @@ var L7HTTPCounter uint32
 
 func ProtoLogToHTTPLogger(l *datatype.AppProtoLogsData, shardID int) *HTTPLogger {
 	h := AcquireHTTPLogger()
-	h._id = genID(uint32(l.Timestamp/time.Microsecond), &L7HTTPCounter, shardID)
+	h._id = genID(uint32(l.StartTime/time.Microsecond), &L7HTTPCounter, shardID)
 	h.Fill(l)
 	return h
 }
@@ -519,7 +547,7 @@ var L7DNSCounter uint32
 
 func ProtoLogToDNSLogger(l *datatype.AppProtoLogsData, shardID int) *DNSLogger {
 	h := AcquireDNSLogger()
-	h._id = genID(uint32(l.Timestamp/time.Microsecond), &L7DNSCounter, shardID)
+	h._id = genID(uint32(l.StartTime/time.Microsecond), &L7DNSCounter, shardID)
 	h.Fill(l)
 	return h
 }
