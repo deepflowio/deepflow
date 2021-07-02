@@ -907,7 +907,7 @@ func (t *Tag) TableID(isSecond bool) (uint8, error) {
 func genTagColumns(code Code) []*ckdb.Column {
 	columns := []*ckdb.Column{}
 	columns = append(columns, ckdb.NewColumnWithGroupBy("time", ckdb.DateTime))
-	columns = append(columns, ckdb.NewColumn("_tid", ckdb.UInt8).SetComment("用于区分trident不同的pipeline"))
+	columns = append(columns, ckdb.NewColumn("_tid", ckdb.UInt8).SetComment("用于区分trident不同的pipeline").SetIndex(ckdb.IndexNone))
 	if code&ACLGID != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("acl_gid", ckdb.UInt16).SetComment("ACL组ID"))
 	}
