@@ -459,8 +459,12 @@ func (k *KnowledgeGraph) FillL7(l *datatype.AppProtoLogsData) {
 
 	if l.IsIPv6 {
 		info0, info1 = pf.PlatformData.QueryIPV6InfosPair(int16(l3EpcID0), net.IP(l.IP6Src[:]), int16(l3EpcID1), net.IP(l.IP6Dst[:]))
+		k.GroupIDs0, k.BusinessIDs0 = pf.PlatformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID0), l.IP6Src[:])
+		k.GroupIDs1, k.BusinessIDs1 = pf.PlatformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID1), l.IP6Dst[:])
 	} else {
 		info0, info1 = pf.PlatformData.QueryIPV4InfosPair(int16(l3EpcID0), uint32(l.IPSrc), int16(l3EpcID1), uint32(l.IPDst))
+		k.GroupIDs0, k.BusinessIDs0 = pf.PlatformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID0), l.IPSrc)
+		k.GroupIDs1, k.BusinessIDs1 = pf.PlatformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID1), l.IPDst)
 	}
 
 	if info0 != nil {
