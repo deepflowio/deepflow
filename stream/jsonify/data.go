@@ -847,11 +847,13 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool) {
 		k.EpcID1 = parseUint32EpcID(l2Info1.L2EpcID)
 	}
 
-	// fix me 目前默认写1
-	k.GroupIDs0 = []uint16{1}
-	k.GroupIDs1 = []uint16{1}
-	k.BusinessIDs0 = []uint16{1}
-	k.BusinessIDs1 = []uint16{1}
+	if isIPV6 {
+		k.GroupIDs0, k.BusinessIDs0 = pf.PlatformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID0), f.IP6Src)
+		k.GroupIDs1, k.BusinessIDs1 = pf.PlatformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID1), f.IP6Dst)
+	} else {
+		k.GroupIDs0, k.BusinessIDs0 = pf.PlatformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID0), f.IPSrc)
+		k.GroupIDs1, k.BusinessIDs1 = pf.PlatformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID1), f.IPDst)
+	}
 }
 
 func (i *FlowInfo) Fill(f *datatype.TaggedFlow) {

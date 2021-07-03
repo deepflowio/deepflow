@@ -82,10 +82,11 @@ func DocToRozeDocuments(doc *app.Document) *msg.RozeDocument {
 			t.PodGroupID1 = info1.PodGroupID
 			t.PodID1 = info1.PodID
 			t.PodClusterID1 = uint16(info1.PodClusterID)
-			// FIXME 后续补充
-			t.BusinessIDs1 = []uint16{1, 2}
-			t.GroupIDs1 = []uint16{2, 3}
-			t.IsKeyService = 1
+			if t.IsIPv6 != 0 {
+				t.GroupIDs1, t.BusinessIDs1 = pf.PlatformData.QueryIPv6GroupIDsAndBusinessIDs(t.L3EpcID1, t.IP61)
+			} else {
+				t.GroupIDs1, t.BusinessIDs1 = pf.PlatformData.QueryGroupIDsAndBusinessIDs(t.L3EpcID1, t.IP1)
+			}
 			if info == nil {
 				var ip0 net.IP
 				if t.IsIPv6 != 0 {
@@ -135,10 +136,21 @@ func DocToRozeDocuments(doc *app.Document) *msg.RozeDocument {
 		t.PodGroupID = info.PodGroupID
 		t.PodID = info.PodID
 		t.PodClusterID = uint16(info.PodClusterID)
-		// FIXME 后续补充
-		t.BusinessIDs = []uint16{1, 2, 3}
-		t.GroupIDs = []uint16{2, 3, 4}
-		t.IsKeyService = 0
+		if t.IsIPv6 != 0 {
+			t.GroupIDs, t.BusinessIDs = pf.PlatformData.QueryIPv6GroupIDsAndBusinessIDs(t.L3EpcID, t.IP6)
+			if t.Code&PortAddCode != 0 {
+				if pf.PlatformData.QueryIPv6IsKeyService(t.L3EpcID, t.IP6, t.Protocol, t.ServerPort) {
+					t.IsKeyService = 1
+				}
+			}
+		} else {
+			t.GroupIDs, t.BusinessIDs = pf.PlatformData.QueryGroupIDsAndBusinessIDs(t.L3EpcID, t.IP)
+			if t.Code&PortAddCode != 0 {
+				if pf.PlatformData.QueryIsKeyService(t.L3EpcID, t.IP, t.Protocol, t.ServerPort) {
+					t.IsKeyService = 1
+				}
+			}
+		}
 		if info1 == nil && (t.Code&EdgeCode == EdgeCode) {
 			var ip1 net.IP
 			if t.IsIPv6 != 0 {
