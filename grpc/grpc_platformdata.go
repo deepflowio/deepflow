@@ -13,8 +13,11 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/google/gopacket/layers"
 	"github.com/spf13/cobra"
 	"github.com/vishvananda/netlink"
+	"gitlab.x.lan/yunshan/droplet-libs/logger"
+	api "gitlab.x.lan/yunshan/droplet-libs/reciter-api"
 	"golang.org/x/net/context"
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
@@ -32,6 +35,7 @@ const (
 	EpcIDIPV6_LEN         = 20
 	LruSlotSize           = 1 << 14
 	LruCap                = 1 << 17
+	GROUPID_MAX           = 1 << 16
 )
 
 type BaseInfo struct {
@@ -92,10 +96,16 @@ type PlatformInfoTable struct {
 	ctlIP               string
 	hostname            string
 	runtimeEnv          utils.RuntimeEnv
-	tsdbShardID         uint32
-	tsdbReplicaIP       string
-	tsdbDataMountPath   string
 	pcapDataMountPath   string
+
+	versionGroups        uint64
+	groupLabeler         *GroupLabeler
+	serviceLabeler       *GroupLabeler
+	groupLabelerLogger   *logger.PrefixLogger
+	serviceLabelerLogger *logger.PrefixLogger
+	groupIDToBusiessID   []uint16
+	groupLabelerLock     *sync.RWMutex
+	serviceLabelerLock   *sync.RWMutex
 
 	*GrpcSession
 	ipv4Lock  *sync.RWMutex
@@ -220,26 +230,30 @@ func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID
 // 单例模式，只启动一次
 func NewPlatformInfoTable(ips []net.IP, port int, moduleName string, pcapDataPath string, receiver *receiver.Receiver) *PlatformInfoTable {
 	table := &PlatformInfoTable{
-		receiver:           receiver,
-		bootTime:           uint32(time.Now().Unix()),
-		GrpcSession:        &GrpcSession{},
-		ipv4Lock:           &sync.RWMutex{},
-		ipv6Lock:           &sync.RWMutex{},
-		macLock:            &sync.RWMutex{},
-		epcIDLock:          &sync.RWMutex{},
-		epcIDIPV4Lru:       lru.NewU64LRU("epcIDIPV4_"+moduleName, LruSlotSize, LruCap),
-		epcIDIPV6Lru:       lru.NewU160LRU("epcIDIPV6_"+moduleName, LruSlotSize, LruCap),
-		epcIDIPV4Infos:     make(map[uint64]*Info),
-		epcIDIPV6Infos:     make(map[[EpcIDIPV6_LEN]byte]*Info),
-		macInfos:           make(map[uint64]*Info),
-		macMissCount:       make(map[uint64]*uint64),
-		epcIDIPV4CidrInfos: make(map[int32][]*CidrInfo),
-		epcIDIPV6CidrInfos: make(map[int32][]*CidrInfo),
-		epcIDBaseInfos:     make(map[int32]*BaseInfo),
-		epcIDBaseMissCount: make(map[int32]*uint64),
-		moduleName:         moduleName,
-		runtimeEnv:         utils.GetRuntimeEnv(),
-		pcapDataMountPath:  utils.Mountpoint(pcapDataPath),
+		receiver:             receiver,
+		bootTime:             uint32(time.Now().Unix()),
+		GrpcSession:          &GrpcSession{},
+		ipv4Lock:             &sync.RWMutex{},
+		ipv6Lock:             &sync.RWMutex{},
+		macLock:              &sync.RWMutex{},
+		epcIDLock:            &sync.RWMutex{},
+		groupLabelerLock:     &sync.RWMutex{},
+		serviceLabelerLock:   &sync.RWMutex{},
+		epcIDIPV4Lru:         lru.NewU64LRU("epcIDIPV4_"+moduleName, LruSlotSize, LruCap),
+		epcIDIPV6Lru:         lru.NewU160LRU("epcIDIPV6_"+moduleName, LruSlotSize, LruCap),
+		epcIDIPV4Infos:       make(map[uint64]*Info),
+		epcIDIPV6Infos:       make(map[[EpcIDIPV6_LEN]byte]*Info),
+		macInfos:             make(map[uint64]*Info),
+		macMissCount:         make(map[uint64]*uint64),
+		epcIDIPV4CidrInfos:   make(map[int32][]*CidrInfo),
+		epcIDIPV6CidrInfos:   make(map[int32][]*CidrInfo),
+		epcIDBaseInfos:       make(map[int32]*BaseInfo),
+		epcIDBaseMissCount:   make(map[int32]*uint64),
+		moduleName:           moduleName,
+		runtimeEnv:           utils.GetRuntimeEnv(),
+		pcapDataMountPath:    utils.Mountpoint(pcapDataPath),
+		groupLabelerLogger:   logger.WrapWithPrefixLogger("groupLabeler", log),
+		serviceLabelerLogger: logger.WrapWithPrefixLogger("serviceLabeler", log),
 	}
 	runOnce := func() {
 		if err := table.Reload(); err != nil {
@@ -556,8 +570,8 @@ func (t *PlatformInfoTable) String() string {
 	sb := &strings.Builder{}
 
 	sb.WriteString(fmt.Sprintf("RegionID:%d   Drop Other RegionID Data Count:%d\n", t.regionID, t.otherRegionCount))
-	sb.WriteString(fmt.Sprintf("moduleName:%s ctlIP:%s hostname:%s RegionID:%d tsdbShardID:%d tsdbReplicaIP:%s tsdbDataMountPath:%s pcapDataMountPath:%s\n",
-		t.moduleName, t.ctlIP, t.hostname, t.regionID, t.tsdbShardID, t.tsdbReplicaIP, t.tsdbDataMountPath, t.pcapDataMountPath))
+	sb.WriteString(fmt.Sprintf("moduleName:%s ctlIP:%s hostname:%s RegionID:%d pcapDataMountPath:%s\n",
+		t.moduleName, t.ctlIP, t.hostname, t.regionID, t.pcapDataMountPath))
 	sb.WriteString(fmt.Sprintf("ARCH:%s OS:%s Kernel:%s CPUNum:%d MemorySize:%d\n", t.runtimeEnv.Arch, t.runtimeEnv.OS, t.runtimeEnv.KernelVersion, t.runtimeEnv.CpuNum, t.runtimeEnv.MemorySize))
 	t.ipv4Lock.RLock()
 	if len(t.epcIDIPV4Infos) > 0 {
@@ -764,6 +778,145 @@ func lookup(host net.IP) (net.IP, error) {
 	return src, nil
 }
 
+func (t *PlatformInfoTable) UpdateGroupLabeler() {
+	//t.groupLabeler = NewGroupLabeler(t.groupLabelerLogger,
+
+}
+
+func (t *PlatformInfoTable) UpdateServices() {
+
+}
+
+func dedupU16(xs []uint16) []uint16 {
+	if len(xs) == 0 {
+		return xs
+	}
+	sort.Slice(xs, func(i, j int) bool { return xs[i] < xs[j] })
+	i, j := 0, 1
+	for ; i < len(xs)-1; i++ {
+		for j < len(xs) && xs[j] == xs[i] {
+			j++
+		}
+		if j == len(xs) {
+			break
+		}
+		xs[i+1] = xs[j]
+	}
+	return xs[:i+1]
+}
+
+func uint32SliceToUint16Slice(u32s []uint32) []uint16 {
+	u16s := make([]uint16, len(u32s))
+	for i, v := range u32s {
+		u16s[i] = uint16(v)
+	}
+	return u16s
+}
+
+func (t *PlatformInfoTable) groupIDsToBusnessIDs(groupIDs []uint16) []uint16 {
+	businessIDs := make([]uint16, 0, len(groupIDs))
+	for _, gid := range groupIDs {
+		if t.groupIDToBusiessID[gid] == 0 {
+			continue
+		}
+		businessIDs = append(businessIDs, t.groupIDToBusiessID[gid])
+	}
+	return dedupU16(businessIDs)
+}
+
+func (t *PlatformInfoTable) QueryGroupIDsAndBusinessIDs(l3EpcID int16, ipv4 uint32) ([]uint16, []uint16) {
+	if t.groupLabeler == nil {
+		return []uint16{}, []uint16{}
+	}
+	// FIXME 优化锁
+	t.groupLabelerLock.Lock()
+	groupIDs := uint32SliceToUint16Slice(t.groupLabeler.Query(l3EpcID, ipv4, 0))
+	t.groupLabelerLock.Unlock()
+
+	return groupIDs, t.groupIDsToBusnessIDs(groupIDs)
+}
+
+func (t *PlatformInfoTable) QueryIPv6GroupIDsAndBusinessIDs(l3EpcID int16, ipv6 net.IP) ([]uint16, []uint16) {
+	if t.groupLabeler == nil {
+		return []uint16{}, []uint16{}
+	}
+	// FIXME 优化锁
+	t.groupLabelerLock.Lock()
+	groupIDs := uint32SliceToUint16Slice(t.groupLabeler.QueryIPv6(l3EpcID, ipv6, 0))
+	t.groupLabelerLock.Unlock()
+
+	return groupIDs, t.groupIDsToBusnessIDs(groupIDs)
+}
+
+func (t *PlatformInfoTable) QueryIsKeyService(l3EpcID int16, ipv4 uint32, protocol layers.IPProtocol, serverPort uint16) bool {
+	if t.serviceLabeler == nil {
+		return false
+	}
+	// FIXME 优化锁
+	t.serviceLabelerLock.Lock()
+	defer t.serviceLabelerLock.Unlock()
+	// FIXME 总返回false
+	return len(t.serviceLabeler.QueryServer(l3EpcID, ipv4, 0, protocol, serverPort)) > 0
+}
+
+func (t *PlatformInfoTable) QueryIPv6IsKeyService(l3EpcID int16, ipv6 net.IP, protocol layers.IPProtocol, serverPort uint16) bool {
+	if t.serviceLabeler == nil {
+		return false
+	}
+	// FIXME 优化锁
+	t.serviceLabelerLock.Lock()
+	defer t.serviceLabelerLock.Unlock()
+	return len(t.serviceLabeler.QueryServerIPv6(l3EpcID, ipv6, 0, protocol, serverPort)) > 0
+}
+
+func (t *PlatformInfoTable) updateGroupIDsAndBusinessIDs(response *trident.SyncResponse) bool {
+	groupsData := trident.Groups{}
+	groupIDToBusiessID := make([]uint16, GROUPID_MAX)
+	if compressed := response.GetGroups(); compressed != nil {
+		if err := groupsData.Unmarshal(compressed); err != nil {
+			log.Warningf("unmarshal grpc compressed groups failed as %v", err)
+			return false
+		}
+	}
+
+	groups := make([]api.GroupIDMap, 0, len(groupsData.GetGroups()))
+	for _, group := range groupsData.GetGroups() {
+		if group.GetType() == trident.GroupType_ANONYMOUS {
+			continue
+		}
+		groupID := group.GetId()
+		if groupID > GROUPID_MAX {
+			continue
+		}
+		groups = append(groups, api.GroupIDMap{
+			L3EpcID:  int32(group.GetEpcId()),
+			GroupID:  int32(groupID),
+			CIDRs:    group.GetIps(),
+			IPRanges: group.GetIpRanges(),
+		})
+		groupIDToBusiessID[uint16(groupID)] = uint16(group.GetBusinessId())
+		log.Infof("group: %+v", group)
+	}
+	t.groupIDToBusiessID = groupIDToBusiessID
+	t.groupLabeler = NewGroupLabeler(t.groupLabelerLogger, groups)
+
+	services := make([]api.GroupIDMap, 0, len(groupsData.GetSvcs()))
+	for i, svc := range groupsData.GetSvcs() {
+		services = append(services, api.GroupIDMap{
+			GroupID:     int32(i),
+			L3EpcID:     int32(svc.GetEpcId()),
+			CIDRs:       svc.GetIps(),
+			IPRanges:    svc.GetIpRanges(),
+			Protocol:    uint16(svc.GetProtocol()),
+			ServerPorts: svc.GetServerPorts(),
+		})
+		log.Infof("svc: %+v", svc)
+	}
+	t.serviceLabeler = NewGroupLabeler(t.serviceLabelerLogger, services)
+
+	return true
+}
+
 func (t *PlatformInfoTable) Reload() error {
 	var response *trident.SyncResponse
 	err := t.Request(func(ctx context.Context, remote net.IP) error {
@@ -795,6 +948,7 @@ func (t *PlatformInfoTable) Reload() error {
 		request := trident.SyncRequest{
 			BootTime:            proto.Uint32(t.bootTime),
 			VersionPlatformData: proto.Uint64(t.versionPlatformData),
+			VersionGroups:       proto.Uint64(t.versionGroups),
 			CtrlIp:              proto.String(local.String()),
 			ProcessName:         proto.String(t.moduleName),
 			Host:                proto.String(hostname),
@@ -819,6 +973,14 @@ func (t *PlatformInfoTable) Reload() error {
 
 	if status := response.GetStatus(); status != trident.Status_SUCCESS {
 		return fmt.Errorf("grpc response failed. responseStatus is %v", status)
+	}
+
+	newGroupsVersion := response.GetVersionGroups()
+	if newGroupsVersion != t.versionGroups {
+		log.Infof("Update rpc groups version %d -> %d ", t.versionGroups, newGroupsVersion)
+		if t.updateGroupIDsAndBusinessIDs(response) {
+			t.versionGroups = newGroupsVersion
+		}
 	}
 
 	newVersion := response.GetVersionPlatformData()
