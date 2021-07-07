@@ -24,35 +24,35 @@ const (
 type GroupLabeler struct {
 	ipCacheLocation   map[uint64]int
 	ipv6CacheLocation *idmap.U160IDMap
-	cache             [][]uint32
+	cache             [][]uint16
 
 	serverIpCacheLocation   *idmap.U128IDMap
 	serverIpv6CacheLocation *idmap.U192IDMap
-	serverCache             [][]uint32
+	serverCache             [][]uint16
 
 	ipGroup        *policy.IpResourceGroup
-	internetGroups []uint32
+	internetGroups []uint16
 
 	podGroup map[uint16]uint32
 
 	*portFilter
 
-	indexToGroupID []uint32
+	indexToGroupID []uint16
 }
 
 func NewGroupLabeler(log *logger.PrefixLogger, idMaps []api.GroupIDMap) *GroupLabeler {
 	ipGroupData := make([]*policy.IpGroupData, 0, len(idMaps))
-	internetGroups := make([]uint32, 0, 1)
+	internetGroups := make([]uint16, 0, 1)
 	podGroup := make(map[uint16]uint32)
-	indexToGroupID := make([]uint32, len(idMaps))
+	indexToGroupID := make([]uint16, len(idMaps))
 	for i, idMap := range idMaps {
-		indexToGroupID[i] = uint32(idMap.GroupID)
+		indexToGroupID[i] = idMap.GroupID
 		if pod := idMap.PodGroupID; pod > 0 {
 			podGroup[pod] = uint32(i)
 			continue
 		}
 		if int16(idMap.L3EpcID) == datatype.EPC_FROM_INTERNET {
-			internetGroups = append(internetGroups, uint32(idMap.GroupID))
+			internetGroups = append(internetGroups, uint16(idMap.GroupID))
 			continue
 		}
 		ips := idMap.CIDRs
@@ -80,10 +80,10 @@ func NewGroupLabeler(log *logger.PrefixLogger, idMaps []api.GroupIDMap) *GroupLa
 	return &GroupLabeler{
 		ipCacheLocation:         make(map[uint64]int),
 		ipv6CacheLocation:       idmap.NewU160IDMap("", GROUP_CACHE_SIZE).NoStats(),
-		cache:                   make([][]uint32, 0, GROUP_CACHE_SIZE),
+		cache:                   make([][]uint16, 0, GROUP_CACHE_SIZE),
 		serverIpCacheLocation:   idmap.NewU128IDMap("", GROUP_CACHE_SIZE).NoStats(),
 		serverIpv6CacheLocation: idmap.NewU192IDMap("", GROUP_CACHE_SIZE).NoStats(),
-		serverCache:             make([][]uint32, 0, GROUP_CACHE_SIZE),
+		serverCache:             make([][]uint16, 0, GROUP_CACHE_SIZE),
 		ipGroup:                 ipGroup,
 		internetGroups:          internetGroups,
 		podGroup:                podGroup,
@@ -92,7 +92,7 @@ func NewGroupLabeler(log *logger.PrefixLogger, idMaps []api.GroupIDMap) *GroupLa
 	}
 }
 
-func dedup(xs []uint32) []uint32 {
+func dedup(xs []uint16) []uint16 {
 	if len(xs) == 0 {
 		return xs
 	}
@@ -110,19 +110,19 @@ func dedup(xs []uint32) []uint32 {
 	return xs[:i+1]
 }
 
-func (l *GroupLabeler) backMapAndDedup(gs []uint32) []uint32 {
+func (l *GroupLabeler) backMapAndDedup(gs []uint16) []uint16 {
 	if len(gs) == 0 {
 		return gs
 	}
 	// 这里必须copy，否则会改变cache中的值
-	newGroups := make([]uint32, len(gs))
+	newGroups := make([]uint16, len(gs))
 	for i, g := range gs {
 		newGroups[i] = l.indexToGroupID[g]
 	}
 	return dedup(newGroups)
 }
 
-func (l *GroupLabeler) innerQuery(l3EpcID int16, ip uint32, podGroupID uint16) []uint32 {
+func (l *GroupLabeler) innerQuery(l3EpcID int16, ip uint32, podGroupID uint16) []uint16 {
 	if l3EpcID == datatype.EPC_FROM_INTERNET {
 		return l.internetGroups
 	}
@@ -132,18 +132,18 @@ func (l *GroupLabeler) innerQuery(l3EpcID int16, ip uint32, podGroupID uint16) [
 	}
 	groups := l.ipGroup.GetGroupIds(ip, &datatype.EndpointInfo{L3EpcId: int32(l3EpcID)})
 	if gid, in := l.podGroup[podGroupID]; in {
-		groups = append(groups, gid)
+		groups = append(groups, uint16(gid))
 	}
 	l.ipCacheLocation[key] = len(l.cache)
 	l.cache = append(l.cache, groups)
 	return groups
 }
 
-func (l *GroupLabeler) Query(l3EpcID int16, ip uint32, podGroupID uint16) []uint32 {
+func (l *GroupLabeler) Query(l3EpcID int16, ip uint32, podGroupID uint16) []uint16 {
 	return l.backMapAndDedup(l.innerQuery(l3EpcID, ip, podGroupID))
 }
 
-func (l *GroupLabeler) QueryServer(l3EpcID int16, ip uint32, podGroupID uint16, protocol layers.IPProtocol, serverPort uint16) []uint32 {
+func (l *GroupLabeler) QueryServer(l3EpcID int16, ip uint32, podGroupID uint16, protocol layers.IPProtocol, serverPort uint16) []uint16 {
 	if l3EpcID == datatype.EPC_FROM_INTERNET {
 		return l.internetGroups
 	}
@@ -153,7 +153,7 @@ func (l *GroupLabeler) QueryServer(l3EpcID int16, ip uint32, podGroupID uint16, 
 		return l.backMapAndDedup(l.serverCache[loc])
 	}
 	all := l.innerQuery(l3EpcID, ip, podGroupID)
-	filtered := make([]uint32, 0, len(all))
+	filtered := make([]uint16, 0, len(all))
 	for _, group := range all {
 		if l.check(int16(group), protocol, serverPort) {
 			filtered = append(filtered, group)
@@ -163,19 +163,19 @@ func (l *GroupLabeler) QueryServer(l3EpcID int16, ip uint32, podGroupID uint16, 
 	return l.backMapAndDedup(filtered)
 }
 
-func (l *GroupLabeler) innerQueryIPv6(key []byte, hash uint32, l3EpcID int16, ip net.IP, podGroupID uint16) []uint32 {
+func (l *GroupLabeler) innerQueryIPv6(key []byte, hash uint32, l3EpcID int16, ip net.IP, podGroupID uint16) []uint16 {
 	if loc, added := l.ipv6CacheLocation.AddOrGet(key, hash, uint32(len(l.cache)), false); !added {
 		return l.cache[loc]
 	}
 	groups := l.ipGroup.GetGroupIdsByIpv6(ip, &datatype.EndpointInfo{L3EpcId: int32(l3EpcID)})
 	if gid, in := l.podGroup[podGroupID]; in {
-		groups = append(groups, gid)
+		groups = append(groups, uint16(gid))
 	}
 	l.cache = append(l.cache, groups)
 	return groups
 }
 
-func (l *GroupLabeler) QueryIPv6(l3EpcID int16, ip net.IP, podGroupID uint16) []uint32 {
+func (l *GroupLabeler) QueryIPv6(l3EpcID int16, ip net.IP, podGroupID uint16) []uint16 {
 	if l3EpcID == datatype.EPC_FROM_INTERNET {
 		return l.internetGroups
 	}
@@ -190,7 +190,7 @@ func (l *GroupLabeler) QueryIPv6(l3EpcID int16, ip net.IP, podGroupID uint16) []
 	return l.backMapAndDedup(l.innerQueryIPv6(key[:], hash, l3EpcID, ip, podGroupID))
 }
 
-func (l *GroupLabeler) QueryServerIPv6(l3EpcID int16, ip net.IP, podGroupID uint16, protocol layers.IPProtocol, serverPort uint16) []uint32 {
+func (l *GroupLabeler) QueryServerIPv6(l3EpcID int16, ip net.IP, podGroupID uint16, protocol layers.IPProtocol, serverPort uint16) []uint16 {
 	if l3EpcID == datatype.EPC_FROM_INTERNET {
 		return l.internetGroups
 	}
@@ -212,7 +212,7 @@ func (l *GroupLabeler) QueryServerIPv6(l3EpcID int16, ip net.IP, podGroupID uint
 	// 排除掉前4字节就是client查询的key
 	hash ^= binary.BigEndian.Uint32(key[:])
 	all := l.innerQueryIPv6(key[4:], hash, l3EpcID, ip, podGroupID)
-	filtered := make([]uint32, 0, len(all))
+	filtered := make([]uint16, 0, len(all))
 	for _, group := range all {
 		if l.check(int16(group), protocol, serverPort) {
 			filtered = append(filtered, group)

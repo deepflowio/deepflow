@@ -15,14 +15,14 @@ import (
 
 func TestDedup(t *testing.T) {
 	testcases := []struct {
-		orig     []uint32
-		expected []uint32
+		orig     []uint16
+		expected []uint16
 	}{
-		{[]uint32{1, 2, 2, 3, 3, 4, 4, 4, 5, 1, 3, 2, 5, 6}, []uint32{1, 2, 3, 4, 5, 6}},
-		{[]uint32{}, []uint32{}},
-		{[]uint32{3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3}, []uint32{3}},
-		{[]uint32{9, 8, 8, 5, 9}, []uint32{5, 8, 9}},
-		{[]uint32{9}, []uint32{9}},
+		{[]uint16{1, 2, 2, 3, 3, 4, 4, 4, 5, 1, 3, 2, 5, 6}, []uint16{1, 2, 3, 4, 5, 6}},
+		{[]uint16{}, []uint16{}},
+		{[]uint16{3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3}, []uint16{3}},
+		{[]uint16{9, 8, 8, 5, 9}, []uint16{5, 8, 9}},
+		{[]uint16{9}, []uint16{9}},
 	}
 	for _, tc := range testcases {
 		if result := dedup(tc.orig); !reflect.DeepEqual(tc.expected, result) {
@@ -40,7 +40,7 @@ func TestSimpleGroups(t *testing.T) {
 		{GroupID: 5, PodGroupID: 1234, Protocol: policy.PROTO_ALL, ServerPorts: "444,25-123"},
 	}
 	labeler := NewGroupLabeler(nil, rawGroupMaps)
-	var result []uint32
+	var result []uint16
 	result = labeler.Query(1, binary.BigEndian.Uint32([]byte{172, 16, 2, 233}), 0)
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
 	if len(result) != 2 || result[0] != 1 || result[1] != 3 {
@@ -84,7 +84,7 @@ func TestDuplicateIDGroups(t *testing.T) {
 		{L3EpcID: 1, GroupID: 233, CIDRs: []string{"172.21.0.0/16"}, Protocol: policy.PROTO_ALL, ServerPorts: "444,25-123"},
 	}
 	labeler := NewGroupLabeler(nil, rawGroupMaps)
-	var result []uint32
+	var result []uint16
 	result = labeler.QueryServer(1, binary.BigEndian.Uint32([]byte{172, 16, 2, 233}), 0, layers.IPProtocolTCP, 123)
 	if len(result) != 1 || result[0] != 233 {
 		t.Error("group查询不正确")
@@ -114,7 +114,7 @@ func TestSimpleIPv6Groups(t *testing.T) {
 	labeler := NewGroupLabeler(nil, rawGroupMaps)
 	var ip [net.IPv6len]byte
 	ip[net.IPv6len-1] = 1
-	var result []uint32
+	var result []uint16
 
 	binary.BigEndian.PutUint64(ip[:], 0xbabefacebeefcafe)
 	result = labeler.QueryIPv6(1, ip[:], 0)
@@ -163,7 +163,7 @@ func TestOverlappingGroups(t *testing.T) {
 		{L3EpcID: 1, GroupID: 3, CIDRs: []string{"10.16.0.0/16", "10.130.0.0/24"}},
 	}
 	labeler := NewGroupLabeler(nil, rawGroupMaps)
-	var result []uint32
+	var result []uint16
 	result = labeler.Query(1, binary.BigEndian.Uint32([]byte{10, 16, 2, 233}), 0)
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
 	if len(result) != 2 || result[0] != 1 || result[1] != 3 {
@@ -189,7 +189,7 @@ func TestIPRangeGroups(t *testing.T) {
 		{L3EpcID: 1, GroupID: 4, IPRanges: []string{"10.128.0.0-10.130.3.232"}},
 	}
 	labeler := NewGroupLabeler(nil, rawGroupMaps)
-	var result []uint32
+	var result []uint16
 	result = labeler.Query(1, binary.BigEndian.Uint32([]byte{10, 16, 2, 233}), 0)
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
 	if len(result) != 2 || result[0] != 1 || result[1] != 3 {
@@ -217,7 +217,7 @@ func TestIPv6RangeGroups(t *testing.T) {
 	labeler := NewGroupLabeler(nil, rawGroupMaps)
 	var ip [net.IPv6len]byte
 	ip[net.IPv6len-1] = 1
-	var result []uint32
+	var result []uint16
 	binary.BigEndian.PutUint64(ip[:], 0xbabefacebeefcafe)
 	result = labeler.QueryIPv6(1, ip[:], 0)
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
@@ -250,7 +250,7 @@ func TestMixedIPGroups(t *testing.T) {
 	labeler := NewGroupLabeler(nil, rawGroupMaps)
 	var ip [net.IPv6len]byte
 	ip[net.IPv6len-1] = 1
-	var result []uint32
+	var result []uint16
 
 	result = labeler.Query(1, binary.BigEndian.Uint32([]byte{10, 16, 2, 233}), 0)
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
@@ -296,7 +296,7 @@ func TestAnyRuleGroups(t *testing.T) {
 		{L3EpcID: 0, GroupID: 2, IPRanges: []string{"10.128.0.0-10.255.255.255"}},
 	}
 	labeler := NewGroupLabeler(nil, rawGroupMaps)
-	var result []uint32
+	var result []uint16
 	result = labeler.Query(2, binary.BigEndian.Uint32([]byte{10, 16, 2, 233}), 0)
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
 	if len(result) != 1 || result[0] != 1 {
