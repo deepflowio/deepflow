@@ -128,7 +128,7 @@ const (
 
 type GroupIDMap struct {
 	L3EpcID     int32    `json:"l3_epc_id"`
-	GroupID     int32    `json:"group_id"`
+	GroupID     uint16   `json:"group_id"`
 	CIDRs       []string `json:"cidrs"`
 	IPRanges    []string `json:"ip_ranges"` // 格式为{IP0}-{IP1}, 如 10.33.2.202-10.34.1.233
 	PodGroupID  uint16   `json:"pod_group_id"`
