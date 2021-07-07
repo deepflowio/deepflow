@@ -7,6 +7,8 @@ import (
 
 	zmq4 "github.com/pebbe/zmq4"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/debug"
+	"gitlab.x.lan/yunshan/droplet-libs/grpc"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/receiver"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
@@ -18,7 +20,6 @@ import (
 	"gitlab.x.lan/yunshan/droplet/stream/dbwriter"
 	"gitlab.x.lan/yunshan/droplet/stream/decoder"
 	"gitlab.x.lan/yunshan/droplet/stream/geo"
-	"gitlab.x.lan/yunshan/droplet/stream/platformdata"
 	"gitlab.x.lan/yunshan/droplet/stream/pusher"
 	"gitlab.x.lan/yunshan/droplet/stream/throttler"
 	_ "golang.org/x/net/context"
@@ -38,6 +39,7 @@ type Stream struct {
 type Logger struct {
 	Config        *config.Config
 	Decoders      []*decoder.Decoder
+	PlatformDatas []*grpc.PlatformInfoTable
 	Throttlers    []*throttler.ThrottlingQueue
 	ESWriters     []*dbwriter.ESWriter
 	Broker        *pusher.FlowSender
@@ -53,15 +55,14 @@ func NewStream(config *config.Config, recv *receiver.Receiver) (*Stream, error) 
 			controllers[i] = controllers[i].To4()
 		}
 	}
-	platformdata.New(controllers, config.ControllerPort, "stream", nil)
 	geo.NewGeoTree()
 
 	flowLogWriter, err := dbwriter.NewFlowLogWriter(config.CKDB.Primary, config.CKDB.Secondary, config.CKAuth.User, config.CKAuth.Password, config.ReplicaEnabled, config.CKWriterConfig)
 	if err != nil {
 		return nil, err
 	}
-	flowLogger, err := NewFlowLogger(config, manager, recv, flowLogWriter)
-	protoLogger := NewProtoLogger(config, manager, recv, flowLogWriter)
+	flowLogger, err := NewFlowLogger(config, controllers, manager, recv, flowLogWriter)
+	protoLogger := NewProtoLogger(config, controllers, manager, recv, flowLogWriter)
 	return &Stream{
 		StreamConfig: config,
 		FlowLogger:   flowLogger,
@@ -89,7 +90,7 @@ func newESWriter(config *config.Config, appName string, esQueue queue.QueueReade
 	}
 }
 
-func NewFlowLogger(config *config.Config, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter) (*Logger, error) {
+func NewFlowLogger(config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter) (*Logger, error) {
 	msgType := datatype.MESSAGE_TYPE_TAGGEDFLOW
 	queueCount := config.DecoderQueueCount
 	queueSuffix := "-l4"
@@ -128,6 +129,7 @@ func NewFlowLogger(config *config.Config, manager *dropletqueue.Manager, recv *r
 	throttlers := make([]*throttler.ThrottlingQueue, queueCount)
 	esWriters := make([]*dbwriter.ESWriter, queueCount)
 	decoders := make([]*decoder.Decoder, queueCount)
+	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 
 	for i := 0; i < queueCount; i++ {
 		throttlers[i] = throttler.NewThrottlingQueue(
@@ -136,10 +138,15 @@ func NewFlowLogger(config *config.Config, manager *dropletqueue.Manager, recv *r
 			flowLogWriter,
 		)
 		esWriters[i] = newESWriter(config, common.L4_FLOW_ID.String(), queue.QueueReader(esWriterQueues.FixedMultiQueue[i]))
+		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, config.ControllerPort, "stream-l4-log-"+strconv.Itoa(i), "", nil)
+		if i == 0 {
+			debug.ServerRegisterSimple(CMD_PLATFORMDATA, platformDatas[i])
+		}
 		decoders[i] = decoder.NewDecoder(
 			i,
 			msgType,
 			config.ShardID,
+			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			throttlers[i],
 			nil,
@@ -151,6 +158,7 @@ func NewFlowLogger(config *config.Config, manager *dropletqueue.Manager, recv *r
 	return &Logger{
 		Config:        config,
 		Decoders:      decoders,
+		PlatformDatas: platformDatas,
 		Throttlers:    throttlers,
 		ESWriters:     esWriters,
 		FlowLogWriter: flowLogWriter,
@@ -159,7 +167,7 @@ func NewFlowLogger(config *config.Config, manager *dropletqueue.Manager, recv *r
 
 }
 
-func NewProtoLogger(config *config.Config, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter) *Logger {
+func NewProtoLogger(config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter) *Logger {
 	queueSuffix := "-l7"
 	queueCount := config.DecoderQueueCount
 	msgType := datatype.MESSAGE_TYPE_PROTOCOLLOG
@@ -194,6 +202,7 @@ func NewProtoLogger(config *config.Config, manager *dropletqueue.Manager, recv *
 	httpEsWriters := make([]*dbwriter.ESWriter, queueCount)
 	dnsEsWriters := make([]*dbwriter.ESWriter, queueCount)
 
+	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	decoders := make([]*decoder.Decoder, queueCount)
 	for i := 0; i < queueCount; i++ {
 		httpThrottlers[i] = throttler.NewThrottlingQueue(
@@ -208,10 +217,12 @@ func NewProtoLogger(config *config.Config, manager *dropletqueue.Manager, recv *
 		)
 		httpEsWriters[i] = newESWriter(config, common.L7_HTTP_ID.String(), queue.QueueReader(httpEsWriterQueues.FixedMultiQueue[i]))
 		dnsEsWriters[i] = newESWriter(config, common.L7_DNS_ID.String(), queue.QueueReader(dnsEsWriterQueues.FixedMultiQueue[i]))
+		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, config.ControllerPort, "stream-l7-log-"+strconv.Itoa(i), "", nil)
 		decoders[i] = decoder.NewDecoder(
 			i,
 			msgType,
 			config.ShardID,
+			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			nil,
 			httpThrottlers[i],
@@ -222,14 +233,19 @@ func NewProtoLogger(config *config.Config, manager *dropletqueue.Manager, recv *
 	}
 
 	return &Logger{
-		Config:     config,
-		Decoders:   decoders,
-		Throttlers: append(httpThrottlers, dnsThrottlers...),
-		ESWriters:  append(httpEsWriters, dnsEsWriters...),
+		Config:        config,
+		Decoders:      decoders,
+		PlatformDatas: platformDatas,
+		Throttlers:    append(httpThrottlers, dnsThrottlers...),
+		ESWriters:     append(httpEsWriters, dnsEsWriters...),
 	}
 }
 
 func (l *Logger) Start() {
+	for _, platformData := range l.PlatformDatas {
+		platformData.Start()
+	}
+
 	for _, decoder := range l.Decoders {
 		go decoder.Run()
 	}
@@ -240,6 +256,12 @@ func (l *Logger) Start() {
 	}
 }
 
+func (l *Logger) Close() {
+	for _, platformData := range l.PlatformDatas {
+		platformData.Close()
+	}
+}
+
 func (s *Stream) Start() {
 	s.FlowLogger.Start()
 	s.ProtoLogger.Start()
@@ -247,9 +269,9 @@ func (s *Stream) Start() {
 	if s.StreamConfig.BrokerEnabled {
 		go s.FlowLogger.Broker.Run()
 	}
-	platformdata.Start()
 }
 
 func (s *Stream) Close() {
-	platformdata.Close()
+	s.FlowLogger.Close()
+	s.ProtoLogger.Close()
 }

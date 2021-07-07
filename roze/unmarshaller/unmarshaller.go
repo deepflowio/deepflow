@@ -10,6 +10,7 @@ import (
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
+	"gitlab.x.lan/yunshan/droplet-libs/grpc"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/receiver"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
@@ -65,6 +66,7 @@ type Counter struct {
 
 type Unmarshaller struct {
 	index              int
+	platformData       *grpc.PlatformInfoTable
 	disableSecondWrite bool
 	disableVtapPacket  bool
 	unmarshallQueue    queue.QueueReader
@@ -80,7 +82,7 @@ type Unmarshaller struct {
 	utils.Closable
 }
 
-func NewUnmarshaller(index int, disableSecondWrite, disableVtapPacket bool, unmarshallQueue queue.QueueReader, influxdbWriter, influxdbWriterS1 *store.InfluxdbWriter, dbwriter *dbwriter.DbWriter, storeQueueNum int) *Unmarshaller {
+func NewUnmarshaller(index int, platformData *grpc.PlatformInfoTable, disableSecondWrite, disableVtapPacket bool, unmarshallQueue queue.QueueReader, influxdbWriter, influxdbWriterS1 *store.InfluxdbWriter, dbwriter *dbwriter.DbWriter, storeQueueNum int) *Unmarshaller {
 	queueBatchCaches := make([]QueueCache, storeQueueNum)
 	queueBatchCachesS1 := make([]QueueCache, storeQueueNum)
 	queueAggrCaches := make([]QueueCache, storeQueueNum)
@@ -92,6 +94,7 @@ func NewUnmarshaller(index int, disableSecondWrite, disableVtapPacket bool, unma
 
 	return &Unmarshaller{
 		index:              index,
+		platformData:       platformData,
 		disableSecondWrite: disableSecondWrite,
 		disableVtapPacket:  disableVtapPacket,
 		unmarshallQueue:    unmarshallQueue,
@@ -295,7 +298,7 @@ func (u *Unmarshaller) QueueProcess() {
 						continue
 					}
 
-					rd := DocToRozeDocuments(doc)
+					rd := DocToRozeDocuments(doc, u.platformData)
 					if rd == nil {
 						u.counter.DropDocCount++
 						app.ReleaseDocument(doc)

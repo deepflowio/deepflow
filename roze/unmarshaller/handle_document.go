@@ -9,7 +9,6 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 	"gitlab.x.lan/yunshan/droplet/roze/msg"
-	pf "gitlab.x.lan/yunshan/droplet/roze/platformdata"
 )
 
 const (
@@ -24,7 +23,7 @@ func releaseRozeDocument(rd *msg.RozeDocument) {
 	msg.ReleaseRozeDocument(rd)
 }
 
-func DocToRozeDocuments(doc *app.Document) *msg.RozeDocument {
+func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable) *msg.RozeDocument {
 	rd := msg.AcquireRozeDocument()
 	rd.Document = doc
 	t := doc.Tag.(*zerodoc.Tag)
@@ -37,7 +36,7 @@ func DocToRozeDocuments(doc *app.Document) *msg.RozeDocument {
 	}
 
 	var info, info1 *grpc.Info
-	myRegionID := uint16(pf.PlatformData.QueryRegionID())
+	myRegionID := uint16(platformData.QueryRegionID())
 	if t.Code&zerodoc.ServerPort == zerodoc.ServerPort {
 		t.Code |= PortAddCode
 	}
@@ -50,25 +49,25 @@ func DocToRozeDocuments(doc *app.Document) *msg.RozeDocument {
 
 		// 当MAC/MAC1非0时，通过MAC来获取资源信息
 		if t.MAC != 0 && t.MAC1 != 0 {
-			info, info1 = pf.PlatformData.QueryMacInfosPair(t.MAC|uint64(t.L3EpcID)<<48, t.MAC1|uint64(t.L3EpcID1)<<48)
+			info, info1 = platformData.QueryMacInfosPair(t.MAC|uint64(t.L3EpcID)<<48, t.MAC1|uint64(t.L3EpcID1)<<48)
 		} else if t.MAC != 0 {
-			info = pf.PlatformData.QueryMacInfo(t.MAC | uint64(t.L3EpcID)<<48)
+			info = platformData.QueryMacInfo(t.MAC | uint64(t.L3EpcID)<<48)
 			if t.IsIPv6 != 0 {
-				info1 = pf.PlatformData.QueryIPV6Infos(t.L3EpcID1, t.IP61)
+				info1 = platformData.QueryIPV6Infos(t.L3EpcID1, t.IP61)
 			} else {
-				info1 = pf.PlatformData.QueryIPV4Infos(t.L3EpcID1, t.IP1)
+				info1 = platformData.QueryIPV4Infos(t.L3EpcID1, t.IP1)
 			}
 		} else if t.MAC1 != 0 {
 			if t.IsIPv6 != 0 {
-				info = pf.PlatformData.QueryIPV6Infos(t.L3EpcID, t.IP6)
+				info = platformData.QueryIPV6Infos(t.L3EpcID, t.IP6)
 			} else {
-				info = pf.PlatformData.QueryIPV4Infos(t.L3EpcID, t.IP)
+				info = platformData.QueryIPV4Infos(t.L3EpcID, t.IP)
 			}
-			info1 = pf.PlatformData.QueryMacInfo(t.MAC1 | uint64(t.L3EpcID1)<<48)
+			info1 = platformData.QueryMacInfo(t.MAC1 | uint64(t.L3EpcID1)<<48)
 		} else if t.IsIPv6 != 0 {
-			info, info1 = pf.PlatformData.QueryIPV6InfosPair(t.L3EpcID, t.IP6, t.L3EpcID1, t.IP61)
+			info, info1 = platformData.QueryIPV6InfosPair(t.L3EpcID, t.IP6, t.L3EpcID1, t.IP61)
 		} else {
-			info, info1 = pf.PlatformData.QueryIPV4InfosPair(t.L3EpcID, t.IP, t.L3EpcID1, t.IP1)
+			info, info1 = platformData.QueryIPV4InfosPair(t.L3EpcID, t.IP, t.L3EpcID1, t.IP1)
 		}
 		if info1 != nil {
 			t.RegionID1 = uint16(info1.RegionID)
@@ -83,9 +82,9 @@ func DocToRozeDocuments(doc *app.Document) *msg.RozeDocument {
 			t.PodID1 = info1.PodID
 			t.PodClusterID1 = uint16(info1.PodClusterID)
 			if t.IsIPv6 != 0 {
-				t.GroupIDs1, t.BusinessIDs1 = pf.PlatformData.QueryIPv6GroupIDsAndBusinessIDs(t.L3EpcID1, t.IP61)
+				t.GroupIDs1, t.BusinessIDs1 = platformData.QueryIPv6GroupIDsAndBusinessIDs(t.L3EpcID1, t.IP61)
 			} else {
-				t.GroupIDs1, t.BusinessIDs1 = pf.PlatformData.QueryGroupIDsAndBusinessIDs(t.L3EpcID1, t.IP1)
+				t.GroupIDs1, t.BusinessIDs1 = platformData.QueryGroupIDsAndBusinessIDs(t.L3EpcID1, t.IP1)
 			}
 			if info == nil {
 				var ip0 net.IP
@@ -104,7 +103,7 @@ func DocToRozeDocuments(doc *app.Document) *msg.RozeDocument {
 			if myRegionID != 0 && t.RegionID1 != 0 {
 				if t.TAPSide == zerodoc.Server && t.RegionID1 != myRegionID { // 对于双端 的统计值，需要去掉 tap_side 对应的一侧与自身region_id 不匹配的内容。
 					releaseRozeDocument(rd)
-					pf.PlatformData.AddOtherRegion()
+					platformData.AddOtherRegion()
 					return nil
 				}
 			}
@@ -116,11 +115,11 @@ func DocToRozeDocuments(doc *app.Document) *msg.RozeDocument {
 		}
 
 		if t.MAC != 0 {
-			info = pf.PlatformData.QueryMacInfo(t.MAC | uint64(t.L3EpcID)<<48)
+			info = platformData.QueryMacInfo(t.MAC | uint64(t.L3EpcID)<<48)
 		} else if t.IsIPv6 != 0 {
-			info = pf.PlatformData.QueryIPV6Infos(t.L3EpcID, t.IP6)
+			info = platformData.QueryIPV6Infos(t.L3EpcID, t.IP6)
 		} else {
-			info = pf.PlatformData.QueryIPV4Infos(t.L3EpcID, t.IP)
+			info = platformData.QueryIPV4Infos(t.L3EpcID, t.IP)
 		}
 	}
 
@@ -137,16 +136,16 @@ func DocToRozeDocuments(doc *app.Document) *msg.RozeDocument {
 		t.PodID = info.PodID
 		t.PodClusterID = uint16(info.PodClusterID)
 		if t.IsIPv6 != 0 {
-			t.GroupIDs, t.BusinessIDs = pf.PlatformData.QueryIPv6GroupIDsAndBusinessIDs(t.L3EpcID, t.IP6)
+			t.GroupIDs, t.BusinessIDs = platformData.QueryIPv6GroupIDsAndBusinessIDs(t.L3EpcID, t.IP6)
 			if t.Code&PortAddCode != 0 {
-				if pf.PlatformData.QueryIPv6IsKeyService(t.L3EpcID, t.IP6, t.Protocol, t.ServerPort) {
+				if platformData.QueryIPv6IsKeyService(t.L3EpcID, t.IP6, t.Protocol, t.ServerPort) {
 					t.IsKeyService = 1
 				}
 			}
 		} else {
-			t.GroupIDs, t.BusinessIDs = pf.PlatformData.QueryGroupIDsAndBusinessIDs(t.L3EpcID, t.IP)
+			t.GroupIDs, t.BusinessIDs = platformData.QueryGroupIDsAndBusinessIDs(t.L3EpcID, t.IP)
 			if t.Code&PortAddCode != 0 {
-				if pf.PlatformData.QueryIsKeyService(t.L3EpcID, t.IP, t.Protocol, t.ServerPort) {
+				if platformData.QueryIsKeyService(t.L3EpcID, t.IP, t.Protocol, t.ServerPort) {
 					t.IsKeyService = 1
 				}
 			}
@@ -170,13 +169,13 @@ func DocToRozeDocuments(doc *app.Document) *msg.RozeDocument {
 			if t.Code&EdgeCode == EdgeCode { // 对于双端 的统计值，需要去掉 tap_side 对应的一侧与自身region_id 不匹配的内容。
 				if t.TAPSide == zerodoc.Client && t.RegionID != myRegionID {
 					releaseRozeDocument(rd)
-					pf.PlatformData.AddOtherRegion()
+					platformData.AddOtherRegion()
 					return nil
 				}
 			} else { // 对于单端的统计值，需要去掉与自身region_id不匹配的内容
 				if t.RegionID != myRegionID {
 					releaseRozeDocument(rd)
-					pf.PlatformData.AddOtherRegion()
+					platformData.AddOtherRegion()
 					return nil
 				}
 			}

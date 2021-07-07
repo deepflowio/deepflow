@@ -10,28 +10,30 @@ import (
 
 	logging "github.com/op/go-logging"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/debug"
+	"gitlab.x.lan/yunshan/droplet-libs/grpc"
 	libqueue "gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/receiver"
 	"gitlab.x.lan/yunshan/droplet-libs/store"
 
-	// "gitlab.x.lan/yunshan/droplet/common/datasource"
 	"gitlab.x.lan/yunshan/droplet/droplet/queue"
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
 	"gitlab.x.lan/yunshan/droplet/roze/config"
 	"gitlab.x.lan/yunshan/droplet/roze/dbwriter"
-	"gitlab.x.lan/yunshan/droplet/roze/platformdata"
 	"gitlab.x.lan/yunshan/droplet/roze/unmarshaller"
 )
 
 const (
-	INFLUXDB_RP_1M = "rp_1m"
-	INFLUXDB_RP_1S = "rp_1s"
+	INFLUXDB_RP_1M   = "rp_1m"
+	INFLUXDB_RP_1S   = "rp_1s"
+	CMD_PLATFORMDATA = 33
 )
 
 var log = logging.MustGetLogger("roze")
 
 type Roze struct {
 	unmarshallers    []*unmarshaller.Unmarshaller
+	platformDatas    []*grpc.PlatformInfoTable
 	InfluxdbWriter   *store.InfluxdbWriter
 	InfluxdbWriterS1 *store.InfluxdbWriter
 	Repair           *store.Repair
@@ -75,8 +77,6 @@ func NewRoze(cfg *config.Config, recv *receiver.Receiver) (*Roze, error) {
 
 	recv.RegistHandler(datatype.MESSAGE_TYPE_METRICS, unmarshallQueues, unmarshallQueueCount)
 
-	platformdata.New(controllers, cfg.ControllerPort, "roze", cfg.Pcap.FileDirectory, recv)
-
 	var err error
 	roze.InfluxdbWriter, err = store.NewInfluxdbWriter(cfg.TSDB.Primary, cfg.TSDB.Replica, cfg.TSDBAuth.Username, cfg.TSDBAuth.Password, "influxdb_writer", strconv.Itoa(cfg.ShardID), cfg.StoreQueueCount, cfg.StoreQueueSize)
 	if err != nil {
@@ -117,18 +117,26 @@ func NewRoze(cfg *config.Config, recv *receiver.Receiver) (*Roze, error) {
 	}
 
 	roze.unmarshallers = make([]*unmarshaller.Unmarshaller, unmarshallQueueCount)
+	roze.platformDatas = make([]*grpc.PlatformInfoTable, unmarshallQueueCount)
 	for i := 0; i < unmarshallQueueCount; i++ {
-		roze.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, cfg.DisableSecondWrite, cfg.DisableVtapPacket, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), roze.InfluxdbWriter, roze.InfluxdbWriterS1, roze.dbwriter, cfg.StoreQueueCount)
+		if i == 0 {
+			// 只第一个上报数据节点信息
+			roze.platformDatas[i] = grpc.NewPlatformInfoTable(controllers, cfg.ControllerPort, "roze", cfg.Pcap.FileDirectory, recv)
+			debug.ServerRegisterSimple(CMD_PLATFORMDATA, roze.platformDatas[i])
+		} else {
+			roze.platformDatas[i] = grpc.NewPlatformInfoTable(controllers, cfg.ControllerPort, "roze-"+strconv.Itoa(i), "", nil)
+		}
+		roze.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, roze.platformDatas[i], cfg.DisableSecondWrite, cfg.DisableVtapPacket, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), roze.InfluxdbWriter, roze.InfluxdbWriterS1, roze.dbwriter, cfg.StoreQueueCount)
 	}
 
 	return &roze, nil
 }
 
 func (r *Roze) Start() {
-	platformdata.Start()
 
 	unmarshallQueueCount := len(r.unmarshallers)
 	for i := 0; i < unmarshallQueueCount; i++ {
+		r.platformDatas[i].Start()
 		go r.unmarshallers[i].QueueProcess()
 	}
 
@@ -139,7 +147,10 @@ func (r *Roze) Start() {
 }
 
 func (r *Roze) Close() error {
-	platformdata.Close()
+	for i := 0; i < len(r.unmarshallers); i++ {
+		r.platformDatas[i].Close()
+	}
+	r.dbwriter.Close()
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
