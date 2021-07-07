@@ -7,6 +7,7 @@ import (
 
 	"gitlab.x.lan/yunshan/droplet-libs/codec"
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/grpc"
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/receiver"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
@@ -36,6 +37,7 @@ type Decoder struct {
 	index          int
 	msgType        int
 	shardID        int
+	platformData   *grpc.PlatformInfoTable
 	inQueue        queue.QueueReader
 	flowThrottler  *throttler.ThrottlingQueue
 	httpThrottler  *throttler.ThrottlingQueue
@@ -50,6 +52,7 @@ type Decoder struct {
 
 func NewDecoder(
 	index, msgType, shardID int,
+	platformData *grpc.PlatformInfoTable,
 	inQueue queue.QueueReader,
 	flowThrottler *throttler.ThrottlingQueue,
 	httpThrottler *throttler.ThrottlingQueue,
@@ -61,6 +64,7 @@ func NewDecoder(
 		index:          index,
 		msgType:        msgType,
 		shardID:        shardID,
+		platformData:   platformData,
 		inQueue:        inQueue,
 		flowThrottler:  flowThrottler,
 		httpThrottler:  httpThrottler,
@@ -148,7 +152,7 @@ func (d *Decoder) sendFlow(flow *datatype.TaggedFlow) {
 		log.Debugf("decoder %d recv flow: %s", d.index, flow)
 	}
 	d.counter.L4Count++
-	l := jsonify.TaggedFlowToLogger(flow, d.shardID)
+	l := jsonify.TaggedFlowToLogger(flow, d.shardID, d.platformData)
 	if d.brokerEnabled {
 		l.AddReferenceCount()
 		d.outBrokerQueue.Put(l)
@@ -165,7 +169,7 @@ func (d *Decoder) sendProto(proto *datatype.AppProtoLogsData) {
 	}
 	if proto.Proto == datatype.PROTO_HTTP {
 		d.counter.L7HTTPCount++
-		l := jsonify.ProtoLogToHTTPLogger(proto, d.shardID)
+		l := jsonify.ProtoLogToHTTPLogger(proto, d.shardID, d.platformData)
 		if d.brokerEnabled {
 			l.AddReferenceCount()
 			d.outBrokerQueue.Put(l)
@@ -175,7 +179,7 @@ func (d *Decoder) sendProto(proto *datatype.AppProtoLogsData) {
 		}
 	} else if proto.Proto == datatype.PROTO_DNS {
 		d.counter.L7DNSCount++
-		l := jsonify.ProtoLogToDNSLogger(proto, d.shardID)
+		l := jsonify.ProtoLogToDNSLogger(proto, d.shardID, d.platformData)
 		if d.brokerEnabled {
 			l.AddReferenceCount()
 			d.outBrokerQueue.Put(l)

@@ -13,7 +13,6 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/grpc"
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	"gitlab.x.lan/yunshan/droplet/stream/geo"
-	pf "gitlab.x.lan/yunshan/droplet/stream/platformdata"
 )
 
 const (
@@ -775,7 +774,7 @@ func (i *Internet) Fill(f *datatype.TaggedFlow) {
 	i.Province1 = geo.QueryProvince(f.IPDst)
 }
 
-func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool) {
+func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool, platformData *grpc.PlatformInfoTable) {
 	var info0, info1 *grpc.Info
 	l3EpcID0, l3EpcID1 := f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].L3EpcID, f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].L3EpcID
 	isVip0, isVip1 := f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].IsVIPInterface, f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].IsVIPInterface
@@ -783,34 +782,34 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool) {
 	l3EpcMac0, l3EpcMac1 := mac0|uint64(l3EpcID0)<<48, mac1|uint64(l3EpcID1)<<48 // 使用l3EpcID和mac查找，防止跨AZ mac冲突
 
 	if isVip0 && isVip1 {
-		info0, info1 = pf.PlatformData.QueryMacInfosPair(l3EpcMac0, l3EpcMac1)
+		info0, info1 = platformData.QueryMacInfosPair(l3EpcMac0, l3EpcMac1)
 	} else if isVip0 {
-		info0 = pf.PlatformData.QueryMacInfo(l3EpcMac0)
+		info0 = platformData.QueryMacInfo(l3EpcMac0)
 		if isIPV6 {
-			info1 = pf.PlatformData.QueryIPV6Infos(int16(l3EpcID1), f.IP6Dst)
+			info1 = platformData.QueryIPV6Infos(int16(l3EpcID1), f.IP6Dst)
 		} else {
-			info1 = pf.PlatformData.QueryIPV4Infos(int16(l3EpcID1), uint32(f.IPDst))
+			info1 = platformData.QueryIPV4Infos(int16(l3EpcID1), uint32(f.IPDst))
 		}
 	} else if isVip1 {
 		if isIPV6 {
-			info0 = pf.PlatformData.QueryIPV6Infos(int16(l3EpcID0), f.IP6Src)
+			info0 = platformData.QueryIPV6Infos(int16(l3EpcID0), f.IP6Src)
 		} else {
-			info0 = pf.PlatformData.QueryIPV4Infos(int16(l3EpcID0), uint32(f.IPSrc))
+			info0 = platformData.QueryIPV4Infos(int16(l3EpcID0), uint32(f.IPSrc))
 		}
-		info1 = pf.PlatformData.QueryMacInfo(l3EpcMac1)
+		info1 = platformData.QueryMacInfo(l3EpcMac1)
 	} else if isIPV6 {
-		info0, info1 = pf.PlatformData.QueryIPV6InfosPair(int16(l3EpcID0), f.IP6Src, int16(l3EpcID1), f.IP6Dst)
+		info0, info1 = platformData.QueryIPV6InfosPair(int16(l3EpcID0), f.IP6Src, int16(l3EpcID1), f.IP6Dst)
 	} else {
-		info0, info1 = pf.PlatformData.QueryIPV4InfosPair(int16(l3EpcID0), uint32(f.IPSrc), int16(l3EpcID1), uint32(f.IPDst))
+		info0, info1 = platformData.QueryIPV4InfosPair(int16(l3EpcID0), uint32(f.IPSrc), int16(l3EpcID1), uint32(f.IPDst))
 	}
 
 	var l2Info0, l2Info1 *grpc.Info
 	if l3EpcID0 > 0 && l3EpcID1 > 0 {
-		l2Info0, l2Info1 = pf.PlatformData.QueryMacInfosPair(l3EpcMac0, l3EpcMac1)
+		l2Info0, l2Info1 = platformData.QueryMacInfosPair(l3EpcMac0, l3EpcMac1)
 	} else if l3EpcID0 > 0 {
-		l2Info0 = pf.PlatformData.QueryMacInfo(l3EpcMac0)
+		l2Info0 = platformData.QueryMacInfo(l3EpcMac0)
 	} else if l3EpcID1 > 0 {
-		l2Info1 = pf.PlatformData.QueryMacInfo(l3EpcMac1)
+		l2Info1 = platformData.QueryMacInfo(l3EpcMac1)
 	}
 
 	if info0 != nil {
@@ -848,11 +847,11 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool) {
 	}
 
 	if isIPV6 {
-		k.GroupIDs0, k.BusinessIDs0 = pf.PlatformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID0), f.IP6Src)
-		k.GroupIDs1, k.BusinessIDs1 = pf.PlatformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID1), f.IP6Dst)
+		k.GroupIDs0, k.BusinessIDs0 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID0), f.IP6Src)
+		k.GroupIDs1, k.BusinessIDs1 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID1), f.IP6Dst)
 	} else {
-		k.GroupIDs0, k.BusinessIDs0 = pf.PlatformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID0), f.IPSrc)
-		k.GroupIDs1, k.BusinessIDs1 = pf.PlatformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID1), f.IPDst)
+		k.GroupIDs0, k.BusinessIDs0 = platformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID0), f.IPSrc)
+		k.GroupIDs1, k.BusinessIDs1 = platformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID1), f.IPDst)
 	}
 }
 
@@ -1021,7 +1020,7 @@ func genID(time uint32, counter *uint32, shardID int) uint64 {
 	return uint64(time)<<32 | (uint64(shardID) << 24) | (uint64(count) & 0xffffff)
 }
 
-func TaggedFlowToLogger(f *datatype.TaggedFlow, shardID int) *FlowLogger {
+func TaggedFlowToLogger(f *datatype.TaggedFlow, shardID int, platformData *grpc.PlatformInfoTable) *FlowLogger {
 	isIPV6 := f.EthType == layers.EthernetTypeIPv6
 
 	s := AcquireFlowLogger()
@@ -1031,7 +1030,7 @@ func TaggedFlowToLogger(f *datatype.TaggedFlow, shardID int) *FlowLogger {
 	s.TransportLayer.Fill(f)
 	s.ApplicationLayer.Fill(f)
 	s.Internet.Fill(f)
-	s.KnowledgeGraph.Fill(f, isIPV6)
+	s.KnowledgeGraph.Fill(f, isIPV6, platformData)
 	s.FlowInfo.Fill(f)
 	s.Metrics.Fill(f)
 

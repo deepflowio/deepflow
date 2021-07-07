@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.x.lan/yunshan/droplet-libs/grpc"
 	"gitlab.x.lan/yunshan/droplet/stream/geo"
-	pf "gitlab.x.lan/yunshan/droplet/stream/platformdata"
 )
 
 func TestJsonify(t *testing.T) {
@@ -33,10 +33,10 @@ func TestJsonify(t *testing.T) {
 }
 
 func TestZeroToNull(t *testing.T) {
-	pf.New(nil, 0, "stream", nil)
+	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", nil)
 	taggedFlow := datatype.TaggedFlow{}
 
-	flow := TaggedFlowToLogger(&taggedFlow, 0)
+	flow := TaggedFlowToLogger(&taggedFlow, 0, pf)
 
 	flowByte, _ := json.Marshal(flow)
 
@@ -80,7 +80,8 @@ func TestProtoLogToHTTPLogger(t *testing.T) {
 	appData.Proto = datatype.PROTO_HTTP
 	appData.Detail = &datatype.HTTPInfo{}
 
-	httpData := ProtoLogToHTTPLogger(appData, 0)
+	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", nil)
+	httpData := ProtoLogToHTTPLogger(appData, 0, pf)
 	if httpData.VtapID != 123 {
 		t.Errorf("expect 123, result %v", httpData.VtapID)
 	}
@@ -98,7 +99,8 @@ func TestProtoLogToDNSLogger(t *testing.T) {
 	appData.Proto = datatype.PROTO_HTTP
 	appData.Detail = &datatype.DNSInfo{}
 
-	dnsData := ProtoLogToDNSLogger(appData, 0)
+	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", nil)
+	dnsData := ProtoLogToDNSLogger(appData, 0, pf)
 	if dnsData.TapType != 3 {
 		t.Errorf("expect 3, result %v", dnsData.TapType)
 	}

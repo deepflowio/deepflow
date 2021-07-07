@@ -104,7 +104,7 @@ func initReplicaTable(addr, user, password string, t *ckdb.Table) {
 }
 
 func NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName string, table *ckdb.Table, replicaEnabled bool, queueCount, queueSize, batchSize, flushTimeout int) (*CKWriter, error) {
-	log.Info("New CK writer: primaryAddr=%s, secondaryAddr=%s, user=%s, database=%s, table=%s, replica=%v, queueCount=%d, queueSize=%d, batchSize=%d, flushTimeout=%ds",
+	log.Infof("New CK writer: primaryAddr=%s, secondaryAddr=%s, user=%s, database=%s, table=%s, replica=%v, queueCount=%d, queueSize=%d, batchSize=%d, flushTimeout=%ds",
 		primaryAddr, secondaryAddr, user, table.Database, table.LocalName, replicaEnabled, queueCount, queueSize, batchSize, flushTimeout)
 
 	cks := make([]clickhouse.Clickhouse, queueCount)
@@ -300,7 +300,9 @@ func (w *CKWriter) Close() {
 	w.exit = true
 	w.wg.Wait()
 	for _, c := range w.cks {
-		c.Close()
+		if c != nil {
+			c.Close()
+		}
 	}
 	for _, c := range w.counters {
 		c.Close()

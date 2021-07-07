@@ -12,7 +12,6 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/grpc"
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
-	pf "gitlab.x.lan/yunshan/droplet/stream/platformdata"
 )
 
 type L7Base struct {
@@ -284,8 +283,8 @@ func parseVersion(str string) uint8 {
 	return uint8(v)
 }
 
-func (h *HTTPLogger) Fill(l *datatype.AppProtoLogsData) {
-	h.L7Base.Fill(l)
+func (h *HTTPLogger) Fill(l *datatype.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
+	h.L7Base.Fill(l, platformData)
 	if l.Proto == datatype.PROTO_HTTP {
 		if httpInfo, ok := l.Detail.(*datatype.HTTPInfo); ok {
 			h.Version = parseVersion(httpInfo.Version)
@@ -394,8 +393,8 @@ func (d *DNSLogger) WriteBlock(block *ckdb.Block) error {
 	return nil
 }
 
-func (d *DNSLogger) Fill(l *datatype.AppProtoLogsData) {
-	d.L7Base.Fill(l)
+func (d *DNSLogger) Fill(l *datatype.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
+	d.L7Base.Fill(l, platformData)
 
 	// 应用层DNS信息
 	if l.Proto == datatype.PROTO_DNS {
@@ -425,7 +424,7 @@ func (d *DNSLogger) String() string {
 	return fmt.Sprintf("DNS: %+v\n", *d)
 }
 
-func (b *L7Base) Fill(l *datatype.AppProtoLogsData) {
+func (b *L7Base) Fill(l *datatype.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
 	// 网络层
 	if l.IsIPv6 {
 		b.IsIPv4 = false
@@ -442,7 +441,7 @@ func (b *L7Base) Fill(l *datatype.AppProtoLogsData) {
 	b.ServerPort = l.PortDst
 
 	// 知识图谱
-	b.KnowledgeGraph.FillL7(l)
+	b.KnowledgeGraph.FillL7(l, platformData)
 
 	// 流信息
 	b.FlowID = l.FlowId
@@ -453,18 +452,18 @@ func (b *L7Base) Fill(l *datatype.AppProtoLogsData) {
 	b.EndTime = uint64(l.EndTime / time.Microsecond)
 }
 
-func (k *KnowledgeGraph) FillL7(l *datatype.AppProtoLogsData) {
+func (k *KnowledgeGraph) FillL7(l *datatype.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
 	var info0, info1 *grpc.Info
 	l3EpcID0, l3EpcID1 := l.L3EpcIDSrc, l.L3EpcIDDst
 
 	if l.IsIPv6 {
-		info0, info1 = pf.PlatformData.QueryIPV6InfosPair(int16(l3EpcID0), net.IP(l.IP6Src[:]), int16(l3EpcID1), net.IP(l.IP6Dst[:]))
-		k.GroupIDs0, k.BusinessIDs0 = pf.PlatformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID0), l.IP6Src[:])
-		k.GroupIDs1, k.BusinessIDs1 = pf.PlatformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID1), l.IP6Dst[:])
+		info0, info1 = platformData.QueryIPV6InfosPair(int16(l3EpcID0), net.IP(l.IP6Src[:]), int16(l3EpcID1), net.IP(l.IP6Dst[:]))
+		k.GroupIDs0, k.BusinessIDs0 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID0), l.IP6Src[:])
+		k.GroupIDs1, k.BusinessIDs1 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID1), l.IP6Dst[:])
 	} else {
-		info0, info1 = pf.PlatformData.QueryIPV4InfosPair(int16(l3EpcID0), uint32(l.IPSrc), int16(l3EpcID1), uint32(l.IPDst))
-		k.GroupIDs0, k.BusinessIDs0 = pf.PlatformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID0), l.IPSrc)
-		k.GroupIDs1, k.BusinessIDs1 = pf.PlatformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID1), l.IPDst)
+		info0, info1 = platformData.QueryIPV4InfosPair(int16(l3EpcID0), uint32(l.IPSrc), int16(l3EpcID1), uint32(l.IPDst))
+		k.GroupIDs0, k.BusinessIDs0 = platformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID0), l.IPSrc)
+		k.GroupIDs1, k.BusinessIDs1 = platformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID1), l.IPDst)
 	}
 
 	if info0 != nil {
@@ -519,10 +518,10 @@ func ReleaseHTTPLogger(l *HTTPLogger) {
 
 var L7HTTPCounter uint32
 
-func ProtoLogToHTTPLogger(l *datatype.AppProtoLogsData, shardID int) *HTTPLogger {
+func ProtoLogToHTTPLogger(l *datatype.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) *HTTPLogger {
 	h := AcquireHTTPLogger()
 	h._id = genID(uint32(l.StartTime/time.Microsecond), &L7HTTPCounter, shardID)
-	h.Fill(l)
+	h.Fill(l, platformData)
 	return h
 }
 
@@ -549,9 +548,9 @@ func ReleaseDNSLogger(l *DNSLogger) {
 
 var L7DNSCounter uint32
 
-func ProtoLogToDNSLogger(l *datatype.AppProtoLogsData, shardID int) *DNSLogger {
+func ProtoLogToDNSLogger(l *datatype.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) *DNSLogger {
 	h := AcquireDNSLogger()
 	h._id = genID(uint32(l.StartTime/time.Microsecond), &L7DNSCounter, shardID)
-	h.Fill(l)
+	h.Fill(l, platformData)
 	return h
 }

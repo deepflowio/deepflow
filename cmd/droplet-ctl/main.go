@@ -25,11 +25,11 @@ import (
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
 	"gitlab.x.lan/yunshan/droplet/dropletctl/rpc"
 	rozecfg "gitlab.x.lan/yunshan/droplet/roze/config"
-	roze "gitlab.x.lan/yunshan/droplet/roze/platformdata"
+	"gitlab.x.lan/yunshan/droplet/roze/roze"
 	streamcfg "gitlab.x.lan/yunshan/droplet/stream/config"
 	"gitlab.x.lan/yunshan/droplet/stream/dbwriter"
 	"gitlab.x.lan/yunshan/droplet/stream/jsonify/dfi"
-	stream "gitlab.x.lan/yunshan/droplet/stream/platformdata"
+	"gitlab.x.lan/yunshan/droplet/stream/stream"
 )
 
 func main() {
