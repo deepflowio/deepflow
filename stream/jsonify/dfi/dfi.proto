@@ -83,6 +83,8 @@ message KnowledgeGraph {
 	optional int32  epc_id_1 = 24;
 	optional uint32 subnet_id_0 = 25;
 	optional uint32 subnet_id_1 = 26;
+	repeated uint32 group_ids = 27;
+	repeated uint32 business_ids = 28;
 }
 
 message FlowInfo {

@@ -17,7 +17,6 @@ vendor:
 	test -n "$(shell go list -e -f '{{.Dir}}' ${DROPLET_LIBS})"
 	cp -r $(shell go list -e -f '{{.Dir}}' ${MESSAGE})/* vendor/${MESSAGE}/
 	cp -r $(shell go list -e -f '{{.Dir}}' ${DROPLET_LIBS})/* vendor/${DROPLET_LIBS}/
-	cp -f vendor/gitlab.x.lan/platform/influxdb/client/v2/* vendor/github.com/influxdata/influxdb/client/v2/
 	find vendor -type d -exec chmod +w {} \;
 	cd vendor/${MESSAGE} && go generate ./...
 	cd vendor/${DROPLET_LIBS} && go generate ./...
@@ -51,5 +50,6 @@ droplet-ctl: vendor
 
 .PHONY: clean
 clean:
+	chmod -R 777 vendor
 	rm -rf vendor
 	rm -rf bin

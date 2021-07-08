@@ -9,12 +9,10 @@ import (
 	"time"
 	"unicode"
 
-	logging "github.com/op/go-logging"
 	"github.com/spf13/cobra"
 	"gitlab.x.lan/yunshan/droplet-libs/debug"
 	"gitlab.x.lan/yunshan/droplet-libs/grpc"
 	"gitlab.x.lan/yunshan/droplet-libs/receiver"
-	"gitlab.x.lan/yunshan/droplet-libs/store"
 	"gitlab.x.lan/yunshan/droplet-libs/zmq"
 	"gitlab.x.lan/yunshan/droplet/droplet/adapter"
 
@@ -24,10 +22,8 @@ import (
 	"gitlab.x.lan/yunshan/droplet/droplet/queue"
 	"gitlab.x.lan/yunshan/droplet/dropletctl"
 	"gitlab.x.lan/yunshan/droplet/dropletctl/rpc"
-	rozecfg "gitlab.x.lan/yunshan/droplet/roze/config"
 	"gitlab.x.lan/yunshan/droplet/roze/roze"
 	streamcfg "gitlab.x.lan/yunshan/droplet/stream/config"
-	"gitlab.x.lan/yunshan/droplet/stream/dbwriter"
 	"gitlab.x.lan/yunshan/droplet/stream/jsonify/dfi"
 	"gitlab.x.lan/yunshan/droplet/stream/stream"
 )
@@ -66,9 +62,6 @@ func main() {
 	root.AddCommand(debug.RegisterLogLevelCommand())
 	root.AddCommand(RegisterTimeConvertCommand())
 	root.AddCommand(grpc.RegisterPlatformDataCommand(controllers, int(cfg.ControllerPort)))
-	rozeconfig := rozecfg.Load(dropletctl.ConfigPath)
-
-	root.AddCommand(RegisterUpdateCQCommand(rozeconfig.TSDBAuth.Username, rozeconfig.TSDBAuth.Password))
 
 	dropletCmd.AddCommand(queue.RegisterCommand(dropletctl.DROPLETCTL_QUEUE, []string{
 		"1-receiver-to-statsd",
@@ -88,14 +81,9 @@ func main() {
 	streamCmd.AddCommand(queue.RegisterCommand(dropletctl.DROPLETCTL_STREAM_QUEUE, []string{
 		"1-receive-to-decode-l4",
 		"1-receive-to-decode-l7",
-		"2-decode-to-es-writer-queue-l4",
-		"2-decode-to-es-writer-http-l7",
-		"2-decode-to-es-writer-dns-l7",
 	}))
 	streamCmd.AddCommand(debug.ClientRegisterSimple(stream.CMD_PLATFORMDATA, debug.CmdHelper{"platformData [filter]", "show stream platform data statistics"}, nil))
 	streamCmd.AddCommand(RegisterReceiveFlowLogCommand())
-	streamconfig := streamcfg.Load(dropletctl.ConfigPath)
-	streamCmd.AddCommand(dbwriter.RegisterESIndexHandleCommand(streamconfig.ESHostPorts, streamconfig.ESAuth.User, streamconfig.ESAuth.Password))
 
 	root.GenBashCompletionFile("/usr/share/bash-completion/completions/droplet-ctl")
 	root.SetArgs(os.Args[1:])
@@ -171,23 +159,6 @@ func RegisterTimeConvertCommand() *cobra.Command {
 		},
 	}
 
-	return cmd
-}
-
-func RegisterUpdateCQCommand(tsdbUser, tsdbPassword string) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "cq-update",
-		Short: "update continuous queries",
-		Run: func(cmd *cobra.Command, args []string) {
-			logging.SetLevel(logging.WARNING, "")
-			err := store.UpdateCQs("http://127.0.0.1:20044", tsdbUser, tsdbPassword)
-			if err != nil {
-				fmt.Println("failed", err)
-			} else {
-				fmt.Println("success")
-			}
-		},
-	}
 	return cmd
 }
 
