@@ -14,7 +14,6 @@ import (
 	"gitlab.x.lan/yunshan/droplet-libs/queue"
 	"gitlab.x.lan/yunshan/droplet-libs/receiver"
 	"gitlab.x.lan/yunshan/droplet-libs/stats"
-	"gitlab.x.lan/yunshan/droplet-libs/store"
 	"gitlab.x.lan/yunshan/droplet-libs/utils"
 	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
 	"gitlab.x.lan/yunshan/droplet/roze/dbwriter"
@@ -24,12 +23,11 @@ import (
 var log = logging.MustGetLogger("roze.unmarshaller")
 
 const (
-	QUEUE_BATCH_SIZE         = 128
-	FLUSH_INTERVAL           = 5
-	GET_MAX_SIZE             = 1024
-	FLUSH_CONFIDENCE_TIMEOUT = 120
-	DOC_TIME_EXCEED          = 300
-	HASH_SEED                = 17
+	QUEUE_BATCH_SIZE = 1024
+	FLUSH_INTERVAL   = 5
+	GET_MAX_SIZE     = 1024
+	DOC_TIME_EXCEED  = 300
+	HASH_SEED        = 17
 )
 
 type QueueCache struct {
@@ -70,41 +68,21 @@ type Unmarshaller struct {
 	disableSecondWrite bool
 	disableVtapPacket  bool
 	unmarshallQueue    queue.QueueReader
-	influxdbWriter     *store.InfluxdbWriter
-	influxdbWriterS1   *store.InfluxdbWriter
 	dbwriter           *dbwriter.DbWriter
-	storeQueueNum      int
-	queueBatchCaches   []QueueCache
-	queueBatchCachesS1 []QueueCache
-	queueAggrCaches    []QueueCache
+	queueBatchCache    QueueCache
 	counter            *Counter
 	dbCounter          [msg.MAX_INDEX]int64
 	utils.Closable
 }
 
-func NewUnmarshaller(index int, platformData *grpc.PlatformInfoTable, disableSecondWrite, disableVtapPacket bool, unmarshallQueue queue.QueueReader, influxdbWriter, influxdbWriterS1 *store.InfluxdbWriter, dbwriter *dbwriter.DbWriter, storeQueueNum int) *Unmarshaller {
-	queueBatchCaches := make([]QueueCache, storeQueueNum)
-	queueBatchCachesS1 := make([]QueueCache, storeQueueNum)
-	queueAggrCaches := make([]QueueCache, storeQueueNum)
-	for i := 0; i < storeQueueNum; i++ {
-		queueBatchCaches[i].values = make([]interface{}, 0, QUEUE_BATCH_SIZE)
-		queueBatchCachesS1[i].values = make([]interface{}, 0, QUEUE_BATCH_SIZE)
-		queueAggrCaches[i].values = make([]interface{}, 0, QUEUE_BATCH_SIZE)
-	}
-
+func NewUnmarshaller(index int, platformData *grpc.PlatformInfoTable, disableSecondWrite, disableVtapPacket bool, unmarshallQueue queue.QueueReader, dbwriter *dbwriter.DbWriter) *Unmarshaller {
 	return &Unmarshaller{
 		index:              index,
 		platformData:       platformData,
 		disableSecondWrite: disableSecondWrite,
 		disableVtapPacket:  disableVtapPacket,
 		unmarshallQueue:    unmarshallQueue,
-		storeQueueNum:      storeQueueNum,
-		queueBatchCaches:   queueBatchCaches,
-		queueBatchCachesS1: queueBatchCachesS1,
-		queueAggrCaches:    queueAggrCaches,
 		counter:            &Counter{MaxDelay: -3600, MinDelay: 3600},
-		influxdbWriter:     influxdbWriter,
-		influxdbWriterS1:   influxdbWriterS1,
 		dbwriter:           dbwriter,
 	}
 }
@@ -171,50 +149,21 @@ func (u *Unmarshaller) GetCounter() interface{} {
 	return counter
 }
 
-func (u *Unmarshaller) putStoreQueue(index uint32, si *msg.RozeDocument) {
-	var writer *store.InfluxdbWriter
-	var queueCache *QueueCache
-
-	if si.Document.Flags&app.FLAG_PER_SECOND_METRICS != 0 {
-		queueCache = &u.queueBatchCachesS1[index]
-		writer = u.influxdbWriterS1
-	} else {
-		queueCache = &u.queueBatchCaches[index]
-		writer = u.influxdbWriter
-	}
-
-	if u.dbwriter != nil {
-		si.AddReferenceCount()
-	}
+func (u *Unmarshaller) putStoreQueue(si *msg.RozeDocument) {
+	queueCache := &u.queueBatchCache
 	queueCache.values = append(queueCache.values, si)
 
 	if len(queueCache.values) >= QUEUE_BATCH_SIZE {
-		writer.Put(int(index), queueCache.values...)
-		if u.dbwriter != nil {
-			u.dbwriter.Put(queueCache.values...)
-		}
+		u.dbwriter.Put(queueCache.values...)
 		queueCache.values = queueCache.values[:0]
 	}
 }
 
-func (u *Unmarshaller) flushStoreQueues() {
-	for i := 0; i < u.storeQueueNum; i++ {
-		queueCache := &u.queueBatchCaches[i]
-		queueCacheS1 := &u.queueBatchCachesS1[i]
-		if len(queueCache.values) > 0 {
-			u.influxdbWriter.Put(i, queueCache.values...)
-			if u.dbwriter != nil {
-				u.dbwriter.Put(queueCache.values...)
-			}
-			queueCache.values = queueCache.values[:0]
-		}
-		if len(queueCacheS1.values) > 0 {
-			u.influxdbWriterS1.Put(i, queueCacheS1.values...)
-			if u.dbwriter != nil {
-				u.dbwriter.Put(queueCache.values...)
-			}
-			queueCacheS1.values = queueCacheS1.values[:0]
-		}
+func (u *Unmarshaller) flushStoreQueue() {
+	queueCache := &u.queueBatchCache
+	if len(queueCache.values) > 0 {
+		u.dbwriter.Put(queueCache.values...)
+		queueCache.values = queueCache.values[:0]
 	}
 }
 
@@ -222,7 +171,7 @@ func DecodeForQueueMonitor(item interface{}) (interface{}, error) {
 	var ret interface{}
 	bytes, ok := item.(*receiver.RecvBuffer)
 	if !ok {
-		return nil, errors.New("only support data(type: RecvBuffer) to unmarshall ")
+		return nil, errors.New("only support data(type: RecvBuffer) to unmarshall")
 	}
 
 	ret, err := decodeForDebug(bytes.Buffer[bytes.Begin:bytes.End])
@@ -273,7 +222,6 @@ func (u *Unmarshaller) QueueProcess() {
 	stats.RegisterCountable("unmarshaller", u, stats.OptionStatTags{"thread": strconv.Itoa(u.index)})
 	rawDocs := make([]interface{}, GET_MAX_SIZE)
 	decoder := &codec.SimpleDecoder{}
-	encoder := &codec.SimpleEncoder{}
 
 	for {
 		n := u.unmarshallQueue.Gets(rawDocs)
@@ -314,13 +262,12 @@ func (u *Unmarshaller) QueueProcess() {
 						continue
 					}
 
-					hashKey := uint32(GetDocHashValue(doc, encoder)) % uint32(u.storeQueueNum)
-					u.putStoreQueue(hashKey, rd)
+					u.putStoreQueue(rd)
 				}
 				receiver.ReleaseRecvBuffer(recvBytes)
 
 			} else if value == nil { // flush ticker
-				u.flushStoreQueues()
+				u.flushStoreQueue()
 			} else {
 				log.Warning("get unmarshall queue data type wrong")
 			}

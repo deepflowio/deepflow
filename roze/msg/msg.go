@@ -3,16 +3,12 @@ package msg
 import (
 	"fmt"
 
-	"encoding/binary"
-
 	logging "github.com/op/go-logging"
 
 	"gitlab.x.lan/yunshan/droplet-libs/app"
 	"gitlab.x.lan/yunshan/droplet-libs/ckdb"
 	"gitlab.x.lan/yunshan/droplet-libs/pool"
-	"gitlab.x.lan/yunshan/droplet-libs/store"
 	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
-	"gitlab.x.lan/yunshan/droplet/roze/config"
 )
 
 var log = logging.MustGetLogger("roze.msg")
@@ -40,9 +36,8 @@ const (
 )
 
 type RozeDocument struct {
-	database    string
-	measurement string
-	appCodeID   uint64
+	database  string
+	appCodeID uint64
 	*app.Document
 
 	pool.ReferenceCount
@@ -80,8 +75,8 @@ func CloneRozeDocument(rd *RozeDocument) *RozeDocument {
 /* for queue monitor */
 func (rd *RozeDocument) String() string {
 	return fmt.Sprintf(
-		"\n db: %s table: %s {\n\ttimestamp: %d\tFlags: b%b\n\ttag: %s\n\tmeter: %#v\n}\n",
-		rd.Database(), rd.Measurement(), rd.Timestamp, rd.Flags, rd.Tag, rd.Meter)
+		"\n db: %s {\n\ttimestamp: %d\tFlags: b%b\n\ttag: %s\n\tmeter: %#v\n}\n",
+		rd.Database(), rd.Timestamp, rd.Flags, rd.Tag, rd.Meter)
 }
 
 func (rd *RozeDocument) SortKey() uint64 {
@@ -94,14 +89,6 @@ func (rd *RozeDocument) AppID() int {
 
 func GenAppCodeID(databaseNameID uint16, measurementNameID uint8) uint64 {
 	return uint64(databaseNameID)<<16 | uint64(measurementNameID)
-}
-
-func (rd *RozeDocument) AppCodeID() uint64 {
-	if rd.appCodeID != 0 {
-		return rd.appCodeID
-	}
-	rd.appCodeID = GenAppCodeID(rd.DatabaseNameID(), rd.MeasurementNameID())
-	return rd.appCodeID
 }
 
 func (rd *RozeDocument) AppName() string {
@@ -177,54 +164,6 @@ func (rd *RozeDocument) DatabaseNameID() uint16 {
 	return uint16(rd.AppID())
 }
 
-func (rd *RozeDocument) Measurement() string {
-	if rd.measurement != "" {
-		return rd.measurement
-	}
-	rd.measurement = zerodoc.MeasurementNames[rd.MeasurementNameID()]
-	return rd.measurement
-}
-
-func (rd *RozeDocument) MeasurementNameID() uint8 {
-	if _, ok := rd.Document.Tag.(*zerodoc.Tag); ok {
-		return zerodoc.MAIN
-	} else {
-		panic("Document.Tag is not the struct zerodoc.Tag")
-	}
-	return zerodoc.MAIN
-}
-
-func (rd *RozeDocument) GetDBName() string {
-	return rd.Database()
-}
-
-func (rd *RozeDocument) GetMeasurement() string {
-	return rd.Measurement()
-}
-
-func (rd *RozeDocument) GetTimestamp() uint32 {
-	return rd.Document.Timestamp
-}
-
-func (rd *RozeDocument) MarshalToBytes(buffer []byte) int {
-	offset := 0
-
-	size := copy(buffer[offset+4:], rd.Measurement())
-	size += copy(buffer[offset+4+size:], ",_id="+rd.GetShardID())
-	size += rd.Tag.MarshalTo(buffer[offset+4+size:])
-
-	binary.BigEndian.PutUint32(buffer[offset:], uint32(size))
-	offset += (4 + size)
-
-	size = rd.Meter.MarshalTo(buffer[offset+4:])
-	binary.BigEndian.PutUint32(buffer[offset:], uint32(size))
-	offset += (4 + size)
-
-	offset += store.MarshalTimestampTo(rd.Document.Timestamp, buffer[offset:])
-
-	return offset
-}
-
 func (rd *RozeDocument) Release() {
 	ReleaseRozeDocument(rd)
 }
@@ -242,9 +181,4 @@ func (rd *RozeDocument) WriteBlock(block *ckdb.Block) error {
 func (rd *RozeDocument) TableID() (uint8, error) {
 	tag, _ := rd.Tag.(*zerodoc.Tag)
 	return tag.TableID((rd.Document.Flags & app.FLAG_PER_SECOND_METRICS) == 1)
-}
-
-func (rd *RozeDocument) GetShardID() string {
-	return config.GetShardID()
-
 }

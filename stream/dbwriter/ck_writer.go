@@ -1,12 +1,15 @@
 package dbwriter
 
 import (
+	logging "github.com/op/go-logging"
 	"gitlab.x.lan/yunshan/droplet-libs/ckdb"
 	"gitlab.x.lan/yunshan/droplet/pkg/ckwriter"
 	"gitlab.x.lan/yunshan/droplet/stream/common"
 	"gitlab.x.lan/yunshan/droplet/stream/config"
 	"gitlab.x.lan/yunshan/droplet/stream/jsonify"
 )
+
+var log = logging.MustGetLogger("stream.dbwriter")
 
 const (
 	CACHE_SIZE = 10240

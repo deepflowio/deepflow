@@ -8,6 +8,8 @@ verify-x64:
     - x64
 
   script:
+    - touch vendor
+    - make clean
     - go mod tidy
     - go fmt ./...; [[ -z $(git status -s --ignore-submodule) ]] || exit -1
     - make
@@ -48,6 +50,8 @@ verify-arm64:
     - arm64
 
   script:
+    - touch vendor
+    - make clean
     - go mod tidy
     - go fmt ./...; [[ -z $(git status -s --ignore-submodule) ]] || exit -1
     - make

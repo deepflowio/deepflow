@@ -15,13 +15,8 @@ var log = logging.MustGetLogger("stream.config")
 const (
 	DefaultControllerIP      = "127.0.0.1"
 	DefaultControllerPort    = 20035
-	DefaultESHostPort        = "127.0.0.1:20042"
 	DefaultCKPrimaryAddr     = "tcp://127.0.0.1:9000"
-	DefaultThrottle          = 1000
-	DefaultOpLoadFactor      = 10
-	DefaultRPSplitSize       = 86400 // 1天
-	DefaultRPSlots           = 7322
-	DefaultRPAliveSlots      = 31
+	DefaultThrottle          = 50000
 	DefaultDecoderQueueCount = 2
 	DefaultDecoderQueueSize  = 100000
 	DefaultBrokerQueueSize   = 10000
@@ -55,22 +50,14 @@ type Config struct {
 	ShardID           int            `yaml:"shard-id"`
 	ControllerIPs     []string       `yaml:"controller-ips"`
 	ControllerPort    int            `yaml:"controller-port"`
-	ESHostPorts       []string       `yaml:"es-host-port"`
-	ESAuth            Auth           `yaml:"es-auth"`
-	ESReplica         int            `yaml:"es-number-of-replica"`
 	CKDB              CKAddr         `yaml:"ckdb"`
 	CKAuth            Auth           `yaml:"ck-auth"`
 	ReplicaEnabled    bool           `yaml:"flowlog-replica-enabled"`
 	CKWriterConfig    CKWriterConfig `yaml:"metrics-ck-wirter"`
-	ESTiering         bool           `yaml:"es-tiering"`
 	Throttle          int            `yaml:"throttle"`
 	L4Throttle        int            `yaml:"l4-throttle"`
 	L7HTTPThrottle    int            `yaml:"l7-http-throttle"`
 	L7DNSThrottle     int            `yaml:"l7-dns-throttle"`
-	OpLoadFactor      int            `yaml:"op-load-factor"`
-	RPSplitSize       int            `yaml:"rp-split-size"`
-	RPSlots           int            `yaml:"rp-slots"`
-	RPAliveSlots      int            `yaml:"rp-alive-slots"`
 	DecoderQueueCount int            `yaml:"decoder-queue-count"`
 	DecoderQueueSize  int            `yaml:"decoder-queue-size"`
 	BrokerQueueSize   int            `yaml:"broker-queue-size"`
@@ -101,13 +88,8 @@ func (c *Config) Validate() error {
 func Load(path string) *Config {
 	config := &Config{
 		ControllerPort:    DefaultControllerPort,
-		ESHostPorts:       []string{DefaultESHostPort},
 		CKDB:              CKAddr{DefaultCKPrimaryAddr, ""},
 		Throttle:          DefaultThrottle,
-		OpLoadFactor:      DefaultOpLoadFactor,
-		RPSplitSize:       int(DefaultRPSplitSize),
-		RPSlots:           DefaultRPSlots,
-		RPAliveSlots:      DefaultRPAliveSlots,
 		DecoderQueueCount: DefaultDecoderQueueCount,
 		DecoderQueueSize:  DefaultDecoderQueueSize,
 		BrokerQueueSize:   DefaultBrokerQueueSize,

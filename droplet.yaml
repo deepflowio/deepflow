@@ -5,7 +5,7 @@
 ## controller listening port
 #controller-port: 20035
 
-## es的相关的配置stream和droplet都需要
+## es的相关的配置syslog写es
 #es-host-port:
 #  - 127.0.0.1:20042
 
@@ -16,6 +16,7 @@
 #ckdb-auth:
 #  user:
 #  password:
+
 ckdb:
   primary: tcp://127.0.0.1:9000
 # secondary:          // 如果配置2个地址，xxx-replica-enabled 为false，则作为primary写入, xxx-replica-enabled 为true 作为replica写入
@@ -126,18 +127,6 @@ ckdb:
 #  file-directory: /var/lib/droplet/pcap
 
 ## ########################### roze config #############################################
-## set cluster shard id
-#shard-id: 0
-
-## Add connection of influxdb http addr
-#tsdb:
-#  primary: http://127.0.0.1:20044
-#  replica:   # optional
-
-## 使用配置的用户名密码访问influxdb
-#tsdb-auth:
-#  username:
-#  password:
 
 ## 是否不写入秒级数据: 默认: false(写入)
 #disable-second-write: false
@@ -154,64 +143,17 @@ ckdb:
 ## size of unmarshall queue, defaults to 10240
 #unmarshall-queue-size: 10240
 
-## parallelism of store, defaults to 4
-#store-queue-count: 4
-
-## size of store queue, defaults to 131072
-#store-queue-size: 131072
-
-## size of store batch buffer, defaults to 65536
-#store-batch-buffer-size: 65536
-
-## duration, shard-duration: for "autogen" retention policy
-## duration-s1, shard-duration-s1: for "s1" retention policy
-## default: duration: 170h, shard-duration: 1d
-## default: duration-s1: 26h, shard-duration-s1: 3h
-## the duration unit: w week, d day, h hour
-#influxdb-default-retention-policy:
-#  duration: 170h
-#  shard-duration: 1d
-#  duration-s1: 26h
-#  shard-duration-s1: 1h
-
-## Set for turn on/off repair, choice from [true, false] default: true
-#repair-enabled: true
-
-## 距离当前多长时间的confidence不同步, 默认: 300 (秒)
-#repair-keep-time: 300
-
-## set repair runing interval time,  defult: 60 (seconds)
-#repair-interval: 60
-
-## 每次同步多少条confidence, 默认值: 200 (条)
-#repair-sync-count-once: 200
-
-## Receiver判断丢包的缓冲区大小，默认值：1024，范围64到64k
-#receiver-window-size: 1024
-
 ## ########################## stream config ############################################
-## es writer all queue limit max size
-#throttle: 1000
+## 用来保证全集群流日志_id的唯一性
+#shard-id: 0
 
-## set es index.number_of_replicas
-#es-number-of-replica: 0
-
-# if true will set 'index.routing.allocation.require.box_type' to 'warm'
-#es-tiering: false
+## writer all queue limit max size
+#throttle: 50000
 
 ## 分别控制l4流日志, http流日志，dns流日志的写入限速。默认值为0，表示使用throttle的设置值.若非0，则使用设置值
 #l4-throttle: 0
 #l7-http-throttle: 0
 #l7-dns-throttle: 0
-
-## es writer denominator for sleep time
-#op-load-factor: 10
-
-#rp-split-size: 86400
-
-#rp-slots: 7322
-
-#rp-alive-slots: 31
 
 #decoder-queue-count: 2
 
