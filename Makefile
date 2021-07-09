@@ -50,6 +50,7 @@ droplet-ctl: vendor
 
 .PHONY: clean
 clean:
+	touch vendor
 	chmod -R 777 vendor
 	rm -rf vendor
 	rm -rf bin
