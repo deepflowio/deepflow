@@ -915,41 +915,41 @@ func genTagColumns(code Code) []*ckdb.Column {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("az_id", ckdb.UInt16).SetComment("可用区ID"))
 	}
 	if code&AZIDPath != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("az_id_0", ckdb.UInt16))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("az_id_1", ckdb.UInt16))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("az_id_0", ckdb.UInt16).SetComment("ip4/6_0对应的可用区ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("az_id_1", ckdb.UInt16).SetComment("ip4/6_1对应的可用区ID"))
 	}
 
 	if code&BusinessIDs != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("business_ids", ckdb.ArrayUInt16).SetComment("ip对应的业务ID列表"))
 	}
 	if code&BusinessIDsPath != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("business_ids_0", ckdb.ArrayUInt16))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("business_ids_1", ckdb.ArrayUInt16))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("business_ids_0", ckdb.ArrayUInt16).SetComment("ip4/6_0对应的的业务ID列表"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("business_ids_1", ckdb.ArrayUInt16).SetComment("ip4/6_1对应的的业务ID列表"))
 	}
 
 	if code&Direction != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("direction", ckdb.LowCardinalityString).SetComment("统计量对应的流方向.c2s: ip/ip_0为客户端,ip_1为服务端. s2c: ip/ip_0为服务端,ip_1为客户端"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("direction", ckdb.LowCardinalityString).SetComment("统计量对应的流方向. c2s: ip为客户端, s2c: ip为服务端"))
 	}
 
 	if code&GroupIDs != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("group_ids", ckdb.ArrayUInt16).SetComment("ip对应的资源组ID列表"))
 	}
 	if code&GroupIDsPath != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("group_ids_0", ckdb.ArrayUInt16))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("group_ids_1", ckdb.ArrayUInt16))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("group_ids_0", ckdb.ArrayUInt16).SetComment("ip4/6_0对应的资源组ID列表"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("group_ids_1", ckdb.ArrayUInt16).SetComment("ip4/6_1对应的资源组ID列表"))
 	}
 
 	if code&HostID != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("host_id", ckdb.UInt16).SetComment("宿主机ID"))
 	}
 	if code&HostIDPath != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("host_id_0", ckdb.UInt16))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("host_id_1", ckdb.UInt16))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("host_id_0", ckdb.UInt16).SetComment("ip4/6_0对应的宿主机ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("host_id_1", ckdb.UInt16).SetComment("ip4/6_1对应的宿主机ID"))
 	}
 	if code&IP != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("ip4", ckdb.IPv4).SetComment("IPv4地址"))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("ip6", ckdb.IPv6).SetComment("IPV6地址"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("is_ipv4", ckdb.UInt8).SetIndex(ckdb.IndexMinmax).SetComment("是否IPV4地址 0: 否，ip6字段有效 1: 是，ip4字段有效"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("is_ipv4", ckdb.UInt8).SetIndex(ckdb.IndexMinmax).SetComment("是否IPV4地址. 0: 否, ip6字段有效, 1: 是, ip4字段有效"))
 	}
 	if code&IPPath != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("ip4_0", ckdb.IPv4))
@@ -960,7 +960,7 @@ func genTagColumns(code Code) []*ckdb.Column {
 	}
 
 	if code&IsKeyService != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("is_key_service", ckdb.UInt8).SetComment("是否属于关键服务0: 否 1: 是").SetIndex(ckdb.IndexMinmax))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("is_key_service", ckdb.UInt8).SetComment("是否属于关键服务0: 否, 1: 是").SetIndex(ckdb.IndexMinmax))
 	}
 
 	if code&L3Device != 0 {
@@ -969,18 +969,18 @@ func genTagColumns(code Code) []*ckdb.Column {
 	}
 
 	if code&L3DevicePath != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_device_id_0", ckdb.UInt32))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_device_id_1", ckdb.UInt32))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_device_type_0", ckdb.UInt8))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_device_type_1", ckdb.UInt8))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_device_id_0", ckdb.UInt32).SetComment("ip4/6_0对应的资源ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_device_id_1", ckdb.UInt32).SetComment("ip4/6_1对应的资源ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_device_type_0", ckdb.UInt8).SetComment("ip4/6_0对应的资源类型"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_device_type_1", ckdb.UInt8).SetComment("ip4/6_1对应的资源类型"))
 	}
 
 	if code&L3EpcID != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_epc_id", ckdb.Int32).SetComment("ip对应的EPC ID"))
 	}
 	if code&L3EpcIDPath != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_epc_id_0", ckdb.Int32))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_epc_id_1", ckdb.Int32))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_epc_id_0", ckdb.Int32).SetComment("ip4/6_0对应的EPC ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_epc_id_1", ckdb.Int32).SetComment("ip4/6_1对应的EPC ID"))
 	}
 
 	if code&MAC != 0 {
@@ -998,35 +998,35 @@ func genTagColumns(code Code) []*ckdb.Column {
 	}
 
 	if code&PodClusterIDPath != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_cluster_id_0", ckdb.UInt16))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_cluster_id_1", ckdb.UInt16))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_cluster_id_0", ckdb.UInt16).SetComment("ip4/6_0对应的容器集群ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_cluster_id_1", ckdb.UInt16).SetComment("ip4/6_1对应的容器集群ID"))
 	}
 
 	if code&PodGroupID != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_group_id", ckdb.UInt32).SetComment("ip对应的容器组ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_group_id", ckdb.UInt32).SetComment("ip对应的容器工作负载ID"))
 	}
 
 	if code&PodGroupIDPath != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_group_id_0", ckdb.UInt32))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_group_id_1", ckdb.UInt32))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_group_id_0", ckdb.UInt32).SetComment("ip4/6_0对应的容器工作负载ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_group_id_1", ckdb.UInt32).SetComment("ip4/6_1对应的容器工作负载ID"))
 	}
 
 	if code&PodID != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_id", ckdb.UInt32).SetComment("ip对应的容器ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_id", ckdb.UInt32).SetComment("ip对应的容器POD ID"))
 	}
 
 	if code&PodIDPath != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_id_0", ckdb.UInt32))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_id_1", ckdb.UInt32))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_id_0", ckdb.UInt32).SetComment("ip4/6_0对应的容器POD ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_id_1", ckdb.UInt32).SetComment("ip4/6_1对应的容器POD ID"))
 	}
 
 	if code&PodNodeID != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_node_id", ckdb.UInt32).SetComment("ip对应的节点ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_node_id", ckdb.UInt32).SetComment("ip对应的容器节点ID"))
 	}
 
 	if code&PodNodeIDPath != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_node_id_0", ckdb.UInt32))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_node_id_1", ckdb.UInt32))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_node_id_0", ckdb.UInt32).SetComment("ip4/6_0对应的容器节点ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_node_id_1", ckdb.UInt32).SetComment("ip4/6_1对应的容器节点ID"))
 	}
 
 	if code&PodNSID != 0 {
@@ -1034,20 +1034,20 @@ func genTagColumns(code Code) []*ckdb.Column {
 	}
 
 	if code&PodNSIDPath != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_ns_id_0", ckdb.UInt16))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_ns_id_1", ckdb.UInt16))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_ns_id_0", ckdb.UInt16).SetComment("ip4/6_0对应的容器命名空间ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("pod_ns_id_1", ckdb.UInt16).SetComment("ip4/6_1对应的容器命名空间ID"))
 	}
 
 	if code&Protocol != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("protocol", ckdb.UInt8).SetComment("0: 非IP包 1-255: ip协议号(其中 1:icmp 6:tcp 17:udp)"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("protocol", ckdb.UInt8).SetComment("0: 非IP包, 1-255: ip协议号(其中 1:icmp 6:tcp 17:udp)"))
 	}
 
 	if code&RegionID != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("region_id", ckdb.UInt16).SetComment("ip对应的云平台区域ID"))
 	}
 	if code&RegionIDPath != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("region_id_0", ckdb.UInt16))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("region_id_1", ckdb.UInt16))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("region_id_0", ckdb.UInt16).SetComment("ip4/6_0对应的云平台区域ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("region_id_1", ckdb.UInt16).SetComment("ip4/6_1对应的云平台区域ID"))
 	}
 
 	if code&ServerPort != 0 {
@@ -1058,24 +1058,24 @@ func genTagColumns(code Code) []*ckdb.Column {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("subnet_id", ckdb.UInt16).SetComment("ip对应的子网ID(0: 未找到)"))
 	}
 	if code&SubnetIDPath != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("subnet_id_0", ckdb.UInt16))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("subnet_id_1", ckdb.UInt16))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("subnet_id_0", ckdb.UInt16).SetComment("ip4/6_0对应的子网ID(0: 未找到)"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("subnet_id_1", ckdb.UInt16).SetComment("ip4/6_1对应的子网ID(0: 未找到)"))
 	}
 	if code&TagType != 0 && code&TagValue != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("tag_type", ckdb.UInt8).SetComment("1: 省份(仅针对geo库) 2: TCP Flag(仅针对packet库) 3: 播送类型(仅针对packet库) 4: 隧道分发点ID(仅针对flow库)"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("tag_value", ckdb.LowCardinalityString).SetComment("tag_type对应的具体值. tag_type=1: 省份 tag_type=2: TCP包头的Flag字段 tag_type=3: 播送类性(broadcast: 广播 multicast: 组播 unicast: 未知单播) tag_type=4: 隧道分发点ID "))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("tag_type", ckdb.UInt8).SetComment("1: 省份(仅针对geo库), 2: TCP Flag(仅针对packet库), 3: 播送类型(仅针对packet库), 4: 隧道分发点ID(仅针对flow库), 5: TTL, 6: 包长范围"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("tag_value", ckdb.LowCardinalityString).SetComment("tag_type对应的具体值. tag_type=1: 省份, tag_type=2: TCP包头的Flag字段, tag_type=3: 播送类性(broadcast: 广播, multicast: 组播, unicast: 未知单播), tag_type=4: 隧道分发点ID, tag_type=5: TTL的值, tag_type=6: 包长范围值"))
 	}
 	if code&TAPPort != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_port", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("采集网口标识 若tap_type为3: 虚拟网络流量源, 表示虚拟接口MAC地址低4字节 00000000~FFFFFFFF"))
 	}
 	if code&TAPSide != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_side", ckdb.LowCardinalityString).SetComment("流量采集位置(c: 客户端(0侧)采集 s: 服务端(1侧)采集)"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_side", ckdb.LowCardinalityString).SetComment("流量采集位置(c: 客户端(0侧)采集, s: 服务端(1侧)采集)"))
 	}
 	if code&TAPType != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_type", ckdb.UInt8).SetComment("流量采集点(1-2,4-30: 接入网络流量 3: 虚拟网络流量)"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_type", ckdb.UInt8).SetComment("流量采集点(1-2,4-255: 接入网络流量, 3: 虚拟网络流量)"))
 	}
 	if code&VTAPID != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("vtap_id", ckdb.UInt16).SetComment("采集器控制IP的ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("vtap_id", ckdb.UInt16).SetComment("采集器的ID"))
 	}
 
 	return columns
