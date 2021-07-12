@@ -91,7 +91,7 @@ var NetworkLayerColumns = []*ckdb.Column{
 	ckdb.NewColumn("ip4_1", ckdb.IPv4),
 	ckdb.NewColumn("ip6_0", ckdb.IPv6),
 	ckdb.NewColumn("ip6_1", ckdb.IPv6),
-	ckdb.NewColumn("is_ipv4", ckdb.UInt8),
+	ckdb.NewColumn("is_ipv4", ckdb.UInt8).SetIndex(ckdb.IndexMinmax),
 	ckdb.NewColumn("protocol", ckdb.UInt8),
 	ckdb.NewColumn("tunnel_tier", ckdb.UInt8),
 	ckdb.NewColumn("tunnel_type", ckdb.UInt16),
@@ -105,7 +105,7 @@ var NetworkLayerColumns = []*ckdb.Column{
 	ckdb.NewColumn("tunnel_tx_ip6_1", ckdb.IPv6),
 	ckdb.NewColumn("tunnel_rx_ip6_0", ckdb.IPv6),
 	ckdb.NewColumn("tunnel_rx_ip6_1", ckdb.IPv6),
-	ckdb.NewColumn("tunnel_is_ipv4", ckdb.UInt8),
+	ckdb.NewColumn("tunnel_is_ipv4", ckdb.UInt8).SetIndex(ckdb.IndexMinmax),
 }
 
 func (n *NetworkLayer) WriteBlock(block *ckdb.Block) error {
@@ -201,8 +201,8 @@ var TransportLayerColumns = []*ckdb.Column{
 	// 传输层
 	ckdb.NewColumn("client_port", ckdb.UInt16).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("server_port", ckdb.UInt16).SetIndex(ckdb.IndexSet),
-	ckdb.NewColumn("tcp_flags_bit_0", ckdb.UInt16),
-	ckdb.NewColumn("tcp_flags_bit_1", ckdb.UInt16),
+	ckdb.NewColumn("tcp_flags_bit_0", ckdb.UInt16).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("tcp_flags_bit_1", ckdb.UInt16).SetIndex(ckdb.IndexNone),
 }
 
 func (t *TransportLayer) WriteBlock(block *ckdb.Block) error {
@@ -227,7 +227,7 @@ type ApplicationLayer struct {
 
 var ApplicationLayerColumns = []*ckdb.Column{
 	// 应用层
-	ckdb.NewColumn("l7_protocol", ckdb.UInt8),
+	ckdb.NewColumn("l7_protocol", ckdb.UInt8).SetIndex(ckdb.IndexMinmax),
 }
 
 func (a *ApplicationLayer) WriteBlock(block *ckdb.Block) error {
@@ -244,8 +244,8 @@ type Internet struct {
 
 var InternetColumns = []*ckdb.Column{
 	// 广域网
-	ckdb.NewColumn("province_0", ckdb.String),
-	ckdb.NewColumn("province_1", ckdb.String),
+	ckdb.NewColumn("province_0", ckdb.LowCardinalityString),
+	ckdb.NewColumn("province_1", ckdb.LowCardinalityString),
 }
 
 func (i *Internet) WriteBlock(block *ckdb.Block) error {
@@ -438,16 +438,16 @@ type FlowInfo struct {
 
 var FlowInfoColumns = []*ckdb.Column{
 	// 流信息
-	ckdb.NewColumn("close_type", ckdb.UInt16),
+	ckdb.NewColumn("close_type", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 	ckdb.NewColumn("flow_source", ckdb.UInt16),
 	ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 	ckdb.NewColumn("tap_type", ckdb.UInt16),
 	ckdb.NewColumn("tap_port", ckdb.UInt32),
 	ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
-	ckdb.NewColumn("l2_end_0", ckdb.UInt8),
-	ckdb.NewColumn("l2_end_1", ckdb.UInt8),
-	ckdb.NewColumn("l3_end_0", ckdb.UInt8),
-	ckdb.NewColumn("l3_end_1", ckdb.UInt8),
+	ckdb.NewColumn("l2_end_0", ckdb.UInt8).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("l2_end_1", ckdb.UInt8).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("l3_end_0", ckdb.UInt8).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("l3_end_1", ckdb.UInt8).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 	ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 	ckdb.NewColumn("time", ckdb.DateTime).SetComment("精度: 秒"),
@@ -563,8 +563,8 @@ var MetricsColumns = []*ckdb.Column{
 	ckdb.NewColumn("total_packet_rx", ckdb.UInt64),
 	ckdb.NewColumn("total_byte_tx", ckdb.UInt64),
 	ckdb.NewColumn("total_byte_rx", ckdb.UInt64),
-	ckdb.NewColumn("l7_request", ckdb.UInt32),
-	ckdb.NewColumn("l7_response", ckdb.UInt32),
+	ckdb.NewColumn("l7_request", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("l7_response", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 
 	ckdb.NewColumn("rtt", ckdb.Float64).SetComment("单位: 微秒"),
 	ckdb.NewColumn("rtt_client_sum", ckdb.Float64),
