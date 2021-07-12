@@ -406,7 +406,7 @@ func NewColumn(name string, t ColumnType) *Column {
 	switch t {
 	case UInt8: // u8默认设置set的二级索引
 		index = IndexSet
-	case UInt16, UInt32, Int32, IPv4, IPv6: // 默认设置minmax的二级索引
+	case UInt16, UInt32, Int32, IPv4, IPv6, ArrayUInt16: // 默认设置minmax的二级索引
 		index = IndexMinmax
 	case UInt64, Int64:
 		codec = CodecT64
