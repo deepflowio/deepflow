@@ -4,8 +4,8 @@ import (
 	"net"
 
 	logging "github.com/op/go-logging"
-	"gitlab.x.lan/yunshan/droplet-libs/queue"
-	"gitlab.x.lan/yunshan/droplet-libs/receiver"
+	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
+	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
 )
 
 var log = logging.MustGetLogger("droplet.statsd")

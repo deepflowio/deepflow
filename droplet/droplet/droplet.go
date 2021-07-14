@@ -7,20 +7,20 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
-	libpcap "gitlab.x.lan/yunshan/droplet-libs/pcap"
-	libqueue "gitlab.x.lan/yunshan/droplet-libs/queue"
-	"gitlab.x.lan/yunshan/droplet-libs/receiver"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	libpcap "gitlab.yunshan.net/yunshan/droplet-libs/pcap"
+	libqueue "gitlab.yunshan.net/yunshan/droplet-libs/queue"
+	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
 
-	"gitlab.x.lan/yunshan/droplet/droplet/adapter"
-	"gitlab.x.lan/yunshan/droplet/droplet/config"
-	"gitlab.x.lan/yunshan/droplet/droplet/labeler"
-	"gitlab.x.lan/yunshan/droplet/droplet/pcap"
-	"gitlab.x.lan/yunshan/droplet/droplet/queue"
-	"gitlab.x.lan/yunshan/droplet/droplet/statsd"
-	"gitlab.x.lan/yunshan/droplet/droplet/syslog"
-	"gitlab.x.lan/yunshan/droplet/dropletctl"
-	"gitlab.x.lan/yunshan/message/trident"
+	"gitlab.yunshan.net/yunshan/droplet/droplet/adapter"
+	"gitlab.yunshan.net/yunshan/droplet/droplet/config"
+	"gitlab.yunshan.net/yunshan/droplet/droplet/labeler"
+	"gitlab.yunshan.net/yunshan/droplet/droplet/pcap"
+	"gitlab.yunshan.net/yunshan/droplet/droplet/queue"
+	"gitlab.yunshan.net/yunshan/droplet/droplet/statsd"
+	"gitlab.yunshan.net/yunshan/droplet/droplet/syslog"
+	"gitlab.yunshan.net/yunshan/droplet/dropletctl"
+	"gitlab.yunshan.net/yunshan/message/trident"
 )
 
 var log = logging.MustGetLogger("droplet")

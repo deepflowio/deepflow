@@ -5,10 +5,10 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"gitlab.x.lan/yunshan/droplet-libs/app"
-	"gitlab.x.lan/yunshan/droplet-libs/ckdb"
-	"gitlab.x.lan/yunshan/droplet-libs/pool"
-	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
+	"gitlab.yunshan.net/yunshan/droplet-libs/app"
+	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
+	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
 )
 
 var log = logging.MustGetLogger("roze.msg")

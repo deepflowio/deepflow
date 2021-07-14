@@ -3,9 +3,9 @@ package adapter
 import (
 	"strconv"
 
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
-	"gitlab.x.lan/yunshan/droplet-libs/queue"
-	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
+	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
 )
 
 type slave struct {

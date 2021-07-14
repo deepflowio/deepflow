@@ -5,15 +5,15 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"gitlab.x.lan/yunshan/droplet-libs/codec"
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
-	"gitlab.x.lan/yunshan/droplet-libs/grpc"
-	"gitlab.x.lan/yunshan/droplet-libs/queue"
-	"gitlab.x.lan/yunshan/droplet-libs/receiver"
-	"gitlab.x.lan/yunshan/droplet-libs/stats"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
-	"gitlab.x.lan/yunshan/droplet/stream/jsonify"
-	"gitlab.x.lan/yunshan/droplet/stream/throttler"
+	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
+	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
+	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
+	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
+	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"gitlab.yunshan.net/yunshan/droplet/stream/jsonify"
+	"gitlab.yunshan.net/yunshan/droplet/stream/throttler"
 )
 
 var log = logging.MustGetLogger("stream.decoder")

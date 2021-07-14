@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	rawqueue "gitlab.x.lan/yunshan/droplet-libs/queue"
+	rawqueue "gitlab.yunshan.net/yunshan/droplet-libs/queue"
 )
 
 func TestSingleQueueSingleUserPuts(t *testing.T) {

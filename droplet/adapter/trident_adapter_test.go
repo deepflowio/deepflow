@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"gitlab.x.lan/yunshan/droplet/droplet/queue"
+	"gitlab.yunshan.net/yunshan/droplet/droplet/queue"
 )
 
 func TestTridentAdapter(t *testing.T) {

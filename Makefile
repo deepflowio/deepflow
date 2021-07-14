@@ -1,5 +1,5 @@
-MESSAGE = gitlab.x.lan/yunshan/message
-DROPLET_LIBS = gitlab.x.lan/yunshan/droplet-libs
+MESSAGE = gitlab.yunshan.net/yunshan/message
+DROPLET_LIBS = gitlab.yunshan.net/yunshan/droplet-libs
 
 REV_COUNT = $(shell git rev-list --count HEAD)
 COMMIT_DATE = $(shell git show -s --format=%cd --date=short HEAD)

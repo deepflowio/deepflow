@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.x.lan/yunshan/droplet-libs/queue"
-	"gitlab.x.lan/yunshan/droplet-libs/receiver"
+	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
+	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
 )
 
 const (

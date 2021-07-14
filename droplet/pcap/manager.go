@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.x.lan/yunshan/droplet-libs/queue"
-	"gitlab.x.lan/yunshan/droplet-libs/stats"
-	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
+	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
+	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
 )
 
 var (

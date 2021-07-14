@@ -3,12 +3,12 @@ package unmarshaller
 import (
 	"net"
 
-	"gitlab.x.lan/yunshan/droplet-libs/app"
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
-	"gitlab.x.lan/yunshan/droplet-libs/grpc"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
-	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
-	"gitlab.x.lan/yunshan/droplet/roze/msg"
+	"gitlab.yunshan.net/yunshan/droplet-libs/app"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
+	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
+	"gitlab.yunshan.net/yunshan/droplet/roze/msg"
 )
 
 const (

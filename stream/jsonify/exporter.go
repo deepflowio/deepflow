@@ -2,8 +2,8 @@ package jsonify
 
 import (
 	"github.com/gogo/protobuf/proto"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
-	"gitlab.x.lan/yunshan/droplet/stream/jsonify/dfi"
+	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"gitlab.yunshan.net/yunshan/droplet/stream/jsonify/dfi"
 )
 
 func NewDataLinkLayer(f *FlowLogger) *dfi.DataLinkLayer {
