@@ -4,9 +4,9 @@ import (
 	"encoding/binary"
 	"sort"
 
-	"gitlab.x.lan/yunshan/droplet-libs/app"
-	"gitlab.x.lan/yunshan/droplet-libs/codec"
-	"gitlab.x.lan/yunshan/droplet-libs/pool"
+	"gitlab.yunshan.net/yunshan/droplet-libs/app"
+	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 )
 
 type CustomTagMeterMeta struct {

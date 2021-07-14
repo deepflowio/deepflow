@@ -13,7 +13,7 @@ import (
 
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	logging "github.com/op/go-logging"
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 )
 
 const (

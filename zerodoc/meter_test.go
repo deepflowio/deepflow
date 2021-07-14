@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"gitlab.x.lan/yunshan/droplet-libs/app"
+	"gitlab.yunshan.net/yunshan/droplet-libs/app"
 )
 
 func TestMeterReverse(t *testing.T) {

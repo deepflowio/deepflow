@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"net"
 
-	. "gitlab.x.lan/yunshan/droplet-libs/utils"
+	. "gitlab.yunshan.net/yunshan/droplet-libs/utils"
 )
 
 type ipSegment struct {

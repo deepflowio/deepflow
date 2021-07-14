@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
 )
 
 type FixedMultiQueue []*OverwriteQueue

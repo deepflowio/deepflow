@@ -2,7 +2,7 @@
 package datastructure
 
 import (
-	"gitlab.x.lan/yunshan/droplet-libs/pool"
+	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 )
 
 var elementPool = pool.NewLockFreePool(func() interface{} {

@@ -5,7 +5,7 @@ import (
 	"math"
 	"net"
 
-	"gitlab.x.lan/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 )
 
 var (

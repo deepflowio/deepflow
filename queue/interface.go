@@ -3,7 +3,7 @@ package queue
 import (
 	"time"
 
-	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
 )
 
 const MAX_QUEUE_COUNT = 16

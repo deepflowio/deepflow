@@ -11,7 +11,7 @@ import (
 
 	. "github.com/golang/mock/gomock"
 	"github.com/influxdata/influxdb/client/v2"
-	"gitlab.x.lan/yunshan/droplet-libs/store/mock_client"
+	"gitlab.yunshan.net/yunshan/droplet-libs/store/mock_client"
 )
 
 const (

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
+	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
 )
 
 const (

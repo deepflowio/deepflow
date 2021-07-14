@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/google/gopacket/layers"
-	"gitlab.x.lan/yunshan/droplet-libs/app"
-	"gitlab.x.lan/yunshan/droplet-libs/codec"
-	"gitlab.x.lan/yunshan/droplet-libs/geo"
-	"gitlab.x.lan/yunshan/droplet-libs/pool"
+	"gitlab.yunshan.net/yunshan/droplet-libs/app"
+	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/geo"
+	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 )
 
 const (

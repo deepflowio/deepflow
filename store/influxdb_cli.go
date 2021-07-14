@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/client/v2"
-	"gitlab.x.lan/yunshan/droplet-libs/app"
-	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
+	"gitlab.yunshan.net/yunshan/droplet-libs/app"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
 )
 
 const (

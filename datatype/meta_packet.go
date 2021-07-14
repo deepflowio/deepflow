@@ -9,8 +9,8 @@ import (
 
 	. "github.com/google/gopacket/layers"
 
-	"gitlab.x.lan/yunshan/droplet-libs/pool"
-	. "gitlab.x.lan/yunshan/droplet-libs/utils"
+	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
+	. "gitlab.yunshan.net/yunshan/droplet-libs/utils"
 )
 
 const VLAN_ID_MASK = uint16((1 << 12) - 1)

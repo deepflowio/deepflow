@@ -1,4 +1,4 @@
-MESSAGE = gitlab.x.lan/yunshan/message
+MESSAGE = gitlab.yunshan.net/yunshan/message
 
 afpacket-debug:
 	go build -gcflags 'all=-N -l' -o benchTest_afpacket ./afpacket/main.go

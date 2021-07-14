@@ -5,7 +5,7 @@ import (
 	"net"
 	"reflect"
 
-	"gitlab.x.lan/yunshan/droplet-libs/pool"
+	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 )
 
 const (

@@ -3,7 +3,7 @@ package policy
 import (
 	"fmt"
 
-	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	. "gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 )
 
 type Acl struct {

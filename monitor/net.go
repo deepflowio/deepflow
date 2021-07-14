@@ -5,8 +5,8 @@ import (
 
 	"github.com/shirou/gopsutil/net"
 
-	"gitlab.x.lan/yunshan/droplet-libs/stats"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
+	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
+	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
 )
 
 var (
