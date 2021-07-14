@@ -3,10 +3,10 @@ package pusher
 import (
 	logging "github.com/op/go-logging"
 
-	"gitlab.x.lan/yunshan/droplet-libs/queue"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
-	"gitlab.x.lan/yunshan/droplet-libs/zmq"
-	"gitlab.x.lan/yunshan/droplet/stream/jsonify"
+	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
+	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zmq"
+	"gitlab.yunshan.net/yunshan/droplet/stream/jsonify"
 )
 
 var log = logging.MustGetLogger("stream.pusher")

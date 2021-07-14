@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"net"
 
-	"gitlab.x.lan/yunshan/droplet-libs/debug"
+	"gitlab.yunshan.net/yunshan/droplet-libs/debug"
 
-	"gitlab.x.lan/yunshan/droplet/dropletctl"
+	"gitlab.yunshan.net/yunshan/droplet/dropletctl"
 )
 
 type MonitorOperator interface {

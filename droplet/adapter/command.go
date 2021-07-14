@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"gitlab.x.lan/yunshan/droplet-libs/debug"
+	"gitlab.yunshan.net/yunshan/droplet-libs/debug"
 )
 
 const (

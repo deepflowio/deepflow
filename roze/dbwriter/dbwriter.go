@@ -3,11 +3,11 @@ package dbwriter
 import (
 	logging "github.com/op/go-logging"
 
-	"gitlab.x.lan/yunshan/droplet-libs/ckdb"
-	"gitlab.x.lan/yunshan/droplet-libs/zerodoc"
-	"gitlab.x.lan/yunshan/droplet/pkg/ckwriter"
-	"gitlab.x.lan/yunshan/droplet/roze/config"
-	"gitlab.x.lan/yunshan/droplet/roze/msg"
+	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
+	"gitlab.yunshan.net/yunshan/droplet/pkg/ckwriter"
+	"gitlab.yunshan.net/yunshan/droplet/roze/config"
+	"gitlab.yunshan.net/yunshan/droplet/roze/msg"
 )
 
 var log = logging.MustGetLogger("roze.dbwriter")

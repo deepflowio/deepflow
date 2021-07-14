@@ -7,17 +7,17 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
-	"gitlab.x.lan/yunshan/droplet-libs/debug"
-	"gitlab.x.lan/yunshan/droplet-libs/grpc"
-	libqueue "gitlab.x.lan/yunshan/droplet-libs/queue"
-	"gitlab.x.lan/yunshan/droplet-libs/receiver"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	"gitlab.yunshan.net/yunshan/droplet-libs/debug"
+	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
+	libqueue "gitlab.yunshan.net/yunshan/droplet-libs/queue"
+	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
 
-	"gitlab.x.lan/yunshan/droplet/droplet/queue"
-	"gitlab.x.lan/yunshan/droplet/dropletctl"
-	"gitlab.x.lan/yunshan/droplet/roze/config"
-	"gitlab.x.lan/yunshan/droplet/roze/dbwriter"
-	"gitlab.x.lan/yunshan/droplet/roze/unmarshaller"
+	"gitlab.yunshan.net/yunshan/droplet/droplet/queue"
+	"gitlab.yunshan.net/yunshan/droplet/dropletctl"
+	"gitlab.yunshan.net/yunshan/droplet/roze/config"
+	"gitlab.yunshan.net/yunshan/droplet/roze/dbwriter"
+	"gitlab.yunshan.net/yunshan/droplet/roze/unmarshaller"
 )
 
 const (

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"gitlab.x.lan/yunshan/droplet-libs/grpc"
-	"gitlab.x.lan/yunshan/message/trident"
+	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
+	"gitlab.yunshan.net/yunshan/message/trident"
 	"golang.org/x/net/context"
 )
 

@@ -14,9 +14,9 @@ import (
 
 	logging "github.com/op/go-logging"
 	"github.com/spf13/cobra"
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
-	"gitlab.x.lan/yunshan/droplet-libs/debug"
-	"gitlab.x.lan/yunshan/droplet-libs/queue"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	"gitlab.yunshan.net/yunshan/droplet-libs/debug"
+	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
 )
 
 var log = logging.MustGetLogger("queue_manager")
