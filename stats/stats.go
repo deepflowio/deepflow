@@ -17,7 +17,7 @@ import (
 	"github.com/op/go-logging"
 	"gopkg.in/alexcesaro/statsd.v2"
 
-	. "gitlab.x.lan/yunshan/droplet-libs/datastructure"
+	. "gitlab.yunshan.net/yunshan/droplet-libs/datastructure"
 )
 
 var log = logging.MustGetLogger("stats")

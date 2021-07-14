@@ -1,6 +1,6 @@
 package app
 
-import "gitlab.x.lan/yunshan/droplet-libs/datatype"
+import "gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 
 type MeteringProcessor interface {
 	GetName() string

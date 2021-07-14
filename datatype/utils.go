@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
+	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
 )
 
 var (

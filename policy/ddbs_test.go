@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	. "github.com/google/gopacket/layers"
-	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	. "gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 )
 
 func TestDdbsSimple(t *testing.T) {

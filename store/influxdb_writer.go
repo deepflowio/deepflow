@@ -13,14 +13,14 @@ import (
 	"github.com/influxdata/influxdb/models"
 	logging "github.com/op/go-logging"
 
-	// 需要从gitlab.x.lan获取新的写入接口，然后在Makefile中拷贝到vendor/github.com/influxdata/influxdb/client/v2
-	_ "gitlab.x.lan/platform/influxdb/client/v2"
+	// 需要从gitlab.yunshan.net获取新的写入接口，然后在Makefile中拷贝到vendor/github.com/influxdata/influxdb/client/v2
+	// _ "gitlab.yunshan.net/platform/influxdb/client/v2"
 
-	"gitlab.x.lan/yunshan/droplet-libs/app"
-	"gitlab.x.lan/yunshan/droplet-libs/pool"
-	"gitlab.x.lan/yunshan/droplet-libs/queue"
-	"gitlab.x.lan/yunshan/droplet-libs/stats"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
+	"gitlab.yunshan.net/yunshan/droplet-libs/app"
+	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
+	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
+	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
+	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
 )
 
 var log = logging.MustGetLogger("store")
@@ -516,7 +516,7 @@ func (w *InfluxdbWriter) writeInfluxdb(writerInfo *WriterInfo, dbCreateCtl *DBCr
 	}
 
 	if w.WriteDirect {
-		err = writerInfo.httpClient.WriteDirect(db, pc.rp, pc.buffer[:pc.offset])
+		// err = writerInfo.httpClient.WriteDirect(db, pc.rp, pc.buffer[:pc.offset])
 	} else {
 		err = writerInfo.httpClient.Write(pc.bp)
 	}

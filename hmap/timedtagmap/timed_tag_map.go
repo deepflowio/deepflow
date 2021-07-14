@@ -3,9 +3,9 @@ package timedtagmap
 import (
 	"strconv"
 
-	"gitlab.x.lan/yunshan/droplet-libs/pool"
-	"gitlab.x.lan/yunshan/droplet-libs/stats"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
+	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
+	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
+	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
 )
 
 type TagID int32

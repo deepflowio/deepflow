@@ -16,8 +16,8 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/afpacket"
 	logging "github.com/op/go-logging"
-	. "gitlab.x.lan/yunshan/droplet-libs/logger"
-	. "gitlab.x.lan/yunshan/droplet-libs/xdppacket/cmd/common"
+	. "gitlab.yunshan.net/yunshan/droplet-libs/logger"
+	. "gitlab.yunshan.net/yunshan/droplet-libs/xdppacket/cmd/common"
 )
 
 const (
