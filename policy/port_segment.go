@@ -3,7 +3,7 @@ package policy
 import (
 	"math"
 
-	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	. "gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 )
 
 type portSegment struct {

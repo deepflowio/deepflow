@@ -6,8 +6,8 @@ import (
 
 	"strings"
 
-	"gitlab.x.lan/yunshan/droplet-libs/app"
-	"gitlab.x.lan/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/app"
+	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 )
 
 // The return Document, must call app.ReleaseDocument to release after used

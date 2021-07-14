@@ -3,8 +3,8 @@ package datatype
 import (
 	"fmt"
 
-	"gitlab.x.lan/yunshan/droplet-libs/codec"
-	"gitlab.x.lan/yunshan/droplet-libs/pool"
+	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 )
 
 const (

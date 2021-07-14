@@ -8,9 +8,9 @@ import (
 
 	"github.com/google/gopacket/layers"
 
-	"gitlab.x.lan/yunshan/droplet-libs/codec"
-	"gitlab.x.lan/yunshan/droplet-libs/pool"
-	. "gitlab.x.lan/yunshan/droplet-libs/utils"
+	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
+	. "gitlab.yunshan.net/yunshan/droplet-libs/utils"
 )
 
 type CloseType uint8

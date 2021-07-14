@@ -17,11 +17,11 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.org/x/net/context"
 
-	"gitlab.x.lan/yunshan/droplet-libs/datatype"
-	"gitlab.x.lan/yunshan/droplet-libs/hmap/lru"
-	"gitlab.x.lan/yunshan/droplet-libs/receiver"
-	"gitlab.x.lan/yunshan/droplet-libs/utils"
-	"gitlab.x.lan/yunshan/message/trident"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	"gitlab.yunshan.net/yunshan/droplet-libs/hmap/lru"
+	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
+	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"gitlab.yunshan.net/yunshan/message/trident"
 )
 
 // 以最后一次NewPlatformInfoTable() table作为全局的platformInfoTable
@@ -808,9 +808,6 @@ func (t *PlatformInfoTable) Reload() error {
 			Os:                  proto.String(t.runtimeEnv.OS),
 			KernelVersion:       proto.String(t.runtimeEnv.KernelVersion),
 			TsdbReportInfo: &trident.TsdbReportInfo{
-				TsdbShardId:       proto.Uint32(t.tsdbShardID),
-				TsdbReplicaIp:     proto.String(t.tsdbReplicaIP),     // 没有replica则上报空
-				TsdbDataMountPath: proto.String(t.tsdbDataMountPath), // 没有取到，则上报空
 				PcapDataMountPath: proto.String(t.pcapDataMountPath),
 			},
 		}
