@@ -4,7 +4,7 @@ import (
 	"math"
 	"sort"
 
-	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
+	. "gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 )
 
 type Table6Item struct {

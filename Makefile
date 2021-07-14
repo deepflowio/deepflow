@@ -1,10 +1,10 @@
-MESSAGE = gitlab.x.lan/yunshan/message
+MESSAGE = gitlab.yunshan.net/yunshan/message
 
 vendor:
 	go mod tidy && go mod download && go mod vendor
 	test -n "$(shell go list -e -f '{{.Dir}}' ${MESSAGE})"
 	cp -r $(shell go list -e -f '{{.Dir}}' ${MESSAGE})/* vendor/${MESSAGE}/
-	cp -f vendor/gitlab.x.lan/platform/influxdb/client/v2/* vendor/github.com/influxdata/influxdb/client/v2/
+	#cp -f vendor/gitlab.yunshan.net/platform/influxdb/client/v2/* vendor/github.com/influxdata/influxdb/client/v2/
 	find vendor -type d -exec chmod +w {} \;
 	cd vendor/${MESSAGE}/ && go generate ./...
 	# cd xdppacket/ebpf/; chmod a+x remote-make; ./remote-make

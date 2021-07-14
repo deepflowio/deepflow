@@ -6,7 +6,7 @@ import (
 	"net"
 	"unsafe"
 
-	"gitlab.x.lan/yunshan/droplet-libs/pool"
+	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 )
 
 // buffered encoder

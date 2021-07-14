@@ -12,9 +12,9 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
-	. "gitlab.x.lan/yunshan/droplet-libs/logger"
-	. "gitlab.x.lan/yunshan/droplet-libs/xdppacket"
-	. "gitlab.x.lan/yunshan/droplet-libs/xdppacket/cmd/common"
+	. "gitlab.yunshan.net/yunshan/droplet-libs/logger"
+	. "gitlab.yunshan.net/yunshan/droplet-libs/xdppacket"
+	. "gitlab.yunshan.net/yunshan/droplet-libs/xdppacket/cmd/common"
 )
 
 var log = logging.MustGetLogger(os.Args[0])

@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"gitlab.x.lan/yunshan/droplet-libs/hmap"
-	oldlru "gitlab.x.lan/yunshan/droplet-libs/lru"
+	"gitlab.yunshan.net/yunshan/droplet-libs/hmap"
+	oldlru "gitlab.yunshan.net/yunshan/droplet-libs/lru"
 )
 
 func TestU64LRU(t *testing.T) {

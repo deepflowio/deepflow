@@ -5,10 +5,10 @@ import (
 	"math"
 	"strconv"
 
-	. "gitlab.x.lan/yunshan/droplet-libs/datatype"
-	"gitlab.x.lan/yunshan/droplet-libs/hmap/lru"
-	"gitlab.x.lan/yunshan/droplet-libs/stats"
-	. "gitlab.x.lan/yunshan/droplet-libs/utils"
+	. "gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	"gitlab.yunshan.net/yunshan/droplet-libs/hmap/lru"
+	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
+	. "gitlab.yunshan.net/yunshan/droplet-libs/utils"
 )
 
 const (

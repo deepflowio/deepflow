@@ -1,7 +1,7 @@
 package datatype
 
 import (
-	"gitlab.x.lan/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 )
 
 type Tag struct {

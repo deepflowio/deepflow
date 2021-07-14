@@ -6,7 +6,7 @@ import (
 	"github.com/op/go-logging"
 	"github.com/shirou/gopsutil/process"
 
-	"gitlab.x.lan/yunshan/droplet-libs/stats"
+	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
 )
 
 var log = logging.MustGetLogger("monitor")

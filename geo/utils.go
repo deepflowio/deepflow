@@ -1,7 +1,7 @@
 package geo
 
 import (
-	tree "gitlab.x.lan/yunshan/droplet-libs/segmenttree"
+	tree "gitlab.yunshan.net/yunshan/droplet-libs/segmenttree"
 )
 
 func DecodeCountry(country uint8) string {
