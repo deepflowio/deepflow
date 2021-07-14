@@ -1,4 +1,4 @@
-module gitlab.x.lan/yunshan/message
+module gitlab.yunshan.net/yunshan/message
 
 require github.com/gogo/protobuf v1.2.0
 
