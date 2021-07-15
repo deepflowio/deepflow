@@ -184,9 +184,9 @@ const (
 func getMetricsTableName(id uint8, table string, t TableType) string {
 	dbId := zerodoc.MetricsDBID(id)
 	if len(t.String()) == 0 {
-		return fmt.Sprintf("%s.%s", dbId.DBName(), table)
+		return fmt.Sprintf("%s.`%s`", dbId.DBName(), table)
 	}
-	return fmt.Sprintf("%s.%s_%s", dbId.DBName(), table, t.String())
+	return fmt.Sprintf("%s.`%s_%s`", dbId.DBName(), table, t.String())
 }
 
 func makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable string, partitionTime ckdb.TimeFuncType, duration int) string {
