@@ -1,6 +1,8 @@
 package dbwriter
 
 import (
+	"fmt"
+
 	logging "github.com/op/go-logging"
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet/pkg/ckwriter"
@@ -20,8 +22,8 @@ type FlowLogWriter struct {
 }
 
 func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.EngineType) *ckdb.Table {
-	orderKeys := []string{"l3_epc_id_1", "ip4_1", "ip6_1", "l3_epc_id_0", "ip4_0", "ip6_0", "server_port"}
-	orderKeys = append(orderKeys, id.TimeKey())
+	orderByHour := fmt.Sprintf("toStartOfHour(%s)", id.TimeKey())
+	orderKeys := []string{orderByHour, "l3_epc_id_1", "ip4_1", "ip6_1", "l3_epc_id_0", "ip4_0", "ip6_0", "server_port"}
 
 	return &ckdb.Table{
 		ID:              uint8(id),
