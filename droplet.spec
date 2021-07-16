@@ -27,12 +27,14 @@ mkdir -p $RPM_BUILD_ROOT/usr/sbin/
 cp %pwd/bin/droplet $RPM_BUILD_ROOT/usr/sbin/
 mkdir -p $RPM_BUILD_ROOT/usr/bin/
 cp %pwd/bin/droplet-ctl $RPM_BUILD_ROOT/usr/bin/
+cp %pwd/pkg/influxdb-migrate/influxdb-migrate $RPM_BUILD_ROOT/usr/bin/
 go get github.com/go-delve/delve/cmd/dlv
 cp $(go env GOPATH)/bin/dlv $RPM_BUILD_ROOT/usr/bin/dlv.droplet
 mkdir -p $RPM_BUILD_ROOT/lib/systemd/system/
 cp %pwd/droplet.service $RPM_BUILD_ROOT/lib/systemd/system/
 mkdir -p $RPM_BUILD_ROOT/etc/
 cp %pwd/droplet.yaml $RPM_BUILD_ROOT/etc/
+cp %pwd/pkg/influxdb-migrate/influxdb_migrate.yaml $RPM_BUILD_ROOT/etc/
 cp %pwd/droplet.yaml $RPM_BUILD_ROOT/etc/droplet.yaml.sample
 mkdir -p $RPM_BUILD_ROOT/usr/share/droplet/
 mkdir -p $RPM_BUILD_ROOT%{pcapdir}
@@ -40,6 +42,8 @@ mkdir -p $RPM_BUILD_ROOT%{pcapdir}
 %files
 /usr/bin/dlv.droplet
 /usr/bin/droplet-ctl
+/usr/bin/influxdb-migrate
+/etc/influxdb_migrate.yaml
 /usr/sbin/droplet
 /etc/droplet.yaml.sample
 %config(noreplace) /lib/systemd/system/droplet.service
