@@ -346,9 +346,14 @@ func createTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, baseTable
 
 func modTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, dstTable string, duration int) error {
 	table := getMetricsTable(dbId)
-	tableAgg := getMetricsTableName(uint8(dbId), dstTable, AGG)
+	tableMod := ""
+	if dstTable == ORIGIN_TABLE_1M || dstTable == ORIGIN_TABLE_1S {
+		tableMod = getMetricsTableName(uint8(dbId), dstTable, LOCAL)
+	} else {
+		tableMod = getMetricsTableName(uint8(dbId), dstTable, AGG)
+	}
 	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s + toIntervalDay(%d)",
-		tableAgg, table.TimeKey, duration)
+		tableMod, table.TimeKey, duration)
 
 	return ckwriter.ExecSQL(ck, modTable)
 }
