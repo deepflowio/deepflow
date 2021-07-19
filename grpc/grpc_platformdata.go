@@ -777,7 +777,7 @@ func (t *PlatformInfoTable) updateGroupIDsAndBusinessIDs(response *trident.SyncR
 			IPRanges: group.GetIpRanges(),
 		})
 		groupIDToBusiessID[uint16(groupID)] = uint16(group.GetBusinessId())
-		log.Infof("group: %+v", group)
+		log.Debugf("group: %+v", group)
 	}
 	t.groupIDToBusiessID = groupIDToBusiessID
 	t.groupLabeler = NewGroupLabeler(t.groupLabelerLogger, groups)
@@ -792,7 +792,7 @@ func (t *PlatformInfoTable) updateGroupIDsAndBusinessIDs(response *trident.SyncR
 			Protocol:    uint16(svc.GetProtocol()),
 			ServerPorts: svc.GetServerPorts(),
 		})
-		log.Infof("svc: %+v", svc)
+		log.Debugf("svc: %+v", svc)
 	}
 	t.serviceLabeler = NewGroupLabeler(t.serviceLabelerLogger, services)
 
@@ -902,10 +902,12 @@ func (t *PlatformInfoTable) Reload() error {
 	}
 	t.epcIDIPV4Infos = newEpcIDIPV4Infos
 	t.epcIDIPV4CidrInfos = newEpcIDIPV4CidrInfos
+	t.epcIDIPV4Lru.NoStats()
 	t.epcIDIPV4Lru = lru.NewU64LRU("epcIDIPV4_"+t.moduleName, LruSlotSize, LruCap)
 
 	t.epcIDIPV6Infos = newEpcIDIPV6Infos
 	t.epcIDIPV6CidrInfos = newEpcIDIPV6CidrInfos
+	t.epcIDIPV6Lru.NoStats()
 	t.epcIDIPV6Lru = lru.NewU160LRU("epcIDIPV6_"+t.moduleName, LruSlotSize, LruCap)
 
 	t.macInfos = newMacInfos
