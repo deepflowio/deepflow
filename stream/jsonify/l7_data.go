@@ -520,7 +520,7 @@ var L7HTTPCounter uint32
 
 func ProtoLogToHTTPLogger(l *datatype.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) *HTTPLogger {
 	h := AcquireHTTPLogger()
-	h._id = genID(uint32(l.StartTime/time.Microsecond), &L7HTTPCounter, shardID)
+	h._id = genID(uint32(l.StartTime/time.Second), &L7HTTPCounter, shardID)
 	h.Fill(l, platformData)
 	return h
 }
@@ -550,7 +550,7 @@ var L7DNSCounter uint32
 
 func ProtoLogToDNSLogger(l *datatype.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) *DNSLogger {
 	h := AcquireDNSLogger()
-	h._id = genID(uint32(l.StartTime/time.Microsecond), &L7DNSCounter, shardID)
+	h._id = genID(uint32(l.StartTime/time.Second), &L7DNSCounter, shardID)
 	h.Fill(l, platformData)
 	return h
 }
