@@ -10,6 +10,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
 )
@@ -179,8 +180,12 @@ type RuntimeEnv struct {
 }
 
 func GetRuntimeEnv() RuntimeEnv {
+	cpuNum, err := cpu.Counts(true)
+	if err != nil {
+		cpuNum = runtime.NumCPU()
+	}
 	env := RuntimeEnv{
-		CpuNum: uint32(runtime.NumCPU()),
+		CpuNum: uint32(cpuNum),
 	}
 	if v, err := mem.VirtualMemory(); err == nil {
 		env.MemorySize = v.Total
