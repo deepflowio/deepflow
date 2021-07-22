@@ -42,7 +42,7 @@ migrates-1m:
 
 # # 自定义数据源的迁移，需要根据局点情况，具体配置
 #migrates-1h1d:
-#- dbs: 
+#- dbs:
 #  - vtap_flow
 #  - vtap_flow_edge
 #  - vtap_flow_port
@@ -51,7 +51,7 @@ migrates-1m:
 #  ck-table: 1h # 一般和rp相同，除非要迁移改名
 #  unsummable: avg  # 非累加聚合的值 avg, max, min
 #  interval: 1h   # 聚合的时间粒度 1h,1d
-#  time-range: ""
+#  time-range: "time<now()-7d" # 需要排除分钟数据的时间
 #- dbs:
 #  - vtap_packet
 #  - vtap_packet_edge
@@ -59,7 +59,7 @@ migrates-1m:
 #  ck-table: 1h
 #  unsummable: avg
 #  interval: 1h
-#  time-range: ""
+#  time-range: "time<now()-7d" # 需要排除分钟数据的时间
 #- dbs:
 #  - vtap_wan
 #  - vtap_wan_port
@@ -67,7 +67,7 @@ migrates-1m:
 #  ck-table: 1h
 #  unsummable: avg
 #  interval: 1h
-#  time-range: ""
+#  time-range: "time<now()-7d" # 需要排除分钟数据的时间
 #- dbs:
 #  - vtap_flow
 #  - vtap_flow_edge
@@ -77,4 +77,4 @@ migrates-1m:
 #  ck-table: 1d
 #  unsummable: avg  # 非累加聚合的值 avg, max, min
 #  interval: 1d   # 聚合的时间粒度 1h,1d
-#  time-range: ""
+#  time-range: "time<now()-30d" # 需要排除小时或分钟数据的时间
