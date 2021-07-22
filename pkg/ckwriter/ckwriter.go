@@ -3,6 +3,7 @@ package ckwriter
 import (
 	"database/sql/driver"
 	"fmt"
+	"reflect"
 	"strconv"
 	"sync"
 	"time"
@@ -217,8 +218,9 @@ func (w *CKWriter) queueProcess(queueID int) {
 
 func (w *CKWriter) ResetConnection(queueID int) error {
 	var err error
-	if w.cks[queueID] != nil {
+	if !IsNil(w.cks[queueID]) {
 		w.cks[queueID].Close()
+		w.cks[queueID] = nil
 	}
 	if w.cks[queueID], err = clickhouse.OpenDirect(fmt.Sprintf("%s?username=%s&password=%s", w.primaryAddr, w.user, w.password)); err != nil {
 		return err
@@ -231,10 +233,10 @@ func (w *CKWriter) Write(queueID int, items []CKItem) {
 		if w.counters[queueID].WriteFailedCount == 0 {
 			log.Warningf("write table(%s.%s) failed, drop(%d) items: %s", w.table.Database, w.table.LocalName, len(items), err)
 			if err := w.ResetConnection(queueID); err != nil {
-				log.Warningf("reck clickhouse failed: %s", err)
+				log.Warningf("reconnect clickhouse failed: %s", err)
 				time.Sleep(time.Minute)
 			} else {
-				log.Infof("reck clickhouse success: %s %s", w.table.Database, w.table.LocalName)
+				log.Infof("reconnect clickhouse success: %s %s", w.table.Database, w.table.LocalName)
 			}
 		}
 		w.counters[queueID].WriteFailedCount += int64(len(items))
@@ -247,12 +249,23 @@ func (w *CKWriter) Write(queueID int, items []CKItem) {
 	}
 }
 
+func IsNil(i interface{}) bool {
+	if i == nil {
+		return true
+	}
+	vi := reflect.ValueOf(i)
+	if vi.Kind() == reflect.Ptr {
+		return vi.IsNil()
+	}
+	return false
+}
+
 func (w *CKWriter) writeItems(queueID int, items []CKItem) error {
 	if len(items) == 0 {
 		return nil
 	}
 	ck := w.cks[queueID]
-	if ck == nil {
+	if IsNil(ck) {
 		if err := w.ResetConnection(queueID); err != nil {
 			time.Sleep(time.Minute)
 			return fmt.Errorf("can not ck to clickhouse: %s", err)

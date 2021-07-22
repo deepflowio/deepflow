@@ -23,8 +23,6 @@ vendor:
 	go generate ./...
 	# 修复clickhouse-go的WritexxxNullable接口写入数据错误的问题
 	patch vendor/github.com/ClickHouse/clickhouse-go/lib/data/block_write_column.go < patch/clickhouse-go/nullable.patch
-	# 规避写crash
-	patch vendor/github.com/ClickHouse/clickhouse-go/clickhouse.go < patch/clickhouse-go/avoid-write-crash.patch
 
 .PHONY: test
 test: vendor
