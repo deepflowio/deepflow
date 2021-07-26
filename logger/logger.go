@@ -13,7 +13,6 @@ import (
 
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	logging "github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 )
 
 const (
@@ -128,28 +127,30 @@ func applyBackendChange() {
 	logging.SetLevel(level, "")
 }
 
-func getRemoteAddress(remote string) string {
+func getRemoteAddress(remote string, port int) string {
 	if ip := net.ParseIP(remote); ip != nil {
 		// 不带端口的v4/v6地址
 		if ip.To4() != nil {
-			return fmt.Sprintf("%s:%d", remote, datatype.DROPLET_PORT)
+			return fmt.Sprintf("%s:%d", remote, port)
 		} else {
-			return fmt.Sprintf("[%s]:%d", remote, datatype.DROPLET_PORT)
+			return fmt.Sprintf("[%s]:%d", remote, port)
 		}
 	} else if !strings.Contains(remote, ":") {
 		// 不带端口的域名
-		return fmt.Sprintf("%s:%d", remote, datatype.DROPLET_PORT)
+		return fmt.Sprintf("%s:%d", remote, port)
 	}
 	return remote
 }
 
-func EnableRsyslog(remotes ...string) error {
+// msgType在datatype/droplet-message.go中定义
+// trident调用时前2个参数传入datatype.MESSAGE_TYPE_SYSLOG 和 datatype.DROPLET_PORT
+func EnableRsyslog(msgType byte, remotePort int, remotes ...string) error {
 	rsyslogBackends = rsyslogBackends[:0]
 	rsyslogWriters = rsyslogWriters[:0]
 	for _, remote := range remotes {
 		// 消息头包括FrameSize和Type，UDP时FrameSize无用
-		header := bytes.NewBuffer([]byte{0, 0, 0, 0, datatype.MESSAGE_TYPE_SYSLOG})
-		ioWriter := NewRsyslogWriter("udp", getRemoteAddress(remote), path.Base(os.Args[0]), header.String())
+		header := bytes.NewBuffer([]byte{0, 0, 0, 0, msgType})
+		ioWriter := NewRsyslogWriter("udp", getRemoteAddress(remote, remotePort), path.Base(os.Args[0]), header.String())
 		rsyslogWriters = append(rsyslogWriters, ioWriter)
 
 		backend := logging.NewBackendFormatter(
