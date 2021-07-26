@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/gopacket/layers"
 
-	"gitlab.x.lan/yunshan/droplet-libs/policy"
-	api "gitlab.x.lan/yunshan/droplet-libs/reciter-api"
+	"gitlab.yunshan.net/yunshan/droplet-libs/policy"
+	api "gitlab.yunshan.net/yunshan/droplet-libs/reciter-api"
 )
 
 func TestDedup(t *testing.T) {
