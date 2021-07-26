@@ -15,8 +15,8 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/spf13/cobra"
 	"github.com/vishvananda/netlink"
-	"gitlab.x.lan/yunshan/droplet-libs/logger"
-	api "gitlab.x.lan/yunshan/droplet-libs/reciter-api"
+	"gitlab.yunshan.net/yunshan/droplet-libs/logger"
+	api "gitlab.yunshan.net/yunshan/droplet-libs/reciter-api"
 	"golang.org/x/net/context"
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
