@@ -20,6 +20,7 @@ const (
 	DefaultUnmarshallQueueSize  = 10240
 	DefaultReceiverWindowSize   = 1024
 	DefaultPcapDataPath         = "/var/lib/pcap"
+	DefaultCKReadTimeout        = 300
 )
 
 type CKAddrs struct {
@@ -46,6 +47,7 @@ type CKWriterConfig struct {
 type Config struct {
 	CKDB                      CKAddrs        `yaml:"ckdb"`
 	CKDBAuth                  Auth           `yaml:"ckdb-auth"`
+	CKReadTimeout             int            `yaml:"ck-read-timeout"`
 	ReplicaEnabled            bool           `yaml:"metrics-replica-enabled"`
 	CKWriterConfig            CKWriterConfig `yaml:"metrics-ck-wirter"`
 	Pcap                      PCapConfig     `yaml:"pcap"`
@@ -92,6 +94,7 @@ func Load(path string) *Config {
 		ControllerPort:            DefaultControllerPort,
 		CKDB:                      CKAddrs{DefaultCKPrimaryAddr, ""},
 		CKWriterConfig:            CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
+		CKReadTimeout:             DefaultCKReadTimeout,
 		UnmarshallQueueCount:      DefaultUnmarshallQueueCount,
 		UnmarshallQueueSize:       DefaultUnmarshallQueueSize,
 		ReceiverWindowSize:        DefaultReceiverWindowSize,
