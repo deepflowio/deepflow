@@ -189,10 +189,20 @@ func getMetricsTableName(id uint8, table string, t TableType) string {
 	return fmt.Sprintf("%s.`%s_%s`", dbId.DBName(), table, t.String())
 }
 
+func stringSliceHas(items []string, item string) bool {
+	for _, s := range items {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
 func makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable string, partitionTime ckdb.TimeFuncType, duration int) string {
 	aggTable := getMetricsTableName(t.ID, dstTable, AGG)
 
 	columns := []string{}
+	orderKeys := t.OrderKeys
 	for _, p := range t.Columns {
 		// 跳过_开头的字段，如_tid, _id
 		if strings.HasPrefix(p.Name, "_") {
@@ -204,6 +214,9 @@ func makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable
 		}
 
 		if p.GroupBy {
+			if !stringSliceHas(orderKeys, p.Name) {
+				orderKeys = append(orderKeys, p.Name)
+			}
 			columns = append(columns, fmt.Sprintf("%s %s %s", p.Name, p.Type.String(), codec))
 		} else {
 			columns = append(columns, getColumnString(p, aggrSummable, aggrUnsummable, AGG))
@@ -226,7 +239,7 @@ func makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable
 		strings.Join(columns, ",\n"),
 		engine,
 		strings.Join(t.OrderKeys[:t.PrimaryKeyCount], ","),
-		strings.Join(t.OrderKeys, ","),
+		strings.Join(orderKeys, ","), // 以order by的字段排序, 相同的做聚合
 		partitionTime.String(t.TimeKey),
 		t.TimeKey, duration)
 }
@@ -240,7 +253,7 @@ func makeMVTableCreateSQL(t *ckdb.Table, baseTable, dstTable, aggrSummable, aggr
 	columnTableType := MV
 	tableBase := getMetricsTableName(t.ID, baseTable, baseTableType)
 
-	groupKeys := []string{}
+	groupKeys := t.OrderKeys
 	columns := []string{}
 	for _, p := range t.Columns {
 		if strings.HasPrefix(p.Name, "_") {
@@ -252,7 +265,9 @@ func makeMVTableCreateSQL(t *ckdb.Table, baseTable, dstTable, aggrSummable, aggr
 			} else {
 				columns = append(columns, p.Name)
 			}
-			groupKeys = append(groupKeys, p.Name)
+			if !stringSliceHas(groupKeys, p.Name) {
+				groupKeys = append(groupKeys, p.Name)
+			}
 		} else {
 			columns = append(columns, getColumnString(p, aggrSummable, aggrUnsummable, columnTableType))
 		}
@@ -275,14 +290,16 @@ func makeCreateTableLocal(t *ckdb.Table, baseTable, dstTable, aggrSummable, aggr
 	tableLocal := getMetricsTableName(t.ID, dstTable, LOCAL)
 
 	columns := []string{}
-	groupKeys := []string{}
+	groupKeys := t.OrderKeys
 	for _, p := range t.Columns {
 		if strings.HasPrefix(p.Name, "_") {
 			continue
 		}
 		if p.GroupBy {
 			columns = append(columns, p.Name)
-			groupKeys = append(groupKeys, p.Name)
+			if !stringSliceHas(groupKeys, p.Name) {
+				groupKeys = append(groupKeys, p.Name)
+			}
 		} else {
 			columns = append(columns, getColumnString(p, aggrSummable, aggrUnsummable, LOCAL))
 		}
