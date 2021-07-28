@@ -465,6 +465,8 @@ message GenesisSyncRequest {
 
     optional string source_ip = 3;
     optional uint32 vtap_id = 4;
+
+    optional string nat_ip = 6;
 }
 
 message GenesisSyncResponse {
