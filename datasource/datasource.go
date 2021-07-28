@@ -19,18 +19,20 @@ const (
 )
 
 type DatasourceManager struct {
-	ckAddrs  []string // 需要修改数据源的clickhouse地址, 支持多个
-	user     string
-	password string
+	ckAddrs     []string // 需要修改数据源的clickhouse地址, 支持多个
+	user        string
+	password    string
+	readTimeout int
 
 	server *http.Server
 }
 
-func NewDatasourceManager(ckAddrs []string, user, password string) *DatasourceManager {
+func NewDatasourceManager(ckAddrs []string, user, password string, readTimeout int) *DatasourceManager {
 	return &DatasourceManager{
-		ckAddrs:  ckAddrs,
-		user:     user,
-		password: password,
+		ckAddrs:     ckAddrs,
+		user:        user,
+		password:    password,
+		readTimeout: readTimeout,
 		server: &http.Server{
 			Addr:    ":" + strconv.Itoa(DATASOURCE_PORT),
 			Handler: mux.NewRouter(),
@@ -96,7 +98,7 @@ func (m *DatasourceManager) rpAdd(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Infof("receive rpadd request: %+v", b)
 
-	err = DatasourceHandle(m.ckAddrs, m.user, m.password, b.DB, "add", b.BaseRP, b.Name, b.SummableOP, b.UnsummableOP, b.Interval, b.Duration)
+	err = DatasourceHandle(m.ckAddrs, m.user, m.password, b.DB, "add", b.BaseRP, b.Name, b.SummableOP, b.UnsummableOP, b.Interval, b.Duration, m.readTimeout)
 	if err != nil {
 		respFailed(w, err.Error())
 		return
@@ -119,7 +121,7 @@ func (m *DatasourceManager) rpMod(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Infof("receive rpmod request: %+v", b)
 
-	err = DatasourceHandle(m.ckAddrs, m.user, m.password, b.DB, "mod", "", b.Name, "", "", 0, b.Duration)
+	err = DatasourceHandle(m.ckAddrs, m.user, m.password, b.DB, "mod", "", b.Name, "", "", 0, b.Duration, m.readTimeout)
 	if err != nil {
 		respFailed(w, err.Error())
 		return
@@ -143,7 +145,7 @@ func (m *DatasourceManager) rpDel(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Infof("receive rpdel request: %+v", b)
 
-	err = DatasourceHandle(m.ckAddrs, m.user, m.password, b.DB, "del", "", b.Name, "", "", 0, 0)
+	err = DatasourceHandle(m.ckAddrs, m.user, m.password, b.DB, "del", "", b.Name, "", "", 0, 0, m.readTimeout)
 	if err != nil {
 		respFailed(w, err.Error())
 		return

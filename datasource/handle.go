@@ -382,13 +382,13 @@ func delTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, table string
 	return nil
 }
 
-func DatasourceHandle(ckAddrs []string, user, password, dbGroup, action, baseTable, dstTable, aggrSummable, aggrUnsummable string, interval, duration int) error {
+func DatasourceHandle(ckAddrs []string, user, password, dbGroup, action, baseTable, dstTable, aggrSummable, aggrUnsummable string, interval, duration int, timeout int) error {
 	var cks []clickhouse.Clickhouse
 	for _, addr := range ckAddrs {
 		if len(addr) == 0 {
 			continue
 		}
-		ck, err := clickhouse.OpenDirect(fmt.Sprintf("%s?username=%s&password=%s", addr, user, password))
+		ck, err := clickhouse.OpenDirect(fmt.Sprintf("%s?username=%s&password=%s&read_timeout=%d", addr, user, password, timeout))
 		if err != nil {
 			return err
 		}

@@ -92,7 +92,6 @@ func main() {
 	log.Infof("droplet config:\n%s", string(bytes))
 
 	receiver := receiver.NewReceiver(datatype.DROPLET_PORT, cfg.UDPReadBuffer, cfg.TCPReadBuffer)
-	receiver.Start()
 
 	closers := droplet.Start(dropletConfig, receiver)
 
@@ -125,10 +124,13 @@ func main() {
 
 		// 创建、修改、删除数据源及其存储时长
 		ds := datasource.NewDatasourceManager([]string{rozeConfig.CKDB.Primary, rozeConfig.CKDB.Secondary},
-			rozeConfig.CKDBAuth.Username, rozeConfig.CKDBAuth.Password)
+			rozeConfig.CKDBAuth.Username, rozeConfig.CKDBAuth.Password, rozeConfig.CKReadTimeout)
 		ds.Start()
 		defer ds.Close()
 	}
+	// receiver延时启动，防止启动后收到数据无法处理，而上报异常日志
+	time.Sleep(time.Second)
+	receiver.Start()
 
 	// setup system signal
 	signalChannel := make(chan os.Signal, 1)
