@@ -238,11 +238,6 @@ func makeMVTableCreateSQL(t *ckdb.Table, baseTable, dstTable, aggrSummable, aggr
 	// 对于从1m,1s表进行聚合的表，使用local表作为源表
 	baseTableType := LOCAL
 	columnTableType := MV
-	if baseTable != ORIGIN_TABLE_1M && baseTable != ORIGIN_TABLE_1S {
-		// 对于二次聚合的表，需要使用agg表作为源表
-		baseTableType = AGG
-		columnTableType = LOCAL
-	}
 	tableBase := getMetricsTableName(t.ID, baseTable, baseTableType)
 
 	groupKeys := []string{}
@@ -321,6 +316,9 @@ func getMetricsTable(id zerodoc.MetricsDBID) *ckdb.Table {
 
 func createTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
 	table := getMetricsTable(dbId)
+	if baseTable != ORIGIN_TABLE_1M && baseTable != ORIGIN_TABLE_1S {
+		return fmt.Errorf("Only support base datasource 1s,1m")
+	}
 
 	aggTime := ckdb.TimeFuncHour
 	partitionTime := ckdb.TimeFuncWeek
