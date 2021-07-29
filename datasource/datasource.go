@@ -19,20 +19,22 @@ const (
 )
 
 type DatasourceManager struct {
-	ckAddrs     []string // 需要修改数据源的clickhouse地址, 支持多个
-	user        string
-	password    string
-	readTimeout int
+	ckAddrs        []string // 需要修改数据源的clickhouse地址, 支持多个
+	user           string
+	password       string
+	readTimeout    int
+	replicaEnabled bool
 
 	server *http.Server
 }
 
-func NewDatasourceManager(ckAddrs []string, user, password string, readTimeout int) *DatasourceManager {
+func NewDatasourceManager(ckAddrs []string, user, password string, readTimeout int, replicaEnabled bool) *DatasourceManager {
 	return &DatasourceManager{
-		ckAddrs:     ckAddrs,
-		user:        user,
-		password:    password,
-		readTimeout: readTimeout,
+		ckAddrs:        ckAddrs,
+		user:           user,
+		password:       password,
+		readTimeout:    readTimeout,
+		replicaEnabled: replicaEnabled,
 		server: &http.Server{
 			Addr:    ":" + strconv.Itoa(DATASOURCE_PORT),
 			Handler: mux.NewRouter(),
@@ -98,7 +100,7 @@ func (m *DatasourceManager) rpAdd(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Infof("receive rpadd request: %+v", b)
 
-	err = DatasourceHandle(m.ckAddrs, m.user, m.password, b.DB, "add", b.BaseRP, b.Name, b.SummableOP, b.UnsummableOP, b.Interval, b.Duration, m.readTimeout)
+	err = DatasourceHandle(m.ckAddrs, m.user, m.password, b.DB, "add", b.BaseRP, b.Name, b.SummableOP, b.UnsummableOP, b.Interval, b.Duration, m.readTimeout, m.replicaEnabled)
 	if err != nil {
 		respFailed(w, err.Error())
 		return
@@ -121,7 +123,7 @@ func (m *DatasourceManager) rpMod(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Infof("receive rpmod request: %+v", b)
 
-	err = DatasourceHandle(m.ckAddrs, m.user, m.password, b.DB, "mod", "", b.Name, "", "", 0, b.Duration, m.readTimeout)
+	err = DatasourceHandle(m.ckAddrs, m.user, m.password, b.DB, "mod", "", b.Name, "", "", 0, b.Duration, m.readTimeout, m.replicaEnabled)
 	if err != nil {
 		respFailed(w, err.Error())
 		return
@@ -145,7 +147,7 @@ func (m *DatasourceManager) rpDel(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Infof("receive rpdel request: %+v", b)
 
-	err = DatasourceHandle(m.ckAddrs, m.user, m.password, b.DB, "del", "", b.Name, "", "", 0, 0, m.readTimeout)
+	err = DatasourceHandle(m.ckAddrs, m.user, m.password, b.DB, "del", "", b.Name, "", "", 0, 0, m.readTimeout, m.replicaEnabled)
 	if err != nil {
 		respFailed(w, err.Error())
 		return
