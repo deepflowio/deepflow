@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"net"
+	"time"
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/debug"
 
@@ -38,9 +39,17 @@ func (m *Monitor) isDebugOn() bool {
 }
 
 func (m *Monitor) run(conn *net.UDPConn, remote *net.UDPAddr) {
+	start := time.Now()
+	var counter int
 	for m.DebugOn {
+		counter++
 		items := <-m.ch
 		m.sendDebug(conn, remote, items)
+		if time.Since(start) > time.Minute {
+			m.DebugOn = false
+			log.Infof("Monitor[%s] change debug switch to off for timeout(60s)", m.Name)
+			debugSendMsg(conn, remote, fmt.Sprintf("Stop Monitor[%s] for timeout(60s), total receive %d msg", m.Name, counter))
+		}
 	}
 }
 
@@ -49,6 +58,15 @@ func (m *Monitor) debugSwitch(on bool) {
 		log.Infof("Monitor[%s] change debug switch to %v", m.Name, on)
 		m.DebugOn = on
 	}
+}
+
+func debugSendMsg(conn *net.UDPConn, remote *net.UDPAddr, msg string) {
+	buffer := bytes.Buffer{}
+	encoder := gob.NewEncoder(&buffer)
+	if err := encoder.Encode(msg); err != nil {
+		log.Error(err)
+	}
+	debug.SendToClient(conn, remote, 0, &buffer)
 }
 
 func (m *Monitor) TurnOnDebug(conn *net.UDPConn, remote *net.UDPAddr) {
