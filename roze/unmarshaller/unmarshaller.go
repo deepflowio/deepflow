@@ -199,12 +199,10 @@ func decodeForDebug(b []byte) (BatchDocument, error) {
 	docs := make([]*app.Document, 0)
 
 	for !decoder.IsEnd() {
-		doc, _ := zerodoc.DecodeForQueueMonitor(decoder)
-
-		if decoder.Failed() {
-			return nil, errors.New("Decode failed")
+		doc, err := zerodoc.DecodeForQueueMonitor(decoder)
+		if err != nil {
+			return nil, err
 		}
-
 		docs = append(docs, doc)
 	}
 	return BatchDocument(docs), nil
