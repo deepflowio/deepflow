@@ -198,7 +198,7 @@ func stringSliceHas(items []string, item string) bool {
 	return false
 }
 
-func makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable string, partitionTime ckdb.TimeFuncType, duration int) string {
+func makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable string, partitionTime ckdb.TimeFuncType, duration int, replicaEnabled bool) string {
 	aggTable := getMetricsTableName(t.ID, dstTable, AGG)
 
 	columns := []string{}
@@ -224,7 +224,7 @@ func makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable
 	}
 
 	engine := ckdb.AggregatingMergeTree.String()
-	if t.Engine == ckdb.ReplicatedMergeTree {
+	if replicaEnabled {
 		engine = fmt.Sprintf(ckdb.ReplicatedAggregatingMergeTree.String(), t.Database, dstTable+"_"+AGG.String())
 	}
 
@@ -331,7 +331,7 @@ func getMetricsTable(id zerodoc.MetricsDBID) *ckdb.Table {
 	return zerodoc.GetMetricsTables(ckdb.MergeTree)[id] // GetMetricsTables取的全局变量的值，以roze在启动时对tables初始化的参数为准
 }
 
-func createTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
+func createTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int, replicaEnabled bool) error {
 	table := getMetricsTable(dbId)
 	if baseTable != ORIGIN_TABLE_1M && baseTable != ORIGIN_TABLE_1S {
 		return fmt.Errorf("Only support base datasource 1s,1m")
@@ -345,7 +345,7 @@ func createTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, baseTable
 	}
 
 	commands := []string{
-		makeAggTableCreateSQL(table, dstTable, aggrSummable, aggrUnsummable, partitionTime, duration),
+		makeAggTableCreateSQL(table, dstTable, aggrSummable, aggrUnsummable, partitionTime, duration, replicaEnabled),
 		makeMVTableCreateSQL(table, baseTable, dstTable, aggrSummable, aggrUnsummable, aggTime),
 		makeCreateTableLocal(table, baseTable, dstTable, aggrSummable, aggrUnsummable),
 		makeGlobalTableCreateSQL(table, dstTable),
@@ -397,7 +397,7 @@ func delTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, table string
 	return nil
 }
 
-func DatasourceHandle(ckAddrs []string, user, password, dbGroup, action, baseTable, dstTable, aggrSummable, aggrUnsummable string, interval, duration int, timeout int) error {
+func DatasourceHandle(ckAddrs []string, user, password, dbGroup, action, baseTable, dstTable, aggrSummable, aggrUnsummable string, interval, duration int, timeout int, replicaEnabled bool) error {
 	var cks []clickhouse.Clickhouse
 	for _, addr := range ckAddrs {
 		if len(addr) == 0 {
@@ -473,7 +473,7 @@ func DatasourceHandle(ckAddrs []string, user, password, dbGroup, action, baseTab
 				if interval == 1440 {
 					aggInterval = IntervalDay
 				}
-				if err := createTableMV(ck, dbId, baseTable, dstTable, aggrSummable, aggrUnsummable, aggInterval, duration); err != nil {
+				if err := createTableMV(ck, dbId, baseTable, dstTable, aggrSummable, aggrUnsummable, aggInterval, duration, replicaEnabled); err != nil {
 					return err
 				}
 			case MOD:
