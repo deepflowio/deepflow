@@ -35,6 +35,8 @@ enum Exception {
     RX_PPS_THRESHOLD_EXCEEDED  = 64;
     ANALYZER_NO_GW_ARP         = 128;
     INVALID_CONFIGURATION      = 256;
+    THREAD_THRESHOLD_EXCEEDED  = 512;
+    PROCESS_THRESHOLD_EXCEEDED = 1024;
 }
 
 message CommunicationVtap {
@@ -203,6 +205,9 @@ message Config {
     // 新增资源限制
     optional uint32  log_threshold        = 101 [default = 300];
     optional string  log_level            = 102 [default = "INFO"];
+    optional uint32  thread_threshold     = 103 [default = 100]; // 限制采集器运行环境中trident进程内线程数量
+    optional uint32  process_threshold    = 104 [default = 10]; // 限制采集器运行环境中trident进程启动的其他子进程数量
+
 
     // 新增基础配置参数
     optional uint32  log_retention        = 201 [default = 30]; // uint: day
