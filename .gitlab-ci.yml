@@ -36,9 +36,9 @@ docker-x64:
     - x64
   script:
     - make
-    - docker rmi nexus.yunshan.net:5000/droplet:$(echo ${CI_COMMIT_REF_NAME//B_LC_RELEASE_} | tr '_' '.' | sed 's/master/latest/') || true
-    - docker build -t nexus.yunshan.net:5000/droplet:$(echo ${CI_COMMIT_REF_NAME//B_LC_RELEASE_} | tr '_' '.' | sed 's/master/latest/') ./
-    - docker push nexus.yunshan.net:5000/droplet:$(echo ${CI_COMMIT_REF_NAME//B_LC_RELEASE_} | tr '_' '.' | sed 's/master/latest/')
+    - docker rmi docker-hosted.nexus.yunshan.net/droplet:$(echo ${CI_COMMIT_REF_NAME//B_LC_RELEASE_} | tr '_' '.' | sed 's/master/latest/') || true
+    - docker build -t docker-hosted.nexus.yunshan.net/droplet:$(echo ${CI_COMMIT_REF_NAME//B_LC_RELEASE_} | tr '_' '.' | sed 's/master/latest/') ./
+    - docker push docker-hosted.nexus.yunshan.net/droplet:$(echo ${CI_COMMIT_REF_NAME//B_LC_RELEASE_} | tr '_' '.' | sed 's/master/latest/')
   only:
     - master
     - /B_LC_RELEASE_.*/
