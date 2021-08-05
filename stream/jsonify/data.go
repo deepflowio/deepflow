@@ -585,7 +585,7 @@ var MetricsColumns = []*ckdb.Column{
 	ckdb.NewColumn("art_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
 	ckdb.NewColumn("rrt_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
 
-	ckdb.NewColumn("retans_tx", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("retrans_tx", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("retrans_rx", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("zero_win_tx", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("zero_win_rx", ckdb.UInt32).SetIndex(ckdb.IndexNone),
