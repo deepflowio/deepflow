@@ -234,14 +234,16 @@ func makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable
 				   PRIMARY KEY (%s)
 				   ORDER BY (%s)
 				   PARTITION BY %s
-				   TTL %s + toIntervalDay(%d)`,
+				   TTL %s + toIntervalDay(%d)
+				   SETTINGS storage_policy = '%s'`,
 		aggTable,
 		strings.Join(columns, ",\n"),
 		engine,
 		strings.Join(t.OrderKeys[:t.PrimaryKeyCount], ","),
 		strings.Join(orderKeys, ","), // 以order by的字段排序, 相同的做聚合
 		partitionTime.String(t.TimeKey),
-		t.TimeKey, duration)
+		t.TimeKey, duration,
+		ckdb.DF_STORAGE_POLICY)
 }
 
 func makeMVTableCreateSQL(t *ckdb.Table, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggrTimeFunc ckdb.TimeFuncType) string {
