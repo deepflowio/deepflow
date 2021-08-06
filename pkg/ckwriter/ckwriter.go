@@ -312,9 +312,10 @@ func (w *CKWriter) writeItems(queueID int, items []CKItem) error {
 func (w *CKWriter) Close() {
 	w.exit = true
 	w.wg.Wait()
-	for _, c := range w.cks {
-		if c != nil {
+	for i, c := range w.cks {
+		if !IsNil(c) {
 			c.Close()
+			w.cks[i] = nil
 		}
 	}
 	for _, c := range w.counters {
