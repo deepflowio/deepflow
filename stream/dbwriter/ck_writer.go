@@ -33,7 +33,7 @@ func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.En
 		Columns:         columns,
 		TimeKey:         id.TimeKey(),
 		Engine:          engine,
-		PartitionFunc:   ckdb.TimeFuncYYYYMMDD,
+		PartitionFunc:   ckdb.TimeFuncFourHour,
 		TTL:             3,
 		OrderKeys:       orderKeys,
 		PrimaryKeyCount: len(orderKeys),
