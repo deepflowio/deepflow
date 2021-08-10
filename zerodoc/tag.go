@@ -104,6 +104,11 @@ const (
 type DirectionEnum uint8
 
 const (
+	_CLIENT_SERVER_MASK = 0x3
+	_SIDE_TYPE_MASK     = 0xfc
+)
+
+const (
 	_ DirectionEnum = iota
 	ClientToServer
 	ServerToClient
@@ -120,11 +125,15 @@ const (
 )
 
 func (d DirectionEnum) IsClientToServer() bool {
-	return d&0x3 == ClientToServer
+	return d&_CLIENT_SERVER_MASK == ClientToServer
 }
 
 func (d DirectionEnum) IsServerToClient() bool {
-	return d&0x3 == ServerToClient
+	return d&_CLIENT_SERVER_MASK == ServerToClient
+}
+
+func (d DirectionEnum) IsGateway() bool {
+	return SideType(d&_SIDE_TYPE_MASK) == GatewaySide
 }
 
 type TAPSideEnum uint8
