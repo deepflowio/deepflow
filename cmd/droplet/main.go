@@ -19,6 +19,7 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/logger"
 	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
 	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
+	"gitlab.yunshan.net/yunshan/droplet/ckmonitor"
 	"gitlab.yunshan.net/yunshan/droplet/datasource"
 	yaml "gopkg.in/yaml.v2"
 
@@ -127,6 +128,15 @@ func main() {
 			rozeConfig.CKDBAuth.Username, rozeConfig.CKDBAuth.Password, rozeConfig.CKReadTimeout, rozeConfig.ReplicaEnabled)
 		ds.Start()
 		defer ds.Close()
+
+		// 检查clickhouse的磁盘空间占用，达到阈值时，自动删除老数据
+		cm, err := ckmonitor.NewCKMonitor(&cfg.CKDiskMonitor, rozeConfig.CKDB.Primary, rozeConfig.CKDB.Secondary, rozeConfig.CKDBAuth.Username, rozeConfig.CKDBAuth.Password)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		cm.Start()
+		defer cm.Close()
 	}
 	// receiver延时启动，防止启动后收到数据无法处理，而上报异常日志
 	time.Sleep(time.Second)

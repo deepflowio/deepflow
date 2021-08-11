@@ -13,16 +13,29 @@ import (
 
 var log = logging.MustGetLogger("config")
 
+const (
+	DefaultCheckInterval   = 600 // clickhouse是异步删除
+	DefaultDiskUsedPercent = 90
+	DefaultDiskFreeSpace   = 10
+)
+
+type CKDiskMonitor struct {
+	CheckInterval int `yaml:"check-interval"` // s
+	UsedPercent   int `yaml:"used-percent"`   // 0-100
+	FreeSpace     int `yaml:"free-space"`     // Gb
+}
+
 type Config struct {
-	ControllerIps     []string `yaml:"controller-ips,flow"`
-	ControllerPort    uint16   `yaml:"controller-port"`
-	StreamRozeEnabled bool     `yaml:"stream-roze-enabled"`
-	UDPReadBuffer     int      `yaml:"udp-read-buffer"`
-	TCPReadBuffer     int      `yaml:"tcp-read-buffer"`
-	LogFile           string   `yaml:"log-file"`
-	LogLevel          string   `yaml:"log-level"`
-	Profiler          bool     `yaml:"profiler"`
-	MaxCPUs           int      `yaml:"max-cpus"`
+	ControllerIps     []string      `yaml:"controller-ips,flow"`
+	ControllerPort    uint16        `yaml:"controller-port"`
+	StreamRozeEnabled bool          `yaml:"stream-roze-enabled"`
+	UDPReadBuffer     int           `yaml:"udp-read-buffer"`
+	TCPReadBuffer     int           `yaml:"tcp-read-buffer"`
+	LogFile           string        `yaml:"log-file"`
+	LogLevel          string        `yaml:"log-level"`
+	Profiler          bool          `yaml:"profiler"`
+	MaxCPUs           int           `yaml:"max-cpus"`
+	CKDiskMonitor     CKDiskMonitor `yaml:"ck-disk-monitor"`
 }
 
 func (c *Config) Validate() error {
@@ -54,6 +67,7 @@ func Load(path string) Config {
 		UDPReadBuffer:  64 << 20,
 		TCPReadBuffer:  4 << 20,
 		LogFile:        "/var/log/droplet/droplet.log",
+		CKDiskMonitor:  CKDiskMonitor{DefaultCheckInterval, DefaultDiskUsedPercent, DefaultDiskFreeSpace},
 	}
 	if err != nil {
 		config.Validate()
