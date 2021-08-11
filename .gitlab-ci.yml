@@ -62,7 +62,7 @@ package-arm64:
     - arm64
 
   script:
-    - rpmbuild -bb droplet.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
+    - rpmbuild -bb droplet_arm64.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
   artifacts:
     paths:
     - aarch64/droplet*.rpm
