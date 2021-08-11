@@ -33,6 +33,7 @@ type PlatformData struct {
 	PodClusterId   uint32
 	PodNodeId      uint32
 	IfType         uint8
+	DeviceType     uint8
 	IsVIPInterface bool
 	// 适配windows hyper-v场景出现的在不同Region存在相同MAC，PlatformData查询GRPC下发的Region id,
 	// PlatformData不在同一Region中，该字段为True, 若为true不会创建mac表
