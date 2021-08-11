@@ -40,6 +40,12 @@ ckdb:
 ## 默认读超时，修改数据保留时长时使用
 #ck-read-timeout: 300
 
+## clickhouse数据磁盘空间不足时，处理
+#ck-disk-monitor:
+#  check-interval: 600 # 检查时间间隔(单位: 秒)
+#  used-percent: 90    # 达到磁盘占用率时，开始清除老数据
+#  free-space: 10      # 磁盘空闲小于该值时，开始清除老数据(单位: GB)
+
 ## stream,roze模块是否启用，默认不启用(处于单独的控制器)
 #stream-roze-enabled: false
 
