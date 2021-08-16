@@ -5,6 +5,7 @@ import (
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
+	"gitlab.yunshan.net/yunshan/droplet/common"
 	"gitlab.yunshan.net/yunshan/droplet/pkg/ckwriter"
 	"gitlab.yunshan.net/yunshan/droplet/roze/config"
 	"gitlab.yunshan.net/yunshan/droplet/roze/msg"
@@ -26,7 +27,7 @@ func NewDbWriter(primaryAddr, secondaryAddr, user, password string, replicaEnabl
 	if replicaEnabled {
 		engine = ckdb.ReplicatedMergeTree
 	}
-	tables := zerodoc.GetMetricsTables(engine)
+	tables := zerodoc.GetMetricsTables(engine, common.CK_VERSION)
 	for _, table := range tables {
 		counterName := "metrics_1m"
 		if table.ID >= uint8(zerodoc.VTAP_FLOW_1S) {

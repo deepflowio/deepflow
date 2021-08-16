@@ -9,7 +9,7 @@ import (
 
 	"database/sql"
 
-	clickhouse "github.com/ClickHouse/clickhouse-go"
+	"gitlab.yunshan.net/yunshan/droplet/common"
 	"gitlab.yunshan.net/yunshan/droplet/config"
 )
 
@@ -52,33 +52,19 @@ func NewCKMonitor(cfg *config.CKDiskMonitor, primaryAddr, secondaryAddr, usernam
 		password:             password,
 	}
 	var err error
-	m.primaryConn, err = newCKConnection(primaryAddr, username, password)
+	m.primaryConn, err = common.NewCKConnection(primaryAddr, username, password)
 	if err != nil {
 		return nil, err
 	}
 
 	if secondaryAddr != "" {
-		m.secondaryConn, err = newCKConnection(secondaryAddr, username, password)
+		m.secondaryConn, err = common.NewCKConnection(secondaryAddr, username, password)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	return m, nil
-}
-
-func newCKConnection(addr, username, password string) (*sql.DB, error) {
-	connect, err := sql.Open("clickhouse", fmt.Sprintf("%s?username=%s&password=%s", addr, username, password))
-	if err != nil {
-		return nil, err
-	}
-	if err := connect.Ping(); err != nil {
-		if exception, ok := err.(*clickhouse.Exception); ok {
-			log.Warningf("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)
-		}
-		return nil, err
-	}
-	return connect, nil
 }
 
 func (m *Monitor) updateConnection(connect *sql.DB, addr string) *sql.DB {
@@ -90,7 +76,7 @@ func (m *Monitor) updateConnection(connect *sql.DB, addr string) *sql.DB {
 		if connect != nil {
 			connect.Close()
 		}
-		connectNew, err := newCKConnection(addr, m.username, m.password)
+		connectNew, err := common.NewCKConnection(addr, m.username, m.password)
 		if err != nil {
 			log.Warning(err)
 		}

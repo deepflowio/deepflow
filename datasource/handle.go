@@ -7,6 +7,7 @@ import (
 	clickhouse "github.com/ClickHouse/clickhouse-go"
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
+	basecommon "gitlab.yunshan.net/yunshan/droplet/common"
 	"gitlab.yunshan.net/yunshan/droplet/pkg/ckwriter"
 	"gitlab.yunshan.net/yunshan/droplet/stream/common"
 )
@@ -339,7 +340,7 @@ func makeGlobalTableCreateSQL(t *ckdb.Table, dstTable string) string {
 }
 
 func getMetricsTable(id zerodoc.MetricsDBID) *ckdb.Table {
-	return zerodoc.GetMetricsTables(ckdb.MergeTree)[id] // GetMetricsTables取的全局变量的值，以roze在启动时对tables初始化的参数为准
+	return zerodoc.GetMetricsTables(ckdb.MergeTree, basecommon.CK_VERSION)[id] // GetMetricsTables取的全局变量的值，以roze在启动时对tables初始化的参数为准
 }
 
 func (m *DatasourceManager) createTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
