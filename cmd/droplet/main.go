@@ -23,6 +23,7 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet/datasource"
 	yaml "gopkg.in/yaml.v2"
 
+	"gitlab.yunshan.net/yunshan/droplet/ckissu"
 	"gitlab.yunshan.net/yunshan/droplet/config"
 	dropletcfg "gitlab.yunshan.net/yunshan/droplet/droplet/config"
 	"gitlab.yunshan.net/yunshan/droplet/droplet/droplet"
@@ -107,19 +108,13 @@ func main() {
 
 		// 写遥测数据
 		roze, err := roze.NewRoze(rozeConfig, receiver)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+		checkError(err)
 		roze.Start()
 		defer roze.Close()
 
 		// 写流日志数据
 		stream, err := stream.NewStream(streamConfig, receiver)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+		checkError(err)
 		stream.Start()
 		defer stream.Close()
 
@@ -132,15 +127,20 @@ func main() {
 
 		// 检查clickhouse的磁盘空间占用，达到阈值时，自动删除老数据
 		cm, err := ckmonitor.NewCKMonitor(&cfg.CKDiskMonitor, rozeConfig.CKDB.Primary, rozeConfig.CKDB.Secondary, rozeConfig.CKDBAuth.Username, rozeConfig.CKDBAuth.Password)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+		checkError(err)
 		cm.Start()
 		defer cm.Close()
+
+		// clickhouse表结构变更处理
+		issu, err := ckissu.NewCKIssu(rozeConfig.CKDB.Primary, rozeConfig.CKDB.Secondary, rozeConfig.CKDBAuth.Username, rozeConfig.CKDBAuth.Password)
+		checkError(err)
+		// 等roze,stream初始化建表完成,再执行issu
+		time.Sleep(time.Second)
+		err = issu.Start()
+		checkError(err)
+		issu.Close()
 	}
-	// receiver延时启动，防止启动后收到数据无法处理，而上报异常日志
-	time.Sleep(time.Second)
+	// receiver后启动，防止启动后收到数据无法处理，而上报异常日志
 	receiver.Start()
 
 	// setup system signal
@@ -158,4 +158,11 @@ func main() {
 	}
 	wg.Wait()
 	receiver.Close()
+}
+
+func checkError(err error) {
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }

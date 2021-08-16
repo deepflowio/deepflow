@@ -231,15 +231,26 @@ func (w *CKWriter) ResetConnection(queueID int) error {
 func (w *CKWriter) Write(queueID int, items []CKItem) {
 	if err := w.writeItems(queueID, items); err != nil {
 		if w.counters[queueID].WriteFailedCount == 0 {
-			log.Warningf("write table(%s.%s) failed, drop(%d) items: %s", w.table.Database, w.table.LocalName, len(items), err)
+			log.Warningf("write table(%s.%s) failed, will retry write(%d) items: %s", w.table.Database, w.table.LocalName, len(items), err)
 			if err := w.ResetConnection(queueID); err != nil {
 				log.Warningf("reconnect clickhouse failed: %s", err)
 				time.Sleep(time.Minute)
 			} else {
 				log.Infof("reconnect clickhouse success: %s %s", w.table.Database, w.table.LocalName)
 			}
+
+			// 写失败重连后重试一次, 规避偶尔写失败问题
+			if err = w.writeItems(queueID, items); err != nil {
+				log.Warningf("retry write table(%s.%s) failed, drop(%d) items: %s", w.table.Database, w.table.LocalName, len(items), err)
+			} else {
+				log.Infof("retry write table(%s.%s) success, write(%d) items", w.table.Database, w.table.LocalName, len(items))
+			}
 		}
-		w.counters[queueID].WriteFailedCount += int64(len(items))
+		if err != nil {
+			w.counters[queueID].WriteFailedCount += int64(len(items))
+		} else {
+			w.counters[queueID].WriteSuccessCount += int64(len(items))
+		}
 	} else {
 		w.counters[queueID].WriteSuccessCount += int64(len(items))
 	}
