@@ -902,7 +902,8 @@ func (t *Tag) MarshalTo(b []byte) int {
 
 func (t *Tag) TableID(isSecond bool) (uint8, error) {
 	for i, code := range metricsDBCodes {
-		if t.Code == code {
+		// 有时会有MAC,MACPath字段，需要先排除再比较
+		if t.Code&^MAC&^MACPath == code {
 			if isSecond {
 				return uint8(i) + uint8(VTAP_FLOW_1S), nil
 			}
