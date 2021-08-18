@@ -177,6 +177,28 @@ func TestDecapsulateTencentGre(t *testing.T) {
 	}
 }
 
+func TestDecapsulateTeb(t *testing.T) {
+	expected := &TunnelInfo{
+		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.25.6.6").To4())),
+		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.25.59.67").To4())),
+		Id:   0x2000000,
+		Type: TUNNEL_TYPE_ERSPAN,
+		Tier: 1,
+	}
+
+	packets, _ := loadPcap("vmware-gre-teb.pcap")
+	packet := packets[2]
+
+	l2Len := 14
+	actual := &TunnelInfo{}
+	offset := actual.Decapsulate(packet, l2Len, TUNNEL_TYPE_NONE, true)
+	expectedOffset := 28
+	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
+		t.Errorf("expectedTeb: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
+			expected, actual, expectedOffset, offset)
+	}
+}
+
 func TestDecapsulateIp6Vxlan(t *testing.T) {
 	expected := &TunnelInfo{
 		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("0.0.2.63").To4())),
