@@ -198,7 +198,16 @@ func stringSliceHas(items []string, item string) bool {
 	return false
 }
 
-func makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable string, partitionTime ckdb.TimeFuncType, duration int, replicaEnabled bool) string {
+func makeTTLString(timeKey string, duration int, ckdbEnabled bool, ckdbVolume string, ckdbTTLTimes int) string {
+	if ckdbEnabled {
+		return fmt.Sprintf("%s + toIntervalDay(%d), %s +  toIntervalDay(%d) TO VOLUME '%s'",
+			timeKey, duration*(ckdbTTLTimes+1),
+			timeKey, duration, ckdbVolume)
+	}
+	return fmt.Sprintf("%s + toIntervalDay(%d)", timeKey, duration)
+}
+
+func (m *DatasourceManager) makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable string, partitionTime ckdb.TimeFuncType, duration int) string {
 	aggTable := getMetricsTableName(t.ID, dstTable, AGG)
 
 	columns := []string{}
@@ -224,7 +233,7 @@ func makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable
 	}
 
 	engine := ckdb.AggregatingMergeTree.String()
-	if replicaEnabled {
+	if m.replicaEnabled {
 		engine = fmt.Sprintf(ckdb.ReplicatedAggregatingMergeTree.String(), t.Database, dstTable+"_"+AGG.String())
 	}
 
@@ -234,7 +243,7 @@ func makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable
 				   PRIMARY KEY (%s)
 				   ORDER BY (%s)
 				   PARTITION BY %s
-				   TTL %s + toIntervalDay(%d)
+				   TTL %s
 				   SETTINGS storage_policy = '%s'`,
 		aggTable,
 		strings.Join(columns, ",\n"),
@@ -242,7 +251,7 @@ func makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable
 		strings.Join(t.OrderKeys[:t.PrimaryKeyCount], ","),
 		strings.Join(orderKeys, ","), // 以order by的字段排序, 相同的做聚合
 		partitionTime.String(t.TimeKey),
-		t.TimeKey, duration,
+		makeTTLString(t.TimeKey, duration, m.ckdbS3Enabled, m.ckdbS3Volume, m.ckdbS3TTLTimes),
 		ckdb.DF_STORAGE_POLICY)
 }
 
@@ -333,7 +342,7 @@ func getMetricsTable(id zerodoc.MetricsDBID) *ckdb.Table {
 	return zerodoc.GetMetricsTables(ckdb.MergeTree)[id] // GetMetricsTables取的全局变量的值，以roze在启动时对tables初始化的参数为准
 }
 
-func createTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int, replicaEnabled bool) error {
+func (m *DatasourceManager) createTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
 	table := getMetricsTable(dbId)
 	if baseTable != ORIGIN_TABLE_1M && baseTable != ORIGIN_TABLE_1S {
 		return fmt.Errorf("Only support base datasource 1s,1m")
@@ -347,7 +356,7 @@ func createTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, baseTable
 	}
 
 	commands := []string{
-		makeAggTableCreateSQL(table, dstTable, aggrSummable, aggrUnsummable, partitionTime, duration, replicaEnabled),
+		m.makeAggTableCreateSQL(table, dstTable, aggrSummable, aggrUnsummable, partitionTime, duration),
 		makeMVTableCreateSQL(table, baseTable, dstTable, aggrSummable, aggrUnsummable, aggTime),
 		makeCreateTableLocal(table, baseTable, dstTable, aggrSummable, aggrUnsummable),
 		makeGlobalTableCreateSQL(table, dstTable),
@@ -361,7 +370,7 @@ func createTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, baseTable
 	return nil
 }
 
-func modTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, dstTable string, duration int) error {
+func (m *DatasourceManager) modTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, dstTable string, duration int) error {
 	table := getMetricsTable(dbId)
 	tableMod := ""
 	if dstTable == ORIGIN_TABLE_1M || dstTable == ORIGIN_TABLE_1S {
@@ -369,17 +378,17 @@ func modTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, dstTable str
 	} else {
 		tableMod = getMetricsTableName(uint8(dbId), dstTable, AGG)
 	}
-	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s + toIntervalDay(%d)",
-		tableMod, table.TimeKey, duration)
+	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
+		tableMod, makeTTLString(table.TimeKey, duration, m.ckdbS3Enabled, m.ckdbS3Volume, m.ckdbS3TTLTimes))
 
 	return ckwriter.ExecSQL(ck, modTable)
 }
 
-func modFlowLogLocalTable(ck clickhouse.Clickhouse, tableID common.FlowLogID, duration int) error {
+func (m *DatasourceManager) modFlowLogLocalTable(ck clickhouse.Clickhouse, tableID common.FlowLogID, duration int) error {
 	timeKey := tableID.TimeKey()
 	tableLocal := fmt.Sprintf("%s.%s_%s", common.FLOW_LOG_DB, tableID.String(), LOCAL)
-	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s + toIntervalDay(%d)",
-		tableLocal, timeKey, duration)
+	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s)",
+		tableLocal, makeTTLString(timeKey, duration, m.ckdbS3Enabled, m.ckdbS3Volume, m.ckdbS3TTLTimes))
 	return ckwriter.ExecSQL(ck, modTable)
 }
 
@@ -399,20 +408,20 @@ func delTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, table string
 	return nil
 }
 
-func DatasourceHandle(ckAddrs []string, user, password, dbGroup, action, baseTable, dstTable, aggrSummable, aggrUnsummable string, interval, duration int, timeout int, replicaEnabled bool) error {
+func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSummable, aggrUnsummable string, interval, duration int) error {
 	var cks []clickhouse.Clickhouse
-	for _, addr := range ckAddrs {
+	for _, addr := range m.ckAddrs {
 		if len(addr) == 0 {
 			continue
 		}
-		ck, err := clickhouse.OpenDirect(fmt.Sprintf("%s?username=%s&password=%s&read_timeout=%d", addr, user, password, timeout))
+		ck, err := clickhouse.OpenDirect(fmt.Sprintf("%s?username=%s&password=%s&read_timeout=%d", addr, m.user, m.password, m.readTimeout))
 		if err != nil {
 			return err
 		}
 		cks = append(cks, ck)
 	}
 	if len(cks) == 0 {
-		return fmt.Errorf("invalid clickhouse addrs: Addrs=%v ", ckAddrs)
+		return fmt.Errorf("invalid clickhouse addrs: Addrs=%v ", m.ckAddrs)
 	}
 
 	duration = duration / 24 // 切换为天
@@ -421,7 +430,7 @@ func DatasourceHandle(ckAddrs []string, user, password, dbGroup, action, baseTab
 	if dbGroup == common.FLOW_LOG_DB && action == actionStrings[MOD] {
 		for _, ck := range cks {
 			for flowLogID := common.L4_FLOW_ID; flowLogID < common.FLOWLOG_ID_MAX; flowLogID++ {
-				if err := modFlowLogLocalTable(ck, flowLogID, duration); err != nil {
+				if err := m.modFlowLogLocalTable(ck, flowLogID, duration); err != nil {
 					return err
 				}
 			}
@@ -475,11 +484,11 @@ func DatasourceHandle(ckAddrs []string, user, password, dbGroup, action, baseTab
 				if interval == 1440 {
 					aggInterval = IntervalDay
 				}
-				if err := createTableMV(ck, dbId, baseTable, dstTable, aggrSummable, aggrUnsummable, aggInterval, duration, replicaEnabled); err != nil {
+				if err := m.createTableMV(ck, dbId, baseTable, dstTable, aggrSummable, aggrUnsummable, aggInterval, duration); err != nil {
 					return err
 				}
 			case MOD:
-				if err := modTableMV(ck, dbId, dstTable, duration); err != nil {
+				if err := m.modTableMV(ck, dbId, dstTable, duration); err != nil {
 					return err
 				}
 			case DEL:

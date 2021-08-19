@@ -20,6 +20,13 @@
 ckdb:
   primary: tcp://127.0.0.1:9000
 # secondary:          // 如果配置2个地址，xxx-replica-enabled 为false，则作为primary写入, xxx-replica-enabled 为true 作为replica写入
+
+## ckdb若使用对象存储,需要设置将数据转移至对象存储
+#ckdb-s3:
+#  enabled: false  #是否使用了对象存储
+#  volume: vol_s3  #ckdb中对象存储的卷名
+#  ttl-times: 3    #对象存储中数据的存储时长是本地存储的几倍
+
 #metrics-replica-enabled: false
 #flowlog-replica-enabled: false
 

@@ -24,17 +24,23 @@ type DatasourceManager struct {
 	password       string
 	readTimeout    int
 	replicaEnabled bool
+	ckdbS3Enabled  bool
+	ckdbS3Volume   string
+	ckdbS3TTLTimes int
 
 	server *http.Server
 }
 
-func NewDatasourceManager(ckAddrs []string, user, password string, readTimeout int, replicaEnabled bool) *DatasourceManager {
+func NewDatasourceManager(ckAddrs []string, user, password string, readTimeout int, replicaEnabled, ckdbS3Enabled bool, ckdbS3Volume string, ckdbS3TTLTimes int) *DatasourceManager {
 	return &DatasourceManager{
 		ckAddrs:        ckAddrs,
 		user:           user,
 		password:       password,
 		readTimeout:    readTimeout,
 		replicaEnabled: replicaEnabled,
+		ckdbS3Enabled:  ckdbS3Enabled,
+		ckdbS3Volume:   ckdbS3Volume,
+		ckdbS3TTLTimes: ckdbS3TTLTimes,
 		server: &http.Server{
 			Addr:    ":" + strconv.Itoa(DATASOURCE_PORT),
 			Handler: mux.NewRouter(),
@@ -100,7 +106,7 @@ func (m *DatasourceManager) rpAdd(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Infof("receive rpadd request: %+v", b)
 
-	err = DatasourceHandle(m.ckAddrs, m.user, m.password, b.DB, "add", b.BaseRP, b.Name, b.SummableOP, b.UnsummableOP, b.Interval, b.Duration, m.readTimeout, m.replicaEnabled)
+	err = m.Handle(b.DB, "add", b.BaseRP, b.Name, b.SummableOP, b.UnsummableOP, b.Interval, b.Duration)
 	if err != nil {
 		respFailed(w, err.Error())
 		return
@@ -123,7 +129,7 @@ func (m *DatasourceManager) rpMod(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Infof("receive rpmod request: %+v", b)
 
-	err = DatasourceHandle(m.ckAddrs, m.user, m.password, b.DB, "mod", "", b.Name, "", "", 0, b.Duration, m.readTimeout, m.replicaEnabled)
+	err = m.Handle(b.DB, "mod", "", b.Name, "", "", 0, b.Duration)
 	if err != nil {
 		respFailed(w, err.Error())
 		return
@@ -147,7 +153,7 @@ func (m *DatasourceManager) rpDel(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Infof("receive rpdel request: %+v", b)
 
-	err = DatasourceHandle(m.ckAddrs, m.user, m.password, b.DB, "del", "", b.Name, "", "", 0, 0, m.readTimeout, m.replicaEnabled)
+	err = m.Handle(b.DB, "del", "", b.Name, "", "", 0, 0)
 	if err != nil {
 		respFailed(w, err.Error())
 		return
