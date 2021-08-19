@@ -125,7 +125,8 @@ func main() {
 
 		// 创建、修改、删除数据源及其存储时长
 		ds := datasource.NewDatasourceManager([]string{rozeConfig.CKDB.Primary, rozeConfig.CKDB.Secondary},
-			rozeConfig.CKDBAuth.Username, rozeConfig.CKDBAuth.Password, rozeConfig.CKReadTimeout, rozeConfig.ReplicaEnabled)
+			rozeConfig.CKDBAuth.Username, rozeConfig.CKDBAuth.Password, rozeConfig.CKReadTimeout, rozeConfig.ReplicaEnabled,
+			cfg.CKS3Storage.Enabled, cfg.CKS3Storage.Volume, cfg.CKS3Storage.TTLTimes)
 		ds.Start()
 		defer ds.Close()
 

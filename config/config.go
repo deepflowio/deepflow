@@ -17,12 +17,20 @@ const (
 	DefaultCheckInterval   = 600 // clickhouse是异步删除
 	DefaultDiskUsedPercent = 90
 	DefaultDiskFreeSpace   = 10
+	DefaultCKDBS3Volume    = "vol_s3"
+	DefaultCKDBS3TTLTimes  = 3 // 对象存储的保留时长是本地存储的3倍
 )
 
 type CKDiskMonitor struct {
 	CheckInterval int `yaml:"check-interval"` // s
 	UsedPercent   int `yaml:"used-percent"`   // 0-100
 	FreeSpace     int `yaml:"free-space"`     // Gb
+}
+
+type CKS3Storage struct {
+	Enabled  bool   `yaml:"enabled"`
+	Volume   string `yaml:"volume"`
+	TTLTimes int    `yaml:"ttl-times"`
 }
 
 type Config struct {
@@ -36,6 +44,7 @@ type Config struct {
 	Profiler          bool          `yaml:"profiler"`
 	MaxCPUs           int           `yaml:"max-cpus"`
 	CKDiskMonitor     CKDiskMonitor `yaml:"ck-disk-monitor"`
+	CKS3Storage       CKS3Storage   `yaml:"ckdb-s3"`
 }
 
 func (c *Config) Validate() error {
@@ -68,6 +77,7 @@ func Load(path string) Config {
 		TCPReadBuffer:  4 << 20,
 		LogFile:        "/var/log/droplet/droplet.log",
 		CKDiskMonitor:  CKDiskMonitor{DefaultCheckInterval, DefaultDiskUsedPercent, DefaultDiskFreeSpace},
+		CKS3Storage:    CKS3Storage{false, DefaultCKDBS3Volume, DefaultCKDBS3TTLTimes},
 	}
 	if err != nil {
 		config.Validate()
