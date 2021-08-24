@@ -15,7 +15,10 @@ import (
 
 var log = logging.MustGetLogger("monitor")
 
-const DFDiskPrefix = "path_" // clickhouse的config.xml配置文件中，deepflow命名的disk名称以‘path_’开头
+const (
+	DFDiskPrefix   = "path_" // clickhouse的config.xml配置文件中，deepflow写入数据的disk名称以‘path_’开头
+	DFS3DiskPrefix = "s3"    // clickhouse的config.xml配置文件中，deepflow写入数据的对象存储disk名称以‘s3’开头
+)
 
 type Monitor struct {
 	checkInterval              int
@@ -102,14 +105,14 @@ func (m *Monitor) updateConnections() {
 	m.secondaryConn = m.updateConnection(m.secondaryConn, m.secondaryAddr)
 }
 
-func getDFMaxDiskNumInfo(connect *sql.DB) (*DiskInfo, error) {
+func getDFDiskInfos(connect *sql.DB) ([]*DiskInfo, bool, error) {
+	hasS3Disk := false
 	rows, err := connect.Query("SELECT name,path,free_space,total_space,keep_free_space FROM system.disks")
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	// 找出名字为path_x中，x为最大时的disk,
-	maxPathNum := -1
-	var maxDiskInfo *DiskInfo
+
+	diskInfos := []*DiskInfo{}
 	for rows.Next() {
 		var (
 			name, path                           string
@@ -117,41 +120,53 @@ func getDFMaxDiskNumInfo(connect *sql.DB) (*DiskInfo, error) {
 		)
 		err := rows.Scan(&name, &path, &freeSpace, &totalSpace, &keepFreeSpace)
 		if err != nil {
-			return nil, nil
+			return nil, false, nil
 		}
 		log.Debugf("name: %s, path: %s, freeSpace: %d, totalSpace: %d, keepFreeSpace: %d", name, path, freeSpace, totalSpace, keepFreeSpace)
-		// deepflow的数据, 写入path_*下
+		// deepflow的数据, 写入`path_` 开头的disk下
 		if strings.HasPrefix(name, DFDiskPrefix) {
-			var pathNum int
-			fmt.Sscanf(name, DFDiskPrefix+"%d", &pathNum)
-			if maxPathNum < pathNum {
-				maxPathNum = pathNum
-				maxDiskInfo = &DiskInfo{name, path, freeSpace, totalSpace, keepFreeSpace}
-			}
+			diskInfos = append(diskInfos, &DiskInfo{name, path, freeSpace, totalSpace, keepFreeSpace})
+		} else if strings.HasPrefix(name, DFS3DiskPrefix) {
+			hasS3Disk = true
 		}
 	}
-	if maxDiskInfo == nil {
-		return nil, fmt.Errorf("can not find any deepflow data disk like '%s'", DFDiskPrefix)
+	if len(diskInfos) == 0 {
+		return nil, hasS3Disk, fmt.Errorf("can not find any deepflow data disk like '%s'", DFDiskPrefix)
 	}
-	return maxDiskInfo, nil
+	return diskInfos, hasS3Disk, nil
 }
 
 func (m *Monitor) isDiskNeedClean(diskInfo *DiskInfo) bool {
 	if diskInfo.totalSpace > 0 {
-		usage := (diskInfo.totalSpace - diskInfo.freeSpace) * 100 / diskInfo.totalSpace
+		usage := ((diskInfo.totalSpace-diskInfo.freeSpace)*100 + diskInfo.totalSpace - 1) / diskInfo.totalSpace
 		if usage > uint64(m.usedPercentThreshold) {
-			log.Warningf("disk usage is over %d, will do partition drop. disk name: %s, path: %s, total space: %d, free space: %d, usage: %d",
+			log.Infof("disk usage is over %d. disk name: %s, path: %s, total space: %d, free space: %d, usage: %d",
 				m.usedPercentThreshold, diskInfo.name, diskInfo.path, diskInfo.totalSpace, diskInfo.freeSpace, usage)
 			return true
 		}
 	}
 	if diskInfo.totalSpace > uint64(m.freeSpaceThreshold) &&
 		diskInfo.freeSpace < uint64(m.freeSpaceThreshold) {
-		log.Warningf("free space is %d < %dG, will do partition drop. disk name: %s, path: %s, total space: %d, free space: %d",
+		log.Infof("free space is %d < %dG. disk name: %s, path: %s, total space: %d, free space: %d",
 			diskInfo.freeSpace, m.freeSpaceThreshold>>30, diskInfo.name, diskInfo.path, diskInfo.totalSpace, diskInfo.freeSpace)
 		return true
 	}
 	return false
+}
+
+// 当所有磁盘都要满足清理条件时，才清理数据
+func (m *Monitor) isDisksNeedClean(diskInfos []*DiskInfo) bool {
+	if len(diskInfos) == 0 {
+		return false
+	}
+
+	for _, diskInfo := range diskInfos {
+		if !m.isDiskNeedClean(diskInfo) {
+			return false
+		}
+	}
+	log.Warningf("disk free space is not enough, will do drop or move partitions.")
+	return true
 }
 
 func getMinPartitions(connect *sql.DB) ([]Partition, error) {
@@ -198,6 +213,23 @@ func (m *Monitor) dropMinPartitions(connect *sql.DB) error {
 	return nil
 }
 
+func (m *Monitor) moveMinPartitions(connect *sql.DB) error {
+	partitions, err := getMinPartitions(connect)
+	if err != nil {
+		return err
+	}
+
+	for _, p := range partitions {
+		sql := fmt.Sprintf("ALTER TABLE %s.%s MOVE PARTITION '%s' TO VOLUME '%s'", p.database, p.table, p.partition, config.DefaultCKDBS3Volume)
+		log.Warningf("move partition: %s, database: %s, table: %s, minTime: %s, maxTime: %s, rows: %d, bytesOnDisk: %d", p.partition, p.database, p.table, p.minTime, p.maxTime, p.rows, p.bytesOnDisk)
+		_, err := connect.Exec(sql)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (m *Monitor) Start() {
 	go m.start()
 }
@@ -218,15 +250,20 @@ func (m *Monitor) start() {
 			if connect == nil {
 				continue
 			}
-			diskInfo, err := getDFMaxDiskNumInfo(connect)
+			diskInfos, hasS3Disk, err := getDFDiskInfos(connect)
 			if err != nil {
 				log.Warning(err)
 				continue
 			}
-			if m.isDiskNeedClean(diskInfo) {
-				err := m.dropMinPartitions(connect)
-				if err != nil {
-					log.Warning("drop partition failed.", err)
+			if m.isDisksNeedClean(diskInfos) {
+				if hasS3Disk {
+					if err := m.moveMinPartitions(connect); err != nil {
+						log.Warning("move partition failed.", err)
+					}
+				} else {
+					if err := m.dropMinPartitions(connect); err != nil {
+						log.Warning("drop partition failed.", err)
+					}
 				}
 			}
 		}
