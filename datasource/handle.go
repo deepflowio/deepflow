@@ -387,7 +387,7 @@ func (m *DatasourceManager) modTableMV(ck clickhouse.Clickhouse, dbId zerodoc.Me
 func (m *DatasourceManager) modFlowLogLocalTable(ck clickhouse.Clickhouse, tableID common.FlowLogID, duration int) error {
 	timeKey := tableID.TimeKey()
 	tableLocal := fmt.Sprintf("%s.%s_%s", common.FLOW_LOG_DB, tableID.String(), LOCAL)
-	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s)",
+	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
 		tableLocal, makeTTLString(timeKey, duration, m.ckdbS3Enabled, m.ckdbS3Volume, m.ckdbS3TTLTimes))
 	return ckwriter.ExecSQL(ck, modTable)
 }
