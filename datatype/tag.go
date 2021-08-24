@@ -5,13 +5,19 @@ import (
 )
 
 type Tag struct {
-	PolicyData PolicyData
+	PolicyData [2]PolicyData
 }
 
 func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
-	t.PolicyData.Encode(encoder)
+	t.PolicyData[0].Encode(encoder)
+	t.PolicyData[1].Encode(encoder)
 }
 
 func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
-	t.PolicyData.Decode(decoder)
+	t.PolicyData[0].Decode(decoder)
+	t.PolicyData[1].Decode(decoder)
+}
+
+func (t *Tag) Reverse() {
+	t.PolicyData[0], t.PolicyData[1] = t.PolicyData[1], t.PolicyData[0]
 }

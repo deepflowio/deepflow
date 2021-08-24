@@ -38,6 +38,11 @@ func (f *TaggedFlow) Release() {
 	ReleaseTaggedFlow(f)
 }
 
+func (f *TaggedFlow) Reverse() {
+	f.Flow.Reverse()
+	f.Tag.Reverse()
+}
+
 var taggedFlowPool = pool.NewLockFreePool(func() interface{} {
 	return new(TaggedFlow)
 })

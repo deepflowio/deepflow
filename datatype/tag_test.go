@@ -14,7 +14,7 @@ func TestTagEncodeAndDecode(t *testing.T) {
 	p.AclId = 10
 	p.ActionFlags = ACTION_PCAP
 	t1 := Tag{
-		PolicyData: *p,
+		PolicyData: [2]PolicyData{*p, *p},
 	}
 	t2 := Tag{}
 	e := codec.SimpleEncoder{}
