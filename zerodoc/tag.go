@@ -361,7 +361,7 @@ type Field struct {
 	TagValue uint16
 }
 
-func newMetricsMinuteTable(id MetricsDBID, engine ckdb.EngineType) *ckdb.Table {
+func newMetricsMinuteTable(id MetricsDBID, engine ckdb.EngineType, version string) *ckdb.Table {
 	timeKey := "time"
 	cluster := ckdb.DF_CLUSTER
 	if engine == ckdb.ReplicatedMergeTree {
@@ -393,6 +393,7 @@ func newMetricsMinuteTable(id MetricsDBID, engine ckdb.EngineType) *ckdb.Table {
 	}
 
 	return &ckdb.Table{
+		Version:         version,
 		ID:              uint8(id),
 		Database:        id.DBName(),
 		LocalName:       ckdb.LOCAL_1M,
@@ -424,14 +425,14 @@ func newMetricsSecondTable(minuteTable *ckdb.Table) *ckdb.Table {
 
 var metricsTables []*ckdb.Table
 
-func GetMetricsTables(engine ckdb.EngineType) []*ckdb.Table {
+func GetMetricsTables(engine ckdb.EngineType, version string) []*ckdb.Table {
 	if metricsTables != nil {
 		return metricsTables
 	}
 
 	minuteTables := []*ckdb.Table{}
 	for i := VTAP_FLOW; i < VTAP_FLOW_1S; i++ {
-		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine))
+		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version))
 	}
 	secondTables := []*ckdb.Table{}
 	for i := VTAP_FLOW_1S; i < VTAP_DB_ID_MAX; i++ {
