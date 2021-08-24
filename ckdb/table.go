@@ -13,6 +13,7 @@ const (
 )
 
 type Table struct {
+	Version         string       // 表版本，用于表结构变更时，做自动更新
 	ID              uint8        // id
 	Database        string       // 所属数据库名
 	LocalName       string       // 本地表名
@@ -31,6 +32,10 @@ func (t *Table) MakeLocalTableCreateSQL() string {
 	columns := []string{}
 	for _, c := range t.Columns {
 		comment := ""
+		// 把time字段的注释标记为表的version
+		if c.Name == t.TimeKey {
+			c.Comment = t.Version
+		}
 		if c.Comment != "" {
 			comment = fmt.Sprintf("COMMENT '%s'", c.Comment)
 		}
