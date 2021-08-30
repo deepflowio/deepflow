@@ -27,7 +27,7 @@ func (m *UsageMeter) Reverse() {
 }
 
 func (m *UsageMeter) ID() uint8 {
-	return PACKET_ID
+	return ACL_ID
 }
 
 func (m *UsageMeter) Name() string {

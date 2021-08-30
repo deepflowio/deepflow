@@ -26,11 +26,9 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 
 	meterID := decoder.ReadU8()
 	switch meterID {
-	case GEO_ID:
-		doc.Meter = AcquireGeoMeter()
 	case FLOW_ID:
 		doc.Meter = AcquireFlowMeter()
-	case PACKET_ID, ACL_ID:
+	case ACL_ID:
 		doc.Meter = AcquireUsageMeter()
 	default:
 		doc.Release()
@@ -59,11 +57,9 @@ func DecodeForQueueMonitor(decoder *codec.SimpleDecoder) (*app.Document, error) 
 
 	meterID := decoder.ReadU8()
 	switch meterID {
-	case GEO_ID:
-		doc.Meter = &GeoMeter{}
 	case FLOW_ID:
 		doc.Meter = &FlowMeter{}
-	case PACKET_ID, ACL_ID:
+	case ACL_ID:
 		doc.Meter = &UsageMeter{}
 	default:
 		return nil, errors.New(fmt.Sprintf("Error meter ID %d", meterID))

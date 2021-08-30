@@ -11,7 +11,6 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/app"
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
-	"gitlab.yunshan.net/yunshan/droplet-libs/geo"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
 )
@@ -185,122 +184,13 @@ const (
 )
 
 const (
-	TAG_TYPE_PROVINCE = 1 + iota
-	TAG_TYPE_TCP_FLAG
-	TAG_TYPE_CAST_TYPE
+	_ = 1 + iota // TAG_TYPE_PROVINCE = 1 + iota，已删除
+	_            // TAG_TYPE_TCP_FLAG，已删除
+	_            // TAG_TYPE_CAST_TYPE，已删除
 	TAG_TYPE_TUNNEL_IP_ID
-	TAG_TYPE_TTL
-	TAG_TYPE_PACKET_SIZE
+	_ // TAG_TYPE_TTL，已删除
+	_ // TAG_TYPE_PACKET_SIZE，已删除
 )
-
-type CastTypeEnum uint8
-
-// 作为TagValue值使用字符串;统计数据UNKNOWN无效，Index取值范围是1~3
-const (
-	UNKNOWN CastTypeEnum = iota
-	BROADCAST
-	MULTICAST
-	UNICAST
-	MAX_CAST_TYPE //  4
-)
-
-type TCPFlag uint8
-
-// TagValue使用具体的Flags值
-const (
-	TCP_FLAG_FIN TCPFlag = 1 << iota
-	TCP_FLAG_SYN
-	TCP_FLAG_RST
-	TCP_FLAG_PSH
-	TCP_FLAG_ACK
-
-	TCP_FLAG_FIN_ACK = TCP_FLAG_FIN | TCP_FLAG_ACK
-	TCP_FLAG_SYN_ACK = TCP_FLAG_SYN | TCP_FLAG_ACK
-	TCP_FLAG_RST_ACK = TCP_FLAG_RST | TCP_FLAG_ACK
-	TCP_FLAG_PSH_ACK = TCP_FLAG_PSH | TCP_FLAG_ACK
-
-	TCP_FLAG_OTHERS TCPFlag = 255 // 特殊标记，不能用于判断TCP Flag比特是否置位
-)
-
-// TCP Flags统计时映射的Index取值范围是4~10
-const (
-	TCP_FLAG_SYN_INDEX = iota + uint8(MAX_CAST_TYPE)
-	TCP_FLAG_SYN_ACK_INDEX
-	TCP_FLAG_ACK_INDEX
-	TCP_FLAG_PSH_ACK_INDEX
-	TCP_FLAG_FIN_ACK_INDEX
-	TCP_FLAG_RST_ACK_INDEX
-	TCP_FLAG_OTHERS_INDEX
-
-	MAX_TCP_FLAGS_INDEX
-)
-
-var TCPIndexToFlags = [MAX_TCP_FLAGS_INDEX]TCPFlag{
-	TCP_FLAG_SYN_INDEX:     TCP_FLAG_SYN,
-	TCP_FLAG_SYN_ACK_INDEX: TCP_FLAG_SYN_ACK,
-	TCP_FLAG_ACK_INDEX:     TCP_FLAG_ACK,
-	TCP_FLAG_PSH_ACK_INDEX: TCP_FLAG_PSH_ACK,
-	TCP_FLAG_FIN_ACK_INDEX: TCP_FLAG_FIN_ACK,
-	TCP_FLAG_RST_ACK_INDEX: TCP_FLAG_RST_ACK,
-	TCP_FLAG_OTHERS_INDEX:  TCP_FLAG_OTHERS,
-}
-
-// 作为TagValue值和统计数据的Index，取值范围是11~21
-const (
-	TTL_1 = iota + MAX_TCP_FLAGS_INDEX
-	TTL_2
-	TTL_3
-	TTL_4
-	TTL_30
-	TTL_32
-	TTL_60
-	TTL_64
-	TTL_128
-	TTL_255
-	TTL_OTHER
-	MAX_TTL
-)
-
-// 作为TagValue值和统计数据的Index，取值范围是22~30
-const (
-	PACKET_SIZE_0_64 = iota + MAX_TTL
-	PACKET_SIZE_65_128
-	PACKET_SIZE_129_256
-	PACKET_SIZE_257_512
-	PACKET_SIZE_513_1024
-	PACKET_SIZE_1025_1500
-	PACKET_SIZE_1501_9000
-	PACKET_SIZE_9001_30000
-	PACKET_SIZE_30001_65535
-	MAX_PACKET_SIZE
-)
-
-const (
-	N_METERS = MAX_PACKET_SIZE
-)
-
-var TTL_PACKET_SIZE [MAX_PACKET_SIZE]string = [MAX_PACKET_SIZE]string{
-	TTL_1:                   "1",
-	TTL_2:                   "2",
-	TTL_3:                   "3",
-	TTL_4:                   "4",
-	TTL_30:                  "30",
-	TTL_32:                  "32",
-	TTL_60:                  "60",
-	TTL_64:                  "64",
-	TTL_128:                 "128",
-	TTL_255:                 "255",
-	TTL_OTHER:               "others",
-	PACKET_SIZE_0_64:        "0-64",
-	PACKET_SIZE_65_128:      "65-128",
-	PACKET_SIZE_129_256:     "129-256",
-	PACKET_SIZE_257_512:     "257-512",
-	PACKET_SIZE_513_1024:    "513-1024",
-	PACKET_SIZE_1025_1500:   "1025-1500",
-	PACKET_SIZE_1501_9000:   "1501-9000",
-	PACKET_SIZE_9001_30000:  "9001-30000",
-	PACKET_SIZE_30001_65535: "30001-65535",
-}
 
 type Field struct {
 	// 注意字节对齐！
@@ -386,10 +276,8 @@ func newMetricsMinuteTable(id MetricsDBID, engine ckdb.EngineType, version strin
 	switch id {
 	case VTAP_FLOW, VTAP_FLOW_PORT, VTAP_FLOW_EDGE, VTAP_FLOW_EDGE_PORT:
 		meterColumns = FlowMeterColumns()
-	case VTAP_PACKET, VTAP_PACKET_EDGE, VTAP_ACL:
+	case VTAP_ACL:
 		meterColumns = UsageMeterColumns()
-	case VTAP_WAN, VTAP_WAN_PORT:
-		meterColumns = GeoMeterColumns()
 	}
 
 	return &ckdb.Table{
@@ -449,19 +337,19 @@ const (
 	VTAP_FLOW_PORT
 	VTAP_FLOW_EDGE
 	VTAP_FLOW_EDGE_PORT
-	VTAP_PACKET
-	VTAP_PACKET_EDGE
+	_VTAP_PACKET      // 已删除
+	_VTAP_PACKET_EDGE // 已删除
 
-	VTAP_WAN
-	VTAP_WAN_PORT
+	_VTAP_WAN      // 已删除
+	_VTAP_WAN_PORT // 已删除
 	VTAP_ACL
 
 	VTAP_FLOW_1S
 	VTAP_FLOW_PORT_1S
 	VTAP_FLOW_EDGE_1S
 	VTAP_FLOW_EDGE_PORT_1S
-	VTAP_PACKET_1S
-	VTAP_PACKET_EDGE_1S
+	_VTAP_PACKET_1S      // 已删除
+	_VTAP_PACKET_EDGE_1S // 已删除
 
 	VTAP_DB_ID_MAX
 )
@@ -485,12 +373,8 @@ var metricsDBNames = []string{
 	VTAP_FLOW_PORT:      "vtap_flow_port",
 	VTAP_FLOW_EDGE:      "vtap_flow_edge",
 	VTAP_FLOW_EDGE_PORT: "vtap_flow_edge_port",
-	VTAP_PACKET:         "vtap_packet",
-	VTAP_PACKET_EDGE:    "vtap_packet_edge",
 
-	VTAP_WAN:      "vtap_wan",
-	VTAP_WAN_PORT: "vtap_wan_port",
-	VTAP_ACL:      "vtap_acl",
+	VTAP_ACL: "vtap_acl",
 }
 
 func MetricsDBNameToID(name string) MetricsDBID {
@@ -513,10 +397,6 @@ var metricsDBCodes = []Code{
 	VTAP_FLOW_PORT:      BaseCode | BasePortCode | Direction,
 	VTAP_FLOW_EDGE:      BasePathCode | Protocol | TAPPort,
 	VTAP_FLOW_EDGE_PORT: BasePathCode | BasePortCode | TAPPort,
-	VTAP_PACKET:         BaseCode | Direction | TagType | TagValue,
-	VTAP_PACKET_EDGE:    BasePathCode | TagType | TagValue,
-	VTAP_WAN:            BaseCode | Direction | Protocol | TagType | TagValue,
-	VTAP_WAN_PORT:       BaseCode | BasePortCode | Direction | TagType | TagValue,
 	VTAP_ACL:            ACLGID | TagType | TagValue | VTAPID,
 }
 
@@ -824,39 +704,9 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",tag_type=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagType), 10))
 		switch t.TagType {
-		case TAG_TYPE_PROVINCE:
-			offset += copy(b[offset:], ",tag_value=")
-			offset += copy(b[offset:], geo.DecodeRegion(uint8(t.TagValue)))
-		// offset += copy(b[offset:], ",isp=")
-		// offset += copy(b[offset:], geo.DecodeISP(t.ISP))
-		// offset += copy(b[offset:], ",country=")
-		// offset += copy(b[offset:], geo.DecodeCountry(t.Country))
-		case TAG_TYPE_TCP_FLAG:
-			offset += copy(b[offset:], ",tag_value=")
-			offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagValue), 10))
-		case TAG_TYPE_CAST_TYPE:
-			switch CastTypeEnum(t.TagValue) {
-			case BROADCAST:
-				offset += copy(b[offset:], ",tag_value=broadcast")
-			case MULTICAST:
-				offset += copy(b[offset:], ",tag_value=multicast")
-			case UNICAST:
-				offset += copy(b[offset:], ",tag_value=unicast")
-			default:
-				offset += copy(b[offset:], ",tag_value=unknown")
-			}
 		case TAG_TYPE_TUNNEL_IP_ID:
 			offset += copy(b[offset:], ",tag_value=")
 			offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagValue), 10))
-		case TAG_TYPE_TTL:
-			fallthrough
-		case TAG_TYPE_PACKET_SIZE:
-			offset += copy(b[offset:], ",tag_value=")
-			if t.TagValue < uint16(MAX_PACKET_SIZE) && t.TagValue >= uint16(TTL_1) {
-				offset += copy(b[offset:], TTL_PACKET_SIZE[t.TagValue])
-			} else {
-				offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagValue), 10))
-			}
 		}
 	}
 	if t.Code&TAPPort != 0 {
@@ -1401,49 +1251,9 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
 		}
 
 		switch t.TagType {
-		case TAG_TYPE_PROVINCE:
-			if err := block.WriteString(geo.DecodeRegion(uint8(t.TagValue))); err != nil {
-				return err
-			}
-		case TAG_TYPE_TCP_FLAG:
-			if err := block.WriteString(strconv.FormatUint(uint64(t.TagValue), 10)); err != nil {
-				return err
-			}
-		case TAG_TYPE_CAST_TYPE:
-			switch CastTypeEnum(t.TagValue) {
-			case BROADCAST:
-				if err := block.WriteString("broadcast"); err != nil {
-					return err
-				}
-			case MULTICAST:
-				if err := block.WriteString("multicast"); err != nil {
-					return err
-				}
-			case UNICAST:
-				if err := block.WriteString("unicast"); err != nil {
-					return err
-				}
-			default:
-				if err := block.WriteString("unknown"); err != nil {
-					return err
-				}
-			}
 		case TAG_TYPE_TUNNEL_IP_ID:
 			if err := block.WriteString(strconv.FormatUint(uint64(t.TagValue), 10)); err != nil {
 				return err
-			}
-		case TAG_TYPE_TTL:
-			fallthrough
-		case TAG_TYPE_PACKET_SIZE:
-			if t.TagValue < uint16(MAX_PACKET_SIZE) && t.TagValue >= uint16(TTL_1) {
-				if err := block.WriteString(TTL_PACKET_SIZE[t.TagValue]); err != nil {
-					return err
-				}
-
-			} else {
-				if err := block.WriteString(strconv.FormatUint(uint64(t.TagValue), 10)); err != nil {
-					return err
-				}
 			}
 		}
 	}

@@ -10,7 +10,6 @@ import (
 	"github.com/google/gopacket/layers"
 	"gitlab.yunshan.net/yunshan/droplet-libs/app"
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
-	"gitlab.yunshan.net/yunshan/droplet-libs/geo"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 )
 
@@ -160,28 +159,7 @@ func (t *MiniTag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",tag_type=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagType), 10))
 		switch t.TagType {
-		case TAG_TYPE_PROVINCE:
-			offset += copy(b[offset:], ",tag_value=")
-			offset += copy(b[offset:], geo.DecodeRegion(uint8(t.TagValue)))
-		case TAG_TYPE_TCP_FLAG:
-			offset += copy(b[offset:], ",tag_value=")
-			offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagValue), 10))
-		case TAG_TYPE_CAST_TYPE:
-			switch CastTypeEnum(t.TagValue) {
-			case BROADCAST:
-				offset += copy(b[offset:], ",tag_value=broadcast")
-			case MULTICAST:
-				offset += copy(b[offset:], ",tag_value=multicast")
-			case UNICAST:
-				offset += copy(b[offset:], ",tag_value=unicast")
-			default:
-				offset += copy(b[offset:], ",tag_value=unknown")
-			}
 		case TAG_TYPE_TUNNEL_IP_ID:
-			fallthrough
-		case TAG_TYPE_TTL:
-			fallthrough
-		case TAG_TYPE_PACKET_SIZE:
 			offset += copy(b[offset:], ",tag_value=")
 			offset += copy(b[offset:], strconv.FormatUint(uint64(t.TagValue), 10))
 		}
