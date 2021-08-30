@@ -11,8 +11,8 @@ const (
 const (
 	FLOW_SECOND_ID uint8 = iota
 	FLOW_ID
-	GEO_ID
-	PACKET_ID
+	_      // GEO_ID，已删除
+	_      // PACKET_ID，已删除
 	ACL_ID // 目前meter的ACL_ID和PACKET_ID内容一致
 
 	MAX_APP_ID
