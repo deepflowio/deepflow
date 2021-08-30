@@ -53,7 +53,6 @@ type Config struct {
 	Pcap                      PCapConfig     `yaml:"pcap"`
 	DisableSecondWrite        bool           `yaml:"disable-second-write"`
 	DisableSecondWriteReplica bool           `yaml:"disable-second-write-replica"`
-	DisableVtapPacket         bool           `yaml:"disable-vtap-packet"`
 	ControllerIPs             []string       `yaml:"controller-ips"`
 	ControllerPort            int            `yaml:"controller-port"`
 	UnmarshallQueueCount      int            `yaml:"unmarshall-queue-count"`
