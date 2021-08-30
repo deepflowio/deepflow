@@ -35,14 +35,14 @@ var ColumnRename572 = []*ColumnRename{
 	&ColumnRename{
 		Db:            "flow_log",
 		Table:         "l4_flow_log",
-		OldColumnName: "retan_tx",
-		NewColumnName: "retran_tx",
+		OldColumnName: "retans_tx",
+		NewColumnName: "retrans_tx",
 	},
 	&ColumnRename{
 		Db:            "flow_log",
 		Table:         "l4_flow_log_local",
-		OldColumnName: "retan_tx",
-		NewColumnName: "retran_tx",
+		OldColumnName: "retans_tx",
+		NewColumnName: "retrans_tx",
 	},
 }
 
