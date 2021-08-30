@@ -19,18 +19,12 @@ const (
 	VTAP_FLOW_PORT
 	VTAP_FLOW_EDGE
 	VTAP_FLOW_EDGE_PORT
-	VTAP_PACKET
-	VTAP_PACKET_EDGE
 	VTAP_ACL
-	VTAP_WAN
-	VTAP_WAN_PORT
 
 	VTAP_FLOW_1S
 	VTAP_FLOW_PORT_1S
 	VTAP_FLOW_EDGE_1S
 	VTAP_FLOW_EDGE_PORT_1S
-	VTAP_PACKET_1S
-	VTAP_PACKET_EDGE_1S
 
 	MAX_INDEX
 )
@@ -101,7 +95,7 @@ func (rd *RozeDocument) DatabaseIndex() int {
 	if tag, ok := rd.Document.Tag.(*zerodoc.Tag); ok {
 		suffixID = tag.DatabaseSuffixID()
 	}
-	if suffixID == zerodoc.SUFFIX_ACL && rd.Document.Meter.ID() == zerodoc.PACKET_ID {
+	if suffixID == zerodoc.SUFFIX_ACL && rd.Document.Meter.ID() == zerodoc.ACL_ID {
 		return VTAP_ACL
 	}
 
@@ -115,17 +109,6 @@ func (rd *RozeDocument) DatabaseIndex() int {
 			index = VTAP_FLOW_PORT
 		} else if suffixID == zerodoc.SUFFIX_EDGE_PORT {
 			index = VTAP_FLOW_EDGE_PORT
-		}
-	case zerodoc.GEO_ID:
-		index = VTAP_WAN
-		if suffixID == zerodoc.SUFFIX_PORT {
-			index = VTAP_WAN_PORT
-		}
-		return index
-	case zerodoc.PACKET_ID:
-		index = VTAP_PACKET
-		if suffixID == zerodoc.SUFFIX_EDGE {
-			index = VTAP_PACKET_EDGE
 		}
 	}
 
@@ -148,7 +131,7 @@ func (rd *RozeDocument) Database() string {
 	}
 
 	// 对于 vtap_packet_acl的数据写入 vtap_acl
-	if suffixID == zerodoc.SUFFIX_ACL && rd.Document.Meter.ID() == zerodoc.PACKET_ID {
+	if suffixID == zerodoc.SUFFIX_ACL && rd.Document.Meter.ID() == zerodoc.ACL_ID {
 		rd.database = zerodoc.MeterVTAPNames[zerodoc.ACL_ID]
 	} else {
 		rd.database = rd.AppName() + suffix

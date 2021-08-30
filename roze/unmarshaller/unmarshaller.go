@@ -52,13 +52,7 @@ type Counter struct {
 	FlowEdge1sCount     int64 `statsd:"vtap-flow-edge-1s"`
 	FlowEdgePortCount   int64 `statsd:"vtap-flow-edge-port"`
 	FlowEdgePort1sCount int64 `statsd:"vtap-flow-edge-port-1s"`
-	PacketCount         int64 `statsd:"vtap-packet"`
-	Packet1sCount       int64 `statsd:"vtap-packet-1s"`
-	PacketEdgeCount     int64 `statsd:"vtap-packet-edge"`
-	PacketEdge1sCount   int64 `statsd:"vtap-packet-edge-1s"`
 	AclCount            int64 `statsd:"vtap-acl"`
-	WanCount            int64 `statsd:"vtap-wan"`
-	WanPortCount        int64 `statsd:"vtap-wan-port"`
 	OtherCount          int64 `statsd:"other-db-count"`
 }
 
@@ -66,7 +60,6 @@ type Unmarshaller struct {
 	index              int
 	platformData       *grpc.PlatformInfoTable
 	disableSecondWrite bool
-	disableVtapPacket  bool
 	unmarshallQueue    queue.QueueReader
 	dbwriter           *dbwriter.DbWriter
 	queueBatchCache    QueueCache
@@ -75,12 +68,11 @@ type Unmarshaller struct {
 	utils.Closable
 }
 
-func NewUnmarshaller(index int, platformData *grpc.PlatformInfoTable, disableSecondWrite, disableVtapPacket bool, unmarshallQueue queue.QueueReader, dbwriter *dbwriter.DbWriter) *Unmarshaller {
+func NewUnmarshaller(index int, platformData *grpc.PlatformInfoTable, disableSecondWrite bool, unmarshallQueue queue.QueueReader, dbwriter *dbwriter.DbWriter) *Unmarshaller {
 	return &Unmarshaller{
 		index:              index,
 		platformData:       platformData,
 		disableSecondWrite: disableSecondWrite,
-		disableVtapPacket:  disableVtapPacket,
 		unmarshallQueue:    unmarshallQueue,
 		counter:            &Counter{MaxDelay: -3600, MinDelay: 3600},
 		dbwriter:           dbwriter,
@@ -137,13 +129,7 @@ func (u *Unmarshaller) GetCounter() interface{} {
 	counter.FlowEdge1sCount, u.dbCounter[msg.VTAP_FLOW_EDGE_1S] = u.dbCounter[msg.VTAP_FLOW_EDGE_1S], 0
 	counter.FlowEdgePortCount, u.dbCounter[msg.VTAP_FLOW_EDGE_PORT] = u.dbCounter[msg.VTAP_FLOW_EDGE_PORT], 0
 	counter.FlowEdgePort1sCount, u.dbCounter[msg.VTAP_FLOW_EDGE_PORT_1S] = u.dbCounter[msg.VTAP_FLOW_EDGE_PORT_1S], 0
-	counter.PacketCount, u.dbCounter[msg.VTAP_PACKET] = u.dbCounter[msg.VTAP_PACKET], 0
-	counter.Packet1sCount, u.dbCounter[msg.VTAP_PACKET_1S] = u.dbCounter[msg.VTAP_PACKET_1S], 0
-	counter.PacketEdgeCount, u.dbCounter[msg.VTAP_PACKET_EDGE] = u.dbCounter[msg.VTAP_PACKET_EDGE], 0
-	counter.PacketEdge1sCount, u.dbCounter[msg.VTAP_PACKET_EDGE_1S] = u.dbCounter[msg.VTAP_PACKET_EDGE_1S], 0
 	counter.AclCount, u.dbCounter[msg.VTAP_ACL] = u.dbCounter[msg.VTAP_ACL], 0
-	counter.WanCount, u.dbCounter[msg.VTAP_WAN] = u.dbCounter[msg.VTAP_WAN], 0
-	counter.WanPortCount, u.dbCounter[msg.VTAP_WAN_PORT] = u.dbCounter[msg.VTAP_WAN_PORT], 0
 	counter.OtherCount, u.dbCounter[msg.INVALID_INDEX] = u.dbCounter[msg.INVALID_INDEX], 0
 
 	return counter
@@ -252,13 +238,6 @@ func (u *Unmarshaller) QueueProcess() {
 					}
 					DBIndex := rd.DatabaseIndex()
 					u.dbCounter[DBIndex]++
-
-					if u.disableVtapPacket &&
-						(DBIndex == msg.VTAP_PACKET ||
-							DBIndex == msg.VTAP_PACKET_EDGE) {
-						msg.ReleaseRozeDocument(rd)
-						continue
-					}
 
 					u.putStoreQueue(rd)
 				}

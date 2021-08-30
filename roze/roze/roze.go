@@ -70,7 +70,7 @@ func NewRoze(cfg *config.Config, recv *receiver.Receiver) (*Roze, error) {
 		} else {
 			roze.platformDatas[i] = grpc.NewPlatformInfoTable(controllers, cfg.ControllerPort, "roze-"+strconv.Itoa(i), "", nil)
 		}
-		roze.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, roze.platformDatas[i], cfg.DisableSecondWrite, cfg.DisableVtapPacket, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), roze.dbwriter)
+		roze.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, roze.platformDatas[i], cfg.DisableSecondWrite, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), roze.dbwriter)
 	}
 
 	return &roze, nil

@@ -30,7 +30,7 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 	t.SetID("") // 由于需要修改Tag增删Field，清空ID避免字段脏
 
 	// vtap_acl 分钟级数据不用填充
-	if doc.Meter.ID() == zerodoc.PACKET_ID &&
+	if doc.Meter.ID() == zerodoc.ACL_ID &&
 		t.DatabaseSuffixID() == 1 { // 只有acl后缀
 		return rd
 	}
