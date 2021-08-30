@@ -8,7 +8,7 @@ import (
 )
 
 func TestMeterReverse(t *testing.T) {
-	meters := []app.Meter{&FlowMeter{}, &GeoMeter{}, &UsageMeter{}}
+	meters := []app.Meter{&FlowMeter{}, &UsageMeter{}}
 	interestedFieldPairs := [][]string{
 		{"PacketTx", "PacketRx"},
 		{"ByteTx", "ByteRx"},
