@@ -123,18 +123,14 @@ func getDFDiskInfos(connect *sql.DB) ([]*DiskInfo, bool, error) {
 }
 
 func (m *Monitor) isDiskNeedClean(diskInfo *DiskInfo) bool {
-	if diskInfo.totalSpace > 0 {
-		usage := ((diskInfo.totalSpace-diskInfo.freeSpace)*100 + diskInfo.totalSpace - 1) / diskInfo.totalSpace
-		if usage > uint64(m.usedPercentThreshold) {
-			log.Infof("disk usage is over %d. disk name: %s, path: %s, total space: %d, free space: %d, usage: %d",
-				m.usedPercentThreshold, diskInfo.name, diskInfo.path, diskInfo.totalSpace, diskInfo.freeSpace, usage)
-			return true
-		}
+	if diskInfo.totalSpace == 0 {
+		return false
 	}
-	if diskInfo.totalSpace > uint64(m.freeSpaceThreshold) &&
-		diskInfo.freeSpace < uint64(m.freeSpaceThreshold) {
-		log.Infof("free space is %d < %dG. disk name: %s, path: %s, total space: %d, free space: %d",
-			diskInfo.freeSpace, m.freeSpaceThreshold>>30, diskInfo.name, diskInfo.path, diskInfo.totalSpace, diskInfo.freeSpace)
+
+	usage := ((diskInfo.totalSpace-diskInfo.freeSpace)*100 + diskInfo.totalSpace - 1) / diskInfo.totalSpace
+	if usage > uint64(m.usedPercentThreshold) && diskInfo.freeSpace < uint64(m.freeSpaceThreshold) {
+		log.Infof("disk usage is over %d. disk name: %s, path: %s, total space: %d, free space: %d, usage: %d",
+			m.usedPercentThreshold, diskInfo.name, diskInfo.path, diskInfo.totalSpace, diskInfo.freeSpace, usage)
 		return true
 	}
 	return false

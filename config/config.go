@@ -16,7 +16,7 @@ var log = logging.MustGetLogger("config")
 const (
 	DefaultCheckInterval   = 600 // clickhouse是异步删除
 	DefaultDiskUsedPercent = 90
-	DefaultDiskFreeSpace   = 10
+	DefaultDiskFreeSpace   = 50
 	DefaultCKDBS3Volume    = "vol_s3"
 	DefaultCKDBS3TTLTimes  = 3 // 对象存储的保留时长是本地存储的3倍
 )
