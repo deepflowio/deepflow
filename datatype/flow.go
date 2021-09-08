@@ -804,6 +804,8 @@ func (f *FlowPerfStats) Encode(encoder *codec.SimpleEncoder) {
 }
 
 func (f *FlowPerfStats) SequentialMerge(rhs *FlowPerfStats) {
+	f.L4Protocol = rhs.L4Protocol
+	f.L7Protocol = rhs.L7Protocol
 	f.TCPPerfStats.SequentialMerge(&rhs.TCPPerfStats)
 	f.L7PerfStats.SequentialMerge(&rhs.L7PerfStats)
 }
