@@ -460,6 +460,7 @@ message GenesisSyncRequest {
 
     optional string source_ip = 3;
     optional uint32 vtap_id = 4;
+    optional string kubernetes_cluster_id = 5; // 仅对容器类型的采集器有意义
 
     optional string nat_ip = 6;
 }
