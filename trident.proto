@@ -283,12 +283,21 @@ message Group {
     optional uint32 business_id = 7;
 }
 
+enum ServiceType {
+    POD_SERVICE = 0;
+    LB_SERVICE = 1;
+    NAT_SERVICE = 2;
+    RG_SERVICE = 3;
+}
+
 message Service {
     optional uint32 epc_id = 2 [default = 0];
     repeated string ips = 5;
     repeated string ip_ranges = 6;
     optional uint32 protocol = 7 [default = 256];
     optional string server_ports = 8; // 格式: 22,80,22-80
+    optional ServiceType type = 9;
+    optional uint32 id = 10;
 }
 
 message Groups {
