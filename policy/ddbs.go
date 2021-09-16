@@ -8,13 +8,13 @@ import (
 )
 
 type Table6Item struct {
-	match, mask MatchedField6
+	match, mask *MatchedField6
 
 	policy *PolicyData
 }
 
 type TableItem struct {
-	match, mask MatchedField
+	match, mask *MatchedField
 
 	policy *PolicyData
 }
@@ -214,8 +214,8 @@ func (d *Ddbs) generateMaskVector(acls []*Acl, isIpv6 bool) {
 		d.maskVector6.SetBits(vectorBits...)
 		d.vector6Bits = vectorBits
 	} else {
-		d.mask6MinBit = vectorBits[0]
-		d.mask6MaxBit = vectorBits[vectorSize-1]
+		d.maskMinBit = vectorBits[0]
+		d.maskMaxBit = vectorBits[vectorSize-1]
 		d.maskVector.SetBits(vectorBits...)
 		d.vectorBits = vectorBits
 	}
@@ -224,10 +224,11 @@ func (d *Ddbs) generateMaskVector(acls []*Acl, isIpv6 bool) {
 func (d *Ddbs) generateVectorTable6(acls []*Acl) {
 	table := &[TABLE_SIZE][]*Table6Item{}
 	for _, acl := range acls {
-		for i, match := range acl.AllMatched6 {
+		for i := range acl.AllMatched6 {
+			match := &acl.AllMatched6[i]
 			index := match.GetAllTableIndex(&d.maskVector6, &acl.AllMatched6Mask[i], d.mask6MinBit, d.mask6MaxBit, d.vector6Bits)
 			for _, index := range index {
-				table[index] = append(table[index], &Table6Item{match, acl.AllMatched6Mask[i], &acl.policy})
+				table[index] = append(table[index], &Table6Item{match, &(acl.AllMatched6Mask[i]), &acl.policy})
 			}
 		}
 	}
@@ -237,10 +238,11 @@ func (d *Ddbs) generateVectorTable6(acls []*Acl) {
 func (d *Ddbs) generateVectorTable(acls []*Acl) {
 	table := &[TABLE_SIZE][]*TableItem{}
 	for _, acl := range acls {
-		for i, match := range acl.AllMatched {
+		for i := range acl.AllMatched {
+			match := &acl.AllMatched[i]
 			index := match.GetAllTableIndex(&d.maskVector, &acl.AllMatchedMask[i], d.maskMinBit, d.maskMaxBit, d.vectorBits)
 			for _, index := range index {
-				table[index] = append(table[index], &TableItem{match, acl.AllMatchedMask[i], &acl.policy})
+				table[index] = append(table[index], &TableItem{match, &(acl.AllMatchedMask[i]), &acl.policy})
 			}
 		}
 	}
@@ -286,7 +288,7 @@ func (d *Ddbs) mergePolicy(packetEndpointData *EndpointData, packet *LookupKey, 
 func (d *Ddbs) getPolicyFromTable(key *MatchedField, direction DirectionType, portPolicy *PolicyData) *PolicyData {
 	index := key.GetTableIndex(&d.maskVector, d.maskMinBit, d.maskMaxBit)
 	for _, item := range d.table[index] {
-		if result := key.And(&item.mask); result.Equal(&item.match) {
+		if result := key.And(item.mask); result.Equal(item.match) {
 			if portPolicy == INVALID_POLICY_DATA {
 				portPolicy = new(PolicyData)
 			}
@@ -300,7 +302,7 @@ func (d *Ddbs) getPolicyFromTable(key *MatchedField, direction DirectionType, po
 func (d *Ddbs) getPolicyFromTable6(key *MatchedField6, direction DirectionType, portPolicy *PolicyData) *PolicyData {
 	index := key.GetTableIndex(&d.maskVector6, d.mask6MinBit, d.mask6MaxBit)
 	for _, item := range d.table6[index] {
-		if result := key.And(&item.mask); result.Equal(&item.match) {
+		if result := key.And(item.mask); result.Equal(item.match) {
 			if portPolicy == INVALID_POLICY_DATA {
 				portPolicy = new(PolicyData)
 			}
