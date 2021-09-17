@@ -13,6 +13,7 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 	"gitlab.yunshan.net/yunshan/droplet/stream/geo"
+	"gitlab.yunshan.net/yunshan/message/trident"
 )
 
 const (
@@ -290,6 +291,8 @@ type KnowledgeGraph struct {
 	GroupIDs1     []uint16 `json:"group_ids_1"`
 	BusinessIDs0  []uint16 `json:"business_ids_0"`
 	BusinessIDs1  []uint16 `json:"business_ids_1"`
+	ServiceID0    uint32   `json:"service_id_0"`
+	ServiceID1    uint32   `json:"service_id_1"`
 }
 
 var KnowledgeGraphColumns = []*ckdb.Column{
@@ -324,6 +327,8 @@ var KnowledgeGraphColumns = []*ckdb.Column{
 	ckdb.NewColumn("group_ids_1", ckdb.ArrayUInt16),
 	ckdb.NewColumn("business_ids_0", ckdb.ArrayUInt16),
 	ckdb.NewColumn("business_ids_1", ckdb.ArrayUInt16),
+	ckdb.NewColumn("service_id_0", ckdb.UInt32),
+	ckdb.NewColumn("service_id_1", ckdb.UInt32),
 }
 
 func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) error {
@@ -415,6 +420,12 @@ func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteArray(k.BusinessIDs1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(k.ServiceID0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(k.ServiceID1); err != nil {
 		return err
 	}
 	return nil
@@ -849,9 +860,31 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool, platformData 
 	if isIPV6 {
 		k.GroupIDs0, k.BusinessIDs0 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID0), f.IP6Src)
 		k.GroupIDs1, k.BusinessIDs1 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID1), f.IP6Dst)
+		// 0端如果是clusterIP或后端podIP需要匹配service_id
+		if k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
+			k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD) {
+			_, k.ServiceID0 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID0), f.IP6Src, f.Proto, 0)
+		}
+		// 1端如果是NodeIP,clusterIP或后端podIP需要匹配service_id
+		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
+			k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD) ||
+			k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_NODE) {
+			_, k.ServiceID1 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID1), f.IP6Dst, f.Proto, f.PortDst)
+		}
 	} else {
 		k.GroupIDs0, k.BusinessIDs0 = platformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID0), f.IPSrc)
 		k.GroupIDs1, k.BusinessIDs1 = platformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID1), f.IPDst)
+		// 0端如果是clusterIP或后端podIP需要匹配service_id
+		if k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
+			k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD) {
+			_, k.ServiceID0 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID0), f.IPSrc, f.Proto, 0)
+		}
+		// 1端如果是NodeIP,clusterIP或后端podIP需要匹配service_id
+		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
+			k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD) ||
+			k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_NODE) {
+			_, k.ServiceID1 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID1), f.IPDst, f.Proto, f.PortDst)
+		}
 	}
 }
 
