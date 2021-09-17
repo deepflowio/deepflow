@@ -61,7 +61,7 @@ const (
 	DDBS TableID = iota
 )
 
-type TableCreator func(queueCount int, mapSize uint32, fastPathDisable bool) TableOperator
+type TableCreator func(queueCount, level int, mapSize uint32, fastPathDisable bool) TableOperator
 
 var tableCreator = [...]TableCreator{
 	DDBS: NewDdbs,
@@ -124,7 +124,7 @@ func getAvailableMapSize(queueCount int, mapSize uint32) uint32 {
 	return availableMapSize
 }
 
-func NewPolicyTable(queueCount int, mapSize uint32, fastPathDisable bool, ids ...TableID) *PolicyTable { // 传入Protobuf结构体指针
+func NewPolicyTable(queueCount, level int, mapSize uint32, fastPathDisable bool, ids ...TableID) *PolicyTable { // 传入Protobuf结构体指针
 	availableMapSize := getAvailableMapSize(queueCount, mapSize)
 	policyTable := &PolicyTable{
 		cloudPlatformLabeler: NewCloudPlatformLabeler(queueCount, availableMapSize),
@@ -135,7 +135,7 @@ func NewPolicyTable(queueCount int, mapSize uint32, fastPathDisable bool, ids ..
 	if len(ids) > 0 {
 		id = ids[0]
 	}
-	policyTable.operator = tableCreator[id](queueCount, mapSize, fastPathDisable)
+	policyTable.operator = tableCreator[id](queueCount, level, mapSize, fastPathDisable)
 	policyTable.operator.SetCloudPlatform(policyTable.cloudPlatformLabeler)
 	return policyTable
 }

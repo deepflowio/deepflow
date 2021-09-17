@@ -25,6 +25,11 @@ const (
 	TABLE_SIZE           = 1 << MASK_VECTOR_MAX_SIZE
 )
 
+const (
+	_LEVEL_MIN = 1
+	_LEVEL_MAX = 16
+)
+
 type Ddbs struct {
 	FastPath
 	InterestTable
@@ -32,6 +37,7 @@ type Ddbs struct {
 
 	FastPathDisable bool
 	queueCount      int
+	level           int
 
 	RawAcls []*Acl
 
@@ -62,9 +68,13 @@ func getAclId(ids ...uint32) uint32 {
 	return 0
 }
 
-func NewDdbs(queueCount int, mapSize uint32, fastPathDisable bool) TableOperator {
+func NewDdbs(queueCount, level int, mapSize uint32, fastPathDisable bool) TableOperator {
+	if level < _LEVEL_MIN || level > _LEVEL_MAX {
+		panic("NewDdbs invalid level.")
+	}
 	ddbs := new(Ddbs)
 	ddbs.queueCount = queueCount
+	ddbs.level = level
 	ddbs.FastPathDisable = fastPathDisable
 	ddbs.groupIpMap = make(map[uint16][]ipSegment, 1000)
 	ddbs.InterestTable.Init()
@@ -113,7 +123,7 @@ func (d *Ddbs) getVectorSize(acls []*Acl) int {
 	}
 	vectorSize := 0
 	for vectorSize = MASK_VECTOR_MAX_SIZE; vectorSize > MASK_VECTOR_MIN_SIZE; vectorSize-- {
-		if matchedSum>>2 >= 1<<vectorSize {
+		if matchedSum>>d.level >= 1<<vectorSize {
 			break
 		}
 	}
@@ -226,9 +236,14 @@ func (d *Ddbs) generateVectorTable6(acls []*Acl) {
 	for _, acl := range acls {
 		for i := range acl.AllMatched6 {
 			match := &acl.AllMatched6[i]
-			index := match.GetAllTableIndex(&d.maskVector6, &acl.AllMatched6Mask[i], d.mask6MinBit, d.mask6MaxBit, d.vector6Bits)
-			for _, index := range index {
-				table[index] = append(table[index], &Table6Item{match, &(acl.AllMatched6Mask[i]), &acl.policy})
+			indexs := match.GetAllTableIndex(&d.maskVector6, &acl.AllMatched6Mask[i], d.mask6MinBit, d.mask6MaxBit, d.vector6Bits)
+			items := make([]Table6Item, len(indexs))
+			for j, index := range indexs {
+				item := &items[j]
+				item.match = match
+				item.mask = &(acl.AllMatched6Mask[i])
+				item.policy = &acl.policy
+				table[index] = append(table[index], item)
 			}
 		}
 	}
@@ -240,9 +255,14 @@ func (d *Ddbs) generateVectorTable(acls []*Acl) {
 	for _, acl := range acls {
 		for i := range acl.AllMatched {
 			match := &acl.AllMatched[i]
-			index := match.GetAllTableIndex(&d.maskVector, &acl.AllMatchedMask[i], d.maskMinBit, d.maskMaxBit, d.vectorBits)
-			for _, index := range index {
-				table[index] = append(table[index], &TableItem{match, &(acl.AllMatchedMask[i]), &acl.policy})
+			indexs := match.GetAllTableIndex(&d.maskVector, &acl.AllMatchedMask[i], d.maskMinBit, d.maskMaxBit, d.vectorBits)
+			items := make([]TableItem, len(indexs))
+			for j, index := range indexs {
+				item := &items[j]
+				item.match = match
+				item.mask = &(acl.AllMatchedMask[i])
+				item.policy = &acl.policy
+				table[index] = append(table[index], item)
 			}
 		}
 	}
