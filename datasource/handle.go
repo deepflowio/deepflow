@@ -225,7 +225,11 @@ func (m *DatasourceManager) makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrS
 			if !stringSliceHas(orderKeys, p.Name) {
 				orderKeys = append(orderKeys, p.Name)
 			}
-			columns = append(columns, fmt.Sprintf("%s %s %s", p.Name, p.Type.String(), codec))
+			comment := ""
+			if p.Comment != "" {
+				comment = fmt.Sprintf("COMMENT '%s'", p.Comment)
+			}
+			columns = append(columns, fmt.Sprintf("%s %s %s %s", p.Name, p.Type.String(), comment, codec))
 		} else {
 			columns = append(columns, getColumnString(p, aggrSummable, aggrUnsummable, AGG))
 		}
@@ -254,7 +258,7 @@ func (m *DatasourceManager) makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrS
 		ckdb.DF_STORAGE_POLICY)
 }
 
-func makeMVTableCreateSQL(t *ckdb.Table, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggrTimeFunc ckdb.TimeFuncType) string {
+func MakeMVTableCreateSQL(t *ckdb.Table, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggrTimeFunc ckdb.TimeFuncType) string {
 	tableMv := getMetricsTableName(t.ID, dstTable, MV)
 	tableAgg := getMetricsTableName(t.ID, dstTable, AGG)
 
@@ -295,7 +299,7 @@ func makeMVTableCreateSQL(t *ckdb.Table, baseTable, dstTable, aggrSummable, aggr
 		strings.Join(t.OrderKeys, ","))
 }
 
-func makeCreateTableLocal(t *ckdb.Table, baseTable, dstTable, aggrSummable, aggrUnsummable string) string {
+func MakeCreateTableLocal(t *ckdb.Table, baseTable, dstTable, aggrSummable, aggrUnsummable string) string {
 	tableAgg := getMetricsTableName(t.ID, dstTable, AGG)
 	tableLocal := getMetricsTableName(t.ID, dstTable, LOCAL)
 
@@ -327,7 +331,7 @@ GROUP BY (%s)`,
 		strings.Join(groupKeys, ","))
 }
 
-func makeGlobalTableCreateSQL(t *ckdb.Table, dstTable string) string {
+func MakeGlobalTableCreateSQL(t *ckdb.Table, dstTable string) string {
 	tableGlobal := getMetricsTableName(t.ID, dstTable, GLOBAL)
 	tableLocal := getMetricsTableName(t.ID, dstTable, LOCAL)
 	engine := fmt.Sprintf(ckdb.Distributed.String(), t.Cluster, t.Database, dstTable+"_"+LOCAL.String())
@@ -356,9 +360,9 @@ func (m *DatasourceManager) createTableMV(ck clickhouse.Clickhouse, dbId zerodoc
 
 	commands := []string{
 		m.makeAggTableCreateSQL(table, dstTable, aggrSummable, aggrUnsummable, partitionTime, duration),
-		makeMVTableCreateSQL(table, baseTable, dstTable, aggrSummable, aggrUnsummable, aggTime),
-		makeCreateTableLocal(table, baseTable, dstTable, aggrSummable, aggrUnsummable),
-		makeGlobalTableCreateSQL(table, dstTable),
+		MakeMVTableCreateSQL(table, baseTable, dstTable, aggrSummable, aggrUnsummable, aggTime),
+		MakeCreateTableLocal(table, baseTable, dstTable, aggrSummable, aggrUnsummable),
+		MakeGlobalTableCreateSQL(table, dstTable),
 	}
 	for _, cmd := range commands {
 		log.Info(cmd)
