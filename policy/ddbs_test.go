@@ -1289,7 +1289,7 @@ func TestDdbsProtocol(t *testing.T) {
 
 func TestDdbsCidr(t *testing.T) {
 	// 创建 policyTable
-	table := NewPolicyTable(1, 1024, false, DDBS)
+	table := NewPolicyTable(1, 2, 1024, false, DDBS)
 	cidr := generateCidr(10, 1, "192.168.2.12/24")
 	table.UpdateCidrs([]*Cidr{cidr})
 

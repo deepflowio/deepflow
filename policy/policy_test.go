@@ -406,7 +406,7 @@ func generatePlatformData(policy *PolicyTable) {
 
 // 生成特定平台和资源组信息
 func generatePolicyTable(ids ...TableID) *PolicyTable {
-	policy := NewPolicyTable(1, 1024, false, ids...)
+	policy := NewPolicyTable(1, 2, 1024, false, ids...)
 	datas := make([]PlatformData, 0, 2)
 	ipGroups := make([]*IpGroupData, 0, 3)
 	connections := make([]*PeerConnection, 0, 8)
