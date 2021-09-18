@@ -33,6 +33,7 @@ const (
 	PodClusterID
 	BusinessIDs
 	GroupIDs
+	ServiceID // 1<<15 后续不能再添加了
 )
 
 const (
@@ -51,6 +52,7 @@ const (
 	PodClusterIDPath
 	BusinessIDsPath
 	GroupIDsPath
+	ServiceIDPath // 1<<31
 )
 
 const (
@@ -217,6 +219,7 @@ type Field struct {
 	PodClusterID uint16
 	BusinessIDs  []uint16
 	GroupIDs     []uint16
+	ServiceID    uint32
 
 	MAC1          uint64
 	IP61          net.IP // FIXME: 合并IP61和IP1
@@ -235,6 +238,7 @@ type Field struct {
 	PodClusterID1 uint16
 	BusinessIDs1  []uint16
 	GroupIDs1     []uint16
+	ServiceID1    uint32
 
 	ACLGID       uint16
 	Direction    DirectionEnum
@@ -381,8 +385,8 @@ func MetricsDBNameToID(name string) MetricsDBID {
 }
 
 const (
-	BaseCode     = AZID | HostID | IP | L3Device | L3EpcID | PodClusterID | PodGroupID | PodID | PodNodeID | PodNSID | RegionID | SubnetID | TAPType | VTAPID | BusinessIDs | GroupIDs
-	BasePathCode = AZIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | PodClusterIDPath | PodGroupIDPath | PodIDPath | PodNodeIDPath | PodNSIDPath | RegionIDPath | SubnetIDPath | TAPSide | TAPType | VTAPID | BusinessIDsPath | GroupIDsPath
+	BaseCode     = AZID | HostID | IP | L3Device | L3EpcID | PodClusterID | PodGroupID | PodID | PodNodeID | PodNSID | RegionID | SubnetID | TAPType | VTAPID | BusinessIDs | GroupIDs | ServiceID
+	BasePathCode = AZIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | PodClusterIDPath | PodGroupIDPath | PodIDPath | PodNodeIDPath | PodNSIDPath | RegionIDPath | SubnetIDPath | TAPSide | TAPType | VTAPID | BusinessIDsPath | GroupIDsPath | ServiceIDPath
 	BasePortCode = Protocol | ServerPort | IsKeyService
 )
 
@@ -684,6 +688,18 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ServerPort), 10))
 	}
 
+	if t.Code&ServiceID != 0 {
+		offset += copy(b[offset:], ",service_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ServiceID), 10))
+	}
+
+	if t.Code&ServiceIDPath != 0 {
+		offset += copy(b[offset:], ",service_id_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ServiceID), 10))
+		offset += copy(b[offset:], ",service_id_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ServiceID1), 10))
+	}
+
 	if t.Code&SubnetID != 0 {
 		offset += copy(b[offset:], ",subnet_id=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.SubnetID), 10))
@@ -903,6 +919,14 @@ func genTagColumns(code Code) []*ckdb.Column {
 	if code&RegionIDPath != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("region_id_0", ckdb.UInt16).SetComment("ip4/6_0对应的云平台区域ID"))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("region_id_1", ckdb.UInt16).SetComment("ip4/6_1对应的云平台区域ID"))
+	}
+
+	if code&ServiceID != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("service_id", ckdb.UInt32).SetComment("ip对应的服务ID"))
+	}
+	if code&ServiceIDPath != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("service_id_0", ckdb.UInt32).SetComment("ip4/6_0对应的服务ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("service_id_1", ckdb.UInt32).SetComment("ip4/6_1对应的服务ID"))
 	}
 
 	if code&ServerPort != 0 {
@@ -1220,6 +1244,21 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
 			return err
 		}
 	}
+	if code&ServiceID != 0 {
+		if err := block.WriteUInt32(t.ServiceID); err != nil {
+			return err
+		}
+	}
+	if code&ServiceIDPath != 0 {
+		if err := block.WriteUInt32(t.ServiceID); err != nil {
+			return err
+		}
+
+		if err := block.WriteUInt32(t.ServiceID1); err != nil {
+			return err
+		}
+	}
+
 	if code&ServerPort != 0 {
 		if err := block.WriteUInt16(t.ServerPort); err != nil {
 			return err
