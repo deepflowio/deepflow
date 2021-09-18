@@ -100,6 +100,7 @@ type PlatformInfoTable struct {
 	groupLabelerLogger   *logger.PrefixLogger
 	serviceLabelerLogger *logger.PrefixLogger
 	groupIDToBusiessID   []uint16
+	services             []api.GroupIDMap
 
 	*GrpcSession
 }
@@ -737,18 +738,36 @@ func (t *PlatformInfoTable) QueryIPv6GroupIDsAndBusinessIDs(l3EpcID int16, ipv6 
 	return groupIDs, t.groupIDsToBusnessIDs(groupIDs)
 }
 
-func (t *PlatformInfoTable) QueryIsKeyService(l3EpcID int16, ipv4 uint32, protocol layers.IPProtocol, serverPort uint16) bool {
+// is_key_service查询
+//   使用 epcid+ip+port 查询is_key_service
+// service_id 查询, 只支持查询pod_service类型的服务
+//   1，使用 epcid+clusterIP(device_type为POD_SERVICE) + port(可选) 查询
+//   2，使用 epcid+后端podIP(device_type为POD) + port(可选) 查询
+//   3，使用 epcid+nodeIP(device_type为POD_NODE)+port(必选) 查询
+func (t *PlatformInfoTable) QueryIsKeyServiceAndID(l3EpcID int16, ipv4 uint32, protocol layers.IPProtocol, serverPort uint16) (bool, uint32) {
 	if t.serviceLabeler == nil {
-		return false
+		return false, 0
 	}
-	return len(t.serviceLabeler.QueryServer(l3EpcID, ipv4, 0, protocol, serverPort)) > 0
+	serviceIdxs := t.serviceLabeler.QueryServer(l3EpcID, ipv4, 0, protocol, serverPort)
+	for _, i := range serviceIdxs {
+		if t.services[i].ServiceID > 0 {
+			return true, t.services[i].ServiceID
+		}
+	}
+	return len(serviceIdxs) > 0, 0
 }
 
-func (t *PlatformInfoTable) QueryIPv6IsKeyService(l3EpcID int16, ipv6 net.IP, protocol layers.IPProtocol, serverPort uint16) bool {
+func (t *PlatformInfoTable) QueryIPv6IsKeyServiceAndID(l3EpcID int16, ipv6 net.IP, protocol layers.IPProtocol, serverPort uint16) (bool, uint32) {
 	if t.serviceLabeler == nil {
-		return false
+		return false, 0
 	}
-	return len(t.serviceLabeler.QueryServerIPv6(l3EpcID, ipv6, 0, protocol, serverPort)) > 0
+	serviceIdxs := t.serviceLabeler.QueryServerIPv6(l3EpcID, ipv6, 0, protocol, serverPort)
+	for _, i := range serviceIdxs {
+		if t.services[i].ServiceID > 0 {
+			return true, t.services[i].ServiceID
+		}
+	}
+	return len(serviceIdxs) > 0, 0
 }
 
 func (t *PlatformInfoTable) updateGroupIDsAndBusinessIDs(response *trident.SyncResponse) bool {
@@ -784,17 +803,32 @@ func (t *PlatformInfoTable) updateGroupIDsAndBusinessIDs(response *trident.SyncR
 
 	services := make([]api.GroupIDMap, 0, len(groupsData.GetSvcs()))
 	for i, svc := range groupsData.GetSvcs() {
-		services = append(services, api.GroupIDMap{
+		groupIDMap := api.GroupIDMap{
 			GroupID:     uint16(i),
 			L3EpcID:     int32(svc.GetEpcId()),
 			CIDRs:       svc.GetIps(),
 			IPRanges:    svc.GetIpRanges(),
 			Protocol:    uint16(svc.GetProtocol()),
 			ServerPorts: svc.GetServerPorts(),
-		})
+			ServiceID:   svc.GetId(),
+		}
+
+		// 目前只支持pod的service查询service_id
+		if svc.GetType() != trident.ServiceType_POD_SERVICE {
+			groupIDMap.ServiceID = 0
+		} else {
+			// serverPorts 默认增加0端口，当只用vpc和ip时用0端口也能匹配服务id
+			if groupIDMap.ServerPorts == "" {
+				groupIDMap.ServerPorts = "0"
+			} else {
+				groupIDMap.ServerPorts += ",0"
+			}
+		}
+		services = append(services, groupIDMap)
 		log.Debugf("svc: %+v", svc)
 	}
 	t.serviceLabeler = NewGroupLabeler(t.serviceLabelerLogger, services)
+	t.services = services
 
 	return true
 }
