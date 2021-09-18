@@ -135,6 +135,7 @@ type GroupIDMap struct {
 	Protocol    uint16   `json:"protocol"`     // 协议用256表示任意，所以长度至少为9bit
 	ServerPorts string   `json:"server_ports"` // 格式为逗号分隔的IP范围，如 22,12000-13000
 	Role        string   `json:"role"`
+	ServiceID   uint32   `json:"service_id"`
 }
 
 type TagIDMap struct {
