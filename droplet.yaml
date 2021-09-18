@@ -116,6 +116,8 @@ ckdb:
 #  ## map-size-limit >= filter-queue-count*1024
 #  ## map-size-limit <= filter-queue-count*1048576
 #  map-size-limit: 1048576
+#  ## 值越大策略Firstpath表内存使用越少性能越低，取值范围为[1,16]，其他非法值使用默认值8
+#  level: 0
 
 #pcap:
 #  ## 计算TCP/IP checksum，默认不计算

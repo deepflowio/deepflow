@@ -85,7 +85,7 @@ func Start(cfg *config.Config, recv *receiver.Receiver) (closers []io.Closer) {
 
 	// labeler
 	labelerManager := labeler.NewLabelerManager(labelerQueues.Readers(), pcapAppQueues.Writers(),
-		cfg.Queue.PacketQueueCount, cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable)
+		cfg.Queue.PacketQueueCount, cfg.Labeler.Level, cfg.Labeler.MapSizeLimit, cfg.Labeler.FastPathDisable)
 	labelerManager.Start()
 
 	if len(controllers) > 0 {

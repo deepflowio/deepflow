@@ -44,6 +44,7 @@ type AdapterConfig struct {
 type LabelerConfig struct {
 	FastPathDisable bool   `yaml:"fast-path-disable"`
 	MapSizeLimit    uint32 `yaml:"map-size-limit"`
+	Level           int    `yaml:"level"`
 }
 
 type QueueConfig struct {
@@ -93,6 +94,9 @@ func (c *Config) Validate() error {
 
 	if c.Labeler.MapSizeLimit == 0 {
 		c.Labeler.MapSizeLimit = 1024 * 1024
+	}
+	if c.Labeler.Level < 1 || c.Labeler.Level > 16 {
+		c.Labeler.Level = 8
 	}
 
 	if c.Queue.PacketQueueCount < 1 || c.Queue.PacketQueueCount > 16 {

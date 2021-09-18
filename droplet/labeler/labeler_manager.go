@@ -57,12 +57,12 @@ type DumpKey struct {
 	InPort uint32
 }
 
-func NewLabelerManager(packetQueueReaders []queue.QueueReader, packetQueueWriters []queue.QueueWriter, queueCount int, mapSize uint32, disable bool) *LabelerManager {
+func NewLabelerManager(packetQueueReaders []queue.QueueReader, packetQueueWriters []queue.QueueWriter, queueCount, level int, mapSize uint32, disable bool) *LabelerManager {
 	labeler := &LabelerManager{
 		packetQueueReaders: packetQueueReaders,
 		packetQueueWriters: packetQueueWriters,
 		lookupKey:          make([]datatype.LookupKey, queueCount),
-		policyTable:        policy.NewPolicyTable(queueCount, mapSize, disable),
+		policyTable:        policy.NewPolicyTable(queueCount, level, mapSize, disable),
 	}
 	labeler.command.init(labeler)
 	debug.Register(dropletctl.DROPLETCTL_LABELER, labeler)
