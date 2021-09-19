@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "trident-rs"
+name = "trident"
 version = "0.1.0"
