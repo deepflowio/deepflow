@@ -1,3 +1,6 @@
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
 stages:
   - verify
   - package
@@ -10,6 +13,7 @@ verify-x64:
   script:
     - cargo build
     - cargo test
+    - cargo fmt --all -- --check
 
 package-x64:
   stage: package
