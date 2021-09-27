@@ -17,26 +17,40 @@ type CloseType uint8
 
 const (
 	CloseTypeUnknown CloseType = iota
-	CloseTypeTCPFin
-	CloseTypeTCPServerRst
-	CloseTypeTimeout
-	CloseTypeFlood
-	CloseTypeForcedReport // 5
-	_                     // CloseTypeFoecedClose is not used any more, so skip it
-	CloseTypeClientSYNRepeat
-	CloseTypeServerHalfClose
-	CloseTypeTCPClientRst
-	CloseTypeServerSYNACKRepeat // 10
-	CloseTypeClientHalfClose
 
-	_ // CloseTypeClientNoResponse is not used any more
-	CloseTypeClientSourcePortReuse
-	_                    // CloseTypeClientSYNRetryLack is not used any more
-	CloseTypeServerReset // 15
-	_                    // CloseTypeServerNoResponse is not used any more
-	CloseTypeServerQueueLack
-	CloseTypeClientEstablishReset
-	CloseTypeServerEstablishReset
+	// 流日志CloseType和流统计指标量之间的对应关系，见
+	// trident/collector/quadruple_generator.go: init函数
+	//	case datatype.CloseTypeTCPServerRst:
+	//		_CLOSE_TYPE_METERS[flowType].ServerRstFlow = 1
+	//	...
+	// 流统计指标量和数据库字段名之间的对应关系，见
+	// droplet-libs/zerodoc/basic_meter.go: Anomaly结构体定义
+	//	ClientRstFlow       uint64 `db:"client_rst_flow"`
+	//	...
+	// 数据库字段名和页面文案之间的对应关系，见
+	// droplet-libs/zerodoc/basic_meter.go: AnomalyColumns函数
+	//	ANOMALY_CLIENT_RST_FLOW: {"client_rst_flow", "传输-客户端重置"},
+	//	...
+
+	CloseTypeTCPFin                //  1: 正常结束
+	CloseTypeTCPServerRst          //  2: 传输-服务端重置
+	CloseTypeTimeout               //  3: 连接超时
+	_                              //  4: 【废弃】CloseTypeFlood
+	CloseTypeForcedReport          //  5: 周期性上报
+	_                              //  6: 【废弃】CloseTypeFoecedClose
+	CloseTypeClientSYNRepeat       //  7: 建连-客户端SYN结束
+	CloseTypeServerHalfClose       //  8: 断连-服务端半关
+	CloseTypeTCPClientRst          //  9: 传输-客户端重置
+	CloseTypeServerSYNACKRepeat    // 10: 建连-服务端SYN结束
+	CloseTypeClientHalfClose       // 11: 断连-客户端半关
+	_                              // 12: 【废弃】CloseTypeClientNoResponse
+	CloseTypeClientSourcePortReuse // 13: 建连-客户端端口复用
+	_                              // 14: 【废弃】CloseTypeClientSYNRetryLack
+	CloseTypeServerReset           // 15: 建连-服务端直接重置
+	_                              // 16: 【废弃】CloseTypeServerNoResponse
+	CloseTypeServerQueueLack       // 17: 传输-服务端队列溢出
+	CloseTypeClientEstablishReset  // 18: 建连-客户端其他重置
+	CloseTypeServerEstablishReset  // 19: 建连-服务端其他重置
 	MaxCloseType
 )
 
