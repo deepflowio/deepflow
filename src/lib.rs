@@ -2,6 +2,7 @@
 
 mod common;
 mod config;
+pub mod dispatcher;
 mod error;
 mod flow_generator;
 mod handler;

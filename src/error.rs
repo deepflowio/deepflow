@@ -42,6 +42,8 @@ pub enum Error {
     RedisPerfParse(String),
     #[error("redis log parse: {0}")]
     RedisLogParse(String),
+    #[error("invalid tpacket version: {0}")]
+    InvalidTpVersion(isize),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
