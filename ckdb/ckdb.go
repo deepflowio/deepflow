@@ -304,6 +304,7 @@ const (
 	TimeFuncTenMinute
 	TimeFuncHour
 	TimeFuncFourHour
+	TimeFuncTwelveHour
 	TimeFuncDay
 	TimeFuncWeek
 	TimeFuncMonth
@@ -312,16 +313,17 @@ const (
 )
 
 var timeFuncTypeString = []string{
-	TimeFuncNone:      "%s",
-	TimeFuncMinute:    "toStartOfMinute(%s)", // %s指代函数作用于的字段名
-	TimeFuncTenMinute: "toStartOfTenMinute(%s)",
-	TimeFuncHour:      "toStartOfHour(%s)",
-	TimeFuncFourHour:  "toStartOfInterval(%s, INTERVAL 4 hour)",
-	TimeFuncDay:       "toStartOfDay(%s)",
-	TimeFuncWeek:      "toStartOfWeek(%s)",
-	TimeFuncMonth:     "toStartOfMonth(%s)",
-	TimeFuncYYYYMM:    "toYYYYMM(%s)",
-	TimeFuncYYYYMMDD:  "toYYYYMMDD(%s)",
+	TimeFuncNone:       "%s",
+	TimeFuncMinute:     "toStartOfMinute(%s)", // %s指代函数作用于的字段名
+	TimeFuncTenMinute:  "toStartOfTenMinute(%s)",
+	TimeFuncHour:       "toStartOfHour(%s)",
+	TimeFuncFourHour:   "toStartOfInterval(%s, INTERVAL 4 hour)",
+	TimeFuncTwelveHour: "toStartOfInterval(%s, INTERVAL 12 hour)",
+	TimeFuncDay:        "toStartOfDay(%s)",
+	TimeFuncWeek:       "toStartOfWeek(%s)",
+	TimeFuncMonth:      "toStartOfMonth(%s)",
+	TimeFuncYYYYMM:     "toYYYYMM(%s)",
+	TimeFuncYYYYMMDD:   "toYYYYMMDD(%s)",
 }
 
 func (t TimeFuncType) String(timeKey string) string {

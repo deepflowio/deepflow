@@ -293,7 +293,7 @@ func newMetricsMinuteTable(id MetricsDBID, engine ckdb.EngineType, version strin
 		Columns:         append(genTagColumns(metricsDBCodes[id]), meterColumns...),
 		TimeKey:         timeKey,
 		TTL:             7, // 分钟数据默认保留7天
-		PartitionFunc:   ckdb.TimeFuncDay,
+		PartitionFunc:   ckdb.TimeFuncTwelveHour,
 		Engine:          engine,
 		Cluster:         cluster,
 		OrderKeys:       orderKeys,
