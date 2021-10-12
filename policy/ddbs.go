@@ -284,6 +284,9 @@ func (d *Ddbs) addFastPath(endpointData *EndpointData, packet *LookupKey, policy
 	endpointStore := &EndpointStore{}
 	endpointStore.InitPointer(endpointData)
 
+	// ddbs算法不使用interest相关，这里为加入fastpath做准备
+	d.getFastInterestKeys(packet)
+
 	packetEndpointData := d.cloudPlatformLabeler.UpdateEndpointData(endpointStore, packet)
 	d.addPortFastPolicy(endpointStore, packetEndpointData, packet, policyForward, policyBackward)
 	return endpointStore, packetEndpointData
@@ -334,8 +337,6 @@ func (d *Ddbs) getPolicyFromTable6(key *MatchedField6, direction DirectionType, 
 }
 
 func (d *Ddbs) GetPolicyByFirstPath(packet *LookupKey, findPolicy *PolicyData, endpointData *EndpointData) *EndpointStore {
-	// ddbs不需要资源组相关的优化，只使用端口协议的优化
-	d.getFastInterestKeys(packet)
 	packet.GenerateMatchedField(endpointData.SrcInfo.GetL3Epc(), endpointData.DstInfo.GetL3Epc())
 
 	keys := [...]*MatchedField{FORWARD: &packet.ForwardMatched, BACKWARD: &packet.BackwardMatched}
@@ -399,7 +400,7 @@ func (d *Ddbs) UpdateAcls(acls []*Acl, check ...bool) {
 		generateAcls = append(generateAcls, acl)
 	}
 
-	// 生成策略InterestMap,更新策略
+	// 生成策略InterestMap
 	d.GenerateInterestMaps(generateAcls)
 	// 生成Ddbs查询表
 	d.generateDdbsTable(generateAcls)

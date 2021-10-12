@@ -53,24 +53,6 @@ func (t *InterestTable) generateInterestPortMap(acls []*Acl) {
 			}
 		}
 	}
-
-	for _, acl := range acls {
-		for _, port := range acl.SrcPortRange {
-			for i := int(port.Min()); i <= int(port.Max()); {
-				portRangs := interestPortMaps[i]
-				acl.SrcPorts = append(acl.SrcPorts, portRangs.Min())
-				i = int(portRangs.Max()) + 1
-			}
-		}
-
-		for _, port := range acl.DstPortRange {
-			for i := int(port.Min()); i <= int(port.Max()); {
-				portRangs := interestPortMaps[i]
-				acl.DstPorts = append(acl.DstPorts, portRangs.Min())
-				i = int(portRangs.Max()) + 1
-			}
-		}
-	}
 	t.InterestPortMaps = interestPortMaps
 }
 
