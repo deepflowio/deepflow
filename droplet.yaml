@@ -173,13 +173,3 @@ ckdb:
 #decoder-queue-count: 2
 
 #decoder-queue-size: 100000
-
-#broker-queue-size: 10000
-
-#broker-zmq-ip: "127.0.0.1"
-
-#broker-zmq-port: 20204
-
-#broker-zmq-hwm: 1000
-
-#broker-enabled: false

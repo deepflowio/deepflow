@@ -4,20 +4,17 @@ import (
 	"net"
 	"strconv"
 
-	zmq4 "github.com/pebbe/zmq4"
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 	"gitlab.yunshan.net/yunshan/droplet-libs/debug"
 	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
 	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
 	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zmq"
 	dropletqueue "gitlab.yunshan.net/yunshan/droplet/droplet/queue"
 	"gitlab.yunshan.net/yunshan/droplet/dropletctl"
 	"gitlab.yunshan.net/yunshan/droplet/stream/config"
 	"gitlab.yunshan.net/yunshan/droplet/stream/dbwriter"
 	"gitlab.yunshan.net/yunshan/droplet/stream/decoder"
 	"gitlab.yunshan.net/yunshan/droplet/stream/geo"
-	"gitlab.yunshan.net/yunshan/droplet/stream/pusher"
 	"gitlab.yunshan.net/yunshan/droplet/stream/throttler"
 	_ "golang.org/x/net/context"
 	_ "google.golang.org/grpc"
@@ -38,7 +35,6 @@ type Logger struct {
 	Decoders      []*decoder.Decoder
 	PlatformDatas []*grpc.PlatformInfoTable
 	Throttlers    []*throttler.ThrottlingQueue
-	Broker        *pusher.FlowSender
 	FlowLogWriter *dbwriter.FlowLogWriter
 }
 
@@ -77,22 +73,6 @@ func NewFlowLogger(config *config.Config, controllers []net.IP, manager *droplet
 		1)
 	recv.RegistHandler(uint8(msgType), decodeQueues, queueCount)
 
-	var broker *pusher.FlowSender
-	var brokerQueue *dropletqueue.Queue
-	if config.BrokerEnabled {
-		brokerQueue = manager.NewQueue(
-			"2-broker-queue"+queueSuffix,
-			config.BrokerQueueSize,
-		)
-		zmqBytePusher := zmq.NewZMQBytePusher(
-			config.BrokerZMQIP,
-			uint16(config.BrokerZMQPort),
-			config.BrokerZMQHWM,
-			zmq4.PUB,
-		)
-		broker = pusher.NewFlowSender(zmqBytePusher, brokerQueue)
-	}
-
 	throttle := config.Throttle / queueCount
 	if config.L4Throttle != 0 {
 		throttle = config.L4Throttle / queueCount
@@ -120,8 +100,6 @@ func NewFlowLogger(config *config.Config, controllers []net.IP, manager *droplet
 			throttlers[i],
 			nil,
 			nil,
-			config.BrokerEnabled,
-			brokerQueue,
 		)
 	}
 	return &Logger{
@@ -130,7 +108,6 @@ func NewFlowLogger(config *config.Config, controllers []net.IP, manager *droplet
 		PlatformDatas: platformDatas,
 		Throttlers:    throttlers,
 		FlowLogWriter: flowLogWriter,
-		Broker:        broker,
 	}, nil
 
 }
@@ -181,8 +158,6 @@ func NewProtoLogger(config *config.Config, controllers []net.IP, manager *drople
 			nil,
 			httpThrottlers[i],
 			dnsThrottlers[i],
-			false,
-			nil,
 		)
 	}
 
@@ -213,10 +188,6 @@ func (l *Logger) Close() {
 func (s *Stream) Start() {
 	s.FlowLogger.Start()
 	s.ProtoLogger.Start()
-
-	if s.StreamConfig.BrokerEnabled {
-		go s.FlowLogger.Broker.Run()
-	}
 }
 
 func (s *Stream) Close() {

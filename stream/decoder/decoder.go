@@ -34,17 +34,15 @@ type Counter struct {
 }
 
 type Decoder struct {
-	index          int
-	msgType        int
-	shardID        int
-	platformData   *grpc.PlatformInfoTable
-	inQueue        queue.QueueReader
-	flowThrottler  *throttler.ThrottlingQueue
-	httpThrottler  *throttler.ThrottlingQueue
-	dnsThrottler   *throttler.ThrottlingQueue
-	brokerEnabled  bool
-	outBrokerQueue queue.QueueWriter
-	debugEnabled   bool
+	index         int
+	msgType       int
+	shardID       int
+	platformData  *grpc.PlatformInfoTable
+	inQueue       queue.QueueReader
+	flowThrottler *throttler.ThrottlingQueue
+	httpThrottler *throttler.ThrottlingQueue
+	dnsThrottler  *throttler.ThrottlingQueue
+	debugEnabled  bool
 
 	counter *Counter
 	utils.Closable
@@ -57,22 +55,18 @@ func NewDecoder(
 	flowThrottler *throttler.ThrottlingQueue,
 	httpThrottler *throttler.ThrottlingQueue,
 	dnsThrottler *throttler.ThrottlingQueue,
-	brokerEnabled bool,
-	outBrokerQueue queue.QueueWriter,
 ) *Decoder {
 	return &Decoder{
-		index:          index,
-		msgType:        msgType,
-		shardID:        shardID,
-		platformData:   platformData,
-		inQueue:        inQueue,
-		flowThrottler:  flowThrottler,
-		httpThrottler:  httpThrottler,
-		dnsThrottler:   dnsThrottler,
-		brokerEnabled:  brokerEnabled,
-		outBrokerQueue: outBrokerQueue,
-		debugEnabled:   log.IsEnabledFor(logging.DEBUG),
-		counter:        &Counter{},
+		index:         index,
+		msgType:       msgType,
+		shardID:       shardID,
+		platformData:  platformData,
+		inQueue:       inQueue,
+		flowThrottler: flowThrottler,
+		httpThrottler: httpThrottler,
+		dnsThrottler:  dnsThrottler,
+		debugEnabled:  log.IsEnabledFor(logging.DEBUG),
+		counter:       &Counter{},
 	}
 }
 
@@ -153,10 +147,6 @@ func (d *Decoder) sendFlow(flow *datatype.TaggedFlow) {
 	}
 	d.counter.L4Count++
 	l := jsonify.TaggedFlowToLogger(flow, d.shardID, d.platformData)
-	if d.brokerEnabled {
-		l.AddReferenceCount()
-		d.outBrokerQueue.Put(l)
-	}
 	if !d.flowThrottler.Send(l) {
 		d.counter.L4DropCount++
 	}
@@ -170,20 +160,12 @@ func (d *Decoder) sendProto(proto *datatype.AppProtoLogsData) {
 	if proto.Proto == datatype.PROTO_HTTP {
 		d.counter.L7HTTPCount++
 		l := jsonify.ProtoLogToHTTPLogger(proto, d.shardID, d.platformData)
-		if d.brokerEnabled {
-			l.AddReferenceCount()
-			d.outBrokerQueue.Put(l)
-		}
 		if !d.httpThrottler.Send(l) {
 			d.counter.L7HTTPDropCount++
 		}
 	} else if proto.Proto == datatype.PROTO_DNS {
 		d.counter.L7DNSCount++
 		l := jsonify.ProtoLogToDNSLogger(proto, d.shardID, d.platformData)
-		if d.brokerEnabled {
-			l.AddReferenceCount()
-			d.outBrokerQueue.Put(l)
-		}
 		if !d.dnsThrottler.Send(l) {
 			d.counter.L7DNSDropCount++
 		}

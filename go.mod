@@ -6,7 +6,6 @@ require (
 	github.com/ClickHouse/clickhouse-go v1.4.5
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/fortytw2/leaktest v1.3.0 // indirect
-	github.com/gogo/protobuf v1.3.0
 	github.com/golang/protobuf v1.3.1
 	github.com/google/gopacket v1.1.18
 	github.com/gorilla/mux v1.8.0
@@ -14,7 +13,6 @@ require (
 	github.com/mailru/easyjson v0.7.1 // indirect
 	github.com/olivere/elastic v6.2.16+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
-	github.com/pebbe/zmq4 v1.0.0
 	github.com/spf13/cobra v0.0.5
 	gitlab.yunshan.net/yunshan/droplet-libs v0.0.0-20210927101309-b4e2dde40a0d
 	gitlab.yunshan.net/yunshan/message v0.0.0-20210916085527-1d68447446c8
