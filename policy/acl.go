@@ -13,8 +13,6 @@ type Acl struct {
 	DstGroups       []uint32
 	SrcPortRange    []PortRange // 0仅表示采集端口0
 	DstPortRange    []PortRange // 0仅表示采集端口0
-	SrcPorts        []uint16    // 0仅表示采集端口0
-	DstPorts        []uint16    // 0仅表示采集端口0
 	Proto           uint16      // 256表示全采集, 0表示采集采集协议0
 	NpbActions      []NpbActions
 	AllMatched      []MatchedField
@@ -33,8 +31,6 @@ func (a *Acl) InitPolicy() {
 }
 
 func (a *Acl) Reset() {
-	a.SrcPorts = a.SrcPorts[:0]
-	a.DstPorts = a.DstPorts[:0]
 	a.AllMatched = a.AllMatched[:0]
 	a.AllMatchedMask = a.AllMatchedMask[:0]
 	a.AllMatched6 = a.AllMatched6[:0]
@@ -73,10 +69,10 @@ func (a *Acl) getPortRange(rawPorts []uint16) []PortRange {
 func (a *Acl) generatePortSegment() ([]portSegment, []portSegment) {
 	srcSegment := make([]portSegment, 0, 2)
 	dstSegment := make([]portSegment, 0, 2)
-	for _, ports := range a.getPortRange(a.SrcPorts) {
+	for _, ports := range a.SrcPortRange {
 		srcSegment = append(srcSegment, newPortSegments(ports)...)
 	}
-	for _, ports := range a.getPortRange(a.DstPorts) {
+	for _, ports := range a.DstPortRange {
 		dstSegment = append(dstSegment, newPortSegments(ports)...)
 	}
 	if len(srcSegment) == 0 {
@@ -215,6 +211,6 @@ func (a *Acl) getPorts(rawPorts []uint16) string {
 }
 
 func (a *Acl) String() string {
-	return fmt.Sprintf("Id:%v TapType:%v SrcGroups:%v DstGroups:%v SrcPortRange:[%v] SrcPorts:[%s] DstPortRange:[%v] DstPorts:[%s] Proto:%v NpbActions:%s",
-		a.Id, a.TapType, a.SrcGroups, a.DstGroups, a.SrcPortRange, a.getPorts(a.SrcPorts), a.DstPortRange, a.getPorts(a.DstPorts), a.Proto, a.NpbActions)
+	return fmt.Sprintf("Id:%v TapType:%v SrcGroups:%v DstGroups:%v SrcPortRange:[%v] DstPortRange:[%v] Proto:%v NpbActions:%s",
+		a.Id, a.TapType, a.SrcGroups, a.DstGroups, a.SrcPortRange, a.DstPortRange, a.Proto, a.NpbActions)
 }
