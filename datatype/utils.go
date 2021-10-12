@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"math"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -223,5 +224,31 @@ func SplitPort2Int(src string) []PortRange {
 	for _, srcPorts := range splitSrcPorts {
 		ports = append(ports, getPorts(srcPorts)...)
 	}
-	return ports
+
+	// 从小到大排序
+	sort.Slice(ports, func(i, j int) bool { return ports[i].Min() < ports[j].Min() })
+	deleteFlags := make([]bool, len(ports))
+	for i := 0; i < len(ports); i++ {
+		if i == len(ports)-1 {
+			continue
+		}
+		// 合并连续的端口号
+		if ports[i].Max()+1 >= ports[i+1].Min() {
+			max := ports[i+1].Max()
+			if ports[i].Max() > max {
+				max = ports[i].Max()
+			}
+			ports[i+1] = NewPortRange(ports[i].Min(), max)
+			deleteFlags[i] = true
+		}
+	}
+	newPorts := make([]PortRange, 0, len(ports))
+	// 删除无效数据
+	for i := 0; i < len(ports); i++ {
+		if deleteFlags[i] {
+			continue
+		}
+		newPorts = append(newPorts, ports[i])
+	}
+	return newPorts
 }

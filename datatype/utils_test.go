@@ -150,3 +150,30 @@ func TestIp6RangeConvert(t *testing.T) {
 		t.Errorf("TestIp6RangeConvert Check Failed! %v", ips)
 	}
 }
+
+func TestSplitPort2Int(t *testing.T) {
+	n := SplitPort2Int("100-200,200-400")
+	if n[0] != NewPortRange(100, 400) {
+		t.Errorf("TestSplitPort2Int Check Failed! %v", n)
+	}
+	n = SplitPort2Int("102,100,101")
+	if n[0] != NewPortRange(100, 102) {
+		t.Errorf("TestSplitPort2Int Check Failed! %v", n)
+	}
+	n = SplitPort2Int("100-400,200-300")
+	if n[0] != NewPortRange(100, 400) {
+		t.Errorf("TestSplitPort2Int Check Failed! %v", n)
+	}
+	n = SplitPort2Int("200-300,100-400")
+	if n[0] != NewPortRange(100, 400) {
+		t.Errorf("TestSplitPort2Int Check Failed! %v", n)
+	}
+	n = SplitPort2Int("100-400,100-300,100-500")
+	if n[0] != NewPortRange(100, 500) {
+		t.Errorf("TestSplitPort2Int Check Failed! %v", n)
+	}
+	n = SplitPort2Int("200-400,100-400,300-400")
+	if n[0] != NewPortRange(100, 400) {
+		t.Errorf("TestSplitPort2Int Check Failed! %v", n)
+	}
+}
