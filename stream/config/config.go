@@ -60,11 +60,6 @@ type Config struct {
 	L7DNSThrottle     int            `yaml:"l7-dns-throttle"`
 	DecoderQueueCount int            `yaml:"decoder-queue-count"`
 	DecoderQueueSize  int            `yaml:"decoder-queue-size"`
-	BrokerQueueSize   int            `yaml:"broker-queue-size"`
-	BrokerZMQIP       string         `yaml:"broker-zmq-ip"`
-	BrokerZMQPort     int            `yaml:"broker-zmq-port"`
-	BrokerZMQHWM      int            `yaml:"broker-zmq-hwm"`
-	BrokerEnabled     bool           `yaml:"broker-enabled"`
 }
 
 func (c *Config) Validate() error {
@@ -92,10 +87,6 @@ func Load(path string) *Config {
 		Throttle:          DefaultThrottle,
 		DecoderQueueCount: DefaultDecoderQueueCount,
 		DecoderQueueSize:  DefaultDecoderQueueSize,
-		BrokerQueueSize:   DefaultBrokerQueueSize,
-		BrokerZMQIP:       DefaultBrokerZMQIP,
-		BrokerZMQPort:     DefaultBrokerZMQPort,
-		BrokerZMQHWM:      DefaultBrokerZMQHWM,
 		CKWriterConfig:    CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {

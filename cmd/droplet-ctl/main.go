@@ -13,7 +13,6 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/debug"
 	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
 	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zmq"
 	"gitlab.yunshan.net/yunshan/droplet/droplet/adapter"
 
 	"gitlab.yunshan.net/yunshan/droplet/config"
@@ -23,8 +22,6 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet/dropletctl"
 	"gitlab.yunshan.net/yunshan/droplet/dropletctl/rpc"
 	"gitlab.yunshan.net/yunshan/droplet/roze/roze"
-	streamcfg "gitlab.yunshan.net/yunshan/droplet/stream/config"
-	"gitlab.yunshan.net/yunshan/droplet/stream/jsonify/dfi"
 	"gitlab.yunshan.net/yunshan/droplet/stream/stream"
 )
 
@@ -83,7 +80,6 @@ func main() {
 		"1-receive-to-decode-l7",
 	}))
 	streamCmd.AddCommand(debug.ClientRegisterSimple(stream.CMD_PLATFORMDATA, debug.CmdHelper{"platformData [filter]", "show stream platform data statistics"}, nil))
-	streamCmd.AddCommand(RegisterReceiveFlowLogCommand())
 
 	root.GenBashCompletionFile("/usr/share/bash-completion/completions/droplet-ctl")
 	root.SetArgs(os.Args[1:])
@@ -159,33 +155,5 @@ func RegisterTimeConvertCommand() *cobra.Command {
 		},
 	}
 
-	return cmd
-}
-
-func RegisterReceiveFlowLogCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "flow-print",
-		Short: "print publishing flow",
-		Run: func(cmd *cobra.Command, args []string) {
-			sub, err := zmq.NewSubscriber("127.0.0.1", streamcfg.DefaultBrokerZMQPort, 1000000, zmq.CLIENT)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-			for {
-				bytes, err := sub.Recv()
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-				flow := &dfi.Flow{}
-				if e := flow.Unmarshal(bytes); e != nil {
-					fmt.Println(err)
-					return
-				}
-				fmt.Println(flow)
-			}
-		},
-	}
 	return cmd
 }
