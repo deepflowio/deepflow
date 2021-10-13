@@ -501,8 +501,9 @@ func parseAcl(args []string) *policy.Acl {
 				fmt.Printf("invalid port %s from %s\n", keyValue[1], args[0])
 				return nil
 			}
-			acl.DstPorts = make([]uint16, 0)
-			acl.DstPorts = append(acl.DstPorts, uint16(port))
+			acl.DstPortRange = make([]datatype.PortRange, 0)
+			acl.DstPortRange = append(acl.DstPortRange,
+				datatype.NewPortRange(uint16(port), uint16(port)))
 		default:
 			fmt.Printf("invalid key from %s\n", args[0])
 			return nil
