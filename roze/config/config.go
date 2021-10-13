@@ -98,7 +98,8 @@ func Load(path string) *Config {
 		UnmarshallQueueSize:       DefaultUnmarshallQueueSize,
 		ReceiverWindowSize:        DefaultReceiverWindowSize,
 		DisableSecondWriteReplica: true,
-		Pcap:                      PCapConfig{DefaultPcapDataPath},
+
+		Pcap: PCapConfig{DefaultPcapDataPath},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		log.Info("no config file, use defaults")
