@@ -28,6 +28,7 @@ const (
 	LE_ERSPAN_PROTO_TYPE_III  = 0xEB22 // 0x22EB's LittleEndian
 	LE_VXLAN_PROTO_UDP_DPORT  = 0xB512 // 0x12B5(4789)'s LittleEndian
 	LE_VXLAN_PROTO_UDP_DPORT2 = 0x1821 // 0x2118(8472)'s LittleEndian
+	LE_VXLAN_PROTO_UDP_DPORT3 = 0x801A // 0x1A80(6784)'s LittleEndian
 	LE_TEB_PROTO              = 0x5865 // 0x6558(25944)'s LittleEndian
 	VXLAN_FLAGS               = 8
 
@@ -69,7 +70,9 @@ func (t *TunnelInfo) DecapsulateVxlan(packet []byte, l2Len int, tunnelType Tunne
 		return 0
 	}
 	dstPort := *(*uint16)(unsafe.Pointer(&l3Packet[OFFSET_DPORT-ETH_HEADER_SIZE]))
-	if dstPort != LE_VXLAN_PROTO_UDP_DPORT && dstPort != LE_VXLAN_PROTO_UDP_DPORT2 {
+	if dstPort != LE_VXLAN_PROTO_UDP_DPORT &&
+		dstPort != LE_VXLAN_PROTO_UDP_DPORT2 &&
+		dstPort != LE_VXLAN_PROTO_UDP_DPORT3 {
 		return 0
 	}
 	if l3Packet[OFFSET_VXLAN_FLAGS-ETH_HEADER_SIZE] != VXLAN_FLAGS {
@@ -266,7 +269,9 @@ func (t *TunnelInfo) Decapsulate6Vxlan(packet []byte, l2Len int, tunnelType Tunn
 		return 0
 	}
 	dstPort := *(*uint16)(unsafe.Pointer(&l3Packet[IP6_HEADER_SIZE+UDP_DPORT_OFFSET]))
-	if dstPort != LE_VXLAN_PROTO_UDP_DPORT && dstPort != LE_VXLAN_PROTO_UDP_DPORT2 {
+	if dstPort != LE_VXLAN_PROTO_UDP_DPORT &&
+		dstPort != LE_VXLAN_PROTO_UDP_DPORT2 &&
+		dstPort != LE_VXLAN_PROTO_UDP_DPORT3 {
 		return 0
 	}
 	if l3Packet[IP6_HEADER_SIZE+UDP_HEADER_SIZE+VXLAN_FLAGS_OFFSET] != VXLAN_FLAGS {
