@@ -315,6 +315,7 @@ type Receiver struct {
 	lastTCPFlushTime int64
 	timeNow          int64
 	lastLogTime      int64
+	lastTCPLogTime   int64
 	dropLogCount     int64
 
 	exit   bool
@@ -583,6 +584,17 @@ func (r *Receiver) logReceiveError(size int, remoteAddr *net.UDPAddr, err error)
 	}
 }
 
+func (r *Receiver) logTCPReceiveInvalidData(str string) {
+	atomic.AddUint64(&r.counter.Invalid, 1)
+	// 防止日志刷屏
+	if r.timeNow-r.lastTCPLogTime < LOG_INTERVAL {
+		r.dropLogCount++
+		return
+	}
+	r.lastTCPLogTime = r.timeNow
+	log.Warningf(fmt.Sprintf("%s, already drop log count %d", str, r.dropLogCount))
+}
+
 func (r *Receiver) ProcessUDPServer() {
 	defer r.UDPConn.Close()
 	baseHeader := &datatype.BaseHeader{}
@@ -774,8 +786,13 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 			sequence = flowHeader.Sequence
 		}
 
+		dataLen := int(baseHeader.FrameSize) - headerLen
+		if dataLen > RECV_BUFSIZE {
+			r.logTCPReceiveInvalidData(fmt.Sprintf("TCP client(%s) wrong frame size(%d)", conn.RemoteAddr().String(), baseHeader.FrameSize))
+			return
+		}
 		recvBuffer := AcquireRecvBuffer()
-		if err := ReadN(conn, recvBuffer.Buffer[:int(baseHeader.FrameSize)-headerLen]); err != nil {
+		if err := ReadN(conn, recvBuffer.Buffer[:dataLen]); err != nil {
 			atomic.AddUint64(&r.counter.Invalid, 1)
 			ReleaseRecvBuffer(recvBuffer)
 			log.Warningf("TCP client(%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
