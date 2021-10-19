@@ -119,6 +119,7 @@ const (
 	L7_PROTOCOL_UNKOWN L7Protocol = iota
 	L7_PROTOCOL_HTTP
 	L7_PROTOCOL_DNS
+	L7_PROTOCOL_MYSQL
 
 	L7_PROTOCOL_MAX
 )
@@ -621,6 +622,8 @@ func (p *L7Protocol) String() string {
 		formatted = "http"
 	case L7_PROTOCOL_DNS:
 		formatted = "dns"
+	case L7_PROTOCOL_MYSQL:
+		formatted = "mysql"
 	}
 	return formatted
 }

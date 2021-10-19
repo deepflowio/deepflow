@@ -16,6 +16,8 @@ const (
 	PROTO_UNKOWN LogProtoType = iota
 	PROTO_HTTP
 	PROTO_DNS
+	PROTO_MYSQL
+	PROTO_REDIS
 )
 
 func (t *LogProtoType) String() string {
@@ -25,6 +27,10 @@ func (t *LogProtoType) String() string {
 		formatted = "HTTP"
 	case PROTO_DNS:
 		formatted = "DNS"
+	case PROTO_MYSQL:
+		formatted = "MYSQL"
+	case PROTO_REDIS:
+		formatted = "REDIS"
 	default:
 		formatted = "UNKOWN"
 	}
@@ -34,11 +40,12 @@ func (t *LogProtoType) String() string {
 
 type LogMessageType uint8
 
-// 仅针对HTTP,DNS
 const (
 	MSG_T_REQUEST LogMessageType = iota
 	MSG_T_RESPONSE
 	MSG_T_SESSION
+	MSG_T_OTHER
+	MSG_T_MAX
 )
 
 func (t *LogMessageType) String() string {
@@ -101,10 +108,9 @@ func (i *AppProtoLogsBaseInfo) String() string {
 	formatted += fmt.Sprintf("Code: %v ", i.Code)
 	formatted += fmt.Sprintf("RRT: %v ", i.RRT)
 
-	if len(i.IP6Src) > 0 {
-		formatted += fmt.Sprintf("IP6Src: %s ", i.IP6Src)
-		formatted += fmt.Sprintf("IP6Dst: %s ", i.IP6Dst)
-
+	if i.IsIPv6 {
+		formatted += fmt.Sprintf("IP6Src: %s ", net.IP(i.IP6Src[:]))
+		formatted += fmt.Sprintf("IP6Dst: %s ", net.IP(i.IP6Dst[:]))
 	} else {
 		formatted += fmt.Sprintf("IPSrc: %s ", utils.IpFromUint32(i.IPSrc))
 		formatted += fmt.Sprintf("IPDst: %s ", utils.IpFromUint32(i.IPDst))
@@ -256,6 +262,10 @@ func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
 		dnsInfo := AcquireDNSInfo()
 		dnsInfo.Decode(decoder, l.MsgType, l.Code)
 		l.Detail = dnsInfo
+	} else if l.Proto == PROTO_MYSQL {
+		mysqlInfo := AcquireMYSQLInfo()
+		mysqlInfo.Decode(decoder, l.MsgType, l.Code)
+		l.Detail = mysqlInfo
 	}
 
 	return nil
@@ -265,6 +275,7 @@ type ProtoSpecialInfo interface {
 	Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, code uint16)
 	Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, code uint16)
 	String() string
+	Merge(interface{})
 }
 
 // HTTPv2根据需要添加
@@ -308,6 +319,8 @@ func (h *HTTPInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, 
 func (h *HTTPInfo) String() string {
 	return fmt.Sprintf("%#v", h)
 }
+
+func (h *HTTPInfo) Merge(_ interface{}) {}
 
 // | type | 查询类型 | 说明|
 // | ---- | -------- | --- |
@@ -357,4 +370,10 @@ func (d *DNSInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, c
 
 func (d *DNSInfo) String() string {
 	return fmt.Sprintf("%#v", d)
+}
+
+func (d *DNSInfo) Merge(r interface{}) {
+	if response, ok := r.(*DNSInfo); ok {
+		d.Answers = response.Answers
+	}
 }
