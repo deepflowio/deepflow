@@ -3,6 +3,7 @@ mod config;
 mod consts;
 mod error;
 mod handler;
+mod pcap;
 mod platform;
 mod proto;
 mod rpc;

@@ -10,8 +10,10 @@ default-run = "trident"
 [dependencies]
 anyhow = "1.0"
 cadence = "0.27.0"
+chrono = "0.4.19"
 clap = {version = "3.0.0-rc.7", features = ["derive"] }
 crossbeam = "0.8.1"
+dashmap = "5.0.0"
 enum_dispatch = "0.3.7"
 flexi_logger = "0.20"
 futures = "~0.3"
@@ -44,7 +46,7 @@ windows = {version = "0.30", features = ["Win32_Foundation", "Win32_System_Diagn
 
 
 [dev-dependencies]
-flexi_logger = "0.20"
+tempfile = "3.2.0"
 
 [build-dependencies]
 tonic-build = "0.5.2"

@@ -107,7 +107,6 @@ impl NtpPacket {
 }
 
 /// Parse an NTP packet, version 3 or 4
-#[inline]
 pub fn parse_ntp(i: &[u8]) -> Option<NtpPacket> {
     match NtpPacket::parse(i) {
         Ok((_, packet)) => Some(packet),
