@@ -458,6 +458,8 @@ message InterfaceInfo {
     optional string device_id = 4;
 
     optional uint32 tap_index = 5;
+
+    optional string device_name = 6;
 }
 
 message GenesisSyncRequest {
