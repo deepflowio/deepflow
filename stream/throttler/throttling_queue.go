@@ -18,6 +18,7 @@ type throttleItem interface {
 
 type ThrottlingQueue struct {
 	flowLogWriter *dbwriter.FlowLogWriter
+	index         int
 
 	Throttle        int
 	lastFlush       int64
@@ -27,10 +28,11 @@ type ThrottlingQueue struct {
 	sampleItems []interface{}
 }
 
-func NewThrottlingQueue(throttle int, flowLogWriter *dbwriter.FlowLogWriter) *ThrottlingQueue {
+func NewThrottlingQueue(throttle int, flowLogWriter *dbwriter.FlowLogWriter, index int) *ThrottlingQueue {
 	thq := &ThrottlingQueue{
 		Throttle:      throttle * THROTTLE_BUCKET,
 		flowLogWriter: flowLogWriter,
+		index:         index,
 	}
 	thq.sampleItems = make([]interface{}, thq.Throttle)
 	return thq
@@ -38,7 +40,7 @@ func NewThrottlingQueue(throttle int, flowLogWriter *dbwriter.FlowLogWriter) *Th
 
 func (thq *ThrottlingQueue) flush() {
 	if thq.periodEmitCount > 0 {
-		thq.flowLogWriter.Put(thq.sampleItems[:thq.periodEmitCount]...)
+		thq.flowLogWriter.Put(thq.index, thq.sampleItems[:thq.periodEmitCount]...)
 	}
 }
 

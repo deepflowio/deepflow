@@ -81,7 +81,7 @@ func TestProtoLogToHTTPLogger(t *testing.T) {
 	appData.Detail = &datatype.HTTPInfo{}
 
 	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", nil)
-	httpData := ProtoLogToHTTPLogger(appData, 0, pf)
+	httpData := ProtoLogToHTTPLogger(appData, 0, pf).(*HTTPLogger)
 	if httpData.VtapID != 123 {
 		t.Errorf("expect 123, result %v", httpData.VtapID)
 	}
@@ -100,7 +100,7 @@ func TestProtoLogToDNSLogger(t *testing.T) {
 	appData.Detail = &datatype.DNSInfo{}
 
 	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", nil)
-	dnsData := ProtoLogToDNSLogger(appData, 0, pf)
+	dnsData := ProtoLogToDNSLogger(appData, 0, pf).(*DNSLogger)
 	if dnsData.TapType != 3 {
 		t.Errorf("expect 3, result %v", dnsData.TapType)
 	}

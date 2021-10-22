@@ -12,6 +12,7 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
 	"gitlab.yunshan.net/yunshan/droplet/common"
 	"gitlab.yunshan.net/yunshan/droplet/stream/geo"
 	"gitlab.yunshan.net/yunshan/message/trident"
@@ -294,6 +295,8 @@ type KnowledgeGraph struct {
 	BusinessIDs1  []uint16 `json:"business_ids_1"`
 	ServiceID0    uint32   `json:"service_id_0"`
 	ServiceID1    uint32   `json:"service_id_1"`
+	LBListenerID0 uint32   `json:"lb_listener_id_0"`
+	LBListenerID1 uint32   `json:"lb_listener_id_1"`
 }
 
 var KnowledgeGraphColumns = []*ckdb.Column{
@@ -330,6 +333,8 @@ var KnowledgeGraphColumns = []*ckdb.Column{
 	ckdb.NewColumn("business_ids_1", ckdb.ArrayUInt16),
 	ckdb.NewColumn("service_id_0", ckdb.UInt32),
 	ckdb.NewColumn("service_id_1", ckdb.UInt32),
+	ckdb.NewColumn("lb_listener_id_0", ckdb.UInt32),
+	ckdb.NewColumn("lb_listener_id_1", ckdb.UInt32),
 }
 
 func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) error {
@@ -429,6 +434,12 @@ func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt32(k.ServiceID1); err != nil {
 		return err
 	}
+	if err := block.WriteUInt32(k.LBListenerID0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(k.LBListenerID1); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -438,6 +449,7 @@ type FlowInfo struct {
 	FlowID     uint64 `json:"flow_id"`
 	TapType    uint16 `json:"tap_type"`
 	TapPort    uint32 `json:"tap_port"` // 显示为固定八个字符的16进制如'01234567'
+	TapSide    string `json:"tap_side"`
 	VtapID     uint16 `json:"vtap_id"`
 	L2End0     bool   `json:"l2_end_0"`
 	L2End1     bool   `json:"l2_end_1"`
@@ -455,6 +467,7 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 	ckdb.NewColumn("tap_type", ckdb.UInt16),
 	ckdb.NewColumn("tap_port", ckdb.UInt32),
+	ckdb.NewColumn("tap_side", ckdb.LowCardinalityString),
 	ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 	ckdb.NewColumn("l2_end_0", ckdb.UInt8).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("l2_end_1", ckdb.UInt8).SetIndex(ckdb.IndexNone),
@@ -481,6 +494,9 @@ func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt32(f.TapPort); err != nil {
+		return err
+	}
+	if err := block.WriteString(f.TapSide); err != nil {
 		return err
 	}
 	if err := block.WriteUInt16(f.VtapID); err != nil {
@@ -871,19 +887,21 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool, platformData 
 		k.EpcID1 = parseUint32EpcID(l2Info1.L2EpcID)
 	}
 
+	var serviceID uint32
 	if isIPV6 {
 		k.GroupIDs0, k.BusinessIDs0 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID0), f.IP6Src)
 		k.GroupIDs1, k.BusinessIDs1 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID1), f.IP6Dst)
 		// 0端如果是clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID0 != 0 {
-			_, k.ServiceID0 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID0), f.IP6Src, f.Proto, 0)
+			_, k.ServiceID0, _ = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID0), f.IP6Src, f.Proto, 0)
 		}
+		_, serviceID, k.LBListenerID1 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID1), f.IP6Dst, f.Proto, f.PortDst)
 		// 1端如果是NodeIP,clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID1 != 0 ||
 			k.PodNodeID1 != 0 {
-			_, k.ServiceID1 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID1), f.IP6Dst, f.Proto, f.PortDst)
+			k.ServiceID1 = serviceID
 		}
 	} else {
 		k.GroupIDs0, k.BusinessIDs0 = platformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID0), f.IPSrc)
@@ -891,13 +909,14 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool, platformData 
 		// 0端如果是clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID0 != 0 {
-			_, k.ServiceID0 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID0), f.IPSrc, f.Proto, 0)
+			_, k.ServiceID0, _ = platformData.QueryIsKeyServiceAndID(int16(l3EpcID0), f.IPSrc, f.Proto, 0)
 		}
+		_, serviceID, k.LBListenerID1 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID1), f.IPDst, f.Proto, f.PortDst)
 		// 1端如果是NodeIP,clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID1 != 0 ||
 			k.PodNodeID1 != 0 {
-			_, k.ServiceID1 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID1), f.IPDst, f.Proto, f.PortDst)
+			k.ServiceID1 = serviceID
 		}
 	}
 }
@@ -908,6 +927,7 @@ func (i *FlowInfo) Fill(f *datatype.TaggedFlow) {
 	i.FlowID = f.FlowID
 	i.TapType = uint16(f.TapType)
 	i.TapPort = f.TapPort
+	i.TapSide = zerodoc.TAPSideEnum(f.TapSide).String()
 	i.VtapID = f.VtapId
 
 	i.L2End0 = f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].IsL2End

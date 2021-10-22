@@ -42,6 +42,10 @@ func GetFlowLogTables(engine ckdb.EngineType) []*ckdb.Table {
 		newFlowLogTable(common.L4_FLOW_ID, jsonify.FlowLoggerColumns(), engine),
 		newFlowLogTable(common.L7_HTTP_ID, jsonify.HTTPLoggerColumns(), engine),
 		newFlowLogTable(common.L7_DNS_ID, jsonify.DNSLoggerColumns(), engine),
+		newFlowLogTable(common.L7_SQL_ID, jsonify.SQLLoggerColumns(), engine),
+		newFlowLogTable(common.L7_NOSQL_ID, jsonify.NoSQLLoggerColumns(), engine),
+		newFlowLogTable(common.L7_RPC_ID, jsonify.RPCLoggerColumns(), engine),
+		newFlowLogTable(common.L7_MQ_ID, jsonify.MQLoggerColumns(), engine),
 	}
 }
 
@@ -69,30 +73,8 @@ func NewFlowLogWriter(primaryAddr, secondaryAddr, user, password string, replica
 	}, nil
 }
 
-func (w *FlowLogWriter) Put(items ...interface{}) error {
-	caches := [common.FLOWLOG_ID_MAX][]interface{}{}
-	for i, _ := range caches {
-		caches[i] = make([]interface{}, 0, CACHE_SIZE)
-	}
-	for _, item := range items {
-		switch t := item.(type) {
-		case *jsonify.FlowLogger:
-			caches[common.L4_FLOW_ID] = append(caches[common.L4_FLOW_ID], item)
-		case *jsonify.HTTPLogger:
-			caches[common.L7_HTTP_ID] = append(caches[common.L7_HTTP_ID], item)
-		case *jsonify.DNSLogger:
-			caches[common.L7_DNS_ID] = append(caches[common.L7_DNS_ID], item)
-		default:
-			log.Warningf("unsupport item type %T", t)
-		}
-	}
-
-	for i, cache := range caches {
-		if len(cache) > 0 {
-			w.ckwriters[i].Put(cache...)
-		}
-	}
-	return nil
+func (w *FlowLogWriter) Put(index int, items ...interface{}) {
+	w.ckwriters[index].Put(items...)
 }
 
 func (w *FlowLogWriter) Close() {

@@ -58,6 +58,10 @@ type Config struct {
 	L4Throttle        int            `yaml:"l4-throttle"`
 	L7HTTPThrottle    int            `yaml:"l7-http-throttle"`
 	L7DNSThrottle     int            `yaml:"l7-dns-throttle"`
+	L7SQLThrottle     int            `yaml:"l7-sql-throttle"`
+	L7NoSQLThrottle   int            `yaml:"l7-nosql-throttle"`
+	L7RPCThrottle     int            `yaml:"l7-rpc-throttle"`
+	L7MQThrottle      int            `yaml:"l7-mq-throttle"`
 	DecoderQueueCount int            `yaml:"decoder-queue-count"`
 	DecoderQueueSize  int            `yaml:"decoder-queue-size"`
 }

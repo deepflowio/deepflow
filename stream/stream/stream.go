@@ -11,6 +11,7 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
 	dropletqueue "gitlab.yunshan.net/yunshan/droplet/droplet/queue"
 	"gitlab.yunshan.net/yunshan/droplet/dropletctl"
+	"gitlab.yunshan.net/yunshan/droplet/stream/common"
 	"gitlab.yunshan.net/yunshan/droplet/stream/config"
 	"gitlab.yunshan.net/yunshan/droplet/stream/dbwriter"
 	"gitlab.yunshan.net/yunshan/droplet/stream/decoder"
@@ -34,7 +35,6 @@ type Logger struct {
 	Config        *config.Config
 	Decoders      []*decoder.Decoder
 	PlatformDatas []*grpc.PlatformInfoTable
-	Throttlers    []*throttler.ThrottlingQueue
 	FlowLogWriter *dbwriter.FlowLogWriter
 }
 
@@ -78,14 +78,15 @@ func NewFlowLogger(config *config.Config, controllers []net.IP, manager *droplet
 		throttle = config.L4Throttle / queueCount
 	}
 
-	throttlers := make([]*throttler.ThrottlingQueue, queueCount)
+	throttlers := make([][common.FLOWLOG_ID_MAX]*throttler.ThrottlingQueue, queueCount)
 	decoders := make([]*decoder.Decoder, queueCount)
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 
 	for i := 0; i < queueCount; i++ {
-		throttlers[i] = throttler.NewThrottlingQueue(
+		throttlers[i][int(common.L4_FLOW_ID)] = throttler.NewThrottlingQueue(
 			throttle,
 			flowLogWriter,
+			int(common.L4_FLOW_ID),
 		)
 		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, config.ControllerPort, "stream-l4-log-"+strconv.Itoa(i), "", nil)
 		if i == 0 {
@@ -98,18 +99,14 @@ func NewFlowLogger(config *config.Config, controllers []net.IP, manager *droplet
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			throttlers[i],
-			nil,
-			nil,
 		)
 	}
 	return &Logger{
 		Config:        config,
 		Decoders:      decoders,
 		PlatformDatas: platformDatas,
-		Throttlers:    throttlers,
 		FlowLogWriter: flowLogWriter,
 	}, nil
-
 }
 
 func NewProtoLogger(config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter) *Logger {
@@ -125,39 +122,48 @@ func NewProtoLogger(config *config.Config, controllers []net.IP, manager *drople
 
 	recv.RegistHandler(uint8(msgType), decodeQueues, queueCount)
 
-	httpThrottle := config.Throttle / queueCount
-	if config.L7HTTPThrottle != 0 {
-		httpThrottle = config.L7HTTPThrottle / queueCount
+	var throttles [common.FLOWLOG_ID_MAX]int
+	for i, _ := range throttles {
+		throttles[i] = config.Throttle / queueCount
 	}
-	dnsThrottle := config.Throttle / queueCount
+	if config.L7HTTPThrottle != 0 {
+		throttles[common.L7_HTTP_ID] = config.L7HTTPThrottle / queueCount
+	}
 	if config.L7DNSThrottle != 0 {
-		dnsThrottle = config.L7DNSThrottle / queueCount
+		throttles[common.L7_DNS_ID] = config.L7DNSThrottle / queueCount
+	}
+	if config.L7SQLThrottle != 0 {
+		throttles[common.L7_SQL_ID] = config.L7SQLThrottle / queueCount
+	}
+	if config.L7NoSQLThrottle != 0 {
+		throttles[common.L7_NOSQL_ID] = config.L7NoSQLThrottle / queueCount
+	}
+	if config.L7RPCThrottle != 0 {
+		throttles[common.L7_RPC_ID] = config.L7RPCThrottle / queueCount
+	}
+	if config.L7MQThrottle != 0 {
+		throttles[common.L7_MQ_ID] = config.L7MQThrottle / queueCount
 	}
 
-	httpThrottlers := make([]*throttler.ThrottlingQueue, queueCount)
-	dnsThrottlers := make([]*throttler.ThrottlingQueue, queueCount)
+	throttlers := make([][common.FLOWLOG_ID_MAX]*throttler.ThrottlingQueue, queueCount)
 
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	decoders := make([]*decoder.Decoder, queueCount)
 	for i := 0; i < queueCount; i++ {
-		httpThrottlers[i] = throttler.NewThrottlingQueue(
-			httpThrottle,
-			flowLogWriter,
-		)
-		dnsThrottlers[i] = throttler.NewThrottlingQueue(
-			dnsThrottle,
-			flowLogWriter,
-		)
+		for j := common.L7_HTTP_ID; j < common.FLOWLOG_ID_MAX; j++ {
+			throttlers[i][j] = throttler.NewThrottlingQueue(
+				throttles[j],
+				flowLogWriter,
+				int(j),
+			)
+		}
 		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, config.ControllerPort, "stream-l7-log-"+strconv.Itoa(i), "", nil)
 		decoders[i] = decoder.NewDecoder(
-			i,
-			msgType,
+			i, msgType,
 			config.ShardID,
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
-			nil,
-			httpThrottlers[i],
-			dnsThrottlers[i],
+			throttlers[i],
 		)
 	}
 
@@ -165,7 +171,6 @@ func NewProtoLogger(config *config.Config, controllers []net.IP, manager *drople
 		Config:        config,
 		Decoders:      decoders,
 		PlatformDatas: platformDatas,
-		Throttlers:    append(httpThrottlers, dnsThrottlers...),
 	}
 }
 
