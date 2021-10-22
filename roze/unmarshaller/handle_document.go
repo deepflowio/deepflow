@@ -95,14 +95,14 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 				} else {
 					// 没有port,如果是cluserIP 或 pod_IP，需要获取service_id
 					if t.L3DeviceType1 == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-						t.L3DeviceType1 == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD) {
+						t.PodID1 != 0 {
 						_, serviceID = platformData.QueryIPv6IsKeyServiceAndID(t.L3EpcID1, t.IP61, t.Protocol, 0)
 					}
 				}
 				// 如果是pod服务，需要设置service_id
 				if t.L3DeviceType1 == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-					t.L3DeviceType1 == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD) ||
-					t.L3DeviceType1 == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_NODE) {
+					t.PodID1 != 0 ||
+					t.PodNodeID1 != 0 {
 					t.ServiceID1 = serviceID
 				}
 			} else {
@@ -116,14 +116,14 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 				} else {
 					// 没有port,如果是cluserIP 或 pod_IP，需要获取service_id
 					if t.L3DeviceType1 == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-						t.L3DeviceType1 == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD) {
+						t.PodID1 != 0 {
 						_, serviceID = platformData.QueryIsKeyServiceAndID(t.L3EpcID1, t.IP1, t.Protocol, 0)
 					}
 				}
 				// 如果是pod服务，需要设置service_id
 				if t.L3DeviceType1 == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-					t.L3DeviceType1 == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD) ||
-					t.L3DeviceType1 == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_NODE) {
+					t.PodID1 != 0 ||
+					t.PodNodeID1 != 0 {
 					t.ServiceID1 = serviceID
 				}
 			}
@@ -190,14 +190,14 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 				// 有port有edge, 无port无edge，无port有edge
 				// 如果是cluserIP 或 pod_IP，需要获取service_id
 				if t.L3DeviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-					t.L3DeviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD) {
+					t.PodID != 0 {
 					_, serviceID = platformData.QueryIPv6IsKeyServiceAndID(t.L3EpcID, t.IP6, t.Protocol, 0)
 				}
 			}
 			// 如果是pod服务，需要设置service_id
 			if t.L3DeviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-				t.L3DeviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD) ||
-				t.L3DeviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_NODE) {
+				t.PodID != 0 ||
+				t.PodNodeID != 0 {
 				t.ServiceID = serviceID
 			}
 		} else {
@@ -212,14 +212,14 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 				// 有port有edge, 无port无edge，无port有edge
 				// 如果是cluserIP 或 pod_IP，需要获取service_id
 				if t.L3DeviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-					t.L3DeviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD) {
+					t.PodID != 0 {
 					_, serviceID = platformData.QueryIsKeyServiceAndID(t.L3EpcID, t.IP, t.Protocol, 0)
 				}
 			}
 			// 如果是pod服务，需要设置service_id
 			if t.L3DeviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-				t.L3DeviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD) ||
-				t.L3DeviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_NODE) {
+				t.PodID != 0 ||
+				t.PodNodeID != 0 {
 				t.ServiceID = serviceID
 			}
 		}
