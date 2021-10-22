@@ -862,13 +862,13 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool, platformData 
 		k.GroupIDs1, k.BusinessIDs1 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID1), f.IP6Dst)
 		// 0端如果是clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-			k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD) {
+			k.PodID0 != 0 {
 			_, k.ServiceID0 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID0), f.IP6Src, f.Proto, 0)
 		}
 		// 1端如果是NodeIP,clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-			k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD) ||
-			k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_NODE) {
+			k.PodID1 != 0 ||
+			k.PodNodeID1 != 0 {
 			_, k.ServiceID1 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID1), f.IP6Dst, f.Proto, f.PortDst)
 		}
 	} else {
@@ -876,13 +876,13 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool, platformData 
 		k.GroupIDs1, k.BusinessIDs1 = platformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID1), f.IPDst)
 		// 0端如果是clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-			k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD) {
+			k.PodID0 != 0 {
 			_, k.ServiceID0 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID0), f.IPSrc, f.Proto, 0)
 		}
 		// 1端如果是NodeIP,clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-			k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD) ||
-			k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_NODE) {
+			k.PodID1 != 0 ||
+			k.PodNodeID1 != 0 {
 			_, k.ServiceID1 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID1), f.IPDst, f.Proto, f.PortDst)
 		}
 	}
