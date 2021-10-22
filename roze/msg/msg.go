@@ -26,6 +26,11 @@ const (
 	VTAP_FLOW_EDGE_1S
 	VTAP_FLOW_EDGE_PORT_1S
 
+	VTAP_APP
+	VTAP_APP_PORT
+	VTAP_APP_EDGE
+	VTAP_APP_EDGE_PORT
+
 	MAX_INDEX
 )
 
@@ -70,7 +75,7 @@ func CloneRozeDocument(rd *RozeDocument) *RozeDocument {
 func (rd *RozeDocument) String() string {
 	return fmt.Sprintf(
 		"\n db: %s {\n\ttimestamp: %d\tFlags: b%b\n\ttag: %s\n\tmeter: %#v\n}\n",
-		rd.Database(), rd.Timestamp, rd.Flags, rd.Tag, rd.Meter)
+		rd.Database(), rd.Timestamp, rd.Flags, rd.Tagger, rd.Meter)
 }
 
 func (rd *RozeDocument) SortKey() uint64 {
@@ -92,7 +97,7 @@ func (rd *RozeDocument) AppName() string {
 // 用于统计各个数据库写入的数据量
 func (rd *RozeDocument) DatabaseIndex() int {
 	suffixID := 0
-	if tag, ok := rd.Document.Tag.(*zerodoc.Tag); ok {
+	if tag, ok := rd.Document.Tagger.(*zerodoc.Tag); ok {
 		suffixID = tag.DatabaseSuffixID()
 	}
 	if suffixID == zerodoc.SUFFIX_ACL && rd.Document.Meter.ID() == zerodoc.ACL_ID {
@@ -103,12 +108,23 @@ func (rd *RozeDocument) DatabaseIndex() int {
 	switch rd.Document.Meter.ID() {
 	case zerodoc.FLOW_ID:
 		index = VTAP_FLOW
-		if suffixID == zerodoc.SUFFIX_EDGE {
+		switch suffixID {
+		case zerodoc.SUFFIX_EDGE:
 			index = VTAP_FLOW_EDGE
-		} else if suffixID == zerodoc.SUFFIX_PORT {
+		case zerodoc.SUFFIX_PORT:
 			index = VTAP_FLOW_PORT
-		} else if suffixID == zerodoc.SUFFIX_EDGE_PORT {
+		case zerodoc.SUFFIX_EDGE_PORT:
 			index = VTAP_FLOW_EDGE_PORT
+		}
+	case zerodoc.APP_ID:
+		index = VTAP_APP
+		switch suffixID {
+		case zerodoc.SUFFIX_EDGE:
+			index = VTAP_APP_EDGE
+		case zerodoc.SUFFIX_PORT:
+			index = VTAP_APP_PORT
+		case zerodoc.SUFFIX_EDGE_PORT:
+			index = VTAP_APP_EDGE_PORT
 		}
 	}
 
@@ -125,7 +141,7 @@ func (rd *RozeDocument) Database() string {
 
 	suffix := ""
 	suffixID := 0
-	if tag, ok := rd.Document.Tag.(*zerodoc.Tag); ok {
+	if tag, ok := rd.Document.Tagger.(*zerodoc.Tag); ok {
 		suffix = tag.DatabaseSuffix()
 		suffixID = tag.DatabaseSuffixID()
 	}
@@ -141,7 +157,7 @@ func (rd *RozeDocument) Database() string {
 }
 
 func (rd *RozeDocument) DatabaseNameID() uint16 {
-	if tag, ok := rd.Document.Tag.(*zerodoc.Tag); ok {
+	if tag, ok := rd.Document.Tagger.(*zerodoc.Tag); ok {
 		return uint16((rd.AppID() << 8) | tag.DatabaseSuffixID())
 	}
 	return uint16(rd.AppID())
@@ -152,7 +168,7 @@ func (rd *RozeDocument) Release() {
 }
 
 func (rd *RozeDocument) WriteBlock(block *ckdb.Block) error {
-	if err := rd.Tag.(*zerodoc.Tag).WriteBlock(block, rd.Timestamp); err != nil {
+	if err := rd.Tagger.(*zerodoc.Tag).WriteBlock(block, rd.Timestamp); err != nil {
 		return err
 	}
 	if err := rd.Meter.WriteBlock(block); err != nil {
@@ -162,6 +178,6 @@ func (rd *RozeDocument) WriteBlock(block *ckdb.Block) error {
 }
 
 func (rd *RozeDocument) TableID() (uint8, error) {
-	tag, _ := rd.Tag.(*zerodoc.Tag)
+	tag, _ := rd.Tagger.(*zerodoc.Tag)
 	return tag.TableID((rd.Document.Flags & app.FLAG_PER_SECOND_METRICS) == 1)
 }

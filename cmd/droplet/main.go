@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -87,7 +88,7 @@ func main() {
 
 	stats.RegisterGcMonitor()
 	stats.SetMinInterval(10 * time.Second)
-	stats.SetRemotes(net.UDPAddr{net.ParseIP("127.0.0.1").To4(), INFLUXDB_RELAY_PORT, ""})
+	stats.SetRemotes(net.JoinHostPort("127.0.0.1", strconv.Itoa(INFLUXDB_RELAY_PORT)))
 
 	dropletConfig := dropletcfg.Load(*configPath)
 	bytes, _ = yaml.Marshal(dropletConfig)

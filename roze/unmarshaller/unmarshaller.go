@@ -185,7 +185,7 @@ func decodeForDebug(b []byte) (BatchDocument, error) {
 	docs := make([]*app.Document, 0)
 
 	for !decoder.IsEnd() {
-		doc, err := zerodoc.DecodeForQueueMonitor(decoder)
+		doc, err := app.DecodeForQueueMonitor(decoder)
 		if err != nil {
 			return nil, err
 		}
@@ -196,7 +196,7 @@ func decodeForDebug(b []byte) (BatchDocument, error) {
 
 func GetDocHashValue(doc *app.Document, encoder *codec.SimpleEncoder) uint64 {
 	encoder.Reset()
-	tag := doc.Tag.(*zerodoc.Tag)
+	tag := doc.Tagger.(*zerodoc.Tag)
 	// 分组时tid不同，code相同的doc需要分在一组
 	tag.EncodeByCodeTID(tag.Code, 0, encoder)
 	return utils.DJBHash(HASH_SEED, encoder.String())
@@ -215,7 +215,7 @@ func (u *Unmarshaller) QueueProcess() {
 				bytes := recvBytes.Buffer[recvBytes.Begin:recvBytes.End]
 				decoder.Init(bytes)
 				for !decoder.Failed() && !decoder.IsEnd() {
-					doc, err := zerodoc.Decode(decoder)
+					doc, err := app.Decode(decoder)
 					if err != nil {
 						u.counter.ErrDocCount++
 						log.Warningf("Decode failed, bytes len=%d err=%s", len([]byte(bytes)), err)

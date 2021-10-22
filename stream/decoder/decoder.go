@@ -12,6 +12,7 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
 	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"gitlab.yunshan.net/yunshan/droplet/stream/common"
 	"gitlab.yunshan.net/yunshan/droplet/stream/jsonify"
 	"gitlab.yunshan.net/yunshan/droplet/stream/throttler"
 )
@@ -23,26 +24,32 @@ const (
 )
 
 type Counter struct {
-	RawCount        int64 `statsd:"raw-count"`
-	L7HTTPCount     int64 `statsd:"l7-http-count"`
-	L7HTTPDropCount int64 `statsd:"l7-http-drop-count"`
-	L7DNSCount      int64 `statsd:"l7-dns-count"`
-	L7DNSDropCount  int64 `statsd:"l7-dns-drop-count"`
-	L4Count         int64 `statsd:"l4-count"`
-	L4DropCount     int64 `statsd:"l4-drop-count"`
-	ErrorCount      int64 `statsd:"err-count"`
+	RawCount         int64 `statsd:"raw-count"`
+	L4Count          int64 `statsd:"l4-count"`
+	L4DropCount      int64 `statsd:"l4-drop-count"`
+	L7HTTPCount      int64 `statsd:"l7-http-count"`
+	L7HTTPDropCount  int64 `statsd:"l7-http-drop-count"`
+	L7DNSCount       int64 `statsd:"l7-dns-count"`
+	L7DNSDropCount   int64 `statsd:"l7-dns-drop-count"`
+	L7SQLCount       int64 `statsd:"l7-sql-count"`
+	L7SQLDropCount   int64 `statsd:"l7-sql-drop-count"`
+	L7NoSQLCount     int64 `statsd:"l7-nosql-count"`
+	L7NoSQLDropCount int64 `statsd:"l7-nosql-drop-count"`
+	L7RPCCount       int64 `statsd:"l7-rpc-count"`
+	L7RPCDropCount   int64 `statsd:"l7-rpc-drop-count"`
+	L7MQCount        int64 `statsd:"l7-mq-count"`
+	L7MQDropCount    int64 `statsd:"l7-mq-drop-count"`
+	ErrorCount       int64 `statsd:"err-count"`
 }
 
 type Decoder struct {
-	index         int
-	msgType       int
-	shardID       int
-	platformData  *grpc.PlatformInfoTable
-	inQueue       queue.QueueReader
-	flowThrottler *throttler.ThrottlingQueue
-	httpThrottler *throttler.ThrottlingQueue
-	dnsThrottler  *throttler.ThrottlingQueue
-	debugEnabled  bool
+	index        int
+	msgType      int
+	shardID      int
+	platformData *grpc.PlatformInfoTable
+	inQueue      queue.QueueReader
+	throttlers   [common.FLOWLOG_ID_MAX]*throttler.ThrottlingQueue
+	debugEnabled bool
 
 	counter *Counter
 	utils.Closable
@@ -52,21 +59,17 @@ func NewDecoder(
 	index, msgType, shardID int,
 	platformData *grpc.PlatformInfoTable,
 	inQueue queue.QueueReader,
-	flowThrottler *throttler.ThrottlingQueue,
-	httpThrottler *throttler.ThrottlingQueue,
-	dnsThrottler *throttler.ThrottlingQueue,
+	throttlers [common.FLOWLOG_ID_MAX]*throttler.ThrottlingQueue,
 ) *Decoder {
 	return &Decoder{
-		index:         index,
-		msgType:       msgType,
-		shardID:       shardID,
-		platformData:  platformData,
-		inQueue:       inQueue,
-		flowThrottler: flowThrottler,
-		httpThrottler: httpThrottler,
-		dnsThrottler:  dnsThrottler,
-		debugEnabled:  log.IsEnabledFor(logging.DEBUG),
-		counter:       &Counter{},
+		index:        index,
+		msgType:      msgType,
+		shardID:      shardID,
+		platformData: platformData,
+		inQueue:      inQueue,
+		throttlers:   throttlers,
+		debugEnabled: log.IsEnabledFor(logging.DEBUG),
+		counter:      &Counter{},
 	}
 }
 
@@ -147,40 +150,78 @@ func (d *Decoder) sendFlow(flow *datatype.TaggedFlow) {
 	}
 	d.counter.L4Count++
 	l := jsonify.TaggedFlowToLogger(flow, d.shardID, d.platformData)
-	if !d.flowThrottler.Send(l) {
+	if !d.throttlers[common.L4_FLOW_ID].Send(l) {
 		d.counter.L4DropCount++
 	}
 	flow.Release()
+}
+
+type decodeFunc func(*datatype.AppProtoLogsData, int, *grpc.PlatformInfoTable) interface{}
+
+var decoderFuncs = []decodeFunc{
+	datatype.PROTO_HTTP:  jsonify.ProtoLogToHTTPLogger,
+	datatype.PROTO_DNS:   jsonify.ProtoLogToDNSLogger,
+	datatype.PROTO_MYSQL: jsonify.ProtoLogToSQLLogger,
+	datatype.PROTO_REDIS: jsonify.ProtoLogToNoSQLLogger,
+	datatype.PROTO_DUBBO: jsonify.ProtoLogToRPCLogger,
+	datatype.PROTO_KAFKA: jsonify.ProtoLogToMQLogger,
+}
+
+var throttleIDs = []common.FlowLogID{
+	datatype.PROTO_HTTP:  common.L7_HTTP_ID,
+	datatype.PROTO_DNS:   common.L7_DNS_ID,
+	datatype.PROTO_MYSQL: common.L7_SQL_ID,
+	datatype.PROTO_REDIS: common.L7_NOSQL_ID,
+	datatype.PROTO_DUBBO: common.L7_RPC_ID,
+	datatype.PROTO_KAFKA: common.L7_MQ_ID,
 }
 
 func (d *Decoder) sendProto(proto *datatype.AppProtoLogsData) {
 	if d.debugEnabled {
 		log.Debugf("decoder %d recv proto: %s", d.index, proto)
 	}
-	if proto.Proto == datatype.PROTO_HTTP {
+
+	df := decoderFuncs[proto.Proto]
+	if df == nil {
+		d.counter.ErrorCount++
+		log.Debugf("proto(%s) decoder is not exist", proto.Proto)
+		return
+	}
+
+	l := df(proto, d.shardID, d.platformData)
+	throttleID := throttleIDs[proto.Proto]
+	var drop int64
+	if !d.throttlers[throttleID].Send(l) {
+		drop++
+	}
+	switch proto.Proto {
+	case datatype.PROTO_HTTP:
 		d.counter.L7HTTPCount++
-		l := jsonify.ProtoLogToHTTPLogger(proto, d.shardID, d.platformData)
-		if !d.httpThrottler.Send(l) {
-			d.counter.L7HTTPDropCount++
-		}
-	} else if proto.Proto == datatype.PROTO_DNS {
+		d.counter.L7HTTPDropCount += drop
+	case datatype.PROTO_DNS:
 		d.counter.L7DNSCount++
-		l := jsonify.ProtoLogToDNSLogger(proto, d.shardID, d.platformData)
-		if !d.dnsThrottler.Send(l) {
-			d.counter.L7DNSDropCount++
-		}
+		d.counter.L7DNSDropCount += drop
+	case datatype.PROTO_MYSQL:
+		d.counter.L7SQLCount++
+		d.counter.L7SQLDropCount += drop
+	case datatype.PROTO_REDIS:
+		d.counter.L7NoSQLCount++
+		d.counter.L7NoSQLDropCount += drop
+	case datatype.PROTO_DUBBO:
+		d.counter.L7RPCCount++
+		d.counter.L7RPCDropCount += drop
+	case datatype.PROTO_KAFKA:
+		d.counter.L7MQCount++
+		d.counter.L7MQDropCount += drop
 	}
 	proto.Release()
 }
 
 func (d *Decoder) flush() {
-	if d.flowThrottler != nil {
-		d.flowThrottler.Send(nil)
-	}
-	if d.httpThrottler != nil {
-		d.httpThrottler.Send(nil)
-	}
-	if d.dnsThrottler != nil {
-		d.dnsThrottler.Send(nil)
+	for _, throttler := range d.throttlers {
+		if throttler != nil {
+			throttler.Send(nil)
+
+		}
 	}
 }

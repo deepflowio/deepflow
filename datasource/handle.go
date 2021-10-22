@@ -15,11 +15,14 @@ import (
 const (
 	ORIGIN_TABLE_1M = "1m"
 	ORIGIN_TABLE_1S = "1s"
+	FLOW_LOG_L4     = "flow_log.l4"
+	FLOW_LOG_L7     = "flow_log.l7"
 )
 
 // VATP_ACL数据库, 不进行数据源修改
 var metricsGroupDBIDs = [][]zerodoc.MetricsDBID{
 	zerodoc.VTAP_FLOW: []zerodoc.MetricsDBID{zerodoc.VTAP_FLOW, zerodoc.VTAP_FLOW_EDGE, zerodoc.VTAP_FLOW_EDGE_PORT, zerodoc.VTAP_FLOW_PORT},
+	zerodoc.VTAP_APP:  []zerodoc.MetricsDBID{zerodoc.VTAP_APP, zerodoc.VTAP_APP_EDGE, zerodoc.VTAP_APP_EDGE_PORT, zerodoc.VTAP_APP_PORT},
 }
 
 func getMetricsSubDBIDs(dbGroup string) ([]zerodoc.MetricsDBID, error) {
@@ -37,8 +40,7 @@ var unsummableMaxFieldsMap = map[string]struct{}{
 	"rtt_server_max": {},
 	"srt_max":        {},
 	"art_max":        {},
-	"http_rrt_max":   {},
-	"dns_rrt_max":    {},
+	"rrt_max":        {},
 }
 
 //  对于unsumable的sum列使用max,min聚合时, count列取相应的max,min列的值
@@ -48,16 +50,14 @@ var unsummableFieldsMap = map[string]struct{}{
 	"rtt_server_sum": {},
 	"srt_sum":        {},
 	"art_sum":        {},
-	"http_rrt_sum":   {},
-	"dns_rrt_sum":    {},
+	"rrt_sum":        {},
 
 	"rtt_count":        {},
 	"rtt_client_count": {},
 	"rtt_server_count": {},
 	"srt_count":        {},
 	"art_count":        {},
-	"http_rrt_count":   {},
-	"dns_rrt_count":    {},
+	"rrt_count":        {},
 }
 
 func getColumnString(column *ckdb.Column, aggrSummable, aggrUnsummable string, t TableType) string {
@@ -429,10 +429,19 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 
 	duration = duration / 24 // 切换为天
 
-	// flow_log只支持mod
-	if dbGroup == common.FLOW_LOG_DB && action == actionStrings[MOD] {
+	// flow_log.l4和flow_log.l7只支持mod
+	if (dbGroup == FLOW_LOG_L4 || dbGroup == FLOW_LOG_L7) && action == actionStrings[MOD] {
 		for _, ck := range cks {
-			for flowLogID := common.L4_FLOW_ID; flowLogID < common.FLOWLOG_ID_MAX; flowLogID++ {
+			var flowLogIDMin, flowLogIDMax common.FlowLogID
+			if dbGroup == FLOW_LOG_L4 {
+				// 以L7_HTTP_ID为界，小于它的为L4 LOG, 大于等于它的为L7 LOG
+				flowLogIDMin = common.L4_FLOW_ID
+				flowLogIDMax = common.L7_HTTP_ID
+			} else if dbGroup == FLOW_LOG_L7 {
+				flowLogIDMin = common.L7_HTTP_ID
+				flowLogIDMax = common.FLOWLOG_ID_MAX
+			}
+			for flowLogID := flowLogIDMin; flowLogID < flowLogIDMax; flowLogID++ {
 				if err := m.modFlowLogLocalTable(ck, flowLogID, duration); err != nil {
 					return err
 				}
