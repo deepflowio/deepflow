@@ -1,6 +1,3 @@
-use anyhow::{Context, Error, Result};
-use log::{debug, error, info, warn};
-use roxmltree::Document;
 use std::process::Command;
 use std::{
     fs::{read_dir, OpenOptions},
@@ -13,6 +10,11 @@ use std::{
     thread::{self, JoinHandle},
     time::Duration,
 };
+
+use anyhow::{Context, Error, Result};
+use flexi_logger::Logger;
+use log::{debug, error, info, warn};
+use roxmltree::Document;
 
 const DEFAULT_LIBVIRT_XML_PATH: &'static str = "/etc/libvirt/qemu";
 
@@ -319,7 +321,7 @@ mod tests {
 
     #[test]
     fn test_libxml_extractor() {
-        env_logger::init();
+        Logger::try_with_str("info").unwrap().start().unwrap();
         let entries =
             LibVirtXmlExtractor::extract_from("src/platform/instance-00000054.xml").unwrap();
         let file_path = PathBuf::from("src/platform");

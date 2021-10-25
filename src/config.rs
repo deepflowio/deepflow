@@ -1,7 +1,6 @@
-use std::error::Error;
 use std::fs;
 use std::io;
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::ToSocketAddrs;
 use std::path::Path;
 use std::time::Duration;
 
