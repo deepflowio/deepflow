@@ -1,2 +1,6 @@
-pub mod platform;
-pub mod rpc;
+mod config;
+mod platform;
+mod proto;
+mod rpc;
+
+pub mod trident;
