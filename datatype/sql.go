@@ -105,3 +105,60 @@ func (i *MysqlInfo) Merge(r interface{}) {
 		i.ErrorCode = response.ErrorCode
 	}
 }
+
+var redisInfoPool = pool.NewLockFreePool(func() interface{} {
+	return new(RedisInfo)
+})
+
+func AcquireREDISInfo() *RedisInfo {
+	return redisInfoPool.Get().(*RedisInfo)
+}
+
+func ReleaseREDISInfo(d *RedisInfo) {
+	*d = RedisInfo{}
+	redisInfoPool.Put(d)
+}
+
+type RedisInfo struct {
+	Request  string
+	Response string
+}
+
+func (i *RedisInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, code uint16) {
+	switch msgType {
+	case MSG_T_REQUEST:
+		encoder.WriteString255(i.Request)
+	case MSG_T_RESPONSE:
+		encoder.WriteString255(i.Response)
+	case MSG_T_SESSION:
+		encoder.WriteString255(i.Request)
+		encoder.WriteString255(i.Response)
+	default:
+		panic("RedisInfo encode msg type error!")
+
+	}
+}
+
+func (i *RedisInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, code uint16) {
+	switch msgType {
+	case MSG_T_REQUEST:
+		i.Request = decoder.ReadString255()
+	case MSG_T_RESPONSE:
+		i.Response = decoder.ReadString255()
+	case MSG_T_SESSION:
+		i.Request = decoder.ReadString255()
+		i.Response = decoder.ReadString255()
+	default:
+		panic("RedisInfo decode msg type error!")
+	}
+}
+
+func (i *RedisInfo) String() string {
+	return fmt.Sprintf("%#v", i)
+}
+
+func (i *RedisInfo) Merge(r interface{}) {
+	if redis, ok := r.(*RedisInfo); ok {
+		i.Response = redis.Response
+	}
+}
