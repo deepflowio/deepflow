@@ -1,7 +1,7 @@
 [package]
 name = "trident"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 default-run = "trident"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -10,11 +10,11 @@ default-run = "trident"
 
 [dependencies]
 anyhow = "1.0"
-clap = "3.0.0-beta.5"
+clap = {version = "3.0.0-beta.5", features=["derive"] }
 flexi_logger = "0.19"
 futures = "~0.3"
-humantime-serde = "1.0"
 hostname = "0.3.1"
+humantime-serde = "1.0"
 log = "0.4"
 neli = "0.5"
 nix = "0.23"

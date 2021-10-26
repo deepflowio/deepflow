@@ -1,22 +1,21 @@
-use std::convert::TryFrom;
 use std::fmt;
 use std::net::IpAddr;
+use std::{ffi::CStr, str::FromStr};
 
 use anyhow::{anyhow, Context, Result};
 use neli::{
-    consts::{
-        nl::{NlTypeWrapper, NlmF, NlmFFlags},
-        rtnl::*,
-        socket::NlFamily,
-    },
+    consts::{nl::*, rtnl::*, socket::*},
     err::NlError,
     nl::{NlPayload, Nlmsghdr},
-    rtnl::{Ifaddrmsg, Ifinfomsg, Rtattr, Rtmsg},
-    socket::NlSocketHandle,
+    rtnl::*,
+    socket::*,
     types::{Buffer, RtBuffer},
 };
+use nix::libc::IFLA_INFO_KIND;
 
-#[derive(Clone, PartialEq, Eq)]
+use crate::error::Error;
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Default, Copy)]
 pub struct MacAddr([u8; 6]);
 
 pub const MAC_ADDR_ZERO: MacAddr = MacAddr([0, 0, 0, 0, 0, 0]);
@@ -41,10 +40,44 @@ impl fmt::Display for MacAddr {
     }
 }
 
+impl From<MacAddr> for u64 {
+    fn from(mac: MacAddr) -> Self {
+        mac.0.into_iter().fold(0, |r, a| (r + a as u64) << 8)
+    }
+}
+
+impl TryFrom<u64> for MacAddr {
+    type Error = core::array::TryFromSliceError;
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        let slice = &value.to_le_bytes()[..6];
+        <&[u8; 6]>::try_from(slice).map(|a| MacAddr(*a))
+    }
+}
+
+impl FromStr for MacAddr {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut addr = [0u8; 6];
+        for (idx, n_s) in s.split(":").enumerate() {
+            if idx >= 6 {
+                return Err(Error::ParseMacFailed(s.to_string()));
+            }
+            match u8::from_str_radix(n_s, 16) {
+                Ok(n) => addr[idx] = n,
+                Err(_) => return Err(Error::ParseMacFailed(s.to_string())),
+            }
+        }
+        Ok(MacAddr(addr))
+    }
+}
+
 #[derive(Debug)]
 pub struct Link {
     pub if_index: u32,
     pub mac_addr: MacAddr,
+    pub name: String,
+    pub if_type: Option<String>,
+    pub parent_index: Option<u32>,
 }
 
 pub fn link_list() -> Result<Vec<Link>, NlError> {
@@ -74,23 +107,68 @@ pub fn link_list() -> Result<Vec<Link>, NlError> {
             let payload = m.get_payload()?;
 
             let mut mac_addr = None;
+            let mut if_type = None;
+            let mut parent_index = None;
+            let mut if_name = None;
+
             for attr in payload.rtattrs.iter() {
                 match attr.rta_type {
                     Ifla::Address => {
                         mac_addr = <&[u8; 6]>::try_from(attr.rta_payload.as_ref()).ok()
                     }
-                    _ => (),
+                    Ifla::Linkinfo => {
+                        let info = attr.rta_payload.as_ref();
+                        let len = u16::from_le_bytes(*<&[u8; 2]>::try_from(&info[..2]).unwrap());
+                        let attr_type =
+                            u16::from_le_bytes(*<&[u8; 2]>::try_from(&info[2..4]).unwrap());
+
+                        if let Some(attr_payload) = info.get(4..len as usize) {
+                            // INFO_KIND 排列payload第一， IFLA_INFO_KIND = 1
+                            if attr_type == IFLA_INFO_KIND {
+                                if_type = CStr::from_bytes_with_nul(attr_payload)
+                                    .ok()
+                                    .and_then(|c| c.to_str().ok())
+                                    .map(String::from);
+                            }
+                        }
+                    }
+                    Ifla::Ifname => {
+                        if_name = CStr::from_bytes_with_nul(attr.rta_payload.as_ref())
+                            .ok()
+                            .and_then(|c| c.to_str().ok())
+                            .map(String::from);
+                    }
+                    Ifla::Link => {
+                        if let Some(payload) = attr.rta_payload.as_ref().get(..4) {
+                            parent_index =
+                                Some(u32::from_le_bytes(*<&[u8; 4]>::try_from(payload).unwrap()));
+                        }
+                    }
+                    _ => {}
                 }
             }
-            if let Some(mac_addr) = mac_addr {
+
+            if let Some(mac) = mac_addr {
                 links.push(Link {
                     if_index: payload.ifi_index as u32,
-                    mac_addr: MacAddr(*mac_addr),
+                    name: if_name.unwrap_or_default(),
+                    mac_addr: MacAddr(*mac),
+                    if_type,
+                    parent_index,
                 });
             }
         }
     }
+
     Ok(links)
+}
+
+#[derive(Debug)]
+pub struct Addr {
+    pub if_index: u32,
+    pub ip_addr: IpAddr,
+    pub scope: u8,
+    pub prefix_len: u8,
 }
 
 fn parse_ip_slice(bs: &[u8]) -> Option<IpAddr> {
@@ -101,12 +179,6 @@ fn parse_ip_slice(bs: &[u8]) -> Option<IpAddr> {
     } else {
         None
     }
-}
-
-#[derive(Debug)]
-pub struct Addr {
-    pub if_index: u32,
-    pub ip_addr: IpAddr,
 }
 
 pub fn addr_list() -> Result<Vec<Addr>, NlError> {
@@ -135,6 +207,7 @@ pub fn addr_list() -> Result<Vec<Addr>, NlError> {
         if m.nl_type != Rtm::Newaddr.into() {
             continue;
         }
+
         let payload = m.get_payload()?;
 
         let mut ip_addr = None;
@@ -148,6 +221,8 @@ pub fn addr_list() -> Result<Vec<Addr>, NlError> {
             addrs.push(Addr {
                 if_index: payload.ifa_index as u32,
                 ip_addr,
+                prefix_len: payload.ifa_prefixlen as u8,
+                scope: payload.ifa_scope as u8,
             });
         }
     }

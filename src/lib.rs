@@ -1,8 +1,8 @@
 mod config;
 mod consts;
+mod error;
 mod platform;
 mod proto;
 mod rpc;
-mod utils;
-
 pub mod trident;
+mod utils;
