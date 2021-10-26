@@ -742,11 +742,15 @@ func (t *PlatformInfoTable) QueryIPv6GroupIDsAndBusinessIDs(l3EpcID int16, ipv6 
 //   使用 epcid+ip+port 查询is_key_service
 // service_id 查询, 只支持查询pod_service类型的服务
 //   1，使用 epcid+clusterIP(device_type为POD_SERVICE) + port(可选) 查询
-//   2，使用 epcid+后端podIP(device_type为POD) + port(可选) 查询
-//   3，使用 epcid+nodeIP(device_type为POD_NODE)+port(必选) 查询
+//   2，使用 epcid+后端podIP(pod_id 非0) + port(可选) 查询
+//   3，使用 epcid+nodeIP(pod_node_id 非0)+port(必选) 查询
 func (t *PlatformInfoTable) QueryIsKeyServiceAndID(l3EpcID int16, ipv4 uint32, protocol layers.IPProtocol, serverPort uint16) (bool, uint32) {
 	if t.serviceLabeler == nil {
 		return false, 0
+	}
+	// serverPort为0时，也忽略protocol
+	if serverPort == 0 {
+		protocol = 0
 	}
 	serviceIdxs := t.serviceLabeler.QueryServer(l3EpcID, ipv4, 0, protocol, serverPort)
 	for _, i := range serviceIdxs {
@@ -760,6 +764,10 @@ func (t *PlatformInfoTable) QueryIsKeyServiceAndID(l3EpcID int16, ipv4 uint32, p
 func (t *PlatformInfoTable) QueryIPv6IsKeyServiceAndID(l3EpcID int16, ipv6 net.IP, protocol layers.IPProtocol, serverPort uint16) (bool, uint32) {
 	if t.serviceLabeler == nil {
 		return false, 0
+	}
+	// serverPort为0时，也忽略protocol
+	if serverPort == 0 {
+		protocol = 0
 	}
 	serviceIdxs := t.serviceLabeler.QueryServerIPv6(l3EpcID, ipv6, 0, protocol, serverPort)
 	for _, i := range serviceIdxs {
@@ -802,9 +810,10 @@ func (t *PlatformInfoTable) updateGroupIDsAndBusinessIDs(response *trident.SyncR
 	t.groupLabeler = NewGroupLabeler(t.groupLabelerLogger, groups)
 
 	services := make([]api.GroupIDMap, 0, len(groupsData.GetSvcs()))
-	for i, svc := range groupsData.GetSvcs() {
+	serviceIndex := 0
+	for _, svc := range groupsData.GetSvcs() {
 		groupIDMap := api.GroupIDMap{
-			GroupID:     uint16(i),
+			GroupID:     uint16(serviceIndex),
 			L3EpcID:     int32(svc.GetEpcId()),
 			CIDRs:       svc.GetIps(),
 			IPRanges:    svc.GetIpRanges(),
@@ -825,12 +834,48 @@ func (t *PlatformInfoTable) updateGroupIDsAndBusinessIDs(response *trident.SyncR
 			}
 		}
 		services = append(services, groupIDMap)
-		log.Debugf("svc: %+v", svc)
+		log.Debugf("svc: %+v", groupIDMap)
+		serviceIndex++
+		// 增加支持若查询时的protocol为0，则忽略protocol的匹配
+		groupIDMapProtoIgnore := groupIDMap
+		groupIDMapProtoIgnore.Protocol = 0
+		groupIDMapProtoIgnore.GroupID = uint16(serviceIndex)
+		if !servicesHasGroupIDMap(services, groupIDMapProtoIgnore) { // 防止重复增加
+			services = append(services, groupIDMapProtoIgnore)
+			serviceIndex++
+			log.Debugf("svc protocol ignore: %+v", groupIDMapProtoIgnore)
+		}
 	}
 	t.serviceLabeler = NewGroupLabeler(t.serviceLabelerLogger, services)
 	t.services = services
 
 	return true
+}
+
+func stringsEqual(s1, s2 []string) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+	for i, v := range s1 {
+		if v != s2[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func servicesHasGroupIDMap(services []api.GroupIDMap, g api.GroupIDMap) bool {
+	for _, s := range services {
+		if s.L3EpcID == g.L3EpcID &&
+			stringsEqual(s.CIDRs, g.CIDRs) &&
+			stringsEqual(s.IPRanges, g.IPRanges) &&
+			s.Protocol == g.Protocol &&
+			s.ServerPorts == g.ServerPorts &&
+			s.ServiceID == g.ServiceID {
+			return true
+		}
+	}
+	return false
 }
 
 func (t *PlatformInfoTable) Reload() error {
