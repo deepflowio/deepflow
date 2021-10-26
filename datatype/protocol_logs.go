@@ -57,6 +57,8 @@ func (t *LogMessageType) String() string {
 		formatted = "REQUEST"
 	case MSG_T_RESPONSE:
 		formatted = "RESPONSE"
+	case MSG_T_OTHER:
+		formatted = "OTHER"
 	default:
 		formatted = "UNKOWN"
 	}
@@ -264,6 +266,10 @@ func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
 		l.Detail = dnsInfo
 	} else if l.Proto == PROTO_MYSQL {
 		mysqlInfo := AcquireMYSQLInfo()
+		mysqlInfo.Decode(decoder, l.MsgType, l.Code)
+		l.Detail = mysqlInfo
+	} else if l.Proto == PROTO_REDIS {
+		mysqlInfo := AcquireREDISInfo()
 		mysqlInfo.Decode(decoder, l.MsgType, l.Code)
 		l.Detail = mysqlInfo
 	}

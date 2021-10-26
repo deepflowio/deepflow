@@ -120,6 +120,7 @@ const (
 	L7_PROTOCOL_HTTP
 	L7_PROTOCOL_DNS
 	L7_PROTOCOL_MYSQL
+	L7_PROTOCOL_REDIS
 
 	L7_PROTOCOL_MAX
 )
@@ -624,6 +625,8 @@ func (p *L7Protocol) String() string {
 		formatted = "dns"
 	case L7_PROTOCOL_MYSQL:
 		formatted = "mysql"
+	case L7_PROTOCOL_REDIS:
+		formatted = "redis"
 	}
 	return formatted
 }
