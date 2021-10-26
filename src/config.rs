@@ -569,7 +569,7 @@ impl<'a> TryFrom<&'a trident::Config> for RuntimeConfig<'a> {
             l7_log_packet_size: conf.l7_log_packet_size(),
             l4_log_collect_nps_threshold: conf.l4_log_collect_nps_threshold(),
             l7_log_collect_nps_threshold: conf.l7_log_collect_nps_threshold(),
-            l7_metrics_enabled: conf.l7_metrics_enabled() > 0,
+            l7_metrics_enabled: conf.l7_metrics_enabled(),
             l7_log_store_tap_types: &conf.l7_log_store_tap_types,
             decap_type: conf.decap_type(),
             region_id: conf.region_id(),
@@ -589,7 +589,6 @@ impl<'a> TryFrom<&'a trident::Config> for RuntimeConfig<'a> {
 #[cfg(test)]
 mod tests {
     use crate::config::Config;
-    use std::fs;
 
     #[test]
     fn read_yaml_file() {

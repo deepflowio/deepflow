@@ -1,58 +1,31 @@
-use std::process::Command;
 use std::{
     fs::{read_dir, OpenOptions},
     io::Read,
     path::{Path, PathBuf},
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, Mutex, MutexGuard, RwLock,
-    },
+    process::Command,
+    sync::{Arc, Condvar, Mutex, MutexGuard, RwLock},
     thread::{self, JoinHandle},
     time::Duration,
 };
 
 use anyhow::{Context, Error, Result};
-use flexi_logger::Logger;
-use log::{debug, error, info, warn};
+use log::{debug, error};
 use roxmltree::Document;
 
+use crate::utils::net::MacAddr;
+
+use super::InterfaceEntry;
+
 const DEFAULT_LIBVIRT_XML_PATH: &'static str = "/etc/libvirt/qemu";
-
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub struct InterfaceEntry {
-    name: String,
-    mac_int: u64,
-    domain_uuid: String,
-    domain_name: String,
-}
-
-impl InterfaceEntry {
-    pub fn get_name(&self) -> &str {
-        &self.name
-    }
-    pub fn get_mac_int(&self) -> u64 {
-        self.mac_int
-    }
-    pub fn set_name(&mut self, name: String) {
-        self.name = name;
-    }
-    pub fn set_mac_int(&mut self, mac_int: u64) {
-        self.mac_int = mac_int;
-    }
-    pub fn set_domain_uuid(&mut self, domain_uuid: String) {
-        self.domain_uuid = domain_uuid;
-    }
-    pub fn set_domain_name(&mut self, domain_name: String) {
-        self.domain_name = domain_name;
-    }
-}
+const REFRESH_INTERVAL: Duration = Duration::from_secs(60);
 
 #[derive(Debug)]
-pub struct LibVirtXmlExtractor {
+struct LibVirtXmlExtractor {
     path: Arc<Mutex<PathBuf>>,
     entries: Arc<RwLock<Vec<InterfaceEntry>>>,
-    running: Arc<AtomicBool>,
+    running: Arc<Mutex<bool>>,
     thread: Mutex<Option<JoinHandle<()>>>,
+    ticker: Arc<Condvar>,
 }
 
 impl LibVirtXmlExtractor {
@@ -61,8 +34,9 @@ impl LibVirtXmlExtractor {
         Self {
             path: Arc::new(Mutex::new(PathBuf::from(DEFAULT_LIBVIRT_XML_PATH))),
             entries: Arc::new(RwLock::new(Vec::new())),
-            running: Arc::new(AtomicBool::new(false)),
+            running: Arc::new(Mutex::new(false)),
             thread: Mutex::new(None),
+            ticker: Arc::new(Condvar::new()),
         }
     }
 
@@ -70,66 +44,65 @@ impl LibVirtXmlExtractor {
     fn refresh(path_lock: MutexGuard<PathBuf>, arc_entries: Arc<RwLock<Vec<InterfaceEntry>>>) {
         let path = path_lock.clone();
         drop(path_lock);
-        if let Ok(entries) = Self::extract_interface_info_from_xml(path.as_path()) {
-            *arc_entries.write().unwrap() = entries;
-        } else {
-            error!("cannot extract interface info from xml");
+        match Self::extract_interface_info_from_xml(path.as_path()) {
+            Ok(entries) => *arc_entries.write().unwrap() = entries,
+            Err(_) => error!("cannot extract interface info from xml"),
         }
     }
 
     /// run extractor and get entries in every 60s
     pub fn start(&self) {
         // change status to RUNNING
-        if self.running.swap(true, Ordering::SeqCst) == true {
+        let mut running_lock = self.running.lock().unwrap();
+        if *running_lock {
             return;
         }
+        *running_lock = true;
+        drop(running_lock);
+
         let path = Arc::clone(&self.path);
         let entries = Arc::clone(&self.entries);
         let running = Arc::clone(&self.running);
-        let mut thread_lock = self.thread.lock().unwrap();
-        if thread_lock.is_none() {
-            *thread_lock = Some(thread::spawn(move || {
-                while running.load(Ordering::SeqCst) {
-                    let (path_lock, entries) = (path.lock().unwrap(), Arc::clone(&entries));
-                    LibVirtXmlExtractor::refresh(path_lock, entries);
-                    if running.load(Ordering::SeqCst) == false {
-                        break;
-                    }
-                    thread::sleep(Duration::new(60, 0));
-                }
-            }));
-        }
+        let timer = self.ticker.clone();
+
+        *self.thread.lock().unwrap() = Some(thread::spawn(move || loop {
+            let (path_lock, entries) = (path.lock().unwrap(), Arc::clone(&entries));
+            LibVirtXmlExtractor::refresh(path_lock, entries);
+
+            let guard = running.lock().unwrap();
+            if !*guard {
+                break;
+            }
+            let (guard, _) = timer.wait_timeout(guard, REFRESH_INTERVAL).unwrap();
+            if !*guard {
+                break;
+            }
+        }));
     }
 
     pub fn stop(&self) {
-        if self.running.swap(false, Ordering::SeqCst) == false {
+        let mut running_lock = self.running.lock().unwrap();
+        if !*running_lock {
             return;
         }
+        *running_lock = false;
+        drop(running_lock);
+        self.ticker.notify_one();
 
         if let Some(handle) = self.thread.lock().unwrap().take() {
-            match handle.join() {
-                Ok(_) => info!("exit refresh xml threads success"),
-                Err(_) => error!("exit refresh xml threads failed"),
-            }
-        } else {
-            warn!("no more thread to stop");
+            handle
+                .join()
+                .unwrap_or_else(|_| debug!("exit refresh xml threads failed"));
         }
     }
 
     /// get entries info protect by RWLock
     pub fn get_entries(&self) -> Option<Vec<InterfaceEntry>> {
-        if let Ok(entries) = self.entries.read() {
-            debug!("get entries from extractor");
-            Some(entries.clone())
-        } else {
-            error!("cannot get interface entries from extractor");
-            None
-        }
+        self.entries.read().map(|entries| entries.clone()).ok()
     }
     /// set libvirt xml file extract path
     pub fn set_path(&self, path: PathBuf) {
-        let mut path_lock = self.path.lock().unwrap();
-        *path_lock = path;
+        *self.path.lock().unwrap() = path;
     }
 
     fn extract_interfaces(document: &Document) -> Result<Vec<InterfaceEntry>> {
@@ -141,55 +114,45 @@ impl LibVirtXmlExtractor {
                 continue;
             }
             if node.has_tag_name("name") {
-                domain_name = Some(String::from(node.text().unwrap_or_default()));
+                domain_name = node.text().map(String::from);
             }
             if node.has_tag_name("uuid") {
-                domain_uuid = Some(String::from(node.text().unwrap_or_default()));
+                domain_uuid = node.text().map(String::from);
             }
 
-            if !node.has_tag_name("devices") {
+            if !node.has_tag_name("devices") || domain_name.is_none() || domain_uuid.is_none() {
                 continue;
             }
             for child in node.children() {
                 if !child.has_tag_name("interface") {
                     continue;
                 }
-                let mut mac_int = 0;
-                let mut dev = "";
-                'INTERFACE: for subchild in child.children() {
+                let mut dev = None;
+                let mut mac = None;
+                for subchild in child.children() {
                     if subchild.has_tag_name("mac") {
-                        let mac = subchild.attribute("address").unwrap_or_default();
-                        for n_s in mac.split(":") {
-                            if let Ok(n) = u8::from_str_radix(n_s, 16) {
-                                mac_int <<= 8;
-                                mac_int |= n as u64;
-                            } else {
-                                error!(
-                                    "invalid mac {} in domain name {} uuid {}",
-                                    mac,
-                                    domain_name.as_ref().unwrap_or(&format!("NO_DOMAIN_NAME")),
-                                    domain_uuid.as_ref().unwrap_or(&format!("NO_DOMAIN_UUID"))
-                                );
-                                continue 'INTERFACE;
-                            }
+                        let mac_str = subchild.attribute("address").unwrap_or_default();
+                        match mac_str.parse::<MacAddr>() {
+                            Ok(m) => mac = Some(m),
+                            Err(e) => debug!("{}", e),
                         }
                     }
 
                     if subchild.has_tag_name("target") {
-                        dev = subchild.attribute("dev").unwrap_or_default();
+                        dev = subchild.attribute("dev");
                     }
                 }
-                if mac_int == 0 || domain_name.is_none() || domain_uuid.is_none() {
+                if mac.is_none() {
                     continue;
                 }
-                if dev == "" {
+                if dev.is_none() {
                     return Err(Error::msg("no target dev in interface info"));
                 }
                 entries.push(InterfaceEntry {
-                    name: String::from(dev),
-                    mac_int,
-                    domain_uuid: domain_uuid.clone().unwrap(),
-                    domain_name: domain_name.clone().unwrap(),
+                    name: String::from(dev.unwrap()),
+                    mac: mac.unwrap(),
+                    domain_uuid: domain_uuid.as_ref().map(String::from).unwrap(),
+                    domain_name: domain_name.as_ref().map(String::from).unwrap(),
                 });
             }
         }
@@ -220,15 +183,18 @@ impl LibVirtXmlExtractor {
                     e
                 );
 
-                let mut domain_uuid = String::default();
-                for node in document.root_element().children() {
-                    if node.is_element() {
-                        if node.has_tag_name("uuid") {
-                            domain_uuid = String::from(node.text().unwrap_or_default());
-                            break;
-                        }
-                    }
+                let domain_uuid = document
+                    .root_element()
+                    .children()
+                    .into_iter()
+                    .find(|node| node.is_element() && node.has_tag_name("uuid"))
+                    .and_then(|node| node.text())
+                    .map(String::from);
+
+                if domain_uuid.is_none() {
+                    return Err(Error::msg("cannot parse domain uuid"));
                 }
+                let domain_uuid = domain_uuid.unwrap();
 
                 let output = Command::new("virsh")
                     .arg("dumpxml")
@@ -253,11 +219,12 @@ impl LibVirtXmlExtractor {
                         if !output.status.success() {
                             return Err(Error::msg("failed to run virsh domstate"));
                         }
-                        let status_msg = String::from_utf8(output.stdout).unwrap();
-                        if status_msg.starts_with("running") {
-                            return Err(Error::msg(
-                                "virsh dumpxml has no target dev in interface info",
-                            ));
+                        if let Ok(status_msg) = String::from_utf8(output.stdout) {
+                            if status_msg.starts_with("running") {
+                                return Err(Error::msg(
+                                    "virsh dumpxml has no target dev in interface info",
+                                ));
+                            }
                         }
                         debug!("not running vm {} ignored", file_path.as_ref().display());
                         return Err(Error::msg(format!(
@@ -320,9 +287,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_libxml_extractor() {
-        Logger::try_with_str("info").unwrap().start().unwrap();
         let entries =
             LibVirtXmlExtractor::extract_from("src/platform/instance-00000054.xml").unwrap();
         let file_path = PathBuf::from("src/platform");
