@@ -1,15 +1,16 @@
-use std::error::Error;
 use std::path::Path;
 
+use anyhow::{Context, Result};
 use flexi_logger::{colored_opt_format, Age, Cleanup, Criterion, FileSpec, Logger, Naming};
 use log::info;
 
 use crate::config::Config;
+use crate::utils::net;
 
 pub struct Trident {}
 
 impl Trident {
-    pub fn new(config_path: &dyn AsRef<Path>, revision: &str) -> Result<Trident, Box<dyn Error>> {
+    pub fn new(config_path: &dyn AsRef<Path>, revision: &str) -> Result<Trident> {
         let config = Config::load_from_file(config_path)?;
 
         let logger = Logger::try_with_str("info")?
@@ -19,6 +20,10 @@ impl Trident {
             .create_symlink(&config.log_file)
             .append()
             .start()?;
+
+        let (_ctrl_ip, _ctrl_mac) =
+            net::get_route_src_ip_and_mac(&config.controller_ips[0].parse().unwrap())
+                .context("failed getting control ip and mac")?;
         Ok(Trident {})
     }
 

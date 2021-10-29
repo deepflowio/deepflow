@@ -320,6 +320,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_libxml_extractor() {
         Logger::try_with_str("info").unwrap().start().unwrap();
         let entries =

@@ -9,15 +9,19 @@ default-run = "trident"
 [dev-dependencies]
 
 [dependencies]
-chrono = "0.2.16"
+anyhow = "1.0"
 clap = "3.0.0-beta.5"
 flexi_logger = "0.19"
 futures = "~0.3"
 humantime-serde = "1.0"
 hostname = "0.3.1"
 log = "0.4"
+neli = "0.5"
+nom = "7.0.0"
+nom-derive = "0.10.0"
 parking_lot = "0.11"
 prost = "0.8.0"
+roxmltree = "0.14.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.8"
 signal-hook = "0.3"
@@ -25,10 +29,6 @@ sysinfo = { version = "0.20", default-features = false }
 thiserror = "1.0"
 tokio = { version = "1.12.0", features = ["full"] }
 tonic = "0.5.2"
-anyhow = "1.0"
-roxmltree = "0.14.1"
-nom = "7.0.0"
-nom-derive = "0.10.0"
 
 [build-dependencies]
 tonic-build = "0.5.2"
