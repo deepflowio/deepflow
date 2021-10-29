@@ -53,7 +53,7 @@ type Config struct {
 	CKDB              CKAddr         `yaml:"ckdb"`
 	CKAuth            Auth           `yaml:"ck-auth"`
 	ReplicaEnabled    bool           `yaml:"flowlog-replica-enabled"`
-	CKWriterConfig    CKWriterConfig `yaml:"metrics-ck-wirter"`
+	CKWriterConfig    CKWriterConfig `yaml:"flowlog-ck-writer"`
 	Throttle          int            `yaml:"throttle"`
 	L4Throttle        int            `yaml:"l4-throttle"`
 	L7HTTPThrottle    int            `yaml:"l7-http-throttle"`
