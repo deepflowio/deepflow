@@ -1,6 +1,6 @@
-use std::error::Error;
 use std::path::Path;
 
+use anyhow::Result;
 use clap::{AppSettings, Parser};
 use signal_hook::consts::TERM_SIGNALS;
 use signal_hook::iterator::Signals;
@@ -50,7 +50,7 @@ fn wait_on_signals() {
 #[cfg(windows)]
 fn wait_on_signals() {}
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<()> {
     let opts = Opts::parse();
     let version = format!("{}-{}", env!("REV_COUNT"), env!("REVISION"));
 
