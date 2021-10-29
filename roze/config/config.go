@@ -49,7 +49,7 @@ type Config struct {
 	CKDBAuth                  Auth           `yaml:"ckdb-auth"`
 	CKReadTimeout             int            `yaml:"ck-read-timeout"`
 	ReplicaEnabled            bool           `yaml:"metrics-replica-enabled"`
-	CKWriterConfig            CKWriterConfig `yaml:"metrics-ck-wirter"`
+	CKWriterConfig            CKWriterConfig `yaml:"metrics-ck-writer"`
 	Pcap                      PCapConfig     `yaml:"pcap"`
 	DisableSecondWrite        bool           `yaml:"disable-second-write"`
 	DisableSecondWriteReplica bool           `yaml:"disable-second-write-replica"`
