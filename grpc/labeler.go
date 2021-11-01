@@ -241,7 +241,7 @@ func newPortFilter(log *logger.PrefixLogger, groupIDMaps []api.GroupIDMap) *port
 		}
 		key := (uint32(i&0xFFFF) << 9) | uint32(entry.Protocol)&0x1FF
 		if _, in := groupProtocolMap[key]; !in {
-			groupProtocolMap[key] = make([]datatype.PortRange, 0, len(groupIDMaps))
+			groupProtocolMap[key] = make([]datatype.PortRange, 0)
 		}
 		ports := []datatype.PortRange{datatype.NewPortRange(0, 65535)}
 		if entry.ServerPorts != "" {
