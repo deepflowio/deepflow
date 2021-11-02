@@ -7,11 +7,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/gopacket/layers"
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"gitlab.yunshan.net/yunshan/message/trident"
 )
 
 type L7Base struct {
@@ -493,6 +495,38 @@ func (k *KnowledgeGraph) FillL7(l *datatype.AppProtoLogsData, platformData *grpc
 		k.SubnetID1 = uint16(info1.SubnetID)
 	}
 	k.L3EpcID0, k.L3EpcID1 = l3EpcID0, l3EpcID1
+
+	// DNS的协议是any，其他l7的协议都是TCP
+	protocol := layers.IPProtocolTCP
+	if l.Proto == datatype.PROTO_DNS {
+		protocol = 0
+	}
+
+	if l.IsIPv6 {
+		// 0端如果是clusterIP或后端podIP需要匹配service_id
+		if k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
+			k.PodID0 != 0 {
+			_, k.ServiceID0 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID0), net.IP(l.IP6Src[:]), 0, 0)
+		}
+		// 1端如果是NodeIP,clusterIP或后端podIP需要匹配service_id
+		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
+			k.PodID1 != 0 ||
+			k.PodNodeID1 != 0 {
+			_, k.ServiceID1 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID1), net.IP(l.IP6Dst[:]), protocol, l.PortDst)
+		}
+	} else {
+		// 0端如果是clusterIP或后端podIP需要匹配service_id
+		if k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
+			k.PodID0 != 0 {
+			_, k.ServiceID0 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID0), l.IPSrc, 0, 0)
+		}
+		// 1端如果是NodeIP,clusterIP或后端podIP需要匹配service_id
+		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
+			k.PodID1 != 0 ||
+			k.PodNodeID1 != 0 {
+			_, k.ServiceID1 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID1), l.IPDst, protocol, l.PortDst)
+		}
+	}
 }
 
 var poolHTTPLogger = pool.NewLockFreePool(func() interface{} {
