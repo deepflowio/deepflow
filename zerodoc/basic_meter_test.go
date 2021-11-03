@@ -10,24 +10,28 @@ func TestMarshalTraffic(t *testing.T) {
 	var l int
 
 	t1 := Traffic{
-		PacketTx:     1,
-		PacketRx:     2,
-		ByteTx:       3,
-		ByteRx:       4,
-		L3ByteTx:     12,
-		L3ByteRx:     13,
-		L4ByteTx:     14,
-		L4ByteRx:     15,
-		NewFlow:      6,
-		ClosedFlow:   7,
-		HTTPRequest:  8,
-		HTTPResponse: 9,
-		DNSRequest:   10,
-		DNSResponse:  11,
+		PacketTx:      1,
+		PacketRx:      2,
+		ByteTx:        3,
+		ByteRx:        4,
+		L3ByteTx:      12,
+		L3ByteRx:      13,
+		L4ByteTx:      14,
+		L4ByteRx:      15,
+		NewFlow:       6,
+		ClosedFlow:    7,
+		HTTPRequest:   8,
+		HTTPResponse:  9,
+		DNSRequest:    10,
+		DNSResponse:   11,
+		DubboRequest:  12,
+		DubboResponse: 13,
+		KafkaRequest:  14,
+		KafkaResponse: 15,
 	}
 	l = t1.MarshalTo(buffer[:])
 	if string(buffer[:l]) != "packet=3i,packet_tx=1i,packet_rx=2i,byte_tx=3i,byte_rx=4i,byte=7i,l3_byte_tx=12i,l3_byte_rx=13i,l4_byte_tx=14i,l4_byte_rx=15i,new_flow=6i,closed_flow=7i"+
-		",http_request=8i,http_response=9i,dns_request=10i,dns_response=11i" {
+		",http_request=8i,http_response=9i,dns_request=10i,dns_response=11i,dubbo_request=12i,dubbo_response=13i,kafka_request=14i,kafka_response=15i" {
 		t.Error("MarshalTo()实现不正确")
 	}
 
@@ -109,7 +113,7 @@ func TestMerge(t *testing.T) {
 		t.Errorf("Traffic ConcurrentMerge failed, expected:%v, actual:%v", t2, t1)
 	}
 
-	l1, l2 := &Latency{}, &Latency{1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2}
+	l1, l2 := &Latency{}, &Latency{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2}
 	initMeter(l1, 1)
 	l1.ConcurrentMerge(l1)
 	if *l1 != *l2 {
@@ -148,7 +152,9 @@ func TestMarshalAnomaly(t *testing.T) {
 		"http_client_error=1i,http_server_error=1i,http_timeout=1i,http_error=2i," +
 		"dns_client_error=1i,dns_server_error=1i,dns_timeout=1i,dns_error=2i," +
 		"mysql_client_error=1i,mysql_server_error=1i,mysql_timeout=1i,mysql_error=2i," +
-		"redis_client_error=1i,redis_server_error=1i,redis_timeout=1i,redis_error=2i"
+		"redis_client_error=1i,redis_server_error=1i,redis_timeout=1i,redis_error=2i," +
+		"dubbo_client_error=1i,dubbo_server_error=1i,dubbo_timeout=1i,dubbo_error=2i," +
+		"kafka_client_error=1i,kafka_server_error=1i,kafka_timeout=1i,kafka_error=2i"
 	if string(actual[:n]) != expected {
 		t.Errorf("Anomaly MarshalTo failed, \n\texpected:%v\n\tactual:  %v\n", expected, string(actual[:n]))
 	}
