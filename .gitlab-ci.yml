@@ -53,7 +53,7 @@ docker-x64:
 verify-arm64:
   stage: verify
   tags:
-    - arm64
+    - ecs-arm64
 
   script:
     - touch vendor
@@ -65,7 +65,7 @@ verify-arm64:
 package-arm64:
   stage: package
   tags:
-    - arm64
+    - ecs-arm64
 
   script:
     - rpmbuild -bb droplet_arm64.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
