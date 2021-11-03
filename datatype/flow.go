@@ -121,6 +121,8 @@ const (
 	L7_PROTOCOL_DNS
 	L7_PROTOCOL_MYSQL
 	L7_PROTOCOL_REDIS
+	L7_PROTOCOL_DUBBO
+	L7_PROTOCOL_KAFKA
 
 	L7_PROTOCOL_MAX
 )
@@ -627,6 +629,10 @@ func (p *L7Protocol) String() string {
 		formatted = "mysql"
 	case L7_PROTOCOL_REDIS:
 		formatted = "redis"
+	case L7_PROTOCOL_DUBBO:
+		formatted = "dubbo"
+	case L7_PROTOCOL_KAFKA:
+		formatted = "kafka"
 	}
 	return formatted
 }

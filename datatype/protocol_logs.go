@@ -18,6 +18,8 @@ const (
 	PROTO_DNS
 	PROTO_MYSQL
 	PROTO_REDIS
+	PROTO_DUBBO
+	PROTO_KAFKA
 )
 
 func (t *LogProtoType) String() string {
@@ -31,6 +33,10 @@ func (t *LogProtoType) String() string {
 		formatted = "MYSQL"
 	case PROTO_REDIS:
 		formatted = "REDIS"
+	case PROTO_DUBBO:
+		formatted = "DUBBO"
+	case PROTO_KAFKA:
+		formatted = "KAFKA"
 	default:
 		formatted = "UNKOWN"
 	}
@@ -272,6 +278,14 @@ func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
 		mysqlInfo := AcquireREDISInfo()
 		mysqlInfo.Decode(decoder, l.MsgType, l.Code)
 		l.Detail = mysqlInfo
+	} else if l.Proto == PROTO_DUBBO {
+		dubboInfo := AcquireDubboInfo()
+		dubboInfo.Decode(decoder, l.MsgType, l.Code)
+		l.Detail = dubboInfo
+	} else if l.Proto == PROTO_KAFKA {
+		kafkaInfo := AcquireKafkaInfo()
+		kafkaInfo.Decode(decoder, l.MsgType, l.Code)
+		l.Detail = kafkaInfo
 	}
 
 	return nil
