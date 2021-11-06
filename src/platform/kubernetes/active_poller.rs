@@ -15,28 +15,29 @@ use log::{debug, info, log_enabled, warn, Level};
 use nix::errno::Errno;
 use nix::sched::{setns, CloneFlags};
 
-use super::{ls_ns_net, InterfaceInfo};
+use super::{ls_ns_net, InterfaceInfo, Poller};
+use crate::error::Result;
 use crate::utils::net::{addr_list, link_list};
 
 #[derive(Debug)]
-struct ActivePoller {
+pub struct ActivePoller {
     interval: Duration,
     version: Arc<AtomicU64>,
     entries: Arc<Mutex<Option<Vec<InterfaceInfo>>>>,
     running: Arc<Mutex<bool>>,
-    thread: Option<JoinHandle<()>>,
     timer: Arc<Condvar>,
+    thread: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl ActivePoller {
-    pub(super) fn new(interval: Duration) -> Self {
+    pub fn new(interval: Duration) -> Self {
         Self {
             interval,
             version: Arc::new(AtomicU64::new(0)),
             entries: Arc::new(Mutex::new(None)),
             running: Arc::new(Mutex::new(false)),
-            thread: None,
             timer: Arc::new(Condvar::new()),
+            thread: Mutex::new(None),
         }
     }
 
@@ -113,7 +114,7 @@ impl ActivePoller {
                         .map(|t| t.as_str())
                         .unwrap_or_default();
                     match link_type {
-                        "veth" | "macvlan" | "ipvlan" => {}
+                        "veth" | "macvlan" | "ipvlan" => (),
                         _ => continue,
                     }
 
@@ -223,21 +224,24 @@ impl ActivePoller {
             }
         }
     }
+}
 
-    pub fn get_version(&self) -> u64 {
+impl Poller for ActivePoller {
+    fn get_version(&self) -> u64 {
         self.version.load(Ordering::SeqCst)
     }
 
-    pub fn get_interface_info(&self) -> Option<Vec<InterfaceInfo>> {
+    fn get_interface_info(&self) -> Option<Vec<InterfaceInfo>> {
         self.entries.lock().unwrap().as_ref().map(|e| e.clone())
     }
 
-    pub fn start(&mut self) {
+    fn start(&self) {
         if *self.running.lock().unwrap() {
+            debug!("Active Poller has already running");
             return;
         }
 
-        info!("starts kubernetes poller");
+        info!("Starts kubernetes active poller");
         let entries = self.entries.clone();
         let running = self.running.clone();
         let version = self.version.clone();
@@ -246,21 +250,23 @@ impl ActivePoller {
 
         let handle =
             thread::spawn(move || Self::process(timer, running, version, entries, timeout));
-        self.thread = Some(handle);
+        *self.thread.lock().unwrap() = Some(handle);
     }
 
-    pub fn stop(&mut self) {
+    fn stop(&self) {
         let mut running_lock = self.running.lock().unwrap();
-        if *running_lock {
-            *running_lock = false;
-            drop(running_lock);
-
-            self.timer.notify_one();
-            if let Some(handle) = self.thread.take() {
-                handle.join().expect("cannot wait thread");
-            }
-            info!("stops kubernetes poller");
+        if !*running_lock {
+            debug!("Active Poller has already stopped");
+            return;
         }
+        *running_lock = false;
+        drop(running_lock);
+
+        self.timer.notify_one();
+        if let Some(handle) = self.thread.lock().unwrap().take() {
+            handle.join().expect("cannot wait thread");
+        }
+        info!("Stops kubernetes poller");
     }
 }
 
@@ -278,7 +284,7 @@ mod test {
 
     #[test]
     fn assert_poller() {
-        let mut poller = ActivePoller::new(Duration::from_secs(30));
+        let poller = ActivePoller::new(Duration::from_secs(30));
         poller.start();
         thread::sleep(Duration::from_secs(1));
         if let Some(infos) = poller.get_interface_info() {

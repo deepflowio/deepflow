@@ -1,10 +1,48 @@
-use std::{collections::HashMap, fmt, fs, io, net::IpAddr, os::unix::io::AsRawFd};
+use std::{collections::HashMap, fmt, fs, io, net::IpAddr, os::unix::io::AsRawFd, time::Duration};
 
+use enum_dispatch::enum_dispatch;
 use nix::sched::{setns, CloneFlags};
 
+use crate::error::Result;
 use crate::utils::net::MacAddr;
 
 mod active_poller;
+pub use active_poller::ActivePoller;
+
+#[enum_dispatch]
+pub enum GenericPoller {
+    ActivePoller,
+    PassivePoller,
+}
+
+#[enum_dispatch(GenericPoller)]
+pub trait Poller {
+    fn get_version(&self) -> u64;
+    fn get_interface_info(&self) -> Option<Vec<InterfaceInfo>>;
+    fn start(&self);
+    fn stop(&self);
+}
+
+//TODO
+pub struct PassivePoller;
+
+impl PassivePoller {
+    pub fn new(interval: Duration) -> Self {
+        todo!()
+    }
+}
+
+impl Poller for PassivePoller {
+    fn get_version(&self) -> u64 {
+        0
+    }
+    fn get_interface_info(&self) -> Option<Vec<InterfaceInfo>> {
+        None
+    }
+    fn start(&self) {}
+    fn stop(&self) {}
+}
+//END
 
 #[derive(Debug, Clone)]
 pub struct InterfaceInfo {

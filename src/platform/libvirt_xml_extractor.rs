@@ -20,7 +20,7 @@ const DEFAULT_LIBVIRT_XML_PATH: &'static str = "/etc/libvirt/qemu";
 const REFRESH_INTERVAL: Duration = Duration::from_secs(60);
 
 #[derive(Debug)]
-struct LibVirtXmlExtractor {
+pub struct LibVirtXmlExtractor {
     path: Arc<Mutex<PathBuf>>,
     entries: Arc<RwLock<Vec<InterfaceEntry>>>,
     running: Arc<Mutex<bool>>,
