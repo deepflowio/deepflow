@@ -6,6 +6,8 @@ use parking_lot::RwLock;
 use log::{info, warn};
 use tonic::transport::{Channel, Endpoint};
 
+use crate::proto::trident::KubernetesApiSyncRequest;
+
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 
 struct Config {

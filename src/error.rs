@@ -4,7 +4,7 @@ use thiserror::Error;
 pub enum Error {
     #[error("parse mac address failed from: {0}")]
     ParseMacFailed(String),
-    #[error("call try_from() failed from: {0}")]
+    #[error("call try_from() failed from {0}")]
     TryFromFailed(String),
     #[error("kubernetes watchers error ")]
     KubeWatcher(#[from] kube::runtime::watcher::Error),
@@ -16,10 +16,10 @@ pub enum Error {
     IO(#[from] std::io::Error),
     #[error("data not found: {0}")]
     NotFound(String),
-    #[error("Arp lookup failed from: {0}")]
-    ArpLookup(String),
     #[error("Windows related error:{0}")]
     Windows(String),
+    #[error("Kubernetes ApiWatcher error: {0}")]
+    KubernetesApiWatcher(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
