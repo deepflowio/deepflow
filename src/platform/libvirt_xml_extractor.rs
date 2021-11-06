@@ -25,7 +25,7 @@ struct LibVirtXmlExtractor {
     entries: Arc<RwLock<Vec<InterfaceEntry>>>,
     running: Arc<Mutex<bool>>,
     thread: Mutex<Option<JoinHandle<()>>>,
-    ticker: Arc<Condvar>,
+    timer: Arc<Condvar>,
 }
 
 impl LibVirtXmlExtractor {
@@ -36,7 +36,7 @@ impl LibVirtXmlExtractor {
             entries: Arc::new(RwLock::new(Vec::new())),
             running: Arc::new(Mutex::new(false)),
             thread: Mutex::new(None),
-            ticker: Arc::new(Condvar::new()),
+            timer: Arc::new(Condvar::new()),
         }
     }
 
@@ -63,7 +63,7 @@ impl LibVirtXmlExtractor {
         let path = Arc::clone(&self.path);
         let entries = Arc::clone(&self.entries);
         let running = Arc::clone(&self.running);
-        let timer = self.ticker.clone();
+        let timer = self.timer.clone();
 
         *self.thread.lock().unwrap() = Some(thread::spawn(move || loop {
             let (path_lock, entries) = (path.lock().unwrap(), Arc::clone(&entries));
@@ -87,7 +87,7 @@ impl LibVirtXmlExtractor {
         }
         *running_lock = false;
         drop(running_lock);
-        self.ticker.notify_one();
+        self.timer.notify_one();
 
         if let Some(handle) = self.thread.lock().unwrap().take() {
             handle

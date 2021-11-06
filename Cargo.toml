@@ -6,17 +6,18 @@ default-run = "trident"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dev-dependencies]
 
 [dependencies]
 anyhow = "1.0"
-clap = {version = "3.0.0-beta.5", features=["derive"] }
-flexi_logger = "0.19"
+clap = {version = "3.0.0-rc.0", features = ["derive"] }
+crossbeam = "0.8.1"
+flexi_logger = "0.20"
 futures = "~0.3"
 hostname = "0.3.1"
 humantime-serde = "1.0"
+ipnet = "2.3.1"
 log = "0.4"
-neli = "0.5"
+neli = "0.5.3"
 nix = "0.23"
 nom = "7.0.0"
 nom-derive = "0.10.0"
@@ -32,5 +33,11 @@ thiserror = "1.0"
 tokio = { version = "1.12.0", features = ["full"] }
 tonic = "0.5.2"
 
+
+[dev-dependencies]
+flexi_logger = "0.20"
+
 [build-dependencies]
 tonic-build = "0.5.2"
+
+[features]

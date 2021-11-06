@@ -1,3 +1,4 @@
+mod kubernetes;
 mod libvirt_xml_extractor;
 
 use crate::utils::net::MacAddr;
@@ -8,4 +9,11 @@ pub struct InterfaceEntry {
     mac: MacAddr,
     domain_uuid: String,
     domain_name: String,
+}
+
+#[derive(Debug)]
+pub enum PollerType {
+    Adaptive,
+    Active,
+    Passive,
 }
