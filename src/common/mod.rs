@@ -1,6 +1,32 @@
-mod enums;
+use std::{
+    fmt,
+    hash::{Hash, Hasher},
+    net::Ipv4Addr,
+};
 
+mod enums;
 pub use enums::*;
+
+mod tap_types;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct XflowKey {
+    ip: Ipv4Addr,
+    tap_idx: u32,
+}
+
+impl Hash for XflowKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let key = ((u32::from(self.ip) as u64) << 32) + self.tap_idx as u64;
+        key.hash(state)
+    }
+}
+
+impl fmt::Display for XflowKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "source_ip:{}, interface_index:{}", self.ip, self.tap_idx)
+    }
+}
 
 #[cfg(target_os = "linux")]
 mod consts {

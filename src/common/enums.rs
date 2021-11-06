@@ -4,6 +4,87 @@ use std::fmt;
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
+/// EthernetType is an enumeration of ethernet type values, and acts as a decoder
+/// for any type it supports.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
+#[repr(u16)]
+pub enum Ethernet {
+    // EthernetTypeLLC is not an actual ethernet type.  It is instead a
+    // placeholder we use in Ethernet frames that use the 802.3 standard of
+    // srcmac|dstmac|length|LLC instead of srcmac|dstmac|ethertype.
+    LLC = 0,
+    IPv4 = 0x0800,
+    ARP = 0x0806,
+    IPv6 = 0x86DD,
+    CiscoDiscovery = 0x2000,
+    NortelDiscovery = 0x01a2,
+    TransparentEthernetBridging = 0x6558,
+    Dot1Q = 0x8100,
+    PPP = 0x880b,
+    PPPoEDiscovery = 0x8863,
+    PPPoESession = 0x8864,
+    MPLSUnicast = 0x8847,
+    MPLSMulticast = 0x8848,
+    EAPOL = 0x888e,
+    QinQ = 0x88a8,
+    LinkLayerDiscovery = 0x88cc,
+    EthernetCTP = 0x9000,
+}
+
+impl PartialEq<u16> for Ethernet {
+    fn eq(&self, other: &u16) -> bool {
+        u16::from(*self).eq(other)
+    }
+}
+
+impl PartialEq<Ethernet> for u16 {
+    fn eq(&self, other: &Ethernet) -> bool {
+        u16::from(*other).eq(self)
+    }
+}
+
+// IPProtocol is an enumeration of IP protocol values, and acts as a decoder
+// for any type it supports.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
+#[repr(u8)]
+pub enum IpProtocol {
+    IPv6HopByHop = 0,
+    ICMPv4 = 1,
+    IGMP = 2,
+    IPv4 = 4,
+    TCP = 6,
+    UDP = 17,
+    RUDP = 27,
+    IPv6 = 41,
+    IPv6Routing = 43,
+    IPv6Fragment = 44,
+    GRE = 47,
+    ESP = 50,
+    AH = 51,
+    ICMPv6 = 58,
+    NoNextHeader = 59,
+    IPv6Destination = 60,
+    OSPF = 89,
+    IPIP = 94,
+    EtherIP = 97,
+    VRRP = 112,
+    SCTP = 132,
+    UDPLite = 136,
+    MPLSInIP = 137,
+}
+
+impl PartialEq<u8> for IpProtocol {
+    fn eq(&self, other: &u8) -> bool {
+        u8::from(*self).eq(other)
+    }
+}
+
+impl PartialEq<IpProtocol> for u8 {
+    fn eq(&self, other: &IpProtocol) -> bool {
+        u8::from(*other).eq(self)
+    }
+}
+
 // LinkType is an enumeration of link types, and acts as a decoder for any
 // link type it supports.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
@@ -62,6 +143,7 @@ impl PartialEq<Link> for u8 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, TryFromPrimitive, IntoPrimitive)]
 #[repr(u16)]
 pub enum TapType {
+    #[num_enum(default)]
     Any = 0,
     Isp1 = 1,
     Isp2 = 2,
@@ -84,6 +166,15 @@ impl fmt::Display for TapType {
 #[cfg(test)]
 mod test {
     use super::*;
+    #[test]
+    fn assert_ethernet_type() {
+        let eth_type = Ethernet::IPv6;
+        let ipv6: u16 = eth_type.into();
+        assert_eq!(eth_type, 0x86DDu16);
+        assert_eq!(0x86DDu16, eth_type);
+        assert_eq!(ipv6, 0x86DDu16);
+        assert_eq!(Ok(Ethernet::ARP), Ethernet::try_from(0x806u16));
+    }
 
     #[test]
     fn assert_link_type() {
@@ -91,5 +182,13 @@ mod test {
         assert_eq!(link_type, 9);
         assert_eq!(9, link_type);
         assert_eq!(Ok(Link::Talk), Link::try_from(114u8));
+    }
+
+    #[test]
+    fn assert_ip_protocol() {
+        let ip = IpProtocol::ICMPv6;
+        assert_eq!(ip, 58);
+        assert_eq!(58, ip);
+        assert_eq!(Ok(IpProtocol::UDP), IpProtocol::try_from(17u8));
     }
 }
