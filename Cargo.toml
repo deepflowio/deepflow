@@ -18,6 +18,7 @@ enum_dispatch = "0.3.7"
 flexi_logger = "0.20"
 futures = "~0.3"
 hostname = "0.3.1"
+http = "0.2.5"
 humantime-serde = "1.0"
 k8s-openapi = { version = "^0.13", features = ["v1_19"] }
 kube = { version = "0.64", features = ["derive", "runtime"] }
@@ -27,13 +28,16 @@ nix = "0.23"
 nom = "7.0.0"
 nom-derive = "0.10.0"
 num_enum = "0.5.6"
+openshift-openapi = { git =  "https://gitlab.yunshan.net/zhicong/openshfit-openapi.git", version = "0.3.1", features = ["v4_6"] }
 parking_lot = "0.11"
 pnet = "^0.29"
 prost = "0.8.0"
 regex = "1"
 ring = "0.16.20"
+reqwest = "0.11.7"
 roxmltree = "0.14.1"
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.72"
 serde_yaml = "0.8"
 signal-hook = "0.3"
 sysinfo = { version = "0.20", default-features = false }

@@ -6,6 +6,8 @@ use nix::sched::{setns, CloneFlags};
 use crate::utils::net::MacAddr;
 
 mod active_poller;
+mod api_watcher;
+mod resource_watcher;
 pub use active_poller::ActivePoller;
 
 #[enum_dispatch]

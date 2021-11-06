@@ -3,5 +3,6 @@
 # generated protobuf files
 src/proto/common.rs
 src/proto/trident.rs
+.cargo
 
 Cargo.lock
