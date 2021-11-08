@@ -221,6 +221,28 @@ func TestDecapsulateIp6Vxlan(t *testing.T) {
 	}
 }
 
+func TestDecapsulateIpIp(t *testing.T) {
+	expected := &TunnelInfo{
+		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.162.42.93").To4())),
+		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.162.33.164").To4())),
+		Type: TUNNEL_TYPE_IPIP,
+		Tier: 1,
+	}
+	packets, _ := loadPcap("ipip.pcap")
+	packet := packets[0]
+
+	l2Len := 18
+	actual := &TunnelInfo{}
+	offset := actual.Decapsulate(packet, l2Len, TUNNEL_TYPE_IPIP, true)
+	expectedOffset := IP_HEADER_SIZE - l2Len
+	if !reflect.DeepEqual(expected, actual) ||
+		offset != expectedOffset {
+		t.Errorf("expectedIpIP: \n\ttunnel: %+v\n\tactual: %+v\n\toffset: %v\n\tactual: %v\n",
+			expected, actual, expectedOffset, offset)
+		t.Errorf("Packet: %x", packet[offset:])
+	}
+}
+
 func BenchmarkDecapsulateTCP(b *testing.B) {
 	packet := [256]byte{}
 	tunnel := &TunnelInfo{}

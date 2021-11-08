@@ -252,11 +252,11 @@ func (t *TunnelInfo) Decapsulate(packet []byte, l2Len int, tunnelType TunnelType
 		offset = t.DecapsulateGre(l3Packet, decapErspanOrTeb, tunnelType&TUNNEL_TYPE_TIER1_MASK == TUNNEL_TYPE_TENCENT_GRE)
 	} else if protocol == IPProtocolIPv4 {
 		if tunnelType&TUNNEL_TYPE_TIER1_MASK == TUNNEL_TYPE_IPIP {
-			offset = t.DecapsulateIPIP(packet, l2Len, IP_HEADER_SIZE)
+			offset = t.DecapsulateIPIP(packet, l2Len, false, false)
 		}
 	} else if protocol == IPProtocolIPv6 {
 		if tunnelType&TUNNEL_TYPE_TIER1_MASK == TUNNEL_TYPE_IPIP {
-			offset = t.Decapsulate6IPIP(packet, l2Len, IP_HEADER_SIZE)
+			offset = t.DecapsulateIPIP(packet, l2Len, false, true)
 		}
 	}
 
@@ -312,11 +312,11 @@ func (t *TunnelInfo) Decapsulate6(packet []byte, l2Len int, tunnelType TunnelTyp
 		}
 	} else if protocol == IPProtocolIPv4 {
 		if tunnelType&TUNNEL_TYPE_TIER1_MASK == TUNNEL_TYPE_IPIP {
-			offset = t.DecapsulateIPIP(packet, l2Len, IP6_HEADER_SIZE)
+			offset = t.DecapsulateIPIP(packet, l2Len, true, false)
 		}
 	} else if protocol == IPProtocolIPv6 {
 		if tunnelType&TUNNEL_TYPE_TIER1_MASK == TUNNEL_TYPE_IPIP {
-			offset = t.Decapsulate6IPIP(packet, l2Len, IP6_HEADER_SIZE)
+			offset = t.DecapsulateIPIP(packet, l2Len, true, true)
 		}
 	}
 
@@ -327,11 +327,15 @@ func (t *TunnelInfo) Valid() bool {
 	return t.Type != TUNNEL_TYPE_NONE
 }
 
-func (t *TunnelInfo) DecapsulateIPIP(packet []byte, l2Len int, size int) int {
+func (t *TunnelInfo) DecapsulateIPIP(packet []byte, l2Len int, underlayIpv6, overlayIpv6 bool) int {
 	l3Packet := packet[l2Len:]
+	underlayIpHeaderSize := int((l3Packet[IP_IHL_OFFSET] & 0xf) << 2)
+	if underlayIpv6 { // underlay网络为IPv6时不支持Options字段
+		underlayIpHeaderSize = IP6_HEADER_SIZE
+	}
 
 	if t.Tier == 0 {
-		if size == IP6_HEADER_SIZE {
+		if underlayIpv6 {
 			t.Src = BigEndian.Uint32(l3Packet[IP6_SIP_OFFSET:])
 			t.Dst = BigEndian.Uint32(l3Packet[IP6_DIP_OFFSET:])
 		} else {
@@ -345,46 +349,16 @@ func (t *TunnelInfo) DecapsulateIPIP(packet []byte, l2Len int, size int) int {
 	}
 	t.Tier++
 
-	if size == IP_HEADER_SIZE {
-		copy(packet[IP_HEADER_SIZE:], packet[:ETH_HEADER_SIZE])
-		BigEndian.PutUint16(packet[IP_HEADER_SIZE+MAC_ADDR_LEN*2:], uint16(EthernetTypeIPv4))
-		return IP_HEADER_SIZE - ETH_HEADER_SIZE
-	} else if size == IP6_HEADER_SIZE {
-		copy(packet[IP6_HEADER_SIZE:], packet[:ETH_HEADER_SIZE])
-		BigEndian.PutUint16(packet[IP6_HEADER_SIZE+MAC_ADDR_LEN*2:], uint16(EthernetTypeIPv4))
-		return IP6_HEADER_SIZE - ETH_HEADER_SIZE
-	}
+	// 去除underlay ip头，将l2层头放在overlay ip头前
 
-	return 0
-}
-
-func (t *TunnelInfo) Decapsulate6IPIP(packet []byte, l2Len int, size int) int {
-	l3Packet := packet[l2Len:]
-
-	if t.Tier == 0 {
-		if size == IP6_HEADER_SIZE {
-			t.Src = BigEndian.Uint32(l3Packet[IP6_SIP_OFFSET:])
-			t.Dst = BigEndian.Uint32(l3Packet[IP6_DIP_OFFSET:])
-		} else {
-			t.Src = BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:])
-			t.Dst = BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:])
-		}
-		t.Type = TUNNEL_TYPE_IPIP
-		t.Id = 0
+	// 偏移计算：overlay ip头开始位置(l2Len + underlayIpHeaderSize) - l2层长度(l2Len)
+	start := l2Len + underlayIpHeaderSize - l2Len
+	copy(packet[start:], packet[:l2Len])
+	if !overlayIpv6 {
+		BigEndian.PutUint16(packet[start+l2Len-2:], uint16(EthernetTypeIPv4))
 	} else {
-		t.Type = TUNNEL_TYPE_VXLAN_IPIP
+		BigEndian.PutUint16(packet[start+l2Len-2:], uint16(EthernetTypeIPv6))
 	}
-	t.Tier++
-
-	if size == IP_HEADER_SIZE {
-		copy(packet[IP_HEADER_SIZE:], packet[:ETH_HEADER_SIZE])
-		BigEndian.PutUint16(packet[IP_HEADER_SIZE+MAC_ADDR_LEN*2:], uint16(EthernetTypeIPv6))
-		return IP_HEADER_SIZE - ETH_HEADER_SIZE
-	} else if size == IP6_HEADER_SIZE {
-		copy(packet[IP6_HEADER_SIZE:], packet[:ETH_HEADER_SIZE])
-		BigEndian.PutUint16(packet[IP6_HEADER_SIZE+MAC_ADDR_LEN*2:], uint16(EthernetTypeIPv6))
-		return IP6_HEADER_SIZE - ETH_HEADER_SIZE
-	}
-
-	return 0
+	// l2已经做过解析，这个去除掉已经解析的l2长度
+	return start - l2Len
 }
