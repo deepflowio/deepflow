@@ -3,9 +3,12 @@ package common
 import (
 	"database/sql"
 	"fmt"
+	"net"
 
 	clickhouse "github.com/ClickHouse/clickhouse-go"
 	logging "github.com/op/go-logging"
+	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
+	"gitlab.yunshan.net/yunshan/message/trident"
 )
 
 var log = logging.MustGetLogger("common")
@@ -22,4 +25,24 @@ func NewCKConnection(addr, username, password string) (*sql.DB, error) {
 		return nil, err
 	}
 	return connect, nil
+}
+
+// 如果通过MAC匹配平台信息失败，则需要通过IP再获取, 解决工单122/126问题
+// 此时通过IP获取的平台信息中，仅返回subnet_id,az_id,region_id,device_type，且device_type设置为路由器类型
+func RegetInfoFromIP(isIPv6 bool, ip6 net.IP, ip4 uint32, epcID int16, platformData *grpc.PlatformInfoTable) *grpc.Info {
+	var info *grpc.Info
+	if isIPv6 {
+		info = platformData.QueryIPV6Infos(epcID, ip6)
+	} else {
+		info = platformData.QueryIPV4Infos(epcID, ip4)
+	}
+	if info != nil {
+		newInfo := &grpc.Info{}
+		newInfo.SubnetID = info.SubnetID
+		newInfo.AZID = info.AZID
+		newInfo.RegionID = info.RegionID
+		newInfo.DeviceType = uint32(trident.DeviceType_DEVICE_TYPE_NSP_VGATEWAY)
+		info = newInfo
+	}
+	return info
 }

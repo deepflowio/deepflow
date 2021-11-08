@@ -8,6 +8,7 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
 	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
+	"gitlab.yunshan.net/yunshan/droplet/common"
 	"gitlab.yunshan.net/yunshan/droplet/roze/msg"
 	"gitlab.yunshan.net/yunshan/message/trident"
 )
@@ -47,12 +48,20 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 		if t.L3EpcID == datatype.EPC_FROM_INTERNET && t.L3EpcID1 == datatype.EPC_FROM_INTERNET {
 			return rd
 		}
-
 		// 当MAC/MAC1非0时，通过MAC来获取资源信息
 		if t.MAC != 0 && t.MAC1 != 0 {
 			info, info1 = platformData.QueryMacInfosPair(t.MAC|uint64(t.L3EpcID)<<48, t.MAC1|uint64(t.L3EpcID1)<<48)
+			if info == nil {
+				info = common.RegetInfoFromIP(t.IsIPv6 == 1, t.IP6, t.IP, t.L3EpcID, platformData)
+			}
+			if info1 == nil {
+				info1 = common.RegetInfoFromIP(t.IsIPv6 == 1, t.IP61, t.IP1, t.L3EpcID1, platformData)
+			}
 		} else if t.MAC != 0 {
 			info = platformData.QueryMacInfo(t.MAC | uint64(t.L3EpcID)<<48)
+			if info == nil {
+				info = common.RegetInfoFromIP(t.IsIPv6 == 1, t.IP6, t.IP, t.L3EpcID, platformData)
+			}
 			if t.IsIPv6 != 0 {
 				info1 = platformData.QueryIPV6Infos(t.L3EpcID1, t.IP61)
 			} else {
@@ -65,6 +74,9 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 				info = platformData.QueryIPV4Infos(t.L3EpcID, t.IP)
 			}
 			info1 = platformData.QueryMacInfo(t.MAC1 | uint64(t.L3EpcID1)<<48)
+			if info1 == nil {
+				info1 = common.RegetInfoFromIP(t.IsIPv6 == 1, t.IP61, t.IP1, t.L3EpcID1, platformData)
+			}
 		} else if t.IsIPv6 != 0 {
 			info, info1 = platformData.QueryIPV6InfosPair(t.L3EpcID, t.IP6, t.L3EpcID1, t.IP61)
 		} else {
