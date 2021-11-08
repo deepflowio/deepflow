@@ -12,6 +12,7 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
+	"gitlab.yunshan.net/yunshan/droplet/common"
 	"gitlab.yunshan.net/yunshan/droplet/stream/geo"
 	"gitlab.yunshan.net/yunshan/message/trident"
 )
@@ -788,14 +789,24 @@ func (i *Internet) Fill(f *datatype.TaggedFlow) {
 func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool, platformData *grpc.PlatformInfoTable) {
 	var info0, info1 *grpc.Info
 	l3EpcID0, l3EpcID1 := f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].L3EpcID, f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].L3EpcID
+	// FIXME 5.7.4增加tap_side后，需要增加对tap_side的判断来决定是否为VIP
 	isVip0, isVip1 := f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].IsVIPInterface, f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].IsVIPInterface
 	mac0, mac1 := f.FlowKey.MACSrc, f.FlowKey.MACDst
 	l3EpcMac0, l3EpcMac1 := mac0|uint64(l3EpcID0)<<48, mac1|uint64(l3EpcID1)<<48 // 使用l3EpcID和mac查找，防止跨AZ mac冲突
 
 	if isVip0 && isVip1 {
 		info0, info1 = platformData.QueryMacInfosPair(l3EpcMac0, l3EpcMac1)
+		if info0 == nil {
+			info0 = common.RegetInfoFromIP(isIPV6, f.IP6Src, uint32(f.IPSrc), int16(l3EpcID0), platformData)
+		}
+		if info1 == nil {
+			info1 = common.RegetInfoFromIP(isIPV6, f.IP6Dst, uint32(f.IPDst), int16(l3EpcID1), platformData)
+		}
 	} else if isVip0 {
 		info0 = platformData.QueryMacInfo(l3EpcMac0)
+		if info0 == nil {
+			info0 = common.RegetInfoFromIP(isIPV6, f.IP6Src, uint32(f.IPSrc), int16(l3EpcID0), platformData)
+		}
 		if isIPV6 {
 			info1 = platformData.QueryIPV6Infos(int16(l3EpcID1), f.IP6Dst)
 		} else {
@@ -808,6 +819,9 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool, platformData 
 			info0 = platformData.QueryIPV4Infos(int16(l3EpcID0), uint32(f.IPSrc))
 		}
 		info1 = platformData.QueryMacInfo(l3EpcMac1)
+		if info1 == nil {
+			info1 = common.RegetInfoFromIP(isIPV6, f.IP6Dst, uint32(f.IPDst), int16(l3EpcID1), platformData)
+		}
 	} else if isIPV6 {
 		info0, info1 = platformData.QueryIPV6InfosPair(int16(l3EpcID0), f.IP6Src, int16(l3EpcID1), f.IP6Dst)
 	} else {
