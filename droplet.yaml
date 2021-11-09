@@ -142,7 +142,7 @@ ckdb:
 #  max-file-period-second: 300
 #
 #  ## pcap文件存储的文件夹
-#  file-directory: /var/lib/droplet/pcap
+#  file-directory: /var/lib/pcap
 
 ## ########################### roze config #############################################
 

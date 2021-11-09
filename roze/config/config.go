@@ -7,6 +7,7 @@ import (
 	"os"
 
 	logging "github.com/op/go-logging"
+	"gitlab.yunshan.net/yunshan/droplet/common"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -19,7 +20,6 @@ const (
 	DefaultUnmarshallQueueCount = 4
 	DefaultUnmarshallQueueSize  = 10240
 	DefaultReceiverWindowSize   = 1024
-	DefaultPcapDataPath         = "/var/lib/pcap"
 	DefaultCKReadTimeout        = 300
 )
 
@@ -99,7 +99,7 @@ func Load(path string) *Config {
 		ReceiverWindowSize:        DefaultReceiverWindowSize,
 		DisableSecondWriteReplica: true,
 
-		Pcap: PCapConfig{DefaultPcapDataPath},
+		Pcap: PCapConfig{common.DEFAULT_PCAP_DATA_PATH},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		log.Info("no config file, use defaults")
