@@ -8,6 +8,7 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
+	"gitlab.yunshan.net/yunshan/droplet/common"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -140,7 +141,7 @@ func (c *Config) Validate() error {
 		c.PCap.DiskFreeSpaceMarginGB = 10
 	}
 	if c.PCap.FileDirectory == "" {
-		c.PCap.FileDirectory = "/var/lib/droplet/pcap"
+		c.PCap.FileDirectory = common.DEFAULT_PCAP_DATA_PATH
 	}
 
 	if c.SyslogDirectory == "" {
