@@ -413,9 +413,18 @@ func (l *CloudPlatformLabeler) setEpcByCidr(ip net.IP, epc int32, endpointInfo *
 }
 
 func (l *CloudPlatformLabeler) setEpcByTunnelCidr(ip net.IP, tunnelId uint32, endpointInfo *EndpointInfo) bool {
-	for _, cidr := range l.tunnelIdCidrMapData[tunnelId] {
+	cidrs := l.tunnelIdCidrMapData[tunnelId]
+	for _, cidr := range cidrs {
 		if cidr.IpNet.Contains(ip) {
 			endpointInfo.L3EpcId = cidr.EpcId
+			return true
+		}
+	}
+	// 在光大青云环境中跨VPC通信时，在dvr master宿主机上bond口采集流量的vni为dvr master和
+	// dvr slave自管网络的vni，和overlay ip对应的vni不一致，目前因为自管网络的EPC和overlay
+	// ip所在子网的EPC相同，所以这里通过vni查询失败后再通过EPC查询
+	for _, cidr := range cidrs {
+		if ok := l.setEpcByCidr(ip, cidr.EpcId, endpointInfo); ok {
 			return true
 		}
 	}
