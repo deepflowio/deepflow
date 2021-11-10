@@ -169,6 +169,9 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 
 		if t.MAC != 0 {
 			info = platformData.QueryMacInfo(t.MAC | uint64(t.L3EpcID)<<48)
+			if info == nil {
+				info = common.RegetInfoFromIP(t.IsIPv6 == 1, t.IP6, t.IP, t.L3EpcID, platformData)
+			}
 		} else if t.IsIPv6 != 0 {
 			info = platformData.QueryIPV6Infos(t.L3EpcID, t.IP6)
 		} else {
