@@ -3,6 +3,7 @@ package common
 import (
 	"database/sql"
 	"fmt"
+	"math"
 	"net"
 
 	clickhouse "github.com/ClickHouse/clickhouse-go"
@@ -42,6 +43,7 @@ func RegetInfoFromIP(isIPv6 bool, ip6 net.IP, ip4 uint32, epcID int16, platformD
 		newInfo.AZID = info.AZID
 		newInfo.RegionID = info.RegionID
 		newInfo.DeviceType = uint32(trident.DeviceType_DEVICE_TYPE_NSP_VGATEWAY)
+		newInfo.DeviceID = math.MaxUint32 // 若为0，WEB会认为无效值，故取U32最大值，api层会特殊处理
 		info = newInfo
 	}
 	return info
