@@ -109,7 +109,7 @@ func TestMerge(t *testing.T) {
 		t.Errorf("Traffic ConcurrentMerge failed, expected:%v, actual:%v", t2, t1)
 	}
 
-	l1, l2 := &Latency{}, &Latency{1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2}
+	l1, l2 := &Latency{}, &Latency{1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2}
 	initMeter(l1, 1)
 	l1.ConcurrentMerge(l1)
 	if *l1 != *l2 {
@@ -146,7 +146,9 @@ func TestMarshalAnomaly(t *testing.T) {
 		"tcp_timeout=1i," +
 		"client_establish_fail=3i,server_establish_fail=4i,tcp_establish_fail=7i," +
 		"http_client_error=1i,http_server_error=1i,http_timeout=1i,http_error=2i," +
-		"dns_client_error=1i,dns_server_error=1i,dns_timeout=1i,dns_error=2i"
+		"dns_client_error=1i,dns_server_error=1i,dns_timeout=1i,dns_error=2i," +
+		"mysql_client_error=1i,mysql_server_error=1i,mysql_timeout=1i,mysql_error=2i," +
+		"redis_client_error=1i,redis_server_error=1i,redis_timeout=1i,redis_error=2i"
 	if string(actual[:n]) != expected {
 		t.Errorf("Anomaly MarshalTo failed, \n\texpected:%v\n\tactual:  %v\n", expected, string(actual[:n]))
 	}

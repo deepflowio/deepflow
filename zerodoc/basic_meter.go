@@ -19,10 +19,14 @@ type Traffic struct {
 	NewFlow    uint64 `db:"new_flow"`
 	ClosedFlow uint64 `db:"closed_flow"`
 
-	HTTPRequest  uint64 `db:"http_request"`
-	HTTPResponse uint64 `db:"http_response"`
-	DNSRequest   uint64 `db:"dns_request"`
-	DNSResponse  uint64 `db:"dns_response"`
+	HTTPRequest   uint32 `db:"http_request"`
+	HTTPResponse  uint32 `db:"http_response"`
+	DNSRequest    uint32 `db:"dns_request"`
+	DNSResponse   uint32 `db:"dns_response"`
+	MYSQLRequest  uint32 `db:"mysql_request"`
+	MYSQLResponse uint32 `db:"mysql_response"`
+	REDISRequest  uint32 `db:"redis_request"`
+	REDISResponse uint32 `db:"redis_response"`
 }
 
 func (t *Traffic) Reverse() {
@@ -46,10 +50,14 @@ func (t *Traffic) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(t.NewFlow)
 	encoder.WriteVarintU64(t.ClosedFlow)
 
-	encoder.WriteVarintU64(t.HTTPRequest)
-	encoder.WriteVarintU64(t.HTTPResponse)
-	encoder.WriteVarintU64(t.DNSRequest)
-	encoder.WriteVarintU64(t.DNSResponse)
+	encoder.WriteVarintU32(t.HTTPRequest)
+	encoder.WriteVarintU32(t.HTTPResponse)
+	encoder.WriteVarintU32(t.DNSRequest)
+	encoder.WriteVarintU32(t.DNSResponse)
+	encoder.WriteVarintU32(t.MYSQLRequest)
+	encoder.WriteVarintU32(t.MYSQLResponse)
+	encoder.WriteVarintU32(t.REDISRequest)
+	encoder.WriteVarintU32(t.REDISResponse)
 }
 
 func (t *Traffic) Decode(decoder *codec.SimpleDecoder) {
@@ -64,10 +72,14 @@ func (t *Traffic) Decode(decoder *codec.SimpleDecoder) {
 	t.NewFlow = decoder.ReadVarintU64()
 	t.ClosedFlow = decoder.ReadVarintU64()
 
-	t.HTTPRequest = decoder.ReadVarintU64()
-	t.HTTPResponse = decoder.ReadVarintU64()
-	t.DNSRequest = decoder.ReadVarintU64()
-	t.DNSResponse = decoder.ReadVarintU64()
+	t.HTTPRequest = decoder.ReadVarintU32()
+	t.HTTPResponse = decoder.ReadVarintU32()
+	t.DNSRequest = decoder.ReadVarintU32()
+	t.DNSResponse = decoder.ReadVarintU32()
+	t.MYSQLRequest = decoder.ReadVarintU32()
+	t.MYSQLResponse = decoder.ReadVarintU32()
+	t.REDISRequest = decoder.ReadVarintU32()
+	t.REDISResponse = decoder.ReadVarintU32()
 }
 
 func (t *Traffic) ConcurrentMerge(other *Traffic) {
@@ -86,6 +98,10 @@ func (t *Traffic) ConcurrentMerge(other *Traffic) {
 	t.HTTPResponse += other.HTTPResponse
 	t.DNSRequest += other.DNSRequest
 	t.DNSResponse += other.DNSResponse
+	t.MYSQLRequest += other.MYSQLRequest
+	t.MYSQLResponse += other.MYSQLResponse
+	t.REDISRequest += other.REDISRequest
+	t.REDISResponse += other.REDISResponse
 }
 
 func (t *Traffic) SequentialMerge(other *Traffic) {
@@ -101,11 +117,14 @@ func (t *Traffic) MarshalTo(b []byte) int {
 
 	fields := []string{
 		"packet_tx=", "packet_rx=", "byte_tx=", "byte_rx=", "byte=", "l3_byte_tx=", "l3_byte_rx=", "l4_byte_tx=", "l4_byte_rx=", "new_flow=", "closed_flow=",
-		"http_request=", "http_response=", "dns_request=", "dns_response=",
+		"http_request=", "http_response=", "dns_request=", "dns_response=", "mysql_request=", "mysql_response=", "redis_request=", "redis_response=",
 	}
 	values := []uint64{
 		t.PacketTx, t.PacketRx, t.ByteTx, t.ByteRx, t.ByteTx + t.ByteRx, t.L3ByteTx, t.L3ByteRx, t.L4ByteTx, t.L4ByteRx, t.NewFlow, t.ClosedFlow,
-		t.HTTPRequest, t.HTTPResponse, t.DNSRequest, t.DNSResponse,
+		uint64(t.HTTPRequest), uint64(t.HTTPResponse),
+		uint64(t.DNSRequest), uint64(t.DNSResponse),
+		uint64(t.MYSQLRequest), uint64(t.MYSQLResponse),
+		uint64(t.REDISRequest), uint64(t.REDISResponse),
 	}
 	n := marshalKeyValues(b[offset:], fields, values)
 	if n == 0 {
@@ -135,6 +154,10 @@ const (
 	TRAFFIC_HTTP_RESPONSE
 	TRAFFIC_DNS_REQUEST
 	TRAFFIC_DNS_RESPONSE
+	TRAFFIC_MYSQL_REQUEST
+	TRAFFIC_MYSQL_RESPONSE
+	TRAFFIC_REDIS_REQUEST
+	TRAFFIC_REDIS_RESPONSE
 )
 
 // Columns列和WriteBlock的列需要按顺序一一对应
@@ -157,10 +180,14 @@ func TrafficColumns() []*ckdb.Column {
 			TRAFFIC_NEW_FLOW:    {"new_flow", "累计新建连接数"},
 			TRAFFIC_CLOSED_FLOW: {"closed_flow", "累计关闭连接数"},
 
-			TRAFFIC_HTTP_REQUEST:  {"http_request", "累计HTTP请求包数"},
-			TRAFFIC_HTTP_RESPONSE: {"http_response", "累计HTTP响应包数"},
-			TRAFFIC_DNS_REQUEST:   {"dns_request", "累计DNS请求包数"},
-			TRAFFIC_DNS_RESPONSE:  {"dns_response", "累计DNS响应包数"},
+			TRAFFIC_HTTP_REQUEST:   {"http_request", "累计HTTP请求包数"},
+			TRAFFIC_HTTP_RESPONSE:  {"http_response", "累计HTTP响应包数"},
+			TRAFFIC_DNS_REQUEST:    {"dns_request", "累计DNS请求包数"},
+			TRAFFIC_DNS_RESPONSE:   {"dns_response", "累计DNS响应包数"},
+			TRAFFIC_MYSQL_REQUEST:  {"mysql_request", "累计MYSQL请求包数"},
+			TRAFFIC_MYSQL_RESPONSE: {"mysql_response", "累计MYSQL响应包数"},
+			TRAFFIC_REDIS_REQUEST:  {"redis_request", "累计REDIS请求包数"},
+			TRAFFIC_REDIS_RESPONSE: {"redis_response", "累计REDIS响应包数"},
 		},
 		ckdb.UInt64)
 }
@@ -184,10 +211,14 @@ func (t *Traffic) WriteBlock(block *ckdb.Block) error {
 		TRAFFIC_NEW_FLOW:    t.NewFlow,
 		TRAFFIC_CLOSED_FLOW: t.ClosedFlow,
 
-		TRAFFIC_HTTP_REQUEST:  t.HTTPRequest,
-		TRAFFIC_HTTP_RESPONSE: t.HTTPResponse,
-		TRAFFIC_DNS_REQUEST:   t.DNSRequest,
-		TRAFFIC_DNS_RESPONSE:  t.DNSResponse,
+		TRAFFIC_HTTP_REQUEST:   uint64(t.HTTPRequest),
+		TRAFFIC_HTTP_RESPONSE:  uint64(t.HTTPResponse),
+		TRAFFIC_DNS_REQUEST:    uint64(t.DNSRequest),
+		TRAFFIC_DNS_RESPONSE:   uint64(t.DNSResponse),
+		TRAFFIC_MYSQL_REQUEST:  uint64(t.MYSQLRequest),
+		TRAFFIC_MYSQL_RESPONSE: uint64(t.MYSQLResponse),
+		TRAFFIC_REDIS_REQUEST:  uint64(t.REDISRequest),
+		TRAFFIC_REDIS_RESPONSE: uint64(t.REDISResponse),
 	}
 	for _, v := range values {
 		if err := block.WriteUInt64(v); err != nil {
@@ -205,6 +236,8 @@ type Latency struct {
 	ARTMax       uint32 `db:"art_max"`        // us
 	HTTPRRTMax   uint32 `db:"http_rrt_max"`   // us
 	DNSRRTMax    uint32 `db:"dns_rrt_max"`    // us
+	MYSQLRRTMax  uint32 `db:"mysql_rrt_max"`  // us
+	REDISRRTMax  uint32 `db:"redis_rrt_max"`  // us
 
 	RTTSum       uint64 `db:"rtt_sum"`        // us
 	RTTClientSum uint64 `db:"rtt_client_sum"` // us
@@ -213,14 +246,18 @@ type Latency struct {
 	ARTSum       uint64 `db:"art_sum"`        // us
 	HTTPRRTSum   uint64 `db:"http_rrt_sum"`   // us
 	DNSRRTSum    uint64 `db:"dns_rrt_sum"`    // us
+	MYSQLRRTSum  uint64 `db:"mysql_rrt_sum"`  // us
+	REDISRRTSum  uint64 `db:"redis_rrt_sum"`  // us
 
-	RTTCount       uint64 `db:"rtt_count"` // XXX：考虑优化为u32，因为1分钟内时延计算量预期应该在40亿次以内
-	RTTClientCount uint64 `db:"rtt_client_count"`
-	RTTServerCount uint64 `db:"rtt_server_count"`
-	SRTCount       uint64 `db:"srt_count"`
-	ARTCount       uint64 `db:"art_count"`
-	HTTPRRTCount   uint64 `db:"http_rrt_count"`
-	DNSRRTCount    uint64 `db:"dns_rrt_count"`
+	RTTCount       uint32 `db:"rtt_count"`
+	RTTClientCount uint32 `db:"rtt_client_count"`
+	RTTServerCount uint32 `db:"rtt_server_count"`
+	SRTCount       uint32 `db:"srt_count"`
+	ARTCount       uint32 `db:"art_count"`
+	HTTPRRTCount   uint32 `db:"http_rrt_count"`
+	DNSRRTCount    uint32 `db:"dns_rrt_count"`
+	MYSQLRRTCount  uint32 `db:"mysql_rrt_count"`
+	REDISRRTCount  uint32 `db:"redis_rrt_count"`
 }
 
 func (_ *Latency) Reverse() {
@@ -235,6 +272,8 @@ func (l *Latency) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU32(l.ARTMax)
 	encoder.WriteVarintU32(l.HTTPRRTMax)
 	encoder.WriteVarintU32(l.DNSRRTMax)
+	encoder.WriteVarintU32(l.MYSQLRRTMax)
+	encoder.WriteVarintU32(l.REDISRRTMax)
 
 	encoder.WriteVarintU64(l.RTTSum)
 	encoder.WriteVarintU64(l.RTTClientSum)
@@ -243,14 +282,18 @@ func (l *Latency) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(l.ARTSum)
 	encoder.WriteVarintU64(l.HTTPRRTSum)
 	encoder.WriteVarintU64(l.DNSRRTSum)
+	encoder.WriteVarintU64(l.MYSQLRRTSum)
+	encoder.WriteVarintU64(l.REDISRRTSum)
 
-	encoder.WriteVarintU64(l.RTTCount)
-	encoder.WriteVarintU64(l.RTTClientCount)
-	encoder.WriteVarintU64(l.RTTServerCount)
-	encoder.WriteVarintU64(l.SRTCount)
-	encoder.WriteVarintU64(l.ARTCount)
-	encoder.WriteVarintU64(l.HTTPRRTCount)
-	encoder.WriteVarintU64(l.DNSRRTCount)
+	encoder.WriteVarintU32(l.RTTCount)
+	encoder.WriteVarintU32(l.RTTClientCount)
+	encoder.WriteVarintU32(l.RTTServerCount)
+	encoder.WriteVarintU32(l.SRTCount)
+	encoder.WriteVarintU32(l.ARTCount)
+	encoder.WriteVarintU32(l.HTTPRRTCount)
+	encoder.WriteVarintU32(l.DNSRRTCount)
+	encoder.WriteVarintU32(l.MYSQLRRTCount)
+	encoder.WriteVarintU32(l.REDISRRTCount)
 }
 
 func (l *Latency) Decode(decoder *codec.SimpleDecoder) {
@@ -261,6 +304,8 @@ func (l *Latency) Decode(decoder *codec.SimpleDecoder) {
 	l.ARTMax = decoder.ReadVarintU32()
 	l.HTTPRRTMax = decoder.ReadVarintU32()
 	l.DNSRRTMax = decoder.ReadVarintU32()
+	l.MYSQLRRTMax = decoder.ReadVarintU32()
+	l.REDISRRTMax = decoder.ReadVarintU32()
 
 	l.RTTSum = decoder.ReadVarintU64()
 	l.RTTClientSum = decoder.ReadVarintU64()
@@ -269,14 +314,18 @@ func (l *Latency) Decode(decoder *codec.SimpleDecoder) {
 	l.ARTSum = decoder.ReadVarintU64()
 	l.HTTPRRTSum = decoder.ReadVarintU64()
 	l.DNSRRTSum = decoder.ReadVarintU64()
+	l.MYSQLRRTSum = decoder.ReadVarintU64()
+	l.REDISRRTSum = decoder.ReadVarintU64()
 
-	l.RTTCount = decoder.ReadVarintU64()
-	l.RTTClientCount = decoder.ReadVarintU64()
-	l.RTTServerCount = decoder.ReadVarintU64()
-	l.SRTCount = decoder.ReadVarintU64()
-	l.ARTCount = decoder.ReadVarintU64()
-	l.HTTPRRTCount = decoder.ReadVarintU64()
-	l.DNSRRTCount = decoder.ReadVarintU64()
+	l.RTTCount = decoder.ReadVarintU32()
+	l.RTTClientCount = decoder.ReadVarintU32()
+	l.RTTServerCount = decoder.ReadVarintU32()
+	l.SRTCount = decoder.ReadVarintU32()
+	l.ARTCount = decoder.ReadVarintU32()
+	l.HTTPRRTCount = decoder.ReadVarintU32()
+	l.DNSRRTCount = decoder.ReadVarintU32()
+	l.MYSQLRRTCount = decoder.ReadVarintU32()
+	l.REDISRRTCount = decoder.ReadVarintU32()
 }
 
 func (l *Latency) ConcurrentMerge(other *Latency) {
@@ -301,6 +350,12 @@ func (l *Latency) ConcurrentMerge(other *Latency) {
 	if l.DNSRRTMax < other.DNSRRTMax {
 		l.DNSRRTMax = other.DNSRRTMax
 	}
+	if l.MYSQLRRTMax < other.MYSQLRRTMax {
+		l.MYSQLRRTMax = other.MYSQLRRTMax
+	}
+	if l.REDISRRTMax < other.REDISRRTMax {
+		l.REDISRRTMax = other.REDISRRTMax
+	}
 
 	l.RTTSum += other.RTTSum
 	l.RTTClientSum += other.RTTClientSum
@@ -309,6 +364,8 @@ func (l *Latency) ConcurrentMerge(other *Latency) {
 	l.ARTSum += other.ARTSum
 	l.HTTPRRTSum += other.HTTPRRTSum
 	l.DNSRRTSum += other.DNSRRTSum
+	l.MYSQLRRTSum += other.MYSQLRRTSum
+	l.REDISRRTSum += other.REDISRRTSum
 
 	l.RTTCount += other.RTTCount
 	l.RTTClientCount += other.RTTClientCount
@@ -317,6 +374,8 @@ func (l *Latency) ConcurrentMerge(other *Latency) {
 	l.ARTCount += other.ARTCount
 	l.HTTPRRTCount += other.HTTPRRTCount
 	l.DNSRRTCount += other.DNSRRTCount
+	l.MYSQLRRTCount += other.MYSQLRRTCount
+	l.REDISRRTCount += other.REDISRRTCount
 
 }
 
@@ -325,13 +384,19 @@ func (l *Latency) SequentialMerge(other *Latency) {
 }
 
 func (l *Latency) MarshalTo(b []byte) int {
-	fields := []string{"rtt_sum=", "rtt_client_sum=", "rtt_server_sum=", "srt_sum=", "art_sum=", "http_rrt_sum=", "dns_rrt_sum=",
-		"rtt_count=", "rtt_client_count=", "rtt_server_count=", "srt_count=", "art_count=", "http_rrt_count=", "dns_rrt_count=",
-		"rtt_max=", "rtt_client_max=", "rtt_server_max=", "srt_max=", "art_max=", "http_rrt_max=", "dns_rrt_max="}
+	fields := []string{"rtt_sum=", "rtt_client_sum=", "rtt_server_sum=", "srt_sum=", "art_sum=",
+		"http_rrt_sum=", "dns_rrt_sum=", "mysql_rrt_sum=", "redis_rrt_sum=",
+		"rtt_count=", "rtt_client_count=", "rtt_server_count=", "srt_count=", "art_count=",
+		"http_rrt_count=", "dns_rrt_count=", "mysql_rrt_count=", "redis_rrt_count=",
+		"rtt_max=", "rtt_client_max=", "rtt_server_max=", "srt_max=", "art_max=",
+		"http_rrt_max=", "dns_rrt_max=", "mysql_rrt_max=", "redis_rrt_max="}
 	values := []uint64{
-		l.RTTSum, l.RTTClientSum, l.RTTServerSum, l.SRTSum, l.ARTSum, l.HTTPRRTSum, l.DNSRRTSum,
-		l.RTTCount, l.RTTClientCount, l.RTTServerCount, l.SRTCount, l.ARTCount, l.HTTPRRTCount, l.DNSRRTCount,
-		uint64(l.RTTMax), uint64(l.RTTClientMax), uint64(l.RTTServerMax), uint64(l.SRTMax), uint64(l.ARTMax), uint64(l.HTTPRRTMax), uint64(l.DNSRRTMax),
+		l.RTTSum, l.RTTClientSum, l.RTTServerSum, l.SRTSum, l.ARTSum,
+		l.HTTPRRTSum, l.DNSRRTSum, l.MYSQLRRTSum, l.REDISRRTSum,
+		uint64(l.RTTCount), uint64(l.RTTClientCount), uint64(l.RTTServerCount), uint64(l.SRTCount), uint64(l.ARTCount),
+		uint64(l.HTTPRRTCount), uint64(l.DNSRRTCount), uint64(l.MYSQLRRTCount), uint64(l.REDISRRTCount),
+		uint64(l.RTTMax), uint64(l.RTTClientMax), uint64(l.RTTServerMax), uint64(l.SRTMax), uint64(l.ARTMax),
+		uint64(l.HTTPRRTMax), uint64(l.DNSRRTMax), uint64(l.MYSQLRRTMax), uint64(l.REDISRRTMax),
 	}
 	return marshalKeyValues(b, fields, values)
 }
@@ -344,6 +409,8 @@ const (
 	LATENCY_ART
 	LATENCY_HTTP_RRT
 	LATENCY_DNS_RRT
+	LATENCY_MYSQL_RRT
+	LATENCY_REDIS_RRT
 )
 
 // Columns列和WriteBlock的列需要按顺序一一对应
@@ -357,6 +424,8 @@ func LatencyColumns() []*ckdb.Column {
 			LATENCY_ART:        {"art_sum", "累计所有应用响应时延(us)"},
 			LATENCY_HTTP_RRT:   {"http_rrt_sum", "累计所有HTTP请求响应时延(us)"},
 			LATENCY_DNS_RRT:    {"dns_rrt_sum", "累计所有DNS请求响应时延(us)"},
+			LATENCY_MYSQL_RRT:  {"mysql_rrt_sum", "累计所有MYSQL请求响应时延(us)"},
+			LATENCY_REDIS_RRT:  {"redis_rrt_sum", "累计所有REDIS请求响应时延(us)"},
 		},
 		ckdb.Float64)
 	counterColumns := ckdb.NewColumnsWithComment(
@@ -368,6 +437,8 @@ func LatencyColumns() []*ckdb.Column {
 			LATENCY_ART:        {"art_count", "应用响应时延计算次数"},
 			LATENCY_HTTP_RRT:   {"http_rrt_count", "HTTP请求响应时延计算次数"},
 			LATENCY_DNS_RRT:    {"dns_rrt_count", "DNS请求响应时延计算次数"},
+			LATENCY_MYSQL_RRT:  {"mysql_rrt_count", "MYSQL请求响应时延计算次数"},
+			LATENCY_REDIS_RRT:  {"redis_rrt_count", "REDIS请求响应时延计算次数"},
 		},
 		ckdb.UInt64)
 	maxColumns := ckdb.NewColumnsWithComment(
@@ -379,6 +450,8 @@ func LatencyColumns() []*ckdb.Column {
 			LATENCY_ART:        {"art_max", "所有应用响应时延最大值(us)"},
 			LATENCY_HTTP_RRT:   {"http_rrt_max", "所有HTTP请求响应时延最大值(us)"},
 			LATENCY_DNS_RRT:    {"dns_rrt_max", "所有DNS请求响应时延最大值(us)"},
+			LATENCY_MYSQL_RRT:  {"mysql_rrt_max", "所有MYSQL请求响应时延最大值(us)"},
+			LATENCY_REDIS_RRT:  {"redis_rrt_max", "所有REDIS请求响应时延最大值(us)"},
 		}, ckdb.UInt32)
 	for _, c := range maxColumns {
 		c.SetIndex(ckdb.IndexNone)
@@ -399,15 +472,19 @@ func (l *Latency) WriteBlock(block *ckdb.Block) error {
 		LATENCY_SRT:        float64(l.SRTSum),
 		LATENCY_ART:        float64(l.ARTSum),
 		LATENCY_HTTP_RRT:   float64(l.HTTPRRTSum),
-		LATENCY_DNS_RRT:    float64(l.DNSRRTSum)}
+		LATENCY_DNS_RRT:    float64(l.DNSRRTSum),
+		LATENCY_MYSQL_RRT:  float64(l.MYSQLRRTSum),
+		LATENCY_REDIS_RRT:  float64(l.REDISRRTSum)}
 	counterValues := []uint64{
-		LATENCY_RTT:        l.RTTCount,
-		LATENCY_RTT_CLIENT: l.RTTClientCount,
-		LATENCY_RTT_SERVER: l.RTTServerCount,
-		LATENCY_SRT:        l.SRTCount,
-		LATENCY_ART:        l.ARTCount,
-		LATENCY_HTTP_RRT:   l.HTTPRRTCount,
-		LATENCY_DNS_RRT:    l.DNSRRTCount}
+		LATENCY_RTT:        uint64(l.RTTCount),
+		LATENCY_RTT_CLIENT: uint64(l.RTTClientCount),
+		LATENCY_RTT_SERVER: uint64(l.RTTServerCount),
+		LATENCY_SRT:        uint64(l.SRTCount),
+		LATENCY_ART:        uint64(l.ARTCount),
+		LATENCY_HTTP_RRT:   uint64(l.HTTPRRTCount),
+		LATENCY_DNS_RRT:    uint64(l.DNSRRTCount),
+		LATENCY_MYSQL_RRT:  uint64(l.MYSQLRRTCount),
+		LATENCY_REDIS_RRT:  uint64(l.REDISRRTCount)}
 	maxValues := []uint32{
 		LATENCY_RTT:        l.RTTMax,
 		LATENCY_RTT_CLIENT: l.RTTClientMax,
@@ -415,7 +492,9 @@ func (l *Latency) WriteBlock(block *ckdb.Block) error {
 		LATENCY_SRT:        l.SRTMax,
 		LATENCY_ART:        l.ARTMax,
 		LATENCY_HTTP_RRT:   l.HTTPRRTMax,
-		LATENCY_DNS_RRT:    l.DNSRRTMax}
+		LATENCY_DNS_RRT:    l.DNSRRTMax,
+		LATENCY_MYSQL_RRT:  l.MYSQLRRTMax,
+		LATENCY_REDIS_RRT:  l.REDISRRTMax}
 	for _, v := range sumValues {
 		if err := block.WriteFloat64(v); err != nil {
 			return err
@@ -536,12 +615,18 @@ type Anomaly struct {
 	ServerEstablishReset  uint64 `db:"server_establish_other_rst"`
 	TCPTimeout            uint64 `db:"tcp_timeout"`
 
-	HTTPClientError uint64 `db:"http_client_error"`
-	HTTPServerError uint64 `db:"http_server_error"`
-	HTTPTimeout     uint64 `db:"http_timeout"`
-	DNSClientError  uint64 `db:"dns_client_error"`
-	DNSServerError  uint64 `db:"dns_server_error"`
-	DNSTimeout      uint64 `db:"dns_timeout"`
+	HTTPClientError  uint32 `db:"http_client_error"`
+	HTTPServerError  uint32 `db:"http_server_error"`
+	HTTPTimeout      uint32 `db:"http_timeout"`
+	DNSClientError   uint32 `db:"dns_client_error"`
+	DNSServerError   uint32 `db:"dns_server_error"`
+	DNSTimeout       uint32 `db:"dns_timeout"`
+	MYSQLClientError uint32 `db:"mysql_client_error"`
+	MYSQLServerError uint32 `db:"mysql_server_error"`
+	MYSQLTimeout     uint32 `db:"mysql_timeout"`
+	REDISClientError uint32 `db:"redis_client_error"`
+	REDISServerError uint32 `db:"redis_server_error"`
+	REDISTimeout     uint32 `db:"redis_timeout"`
 }
 
 func (_ *Anomaly) Reverse() {
@@ -563,12 +648,18 @@ func (a *Anomaly) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(a.ServerEstablishReset)
 	encoder.WriteVarintU64(a.TCPTimeout)
 
-	encoder.WriteVarintU64(a.HTTPClientError)
-	encoder.WriteVarintU64(a.HTTPServerError)
-	encoder.WriteVarintU64(a.HTTPTimeout)
-	encoder.WriteVarintU64(a.DNSClientError)
-	encoder.WriteVarintU64(a.DNSServerError)
-	encoder.WriteVarintU64(a.DNSTimeout)
+	encoder.WriteVarintU32(a.HTTPClientError)
+	encoder.WriteVarintU32(a.HTTPServerError)
+	encoder.WriteVarintU32(a.HTTPTimeout)
+	encoder.WriteVarintU32(a.DNSClientError)
+	encoder.WriteVarintU32(a.DNSServerError)
+	encoder.WriteVarintU32(a.DNSTimeout)
+	encoder.WriteVarintU32(a.MYSQLClientError)
+	encoder.WriteVarintU32(a.MYSQLServerError)
+	encoder.WriteVarintU32(a.MYSQLTimeout)
+	encoder.WriteVarintU32(a.REDISClientError)
+	encoder.WriteVarintU32(a.REDISServerError)
+	encoder.WriteVarintU32(a.REDISTimeout)
 }
 
 func (a *Anomaly) Decode(decoder *codec.SimpleDecoder) {
@@ -586,12 +677,18 @@ func (a *Anomaly) Decode(decoder *codec.SimpleDecoder) {
 	a.ServerEstablishReset = decoder.ReadVarintU64()
 	a.TCPTimeout = decoder.ReadVarintU64()
 
-	a.HTTPClientError = decoder.ReadVarintU64()
-	a.HTTPServerError = decoder.ReadVarintU64()
-	a.HTTPTimeout = decoder.ReadVarintU64()
-	a.DNSClientError = decoder.ReadVarintU64()
-	a.DNSServerError = decoder.ReadVarintU64()
-	a.DNSTimeout = decoder.ReadVarintU64()
+	a.HTTPClientError = decoder.ReadVarintU32()
+	a.HTTPServerError = decoder.ReadVarintU32()
+	a.HTTPTimeout = decoder.ReadVarintU32()
+	a.DNSClientError = decoder.ReadVarintU32()
+	a.DNSServerError = decoder.ReadVarintU32()
+	a.DNSTimeout = decoder.ReadVarintU32()
+	a.MYSQLClientError = decoder.ReadVarintU32()
+	a.MYSQLServerError = decoder.ReadVarintU32()
+	a.MYSQLTimeout = decoder.ReadVarintU32()
+	a.REDISClientError = decoder.ReadVarintU32()
+	a.REDISServerError = decoder.ReadVarintU32()
+	a.REDISTimeout = decoder.ReadVarintU32()
 }
 
 func (a *Anomaly) ConcurrentMerge(other *Anomaly) {
@@ -616,6 +713,14 @@ func (a *Anomaly) ConcurrentMerge(other *Anomaly) {
 	a.DNSClientError += other.DNSClientError
 	a.DNSServerError += other.DNSServerError
 	a.DNSTimeout += other.DNSTimeout
+
+	a.MYSQLClientError += other.MYSQLClientError
+	a.MYSQLServerError += other.MYSQLServerError
+	a.MYSQLTimeout += other.MYSQLTimeout
+
+	a.REDISClientError += other.REDISClientError
+	a.REDISServerError += other.REDISServerError
+	a.REDISTimeout += other.REDISTimeout
 }
 
 func (a *Anomaly) SequentialMerge(other *Anomaly) {
@@ -633,6 +738,8 @@ func (a *Anomaly) MarshalTo(b []byte) int {
 		"client_establish_fail=", "server_establish_fail=", "tcp_establish_fail=",
 		"http_client_error=", "http_server_error=", "http_timeout=", "http_error=",
 		"dns_client_error=", "dns_server_error=", "dns_timeout=", "dns_error=",
+		"mysql_client_error=", "mysql_server_error=", "mysql_timeout=", "mysql_error=",
+		"redis_client_error=", "redis_server_error=", "redis_timeout=", "redis_error=",
 	}
 	clientFail := a.ClientSynRepeat + a.ClientSourcePortReuse + a.ClientEstablishReset
 	serverFail := a.ServerSYNACKRepeat + a.ServerReset + a.ServerQueueLack + a.ServerEstablishReset
@@ -644,8 +751,10 @@ func (a *Anomaly) MarshalTo(b []byte) int {
 		a.ClientEstablishReset, a.ServerEstablishReset,
 		a.TCPTimeout,
 		clientFail, serverFail, clientFail + serverFail,
-		a.HTTPClientError, a.HTTPServerError, a.HTTPTimeout, a.HTTPClientError + a.HTTPServerError,
-		a.DNSClientError, a.DNSServerError, a.DNSTimeout, a.DNSClientError + a.DNSServerError,
+		uint64(a.HTTPClientError), uint64(a.HTTPServerError), uint64(a.HTTPTimeout), uint64(a.HTTPClientError + a.HTTPServerError),
+		uint64(a.DNSClientError), uint64(a.DNSServerError), uint64(a.DNSTimeout), uint64(a.DNSClientError + a.DNSServerError),
+		uint64(a.MYSQLClientError), uint64(a.MYSQLServerError), uint64(a.MYSQLTimeout), uint64(a.MYSQLClientError + a.MYSQLServerError),
+		uint64(a.REDISClientError), uint64(a.REDISServerError), uint64(a.REDISTimeout), uint64(a.REDISClientError + a.REDISServerError),
 	}
 	return marshalKeyValues(b, fields, values)
 }
@@ -682,6 +791,16 @@ const (
 	ANOMALY_DNS_SERVER_ERROR
 	ANOMALY_DNS_TIMEOUT
 	ANOMALY_DNS_ERROR
+
+	ANOMALY_MYSQL_CLIENT_ERROR
+	ANOMALY_MYSQL_SERVER_ERROR
+	ANOMALY_MYSQL_TIMEOUT
+	ANOMALY_MYSQL_ERROR
+
+	ANOMALY_REDIS_CLIENT_ERROR
+	ANOMALY_REDIS_SERVER_ERROR
+	ANOMALY_REDIS_TIMEOUT
+	ANOMALY_REDIS_ERROR
 )
 
 // Columns列和WriteBlock的列需要按顺序一一对应
@@ -719,6 +838,16 @@ func AnomalyColumns() []*ckdb.Column {
 			ANOMALY_DNS_SERVER_ERROR: {"dns_server_error", "DNS服务端错误次数"},
 			ANOMALY_DNS_TIMEOUT:      {"dns_timeout", "DNS请求超时次数"},
 			ANOMALY_DNS_ERROR:        {"dns_error", "DNS异常次数"},
+
+			ANOMALY_MYSQL_CLIENT_ERROR: {"mysql_client_error", "MYSQL客户端错误次数"},
+			ANOMALY_MYSQL_SERVER_ERROR: {"mysql_server_error", "MYSQL服务端错误次数"},
+			ANOMALY_MYSQL_TIMEOUT:      {"mysql_timeout", "MYSQL请求超时次数"},
+			ANOMALY_MYSQL_ERROR:        {"mysql_error", "MYSQL异常次数"},
+
+			ANOMALY_REDIS_CLIENT_ERROR: {"redis_client_error", "REDIS客户端错误次数"},
+			ANOMALY_REDIS_SERVER_ERROR: {"redis_server_error", "REDIS服务端错误次数"},
+			ANOMALY_REDIS_TIMEOUT:      {"redis_timeout", "REDIS请求超时次数"},
+			ANOMALY_REDIS_ERROR:        {"redis_error", "REDIS异常次数"},
 		}, ckdb.UInt64)
 }
 
@@ -749,15 +878,25 @@ func (a *Anomaly) WriteBlock(block *ckdb.Block) error {
 		ANOMALY_SERVER_ESTABLISH_FAIL: serverFail,
 		ANOMALY_TCP_ESTABLISH_FAIL:    clientFail + serverFail,
 
-		ANOMALY_HTTP_CLIENT_ERROR: a.HTTPClientError,
-		ANOMALY_HTTP_SERVER_ERROR: a.HTTPServerError,
-		ANOMALY_HTTP_TIMEOUT:      a.HTTPTimeout,
-		ANOMALY_HTTP_ERROR:        a.HTTPClientError + a.HTTPServerError,
+		ANOMALY_HTTP_CLIENT_ERROR: uint64(a.HTTPClientError),
+		ANOMALY_HTTP_SERVER_ERROR: uint64(a.HTTPServerError),
+		ANOMALY_HTTP_TIMEOUT:      uint64(a.HTTPTimeout),
+		ANOMALY_HTTP_ERROR:        uint64(a.HTTPClientError + a.HTTPServerError),
 
-		ANOMALY_DNS_CLIENT_ERROR: a.DNSClientError,
-		ANOMALY_DNS_SERVER_ERROR: a.DNSServerError,
-		ANOMALY_DNS_TIMEOUT:      a.DNSTimeout,
-		ANOMALY_DNS_ERROR:        a.DNSClientError + a.DNSServerError,
+		ANOMALY_DNS_CLIENT_ERROR: uint64(a.DNSClientError),
+		ANOMALY_DNS_SERVER_ERROR: uint64(a.DNSServerError),
+		ANOMALY_DNS_TIMEOUT:      uint64(a.DNSTimeout),
+		ANOMALY_DNS_ERROR:        uint64(a.DNSClientError + a.DNSServerError),
+
+		ANOMALY_MYSQL_CLIENT_ERROR: uint64(a.MYSQLClientError),
+		ANOMALY_MYSQL_SERVER_ERROR: uint64(a.MYSQLServerError),
+		ANOMALY_MYSQL_TIMEOUT:      uint64(a.MYSQLTimeout),
+		ANOMALY_MYSQL_ERROR:        uint64(a.MYSQLClientError + a.MYSQLServerError),
+
+		ANOMALY_REDIS_CLIENT_ERROR: uint64(a.REDISClientError),
+		ANOMALY_REDIS_SERVER_ERROR: uint64(a.REDISServerError),
+		ANOMALY_REDIS_TIMEOUT:      uint64(a.REDISTimeout),
+		ANOMALY_REDIS_ERROR:        uint64(a.REDISClientError + a.REDISServerError),
 	}
 	for _, v := range values {
 		if err := block.WriteUInt64(v); err != nil {
