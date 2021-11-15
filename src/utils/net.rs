@@ -12,12 +12,15 @@ use neli::{
     },
     err::NlError,
     nl::{NlPayload, Nlmsghdr},
-    rtnl::{Ifinfomsg, Rtattr, Rtmsg},
+    rtnl::{Ifaddrmsg, Ifinfomsg, Rtattr, Rtmsg},
     socket::NlSocketHandle,
     types::{Buffer, RtBuffer},
 };
 
+#[derive(Clone, PartialEq, Eq)]
 pub struct MacAddr([u8; 6]);
+
+pub const MAC_ADDR_ZERO: MacAddr = MacAddr([0, 0, 0, 0, 0, 0]);
 
 impl fmt::Debug for MacAddr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -84,17 +87,11 @@ pub fn link_list() -> Result<Vec<Link>, NlError> {
                 links.push(Link {
                     if_index: payload.ifi_index as u32,
                     mac_addr: MacAddr(*mac_addr),
-                })
+                });
             }
         }
     }
     Ok(links)
-}
-
-#[derive(Debug)]
-pub struct Route {
-    pub src_ip: IpAddr,
-    pub oif_index: u32,
 }
 
 fn parse_ip_slice(bs: &[u8]) -> Option<IpAddr> {
@@ -105,6 +102,63 @@ fn parse_ip_slice(bs: &[u8]) -> Option<IpAddr> {
     } else {
         None
     }
+}
+
+#[derive(Debug)]
+pub struct Addr {
+    pub if_index: u32,
+    pub ip_addr: IpAddr,
+}
+
+pub fn addr_list() -> Result<Vec<Addr>, NlError> {
+    let msg = Ifaddrmsg {
+        ifa_family: RtAddrFamily::Unspecified,
+        ifa_prefixlen: 0,
+        ifa_flags: IfaFFlags::empty(),
+        ifa_scope: 0,
+        ifa_index: 0,
+        rtattrs: RtBuffer::new(),
+    };
+    let req = Nlmsghdr::new(
+        None,
+        Rtm::Getaddr,
+        NlmFFlags::new(&[NlmF::Request, NlmF::Dump]),
+        None,
+        None,
+        NlPayload::Payload(msg),
+    );
+    let mut socket = NlSocketHandle::connect(NlFamily::Route, None, &[])?;
+    socket.send(req)?;
+
+    let mut addrs = vec![];
+    for m in socket.iter::<Ifaddrmsg>(false) {
+        let m = m?;
+        if m.nl_type != Rtm::Newaddr.into() {
+            continue;
+        }
+        let payload = m.get_payload()?;
+
+        let mut ip_addr = None;
+        for attr in payload.rtattrs.iter() {
+            match attr.rta_type {
+                Ifa::Address => ip_addr = parse_ip_slice(attr.rta_payload.as_ref()),
+                _ => (),
+            }
+        }
+        if let Some(ip_addr) = ip_addr {
+            addrs.push(Addr {
+                if_index: payload.ifa_index as u32,
+                ip_addr,
+            });
+        }
+    }
+    Ok(addrs)
+}
+
+#[derive(Debug)]
+pub struct Route {
+    pub src_ip: IpAddr,
+    pub oif_index: u32,
 }
 
 pub fn route_get(dest: &IpAddr) -> Result<Vec<Route>, NlError> {
@@ -169,10 +223,26 @@ pub fn route_get(dest: &IpAddr) -> Result<Vec<Route>, NlError> {
 
 pub fn get_route_src_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
     let (src_ip, oif_index) = get_route_src_ip_and_ifindex(dest)?;
-    for link in link_list().context("failed to get links")? {
+    let links = link_list().context("failed to get links")?;
+    for link in links.iter() {
         if link.if_index == oif_index {
-            return Ok((src_ip, link.mac_addr));
+            if link.mac_addr == MAC_ADDR_ZERO {
+                // loopback，需要从ip地址找mac
+                break;
+            }
+            return Ok((src_ip, link.mac_addr.clone()));
         }
+    }
+    for addr in addr_list().context("failed to get addrs")? {
+        if addr.ip_addr != src_ip {
+            continue;
+        }
+        for link in links {
+            if addr.if_index == link.if_index {
+                return Ok((src_ip, link.mac_addr));
+            }
+        }
+        break;
     }
     Err(anyhow!("link with index {} not found", oif_index))
 }
