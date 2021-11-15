@@ -3,7 +3,6 @@ package stats
 import (
 	"flag"
 	"fmt"
-	"net"
 	"os"
 	"path"
 	"reflect"
@@ -14,8 +13,8 @@ import (
 
 	"github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/models"
-	"github.com/op/go-logging"
-	"gopkg.in/alexcesaro/statsd.v2"
+	logging "github.com/op/go-logging"
+	statsd "gopkg.in/alexcesaro/statsd.v2"
 
 	. "gitlab.yunshan.net/yunshan/droplet-libs/datastructure"
 )
@@ -46,7 +45,7 @@ var (
 	lock        sync.Mutex
 	preHooks    []func()
 	statSources = LinkedList{}
-	remotes     = []net.UDPAddr{}
+	remotes     = []string{}
 	remoteIndex = -1
 	connection  client.Client
 
@@ -154,9 +153,9 @@ func collectBatchPoints() client.BatchPoints {
 	return bp
 }
 
-func newStatsdClient(remote net.UDPAddr) *statsd.Client {
+func newStatsdClient(remote string) *statsd.Client {
 	options := []statsd.Option{
-		statsd.Address(remote.String()),
+		statsd.Address(remote),
 		statsd.TagsFormat(statsd.InfluxDB),
 	}
 	c, err := statsd.New(options...)
@@ -170,10 +169,10 @@ func newStatsdClient(remote net.UDPAddr) *statsd.Client {
 func sendStatsd(bp client.BatchPoints) {
 	for i, remote := range remotes {
 		if len(statsdClients) <= i {
-			statsdClients = append(statsdClients, newStatsdClient(net.UDPAddr{remote.IP, remote.Port, ""}))
+			statsdClients = append(statsdClients, newStatsdClient(remote))
 		}
 		if statsdClients[i] == nil {
-			statsdClients[i] = newStatsdClient(net.UDPAddr{remote.IP, remote.Port, ""})
+			statsdClients[i] = newStatsdClient(remote)
 		}
 	}
 
@@ -206,7 +205,7 @@ func sendStatsd(bp client.BatchPoints) {
 
 func nextRemote() error {
 	remoteIndex = (remoteIndex + 1) % len(remotes)
-	conn, err := client.NewUDPClient(client.UDPConfig{remotes[remoteIndex].String(), 1400})
+	conn, err := client.NewUDPClient(client.UDPConfig{remotes[remoteIndex], 1400})
 	if err != nil {
 		return err
 	}
@@ -260,7 +259,7 @@ func run() {
 	}
 }
 
-func setRemotes(addrs ...net.UDPAddr) {
+func setRemotes(addrs ...string) {
 	log.Info("Remote changed to", addrs)
 	remotes = addrs
 	lock.Lock()
