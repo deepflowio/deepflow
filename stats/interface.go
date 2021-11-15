@@ -1,7 +1,6 @@
 package stats
 
 import (
-	"net"
 	"time"
 )
 
@@ -41,7 +40,7 @@ func SetMinInterval(interval time.Duration) {
 
 // 指定influxdb远程服务器
 // 只会有其中一个远程服务器会收到统计数据
-func SetRemotes(addrs ...net.UDPAddr) {
+func SetRemotes(addrs ...string) {
 	setRemotes(addrs...)
 }
 
