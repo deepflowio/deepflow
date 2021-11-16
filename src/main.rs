@@ -64,7 +64,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let t = trident::Trident::new(&Path::new(&opts.config_file), &version)?;
+    let t = trident::Trident::new(&Path::new(&opts.config_file), version)?;
     t.start();
     wait_on_signals();
     t.stop();

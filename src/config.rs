@@ -1,13 +1,16 @@
+use std::convert::TryFrom;
 use std::fs;
 use std::io;
-use std::net::ToSocketAddrs;
+use std::net::{IpAddr, ToSocketAddrs};
 use std::path::Path;
 use std::time::Duration;
 
 use serde::Deserialize;
 use thiserror::Error;
+use tokio::runtime::Runtime;
 
-use crate::proto::{common::TridentType, trident};
+use crate::consts;
+use crate::proto::{common, trident};
 
 #[cfg(unix)]
 const DEFAULT_LOG_FILE: &str = "/var/log/trident/trident.log";
@@ -20,6 +23,8 @@ pub enum ConfigError {
     ControllerIpsEmpty,
     #[error("controller-ips invalid")]
     ControllerIpsInvalid,
+    #[error("runtime config invalid: {0}")]
+    RuntimeConfigInvalid(String),
 }
 
 #[derive(Debug, Deserialize)]
@@ -357,6 +362,228 @@ pub enum KubernetesPollerType {
 pub enum IngressFlavour {
     Kubernetes,
     Openshift,
+}
+
+#[derive(Debug)]
+pub struct RuntimeConfig<'a> {
+    pub enabled: bool,
+    pub max_cpus: u32,
+    pub max_memory: u64,
+    pub sync_interval: Duration,
+    pub stats_interval: Duration,
+    pub global_pps_threshold: u64,
+    pub tap_interface_regex: &'a str,
+    pub host: &'a str,
+    pub rsyslog_enabled: bool,
+    pub output_vlan: u16,
+    pub mtu: u32,
+    pub npb_bps_threshold: u64,
+    pub collector_enabled: bool,
+    pub l4_log_store_tap_types: &'a Vec<u32>,
+    pub packet_header_enabled: bool,
+    pub platform_enabled: bool,
+    pub server_tx_bandwidth_threshold: u64,
+    pub bandwidth_probe_interval: Duration,
+    pub npb_vlan_mode: trident::VlanMode,
+    pub npb_dedup_enabled: bool,
+    pub if_mac_source: trident::IfMacSource,
+    pub vtap_flow_1s_enabled: bool,
+    pub debug_enabled: bool,
+    pub log_threshold: u32,
+    pub log_level: log::Level,
+    pub analyzer_ip: &'a str,
+    pub max_escape: Duration,
+    pub proxy_controller_ip: &'a str,
+    pub vtap_id: u16,
+    pub collector_socket_type: trident::SocketType,
+    pub compressor_socket_type: trident::SocketType,
+    pub npb_socket_type: trident::SocketType,
+    pub trident_type: common::TridentType,
+    pub capture_packet_size: u32,
+    pub inactive_server_port_enabled: bool,
+    pub libvirt_xml_path: &'a str,
+    pub l7_log_packet_size: u32,
+    pub l4_log_collect_nps_threshold: u64,
+    pub l7_log_collect_nps_threshold: u64,
+    pub l7_metrics_enabled: bool,
+    pub l7_log_store_tap_types: &'a Vec<u32>,
+    pub decap_type: trident::DecapType,
+    pub region_id: u32,
+    pub pod_cluster_id: u32,
+    pub log_retention: u32,
+    pub capture_socket_type: trident::CaptureSocketType,
+    pub process_threshold: u32,
+    pub thread_threshold: u32,
+    pub capture_bpf: &'a str,
+}
+
+impl RuntimeConfig<'_> {
+    fn validate(&self) -> Result<(), ConfigError> {
+        if self.sync_interval < Duration::from_secs(1)
+            || self.sync_interval > Duration::from_secs(60 * 60)
+        {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "sync-interval {:?} not in [1s, 1h]",
+                self.sync_interval
+            )));
+        }
+        if self.stats_interval < Duration::from_secs(1)
+            || self.stats_interval > Duration::from_secs(60 * 60)
+        {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "stats-interval {:?} not in [1s, 1h]",
+                self.stats_interval
+            )));
+        }
+
+        // 虽然RFC 791里最低MTU是68，但是此时compressor会崩溃，
+        // 所以MTU最低限定到200以确保trident能够成功运行
+        if self.mtu < 200 {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "MTU({}) specified smaller than 200",
+                self.mtu
+            )));
+        }
+
+        if self.output_vlan > 4095 {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "output-vlan({}) out of range (0-4095)",
+                self.output_vlan
+            )));
+        }
+
+        if self.analyzer_ip.parse::<IpAddr>().is_err() || self.analyzer_ip == "0.0.0.0" {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "analyzer-ip({}) invalid",
+                self.analyzer_ip
+            )));
+        }
+
+        if regex::Regex::new(&self.tap_interface_regex).is_err() {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "malformed tap-interface-regex({})",
+                self.tap_interface_regex
+            )));
+        }
+
+        if self.max_escape < Duration::from_secs(600)
+            || self.max_escape > Duration::from_secs(86400)
+        {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "max-escape-seconds {:?} not in [600s, 86400s]",
+                self.max_escape
+            )));
+        }
+
+        if self.proxy_controller_ip.parse::<IpAddr>().is_err()
+            || self.proxy_controller_ip == "0.0.0.0"
+        {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "proxy-controller-ip({}) invalid",
+                self.proxy_controller_ip
+            )));
+        }
+
+        if self.capture_packet_size > 65535 || self.capture_packet_size < 128 {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "capture packet size {} not in [128, 65535]",
+                self.capture_packet_size
+            )));
+        }
+
+        if self
+            .l4_log_store_tap_types
+            .iter()
+            .any(|&x| x > consts::TapType::Max as u32)
+        {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "l4-log-tap-types has tap type not in [{:?}, {:?}]",
+                consts::TapType::Any,
+                consts::TapType::Max
+            )));
+        }
+
+        if self
+            .l7_log_store_tap_types
+            .iter()
+            .any(|&x| x > consts::TapType::Max as u32)
+        {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "l7-log-store-tap-types has tap type not in [{:?}, {:?}]",
+                consts::TapType::Any,
+                consts::TapType::Max
+            )));
+        }
+        Ok(())
+    }
+}
+
+impl<'a> TryFrom<&'a trident::Config> for RuntimeConfig<'a> {
+    type Error = io::Error;
+
+    fn try_from(conf: &trident::Config) -> Result<RuntimeConfig, io::Error> {
+        let rc = RuntimeConfig {
+            enabled: conf.enabled(),
+            max_cpus: conf.max_cpus(),
+            max_memory: (conf.max_memory() as u64) << 20,
+            sync_interval: Duration::from_secs(conf.sync_interval() as u64),
+            stats_interval: Duration::from_secs(conf.stats_interval() as u64),
+            global_pps_threshold: conf.global_pps_threshold(),
+            tap_interface_regex: conf.tap_interface_regex(),
+            host: conf.host(),
+            rsyslog_enabled: conf.rsyslog_enabled(),
+            output_vlan: (conf.output_vlan() & 0xFFFFFFFF) as u16,
+            mtu: conf.mtu(),
+            npb_bps_threshold: conf.npb_bps_threshold(),
+            collector_enabled: conf.collector_enabled(),
+            l4_log_store_tap_types: &conf.l4_log_tap_types,
+            packet_header_enabled: conf.packet_header_enabled(),
+            platform_enabled: conf.platform_enabled(),
+            server_tx_bandwidth_threshold: conf.server_tx_bandwidth_threshold(),
+            bandwidth_probe_interval: Duration::from_secs(conf.bandwidth_probe_interval()),
+            npb_vlan_mode: conf.npb_vlan_mode(),
+            npb_dedup_enabled: conf.npb_dedup_enabled(),
+            if_mac_source: conf.if_mac_source(),
+            vtap_flow_1s_enabled: conf.vtap_flow_1s_enabled(),
+            debug_enabled: conf.debug_enabled(),
+            log_threshold: conf.log_threshold(),
+            log_level: match conf.log_level().to_lowercase().as_str() {
+                "error" => log::Level::Error,
+                "warn" => log::Level::Warn,
+                "info" => log::Level::Info,
+                "debug" => log::Level::Debug,
+                "trace" => log::Level::Trace,
+                _ => log::Level::Info,
+            },
+            analyzer_ip: conf.analyzer_ip(),
+            max_escape: Duration::from_secs(conf.max_escape_seconds() as u64),
+            proxy_controller_ip: conf.proxy_controller_ip(),
+            vtap_id: (conf.vtap_id() & 0xFFFFFFFF) as u16,
+            collector_socket_type: conf.collector_socket_type(),
+            compressor_socket_type: conf.compressor_socket_type(),
+            npb_socket_type: conf.npb_socket_type(),
+            trident_type: conf.trident_type(),
+            capture_packet_size: conf.capture_packet_size(),
+            inactive_server_port_enabled: conf.inactive_server_port_enabled(),
+            libvirt_xml_path: conf.libvirt_xml_path(),
+            l7_log_packet_size: conf.l7_log_packet_size(),
+            l4_log_collect_nps_threshold: conf.l4_log_collect_nps_threshold(),
+            l7_log_collect_nps_threshold: conf.l7_log_collect_nps_threshold(),
+            l7_metrics_enabled: conf.l7_metrics_enabled() > 0,
+            l7_log_store_tap_types: &conf.l7_log_store_tap_types,
+            decap_type: conf.decap_type(),
+            region_id: conf.region_id(),
+            pod_cluster_id: conf.pod_cluster_id(),
+            log_retention: conf.log_retention(),
+            capture_socket_type: conf.capture_socket_type(),
+            process_threshold: conf.process_threshold(),
+            thread_threshold: conf.thread_threshold(),
+            capture_bpf: conf.capture_bpf(),
+        };
+        rc.validate()
+            .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err.to_string()))?;
+        Ok(rc)
+    }
 }
 
 #[cfg(test)]
