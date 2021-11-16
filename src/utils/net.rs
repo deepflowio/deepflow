@@ -1,6 +1,5 @@
 use std::convert::TryFrom;
 use std::fmt;
-use std::iter::FromIterator;
 use std::net::IpAddr;
 
 use anyhow::{anyhow, Context, Result};
