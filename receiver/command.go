@@ -42,6 +42,10 @@ func RegisterTridentStatusCommand() *cobra.Command {
 				Helper: "show trident l7-http-dns flow log status",
 			},
 			debug.CmdHelper{
+				Cmd:    "dfstatsd",
+				Helper: "show trident dfstatsd status",
+			},
+			debug.CmdHelper{
 				Cmd:    "status",
 				Helper: "show trident metric status",
 			},

@@ -19,6 +19,7 @@ const (
 	MESSAGE_TYPE_METRICS
 	MESSAGE_TYPE_TAGGEDFLOW
 	MESSAGE_TYPE_PROTOCOLLOG
+	MESSAGE_TYPE_DFSTATSD
 	MESSAGE_TYPE_MAX
 )
 
@@ -29,6 +30,7 @@ var MessageTypeString = [MESSAGE_TYPE_MAX]string{
 	"metrics",
 	"l4_log",
 	"l7_log",
+	"df_statsd",
 }
 
 const (
@@ -71,7 +73,7 @@ func (h *BaseHeader) Decode(buf []byte) error {
 		if h.FrameSize <= MESSAGE_HEADER_LEN {
 			return fmt.Errorf("header type is %d frame size is %d smaller than header length %d,  invalid", h.Type, h.FrameSize, MESSAGE_HEADER_LEN)
 		}
-	case MESSAGE_TYPE_SYSLOG, MESSAGE_TYPE_STATSD:
+	case MESSAGE_TYPE_SYSLOG, MESSAGE_TYPE_STATSD, MESSAGE_TYPE_DFSTATSD:
 		return nil
 	case MESSAGE_TYPE_METRICS, MESSAGE_TYPE_TAGGEDFLOW, MESSAGE_TYPE_PROTOCOLLOG:
 		if h.FrameSize <= MESSAGE_HEADER_LEN+FLOW_HEADER_LEN {
