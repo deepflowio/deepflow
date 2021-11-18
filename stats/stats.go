@@ -7,15 +7,18 @@ import (
 	"path"
 	"reflect"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/models"
 	logging "github.com/op/go-logging"
 	statsd "gopkg.in/alexcesaro/statsd.v2"
 
+	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 	. "gitlab.yunshan.net/yunshan/droplet-libs/datastructure"
 )
 
@@ -46,10 +49,12 @@ var (
 	preHooks    []func()
 	statSources = LinkedList{}
 	remotes     = []string{}
+	dfRemote    string
 	remoteIndex = -1
 	connection  client.Client
 
-	statsdClients = make([]*statsd.Client, 2) // could be nil
+	statsdClients  = make([]*statsd.Client, 2) // could be nil
+	dfstatsdClient *UDPClient                  // could be nil
 )
 
 type StatItem struct {
@@ -167,6 +172,7 @@ func newStatsdClient(remote string) *statsd.Client {
 }
 
 func sendStatsd(bp client.BatchPoints) {
+	encoder := new(codec.SimpleEncoder)
 	for i, remote := range remotes {
 		if len(statsdClients) <= i {
 			statsdClients = append(statsdClients, newStatsdClient(remote))
@@ -174,6 +180,9 @@ func sendStatsd(bp client.BatchPoints) {
 		if statsdClients[i] == nil {
 			statsdClients[i] = newStatsdClient(remote)
 		}
+	}
+	if dfstatsdClient == nil && dfRemote != "" {
+		dfstatsdClient, _ = NewUDPClient(UDPConfig{dfRemote, 1400})
 	}
 
 	for _, point := range bp.Points() {
@@ -199,6 +208,44 @@ func sendStatsd(bp client.BatchPoints) {
 				name := strings.Replace(key, "-", "_", -1)
 				statsdClient.Count(name, value)
 			}
+		}
+
+		if dfstatsdClient != nil {
+			dfStats := AcquireDFStats()
+			dfStats.Time = uint32(point.Time().Unix())
+			module = strings.ReplaceAll(module, ".", "_")
+			dfStats.TableName = strings.ReplaceAll(module, "-", "_")
+			for k, v := range point.Tags() {
+				dfStats.Tags = append(dfStats.Tags, Tag{k, v})
+			}
+			sort.Slice(dfStats.Tags, func(i, j int) bool {
+				return dfStats.Tags[i].Key < dfStats.Tags[j].Key
+			})
+
+			for k, v := range fields {
+				name := strings.Replace(k, "-", "_", -1)
+				valueType := TypeInt64
+				var value int64
+				switch v.(type) {
+				case float64:
+					valueType = TypeFloat64
+					vfloat := v.(float64)
+					value = *((*int64)(unsafe.Pointer(&vfloat)))
+				default:
+					value = v.(int64)
+				}
+				dfStats.Fields = append(dfStats.Fields, Field{name, valueType, value})
+			}
+			sort.Slice(dfStats.Fields, func(i, j int) bool {
+				return dfStats.Fields[i].Key < dfStats.Fields[j].Key
+			})
+
+			if dfstatsdClient != nil {
+				dfStats.Encode(encoder)
+				dfstatsdClient.Write(encoder.Bytes())
+				encoder.Reset()
+			}
+			ReleaseDFStats(dfStats)
 		}
 	}
 }
@@ -268,6 +315,12 @@ func setRemotes(addrs ...string) {
 		connection = nil
 	}
 	lock.Unlock()
+}
+
+func setDFRemote(addr string) {
+	log.Info("DFRemote changed to", addr)
+	dfRemote = addr
+	dfstatsdClient = nil
 }
 
 func setHostname(name string) {

@@ -40,8 +40,14 @@ func SetMinInterval(interval time.Duration) {
 
 // 指定influxdb远程服务器
 // 只会有其中一个远程服务器会收到统计数据
+// addr格式: "192.168.1.1:20033"
 func SetRemotes(addrs ...string) {
 	setRemotes(addrs...)
+}
+
+// addr格式: "192.168.1.1:20033"
+func SetDFRemote(addr string) {
+	setDFRemote(addr)
 }
 
 // 指定远程服务器类型，默认influxdb
