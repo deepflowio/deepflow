@@ -203,6 +203,7 @@ message Config {
     // 新增基础配置参数
     optional uint32  log_retention        = 201 [default = 30]; // uint: day
     optional DecapType decap_type         = 202 [default = DECAP_TYPE_NONE];
+    optional bool ntp_enabled             = 203 [default = true];
 
     // 新增全景图配置参数
     optional string  http_log_proxy_client = 301 [default = 'X-Forwarded-For'];
@@ -212,8 +213,9 @@ message Config {
     optional uint64  l7_log_collect_nps_threshold = 305 [default = 10000];
 
     // 新增全景图功能开关
-    optional uint32  l7_metrics_enabled   = 401 [default = 1];
-    repeated uint32  l7_log_store_tap_types = 403;
+    repeated uint32 l7_log_store_tap_types = 403;
+    optional bool   l4_performance_enabled = 404 [default = true];
+    optional bool   l7_metrics_enabled     = 405 [default = true];
 }
 
 message Segment { // e.g. single LAN area
