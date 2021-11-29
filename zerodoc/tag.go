@@ -34,11 +34,12 @@ const (
 	PodClusterID
 	BusinessIDs
 	GroupIDs
-	ServiceID // 1<<15 后续不能再添加了
+	ServiceID    // 1<< 15
+	LBListenerID // 1<< 16 支持最大偏移到19
 )
 
 const (
-	IPPath Code = 0x10000 << iota // 1 << 16
+	IPPath Code = 0x100000 << iota // 1 << 20
 	L3EpcIDPath
 	L3DevicePath
 	SubnetIDPath
@@ -53,11 +54,12 @@ const (
 	PodClusterIDPath
 	BusinessIDsPath
 	GroupIDsPath
-	ServiceIDPath // 1<<31
+	ServiceIDPath    // 1<<35
+	LBListenerIDPath // 1<<36 支持最大偏移到39
 )
 
 const (
-	Direction Code = 0x100000000 << iota // 1 << 32
+	Direction Code = 0x10000000000 << iota // 1 << 40
 	ACLGID
 	Protocol
 	ServerPort
@@ -77,7 +79,7 @@ const (
 )
 
 func (c Code) HasEdgeTagField() bool {
-	return c&0xffff0000 != 0
+	return c&0xfffff00000 != 0
 }
 
 type DeviceType uint8
@@ -222,6 +224,7 @@ type Field struct {
 	BusinessIDs  []uint16
 	GroupIDs     []uint16
 	ServiceID    uint32
+	LBListenerID uint32
 
 	MAC1          uint64
 	IP61          net.IP // FIXME: 合并IP61和IP1
@@ -241,6 +244,7 @@ type Field struct {
 	BusinessIDs1  []uint16
 	GroupIDs1     []uint16
 	ServiceID1    uint32
+	LBListenerID1 uint32
 
 	ACLGID       uint16
 	Direction    DirectionEnum
@@ -628,6 +632,16 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",l7_protocol=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L7Protocol), 10))
 	}
+	if t.Code&LBListenerID != 0 {
+		offset += copy(b[offset:], ",lb_listener_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.LBListenerID), 10))
+	}
+	if t.Code&LBListenerIDPath != 0 {
+		offset += copy(b[offset:], ",lb_listener_id_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.LBListenerID), 10))
+		offset += copy(b[offset:], ",lb_listener_id_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.LBListenerID1), 10))
+	}
 	if t.Code&MAC != 0 {
 		// 不存入tsdb中
 		//offset += copy(b[offset:], ",mac=")
@@ -889,6 +903,14 @@ func genTagColumns(code Code) []*ckdb.Column {
 	}
 	if code&L7Protocol != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("l7_protocol", ckdb.UInt8).SetComment("应用协议0: unknown, 1: http, 2: dns, 3: mysql, 4: redis, 5: dubbo, 6: kafka"))
+	}
+
+	if code&LBListenerID != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("lb_listener_id", ckdb.UInt32).SetComment("ip对应的负载均衡监听器ID"))
+	}
+	if code&LBListenerIDPath != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("lb_listener_id_0", ckdb.UInt32).SetComment("ip0对应的负载均衡监听器ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("lb_listener_id_1", ckdb.UInt32).SetComment("ip1对应的负载均衡监听器ID"))
 	}
 
 	if code&MAC != 0 {
@@ -1166,6 +1188,20 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
 
 	if code&L7Protocol != 0 {
 		if err := block.WriteUInt8(uint8(t.L7Protocol)); err != nil {
+			return err
+		}
+	}
+
+	if code&LBListenerID != 0 {
+		if err := block.WriteUInt32(t.LBListenerID); err != nil {
+			return err
+		}
+	}
+	if code&LBListenerIDPath != 0 {
+		if err := block.WriteUInt32(t.LBListenerID); err != nil {
+			return err
+		}
+		if err := block.WriteUInt32(t.LBListenerID1); err != nil {
 			return err
 		}
 	}
