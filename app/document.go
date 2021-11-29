@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	VERSION               = 20211112 // 修改Document的序列化结构时需同步修改此常量
+	VERSION               = 20211130 // 修改Document的序列化结构时需同步修改此常量
 	MAX_DOC_STRING_LENGTH = 2048
 )
 
