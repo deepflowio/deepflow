@@ -14,6 +14,7 @@ const (
 	_      // GEO_ID，已删除
 	_      // PACKET_ID，已删除
 	ACL_ID // 目前meter的ACL_ID和PACKET_ID内容一致
+	APP_ID
 
 	MAX_APP_ID
 )
@@ -24,6 +25,7 @@ var MeterVTAPNames [MAX_APP_ID]string = [MAX_APP_ID]string{
 	"vtap_wan",
 	"vtap_packet",
 	"vtap_acl",
+	"vtap_app",
 }
 
 var MeterNamesToID map[string]uint8

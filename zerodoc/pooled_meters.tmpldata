@@ -1,4 +1,5 @@
 [
     "FlowMeter",
-    "UsageMeter"
+    "UsageMeter",
+    "AppMeter"
 ]
