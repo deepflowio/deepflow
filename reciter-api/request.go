@@ -136,6 +136,7 @@ type GroupIDMap struct {
 	ServerPorts string   `json:"server_ports"` // 格式为逗号分隔的IP范围，如 22,12000-13000
 	Role        string   `json:"role"`
 	ServiceID   uint32   `json:"service_id"`
+	ServiceType int32    `json:"service_type"`
 }
 
 type TagIDMap struct {
