@@ -11,6 +11,7 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/app"
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
 )
@@ -67,6 +68,7 @@ const (
 	TAPSide
 	TAPPort
 	IsKeyService
+	L7Protocol
 )
 
 const (
@@ -250,6 +252,7 @@ type Field struct {
 	TAPType      TAPTypeEnum
 	IsIPv6       uint8 // (8B) 与IP/IP6是共生字段
 	IsKeyService uint8
+	L7Protocol   datatype.L7Protocol
 
 	TagType  uint8
 	TagValue uint16
@@ -282,6 +285,8 @@ func newMetricsMinuteTable(id MetricsDBID, engine ckdb.EngineType, version strin
 		meterColumns = FlowMeterColumns()
 	case VTAP_ACL:
 		meterColumns = UsageMeterColumns()
+	case VTAP_APP, VTAP_APP_PORT, VTAP_APP_EDGE, VTAP_APP_EDGE_PORT:
+		meterColumns = AppMeterColumns()
 	}
 
 	return &ckdb.Table{
@@ -323,11 +328,11 @@ func GetMetricsTables(engine ckdb.EngineType, version string) []*ckdb.Table {
 	}
 
 	minuteTables := []*ckdb.Table{}
-	for i := VTAP_FLOW; i < VTAP_FLOW_1S; i++ {
+	for i := VTAP_FLOW; i <= VTAP_ACL; i++ {
 		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version))
 	}
 	secondTables := []*ckdb.Table{}
-	for i := VTAP_FLOW_1S; i < VTAP_DB_ID_MAX; i++ {
+	for i := VTAP_FLOW_1S; i <= VTAP_APP_EDGE_PORT_1S; i++ {
 		secondTables = append(secondTables, newMetricsSecondTable(minuteTables[i-VTAP_FLOW_1S]))
 	}
 	metricsTables = append(minuteTables, secondTables...)
@@ -342,6 +347,11 @@ const (
 	VTAP_FLOW_EDGE
 	VTAP_FLOW_EDGE_PORT
 
+	VTAP_APP
+	VTAP_APP_PORT
+	VTAP_APP_EDGE
+	VTAP_APP_EDGE_PORT
+
 	VTAP_ACL
 
 	VTAP_FLOW_1S
@@ -349,20 +359,19 @@ const (
 	VTAP_FLOW_EDGE_1S
 	VTAP_FLOW_EDGE_PORT_1S
 
+	VTAP_APP_1S
+	VTAP_APP_PORT_1S
+	VTAP_APP_EDGE_1S
+	VTAP_APP_EDGE_PORT_1S
+
 	VTAP_DB_ID_MAX
 )
 
 func (i MetricsDBID) DBName() string {
-	if i >= VTAP_FLOW_1S {
-		return metricsDBNames[i-VTAP_FLOW_1S]
-	}
 	return metricsDBNames[i]
 }
 
 func (i MetricsDBID) DBCode() Code {
-	if i >= VTAP_FLOW_1S {
-		return metricsDBCodes[i-VTAP_FLOW_1S]
-	}
 	return metricsDBCodes[i]
 }
 
@@ -372,7 +381,22 @@ var metricsDBNames = []string{
 	VTAP_FLOW_EDGE:      "vtap_flow_edge",
 	VTAP_FLOW_EDGE_PORT: "vtap_flow_edge_port",
 
+	VTAP_APP:           "vtap_app",
+	VTAP_APP_PORT:      "vtap_app_port",
+	VTAP_APP_EDGE:      "vtap_app_edge",
+	VTAP_APP_EDGE_PORT: "vtap_app_edge_port",
+
 	VTAP_ACL: "vtap_acl",
+
+	VTAP_FLOW_1S:           "vtap_flow",
+	VTAP_FLOW_PORT_1S:      "vtap_flow_port",
+	VTAP_FLOW_EDGE_1S:      "vtap_flow_edge",
+	VTAP_FLOW_EDGE_PORT_1S: "vtap_flow_edge_port",
+
+	VTAP_APP_1S:           "vtap_app",
+	VTAP_APP_PORT_1S:      "vtap_app_port",
+	VTAP_APP_EDGE_1S:      "vtap_app_edge",
+	VTAP_APP_EDGE_PORT_1S: "vtap_app_edge_port",
 }
 
 func MetricsDBNameToID(name string) MetricsDBID {
@@ -395,7 +419,13 @@ var metricsDBCodes = []Code{
 	VTAP_FLOW_PORT:      BaseCode | BasePortCode | Direction,
 	VTAP_FLOW_EDGE:      BasePathCode | Protocol | TAPPort,
 	VTAP_FLOW_EDGE_PORT: BasePathCode | BasePortCode | TAPPort,
-	VTAP_ACL:            ACLGID | TagType | TagValue | VTAPID,
+
+	VTAP_APP:           BaseCode | Direction | Protocol | L7Protocol,
+	VTAP_APP_PORT:      BaseCode | BasePortCode | Direction | L7Protocol,
+	VTAP_APP_EDGE:      BasePathCode | Protocol | TAPPort | L7Protocol,
+	VTAP_APP_EDGE_PORT: BasePathCode | BasePortCode | TAPPort | L7Protocol,
+
+	VTAP_ACL: ACLGID | TagType | TagValue | VTAPID,
 }
 
 type Tag struct {
@@ -593,6 +623,10 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID))
 		offset += copy(b[offset:], ",l3_epc_id_1=")
 		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID1))
+	}
+	if t.Code&L7Protocol != 0 {
+		offset += copy(b[offset:], ",l7_protocol=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L7Protocol), 10))
 	}
 	if t.Code&MAC != 0 {
 		// 不存入tsdb中
@@ -852,6 +886,9 @@ func genTagColumns(code Code) []*ckdb.Column {
 	if code&L3EpcIDPath != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_epc_id_0", ckdb.Int32).SetComment("ip4/6_0对应的EPC ID"))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_epc_id_1", ckdb.Int32).SetComment("ip4/6_1对应的EPC ID"))
+	}
+	if code&L7Protocol != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("l7_protocol", ckdb.UInt8).SetComment("应用协议0: unknown, 1: http, 2: dns, 3: mysql, 4: redis, 5: dubbo, 6: kafka"))
 	}
 
 	if code&MAC != 0 {
@@ -1127,6 +1164,12 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
 		}
 	}
 
+	if code&L7Protocol != 0 {
+		if err := block.WriteUInt8(uint8(t.L7Protocol)); err != nil {
+			return err
+		}
+	}
+
 	if code&MAC != 0 {
 		// 不存
 		// if err := block.WriteUInt64(t.MAC); err != nil {
@@ -1377,6 +1420,9 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 		t.L3DeviceID = decoder.ReadU32()
 		t.L3DeviceType = DeviceType(decoder.ReadU8())
 	}
+	if t.Code&L7Protocol != 0 {
+		t.L7Protocol = datatype.L7Protocol(decoder.ReadU8())
+	}
 	if t.Code&HostID != 0 {
 		t.HostID = decoder.ReadU16()
 	}
@@ -1558,6 +1604,9 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 	if code&L3Device != 0 {
 		encoder.WriteU32(t.L3DeviceID)
 		encoder.WriteU8(uint8(t.L3DeviceType))
+	}
+	if code&L7Protocol != 0 {
+		encoder.WriteU8(uint8(t.L7Protocol))
 	}
 	if code&HostID != 0 {
 		encoder.WriteU16(t.HostID)
