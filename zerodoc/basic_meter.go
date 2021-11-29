@@ -19,18 +19,8 @@ type Traffic struct {
 	NewFlow    uint64 `db:"new_flow"`
 	ClosedFlow uint64 `db:"closed_flow"`
 
-	HTTPRequest   uint32 `db:"http_request"`
-	HTTPResponse  uint32 `db:"http_response"`
-	DNSRequest    uint32 `db:"dns_request"`
-	DNSResponse   uint32 `db:"dns_response"`
-	MYSQLRequest  uint32 `db:"mysql_request"`
-	MYSQLResponse uint32 `db:"mysql_response"`
-	REDISRequest  uint32 `db:"redis_request"`
-	REDISResponse uint32 `db:"redis_response"`
-	DubboRequest  uint32 `db:"dubbo_request"`
-	DubboResponse uint32 `db:"dubbo_response"`
-	KafkaRequest  uint32 `db:"kafka_request"`
-	KafkaResponse uint32 `db:"kafka_response"`
+	L7Request  uint32 `db:"l7_request"`
+	L7Response uint32 `db:"l7_response"`
 }
 
 func (t *Traffic) Reverse() {
@@ -54,18 +44,8 @@ func (t *Traffic) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(t.NewFlow)
 	encoder.WriteVarintU64(t.ClosedFlow)
 
-	encoder.WriteVarintU32(t.HTTPRequest)
-	encoder.WriteVarintU32(t.HTTPResponse)
-	encoder.WriteVarintU32(t.DNSRequest)
-	encoder.WriteVarintU32(t.DNSResponse)
-	encoder.WriteVarintU32(t.MYSQLRequest)
-	encoder.WriteVarintU32(t.MYSQLResponse)
-	encoder.WriteVarintU32(t.REDISRequest)
-	encoder.WriteVarintU32(t.REDISResponse)
-	encoder.WriteVarintU32(t.DubboRequest)
-	encoder.WriteVarintU32(t.DubboResponse)
-	encoder.WriteVarintU32(t.KafkaRequest)
-	encoder.WriteVarintU32(t.KafkaResponse)
+	encoder.WriteVarintU32(t.L7Request)
+	encoder.WriteVarintU32(t.L7Response)
 }
 
 func (t *Traffic) Decode(decoder *codec.SimpleDecoder) {
@@ -80,18 +60,8 @@ func (t *Traffic) Decode(decoder *codec.SimpleDecoder) {
 	t.NewFlow = decoder.ReadVarintU64()
 	t.ClosedFlow = decoder.ReadVarintU64()
 
-	t.HTTPRequest = decoder.ReadVarintU32()
-	t.HTTPResponse = decoder.ReadVarintU32()
-	t.DNSRequest = decoder.ReadVarintU32()
-	t.DNSResponse = decoder.ReadVarintU32()
-	t.MYSQLRequest = decoder.ReadVarintU32()
-	t.MYSQLResponse = decoder.ReadVarintU32()
-	t.REDISRequest = decoder.ReadVarintU32()
-	t.REDISResponse = decoder.ReadVarintU32()
-	t.DubboRequest = decoder.ReadVarintU32()
-	t.DubboResponse = decoder.ReadVarintU32()
-	t.KafkaRequest = decoder.ReadVarintU32()
-	t.KafkaResponse = decoder.ReadVarintU32()
+	t.L7Request = decoder.ReadVarintU32()
+	t.L7Response = decoder.ReadVarintU32()
 }
 
 func (t *Traffic) ConcurrentMerge(other *Traffic) {
@@ -106,18 +76,8 @@ func (t *Traffic) ConcurrentMerge(other *Traffic) {
 	t.NewFlow += other.NewFlow
 	t.ClosedFlow += other.ClosedFlow
 
-	t.HTTPRequest += other.HTTPRequest
-	t.HTTPResponse += other.HTTPResponse
-	t.DNSRequest += other.DNSRequest
-	t.DNSResponse += other.DNSResponse
-	t.MYSQLRequest += other.MYSQLRequest
-	t.MYSQLResponse += other.MYSQLResponse
-	t.REDISRequest += other.REDISRequest
-	t.REDISResponse += other.REDISResponse
-	t.DubboRequest += other.DubboRequest
-	t.DubboResponse += other.DubboResponse
-	t.KafkaRequest += other.KafkaRequest
-	t.KafkaResponse += other.KafkaResponse
+	t.L7Request += other.L7Request
+	t.L7Response += other.L7Response
 }
 
 func (t *Traffic) SequentialMerge(other *Traffic) {
@@ -133,17 +93,11 @@ func (t *Traffic) MarshalTo(b []byte) int {
 
 	fields := []string{
 		"packet_tx=", "packet_rx=", "byte_tx=", "byte_rx=", "byte=", "l3_byte_tx=", "l3_byte_rx=", "l4_byte_tx=", "l4_byte_rx=", "new_flow=", "closed_flow=",
-		"http_request=", "http_response=", "dns_request=", "dns_response=", "mysql_request=", "mysql_response=", "redis_request=", "redis_response=",
-		"dubbo_request=", "dubbo_response=", "kafka_request=", "kafka_response=",
+		"l7_request=", "l7_response=",
 	}
 	values := []uint64{
 		t.PacketTx, t.PacketRx, t.ByteTx, t.ByteRx, t.ByteTx + t.ByteRx, t.L3ByteTx, t.L3ByteRx, t.L4ByteTx, t.L4ByteRx, t.NewFlow, t.ClosedFlow,
-		uint64(t.HTTPRequest), uint64(t.HTTPResponse),
-		uint64(t.DNSRequest), uint64(t.DNSResponse),
-		uint64(t.MYSQLRequest), uint64(t.MYSQLResponse),
-		uint64(t.REDISRequest), uint64(t.REDISResponse),
-		uint64(t.DubboRequest), uint64(t.DubboResponse),
-		uint64(t.KafkaRequest), uint64(t.KafkaResponse),
+		uint64(t.L7Request), uint64(t.L7Response),
 	}
 	n := marshalKeyValues(b[offset:], fields, values)
 	if n == 0 {
@@ -169,18 +123,8 @@ const (
 	TRAFFIC_NEW_FLOW
 	TRAFFIC_CLOSED_FLOW
 
-	TRAFFIC_HTTP_REQUEST
-	TRAFFIC_HTTP_RESPONSE
-	TRAFFIC_DNS_REQUEST
-	TRAFFIC_DNS_RESPONSE
-	TRAFFIC_MYSQL_REQUEST
-	TRAFFIC_MYSQL_RESPONSE
-	TRAFFIC_REDIS_REQUEST
-	TRAFFIC_REDIS_RESPONSE
-	TRAFFIC_DUBBO_REQUEST
-	TRAFFIC_DUBBO_RESPONSE
-	TRAFFIC_KAFKA_REQUEST
-	TRAFFIC_KAFKA_RESPONSE
+	TRAFFIC_L7_REQUEST
+	TRAFFIC_L7_RESPONSE
 )
 
 // Columns列和WriteBlock的列需要按顺序一一对应
@@ -203,18 +147,8 @@ func TrafficColumns() []*ckdb.Column {
 			TRAFFIC_NEW_FLOW:    {"new_flow", "累计新建连接数"},
 			TRAFFIC_CLOSED_FLOW: {"closed_flow", "累计关闭连接数"},
 
-			TRAFFIC_HTTP_REQUEST:   {"http_request", "累计HTTP请求包数"},
-			TRAFFIC_HTTP_RESPONSE:  {"http_response", "累计HTTP响应包数"},
-			TRAFFIC_DNS_REQUEST:    {"dns_request", "累计DNS请求包数"},
-			TRAFFIC_DNS_RESPONSE:   {"dns_response", "累计DNS响应包数"},
-			TRAFFIC_MYSQL_REQUEST:  {"mysql_request", "累计MYSQL请求包数"},
-			TRAFFIC_MYSQL_RESPONSE: {"mysql_response", "累计MYSQL响应包数"},
-			TRAFFIC_REDIS_REQUEST:  {"redis_request", "累计REDIS请求包数"},
-			TRAFFIC_REDIS_RESPONSE: {"redis_response", "累计REDIS响应包数"},
-			TRAFFIC_DUBBO_REQUEST:  {"dubbo_request", "累计DUBBO请求包数"},
-			TRAFFIC_DUBBO_RESPONSE: {"dubbo_response", "累计DUBBO响应包数"},
-			TRAFFIC_KAFKA_REQUEST:  {"kafka_request", "累计KAFKA请求包数"},
-			TRAFFIC_KAFKA_RESPONSE: {"kafka_response", "累计KAFKA响应包数"},
+			TRAFFIC_L7_REQUEST:  {"l7_request", "累计应用请求数"},
+			TRAFFIC_L7_RESPONSE: {"l7_response", "累计应用响应数"},
 		},
 		ckdb.UInt64)
 }
@@ -238,18 +172,8 @@ func (t *Traffic) WriteBlock(block *ckdb.Block) error {
 		TRAFFIC_NEW_FLOW:    t.NewFlow,
 		TRAFFIC_CLOSED_FLOW: t.ClosedFlow,
 
-		TRAFFIC_HTTP_REQUEST:   uint64(t.HTTPRequest),
-		TRAFFIC_HTTP_RESPONSE:  uint64(t.HTTPResponse),
-		TRAFFIC_DNS_REQUEST:    uint64(t.DNSRequest),
-		TRAFFIC_DNS_RESPONSE:   uint64(t.DNSResponse),
-		TRAFFIC_MYSQL_REQUEST:  uint64(t.MYSQLRequest),
-		TRAFFIC_MYSQL_RESPONSE: uint64(t.MYSQLResponse),
-		TRAFFIC_REDIS_REQUEST:  uint64(t.REDISRequest),
-		TRAFFIC_REDIS_RESPONSE: uint64(t.REDISResponse),
-		TRAFFIC_DUBBO_REQUEST:  uint64(t.DubboRequest),
-		TRAFFIC_DUBBO_RESPONSE: uint64(t.DubboResponse),
-		TRAFFIC_KAFKA_REQUEST:  uint64(t.KafkaRequest),
-		TRAFFIC_KAFKA_RESPONSE: uint64(t.KafkaResponse),
+		TRAFFIC_L7_REQUEST:  uint64(t.L7Request),
+		TRAFFIC_L7_RESPONSE: uint64(t.L7Response),
 	}
 	for _, v := range values {
 		if err := block.WriteUInt64(v); err != nil {
@@ -265,36 +189,21 @@ type Latency struct {
 	RTTServerMax uint32 `db:"rtt_server_max"` // us
 	SRTMax       uint32 `db:"srt_max"`        // us
 	ARTMax       uint32 `db:"art_max"`        // us
-	HTTPRRTMax   uint32 `db:"http_rrt_max"`   // us
-	DNSRRTMax    uint32 `db:"dns_rrt_max"`    // us
-	MYSQLRRTMax  uint32 `db:"mysql_rrt_max"`  // us
-	REDISRRTMax  uint32 `db:"redis_rrt_max"`  // us
-	DubboRRTMax  uint32 `db:"dubbo_rrt_max"`  // us
-	KafkaRRTMax  uint32 `db:"kafka_rrt_max"`  // us
+	RRTMax       uint32 `db:"rrt_max"`        // us
 
 	RTTSum       uint64 `db:"rtt_sum"`        // us
 	RTTClientSum uint64 `db:"rtt_client_sum"` // us
 	RTTServerSum uint64 `db:"rtt_server_sum"` // us
 	SRTSum       uint64 `db:"srt_sum"`        // us
 	ARTSum       uint64 `db:"art_sum"`        // us
-	HTTPRRTSum   uint64 `db:"http_rrt_sum"`   // us
-	DNSRRTSum    uint64 `db:"dns_rrt_sum"`    // us
-	MYSQLRRTSum  uint64 `db:"mysql_rrt_sum"`  // us
-	REDISRRTSum  uint64 `db:"redis_rrt_sum"`  // us
-	DubboRRTSum  uint64 `db:"dubbo_rrt_sum"`  // us
-	KafkaRRTSum  uint64 `db:"kafka_rrt_sum"`  // us
+	RRTSum       uint64 `db:"rrt_sum"`        // us
 
 	RTTCount       uint32 `db:"rtt_count"`
 	RTTClientCount uint32 `db:"rtt_client_count"`
 	RTTServerCount uint32 `db:"rtt_server_count"`
 	SRTCount       uint32 `db:"srt_count"`
 	ARTCount       uint32 `db:"art_count"`
-	HTTPRRTCount   uint32 `db:"http_rrt_count"`
-	DNSRRTCount    uint32 `db:"dns_rrt_count"`
-	MYSQLRRTCount  uint32 `db:"mysql_rrt_count"`
-	REDISRRTCount  uint32 `db:"redis_rrt_count"`
-	DubboRRTCount  uint32 `db:"dubbo_rrt_count"`
-	KafkaRRTCount  uint32 `db:"kafka_rrt_count"`
+	RRTCount       uint32 `db:"rrt_count"`
 }
 
 func (_ *Latency) Reverse() {
@@ -307,36 +216,21 @@ func (l *Latency) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU32(l.RTTServerMax)
 	encoder.WriteVarintU32(l.SRTMax)
 	encoder.WriteVarintU32(l.ARTMax)
-	encoder.WriteVarintU32(l.HTTPRRTMax)
-	encoder.WriteVarintU32(l.DNSRRTMax)
-	encoder.WriteVarintU32(l.MYSQLRRTMax)
-	encoder.WriteVarintU32(l.REDISRRTMax)
-	encoder.WriteVarintU32(l.DubboRRTMax)
-	encoder.WriteVarintU32(l.KafkaRRTMax)
+	encoder.WriteVarintU32(l.RRTMax)
 
 	encoder.WriteVarintU64(l.RTTSum)
 	encoder.WriteVarintU64(l.RTTClientSum)
 	encoder.WriteVarintU64(l.RTTServerSum)
 	encoder.WriteVarintU64(l.SRTSum)
 	encoder.WriteVarintU64(l.ARTSum)
-	encoder.WriteVarintU64(l.HTTPRRTSum)
-	encoder.WriteVarintU64(l.DNSRRTSum)
-	encoder.WriteVarintU64(l.MYSQLRRTSum)
-	encoder.WriteVarintU64(l.REDISRRTSum)
-	encoder.WriteVarintU64(l.DubboRRTSum)
-	encoder.WriteVarintU64(l.KafkaRRTSum)
+	encoder.WriteVarintU64(l.RRTSum)
 
 	encoder.WriteVarintU32(l.RTTCount)
 	encoder.WriteVarintU32(l.RTTClientCount)
 	encoder.WriteVarintU32(l.RTTServerCount)
 	encoder.WriteVarintU32(l.SRTCount)
 	encoder.WriteVarintU32(l.ARTCount)
-	encoder.WriteVarintU32(l.HTTPRRTCount)
-	encoder.WriteVarintU32(l.DNSRRTCount)
-	encoder.WriteVarintU32(l.MYSQLRRTCount)
-	encoder.WriteVarintU32(l.REDISRRTCount)
-	encoder.WriteVarintU32(l.DubboRRTCount)
-	encoder.WriteVarintU32(l.KafkaRRTCount)
+	encoder.WriteVarintU32(l.RRTCount)
 }
 
 func (l *Latency) Decode(decoder *codec.SimpleDecoder) {
@@ -345,36 +239,21 @@ func (l *Latency) Decode(decoder *codec.SimpleDecoder) {
 	l.RTTServerMax = decoder.ReadVarintU32()
 	l.SRTMax = decoder.ReadVarintU32()
 	l.ARTMax = decoder.ReadVarintU32()
-	l.HTTPRRTMax = decoder.ReadVarintU32()
-	l.DNSRRTMax = decoder.ReadVarintU32()
-	l.MYSQLRRTMax = decoder.ReadVarintU32()
-	l.REDISRRTMax = decoder.ReadVarintU32()
-	l.DubboRRTMax = decoder.ReadVarintU32()
-	l.KafkaRRTMax = decoder.ReadVarintU32()
+	l.RRTMax = decoder.ReadVarintU32()
 
 	l.RTTSum = decoder.ReadVarintU64()
 	l.RTTClientSum = decoder.ReadVarintU64()
 	l.RTTServerSum = decoder.ReadVarintU64()
 	l.SRTSum = decoder.ReadVarintU64()
 	l.ARTSum = decoder.ReadVarintU64()
-	l.HTTPRRTSum = decoder.ReadVarintU64()
-	l.DNSRRTSum = decoder.ReadVarintU64()
-	l.MYSQLRRTSum = decoder.ReadVarintU64()
-	l.REDISRRTSum = decoder.ReadVarintU64()
-	l.MYSQLRRTSum = decoder.ReadVarintU64()
-	l.REDISRRTSum = decoder.ReadVarintU64()
+	l.RRTSum = decoder.ReadVarintU64()
 
 	l.RTTCount = decoder.ReadVarintU32()
 	l.RTTClientCount = decoder.ReadVarintU32()
 	l.RTTServerCount = decoder.ReadVarintU32()
 	l.SRTCount = decoder.ReadVarintU32()
 	l.ARTCount = decoder.ReadVarintU32()
-	l.HTTPRRTCount = decoder.ReadVarintU32()
-	l.DNSRRTCount = decoder.ReadVarintU32()
-	l.MYSQLRRTCount = decoder.ReadVarintU32()
-	l.REDISRRTCount = decoder.ReadVarintU32()
-	l.DubboRRTCount = decoder.ReadVarintU32()
-	l.KafkaRRTCount = decoder.ReadVarintU32()
+	l.RRTCount = decoder.ReadVarintU32()
 }
 
 func (l *Latency) ConcurrentMerge(other *Latency) {
@@ -393,23 +272,8 @@ func (l *Latency) ConcurrentMerge(other *Latency) {
 	if l.ARTMax < other.ARTMax {
 		l.ARTMax = other.ARTMax
 	}
-	if l.HTTPRRTMax < other.HTTPRRTMax {
-		l.HTTPRRTMax = other.HTTPRRTMax
-	}
-	if l.DNSRRTMax < other.DNSRRTMax {
-		l.DNSRRTMax = other.DNSRRTMax
-	}
-	if l.MYSQLRRTMax < other.MYSQLRRTMax {
-		l.MYSQLRRTMax = other.MYSQLRRTMax
-	}
-	if l.REDISRRTMax < other.REDISRRTMax {
-		l.REDISRRTMax = other.REDISRRTMax
-	}
-	if l.DubboRRTMax < other.DubboRRTMax {
-		l.DubboRRTMax = other.DubboRRTMax
-	}
-	if l.KafkaRRTMax < other.KafkaRRTMax {
-		l.KafkaRRTMax = other.KafkaRRTMax
+	if l.RRTMax < other.RRTMax {
+		l.RRTMax = other.RRTMax
 	}
 
 	l.RTTSum += other.RTTSum
@@ -417,24 +281,14 @@ func (l *Latency) ConcurrentMerge(other *Latency) {
 	l.RTTServerSum += other.RTTServerSum
 	l.SRTSum += other.SRTSum
 	l.ARTSum += other.ARTSum
-	l.HTTPRRTSum += other.HTTPRRTSum
-	l.DNSRRTSum += other.DNSRRTSum
-	l.MYSQLRRTSum += other.MYSQLRRTSum
-	l.REDISRRTSum += other.REDISRRTSum
-	l.DubboRRTSum += other.DubboRRTSum
-	l.KafkaRRTSum += other.KafkaRRTSum
+	l.RRTSum += other.RRTSum
 
 	l.RTTCount += other.RTTCount
 	l.RTTClientCount += other.RTTClientCount
 	l.RTTServerCount += other.RTTServerCount
 	l.SRTCount += other.SRTCount
 	l.ARTCount += other.ARTCount
-	l.HTTPRRTCount += other.HTTPRRTCount
-	l.DNSRRTCount += other.DNSRRTCount
-	l.MYSQLRRTCount += other.MYSQLRRTCount
-	l.REDISRRTCount += other.REDISRRTCount
-	l.DubboRRTCount += other.DubboRRTCount
-	l.KafkaRRTCount += other.KafkaRRTCount
+	l.RRTCount += other.RRTCount
 }
 
 func (l *Latency) SequentialMerge(other *Latency) {
@@ -442,19 +296,13 @@ func (l *Latency) SequentialMerge(other *Latency) {
 }
 
 func (l *Latency) MarshalTo(b []byte) int {
-	fields := []string{"rtt_sum=", "rtt_client_sum=", "rtt_server_sum=", "srt_sum=", "art_sum=",
-		"http_rrt_sum=", "dns_rrt_sum=", "mysql_rrt_sum=", "redis_rrt_sum=", "dubbo_rrt_sum=", "kafka_rrt_sum=",
-		"rtt_count=", "rtt_client_count=", "rtt_server_count=", "srt_count=", "art_count=",
-		"http_rrt_count=", "dns_rrt_count=", "mysql_rrt_count=", "redis_rrt_count=", "dubbo_rrt_count=", "kafka_rrt_count=",
-		"rtt_max=", "rtt_client_max=", "rtt_server_max=", "srt_max=", "art_max=",
-		"http_rrt_max=", "dns_rrt_max=", "mysql_rrt_max=", "redis_rrt_max=", "dubbo_rrt_max=", "kafka_rrt_max="}
+	fields := []string{"rtt_sum=", "rtt_client_sum=", "rtt_server_sum=", "srt_sum=", "art_sum=", "rrt_sum=",
+		"rtt_count=", "rtt_client_count=", "rtt_server_count=", "srt_count=", "art_count=", "rrt_count=",
+		"rtt_max=", "rtt_client_max=", "rtt_server_max=", "srt_max=", "art_max=", "rrt_max="}
 	values := []uint64{
-		l.RTTSum, l.RTTClientSum, l.RTTServerSum, l.SRTSum, l.ARTSum,
-		l.HTTPRRTSum, l.DNSRRTSum, l.MYSQLRRTSum, l.REDISRRTSum, l.DubboRRTSum, l.KafkaRRTSum,
-		uint64(l.RTTCount), uint64(l.RTTClientCount), uint64(l.RTTServerCount), uint64(l.SRTCount), uint64(l.ARTCount),
-		uint64(l.HTTPRRTCount), uint64(l.DNSRRTCount), uint64(l.MYSQLRRTCount), uint64(l.REDISRRTCount), uint64(l.DubboRRTCount), uint64(l.KafkaRRTCount),
-		uint64(l.RTTMax), uint64(l.RTTClientMax), uint64(l.RTTServerMax), uint64(l.SRTMax), uint64(l.ARTMax),
-		uint64(l.HTTPRRTMax), uint64(l.DNSRRTMax), uint64(l.MYSQLRRTMax), uint64(l.REDISRRTMax), uint64(l.DubboRRTMax), uint64(l.KafkaRRTMax),
+		l.RTTSum, l.RTTClientSum, l.RTTServerSum, l.SRTSum, l.ARTSum, l.RRTSum,
+		uint64(l.RTTCount), uint64(l.RTTClientCount), uint64(l.RTTServerCount), uint64(l.SRTCount), uint64(l.ARTCount), uint64(l.RRTCount),
+		uint64(l.RTTMax), uint64(l.RTTClientMax), uint64(l.RTTServerMax), uint64(l.SRTMax), uint64(l.ARTMax), uint64(l.RRTMax),
 	}
 	return marshalKeyValues(b, fields, values)
 }
@@ -465,12 +313,7 @@ const (
 	LATENCY_RTT_SERVER
 	LATENCY_SRT
 	LATENCY_ART
-	LATENCY_HTTP_RRT
-	LATENCY_DNS_RRT
-	LATENCY_MYSQL_RRT
-	LATENCY_REDIS_RRT
-	LATENCY_DUBBO_RRT
-	LATENCY_KAFKA_RRT
+	LATENCY_RRT
 )
 
 // Columns列和WriteBlock的列需要按顺序一一对应
@@ -482,12 +325,7 @@ func LatencyColumns() []*ckdb.Column {
 			LATENCY_RTT_SERVER: {"rtt_server_sum", "服务端累计建立连接RTT(us)"},
 			LATENCY_SRT:        {"srt_sum", "累计所有系统响应时延(us)"},
 			LATENCY_ART:        {"art_sum", "累计所有应用响应时延(us)"},
-			LATENCY_HTTP_RRT:   {"http_rrt_sum", "累计所有HTTP请求响应时延(us)"},
-			LATENCY_DNS_RRT:    {"dns_rrt_sum", "累计所有DNS请求响应时延(us)"},
-			LATENCY_MYSQL_RRT:  {"mysql_rrt_sum", "累计所有MYSQL请求响应时延(us)"},
-			LATENCY_REDIS_RRT:  {"redis_rrt_sum", "累计所有REDIS请求响应时延(us)"},
-			LATENCY_DUBBO_RRT:  {"dubbo_rrt_sum", "累计所有Dubbo请求响应时延(us)"},
-			LATENCY_KAFKA_RRT:  {"kafka_rrt_sum", "累计所有Kafka请求响应时延(us)"},
+			LATENCY_RRT:        {"rrt_sum", "累计所有应用请求响应时延(us)"},
 		},
 		ckdb.Float64)
 	counterColumns := ckdb.NewColumnsWithComment(
@@ -497,12 +335,7 @@ func LatencyColumns() []*ckdb.Column {
 			LATENCY_RTT_SERVER: {"rtt_server_count", "服务端建立连接时延计算次数"},
 			LATENCY_SRT:        {"srt_count", "系统响应时延计算次数"},
 			LATENCY_ART:        {"art_count", "应用响应时延计算次数"},
-			LATENCY_HTTP_RRT:   {"http_rrt_count", "HTTP请求响应时延计算次数"},
-			LATENCY_DNS_RRT:    {"dns_rrt_count", "DNS请求响应时延计算次数"},
-			LATENCY_MYSQL_RRT:  {"mysql_rrt_count", "MYSQL请求响应时延计算次数"},
-			LATENCY_REDIS_RRT:  {"redis_rrt_count", "REDIS请求响应时延计算次数"},
-			LATENCY_DUBBO_RRT:  {"dubbo_rrt_count", "Dubbo请求响应时延计算次数"},
-			LATENCY_KAFKA_RRT:  {"kafka_rrt_count", "Kafka请求响应时延计算次数"},
+			LATENCY_RRT:        {"rrt_count", "应用请求响应时延计算次数"},
 		},
 		ckdb.UInt64)
 	maxColumns := ckdb.NewColumnsWithComment(
@@ -512,12 +345,7 @@ func LatencyColumns() []*ckdb.Column {
 			LATENCY_RTT_SERVER: {"rtt_server_max", "服务端建立连接RTT最大值(us)"},
 			LATENCY_SRT:        {"srt_max", "所有系统响应时延最大值(us)"},
 			LATENCY_ART:        {"art_max", "所有应用响应时延最大值(us)"},
-			LATENCY_HTTP_RRT:   {"http_rrt_max", "所有HTTP请求响应时延最大值(us)"},
-			LATENCY_DNS_RRT:    {"dns_rrt_max", "所有DNS请求响应时延最大值(us)"},
-			LATENCY_MYSQL_RRT:  {"mysql_rrt_max", "所有MYSQL请求响应时延最大值(us)"},
-			LATENCY_REDIS_RRT:  {"redis_rrt_max", "所有REDIS请求响应时延最大值(us)"},
-			LATENCY_DUBBO_RRT:  {"dubbo_rrt_max", "所有Dubbo请求响应时延最大值(us)"},
-			LATENCY_KAFKA_RRT:  {"kafka_rrt_max", "所有Kafka请求响应时延最大值(us)"},
+			LATENCY_RRT:        {"rrt_max", "所有应用请求响应时延最大值(us)"},
 		}, ckdb.UInt32)
 	for _, c := range maxColumns {
 		c.SetIndex(ckdb.IndexNone)
@@ -537,24 +365,14 @@ func (l *Latency) WriteBlock(block *ckdb.Block) error {
 		LATENCY_RTT_SERVER: float64(l.RTTServerSum),
 		LATENCY_SRT:        float64(l.SRTSum),
 		LATENCY_ART:        float64(l.ARTSum),
-		LATENCY_HTTP_RRT:   float64(l.HTTPRRTSum),
-		LATENCY_DNS_RRT:    float64(l.DNSRRTSum),
-		LATENCY_MYSQL_RRT:  float64(l.MYSQLRRTSum),
-		LATENCY_REDIS_RRT:  float64(l.REDISRRTSum),
-		LATENCY_DUBBO_RRT:  float64(l.DubboRRTSum),
-		LATENCY_KAFKA_RRT:  float64(l.KafkaRRTSum)}
+		LATENCY_RRT:        float64(l.RRTSum)}
 	counterValues := []uint64{
 		LATENCY_RTT:        uint64(l.RTTCount),
 		LATENCY_RTT_CLIENT: uint64(l.RTTClientCount),
 		LATENCY_RTT_SERVER: uint64(l.RTTServerCount),
 		LATENCY_SRT:        uint64(l.SRTCount),
 		LATENCY_ART:        uint64(l.ARTCount),
-		LATENCY_HTTP_RRT:   uint64(l.HTTPRRTCount),
-		LATENCY_DNS_RRT:    uint64(l.DNSRRTCount),
-		LATENCY_MYSQL_RRT:  uint64(l.MYSQLRRTCount),
-		LATENCY_REDIS_RRT:  uint64(l.REDISRRTCount),
-		LATENCY_DUBBO_RRT:  uint64(l.DubboRRTCount),
-		LATENCY_KAFKA_RRT:  uint64(l.KafkaRRTCount)}
+		LATENCY_RRT:        uint64(l.RRTCount)}
 
 	maxValues := []uint32{
 		LATENCY_RTT:        l.RTTMax,
@@ -562,12 +380,7 @@ func (l *Latency) WriteBlock(block *ckdb.Block) error {
 		LATENCY_RTT_SERVER: l.RTTServerMax,
 		LATENCY_SRT:        l.SRTMax,
 		LATENCY_ART:        l.ARTMax,
-		LATENCY_HTTP_RRT:   l.HTTPRRTMax,
-		LATENCY_DNS_RRT:    l.DNSRRTMax,
-		LATENCY_MYSQL_RRT:  l.MYSQLRRTMax,
-		LATENCY_REDIS_RRT:  l.REDISRRTMax,
-		LATENCY_DUBBO_RRT:  l.DubboRRTMax,
-		LATENCY_KAFKA_RRT:  l.KafkaRRTMax}
+		LATENCY_RRT:        l.RRTMax}
 	for _, v := range sumValues {
 		if err := block.WriteFloat64(v); err != nil {
 			return err
@@ -688,24 +501,9 @@ type Anomaly struct {
 	ServerEstablishReset  uint64 `db:"server_establish_other_rst"`
 	TCPTimeout            uint64 `db:"tcp_timeout"`
 
-	HTTPClientError  uint32 `db:"http_client_error"`
-	HTTPServerError  uint32 `db:"http_server_error"`
-	HTTPTimeout      uint32 `db:"http_timeout"`
-	DNSClientError   uint32 `db:"dns_client_error"`
-	DNSServerError   uint32 `db:"dns_server_error"`
-	DNSTimeout       uint32 `db:"dns_timeout"`
-	MYSQLClientError uint32 `db:"mysql_client_error"`
-	MYSQLServerError uint32 `db:"mysql_server_error"`
-	MYSQLTimeout     uint32 `db:"mysql_timeout"`
-	REDISClientError uint32 `db:"redis_client_error"`
-	REDISServerError uint32 `db:"redis_server_error"`
-	REDISTimeout     uint32 `db:"redis_timeout"`
-	DubboClientError uint32 `db:"dubbo_client_error"`
-	DubboServerError uint32 `db:"dubbo_server_error"`
-	DubboTimeout     uint32 `db:"dubbo_timeout"`
-	KafkaClientError uint32 `db:"kafka_client_error"`
-	KafkaServerError uint32 `db:"kafka_server_error"`
-	KafkaTimeout     uint32 `db:"kafka_timeout"`
+	L7ClientError uint32 `db:"l7_client_error"`
+	L7ServerError uint32 `db:"l7_server_error"`
+	L7Timeout     uint32 `db:"l7_timeout"`
 }
 
 func (_ *Anomaly) Reverse() {
@@ -727,24 +525,9 @@ func (a *Anomaly) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(a.ServerEstablishReset)
 	encoder.WriteVarintU64(a.TCPTimeout)
 
-	encoder.WriteVarintU32(a.HTTPClientError)
-	encoder.WriteVarintU32(a.HTTPServerError)
-	encoder.WriteVarintU32(a.HTTPTimeout)
-	encoder.WriteVarintU32(a.DNSClientError)
-	encoder.WriteVarintU32(a.DNSServerError)
-	encoder.WriteVarintU32(a.DNSTimeout)
-	encoder.WriteVarintU32(a.MYSQLClientError)
-	encoder.WriteVarintU32(a.MYSQLServerError)
-	encoder.WriteVarintU32(a.MYSQLTimeout)
-	encoder.WriteVarintU32(a.REDISClientError)
-	encoder.WriteVarintU32(a.REDISServerError)
-	encoder.WriteVarintU32(a.REDISTimeout)
-	encoder.WriteVarintU32(a.DubboClientError)
-	encoder.WriteVarintU32(a.DubboServerError)
-	encoder.WriteVarintU32(a.DubboTimeout)
-	encoder.WriteVarintU32(a.KafkaClientError)
-	encoder.WriteVarintU32(a.KafkaServerError)
-	encoder.WriteVarintU32(a.KafkaTimeout)
+	encoder.WriteVarintU32(a.L7ClientError)
+	encoder.WriteVarintU32(a.L7ServerError)
+	encoder.WriteVarintU32(a.L7Timeout)
 }
 
 func (a *Anomaly) Decode(decoder *codec.SimpleDecoder) {
@@ -762,24 +545,9 @@ func (a *Anomaly) Decode(decoder *codec.SimpleDecoder) {
 	a.ServerEstablishReset = decoder.ReadVarintU64()
 	a.TCPTimeout = decoder.ReadVarintU64()
 
-	a.HTTPClientError = decoder.ReadVarintU32()
-	a.HTTPServerError = decoder.ReadVarintU32()
-	a.HTTPTimeout = decoder.ReadVarintU32()
-	a.DNSClientError = decoder.ReadVarintU32()
-	a.DNSServerError = decoder.ReadVarintU32()
-	a.DNSTimeout = decoder.ReadVarintU32()
-	a.MYSQLClientError = decoder.ReadVarintU32()
-	a.MYSQLServerError = decoder.ReadVarintU32()
-	a.MYSQLTimeout = decoder.ReadVarintU32()
-	a.REDISClientError = decoder.ReadVarintU32()
-	a.REDISServerError = decoder.ReadVarintU32()
-	a.REDISTimeout = decoder.ReadVarintU32()
-	a.DubboClientError = decoder.ReadVarintU32()
-	a.DubboServerError = decoder.ReadVarintU32()
-	a.DubboTimeout = decoder.ReadVarintU32()
-	a.KafkaClientError = decoder.ReadVarintU32()
-	a.KafkaServerError = decoder.ReadVarintU32()
-	a.KafkaTimeout = decoder.ReadVarintU32()
+	a.L7ClientError = decoder.ReadVarintU32()
+	a.L7ServerError = decoder.ReadVarintU32()
+	a.L7Timeout = decoder.ReadVarintU32()
 }
 
 func (a *Anomaly) ConcurrentMerge(other *Anomaly) {
@@ -797,29 +565,9 @@ func (a *Anomaly) ConcurrentMerge(other *Anomaly) {
 	a.ServerEstablishReset += other.ServerEstablishReset
 	a.TCPTimeout += other.TCPTimeout
 
-	a.HTTPClientError += other.HTTPClientError
-	a.HTTPServerError += other.HTTPServerError
-	a.HTTPTimeout += other.HTTPTimeout
-
-	a.DNSClientError += other.DNSClientError
-	a.DNSServerError += other.DNSServerError
-	a.DNSTimeout += other.DNSTimeout
-
-	a.MYSQLClientError += other.MYSQLClientError
-	a.MYSQLServerError += other.MYSQLServerError
-	a.MYSQLTimeout += other.MYSQLTimeout
-
-	a.REDISClientError += other.REDISClientError
-	a.REDISServerError += other.REDISServerError
-	a.REDISTimeout += other.REDISTimeout
-
-	a.DubboClientError += other.DubboClientError
-	a.DubboServerError += other.DubboServerError
-	a.DubboTimeout += other.DubboTimeout
-
-	a.KafkaClientError += other.KafkaClientError
-	a.KafkaServerError += other.KafkaServerError
-	a.KafkaTimeout += other.KafkaTimeout
+	a.L7ClientError += other.L7ClientError
+	a.L7ServerError += other.L7ServerError
+	a.L7Timeout += other.L7Timeout
 }
 
 func (a *Anomaly) SequentialMerge(other *Anomaly) {
@@ -835,12 +583,7 @@ func (a *Anomaly) MarshalTo(b []byte) int {
 		"client_establish_other_rst=", "server_establish_other_rst=",
 		"tcp_timeout=",
 		"client_establish_fail=", "server_establish_fail=", "tcp_establish_fail=",
-		"http_client_error=", "http_server_error=", "http_timeout=", "http_error=",
-		"dns_client_error=", "dns_server_error=", "dns_timeout=", "dns_error=",
-		"mysql_client_error=", "mysql_server_error=", "mysql_timeout=", "mysql_error=",
-		"redis_client_error=", "redis_server_error=", "redis_timeout=", "redis_error=",
-		"dubbo_client_error=", "dubbo_server_error=", "dubbo_timeout=", "dubbo_error=",
-		"kafka_client_error=", "kafka_server_error=", "kafka_timeout=", "kafka_error=",
+		"l7_client_error=", "l7_server_error=", "l7_timeout=", "l7_error=",
 	}
 	clientFail := a.ClientSynRepeat + a.ClientSourcePortReuse + a.ClientEstablishReset
 	serverFail := a.ServerSYNACKRepeat + a.ServerReset + a.ServerQueueLack + a.ServerEstablishReset
@@ -852,12 +595,7 @@ func (a *Anomaly) MarshalTo(b []byte) int {
 		a.ClientEstablishReset, a.ServerEstablishReset,
 		a.TCPTimeout,
 		clientFail, serverFail, clientFail + serverFail,
-		uint64(a.HTTPClientError), uint64(a.HTTPServerError), uint64(a.HTTPTimeout), uint64(a.HTTPClientError + a.HTTPServerError),
-		uint64(a.DNSClientError), uint64(a.DNSServerError), uint64(a.DNSTimeout), uint64(a.DNSClientError + a.DNSServerError),
-		uint64(a.MYSQLClientError), uint64(a.MYSQLServerError), uint64(a.MYSQLTimeout), uint64(a.MYSQLClientError + a.MYSQLServerError),
-		uint64(a.REDISClientError), uint64(a.REDISServerError), uint64(a.REDISTimeout), uint64(a.REDISClientError + a.REDISServerError),
-		uint64(a.DubboClientError), uint64(a.DubboServerError), uint64(a.DubboTimeout), uint64(a.DubboClientError + a.DubboServerError),
-		uint64(a.KafkaClientError), uint64(a.KafkaServerError), uint64(a.KafkaTimeout), uint64(a.KafkaClientError + a.KafkaServerError),
+		uint64(a.L7ClientError), uint64(a.L7ServerError), uint64(a.L7Timeout), uint64(a.L7ClientError + a.L7ServerError),
 	}
 	return marshalKeyValues(b, fields, values)
 }
@@ -884,41 +622,17 @@ const (
 	ANOMALY_CLIENT_ESTABLISH_FAIL
 	ANOMALY_SERVER_ESTABLISH_FAIL
 	ANOMALY_TCP_ESTABLISH_FAIL
-
-	ANOMALY_HTTP_CLIENT_ERROR
-	ANOMALY_HTTP_SERVER_ERROR
-	ANOMALY_HTTP_TIMEOUT
-	ANOMALY_HTTP_ERROR
-
-	ANOMALY_DNS_CLIENT_ERROR
-	ANOMALY_DNS_SERVER_ERROR
-	ANOMALY_DNS_TIMEOUT
-	ANOMALY_DNS_ERROR
-
-	ANOMALY_MYSQL_CLIENT_ERROR
-	ANOMALY_MYSQL_SERVER_ERROR
-	ANOMALY_MYSQL_TIMEOUT
-	ANOMALY_MYSQL_ERROR
-
-	ANOMALY_REDIS_CLIENT_ERROR
-	ANOMALY_REDIS_SERVER_ERROR
-	ANOMALY_REDIS_TIMEOUT
-	ANOMALY_REDIS_ERROR
-
-	ANOMALY_DUBBO_CLIENT_ERROR
-	ANOMALY_DUBBO_SERVER_ERROR
-	ANOMALY_DUBBO_TIMEOUT
-	ANOMALY_DUBBO_ERROR
-
-	ANOMALY_KAFKA_CLIENT_ERROR
-	ANOMALY_KAFKA_SERVER_ERROR
-	ANOMALY_KAFKA_TIMEOUT
-	ANOMALY_KAFKA_ERROR
+)
+const (
+	ANOMALY_L7_CLIENT_ERROR = iota
+	ANOMALY_L7_SERVER_ERROR
+	ANOMALY_L7_TIMEOUT
+	ANOMALY_L7_ERROR
 )
 
 // Columns列和WriteBlock的列需要按顺序一一对应
 func AnomalyColumns() []*ckdb.Column {
-	return ckdb.NewColumnsWithComment(
+	anomalColumns := ckdb.NewColumnsWithComment(
 		[][2]string{
 			ANOMALY_CLIENT_RST_FLOW: {"client_rst_flow", "传输-客户端重置"},
 			ANOMALY_SERVER_RST_FLOW: {"server_rst_flow", "传输-服务端重置"},
@@ -941,37 +655,17 @@ func AnomalyColumns() []*ckdb.Column {
 			ANOMALY_CLIENT_ESTABLISH_FAIL: {"client_establish_fail", "TCP客户端建连失败次数"},
 			ANOMALY_SERVER_ESTABLISH_FAIL: {"server_establish_fail", "TCP服务端建连失败次数"},
 			ANOMALY_TCP_ESTABLISH_FAIL:    {"tcp_establish_fail", "TCP建连失败次数"},
-
-			ANOMALY_HTTP_CLIENT_ERROR: {"http_client_error", "HTTP客户端异常次数"},
-			ANOMALY_HTTP_SERVER_ERROR: {"http_server_error", "HTTP服务端异常次数"},
-			ANOMALY_HTTP_TIMEOUT:      {"http_timeout", "HTTP请求超时次数"},
-			ANOMALY_HTTP_ERROR:        {"http_error", "HTTP异常次数"},
-
-			ANOMALY_DNS_CLIENT_ERROR: {"dns_client_error", "DNS客户端错误次数"},
-			ANOMALY_DNS_SERVER_ERROR: {"dns_server_error", "DNS服务端错误次数"},
-			ANOMALY_DNS_TIMEOUT:      {"dns_timeout", "DNS请求超时次数"},
-			ANOMALY_DNS_ERROR:        {"dns_error", "DNS异常次数"},
-
-			ANOMALY_MYSQL_CLIENT_ERROR: {"mysql_client_error", "MYSQL客户端错误次数"},
-			ANOMALY_MYSQL_SERVER_ERROR: {"mysql_server_error", "MYSQL服务端错误次数"},
-			ANOMALY_MYSQL_TIMEOUT:      {"mysql_timeout", "MYSQL请求超时次数"},
-			ANOMALY_MYSQL_ERROR:        {"mysql_error", "MYSQL异常次数"},
-
-			ANOMALY_REDIS_CLIENT_ERROR: {"redis_client_error", "REDIS客户端错误次数"},
-			ANOMALY_REDIS_SERVER_ERROR: {"redis_server_error", "REDIS服务端错误次数"},
-			ANOMALY_REDIS_TIMEOUT:      {"redis_timeout", "REDIS请求超时次数"},
-			ANOMALY_REDIS_ERROR:        {"redis_error", "REDIS异常次数"},
-
-			ANOMALY_DUBBO_CLIENT_ERROR: {"dubbo_client_error", "Dubbo客户端错误次数"},
-			ANOMALY_DUBBO_SERVER_ERROR: {"dubbo_server_error", "Dubbo服务端错误次数"},
-			ANOMALY_DUBBO_TIMEOUT:      {"dubbo_timeout", "Dubbo请求超时次数"},
-			ANOMALY_DUBBO_ERROR:        {"dubbo_error", "Dubbo异常次数"},
-
-			ANOMALY_KAFKA_CLIENT_ERROR: {"kafka_client_error", "Kafka客户端错误次数"},
-			ANOMALY_KAFKA_SERVER_ERROR: {"kafka_server_error", "Kafka服务端错误次数"},
-			ANOMALY_KAFKA_TIMEOUT:      {"kafka_timeout", "Kafka请求超时次数"},
-			ANOMALY_KAFKA_ERROR:        {"kafka_error", "Kafka异常次数"},
 		}, ckdb.UInt64)
+
+	l7AnomalColumns := ckdb.NewColumnsWithComment(
+		[][2]string{
+			ANOMALY_L7_CLIENT_ERROR: {"l7_client_error", "应用客户端异常次数"},
+			ANOMALY_L7_SERVER_ERROR: {"l7_server_error", "应用服务端异常次数"},
+			ANOMALY_L7_TIMEOUT:      {"l7_time_out", "应用请求超时次数"},
+			ANOMALY_L7_ERROR:        {"l7_error", "应用异常次数"},
+		}, ckdb.UInt32)
+
+	return append(anomalColumns, l7AnomalColumns...)
 }
 
 // WriteBlock的列和AnomalyColumns需要按顺序一一对应
@@ -1000,39 +694,22 @@ func (a *Anomaly) WriteBlock(block *ckdb.Block) error {
 		ANOMALY_CLIENT_ESTABLISH_FAIL: clientFail,
 		ANOMALY_SERVER_ESTABLISH_FAIL: serverFail,
 		ANOMALY_TCP_ESTABLISH_FAIL:    clientFail + serverFail,
-
-		ANOMALY_HTTP_CLIENT_ERROR: uint64(a.HTTPClientError),
-		ANOMALY_HTTP_SERVER_ERROR: uint64(a.HTTPServerError),
-		ANOMALY_HTTP_TIMEOUT:      uint64(a.HTTPTimeout),
-		ANOMALY_HTTP_ERROR:        uint64(a.HTTPClientError + a.HTTPServerError),
-
-		ANOMALY_DNS_CLIENT_ERROR: uint64(a.DNSClientError),
-		ANOMALY_DNS_SERVER_ERROR: uint64(a.DNSServerError),
-		ANOMALY_DNS_TIMEOUT:      uint64(a.DNSTimeout),
-		ANOMALY_DNS_ERROR:        uint64(a.DNSClientError + a.DNSServerError),
-
-		ANOMALY_MYSQL_CLIENT_ERROR: uint64(a.MYSQLClientError),
-		ANOMALY_MYSQL_SERVER_ERROR: uint64(a.MYSQLServerError),
-		ANOMALY_MYSQL_TIMEOUT:      uint64(a.MYSQLTimeout),
-		ANOMALY_MYSQL_ERROR:        uint64(a.MYSQLClientError + a.MYSQLServerError),
-
-		ANOMALY_REDIS_CLIENT_ERROR: uint64(a.REDISClientError),
-		ANOMALY_REDIS_SERVER_ERROR: uint64(a.REDISServerError),
-		ANOMALY_REDIS_TIMEOUT:      uint64(a.REDISTimeout),
-		ANOMALY_REDIS_ERROR:        uint64(a.REDISClientError + a.REDISServerError),
-
-		ANOMALY_DUBBO_CLIENT_ERROR: uint64(a.DubboClientError),
-		ANOMALY_DUBBO_SERVER_ERROR: uint64(a.DubboServerError),
-		ANOMALY_DUBBO_TIMEOUT:      uint64(a.DubboTimeout),
-		ANOMALY_DUBBO_ERROR:        uint64(a.DubboClientError + a.DubboServerError),
-
-		ANOMALY_KAFKA_CLIENT_ERROR: uint64(a.KafkaClientError),
-		ANOMALY_KAFKA_SERVER_ERROR: uint64(a.KafkaServerError),
-		ANOMALY_KAFKA_TIMEOUT:      uint64(a.KafkaTimeout),
-		ANOMALY_KAFKA_ERROR:        uint64(a.KafkaClientError + a.KafkaServerError),
 	}
+	l7Values := []uint32{
+		ANOMALY_L7_CLIENT_ERROR: a.L7ClientError,
+		ANOMALY_L7_SERVER_ERROR: a.L7ServerError,
+		ANOMALY_L7_TIMEOUT:      a.L7Timeout,
+		ANOMALY_L7_ERROR:        a.L7ClientError + a.L7ServerError,
+	}
+
 	for _, v := range values {
 		if err := block.WriteUInt64(v); err != nil {
+			return err
+		}
+	}
+
+	for _, v := range l7Values {
+		if err := block.WriteUInt32(v); err != nil {
 			return err
 		}
 	}
