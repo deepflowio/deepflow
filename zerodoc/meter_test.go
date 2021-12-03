@@ -3,19 +3,17 @@ package zerodoc
 import (
 	"reflect"
 	"testing"
-
-	"gitlab.yunshan.net/yunshan/droplet-libs/app"
 )
 
 func TestMeterReverse(t *testing.T) {
-	meters := []app.Meter{&FlowMeter{}, &UsageMeter{}}
+	meters := []Meter{&FlowMeter{}, &UsageMeter{}}
 	interestedFieldPairs := [][]string{
 		{"PacketTx", "PacketRx"},
 		{"ByteTx", "ByteRx"},
 		{"L4PacketTx", "L4PacketRx"},
 		{"L4ByteTx", "L4ByteRx"},
 	}
-	set := func(meter app.Meter, field string, value uint64) bool {
+	set := func(meter Meter, field string, value uint64) bool {
 		tp := reflect.ValueOf(meter).Elem()
 		if f := tp.FieldByName(field); f.CanSet() {
 			f.SetUint(value)
@@ -32,7 +30,7 @@ func TestMeterReverse(t *testing.T) {
 		}
 		return false
 	}
-	get := func(meter app.Meter, field string) (uint64, bool) {
+	get := func(meter Meter, field string) (uint64, bool) {
 		tp := reflect.ValueOf(meter).Elem()
 		if f := tp.FieldByName(field); f.CanAddr() {
 			return f.Uint(), true

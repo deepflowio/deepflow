@@ -8,14 +8,14 @@ import (
 	"strings"
 
 	"github.com/google/gopacket/layers"
-	"gitlab.yunshan.net/yunshan/droplet-libs/app"
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 )
 
 const (
 	MINI_FIELD_FULL_CODES = IP | IPPath | L3EpcID | L3EpcIDPath | VTAPID | Protocol | ServerPort |
-		MAC | MACPath | Direction | TAPType | ACLGID | TagType | TagValue
+		MAC | MACPath | Direction | TAPType | ACLGID | L7Protocol | TagType | TagValue
 )
 
 type MiniField struct {
@@ -40,6 +40,7 @@ type MiniField struct {
 	VTAPID     uint16
 	TAPPort    uint32
 	TAPType    TAPTypeEnum
+	L7Protocol datatype.L7Protocol
 
 	TagType  uint8 // (8B)
 	TagValue uint16
@@ -75,7 +76,7 @@ type MiniTag struct {
 
 // 只用于调试
 func (t *MiniTag) ToKVString() string {
-	buffer := make([]byte, app.MAX_DOC_STRING_LENGTH)
+	buffer := make([]byte, MAX_STRING_LENGTH)
 	size := t.MarshalTo(buffer)
 	return string(buffer[:size])
 }
@@ -272,6 +273,9 @@ func (t *MiniTag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEnc
 	if code&TAPType != 0 {
 		encoder.WriteU8(uint8(t.TAPType))
 	}
+	if code&L7Protocol != 0 {
+		encoder.WriteU8(uint8(t.L7Protocol))
+	}
 
 	if code&TagType != 0 {
 		encoder.WriteU8(t.TagType)
@@ -361,7 +365,7 @@ func CloneMiniTag(miniTag *MiniTag) *MiniTag {
 	return newMiniTag
 }
 
-func (t *MiniTag) Clone() app.Tag {
+func (t *MiniTag) Clone() Tagger {
 	return CloneMiniTag(t)
 }
 

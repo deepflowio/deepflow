@@ -16,11 +16,11 @@ import (
 	// 需要从gitlab.yunshan.net获取新的写入接口，然后在Makefile中拷贝到vendor/github.com/influxdata/influxdb/client/v2
 	// _ "gitlab.yunshan.net/platform/influxdb/client/v2"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/app"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
 	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
 )
 
 var log = logging.MustGetLogger("store")
@@ -78,7 +78,7 @@ type PointCache struct {
 }
 
 var bufferPool = pool.NewLockFreePool(func() interface{} {
-	return make([]byte, DEFAULT_BATCH_SIZE+app.MAX_DOC_STRING_LENGTH)
+	return make([]byte, DEFAULT_BATCH_SIZE+zerodoc.MAX_STRING_LENGTH)
 },
 	pool.OptionPoolSizePerCPU(8),
 	pool.OptionInitFullPoolSize(8))
