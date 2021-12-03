@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"sort"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/app"
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 )
@@ -128,7 +127,7 @@ func AcquireCustomTag() *CustomTag {
 	return t
 }
 
-func (t *CustomTag) Clone() app.Tag {
+func (t *CustomTag) Clone() Tagger {
 	newTag := AcquireCustomTag()
 	newTag.Meta = t.Meta
 	newTag.id = t.id
@@ -138,7 +137,7 @@ func (t *CustomTag) Clone() app.Tag {
 	return newTag
 }
 
-func (t *CustomTag) PseudoClone() app.Tag {
+func (t *CustomTag) PseudoClone() Tagger {
 	t.AddReferenceCount()
 	return t
 }
@@ -191,6 +190,10 @@ func (t *CustomTag) GetCode() uint64 {
 	return t.Code
 }
 
+func (t *CustomTag) SetCode(code uint64) {
+	t.Code = code
+}
+
 func (t *CustomTag) GetID(encoder *codec.SimpleEncoder) string {
 	if t.id == "" {
 		encoder.Reset()
@@ -231,7 +234,7 @@ func (t *CustomTag) MarshalTo(b []byte) int {
 }
 
 func (t *CustomTag) ToKVString() string {
-	buffer := make([]byte, app.MAX_DOC_STRING_LENGTH)
+	buffer := make([]byte, MAX_STRING_LENGTH)
 	size := t.MarshalTo(buffer)
 	return string(buffer[:size])
 }
@@ -240,7 +243,7 @@ func (t *CustomTag) String() string {
 	return t.ToKVString()
 }
 
-var _ app.Tag = &CustomTag{}
+var _ Tagger = &CustomTag{}
 
 type CustomMeter struct {
 	Meta *CustomMeterMeta

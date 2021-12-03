@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/client/v2"
-	"gitlab.yunshan.net/yunshan/droplet-libs/app"
 	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
 )
 
@@ -688,7 +687,7 @@ func containsString(array []string, str string) bool {
 }
 
 func getFields(db string) []string {
-	var meter app.Meter
+	var meter zerodoc.Meter
 	if strings.HasPrefix(db, zerodoc.MeterVTAPNames[zerodoc.FLOW_ID]) {
 		meter = &zerodoc.FlowMeter{}
 	} else if strings.HasPrefix(db, zerodoc.MeterVTAPNames[zerodoc.ACL_ID]) {

@@ -1,7 +1,6 @@
 package zerodoc
 
 import (
-	"gitlab.yunshan.net/yunshan/droplet-libs/app"
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 )
@@ -46,7 +45,7 @@ func (m *AppMeter) Decode(decoder *codec.SimpleDecoder) {
 	m.AppAnomaly.Decode(decoder)
 }
 
-func (m *AppMeter) ConcurrentMerge(other app.Meter) {
+func (m *AppMeter) ConcurrentMerge(other Meter) {
 	if pm, ok := other.(*AppMeter); ok {
 		m.AppTriffic.ConcurrentMerge(&pm.AppTriffic)
 		m.AppLatency.ConcurrentMerge(&pm.AppLatency)
@@ -54,7 +53,7 @@ func (m *AppMeter) ConcurrentMerge(other app.Meter) {
 	}
 }
 
-func (m *AppMeter) SequentialMerge(other app.Meter) {
+func (m *AppMeter) SequentialMerge(other Meter) {
 	if pm, ok := other.(*AppMeter); ok {
 		m.AppTriffic.SequentialMerge(&pm.AppTriffic)
 		m.AppLatency.SequentialMerge(&pm.AppLatency)

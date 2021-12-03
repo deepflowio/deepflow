@@ -4,46 +4,14 @@ import (
 	"errors"
 	"fmt"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
 )
 
 const (
-	VERSION               = 20211208 // 修改Document的序列化结构时需同步修改此常量
-	MAX_DOC_STRING_LENGTH = 2048
+	VERSION = 20211209 // 修改Document的序列化结构时需同步修改此常量
 )
-
-type Tag interface {
-	GetID(*codec.SimpleEncoder) string
-	SetID(string)
-	Encode(*codec.SimpleEncoder)
-	GetCode() uint64
-	GetTAPType() uint8
-	ToKVString() string
-	MarshalTo([]byte) int
-	String() string
-	Clone() Tag
-	Release()
-}
-
-type Meter interface {
-	ID() uint8
-	Name() string
-	VTAPName() string
-	Encode(*codec.SimpleEncoder)
-	Decode(*codec.SimpleDecoder)
-	ConcurrentMerge(Meter)
-	SequentialMerge(Meter)
-	ToKVString() string
-	MarshalTo([]byte) int
-	SortKey() uint64
-	Clone() Meter
-	Release()
-	Reverse()
-	ToReversed() Meter
-	WriteBlock(block *ckdb.Block) error // 写入clickhouse的block
-}
 
 type DocumentFlag uint32
 
@@ -51,8 +19,8 @@ type Document struct {
 	pool.ReferenceCount
 
 	Timestamp uint32
-	Tag
-	Meter
+	zerodoc.Tagger
+	zerodoc.Meter
 	Flags DocumentFlag
 }
 
@@ -62,7 +30,7 @@ const (
 
 func (d Document) String() string {
 	return fmt.Sprintf("\n{\n\ttimestamp: %d\tFlags: b%b\n\ttag: %s\n\tmeter: %#v\n}\n",
-		d.Timestamp, d.Flags, d.Tag, d.Meter)
+		d.Timestamp, d.Flags, d.Tagger, d.Meter)
 }
 
 var poolDocument = pool.NewLockFreePool(func() interface{} {
@@ -80,8 +48,8 @@ func ReleaseDocument(doc *Document) {
 		return
 	}
 
-	if doc.Tag != nil {
-		doc.Tag.Release()
+	if doc.Tagger != nil {
+		doc.Tagger.Release()
 	}
 	if doc.Meter != nil {
 		doc.Meter.Release()
@@ -93,7 +61,7 @@ func ReleaseDocument(doc *Document) {
 func CloneDocument(doc *Document) *Document {
 	newDoc := AcquireDocument()
 	newDoc.Timestamp = doc.Timestamp
-	newDoc.Tag = doc.Tag.Clone()
+	newDoc.Tagger = doc.Tagger.Clone()
 	newDoc.Meter = doc.Meter.Clone()
 	newDoc.Flags = doc.Flags
 	return newDoc
@@ -108,11 +76,11 @@ func (d *Document) Release() {
 }
 
 func (d *Document) Encode(encoder *codec.SimpleEncoder) error {
-	if d.Tag == nil || d.Meter == nil {
+	if d.Tagger == nil || d.Meter == nil {
 		return errors.New("No tag or meter in document")
 	}
 	encoder.WriteU32(d.Timestamp)
-	d.Tag.Encode(encoder)
+	d.Tagger.Encode(encoder)
 	encoder.WriteU8(d.Meter.ID())
 	d.Meter.Encode(encoder)
 	encoder.WriteU32(uint32(d.Flags))

@@ -1,4 +1,4 @@
-package zerodoc
+package app
 
 import (
 	"errors"
@@ -6,38 +6,38 @@ import (
 
 	"strings"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/app"
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
 )
 
 // The return Document, must call app.ReleaseDocument to release after used
-func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
+func Decode(decoder *codec.SimpleDecoder) (*Document, error) {
 	if decoder == nil {
 		return nil, errors.New("No input decoder")
 	}
 
-	doc := app.AcquireDocument()
+	doc := AcquireDocument()
 	doc.Timestamp = decoder.ReadU32()
 
-	tag := AcquireTag()
-	tag.Field = AcquireField()
+	tag := zerodoc.AcquireTag()
+	tag.Field = zerodoc.AcquireField()
 	tag.Decode(decoder)
-	doc.Tag = tag
+	doc.Tagger = tag
 
 	meterID := decoder.ReadU8()
 	switch meterID {
-	case FLOW_ID:
-		doc.Meter = AcquireFlowMeter()
-	case ACL_ID:
-		doc.Meter = AcquireUsageMeter()
-	case APP_ID:
-		doc.Meter = AcquireAppMeter()
+	case zerodoc.FLOW_ID:
+		doc.Meter = zerodoc.AcquireFlowMeter()
+	case zerodoc.ACL_ID:
+		doc.Meter = zerodoc.AcquireUsageMeter()
+	case zerodoc.APP_ID:
+		doc.Meter = zerodoc.AcquireAppMeter()
 	default:
 		doc.Release()
 		return nil, errors.New(fmt.Sprintf("Error meter ID %v", meterID))
 	}
 	doc.Meter.Decode(decoder)
-	doc.Flags = app.DocumentFlag(decoder.ReadU32())
+	doc.Flags = DocumentFlag(decoder.ReadU32())
 
 	if decoder.Failed() {
 		doc.Release()
@@ -48,28 +48,28 @@ func Decode(decoder *codec.SimpleDecoder) (*app.Document, error) {
 }
 
 // queue monitor 打印时使用
-func DecodeForQueueMonitor(decoder *codec.SimpleDecoder) (*app.Document, error) {
-	doc := &app.Document{}
+func DecodeForQueueMonitor(decoder *codec.SimpleDecoder) (*Document, error) {
+	doc := &Document{}
 	doc.Timestamp = decoder.ReadU32()
 
-	tag := &Tag{}
-	tag.Field = &Field{}
+	tag := &zerodoc.Tag{}
+	tag.Field = &zerodoc.Field{}
 	tag.Decode(decoder)
-	doc.Tag = tag
+	doc.Tagger = tag
 
 	meterID := decoder.ReadU8()
 	switch meterID {
-	case FLOW_ID:
-		doc.Meter = &FlowMeter{}
-	case ACL_ID:
-		doc.Meter = &UsageMeter{}
-	case APP_ID:
-		doc.Meter = &AppMeter{}
+	case zerodoc.FLOW_ID:
+		doc.Meter = &zerodoc.FlowMeter{}
+	case zerodoc.ACL_ID:
+		doc.Meter = &zerodoc.UsageMeter{}
+	case zerodoc.APP_ID:
+		doc.Meter = &zerodoc.AppMeter{}
 	default:
 		return nil, errors.New(fmt.Sprintf("Error meter ID %d", meterID))
 	}
 	doc.Meter.Decode(decoder)
-	doc.Flags = app.DocumentFlag(decoder.ReadU32())
+	doc.Flags = DocumentFlag(decoder.ReadU32())
 
 	if decoder.Failed() {
 		return nil, errors.New("Decode failed")
@@ -79,18 +79,18 @@ func DecodeForQueueMonitor(decoder *codec.SimpleDecoder) (*app.Document, error) 
 
 func GetDbMeterID(db, rp string) (uint8, error) {
 	// vtap_flow数据库，不使用flow_second_id返回数据
-	for meterID := FLOW_ID; meterID < MAX_APP_ID; meterID++ {
-		if strings.HasPrefix(db, MeterVTAPNames[meterID]) {
+	for meterID := zerodoc.FLOW_ID; meterID < zerodoc.MAX_APP_ID; meterID++ {
+		if strings.HasPrefix(db, zerodoc.MeterVTAPNames[meterID]) {
 			return meterID, nil
 		}
 	}
-	return MAX_APP_ID, fmt.Errorf("unsupport db %s", db)
+	return zerodoc.MAX_APP_ID, fmt.Errorf("unsupport db %s", db)
 }
 
-func DecodeTsdbRow(decoder *codec.SimpleDecoder) (*app.Document, error) {
+func DecodeTsdbRow(decoder *codec.SimpleDecoder) (*Document, error) {
 	version := decoder.ReadU32()
-	if version != app.VERSION {
-		return nil, fmt.Errorf("message version incorrect, expect %d, found %d.", app.VERSION, version)
+	if version != VERSION {
+		return nil, fmt.Errorf("message version incorrect, expect %d, found %d.", VERSION, version)
 	}
 	return Decode(decoder)
 }
