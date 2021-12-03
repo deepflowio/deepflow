@@ -3,7 +3,6 @@ package zerodoc
 import (
 	"strconv"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/app"
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 )
@@ -65,7 +64,7 @@ func (m *UsageMeter) SortKey() uint64 {
 }
 
 func (m *UsageMeter) ToKVString() string {
-	buffer := make([]byte, app.MAX_DOC_STRING_LENGTH)
+	buffer := make([]byte, MAX_STRING_LENGTH)
 	size := m.MarshalTo(buffer)
 	return string(buffer[:size])
 }
@@ -168,12 +167,12 @@ func (m *UsageMeter) Merge(other *UsageMeter) {
 	m.L4ByteRx += other.L4ByteRx
 }
 
-func (m *UsageMeter) ConcurrentMerge(other app.Meter) {
+func (m *UsageMeter) ConcurrentMerge(other Meter) {
 	if other, ok := other.(*UsageMeter); ok {
 		m.Merge(other)
 	}
 }
 
-func (m *UsageMeter) SequentialMerge(other app.Meter) {
+func (m *UsageMeter) SequentialMerge(other Meter) {
 	m.ConcurrentMerge(other)
 }
