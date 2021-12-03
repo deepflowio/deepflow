@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/google/gopacket/layers"
-	"gitlab.yunshan.net/yunshan/droplet-libs/app"
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
@@ -439,7 +438,7 @@ type Tag struct {
 }
 
 func (t *Tag) ToKVString() string {
-	buffer := make([]byte, app.MAX_DOC_STRING_LENGTH)
+	buffer := make([]byte, MAX_STRING_LENGTH)
 	size := t.MarshalTo(buffer)
 	return string(buffer[:size])
 }
@@ -1912,7 +1911,7 @@ func CloneTag(tag *Tag) *Tag {
 	return newTag
 }
 
-func (t *Tag) Clone() app.Tag {
+func (t *Tag) Clone() Tagger {
 	return CloneTag(t)
 }
 
