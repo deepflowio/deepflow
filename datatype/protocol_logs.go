@@ -72,9 +72,16 @@ func (t *LogMessageType) String() string {
 	return formatted
 }
 
+const (
+	STATUS_OK uint8 = iota
+	STATUS_ERROR
+	STATUS_NOT_EXIST
+)
+
 type AppProtoHead struct {
 	Proto   LogProtoType
 	MsgType LogMessageType // HTTP，DNS: request/response
+	Status  uint8          // 状态描述：0：正常，1：异常，2：不存在
 	Code    uint16         // HTTP状态码: 1xx-5xx, DNS状态码: 0-7
 	RRT     time.Duration  // HTTP，DNS时延: response-request
 }
@@ -114,6 +121,7 @@ func (i *AppProtoLogsBaseInfo) String() string {
 	formatted += fmt.Sprintf("Proto: %s ", i.Proto.String())
 	formatted += fmt.Sprintf("MsgType: %s ", i.MsgType.String())
 	formatted += fmt.Sprintf("Code: %v ", i.Code)
+	formatted += fmt.Sprintf("Status: %v ", i.Status)
 	formatted += fmt.Sprintf("RRT: %v ", i.RRT)
 
 	if i.IsIPv6 {
@@ -215,6 +223,7 @@ func (l *AppProtoLogsData) Encode(encoder *codec.SimpleEncoder) error {
 	encoder.WriteU32(l.TapPort)
 	encoder.WriteU8(byte(l.Proto))
 	encoder.WriteU8(byte(l.MsgType))
+	encoder.WriteU8(byte(l.Status))
 	encoder.WriteU16(l.Code)
 	encoder.WriteU64(uint64(l.RRT))
 
@@ -245,6 +254,7 @@ func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
 	l.TapPort = decoder.ReadU32()
 	l.Proto = LogProtoType(decoder.ReadU8())
 	l.MsgType = LogMessageType(decoder.ReadU8())
+	l.Status = decoder.ReadU8()
 	l.Code = decoder.ReadU16()
 	l.RRT = time.Duration(decoder.ReadU64())
 
