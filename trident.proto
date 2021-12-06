@@ -178,6 +178,7 @@ message Config {
     optional string  proxy_controller_ip  = 34; // 控制器代理IP
     optional uint32  region_id            = 35 [default = 0]; // 采集器所在区域ID或数据节点所在区域ID
     optional uint32  pod_cluster_id       = 36 [default = 0]; // 采集器所在容器集群ID
+    optional uint32  epc_id               = 37 [default = 0]; // 采集器所在epc_id, 仅对Workload-V/P, 容器-V/P类型有意义
 
     optional uint32 vtap_id               = 40;  // 限制在64000
     optional common.TridentType trident_type = 41;
