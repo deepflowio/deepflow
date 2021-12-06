@@ -26,7 +26,7 @@ type KafkaInfo struct {
 
 	// request
 	ApiVersion uint16
-	ApiKey     string
+	ApiKey     uint16
 	ClientID   string
 }
 
@@ -35,7 +35,7 @@ func (i *KafkaInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType,
 	encoder.WriteU32(i.CorrelationId)
 	if msgType == MSG_T_SESSION || msgType == MSG_T_REQUEST {
 		encoder.WriteU16(i.ApiVersion)
-		encoder.WriteString255(i.ApiKey)
+		encoder.WriteU16(i.ApiKey)
 		encoder.WriteString255(i.ClientID)
 	}
 }
@@ -45,7 +45,7 @@ func (i *KafkaInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType,
 	i.CorrelationId = decoder.ReadU32()
 	if msgType == MSG_T_SESSION || msgType == MSG_T_REQUEST {
 		i.ApiVersion = decoder.ReadU16()
-		i.ApiKey = decoder.ReadString255()
+		i.ApiKey = decoder.ReadU16()
 		i.ClientID = decoder.ReadString255()
 	}
 }
