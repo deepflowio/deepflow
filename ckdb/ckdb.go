@@ -190,12 +190,15 @@ const (
 	UInt16
 	UInt16Nullable
 	UInt8
+	UInt8Nullable
 	Int64
 	Int64Nullable
 	Int32
 	Int32Nullable
 	Int16
+	Int16Nullable
 	Int8
+	Int8Nullable
 	Float64
 	Float64Nullable
 	String
@@ -220,12 +223,15 @@ var cloumnTypeString = []string{
 	UInt16:               "UInt16",
 	UInt16Nullable:       "Nullable(UInt16)",
 	UInt8:                "UInt8",
+	UInt8Nullable:        "Nullable(UInt8)",
 	Int64:                "Int64",
 	Int64Nullable:        "Nullable(Int64)",
 	Int32:                "Int32",
 	Int32Nullable:        "Nullable(Int32)",
 	Int16:                "Int16",
+	Int16Nullable:        "Nullable(Int16)",
 	Int8:                 "Int8",
+	Int8Nullable:         "Nullable(Int8)",
 	Float64:              "Float64",
 	Float64Nullable:      "Nullable(Float64)",
 	String:               "String",
