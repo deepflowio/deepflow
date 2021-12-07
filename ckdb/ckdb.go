@@ -36,6 +36,14 @@ func (b *Block) WriteUInt8(v uint8) error {
 	return nil
 }
 
+func (b *Block) WriteUInt8Nullable(v *uint8) error {
+	if err := b.Block.WriteUInt8Nullable(b.index, v); err != nil {
+		return err
+	}
+	b.index++
+	return nil
+}
+
 func (b *Block) WriteUInt16(v uint16) error {
 	if err := b.Block.WriteUInt16(b.index, v); err != nil {
 		return err
@@ -92,8 +100,24 @@ func (b *Block) WriteInt8(v int8) error {
 	return nil
 }
 
+func (b *Block) WriteInt8Nullable(v *int8) error {
+	if err := b.Block.WriteInt8Nullable(b.index, v); err != nil {
+		return err
+	}
+	b.index++
+	return nil
+}
+
 func (b *Block) WriteInt16(v int16) error {
 	if err := b.Block.WriteInt16(b.index, v); err != nil {
+		return err
+	}
+	b.index++
+	return nil
+}
+
+func (b *Block) WriteInt16Nullable(v *int16) error {
+	if err := b.Block.WriteInt16Nullable(b.index, v); err != nil {
 		return err
 	}
 	b.index++
