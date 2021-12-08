@@ -99,7 +99,7 @@ const (
 type SideType uint8
 
 const (
-	NodeSide SideType = (iota + 1) << 2
+	NodeSide SideType = (iota + 1) << 3
 	HypervisorSide
 	GatewayHypervisorSide
 	GatewaySide
@@ -108,14 +108,14 @@ const (
 type DirectionEnum uint8
 
 const (
-	_CLIENT_SERVER_MASK = 0x3
-	_SIDE_TYPE_MASK     = 0xfc
+	_CLIENT_SERVER_MASK = 0x7
+	_SIDE_TYPE_MASK     = 0xf8
 )
 
 const (
-	_ DirectionEnum = iota
-	ClientToServer
+	ClientToServer = 1 << iota
 	ServerToClient
+	LocalToLocal
 
 	// 以下类型为转换tapside而增加，在写入db时均记为c2s或s2c
 	ClientNodeToServer              = ClientToServer | DirectionEnum(NodeSide)              // 客户端容器节点，路由、SNAT、隧道
@@ -143,9 +143,9 @@ func (d DirectionEnum) IsGateway() bool {
 type TAPSideEnum uint8
 
 const (
-	Rest TAPSideEnum = iota
-	Client
+	Client TAPSideEnum = 1 << iota
 	Server
+	Local
 	ClientNode              = Client | TAPSideEnum(NodeSide)
 	ServerNode              = Server | TAPSideEnum(NodeSide)
 	ClientHypervisor        = Client | TAPSideEnum(HypervisorSide)
@@ -154,12 +154,14 @@ const (
 	ServerGatewayHypervisor = Server | TAPSideEnum(GatewayHypervisorSide)
 	ClientGateway           = Client | TAPSideEnum(GatewaySide)
 	ServerGateway           = Server | TAPSideEnum(GatewaySide)
+	Rest                    = 0
 )
 
 var TAPSideEnumsString = []string{
 	Rest:                    "rest",
 	Client:                  "c",
 	Server:                  "s",
+	Local:                   "local",
 	ClientNode:              "c-nd",
 	ServerNode:              "s-nd",
 	ClientHypervisor:        "c-hv",
