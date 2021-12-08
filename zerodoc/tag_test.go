@@ -345,14 +345,14 @@ func TestDirectionEnum(t *testing.T) {
 
 func TestDirectionToTAPSide(t *testing.T) {
 	directions := []DirectionEnum{
-		ClientToServer, ServerToClient,
+		ClientToServer, ServerToClient, LocalToLocal,
 		ClientNodeToServer, ServerNodeToClient,
 		ClientHypervisorToServer, ServerHypervisorToClient,
 		ClientGatewayHypervisorToServer, ServerGatewayHypervisorToClient,
 		ClientGatewayToServer, ServerGatewayToClient,
 	}
 	tapSides := []TAPSideEnum{
-		Client, Server,
+		Client, Server, Local,
 		ClientNode, ServerNode,
 		ClientHypervisor, ServerHypervisor,
 		ClientGatewayHypervisor, ServerGatewayHypervisor,

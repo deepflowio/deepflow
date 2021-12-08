@@ -464,7 +464,7 @@ func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType Ta
 		// L2End为真时，可通过流量中的Mac判断是否为VIP设备
 		endpointInfo.IsVIPInterface = platformData.IsVIPInterface
 		// IP为0，则取MAC对应的二层数据作为三层数据
-		if l3End || ip.IsUnspecified() {
+		if l3End || ip.IsUnspecified() || ip.IsLoopback() {
 			endpointInfo.SetL3Data(platformData)
 			return endpointInfo
 		}
