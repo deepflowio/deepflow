@@ -412,8 +412,8 @@ func MetricsDBNameToID(name string) MetricsDBID {
 }
 
 const (
-	BaseCode     = AZID | HostID | IP | L3Device | L3EpcID | PodClusterID | PodGroupID | PodID | PodNodeID | PodNSID | RegionID | SubnetID | TAPType | VTAPID | BusinessIDs | GroupIDs | ServiceID
-	BasePathCode = AZIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | PodClusterIDPath | PodGroupIDPath | PodIDPath | PodNodeIDPath | PodNSIDPath | RegionIDPath | SubnetIDPath | TAPSide | TAPType | VTAPID | BusinessIDsPath | GroupIDsPath | ServiceIDPath
+	BaseCode     = AZID | HostID | IP | L3Device | L3EpcID | PodClusterID | PodGroupID | PodID | PodNodeID | PodNSID | RegionID | SubnetID | TAPType | VTAPID | BusinessIDs | GroupIDs | ServiceID | LBListenerID
+	BasePathCode = AZIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | PodClusterIDPath | PodGroupIDPath | PodIDPath | PodNodeIDPath | PodNSIDPath | RegionIDPath | SubnetIDPath | TAPSide | TAPType | VTAPID | BusinessIDsPath | GroupIDsPath | ServiceIDPath | LBListenerIDPath
 	BasePortCode = Protocol | ServerPort | IsKeyService
 )
 
