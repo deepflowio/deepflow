@@ -84,6 +84,7 @@ type AppProtoHead struct {
 	Status  uint8          // 状态描述：0：正常，1：异常，2：不存在
 	Code    uint16         // HTTP状态码: 1xx-5xx, DNS状态码: 0-7
 	RRT     time.Duration  // HTTP，DNS时延: response-request
+
 }
 
 type AppProtoLogsBaseInfo struct {
@@ -94,6 +95,7 @@ type AppProtoLogsBaseInfo struct {
 	TapType   uint16
 	TapPort   uint32
 	IsIPv6    bool
+	TapSide   uint8
 	AppProtoHead
 
 	/* L3 */
@@ -226,6 +228,7 @@ func (l *AppProtoLogsData) Encode(encoder *codec.SimpleEncoder) error {
 	encoder.WriteU8(byte(l.Status))
 	encoder.WriteU16(l.Code)
 	encoder.WriteU64(uint64(l.RRT))
+	encoder.WriteU8(l.TapSide)
 
 	if l.IsIPv6 {
 		encoder.WriteBool(true)
@@ -257,6 +260,7 @@ func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
 	l.Status = decoder.ReadU8()
 	l.Code = decoder.ReadU16()
 	l.RRT = time.Duration(decoder.ReadU64())
+	l.TapSide = decoder.ReadU8()
 
 	if decoder.ReadBool() {
 		l.IsIPv6 = true

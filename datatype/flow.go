@@ -266,6 +266,7 @@ type Flow struct {
 	QueueHash       uint8
 	IsNewFlow       bool
 	Reversed        bool
+	TapSide         uint8
 }
 
 func (t FlowSource) String() string {
@@ -569,6 +570,7 @@ func (f *Flow) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU8(uint8(f.CloseType))
 	encoder.WriteU8(uint8(f.FlowSource))
 	encoder.WriteBool(f.IsActiveService)
+	encoder.WriteU8(f.TapSide)
 }
 
 func (f *Flow) Decode(decoder *codec.SimpleDecoder) {
@@ -598,6 +600,7 @@ func (f *Flow) Decode(decoder *codec.SimpleDecoder) {
 	f.CloseType = CloseType(decoder.ReadU8())
 	f.FlowSource = FlowSource(decoder.ReadU8())
 	f.IsActiveService = decoder.ReadBool()
+	f.TapSide = decoder.ReadU8()
 }
 
 func formatStruct(s interface{}) string {
