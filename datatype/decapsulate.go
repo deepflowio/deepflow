@@ -14,13 +14,11 @@ type TunnelType uint16
 
 const (
 	// 0~5 bit 表示第一层隧道，6~12 bit表示第二层隧道
-	TUNNEL_TYPE_NONE        = TunnelType(pb.DecapType_DECAP_TYPE_NONE)
-	TUNNEL_TYPE_VXLAN       = TunnelType(pb.DecapType_DECAP_TYPE_VXLAN)
-	TUNNEL_TYPE_IPIP        = TunnelType(pb.DecapType_DECAP_TYPE_IPIP)
-	TUNNEL_TYPE_TENCENT_GRE = TunnelType(pb.DecapType_DECAP_TYPE_TENCENT)     // GRE.ver=1 GRE.protoType=IPv4/IPv6
-	TUNNEL_TYPE_VXLAN_VXLAN = TunnelType(pb.DecapType_DECAP_TYPE_VXLAN_VXLAN) // (DECAP_TYPE_VXLAN << 6) | DECAP_TYPE_VXLAN
-	TUNNEL_TYPE_VXLAN_IPIP  = TunnelType(pb.DecapType_DECAP_TYPE_VXLAN_IPIP)  // (DECAP_TYPE_VXLAN << 6) | DECAP_TYPE_IPIP
-	TUNNEL_TYPE_ERSPAN      = 0xffff
+	TUNNEL_TYPE_NONE          = TunnelType(pb.DecapType_DECAP_TYPE_NONE)
+	TUNNEL_TYPE_VXLAN         = TunnelType(pb.DecapType_DECAP_TYPE_VXLAN)
+	TUNNEL_TYPE_IPIP          = TunnelType(pb.DecapType_DECAP_TYPE_IPIP)
+	TUNNEL_TYPE_TENCENT_GRE   = TunnelType(pb.DecapType_DECAP_TYPE_TENCENT) // GRE.ver=1 GRE.protoType=IPv4/IPv6
+	TUNNEL_TYPE_ERSPAN_OR_TEB = TunnelType(0xf)
 
 	LE_IPV4_PROTO_TYPE_I      = 0x0008 // 0x0008's LittleEndian
 	LE_IPV6_PROTO_TYPE_I      = 0xDD86 // 0x86dd's LittleEndian
@@ -34,22 +32,67 @@ const (
 
 	TUNNEL_TYPE_TIER1_MASK  = 0x3f
 	TUNNEL_TYPE_TIER2_SHIFT = 6
+
+	_TUNNEL_TIER_LIMIT = 2
 )
 
-func (t TunnelType) String() string {
-	if t == TUNNEL_TYPE_VXLAN {
-		return "vxlan"
-	} else if t == TUNNEL_TYPE_TENCENT_GRE {
-		return "tencent-gre"
-	} else if t == TUNNEL_TYPE_VXLAN_VXLAN {
-		return "vxlan-vxlan"
-	} else if t == TUNNEL_TYPE_IPIP {
-		return "ipip"
-	} else if t == TUNNEL_TYPE_VXLAN_IPIP {
-		return "vxlan-ipip"
+var (
+	tunnelTypeTips = [...]string{
+		TUNNEL_TYPE_NONE:          "none",
+		TUNNEL_TYPE_VXLAN:         "vxlan",
+		TUNNEL_TYPE_IPIP:          "ipip",
+		TUNNEL_TYPE_TENCENT_GRE:   "tencent-gre",
+		TUNNEL_TYPE_ERSPAN_OR_TEB: "erspan-or-teb",
 	}
+)
 
-	return "none"
+func (t TunnelType) Has(tunnelType TunnelType) bool {
+	return (t&TUNNEL_TYPE_TIER1_MASK) == tunnelType || (t>>TUNNEL_TYPE_TIER2_SHIFT) == tunnelType
+}
+
+func (t TunnelType) String() string {
+	tips := ""
+	tier1 := t >> TUNNEL_TYPE_TIER2_SHIFT
+	if tier1 >= TUNNEL_TYPE_VXLAN && tier1 <= TUNNEL_TYPE_TENCENT_GRE {
+		tips += tunnelTypeTips[tier1] + "|"
+	}
+	tier2 := t & TUNNEL_TYPE_TIER1_MASK
+	if tier1 >= TUNNEL_TYPE_NONE && tier1 <= TUNNEL_TYPE_TENCENT_GRE {
+		tips += tunnelTypeTips[tier2]
+	}
+	return tips
+}
+
+type TunnelTypeBitmap uint16
+
+func NewTunnelTypeBitmap(items ...TunnelType) TunnelTypeBitmap {
+	bitmap := TunnelTypeBitmap(0)
+	for _, item := range items {
+		bitmap |= (1 << item)
+	}
+	return bitmap
+}
+
+func (b *TunnelTypeBitmap) Add(tunnelType TunnelType) {
+	*b |= 1 << tunnelType
+}
+
+func (b TunnelTypeBitmap) Has(tunnelType TunnelType) bool {
+	return (b & (1 << tunnelType)) != 0
+}
+
+func (b TunnelTypeBitmap) IsEmpty() bool {
+	return b == 0
+}
+
+func (b TunnelTypeBitmap) String() string {
+	context := ""
+	for i := TunnelType(0); i <= TUNNEL_TYPE_ERSPAN_OR_TEB; i++ {
+		if b.Has(i) {
+			context += tunnelTypeTips[i]
+		}
+	}
+	return context
 }
 
 type TunnelInfo struct {
@@ -64,7 +107,7 @@ func (t *TunnelInfo) String() string {
 	return fmt.Sprintf("type: %s, src: %s, dst: %s, id: %d, tier: %d", t.Type, IpFromUint32(t.Src), IpFromUint32(t.Dst), t.Id, t.Tier)
 }
 
-func (t *TunnelInfo) DecapsulateVxlan(packet []byte, l2Len int, tunnelType TunnelType) int {
+func (t *TunnelInfo) DecapsulateVxlan(packet []byte, l2Len int) int {
 	l3Packet := packet[l2Len:]
 	if len(l3Packet) < OFFSET_VXLAN_FLAGS+VXLAN_HEADER_SIZE {
 		return 0
@@ -85,8 +128,8 @@ func (t *TunnelInfo) DecapsulateVxlan(packet []byte, l2Len int, tunnelType Tunne
 		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
 		t.Type = TUNNEL_TYPE_VXLAN
 		t.Id = BigEndian.Uint32(l3Packet[OFFSET_VXLAN_VNI-ETH_HEADER_SIZE:]) >> 8
-	} else { // VXLAN-VXLAN
-		t.Type = TUNNEL_TYPE_VXLAN_VXLAN
+	} else {
+		t.Type = (t.Type << TUNNEL_TYPE_TIER2_SHIFT) | TUNNEL_TYPE_VXLAN
 	}
 	t.Tier++
 
@@ -116,7 +159,9 @@ func (t *TunnelInfo) DecapsulateErspan(l3Packet []byte, flags, greProtocolType u
 			if t.Tier == 0 {
 				t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
 				t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
-				t.Type = TUNNEL_TYPE_ERSPAN
+				t.Type = TUNNEL_TYPE_ERSPAN_OR_TEB
+			} else {
+				t.Type = (t.Type << TUNNEL_TYPE_TIER2_SHIFT) | TUNNEL_TYPE_ERSPAN_OR_TEB
 			}
 			t.Tier++
 			return ipHeaderSize + GRE_HEADER_SIZE + ERSPANI_HEADER_SIZE
@@ -126,8 +171,10 @@ func (t *TunnelInfo) DecapsulateErspan(l3Packet []byte, flags, greProtocolType u
 			if t.Tier == 0 {
 				t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
 				t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
-				t.Type = TUNNEL_TYPE_ERSPAN
+				t.Type = TUNNEL_TYPE_ERSPAN_OR_TEB
 				t.Id = BigEndian.Uint32(l3Packet[ipHeaderSize+greHeaderSize+ERSPAN_ID_OFFSET:]) & 0x3ff
+			} else {
+				t.Type = (t.Type << TUNNEL_TYPE_TIER2_SHIFT) | TUNNEL_TYPE_ERSPAN_OR_TEB
 			}
 			t.Tier++
 			return ipHeaderSize + greHeaderSize + ERSPANII_HEADER_SIZE
@@ -138,8 +185,10 @@ func (t *TunnelInfo) DecapsulateErspan(l3Packet []byte, flags, greProtocolType u
 		if t.Tier == 0 {
 			t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
 			t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
-			t.Type = TUNNEL_TYPE_ERSPAN
+			t.Type = TUNNEL_TYPE_ERSPAN_OR_TEB
 			t.Id = BigEndian.Uint32(l3Packet[ipHeaderSize+greHeaderSize+ERSPAN_ID_OFFSET:]) & 0x3ff
+		} else {
+			t.Type = (t.Type << TUNNEL_TYPE_TIER2_SHIFT) | TUNNEL_TYPE_ERSPAN_OR_TEB
 		}
 		t.Tier++
 		oFlag := l3Packet[ipHeaderSize+greHeaderSize+ERSPANIII_FLAGS_OFFSET] & 0x1
@@ -173,7 +222,10 @@ func (t *TunnelInfo) DecapsulateTencentGre(l3Packet []byte, flags, greProtocolTy
 		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
 		t.Type = TUNNEL_TYPE_TENCENT_GRE
 		t.Id = BigEndian.Uint32(l3Packet[ipHeaderSize+greKeyOffset:])
+	} else {
+		t.Type = (t.Type << TUNNEL_TYPE_TIER2_SHIFT) | TUNNEL_TYPE_TENCENT_GRE
 	}
+
 	t.Tier++
 	overlayOffset := greHeaderSize + ipHeaderSize - ETH_HEADER_SIZE // 这里伪造L2层信息
 
@@ -214,28 +266,40 @@ func (t *TunnelInfo) DecapsulateTeb(l3Packet []byte, flags, greProtocolType uint
 	if t.Tier == 0 {
 		t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
 		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
-		t.Type = TUNNEL_TYPE_ERSPAN // TEB不保存TUNNEL信息，在这里标注为ERSPAN
+		t.Type = TUNNEL_TYPE_ERSPAN_OR_TEB // TEB不保存TUNNEL信息，在这里标注为ERSPAN
 		t.Id = BigEndian.Uint32(l3Packet[ipHeaderSize+greKeyOffset:])
+	} else {
+		t.Type = (t.Type << TUNNEL_TYPE_TIER2_SHIFT) | TUNNEL_TYPE_ERSPAN_OR_TEB
 	}
+
 	t.Tier++
 	return greHeaderSize + ipHeaderSize
 }
 
-func (t *TunnelInfo) DecapsulateGre(l3Packet []byte, decapErspanOrTeb, decapTencentGre bool) int {
+func (t *TunnelInfo) DecapsulateGre(l3Packet []byte, tunnelTypeBitmap TunnelTypeBitmap) int {
 	ipHeaderSize := int((l3Packet[IP_IHL_OFFSET] & 0xf) << 2)
 	flags := BigEndian.Uint16(l3Packet[ipHeaderSize+GRE_FLAGS_OFFSET:])
 	greProtocolType := *(*uint16)(unsafe.Pointer(&l3Packet[ipHeaderSize+GRE_PROTOCOL_OFFSET]))
-	if decapErspanOrTeb && (greProtocolType == LE_ERSPAN_PROTO_TYPE_II || greProtocolType == LE_ERSPAN_PROTO_TYPE_III) { // ERSPAN
+	if tunnelTypeBitmap.Has(TUNNEL_TYPE_ERSPAN_OR_TEB) &&
+		(greProtocolType == LE_ERSPAN_PROTO_TYPE_II || greProtocolType == LE_ERSPAN_PROTO_TYPE_III) { // ERSPAN
 		return t.DecapsulateErspan(l3Packet, flags, greProtocolType, ipHeaderSize)
-	} else if decapTencentGre && (greProtocolType == LE_IPV4_PROTO_TYPE_I || greProtocolType == LE_IPV6_PROTO_TYPE_I) {
+	} else if tunnelTypeBitmap.Has(TUNNEL_TYPE_TENCENT_GRE) &&
+		(greProtocolType == LE_IPV4_PROTO_TYPE_I || greProtocolType == LE_IPV6_PROTO_TYPE_I) {
 		return t.DecapsulateTencentGre(l3Packet, flags, greProtocolType, ipHeaderSize)
-	} else if decapErspanOrTeb && greProtocolType == LE_TEB_PROTO {
+	} else if tunnelTypeBitmap.Has(TUNNEL_TYPE_ERSPAN_OR_TEB) &&
+		greProtocolType == LE_TEB_PROTO {
 		return t.DecapsulateTeb(l3Packet, flags, greProtocolType, ipHeaderSize)
 	}
 	return 0
 }
 
-func (t *TunnelInfo) Decapsulate(packet []byte, l2Len int, tunnelType TunnelType, decapErspanOrTeb bool) int {
+func (t *TunnelInfo) Decapsulate(packet []byte, l2Len int, tunnelTypeBitmap TunnelTypeBitmap) int {
+	if tunnelTypeBitmap.IsEmpty() {
+		return 0
+	}
+	if t.Tier == _TUNNEL_TIER_LIMIT {
+		return 0
+	}
 	// 通过ERSPANIII_HEADER_SIZE(12 bytes)+ERSPANIII_SUBHEADER_SIZE(8 bytes)判断，保证不会数组越界
 	l3Packet := packet[l2Len:]
 	if len(l3Packet) < IP_HEADER_SIZE+GRE_HEADER_SIZE+ERSPANIII_HEADER_SIZE+ERSPANIII_SUBHEADER_SIZE {
@@ -245,17 +309,17 @@ func (t *TunnelInfo) Decapsulate(packet []byte, l2Len int, tunnelType TunnelType
 	offset := 0
 	protocol := IPProtocol(l3Packet[OFFSET_IP_PROTOCOL-ETH_HEADER_SIZE])
 	if protocol == IPProtocolUDP {
-		if (tunnelType&TUNNEL_TYPE_TIER1_MASK == TUNNEL_TYPE_VXLAN) || (tunnelType>>TUNNEL_TYPE_TIER2_SHIFT == TUNNEL_TYPE_VXLAN) {
-			offset = t.DecapsulateVxlan(packet, l2Len, tunnelType)
+		if tunnelTypeBitmap.Has(TUNNEL_TYPE_VXLAN) {
+			offset = t.DecapsulateVxlan(packet, l2Len)
 		}
 	} else if protocol == IPProtocolGRE {
-		offset = t.DecapsulateGre(l3Packet, decapErspanOrTeb, tunnelType&TUNNEL_TYPE_TIER1_MASK == TUNNEL_TYPE_TENCENT_GRE)
+		offset = t.DecapsulateGre(l3Packet, tunnelTypeBitmap)
 	} else if protocol == IPProtocolIPv4 {
-		if tunnelType&TUNNEL_TYPE_TIER1_MASK == TUNNEL_TYPE_IPIP {
+		if tunnelTypeBitmap.Has(TUNNEL_TYPE_IPIP) {
 			offset = t.DecapsulateIPIP(packet, l2Len, false, false)
 		}
 	} else if protocol == IPProtocolIPv6 {
-		if tunnelType&TUNNEL_TYPE_TIER1_MASK == TUNNEL_TYPE_IPIP {
+		if tunnelTypeBitmap.Has(TUNNEL_TYPE_IPIP) {
 			offset = t.DecapsulateIPIP(packet, l2Len, false, true)
 		}
 	}
@@ -263,7 +327,7 @@ func (t *TunnelInfo) Decapsulate(packet []byte, l2Len int, tunnelType TunnelType
 	return offset
 }
 
-func (t *TunnelInfo) Decapsulate6Vxlan(packet []byte, l2Len int, tunnelType TunnelType) int {
+func (t *TunnelInfo) Decapsulate6Vxlan(packet []byte, l2Len int) int {
 	l3Packet := packet[l2Len:]
 	if len(l3Packet) < OFFSET_VXLAN_FLAGS+VXLAN_HEADER_SIZE {
 		return 0
@@ -284,8 +348,8 @@ func (t *TunnelInfo) Decapsulate6Vxlan(packet []byte, l2Len int, tunnelType Tunn
 		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[IP6_DIP_OFFSET:]))
 		t.Type = TUNNEL_TYPE_VXLAN
 		t.Id = BigEndian.Uint32(l3Packet[IP6_HEADER_SIZE+UDP_HEADER_SIZE+VXLAN_VNI_OFFSET:]) >> 8
-	} else { // VXLAN-VXLAN
-		t.Type = TUNNEL_TYPE_VXLAN_VXLAN
+	} else {
+		t.Type = (t.Type << TUNNEL_TYPE_TIER2_SHIFT) | TUNNEL_TYPE_VXLAN
 	}
 	t.Tier++
 
@@ -293,8 +357,11 @@ func (t *TunnelInfo) Decapsulate6Vxlan(packet []byte, l2Len int, tunnelType Tunn
 	return IP6_HEADER_SIZE + UDP_HEADER_SIZE + VXLAN_HEADER_SIZE
 }
 
-func (t *TunnelInfo) Decapsulate6(packet []byte, l2Len int, tunnelType TunnelType) int {
-	if tunnelType == TUNNEL_TYPE_NONE {
+func (t *TunnelInfo) Decapsulate6(packet []byte, l2Len int, tunnelTypeBitmap TunnelTypeBitmap) int {
+	if tunnelTypeBitmap.IsEmpty() {
+		return 0
+	}
+	if t.Tier == _TUNNEL_TIER_LIMIT {
 		return 0
 	}
 
@@ -307,15 +374,15 @@ func (t *TunnelInfo) Decapsulate6(packet []byte, l2Len int, tunnelType TunnelTyp
 	offset := 0
 	protocol := IPProtocol(l3Packet[IP6_PROTO_OFFSET])
 	if protocol == IPProtocolUDP {
-		if (tunnelType&TUNNEL_TYPE_TIER1_MASK == TUNNEL_TYPE_VXLAN) || (tunnelType>>TUNNEL_TYPE_TIER2_SHIFT == TUNNEL_TYPE_VXLAN) {
-			offset = t.Decapsulate6Vxlan(packet, l2Len, tunnelType)
+		if tunnelTypeBitmap.Has(TUNNEL_TYPE_VXLAN) {
+			offset = t.Decapsulate6Vxlan(packet, l2Len)
 		}
 	} else if protocol == IPProtocolIPv4 {
-		if tunnelType&TUNNEL_TYPE_TIER1_MASK == TUNNEL_TYPE_IPIP {
+		if tunnelTypeBitmap.Has(TUNNEL_TYPE_IPIP) {
 			offset = t.DecapsulateIPIP(packet, l2Len, true, false)
 		}
 	} else if protocol == IPProtocolIPv6 {
-		if tunnelType&TUNNEL_TYPE_TIER1_MASK == TUNNEL_TYPE_IPIP {
+		if tunnelTypeBitmap.Has(TUNNEL_TYPE_IPIP) {
 			offset = t.DecapsulateIPIP(packet, l2Len, true, true)
 		}
 	}
@@ -345,7 +412,7 @@ func (t *TunnelInfo) DecapsulateIPIP(packet []byte, l2Len int, underlayIpv6, ove
 		t.Type = TUNNEL_TYPE_IPIP
 		t.Id = 0
 	} else {
-		t.Type = TUNNEL_TYPE_VXLAN_IPIP
+		t.Type = (t.Type << TUNNEL_TYPE_TIER2_SHIFT) | TUNNEL_TYPE_IPIP
 	}
 	t.Tier++
 
