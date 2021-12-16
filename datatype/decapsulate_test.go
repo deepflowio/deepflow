@@ -43,11 +43,12 @@ func loadPcap(file string) ([]RawPacket, []PacketLen) {
 }
 
 func TestDecapsulateErspanI(t *testing.T) {
+	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_ERSPAN_OR_TEB)
 	expected := &TunnelInfo{
 		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("172.28.25.108").To4())),
 		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("172.28.28.70").To4())),
 		Id:   0,
-		Type: TUNNEL_TYPE_ERSPAN,
+		Type: TUNNEL_TYPE_ERSPAN_OR_TEB,
 		Tier: 1,
 	}
 
@@ -57,14 +58,14 @@ func TestDecapsulateErspanI(t *testing.T) {
 
 	l2Len := 18
 	actual := &TunnelInfo{}
-	offset := actual.Decapsulate(packet1, l2Len, TUNNEL_TYPE_ERSPAN, true)
+	offset := actual.Decapsulate(packet1, l2Len, bitmap)
 	expectedOffset := IP_HEADER_SIZE + GRE_HEADER_SIZE
 	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
 		t.Errorf("expectedErspanI: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
 			expected, actual, expectedOffset, offset)
 	}
 	actual = &TunnelInfo{}
-	actual.Decapsulate(packet2, l2Len, TUNNEL_TYPE_ERSPAN, true)
+	actual.Decapsulate(packet2, l2Len, bitmap)
 	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
 		t.Errorf("expectedErspanI: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
 			expected, actual, expectedOffset, offset)
@@ -72,11 +73,12 @@ func TestDecapsulateErspanI(t *testing.T) {
 }
 
 func TestDecapsulateErspanII(t *testing.T) {
+	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_ERSPAN_OR_TEB)
 	expected := &TunnelInfo{
 		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("2.2.2.2").To4())),
 		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("1.1.1.1").To4())),
 		Id:   100,
-		Type: TUNNEL_TYPE_ERSPAN,
+		Type: TUNNEL_TYPE_ERSPAN_OR_TEB,
 		Tier: 1,
 	}
 
@@ -86,14 +88,14 @@ func TestDecapsulateErspanII(t *testing.T) {
 
 	l2Len := 14
 	actual := &TunnelInfo{}
-	offset := actual.Decapsulate(packet1, l2Len, TUNNEL_TYPE_ERSPAN, true)
+	offset := actual.Decapsulate(packet1, l2Len, bitmap)
 	expectedOffset := 50 - l2Len
 	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
 		t.Errorf("expectedErspanII: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
 			expected, actual, expectedOffset, offset)
 	}
 	actual = &TunnelInfo{}
-	actual.Decapsulate(packet2, l2Len, TUNNEL_TYPE_ERSPAN, true)
+	actual.Decapsulate(packet2, l2Len, bitmap)
 	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
 		t.Errorf("expectedErspanII: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
 			expected, actual, expectedOffset, offset)
@@ -103,11 +105,12 @@ func TestDecapsulateErspanII(t *testing.T) {
 }
 
 func TestDecapsulateIII(t *testing.T) {
+	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_ERSPAN_OR_TEB)
 	expected := &TunnelInfo{
 		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("172.16.1.103").To4())),
 		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.30.101.132").To4())),
 		Id:   0,
-		Type: TUNNEL_TYPE_ERSPAN,
+		Type: TUNNEL_TYPE_ERSPAN_OR_TEB,
 		Tier: 1,
 	}
 
@@ -116,7 +119,7 @@ func TestDecapsulateIII(t *testing.T) {
 
 	l2Len := 14
 	actual := &TunnelInfo{}
-	offset := actual.Decapsulate(packet, l2Len, TUNNEL_TYPE_ERSPAN, true)
+	offset := actual.Decapsulate(packet, l2Len, bitmap)
 	expectedOffset := 54 - l2Len
 	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
 		t.Errorf("expectedErspanII: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
@@ -125,6 +128,7 @@ func TestDecapsulateIII(t *testing.T) {
 }
 
 func TestDecapsulateVxlan(t *testing.T) {
+	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_VXLAN)
 	expected := &TunnelInfo{
 		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("172.16.1.103").To4())),
 		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("172.20.1.171").To4())),
@@ -138,7 +142,7 @@ func TestDecapsulateVxlan(t *testing.T) {
 
 	l2Len := 14
 	actual := &TunnelInfo{}
-	offset := actual.Decapsulate(packet, l2Len, TUNNEL_TYPE_VXLAN, true)
+	offset := actual.Decapsulate(packet, l2Len, bitmap)
 	expectedOffset := 50 - l2Len
 	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
 		t.Errorf("expectedErspanII: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
@@ -147,6 +151,7 @@ func TestDecapsulateVxlan(t *testing.T) {
 }
 
 func TestDecapsulateTencentGre(t *testing.T) {
+	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_TENCENT_GRE)
 	expected := &TunnelInfo{
 		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.19.0.21").To4())),
 		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.21.64.5").To4())),
@@ -167,7 +172,7 @@ func TestDecapsulateTencentGre(t *testing.T) {
 
 	l2Len := 14
 	actual := &TunnelInfo{}
-	offset := actual.Decapsulate(packet, l2Len, TUNNEL_TYPE_TENCENT_GRE, true)
+	offset := actual.Decapsulate(packet, l2Len, bitmap)
 	expectedOffset := 18
 	if !reflect.DeepEqual(expected, actual) ||
 		offset != expectedOffset ||
@@ -178,11 +183,12 @@ func TestDecapsulateTencentGre(t *testing.T) {
 }
 
 func TestDecapsulateTeb(t *testing.T) {
+	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_ERSPAN_OR_TEB)
 	expected := &TunnelInfo{
 		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.25.6.6").To4())),
 		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.25.59.67").To4())),
 		Id:   0x2000000,
-		Type: TUNNEL_TYPE_ERSPAN,
+		Type: TUNNEL_TYPE_ERSPAN_OR_TEB,
 		Tier: 1,
 	}
 
@@ -191,7 +197,7 @@ func TestDecapsulateTeb(t *testing.T) {
 
 	l2Len := 14
 	actual := &TunnelInfo{}
-	offset := actual.Decapsulate(packet, l2Len, TUNNEL_TYPE_NONE, true)
+	offset := actual.Decapsulate(packet, l2Len, bitmap)
 	expectedOffset := 28
 	if !reflect.DeepEqual(expected, actual) || offset != expectedOffset {
 		t.Errorf("expectedTeb: %+v\n actual: %+v, expectedOffset:%v, offset:%v",
@@ -200,6 +206,7 @@ func TestDecapsulateTeb(t *testing.T) {
 }
 
 func TestDecapsulateIp6Vxlan(t *testing.T) {
+	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_VXLAN)
 	expected := &TunnelInfo{
 		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("0.0.2.63").To4())),
 		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("0.0.2.61").To4())),
@@ -212,7 +219,7 @@ func TestDecapsulateIp6Vxlan(t *testing.T) {
 
 	l2Len := 14
 	actual := &TunnelInfo{}
-	offset := actual.Decapsulate6(packet, l2Len, TUNNEL_TYPE_VXLAN)
+	offset := actual.Decapsulate6(packet, l2Len, bitmap)
 	expectedOffset := IP6_HEADER_SIZE + UDP_HEADER_SIZE + VXLAN_HEADER_SIZE
 	if !reflect.DeepEqual(expected, actual) ||
 		offset != expectedOffset {
@@ -222,6 +229,7 @@ func TestDecapsulateIp6Vxlan(t *testing.T) {
 }
 
 func TestDecapsulateIpIp(t *testing.T) {
+	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_IPIP)
 	expected := &TunnelInfo{
 		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.162.42.93").To4())),
 		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.162.33.164").To4())),
@@ -233,7 +241,7 @@ func TestDecapsulateIpIp(t *testing.T) {
 
 	l2Len := 18
 	actual := &TunnelInfo{}
-	offset := actual.Decapsulate(packet, l2Len, TUNNEL_TYPE_IPIP, true)
+	offset := actual.Decapsulate(packet, l2Len, bitmap)
 	expectedOffset := IP_HEADER_SIZE - l2Len
 	if !reflect.DeepEqual(expected, actual) ||
 		offset != expectedOffset {
@@ -243,29 +251,51 @@ func TestDecapsulateIpIp(t *testing.T) {
 	}
 }
 
+func TestDecapsulateAll(t *testing.T) {
+	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_VXLAN, TUNNEL_TYPE_ERSPAN_OR_TEB)
+	tunnelMap := map[TunnelType]bool{TUNNEL_TYPE_VXLAN: false, TUNNEL_TYPE_ERSPAN_OR_TEB: false}
+
+	packets, _ := loadPcap("decapsulate_test.pcap")
+	for _, packet := range packets {
+		l2Len := 14
+		actual := &TunnelInfo{}
+		actual.Decapsulate(packet, l2Len, bitmap)
+		tunnelMap[actual.Type] = true
+	}
+
+	for key, value := range tunnelMap {
+		if !value {
+			t.Errorf("expect %s but not exist.", TunnelType(key))
+		}
+	}
+}
+
 func BenchmarkDecapsulateTCP(b *testing.B) {
+	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_VXLAN)
 	packet := [256]byte{}
 	tunnel := &TunnelInfo{}
 	packet[OFFSET_IP_PROTOCOL-ETH_HEADER_SIZE] = byte(IPProtocolTCP)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		tunnel.Decapsulate(packet[:], 0, TUNNEL_TYPE_VXLAN, true)
+		tunnel.Decapsulate(packet[:], 0, bitmap)
 	}
 }
 
 func BenchmarkDecapsulateUDP(b *testing.B) {
+	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_VXLAN)
 	packet := [256]byte{}
 	tunnel := &TunnelInfo{}
 	packet[OFFSET_IP_PROTOCOL-ETH_HEADER_SIZE] = byte(IPProtocolUDP)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		tunnel.Decapsulate(packet[:], 0, TUNNEL_TYPE_VXLAN, true)
+		tunnel.Decapsulate(packet[:], 0, bitmap)
 	}
 }
 
 func BenchmarkDecapsulateUDP4789(b *testing.B) {
+	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_VXLAN)
 	packet := [256]byte{}
 	tunnel := &TunnelInfo{}
 	packet[OFFSET_IP_PROTOCOL-ETH_HEADER_SIZE] = byte(IPProtocolUDP)
@@ -274,11 +304,12 @@ func BenchmarkDecapsulateUDP4789(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		tunnel.Decapsulate(packet[:], 0, TUNNEL_TYPE_VXLAN, true)
+		tunnel.Decapsulate(packet[:], 0, bitmap)
 	}
 }
 
 func BenchmarkDecapsulateVXLAN(b *testing.B) {
+	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_VXLAN)
 	packet := [256]byte{}
 	tunnel := &TunnelInfo{}
 	packet[OFFSET_IP_PROTOCOL-ETH_HEADER_SIZE] = byte(IPProtocolUDP)
@@ -288,6 +319,6 @@ func BenchmarkDecapsulateVXLAN(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		tunnel.Decapsulate(packet[:], 0, TUNNEL_TYPE_VXLAN, true)
+		tunnel.Decapsulate(packet[:], 0, bitmap)
 	}
 }
