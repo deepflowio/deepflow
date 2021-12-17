@@ -75,6 +75,9 @@ func (s *NoSQLLogger) WriteBlock(block *ckdb.Block) error {
 		if err := block.WriteString(s.redis.Error); err != nil {
 			return err
 		}
+		if err := block.WriteUInt64(uint64(s.AppProtoLogsData.AppProtoLogsBaseInfo.RRT / time.Microsecond)); err != nil {
+			return err
+		}
 	}
 
 	return nil
