@@ -158,12 +158,14 @@ func (i *RedisInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType,
 	switch msgType {
 	case MSG_T_REQUEST:
 		i.Request = decoder.ReadString255()
+		i.RequestType = decoder.ReadString255()
 	case MSG_T_RESPONSE:
 		i.Response = decoder.ReadString255()
 		i.Status = decoder.ReadString255()
 		i.Error = decoder.ReadString255()
 	case MSG_T_SESSION:
 		i.Request = decoder.ReadString255()
+		i.RequestType = decoder.ReadString255()
 		i.Response = decoder.ReadString255()
 		i.Status = decoder.ReadString255()
 		i.Error = decoder.ReadString255()
