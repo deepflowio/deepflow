@@ -34,17 +34,19 @@ type ColumnRename struct {
 }
 
 type ColumnAdd struct {
-	Db         string
-	Table      string
-	ColumnName string
-	ColumnType ckdb.ColumnType
+	Db           string
+	Table        string
+	ColumnName   string
+	ColumnType   ckdb.ColumnType
+	DefaultValue string
 }
 
 type ColumnAdds struct {
-	Dbs         []string
-	Tables      []string
-	ColumnNames []string
-	ColumnType  ckdb.ColumnType
+	Dbs          []string
+	Tables       []string
+	ColumnNames  []string
+	ColumnType   ckdb.ColumnType
+	DefaultValue string
 }
 
 var ColumnRename572 = []*ColumnRename{
@@ -122,10 +124,11 @@ var ColumnAdd600 = []*ColumnAdds{
 		ColumnType:  ckdb.UInt32,
 	},
 	&ColumnAdds{
-		Dbs:         []string{"flow_log"},
-		Tables:      []string{"l4_flow_log", "l4_flow_log_local", "l7_http_log", "l7_http_log_local", "l7_dns_log", "l7_dns_log_local"},
-		ColumnNames: []string{"tap_side"},
-		ColumnType:  ckdb.LowCardinalityString,
+		Dbs:          []string{"flow_log"},
+		Tables:       []string{"l4_flow_log", "l4_flow_log_local", "l7_http_log", "l7_http_log_local", "l7_dns_log", "l7_dns_log_local"},
+		ColumnNames:  []string{"tap_side"},
+		ColumnType:   ckdb.LowCardinalityString,
+		DefaultValue: "'rest'",
 	},
 }
 
@@ -385,8 +388,12 @@ func NewCKIssu(primaryAddr, secondaryAddr, username, password string) (*Issu, er
 }
 
 func (i *Issu) addColumn(connect *sql.DB, c *ColumnAdd) error {
-	sql := fmt.Sprintf("ALTER TABLE %s.`%s` ADD COLUMN %s %s ",
-		c.Db, c.Table, c.ColumnName, c.ColumnType)
+	defaultValue := ""
+	if len(c.DefaultValue) > 0 {
+		defaultValue = fmt.Sprintf("default %s", c.DefaultValue)
+	}
+	sql := fmt.Sprintf("ALTER TABLE %s.`%s` ADD COLUMN %s %s %s",
+		c.Db, c.Table, c.ColumnName, c.ColumnType, defaultValue)
 	log.Info(sql)
 	_, err := connect.Exec(sql)
 	if err != nil {
@@ -468,10 +475,11 @@ func getColumnAdds(columnAdds *ColumnAdds) []*ColumnAdd {
 		for _, tbl := range columnAdds.Tables {
 			for _, clmn := range columnAdds.ColumnNames {
 				adds = append(adds, &ColumnAdd{
-					Db:         db,
-					Table:      tbl,
-					ColumnName: clmn,
-					ColumnType: columnAdds.ColumnType,
+					Db:           db,
+					Table:        tbl,
+					ColumnName:   clmn,
+					ColumnType:   columnAdds.ColumnType,
+					DefaultValue: columnAdds.DefaultValue,
 				})
 			}
 		}
