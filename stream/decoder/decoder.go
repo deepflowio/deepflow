@@ -181,6 +181,10 @@ func (d *Decoder) sendProto(proto *datatype.AppProtoLogsData) {
 		log.Debugf("decoder %d recv proto: %s", d.index, proto)
 	}
 
+	if int(proto.Proto) >= len(decoderFuncs) {
+		log.Warningf("invalid proto.Proto %d %s", proto.Proto, proto)
+	}
+
 	df := decoderFuncs[proto.Proto]
 	if df == nil {
 		d.counter.ErrorCount++
