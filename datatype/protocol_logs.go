@@ -125,6 +125,7 @@ func (i *AppProtoLogsBaseInfo) String() string {
 	formatted += fmt.Sprintf("Code: %v ", i.Code)
 	formatted += fmt.Sprintf("Status: %v ", i.Status)
 	formatted += fmt.Sprintf("RRT: %v ", i.RRT)
+	formatted += fmt.Sprintf("TapSide: %d ", i.TapSide)
 
 	if i.IsIPv6 {
 		formatted += fmt.Sprintf("IP6Src: %s ", net.IP(i.IP6Src[:]))
