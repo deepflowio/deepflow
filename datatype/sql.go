@@ -108,6 +108,7 @@ func (i *MysqlInfo) Merge(r interface{}) {
 		i.ResponseCode = response.ResponseCode
 		i.AffectedRows = response.AffectedRows
 		i.ErrorCode = response.ErrorCode
+		i.ErrorMessage = response.ErrorMessage
 	}
 }
 
