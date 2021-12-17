@@ -181,5 +181,7 @@ func (i *RedisInfo) String() string {
 func (i *RedisInfo) Merge(r interface{}) {
 	if redis, ok := r.(*RedisInfo); ok {
 		i.Response = redis.Response
+		i.Status = redis.Status
+		i.Error = redis.Error
 	}
 }
