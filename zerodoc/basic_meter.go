@@ -5,6 +5,7 @@ import (
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
 )
 
 type Traffic struct {
@@ -46,6 +47,38 @@ func (t *Traffic) Encode(encoder *codec.SimpleEncoder) {
 
 	encoder.WriteVarintU32(t.L7Request)
 	encoder.WriteVarintU32(t.L7Response)
+}
+
+func (t *Traffic) WriteToPB(p *pb.Traffic) {
+	p.PacketTx = t.PacketTx
+	p.PacketRx = t.PacketRx
+	p.ByteTx = t.ByteTx
+	p.ByteRx = t.ByteRx
+	p.L3ByteTx = t.L3ByteTx
+	p.L3ByteRx = t.L3ByteRx
+	p.L4ByteTx = t.L4ByteTx
+	p.L4ByteRx = t.L4ByteRx
+	p.NewFlow = t.NewFlow
+	p.ClosedFlow = t.ClosedFlow
+
+	p.L7Request = t.L7Request
+	p.L7Response = t.L7Response
+}
+
+func (t *Traffic) ReadFromPB(p *pb.Traffic) {
+	t.PacketTx = p.PacketTx
+	t.PacketRx = p.PacketRx
+	t.ByteTx = p.ByteTx
+	t.ByteRx = p.ByteRx
+	t.L3ByteTx = p.L3ByteTx
+	t.L3ByteRx = p.L3ByteRx
+	t.L4ByteTx = p.L4ByteTx
+	t.L4ByteRx = p.L4ByteRx
+	t.NewFlow = p.NewFlow
+	t.ClosedFlow = p.ClosedFlow
+
+	t.L7Request = p.L7Request
+	t.L7Response = p.L7Response
 }
 
 func (t *Traffic) Decode(decoder *codec.SimpleDecoder) {
@@ -231,6 +264,51 @@ func (l *Latency) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU32(l.SRTCount)
 	encoder.WriteVarintU32(l.ARTCount)
 	encoder.WriteVarintU32(l.RRTCount)
+}
+func (l *Latency) WriteToPB(p *pb.Latency) {
+	p.RTTMax = l.RTTMax
+	p.RTTClientMax = l.RTTClientMax
+	p.RTTServerMax = l.RTTServerMax
+	p.SRTMax = l.SRTMax
+	p.ARTMax = l.ARTMax
+	p.RRTMax = l.RRTMax
+
+	p.RTTSum = l.RTTSum
+	p.RTTClientSum = l.RTTClientSum
+	p.RTTServerSum = l.RTTServerSum
+	p.SRTSum = l.SRTSum
+	p.ARTSum = l.ARTSum
+	p.RRTSum = l.RRTSum
+
+	p.RTTCount = l.RTTCount
+	p.RTTClientCount = l.RTTClientCount
+	p.RTTServerCount = l.RTTServerCount
+	p.SRTCount = l.SRTCount
+	p.ARTCount = l.ARTCount
+	p.RRTCount = l.RRTCount
+}
+
+func (l *Latency) ReadFromPB(p *pb.Latency) {
+	l.RTTMax = p.RTTMax
+	l.RTTClientMax = p.RTTClientMax
+	l.RTTServerMax = p.RTTServerMax
+	l.SRTMax = p.SRTMax
+	l.ARTMax = p.ARTMax
+	l.RRTMax = p.RRTMax
+
+	l.RTTSum = p.RTTSum
+	l.RTTClientSum = p.RTTClientSum
+	l.RTTServerSum = p.RTTServerSum
+	l.SRTSum = l.SRTSum
+	l.ARTSum = l.ARTSum
+	l.RRTSum = l.RRTSum
+
+	l.RTTCount = l.RTTCount
+	l.RTTClientCount = l.RTTClientCount
+	l.RTTServerCount = l.RTTServerCount
+	l.SRTCount = l.SRTCount
+	l.ARTCount = l.ARTCount
+	l.RRTCount = l.RRTCount
 }
 
 func (l *Latency) Decode(decoder *codec.SimpleDecoder) {
@@ -419,6 +497,20 @@ func (a *Performance) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(a.ZeroWinRx)
 }
 
+func (a *Performance) WriteToPB(p *pb.Performance) {
+	p.RetransTx = a.RetransTx
+	p.RetransRx = a.RetransRx
+	p.ZeroWinTx = a.ZeroWinTx
+	p.ZeroWinRx = a.ZeroWinRx
+}
+
+func (a *Performance) ReadFromPB(p *pb.Performance) {
+	a.RetransTx = p.RetransTx
+	a.RetransRx = p.RetransRx
+	a.ZeroWinTx = p.ZeroWinTx
+	a.ZeroWinRx = p.ZeroWinRx
+}
+
 func (a *Performance) Decode(decoder *codec.SimpleDecoder) {
 	a.RetransTx = decoder.ReadVarintU64()
 	a.RetransRx = decoder.ReadVarintU64()
@@ -528,6 +620,46 @@ func (a *Anomaly) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU32(a.L7ClientError)
 	encoder.WriteVarintU32(a.L7ServerError)
 	encoder.WriteVarintU32(a.L7Timeout)
+}
+
+func (a *Anomaly) WriteToPB(p *pb.Anomaly) {
+	p.ClientRstFlow = a.ClientRstFlow
+	p.ServerRstFlow = a.ServerRstFlow
+	p.ClientSynRepeat = a.ClientSynRepeat
+	p.ServerSYNACKRepeat = a.ServerSYNACKRepeat
+	p.ClientHalfCloseFlow = a.ClientHalfCloseFlow
+	p.ServerHalfCloseFlow = a.ServerHalfCloseFlow
+
+	p.ClientSourcePortReuse = a.ClientSourcePortReuse
+	p.ClientEstablishReset = a.ClientEstablishReset
+	p.ServerReset = a.ServerReset
+	p.ServerQueueLack = a.ServerQueueLack
+	p.ServerEstablishReset = a.ServerEstablishReset
+	p.TCPTimeout = a.TCPTimeout
+
+	p.L7ClientError = a.L7ClientError
+	p.L7ServerError = a.L7ServerError
+	p.L7Timeout = a.L7Timeout
+}
+
+func (a *Anomaly) ReadFromPB(p *pb.Anomaly) {
+	a.ClientRstFlow = p.ClientRstFlow
+	a.ServerRstFlow = p.ServerRstFlow
+	a.ClientSynRepeat = p.ClientSynRepeat
+	a.ServerSYNACKRepeat = p.ServerSYNACKRepeat
+	a.ClientHalfCloseFlow = p.ClientHalfCloseFlow
+	a.ServerHalfCloseFlow = p.ServerHalfCloseFlow
+
+	a.ClientSourcePortReuse = p.ClientSourcePortReuse
+	a.ClientEstablishReset = p.ClientEstablishReset
+	a.ServerReset = p.ServerReset
+	a.ServerQueueLack = p.ServerQueueLack
+	a.ServerEstablishReset = p.ServerEstablishReset
+	a.TCPTimeout = p.TCPTimeout
+
+	a.L7ClientError = p.L7ClientError
+	a.L7ServerError = p.L7ServerError
+	a.L7Timeout = p.L7Timeout
 }
 
 func (a *Anomaly) Decode(decoder *codec.SimpleDecoder) {
@@ -726,6 +858,14 @@ func (l *FlowLoad) Reverse() {
 
 func (l *FlowLoad) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(l.Load)
+}
+
+func (l *FlowLoad) WriteToPB(p *pb.FlowLoad) {
+	p.Load = l.Load
+}
+
+func (l *FlowLoad) ReadFromPB(p *pb.FlowLoad) {
+	l.Load = p.Load
 }
 
 func (l *FlowLoad) Decode(decoder *codec.SimpleDecoder) {

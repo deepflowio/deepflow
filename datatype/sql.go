@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 )
 
@@ -71,6 +72,39 @@ func (i *MysqlInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType,
 		encoder.WriteU16(i.ErrorCode)
 		encoder.WriteU64(i.AffectedRows)
 		encoder.WriteString255(i.ErrorMessage)
+	}
+}
+
+func (i *MysqlInfo) WriteToPB(p *pb.MysqlInfo, msgType LogMessageType) {
+	switch msgType {
+	case MSG_T_OTHER:
+		*p = pb.MysqlInfo{}
+		p.ProtocolVersion = uint32(i.ProtocolVersion)
+		p.ServerVersion = i.ServerVersion
+		p.ServerThreadID = i.ServerThreadID
+	case MSG_T_REQUEST:
+		*p = pb.MysqlInfo{}
+		p.Command = uint32(i.Command)
+		p.Context = i.Context
+	case MSG_T_RESPONSE:
+		p.ResponseCode = uint32(i.ResponseCode)
+		p.AffectedRows = i.AffectedRows
+		p.ErrorCode = uint32(i.ErrorCode)
+		p.ErrorMessage = i.ErrorMessage
+
+		p.Command = 0
+		p.Context = ""
+		p.ProtocolVersion = 0
+	case MSG_T_SESSION:
+		p.Command = uint32(i.Command)
+		p.Context = i.Context
+
+		p.ResponseCode = uint32(i.ResponseCode)
+		p.AffectedRows = i.AffectedRows
+		p.ErrorCode = uint32(i.ErrorCode)
+		p.ErrorMessage = i.ErrorMessage
+
+		p.ProtocolVersion = 0
 	}
 }
 
@@ -151,8 +185,35 @@ func (i *RedisInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType,
 		encoder.WriteString255(i.Error)
 	default:
 		panic("RedisInfo encode msg type error!")
-
 	}
+}
+
+func (i *RedisInfo) WriteToPB(p *pb.RedisInfo, msgType LogMessageType) {
+	switch msgType {
+	case MSG_T_REQUEST:
+		p.Request = i.Request
+		p.RequestType = i.RequestType
+
+		p.Response = ""
+		p.Status = ""
+		p.Error = ""
+	case MSG_T_RESPONSE:
+		p.Request = ""
+		p.RequestType = ""
+
+		p.Response = i.Response
+		p.Status = i.Status
+		p.Error = i.Error
+	case MSG_T_SESSION:
+		p.Request = i.Request
+		p.RequestType = i.RequestType
+		p.Response = i.Response
+		p.Status = i.Status
+		p.Error = i.Error
+	default:
+		panic("RedisInfo encode msg type error!")
+	}
+
 }
 
 func (i *RedisInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, code uint16) {

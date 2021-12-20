@@ -16,6 +16,27 @@ type SimpleEncoder struct {
 	pool.ReferenceCount
 }
 
+type PBCodec interface {
+	Size() int
+	MarshalTo([]byte) (int, error)
+	Unmarshal([]byte) error
+}
+
+func (e *SimpleEncoder) WritePB(v PBCodec) {
+	offset := len(e.buf)
+	size := v.Size()
+	e.buf = append(e.buf, make([]byte, size+16)...) // 需要额申请16字节用于保留长度
+	n, err := v.MarshalTo(e.buf[offset+4:])         // 预留4字节后面填写length
+	if err != nil {
+		panic(fmt.Sprintf("encode proto buf failed pb size %d, buffer size %d", v.Size(), len(e.buf)))
+	}
+
+	// 记录长度, 不包括自己的4字节
+	binary.LittleEndian.PutUint32(e.buf[offset:], uint32(n))
+	e.buf = e.buf[:offset+4+n]
+	return
+}
+
 func (e *SimpleEncoder) WriteBool(v bool) {
 	if v {
 		e.buf = append(e.buf, 1)
@@ -144,6 +165,27 @@ func (d *SimpleDecoder) Init(buf []byte) {
 	d.buf = buf
 	d.offset = 0
 	d.err = 0
+}
+
+func (d *SimpleDecoder) ReadPB(pb PBCodec) error {
+	d.offset += 4
+	if d.offset > len(d.buf) {
+		d.err++
+		return fmt.Errorf("offset(%d) out of buf len(%d)", d.offset, len(d.buf))
+	}
+	n := int(binary.LittleEndian.Uint32(d.buf[d.offset-4 : d.offset]))
+	d.offset += n
+	if d.offset > len(d.buf) {
+		d.err++
+		return fmt.Errorf("offset(%d) out of buf len(%d)", d.offset, len(d.buf))
+	}
+	err := pb.Unmarshal(d.buf[d.offset-n : d.offset])
+	if err != nil {
+		d.err++
+		return err
+	}
+
+	return nil
 }
 
 func (d *SimpleDecoder) ReadU8() byte {
