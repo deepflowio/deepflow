@@ -795,8 +795,11 @@ func (i *Internet) Fill(f *datatype.TaggedFlow) {
 func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool, platformData *grpc.PlatformInfoTable) {
 	var info0, info1 *grpc.Info
 	l3EpcID0, l3EpcID1 := f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].L3EpcID, f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].L3EpcID
-	// FIXME 5.7.4增加tap_side后，需要增加对tap_side的判断来决定是否为VIP
 	isVip0, isVip1 := f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].IsVIPInterface, f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].IsVIPInterface
+	// 对于本地的流量，也需要使用epc+mac来匹配
+	if f.Flow.TapSide == uint8(zerodoc.Local) {
+		isVip0, isVip1 = true, true
+	}
 	mac0, mac1 := f.FlowKey.MACSrc, f.FlowKey.MACDst
 	l3EpcMac0, l3EpcMac1 := mac0|uint64(l3EpcID0)<<48, mac1|uint64(l3EpcID1)<<48 // 使用l3EpcID和mac查找，防止跨AZ mac冲突
 
