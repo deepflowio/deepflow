@@ -295,8 +295,6 @@ type KnowledgeGraph struct {
 	BusinessIDs1  []uint16 `json:"business_ids_1"`
 	ServiceID0    uint32   `json:"service_id_0"`
 	ServiceID1    uint32   `json:"service_id_1"`
-	LBListenerID0 uint32   `json:"lb_listener_id_0"`
-	LBListenerID1 uint32   `json:"lb_listener_id_1"`
 }
 
 var KnowledgeGraphColumns = []*ckdb.Column{
@@ -333,8 +331,6 @@ var KnowledgeGraphColumns = []*ckdb.Column{
 	ckdb.NewColumn("business_ids_1", ckdb.ArrayUInt16),
 	ckdb.NewColumn("service_id_0", ckdb.UInt32),
 	ckdb.NewColumn("service_id_1", ckdb.UInt32),
-	ckdb.NewColumn("lb_listener_id_0", ckdb.UInt32),
-	ckdb.NewColumn("lb_listener_id_1", ckdb.UInt32),
 }
 
 func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) error {
@@ -432,12 +428,6 @@ func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt32(k.ServiceID1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(k.LBListenerID0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(k.LBListenerID1); err != nil {
 		return err
 	}
 	return nil
@@ -894,14 +884,13 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool, platformData 
 		// 0端如果是clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID0 != 0 {
-			_, k.ServiceID0, _ = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID0), f.IP6Src, f.Proto, 0)
+			_, k.ServiceID0 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID0), f.IP6Src, f.Proto, 0)
 		}
-		_, serviceID, k.LBListenerID1 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID1), f.IP6Dst, f.Proto, f.PortDst)
 		// 1端如果是NodeIP,clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID1 != 0 ||
 			k.PodNodeID1 != 0 {
-			k.ServiceID1 = serviceID
+			_, k.ServiceID1 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID1), f.IP6Dst, f.Proto, f.PortDst)
 		}
 	} else {
 		k.GroupIDs0, k.BusinessIDs0 = platformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID0), f.IPSrc)
@@ -909,14 +898,14 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool, platformData 
 		// 0端如果是clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID0 != 0 {
-			_, k.ServiceID0, _ = platformData.QueryIsKeyServiceAndID(int16(l3EpcID0), f.IPSrc, f.Proto, 0)
+			_, k.ServiceID0 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID0), f.IPSrc, f.Proto, 0)
 		}
-		_, serviceID, k.LBListenerID1 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID1), f.IPDst, f.Proto, f.PortDst)
 		// 1端如果是NodeIP,clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID1 != 0 ||
 			k.PodNodeID1 != 0 {
 			k.ServiceID1 = serviceID
+			_, k.ServiceID1 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID1), f.IPDst, f.Proto, f.PortDst)
 		}
 	}
 }

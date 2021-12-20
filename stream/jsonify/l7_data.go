@@ -511,32 +511,29 @@ func (k *KnowledgeGraph) FillL7(l *datatype.AppProtoLogsData, platformData *grpc
 		protocol = 0
 	}
 
-	var serviceID uint32
 	if l.IsIPv6 {
 		// 0端如果是clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID0 != 0 {
-			_, k.ServiceID0, _ = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID0), net.IP(l.IP6Src[:]), 0, 0)
+			_, k.ServiceID0 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID0), net.IP(l.IP6Src[:]), 0, 0)
 		}
-		_, serviceID, k.LBListenerID1 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID1), net.IP(l.IP6Dst[:]), protocol, l.PortDst)
 		// 1端如果是NodeIP,clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID1 != 0 ||
 			k.PodNodeID1 != 0 {
-			k.ServiceID1 = serviceID
+			_, k.ServiceID1 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID1), net.IP(l.IP6Dst[:]), protocol, l.PortDst)
 		}
 	} else {
 		// 0端如果是clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID0 != 0 {
-			_, k.ServiceID0, _ = platformData.QueryIsKeyServiceAndID(int16(l3EpcID0), l.IPSrc, 0, 0)
+			_, k.ServiceID0 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID0), l.IPSrc, 0, 0)
 		}
-		_, serviceID, k.LBListenerID1 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID1), l.IPDst, protocol, l.PortDst)
 		// 1端如果是NodeIP,clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID1 != 0 ||
 			k.PodNodeID1 != 0 {
-			k.ServiceID1 = serviceID
+			_, k.ServiceID1 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID1), l.IPDst, protocol, l.PortDst)
 		}
 	}
 }

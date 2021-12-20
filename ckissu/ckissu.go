@@ -106,24 +106,6 @@ var ColumnAdd600 = []*ColumnAdds{
 	},
 
 	&ColumnAdds{
-		Dbs:         []string{"vtap_flow", "vtap_flow_port"},
-		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
-		ColumnNames: []string{"lb_listener_id"},
-		ColumnType:  ckdb.UInt32,
-	},
-	&ColumnAdds{
-		Dbs:         []string{"vtap_flow_edge", "vtap_flow_edge_port"},
-		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
-		ColumnNames: []string{"lb_listener_id_0", "lb_listener_id_1"},
-		ColumnType:  ckdb.UInt32,
-	},
-	&ColumnAdds{
-		Dbs:         []string{"flow_log"},
-		Tables:      []string{"l4_flow_log", "l4_flow_log_local", "l7_http_log", "l7_http_log_local", "l7_dns_log", "l7_dns_log_local"},
-		ColumnNames: []string{"lb_listener_id_0", "lb_listener_id_1"},
-		ColumnType:  ckdb.UInt32,
-	},
-	&ColumnAdds{
 		Dbs:          []string{"flow_log"},
 		Tables:       []string{"l4_flow_log", "l4_flow_log_local", "l7_http_log", "l7_http_log_local", "l7_dns_log", "l7_dns_log_local"},
 		ColumnNames:  []string{"tap_side"},
@@ -271,27 +253,6 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo) ([]*Colum
 			ColumnNames: []string{"l7_client_error", "l7_server_error", "l7_time_out", "l7_error", "rrt_max"},
 			ColumnType:  ckdb.UInt32,
 		},
-	}
-	if d.db == "vtap_flow_edge" || d.db == "vtap_flow_edge_port" {
-		columnAddss = append(columnAddss, []*ColumnAdds{
-			&ColumnAdds{
-				Dbs:         []string{d.db},
-				Tables:      []string{d.name, d.name + "_agg"},
-				ColumnNames: []string{"lb_listener_id_0", "lb_listener_id_1"},
-				ColumnType:  ckdb.UInt32,
-			},
-		}...,
-		)
-	} else if d.db == "vtap_flow" || d.db == "vtap_flow_port" {
-		columnAddss = append(columnAddss, []*ColumnAdds{
-			&ColumnAdds{
-				Dbs:         []string{d.db},
-				Tables:      []string{d.name, d.name + "_agg"},
-				ColumnNames: []string{"lb_listener_id"},
-				ColumnType:  ckdb.UInt32,
-			},
-		}...,
-		)
 	}
 	for _, adds := range columnAddss {
 		columnAdds = append(columnAdds, getColumnAdds(adds)...)
