@@ -11,6 +11,7 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
 )
 
 const (
@@ -62,6 +63,29 @@ func (f *MiniField) IP1() net.IP {
 		return net.IP(f.rawIP1[:net.IPv6len])
 	}
 	return net.IP(f.rawIP1[:net.IPv4len])
+}
+
+func (f *MiniField) WriteToPB(p *pb.MiniField) {
+	p.RawIP = f.rawIP[:]
+	p.RawIP1 = f.rawIP1[:]
+	p.GlobalThreadID = uint32(f.GlobalThreadID)
+	p.IsIPv6 = uint32(f.IsIPv6)
+	p.L3EpcID = int32(f.L3EpcID)
+	p.L3EpcID1 = int32(f.L3EpcID1)
+	p.MAC = uint64(f.MAC)
+	p.MAC1 = uint64(f.MAC1)
+
+	p.Direction = uint32(f.Direction)
+	p.TapSide = uint32(f.Direction.ToTAPSide())
+	p.Protocol = uint32(f.Protocol)
+	p.ACLGID = uint32(f.ACLGID)
+	p.ServerPort = uint32(f.ServerPort)
+	p.VTAPID = uint32(f.VTAPID)
+	p.TAPPort = f.TAPPort
+	p.TAPType = uint32(f.TAPType)
+	p.L7Protocol = uint32(f.L7Protocol)
+	p.TagType = uint32(f.TagType)
+	p.TagValue = uint32(f.TagValue)
 }
 
 func (f *MiniField) SetIP1(ip net.IP) {
@@ -200,6 +224,19 @@ func (t *MiniTag) Encode(encoder *codec.SimpleEncoder) {
 		return
 	}
 	t.EncodeByCodeTID(t.Code, t.GlobalThreadID, encoder)
+}
+
+func (t *MiniTag) WriteToPB(p *pb.MiniTag) {
+	if p.Field == nil {
+		p.Field = &pb.MiniField{}
+	}
+	t.MiniField.WriteToPB(p.Field)
+	code := t.Code
+	if code&Direction != 0 && code.HasEdgeTagField() {
+		code |= TAPSide
+		code &= ^Direction
+	}
+	p.Code = uint64(code)
 }
 
 func (t *MiniTag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder) {

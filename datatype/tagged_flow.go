@@ -4,11 +4,13 @@ import (
 	"fmt"
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 )
 
 const (
-	VERSION = 20220111
+	VERSION                   = 20220112
+	LAST_SIMPLE_CODEC_VERSION = 20220111 // 这个版本及之前的版本使用simple_codec, 之后的版本使用pb_codec, 使用pb_codec在版本不匹配时，不丢数据
 )
 
 type TaggedFlow struct {
@@ -25,6 +27,33 @@ func (f *TaggedFlow) SequentialMerge(rhs *TaggedFlow) {
 
 func (f *TaggedFlow) Encode(encoder *codec.SimpleEncoder) error {
 	f.Flow.Encode(encoder)
+	// f.Tag.Encode(encoder)  // 目前无需发送,不encode
+	return nil
+}
+
+func (f *TaggedFlow) EncodePB(encoder *codec.SimpleEncoder, i interface{}) error {
+	p, ok := i.(*pb.TaggedFlow)
+	if !ok {
+		return fmt.Errorf("invalid interface type, should be *pb.TaggedFlow")
+	}
+	// 传入的的p *pb.TaggedFlow是可复用的，若p.FlowPerfStats无须发送，会被置为空，故先保留，使可复用
+	var flowPerfStats *pb.FlowPerfStats
+	if p.Flow != nil {
+		flowPerfStats = p.Flow.FlowPerfStats
+	}
+	f.WriteToPB(p)
+	encoder.WritePB(p)
+	if p.Flow.FlowPerfStats == nil {
+		p.Flow.FlowPerfStats = flowPerfStats
+	}
+	return nil
+}
+
+func (f *TaggedFlow) WriteToPB(p *pb.TaggedFlow) error {
+	if p.Flow == nil {
+		p.Flow = &pb.Flow{}
+	}
+	f.Flow.WriteToPB(p.Flow)
 	// f.Tag.Encode(encoder)  // 目前无需发送,不encode
 	return nil
 }
@@ -93,4 +122,8 @@ func PseudoCloneTaggedFlowHelper(items []interface{}) {
 
 func (f *TaggedFlow) String() string {
 	return fmt.Sprintf("%s\n\tTag: %+v", f.Flow.String(), f.Tag)
+}
+
+func DecodePB(decoder *codec.SimpleDecoder, t *pb.TaggedFlow) {
+	decoder.ReadPB(t)
 }

@@ -1,6 +1,7 @@
 package zerodoc
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math"
 	"net"
@@ -13,6 +14,7 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
 )
 
 type Code uint64
@@ -1565,6 +1567,43 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 	if !decoder.Failed() {
 		t.id = string(decoder.Bytes()[offset:decoder.Offset()]) // Encode内容就是它的id
 	}
+}
+
+func (t *Tag) ReadFromPB(p *pb.MiniTag) {
+	t.Code = Code(p.Code)
+	t.IsIPv6 = uint8(p.Field.IsIPv6)
+	if t.IsIPv6 != 0 {
+		if t.IP6 == nil {
+			t.IP6 = make([]byte, 16)
+		}
+		copy(t.IP6, p.Field.RawIP[:net.IPv6len])
+		if t.Code&IPPath != 0 {
+			if t.IP61 == nil {
+				t.IP61 = make([]byte, 16)
+			}
+			copy(t.IP61, p.Field.RawIP1[:net.IPv6len])
+		}
+	} else {
+		t.IP = binary.BigEndian.Uint32(p.Field.RawIP[:net.IPv4len])
+		if t.Code&IPPath != 0 {
+			t.IP1 = binary.BigEndian.Uint32(p.Field.RawIP1[:net.IPv4len])
+		}
+	}
+	t.MAC = p.Field.MAC
+	t.MAC1 = p.Field.MAC1
+	t.L3EpcID = int16(p.Field.L3EpcID)
+	t.L3EpcID1 = int16(p.Field.L3EpcID1)
+	t.Direction = DirectionEnum(p.Field.Direction)
+	t.TAPSide = TAPSideEnum(p.Field.TapSide)
+	t.Protocol = layers.IPProtocol(p.Field.Protocol)
+	t.ACLGID = uint16(p.Field.ACLGID)
+	t.ServerPort = uint16(p.Field.ServerPort)
+	t.VTAPID = uint16(p.Field.VTAPID)
+	t.TAPPort = p.Field.TAPPort
+	t.TAPType = TAPTypeEnum(p.Field.TAPType)
+	t.L7Protocol = datatype.L7Protocol(p.Field.L7Protocol)
+	t.TagType = uint8(p.Field.TagType)
+	t.TagValue = uint16(p.Field.TagValue)
 }
 
 func (t *Tag) Encode(encoder *codec.SimpleEncoder) {

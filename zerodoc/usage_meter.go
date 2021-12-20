@@ -5,6 +5,7 @@ import (
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
 )
 
 type UsageMeter struct {
@@ -46,6 +47,28 @@ func (m *UsageMeter) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU64(m.L3ByteRx)
 	encoder.WriteVarintU64(m.L4ByteTx)
 	encoder.WriteVarintU64(m.L4ByteRx)
+}
+
+func (m *UsageMeter) WriteToPB(p *pb.UsageMeter) {
+	p.PacketTx = m.PacketTx
+	p.PacketRx = m.PacketRx
+	p.ByteTx = m.ByteTx
+	p.ByteRx = m.ByteRx
+	p.L3ByteTx = m.L3ByteTx
+	p.L3ByteRx = m.L3ByteRx
+	p.L4ByteTx = m.L4ByteTx
+	p.L4ByteRx = m.L4ByteRx
+}
+
+func (m *UsageMeter) ReadFromPB(p *pb.UsageMeter) {
+	m.PacketTx = p.PacketTx
+	m.PacketRx = p.PacketRx
+	m.ByteTx = p.ByteTx
+	m.ByteRx = p.ByteRx
+	m.L3ByteTx = p.L3ByteTx
+	m.L3ByteRx = p.L3ByteRx
+	m.L4ByteTx = p.L4ByteTx
+	m.L4ByteRx = p.L4ByteRx
 }
 
 func (m *UsageMeter) Decode(decoder *codec.SimpleDecoder) {

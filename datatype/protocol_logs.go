@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
 )
@@ -89,6 +90,14 @@ type AppProtoHead struct {
 	Code    uint16         // HTTP状态码: 1xx-5xx, DNS状态码: 0-7
 	RRT     time.Duration  // HTTP，DNS时延: response-request
 
+}
+
+func (h *AppProtoHead) WriteToPB(p *pb.AppProtoHead) {
+	p.Proto = uint32(h.Proto)
+	p.MsgType = uint32(h.MsgType)
+	p.Status = uint32(h.Status)
+	p.Code = uint32(h.Code)
+	p.RRT = uint64(h.RRT)
 }
 
 type AppProtoLogsBaseInfo struct {
@@ -280,6 +289,122 @@ func (l *AppProtoLogsData) Encode(encoder *codec.SimpleEncoder) error {
 	return nil
 }
 
+func (l *AppProtoLogsBaseInfo) WriteToPB(p *pb.AppProtoLogsBaseInfo) {
+	p.StartTime = uint64(l.StartTime)
+	p.EndTime = uint64(l.EndTime)
+	p.FlowId = l.FlowId
+	p.TapPort = l.TapPort
+	p.VtapId = uint32(l.VtapId)
+	p.TapType = uint32(l.TapType)
+	p.IsIPv6 = utils.Bool2UInt32(l.IsIPv6)
+	p.TapSide = uint32(l.TapSide)
+	if p.Head == nil {
+		p.Head = &pb.AppProtoHead{}
+	}
+	l.AppProtoHead.WriteToPB(p.Head)
+
+	p.MacSrc = l.MacSrc
+	p.MacDst = l.MacDst
+	p.IPSrc = l.IPSrc
+	p.IPDst = l.IPDst
+	p.IP6Src = l.IP6Src[:]
+	p.IP6Dst = l.IP6Dst[:]
+	p.L3EpcIDSrc = l.L3EpcIDSrc
+	p.L3EpcIDDst = l.L3EpcIDDst
+	p.PortSrc = uint32(l.PortSrc)
+	p.PortDst = uint32(l.PortDst)
+	p.Protocol = uint32(l.Protocol)
+	p.IsVIPInterfaceSrc = utils.Bool2UInt32(l.IsVIPInterfaceSrc)
+	p.IsVIPInterfaceDst = utils.Bool2UInt32(l.IsVIPInterfaceDst)
+}
+
+func (l *AppProtoLogsData) EncodePB(encoder *codec.SimpleEncoder, i interface{}) error {
+	p, ok := i.(*pb.AppProtoLogsData)
+	if !ok {
+		return fmt.Errorf("invalid interface type, should be *pb.AppProtoLogsData")
+	}
+
+	data := *p
+	l.WriteToPB(p)
+	encoder.WritePB(p)
+	if p.Http == nil {
+		p.Http = data.Http
+	}
+	if p.Dns == nil {
+		p.Dns = data.Dns
+	}
+	if p.Mysql == nil {
+		p.Mysql = data.Mysql
+	}
+	if p.Redis == nil {
+		p.Redis = data.Redis
+	}
+	if p.Dubbo == nil {
+		p.Dubbo = data.Dubbo
+	}
+	if p.Kafka == nil {
+		p.Kafka = data.Kafka
+	}
+	return nil
+}
+
+func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
+	if p.BaseInfo == nil {
+		p.BaseInfo = &pb.AppProtoLogsBaseInfo{}
+	}
+	l.AppProtoLogsBaseInfo.WriteToPB(p.BaseInfo)
+	switch l.Proto {
+	case PROTO_HTTP:
+		if http, ok := l.Detail.(*HTTPInfo); ok {
+			if p.Http == nil {
+				p.Http = &pb.HTTPInfo{}
+			}
+			http.WriteToPB(p.Http, l.AppProtoLogsBaseInfo.MsgType)
+		}
+		p.Dns, p.Mysql, p.Redis, p.Dubbo, p.Kafka = nil, nil, nil, nil, nil
+	case PROTO_DNS:
+		if dns, ok := l.Detail.(*DNSInfo); ok {
+			if p.Dns == nil {
+				p.Dns = &pb.DNSInfo{}
+			}
+			dns.WriteToPB(p.Dns, l.AppProtoLogsBaseInfo.MsgType)
+		}
+		p.Http, p.Mysql, p.Redis, p.Dubbo, p.Kafka = nil, nil, nil, nil, nil
+	case PROTO_MYSQL:
+		if mysql, ok := l.Detail.(*MysqlInfo); ok {
+			if p.Mysql == nil {
+				p.Mysql = &pb.MysqlInfo{}
+			}
+			mysql.WriteToPB(p.Mysql, l.AppProtoLogsBaseInfo.MsgType)
+		}
+		p.Http, p.Dns, p.Redis, p.Dubbo, p.Kafka = nil, nil, nil, nil, nil
+	case PROTO_REDIS:
+		if redis, ok := l.Detail.(*RedisInfo); ok {
+			if p.Redis == nil {
+				p.Redis = &pb.RedisInfo{}
+			}
+			redis.WriteToPB(p.Redis, l.AppProtoLogsBaseInfo.MsgType)
+		}
+		p.Http, p.Dns, p.Mysql, p.Dubbo, p.Kafka = nil, nil, nil, nil, nil
+	case PROTO_DUBBO:
+		if dubbo, ok := l.Detail.(*DubboInfo); ok {
+			if p.Dubbo == nil {
+				p.Dubbo = &pb.DubboInfo{}
+			}
+			dubbo.WriteToPB(p.Dubbo, l.AppProtoLogsBaseInfo.MsgType)
+		}
+		p.Http, p.Dns, p.Mysql, p.Redis, p.Kafka = nil, nil, nil, nil, nil
+	case PROTO_KAFKA:
+		if kafka, ok := l.Detail.(*KafkaInfo); ok {
+			if p.Kafka == nil {
+				p.Kafka = &pb.KafkaInfo{}
+			}
+			kafka.WriteToPB(p.Kafka, l.AppProtoLogsBaseInfo.MsgType)
+		}
+		p.Http, p.Dns, p.Mysql, p.Redis, p.Dubbo = nil, nil, nil, nil, nil
+	}
+}
+
 func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
 	l.StartTime = time.Duration(decoder.ReadU64())
 	l.EndTime = time.Duration(decoder.ReadU64())
@@ -374,6 +499,24 @@ func (h *HTTPInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, 
 	encoder.WriteString255(h.TraceID)
 }
 
+func (h *HTTPInfo) WriteToPB(p *pb.HTTPInfo, msgType LogMessageType) {
+	p.StreamID = h.StreamID
+	p.ContentLength = h.ContentLength
+	p.Version = h.Version
+	if msgType == MSG_T_SESSION || msgType == MSG_T_REQUEST {
+		p.Method = h.Method
+		p.Path = h.Path
+		p.Host = h.Host
+		p.ClientIP = h.ClientIP
+	} else {
+		p.Method = ""
+		p.Path = ""
+		p.Host = ""
+		p.ClientIP = ""
+	}
+	p.TraceID = h.TraceID
+}
+
 func (h *HTTPInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, code uint16) {
 	h.StreamID = decoder.ReadU32()
 	h.ContentLength = int64(decoder.ReadU64())
@@ -425,6 +568,22 @@ func (d *DNSInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, c
 	}
 	if msgType == MSG_T_SESSION || msgType == MSG_T_RESPONSE {
 		encoder.WriteString255(d.Answers)
+	}
+}
+
+func (h *DNSInfo) WriteToPB(p *pb.DNSInfo, msgType LogMessageType) {
+	p.TransID = uint32(h.TransID)
+	p.QueryType = uint32(h.QueryType)
+
+	if msgType == MSG_T_SESSION || msgType == MSG_T_REQUEST {
+		p.QueryName = h.QueryName
+	} else {
+		p.QueryName = ""
+	}
+	if msgType == MSG_T_SESSION || msgType == MSG_T_RESPONSE {
+		p.Answers = h.Answers
+	} else {
+		p.Answers = ""
 	}
 }
 
