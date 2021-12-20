@@ -15,8 +15,8 @@ import (
 
 const (
 	EdgeCode    = zerodoc.IPPath | zerodoc.L3EpcIDPath
-	MainAddCode = zerodoc.RegionID | zerodoc.HostID | zerodoc.L3Device | zerodoc.SubnetID | zerodoc.PodNodeID | zerodoc.AZID | zerodoc.PodGroupID | zerodoc.PodNSID | zerodoc.PodID | zerodoc.PodClusterID | zerodoc.BusinessIDs | zerodoc.GroupIDs | zerodoc.ServiceID | zerodoc.LBListenerID
-	EdgeAddCode = zerodoc.RegionIDPath | zerodoc.HostIDPath | zerodoc.L3DevicePath | zerodoc.SubnetIDPath | zerodoc.PodNodeIDPath | zerodoc.AZIDPath | zerodoc.PodGroupIDPath | zerodoc.PodNSIDPath | zerodoc.PodIDPath | zerodoc.PodClusterIDPath | zerodoc.BusinessIDsPath | zerodoc.GroupIDsPath | zerodoc.ServiceIDPath | zerodoc.LBListenerIDPath
+	MainAddCode = zerodoc.RegionID | zerodoc.HostID | zerodoc.L3Device | zerodoc.SubnetID | zerodoc.PodNodeID | zerodoc.AZID | zerodoc.PodGroupID | zerodoc.PodNSID | zerodoc.PodID | zerodoc.PodClusterID | zerodoc.BusinessIDs | zerodoc.GroupIDs | zerodoc.ServiceID
+	EdgeAddCode = zerodoc.RegionIDPath | zerodoc.HostIDPath | zerodoc.L3DevicePath | zerodoc.SubnetIDPath | zerodoc.PodNodeIDPath | zerodoc.AZIDPath | zerodoc.PodGroupIDPath | zerodoc.PodNSIDPath | zerodoc.PodIDPath | zerodoc.PodClusterIDPath | zerodoc.BusinessIDsPath | zerodoc.GroupIDsPath | zerodoc.ServiceIDPath
 	PortAddCode = zerodoc.IsKeyService
 )
 
@@ -98,9 +98,9 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 			isKeyService := false
 			if t.IsIPv6 != 0 {
 				t.GroupIDs1, t.BusinessIDs1 = platformData.QueryIPv6GroupIDsAndBusinessIDs(t.L3EpcID1, t.IP61)
-				// 如果存在port，需要设置is_key_service, 并获取service_id,lbListenerID
+				// 如果存在port，需要设置is_key_service, 并获取service_id
 				if t.Code&PortAddCode != 0 {
-					isKeyService, serviceID, t.LBListenerID1 = platformData.QueryIPv6IsKeyServiceAndID(t.L3EpcID1, t.IP61, t.Protocol, t.ServerPort)
+					isKeyService, serviceID = platformData.QueryIPv6IsKeyServiceAndID(t.L3EpcID1, t.IP61, t.Protocol, t.ServerPort)
 					if isKeyService {
 						t.IsKeyService = 1
 					}
@@ -108,7 +108,7 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 					// 没有port,如果是cluserIP 或 pod_IP，需要获取service_id
 					if t.L3DeviceType1 == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 						t.PodID1 != 0 {
-						_, serviceID, _ = platformData.QueryIPv6IsKeyServiceAndID(t.L3EpcID1, t.IP61, t.Protocol, 0)
+						_, serviceID = platformData.QueryIPv6IsKeyServiceAndID(t.L3EpcID1, t.IP61, t.Protocol, 0)
 					}
 				}
 				// 如果是pod服务，需要设置service_id
@@ -119,9 +119,9 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 				}
 			} else {
 				t.GroupIDs1, t.BusinessIDs1 = platformData.QueryGroupIDsAndBusinessIDs(t.L3EpcID1, t.IP1)
-				// 如果存在port，需要设置is_key_service, 并获取service_id,lbListenerID
+				// 如果存在port，需要设置is_key_service, 并获取service_id
 				if t.Code&PortAddCode != 0 {
-					isKeyService, serviceID, t.LBListenerID1 = platformData.QueryIsKeyServiceAndID(t.L3EpcID1, t.IP1, t.Protocol, t.ServerPort)
+					isKeyService, serviceID = platformData.QueryIsKeyServiceAndID(t.L3EpcID1, t.IP1, t.Protocol, t.ServerPort)
 					if isKeyService {
 						t.IsKeyService = 1
 					}
@@ -129,7 +129,7 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 					// 没有port,如果是cluserIP 或 pod_IP，需要获取service_id
 					if t.L3DeviceType1 == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 						t.PodID1 != 0 {
-						_, serviceID, _ = platformData.QueryIsKeyServiceAndID(t.L3EpcID1, t.IP1, t.Protocol, 0)
+						_, serviceID = platformData.QueryIsKeyServiceAndID(t.L3EpcID1, t.IP1, t.Protocol, 0)
 					}
 				}
 				// 如果是pod服务，需要设置service_id
@@ -197,7 +197,7 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 			t.GroupIDs, t.BusinessIDs = platformData.QueryIPv6GroupIDsAndBusinessIDs(t.L3EpcID, t.IP6)
 			// 在0端, 有port无edge的数据需计算isKeyService，如:vtap_flow_port
 			if t.Code&PortAddCode != 0 && t.Code&EdgeCode == 0 {
-				isKeyService, serviceID, t.LBListenerID = platformData.QueryIPv6IsKeyServiceAndID(t.L3EpcID, t.IP6, t.Protocol, t.ServerPort)
+				isKeyService, serviceID = platformData.QueryIPv6IsKeyServiceAndID(t.L3EpcID, t.IP6, t.Protocol, t.ServerPort)
 				if isKeyService {
 					t.IsKeyService = 1
 				}
@@ -206,7 +206,7 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 				// 如果是cluserIP 或 pod_IP，需要获取service_id
 				if t.L3DeviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 					t.PodID != 0 {
-					_, serviceID, _ = platformData.QueryIPv6IsKeyServiceAndID(t.L3EpcID, t.IP6, t.Protocol, 0)
+					_, serviceID = platformData.QueryIPv6IsKeyServiceAndID(t.L3EpcID, t.IP6, t.Protocol, 0)
 				}
 			}
 			// 如果是pod服务，需要设置service_id
@@ -219,7 +219,7 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 			t.GroupIDs, t.BusinessIDs = platformData.QueryGroupIDsAndBusinessIDs(t.L3EpcID, t.IP)
 			// 在0端, 有port无edge的数据需计算isKeyService，如:vtap_flow_port
 			if t.Code&PortAddCode != 0 && t.Code&EdgeCode == 0 {
-				isKeyService, serviceID, t.LBListenerID = platformData.QueryIsKeyServiceAndID(t.L3EpcID, t.IP, t.Protocol, t.ServerPort)
+				isKeyService, serviceID = platformData.QueryIsKeyServiceAndID(t.L3EpcID, t.IP, t.Protocol, t.ServerPort)
 				if isKeyService {
 					t.IsKeyService = 1
 				}
@@ -228,7 +228,7 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 				// 如果是cluserIP 或 pod_IP，需要获取service_id
 				if t.L3DeviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 					t.PodID != 0 {
-					_, serviceID, _ = platformData.QueryIsKeyServiceAndID(t.L3EpcID, t.IP, t.Protocol, 0)
+					_, serviceID = platformData.QueryIsKeyServiceAndID(t.L3EpcID, t.IP, t.Protocol, 0)
 				}
 			}
 			// 如果是pod服务，需要设置service_id
