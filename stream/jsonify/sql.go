@@ -80,7 +80,7 @@ func (s *SQLLogger) WriteBlock(block *ckdb.Block) error {
 		}
 
 		errCode := &s.mysql.ErrorCode
-		if status == datatype.STATUS_OK {
+		if status != datatype.STATUS_ERROR {
 			errCode = nil
 		}
 		if err := block.WriteUInt16Nullable(errCode); err != nil {
