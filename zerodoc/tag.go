@@ -33,8 +33,7 @@ const (
 	PodClusterID
 	BusinessIDs
 	GroupIDs
-	ServiceID    // 1<< 15
-	LBListenerID // 1<< 16 支持最大偏移到19
+	ServiceID // 1<< 15 支持最大偏移到19
 )
 
 const (
@@ -53,8 +52,7 @@ const (
 	PodClusterIDPath
 	BusinessIDsPath
 	GroupIDsPath
-	ServiceIDPath    // 1<<35
-	LBListenerIDPath // 1<<36 支持最大偏移到39
+	ServiceIDPath // 1<<35 支持最大偏移到39
 )
 
 const (
@@ -225,7 +223,6 @@ type Field struct {
 	BusinessIDs  []uint16
 	GroupIDs     []uint16
 	ServiceID    uint32
-	LBListenerID uint32
 
 	MAC1          uint64
 	IP61          net.IP // FIXME: 合并IP61和IP1
@@ -245,7 +242,6 @@ type Field struct {
 	BusinessIDs1  []uint16
 	GroupIDs1     []uint16
 	ServiceID1    uint32
-	LBListenerID1 uint32
 
 	ACLGID       uint16
 	Direction    DirectionEnum
@@ -414,8 +410,8 @@ func MetricsDBNameToID(name string) MetricsDBID {
 }
 
 const (
-	BaseCode     = AZID | HostID | IP | L3Device | L3EpcID | PodClusterID | PodGroupID | PodID | PodNodeID | PodNSID | RegionID | SubnetID | TAPType | VTAPID | BusinessIDs | GroupIDs | ServiceID | LBListenerID
-	BasePathCode = AZIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | PodClusterIDPath | PodGroupIDPath | PodIDPath | PodNodeIDPath | PodNSIDPath | RegionIDPath | SubnetIDPath | TAPSide | TAPType | VTAPID | BusinessIDsPath | GroupIDsPath | ServiceIDPath | LBListenerIDPath
+	BaseCode     = AZID | HostID | IP | L3Device | L3EpcID | PodClusterID | PodGroupID | PodID | PodNodeID | PodNSID | RegionID | SubnetID | TAPType | VTAPID | BusinessIDs | GroupIDs | ServiceID
+	BasePathCode = AZIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | PodClusterIDPath | PodGroupIDPath | PodIDPath | PodNodeIDPath | PodNSIDPath | RegionIDPath | SubnetIDPath | TAPSide | TAPType | VTAPID | BusinessIDsPath | GroupIDsPath | ServiceIDPath
 	BasePortCode = Protocol | ServerPort | IsKeyService
 )
 
@@ -632,16 +628,6 @@ func (t *Tag) MarshalTo(b []byte) int {
 	if t.Code&L7Protocol != 0 {
 		offset += copy(b[offset:], ",l7_protocol=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L7Protocol), 10))
-	}
-	if t.Code&LBListenerID != 0 {
-		offset += copy(b[offset:], ",lb_listener_id=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.LBListenerID), 10))
-	}
-	if t.Code&LBListenerIDPath != 0 {
-		offset += copy(b[offset:], ",lb_listener_id_0=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.LBListenerID), 10))
-		offset += copy(b[offset:], ",lb_listener_id_1=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.LBListenerID1), 10))
 	}
 	if t.Code&MAC != 0 {
 		// 不存入tsdb中
@@ -904,14 +890,6 @@ func genTagColumns(code Code) []*ckdb.Column {
 	}
 	if code&L7Protocol != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("l7_protocol", ckdb.UInt8).SetComment("应用协议0: unknown, 1: http, 2: dns, 3: mysql, 4: redis, 5: dubbo, 6: kafka"))
-	}
-
-	if code&LBListenerID != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("lb_listener_id", ckdb.UInt32).SetComment("ip对应的负载均衡监听器ID"))
-	}
-	if code&LBListenerIDPath != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("lb_listener_id_0", ckdb.UInt32).SetComment("ip0对应的负载均衡监听器ID"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("lb_listener_id_1", ckdb.UInt32).SetComment("ip1对应的负载均衡监听器ID"))
 	}
 
 	if code&MAC != 0 {
@@ -1189,20 +1167,6 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
 
 	if code&L7Protocol != 0 {
 		if err := block.WriteUInt8(uint8(t.L7Protocol)); err != nil {
-			return err
-		}
-	}
-
-	if code&LBListenerID != 0 {
-		if err := block.WriteUInt32(t.LBListenerID); err != nil {
-			return err
-		}
-	}
-	if code&LBListenerIDPath != 0 {
-		if err := block.WriteUInt32(t.LBListenerID); err != nil {
-			return err
-		}
-		if err := block.WriteUInt32(t.LBListenerID1); err != nil {
 			return err
 		}
 	}
