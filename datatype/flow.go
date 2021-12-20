@@ -54,6 +54,18 @@ const (
 	MaxCloseType
 )
 
+func (t CloseType) IsClientError() bool {
+	return t == CloseTypeClientSYNRepeat || t == CloseTypeTCPClientRst ||
+		t == CloseTypeClientHalfClose || t == CloseTypeClientSourcePortReuse ||
+		t == CloseTypeClientEstablishReset
+}
+
+func (t CloseType) IsServerError() bool {
+	return t == CloseTypeTCPServerRst || t == CloseTypeTimeout ||
+		t == CloseTypeServerHalfClose || t == CloseTypeServerSYNACKRepeat ||
+		t == CloseTypeServerReset || t == CloseTypeServerQueueLack || t == CloseTypeServerEstablishReset
+}
+
 type DeviceType uint8
 
 const (
