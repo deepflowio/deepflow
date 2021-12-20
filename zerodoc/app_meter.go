@@ -3,6 +3,7 @@ package zerodoc
 import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
 )
 
 type AppMeter struct {
@@ -37,6 +38,29 @@ func (m *AppMeter) Encode(encoder *codec.SimpleEncoder) {
 	m.AppTriffic.Encode(encoder)
 	m.AppLatency.Encode(encoder)
 	m.AppAnomaly.Encode(encoder)
+}
+
+func (m *AppMeter) WriteToPB(p *pb.AppMeter) {
+	if p.AppTriffic == nil {
+		p.AppTriffic = &pb.AppTriffic{}
+	}
+	m.AppTriffic.WriteToPB(p.AppTriffic)
+
+	if p.AppLatency == nil {
+		p.AppLatency = &pb.AppLatency{}
+	}
+	m.AppLatency.WriteToPB(p.AppLatency)
+
+	if p.AppAnomaly == nil {
+		p.AppAnomaly = &pb.AppAnomaly{}
+	}
+	m.AppAnomaly.WriteToPB(p.AppAnomaly)
+}
+
+func (m *AppMeter) ReadFromPB(p *pb.AppMeter) {
+	m.AppTriffic.ReadFromPB(p.AppTriffic)
+	m.AppLatency.ReadFromPB(p.AppLatency)
+	m.AppAnomaly.ReadFromPB(p.AppAnomaly)
 }
 
 func (m *AppMeter) Decode(decoder *codec.SimpleDecoder) {
@@ -125,6 +149,16 @@ func (t *AppTriffic) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU32(t.Response)
 }
 
+func (t *AppTriffic) WriteToPB(p *pb.AppTriffic) {
+	p.Request = t.Request
+	p.Response = t.Response
+}
+
+func (t *AppTriffic) ReadFromPB(p *pb.AppTriffic) {
+	t.Request = p.Request
+	t.Response = p.Response
+}
+
 func (t *AppTriffic) Decode(decoder *codec.SimpleDecoder) {
 	t.Request = decoder.ReadVarintU32()
 	t.Response = decoder.ReadVarintU32()
@@ -184,6 +218,18 @@ func (l *AppLatency) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU32(l.RRTMax)
 	encoder.WriteVarintU64(l.RRTSum)
 	encoder.WriteVarintU32(l.RRTCount)
+}
+
+func (l *AppLatency) WriteToPB(p *pb.AppLatency) {
+	p.RRTMax = l.RRTMax
+	p.RRTSum = l.RRTSum
+	p.RRTCount = l.RRTCount
+}
+
+func (l *AppLatency) ReadFromPB(p *pb.AppLatency) {
+	l.RRTMax = p.RRTMax
+	l.RRTSum = p.RRTSum
+	l.RRTCount = p.RRTCount
 }
 
 func (l *AppLatency) Decode(decoder *codec.SimpleDecoder) {
@@ -253,6 +299,18 @@ func (a *AppAnomaly) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU32(a.ClientError)
 	encoder.WriteVarintU32(a.ServerError)
 	encoder.WriteVarintU32(a.Timeout)
+}
+
+func (a *AppAnomaly) WriteToPB(p *pb.AppAnomaly) {
+	p.ClientError = a.ClientError
+	p.ServerError = a.ServerError
+	p.Timeout = a.Timeout
+}
+
+func (a *AppAnomaly) ReadFromPB(p *pb.AppAnomaly) {
+	a.ClientError = p.ClientError
+	a.ServerError = p.ServerError
+	a.Timeout = p.Timeout
 }
 
 func (a *AppAnomaly) Decode(decoder *codec.SimpleDecoder) {

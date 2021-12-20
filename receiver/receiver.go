@@ -635,16 +635,18 @@ func (r *Receiver) ProcessUDPServer() {
 		headerLen := datatype.MESSAGE_HEADER_LEN
 		metricsTimestamp, vtapID, sequence := uint32(0), uint16(0), uint64(0)
 		// 对Metrics和TaggedFlow,AppProtoLogData处理
-		if baseHeader.Type == datatype.MESSAGE_TYPE_METRICS ||
-			baseHeader.Type == datatype.MESSAGE_TYPE_TAGGEDFLOW ||
-			baseHeader.Type == datatype.MESSAGE_TYPE_PROTOCOLLOG {
+		if baseHeader.Type >= datatype.MESSAGE_TYPE_METRICS &&
+			baseHeader.Type <= datatype.MESSAGE_TYPE_PROTOCOLLOG {
 			flowHeader.Decode(recvBuffer.Buffer[datatype.MESSAGE_HEADER_LEN:])
 			headerLen += datatype.FLOW_HEADER_LEN
 
 			if err := ValidateFlowVersion(baseHeader.Type, flowHeader.Version); err != nil {
-				ReleaseRecvBuffer(recvBuffer)
-				r.logReceiveError(size, remoteAddr, err)
-				continue
+				r.logReceiveError(size, remoteAddr, fmt.Errorf("%s msgType: %s ", err, datatype.MessageTypeString[baseHeader.Type]))
+				// 但版本不匹配，且版本小于app.LAST_SIMPLE_CODEC_VERSION时，才会拒绝连接
+				if flowHeader.Version <= app.LAST_SIMPLE_CODEC_VERSION {
+					ReleaseRecvBuffer(recvBuffer)
+					continue
+				}
 			}
 
 			vtapID = flowHeader.VTAPID
@@ -765,9 +767,8 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 		headerLen := datatype.MESSAGE_HEADER_LEN
 		metricsTimestamp, vtapID, sequence := uint32(0), uint16(0), uint64(0)
 		// 对metrics和TaggedFlow处理
-		if baseHeader.Type == datatype.MESSAGE_TYPE_METRICS ||
-			baseHeader.Type == datatype.MESSAGE_TYPE_TAGGEDFLOW ||
-			baseHeader.Type == datatype.MESSAGE_TYPE_PROTOCOLLOG {
+		if baseHeader.Type >= datatype.MESSAGE_TYPE_METRICS &&
+			baseHeader.Type <= datatype.MESSAGE_TYPE_PROTOCOLLOG {
 			if err := ReadN(conn, flowHeaderBuffer); err != nil {
 				atomic.AddUint64(&r.counter.Invalid, 1)
 				log.Warningf("TCP client(%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
@@ -778,9 +779,12 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 
 			if err := ValidateFlowVersion(baseHeader.Type, flowHeader.Version); err != nil {
 				atomic.AddUint64(&r.counter.Invalid, 1)
-				log.Warningf("recv from %s, %s", conn.RemoteAddr().String(), err)
-				time.Sleep(10 * time.Second) // 等待10秒，防止日志刷屏
-				return
+				log.Warningf("recv from %s, %s", conn.RemoteAddr().String(), fmt.Errorf("error: %s msgType: %s", err, datatype.MessageTypeString[baseHeader.Type]))
+				// 但版本不匹配，且版本小于app.LAST_SIMPLE_CODEC_VERSION时，才会拒绝连接
+				if flowHeader.Version <= app.LAST_SIMPLE_CODEC_VERSION {
+					time.Sleep(10 * time.Second) // 等待10秒，防止日志刷屏
+					return
+				}
 			}
 			vtapID = flowHeader.VTAPID
 			sequence = flowHeader.Sequence

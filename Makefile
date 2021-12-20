@@ -10,6 +10,7 @@ vendor:
 	# cd xdppacket/ebpf/; chmod a+x remote-make; ./remote-make
 	go generate ./geo/...
 	go generate ./zerodoc/...
+	go generate ./datatype/...
 	go generate ./hmap/lru/...
 	go generate ./hmap/idmap/...
 
@@ -24,6 +25,8 @@ clean:
 	rm -rf vendor
 	rm -rf bin
 	rm -rf x86_64
+	rm -rf zerodoc/pb/*.pb.go
+	rm -rf datatype/pb/*.pb.go
 
 .DEFAULT_GOAL := test
 

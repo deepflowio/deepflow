@@ -3,6 +3,7 @@ package zerodoc
 import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
 )
 
 type FlowMeter struct {
@@ -43,6 +44,41 @@ func (m *FlowMeter) Encode(encoder *codec.SimpleEncoder) {
 	m.Performance.Encode(encoder)
 	m.Anomaly.Encode(encoder)
 	m.FlowLoad.Encode(encoder)
+}
+
+func (m *FlowMeter) WriteToPB(p *pb.FlowMeter) {
+	if p.Traffic == nil {
+		p.Traffic = &pb.Traffic{}
+	}
+	m.Traffic.WriteToPB(p.Traffic)
+
+	if p.Latency == nil {
+		p.Latency = &pb.Latency{}
+	}
+	m.Latency.WriteToPB(p.Latency)
+
+	if p.Performance == nil {
+		p.Performance = &pb.Performance{}
+	}
+	m.Performance.WriteToPB(p.Performance)
+
+	if p.Anomaly == nil {
+		p.Anomaly = &pb.Anomaly{}
+	}
+	m.Anomaly.WriteToPB(p.Anomaly)
+
+	if p.Flowload == nil {
+		p.Flowload = &pb.FlowLoad{}
+	}
+	m.FlowLoad.WriteToPB(p.Flowload)
+}
+
+func (m *FlowMeter) ReadFromPB(p *pb.FlowMeter) {
+	m.Traffic.ReadFromPB(p.Traffic)
+	m.Latency.ReadFromPB(p.Latency)
+	m.Performance.ReadFromPB(p.Performance)
+	m.Anomaly.ReadFromPB(p.Anomaly)
+	m.FlowLoad.ReadFromPB(p.Flowload)
 }
 
 func (m *FlowMeter) Decode(decoder *codec.SimpleDecoder) {

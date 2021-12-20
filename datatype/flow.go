@@ -9,6 +9,7 @@ import (
 	"github.com/google/gopacket/layers"
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 	. "gitlab.yunshan.net/yunshan/droplet-libs/utils"
 )
@@ -228,6 +229,18 @@ func (f *TunnelField) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU8(f.Tier)
 }
 
+func (f *TunnelField) WriteToPB(p *pb.TunnelField) {
+	p.TxIP0 = f.TxIP0
+	p.TxIP0 = f.TxIP0
+	p.TxIP1 = f.TxIP1
+	p.RxIP0 = f.RxIP0
+	p.RxIP1 = f.RxIP1
+	p.TxId = f.TxId
+	p.RxId = f.RxId
+	p.Type = uint32(f.Type)
+	p.Tier = uint32(f.Tier)
+}
+
 func (f *TunnelField) Decode(decoder *codec.SimpleDecoder) {
 	f.TxIP0 = decoder.ReadU32()
 	f.TxIP1 = decoder.ReadU32()
@@ -321,6 +334,21 @@ func (f *FlowKey) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU8(uint8(f.Proto))
 }
 
+func (f *FlowKey) WriteToPB(p *pb.FlowKey) {
+	p.VtapId = uint32(f.VtapId)
+	p.TapType = uint32(f.TapType)
+	p.TapPort = f.TapPort
+	p.MACSrc = uint64(f.MACSrc)
+	p.MACDst = uint64(f.MACDst)
+	p.IPSrc = f.IPSrc
+	p.IPDst = f.IPDst
+	p.IP6Src = f.IP6Src
+	p.IP6Dst = f.IP6Dst
+	p.PortSrc = uint32(f.PortSrc)
+	p.PortDst = uint32(f.PortDst)
+	p.Proto = uint32(f.Proto)
+}
+
 func (f *FlowKey) Decode(decoder *codec.SimpleDecoder) {
 	f.VtapId = decoder.ReadU16()
 	f.TapType = TapType(decoder.ReadU16())
@@ -353,6 +381,11 @@ func (f *FlowKey) Decode(decoder *codec.SimpleDecoder) {
 func (f *TcpPerfCountsPeer) SequentialMerge(rhs *TcpPerfCountsPeer) {
 	f.RetransCount += rhs.RetransCount
 	f.ZeroWinCount += rhs.ZeroWinCount
+}
+
+func (t *TcpPerfCountsPeer) WriteToPB(p *pb.TcpPerfCountsPeer) {
+	p.RetransCount = p.RetransCount
+	p.ZeroWinCount = p.ZeroWinCount
 }
 
 func (t *TcpPerfCountsPeer) Encode(encoder *codec.SimpleEncoder) {
@@ -429,6 +462,42 @@ func (f *TCPPerfStats) Encode(encoder *codec.SimpleEncoder, l4Protocol L4Protoco
 	}
 }
 
+func (f *TCPPerfStats) WriteToPB(p *pb.TCPPerfStats, l4Protocol L4Protocol) {
+	if l4Protocol == L4_PROTOCOL_TCP {
+		p.RTTClientMax = f.RTTClientMax
+		p.RTTServerMax = f.RTTServerMax
+		p.SRTMax = f.SRTMax
+		p.ARTMax = f.ARTMax
+
+		p.RTT = f.RTT
+		p.RTTClientSum = f.RTTClientSum
+		p.RTTServerSum = f.RTTServerSum
+		p.SRTSum = f.SRTSum
+		p.ARTSum = f.ARTSum
+
+		p.RTTClientCount = f.RTTClientCount
+		p.RTTServerCount = f.RTTServerCount
+		p.SRTCount = f.SRTCount
+		p.ARTCount = f.ARTCount
+
+		if p.TcpPerfCountsPeerTx == nil {
+			p.TcpPerfCountsPeerTx = &pb.TcpPerfCountsPeer{}
+		}
+		f.TcpPerfCountsPeers[0].WriteToPB(p.TcpPerfCountsPeerTx)
+
+		if p.TcpPerfCountsPeerRx == nil {
+			p.TcpPerfCountsPeerRx = &pb.TcpPerfCountsPeer{}
+		}
+		f.TcpPerfCountsPeers[1].WriteToPB(p.TcpPerfCountsPeerRx)
+		p.TotalRetransCount = f.TotalRetransCount
+	} else if l4Protocol == L4_PROTOCOL_UDP {
+		*p = pb.TCPPerfStats{}
+		p.ARTMax = f.ARTMax
+		p.ARTSum = f.ARTSum
+		p.ARTCount = f.ARTCount
+	}
+}
+
 func (f *TCPPerfStats) Decode(decoder *codec.SimpleDecoder, l4Protocol L4Protocol) {
 	if l4Protocol == L4_PROTOCOL_TCP {
 		f.RTTClientMax = decoder.ReadVarintU32()
@@ -497,6 +566,25 @@ func (f *FlowMetricsPeer) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteBool(f.IsDevice)
 	encoder.WriteBool(f.IsVIPInterface)
 	encoder.WriteBool(f.IsVIP)
+}
+
+func (f *FlowMetricsPeer) WriteToPB(p *pb.FlowMetricsPeer) {
+	p.ByteCount = f.ByteCount
+	p.L3ByteCount = f.L3ByteCount
+	p.L4ByteCount = f.L4ByteCount
+	p.PacketCount = f.PacketCount
+	p.TotalByteCount = f.TotalByteCount
+	p.TotalPacketCount = f.TotalPacketCount
+	p.First = uint64(f.First)
+	p.Last = uint64(f.Last)
+	p.TCPFlags = uint32(f.TCPFlags)
+	p.L3EpcID = f.L3EpcID
+	p.IsL2End = Bool2UInt32(f.IsL2End)
+	p.IsL3End = Bool2UInt32(f.IsL3End)
+	p.IsActiveHost = Bool2UInt32(f.IsActiveHost)
+	p.IsDevice = Bool2UInt32(f.IsDevice)
+	p.IsVIPInterface = Bool2UInt32(f.IsVIPInterface)
+	p.IsVIP = Bool2UInt32(f.IsVIP)
 }
 
 func (f *FlowMetricsPeer) Decode(decoder *codec.SimpleDecoder) {
@@ -583,6 +671,50 @@ func (f *Flow) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU8(uint8(f.FlowSource))
 	encoder.WriteBool(f.IsActiveService)
 	encoder.WriteU8(f.TapSide)
+}
+
+func (f *Flow) WriteToPB(p *pb.Flow) {
+	if p.FlowKey == nil {
+		p.FlowKey = &pb.FlowKey{}
+	}
+	f.FlowKey.WriteToPB(p.FlowKey)
+
+	if p.FlowMetricsPeerSrc == nil {
+		p.FlowMetricsPeerSrc = &pb.FlowMetricsPeer{}
+	}
+	f.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].WriteToPB(p.FlowMetricsPeerSrc)
+
+	if p.FlowMetricsPeerDst == nil {
+		p.FlowMetricsPeerDst = &pb.FlowMetricsPeer{}
+	}
+	f.FlowMetricsPeers[FLOW_METRICS_PEER_DST].WriteToPB(p.FlowMetricsPeerDst)
+
+	if p.Tunnel == nil {
+		p.Tunnel = &pb.TunnelField{}
+	}
+	f.Tunnel.WriteToPB(p.Tunnel)
+
+	p.FlowID = f.FlowID
+	p.StartTime = uint64(f.StartTime)
+	p.EndTime = uint64(f.EndTime)
+	p.Duration = uint64(f.Duration)
+
+	p.EthType = uint32(f.EthType)
+	if f.FlowPerfStats != nil {
+		p.HasFlowPerfStats = 1
+		if p.FlowPerfStats == nil {
+			p.FlowPerfStats = &pb.FlowPerfStats{}
+		}
+		f.FlowPerfStats.WriteToPB(p.FlowPerfStats)
+	} else {
+		p.HasFlowPerfStats = 0
+		p.FlowPerfStats = nil
+	}
+
+	p.CloseType = uint32(f.CloseType)
+	p.FlowSource = uint32(f.FlowSource)
+	p.IsActiveService = Bool2UInt32(f.IsActiveService)
+	p.TapSide = uint32(f.TapSide)
 }
 
 func (f *Flow) Decode(decoder *codec.SimpleDecoder) {
@@ -815,6 +947,17 @@ func (p *L7PerfStats) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU32(p.RRTMax)
 }
 
+func (p *L7PerfStats) WriteToPB(b *pb.L7PerfStats) {
+	b.RequestCount = b.RequestCount
+	b.ResponseCount = b.ResponseCount
+	b.ErrClientCount = b.ErrClientCount
+	b.ErrServerCount = b.ErrServerCount
+	b.ErrTimeout = b.ErrTimeout
+	b.RRTCount = b.RRTCount
+	b.RRTSum = b.RRTSum
+	b.RRTMax = b.RRTMax
+}
+
 func (p *L7PerfStats) SequentialMerge(rhs *L7PerfStats) {
 	p.RequestCount += rhs.RequestCount
 	p.ResponseCount += rhs.ResponseCount
@@ -842,6 +985,21 @@ func (f *FlowPerfStats) Encode(encoder *codec.SimpleEncoder) {
 
 	f.TCPPerfStats.Encode(encoder, f.L4Protocol)
 	f.L7PerfStats.Encode(encoder)
+}
+
+func (f *FlowPerfStats) WriteToPB(p *pb.FlowPerfStats) {
+	p.L4Protocol = uint32(f.L4Protocol)
+	p.L7Protocol = uint32(f.L7Protocol)
+
+	if p.TCPPerfStats == nil {
+		p.TCPPerfStats = &pb.TCPPerfStats{}
+	}
+	f.TCPPerfStats.WriteToPB(p.TCPPerfStats, f.L4Protocol)
+
+	if p.L7PerfStats == nil {
+		p.L7PerfStats = &pb.L7PerfStats{}
+	}
+	f.L7PerfStats.WriteToPB(p.L7PerfStats)
 }
 
 func (f *FlowPerfStats) SequentialMerge(rhs *FlowPerfStats) {
