@@ -7,6 +7,7 @@ require (
 	github.com/Workiva/go-datastructures v1.0.50
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/docker/go-units v0.3.3
+	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.2.0
 	github.com/golang/protobuf v1.3.0
 	github.com/google/gopacket v1.1.17
@@ -25,8 +26,8 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/textnode/fencer v0.0.0-20121219195347-6baed0e5ef9a
 	github.com/vishvananda/netlink v1.1.0
-	gitlab.yunshan.net/yunshan/message v0.0.0-20210916085527-1d68447446c8
-	golang.org/x/net v0.0.0-20190514140710-3ec191127204
+	gitlab.yunshan.net/yunshan/message v0.0.0-20220106081013-2d6205a1e114
+	golang.org/x/net v0.0.0-20201021035429-f5854403a974
 	golang.org/x/sys v0.0.0-20201024232916-9f70ab9862d5
 	google.golang.org/grpc v1.19.0
 	gopkg.in/alexcesaro/statsd.v2 v2.0.0

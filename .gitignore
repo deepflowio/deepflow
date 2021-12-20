@@ -2,3 +2,5 @@
 /*.test
 /.test-coverage.txt
 .idea/
+/datatype/pb/*.pb.go
+/zerodoc/pb/*.pb.go

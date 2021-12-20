@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 )
 
@@ -48,6 +49,24 @@ func (i *DubboInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType,
 		encoder.WriteString255(i.MethodName)
 	}
 
+}
+
+func (i *DubboInfo) WriteToPB(p *pb.DubboInfo, msgType LogMessageType) {
+	p.SerialID = uint32(i.SerialID)
+	p.Type = uint32(i.Type)
+	p.BodyLen = i.BodyLen
+	p.ID = uint32(i.ID)
+	if msgType == MSG_T_SESSION || msgType == MSG_T_REQUEST {
+		p.DubboVersion = i.DubboVersion
+		p.ServiceName = i.ServiceName
+		p.ServiceVersion = i.ServiceVersion
+		p.MethodName = i.MethodName
+	} else {
+		p.DubboVersion = ""
+		p.ServiceName = ""
+		p.ServiceVersion = ""
+		p.MethodName = ""
+	}
 }
 
 func (i *DubboInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, code uint16) {

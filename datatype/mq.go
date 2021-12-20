@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 )
 
@@ -51,6 +52,32 @@ func (i *KafkaInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType,
 		encoder.WriteString255(i.ClientID)
 
 		encoder.WriteU32(i.RespMsgSize)
+	}
+}
+
+func (i *KafkaInfo) WriteToPB(p *pb.KafkaInfo, msgType LogMessageType) {
+
+	switch msgType {
+	case MSG_T_REQUEST:
+		p.CorrelationId = i.CorrelationId
+		p.ReqMsgSize = i.ReqMsgSize
+		p.ApiVersion = uint32(i.ApiVersion)
+		p.ApiKey = uint32(i.ApiKey)
+		p.ClientID = i.ClientID
+
+		p.RespMsgSize = 0
+	case MSG_T_RESPONSE:
+		*p = pb.KafkaInfo{}
+		p.CorrelationId = i.CorrelationId
+		p.RespMsgSize = i.RespMsgSize
+	case MSG_T_SESSION:
+		p.CorrelationId = i.CorrelationId
+		p.ReqMsgSize = i.ReqMsgSize
+		p.ApiVersion = uint32(i.ApiVersion)
+		p.ApiKey = uint32(i.ApiKey)
+		p.ClientID = i.ClientID
+
+		p.RespMsgSize = i.RespMsgSize
 	}
 }
 
