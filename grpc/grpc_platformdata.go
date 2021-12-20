@@ -740,59 +740,42 @@ func (t *PlatformInfoTable) QueryIPv6GroupIDsAndBusinessIDs(l3EpcID int16, ipv6 
 
 // is_key_service查询
 //   使用 epcid+ip+port 查询is_key_service
-// service_id 查询, 只支持查询pod_service和lb_service类型的服务
+// service_id 查询, 只支持查询pod_service类型的服务
 //   1，使用 epcid+clusterIP(device_type为POD_SERVICE) + port(可选) 查询
 //   2，使用 epcid+后端podIP(pod_id 非0) + port(可选) 查询
 //   3，使用 epcid+nodeIP(pod_node_id 非0)+port(必选) 查询
-// 返回值： is_key_service, pod_service_id, lb_service_id
-func (t *PlatformInfoTable) QueryIsKeyServiceAndID(l3EpcID int16, ipv4 uint32, protocol layers.IPProtocol, serverPort uint16) (bool, uint32, uint32) {
+func (t *PlatformInfoTable) QueryIsKeyServiceAndID(l3EpcID int16, ipv4 uint32, protocol layers.IPProtocol, serverPort uint16) (bool, uint32) {
 	if t.serviceLabeler == nil {
-		return false, 0, 0
+		return false, 0
 	}
 	// serverPort为0时，也忽略protocol
 	if serverPort == 0 {
 		protocol = 0
 	}
-	var podServiceID, lbServiceID uint32
 	serviceIdxs := t.serviceLabeler.QueryServer(l3EpcID, ipv4, 0, protocol, serverPort)
 	for _, i := range serviceIdxs {
-		if t.services[i].ServiceID == 0 {
-			continue
-		}
-		if t.services[i].ServiceType == int32(trident.ServiceType_POD_SERVICE) &&
-			podServiceID == 0 { // 取第一个匹配到的
-			podServiceID = t.services[i].ServiceID
-		} else if t.services[i].ServiceType == int32(trident.ServiceType_LB_SERVICE) &&
-			lbServiceID == 0 { // 取第一个匹配到的
-			lbServiceID = t.services[i].ServiceID
+		if t.services[i].ServiceID > 0 {
+			return true, t.services[i].ServiceID
 		}
 	}
-	return len(serviceIdxs) > 0, podServiceID, lbServiceID
+	return len(serviceIdxs) > 0, 0
 }
 
-func (t *PlatformInfoTable) QueryIPv6IsKeyServiceAndID(l3EpcID int16, ipv6 net.IP, protocol layers.IPProtocol, serverPort uint16) (bool, uint32, uint32) {
+func (t *PlatformInfoTable) QueryIPv6IsKeyServiceAndID(l3EpcID int16, ipv6 net.IP, protocol layers.IPProtocol, serverPort uint16) (bool, uint32) {
 	if t.serviceLabeler == nil {
-		return false, 0, 0
+		return false, 0
 	}
 	// serverPort为0时，也忽略protocol
 	if serverPort == 0 {
 		protocol = 0
 	}
-	var podServiceID, lbServiceID uint32
 	serviceIdxs := t.serviceLabeler.QueryServerIPv6(l3EpcID, ipv6, 0, protocol, serverPort)
 	for _, i := range serviceIdxs {
-		if t.services[i].ServiceID == 0 {
-			continue
-		}
-		if t.services[i].ServiceType == int32(trident.ServiceType_POD_SERVICE) &&
-			podServiceID == 0 { // 取第一个匹配到的
-			podServiceID = t.services[i].ServiceID
-		} else if t.services[i].ServiceType == int32(trident.ServiceType_LB_SERVICE) &&
-			lbServiceID == 0 { // 取第一个匹配到的
-			lbServiceID = t.services[i].ServiceID
+		if t.services[i].ServiceID > 0 {
+			return true, t.services[i].ServiceID
 		}
 	}
-	return len(serviceIdxs) > 0, podServiceID, lbServiceID
+	return len(serviceIdxs) > 0, 0
 }
 
 func (t *PlatformInfoTable) updateGroupIDsAndBusinessIDs(response *trident.SyncResponse) bool {
@@ -837,12 +820,10 @@ func (t *PlatformInfoTable) updateGroupIDsAndBusinessIDs(response *trident.SyncR
 			Protocol:    uint16(svc.GetProtocol()),
 			ServerPorts: svc.GetServerPorts(),
 			ServiceID:   svc.GetId(),
-			ServiceType: int32(svc.GetType()),
 		}
 
-		// 目前只支持pod和lb的service查询service_id
-		if svc.GetType() != trident.ServiceType_POD_SERVICE ||
-			svc.GetType() != trident.ServiceType_LB_SERVICE {
+		// 目前只支持pod的service查询service_id
+		if svc.GetType() != trident.ServiceType_POD_SERVICE {
 			groupIDMap.ServiceID = 0
 		} else {
 			// serverPorts 默认增加0端口，当只用vpc和ip时用0端口也能匹配服务id
