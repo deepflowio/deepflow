@@ -98,6 +98,9 @@ type AppProtoLogsBaseInfo struct {
 	TapSide   uint8
 	AppProtoHead
 
+	/* L2 */
+	MacSrc uint64
+	MacDst uint64
 	/* L3 */
 	IPSrc IPv4Int
 	IPDst IPv4Int
@@ -126,6 +129,10 @@ func (i *AppProtoLogsBaseInfo) String() string {
 	formatted += fmt.Sprintf("Status: %v ", i.Status)
 	formatted += fmt.Sprintf("RRT: %v ", i.RRT)
 	formatted += fmt.Sprintf("TapSide: %d ", i.TapSide)
+	if i.MacSrc > 0 || i.MacDst > 0 {
+		formatted += fmt.Sprintf("MacSrc: %s ", utils.Uint64ToMac(i.MacSrc))
+		formatted += fmt.Sprintf("MacDst: %s ", utils.Uint64ToMac(i.MacDst))
+	}
 
 	if i.IsIPv6 {
 		formatted += fmt.Sprintf("IP6Src: %s ", net.IP(i.IP6Src[:]))
@@ -230,6 +237,8 @@ func (l *AppProtoLogsData) Encode(encoder *codec.SimpleEncoder) error {
 	encoder.WriteU16(l.Code)
 	encoder.WriteU64(uint64(l.RRT))
 	encoder.WriteU8(l.TapSide)
+	encoder.WriteU64(l.MacSrc)
+	encoder.WriteU64(l.MacDst)
 
 	if l.IsIPv6 {
 		encoder.WriteBool(true)
@@ -262,6 +271,8 @@ func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
 	l.Code = decoder.ReadU16()
 	l.RRT = time.Duration(decoder.ReadU64())
 	l.TapSide = decoder.ReadU8()
+	l.MacSrc = decoder.ReadU64()
+	l.MacDst = decoder.ReadU64()
 
 	if decoder.ReadBool() {
 		l.IsIPv6 = true
