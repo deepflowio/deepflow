@@ -795,15 +795,16 @@ func (i *Internet) Fill(f *datatype.TaggedFlow) {
 func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool, platformData *grpc.PlatformInfoTable) {
 	var info0, info1 *grpc.Info
 	l3EpcID0, l3EpcID1 := f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].L3EpcID, f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].L3EpcID
-	isVip0, isVip1 := f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].IsVIPInterface, f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].IsVIPInterface
-	// 对于本地的流量，也需要使用epc+mac来匹配
+	// 对于VIP的流量，需要使用MAC来匹配
+	lookupByMac0, lookupByMac1 := f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_SRC].IsVIPInterface, f.FlowMetricsPeers[datatype.FLOW_METRICS_PEER_DST].IsVIPInterface
+	// 对于本地的流量，也需要使用MAC来匹配
 	if f.Flow.TapSide == uint8(zerodoc.Local) {
-		isVip0, isVip1 = true, true
+		lookupByMac0, lookupByMac1 = true, true
 	}
 	mac0, mac1 := f.FlowKey.MACSrc, f.FlowKey.MACDst
 	l3EpcMac0, l3EpcMac1 := mac0|uint64(l3EpcID0)<<48, mac1|uint64(l3EpcID1)<<48 // 使用l3EpcID和mac查找，防止跨AZ mac冲突
 
-	if isVip0 && isVip1 {
+	if lookupByMac0 && lookupByMac1 {
 		info0, info1 = platformData.QueryMacInfosPair(l3EpcMac0, l3EpcMac1)
 		if info0 == nil {
 			info0 = common.RegetInfoFromIP(isIPV6, f.IP6Src, uint32(f.IPSrc), int16(l3EpcID0), platformData)
@@ -811,7 +812,7 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool, platformData 
 		if info1 == nil {
 			info1 = common.RegetInfoFromIP(isIPV6, f.IP6Dst, uint32(f.IPDst), int16(l3EpcID1), platformData)
 		}
-	} else if isVip0 {
+	} else if lookupByMac0 {
 		info0 = platformData.QueryMacInfo(l3EpcMac0)
 		if info0 == nil {
 			info0 = common.RegetInfoFromIP(isIPV6, f.IP6Src, uint32(f.IPSrc), int16(l3EpcID0), platformData)
@@ -821,7 +822,7 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool, platformData 
 		} else {
 			info1 = platformData.QueryIPV4Infos(int16(l3EpcID1), uint32(f.IPDst))
 		}
-	} else if isVip1 {
+	} else if lookupByMac1 {
 		if isIPV6 {
 			info0 = platformData.QueryIPV6Infos(int16(l3EpcID0), f.IP6Src)
 		} else {
@@ -880,7 +881,6 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool, platformData 
 		k.EpcID1 = parseUint32EpcID(l2Info1.L2EpcID)
 	}
 
-	var serviceID uint32
 	if isIPV6 {
 		k.GroupIDs0, k.BusinessIDs0 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID0), f.IP6Src)
 		k.GroupIDs1, k.BusinessIDs1 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID1), f.IP6Dst)
@@ -907,7 +907,6 @@ func (k *KnowledgeGraph) Fill(f *datatype.TaggedFlow, isIPV6 bool, platformData 
 		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID1 != 0 ||
 			k.PodNodeID1 != 0 {
-			k.ServiceID1 = serviceID
 			_, k.ServiceID1 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID1), f.IPDst, f.Proto, f.PortDst)
 		}
 	}
