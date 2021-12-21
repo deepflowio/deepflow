@@ -14,6 +14,7 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
 	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
+	"gitlab.yunshan.net/yunshan/droplet/common"
 	"gitlab.yunshan.net/yunshan/message/trident"
 )
 
@@ -337,6 +338,7 @@ type DNSLogger struct {
 	QueryType  uint16 `json:"query_type,omitempty"`
 	AnswerCode uint16 `json:"answer_code"`
 	AnswerAddr string `json:"answer_addr,omitempty"`
+	Protocol   uint8  `json:"protocol"`
 
 	// 指标量
 	Duration uint64 `json:"duration,omitempty"` // us
@@ -354,6 +356,7 @@ func DNSLoggerColumns() []*ckdb.Column {
 		ckdb.NewColumn("query_type", ckdb.UInt16Nullable),
 		ckdb.NewColumn("answer_code", ckdb.UInt16Nullable),
 		ckdb.NewColumn("answer_addr", ckdb.String),
+		ckdb.NewColumn("protocol", ckdb.UInt8).SetComment("0: 非IP包, 1-255: ip协议号(其中 1:icmp 6:tcp 17:udp)"),
 
 		// 指标量
 		ckdb.NewColumn("duration", ckdb.UInt64).SetComment(" 单位: 微秒"),
@@ -396,6 +399,9 @@ func (d *DNSLogger) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteString(d.AnswerAddr); err != nil {
 		return err
 	}
+	if err := block.WriteUInt8(d.Protocol); err != nil {
+		return err
+	}
 
 	if err := block.WriteUInt64(d.Duration); err != nil {
 		return err
@@ -413,6 +419,7 @@ func (d *DNSLogger) Fill(l *datatype.AppProtoLogsData, platformData *grpc.Platfo
 			d.DomainName = dnsInfo.QueryName
 			d.QueryType = dnsInfo.QueryType
 			d.AnswerAddr = dnsInfo.Answers
+			d.Protocol = l.Protocol
 		}
 	}
 	d.Type = uint8(l.MsgType)
@@ -467,14 +474,48 @@ func (k *KnowledgeGraph) FillL7(l *datatype.AppProtoLogsData, platformData *grpc
 	var info0, info1 *grpc.Info
 	l3EpcID0, l3EpcID1 := l.L3EpcIDSrc, l.L3EpcIDDst
 
-	if l.IsIPv6 {
+	// 对于VIP的流量，需要使用MAC来匹配
+	lookupByMac0, lookupByMac1 := l.IsVIPInterfaceSrc, l.IsVIPInterfaceDst
+	// 对于本地的流量，也需要使用MAC来匹配
+	if l.TapSide == uint8(zerodoc.Local) {
+		lookupByMac0, lookupByMac1 = true, true
+	}
+	mac0, mac1 := l.MacSrc, l.MacDst
+	l3EpcMac0, l3EpcMac1 := mac0|uint64(l3EpcID0)<<48, mac1|uint64(l3EpcID1)<<48
+
+	if lookupByMac0 && lookupByMac1 {
+		info0, info1 = platformData.QueryMacInfosPair(l3EpcMac0, l3EpcMac1)
+		if info0 == nil {
+			info0 = common.RegetInfoFromIP(l.IsIPv6, l.IP6Src[:], uint32(l.IPSrc), int16(l3EpcID0), platformData)
+		}
+		if info1 == nil {
+			info1 = common.RegetInfoFromIP(l.IsIPv6, l.IP6Dst[:], uint32(l.IPDst), int16(l3EpcID1), platformData)
+		}
+	} else if lookupByMac0 {
+		info0 = platformData.QueryMacInfo(l3EpcMac0)
+		if info0 == nil {
+			info0 = common.RegetInfoFromIP(l.IsIPv6, l.IP6Src[:], uint32(l.IPSrc), int16(l3EpcID0), platformData)
+		}
+		if l.IsIPv6 {
+			info1 = platformData.QueryIPV6Infos(int16(l3EpcID1), l.IP6Dst[:])
+		} else {
+			info1 = platformData.QueryIPV4Infos(int16(l3EpcID1), uint32(l.IPDst))
+		}
+	} else if lookupByMac1 {
+		if l.IsIPv6 {
+			info0 = platformData.QueryIPV6Infos(int16(l3EpcID0), l.IP6Src[:])
+		} else {
+			info0 = platformData.QueryIPV4Infos(int16(l3EpcID0), uint32(l.IPSrc))
+		}
+		info1 = platformData.QueryMacInfo(l3EpcMac1)
+		if info1 == nil {
+			info1 = common.RegetInfoFromIP(l.IsIPv6, l.IP6Dst[:], uint32(l.IPDst), int16(l3EpcID1), platformData)
+		}
+	} else if l.IsIPv6 {
 		info0, info1 = platformData.QueryIPV6InfosPair(int16(l3EpcID0), net.IP(l.IP6Src[:]), int16(l3EpcID1), net.IP(l.IP6Dst[:]))
-		k.GroupIDs0, k.BusinessIDs0 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID0), l.IP6Src[:])
-		k.GroupIDs1, k.BusinessIDs1 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID1), l.IP6Dst[:])
+
 	} else {
 		info0, info1 = platformData.QueryIPV4InfosPair(int16(l3EpcID0), uint32(l.IPSrc), int16(l3EpcID1), uint32(l.IPDst))
-		k.GroupIDs0, k.BusinessIDs0 = platformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID0), l.IPSrc)
-		k.GroupIDs1, k.BusinessIDs1 = platformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID1), l.IPDst)
 	}
 
 	if info0 != nil {
@@ -512,6 +553,9 @@ func (k *KnowledgeGraph) FillL7(l *datatype.AppProtoLogsData, platformData *grpc
 	}
 
 	if l.IsIPv6 {
+		k.GroupIDs0, k.BusinessIDs0 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID0), l.IP6Src[:])
+		k.GroupIDs1, k.BusinessIDs1 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID1), l.IP6Dst[:])
+
 		// 0端如果是clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID0 != 0 {
@@ -524,6 +568,9 @@ func (k *KnowledgeGraph) FillL7(l *datatype.AppProtoLogsData, platformData *grpc
 			_, k.ServiceID1 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID1), net.IP(l.IP6Dst[:]), protocol, l.PortDst)
 		}
 	} else {
+		k.GroupIDs0, k.BusinessIDs0 = platformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID0), l.IPSrc)
+		k.GroupIDs1, k.BusinessIDs1 = platformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID1), l.IPDst)
+
 		// 0端如果是clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID0 != 0 {

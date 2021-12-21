@@ -104,13 +104,19 @@ var ColumnAdd600 = []*ColumnAdds{
 		ColumnNames: []string{"rrt_count", "l7_request", "l7_response"},
 		ColumnType:  ckdb.UInt64,
 	},
-
 	&ColumnAdds{
 		Dbs:          []string{"flow_log"},
 		Tables:       []string{"l4_flow_log", "l4_flow_log_local", "l7_http_log", "l7_http_log_local", "l7_dns_log", "l7_dns_log_local"},
 		ColumnNames:  []string{"tap_side"},
 		ColumnType:   ckdb.LowCardinalityString,
 		DefaultValue: "'rest'",
+	},
+	&ColumnAdds{
+		Dbs:          []string{"flow_log"},
+		Tables:       []string{"l7_dns_log", "l7_dns_log_local"},
+		ColumnNames:  []string{"protocol"},
+		ColumnType:   ckdb.UInt8,
+		DefaultValue: "17",
 	},
 }
 
