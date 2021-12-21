@@ -91,9 +91,9 @@ type AppProtoLogsBaseInfo struct {
 	StartTime time.Duration // 开始时间, packet的时间戳
 	EndTime   time.Duration // 结束时间, 初始化时等于开始时间
 	FlowId    uint64        // 对应flow的ID
+	TapPort   uint32
 	VtapId    uint16
 	TapType   uint16
-	TapPort   uint32
 	IsIPv6    bool
 	TapSide   uint8
 	AppProtoHead
@@ -107,12 +107,16 @@ type AppProtoLogsBaseInfo struct {
 	/* L3 IPv6 */
 	IP6Src [net.IPv6len]byte
 	IP6Dst [net.IPv6len]byte
-	/* L4 */
-	PortSrc uint16
-	PortDst uint16
 	/* L3EpcID */
 	L3EpcIDSrc int32
 	L3EpcIDDst int32
+	/* L4 */
+	PortSrc uint16
+	PortDst uint16
+
+	Protocol          uint8
+	IsVIPInterfaceSrc bool
+	IsVIPInterfaceDst bool
 }
 
 func (i *AppProtoLogsBaseInfo) String() string {
@@ -129,6 +133,8 @@ func (i *AppProtoLogsBaseInfo) String() string {
 	formatted += fmt.Sprintf("Status: %v ", i.Status)
 	formatted += fmt.Sprintf("RRT: %v ", i.RRT)
 	formatted += fmt.Sprintf("TapSide: %d ", i.TapSide)
+	formatted += fmt.Sprintf("IsVIPInterfaceSrc: %v ", i.IsVIPInterfaceSrc)
+	formatted += fmt.Sprintf("IsVIPInterfaceDst: %v ", i.IsVIPInterfaceDst)
 	if i.MacSrc > 0 || i.MacDst > 0 {
 		formatted += fmt.Sprintf("MacSrc: %s ", utils.Uint64ToMac(i.MacSrc))
 		formatted += fmt.Sprintf("MacDst: %s ", utils.Uint64ToMac(i.MacDst))
@@ -141,6 +147,7 @@ func (i *AppProtoLogsBaseInfo) String() string {
 		formatted += fmt.Sprintf("IPSrc: %s ", utils.IpFromUint32(i.IPSrc))
 		formatted += fmt.Sprintf("IPDst: %s ", utils.IpFromUint32(i.IPDst))
 	}
+	formatted += fmt.Sprintf("Protocol: %v ", i.Protocol)
 	formatted += fmt.Sprintf("PortSrc: %v ", i.PortSrc)
 	formatted += fmt.Sprintf("PortDst: %v ", i.PortDst)
 	formatted += fmt.Sprintf("L3EpcIDSrc: %v ", i.L3EpcIDSrc)
@@ -253,6 +260,9 @@ func (l *AppProtoLogsData) Encode(encoder *codec.SimpleEncoder) error {
 	encoder.WriteU16(l.PortDst)
 	encoder.WriteU32(uint32(l.L3EpcIDSrc))
 	encoder.WriteU32(uint32(l.L3EpcIDDst))
+	encoder.WriteU8(l.Protocol)
+	encoder.WriteBool(l.IsVIPInterfaceSrc)
+	encoder.WriteBool(l.IsVIPInterfaceDst)
 
 	l.Detail.Encode(encoder, l.MsgType, l.Code)
 	return nil
@@ -287,6 +297,9 @@ func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
 	l.PortDst = decoder.ReadU16()
 	l.L3EpcIDSrc = int32(decoder.ReadU32())
 	l.L3EpcIDDst = int32(decoder.ReadU32())
+	l.Protocol = decoder.ReadU8()
+	l.IsVIPInterfaceSrc = decoder.ReadBool()
+	l.IsVIPInterfaceDst = decoder.ReadBool()
 
 	if l.Proto == PROTO_HTTP {
 		httpInfo := AcquireHTTPInfo()
