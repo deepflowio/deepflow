@@ -6,20 +6,75 @@ import (
 	. "gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 )
 
+const (
+	_FIELD_NODE_SIZE  = (MATCHED_FIELD_LEN * 8 * 2) + 8  // 56
+	_FIELD6_NODE_SIZE = (MATCHED_FIELD6_LEN * 8 * 2) + 8 // 104
+)
+
+type Link6 struct {
+	Head  *Match6Node
+	Count uint32
+}
+
+type Match6Node struct {
+	Matched, MatchedMask MatchedField6
+
+	Next *Match6Node
+}
+
+func (n *Match6Node) GetAllTableIndex(maskVector *MatchedField6, min, max int, vectorBits []int) []uint16 {
+	return n.Matched.GetAllTableIndex(maskVector, &n.MatchedMask, min, max, vectorBits)
+}
+
+func (l *Link6) reset() {
+	l.Head = nil
+	l.Count = 0
+}
+
+func (l *Link6) add(node *Match6Node) {
+	node.Next = l.Head
+	l.Head = node
+	l.Count += 1
+}
+
+type Link struct {
+	Head  *MatchNode
+	Count uint32
+}
+
+func (l *Link) reset() {
+	l.Head = nil
+	l.Count = 0
+}
+
+func (l *Link) add(node *MatchNode) {
+	node.Next = l.Head
+	l.Head = node
+	l.Count += 1
+}
+
+type MatchNode struct {
+	Matched, MatchedMask MatchedField
+
+	Next *MatchNode
+}
+
+func (n *MatchNode) GetAllTableIndex(maskVector *MatchedField, min, max int, vectorBits []int) []uint16 {
+	return n.Matched.GetAllTableIndex(maskVector, &n.MatchedMask, min, max, vectorBits)
+}
+
 type Acl struct {
-	Id              uint32
-	TapType         TapType
-	SrcGroups       []uint32
-	DstGroups       []uint32
-	SrcPortRange    []PortRange // 0仅表示采集端口0
-	DstPortRange    []PortRange // 0仅表示采集端口0
-	Proto           uint16      // 256表示全采集, 0表示采集采集协议0
-	NpbActions      []NpbActions
-	AllMatched      []MatchedField
-	AllMatchedMask  []MatchedField // MatchedMask对应的位为0，表示对应Matched的位为*，0或1都匹配该策略
-	AllMatched6     []MatchedField6
-	AllMatched6Mask []MatchedField6 // MatchedMask对应的位为0，表示对应Matched的位为*，0或1都匹配该策略
-	policy          PolicyData
+	Id           uint32
+	TapType      TapType
+	SrcGroups    []uint32
+	DstGroups    []uint32
+	SrcPortRange []PortRange // 0仅表示采集端口0
+	DstPortRange []PortRange // 0仅表示采集端口0
+	Proto        uint16      // 256表示全采集, 0表示采集采集协议0
+	NpbActions   []NpbActions
+	FieldLink    Link
+	Field6Link   Link6
+	policy       PolicyData
 }
 
 const (
@@ -31,10 +86,8 @@ func (a *Acl) InitPolicy() {
 }
 
 func (a *Acl) Reset() {
-	a.AllMatched = a.AllMatched[:0]
-	a.AllMatchedMask = a.AllMatchedMask[:0]
-	a.AllMatched6 = a.AllMatched6[:0]
-	a.AllMatched6Mask = a.AllMatched6Mask[:0]
+	a.FieldLink.reset()
+	a.Field6Link.reset()
 }
 
 func (a *Acl) getPortRange(rawPorts []uint16) []PortRange {
@@ -85,9 +138,11 @@ func (a *Acl) generatePortSegment() ([]portSegment, []portSegment) {
 }
 
 func (a *Acl) generateMatchedField(srcMac, dstMac uint64, srcIps, dstIps ipSegment, srcPorts, dstPorts []portSegment) {
-	for _, srcPort := range srcPorts {
-		for _, dstPort := range dstPorts {
-			match, mask := MatchedField{}, MatchedField{}
+	nodes := make([]MatchNode, len(srcPorts)*len(dstPorts))
+	for i, srcPort := range srcPorts {
+		for j, dstPort := range dstPorts {
+			index := i*len(srcPorts) + j
+			match, mask := &nodes[index].Matched, &nodes[index].MatchedMask
 
 			match.Set(MATCHED_TAP_TYPE, uint64(a.TapType))
 			match.Set(MATCHED_SRC_IP, uint64(srcIps.getIp()))
@@ -112,16 +167,19 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint64, srcIps, dstIps ipSegme
 				match.Set(MATCHED_PROTO, uint64(a.Proto))
 				mask.SetMask(MATCHED_PROTO, uint64(0xff))
 			}
-			a.AllMatched = append(a.AllMatched, match)
-			a.AllMatchedMask = append(a.AllMatchedMask, mask)
+
+			a.FieldLink.add(&nodes[index])
 		}
 	}
 }
 
 func (a *Acl) generateMatchedField6(srcMac, dstMac uint64, srcIps, dstIps ipSegment, srcPorts, dstPorts []portSegment) {
-	for _, srcPort := range srcPorts {
-		for _, dstPort := range dstPorts {
-			match, mask := MatchedField6{}, MatchedField6{}
+	nodes := make([]Match6Node, len(srcPorts)*len(dstPorts))
+	for i, srcPort := range srcPorts {
+		for j, dstPort := range dstPorts {
+			index := i*len(srcPorts) + j
+			match, mask := &nodes[index].Matched, &nodes[index].MatchedMask
+
 			match.Set(MATCHED6_TAP_TYPE, uint64(a.TapType))
 			ip0, ip1 := srcIps.getIp6()
 			match.Set(MATCHED6_SRC_IP0, ip0)
@@ -154,8 +212,7 @@ func (a *Acl) generateMatchedField6(srcMac, dstMac uint64, srcIps, dstIps ipSegm
 				mask.SetMask(MATCHED6_PROTO, uint64(0xff))
 			}
 
-			a.AllMatched6Mask = append(a.AllMatched6Mask, mask)
-			a.AllMatched6 = append(a.AllMatched6, match)
+			a.Field6Link.add(&nodes[index])
 		}
 	}
 }

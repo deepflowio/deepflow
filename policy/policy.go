@@ -75,10 +75,11 @@ type TableOperator interface {
 	DelAcl(id int)
 	GetAcl() []*Acl
 	FlushAcls()
-	UpdateAcls(data []*Acl, check ...bool)
+	UpdateAcls(data []*Acl, check ...bool) error
 	UpdateInterfaceData(data []PlatformData)
 	UpdateIpGroupData(data []*IpGroupData)
 	UpdateCidr(data []*Cidr)
+	UpdateMemoryLimit(memoryLimit uint64)
 
 	SetCloudPlatform(cloudPlatformLabeler *CloudPlatformLabeler)
 
@@ -110,6 +111,8 @@ type PolicyCounter struct {
 	FastPathMacCount     uint32 `statsd:"fast_path_mac_count"`
 	FastPathPolicyCount  uint32 `statsd:"fast_path_policy_count"`
 	UnmatchedPacketCount uint64 `statsd:"unmatched_packet_count"`
+	FirstPathItems       uint64 `statsd:"first_path_items"`
+	FirstPathMaxBucket   uint32 `statsd:"first_path_max_bucket"`
 }
 
 func getAvailableMapSize(queueCount int, mapSize uint32) uint32 {
@@ -239,12 +242,16 @@ func (t *PolicyTable) UpdateCidrs(data []*Cidr) {
 	t.operator.UpdateCidr(data)
 }
 
-func (t *PolicyTable) UpdateAclData(data []*Acl, check ...bool) {
-	t.operator.UpdateAcls(data, check...)
+func (t *PolicyTable) UpdateAclData(data []*Acl, check ...bool) error {
+	return t.operator.UpdateAcls(data, check...)
 }
 
 func (t *PolicyTable) EnableAclData() {
 	t.operator.FlushAcls()
+}
+
+func (t *PolicyTable) UpdateMemoryLimit(limit uint64) {
+	t.operator.UpdateMemoryLimit(limit)
 }
 
 // 该函数仅用于测试或命令行使用

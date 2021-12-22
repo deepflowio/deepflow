@@ -109,7 +109,7 @@ func (f *MatchedField6) SetBits(whichs ...int) {
 func (f *MatchedField6) GetAllTableIndex(maskVector, mask *MatchedField6, min, max int, vectorBits []int) []uint16 {
 	// 若f为0101， maskVector为0111, mask为1001，返回{001,011,101,111}
 	index := f.GetTableIndex(maskVector, min, max)
-	indexOffset := make([]int, 0, 4) // indexOffset存储vector对应当前match field中为全采集的位，测试发现大于4的情况很少
+	indexOffset := make([]int, 0, 1)
 	for i, offset := range vectorBits {
 		// 掩码对应的位为0，表示全采集
 		if mask.IsBitZero(offset) {
@@ -121,7 +121,7 @@ func (f *MatchedField6) GetAllTableIndex(maskVector, mask *MatchedField6, min, m
 		index &= ^(1 << uint16(offset))
 	}
 
-	base := make([]uint16, 0, 16) // 根据indexOffset的大小，2^4为16
+	base := make([]uint16, 0, 1)
 	base = append(base, index)
 	for _, offset := range indexOffset {
 		create := make([]uint16, len(base))
