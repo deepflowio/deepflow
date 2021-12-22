@@ -120,6 +120,21 @@ var ColumnAdd600 = []*ColumnAdds{
 	},
 }
 
+var ColumnRename600 = []*ColumnRename{
+	&ColumnRename{
+		Db:            "flow_log",
+		Table:         "l7_http_log",
+		OldColumnName: "status_code",
+		NewColumnName: "answer_code",
+	},
+	&ColumnRename{
+		Db:            "flow_log",
+		Table:         "l7_http_log_local",
+		OldColumnName: "status_code",
+		NewColumnName: "answer_code",
+	},
+}
+
 func getTables(connect *sql.DB, db string) ([]string, error) {
 	sql := fmt.Sprintf("SHOW TABLES IN %s", db)
 	rows, err := connect.Query(sql)
@@ -337,6 +352,7 @@ func NewCKIssu(primaryAddr, secondaryAddr, username, password string) (*Issu, er
 		columnAdds = append(columnAdds, getColumnAdds(adds)...)
 	}
 	i.columnAdds = columnAdds
+	i.columnRenames = ColumnRename600
 
 	var err error
 	i.primaryConnection, err = common.NewCKConnection(primaryAddr, username, password)
@@ -379,6 +395,7 @@ func (i *Issu) renameColumn(connect *sql.DB, cr *ColumnRename) error {
 	// ALTER TABLE flow_log.l4_flow_log  RENAME COLUMN retan_tx TO retran_tx
 	sql := fmt.Sprintf("ALTER TABLE %s.%s RENAME COLUMN %s to %s",
 		cr.Db, cr.Table, cr.OldColumnName, cr.NewColumnName)
+	log.Info("rename column: ", sql)
 	_, err := connect.Exec(sql)
 	if err != nil {
 		// 如果已经修改过，就会报错不存在column，需要跳过该错误

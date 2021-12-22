@@ -158,7 +158,7 @@ type HTTPLogger struct {
 	Path         string `json:"path,omitempty"`
 	StreamID     uint32 `json:"stream_id,omitempty"`
 	TraceID      string `json:"trace_id,omitempty"`
-	StatusCode   uint16 `json:"status_code,omitempty"`
+	AnswerCode   uint16 `json:"answer_code,omitempty"`
 
 	// 指标量
 	ContentLength int64  `json:"content_length"`
@@ -182,7 +182,7 @@ func HTTPLoggerColumns() []*ckdb.Column {
 		ckdb.NewColumn("path", ckdb.String),
 		ckdb.NewColumn("stream_id", ckdb.UInt32Nullable),
 		ckdb.NewColumn("trace_id", ckdb.String),
-		ckdb.NewColumn("status_code", ckdb.UInt16Nullable),
+		ckdb.NewColumn("answer_code", ckdb.UInt16Nullable),
 
 		// 指标量
 		ckdb.NewColumn("content_length", ckdb.Int64Nullable),
@@ -241,8 +241,8 @@ func (h *HTTPLogger) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteString(h.TraceID); err != nil {
 		return err
 	}
-	statusCode := &(h.StatusCode)
-	if h.StatusCode == 0 {
+	statusCode := &(h.AnswerCode)
+	if h.AnswerCode == 0 {
 		statusCode = nil
 	}
 	if err := block.WriteUInt16Nullable(statusCode); err != nil {
@@ -308,7 +308,7 @@ func (h *HTTPLogger) Fill(l *datatype.AppProtoLogsData, platformData *grpc.Platf
 		}
 	}
 	h.Type = uint8(l.MsgType)
-	h.StatusCode = l.Code
+	h.AnswerCode = l.Code
 	h.Duration = uint64(l.RRT / time.Microsecond)
 }
 
