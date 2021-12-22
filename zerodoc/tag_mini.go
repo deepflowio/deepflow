@@ -229,6 +229,9 @@ func (t *MiniTag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEnc
 	if code&L3EpcID != 0 {
 		encoder.WriteU16(uint16(srcEpc))
 	}
+	if code&L7Protocol != 0 {
+		encoder.WriteU8(uint8(t.L7Protocol))
+	}
 
 	if code&MACPath != 0 {
 		encoder.WriteU64(srcMAC)
@@ -272,9 +275,6 @@ func (t *MiniTag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEnc
 	}
 	if code&TAPType != 0 {
 		encoder.WriteU8(uint8(t.TAPType))
-	}
-	if code&L7Protocol != 0 {
-		encoder.WriteU8(uint8(t.L7Protocol))
 	}
 
 	if code&TagType != 0 {
