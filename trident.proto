@@ -37,6 +37,7 @@ enum Exception {
     INVALID_CONFIGURATION      = 256;
     THREAD_THRESHOLD_EXCEEDED  = 512;
     PROCESS_THRESHOLD_EXCEEDED = 1024;
+    INVALID_LOCAL_CONFIG_FILE  = 2048;
 }
 
 message CommunicationVtap {
@@ -46,6 +47,11 @@ message CommunicationVtap {
 
 message TsdbReportInfo {
     optional string pcap_data_mount_path = 4;
+}
+
+message LocalConfigFile {
+    optional string local_config = 1;	// 全量的配置文件内容
+    optional string revision = 2;	// 配置文件MD5值
 }
 
 message SyncRequest {
@@ -79,6 +85,8 @@ message SyncRequest {
     optional TsdbReportInfo tsdb_report_info = 43; // 仅对数据节点有意义
 
     optional string kubernetes_cluster_id = 45; // 仅对容器类型的采集器有意义
+
+    optional LocalConfigFile local_config_file = 46;
 }
 
 enum Status {
@@ -393,6 +401,7 @@ message FlowAcls {
 message SyncResponse {
     optional Status status = 1;
     optional Config config = 2;
+    optional LocalConfigFile local_config_file = 3;
     optional string revision = 4; // 指定升级的目标revision
     optional string self_update_url = 5; // 指定升级的URL路径
 
