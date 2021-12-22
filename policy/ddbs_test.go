@@ -57,7 +57,7 @@ func TestDdbsSimple(t *testing.T) {
 	acls = append(acls, acl2)
 	table.UpdateAcls(acls)
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.Merge([]NpbActions{action, action2}, acl.Id)
+	basicPolicyData.Merge([]NpbActions{action2, action}, acl2.Id)
 
 	// 4-key
 	key = generateLookupKey(group1Mac, group2Mac, group1Ip1, group2Ip1, IPProtocolTCP, 0, 8000)
@@ -268,7 +268,7 @@ func TestDdbsResourceGroupPolicy(t *testing.T) {
 	key = generateLookupKey(group3Mac1, group5Mac1, ip6, ip7, IPProtocolUDP, 1000, 1023)
 	_, policyData = table.lookupAllByKey(key)
 	basicPolicyData = new(PolicyData)
-	basicPolicyData.Merge([]NpbActions{action2, action3}, acl2.Id)
+	basicPolicyData.Merge([]NpbActions{action3, action2}, acl3.Id)
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("ResourceGroupPolicy: 5-key Check Failed!")
 	}
@@ -296,7 +296,7 @@ func TestDdbsSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	policyData := getPolicyByFirstPath(table, result, key1)
 	backward1 := action1.ReverseTapSide()
 	basicPolicyData1 := new(PolicyData)
-	basicPolicyData1.Merge([]NpbActions{action1, action2, backward1}, acl1.Id) // 可以匹配backward1
+	basicPolicyData1.Merge([]NpbActions{action2, action1, backward1}, acl2.Id) // 可以匹配backward1
 	if !CheckPolicyResult(t, basicPolicyData1, policyData) {
 		t.Error("key1 FirstPath Check Failed!")
 	}
@@ -339,7 +339,7 @@ func TestDdbsSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	// 匹配ipGroup6、group3，ipGroup7有epc限制，group4mac不符
 	policyData = getPolicyByFirstPath(table, result, key3)
 	basicPolicyData3 := new(PolicyData)
-	basicPolicyData3.Merge([]NpbActions{action1, action2, backward1}, acl1.Id)
+	basicPolicyData3.Merge([]NpbActions{action2, action1, backward1}, acl2.Id)
 	if !CheckPolicyResult(t, basicPolicyData3, policyData) {
 		t.Error("key3 FirstPath Check Failed!")
 	}
@@ -350,7 +350,7 @@ func TestDdbsSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	// 源端匹配group4不匹配group3，目的端匹配ipGroup6不匹配ipGroup7
 	policyData = getPolicyByFirstPath(table, result, key4)
 	basicPolicyData4 := new(PolicyData)
-	basicPolicyData4.Merge([]NpbActions{action1, action4}, acl1.Id)
+	basicPolicyData4.Merge([]NpbActions{action4, action1}, acl4.Id)
 	if !CheckPolicyResult(t, basicPolicyData4, policyData) {
 		t.Error("key4 FirstPath Check Failed!")
 	}
@@ -361,7 +361,7 @@ func TestDdbsSrcDevGroupDstIpGroupPolicy(t *testing.T) {
 	// 源端匹配group4不匹配group3,目的端匹配ipGroup6不匹配ipGroup7
 	policyData = getPolicyByFirstPath(table, result, key5)
 	basicPolicyData5 := new(PolicyData)
-	basicPolicyData5.Merge([]NpbActions{action1, action4}, acl1.Id)
+	basicPolicyData5.Merge([]NpbActions{action4, action1}, acl4.Id)
 	if !CheckPolicyResult(t, basicPolicyData5, policyData) {
 		t.Error("key5 FirstPath Check Failed!")
 	}
@@ -423,7 +423,7 @@ func TestDdbsFirstPathVsFastPath(t *testing.T) {
 	backward2 := action2.ReverseTapSide()
 	basicPolicyData1 := new(PolicyData)
 	basicPolicyData1.NpbActions = make([]NpbActions, 0, 2)
-	basicPolicyData1.Merge([]NpbActions{action1, action2, backward2}, acl1.Id)
+	basicPolicyData1.Merge([]NpbActions{action2, action1, backward2}, acl2.Id)
 	if !CheckPolicyResult(t, basicPolicyData1, policyData) {
 		t.Error("key1 FirstPath Check Failed! ", result)
 	}
@@ -446,7 +446,7 @@ func TestDdbsFirstPathVsFastPath(t *testing.T) {
 	// 可匹配acl1，direction=3；可匹配acl2，direction=3
 	basicPolicyData3 := new(PolicyData)
 	basicPolicyData3.NpbActions = make([]NpbActions, 0, 4)
-	basicPolicyData3.Merge([]NpbActions{action1, action2, backward1, backward2}, acl1.Id)
+	basicPolicyData3.Merge([]NpbActions{action2, action1, backward1, backward2}, acl2.Id)
 	if !CheckPolicyResult(t, basicPolicyData3, policyData) {
 		t.Error("key3 FirstPath Check Failed!")
 	}
@@ -529,7 +529,7 @@ func TestDdbsEndpointDataDirection(t *testing.T) {
 
 	policyData1 := getPolicyByFirstPath(table, result, key1)
 	basicPolicyData1 := new(PolicyData)
-	basicPolicyData1.Merge([]NpbActions{action1, action2}, acl1.Id)
+	basicPolicyData1.Merge([]NpbActions{action2, action1}, acl2.Id)
 	if !CheckPolicyResult(t, basicPolicyData1, policyData1) {
 		t.Error("key1 FirstPath Check Failed!")
 	}
@@ -549,7 +549,7 @@ func TestDdbsEndpointDataDirection(t *testing.T) {
 	backward1 := action1.ReverseTapSide()
 	backward2 := action2.ReverseTapSide()
 	basicPolicyData2 := new(PolicyData)
-	basicPolicyData2.Merge([]NpbActions{backward1, backward2}, acl1.Id)
+	basicPolicyData2.Merge([]NpbActions{backward2, backward1}, acl2.Id)
 	if !CheckPolicyResult(t, basicPolicyData2, policyData2) {
 		t.Error("key2 FirstPath Check Failed!")
 	}
@@ -644,7 +644,7 @@ func TestDdbsNpbAction(t *testing.T) {
 	table.UpdateAcls(acls)
 	// 构建预期结果
 	basicPolicyData := &PolicyData{}
-	basicPolicyData.MergeNpbAction([]NpbActions{npb.ReverseTapSide()}, 25, BACKWARD)
+	basicPolicyData.MergeNpbAction([]NpbActions{npb.ReverseTapSide()}, 26, BACKWARD)
 
 	// key1: ip4:1000 -> ip3:1023 tcp
 	key1 := generateLookupKey(mac2, mac1, group2Ip1, group1Ip1, IPProtocolTCP, 1000, 1023, NPB)
@@ -661,7 +661,7 @@ func TestDdbsNpbAction(t *testing.T) {
 	setEthTypeAndOthers(key1, EthernetTypeIPv4, 64, true, false)
 	_, policyData = table.lookupAllByKey(key1)
 	basicPolicyData = &PolicyData{}
-	basicPolicyData.MergeNpbAction([]NpbActions{npb1, npb2}, 25)
+	basicPolicyData.MergeNpbAction([]NpbActions{npb1, npb2}, 26)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestNpbAction Check Failed!")
@@ -669,7 +669,7 @@ func TestDdbsNpbAction(t *testing.T) {
 
 	// key2: ip3:1023 -> ip4:1000 udp
 	*basicPolicyData = PolicyData{}
-	basicPolicyData.MergeNpbAction([]NpbActions{npb2, npb3}, 26)
+	basicPolicyData.MergeNpbAction([]NpbActions{npb3, npb2}, 27)
 	key2 := generateLookupKey(group1Mac, group2Mac, group1Ip1, group2Ip1, IPProtocolUDP, 1023, 1000, NPB)
 	setEthTypeAndOthers(key2, EthernetTypeIPv4, 64, true, true)
 	_, policyData = table.lookupAllByKey(key2)
@@ -889,7 +889,7 @@ func TestDdbsNpbActionAclGids(t *testing.T) {
 	table.UpdateAcls(acls)
 	// 构建预期结果
 	basicPolicyData := &PolicyData{}
-	basicPolicyData.MergeNpbAction([]NpbActions{npb1.ReverseTapSide(), npb2}, 25, BACKWARD)
+	basicPolicyData.MergeNpbAction([]NpbActions{npb2, npb1.ReverseTapSide()}, 26, BACKWARD)
 
 	// key1: ip4:1000 -> ip3:1023 tcp
 	key1 := generateLookupKey(mac2, mac1, group2Ip1, group1Ip1, IPProtocolTCP, 1000, 1023, NPB)
@@ -1036,7 +1036,7 @@ func TestDdbsTapType(t *testing.T) {
 	_, policyData := table.lookupAllByKey(key)
 	// 构建预期结果
 	basicPolicyData := new(PolicyData)
-	basicPolicyData.Merge([]NpbActions{action, action2}, acl.Id)
+	basicPolicyData.Merge([]NpbActions{action2, action}, acl2.Id)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {
 		t.Error("TestDdbsTapType Check Failed!")
@@ -1305,6 +1305,105 @@ func TestDdbsCidr(t *testing.T) {
 	endpointData, _ = table.lookupAllByKey(key1)
 	if endpointData.SrcInfo.L3EpcId == 10 {
 		t.Error(endpointData)
+	}
+}
+
+func TestDdbsMemory(t *testing.T) {
+	table := generatePolicyTable(DDBS)
+	action := toNpbAction(10, 0, NPB_TUNNEL_TYPE_PCAP, TAPSIDE_SRC, 0)
+	acl := generatePolicyAcl(table, action, 10, group[18], group[19], IPProtocolTCP, 0)
+	acl.DstPortRange = []PortRange{
+		NewPortRange(9012, 9012),
+		NewPortRange(7007, 7007),
+		NewPortRange(7004, 7004),
+		NewPortRange(9003, 9003),
+		NewPortRange(7016, 7016),
+		NewPortRange(9208, 9208),
+		NewPortRange(7018, 7018),
+		NewPortRange(7777, 7777),
+		NewPortRange(8004, 8004),
+		NewPortRange(8002, 8002),
+		NewPortRange(8001, 8001),
+		NewPortRange(8009, 8009),
+		NewPortRange(8010, 8010),
+		NewPortRange(8003, 8003),
+		NewPortRange(80, 80),
+		NewPortRange(8000, 8000),
+		NewPortRange(9500, 9500),
+		NewPortRange(8800, 8800),
+		NewPortRange(9002, 9002),
+		NewPortRange(8100, 8100),
+		NewPortRange(8600, 8600),
+		NewPortRange(9000, 9000),
+		NewPortRange(8700, 8700),
+		NewPortRange(9900, 9900),
+		NewPortRange(6902, 6902),
+		NewPortRange(6904, 6904),
+		NewPortRange(6912, 6912),
+		NewPortRange(6914, 6914),
+		NewPortRange(6922, 6922),
+		NewPortRange(6924, 6924),
+		NewPortRange(6932, 6932),
+		NewPortRange(6942, 6942),
+		NewPortRange(6952, 6952),
+		NewPortRange(6954, 6954),
+		NewPortRange(6962, 6962),
+		NewPortRange(6972, 6972),
+		NewPortRange(6982, 6982),
+		NewPortRange(6992, 6992),
+		NewPortRange(30000, 30000),
+		NewPortRange(7402, 7402),
+		NewPortRange(8300, 8300),
+		NewPortRange(8500, 8500),
+		NewPortRange(9300, 9300),
+		NewPortRange(7001, 7001),
+		NewPortRange(8180, 8180),
+		NewPortRange(8514, 8514),
+		NewPortRange(9001, 9001),
+		NewPortRange(8011, 8011),
+		NewPortRange(6800, 6800),
+		NewPortRange(9200, 9200),
+		NewPortRange(9100, 9100),
+		NewPortRange(7510, 7510),
+		NewPortRange(31800, 31800),
+		NewPortRange(8210, 8210),
+		NewPortRange(1401, 1401),
+		NewPortRange(5555, 5555),
+		NewPortRange(1500, 1500),
+		NewPortRange(7070, 7070),
+		NewPortRange(8105, 8105),
+		NewPortRange(4101, 4101),
+		NewPortRange(8060, 8060),
+		NewPortRange(8090, 8090),
+		NewPortRange(8014, 8014),
+		NewPortRange(9132, 9132),
+		NewPortRange(1601, 1601),
+		NewPortRange(8201, 8201),
+		NewPortRange(7006, 7006),
+		NewPortRange(7707, 7707),
+		NewPortRange(7110, 7110),
+		NewPortRange(4201, 4201),
+		NewPortRange(8900, 8900),
+		NewPortRange(8015, 8015),
+		NewPortRange(6060, 6060),
+		NewPortRange(10009, 10009),
+		NewPortRange(8099, 8099),
+		NewPortRange(7005, 7005),
+		NewPortRange(9011, 9011),
+		NewPortRange(7501, 7501),
+		NewPortRange(11007, 11007),
+		NewPortRange(10003, 10003),
+		NewPortRange(7002, 7002),
+		NewPortRange(6800, 6800),
+		NewPortRange(7008, 7008),
+	}
+	acls := []*Acl{}
+	acls = append(acls, acl)
+	// 255万条策略使用225196928字节大约214M常驻内存，策略更新会有些临时内存的申请这里限制到270M内存
+	table.UpdateMemoryLimit(270 << 20)
+	err := table.UpdateAcls(acls)
+	if err != nil {
+		t.Errorf("TestDdbsMemory error: %v", err)
 	}
 }
 
