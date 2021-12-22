@@ -38,6 +38,7 @@ enum Exception {
     THREAD_THRESHOLD_EXCEEDED  = 512;
     PROCESS_THRESHOLD_EXCEEDED = 1024;
     INVALID_LOCAL_CONFIG_FILE  = 2048;
+    TOO_MANY_POLICIES          = 4096;
 }
 
 message CommunicationVtap {
