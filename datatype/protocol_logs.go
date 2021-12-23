@@ -13,13 +13,15 @@ import (
 type LogProtoType uint8
 
 const (
-	PROTO_UNKOWN LogProtoType = iota
+	PROTO_UNKNOWN LogProtoType = iota
 	PROTO_HTTP
 	PROTO_DNS
 	PROTO_MYSQL
 	PROTO_REDIS
 	PROTO_DUBBO
 	PROTO_KAFKA
+	PROTO_OTHER
+	PROTO_MAX
 )
 
 func (t *LogProtoType) String() string {
@@ -37,8 +39,10 @@ func (t *LogProtoType) String() string {
 		formatted = "DUBBO"
 	case PROTO_KAFKA:
 		formatted = "KAFKA"
+	case PROTO_OTHER:
+		formatted = "OTHER"
 	default:
-		formatted = "UNKOWN"
+		formatted = "UNKNOWN"
 	}
 
 	return formatted
@@ -66,7 +70,7 @@ func (t *LogMessageType) String() string {
 	case MSG_T_OTHER:
 		formatted = "OTHER"
 	default:
-		formatted = "UNKOWN"
+		formatted = "UNKNOWN"
 	}
 
 	return formatted
