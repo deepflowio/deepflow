@@ -59,7 +59,11 @@ func NewFlowLogWriter(primaryAddr, secondaryAddr, user, password string, replica
 		tables = GetFlowLogTables(ckdb.MergeTree)
 	}
 	for i, table := range tables {
-		ckwriters[i], err = ckwriter.NewCKWriter(primaryAddr, secondaryAddr, user, password, "flow_log", table, replicaEnabled,
+		counterName := "app_flow_log"
+		if table.ID == uint8(common.L4_FLOW_ID) {
+			counterName = "flow_log"
+		}
+		ckwriters[i], err = ckwriter.NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName, table, replicaEnabled,
 			ckWriterCfg.QueueCount, ckWriterCfg.QueueSize, ckWriterCfg.BatchSize, ckWriterCfg.FlushTimeout)
 		if err != nil {
 			log.Error(err)

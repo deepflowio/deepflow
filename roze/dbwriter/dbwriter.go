@@ -32,6 +32,10 @@ func NewDbWriter(primaryAddr, secondaryAddr, user, password string, replicaEnabl
 		counterName := "metrics_1m"
 		if table.ID >= uint8(zerodoc.VTAP_FLOW_1S) && table.ID <= uint8(zerodoc.VTAP_FLOW_EDGE_PORT_1S) {
 			counterName = "metrics_1s"
+		} else if table.ID >= uint8(zerodoc.VTAP_APP_1S) && table.ID <= uint8(zerodoc.VTAP_APP_EDGE_PORT_1S) {
+			counterName = "app_1s"
+		} else if table.ID >= uint8(zerodoc.VTAP_APP) && table.ID <= uint8(zerodoc.VTAP_APP_EDGE_PORT) {
+			counterName = "app_1m"
 		}
 		ckwriter, err := ckwriter.NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName, table, replicaEnabled,
 			ckWriterCfg.QueueCount, ckWriterCfg.QueueSize, ckWriterCfg.BatchSize, ckWriterCfg.FlushTimeout)
