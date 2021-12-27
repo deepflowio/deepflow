@@ -130,7 +130,7 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt64(f.EndTime); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(uint32(f.StartTime / US_TO_S_DEVISOR)); err != nil {
+	if err := block.WriteUInt32(uint32(f.EndTime / US_TO_S_DEVISOR)); err != nil {
 		return err
 	}
 	if err := block.WriteUInt32(uint32(f.EndTime / US_TO_S_DEVISOR)); err != nil {
