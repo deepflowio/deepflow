@@ -19,6 +19,8 @@ const (
 	DefaultDiskFreeSpace   = 50
 	DefaultCKDBS3Volume    = "vol_s3"
 	DefaultCKDBS3TTLTimes  = 3 // 对象存储的保留时长是本地存储的3倍
+	DefaultInfluxdbHost    = "influxdb"
+	DefaultInfluxdbPort    = "20044"
 )
 
 type CKDiskMonitor struct {
@@ -33,6 +35,11 @@ type CKS3Storage struct {
 	TTLTimes int    `yaml:"ttl-times"`
 }
 
+type HostPort struct {
+	Host string `yaml:"host"`
+	Port string `yaml:"port"`
+}
+
 type Config struct {
 	ControllerIps     []string      `yaml:"controller-ips,flow"`
 	ControllerPort    uint16        `yaml:"controller-port"`
@@ -45,6 +52,7 @@ type Config struct {
 	MaxCPUs           int           `yaml:"max-cpus"`
 	CKDiskMonitor     CKDiskMonitor `yaml:"ck-disk-monitor"`
 	CKS3Storage       CKS3Storage   `yaml:"ckdb-s3"`
+	Influxdb          HostPort      `yaml:"influxdb"`
 }
 
 func (c *Config) Validate() error {
@@ -78,6 +86,7 @@ func Load(path string) Config {
 		LogFile:        "/var/log/droplet/droplet.log",
 		CKDiskMonitor:  CKDiskMonitor{DefaultCheckInterval, DefaultDiskUsedPercent, DefaultDiskFreeSpace},
 		CKS3Storage:    CKS3Storage{false, DefaultCKDBS3Volume, DefaultCKDBS3TTLTimes},
+		Influxdb:       HostPort{DefaultInfluxdbHost, DefaultInfluxdbPort},
 	}
 	if err != nil {
 		config.Validate()
