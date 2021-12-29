@@ -177,7 +177,7 @@ func ProtoLogToMQLogger(l *datatype.AppProtoLogsData, shardID int, platformData 
 	h := AcquireMQLogger()
 	l.AddReferenceCount()
 	h.AppProtoLogsData = l
-	h._id = genID(uint32(l.StartTime/time.Second), &L7MQCounter, shardID)
+	h._id = genID(uint32(l.EndTime/time.Second), &L7MQCounter, shardID)
 	h.Fill(l, platformData)
 	return h
 }
