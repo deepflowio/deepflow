@@ -154,7 +154,7 @@ func ProtoLogToSQLLogger(l *datatype.AppProtoLogsData, shardID int, platformData
 	h := AcquireSQLLogger()
 	l.AddReferenceCount()
 	h.AppProtoLogsData = l
-	h._id = genID(uint32(l.StartTime/time.Second), &L7SQLCounter, shardID)
+	h._id = genID(uint32(l.EndTime/time.Second), &L7SQLCounter, shardID)
 	h.Fill(l, platformData)
 	return h
 }

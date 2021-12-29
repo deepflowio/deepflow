@@ -642,7 +642,7 @@ var L7DNSCounter uint32
 
 func ProtoLogToDNSLogger(l *datatype.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
 	h := AcquireDNSLogger()
-	h._id = genID(uint32(l.StartTime/time.Second), &L7DNSCounter, shardID)
+	h._id = genID(uint32(l.EndTime/time.Second), &L7DNSCounter, shardID)
 	h.Fill(l, platformData)
 	return h
 }

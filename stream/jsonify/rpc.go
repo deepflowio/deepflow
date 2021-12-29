@@ -155,7 +155,7 @@ func ProtoLogToRPCLogger(l *datatype.AppProtoLogsData, shardID int, platformData
 	h := AcquireRPCLogger()
 	l.AddReferenceCount()
 	h.AppProtoLogsData = l
-	h._id = genID(uint32(l.StartTime/time.Second), &L7RPCCounter, shardID)
+	h._id = genID(uint32(l.EndTime/time.Second), &L7RPCCounter, shardID)
 	h.Fill(l, platformData)
 	return h
 }

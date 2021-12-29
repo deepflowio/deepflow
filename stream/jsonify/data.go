@@ -1082,7 +1082,7 @@ func TaggedFlowToLogger(f *datatype.TaggedFlow, shardID int, platformData *grpc.
 	isIPV6 := f.EthType == layers.EthernetTypeIPv6
 
 	s := AcquireFlowLogger()
-	s._id = genID(uint32(f.StartTime/time.Second), &L4FlowCounter, shardID)
+	s._id = genID(uint32(f.EndTime/time.Second), &L4FlowCounter, shardID)
 	s.DataLinkLayer.Fill(f)
 	s.NetworkLayer.Fill(f, isIPV6)
 	s.TransportLayer.Fill(f)
