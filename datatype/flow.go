@@ -845,8 +845,13 @@ func (f *FlowPerfStats) Encode(encoder *codec.SimpleEncoder) {
 }
 
 func (f *FlowPerfStats) SequentialMerge(rhs *FlowPerfStats) {
-	f.L4Protocol = rhs.L4Protocol
-	f.L7Protocol = rhs.L7Protocol
+	if f.L4Protocol == L4_PROTOCOL_UNKOWN {
+		f.L4Protocol = rhs.L4Protocol
+	}
+	if f.L7Protocol == L7_PROTOCOL_UNKNOWN || (f.L7Protocol == L7_PROTOCOL_OTHER &&
+		rhs.L7Protocol != L7_PROTOCOL_UNKNOWN) {
+		f.L7Protocol = rhs.L7Protocol
+	}
 	f.TCPPerfStats.SequentialMerge(&rhs.TCPPerfStats)
 	f.L7PerfStats.SequentialMerge(&rhs.L7PerfStats)
 }
