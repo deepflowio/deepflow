@@ -103,7 +103,7 @@ func Convert2Vips(datas []string) ([]net.IP, []net.IP) {
 
 func newIpGroupData(ipGroup *trident.Group) *policy.IpGroupData {
 	if ipGroup == nil || (ipGroup.GetIps() == nil && ipGroup.GetIpRanges() == nil) {
-		log.Warningf("IpGroup(%v) is invalid.", ipGroup)
+		log.Warningf("IpGroup(%v) is invalid, ips and ip-range is nil.", ipGroup)
 		return nil
 	}
 
