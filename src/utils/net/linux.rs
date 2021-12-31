@@ -1,6 +1,4 @@
-use std::fmt;
-use std::net::IpAddr;
-use std::{ffi::CStr, str::FromStr};
+use std::{ffi::CStr, net::IpAddr};
 
 use anyhow::{anyhow, Context, Result};
 use neli::{
@@ -13,72 +11,13 @@ use neli::{
 };
 use nix::libc::IFLA_INFO_KIND;
 
-use crate::error::Error;
+use super::{Addr, Link, MacAddr, Route, MAC_ADDR_ZERO};
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Default, Copy)]
-pub struct MacAddr([u8; 6]);
-
-pub const MAC_ADDR_ZERO: MacAddr = MacAddr([0, 0, 0, 0, 0, 0]);
-
-impl fmt::Debug for MacAddr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-            self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5]
-        )
-    }
-}
-
-impl fmt::Display for MacAddr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-            self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5]
-        )
-    }
-}
-
-impl From<MacAddr> for u64 {
-    fn from(mac: MacAddr) -> Self {
-        mac.0.into_iter().fold(0, |r, a| (r + a as u64) << 8)
-    }
-}
-
-impl TryFrom<u64> for MacAddr {
-    type Error = core::array::TryFromSliceError;
-    fn try_from(value: u64) -> Result<Self, Self::Error> {
-        let slice = &value.to_le_bytes()[..6];
-        <&[u8; 6]>::try_from(slice).map(|a| MacAddr(*a))
-    }
-}
-
-impl FromStr for MacAddr {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut addr = [0u8; 6];
-        for (idx, n_s) in s.split(":").enumerate() {
-            if idx >= 6 {
-                return Err(Error::ParseMacFailed(s.to_string()));
-            }
-            match u8::from_str_radix(n_s, 16) {
-                Ok(n) => addr[idx] = n,
-                Err(_) => return Err(Error::ParseMacFailed(s.to_string())),
-            }
-        }
-        Ok(MacAddr(addr))
-    }
-}
-
-#[derive(Debug)]
-pub struct Link {
-    pub if_index: u32,
-    pub mac_addr: MacAddr,
-    pub name: String,
-    pub if_type: Option<String>,
-    pub parent_index: Option<u32>,
-}
+/*
+* TODO
+*  BPF socket 构造
+*
+*/
 
 pub fn link_list() -> Result<Vec<Link>, NlError> {
     let msg = Ifinfomsg::new(
@@ -163,14 +102,6 @@ pub fn link_list() -> Result<Vec<Link>, NlError> {
     Ok(links)
 }
 
-#[derive(Debug)]
-pub struct Addr {
-    pub if_index: u32,
-    pub ip_addr: IpAddr,
-    pub scope: u8,
-    pub prefix_len: u8,
-}
-
 fn parse_ip_slice(bs: &[u8]) -> Option<IpAddr> {
     if let Ok(s) = <&[u8; 4]>::try_from(bs) {
         Some(IpAddr::from(*s))
@@ -229,12 +160,6 @@ pub fn addr_list() -> Result<Vec<Addr>, NlError> {
     Ok(addrs)
 }
 
-#[derive(Debug)]
-pub struct Route {
-    pub src_ip: IpAddr,
-    pub oif_index: u32,
-}
-
 pub fn route_get(dest: &IpAddr) -> Result<Vec<Route>, NlError> {
     let msg = {
         let (rtm_family, rtm_dst_len, buf): (_, _, Buffer) = match dest {
@@ -275,6 +200,7 @@ pub fn route_get(dest: &IpAddr) -> Result<Vec<Route>, NlError> {
 
             let mut src_ip = None;
             let mut oif_index = None;
+            let mut gateway = None;
             for attr in payload.rtattrs.iter() {
                 match attr.rta_type {
                     Rta::Prefsrc => src_ip = parse_ip_slice(attr.rta_payload.as_ref()),
@@ -283,11 +209,16 @@ pub fn route_get(dest: &IpAddr) -> Result<Vec<Route>, NlError> {
                             .ok()
                             .map(|x| u32::from_le_bytes(*x))
                     }
+                    Rta::Gateway => gateway = parse_ip_slice(attr.rta_payload.as_ref()),
                     _ => (),
                 }
             }
             match (src_ip, oif_index) {
-                (Some(src_ip), Some(oif_index)) => routes.push(Route { src_ip, oif_index }),
+                (Some(src_ip), Some(oif_index)) => routes.push(Route {
+                    src_ip,
+                    oif_index,
+                    gateway,
+                }),
                 _ => (),
             }
         }

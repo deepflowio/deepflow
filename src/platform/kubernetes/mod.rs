@@ -3,7 +3,6 @@ use std::{collections::HashMap, fmt, fs, io, net::IpAddr, os::unix::io::AsRawFd,
 use enum_dispatch::enum_dispatch;
 use nix::sched::{setns, CloneFlags};
 
-use crate::error::Result;
 use crate::utils::net::MacAddr;
 
 mod active_poller;

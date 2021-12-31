@@ -16,6 +16,10 @@ pub enum Error {
     IO(#[from] std::io::Error),
     #[error("data not found: {0}")]
     NotFound(String),
+    #[error("Arp lookup failed from: {0}")]
+    ArpLookup(String),
+    #[error("Windows related error:{0}")]
+    Windows(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

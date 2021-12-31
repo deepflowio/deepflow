@@ -16,7 +16,6 @@ use nix::errno::Errno;
 use nix::sched::{setns, CloneFlags};
 
 use super::{ls_ns_net, InterfaceInfo, Poller};
-use crate::error::Result;
 use crate::utils::net::{addr_list, link_list};
 
 #[derive(Debug)]
@@ -189,7 +188,6 @@ impl ActivePoller {
         // 初始化
         *entries.lock().unwrap() = Self::query(&mut priv_logged);
         version.store(1, Ordering::SeqCst);
-        *running.lock().unwrap() = true;
 
         loop {
             let guard = running.lock().unwrap();
@@ -236,12 +234,16 @@ impl Poller for ActivePoller {
     }
 
     fn start(&self) {
-        if *self.running.lock().unwrap() {
-            debug!("Active Poller has already running");
-            return;
+        {
+            let mut running_guard = self.running.lock().unwrap();
+            if *running_guard {
+                debug!("ActivePoller has already running");
+                return;
+            }
+            *running_guard = true;
         }
 
-        info!("Starts kubernetes active poller");
+        info!("starts kubernetes active poller");
         let entries = self.entries.clone();
         let running = self.running.clone();
         let version = self.version.clone();
@@ -250,23 +252,24 @@ impl Poller for ActivePoller {
 
         let handle =
             thread::spawn(move || Self::process(timer, running, version, entries, timeout));
-        *self.thread.lock().unwrap() = Some(handle);
+        self.thread.lock().unwrap().replace(handle);
     }
 
     fn stop(&self) {
-        let mut running_lock = self.running.lock().unwrap();
-        if !*running_lock {
-            debug!("Active Poller has already stopped");
-            return;
+        {
+            let mut running_lock = self.running.lock().unwrap();
+            if !*running_lock {
+                debug!("ActivePoller has already stopped");
+                return;
+            }
+            *running_lock = false;
         }
-        *running_lock = false;
-        drop(running_lock);
 
         self.timer.notify_one();
         if let Some(handle) = self.thread.lock().unwrap().take() {
             handle.join().expect("cannot wait thread");
         }
-        info!("Stops kubernetes poller");
+        info!("stops kubernetes poller");
     }
 }
 
