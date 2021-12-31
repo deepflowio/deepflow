@@ -141,7 +141,7 @@ func (a *Acl) generateMatchedField(srcMac, dstMac uint64, srcIps, dstIps ipSegme
 	nodes := make([]MatchNode, len(srcPorts)*len(dstPorts))
 	for i, srcPort := range srcPorts {
 		for j, dstPort := range dstPorts {
-			index := i*len(srcPorts) + j
+			index := i*len(dstPorts) + j
 			match, mask := &nodes[index].Matched, &nodes[index].MatchedMask
 
 			match.Set(MATCHED_TAP_TYPE, uint64(a.TapType))
@@ -177,7 +177,7 @@ func (a *Acl) generateMatchedField6(srcMac, dstMac uint64, srcIps, dstIps ipSegm
 	nodes := make([]Match6Node, len(srcPorts)*len(dstPorts))
 	for i, srcPort := range srcPorts {
 		for j, dstPort := range dstPorts {
-			index := i*len(srcPorts) + j
+			index := i*len(dstPorts) + j
 			match, mask := &nodes[index].Matched, &nodes[index].MatchedMask
 
 			match.Set(MATCHED6_TAP_TYPE, uint64(a.TapType))
