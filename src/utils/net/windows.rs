@@ -6,9 +6,10 @@ use std::{
 use windows::Win32::{
     Foundation::{CHAR, ERROR_BUFFER_OVERFLOW, NO_ERROR},
     NetworkManagement::IpHelper::{
-        GetAdaptersAddresses, GetBestInterfaceEx, GetBestRoute2, IfOperStatusUp, AF_INET, AF_INET6,
-        AF_UNSPEC, GAA_FLAG_INCLUDE_ALL_INTERFACES, IP_ADAPTER_ADDRESSES_LH,
-        IP_ADAPTER_ADDRESSES_LH_0, IP_ADAPTER_ADDRESSES_LH_0_0, MIB_IPFORWARD_ROW2,
+        GetAdaptersAddresses, GetBestInterfaceEx, GetBestRoute2, IfOperStatusUp,
+        ResolveIpNetEntry2, AF_INET, AF_INET6, AF_UNSPEC, GAA_FLAG_INCLUDE_ALL_INTERFACES,
+        IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_ADDRESSES_LH_0, IP_ADAPTER_ADDRESSES_LH_0_0,
+        MIB_IPFORWARD_ROW2, MIB_IPNET_ROW2,
     },
     Networking::WinSock::{
         IN6_ADDR, IN6_ADDR_0, IN_ADDR, IN_ADDR_0, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6,
@@ -16,7 +17,7 @@ use windows::Win32::{
     },
 };
 
-use super::{Addr, Link, MacAddr, Route, MAC_ADDR_ZERO};
+use super::{Addr, Link, MacAddr, NeighborEntry, Route, MAC_ADDR_ZERO};
 use crate::{
     common::IfType,
     error::{Error, Result},
@@ -32,6 +33,79 @@ use crate::{
 enum SafetySockAddr {
     Ipv4(SOCKADDR_IN),
     Ipv6(SOCKADDR_IN6),
+}
+
+pub fn neighbor_lookup(mut dest_addr: IpAddr) -> Result<NeighborEntry> {
+    let route = route_get(dest_addr)?;
+
+    let dest_sockaddr = match (route.gateway, dest_addr) {
+        (Some(IpAddr::V4(v4)), _) | (None, IpAddr::V4(v4)) => SOCKADDR_INET {
+            Ipv4: SOCKADDR_IN {
+                sin_family: AF_INET as u16,
+                sin_port: 0,
+                sin_zero: [CHAR::default(); 8],
+                sin_addr: IN_ADDR {
+                    S_un: IN_ADDR_0 {
+                        S_addr: u32::from(v4).to_be(),
+                    },
+                },
+            },
+        },
+        (Some(IpAddr::V6(v6)), _) | (None, IpAddr::V6(v6)) => SOCKADDR_INET {
+            Ipv6: SOCKADDR_IN6 {
+                sin6_family: AF_INET6 as u16,
+                sin6_port: 0,
+                sin6_addr: IN6_ADDR {
+                    u: IN6_ADDR_0 { Byte: v6.octets() },
+                },
+                sin6_flowinfo: 0,
+                Anonymous: SOCKADDR_IN6_0 { sin6_scope_id: 0 },
+            },
+        },
+    };
+
+    let mut ipnet_row = MIB_IPNET_ROW2::default();
+    ipnet_row.InterfaceIndex = route.oif_index;
+    ipnet_row.Address = dest_sockaddr;
+
+    // 发送ARP/NDP request 获取目的IP的mac address
+    if let Err(err) = unsafe { ResolveIpNetEntry2(&mut ipnet_row, ptr::null()) } {
+        return Err(Error::Windows(format!(
+            "resolve (ip -> mac address) error: {}",
+            err
+        )));
+    }
+
+    // mac addr length=6
+    if ipnet_row.PhysicalAddressLength != 6 {
+        return Err(Error::Windows(format!(
+            "get wrong mac address length={}",
+            ipnet_row.PhysicalAddressLength
+        )));
+    }
+
+    let link = get_interface_by_index(route.oif_index)?;
+
+    let mac_addr = MacAddr(
+        ipnet_row
+            .PhysicalAddress
+            .get(..6)
+            .and_then(|m| <&[u8; 6]>::try_from(m).ok())
+            .map(|m| *m)
+            .unwrap(),
+    );
+
+    dest_addr = match route.gateway {
+        Some(addr) => addr,
+        None => dest_addr,
+    };
+
+    Ok(NeighborEntry {
+        src_addr: route.src_ip,
+        dest_addr,
+        dest_mac_addr: mac_addr,
+        src_link: link,
+    })
 }
 
 pub fn get_interface_by_name(friendly_name: &str) -> Result<Link> {
