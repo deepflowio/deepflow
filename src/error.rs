@@ -16,6 +16,10 @@ pub enum Error {
     IO(#[from] std::io::Error),
     #[error("data not found: {0}")]
     NotFound(String),
+    #[error("neighbor lookup failed from: {0}")]
+    NeighborLookup(String),
+    #[error("netlink error")]
+    NetLink(#[from] neli::err::NlError),
     #[error("Windows related error:{0}")]
     Windows(String),
     #[error("Kubernetes ApiWatcher error: {0}")]

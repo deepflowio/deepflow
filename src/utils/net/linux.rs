@@ -1,6 +1,11 @@
-use std::{ffi::CStr, net::IpAddr};
+use std::{
+    ffi::CStr,
+    io::ErrorKind,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    time::Duration,
+};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::Context;
 use neli::{
     consts::{nl::*, rtnl::*, socket::*},
     err::NlError,
@@ -10,14 +15,358 @@ use neli::{
     types::{Buffer, RtBuffer},
 };
 use nix::libc::IFLA_INFO_KIND;
+use pnet::{
+    datalink::{self, DataLinkReceiver, DataLinkSender, NetworkInterface},
+    packet::{
+        arp::{ArpHardwareTypes, ArpOperations, ArpPacket, MutableArpPacket},
+        ethernet::{EtherTypes, EthernetPacket, MutableEthernetPacket},
+        icmpv6::{
+            ndp::{
+                Icmpv6Codes, MutableNeighborSolicitPacket, NdpOption, NdpOptionTypes,
+                NeighborAdvertPacket,
+            },
+            Icmpv6Types,
+        },
+        ip::IpNextHeaderProtocols,
+        Packet,
+    },
+    transport::{
+        icmpv6_packet_iter, transport_channel, TransportChannelType, TransportProtocol,
+        TransportReceiver, TransportSender,
+    },
+};
 
-use super::{Addr, Link, MacAddr, Route, MAC_ADDR_ZERO};
+use super::{Addr, Link, MacAddr, NeighborEntry, Route, MAC_ADDR_ZERO};
+use crate::error::{Error, Result};
+
+const BUFFER_SIZE: usize = 512;
+const RCV_TIMEOUT: Duration = Duration::from_millis(500);
 
 /*
 * TODO
 *  BPF socket 构造
 *
 */
+
+pub fn neighbor_lookup(mut dest_addr: IpAddr) -> Result<NeighborEntry> {
+    let mut routes = route_get(&dest_addr)?;
+    if routes.is_empty() {
+        return Err(Error::NeighborLookup(format!(
+            "no such route with destination address=({})",
+            dest_addr
+        )));
+    }
+    let route = routes.swap_remove(0);
+
+    // 如果是外部网地址，那么能获取到gateway
+    if let Some(gw) = route.gateway {
+        dest_addr = gw;
+    }
+
+    let selected_interface = match datalink::interfaces()
+        .into_iter()
+        .find(|i| i.index == route.oif_index)
+    {
+        Some(interface) => interface,
+        None => {
+            return Err(Error::NeighborLookup(format!(
+                "could not find selected interface (if_index={})",
+                route.oif_index
+            )));
+        }
+    };
+
+    let target_mac = match (dest_addr, route.src_ip) {
+        (IpAddr::V4(dest_addr), IpAddr::V4(src_addr)) => {
+            arp_lookup(&selected_interface, src_addr, dest_addr)?
+        }
+        (IpAddr::V6(dest_addr), IpAddr::V6(_)) => ndp_lookup(&selected_interface, dest_addr)?,
+        (_, _) => {
+            return Err(Error::NeighborLookup(format!(
+                "invalid dest_addr src_ip pair=({}, {})",
+                dest_addr, route.src_ip
+            )));
+        }
+    };
+
+    let NetworkInterface {
+        name, index, mac, ..
+    } = selected_interface;
+
+    if mac.is_none() {
+        return Err(Error::NeighborLookup(String::from(
+            "source interface MAC address is none",
+        )));
+    }
+
+    Ok(NeighborEntry {
+        src_addr: route.src_ip,
+        src_link: Link {
+            if_index: index,
+            mac_addr: MacAddr(mac.unwrap().octets()),
+            name,
+            if_type: None,
+            parent_index: None,
+        },
+        dest_addr,
+        dest_mac_addr: target_mac,
+    })
+}
+
+fn ndp_lookup(selected_interface: &NetworkInterface, dest_addr: Ipv6Addr) -> Result<MacAddr> {
+    let protocol =
+        TransportChannelType::Layer4(TransportProtocol::Ipv6(IpNextHeaderProtocols::Icmpv6));
+
+    let (mut tx, mut rx) = match transport_channel(BUFFER_SIZE, protocol) {
+        Ok((tx, rx)) => (tx, rx),
+        Err(err) => {
+            return Err(Error::NeighborLookup(format!(
+                "create ndp transport channel error: {}",
+                err
+            )));
+        }
+    };
+
+    // 用默认值(64)不能接收response, 因为 solicitation packet 强制设置为255
+    // https://mirrors.ustc.edu.cn/rfc/rfc4861.html#section-4.1
+    if let Err(err) = tx.set_ttl(255) {
+        return Err(Error::NeighborLookup(format!(
+            "config ttl on ndp transport channel error: {}",
+            err
+        )));
+    }
+
+    send_ndp_request(&mut tx, selected_interface, dest_addr)?;
+    receive_ndp_response(&mut rx)
+}
+
+// lo ip，MAC地址返为 MAC_ADDR_ZERO
+// source_ip: 发包IP
+// target_ip： 要查询mac 的IP
+// MacAddr: target_ip 的mac
+// Link: 发包Link
+fn arp_lookup(
+    selected_interface: &NetworkInterface,
+    source_addr: Ipv4Addr,
+    dest_addr: Ipv4Addr,
+) -> Result<MacAddr> {
+    let channel_config = datalink::Config {
+        // 设置接收timeout
+        read_timeout: Some(RCV_TIMEOUT),
+        ..datalink::Config::default()
+    };
+
+    let (mut tx, mut rx) = match datalink::channel(&selected_interface, channel_config) {
+        Ok(datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
+        Ok(_) => {
+            return Err(Error::NeighborLookup(String::from(
+                "not an ethernet datalink channel",
+            )));
+        }
+        Err(error) => {
+            return Err(Error::NeighborLookup(format!(
+                "datalink channel creation failed error: {}",
+                error
+            )));
+        }
+    };
+
+    send_arp_request(&mut tx, selected_interface, source_addr, dest_addr)?;
+    receive_arp_response(&mut rx)
+}
+
+fn receive_ndp_response(rx: &mut TransportReceiver) -> Result<MacAddr> {
+    let mut iter = icmpv6_packet_iter(rx);
+    match iter.next_with_timeout(RCV_TIMEOUT) {
+        Ok(Some((pkt, addr))) => {
+            if pkt.get_icmpv6_type() == Icmpv6Types::NeighborAdvert {
+                NeighborAdvertPacket::new(pkt.packet())
+                    .and_then(|pkt| {
+                        pkt.get_options()
+                            .into_iter()
+                            .find(|option| option.option_type == NdpOptionTypes::TargetLLAddr)
+                            .and_then(|option| {
+                                <&[u8; 6]>::try_from(option.data.as_slice())
+                                    .ok()
+                                    .map(|m| MacAddr(*m))
+                            })
+                    })
+                    .ok_or(Error::NeighborLookup(String::from(
+                        "parse neighbor advertisement packet failed and get none MAC address",
+                    )))
+            } else {
+                let err_msg = format!(
+                    "ICMP type other than neighbor advertisement received from {:?} {:?}",
+                    addr,
+                    pkt.get_icmpv6_type()
+                );
+                return Err(Error::NeighborLookup(err_msg));
+            }
+        }
+        Ok(_) => {
+            return Err(Error::NeighborLookup(format!(
+                "receive neighbor advertisement packet timeout ({:?})",
+                RCV_TIMEOUT
+            )));
+        }
+        Err(e) => {
+            return Err(Error::NeighborLookup(format!(
+                "receive neighbor advertisement packet error: {}",
+                e
+            )));
+        }
+    }
+}
+
+// W: 不需要指定source address
+// A: `tx`发包指定target address 自动寻找 source address和 interface
+// W: 不需要计算请求节点的组播地址
+// A: 因为在lookup 函数已计算出获得mac接口的的ipv6 address
+fn send_ndp_request(
+    tx: &mut TransportSender,
+    interface: &NetworkInterface,
+    dest_addr: Ipv6Addr,
+) -> Result<()> {
+    // NeighborSolicit packet length = 24bytes , option 字段 8bytes, 共32bytes
+    let mut ns_buf = [0u8; 32];
+    let mut packet = match MutableNeighborSolicitPacket::new(&mut ns_buf) {
+        Some(p) => p,
+        None => {
+            return Err(Error::NeighborLookup(format!(
+                "failed to create neighbor solicit packet"
+            )));
+        }
+    };
+
+    packet.set_target_addr(dest_addr);
+    packet.set_icmpv6_type(Icmpv6Types::NeighborSolicit);
+    packet.set_icmpv6_code(Icmpv6Codes::NoCode);
+
+    let mac = interface.mac.unwrap().octets();
+    // length = size_of(type) + size_of(length) + size_of(data) 单位是8字节，所以是1
+    // https://mirrors.ustc.edu.cn/rfc/rfc4861.html#section-4.6.1
+    let ndp_option = NdpOption {
+        option_type: NdpOptionTypes::SourceLLAddr,
+        length: 1,
+        data: Vec::from(mac),
+    };
+    packet.set_options(&[ndp_option]);
+
+    if let Err(err) = tx.send_to(packet, IpAddr::from(dest_addr)) {
+        return Err(Error::NeighborLookup(format!(
+            "send ndp request packet error: {}",
+            err
+        )));
+    }
+    Ok(())
+}
+
+fn send_arp_request(
+    tx: &mut Box<dyn DataLinkSender>,
+    interface: &NetworkInterface,
+    source_addr: Ipv4Addr,
+    dest_addr: Ipv4Addr,
+) -> Result<()> {
+    const ETHERNET_STD_PACKET_SIZE: usize = 42;
+    const ARP_PACKET_SIZE: usize = 28;
+    const HW_ADDR_LEN: u8 = 6;
+    const IP_ADDR_LEN: u8 = 4;
+
+    let mut ethernet_buffer = [0u8; ETHERNET_STD_PACKET_SIZE];
+
+    let mut ethernet_packet = match MutableEthernetPacket::new(&mut ethernet_buffer) {
+        Some(pkt) => pkt,
+        None => {
+            return Err(Error::NeighborLookup(String::from(
+                "could not create ethernet packet",
+            )));
+        }
+    };
+
+    let src_mac = match interface.mac {
+        Some(mac) => mac,
+        None => {
+            return Err(Error::NeighborLookup(String::from(
+                "interface should have a MAC address",
+            )));
+        }
+    };
+    let target_mac = datalink::MacAddr::broadcast();
+
+    ethernet_packet.set_destination(target_mac);
+    ethernet_packet.set_source(src_mac);
+    ethernet_packet.set_ethertype(EtherTypes::Arp);
+
+    let mut arp_buffer = [0u8; ARP_PACKET_SIZE];
+
+    let mut arp_packet = match MutableArpPacket::new(&mut arp_buffer) {
+        Some(p) => p,
+        None => {
+            return Err(Error::NeighborLookup(String::from(
+                "could not create ARP packet",
+            )));
+        }
+    };
+
+    arp_packet.set_hardware_type(ArpHardwareTypes::Ethernet);
+    arp_packet.set_protocol_type(EtherTypes::Ipv4);
+    arp_packet.set_hw_addr_len(HW_ADDR_LEN);
+    arp_packet.set_proto_addr_len(IP_ADDR_LEN);
+    arp_packet.set_operation(ArpOperations::Request);
+    arp_packet.set_sender_hw_addr(src_mac);
+    arp_packet.set_sender_proto_addr(source_addr);
+    arp_packet.set_target_hw_addr(target_mac);
+    arp_packet.set_target_proto_addr(dest_addr);
+    ethernet_packet.set_payload(arp_packet.packet());
+
+    tx.send_to(ethernet_packet.packet(), Some(interface.clone()));
+
+    Ok(())
+}
+
+fn receive_arp_response(rx: &mut Box<dyn DataLinkReceiver>) -> Result<MacAddr> {
+    match rx.next() {
+        Ok(buffer) => match EthernetPacket::new(buffer) {
+            Some(ethernet_packet) => {
+                let is_arp_type = matches!(ethernet_packet.get_ethertype(), EtherTypes::Arp);
+                if !is_arp_type {
+                    return Err(Error::NeighborLookup(String::from("invalid ARP type")));
+                }
+                let arp_packet =
+                    ArpPacket::new(&buffer[MutableEthernetPacket::minimum_packet_size()..]);
+                match arp_packet {
+                    Some(arp) => {
+                        return Ok(MacAddr(arp.get_sender_hw_addr().octets()));
+                    }
+                    None => {
+                        return Err(Error::NeighborLookup(String::from(
+                            "could not create ARP packet",
+                        )));
+                    }
+                }
+            }
+            None => {
+                return Err(Error::NeighborLookup(String::from(
+                    "could not build ethernet packet",
+                )));
+            }
+        },
+        Err(e) => match e.kind() {
+            // 因为 channel_config 设置了timeout，所以等不到就会报错
+            ErrorKind::TimedOut => {
+                return Err(Error::NeighborLookup(String::from(
+                    "receive ethernet packet timeout",
+                )));
+            }
+            _ => {
+                return Err(Error::NeighborLookup(format!(
+                    "receive ARP request error: {}",
+                    e
+                )));
+            }
+        },
+    }
+}
 
 pub fn link_list() -> Result<Vec<Link>, NlError> {
     let msg = Ifinfomsg::new(
@@ -226,7 +575,7 @@ pub fn route_get(dest: &IpAddr) -> Result<Vec<Route>, NlError> {
     Ok(routes)
 }
 
-pub fn get_route_src_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
+pub fn get_route_src_ip_and_mac(dest: &IpAddr) -> anyhow::Result<(IpAddr, MacAddr)> {
     let (src_ip, oif_index) = get_route_src_ip_and_ifindex(dest)?;
     let links = link_list().context("failed to get links")?;
     for link in links.iter() {
@@ -249,17 +598,17 @@ pub fn get_route_src_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
         }
         break;
     }
-    Err(anyhow!("link with index {} not found", oif_index))
+    Err(anyhow::anyhow!("link with index {} not found", oif_index))
 }
 
-pub fn get_route_src_ip(dest: &IpAddr) -> Result<IpAddr> {
+pub fn get_route_src_ip(dest: &IpAddr) -> anyhow::Result<IpAddr> {
     get_route_src_ip_and_ifindex(dest).map(|r| r.0)
 }
 
-fn get_route_src_ip_and_ifindex(dest: &IpAddr) -> Result<(IpAddr, u32)> {
+fn get_route_src_ip_and_ifindex(dest: &IpAddr) -> anyhow::Result<(IpAddr, u32)> {
     let routes = route_get(dest).with_context(|| format!("failed to get routes for {}", dest))?;
     if routes.is_empty() {
-        return Err(anyhow!("no route found for {}", dest));
+        return Err(anyhow::anyhow!("no route found for {}", dest));
     }
     Ok((routes[0].src_ip, routes[0].oif_index))
 }
