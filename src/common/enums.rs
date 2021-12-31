@@ -163,6 +163,38 @@ impl fmt::Display for TapType {
     }
 }
 
+// 因为不知道Windows 的iftype 有那些，只能写一些常用的
+//https://docs.microsoft.com/en-us/windows/win32/api/iptypes/ns-iptypes-ip_adapter_addresses_lh
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
+#[repr(u32)]
+pub enum IfType {
+    Other = 1,
+    Ethernet = 6,
+    TokenRing = 9,
+    PPP = 23,
+    Loopback = 24,
+    ATM = 37,
+    IEEE80211 = 71,
+    Tunnel = 131,
+    IEEE1394 = 144,
+}
+
+impl fmt::Display for IfType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IfType::Other => write!(f, "other"),
+            IfType::Ethernet => write!(f, "ethernet"),
+            IfType::TokenRing => write!(f, "tokenping"),
+            IfType::PPP => write!(f, "ppp"),
+            IfType::Loopback => write!(f, "loopback"),
+            IfType::ATM => write!(f, "atm"),
+            IfType::IEEE80211 => write!(f, "ieee80211"),
+            IfType::Tunnel => write!(f, "tunnel"),
+            IfType::IEEE1394 => write!(f, "ieee1394"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
