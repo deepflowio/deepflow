@@ -6,6 +6,7 @@ import (
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 )
@@ -16,8 +17,8 @@ type SQLLogger struct {
 
 	L7Base
 
-	*datatype.AppProtoLogsData
-	mysql *datatype.MysqlInfo
+	*pb.AppProtoLogsData
+	mysql *pb.MysqlInfo
 }
 
 func SQLLoggerColumns() []*ckdb.Column {
@@ -53,7 +54,7 @@ func (s *SQLLogger) WriteBlock(block *ckdb.Block) error {
 		if err := block.WriteUInt8(uint8(datatype.L7_PROTOCOL_MYSQL)); err != nil {
 			return err
 		}
-		msgType := s.AppProtoLogsData.AppProtoLogsBaseInfo.MsgType
+		msgType := datatype.LogMessageType(s.AppProtoLogsData.BaseInfo.Head.MsgType)
 		if err := block.WriteUInt8(uint8(msgType)); err != nil {
 			return err
 		}
@@ -71,7 +72,7 @@ func (s *SQLLogger) WriteBlock(block *ckdb.Block) error {
 		}
 
 		// 响应时有效
-		status := s.AppProtoLogsData.AppProtoLogsBaseInfo.Status
+		status := uint8(s.AppProtoLogsData.BaseInfo.Head.Status)
 		if msgType == datatype.MSG_T_REQUEST {
 			status = datatype.STATUS_NOT_EXIST
 		}
@@ -79,18 +80,21 @@ func (s *SQLLogger) WriteBlock(block *ckdb.Block) error {
 			return err
 		}
 
-		errCode := &s.mysql.ErrorCode
+		errCode := uint16(s.mysql.ErrorCode)
 		if status != datatype.STATUS_ERROR {
-			errCode = nil
-		}
-		if err := block.WriteUInt16Nullable(errCode); err != nil {
-			return err
+			if err := block.WriteUInt16Nullable(nil); err != nil {
+				return err
+			}
+		} else {
+			if err := block.WriteUInt16Nullable(&errCode); err != nil {
+				return err
+			}
 		}
 		if err := block.WriteString(s.mysql.ErrorMessage); err != nil {
 			return err
 		}
 
-		if err := block.WriteUInt64(uint64(s.AppProtoLogsData.AppProtoLogsBaseInfo.RRT / time.Microsecond)); err != nil {
+		if err := block.WriteUInt64(s.AppProtoLogsData.BaseInfo.Head.RRT / uint64(time.Microsecond)); err != nil {
 			return err
 		}
 
@@ -102,14 +106,10 @@ func (s *SQLLogger) WriteBlock(block *ckdb.Block) error {
 	return nil
 }
 
-func (s *SQLLogger) Fill(l *datatype.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
+func (s *SQLLogger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
 	s.L7Base.Fill(l, platformData)
 
-	if l.Proto == datatype.PROTO_MYSQL {
-		if info, ok := l.Detail.(*datatype.MysqlInfo); ok {
-			s.mysql = info
-		}
-	}
+	s.mysql = l.Mysql
 }
 
 func (s *SQLLogger) Release() {
@@ -150,11 +150,10 @@ func ReleaseSQLLogger(l *SQLLogger) {
 
 var L7SQLCounter uint32
 
-func ProtoLogToSQLLogger(l *datatype.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
+func ProtoLogToSQLLogger(l *pb.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
 	h := AcquireSQLLogger()
-	l.AddReferenceCount()
 	h.AppProtoLogsData = l
-	h._id = genID(uint32(l.EndTime/time.Second), &L7SQLCounter, shardID)
+	h._id = genID(uint32(l.BaseInfo.EndTime/uint64(time.Second)), &L7SQLCounter, shardID)
 	h.Fill(l, platformData)
 	return h
 }

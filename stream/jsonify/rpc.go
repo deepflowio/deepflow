@@ -6,6 +6,7 @@ import (
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 )
@@ -17,8 +18,8 @@ type RPCLogger struct {
 
 	L7Base
 
-	*datatype.AppProtoLogsData
-	dubbo *datatype.DubboInfo
+	*pb.AppProtoLogsData
+	dubbo *pb.DubboInfo
 }
 
 func RPCLoggerColumns() []*ckdb.Column {
@@ -57,7 +58,7 @@ func (s *RPCLogger) WriteBlock(block *ckdb.Block) error {
 		if err := block.WriteString(s.dubbo.DubboVersion); err != nil {
 			return err
 		}
-		msgType := s.AppProtoLogsData.AppProtoLogsBaseInfo.MsgType
+		msgType := datatype.LogMessageType(s.AppProtoLogsData.BaseInfo.Head.MsgType)
 		if err := block.WriteUInt8(uint8(msgType)); err != nil {
 			return err
 		}
@@ -71,7 +72,7 @@ func (s *RPCLogger) WriteBlock(block *ckdb.Block) error {
 			return err
 		}
 
-		status := s.AppProtoLogsData.AppProtoLogsBaseInfo.Status
+		status := uint8(s.AppProtoLogsData.BaseInfo.Head.Status)
 		if msgType == datatype.MSG_T_REQUEST {
 			status = datatype.STATUS_NOT_EXIST
 		}
@@ -79,23 +80,26 @@ func (s *RPCLogger) WriteBlock(block *ckdb.Block) error {
 			return err
 		}
 
-		answerCode := &s.AppProtoLogsData.AppProtoLogsBaseInfo.Code
+		answerCode := uint16(s.AppProtoLogsData.BaseInfo.Head.Code)
 		if msgType == datatype.MSG_T_REQUEST {
-			answerCode = nil
-		}
-		if err := block.WriteUInt16Nullable(answerCode); err != nil {
-			return err
+			if err := block.WriteUInt16Nullable(nil); err != nil {
+				return err
+			}
+		} else {
+			if err := block.WriteUInt16Nullable(&answerCode); err != nil {
+				return err
+			}
 		}
 
 		execptionDesc := ""
-		if answerCode != nil && *answerCode <= SERVER_THREADPOOL_EXHAUSTED_ERROR {
-			execptionDesc = dubboExceptionDesc[*answerCode]
+		if answerCode >= uint16(OK) && answerCode <= SERVER_THREADPOOL_EXHAUSTED_ERROR {
+			execptionDesc = dubboExceptionDesc[answerCode]
 		}
 		if err := block.WriteString(execptionDesc); err != nil {
 			return err
 		}
 
-		if err := block.WriteUInt64(uint64(s.AppProtoLogsData.AppProtoLogsBaseInfo.RRT / time.Microsecond)); err != nil {
+		if err := block.WriteUInt64(s.AppProtoLogsData.BaseInfo.Head.RRT / uint64(time.Microsecond)); err != nil {
 			return err
 		}
 	}
@@ -103,14 +107,9 @@ func (s *RPCLogger) WriteBlock(block *ckdb.Block) error {
 	return nil
 }
 
-func (s *RPCLogger) Fill(l *datatype.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
+func (s *RPCLogger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
 	s.L7Base.Fill(l, platformData)
-
-	if l.Proto == datatype.PROTO_DUBBO {
-		if info, ok := l.Detail.(*datatype.DubboInfo); ok {
-			s.dubbo = info
-		}
-	}
+	s.dubbo = l.Dubbo
 }
 
 func (s *RPCLogger) Release() {
@@ -151,11 +150,10 @@ func ReleaseRPCLogger(l *RPCLogger) {
 
 var L7RPCCounter uint32
 
-func ProtoLogToRPCLogger(l *datatype.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
+func ProtoLogToRPCLogger(l *pb.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
 	h := AcquireRPCLogger()
-	l.AddReferenceCount()
 	h.AppProtoLogsData = l
-	h._id = genID(uint32(l.EndTime/time.Second), &L7RPCCounter, shardID)
+	h._id = genID(uint32(l.BaseInfo.EndTime/uint64(time.Second)), &L7RPCCounter, shardID)
 	h.Fill(l, platformData)
 	return h
 }

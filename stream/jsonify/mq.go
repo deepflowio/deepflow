@@ -6,6 +6,7 @@ import (
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 )
@@ -21,8 +22,8 @@ type MQLogger struct {
 
 	L7Base
 
-	*datatype.AppProtoLogsData
-	kafka *datatype.KafkaInfo
+	*pb.AppProtoLogsData
+	kafka *pb.KafkaInfo
 }
 
 func MQLoggerColumns() []*ckdb.Column {
@@ -58,7 +59,7 @@ func (s *MQLogger) WriteBlock(block *ckdb.Block) error {
 		if err := block.WriteUInt8(uint8(datatype.L7_PROTOCOL_KAFKA)); err != nil {
 			return err
 		}
-		msgType := s.AppProtoLogsData.AppProtoLogsBaseInfo.MsgType
+		msgType := datatype.LogMessageType(s.AppProtoLogsData.BaseInfo.Head.MsgType)
 		if err := block.WriteUInt8(uint8(msgType)); err != nil {
 			return err
 		}
@@ -74,7 +75,7 @@ func (s *MQLogger) WriteBlock(block *ckdb.Block) error {
 			return err
 		}
 
-		status := s.AppProtoLogsData.AppProtoLogsBaseInfo.Status
+		status := uint8(s.AppProtoLogsData.BaseInfo.Head.Status)
 		if msgType == datatype.MSG_T_REQUEST {
 			status = datatype.STATUS_NOT_EXIST
 		}
@@ -82,7 +83,7 @@ func (s *MQLogger) WriteBlock(block *ckdb.Block) error {
 			return err
 		}
 
-		answerCode := int16(s.AppProtoLogsData.AppProtoLogsBaseInfo.Code)
+		answerCode := int16(s.AppProtoLogsData.BaseInfo.Head.Code)
 		answerCodePtr := &answerCode
 		if msgType == datatype.MSG_T_REQUEST || answerCode == int16(NONE) {
 			answerCodePtr = nil
@@ -103,7 +104,7 @@ func (s *MQLogger) WriteBlock(block *ckdb.Block) error {
 			return err
 		}
 
-		if err := block.WriteUInt64(uint64(s.AppProtoLogsData.AppProtoLogsBaseInfo.RRT / time.Microsecond)); err != nil {
+		if err := block.WriteUInt64(s.AppProtoLogsData.BaseInfo.Head.RRT / uint64(time.Microsecond)); err != nil {
 			return err
 		}
 		var requestLen, responseLen uint32
@@ -125,14 +126,10 @@ func (s *MQLogger) WriteBlock(block *ckdb.Block) error {
 	return nil
 }
 
-func (s *MQLogger) Fill(l *datatype.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
+func (s *MQLogger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
 	s.L7Base.Fill(l, platformData)
 
-	if l.Proto == datatype.PROTO_KAFKA {
-		if info, ok := l.Detail.(*datatype.KafkaInfo); ok {
-			s.kafka = info
-		}
-	}
+	s.kafka = l.Kafka
 }
 
 func (s *MQLogger) Release() {
@@ -173,11 +170,10 @@ func ReleaseMQLogger(l *MQLogger) {
 
 var L7MQCounter uint32
 
-func ProtoLogToMQLogger(l *datatype.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
+func ProtoLogToMQLogger(l *pb.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
 	h := AcquireMQLogger()
-	l.AddReferenceCount()
 	h.AppProtoLogsData = l
-	h._id = genID(uint32(l.EndTime/time.Second), &L7MQCounter, shardID)
+	h._id = genID(uint32(l.BaseInfo.EndTime/uint64(time.Second)), &L7MQCounter, shardID)
 	h.Fill(l, platformData)
 	return h
 }

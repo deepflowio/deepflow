@@ -13,7 +13,6 @@ const (
 
 type throttleItem interface {
 	Release()
-	AddReferenceCount()
 }
 
 type ThrottlingQueue struct {
