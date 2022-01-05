@@ -208,11 +208,19 @@ func ReleaseAppProtoLogsData(d *AppProtoLogsData) {
 	if d.SubReferenceCount() {
 		return
 	}
-
-	if d.Proto == PROTO_HTTP {
+	switch d.Proto {
+	case PROTO_HTTP:
 		ReleaseHTTPInfo(d.Detail.(*HTTPInfo))
-	} else if d.Proto == PROTO_DNS {
+	case PROTO_DNS:
 		ReleaseDNSInfo(d.Detail.(*DNSInfo))
+	case PROTO_MYSQL:
+		ReleaseMYSQLInfo(d.Detail.(*MysqlInfo))
+	case PROTO_REDIS:
+		ReleaseREDISInfo(d.Detail.(*RedisInfo))
+	case PROTO_DUBBO:
+		ReleaseDubboInfo(d.Detail.(*DubboInfo))
+	case PROTO_KAFKA:
+		ReleaseKafkaInfo(d.Detail.(*KafkaInfo))
 	}
 
 	*d = zeroAppProtoLogsData
