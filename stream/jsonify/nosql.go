@@ -7,6 +7,7 @@ import (
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 )
@@ -17,8 +18,8 @@ type NoSQLLogger struct {
 
 	L7Base
 
-	*datatype.AppProtoLogsData
-	redis *datatype.RedisInfo
+	*pb.AppProtoLogsData
+	redis *pb.RedisInfo
 }
 
 func NoSQLLoggerColumns() []*ckdb.Column {
@@ -51,7 +52,7 @@ func (s *NoSQLLogger) WriteBlock(block *ckdb.Block) error {
 		if err := block.WriteUInt8(uint8(datatype.L7_PROTOCOL_REDIS)); err != nil {
 			return err
 		}
-		msgType := s.AppProtoLogsData.AppProtoLogsBaseInfo.MsgType
+		msgType := datatype.LogMessageType(s.AppProtoLogsData.BaseInfo.Head.MsgType)
 		if err := block.WriteUInt8(uint8(msgType)); err != nil {
 			return err
 		}
@@ -64,7 +65,7 @@ func (s *NoSQLLogger) WriteBlock(block *ckdb.Block) error {
 			return err
 		}
 		// status
-		status := s.AppProtoLogsData.AppProtoLogsBaseInfo.Status
+		status := uint8(s.AppProtoLogsData.BaseInfo.Head.Status)
 		if msgType == datatype.MSG_T_REQUEST {
 			status = datatype.STATUS_NOT_EXIST
 		}
@@ -75,7 +76,7 @@ func (s *NoSQLLogger) WriteBlock(block *ckdb.Block) error {
 		if err := block.WriteString(s.redis.Error); err != nil {
 			return err
 		}
-		if err := block.WriteUInt64(uint64(s.AppProtoLogsData.AppProtoLogsBaseInfo.RRT / time.Microsecond)); err != nil {
+		if err := block.WriteUInt64(s.AppProtoLogsData.BaseInfo.Head.RRT / uint64(time.Microsecond)); err != nil {
 			return err
 		}
 	}
@@ -83,14 +84,9 @@ func (s *NoSQLLogger) WriteBlock(block *ckdb.Block) error {
 	return nil
 }
 
-func (s *NoSQLLogger) Fill(l *datatype.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
+func (s *NoSQLLogger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
 	s.L7Base.Fill(l, platformData)
-
-	if l.Proto == datatype.PROTO_REDIS {
-		if info, ok := l.Detail.(*datatype.RedisInfo); ok {
-			s.redis = info
-		}
-	}
+	s.redis = l.Redis
 }
 
 func (s *NoSQLLogger) Release() {
@@ -131,11 +127,10 @@ func ReleaseNoSQLLogger(l *NoSQLLogger) {
 
 var L7NoSQLCounter uint32
 
-func ProtoLogToNoSQLLogger(l *datatype.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
+func ProtoLogToNoSQLLogger(l *pb.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
 	h := AcquireNoSQLLogger()
-	l.AddReferenceCount()
 	h.AppProtoLogsData = l
-	h._id = genID(uint32(l.EndTime/time.Second), &L7NoSQLCounter, shardID)
+	h._id = genID(uint32(l.BaseInfo.EndTime/uint64(time.Second)), &L7NoSQLCounter, shardID)
 	h.Fill(l, platformData)
 	return h
 }

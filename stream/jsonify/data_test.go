@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
 	"gitlab.yunshan.net/yunshan/droplet/stream/geo"
 )
@@ -34,7 +35,14 @@ func TestJsonify(t *testing.T) {
 
 func TestZeroToNull(t *testing.T) {
 	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", nil)
-	taggedFlow := datatype.TaggedFlow{}
+	taggedFlow := pb.TaggedFlow{
+		Flow: &pb.Flow{
+			FlowKey:            &pb.FlowKey{},
+			Tunnel:             &pb.TunnelField{},
+			FlowMetricsPeerSrc: &pb.FlowMetricsPeer{},
+			FlowMetricsPeerDst: &pb.FlowMetricsPeer{},
+		},
+	}
 
 	flow := TaggedFlowToLogger(&taggedFlow, 0, pf)
 
@@ -74,11 +82,15 @@ func TestParseUint32EpcID(t *testing.T) {
 }
 
 func TestProtoLogToHTTPLogger(t *testing.T) {
-	appData := &datatype.AppProtoLogsData{}
-	appData.VtapId = 123
-	appData.EndTime = 10 * time.Microsecond
-	appData.Proto = datatype.PROTO_HTTP
-	appData.Detail = &datatype.HTTPInfo{}
+	appData := &pb.AppProtoLogsData{
+		BaseInfo: &pb.AppProtoLogsBaseInfo{
+			Head: &pb.AppProtoHead{},
+		},
+	}
+	appData.BaseInfo.VtapId = 123
+	appData.BaseInfo.EndTime = uint64(10 * time.Microsecond)
+	appData.BaseInfo.Head.Proto = uint32(datatype.PROTO_HTTP)
+	appData.Http = &pb.HTTPInfo{}
 
 	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", nil)
 	httpData := ProtoLogToHTTPLogger(appData, 0, pf).(*HTTPLogger)
@@ -93,11 +105,15 @@ func TestProtoLogToHTTPLogger(t *testing.T) {
 }
 
 func TestProtoLogToDNSLogger(t *testing.T) {
-	appData := &datatype.AppProtoLogsData{}
-	appData.TapType = 3
-	appData.EndTime = 10 * time.Microsecond
-	appData.Proto = datatype.PROTO_HTTP
-	appData.Detail = &datatype.DNSInfo{}
+	appData := &pb.AppProtoLogsData{
+		BaseInfo: &pb.AppProtoLogsBaseInfo{
+			Head: &pb.AppProtoHead{},
+		},
+	}
+	appData.BaseInfo.TapType = 3
+	appData.BaseInfo.EndTime = uint64(10 * time.Microsecond)
+	appData.BaseInfo.Head.Proto = uint32(datatype.PROTO_HTTP)
+	appData.Dns = &pb.DNSInfo{}
 
 	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", nil)
 	dnsData := ProtoLogToDNSLogger(appData, 0, pf).(*DNSLogger)

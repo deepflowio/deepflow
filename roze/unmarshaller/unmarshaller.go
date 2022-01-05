@@ -16,6 +16,7 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
 	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
 	"gitlab.yunshan.net/yunshan/droplet/roze/dbwriter"
 	"gitlab.yunshan.net/yunshan/droplet/roze/msg"
 )
@@ -206,7 +207,7 @@ func (u *Unmarshaller) QueueProcess() {
 	stats.RegisterCountable("unmarshaller", u, stats.OptionStatTags{"thread": strconv.Itoa(u.index)})
 	rawDocs := make([]interface{}, GET_MAX_SIZE)
 	decoder := &codec.SimpleDecoder{}
-
+	pbDoc := &pb.Document{}
 	for {
 		n := u.unmarshallQueue.Gets(rawDocs)
 		for i := 0; i < n; i++ {
@@ -215,7 +216,7 @@ func (u *Unmarshaller) QueueProcess() {
 				bytes := recvBytes.Buffer[recvBytes.Begin:recvBytes.End]
 				decoder.Init(bytes)
 				for !decoder.Failed() && !decoder.IsEnd() {
-					doc, err := app.Decode(decoder)
+					doc, err := app.DecodePB(decoder, pbDoc)
 					if err != nil {
 						u.counter.ErrDocCount++
 						log.Warningf("Decode failed, bytes len=%d err=%s", len([]byte(bytes)), err)

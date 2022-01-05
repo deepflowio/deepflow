@@ -10,6 +10,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
@@ -293,23 +294,22 @@ func parseVersion(str string) uint8 {
 	return uint8(v)
 }
 
-func (h *HTTPLogger) Fill(l *datatype.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
+func (h *HTTPLogger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
 	h.L7Base.Fill(l, platformData)
-	if l.Proto == datatype.PROTO_HTTP {
-		if httpInfo, ok := l.Detail.(*datatype.HTTPInfo); ok {
-			h.Version = parseVersion(httpInfo.Version)
-			h.Method = strings.ToUpper(httpInfo.Method)
-			h.ClientIP4, h.ClientIP6, h.ClientIsIPv4 = parseIP(httpInfo.ClientIP)
-			h.Host = httpInfo.Host
-			h.Path = httpInfo.Path
-			h.StreamID = httpInfo.StreamID
-			h.TraceID = httpInfo.TraceID
-			h.ContentLength = int64(httpInfo.ContentLength)
-		}
+	if l.Http != nil {
+		httpInfo := l.Http
+		h.Version = parseVersion(httpInfo.Version)
+		h.Method = strings.ToUpper(httpInfo.Method)
+		h.ClientIP4, h.ClientIP6, h.ClientIsIPv4 = parseIP(httpInfo.ClientIP)
+		h.Host = httpInfo.Host
+		h.Path = httpInfo.Path
+		h.StreamID = httpInfo.StreamID
+		h.TraceID = httpInfo.TraceID
+		h.ContentLength = int64(httpInfo.ContentLength)
 	}
-	h.Type = uint8(l.MsgType)
-	h.AnswerCode = l.Code
-	h.Duration = uint64(l.RRT / time.Microsecond)
+	h.Type = uint8(l.BaseInfo.Head.MsgType)
+	h.AnswerCode = uint16(l.BaseInfo.Head.Code)
+	h.Duration = l.BaseInfo.Head.RRT / uint64(time.Microsecond)
 }
 
 func (h *HTTPLogger) Release() {
@@ -409,24 +409,23 @@ func (d *DNSLogger) WriteBlock(block *ckdb.Block) error {
 	return nil
 }
 
-func (d *DNSLogger) Fill(l *datatype.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
+func (d *DNSLogger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
 	d.L7Base.Fill(l, platformData)
 
 	// 应用层DNS信息
-	if l.Proto == datatype.PROTO_DNS {
-		if dnsInfo, ok := l.Detail.(*datatype.DNSInfo); ok {
-			d.ID = dnsInfo.TransID
-			d.DomainName = dnsInfo.QueryName
-			d.QueryType = dnsInfo.QueryType
-			d.AnswerAddr = dnsInfo.Answers
-			d.Protocol = l.Protocol
-		}
+	if l.Dns != nil {
+		dnsInfo := l.Dns
+		d.ID = uint16(dnsInfo.TransID)
+		d.DomainName = dnsInfo.QueryName
+		d.QueryType = uint16(dnsInfo.QueryType)
+		d.AnswerAddr = dnsInfo.Answers
+		d.Protocol = uint8(l.BaseInfo.Protocol)
 	}
-	d.Type = uint8(l.MsgType)
-	d.AnswerCode = l.Code
+	d.Type = uint8(l.BaseInfo.Head.MsgType)
+	d.AnswerCode = uint16(l.BaseInfo.Head.Code)
 
 	// 指标量
-	d.Duration = uint64(l.RRT / time.Microsecond)
+	d.Duration = l.BaseInfo.Head.RRT / uint64(time.Microsecond)
 }
 
 func (d *DNSLogger) Release() {
@@ -441,9 +440,10 @@ func (d *DNSLogger) String() string {
 	return fmt.Sprintf("DNS: %+v\n", *d)
 }
 
-func (b *L7Base) Fill(l *datatype.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
+func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
+	l := log.BaseInfo
 	// 网络层
-	if l.IsIPv6 {
+	if l.IsIPv6 == 1 {
 		b.IsIPv4 = false
 		b.IP60 = l.IP6Src[:]
 		b.IP61 = l.IP6Dst[:]
@@ -454,64 +454,70 @@ func (b *L7Base) Fill(l *datatype.AppProtoLogsData, platformData *grpc.PlatformI
 	}
 
 	// 传输层
-	b.ClientPort = l.PortSrc
-	b.ServerPort = l.PortDst
+	b.ClientPort = uint16(l.PortSrc)
+	b.ServerPort = uint16(l.PortDst)
 
 	// 知识图谱
-	b.KnowledgeGraph.FillL7(l, platformData)
+	// DNS的协议是any，其他l7的协议都是TCP
+	protocol := layers.IPProtocolTCP
+	if log.BaseInfo.Head.Proto == uint32(datatype.PROTO_DNS) {
+		protocol = 0
+	}
+	b.KnowledgeGraph.FillL7(l, platformData, protocol)
 
 	// 流信息
 	b.FlowID = l.FlowId
-	b.TapType = l.TapType
+	b.TapType = uint16(l.TapType)
 	b.TapPort = l.TapPort
 	b.TapSide = zerodoc.TAPSideEnum(l.TapSide).String()
-	b.VtapID = l.VtapId
-	b.StartTime = uint64(l.StartTime / time.Microsecond)
-	b.EndTime = uint64(l.EndTime / time.Microsecond)
+	b.VtapID = uint16(l.VtapId)
+	b.StartTime = l.StartTime / uint64(time.Microsecond)
+	b.EndTime = l.EndTime / uint64(time.Microsecond)
 }
 
-func (k *KnowledgeGraph) FillL7(l *datatype.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
+func (k *KnowledgeGraph) FillL7(l *pb.AppProtoLogsBaseInfo, platformData *grpc.PlatformInfoTable, protocol layers.IPProtocol) {
 	var info0, info1 *grpc.Info
 	l3EpcID0, l3EpcID1 := l.L3EpcIDSrc, l.L3EpcIDDst
 
 	// 对于VIP的流量，需要使用MAC来匹配
-	lookupByMac0, lookupByMac1 := l.IsVIPInterfaceSrc, l.IsVIPInterfaceDst
+	lookupByMac0, lookupByMac1 := l.IsVIPInterfaceSrc == 1, l.IsVIPInterfaceDst == 1
 	// 对于本地的流量，也需要使用MAC来匹配
-	if l.TapSide == uint8(zerodoc.Local) {
+	if l.TapSide == uint32(zerodoc.Local) {
 		lookupByMac0, lookupByMac1 = true, true
 	}
 	mac0, mac1 := l.MacSrc, l.MacDst
 	l3EpcMac0, l3EpcMac1 := mac0|uint64(l3EpcID0)<<48, mac1|uint64(l3EpcID1)<<48
 
+	isIPv6 := l.IsIPv6 == 1
 	if lookupByMac0 && lookupByMac1 {
 		info0, info1 = platformData.QueryMacInfosPair(l3EpcMac0, l3EpcMac1)
 		if info0 == nil {
-			info0 = common.RegetInfoFromIP(l.IsIPv6, l.IP6Src[:], uint32(l.IPSrc), int16(l3EpcID0), platformData)
+			info0 = common.RegetInfoFromIP(isIPv6, l.IP6Src[:], uint32(l.IPSrc), int16(l3EpcID0), platformData)
 		}
 		if info1 == nil {
-			info1 = common.RegetInfoFromIP(l.IsIPv6, l.IP6Dst[:], uint32(l.IPDst), int16(l3EpcID1), platformData)
+			info1 = common.RegetInfoFromIP(isIPv6, l.IP6Dst[:], uint32(l.IPDst), int16(l3EpcID1), platformData)
 		}
 	} else if lookupByMac0 {
 		info0 = platformData.QueryMacInfo(l3EpcMac0)
 		if info0 == nil {
-			info0 = common.RegetInfoFromIP(l.IsIPv6, l.IP6Src[:], uint32(l.IPSrc), int16(l3EpcID0), platformData)
+			info0 = common.RegetInfoFromIP(isIPv6, l.IP6Src[:], uint32(l.IPSrc), int16(l3EpcID0), platformData)
 		}
-		if l.IsIPv6 {
+		if isIPv6 {
 			info1 = platformData.QueryIPV6Infos(int16(l3EpcID1), l.IP6Dst[:])
 		} else {
 			info1 = platformData.QueryIPV4Infos(int16(l3EpcID1), uint32(l.IPDst))
 		}
 	} else if lookupByMac1 {
-		if l.IsIPv6 {
+		if isIPv6 {
 			info0 = platformData.QueryIPV6Infos(int16(l3EpcID0), l.IP6Src[:])
 		} else {
 			info0 = platformData.QueryIPV4Infos(int16(l3EpcID0), uint32(l.IPSrc))
 		}
 		info1 = platformData.QueryMacInfo(l3EpcMac1)
 		if info1 == nil {
-			info1 = common.RegetInfoFromIP(l.IsIPv6, l.IP6Dst[:], uint32(l.IPDst), int16(l3EpcID1), platformData)
+			info1 = common.RegetInfoFromIP(isIPv6, l.IP6Dst[:], uint32(l.IPDst), int16(l3EpcID1), platformData)
 		}
-	} else if l.IsIPv6 {
+	} else if isIPv6 {
 		info0, info1 = platformData.QueryIPV6InfosPair(int16(l3EpcID0), net.IP(l.IP6Src[:]), int16(l3EpcID1), net.IP(l.IP6Dst[:]))
 
 	} else {
@@ -546,13 +552,7 @@ func (k *KnowledgeGraph) FillL7(l *datatype.AppProtoLogsData, platformData *grpc
 	}
 	k.L3EpcID0, k.L3EpcID1 = l3EpcID0, l3EpcID1
 
-	// DNS的协议是any，其他l7的协议都是TCP
-	protocol := layers.IPProtocolTCP
-	if l.Proto == datatype.PROTO_DNS {
-		protocol = 0
-	}
-
-	if l.IsIPv6 {
+	if isIPv6 {
 		k.GroupIDs0, k.BusinessIDs0 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID0), l.IP6Src[:])
 		k.GroupIDs1, k.BusinessIDs1 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID1), l.IP6Dst[:])
 
@@ -565,7 +565,7 @@ func (k *KnowledgeGraph) FillL7(l *datatype.AppProtoLogsData, platformData *grpc
 		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID1 != 0 ||
 			k.PodNodeID1 != 0 {
-			_, k.ServiceID1 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID1), net.IP(l.IP6Dst[:]), protocol, l.PortDst)
+			_, k.ServiceID1 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID1), net.IP(l.IP6Dst[:]), protocol, uint16(l.PortDst))
 		}
 	} else {
 		k.GroupIDs0, k.BusinessIDs0 = platformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID0), l.IPSrc)
@@ -580,7 +580,7 @@ func (k *KnowledgeGraph) FillL7(l *datatype.AppProtoLogsData, platformData *grpc
 		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID1 != 0 ||
 			k.PodNodeID1 != 0 {
-			_, k.ServiceID1 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID1), l.IPDst, protocol, l.PortDst)
+			_, k.ServiceID1 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID1), l.IPDst, protocol, uint16(l.PortDst))
 		}
 	}
 }
@@ -609,9 +609,9 @@ func ReleaseHTTPLogger(l *HTTPLogger) {
 
 var L7HTTPCounter uint32
 
-func ProtoLogToHTTPLogger(l *datatype.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
+func ProtoLogToHTTPLogger(l *pb.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
 	h := AcquireHTTPLogger()
-	h._id = genID(uint32(l.EndTime/time.Second), &L7HTTPCounter, shardID)
+	h._id = genID(uint32(l.BaseInfo.EndTime/uint64(time.Second)), &L7HTTPCounter, shardID)
 	h.Fill(l, platformData)
 	return h
 }
@@ -640,9 +640,9 @@ func ReleaseDNSLogger(l *DNSLogger) {
 
 var L7DNSCounter uint32
 
-func ProtoLogToDNSLogger(l *datatype.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
+func ProtoLogToDNSLogger(l *pb.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
 	h := AcquireDNSLogger()
-	h._id = genID(uint32(l.EndTime/time.Second), &L7DNSCounter, shardID)
+	h._id = genID(uint32(l.BaseInfo.EndTime/uint64(time.Second)), &L7DNSCounter, shardID)
 	h.Fill(l, platformData)
 	return h
 }

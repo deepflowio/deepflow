@@ -7,6 +7,7 @@ import (
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
 	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
 	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
@@ -89,6 +90,7 @@ func (d *Decoder) Run() {
 		"msg_type": msgType})
 	buffer := make([]interface{}, BUFFER_SIZE)
 	decoder := &codec.SimpleDecoder{}
+	pbTaggedFlow := &pb.TaggedFlow{}
 	for {
 		n := d.inQueue.Gets(buffer)
 		for i := 0; i < n; i++ {
@@ -106,37 +108,38 @@ func (d *Decoder) Run() {
 			if d.msgType == datatype.MESSAGE_TYPE_PROTOCOLLOG {
 				d.handleProtoLog(decoder)
 			} else if d.msgType == datatype.MESSAGE_TYPE_TAGGEDFLOW {
-				d.handleTaggedFlow(decoder)
+				d.handleTaggedFlow(decoder, pbTaggedFlow)
 			}
 			receiver.ReleaseRecvBuffer(recvBytes)
 		}
 	}
 }
 
-func (d *Decoder) handleTaggedFlow(decoder *codec.SimpleDecoder) {
+func (d *Decoder) handleTaggedFlow(decoder *codec.SimpleDecoder, pbTaggedFlow *pb.TaggedFlow) {
 	for !decoder.IsEnd() {
-		flow := datatype.AcquireTaggedFlow()
-		flow.Decode(decoder)
+		decoder.ReadPB(pbTaggedFlow)
 		if decoder.Failed() {
 			d.counter.ErrorCount++
-			flow.Release()
 			log.Errorf("flow decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
 			return
 		}
-		if flow.StartTime == 0 { // 存在小概率starttime为0的异常数据
-			log.Warningf("invalid flow starttime %s", flow)
+		if !pbTaggedFlow.IsValid() {
+			d.counter.ErrorCount++
+			log.Warningf("invalid flow %s", pbTaggedFlow.Flow)
+			continue
 		}
-		d.sendFlow(flow)
+		d.sendFlow(pbTaggedFlow)
 	}
 }
 
 func (d *Decoder) handleProtoLog(decoder *codec.SimpleDecoder) {
 	for !decoder.IsEnd() {
-		protoLog := datatype.AcquireAppProtoLogsData()
-		protoLog.Decode(decoder)
-		if decoder.Failed() {
+		protoLog := pb.AcquirePbAppProtoLogsData()
+
+		decoder.ReadPB(protoLog)
+		if decoder.Failed() || !protoLog.IsValid() {
 			d.counter.ErrorCount++
-			protoLog.Release()
+			pb.ReleasePbAppProtoLogsData(protoLog)
 			log.Errorf("proto log decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
 			return
 		}
@@ -144,7 +147,7 @@ func (d *Decoder) handleProtoLog(decoder *codec.SimpleDecoder) {
 	}
 }
 
-func (d *Decoder) sendFlow(flow *datatype.TaggedFlow) {
+func (d *Decoder) sendFlow(flow *pb.TaggedFlow) {
 	if d.debugEnabled {
 		log.Debugf("decoder %d recv flow: %s", d.index, flow)
 	}
@@ -153,10 +156,9 @@ func (d *Decoder) sendFlow(flow *datatype.TaggedFlow) {
 	if !d.throttlers[common.L4_FLOW_ID].Send(l) {
 		d.counter.L4DropCount++
 	}
-	flow.Release()
 }
 
-type decodeFunc func(*datatype.AppProtoLogsData, int, *grpc.PlatformInfoTable) interface{}
+type decodeFunc func(*pb.AppProtoLogsData, int, *grpc.PlatformInfoTable) interface{}
 
 var decoderFuncs = []decodeFunc{
 	datatype.PROTO_HTTP:  jsonify.ProtoLogToHTTPLogger,
@@ -176,29 +178,30 @@ var throttleIDs = []common.FlowLogID{
 	datatype.PROTO_KAFKA: common.L7_MQ_ID,
 }
 
-func (d *Decoder) sendProto(proto *datatype.AppProtoLogsData) {
+func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 	if d.debugEnabled {
 		log.Debugf("decoder %d recv proto: %s", d.index, proto)
 	}
 
-	if int(proto.Proto) >= len(decoderFuncs) {
-		log.Warningf("invalid proto.Proto %d %s", proto.Proto, proto)
+	protoHead := proto.BaseInfo.Head
+	if int(protoHead.Proto) >= len(decoderFuncs) {
+		log.Warningf("invalid proto.Proto %d %s", protoHead.Proto, proto)
 	}
 
-	df := decoderFuncs[proto.Proto]
-	if df == nil {
+	decoder := decoderFuncs[protoHead.Proto]
+	if decoder == nil {
 		d.counter.ErrorCount++
-		log.Debugf("proto(%s) decoder is not exist", proto.Proto)
+		log.Debugf("proto(%s) decoder is not exist", protoHead.Proto)
 		return
 	}
 
-	l := df(proto, d.shardID, d.platformData)
-	throttleID := throttleIDs[proto.Proto]
+	l := decoder(proto, d.shardID, d.platformData)
+	throttleID := throttleIDs[protoHead.Proto]
 	var drop int64
 	if !d.throttlers[throttleID].Send(l) {
 		drop++
 	}
-	switch proto.Proto {
+	switch datatype.LogProtoType(protoHead.Proto) {
 	case datatype.PROTO_HTTP:
 		d.counter.L7HTTPCount++
 		d.counter.L7HTTPDropCount += drop
@@ -218,7 +221,6 @@ func (d *Decoder) sendProto(proto *datatype.AppProtoLogsData) {
 		d.counter.L7MQCount++
 		d.counter.L7MQDropCount += drop
 	}
-	proto.Release()
 }
 
 func (d *Decoder) flush() {
