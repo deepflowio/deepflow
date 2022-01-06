@@ -611,7 +611,7 @@ var L7HTTPCounter uint32
 
 func ProtoLogToHTTPLogger(l *datatype.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
 	h := AcquireHTTPLogger()
-	h._id = genID(uint32(l.StartTime/time.Second), &L7HTTPCounter, shardID)
+	h._id = genID(uint32(l.EndTime/time.Second), &L7HTTPCounter, shardID)
 	h.Fill(l, platformData)
 	return h
 }
