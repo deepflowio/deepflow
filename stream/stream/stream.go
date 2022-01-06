@@ -3,11 +3,13 @@ package stream
 import (
 	"net"
 	"strconv"
+	"time"
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 	"gitlab.yunshan.net/yunshan/droplet-libs/debug"
 	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
 	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
+	libqueue "gitlab.yunshan.net/yunshan/droplet-libs/queue"
 	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
 	dropletqueue "gitlab.yunshan.net/yunshan/droplet/droplet/queue"
 	"gitlab.yunshan.net/yunshan/droplet/dropletctl"
@@ -70,7 +72,9 @@ func NewFlowLogger(config *config.Config, controllers []net.IP, manager *droplet
 		"1-receive-to-decode"+queueSuffix,
 		config.DecoderQueueSize,
 		queueCount,
-		1)
+		1,
+		libqueue.OptionFlushIndicator(3*time.Second),
+		libqueue.OptionRelease(func(p interface{}) { receiver.ReleaseRecvBuffer(p.(*receiver.RecvBuffer)) }))
 	recv.RegistHandler(uint8(msgType), decodeQueues, queueCount)
 
 	throttle := config.Throttle / queueCount
@@ -118,7 +122,9 @@ func NewProtoLogger(config *config.Config, controllers []net.IP, manager *drople
 		"1-receive-to-decode"+queueSuffix,
 		config.DecoderQueueSize,
 		queueCount,
-		1)
+		1,
+		libqueue.OptionFlushIndicator(3*time.Second),
+		libqueue.OptionRelease(func(p interface{}) { receiver.ReleaseRecvBuffer(p.(*receiver.RecvBuffer)) }))
 
 	recv.RegistHandler(uint8(msgType), decodeQueues, queueCount)
 
