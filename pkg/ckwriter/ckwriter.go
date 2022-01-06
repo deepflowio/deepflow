@@ -203,7 +203,7 @@ func (w *CKWriter) queueProcess(queueID int) {
 					caches = caches[:0]
 					lastWriteTime = time.Now()
 				}
-			} else if item == nil { // flush ticker
+			} else if IsNil(item) { // flush ticker
 				if time.Since(lastWriteTime) > time.Duration(w.flushTimeout)*time.Second {
 					w.Write(queueID, caches)
 					caches = caches[:0]
