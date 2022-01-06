@@ -315,7 +315,7 @@ func (w *CKWriter) writeItems(queueID int, items []CKItem) error {
 	if err != nil {
 		return fmt.Errorf("commit write block failed: %s", err)
 	} else {
-		log.Debugf("commit success, table %s commit %d items", w.table, len(items))
+		log.Debugf("commit success, table (%s.%s) commit %d items", w.table.Database, w.table.LocalName, len(items))
 	}
 	return nil
 }
