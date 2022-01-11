@@ -44,8 +44,8 @@ type MysqlInfo struct {
 	Context string
 	// Response
 	ResponseCode uint8
-	AffectedRows uint8
 	ErrorCode    uint16
+	AffectedRows uint64
 	ErrorMessage string
 }
 
@@ -60,16 +60,16 @@ func (i *MysqlInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType,
 		encoder.WriteString255(i.Context)
 	case MSG_T_RESPONSE:
 		encoder.WriteU8(i.ResponseCode)
-		encoder.WriteU8(i.AffectedRows)
 		encoder.WriteU16(i.ErrorCode)
+		encoder.WriteU64(i.AffectedRows)
 		encoder.WriteString255(i.ErrorMessage)
 	case MSG_T_SESSION:
 		encoder.WriteU8(i.Command)
 		encoder.WriteString255(i.Context)
 
 		encoder.WriteU8(i.ResponseCode)
-		encoder.WriteU8(i.AffectedRows)
 		encoder.WriteU16(i.ErrorCode)
+		encoder.WriteU64(i.AffectedRows)
 		encoder.WriteString255(i.ErrorMessage)
 	}
 }
@@ -85,16 +85,16 @@ func (i *MysqlInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType,
 		i.Context = decoder.ReadString255()
 	case MSG_T_RESPONSE:
 		i.ResponseCode = decoder.ReadU8()
-		i.AffectedRows = decoder.ReadU8()
 		i.ErrorCode = decoder.ReadU16()
+		i.AffectedRows = decoder.ReadU64()
 		i.ErrorMessage = decoder.ReadString255()
 	case MSG_T_SESSION:
 		i.Command = decoder.ReadU8()
 		i.Context = decoder.ReadString255()
 
 		i.ResponseCode = decoder.ReadU8()
-		i.AffectedRows = decoder.ReadU8()
 		i.ErrorCode = decoder.ReadU16()
+		i.AffectedRows = decoder.ReadU64()
 		i.ErrorMessage = decoder.ReadString255()
 	}
 }
