@@ -36,7 +36,7 @@ func SQLLoggerColumns() []*ckdb.Column {
 		ckdb.NewColumn("exception_desc", ckdb.String).SetComment("异常描述"),
 
 		ckdb.NewColumn("duration", ckdb.UInt64).SetComment("响应时延, 请求报文与第一个响应报文的时长(us)"), // us
-		ckdb.NewColumn("affected_rows", ckdb.UInt8).SetComment("影响行数").SetIndex(ckdb.IndexNone),
+		ckdb.NewColumn("affected_rows", ckdb.UInt64).SetComment("影响行数").SetIndex(ckdb.IndexNone),
 	)
 	return columns
 }
@@ -94,7 +94,7 @@ func (s *SQLLogger) WriteBlock(block *ckdb.Block) error {
 			return err
 		}
 
-		if err := block.WriteUInt8(s.mysql.AffectedRows); err != nil {
+		if err := block.WriteUInt64(s.mysql.AffectedRows); err != nil {
 			return err
 		}
 	}
