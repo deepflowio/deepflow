@@ -89,9 +89,8 @@ func Load(path string) Config {
 		Influxdb:       HostPort{DefaultInfluxdbHost, DefaultInfluxdbPort},
 	}
 	if err != nil {
-		config.Validate()
-		log.Warning("Read config file error:", err)
-		return config
+		log.Error("Read config file error:", err)
+		os.Exit(1)
 	}
 	if err = yaml.Unmarshal(configBytes, &config); err != nil {
 		log.Error("Unmarshal yaml error:", err)
