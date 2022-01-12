@@ -81,12 +81,14 @@ const (
 	STATUS_OK uint8 = iota
 	STATUS_ERROR
 	STATUS_NOT_EXIST
+	STATUS_SERVER_ERROR
+	STATUS_CLIENT_ERROR
 )
 
 type AppProtoHead struct {
 	Proto   LogProtoType
 	MsgType LogMessageType // HTTP，DNS: request/response
-	Status  uint8          // 状态描述：0：正常，1：异常，2：不存在
+	Status  uint8          // 状态描述：0：正常，1：已废弃使用(先前用于表示异常)，2：不存在，3：服务端异常，4：客户端异常
 	Code    uint16         // HTTP状态码: 1xx-5xx, DNS状态码: 0-7
 	RRT     time.Duration  // HTTP，DNS时延: response-request
 
@@ -476,65 +478,113 @@ type ProtoSpecialInfo interface {
 
 // HTTPv2根据需要添加
 type HTTPInfo struct {
-	StreamID      uint32 // HTTPv2
-	ContentLength int64
-	Version       string
-	Method        string
-	Path          string
-	Host          string
-	ClientIP      string
-	TraceID       string
+	StreamID uint32 // HTTPv2
+	Version  string
+	TraceID  string
+	SpanID   string
+
+	Method   string
+	Path     string
+	Host     string
+	ClientIP string
+
+	ReqContentLength  int64
+	RespContentLength int64
 }
 
 func (h *HTTPInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, code uint16) {
 	encoder.WriteU32(h.StreamID)
-	encoder.WriteU64(uint64(h.ContentLength))
 	encoder.WriteString255(h.Version)
-	if msgType == MSG_T_SESSION || msgType == MSG_T_REQUEST {
+	encoder.WriteString255(h.TraceID)
+	encoder.WriteString255(h.SpanID)
+
+	switch msgType {
+	case MSG_T_REQUEST:
 		encoder.WriteString255(h.Method)
 		encoder.WriteString255(h.Path)
 		encoder.WriteString255(h.Host)
 		encoder.WriteString255(h.ClientIP)
+		encoder.WriteU64(uint64(h.ReqContentLength))
+	case MSG_T_RESPONSE:
+		encoder.WriteU64(uint64(h.RespContentLength))
+	case MSG_T_SESSION:
+		encoder.WriteString255(h.Method)
+		encoder.WriteString255(h.Path)
+		encoder.WriteString255(h.Host)
+		encoder.WriteString255(h.ClientIP)
+		encoder.WriteU64(uint64(h.ReqContentLength))
+
+		encoder.WriteU64(uint64(h.RespContentLength))
 	}
-	encoder.WriteString255(h.TraceID)
 }
 
 func (h *HTTPInfo) WriteToPB(p *pb.HTTPInfo, msgType LogMessageType) {
 	p.StreamID = h.StreamID
-	p.ContentLength = h.ContentLength
 	p.Version = h.Version
-	if msgType == MSG_T_SESSION || msgType == MSG_T_REQUEST {
+	p.TraceID = h.TraceID
+	p.SpanID = h.SpanID
+
+	switch msgType {
+	case MSG_T_REQUEST:
 		p.Method = h.Method
 		p.Path = h.Path
 		p.Host = h.Host
 		p.ClientIP = h.ClientIP
-	} else {
+		p.ReqContentLength = h.ReqContentLength
+		p.RespContentLength = 0
+	case MSG_T_RESPONSE:
+		p.RespContentLength = h.RespContentLength
 		p.Method = ""
 		p.Path = ""
 		p.Host = ""
 		p.ClientIP = ""
+		p.ReqContentLength = 0
+	case MSG_T_SESSION:
+		p.Method = h.Method
+		p.Path = h.Path
+		p.Host = h.Host
+		p.ClientIP = h.ClientIP
+		p.ReqContentLength = h.ReqContentLength
+
+		p.RespContentLength = h.RespContentLength
 	}
-	p.TraceID = h.TraceID
 }
 
 func (h *HTTPInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, code uint16) {
 	h.StreamID = decoder.ReadU32()
-	h.ContentLength = int64(decoder.ReadU64())
 	h.Version = decoder.ReadString255()
-	if msgType == MSG_T_SESSION || msgType == MSG_T_REQUEST {
+	h.TraceID = decoder.ReadString255()
+	h.SpanID = decoder.ReadString255()
+
+	switch msgType {
+	case MSG_T_REQUEST:
 		h.Method = decoder.ReadString255()
 		h.Path = decoder.ReadString255()
 		h.Host = decoder.ReadString255()
 		h.ClientIP = decoder.ReadString255()
+		h.ReqContentLength = int64(decoder.ReadU64())
+	case MSG_T_RESPONSE:
+		h.RespContentLength = int64(decoder.ReadU64())
+	case MSG_T_SESSION:
+		h.Method = decoder.ReadString255()
+		h.Path = decoder.ReadString255()
+		h.Host = decoder.ReadString255()
+		h.ClientIP = decoder.ReadString255()
+		h.ReqContentLength = int64(decoder.ReadU64())
+
+		h.RespContentLength = int64(decoder.ReadU64())
 	}
-	h.TraceID = decoder.ReadString255()
 }
 
 func (h *HTTPInfo) String() string {
 	return fmt.Sprintf("%#v", h)
 }
 
-func (h *HTTPInfo) Merge(_ interface{}) {}
+func (h *HTTPInfo) Merge(r interface{}) {
+	if http, ok := r.(*HTTPInfo); ok {
+		h.RespContentLength = http.RespContentLength
+	}
+}
 
 // | type | 查询类型 | 说明|
 // | ---- | -------- | --- |
