@@ -25,13 +25,13 @@ type KafkaInfo struct {
 	CorrelationId uint32
 
 	// request
-	ReqMsgSize uint32
+	ReqMsgSize int32
 	ApiVersion uint16
 	ApiKey     uint16
 	ClientID   string
 
 	// reponse
-	RespMsgSize uint32
+	RespMsgSize int32
 }
 
 func (i *KafkaInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, code uint16) {
@@ -39,19 +39,19 @@ func (i *KafkaInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType,
 
 	switch msgType {
 	case MSG_T_REQUEST:
-		encoder.WriteU32(i.ReqMsgSize)
+		encoder.WriteU32(uint32(i.ReqMsgSize))
 		encoder.WriteU16(i.ApiVersion)
 		encoder.WriteU16(i.ApiKey)
 		encoder.WriteString255(i.ClientID)
 	case MSG_T_RESPONSE:
-		encoder.WriteU32(i.RespMsgSize)
+		encoder.WriteU32(uint32(i.RespMsgSize))
 	case MSG_T_SESSION:
-		encoder.WriteU32(i.ReqMsgSize)
+		encoder.WriteU32(uint32(i.ReqMsgSize))
 		encoder.WriteU16(i.ApiVersion)
 		encoder.WriteU16(i.ApiKey)
 		encoder.WriteString255(i.ClientID)
 
-		encoder.WriteU32(i.RespMsgSize)
+		encoder.WriteU32(uint32(i.RespMsgSize))
 	}
 }
 
@@ -85,19 +85,19 @@ func (i *KafkaInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType,
 	i.CorrelationId = decoder.ReadU32()
 	switch msgType {
 	case MSG_T_REQUEST:
-		i.ReqMsgSize = decoder.ReadU32()
+		i.ReqMsgSize = int32(decoder.ReadU32())
 		i.ApiVersion = decoder.ReadU16()
 		i.ApiKey = decoder.ReadU16()
 		i.ClientID = decoder.ReadString255()
 	case MSG_T_RESPONSE:
-		i.RespMsgSize = decoder.ReadU32()
+		i.RespMsgSize = int32(decoder.ReadU32())
 	case MSG_T_SESSION:
-		i.ReqMsgSize = decoder.ReadU32()
+		i.ReqMsgSize = int32(decoder.ReadU32())
 		i.ApiVersion = decoder.ReadU16()
 		i.ApiKey = decoder.ReadU16()
 		i.ClientID = decoder.ReadString255()
 
-		i.RespMsgSize = decoder.ReadU32()
+		i.RespMsgSize = int32(decoder.ReadU32())
 	}
 }
 

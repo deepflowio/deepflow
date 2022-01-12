@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	VERSION                   = 20220112
+	VERSION                   = 20220113
 	LAST_SIMPLE_CODEC_VERSION = 20220111 // 这个版本及之前的版本使用simple_codec, 之后的版本使用pb_codec, 使用pb_codec在版本不匹配时，不丢数据
 )
 
