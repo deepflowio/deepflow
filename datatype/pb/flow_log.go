@@ -30,3 +30,24 @@ func ReleasePbAppProtoLogsData(d *AppProtoLogsData) {
 func (d *AppProtoLogsData) Release() {
 	ReleasePbAppProtoLogsData(d)
 }
+
+func (d *AppProtoLogsData) IsValid() bool {
+	if d == nil ||
+		d.BaseInfo == nil ||
+		d.BaseInfo.Head == nil {
+		return false
+	}
+	return true
+}
+
+func (t *TaggedFlow) IsValid() bool {
+	if t == nil ||
+		t.Flow == nil ||
+		t.Flow.FlowKey == nil ||
+		t.Flow.FlowMetricsPeerSrc == nil ||
+		t.Flow.FlowMetricsPeerDst == nil ||
+		t.Flow.Tunnel == nil {
+		return false
+	}
+	return true
+}
