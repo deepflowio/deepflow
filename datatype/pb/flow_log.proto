@@ -188,13 +188,16 @@ message AppProtoHead {
 
 message HTTPInfo {
 	uint32 StreamID = 1;
-	int64  ContentLength = 2;
 	string Version = 3;
 	string Method = 4;
 	string Path = 5;
 	string Host = 6;
 	string ClientIP = 7;
 	string TraceID = 8;
+	string SpanID = 9;
+
+	int64  ReqContentLength = 10;
+	int64  RespContentLength = 11;
 }
 
 message DNSInfo {
@@ -207,24 +210,26 @@ message DNSInfo {
 message DubboInfo {
 	uint32 SerialID = 1;
 	uint32 Type = 2;
-	uint32 BodyLen = 3;
 	uint32 ID = 4;
 
 	string DubboVersion = 5;
 	string ServiceName = 6;
 	string ServiceVersion = 7;
 	string MethodName = 8;
+
+	int32 ReqBodyLen = 9;
+	int32 RespBodyLen = 10;
 }
 
 message KafkaInfo{
 	uint32 CorrelationId = 1;
 
-	uint32 ReqMsgSize = 2;
+	int32 ReqMsgSize = 2;
 	uint32 ApiVersion = 3;
 	uint32 ApiKey = 4;
 	string ClientID = 5;
 
-	uint32 RespMsgSize = 6;
+	int32 RespMsgSize = 6;
 }
 
 message MysqlInfo {
