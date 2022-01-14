@@ -29,7 +29,7 @@ const (
 	QUEUE_CACHE_FLUSH_TIMEOUT = 3
 	DROP_DETECT_WINDOW_SIZE   = 1024
 	QUEUE_BATCH_NUM           = 16
-	LOG_INTERVAL              = 3
+	LOG_INTERVAL              = 10
 	RECORD_STATUS_TIMEOUT     = 30 // 每30秒记录下trident的活跃信息，platformData模块每分钟会上报trisolaris
 	SOCKET_READ_ERROR         = "maybe trident restart."
 )
@@ -779,11 +779,15 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 
 			if err := ValidateFlowVersion(baseHeader.Type, flowHeader.Version); err != nil {
 				atomic.AddUint64(&r.counter.Invalid, 1)
-				log.Warningf("recv from %s, %s", conn.RemoteAddr().String(), fmt.Errorf("error: %s msgType: %s", err, datatype.MessageTypeString[baseHeader.Type]))
 				// 但版本不匹配，且版本小于app.LAST_SIMPLE_CODEC_VERSION时，才会拒绝连接
 				if flowHeader.Version <= app.LAST_SIMPLE_CODEC_VERSION {
+					log.Warningf("recv from %s, %s", conn.RemoteAddr().String(), fmt.Errorf("error: %s msgType: %s", err, datatype.MessageTypeString[baseHeader.Type]))
 					time.Sleep(10 * time.Second) // 等待10秒，防止日志刷屏
 					return
+				}
+				if r.timeNow-r.lastLogTime > LOG_INTERVAL {
+					log.Infof("recv from %s, %s", conn.RemoteAddr().String(), fmt.Errorf("error: %s msgType: %s", err, datatype.MessageTypeString[baseHeader.Type]))
+					r.lastLogTime = r.timeNow
 				}
 			}
 			vtapID = flowHeader.VTAPID
