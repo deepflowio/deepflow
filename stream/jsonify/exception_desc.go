@@ -1,32 +1,23 @@
 package jsonify
 
-type DubboCode uint8
+var dubboExceptionDescs = []string{
+	20:  "OK",
+	30:  "CLIENT_TIMEOUT",
+	31:  "SERVER_TIMEOUT",
+	40:  "BAD_REQUEST",
+	50:  "BAD_RESPONSE",
+	60:  "SERVICE_NOT_FOUND",
+	70:  "SERVICE_ERROR",
+	80:  "SERVER_ERROR",
+	90:  "CLIENT_ERROR",
+	100: "SERVER_THREADPOOL_EXHAUSTED_ERROR",
+}
 
-const (
-	OK                                DubboCode = 20
-	CHANNEL_INACTIVE                            = 35
-	BAD_REQUEST                                 = 40
-	CLIENT_TIMEOUT                              = 30
-	SERVER_TIMEOUT                              = 31
-	BAD_RESPONSE                                = 50
-	SERVICE_NOT_FOUND                           = 60
-	SERVICE_ERROR                               = 70
-	SERVER_ERROR                                = 80
-	CLIENT_ERROR                                = 90
-	SERVER_THREADPOOL_EXHAUSTED_ERROR           = 100
-)
-
-var dubboExceptionDesc = []string{
-	CLIENT_TIMEOUT:                    "client side timeout.",
-	SERVER_TIMEOUT:                    "server side timeout.",
-	CHANNEL_INACTIVE:                  "channel inactive, directly return the unfinished requests.",
-	BAD_REQUEST:                       "request format error.",
-	BAD_RESPONSE:                      "response format error.",
-	SERVICE_NOT_FOUND:                 "service not found.",
-	SERVICE_ERROR:                     "service error.",
-	SERVER_ERROR:                      "internal server error.",
-	CLIENT_ERROR:                      "internal server error.",
-	SERVER_THREADPOOL_EXHAUSTED_ERROR: "server side threadpool exhausted and quick return.",
+func GetDubboExceptionDesc(errCode uint16) string {
+	if int(errCode) < len(dubboExceptionDescs) {
+		return dubboExceptionDescs[errCode]
+	}
+	return ""
 }
 
 type KafakaCode int16
@@ -145,7 +136,7 @@ const (
 	UNKNOWN_SERVER_ERROR_DESC = "The server experienced an unexpected error when processing the request."
 )
 
-var kafkaExceptionDesc = []string{
+var kafkaExceptionDescs = []string{
 	OFFSET_OUT_OF_RANGE:                   "The requested offset is not within the range of offsets maintained by the server.",
 	CORRUPT_MESSAGE:                       "This message has failed its CRC checksum, exceeds the valid size, has a null key for a compacted topic, or is otherwise corrupt.",
 	UNKNOWN_TOPIC_OR_PARTITION:            "This server does not host this topic-partition.",
@@ -251,4 +242,126 @@ var kafkaExceptionDesc = []string{
 	INCONSISTENT_TOPIC_ID:                 "The log's topic ID did not match the topic ID in the request.",
 	INCONSISTENT_CLUSTER_ID:               "The clusterId in the request does not match that found on the server.",
 	TRANSACTIONAL_ID_NOT_FOUND:            "The transactionalId could not be found.",
+}
+
+func GetKafkaExceptionDesc(errCode int16) string {
+	if errCode == UNKNOWN_SERVER_ERROR {
+		return UNKNOWN_SERVER_ERROR_DESC
+	}
+	if errCode > 0 && int(errCode) < len(kafkaExceptionDescs) {
+		return kafkaExceptionDescs[errCode]
+	}
+	return ""
+}
+
+var httpExceptionDescs = []string{
+	100: "Continue",
+	101: "Switching Protocols",
+	102: "Processing (WebDAV; RFC 2518)",
+	103: "Early Hints (RFC 8297)",
+	200: "OK",
+	201: "Created",
+	202: "Accepted",
+	203: "Non-Authoritative Information (since HTTP/1.1)",
+	204: "No Content",
+	205: "Reset Content",
+	206: "Partial Content (RFC 7233)",
+	207: "Multi-Status (WebDAV; RFC 4918)",
+	208: "Already Reported (WebDAV; RFC 5842)",
+	226: "IM Used (RFC 3229)",
+	300: "Multiple Choices",
+	301: "Moved Permanently",
+	302: "Found (Previously \"Moved temporarily\")",
+	303: "See Other (since HTTP/1.1)",
+	304: "Not Modified (RFC 7232)",
+	305: "Use Proxy (since HTTP/1.1)",
+	306: "Switch Proxy",
+	307: "Temporary Redirect (since HTTP/1.1)",
+	308: "Permanent Redirect (RFC 7538)",
+	400: "Bad Request",
+	401: "Unauthorized (RFC 7235)",
+	402: "Payment Required",
+	403: "Forbidden",
+	404: "Not Found",
+	405: "Method Not Allowed",
+	406: "Not Acceptable",
+	407: "Proxy Authentication Required (RFC 7235)",
+	408: "Request Timeout",
+	409: "Conflict",
+	410: "Gone",
+	411: "Length Required",
+	412: "Precondition Failed (RFC 7232)",
+	413: "Payload Too Large (RFC 7231)",
+	414: "URI Too Long (RFC 7231)",
+	415: "Unsupported Media Type (RFC 7231)",
+	416: "Range Not Satisfiable (RFC 7233)",
+	417: "Expectation Failed",
+	418: "I'm a teapot (RFC 2324, RFC 7168)",
+	421: "Misdirected Request (RFC 7540)",
+	422: "Unprocessable Entity (WebDAV; RFC 4918)",
+	423: "Locked (WebDAV; RFC 4918)",
+	424: "Failed Dependency (WebDAV; RFC 4918)",
+	425: "Too Early (RFC 8470)",
+	426: "Upgrade Required",
+	428: "Precondition Required (RFC 6585)",
+	429: "Too Many Requests (RFC 6585)",
+	431: "Request Header Fields Too Large (RFC 6585)",
+	451: "Unavailable For Legal Reasons (RFC 7725)",
+	500: "Internal Server Error",
+	501: "Not Implemented",
+	502: "Bad Gateway",
+	503: "Service Unavailable",
+	504: "Gateway Timeout",
+	505: "HTTP Version Not Supported",
+	506: "Variant Also Negotiates (RFC 2295)",
+	507: "Insufficient Storage (WebDAV; RFC 4918)",
+	508: "Loop Detected (WebDAV; RFC 5842)",
+	510: "Not Extended (RFC 2774)",
+	511: "Network Authentication Required (RFC 6585)",
+}
+
+func GetHTTPExceptionDesc(errCode uint16) string {
+	if int(errCode) < len(httpExceptionDescs) {
+		return httpExceptionDescs[errCode]
+	}
+	return ""
+}
+
+var dnsExceptionDescs = []string{
+	0:  "No Error",
+	1:  "Format Error",
+	2:  "Server Failure",
+	3:  "Non-Existent Domain",
+	4:  "Not Implemented",
+	5:  "Query Refused",
+	6:  "Name Exists when it should not",
+	7:  "RR Set Exists when it should not",
+	8:  "RR Set that should exist does not",
+	9:  "Server Not Authoritative for zone",
+	10: "Name not contained in zone",
+	11: "available for assignment",
+	12: "available for assignment",
+	13: "available for assignment",
+	14: "available for assignment",
+	15: "available for assignment",
+	16: "Bad OPT Version [RFC 2671]; TSIG Signature Failure [RFC 2845]",
+	17: "Key not recognized",
+	18: "Signature out of time window",
+	19: "Bad TKEY Mode",
+	20: "Duplicate key name",
+	21: "Algorithm not supported",
+}
+
+func GetDNSExceptionDesc(errCode uint16) string {
+	if int(errCode) < len(dnsExceptionDescs) {
+		return dnsExceptionDescs[errCode]
+	}
+	if errCode >= 22 && errCode <= 3840 {
+		return "available for assignment"
+	} else if errCode >= 3841 && errCode <= 4095 {
+		return "Private Use"
+	} else if errCode >= 4096 && errCode <= 65535 {
+		return "available for assignment"
+	}
+	return ""
 }

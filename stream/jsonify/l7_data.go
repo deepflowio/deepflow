@@ -149,21 +149,25 @@ type HTTPLogger struct {
 	L7Base
 
 	// http应用层
-	Type         uint8  `json:"type"` // 0: request  1: response 2: session
-	Version      uint8  `json:"version"`
-	Method       string `json:"method,omitempty"`
-	ClientIP4    uint32 `json:"client_ip4,omitempty"`
-	ClientIP6    net.IP `json:"client_ip6,omitempty"`
-	ClientIsIPv4 bool   `json:"client_is_ipv4"`
-	Host         string `json:"host,omitempty"`
-	Path         string `json:"path,omitempty"`
-	StreamID     uint32 `json:"stream_id,omitempty"`
-	TraceID      string `json:"trace_id,omitempty"`
-	AnswerCode   uint16 `json:"answer_code,omitempty"`
+	Type          uint8  `json:"type"` // 0: request  1: response 2: session
+	Version       uint8  `json:"version"`
+	Method        string `json:"method,omitempty"`
+	ClientIP4     uint32 `json:"client_ip4,omitempty"`
+	ClientIP6     net.IP `json:"client_ip6,omitempty"`
+	ClientIsIPv4  bool   `json:"client_is_ipv4"`
+	Host          string `json:"host,omitempty"`
+	Path          string `json:"path,omitempty"`
+	StreamID      uint32 `json:"stream_id,omitempty"`
+	TraceID       string `json:"trace_id,omitempty"`
+	SpanID        string
+	StatusCode    uint8
+	AnswerCode    uint16 `json:"answer_code,omitempty"`
+	ExceptionDesc string
 
 	// 指标量
-	ContentLength int64  `json:"content_length"`
-	Duration      uint64 `json:"duration,omitempty"` // us
+	ReqMsgSize  int64
+	RespMsgSize int64
+	Duration    uint64 `json:"duration,omitempty"` // us
 }
 
 func HTTPLoggerColumns() []*ckdb.Column {
@@ -183,10 +187,14 @@ func HTTPLoggerColumns() []*ckdb.Column {
 		ckdb.NewColumn("path", ckdb.String),
 		ckdb.NewColumn("stream_id", ckdb.UInt32Nullable),
 		ckdb.NewColumn("trace_id", ckdb.String),
+		ckdb.NewColumn("span_id", ckdb.String),
+		ckdb.NewColumn("status_code", ckdb.UInt8).SetComment("状态, 0: 正常, 1: 异常 ,2: 不存在，3:服务端异常, 4: 客户端异常"),
 		ckdb.NewColumn("answer_code", ckdb.UInt16Nullable),
+		ckdb.NewColumn("exception_desc", ckdb.LowCardinalityString).SetComment("异常描述"),
 
 		// 指标量
-		ckdb.NewColumn("content_length", ckdb.Int64Nullable),
+		ckdb.NewColumn("request_length", ckdb.Int64Nullable).SetComment("请求长度"),
+		ckdb.NewColumn("response_length", ckdb.Int64Nullable).SetComment("响应长度"),
 		ckdb.NewColumn("duration", ckdb.UInt64),
 	)
 	return httpColumns
@@ -242,18 +250,49 @@ func (h *HTTPLogger) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteString(h.TraceID); err != nil {
 		return err
 	}
-	statusCode := &(h.AnswerCode)
-	if h.AnswerCode == 0 {
-		statusCode = nil
-	}
-	if err := block.WriteUInt16Nullable(statusCode); err != nil {
+	if err := block.WriteString(h.SpanID); err != nil {
 		return err
 	}
-	contentLength := &(h.ContentLength)
-	if h.ContentLength == -1 { // contentLength解析失败时会赋值为-1，需要按无意义处理
-		contentLength = nil
+
+	msgType := datatype.LogMessageType(h.Type)
+	answerCode := &(h.AnswerCode)
+	if msgType == datatype.MSG_T_REQUEST {
+		h.StatusCode = datatype.STATUS_NOT_EXIST
+		answerCode = nil
 	}
-	if err := block.WriteInt64Nullable(contentLength); err != nil {
+
+	if err := block.WriteUInt8(h.StatusCode); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16Nullable(answerCode); err != nil {
+		return err
+	}
+
+	exceptionDesc := ""
+	if h.StatusCode == datatype.STATUS_SERVER_ERROR ||
+		h.StatusCode == datatype.STATUS_CLIENT_ERROR {
+		exceptionDesc = GetHTTPExceptionDesc(h.AnswerCode)
+	}
+	if err := block.WriteString(exceptionDesc); err != nil {
+		return err
+	}
+
+	var requestLen, responseLen *int64
+	if msgType == datatype.MSG_T_REQUEST || msgType == datatype.MSG_T_SESSION {
+		if h.ReqMsgSize != -1 {
+			requestLen = &h.ReqMsgSize
+		}
+	}
+
+	if msgType == datatype.MSG_T_RESPONSE || msgType == datatype.MSG_T_SESSION {
+		if h.RespMsgSize != -1 {
+			responseLen = &h.RespMsgSize
+		}
+	}
+	if err := block.WriteInt64Nullable(requestLen); err != nil {
+		return err
+	}
+	if err := block.WriteInt64Nullable(responseLen); err != nil {
 		return err
 	}
 	if err := block.WriteUInt64(h.Duration); err != nil {
@@ -305,9 +344,12 @@ func (h *HTTPLogger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInf
 		h.Path = httpInfo.Path
 		h.StreamID = httpInfo.StreamID
 		h.TraceID = httpInfo.TraceID
-		h.ContentLength = int64(httpInfo.ContentLength)
+		h.SpanID = httpInfo.SpanID
+		h.ReqMsgSize = httpInfo.ReqContentLength
+		h.RespMsgSize = httpInfo.RespContentLength
 	}
 	h.Type = uint8(l.BaseInfo.Head.MsgType)
+	h.StatusCode = uint8(l.BaseInfo.Head.Status)
 	h.AnswerCode = uint16(l.BaseInfo.Head.Code)
 	h.Duration = l.BaseInfo.Head.RRT / uint64(time.Microsecond)
 }
@@ -332,13 +374,15 @@ type DNSLogger struct {
 	L7Base
 
 	// DNS应用层
-	Type       uint8  `json:"type"` // 0: request  1: response 2: session
-	ID         uint16 `json:"id"`
-	DomainName string `json:"domain_name,omitempty"`
-	QueryType  uint16 `json:"query_type,omitempty"`
-	AnswerCode uint16 `json:"answer_code"`
-	AnswerAddr string `json:"answer_addr,omitempty"`
-	Protocol   uint8  `json:"protocol"`
+	Type          uint8  `json:"type"` // 0: request  1: response 2: session
+	ID            uint16 `json:"id"`
+	DomainName    string `json:"domain_name,omitempty"`
+	QueryType     uint16 `json:"query_type,omitempty"`
+	StatusCode    uint8
+	AnswerCode    uint16 `json:"answer_code"`
+	AnswerAddr    string `json:"answer_addr,omitempty"`
+	Protocol      uint8  `json:"protocol"`
+	ExceptionDesc string
 
 	// 指标量
 	Duration uint64 `json:"duration,omitempty"` // us
@@ -354,9 +398,11 @@ func DNSLoggerColumns() []*ckdb.Column {
 		ckdb.NewColumn("id", ckdb.UInt16),
 		ckdb.NewColumn("domain_name", ckdb.String),
 		ckdb.NewColumn("query_type", ckdb.UInt16Nullable),
+		ckdb.NewColumn("status_code", ckdb.UInt8).SetComment("状态, 0: 正常, 1: 异常 ,2: 不存在，3:服务端异常, 4: 客户端异常"),
 		ckdb.NewColumn("answer_code", ckdb.UInt16Nullable),
 		ckdb.NewColumn("answer_addr", ckdb.String),
 		ckdb.NewColumn("protocol", ckdb.UInt8).SetComment("0: 非IP包, 1-255: ip协议号(其中 1:icmp 6:tcp 17:udp)"),
+		ckdb.NewColumn("exception_desc", ckdb.LowCardinalityString).SetComment("异常描述"),
 
 		// 指标量
 		ckdb.NewColumn("duration", ckdb.UInt64).SetComment(" 单位: 微秒"),
@@ -389,17 +435,34 @@ func (d *DNSLogger) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt16Nullable(queryType); err != nil {
 		return err
 	}
+
+	msgType := datatype.LogMessageType(d.Type)
 	answerCode := &(d.AnswerCode)
-	if d.Type == 0 {
+	if msgType == datatype.MSG_T_REQUEST {
+		d.StatusCode = datatype.STATUS_NOT_EXIST
 		answerCode = nil
+	}
+
+	if err := block.WriteUInt8(d.StatusCode); err != nil {
+		return err
 	}
 	if err := block.WriteUInt16Nullable(answerCode); err != nil {
 		return err
 	}
+
 	if err := block.WriteString(d.AnswerAddr); err != nil {
 		return err
 	}
 	if err := block.WriteUInt8(d.Protocol); err != nil {
+		return err
+	}
+
+	exceptionDesc := ""
+	if d.StatusCode == datatype.STATUS_SERVER_ERROR ||
+		d.StatusCode == datatype.STATUS_CLIENT_ERROR {
+		exceptionDesc = GetDNSExceptionDesc(d.AnswerCode)
+	}
+	if err := block.WriteString(exceptionDesc); err != nil {
 		return err
 	}
 
@@ -422,8 +485,8 @@ func (d *DNSLogger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfo
 		d.Protocol = uint8(l.BaseInfo.Protocol)
 	}
 	d.Type = uint8(l.BaseInfo.Head.MsgType)
+	d.StatusCode = uint8(l.BaseInfo.Head.Status)
 	d.AnswerCode = uint16(l.BaseInfo.Head.Code)
-
 	// 指标量
 	d.Duration = l.BaseInfo.Head.RRT / uint64(time.Microsecond)
 }

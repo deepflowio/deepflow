@@ -31,7 +31,7 @@ func MQLoggerColumns() []*ckdb.Column {
 	columns = append(columns, ckdb.NewColumn("_id", ckdb.UInt64).SetCodec(ckdb.CodecDoubleDelta))
 	columns = append(columns, L7BaseColumns()...)
 	columns = append(columns,
-		ckdb.NewColumn("l7_protocol", ckdb.UInt8).SetComment("应用协议, 5: Dubbo"),
+		ckdb.NewColumn("l7_protocol", ckdb.UInt8).SetComment("应用协议, 6: Kafka"),
 		ckdb.NewColumn("type", ckdb.UInt8).SetComment("报文类型, 0: 请求, 1: 回复, 2: 会话"),
 		ckdb.NewColumn("request_id", ckdb.UInt32).SetComment("请求ID, kafka: correlation_id"),
 
@@ -41,8 +41,8 @@ func MQLoggerColumns() []*ckdb.Column {
 		ckdb.NewColumn("exception_desc", ckdb.LowCardinalityString).SetComment("异常描述"),
 
 		ckdb.NewColumn("duration", ckdb.UInt64).SetComment("响应时延(us)"),
-		ckdb.NewColumn("request_length", ckdb.UInt32).SetComment("请求长度"),
-		ckdb.NewColumn("response_length", ckdb.UInt32).SetComment("响应长度"),
+		ckdb.NewColumn("request_length", ckdb.Int32Nullable).SetComment("请求长度"),
+		ckdb.NewColumn("response_length", ckdb.Int32Nullable).SetComment("响应长度"),
 	)
 	return columns
 }
@@ -92,33 +92,34 @@ func (s *MQLogger) WriteBlock(block *ckdb.Block) error {
 			return err
 		}
 
-		execptionDesc := ""
-		if answerCodePtr != nil {
-			if answerCode <= TRANSACTIONAL_ID_NOT_FOUND && answerCode >= 0 {
-				execptionDesc = kafkaExceptionDesc[answerCode]
-			} else if answerCode == UNKNOWN_SERVER_ERROR {
-				execptionDesc = UNKNOWN_SERVER_ERROR_DESC
-			}
+		exceptionDesc := ""
+		if status == datatype.STATUS_CLIENT_ERROR ||
+			status == datatype.STATUS_SERVER_ERROR {
+			exceptionDesc = GetKafkaExceptionDesc(answerCode)
 		}
-		if err := block.WriteString(execptionDesc); err != nil {
+		if err := block.WriteString(exceptionDesc); err != nil {
 			return err
 		}
 
 		if err := block.WriteUInt64(s.AppProtoLogsData.BaseInfo.Head.RRT / uint64(time.Microsecond)); err != nil {
 			return err
 		}
-		var requestLen, responseLen uint32
-		if msgType == datatype.MSG_T_REQUEST || msgType == datatype.MSG_T_SESSION {
-			requestLen = s.kafka.ReqMsgSize
-		}
 
-		if msgType == datatype.MSG_T_RESPONSE || msgType == datatype.MSG_T_SESSION {
-			responseLen = s.kafka.RespMsgSize
+		var requestLen, responseLen *int32
+		if msgType == datatype.MSG_T_REQUEST || msgType == datatype.MSG_T_SESSION {
+			if s.kafka.ReqMsgSize != -1 {
+				requestLen = &s.kafka.ReqMsgSize
+			}
 		}
-		if err := block.WriteUInt32(requestLen); err != nil {
+		if msgType == datatype.MSG_T_RESPONSE || msgType == datatype.MSG_T_SESSION {
+			if s.kafka.RespMsgSize != -1 {
+				responseLen = &s.kafka.RespMsgSize
+			}
+		}
+		if err := block.WriteInt32Nullable(requestLen); err != nil {
 			return err
 		}
-		if err := block.WriteUInt32(responseLen); err != nil {
+		if err := block.WriteInt32Nullable(responseLen); err != nil {
 			return err
 		}
 	}
