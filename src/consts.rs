@@ -1,3 +1,5 @@
+pub const DROPLET_PORT: u16 = 20033;
+
 #[derive(Debug)]
 pub enum TapType {
     Any = 0,

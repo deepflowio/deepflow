@@ -12,7 +12,7 @@ use log::{info, LevelFilter, Log};
 
 use crate::config::Config;
 use crate::rpc::{Session, Synchronizer, DEFAULT_TIMEOUT};
-use crate::utils::net;
+use crate::utils::{net, stats};
 
 pub struct Trident {
     synchronizer: Arc<Synchronizer>,
@@ -37,6 +37,9 @@ impl Trident {
             net::get_route_src_ip_and_mac(&config.controller_ips[0].parse().unwrap())
                 .context("failed getting control ip and mac")?;
 
+        let stats_collector = stats::Collector::new(&config.controller_ips);
+        stats_collector.start();
+
         let session = Arc::new(Session::new(
             config.controller_port,
             config.controller_tls_port,
@@ -44,16 +47,16 @@ impl Trident {
             config.controller_cert_file_prefix,
             config.controller_ips,
         ));
-        Ok(Trident {
-            synchronizer: Arc::new(Synchronizer::new(
-                session.clone(),
-                revision,
-                ctrl_ip.to_string(),
-                ctrl_mac.to_string(),
-                config.vtap_group_id_request,
-                config.kubernetes_cluster_id,
-            )),
-        })
+        let synchronizer = Arc::new(Synchronizer::new(
+            session.clone(),
+            revision,
+            ctrl_ip.to_string(),
+            ctrl_mac.to_string(),
+            config.vtap_group_id_request,
+            config.kubernetes_cluster_id,
+        ));
+        stats_collector.register_countable("synchronizer", synchronizer.clone(), vec![]);
+        Ok(Trident { synchronizer })
     }
 
     pub fn start(&self) {

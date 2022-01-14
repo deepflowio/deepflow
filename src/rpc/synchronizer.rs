@@ -15,7 +15,10 @@ use tokio::time;
 use crate::config::RuntimeConfig;
 use crate::proto::trident;
 use crate::rpc::session::Session;
-use crate::utils;
+use crate::utils::{
+    self,
+    stats::{Countable, Counter},
+};
 
 const DEFAULT_SYNC_INTERVAL: Duration = Duration::from_secs(10);
 const RPC_RETRY_INTERVAL: Duration = Duration::from_secs(60);
@@ -396,6 +399,16 @@ impl Synchronizer {
                 let _ = t.await;
             }
         });
+    }
+}
+
+impl Countable for Synchronizer {
+    fn get_counters(&self) -> Vec<Counter> {
+        vec![]
+    }
+
+    fn closed(&self) -> bool {
+        !self.running.load(Ordering::SeqCst)
     }
 }
 
