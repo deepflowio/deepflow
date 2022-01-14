@@ -87,22 +87,28 @@ var ColumnAdd573 = []*ColumnAdds{
 
 var ColumnAdd600 = []*ColumnAdds{
 	&ColumnAdds{
-		Dbs:         []string{"vtap_flow", "vtap_flow_port", "vtap_flow_edge", "vtap_flow_edge_port"},
+		Dbs:         []string{"vtap_flow_port", "vtap_flow_edge_port"},
 		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
 		ColumnNames: []string{"l7_client_error", "l7_server_error", "l7_time_out", "l7_error", "rrt_max"},
 		ColumnType:  ckdb.UInt32,
 	},
 	&ColumnAdds{
-		Dbs:         []string{"vtap_flow", "vtap_flow_port", "vtap_flow_edge", "vtap_flow_edge_port"},
+		Dbs:         []string{"vtap_flow_port", "vtap_flow_edge_port"},
 		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
 		ColumnNames: []string{"rrt_sum"},
 		ColumnType:  ckdb.Float64,
 	},
 	&ColumnAdds{
-		Dbs:         []string{"vtap_flow", "vtap_flow_port", "vtap_flow_edge", "vtap_flow_edge_port"},
+		Dbs:         []string{"vtap_flow_port", "vtap_flow_edge_port"},
 		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
-		ColumnNames: []string{"rrt_count", "l7_request", "l7_response"},
+		ColumnNames: []string{"rrt_count", "l7_request", "l7_response", "tcp_transfer_fail", "tcp_rst_fail"},
 		ColumnType:  ckdb.UInt64,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"vtap_flow_port", "vtap_flow_edge_port"},
+		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
+		ColumnNames: []string{"tap_port_type"},
+		ColumnType:  ckdb.UInt8,
 	},
 	&ColumnAdds{
 		Dbs:          []string{"flow_log"},
@@ -112,11 +118,35 @@ var ColumnAdd600 = []*ColumnAdds{
 		DefaultValue: "'rest'",
 	},
 	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local", "l7_http_log", "l7_http_log_local", "l7_dns_log", "l7_dns_log_local"},
+		ColumnNames: []string{"tap_port_type"},
+		ColumnType:  ckdb.UInt8,
+	},
+	&ColumnAdds{
 		Dbs:          []string{"flow_log"},
 		Tables:       []string{"l7_dns_log", "l7_dns_log_local"},
 		ColumnNames:  []string{"protocol"},
 		ColumnType:   ckdb.UInt8,
 		DefaultValue: "17",
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_http_log", "l7_http_log_local", "l7_dns_log", "l7_dns_log_local"},
+		ColumnNames: []string{"status_code"},
+		ColumnType:  ckdb.UInt8,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_http_log", "l7_http_log_local", "l7_dns_log", "l7_dns_log_local"},
+		ColumnNames: []string{"exception_desc"},
+		ColumnType:  ckdb.LowCardinalityString,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_http_log", "l7_http_log_local"},
+		ColumnNames: []string{"response_length"},
+		ColumnType:  ckdb.Int64Nullable,
 	},
 }
 
@@ -132,6 +162,18 @@ var ColumnRename600 = []*ColumnRename{
 		Table:         "l7_http_log_local",
 		OldColumnName: "status_code",
 		NewColumnName: "answer_code",
+	},
+	&ColumnRename{
+		Db:            "flow_log",
+		Table:         "l7_http_log",
+		OldColumnName: "content_length",
+		NewColumnName: "request_length",
+	},
+	&ColumnRename{
+		Db:            "flow_log",
+		Table:         "l7_http_log_local",
+		OldColumnName: "content_length",
+		NewColumnName: "request_length",
 	},
 }
 
@@ -400,7 +442,8 @@ func (i *Issu) renameColumn(connect *sql.DB, cr *ColumnRename) error {
 	if err != nil {
 		// 如果已经修改过，就会报错不存在column，需要跳过该错误
 		// Code: 10. DB::Exception: Received from localhost:9000. DB::Exception: Wrong column name. Cannot find column `retan_tx` to rename.
-		if strings.Contains(err.Error(), "Cannot find column") {
+		if strings.Contains(err.Error(), "Cannot find column") ||
+			strings.Contains(err.Error(), "column with this name already exists") {
 			log.Infof("db: %s, table: %s error: %s", cr.Db, cr.Table, err)
 			return nil
 		}

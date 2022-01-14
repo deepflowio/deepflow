@@ -37,6 +37,8 @@ func RPCLoggerColumns() []*ckdb.Column {
 		ckdb.NewColumn("answer_code", ckdb.UInt16Nullable).SetComment("响应码"),
 		ckdb.NewColumn("exception_desc", ckdb.LowCardinalityString).SetComment("异常描述"),
 
+		ckdb.NewColumn("request_length", ckdb.Int32Nullable).SetComment("请求长度"),
+		ckdb.NewColumn("response_length", ckdb.Int32Nullable).SetComment("响应长度"),
 		ckdb.NewColumn("duration", ckdb.UInt64).SetComment("响应时延, 统计请求报文与第一个响应报文的时长(us)"), // us
 	)
 	return columns
@@ -91,14 +93,33 @@ func (s *RPCLogger) WriteBlock(block *ckdb.Block) error {
 			}
 		}
 
-		execptionDesc := ""
-		if answerCode >= uint16(OK) && answerCode <= SERVER_THREADPOOL_EXHAUSTED_ERROR {
-			execptionDesc = dubboExceptionDesc[answerCode]
+		exceptionDesc := ""
+		if status == datatype.STATUS_SERVER_ERROR ||
+			status == datatype.STATUS_CLIENT_ERROR {
+			exceptionDesc = GetDubboExceptionDesc(answerCode)
 		}
-		if err := block.WriteString(execptionDesc); err != nil {
+		if err := block.WriteString(exceptionDesc); err != nil {
 			return err
 		}
 
+		var requestLen, responseLen *int32
+		if msgType == datatype.MSG_T_REQUEST || msgType == datatype.MSG_T_SESSION {
+			if s.dubbo.ReqBodyLen != -1 {
+				requestLen = &s.dubbo.ReqBodyLen
+			}
+		}
+
+		if msgType == datatype.MSG_T_RESPONSE || msgType == datatype.MSG_T_SESSION {
+			if s.dubbo.RespBodyLen != -1 {
+				responseLen = &s.dubbo.RespBodyLen
+			}
+		}
+		if err := block.WriteInt32Nullable(requestLen); err != nil {
+			return err
+		}
+		if err := block.WriteInt32Nullable(responseLen); err != nil {
+			return err
+		}
 		if err := block.WriteUInt64(s.AppProtoLogsData.BaseInfo.Head.RRT / uint64(time.Microsecond)); err != nil {
 			return err
 		}
