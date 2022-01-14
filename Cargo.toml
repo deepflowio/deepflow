@@ -9,6 +9,7 @@ default-run = "trident"
 
 [dependencies]
 anyhow = "1.0"
+cadence = "0.27.0"
 clap = {version = "3.0.0-rc.7", features = ["derive"] }
 crossbeam = "0.8.1"
 enum_dispatch = "0.3.7"
@@ -16,8 +17,8 @@ flexi_logger = "0.20"
 futures = "~0.3"
 hostname = "0.3.1"
 humantime-serde = "1.0"
-k8s-openapi =  {version = "0.13", default-features = false, features = ["v1_22"] }
-kube = { version = "0.64", features = ["runtime","derive"] }
+k8s-openapi = { version = "^0.13", features = ["v1_19"] }
+kube = { version = "0.64", features = ["derive", "runtime"] }
 log = "0.4"
 neli = "0.5.3"
 nix = "0.23"
