@@ -121,8 +121,8 @@ github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df/go.mod h1:JP3t17
 github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
-gitlab.yunshan.net/yunshan/droplet-libs v0.0.0-20220117035020-c8f1dffd679f h1:fiYA1rz0zck4vL5vu0VFp6jeeIlRWvv1YEV/9zwioRU=
-gitlab.yunshan.net/yunshan/droplet-libs v0.0.0-20220117035020-c8f1dffd679f/go.mod h1:1ZWtl8gD7hmzodLLxgy+te0/ydT12SepR6RNgBpPnTE=
+gitlab.yunshan.net/yunshan/droplet-libs v0.0.0-20220119093907-95fcd3f05c15 h1:hum/1U/GwbPtSKz2j56WsqFYcpQigj5alLEVZmNpb2E=
+gitlab.yunshan.net/yunshan/droplet-libs v0.0.0-20220119093907-95fcd3f05c15/go.mod h1:1ZWtl8gD7hmzodLLxgy+te0/ydT12SepR6RNgBpPnTE=
 gitlab.yunshan.net/yunshan/message v0.0.0-20220112123654-1fab16d92f93 h1:lW1/woQs1DlID7NP6B1b+PpnX59VKgXM4ww9z0odnnA=
 gitlab.yunshan.net/yunshan/message v0.0.0-20220112123654-1fab16d92f93/go.mod h1:ewhcn9CoC6hetqkwq2oOZL8KmzRPQ4hUokN0YTVBk8M=
 golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=

@@ -435,22 +435,23 @@ func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) error {
 }
 
 type FlowInfo struct {
-	CloseType  uint16 `json:"close_type"`
-	FlowSource uint16 `json:"flow_source"`
-	FlowID     uint64 `json:"flow_id"`
-	TapType    uint16 `json:"tap_type"`
-	TapPort    uint32 `json:"tap_port"` // 显示为固定八个字符的16进制如'01234567'
-	TapSide    string `json:"tap_side"`
-	VtapID     uint16 `json:"vtap_id"`
-	L2End0     bool   `json:"l2_end_0"`
-	L2End1     bool   `json:"l2_end_1"`
-	L3End0     bool   `json:"l3_end_0"`
-	L3End1     bool   `json:"l3_end_1"`
-	StartTime  uint64 `json:"start_time"` // us
-	EndTime    uint64 `json:"end_time"`   // us
-	Duration   uint64 `json:"duration"`   // us
-	SynSeq     uint32 `json:"syn_seq"`
-	SynAckSeq  uint32 `json:"syn_ack_seq"`
+	CloseType   uint16 `json:"close_type"`
+	FlowSource  uint16 `json:"flow_source"`
+	FlowID      uint64 `json:"flow_id"`
+	TapType     uint16 `json:"tap_type"`
+	TapPortType uint8  `json:"tap_port_type"` // 0: MAC, 1: IPv4, 2:IPv6, 3: ID
+	TapPort     uint32 `json:"tap_port"`
+	TapSide     string `json:"tap_side"`
+	VtapID      uint16 `json:"vtap_id"`
+	L2End0      bool   `json:"l2_end_0"`
+	L2End1      bool   `json:"l2_end_1"`
+	L3End0      bool   `json:"l3_end_0"`
+	L3End1      bool   `json:"l3_end_1"`
+	StartTime   uint64 `json:"start_time"` // us
+	EndTime     uint64 `json:"end_time"`   // us
+	Duration    uint64 `json:"duration"`   // us
+	SynSeq      uint32 `json:"syn_seq"`
+	SynAckSeq   uint32 `json:"syn_ack_seq"`
 }
 
 var FlowInfoColumns = []*ckdb.Column{
@@ -459,6 +460,7 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("flow_source", ckdb.UInt16),
 	ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 	ckdb.NewColumn("tap_type", ckdb.UInt16),
+	ckdb.NewColumn("tap_port_type", ckdb.UInt8),
 	ckdb.NewColumn("tap_port", ckdb.UInt32),
 	ckdb.NewColumn("tap_side", ckdb.LowCardinalityString),
 	ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
@@ -486,6 +488,9 @@ func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt16(f.TapType); err != nil {
+		return err
+	}
+	if err := block.WriteUInt8(f.TapPortType); err != nil {
 		return err
 	}
 	if err := block.WriteUInt32(f.TapPort); err != nil {
@@ -940,7 +945,7 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 	i.FlowSource = uint16(f.FlowSource)
 	i.FlowID = f.FlowID
 	i.TapType = uint16(f.FlowKey.TapType)
-	i.TapPort = f.FlowKey.TapPort
+	i.TapPort, i.TapPortType = datatype.TapPort(f.FlowKey.TapPort).SplitToPortAndType()
 	i.TapSide = zerodoc.TAPSideEnum(f.TapSide).String()
 	i.VtapID = uint16(f.FlowKey.VtapId)
 
