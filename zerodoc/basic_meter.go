@@ -754,6 +754,9 @@ const (
 	ANOMALY_CLIENT_ESTABLISH_FAIL
 	ANOMALY_SERVER_ESTABLISH_FAIL
 	ANOMALY_TCP_ESTABLISH_FAIL
+
+	ANOMALY_TRANSFER_FAIL
+	ANOMALY_RST_FAIL
 )
 const (
 	ANOMALY_L7_CLIENT_ERROR = iota
@@ -772,8 +775,8 @@ func AnomalyColumns() []*ckdb.Column {
 			ANOMALY_CLIENT_SYN_REPEAT:     {"client_syn_repeat", "建连-客户端SYN结束"},
 			ANOMALY_SERVER_SYN_ACK_REPEAT: {"server_syn_ack_repeat", "建连-服务端SYN结束"},
 
-			ANOMALY_CLIENT_HALF_CLOSE_FLOW: {"client_half_close_flow", "断连-客户端半关"},
-			ANOMALY_SERVER_HALF_CLOSE_FLOW: {"server_half_close_flow", "断连-服务端半关"},
+			ANOMALY_CLIENT_HALF_CLOSE_FLOW: {"client_half_close_flow", "传输-客户端半关"},
+			ANOMALY_SERVER_HALF_CLOSE_FLOW: {"server_half_close_flow", "传输-服务端半关"},
 
 			ANOMALY_CLIENT_SOURCE_PORT_REUSE: {"client_source_port_reuse", "建连-客户端端口复用"},
 			ANOMALY_SERVER_RESET:             {"server_reset", "建连-服务端直接重置"},
@@ -782,11 +785,14 @@ func AnomalyColumns() []*ckdb.Column {
 			ANOMALY_CLIENT_ESTABLISH_OTHER_RST: {"client_establish_other_rst", "建连-客户端其他重置"},
 			ANOMALY_SERVER_ESTABLISH_OTHER_RST: {"server_establish_other_rst", "建连-服务端其他重置"},
 
-			ANOMALY_TCP_TIMEOUT: {"tcp_timeout", "TCP连接超时次数"},
+			ANOMALY_TCP_TIMEOUT: {"tcp_timeout", "传输-连接超时次数"},
 
 			ANOMALY_CLIENT_ESTABLISH_FAIL: {"client_establish_fail", "TCP客户端建连失败次数"},
 			ANOMALY_SERVER_ESTABLISH_FAIL: {"server_establish_fail", "TCP服务端建连失败次数"},
 			ANOMALY_TCP_ESTABLISH_FAIL:    {"tcp_establish_fail", "TCP建连失败次数"},
+
+			ANOMALY_TRANSFER_FAIL: {"tcp_transfer_fail", "TCP传输失败次数"},
+			ANOMALY_RST_FAIL:      {"tcp_rst_fail", "TCP重置次数"},
 		}, ckdb.UInt64)
 
 	l7AnomalColumns := ckdb.NewColumnsWithComment(
@@ -804,6 +810,10 @@ func AnomalyColumns() []*ckdb.Column {
 func (a *Anomaly) WriteBlock(block *ckdb.Block) error {
 	clientFail := a.ClientSynRepeat + a.ClientSourcePortReuse + a.ClientEstablishReset
 	serverFail := a.ServerSYNACKRepeat + a.ServerReset + a.ServerQueueLack + a.ServerEstablishReset
+	// 表示 传输-客户端/服务端重置, 传输-服务端队列溢出, 传输-客户端半关, 传输-服务端半关, 传输-连接超时次数
+	transferFail := a.ClientRstFlow + a.ServerRstFlow + a.ServerQueueLack + a.ClientHalfCloseFlow + a.ServerHalfCloseFlow + a.TCPTimeout
+	// 表示所有重置的次数之和，包含建连-客户端/服务端其他重置、建连-服务端直接重置、传输-客户端/服务端重置
+	rstFail := a.ClientEstablishReset + a.ServerEstablishReset + a.ServerReset + a.ClientRstFlow + a.ServerRstFlow
 	values := []uint64{
 		ANOMALY_CLIENT_RST_FLOW: a.ClientRstFlow,
 		ANOMALY_SERVER_RST_FLOW: a.ServerRstFlow,
@@ -826,6 +836,9 @@ func (a *Anomaly) WriteBlock(block *ckdb.Block) error {
 		ANOMALY_CLIENT_ESTABLISH_FAIL: clientFail,
 		ANOMALY_SERVER_ESTABLISH_FAIL: serverFail,
 		ANOMALY_TCP_ESTABLISH_FAIL:    clientFail + serverFail,
+
+		ANOMALY_TRANSFER_FAIL: transferFail,
+		ANOMALY_RST_FAIL:      rstFail,
 	}
 	l7Values := []uint32{
 		ANOMALY_L7_CLIENT_ERROR: a.L7ClientError,
