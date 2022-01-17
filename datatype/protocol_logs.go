@@ -106,7 +106,7 @@ type AppProtoLogsBaseInfo struct {
 	StartTime time.Duration // 开始时间, packet的时间戳
 	EndTime   time.Duration // 结束时间, 初始化时等于开始时间
 	FlowId    uint64        // 对应flow的ID
-	TapPort   uint32
+	TapPort   TapPort
 	VtapId    uint16
 	TapType   uint16
 	IsIPv6    bool
@@ -141,7 +141,7 @@ func (i *AppProtoLogsBaseInfo) String() string {
 	formatted += fmt.Sprintf("FlowId: %v ", i.FlowId)
 	formatted += fmt.Sprintf("VtapId: %v ", i.VtapId)
 	formatted += fmt.Sprintf("TapType: %v ", i.TapType)
-	formatted += fmt.Sprintf("TapPort: %v ", i.TapPort)
+	formatted += fmt.Sprintf("TapPort: %s ", i.TapPort)
 	formatted += fmt.Sprintf("Proto: %s ", i.Proto.String())
 	formatted += fmt.Sprintf("MsgType: %s ", i.MsgType.String())
 	formatted += fmt.Sprintf("Code: %v ", i.Code)
@@ -260,7 +260,7 @@ func (l *AppProtoLogsData) Encode(encoder *codec.SimpleEncoder) error {
 	encoder.WriteU64(l.FlowId)
 	encoder.WriteU16(l.VtapId)
 	encoder.WriteU16(l.TapType)
-	encoder.WriteU32(l.TapPort)
+	encoder.WriteU64(uint64(l.TapPort))
 	encoder.WriteU8(byte(l.Proto))
 	encoder.WriteU8(byte(l.MsgType))
 	encoder.WriteU8(byte(l.Status))
@@ -295,7 +295,7 @@ func (l *AppProtoLogsBaseInfo) WriteToPB(p *pb.AppProtoLogsBaseInfo) {
 	p.StartTime = uint64(l.StartTime)
 	p.EndTime = uint64(l.EndTime)
 	p.FlowId = l.FlowId
-	p.TapPort = l.TapPort
+	p.TapPort = uint64(l.TapPort)
 	p.VtapId = uint32(l.VtapId)
 	p.TapType = uint32(l.TapType)
 	p.IsIPv6 = utils.Bool2UInt32(l.IsIPv6)
@@ -413,7 +413,7 @@ func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
 	l.FlowId = decoder.ReadU64()
 	l.VtapId = decoder.ReadU16()
 	l.TapType = decoder.ReadU16()
-	l.TapPort = decoder.ReadU32()
+	l.TapPort = TapPort(decoder.ReadU64())
 	l.Proto = LogProtoType(decoder.ReadU8())
 	l.MsgType = LogMessageType(decoder.ReadU8())
 	l.Status = decoder.ReadU8()

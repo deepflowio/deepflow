@@ -29,7 +29,7 @@ message MiniField {
 
 	uint32 ServerPort = 13;
 	uint32 VTAPID = 14;
-	uint32 TAPPort = 15;
+	uint64 TAPPort = 15;
 	uint32 TAPType = 16;
 	uint32 L7Protocol = 17;
 

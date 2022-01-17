@@ -208,11 +208,12 @@ func TestDecapsulateTeb(t *testing.T) {
 func TestDecapsulateIp6Vxlan(t *testing.T) {
 	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_VXLAN)
 	expected := &TunnelInfo{
-		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("0.0.2.63").To4())),
-		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("0.0.2.61").To4())),
-		Id:   27,
-		Type: TUNNEL_TYPE_VXLAN,
-		Tier: 1,
+		Src:    IPv4Int(BigEndian.Uint32(net.ParseIP("0.0.2.63").To4())),
+		Dst:    IPv4Int(BigEndian.Uint32(net.ParseIP("0.0.2.61").To4())),
+		Id:     27,
+		Type:   TUNNEL_TYPE_VXLAN,
+		Tier:   1,
+		IsIPv6: true,
 	}
 	packets, _ := loadPcap("ip6-vxlan.pcap")
 	packet := packets[0]
