@@ -194,7 +194,7 @@ const (
 type FlowKey struct {
 	VtapId  uint16
 	TapType TapType
-	TapPort uint32
+	TapPort TapPort // 采集端口信息类型 + 采集端口信息
 	/* L2 */
 	MACSrc MacInt
 	MACDst MacInt
@@ -216,6 +216,7 @@ type TunnelField struct {
 	TxId, RxId   uint32
 	Type         TunnelType
 	Tier         uint8
+	IsIPv6       bool
 }
 
 func (f *TunnelField) Encode(encoder *codec.SimpleEncoder) {
@@ -227,6 +228,7 @@ func (f *TunnelField) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU32(f.RxId)
 	encoder.WriteU8(uint8(f.Type))
 	encoder.WriteU8(f.Tier)
+	encoder.WriteBool(f.IsIPv6)
 }
 
 func (f *TunnelField) WriteToPB(p *pb.TunnelField) {
@@ -239,6 +241,9 @@ func (f *TunnelField) WriteToPB(p *pb.TunnelField) {
 	p.RxId = f.RxId
 	p.Type = uint32(f.Type)
 	p.Tier = uint32(f.Tier)
+	if f.IsIPv6 {
+		p.IsIPv6 = 1
+	}
 }
 
 func (f *TunnelField) Decode(decoder *codec.SimpleDecoder) {
@@ -250,14 +255,15 @@ func (f *TunnelField) Decode(decoder *codec.SimpleDecoder) {
 	f.RxId = decoder.ReadU32()
 	f.Type = TunnelType(decoder.ReadU8())
 	f.Tier = decoder.ReadU8()
+	f.IsIPv6 = decoder.ReadBool()
 }
 
 func (t *TunnelField) String() string {
 	if t.Type == TUNNEL_TYPE_NONE {
 		return "none "
 	}
-	return fmt.Sprintf("type: %s, tx_id: %d, rx_id: %d, tier: %d, tx_ip_0: %s, tx_ip_1: %s, rx_ip_0: %s, rx_ip_1: %s ",
-		t.Type, t.TxId, t.RxId, t.Tier,
+	return fmt.Sprintf("type: %s, tx_id: %d, rx_id: %d, tier: %d, is_ipv6: %v, tx_ip_0: %s, tx_ip_1: %s, rx_ip_0: %s, rx_ip_1: %s ",
+		t.Type, t.TxId, t.RxId, t.Tier, t.IsIPv6,
 		IpFromUint32(t.TxIP0), IpFromUint32(t.TxIP1),
 		IpFromUint32(t.RxIP0), IpFromUint32(t.RxIP1))
 }
@@ -314,7 +320,7 @@ func (_ *FlowKey) SequentialMerge(_ *FlowKey) {
 func (f *FlowKey) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU16(f.VtapId)
 	encoder.WriteU16(uint16(f.TapType))
-	encoder.WriteU32(f.TapPort)
+	encoder.WriteU64(uint64(f.TapPort))
 
 	encoder.WriteU64(f.MACSrc)
 	encoder.WriteU64(f.MACDst)
@@ -337,7 +343,7 @@ func (f *FlowKey) Encode(encoder *codec.SimpleEncoder) {
 func (f *FlowKey) WriteToPB(p *pb.FlowKey) {
 	p.VtapId = uint32(f.VtapId)
 	p.TapType = uint32(f.TapType)
-	p.TapPort = f.TapPort
+	p.TapPort = uint64(f.TapPort)
 	p.MACSrc = uint64(f.MACSrc)
 	p.MACDst = uint64(f.MACDst)
 	p.IPSrc = f.IPSrc
@@ -352,7 +358,7 @@ func (f *FlowKey) WriteToPB(p *pb.FlowKey) {
 func (f *FlowKey) Decode(decoder *codec.SimpleDecoder) {
 	f.VtapId = decoder.ReadU16()
 	f.TapType = TapType(decoder.ReadU16())
-	f.TapPort = decoder.ReadU32()
+	f.TapPort = TapPort(decoder.ReadU64())
 
 	f.MACSrc = decoder.ReadU64()
 	f.MACDst = decoder.ReadU64()
@@ -849,7 +855,7 @@ func (f *FlowKey) String() string {
 	formatted := ""
 	formatted += fmt.Sprintf("VtapId: %d ", f.VtapId)
 	formatted += fmt.Sprintf("TapType: %d ", f.TapType)
-	formatted += fmt.Sprintf("TapPort: 0x%x\n", f.TapPort)
+	formatted += fmt.Sprintf("TapPort: %s\n", f.TapPort)
 	formatted += fmt.Sprintf("\tMACSrc: %s ", Uint64ToMac(f.MACSrc))
 	formatted += fmt.Sprintf("MACDst: %s ", Uint64ToMac(f.MACDst))
 	if len(f.IP6Src) > 0 {

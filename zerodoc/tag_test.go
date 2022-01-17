@@ -368,7 +368,7 @@ func TestDirectionToTAPSide(t *testing.T) {
 func TestPutTAPPort(t *testing.T) {
 	bs := make([]byte, 16)
 	for _, tc := range []struct {
-		input  uint32
+		input  uint64
 		output string
 	}{
 		{0, "00000000"},

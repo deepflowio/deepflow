@@ -96,11 +96,12 @@ func (b TunnelTypeBitmap) String() string {
 }
 
 type TunnelInfo struct {
-	Src  IPv4Int
-	Dst  IPv4Int
-	Id   uint32
-	Type TunnelType
-	Tier uint8
+	Src    IPv4Int
+	Dst    IPv4Int
+	Id     uint32
+	Type   TunnelType
+	Tier   uint8
+	IsIPv6 bool
 }
 
 func (t *TunnelInfo) String() string {
@@ -348,6 +349,7 @@ func (t *TunnelInfo) Decapsulate6Vxlan(packet []byte, l2Len int) int {
 		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[IP6_DIP_OFFSET:]))
 		t.Type = TUNNEL_TYPE_VXLAN
 		t.Id = BigEndian.Uint32(l3Packet[IP6_HEADER_SIZE+UDP_HEADER_SIZE+VXLAN_VNI_OFFSET:]) >> 8
+		t.IsIPv6 = true
 	} else {
 		t.Type = (t.Type << TUNNEL_TYPE_TIER2_SHIFT) | TUNNEL_TYPE_VXLAN
 	}
@@ -405,6 +407,7 @@ func (t *TunnelInfo) DecapsulateIPIP(packet []byte, l2Len int, underlayIpv6, ove
 		if underlayIpv6 {
 			t.Src = BigEndian.Uint32(l3Packet[IP6_SIP_OFFSET:])
 			t.Dst = BigEndian.Uint32(l3Packet[IP6_DIP_OFFSET:])
+			t.IsIPv6 = true
 		} else {
 			t.Src = BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:])
 			t.Dst = BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:])
