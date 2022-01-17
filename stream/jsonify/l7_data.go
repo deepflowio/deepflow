@@ -35,15 +35,16 @@ type L7Base struct {
 	ServerPort uint16 `json:"server_port"`
 
 	// 流信息
-	FlowID     uint64 `json:"flow_id"`
-	TapType    uint16 `json:"tap_type"`
-	TapPort    uint32 `json:"tap_port"` // 显示为固定八个字符的16进制如'01234567'
-	TapSide    string `json:"tap_side"`
-	VtapID     uint16 `json:"vtap_id"`
-	ReqTcpSeq  uint32 `json:"req_tcp_seq"`
-	RespTcpSeq uint32 `json:"resp_tcp_seq"`
-	StartTime  uint64 `json:"start_time"` // us
-	EndTime    uint64 `json:"end_time"`   // us
+	FlowID      uint64 `json:"flow_id"`
+	TapType     uint16 `json:"tap_type"`
+	TapPortType uint8  `json:"tap_port_type"`
+	TapPort     uint32 `json:"tap_port"`
+	TapSide     string `json:"tap_side"`
+	VtapID      uint16 `json:"vtap_id"`
+	ReqTcpSeq   uint32 `json:"req_tcp_seq"`
+	RespTcpSeq  uint32 `json:"resp_tcp_seq"`
+	StartTime   uint64 `json:"start_time"` // us
+	EndTime     uint64 `json:"end_time"`   // us
 }
 
 func L7BaseColumns() []*ckdb.Column {
@@ -65,6 +66,7 @@ func L7BaseColumns() []*ckdb.Column {
 		// 流信息
 		ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 		ckdb.NewColumn("tap_type", ckdb.UInt16).SetIndex(ckdb.IndexSet),
+		ckdb.NewColumn("tap_port_type", ckdb.UInt8).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("tap_port", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("tap_side", ckdb.LowCardinalityString),
 		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
@@ -118,6 +120,9 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt16(f.TapType); err != nil {
+		return err
+	}
+	if err := block.WriteUInt8(f.TapPortType); err != nil {
 		return err
 	}
 	if err := block.WriteUInt32(f.TapPort); err != nil {
@@ -543,7 +548,7 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	// 流信息
 	b.FlowID = l.FlowId
 	b.TapType = uint16(l.TapType)
-	b.TapPort = l.TapPort
+	b.TapPort, b.TapPortType = datatype.TapPort(l.TapPort).SplitToPortAndType()
 	b.TapSide = zerodoc.TAPSideEnum(l.TapSide).String()
 	b.VtapID = uint16(l.VtapId)
 	b.StartTime = l.StartTime / uint64(time.Microsecond)

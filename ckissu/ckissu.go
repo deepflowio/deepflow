@@ -105,7 +105,7 @@ var ColumnAdd600 = []*ColumnAdds{
 		ColumnType:  ckdb.UInt64,
 	},
 	&ColumnAdds{
-		Dbs:         []string{"vtap_flow_port", "vtap_flow_edge_port"},
+		Dbs:         []string{"vtap_flow_edge_port"},
 		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
 		ColumnNames: []string{"tap_port_type"},
 		ColumnType:  ckdb.UInt8,
