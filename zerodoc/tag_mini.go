@@ -39,7 +39,7 @@ type MiniField struct {
 	ACLGID     uint16
 	ServerPort uint16
 	VTAPID     uint16
-	TAPPort    uint32
+	TAPPort    datatype.TapPort
 	TAPType    TAPTypeEnum
 	L7Protocol datatype.L7Protocol
 
@@ -81,7 +81,7 @@ func (f *MiniField) WriteToPB(p *pb.MiniField) {
 	p.ACLGID = uint32(f.ACLGID)
 	p.ServerPort = uint32(f.ServerPort)
 	p.VTAPID = uint32(f.VTAPID)
-	p.TAPPort = f.TAPPort
+	p.TAPPort = uint64(f.TAPPort)
 	p.TAPType = uint32(f.TAPType)
 	p.L7Protocol = uint32(f.L7Protocol)
 	p.TagType = uint32(f.TagType)
@@ -191,7 +191,7 @@ func (t *MiniTag) MarshalTo(b []byte) int {
 	}
 	if t.Code&TAPPort != 0 {
 		offset += copy(b[offset:], ",tap_port=")
-		offset += putTAPPort(b[offset:], t.TAPPort)
+		offset += putTAPPort(b[offset:], uint64(t.TAPPort))
 	}
 	if t.Code&TAPType != 0 {
 		offset += copy(b[offset:], ",tap_type=")
@@ -305,7 +305,7 @@ func (t *MiniTag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEnc
 		encoder.WriteU16(t.VTAPID)
 	}
 	if code&TAPPort != 0 {
-		encoder.WriteU32(t.TAPPort)
+		encoder.WriteU64(uint64(t.TAPPort))
 	}
 	if code&TAPSide != 0 {
 		encoder.WriteU8(uint8(tapSide))

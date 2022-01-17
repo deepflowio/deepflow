@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	VERSION                   = 20220112 // 修改Document的序列化结构时需同步修改此常量
+	VERSION                   = 20220117 // 修改Document的序列化结构时需同步修改此常量
 	LAST_SIMPLE_CODEC_VERSION = 20220111 // 这个版本及之前的版本使用 simple_codec, 之后的版本使用pb_codec
 )
 
