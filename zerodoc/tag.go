@@ -250,7 +250,7 @@ type Field struct {
 	Protocol     layers.IPProtocol
 	ServerPort   uint16
 	VTAPID       uint16
-	TAPPort      uint32
+	TAPPort      datatype.TapPort
 	TAPSide      TAPSideEnum
 	TAPType      TAPTypeEnum
 	IsIPv6       uint8 // (8B) 与IP/IP6是共生字段
@@ -758,7 +758,7 @@ func (t *Tag) MarshalTo(b []byte) int {
 	}
 	if t.Code&TAPPort != 0 {
 		offset += copy(b[offset:], ",tap_port=")
-		offset += putTAPPort(b[offset:], t.TAPPort)
+		offset += putTAPPort(b[offset:], uint64(t.TAPPort))
 	}
 	if t.Code&TAPSide != 0 {
 		switch t.TAPSide {
@@ -985,7 +985,8 @@ func genTagColumns(code Code) []*ckdb.Column {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("tag_value", ckdb.LowCardinalityString).SetComment("tag_type对应的具体值. tag_type=1: 省份, tag_type=2: TCP包头的Flag字段, tag_type=3: 播送类性(broadcast: 广播, multicast: 组播, unicast: 未知单播), tag_type=4: 隧道分发点ID, tag_type=5: TTL的值, tag_type=6: 包长范围值"))
 	}
 	if code&TAPPort != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_port", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("采集网口标识 若tap_type为3: 虚拟网络流量源, 表示虚拟接口MAC地址低4字节 00000000~FFFFFFFF"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_port_type", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("采集位置标识类型 0: MAC，1: IPv4, 2: IPv6, 3: ID, 4: NetFlow, 5: SFlow"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_port", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("采集位置标识 若tap_type为3: 虚拟网络流量源, 表示虚拟接口MAC地址低4字节 00000000~FFFFFFFF"))
 	}
 	if code&TAPSide != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_side", ckdb.LowCardinalityString).SetComment("流量采集位置(c: 客户端(0侧)采集, s: 服务端(1侧)采集)"))
@@ -1337,7 +1338,11 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
 		}
 	}
 	if code&TAPPort != 0 {
-		if err := block.WriteUInt32(t.TAPPort); err != nil {
+		tapPort, tapPortType := t.TAPPort.SplitToPortAndType()
+		if err := block.WriteUInt8(tapPortType); err != nil {
+			return err
+		}
+		if err := block.WriteUInt32(tapPort); err != nil {
 			return err
 		}
 	}
@@ -1362,9 +1367,9 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
 
 const TAP_PORT_STR_LEN = 8
 
-func putTAPPort(bs []byte, tapPort uint32) int {
+func putTAPPort(bs []byte, tapPort uint64) int {
 	copy(bs, "00000000")
-	s := strconv.FormatUint(uint64(tapPort), 16)
+	s := strconv.FormatUint(tapPort, 16)
 	copy(bs[TAP_PORT_STR_LEN-len(s):], s)
 	return TAP_PORT_STR_LEN
 }
@@ -1542,7 +1547,7 @@ func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
 		t.VTAPID = decoder.ReadU16()
 	}
 	if t.Code&TAPPort != 0 {
-		t.TAPPort = decoder.ReadU32()
+		t.TAPPort = datatype.TapPort(decoder.ReadU64())
 	}
 	if t.Code&TAPSide != 0 {
 		t.TAPSide = TAPSideEnum(decoder.ReadU8())
@@ -1599,7 +1604,7 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.ACLGID = uint16(p.Field.ACLGID)
 	t.ServerPort = uint16(p.Field.ServerPort)
 	t.VTAPID = uint16(p.Field.VTAPID)
-	t.TAPPort = p.Field.TAPPort
+	t.TAPPort = datatype.TapPort(p.Field.TAPPort)
 	t.TAPType = TAPTypeEnum(p.Field.TAPType)
 	t.L7Protocol = datatype.L7Protocol(p.Field.L7Protocol)
 	t.TagType = uint8(p.Field.TagType)
@@ -1766,7 +1771,7 @@ func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder
 		encoder.WriteU16(t.VTAPID)
 	}
 	if code&TAPPort != 0 {
-		encoder.WriteU32(t.TAPPort)
+		encoder.WriteU64(uint64(t.TAPPort))
 	}
 	if code&TAPSide != 0 {
 		encoder.WriteU8(uint8(t.TAPSide))

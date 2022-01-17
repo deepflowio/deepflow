@@ -45,7 +45,7 @@ message Flow {
 message FlowKey {
 	uint32 VtapId = 1;
 	uint32 TapType = 2;
-	uint32 TapPort = 3;
+	uint64 TapPort = 3;
 	uint64 MACSrc = 4;
 	uint64 MACDst = 5;
 
@@ -90,6 +90,7 @@ message TunnelField {
 	uint32 RxId = 6;
 	uint32 Type = 7;
 	uint32 Tier = 8;
+	uint32 IsIPv6 = 9;
 }
 
 message FlowPerfStats {
@@ -151,7 +152,7 @@ message AppProtoLogsBaseInfo {
 	uint64 StartTime = 1;
 	uint64 EndTime = 2;
 	uint64 FlowId = 3;
-	uint32 TapPort = 4;
+	uint64 TapPort = 4;
 	uint32 VtapId = 5;
 	uint32 TapType = 6;
 	uint32 IsIPv6 = 7;
