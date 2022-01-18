@@ -148,6 +148,12 @@ var ColumnAdd600 = []*ColumnAdds{
 		ColumnNames: []string{"response_length"},
 		ColumnType:  ckdb.Int64Nullable,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_http_log", "l7_http_log_local"},
+		ColumnNames: []string{"span_id"},
+		ColumnType:  ckdb.String,
+	},
 }
 
 var ColumnRename600 = []*ColumnRename{
