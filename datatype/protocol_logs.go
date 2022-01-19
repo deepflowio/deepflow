@@ -128,6 +128,9 @@ type AppProtoLogsBaseInfo struct {
 	/* L4 */
 	PortSrc uint16
 	PortDst uint16
+	/* First L7 TCP Seq */
+	ReqTcpSeq  uint32
+	RespTcpSeq uint32
 
 	Protocol          uint8
 	IsVIPInterfaceSrc bool
@@ -166,8 +169,9 @@ func (i *AppProtoLogsBaseInfo) String() string {
 	formatted += fmt.Sprintf("PortSrc: %v ", i.PortSrc)
 	formatted += fmt.Sprintf("PortDst: %v ", i.PortDst)
 	formatted += fmt.Sprintf("L3EpcIDSrc: %v ", i.L3EpcIDSrc)
-	formatted += fmt.Sprintf("L3EpcIDDst: %v", i.L3EpcIDDst)
-
+	formatted += fmt.Sprintf("L3EpcIDDst: %v ", i.L3EpcIDDst)
+	formatted += fmt.Sprintf("ReqTcpSeq: %v ", i.ReqTcpSeq)
+	formatted += fmt.Sprintf("RespTcpSeq: %v", i.RespTcpSeq)
 	return formatted
 }
 
@@ -286,6 +290,8 @@ func (l *AppProtoLogsData) Encode(encoder *codec.SimpleEncoder) error {
 	encoder.WriteU8(l.Protocol)
 	encoder.WriteBool(l.IsVIPInterfaceSrc)
 	encoder.WriteBool(l.IsVIPInterfaceDst)
+	encoder.WriteU32(l.ReqTcpSeq)
+	encoder.WriteU32(l.RespTcpSeq)
 
 	l.Detail.Encode(encoder, l.MsgType, l.Code)
 	return nil
@@ -318,6 +324,8 @@ func (l *AppProtoLogsBaseInfo) WriteToPB(p *pb.AppProtoLogsBaseInfo) {
 	p.Protocol = uint32(l.Protocol)
 	p.IsVIPInterfaceSrc = utils.Bool2UInt32(l.IsVIPInterfaceSrc)
 	p.IsVIPInterfaceDst = utils.Bool2UInt32(l.IsVIPInterfaceDst)
+	p.ReqTcpSeq = l.ReqTcpSeq
+	p.RespTcpSeq = l.RespTcpSeq
 }
 
 func (l *AppProtoLogsData) EncodePB(encoder *codec.SimpleEncoder, i interface{}) error {
@@ -439,6 +447,8 @@ func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
 	l.Protocol = decoder.ReadU8()
 	l.IsVIPInterfaceSrc = decoder.ReadBool()
 	l.IsVIPInterfaceDst = decoder.ReadBool()
+	l.ReqTcpSeq = decoder.ReadU32()
+	l.RespTcpSeq = decoder.ReadU32()
 
 	if l.Proto == PROTO_HTTP {
 		httpInfo := AcquireHTTPInfo()
