@@ -35,13 +35,15 @@ type L7Base struct {
 	ServerPort uint16 `json:"server_port"`
 
 	// 流信息
-	FlowID    uint64 `json:"flow_id"`
-	TapType   uint16 `json:"tap_type"`
-	TapPort   uint32 `json:"tap_port"` // 显示为固定八个字符的16进制如'01234567'
-	TapSide   string `json:"tap_side"`
-	VtapID    uint16 `json:"vtap_id"`
-	StartTime uint64 `json:"start_time"` // us
-	EndTime   uint64 `json:"end_time"`   // us
+	FlowID     uint64 `json:"flow_id"`
+	TapType    uint16 `json:"tap_type"`
+	TapPort    uint32 `json:"tap_port"` // 显示为固定八个字符的16进制如'01234567'
+	TapSide    string `json:"tap_side"`
+	VtapID     uint16 `json:"vtap_id"`
+	ReqTcpSeq  uint32 `json:"req_tcp_seq"`
+	RespTcpSeq uint32 `json:"resp_tcp_seq"`
+	StartTime  uint64 `json:"start_time"` // us
+	EndTime    uint64 `json:"end_time"`   // us
 }
 
 func L7BaseColumns() []*ckdb.Column {
@@ -66,6 +68,8 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("tap_port", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("tap_side", ckdb.LowCardinalityString),
 		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
+		ckdb.NewColumn("req_tcp_seq", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+		ckdb.NewColumn("resp_tcp_seq", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("time", ckdb.DateTime).SetComment("精度: 秒"),
@@ -123,6 +127,14 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt16(f.VtapID); err != nil {
+		return err
+	}
+	// FIXME: req_tcp_seq
+	if err := block.WriteUInt32(0); err != nil {
+		return err
+	}
+	// FIXME: resp_tcp_seq
+	if err := block.WriteUInt32(0); err != nil {
 		return err
 	}
 	if err := block.WriteUInt64(f.StartTime); err != nil {
