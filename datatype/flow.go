@@ -92,6 +92,7 @@ const (
 type TcpPerfCountsPeer struct {
 	RetransCount uint32
 	ZeroWinCount uint32
+	FirstSeqID   uint32
 }
 
 // size = 20 * 4B = 80Byte
@@ -387,21 +388,25 @@ func (f *FlowKey) Decode(decoder *codec.SimpleDecoder) {
 func (f *TcpPerfCountsPeer) SequentialMerge(rhs *TcpPerfCountsPeer) {
 	f.RetransCount += rhs.RetransCount
 	f.ZeroWinCount += rhs.ZeroWinCount
+	f.FirstSeqID = rhs.FirstSeqID
 }
 
 func (t *TcpPerfCountsPeer) WriteToPB(p *pb.TcpPerfCountsPeer) {
-	p.RetransCount = p.RetransCount
-	p.ZeroWinCount = p.ZeroWinCount
+	p.RetransCount = t.RetransCount
+	p.ZeroWinCount = t.ZeroWinCount
+	p.FirstSeqID = t.FirstSeqID
 }
 
 func (t *TcpPerfCountsPeer) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteVarintU32(t.RetransCount)
 	encoder.WriteVarintU32(t.ZeroWinCount)
+	encoder.WriteVarintU32(t.FirstSeqID)
 }
 
 func (t *TcpPerfCountsPeer) Decode(decoder *codec.SimpleDecoder) {
 	t.RetransCount = decoder.ReadVarintU32()
 	t.ZeroWinCount = decoder.ReadVarintU32()
+	t.FirstSeqID = decoder.ReadVarintU32()
 }
 
 func (f *TCPPerfStats) SequentialMerge(rhs *TCPPerfStats) {
@@ -831,8 +836,10 @@ func (p *TCPPerfStats) String() string {
 	formatted += fmt.Sprintf("ARTCount:%v ", p.ARTCount)
 	formatted += fmt.Sprintf("RetransCountSrc:%v ", p.TcpPerfCountsPeers[0].RetransCount)
 	formatted += fmt.Sprintf("ZeroWinCountSrc:%v ", p.TcpPerfCountsPeers[0].ZeroWinCount)
+	formatted += fmt.Sprintf("SynFirstSeqID:%v ", p.TcpPerfCountsPeers[0].FirstSeqID)
 	formatted += fmt.Sprintf("RetransCountDst:%v ", p.TcpPerfCountsPeers[1].RetransCount)
 	formatted += fmt.Sprintf("ZeroWinCountDst:%v ", p.TcpPerfCountsPeers[1].ZeroWinCount)
+	formatted += fmt.Sprintf("SynAckFirstSeqID:%v ", p.TcpPerfCountsPeers[1].FirstSeqID)
 	formatted += fmt.Sprintf("TotalRetransCount:%v", p.TotalRetransCount)
 
 	return formatted
