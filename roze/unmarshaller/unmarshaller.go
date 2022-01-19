@@ -207,7 +207,6 @@ func (u *Unmarshaller) QueueProcess() {
 	stats.RegisterCountable("unmarshaller", u, stats.OptionStatTags{"thread": strconv.Itoa(u.index)})
 	rawDocs := make([]interface{}, GET_MAX_SIZE)
 	decoder := &codec.SimpleDecoder{}
-	pbDoc := &pb.Document{}
 	for {
 		n := u.unmarshallQueue.Gets(rawDocs)
 		for i := 0; i < n; i++ {
@@ -216,6 +215,7 @@ func (u *Unmarshaller) QueueProcess() {
 				bytes := recvBytes.Buffer[recvBytes.Begin:recvBytes.End]
 				decoder.Init(bytes)
 				for !decoder.Failed() && !decoder.IsEnd() {
+					pbDoc := &pb.Document{}
 					doc, err := app.DecodePB(decoder, pbDoc)
 					if err != nil {
 						u.counter.ErrDocCount++
