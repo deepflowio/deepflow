@@ -449,6 +449,8 @@ type FlowInfo struct {
 	StartTime  uint64 `json:"start_time"` // us
 	EndTime    uint64 `json:"end_time"`   // us
 	Duration   uint64 `json:"duration"`   // us
+	SynSeq     uint32 `json:"syn_seq"`
+	SynAckSeq  uint32 `json:"syn_ack_seq"`
 }
 
 var FlowInfoColumns = []*ckdb.Column{
@@ -469,6 +471,8 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("time", ckdb.DateTime).SetComment("精度: 秒"),
 	ckdb.NewColumn("end_time_s", ckdb.DateTime).SetComment("精度: 秒"),
 	ckdb.NewColumn("duration", ckdb.UInt64).SetComment("单位: 微秒"),
+	ckdb.NewColumn("syn_seq", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("握手包的TCP SEQ序列号"),
+	ckdb.NewColumn("syn_ack_seq", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("握手回应包的TCP SEQ序列号"),
 }
 
 func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
@@ -518,6 +522,14 @@ func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt64(f.Duration); err != nil {
+		return err
+	}
+	// FIXME: syn_req
+	if err := block.WriteUInt32(0); err != nil {
+		return err
+	}
+	// FIXME: syn_ack_req
+	if err := block.WriteUInt32(0); err != nil {
 		return err
 	}
 

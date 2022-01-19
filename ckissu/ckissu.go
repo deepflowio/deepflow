@@ -124,6 +124,18 @@ var ColumnAdd600 = []*ColumnAdds{
 		ColumnType:  ckdb.UInt8,
 	},
 	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"syn_seq", "syn_ack_seq"},
+		ColumnType:  ckdb.UInt32,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_http_log", "l7_http_log_local", "l7_dns_log", "l7_dns_log_local"},
+		ColumnNames: []string{"req_tcp_seq", "resp_tcp_seq"},
+		ColumnType:  ckdb.UInt32,
+	},
+	&ColumnAdds{
 		Dbs:          []string{"flow_log"},
 		Tables:       []string{"l7_dns_log", "l7_dns_log_local"},
 		ColumnNames:  []string{"protocol"},
