@@ -117,6 +117,7 @@ func (d *Decoder) Run() {
 func (d *Decoder) handleTaggedFlow(decoder *codec.SimpleDecoder) {
 	pbTaggedFlow := &pb.TaggedFlow{}
 	for !decoder.IsEnd() {
+		pbTaggedFlow.Reset()
 		decoder.ReadPB(pbTaggedFlow)
 		if decoder.Failed() {
 			d.counter.ErrorCount++
