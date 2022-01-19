@@ -90,7 +90,6 @@ func (d *Decoder) Run() {
 		"msg_type": msgType})
 	buffer := make([]interface{}, BUFFER_SIZE)
 	decoder := &codec.SimpleDecoder{}
-	pbTaggedFlow := &pb.TaggedFlow{}
 	for {
 		n := d.inQueue.Gets(buffer)
 		for i := 0; i < n; i++ {
@@ -108,14 +107,15 @@ func (d *Decoder) Run() {
 			if d.msgType == datatype.MESSAGE_TYPE_PROTOCOLLOG {
 				d.handleProtoLog(decoder)
 			} else if d.msgType == datatype.MESSAGE_TYPE_TAGGEDFLOW {
-				d.handleTaggedFlow(decoder, pbTaggedFlow)
+				d.handleTaggedFlow(decoder)
 			}
 			receiver.ReleaseRecvBuffer(recvBytes)
 		}
 	}
 }
 
-func (d *Decoder) handleTaggedFlow(decoder *codec.SimpleDecoder, pbTaggedFlow *pb.TaggedFlow) {
+func (d *Decoder) handleTaggedFlow(decoder *codec.SimpleDecoder) {
+	pbTaggedFlow := &pb.TaggedFlow{}
 	for !decoder.IsEnd() {
 		decoder.ReadPB(pbTaggedFlow)
 		if decoder.Failed() {
