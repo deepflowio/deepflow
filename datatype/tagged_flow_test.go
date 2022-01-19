@@ -55,6 +55,7 @@ func TestTaggedFlowEncodeDecode(t *testing.T) {
 	tcpPerfCountsPeer := TcpPerfCountsPeer{
 		RetransCount: 601,
 		ZeroWinCount: 602,
+		FirstSeqID:   603,
 	}
 
 	TCPPerfStats := TCPPerfStats{

@@ -125,6 +125,7 @@ message TCPPerfStats {
 message TcpPerfCountsPeer {
 	uint32 RetransCount = 1;
 	uint32 ZeroWinCount = 2;
+	uint32 FirstSeqID = 3;
 }
 
 message L7PerfStats {
@@ -177,6 +178,9 @@ message AppProtoLogsBaseInfo {
 	uint32 Protocol = 20;
 	uint32 IsVIPInterfaceSrc = 21;
 	uint32 IsVIPInterfaceDst = 22;
+
+	uint32 ReqTcpSeq = 23;
+	uint32 RespTcpSeq = 24;
 }
 
 message AppProtoHead {
