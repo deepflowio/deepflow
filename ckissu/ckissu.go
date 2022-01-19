@@ -537,7 +537,7 @@ func (i *Issu) addColumns(connect *sql.DB) ([]*ColumnAdd, error) {
 		dones = append(dones, add)
 	}
 
-	for _, db := range []string{"vtap_flow", "vtap_flow_edge", "vtap_flow_port", "vtap_flow_edge_port"} {
+	for _, db := range []string{"vtap_flow_port", "vtap_flow_edge_port"} {
 		datasourceInfos, err := getUserDefinedDatasourceInfos(connect, db)
 		if err != nil {
 			return nil, err
