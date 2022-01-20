@@ -596,6 +596,9 @@ func (h *HTTPInfo) Merge(r interface{}) {
 		if h.TraceID == "" {
 			h.TraceID = http.TraceID
 		}
+		if h.SpanID == "" {
+			h.SpanID = http.SpanID
+		}
 	}
 }
 
