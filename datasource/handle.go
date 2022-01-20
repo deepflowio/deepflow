@@ -21,8 +21,8 @@ const (
 
 // VATP_ACL数据库, 不进行数据源修改
 var metricsGroupDBIDs = [][]zerodoc.MetricsDBID{
-	zerodoc.VTAP_FLOW: []zerodoc.MetricsDBID{zerodoc.VTAP_FLOW, zerodoc.VTAP_FLOW_EDGE, zerodoc.VTAP_FLOW_EDGE_PORT, zerodoc.VTAP_FLOW_PORT},
-	zerodoc.VTAP_APP:  []zerodoc.MetricsDBID{zerodoc.VTAP_APP, zerodoc.VTAP_APP_EDGE, zerodoc.VTAP_APP_EDGE_PORT, zerodoc.VTAP_APP_PORT},
+	zerodoc.VTAP_FLOW: []zerodoc.MetricsDBID{zerodoc.VTAP_FLOW_EDGE_PORT, zerodoc.VTAP_FLOW_PORT},
+	zerodoc.VTAP_APP:  []zerodoc.MetricsDBID{zerodoc.VTAP_APP_EDGE_PORT, zerodoc.VTAP_APP_PORT},
 }
 
 func getMetricsSubDBIDs(dbGroup string) ([]zerodoc.MetricsDBID, error) {
