@@ -583,6 +583,9 @@ func (h *HTTPInfo) String() string {
 func (h *HTTPInfo) Merge(r interface{}) {
 	if http, ok := r.(*HTTPInfo); ok {
 		h.RespContentLength = http.RespContentLength
+		if h.TraceID == "" {
+			h.TraceID = http.TraceID
+		}
 	}
 }
 
