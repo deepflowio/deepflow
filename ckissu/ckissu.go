@@ -126,7 +126,7 @@ var ColumnAdd600 = []*ColumnAdds{
 	&ColumnAdds{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
-		ColumnNames: []string{"syn_seq", "syn_ack_seq"},
+		ColumnNames: []string{"syn_seq", "syn_ack_seq", "l7_error"},
 		ColumnType:  ckdb.UInt32,
 	},
 	&ColumnAdds{
