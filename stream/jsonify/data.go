@@ -586,6 +586,7 @@ type Metrics struct {
 	L7ClientError   uint32 `json:"l7_client_error,omitempty"`
 	L7ServerError   uint32 `json:"l7_server_error,omitempty"`
 	L7ServerTimeout uint32 `json:"l7_server_timeout,omitempty"`
+	L7Error         uint32 `json:"l7_error,omitempty"`
 }
 
 var MetricsColumns = []*ckdb.Column{
@@ -631,6 +632,7 @@ var MetricsColumns = []*ckdb.Column{
 	ckdb.NewColumn("l7_client_error", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("l7_server_error", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("l7_server_timeout", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("l7_error", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 }
 
 func (m *Metrics) WriteBlock(block *ckdb.Block) error {
@@ -747,6 +749,9 @@ func (m *Metrics) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt32(m.L7ServerTimeout); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(m.L7Error); err != nil {
 		return err
 	}
 	return nil
@@ -994,6 +999,7 @@ func (m *Metrics) Fill(f *pb.Flow) {
 		m.L7ClientError = p.L7PerfStats.ErrClientCount
 		m.L7ServerError = p.L7PerfStats.ErrServerCount
 		m.L7ServerTimeout = p.L7PerfStats.ErrTimeout
+		m.L7Error = m.L7ClientError + m.L7ServerError
 
 		m.RTT = p.TCPPerfStats.RTT
 		m.RTTClientSum = p.TCPPerfStats.RTTClientSum
