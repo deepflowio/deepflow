@@ -725,6 +725,7 @@ func (f *Flow) WriteToPB(p *pb.Flow) {
 	p.CloseType = uint32(f.CloseType)
 	p.FlowSource = uint32(f.FlowSource)
 	p.IsActiveService = Bool2UInt32(f.IsActiveService)
+	p.IsNewFlow = Bool2UInt32(f.IsNewFlow)
 	p.TapSide = uint32(f.TapSide)
 }
 
