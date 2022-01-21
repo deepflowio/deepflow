@@ -134,12 +134,10 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt16(f.VtapID); err != nil {
 		return err
 	}
-	// FIXME: req_tcp_seq
-	if err := block.WriteUInt32(0); err != nil {
+	if err := block.WriteUInt32(f.ReqTcpSeq); err != nil {
 		return err
 	}
-	// FIXME: resp_tcp_seq
-	if err := block.WriteUInt32(0); err != nil {
+	if err := block.WriteUInt32(f.RespTcpSeq); err != nil {
 		return err
 	}
 	if err := block.WriteUInt64(f.StartTime); err != nil {
@@ -551,6 +549,8 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.TapPort, b.TapPortType = datatype.TapPort(l.TapPort).SplitToPortAndType()
 	b.TapSide = zerodoc.TAPSideEnum(l.TapSide).String()
 	b.VtapID = uint16(l.VtapId)
+	b.ReqTcpSeq = l.ReqTcpSeq
+	b.RespTcpSeq = l.RespTcpSeq
 	b.StartTime = l.StartTime / uint64(time.Microsecond)
 	b.EndTime = l.EndTime / uint64(time.Microsecond)
 }

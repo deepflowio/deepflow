@@ -199,6 +199,8 @@ type TransportLayer struct {
 	ServerPort   uint16 `json:"server_port"`
 	TCPFlagsBit0 uint16 `json:"tcp_flags_bit_0,omitempty"`
 	TCPFlagsBit1 uint16 `json:"tcp_flags_bit_1,omitempty"`
+	SynSeq       uint32 `json:"syn_seq"`
+	SynAckSeq    uint32 `json:"syn_ack_seq"`
 }
 
 var TransportLayerColumns = []*ckdb.Column{
@@ -207,6 +209,8 @@ var TransportLayerColumns = []*ckdb.Column{
 	ckdb.NewColumn("server_port", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 	ckdb.NewColumn("tcp_flags_bit_0", ckdb.UInt16).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("tcp_flags_bit_1", ckdb.UInt16).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("syn_seq", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("握手包的TCP SEQ序列号"),
+	ckdb.NewColumn("syn_ack_seq", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("握手回应包的TCP SEQ序列号"),
 }
 
 func (t *TransportLayer) WriteBlock(block *ckdb.Block) error {
@@ -220,6 +224,12 @@ func (t *TransportLayer) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt16(t.TCPFlagsBit1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(t.SynSeq); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(t.SynAckSeq); err != nil {
 		return err
 	}
 	return nil
@@ -450,8 +460,7 @@ type FlowInfo struct {
 	StartTime   uint64 `json:"start_time"` // us
 	EndTime     uint64 `json:"end_time"`   // us
 	Duration    uint64 `json:"duration"`   // us
-	SynSeq      uint32 `json:"syn_seq"`
-	SynAckSeq   uint32 `json:"syn_ack_seq"`
+	IsNewFlow   uint8  `json:"is_new_flow"`
 }
 
 var FlowInfoColumns = []*ckdb.Column{
@@ -473,8 +482,7 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("time", ckdb.DateTime).SetComment("精度: 秒"),
 	ckdb.NewColumn("end_time_s", ckdb.DateTime).SetComment("精度: 秒"),
 	ckdb.NewColumn("duration", ckdb.UInt64).SetComment("单位: 微秒"),
-	ckdb.NewColumn("syn_seq", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("握手包的TCP SEQ序列号"),
-	ckdb.NewColumn("syn_ack_seq", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("握手回应包的TCP SEQ序列号"),
+	ckdb.NewColumn("is_new_flow", ckdb.UInt8),
 }
 
 func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
@@ -529,12 +537,7 @@ func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt64(f.Duration); err != nil {
 		return err
 	}
-	// FIXME: syn_req
-	if err := block.WriteUInt32(0); err != nil {
-		return err
-	}
-	// FIXME: syn_ack_req
-	if err := block.WriteUInt32(0); err != nil {
+	if err := block.WriteUInt8(f.IsNewFlow); err != nil {
 		return err
 	}
 
@@ -807,6 +810,15 @@ func (t *TransportLayer) Fill(f *pb.Flow) {
 	t.ServerPort = uint16(f.FlowKey.PortDst)
 	t.TCPFlagsBit0 = uint16(f.FlowMetricsPeerSrc.TCPFlags)
 	t.TCPFlagsBit1 = uint16(f.FlowMetricsPeerDst.TCPFlags)
+	if f.HasFlowPerfStats == 1 {
+		p := f.FlowPerfStats
+		if p.TCPPerfStats.TcpPerfCountsPeerTx != nil {
+			t.SynSeq = p.TCPPerfStats.TcpPerfCountsPeerTx.FirstSeqID
+		}
+		if p.TCPPerfStats.TcpPerfCountsPeerRx != nil {
+			t.SynAckSeq = p.TCPPerfStats.TcpPerfCountsPeerRx.FirstSeqID
+		}
+	}
 }
 
 func (a *ApplicationLayer) Fill(f *pb.Flow) {
@@ -957,6 +969,7 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 	i.StartTime = f.StartTime / uint64(time.Microsecond)
 	i.EndTime = f.EndTime / uint64(time.Microsecond)
 	i.Duration = f.Duration / uint64(time.Microsecond)
+	i.IsNewFlow = uint8(f.IsNewFlow)
 }
 
 func (m *Metrics) Fill(f *pb.Flow) {
