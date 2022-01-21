@@ -51,3 +51,49 @@ func (t *TaggedFlow) IsValid() bool {
 	}
 	return true
 }
+
+// 清空pb的TaggedFlow 使解码时可以反复使用
+func (t *TaggedFlow) ResetAll() {
+	flowPerfStats := t.Flow.FlowPerfStats
+	if flowPerfStats != nil {
+		tcpPerfStats := flowPerfStats.TCPPerfStats
+		tcpPerfCountsPeerTx := tcpPerfStats.TcpPerfCountsPeerTx
+		tcpPerfCountsPeerRx := tcpPerfStats.TcpPerfCountsPeerRx
+
+		tcpPerfCountsPeerTx.Reset()
+		tcpPerfCountsPeerRx.Reset()
+		tcpPerfStats.Reset()
+		tcpPerfStats.TcpPerfCountsPeerTx = tcpPerfCountsPeerTx
+		tcpPerfStats.TcpPerfCountsPeerRx = tcpPerfCountsPeerRx
+
+		l7PerfStats := flowPerfStats.L7PerfStats
+		l7PerfStats.Reset()
+
+		flowPerfStats.Reset()
+		flowPerfStats.L7PerfStats = l7PerfStats
+		flowPerfStats.TCPPerfStats = tcpPerfStats
+	}
+
+	flowKey := t.Flow.FlowKey
+	flowKey.Reset()
+	flowMetricsPeerSrc := t.Flow.FlowMetricsPeerSrc
+	flowMetricsPeerSrc.Reset()
+	flowMetricsPeerDst := t.Flow.FlowMetricsPeerDst
+	flowMetricsPeerDst.Reset()
+	tunnel := t.Flow.Tunnel
+	tunnel.Reset()
+
+	flow := t.Flow
+	flow.Reset()
+
+	if flowPerfStats != nil {
+		flow.FlowPerfStats = flowPerfStats
+	}
+	flow.FlowKey = flowKey
+	flow.FlowMetricsPeerSrc = flowMetricsPeerSrc
+	flow.FlowMetricsPeerDst = flowMetricsPeerDst
+	flow.Tunnel = tunnel
+
+	t.Reset()
+	t.Flow = flow
+}
