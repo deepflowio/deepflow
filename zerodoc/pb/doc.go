@@ -1,5 +1,28 @@
 package pb
 
+func NewDocument() *Document {
+	return &Document{
+		Minitag: &MiniTag{
+			Field: &MiniField{},
+		},
+		Meter: &Meter{
+			Flow: &FlowMeter{
+				Traffic:     &Traffic{},
+				Latency:     &Latency{},
+				Performance: &Performance{},
+				Anomaly:     &Anomaly{},
+				Flowload:    &FlowLoad{},
+			},
+			Usage: &UsageMeter{},
+			App: &AppMeter{
+				AppTriffic: &AppTriffic{},
+				AppLatency: &AppLatency{},
+				AppAnomaly: &AppAnomaly{},
+			},
+		},
+	}
+}
+
 // 清空pb的Document使解码时可以反复使用
 func (d *Document) ResetAll() {
 	miniTag := d.Minitag

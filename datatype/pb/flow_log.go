@@ -52,6 +52,24 @@ func (t *TaggedFlow) IsValid() bool {
 	return true
 }
 
+func NewTaggedFlow() *TaggedFlow {
+	return &TaggedFlow{
+		Flow: &Flow{
+			FlowKey:            &FlowKey{},
+			FlowMetricsPeerSrc: &FlowMetricsPeer{},
+			FlowMetricsPeerDst: &FlowMetricsPeer{},
+			Tunnel:             &TunnelField{},
+			FlowPerfStats: &FlowPerfStats{
+				TCPPerfStats: &TCPPerfStats{
+					TcpPerfCountsPeerTx: &TcpPerfCountsPeer{},
+					TcpPerfCountsPeerRx: &TcpPerfCountsPeer{},
+				},
+				L7PerfStats: &L7PerfStats{},
+			},
+		},
+	}
+}
+
 // 清空pb的TaggedFlow 使解码时可以反复使用
 func (t *TaggedFlow) ResetAll() {
 	flowPerfStats := t.Flow.FlowPerfStats
