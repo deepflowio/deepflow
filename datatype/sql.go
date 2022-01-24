@@ -3,7 +3,6 @@ package datatype
 import (
 	"fmt"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 )
@@ -50,31 +49,6 @@ type MysqlInfo struct {
 	ErrorMessage string
 }
 
-func (i *MysqlInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, code uint16) {
-	switch msgType {
-	case MSG_T_OTHER:
-		encoder.WriteU8(i.ProtocolVersion)
-		encoder.WriteString255(i.ServerVersion)
-		encoder.WriteU32(i.ServerThreadID)
-	case MSG_T_REQUEST:
-		encoder.WriteU8(i.Command)
-		encoder.WriteString255(i.Context)
-	case MSG_T_RESPONSE:
-		encoder.WriteU8(i.ResponseCode)
-		encoder.WriteU16(i.ErrorCode)
-		encoder.WriteU64(i.AffectedRows)
-		encoder.WriteString255(i.ErrorMessage)
-	case MSG_T_SESSION:
-		encoder.WriteU8(i.Command)
-		encoder.WriteString255(i.Context)
-
-		encoder.WriteU8(i.ResponseCode)
-		encoder.WriteU16(i.ErrorCode)
-		encoder.WriteU64(i.AffectedRows)
-		encoder.WriteString255(i.ErrorMessage)
-	}
-}
-
 func (i *MysqlInfo) WriteToPB(p *pb.MysqlInfo, msgType LogMessageType) {
 	switch msgType {
 	case MSG_T_OTHER:
@@ -105,31 +79,6 @@ func (i *MysqlInfo) WriteToPB(p *pb.MysqlInfo, msgType LogMessageType) {
 		p.ErrorMessage = i.ErrorMessage
 
 		p.ProtocolVersion = 0
-	}
-}
-
-func (i *MysqlInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, code uint16) {
-	switch msgType {
-	case MSG_T_OTHER:
-		i.ProtocolVersion = decoder.ReadU8()
-		i.ServerVersion = decoder.ReadString255()
-		i.ServerThreadID = decoder.ReadU32()
-	case MSG_T_REQUEST:
-		i.Command = decoder.ReadU8()
-		i.Context = decoder.ReadString255()
-	case MSG_T_RESPONSE:
-		i.ResponseCode = decoder.ReadU8()
-		i.ErrorCode = decoder.ReadU16()
-		i.AffectedRows = decoder.ReadU64()
-		i.ErrorMessage = decoder.ReadString255()
-	case MSG_T_SESSION:
-		i.Command = decoder.ReadU8()
-		i.Context = decoder.ReadString255()
-
-		i.ResponseCode = decoder.ReadU8()
-		i.ErrorCode = decoder.ReadU16()
-		i.AffectedRows = decoder.ReadU64()
-		i.ErrorMessage = decoder.ReadString255()
 	}
 }
 
@@ -168,26 +117,6 @@ type RedisInfo struct {
 	Error    string // '-'
 }
 
-func (i *RedisInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, code uint16) {
-	switch msgType {
-	case MSG_T_REQUEST:
-		encoder.WriteString255(i.Request)
-		encoder.WriteString255(i.RequestType)
-	case MSG_T_RESPONSE:
-		encoder.WriteString255(i.Response)
-		encoder.WriteString255(i.Status)
-		encoder.WriteString255(i.Error)
-	case MSG_T_SESSION:
-		encoder.WriteString255(i.Request)
-		encoder.WriteString255(i.RequestType)
-		encoder.WriteString255(i.Response)
-		encoder.WriteString255(i.Status)
-		encoder.WriteString255(i.Error)
-	default:
-		panic("RedisInfo encode msg type error!")
-	}
-}
-
 func (i *RedisInfo) WriteToPB(p *pb.RedisInfo, msgType LogMessageType) {
 	switch msgType {
 	case MSG_T_REQUEST:
@@ -214,26 +143,6 @@ func (i *RedisInfo) WriteToPB(p *pb.RedisInfo, msgType LogMessageType) {
 		panic("RedisInfo encode msg type error!")
 	}
 
-}
-
-func (i *RedisInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, code uint16) {
-	switch msgType {
-	case MSG_T_REQUEST:
-		i.Request = decoder.ReadString255()
-		i.RequestType = decoder.ReadString255()
-	case MSG_T_RESPONSE:
-		i.Response = decoder.ReadString255()
-		i.Status = decoder.ReadString255()
-		i.Error = decoder.ReadString255()
-	case MSG_T_SESSION:
-		i.Request = decoder.ReadString255()
-		i.RequestType = decoder.ReadString255()
-		i.Response = decoder.ReadString255()
-		i.Status = decoder.ReadString255()
-		i.Error = decoder.ReadString255()
-	default:
-		panic("RedisInfo decode msg type error!")
-	}
 }
 
 func (i *RedisInfo) String() string {

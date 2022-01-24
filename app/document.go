@@ -77,18 +77,6 @@ func (d *Document) Release() {
 	ReleaseDocument(d)
 }
 
-func (d *Document) Encode(encoder *codec.SimpleEncoder) error {
-	if d.Tagger == nil || d.Meter == nil {
-		return errors.New("No tag or meter in document")
-	}
-	encoder.WriteU32(d.Timestamp)
-	d.Tagger.Encode(encoder)
-	encoder.WriteU8(d.Meter.ID())
-	d.Meter.Encode(encoder)
-	encoder.WriteU32(uint32(d.Flags))
-	return nil
-}
-
 func (d *Document) EncodePB(encoder *codec.SimpleEncoder, i interface{}) error {
 	p, ok := i.(*pb.Document)
 	if !ok {

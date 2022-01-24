@@ -1,7 +1,6 @@
 package zerodoc
 
 import (
-	"encoding/binary"
 	"fmt"
 	"net"
 	"strconv"
@@ -218,14 +217,6 @@ func (t *MiniTag) Decode(_ *codec.SimpleDecoder) {
 	panic("not supported")
 }
 
-func (t *MiniTag) Encode(encoder *codec.SimpleEncoder) {
-	if t.id != "" {
-		encoder.WriteRawString(t.id) // ID就是序列化bytes，避免重复计算
-		return
-	}
-	t.EncodeByCodeTID(t.Code, t.GlobalThreadID, encoder)
-}
-
 func (t *MiniTag) WriteToPB(p *pb.MiniTag) {
 	if p.Field == nil {
 		p.Field = &pb.MiniField{}
@@ -237,98 +228,6 @@ func (t *MiniTag) WriteToPB(p *pb.MiniTag) {
 		code &= ^Direction
 	}
 	p.Code = uint64(code)
-}
-
-func (t *MiniTag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder) {
-	srcIP, dstIP := t.IP(), t.IP1()
-	srcMAC, dstMAC := t.MAC, t.MAC1
-	srcEpc, dstEpc := t.L3EpcID, t.L3EpcID1
-	var tapSide TAPSideEnum
-	if code&Direction != 0 && code.HasEdgeTagField() {
-		code |= TAPSide
-		code &= ^Direction
-		tapSide = t.Direction.ToTAPSide()
-	}
-	encoder.WriteU64(uint64(code))
-	encoder.WriteU8(tid)
-
-	if code&MAC != 0 {
-		encoder.WriteU64(srcMAC)
-	}
-	if code&IP != 0 {
-		encoder.WriteU8(t.IsIPv6)
-		if t.IsIPv6 != 0 {
-			encoder.WriteIPv6(srcIP)
-		} else {
-			encoder.WriteU32(binary.BigEndian.Uint32(srcIP))
-		}
-	}
-	if code&L3EpcID != 0 {
-		encoder.WriteU16(uint16(srcEpc))
-	}
-	if code&L7Protocol != 0 {
-		encoder.WriteU8(uint8(t.L7Protocol))
-	}
-
-	if code&MACPath != 0 {
-		encoder.WriteU64(srcMAC)
-		encoder.WriteU64(dstMAC)
-	}
-	if code&IPPath != 0 {
-		encoder.WriteU8(t.IsIPv6)
-		if t.IsIPv6 != 0 {
-			encoder.WriteIPv6(srcIP)
-			encoder.WriteIPv6(dstIP)
-		} else {
-			encoder.WriteU32(binary.BigEndian.Uint32(srcIP))
-			encoder.WriteU32(binary.BigEndian.Uint32(dstIP))
-		}
-	}
-	if code&L3EpcIDPath != 0 {
-		encoder.WriteU16(uint16(srcEpc))
-		encoder.WriteU16(uint16(dstEpc))
-	}
-
-	if code&Direction != 0 {
-		encoder.WriteU8(uint8(t.Direction))
-	}
-	if code&ACLGID != 0 {
-		encoder.WriteU16(t.ACLGID)
-	}
-	if code&Protocol != 0 {
-		encoder.WriteU8(uint8(t.Protocol))
-	}
-	if code&ServerPort != 0 {
-		encoder.WriteU16(t.ServerPort)
-	}
-	if code&VTAPID != 0 {
-		encoder.WriteU16(t.VTAPID)
-	}
-	if code&TAPPort != 0 {
-		encoder.WriteU64(uint64(t.TAPPort))
-	}
-	if code&TAPSide != 0 {
-		encoder.WriteU8(uint8(tapSide))
-	}
-	if code&TAPType != 0 {
-		encoder.WriteU8(uint8(t.TAPType))
-	}
-
-	if code&TagType != 0 {
-		encoder.WriteU8(t.TagType)
-	}
-	if code&TagValue != 0 {
-		encoder.WriteU16(t.TagValue)
-	}
-}
-
-func (t *MiniTag) GetID(encoder *codec.SimpleEncoder) string {
-	if t.id == "" {
-		encoder.Reset()
-		t.Encode(encoder)
-		t.id = encoder.String()
-	}
-	return t.id
 }
 
 func (t *MiniTag) SetID(id string) {

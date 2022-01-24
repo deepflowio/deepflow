@@ -4,7 +4,6 @@ import (
 	"strconv"
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
 )
 
@@ -38,17 +37,6 @@ func (m *UsageMeter) VTAPName() string {
 	return MeterVTAPNames[m.ID()]
 }
 
-func (m *UsageMeter) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteVarintU64(m.PacketTx)
-	encoder.WriteVarintU64(m.PacketRx)
-	encoder.WriteVarintU64(m.ByteTx)
-	encoder.WriteVarintU64(m.ByteRx)
-	encoder.WriteVarintU64(m.L3ByteTx)
-	encoder.WriteVarintU64(m.L3ByteRx)
-	encoder.WriteVarintU64(m.L4ByteTx)
-	encoder.WriteVarintU64(m.L4ByteRx)
-}
-
 func (m *UsageMeter) WriteToPB(p *pb.UsageMeter) {
 	p.PacketTx = m.PacketTx
 	p.PacketRx = m.PacketRx
@@ -69,17 +57,6 @@ func (m *UsageMeter) ReadFromPB(p *pb.UsageMeter) {
 	m.L3ByteRx = p.L3ByteRx
 	m.L4ByteTx = p.L4ByteTx
 	m.L4ByteRx = p.L4ByteRx
-}
-
-func (m *UsageMeter) Decode(decoder *codec.SimpleDecoder) {
-	m.PacketTx = decoder.ReadVarintU64()
-	m.PacketRx = decoder.ReadVarintU64()
-	m.ByteTx = decoder.ReadVarintU64()
-	m.ByteRx = decoder.ReadVarintU64()
-	m.L3ByteTx = decoder.ReadVarintU64()
-	m.L3ByteRx = decoder.ReadVarintU64()
-	m.L4ByteTx = decoder.ReadVarintU64()
-	m.L4ByteRx = decoder.ReadVarintU64()
 }
 
 func (m *UsageMeter) SortKey() uint64 {

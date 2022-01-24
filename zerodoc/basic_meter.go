@@ -4,7 +4,6 @@ import (
 	"strconv"
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
 )
 
@@ -31,22 +30,6 @@ func (t *Traffic) Reverse() {
 	t.L4ByteTx, t.L4ByteRx = t.L4ByteRx, t.L4ByteTx
 
 	// HTTP、DNS统计量以客户端、服务端为视角，无需Reverse
-}
-
-func (t *Traffic) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteVarintU64(t.PacketTx)
-	encoder.WriteVarintU64(t.PacketRx)
-	encoder.WriteVarintU64(t.ByteTx)
-	encoder.WriteVarintU64(t.ByteRx)
-	encoder.WriteVarintU64(t.L3ByteTx)
-	encoder.WriteVarintU64(t.L3ByteRx)
-	encoder.WriteVarintU64(t.L4ByteTx)
-	encoder.WriteVarintU64(t.L4ByteRx)
-	encoder.WriteVarintU64(t.NewFlow)
-	encoder.WriteVarintU64(t.ClosedFlow)
-
-	encoder.WriteVarintU32(t.L7Request)
-	encoder.WriteVarintU32(t.L7Response)
 }
 
 func (t *Traffic) WriteToPB(p *pb.Traffic) {
@@ -79,22 +62,6 @@ func (t *Traffic) ReadFromPB(p *pb.Traffic) {
 
 	t.L7Request = p.L7Request
 	t.L7Response = p.L7Response
-}
-
-func (t *Traffic) Decode(decoder *codec.SimpleDecoder) {
-	t.PacketTx = decoder.ReadVarintU64()
-	t.PacketRx = decoder.ReadVarintU64()
-	t.ByteTx = decoder.ReadVarintU64()
-	t.ByteRx = decoder.ReadVarintU64()
-	t.L3ByteTx = decoder.ReadVarintU64()
-	t.L3ByteRx = decoder.ReadVarintU64()
-	t.L4ByteTx = decoder.ReadVarintU64()
-	t.L4ByteRx = decoder.ReadVarintU64()
-	t.NewFlow = decoder.ReadVarintU64()
-	t.ClosedFlow = decoder.ReadVarintU64()
-
-	t.L7Request = decoder.ReadVarintU32()
-	t.L7Response = decoder.ReadVarintU32()
 }
 
 func (t *Traffic) ConcurrentMerge(other *Traffic) {
@@ -243,28 +210,6 @@ func (_ *Latency) Reverse() {
 	// 时延统计量以客户端、服务端为视角，无需Reverse
 }
 
-func (l *Latency) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteVarintU32(l.RTTMax)
-	encoder.WriteVarintU32(l.RTTClientMax)
-	encoder.WriteVarintU32(l.RTTServerMax)
-	encoder.WriteVarintU32(l.SRTMax)
-	encoder.WriteVarintU32(l.ARTMax)
-	encoder.WriteVarintU32(l.RRTMax)
-
-	encoder.WriteVarintU64(l.RTTSum)
-	encoder.WriteVarintU64(l.RTTClientSum)
-	encoder.WriteVarintU64(l.RTTServerSum)
-	encoder.WriteVarintU64(l.SRTSum)
-	encoder.WriteVarintU64(l.ARTSum)
-	encoder.WriteVarintU64(l.RRTSum)
-
-	encoder.WriteVarintU32(l.RTTCount)
-	encoder.WriteVarintU32(l.RTTClientCount)
-	encoder.WriteVarintU32(l.RTTServerCount)
-	encoder.WriteVarintU32(l.SRTCount)
-	encoder.WriteVarintU32(l.ARTCount)
-	encoder.WriteVarintU32(l.RRTCount)
-}
 func (l *Latency) WriteToPB(p *pb.Latency) {
 	p.RTTMax = l.RTTMax
 	p.RTTClientMax = l.RTTClientMax
@@ -309,29 +254,6 @@ func (l *Latency) ReadFromPB(p *pb.Latency) {
 	l.SRTCount = p.SRTCount
 	l.ARTCount = p.ARTCount
 	l.RRTCount = p.RRTCount
-}
-
-func (l *Latency) Decode(decoder *codec.SimpleDecoder) {
-	l.RTTMax = decoder.ReadVarintU32()
-	l.RTTClientMax = decoder.ReadVarintU32()
-	l.RTTServerMax = decoder.ReadVarintU32()
-	l.SRTMax = decoder.ReadVarintU32()
-	l.ARTMax = decoder.ReadVarintU32()
-	l.RRTMax = decoder.ReadVarintU32()
-
-	l.RTTSum = decoder.ReadVarintU64()
-	l.RTTClientSum = decoder.ReadVarintU64()
-	l.RTTServerSum = decoder.ReadVarintU64()
-	l.SRTSum = decoder.ReadVarintU64()
-	l.ARTSum = decoder.ReadVarintU64()
-	l.RRTSum = decoder.ReadVarintU64()
-
-	l.RTTCount = decoder.ReadVarintU32()
-	l.RTTClientCount = decoder.ReadVarintU32()
-	l.RTTServerCount = decoder.ReadVarintU32()
-	l.SRTCount = decoder.ReadVarintU32()
-	l.ARTCount = decoder.ReadVarintU32()
-	l.RRTCount = decoder.ReadVarintU32()
 }
 
 func (l *Latency) ConcurrentMerge(other *Latency) {
@@ -490,13 +412,6 @@ func (a *Performance) Reverse() {
 	// 性能统计量以客户端、服务端为视角，无需Reverse
 }
 
-func (a *Performance) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteVarintU64(a.RetransTx)
-	encoder.WriteVarintU64(a.RetransRx)
-	encoder.WriteVarintU64(a.ZeroWinTx)
-	encoder.WriteVarintU64(a.ZeroWinRx)
-}
-
 func (a *Performance) WriteToPB(p *pb.Performance) {
 	p.RetransTx = a.RetransTx
 	p.RetransRx = a.RetransRx
@@ -509,13 +424,6 @@ func (a *Performance) ReadFromPB(p *pb.Performance) {
 	a.RetransRx = p.RetransRx
 	a.ZeroWinTx = p.ZeroWinTx
 	a.ZeroWinRx = p.ZeroWinRx
-}
-
-func (a *Performance) Decode(decoder *codec.SimpleDecoder) {
-	a.RetransTx = decoder.ReadVarintU64()
-	a.RetransRx = decoder.ReadVarintU64()
-	a.ZeroWinTx = decoder.ReadVarintU64()
-	a.ZeroWinRx = decoder.ReadVarintU64()
 }
 
 func (a *Performance) ConcurrentMerge(other *Performance) {
@@ -602,26 +510,6 @@ func (_ *Anomaly) Reverse() {
 	// 异常统计量以客户端、服务端为视角，无需Reverse
 }
 
-func (a *Anomaly) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteVarintU64(a.ClientRstFlow)
-	encoder.WriteVarintU64(a.ServerRstFlow)
-	encoder.WriteVarintU64(a.ClientSynRepeat)
-	encoder.WriteVarintU64(a.ServerSYNACKRepeat)
-	encoder.WriteVarintU64(a.ClientHalfCloseFlow)
-	encoder.WriteVarintU64(a.ServerHalfCloseFlow)
-
-	encoder.WriteVarintU64(a.ClientSourcePortReuse)
-	encoder.WriteVarintU64(a.ClientEstablishReset)
-	encoder.WriteVarintU64(a.ServerReset)
-	encoder.WriteVarintU64(a.ServerQueueLack)
-	encoder.WriteVarintU64(a.ServerEstablishReset)
-	encoder.WriteVarintU64(a.TCPTimeout)
-
-	encoder.WriteVarintU32(a.L7ClientError)
-	encoder.WriteVarintU32(a.L7ServerError)
-	encoder.WriteVarintU32(a.L7Timeout)
-}
-
 func (a *Anomaly) WriteToPB(p *pb.Anomaly) {
 	p.ClientRstFlow = a.ClientRstFlow
 	p.ServerRstFlow = a.ServerRstFlow
@@ -660,26 +548,6 @@ func (a *Anomaly) ReadFromPB(p *pb.Anomaly) {
 	a.L7ClientError = p.L7ClientError
 	a.L7ServerError = p.L7ServerError
 	a.L7Timeout = p.L7Timeout
-}
-
-func (a *Anomaly) Decode(decoder *codec.SimpleDecoder) {
-	a.ClientRstFlow = decoder.ReadVarintU64()
-	a.ServerRstFlow = decoder.ReadVarintU64()
-	a.ClientSynRepeat = decoder.ReadVarintU64()
-	a.ServerSYNACKRepeat = decoder.ReadVarintU64()
-	a.ClientHalfCloseFlow = decoder.ReadVarintU64()
-	a.ServerHalfCloseFlow = decoder.ReadVarintU64()
-
-	a.ClientSourcePortReuse = decoder.ReadVarintU64()
-	a.ClientEstablishReset = decoder.ReadVarintU64()
-	a.ServerReset = decoder.ReadVarintU64()
-	a.ServerQueueLack = decoder.ReadVarintU64()
-	a.ServerEstablishReset = decoder.ReadVarintU64()
-	a.TCPTimeout = decoder.ReadVarintU64()
-
-	a.L7ClientError = decoder.ReadVarintU32()
-	a.L7ServerError = decoder.ReadVarintU32()
-	a.L7Timeout = decoder.ReadVarintU32()
 }
 
 func (a *Anomaly) ConcurrentMerge(other *Anomaly) {
@@ -869,20 +737,12 @@ func (l *FlowLoad) Reverse() {
 	// 负载统计量无方向，无需Reverse
 }
 
-func (l *FlowLoad) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteVarintU64(l.Load)
-}
-
 func (l *FlowLoad) WriteToPB(p *pb.FlowLoad) {
 	p.Load = l.Load
 }
 
 func (l *FlowLoad) ReadFromPB(p *pb.FlowLoad) {
 	l.Load = p.Load
-}
-
-func (l *FlowLoad) Decode(decoder *codec.SimpleDecoder) {
-	l.Load = decoder.ReadVarintU64()
 }
 
 func (l *FlowLoad) ConcurrentMerge(other *FlowLoad) {

@@ -2,7 +2,6 @@ package zerodoc
 
 import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
 )
 
@@ -38,14 +37,6 @@ func (m *FlowMeter) SortKey() uint64 {
 	return m.PacketTx + m.PacketRx
 }
 
-func (m *FlowMeter) Encode(encoder *codec.SimpleEncoder) {
-	m.Traffic.Encode(encoder)
-	m.Latency.Encode(encoder)
-	m.Performance.Encode(encoder)
-	m.Anomaly.Encode(encoder)
-	m.FlowLoad.Encode(encoder)
-}
-
 func (m *FlowMeter) WriteToPB(p *pb.FlowMeter) {
 	if p.Traffic == nil {
 		p.Traffic = &pb.Traffic{}
@@ -79,14 +70,6 @@ func (m *FlowMeter) ReadFromPB(p *pb.FlowMeter) {
 	m.Performance.ReadFromPB(p.Performance)
 	m.Anomaly.ReadFromPB(p.Anomaly)
 	m.FlowLoad.ReadFromPB(p.Flowload)
-}
-
-func (m *FlowMeter) Decode(decoder *codec.SimpleDecoder) {
-	m.Traffic.Decode(decoder)
-	m.Latency.Decode(decoder)
-	m.Performance.Decode(decoder)
-	m.Anomaly.Decode(decoder)
-	m.FlowLoad.Decode(decoder)
 }
 
 func (m *FlowMeter) ConcurrentMerge(other Meter) {
