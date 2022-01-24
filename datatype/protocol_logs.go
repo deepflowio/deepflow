@@ -258,45 +258,6 @@ func (l *AppProtoLogsData) Release() {
 	ReleaseAppProtoLogsData(l)
 }
 
-func (l *AppProtoLogsData) Encode(encoder *codec.SimpleEncoder) error {
-	encoder.WriteU64(uint64(l.StartTime))
-	encoder.WriteU64(uint64(l.EndTime))
-	encoder.WriteU64(l.FlowId)
-	encoder.WriteU16(l.VtapId)
-	encoder.WriteU16(l.TapType)
-	encoder.WriteU64(uint64(l.TapPort))
-	encoder.WriteU8(byte(l.Proto))
-	encoder.WriteU8(byte(l.MsgType))
-	encoder.WriteU8(byte(l.Status))
-	encoder.WriteU16(l.Code)
-	encoder.WriteU64(uint64(l.RRT))
-	encoder.WriteU8(l.TapSide)
-	encoder.WriteU64(l.MacSrc)
-	encoder.WriteU64(l.MacDst)
-
-	if l.IsIPv6 {
-		encoder.WriteBool(true)
-		encoder.WriteIPv6(l.IP6Src[:])
-		encoder.WriteIPv6(l.IP6Dst[:])
-	} else {
-		encoder.WriteBool(false)
-		encoder.WriteU32(uint32(l.IPSrc))
-		encoder.WriteU32(uint32(l.IPDst))
-	}
-	encoder.WriteU16(l.PortSrc)
-	encoder.WriteU16(l.PortDst)
-	encoder.WriteU32(uint32(l.L3EpcIDSrc))
-	encoder.WriteU32(uint32(l.L3EpcIDDst))
-	encoder.WriteU8(l.Protocol)
-	encoder.WriteBool(l.IsVIPInterfaceSrc)
-	encoder.WriteBool(l.IsVIPInterfaceDst)
-	encoder.WriteU32(l.ReqTcpSeq)
-	encoder.WriteU32(l.RespTcpSeq)
-
-	l.Detail.Encode(encoder, l.MsgType, l.Code)
-	return nil
-}
-
 func (l *AppProtoLogsBaseInfo) WriteToPB(p *pb.AppProtoLogsBaseInfo) {
 	p.StartTime = uint64(l.StartTime)
 	p.EndTime = uint64(l.EndTime)
@@ -415,73 +376,7 @@ func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
 	}
 }
 
-func (l *AppProtoLogsData) Decode(decoder *codec.SimpleDecoder) error {
-	l.StartTime = time.Duration(decoder.ReadU64())
-	l.EndTime = time.Duration(decoder.ReadU64())
-	l.FlowId = decoder.ReadU64()
-	l.VtapId = decoder.ReadU16()
-	l.TapType = decoder.ReadU16()
-	l.TapPort = TapPort(decoder.ReadU64())
-	l.Proto = LogProtoType(decoder.ReadU8())
-	l.MsgType = LogMessageType(decoder.ReadU8())
-	l.Status = decoder.ReadU8()
-	l.Code = decoder.ReadU16()
-	l.RRT = time.Duration(decoder.ReadU64())
-	l.TapSide = decoder.ReadU8()
-	l.MacSrc = decoder.ReadU64()
-	l.MacDst = decoder.ReadU64()
-
-	if decoder.ReadBool() {
-		l.IsIPv6 = true
-		decoder.ReadIPv6(l.IP6Src[:])
-		decoder.ReadIPv6(l.IP6Dst[:])
-	} else {
-		l.IsIPv6 = false
-		l.IPSrc = decoder.ReadU32()
-		l.IPDst = decoder.ReadU32()
-	}
-	l.PortSrc = decoder.ReadU16()
-	l.PortDst = decoder.ReadU16()
-	l.L3EpcIDSrc = int32(decoder.ReadU32())
-	l.L3EpcIDDst = int32(decoder.ReadU32())
-	l.Protocol = decoder.ReadU8()
-	l.IsVIPInterfaceSrc = decoder.ReadBool()
-	l.IsVIPInterfaceDst = decoder.ReadBool()
-	l.ReqTcpSeq = decoder.ReadU32()
-	l.RespTcpSeq = decoder.ReadU32()
-
-	if l.Proto == PROTO_HTTP {
-		httpInfo := AcquireHTTPInfo()
-		httpInfo.Decode(decoder, l.MsgType, l.Code)
-		l.Detail = httpInfo
-	} else if l.Proto == PROTO_DNS {
-		dnsInfo := AcquireDNSInfo()
-		dnsInfo.Decode(decoder, l.MsgType, l.Code)
-		l.Detail = dnsInfo
-	} else if l.Proto == PROTO_MYSQL {
-		mysqlInfo := AcquireMYSQLInfo()
-		mysqlInfo.Decode(decoder, l.MsgType, l.Code)
-		l.Detail = mysqlInfo
-	} else if l.Proto == PROTO_REDIS {
-		mysqlInfo := AcquireREDISInfo()
-		mysqlInfo.Decode(decoder, l.MsgType, l.Code)
-		l.Detail = mysqlInfo
-	} else if l.Proto == PROTO_DUBBO {
-		dubboInfo := AcquireDubboInfo()
-		dubboInfo.Decode(decoder, l.MsgType, l.Code)
-		l.Detail = dubboInfo
-	} else if l.Proto == PROTO_KAFKA {
-		kafkaInfo := AcquireKafkaInfo()
-		kafkaInfo.Decode(decoder, l.MsgType, l.Code)
-		l.Detail = kafkaInfo
-	}
-
-	return nil
-}
-
 type ProtoSpecialInfo interface {
-	Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, code uint16)
-	Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, code uint16)
 	String() string
 	Merge(interface{})
 }
@@ -500,32 +395,6 @@ type HTTPInfo struct {
 
 	ReqContentLength  int64
 	RespContentLength int64
-}
-
-func (h *HTTPInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, code uint16) {
-	encoder.WriteU32(h.StreamID)
-	encoder.WriteString255(h.Version)
-	encoder.WriteString255(h.TraceID)
-	encoder.WriteString255(h.SpanID)
-
-	switch msgType {
-	case MSG_T_REQUEST:
-		encoder.WriteString255(h.Method)
-		encoder.WriteString255(h.Path)
-		encoder.WriteString255(h.Host)
-		encoder.WriteString255(h.ClientIP)
-		encoder.WriteU64(uint64(h.ReqContentLength))
-	case MSG_T_RESPONSE:
-		encoder.WriteU64(uint64(h.RespContentLength))
-	case MSG_T_SESSION:
-		encoder.WriteString255(h.Method)
-		encoder.WriteString255(h.Path)
-		encoder.WriteString255(h.Host)
-		encoder.WriteString255(h.ClientIP)
-		encoder.WriteU64(uint64(h.ReqContentLength))
-
-		encoder.WriteU64(uint64(h.RespContentLength))
-	}
 }
 
 func (h *HTTPInfo) WriteToPB(p *pb.HTTPInfo, msgType LogMessageType) {
@@ -557,32 +426,6 @@ func (h *HTTPInfo) WriteToPB(p *pb.HTTPInfo, msgType LogMessageType) {
 		p.ReqContentLength = h.ReqContentLength
 
 		p.RespContentLength = h.RespContentLength
-	}
-}
-
-func (h *HTTPInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, code uint16) {
-	h.StreamID = decoder.ReadU32()
-	h.Version = decoder.ReadString255()
-	h.TraceID = decoder.ReadString255()
-	h.SpanID = decoder.ReadString255()
-
-	switch msgType {
-	case MSG_T_REQUEST:
-		h.Method = decoder.ReadString255()
-		h.Path = decoder.ReadString255()
-		h.Host = decoder.ReadString255()
-		h.ClientIP = decoder.ReadString255()
-		h.ReqContentLength = int64(decoder.ReadU64())
-	case MSG_T_RESPONSE:
-		h.RespContentLength = int64(decoder.ReadU64())
-	case MSG_T_SESSION:
-		h.Method = decoder.ReadString255()
-		h.Path = decoder.ReadString255()
-		h.Host = decoder.ReadString255()
-		h.ClientIP = decoder.ReadString255()
-		h.ReqContentLength = int64(decoder.ReadU64())
-
-		h.RespContentLength = int64(decoder.ReadU64())
 	}
 }
 
@@ -626,17 +469,6 @@ type DNSInfo struct {
 	Answers string
 }
 
-func (d *DNSInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, code uint16) {
-	encoder.WriteU16(d.TransID)
-	encoder.WriteU16(d.QueryType)
-	if msgType == MSG_T_SESSION || msgType == MSG_T_REQUEST {
-		encoder.WriteString255(d.QueryName)
-	}
-	if msgType == MSG_T_SESSION || msgType == MSG_T_RESPONSE {
-		encoder.WriteString255(d.Answers)
-	}
-}
-
 func (h *DNSInfo) WriteToPB(p *pb.DNSInfo, msgType LogMessageType) {
 	p.TransID = uint32(h.TransID)
 	p.QueryType = uint32(h.QueryType)
@@ -650,17 +482,6 @@ func (h *DNSInfo) WriteToPB(p *pb.DNSInfo, msgType LogMessageType) {
 		p.Answers = h.Answers
 	} else {
 		p.Answers = ""
-	}
-}
-
-func (d *DNSInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, code uint16) {
-	d.TransID = decoder.ReadU16()
-	d.QueryType = decoder.ReadU16()
-	if msgType == MSG_T_SESSION || msgType == MSG_T_REQUEST {
-		d.QueryName = decoder.ReadString255()
-	}
-	if msgType == MSG_T_SESSION || msgType == MSG_T_RESPONSE {
-		d.Answers = decoder.ReadString255()
 	}
 }
 

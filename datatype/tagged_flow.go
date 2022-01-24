@@ -25,12 +25,6 @@ func (f *TaggedFlow) SequentialMerge(rhs *TaggedFlow) {
 	// f.Tag.SequentialMerge(rhs.Tag)  // 目前无需发送,不merge
 }
 
-func (f *TaggedFlow) Encode(encoder *codec.SimpleEncoder) error {
-	f.Flow.Encode(encoder)
-	// f.Tag.Encode(encoder)  // 目前无需发送,不encode
-	return nil
-}
-
 func (f *TaggedFlow) EncodePB(encoder *codec.SimpleEncoder, i interface{}) error {
 	p, ok := i.(*pb.TaggedFlow)
 	if !ok {
@@ -56,11 +50,6 @@ func (f *TaggedFlow) WriteToPB(p *pb.TaggedFlow) error {
 	f.Flow.WriteToPB(p.Flow)
 	// f.Tag.Encode(encoder)  // 目前无需发送,不encode
 	return nil
-}
-
-func (f *TaggedFlow) Decode(decoder *codec.SimpleDecoder) {
-	f.Flow.Decode(decoder)
-	// f.Tag.Decode(decoder)
 }
 
 func (f *TaggedFlow) Release() {

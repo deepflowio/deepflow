@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/gopacket/layers"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 	. "gitlab.yunshan.net/yunshan/droplet-libs/utils"
@@ -222,22 +221,6 @@ type TunnelField struct {
 	IsIPv6         bool
 }
 
-func (f *TunnelField) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU32(f.TxIP0)
-	encoder.WriteU32(f.TxIP1)
-	encoder.WriteU32(f.RxIP0)
-	encoder.WriteU32(f.RxIP1)
-	encoder.WriteU32(f.TxMAC0)
-	encoder.WriteU32(f.TxMAC1)
-	encoder.WriteU32(f.RxMAC0)
-	encoder.WriteU32(f.RxMAC1)
-	encoder.WriteU32(f.TxId)
-	encoder.WriteU32(f.RxId)
-	encoder.WriteU8(uint8(f.Type))
-	encoder.WriteU8(f.Tier)
-	encoder.WriteBool(f.IsIPv6)
-}
-
 func (f *TunnelField) WriteToPB(p *pb.TunnelField) {
 	p.TxIP0 = f.TxIP0
 	p.TxIP1 = f.TxIP1
@@ -254,22 +237,6 @@ func (f *TunnelField) WriteToPB(p *pb.TunnelField) {
 	if f.IsIPv6 {
 		p.IsIPv6 = 1
 	}
-}
-
-func (f *TunnelField) Decode(decoder *codec.SimpleDecoder) {
-	f.TxIP0 = decoder.ReadU32()
-	f.TxIP1 = decoder.ReadU32()
-	f.RxIP0 = decoder.ReadU32()
-	f.RxIP1 = decoder.ReadU32()
-	f.TxMAC0 = decoder.ReadU32()
-	f.TxMAC1 = decoder.ReadU32()
-	f.RxMAC0 = decoder.ReadU32()
-	f.RxMAC1 = decoder.ReadU32()
-	f.TxId = decoder.ReadU32()
-	f.RxId = decoder.ReadU32()
-	f.Type = TunnelType(decoder.ReadU8())
-	f.Tier = decoder.ReadU8()
-	f.IsIPv6 = decoder.ReadBool()
 }
 
 func (t *TunnelField) String() string {
@@ -331,29 +298,6 @@ func (_ *FlowKey) SequentialMerge(_ *FlowKey) {
 	// 所有字段均无需改变
 }
 
-func (f *FlowKey) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU16(f.VtapId)
-	encoder.WriteU16(uint16(f.TapType))
-	encoder.WriteU64(uint64(f.TapPort))
-
-	encoder.WriteU64(f.MACSrc)
-	encoder.WriteU64(f.MACDst)
-
-	if len(f.IP6Src) > 0 {
-		encoder.WriteBool(true) // 额外encode bool, decode时需要根据该bool, 来判断是否decode ipv6
-		encoder.WriteIPv6(f.IP6Src)
-		encoder.WriteIPv6(f.IP6Dst)
-	} else {
-		encoder.WriteBool(false)
-		encoder.WriteU32(f.IPSrc)
-		encoder.WriteU32(f.IPDst)
-	}
-
-	encoder.WriteU16(f.PortSrc)
-	encoder.WriteU16(f.PortDst)
-	encoder.WriteU8(uint8(f.Proto))
-}
-
 func (f *FlowKey) WriteToPB(p *pb.FlowKey) {
 	p.VtapId = uint32(f.VtapId)
 	p.TapType = uint32(f.TapType)
@@ -369,35 +313,6 @@ func (f *FlowKey) WriteToPB(p *pb.FlowKey) {
 	p.Proto = uint32(f.Proto)
 }
 
-func (f *FlowKey) Decode(decoder *codec.SimpleDecoder) {
-	f.VtapId = decoder.ReadU16()
-	f.TapType = TapType(decoder.ReadU16())
-	f.TapPort = TapPort(decoder.ReadU64())
-
-	f.MACSrc = decoder.ReadU64()
-	f.MACDst = decoder.ReadU64()
-
-	if decoder.ReadBool() {
-		if f.IP6Src == nil {
-			f.IP6Src = make([]byte, 16)
-		}
-		decoder.ReadIPv6(f.IP6Src)
-		if f.IP6Dst == nil {
-			f.IP6Dst = make([]byte, 16)
-		}
-		decoder.ReadIPv6(f.IP6Dst)
-	} else {
-		f.IPSrc = decoder.ReadU32()
-		f.IPDst = decoder.ReadU32()
-		f.IP6Src = nil
-		f.IP6Dst = nil
-	}
-
-	f.PortSrc = decoder.ReadU16()
-	f.PortDst = decoder.ReadU16()
-	f.Proto = layers.IPProtocol(decoder.ReadU8())
-}
-
 func (f *TcpPerfCountsPeer) SequentialMerge(rhs *TcpPerfCountsPeer) {
 	f.RetransCount += rhs.RetransCount
 	f.ZeroWinCount += rhs.ZeroWinCount
@@ -408,18 +323,6 @@ func (t *TcpPerfCountsPeer) WriteToPB(p *pb.TcpPerfCountsPeer) {
 	p.RetransCount = t.RetransCount
 	p.ZeroWinCount = t.ZeroWinCount
 	p.FirstSeqID = t.FirstSeqID
-}
-
-func (t *TcpPerfCountsPeer) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteVarintU32(t.RetransCount)
-	encoder.WriteVarintU32(t.ZeroWinCount)
-	encoder.WriteVarintU32(t.FirstSeqID)
-}
-
-func (t *TcpPerfCountsPeer) Decode(decoder *codec.SimpleDecoder) {
-	t.RetransCount = decoder.ReadVarintU32()
-	t.ZeroWinCount = decoder.ReadVarintU32()
-	t.FirstSeqID = decoder.ReadVarintU32()
 }
 
 func (f *TCPPerfStats) SequentialMerge(rhs *TCPPerfStats) {
@@ -458,34 +361,6 @@ func (f *TCPPerfStats) Reverse() {
 	f.TcpPerfCountsPeers[0], f.TcpPerfCountsPeers[1] = f.TcpPerfCountsPeers[1], f.TcpPerfCountsPeers[0]
 }
 
-func (f *TCPPerfStats) Encode(encoder *codec.SimpleEncoder, l4Protocol L4Protocol) {
-	if l4Protocol == L4_PROTOCOL_TCP {
-		encoder.WriteVarintU32(f.RTTClientMax)
-		encoder.WriteVarintU32(f.RTTServerMax)
-		encoder.WriteVarintU32(f.SRTMax)
-		encoder.WriteVarintU32(f.ARTMax)
-
-		encoder.WriteVarintU32(f.RTT)
-		encoder.WriteVarintU32(f.RTTClientSum)
-		encoder.WriteVarintU32(f.RTTServerSum)
-		encoder.WriteVarintU32(f.SRTSum)
-		encoder.WriteVarintU32(f.ARTSum)
-		encoder.WriteVarintU32(f.RTTClientCount)
-		encoder.WriteVarintU32(f.RTTServerCount)
-		encoder.WriteVarintU32(f.SRTCount)
-		encoder.WriteVarintU32(f.ARTCount)
-
-		f.TcpPerfCountsPeers[0].Encode(encoder)
-		f.TcpPerfCountsPeers[1].Encode(encoder)
-
-		encoder.WriteVarintU32(f.TotalRetransCount)
-	} else if l4Protocol == L4_PROTOCOL_UDP {
-		encoder.WriteVarintU32(f.ARTMax)
-		encoder.WriteVarintU32(f.ARTSum)
-		encoder.WriteVarintU32(f.ARTCount)
-	}
-}
-
 func (f *TCPPerfStats) WriteToPB(p *pb.TCPPerfStats, l4Protocol L4Protocol) {
 	if l4Protocol == L4_PROTOCOL_TCP {
 		p.RTTClientMax = f.RTTClientMax
@@ -522,34 +397,6 @@ func (f *TCPPerfStats) WriteToPB(p *pb.TCPPerfStats, l4Protocol L4Protocol) {
 	}
 }
 
-func (f *TCPPerfStats) Decode(decoder *codec.SimpleDecoder, l4Protocol L4Protocol) {
-	if l4Protocol == L4_PROTOCOL_TCP {
-		f.RTTClientMax = decoder.ReadVarintU32()
-		f.RTTServerMax = decoder.ReadVarintU32()
-		f.SRTMax = decoder.ReadVarintU32()
-		f.ARTMax = decoder.ReadVarintU32()
-
-		f.RTT = decoder.ReadVarintU32()
-		f.RTTClientSum = decoder.ReadVarintU32()
-		f.RTTServerSum = decoder.ReadVarintU32()
-		f.SRTSum = decoder.ReadVarintU32()
-		f.ARTSum = decoder.ReadVarintU32()
-		f.RTTClientCount = decoder.ReadVarintU32()
-		f.RTTServerCount = decoder.ReadVarintU32()
-		f.SRTCount = decoder.ReadVarintU32()
-		f.ARTCount = decoder.ReadVarintU32()
-
-		f.TcpPerfCountsPeers[0].Decode(decoder)
-		f.TcpPerfCountsPeers[1].Decode(decoder)
-
-		f.TotalRetransCount = decoder.ReadVarintU32()
-	} else if l4Protocol == L4_PROTOCOL_UDP {
-		f.ARTMax = decoder.ReadVarintU32()
-		f.ARTSum = decoder.ReadVarintU32()
-		f.ARTCount = decoder.ReadVarintU32()
-	}
-}
-
 func (f *FlowMetricsPeer) SequentialMerge(rhs *FlowMetricsPeer) {
 	f.ByteCount += rhs.ByteCount
 	f.L3ByteCount += rhs.L3ByteCount
@@ -571,27 +418,6 @@ func (f *FlowMetricsPeer) SequentialMerge(rhs *FlowMetricsPeer) {
 	f.IsLocalIp = rhs.IsLocalIp
 }
 
-func (f *FlowMetricsPeer) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteVarintU64(f.ByteCount)
-	encoder.WriteVarintU64(f.L3ByteCount)
-	encoder.WriteVarintU64(f.L4ByteCount)
-	encoder.WriteVarintU64(f.PacketCount)
-	encoder.WriteVarintU64(f.TotalByteCount)
-	encoder.WriteVarintU64(f.TotalPacketCount)
-
-	encoder.WriteU64(uint64(f.First))
-	encoder.WriteU64(uint64(f.Last))
-	encoder.WriteU8(f.TCPFlags)
-	encoder.WriteU32(uint32(f.L3EpcID))
-
-	encoder.WriteBool(f.IsL2End)
-	encoder.WriteBool(f.IsL3End)
-	encoder.WriteBool(f.IsActiveHost)
-	encoder.WriteBool(f.IsDevice)
-	encoder.WriteBool(f.IsVIPInterface)
-	encoder.WriteBool(f.IsVIP)
-}
-
 func (f *FlowMetricsPeer) WriteToPB(p *pb.FlowMetricsPeer) {
 	p.ByteCount = f.ByteCount
 	p.L3ByteCount = f.L3ByteCount
@@ -609,27 +435,6 @@ func (f *FlowMetricsPeer) WriteToPB(p *pb.FlowMetricsPeer) {
 	p.IsDevice = Bool2UInt32(f.IsDevice)
 	p.IsVIPInterface = Bool2UInt32(f.IsVIPInterface)
 	p.IsVIP = Bool2UInt32(f.IsVIP)
-}
-
-func (f *FlowMetricsPeer) Decode(decoder *codec.SimpleDecoder) {
-	f.ByteCount = decoder.ReadVarintU64()
-	f.L3ByteCount = decoder.ReadVarintU64()
-	f.L4ByteCount = decoder.ReadVarintU64()
-	f.PacketCount = decoder.ReadVarintU64()
-	f.TotalByteCount = decoder.ReadVarintU64()
-	f.TotalPacketCount = decoder.ReadVarintU64()
-
-	f.First = time.Duration(decoder.ReadU64())
-	f.Last = time.Duration(decoder.ReadU64())
-	f.TCPFlags = decoder.ReadU8()
-	f.L3EpcID = int32(decoder.ReadU32())
-
-	f.IsL2End = decoder.ReadBool()
-	f.IsL3End = decoder.ReadBool()
-	f.IsActiveHost = decoder.ReadBool()
-	f.IsDevice = decoder.ReadBool()
-	f.IsVIPInterface = decoder.ReadBool()
-	f.IsVIP = decoder.ReadBool()
 }
 
 // FIXME 注意：由于FlowGenerator中TCPPerfStats在Flow方向调整之后才获取到，
@@ -667,36 +472,6 @@ func (f *Flow) SequentialMerge(rhs *Flow) {
 	f.CloseType = rhs.CloseType
 	f.IsActiveService = rhs.IsActiveService
 	f.Reversed = rhs.Reversed
-}
-
-func (f *Flow) Encode(encoder *codec.SimpleEncoder) {
-	f.FlowKey.Encode(encoder)
-	for i := 0; i < FLOW_METRICS_PEER_MAX; i++ {
-		f.FlowMetricsPeers[i].Encode(encoder)
-	}
-	f.Tunnel.Encode(encoder)
-
-	encoder.WriteU64(f.FlowID)
-
-	encoder.WriteU64(uint64(f.StartTime))
-	encoder.WriteU64(uint64(f.EndTime))
-	encoder.WriteU64(uint64(f.Duration))
-	// encoder.WriteU64(uint64(f.FlowStatTime)) // 目前无需发送，不用encode(下面注释掉的，同理)
-
-	// encoder.WriteU16(f.VLAN)
-	encoder.WriteU16(uint16(f.EthType))
-
-	if f.FlowPerfStats != nil {
-		encoder.WriteBool(true)
-		f.FlowPerfStats.Encode(encoder)
-	} else {
-		encoder.WriteBool(false)
-	}
-
-	encoder.WriteU8(uint8(f.CloseType))
-	encoder.WriteU8(uint8(f.FlowSource))
-	encoder.WriteBool(f.IsActiveService)
-	encoder.WriteU8(f.TapSide)
 }
 
 func (f *Flow) WriteToPB(p *pb.Flow) {
@@ -742,36 +517,6 @@ func (f *Flow) WriteToPB(p *pb.Flow) {
 	p.IsActiveService = Bool2UInt32(f.IsActiveService)
 	p.IsNewFlow = Bool2UInt32(f.IsNewFlow)
 	p.TapSide = uint32(f.TapSide)
-}
-
-func (f *Flow) Decode(decoder *codec.SimpleDecoder) {
-	f.FlowKey.Decode(decoder)
-	for i := 0; i < FLOW_METRICS_PEER_MAX; i++ {
-		f.FlowMetricsPeers[i].Decode(decoder)
-	}
-	f.Tunnel.Decode(decoder)
-
-	f.FlowID = decoder.ReadU64()
-
-	f.StartTime = time.Duration(decoder.ReadU64())
-	f.EndTime = time.Duration(decoder.ReadU64())
-	f.Duration = time.Duration(decoder.ReadU64())
-	// f.FlowStatTime = time.Duration(decoder.ReadU64())
-
-	// f.VLAN = decoder.ReadU16()
-	f.EthType = layers.EthernetType(decoder.ReadU16())
-
-	if decoder.ReadBool() {
-		f.FlowPerfStats = AcquireFlowPerfStats()
-		f.FlowPerfStats.Decode(decoder)
-	} else {
-		f.FlowPerfStats = nil
-	}
-
-	f.CloseType = CloseType(decoder.ReadU8())
-	f.FlowSource = FlowSource(decoder.ReadU8())
-	f.IsActiveService = decoder.ReadBool()
-	f.TapSide = decoder.ReadU8()
 }
 
 func formatStruct(s interface{}) string {
@@ -954,28 +699,6 @@ func CloneFlowPerfStats(s *FlowPerfStats) *FlowPerfStats {
 	return newFlowPerfStats
 }
 
-func (p *L7PerfStats) Decode(decoder *codec.SimpleDecoder) {
-	p.RequestCount = decoder.ReadVarintU32()
-	p.ResponseCount = decoder.ReadVarintU32()
-	p.ErrClientCount = decoder.ReadVarintU32()
-	p.ErrServerCount = decoder.ReadVarintU32()
-	p.ErrTimeout = decoder.ReadVarintU32()
-	p.RRTCount = decoder.ReadVarintU32()
-	p.RRTSum = decoder.ReadVarintU64()
-	p.RRTMax = decoder.ReadVarintU32()
-}
-
-func (p *L7PerfStats) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteVarintU32(p.RequestCount)
-	encoder.WriteVarintU32(p.ResponseCount)
-	encoder.WriteVarintU32(p.ErrClientCount)
-	encoder.WriteVarintU32(p.ErrServerCount)
-	encoder.WriteVarintU32(p.ErrTimeout)
-	encoder.WriteVarintU32(p.RRTCount)
-	encoder.WriteVarintU64(p.RRTSum)
-	encoder.WriteVarintU32(p.RRTMax)
-}
-
 func (p *L7PerfStats) WriteToPB(b *pb.L7PerfStats) {
 	b.RequestCount = p.RequestCount
 	b.ResponseCount = p.ResponseCount
@@ -998,22 +721,6 @@ func (p *L7PerfStats) SequentialMerge(rhs *L7PerfStats) {
 	if p.RRTMax < rhs.RRTMax {
 		p.RRTMax = rhs.RRTMax
 	}
-}
-
-func (f *FlowPerfStats) Decode(decoder *codec.SimpleDecoder) {
-	f.L4Protocol = L4Protocol(decoder.ReadU8())
-	f.L7Protocol = L7Protocol(decoder.ReadU8())
-
-	f.TCPPerfStats.Decode(decoder, f.L4Protocol)
-	f.L7PerfStats.Decode(decoder)
-}
-
-func (f *FlowPerfStats) Encode(encoder *codec.SimpleEncoder) {
-	encoder.WriteU8(uint8(f.L4Protocol))
-	encoder.WriteU8(uint8(f.L7Protocol))
-
-	f.TCPPerfStats.Encode(encoder, f.L4Protocol)
-	f.L7PerfStats.Encode(encoder)
 }
 
 func (f *FlowPerfStats) WriteToPB(p *pb.FlowPerfStats) {
