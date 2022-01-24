@@ -2,13 +2,10 @@ package zerodoc
 
 import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 )
 
 type Tagger interface {
-	GetID(*codec.SimpleEncoder) string
 	SetID(string)
-	Encode(*codec.SimpleEncoder)
 	GetCode() uint64
 	SetCode(uint64)
 	GetTAPType() uint8
@@ -23,8 +20,6 @@ type Meter interface {
 	ID() uint8
 	Name() string
 	VTAPName() string
-	Encode(*codec.SimpleEncoder)
-	Decode(*codec.SimpleDecoder)
 	ConcurrentMerge(Meter)
 	SequentialMerge(Meter)
 	ToKVString() string

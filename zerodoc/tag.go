@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/gopacket/layers"
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
@@ -284,11 +283,11 @@ func newMetricsMinuteTable(id MetricsDBID, engine ckdb.EngineType, version strin
 
 	var meterColumns []*ckdb.Column
 	switch id {
-	case VTAP_FLOW, VTAP_FLOW_PORT, VTAP_FLOW_EDGE, VTAP_FLOW_EDGE_PORT:
+	case VTAP_FLOW_PORT, VTAP_FLOW_EDGE_PORT:
 		meterColumns = FlowMeterColumns()
 	case VTAP_ACL:
 		meterColumns = UsageMeterColumns()
-	case VTAP_APP, VTAP_APP_PORT, VTAP_APP_EDGE, VTAP_APP_EDGE_PORT:
+	case VTAP_APP_PORT, VTAP_APP_EDGE_PORT:
 		meterColumns = AppMeterColumns()
 	}
 
@@ -312,7 +311,7 @@ func newMetricsMinuteTable(id MetricsDBID, engine ckdb.EngineType, version strin
 // 由分钟表生成秒表
 func newMetricsSecondTable(minuteTable *ckdb.Table) *ckdb.Table {
 	t := *minuteTable
-	t.ID = minuteTable.ID + uint8(VTAP_FLOW_1S)
+	t.ID = minuteTable.ID + uint8(VTAP_FLOW_PORT_1S)
 	t.LocalName = ckdb.LOCAL_1S
 	t.GlobalName = ckdb.GLOBAL_1S
 	t.TTL = 1 // 秒数据默认保存1天
@@ -331,12 +330,12 @@ func GetMetricsTables(engine ckdb.EngineType, version string) []*ckdb.Table {
 	}
 
 	minuteTables := []*ckdb.Table{}
-	for i := VTAP_FLOW; i <= VTAP_ACL; i++ {
+	for i := VTAP_FLOW_PORT; i <= VTAP_ACL; i++ {
 		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version))
 	}
 	secondTables := []*ckdb.Table{}
-	for i := VTAP_FLOW_1S; i <= VTAP_APP_EDGE_PORT_1S; i++ {
-		secondTables = append(secondTables, newMetricsSecondTable(minuteTables[i-VTAP_FLOW_1S]))
+	for i := VTAP_FLOW_PORT_1S; i <= VTAP_APP_EDGE_PORT_1S; i++ {
+		secondTables = append(secondTables, newMetricsSecondTable(minuteTables[i-VTAP_FLOW_PORT_1S]))
 	}
 	metricsTables = append(minuteTables, secondTables...)
 	return metricsTables
@@ -345,26 +344,18 @@ func GetMetricsTables(engine ckdb.EngineType, version string) []*ckdb.Table {
 type MetricsDBID uint8
 
 const (
-	VTAP_FLOW MetricsDBID = iota
-	VTAP_FLOW_PORT
-	VTAP_FLOW_EDGE
+	VTAP_FLOW_PORT MetricsDBID = iota
 	VTAP_FLOW_EDGE_PORT
 
-	VTAP_APP
 	VTAP_APP_PORT
-	VTAP_APP_EDGE
 	VTAP_APP_EDGE_PORT
 
 	VTAP_ACL
 
-	VTAP_FLOW_1S
 	VTAP_FLOW_PORT_1S
-	VTAP_FLOW_EDGE_1S
 	VTAP_FLOW_EDGE_PORT_1S
 
-	VTAP_APP_1S
 	VTAP_APP_PORT_1S
-	VTAP_APP_EDGE_1S
 	VTAP_APP_EDGE_PORT_1S
 
 	VTAP_DB_ID_MAX
@@ -379,26 +370,18 @@ func (i MetricsDBID) DBCode() Code {
 }
 
 var metricsDBNames = []string{
-	VTAP_FLOW:           "vtap_flow",
 	VTAP_FLOW_PORT:      "vtap_flow_port",
-	VTAP_FLOW_EDGE:      "vtap_flow_edge",
 	VTAP_FLOW_EDGE_PORT: "vtap_flow_edge_port",
 
-	VTAP_APP:           "vtap_app",
 	VTAP_APP_PORT:      "vtap_app_port",
-	VTAP_APP_EDGE:      "vtap_app_edge",
 	VTAP_APP_EDGE_PORT: "vtap_app_edge_port",
 
 	VTAP_ACL: "vtap_acl",
 
-	VTAP_FLOW_1S:           "vtap_flow",
 	VTAP_FLOW_PORT_1S:      "vtap_flow_port",
-	VTAP_FLOW_EDGE_1S:      "vtap_flow_edge",
 	VTAP_FLOW_EDGE_PORT_1S: "vtap_flow_edge_port",
 
-	VTAP_APP_1S:           "vtap_app",
 	VTAP_APP_PORT_1S:      "vtap_app_port",
-	VTAP_APP_EDGE_1S:      "vtap_app_edge",
 	VTAP_APP_EDGE_PORT_1S: "vtap_app_edge_port",
 }
 
@@ -418,14 +401,10 @@ const (
 )
 
 var metricsDBCodes = []Code{
-	VTAP_FLOW:           BaseCode | Direction | Protocol,
 	VTAP_FLOW_PORT:      BaseCode | BasePortCode | Direction,
-	VTAP_FLOW_EDGE:      BasePathCode | Protocol | TAPPort,
 	VTAP_FLOW_EDGE_PORT: BasePathCode | BasePortCode | TAPPort,
 
-	VTAP_APP:           BaseCode | Direction | Protocol | L7Protocol,
 	VTAP_APP_PORT:      BaseCode | BasePortCode | Direction | L7Protocol,
-	VTAP_APP_EDGE:      BasePathCode | Protocol | TAPPort | L7Protocol,
 	VTAP_APP_EDGE_PORT: BasePathCode | BasePortCode | TAPPort | L7Protocol,
 
 	VTAP_ACL: ACLGID | TagType | TagValue | VTAPID,
@@ -803,7 +782,7 @@ func (t *Tag) TableID(isSecond bool) (uint8, error) {
 		// 有时会有MAC,MACPath字段，需要先排除再比较
 		if t.Code&^MAC&^MACPath == code {
 			if isSecond {
-				return uint8(i) + uint8(VTAP_FLOW_1S), nil
+				return uint8(i) + uint8(VTAP_FLOW_PORT_1S), nil
 			}
 			return uint8(i), nil
 		}
@@ -1394,186 +1373,6 @@ func (t *Tag) String() string {
 	return buf.String()
 }
 
-func (t *Tag) Decode(decoder *codec.SimpleDecoder) {
-	offset := decoder.Offset()
-
-	t.Code = Code(decoder.ReadU64())
-	t.GlobalThreadID = decoder.ReadU8()
-
-	if t.Code&MAC != 0 {
-		t.MAC = decoder.ReadU64()
-	}
-	if t.Code&IP != 0 {
-		t.IsIPv6 = decoder.ReadU8()
-		if t.IsIPv6 != 0 {
-			if t.IP6 == nil {
-				t.IP6 = make([]byte, 16)
-			}
-			decoder.ReadIPv6(t.IP6)
-		} else {
-			t.IP = decoder.ReadU32()
-		}
-	}
-
-	if t.Code&BusinessIDs != 0 {
-		t.BusinessIDs = decoder.ReadU16Slice()
-	}
-	if t.Code&GroupIDs != 0 {
-		t.GroupIDs = decoder.ReadU16Slice()
-	}
-	if t.Code&L3EpcID != 0 {
-		t.L3EpcID = int16(decoder.ReadU16())
-	}
-	if t.Code&L3Device != 0 {
-		t.L3DeviceID = decoder.ReadU32()
-		t.L3DeviceType = DeviceType(decoder.ReadU8())
-	}
-	if t.Code&L7Protocol != 0 {
-		t.L7Protocol = datatype.L7Protocol(decoder.ReadU8())
-	}
-	if t.Code&HostID != 0 {
-		t.HostID = decoder.ReadU16()
-	}
-	if t.Code&RegionID != 0 {
-		t.RegionID = decoder.ReadU16()
-	}
-	if t.Code&PodNodeID != 0 {
-		t.PodNodeID = decoder.ReadU32()
-	}
-	if t.Code&PodNSID != 0 {
-		t.PodNSID = decoder.ReadU16()
-	}
-	if t.Code&PodID != 0 {
-		t.PodID = decoder.ReadU32()
-	}
-	if t.Code&AZID != 0 {
-		t.AZID = decoder.ReadU16()
-	}
-	if t.Code&PodGroupID != 0 {
-		t.PodGroupID = decoder.ReadU32()
-	}
-	if t.Code&PodClusterID != 0 {
-		t.PodClusterID = decoder.ReadU16()
-	}
-
-	if t.Code&MACPath != 0 {
-		t.MAC = decoder.ReadU64()
-		t.MAC1 = decoder.ReadU64()
-	}
-	if t.Code&IPPath != 0 {
-		t.IsIPv6 = decoder.ReadU8()
-		if t.IsIPv6 != 0 {
-			if t.IP6 == nil {
-				t.IP6 = make([]byte, 16)
-			}
-			if t.IP61 == nil {
-				t.IP61 = make([]byte, 16)
-			}
-			decoder.ReadIPv6(t.IP6)
-			decoder.ReadIPv6(t.IP61)
-		} else {
-			t.IP = decoder.ReadU32()
-			t.IP1 = decoder.ReadU32()
-		}
-	}
-	if t.Code&BusinessIDsPath != 0 {
-		t.BusinessIDs = decoder.ReadU16Slice()
-		t.BusinessIDs1 = decoder.ReadU16Slice()
-	}
-	if t.Code&GroupIDsPath != 0 {
-		t.GroupIDs = decoder.ReadU16Slice()
-		t.GroupIDs1 = decoder.ReadU16Slice()
-	}
-	if t.Code&L3EpcIDPath != 0 {
-		t.L3EpcID = int16(decoder.ReadU16())
-		t.L3EpcID1 = int16(decoder.ReadU16())
-	}
-	if t.Code&L3DevicePath != 0 {
-		t.L3DeviceID = decoder.ReadU32()
-		t.L3DeviceType = DeviceType(decoder.ReadU8())
-		t.L3DeviceID1 = decoder.ReadU32()
-		t.L3DeviceType1 = DeviceType(decoder.ReadU8())
-	}
-	if t.Code&HostIDPath != 0 {
-		t.HostID = decoder.ReadU16()
-		t.HostID1 = decoder.ReadU16()
-	}
-	if t.Code&SubnetIDPath != 0 {
-		t.SubnetID = decoder.ReadU16()
-		t.SubnetID1 = decoder.ReadU16()
-	}
-	if t.Code&RegionIDPath != 0 {
-		t.RegionID = decoder.ReadU16()
-		t.RegionID1 = decoder.ReadU16()
-	}
-	if t.Code&PodNodeIDPath != 0 {
-		t.PodNodeID = decoder.ReadU32()
-		t.PodNodeID1 = decoder.ReadU32()
-	}
-	if t.Code&PodNSIDPath != 0 {
-		t.PodNSID = decoder.ReadU16()
-		t.PodNSID1 = decoder.ReadU16()
-	}
-	if t.Code&PodIDPath != 0 {
-		t.PodID = decoder.ReadU32()
-		t.PodID1 = decoder.ReadU32()
-	}
-	if t.Code&AZIDPath != 0 {
-		t.AZID = decoder.ReadU16()
-		t.AZID1 = decoder.ReadU16()
-	}
-	if t.Code&PodGroupIDPath != 0 {
-		t.PodGroupID = decoder.ReadU32()
-		t.PodGroupID1 = decoder.ReadU32()
-	}
-	if t.Code&PodClusterIDPath != 0 {
-		t.PodClusterID = decoder.ReadU16()
-		t.PodClusterID1 = decoder.ReadU16()
-	}
-
-	if t.Code&Direction != 0 {
-		t.Direction = DirectionEnum(decoder.ReadU8())
-	}
-	if t.Code&ACLGID != 0 {
-		t.ACLGID = decoder.ReadU16()
-	}
-	if t.Code&Protocol != 0 {
-		t.Protocol = layers.IPProtocol(decoder.ReadU8())
-	}
-	if t.Code&ServerPort != 0 {
-		t.ServerPort = decoder.ReadU16()
-	}
-	if t.Code&VTAPID != 0 {
-		t.VTAPID = decoder.ReadU16()
-	}
-	if t.Code&TAPPort != 0 {
-		t.TAPPort = datatype.TapPort(decoder.ReadU64())
-	}
-	if t.Code&TAPSide != 0 {
-		t.TAPSide = TAPSideEnum(decoder.ReadU8())
-	}
-	if t.Code&TAPType != 0 {
-		t.TAPType = TAPTypeEnum(decoder.ReadU8())
-	}
-	if t.Code&SubnetID != 0 {
-		t.SubnetID = decoder.ReadU16()
-	}
-
-	if t.Code&TagType != 0 {
-		t.TagType = decoder.ReadU8()
-	}
-	if t.Code&TagValue != 0 {
-		t.TagValue = decoder.ReadU16()
-	}
-	if t.Code&IsKeyService != 0 {
-		t.IsKeyService = decoder.ReadU8()
-	}
-
-	if !decoder.Failed() {
-		t.id = string(decoder.Bytes()[offset:decoder.Offset()]) // Encode内容就是它的id
-	}
-}
-
 func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.Code = Code(p.Code)
 	t.IsIPv6 = uint8(p.Field.IsIPv6)
@@ -1609,198 +1408,6 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.L7Protocol = datatype.L7Protocol(p.Field.L7Protocol)
 	t.TagType = uint8(p.Field.TagType)
 	t.TagValue = uint16(p.Field.TagValue)
-}
-
-func (t *Tag) Encode(encoder *codec.SimpleEncoder) {
-	if t.id != "" {
-		encoder.WriteRawString(t.id) // ID就是序列化bytes，避免重复计算
-		return
-	}
-	t.EncodeByCodeTID(t.Code, t.GlobalThreadID, encoder)
-}
-
-func (t *Tag) EncodeByCodeTID(code Code, tid uint8, encoder *codec.SimpleEncoder) {
-	encoder.WriteU64(uint64(code))
-	encoder.WriteU8(tid)
-
-	if code&MAC != 0 {
-		encoder.WriteU64(t.MAC)
-	}
-	if code&IP != 0 {
-		encoder.WriteU8(t.IsIPv6)
-		if t.IsIPv6 != 0 {
-			if t.IP6 == nil {
-				t.IP6 = make([]byte, 16)
-			}
-			encoder.WriteIPv6(t.IP6)
-		} else {
-			encoder.WriteU32(t.IP)
-		}
-	}
-	if code&BusinessIDs != 0 {
-		encoder.WriteU16Slice(t.BusinessIDs)
-	}
-	if code&GroupIDs != 0 {
-		encoder.WriteU16Slice(t.GroupIDs)
-	}
-	if code&L3EpcID != 0 {
-		encoder.WriteU16(uint16(t.L3EpcID))
-	}
-	if code&L3Device != 0 {
-		encoder.WriteU32(t.L3DeviceID)
-		encoder.WriteU8(uint8(t.L3DeviceType))
-	}
-	if code&L7Protocol != 0 {
-		encoder.WriteU8(uint8(t.L7Protocol))
-	}
-	if code&HostID != 0 {
-		encoder.WriteU16(t.HostID)
-	}
-	if code&RegionID != 0 {
-		encoder.WriteU16(t.RegionID)
-	}
-	if code&PodNodeID != 0 {
-		encoder.WriteU32(t.PodNodeID)
-	}
-	if code&PodNSID != 0 {
-		encoder.WriteU16(t.PodNSID)
-	}
-	if code&PodID != 0 {
-		encoder.WriteU32(t.PodID)
-	}
-	if code&AZID != 0 {
-		encoder.WriteU16(t.AZID)
-	}
-	if code&PodGroupID != 0 {
-		encoder.WriteU16(uint16(t.PodGroupID))
-	}
-	if code&PodClusterID != 0 {
-		encoder.WriteU16(t.PodClusterID)
-	}
-
-	if code&MACPath != 0 {
-		encoder.WriteU64(t.MAC)
-		encoder.WriteU64(t.MAC1)
-	}
-	if code&IPPath != 0 {
-		encoder.WriteU8(t.IsIPv6)
-		if t.IsIPv6 != 0 {
-			// 当influxdb打包数据发送给reciter时, 存在code中有IPPath,
-			// 而实际查询结果只要IP6或IP61或都没有, 这时如果对IP6, IP61 进行encode会导致panic
-			if t.IP6 == nil {
-				t.IP6 = make([]byte, 16)
-			}
-			if t.IP61 == nil {
-				t.IP61 = make([]byte, 16)
-			}
-			encoder.WriteIPv6(t.IP6)
-			encoder.WriteIPv6(t.IP61)
-		} else {
-			encoder.WriteU32(t.IP)
-			encoder.WriteU32(t.IP1)
-		}
-	}
-	if code&BusinessIDsPath != 0 {
-		encoder.WriteU16Slice(t.BusinessIDs)
-		encoder.WriteU16Slice(t.BusinessIDs1)
-	}
-	if code&GroupIDsPath != 0 {
-		encoder.WriteU16Slice(t.GroupIDs)
-		encoder.WriteU16Slice(t.GroupIDs1)
-	}
-	if code&L3EpcIDPath != 0 {
-		encoder.WriteU16(uint16(t.L3EpcID))
-		encoder.WriteU16(uint16(t.L3EpcID1))
-	}
-	if code&L3DevicePath != 0 {
-		encoder.WriteU32(t.L3DeviceID)
-		encoder.WriteU8(uint8(t.L3DeviceType))
-		encoder.WriteU32(t.L3DeviceID1)
-		encoder.WriteU8(uint8(t.L3DeviceType1))
-	}
-	if code&HostIDPath != 0 {
-		encoder.WriteU16(t.HostID)
-		encoder.WriteU16(t.HostID1)
-	}
-	if code&SubnetIDPath != 0 {
-		encoder.WriteU16(t.SubnetID)
-		encoder.WriteU16(t.SubnetID1)
-	}
-	if code&RegionIDPath != 0 {
-		encoder.WriteU16(t.RegionID)
-		encoder.WriteU16(t.RegionID1)
-	}
-	if code&PodNodeIDPath != 0 {
-		encoder.WriteU32(t.PodNodeID)
-		encoder.WriteU32(t.PodNodeID1)
-	}
-	if code&PodNSIDPath != 0 {
-		encoder.WriteU16(t.PodNSID)
-		encoder.WriteU16(t.PodNSID1)
-	}
-	if code&PodIDPath != 0 {
-		encoder.WriteU32(t.PodID)
-		encoder.WriteU32(t.PodID1)
-	}
-	if code&AZIDPath != 0 {
-		encoder.WriteU16(t.AZID)
-		encoder.WriteU16(t.AZID1)
-	}
-	if code&PodGroupIDPath != 0 {
-		encoder.WriteU16(uint16(t.PodGroupID))
-		encoder.WriteU16(uint16(t.PodGroupID1))
-	}
-	if code&PodClusterIDPath != 0 {
-		encoder.WriteU16(t.PodClusterID)
-		encoder.WriteU16(t.PodClusterID1)
-	}
-
-	if code&Direction != 0 {
-		encoder.WriteU8(uint8(t.Direction))
-	}
-	if code&ACLGID != 0 {
-		encoder.WriteU16(t.ACLGID)
-	}
-	if code&Protocol != 0 {
-		encoder.WriteU8(uint8(t.Protocol))
-	}
-	if code&ServerPort != 0 {
-		encoder.WriteU16(t.ServerPort)
-	}
-	if code&VTAPID != 0 {
-		encoder.WriteU16(t.VTAPID)
-	}
-	if code&TAPPort != 0 {
-		encoder.WriteU64(uint64(t.TAPPort))
-	}
-	if code&TAPSide != 0 {
-		encoder.WriteU8(uint8(t.TAPSide))
-	}
-	if code&TAPType != 0 {
-		encoder.WriteU8(uint8(t.TAPType))
-	}
-	if code&SubnetID != 0 {
-		encoder.WriteU16(t.SubnetID)
-	}
-
-	if code&TagType != 0 {
-		encoder.WriteU8(t.TagType)
-	}
-	if code&TagValue != 0 {
-		encoder.WriteU16(t.TagValue)
-	}
-	if code&IsKeyService != 0 {
-		encoder.WriteU8(t.IsKeyService)
-	}
-}
-
-func (t *Tag) GetID(encoder *codec.SimpleEncoder) string {
-	if t.id == "" {
-		encoder.Reset()
-		t.Encode(encoder)
-		t.id = encoder.String()
-	}
-	return t.id
 }
 
 func (t *Tag) SetID(id string) {
