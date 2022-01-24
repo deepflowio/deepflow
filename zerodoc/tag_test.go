@@ -12,6 +12,7 @@ import (
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
 )
 
 func TestHasEdgeTagField(t *testing.T) {
@@ -260,11 +261,16 @@ func TestEncodeMiniTag(t *testing.T) {
 		Code: IP | L3EpcID | VTAPID | Protocol | ServerPort | Direction | TAPType | ACLGID | TagType | TagValue,
 	}
 
-	sideMiniTag.Encode(encoder)
+	pbMtagE := &pb.MiniTag{}
+	sideMiniTag.WriteToPB(pbMtagE)
+	encoder.WritePB(pbMtagE)
+
 	decoder.Init(encoder.Bytes())
+	pbMtagD := &pb.MiniTag{}
+	decoder.ReadPB(pbMtagD)
 
 	sideTag := &Tag{Field: &Field{}}
-	sideTag.Decode(decoder)
+	sideTag.ReadFromPB(pbMtagD)
 
 	if !checkTagAndMiniTagEqual(sideTag, sideMiniTag) {
 		t.Error("mini tag and tag mismatch")
@@ -293,11 +299,15 @@ func TestEncodeMiniTag(t *testing.T) {
 		Code: IPPath | L3EpcIDPath | VTAPID | Protocol | ServerPort | Direction | TAPType | ACLGID | TagType | TagValue,
 	}
 
-	edgeMiniTag.Encode(encoder)
+	pbMtagE.Reset()
+	edgeMiniTag.WriteToPB(pbMtagE)
+	encoder.WritePB(pbMtagE)
 	decoder.Init(encoder.Bytes())
 
+	pbMtagD.Reset()
 	edgeTag := &Tag{Field: &Field{}}
-	edgeTag.Decode(decoder)
+	decoder.ReadPB(pbMtagD)
+	edgeTag.ReadFromPB(pbMtagD)
 
 	if !checkTagAndMiniTagEqual(edgeTag, edgeMiniTag) {
 		t.Error("mini tag and tag mismatch")
@@ -308,11 +318,15 @@ func TestEncodeMiniTag(t *testing.T) {
 	encoder.Reset()
 	edgeMiniTag.Direction = ServerToClient
 
-	edgeMiniTag.Encode(encoder)
+	pbMtagE.Reset()
+	edgeMiniTag.WriteToPB(pbMtagE)
+	encoder.WritePB(pbMtagE)
 	decoder.Init(encoder.Bytes())
 
+	pbMtagD.Reset()
+	decoder.ReadPB(pbMtagD)
 	edgeTag = &Tag{Field: &Field{}}
-	edgeTag.Decode(decoder)
+	edgeTag.ReadFromPB(pbMtagD)
 
 	if !checkTagAndMiniTagEqual(edgeTag, edgeMiniTag) {
 		t.Error("mini tag and tag mismatch")

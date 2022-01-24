@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/gopacket/layers"
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
 )
 
 func TestTaggedFlowEncodeDecode(t *testing.T) {
@@ -90,15 +91,17 @@ func TestTaggedFlowEncodeDecode(t *testing.T) {
 		Flow: Flow,
 	}
 	encoder := codec.AcquireSimpleEncoder()
-	ef.Encode(encoder)
+	pbEncode := &pb.TaggedFlow{}
+	ef.WriteToPB(pbEncode)
+	encoder.WritePB(pbEncode)
 
 	decoder := &codec.SimpleDecoder{}
 	decoder.Init(encoder.Bytes())
-	df := &TaggedFlow{}
-	df.Decode(decoder)
+	pbDecode := &pb.TaggedFlow{}
+	decoder.ReadPB(pbDecode)
 
-	if ef.String() != df.String() {
-		t.Errorf("flow encode和decode结果不一致 \nencode=%s  \ndecode=%s", ef, df)
+	if pbEncode.String() != pbDecode.String() {
+		t.Errorf("flow encode和decode结果不一致 \nencode=%s  \ndecode=%s", pbEncode, pbDecode)
 	}
 }
 
@@ -125,15 +128,18 @@ func TestTaggedFlowEncodeDecodeiNul(t *testing.T) {
 		Flow: Flow,
 	}
 	encoder := codec.AcquireSimpleEncoder()
-	ef.Encode(encoder)
+
+	pbEncode := &pb.TaggedFlow{}
+	ef.WriteToPB(pbEncode)
+	encoder.WritePB(pbEncode)
 
 	decoder := &codec.SimpleDecoder{}
 	decoder.Init(encoder.Bytes())
-	df := &TaggedFlow{}
-	df.Decode(decoder)
+	pbDecode := &pb.TaggedFlow{}
+	decoder.ReadPB(pbDecode)
 
-	if ef.String() != df.String() {
-		t.Errorf("flow encode和decode结果不一致 \nencode=%s  \ndecode=%s", ef, df)
+	if pbEncode.String() != pbDecode.String() {
+		t.Errorf("flow encode和decode结果不一致 \nencode=%s  \ndecode=%s", pbEncode, pbDecode)
 	}
 }
 
