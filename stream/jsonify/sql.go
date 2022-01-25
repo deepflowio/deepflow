@@ -81,12 +81,13 @@ func (s *SQLLogger) WriteBlock(block *ckdb.Block) error {
 		}
 
 		errCode := uint16(s.mysql.ErrorCode)
-		if status != datatype.STATUS_ERROR {
-			if err := block.WriteUInt16Nullable(nil); err != nil {
+		if status == datatype.STATUS_CLIENT_ERROR ||
+			status == datatype.STATUS_SERVER_ERROR {
+			if err := block.WriteUInt16Nullable(&errCode); err != nil {
 				return err
 			}
 		} else {
-			if err := block.WriteUInt16Nullable(&errCode); err != nil {
+			if err := block.WriteUInt16Nullable(nil); err != nil {
 				return err
 			}
 		}
