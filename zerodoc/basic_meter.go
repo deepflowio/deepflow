@@ -299,16 +299,16 @@ func (l *Latency) ReadFromPB(p *pb.Latency) {
 	l.RTTSum = p.RTTSum
 	l.RTTClientSum = p.RTTClientSum
 	l.RTTServerSum = p.RTTServerSum
-	l.SRTSum = l.SRTSum
-	l.ARTSum = l.ARTSum
-	l.RRTSum = l.RRTSum
+	l.SRTSum = p.SRTSum
+	l.ARTSum = p.ARTSum
+	l.RRTSum = p.RRTSum
 
-	l.RTTCount = l.RTTCount
-	l.RTTClientCount = l.RTTClientCount
-	l.RTTServerCount = l.RTTServerCount
-	l.SRTCount = l.SRTCount
-	l.ARTCount = l.ARTCount
-	l.RRTCount = l.RRTCount
+	l.RTTCount = p.RTTCount
+	l.RTTClientCount = p.RTTClientCount
+	l.RTTServerCount = p.RTTServerCount
+	l.SRTCount = p.SRTCount
+	l.ARTCount = p.ARTCount
+	l.RRTCount = p.RRTCount
 }
 
 func (l *Latency) Decode(decoder *codec.SimpleDecoder) {
