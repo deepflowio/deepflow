@@ -962,14 +962,14 @@ func (p *L7PerfStats) Encode(encoder *codec.SimpleEncoder) {
 }
 
 func (p *L7PerfStats) WriteToPB(b *pb.L7PerfStats) {
-	b.RequestCount = b.RequestCount
-	b.ResponseCount = b.ResponseCount
-	b.ErrClientCount = b.ErrClientCount
-	b.ErrServerCount = b.ErrServerCount
-	b.ErrTimeout = b.ErrTimeout
-	b.RRTCount = b.RRTCount
-	b.RRTSum = b.RRTSum
-	b.RRTMax = b.RRTMax
+	b.RequestCount = p.RequestCount
+	b.ResponseCount = p.ResponseCount
+	b.ErrClientCount = p.ErrClientCount
+	b.ErrServerCount = p.ErrServerCount
+	b.ErrTimeout = p.ErrTimeout
+	b.RRTCount = p.RRTCount
+	b.RRTSum = p.RRTSum
+	b.RRTMax = p.RRTMax
 }
 
 func (p *L7PerfStats) SequentialMerge(rhs *L7PerfStats) {
