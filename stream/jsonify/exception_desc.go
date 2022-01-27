@@ -130,6 +130,7 @@ const (
 	INCONSISTENT_TOPIC_ID                            = 103
 	INCONSISTENT_CLUSTER_ID                          = 104
 	TRANSACTIONAL_ID_NOT_FOUND                       = 105
+	FETCH_SESSION_TOPIC_ID_ERROR                     = 106
 )
 
 const (
@@ -242,6 +243,7 @@ var kafkaExceptionDescs = []string{
 	INCONSISTENT_TOPIC_ID:                 "The log's topic ID did not match the topic ID in the request.",
 	INCONSISTENT_CLUSTER_ID:               "The clusterId in the request does not match that found on the server.",
 	TRANSACTIONAL_ID_NOT_FOUND:            "The transactionalId could not be found.",
+	FETCH_SESSION_TOPIC_ID_ERROR:          "The fetch session encountered inconsistent topic ID usage",
 }
 
 func GetKafkaExceptionDesc(errCode int16) string {
