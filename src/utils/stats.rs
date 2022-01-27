@@ -5,14 +5,34 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use cadence::{Counted, MetricError, MetricResult, MetricSink, StatsdClient};
+use cadence::{
+    ext::{MetricValue, ToCounterValue},
+    Counted, MetricError, MetricResult, MetricSink, StatsdClient,
+};
 use log::{info, warn};
 
 use crate::consts::DROPLET_PORT;
 
 const TICK_CYCLE: Duration = Duration::from_secs(5);
 
-pub type Counter = (&'static str, i64);
+#[derive(Clone, Copy, Debug)]
+pub enum CounterValue {
+    Signed(i64),
+    Unsigned(u64),
+    Float(f64),
+}
+
+impl ToCounterValue for CounterValue {
+    fn try_to_value(self) -> MetricResult<MetricValue> {
+        Ok(match self {
+            CounterValue::Signed(v) => MetricValue::Signed(v),
+            CounterValue::Unsigned(v) => MetricValue::Unsigned(v),
+            CounterValue::Float(v) => MetricValue::Float(v),
+        })
+    }
+}
+
+pub type Counter = (&'static str, CounterValue);
 
 pub trait Countable: Send + Sync {
     fn get_counters(&self) -> Vec<Counter>;
