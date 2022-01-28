@@ -212,12 +212,14 @@ type FlowKey struct {
 }
 
 type TunnelField struct {
-	TxIP0, TxIP1 IPv4Int // 对应发送方向的源目的隧道IP
-	RxIP0, RxIP1 IPv4Int // 对应接收方向的源目的隧道IP
-	TxId, RxId   uint32
-	Type         TunnelType
-	Tier         uint8
-	IsIPv6       bool
+	TxIP0, TxIP1   IPv4Int // 对应发送方向的源目的隧道IP
+	RxIP0, RxIP1   IPv4Int // 对应接收方向的源目的隧道IP
+	TxMAC0, TxMAC1 uint32  // 对应发送方向的源目的隧道MAC，低4字节
+	RxMAC0, RxMAC1 uint32  // 对应接收方向的源目的隧道MAC，低4字节
+	TxId, RxId     uint32
+	Type           TunnelType
+	Tier           uint8
+	IsIPv6         bool
 }
 
 func (f *TunnelField) Encode(encoder *codec.SimpleEncoder) {
@@ -225,6 +227,10 @@ func (f *TunnelField) Encode(encoder *codec.SimpleEncoder) {
 	encoder.WriteU32(f.TxIP1)
 	encoder.WriteU32(f.RxIP0)
 	encoder.WriteU32(f.RxIP1)
+	encoder.WriteU32(f.TxMAC0)
+	encoder.WriteU32(f.TxMAC1)
+	encoder.WriteU32(f.RxMAC0)
+	encoder.WriteU32(f.RxMAC1)
 	encoder.WriteU32(f.TxId)
 	encoder.WriteU32(f.RxId)
 	encoder.WriteU8(uint8(f.Type))
@@ -234,10 +240,13 @@ func (f *TunnelField) Encode(encoder *codec.SimpleEncoder) {
 
 func (f *TunnelField) WriteToPB(p *pb.TunnelField) {
 	p.TxIP0 = f.TxIP0
-	p.TxIP0 = f.TxIP0
 	p.TxIP1 = f.TxIP1
 	p.RxIP0 = f.RxIP0
 	p.RxIP1 = f.RxIP1
+	p.TxMAC0 = f.TxMAC0
+	p.TxMAC1 = f.TxMAC1
+	p.RxMAC0 = f.RxMAC0
+	p.RxMAC1 = f.RxMAC1
 	p.TxId = f.TxId
 	p.RxId = f.RxId
 	p.Type = uint32(f.Type)
@@ -252,6 +261,10 @@ func (f *TunnelField) Decode(decoder *codec.SimpleDecoder) {
 	f.TxIP1 = decoder.ReadU32()
 	f.RxIP0 = decoder.ReadU32()
 	f.RxIP1 = decoder.ReadU32()
+	f.TxMAC0 = decoder.ReadU32()
+	f.TxMAC1 = decoder.ReadU32()
+	f.RxMAC0 = decoder.ReadU32()
+	f.RxMAC1 = decoder.ReadU32()
 	f.TxId = decoder.ReadU32()
 	f.RxId = decoder.ReadU32()
 	f.Type = TunnelType(decoder.ReadU8())
@@ -263,10 +276,10 @@ func (t *TunnelField) String() string {
 	if t.Type == TUNNEL_TYPE_NONE {
 		return "none "
 	}
-	return fmt.Sprintf("type: %s, tx_id: %d, rx_id: %d, tier: %d, is_ipv6: %v, tx_ip_0: %s, tx_ip_1: %s, rx_ip_0: %s, rx_ip_1: %s ",
+	return fmt.Sprintf("type: %s, tx_id: %d, rx_id: %d, tier: %d, is_ipv6: %v, tx_ip_0: %s %08x, tx_ip_1: %s %08x, rx_ip_0: %s %08x, rx_ip_1: %s %08x ",
 		t.Type, t.TxId, t.RxId, t.Tier, t.IsIPv6,
-		IpFromUint32(t.TxIP0), IpFromUint32(t.TxIP1),
-		IpFromUint32(t.RxIP0), IpFromUint32(t.RxIP1))
+		IpFromUint32(t.TxIP0), t.TxMAC0, IpFromUint32(t.TxIP1), t.TxMAC1,
+		IpFromUint32(t.RxIP0), t.RxMAC0, IpFromUint32(t.RxIP1), t.RxMAC1)
 }
 
 // 结构或顺序变化，需要同步修改Encode和Decode
@@ -623,7 +636,9 @@ func (f *FlowMetricsPeer) Decode(decoder *codec.SimpleDecoder) {
 // 因此这里不包含对TCPPerfStats的反向。
 func (f *Flow) Reverse() {
 	f.Reversed = !f.Reversed
+	f.TapSide = 0 // 反向后需要重新计算
 	f.Tunnel.TxIP0, f.Tunnel.TxIP1, f.Tunnel.RxIP0, f.Tunnel.RxIP1 = f.Tunnel.RxIP0, f.Tunnel.RxIP1, f.Tunnel.TxIP0, f.Tunnel.TxIP1
+	f.Tunnel.TxMAC0, f.Tunnel.TxMAC1, f.Tunnel.RxMAC0, f.Tunnel.RxMAC1 = f.Tunnel.RxMAC0, f.Tunnel.RxMAC1, f.Tunnel.TxMAC0, f.Tunnel.TxMAC1
 	f.Tunnel.TxId, f.Tunnel.RxId = f.Tunnel.RxId, f.Tunnel.TxId
 	f.MACSrc, f.MACDst = f.MACDst, f.MACSrc
 	f.IPSrc, f.IPDst = f.IPDst, f.IPSrc
