@@ -1,21 +1,20 @@
 use std::path::Path;
 use std::sync::Arc;
-use std::thread;
-use std::time::Duration;
 
 use anyhow::{Context, Result};
 use flexi_logger::{
-    colored_opt_format, writers::FileLogWriter, Age, Cleanup, Criterion, Duplicate, FileSpec,
-    Logger, LoggerHandle, Naming,
+    colored_opt_format, Age, Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming,
 };
-use log::{info, LevelFilter, Log};
+use log::info;
 
 use crate::config::Config;
+use crate::monitor::Monitor;
 use crate::rpc::{Session, Synchronizer, DEFAULT_TIMEOUT};
 use crate::utils::{net, stats};
 
 pub struct Trident {
     synchronizer: Arc<Synchronizer>,
+    monitor: Monitor,
 }
 
 impl Trident {
@@ -37,7 +36,7 @@ impl Trident {
             net::get_route_src_ip_and_mac(&config.controller_ips[0].parse().unwrap())
                 .context("failed getting control ip and mac")?;
 
-        let stats_collector = stats::Collector::new(&config.controller_ips);
+        let stats_collector = Arc::new(stats::Collector::new(&config.controller_ips));
         stats_collector.start();
 
         let session = Arc::new(Session::new(
@@ -56,16 +55,24 @@ impl Trident {
             config.kubernetes_cluster_id,
         ));
         stats_collector.register_countable("synchronizer", synchronizer.clone(), vec![]);
-        Ok(Trident { synchronizer })
+
+        let monitor = Monitor::new(stats_collector.clone())?;
+
+        Ok(Trident {
+            synchronizer,
+            monitor,
+        })
     }
 
     pub fn start(&self) {
         info!("==================== Launching YUNSHAN DeepFlow vTap (a.k.a. Trident) ====================");
         self.synchronizer.start();
+        self.monitor.start();
     }
 
     pub fn stop(&self) {
         info!("Gracefully stopping");
         self.synchronizer.stop();
+        self.monitor.stop();
     }
 }
