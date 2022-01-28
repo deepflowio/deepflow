@@ -89,7 +89,7 @@ var ColumnAdd600 = []*ColumnAdds{
 	&ColumnAdds{
 		Dbs:         []string{"vtap_flow_port", "vtap_flow_edge_port"},
 		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
-		ColumnNames: []string{"l7_client_error", "l7_server_error", "l7_time_out", "l7_error", "rrt_max"},
+		ColumnNames: []string{"l7_client_error", "l7_server_error", "l7_timeout", "l7_error", "rrt_max"},
 		ColumnType:  ckdb.UInt32,
 	},
 	&ColumnAdds{
@@ -325,7 +325,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo) ([]*Colum
 		&ColumnAdds{
 			Dbs:         []string{d.db},
 			Tables:      []string{d.name, d.name + "_agg"},
-			ColumnNames: []string{"rrt_count", "l7_request", "l7_response"},
+			ColumnNames: []string{"rrt_count", "l7_request", "l7_response", "tcp_transfer_fail", "tcp_rst_fail"},
 			ColumnType:  ckdb.UInt64,
 		},
 		&ColumnAdds{
@@ -337,9 +337,18 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo) ([]*Colum
 		&ColumnAdds{
 			Dbs:         []string{d.db},
 			Tables:      []string{d.name, d.name + "_agg"},
-			ColumnNames: []string{"l7_client_error", "l7_server_error", "l7_time_out", "l7_error", "rrt_max"},
+			ColumnNames: []string{"l7_client_error", "l7_server_error", "l7_timeout", "l7_error", "rrt_max"},
 			ColumnType:  ckdb.UInt32,
 		},
+	}
+	if d.db == "vtap_flow_edge_port" {
+		columnAddss = append(columnAddss,
+			&ColumnAdds{
+				Dbs:         []string{d.db},
+				Tables:      []string{d.name, d.name + "_agg"},
+				ColumnNames: []string{"tap_port_type"},
+				ColumnType:  ckdb.UInt8,
+			})
 	}
 	for _, adds := range columnAddss {
 		columnAdds = append(columnAdds, getColumnAdds(adds)...)
