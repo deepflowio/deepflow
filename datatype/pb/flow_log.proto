@@ -86,11 +86,15 @@ message TunnelField {
 	uint32 TxIP1 = 2;
 	uint32 RxIP0 = 3;
 	uint32 RxIP1 = 4;
-	uint32 TxId = 5;
-	uint32 RxId = 6;
-	uint32 Type = 7;
-	uint32 Tier = 8;
-	uint32 IsIPv6 = 9;
+	uint32 TxMAC0 = 5;
+	uint32 TxMAC1 = 6;
+	uint32 RxMAC0 = 7;
+	uint32 RxMAC1 = 8;
+	uint32 TxId = 9;
+	uint32 RxId = 10;
+	uint32 Type = 11;
+	uint32 Tier = 12;
+	uint32 IsIPv6 = 13;
 }
 
 message FlowPerfStats {

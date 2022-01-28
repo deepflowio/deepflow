@@ -45,11 +45,13 @@ func loadPcap(file string) ([]RawPacket, []PacketLen) {
 func TestDecapsulateErspanI(t *testing.T) {
 	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_ERSPAN_OR_TEB)
 	expected := &TunnelInfo{
-		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("172.28.25.108").To4())),
-		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("172.28.28.70").To4())),
-		Id:   0,
-		Type: TUNNEL_TYPE_ERSPAN_OR_TEB,
-		Tier: 1,
+		Src:    IPv4Int(BigEndian.Uint32(net.ParseIP("172.28.25.108").To4())),
+		Dst:    IPv4Int(BigEndian.Uint32(net.ParseIP("172.28.28.70").To4())),
+		MacSrc: 0xbdf819ff,
+		MacDst: 0x22222222,
+		Id:     0,
+		Type:   TUNNEL_TYPE_ERSPAN_OR_TEB,
+		Tier:   1,
 	}
 
 	packets, _ := loadPcap("decapsulate_erspan1.pcap")
@@ -75,11 +77,13 @@ func TestDecapsulateErspanI(t *testing.T) {
 func TestDecapsulateErspanII(t *testing.T) {
 	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_ERSPAN_OR_TEB)
 	expected := &TunnelInfo{
-		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("2.2.2.2").To4())),
-		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("1.1.1.1").To4())),
-		Id:   100,
-		Type: TUNNEL_TYPE_ERSPAN_OR_TEB,
-		Tier: 1,
+		Src:    IPv4Int(BigEndian.Uint32(net.ParseIP("2.2.2.2").To4())),
+		Dst:    IPv4Int(BigEndian.Uint32(net.ParseIP("1.1.1.1").To4())),
+		MacSrc: 0xf1e20101,
+		MacDst: 0xf1e20112,
+		Id:     100,
+		Type:   TUNNEL_TYPE_ERSPAN_OR_TEB,
+		Tier:   1,
 	}
 
 	packets, _ := loadPcap("decapsulate_test.pcap")
@@ -107,11 +111,13 @@ func TestDecapsulateErspanII(t *testing.T) {
 func TestDecapsulateIII(t *testing.T) {
 	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_ERSPAN_OR_TEB)
 	expected := &TunnelInfo{
-		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("172.16.1.103").To4())),
-		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.30.101.132").To4())),
-		Id:   0,
-		Type: TUNNEL_TYPE_ERSPAN_OR_TEB,
-		Tier: 1,
+		Src:    IPv4Int(BigEndian.Uint32(net.ParseIP("172.16.1.103").To4())),
+		Dst:    IPv4Int(BigEndian.Uint32(net.ParseIP("10.30.101.132").To4())),
+		MacSrc: 0x60d19449,
+		MacDst: 0x3ee959f5,
+		Id:     0,
+		Type:   TUNNEL_TYPE_ERSPAN_OR_TEB,
+		Tier:   1,
 	}
 
 	packets, _ := loadPcap("decapsulate_test.pcap")
@@ -130,11 +136,13 @@ func TestDecapsulateIII(t *testing.T) {
 func TestDecapsulateVxlan(t *testing.T) {
 	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_VXLAN)
 	expected := &TunnelInfo{
-		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("172.16.1.103").To4())),
-		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("172.20.1.171").To4())),
-		Id:   123,
-		Type: TUNNEL_TYPE_VXLAN,
-		Tier: 1,
+		Src:    IPv4Int(BigEndian.Uint32(net.ParseIP("172.16.1.103").To4())),
+		Dst:    IPv4Int(BigEndian.Uint32(net.ParseIP("172.20.1.171").To4())),
+		MacSrc: 0xafda7679,
+		MacDst: 0x3ddd88c3,
+		Id:     123,
+		Type:   TUNNEL_TYPE_VXLAN,
+		Tier:   1,
 	}
 
 	packets, _ := loadPcap("decapsulate_test.pcap")
@@ -153,11 +161,13 @@ func TestDecapsulateVxlan(t *testing.T) {
 func TestDecapsulateTencentGre(t *testing.T) {
 	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_TENCENT_GRE)
 	expected := &TunnelInfo{
-		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.19.0.21").To4())),
-		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.21.64.5").To4())),
-		Id:   0x10285,
-		Type: TUNNEL_TYPE_TENCENT_GRE,
-		Tier: 1,
+		Src:    IPv4Int(BigEndian.Uint32(net.ParseIP("10.19.0.21").To4())),
+		Dst:    IPv4Int(BigEndian.Uint32(net.ParseIP("10.21.64.5").To4())),
+		MacSrc: 0xbffac801,
+		MacDst: 0x06246b71,
+		Id:     0x10285,
+		Type:   TUNNEL_TYPE_TENCENT_GRE,
+		Tier:   1,
 	}
 	expectedOverlay := []byte{
 		0x00, 0x00, 0x00, 0x00, 0x02, 0x85,
@@ -185,11 +195,13 @@ func TestDecapsulateTencentGre(t *testing.T) {
 func TestDecapsulateTeb(t *testing.T) {
 	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_ERSPAN_OR_TEB)
 	expected := &TunnelInfo{
-		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.25.6.6").To4())),
-		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.25.59.67").To4())),
-		Id:   0x2000000,
-		Type: TUNNEL_TYPE_ERSPAN_OR_TEB,
-		Tier: 1,
+		Src:    IPv4Int(BigEndian.Uint32(net.ParseIP("10.25.6.6").To4())),
+		Dst:    IPv4Int(BigEndian.Uint32(net.ParseIP("10.25.59.67").To4())),
+		MacSrc: 0x3503bca8,
+		MacDst: 0x56aefcc6,
+		Id:     0x2000000,
+		Type:   TUNNEL_TYPE_ERSPAN_OR_TEB,
+		Tier:   1,
 	}
 
 	packets, _ := loadPcap("vmware-gre-teb.pcap")
@@ -210,6 +222,8 @@ func TestDecapsulateIp6Vxlan(t *testing.T) {
 	expected := &TunnelInfo{
 		Src:    IPv4Int(BigEndian.Uint32(net.ParseIP("0.0.2.63").To4())),
 		Dst:    IPv4Int(BigEndian.Uint32(net.ParseIP("0.0.2.61").To4())),
+		MacSrc: 0x3e7eda7d,
+		MacDst: 0x3ebb1665,
 		Id:     27,
 		Type:   TUNNEL_TYPE_VXLAN,
 		Tier:   1,
@@ -232,10 +246,12 @@ func TestDecapsulateIp6Vxlan(t *testing.T) {
 func TestDecapsulateIpIp(t *testing.T) {
 	bitmap := NewTunnelTypeBitmap(TUNNEL_TYPE_IPIP)
 	expected := &TunnelInfo{
-		Src:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.162.42.93").To4())),
-		Dst:  IPv4Int(BigEndian.Uint32(net.ParseIP("10.162.33.164").To4())),
-		Type: TUNNEL_TYPE_IPIP,
-		Tier: 1,
+		Src:    IPv4Int(BigEndian.Uint32(net.ParseIP("10.162.42.93").To4())),
+		Dst:    IPv4Int(BigEndian.Uint32(net.ParseIP("10.162.33.164").To4())),
+		MacSrc: 0x027dc643,
+		MacDst: 0x0027e67d,
+		Type:   TUNNEL_TYPE_IPIP,
+		Tier:   1,
 	}
 	packets, _ := loadPcap("ipip.pcap")
 	packet := packets[0]
