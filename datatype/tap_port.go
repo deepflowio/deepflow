@@ -7,10 +7,11 @@ import (
 )
 
 const (
-	TAPPORT_FROM_MAC = iota
-	TAPPORT_FROM_IPV4
-	TAPPORT_FROM_IPV6
-	TAPPORT_FROM_ID // 专属类型采集器时使用dispatcher id
+	TAPPORT_FROM_LOCAL_MAC   = iota
+	TAPPORT_FROM_GATEWAY_MAC // 专有云NFV网关镜像流量
+	TAPPORT_FROM_TUNNEL_IPV4 // 交换机ERSPAN镜像流量
+	TAPPORT_FROM_TUNNEL_IPV6 // 交换机ERSPAN镜像流量
+	TAPPORT_FROM_ID          // 其他镜像流量（dispatcher id）
 	TAPPORT_FROM_NETFLOW
 	TAPPORT_FROM_SFLOW
 )
@@ -25,8 +26,8 @@ const (
 // +------+-------------------------------------+
 type TapPort uint64
 
-func FromMAC(mac uint32) TapPort {
-	return TapPort(mac) | TAPPORT_FROM_MAC<<_FROM_OFFSET
+func FromLocalMAC(mac uint32) TapPort {
+	return TapPort(mac) | TAPPORT_FROM_LOCAL_MAC<<_FROM_OFFSET
 }
 
 func FromNetFlow(mac uint32) TapPort {
@@ -37,12 +38,16 @@ func FromSFlow(mac uint32) TapPort {
 	return TapPort(mac) | TAPPORT_FROM_SFLOW<<_FROM_OFFSET
 }
 
-func FromIP(ip uint32, isIPv6 bool) TapPort {
+func FromGatewayMAC(mac uint32) TapPort {
+	return TapPort(mac) | TAPPORT_FROM_GATEWAY_MAC<<_FROM_OFFSET
+}
+
+func FromTunnelIP(ip uint32, isIPv6 bool) TapPort {
 	tapPort := TapPort(ip)
 	if !isIPv6 {
-		tapPort |= TAPPORT_FROM_IPV4 << _FROM_OFFSET
+		tapPort |= TAPPORT_FROM_TUNNEL_IPV4 << _FROM_OFFSET
 	} else {
-		tapPort |= TAPPORT_FROM_IPV6 << _FROM_OFFSET
+		tapPort |= TAPPORT_FROM_TUNNEL_IPV6 << _FROM_OFFSET
 	}
 	return tapPort
 }
@@ -58,12 +63,15 @@ func (p TapPort) SplitToPortAndType() (uint32, uint8) {
 func (p TapPort) String() string {
 	tapPort, tapPortType := p.SplitToPortAndType()
 	switch tapPortType {
-	case TAPPORT_FROM_MAC:
-		return fmt.Sprintf("MAC@%02x:%02x:%02x:%02x",
+	case TAPPORT_FROM_LOCAL_MAC:
+		return fmt.Sprintf("LMAC@%02x:%02x:%02x:%02x",
 			uint8(tapPort>>24), uint8(tapPort>>16), uint8(tapPort>>8), uint8(tapPort))
-	case TAPPORT_FROM_IPV4:
+	case TAPPORT_FROM_GATEWAY_MAC:
+		return fmt.Sprintf("GMAC@%02x:%02x:%02x:%02x",
+			uint8(tapPort>>24), uint8(tapPort>>16), uint8(tapPort>>8), uint8(tapPort))
+	case TAPPORT_FROM_TUNNEL_IPV4:
 		return fmt.Sprintf("IPv4@%s", utils.IpFromUint32(tapPort))
-	case TAPPORT_FROM_IPV6:
+	case TAPPORT_FROM_TUNNEL_IPV6:
 		return fmt.Sprintf("IPv6@0x%08x", tapPort)
 	case TAPPORT_FROM_ID:
 		return fmt.Sprintf("ID@%d", tapPort)

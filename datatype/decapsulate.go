@@ -98,6 +98,8 @@ func (b TunnelTypeBitmap) String() string {
 type TunnelInfo struct {
 	Src    IPv4Int
 	Dst    IPv4Int
+	MacSrc uint32 // lowest 4B
+	MacDst uint32 // lowest 4B
 	Id     uint32
 	Type   TunnelType
 	Tier   uint8
@@ -105,7 +107,9 @@ type TunnelInfo struct {
 }
 
 func (t *TunnelInfo) String() string {
-	return fmt.Sprintf("type: %s, src: %s, dst: %s, id: %d, tier: %d", t.Type, IpFromUint32(t.Src), IpFromUint32(t.Dst), t.Id, t.Tier)
+	return fmt.Sprintf(
+		"type: %s, src: %s %08x, dst: %s %08x, id: %d, tier: %d",
+		t.Type, IpFromUint32(t.Src), t.MacSrc, IpFromUint32(t.Dst), t.MacDst, t.Id, t.Tier)
 }
 
 func (t *TunnelInfo) DecapsulateVxlan(packet []byte, l2Len int) int {
@@ -127,6 +131,8 @@ func (t *TunnelInfo) DecapsulateVxlan(packet []byte, l2Len int) int {
 	if t.Tier == 0 {
 		t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
 		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
+		t.MacSrc = BigEndian.Uint32(packet[OFFSET_SA_LOW4B:])
+		t.MacDst = BigEndian.Uint32(packet[OFFSET_DA_LOW4B:])
 		t.Type = TUNNEL_TYPE_VXLAN
 		t.Id = BigEndian.Uint32(l3Packet[OFFSET_VXLAN_VNI-ETH_HEADER_SIZE:]) >> 8
 	} else {
@@ -152,7 +158,8 @@ func (t *TunnelInfo) calcGreOptionSize(flags uint16) int {
 	return size
 }
 
-func (t *TunnelInfo) DecapsulateErspan(l3Packet []byte, flags, greProtocolType uint16, ipHeaderSize int) int {
+func (t *TunnelInfo) DecapsulateErspan(packet []byte, l2Len int, flags, greProtocolType uint16, ipHeaderSize int) int {
+	l3Packet := packet[l2Len:]
 	switch greProtocolType {
 	case LE_ERSPAN_PROTO_TYPE_II:
 		if flags == 0 { // ERSPAN I
@@ -160,6 +167,8 @@ func (t *TunnelInfo) DecapsulateErspan(l3Packet []byte, flags, greProtocolType u
 			if t.Tier == 0 {
 				t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
 				t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
+				t.MacSrc = BigEndian.Uint32(packet[OFFSET_SA_LOW4B:])
+				t.MacDst = BigEndian.Uint32(packet[OFFSET_DA_LOW4B:])
 				t.Type = TUNNEL_TYPE_ERSPAN_OR_TEB
 			} else {
 				t.Type = (t.Type << TUNNEL_TYPE_TIER2_SHIFT) | TUNNEL_TYPE_ERSPAN_OR_TEB
@@ -172,6 +181,8 @@ func (t *TunnelInfo) DecapsulateErspan(l3Packet []byte, flags, greProtocolType u
 			if t.Tier == 0 {
 				t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
 				t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
+				t.MacSrc = BigEndian.Uint32(packet[OFFSET_SA_LOW4B:])
+				t.MacDst = BigEndian.Uint32(packet[OFFSET_DA_LOW4B:])
 				t.Type = TUNNEL_TYPE_ERSPAN_OR_TEB
 				t.Id = BigEndian.Uint32(l3Packet[ipHeaderSize+greHeaderSize+ERSPAN_ID_OFFSET:]) & 0x3ff
 			} else {
@@ -186,6 +197,8 @@ func (t *TunnelInfo) DecapsulateErspan(l3Packet []byte, flags, greProtocolType u
 		if t.Tier == 0 {
 			t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
 			t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
+			t.MacSrc = BigEndian.Uint32(packet[OFFSET_SA_LOW4B:])
+			t.MacDst = BigEndian.Uint32(packet[OFFSET_DA_LOW4B:])
 			t.Type = TUNNEL_TYPE_ERSPAN_OR_TEB
 			t.Id = BigEndian.Uint32(l3Packet[ipHeaderSize+greHeaderSize+ERSPAN_ID_OFFSET:]) & 0x3ff
 		} else {
@@ -208,7 +221,7 @@ func IsGrePseudoInnerMac(mac uint64) bool {
 	return mac>>16 == 0
 }
 
-func (t *TunnelInfo) DecapsulateTencentGre(l3Packet []byte, flags, greProtocolType uint16, ipHeaderSize int) int {
+func (t *TunnelInfo) DecapsulateTencentGre(packet []byte, l2Len int, flags, greProtocolType uint16, ipHeaderSize int) int {
 	if flags&GRE_FLAGS_VER_MASK != 1 || flags&GRE_FLAGS_KEY_MASK == 0 { // 未知的GRE
 		return 0
 	}
@@ -217,10 +230,13 @@ func (t *TunnelInfo) DecapsulateTencentGre(l3Packet []byte, flags, greProtocolTy
 	if flags&GRE_FLAGS_CSUM_MASK != 0 {
 		greKeyOffset += GRE_CSUM_LEN
 	}
+	l3Packet := packet[l2Len:]
 	// 仅保存最外层的隧道信息
 	if t.Tier == 0 {
 		t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
 		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
+		t.MacSrc = BigEndian.Uint32(packet[OFFSET_SA_LOW4B:])
+		t.MacDst = BigEndian.Uint32(packet[OFFSET_DA_LOW4B:])
 		t.Type = TUNNEL_TYPE_TENCENT_GRE
 		t.Id = BigEndian.Uint32(l3Packet[ipHeaderSize+greKeyOffset:])
 	} else {
@@ -254,7 +270,7 @@ func (t *TunnelInfo) DecapsulateTencentGre(l3Packet []byte, flags, greProtocolTy
 	return overlayOffset
 }
 
-func (t *TunnelInfo) DecapsulateTeb(l3Packet []byte, flags, greProtocolType uint16, ipHeaderSize int) int {
+func (t *TunnelInfo) DecapsulateTeb(packet []byte, l2Len int, flags, greProtocolType uint16, ipHeaderSize int) int {
 	if flags&GRE_FLAGS_VER_MASK != 0 || flags&GRE_FLAGS_KEY_MASK == 0 { // 未知的GRE
 		return 0
 	}
@@ -263,10 +279,13 @@ func (t *TunnelInfo) DecapsulateTeb(l3Packet []byte, flags, greProtocolType uint
 	if flags&GRE_FLAGS_CSUM_MASK != 0 {
 		greKeyOffset += GRE_CSUM_LEN
 	}
+	l3Packet := packet[l2Len:]
 	// 仅保存最外层的隧道信息
 	if t.Tier == 0 {
 		t.Src = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:]))
 		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:]))
+		t.MacSrc = BigEndian.Uint32(packet[OFFSET_SA_LOW4B:])
+		t.MacDst = BigEndian.Uint32(packet[OFFSET_DA_LOW4B:])
 		t.Type = TUNNEL_TYPE_ERSPAN_OR_TEB // TEB不保存TUNNEL信息，在这里标注为ERSPAN
 		t.Id = BigEndian.Uint32(l3Packet[ipHeaderSize+greKeyOffset:])
 	} else {
@@ -277,19 +296,20 @@ func (t *TunnelInfo) DecapsulateTeb(l3Packet []byte, flags, greProtocolType uint
 	return greHeaderSize + ipHeaderSize
 }
 
-func (t *TunnelInfo) DecapsulateGre(l3Packet []byte, tunnelTypeBitmap TunnelTypeBitmap) int {
+func (t *TunnelInfo) DecapsulateGre(packet []byte, l2Len int, tunnelTypeBitmap TunnelTypeBitmap) int {
+	l3Packet := packet[l2Len:]
 	ipHeaderSize := int((l3Packet[IP_IHL_OFFSET] & 0xf) << 2)
 	flags := BigEndian.Uint16(l3Packet[ipHeaderSize+GRE_FLAGS_OFFSET:])
 	greProtocolType := *(*uint16)(unsafe.Pointer(&l3Packet[ipHeaderSize+GRE_PROTOCOL_OFFSET]))
 	if tunnelTypeBitmap.Has(TUNNEL_TYPE_ERSPAN_OR_TEB) &&
 		(greProtocolType == LE_ERSPAN_PROTO_TYPE_II || greProtocolType == LE_ERSPAN_PROTO_TYPE_III) { // ERSPAN
-		return t.DecapsulateErspan(l3Packet, flags, greProtocolType, ipHeaderSize)
+		return t.DecapsulateErspan(packet, l2Len, flags, greProtocolType, ipHeaderSize)
 	} else if tunnelTypeBitmap.Has(TUNNEL_TYPE_TENCENT_GRE) &&
 		(greProtocolType == LE_IPV4_PROTO_TYPE_I || greProtocolType == LE_IPV6_PROTO_TYPE_I) {
-		return t.DecapsulateTencentGre(l3Packet, flags, greProtocolType, ipHeaderSize)
+		return t.DecapsulateTencentGre(packet, l2Len, flags, greProtocolType, ipHeaderSize)
 	} else if tunnelTypeBitmap.Has(TUNNEL_TYPE_ERSPAN_OR_TEB) &&
 		greProtocolType == LE_TEB_PROTO {
-		return t.DecapsulateTeb(l3Packet, flags, greProtocolType, ipHeaderSize)
+		return t.DecapsulateTeb(packet, l2Len, flags, greProtocolType, ipHeaderSize)
 	}
 	return 0
 }
@@ -314,7 +334,7 @@ func (t *TunnelInfo) Decapsulate(packet []byte, l2Len int, tunnelTypeBitmap Tunn
 			offset = t.DecapsulateVxlan(packet, l2Len)
 		}
 	} else if protocol == IPProtocolGRE {
-		offset = t.DecapsulateGre(l3Packet, tunnelTypeBitmap)
+		offset = t.DecapsulateGre(packet, l2Len, tunnelTypeBitmap)
 	} else if protocol == IPProtocolIPv4 {
 		if tunnelTypeBitmap.Has(TUNNEL_TYPE_IPIP) {
 			offset = t.DecapsulateIPIP(packet, l2Len, false, false)
@@ -347,6 +367,8 @@ func (t *TunnelInfo) Decapsulate6Vxlan(packet []byte, l2Len int) int {
 	if t.Tier == 0 {
 		t.Src = IPv4Int(BigEndian.Uint32(l3Packet[IP6_SIP_OFFSET:]))
 		t.Dst = IPv4Int(BigEndian.Uint32(l3Packet[IP6_DIP_OFFSET:]))
+		t.MacSrc = BigEndian.Uint32(packet[OFFSET_SA_LOW4B:])
+		t.MacDst = BigEndian.Uint32(packet[OFFSET_DA_LOW4B:])
 		t.Type = TUNNEL_TYPE_VXLAN
 		t.Id = BigEndian.Uint32(l3Packet[IP6_HEADER_SIZE+UDP_HEADER_SIZE+VXLAN_VNI_OFFSET:]) >> 8
 		t.IsIPv6 = true
@@ -407,10 +429,14 @@ func (t *TunnelInfo) DecapsulateIPIP(packet []byte, l2Len int, underlayIpv6, ove
 		if underlayIpv6 {
 			t.Src = BigEndian.Uint32(l3Packet[IP6_SIP_OFFSET:])
 			t.Dst = BigEndian.Uint32(l3Packet[IP6_DIP_OFFSET:])
+			t.MacSrc = BigEndian.Uint32(packet[OFFSET_SA_LOW4B:])
+			t.MacDst = BigEndian.Uint32(packet[OFFSET_DA_LOW4B:])
 			t.IsIPv6 = true
 		} else {
 			t.Src = BigEndian.Uint32(l3Packet[OFFSET_SIP-ETH_HEADER_SIZE:])
 			t.Dst = BigEndian.Uint32(l3Packet[OFFSET_DIP-ETH_HEADER_SIZE:])
+			t.MacSrc = BigEndian.Uint32(packet[OFFSET_SA_LOW4B:])
+			t.MacDst = BigEndian.Uint32(packet[OFFSET_DA_LOW4B:])
 		}
 		t.Type = TUNNEL_TYPE_IPIP
 		t.Id = 0
