@@ -88,6 +88,10 @@ type NetworkLayer struct {
 	TunnelRxIP60 net.IP `json:"tunnel_rx_ip6_0,omitempty"`
 	TunnelRxIP61 net.IP `json:"tunnel_rx_ip6_1,omitempty"`
 	TunnelIsIPv4 bool   `json:"tunnel_is_ipv4"`
+	TunnelTxMac0 uint32 `json:"tunnel_tx_mac_0,omitempty"`
+	TunnelTxMac1 uint32 `json:"tunnel_tx_mac_1,omitempty"`
+	TunnelRxMac0 uint32 `json:"tunnel_rx_mac_0,omitempty"`
+	TunnelRxMac1 uint32 `json:"tunnel_rx_mac_1,omitempty"`
 }
 
 var NetworkLayerColumns = []*ckdb.Column{
@@ -110,6 +114,10 @@ var NetworkLayerColumns = []*ckdb.Column{
 	ckdb.NewColumn("tunnel_rx_ip6_0", ckdb.IPv6),
 	ckdb.NewColumn("tunnel_rx_ip6_1", ckdb.IPv6),
 	ckdb.NewColumn("tunnel_is_ipv4", ckdb.UInt8).SetIndex(ckdb.IndexMinmax),
+	ckdb.NewColumn("tunnel_tx_mac_0", ckdb.UInt32),
+	ckdb.NewColumn("tunnel_tx_mac_1", ckdb.UInt32),
+	ckdb.NewColumn("tunnel_rx_mac_0", ckdb.UInt32),
+	ckdb.NewColumn("tunnel_rx_mac_1", ckdb.UInt32),
 }
 
 func (n *NetworkLayer) WriteBlock(block *ckdb.Block) error {
@@ -188,6 +196,18 @@ func (n *NetworkLayer) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteBool(n.TunnelIsIPv4); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(n.TunnelTxMac0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(n.TunnelTxMac1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(n.TunnelRxMac0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(n.TunnelRxMac1); err != nil {
 		return err
 	}
 
@@ -807,6 +827,10 @@ func (n *NetworkLayer) Fill(f *pb.Flow, isIPV6 bool) {
 		n.TunnelRxIP40 = f.Tunnel.RxIP0
 		n.TunnelRxIP41 = f.Tunnel.RxIP1
 		n.TunnelIsIPv4 = true
+		n.TunnelTxMac0 = f.Tunnel.TxMAC0
+		n.TunnelTxMac1 = f.Tunnel.TxMAC1
+		n.TunnelRxMac0 = f.Tunnel.RxMAC0
+		n.TunnelRxMac1 = f.Tunnel.RxMAC1
 	}
 }
 
