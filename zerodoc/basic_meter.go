@@ -799,7 +799,7 @@ func AnomalyColumns() []*ckdb.Column {
 		[][2]string{
 			ANOMALY_L7_CLIENT_ERROR: {"l7_client_error", "应用客户端异常次数"},
 			ANOMALY_L7_SERVER_ERROR: {"l7_server_error", "应用服务端异常次数"},
-			ANOMALY_L7_TIMEOUT:      {"l7_time_out", "应用请求超时次数"},
+			ANOMALY_L7_TIMEOUT:      {"l7_timeout", "应用请求超时次数"},
 			ANOMALY_L7_ERROR:        {"l7_error", "应用异常次数"},
 		}, ckdb.UInt32)
 
