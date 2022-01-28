@@ -21,7 +21,7 @@ func TestTaggedFlowEncodeDecode(t *testing.T) {
 	FlowKey := FlowKey{
 		VtapId:  200,
 		TapType: 3,
-		TapPort: FromMAC(201),
+		TapPort: FromLocalMAC(201),
 		MACSrc:  20000000002,
 		MACDst:  20000000003,
 

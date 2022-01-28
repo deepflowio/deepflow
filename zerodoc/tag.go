@@ -137,7 +137,7 @@ func (d DirectionEnum) IsServerToClient() bool {
 }
 
 func (d DirectionEnum) IsGateway() bool {
-	return SideType(d&_SIDE_TYPE_MASK) == GatewaySide
+	return SideType(d&_SIDE_TYPE_MASK)&(GatewaySide|GatewayHypervisorSide) != 0
 }
 
 type TAPSideEnum uint8
