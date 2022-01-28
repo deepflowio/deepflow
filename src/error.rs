@@ -24,6 +24,8 @@ pub enum Error {
     Windows(String),
     #[error("Kubernetes ApiWatcher error: {0}")]
     KubernetesApiWatcher(String),
+    #[error("system: {0}")]
+    SysMonitor(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
