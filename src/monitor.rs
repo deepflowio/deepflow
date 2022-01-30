@@ -17,7 +17,7 @@ use crate::{
     error::{Error, Result},
     utils::{
         net::link_list,
-        stats::{Collector, Countable, Counter, CounterValue, StatsOption},
+        stats::{Collector, Countable, Counter, CounterType, CounterValue, StatsOption},
     },
 };
 
@@ -66,26 +66,32 @@ impl Countable for LinkStatusBroker {
         let mut old_guard = self.old.lock().unwrap();
         metrics.push((
             "rx",
+            CounterType::Counted,
             CounterValue::Unsigned(new_guard.rx.overflowing_sub(old_guard.rx).0),
         ));
         metrics.push((
             "tx",
+            CounterType::Counted,
             CounterValue::Unsigned(new_guard.tx.overflowing_sub(old_guard.tx).0),
         ));
         metrics.push((
             "tx_bytes",
+            CounterType::Counted,
             CounterValue::Unsigned(new_guard.tx_bytes.overflowing_sub(old_guard.tx_bytes).0),
         ));
         metrics.push((
             "rx_bytes",
+            CounterType::Counted,
             CounterValue::Unsigned(new_guard.rx_bytes.overflowing_sub(old_guard.rx_bytes).0),
         ));
         metrics.push((
             "drop_in",
+            CounterType::Counted,
             CounterValue::Unsigned(new_guard.drop_in.overflowing_sub(old_guard.drop_in).0),
         ));
         metrics.push((
             "drop_out",
+            CounterType::Counted,
             CounterValue::Unsigned(new_guard.drop_out.overflowing_sub(old_guard.drop_out).0),
         ));
 
@@ -167,10 +173,19 @@ impl Countable for SysStatusBroker {
                 let mem_used = process.memory() << 10;
 
                 let mut metrics = vec![];
-                metrics.push(("cpu_percent", CounterValue::Float(cpu_usage)));
-                metrics.push(("memory", CounterValue::Unsigned(mem_used)));
+                metrics.push((
+                    "cpu_percent",
+                    CounterType::Gauged,
+                    CounterValue::Float(cpu_usage),
+                ));
+                metrics.push((
+                    "memory",
+                    CounterType::Gauged,
+                    CounterValue::Unsigned(mem_used),
+                ));
                 metrics.push((
                     "create_time",
+                    CounterType::Gauged,
                     CounterValue::Unsigned(self.create_time.as_millis() as u64),
                 ));
                 metrics
