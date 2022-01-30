@@ -50,9 +50,14 @@ windows = {version = "0.30", features = ["Win32_Foundation", "Win32_System_Diagn
 
 
 [dev-dependencies]
+criterion = "0.3.5"
 tempfile = "3.2.0"
 
 [build-dependencies]
 tonic-build = "0.5.2"
 
 [features]
+
+[[bench]]
+name = "queue"
+harness = false
