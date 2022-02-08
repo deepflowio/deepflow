@@ -15,24 +15,16 @@ var log = logging.MustGetLogger("roze.msg")
 
 const (
 	INVALID_INDEX = iota
-	VTAP_FLOW
 	VTAP_FLOW_PORT
-	VTAP_FLOW_EDGE
 	VTAP_FLOW_EDGE_PORT
 
-	VTAP_FLOW_1S
 	VTAP_FLOW_PORT_1S
-	VTAP_FLOW_EDGE_1S
 	VTAP_FLOW_EDGE_PORT_1S
 
-	VTAP_APP
 	VTAP_APP_PORT
-	VTAP_APP_EDGE
 	VTAP_APP_EDGE_PORT
 
-	VTAP_APP_1S
 	VTAP_APP_PORT_1S
-	VTAP_APP_EDGE_1S
 	VTAP_APP_EDGE_PORT_1S
 
 	VTAP_ACL
@@ -113,20 +105,16 @@ func (rd *RozeDocument) DatabaseIndex() int {
 	index := INVALID_INDEX
 	switch rd.Document.Meter.ID() {
 	case zerodoc.FLOW_ID:
-		index = VTAP_FLOW
+		index = VTAP_FLOW_PORT
 		switch suffixID {
-		case zerodoc.SUFFIX_EDGE:
-			index = VTAP_FLOW_EDGE
 		case zerodoc.SUFFIX_PORT:
 			index = VTAP_FLOW_PORT
 		case zerodoc.SUFFIX_EDGE_PORT:
 			index = VTAP_FLOW_EDGE_PORT
 		}
 	case zerodoc.APP_ID:
-		index = VTAP_APP
+		index = VTAP_APP_PORT
 		switch suffixID {
-		case zerodoc.SUFFIX_EDGE:
-			index = VTAP_APP_EDGE
 		case zerodoc.SUFFIX_PORT:
 			index = VTAP_APP_PORT
 		case zerodoc.SUFFIX_EDGE_PORT:
@@ -135,7 +123,7 @@ func (rd *RozeDocument) DatabaseIndex() int {
 	}
 
 	if index != INVALID_INDEX && rd.Document.Flags&app.FLAG_PER_SECOND_METRICS != 0 {
-		return index + (VTAP_FLOW_1S - VTAP_FLOW)
+		return index + (VTAP_FLOW_PORT_1S - VTAP_FLOW_PORT)
 	}
 	return index
 }

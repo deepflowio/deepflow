@@ -30,11 +30,11 @@ func NewDbWriter(primaryAddr, secondaryAddr, user, password string, replicaEnabl
 	tables := zerodoc.GetMetricsTables(engine, common.CK_VERSION)
 	for _, table := range tables {
 		counterName := "metrics_1m"
-		if table.ID >= uint8(zerodoc.VTAP_FLOW_1S) && table.ID <= uint8(zerodoc.VTAP_FLOW_EDGE_PORT_1S) {
+		if table.ID >= uint8(zerodoc.VTAP_FLOW_PORT_1S) && table.ID <= uint8(zerodoc.VTAP_FLOW_EDGE_PORT_1S) {
 			counterName = "metrics_1s"
-		} else if table.ID >= uint8(zerodoc.VTAP_APP_1S) && table.ID <= uint8(zerodoc.VTAP_APP_EDGE_PORT_1S) {
+		} else if table.ID >= uint8(zerodoc.VTAP_APP_PORT_1S) && table.ID <= uint8(zerodoc.VTAP_APP_EDGE_PORT_1S) {
 			counterName = "app_1s"
-		} else if table.ID >= uint8(zerodoc.VTAP_APP) && table.ID <= uint8(zerodoc.VTAP_APP_EDGE_PORT) {
+		} else if table.ID >= uint8(zerodoc.VTAP_APP_PORT) && table.ID <= uint8(zerodoc.VTAP_APP_EDGE_PORT) {
 			counterName = "app_1m"
 		}
 		ckwriter, err := ckwriter.NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName, table, replicaEnabled,
