@@ -15,7 +15,6 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
 	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
 	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
 	"gitlab.yunshan.net/yunshan/droplet/roze/dbwriter"
 	"gitlab.yunshan.net/yunshan/droplet/roze/msg"
@@ -45,12 +44,8 @@ type Counter struct {
 	FutureDocCount  int64 `statsd:"future-doc-count"`
 	DropDocCount    int64 `statsd:"drop-doc-count"`
 
-	FlowCount           int64 `statsd:"vtap-flow"`
-	Flow1sCount         int64 `statsd:"vtap-flow-1s"`
 	FlowPortCount       int64 `statsd:"vtap-flow-port"`
 	FlowPort1sCount     int64 `statsd:"vtap-flow-port-1s"`
-	FlowEdgeCount       int64 `statsd:"vtap-flow-edge"`
-	FlowEdge1sCount     int64 `statsd:"vtap-flow-edge-1s"`
 	FlowEdgePortCount   int64 `statsd:"vtap-flow-edge-port"`
 	FlowEdgePort1sCount int64 `statsd:"vtap-flow-edge-port-1s"`
 	AclCount            int64 `statsd:"vtap-acl"`
@@ -122,12 +117,8 @@ func (u *Unmarshaller) GetCounter() interface{} {
 		counter.MinDelay = 0
 	}
 
-	counter.FlowCount, u.dbCounter[msg.VTAP_FLOW] = u.dbCounter[msg.VTAP_FLOW], 0
-	counter.Flow1sCount, u.dbCounter[msg.VTAP_FLOW_1S] = u.dbCounter[msg.VTAP_FLOW_1S], 0
 	counter.FlowPortCount, u.dbCounter[msg.VTAP_FLOW_PORT] = u.dbCounter[msg.VTAP_FLOW_PORT], 0
 	counter.FlowPort1sCount, u.dbCounter[msg.VTAP_FLOW_PORT_1S] = u.dbCounter[msg.VTAP_FLOW_PORT_1S], 0
-	counter.FlowEdgeCount, u.dbCounter[msg.VTAP_FLOW_EDGE] = u.dbCounter[msg.VTAP_FLOW_EDGE], 0
-	counter.FlowEdge1sCount, u.dbCounter[msg.VTAP_FLOW_EDGE_1S] = u.dbCounter[msg.VTAP_FLOW_EDGE_1S], 0
 	counter.FlowEdgePortCount, u.dbCounter[msg.VTAP_FLOW_EDGE_PORT] = u.dbCounter[msg.VTAP_FLOW_EDGE_PORT], 0
 	counter.FlowEdgePort1sCount, u.dbCounter[msg.VTAP_FLOW_EDGE_PORT_1S] = u.dbCounter[msg.VTAP_FLOW_EDGE_PORT_1S], 0
 	counter.AclCount, u.dbCounter[msg.VTAP_ACL] = u.dbCounter[msg.VTAP_ACL], 0
@@ -193,14 +184,6 @@ func decodeForDebug(b []byte) (BatchDocument, error) {
 		docs = append(docs, doc)
 	}
 	return BatchDocument(docs), nil
-}
-
-func GetDocHashValue(doc *app.Document, encoder *codec.SimpleEncoder) uint64 {
-	encoder.Reset()
-	tag := doc.Tagger.(*zerodoc.Tag)
-	// 分组时tid不同，code相同的doc需要分在一组
-	tag.EncodeByCodeTID(tag.Code, 0, encoder)
-	return utils.DJBHash(HASH_SEED, encoder.String())
 }
 
 func (u *Unmarshaller) QueueProcess() {
