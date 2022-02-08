@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
@@ -140,4 +141,19 @@ func (d *Document) WriteToPB(p *pb.Document) error {
 
 	p.Flags = uint32(d.Flags)
 	return nil
+}
+
+func (d *Document) WriteBlock(block *ckdb.Block) error {
+	if err := d.Tagger.(*zerodoc.Tag).WriteBlock(block, d.Timestamp); err != nil {
+		return err
+	}
+	if err := d.Meter.WriteBlock(block); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *Document) TableID() (uint8, error) {
+	tag, _ := d.Tagger.(*zerodoc.Tag)
+	return tag.TableID((d.Flags & FLAG_PER_SECOND_METRICS) == 1)
 }
