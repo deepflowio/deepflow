@@ -1,6 +1,7 @@
 package unmarshaller
 
 import (
+	"fmt"
 	"net"
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/app"
@@ -9,7 +10,6 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
 	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
 	"gitlab.yunshan.net/yunshan/droplet/common"
-	"gitlab.yunshan.net/yunshan/droplet/roze/msg"
 	"gitlab.yunshan.net/yunshan/message/trident"
 )
 
@@ -20,21 +20,14 @@ const (
 	PortAddCode = zerodoc.IsKeyService
 )
 
-func releaseRozeDocument(rd *msg.RozeDocument) {
-	rd.Document = nil
-	msg.ReleaseRozeDocument(rd)
-}
-
-func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable) *msg.RozeDocument {
-	rd := msg.AcquireRozeDocument()
-	rd.Document = doc
+func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) error {
 	t := doc.Tagger.(*zerodoc.Tag)
 	t.SetID("") // 由于需要修改Tag增删Field，清空ID避免字段脏
 
 	// vtap_acl 分钟级数据不用填充
 	if doc.Meter.ID() == zerodoc.ACL_ID &&
 		t.DatabaseSuffixID() == 1 { // 只有acl后缀
-		return rd
+		return nil
 	}
 
 	var info, info1 *grpc.Info
@@ -46,7 +39,7 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 		t.Code |= EdgeAddCode
 
 		if t.L3EpcID == datatype.EPC_FROM_INTERNET && t.L3EpcID1 == datatype.EPC_FROM_INTERNET {
-			return rd
+			return nil
 		}
 		// 当MAC/MAC1非0时，通过MAC来获取资源信息
 		if t.MAC != 0 && t.MAC1 != 0 {
@@ -155,16 +148,15 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 			}
 			if myRegionID != 0 && t.RegionID1 != 0 {
 				if t.TAPSide == zerodoc.Server && t.RegionID1 != myRegionID { // 对于双端 的统计值，需要去掉 tap_side 对应的一侧与自身region_id 不匹配的内容。
-					releaseRozeDocument(rd)
 					platformData.AddOtherRegion()
-					return nil
+					return fmt.Errorf("My regionID is %d, but document regionID1 is %d", myRegionID, t.RegionID1)
 				}
 			}
 		}
 	} else {
 		t.Code |= MainAddCode
 		if t.L3EpcID == datatype.EPC_FROM_INTERNET {
-			return rd
+			return nil
 		}
 
 		if t.MAC != 0 {
@@ -256,19 +248,17 @@ func DocToRozeDocuments(doc *app.Document, platformData *grpc.PlatformInfoTable)
 		if myRegionID != 0 && t.RegionID != 0 {
 			if t.Code&EdgeCode == EdgeCode { // 对于双端 的统计值，需要去掉 tap_side 对应的一侧与自身region_id 不匹配的内容。
 				if t.TAPSide == zerodoc.Client && t.RegionID != myRegionID {
-					releaseRozeDocument(rd)
 					platformData.AddOtherRegion()
-					return nil
+					return fmt.Errorf("My regionID is %d, but document regionID is %d", myRegionID, t.RegionID)
 				}
 			} else { // 对于单端的统计值，需要去掉与自身region_id不匹配的内容
 				if t.RegionID != myRegionID {
-					releaseRozeDocument(rd)
 					platformData.AddOtherRegion()
-					return nil
+					return fmt.Errorf("My regionID is %d, but document regionID is %d", myRegionID, t.RegionID)
 				}
 			}
 		}
 	}
 
-	return rd
+	return nil
 }

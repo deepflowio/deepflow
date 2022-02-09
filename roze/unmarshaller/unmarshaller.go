@@ -7,6 +7,7 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/app"
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
@@ -17,7 +18,6 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
 	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
 	"gitlab.yunshan.net/yunshan/droplet/roze/dbwriter"
-	"gitlab.yunshan.net/yunshan/droplet/roze/msg"
 )
 
 var log = logging.MustGetLogger("roze.unmarshaller")
@@ -60,7 +60,7 @@ type Unmarshaller struct {
 	dbwriter           *dbwriter.DbWriter
 	queueBatchCache    QueueCache
 	counter            *Counter
-	dbCounter          [msg.MAX_INDEX]int64
+	dbCounter          [zerodoc.VTAP_DB_ID_MAX + 1]int64
 	utils.Closable
 }
 
@@ -117,19 +117,19 @@ func (u *Unmarshaller) GetCounter() interface{} {
 		counter.MinDelay = 0
 	}
 
-	counter.FlowPortCount, u.dbCounter[msg.VTAP_FLOW_PORT] = u.dbCounter[msg.VTAP_FLOW_PORT], 0
-	counter.FlowPort1sCount, u.dbCounter[msg.VTAP_FLOW_PORT_1S] = u.dbCounter[msg.VTAP_FLOW_PORT_1S], 0
-	counter.FlowEdgePortCount, u.dbCounter[msg.VTAP_FLOW_EDGE_PORT] = u.dbCounter[msg.VTAP_FLOW_EDGE_PORT], 0
-	counter.FlowEdgePort1sCount, u.dbCounter[msg.VTAP_FLOW_EDGE_PORT_1S] = u.dbCounter[msg.VTAP_FLOW_EDGE_PORT_1S], 0
-	counter.AclCount, u.dbCounter[msg.VTAP_ACL] = u.dbCounter[msg.VTAP_ACL], 0
-	counter.OtherCount, u.dbCounter[msg.INVALID_INDEX] = u.dbCounter[msg.INVALID_INDEX], 0
+	counter.FlowPortCount, u.dbCounter[zerodoc.VTAP_FLOW_PORT] = u.dbCounter[zerodoc.VTAP_FLOW_PORT], 0
+	counter.FlowPort1sCount, u.dbCounter[zerodoc.VTAP_FLOW_PORT_1S] = u.dbCounter[zerodoc.VTAP_FLOW_PORT_1S], 0
+	counter.FlowEdgePortCount, u.dbCounter[zerodoc.VTAP_FLOW_EDGE_PORT] = u.dbCounter[zerodoc.VTAP_FLOW_EDGE_PORT], 0
+	counter.FlowEdgePort1sCount, u.dbCounter[zerodoc.VTAP_FLOW_EDGE_PORT_1S] = u.dbCounter[zerodoc.VTAP_FLOW_EDGE_PORT_1S], 0
+	counter.AclCount, u.dbCounter[zerodoc.VTAP_ACL] = u.dbCounter[zerodoc.VTAP_ACL], 0
+	counter.OtherCount, u.dbCounter[zerodoc.VTAP_DB_ID_MAX] = u.dbCounter[zerodoc.VTAP_DB_ID_MAX], 0
 
 	return counter
 }
 
-func (u *Unmarshaller) putStoreQueue(si *msg.RozeDocument) {
+func (u *Unmarshaller) putStoreQueue(doc *app.Document) {
 	queueCache := &u.queueBatchCache
-	queueCache.values = append(queueCache.values, si)
+	queueCache.values = append(queueCache.values, doc)
 
 	if len(queueCache.values) >= QUEUE_BATCH_SIZE {
 		u.dbwriter.Put(queueCache.values...)
@@ -215,16 +215,23 @@ func (u *Unmarshaller) QueueProcess() {
 						continue
 					}
 
-					rd := DocToRozeDocuments(doc, u.platformData)
-					if rd == nil {
+					if err := DocumentExpand(doc, u.platformData); err != nil {
+						log.Debug(err)
 						u.counter.DropDocCount++
 						app.ReleaseDocument(doc)
 						continue
 					}
-					DBIndex := rd.DatabaseIndex()
-					u.dbCounter[DBIndex]++
 
-					u.putStoreQueue(rd)
+					tableID, err := doc.TableID()
+					if err != nil {
+						log.Debug(err)
+						u.counter.DropDocCount++
+						app.ReleaseDocument(doc)
+						continue
+					}
+					u.dbCounter[tableID]++
+
+					u.putStoreQueue(doc)
 				}
 				receiver.ReleaseRecvBuffer(recvBytes)
 
