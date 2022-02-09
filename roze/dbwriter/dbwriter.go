@@ -2,13 +2,13 @@ package dbwriter
 
 import (
 	logging "github.com/op/go-logging"
+	"gitlab.yunshan.net/yunshan/droplet-libs/app"
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
 	"gitlab.yunshan.net/yunshan/droplet/common"
 	"gitlab.yunshan.net/yunshan/droplet/pkg/ckwriter"
 	"gitlab.yunshan.net/yunshan/droplet/roze/config"
-	"gitlab.yunshan.net/yunshan/droplet/roze/msg"
 )
 
 var log = logging.MustGetLogger("roze.dbwriter")
@@ -58,7 +58,7 @@ func (w *DbWriter) Put(items ...interface{}) error {
 		caches[i] = make([]interface{}, 0, CACHE_SIZE)
 	}
 	for _, item := range items {
-		doc, ok := item.(*msg.RozeDocument)
+		doc, ok := item.(*app.Document)
 		if !ok {
 			log.Warningf("receive wrong type data %v", item)
 			continue
