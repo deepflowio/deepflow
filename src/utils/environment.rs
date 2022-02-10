@@ -1,0 +1,163 @@
+use std::{net::IpAddr, path::Path, process::exit, thread, time::Duration};
+
+use bytesize::ByteSize;
+use log::{error, warn};
+use sysinfo::{DiskExt, System, SystemExt};
+
+use crate::common::TRIDENT_PROCESS_LIMIT;
+use crate::error::{Error, Result};
+
+use super::net::get_link_enabled_features;
+use super::process::{get_memory_rss, get_process_num_by_name};
+
+pub fn kernel_check() {
+    if cfg!(target_os = "windows") {
+        return;
+    }
+
+    use nix::sys::utsname::uname;
+    const RECOMMENDED_KERNEL_VERSION: &str = "4.19.17";
+    // kernel_version 形如 5.4.0-13格式
+    let sys_uname = uname();
+    if sys_uname
+        .release()
+        .trim()
+        .split_once('-') // `-` 后面数字是修改版本号的次数，可以用 `-` 分隔
+        .unwrap_or_default()
+        .0
+        .ne(RECOMMENDED_KERNEL_VERSION)
+    {
+        warn!(
+            "kernel version is not recommended({})",
+            RECOMMENDED_KERNEL_VERSION
+        );
+    }
+}
+
+pub fn tap_interface_check(tap_interfaces: &[String]) {
+    if cfg!(target_os = "windows") {
+        return;
+    }
+
+    if tap_interfaces.is_empty() {
+        return error!("static-config: tap-interfaces is none in analyzer-mode");
+    }
+
+    for name in tap_interfaces {
+        let features = match get_link_enabled_features(name) {
+            Ok(f) => f,
+            Err(e) => {
+                warn!("{}, please check rx-vlan-offload manually", e);
+                continue;
+            }
+        };
+        if features.contains("rx-vlan-hw-parse") {
+            warn!(
+                "NIC {} feature rx-vlan-offload is on, turn off if packet has vlan",
+                name
+            );
+        }
+    }
+}
+
+pub fn free_memory_check(required: u64) -> Result<()> {
+    get_memory_rss()
+        .map_err(|e| Error::Environment(e.to_string()))
+        .and_then(|memory_usage| {
+            if required < memory_usage {
+                return Ok(());
+            }
+
+            let still_need = required - memory_usage;
+            let mut system = System::new();
+            system.refresh_memory();
+
+            if still_need <= system.available_memory() * 1024 {
+                Ok(())
+            } else {
+                Err(Error::Environment(format!(
+                    "need {} more memory to run",
+                    ByteSize::b(still_need).to_string_as(true)
+                )))
+            }
+        })
+}
+
+pub fn free_space_check<P: AsRef<Path>>(path: P, required: u64) -> Result<()> {
+    let mut system = System::new();
+    system.refresh_disks_list();
+
+    let mut disk_free_usage = 0;
+    let mut path_size = 0;
+    for disk in system.disks() {
+        let disk_path = disk.mount_point();
+        if path.as_ref().starts_with(disk_path) {
+            let count = disk_path.iter().count();
+            if count > path_size {
+                path_size = count;
+                disk_free_usage = disk.available_space();
+            }
+        }
+    }
+
+    if path_size == 0 {
+        return Err(Error::Environment(format!(
+            "can't find path={} from disk list",
+            path.as_ref().display()
+        )));
+    }
+
+    if required > disk_free_usage {
+        return Err(Error::Environment(format!(
+            "insufficient free space at {}, at least {} required",
+            path.as_ref().display(),
+            ByteSize::b(required).to_string_as(true)
+        )));
+    }
+
+    Ok(())
+}
+
+pub fn controller_ip_check(ips: &[IpAddr]) {
+    if ips.iter().all(|ip| ip.is_ipv4()) {
+        return;
+    }
+
+    if ips.iter().all(|ip| ip.is_ipv6()) {
+        return;
+    }
+
+    error!(
+        "controller ip({:?}) is not support both IPv4 and IPv6, trident restart...",
+        ips
+    );
+
+    thread::sleep(Duration::from_secs(1));
+    exit(-1);
+}
+
+pub fn trident_process_check() {
+    let process_num = if cfg!(target_os = "windows") {
+        get_process_num_by_name("trident.exe")
+    } else {
+        get_process_num_by_name("trident")
+    };
+
+    match process_num {
+        Ok(num) => {
+            if num > TRIDENT_PROCESS_LIMIT {
+                error!(
+                    "the number of process exceeds the limit({} > {})",
+                    num, TRIDENT_PROCESS_LIMIT
+                );
+                thread::sleep(Duration::from_secs(1));
+                exit(-1);
+            }
+        }
+        Err(e) => {
+            warn!("{}", e);
+        }
+    }
+}
+
+//TODO Windows 相关
