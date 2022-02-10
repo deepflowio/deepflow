@@ -3,9 +3,14 @@ use std::{fmt, net::IpAddr, str::FromStr};
 use crate::error::Error;
 
 #[cfg(target_os = "linux")]
+mod ethtool;
+#[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "linux")]
+pub use ethtool::*;
+#[cfg(target_os = "linux")]
 pub use linux::*;
+
 #[cfg(target_os = "windows")]
 mod windows;
 #[cfg(target_os = "windows")]

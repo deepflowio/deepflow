@@ -26,6 +26,12 @@ pub enum Error {
     KubernetesApiWatcher(String),
     #[error("system: {0}")]
     SysMonitor(String),
+    #[error("environment error: {0}")]
+    Environment(String),
+    #[error("Nix Errno")]
+    Errno(#[from] nix::errno::Errno),
+    #[error("ethtool: {0}")]
+    Ethtool(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

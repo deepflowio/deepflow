@@ -1,4 +1,6 @@
 pub(crate) mod command;
+pub(crate) mod environment;
+pub(crate) mod guard;
 pub(crate) mod net;
 pub(crate) mod process;
 pub(crate) mod queue;

@@ -12,6 +12,7 @@ mod policy;
 mod tag;
 mod tagged_flow;
 mod tap_types;
+pub use consts::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct XflowKey {
@@ -34,7 +35,9 @@ impl fmt::Display for XflowKey {
 
 #[cfg(target_os = "linux")]
 mod consts {
-
+    pub const NORMAL_EXIT_WITH_RESTART: i32 = 3;
+    pub const TRIDENT_PROCESS_LIMIT: u32 = 10;
+    pub const TRIDENT_THREAD_LIMIT: u32 = 100;
     pub const DEFAULT_LOGFILE: &'static str = "/var/log/trident/trident.log";
     pub const DEFAULT_CONF_FILE: &'static str = "/etc/trident.yaml";
     pub const COREFILE_FORMAT: &'static str = "core";
@@ -44,6 +47,9 @@ mod consts {
 
 #[cfg(target_os = "windows")]
 mod consts {
+    pub const NORMAL_EXIT_WITH_RESTART: i32 = 3;
+    pub const TRIDENT_PROCESS_LIMIT: u32 = 10;
+    pub const TRIDENT_THREAD_LIMIT: u32 = 100;
     pub const DEFAULT_LOGFILE: &str = "C:\\DeepFlow\\trident\\log\\trident.log";
     // NOTE yaml must be full path, otherwise service wouldn't start as you wish.
     pub const DEFAULT_CONF_FILE: &str = "C:\\DeepFlow\\trident\\trident-windows.yaml";

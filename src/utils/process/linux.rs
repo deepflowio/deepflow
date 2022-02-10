@@ -14,6 +14,33 @@ use nix::sys::utsname::uname;
 const MIN_MAJOR_RELEASE: u8 = 2;
 const MIN_MINOR_RELEASE: u8 = 6;
 
+//返回当前进程占用内存RSS单位（字节）
+pub fn get_memory_rss() -> Result<u64> {
+    let pid = process::id();
+
+    let mut status = File::open(format!("/proc/{}/status", pid))?;
+    let mut buf = String::new();
+    status.read_to_string(&mut buf)?;
+
+    for line in buf.lines() {
+        if !line.starts_with("VmRSS") {
+            continue;
+        }
+        for field in line.trim().split_whitespace() {
+            // /proc/pid/status VmmRSS以KB为单位
+            if let Ok(n) = field.parse::<u64>() {
+                return Ok(n << 10);
+            }
+        }
+        break;
+    }
+
+    Err(Error::new(
+        ErrorKind::Other,
+        "run get_memory_rss function failed: can't find VmmRSS field or prase VmmRSS field failed",
+    ))
+}
+
 // 仅计算当前进程及其子进程，没有计算子进程的子进程等
 // /proc/<pid>/status目录中ppid为当前进程的pid
 pub fn get_process_num() -> Result<u32> {

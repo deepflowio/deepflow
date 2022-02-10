@@ -313,12 +313,11 @@ impl Monitor {
             return;
         }
         // tear down
-        {
-            let mut link_map_guard = self.link_map.lock().unwrap();
-            link_map_guard
-                .drain()
-                .for_each(|(_, broker)| broker.close());
-        }
+        self.link_map
+            .lock()
+            .unwrap()
+            .drain()
+            .for_each(|(_, broker)| broker.close());
         self.sys_monitor.close();
         info!("monitor stopped");
     }

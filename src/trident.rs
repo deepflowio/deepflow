@@ -10,6 +10,7 @@ use log::info;
 use crate::config::Config;
 use crate::monitor::Monitor;
 use crate::rpc::{Session, Synchronizer, DEFAULT_TIMEOUT};
+use crate::utils::guard::Guard;
 use crate::utils::{net, stats};
 
 pub struct Trident {

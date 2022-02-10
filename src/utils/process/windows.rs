@@ -2,12 +2,14 @@ use std::{mem::size_of, path::PathBuf, process};
 
 use log::debug;
 use windows::Win32::{
-    Foundation::{GetLastError, CHAR, HINSTANCE, INVALID_HANDLE_VALUE, PWSTR},
+    Foundation::{GetLastError, BOOL, CHAR, HINSTANCE, INVALID_HANDLE_VALUE, PWSTR},
     System::{
         Diagnostics::ToolHelp::{
             CreateToolhelp32Snapshot, Process32Next, PROCESSENTRY32, TH32CS_SNAPPROCESS,
         },
         LibraryLoader::GetModuleFileNameW,
+        ProcessStatus::{K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS},
+        Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ},
     },
 };
 
@@ -15,6 +17,37 @@ use crate::{
     error::{Error, Result},
     utils::WIN_ERROR_CODE_STR,
 };
+
+//返回当前进程占用内存RSS单位（字节）
+pub fn get_memory_rss() -> Result<u64> {
+    let pid = process::id();
+    let mut pmc = PROCESS_MEMORY_COUNTERS::default();
+
+    unsafe {
+        let handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, BOOL(0), pid);
+        if handle == INVALID_HANDLE_VALUE {
+            return Err(Error::Windows(format!(
+                "get process handle failed pid={}",
+                pid
+            )));
+        }
+
+        if K32GetProcessMemoryInfo(
+            handle,
+            &mut pmc,
+            size_of::<PROCESS_MEMORY_COUNTERS>() as u32,
+        )
+        .as_bool()
+        {
+            Ok(pmc.WorkingSetSize as u64)
+        } else {
+            Err(Error::Windows(format!(
+                "run K32GetProcessMemoryInfo function failed pid={}",
+                pid
+            )))
+        }
+    }
+}
 
 // 仅计算当前进程及其子进程，没有计算子进程的子进程
 pub fn get_process_num() -> Result<u32> {
