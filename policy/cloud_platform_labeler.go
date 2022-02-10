@@ -424,6 +424,7 @@ func (l *CloudPlatformLabeler) setEpcByTunnelCidr(ip net.IP, tunnelId uint32, en
 	// dvr slave自管网络的vni，和overlay ip对应的vni不一致，目前因为自管网络的EPC和overlay
 	// ip所在子网的EPC相同，所以这里通过vni查询失败后再通过EPC查询
 	for _, cidr := range cidrs {
+		// FIXME: 这里只需要找不重复的EpcID即可，现在的搜索办法会重复搜索有多个CIDR的Epc
 		if ok := l.setEpcByCidr(ip, cidr.EpcId, endpointInfo); ok {
 			return true
 		}
@@ -449,8 +450,13 @@ func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType Ta
 		if IsGrePseudoInnerMac(mac) {
 			// 腾讯TCE使用GRE封装场景下，此处拿到是伪造MAC，无法用于查询云平台信息，直接在此分支中返回即可
 			if endpointInfo.L3EpcId == 0 {
-				// step 2: 查询DEEPFLOW添加的WAN监控网段(cidr)
-				l.setEpcByCidr(ip, EPC_FROM_DEEPFLOW, endpointInfo)
+				// step 2: 查询平台数据WAN接口
+				if platformData := l.GetDataByIp(ip); platformData != nil {
+					endpointInfo.SetL3Data(platformData)
+				} else {
+					// step 3: 查询DEEPFLOW添加的WAN监控网段(cidr)
+					l.setEpcByCidr(ip, EPC_FROM_DEEPFLOW, endpointInfo)
+				}
 			}
 			return endpointInfo
 		} else {
