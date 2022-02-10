@@ -222,7 +222,8 @@ func IsGrePseudoInnerMac(mac uint64) bool {
 }
 
 func (t *TunnelInfo) DecapsulateTencentGre(packet []byte, l2Len int, flags, greProtocolType uint16, ipHeaderSize int) int {
-	if flags&GRE_FLAGS_VER_MASK != 1 || flags&GRE_FLAGS_KEY_MASK == 0 { // 未知的GRE
+	// TCE GRE：Version 0、Version 1两种
+	if flags&GRE_FLAGS_VER_MASK > 1 || flags&GRE_FLAGS_KEY_MASK == 0 { // 未知的GRE
 		return 0
 	}
 	greHeaderSize := GRE_HEADER_SIZE + t.calcGreOptionSize(flags)
