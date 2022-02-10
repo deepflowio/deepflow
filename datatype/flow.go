@@ -241,10 +241,10 @@ func (f *TunnelField) WriteToPB(p *pb.TunnelField) {
 
 func (t *TunnelField) String() string {
 	if t.Type == TUNNEL_TYPE_NONE {
-		return "none "
+		return "none"
 	}
-	return fmt.Sprintf("type: %s, tx_id: %d, rx_id: %d, tier: %d, is_ipv6: %v, tx_ip_0: %s %08x, tx_ip_1: %s %08x, rx_ip_0: %s %08x, rx_ip_1: %s %08x ",
-		t.Type, t.TxId, t.RxId, t.Tier, t.IsIPv6,
+	return fmt.Sprintf("%s, tx_id: %d, rx_id: %d, tier: %d, tx_0: %s %08x, tx_1: %s %08x, rx_0: %s %08x, rx_1: %s %08x",
+		t.Type, t.TxId, t.RxId, t.Tier,
 		IpFromUint32(t.TxIP0), t.TxMAC0, IpFromUint32(t.TxIP1), t.TxMAC1,
 		IpFromUint32(t.RxIP0), t.RxMAC0, IpFromUint32(t.RxIP1), t.RxMAC1)
 }
@@ -290,7 +290,7 @@ func (t FlowSource) String() string {
 	case FLOW_SOURCE_NETFLOW:
 		return "netflow"
 	default:
-		return "unkown flow source"
+		return "unknown"
 	}
 }
 
@@ -597,10 +597,10 @@ func (p *TCPPerfStats) String() string {
 	formatted += fmt.Sprintf("ARTCount:%v ", p.ARTCount)
 	formatted += fmt.Sprintf("RetransCountSrc:%v ", p.TcpPerfCountsPeers[0].RetransCount)
 	formatted += fmt.Sprintf("ZeroWinCountSrc:%v ", p.TcpPerfCountsPeers[0].ZeroWinCount)
-	formatted += fmt.Sprintf("SynFirstSeqID:%v ", p.TcpPerfCountsPeers[0].FirstSeqID)
+	formatted += fmt.Sprintf("SynSeqID:%v ", p.TcpPerfCountsPeers[0].FirstSeqID)
 	formatted += fmt.Sprintf("RetransCountDst:%v ", p.TcpPerfCountsPeers[1].RetransCount)
 	formatted += fmt.Sprintf("ZeroWinCountDst:%v ", p.TcpPerfCountsPeers[1].ZeroWinCount)
-	formatted += fmt.Sprintf("SynAckFirstSeqID:%v ", p.TcpPerfCountsPeers[1].FirstSeqID)
+	formatted += fmt.Sprintf("SynAckSeqID:%v ", p.TcpPerfCountsPeers[1].FirstSeqID)
 	formatted += fmt.Sprintf("TotalRetransCount:%v", p.TotalRetransCount)
 
 	return formatted
