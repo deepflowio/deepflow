@@ -105,9 +105,9 @@ var ColumnAdd600 = []*ColumnAdds{
 		ColumnType:  ckdb.UInt64,
 	},
 	&ColumnAdds{
-		Dbs:         []string{"vtap_flow_edge_port"},
+		Dbs:         []string{"vtap_flow_edge_port", "vtap_flow_port", "vtap_app_port", "vtap_app_edge_port"},
 		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
-		ColumnNames: []string{"tap_port_type"},
+		ColumnNames: []string{"tap_port_type", "tunnel_type"},
 		ColumnType:  ckdb.UInt8,
 	},
 	&ColumnAdds{
@@ -118,9 +118,10 @@ var ColumnAdd600 = []*ColumnAdds{
 		DefaultValue: "'rest'",
 	},
 	&ColumnAdds{
-		Dbs:         []string{"flow_log"},
-		Tables:      []string{"l4_flow_log", "l4_flow_log_local", "l7_http_log", "l7_http_log_local", "l7_dns_log", "l7_dns_log_local"},
-		ColumnNames: []string{"tap_port_type"},
+		Dbs: []string{"flow_log"},
+		Tables: []string{"l4_flow_log", "l4_flow_log_local", "l7_http_log", "l7_http_log_local", "l7_dns_log", "l7_dns_log_local",
+			"l7_mq_log", "l7_mq_log_local", "l7_sql_log", "l7_sql_log_local", "l7_nosql_log", "l7_nosql_log_local", "l7_rpc_log", "l7_rpc_log_local"},
+		ColumnNames: []string{"tap_port_type", "tunnel_type"},
 		ColumnType:  ckdb.UInt8,
 	},
 	&ColumnAdds{

@@ -986,7 +986,7 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 	i.FlowSource = uint16(f.FlowSource)
 	i.FlowID = f.FlowID
 	i.TapType = uint16(f.FlowKey.TapType)
-	i.TapPort, i.TapPortType = datatype.TapPort(f.FlowKey.TapPort).SplitToPortAndType()
+	i.TapPort, i.TapPortType, _ = datatype.TapPort(f.FlowKey.TapPort).SplitToPortTypeTunnel()
 	i.TapSide = zerodoc.TAPSideEnum(f.TapSide).String()
 	i.VtapID = uint16(f.FlowKey.VtapId)
 
