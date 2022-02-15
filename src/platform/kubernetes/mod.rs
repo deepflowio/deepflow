@@ -28,7 +28,7 @@ pub trait Poller {
 pub struct PassivePoller;
 
 impl PassivePoller {
-    pub fn new(interval: Duration) -> Self {
+    pub fn new(_interval: Duration) -> Self {
         todo!()
     }
 }
