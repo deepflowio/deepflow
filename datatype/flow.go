@@ -91,7 +91,6 @@ const (
 type TcpPerfCountsPeer struct {
 	RetransCount uint32
 	ZeroWinCount uint32
-	FirstSeqID   uint32
 }
 
 // size = 20 * 4B = 80Byte
@@ -259,6 +258,12 @@ type Flow struct {
 
 	FlowID uint64
 
+	// TCP Seq
+	SYNSeq            uint32
+	SYNACKSeq         uint32
+	LastKeepAliveSeq0 uint32
+	LastKeepAliveSeq1 uint32
+
 	/* Timers */
 	StartTime    time.Duration
 	EndTime      time.Duration
@@ -316,13 +321,11 @@ func (f *FlowKey) WriteToPB(p *pb.FlowKey) {
 func (f *TcpPerfCountsPeer) SequentialMerge(rhs *TcpPerfCountsPeer) {
 	f.RetransCount += rhs.RetransCount
 	f.ZeroWinCount += rhs.ZeroWinCount
-	f.FirstSeqID = rhs.FirstSeqID
 }
 
 func (t *TcpPerfCountsPeer) WriteToPB(p *pb.TcpPerfCountsPeer) {
 	p.RetransCount = t.RetransCount
 	p.ZeroWinCount = t.ZeroWinCount
-	p.FirstSeqID = t.FirstSeqID
 }
 
 func (f *TCPPerfStats) SequentialMerge(rhs *TCPPerfStats) {
@@ -472,6 +475,14 @@ func (f *Flow) SequentialMerge(rhs *Flow) {
 	f.CloseType = rhs.CloseType
 	f.IsActiveService = rhs.IsActiveService
 	f.Reversed = rhs.Reversed
+
+	// 若flow中存在KeepAlive报文，f.LastKeepAliveSeq0及f.LastKeepAliveSeq1保存最后采集到的Seq
+	if rhs.LastKeepAliveSeq0 != 0 {
+		f.LastKeepAliveSeq0 = rhs.LastKeepAliveSeq0
+	}
+	if rhs.LastKeepAliveSeq1 != 0 {
+		f.LastKeepAliveSeq1 = rhs.LastKeepAliveSeq1
+	}
 }
 
 func (f *Flow) WriteToPB(p *pb.Flow) {
@@ -496,6 +507,12 @@ func (f *Flow) WriteToPB(p *pb.Flow) {
 	f.Tunnel.WriteToPB(p.Tunnel)
 
 	p.FlowID = f.FlowID
+
+	p.SYNSeq = f.SYNSeq
+	p.SYNACKSeq = f.SYNACKSeq
+	p.LastKeepAliveSeq0 = f.LastKeepAliveSeq0
+	p.LastKeepAliveSeq1 = f.LastKeepAliveSeq1
+
 	p.StartTime = uint64(f.StartTime)
 	p.EndTime = uint64(f.EndTime)
 	p.Duration = uint64(f.Duration)
@@ -597,10 +614,8 @@ func (p *TCPPerfStats) String() string {
 	formatted += fmt.Sprintf("ARTCount:%v ", p.ARTCount)
 	formatted += fmt.Sprintf("RetransCountSrc:%v ", p.TcpPerfCountsPeers[0].RetransCount)
 	formatted += fmt.Sprintf("ZeroWinCountSrc:%v ", p.TcpPerfCountsPeers[0].ZeroWinCount)
-	formatted += fmt.Sprintf("SynSeqID:%v ", p.TcpPerfCountsPeers[0].FirstSeqID)
 	formatted += fmt.Sprintf("RetransCountDst:%v ", p.TcpPerfCountsPeers[1].RetransCount)
 	formatted += fmt.Sprintf("ZeroWinCountDst:%v ", p.TcpPerfCountsPeers[1].ZeroWinCount)
-	formatted += fmt.Sprintf("SynAckSeqID:%v ", p.TcpPerfCountsPeers[1].FirstSeqID)
 	formatted += fmt.Sprintf("TotalRetransCount:%v", p.TotalRetransCount)
 
 	return formatted
@@ -663,6 +678,10 @@ func (f *Flow) String() string {
 	formatted += fmt.Sprintf("IsActiveService: %v ", f.IsActiveService)
 	formatted += fmt.Sprintf("IsNewFlow: %v ", f.IsNewFlow)
 	formatted += fmt.Sprintf("QueueHash: %d ", f.QueueHash)
+	formatted += fmt.Sprintf("SYNSeq: %d ", f.SYNSeq)
+	formatted += fmt.Sprintf("SYNACKSeq: %d ", f.SYNACKSeq)
+	formatted += fmt.Sprintf("LastKeepAliveSeq0: %d ", f.LastKeepAliveSeq0)
+	formatted += fmt.Sprintf("LastKeepAliveSeq1: %d ", f.LastKeepAliveSeq1)
 	formatted += fmt.Sprintf("FlowStatTime: %d\n", f.FlowStatTime/time.Second)
 	formatted += fmt.Sprintf("\tStartTime: %d ", f.StartTime)
 	formatted += fmt.Sprintf("EndTime: %d ", f.EndTime)
