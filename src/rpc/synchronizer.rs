@@ -2,10 +2,9 @@ use std::convert::TryInto;
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use log::{debug, error, info, warn};
+use log::{debug, info, warn};
 use parking_lot::{Mutex, RwLock, RwLockUpgradableReadGuard};
 use sysinfo::{System, SystemExt};
 use tokio::runtime::Runtime;
@@ -188,7 +187,9 @@ impl Synchronizer {
         }
     }
 
-    fn on_config_change(config: &RuntimeConfig) {}
+    fn on_config_change(_config: &RuntimeConfig) {
+        todo!()
+    }
 
     fn on_response(
         remote: &str,
@@ -296,13 +297,13 @@ impl Synchronizer {
     fn run(&self) {
         let session = self.session.clone();
         let static_config = self.static_config.clone();
-        let config = self.config.clone();
+        let _config = self.config.clone();
         let status = self.status.clone();
         let sync_interval = self.sync_interval;
         let running = self.running.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             let mut client = None;
-            let mut version = session.get_version();
+            let version = session.get_version();
             while running.load(Ordering::SeqCst) {
                 match hostname::get() {
                     Ok(hostname) => {
@@ -317,7 +318,6 @@ impl Synchronizer {
                     Err(e) => warn!("refresh hostname failed: {}", e),
                 }
                 if session.get_request_failed() {
-                    let config = config.read();
                     let status = status.read();
                     info!(
                         "TapMode: {:?}, CtrlMac: {}, CtrlIp: {}, Hostname: {}",

@@ -7,7 +7,6 @@ use std::time::Duration;
 
 use serde::Deserialize;
 use thiserror::Error;
-use tokio::runtime::Runtime;
 
 use crate::consts;
 use crate::proto::{common, trident};
