@@ -367,7 +367,6 @@ impl<T> Receiver<T> {
                     Ok(msgs)
                 }
                 Err(e) => Err(e),
-                _ => unreachable!(),
             }
         }
     }

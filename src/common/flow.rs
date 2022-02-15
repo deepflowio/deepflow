@@ -1,7 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 
-use super::{Ethernet, IpProtocol, TapType};
+use super::{EthernetType, IpProtocol, TapType};
 
 use crate::utils::net::MacAddr;
 
@@ -115,7 +115,7 @@ pub enum L7Protocol {
     Redis = 4,
     Dubbo = 5,
     Kafka = 6,
-    other = 7,
+    Other = 7,
     Max = 8,
 }
 
@@ -161,7 +161,7 @@ pub struct Flow {
     flow_start_time: Duration,
 
     vlan: u16,
-    eth_type: Ethernet,
+    eth_type: EthernetType,
 
     /* TCP Perf Data*/
     flow_perf_stats: Option<FlowPerfStats>,

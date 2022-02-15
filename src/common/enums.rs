@@ -8,7 +8,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 /// for any type it supports.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
 #[repr(u16)]
-pub enum Ethernet {
+pub enum EthernetType {
     // EthernetTypeLLC is not an actual ethernet type.  It is instead a
     // placeholder we use in Ethernet frames that use the 802.3 standard of
     // srcmac|dstmac|length|LLC instead of srcmac|dstmac|ethertype.
@@ -31,14 +31,14 @@ pub enum Ethernet {
     EthernetCTP = 0x9000,
 }
 
-impl PartialEq<u16> for Ethernet {
+impl PartialEq<u16> for EthernetType {
     fn eq(&self, other: &u16) -> bool {
         u16::from(*self).eq(other)
     }
 }
 
-impl PartialEq<Ethernet> for u16 {
-    fn eq(&self, other: &Ethernet) -> bool {
+impl PartialEq<EthernetType> for u16 {
+    fn eq(&self, other: &EthernetType) -> bool {
         u16::from(*other).eq(self)
     }
 }
@@ -89,7 +89,7 @@ impl PartialEq<IpProtocol> for u8 {
 // link type it supports.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
 #[repr(u8)]
-pub enum Link {
+pub enum LinkType {
     // According to pcap-linktype(7) and http://www.tcpdump.org/linktypes.html
     Null = 0,
     Ethernet = 1,
@@ -128,14 +128,14 @@ pub enum Link {
     IPv6 = 229,
 }
 
-impl PartialEq<u8> for Link {
+impl PartialEq<u8> for LinkType {
     fn eq(&self, other: &u8) -> bool {
         u8::from(*self).eq(other)
     }
 }
 
-impl PartialEq<Link> for u8 {
-    fn eq(&self, other: &Link) -> bool {
+impl PartialEq<LinkType> for u8 {
+    fn eq(&self, other: &LinkType) -> bool {
         u8::from(*other).eq(self)
     }
 }
@@ -200,20 +200,20 @@ mod test {
     use super::*;
     #[test]
     fn assert_ethernet_type() {
-        let eth_type = Ethernet::IPv6;
+        let eth_type = EthernetType::IPv6;
         let ipv6: u16 = eth_type.into();
         assert_eq!(eth_type, 0x86DDu16);
         assert_eq!(0x86DDu16, eth_type);
         assert_eq!(ipv6, 0x86DDu16);
-        assert_eq!(Ok(Ethernet::ARP), Ethernet::try_from(0x806u16));
+        assert_eq!(Ok(EthernetType::ARP), EthernetType::try_from(0x806u16));
     }
 
     #[test]
     fn assert_link_type() {
-        let link_type = Link::PPP;
+        let link_type = LinkType::PPP;
         assert_eq!(link_type, 9);
         assert_eq!(9, link_type);
-        assert_eq!(Ok(Link::Talk), Link::try_from(114u8));
+        assert_eq!(Ok(LinkType::Talk), LinkType::try_from(114u8));
     }
 
     #[test]

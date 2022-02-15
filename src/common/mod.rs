@@ -8,6 +8,7 @@ mod enums;
 pub use enums::*;
 
 mod flow;
+mod matched_field;
 mod policy;
 mod tag;
 mod tagged_flow;
