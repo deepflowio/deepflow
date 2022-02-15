@@ -400,45 +400,50 @@ func (l *CloudPlatformLabeler) UpdateCidr(cidrs []*Cidr) {
 	l.tunnelIdCidrMapData = tunnelCidr
 }
 
-func (l *CloudPlatformLabeler) setEpcByCidr(ip net.IP, epc int32, endpointInfo *EndpointInfo) bool {
+// 函数通过EPC+IP查询对应的CIDR，获取EPC和VIP标记
+// 注意当查询外网时必须给epc参数传递EPC_FROM_DEEPFLOW值，表示在所有WAN CIDR范围内搜索，并返回该CIDR的真实EPC
+func (l *CloudPlatformLabeler) setEpcAndVIPByCidr(ip net.IP, epc int32, endpointInfo *EndpointInfo) bool {
 	for _, cidr := range l.epcCidrMapData[epc] {
 		if cidr.IpNet.Contains(ip) {
-			// 获取的EPC以CIDR实际存储的为主
-			// 使用EPC_FROM_DEEPFLOW查表, 会获取WAN的CIDR, 但是其EPC可能不是EPC_FROM_DEEPFLOW
 			endpointInfo.L3EpcId = cidr.EpcId
+			endpointInfo.IsVIP = cidr.IsVIP
 			return true
 		}
 	}
 	return false
 }
 
-func (l *CloudPlatformLabeler) setEpcByTunnelCidr(ip net.IP, tunnelId uint32, endpointInfo *EndpointInfo) bool {
+// 函数通过EPC+IP查询对应的CIDR，获取EPC和VIP标记
+// 注意当查询外网时必须给epc参数传递EPC_FROM_DEEPFLOW值，表示在所有WAN CIDR范围内搜索，并返回该CIDR的真实EPC
+func (l *CloudPlatformLabeler) setEpcAndVIPByTunnelCidr(ip net.IP, tunnelId uint32, endpointInfo *EndpointInfo) bool {
 	cidrs := l.tunnelIdCidrMapData[tunnelId]
 	for _, cidr := range cidrs {
 		if cidr.IpNet.Contains(ip) {
 			endpointInfo.L3EpcId = cidr.EpcId
+			endpointInfo.IsVIP = cidr.IsVIP
 			return true
 		}
 	}
 	// 在光大青云环境中跨VPC通信时，在dvr master宿主机上bond口采集流量的vni为dvr master和
 	// dvr slave自管网络的vni，和overlay ip对应的vni不一致，目前因为自管网络的EPC和overlay
 	// ip所在子网的EPC相同，所以这里通过vni查询失败后再通过EPC查询
+	lastEpc := int32(0)
 	for _, cidr := range cidrs {
-		// FIXME: 这里只需要找不重复的EpcID即可，现在的搜索办法会重复搜索有多个CIDR的Epc
-		if ok := l.setEpcByCidr(ip, cidr.EpcId, endpointInfo); ok {
+		// 这里只需要找不重复的EpcID即可
+		if cidr.EpcId == lastEpc {
+			continue
+		}
+		lastEpc = cidr.EpcId
+		if ok := l.setEpcAndVIPByCidr(ip, cidr.EpcId, endpointInfo); ok {
 			return true
 		}
 	}
 	return false
 }
 
-func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType TapType, l3End, isVIP bool, tunnelId uint32) *EndpointInfo {
+func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType TapType, l3End bool, tunnelId uint32) (*EndpointInfo, bool) {
+	isWAN := false
 	endpointInfo := new(EndpointInfo)
-	if isVIP {
-		// ip地址是否为VIP
-		endpointInfo.IsVIP = isVIP
-		endpointInfo.RealIP = l.GetRealIpByMac(mac, ip.To4() == nil)
-	}
 	// 如下场景无法直接查询隧道内层的MAC地址确定EPC：
 	// 1. 腾讯TCE：使用GRE做隧道封装，内层没有MAC
 	// 2. 使用VXLAN隧道但内层MAC已无法识别
@@ -446,19 +451,20 @@ func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType Ta
 	// 采集器并不关心具体的云平台差异，只要控制器下发隧道ID，都会优先使用它进行查询
 	if tunnelId > 0 {
 		// step 1: 查询tunnelID监控网段(cidr)
-		l.setEpcByTunnelCidr(ip, tunnelId, endpointInfo)
+		l.setEpcAndVIPByTunnelCidr(ip, tunnelId, endpointInfo)
 		if IsGrePseudoInnerMac(mac) {
 			// 腾讯TCE使用GRE封装场景下，此处拿到是伪造MAC，无法用于查询云平台信息，直接在此分支中返回即可
 			if endpointInfo.L3EpcId == 0 {
 				// step 2: 查询平台数据WAN接口
 				if platformData := l.GetDataByIp(ip); platformData != nil {
 					endpointInfo.SetL3Data(platformData)
+					isWAN = platformData.IfType == IF_TYPE_WAN
 				} else {
 					// step 3: 查询DEEPFLOW添加的WAN监控网段(cidr)
-					l.setEpcByCidr(ip, EPC_FROM_DEEPFLOW, endpointInfo)
+					isWAN = l.setEpcAndVIPByCidr(ip, EPC_FROM_DEEPFLOW, endpointInfo)
 				}
 			}
-			return endpointInfo
+			return endpointInfo, isWAN
 		} else {
 			// 其他云如果使用TunnelID没有查询到，还需要继续用MAC查询
 		}
@@ -472,14 +478,16 @@ func (l *CloudPlatformLabeler) GetEndpointInfo(mac uint64, ip net.IP, tapType Ta
 		// IP为0，则取MAC对应的二层数据作为三层数据
 		if l3End || ip.IsUnspecified() || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
 			endpointInfo.SetL3Data(platformData)
-			return endpointInfo
+			isWAN = platformData.IfType == IF_TYPE_WAN
+			return endpointInfo, isWAN
 		}
 	}
 	// step 2: 使用L2EpcId + IP查询L3，如果L2EpcId为0，会查询到DEEPFLOW添加的监控IP
 	if platformData = l.GetDataByEpcIp(endpointInfo.L2EpcId, ip); platformData != nil {
 		endpointInfo.SetL3Data(platformData)
+		isWAN = platformData.IfType == IF_TYPE_WAN
 	}
-	return endpointInfo
+	return endpointInfo, isWAN
 }
 
 // 检查L2End和L3End是否有可能进行修正
@@ -509,7 +517,7 @@ func (l *CloudPlatformLabeler) ModifyEndpointData(endpointData *EndpointData, ke
 			dstData.SetL3Data(platformData)
 		} else {
 			// 本端IP + 对端EPC查询CIDR表
-			l.setEpcByCidr(dstIp, srcData.L3EpcId, dstData)
+			l.setEpcAndVIPByCidr(dstIp, srcData.L3EpcId, dstData)
 		}
 	}
 
@@ -519,7 +527,7 @@ func (l *CloudPlatformLabeler) ModifyEndpointData(endpointData *EndpointData, ke
 			srcData.SetL3Data(platformData)
 		} else {
 			// 本端IP + 对端EPC查询CIDR表
-			l.setEpcByCidr(srcIp, dstData.L3EpcId, srcData)
+			l.setEpcAndVIPByCidr(srcIp, dstData.L3EpcId, srcData)
 		}
 	}
 }
@@ -532,7 +540,7 @@ func (l *CloudPlatformLabeler) peerConnection(ip net.IP, epc int32, endpointInfo
 		}
 	}
 	for _, peerEpc := range l.peerConnectionTable[epc] {
-		if l.setEpcByCidr(ip, peerEpc, endpointInfo) {
+		if l.setEpcAndVIPByCidr(ip, peerEpc, endpointInfo) {
 			break
 		}
 	}
@@ -579,7 +587,7 @@ func (l *CloudPlatformLabeler) GetL3ByWanIp(srcIp, dstIp net.IP, endpointData *E
 			found = true
 		} else {
 			// step 2: 查询DEEPFLOW添加的WAN监控网段(cidr)
-			found = l.setEpcByCidr(srcIp, EPC_FROM_DEEPFLOW, srcData) || found
+			found = l.setEpcAndVIPByCidr(srcIp, EPC_FROM_DEEPFLOW, srcData) || found
 		}
 	}
 	if dstData.L3EpcId == 0 {
@@ -589,10 +597,25 @@ func (l *CloudPlatformLabeler) GetL3ByWanIp(srcIp, dstIp net.IP, endpointData *E
 			found = true
 		} else {
 			// step 2: 查询DEEPFLOW添加的WAN监控网段(cidr)
-			found = l.setEpcByCidr(dstIp, EPC_FROM_DEEPFLOW, dstData) || found
+			found = l.setEpcAndVIPByCidr(dstIp, EPC_FROM_DEEPFLOW, dstData) || found
 		}
 	}
 	return found
+}
+
+func (l *CloudPlatformLabeler) GetVIP(mac uint64, ip net.IP, isWAN bool, endpoint *EndpointInfo) {
+	if !endpoint.IsVIP && endpoint.L3EpcId > 0 {
+		// 平台数据中仅CIDR有VIP信息，当平台数据不是通过CIDR计算出来时，这里还需要再补充查询CIDR数据以确认是否为VIP。注意WAN IP可在所有WAN CIDR中搜索，LAN IP必须在对应EPC的CIDR中搜索。
+		if !isWAN {
+			l.setEpcAndVIPByCidr(ip, endpoint.L3EpcId, endpoint)
+		} else {
+			l.setEpcAndVIPByCidr(ip, EPC_FROM_DEEPFLOW, endpoint)
+		}
+	}
+	if endpoint.IsVIP {
+		// VIP时根据MAC地址获取真实IP
+		endpoint.RealIP = l.GetRealIpByMac(mac, ip.To4() == nil)
+	}
 }
 
 func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
@@ -601,11 +624,10 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 	if key.EthType == EthernetTypeIPv6 || len(key.Src6Ip) > 0 {
 		srcIp, dstIp = key.Src6Ip, key.Dst6Ip
 	}
-	// vip: vip查询mac对应的实际IP
 	// l2: mac查询
 	// l3: l2epc+ip查询
-	srcData := l.GetEndpointInfo(key.SrcMac, srcIp, key.TapType, key.L3End0, key.IsVIP0, key.TunnelId)
-	dstData := l.GetEndpointInfo(key.DstMac, dstIp, key.TapType, key.L3End1, key.IsVIP1, key.TunnelId)
+	srcData, srcWAN := l.GetEndpointInfo(key.SrcMac, srcIp, key.TapType, key.L3End0, key.TunnelId)
+	dstData, dstWAN := l.GetEndpointInfo(key.DstMac, dstIp, key.TapType, key.L3End1, key.TunnelId)
 	endpoint := &EndpointData{SrcInfo: srcData, DstInfo: dstData}
 	// l3: 私有网络 VPC内部路由
 	// 1) 本端IP + 对端EPC查询EPC-IP表
@@ -624,6 +646,10 @@ func (l *CloudPlatformLabeler) GetEndpointData(key *LookupKey) *EndpointData {
 		l.ModifyEndpointData(endpoint, key)
 		l.GetL3ByPeerConnection(srcIp, dstIp, endpoint)
 	}
+	// vip: vip查询，如果是VIP查询mac对应的实际IP
+	l.GetVIP(key.SrcMac, srcIp, srcWAN, srcData)
+	l.GetVIP(key.DstMac, dstIp, dstWAN, dstData)
 	l.ModifyInternetEpcId(endpoint)
+
 	return endpoint
 }
