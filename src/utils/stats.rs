@@ -311,7 +311,6 @@ impl Collector {
                                         }
                                         b.send();
                                     }
-                                    _ => (),
                                 }
                             }
                         }

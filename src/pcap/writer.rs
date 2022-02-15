@@ -7,7 +7,7 @@ use std::{
 
 use log::{debug, error};
 
-use crate::common::{Link, TapType};
+use crate::common::{LinkType, TapType};
 
 use super::{
     format_time, PcapPacket, PCAP_MAGIC, RECORD_HEADER_LEN, SNAP_LEN, VERSION_MAJOR, VERSION_MINOR,
@@ -99,7 +99,7 @@ impl Writer {
         writer.write(VERSION_MAJOR.to_le_bytes().as_slice())?;
         writer.write(VERSION_MINOR.to_le_bytes().as_slice())?;
         writer.write(snap_len.to_le_bytes().as_slice())?;
-        writer.write(u8::from(Link::Ethernet).to_le_bytes().as_slice())?;
+        writer.write(u8::from(LinkType::Ethernet).to_le_bytes().as_slice())?;
 
         Ok(())
     }
