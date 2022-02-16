@@ -215,12 +215,14 @@ func (n *NetworkLayer) WriteBlock(block *ckdb.Block) error {
 }
 
 type TransportLayer struct {
-	ClientPort   uint16 `json:"client_port"`
-	ServerPort   uint16 `json:"server_port"`
-	TCPFlagsBit0 uint16 `json:"tcp_flags_bit_0,omitempty"`
-	TCPFlagsBit1 uint16 `json:"tcp_flags_bit_1,omitempty"`
-	SynSeq       uint32 `json:"syn_seq"`
-	SynAckSeq    uint32 `json:"syn_ack_seq"`
+	ClientPort        uint16 `json:"client_port"`
+	ServerPort        uint16 `json:"server_port"`
+	TCPFlagsBit0      uint16 `json:"tcp_flags_bit_0,omitempty"`
+	TCPFlagsBit1      uint16 `json:"tcp_flags_bit_1,omitempty"`
+	SynSeq            uint32 `json:"syn_seq"`
+	SynAckSeq         uint32 `json:"syn_ack_seq"`
+	LastKeepaliveSeq0 uint32 `json:"last_keepalive_seq_0"`
+	LastKeepaliveSeq1 uint32 `json:"last_keepalive_seq_1"`
 }
 
 var TransportLayerColumns = []*ckdb.Column{
@@ -231,6 +233,8 @@ var TransportLayerColumns = []*ckdb.Column{
 	ckdb.NewColumn("tcp_flags_bit_1", ckdb.UInt16).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("syn_seq", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("握手包的TCP SEQ序列号"),
 	ckdb.NewColumn("syn_ack_seq", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("握手回应包的TCP SEQ序列号"),
+	ckdb.NewColumn("last_keepalive_seq_0", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("last_keepalive_seq_1", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 }
 
 func (t *TransportLayer) WriteBlock(block *ckdb.Block) error {
@@ -250,6 +254,12 @@ func (t *TransportLayer) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt32(t.SynAckSeq); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(t.LastKeepaliveSeq0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(t.LastKeepaliveSeq1); err != nil {
 		return err
 	}
 	return nil
@@ -839,15 +849,10 @@ func (t *TransportLayer) Fill(f *pb.Flow) {
 	t.ServerPort = uint16(f.FlowKey.PortDst)
 	t.TCPFlagsBit0 = uint16(f.FlowMetricsPeerSrc.TCPFlags)
 	t.TCPFlagsBit1 = uint16(f.FlowMetricsPeerDst.TCPFlags)
-	if f.HasFlowPerfStats == 1 {
-		p := f.FlowPerfStats
-		if p.TCPPerfStats.TcpPerfCountsPeerTx != nil {
-			t.SynSeq = p.TCPPerfStats.TcpPerfCountsPeerTx.FirstSeqID
-		}
-		if p.TCPPerfStats.TcpPerfCountsPeerRx != nil {
-			t.SynAckSeq = p.TCPPerfStats.TcpPerfCountsPeerRx.FirstSeqID
-		}
-	}
+	t.SynSeq = f.SYNSeq
+	t.SynAckSeq = f.SYNACKSeq
+	t.LastKeepaliveSeq0 = f.LastKeepAliveSeq0
+	t.LastKeepaliveSeq1 = f.LastKeepAliveSeq1
 }
 
 func (a *ApplicationLayer) Fill(f *pb.Flow) {
