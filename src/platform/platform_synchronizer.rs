@@ -12,6 +12,7 @@ use std::{
 
 use log::{debug, info, warn};
 use ring::digest;
+use tokio::runtime::Runtime;
 
 use super::{
     kubernetes::{
@@ -22,9 +23,9 @@ use super::{
     InterfaceEntry, PollerType,
 };
 
-use crate::error::Result;
 use crate::handler;
-use crate::proto::trident;
+use crate::proto::trident::{self, GenesisSyncRequest, GenesisSyncResponse};
+use crate::rpc::Session;
 use crate::utils::command::*;
 
 const SHA1_DIGEST_LEN: usize = 20;
@@ -36,7 +37,7 @@ struct ProcessArgs {
     config: Arc<config::StaticConfig>,
     ctrl_ip: IpAddr,
     kubernetes_cluster_id: String,
-    session: Arc<rpc::PollingSession>,
+    session: Arc<Session>,
     sniffer: Arc<sniffer_builder::Sniffer>,
     timer: Arc<Condvar>,
     poll_interval: Duration,
@@ -80,7 +81,7 @@ pub struct Synchronizer {
     xml_path: Arc<Mutex<PathBuf>>,
     thread: Mutex<Option<JoinHandle<()>>>,
     config: Arc<config::StaticConfig>,
-    session: Arc<rpc::PollingSession>,
+    session: Arc<Session>,
     xml_extractor: Arc<LibVirtXmlExtractor>,
     sniffer: Arc<sniffer_builder::Sniffer>,
 }
@@ -94,7 +95,7 @@ impl Synchronizer {
         kubernetes_cluster_id: String,
 
         config: Arc<config::StaticConfig>,
-        session: Arc<rpc::PollingSession>,
+        session: Arc<Session>,
         xml_extractor: Arc<LibVirtXmlExtractor>,
         sniffer: Arc<sniffer_builder::Sniffer>,
         mappings: Arc<mappings::Mappings>,
@@ -206,8 +207,6 @@ impl Synchronizer {
         }
         *running_guard = true;
         drop(running_guard);
-
-        self.session.init();
 
         let process_args = ProcessArgs {
             platform_enabled: self.platform_enabled.clone(),
@@ -450,7 +449,8 @@ impl Synchronizer {
         self_xml_interfaces: &Vec<InterfaceEntry>,
         vtap_id: u32,
         version: u64,
-    ) -> Result<u64> {
+        rt: &Runtime,
+    ) -> Result<u64, tonic::Status> {
         let platform_enabled = process_args.platform_enabled.load(Ordering::SeqCst);
 
         let (mut ips, mut lldp_infos) = (vec![], vec![]);
@@ -549,11 +549,13 @@ impl Synchronizer {
             nat_ip: None,
         };
 
-        let response = process_args.session.sync_genesis(msg)?;
-        Ok(response.version())
+        rt.block_on(Self::genesis_sync(&process_args.session, msg))
+            .map(|r| r.into_inner().version())
     }
 
     fn process(args: ProcessArgs) {
+        let rt = Runtime::new().unwrap();
+
         let mut last_version = 0;
         let mut kubernetes_version = 0;
         let mut last_ip_update_timestamp = Duration::default();
@@ -598,8 +600,9 @@ impl Synchronizer {
                     nat_ip: None,
                 };
 
-                match args.session.sync_genesis(msg) {
+                match rt.block_on(Self::genesis_sync(&args.session, msg)) {
                     Ok(res) => {
+                        let res = res.into_inner();
                         let remote_version = res.version();
                         if remote_version == cur_version {
                             if Self::wait_timeout(&args.running, &args.timer, args.poll_interval) {
@@ -631,6 +634,7 @@ impl Synchronizer {
                 &xml_interfaces,
                 cur_vtap_id,
                 cur_version,
+                &rt,
             ) {
                 Ok(version) => last_version = version,
                 Err(e) => {
@@ -659,26 +663,18 @@ impl Synchronizer {
         }
         false
     }
-}
 
-//TODO
-mod rpc {
-    use crate::error::Result;
-    use crate::proto::trident::{self, GenesisSyncResponse};
+    async fn genesis_sync(
+        session: &Arc<Session>,
+        req: GenesisSyncRequest,
+    ) -> Result<tonic::Response<GenesisSyncResponse>, tonic::Status> {
+        session.update_current_server().await;
+        let client = session
+            .get_client()
+            .ok_or(tonic::Status::not_found("rpc client not connected"))?;
 
-    pub struct PollingSession;
-
-    impl PollingSession {
-        pub fn init(&self) {
-            todo!()
-        }
-        pub fn sync_genesis(
-            &self,
-            _msg: trident::GenesisSyncRequest,
-            // RPC 模块定义的错误
-        ) -> Result<GenesisSyncResponse> {
-            todo!()
-        }
+        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
+        client.genesis_sync(req).await
     }
 }
 

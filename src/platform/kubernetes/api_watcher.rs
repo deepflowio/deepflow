@@ -19,7 +19,10 @@ use super::resource_watcher::{GenericResourceWatcher, Watcher};
 use crate::{
     error::{Error, Result},
     platform::kubernetes::resource_watcher::ResourceWatcherFactory,
-    proto::trident::{KubernetesApiInfo, KubernetesApiSyncRequest},
+    proto::trident::{
+        self, KubernetesApiInfo, KubernetesApiSyncRequest, KubernetesApiSyncResponse,
+    },
+    rpc::Session,
 };
 
 /*
@@ -63,17 +66,17 @@ struct ApiWatcher {
     watchers: Arc<Mutex<HashMap<String, GenericResourceWatcher>>>,
     err_msgs: Arc<Mutex<Vec<String>>>,
     apiserver_version: Arc<Mutex<Info>>,
-    session: Arc<rpc::Session>,
+    session: Arc<Session>,
 }
 
 impl ApiWatcher {
     pub fn new(
-        session: Arc<rpc::Session>,
         ctrl_ip: IpAddr,
         cluster_id: String,
         is_openshift_route: bool,
         interval: Duration,
         runtime: Handle,
+        session: Arc<Session>,
     ) -> Self {
         Self {
             context: Arc::new(Context {
@@ -356,9 +359,10 @@ impl ApiWatcher {
     }
 
     fn process(
+        context: &Arc<Context>,
         apiserver_version: &Arc<Mutex<Info>>,
         ctrl_ip: &IpAddr,
-        session: &Arc<rpc::Session>,
+        session: &Arc<Session>,
         version: &AtomicU64,
         err_msgs: &Arc<Mutex<Vec<String>>>,
         cluster_id: &str,
@@ -419,13 +423,17 @@ impl ApiWatcher {
             entries: total_entries,
         };
 
-        match session.sync_kubernetes_api(msg.clone()) {
+        match context
+            .runtime
+            .block_on(Self::kubernetes_api_sync(session, msg.clone()))
+        {
             Ok(resp) => {
                 if has_update {
                     // 已经发过全量了，不用管返回
                     // 等待下一次timeout
                     return;
                 }
+                let resp = resp.into_inner();
                 if resp.version() == version.load(Ordering::SeqCst) {
                     // 接收端返回之前的version，如果相等，不需要全量同步
                     return;
@@ -453,11 +461,27 @@ impl ApiWatcher {
 
         msg.entries = total_entries;
 
-        if let Err(e) = session.sync_kubernetes_api(msg) {
+        if let Err(e) = context
+            .runtime
+            .block_on(Self::kubernetes_api_sync(session, msg))
+        {
             let err = format!("KubernetesAPISync failed: {}", e);
             warn!("{}", err);
             err_msgs.lock().unwrap().push(err);
         }
+    }
+
+    async fn kubernetes_api_sync(
+        session: &Arc<Session>,
+        req: KubernetesApiSyncRequest,
+    ) -> Result<tonic::Response<KubernetesApiSyncResponse>, tonic::Status> {
+        session.update_current_server().await;
+        let client = session
+            .get_client()
+            .ok_or(tonic::Status::not_found("rpc client not connected"))?;
+
+        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
+        client.kubernetes_api_sync(req).await
     }
 
     fn parse_apiserver_version(info: &Info) -> Option<KubernetesApiInfo> {
@@ -473,7 +497,7 @@ impl ApiWatcher {
 
     fn run(
         context: Arc<Context>,
-        session: Arc<rpc::Session>,
+        session: Arc<Session>,
         timer: Arc<Condvar>,
         running: Arc<Mutex<bool>>,
         apiserver_version: Arc<Mutex<Info>>,
@@ -500,7 +524,10 @@ impl ApiWatcher {
                         error_msg: Some(e.to_string()),
                         entries: vec![],
                     };
-                    if let Err(e) = session.sync_kubernetes_api(msg) {
+                    if let Err(e) = context
+                        .runtime
+                        .block_on(Self::kubernetes_api_sync(&session, msg))
+                    {
                         debug!("report error: {}", e);
                     }
                 }
@@ -527,6 +554,7 @@ impl ApiWatcher {
         // 等一等watcher，第一个tick再上报
         while Self::wait_timeout(&running, &timer, context.interval) {
             Self::process(
+                &context,
                 &apiserver_version,
                 &context.ctrl_ip,
                 &session,
@@ -559,20 +587,3 @@ impl ApiWatcher {
         false
     }
 }
-
-//TODO
-mod rpc {
-    use crate::proto::trident::{KubernetesApiSyncRequest, KubernetesApiSyncResponse};
-
-    pub struct Session;
-
-    impl Session {
-        pub fn sync_kubernetes_api(
-            &self,
-            _msg: KubernetesApiSyncRequest,
-        ) -> crate::error::Result<KubernetesApiSyncResponse> {
-            Ok(KubernetesApiSyncResponse { version: Some(1) })
-        }
-    }
-}
-//END
