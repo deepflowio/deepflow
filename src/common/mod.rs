@@ -7,6 +7,10 @@ use std::{
 mod enums;
 pub use enums::*;
 
+mod flow;
+mod policy;
+mod tag;
+mod tagged_flow;
 mod tap_types;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
