@@ -11,3 +11,10 @@ pub struct PolicyData {
     acl_id: u32,
     action_flags: ActionFlag,
 }
+
+#[repr(u8)]
+pub enum DirectionType {
+    NoDirection = 0,
+    Forward = 1,
+    Backward = 2,
+}

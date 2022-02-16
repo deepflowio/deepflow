@@ -144,6 +144,8 @@ pub struct FlowMetricsPeer {
 }
 
 impl FlowMetricsPeer {
+    pub const SRC: u8 = 0;
+    pub const DST: u8 = 1;
     pub fn sequential_merge(&mut self, other: &FlowMetricsPeer) {}
 }
 

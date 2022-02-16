@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod common;
 mod config;
 mod consts;

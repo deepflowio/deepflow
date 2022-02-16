@@ -158,7 +158,7 @@ impl Worker {
     }
 
     fn get_writer_key(dispatcher_id: u32, acl_gid: u16, tap_type: TapType) -> u64 {
-        (dispatcher_id as u64) << 32 | (acl_gid as u64) << 16 | tap_type as u64
+        (dispatcher_id as u64) << 32 | (acl_gid as u64) << 16 | u16::from(tap_type) as u64
     }
 
     fn finish_writer(writer: Writer, worker_counter_guard: &mut MutexGuard<WorkerCounter>) {
