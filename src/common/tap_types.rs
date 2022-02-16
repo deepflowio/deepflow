@@ -168,9 +168,12 @@ mod tests {
     fn verify_vlan(tap_typer: &TapTyper, vlan: u16, tap: u16) {
         let tap_actual = tap_typer.get_tap_type_by_vlan(vlan).unwrap();
         assert_eq!(
-            tap, tap_actual as u16,
+            tap,
+            u16::from(tap_actual),
             "actual tap_type[vlan:{0}, taptype:{1}], but expected tap_type[vlan:{0}, taptype:{2}]",
-            vlan, tap_actual as u16, tap
+            vlan,
+            u16::from(tap_actual),
+            tap
         );
     }
 
@@ -191,9 +194,9 @@ mod tests {
         let xflow_key = XflowKey { ip, tap_idx };
         let tap_actual = tap_typer.get_tap_type_by_xflow_key(&xflow_key).unwrap();
 
-        assert_eq!(tap, tap_actual as u16,
+        assert_eq!(tap, u16::from(tap_actual),
             "actual tap_type[flowKey:{0}, taptype:{1}], but expected tap_type[flowKey:{0}, taptype:{2}]",
-            xflow_key, tap_actual as u16, tap
+            xflow_key, u16::from(tap_actual), tap
         );
     }
 

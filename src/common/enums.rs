@@ -6,29 +6,35 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 /// EthernetType is an enumeration of ethernet type values, and acts as a decoder
 /// for any type it supports.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
 #[repr(u16)]
 pub enum EthernetType {
     // EthernetTypeLLC is not an actual ethernet type.  It is instead a
     // placeholder we use in Ethernet frames that use the 802.3 standard of
     // srcmac|dstmac|length|LLC instead of srcmac|dstmac|ethertype.
-    LLC = 0,
-    IPv4 = 0x0800,
-    ARP = 0x0806,
-    IPv6 = 0x86DD,
+    Llc = 0,
+    Ipv4 = 0x0800,
+    Arp = 0x0806,
+    Ipv6 = 0x86DD,
     CiscoDiscovery = 0x2000,
     NortelDiscovery = 0x01a2,
     TransparentEthernetBridging = 0x6558,
     Dot1Q = 0x8100,
-    PPP = 0x880b,
-    PPPoEDiscovery = 0x8863,
-    PPPoESession = 0x8864,
-    MPLSUnicast = 0x8847,
-    MPLSMulticast = 0x8848,
-    EAPOL = 0x888e,
+    Ppp = 0x880b,
+    PppoeDiscovery = 0x8863,
+    PppoeSession = 0x8864,
+    MplsUnicast = 0x8847,
+    MplsMulticast = 0x8848,
+    Eapol = 0x888e,
     QinQ = 0x88a8,
     LinkLayerDiscovery = 0x88cc,
-    EthernetCTP = 0x9000,
+    EthernetCtp = 0x9000,
+}
+
+impl Default for EthernetType {
+    fn default() -> Self {
+        EthernetType::Llc
+    }
 }
 
 impl PartialEq<u16> for EthernetType {
@@ -45,32 +51,38 @@ impl PartialEq<EthernetType> for u16 {
 
 // IPProtocol is an enumeration of IP protocol values, and acts as a decoder
 // for any type it supports.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
 #[repr(u8)]
 pub enum IpProtocol {
-    IPv6HopByHop = 0,
-    ICMPv4 = 1,
-    IGMP = 2,
-    IPv4 = 4,
-    TCP = 6,
-    UDP = 17,
-    RUDP = 27,
-    IPv6 = 41,
-    IPv6Routing = 43,
-    IPv6Fragment = 44,
-    GRE = 47,
-    ESP = 50,
-    AH = 51,
-    ICMPv6 = 58,
+    Ipv6HopByHop = 0,
+    Icmpv4 = 1,
+    Igmp = 2,
+    Ipv4 = 4,
+    Tcp = 6,
+    Udp = 17,
+    Rudp = 27,
+    Ipv6 = 41,
+    Ipv6Routing = 43,
+    Ipv6Fragment = 44,
+    Gre = 47,
+    Esp = 50,
+    Ah = 51,
+    Icmpv6 = 58,
     NoNextHeader = 59,
-    IPv6Destination = 60,
-    OSPF = 89,
-    IPIP = 94,
-    EtherIP = 97,
-    VRRP = 112,
-    SCTP = 132,
-    UDPLite = 136,
-    MPLSInIP = 137,
+    Ipv6Destination = 60,
+    Ospf = 89,
+    Ipip = 94,
+    EtherIp = 97,
+    Vrrp = 112,
+    Sstp = 132,
+    UdpLite = 136,
+    MplsInIp = 137,
+}
+
+impl Default for IpProtocol {
+    fn default() -> Self {
+        IpProtocol::Ipv6HopByHop
+    }
 }
 
 impl PartialEq<u8> for IpProtocol {
@@ -87,45 +99,45 @@ impl PartialEq<IpProtocol> for u8 {
 
 // LinkType is an enumeration of link types, and acts as a decoder for any
 // link type it supports.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
 #[repr(u8)]
 pub enum LinkType {
     // According to pcap-linktype(7) and http://www.tcpdump.org/linktypes.html
     Null = 0,
     Ethernet = 1,
-    AX25 = 3,
+    Ax25 = 3,
     TokenRing = 6,
     ArcNet = 7,
-    SLIP = 8,
-    PPP = 9,
-    FDDI = 10,
+    Slip = 8,
+    Ppp = 9,
+    Fddi = 10,
     PppHdlc = 50,
     PppEthernet = 51,
-    AtmRFC1483 = 100,
+    AtmRfc1483 = 100,
     Raw = 101,
-    CHdlc = 104,
-    IEEE802_11 = 105,
+    Chdlc = 104,
+    Ieee802_11 = 105,
     Relay = 107,
     Loop = 108,
     LinuxSLL = 113,
     Talk = 114,
-    PFLog = 117,
+    PfLog = 117,
     PrismHeader = 119,
-    IPOverFC = 122,
-    SunATM = 123,
-    IEEE80211Radio = 127,
-    ARCNetLinux = 129,
-    IPOver1394 = 138,
-    MTP2Phdr = 139,
-    MTP2 = 140,
-    MTP3 = 141,
-    SCCP = 142,
-    DOCSIS = 143,
-    LinuxIRDA = 144,
-    LinuxLAPD = 177,
-    LinuxUSB = 220,
-    IPv4 = 228,
-    IPv6 = 229,
+    IpOverFc = 122,
+    SunAtm = 123,
+    Ieee80211Radio = 127,
+    ArcNetLinux = 129,
+    IpOver1394 = 138,
+    Mtp2Phdr = 139,
+    Mtp2 = 140,
+    Mtp3 = 141,
+    Sccp = 142,
+    Docsis = 143,
+    LinuxIrda = 144,
+    LinuxLapd = 177,
+    LinuxUsb = 220,
+    Ipv4 = 228,
+    Ipv6 = 229,
 }
 
 impl PartialEq<u8> for LinkType {
@@ -140,23 +152,48 @@ impl PartialEq<LinkType> for u8 {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, TryFromPrimitive, IntoPrimitive)]
-#[repr(u16)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TapType {
-    #[num_enum(default)]
-    Any = 0,
-    Isp1 = 1,
-    Isp2 = 2,
-    Tor = 3,
-    Max = 256,
+    Any,
+    Isp(u8),
+    Tor,
+    Max,
+}
+
+impl TryFrom<u16> for TapType {
+    type Error = &'static str;
+    fn try_from(t: u16) -> Result<TapType, Self::Error> {
+        match t {
+            0 => Ok(TapType::Any),
+            3 => Ok(TapType::Tor),
+            v if v < 256 => Ok(TapType::Isp(v as u8)),
+            _ => Err("tap_type not in [0, 256)"),
+        }
+    }
+}
+
+impl From<TapType> for u16 {
+    fn from(t: TapType) -> u16 {
+        match t {
+            TapType::Any => 0,
+            TapType::Isp(v) => v as u16,
+            TapType::Tor => 3,
+            TapType::Max => 256,
+        }
+    }
+}
+
+impl Default for TapType {
+    fn default() -> TapType {
+        TapType::Any
+    }
 }
 
 impl fmt::Display for TapType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             TapType::Any => write!(f, "any"),
-            TapType::Isp1 => write!(f, "isp1"),
-            TapType::Isp2 => write!(f, "isp2"),
+            TapType::Isp(n) => write!(f, "isp{}", n),
             TapType::Tor => write!(f, "tor"),
             TapType::Max => write!(f, "max"),
         }
@@ -165,18 +202,18 @@ impl fmt::Display for TapType {
 
 // 因为不知道Windows 的iftype 有那些，只能写一些常用的
 //https://docs.microsoft.com/en-us/windows/win32/api/iptypes/ns-iptypes-ip_adapter_addresses_lh
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
 #[repr(u32)]
 pub enum IfType {
     Other = 1,
     Ethernet = 6,
     TokenRing = 9,
-    PPP = 23,
+    Ppp = 23,
     Loopback = 24,
-    ATM = 37,
-    IEEE80211 = 71,
+    Atm = 37,
+    Ieee80211 = 71,
     Tunnel = 131,
-    IEEE1394 = 144,
+    Ieee1394 = 144,
 }
 
 impl fmt::Display for IfType {
@@ -185,13 +222,42 @@ impl fmt::Display for IfType {
             IfType::Other => write!(f, "other"),
             IfType::Ethernet => write!(f, "ethernet"),
             IfType::TokenRing => write!(f, "tokenping"),
-            IfType::PPP => write!(f, "ppp"),
+            IfType::Ppp => write!(f, "ppp"),
             IfType::Loopback => write!(f, "loopback"),
-            IfType::ATM => write!(f, "atm"),
-            IfType::IEEE80211 => write!(f, "ieee80211"),
+            IfType::Atm => write!(f, "atm"),
+            IfType::Ieee80211 => write!(f, "ieee80211"),
             IfType::Tunnel => write!(f, "tunnel"),
-            IfType::IEEE1394 => write!(f, "ieee1394"),
+            IfType::Ieee1394 => write!(f, "ieee1394"),
         }
+    }
+}
+
+#[repr(u8)]
+pub enum HeaderType {
+    Invalid = 0,
+    Eth = 0x1,
+    Arp = 0x2,
+    Ipv4 = 0x20,
+    Ipv4Icmp = 0x21,
+    Ipv6 = 0x40,
+    Ipv4Tcp = 0x80,
+    Ipv4Udp = 0x81,
+    Ipv6Tcp = 0xb0,
+    Ipv6Udp = 0xb1,
+}
+
+#[allow(non_upper_case_globals)]
+impl HeaderType {
+    pub const L2: HeaderType = HeaderType::Eth;
+    pub const L3: HeaderType = HeaderType::Ipv4;
+    pub const L3Ipv6: HeaderType = HeaderType::Ipv6;
+    pub const L4: HeaderType = HeaderType::Ipv4Tcp;
+    pub const L4Ipv6: HeaderType = HeaderType::Ipv6Tcp;
+}
+
+impl Default for HeaderType {
+    fn default() -> HeaderType {
+        HeaderType::Invalid
     }
 }
 
@@ -200,17 +266,17 @@ mod test {
     use super::*;
     #[test]
     fn assert_ethernet_type() {
-        let eth_type = EthernetType::IPv6;
+        let eth_type = EthernetType::Ipv6;
         let ipv6: u16 = eth_type.into();
         assert_eq!(eth_type, 0x86DDu16);
         assert_eq!(0x86DDu16, eth_type);
         assert_eq!(ipv6, 0x86DDu16);
-        assert_eq!(Ok(EthernetType::ARP), EthernetType::try_from(0x806u16));
+        assert_eq!(Ok(EthernetType::Arp), EthernetType::try_from(0x806u16));
     }
 
     #[test]
     fn assert_link_type() {
-        let link_type = LinkType::PPP;
+        let link_type = LinkType::Ppp;
         assert_eq!(link_type, 9);
         assert_eq!(9, link_type);
         assert_eq!(Ok(LinkType::Talk), LinkType::try_from(114u8));
@@ -218,9 +284,9 @@ mod test {
 
     #[test]
     fn assert_ip_protocol() {
-        let ip = IpProtocol::ICMPv6;
+        let ip = IpProtocol::Icmpv6;
         assert_eq!(ip, 58);
         assert_eq!(58, ip);
-        assert_eq!(Ok(IpProtocol::UDP), IpProtocol::try_from(17u8));
+        assert_eq!(Ok(IpProtocol::Udp), IpProtocol::try_from(17u8));
     }
 }

@@ -8,7 +8,7 @@ use std::time::Duration;
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::consts;
+use crate::common::TapType;
 use crate::proto::{common, trident};
 
 #[cfg(unix)]
@@ -493,24 +493,24 @@ impl RuntimeConfig<'_> {
         if self
             .l4_log_store_tap_types
             .iter()
-            .any(|&x| x > consts::TapType::Max as u32)
+            .any(|&x| x > u16::from(TapType::Max) as u32)
         {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "l4-log-tap-types has tap type not in [{:?}, {:?}]",
-                consts::TapType::Any,
-                consts::TapType::Max
+                "l4-log-tap-types has tap type not in [{:?}, {:?})",
+                TapType::Any,
+                TapType::Max
             )));
         }
 
         if self
             .l7_log_store_tap_types
             .iter()
-            .any(|&x| x > consts::TapType::Max as u32)
+            .any(|&x| x > u16::from(TapType::Max) as u32)
         {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "l7-log-store-tap-types has tap type not in [{:?}, {:?}]",
-                consts::TapType::Any,
-                consts::TapType::Max
+                "l7-log-store-tap-types has tap type not in [{:?}, {:?})",
+                TapType::Any,
+                TapType::Max
             )));
         }
         Ok(())
