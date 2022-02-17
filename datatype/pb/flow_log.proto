@@ -44,8 +44,8 @@ message Flow {
 	// TCP Seq
 	uint32 SYNSeq       = 20;
 	uint32 SYNACKSeq    = 21;
-	uint32 LastKeepAliveSeq0   = 22;
-	uint32 LastKeepAliveSeq1   = 23;
+	uint32 LastKeepaliveSeq   = 22;
+	uint32 LastKeepaliveAck   = 23;
 }
 
 message FlowKey {
