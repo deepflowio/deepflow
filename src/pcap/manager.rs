@@ -4,37 +4,21 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
-        Mutex,
+        Arc, Mutex,
     },
     time::Duration,
 };
 
-use crossbeam::channel;
 use log::{debug, error, info, warn};
 
 use super::{
     format_time, get_temp_filename, worker::Worker, PcapPacket, TapType, GLOBAL_HEADER_LEN,
     INCL_LEN_OFFSET, RECORD_HEADER_LEN, TS_SEC_OFFSET,
 };
-use crate::utils::stats::{Countable, Counter};
-
-#[derive(Debug, Clone, Copy, Default)]
-pub struct ManagerCounter {
-    // statsd: "file_creations"
-    file_creations: u64,
-    // statsd: "file_closes"
-    file_closes: u64,
-    // statsd: "file_rejections"
-    file_rejections: u64,
-    // statsd: "file_creation_failures"
-    file_creation_failures: u64,
-    // statsd: "file_writing_failures"
-    file_writing_failures: u64,
-    // statsd: "written_count"
-    written_count: u64,
-    // statsd: "written_bytes"
-    written_bytes: u64,
-}
+use crate::utils::{
+    queue,
+    stats::{Collector, StatsOption},
+};
 
 pub struct WorkerManager {
     block_size_kb: u32,
@@ -43,9 +27,9 @@ pub struct WorkerManager {
     max_file_period: Duration,
     base_directory: PathBuf,
     running: AtomicBool,
-    counter: ManagerCounter,
-    workers: Mutex<Vec<Worker>>,
+    workers: Mutex<Vec<Arc<Worker>>>,
     example_filepath: PathBuf,
+    stats: Arc<Collector>,
 }
 
 impl WorkerManager {
@@ -56,14 +40,15 @@ impl WorkerManager {
         max_file_period: Duration,
         base_directory: P,
         interval: Duration,
-        packet_receivers: Vec<channel::Receiver<PcapPacket>>,
+        packet_receivers: Vec<queue::Receiver<PcapPacket>>,
+        stats: Arc<Collector>,
     ) -> Self {
         let worker_max_concurrent_files = max_concurrent_files / packet_receivers.len() as u32;
         let workers = packet_receivers
             .into_iter()
             .enumerate()
             .map(|(index, receiver)| {
-                Worker::new(
+                Arc::new(Worker::new(
                     index,
                     worker_max_concurrent_files,
                     max_file_size_mb << 20,
@@ -72,9 +57,9 @@ impl WorkerManager {
                     block_size_kb << 10,
                     receiver,
                     interval,
-                )
+                ))
             })
-            .collect::<Vec<_>>();
+            .collect();
 
         let example_filepath = get_temp_filename(
             &Path::new("yunshan"),
@@ -92,9 +77,9 @@ impl WorkerManager {
             max_file_period,
             base_directory: base_directory.as_ref().to_path_buf(),
             running: AtomicBool::new(false),
-            counter: ManagerCounter::default(),
             workers: Mutex::new(workers),
             example_filepath,
+            stats,
         }
     }
 
@@ -122,6 +107,11 @@ impl WorkerManager {
         }
 
         for worker in self.workers.lock().unwrap().iter() {
+            self.stats.register_countable(
+                "pcap",
+                worker.clone(),
+                vec![StatsOption::Tag("index", worker.index.to_string())],
+            );
             worker.start();
         }
 
@@ -289,15 +279,3 @@ impl WorkerManager {
         Ok(Duration::from_secs(last_record_time as u64))
     }
 }
-
-//TODO
-impl Countable for WorkerManager {
-    fn get_counters(&self) -> Vec<Counter> {
-        vec![]
-    }
-
-    fn closed(&self) -> bool {
-        !self.running.load(Ordering::SeqCst)
-    }
-}
-// END
