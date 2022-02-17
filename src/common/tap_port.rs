@@ -1,6 +1,7 @@
 use std::fmt;
 use std::net::Ipv4Addr;
 
+#[derive(Default)]
 // 64     60                                    0
 // +------+-------------------------------------+
 // | from |              ip/id/mac              |
