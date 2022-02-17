@@ -1,5 +1,12 @@
 use super::policy::PolicyData;
 
+#[derive(Debug, Default)]
 pub struct Tag {
-    policy_data: [PolicyData; 2],
+    pub policy_data: [PolicyData; 2],
+}
+
+impl Tag {
+    pub fn reverse(&mut self) {
+        self.policy_data.swap(0, 1);
+    }
 }
