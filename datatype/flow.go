@@ -259,10 +259,10 @@ type Flow struct {
 	FlowID uint64
 
 	// TCP Seq
-	SYNSeq            uint32
-	SYNACKSeq         uint32
-	LastKeepAliveSeq0 uint32
-	LastKeepAliveSeq1 uint32
+	SYNSeq           uint32
+	SYNACKSeq        uint32
+	LastKeepaliveSeq uint32
+	LastKeepaliveAck uint32
 
 	/* Timers */
 	StartTime    time.Duration
@@ -476,12 +476,12 @@ func (f *Flow) SequentialMerge(rhs *Flow) {
 	f.IsActiveService = rhs.IsActiveService
 	f.Reversed = rhs.Reversed
 
-	// 若flow中存在KeepAlive报文，f.LastKeepAliveSeq0及f.LastKeepAliveSeq1保存最后采集到的Seq
-	if rhs.LastKeepAliveSeq0 != 0 {
-		f.LastKeepAliveSeq0 = rhs.LastKeepAliveSeq0
+	// 若flow中存在KeepAlive报文，f.LastKeepaliveSeq及f.LastKeepaliveAck保存最后采集到的信息
+	if rhs.LastKeepaliveSeq != 0 {
+		f.LastKeepaliveSeq = rhs.LastKeepaliveSeq
 	}
-	if rhs.LastKeepAliveSeq1 != 0 {
-		f.LastKeepAliveSeq1 = rhs.LastKeepAliveSeq1
+	if rhs.LastKeepaliveAck != 0 {
+		f.LastKeepaliveAck = rhs.LastKeepaliveAck
 	}
 }
 
@@ -510,8 +510,8 @@ func (f *Flow) WriteToPB(p *pb.Flow) {
 
 	p.SYNSeq = f.SYNSeq
 	p.SYNACKSeq = f.SYNACKSeq
-	p.LastKeepAliveSeq0 = f.LastKeepAliveSeq0
-	p.LastKeepAliveSeq1 = f.LastKeepAliveSeq1
+	p.LastKeepaliveSeq = f.LastKeepaliveSeq
+	p.LastKeepaliveAck = f.LastKeepaliveAck
 
 	p.StartTime = uint64(f.StartTime)
 	p.EndTime = uint64(f.EndTime)
@@ -680,8 +680,8 @@ func (f *Flow) String() string {
 	formatted += fmt.Sprintf("QueueHash: %d ", f.QueueHash)
 	formatted += fmt.Sprintf("SYNSeq: %d ", f.SYNSeq)
 	formatted += fmt.Sprintf("SYNACKSeq: %d ", f.SYNACKSeq)
-	formatted += fmt.Sprintf("LastKeepAliveSeq0: %d ", f.LastKeepAliveSeq0)
-	formatted += fmt.Sprintf("LastKeepAliveSeq1: %d ", f.LastKeepAliveSeq1)
+	formatted += fmt.Sprintf("LastKeepaliveSeq: %d ", f.LastKeepaliveSeq)
+	formatted += fmt.Sprintf("LastKeepaliveAck: %d ", f.LastKeepaliveAck)
 	formatted += fmt.Sprintf("FlowStatTime: %d\n", f.FlowStatTime/time.Second)
 	formatted += fmt.Sprintf("\tStartTime: %d ", f.StartTime)
 	formatted += fmt.Sprintf("EndTime: %d ", f.EndTime)
