@@ -14,7 +14,7 @@ require (
 	github.com/olivere/elastic v6.2.16+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/spf13/cobra v0.0.5
-	gitlab.yunshan.net/yunshan/droplet-libs v0.0.0-20220216110846-8c9c0de3441d
+	gitlab.yunshan.net/yunshan/droplet-libs v0.0.0-20220217024507-89ec4b1f6797
 	gitlab.yunshan.net/yunshan/message v0.0.0-20220117021718-14f42b82fe8e
 	golang.org/x/net v0.0.0-20201021035429-f5854403a974
 	google.golang.org/genproto v0.0.0-20190626174449-989357319d63 // indirect
