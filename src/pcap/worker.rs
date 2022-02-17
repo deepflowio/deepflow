@@ -1,5 +1,6 @@
 use std::{
     fs,
+    ops::Deref,
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -9,7 +10,6 @@ use std::{
     time::Duration,
 };
 
-use crossbeam::channel::{self, RecvTimeoutError};
 use dashmap::DashMap;
 use log::{debug, error, info, warn};
 
@@ -18,7 +18,8 @@ use super::{
     writer::{Writer, WriterCounter},
     PcapPacket, TapType,
 };
-use crate::utils::stats::{Countable, Counter};
+use crate::utils::queue::{self, Error};
+use crate::utils::stats::{Countable, Counter, CounterType, CounterValue};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct WorkerCounter {
@@ -47,13 +48,12 @@ struct WorkerConfig {
     writer_buffer_size: u32,
 }
 
-#[derive(Debug)]
 pub struct Worker {
-    index: usize,
+    pub index: usize,
     config: WorkerConfig,
     counter: Arc<Mutex<WorkerCounter>>,
     writers: Arc<DashMap<u64, Writer>>,
-    packet_receiver: Arc<channel::Receiver<PcapPacket>>,
+    packet_receiver: Arc<queue::Receiver<PcapPacket>>,
     thread: Mutex<Option<JoinHandle<()>>>,
     interval: Duration,
     running: AtomicBool,
@@ -67,7 +67,7 @@ impl Worker {
         max_file_period: Duration,
         base_directory: PathBuf,
         writer_buffer_size: u32,
-        packet_receiver: channel::Receiver<PcapPacket>,
+        packet_receiver: queue::Receiver<PcapPacket>,
         interval: Duration,
     ) -> Self {
         Self {
@@ -102,15 +102,15 @@ impl Worker {
 
         // 上层Sender要关闭channel，才调用worker的stop方法
         let thread = thread::spawn(move || loop {
-            match packet_receiver.recv_timeout(interval) {
+            match packet_receiver.recv(Some(interval)) {
                 Ok(pkt) => {
                     Self::write_pkt(pkt, &writers, &config, &counter);
                 }
-                Err(RecvTimeoutError::Timeout) => {
+                Err(Error::Timeout) => {
                     let now = rpc::get_timestamp();
                     Self::clean_timeout_file(now, &writers, &config, &counter);
                 }
-                Err(RecvTimeoutError::Disconnected) => {
+                Err(Error::Terminated(_, _)) => {
                     let now = rpc::get_timestamp();
                     Self::clean_timeout_file(now, &writers, &config, &counter);
                     break;
@@ -319,14 +319,57 @@ mod rpc {
 }
 //END
 
-//TODO
 impl Countable for Worker {
     fn get_counters(&self) -> Vec<Counter> {
-        vec![]
+        let WorkerCounter {
+            file_creations,
+            file_closes,
+            file_rejections,
+            file_creation_failures,
+            file_writing_failures,
+            written_count,
+            written_bytes,
+        } = *self.counter.lock().unwrap().deref();
+        vec![
+            (
+                "file_creations",
+                CounterType::Counted,
+                CounterValue::Unsigned(file_creations),
+            ),
+            (
+                "file_closes",
+                CounterType::Counted,
+                CounterValue::Unsigned(file_closes),
+            ),
+            (
+                "file_rejections",
+                CounterType::Counted,
+                CounterValue::Unsigned(file_rejections),
+            ),
+            (
+                "file_creation_failures",
+                CounterType::Counted,
+                CounterValue::Unsigned(file_creation_failures),
+            ),
+            (
+                "file_writing_failures",
+                CounterType::Counted,
+                CounterValue::Unsigned(file_writing_failures),
+            ),
+            (
+                "written_count",
+                CounterType::Counted,
+                CounterValue::Unsigned(written_count),
+            ),
+            (
+                "written_bytes",
+                CounterType::Counted,
+                CounterValue::Unsigned(written_bytes),
+            ),
+        ]
     }
 
     fn closed(&self) -> bool {
         !self.running.load(Ordering::SeqCst)
     }
 }
-// END
