@@ -1,0 +1,35 @@
+syntax = "proto2";
+
+package licenseV6;
+option go_package = "licenseV6";
+
+
+enum VtapFunction {
+    TRAFFIC_DISTRIBUTION    = 1; // 流量分发
+    NETWORK_MONITORING      = 2; // 网络监控
+    APPLICATION_MONITORING  = 3; // 应用监控
+}
+
+message License {
+    optional int32  user_type = 1; //候选项：正式客户、内部使用
+    optional string customer = 2; // 客户名称
+    optional string contract_no = 3; //合同编号
+    optional uint32 crm_id = 4; //CRM ID
+    optional string product_version = 5; // 版本号 V5
+    repeated string controller_hostname = 6; // 控制器主机名
+    repeated string controller_public_ip = 7; // 控制器IP
+    optional int32 a_vtap_count = 8; // A类采集器数量 
+    repeated int32 a_vtap_function = 9; // A类采集器功能 
+    optional int32 b_vtap_count = 10; // B类采集器数量 
+    repeated int32 b_vtap_function = 11; // B类采集器功能 
+    optional int32 c_vtap_count = 12; // C类采集器数量 
+    repeated int32 c_vtap_function = 13; // C类采集器功能 
+    optional int32 dedicated_vtap_count = 14; // 专属服务器采集器数量
+    repeated int32 dedicated_vtap_function = 15; // 专属服务器采集器功能
+    optional string activation_time = 16; // 生效日期 "2019-09-11"
+    optional uint32 expiration_days = 17; // 许可天数, 0表示永久授权
+    optional string signatory = 18; // 签发人
+    optional string issuance_time = 19; // 签发时间戳 "2019-09-11 15:43:20"
+    optional string sign_server_ip = 20; // 签发服务器IP
+    optional string agency = 21; // 代理商
+}
