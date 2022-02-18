@@ -34,6 +34,10 @@ pub enum Error {
     Ethtool(String),
     #[error("parse packet failed from: {0}")]
     ParsePacketFailed(String),
+    #[error("dns perf parse: {0}")]
+    DnsPerfParse(String),
+    #[error("dns log parse: {0}")]
+    DnsLogParse(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

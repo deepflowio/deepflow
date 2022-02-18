@@ -1,3 +1,4 @@
+pub(crate) mod bytes;
 pub(crate) mod command;
 pub(crate) mod environment;
 pub(crate) mod guard;

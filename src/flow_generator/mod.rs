@@ -1,3 +1,4 @@
+mod dns;
 mod flow_config;
 mod flow_state;
 
