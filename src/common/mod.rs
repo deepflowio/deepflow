@@ -8,6 +8,7 @@ mod matched_field;
 pub mod meta_packet;
 pub mod platform_data;
 pub mod policy;
+pub mod protocol_logs;
 mod tag;
 pub mod tagged_flow;
 pub mod tap_port;

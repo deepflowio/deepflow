@@ -451,7 +451,7 @@ pub fn link_list() -> Result<Vec<Link>, NlError> {
     Ok(links)
 }
 
-fn parse_ip_slice(bs: &[u8]) -> Option<IpAddr> {
+pub fn parse_ip_slice(bs: &[u8]) -> Option<IpAddr> {
     if let Ok(s) = <&[u8; 4]>::try_from(bs) {
         Some(IpAddr::from(*s))
     } else if let Ok(s) = <&[u8; 16]>::try_from(bs) {
