@@ -11,7 +11,7 @@ use cadence::{
 };
 use log::{info, warn};
 
-use crate::consts::DROPLET_PORT;
+use crate::common::DROPLET_PORT;
 
 const TICK_CYCLE: Duration = Duration::from_secs(5);
 

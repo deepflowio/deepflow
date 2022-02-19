@@ -16,6 +16,7 @@ use crate::proto::trident;
 use crate::rpc::session::Session;
 use crate::utils::{
     self,
+    net::is_unicast_link_local,
     stats::{Countable, Counter},
 };
 
@@ -121,7 +122,7 @@ impl Synchronizer {
             match ip_addr {
                 IpAddr::V4(addr) => addr.is_link_local(),
                 // Ipv6Addr::is_unicast_link_local()是实验API无法使用
-                IpAddr::V6(addr) => (addr.segments()[0] & 0xffc0) == 0xfe80,
+                IpAddr::V6(addr) => is_unicast_link_local(&addr),
             }
         }
 

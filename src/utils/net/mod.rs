@@ -1,4 +1,8 @@
-use std::{fmt, net::IpAddr, str::FromStr};
+use std::{
+    fmt,
+    net::{IpAddr, Ipv6Addr},
+    str::FromStr,
+};
 
 use crate::error::Error;
 
@@ -102,4 +106,9 @@ impl FromStr for MacAddr {
         }
         Ok(MacAddr(addr))
     }
+}
+
+pub fn is_unicast_link_local(ip: &Ipv6Addr) -> bool {
+    // Ipv6Addr::is_unicast_link_local()是实验API无法使用
+    ip.segments()[0] & 0xffc0 == 0xfe80
 }

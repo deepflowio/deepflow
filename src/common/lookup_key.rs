@@ -1,14 +1,16 @@
+use std::fmt;
 use std::net::{IpAddr, Ipv4Addr};
+use std::time::Duration;
 
 use super::{
     matched_field::{MatchedField, MatchedFieldv4, MatchedFieldv6, MatchedFlag},
-    EthernetType, FeatureFlags, IpProtocol, TapType,
+    EthernetType, FeatureFlag, IpProtocol, TapType,
 };
 
 use crate::utils::net::MacAddr;
 
 pub struct LookupKey {
-    pub timestamp: u32,
+    pub timestamp: Duration,
     pub src_mac: MacAddr,
     pub dst_mac: MacAddr,
     pub src_ip: IpAddr,
@@ -26,7 +28,7 @@ pub struct LookupKey {
     pub l3_epc_id_1: u16,
     pub proto: IpProtocol,
     pub tap_type: TapType,
-    pub feature_flag: FeatureFlags,
+    pub feature_flag: FeatureFlag,
     pub forward_matched: Option<MatchedField>,
     pub backward_matched: Option<MatchedField>,
     pub fast_index: usize,
@@ -36,7 +38,7 @@ pub struct LookupKey {
 impl Default for LookupKey {
     fn default() -> Self {
         LookupKey {
-            timestamp: 0,
+            timestamp: Duration::ZERO,
             src_mac: Default::default(),
             dst_mac: Default::default(),
             src_ip: Ipv4Addr::UNSPECIFIED.into(),
@@ -54,7 +56,7 @@ impl Default for LookupKey {
             l3_epc_id_1: 0,
             proto: Default::default(),
             tap_type: Default::default(),
-            feature_flag: FeatureFlags::NPB,
+            feature_flag: FeatureFlag::NPB,
             forward_matched: None,
             backward_matched: None,
             fast_index: 0,
@@ -120,7 +122,31 @@ impl LookupKey {
         );
     }
 
-    pub fn has_feature_flag(&self, feature_flag: FeatureFlags) -> bool {
+    pub fn has_feature_flag(&self, feature_flag: FeatureFlag) -> bool {
         self.feature_flag & feature_flag == feature_flag
+    }
+}
+
+impl fmt::Display for LookupKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{:?} {}:{} > {}:{}, eth_type: {:#06x}, {}.{}.{} > {}.{}.{}, proto: {:?}, tap_type: {}, tunnel_id: {}",
+            self.timestamp,
+            self.src_mac,
+            self.l2_end_0,
+            self.dst_mac,
+            self.l2_end_1,
+            self.eth_type as u16,
+            self.src_ip,
+            self.src_port,
+            self.l3_end_0,
+            self.dst_ip,
+            self.dst_port,
+            self.l3_end_1,
+            self.proto,
+            self.tap_type,
+            self.tunnel_id,
+        )
     }
 }

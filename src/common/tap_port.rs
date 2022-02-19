@@ -1,11 +1,11 @@
 use std::fmt;
 use std::net::Ipv4Addr;
 
-#[derive(Default)]
 // 64     60                                    0
 // +------+-------------------------------------+
 // | from |              ip/id/mac              |
 // +------+-------------------------------------+
+#[derive(Default)]
 pub struct TapPort(u64);
 
 impl TapPort {
@@ -63,7 +63,7 @@ impl fmt::Display for TapPort {
                 let bs = p.to_be_bytes();
                 write!(
                     f,
-                    "LMAC@{:#02x}:{:#02x}:{:#02x}:{:#02x}",
+                    "LMAC@{:02x}:{:02x}:{:02x}:{:02x}",
                     bs[0], bs[1], bs[2], bs[3]
                 )
             }
@@ -71,7 +71,7 @@ impl fmt::Display for TapPort {
                 let bs = p.to_be_bytes();
                 write!(
                     f,
-                    "GMAC@{:#02x}:{:#02x}:{:#02x}:{:#02x}",
+                    "GMAC@{:02x}:{:02x}:{:02x}:{:02x}",
                     bs[0], bs[1], bs[2], bs[3]
                 )
             }
