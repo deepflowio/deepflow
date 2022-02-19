@@ -11,8 +11,14 @@ use pnet::packet::{
 };
 
 use super::{
-    consts::*, EndpointData, EthernetType, FlowMetricsPeer, HeaderType, IpProtocol, LookupKey,
-    PolicyData, TapPort, TunnelInfo,
+    consts::*,
+    decapsulate::TunnelInfo,
+    endpoint::EndpointData,
+    enums::{EthernetType, HeaderType, IpProtocol},
+    flow::FlowMetricsPeer,
+    lookup_key::LookupKey,
+    policy::PolicyData,
+    tap_port::TapPort,
 };
 
 use crate::error;

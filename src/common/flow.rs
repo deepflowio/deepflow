@@ -5,7 +5,11 @@ use std::{
     time::Duration,
 };
 
-use super::{EthernetType, IpProtocol, TapPort, TapType, TunnelType};
+use super::{
+    decapsulate::TunnelType,
+    enums::{EthernetType, IpProtocol, TapType},
+    tap_port::TapPort,
+};
 
 use crate::utils::net::MacAddr;
 

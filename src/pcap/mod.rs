@@ -5,7 +5,7 @@ use std::{
 
 use chrono::{DateTime, Utc};
 
-use crate::common::TapType;
+use crate::common::enums::TapType;
 
 mod manager;
 mod worker;

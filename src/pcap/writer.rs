@@ -7,7 +7,7 @@ use std::{
 
 use log::{debug, error};
 
-use crate::common::{LinkType, TapType};
+use crate::common::enums::{LinkType, TapType};
 
 use super::{
     format_time, PcapPacket, PCAP_MAGIC, RECORD_HEADER_LEN, SNAP_LEN, VERSION_MAJOR, VERSION_MINOR,

@@ -8,7 +8,7 @@ use std::time::Duration;
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::common::TapType;
+use crate::common::enums::TapType;
 use crate::proto::{common, trident};
 
 #[cfg(unix)]
