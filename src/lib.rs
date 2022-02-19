@@ -2,7 +2,6 @@
 
 mod common;
 mod config;
-mod consts;
 mod error;
 mod handler;
 mod monitor;

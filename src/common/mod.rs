@@ -15,7 +15,7 @@ mod tap_types;
 pub use consts::*;
 
 pub use decapsulate::{TunnelInfo, TunnelType};
-pub use endpoint::{EndpointData, FeatureFlags};
+pub use endpoint::{EndpointData, FeatureFlag};
 pub use enums::*;
 pub use flow::FlowMetricsPeer;
 pub use lookup_key::LookupKey;

@@ -1,4 +1,5 @@
-use std::{fmt, net::Ipv4Addr};
+use std::fmt;
+use std::net::Ipv4Addr;
 
 use crate::proto::trident::DecapType;
 
@@ -118,6 +119,16 @@ pub struct TunnelInfo {
 
 impl TunnelInfo {
     // TODO
+}
+
+impl fmt::Display for TunnelInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "type: {:?}, src: {} {:#010x}, dst: {} {:#010x}, id: {}, tier: {}",
+            self.tunnel_type, self.src, self.mac_src, self.dst, self.mac_dst, self.id, self.tier
+        )
+    }
 }
 
 #[cfg(test)]

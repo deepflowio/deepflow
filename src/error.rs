@@ -32,6 +32,8 @@ pub enum Error {
     Errno(#[from] nix::errno::Errno),
     #[error("ethtool: {0}")]
     Ethtool(String),
+    #[error("parse packet failed from: {0}")]
+    ParsePacketFailed(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
