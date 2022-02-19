@@ -3,8 +3,9 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 
 use super::{
+    endpoint::FeatureFlag,
+    enums::{EthernetType, IpProtocol, TapType},
     matched_field::{MatchedField, MatchedFieldv4, MatchedFieldv6, MatchedFlag},
-    EthernetType, FeatureFlag, IpProtocol, TapType,
 };
 
 use crate::utils::net::MacAddr;

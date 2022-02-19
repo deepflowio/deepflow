@@ -1,27 +1,18 @@
 mod consts;
-mod decapsulate;
-mod endpoint;
-mod enums;
-mod flow;
-mod lookup_key;
+pub mod decapsulate;
+pub mod endpoint;
+pub mod enums;
+pub mod flow;
+pub mod lookup_key;
 mod matched_field;
 mod meta_packet;
-mod platform_data;
-mod policy;
+pub mod platform_data;
+pub mod policy;
 mod tag;
 mod tagged_flow;
-mod tap_port;
+pub mod tap_port;
 mod tap_types;
 pub use consts::*;
-
-pub use decapsulate::{TunnelInfo, TunnelType};
-pub use endpoint::{EndpointData, FeatureFlag};
-pub use enums::*;
-pub use flow::FlowMetricsPeer;
-pub use lookup_key::LookupKey;
-pub use platform_data::PlatformData;
-pub use policy::{DirectionType, PolicyData};
-pub use tap_port::TapPort;
 
 use std::{
     fmt,

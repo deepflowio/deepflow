@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use bitflags::bitflags;
 
-use super::{LookupKey, PlatformData, TapType};
+use super::{enums::TapType, lookup_key::LookupKey, platform_data::PlatformData};
 
 pub const EPC_FROM_DEEPFLOW: i32 = -1;
 pub const EPC_FROM_INTERNET: i32 = -1;
