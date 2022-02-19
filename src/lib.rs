@@ -5,6 +5,7 @@ mod config;
 mod error;
 mod flow_generator;
 mod handler;
+mod metric;
 mod monitor;
 mod pcap;
 mod platform;

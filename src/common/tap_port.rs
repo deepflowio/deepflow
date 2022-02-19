@@ -94,3 +94,9 @@ impl fmt::Display for TapPort {
         }
     }
 }
+
+impl fmt::Debug for TapPort {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
+    }
+}

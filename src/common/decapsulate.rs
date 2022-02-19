@@ -10,7 +10,7 @@ pub enum TunnelType {
     Vxlan = DecapType::Vxlan as u16,
     Ipip = DecapType::Ipip as u16,
     TencentGre = DecapType::Tencent as u16,
-    ErspanOrTeb = DecapType::Tencent as u16 + 1,
+    ErspanOrTeb = TunnelType::TencentGre as u16 + 1,
 }
 
 impl TryFrom<&DecapType> for TunnelType {
