@@ -9,7 +9,7 @@ mod meta_packet;
 pub mod platform_data;
 pub mod policy;
 mod tag;
-mod tagged_flow;
+pub mod tagged_flow;
 pub mod tap_port;
 mod tap_types;
 
