@@ -24,6 +24,28 @@ func AcquirePbAppProtoLogsData() *AppProtoLogsData {
 }
 
 func ReleasePbAppProtoLogsData(d *AppProtoLogsData) {
+	if d == nil {
+		return
+	}
+
+	head := d.BaseInfo.Head
+	head.Reset()
+	basicInfo := d.BaseInfo
+	basicInfo.Reset()
+	basicInfo.Head = head
+
+	http, dns, dubbo, kafka, mysql, redis := d.Http, d.Dns, d.Dubbo, d.Kafka, d.Mysql, d.Redis
+	http.Reset()
+	dns.Reset()
+	dubbo.Reset()
+	kafka.Reset()
+	mysql.Reset()
+	redis.Reset()
+
+	d.Reset()
+	d.BaseInfo = basicInfo
+	d.Http, d.Dns, d.Dubbo, d.Kafka, d.Mysql, d.Redis = http, dns, dubbo, kafka, mysql, redis
+
 	pbAppProtoLogsDataPool.Put(d)
 }
 

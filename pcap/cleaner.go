@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("pcap")
@@ -79,22 +79,47 @@ func (c *Cleaner) work() {
 		sumSize := int64(0)
 		nDeleted := 0
 		pcapDataRetention := c.GetPcapDataRetention()
-		for _, f := range files {
+		firstDeleteIndex, lastDeleteIndex := 0, 0
+		for i, f := range files {
 			sumSize += f.size
 			if sumSize >= c.maxDirectorySize || (pcapDataRetention != 0 && now.Sub(f.fileTime) > pcapDataRetention) {
+				if nDeleted == 0 {
+					firstDeleteIndex = i
+				}
+				lastDeleteIndex = i
 				os.Remove(f.location)
 				nDeleted++
 			}
+		}
+		if nDeleted > 0 {
+			log.Info("Pcap total size %d(before deleted), have deleted pcap file count %d, first file name: %s, mod time: %v, size: %d, last file name: %s, mod time: %v, size: %d",
+				sumSize, nDeleted,
+				files[firstDeleteIndex].location, files[firstDeleteIndex].fileTime, files[firstDeleteIndex].size,
+				files[lastDeleteIndex].location, files[lastDeleteIndex].fileTime, files[lastDeleteIndex].size)
 		}
 
 		fs := syscall.Statfs_t{}
 		err := syscall.Statfs(c.baseDirectory, &fs)
 		if err == nil {
+			nDeletedForFree := 0
+			firstDeleteIndex, lastDeleteIndex = 0, 0
 			free := int64(fs.Bfree) * int64(fs.Bsize)
 			for i := len(files) - nDeleted - 1; i >= 0 && free < c.diskFreeSpaceMargin; i-- {
+				if nDeletedForFree == 0 {
+					firstDeleteIndex = i
+				}
+				lastDeleteIndex = i
+				nDeletedForFree++
 				os.Remove(files[i].location)
 				free += files[i].size
 			}
+			if nDeletedForFree > 0 {
+				log.Info("Pcap disk free size %d(after deleted), have deleted pcap file count %d, first file name: %s, mod time: %v, size: %d, last file name: %s, mod time: %v, size: %d",
+					free, nDeletedForFree,
+					files[firstDeleteIndex].location, files[firstDeleteIndex].fileTime, files[firstDeleteIndex].size,
+					files[lastDeleteIndex].location, files[lastDeleteIndex].fileTime, files[lastDeleteIndex].size)
+			}
+
 		}
 		c.fileLock.Unlock()
 	}
