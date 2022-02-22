@@ -2,7 +2,10 @@
 
 use std::fmt;
 
+use bitflags::bitflags;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+
+use super::flow::FlowMetricsPeer;
 
 /// EthernetType is an enumeration of ethernet type values, and acts as a decoder
 /// for any type it supports.
@@ -289,6 +292,83 @@ impl HeaderType {
 impl Default for HeaderType {
     fn default() -> HeaderType {
         HeaderType::Invalid
+    }
+}
+
+bitflags! {
+    pub struct TcpFlags: u8 {
+        const FIN = 0b000001;
+        const SYN = 0b000010;
+        const RST = 0b000100;
+        const PSH = 0b001000;
+        const ACK = 0b010000;
+        const URG = 0b100000;
+        const MASK = 0x3F;
+
+        const SYN_ACK = Self::SYN.bits | Self::ACK.bits;
+        const FIN_ACK = Self::FIN.bits | Self::ACK.bits;
+        const FIN_PSH_ACK = Self::FIN.bits | Self::PSH.bits | Self::ACK.bits;
+        const RST_ACK = Self::RST.bits | Self::ACK.bits;
+        const RST_PSH_ACK = Self::RST.bits | Self::PSH.bits | Self::ACK.bits;
+        const PSH_ACK = Self::PSH.bits | Self::ACK.bits;
+        const PSH_ACK_URG = Self::PSH.bits | Self::ACK.bits | Self::URG.bits;
+    }
+}
+
+impl fmt::Display for TcpFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut bit_strs = vec![];
+        if self.contains(Self::FIN) {
+            bit_strs.push("FIN");
+        }
+        if self.contains(Self::SYN) {
+            bit_strs.push("SYN");
+        }
+        if self.contains(Self::RST) {
+            bit_strs.push("RST");
+        }
+        if self.contains(Self::PSH) {
+            bit_strs.push("PSH");
+        }
+        if self.contains(Self::ACK) {
+            bit_strs.push("ACK");
+        }
+        if self.contains(Self::URG) {
+            bit_strs.push("URG");
+        }
+        write!(f, "{}", bit_strs.join("|"))
+    }
+}
+
+impl TcpFlags {
+    pub fn is_invalid(&self) -> bool {
+        match *self & TcpFlags::MASK {
+            TcpFlags::SYN => false,
+            TcpFlags::SYN_ACK => false,
+            TcpFlags::FIN => false,
+            TcpFlags::FIN_ACK => false,
+            TcpFlags::FIN_PSH_ACK => false,
+            TcpFlags::RST => false,
+            TcpFlags::RST_ACK => false,
+            TcpFlags::RST_PSH_ACK => false,
+            TcpFlags::ACK => false,
+            TcpFlags::PSH_ACK => false,
+            TcpFlags::PSH_ACK_URG => false,
+            _ => true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum PacketDirection {
+    ClientToServer = FlowMetricsPeer::SRC,
+    ServerToClient = FlowMetricsPeer::DST,
+}
+
+impl Default for PacketDirection {
+    fn default() -> PacketDirection {
+        PacketDirection::ClientToServer
     }
 }
 

@@ -3,7 +3,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 
 use super::{
-    endpoint::FeatureFlag,
+    endpoint::FeatureFlags,
     enums::{EthernetType, IpProtocol, TapType},
     matched_field::{MatchedField, MatchedFieldv4, MatchedFieldv6, MatchedFlag},
 };
@@ -29,7 +29,7 @@ pub struct LookupKey {
     pub l3_epc_id_1: u16,
     pub proto: IpProtocol,
     pub tap_type: TapType,
-    pub feature_flag: FeatureFlag,
+    pub feature_flag: FeatureFlags,
     pub forward_matched: Option<MatchedField>,
     pub backward_matched: Option<MatchedField>,
     pub fast_index: usize,
@@ -57,7 +57,7 @@ impl Default for LookupKey {
             l3_epc_id_1: 0,
             proto: Default::default(),
             tap_type: Default::default(),
-            feature_flag: FeatureFlag::NPB,
+            feature_flag: FeatureFlags::NPB,
             forward_matched: None,
             backward_matched: None,
             fast_index: 0,
@@ -123,7 +123,7 @@ impl LookupKey {
         );
     }
 
-    pub fn has_feature_flag(&self, feature_flag: FeatureFlag) -> bool {
+    pub fn has_feature_flag(&self, feature_flag: FeatureFlags) -> bool {
         self.feature_flag & feature_flag == feature_flag
     }
 }

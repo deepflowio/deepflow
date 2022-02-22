@@ -14,8 +14,7 @@ use super::{
     consts::*,
     decapsulate::TunnelInfo,
     endpoint::EndpointData,
-    enums::{EthernetType, HeaderType, IpProtocol},
-    flow::FlowMetricsPeer,
+    enums::{EthernetType, HeaderType, IpProtocol, PacketDirection},
     lookup_key::LookupKey,
     policy::PolicyData,
     tap_port::TapPort,
@@ -729,19 +728,6 @@ pub struct MetaPacketTcpHeader {
     pub win_scale: u8,
     pub sack_permitted: bool,
     pub sack: Option<Vec<u8>>, // sack value
-}
-
-#[derive(Debug)]
-#[repr(u8)]
-pub enum PacketDirection {
-    ClientToServer = FlowMetricsPeer::SRC,
-    ServerToClient = FlowMetricsPeer::DST,
-}
-
-impl Default for PacketDirection {
-    fn default() -> PacketDirection {
-        PacketDirection::ClientToServer
-    }
 }
 
 #[cfg(test)]

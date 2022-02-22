@@ -5,12 +5,15 @@ use std::{
     time::Duration,
 };
 
+use log::warn;
+
 use super::{
     decapsulate::TunnelType,
-    enums::{EthernetType, IpProtocol, TapType},
+    enums::{EthernetType, IpProtocol, TapType, TcpFlags},
     tap_port::TapPort,
 };
 
+use crate::flow_generator::FlowState;
 use crate::utils::net::MacAddr;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -391,7 +394,7 @@ pub struct FlowMetricsPeer {
     pub is_l3_end: bool,
     pub is_active_host: bool,
     pub is_device: bool,        // ture表明是从平台数据获取的
-    pub tcp_flags: u8,          // 所有TCP的Flags的或运算结果
+    pub tcp_flags: TcpFlags,    // 所有TCP的Flags的或运算结果
     pub is_vip_interface: bool, // 目前仅支持微软Mux设备，从grpc Interface中获取
     pub is_vip: bool,           // 从grpc cidr中获取
     pub is_local_mac: bool,     // 同EndpointInfo中的IsLocalMac, 流日志中不需要存储
@@ -416,7 +419,7 @@ impl Default for FlowMetricsPeer {
             is_l3_end: false,
             is_active_host: false,
             is_device: false,
-            tcp_flags: 0,
+            tcp_flags: TcpFlags::empty(),
             is_vip_interface: false,
             is_vip: false,
             is_local_mac: false,
@@ -524,6 +527,58 @@ impl Flow {
         self.tunnel.reverse();
         self.flow_key.reverse();
         self.flow_metrics_peers.swap(0, 1);
+    }
+
+    pub fn update_close_type(&mut self, flow_state: FlowState) {
+        self.close_type = match flow_state {
+            FlowState::Exception => CloseType::Unknown,
+            FlowState::Opening1 => CloseType::ClientSynRepeat,
+            FlowState::Opening2 => CloseType::ServerSynAckRepeat,
+            FlowState::Established => CloseType::Timeout,
+            FlowState::ClosingTx1 => CloseType::ServerHalfClose,
+            FlowState::ClosingRx1 => CloseType::ClientHalfClose,
+            FlowState::ClosingTx2 | FlowState::ClosingRx2 | FlowState::Closed => CloseType::TcpFin,
+            FlowState::Reset => {
+                if self.flow_metrics_peers[FlowMetricsPeer::DST as usize]
+                    .tcp_flags
+                    .contains(TcpFlags::RST)
+                {
+                    CloseType::TcpServerRst
+                } else {
+                    CloseType::TcpClientRst
+                }
+            }
+            FlowState::Syn1 | FlowState::ClientL4PortReuse => CloseType::ClientSourcePortReuse,
+            FlowState::ServerReset => CloseType::ServerReset,
+            FlowState::SynAck1 => CloseType::ServerQueueLack,
+            FlowState::ServerCandidateQueueLack => {
+                const TCP_SYN_RETRANSE_MIN_TIMES: u64 = 3;
+                if self.flow_metrics_peers[FlowMetricsPeer::DST as usize].total_packet_count
+                    > TCP_SYN_RETRANSE_MIN_TIMES
+                {
+                    CloseType::ServerQueueLack
+                } else {
+                    CloseType::TcpClientRst
+                }
+            }
+            FlowState::EstablishReset => {
+                if self.flow_metrics_peers[FlowMetricsPeer::DST as usize]
+                    .tcp_flags
+                    .contains(TcpFlags::RST)
+                {
+                    CloseType::ServerEstablishReset
+                } else {
+                    CloseType::ClientEstablishReset
+                }
+            }
+            _ => {
+                warn!(
+                    "unexpected 'unknown' close type, flow id is {}",
+                    self.flow_id
+                );
+                CloseType::Unknown
+            }
+        }
     }
 }
 

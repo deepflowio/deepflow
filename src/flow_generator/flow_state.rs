@@ -1,0 +1,1643 @@
+use std::mem::{self, MaybeUninit};
+use std::rc::Rc;
+use std::time::Duration;
+
+use super::FlowTimeout;
+
+use crate::common::enums::TcpFlags;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlowState {
+    Raw,
+    Opening1,
+    Opening2,
+    Established,
+    ClosingTx1,
+    ClosingTx2,
+    ClosingRx1,
+    ClosingRx2,
+    Closed,
+    Reset,
+    Exception,
+
+    ServerReset,
+    ServerCandidateQueueLack,
+    ClientL4PortReuse,
+    Syn1,
+    SynAck1,
+    EstablishReset,
+
+    Max,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StateValue {
+    pub timeout: Duration,
+    pub state: FlowState,
+    pub closed: bool,
+}
+
+impl StateValue {
+    pub fn new(timeout: Duration, state: FlowState, closed: bool) -> Self {
+        Self {
+            timeout,
+            state,
+            closed,
+        }
+    }
+}
+
+impl Default for StateValue {
+    fn default() -> Self {
+        Self {
+            timeout: Duration::default(),
+            state: FlowState::Raw,
+            closed: false,
+        }
+    }
+}
+
+type StateEntry = Option<Rc<StateValue>>;
+const N_FLAGS: usize = TcpFlags::MASK.bits() as usize + 1;
+const N_STATES: usize = FlowState::Max as usize;
+
+pub struct StateMachine([[StateEntry; N_FLAGS]; N_STATES]);
+
+impl Default for StateMachine {
+    fn default() -> Self {
+        // Initializing with unsafe because:
+        // 1. [StateEntry; N_FLAGS] is not possible because Rc is not Copy
+        // 2. [T; N] implements Default for N <= 32, but N_FLAGS is 64
+        unsafe {
+            let mut arr: [[MaybeUninit<StateEntry>; N_FLAGS]; N_STATES] = {
+                let arr: MaybeUninit<[[StateEntry; N_FLAGS]; N_STATES]> = MaybeUninit::uninit();
+                mem::transmute(arr)
+            };
+
+            for flag_arr in arr.iter_mut() {
+                for state in flag_arr.iter_mut() {
+                    state.write(None);
+                }
+            }
+
+            StateMachine(mem::transmute(arr))
+        }
+    }
+}
+
+impl StateMachine {
+    pub fn new_master(t: &FlowTimeout) -> Self {
+        let mut wrapped = StateMachine::default();
+        let m = &mut wrapped.0;
+
+        // for FlowState::Raw
+        let s = Rc::new(StateValue::new(t.opening, FlowState::Opening1, false));
+        m[FlowState::Raw as usize][TcpFlags::SYN.bits() as usize] = Some(s);
+
+        // FIN(正)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingTx1, false));
+        m[FlowState::Raw as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::Raw as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Raw as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(t.closing, FlowState::Reset, false));
+        m[FlowState::Raw as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::Raw as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Raw as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(
+            t.established,
+            FlowState::Established,
+            false,
+        ));
+        m[FlowState::Raw as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Raw as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Raw as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
+
+        // for FlowState::Opening1
+        let s = Rc::new(StateValue::new(t.opening, FlowState::Opening1, false));
+        m[FlowState::Opening1 as usize][TcpFlags::SYN.bits() as usize] = Some(s);
+
+        // FIN(正)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingTx1, false));
+        m[FlowState::Opening1 as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening1 as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening1 as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        // RST(正)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::EstablishReset, false));
+        m[FlowState::Opening1 as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening1 as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening1 as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
+
+        // 有ACK(正)
+        let s = Rc::new(StateValue::new(
+            t.established,
+            FlowState::Established,
+            false,
+        ));
+        m[FlowState::Opening1 as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening1 as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening1 as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
+
+        // for FlowState::Opening2
+        let s = Rc::new(StateValue::new(t.opening, FlowState::Opening2, false));
+        m[FlowState::Opening2 as usize][TcpFlags::SYN.bits() as usize] = Some(s);
+
+        // FIN(正)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingTx1, false));
+        m[FlowState::Opening2 as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening2 as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening2 as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        // 有RST(正)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::EstablishReset, false));
+        m[FlowState::Opening2 as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening2 as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening2 as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
+
+        // 有ACK(正)
+        let s = Rc::new(StateValue::new(
+            t.established,
+            FlowState::Established,
+            false,
+        ));
+        m[FlowState::Opening2 as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening2 as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening2 as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
+
+        // for FlowState::Established
+        let s = Rc::new(StateValue::new(
+            t.established,
+            FlowState::Established,
+            false,
+        ));
+        m[FlowState::Established as usize][TcpFlags::SYN.bits() as usize] = Some(s);
+
+        // 有FIN(正)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingTx1, false));
+        m[FlowState::Established as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::Established as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Established as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        // 有RST(正、反一致)
+        let s = Rc::new(StateValue::new(t.established_rst, FlowState::Reset, false));
+        m[FlowState::Established as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::Established as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Established as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
+
+        // 有ACK
+        let s = Rc::new(StateValue::new(
+            t.established,
+            FlowState::Established,
+            false,
+        ));
+        m[FlowState::Established as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Established as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Established as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
+
+        // for FlowState::ClosingTx1
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingTx1, false));
+        m[FlowState::ClosingTx1 as usize][TcpFlags::SYN.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingTx1 as usize][TcpFlags::SYN_ACK.bits() as usize] = Some(s);
+
+        // 有FIN(正)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingTx1, false));
+        m[FlowState::ClosingTx1 as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingTx1 as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingTx1 as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(t.closing, FlowState::Reset, false));
+        m[FlowState::ClosingTx1 as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingTx1 as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingTx1 as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingTx1, false));
+        m[FlowState::ClosingTx1 as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingTx1 as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingTx1 as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
+
+        // for FlowState::ClosingTx2
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingTx2, false));
+        m[FlowState::ClosingTx2 as usize][TcpFlags::SYN.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingTx2 as usize][TcpFlags::SYN_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingTx2, false));
+        m[FlowState::ClosingTx2 as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingTx2 as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingTx2 as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(t.closed_fin, FlowState::Reset, true));
+        m[FlowState::ClosingTx2 as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingTx2 as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingTx2 as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
+
+        // ACK(正)
+        let s = Rc::new(StateValue::new(t.closed_fin, FlowState::Closed, true));
+        m[FlowState::ClosingTx2 as usize][TcpFlags::ACK.bits() as usize] = Some(s);
+
+        // for FlowState::ClosingRx1
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingRx1, false));
+        m[FlowState::ClosingRx1 as usize][TcpFlags::SYN.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingRx1 as usize][TcpFlags::SYN_ACK.bits() as usize] = Some(s);
+
+        // FIN(正)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingRx2, false));
+        m[FlowState::ClosingRx1 as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingRx1 as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingRx1 as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(t.closing, FlowState::Reset, false));
+        m[FlowState::ClosingRx1 as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingRx1 as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingRx1 as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingRx1, false));
+        m[FlowState::ClosingRx1 as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingRx1 as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingRx1 as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
+
+        // for FlowState::ClosingRx2
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingRx2, false));
+        m[FlowState::ClosingRx2 as usize][TcpFlags::SYN.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingRx2 as usize][TcpFlags::SYN_ACK.bits() as usize] = Some(s);
+
+        // FIN(正，反一致)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingRx2, false));
+        m[FlowState::ClosingRx2 as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingRx2 as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingRx2 as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(t.closed_fin, FlowState::Reset, true));
+        m[FlowState::ClosingRx2 as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingRx2 as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingRx2 as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
+
+        // ACK(正)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingRx2, false));
+        m[FlowState::ClosingRx2 as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingRx2 as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingRx2 as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
+
+        // for FlowState::Closed
+
+        // for FlowState::Reset
+        let s = Rc::new(StateValue::new(t.exception, FlowState::Reset, false));
+        m[FlowState::Reset as usize][TcpFlags::SYN.bits() as usize] = Some(s.clone());
+        m[FlowState::Reset as usize][TcpFlags::SYN_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(t.exception, FlowState::Reset, false));
+        m[FlowState::Reset as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::Reset as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Reset as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(t.exception, FlowState::Reset, false));
+        m[FlowState::Reset as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::Reset as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Reset as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(t.exception, FlowState::Reset, false));
+        m[FlowState::Reset as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Reset as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Reset as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
+
+        // for FlowState::EXCEPTION
+
+        // for FlowState::Syn1
+        let s = Rc::new(StateValue::new(t.opening, FlowState::Opening1, false));
+        m[FlowState::Syn1 as usize][TcpFlags::SYN.bits() as usize] = Some(s);
+
+        // RST(正)
+        let s = Rc::new(StateValue::new(
+            t.closing,
+            FlowState::ClientL4PortReuse,
+            false,
+        ));
+        m[FlowState::Syn1 as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::Syn1 as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Syn1 as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
+
+        // ACK(正)
+        let s = Rc::new(StateValue::new(
+            t.established,
+            FlowState::Established,
+            false,
+        ));
+        m[FlowState::Syn1 as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Syn1 as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Syn1 as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
+
+        // FIN(正)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingTx1, false));
+        m[FlowState::Syn1 as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::Syn1 as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Syn1 as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        // for FlowState::ClientL4PortReuse
+        let s = Rc::new(StateValue::new(
+            t.exception,
+            FlowState::ClientL4PortReuse,
+            false,
+        ));
+        m[FlowState::ClientL4PortReuse as usize][TcpFlags::SYN.bits() as usize] = Some(s.clone());
+        m[FlowState::ClientL4PortReuse as usize][TcpFlags::SYN_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(
+            t.exception,
+            FlowState::ClientL4PortReuse,
+            false,
+        ));
+        m[FlowState::ClientL4PortReuse as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::ClientL4PortReuse as usize][TcpFlags::FIN_ACK.bits() as usize] =
+            Some(s.clone());
+        m[FlowState::ClientL4PortReuse as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(
+            t.exception,
+            FlowState::ClientL4PortReuse,
+            false,
+        ));
+        m[FlowState::ClientL4PortReuse as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::ClientL4PortReuse as usize][TcpFlags::RST_ACK.bits() as usize] =
+            Some(s.clone());
+        m[FlowState::ClientL4PortReuse as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(
+            t.exception,
+            FlowState::ClientL4PortReuse,
+            false,
+        ));
+        m[FlowState::ClientL4PortReuse as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClientL4PortReuse as usize][TcpFlags::PSH_ACK.bits() as usize] =
+            Some(s.clone());
+        m[FlowState::ClientL4PortReuse as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
+
+        // for FlowState::SynAck1
+        let s = Rc::new(StateValue::new(
+            t.established,
+            FlowState::Established,
+            false,
+        ));
+        m[FlowState::SynAck1 as usize][TcpFlags::SYN.bits() as usize] = Some(s);
+
+        // FIN(正)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingTx1, false));
+        m[FlowState::SynAck1 as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::SynAck1 as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::SynAck1 as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        // RST(正)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::Reset, false));
+        m[FlowState::SynAck1 as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::SynAck1 as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::SynAck1 as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
+
+        // ACK(正)
+        let s = Rc::new(StateValue::new(t.established, FlowState::SynAck1, false));
+        m[FlowState::SynAck1 as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::SynAck1 as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::SynAck1 as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
+
+        // for FlowState::ServerCandidateQueueLack
+        let s = Rc::new(StateValue::new(
+            t.exception,
+            FlowState::ServerCandidateQueueLack,
+            false,
+        ));
+        m[FlowState::ServerCandidateQueueLack as usize][TcpFlags::SYN.bits() as usize] =
+            Some(s.clone());
+        m[FlowState::ServerCandidateQueueLack as usize][TcpFlags::SYN_ACK.bits() as usize] =
+            Some(s);
+
+        let s = Rc::new(StateValue::new(
+            t.exception,
+            FlowState::ServerCandidateQueueLack,
+            false,
+        ));
+        m[FlowState::ServerCandidateQueueLack as usize][TcpFlags::FIN.bits() as usize] =
+            Some(s.clone());
+        m[FlowState::ServerCandidateQueueLack as usize][TcpFlags::FIN_ACK.bits() as usize] =
+            Some(s.clone());
+        m[FlowState::ServerCandidateQueueLack as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] =
+            Some(s);
+
+        let s = Rc::new(StateValue::new(
+            t.exception,
+            FlowState::ServerCandidateQueueLack,
+            false,
+        ));
+        m[FlowState::ServerCandidateQueueLack as usize][TcpFlags::RST.bits() as usize] =
+            Some(s.clone());
+        m[FlowState::ServerCandidateQueueLack as usize][TcpFlags::RST_ACK.bits() as usize] =
+            Some(s.clone());
+        m[FlowState::ServerCandidateQueueLack as usize][TcpFlags::RST_PSH_ACK.bits() as usize] =
+            Some(s);
+
+        let s = Rc::new(StateValue::new(
+            t.exception,
+            FlowState::ServerCandidateQueueLack,
+            false,
+        ));
+        m[FlowState::ServerCandidateQueueLack as usize][TcpFlags::ACK.bits() as usize] =
+            Some(s.clone());
+        m[FlowState::ServerCandidateQueueLack as usize][TcpFlags::PSH_ACK.bits() as usize] =
+            Some(s.clone());
+        m[FlowState::ServerCandidateQueueLack as usize][TcpFlags::PSH_ACK_URG.bits() as usize] =
+            Some(s);
+
+        // for FlowState::ServerReset
+        let s = Rc::new(StateValue::new(t.exception, FlowState::ServerReset, false));
+        m[FlowState::ServerReset as usize][TcpFlags::SYN.bits() as usize] = Some(s.clone());
+        m[FlowState::ServerReset as usize][TcpFlags::SYN_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(t.exception, FlowState::ServerReset, false));
+        m[FlowState::ServerReset as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::ServerReset as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ServerReset as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(t.exception, FlowState::ServerReset, false));
+        m[FlowState::ServerReset as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::ServerReset as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ServerReset as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(t.exception, FlowState::ServerReset, false));
+        m[FlowState::ServerReset as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ServerReset as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ServerReset as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
+
+        // for FlowState::EstablishReset
+        let s = Rc::new(StateValue::new(
+            t.exception,
+            FlowState::EstablishReset,
+            false,
+        ));
+        m[FlowState::EstablishReset as usize][TcpFlags::SYN.bits() as usize] = Some(s.clone());
+        m[FlowState::EstablishReset as usize][TcpFlags::SYN_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(
+            t.exception,
+            FlowState::EstablishReset,
+            false,
+        ));
+        m[FlowState::EstablishReset as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::EstablishReset as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::EstablishReset as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(
+            t.exception,
+            FlowState::EstablishReset,
+            false,
+        ));
+        m[FlowState::EstablishReset as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::EstablishReset as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::EstablishReset as usize][TcpFlags::RST_PSH_ACK.bits() as usize] =
+            Some(s.clone());
+
+        let s = Rc::new(StateValue::new(
+            t.exception,
+            FlowState::EstablishReset,
+            false,
+        ));
+        m[FlowState::EstablishReset as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::EstablishReset as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::EstablishReset as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
+
+        wrapped
+    }
+
+    pub fn new_slave(t: &FlowTimeout) -> Self {
+        let mut wrapped = StateMachine::default();
+        let m = &mut wrapped.0;
+
+        // for FlowState::Raw
+        // SYN/ACK(反)
+        let s = Rc::new(StateValue::new(t.opening, FlowState::Opening2, false));
+        m[FlowState::Raw as usize][TcpFlags::SYN_ACK.bits() as usize] = Some(s);
+
+        // FIN(反)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingRx1, false));
+        m[FlowState::Raw as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::Raw as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Raw as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        // for FlowState::Opening1
+        let s = Rc::new(StateValue::new(t.opening, FlowState::Opening2, false));
+        m[FlowState::Opening1 as usize][TcpFlags::SYN_ACK.bits() as usize] = Some(s);
+
+        // ACK(反)
+        let s = Rc::new(StateValue::new(t.opening, FlowState::Syn1, false));
+        m[FlowState::Opening1 as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening1 as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening1 as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
+
+        // RST(反)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ServerReset, false));
+        m[FlowState::Opening1 as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening1 as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening1 as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
+
+        // FIN(反)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingRx1, false));
+        m[FlowState::Opening1 as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening1 as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening1 as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        // for FlowState::Opening2
+        let s = Rc::new(StateValue::new(t.opening, FlowState::Opening2, false));
+        m[FlowState::Opening2 as usize][TcpFlags::SYN_ACK.bits() as usize] = Some(s);
+
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingRx1, false));
+        m[FlowState::Opening2 as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening2 as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening2 as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        // RST(反)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::EstablishReset, false));
+        m[FlowState::Opening2 as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening2 as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Opening2 as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
+
+        // for FlowState::Established
+        // SYN/ACK
+        let s = Rc::new(StateValue::new(t.established, FlowState::SynAck1, false));
+        m[FlowState::Established as usize][TcpFlags::SYN_ACK.bits() as usize] = Some(s.clone());
+
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingRx1, false));
+        m[FlowState::Established as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::Established as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Established as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        // for FlowState::ClosingTx1
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingTx2, false));
+        m[FlowState::ClosingTx1 as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingTx1 as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingTx1 as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        // for FlowState::ClosingTx2
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingTx2, false));
+        m[FlowState::ClosingTx2 as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingTx2 as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingTx2 as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
+
+        // for FlowState::ClosingRx1
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingRx1, false));
+        m[FlowState::ClosingRx1 as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingRx1 as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::ClosingRx1 as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        // for FlowState::ClosingRx2
+        let s = Rc::new(StateValue::new(t.closed_fin, FlowState::Closed, true));
+        m[FlowState::ClosingRx2 as usize][TcpFlags::ACK.bits() as usize] = Some(s);
+
+        // for FlowState::Closed
+
+        // for FlowState::Reset
+
+        // for FlowState::EXCEPTION
+
+        // for FlowState::Syn1
+        // SYN/ACK
+        let s = Rc::new(StateValue::new(t.opening, FlowState::Opening2, false));
+        m[FlowState::Syn1 as usize][TcpFlags::SYN_ACK.bits() as usize] = Some(s);
+
+        // 有ACK(反)
+        let s = Rc::new(StateValue::new(t.opening, FlowState::Syn1, false));
+        m[FlowState::Syn1 as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Syn1 as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Syn1 as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
+
+        // 有FIN(反)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingRx1, false));
+        m[FlowState::Syn1 as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::Syn1 as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Syn1 as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        // RST(反)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::EstablishReset, false));
+        m[FlowState::Syn1 as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::Syn1 as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Syn1 as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
+
+        // for FlowState::SynAck1
+        // SYN/ACK
+        let s = Rc::new(StateValue::new(t.established, FlowState::SynAck1, false));
+        m[FlowState::SynAck1 as usize][TcpFlags::SYN_ACK.bits() as usize] = Some(s);
+
+        // 有FIN(反)
+        let s = Rc::new(StateValue::new(t.closing, FlowState::ClosingRx1, false));
+        m[FlowState::SynAck1 as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::SynAck1 as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::SynAck1 as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
+
+        // RST(反)
+        let s = Rc::new(StateValue::new(
+            t.established_rst,
+            FlowState::ServerCandidateQueueLack,
+            false,
+        ));
+        m[FlowState::SynAck1 as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::SynAck1 as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::SynAck1 as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
+
+        // ACK(反)
+        let s = Rc::new(StateValue::new(
+            t.established,
+            FlowState::Established,
+            false,
+        ));
+        m[FlowState::SynAck1 as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::SynAck1 as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::SynAck1 as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
+
+        // for FlowState::ServerReset
+
+        // for FlowState::ClientL4PortReuse
+
+        // for FlowState::ServerCandidateQueueLack
+
+        wrapped
+    }
+
+    pub fn get(&self, state: FlowState, flags: TcpFlags) -> Option<&StateValue> {
+        self.0[state as usize][(flags.bits() & TcpFlags::MASK.bits()) as usize]
+            .as_ref()
+            .map(Rc::as_ref)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fmt;
+
+    use super::*;
+
+    use crate::common::enums::PacketDirection;
+    use crate::flow_generator::{FlowTimeout, TcpTimeout};
+
+    #[test]
+    fn state_machine_initialize() {
+        let mut m: StateMachine = Default::default();
+        for flag_arr in m.0.iter_mut() {
+            for state in flag_arr.iter_mut() {
+                assert!(state.is_none());
+                *state = Some(Rc::new(StateValue::default()));
+                assert!(state.is_some());
+            }
+        }
+    }
+
+    #[test]
+    fn simple_get_state() {
+        let flow_timeout: FlowTimeout = TcpTimeout::default().into();
+        let m = StateMachine::new_master(&flow_timeout);
+        assert_eq!(
+            *m.get(FlowState::ClientL4PortReuse, TcpFlags::FIN_ACK)
+                .unwrap(),
+            StateValue::new(flow_timeout.exception, FlowState::ClientL4PortReuse, false,)
+        );
+    }
+
+    // TODO: more tests
+
+    struct TestData {
+        // input
+        pub cur_state: FlowState,
+        pub tcp_flags: TcpFlags,
+        pub pkt_dir: PacketDirection,
+
+        // expected output
+        pub next_state: FlowState,
+        pub timeout: Duration,
+        pub closed: bool,
+    }
+
+    impl fmt::Display for TestData {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(
+                f,
+                "current flow: [state: {:?}]; packet [tcp_flags: {}, direction: {:?}]\n",
+                self.cur_state, self.tcp_flags, self.pkt_dir
+            )?;
+            write!(
+                f,
+                "expected result: [state: {:?}, timeout: {:?}, closed: {}\n",
+                self.next_state, self.timeout, self.closed
+            )
+        }
+    }
+
+    fn init_test_case() -> Vec<TestData> {
+        let ack_flags = vec![TcpFlags::ACK, TcpFlags::PSH_ACK, TcpFlags::PSH_ACK_URG];
+        let fin_flags = vec![TcpFlags::FIN, TcpFlags::FIN_ACK, TcpFlags::FIN_PSH_ACK];
+        let rst_flags = vec![TcpFlags::RST, TcpFlags::RST_ACK, TcpFlags::RST_PSH_ACK];
+        let directions = vec![
+            PacketDirection::ClientToServer,
+            PacketDirection::ServerToClient,
+        ];
+        let flow_timeout: FlowTimeout = TcpTimeout::default().into();
+
+        let mut cases = vec![];
+
+        // FlowState::Raw
+        let cur_state = FlowState::Raw;
+        let pkt_dir = PacketDirection::ClientToServer;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN,
+            pkt_dir,
+            next_state: FlowState::Opening1,
+            timeout: flow_timeout.opening,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClosingTx1,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+        for &tcp_flags in rst_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::Reset,
+                    timeout: flow_timeout.closing,
+                    closed: false,
+                });
+            }
+        }
+        for &tcp_flags in ack_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::Established,
+                    timeout: flow_timeout.established,
+                    closed: false,
+                });
+            }
+        }
+
+        let pkt_dir = PacketDirection::ServerToClient;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN_ACK,
+            pkt_dir,
+            next_state: FlowState::Opening2,
+            timeout: flow_timeout.opening,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClosingRx1,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+
+        // FlowState::Opening1
+        let cur_state = FlowState::Opening1;
+        let pkt_dir = PacketDirection::ClientToServer;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN,
+            pkt_dir,
+            next_state: FlowState::Opening1,
+            timeout: flow_timeout.opening,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClosingTx1,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+        for &tcp_flags in rst_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::EstablishReset,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+        for &tcp_flags in ack_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::Established,
+                timeout: flow_timeout.established,
+                closed: false,
+            });
+        }
+
+        let pkt_dir = PacketDirection::ServerToClient;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN_ACK,
+            pkt_dir,
+            next_state: FlowState::Opening2,
+            timeout: flow_timeout.opening,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClosingRx1,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+        for &tcp_flags in rst_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ServerReset,
+                timeout: flow_timeout.opening,
+                closed: false,
+            });
+        }
+        for &tcp_flags in ack_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::Syn1,
+                timeout: flow_timeout.opening,
+                closed: false,
+            });
+        }
+
+        // FlowState::Opening2
+        let cur_state = FlowState::Opening2;
+        let pkt_dir = PacketDirection::ClientToServer;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN,
+            pkt_dir,
+            next_state: FlowState::Opening2,
+            timeout: flow_timeout.opening,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClosingTx1,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+        for &tcp_flags in rst_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::EstablishReset,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+        for &tcp_flags in ack_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::Established,
+                    timeout: flow_timeout.established,
+                    closed: false,
+                });
+            }
+        }
+
+        let pkt_dir = PacketDirection::ServerToClient;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN_ACK,
+            pkt_dir,
+            next_state: FlowState::Opening2,
+            timeout: flow_timeout.opening,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClosingRx1,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+        for &tcp_flags in rst_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::EstablishReset,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+
+        // FlowState::Established
+        let cur_state = FlowState::Established;
+        let pkt_dir = PacketDirection::ClientToServer;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN,
+            pkt_dir,
+            next_state: FlowState::Established,
+            timeout: flow_timeout.established,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClosingTx1,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+        for &tcp_flags in rst_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::Reset,
+                    timeout: flow_timeout.established_rst,
+                    closed: false,
+                });
+            }
+        }
+        for &tcp_flags in ack_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::Established,
+                    timeout: flow_timeout.established,
+                    closed: false,
+                });
+            }
+        }
+
+        let pkt_dir = PacketDirection::ServerToClient;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN_ACK,
+            pkt_dir,
+            next_state: FlowState::SynAck1,
+            timeout: flow_timeout.established,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClosingRx1,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+
+        // FlowState::ClosingTx1
+        let cur_state = FlowState::ClosingTx1;
+        let pkt_dir = PacketDirection::ClientToServer;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN,
+            pkt_dir,
+            next_state: FlowState::ClosingTx1,
+            timeout: flow_timeout.closing,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClosingTx1,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+        for &tcp_flags in rst_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::Reset,
+                    timeout: flow_timeout.closing,
+                    closed: false,
+                });
+            }
+        }
+        for &tcp_flags in ack_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::ClosingTx1,
+                    timeout: flow_timeout.closing,
+                    closed: false,
+                });
+            }
+        }
+
+        let pkt_dir = PacketDirection::ServerToClient;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN_ACK,
+            pkt_dir,
+            next_state: FlowState::ClosingTx1,
+            timeout: flow_timeout.closing,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClosingTx2,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+
+        // FlowState::ClosingTx2
+        let cur_state = FlowState::ClosingTx2;
+        let pkt_dir = PacketDirection::ClientToServer;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN,
+            pkt_dir,
+            next_state: FlowState::ClosingTx2,
+            timeout: flow_timeout.closing,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::ClosingTx2,
+                    timeout: flow_timeout.closing,
+                    closed: false,
+                });
+            }
+        }
+        for &tcp_flags in rst_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::Reset,
+                    timeout: flow_timeout.closed_fin,
+                    closed: false,
+                });
+            }
+        }
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::ACK,
+            pkt_dir,
+            next_state: FlowState::Closed,
+            timeout: flow_timeout.closed_fin,
+            closed: false,
+        });
+
+        let pkt_dir = PacketDirection::ServerToClient;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN_ACK,
+            pkt_dir,
+            next_state: FlowState::ClosingTx2,
+            timeout: flow_timeout.closing,
+            closed: false,
+        });
+        for &tcp_flags in ack_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClosingTx2,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+
+        // FlowState::ClosingRx1
+        let cur_state = FlowState::ClosingRx1;
+        let pkt_dir = PacketDirection::ClientToServer;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN,
+            pkt_dir,
+            next_state: FlowState::ClosingRx1,
+            timeout: flow_timeout.closing,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClosingRx2,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+        for &tcp_flags in rst_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::Reset,
+                    timeout: flow_timeout.closing,
+                    closed: false,
+                });
+            }
+        }
+        for &tcp_flags in ack_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::ClosingRx1,
+                    timeout: flow_timeout.closing,
+                    closed: false,
+                });
+            }
+        }
+
+        let pkt_dir = PacketDirection::ServerToClient;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN_ACK,
+            pkt_dir,
+            next_state: FlowState::ClosingRx1,
+            timeout: flow_timeout.closing,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClosingRx1,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+
+        // FlowState::ClosingRx2
+        let cur_state = FlowState::ClosingRx2;
+        let pkt_dir = PacketDirection::ClientToServer;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN,
+            pkt_dir,
+            next_state: FlowState::ClosingRx2,
+            timeout: flow_timeout.closing,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::ClosingRx2,
+                    timeout: flow_timeout.closing,
+                    closed: false,
+                });
+            }
+        }
+        for &tcp_flags in rst_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::Reset,
+                    timeout: flow_timeout.closed_fin,
+                    closed: false,
+                });
+            }
+        }
+        for &tcp_flags in ack_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClosingRx2,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+
+        let pkt_dir = PacketDirection::ServerToClient;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN_ACK,
+            pkt_dir,
+            next_state: FlowState::ClosingRx2,
+            timeout: flow_timeout.closing,
+            closed: false,
+        });
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::ACK,
+            pkt_dir,
+            next_state: FlowState::Closed,
+            timeout: flow_timeout.closed_fin,
+            closed: false,
+        });
+
+        // FlowState::Reset
+        let cur_state = FlowState::Reset;
+        let pkt_dir = PacketDirection::ClientToServer;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN,
+            pkt_dir,
+            next_state: FlowState::Reset,
+            timeout: flow_timeout.exception,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::Reset,
+                    timeout: flow_timeout.exception,
+                    closed: false,
+                });
+            }
+        }
+        for &tcp_flags in rst_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::Reset,
+                    timeout: flow_timeout.exception,
+                    closed: false,
+                });
+            }
+        }
+        for &tcp_flags in ack_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::Reset,
+                    timeout: flow_timeout.exception,
+                    closed: false,
+                });
+            }
+        }
+
+        // FlowState::Syn1
+        let cur_state = FlowState::Syn1;
+        let pkt_dir = PacketDirection::ClientToServer;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN,
+            pkt_dir,
+            next_state: FlowState::Opening1,
+            timeout: flow_timeout.opening,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClosingTx1,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+        for &tcp_flags in rst_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClientL4PortReuse,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+        for &tcp_flags in ack_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::Established,
+                timeout: flow_timeout.established,
+                closed: false,
+            });
+        }
+
+        let pkt_dir = PacketDirection::ServerToClient;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN_ACK,
+            pkt_dir,
+            next_state: FlowState::Opening2,
+            timeout: flow_timeout.opening,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClosingRx1,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+        for &tcp_flags in rst_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::EstablishReset,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+        for &tcp_flags in ack_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::Syn1,
+                timeout: flow_timeout.opening,
+                closed: false,
+            });
+        }
+
+        // FlowState::ClientL4PortReuse
+        let cur_state = FlowState::ClientL4PortReuse;
+        let pkt_dir = PacketDirection::ClientToServer;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN,
+            pkt_dir,
+            next_state: FlowState::ClientL4PortReuse,
+            timeout: flow_timeout.exception,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::ClientL4PortReuse,
+                    timeout: flow_timeout.exception,
+                    closed: false,
+                });
+            }
+        }
+        for &tcp_flags in rst_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClientL4PortReuse,
+                timeout: flow_timeout.exception,
+                closed: false,
+            });
+        }
+        for &tcp_flags in ack_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClientL4PortReuse,
+                timeout: flow_timeout.exception,
+                closed: false,
+            });
+        }
+
+        // FlowState::SynAck1
+        let cur_state = FlowState::SynAck1;
+        let pkt_dir = PacketDirection::ClientToServer;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN,
+            pkt_dir,
+            next_state: FlowState::Established,
+            timeout: flow_timeout.established,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClosingTx1,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+        for &tcp_flags in rst_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::Reset,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+        for &tcp_flags in ack_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::SynAck1,
+                timeout: flow_timeout.established,
+                closed: false,
+            });
+        }
+
+        let pkt_dir = PacketDirection::ServerToClient;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN_ACK,
+            pkt_dir,
+            next_state: FlowState::SynAck1,
+            timeout: flow_timeout.established,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ClosingRx1,
+                timeout: flow_timeout.closing,
+                closed: false,
+            });
+        }
+        for &tcp_flags in rst_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::ServerCandidateQueueLack,
+                timeout: flow_timeout.established_rst,
+                closed: false,
+            });
+        }
+        for &tcp_flags in ack_flags.iter() {
+            cases.push(TestData {
+                cur_state,
+                tcp_flags,
+                pkt_dir,
+                next_state: FlowState::Established,
+                timeout: flow_timeout.established,
+                closed: false,
+            });
+        }
+
+        // FlowState::ServerCandidateQueueLack
+        let cur_state = FlowState::ServerCandidateQueueLack;
+        let pkt_dir = PacketDirection::ClientToServer;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN,
+            pkt_dir,
+            next_state: FlowState::ServerCandidateQueueLack,
+            timeout: flow_timeout.exception,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::ServerCandidateQueueLack,
+                    timeout: flow_timeout.exception,
+                    closed: false,
+                });
+            }
+        }
+        for &tcp_flags in rst_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::ServerCandidateQueueLack,
+                    timeout: flow_timeout.exception,
+                    closed: false,
+                });
+            }
+        }
+        for &tcp_flags in ack_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::ServerCandidateQueueLack,
+                    timeout: flow_timeout.exception,
+                    closed: false,
+                });
+            }
+        }
+
+        // FlowState::ServerReset
+        let cur_state = FlowState::ServerReset;
+        let pkt_dir = PacketDirection::ClientToServer;
+        cases.push(TestData {
+            cur_state,
+            tcp_flags: TcpFlags::SYN,
+            pkt_dir,
+            next_state: FlowState::ServerReset,
+            timeout: flow_timeout.exception,
+            closed: false,
+        });
+        for &tcp_flags in fin_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::ServerReset,
+                    timeout: flow_timeout.exception,
+                    closed: false,
+                });
+            }
+        }
+        for &tcp_flags in rst_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::ServerReset,
+                    timeout: flow_timeout.exception,
+                    closed: false,
+                });
+            }
+        }
+        for &tcp_flags in ack_flags.iter() {
+            for &pkt_dir in directions.iter() {
+                cases.push(TestData {
+                    cur_state,
+                    tcp_flags,
+                    pkt_dir,
+                    next_state: FlowState::ServerReset,
+                    timeout: flow_timeout.exception,
+                    closed: false,
+                });
+            }
+        }
+
+        cases
+    }
+}
