@@ -3,6 +3,7 @@
 mod common;
 mod config;
 mod error;
+mod flow_generator;
 mod handler;
 mod monitor;
 mod pcap;
