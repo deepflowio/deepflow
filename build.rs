@@ -9,6 +9,7 @@ fn generate_protobuf() -> Result<(), Box<dyn Error>> {
             &[
                 "src/proto/message/common.proto",
                 "src/proto/message/trident.proto",
+                "src/proto/message/metric.proto",
             ],
             &["src/proto/message"],
         )?;

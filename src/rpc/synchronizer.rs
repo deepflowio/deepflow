@@ -162,6 +162,8 @@ impl Synchronizer {
             // not interested
             communication_vtaps: vec![],
             tsdb_report_info: None,
+            // FIXME @xiangwang 后续增加配置文件处理业务逻辑
+            local_config_file: None,
         }
     }
 
