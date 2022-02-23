@@ -21,7 +21,6 @@ impl TryFrom<&DecapType> for TunnelType {
             DecapType::Vxlan => Ok(TunnelType::Vxlan),
             DecapType::Ipip => Ok(TunnelType::Ipip),
             DecapType::Tencent => Ok(TunnelType::TencentGre),
-            _ => Err("TunnelType not accept the value"),
         }
     }
 }

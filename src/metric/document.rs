@@ -1,6 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr};
 
 use bitflags::bitflags;
+use prost::Message;
 
 use super::meter::Meter;
 
@@ -9,6 +10,7 @@ use crate::common::{
     flow::L7Protocol,
     tap_port::TapPort,
 };
+use crate::proto::metric;
 use crate::utils::net::MacAddr;
 
 #[derive(Debug)]
@@ -35,6 +37,22 @@ impl Document {
 
     pub fn reverse(&mut self) {
         self.meter.reverse()
+    }
+
+    fn encode(self, buf: &mut &mut [u8]) -> Result<(), prost::EncodeError> {
+        let pb_doc: metric::Document = self.into();
+        pb_doc.encode(buf)
+    }
+}
+
+impl From<Document> for metric::Document {
+    fn from(d: Document) -> Self {
+        metric::Document {
+            timestamp: d.timestamp,
+            tag: Some(d.tagger.into()),
+            meter: Some(d.meter.into()),
+            flags: d.flags.bits(),
+        }
     }
 }
 
@@ -249,9 +267,44 @@ impl Default for Tagger {
     }
 }
 
+impl From<Tagger> for metric::MiniTag {
+    fn from(t: Tagger) -> Self {
+        let (ip_vec, ip1_vec) = match (t.ip, t.ip1) {
+            (IpAddr::V4(ip4), IpAddr::V4(ip41)) => (ip4.octets().to_vec(), ip41.octets().to_vec()),
+            (IpAddr::V6(ip6), IpAddr::V6(ip61)) => (ip6.octets().to_vec(), ip61.octets().to_vec()),
+            _ => panic!("ip, ip1 type mismatch"),
+        };
+        metric::MiniTag {
+            code: t.code.bits(),
+            field: Some(metric::MiniField {
+                ip: ip_vec,
+                ip1: ip1_vec,
+                global_thread_id: t.global_thread_id as u32,
+                is_ipv6: t.is_ipv6 as u32,
+                l3_epc_id: t.l3_epc_id as i32,
+                l3_epc_id1: t.l3_epc_id1 as i32,
+                mac: t.mac.into(),
+                mac1: t.mac.into(),
+                direction: t.direction as u32,
+                tap_side: t.tap_side as u32,
+                protocol: t.protocol as u32,
+                acl_gid: t.acl_gid as u32,
+                server_port: t.server_port as u32,
+                vtap_id: t.vtap_id as u32,
+                tap_port: t.tap_port.0,
+                tap_type: u16::from(t.tap_type) as u32,
+                l7_protocol: t.l7_protocol as u32,
+                tag_type: t.tag_type as u32,
+                tag_value: t.tag_value as u32,
+            }),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use prost::Message;
 
     #[test]
     fn merge_reverse() {
@@ -271,5 +324,27 @@ mod tests {
         if let Meter::Flow(ref f1) = doc1.meter {
             assert!(f1.traffic.packet_rx == 3)
         }
+    }
+
+    fn encode() {
+        let mut doc = Document::new(Meter::new_flow());
+        doc.tagger.code = Code::IP | Code::L3_EPC_ID;
+        doc.tagger.l3_epc_id = 10;
+        doc.timestamp = 100;
+        doc.flags = DocumentFlag::PER_SECOND_METRICS;
+        if let Meter::Flow(ref mut f) = doc.meter {
+            f.traffic.packet_tx = 1;
+        }
+
+        let mut a: Vec<u8> = vec![];
+        let buf = &mut a.as_mut_slice();
+        let _ = doc.encode(buf);
+
+        let pb_doc: metric::Document = Message::decode(a.as_slice()).unwrap();
+
+        assert_eq!(pb_doc.timestamp, 100);
+        assert_eq!(pb_doc.flags, 1);
+        assert_eq!(pb_doc.tag.as_ref().unwrap().code, 3);
+        assert_eq!(pb_doc.tag.unwrap().field.unwrap().l3_epc_id, 10);
     }
 }

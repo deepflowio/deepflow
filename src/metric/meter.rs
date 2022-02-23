@@ -1,5 +1,11 @@
 use std::mem::swap;
 
+use crate::proto::metric;
+
+const FLOW_ID: u32 = 1;
+const USAGE_ID: u32 = 4;
+const APP_ID: u32 = 5;
+
 #[derive(Debug)]
 pub enum Meter {
     Flow(FlowMeter),
@@ -35,6 +41,31 @@ impl Meter {
     }
 }
 
+impl From<Meter> for metric::Meter {
+    fn from(m: Meter) -> Self {
+        match m {
+            Meter::Flow(f) => metric::Meter {
+                meter_id: FLOW_ID,
+                flow: Some(f.into()),
+                app: None,
+                usage: None,
+            },
+            Meter::App(f) => metric::Meter {
+                meter_id: APP_ID,
+                flow: None,
+                app: Some(f.into()),
+                usage: None,
+            },
+            Meter::Usage(f) => metric::Meter {
+                meter_id: USAGE_ID,
+                flow: None,
+                app: None,
+                usage: Some(f.into()),
+            },
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct FlowMeter {
     pub traffic: Traffic,
@@ -60,6 +91,18 @@ impl FlowMeter {
     }
 }
 
+impl From<FlowMeter> for metric::FlowMeter {
+    fn from(m: FlowMeter) -> Self {
+        metric::FlowMeter {
+            traffic: Some(m.traffic.into()),
+            latency: Some(m.latency.into()),
+            performance: Some(m.performance.into()),
+            anomaly: Some(m.anomaly.into()),
+            flow_load: Some(m.flow_load.into()),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Traffic {
     pub packet_tx: u64,
@@ -71,7 +114,7 @@ pub struct Traffic {
     pub l4_byte_tx: u64,
     pub l4_byte_rx: u64,
     pub new_flow: u64,
-    pub close_flow: u64,
+    pub closed_flow: u64,
     pub l7_request: u32,
     pub l7_response: u32,
 }
@@ -87,7 +130,7 @@ impl Traffic {
         self.l4_byte_tx += other.l4_byte_tx;
         self.l4_byte_rx += other.l4_byte_rx;
         self.new_flow += other.new_flow;
-        self.close_flow += other.close_flow;
+        self.closed_flow += other.closed_flow;
         self.l7_request += other.l7_request;
         self.l7_response += other.l7_response;
     }
@@ -99,6 +142,25 @@ impl Traffic {
         swap(&mut self.l4_byte_tx, &mut self.l4_byte_rx);
 
         // flow, L7等其他统计,以客户端、服务端为视角，无需Reverse
+    }
+}
+
+impl From<Traffic> for metric::Traffic {
+    fn from(m: Traffic) -> Self {
+        metric::Traffic {
+            packet_tx: m.packet_tx,
+            packet_rx: m.packet_rx,
+            byte_tx: m.byte_tx,
+            byte_rx: m.byte_rx,
+            l3_byte_tx: m.l3_byte_tx,
+            l3_byte_rx: m.l3_byte_rx,
+            l4_byte_tx: m.l4_byte_tx,
+            l4_byte_rx: m.l4_byte_rx,
+            new_flow: m.new_flow,
+            closed_flow: m.closed_flow,
+            l7_request: m.l7_request,
+            l7_response: m.l7_response,
+        }
     }
 }
 
@@ -163,6 +225,33 @@ impl Latency {
     }
 }
 
+impl From<Latency> for metric::Latency {
+    fn from(m: Latency) -> Self {
+        metric::Latency {
+            rtt_max: m.rtt_max,
+            rtt_client_max: m.rtt_client_max,
+            rtt_server_max: m.rtt_server_max,
+            srt_max: m.srt_max,
+            art_max: m.art_max,
+            rrt_max: m.rrt_max,
+
+            rtt_sum: m.rtt_sum,
+            rtt_client_sum: m.rtt_client_sum,
+            rtt_server_sum: m.rtt_server_sum,
+            srt_sum: m.srt_sum,
+            art_sum: m.art_sum,
+            rrt_sum: m.rrt_sum,
+
+            rtt_count: m.rtt_count,
+            rtt_client_count: m.rtt_client_count,
+            rtt_server_count: m.rtt_server_count,
+            srt_count: m.srt_count,
+            art_count: m.art_count,
+            rrt_count: m.rrt_count,
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Performance {
     pub retrans_tx: u64,
@@ -180,25 +269,36 @@ impl Performance {
     }
 }
 
+impl From<Performance> for metric::Performance {
+    fn from(m: Performance) -> Self {
+        metric::Performance {
+            retrans_tx: m.retrans_tx,
+            retrans_rx: m.retrans_rx,
+            zero_win_tx: m.zero_win_tx,
+            zero_win_rx: m.zero_win_rx,
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Anomaly {
     pub client_rst_flow: u64,
     pub server_rst_flow: u64,
     pub client_syn_repeat: u64,
-    pub server_syn_ack_repeat: u64,
+    pub server_synack_repeat: u64,
     pub client_half_close_flow: u64,
     pub server_half_close_flow: u64,
 
     pub client_source_port_reuse: u64,
-    pub client_establish_other_rst: u64,
+    pub client_establish_reset: u64,
     pub server_reset: u64,
     pub server_queue_lack: u64,
-    pub server_establish_other_rst: u64,
+    pub server_establish_reset: u64,
     pub tcp_timeout: u64,
 
-    pub l7_client_error: u64,
-    pub l7_server_error: u64,
-    pub l7_timeout: u64,
+    pub l7_client_error: u32,
+    pub l7_server_error: u32,
+    pub l7_timeout: u32,
 }
 
 impl Anomaly {
@@ -206,20 +306,44 @@ impl Anomaly {
         self.client_rst_flow += other.client_rst_flow;
         self.server_rst_flow += other.server_rst_flow;
         self.client_syn_repeat += other.client_syn_repeat;
-        self.server_syn_ack_repeat += other.server_syn_ack_repeat;
+        self.server_synack_repeat += other.server_synack_repeat;
         self.client_half_close_flow += other.client_half_close_flow;
         self.server_half_close_flow += other.server_half_close_flow;
 
         self.client_source_port_reuse += other.client_source_port_reuse;
-        self.client_establish_other_rst += other.client_establish_other_rst;
+        self.client_establish_reset += other.client_establish_reset;
         self.server_reset += other.server_reset;
         self.server_queue_lack += other.server_queue_lack;
-        self.server_establish_other_rst += other.server_establish_other_rst;
+        self.server_establish_reset += other.server_establish_reset;
         self.tcp_timeout += other.tcp_timeout;
 
         self.l7_client_error += other.l7_client_error;
         self.l7_server_error += other.l7_server_error;
         self.l7_timeout += other.l7_timeout;
+    }
+}
+
+impl From<Anomaly> for metric::Anomaly {
+    fn from(m: Anomaly) -> Self {
+        metric::Anomaly {
+            client_rst_flow: m.client_rst_flow,
+            server_rst_flow: m.server_rst_flow,
+            client_syn_repeat: m.client_syn_repeat,
+            server_synack_repeat: m.server_synack_repeat,
+            client_half_close_flow: m.client_half_close_flow,
+            server_half_close_flow: m.server_half_close_flow,
+
+            client_source_port_reuse: m.client_source_port_reuse,
+            client_establish_reset: m.client_establish_reset,
+            server_reset: m.server_reset,
+            server_queue_lack: m.server_queue_lack,
+            server_establish_reset: m.server_establish_reset,
+            tcp_timeout: m.tcp_timeout,
+
+            l7_client_error: m.l7_client_error,
+            l7_server_error: m.l7_server_error,
+            l7_timeout: m.l7_timeout,
+        }
     }
 }
 
@@ -231,6 +355,12 @@ pub struct FlowLoad {
 impl FlowLoad {
     pub fn sequential_merge(&mut self, other: FlowLoad) {
         self.load += other.load;
+    }
+}
+
+impl From<FlowLoad> for metric::FlowLoad {
+    fn from(m: FlowLoad) -> Self {
+        metric::FlowLoad { load: m.load }
     }
 }
 
@@ -252,6 +382,16 @@ impl AppMeter {
     }
 }
 
+impl From<AppMeter> for metric::AppMeter {
+    fn from(m: AppMeter) -> Self {
+        metric::AppMeter {
+            traffic: Some(m.traffic.into()),
+            latency: Some(m.latency.into()),
+            anomaly: Some(m.anomaly.into()),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct AppTraffic {
     pub request: u32,
@@ -265,6 +405,15 @@ impl AppTraffic {
     }
     pub fn reverse(&mut self) {
         swap(&mut self.request, &mut self.response);
+    }
+}
+
+impl From<AppTraffic> for metric::AppTraffic {
+    fn from(m: AppTraffic) -> Self {
+        metric::AppTraffic {
+            request: m.request,
+            response: m.response,
+        }
     }
 }
 
@@ -285,6 +434,16 @@ impl AppLatency {
     }
 }
 
+impl From<AppLatency> for metric::AppLatency {
+    fn from(m: AppLatency) -> Self {
+        metric::AppLatency {
+            rrt_max: m.rrt_max,
+            rrt_sum: m.rrt_sum,
+            rrt_count: m.rrt_count,
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct AppAnomaly {
     pub client_error: u32,
@@ -297,6 +456,16 @@ impl AppAnomaly {
         self.client_error += other.client_error;
         self.server_error += other.server_error;
         self.timeout += other.timeout;
+    }
+}
+
+impl From<AppAnomaly> for metric::AppAnomaly {
+    fn from(m: AppAnomaly) -> Self {
+        metric::AppAnomaly {
+            client_error: m.client_error,
+            server_error: m.server_error,
+            timeout: m.timeout,
+        }
     }
 }
 
@@ -327,5 +496,20 @@ impl UsageMeter {
         swap(&mut self.byte_tx, &mut self.byte_rx);
         swap(&mut self.l3_byte_tx, &mut self.l3_byte_rx);
         swap(&mut self.l4_byte_tx, &mut self.l4_byte_rx);
+    }
+}
+
+impl From<UsageMeter> for metric::UsageMeter {
+    fn from(m: UsageMeter) -> Self {
+        metric::UsageMeter {
+            packet_tx: m.packet_tx,
+            packet_rx: m.packet_rx,
+            byte_tx: m.byte_tx,
+            byte_rx: m.byte_rx,
+            l3_byte_tx: m.l3_byte_tx,
+            l3_byte_rx: m.l3_byte_rx,
+            l4_byte_tx: m.l4_byte_tx,
+            l4_byte_rx: m.l4_byte_rx,
+        }
     }
 }

@@ -6,7 +6,7 @@ use std::net::Ipv4Addr;
 // | from |              ip/id/mac              |
 // +------+-------------------------------------+
 #[derive(Default)]
-pub struct TapPort(u64);
+pub struct TapPort(pub u64);
 
 impl TapPort {
     pub const FROM_LOCAL_MAC: u8 = 0;
