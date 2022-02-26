@@ -1,7 +1,11 @@
 use std::fmt;
 
+use prost::Message;
+
 use super::flow::Flow;
 use super::tag::Tag;
+
+use crate::proto::flow_log;
 
 #[derive(Default)]
 pub struct TaggedFlow {
@@ -17,6 +21,13 @@ impl TaggedFlow {
         self.flow.reverse();
         self.tag.reverse();
     }
+
+    fn encode(self, buf: &mut &mut [u8]) -> Result<(), prost::EncodeError> {
+        let pb_tagged_flow = flow_log::TaggedFlow {
+            flow: Some(self.flow.into()),
+        };
+        pb_tagged_flow.encode(buf)
+    }
 }
 
 impl fmt::Display for TaggedFlow {
@@ -27,8 +38,13 @@ impl fmt::Display for TaggedFlow {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    use prost::Message;
+
     use super::*;
-    use crate::common::flow::FlowPerfStats;
+
+    use crate::common::{decapsulate::TunnelType, flow::FlowPerfStats, flow::L4Protocol};
 
     // test run: cargo test --package trident --lib -- common::tagged_flow::tests::sequential_merge --exact --nocapture
     #[test]
@@ -67,5 +83,34 @@ mod tests {
         f.reverse();
         assert_eq!(f.flow.tunnel.tx_id, 2);
         assert_eq!(f.flow.flow_metrics_peers[0].l4_byte_count, 200);
+    }
+
+    fn encode() {
+        let mut tflow = TaggedFlow::default();
+        tflow.flow.flow_key.vtap_id = 5;
+        tflow.flow.flow_metrics_peers[1].byte_count = 6;
+        tflow.flow.tunnel.tunnel_type = TunnelType::Vxlan;
+        tflow.flow.flow_id = 8;
+        tflow.flow.start_time = Duration::from_nanos(100_000_000_001);
+        let mut flow_perf_stats = FlowPerfStats::default();
+        flow_perf_stats.l4_protocol = L4Protocol::Tcp;
+        flow_perf_stats.tcp.rtt = 10;
+        tflow.flow.flow_perf_stats = Some(flow_perf_stats);
+        tflow.flow.is_active_service = true;
+
+        let mut a: Vec<u8> = vec![];
+        let buf = &mut a.as_mut_slice();
+        let _ = tflow.encode(buf);
+
+        let pb_tflow: flow_log::TaggedFlow = Message::decode(a.as_slice()).unwrap();
+        let pb_flow = pb_tflow.flow.unwrap();
+        assert_eq!(pb_flow.flow_key.unwrap().vtap_id, 1);
+        assert_eq!(pb_flow.metrics_peer_dst.unwrap().byte_count, 6);
+        assert_eq!(pb_flow.tunnel.unwrap().tunnel_type, 1);
+        assert_eq!(pb_flow.flow_id, 8);
+        assert_eq!(pb_flow.start_time, 100_000_000_001);
+        assert_eq!(pb_flow.perf_stats.as_ref().unwrap().l4_protocol, 1);
+        assert_eq!(pb_flow.is_active_service, 1);
+        assert_eq!(pb_flow.perf_stats.unwrap().tcp.unwrap().rtt, 10);
     }
 }

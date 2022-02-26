@@ -1,7 +1,7 @@
 use std::{
     fmt,
     mem::swap,
-    net::{IpAddr, Ipv4Addr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
     time::Duration,
 };
 
@@ -14,6 +14,7 @@ use super::{
 };
 
 use crate::flow_generator::FlowState;
+use crate::proto::flow_log;
 use crate::utils::net::MacAddr;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -123,6 +124,34 @@ impl fmt::Display for FlowKey {
     }
 }
 
+impl From<FlowKey> for flow_log::FlowKey {
+    fn from(f: FlowKey) -> Self {
+        let (ip4_src, ip4_dst, ip6_src, ip6_dst) = match (f.ip_src, f.ip_dst) {
+            (IpAddr::V4(ip4), IpAddr::V4(ip4_1)) => {
+                (ip4, ip4_1, Ipv6Addr::UNSPECIFIED, Ipv6Addr::UNSPECIFIED)
+            }
+            (IpAddr::V6(ip6), IpAddr::V6(ip6_1)) => {
+                (Ipv4Addr::UNSPECIFIED, Ipv4Addr::UNSPECIFIED, ip6, ip6_1)
+            }
+            _ => panic!("ip_src,ip_dst type mismatch"),
+        };
+        flow_log::FlowKey {
+            vtap_id: f.vtap_id as u32,
+            tap_type: u16::from(f.tap_type) as u32,
+            tap_port: f.tap_port.0,
+            mac_src: f.mac_src.into(),
+            mac_dst: f.mac_dst.into(),
+            ip_src: u32::from_le_bytes(ip4_src.octets()),
+            ip_dst: u32::from_le_bytes(ip4_dst.octets()),
+            ip6_src: ip6_src.octets().to_vec(),
+            ip6_dst: ip6_dst.octets().to_vec(),
+            port_src: f.port_src as u32,
+            port_dst: f.port_dst as u32,
+            proto: f.proto as u32,
+        }
+    }
+}
+
 #[derive(Debug)]
 #[repr(u8)]
 pub enum FlowSource {
@@ -202,6 +231,26 @@ impl fmt::Display for TunnelField {
     }
 }
 
+impl From<TunnelField> for flow_log::TunnelField {
+    fn from(f: TunnelField) -> Self {
+        flow_log::TunnelField {
+            tx_ip0: u32::from_le_bytes(f.tx_ip0.octets()),
+            tx_ip1: u32::from_le_bytes(f.tx_ip1.octets()),
+            rx_ip0: u32::from_le_bytes(f.rx_ip0.octets()),
+            rx_ip1: u32::from_le_bytes(f.rx_ip1.octets()),
+            tx_mac0: f.tx_mac0.into(),
+            tx_mac1: f.tx_mac1.into(),
+            rx_mac0: f.rx_mac0.into(),
+            rx_mac1: f.rx_mac1.into(),
+            tx_id: f.tx_id,
+            rx_id: f.rx_id,
+            tunnel_type: f.tunnel_type as u32,
+            tier: f.tier as u32,
+            is_ipv6: 0,
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TcpPerfCountsPeer {
     pub retrans_count: u32,
@@ -212,6 +261,15 @@ impl TcpPerfCountsPeer {
     pub fn sequential_merge(&mut self, other: &TcpPerfCountsPeer) {
         self.retrans_count += other.retrans_count;
         self.zero_win_count += other.zero_win_count;
+    }
+}
+
+impl From<TcpPerfCountsPeer> for flow_log::TcpPerfCountsPeer {
+    fn from(p: TcpPerfCountsPeer) -> Self {
+        flow_log::TcpPerfCountsPeer {
+            retrans_count: p.retrans_count,
+            zero_win_count: p.zero_win_count,
+        }
     }
 }
 
@@ -277,6 +335,29 @@ impl TcpPerfStats {
     }
 }
 
+impl From<TcpPerfStats> for flow_log::TcpPerfStats {
+    fn from(p: TcpPerfStats) -> Self {
+        flow_log::TcpPerfStats {
+            rtt_client_max: p.rtt_client_max,
+            rtt_server_max: p.rtt_server_max,
+            srt_max: p.srt_max,
+            art_max: p.art_max,
+            rtt: p.rtt,
+            rtt_client_sum: p.rtt_client_sum,
+            rtt_server_sum: p.rtt_server_sum,
+            srt_sum: p.srt_sum,
+            art_sum: p.art_sum,
+            rtt_client_count: p.rtt_client_count,
+            rtt_server_count: p.rtt_server_count,
+            srt_count: p.srt_count,
+            art_count: p.art_count,
+            counts_peer_tx: Some(p.counts_peers[0].into()),
+            counts_peer_rx: Some(p.counts_peers[1].into()),
+            total_retrans_count: p.total_retrans_count,
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct FlowPerfStats {
     pub tcp: TcpPerfStats,
@@ -315,6 +396,17 @@ impl fmt::Display for FlowPerfStats {
     }
 }
 
+impl From<FlowPerfStats> for flow_log::FlowPerfStats {
+    fn from(p: FlowPerfStats) -> Self {
+        flow_log::FlowPerfStats {
+            tcp: Some(p.tcp.into()),
+            l7: Some(p.l7.into()),
+            l4_protocol: p.l4_protocol as u32,
+            l7_protocol: p.l7_protocol as u32,
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct L7PerfStats {
     pub request_count: u32,
@@ -338,6 +430,21 @@ impl L7PerfStats {
         self.rrt_sum += other.rrt_sum;
         if self.rrt_max < other.rrt_max {
             self.rrt_max = other.rrt_max
+        }
+    }
+}
+
+impl From<L7PerfStats> for flow_log::L7PerfStats {
+    fn from(p: L7PerfStats) -> Self {
+        flow_log::L7PerfStats {
+            request_count: p.request_count,
+            response_count: p.response_count,
+            err_client_count: p.err_client_count,
+            err_server_count: p.err_server_count,
+            err_timeout: p.err_timeout,
+            rrt_count: p.rrt_count,
+            rrt_sum: p.rrt_sum,
+            rrt_max: p.rrt_max,
         }
     }
 }
@@ -376,7 +483,7 @@ impl Default for L7Protocol {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct FlowMetricsPeer {
     pub nat_real_ip: IpAddr, // IsVIP为true，通过MAC查询对应的IP
 
@@ -454,6 +561,30 @@ impl FlowMetricsPeer {
     }
 }
 
+impl From<FlowMetricsPeer> for flow_log::FlowMetricsPeer {
+    fn from(m: FlowMetricsPeer) -> Self {
+        flow_log::FlowMetricsPeer {
+            byte_count: m.byte_count,
+            l3_byte_count: m.l3_byte_count,
+            l4_byte_count: m.l4_byte_count,
+            packet_count: m.packet_count,
+            total_byte_count: m.total_byte_count,
+            total_packet_count: m.total_packet_count,
+            first: m.first.as_nanos() as u64,
+            last: m.last.as_nanos() as u64,
+
+            l3_epc_id: m.l3_epc_id,
+            is_l2_end: m.is_l2_end as u32,
+            is_l3_end: m.is_l3_end as u32,
+            is_active_host: m.is_active_host as u32,
+            is_device: m.is_device as u32,
+            tcp_flags: m.tcp_flags.bits() as u32,
+            is_vip_interface: m.is_vip_interface as u32,
+            is_vip: m.is_vip as u32,
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct Flow {
     pub flow_key: FlowKey,
@@ -465,7 +596,7 @@ pub struct Flow {
 
     /* TCP Seq */
     pub syn_seq: u32,
-    pub syn_ack_seq: u32,
+    pub synack_seq: u32,
     pub last_keepalive_seq: u32,
     pub last_keepalive_ack: u32,
 
@@ -587,19 +718,58 @@ impl fmt::Display for Flow {
         write!(
             f,
             "flow_id:{} flow_source:{:?} tunnel:{} close_type:{:?} is_active_service:{} is_new_flow:{} queue_hash:{} \
-        syn_seq:{} syn_ack_seq:{} last_keepalive_seq:{} last_keepalive_ack:{} flow_start_time:{:?} \
+        syn_seq:{} synack_seq:{} last_keepalive_seq:{} last_keepalive_ack:{} flow_start_time:{:?} \
         \t start_time:{:?} end_time:{:?} duration:{:?} \
         \t vlan:{} eth_type:{:?} reversed:{} flow_key:{} \
         \n\t flow_metrics_peers_src:{:?} \
         \n\t flow_metrics_peers_dst:{:?} \
         \n\t flow_perf_stats:{:?}",
             self.flow_id, self.flow_source, self.tunnel, self.close_type, self.is_active_service, self.is_new_flow, self.queue_hash,
-            self.syn_seq, self.syn_ack_seq, self.last_keepalive_seq, self.last_keepalive_ack, self.flow_start_time,
+            self.syn_seq, self.synack_seq, self.last_keepalive_seq, self.last_keepalive_ack, self.flow_start_time,
             self.start_time, self.end_time, self.duration,
             self.vlan, self.eth_type, self.reversed, self.flow_key,
             self.flow_metrics_peers[0],
             self.flow_metrics_peers[1],
             self.flow_perf_stats
         )
+    }
+}
+
+impl From<Flow> for flow_log::Flow {
+    fn from(f: Flow) -> Self {
+        flow_log::Flow {
+            flow_key: Some(f.flow_key.into()),
+            metrics_peer_src: Some(f.flow_metrics_peers[0].into()),
+            metrics_peer_dst: Some(f.flow_metrics_peers[1].into()),
+            tunnel: {
+                if f.tunnel.tunnel_type == TunnelType::None {
+                    None
+                } else {
+                    Some(f.tunnel.into())
+                }
+            },
+            flow_id: f.flow_id,
+            start_time: f.start_time.as_nanos() as u64,
+            end_time: f.end_time.as_nanos() as u64,
+            duration: f.duration.as_nanos() as u64,
+            eth_type: f.eth_type as u32,
+            perf_stats: {
+                if f.flow_perf_stats.is_none() {
+                    None
+                } else {
+                    Some(f.flow_perf_stats.unwrap().into())
+                }
+            },
+            close_type: f.close_type as u32,
+            flow_source: f.flow_source as u32,
+            is_active_service: f.is_active_service as u32,
+            queue_hash: f.queue_hash as u32,
+            is_new_flow: f.is_new_flow as u32,
+            tap_side: f.tap_side as u32,
+            syn_seq: f.syn_seq,
+            synack_seq: f.synack_seq,
+            last_keepalive_seq: f.last_keepalive_seq,
+            last_keepalive_ack: f.last_keepalive_ack,
+        }
     }
 }
