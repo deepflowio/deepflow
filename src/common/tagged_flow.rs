@@ -22,11 +22,14 @@ impl TaggedFlow {
         self.tag.reverse();
     }
 
-    fn encode(self, buf: &mut &mut [u8]) -> Result<(), prost::EncodeError> {
+    fn encode(self, buf: &mut &mut [u8]) -> Result<usize, prost::EncodeError> {
         let pb_tagged_flow = flow_log::TaggedFlow {
             flow: Some(self.flow.into()),
         };
-        pb_tagged_flow.encode(buf)
+        match pb_tagged_flow.encode(buf) {
+            Ok(_) => Ok(pb_tagged_flow.encoded_len()),
+            Err(error) => Err(error),
+        }
     }
 }
 
@@ -85,6 +88,7 @@ mod tests {
         assert_eq!(f.flow.flow_metrics_peers[0].l4_byte_count, 200);
     }
 
+    #[test]
     fn encode() {
         let mut tflow = TaggedFlow::default();
         tflow.flow.flow_key.vtap_id = 5;
@@ -98,13 +102,13 @@ mod tests {
         tflow.flow.flow_perf_stats = Some(flow_perf_stats);
         tflow.flow.is_active_service = true;
 
-        let mut a: Vec<u8> = vec![];
-        let buf = &mut a.as_mut_slice();
-        let _ = tflow.encode(buf);
+        let mut buf: Vec<u8> = vec![0; 200];
+        let encoded_len = tflow.encode(&mut buf.as_mut_slice()).unwrap();
+        let rlt: Result<flow_log::TaggedFlow, prost::DecodeError> =
+            Message::decode(buf.as_slice().get(..encoded_len).unwrap());
 
-        let pb_tflow: flow_log::TaggedFlow = Message::decode(a.as_slice()).unwrap();
-        let pb_flow = pb_tflow.flow.unwrap();
-        assert_eq!(pb_flow.flow_key.unwrap().vtap_id, 1);
+        let pb_flow = rlt.unwrap().flow.unwrap();
+        assert_eq!(pb_flow.flow_key.unwrap().vtap_id, 5);
         assert_eq!(pb_flow.metrics_peer_dst.unwrap().byte_count, 6);
         assert_eq!(pb_flow.tunnel.unwrap().tunnel_type, 1);
         assert_eq!(pb_flow.flow_id, 8);
