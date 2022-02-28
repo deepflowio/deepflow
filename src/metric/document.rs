@@ -39,9 +39,12 @@ impl Document {
         self.meter.reverse()
     }
 
-    fn encode(self, buf: &mut &mut [u8]) -> Result<(), prost::EncodeError> {
+    fn encode(self, buf: &mut &mut [u8]) -> Result<usize, prost::EncodeError> {
         let pb_doc: metric::Document = self.into();
-        pb_doc.encode(buf)
+        match pb_doc.encode(buf) {
+            Ok(_) => Ok(pb_doc.encoded_len()),
+            Err(error) => Err(error),
+        }
     }
 }
 
@@ -326,6 +329,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn encode() {
         let mut doc = Document::new(Meter::new_flow());
         doc.tagger.code = Code::IP | Code::L3_EPC_ID;
@@ -336,11 +340,12 @@ mod tests {
             f.traffic.packet_tx = 1;
         }
 
-        let mut a: Vec<u8> = vec![];
-        let buf = &mut a.as_mut_slice();
-        let _ = doc.encode(buf);
+        let mut buf: Vec<u8> = vec![0; 100];
+        let encode_len = doc.encode(&mut buf.as_mut_slice()).unwrap();
 
-        let pb_doc: metric::Document = Message::decode(a.as_slice()).unwrap();
+        let rlt: Result<metric::Document, prost::DecodeError> =
+            Message::decode(buf.as_slice().get(..encode_len).unwrap());
+        let pb_doc = rlt.unwrap();
 
         assert_eq!(pb_doc.timestamp, 100);
         assert_eq!(pb_doc.flags, 1);
