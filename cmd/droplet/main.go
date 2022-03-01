@@ -53,9 +53,7 @@ const (
 )
 
 func main() {
-	if os.Getppid() != 1 {
-		logger.EnableStdoutLog()
-	}
+	logger.EnableStdoutLog()
 
 	flag.Parse()
 	if *version {
