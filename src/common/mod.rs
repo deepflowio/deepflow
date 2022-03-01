@@ -5,7 +5,7 @@ pub mod enums;
 pub mod flow;
 pub mod lookup_key;
 mod matched_field;
-mod meta_packet;
+pub mod meta_packet;
 pub mod platform_data;
 pub mod policy;
 mod tag;
