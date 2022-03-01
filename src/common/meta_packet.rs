@@ -14,7 +14,7 @@ use super::{
     consts::*,
     decapsulate::TunnelInfo,
     endpoint::EndpointData,
-    enums::{EthernetType, HeaderType, IpProtocol, PacketDirection},
+    enums::{EthernetType, HeaderType, IpProtocol, PacketDirection, TcpFlags},
     lookup_key::LookupKey,
     policy::PolicyData,
     tap_port::TapPort,
@@ -104,6 +104,26 @@ impl MetaPacket {
 
     pub fn is_ndp_response(&self) -> bool {
         self.nd_reply_or_arp_request && self.lookup_key.proto == IpProtocol::Icmpv6
+    }
+
+    pub fn is_syn(&self) -> bool {
+        self.tcp_data.flags & TcpFlags::MASK == TcpFlags::SYN
+    }
+
+    pub fn is_syn_ack(&self) -> bool {
+        self.tcp_data.flags & TcpFlags::MASK == TcpFlags::SYN_ACK && self.payload_len == 0
+    }
+
+    pub fn is_ack(&self) -> bool {
+        self.tcp_data.flags & TcpFlags::MASK == TcpFlags::ACK && self.payload_len == 0
+    }
+
+    pub fn is_psh_ack(&self) -> bool {
+        self.tcp_data.flags & TcpFlags::MASK == TcpFlags::PSH_ACK && self.payload_len > 1
+    }
+
+    pub fn has_valid_payload(&self) -> bool {
+        self.payload_len > 1
     }
 
     pub fn tcp_options_size(&self) -> usize {
@@ -490,7 +510,7 @@ impl MetaPacket {
                 if total_length == 0 {
                     total_length = size_checker as usize + HeaderType::Ipv4.min_header_size();
                 }
-                self.packet_len = total_length + HeaderType::Ipv4.min_header_size();
+                self.packet_len = total_length + HeaderType::Eth.min_packet_size() + vlan_tag_size;
                 // 错包时取最小包长
                 self.packet_len = self
                     .packet_len
@@ -624,7 +644,9 @@ impl MetaPacket {
                 self.tcp_data.data_offset = data_offset;
                 self.tcp_data.win_size =
                     read_u16_be(&packet[FIELD_OFFSET_TCP_WIN + self.l2_l3_opt_size..]);
-                self.tcp_data.flags = packet[FIELD_OFFSET_TCP_FLAG + self.l2_l3_opt_size];
+                self.tcp_data.flags = TcpFlags::from_bits_truncate(
+                    packet[FIELD_OFFSET_TCP_FLAG + self.l2_l3_opt_size],
+                );
                 self.tcp_data.seq =
                     read_u32_be(&packet[FIELD_OFFSET_TCP_SEQ + self.l2_l3_opt_size..]);
                 self.tcp_data.ack =
@@ -723,7 +745,7 @@ pub struct MetaPacketTcpHeader {
     pub ack: u32,
     pub win_size: u16,
     pub mss: u16,
-    pub flags: u8,
+    pub flags: TcpFlags,
     pub data_offset: u8,
     pub win_scale: u8,
     pub sack_permitted: bool,

@@ -62,5 +62,9 @@ tonic-build = "0.5.2"
 [features]
 
 [[bench]]
+name = "flow_generator"
+harness = false
+
+[[bench]]
 name = "utils"
 harness = false
