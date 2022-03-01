@@ -296,6 +296,7 @@ impl Default for HeaderType {
 }
 
 bitflags! {
+    #[derive(Default)]
     pub struct TcpFlags: u8 {
         const FIN = 0b000001;
         const SYN = 0b000010;

@@ -280,7 +280,8 @@ mod tests {
 
     #[test]
     fn test_extract_xml() {
-        if let Ok(entries) = LibVirtXmlExtractor::extract_from("src/platform/instance-00000054.xml")
+        if let Ok(entries) =
+            LibVirtXmlExtractor::extract_from("resources/test/platform/instance-00000054.xml")
         {
             assert_eq!(2, entries.len());
         }
@@ -289,8 +290,9 @@ mod tests {
     #[test]
     fn test_libxml_extractor() {
         let entries =
-            LibVirtXmlExtractor::extract_from("src/platform/instance-00000054.xml").unwrap();
-        let file_path = PathBuf::from("src/platform");
+            LibVirtXmlExtractor::extract_from("resources/test/platform/instance-00000054.xml")
+                .unwrap();
+        let file_path = PathBuf::from("resources/test/platform");
         let extractor = LibVirtXmlExtractor::new();
         extractor.set_path(file_path);
         extractor.start();

@@ -2,8 +2,8 @@
 
 # generated protobuf files
 src/proto/common.rs
-src/proto/flow_logs.rs
-src/proto/metrics.rs
+src/proto/flow_log.rs
+src/proto/metric.rs
 src/proto/trident.rs
 .cargo
 

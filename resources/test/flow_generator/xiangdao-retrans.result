@@ -1,0 +1,702 @@
+0th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    rtt_1: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    retrans_sum: 0,
+    rtt_full: None,
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 0,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: false,
+    },
+}
+		client seq_list: [SeqSegment { seq: 4294966404, len: 6 }]
+		server seq_list: []
+1th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    rtt_1: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    retrans_sum: 0,
+    rtt_full: None,
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 0,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: false,
+    },
+}
+		client seq_list: [SeqSegment { seq: 4294966404, len: 606 }]
+		server seq_list: []
+2th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    rtt_1: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    retrans_sum: 0,
+    rtt_full: None,
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 0,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: false,
+    },
+}
+		client seq_list: [SeqSegment { seq: 4294966404, len: 612 }]
+		server seq_list: []
+3th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    rtt_1: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    retrans_sum: 0,
+    rtt_full: None,
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 0,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: false,
+    },
+}
+		client seq_list: [SeqSegment { seq: 4294966404, len: 612 }]
+		server seq_list: []
+4th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    rtt_1: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    retrans_sum: 0,
+    rtt_full: None,
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 0,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: false,
+    },
+}
+		client seq_list: [SeqSegment { seq: 4294966404, len: 612 }]
+		server seq_list: []
+5th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    rtt_1: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    retrans_sum: 1,
+    rtt_full: None,
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 1,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+		client seq_list: [SeqSegment { seq: 4294966404, len: 612 }]
+		server seq_list: []
+6th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    rtt_1: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    retrans_sum: 1,
+    rtt_full: None,
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 1,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+		client seq_list: [SeqSegment { seq: 339, len: 4 }]
+		server seq_list: []
+7th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    rtt_1: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    retrans_sum: 1,
+    rtt_full: None,
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 1,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+		client seq_list: [SeqSegment { seq: 339, len: 10 }]
+		server seq_list: []
+8th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    rtt_1: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    retrans_sum: 2,
+    rtt_full: None,
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 2,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+		client seq_list: [SeqSegment { seq: 339, len: 10 }]
+		server seq_list: []
+9th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    rtt_1: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    retrans_sum: 2,
+    rtt_full: None,
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 2,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+		client seq_list: [SeqSegment { seq: 339, len: 613 }]
+		server seq_list: []
+10th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    rtt_1: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    retrans_sum: 2,
+    rtt_full: None,
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 2,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+		client seq_list: [SeqSegment { seq: 339, len: 613 }]
+		server seq_list: []
+11th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    rtt_1: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    retrans_sum: 2,
+    rtt_full: None,
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 2,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+		client seq_list: [SeqSegment { seq: 339, len: 613 }]
+		server seq_list: []
+12th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    rtt_1: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    retrans_sum: 2,
+    rtt_full: None,
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 2,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+		client seq_list: [SeqSegment { seq: 339, len: 613 }]
+		server seq_list: []
