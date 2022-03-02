@@ -1790,7 +1790,7 @@ mod tests {
         let mut output = String::new();
 
         let (mut perf, _) = MetaFlowPerf::new();
-        let packets = load_pcap(file);
+        let packets: Vec<MetaPacket> = load_pcap(file);
         assert!(
             packets.len() >= 2,
             "calculating flow perf requires 2 packets at least"
@@ -1855,7 +1855,7 @@ mod tests {
         let mut output = String::new();
 
         let (mut perf, _) = MetaFlowPerf::new();
-        let mut packets = load_pcap(file);
+        let mut packets: Vec<MetaPacket> = load_pcap(file);
         assert!(
             packets.len() >= 2,
             "calculating flow perf requires 2 packets at least"

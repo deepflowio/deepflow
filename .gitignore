@@ -5,6 +5,8 @@ src/proto/common.rs
 src/proto/flow_log.rs
 src/proto/metric.rs
 src/proto/trident.rs
+src/proto/flow_log.rs
+src/proto/metric.rs
 .cargo
 
 Cargo.lock
