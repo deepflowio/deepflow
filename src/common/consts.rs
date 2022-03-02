@@ -117,6 +117,10 @@ pub const UDP_HEADER_SIZE: usize = 8;
 pub const VXLAN_HEADER_SIZE: usize = 8;
 pub const GRE_HEADER_SIZE: usize = 12;
 pub const ERSPAN_HEADER_SIZE: usize = 12;
+pub const ERSPAN_I_HEADER_SIZE: usize = 0;
+pub const ERSPAN_II_HEADER_SIZE: usize = 8;
+pub const ERSPAN_III_HEADER_SIZE: usize = 12;
+pub const ERSPAN_III_SUBHEADER_SIZE: usize = 8;
 pub const TCP_HEADER_SIZE: usize = 20;
 
 // min packet size
@@ -304,3 +308,27 @@ pub const ERSPAN6_TIMESTAMP_HIGH_OFFSET: usize =
 pub const ERSPAN6_TIMESTAMP_LOWER_OFFSET: usize =
     GRE6_PACKET_SIZE + erspan::TYPE3_TIMESTAMP_LOWER_OFFSET;
 pub const ERSPAN6_FLAGS_OFFSET: usize = GRE6_PACKET_SIZE + erspan::TYPE3_FLAGS_OFFSET;
+
+pub const GRE_HEADER_SIZE_DECAP: usize = 4;
+pub const GRE_FLAGS_OFFSET: usize = 0;
+pub const GRE_PROTOCOL_OFFSET: usize = 2;
+pub const GRE_KEY_OFFSET: usize = 4;
+
+pub const GRE_FLAGS_VER_MASK: u16 = 0x7;
+pub const GRE_FLAGS_SEQ_MASK: u16 = 1 << 12;
+pub const GRE_FLAGS_KEY_MASK: u16 = 1 << 13;
+pub const GRE_FLAGS_CSUM_MASK: u16 = 1 << 15;
+
+pub const GRE_SEQ_LEN: usize = 4;
+pub const GRE_KEY_LEN: usize = 4;
+pub const GRE_CSUM_LEN: usize = 4;
+
+pub const IP_IHL_OFFSET: usize = 0;
+pub const IP6_PROTO_OFFSET: usize = 6;
+pub const IP6_SIP_OFFSET: usize = 20; // 用于解析tunnel，仅使用后四个字节
+pub const IP6_DIP_OFFSET: usize = 36; // 用于解析tunnel，仅使用后四个字节
+pub const UDP_DPORT_OFFSET: usize = 2;
+pub const VXLAN_FLAGS_OFFSET_DECAP: usize = 0;
+pub const VXLAN_VNI_OFFSET_DECAP: usize = 4;
+pub const ERSPAN_ID_OFFSET: usize = 0; // erspan2和3共用，4字节取0x3ff
+pub const ERSPAN_III_FLAGS_OFFSET: usize = 11;
