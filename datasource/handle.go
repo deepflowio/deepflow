@@ -26,6 +26,9 @@ var metricsGroupDBIDs = [][]zerodoc.MetricsDBID{
 }
 
 func getMetricsSubDBIDs(dbGroup string) ([]zerodoc.MetricsDBID, error) {
+	if dbGroup == "vtap_flow" || dbGroup == "vtap_app" {
+		dbGroup += "_port"
+	}
 	metricsDBID := zerodoc.MetricsDBNameToID(dbGroup)
 	if metricsDBID < zerodoc.VTAP_DB_ID_MAX {
 		return metricsGroupDBIDs[metricsDBID], nil
