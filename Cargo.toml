@@ -62,5 +62,5 @@ tonic-build = "0.5.2"
 [features]
 
 [[bench]]
-name = "queue"
+name = "utils"
 harness = false

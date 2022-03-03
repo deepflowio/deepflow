@@ -16,4 +16,6 @@ mod utils;
 
 // for benchmarks
 #[doc(hidden)]
-pub use utils::queue::bounded as _queue_bounded;
+pub use {
+    utils::leaky_bucket::LeakyBucket as _LeakyBucket, utils::queue::bounded as _queue_bounded,
+};
