@@ -38,6 +38,10 @@ pub enum Error {
     DnsPerfParse(String),
     #[error("dns log parse: {0}")]
     DnsLogParse(String),
+    #[error("redis perf parse: {0}")]
+    RedisPerfParse(String),
+    #[error("redis log parse: {0}")]
+    RedisLogParse(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

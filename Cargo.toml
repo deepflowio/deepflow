@@ -25,6 +25,7 @@ humantime-serde = "1.0"
 k8s-openapi = { version = "^0.13", features = ["v1_19"] }
 kube = { version = "0.64", features = ["derive", "runtime"] }
 log = "0.4"
+lru = "0.7.3"
 neli = "0.5.3"
 nix = "0.23"
 nom = "7.0.0"

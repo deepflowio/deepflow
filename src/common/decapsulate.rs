@@ -572,7 +572,7 @@ mod tests {
 
     use super::*;
 
-    use crate::utils::test;
+    use crate::utils::test::load_pcap;
 
     pub const PCAP_PATH_PREFIX: &str = "./resources/test/common";
 
@@ -609,8 +609,10 @@ mod tests {
             tier: 1,
             is_ipv6: false,
         };
-        let mut packets: Vec<Vec<u8>> =
-            test::load_pcap(Path::new(PCAP_PATH_PREFIX).join("decapsulate_erspan1.pcap"));
+        let mut packets: Vec<Vec<u8>> = load_pcap(
+            Path::new(PCAP_PATH_PREFIX).join("decapsulate_erspan1.pcap"),
+            None,
+        );
         let packet = packets[0].as_mut_slice();
 
         let l2_len = 18;
@@ -642,8 +644,10 @@ mod tests {
             tier: 1,
             is_ipv6: false,
         };
-        let mut packets: Vec<Vec<u8>> =
-            test::load_pcap(Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"));
+        let mut packets: Vec<Vec<u8>> = load_pcap(
+            Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"),
+            None,
+        );
         let packet = packets[0].as_mut_slice();
 
         let l2_len = 14;
@@ -675,8 +679,10 @@ mod tests {
             tier: 1,
             is_ipv6: false,
         };
-        let mut packets: Vec<Vec<u8>> =
-            test::load_pcap(Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"));
+        let mut packets: Vec<Vec<u8>> = load_pcap(
+            Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"),
+            None,
+        );
         let packet = packets[3].as_mut_slice();
 
         let l2_len = 14;
@@ -701,8 +707,10 @@ mod tests {
             tier: 1,
             is_ipv6: false,
         };
-        let mut packets: Vec<Vec<u8>> =
-            test::load_pcap(Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"));
+        let mut packets: Vec<Vec<u8>> = load_pcap(
+            Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"),
+            None,
+        );
         let packet = packets[2].as_mut_slice();
 
         let l2_len = 14;
@@ -734,7 +742,7 @@ mod tests {
         ];
 
         let mut packets: Vec<Vec<u8>> =
-            test::load_pcap(Path::new(PCAP_PATH_PREFIX).join("tencent-gre.pcap"));
+            load_pcap(Path::new(PCAP_PATH_PREFIX).join("tencent-gre.pcap"), None);
         let packet = packets[0].as_mut_slice();
 
         let l2_len = 14;
@@ -764,8 +772,10 @@ mod tests {
             tier: 1,
             is_ipv6: false,
         };
-        let mut packets: Vec<Vec<u8>> =
-            test::load_pcap(Path::new(PCAP_PATH_PREFIX).join("vmware-gre-teb.pcap"));
+        let mut packets: Vec<Vec<u8>> = load_pcap(
+            Path::new(PCAP_PATH_PREFIX).join("vmware-gre-teb.pcap"),
+            None,
+        );
         let packet = packets[2].as_mut_slice();
 
         let l2_len = 14;
@@ -791,7 +801,7 @@ mod tests {
             is_ipv6: true,
         };
         let mut packets: Vec<Vec<u8>> =
-            test::load_pcap(Path::new(PCAP_PATH_PREFIX).join("ip6-vxlan.pcap"));
+            load_pcap(Path::new(PCAP_PATH_PREFIX).join("ip6-vxlan.pcap"), None);
         let packet = packets[0].as_mut_slice();
 
         let l2_len = 14;
@@ -817,7 +827,7 @@ mod tests {
             is_ipv6: false,
         };
         let mut packets: Vec<Vec<u8>> =
-            test::load_pcap(Path::new(PCAP_PATH_PREFIX).join("ipip.pcap"));
+            load_pcap(Path::new(PCAP_PATH_PREFIX).join("ipip.pcap"), None);
         let packet = packets[0].as_mut_slice();
 
         let l2_len = 18;
@@ -834,8 +844,10 @@ mod tests {
         let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::Vxlan, TunnelType::ErspanOrTeb]);
         let mut actual_bitmap = TunnelTypeBitmap::new(&vec![TunnelType::None]);
 
-        let mut packets: Vec<Vec<u8>> =
-            test::load_pcap(Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"));
+        let mut packets: Vec<Vec<u8>> = load_pcap(
+            Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"),
+            None,
+        );
 
         let l2_len = 14;
 

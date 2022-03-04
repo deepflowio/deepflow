@@ -1,7 +1,9 @@
 mod dns;
+mod l7_rrt;
 mod mq;
 mod rpc;
 mod sql;
+mod stats;
 pub mod tcp;
 mod udp;
 
@@ -20,14 +22,11 @@ use crate::common::{
 use crate::flow_generator::error::Result;
 
 use {
-    dns::DNS_PORT, mq::KAFKA_PORT, rpc::DUBBO_PORT, sql::MYSQL_PORT, sql::REDIS_PORT, tcp::TcpPerf,
-    udp::UdpPerf,
+    dns::DNS_PORT, l7_rrt::L7RrtCache, mq::KAFKA_PORT, rpc::DUBBO_PORT, sql::MYSQL_PORT,
+    sql::REDIS_PORT, tcp::TcpPerf, udp::UdpPerf,
 };
 
 const ART_MAX: Duration = Duration::from_secs(30);
-
-//TODO
-pub struct L7RrtCache;
 
 pub struct DNSPerfData {
     rrt_cache: Rc<RefCell<L7RrtCache>>,
@@ -53,7 +52,7 @@ impl L7FlowPerf for DNSPerfData {
         FlowPerfStats::default()
     }
 
-    fn app_proto_head(&self) -> Option<(AppProtoHead, u16)> {
+    fn app_proto_head(&mut self) -> Option<(AppProtoHead, u16)> {
         None
     }
 }
@@ -72,7 +71,7 @@ pub trait L7FlowPerf {
     fn parse(&mut self, packet: &MetaPacket, flow_id: u64) -> Result<()>;
     fn data_updated(&self) -> bool;
     fn copy_and_reset_data(&mut self, l7_timeout_count: u32) -> FlowPerfStats;
-    fn app_proto_head(&self) -> Option<(AppProtoHead, u16)>;
+    fn app_proto_head(&mut self) -> Option<(AppProtoHead, u16)>;
 }
 
 #[enum_dispatch]
@@ -173,7 +172,7 @@ impl FlowPerf {
         stats
     }
 
-    pub fn app_proto_head(&self, l7_performance_enabled: bool) -> Option<(AppProtoHead, u16)> {
+    pub fn app_proto_head(&mut self, l7_performance_enabled: bool) -> Option<(AppProtoHead, u16)> {
         if !l7_performance_enabled {
             return None;
         }

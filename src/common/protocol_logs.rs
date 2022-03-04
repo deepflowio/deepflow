@@ -18,6 +18,12 @@ pub enum L7ResponseStatus {
     ClientError,
 }
 
+impl Default for L7ResponseStatus {
+    fn default() -> Self {
+        L7ResponseStatus::Ok
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[repr(u8)]
 pub enum LogMessageType {
@@ -26,6 +32,12 @@ pub enum LogMessageType {
     Session,
     Other,
     Max,
+}
+
+impl Default for LogMessageType {
+    fn default() -> Self {
+        LogMessageType::Other
+    }
 }
 
 pub struct AppProtoHead {
