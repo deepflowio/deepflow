@@ -665,14 +665,43 @@ impl StateMachine {
     }
 }
 
+//TODO 测试用的，等rpc模块完成就要去掉，调用真正的rpc
+mod rpc {
+    use std::time::Duration;
+    use std::time::SystemTime;
+    pub fn get_timestamp() -> Duration {
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+    }
+}
+// END
+
 #[cfg(test)]
 mod tests {
+    use std::convert::AsRef;
     use std::fmt;
+    use std::net::Ipv4Addr;
+    use std::path::Path;
+    use std::sync::Arc;
+    use std::sync::Mutex;
 
     use super::*;
 
+    use crate::common::endpoint::{
+        EndpointData, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET,
+    };
     use crate::common::enums::PacketDirection;
+    use crate::common::flow::CloseType;
+    use crate::common::meta_packet::MetaPacket;
+    use crate::common::tagged_flow::TaggedFlow;
+    use crate::flow_generator::flow_map::_new_flow_map_and_receiver;
+    use crate::flow_generator::flow_node::FlowNode;
     use crate::flow_generator::{FlowTimeout, TcpTimeout};
+    use crate::flow_generator::{FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC, TIME_UNIT};
+    use crate::utils::test::load_pcap;
+
+    const FILE_DIR: &'static str = "resources/test/flow_generator";
 
     #[test]
     fn state_machine_initialize() {
@@ -697,7 +726,189 @@ mod tests {
         );
     }
 
-    // TODO: more tests
+    #[test]
+    fn state_machine() {
+        let (mut flow_map, _) = _new_flow_map_and_receiver();
+        let mut flow_node = FlowNode {
+            tagged_flow: TaggedFlow::default(),
+            min_arrived_time: Duration::ZERO,
+            recent_time: Duration::ZERO,
+            timeout: Duration::ZERO,
+            flow_state: FlowState::Raw,
+            meta_flow_perf: None,
+            policy_data_cache: Default::default(),
+            endpoint_data_cache: EndpointData {
+                src_info: Arc::new(Mutex::new(EndpointInfo {
+                    real_ip: Ipv4Addr::UNSPECIFIED.into(),
+                    l2_epc_id: 0,
+                    l3_epc_id: 0,
+                    l2_end: false,
+                    l3_end: false,
+                    is_device: false,
+                    is_vip_interface: false,
+                    is_vip: false,
+                    is_local_mac: false,
+                    is_local_ip: false,
+                })),
+                dst_info: Arc::new(Mutex::new(EndpointInfo {
+                    real_ip: Ipv4Addr::UNSPECIFIED.into(),
+                    l2_epc_id: 0,
+                    l3_epc_id: 0,
+                    l2_end: false,
+                    l3_end: false,
+                    is_device: false,
+                    is_vip_interface: false,
+                    is_vip: false,
+                    is_local_mac: false,
+                    is_local_ip: false,
+                })),
+            },
+            next_tcp_seq0: 0,
+            next_tcp_seq1: 0,
+            packet_in_tick: false,
+            policy_in_tick: [false; 2],
+        };
+
+        let peers = &mut flow_node.tagged_flow.flow.flow_metrics_peers;
+        peers[FLOW_METRICS_PEER_SRC].total_packet_count = 1;
+        peers[FLOW_METRICS_PEER_DST].total_packet_count = 1;
+
+        for data in init_test_case() {
+            flow_node.flow_state = data.cur_state;
+            let closed =
+                flow_map.update_flow_state_machine(&mut flow_node, data.tcp_flags, data.pkt_dir);
+            assert!(
+                closed == data.closed
+                    && flow_node.flow_state == data.next_state
+                    && flow_node.timeout == data.timeout,
+                "{} actual result: [next_state: {:?}, timeout: {:?}, closed: {}]",
+                data,
+                flow_node.flow_state,
+                flow_node.timeout,
+                closed,
+            );
+        }
+    }
+
+    fn state_machine_helper<P: AsRef<Path>>(pcap_file: P, expect_close_type: CloseType) {
+        let (mut flow_map, output_queue_receiver) = _new_flow_map_and_receiver();
+
+        let packets: Vec<MetaPacket> = load_pcap(pcap_file, None);
+        let delta = packets.first().unwrap().lookup_key.timestamp;
+        let mut last_timestamp = Duration::ZERO;
+        for mut pkt in packets {
+            pkt.endpoint_data.replace(EndpointData {
+                src_info: Arc::new(Mutex::new(EndpointInfo {
+                    real_ip: Ipv4Addr::UNSPECIFIED.into(),
+                    l2_epc_id: EPC_FROM_DEEPFLOW,
+                    l3_epc_id: 1,
+                    l2_end: false,
+                    l3_end: false,
+                    is_device: false,
+                    is_vip_interface: false,
+                    is_vip: false,
+                    is_local_mac: false,
+                    is_local_ip: false,
+                })),
+                dst_info: Arc::new(Mutex::new(EndpointInfo {
+                    real_ip: Ipv4Addr::UNSPECIFIED.into(),
+                    l2_epc_id: EPC_FROM_DEEPFLOW,
+                    l3_epc_id: EPC_FROM_INTERNET,
+                    l2_end: false,
+                    l3_end: false,
+                    is_device: false,
+                    is_vip_interface: false,
+                    is_vip: false,
+                    is_local_mac: false,
+                    is_local_ip: false,
+                })),
+            });
+
+            pkt.lookup_key.timestamp = rpc::get_timestamp() + (pkt.lookup_key.timestamp - delta);
+            last_timestamp = pkt.lookup_key.timestamp;
+            flow_map.inject_meta_packet(pkt);
+        }
+
+        flow_map.inject_flush_ticker(last_timestamp);
+        flow_map.inject_flush_ticker(last_timestamp + Duration::from_secs(600));
+
+        let mut tagged_flows = vec![];
+        // 如果不设置超时，队列就会永远等待
+        while let Ok(tagged_flow) = output_queue_receiver.recv(Some(TIME_UNIT)) {
+            tagged_flows.push(tagged_flow);
+        }
+        assert!(
+            tagged_flows.len() > 0,
+            "cannot receive tagged flow from flow_map"
+        );
+        if let Some(tagged_flow) = tagged_flows.pop() {
+            assert_eq!(tagged_flow.flow.close_type, expect_close_type)
+        }
+    }
+
+    #[test]
+    fn syn_repeat() {
+        state_machine_helper(
+            Path::new(FILE_DIR).join("tcp-one-syn.pcap"),
+            CloseType::ClientSynRepeat,
+        )
+    }
+
+    #[test]
+    fn syn_ack_repeat() {
+        state_machine_helper(
+            Path::new(FILE_DIR).join("tcp-n-syn-ack.pcap"),
+            CloseType::ServerSynAckRepeat,
+        )
+    }
+
+    #[test]
+    fn client_source_port_reuse() {
+        state_machine_helper(
+            Path::new(FILE_DIR).join("syn-1.pcap"),
+            CloseType::ClientSourcePortReuse,
+        );
+        state_machine_helper(
+            Path::new(FILE_DIR).join("l4-source-port-reuse.pcap"),
+            CloseType::ClientSourcePortReuse,
+        );
+    }
+
+    #[test]
+    fn server_reset() {
+        state_machine_helper(
+            Path::new(FILE_DIR).join("server-reset.pcap"),
+            CloseType::ServerReset,
+        )
+    }
+
+    #[test]
+    fn server_queue_lack() {
+        state_machine_helper(
+            Path::new(FILE_DIR).join("server-queue-lack.pcap"),
+            CloseType::ServerQueueLack,
+        )
+    }
+
+    #[test]
+    fn client_establish_reset() {
+        state_machine_helper(
+            Path::new(FILE_DIR).join("client-syn-try-lack.pcap"),
+            CloseType::ClientEstablishReset,
+        );
+        state_machine_helper(
+            Path::new(FILE_DIR).join("server-no-response.pcap"),
+            CloseType::ClientEstablishReset,
+        );
+    }
+
+    #[test]
+    fn server_establish_reset() {
+        state_machine_helper(
+            Path::new(FILE_DIR).join("client-no-response.pcap"),
+            CloseType::ServerEstablishReset,
+        )
+    }
 
     struct TestData {
         // input

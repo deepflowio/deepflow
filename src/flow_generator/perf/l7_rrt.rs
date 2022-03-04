@@ -19,8 +19,9 @@ impl L7RrtCache {
         self.0.pop(&((stream_id as u128) << 64 | flow_id as u128))
     }
 
-    pub fn get_and_remove_l7_req_timeout(&mut self, flow_id: u64) {
+    pub fn get_and_remove_l7_req_timeout(&mut self, flow_id: u64) -> u32 {
         self.0.pop(&(flow_id as u128));
+        0
     }
 
     pub fn clear(&mut self) {

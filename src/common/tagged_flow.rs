@@ -7,10 +7,10 @@ use super::tag::Tag;
 
 use crate::proto::flow_log;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct TaggedFlow {
-    flow: Flow,
-    tag: Tag,
+    pub flow: Flow,
+    pub tag: Tag,
 }
 
 impl TaggedFlow {

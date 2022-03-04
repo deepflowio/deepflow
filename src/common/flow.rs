@@ -64,6 +64,7 @@ impl Default for CloseType {
     }
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
 pub struct FlowKey {
     pub vtap_id: u16,
     pub tap_type: TapType,
@@ -152,7 +153,7 @@ impl From<FlowKey> for flow_log::FlowKey {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum FlowSource {
     Normal = 0,
@@ -166,7 +167,7 @@ impl Default for FlowSource {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TunnelField {
     pub tx_ip0: Ipv4Addr, // 对应发送方向的源隧道IP
     pub tx_ip1: Ipv4Addr, // 对应发送方向的目的隧道IP
@@ -457,6 +458,16 @@ pub enum L4Protocol {
     Udp = 2,
 }
 
+impl From<IpProtocol> for L4Protocol {
+    fn from(proto: IpProtocol) -> Self {
+        match proto {
+            IpProtocol::Tcp => Self::Tcp,
+            IpProtocol::Udp => Self::Udp,
+            _ => Self::Unknown,
+        }
+    }
+}
+
 impl Default for L4Protocol {
     fn default() -> Self {
         L4Protocol::Unknown
@@ -585,7 +596,7 @@ impl From<FlowMetricsPeer> for flow_log::FlowMetricsPeer {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Flow {
     pub flow_key: FlowKey,
     pub flow_metrics_peers: [FlowMetricsPeer; 2],

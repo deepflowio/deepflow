@@ -7,7 +7,7 @@ use super::enums::{EthernetType, IpProtocol};
 use crate::proto::trident::DecapType;
 use crate::utils::bytes;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 #[repr(u16)]
 pub enum TunnelType {
     None = DecapType::None as u16,

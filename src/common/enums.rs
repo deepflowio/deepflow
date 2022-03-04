@@ -9,7 +9,7 @@ use super::flow::FlowMetricsPeer;
 
 /// EthernetType is an enumeration of ethernet type values, and acts as a decoder
 /// for any type it supports.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord, TryFromPrimitive, IntoPrimitive)]
 #[repr(u16)]
 pub enum EthernetType {
     // EthernetTypeLLC is not an actual ethernet type.  It is instead a
@@ -54,7 +54,7 @@ impl PartialEq<EthernetType> for u16 {
 
 // IPProtocol is an enumeration of IP protocol values, and acts as a decoder
 // for any type it supports.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
 #[repr(u8)]
 pub enum IpProtocol {
     Ipv6HopByHop = 0,
@@ -155,12 +155,19 @@ impl PartialEq<LinkType> for u8 {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord)]
+#[repr(u16)]
 pub enum TapType {
     Any,
     Isp(u8),
     Tor,
     Max,
+}
+
+impl PartialOrd for TapType {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        u16::from(*self).partial_cmp(&u16::from(*other))
+    }
 }
 
 impl TryFrom<u16> for TapType {
@@ -170,7 +177,7 @@ impl TryFrom<u16> for TapType {
             0 => Ok(TapType::Any),
             3 => Ok(TapType::Tor),
             v if v < 256 => Ok(TapType::Isp(v as u8)),
-            _ => Err("tap_type not in [0, 256)"),
+            _ => Err("TapType not in [0, 256)"),
         }
     }
 }

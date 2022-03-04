@@ -140,6 +140,10 @@ impl Config {
         Ok(c)
     }
 
+    pub fn flow(&self) -> &FlowGeneratorConfig {
+        &self.flow
+    }
+
     // resolve domain name (without port) to ip address
     fn resolve_domain(addr: &str) -> Option<String> {
         format!("{}:1", addr)
@@ -364,21 +368,21 @@ pub enum IngressFlavour {
 }
 
 #[derive(Debug)]
-pub struct RuntimeConfig<'a> {
+pub struct RuntimeConfig {
     pub enabled: bool,
     pub max_cpus: u32,
     pub max_memory: u64,
     pub sync_interval: Duration,
     pub stats_interval: Duration,
     pub global_pps_threshold: u64,
-    pub tap_interface_regex: &'a str,
-    pub host: &'a str,
+    pub tap_interface_regex: String,
+    pub host: String,
     pub rsyslog_enabled: bool,
     pub output_vlan: u16,
     pub mtu: u32,
     pub npb_bps_threshold: u64,
     pub collector_enabled: bool,
-    pub l4_log_store_tap_types: &'a Vec<u32>,
+    pub l4_log_store_tap_types: Vec<u32>,
     pub packet_header_enabled: bool,
     pub platform_enabled: bool,
     pub server_tx_bandwidth_threshold: u64,
@@ -390,9 +394,9 @@ pub struct RuntimeConfig<'a> {
     pub debug_enabled: bool,
     pub log_threshold: u32,
     pub log_level: log::Level,
-    pub analyzer_ip: &'a str,
+    pub analyzer_ip: String,
     pub max_escape: Duration,
-    pub proxy_controller_ip: &'a str,
+    pub proxy_controller_ip: String,
     pub vtap_id: u16,
     pub collector_socket_type: trident::SocketType,
     pub compressor_socket_type: trident::SocketType,
@@ -400,23 +404,24 @@ pub struct RuntimeConfig<'a> {
     pub trident_type: common::TridentType,
     pub capture_packet_size: u32,
     pub inactive_server_port_enabled: bool,
-    pub libvirt_xml_path: &'a str,
+    pub libvirt_xml_path: String,
     pub l7_log_packet_size: u32,
     pub l4_log_collect_nps_threshold: u64,
     pub l7_log_collect_nps_threshold: u64,
     pub l7_metrics_enabled: bool,
-    pub l7_log_store_tap_types: &'a Vec<u32>,
-    pub decap_type: &'a Vec<i32>,
+    pub l7_log_store_tap_types: Vec<u32>,
+    pub decap_type: Vec<i32>,
     pub region_id: u32,
     pub pod_cluster_id: u32,
     pub log_retention: u32,
     pub capture_socket_type: trident::CaptureSocketType,
     pub process_threshold: u32,
     pub thread_threshold: u32,
-    pub capture_bpf: &'a str,
+    pub capture_bpf: String,
+    pub l4_performance_enabled: bool,
 }
 
-impl RuntimeConfig<'_> {
+impl RuntimeConfig {
     fn validate(&self) -> Result<(), ConfigError> {
         if self.sync_interval < Duration::from_secs(1)
             || self.sync_interval > Duration::from_secs(60 * 60)
@@ -517,10 +522,10 @@ impl RuntimeConfig<'_> {
     }
 }
 
-impl<'a> TryFrom<&'a trident::Config> for RuntimeConfig<'a> {
+impl TryFrom<trident::Config> for RuntimeConfig {
     type Error = io::Error;
 
-    fn try_from(conf: &trident::Config) -> Result<RuntimeConfig, io::Error> {
+    fn try_from(mut conf: trident::Config) -> Result<RuntimeConfig, io::Error> {
         let rc = RuntimeConfig {
             enabled: conf.enabled(),
             max_cpus: conf.max_cpus(),
@@ -528,14 +533,14 @@ impl<'a> TryFrom<&'a trident::Config> for RuntimeConfig<'a> {
             sync_interval: Duration::from_secs(conf.sync_interval() as u64),
             stats_interval: Duration::from_secs(conf.stats_interval() as u64),
             global_pps_threshold: conf.global_pps_threshold(),
-            tap_interface_regex: conf.tap_interface_regex(),
-            host: conf.host(),
-            rsyslog_enabled: conf.rsyslog_enabled(),
+            tap_interface_regex: conf.tap_interface_regex.take().unwrap_or_default(),
+            host: conf.host.take().unwrap_or_default(),
+            rsyslog_enabled: conf.rsyslog_enabled.take().unwrap_or_default(),
             output_vlan: (conf.output_vlan() & 0xFFFFFFFF) as u16,
             mtu: conf.mtu(),
             npb_bps_threshold: conf.npb_bps_threshold(),
             collector_enabled: conf.collector_enabled(),
-            l4_log_store_tap_types: &conf.l4_log_tap_types,
+            l4_log_store_tap_types: conf.l4_log_tap_types.drain(..).collect(),
             packet_header_enabled: conf.packet_header_enabled(),
             platform_enabled: conf.platform_enabled(),
             server_tx_bandwidth_threshold: conf.server_tx_bandwidth_threshold(),
@@ -554,9 +559,9 @@ impl<'a> TryFrom<&'a trident::Config> for RuntimeConfig<'a> {
                 "trace" => log::Level::Trace,
                 _ => log::Level::Info,
             },
-            analyzer_ip: conf.analyzer_ip(),
+            analyzer_ip: conf.analyzer_ip.take().unwrap_or_default(),
             max_escape: Duration::from_secs(conf.max_escape_seconds() as u64),
-            proxy_controller_ip: conf.proxy_controller_ip(),
+            proxy_controller_ip: conf.proxy_controller_ip.take().unwrap_or_default(),
             vtap_id: (conf.vtap_id() & 0xFFFFFFFF) as u16,
             collector_socket_type: conf.collector_socket_type(),
             compressor_socket_type: conf.compressor_socket_type(),
@@ -564,20 +569,21 @@ impl<'a> TryFrom<&'a trident::Config> for RuntimeConfig<'a> {
             trident_type: conf.trident_type(),
             capture_packet_size: conf.capture_packet_size(),
             inactive_server_port_enabled: conf.inactive_server_port_enabled(),
-            libvirt_xml_path: conf.libvirt_xml_path(),
+            libvirt_xml_path: conf.libvirt_xml_path.take().unwrap_or_default(),
             l7_log_packet_size: conf.l7_log_packet_size(),
             l4_log_collect_nps_threshold: conf.l4_log_collect_nps_threshold(),
             l7_log_collect_nps_threshold: conf.l7_log_collect_nps_threshold(),
             l7_metrics_enabled: conf.l7_metrics_enabled(),
-            l7_log_store_tap_types: &conf.l7_log_store_tap_types,
-            decap_type: &conf.decap_type,
+            l7_log_store_tap_types: conf.l7_log_store_tap_types.drain(..).collect(),
+            decap_type: conf.decap_type.drain(..).collect(),
             region_id: conf.region_id(),
             pod_cluster_id: conf.pod_cluster_id(),
             log_retention: conf.log_retention(),
             capture_socket_type: conf.capture_socket_type(),
             process_threshold: conf.process_threshold(),
             thread_threshold: conf.thread_threshold(),
-            capture_bpf: conf.capture_bpf(),
+            capture_bpf: conf.capture_bpf.take().unwrap_or_default(),
+            l4_performance_enabled: conf.l4_performance_enabled(),
         };
         rc.validate()
             .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err.to_string()))?;

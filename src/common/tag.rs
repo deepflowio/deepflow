@@ -1,6 +1,6 @@
 use super::policy::PolicyData;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Tag {
     pub policy_data: [PolicyData; 2],
 }

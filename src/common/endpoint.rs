@@ -67,7 +67,7 @@ impl EndpointInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EndpointData {
     pub src_info: Arc<Mutex<EndpointInfo>>,
     pub dst_info: Arc<Mutex<EndpointInfo>>,

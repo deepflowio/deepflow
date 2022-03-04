@@ -711,6 +711,21 @@ impl MetaPacket {
         }
         Ok(())
     }
+
+    /// Get a reference to the meta packet's tunnel.
+    pub fn tunnel(&self) -> Option<&Arc<TunnelInfo>> {
+        self.tunnel.as_ref()
+    }
+
+    /// Get the meta packet's l3 payload len.
+    pub fn l3_payload_len(&self) -> usize {
+        self.l3_payload_len
+    }
+
+    /// Get the meta packet's l4 payload len.
+    pub fn l4_payload_len(&self) -> usize {
+        self.l4_payload_len
+    }
 }
 
 impl fmt::Display for MetaPacket {
