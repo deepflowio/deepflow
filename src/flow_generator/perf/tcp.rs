@@ -1776,9 +1776,8 @@ mod tests {
 
     fn update_test_helper<P: AsRef<Path>>(file: P, check_seq_list: bool) -> String {
         let mut output = String::new();
-
         let (mut perf, _) = TcpPerf::new();
-        let packets: Vec<MetaPacket> = load_pcap(file);
+        let packets: Vec<MetaPacket> = load_pcap(file, None);
         assert!(
             packets.len() >= 2,
             "calculating flow perf requires 2 packets at least"
@@ -1841,9 +1840,8 @@ mod tests {
         reuse_first_n_packets: Option<usize>,
     ) -> String {
         let mut output = String::new();
-
         let (mut perf, _) = TcpPerf::new();
-        let mut packets: Vec<MetaPacket> = load_pcap(file);
+        let mut packets: Vec<MetaPacket> = load_pcap(file, None);
         assert!(
             packets.len() >= 2,
             "calculating flow perf requires 2 packets at least"

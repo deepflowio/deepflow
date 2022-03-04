@@ -1,0 +1,28 @@
+RedisInfo { request: "GET user_conf_config_1", request_type: "GET", response: "", status: "", error: "" }
+RedisInfo { request: "", request_type: "", response: "{\"sso\": {\"sso_link\": \"\", \"sso_open\": false}, \"account\":", status: "", error: "" }
+RedisInfo { request: "EXISTS verify_code", request_type: "EXISTS", response: "", status: "", error: "" }
+RedisInfo { request: "", request_type: "", response: ":1", status: "", error: "" }
+RedisInfo { request: "GET user_conf_config_1", request_type: "GET", response: "", status: "", error: "" }
+RedisInfo { request: "", request_type: "", response: "{\"sso\": {\"sso_link\": \"\", \"sso_open\": false}, \"account\":", status: "", error: "" }
+RedisInfo { request: "GET user_conf_config_1", request_type: "GET", response: "", status: "", error: "" }
+RedisInfo { request: "", request_type: "", response: "{\"sso\": {\"sso_link\": \"\", \"sso_open\": false}, \"account\":", status: "", error: "" }
+RedisInfo { request: "EXISTS verify_code", request_type: "EXISTS", response: "", status: "", error: "" }
+RedisInfo { request: "", request_type: "", response: ":1", status: "", error: "" }
+RedisInfo { request: "GET user_conf_config_1", request_type: "GET", response: "", status: "", error: "" }
+RedisInfo { request: "", request_type: "", response: "{\"sso\": {\"sso_link\": \"\", \"sso_open\": false}, \"account\":", status: "", error: "" }
+RedisInfo { request: "GET user_conf_config_1", request_type: "GET", response: "", status: "", error: "" }
+RedisInfo { request: "", request_type: "", response: "{\"sso\": {\"sso_link\": \"\", \"sso_open\": false}, \"account\":", status: "", error: "" }
+RedisInfo { request: "GET user_conf_config_1", request_type: "GET", response: "", status: "", error: "" }
+RedisInfo { request: "", request_type: "", response: "{\"sso\": {\"sso_link\": \"\", \"sso_open\": false}, \"account\":", status: "", error: "" }
+RedisInfo { request: "EXISTS verify_code", request_type: "EXISTS", response: "", status: "", error: "" }
+RedisInfo { request: "", request_type: "", response: ":1", status: "", error: "" }
+RedisInfo { request: "GET 1 1 http://127.0.0.1:20013/v2/pod-groups", request_type: "GET", response: "", status: "", error: "" }
+RedisInfo { request: "", request_type: "", response: "", status: "", error: "" }
+RedisInfo { request: "", request_type: "", response: "", status: "", error: "" }
+RedisInfo { request: "", request_type: "", response: "", status: "", error: "" }
+RedisInfo { request: "", request_type: "", response: "", status: "", error: "" }
+RedisInfo { request: "", request_type: "", response: "", status: "", error: "" }
+RedisInfo { request: "", request_type: "", response: "", status: "", error: "" }
+RedisInfo { request: "", request_type: "", response: "", status: "", error: "" }
+RedisInfo { request: "", request_type: "", response: "", status: "", error: "-hash:7d9cd9bf65\", \"TYPE\": 5, \"POD_NUM\": 2, \"POD_NAMESPACE_ID\"" }
+RedisInfo { request: "", request_type: "", response: "", status: "", error: "" }

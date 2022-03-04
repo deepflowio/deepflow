@@ -1,2 +1,2 @@
-mod document;
-mod meter;
+pub mod document;
+pub mod meter;
