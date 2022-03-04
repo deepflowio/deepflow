@@ -549,17 +549,13 @@ pub struct TcpPerf {
 }
 
 impl TcpPerf {
-    pub fn new() -> (Self, Arc<Counter>) {
-        let counter = Arc::new(Counter::default());
-        (
-            Self {
-                ctrl_info: Default::default(),
-                perf_data: Default::default(),
-                counter: counter.clone(),
-                handshaking: false,
-            },
+    pub fn new(counter: Arc<Counter>) -> Self {
+        Self {
+            ctrl_info: Default::default(),
+            perf_data: Default::default(),
             counter,
-        )
+            handshaking: false,
+        }
     }
 
     // fpd for first packet direction
@@ -1537,7 +1533,7 @@ mod tests {
     // TODO: fix this test that checks nothing
     #[test]
     fn reestablish_fsm() {
-        let (mut perf, _) = TcpPerf::new();
+        let mut perf = TcpPerf::new(Arc::new(Counter::default()));
 
         // 1SYN -> 2SYN/ACK -> 1ACK -> 1ACK/LEN>0 -> 2ACK -> 2ACK/LEN>0 -> 1ACK -> 1ACK/LEN>0
         // 1SYN
@@ -1645,7 +1641,7 @@ mod tests {
 
     #[test]
     fn preprocess() {
-        let (perf, _) = TcpPerf::new();
+        let perf = TcpPerf::new(Arc::new(Counter::default()));
 
         let packet = MiniMetaPacket {
             data_offset: 5,
@@ -1685,7 +1681,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn meta_flow_perf_update() {
-        let (mut perf, _) = TcpPerf::new();
+        let mut perf = TcpPerf::new(Arc::new(Counter::default()));
         _meta_flow_perf_update(&mut perf);
 
         let perf_data = PerfData {
@@ -1776,7 +1772,8 @@ mod tests {
 
     fn update_test_helper<P: AsRef<Path>>(file: P, check_seq_list: bool) -> String {
         let mut output = String::new();
-        let (mut perf, _) = TcpPerf::new();
+
+        let mut perf = TcpPerf::new(Arc::new(Counter::default()));
         let packets: Vec<MetaPacket> = load_pcap(file, None);
         assert!(
             packets.len() >= 2,
@@ -1840,7 +1837,8 @@ mod tests {
         reuse_first_n_packets: Option<usize>,
     ) -> String {
         let mut output = String::new();
-        let (mut perf, _) = TcpPerf::new();
+
+        let mut perf = TcpPerf::new(Arc::new(Counter::default()));
         let mut packets: Vec<MetaPacket> = load_pcap(file, None);
         assert!(
             packets.len() >= 2,

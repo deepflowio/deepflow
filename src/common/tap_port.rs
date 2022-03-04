@@ -5,7 +5,7 @@ use std::net::Ipv4Addr;
 // +------+-------------------------------------+
 // | from |              ip/id/mac              |
 // +------+-------------------------------------+
-#[derive(Default)]
+#[derive(Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct TapPort(pub u64);
 
 impl TapPort {

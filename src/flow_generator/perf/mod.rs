@@ -10,6 +10,7 @@ mod udp;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU64};
+use std::sync::Arc;
 use std::time::Duration;
 
 use enum_dispatch::enum_dispatch;
@@ -22,9 +23,11 @@ use crate::common::{
 use crate::flow_generator::error::Result;
 
 use {
-    dns::DNS_PORT, l7_rrt::L7RrtCache, mq::KAFKA_PORT, rpc::DUBBO_PORT, sql::MYSQL_PORT,
-    sql::REDIS_PORT, tcp::TcpPerf, udp::UdpPerf,
+    dns::DNS_PORT, mq::KAFKA_PORT, rpc::DUBBO_PORT, sql::MYSQL_PORT, sql::REDIS_PORT, tcp::TcpPerf,
+    udp::UdpPerf,
 };
+
+pub use l7_rrt::L7RrtCache;
 
 const ART_MAX: Duration = Duration::from_secs(30);
 
@@ -107,9 +110,10 @@ impl FlowPerf {
         rrt_cache: Rc<RefCell<L7RrtCache>>,
         l4_proto: L4Protocol,
         l7_proto: L7Protocol,
+        counter: Arc<Counter>,
     ) -> Option<Self> {
         let l4 = match l4_proto {
-            L4Protocol::Tcp => L4FlowPerfTable::from(TcpPerf::new().0),
+            L4Protocol::Tcp => L4FlowPerfTable::from(TcpPerf::new(counter)),
             L4Protocol::Udp => L4FlowPerfTable::from(UdpPerf::new()),
             _ => {
                 return None;

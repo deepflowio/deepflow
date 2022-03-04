@@ -219,8 +219,7 @@ impl Synchronizer {
             warn!("invalid response from {} without config", remote);
             return;
         }
-        let config = config.unwrap();
-        let runtime_config = (&config).try_into();
+        let runtime_config = config.unwrap().try_into();
         if let Err(e) = runtime_config {
             warn!(
                 "invalid response from {} with invalid config: {}",
