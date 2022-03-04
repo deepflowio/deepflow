@@ -76,18 +76,18 @@ func (s *MQLogger) WriteBlock(block *ckdb.Block) error {
 		}
 
 		status := uint8(s.AppProtoLogsData.BaseInfo.Head.Status)
-		if msgType == datatype.MSG_T_REQUEST {
-			status = datatype.STATUS_NOT_EXIST
-		}
-		if err := block.WriteUInt8(status); err != nil {
-			return err
-		}
 
 		answerCode := int16(s.AppProtoLogsData.BaseInfo.Head.Code)
 		answerCodePtr := &answerCode
 		if msgType == datatype.MSG_T_REQUEST || answerCode == int16(NONE) {
 			answerCodePtr = nil
+			status = datatype.STATUS_NOT_EXIST
 		}
+
+		if err := block.WriteUInt8(status); err != nil {
+			return err
+		}
+
 		if err := block.WriteInt16Nullable(answerCodePtr); err != nil {
 			return err
 		}
