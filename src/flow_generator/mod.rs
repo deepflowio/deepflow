@@ -1,4 +1,3 @@
-mod dns;
 mod error;
 mod flow_config;
 mod flow_state;

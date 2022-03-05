@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-pub const DNS_PORT: u16 = 53;
+pub const PORT: u16 = 53;
 
 pub const DNS_TCP_PAYLOAD_OFFSET: usize = 2;
 

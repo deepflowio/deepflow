@@ -360,11 +360,20 @@ impl TcpFlags {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum PacketDirection {
     ClientToServer = FlowMetricsPeer::SRC,
     ServerToClient = FlowMetricsPeer::DST,
+}
+
+impl PacketDirection {
+    pub fn reversed(&self) -> Self {
+        match self {
+            PacketDirection::ClientToServer => PacketDirection::ServerToClient,
+            PacketDirection::ServerToClient => PacketDirection::ClientToServer,
+        }
+    }
 }
 
 impl Default for PacketDirection {

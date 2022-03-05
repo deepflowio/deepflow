@@ -17,9 +17,8 @@ mod utils;
 // for benchmarks
 #[doc(hidden)]
 pub use {
-    common::flow::FlowPerfStats as _FlowPerfStats,
-    flow_generator::perf::tcp_perf_quantifier::{
-        MetaFlowPerf as _MetaFlowPerf, _benchmark_report, _benchmark_session_peer_seq_no_assert,
+    flow_generator::perf::tcp::{
+        TcpPerf as _TcpPerf, _benchmark_report, _benchmark_session_peer_seq_no_assert,
         _meta_flow_perf_update,
     },
     utils::{leaky_bucket::LeakyBucket as _LeakyBucket, queue::bounded as _queue_bounded},

@@ -1,14 +1,14 @@
 use std::path::Path;
 
 use anyhow::Result;
-use clap::{AppSettings, Parser};
+use clap::Parser;
 use signal_hook::consts::TERM_SIGNALS;
 use signal_hook::iterator::Signals;
 
 use ::trident::*;
 
 #[derive(Parser)]
-#[clap(setting = AppSettings::DisableVersionFlag)]
+#[clap(version=concat!(env!("REV_COUNT"), "-", env!("REVISION"), " ", env!("COMMIT_DATE"), "\n", env!("RUSTC_VERSION")))]
 struct Opts {
     /// Specify config file location
     #[clap(short = 'f', long, default_value = "/etc/trident.yaml")]
@@ -53,17 +53,6 @@ fn wait_on_signals() {}
 fn main() -> Result<()> {
     let opts = Opts::parse();
     let version = format!("{}-{}", env!("REV_COUNT"), env!("REVISION"));
-
-    if opts.version {
-        println!(
-            "{} {}\n{}",
-            version,
-            env!("COMMIT_DATE"),
-            env!("RUSTC_VERSION")
-        );
-        return Ok(());
-    }
-
     let t = trident::Trident::new(&Path::new(&opts.config_file), version)?;
     t.start();
     wait_on_signals();

@@ -52,7 +52,7 @@ impl DnsPerfData {
         rrt_cache: &mut u64,
         flow_id: u64,
     ) -> Result<()> {
-        if meta.lookup_key.src_port != DNS_PORT && meta.lookup_key.dst_port != DNS_PORT {
+        if meta.lookup_key.src_port != PORT && meta.lookup_key.dst_port != PORT {
             return Ok(());
         }
 
