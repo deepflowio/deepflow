@@ -3,8 +3,7 @@ use std::time::Instant;
 use criterion::*;
 
 use trident::{
-    _FlowPerfStats as FlowPerfStats, _MetaFlowPerf as MetaFlowPerf,
-    _benchmark_report as benchmark_report,
+    _TcpPerf as TcpPerf, _benchmark_report as benchmark_report,
     _benchmark_session_peer_seq_no_assert as benchmark_session_peer_seq_no_assert,
     _meta_flow_perf_update as meta_flow_perf_update,
 };
@@ -12,18 +11,17 @@ use trident::{
 fn bench_perf(c: &mut Criterion) {
     c.bench_function("perf_stats_report", |b| {
         b.iter_custom(|iters| {
-            let (mut perf, _) = MetaFlowPerf::new();
-            let mut report = FlowPerfStats::default();
+            let (mut perf, _) = TcpPerf::new();
             let start = Instant::now();
             for _ in 0..iters {
-                benchmark_report(&mut perf, &mut report);
+                benchmark_report(&mut perf);
             }
             start.elapsed()
         })
     });
     c.bench_function("perf_update", |b| {
         b.iter_custom(|iters| {
-            let (mut perf, _) = MetaFlowPerf::new();
+            let (mut perf, _) = TcpPerf::new();
             let start = Instant::now();
             for _ in 0..iters {
                 meta_flow_perf_update(&mut perf);

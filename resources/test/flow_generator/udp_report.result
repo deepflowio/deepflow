@@ -1,0 +1,2 @@
+L4Protocol:udp TCPPerfStats:{RTTClientMax:0 RTTServerMax:0 SRTMax:0 ARTMax:24416 RTT:0 RTTClientSum:0 RTTServerSum:0 SRTSum:0 ARTSum:24416 RTTClientCount:0 RTTServerCount:0 SRTCount:0 ARTCount:1 RetransCountSrc:0 ZeroWinCountSrc:0 RetransCountDst:0 ZeroWinCountDst:0 TotalRetransCount:0} 
+	L7Protocol: L7PerfStats:{RequestCount:0 ResponseCount:0 ErrClientCount:0 ErrServerCount:0 ErrTimeout:0 RTTCount:0 RTTSum:0 RTTMax:0}

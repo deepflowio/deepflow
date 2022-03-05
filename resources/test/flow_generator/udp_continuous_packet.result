@@ -1,0 +1,12 @@
+0th udp perf data:
+UdpPerf { req_timestamp: 1533089324.835178s, art_max: 0ns, art_sum: 0ns, art_count: 0, last_pkt_direction: ClientToServer, data_update_flag: false }
+
+1th udp perf data:
+UdpPerf { req_timestamp: 1533089324.835211s, art_max: 0ns, art_sum: 0ns, art_count: 0, last_pkt_direction: ClientToServer, data_update_flag: false }
+
+2th udp perf data:
+UdpPerf { req_timestamp: 1533089324.835211s, art_max: 24.409ms, art_sum: 24.409ms, art_count: 1, last_pkt_direction: ServerToClient, data_update_flag: true }
+
+3th udp perf data:
+UdpPerf { req_timestamp: 1533089324.835211s, art_max: 24.409ms, art_sum: 24.409ms, art_count: 1, last_pkt_direction: ServerToClient, data_update_flag: true }
+

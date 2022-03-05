@@ -5,7 +5,7 @@ use std::time::Duration;
 use bitflags::bitflags;
 use log::debug;
 
-use super::{Counter, L4FlowPerf};
+use super::{Counter, L4FlowPerf, ART_MAX};
 
 use crate::{
     common::{
@@ -18,7 +18,6 @@ use crate::{
 };
 
 const SRT_MAX: Duration = Duration::from_secs(10);
-const ART_MAX: Duration = Duration::from_secs(30);
 const RTT_FULL_MAX: Duration = Duration::from_secs(30);
 const RTT_MAX: Duration = Duration::from_secs(30);
 
@@ -542,14 +541,14 @@ impl PerfData {
     }
 }
 
-pub struct MetaFlowPerf {
+pub struct TcpPerf {
     ctrl_info: PerfControl,
     perf_data: PerfData,
     counter: Arc<Counter>,
     handshaking: bool,
 }
 
-impl MetaFlowPerf {
+impl TcpPerf {
     pub fn new() -> (Self, Arc<Counter>) {
         let counter = Arc::new(Counter::default());
         (
@@ -838,8 +837,8 @@ impl MetaFlowPerf {
     }
 }
 
-impl L4FlowPerf for MetaFlowPerf {
-    fn update(&mut self, p: &MetaPacket, fpd: bool) -> Result<()> {
+impl L4FlowPerf for TcpPerf {
+    fn parse(&mut self, p: &MetaPacket, fpd: bool) -> Result<()> {
         if !self.is_interested_packet(p) {
             self.ctrl_info.0.srt_calculable = false;
             self.ctrl_info.0.art_calculable = false;
@@ -888,27 +887,16 @@ impl L4FlowPerf for MetaFlowPerf {
         d.period_data.updated || d.rtt_0.updated || d.rtt_1.updated || d.rtt_full.is_some()
     }
 
-    fn copy_and_reset_data(&mut self, stats: &mut FlowPerfStats, flow_reversed: bool) {
+    fn copy_and_reset_data(&mut self, flow_reversed: bool) -> FlowPerfStats {
+        let mut stats = FlowPerfStats::default();
         stats.l4_protocol = L4Protocol::Tcp;
-        self.perf_data.update_perf_stats(stats, flow_reversed);
+        self.perf_data.update_perf_stats(&mut stats, flow_reversed);
         self.perf_data.period_data = Default::default();
-    }
-
-    fn reset(&mut self) {
-        self.ctrl_info = Default::default();
-        self.perf_data = Default::default();
-        self.counter
-            .ignored_packet_count
-            .store(0, Ordering::Relaxed);
-        self.counter
-            .invalid_packet_count
-            .store(0, Ordering::Relaxed);
-        self.counter.mismatched_response.store(0, Ordering::Relaxed);
-        self.handshaking = false;
+        stats
     }
 }
 
-impl fmt::Debug for MetaFlowPerf {
+impl fmt::Debug for TcpPerf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -919,7 +907,7 @@ impl fmt::Debug for MetaFlowPerf {
 }
 
 #[doc(hidden)]
-pub fn _benchmark_report(perf: &mut MetaFlowPerf, report: &mut FlowPerfStats) {
+pub fn _benchmark_report(perf: &mut TcpPerf) {
     let pd = &mut perf.perf_data;
     pd.period_data.art_0.max = Duration::from_nanos(100);
     pd.period_data.art_0.sum = Duration::from_nanos(100);
@@ -927,7 +915,7 @@ pub fn _benchmark_report(perf: &mut MetaFlowPerf, report: &mut FlowPerfStats) {
     pd.period_data.art_1.max = Duration::from_nanos(300);
     pd.period_data.art_1.sum = Duration::from_nanos(300);
     pd.period_data.art_1.count = 1;
-    perf.copy_and_reset_data(report, false);
+    let _ = perf.copy_and_reset_data(false);
     let pd = &mut perf.perf_data;
     pd.period_data.art_0.max = Duration::from_nanos(200);
     pd.period_data.art_0.sum = Duration::from_nanos(200);
@@ -935,7 +923,7 @@ pub fn _benchmark_report(perf: &mut MetaFlowPerf, report: &mut FlowPerfStats) {
     pd.period_data.srt_0.max = Duration::from_nanos(1000);
     pd.period_data.srt_0.sum = Duration::from_nanos(1000);
     pd.period_data.srt_0.count = 1;
-    perf.copy_and_reset_data(report, true);
+    let _ = perf.copy_and_reset_data(false);
 }
 
 #[doc(hidden)]
@@ -1039,7 +1027,7 @@ impl From<MiniMetaPacket> for MetaPacket {
 }
 
 #[doc(hidden)]
-pub fn _meta_flow_perf_update(perf: &mut MetaFlowPerf) {
+pub fn _meta_flow_perf_update(perf: &mut TcpPerf) {
     /*
      * rttSum1=1, rttSum0=10: 1SYN -> 2SYN/ACK -> 1ACK ->
      * *art1=4, not rtt: 1ACK/LEN>0 -> 2ACK/LEN>0 -> 2ACK ->
@@ -1059,7 +1047,7 @@ pub fn _meta_flow_perf_update(perf: &mut MetaFlowPerf) {
         ..Default::default()
     }
     .into();
-    perf.update(&packet, false).unwrap();
+    perf.parse(&packet, false).unwrap();
 
     // 2SYN/ACK rttSum1=1
     let packet = MiniMetaPacket {
@@ -1070,7 +1058,7 @@ pub fn _meta_flow_perf_update(perf: &mut MetaFlowPerf) {
         ..Default::default()
     }
     .into();
-    perf.update(&packet, true).unwrap();
+    perf.parse(&packet, true).unwrap();
 
     // 1ACK rttSum0=10
     let packet = MiniMetaPacket {
@@ -1081,7 +1069,7 @@ pub fn _meta_flow_perf_update(perf: &mut MetaFlowPerf) {
         ..Default::default()
     }
     .into();
-    perf.update(&packet, false).unwrap();
+    perf.parse(&packet, false).unwrap();
 
     // 1ACK/LEN>0 len=100
     let packet = MiniMetaPacket {
@@ -1093,7 +1081,7 @@ pub fn _meta_flow_perf_update(perf: &mut MetaFlowPerf) {
         ..Default::default()
     }
     .into();
-    perf.update(&packet, false).unwrap();
+    perf.parse(&packet, false).unwrap();
 
     // 2ACK/LEN>0包，len=100 *art1=4
     let packet = MiniMetaPacket {
@@ -1105,7 +1093,7 @@ pub fn _meta_flow_perf_update(perf: &mut MetaFlowPerf) {
         ..Default::default()
     }
     .into();
-    perf.update(&packet, true).unwrap();
+    perf.parse(&packet, true).unwrap();
 
     // 2ACK 测试连续ACK包, 对RTT计算的影响
     let packet = MiniMetaPacket {
@@ -1116,7 +1104,7 @@ pub fn _meta_flow_perf_update(perf: &mut MetaFlowPerf) {
         ..Default::default()
     }
     .into();
-    perf.update(&packet, true).unwrap();
+    perf.parse(&packet, true).unwrap();
 
     // 2ACK/LEN>0 len=500
     let packet = MiniMetaPacket {
@@ -1128,7 +1116,7 @@ pub fn _meta_flow_perf_update(perf: &mut MetaFlowPerf) {
         ..Default::default()
     }
     .into();
-    perf.update(&packet, true).unwrap();
+    perf.parse(&packet, true).unwrap();
 
     // 1ACK srt0=16
     let packet = MiniMetaPacket {
@@ -1139,7 +1127,7 @@ pub fn _meta_flow_perf_update(perf: &mut MetaFlowPerf) {
         ..Default::default()
     }
     .into();
-    perf.update(&packet, false).unwrap();
+    perf.parse(&packet, false).unwrap();
 
     // 1ACK/LEN>0 len=200 art0=70
     let packet = MiniMetaPacket {
@@ -1151,7 +1139,7 @@ pub fn _meta_flow_perf_update(perf: &mut MetaFlowPerf) {
         ..Default::default()
     }
     .into();
-    perf.update(&packet, false).unwrap();
+    perf.parse(&packet, false).unwrap();
 
     // 2ACK *srt1=100
     let packet = MiniMetaPacket {
@@ -1162,7 +1150,7 @@ pub fn _meta_flow_perf_update(perf: &mut MetaFlowPerf) {
         ..Default::default()
     }
     .into();
-    perf.update(&packet, true).unwrap();
+    perf.parse(&packet, true).unwrap();
 
     // 2ACK/LEN>0 len=300 *art1=106
     let packet = MiniMetaPacket {
@@ -1174,7 +1162,7 @@ pub fn _meta_flow_perf_update(perf: &mut MetaFlowPerf) {
         ..Default::default()
     }
     .into();
-    perf.update(&packet, true).unwrap();
+    perf.parse(&packet, true).unwrap();
 }
 
 #[cfg(test)]
@@ -1549,7 +1537,7 @@ mod tests {
     // TODO: fix this test that checks nothing
     #[test]
     fn reestablish_fsm() {
-        let (mut perf, _) = MetaFlowPerf::new();
+        let (mut perf, _) = TcpPerf::new();
 
         // 1SYN -> 2SYN/ACK -> 1ACK -> 1ACK/LEN>0 -> 2ACK -> 2ACK/LEN>0 -> 1ACK -> 1ACK/LEN>0
         // 1SYN
@@ -1561,7 +1549,7 @@ mod tests {
             ..Default::default()
         }
         .into();
-        perf.update(&packet, true).unwrap();
+        perf.parse(&packet, true).unwrap();
         perf.ctrl_info.0.update_data(&packet);
 
         // 2SYN/ACK rttSum1 = 1
@@ -1573,7 +1561,7 @@ mod tests {
             ..Default::default()
         }
         .into();
-        perf.update(&packet, false).unwrap();
+        perf.parse(&packet, false).unwrap();
         perf.ctrl_info.1.update_data(&packet);
 
         // 1ACK rttSum0 = 10
@@ -1585,7 +1573,7 @@ mod tests {
             ..Default::default()
         }
         .into();
-        perf.update(&packet, true).unwrap();
+        perf.parse(&packet, true).unwrap();
         perf.ctrl_info.0.update_data(&packet);
 
         // 1ACK/LEN>0 len=100
@@ -1599,7 +1587,7 @@ mod tests {
             ..Default::default()
         }
         .into();
-        perf.update(&packet, true).unwrap();
+        perf.parse(&packet, true).unwrap();
         perf.ctrl_info.0.update_data(&packet);
 
         // 2ACK srt1 = 4
@@ -1611,7 +1599,7 @@ mod tests {
             ..Default::default()
         }
         .into();
-        perf.update(&packet, false).unwrap();
+        perf.parse(&packet, false).unwrap();
         perf.ctrl_info.1.update_data(&packet);
 
         // 2ACK/LEN>0 len=500 art1 = 30
@@ -1625,7 +1613,7 @@ mod tests {
             ..Default::default()
         }
         .into();
-        perf.update(&packet, false).unwrap();
+        perf.parse(&packet, false).unwrap();
         perf.ctrl_info.1.update_data(&packet);
 
         // 1ACK srt0 = 16
@@ -1637,7 +1625,7 @@ mod tests {
             ..Default::default()
         }
         .into();
-        perf.update(&packet, true).unwrap();
+        perf.parse(&packet, true).unwrap();
         perf.ctrl_info.0.update_data(&packet);
 
         // 1ACK/LEN>0 len=200 art0 = 54
@@ -1651,13 +1639,13 @@ mod tests {
             ..Default::default()
         }
         .into();
-        perf.update(&packet, true).unwrap();
+        perf.parse(&packet, true).unwrap();
         perf.ctrl_info.0.update_data(&packet);
     }
 
     #[test]
     fn preprocess() {
-        let (perf, _) = MetaFlowPerf::new();
+        let (perf, _) = TcpPerf::new();
 
         let packet = MiniMetaPacket {
             data_offset: 5,
@@ -1697,7 +1685,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn meta_flow_perf_update() {
-        let (mut perf, _) = MetaFlowPerf::new();
+        let (mut perf, _) = TcpPerf::new();
         _meta_flow_perf_update(&mut perf);
 
         let perf_data = PerfData {
@@ -1789,7 +1777,7 @@ mod tests {
     fn update_test_helper<P: AsRef<Path>>(file: P, check_seq_list: bool) -> String {
         let mut output = String::new();
 
-        let (mut perf, _) = MetaFlowPerf::new();
+        let (mut perf, _) = TcpPerf::new();
         let packets: Vec<MetaPacket> = load_pcap(file);
         assert!(
             packets.len() >= 2,
@@ -1804,7 +1792,7 @@ mod tests {
                 i,
                 packet
             );
-            let _ = perf.update(
+            let _ = perf.parse(
                 packet,
                 first_packet.lookup_key.src_ip == packet.lookup_key.src_ip,
             );
@@ -1854,7 +1842,7 @@ mod tests {
     ) -> String {
         let mut output = String::new();
 
-        let (mut perf, _) = MetaFlowPerf::new();
+        let (mut perf, _) = TcpPerf::new();
         let mut packets: Vec<MetaPacket> = load_pcap(file);
         assert!(
             packets.len() >= 2,
@@ -1867,11 +1855,10 @@ mod tests {
             for i in 0..n {
                 let packet = &packets[i];
                 assert!(packet.tcp_data.data_offset != 0);
-                perf.update(&packet, first_packet_src_ip == packet.lookup_key.src_ip)
+                perf.parse(&packet, first_packet_src_ip == packet.lookup_key.src_ip)
                     .unwrap();
             }
-            let mut report = FlowPerfStats::default();
-            perf.copy_and_reset_data(&mut report, reverse_flow);
+            let report = perf.copy_and_reset_data(reverse_flow);
             output.push_str(&format!(
                 "report after reuse {} packets:\n{:#?}\n",
                 n, &report.tcp
@@ -1884,19 +1871,17 @@ mod tests {
                 continue;
             }
             assert!(packet.tcp_data.data_offset != 0);
-            let _ = perf.update(&*packet, first_packet_src_ip == packet.lookup_key.src_ip);
+            let _ = perf.parse(&*packet, first_packet_src_ip == packet.lookup_key.src_ip);
 
             if first_report_moment == i as isize + 1 {
-                let mut report = FlowPerfStats::default();
-                perf.copy_and_reset_data(&mut report, reverse_flow);
+                let report = perf.copy_and_reset_data(reverse_flow);
                 output.push_str(&format!(
                     "report after {}th packet:\n{:#?}\n",
                     first_report_moment, &report.tcp
                 ));
             }
         }
-        let mut report = FlowPerfStats::default();
-        perf.copy_and_reset_data(&mut report, reverse_flow);
+        let report = perf.copy_and_reset_data(reverse_flow);
         output.push_str(&format!("report after last packet:\n{:#?}\n", &report.tcp));
 
         output
