@@ -6,13 +6,13 @@ pub enum Error {
     ParseMacFailed(String),
     #[error("call try_from() failed from {0}")]
     TryFromFailed(String),
-    #[error("kubernetes watchers error ")]
+    #[error(transparent)]
     KubeWatcher(#[from] kube::runtime::watcher::Error),
-    #[error("parse bytes to String error ")]
+    #[error(transparent)]
     ParseUtf8(#[from] std::string::FromUtf8Error),
     #[error("PlatformSynchronizer failed: {0} ")]
     PlatformSynchronizer(String),
-    #[error("IO error")]
+    #[error(transparent)]
     IoError(#[from] std::io::Error),
     #[error("data not found: {0}")]
     NotFound(String),
@@ -22,7 +22,7 @@ pub enum Error {
     SysMonitor(String),
     #[error("environment error: {0}")]
     Environment(String),
-    #[error("Nix Errno")]
+    #[error(transparent)]
     Errno(#[from] nix::errno::Errno),
     #[error("ethtool: {0}")]
     Ethtool(String),

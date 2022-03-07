@@ -2,14 +2,14 @@ use std::rc::Rc;
 use std::str::FromStr;
 use std::time::Instant;
 
-use cidr_utils::cidr::IpCidr;
 use criterion::*;
+use ipnet::IpNet;
 
 use trident::_Cidr as Cidr;
 use trident::_Labeler as Labeler;
 use trident::_LookupKey as LookupKey;
 use trident::_MacAddr as MacAddr;
-use trident::{_IpNet as IpNet, _PlatformData as PlatformData};
+use trident::{_IpSubnet as IpSubnet, _PlatformData as PlatformData};
 
 fn bench_labeler(c: &mut Criterion) {
     c.bench_function("labeler", |b| {
@@ -20,7 +20,7 @@ fn bench_labeler(c: &mut Criterion) {
 
             let interface: PlatformData = PlatformData {
                 mac: 0x112233445566,
-                ips: vec![IpNet {
+                ips: vec![IpSubnet {
                     raw_ip: "192.168.0.200".parse().unwrap(),
                     ..Default::default()
                 }],
@@ -36,7 +36,7 @@ fn bench_labeler(c: &mut Criterion) {
                     + (i & 0xff).to_string().as_str()
                     + "/32".to_string().as_str();
                 let cidr: Cidr = Cidr {
-                    ip_net: IpCidr::from_str(&ip).unwrap(),
+                    ip: IpNet::from_str(&ip).unwrap(),
                     epc_id: 10,
                     ..Default::default()
                 };

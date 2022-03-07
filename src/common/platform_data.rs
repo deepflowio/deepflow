@@ -1,15 +1,19 @@
 use std::net::{IpAddr, Ipv4Addr};
 
+use crate::proto::trident;
+
+use super::{endpoint::EPC_FROM_DEEPFLOW, error::Error, IPV4_MAX_MASK_LEN, IPV6_MAX_MASK_LEN};
+
 #[derive(Debug, PartialEq)]
-pub struct IpNet {
+pub struct IpSubnet {
     pub raw_ip: IpAddr,
     pub netmask: u32,
     pub subnet_id: u32,
 }
 
-impl Default for IpNet {
-    fn default() -> IpNet {
-        IpNet {
+impl Default for IpSubnet {
+    fn default() -> IpSubnet {
+        IpSubnet {
             raw_ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
             netmask: 32,
             subnet_id: 0,
@@ -23,10 +27,21 @@ pub enum IfType {
     LAN = 4,
 }
 
+impl TryFrom<u8> for IfType {
+    type Error = &'static str;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            3 => Ok(Self::WAN),
+            4 => Ok(Self::LAN),
+            _ => Err("invalid number"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct PlatformData {
     pub mac: u64,
-    pub ips: Vec<IpNet>,
+    pub ips: Vec<IpSubnet>,
     pub epc_id: i32,
     pub id: u32,
     pub region_id: u32,
@@ -63,5 +78,66 @@ impl Default for PlatformData {
             skip_tap_interface: false,
             is_local: false,
         }
+    }
+}
+
+impl TryFrom<trident::Interface> for PlatformData {
+    type Error = Error;
+
+    fn try_from(p: trident::Interface) -> Result<Self, Self::Error> {
+        let mut ips = vec![];
+        for ip_res in p.ip_resources.iter() {
+            let ip = ip_res.ip().parse::<IpAddr>().map_err(|e| {
+                Error::ParsePlatformData(format!(
+                    "parse trident::Interface to platform data ip-resource failed: {:?} {}",
+                    ip_res.ip(),
+                    e
+                ))
+            })?;
+            let max = if ip.is_ipv6() {
+                IPV6_MAX_MASK_LEN as u32
+            } else {
+                IPV4_MAX_MASK_LEN as u32
+            };
+            ips.push(IpSubnet {
+                raw_ip: ip,
+                netmask: ip_res.masklen().max(max),
+                subnet_id: ip_res.subnet_id(),
+            });
+        }
+
+        let epc_id = if p.epc_id() > 0 {
+            (p.epc_id() & 0xffff) as i32
+        } else if p.epc_id() == 0 {
+            EPC_FROM_DEEPFLOW
+        } else {
+            p.epc_id() as i32
+        };
+
+        Ok(PlatformData {
+            mac: p.mac().try_into().map_err(|e| {
+                Error::ParsePlatformData(format!(
+                    "parse trident::Interface to platform data mac address failed: {}",
+                    e
+                ))
+            })?,
+            ips,
+            epc_id,
+            id: p.id(),
+            region_id: p.region_id(),
+            pod_cluster_id: p.pod_cluster_id(),
+            pod_node_id: p.pod_node_id(),
+            if_type: IfType::try_from(p.if_type() as u8).map_err(|e| {
+                Error::ParsePlatformData(format!(
+                    "parse trident::Interface to platform data if_type failed: {}",
+                    e
+                ))
+            })?,
+            device_type: p.device_type() as u8,
+            is_vip_interface: p.is_vip_interface(),
+            skip_mac: false,
+            skip_tap_interface: p.pod_node_id() > 0 && p.pod_cluster_id() > 0,
+            is_local: false,
+        })
     }
 }

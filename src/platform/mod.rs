@@ -4,6 +4,8 @@ mod platform_synchronizer;
 
 pub use libvirt_xml_extractor::LibvirtXmlExtractor;
 
+pub use kubernetes::{ActivePoller, ApiWatcher, GenericPoller, Poller};
+
 use crate::utils::net::MacAddr;
 
 #[derive(Debug)]

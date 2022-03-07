@@ -115,7 +115,7 @@ impl fmt::Display for MatchedField {
 
 // N for Ip address length in bytes
 #[repr(C)]
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct MatchedFieldN<const N: usize> {
     // split up because [u8; 2 * N + 10] is not valid
     src_ip: [u8; N],

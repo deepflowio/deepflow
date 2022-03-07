@@ -2,6 +2,7 @@ mod consts;
 pub mod decapsulate;
 pub mod endpoint;
 pub mod enums;
+mod error;
 pub mod flow;
 pub mod lookup_key;
 mod matched_field;
