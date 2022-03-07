@@ -57,7 +57,7 @@ pub struct AppProtoLogsBaseInfo {
     tap_type: TapType,
     is_ipv6: bool,
     tap_side: u8,
-    app_proto_head: AppProtoHead,
+    pub app_proto_head: AppProtoHead,
 
     /* L2 */
     mac_src: MacAddr,
