@@ -9,6 +9,7 @@ mod active_poller;
 mod api_watcher;
 mod resource_watcher;
 pub use active_poller::ActivePoller;
+pub use api_watcher::ApiWatcher;
 
 #[enum_dispatch]
 pub enum GenericPoller {

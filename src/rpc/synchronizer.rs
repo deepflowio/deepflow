@@ -26,16 +26,31 @@ const DEFAULT_SYNC_INTERVAL: Duration = Duration::from_secs(10);
 const RPC_RETRY_INTERVAL: Duration = Duration::from_secs(60);
 
 pub struct StaticConfig {
-    revision: String,
-    boot_time: SystemTime,
+    pub revision: String,
+    pub boot_time: SystemTime,
 
-    tap_mode: trident::TapMode,
-    vtap_group_id_request: String,
-    kubernetes_cluster_id: String,
-    ctrl_mac: String,
-    ctrl_ip: String,
+    pub tap_mode: trident::TapMode,
+    pub vtap_group_id_request: String,
+    pub kubernetes_cluster_id: String,
+    pub ctrl_mac: String,
+    pub ctrl_ip: String,
 
-    env: RuntimeEnvironment,
+    pub env: RuntimeEnvironment,
+}
+
+impl Default for StaticConfig {
+    fn default() -> Self {
+        Self {
+            revision: Default::default(),
+            boot_time: SystemTime::UNIX_EPOCH,
+            tap_mode: Default::default(),
+            vtap_group_id_request: Default::default(),
+            kubernetes_cluster_id: Default::default(),
+            ctrl_ip: Default::default(),
+            ctrl_mac: Default::default(),
+            env: Default::default(),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -45,23 +60,23 @@ pub struct Config {
 
 #[derive(Default)]
 pub struct Status {
-    hostname: String,
+    pub hostname: String,
 
-    time_diff: i64,
+    pub time_diff: i64,
 
-    config_accepted: bool,
-    synced: bool,
-    new_revision: Option<String>,
+    pub config_accepted: bool,
+    pub synced: bool,
+    pub new_revision: Option<String>,
 
-    version_platform_data: u64,
-    version_acls: u64,
-    version_groups: u64,
+    pub version_platform_data: u64,
+    pub version_acls: u64,
+    pub version_groups: u64,
 }
 
 pub struct Synchronizer {
-    static_config: Arc<StaticConfig>,
+    pub static_config: Arc<StaticConfig>,
     config: Arc<RwLock<Config>>,
-    status: Arc<RwLock<Status>>,
+    pub status: Arc<RwLock<Status>>,
 
     sync_interval: Duration,
 
@@ -111,7 +126,7 @@ impl Synchronizer {
         todo!()
     }
 
-    fn generate_sync_request(
+    pub fn generate_sync_request(
         static_config: &Arc<StaticConfig>,
         status: &Arc<RwLock<Status>>,
     ) -> trident::SyncRequest {
@@ -174,6 +189,10 @@ impl Synchronizer {
             // FIXME @xiangwang 后续增加配置文件处理业务逻辑
             local_config_file: None,
         }
+    }
+
+    pub fn clone_session(&self) -> Arc<Session> {
+        self.session.clone()
     }
 
     fn parse_upgrade(
@@ -487,15 +506,15 @@ impl SynchronizerBuilder {
     }
 }
 
-#[derive(Debug)]
-struct RuntimeEnvironment {
-    cpu_num: u32,
-    memory_size: u64,
+#[derive(Debug, Default)]
+pub struct RuntimeEnvironment {
+    pub cpu_num: u32,
+    pub memory_size: u64,
 
-    arch: String,
-    os: String,
+    pub arch: String,
+    pub os: String,
 
-    kernel_version: String,
+    pub kernel_version: String,
 }
 
 impl RuntimeEnvironment {

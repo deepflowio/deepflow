@@ -58,7 +58,7 @@ struct Context {
     ctrl_ip: IpAddr,
 }
 
-struct ApiWatcher {
+pub struct ApiWatcher {
     context: Arc<Context>,
     thread: Mutex<Option<thread::JoinHandle<()>>>,
     running: Arc<Mutex<bool>>,
@@ -103,7 +103,7 @@ impl ApiWatcher {
     }
 
     // 直接拿对应的entries
-    pub fn get_watcher_entries(&self, resource_name: &str) -> Option<Vec<String>> {
+    pub fn get_watcher_entries(&self, resource_name: impl AsRef<str>) -> Option<Vec<String>> {
         if !*self.running.lock().unwrap() {
             debug!("ApiWatcher isn't running");
             return None;
@@ -112,7 +112,7 @@ impl ApiWatcher {
         self.watchers
             .lock()
             .unwrap()
-            .get(resource_name)
+            .get(resource_name.as_ref())
             .map(|watcher| watcher.entries())
     }
 

@@ -332,3 +332,8 @@ pub const VXLAN_FLAGS_OFFSET_DECAP: usize = 0;
 pub const VXLAN_VNI_OFFSET_DECAP: usize = 4;
 pub const ERSPAN_ID_OFFSET: usize = 0; // erspan2和3共用，4字节取0x3ff
 pub const ERSPAN_III_FLAGS_OFFSET: usize = 11;
+
+// IpAddr mask
+pub const IPV6_MAX_MASK_LEN: u8 = 128;
+pub const IPV4_MAX_MASK_LEN: u8 = 32;
+pub const MIN_MASK_LEN: u8 = 0;

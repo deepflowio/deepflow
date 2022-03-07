@@ -80,11 +80,12 @@ pub enum IpProtocol {
     Sstp = 132,
     UdpLite = 136,
     MplsInIp = 137,
+    Unknown = 255,
 }
 
 impl Default for IpProtocol {
     fn default() -> Self {
-        IpProtocol::Ipv6HopByHop
+        IpProtocol::Unknown
     }
 }
 

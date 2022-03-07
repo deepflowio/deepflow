@@ -1,5 +1,20 @@
+use std::cmp::max;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::num::ParseIntError;
+use std::ops::RangeInclusive;
+
 use bitflags::bitflags;
+use ipnet::{IpNet, Ipv4Net, Ipv6Net};
+
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+
+use super::endpoint::EPC_FROM_DEEPFLOW;
+use super::enums::{IpProtocol, TapType};
+use super::error::Error;
+use super::matched_field::{MatchedFieldv4, MatchedFieldv6};
+use super::{IPV4_MAX_MASK_LEN, IPV6_MAX_MASK_LEN, MIN_MASK_LEN};
+
+use crate::proto::trident;
 
 const ACTION_PCAP: u16 = 1;
 
@@ -12,6 +27,16 @@ bitflags! {
         const DST = 0x2;
         const MASK = Self::SRC.bits | Self::DST.bits;
         const ALL = Self::SRC.bits | Self::DST.bits;
+    }
+}
+
+impl From<trident::TapSide> for TapSide {
+    fn from(t: trident::TapSide) -> Self {
+        match t {
+            trident::TapSide::Src => TapSide::SRC,
+            trident::TapSide::Dst => TapSide::DST,
+            trident::TapSide::Both => TapSide::ALL,
+        }
     }
 }
 
@@ -47,6 +72,16 @@ pub enum NpbTunnelType {
     Pcap,
 }
 
+impl From<trident::TunnelType> for NpbTunnelType {
+    fn from(t: trident::TunnelType) -> Self {
+        match t {
+            trident::TunnelType::GreErspan => Self::GreErspan,
+            trident::TunnelType::Pcap => Self::Pcap,
+            trident::TunnelType::Vxlan => Self::VxLan,
+        }
+    }
+}
+
 // 64              48              32            30          26                      0
 // +---------------+---------------+-------------+-----------+-----------------------+
 // |   acl_gid     | payload_slice | tunnel_type | tap_side  |      tunnel_id        |
@@ -55,6 +90,18 @@ pub enum NpbTunnelType {
 pub struct NpbAction {
     action: u64,
     acl_gids: Vec<u16>,
+}
+
+impl From<trident::NpbAction> for NpbAction {
+    fn from(n: trident::NpbAction) -> Self {
+        Self::new(
+            n.npb_acl_group_id(),
+            n.tunnel_id(),
+            n.tunnel_type().into(),
+            n.tap_side().into(),
+            n.payload_slice() as u16,
+        )
+    }
 }
 
 impl NpbAction {
@@ -212,6 +259,355 @@ impl PolicyData {
 
                 self.npb_actions.push(candidate_action);
             }
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum GroupType {
+    Named = 0,
+    Anonymous = 1,
+}
+
+impl From<trident::GroupType> for GroupType {
+    fn from(t: trident::GroupType) -> Self {
+        match t {
+            trident::GroupType::Named => Self::Named,
+            trident::GroupType::Anonymous => Self::Anonymous,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct IpGroupData {
+    pub id: u32,
+    pub epc_id: i32,
+    pub group_type: GroupType,
+    pub ips: Vec<IpNet>,
+    pub vm_ids: Vec<u32>,
+}
+
+impl TryFrom<trident::Group> for IpGroupData {
+    type Error = Error;
+    fn try_from(g: trident::Group) -> Result<Self, Self::Error> {
+        if g.ips.is_empty() && g.ip_ranges.is_empty() {
+            return Err(Error::ParseIpGroupData(format!(
+                "IpGroup({:?}) is invalid, ips and ip-range is none",
+                g
+            )));
+        }
+
+        let mut ips = vec![];
+        for s in g.ips.iter() {
+            let ip = s.parse::<IpNet>().map_err(|e| {
+                Error::ParseIpGroupData(format!("IpGroup({}) parse ip string failed: {}", s, e))
+            })?;
+            ips.push(ip);
+        }
+        for ip_range in g.ip_ranges.iter() {
+            let ip_peers = match ip_range.split_once('-') {
+                Some(p) => p,
+                None => {
+                    return Err(Error::ParseIpGroupData(format!(
+                        "IpGroup ({}) split ip string failed",
+                        ip_range
+                    )));
+                }
+            };
+            let (start, end) = match (ip_peers.0.parse::<IpAddr>(), ip_peers.1.parse::<IpAddr>()) {
+                (Ok(s), Ok(e)) => (s, e),
+                _ => {
+                    return Err(Error::ParseIpGroupData(format!(
+                        "IpGroup ({}, {}) parse ip string failed",
+                        ip_peers.0, ip_peers.1
+                    )));
+                }
+            };
+            ips.append(&mut ip_range_convert_to_cidr(start, end));
+        }
+
+        Ok(IpGroupData {
+            id: g.id() & 0xffff,
+            epc_id: (g.epc_id() & 0xffff) as i32,
+            group_type: g.r#type().into(),
+            ips,
+            vm_ids: vec![],
+        })
+    }
+}
+
+fn ipv4_range_convert(mut start: u32, end: u32) -> Vec<IpNet> {
+    fn v4_get_first_mask(start: u32, end: u32) -> u8 {
+        for len in (MIN_MASK_LEN..IPV4_MAX_MASK_LEN).rev() {
+            if start & (1 << IPV4_MAX_MASK_LEN - len) != 0 {
+                // len继续减少将会使得start不是所在网段的第一个IP
+                return len;
+            }
+            if start | !v4_mask_len_to_netmask(len) >= end
+                || start | !v4_mask_len_to_netmask(len - 1) > end
+            {
+                // len继续减少将会使得网段包含end之后的IP
+                return len;
+            }
+        }
+        0
+    }
+
+    fn v4_mask_len_to_netmask(mask: u8) -> u32 {
+        u32::MAX << IPV4_MAX_MASK_LEN - mask
+    }
+
+    fn v4_get_last_ip(ip: u32, mask: u8) -> u32 {
+        ip | !v4_mask_len_to_netmask(mask)
+    }
+
+    let mut ips = vec![];
+    while start <= end {
+        let mask_len = v4_get_first_mask(start, end);
+        let ip = Ipv4Net::new(Ipv4Addr::from(start), mask_len).unwrap();
+        ips.push(ip.into());
+
+        let last_ip = v4_get_last_ip(start, mask_len);
+        if last_ip == u32::MAX {
+            break;
+        }
+        let rhs = 1 << IPV4_MAX_MASK_LEN - mask_len;
+        start = match start.checked_add(rhs) {
+            Some(s) => s,
+            None => break,
+        };
+    }
+    ips
+}
+
+fn ipv6_range_convert(mut start: u128, end: u128) -> Vec<IpNet> {
+    fn v6_get_first_mask(start: u128, end: u128) -> u8 {
+        for len in (MIN_MASK_LEN..IPV6_MAX_MASK_LEN).rev() {
+            if start & (1 << IPV6_MAX_MASK_LEN - len) != 0 {
+                return len;
+            }
+            if start | !v6_mask_len_to_netmask(len) >= end
+                || start | !v6_mask_len_to_netmask(len - 1) > end
+            {
+                return len;
+            }
+        }
+        0
+    }
+
+    fn v6_mask_len_to_netmask(mask: u8) -> u128 {
+        u128::MAX << IPV6_MAX_MASK_LEN - mask
+    }
+
+    fn v6_get_last_ip(ip: u128, mask: u8) -> u128 {
+        ip | !v6_mask_len_to_netmask(mask)
+    }
+
+    let mut ips = vec![];
+
+    while start <= end {
+        let mask_len = v6_get_first_mask(start, end);
+        let ip = Ipv6Net::new(Ipv6Addr::from(start).into(), mask_len).unwrap();
+        ips.push(ip.into());
+
+        let last_ip = v6_get_last_ip(start, mask_len);
+        if last_ip == u128::MAX {
+            break;
+        }
+        let rhs = 1 << IPV6_MAX_MASK_LEN - mask_len;
+        start = match start.checked_add(rhs) {
+            Some(s) => s,
+            None => break,
+        };
+    }
+    ips
+}
+
+pub fn ip_range_convert_to_cidr(start: IpAddr, end: IpAddr) -> Vec<IpNet> {
+    match (start, end) {
+        (IpAddr::V4(s), IpAddr::V4(e)) => ipv4_range_convert(s.into(), e.into()),
+        (IpAddr::V6(s), IpAddr::V6(e)) => ipv6_range_convert(s.into(), e.into()),
+        _ => unreachable!(),
+    }
+}
+
+#[derive(Debug)]
+pub struct Acl {
+    id: u32,
+    tap_type: TapType,
+    src_groups: Vec<u16>,
+    dst_groups: Vec<u16>,
+    src_port_range: Vec<RangeInclusive<u16>>, // 0仅表示采集端口0
+    dst_port_range: Vec<RangeInclusive<u16>>, // 0仅表示采集端口0
+    proto: IpProtocol,                        // 256表示全采集, 0表示采集采集协议0
+    npb_actions: Vec<NpbAction>,
+    v4_fields: Vec<MatchNodev4>,
+    v6_fields: Vec<MatchNodev6>,
+    policy: PolicyData,
+}
+
+impl From<trident::FlowAcl> for Acl {
+    fn from(mut f: trident::FlowAcl) -> Self {
+        Self {
+            id: f.id(),
+            tap_type: (f.tap_type() as u16).try_into().unwrap_or_default(),
+            src_groups: f.src_group_ids.drain(..).map(|id| id as u16).collect(),
+            dst_groups: f.dst_group_ids.drain(..).map(|id| id as u16).collect(),
+            src_port_range: split_port(f.src_ports()),
+            dst_port_range: split_port(f.dst_ports()),
+            proto: IpProtocol::try_from(f.protocol() as u8).unwrap_or_default(),
+            npb_actions: f.npb_actions.into_iter().map(Into::into).collect(),
+            v4_fields: vec![],
+            v6_fields: vec![],
+            policy: PolicyData::default(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct MatchNodev4 {
+    matched: MatchedFieldv4,
+    matched_mask: MatchedFieldv4,
+}
+
+#[derive(Debug)]
+pub struct MatchNodev6 {
+    matched: MatchedFieldv6,
+    matched_mask: MatchedFieldv6,
+}
+
+pub fn split_port(src: impl AsRef<str>) -> Vec<RangeInclusive<u16>> {
+    fn get_port(src: &str) -> Result<RangeInclusive<u16>, ParseIntError> {
+        let split_src_ports = match src.split_once('-') {
+            Some(p) => p,
+            None => {
+                let port = src.parse::<u32>()?;
+                return Ok(port as u16..=port as u16);
+            }
+        };
+        let min = split_src_ports.0.parse::<u32>()?;
+        let max = split_src_ports.1.parse::<u32>()?;
+
+        Ok(min as u16..=max as u16)
+    }
+
+    let port_ranges = src.as_ref();
+    if port_ranges.len() == 0 {
+        return vec![(0..=65535)];
+    }
+
+    let mut src_ports = port_ranges
+        .split(',')
+        .filter_map(|p| get_port(p).ok())
+        .collect::<Vec<_>>();
+    src_ports.sort_by(|a, b| a.start().cmp(b.start()));
+
+    let mut retain_flags = vec![true; src_ports.len()];
+    for i in 0..src_ports.len() - 1 {
+        // 合并连续的端口号
+        if *src_ports[i].end() + 1 >= *src_ports[i + 1].start() {
+            src_ports[i + 1] =
+                *src_ports[i].start()..=max(*src_ports[i].end(), *src_ports[i + 1].end());
+            retain_flags[i] = false;
+        }
+    }
+
+    // 删除无效数据
+    let mut iter = retain_flags.into_iter();
+    src_ports.retain(|_| iter.next().unwrap());
+    src_ports
+}
+
+// IsVIP为true时不影响cidr epcid表的建立, 但是会单独建立VIP表
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Cidr {
+    pub ip: IpNet,
+    pub tunnel_id: u32,
+    pub epc_id: i32,
+    pub cidr_type: CidrType,
+    pub is_vip: bool,
+    pub region_id: u32,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[repr(u8)]
+pub enum CidrType {
+    Wan = 1,
+    Lan = 2,
+}
+
+impl From<trident::CidrType> for CidrType {
+    fn from(t: trident::CidrType) -> Self {
+        match t {
+            trident::CidrType::Lan => CidrType::Lan,
+            trident::CidrType::Wan => CidrType::Wan,
+        }
+    }
+}
+
+impl TryFrom<trident::Cidr> for Cidr {
+    type Error = Error;
+    fn try_from(c: trident::Cidr) -> Result<Self, Self::Error> {
+        if c.prefix.is_none() {
+            return Err(Error::ParseCidr(format!("Cidr({:?}) is invalid", &c)));
+        }
+        let ip: IpNet = c.prefix().parse().map_err(|_| {
+            Error::ParseCidr(format!("Cidr({:?}) has invalid prefix({})", c, c.prefix()))
+        })?;
+
+        let mut epc_id = c.epc_id();
+        if epc_id > 0 {
+            epc_id &= 0xffff;
+        } else if epc_id == 0 {
+            epc_id = EPC_FROM_DEEPFLOW;
+        }
+
+        Ok(Cidr {
+            ip,
+            tunnel_id: c.tunnel_id(),
+            epc_id,
+            cidr_type: c.r#type().into(),
+            is_vip: c.is_vip(),
+            region_id: c.region_id(),
+        })
+    }
+}
+
+impl Cidr {
+    pub fn netmask_len(&self) -> u8 {
+        match self.ip {
+            IpNet::V4(ip) => ip.prefix_len(),
+            IpNet::V6(ip) => ip.prefix_len(),
+        }
+    }
+}
+
+impl Default for Cidr {
+    fn default() -> Self {
+        Self {
+            ip: Ipv4Net::from(Ipv4Addr::UNSPECIFIED).into(),
+            tunnel_id: 0,
+            epc_id: 0,
+            region_id: 0,
+            cidr_type: CidrType::Lan,
+            is_vip: false,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct PeerConnection {
+    pub id: u32,
+    pub local_epc: i32,
+    pub remote_epc: i32,
+}
+
+impl From<trident::PeerConnection> for PeerConnection {
+    fn from(p: trident::PeerConnection) -> Self {
+        Self {
+            id: p.id(),
+            local_epc: (p.local_epc_id() & 0xffff) as i32,
+            remote_epc: (p.remote_epc_id() & 0xffff) as i32,
         }
     }
 }

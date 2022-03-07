@@ -2,16 +2,14 @@ use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 use std::rc::Rc;
 
+use super::bit::count_trailing_zeros32;
+
 use crate::common::decapsulate::TunnelInfo;
 use crate::common::endpoint::{EndpointData, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET};
 use crate::common::lookup_key::LookupKey;
 use crate::common::platform_data::{IfType, PlatformData};
-use crate::proto::trident::CidrType;
+use crate::common::policy::{Cidr, CidrType, PeerConnection};
 use crate::utils::net::is_unicast_link_local;
-
-use super::bit::count_trailing_zeros32;
-use super::cidr::Cidr;
-use super::peer::PeerConnection;
 
 const BROADCAST_MAC: u64 = 0xffffffffffff;
 const MULTICAST_MAC: u64 = 0x010000000000;
@@ -125,13 +123,13 @@ impl Labeler {
         let mut peer_table: HashMap<i32, Vec<i32>> = HashMap::new();
         for peer in peers {
             peer_table
-                .entry(peer.local_epc_id)
+                .entry(peer.local_epc)
                 .or_default()
-                .push(peer.remote_epc_id);
+                .push(peer.remote_epc);
             peer_table
-                .entry(peer.remote_epc_id)
+                .entry(peer.remote_epc)
                 .or_default()
-                .push(peer.local_epc_id);
+                .push(peer.local_epc);
         }
         self.peer_table = peer_table;
     }
@@ -159,7 +157,7 @@ impl Labeler {
 
         for item in cidrs {
             let mut epc_id = item.epc_id;
-            if item.ttype == CidrType::Wan {
+            if item.cidr_type == CidrType::Wan {
                 epc_id = EPC_FROM_DEEPFLOW;
             }
 
@@ -196,7 +194,7 @@ impl Labeler {
     fn set_epc_by_cidr(&self, ip: IpAddr, epc_id: i32, endpoint: &mut EndpointInfo) -> bool {
         if let Some(list) = self.epc_cidr_table.get(&epc_id) {
             for cidr in list {
-                if cidr.ip_net.contains(ip) {
+                if cidr.ip.contains(&ip) {
                     endpoint.l3_epc_id = cidr.epc_id;
                     endpoint.is_vip = cidr.is_vip;
                     return true;
@@ -216,10 +214,10 @@ impl Labeler {
     ) -> bool {
         if let Some(list) = self.tunnel_cidr_table.get(&tunnel_id) {
             for cidr in list.iter() {
-                if cidr.ip_net.contains(ip) {
+                if cidr.ip.contains(&ip) {
                     endpoint.l3_epc_id = cidr.epc_id;
                     endpoint.is_vip = cidr.is_vip;
-                    return cidr.ttype == CidrType::Wan;
+                    return cidr.cidr_type == CidrType::Wan;
                 }
             }
 
@@ -230,7 +228,7 @@ impl Labeler {
                 }
                 last_epc_id = cidr.epc_id;
                 if self.set_epc_by_cidr(ip, cidr.epc_id, endpoint) {
-                    return cidr.ttype == CidrType::Wan;
+                    return cidr.cidr_type == CidrType::Wan;
                 }
             }
         }
@@ -240,7 +238,7 @@ impl Labeler {
     fn set_vip_by_cidr(&self, ip: IpAddr, epc: i32, info: &mut EndpointInfo) -> bool {
         if let Some(list) = self.epc_cidr_table.get(&epc) {
             for cidr in list {
-                if cidr.ip_net.contains(ip) {
+                if cidr.ip.contains(&ip) {
                     info.is_vip = cidr.is_vip;
                     return true;
                 }
@@ -538,11 +536,13 @@ impl Labeler {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::common::platform_data::IpNet;
-    use crate::utils::net::MacAddr;
-    use cidr_utils::cidr::IpCidr;
     use std::{net::Ipv6Addr, str::FromStr};
+
+    use ipnet::IpNet;
+
+    use super::*;
+    use crate::common::platform_data::IpSubnet;
+    use crate::utils::net::MacAddr;
 
     #[test]
     fn test_mac_normal() {
@@ -552,11 +552,11 @@ mod tests {
         let interface: PlatformData = PlatformData {
             mac: 0x112233445566,
             ips: vec![
-                IpNet {
+                IpSubnet {
                     raw_ip: ip4.parse().unwrap(),
                     ..Default::default()
                 },
-                IpNet {
+                IpSubnet {
                     raw_ip: ip6.parse().unwrap(),
                     netmask: 128,
                     ..Default::default()
@@ -582,7 +582,7 @@ mod tests {
         let mut labeler: Labeler = Default::default();
         let interface1: PlatformData = PlatformData {
             mac: 0x112233445566,
-            ips: vec![IpNet {
+            ips: vec![IpSubnet {
                 raw_ip: "192.168.10.100".parse().unwrap(),
                 ..Default::default()
             }],
@@ -591,7 +591,7 @@ mod tests {
         };
         let interface2: PlatformData = PlatformData {
             mac: 0x112233445566,
-            ips: vec![IpNet {
+            ips: vec![IpSubnet {
                 raw_ip: "192.168.10.200".parse().unwrap(),
                 ..Default::default()
             }],
@@ -617,7 +617,7 @@ mod tests {
     fn test_ip_lan_wan() {
         let mut labeler: Labeler = Default::default();
         let interface1: PlatformData = PlatformData {
-            ips: vec![IpNet {
+            ips: vec![IpSubnet {
                 raw_ip: "192.168.10.100".parse().unwrap(),
                 netmask: 29,
                 ..Default::default()
@@ -626,7 +626,7 @@ mod tests {
             ..Default::default()
         };
         let interface2: PlatformData = PlatformData {
-            ips: vec![IpNet {
+            ips: vec![IpSubnet {
                 raw_ip: "192.168.10.100".parse().unwrap(),
                 netmask: 28,
                 ..Default::default()
@@ -647,7 +647,7 @@ mod tests {
     fn test_ip_netmask() {
         let mut labeler: Labeler = Default::default();
         let interface1: PlatformData = PlatformData {
-            ips: vec![IpNet {
+            ips: vec![IpSubnet {
                 raw_ip: "192.168.10.100".parse().unwrap(),
                 netmask: 29,
                 ..Default::default()
@@ -657,7 +657,7 @@ mod tests {
             ..Default::default()
         };
         let interface2: PlatformData = PlatformData {
-            ips: vec![IpNet {
+            ips: vec![IpSubnet {
                 raw_ip: "192.168.10.100".parse().unwrap(),
                 netmask: 30,
                 ..Default::default()
@@ -678,7 +678,7 @@ mod tests {
     fn test_ip_litte_netmask() {
         let mut labeler: Labeler = Default::default();
         let interface1: PlatformData = PlatformData {
-            ips: vec![IpNet {
+            ips: vec![IpSubnet {
                 raw_ip: "192.168.10.100".parse().unwrap(),
                 netmask: 8,
                 ..Default::default()
@@ -688,7 +688,7 @@ mod tests {
             ..Default::default()
         };
         let interface2: PlatformData = PlatformData {
-            ips: vec![IpNet {
+            ips: vec![IpSubnet {
                 raw_ip: "192.128.10.100".parse().unwrap(),
                 netmask: 9,
                 ..Default::default()
@@ -713,7 +713,7 @@ mod tests {
     fn test_ip6_netmask() {
         let mut labeler: Labeler = Default::default();
         let interface1: PlatformData = PlatformData {
-            ips: vec![IpNet {
+            ips: vec![IpSubnet {
                 raw_ip: "2200:3300:4400::10".parse().unwrap(),
                 netmask: 127,
                 ..Default::default()
@@ -723,7 +723,7 @@ mod tests {
             ..Default::default()
         };
         let interface2: PlatformData = PlatformData {
-            ips: vec![IpNet {
+            ips: vec![IpSubnet {
                 raw_ip: "2200:3300:4400::10".parse().unwrap(),
                 netmask: 128,
                 ..Default::default()
@@ -744,13 +744,13 @@ mod tests {
     fn test_peer_normal() {
         let mut labeler: Labeler = Default::default();
         let peer: PeerConnection = PeerConnection {
-            local_epc_id: 1,
-            remote_epc_id: 2,
+            local_epc: 1,
+            remote_epc: 2,
             ..Default::default()
         };
         let interface1: PlatformData = PlatformData {
             mac: 0x112233445566,
-            ips: vec![IpNet {
+            ips: vec![IpSubnet {
                 raw_ip: "192.168.10.100".parse().unwrap(),
                 ..Default::default()
             }],
@@ -759,7 +759,7 @@ mod tests {
         };
         let interface2: PlatformData = PlatformData {
             mac: 0x112233445566,
-            ips: vec![IpNet {
+            ips: vec![IpSubnet {
                 raw_ip: "192.168.10.200".parse().unwrap(),
                 ..Default::default()
             }],
@@ -784,12 +784,12 @@ mod tests {
     fn test_cidr_order() {
         let mut labeler: Labeler = Default::default();
         let cidr1: Cidr = Cidr {
-            ip_net: IpCidr::from_str("192.168.10.100/24").unwrap(),
+            ip: IpNet::from_str("192.168.10.100/24").unwrap(),
             epc_id: 10,
             ..Default::default()
         };
         let cidr2: Cidr = Cidr {
-            ip_net: IpCidr::from_str("192.168.10.100/25").unwrap(),
+            ip: IpNet::from_str("192.168.10.100/25").unwrap(),
             epc_id: 10,
             is_vip: true,
             ..Default::default()
@@ -807,9 +807,9 @@ mod tests {
     fn test_cidr_wan() {
         let mut labeler: Labeler = Default::default();
         let cidr1: Cidr = Cidr {
-            ip_net: IpCidr::from_str("192.168.10.100/24").unwrap(),
+            ip: IpNet::from_str("192.168.10.100/24").unwrap(),
             epc_id: 10,
-            ttype: CidrType::Wan,
+            cidr_type: CidrType::Wan,
             ..Default::default()
         };
 
@@ -831,7 +831,7 @@ mod tests {
     fn test_cidr_tunnel() {
         let mut labeler: Labeler = Default::default();
         let cidr1: Cidr = Cidr {
-            ip_net: IpCidr::from_str("192.168.10.100/24").unwrap(),
+            ip: IpNet::from_str("192.168.10.100/24").unwrap(),
             epc_id: 10,
             tunnel_id: 10,
             ..Default::default()
@@ -849,7 +849,7 @@ mod tests {
     fn test_cidr_vip() {
         let mut labeler: Labeler = Default::default();
         let cidr1: Cidr = Cidr {
-            ip_net: IpCidr::from_str("192.168.10.100/24").unwrap(),
+            ip: IpNet::from_str("192.168.10.100/24").unwrap(),
             epc_id: 10,
             is_vip: true,
             ..Default::default()
@@ -867,13 +867,13 @@ mod tests {
     fn test_get_endpoint_date() {
         let mut labeler: Labeler = Default::default();
         let peer: PeerConnection = PeerConnection {
-            local_epc_id: 1,
-            remote_epc_id: 2,
+            local_epc: 1,
+            remote_epc: 2,
             ..Default::default()
         };
         let interface1: PlatformData = PlatformData {
             mac: 0x112233445566,
-            ips: vec![IpNet {
+            ips: vec![IpSubnet {
                 raw_ip: "192.168.10.100".parse().unwrap(),
                 ..Default::default()
             }],
@@ -882,7 +882,7 @@ mod tests {
         };
         let interface2: PlatformData = PlatformData {
             mac: 0x112233445577,
-            ips: vec![IpNet {
+            ips: vec![IpSubnet {
                 raw_ip: "192.168.10.200".parse().unwrap(),
                 ..Default::default()
             }],
@@ -890,9 +890,9 @@ mod tests {
             ..Default::default()
         };
         let cidr1: Cidr = Cidr {
-            ip_net: IpCidr::from_str("192.168.10.200/32").unwrap(),
+            ip: IpNet::from_str("192.168.10.200/32").unwrap(),
             epc_id: 10,
-            ttype: CidrType::Wan,
+            cidr_type: CidrType::Wan,
             ..Default::default()
         };
         let list = vec![Rc::new(interface1), Rc::new(interface2)];

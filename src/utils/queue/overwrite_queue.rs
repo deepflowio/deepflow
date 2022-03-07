@@ -8,16 +8,11 @@ use std::sync::{
 };
 use std::time::{Duration, Instant};
 
-use super::stats;
+use super::Error;
+use crate::utils::stats;
 
 pub fn bounded<T>(size: usize) -> (Sender<T>, Receiver<T>, StatsHandle<T>) {
     RefCounter::new(OverwriteQueue::with_capacity(size))
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Error<T> {
-    Timeout,
-    Terminated(Option<T>, Option<Vec<T>>),
 }
 
 #[derive(Debug, Default)]
@@ -69,6 +64,10 @@ impl<T> OverwriteQueue<T> {
             counter: Counter::default(),
             _marker: PhantomData,
         }
+    }
+
+    pub fn terminated(&self) -> bool {
+        self.terminated.load(Ordering::Relaxed)
     }
 
     unsafe fn raw_send(&self, msgs: *const T, count: usize) -> Result<(), Error<T>> {
@@ -269,6 +268,10 @@ impl<T> Sender<T> {
         unsafe { &*self.counter }
     }
 
+    pub fn terminated(&self) -> bool {
+        self.counter().queue.terminated()
+    }
+
     pub fn send(&self, msg: T) -> Result<(), Error<T>> {
         unsafe {
             match self.counter().queue.raw_send(&msg, 1) {
@@ -336,6 +339,10 @@ unsafe impl<T: Send> Sync for Receiver<T> {}
 impl<T> Receiver<T> {
     fn counter(&self) -> &RefCounter<T> {
         unsafe { &*self.counter }
+    }
+
+    pub fn terminated(&self) -> bool {
+        self.counter().queue.terminated()
     }
 
     pub fn recv(&self, timeout: Option<Duration>) -> Result<T, Error<T>> {

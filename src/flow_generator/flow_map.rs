@@ -855,7 +855,7 @@ impl FlowMap {
                 stats.l7_protocol = L7Protocol::Other;
             }
         }
-        //TODO 发送tagged flow 到 debug 模块
+        //TODO collector enabled 条件加上
 
         self.output_buffer.push(tagged_flow);
         if self.output_buffer.len() >= QUEUE_BATCH_SIZE {
