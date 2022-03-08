@@ -53,8 +53,11 @@ windows = {version = "0.30", features = ["Win32_Foundation", "Win32_System_Diagn
 
 [dev-dependencies]
 criterion = "0.3.5"
+lru = "0.7.3"
 pcap = "0.9.1"
+rand = "0.8.5"
 tempfile = "3.2.0"
+uluru = "3.0.0"
 
 [build-dependencies]
 tonic-build = "0.5.2"
@@ -67,4 +70,8 @@ harness = false
 
 [[bench]]
 name = "utils"
+harness = false
+
+[[bench]]
+name = "lru"
 harness = false
