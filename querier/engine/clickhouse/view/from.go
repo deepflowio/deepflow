@@ -28,7 +28,7 @@ func (t *Tables) WriteTo(buf *bytes.Buffer) {
 	}
 }
 
-func (t *Tables) isNull() bool {
+func (t *Tables) IsNull() bool {
 	if len(t.tables) < 1 {
 		return true
 	} else {

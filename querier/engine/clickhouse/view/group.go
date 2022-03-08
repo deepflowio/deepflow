@@ -28,7 +28,7 @@ func (s *Groups) WriteTo(buf *bytes.Buffer) {
 	}
 }
 
-func (s *Groups) isNull() bool {
+func (s *Groups) IsNull() bool {
 	if len(s.groups) < 1 {
 		return true
 	} else {

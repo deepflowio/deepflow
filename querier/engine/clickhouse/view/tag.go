@@ -19,7 +19,7 @@ func (s *Tags) getList() []Node {
 	return s.tags
 }
 
-func (s *Tags) isNull() bool {
+func (s *Tags) IsNull() bool {
 	if len(s.tags) < 1 {
 		return true
 	} else {
@@ -44,6 +44,7 @@ type Tag struct {
 	Value string
 	Alias string
 	Flag  int
+	Withs []*With
 }
 
 func (n *Tag) ToString() string {

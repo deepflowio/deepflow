@@ -32,7 +32,7 @@ func (s *Withs) Append(w *With) {
 	s.withs = append(s.withs, w)
 }
 
-func (s *Withs) isNull() bool {
+func (s *Withs) IsNull() bool {
 	if len(s.withs) < 1 {
 		return true
 	} else {
@@ -42,7 +42,6 @@ func (s *Withs) isNull() bool {
 
 type With struct {
 	Value string
-	Alias string
 	Flag  int
 }
 
@@ -54,8 +53,4 @@ func (n *With) ToString() string {
 
 func (n *With) WriteTo(buf *bytes.Buffer) {
 	buf.WriteString(n.Value)
-	if n.Alias != "" {
-		buf.WriteString(" AS ")
-		buf.WriteString(n.Alias)
-	}
 }

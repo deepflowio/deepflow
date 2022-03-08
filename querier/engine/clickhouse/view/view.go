@@ -22,36 +22,37 @@ type Model struct {
 	Withs *Withs
 	Tags  *Tags
 	//Metrics Metrics
-	//Filters []*Filters
-	From   *Tables
-	Groups *Groups
+	Filters *Filters
+	From    *Tables
+	Groups  *Groups
 	//Havings Havings
 	//Order   Order
 }
 
 func NewModel() *Model {
 	return &Model{
-		Withs:  &Withs{},
-		Tags:   &Tags{},
-		Groups: &Groups{},
-		From:   &Tables{},
+		Withs:   &Withs{},
+		Tags:    &Tags{},
+		Groups:  &Groups{},
+		From:    &Tables{},
+		Filters: &Filters{},
 	}
 }
 
-func (m *Model) AddTag(value string, alias string, flag int) {
-	m.Tags.Append(&Tag{Value: value, Alias: alias, Flag: flag})
+func (m *Model) AddTag(t *Tag) {
+	m.Tags.Append(t)
+}
+
+func (m *Model) AddFilter(f *Filters) {
+	m.Filters.Append(f)
 }
 
 func (m *Model) AddTable(value string) {
 	m.From.Append(&Table{Value: value})
 }
 
-func (m *Model) AddGroup(value string, flag int) {
-	m.Groups.Append(&Group{Value: value})
-}
-
-func (m *Model) AddWith(value string, alias string, flag int) {
-	m.Withs.Append(&With{Value: value, Alias: alias, Flag: flag})
+func (m *Model) AddGroup(g *Group) {
+	m.Groups.Append(g)
 }
 
 type View struct {
@@ -83,10 +84,11 @@ func (v *View) ToString() string {
 func (v *View) trans() {
 	if v.LevelTag == 1 {
 		sv := SubView{
-			Withs:  v.Model.Withs,
-			Tags:   v.Model.Tags,
-			Groups: v.Model.Groups,
-			From:   v.Model.From,
+			Withs:   v.Model.Withs,
+			Tags:    v.Model.Tags,
+			Groups:  v.Model.Groups,
+			From:    v.Model.From,
+			Filters: v.Model.Filters,
 		}
 		v.SubViewLevels = append(v.SubViewLevels, &sv)
 	}
@@ -96,9 +98,9 @@ type SubView struct {
 	Withs *Withs
 	Tags  *Tags
 	//Metrics Metrics
-	//Filters *Filters
-	From   *Tables
-	Groups *Groups
+	Filters *Filters
+	From    *Tables
+	Groups  *Groups
 	//Havings Havings
 	//Order   Order
 }
@@ -124,25 +126,25 @@ func (sv *SubView) removeDup(ns NodeSet) []Node {
 }
 
 func (sv *SubView) WriteTo(buf *bytes.Buffer) {
-	if !sv.Withs.isNull() {
+	if !sv.Withs.IsNull() {
 		sv.Withs.withs = sv.removeDup(sv.Withs)
 		buf.WriteString("WITH ")
 		sv.Withs.WriteTo(buf)
 	}
-	if !sv.Tags.isNull() {
+	if !sv.Tags.IsNull() {
 		sv.Tags.tags = sv.removeDup(sv.Tags)
 		buf.WriteString("SELECT ")
 		sv.Tags.WriteTo(buf)
 	}
-	/* 	if !sv.Filters.isNull() {
-		buf.WriteString(" WHERE ")
-		sv.Filters.WriteTo(buf)
-	} */
-	if !sv.From.isNull() {
+	if !sv.From.IsNull() {
 		buf.WriteString(" FROM ")
 		sv.From.WriteTo(buf)
 	}
-	if !sv.Groups.isNull() {
+	if !sv.Filters.IsNull() {
+		buf.WriteString(" WHERE ")
+		sv.Filters.WriteTo(buf)
+	}
+	if !sv.Groups.IsNull() {
 		buf.WriteString(" GROUP BY ")
 		sv.Groups.WriteTo(buf)
 	}
@@ -155,6 +157,6 @@ type Node interface {
 
 type NodeSet interface {
 	Node
-	isNull() bool
+	IsNull() bool
 	getList() []Node
 }

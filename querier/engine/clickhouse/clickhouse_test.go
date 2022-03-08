@@ -18,6 +18,18 @@ var (
 	}, {
 		input:  "select host, test from t group by host, test",
 		output: "SELECT host_id AS host, test FROM t GROUP BY host_id, test",
+	}, {
+		input:  "select host from t where host='aaa' group by host",
+		output: "SELECT host_id AS host FROM t WHERE host_id = 1 GROUP BY host_id",
+	}, {
+		input:  "select host from t where host='aaa' and c=1 group by host",
+		output: "SELECT host_id AS host FROM t WHERE host_id = 1 AND c = 1 GROUP BY host_id",
+	}, {
+		input:  "select host from t where (host='aaa' and c=1) or b=2 group by host",
+		output: "SELECT host_id AS host FROM t WHERE (host_id = 1 AND c = 1) OR b = 2 GROUP BY host_id",
+	}, {
+		input:  "select host from t where not((host='aaa' and c=1) or b=2) group by host",
+		output: "SELECT host_id AS host FROM t WHERE NOT ((host_id = 1 AND c = 1) OR b = 2) GROUP BY host_id",
 	},
 	}
 )
