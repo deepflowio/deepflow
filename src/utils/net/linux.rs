@@ -1,5 +1,5 @@
 use std::{
-    ffi::CStr,
+    ffi::{CStr, CString},
     io::ErrorKind,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     time::Duration,
@@ -10,8 +10,8 @@ use neli::{
     consts::{nl::*, rtnl::*, socket::*},
     err::NlError,
     nl::{NlPayload, Nlmsghdr},
-    rtnl::*,
-    socket::*,
+    rtnl::{Ifaddrmsg, Ifinfomsg, Rtattr, Rtmsg},
+    socket::NlSocketHandle,
     types::{Buffer, RtBuffer},
 };
 use nix::libc::IFLA_INFO_KIND;
@@ -368,23 +368,7 @@ fn receive_arp_response(rx: &mut Box<dyn DataLinkReceiver>) -> Result<MacAddr> {
     }
 }
 
-pub fn link_list() -> Result<Vec<Link>, NlError> {
-    let msg = Ifinfomsg::new(
-        RtAddrFamily::Unspecified,
-        Arphrd::None,
-        0,
-        IffFlags::empty(),
-        IffFlags::empty(),
-        RtBuffer::new(),
-    );
-    let req = Nlmsghdr::new(
-        None,
-        Rtm::Getlink,
-        NlmFFlags::new(&[NlmF::Request, NlmF::Dump]),
-        None,
-        None,
-        NlPayload::Payload(msg),
-    );
+fn request_link_info(req: Nlmsghdr<Rtm, Ifinfomsg>) -> Result<Vec<Link>, NlError> {
     let mut socket = NlSocketHandle::connect(NlFamily::Route, None, &[])?;
     socket.send(req)?;
 
@@ -449,6 +433,54 @@ pub fn link_list() -> Result<Vec<Link>, NlError> {
     }
 
     Ok(links)
+}
+
+pub fn link_by_name(name: String) -> Result<Link, NlError> {
+    let mut attrs = RtBuffer::new();
+    attrs.push(Rtattr::new(
+        None,
+        Ifla::Ifname,
+        CString::new(name).unwrap().to_bytes(),
+    )?);
+    let msg = Ifinfomsg::new(
+        RtAddrFamily::Unspecified,
+        Arphrd::None,
+        0,
+        IffFlags::empty(),
+        IffFlags::empty(),
+        attrs,
+    );
+    let req = Nlmsghdr::new(
+        None,
+        Rtm::Getlink,
+        NlmFFlags::new(&[NlmF::Request, NlmF::Ack]),
+        None,
+        None,
+        NlPayload::Payload(msg),
+    );
+    let mut links = request_link_info(req)?;
+    assert!(links.len() > 0);
+    Ok(links.pop().unwrap())
+}
+
+pub fn link_list() -> Result<Vec<Link>, NlError> {
+    let msg = Ifinfomsg::new(
+        RtAddrFamily::Unspecified,
+        Arphrd::None,
+        0,
+        IffFlags::empty(),
+        IffFlags::empty(),
+        RtBuffer::new(),
+    );
+    let req = Nlmsghdr::new(
+        None,
+        Rtm::Getlink,
+        NlmFFlags::new(&[NlmF::Request, NlmF::Dump]),
+        None,
+        None,
+        NlPayload::Payload(msg),
+    );
+    request_link_info(req)
 }
 
 pub fn parse_ip_slice(bs: &[u8]) -> Option<IpAddr> {
@@ -611,4 +643,18 @@ fn get_route_src_ip_and_ifindex(dest: &IpAddr) -> anyhow::Result<(IpAddr, u32)> 
         return Err(anyhow::anyhow!("no route found for {}", dest));
     }
     Ok((routes[0].src_ip, routes[0].oif_index))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_link_by_name() {
+        let links = link_list().unwrap();
+        assert!(links.len() > 0);
+        for link in links {
+            assert_eq!(link.if_index, link_by_name(link.name).unwrap().if_index);
+        }
+    }
 }

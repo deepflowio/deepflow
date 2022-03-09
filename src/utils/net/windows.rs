@@ -142,6 +142,10 @@ pub fn addr_list() -> Result<Vec<Addr>> {
     get_adapters_addresses().map(|(_, addresses)| addresses)
 }
 
+pub fn link_by_name(name: String) -> Result<Link> {
+    todo!()
+}
+
 pub fn link_list() -> Result<Vec<Link>> {
     get_adapters_addresses().map(|(adapters, _)| adapters)
 }
