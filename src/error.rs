@@ -36,6 +36,10 @@ pub enum Error {
     RedisPerfParse(String),
     #[error("redis log parse: {0}")]
     RedisLogParse(String),
+    #[error("kafka perf parse: {0}")]
+    KafkaPerfParse(String),
+    #[error("no kafka log {0}")]
+    KafkaLogParse(String),
     #[error("invalid tpacket version: {0}")]
     InvalidTpVersion(isize),
 }
