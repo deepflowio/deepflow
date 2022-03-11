@@ -1,4 +1,5 @@
 use std::fmt;
+use std::net::Ipv4Addr;
 
 use super::consts::*;
 use super::enums::{EthernetType, IpProtocol};
@@ -108,10 +109,10 @@ const LE_TEB_PROTO: u16 = 0x5865; // 0x6558(25944)'s LittleEndian
 const VXLAN_FLAGS: u8 = 8;
 const TUNNEL_TIER_LIMIT: u8 = 2;
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct TunnelInfo {
-    pub src: u32,
-    pub dst: u32,
+    pub src: Ipv4Addr,
+    pub dst: Ipv4Addr,
     pub mac_src: u32, // lowest 4B
     pub mac_dst: u32, // lowest 4B
     pub id: u32,
@@ -120,10 +121,29 @@ pub struct TunnelInfo {
     pub is_ipv6: bool,
 }
 
+impl Default for TunnelInfo {
+    fn default() -> Self {
+        TunnelInfo {
+            src: Ipv4Addr::UNSPECIFIED,
+            dst: Ipv4Addr::UNSPECIFIED,
+            mac_src: 0,
+            mac_dst: 0,
+            id: 0,
+            tunnel_type: TunnelType::default(),
+            tier: 0,
+            is_ipv6: false,
+        }
+    }
+}
+
 impl TunnelInfo {
     fn decapsulate_addr(&mut self, l3_packet: &[u8]) {
-        self.src = bytes::read_u32_be(&l3_packet[FIELD_OFFSET_SIP - ETH_HEADER_SIZE..]);
-        self.dst = bytes::read_u32_be(&l3_packet[FIELD_OFFSET_DIP - ETH_HEADER_SIZE..]);
+        self.src = Ipv4Addr::from(bytes::read_u32_be(
+            &l3_packet[FIELD_OFFSET_SIP - ETH_HEADER_SIZE..],
+        ));
+        self.dst = Ipv4Addr::from(bytes::read_u32_be(
+            &l3_packet[FIELD_OFFSET_DIP - ETH_HEADER_SIZE..],
+        ));
     }
 
     fn decapsulate_mac(&mut self, packet: &[u8]) {
@@ -132,8 +152,8 @@ impl TunnelInfo {
     }
 
     fn decapsulate_v6_addr(&mut self, l3_packet: &[u8]) {
-        self.src = bytes::read_u32_be(&l3_packet[IP6_SIP_OFFSET..]);
-        self.dst = bytes::read_u32_be(&l3_packet[IP6_DIP_OFFSET..]);
+        self.src = Ipv4Addr::from(bytes::read_u32_be(&l3_packet[IP6_SIP_OFFSET..]));
+        self.dst = Ipv4Addr::from(bytes::read_u32_be(&l3_packet[IP6_DIP_OFFSET..]));
     }
 
     pub fn decapsulate_vxlan(&mut self, packet: &[u8], l2_len: usize) -> usize {
@@ -580,8 +600,8 @@ mod tests {
     fn test_decapsulate_erspan() {
         let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::ErspanOrTeb]);
         let expected = TunnelInfo {
-            src: u32::from_be_bytes(Ipv4Addr::new(172, 28, 25, 108).octets()),
-            dst: u32::from_be_bytes(Ipv4Addr::new(172, 28, 28, 70).octets()),
+            src: Ipv4Addr::new(172, 28, 25, 108),
+            dst: Ipv4Addr::new(172, 28, 28, 70),
             mac_src: 0xbdf819ff,
             mac_dst: 0x22222222,
             id: 0,
@@ -613,8 +633,8 @@ mod tests {
     fn test_decapsulate_erspan_ii() {
         let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::ErspanOrTeb]);
         let expected = TunnelInfo {
-            src: u32::from_be_bytes(Ipv4Addr::new(2, 2, 2, 2).octets()),
-            dst: u32::from_be_bytes(Ipv4Addr::new(1, 1, 1, 1).octets()),
+            src: Ipv4Addr::new(2, 2, 2, 2),
+            dst: Ipv4Addr::new(1, 1, 1, 1),
             mac_src: 0xf1e20101,
             mac_dst: 0xf1e20112,
             id: 100,
@@ -646,8 +666,8 @@ mod tests {
     fn test_decapsulate_erspan_iii() {
         let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::ErspanOrTeb]);
         let expected = TunnelInfo {
-            src: u32::from_be_bytes(Ipv4Addr::new(172, 16, 1, 103).octets()),
-            dst: u32::from_be_bytes(Ipv4Addr::new(10, 30, 101, 132).octets()),
+            src: Ipv4Addr::new(172, 16, 1, 103),
+            dst: Ipv4Addr::new(10, 30, 101, 132),
             mac_src: 0x60d19449,
             mac_dst: 0x3ee959f5,
             id: 0,
@@ -672,8 +692,8 @@ mod tests {
     fn test_decapsulate_vxlan() {
         let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::Vxlan]);
         let expected = TunnelInfo {
-            src: u32::from_be_bytes(Ipv4Addr::new(172, 16, 1, 103).octets()),
-            dst: u32::from_be_bytes(Ipv4Addr::new(172, 20, 1, 171).octets()),
+            src: Ipv4Addr::new(172, 16, 1, 103),
+            dst: Ipv4Addr::new(172, 20, 1, 171),
             mac_src: 0xafda7679,
             mac_dst: 0x3ddd88c3,
             id: 123,
@@ -698,8 +718,8 @@ mod tests {
     fn test_decapsulate_tencent_gre() {
         let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::TencentGre]);
         let expected = TunnelInfo {
-            src: u32::from_be_bytes(Ipv4Addr::new(10, 19, 0, 21).octets()),
-            dst: u32::from_be_bytes(Ipv4Addr::new(10, 21, 64, 5).octets()),
+            src: Ipv4Addr::new(10, 19, 0, 21),
+            dst: Ipv4Addr::new(10, 21, 64, 5),
             mac_src: 0xbffac801,
             mac_dst: 0x06246b71,
             id: 0x10285,
@@ -735,8 +755,8 @@ mod tests {
     fn test_decapsulate_teb() {
         let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::ErspanOrTeb]);
         let expected = TunnelInfo {
-            src: u32::from_be_bytes(Ipv4Addr::new(10, 25, 6, 6).octets()),
-            dst: u32::from_be_bytes(Ipv4Addr::new(10, 25, 59, 67).octets()),
+            src: Ipv4Addr::new(10, 25, 6, 6),
+            dst: Ipv4Addr::new(10, 25, 59, 67),
             mac_src: 0x3503bca8,
             mac_dst: 0x56aefcc6,
             id: 0x2000000,
@@ -761,8 +781,8 @@ mod tests {
     fn test_decapsulate_ipv6_vxlan() {
         let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::Vxlan]);
         let expected = TunnelInfo {
-            src: u32::from_be_bytes(Ipv4Addr::new(0, 0, 2, 63).octets()),
-            dst: u32::from_be_bytes(Ipv4Addr::new(0, 0, 2, 61).octets()),
+            src: Ipv4Addr::new(0, 0, 2, 63),
+            dst: Ipv4Addr::new(0, 0, 2, 61),
             mac_src: 0x3e7eda7d,
             mac_dst: 0x3ebb1665,
             id: 27,
@@ -787,8 +807,8 @@ mod tests {
     fn test_decapsulate_ipip() {
         let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::Ipip]);
         let expected = TunnelInfo {
-            src: u32::from_be_bytes(Ipv4Addr::new(10, 162, 42, 93).octets()),
-            dst: u32::from_be_bytes(Ipv4Addr::new(10, 162, 33, 164).octets()),
+            src: Ipv4Addr::new(10, 162, 42, 93),
+            dst: Ipv4Addr::new(10, 162, 33, 164),
             mac_src: 0x027dc643,
             mac_dst: 0x0027e67d,
             id: 0,
