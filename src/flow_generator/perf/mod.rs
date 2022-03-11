@@ -66,6 +66,7 @@ pub trait L4FlowPerf {
     fn copy_and_reset_data(&mut self, flow_reversed: bool) -> FlowPerfStats;
 }
 
+// pub fn new(rrt_cache: Rc<RefCell<L7RrtCache>>) -> Self
 #[enum_dispatch(L7FlowPerfTable)]
 pub trait L7FlowPerf {
     fn parse(&mut self, packet: &MetaPacket, flow_id: u64) -> Result<()>;

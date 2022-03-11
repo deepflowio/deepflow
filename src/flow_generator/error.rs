@@ -2,8 +2,8 @@
 pub enum Error {
     InvalidPacketTimestamp,
     RetransPacket,
-    // call LayerFlowPerf::parse return Error(Layer7 error msg and mismatch_response_count)
-    InvalidL7Payload((String, u64)),
+    // call LayerFlowPerf::parse return Error(Layer7 mismatch_response_count)
+    L7ResponseNotFound(u64),
     ZeroPayloadLen,
 }
 
