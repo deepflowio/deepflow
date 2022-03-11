@@ -5,12 +5,12 @@ import (
 	"metaflow/querier/engine/clickhouse"
 )
 
-func Execute(args map[string]string) (resp []string, err error) {
-	db := getDbByIP(args["IP"])
+func Execute(args map[string]string) (resp map[string][]interface{}, err error) {
+	db := getDbBy()
 	var engine engine.Engine
 	switch db {
 	case "clickhouse":
-		engine = &clickhouse.CHEngine{IP: args["IP"]}
+		engine = &clickhouse.CHEngine{IP: args["ip"], DB: args["db"]}
 		engine.Init()
 	}
 	resp, err = engine.ExecuteQuery(args["sql"])
@@ -18,6 +18,6 @@ func Execute(args map[string]string) (resp []string, err error) {
 	return resp, err
 }
 
-func getDbByIP(IP string) string {
+func getDbBy() string {
 	return "clickhouse"
 }

@@ -2,13 +2,13 @@ package clickhouse
 
 import (
 	"fmt"
-	"github.com/akito0107/xsqlparser/sqlast"
+	"github.com/xwb1989/sqlparser"
 	"metaflow/querier/engine/clickhouse/view"
 )
 
 type Where struct {
 	filter *view.Filters
-	withs  []*view.With
+	withs  []view.Node
 }
 
 func (w *Where) Format(m *view.Model) {
@@ -29,23 +29,20 @@ func GetWhere(tag string) WhereStatement {
 }
 
 type WhereStatement interface {
-	Trans(sqlast.Node, *Where) view.Node
+	Trans(sqlparser.Expr, *Where) view.Node
 }
 
 type WhereDefault struct{}
 
-func (t *WhereDefault) Trans(expr sqlast.Node, stmt *Where) view.Node {
-	return &view.Expr{Value: expr.ToSQLString()}
+func (t *WhereDefault) Trans(expr sqlparser.Expr, stmt *Where) view.Node {
+	return &view.Expr{Value: sqlparser.String(expr)}
 }
 
 // 仅示例
 type WhereHost struct{}
 
-func (t *WhereHost) Trans(expr sqlast.Node, stmt *Where) view.Node {
-	switch expr.(*sqlast.BinaryExpr).Op.Type {
-	case sqlast.Eq:
-		sql := fmt.Sprintf("%s %s %s", "host_id", "=", "1")
-		return &view.Expr{Value: sql}
-	}
-	return nil
+func (t *WhereHost) Trans(expr sqlparser.Expr, stmt *Where) view.Node {
+	op := expr.(*sqlparser.ComparisonExpr).Operator
+	sql := fmt.Sprintf("%s %s %s", "host_id", op, "1")
+	return &view.Expr{Value: sql}
 }

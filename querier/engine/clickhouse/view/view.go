@@ -14,24 +14,22 @@ import (
 			Model.AddTag()
 			Model.AddTable()
 			Model.AddGroup()
-			Model.AddWith()
+			Model.AddFilter()
 			NewView(*Model) View      使用model初始化View结构
 			NewView.ToString() string 生成df-clickhouse-sql
 */
 type Model struct {
-	Withs *Withs
-	Tags  *Tags
-	//Metrics Metrics
+	Tags    *Tags
 	Filters *Filters
 	From    *Tables
 	Groups  *Groups
 	//Havings Havings
 	//Order   Order
+	MetricLevelFlag int //Metric是否需要拆层的标识
 }
 
 func NewModel() *Model {
 	return &Model{
-		Withs:   &Withs{},
 		Tags:    &Tags{},
 		Groups:  &Groups{},
 		From:    &Tables{},
@@ -39,8 +37,8 @@ func NewModel() *Model {
 	}
 }
 
-func (m *Model) AddTag(t *Tag) {
-	m.Tags.Append(t)
+func (m *Model) AddTag(n Node) {
+	m.Tags.Append(n)
 }
 
 func (m *Model) AddFilter(f *Filters) {
@@ -58,19 +56,18 @@ func (m *Model) AddGroup(g *Group) {
 type View struct {
 	Model         *Model     //初始化view
 	SubViewLevels []*SubView //由RawView拆层
-	LevelTag      int        //层级tag
 }
 
 // 使用model初始化view
 func NewView(m *Model) View {
-	return View{Model: m, LevelTag: 1}
+	return View{Model: m}
 }
 
 func (v *View) ToString() string {
 	buf := bytes.Buffer{}
 	v.trans()
 	for i, view := range v.SubViewLevels {
-		if i > 1 {
+		if i > 0 {
 			// 将内层view作为外层view的From
 			view.From.Append(v.SubViewLevels[i-1])
 		}
@@ -80,29 +77,92 @@ func (v *View) ToString() string {
 	return buf.String()
 }
 
-// TODO：由rawview向多层结构转换
 func (v *View) trans() {
-	if v.LevelTag == 1 {
+	var tagsLevelInner []Node
+	var tagsLevelMetric []Node
+	var tagsLevelOuter []Node
+	// 遍历tags，解析至分层结构中
+	for _, tag := range v.Model.Tags.tags {
+		switch node := tag.(type) {
+		case *Tag:
+			if node.Flag == NODE_FLAG_METRIC {
+				// Tag在最内层中只保留value 去掉alias
+				tagsLevelInner = append(tagsLevelInner, &Tag{Value: node.Value})
+				tagsLevelMetric = append(tagsLevelMetric, tag)
+			} else if node.Flag == NODE_FLAG_TRANS {
+				// 需要放入最外层的tag
+				tagsLevelOuter = append(tagsLevelOuter, tag)
+			}
+		case Function:
+			flag := node.GetFlag()
+			if flag == METRIC_FLAG_INNER {
+				tagsLevelInner = append(tagsLevelInner, tag)
+			} else if flag == METRIC_FLAG_OUTER {
+				tagsLevelMetric = append(tagsLevelMetric, tag)
+			}
+		}
+	}
+	if v.Model.MetricLevelFlag == MODEL_METRIC_LEVEL_FLAG_UNLAY {
+		// 计算层不拆层
 		sv := SubView{
-			Withs:   v.Model.Withs,
-			Tags:    v.Model.Tags,
+			Tags:    &Tags{tags: tagsLevelMetric},
 			Groups:  v.Model.Groups,
 			From:    v.Model.From,
 			Filters: v.Model.Filters,
 		}
 		v.SubViewLevels = append(v.SubViewLevels, &sv)
+	} else if v.Model.MetricLevelFlag == MODEL_METRIC_LEVEL_FLAG_LAYERED {
+		// 计算层需要拆层
+		// 计算层里层
+		svInner := SubView{
+			Tags:    &Tags{tags: tagsLevelInner}, // 计算层所有tag及里层算子
+			Groups:  v.Model.Groups,              // TODO:group分层
+			From:    v.Model.From,                // 查询表
+			Filters: v.Model.Filters,             // 所有filter
+		}
+		v.SubViewLevels = append(v.SubViewLevels, &svInner)
+		// 计算层外层
+		svMetric := SubView{
+			Tags:    &Tags{tags: tagsLevelMetric}, // 计算层所有tag及外层算子
+			Groups:  v.Model.Groups,               // TODO:group分层
+			From:    &Tables{},                    // 空table
+			Filters: &Filters{},                   // 空filter
+		}
+		v.SubViewLevels = append(v.SubViewLevels, &svMetric)
+	}
+	if tagsLevelOuter != nil {
+		// 翻译层
+		svOuter := SubView{
+			Tags:    &Tags{tags: tagsLevelOuter}, // 所有翻译层tag
+			Groups:  &Groups{},                   // 空group
+			From:    &Tables{},                   // 空table
+			Filters: &Filters{},                  //空filter
+		}
+		v.SubViewLevels = append(v.SubViewLevels, &svOuter)
 	}
 }
 
 type SubView struct {
-	Withs *Withs
-	Tags  *Tags
-	//Metrics Metrics
+	Tags    *Tags
 	Filters *Filters
 	From    *Tables
 	Groups  *Groups
 	//Havings Havings
 	//Order   Order
+}
+
+func (sv *SubView) GetWiths() []Node {
+	var withs []Node
+	if nodeWiths := sv.Tags.GetWiths(); nodeWiths != nil {
+		withs = append(withs, nodeWiths...)
+	}
+	if nodeWiths := sv.Filters.GetWiths(); nodeWiths != nil {
+		withs = append(withs, nodeWiths...)
+	}
+	if nodeWiths := sv.Groups.GetWiths(); nodeWiths != nil {
+		withs = append(withs, nodeWiths...)
+	}
+	return withs
 }
 
 func (sv *SubView) ToString() string {
@@ -126,10 +186,11 @@ func (sv *SubView) removeDup(ns NodeSet) []Node {
 }
 
 func (sv *SubView) WriteTo(buf *bytes.Buffer) {
-	if !sv.Withs.IsNull() {
-		sv.Withs.withs = sv.removeDup(sv.Withs)
+	if nodeWiths := sv.GetWiths(); nodeWiths != nil {
+		withs := Withs{Withs: nodeWiths}
+		withs.Withs = sv.removeDup(&withs)
 		buf.WriteString("WITH ")
-		sv.Withs.WriteTo(buf)
+		withs.WriteTo(buf)
 	}
 	if !sv.Tags.IsNull() {
 		sv.Tags.tags = sv.removeDup(sv.Tags)
@@ -145,6 +206,7 @@ func (sv *SubView) WriteTo(buf *bytes.Buffer) {
 		sv.Filters.WriteTo(buf)
 	}
 	if !sv.Groups.IsNull() {
+		sv.Groups.groups = sv.removeDup(sv.Groups)
 		buf.WriteString(" GROUP BY ")
 		sv.Groups.WriteTo(buf)
 	}
@@ -153,6 +215,7 @@ func (sv *SubView) WriteTo(buf *bytes.Buffer) {
 type Node interface {
 	ToString() string
 	WriteTo(*bytes.Buffer)
+	GetWiths() []Node
 }
 
 type NodeSet interface {
@@ -160,3 +223,11 @@ type NodeSet interface {
 	IsNull() bool
 	getList() []Node
 }
+
+type NodeBase struct{}
+
+func (n *NodeBase) GetWiths() []Node {
+	return nil
+}
+
+type NodeSetBase struct{ NodeBase }

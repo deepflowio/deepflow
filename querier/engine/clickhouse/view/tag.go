@@ -7,6 +7,7 @@ import (
 // NodeSet Tag结构体集合
 type Tags struct {
 	tags []Node
+	NodeSetBase
 }
 
 func (s *Tags) ToString() string {
@@ -27,7 +28,7 @@ func (s *Tags) IsNull() bool {
 	}
 }
 
-func (s *Tags) Append(t *Tag) {
+func (s *Tags) Append(t Node) {
 	s.tags = append(s.tags, t)
 }
 
@@ -40,11 +41,22 @@ func (s *Tags) WriteTo(buf *bytes.Buffer) {
 	}
 }
 
+func (s *Tags) GetWiths() []Node {
+	var withs []Node
+	for _, node := range s.tags {
+		if nodeWiths := node.GetWiths(); nodeWiths != nil {
+			withs = append(withs, nodeWiths...)
+		}
+	}
+	return withs
+}
+
 type Tag struct {
 	Value string
 	Alias string
 	Flag  int
-	Withs []*With
+	Withs []Node
+	NodeBase
 }
 
 func (n *Tag) ToString() string {
@@ -59,4 +71,8 @@ func (n *Tag) WriteTo(buf *bytes.Buffer) {
 		buf.WriteString(" AS ")
 		buf.WriteString(n.Alias)
 	}
+}
+
+func (n *Tag) GetWiths() []Node {
+	return n.Withs
 }

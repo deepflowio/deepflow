@@ -1,15 +1,15 @@
 package engine
 
 import (
-	"github.com/akito0107/xsqlparser/sqlast"
+	"github.com/xwb1989/sqlparser"
 )
 
 type Engine interface {
-	TransSelect([]sqlast.SQLSelectItem) error
-	TransFrom([]sqlast.TableReference) error
-	TransGroupBy([]sqlast.Node) error
-	TransWhere(sqlast.Node) error
+	TransSelect(sqlparser.SelectExprs) error
+	TransFrom(sqlparser.TableExprs) error
+	TransGroupBy(sqlparser.GroupBy) error
+	TransWhere(*sqlparser.Where) error
 	ToSQLString() string
 	Init()
-	ExecuteQuery(string) ([]string, error)
+	ExecuteQuery(string) (map[string][]interface{}, error)
 }

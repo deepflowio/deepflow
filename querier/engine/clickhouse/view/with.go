@@ -6,7 +6,7 @@ import (
 
 // NodeSet With结构体集合
 type Withs struct {
-	withs []Node
+	Withs []Node
 }
 
 func (s *Withs) ToString() string {
@@ -16,41 +16,45 @@ func (s *Withs) ToString() string {
 }
 
 func (s *Withs) getList() []Node {
-	return s.withs
+	return s.Withs
 }
 
 func (s *Withs) WriteTo(buf *bytes.Buffer) {
-	for i, tag := range s.withs {
+	for i, tag := range s.Withs {
 		tag.WriteTo(buf)
-		if i < len(s.withs)-1 {
+		if i < len(s.Withs)-1 {
 			buf.WriteString(", ")
 		}
 	}
 }
 
 func (s *Withs) Append(w *With) {
-	s.withs = append(s.withs, w)
+	s.Withs = append(s.Withs, w)
 }
 
 func (s *Withs) IsNull() bool {
-	if len(s.withs) < 1 {
+	if len(s.Withs) < 1 {
 		return true
 	} else {
 		return false
 	}
 }
 
+func (s *Withs) GetWiths() []Node {
+	return s.Withs
+}
+
 type With struct {
 	Value string
-	Flag  int
+	NodeBase
+}
+
+func (n *With) WriteTo(buf *bytes.Buffer) {
+	buf.WriteString(n.Value)
 }
 
 func (n *With) ToString() string {
 	buf := bytes.Buffer{}
 	n.WriteTo(&buf)
 	return buf.String()
-}
-
-func (n *With) WriteTo(buf *bytes.Buffer) {
-	buf.WriteString(n.Value)
 }

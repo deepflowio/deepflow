@@ -6,7 +6,8 @@ import (
 
 type Filters struct {
 	Expr  Node
-	Withs []*With
+	Withs []Node
+	NodeSetBase
 }
 
 func (s *Filters) IsNull() bool {
@@ -15,6 +16,10 @@ func (s *Filters) IsNull() bool {
 	} else {
 		return false
 	}
+}
+
+func (s *Filters) GetWiths() []Node {
+	return s.Withs
 }
 
 func (s *Filters) Append(f *Filters) {
@@ -31,18 +36,19 @@ func (s *Filters) Append(f *Filters) {
 	}
 }
 
+func (s *Filters) ToString() string {
+	buf := bytes.Buffer{}
+	s.WriteTo(&buf)
+	return buf.String()
+}
+
 func (s *Filters) WriteTo(buf *bytes.Buffer) {
 	s.Expr.WriteTo(buf)
 }
 
-func (n *Filters) ToString() string {
-	buf := bytes.Buffer{}
-	n.WriteTo(&buf)
-	return buf.String()
-}
-
 // 括号
 type Nested struct {
+	NodeBase
 	Expr Node
 }
 
@@ -60,6 +66,7 @@ func (n *Nested) WriteTo(buf *bytes.Buffer) {
 
 // AND OR NOT
 type BinaryExpr struct {
+	NodeBase
 	Left  Node
 	Right Node
 	Op    Operator
@@ -78,6 +85,7 @@ func (n *BinaryExpr) WriteTo(buf *bytes.Buffer) {
 }
 
 type UnaryExpr struct {
+	NodeBase
 	Op   Operator
 	Expr Node
 }
@@ -94,11 +102,14 @@ func (n *UnaryExpr) WriteTo(buf *bytes.Buffer) {
 }
 
 type Expr struct {
+	NodeBase
 	Value string
 }
 
 func (n *Expr) ToString() string {
-	return n.Value
+	buf := bytes.Buffer{}
+	n.WriteTo(&buf)
+	return buf.String()
 }
 
 func (n *Expr) WriteTo(buf *bytes.Buffer) {

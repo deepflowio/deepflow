@@ -1,26 +1,50 @@
 package clickhouse
 
 import (
-	"github.com/akito0107/xsqlparser/sqlast"
+	"github.com/k0kubun/pp"
+	"github.com/xwb1989/sqlparser"
+	"metaflow/querier/engine/clickhouse/client"
 	"metaflow/querier/engine/clickhouse/view"
 	"metaflow/querier/parse"
 )
 
 type CHEngine struct {
-	Model *view.Model
-	IP    string
+	Model      *view.Model
+	IP         string
+	Statements []Statement
+	DB         string
 }
 
-// 翻译单元,翻译结果写入view.Model
-type Statement interface {
-	Format(*view.Model)
+func (e *CHEngine) ExecuteQuery(sql string) (map[string][]interface{}, error) {
+	parser := parse.Parser{Engine: e}
+	err := parser.ParseSQL(sql)
+	if err != nil {
+		return nil, err
+	}
+	chSql := e.ToSQLString()
+	pp.Println(chSql)
+	// TODO: 根据config写入
+	chClient := client.Client{
+		IP:       e.IP,
+		Port:     "9000",
+		UserName: "default",
+		Password: "",
+		DB:       e.DB,
+	}
+	err = chClient.Init()
+	if err != nil {
+		return nil, err
+	}
+	rst, err := chClient.DoQuery(chSql)
+	pp.Println(rst)
+	return rst, err
 }
 
 func (e *CHEngine) Init() {
 	e.Model = view.NewModel()
 }
 
-func (e *CHEngine) TransSelect(tags []sqlast.SQLSelectItem) error {
+func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 	for _, tag := range tags {
 		err := e.parseSelect(tag)
 		if err != nil {
@@ -30,30 +54,30 @@ func (e *CHEngine) TransSelect(tags []sqlast.SQLSelectItem) error {
 	return nil
 }
 
-func (e *CHEngine) TransWhere(node sqlast.Node) error {
+func (e *CHEngine) TransWhere(node *sqlparser.Where) error {
 	// 生成where的statement
 	whereStmt := Where{}
 	// 解析ast树并生成view.Node结构
-	expr, err := parseWhere(node, &whereStmt)
+	expr, err := parseWhere(node.Expr, &whereStmt)
 	filter := view.Filters{Expr: expr}
 	whereStmt.filter = &filter
-	// statement将结果写入model
-	whereStmt.Format(e.Model)
+	e.Statements = append(e.Statements, &whereStmt)
 	return err
 }
 
-func (e *CHEngine) TransFrom(froms []sqlast.TableReference) error {
+func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 	for _, from := range froms {
 		switch from := from.(type) {
-		case *sqlast.Table:
+		case *sqlparser.AliasedTableExpr:
 			// 解析Table类型
-			e.AddTable(parseIdent(from.Name.Idents[0]))
+			e.AddTable(sqlparser.String(from))
 		}
+
 	}
 	return nil
 }
 
-func (e *CHEngine) TransGroupBy(groups []sqlast.Node) error {
+func (e *CHEngine) TransGroupBy(groups sqlparser.GroupBy) error {
 	for _, group := range groups {
 		err := e.parseGroupBy(group)
 		if err != nil {
@@ -65,6 +89,9 @@ func (e *CHEngine) TransGroupBy(groups []sqlast.Node) error {
 
 // 原始sql转为clickhouse-sql
 func (e *CHEngine) ToSQLString() string {
+	for _, stmt := range e.Statements {
+		stmt.Format(e.Model)
+	}
 	// 使用Model生成View
 	chView := view.NewView(e.Model)
 	// View生成clickhouse-sql
@@ -72,126 +99,160 @@ func (e *CHEngine) ToSQLString() string {
 	return chSql
 }
 
-func (e *CHEngine) ExecuteQuery(sql string) ([]string, error) {
-	parser := parse.Parser{Engine: e}
-	parser.ParseSQL(sql)
-	//chSql := e.ToSQLString()
-	return nil, nil
-}
-
 // 解析GroupBy
-func (e *CHEngine) parseGroupBy(group sqlast.Node) error {
-	e.AddGroup(parseIdent(group.(*sqlast.Ident)))
+func (e *CHEngine) parseGroupBy(group sqlparser.Expr) error {
+	//var args []string
+	switch expr := group.(type) {
+	// 普通字符串
+	case *sqlparser.ColName:
+		e.AddGroup(sqlparser.String(expr))
+	// func(field)
+	case *sqlparser.FuncExpr:
+		/* name, args, err := e.parseFunction(expr)
+		if err != nil {
+			return err
+		}
+		err = e.AddFunction(name, args, "", as)
+		return err */
+	// field +=*/ field
+	case *sqlparser.BinaryExpr:
+		/* function := expr.Left.(*sqlparser.FuncExpr)
+		name, args, err := e.parseFunction(function)
+		if err != nil {
+			return err
+		}
+		math := expr.Operator
+		math += sqlparser.String(expr.Right)
+		e.AddFunction(name, args, math, as) */
+	}
 	return nil
 }
 
 // 解析Select
-func (e *CHEngine) parseSelect(tag sqlast.SQLSelectItem) error {
+func (e *CHEngine) parseSelect(tag sqlparser.SelectExpr) error {
 	// 解析select内容
 	switch tag := tag.(type) {
 	// 带as
-	case *sqlast.AliasSelectItem:
+	case *sqlparser.AliasedExpr:
 		return e.parseSelectAlias(tag)
-	// 不带as
-	case *sqlast.UnnamedSelectItem:
-		return e.parseSelectUnalias(tag)
 	}
 	return nil
 }
 
-// 解析select内容中不带as的格式
-func (e *CHEngine) parseSelectUnalias(item *sqlast.UnnamedSelectItem) error {
-	//var args []string
-	switch node := item.Node.(type) {
-	case *sqlast.Ident:
-		e.AddTag(node.ToSQLString(), "")
-	}
-	return nil
-}
-
-// 解析select内容中带as的格式
-func (e *CHEngine) parseSelectAlias(item *sqlast.AliasSelectItem) error {
-	as := item.Alias.ToSQLString()
+func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
+	as := sqlparser.String(item.As)
 	//var args []string
 	switch expr := item.Expr.(type) {
 	// 普通字符串
-	case *sqlast.Ident:
-		e.AddTag(parseIdent(expr), as)
+	case *sqlparser.ColName:
+		e.AddTag(sqlparser.String(expr), as)
 	// func(field)
-	case *sqlast.Function:
-		//e.AddMetric(expr.Name.ToSQLString())
+	case *sqlparser.FuncExpr:
+		name, args, err := e.parseFunction(expr)
+		if err != nil {
+			return err
+		}
+		err = e.AddFunction(name, args, "", as)
+		return err
 	// field +=*/ field
-	case *sqlast.BinaryExpr:
+	case *sqlparser.BinaryExpr:
+		function := expr.Left.(*sqlparser.FuncExpr)
+		name, args, err := e.parseFunction(function)
+		if err != nil {
+			return err
+		}
+		math := expr.Operator
+		math += sqlparser.String(expr.Right)
+		e.AddFunction(name, args, math, as)
 	}
 	return nil
+}
+
+func (e *CHEngine) parseFunction(item *sqlparser.FuncExpr) (name string, args []string, err error) {
+	for _, arg := range item.Exprs {
+		args = append(args, sqlparser.String(arg))
+	}
+	return sqlparser.String(item.Name), args, nil
 }
 
 func (e *CHEngine) AddGroup(group string) {
 	stmt := GetGroup(group)
-	stmt.Format(e.Model)
+	e.Statements = append(e.Statements, stmt)
 }
 
 func (e *CHEngine) AddTable(table string) {
 	stmt := &Table{Value: table}
-	stmt.Format(e.Model)
+	e.Statements = append(e.Statements, stmt)
 }
 
 func (e *CHEngine) AddTag(tag string, alias string) {
 	stmt := GetTag(tag, alias)
-	stmt.Format(e.Model)
+	e.Statements = append(e.Statements, stmt)
 }
 
-func parseWhere(node sqlast.Node, w *Where) (view.Node, error) {
+func (e *CHEngine) AddFunction(name string, args []string, math string, alias string) error {
+	function, levelFlag, err := GetFunc(name, args, math, alias)
+	if err != nil {
+		return err
+	}
+	// 通过metric判断view是否拆层
+	e.SetLevelFlag(levelFlag)
+	e.Statements = append(e.Statements, function)
+	return nil
+}
+
+func (e *CHEngine) SetLevelFlag(flag int) {
+	if flag > e.Model.MetricLevelFlag {
+		e.Model.MetricLevelFlag = flag
+	}
+}
+
+func parseWhere(node sqlparser.Expr, w *Where) (view.Node, error) {
 	switch node := node.(type) {
-	case *sqlast.BinaryExpr:
-		switch node.Op.Type {
-		case sqlast.And: // AND
-			left, err := parseWhere(node.Left, w)
-			if err != nil {
-				return left, err
-			}
-			right, err := parseWhere(node.Right, w)
-			if err != nil {
-				return right, err
-			}
-			op := view.Operator{Type: view.AND}
-			return &view.BinaryExpr{Left: left, Right: right, Op: op}, nil
-		case sqlast.Or: // OR
-			left, err := parseWhere(node.Left, w)
-			if err != nil {
-				return left, err
-			}
-			right, err := parseWhere(node.Right, w)
-			if err != nil {
-				return right, err
-			}
-			op := view.Operator{Type: view.OR}
-			return &view.BinaryExpr{Left: left, Right: right, Op: op}, nil
-		default: // host='aaa'
-			whereTag := node.Left.ToSQLString()
-			stmt := GetWhere(whereTag)
-			return stmt.Trans(node, w), nil
+	case *sqlparser.AndExpr:
+		left, err := parseWhere(node.Left, w)
+		if err != nil {
+			return left, err
 		}
-	case *sqlast.UnaryExpr:
+		right, err := parseWhere(node.Right, w)
+		if err != nil {
+			return right, err
+		}
+		op := view.Operator{Type: view.AND}
+		return &view.BinaryExpr{Left: left, Right: right, Op: op}, nil
+	case *sqlparser.OrExpr:
+		left, err := parseWhere(node.Left, w)
+		if err != nil {
+			return left, err
+		}
+		right, err := parseWhere(node.Right, w)
+		if err != nil {
+			return right, err
+		}
+		op := view.Operator{Type: view.OR}
+		return &view.BinaryExpr{Left: left, Right: right, Op: op}, nil
+	case *sqlparser.NotExpr:
 		expr, err := parseWhere(node.Expr, w)
 		if err != nil {
 			return expr, err
 		}
-		switch node.Op.Type {
-		case sqlast.Not: // Not
-			op := view.Operator{Type: view.NOT}
-			return &view.UnaryExpr{Op: op, Expr: expr}, nil
-		}
-	case *sqlast.Nested: // 括号
-		expr, err := parseWhere(node.AST, w)
+		op := view.Operator{Type: view.NOT}
+		return &view.UnaryExpr{Op: op, Expr: expr}, nil
+	case *sqlparser.ParenExpr: // 括号
+		expr, err := parseWhere(node.Expr, w)
 		if err != nil {
 			return expr, err
 		}
 		return &view.Nested{Expr: expr}, nil
+	case *sqlparser.ComparisonExpr:
+		whereTag := sqlparser.String(node.Left)
+		stmt := GetWhere(whereTag)
+		return stmt.Trans(node, w), nil
 	}
 	return nil, nil
 }
 
-func parseIdent(item *sqlast.Ident) string {
-	return item.ToSQLString()
+// 翻译单元,翻译结果写入view.Model
+type Statement interface {
+	Format(*view.Model)
 }

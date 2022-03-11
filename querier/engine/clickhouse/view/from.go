@@ -7,6 +7,11 @@ import (
 // NodeSet Table结构体集合
 type Tables struct {
 	tables []Node
+	NodeSetBase
+}
+
+func (t *Tables) getList() []Node {
+	return t.tables
 }
 
 func (t *Tables) ToString() string {
@@ -15,13 +20,16 @@ func (t *Tables) ToString() string {
 	return buf.String()
 }
 
-func (t *Tables) getList() []Node {
-	return t.tables
-}
-
 func (t *Tables) WriteTo(buf *bytes.Buffer) {
-	for i, tag := range t.tables {
-		tag.WriteTo(buf)
+	for i, table := range t.tables {
+		switch table.(type) {
+		case *Table:
+			table.WriteTo(buf)
+		default:
+			buf.WriteString("(")
+			table.WriteTo(buf)
+			buf.WriteString(")")
+		}
 		if i < len(t.tables)-1 {
 			buf.WriteString(", ")
 		}
@@ -41,6 +49,7 @@ func (t *Tables) Append(g Node) {
 }
 
 type Table struct {
+	NodeBase
 	Value string
 }
 

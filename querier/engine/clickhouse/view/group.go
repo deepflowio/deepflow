@@ -7,6 +7,7 @@ import (
 // NodeSet Group结构体集合
 type Groups struct {
 	groups []Node
+	NodeSetBase
 }
 
 func (s *Groups) ToString() string {
@@ -40,15 +41,33 @@ func (s *Groups) Append(g *Group) {
 	s.groups = append(s.groups, g)
 }
 
+func (s *Groups) GetWiths() []Node {
+	var withs []Node
+	for _, node := range s.groups {
+		if nodeWiths := node.GetWiths(); nodeWiths != nil {
+			withs = append(withs, nodeWiths...)
+		}
+	}
+	return withs
+}
+
 type Group struct {
 	Value string
 	Flag  int
+	Withs []Node
+	NodeBase
 }
 
 func (n *Group) ToString() string {
-	return n.Value
+	buf := bytes.Buffer{}
+	n.WriteTo(&buf)
+	return buf.String()
 }
 
 func (n *Group) WriteTo(buf *bytes.Buffer) {
 	buf.WriteString(n.Value)
+}
+
+func (n *Group) GetWiths() []Node {
+	return n.Withs
 }

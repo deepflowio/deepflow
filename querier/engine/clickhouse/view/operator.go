@@ -12,6 +12,7 @@ const (
 
 type Operator struct {
 	Type int
+	NodeBase
 }
 
 func (n *Operator) ToString() string {

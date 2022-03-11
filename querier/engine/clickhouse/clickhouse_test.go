@@ -30,6 +30,21 @@ var (
 	}, {
 		input:  "select host from t where not((host='aaa' and c=1) or b=2) group by host",
 		output: "SELECT host_id AS host FROM t WHERE NOT ((host_id = 1 AND c = 1) OR b = 2) GROUP BY host_id",
+	}, {
+		input:  "select Sum(byte) as sum_byte from t",
+		output: "SELECT SUM(byte) AS sum_byte FROM t",
+	}, {
+		input:  "select Max(byte) as max_byte from t",
+		output: "SELECT MAX(_Sum_byte_) AS max_byte FROM (SELECT SUM(byte) AS _Sum_byte_ FROM t)",
+	}, {
+		input:  "select Sum(byte)/60 as sum_byte from t",
+		output: "SELECT SUM(byte)/60 AS sum_byte FROM t",
+	}, {
+		input:  "select Sum(byte)/60 as sum_byte from t Where (time>=1 and time<=1)",
+		output: "SELECT SUM(byte)/60 AS sum_byte FROM t WHERE (`time` >= 1 AND `time` <= 1)",
+	}, {
+		input:  "select Max(byte) as max_byte from t",
+		output: "SELECT MAX(_Sum_byte_) AS max_byte FROM (SELECT SUM(byte) AS _Sum_byte_ FROM t)",
 	},
 	}
 )
