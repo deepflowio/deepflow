@@ -84,9 +84,11 @@ func (d *DropDetection) Detect(id uint32, seq uint64, timestamp uint32) {
 				d.counter.DisorderSize = disorderSize
 			}
 
-			// 乱序包，仅检测出后使用日志通知不涉及业务
-			log.Infof("%s out of order, %s time %s, cache time %s, packet seq %d, current seq %d",
-				IpFromUint32(uint32(id)), time.Unix(int64(timestamp), 0), d.name, time.Unix(int64(instance.maxTimestamp), 0), seq, instance.seq)
+			if d.counter.Disorder == 0 {
+				// 乱序包，仅检测出后使用日志通知不涉及业务
+				log.Infof("%s out of order, %s time %s, cache time %s, packet seq %d, current seq %d",
+					IpFromUint32(uint32(id)), time.Unix(int64(timestamp), 0), d.name, time.Unix(int64(instance.maxTimestamp), 0), seq, instance.seq)
+			}
 			d.counter.Disorder++
 			return
 		}
