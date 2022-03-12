@@ -92,7 +92,7 @@ func (c *Cleaner) work() {
 			}
 		}
 		if nDeleted > 0 {
-			log.Info("Pcap total size %d(before deleted), have deleted pcap file count %d, first file name: %s, mod time: %v, size: %d, last file name: %s, mod time: %v, size: %d",
+			log.Infof("Pcap total size %d(before deleted), have deleted pcap file count %d, first file name: %s, mod time: %v, size: %d, last file name: %s, mod time: %v, size: %d",
 				sumSize, nDeleted,
 				files[firstDeleteIndex].location, files[firstDeleteIndex].fileTime, files[firstDeleteIndex].size,
 				files[lastDeleteIndex].location, files[lastDeleteIndex].fileTime, files[lastDeleteIndex].size)
@@ -114,7 +114,7 @@ func (c *Cleaner) work() {
 				free += files[i].size
 			}
 			if nDeletedForFree > 0 {
-				log.Info("Pcap disk free size %d(after deleted), have deleted pcap file count %d, first file name: %s, mod time: %v, size: %d, last file name: %s, mod time: %v, size: %d",
+				log.Infof("Pcap disk free size %d(after deleted), have deleted pcap file count %d, first file name: %s, mod time: %v, size: %d, last file name: %s, mod time: %v, size: %d",
 					free, nDeletedForFree,
 					files[firstDeleteIndex].location, files[firstDeleteIndex].fileTime, files[firstDeleteIndex].size,
 					files[lastDeleteIndex].location, files[lastDeleteIndex].fileTime, files[lastDeleteIndex].size)
