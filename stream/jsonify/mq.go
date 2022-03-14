@@ -79,7 +79,7 @@ func (s *MQLogger) WriteBlock(block *ckdb.Block) error {
 
 		answerCode := int16(s.AppProtoLogsData.BaseInfo.Head.Code)
 		answerCodePtr := &answerCode
-		if msgType == datatype.MSG_T_REQUEST || answerCode == int16(NONE) {
+		if msgType == datatype.MSG_T_REQUEST || (answerCode == int16(NONE) && s.kafka.ApiKey != uint32(Fetch)) {
 			answerCodePtr = nil
 			status = datatype.STATUS_NOT_EXIST
 		}
