@@ -20,7 +20,11 @@ type FlowLogWriter struct {
 }
 
 func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.EngineType) *ckdb.Table {
-	orderKeys := []string{"l3_epc_id_1", "ip4_1", "ip6_1", "l3_epc_id_0", "ip4_0", "ip6_0", "server_port"}
+	var orderKeys = []string{}
+	if id == common.L7_FLOW_ID {
+		orderKeys = []string{"l7_protocol"}
+	}
+	orderKeys = append(orderKeys, "l3_epc_id_1", "ip4_1", "ip6_1", "l3_epc_id_0", "ip4_0", "ip6_0", "server_port")
 
 	return &ckdb.Table{
 		ID:              uint8(id),
@@ -40,12 +44,7 @@ func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.En
 func GetFlowLogTables(engine ckdb.EngineType) []*ckdb.Table {
 	return []*ckdb.Table{
 		newFlowLogTable(common.L4_FLOW_ID, jsonify.FlowLoggerColumns(), engine),
-		newFlowLogTable(common.L7_HTTP_ID, jsonify.HTTPLoggerColumns(), engine),
-		newFlowLogTable(common.L7_DNS_ID, jsonify.DNSLoggerColumns(), engine),
-		newFlowLogTable(common.L7_SQL_ID, jsonify.SQLLoggerColumns(), engine),
-		newFlowLogTable(common.L7_NOSQL_ID, jsonify.NoSQLLoggerColumns(), engine),
-		newFlowLogTable(common.L7_RPC_ID, jsonify.RPCLoggerColumns(), engine),
-		newFlowLogTable(common.L7_MQ_ID, jsonify.MQLoggerColumns(), engine),
+		newFlowLogTable(common.L7_FLOW_ID, jsonify.L7LoggerColumns(), engine),
 	}
 }
 
@@ -59,10 +58,7 @@ func NewFlowLogWriter(primaryAddr, secondaryAddr, user, password string, replica
 		tables = GetFlowLogTables(ckdb.MergeTree)
 	}
 	for i, table := range tables {
-		counterName := "app_flow_log"
-		if table.ID == uint8(common.L4_FLOW_ID) {
-			counterName = "flow_log"
-		}
+		counterName := common.FlowLogID(table.ID).String()
 		ckwriters[i], err = ckwriter.NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName, table, replicaEnabled,
 			ckWriterCfg.QueueCount, ckWriterCfg.QueueSize, ckWriterCfg.BatchSize, ckWriterCfg.FlushTimeout)
 		if err != nil {

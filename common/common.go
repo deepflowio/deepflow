@@ -34,3 +34,42 @@ func RegetInfoFromIP(isIPv6 bool, ip6 net.IP, ip4 uint32, epcID int16, platformD
 		return platformData.QueryIPV4Infos(epcID, ip4)
 	}
 }
+
+const (
+	IpType = 0
+
+	PodType     = 10
+	PodNodeType = 14
+
+	PodGroupType = 101
+	ServiceType  = 102
+)
+
+func GetResourceGl0(podID, podNodeID, l3DeviceID uint32, l3DeviceType uint8) (uint32, uint8) {
+	if podID > 0 {
+		return podID, PodType
+	} else if podNodeID > 0 {
+		return podNodeID, PodNodeType
+	} else if l3DeviceID > 0 {
+		return l3DeviceID, l3DeviceType
+	}
+	return 0, IpType
+}
+
+func GetResourceGl1(podGroupID, podNodeID, l3DeviceID uint32, l3DeviceType uint8) (uint32, uint8) {
+	if podGroupID > 0 {
+		return podGroupID, PodGroupType
+	} else if podNodeID > 0 {
+		return podNodeID, PodNodeType
+	} else if l3DeviceID > 0 {
+		return l3DeviceID, l3DeviceType
+	}
+	return 0, IpType
+}
+
+func GetResourceGl2(serviceID, podGroupID, podNodeID, l3DeviceID uint32, l3DeviceType uint8) (uint32, uint8) {
+	if serviceID > 0 {
+		return serviceID, ServiceType
+	}
+	return GetResourceGl1(podGroupID, podNodeID, l3DeviceID, l3DeviceType)
+}

@@ -15,8 +15,8 @@ import (
 
 const (
 	EdgeCode    = zerodoc.IPPath | zerodoc.L3EpcIDPath
-	MainAddCode = zerodoc.RegionID | zerodoc.HostID | zerodoc.L3Device | zerodoc.SubnetID | zerodoc.PodNodeID | zerodoc.AZID | zerodoc.PodGroupID | zerodoc.PodNSID | zerodoc.PodID | zerodoc.PodClusterID | zerodoc.BusinessIDs | zerodoc.GroupIDs | zerodoc.ServiceID
-	EdgeAddCode = zerodoc.RegionIDPath | zerodoc.HostIDPath | zerodoc.L3DevicePath | zerodoc.SubnetIDPath | zerodoc.PodNodeIDPath | zerodoc.AZIDPath | zerodoc.PodGroupIDPath | zerodoc.PodNSIDPath | zerodoc.PodIDPath | zerodoc.PodClusterIDPath | zerodoc.BusinessIDsPath | zerodoc.GroupIDsPath | zerodoc.ServiceIDPath
+	MainAddCode = zerodoc.RegionID | zerodoc.HostID | zerodoc.L3Device | zerodoc.SubnetID | zerodoc.PodNodeID | zerodoc.AZID | zerodoc.PodGroupID | zerodoc.PodNSID | zerodoc.PodID | zerodoc.PodClusterID | zerodoc.ServiceID
+	EdgeAddCode = zerodoc.RegionIDPath | zerodoc.HostIDPath | zerodoc.L3DevicePath | zerodoc.SubnetIDPath | zerodoc.PodNodeIDPath | zerodoc.AZIDPath | zerodoc.PodGroupIDPath | zerodoc.PodNSIDPath | zerodoc.PodIDPath | zerodoc.PodClusterIDPath | zerodoc.ServiceIDPath
 	PortAddCode = zerodoc.IsKeyService
 )
 
@@ -90,7 +90,6 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 			serviceID := uint32(0)
 			isKeyService := false
 			if t.IsIPv6 != 0 {
-				t.GroupIDs1, t.BusinessIDs1 = platformData.QueryIPv6GroupIDsAndBusinessIDs(t.L3EpcID1, t.IP61)
 				// 如果存在port，需要设置is_key_service, 并获取service_id
 				if t.Code&PortAddCode != 0 {
 					isKeyService, serviceID = platformData.QueryIPv6IsKeyServiceAndID(t.L3EpcID1, t.IP61, t.Protocol, t.ServerPort)
@@ -111,7 +110,6 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 					t.ServiceID1 = serviceID
 				}
 			} else {
-				t.GroupIDs1, t.BusinessIDs1 = platformData.QueryGroupIDsAndBusinessIDs(t.L3EpcID1, t.IP1)
 				// 如果存在port，需要设置is_key_service, 并获取service_id
 				if t.Code&PortAddCode != 0 {
 					isKeyService, serviceID = platformData.QueryIsKeyServiceAndID(t.L3EpcID1, t.IP1, t.Protocol, t.ServerPort)
@@ -153,6 +151,9 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 				}
 			}
 		}
+		t.ResourceGl0ID1, t.ResourceGl0Type1 = common.GetResourceGl0(t.PodID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1))
+		t.ResourceGl1ID1, t.ResourceGl1Type1 = common.GetResourceGl1(t.PodGroupID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1))
+		t.ResourceGl2ID1, t.ResourceGl2Type1 = common.GetResourceGl2(t.ServiceID1, t.PodGroupID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1))
 	} else {
 		t.Code |= MainAddCode
 		if t.L3EpcID == datatype.EPC_FROM_INTERNET {
@@ -186,7 +187,6 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 		isKeyService := false
 		serviceID := uint32(0)
 		if t.IsIPv6 != 0 {
-			t.GroupIDs, t.BusinessIDs = platformData.QueryIPv6GroupIDsAndBusinessIDs(t.L3EpcID, t.IP6)
 			// 在0端, 有port无edge的数据需计算isKeyService，如:vtap_flow_port
 			if t.Code&PortAddCode != 0 && t.Code&EdgeCode == 0 {
 				isKeyService, serviceID = platformData.QueryIPv6IsKeyServiceAndID(t.L3EpcID, t.IP6, t.Protocol, t.ServerPort)
@@ -208,7 +208,6 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 				t.ServiceID = serviceID
 			}
 		} else {
-			t.GroupIDs, t.BusinessIDs = platformData.QueryGroupIDsAndBusinessIDs(t.L3EpcID, t.IP)
 			// 在0端, 有port无edge的数据需计算isKeyService，如:vtap_flow_port
 			if t.Code&PortAddCode != 0 && t.Code&EdgeCode == 0 {
 				isKeyService, serviceID = platformData.QueryIsKeyServiceAndID(t.L3EpcID, t.IP, t.Protocol, t.ServerPort)
@@ -258,6 +257,9 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 				}
 			}
 		}
+		t.ResourceGl0ID, t.ResourceGl0Type = common.GetResourceGl0(t.PodID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType))
+		t.ResourceGl1ID, t.ResourceGl1Type = common.GetResourceGl1(t.PodGroupID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType))
+		t.ResourceGl2ID, t.ResourceGl2Type = common.GetResourceGl2(t.ServiceID, t.PodGroupID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType))
 	}
 
 	return nil

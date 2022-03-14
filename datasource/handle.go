@@ -434,20 +434,13 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 
 	// flow_log.l4和flow_log.l7只支持mod
 	if (dbGroup == FLOW_LOG_L4 || dbGroup == FLOW_LOG_L7) && action == actionStrings[MOD] {
+		flowLogID := common.L4_FLOW_ID
+		if dbGroup == FLOW_LOG_L7 {
+			flowLogID = common.L7_FLOW_ID
+		}
 		for _, ck := range cks {
-			var flowLogIDMin, flowLogIDMax common.FlowLogID
-			if dbGroup == FLOW_LOG_L4 {
-				// 以L7_HTTP_ID为界，小于它的为L4 LOG, 大于等于它的为L7 LOG
-				flowLogIDMin = common.L4_FLOW_ID
-				flowLogIDMax = common.L7_HTTP_ID
-			} else if dbGroup == FLOW_LOG_L7 {
-				flowLogIDMin = common.L7_HTTP_ID
-				flowLogIDMax = common.FLOWLOG_ID_MAX
-			}
-			for flowLogID := flowLogIDMin; flowLogID < flowLogIDMax; flowLogID++ {
-				if err := m.modFlowLogLocalTable(ck, flowLogID, duration); err != nil {
-					return err
-				}
+			if err := m.modFlowLogLocalTable(ck, flowLogID, duration); err != nil {
+				return err
 			}
 		}
 		return nil

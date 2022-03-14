@@ -46,24 +46,31 @@ type CKWriterConfig struct {
 	FlushTimeout int `yaml:"flush-timeout"`
 }
 
+type FlowLogDisabled struct {
+	L4    bool `yaml:"l4"`
+	L7    bool `yaml:"l7"`
+	Http  bool `yaml:"http"`
+	Dns   bool `yaml:"dns"`
+	Mysql bool `yaml:"mysql"`
+	Redis bool `yaml:"redis"`
+	Dubbo bool `yaml:"dubbo"`
+	Kafka bool `yaml:"kafka"`
+}
+
 type Config struct {
-	ShardID           int            `yaml:"shard-id"`
-	ControllerIPs     []string       `yaml:"controller-ips"`
-	ControllerPort    int            `yaml:"controller-port"`
-	CKDB              CKAddr         `yaml:"ckdb"`
-	CKAuth            Auth           `yaml:"ck-auth"`
-	ReplicaEnabled    bool           `yaml:"flowlog-replica-enabled"`
-	CKWriterConfig    CKWriterConfig `yaml:"flowlog-ck-writer"`
-	Throttle          int            `yaml:"throttle"`
-	L4Throttle        int            `yaml:"l4-throttle"`
-	L7HTTPThrottle    int            `yaml:"l7-http-throttle"`
-	L7DNSThrottle     int            `yaml:"l7-dns-throttle"`
-	L7SQLThrottle     int            `yaml:"l7-sql-throttle"`
-	L7NoSQLThrottle   int            `yaml:"l7-nosql-throttle"`
-	L7RPCThrottle     int            `yaml:"l7-rpc-throttle"`
-	L7MQThrottle      int            `yaml:"l7-mq-throttle"`
-	DecoderQueueCount int            `yaml:"decoder-queue-count"`
-	DecoderQueueSize  int            `yaml:"decoder-queue-size"`
+	ShardID           int             `yaml:"shard-id"`
+	ControllerIPs     []string        `yaml:"controller-ips"`
+	ControllerPort    int             `yaml:"controller-port"`
+	CKDB              CKAddr          `yaml:"ckdb"`
+	CKAuth            Auth            `yaml:"ck-auth"`
+	ReplicaEnabled    bool            `yaml:"flowlog-replica-enabled"`
+	CKWriterConfig    CKWriterConfig  `yaml:"flowlog-ck-writer"`
+	Throttle          int             `yaml:"throttle"`
+	L4Throttle        int             `yaml:"l4-throttle"`
+	L7Throttle        int             `yaml:"l7-throttle"`
+	FlowLogDisabled   FlowLogDisabled `yaml:"flow-log-disabled"`
+	DecoderQueueCount int             `yaml:"decoder-queue-count"`
+	DecoderQueueSize  int             `yaml:"decoder-queue-size"`
 }
 
 func (c *Config) Validate() error {

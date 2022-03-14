@@ -82,12 +82,12 @@ func NewFlowLogger(config *config.Config, controllers []net.IP, manager *droplet
 		throttle = config.L4Throttle / queueCount
 	}
 
-	throttlers := make([][common.FLOWLOG_ID_MAX]*throttler.ThrottlingQueue, queueCount)
+	throttlers := make([]*throttler.ThrottlingQueue, queueCount)
 	decoders := make([]*decoder.Decoder, queueCount)
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 
 	for i := 0; i < queueCount; i++ {
-		throttlers[i][int(common.L4_FLOW_ID)] = throttler.NewThrottlingQueue(
+		throttlers[i] = throttler.NewThrottlingQueue(
 			throttle,
 			flowLogWriter,
 			int(common.L4_FLOW_ID),
@@ -103,6 +103,7 @@ func NewFlowLogger(config *config.Config, controllers []net.IP, manager *droplet
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			throttlers[i],
+			&config.FlowLogDisabled,
 		)
 	}
 	return &Logger{
@@ -128,41 +129,21 @@ func NewProtoLogger(config *config.Config, controllers []net.IP, manager *drople
 
 	recv.RegistHandler(uint8(msgType), decodeQueues, queueCount)
 
-	var throttles [common.FLOWLOG_ID_MAX]int
-	for i, _ := range throttles {
-		throttles[i] = config.Throttle / queueCount
-	}
-	if config.L7HTTPThrottle != 0 {
-		throttles[common.L7_HTTP_ID] = config.L7HTTPThrottle / queueCount
-	}
-	if config.L7DNSThrottle != 0 {
-		throttles[common.L7_DNS_ID] = config.L7DNSThrottle / queueCount
-	}
-	if config.L7SQLThrottle != 0 {
-		throttles[common.L7_SQL_ID] = config.L7SQLThrottle / queueCount
-	}
-	if config.L7NoSQLThrottle != 0 {
-		throttles[common.L7_NOSQL_ID] = config.L7NoSQLThrottle / queueCount
-	}
-	if config.L7RPCThrottle != 0 {
-		throttles[common.L7_RPC_ID] = config.L7RPCThrottle / queueCount
-	}
-	if config.L7MQThrottle != 0 {
-		throttles[common.L7_MQ_ID] = config.L7MQThrottle / queueCount
+	throttle := config.Throttle / queueCount
+	if config.L7Throttle != 0 {
+		throttle = config.L7Throttle / queueCount
 	}
 
-	throttlers := make([][common.FLOWLOG_ID_MAX]*throttler.ThrottlingQueue, queueCount)
+	throttlers := make([]*throttler.ThrottlingQueue, queueCount)
 
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	decoders := make([]*decoder.Decoder, queueCount)
 	for i := 0; i < queueCount; i++ {
-		for j := common.L7_HTTP_ID; j < common.FLOWLOG_ID_MAX; j++ {
-			throttlers[i][j] = throttler.NewThrottlingQueue(
-				throttles[j],
-				flowLogWriter,
-				int(j),
-			)
-		}
+		throttlers[i] = throttler.NewThrottlingQueue(
+			throttle,
+			flowLogWriter,
+			int(common.L7_FLOW_ID),
+		)
 		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, config.ControllerPort, "stream-l7-log-"+strconv.Itoa(i), "", nil)
 		decoders[i] = decoder.NewDecoder(
 			i, msgType,
@@ -170,6 +151,7 @@ func NewProtoLogger(config *config.Config, controllers []net.IP, manager *drople
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			throttlers[i],
+			&config.FlowLogDisabled,
 		)
 	}
 

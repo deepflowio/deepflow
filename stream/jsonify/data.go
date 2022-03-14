@@ -304,38 +304,48 @@ func (i *Internet) WriteBlock(block *ckdb.Block) error {
 }
 
 type KnowledgeGraph struct {
-	RegionID0     uint16   `json:"region_id_0"`
-	RegionID1     uint16   `json:"region_id_1"`
-	AZID0         uint16   `json:"az_id_0"`
-	AZID1         uint16   `json:"az_id_1"`
-	HostID0       uint16   `json:"host_id_0"`
-	HostID1       uint16   `json:"host_id_1"`
-	L3DeviceType0 uint8    `json:"l3_device_type_0"`
-	L3DeviceType1 uint8    `json:"l3_device_type_1"`
-	L3DeviceID0   uint32   `json:"l3_device_id_0"`
-	L3DeviceID1   uint32   `json:"l3_device_id_1"`
-	PodNodeID0    uint32   `json:"pod_node_id_0"`
-	PodNodeID1    uint32   `json:"pod_node_id_1"`
-	PodNSID0      uint16   `json:"pod_ns_id_0"`
-	PodNSID1      uint16   `json:"pod_ns_id_1"`
-	PodGroupID0   uint32   `json:"pod_group_id_0"`
-	PodGroupID1   uint32   `json:"pod_group_id_1"`
-	PodID0        uint32   `json:"pod_id_0"`
-	PodID1        uint32   `json:"pod_id_1"`
-	PodClusterID0 uint16   `json:"pod_cluster_id_0"`
-	PodClusterID1 uint16   `json:"pod_cluster_id_1"`
-	L3EpcID0      int32    `json:"l3_epc_id_0"`
-	L3EpcID1      int32    `json:"l3_epc_id_1"`
-	EpcID0        int32    `json:"epc_id_0"`
-	EpcID1        int32    `json:"epc_id_1"`
-	SubnetID0     uint16   `json:"subnet_id_0"`
-	SubnetID1     uint16   `json:"subnet_id_1"`
-	GroupIDs0     []uint16 `json:"group_ids_0"`
-	GroupIDs1     []uint16 `json:"group_ids_1"`
-	BusinessIDs0  []uint16 `json:"business_ids_0"`
-	BusinessIDs1  []uint16 `json:"business_ids_1"`
-	ServiceID0    uint32   `json:"service_id_0"`
-	ServiceID1    uint32   `json:"service_id_1"`
+	RegionID0     uint16 `json:"region_id_0"`
+	RegionID1     uint16 `json:"region_id_1"`
+	AZID0         uint16 `json:"az_id_0"`
+	AZID1         uint16 `json:"az_id_1"`
+	HostID0       uint16 `json:"host_id_0"`
+	HostID1       uint16 `json:"host_id_1"`
+	L3DeviceType0 uint8  `json:"l3_device_type_0"`
+	L3DeviceType1 uint8  `json:"l3_device_type_1"`
+	L3DeviceID0   uint32 `json:"l3_device_id_0"`
+	L3DeviceID1   uint32 `json:"l3_device_id_1"`
+	PodNodeID0    uint32 `json:"pod_node_id_0"`
+	PodNodeID1    uint32 `json:"pod_node_id_1"`
+	PodNSID0      uint16 `json:"pod_ns_id_0"`
+	PodNSID1      uint16 `json:"pod_ns_id_1"`
+	PodGroupID0   uint32 `json:"pod_group_id_0"`
+	PodGroupID1   uint32 `json:"pod_group_id_1"`
+	PodID0        uint32 `json:"pod_id_0"`
+	PodID1        uint32 `json:"pod_id_1"`
+	PodClusterID0 uint16 `json:"pod_cluster_id_0"`
+	PodClusterID1 uint16 `json:"pod_cluster_id_1"`
+	L3EpcID0      int32  `json:"l3_epc_id_0"`
+	L3EpcID1      int32  `json:"l3_epc_id_1"`
+	EpcID0        int32  `json:"epc_id_0"`
+	EpcID1        int32  `json:"epc_id_1"`
+	SubnetID0     uint16 `json:"subnet_id_0"`
+	SubnetID1     uint16 `json:"subnet_id_1"`
+	ServiceID0    uint32 `json:"service_id_0"`
+	ServiceID1    uint32 `json:"service_id_1"`
+
+	ResourceGl0ID0   uint32
+	ResourceGl0Type0 uint8
+	ResourceGl1ID0   uint32
+	ResourceGl1Type0 uint8
+	ResourceGl2ID0   uint32
+	ResourceGl2Type0 uint8
+
+	ResourceGl0ID1   uint32
+	ResourceGl0Type1 uint8
+	ResourceGl1ID1   uint32
+	ResourceGl1Type1 uint8
+	ResourceGl2ID1   uint32
+	ResourceGl2Type1 uint8
 }
 
 var KnowledgeGraphColumns = []*ckdb.Column{
@@ -366,12 +376,22 @@ var KnowledgeGraphColumns = []*ckdb.Column{
 	ckdb.NewColumn("epc_id_1", ckdb.Int32),
 	ckdb.NewColumn("subnet_id_0", ckdb.UInt16),
 	ckdb.NewColumn("subnet_id_1", ckdb.UInt16),
-	ckdb.NewColumn("group_ids_0", ckdb.ArrayUInt16),
-	ckdb.NewColumn("group_ids_1", ckdb.ArrayUInt16),
-	ckdb.NewColumn("business_ids_0", ckdb.ArrayUInt16),
-	ckdb.NewColumn("business_ids_1", ckdb.ArrayUInt16),
 	ckdb.NewColumn("service_id_0", ckdb.UInt32),
 	ckdb.NewColumn("service_id_1", ckdb.UInt32),
+
+	ckdb.NewColumn("resource_gl0_id_0", ckdb.UInt32),
+	ckdb.NewColumn("resource_gl0_type_0", ckdb.UInt8),
+	ckdb.NewColumn("resource_gl1_id_0", ckdb.UInt32),
+	ckdb.NewColumn("resource_gl1_type_0", ckdb.UInt8),
+	ckdb.NewColumn("resource_gl2_id_0", ckdb.UInt32),
+	ckdb.NewColumn("resource_gl2_type_0", ckdb.UInt8),
+
+	ckdb.NewColumn("resource_gl0_id_1", ckdb.UInt32),
+	ckdb.NewColumn("resource_gl0_type_1", ckdb.UInt8),
+	ckdb.NewColumn("resource_gl1_id_1", ckdb.UInt32),
+	ckdb.NewColumn("resource_gl1_type_1", ckdb.UInt8),
+	ckdb.NewColumn("resource_gl2_id_1", ckdb.UInt32),
+	ckdb.NewColumn("resource_gl2_type_1", ckdb.UInt8),
 }
 
 func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) error {
@@ -453,24 +473,51 @@ func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt16(k.SubnetID1); err != nil {
 		return err
 	}
-	if err := block.WriteArray(k.GroupIDs0); err != nil {
-		return err
-	}
-	if err := block.WriteArray(k.GroupIDs1); err != nil {
-		return err
-	}
-	if err := block.WriteArray(k.BusinessIDs0); err != nil {
-		return err
-	}
-	if err := block.WriteArray(k.BusinessIDs1); err != nil {
-		return err
-	}
 	if err := block.WriteUInt32(k.ServiceID0); err != nil {
 		return err
 	}
 	if err := block.WriteUInt32(k.ServiceID1); err != nil {
 		return err
 	}
+
+	if err := block.WriteUInt32(k.ResourceGl0ID0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt8(k.ResourceGl0Type0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(k.ResourceGl1ID0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt8(k.ResourceGl1Type0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(k.ResourceGl2ID0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt8(k.ResourceGl2Type0); err != nil {
+		return err
+	}
+
+	if err := block.WriteUInt32(k.ResourceGl0ID1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt8(k.ResourceGl0Type1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(k.ResourceGl1ID1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt8(k.ResourceGl1Type1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(k.ResourceGl2ID1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt8(k.ResourceGl2Type1); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -866,50 +913,58 @@ func (i *Internet) Fill(f *pb.Flow) {
 	i.Province1 = geo.QueryProvince(f.FlowKey.IPDst)
 }
 
-func (k *KnowledgeGraph) Fill(f *pb.Flow, isIPV6 bool, platformData *grpc.PlatformInfoTable) {
+func (k *KnowledgeGraph) fill(
+	platformData *grpc.PlatformInfoTable,
+	isIPv6, isVipInterface0, isVipInterface1 bool,
+	l3EpcID0, l3EpcID1 int16,
+	ip40, ip41 uint32,
+	ip60, ip61 net.IP,
+	mac0, mac1 uint64,
+	port uint16,
+	tapSide uint32,
+	protocol layers.IPProtocol) {
+
 	var info0, info1 *grpc.Info
-	l3EpcID0, l3EpcID1 := f.FlowMetricsPeerSrc.L3EpcID, f.FlowMetricsPeerDst.L3EpcID
 	// 对于VIP的流量，需要使用MAC来匹配
-	lookupByMac0, lookupByMac1 := f.FlowMetricsPeerSrc.IsVIPInterface == 1, f.FlowMetricsPeerDst.IsVIPInterface == 1
+	lookupByMac0, lookupByMac1 := isVipInterface0, isVipInterface1
 	// 对于本地的流量，也需要使用MAC来匹配
-	if f.TapSide == uint32(zerodoc.Local) {
+	if tapSide == uint32(zerodoc.Local) {
 		lookupByMac0, lookupByMac1 = true, true
 	}
-	mac0, mac1 := f.FlowKey.MACSrc, f.FlowKey.MACDst
 	l3EpcMac0, l3EpcMac1 := mac0|uint64(l3EpcID0)<<48, mac1|uint64(l3EpcID1)<<48 // 使用l3EpcID和mac查找，防止跨AZ mac冲突
 
 	if lookupByMac0 && lookupByMac1 {
 		info0, info1 = platformData.QueryMacInfosPair(l3EpcMac0, l3EpcMac1)
 		if info0 == nil {
-			info0 = common.RegetInfoFromIP(isIPV6, f.FlowKey.IP6Src, uint32(f.FlowKey.IPSrc), int16(l3EpcID0), platformData)
+			info0 = common.RegetInfoFromIP(isIPv6, ip60, ip40, l3EpcID0, platformData)
 		}
 		if info1 == nil {
-			info1 = common.RegetInfoFromIP(isIPV6, f.FlowKey.IP6Dst, uint32(f.FlowKey.IPDst), int16(l3EpcID1), platformData)
+			info1 = common.RegetInfoFromIP(isIPv6, ip61, ip41, l3EpcID1, platformData)
 		}
 	} else if lookupByMac0 {
 		info0 = platformData.QueryMacInfo(l3EpcMac0)
 		if info0 == nil {
-			info0 = common.RegetInfoFromIP(isIPV6, f.FlowKey.IP6Src, uint32(f.FlowKey.IPSrc), int16(l3EpcID0), platformData)
+			info0 = common.RegetInfoFromIP(isIPv6, ip60, ip40, l3EpcID0, platformData)
 		}
-		if isIPV6 {
-			info1 = platformData.QueryIPV6Infos(int16(l3EpcID1), f.FlowKey.IP6Dst)
+		if isIPv6 {
+			info1 = platformData.QueryIPV6Infos(l3EpcID1, ip61)
 		} else {
-			info1 = platformData.QueryIPV4Infos(int16(l3EpcID1), uint32(f.FlowKey.IPDst))
+			info1 = platformData.QueryIPV4Infos(l3EpcID1, ip41)
 		}
 	} else if lookupByMac1 {
-		if isIPV6 {
-			info0 = platformData.QueryIPV6Infos(int16(l3EpcID0), f.FlowKey.IP6Src)
+		if isIPv6 {
+			info0 = platformData.QueryIPV6Infos(l3EpcID0, ip60)
 		} else {
-			info0 = platformData.QueryIPV4Infos(int16(l3EpcID0), uint32(f.FlowKey.IPSrc))
+			info0 = platformData.QueryIPV4Infos(l3EpcID0, ip40)
 		}
 		info1 = platformData.QueryMacInfo(l3EpcMac1)
 		if info1 == nil {
-			info1 = common.RegetInfoFromIP(isIPV6, f.FlowKey.IP6Dst, uint32(f.FlowKey.IPDst), int16(l3EpcID1), platformData)
+			info1 = common.RegetInfoFromIP(isIPv6, ip61, ip41, l3EpcID1, platformData)
 		}
-	} else if isIPV6 {
-		info0, info1 = platformData.QueryIPV6InfosPair(int16(l3EpcID0), f.FlowKey.IP6Src, int16(l3EpcID1), f.FlowKey.IP6Dst)
+	} else if isIPv6 {
+		info0, info1 = platformData.QueryIPV6InfosPair(l3EpcID0, ip60, l3EpcID1, ip61)
 	} else {
-		info0, info1 = platformData.QueryIPV4InfosPair(int16(l3EpcID0), uint32(f.FlowKey.IPSrc), int16(l3EpcID1), uint32(f.FlowKey.IPDst))
+		info0, info1 = platformData.QueryIPV4InfosPair(l3EpcID0, ip40, int16(l3EpcID1), ip41)
 	}
 
 	var l2Info0, l2Info1 *grpc.Info
@@ -947,7 +1002,7 @@ func (k *KnowledgeGraph) Fill(f *pb.Flow, isIPV6 bool, platformData *grpc.Platfo
 		k.PodClusterID1 = uint16(info1.PodClusterID)
 		k.SubnetID1 = uint16(info1.SubnetID)
 	}
-	k.L3EpcID0, k.L3EpcID1 = l3EpcID0, l3EpcID1
+	k.L3EpcID0, k.L3EpcID1 = int32(l3EpcID0), int32(l3EpcID1)
 	if l2Info0 != nil {
 		k.EpcID0 = parseUint32EpcID(l2Info0.L2EpcID)
 	}
@@ -955,35 +1010,51 @@ func (k *KnowledgeGraph) Fill(f *pb.Flow, isIPV6 bool, platformData *grpc.Platfo
 		k.EpcID1 = parseUint32EpcID(l2Info1.L2EpcID)
 	}
 
-	if isIPV6 {
-		k.GroupIDs0, k.BusinessIDs0 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID0), f.FlowKey.IP6Src)
-		k.GroupIDs1, k.BusinessIDs1 = platformData.QueryIPv6GroupIDsAndBusinessIDs(int16(l3EpcID1), f.FlowKey.IP6Dst)
+	if isIPv6 {
 		// 0端如果是clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID0 != 0 {
-			_, k.ServiceID0 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID0), f.FlowKey.IP6Src, layers.IPProtocol(f.FlowKey.Proto), 0)
+			_, k.ServiceID0 = platformData.QueryIPv6IsKeyServiceAndID(l3EpcID0, ip60, protocol, 0)
 		}
 		// 1端如果是NodeIP,clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID1 != 0 ||
 			k.PodNodeID1 != 0 {
-			_, k.ServiceID1 = platformData.QueryIPv6IsKeyServiceAndID(int16(l3EpcID1), f.FlowKey.IP6Dst, layers.IPProtocol(f.FlowKey.Proto), uint16(f.FlowKey.PortDst))
+			_, k.ServiceID1 = platformData.QueryIPv6IsKeyServiceAndID(l3EpcID1, ip61, protocol, port)
 		}
 	} else {
-		k.GroupIDs0, k.BusinessIDs0 = platformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID0), f.FlowKey.IPSrc)
-		k.GroupIDs1, k.BusinessIDs1 = platformData.QueryGroupIDsAndBusinessIDs(int16(l3EpcID1), f.FlowKey.IPDst)
 		// 0端如果是clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID0 != 0 {
-			_, k.ServiceID0 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID0), f.FlowKey.IPSrc, layers.IPProtocol(f.FlowKey.Proto), 0)
+			_, k.ServiceID0 = platformData.QueryIsKeyServiceAndID(l3EpcID0, ip40, protocol, 0)
 		}
 		// 1端如果是NodeIP,clusterIP或后端podIP需要匹配service_id
 		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
 			k.PodID1 != 0 ||
 			k.PodNodeID1 != 0 {
-			_, k.ServiceID1 = platformData.QueryIsKeyServiceAndID(int16(l3EpcID1), f.FlowKey.IPDst, layers.IPProtocol(f.FlowKey.Proto), uint16(f.FlowKey.PortDst))
+			_, k.ServiceID1 = platformData.QueryIsKeyServiceAndID(l3EpcID1, ip41, protocol, port)
 		}
 	}
+
+	k.ResourceGl0ID0, k.ResourceGl0Type0 = common.GetResourceGl0(k.PodID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0)
+	k.ResourceGl1ID0, k.ResourceGl1Type0 = common.GetResourceGl1(k.PodGroupID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0)
+	k.ResourceGl2ID0, k.ResourceGl2Type0 = common.GetResourceGl2(k.ServiceID0, k.PodGroupID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0)
+
+	k.ResourceGl0ID1, k.ResourceGl0Type1 = common.GetResourceGl0(k.PodID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1)
+	k.ResourceGl1ID1, k.ResourceGl1Type1 = common.GetResourceGl1(k.PodGroupID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1)
+	k.ResourceGl2ID1, k.ResourceGl2Type1 = common.GetResourceGl2(k.ServiceID1, k.PodGroupID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1)
+}
+
+func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.PlatformInfoTable) {
+	k.fill(platformData,
+		isIPv6, f.FlowMetricsPeerSrc.IsVIPInterface == 1, f.FlowMetricsPeerDst.IsVIPInterface == 1,
+		int16(f.FlowMetricsPeerSrc.L3EpcID), int16(f.FlowMetricsPeerDst.L3EpcID),
+		f.FlowKey.IPSrc, f.FlowKey.IPDst,
+		f.FlowKey.IP6Src, f.FlowKey.IP6Dst,
+		f.FlowKey.MACSrc, f.FlowKey.MACDst,
+		uint16(f.FlowKey.PortDst),
+		f.TapSide,
+		layers.IPProtocol(f.FlowKey.Proto))
 }
 
 func (i *FlowInfo) Fill(f *pb.Flow) {
@@ -1169,7 +1240,7 @@ func TaggedFlowToLogger(f *pb.TaggedFlow, shardID int, platformData *grpc.Platfo
 	s.TransportLayer.Fill(f.Flow)
 	s.ApplicationLayer.Fill(f.Flow)
 	s.Internet.Fill(f.Flow)
-	s.KnowledgeGraph.Fill(f.Flow, isIPV6, platformData)
+	s.KnowledgeGraph.FillL4(f.Flow, isIPV6, platformData)
 	s.FlowInfo.Fill(f.Flow)
 	s.Metrics.Fill(f.Flow)
 

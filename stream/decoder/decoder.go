@@ -13,7 +13,7 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
 	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
-	"gitlab.yunshan.net/yunshan/droplet/stream/common"
+	"gitlab.yunshan.net/yunshan/droplet/stream/config"
 	"gitlab.yunshan.net/yunshan/droplet/stream/jsonify"
 	"gitlab.yunshan.net/yunshan/droplet/stream/throttler"
 )
@@ -28,6 +28,8 @@ type Counter struct {
 	RawCount         int64 `statsd:"raw-count"`
 	L4Count          int64 `statsd:"l4-count"`
 	L4DropCount      int64 `statsd:"l4-drop-count"`
+	L7Count          int64 `statsd:"l7-count"`
+	L7DropCount      int64 `statsd:"l7-drop-count"`
 	L7HTTPCount      int64 `statsd:"l7-http-count"`
 	L7HTTPDropCount  int64 `statsd:"l7-http-drop-count"`
 	L7DNSCount       int64 `statsd:"l7-dns-count"`
@@ -49,8 +51,12 @@ type Decoder struct {
 	shardID      int
 	platformData *grpc.PlatformInfoTable
 	inQueue      queue.QueueReader
-	throttlers   [common.FLOWLOG_ID_MAX]*throttler.ThrottlingQueue
+	throttler    *throttler.ThrottlingQueue
 	debugEnabled bool
+
+	l7Disableds [datatype.PROTO_MAX]bool
+	l7Disabled  bool
+	l4Disabled  bool
 
 	counter *Counter
 	utils.Closable
@@ -60,7 +66,8 @@ func NewDecoder(
 	index, msgType, shardID int,
 	platformData *grpc.PlatformInfoTable,
 	inQueue queue.QueueReader,
-	throttlers [common.FLOWLOG_ID_MAX]*throttler.ThrottlingQueue,
+	throttler *throttler.ThrottlingQueue,
+	flowLogDisabled *config.FlowLogDisabled,
 ) *Decoder {
 	return &Decoder{
 		index:        index,
@@ -68,10 +75,24 @@ func NewDecoder(
 		shardID:      shardID,
 		platformData: platformData,
 		inQueue:      inQueue,
-		throttlers:   throttlers,
+		throttler:    throttler,
 		debugEnabled: log.IsEnabledFor(logging.DEBUG),
 		counter:      &Counter{},
+		l7Disableds:  getL7Disables(flowLogDisabled),
+		l7Disabled:   flowLogDisabled.L7,
+		l4Disabled:   flowLogDisabled.L4,
 	}
+}
+
+func getL7Disables(flowLogConfig *config.FlowLogDisabled) [datatype.PROTO_MAX]bool {
+	l7Disableds := [datatype.PROTO_MAX]bool{}
+	l7Disableds[datatype.PROTO_HTTP] = flowLogConfig.Http
+	l7Disableds[datatype.PROTO_DNS] = flowLogConfig.Dns
+	l7Disableds[datatype.PROTO_MYSQL] = flowLogConfig.Mysql
+	l7Disableds[datatype.PROTO_REDIS] = flowLogConfig.Redis
+	l7Disableds[datatype.PROTO_DUBBO] = flowLogConfig.Dubbo
+	l7Disableds[datatype.PROTO_KAFKA] = flowLogConfig.Kafka
+	return l7Disableds
 }
 
 func (d *Decoder) GetCounter() interface{} {
@@ -105,9 +126,9 @@ func (d *Decoder) Run() {
 				continue
 			}
 			decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
-			if d.msgType == datatype.MESSAGE_TYPE_PROTOCOLLOG {
+			if d.msgType == datatype.MESSAGE_TYPE_PROTOCOLLOG && !d.l7Disabled {
 				d.handleProtoLog(decoder)
-			} else if d.msgType == datatype.MESSAGE_TYPE_TAGGEDFLOW {
+			} else if d.msgType == datatype.MESSAGE_TYPE_TAGGEDFLOW && !d.l4Disabled {
 				d.handleTaggedFlow(decoder, pbTaggedFlow)
 			}
 			receiver.ReleaseRecvBuffer(recvBytes)
@@ -154,29 +175,9 @@ func (d *Decoder) sendFlow(flow *pb.TaggedFlow) {
 	}
 	d.counter.L4Count++
 	l := jsonify.TaggedFlowToLogger(flow, d.shardID, d.platformData)
-	if !d.throttlers[common.L4_FLOW_ID].Send(l) {
+	if !d.throttler.Send(l) {
 		d.counter.L4DropCount++
 	}
-}
-
-type decodeFunc func(*pb.AppProtoLogsData, int, *grpc.PlatformInfoTable) interface{}
-
-var decoderFuncs = []decodeFunc{
-	datatype.PROTO_HTTP:  jsonify.ProtoLogToHTTPLogger,
-	datatype.PROTO_DNS:   jsonify.ProtoLogToDNSLogger,
-	datatype.PROTO_MYSQL: jsonify.ProtoLogToSQLLogger,
-	datatype.PROTO_REDIS: jsonify.ProtoLogToNoSQLLogger,
-	datatype.PROTO_DUBBO: jsonify.ProtoLogToRPCLogger,
-	datatype.PROTO_KAFKA: jsonify.ProtoLogToMQLogger,
-}
-
-var throttleIDs = []common.FlowLogID{
-	datatype.PROTO_HTTP:  common.L7_HTTP_ID,
-	datatype.PROTO_DNS:   common.L7_DNS_ID,
-	datatype.PROTO_MYSQL: common.L7_SQL_ID,
-	datatype.PROTO_REDIS: common.L7_NOSQL_ID,
-	datatype.PROTO_DUBBO: common.L7_RPC_ID,
-	datatype.PROTO_KAFKA: common.L7_MQ_ID,
 }
 
 func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
@@ -184,25 +185,21 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 		log.Debugf("decoder %d recv proto: %s", d.index, proto)
 	}
 
-	protoHead := proto.BaseInfo.Head
-	if int(protoHead.Proto) >= len(decoderFuncs) {
-		log.Warningf("invalid proto.Proto %d %s", protoHead.Proto, proto)
+	d.counter.L7Count++
+	drop := int64(0)
+	if proto.BaseInfo.Head.Proto < uint32(datatype.PROTO_MAX) &&
+		d.l7Disableds[proto.BaseInfo.Head.Proto] {
+		drop = 1
+	} else {
+		l := jsonify.ProtoLogToL7Logger(proto, d.shardID, d.platformData)
+		if !d.throttler.Send(l) {
+			d.counter.L7DropCount++
+			drop = 1
+		}
 	}
+	proto.Release()
 
-	decoder := decoderFuncs[protoHead.Proto]
-	if decoder == nil {
-		d.counter.ErrorCount++
-		log.Debugf("proto(%s) decoder is not exist", protoHead.Proto)
-		return
-	}
-
-	l := decoder(proto, d.shardID, d.platformData)
-	throttleID := throttleIDs[protoHead.Proto]
-	var drop int64
-	if !d.throttlers[throttleID].Send(l) {
-		drop++
-	}
-	switch datatype.LogProtoType(protoHead.Proto) {
+	switch datatype.LogProtoType(proto.BaseInfo.Head.Proto) {
 	case datatype.PROTO_HTTP:
 		d.counter.L7HTTPCount++
 		d.counter.L7HTTPDropCount += drop
@@ -225,10 +222,7 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 }
 
 func (d *Decoder) flush() {
-	for _, throttler := range d.throttlers {
-		if throttler != nil {
-			throttler.Send(nil)
-
-		}
+	if d.throttler != nil {
+		d.throttler.Send(nil)
 	}
 }

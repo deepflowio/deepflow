@@ -202,6 +202,45 @@ var ColumnRename600 = []*ColumnRename{
 	},
 }
 
+var ColumnAdd610 = []*ColumnAdds{
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"resource_gl0_id_0", "resource_gl1_id_0", "resource_gl2_id_0", "resource_gl0_id_1", "resource_gl1_id_1", "resource_gl2_id_1"},
+		ColumnType:  ckdb.UInt32,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"resource_gl0_type_0", "resource_gl1_type_0", "resource_gl2_type_0", "resource_gl0_type_1", "resource_gl1_type_1", "resource_gl2_type_1"},
+		ColumnType:  ckdb.UInt8,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"vtap_flow_port", "vtap_app_port"},
+		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
+		ColumnNames: []string{"resource_gl0_id", "resource_gl1_id", "resource_gl2_id"},
+		ColumnType:  ckdb.UInt32,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"vtap_flow_port", "vtap_app_port"},
+		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
+		ColumnNames: []string{"resource_gl0_type", "resource_gl1_type", "resource_gl2_type"},
+		ColumnType:  ckdb.UInt8,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"vtap_flow_edge_port", "vtap_app_edge_port"},
+		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
+		ColumnNames: []string{"resource_gl0_id_0", "resource_gl1_id_0", "resource_gl2_id_0", "resource_gl0_id_1", "resource_gl1_id_1", "resource_gl2_id_1"},
+		ColumnType:  ckdb.UInt32,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"vtap_flow_edge_port", "vtap_app_edge_port"},
+		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
+		ColumnNames: []string{"resource_gl0_type_0", "resource_gl1_type_0", "resource_gl2_type_0", "resource_gl0_type_1", "resource_gl1_type_1", "resource_gl2_type_1"},
+		ColumnType:  ckdb.UInt32,
+	},
+}
+
 func getTables(connect *sql.DB, db string) ([]string, error) {
 	sql := fmt.Sprintf("SHOW TABLES IN %s", db)
 	rows, err := connect.Query(sql)
@@ -326,31 +365,34 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo) ([]*Colum
 		&ColumnAdds{
 			Dbs:         []string{d.db},
 			Tables:      []string{d.name, d.name + "_agg"},
-			ColumnNames: []string{"rrt_count", "l7_request", "l7_response", "tcp_transfer_fail", "tcp_rst_fail"},
-			ColumnType:  ckdb.UInt64,
-		},
-		&ColumnAdds{
-			Dbs:         []string{d.db},
-			Tables:      []string{d.name, d.name + "_agg"},
-			ColumnNames: []string{"rrt_sum"},
-			ColumnType:  ckdb.Float64,
-		},
-		&ColumnAdds{
-			Dbs:         []string{d.db},
-			Tables:      []string{d.name, d.name + "_agg"},
-			ColumnNames: []string{"l7_client_error", "l7_server_error", "l7_timeout", "l7_error", "rrt_max"},
+			ColumnNames: []string{"resource_gl0_id", "resource_gl1_id", "resource_gl2_id"},
 			ColumnType:  ckdb.UInt32,
 		},
+		&ColumnAdds{
+			Dbs:         []string{d.db},
+			Tables:      []string{d.name, d.name + "_agg"},
+			ColumnNames: []string{"resource_gl0_type", "resource_gl1_type", "resource_gl2_type"},
+			ColumnType:  ckdb.UInt8,
+		},
 	}
-	if d.db == "vtap_flow_edge_port" {
-		columnAddss = append(columnAddss,
-			&ColumnAdds{
-				Dbs:         []string{d.db},
-				Tables:      []string{d.name, d.name + "_agg"},
-				ColumnNames: []string{"tap_port_type"},
-				ColumnType:  ckdb.UInt8,
-			})
+	var columnAddssEdge = []*ColumnAdds{
+		&ColumnAdds{
+			Dbs:         []string{d.db},
+			Tables:      []string{d.name, d.name + "_agg"},
+			ColumnNames: []string{"resource_gl0_id_0", "resource_gl1_id_0", "resource_gl2_id_0", "resource_gl0_id_1", "resource_gl1_id_1", "resource_gl2_id_1"},
+			ColumnType:  ckdb.UInt32,
+		},
+		&ColumnAdds{
+			Dbs:         []string{d.db},
+			Tables:      []string{d.name, d.name + "_agg"},
+			ColumnNames: []string{"resource_gl0_type_0", "resource_gl1_type_0", "resource_gl2_type_0", "resource_gl0_type_1", "resource_gl1_type_1", "resource_gl2_type_1"},
+			ColumnType:  ckdb.UInt8,
+		},
 	}
+	if strings.Contains(d.db, "_edge") {
+		columnAddss = columnAddssEdge
+	}
+
 	for _, adds := range columnAddss {
 		columnAdds = append(columnAdds, getColumnAdds(adds)...)
 	}
@@ -424,11 +466,12 @@ func NewCKIssu(primaryAddr, secondaryAddr, username, password string) (*Issu, er
 	}
 
 	columnAdds := []*ColumnAdd{}
-	for _, adds := range ColumnAdd600 {
+	for _, adds := range ColumnAdd610 {
 		columnAdds = append(columnAdds, getColumnAdds(adds)...)
 	}
 	i.columnAdds = columnAdds
-	i.columnRenames = ColumnRename600
+	// 610版本无字段名字变更
+	// i.columnRenames = ColumnRename610
 
 	var err error
 	i.primaryConnection, err = common.NewCKConnection(primaryAddr, username, password)
@@ -565,7 +608,7 @@ func (i *Issu) addColumns(connect *sql.DB) ([]*ColumnAdd, error) {
 		dones = append(dones, add)
 	}
 
-	for _, db := range []string{"vtap_flow_port", "vtap_flow_edge_port"} {
+	for _, db := range []string{"vtap_flow_port", "vtap_flow_edge_port", "vtap_app_port", "vtap_app_edge_port"} {
 		datasourceInfos, err := getUserDefinedDatasourceInfos(connect, db)
 		if err != nil {
 			return nil, err

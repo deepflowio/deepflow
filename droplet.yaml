@@ -170,11 +170,19 @@ ckdb:
 ## writer all queue limit max size
 #throttle: 50000
 
-## 分别控制l4流日志, http流日志，dns流日志的写入限速。默认值为0，表示使用throttle的设置值.若非0，则使用设置值
+## 分别控制l4流日志, l7流日志，默认值为0，表示使用throttle的设置值.若非0，则使用设置值
 #l4-throttle: 0
-#l7-http-throttle: 0
-#l7-dns-throttle: 0
+#l7-throttle: 0
 
 #decoder-queue-count: 2
-
 #decoder-queue-size: 100000
+
+#flow-log-disabled:
+#  l4: false
+#  l7: false
+#  http: false
+#  dns: false
+#  mysql: false
+#  redis: false
+#  dubbo: false
+#  kafka: false
