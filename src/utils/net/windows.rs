@@ -18,11 +18,8 @@ use windows::Win32::{
 };
 
 use super::{Addr, Link, MacAddr, NeighborEntry, Route, MAC_ADDR_ZERO};
-use crate::{
-    common::IfType,
-    error::{Error, Result},
-    utils::WIN_ERROR_CODE_STR,
-};
+use super::{Error, Result};
+use crate::{common::IfType, utils::WIN_ERROR_CODE_STR};
 
 /*
 * TODO

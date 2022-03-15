@@ -381,14 +381,10 @@ impl MetaPacket {
             }
         }
         self.lookup_key.eth_type = eth_type;
-        self.lookup_key.src_mac = MacAddr(
-            *<&[u8; 6]>::try_from(&packet[FIELD_OFFSET_SA..FIELD_OFFSET_SA + MAC_ADDR_LEN])
-                .unwrap(),
-        );
-        self.lookup_key.dst_mac = MacAddr(
-            *<&[u8; 6]>::try_from(&packet[FIELD_OFFSET_DA..FIELD_OFFSET_DA + MAC_ADDR_LEN])
-                .unwrap(),
-        );
+        self.lookup_key.src_mac =
+            MacAddr::try_from(&packet[FIELD_OFFSET_SA..FIELD_OFFSET_SA + MAC_ADDR_LEN]).unwrap();
+        self.lookup_key.dst_mac =
+            MacAddr::try_from(&packet[FIELD_OFFSET_DA..FIELD_OFFSET_DA + MAC_ADDR_LEN]).unwrap();
 
         self.header_type = HeaderType::Eth;
         self.vlan_tag_size = vlan_tag_size;

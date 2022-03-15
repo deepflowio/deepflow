@@ -128,7 +128,7 @@ fn exec_command(program: &str, args: &[&str]) -> Result<String> {
 
 pub fn get_all_vm_xml<P: AsRef<Path>>(xml_path: P) -> Result<String> {
     if !xml_path.as_ref().is_dir() {
-        return Err(Error::IO(io::Error::new(
+        return Err(Error::IoError(io::Error::new(
             io::ErrorKind::Other,
             format!("xml_path is not directory: {}", xml_path.as_ref().display()),
         )));

@@ -383,8 +383,8 @@ mod tests {
             flow_key: FlowKey {
                 tap_type: TapType::Isp(7),
                 tap_port: TapPort(2100),
-                mac_src: MacAddr([0xb0, 0x60, 0x88, 0x51, 0xd7, 0x54]),
-                mac_dst: MacAddr([0x00, 0x15, 0x5d, 0x70, 0x01, 0x03]),
+                mac_src: MacAddr::from([0xb0, 0x60, 0x88, 0x51, 0xd7, 0x54]),
+                mac_dst: MacAddr::from([0x00, 0x15, 0x5d, 0x70, 0x01, 0x03]),
                 ip_src: src_addr,
                 ip_dst: dst_addr,
                 port_src: 19001,
@@ -484,7 +484,7 @@ mod tests {
         );
         // 右边是go 版本计算得出
         key.hash(&mut hasher);
-        assert_eq!(hasher.finish(), 0xb9ff074a81c14cc5);
+        assert_eq!(hasher.finish(), 1098954493523811076);
     }
 
     #[test]
@@ -501,7 +501,7 @@ mod tests {
         );
         // 右边是go 版本计算得出
         key.hash(&mut hasher);
-        assert_eq!(hasher.finish(), 0x2b6f7e80cf6aef5f);
+        assert_eq!(hasher.finish(), 4948968142922745785);
     }
 
     #[test]

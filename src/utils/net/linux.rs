@@ -5,10 +5,9 @@ use std::{
     time::Duration,
 };
 
-use anyhow::Context;
 use neli::{
     consts::{nl::*, rtnl::*, socket::*},
-    err::NlError,
+    err::NlError::Nlmsgerr,
     nl::{NlPayload, Nlmsghdr},
     rtnl::{Ifaddrmsg, Ifinfomsg, Rtattr, Rtmsg},
     socket::NlSocketHandle,
@@ -37,10 +36,12 @@ use pnet::{
 };
 
 use super::{Addr, Link, MacAddr, NeighborEntry, Route, MAC_ADDR_ZERO};
-use crate::error::{Error, Result};
+use super::{Error, Result};
 
 const BUFFER_SIZE: usize = 512;
 const RCV_TIMEOUT: Duration = Duration::from_millis(500);
+
+const NETLINK_ERROR_NOADDR: i32 = -19;
 
 /*
 * TODO
@@ -81,12 +82,7 @@ pub fn neighbor_lookup(mut dest_addr: IpAddr) -> Result<NeighborEntry> {
             arp_lookup(&selected_interface, src_addr, dest_addr)?
         }
         (IpAddr::V6(dest_addr), IpAddr::V6(_)) => ndp_lookup(&selected_interface, dest_addr)?,
-        (_, _) => {
-            return Err(Error::NeighborLookup(format!(
-                "invalid dest_addr src_ip pair=({}, {})",
-                dest_addr, route.src_ip
-            )));
-        }
+        _ => unreachable!(),
     };
 
     let NetworkInterface {
@@ -368,12 +364,49 @@ fn receive_arp_response(rx: &mut Box<dyn DataLinkReceiver>) -> Result<MacAddr> {
     }
 }
 
-fn request_link_info(req: Nlmsghdr<Rtm, Ifinfomsg>) -> Result<Vec<Link>, NlError> {
+fn request_link_info(name: Option<&str>) -> Result<Vec<Link>> {
+    let rtattrs = match name {
+        Some(n) => RtBuffer::from_iter(
+            vec![Rtattr::new(
+                None,
+                Ifla::Ifname,
+                CString::new(n).unwrap().to_bytes(),
+            )?]
+            .into_iter(),
+        ),
+        _ => RtBuffer::new(),
+    };
+    let msg = Ifinfomsg::new(
+        RtAddrFamily::Unspecified,
+        Arphrd::None,
+        0,
+        IffFlags::empty(),
+        IffFlags::empty(),
+        rtattrs,
+    );
+    let mut req = Nlmsghdr::new(
+        None,
+        Rtm::Getlink,
+        NlmFFlags::new(&[NlmF::Request]),
+        None,
+        None,
+        NlPayload::Payload(msg),
+    );
+    match name {
+        Some(_) => req.nl_flags.set(NlmF::Ack),
+        None => req.nl_flags.set(NlmF::Dump),
+    }
+
     let mut socket = NlSocketHandle::connect(NlFamily::Route, None, &[])?;
     socket.send(req)?;
 
     let mut links = vec![];
     for m in socket.iter::<Ifinfomsg>(false) {
+        if let Err(Nlmsgerr(e)) = m.as_ref() {
+            if e.error == NETLINK_ERROR_NOADDR && name.is_some() {
+                return Err(Error::LinkNotFound(name.unwrap().into()));
+            }
+        }
         let m = m?;
         if let NlTypeWrapper::GenlId(_) = m.nl_type {
             let payload = m.get_payload()?;
@@ -435,52 +468,18 @@ fn request_link_info(req: Nlmsghdr<Rtm, Ifinfomsg>) -> Result<Vec<Link>, NlError
     Ok(links)
 }
 
-pub fn link_by_name(name: String) -> Result<Link, NlError> {
-    let mut attrs = RtBuffer::new();
-    attrs.push(Rtattr::new(
-        None,
-        Ifla::Ifname,
-        CString::new(name).unwrap().to_bytes(),
-    )?);
-    let msg = Ifinfomsg::new(
-        RtAddrFamily::Unspecified,
-        Arphrd::None,
-        0,
-        IffFlags::empty(),
-        IffFlags::empty(),
-        attrs,
-    );
-    let req = Nlmsghdr::new(
-        None,
-        Rtm::Getlink,
-        NlmFFlags::new(&[NlmF::Request, NlmF::Ack]),
-        None,
-        None,
-        NlPayload::Payload(msg),
-    );
-    let mut links = request_link_info(req)?;
-    assert!(links.len() > 0);
-    Ok(links.pop().unwrap())
+pub fn link_by_name<S: AsRef<str>>(name: S) -> Result<Link> {
+    request_link_info(Some(name.as_ref())).map(|mut links| {
+        if links.len() > 0 {
+            links.pop().unwrap()
+        } else {
+            unreachable!()
+        }
+    })
 }
 
-pub fn link_list() -> Result<Vec<Link>, NlError> {
-    let msg = Ifinfomsg::new(
-        RtAddrFamily::Unspecified,
-        Arphrd::None,
-        0,
-        IffFlags::empty(),
-        IffFlags::empty(),
-        RtBuffer::new(),
-    );
-    let req = Nlmsghdr::new(
-        None,
-        Rtm::Getlink,
-        NlmFFlags::new(&[NlmF::Request, NlmF::Dump]),
-        None,
-        None,
-        NlPayload::Payload(msg),
-    );
-    request_link_info(req)
+pub fn link_list() -> Result<Vec<Link>> {
+    request_link_info(None)
 }
 
 pub fn parse_ip_slice(bs: &[u8]) -> Option<IpAddr> {
@@ -493,7 +492,7 @@ pub fn parse_ip_slice(bs: &[u8]) -> Option<IpAddr> {
     }
 }
 
-pub fn addr_list() -> Result<Vec<Addr>, NlError> {
+pub fn addr_list() -> Result<Vec<Addr>> {
     let msg = Ifaddrmsg {
         ifa_family: RtAddrFamily::Unspecified,
         ifa_prefixlen: 0,
@@ -541,7 +540,7 @@ pub fn addr_list() -> Result<Vec<Addr>, NlError> {
     Ok(addrs)
 }
 
-pub fn route_get(dest: &IpAddr) -> Result<Vec<Route>, NlError> {
+pub fn route_get(dest: &IpAddr) -> Result<Vec<Route>> {
     let msg = {
         let (rtm_family, rtm_dst_len, buf): (_, _, Buffer) = match dest {
             IpAddr::V4(addr) => (RtAddrFamily::Inet, 32, addr.octets()[..].into()),
@@ -607,9 +606,9 @@ pub fn route_get(dest: &IpAddr) -> Result<Vec<Route>, NlError> {
     Ok(routes)
 }
 
-pub fn get_route_src_ip_and_mac(dest: &IpAddr) -> anyhow::Result<(IpAddr, MacAddr)> {
+pub fn get_route_src_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
     let (src_ip, oif_index) = get_route_src_ip_and_ifindex(dest)?;
-    let links = link_list().context("failed to get links")?;
+    let links = link_list()?;
     for link in links.iter() {
         if link.if_index == oif_index {
             if link.mac_addr == MAC_ADDR_ZERO {
@@ -619,7 +618,7 @@ pub fn get_route_src_ip_and_mac(dest: &IpAddr) -> anyhow::Result<(IpAddr, MacAdd
             return Ok((src_ip, link.mac_addr.clone()));
         }
     }
-    for addr in addr_list().context("failed to get addrs")? {
+    for addr in addr_list()? {
         if addr.ip_addr != src_ip {
             continue;
         }
@@ -630,17 +629,17 @@ pub fn get_route_src_ip_and_mac(dest: &IpAddr) -> anyhow::Result<(IpAddr, MacAdd
         }
         break;
     }
-    Err(anyhow::anyhow!("link with index {} not found", oif_index))
+    Err(Error::LinkNotFoundIndex(oif_index))
 }
 
-pub fn get_route_src_ip(dest: &IpAddr) -> anyhow::Result<IpAddr> {
+pub fn get_route_src_ip(dest: &IpAddr) -> Result<IpAddr> {
     get_route_src_ip_and_ifindex(dest).map(|r| r.0)
 }
 
-fn get_route_src_ip_and_ifindex(dest: &IpAddr) -> anyhow::Result<(IpAddr, u32)> {
-    let routes = route_get(dest).with_context(|| format!("failed to get routes for {}", dest))?;
+fn get_route_src_ip_and_ifindex(dest: &IpAddr) -> Result<(IpAddr, u32)> {
+    let routes = route_get(dest)?;
     if routes.is_empty() {
-        return Err(anyhow::anyhow!("no route found for {}", dest));
+        return Err(Error::NoRouteToHost(dest.to_string()));
     }
     Ok((routes[0].src_ip, routes[0].oif_index))
 }
@@ -654,7 +653,15 @@ mod tests {
         let links = link_list().unwrap();
         assert!(links.len() > 0);
         for link in links {
-            assert_eq!(link.if_index, link_by_name(link.name).unwrap().if_index);
+            assert_eq!(link.if_index, link_by_name(&link.name).unwrap().if_index);
+        }
+    }
+
+    #[test]
+    fn get_nonexist_link() {
+        match link_by_name("nonexist42") {
+            Err(Error::LinkNotFound(link)) => assert_eq!(link, String::from("nonexist42")),
+            _ => assert!(false),
         }
     }
 }
