@@ -9,7 +9,8 @@ pub(crate) mod process;
 pub(crate) mod queue;
 pub(crate) mod stats;
 
-// for test
+pub use leaky_bucket::LeakyBucket;
+
 #[cfg(test)]
 pub mod test;
 

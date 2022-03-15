@@ -13,15 +13,9 @@ pub enum Error {
     #[error("PlatformSynchronizer failed: {0} ")]
     PlatformSynchronizer(String),
     #[error("IO error")]
-    IO(#[from] std::io::Error),
+    IoError(#[from] std::io::Error),
     #[error("data not found: {0}")]
     NotFound(String),
-    #[error("neighbor lookup failed from: {0}")]
-    NeighborLookup(String),
-    #[error("netlink error")]
-    NetLink(#[from] neli::err::NlError),
-    #[error("Windows related error:{0}")]
-    Windows(String),
     #[error("Kubernetes ApiWatcher error: {0}")]
     KubernetesApiWatcher(String),
     #[error("system: {0}")]

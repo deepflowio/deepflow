@@ -89,6 +89,12 @@ impl LeakyBucket {
     }
 }
 
+impl Default for LeakyBucket {
+    fn default() -> Self {
+        Self::new(None)
+    }
+}
+
 impl Drop for LeakyBucket {
     fn drop(&mut self) {
         self.running.store(false, Ordering::Relaxed);

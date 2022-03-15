@@ -1499,7 +1499,7 @@ mod tests {
         flow_map.inject_meta_packet(packet0);
 
         let mut packet1 = _new_meta_packet();
-        packet1.lookup_key.dst_mac = MacAddr([0x21, 0x43, 0x65, 0xaa, 0xaa, 0xaa]);
+        packet1.lookup_key.dst_mac = MacAddr::from([0x21, 0x43, 0x65, 0xaa, 0xaa, 0xaa]);
         packet1.lookup_key.tap_type = TapType::Tor;
         packet1.tcp_data.flags = TcpFlags::RST;
         _reverse_meta_packet(&mut packet1);
@@ -1524,7 +1524,7 @@ mod tests {
 
         let mut packet3 = _new_meta_packet();
         packet3.lookup_key.src_ip = Ipv4Addr::new(192, 168, 1, 3).into();
-        packet3.lookup_key.dst_mac = MacAddr([0x21, 0x43, 0x65, 0xaa, 0xaa, 0xaa]);
+        packet3.lookup_key.dst_mac = MacAddr::from([0x21, 0x43, 0x65, 0xaa, 0xaa, 0xaa]);
         packet3.lookup_key.tap_type = TapType::Tor;
         packet3.tap_port = TapPort(0x1234);
         packet3.lookup_key.l2_end_0 = true;
