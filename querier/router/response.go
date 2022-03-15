@@ -11,14 +11,14 @@ import (
 type Response struct {
 	OptStatus   string      `json:"OPT_STATUS"`
 	Description string      `json:"DESCRIPTION"`
-	Data        interface{} `json:"DATA"`
+	Result      interface{} `json:"result"`
 }
 
 func HttpResponse(c *gin.Context, httpCode int, data interface{}, optStatus string, description string) {
 	c.JSON(httpCode, Response{
 		OptStatus:   optStatus,
 		Description: description,
-		Data:        data,
+		Result:      data,
 	})
 }
 
@@ -33,7 +33,7 @@ func InternalErrorResponse(c *gin.Context, data interface{}, optStatus string, d
 	c.JSON(http.StatusInternalServerError, Response{
 		OptStatus:   optStatus,
 		Description: description,
-		Data:        data,
+		Result:      data,
 	})
 }
 

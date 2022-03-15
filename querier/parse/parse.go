@@ -22,18 +22,19 @@ func (p *Parser) ParseSQL(sql string) error {
 	}
 
 	pStmt := stmt.(*sqlparser.Select)
-	// Select解析
-	if pStmt.SelectExprs != nil {
-		selectErr := p.Engine.TransSelect(pStmt.SelectExprs)
-		if selectErr != nil {
-			return selectErr
-		}
-	}
 	// From解析
 	if pStmt.From != nil {
 		fromErr := p.Engine.TransFrom(pStmt.From)
 		if fromErr != nil {
 			return fromErr
+		}
+	}
+
+	// Select解析
+	if pStmt.SelectExprs != nil {
+		selectErr := p.Engine.TransSelect(pStmt.SelectExprs)
+		if selectErr != nil {
+			return selectErr
 		}
 	}
 

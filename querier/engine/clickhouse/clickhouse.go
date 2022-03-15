@@ -4,8 +4,10 @@ import (
 	"github.com/k0kubun/pp"
 	"github.com/xwb1989/sqlparser"
 	"metaflow/querier/engine/clickhouse/client"
+	"metaflow/querier/engine/clickhouse/metric"
 	"metaflow/querier/engine/clickhouse/view"
 	"metaflow/querier/parse"
+	"strings"
 )
 
 type CHEngine struct {
@@ -13,11 +15,22 @@ type CHEngine struct {
 	IP         string
 	Statements []Statement
 	DB         string
+	Table      string
 }
 
 func (e *CHEngine) ExecuteQuery(sql string) (map[string][]interface{}, error) {
+	// 解析show开头的sql
+	// show metrics/tags from <table_name> 例：show metrics/tags from l4_flow_log
+	result, isShow, err := e.ParseShowSql(sql)
+	if isShow {
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
 	parser := parse.Parser{Engine: e}
-	err := parser.ParseSQL(sql)
+	err = parser.ParseSQL(sql)
 	if err != nil {
 		return nil, err
 	}
@@ -42,6 +55,38 @@ func (e *CHEngine) ExecuteQuery(sql string) (map[string][]interface{}, error) {
 
 func (e *CHEngine) Init() {
 	e.Model = view.NewModel()
+}
+
+func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, error) {
+	sqlSplit := strings.Split(sql, " ")
+	if strings.ToLower(sqlSplit[0]) != "show" {
+		return nil, false, nil
+	}
+	var table string
+	for i, item := range sqlSplit {
+		if strings.ToLower(item) == "from" {
+			table = sqlSplit[i+1]
+			break
+		}
+	}
+	switch strings.ToLower(sqlSplit[1]) {
+	case "metric":
+		if strings.ToLower(sqlSplit[2]) == "functions" {
+			funcs, err := metric.GetFunctionDescriptions()
+			return funcs, true, err
+		} else {
+			// TODO: 解析失败
+			return nil, true, nil
+		}
+	case "metrics":
+		metrics, err := metric.GetMetricDescriptions(e.DB, table)
+		return metrics, true, err
+	case "tags":
+		return nil, true, nil
+	default:
+		// TODO: 解析失败
+		return nil, true, nil
+	}
 }
 
 func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
@@ -70,7 +115,9 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 		switch from := from.(type) {
 		case *sqlparser.AliasedTableExpr:
 			// 解析Table类型
-			e.AddTable(sqlparser.String(from))
+			table := sqlparser.String(from)
+			e.AddTable(table)
+			e.Table = table
 		}
 
 	}
@@ -191,7 +238,7 @@ func (e *CHEngine) AddTag(tag string, alias string) {
 }
 
 func (e *CHEngine) AddFunction(name string, args []string, math string, alias string) error {
-	function, levelFlag, err := GetFunc(name, args, math, alias)
+	function, levelFlag, err := GetFunc(name, args, math, alias, e.DB, e.Table)
 	if err != nil {
 		return err
 	}

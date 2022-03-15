@@ -191,6 +191,7 @@ func (sv *SubView) WriteTo(buf *bytes.Buffer) {
 		withs.Withs = sv.removeDup(&withs)
 		buf.WriteString("WITH ")
 		withs.WriteTo(buf)
+		buf.WriteString(" ")
 	}
 	if !sv.Tags.IsNull() {
 		sv.Tags.tags = sv.removeDup(sv.Tags)

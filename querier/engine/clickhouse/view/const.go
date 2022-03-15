@@ -13,7 +13,10 @@ const (
 	MODEL_METRIC_LEVEL_FLAG_LAYERED            // 计算层需要根据算子拆层
 )
 
+// Div算子类型
 const (
-	METRIC_IS_0_MEANINGFUL_FALSE = false // 0值无意义，需要将0值作为null处理
-	METRIC_IS_0_MEANINGFUL_TRUE  = true  // 0值有意义，需要将null作为0处理
+	FUNCTION_DIV_TYPE_DEFAULT          int = iota // 默认，不做任何处理
+	FUNCTION_DIV_TYPE_FILL_MINIMUM                // 除数和被除数都+1e-15
+	FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL            // 除数为0时，结果为NULL
+	FUNCTION_DIV_TYPE_0DIVIDER_AS_0               //除数为0时，结果为0
 )
