@@ -1,13 +1,16 @@
 package clickhouse
 
 import (
+	"strings"
+
 	"github.com/k0kubun/pp"
 	"github.com/xwb1989/sqlparser"
+
 	"metaflow/querier/engine/clickhouse/client"
 	"metaflow/querier/engine/clickhouse/metric"
 	"metaflow/querier/engine/clickhouse/view"
 	"metaflow/querier/parse"
-	"strings"
+	"metaflow/querier/tag/description"
 )
 
 type CHEngine struct {
@@ -82,7 +85,8 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, err
 		metrics, err := metric.GetMetricDescriptions(e.DB, table)
 		return metrics, true, err
 	case "tags":
-		return nil, true, nil
+		data := description.GetTagDescriptions(e.DB, table)
+		return data, true, nil
 	default:
 		// TODO: 解析失败
 		return nil, true, nil

@@ -48,7 +48,7 @@ func GetMetricDescriptions(db string, table string) (map[string][]interface{}, e
 		return nil, nil
 	}
 	columns := []interface{}{
-		"name", "displayname", "unit", "type", "category",
+		"name", "display_name", "unit", "type", "category",
 	}
 	var values []interface{}
 	for field, metric := range metrics {

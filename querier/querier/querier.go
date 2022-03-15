@@ -3,6 +3,7 @@ package querier
 import (
 	"github.com/gin-gonic/gin"
 	logging "github.com/op/go-logging"
+
 	"metaflow/querier/router"
 )
 
@@ -18,6 +19,6 @@ func Start() {
 	router.QueryRouter(r)
 	// TODO: 增加router
 	if err := r.Run(":8086"); err != nil {
-		log.Error("startup service failed, err:%v\n", err)
+		log.Errorf("startup service failed, err:%v\n", err)
 	}
 }

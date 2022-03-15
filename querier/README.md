@@ -19,6 +19,41 @@ parse/
 
 clickhouse固定句式获取metrics/tags等可用取值
 -------------------------------------------------
+- db={dbName} sql=show tags from {tableName}
+  - 获取指定数据库dbName中tableName表所支持的Tag描述
+  - 返回结构
+  ```
+  {
+      "OPT_STATUS": "SUCCESS",
+      "DESCRIPTION": "",
+      "result": {
+          "columns": [
+            "name",
+            "client_name",
+            "server_name",
+            "display_name",
+            "type"
+          ],
+          "values": [
+              [
+                "vm",
+                "vm_0",
+                "vm_1",
+                "云服务器",
+                "resource_id"
+              ],
+              [
+                "vm_name",
+                "vm_name_0",
+                "vm_name_1",
+                "云服务器名称",
+                "resource_name"
+              ]
+          ]
+      }
+  }
+  ```
+
 - db={dbName} sql=show metrics from {tableName}
   - 获取指定数据库dbName中tableName表所支持的指标量
   - 返回结构
@@ -29,7 +64,7 @@ clickhouse固定句式获取metrics/tags等可用取值
       "result": {
           "columns": [
           "name",
-          "displayname",
+          "display_name",
           "unit",
           "type", // 1.counter 2.gauge 3.delay 4.percentage
           "category"
