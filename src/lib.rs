@@ -10,6 +10,7 @@ mod metric;
 mod monitor;
 mod pcap;
 mod platform;
+mod policy;
 mod proto;
 mod rpc;
 pub mod trident;
@@ -19,6 +20,8 @@ mod utils;
 #[doc(hidden)]
 pub use {
     common::enums::TcpFlags as _TcpFlags,
+    common::lookup_key::LookupKey as _LookupKey,
+    common::platform_data::{IpNet as _IpNet, PlatformData as _PlatformData},
     flow_generator::flow_map::{
         _new_flow_map_and_receiver, _new_meta_packet, _reverse_meta_packet,
     },
@@ -28,5 +31,8 @@ pub use {
         _meta_flow_perf_update,
     },
     flow_generator::perf::Counter as _Counter,
+    policy::cidr::Cidr as _Cidr,
+    policy::labeler::Labeler as _Labeler,
+    utils::net::MacAddr as _MacAddr,
     utils::{leaky_bucket::LeakyBucket as _LeakyBucket, queue::bounded as _queue_bounded},
 };
