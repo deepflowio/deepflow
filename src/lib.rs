@@ -22,6 +22,7 @@ pub use {
     flow_generator::flow_map::{
         _new_flow_map_and_receiver, _new_meta_packet, _reverse_meta_packet,
     },
+    flow_generator::perf::l7_rrt::L7RrtCache as _L7RrtCache,
     flow_generator::perf::tcp::{
         TcpPerf as _TcpPerf, _benchmark_report, _benchmark_session_peer_seq_no_assert,
         _meta_flow_perf_update,

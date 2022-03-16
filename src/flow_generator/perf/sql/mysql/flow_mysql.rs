@@ -192,7 +192,7 @@ impl MysqlPerfData {
         stats.rrt_last = Duration::ZERO;
         self.rrt_cache
             .borrow_mut()
-            .add_req_time(flow_id, 0, timestamp);
+            .add_req_time(flow_id, None, timestamp);
     }
 
     fn calc_response(&mut self, timestamp: Duration, flow_id: u64, error_code: u16) -> bool {
@@ -220,7 +220,7 @@ impl MysqlPerfData {
         let req_timestamp = match self
             .rrt_cache
             .borrow_mut()
-            .get_and_remove_l7_req_time(flow_id, 0)
+            .get_and_remove_l7_req_time(flow_id, None)
         {
             Some(t) => t,
             None => return true,

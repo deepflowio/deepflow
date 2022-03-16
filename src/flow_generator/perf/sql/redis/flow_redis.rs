@@ -165,7 +165,7 @@ impl RedisPerfData {
         self.msg_type = LogMessageType::Request;
         self.rrt_cache
             .borrow_mut()
-            .add_req_time(flow_id, 0, timestamp);
+            .add_req_time(flow_id, None, timestamp);
     }
 
     // 返回是否无法匹配到request
@@ -193,7 +193,7 @@ impl RedisPerfData {
         let req_timestamp = match self
             .rrt_cache
             .borrow_mut()
-            .get_and_remove_l7_req_time(flow_id, 0)
+            .get_and_remove_l7_req_time(flow_id, None)
         {
             Some(t) => t,
             None => return true,
