@@ -1,58 +1,13 @@
-use std::{fmt, str};
-
 use super::decode::decode;
 
 use crate::{
     common::{
         enums::{IpProtocol, PacketDirection},
         flow::L7Protocol,
-        protocol_logs::{L7LogMethod, LogMessageType},
+        protocol_logs::{LogMessageType, RedisInfo},
     },
     error::{Error, Result},
 };
-
-#[derive(Debug, Default)]
-pub struct RedisInfo {
-    pub request: Vec<u8>,      // 命令字段包括参数例如："set key value"
-    pub request_type: Vec<u8>, // 命令类型不包括参数例如：命令为"set key value"，命令类型为："set"
-    pub response: Vec<u8>,     // 整数回复 + 批量回复 + 多条批量回复
-    pub status: Vec<u8>,       // '+'
-    pub error: Vec<u8>,        // '-'
-}
-
-impl fmt::Display for RedisInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "RedisInfo {{ request: {:?}, ",
-            str::from_utf8(&self.request).unwrap_or_default()
-        )?;
-        write!(
-            f,
-            "request_type: {:?}, ",
-            str::from_utf8(&self.request_type).unwrap_or_default()
-        )?;
-        write!(
-            f,
-            "response: {:?}, ",
-            str::from_utf8(&self.response).unwrap_or_default()
-        )?;
-        write!(
-            f,
-            "status: {:?}, ",
-            str::from_utf8(&self.status).unwrap_or_default()
-        )?;
-        write!(
-            f,
-            "error: {:?} }}",
-            str::from_utf8(&self.error).unwrap_or_default()
-        )
-    }
-}
-
-impl L7LogMethod for RedisInfo {
-    fn write_to_pb(&self) {}
-}
 
 #[derive(Debug, Default)]
 struct RedisLog {

@@ -2,7 +2,7 @@ use super::consts::*;
 use crate::{
     common::{
         enums::{IpProtocol, PacketDirection},
-        protocol_logs::L7LogMethod,
+        protocol_logs::DnsInfo,
         IPV4_ADDR_LEN, IPV6_ADDR_LEN,
     },
     error::{Error, Result},
@@ -20,22 +20,6 @@ struct DnsLog {
     pub domain_type: u16,
     pub query_name: String,
     pub answer_name: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub struct DnsInfo {
-    trans_id: u16,
-    query_type: u16,
-    query_name: String,
-    // 根据查询类型的不同而不同，如：
-    // A: ipv4/ipv6地址
-    // NS: name server
-    // SOA: primary name server
-    answers: String,
-}
-
-impl L7LogMethod for DnsInfo {
-    fn write_to_pb(&self) {}
 }
 
 impl DnsLog {

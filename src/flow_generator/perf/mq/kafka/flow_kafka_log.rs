@@ -4,31 +4,13 @@ use crate::{
     common::{
         enums::{IpProtocol, PacketDirection},
         flow::L7Protocol,
-        protocol_logs::{L7LogMethod, LogMessageType},
+        protocol_logs::{KafkaInfo, LogMessageType},
     },
     error::{Error, Result},
     utils::bytes,
 };
 
 const NO_KAFKA_LOG: &str = "no kafka log.";
-
-#[derive(Debug, Default)]
-struct KafkaInfo {
-    correlation_id: u32,
-
-    // request
-    req_msg_size: i32,
-    api_version: u16,
-    api_key: u16,
-    client_id: String,
-
-    // reponse
-    resp_msg_size: i32,
-}
-
-impl L7LogMethod for KafkaInfo {
-    fn write_to_pb(&self) {}
-}
 
 #[derive(Debug, Default)]
 struct KafkaLog {
