@@ -38,8 +38,10 @@ pub struct Config {
     #[serde(with = "LevelDef")]
     pub log_level: log::Level,
     pub profiler: bool,
-    pub afpacket_blocks_enabled: bool,
-    pub afpacket_blocks: u32,
+    #[serde(alias = "afpacket-blocks-enabled")]
+    pub af_packet_blocks_enabled: bool,
+    #[serde(alias = "afpacket-blocks")]
+    pub af_packet_blocks: u32,
     pub enable_debug_stats: bool,
     pub analyzer_dedup_disabled: bool,
     pub default_tap_type: u32,
@@ -172,8 +174,8 @@ impl Default for Config {
             log_file: DEFAULT_LOG_FILE.into(),
             log_level: log::Level::Info,
             profiler: false,
-            afpacket_blocks_enabled: false,
-            afpacket_blocks: 0,
+            af_packet_blocks_enabled: false,
+            af_packet_blocks: 0,
             enable_debug_stats: false,
             analyzer_dedup_disabled: false,
             default_tap_type: 3,

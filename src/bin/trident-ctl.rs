@@ -1,12 +1,12 @@
 use std::ffi::CString;
 
-use trident::dispatcher::recv_engine::afpacket::{options, options::Options, tpacket::Tpacket};
+use trident::dispatcher::recv_engine::af_packet::{options, options::Options, tpacket::Tpacket};
 
 fn main() {
     let mut opts: Options = Default::default();
     opts.version = options::OptTpacketVersion::TpacketVersion2;
     let mut socket = Tpacket::new(opts).unwrap();
-    println!("afpacket init ok.");
+    println!("af_packet init ok.");
     let mut last: u64 = 0;
     let mut flags = false;
 
