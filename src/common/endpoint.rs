@@ -1,7 +1,9 @@
-use std::net::IpAddr;
-use std::sync::{Arc, Mutex};
-
 use bitflags::bitflags;
+use std::{
+    net::IpAddr,
+    net::Ipv4Addr,
+    sync::{Arc, Mutex},
+};
 
 use super::{enums::TapType, lookup_key::LookupKey, platform_data::PlatformData};
 
@@ -67,6 +69,23 @@ impl EndpointInfo {
     }
 }
 
+impl Default for EndpointInfo {
+    fn default() -> EndpointInfo {
+        EndpointInfo {
+            real_ip: Ipv4Addr::UNSPECIFIED.into(),
+            l2_epc_id: 0,
+            l3_epc_id: 0,
+            l2_end: false,
+            l3_end: false,
+            is_device: false,
+            is_vip_interface: false,
+            is_vip: false,
+            is_local_mac: false,
+            is_local_ip: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct EndpointData {
     pub src_info: Arc<Mutex<EndpointInfo>>,
@@ -85,6 +104,13 @@ impl EndpointData {
         EndpointData {
             src_info: self.dst_info.clone(),
             dst_info: self.src_info.clone(),
+        }
+    }
+
+    pub fn new(src: EndpointInfo, dst: EndpointInfo) -> EndpointData {
+        EndpointData {
+            src_info: Arc::new(Mutex::new(src)),
+            dst_info: Arc::new(Mutex::new(dst)),
         }
     }
 }
