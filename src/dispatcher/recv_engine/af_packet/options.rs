@@ -1,5 +1,6 @@
 use page_size;
-use thiserror::Error;
+
+use super::{Error, Result};
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum OptTpacketVersion {
@@ -19,12 +20,6 @@ impl OptTpacketVersion {
         }
         return false;
     }
-}
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("invalid tpacket version: {0}")]
-    InvalidTpVersion(isize),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -71,22 +66,26 @@ impl Default for Options {
 }
 
 impl Options {
-    pub fn check(&self) -> Result<(), &'static str> {
+    pub fn check(&self) -> Result<()> {
         let page_size = page_size::get() as u32;
         if self.block_size % page_size != 0 {
-            return Err("block size must be divisible by page size.");
+            return Err(Error::InvalidOption(
+                "block size must be divisible by page size.",
+            ));
         }
         if self.block_size % self.frame_size != 0 {
-            return Err("block size must be divisible by frame size.");
+            return Err(Error::InvalidOption(
+                "block size must be divisible by frame size.",
+            ));
         }
         if self.num_blocks < 1 {
-            return Err("num blocks must be >=1.");
+            return Err(Error::InvalidOption("num blocks must be >=1."));
         }
         if self.block_timeout < 1000000 {
-            return Err("block time must be >=1,000,000");
+            return Err(Error::InvalidOption("block time must be >=1,000,000"));
         }
         if self.version.invalid() {
-            return Err("tpacket version is invalid.");
+            return Err(Error::InvalidOption("tpacket version is invalid."));
         }
         Ok(())
     }
@@ -97,7 +96,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_afpacket_opts_default() {
+    fn test_af_packet_opts_default() {
         let opts = Options {
             version: OptTpacketVersion::TpacketVersion2,
             ..Default::default()
@@ -107,11 +106,11 @@ mod tests {
     }
 
     #[test]
-    fn test_afpacket_opts_check() {
+    fn test_af_packet_opts_check() {
         let opts = Options {
             block_size: 1,
             ..Default::default()
         };
-        assert_ne!(Ok(()), opts.check());
+        assert!(opts.check().is_err());
     }
 }

@@ -156,16 +156,19 @@ impl Header for *mut Tpacket2Hdr {
             return (*(*self)).tp_status as isize;
         }
     }
+
     fn clear_status(&mut self) {
         unsafe {
             (*(*self)).tp_status = TP_STATUS_KERNEL;
         }
     }
+
     fn get_time(&self) -> Duration {
         unsafe {
             return Duration::new((*(*self)).tp_sec as u64, (*(*self)).tp_nsec);
         }
     }
+
     fn get_data(&self) -> &[u8] {
         unsafe {
             let ptr =
@@ -173,11 +176,13 @@ impl Header for *mut Tpacket2Hdr {
             return core::slice::from_raw_parts(ptr as *const u8, (*(*self)).tp_snaplen as usize);
         }
     }
+
     fn get_length(&self) -> isize {
         unsafe {
             return (*(*self)).tp_len as isize;
         }
     }
+
     fn get_iface_index(&self) -> isize {
         let ptr = (*self) as *const Tpacket2Hdr as *const u8 as usize;
         unsafe {
@@ -185,6 +190,7 @@ impl Header for *mut Tpacket2Hdr {
             return (*ll).sll_ifindex as isize;
         }
     }
+
     fn next(&mut self) -> bool {
         return false;
     }
@@ -219,6 +225,7 @@ impl Header for V3Wrapper {
             return (*(self.block_hdr)).block_status as isize;
         }
     }
+
     fn clear_status(&mut self) {
         unsafe {
             (*(self.block_hdr)).num_pkts = 0;
@@ -248,11 +255,13 @@ impl Header for V3Wrapper {
             (*self.block_hdr).block_status = TP_STATUS_KERNEL;
         }
     }
+
     fn get_time(&self) -> Duration {
         unsafe {
             return Duration::new((*self.v3_header).tp_sec as u64, (*self.v3_header).tp_nsec);
         }
     }
+
     fn get_data(&self) -> &[u8] {
         unsafe {
             let ptr = self.v3_header as *const u8 as usize;
@@ -263,11 +272,13 @@ impl Header for V3Wrapper {
             );
         }
     }
+
     fn get_length(&self) -> isize {
         unsafe {
             return (*self.v3_header).tp_len as isize;
         }
     }
+
     fn get_iface_index(&self) -> isize {
         let ptr = self.v3_header as *const u8 as usize;
         unsafe {
@@ -275,6 +286,7 @@ impl Header for V3Wrapper {
             return (*ll).sll_ifindex as isize;
         }
     }
+
     fn next(&mut self) -> bool {
         unsafe {
             self.used += 1;
@@ -301,7 +313,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_afpacket_headerv3() {
+    fn test_af_packet_header_v3() {
         let mut raw: [u8; 1000] = [10; 1000];
         let mut v3 = V3Wrapper::from(&mut raw as *mut u8);
         unsafe {
@@ -319,7 +331,7 @@ mod tests {
         assert_ne!(raw, [10; 1000]);
     }
     #[test]
-    fn test_afpacket_headerv2() {
+    fn test_af_packet_header_v2() {
         let mut raw: [u8; 1000] = [10; 1000];
         raw[50] = 10;
         let mut v2 = Tpacket2Hdr::from((&mut raw) as *mut u8);

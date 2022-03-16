@@ -1,4 +1,4 @@
-use std::{error::Error, ffi::CString, io, time::Duration};
+use std::{ffi::CString, io, time::Duration};
 
 use libc::{
     c_int, c_uint, c_void, getsockopt, mmap, munmap, off_t, poll, pollfd, size_t, sockaddr,
@@ -8,9 +8,9 @@ use libc::{
 use pcap_sys::{bpf_program, pcap_compile_nopcap};
 use socket::{self, Socket};
 
-use crate::dispatcher::recv_engine::afpacket::*;
-use crate::error::Error as tError;
-use crate::utils::net::link_by_name;
+use super::{header, options, Error, Result};
+
+use crate::utils::net::{self, link_by_name};
 
 const PACKET_VERSION: c_int = 10;
 const PACKET_RX_RING: c_int = 5;
@@ -70,12 +70,16 @@ pub struct Packet<'a> {
 }
 
 impl Tpacket {
-    fn bind(&self) -> Result<(), Box<dyn Error>> {
+    fn bind(&self) -> Result<()> {
         let mut if_index: i32 = 0;
 
         if self.opts.iface != "" {
             // 根据网卡名称获取网卡if_index
-            let link = link_by_name(self.opts.iface.clone())?;
+            let link = link_by_name(self.opts.iface.clone()).map_err(|e| match e {
+                net::Error::LinkNotFound(s) => Error::LinkError(s),
+                net::Error::NetLinkError(ne) => Error::LinkError(ne.to_string()),
+                _ => unreachable!(),
+            })?;
             if_index = link.if_index as i32;
         }
         unsafe {
@@ -90,14 +94,15 @@ impl Tpacket {
                 std::mem::size_of::<sockaddr_ll>() as u32,
             );
             if res == -1 {
-                return Err(Box::from(io::Error::last_os_error()));
+                return Err(io::Error::last_os_error().into());
             }
         }
         Ok(())
     }
+
     // TODO: 这里看起来不需要，golang版本未涉及该配置，后续有需要再添加
     #[allow(dead_code)]
-    fn set_promisc(&self) -> Result<(), Box<dyn Error>> {
+    fn set_promisc(&self) -> Result<()> {
         // 设置混杂模式
 
         //raw_socket.set_flag(IFF_PROMISC as u64)?;
@@ -108,39 +113,35 @@ impl Tpacket {
         //mreq.mr_type = PACKET_MR_PROMISC as u16;
 
         //raw_socket.setsockopt(SOL_PACKET, PACKET_ADD_MEMBERSHIP, (&mreq as *const packet_mreq) as *const libc::c_void);
-        return Ok(());
+        Ok(())
     }
 
     fn set_version_internal(&mut self, tp_version: options::OptTpacketVersion) -> bool {
         // 设置af packet版本
-        if self
-            .raw_socket
+        self.raw_socket
             .setsockopt(SOL_PACKET, PACKET_VERSION, tp_version as c_int)
             .is_ok()
-        {
-            return true;
-        }
-        return false;
     }
 
-    fn set_version(&mut self) -> Result<(), Box<dyn Error>> {
+    fn set_version(&mut self) -> Result<()> {
         if (self.tp_version == options::OptTpacketVersion::TpacketVersionHighestavailablet
             || self.tp_version == options::OptTpacketVersion::TpacketVersion3)
             && self.set_version_internal(options::OptTpacketVersion::TpacketVersion3)
         {
             self.tp_version = options::OptTpacketVersion::TpacketVersion3;
-            return Ok(());
+            Ok(())
         } else if (self.tp_version == options::OptTpacketVersion::TpacketVersionHighestavailablet
             || self.tp_version == options::OptTpacketVersion::TpacketVersion2)
             && self.set_version_internal(options::OptTpacketVersion::TpacketVersion2)
         {
             self.tp_version = options::OptTpacketVersion::TpacketVersion2;
-            return Ok(());
+            Ok(())
+        } else {
+            Err(Error::InvalidTpVersion(self.tp_version as isize))
         }
-        return Err(Box::new(tError::InvalidTpVersion(self.tp_version as isize)));
     }
 
-    fn set_ring(&self) -> Result<(), Box<dyn Error>> {
+    fn set_ring(&self) -> Result<()> {
         if self.tp_version == options::OptTpacketVersion::TpacketVersion2 {
             let mut req: header::TpacketReq = Default::default();
             req.tp_block_nr = self.opts.num_blocks;
@@ -149,7 +150,7 @@ impl Tpacket {
             req.tp_frame_size = self.opts.frame_size;
             self.raw_socket
                 .setsockopt(SOL_PACKET, PACKET_RX_RING, req)?;
-            return Ok(());
+            Ok(())
         } else if self.tp_version == options::OptTpacketVersion::TpacketVersion3 {
             let mut req: header::TpacketReq3 = Default::default();
             req.tp_block_size = self.opts.block_size;
@@ -159,12 +160,13 @@ impl Tpacket {
             req.tp_retire_blk_tov = self.opts.block_timeout / MILLI_SECONDS;
             self.raw_socket
                 .setsockopt(SOL_PACKET, PACKET_RX_RING, req)?;
-            return Ok(());
+            Ok(())
+        } else {
+            Err(Error::InvalidTpVersion(self.tp_version as isize))
         }
-        return Err(Box::new(tError::InvalidTpVersion(self.tp_version as isize)));
     }
 
-    fn mmap_ring(&mut self) -> Result<(), Box<dyn Error>> {
+    fn mmap_ring(&mut self) -> Result<()> {
         // 接收队列
         unsafe {
             let ret = mmap(
@@ -176,7 +178,7 @@ impl Tpacket {
                 0 as off_t,
             ) as isize;
             if ret == -1 {
-                return Err(Box::from(io::Error::last_os_error()));
+                return Err(io::Error::last_os_error().into());
             }
             self.ring = ret as *mut u8;
         }
@@ -207,7 +209,7 @@ impl Tpacket {
                 return Box::from(header::V3Wrapper::from(position));
             }
             _ => {
-                panic!("Unknown afpacket version.");
+                panic!("Unknown af_packet version.");
             }
         }
     }
@@ -274,7 +276,7 @@ impl Tpacket {
         return None;
     }
 
-    pub fn set_bpf(&self, syntax: CString) -> Result<(), Box<dyn Error>> {
+    pub fn set_bpf(&self, syntax: CString) -> Result<()> {
         let mut prog: bpf_program = bpf_program {
             bf_len: 0,
             bf_insns: std::ptr::null_mut(),
@@ -289,7 +291,7 @@ impl Tpacket {
                 0xffffffff,
             );
             if ret != 0 {
-                return Err(Box::from(io::Error::last_os_error()));
+                return Err(io::Error::last_os_error().into());
             }
         }
         self.raw_socket
@@ -297,7 +299,7 @@ impl Tpacket {
         Ok(())
     }
 
-    pub fn get_socket_stats(&self) -> Result<TpacketStats, Box<dyn Error>> {
+    pub fn get_socket_stats(&self) -> Result<TpacketStats> {
         if self.tp_version == options::OptTpacketVersion::TpacketVersion3 {
             let mut stats_v3 = TpacketStatsV3 {
                 tp_packets: 0,
@@ -314,13 +316,13 @@ impl Tpacket {
                     &mut opt_len as *mut u32,
                 );
                 if ret != 0 {
-                    return Err(Box::from(io::Error::last_os_error()));
+                    return Err(io::Error::last_os_error().into());
                 }
             }
-            return Ok(TpacketStats {
+            Ok(TpacketStats {
                 tp_packets: stats_v3.tp_packets,
                 tp_drops: stats_v3.tp_drops,
-            });
+            })
         } else if self.tp_version == options::OptTpacketVersion::TpacketVersion2 {
             let mut stats = TpacketStats {
                 tp_packets: 0,
@@ -336,16 +338,16 @@ impl Tpacket {
                     &mut opt_len as *mut u32,
                 );
                 if ret != 0 {
-                    return Err(Box::from(io::Error::last_os_error()));
+                    return Err(io::Error::last_os_error().into());
                 }
             }
-            return Ok(stats);
+            Ok(stats)
+        } else {
+            Err(Error::InvalidTpVersion(self.tp_version as isize))
         }
-
-        return Err(Box::new(tError::InvalidTpVersion(self.tp_version as isize)));
     }
 
-    pub fn new(opts: options::Options) -> Result<Self, Box<dyn Error>> {
+    pub fn new(opts: options::Options) -> Result<Self> {
         opts.check()?;
         // 创建原始socket
         let raw_socket = Socket::new(
