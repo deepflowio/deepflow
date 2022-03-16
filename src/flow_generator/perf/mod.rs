@@ -1,5 +1,5 @@
 mod dns;
-mod l7_rrt;
+pub(crate) mod l7_rrt;
 mod mq;
 mod rpc;
 mod sql;

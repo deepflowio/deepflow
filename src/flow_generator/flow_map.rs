@@ -900,7 +900,7 @@ impl FlowMap {
             flow.flow_perf_stats = node.meta_flow_perf.as_mut().and_then(|perf| {
                 perf.copy_and_reset_perf_data(
                     flow.reversed,
-                    l7_timeout_count,
+                    l7_timeout_count as u32,
                     self.l4_metrics_enabled(),
                     self.l7_metrics_enabled(),
                 )

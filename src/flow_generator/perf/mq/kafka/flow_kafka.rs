@@ -247,7 +247,7 @@ impl KafkaPerfData {
 
         self.rrt_cache.borrow_mut().add_req_time(
             flow_id,
-            self.correlation_id,
+            Some(self.correlation_id),
             Duration::from_nanos(timestamp_nanos),
         );
     }
@@ -262,7 +262,7 @@ impl KafkaPerfData {
         let req_timestmp_nanos = match self
             .rrt_cache
             .borrow_mut()
-            .get_and_remove_l7_req_time(flow_id, self.correlation_id)
+            .get_and_remove_l7_req_time(flow_id, Some(self.correlation_id))
         {
             Some(t) => t.as_nanos() as u64,
             None => return true,

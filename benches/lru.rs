@@ -1,11 +1,14 @@
 use std::hash::Hash;
 use std::net::Ipv6Addr;
+use std::time::Duration;
 use std::{net::Ipv4Addr, time::Instant};
 
 use criterion::*;
 use lru::LruCache;
 use rand::prelude::*;
 use uluru::LRUCache;
+
+use trident::_L7RrtCache as L7RrtCache;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct SmallStruct {
@@ -385,6 +388,179 @@ fn lru_128b(c: &mut Criterion) {
     });
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct Request {
+    pub flow_id: u64,
+    pub stream_id: Option<u32>,
+    pub duration: Duration,
+}
+
+fn rrt_lru(c: &mut Criterion) {
+    c.bench_function("rrt_lru-add", |b| {
+        b.iter_custom(|iters| {
+            let mut seeds = vec![];
+            let mut rng = thread_rng();
+            for _ in 0..iters {
+                let i = rng.gen_range(0..iters as usize);
+                // 50%的flow,的stream_id数量为1-1000
+                seeds.push(Request {
+                    flow_id: ((4 * i) as f64).sqrt() as u64 / 2, // 0,1,1,1,2,2,2,2...
+                    stream_id: if (i % 2) == 0 { None } else { Some(i as u32) },
+                    duration: Duration::new(i as u64, i as u32),
+                });
+            }
+            let mut cache = L7RrtCache::new(1000);
+            let start = Instant::now();
+            for item in seeds {
+                cache.add_req_time(item.flow_id, item.stream_id, item.duration);
+            }
+            start.elapsed()
+        })
+    });
+    c.bench_function("rrt_lru-get", |b| {
+        b.iter_custom(|iters| {
+            let mut seeds = vec![];
+            let mut rng = thread_rng();
+            for _ in 0..iters {
+                let i = rng.gen_range(0..iters as usize);
+                seeds.push(Request {
+                    flow_id: ((4 * i) as f64).sqrt() as u64 / 2,
+                    stream_id: if (i % 2) == 0 { None } else { Some(i as u32) },
+                    duration: Duration::new(i as u64, i as u32),
+                });
+            }
+            let mut cache = L7RrtCache::new(1000);
+            for item in &seeds {
+                cache.add_req_time(item.flow_id, item.stream_id, item.duration);
+            }
+            let start = Instant::now();
+            for item in &seeds {
+                cache.get_and_remove_l7_req_time(item.flow_id, item.stream_id);
+            }
+            start.elapsed()
+        })
+    });
+    c.bench_function("rrt_lru-timeout", |b| {
+        b.iter_custom(|iters| {
+            let mut seeds = vec![];
+            let mut rng = thread_rng();
+            for _ in 0..iters {
+                let i = rng.gen_range(0..iters as usize);
+                seeds.push(Request {
+                    flow_id: ((4 * i) as f64).sqrt() as u64 / 2,
+                    stream_id: if (i % 2) == 0 { None } else { Some(i as u32) },
+                    duration: Duration::new(i as u64, i as u32),
+                });
+            }
+            let mut cache = L7RrtCache::new(1000);
+            for item in &seeds {
+                cache.add_req_time(item.flow_id, item.stream_id, item.duration);
+            }
+            let start = Instant::now();
+            for item in &seeds {
+                cache.get_and_remove_l7_req_timeout(item.flow_id);
+            }
+            start.elapsed()
+        })
+    });
+    /* 对比go的bench结果
+    顺序数据
+    rust:
+      rrt_lru-add             time:   [29.340 ns 29.671 ns 29.985 ns]
+      rrt_lru-get             time:   [21.912 ns 22.042 ns 22.183 ns]
+      rrt_lru-timeout         time:   [14.077 ns 14.165 ns 14.263 ns]
+    go:
+      BenchmarkLruAdd-20        	10530165	       116.3 ns/op
+      BenchmarkLruGet-20        	79841413	        14.29 ns/op
+      BenchmarkLruTimeout-20    	175275356	         6.560 ns/op
+
+    随机数据测试：
+      rrt_lru-add             time:   [100.92 ns 102.35 ns 103.49 ns]
+      rrt_lru-get             time:   [75.997 ns 77.185 ns 78.149 ns]
+      rrt_lru-timeout         time:   [13.783 ns 13.827 ns 13.876 ns]
+
+      BenchmarkLruAdd-20        	 7348380	       157.0 ns/op
+      BenchmarkLruGet-20        	82796860	        13.43 ns/op
+      BenchmarkLruTimeout-20    	189908188	         6.304 ns/op
+     */
+    /* go bench 对比代码
+    type Request struct {
+        FlowID   uint64
+        StreamID uint32
+        time     time.Duration
+    }
+
+    func BenchmarkLruAdd(b *testing.B) {
+        capacity := b.N
+        lru := NewL7RRTCache(0, 100, 1000)
+        seeds := make([]Request, 0, capacity)
+        for j := 0; j < b.N; j++ {
+            i := rand.Intn(b.N)
+            streamid := uint32(i)
+            if i%2 == 0 {
+                streamid = 0
+            }
+            seeds = append(seeds, Request{
+                FlowID:   uint64(math.Sqrt(float64(4*i))) / 2,
+                StreamID: streamid,
+                time:     time.Duration(i),
+            })
+        }
+        b.ResetTimer()
+        for i := b.N - 1; i >= 0; i-- {
+            lru.AddReqTime(seeds[i].FlowID, seeds[i].StreamID, seeds[i].time)
+        }
+        lru.Close()
+    }
+
+    func BenchmarkLruGet(b *testing.B) {
+        capacity := b.N
+        lru := NewL7RRTCache(0, 100, 1000)
+        seeds := make([]Request, 0, capacity)
+        for j := 0; j < b.N; j++ {
+            i := rand.Intn(b.N)
+            streamid := uint32(i)
+            if i%2 == 0 {
+                streamid = 0
+            }
+            seeds = append(seeds, Request{
+                FlowID:   uint64(math.Sqrt(float64(4*i))) / 2,
+                StreamID: streamid,
+                time:     time.Duration(i),
+            })
+        }
+        b.ResetTimer()
+        for i := b.N - 1; i >= 0; i-- {
+            lru.GetAndRemoveL7ReqTime(seeds[i].FlowID, seeds[i].StreamID)
+        }
+        lru.Close()
+    }
+
+    func BenchmarkLruTimeout(b *testing.B) {
+        capacity := b.N
+        lru := NewL7RRTCache(0, 100, 1000)
+        seeds := make([]Request, 0, capacity)
+        for j := 0; j < b.N; j++ {
+            i := rand.Intn(b.N)
+            streamid := uint32(i)
+            if i%2 == 0 {
+                streamid = 0
+            }
+            seeds = append(seeds, Request{
+                FlowID:   uint64(math.Sqrt(float64(4*i))) / 2,
+                StreamID: streamid,
+                time:     time.Duration(i),
+            })
+        }
+        b.ResetTimer()
+        for i := b.N - 1; i >= 0; i-- {
+            lru.GetAndRemoveL7ReqTimeouts(seeds[i].FlowID)
+        }
+        lru.Close()
+    }
+    */
+}
+
 /*
 //go 版本代码
 import (
@@ -563,5 +739,5 @@ func BenchmarkU128U64LRUInsert(b *testing.B) {
 }
 */
 
-criterion_group!(benches, lru_64b, lru_128b, lru_192b);
+criterion_group!(benches, lru_64b, lru_128b, lru_192b, rrt_lru);
 criterion_main!(benches);
