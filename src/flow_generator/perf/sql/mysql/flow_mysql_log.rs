@@ -5,46 +5,10 @@ use crate::{
     common::{
         enums::{IpProtocol, PacketDirection},
         flow::L7Protocol,
-        protocol_logs::{AppProtoLogsData, L7LogMethod, LogMessageType},
+        protocol_logs::{AppProtoLogsData, AppProtoLogsInfo, LogMessageType, MysqlInfo},
     },
     utils::bytes,
 };
-
-#[derive(Debug, Default)]
-pub struct MysqlInfo {
-    // Server Greeting
-    pub protocol_version: u8,
-    pub server_version: String,
-    pub server_thread_id: u32,
-    // request
-    pub command: u8,
-    pub context: String,
-    // response
-    response_code: u8,
-    error_code: u16,
-    affected_rows: u64,
-    error_message: String,
-}
-
-impl Clone for MysqlInfo {
-    fn clone(&self) -> Self {
-        MysqlInfo {
-            protocol_version: self.protocol_version,
-            server_version: self.server_version.clone(),
-            server_thread_id: self.server_thread_id,
-            command: self.command,
-            context: self.context.clone(),
-            response_code: self.response_code,
-            error_code: self.error_code,
-            affected_rows: self.affected_rows,
-            error_message: self.error_message.clone(),
-        }
-    }
-}
-
-impl L7LogMethod for MysqlInfo {
-    fn write_to_pb(&self) {}
-}
 
 #[derive(Debug, Default)]
 struct MysqlLog {
@@ -75,13 +39,13 @@ impl MysqlLog {
         self.info = MysqlInfo::default();
     }
 
-    fn get_log_data_special_info(&self, log_data: &mut AppProtoLogsData<MysqlInfo>) {
-        log_data.proto_special_info = self.info.clone();
-        if self.msg_type == LogMessageType::Response
-            && self.info.response_code == MYSQL_RESPONSE_CODE_ERR
+    fn get_log_data_special_info(self, log_data: &mut AppProtoLogsData) {
+        if (&self).msg_type == LogMessageType::Response
+            && (&self).info.response_code == MYSQL_RESPONSE_CODE_ERR
         {
-            log_data.app_proto_logs_base_info.app_proto_head.code = self.info.error_code;
+            log_data.base_info.head.code = (&self).info.error_code;
         }
+        log_data.special_info = AppProtoLogsInfo::Mysql(self.info);
     }
 
     fn greeting(&mut self, payload: &[u8]) -> bool {

@@ -41,10 +41,7 @@ impl Document {
 
     fn encode(self, buf: &mut &mut [u8]) -> Result<usize, prost::EncodeError> {
         let pb_doc: metric::Document = self.into();
-        match pb_doc.encode(buf) {
-            Ok(_) => Ok(pb_doc.encoded_len()),
-            Err(error) => Err(error),
-        }
+        pb_doc.encode(buf).map(|_| pb_doc.encoded_len())
     }
 }
 

@@ -26,10 +26,9 @@ impl TaggedFlow {
         let pb_tagged_flow = flow_log::TaggedFlow {
             flow: Some(self.flow.into()),
         };
-        match pb_tagged_flow.encode(buf) {
-            Ok(_) => Ok(pb_tagged_flow.encoded_len()),
-            Err(error) => Err(error),
-        }
+        pb_tagged_flow
+            .encode(buf)
+            .map(|_| pb_tagged_flow.encoded_len())
     }
 }
 
