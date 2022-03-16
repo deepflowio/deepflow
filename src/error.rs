@@ -42,6 +42,12 @@ pub enum Error {
     KafkaLogParse(String),
     #[error("invalid tpacket version: {0}")]
     InvalidTpVersion(isize),
+    #[error("dubbo parse: {0}")]
+    DubboParse(String),
+    #[error("dubbo perf parse: {0}")]
+    DubboPerfParse(String),
+    #[error("dubbo log parse: {0}")]
+    DubboLogParse(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

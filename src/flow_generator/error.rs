@@ -8,6 +8,7 @@ pub enum Error {
     InvaildIpProtocol,
     InvaildL7Protocol,
     L7ParseFailed,
+    DubboHeaderParseFailed,
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
