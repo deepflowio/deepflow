@@ -35,7 +35,7 @@ func GetMetricsByDBTable(db string, table string) map[string]*Metric {
 	switch db {
 	case "flow_log":
 		if table == "l4_flow_log" {
-			return L4_FLOW_LOG_METRICS
+			return GetL4FlowLogMetrics()
 		}
 	}
 	return nil

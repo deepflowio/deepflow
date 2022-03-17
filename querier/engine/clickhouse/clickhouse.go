@@ -6,6 +6,7 @@ import (
 	"github.com/k0kubun/pp"
 	"github.com/xwb1989/sqlparser"
 
+	"metaflow/querier/common"
 	"metaflow/querier/engine/clickhouse/client"
 	"metaflow/querier/engine/clickhouse/metric"
 	"metaflow/querier/engine/clickhouse/view"
@@ -203,18 +204,13 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		if err != nil {
 			return err
 		}
-		err = e.AddFunction(name, args, "", as)
+		err = e.AddFunction(name, args, as)
 		return err
 	// field +=*/ field
 	case *sqlparser.BinaryExpr:
-		function := expr.Left.(*sqlparser.FuncExpr)
-		name, args, err := e.parseFunction(function)
-		if err != nil {
-			return err
-		}
-		math := expr.Operator
-		math += sqlparser.String(expr.Right)
-		e.AddFunction(name, args, math, as)
+		// TODO
+		_, err := e.parseSelectBinaryExpr(expr)
+		return err
 	}
 	return nil
 }
@@ -224,6 +220,18 @@ func (e *CHEngine) parseFunction(item *sqlparser.FuncExpr) (name string, args []
 		args = append(args, sqlparser.String(arg))
 	}
 	return sqlparser.String(item.Name), args, nil
+}
+
+// TODO
+func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary view.Function, err error) {
+	switch expr := node.(type) {
+	case *sqlparser.BinaryExpr:
+		if !common.IsValueInSliceString(expr.Operator, view.MATH_FUNCTIONS) {
+			// TODO: 报错 不支持的math
+			return nil, nil
+		}
+	}
+	return nil, nil
 }
 
 func (e *CHEngine) AddGroup(group string) {
@@ -241,8 +249,8 @@ func (e *CHEngine) AddTag(tag string, alias string) {
 	e.Statements = append(e.Statements, stmt)
 }
 
-func (e *CHEngine) AddFunction(name string, args []string, math string, alias string) error {
-	function, levelFlag, err := GetFunc(name, args, math, alias, e.DB, e.Table)
+func (e *CHEngine) AddFunction(name string, args []string, alias string) error {
+	function, levelFlag, err := GetFunc(name, args, alias, e.DB, e.Table)
 	if err != nil {
 		return err
 	}

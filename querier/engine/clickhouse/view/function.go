@@ -34,6 +34,8 @@ var FUNC_NAME_MAP map[string]string = map[string]string{
 	FUNCTION_GROUP_ARRAY: "groupArray",
 }
 
+var MATH_FUNCTIONS = []string{FUNCTION_DIV, FUNCTION_PLUS}
+
 func GetFunc(name string) Function {
 	switch name {
 	case FUNCTION_SPREAD:
@@ -52,7 +54,6 @@ type Function interface {
 	Node
 	SetFields([]Node)
 	SetArgs([]string)
-	SetMath(string)
 	SetFlag(int)
 	SetAlias(string, bool) string
 	GetDefaultAlias(bool) string
@@ -70,7 +71,6 @@ type DefaultFunction struct {
 	Args           []string // 其他参数
 	Alias          string   // as
 	Condition      string   // 算子过滤 例：Condition："code in [1,2]" SUMIf(byte, code in [1,2])
-	Math           string   // 算术计算
 	Withs          []Node
 	Flag           int
 	IgnoreZero     bool
@@ -110,7 +110,7 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 		buf.WriteString("Array")
 	}
 
-	// Array后缀算子不支持携带If
+	// 有过滤条件或者忽略0值(Array后缀算子不支持携带If)
 	if (f.Condition != "" || f.IgnoreZero) && !f.IsGroupArray {
 		buf.WriteString("If")
 	}
@@ -153,7 +153,7 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 	} else {
 		// Array后缀的算子处理0值无意义指标量：MAXArray(arrayFilter(x->x>0), _array)
 		for i, field := range f.Fields {
-			if f.IgnoreZero {
+			if !f.IgnoreZero {
 				field.WriteTo(buf)
 			} else {
 				buf.WriteString("arrayFilter(x -> x!=0, ")
@@ -169,7 +169,6 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 
 	buf.WriteString(")")
 
-	buf.WriteString(f.Math)
 	if f.Alias != "" {
 		buf.WriteString(" AS ")
 		buf.WriteString(f.Alias)
@@ -207,10 +206,6 @@ func (f *DefaultFunction) SetAlias(alias string, inner bool) string {
 
 func (f *DefaultFunction) SetFields(fields []Node) {
 	f.Fields = fields
-}
-
-func (f *DefaultFunction) SetMath(math string) {
-	f.Math = math
 }
 
 func (f *DefaultFunction) SetFlag(flag int) {

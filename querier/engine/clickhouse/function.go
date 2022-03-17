@@ -8,33 +8,33 @@ import (
 	"strings"
 )
 
-func GetFunc(name string, args []string, math string, alias string, db string, table string) (Statement, int, error) {
+func GetFunc(name string, args []string, alias string, db string, table string) (Statement, int, error) {
+	var levelFlag int
 	if len(args) > 0 {
 		field := args[0]
-		metric := metric.GetMetric(field, db, table)
-		var levelFlag int
+		metricStruct := metric.GetMetric(field, db, table)
 		// 判断算子是否支持单层
-		unlayFuns := view.METRIC_TYPE_UNLAY_FUNCTIONS[metric.Type]
+		unlayFuns := metric.METRIC_TYPE_UNLAY_FUNCTIONS[metricStruct.Type]
 		if common.IsValueInSliceString(name, unlayFuns) {
 			levelFlag = view.MODEL_METRIC_LEVEL_FLAG_UNLAY
 		} else {
 			levelFlag = view.MODEL_METRIC_LEVEL_FLAG_LAYERED
 		}
 		if alias == "" {
-			alias = GetDefaultAlias(name, args, math)
+			alias = GetDefaultAlias(name, args)
 		}
 		return &Function{
-			Metric: metric,
+			Metric: metricStruct,
 			Name:   name,
+			Field:  field,
 			Args:   args,
-			Math:   math,
 			Alias:  alias,
 		}, levelFlag, nil
 	}
-	return nil, 0, nil
+	return nil, levelFlag, nil
 }
 
-func GetDefaultAlias(name string, args []string, math string) string {
+func GetDefaultAlias(name string, args []string) string {
 	alias := name
 	for _, arg := range args {
 		alias = fmt.Sprintf("%s_%s", alias, strings.ToLower(arg))
@@ -47,8 +47,8 @@ type Function struct {
 	Metric *metric.Metric
 	// 解析获得的参数
 	Name  string
+	Field string
 	Args  []string
-	Math  string
 	Alias string
 }
 
@@ -56,47 +56,67 @@ func (f *Function) Format(m *view.Model) {
 	if m.MetricLevelFlag == view.MODEL_METRIC_LEVEL_FLAG_LAYERED {
 		// 需要拆层
 		var outerFields []view.Node
-		isGroupArray := false
-
-		for _, function := range f.Metric.InnerMetrics {
-			// 内层算子使用默认alias
-			innerAlias := function.SetAlias("", true)
-			function.SetFlag(view.METRIC_FLAG_INNER)
-			function.SetIs0Meaningful(f.Metric.Is0Meaningful)
-			function.Init()
-			m.AddTag(function)
-			// 判断内层算子是否为GroupArray
-			if function.GetName() == view.FUNCTION_GROUP_ARRAY {
-				isGroupArray = true
-			}
-			// 内层算子的alias作为外层算子的fields传入
-			outerFields = append(outerFields, &view.Field{Value: innerAlias})
-		}
-		outFunc := view.GetFunc(f.Name, f.Metric.Is0Meaningful)
-		outFunc.SetFields(outerFields)
-		// 标记为metric层
+		outFunc := view.GetFunc(f.Name)
 		outFunc.SetFlag(view.METRIC_FLAG_OUTER)
 		outFunc.SetAlias(f.Alias, false)
-		outFunc.SetMath(f.Math)
-		outFunc.SetIsGroupArray(isGroupArray)
-		// 当Is0Meaningful为False时，算子会携带If (例：SUMIf(rtt, rtt>0))
-		// 内层是数组的情况下，外层算子（例：SUMArray）不支持携带If。
-		// 在内层就将0值限制（例：groupArrayIf(rtt, rtt>0)）
-		if isGroupArray {
-			outFunc.SetIs0Meaningful(view.METRIC_IS_0_MEANINGFUL_TRUE)
-		} else {
-			outFunc.SetIs0Meaningful(f.Metric.Is0Meaningful)
+		switch f.Metric.Type {
+		case metric.METRIC_TYPE_COUNTER:
+			// 内层算子使用默认alias
+			innerFunction := view.DefaultFunction{
+				Name:   view.FUNCTION_SUM,
+				Fields: []view.Node{&view.Field{Value: f.Metric.DBField}},
+			}
+			innerAlias := innerFunction.SetAlias("", true)
+			innerFunction.SetFlag(view.METRIC_FLAG_INNER)
+			innerFunction.Init()
+			m.AddTag(&innerFunction)
+			outFunc.SetFillNullAsZero(true)
+			// 内层算子的alias作为外层算子的fields传入
+			outerFields = append(outerFields, &view.Field{Value: innerAlias})
+		case metric.METRIC_TYPE_DELAY:
+			innerFunction := view.DefaultFunction{
+				Name:       view.FUNCTION_GROUP_ARRAY,
+				Fields:     []view.Node{&view.Field{Value: f.Metric.DBField}},
+				IgnoreZero: true,
+			}
+			innerAlias := innerFunction.SetAlias("", true)
+			innerFunction.SetFlag(view.METRIC_FLAG_INNER)
+			innerFunction.Init()
+			m.AddTag(&innerFunction)
+			outerFields = append(outerFields, &view.Field{Value: innerAlias})
+			outFunc.SetIsGroupArray(true)
+			outFunc.SetIgnoreZero(true)
+		case metric.METRIC_TYPE_PERCENTAGE:
+			innerFunction := view.DefaultFunction{
+				Name:       view.FUNCTION_GROUP_ARRAY,
+				Fields:     []view.Node{&view.Field{Value: f.Metric.DBField}},
+				IgnoreZero: true,
+			}
+			innerAlias := innerFunction.SetAlias("", true)
+			innerFunction.SetFlag(view.METRIC_FLAG_INNER)
+			innerFunction.Init()
+			m.AddTag(&innerFunction)
+			outerFields = append(outerFields, &view.Field{Value: innerAlias})
+			outFunc.SetIsGroupArray(true)
+			outFunc.SetFillNullAsZero(true)
 		}
+		outFunc.SetFields(outerFields)
 		outFunc.Init()
 		m.AddTag(outFunc)
 	} else if m.MetricLevelFlag == view.MODEL_METRIC_LEVEL_FLAG_UNLAY {
 		// 不需要拆层
-		function := view.GetFunc(f.Name, f.Metric.Is0Meaningful)
+		function := view.GetFunc(f.Name)
 		function.SetFields([]view.Node{&view.Field{Value: f.Metric.DBField}})
 		function.SetFlag(view.METRIC_FLAG_OUTER)
 		function.SetAlias(f.Alias, false)
-		function.SetMath(f.Math)
-		function.SetIs0Meaningful(f.Metric.Is0Meaningful)
+		switch f.Metric.Type {
+		case metric.METRIC_TYPE_COUNTER:
+			function.SetFillNullAsZero(true)
+		case metric.METRIC_TYPE_DELAY:
+			function.SetIgnoreZero(true)
+		case metric.METRIC_TYPE_PERCENTAGE:
+			function.SetFillNullAsZero(true)
+		}
 		function.Init()
 		m.AddTag(function)
 	}

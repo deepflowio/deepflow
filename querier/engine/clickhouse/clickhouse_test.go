@@ -19,53 +19,32 @@ var (
 		input  string
 		output string
 	}{{
-		input:  "select host from l4_flow_log",
-		output: "SELECT host_id AS host FROM l4_flow_log",
-	}, {
-		input:  "select host from l4_flow_log group by host",
-		output: "SELECT host_id AS host FROM l4_flow_log GROUP BY host_id",
-	}, {
-		input:  "select host, test from l4_flow_log group by host, test",
-		output: "SELECT host_id AS host, test FROM l4_flow_log GROUP BY host_id, test",
-	}, {
-		input:  "select host from l4_flow_log where host='aaa' group by host",
-		output: "SELECT host_id AS host FROM l4_flow_log WHERE host_id = 1 GROUP BY host_id",
-	}, {
-		input:  "select host from l4_flow_log where host='aaa' and c=1 group by host",
-		output: "SELECT host_id AS host FROM l4_flow_log WHERE host_id = 1 AND c = 1 GROUP BY host_id",
-	}, {
-		input:  "select host from l4_flow_log where (host='aaa' and c=1) or b=2 group by host",
-		output: "SELECT host_id AS host FROM l4_flow_log WHERE (host_id = 1 AND c = 1) OR b = 2 GROUP BY host_id",
-	}, {
-		input:  "select host from l4_flow_log where not((host='aaa' and c=1) or b=2) group by host",
-		output: "SELECT host_id AS host FROM l4_flow_log WHERE NOT ((host_id = 1 AND c = 1) OR b = 2) GROUP BY host_id",
-	}, {
 		input:  "select Sum(byte) as sum_byte from l4_flow_log",
 		output: "SELECT SUM(byte) AS sum_byte FROM l4_flow_log",
 	}, {
 		input:  "select Max(byte) as max_byte from l4_flow_log",
 		output: "SELECT MAX(_Sum_byte) AS max_byte FROM (SELECT SUM(byte) AS _Sum_byte FROM l4_flow_log)",
 	}, {
-		input:  "select Sum(byte)/60 as sum_byte from l4_flow_log",
-		output: "SELECT SUM(byte)/60 AS sum_byte FROM l4_flow_log",
+		input:  "select Avg(byte) as avg_byte from l4_flow_log",
+		output: "SELECT AVG(_Sum_byte) AS avg_byte FROM (SELECT SUM(byte) AS _Sum_byte FROM l4_flow_log)",
 	}, {
-		input:  "select Sum(byte)/60 as sum_byte from l4_flow_log Where (time>=1 and time<=1)",
-		output: "SELECT SUM(byte)/60 AS sum_byte FROM l4_flow_log WHERE (`time` >= 1 AND `time` <= 1)",
+		input:  "select Stddev(byte) as stddev_byte from l4_flow_log",
+		output: "SELECT stddevPopStable(_Sum_byte) AS stddev_byte FROM (SELECT SUM(byte) AS _Sum_byte FROM l4_flow_log)",
 	}, {
 		input:  "select Max(byte) as max_byte from l4_flow_log",
 		output: "SELECT MAX(_Sum_byte) AS max_byte FROM (SELECT SUM(byte) AS _Sum_byte FROM l4_flow_log)",
-	}, {
-		input:  "select Avg(rtt) as avg_rtt from l4_flow_log",
-		output: "SELECT AVGIf(rtt, rtt != 0) AS avg_rtt FROM l4_flow_log",
-	}, {
-		input:  "select Max(byte) as max_byte, Avg(rtt) as avg_rtt from l4_flow_log",
-		output: "SELECT MAX(_Sum_byte) AS max_byte, AVGArray(arrayFilter(x -> x!=0, _groupArray_rtt)) AS avg_rtt FROM (SELECT SUM(byte) AS _Sum_byte, groupArrayIf(rtt, rtt != 0) AS _groupArray_rtt FROM l4_flow_log)",
 	}, {
 		input:  "select Spread(byte) as spread_byte from l4_flow_log",
 		output: "SELECT MAX(_Sum_byte) - MIN(_Sum_byte) AS spread_byte FROM (SELECT SUM(byte) AS _Sum_byte FROM l4_flow_log)",
 	}, {
 		input:  "select Rspread(byte) as rspread_byte from l4_flow_log",
 		output: "SELECT divide(MAX(_Sum_byte)+1e-15, MIN(_Sum_byte)+1e-15) AS rspread_byte FROM (SELECT SUM(byte) AS _Sum_byte FROM l4_flow_log)",
+	}, {
+		input:  "select Avg(rtt_max) as avg_rtt from l4_flow_log",
+		output: "SELECT AVGIf(rtt, rtt != 0) AS avg_rtt FROM l4_flow_log",
+	}, {
+		input:  "select Max(byte) as max_byte, Avg(rtt_max) as avg_rtt from l4_flow_log",
+		output: "SELECT MAX(_Sum_byte) AS max_byte, AVGArray(arrayFilter(x -> x!=0, _groupArray_rtt)) AS avg_rtt FROM (SELECT SUM(byte) AS _Sum_byte, groupArrayIf(rtt, rtt != 0) AS _groupArray_rtt FROM l4_flow_log)",
 	},
 	}
 )
