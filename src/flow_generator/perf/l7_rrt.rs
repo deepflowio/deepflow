@@ -50,7 +50,13 @@ impl L7RrtCache {
     ) -> Option<Duration> {
         if let Some(vec) = self.double_key_cache.get_mut(&key0) {
             match vec.binary_search_by_key(&key1, |&(a, _)| a) {
-                Ok(i) => Some(vec.remove(i).unwrap().1),
+                Ok(i) => {
+                    let ret = Some(vec.remove(i).unwrap().1);
+                    if vec.is_empty() {
+                        self.double_key_cache.pop(&key0);
+                    }
+                    ret
+                }
                 Err(_) => None,
             }
         } else {
