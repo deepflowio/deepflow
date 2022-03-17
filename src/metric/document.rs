@@ -31,8 +31,8 @@ impl Document {
         }
     }
 
-    pub fn sequential_merge(&mut self, other: Document) {
-        self.meter.sequential_merge(other.meter)
+    pub fn sequential_merge(&mut self, other: &Document) {
+        self.meter.sequential_merge(&other.meter)
     }
 
     pub fn reverse(&mut self) {
@@ -316,7 +316,7 @@ mod tests {
         if let Meter::Flow(ref mut f2) = doc2.meter {
             f2.traffic.packet_tx = 2;
         }
-        doc1.sequential_merge(doc2);
+        doc1.sequential_merge(&doc2);
         if let Meter::Flow(ref f1) = doc1.meter {
             assert!(f1.traffic.packet_tx == 3)
         }

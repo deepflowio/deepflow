@@ -8,7 +8,7 @@ use std::{
 use super::{enums::TapType, lookup_key::LookupKey, platform_data::PlatformData};
 
 pub const EPC_FROM_DEEPFLOW: i32 = -1;
-pub const EPC_FROM_INTERNET: i32 = -1;
+pub const EPC_FROM_INTERNET: i32 = -2;
 pub const GROUP_INTERNET: i32 = -2;
 
 bitflags! {

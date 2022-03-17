@@ -6,7 +6,7 @@ const FLOW_ID: u32 = 1;
 const USAGE_ID: u32 = 4;
 const APP_ID: u32 = 5;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Meter {
     Flow(FlowMeter),
     App(AppMeter),
@@ -24,7 +24,7 @@ impl Meter {
         Meter::Usage(UsageMeter::default())
     }
 
-    pub fn sequential_merge(&mut self, other: Meter) {
+    pub fn sequential_merge(&mut self, other: &Meter) {
         match (self, other) {
             (Meter::Flow(m), Meter::Flow(n)) => m.sequential_merge(n),
             (Meter::App(m), Meter::App(n)) => m.sequential_merge(n),
@@ -66,7 +66,7 @@ impl From<Meter> for metric::Meter {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct FlowMeter {
     pub traffic: Traffic,
     pub latency: Latency,
@@ -76,12 +76,12 @@ pub struct FlowMeter {
 }
 
 impl FlowMeter {
-    pub fn sequential_merge(&mut self, other: FlowMeter) {
-        self.traffic.sequential_merge(other.traffic);
-        self.latency.sequential_merge(other.latency);
-        self.performance.sequential_merge(other.performance);
-        self.anomaly.sequential_merge(other.anomaly);
-        self.flow_load.sequential_merge(other.flow_load);
+    pub fn sequential_merge(&mut self, other: &FlowMeter) {
+        self.traffic.sequential_merge(&other.traffic);
+        self.latency.sequential_merge(&other.latency);
+        self.performance.sequential_merge(&other.performance);
+        self.anomaly.sequential_merge(&other.anomaly);
+        self.flow_load.sequential_merge(&other.flow_load);
     }
 
     pub fn reverse(&mut self) {
@@ -103,7 +103,7 @@ impl From<FlowMeter> for metric::FlowMeter {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct Traffic {
     pub packet_tx: u64,
     pub packet_rx: u64,
@@ -120,7 +120,7 @@ pub struct Traffic {
 }
 
 impl Traffic {
-    pub fn sequential_merge(&mut self, other: Traffic) {
+    pub fn sequential_merge(&mut self, other: &Traffic) {
         self.packet_tx += other.packet_tx;
         self.packet_rx += other.packet_rx;
         self.byte_tx += other.byte_tx;
@@ -164,7 +164,7 @@ impl From<Traffic> for metric::Traffic {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct Latency {
     pub rtt_max: u32,
     pub rtt_client_max: u32,
@@ -189,7 +189,7 @@ pub struct Latency {
 }
 
 impl Latency {
-    pub fn sequential_merge(&mut self, other: Latency) {
+    pub fn sequential_merge(&mut self, other: &Latency) {
         if self.rtt_max < other.rtt_max {
             self.rtt_max = other.rtt_max;
         }
@@ -252,7 +252,7 @@ impl From<Latency> for metric::Latency {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct Performance {
     pub retrans_tx: u64,
     pub retrans_rx: u64,
@@ -261,7 +261,7 @@ pub struct Performance {
 }
 
 impl Performance {
-    pub fn sequential_merge(&mut self, other: Performance) {
+    pub fn sequential_merge(&mut self, other: &Performance) {
         self.retrans_tx += other.retrans_tx;
         self.retrans_rx += other.retrans_rx;
         self.zero_win_tx += other.zero_win_tx;
@@ -280,7 +280,7 @@ impl From<Performance> for metric::Performance {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct Anomaly {
     pub client_rst_flow: u64,
     pub server_rst_flow: u64,
@@ -302,7 +302,7 @@ pub struct Anomaly {
 }
 
 impl Anomaly {
-    pub fn sequential_merge(&mut self, other: Anomaly) {
+    pub fn sequential_merge(&mut self, other: &Anomaly) {
         self.client_rst_flow += other.client_rst_flow;
         self.server_rst_flow += other.server_rst_flow;
         self.client_syn_repeat += other.client_syn_repeat;
@@ -347,13 +347,13 @@ impl From<Anomaly> for metric::Anomaly {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct FlowLoad {
     pub load: u64,
 }
 
 impl FlowLoad {
-    pub fn sequential_merge(&mut self, other: FlowLoad) {
+    pub fn sequential_merge(&mut self, other: &FlowLoad) {
         self.load += other.load;
     }
 }
@@ -364,7 +364,7 @@ impl From<FlowLoad> for metric::FlowLoad {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct AppMeter {
     pub traffic: AppTraffic,
     pub latency: AppLatency,
@@ -372,10 +372,10 @@ pub struct AppMeter {
 }
 
 impl AppMeter {
-    pub fn sequential_merge(&mut self, other: AppMeter) {
-        self.traffic.sequential_merge(other.traffic);
-        self.latency.sequential_merge(other.latency);
-        self.anomaly.sequential_merge(other.anomaly);
+    pub fn sequential_merge(&mut self, other: &AppMeter) {
+        self.traffic.sequential_merge(&other.traffic);
+        self.latency.sequential_merge(&other.latency);
+        self.anomaly.sequential_merge(&other.anomaly);
     }
     pub fn reverse(&mut self) {
         self.traffic.reverse()
@@ -392,14 +392,14 @@ impl From<AppMeter> for metric::AppMeter {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct AppTraffic {
     pub request: u32,
     pub response: u32,
 }
 
 impl AppTraffic {
-    pub fn sequential_merge(&mut self, other: AppTraffic) {
+    pub fn sequential_merge(&mut self, other: &AppTraffic) {
         self.request += other.request;
         self.response += other.response;
     }
@@ -417,7 +417,7 @@ impl From<AppTraffic> for metric::AppTraffic {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct AppLatency {
     pub rrt_max: u32,
     pub rrt_sum: u64,
@@ -425,7 +425,7 @@ pub struct AppLatency {
 }
 
 impl AppLatency {
-    pub fn sequential_merge(&mut self, other: AppLatency) {
+    pub fn sequential_merge(&mut self, other: &AppLatency) {
         if self.rrt_max < other.rrt_max {
             self.rrt_max = other.rrt_max;
         }
@@ -444,7 +444,7 @@ impl From<AppLatency> for metric::AppLatency {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct AppAnomaly {
     pub client_error: u32,
     pub server_error: u32,
@@ -452,7 +452,7 @@ pub struct AppAnomaly {
 }
 
 impl AppAnomaly {
-    pub fn sequential_merge(&mut self, other: AppAnomaly) {
+    pub fn sequential_merge(&mut self, other: &AppAnomaly) {
         self.client_error += other.client_error;
         self.server_error += other.server_error;
         self.timeout += other.timeout;
@@ -469,7 +469,7 @@ impl From<AppAnomaly> for metric::AppAnomaly {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct UsageMeter {
     pub packet_tx: u64,
     pub packet_rx: u64,
@@ -482,7 +482,7 @@ pub struct UsageMeter {
 }
 
 impl UsageMeter {
-    pub fn sequential_merge(&mut self, other: UsageMeter) {
+    pub fn sequential_merge(&mut self, other: &UsageMeter) {
         self.packet_tx += other.packet_tx;
         self.packet_rx += other.packet_rx;
         self.byte_tx += other.byte_tx;

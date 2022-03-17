@@ -10,13 +10,13 @@ use crate::proto::trident::DecapType;
 use crate::utils::bytes;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, TryFromPrimitive)]
-#[repr(u16)]
+#[repr(u8)]
 pub enum TunnelType {
-    None = DecapType::None as u16,
-    Vxlan = DecapType::Vxlan as u16,
-    Ipip = DecapType::Ipip as u16,
-    TencentGre = DecapType::Tencent as u16,
-    ErspanOrTeb = TunnelType::TencentGre as u16 + 1,
+    None = DecapType::None as u8,
+    Vxlan = DecapType::Vxlan as u8,
+    Ipip = DecapType::Ipip as u8,
+    TencentGre = DecapType::Tencent as u8,
+    ErspanOrTeb = TunnelType::TencentGre as u8 + 1,
 }
 
 impl From<DecapType> for TunnelType {

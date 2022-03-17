@@ -153,7 +153,7 @@ impl From<FlowKey> for flow_log::FlowKey {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
 pub enum FlowSource {
     Normal = 0,
