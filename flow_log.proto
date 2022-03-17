@@ -261,10 +261,10 @@ message MysqlInfo {
 }
 
 message RedisInfo {
-    string request = 1;
-    string request_type = 2;
+    bytes request = 1;
+    bytes request_type = 2;
 
-    string response = 3;
-    string status = 4;
-    string error = 5;
+    bytes response = 3;
+    bytes status = 4;
+    bytes error = 5;
 }
