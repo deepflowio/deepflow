@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/k0kubun/pp"
+	logging "github.com/op/go-logging"
 	"github.com/xwb1989/sqlparser"
 
 	"metaflow/querier/common"
@@ -13,6 +14,8 @@ import (
 	"metaflow/querier/parse"
 	"metaflow/querier/tag/description"
 )
+
+var log = logging.MustGetLogger("clickhouse")
 
 type CHEngine struct {
 	Model      *view.Model
@@ -39,6 +42,7 @@ func (e *CHEngine) ExecuteQuery(sql string) (map[string][]interface{}, error) {
 		return nil, err
 	}
 	chSql := e.ToSQLString()
+	log.Debug(chSql)
 	pp.Println(chSql)
 	// TODO: 根据config写入
 	chClient := client.Client{
@@ -157,7 +161,10 @@ func (e *CHEngine) parseGroupBy(group sqlparser.Expr) error {
 	switch expr := group.(type) {
 	// 普通字符串
 	case *sqlparser.ColName:
-		e.AddGroup(sqlparser.String(expr))
+		err := e.AddGroup(sqlparser.String(expr))
+		if err != nil {
+			return err
+		}
 	// func(field)
 	case *sqlparser.FuncExpr:
 		/* name, args, err := e.parseFunction(expr)
@@ -197,7 +204,10 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 	switch expr := item.Expr.(type) {
 	// 普通字符串
 	case *sqlparser.ColName:
-		e.AddTag(sqlparser.String(expr), as)
+		err := e.AddTag(sqlparser.String(expr), as)
+		if err != nil {
+			return err
+		}
 	// func(field)
 	case *sqlparser.FuncExpr:
 		name, args, err := e.parseFunction(expr)
@@ -266,9 +276,13 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 	}
 }
 
-func (e *CHEngine) AddGroup(group string) {
-	stmt := GetGroup(group)
-	e.Statements = append(e.Statements, stmt)
+func (e *CHEngine) AddGroup(group string) error {
+	stmts, err := GetGroup(group)
+	if err != nil {
+		return err
+	}
+	e.Statements = append(e.Statements, stmts...)
+	return nil
 }
 
 func (e *CHEngine) AddTable(table string) {
@@ -276,9 +290,22 @@ func (e *CHEngine) AddTable(table string) {
 	e.Statements = append(e.Statements, stmt)
 }
 
-func (e *CHEngine) AddTag(tag string, alias string) {
-	stmt := GetTag(tag, alias)
-	e.Statements = append(e.Statements, stmt)
+func (e *CHEngine) AddTag(tag string, alias string) error {
+	stmtInners, err := GetTagGenerator(tag, alias)
+	if err != nil {
+		return err
+	}
+	e.Statements = append(e.Statements, stmtInners...)
+
+	stmtOuter, err := GetTagTranslator(tag, alias)
+	if err != nil {
+		return err
+	}
+	_, ok := stmtOuter.(*SelectTag)
+	if ok {
+		e.Statements = append(e.Statements, stmtOuter)
+	}
+	return nil
 }
 
 func (e *CHEngine) AddFunction(name string, args []string, alias string) error {
@@ -337,8 +364,9 @@ func parseWhere(node sqlparser.Expr, w *Where) (view.Node, error) {
 		return &view.Nested{Expr: expr}, nil
 	case *sqlparser.ComparisonExpr:
 		whereTag := sqlparser.String(node.Left)
-		stmt := GetWhere(whereTag)
-		return stmt.Trans(node, w), nil
+		whereValue := sqlparser.String(node.Right)
+		stmt := GetWhere(whereTag, whereValue)
+		return stmt.Trans(node)
 	}
 	return nil, nil
 }

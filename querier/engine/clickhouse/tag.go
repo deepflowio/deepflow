@@ -2,38 +2,45 @@ package clickhouse
 
 import (
 	"metaflow/querier/engine/clickhouse/view"
+	"metaflow/querier/tag"
 )
 
-func GetTag(tag string, alias string) Statement {
-	var stmt Statement
-	// 根据tag字段返回具体tag单元结构体
-	switch tag {
-	// TODO: tag常量结构替换&Flag常量结构替换
-	case "host":
-		stmt = &TagHost{Alias: alias}
-	default:
-		stmt = &TagDefault{Value: tag, Alias: alias}
+func GetTagGenerator(name string, alias string) ([]Statement, error) {
+	var stmts []Statement
+	tag, err := tag.GetTag(name)
+	if err != nil {
+		return stmts, err
 	}
-	return stmt
+	for index, tagGenerator := range tag.TagGenerator {
+		withCondition := []view.Node{}
+		if tagGenerator != "" {
+			withCondition = []view.Node{&view.With{Value: tagGenerator}}
+		}
+		stmts = append(stmts, &SelectTag{Value: tag.TagGeneratorName[index], Withs: withCondition})
+	}
+	return stmts, nil
 }
 
-type TagDefault struct {
+func GetTagTranslator(name string, alias string) (Statement, error) {
+	var stmt Statement
+	tag, err := tag.GetTag(name)
+	if err != nil {
+		return stmt, err
+	}
+	if tag.TagTranslator != "" {
+		withs := []view.Node{&view.With{Value: tag.TagTranslator}}
+		stmt = &SelectTag{Value: tag.Name, Flag: view.NODE_FLAG_TRANS, Withs: withs}
+	}
+	return stmt, nil
+}
+
+type SelectTag struct {
 	Value string
 	Alias string
+	Flag  int
+	Withs []view.Node
 }
 
-func (t *TagDefault) Format(m *view.Model) {
-	m.AddTag(&view.Tag{Value: t.Value, Alias: t.Alias})
-}
-
-type TagHost struct {
-	Alias string
-}
-
-func (t *TagHost) Format(m *view.Model) {
-	// TODO: tag常量结构替换&Flag常量结构替换
-	if t.Alias == "" {
-		t.Alias = "host"
-	}
-	m.AddTag(&view.Tag{Value: "host_id", Alias: t.Alias})
+func (t *SelectTag) Format(m *view.Model) {
+	m.AddTag(&view.Tag{Value: t.Value, Alias: t.Alias, Flag: t.Flag, Withs: t.Withs})
 }

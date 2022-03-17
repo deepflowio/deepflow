@@ -2,8 +2,12 @@ package clickhouse
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/xwb1989/sqlparser"
+
 	"metaflow/querier/engine/clickhouse/view"
+	"metaflow/querier/tag"
 )
 
 type Where struct {
@@ -19,30 +23,37 @@ func (w *Where) Format(m *view.Model) {
 }
 
 // TODO: 按需修改并做抽象
-func GetWhere(tag string) WhereStatement {
-	switch tag {
-	case "host":
-		return &WhereHost{}
-	default:
-		return &WhereDefault{}
-	}
+func GetWhere(name, value string) WhereStatement {
+	var stmt WhereStatement
+	stmt = &WhereTag{Tag: name, Value: value}
+	return stmt
 }
 
 type WhereStatement interface {
-	Trans(sqlparser.Expr, *Where) view.Node
+	Trans(sqlparser.Expr) (view.Node, error)
 }
 
-type WhereDefault struct{}
-
-func (t *WhereDefault) Trans(expr sqlparser.Expr, stmt *Where) view.Node {
-	return &view.Expr{Value: sqlparser.String(expr)}
+type WhereTag struct {
+	Tag   string
+	Value string
 }
 
-// 仅示例
-type WhereHost struct{}
-
-func (t *WhereHost) Trans(expr sqlparser.Expr, stmt *Where) view.Node {
+func (t *WhereTag) Trans(expr sqlparser.Expr) (view.Node, error) {
 	op := expr.(*sqlparser.ComparisonExpr).Operator
-	sql := fmt.Sprintf("%s %s %s", "host_id", op, "1")
-	return &view.Expr{Value: sql}
+	tag, err := tag.GetTag(t.Tag)
+	if err != nil {
+		return nil, err
+	}
+	filterSlice := []string{}
+	notNullFilter := tag.NotNullFilter
+	if notNullFilter != "" {
+		filterSlice = append(filterSlice, notNullFilter)
+	}
+	whereFilter := tag.WhereTranslator
+	if whereFilter != "" {
+		whereFilter = fmt.Sprintf(tag.WhereTranslator, op, t.Value)
+		filterSlice = append(filterSlice, whereFilter)
+	}
+	filter := strings.Join(filterSlice, " AND ")
+	return &view.Expr{Value: filter}, nil
 }
