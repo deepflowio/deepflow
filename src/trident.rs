@@ -15,7 +15,10 @@ use flexi_logger::{
 use log::{info, warn};
 
 use crate::{
-    common::{enums::TapType, tap_types::TapTyper, FREE_SPACE_REQUIREMENT},
+    collector::{quadruple_generator::QuadrupleGeneratorThread, MetricsType},
+    common::{
+        enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, FREE_SPACE_REQUIREMENT,
+    },
     config::{Config, RuntimeConfig},
     dispatcher::{
         self,
@@ -33,7 +36,9 @@ use crate::{
             trident_process_check,
         },
         net::{get_route_src_ip, get_route_src_ip_and_mac, MacAddr},
-        queue, stats, LeakyBucket,
+        queue,
+        stats::{self, StatsOption},
+        LeakyBucket,
     },
 };
 
@@ -228,6 +233,7 @@ struct Components {
     libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
     tap_typer: Arc<TapTyper>,
     dispatchers: Vec<Dispatcher>,
+    quadruple_generators: Vec<QuadrupleGeneratorThread>,
     monitor: Monitor,
 }
 
@@ -321,6 +327,8 @@ impl Components {
         // TODO: collector enabled
         let dispatcher_num = static_config.src_interfaces.len().max(1);
         let mut dispatchers = vec![];
+        let mut quadruple_generators = vec![];
+
         for i in 0..dispatcher_num {
             // TODO: create and start collector
             let (flow_sender, flow_receiver, counter) =
@@ -330,11 +338,6 @@ impl Components {
                 Arc::new(counter),
                 vec![],
             );
-            thread::spawn(|| {
-                for flow in flow_receiver {
-                    info!("{}", flow);
-                }
-            });
 
             // TODO: create and start app proto logs
             let (log_sender, log_receiver, counter) = queue::bounded(static_config.flow_queue_size);
@@ -381,6 +384,17 @@ impl Components {
                 .unwrap();
             dispatcher.start();
             dispatchers.push(dispatcher);
+
+            let mut quadruple_generator = Self::new_collector(
+                i,
+                stats_collector,
+                static_config,
+                runtime_config,
+                flow_receiver,
+                MetricsType::SECOND | MetricsType::MINUTE,
+            );
+            quadruple_generator.start();
+            quadruple_generators.push(quadruple_generator);
         }
 
         // TODO: platform synchronizer
@@ -396,8 +410,98 @@ impl Components {
             libvirt_xml_extractor,
             tap_typer,
             dispatchers,
+            quadruple_generators,
             monitor,
         })
+    }
+
+    // TODO: collector...
+    fn new_collector(
+        id: usize,
+        stats_collector: &Arc<stats::Collector>,
+        static_config: &Config,
+        runtime_config: &RuntimeConfig,
+        flow_receiver: queue::Receiver<TaggedFlow>,
+        metrics_type: MetricsType,
+    ) -> QuadrupleGeneratorThread {
+        let (second_sender, second_receiver, counter) =
+            queue::bounded(static_config.quadruple_queue_size);
+        stats_collector.register_countable(
+            "2-flow-with-meter-to-second-collector",
+            Arc::new(counter),
+            vec![StatsOption::Tag("index", id.to_string())],
+        );
+        let (minute_sender, minute_receiver, counter) =
+            queue::bounded(static_config.quadruple_queue_size);
+        stats_collector.register_countable(
+            "2-flow-with-meter-to-minute-collector",
+            Arc::new(counter),
+            vec![StatsOption::Tag("index", id.to_string())],
+        );
+
+        let (mut l4_log_sender, mut l4_log_receiver) = (None, None);
+        if runtime_config.l4_log_store_tap_types.len() > 0 {
+            let (l4_flow_sender, l4_flow_receiver, counter) =
+                queue::bounded(static_config.flow.aggr_queue_size as usize);
+            stats_collector.register_countable(
+                "2-second-flow-to-minute-aggrer",
+                Arc::new(counter),
+                vec![StatsOption::Tag("index", id.to_string())],
+            );
+            l4_log_sender = Some(l4_flow_sender);
+            l4_log_receiver = Some(l4_flow_receiver);
+        }
+
+        // FIXME: 应该让flowgenerator和dispatcher解耦，并提供Delay函数用于此处
+        // QuadrupleGenerator的Delay组成部分：
+        //   FlowGen中流统计数据固有的Delay：_FLOW_STAT_INTERVAL + packetDelay
+        //   FlowGen中InjectFlushTicker的额外Delay：_TIME_SLOT_UNIT
+        //   FlowGen中输出队列Flush的Delay：flushInterval
+        //   FlowGen中其它处理流程可能产生的Delay: 5s
+        let second_quadruple_tolerable_delay = (static_config.packet_delay.as_secs()
+            + 1
+            + static_config.flow.flush_interval.as_secs()
+            + 5)
+            + static_config.second_flow_extra_delay.as_secs();
+        let minute_quadruple_tolerable_delay = (60 + static_config.packet_delay.as_secs())
+            + 1
+            + static_config.flow.flush_interval.as_secs()
+            + 5;
+
+        let vtap_flow_1s_enabled = Arc::new(AtomicBool::new(runtime_config.vtap_flow_1s_enabled));
+        let quadruple_generator = QuadrupleGeneratorThread::new(
+            id,
+            flow_receiver,
+            second_sender,
+            minute_sender,
+            l4_log_sender,
+            (static_config.flow.hash_slots << 8) as usize, // connection_lru_capacity
+            metrics_type,
+            second_quadruple_tolerable_delay,
+            minute_quadruple_tolerable_delay,
+            1 << 18, // possible_host_size
+            runtime_config.l7_metrics_enabled,
+            vtap_flow_1s_enabled,
+        );
+
+        thread::spawn(move || {
+            for flow in second_receiver {
+                info!("second: {}", flow);
+            }
+        });
+        thread::spawn(move || {
+            for flow in minute_receiver {
+                info!("minute: {}", flow);
+            }
+        });
+        if let Some(l4_flow_receiver) = l4_log_receiver {
+            thread::spawn(move || {
+                for flow in l4_flow_receiver {
+                    info!("l4_flow: {}", flow);
+                }
+            });
+        }
+        quadruple_generator
     }
 
     fn stop(mut self) {
@@ -409,6 +513,9 @@ impl Components {
         // TODO: platform synchronizer
 
         // TODO: collector
+        for q in self.quadruple_generators.iter_mut() {
+            q.stop();
+        }
 
         // TODO: app proto logs handler
 

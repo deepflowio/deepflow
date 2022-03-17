@@ -71,9 +71,9 @@ impl TapPort {
         (
             self.0 as u32,
             (self.0 >> Self::FROM_OFFSET) as u8,
-            ((self.0 >> Self::TUNNEL_TYPE_OFFSET) as u16 & 0xFFF)
+            ((self.0 >> Self::TUNNEL_TYPE_OFFSET) as u8)
                 .try_into()
-                .unwrap(),
+                .unwrap_or(TunnelType::None),
         )
     }
 }
