@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+mod collector;
 mod common;
 mod config;
 pub mod debug;
