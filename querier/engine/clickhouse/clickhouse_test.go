@@ -25,6 +25,9 @@ var (
 		input:  "select Max(byte) as max_byte from l4_flow_log",
 		output: "SELECT MAX(_Sum_byte) AS max_byte FROM (SELECT SUM(byte) AS _Sum_byte FROM l4_flow_log)",
 	}, {
+		input:  "select (Max(byte) + Min(byte))/1 as max_byte from l4_flow_log",
+		output: "SELECT divide(Plus(MAX(_Sum_byte), MIN(_Sum_byte)), 1) AS max_byte FROM (SELECT SUM(byte) AS _Sum_byte FROM l4_flow_log)",
+	}, {
 		input:  "select Avg(byte) as avg_byte from l4_flow_log",
 		output: "SELECT AVG(_Sum_byte) AS avg_byte FROM (SELECT SUM(byte) AS _Sum_byte FROM l4_flow_log)",
 	}, {
@@ -45,6 +48,9 @@ var (
 	}, {
 		input:  "select Max(byte) as max_byte, Avg(rtt_max) as avg_rtt from l4_flow_log",
 		output: "SELECT MAX(_Sum_byte) AS max_byte, AVGArray(arrayFilter(x -> x!=0, _groupArray_rtt)) AS avg_rtt FROM (SELECT SUM(byte) AS _Sum_byte, groupArrayIf(rtt, rtt != 0) AS _groupArray_rtt FROM l4_flow_log)",
+	}, {
+		input:  "select ((Max(byte))+Avg(rtt_max))/(1-Avg(rtt_max)) as avg_rtt from l4_flow_log",
+		output: "SELECT divide(Plus(MAX(_Sum_byte), AVGArray(arrayFilter(x -> x!=0, _groupArray_rtt))), MINUS(1, AVGArray(arrayFilter(x -> x!=0, _groupArray_rtt)))) AS avg_rtt FROM (SELECT SUM(byte) AS _Sum_byte, groupArrayIf(rtt, rtt != 0) AS _groupArray_rtt FROM l4_flow_log)",
 	},
 	}
 )

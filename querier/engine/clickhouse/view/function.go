@@ -17,8 +17,10 @@ const (
 	FUNCTION_RSPREAD     = "Rspread"
 	FUNCTION_Apdex       = "Apdex"
 	FUNCTION_GROUP_ARRAY = "groupArray"
-	FUNCTION_DIV         = "\\"
+	FUNCTION_DIV         = "/"
 	FUNCTION_PLUS        = "+"
+	FUNCTION_MINUS       = "-"
+	FUNCTION_MULTIPLY    = "*"
 	FUNCTION_RATE        = "Rate"
 )
 
@@ -32,9 +34,13 @@ var FUNC_NAME_MAP map[string]string = map[string]string{
 	FUNCTION_PCTL_EXACT:  "quantileExact",
 	FUNCTION_STDDEV:      "stddevPopStable",
 	FUNCTION_GROUP_ARRAY: "groupArray",
+	FUNCTION_PLUS:        "Plus",
+	FUNCTION_DIV:         "Div",
+	FUNCTION_MINUS:       "MINUS",
+	FUNCTION_MULTIPLY:    "MULTIPLY",
 }
 
-var MATH_FUNCTIONS = []string{FUNCTION_DIV, FUNCTION_PLUS}
+var MATH_FUNCTIONS = []string{FUNCTION_DIV, FUNCTION_PLUS, FUNCTION_MINUS, FUNCTION_MULTIPLY}
 
 func GetFunc(name string) Function {
 	switch name {
@@ -44,6 +50,8 @@ func GetFunc(name string) Function {
 		return &RspreadFunction{DefaultFunction: DefaultFunction{Name: name}}
 	case FUNCTION_Apdex:
 		// TODO: apdex
+	case FUNCTION_DIV:
+		return &DivFunction{DefaultFunction: DefaultFunction{Name: name}}
 	default:
 		return &DefaultFunction{Name: name}
 	}
@@ -90,6 +98,9 @@ func (f *DefaultFunction) GetName() string {
 }
 
 func (f *DefaultFunction) GetWiths() []Node {
+	for _, field := range f.Fields {
+		f.Withs = append(f.Withs, field.GetWiths()...)
+	}
 	return f.Withs
 }
 
@@ -334,6 +345,10 @@ func (f *DivFunction) WriteTo(buf *bytes.Buffer) {
 		buf.WriteString("divide_0diveider_as_0")
 		buf.WriteString(f.Fields[0].(Function).GetDefaultAlias(true))
 		buf.WriteString(f.Fields[1].(Function).GetDefaultAlias(true))
+	}
+	if f.Alias != "" {
+		buf.WriteString(" AS ")
+		buf.WriteString(f.Alias)
 	}
 }
 

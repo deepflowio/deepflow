@@ -206,11 +206,15 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		}
 		err = e.AddFunction(name, args, as)
 		return err
-	// field +=*/ field
+	// field +=*/ field 运算符
 	case *sqlparser.BinaryExpr:
-		// TODO
-		_, err := e.parseSelectBinaryExpr(expr)
+		binFunction, err := e.parseSelectBinaryExpr(expr)
+		binFunction.SetAlias(as)
+		e.Statements = append(e.Statements, binFunction)
 		return err
+	default:
+		// TODO 报错
+		return nil
 	}
 	return nil
 }
@@ -222,16 +226,44 @@ func (e *CHEngine) parseFunction(item *sqlparser.FuncExpr) (name string, args []
 	return sqlparser.String(item.Name), args, nil
 }
 
-// TODO
-func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary view.Function, err error) {
+// 解析运算符
+func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, err error) {
 	switch expr := node.(type) {
 	case *sqlparser.BinaryExpr:
 		if !common.IsValueInSliceString(expr.Operator, view.MATH_FUNCTIONS) {
 			// TODO: 报错 不支持的math
 			return nil, nil
 		}
+		left, err := e.parseSelectBinaryExpr(expr.Left)
+		if err != nil {
+			return nil, err
+		}
+		right, err := e.parseSelectBinaryExpr(expr.Right)
+		if err != nil {
+			return nil, err
+		}
+		return GetBinaryFunc(expr.Operator, []Function{left, right})
+	case *sqlparser.FuncExpr:
+		name, args, err := e.parseFunction(expr)
+		if err != nil {
+			return nil, err
+		}
+		function, levelFlag, err := GetAggFunc(name, args, "", e.DB, e.Table)
+		if err != nil {
+			return nil, err
+		}
+		// 通过metric判断view是否拆层
+		e.SetLevelFlag(levelFlag)
+		return function.(Function), nil
+	case *sqlparser.ParenExpr:
+		// 括号
+		return e.parseSelectBinaryExpr(expr.Expr)
+	case *sqlparser.SQLVal:
+		return &Field{Value: sqlparser.String(expr)}, nil
+	default:
+		// TODO: 报错
+		return nil, nil
 	}
-	return nil, nil
 }
 
 func (e *CHEngine) AddGroup(group string) {
@@ -250,7 +282,7 @@ func (e *CHEngine) AddTag(tag string, alias string) {
 }
 
 func (e *CHEngine) AddFunction(name string, args []string, alias string) error {
-	function, levelFlag, err := GetFunc(name, args, alias, e.DB, e.Table)
+	function, levelFlag, err := GetAggFunc(name, args, alias, e.DB, e.Table)
 	if err != nil {
 		return err
 	}

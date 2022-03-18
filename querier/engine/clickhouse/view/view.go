@@ -81,6 +81,8 @@ func (v *View) trans() {
 	var tagsLevelInner []Node
 	var tagsLevelMetric []Node
 	var tagsLevelOuter []Node
+	var groupsLevelInner []Node
+	var groupsLevelMetric []Node
 	// 遍历tags，解析至分层结构中
 	for _, tag := range v.Model.Tags.tags {
 		switch node := tag.(type) {
@@ -102,6 +104,17 @@ func (v *View) trans() {
 			}
 		}
 	}
+	// 计算层拆层的情况下，默认类型的group中with只放在最里层
+	for _, node := range v.Model.Groups.groups {
+		group := node.(*Group)
+		if group.Flag == GROUP_FLAG_DEFAULT {
+			groupsLevelInner = append(groupsLevelInner, group)
+			groupsLevelMetric = append(groupsLevelMetric, &Group{Value: group.Value})
+		} else if group.Flag == GROUP_FLAG_WITH_METRIC_OUTER {
+			groupsLevelInner = append(groupsLevelInner, &Group{Value: group.Value})
+			groupsLevelMetric = append(groupsLevelMetric, group)
+		}
+	}
 	if v.Model.MetricLevelFlag == MODEL_METRIC_LEVEL_FLAG_UNLAY {
 		// 计算层不拆层
 		sv := SubView{
@@ -115,18 +128,18 @@ func (v *View) trans() {
 		// 计算层需要拆层
 		// 计算层里层
 		svInner := SubView{
-			Tags:    &Tags{tags: tagsLevelInner}, // 计算层所有tag及里层算子
-			Groups:  v.Model.Groups,              // TODO:group分层
-			From:    v.Model.From,                // 查询表
-			Filters: v.Model.Filters,             // 所有filter
+			Tags:    &Tags{tags: tagsLevelInner},       // 计算层所有tag及里层算子
+			Groups:  &Groups{groups: groupsLevelInner}, // group分层
+			From:    v.Model.From,                      // 查询表
+			Filters: v.Model.Filters,                   // 所有filter
 		}
 		v.SubViewLevels = append(v.SubViewLevels, &svInner)
 		// 计算层外层
 		svMetric := SubView{
-			Tags:    &Tags{tags: tagsLevelMetric}, // 计算层所有tag及外层算子
-			Groups:  v.Model.Groups,               // TODO:group分层
-			From:    &Tables{},                    // 空table
-			Filters: &Filters{},                   // 空filter
+			Tags:    &Tags{tags: tagsLevelMetric},       // 计算层所有tag及外层算子
+			Groups:  &Groups{groups: groupsLevelMetric}, // group分层
+			From:    &Tables{},                          // 空table
+			Filters: &Filters{},                         // 空filter
 		}
 		v.SubViewLevels = append(v.SubViewLevels, &svMetric)
 	}
@@ -180,6 +193,7 @@ func (sv *SubView) removeDup(ns NodeSet) []Node {
 		str := node.ToString()
 		if _, ok := tmpMap[str]; !ok {
 			targetList = append(targetList, node)
+			tmpMap[str] = nil
 		}
 	}
 	return targetList

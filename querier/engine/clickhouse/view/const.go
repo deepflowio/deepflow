@@ -3,9 +3,16 @@ package view
 const (
 	NODE_FLAG_METRIC int = iota // 仅在计算层
 	NODE_FLAG_TRANS             // 仅在翻译层
+)
 
-	METRIC_FLAG_INNER // METRIC专用FLAG，仅在计算层内层
-	METRIC_FLAG_OUTER // METRIC专用FLAG，仅在计算层外层
+const (
+	METRIC_FLAG_INNER int = iota // METRIC专用FLAG，仅在计算层内层
+	METRIC_FLAG_OUTER            // METRIC专用FLAG，仅在计算层外层
+)
+
+const (
+	GROUP_FLAG_DEFAULT           int = iota // GROUP专用FLAG，with仅放计算层内层
+	GROUP_FLAG_WITH_METRIC_OUTER            // GROUP专用FLAG，with仅放计算层外层
 )
 
 const (
