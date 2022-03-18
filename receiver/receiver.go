@@ -756,7 +756,10 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 		if err := baseHeader.Decode(baseHeaderBuffer); err != nil {
 			log.Warningf("TCP client(%s) decode error.%s", conn.RemoteAddr().String(), err.Error())
 			return
-
+		}
+		// 收到只含包头的空包丢弃
+		if baseHeader.FrameSize == datatype.MESSAGE_HEADER_LEN+datatype.FLOW_HEADER_LEN {
+			continue
 		}
 		if r.handlers[baseHeader.Type] == nil {
 			atomic.AddUint64(&r.counter.Invalid, 1)
