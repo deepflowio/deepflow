@@ -78,7 +78,7 @@ func (h *BaseHeader) Decode(buf []byte) error {
 	case MESSAGE_TYPE_SYSLOG, MESSAGE_TYPE_STATSD, MESSAGE_TYPE_DFSTATSD:
 		return nil
 	case MESSAGE_TYPE_METRICS, MESSAGE_TYPE_TAGGEDFLOW, MESSAGE_TYPE_PROTOCOLLOG:
-		if h.FrameSize <= MESSAGE_HEADER_LEN+FLOW_HEADER_LEN {
+		if h.FrameSize < MESSAGE_HEADER_LEN+FLOW_HEADER_LEN {
 			return fmt.Errorf("header type is %d frame size is %d smaller than header length %d,  invalid", h.Type, h.FrameSize, MESSAGE_HEADER_LEN+FLOW_HEADER_LEN)
 		}
 	default:
