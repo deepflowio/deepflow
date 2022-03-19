@@ -16,6 +16,9 @@ import (
 )
 
 var log = logging.MustGetLogger("clickhouse")
+var DB_TABLE_MAP = map[string][]string{
+	"flow_log": []string{"l4_flow_log"},
+}
 
 type CHEngine struct {
 	Model      *view.Model
@@ -92,6 +95,10 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, err
 	case "tags":
 		data := description.GetTagDescriptions(e.DB, table)
 		return data, true, nil
+	case "tables":
+		return GetTables(e.DB), true, nil
+	case "databases":
+		return GetDatabases(), true, nil
 	default:
 		// TODO: 解析失败
 		return nil, true, nil
@@ -110,7 +117,7 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 
 func (e *CHEngine) TransWhere(node *sqlparser.Where) error {
 	// 生成where的statement
-	whereStmt := Where{}
+	whereStmt := Where{time: e.Model.Time}
 	// 解析ast树并生成view.Node结构
 	expr, err := parseWhere(node.Expr, &whereStmt)
 	filter := view.Filters{Expr: expr}
@@ -374,4 +381,17 @@ func parseWhere(node sqlparser.Expr, w *Where) (view.Node, error) {
 // 翻译单元,翻译结果写入view.Model
 type Statement interface {
 	Format(*view.Model)
+}
+
+func LoadDbDescriptions(dbDescriptions map[string]interface{}) {
+	dbData, ok := dbDescriptions["clickhouse"]
+	if !ok {
+		return
+	}
+	for db, tables := range DB_TABLE_MAP {
+		for _, table := range tables {
+			loadMetrics := metric.LoadMetrics(db, table, dbData.(map[string]interface{}))
+			metric.MergeMetrics(db, table, loadMetrics)
+		}
+	}
 }

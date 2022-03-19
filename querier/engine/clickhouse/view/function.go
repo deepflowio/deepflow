@@ -3,6 +3,7 @@ package view
 import (
 	"bytes"
 	"fmt"
+	"strings"
 )
 
 const (
@@ -15,13 +16,16 @@ const (
 	FUNCTION_STDDEV      = "Stddev"
 	FUNCTION_SPREAD      = "Spread"
 	FUNCTION_RSPREAD     = "Rspread"
-	FUNCTION_Apdex       = "Apdex"
+	FUNCTION_APDEX       = "Apdex"
 	FUNCTION_GROUP_ARRAY = "groupArray"
 	FUNCTION_DIV         = "/"
 	FUNCTION_PLUS        = "+"
 	FUNCTION_MINUS       = "-"
 	FUNCTION_MULTIPLY    = "*"
 	FUNCTION_RATE        = "Rate"
+	FUNCTION_COUNT       = "Count"
+	FUNCTION_UNIQ        = "Uniq"
+	FUNCTION_UNIQ_EXACT  = "UniqExact"
 )
 
 // 对外提供的算子与数据库实际算子转换
@@ -38,6 +42,9 @@ var FUNC_NAME_MAP map[string]string = map[string]string{
 	FUNCTION_DIV:         "Div",
 	FUNCTION_MINUS:       "MINUS",
 	FUNCTION_MULTIPLY:    "MULTIPLY",
+	FUNCTION_COUNT:       "COUNT",
+	FUNCTION_UNIQ:        "uniq",
+	FUNCTION_UNIQ_EXACT:  "uniqExact",
 }
 
 var MATH_FUNCTIONS = []string{FUNCTION_DIV, FUNCTION_PLUS, FUNCTION_MINUS, FUNCTION_MULTIPLY}
@@ -48,8 +55,8 @@ func GetFunc(name string) Function {
 		return &SpreadFunction{DefaultFunction: DefaultFunction{Name: name}}
 	case FUNCTION_RSPREAD:
 		return &RspreadFunction{DefaultFunction: DefaultFunction{Name: name}}
-	case FUNCTION_Apdex:
-		// TODO: apdex
+	case FUNCTION_APDEX:
+		return &ApdexFunction{DefaultFunction: DefaultFunction{Name: name}}
 	case FUNCTION_DIV:
 		return &DivFunction{DefaultFunction: DefaultFunction{Name: name}}
 	default:
@@ -68,9 +75,27 @@ type Function interface {
 	SetIgnoreZero(bool)
 	SetFillNullAsZero(bool)
 	SetIsGroupArray(bool)
+	SetCondition(string)
+	SetTime(*Time)
 	GetFlag() int
 	GetName() string
 	Init()
+}
+
+func FormatField(field string) string {
+	field = strings.ReplaceAll(field, "+", "_plus_")
+	field = strings.ReplaceAll(field, "-", "_minus_")
+	field = strings.ReplaceAll(field, "*", "_multiply_")
+	field = strings.ReplaceAll(field, "/", "_div_")
+	field = strings.ReplaceAll(field, "(", "_")
+	field = strings.ReplaceAll(field, ")", "_")
+	field = strings.ReplaceAll(field, ",", "_")
+	field = strings.ReplaceAll(field, " ", "_")
+	field = strings.ReplaceAll(field, "<", "_")
+	field = strings.ReplaceAll(field, ">", "_")
+	field = strings.ReplaceAll(field, "=", "_")
+	field = strings.ReplaceAll(field, "!", "_")
+	return field
 }
 
 type DefaultFunction struct {
@@ -84,6 +109,8 @@ type DefaultFunction struct {
 	IgnoreZero     bool
 	FillNullAsZero bool
 	IsGroupArray   bool // 是否针对list做聚合，例:SUMArray(rtt_max)
+	Nest           bool // 是否为内层嵌套算子
+	Time           *Time
 	NodeBase
 }
 
@@ -180,21 +207,31 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 
 	buf.WriteString(")")
 
-	if f.Alias != "" {
+	if !f.Nest && f.Alias != "" {
 		buf.WriteString(" AS ")
 		buf.WriteString(f.Alias)
 	}
 }
 
 func (f *DefaultFunction) GetDefaultAlias(inner bool) string {
+	if f.Nest && f.Alias != "" {
+		return f.Alias
+	}
 	buf := bytes.Buffer{}
 	if inner {
 		buf.WriteString("_")
 	}
-	buf.WriteString(f.Name)
+	buf.WriteString(strings.ToLower(FUNC_NAME_MAP[f.Name]))
 	buf.WriteString("_")
 	for i, field := range f.Fields {
-		buf.WriteString(field.ToString())
+		var fieldStr string
+		switch f := field.(type) {
+		case *Field:
+			fieldStr = FormatField(f.ToString())
+		case Function:
+			fieldStr = f.GetDefaultAlias(inner)
+		}
+		buf.WriteString(fieldStr)
 		if i < len(f.Fields)-1 {
 			buf.WriteString("_")
 		}
@@ -213,6 +250,10 @@ func (f *DefaultFunction) SetAlias(alias string, inner bool) string {
 	}
 	f.Alias = alias
 	return alias
+}
+
+func (f *DefaultFunction) SetTime(time *Time) {
+	f.Time = time
 }
 
 func (f *DefaultFunction) SetFields(fields []Node) {
@@ -239,6 +280,10 @@ func (f *DefaultFunction) SetIsGroupArray(isGroupArray bool) {
 	f.IsGroupArray = isGroupArray
 }
 
+func (f *DefaultFunction) SetCondition(condition string) {
+	f.Condition = condition
+}
+
 type Field struct {
 	NodeBase
 	Value string
@@ -254,6 +299,10 @@ func (f *Field) GetWiths() []Node {
 }
 
 func (f *Field) ToString() string {
+	return f.Value
+}
+
+func (f *Field) GetDefaultAlias() string {
 	return f.Value
 }
 
@@ -291,11 +340,13 @@ func (f *RspreadFunction) Init() {
 		Name:       FUNCTION_MAX,
 		Fields:     f.Fields,
 		IgnoreZero: f.IgnoreZero,
+		Nest:       true,
 	}
 	minFunc := DefaultFunction{
 		Name:       FUNCTION_MIN,
 		Fields:     f.Fields,
 		IgnoreZero: f.IgnoreZero,
+		Nest:       true,
 	}
 	f.divFunction = &DivFunction{
 		DivType: FUNCTION_DIV_TYPE_FILL_MINIMUM,
@@ -316,6 +367,60 @@ func (f *RspreadFunction) WriteTo(buf *bytes.Buffer) {
 }
 
 func (f *RspreadFunction) GetWiths() []Node {
+	return f.divFunction.GetWiths()
+}
+
+type ApdexFunction struct {
+	DefaultFunction
+	divFunction *DivFunction // apdex的实际算子是div
+}
+
+func (f *ApdexFunction) Init() {
+	// (sum(if(rtt<=arg,1,0))+sum(if(arg<rtt and rtt<=arg*4, 0.5, 0)))/count()
+	satisfy := fmt.Sprintf("if(%s<=%s,1,0)", f.Fields[0].ToString(), f.Args[0])
+	toler := fmt.Sprintf(
+		"if(%s<%s AND %s<=%s*4,0.5,0)",
+		f.Args[0], f.Fields[0].ToString(), f.Fields[0].ToString(), f.Args[0],
+	)
+	sumSatisfy := DefaultFunction{
+		Name:   FUNCTION_SUM,
+		Fields: []Node{&Field{Value: satisfy}},
+		Alias:  fmt.Sprintf("apdex_satisfy_%s_%s", f.Fields[0].ToString(), f.Args[0]),
+		Nest:   true,
+	}
+	sumToler := DefaultFunction{
+		Name:   FUNCTION_SUM,
+		Fields: []Node{&Field{Value: toler}},
+		Alias:  fmt.Sprintf("apdex_toler_%s_%s", f.Fields[0].ToString(), f.Args[0]),
+		Nest:   true,
+	}
+	plus := DefaultFunction{
+		Name:   FUNCTION_PLUS,
+		Fields: []Node{&sumSatisfy, &sumToler},
+		Nest:   true,
+	}
+	count := DefaultFunction{
+		Name: FUNCTION_COUNT,
+	}
+	f.divFunction = &DivFunction{
+		DefaultFunction: DefaultFunction{
+			Name:   FUNCTION_DIV,
+			Fields: []Node{&plus, &count},
+		},
+		// count为0则结果为null
+		DivType: FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL,
+	}
+}
+
+func (f *ApdexFunction) WriteTo(buf *bytes.Buffer) {
+	f.divFunction.WriteTo(buf)
+	if f.Alias != "" {
+		buf.WriteString(" AS ")
+		buf.WriteString(f.Alias)
+	}
+}
+
+func (f *ApdexFunction) GetWiths() []Node {
 	return f.divFunction.GetWiths()
 }
 
@@ -357,20 +462,65 @@ func (f *DivFunction) GetWiths() []Node {
 	f.Withs = append(f.Withs, f.Fields[1].GetWiths()...)
 	if f.DivType == FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL {
 		with := fmt.Sprintf(
-			"if(%s>0, divide(%s, %s), null) as divide_0diveider_as_null%s%s",
+			"if(%s>0, divide(%s, %s), null)",
 			f.Fields[1].ToString(), f.Fields[0].ToString(), f.Fields[1].ToString(),
+		)
+		alias := fmt.Sprintf(
+			"divide_0diveider_as_null%s%s",
 			f.Fields[0].(Function).GetDefaultAlias(true),
 			f.Fields[1].(Function).GetDefaultAlias(true),
 		)
-		f.Withs = append(f.Withs, &With{Value: with})
+		f.Withs = append(f.Withs, &With{Value: with, Alias: alias})
 	} else if f.DivType == FUNCTION_DIV_TYPE_0DIVIDER_AS_0 {
 		with := fmt.Sprintf(
-			"if(%s>0, divide(%s, %s), 0) as divide_0diveider_as_0%s%s",
+			"if(%s>0, divide(%s, %s), 0)",
 			f.Fields[1].ToString(), f.Fields[0].ToString(), f.Fields[1].ToString(),
+		)
+		alias := fmt.Sprintf(
+			"divide_0diveider_as_0%s%s",
 			f.Fields[0].(Function).GetDefaultAlias(true),
 			f.Fields[1].(Function).GetDefaultAlias(true),
 		)
-		f.Withs = append(f.Withs, &With{Value: with})
+		f.Withs = append(f.Withs, &With{Value: with, Alias: alias})
 	}
 	return f.Withs
+}
+
+type MinFunction struct {
+	DefaultFunction
+}
+
+func (f *MinFunction) WriteTo(buf *bytes.Buffer) {
+	if !f.FillNullAsZero {
+		f.DefaultFunction.WriteTo(buf)
+	} else {
+		buf.WriteString("min_fillnullaszero_")
+		f.Fields[0].WriteTo(buf)
+		if f.Alias != "" {
+			buf.WriteString(" AS ")
+			buf.WriteString(f.Alias)
+		}
+	}
+}
+
+func (f *MinFunction) GetWiths() []Node {
+	if !f.FillNullAsZero {
+		return f.DefaultFunction.GetWiths()
+	} else {
+		var count int
+		if f.Time.Interval > 0 {
+			count = f.Time.WindowSize * f.Time.Interval / f.Time.DatasourceInterval
+		} else {
+			count = int(f.Time.TimeEnd-f.Time.TimeStart)/f.Time.DatasourceInterval + 1
+		}
+		with := fmt.Sprintf(
+			"if(count(%s)=%d, min(%s), 0)",
+			f.Fields[0].ToString(), count, f.Fields[0].ToString(),
+		)
+		alias := fmt.Sprintf(
+			"min_fillnullaszero_%s", f.Fields[0].ToString(),
+		)
+		f.Withs = append(f.Withs, &With{Value: with, Alias: alias})
+		return f.Withs
+	}
 }

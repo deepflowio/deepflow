@@ -46,11 +46,16 @@ func (s *Withs) GetWiths() []Node {
 
 type With struct {
 	Value string
+	Alias string
 	NodeBase
 }
 
 func (n *With) WriteTo(buf *bytes.Buffer) {
 	buf.WriteString(n.Value)
+	if n.Alias != "" {
+		buf.WriteString(" AS ")
+		buf.WriteString(n.Alias)
+	}
 }
 
 func (n *With) ToString() string {

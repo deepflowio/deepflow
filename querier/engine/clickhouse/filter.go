@@ -9,11 +9,13 @@ import (
 
 	"metaflow/querier/engine/clickhouse/tag"
 	"metaflow/querier/engine/clickhouse/view"
+	"strconv"
 )
 
 type Where struct {
 	filter *view.Filters
 	withs  []view.Node
+	time   *view.Time
 }
 
 func (w *Where) Format(m *view.Model) {
@@ -24,8 +26,12 @@ func (w *Where) Format(m *view.Model) {
 }
 
 func GetWhere(name, value string) WhereStatement {
-	stmt := &WhereTag{Tag: name, Value: value}
-	return stmt
+	switch name {
+	case "time":
+		return &TimeTag{Value: value}
+	default:
+		return &WhereTag{Tag: name, Value: value}
+	}
 }
 
 type WhereStatement interface {
@@ -42,7 +48,8 @@ var OperatorMap = map[string]string{
 	"not in": " AND ",
 }
 
-func (t *WhereTag) Trans(expr sqlparser.Expr, stmt *Where) (view.Node, error) {
+func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where) (view.Node, error) {
+
 	op := expr.(*sqlparser.ComparisonExpr).Operator
 	tag, err := tag.GetTag(t.Tag)
 	if err != nil {
@@ -102,4 +109,22 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, stmt *Where) (view.Node, error) {
 	}
 	filter := strings.Join(filterSlice, " AND ")
 	return &view.Expr{Value: filter}, nil
+}
+
+type TimeTag struct {
+	Value string
+}
+
+func (t *TimeTag) Trans(expr sqlparser.Expr, w *Where) (view.Node, error) {
+	compareExpr := expr.(*sqlparser.ComparisonExpr)
+	time, err := strconv.ParseInt(t.Value, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	if compareExpr.Operator == ">=" {
+		w.time.AddTimeStart(time)
+	} else if compareExpr.Operator == "<=" {
+		w.time.AddTimeEnd(time)
+	}
+	return &view.Expr{Value: sqlparser.String(compareExpr)}, nil
 }

@@ -2,6 +2,7 @@ package view
 
 import (
 	"bytes"
+	"time"
 )
 
 /*
@@ -19,6 +20,7 @@ import (
 			NewView.ToString() string 生成df-clickhouse-sql
 */
 type Model struct {
+	Time    *Time
 	Tags    *Tags
 	Filters *Filters
 	From    *Tables
@@ -30,6 +32,7 @@ type Model struct {
 
 func NewModel() *Model {
 	return &Model{
+		Time:    NewTime(),
 		Tags:    &Tags{},
 		Groups:  &Groups{},
 		From:    &Tables{},
@@ -51,6 +54,42 @@ func (m *Model) AddTable(value string) {
 
 func (m *Model) AddGroup(g *Group) {
 	m.Groups.Append(g)
+}
+
+type Time struct {
+	TimeStart          int64
+	TimeEnd            int64
+	Interval           int
+	DatasourceInterval int
+	WindowSize         int
+}
+
+func (t *Time) AddTimeStart(timeStart int64) {
+	if timeStart > t.TimeStart {
+		t.TimeStart = timeStart
+	}
+}
+
+func (t *Time) AddTimeEnd(timeEnd int64) {
+	if timeEnd < t.TimeEnd {
+		t.TimeEnd = timeEnd
+	}
+}
+
+func (t *Time) AddInterval(interval int) {
+	t.Interval = interval
+}
+
+func (t *Time) AddWindowSize(windowSize int) {
+	t.WindowSize = windowSize
+}
+
+func NewTime() *Time {
+	return &Time{
+		TimeEnd:            time.Now().Unix(),
+		DatasourceInterval: 60,
+		WindowSize:         1,
+	}
 }
 
 type View struct {
@@ -97,6 +136,7 @@ func (v *View) trans() {
 			}
 		case Function:
 			flag := node.GetFlag()
+			node.SetTime(v.Model.Time)
 			if flag == METRIC_FLAG_INNER {
 				tagsLevelInner = append(tagsLevelInner, tag)
 			} else if flag == METRIC_FLAG_OUTER {

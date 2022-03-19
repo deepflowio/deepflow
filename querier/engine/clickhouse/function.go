@@ -91,7 +91,8 @@ func (f *AggFunction) SetAlias(alias string) {
 
 func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 	switch f.Metric.Type {
-	case metric.METRIC_TYPE_COUNTER:
+	case metric.METRIC_TYPE_COUNTER, metric.METRIC_TYPE_GAUGE:
+		// 计数类和油标类，内层结构为sum
 		// 内层算子使用默认alias
 		innerFunction := view.DefaultFunction{
 			Name:   view.FUNCTION_SUM,
@@ -103,6 +104,7 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 		m.AddTag(&innerFunction)
 		return innerAlias
 	case metric.METRIC_TYPE_DELAY:
+		// 时延类，内层结构为groupArray，忽略0值
 		innerFunction := view.DefaultFunction{
 			Name:       view.FUNCTION_GROUP_ARRAY,
 			Fields:     []view.Node{&view.Field{Value: f.Metric.DBField}},
@@ -113,13 +115,37 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 		innerFunction.Init()
 		m.AddTag(&innerFunction)
 		return innerAlias
-	case metric.METRIC_TYPE_PERCENTAGE:
-		innerFunction := view.DefaultFunction{
-			Name:       view.FUNCTION_GROUP_ARRAY,
-			Fields:     []view.Node{&view.Field{Value: f.Metric.DBField}},
-			IgnoreZero: true,
+	case metric.METRIC_TYPE_PERCENTAGE, metric.METRIC_TYPE_QUOTIENT:
+		// 比例类和商值类，内层结构为sum(x)/sum(y)
+		divFields := strings.Split(f.Metric.DBField, "/")
+		divField_0 := view.DefaultFunction{
+			Name:   view.FUNCTION_SUM,
+			Fields: []view.Node{&view.Field{Value: divFields[0]}},
+		}
+		divField_1 := view.DefaultFunction{
+			Name:   view.FUNCTION_SUM,
+			Fields: []view.Node{&view.Field{Value: divFields[1]}},
+		}
+		innerFunction := view.DivFunction{
+			DefaultFunction: view.DefaultFunction{
+				Name:   view.FUNCTION_DIV,
+				Fields: []view.Node{&divField_0, &divField_1},
+			},
 		}
 		innerAlias = innerFunction.SetAlias("", true)
+		innerFunction.SetFlag(view.METRIC_FLAG_INNER)
+		innerFunction.Init()
+		m.AddTag(&innerFunction)
+		return innerAlias
+	case metric.METRIC_TYPE_TAG:
+		innerAlias := fmt.Sprintf("_%s", f.Alias)
+		innerFunction := view.DefaultFunction{
+			Name:      f.Name,
+			Fields:    []view.Node{&view.Field{Value: f.Metric.DBField}},
+			Condition: f.Metric.Condition,
+			Alias:     innerAlias,
+		}
+		//innerAlias = innerFunction.SetAlias("", true)
 		innerFunction.SetFlag(view.METRIC_FLAG_INNER)
 		innerFunction.Init()
 		m.AddTag(&innerFunction)
@@ -130,18 +156,24 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 
 func (f *AggFunction) Trans(m *view.Model) view.Node {
 	outFunc := view.GetFunc(f.Name)
-	outFunc.SetFlag(view.METRIC_FLAG_OUTER)
+	if len(f.Args) > 1 {
+		outFunc.SetArgs(f.Args[1:])
+	}
 	if m.MetricLevelFlag == view.MODEL_METRIC_LEVEL_FLAG_LAYERED {
 		innerAlias := f.FormatInnerTag(m)
 		switch f.Metric.Type {
-		case metric.METRIC_TYPE_COUNTER:
+		case metric.METRIC_TYPE_COUNTER, metric.METRIC_TYPE_GAUGE:
+			// 计数类和油标类，null需要补成0
 			outFunc.SetFillNullAsZero(true)
-		case metric.METRIC_TYPE_DELAY:
+		case metric.METRIC_TYPE_DELAY, metric.METRIC_TYPE_QUOTIENT:
+			// 时延类和商值类，忽略0值
 			outFunc.SetIsGroupArray(true)
 			outFunc.SetIgnoreZero(true)
 		case metric.METRIC_TYPE_PERCENTAGE:
-			outFunc.SetIsGroupArray(true)
+			// 比例类，null需要补成0
 			outFunc.SetFillNullAsZero(true)
+		case metric.METRIC_TYPE_TAG:
+			outFunc = view.GetFunc(view.FUNCTION_SUM)
 		}
 		outFunc.SetFields([]view.Node{&view.Field{Value: innerAlias}})
 	} else if m.MetricLevelFlag == view.MODEL_METRIC_LEVEL_FLAG_UNLAY {
@@ -152,9 +184,12 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 			outFunc.SetIgnoreZero(true)
 		case metric.METRIC_TYPE_PERCENTAGE:
 			outFunc.SetFillNullAsZero(true)
+		case metric.METRIC_TYPE_TAG:
+			outFunc.SetCondition(f.Metric.Condition)
 		}
 		outFunc.SetFields([]view.Node{&view.Field{Value: f.Metric.DBField}})
 	}
+	outFunc.SetFlag(view.METRIC_FLAG_OUTER)
 	outFunc.Init()
 	return outFunc
 }

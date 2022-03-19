@@ -76,7 +76,7 @@ parse/
           "name",
           "display_name",
           "unit",
-          "type", // 指标量类型，取值范围：1.counter 2.gauge 3.delay 4.percentage
+          "type", // 指标量类型，取值范围：1.counter 2.gauge 3.delay 4.percentage 5.quotient 6.tag
           "category" // 指标量所属类别
           ],
           "values": [
@@ -112,8 +112,8 @@ parse/
       "result": {
           "columns": [
               "name",
-              "type", // 算子类型，取值范围： 1.聚合类 2.速率类
-              "support_metric_types", // 表示算子可用于哪几类指标量：取值范围： 1.counter 2.gauge 3.delay 4.percentage (数学类默认支持全部)
+              "type",           //  算子类型，取值范围： 1.聚合类 2.速率类
+              "support_metric_types",         // 表示算子可用于哪几类指标量：取值范围：1.counter 2.gauge 3.delay 4.percentage 5.quotient 6.tag
               "unit_overwrite",
               "additionnal_param_count" // 额外参数支持数量，如 percentile此参数为1，则传递为percentile(byte, 99)
           ],
@@ -201,11 +201,29 @@ Tag字段特殊说明
   ```
   - `注意`：对`resource_type_gl2/resource_name_gl2`进行select或者group by时，始终会额外返回`subnet/subnet_name`和`ip`字段
 
-Metric字段特殊说明
------------------
-- 时延类(用于解决原先avg单双层结果不一致的问题)
+
+clickhouse指标量及算子特殊处理：
+-------------------------------------------------
+- Counter计数类及Gauge油标类
+  - 内层算子使用sum
+  - 外层常规算子计算
+  - Counter计数类FillNullAsZero为true，会将null值作为0值处理
+
+  ```
+
+  SELECT AVG(_sum_byte_tx) AS avg_byte_tx
+  FROM
+  (
+      SELECT SUM(byte_tx) AS _sum_byte_tx
+      FROM l4_flow_log
+  )
+
+  ```
+
+- Delay时延类
   - 内层使用算子groupArray将聚合数据作为数组传出（groupArrayIf为0值无意义的处理）
   - 外层针对数组进行聚合，算子:xxxArray
+  - IgnoreZero为true，0值无意义
 
   ```
   SELECT AVGArray(arrayFilter(x -> x!=0, _rtt_sum)) AS avg_rtt
@@ -214,14 +232,39 @@ Metric字段特殊说明
       WITH if(rtt_count > 0, rtt_sum / rtt_count, 0)
       SELECT
           groupArrayIf(rtt_sum, rtt_sum != 0) AS _rtt_sum,
-          host_id,
-          time
       FROM vtap_flow_port.`1m`
-      WHERE ((time >= toDateTime(1647235440)) AND (time <= toDateTime (1647238920))) AND (NOT (host_id = 0))
-      GROUP BY
-          host_id,
-          time
   )
-  GROUP BY host_id
   
+  ```
+
+- Percentage比例类及Quotient商值类
+  - 内层使用sum(x)/sum(y)
+  - 外层常规算子计算
+  - Percentage比例类FillNullAsZero为true，会将null值作为0值处理
+  
+  ```
+
+  SELECT MAX(_div__sum_l7_request__sum_l7_response) AS max_l7_error_ratio
+  FROM
+  (
+      SELECT SUM(l7_request) / SUM(l7_response) AS _div__sum_l7_request__sum_l7_response
+      FROM l4_flow_log
+  )
+
+  ```
+
+
+- Tag类
+  - 仅支持Uniq及UniqExact算子
+  - 内层使用uniqIf()
+  - 外层使用Sum
+  - 在不分层的情况下直接使用uniqIf
+
+  ```
+  SELECT SUM(_uniq_ip_0) AS uniq_ip_0
+  FROM
+  (
+    SELECT uniqIf([toString(ip4_0), toString(subnet_id_0), toString(is_ipv4), toString(ip6_0)], NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))) AS _uniq_ip_0
+    FROM l4_flow_log
+  )
   ```
