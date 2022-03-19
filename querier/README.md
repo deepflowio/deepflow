@@ -17,10 +17,17 @@ parse/
   - clickhouse/view
     - 用于转换sql的view结构体
 
-clickhouse固定句式获取metrics/tags等可用取值
--------------------------------------------------
-- db={dbName} sql=show tags from {tableName}
-  - 获取指定数据库dbName中tableName表所支持的Tag描述
+
+数据库语句及字段说明
+====================
+
+基础语句
+--------
+- 获取指定数据库{dbName}中表{tableName}所支持的tag及描述
+  - 请求语句
+  ```
+  db={dbName} sql=show tags from {tableName}
+  ```
   - 返回结构
   ```
   {
@@ -32,7 +39,7 @@ clickhouse固定句式获取metrics/tags等可用取值
             "client_name",
             "server_name",
             "display_name",
-            "type"
+            "type" // tag类型，取值范围：int, int_enum, string, string_enum, resource_name, resource_id, ip
           ],
           "values": [
               [
@@ -54,8 +61,11 @@ clickhouse固定句式获取metrics/tags等可用取值
   }
   ```
 
-- db={dbName} sql=show metrics from {tableName}
-  - 获取指定数据库dbName中tableName表所支持的指标量
+- 获取指定数据库{dbName}中表{tableName}所支持的metric及描述
+  - 请求语句
+  ```
+  db={dbName} sql=show metrics from {tableName}
+  ```
   - 返回结构
   ```
   {
@@ -66,8 +76,8 @@ clickhouse固定句式获取metrics/tags等可用取值
           "name",
           "display_name",
           "unit",
-          "type", // 1.counter 2.gauge 3.delay 4.percentage
-          "category"
+          "type", // 指标量类型，取值范围：1.counter 2.gauge 3.delay 4.percentage
+          "category" // 指标量所属类别
           ],
           "values": [
               [
@@ -89,8 +99,11 @@ clickhouse固定句式获取metrics/tags等可用取值
   }
   ```
 
-- sql=show metric functions
-  - 获取所有指标量算子
+- 获取指标量所支持的算子及描述
+  - 请求语句
+  ```
+  sql=show metric function
+  ```
   - 返回结构
   ```
   {
@@ -99,10 +112,10 @@ clickhouse固定句式获取metrics/tags等可用取值
       "result": {
           "columns": [
               "name",
-              "type",           // 1.聚合类 2.速率类
-              "support_metric_types",         // 支持的metric类型 1.counter 2.gauge 3.delay 4.percentage (数学类默认支持全部)
+              "type", // 算子类型，取值范围： 1.聚合类 2.速率类
+              "support_metric_types", // 表示算子可用于哪几类指标量：取值范围： 1.counter 2.gauge 3.delay 4.percentage (数学类默认支持全部)
               "unit_overwrite",
-              "additionnal_param_count"       // 额外参数支持数量，如 percentile此参数为1，则传递为percentile(byte, 99)
+              "additionnal_param_count" // 额外参数支持数量，如 percentile此参数为1，则传递为percentile(byte, 99)
           ],
           "values": [
               [
@@ -124,14 +137,77 @@ clickhouse固定句式获取metrics/tags等可用取值
   }
   ```
 
-clickhouse指标量及算子特殊处理：
--------------------------------------------------
+
+Tag字段特殊说明
+---------------
+- 自动分组全展开字段
+  ```
+  resource_type_gl0
+  resource_gl0 或 resource_name_gl0
+  ```
+  - 举例
+  ```
+  select
+      resource_type_gl0_0,
+      resource_name_gl0_0,
+      resource_type_gl0_1,
+      resource_name_gl0_1
+  from `flow_log`.`l4_flow_log`
+  group by
+      resource_type_gl0_0,
+      resource_name_gl0_0,
+      resource_type_gl0_1,
+      resource_name_gl0_1
+  ```
+  - `注意`：对`resource_type_gl0/resource_name_gl0`进行select或者group by时，始终会额外返回`subnet/subnet_name`和`ip`字段
+- 自动分组-工作负载聚合全展开字段：
+  ```
+  resource_type_gl1
+  resource_gl1 或 resource_name_gl1
+  ```
+  - 举例
+  ```
+  select
+      resource_type_gl1_0,
+      resource_name_gl1_0,
+      resource_type_gl1_1,
+      resource_name_gl1_1
+  from `flow_log`.`l4_flow_log`
+  group by
+      resource_type_gl1_0,
+      resource_name_gl1_0,
+      resource_type_gl1_1,
+      resource_name_gl1_1
+  ```
+  - `注意`：对`resource_type_gl1/resource_name_gl1`进行select或者group by时，始终会额外返回`subnet/subnet_name`和`ip`字段
+- 自动分组-服务聚合全展开字段：
+  ```
+  resource_type_gl2
+  resource_gl2 或 resource_name_gl2
+  ```
+  - 举例
+  ```
+  select
+      resource_type_gl2_0,
+      resource_name_gl2_0,
+      resource_type_gl2_1,
+      resource_name_gl2_1
+  from `flow_log`.`l4_flow_log`
+  group by
+      resource_type_gl2_0,
+      resource_name_gl2_0,
+      resource_type_gl2_1,
+      resource_name_gl2_1
+  ```
+  - `注意`：对`resource_type_gl2/resource_name_gl2`进行select或者group by时，始终会额外返回`subnet/subnet_name`和`ip`字段
+
+Metric字段特殊说明
+-----------------
 - 时延类(用于解决原先avg单双层结果不一致的问题)
   - 内层使用算子groupArray将聚合数据作为数组传出（groupArrayIf为0值无意义的处理）
   - 外层针对数组进行聚合，算子:xxxArray
 
   ```
-
   SELECT AVGArray(arrayFilter(x -> x!=0, _rtt_sum)) AS avg_rtt
   FROM
   (
