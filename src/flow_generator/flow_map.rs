@@ -5,7 +5,7 @@ use std::{
     net::Ipv4Addr,
     rc::Rc,
     str::FromStr,
-    sync::{atomic::Ordering, Arc, Mutex},
+    sync::{atomic::Ordering, Arc},
     time::{Duration, SystemTime},
 };
 
@@ -30,6 +30,7 @@ use crate::{
         flow::{CloseType, Flow, FlowKey, FlowMetricsPeer, L4Protocol, L7Protocol, TunnelField},
         lookup_key::LookupKey,
         meta_packet::{MetaPacket, MetaPacketTcpHeader},
+        policy::PolicyData,
         protocol_logs::AppProtoHead,
         tagged_flow::TaggedFlow,
         tap_port::TapPort,
@@ -605,7 +606,7 @@ impl FlowMap {
             next_tcp_seq1: 0,
             policy_data_cache: Default::default(),
             endpoint_data_cache: EndpointData {
-                src_info: Arc::new(Mutex::new(EndpointInfo {
+                src_info: EndpointInfo {
                     real_ip: Ipv4Addr::UNSPECIFIED.into(),
                     l2_epc_id: 0,
                     l3_epc_id: 0,
@@ -616,9 +617,9 @@ impl FlowMap {
                     is_vip: false,
                     is_local_mac: false,
                     is_local_ip: false,
-                })),
+                },
 
-                dst_info: Arc::new(Mutex::new(EndpointInfo {
+                dst_info: EndpointInfo {
                     real_ip: Ipv4Addr::UNSPECIFIED.into(),
                     l2_epc_id: 0,
                     l3_epc_id: 0,
@@ -629,7 +630,7 @@ impl FlowMap {
                     is_vip: false,
                     is_local_mac: false,
                     is_local_ip: false,
-                })),
+                },
             },
         };
         // 标签
@@ -662,24 +663,24 @@ impl FlowMap {
             self.update_endpoint_and_policy_data(node, meta_packet);
         } else {
             // copy endpoint and policy data
-            meta_packet
-                .policy_data
-                .replace(node.policy_data_cache[meta_packet.direction as usize].clone());
+            meta_packet.policy_data.replace(Arc::new(
+                node.policy_data_cache[meta_packet.direction as usize].clone(),
+            ));
             match meta_packet.direction {
                 PacketDirection::ClientToServer => {
                     meta_packet
                         .endpoint_data
-                        .replace(node.endpoint_data_cache.clone());
+                        .replace(Arc::new(node.endpoint_data_cache.clone()));
                 }
                 PacketDirection::ServerToClient => {
                     meta_packet
                         .endpoint_data
-                        .replace(node.endpoint_data_cache.reversed());
+                        .replace(Arc::new(node.endpoint_data_cache.reversed()));
                 }
             }
             if let Some(endpoint_data) = meta_packet.endpoint_data.as_ref() {
-                meta_packet.lookup_key.l3_end_0 = endpoint_data.src_info.lock().unwrap().l3_end;
-                meta_packet.lookup_key.l3_end_1 = endpoint_data.dst_info.lock().unwrap().l3_end;
+                meta_packet.lookup_key.l3_end_0 = endpoint_data.src_info.l3_end;
+                meta_packet.lookup_key.l3_end_1 = endpoint_data.dst_info.l3_end;
             }
         }
 
@@ -983,12 +984,12 @@ impl FlowMap {
         let lookup_key = &meta_packet.lookup_key;
         let src_key = ServiceKey::new(
             lookup_key.src_ip,
-            node.endpoint_data_cache.src_info.lock().unwrap().l3_epc_id as i16,
+            node.endpoint_data_cache.src_info.l3_epc_id as i16,
             lookup_key.src_port,
         );
         let dst_key = ServiceKey::new(
             lookup_key.dst_ip,
-            node.endpoint_data_cache.dst_info.lock().unwrap().l3_epc_id as i16,
+            node.endpoint_data_cache.dst_info.l3_epc_id as i16,
             lookup_key.dst_port,
         );
         let (mut src_score, mut dst_score) = match lookup_key.proto {
@@ -1061,8 +1062,8 @@ impl FlowMap {
         // update endpoint
         match meta_packet.direction {
             PacketDirection::ClientToServer => {
-                if let Some(endpoint_data) = meta_packet.endpoint_data.clone() {
-                    node.endpoint_data_cache = endpoint_data;
+                if meta_packet.endpoint_data.is_some() {
+                    node.endpoint_data_cache = **(meta_packet.endpoint_data.as_ref().unwrap());
                 }
             }
             PacketDirection::ServerToClient => {
@@ -1075,7 +1076,7 @@ impl FlowMap {
         }
 
         {
-            let src_info = node.endpoint_data_cache.src_info.lock().unwrap();
+            let src_info = node.endpoint_data_cache.src_info;
             let peer_src = &mut node.tagged_flow.flow.flow_metrics_peers[0];
             peer_src.is_device = src_info.is_device;
             peer_src.is_vip_interface = src_info.is_vip_interface;
@@ -1090,7 +1091,7 @@ impl FlowMap {
             peer_src.is_local_ip = src_info.is_local_ip;
         }
         {
-            let dst_info = node.endpoint_data_cache.dst_info.lock().unwrap();
+            let dst_info = node.endpoint_data_cache.dst_info;
             let peer_dst = &mut node.tagged_flow.flow.flow_metrics_peers[1];
             peer_dst.is_device = dst_info.is_device;
             peer_dst.is_vip_interface = dst_info.is_vip_interface;
@@ -1106,8 +1107,17 @@ impl FlowMap {
         }
 
         // update policy data
-        if let Some(policy_data) = meta_packet.policy_data.clone() {
-            node.policy_data_cache[meta_packet.direction as usize] = policy_data;
+        if meta_packet.policy_data.is_some() {
+            node.policy_data_cache[meta_packet.direction as usize] = PolicyData {
+                acl_id: meta_packet.policy_data.as_ref().unwrap().acl_id,
+                npb_actions: meta_packet
+                    .policy_data
+                    .as_ref()
+                    .unwrap()
+                    .npb_actions
+                    .clone(),
+                action_flags: meta_packet.policy_data.as_ref().unwrap().action_flags,
+            };
         }
         node.tagged_flow.tag.policy_data = node.policy_data_cache.clone();
     }
@@ -1129,8 +1139,12 @@ pub fn _reverse_meta_packet(packet: &mut MetaPacket) {
     mem::swap(&mut lookup_key.src_port, &mut lookup_key.dst_port);
     mem::swap(&mut lookup_key.src_mac, &mut lookup_key.dst_mac);
     mem::swap(&mut lookup_key.l2_end_0, &mut lookup_key.l2_end_1);
-    if let Some(endpoint_data) = packet.endpoint_data.as_mut() {
-        mem::swap(&mut endpoint_data.src_info, &mut endpoint_data.dst_info);
+    if packet.endpoint_data.is_some() {
+        let endpoint_data = packet.endpoint_data.as_ref().unwrap();
+        packet.endpoint_data = Some(Arc::new(EndpointData {
+            src_info: endpoint_data.dst_info.clone(),
+            dst_info: endpoint_data.src_info.clone(),
+        }));
     }
 }
 
@@ -1194,8 +1208,8 @@ pub fn _new_meta_packet<'a>() -> MetaPacket<'a> {
         seq: 0,
         ..Default::default()
     };
-    packet.endpoint_data = Some(EndpointData {
-        src_info: Arc::new(Mutex::new(EndpointInfo {
+    packet.endpoint_data = Some(Arc::new(EndpointData {
+        src_info: EndpointInfo {
             real_ip: Ipv4Addr::UNSPECIFIED.into(),
             l2_end: false,
             l3_end: false,
@@ -1207,8 +1221,8 @@ pub fn _new_meta_packet<'a>() -> MetaPacket<'a> {
 
             l2_epc_id: EPC_FROM_DEEPFLOW,
             l3_epc_id: 1,
-        })),
-        dst_info: Arc::new(Mutex::new(EndpointInfo {
+        },
+        dst_info: EndpointInfo {
             real_ip: Ipv4Addr::UNSPECIFIED.into(),
             l2_end: false,
             l3_end: false,
@@ -1220,8 +1234,8 @@ pub fn _new_meta_packet<'a>() -> MetaPacket<'a> {
 
             l2_epc_id: EPC_FROM_DEEPFLOW,
             l3_epc_id: EPC_FROM_INTERNET,
-        })),
-    });
+        },
+    }));
     packet
 }
 
@@ -1365,7 +1379,7 @@ mod tests {
         let mut policy_data0 = PolicyData::default();
         policy_data0.merge_npb_action(vec![npb_action], 10, vec![]);
         let mut packet0 = _new_meta_packet();
-        packet0.policy_data.replace(policy_data0);
+        packet0.policy_data.replace(Arc::new(policy_data0));
 
         let npb_action = NpbAction::new(0, 11, NpbTunnelType::VxLan, TapSide::SRC, 123);
         let mut policy_data1 = PolicyData::default();
@@ -1374,7 +1388,7 @@ mod tests {
         packet1.tcp_data.flags = TcpFlags::SYN_ACK;
         _reverse_meta_packet(&mut packet1);
         packet1.direction = PacketDirection::ServerToClient;
-        packet1.policy_data.replace(policy_data1);
+        packet1.policy_data.replace(Arc::new(policy_data1));
 
         let mut node = flow_map.init_flow(&mut packet0);
         node.policy_in_tick.fill(false);

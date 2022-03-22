@@ -1,9 +1,5 @@
 use bitflags::bitflags;
-use std::{
-    net::IpAddr,
-    net::Ipv4Addr,
-    sync::{Arc, Mutex},
-};
+use std::{net::IpAddr, net::Ipv4Addr, sync::Arc};
 
 use super::{enums::TapType, lookup_key::LookupKey, platform_data::PlatformData};
 
@@ -19,7 +15,7 @@ bitflags! {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct EndpointInfo {
     pub real_ip: IpAddr, // IsVIP为true时，该字段有值
     pub l2_epc_id: i32,  // 负数表示特殊值
@@ -86,17 +82,18 @@ impl Default for EndpointInfo {
     }
 }
 
-#[derive(Debug, Clone)]
+// 数据结构内容由策略模块初始化，其他组件只读
+#[derive(Debug, Default, Clone, Copy)]
 pub struct EndpointData {
-    pub src_info: Arc<Mutex<EndpointInfo>>,
-    pub dst_info: Arc<Mutex<EndpointInfo>>,
+    pub src_info: EndpointInfo,
+    pub dst_info: EndpointInfo,
 }
 
 impl EndpointData {
     pub fn set_l2_end(&mut self, key: &LookupKey) {
         if key.tap_type == TapType::Tor {
-            self.src_info.lock().unwrap().l2_end = key.l2_end_0;
-            self.dst_info.lock().unwrap().l2_end = key.l2_end_1;
+            self.src_info.l2_end = key.l2_end_0;
+            self.dst_info.l2_end = key.l2_end_1;
         }
     }
 
@@ -109,8 +106,8 @@ impl EndpointData {
 
     pub fn new(src: EndpointInfo, dst: EndpointInfo) -> EndpointData {
         EndpointData {
-            src_info: Arc::new(Mutex::new(src)),
-            dst_info: Arc::new(Mutex::new(dst)),
+            src_info: src,
+            dst_info: dst,
         }
     }
 }
@@ -123,6 +120,19 @@ pub enum L3L2End {
     TrueFalse,
     TrueTrue,
     Max,
+}
+
+impl From<usize> for L3L2End {
+    fn from(v: usize) -> L3L2End {
+        match v {
+            0 => L3L2End::FalseFalse,
+            1 => L3L2End::FalseTrue,
+            2 => L3L2End::TrueFalse,
+            3 => L3L2End::TrueTrue,
+            4 => L3L2End::Max,
+            _ => unimplemented!(),
+        }
+    }
 }
 
 impl From<(bool, bool)> for L3L2End {
@@ -147,5 +157,90 @@ impl From<L3L2End> for (bool, bool) {
             L3L2End::TrueTrue => (true, true),
             _ => unimplemented!(),
         }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct EndpointStore {
+    datas: [[Arc<EndpointData>; L3L2End::Max as usize]; L3L2End::Max as usize],
+}
+
+impl From<EndpointData> for EndpointStore {
+    fn from(mut e: EndpointData) -> Self {
+        let mut store = EndpointStore::default();
+
+        for i in 0..L3L2End::Max as usize {
+            for j in 0..L3L2End::Max as usize {
+                e.src_info.set_l3_l2_end(L3L2End::from(i));
+                e.dst_info.set_l3_l2_end(L3L2End::from(j));
+                store.datas[i][j] = Arc::new(e);
+            }
+        }
+
+        store
+    }
+}
+
+impl EndpointStore {
+    pub fn get(
+        &self,
+        l2_end_0: bool,
+        l2_end_1: bool,
+        l3_end_0: bool,
+        l3_end_1: bool,
+    ) -> Arc<EndpointData> {
+        return self.datas[L3L2End::from((l2_end_0, l3_end_0)) as usize]
+            [L3L2End::from((l2_end_1, l3_end_1)) as usize]
+            .clone();
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_endpoint_store() {
+        let endpoints = EndpointData {
+            src_info: EndpointInfo {
+                l2_epc_id: 10,
+                l3_epc_id: 20,
+                ..Default::default()
+            },
+            dst_info: EndpointInfo {
+                l2_epc_id: 30,
+                l3_epc_id: 40,
+                ..Default::default()
+            },
+        };
+        let store = EndpointStore::from(endpoints);
+        let result = store.get(false, true, false, false);
+        assert_eq!(result.src_info.l2_end, false);
+        assert_eq!(result.dst_info.l2_end, true);
+        assert_eq!(result.src_info.l3_end, false);
+        assert_eq!(result.dst_info.l3_end, false);
+
+        let result = store.get(true, false, true, true);
+        assert_eq!(result.src_info.l2_end, true);
+        assert_eq!(result.dst_info.l2_end, false);
+        assert_eq!(result.src_info.l3_end, true);
+        assert_eq!(result.dst_info.l3_end, true);
+
+        let result = store.get(true, true, true, false);
+        assert_eq!(result.src_info.l2_end, true);
+        assert_eq!(result.dst_info.l2_end, true);
+        assert_eq!(result.src_info.l3_end, true);
+        assert_eq!(result.dst_info.l3_end, false);
+
+        let result = store.get(false, false, false, true);
+        assert_eq!(result.src_info.l2_end, false);
+        assert_eq!(result.dst_info.l2_end, false);
+        assert_eq!(result.src_info.l3_end, false);
+        assert_eq!(result.dst_info.l3_end, true);
+
+        assert_eq!(result.src_info.l2_epc_id, 10);
+        assert_eq!(result.src_info.l3_epc_id, 20);
+        assert_eq!(result.dst_info.l2_epc_id, 30);
+        assert_eq!(result.dst_info.l3_epc_id, 40);
     }
 }

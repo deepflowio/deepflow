@@ -316,11 +316,14 @@ impl RpcDebugger {
         let pb_acls = trident::FlowAcls::decode_length_delimited(resp.flow_acls())
             .map_err(|e| Error::ProstDecode(e))?;
 
-        let acls = pb_acls
-            .flow_acl
-            .into_iter()
-            .map(Into::into)
-            .map(|a: Acl| format!("{:?}", a));
+        let acls = pb_acls.flow_acl.into_iter().map(|a| {
+            let acl = Acl::try_from(a);
+            if acl.is_err() {
+                return format!("{:?}", acl.unwrap_err());
+            } else {
+                return format!("{}", acl.unwrap());
+            }
+        });
 
         fn truncate_fn(res: &mut Vec<Message<RpcMessage>>, s: String) {
             res.push(Message {
