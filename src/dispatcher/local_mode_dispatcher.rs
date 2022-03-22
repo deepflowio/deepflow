@@ -181,12 +181,7 @@ impl LocalModeDispatcher {
             );
             BaseDispatcher::prepare_flow(&mut meta_packet, TapType::Tor, false, base.id as u8);
             for h in pipeline.handlers.iter_mut() {
-                h.handle(
-                    overlay_packet,
-                    &meta_packet,
-                    meta_packet.endpoint_data.as_ref().clone(),
-                    meta_packet.policy_data.as_ref().clone(),
-                );
+                h.handle(overlay_packet, &meta_packet);
             }
 
             if let Some(policy) = meta_packet.policy_data.as_ref() {

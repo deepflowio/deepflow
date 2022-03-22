@@ -1,7 +1,5 @@
-use std::cmp::max;
+use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::num::ParseIntError;
-use std::ops::RangeInclusive;
 
 use bitflags::bitflags;
 use ipnet::{IpNet, Ipv4Net, Ipv6Net};
@@ -9,9 +7,10 @@ use ipnet::{IpNet, Ipv4Net, Ipv6Net};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use super::endpoint::EPC_FROM_DEEPFLOW;
-use super::enums::{IpProtocol, TapType};
+use super::enums::TapType;
 use super::error::Error;
 use super::matched_field::{MatchedFieldv4, MatchedFieldv6};
+use super::port_range::{PortRange, PortRangeList};
 use super::{IPV4_MAX_MASK_LEN, IPV6_MAX_MASK_LEN, MIN_MASK_LEN};
 
 use crate::proto::trident;
@@ -192,6 +191,14 @@ impl PolicyData {
             npb_actions,
             acl_id,
             action_flags,
+        }
+    }
+
+    pub fn format_npb_action(&mut self) {
+        for item in &mut self.npb_actions {
+            if item.tap_side() == TapSide::ALL && item.tunnel_type() != NpbTunnelType::Pcap {
+                item.set_tap_side(TapSide::SRC);
+            }
         }
     }
 
@@ -431,6 +438,7 @@ pub fn ip_range_convert_to_cidr(start: IpAddr, end: IpAddr) -> Vec<IpNet> {
     }
 }
 
+/*
 #[derive(Debug)]
 pub struct Acl {
     id: u32,
@@ -463,6 +471,7 @@ impl From<trident::FlowAcl> for Acl {
         }
     }
 }
+*/
 
 #[derive(Debug)]
 pub struct MatchNodev4 {
@@ -476,6 +485,94 @@ pub struct MatchNodev6 {
     matched_mask: MatchedFieldv6,
 }
 
+#[derive(Debug, Default)]
+pub struct Acl {
+    pub id: u32,
+    pub tap_type: TapType,
+    pub src_groups: Vec<u32>,
+    pub dst_groups: Vec<u32>,
+    pub src_port_ranges: Vec<PortRange>, // 0仅表示采集端口0
+    pub dst_port_ranges: Vec<PortRange>, // 0仅表示采集端口0
+    pub proto: u16,                      // 256表示全采集, 0表示采集采集协议0
+
+    pub npb_actions: Vec<NpbAction>,
+    pub policy: PolicyData,
+    // TODO: DDBS
+}
+
+// 这个函数不安全，仅用于测试和debug
+/*
+impl From<trident::FlowAcl> for Acl {
+    fn from(mut f: trident::FlowAcl) -> Self {
+        Self {
+            id: f.id(),
+            tap_type: (f.tap_type() as u16).try_into().unwrap_or_default(),
+            src_groups: f.src_group_ids.drain(..).map(|id| id as u16).collect(),
+            dst_groups: f.dst_group_ids.drain(..).map(|id| id as u16).collect(),
+            src_port_ranges: PortRangeList::try_from(f.src_ports.unwrap_or_default()).unwrap().element().to_vec(),
+            dst_port_ranges: PortRangeList::try_from(f.dst_ports.unwrap_or_default()).unwrap().element().to_vec(),
+            proto: f.protocol() as u16,
+            npb_actions: f.npb_actions.into_iter().map(Into::into).collect(),
+            policy: PolicyData::default(),
+        }
+    }
+}
+*/
+
+impl TryFrom<trident::FlowAcl> for Acl {
+    type Error = String;
+
+    fn try_from(a: trident::FlowAcl) -> Result<Self, Self::Error> {
+        let tap_type = TapType::try_from((a.tap_type.unwrap_or_default() & 0xff) as u16);
+        if tap_type.is_err() {
+            return Err(format!(
+                "Acl tap_type parse error: {:?}.\n",
+                tap_type.unwrap_err()
+            ));
+        }
+        let src_ports = PortRangeList::try_from(a.src_ports.unwrap_or_default());
+        if src_ports.is_err() {
+            return Err(format!(
+                "Acl src port parse error: {:?}.\n",
+                src_ports.unwrap_err()
+            ));
+        }
+        let dst_ports = PortRangeList::try_from(a.dst_ports.unwrap_or_default());
+        if dst_ports.is_err() {
+            return Err(format!(
+                "Acl dst port parse error: {:?}.\n",
+                dst_ports.unwrap_err()
+            ));
+        }
+        Ok(Acl {
+            id: a.id.unwrap_or_default(),
+            tap_type: tap_type.unwrap(),
+            src_groups: a
+                .src_group_ids
+                .iter()
+                .map(|x| (x & 0xffff) as u32)
+                .collect(),
+            dst_groups: a
+                .dst_group_ids
+                .iter()
+                .map(|x| (x & 0xffff) as u32)
+                .collect(),
+            src_port_ranges: src_ports.unwrap().element().to_vec(),
+            dst_port_ranges: dst_ports.unwrap().element().to_vec(),
+            proto: (a.protocol.unwrap_or_default() & 0xffff) as u16,
+            ..Default::default()
+        })
+    }
+}
+
+impl fmt::Display for Acl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Id:{} TapType:{} SrcGroups:{:?} DstGroups:{:?} SrcPortRange:{:?} DstPortRange:{:?} Proto:{} NpbActions:{:?}",
+            self.id, self.tap_type, self.src_groups, self.dst_groups, self.src_port_ranges, self.dst_port_ranges, self.proto, self.npb_actions)
+    }
+}
+
+/*
 pub fn split_port(src: impl AsRef<str>) -> Vec<RangeInclusive<u16>> {
     fn get_port(src: &str) -> Result<RangeInclusive<u16>, ParseIntError> {
         let split_src_ports = match src.split_once('-') {
@@ -517,6 +614,7 @@ pub fn split_port(src: impl AsRef<str>) -> Vec<RangeInclusive<u16>> {
     src_ports.retain(|_| iter.next().unwrap());
     src_ports
 }
+*/
 
 // IsVIP为true时不影响cidr epcid表的建立, 但是会单独建立VIP表
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -684,7 +684,6 @@ mod tests {
     use std::net::Ipv4Addr;
     use std::path::Path;
     use std::sync::Arc;
-    use std::sync::Mutex;
 
     use super::*;
 
@@ -737,7 +736,7 @@ mod tests {
             meta_flow_perf: None,
             policy_data_cache: Default::default(),
             endpoint_data_cache: EndpointData {
-                src_info: Arc::new(Mutex::new(EndpointInfo {
+                src_info: EndpointInfo {
                     real_ip: Ipv4Addr::UNSPECIFIED.into(),
                     l2_epc_id: 0,
                     l3_epc_id: 0,
@@ -748,8 +747,8 @@ mod tests {
                     is_vip: false,
                     is_local_mac: false,
                     is_local_ip: false,
-                })),
-                dst_info: Arc::new(Mutex::new(EndpointInfo {
+                },
+                dst_info: EndpointInfo {
                     real_ip: Ipv4Addr::UNSPECIFIED.into(),
                     l2_epc_id: 0,
                     l3_epc_id: 0,
@@ -760,7 +759,7 @@ mod tests {
                     is_vip: false,
                     is_local_mac: false,
                     is_local_ip: false,
-                })),
+                },
             },
             next_tcp_seq0: 0,
             next_tcp_seq1: 0,
@@ -797,8 +796,8 @@ mod tests {
         let delta = packets.first().unwrap().lookup_key.timestamp;
         let mut last_timestamp = Duration::ZERO;
         for mut pkt in packets {
-            pkt.endpoint_data.replace(EndpointData {
-                src_info: Arc::new(Mutex::new(EndpointInfo {
+            pkt.endpoint_data.replace(Arc::new(EndpointData {
+                src_info: EndpointInfo {
                     real_ip: Ipv4Addr::UNSPECIFIED.into(),
                     l2_epc_id: EPC_FROM_DEEPFLOW,
                     l3_epc_id: 1,
@@ -809,8 +808,8 @@ mod tests {
                     is_vip: false,
                     is_local_mac: false,
                     is_local_ip: false,
-                })),
-                dst_info: Arc::new(Mutex::new(EndpointInfo {
+                },
+                dst_info: EndpointInfo {
                     real_ip: Ipv4Addr::UNSPECIFIED.into(),
                     l2_epc_id: EPC_FROM_DEEPFLOW,
                     l3_epc_id: EPC_FROM_INTERNET,
@@ -821,8 +820,8 @@ mod tests {
                     is_vip: false,
                     is_local_mac: false,
                     is_local_ip: false,
-                })),
-            });
+                },
+            }));
 
             pkt.lookup_key.timestamp = rpc::get_timestamp() + (pkt.lookup_key.timestamp - delta);
             last_timestamp = pkt.lookup_key.timestamp;

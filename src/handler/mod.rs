@@ -1,9 +1,7 @@
 use std::net::IpAddr;
 use std::time::Duration;
 
-use crate::common::endpoint::EndpointData;
 use crate::common::meta_packet::MetaPacket;
-use crate::common::policy::PolicyData;
 use crate::utils::net::MacAddr;
 
 pub struct IpInfo {
@@ -27,13 +25,7 @@ pub struct LldpDuInfo {
 pub enum PacketHandler {}
 
 impl PacketHandler {
-    pub fn handle(
-        &mut self,
-        _overlay_packet: &[u8],
-        _meta_packet: &MetaPacket,
-        _endpoint: Option<&EndpointData>,
-        _policy: Option<&PolicyData>,
-    ) {
+    pub fn handle(&mut self, _overlay_packet: &[u8], _meta_packet: &MetaPacket) {
         todo!()
     }
 }
