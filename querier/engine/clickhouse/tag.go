@@ -1,8 +1,8 @@
 package clickhouse
 
 import (
+	"metaflow/querier/engine/clickhouse/tag"
 	"metaflow/querier/engine/clickhouse/view"
-	"metaflow/querier/tag"
 )
 
 func GetTagGenerator(name string, alias string) ([]Statement, error) {
@@ -18,6 +18,7 @@ func GetTagGenerator(name string, alias string) ([]Statement, error) {
 		}
 		stmts = append(stmts, &SelectTag{Value: tag.TagGeneratorName[index], Withs: withCondition})
 	}
+
 	return stmts, nil
 }
 
@@ -29,7 +30,7 @@ func GetTagTranslator(name string, alias string) (Statement, error) {
 	}
 	if tag.TagTranslator != "" {
 		withs := []view.Node{&view.With{Value: tag.TagTranslator}}
-		stmt = &SelectTag{Value: tag.Name, Flag: view.NODE_FLAG_TRANS, Withs: withs}
+		stmt = &SelectTag{Value: name, Flag: view.NODE_FLAG_TRANS, Withs: withs}
 	}
 	return stmt, nil
 }

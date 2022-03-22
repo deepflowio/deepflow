@@ -10,9 +10,9 @@ import (
 	"metaflow/querier/common"
 	"metaflow/querier/engine/clickhouse/client"
 	"metaflow/querier/engine/clickhouse/metric"
+	"metaflow/querier/engine/clickhouse/tag/description"
 	"metaflow/querier/engine/clickhouse/view"
 	"metaflow/querier/parse"
-	"metaflow/querier/tag/description"
 )
 
 var log = logging.MustGetLogger("clickhouse")
@@ -366,7 +366,7 @@ func parseWhere(node sqlparser.Expr, w *Where) (view.Node, error) {
 		whereTag := sqlparser.String(node.Left)
 		whereValue := sqlparser.String(node.Right)
 		stmt := GetWhere(whereTag, whereValue)
-		return stmt.Trans(node)
+		return stmt.Trans(node, w)
 	}
 	return nil, nil
 }

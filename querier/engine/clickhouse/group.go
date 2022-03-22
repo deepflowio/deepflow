@@ -1,8 +1,8 @@
 package clickhouse
 
 import (
+	"metaflow/querier/engine/clickhouse/tag"
 	"metaflow/querier/engine/clickhouse/view"
-	"metaflow/querier/tag"
 )
 
 // TODO: 按需修改并做抽象

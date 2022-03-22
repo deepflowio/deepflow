@@ -6,8 +6,8 @@ import (
 
 	"github.com/xwb1989/sqlparser"
 
+	"metaflow/querier/engine/clickhouse/tag"
 	"metaflow/querier/engine/clickhouse/view"
-	"metaflow/querier/tag"
 )
 
 type Where struct {
@@ -30,7 +30,7 @@ func GetWhere(name, value string) WhereStatement {
 }
 
 type WhereStatement interface {
-	Trans(sqlparser.Expr) (view.Node, error)
+	Trans(sqlparser.Expr, *Where) (view.Node, error)
 }
 
 type WhereTag struct {
@@ -38,7 +38,7 @@ type WhereTag struct {
 	Value string
 }
 
-func (t *WhereTag) Trans(expr sqlparser.Expr) (view.Node, error) {
+func (t *WhereTag) Trans(expr sqlparser.Expr, stmt *Where) (view.Node, error) {
 	op := expr.(*sqlparser.ComparisonExpr).Operator
 	tag, err := tag.GetTag(t.Tag)
 	if err != nil {
