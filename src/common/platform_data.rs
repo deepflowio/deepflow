@@ -4,7 +4,7 @@ use crate::proto::trident;
 
 use super::{endpoint::EPC_FROM_DEEPFLOW, error::Error, IPV4_MAX_MASK_LEN, IPV6_MAX_MASK_LEN};
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct IpSubnet {
     pub raw_ip: IpAddr,
     pub netmask: u32,
@@ -21,7 +21,7 @@ impl Default for IpSubnet {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum IfType {
     WAN = 3,
     LAN = 4,
@@ -38,7 +38,7 @@ impl TryFrom<u8> for IfType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PlatformData {
     pub mac: u64,
     pub ips: Vec<IpSubnet>,

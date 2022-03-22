@@ -1,6 +1,7 @@
 use std::fmt;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr};
+use std::sync::Arc;
 use std::time::Duration;
 
 use pnet::packet::{
@@ -32,8 +33,8 @@ pub struct MetaPacket<'a> {
     vlan_tag_size: usize,
     pub ttl: u8,
     pub reset_ttl: bool,
-    pub endpoint_data: Option<EndpointData>,
-    pub policy_data: Option<PolicyData>,
+    pub endpoint_data: Option<Arc<EndpointData>>,
+    pub policy_data: Option<Arc<PolicyData>>,
 
     offset_ip_0: usize,
     offset_ip_1: usize,

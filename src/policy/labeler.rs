@@ -119,7 +119,7 @@ impl Labeler {
         }
     }
 
-    pub fn update_peer_table(&mut self, peers: &Vec<PeerConnection>) {
+    pub fn update_peer_table(&mut self, peers: &Vec<Rc<PeerConnection>>) {
         let mut peer_table: HashMap<i32, Vec<i32>> = HashMap::new();
         for peer in peers {
             peer_table
@@ -366,6 +366,7 @@ impl Labeler {
                 return (info, is_wan);
             }
         }
+
         // step 2: 使用L2EpcId + IP查询L3，如果L2EpcId为0，会查询到DEEPFLOW添加的监控IP
         if let Some(interface) = self.get_interface_by_epc_ip(ip, info.l2_epc_id) {
             info.set_l3_data(interface);
@@ -375,8 +376,8 @@ impl Labeler {
     }
 
     fn modify_endpoint_data(&self, endpoint: &mut EndpointData, key: &LookupKey) {
-        let mut src_data = endpoint.src_info.lock().unwrap();
-        let mut dst_data = endpoint.dst_info.lock().unwrap();
+        let mut src_data = &mut endpoint.src_info;
+        let mut dst_data = &mut endpoint.dst_info;
         if dst_data.l3_epc_id == 0 && src_data.l3_epc_id > 0 {
             if !is_unicast_mac(u64::from(key.dst_mac)) {
                 dst_data.l3_epc_id = src_data.l3_epc_id;
@@ -404,18 +405,18 @@ impl Labeler {
     }
 
     fn get_l3_by_peer(&self, src: IpAddr, dst: IpAddr, endpoint: &mut EndpointData) {
-        let mut src_data = endpoint.src_info.lock().unwrap();
-        let mut dst_data = endpoint.dst_info.lock().unwrap();
+        let src_data = &mut endpoint.src_info;
+        let dst_data = &mut endpoint.dst_info;
         if src_data.l3_epc_id <= 0 && dst_data.l3_epc_id > 0 {
-            self.get_epc_by_peer(src, dst_data.l3_epc_id, &mut src_data);
+            self.get_epc_by_peer(src, dst_data.l3_epc_id, src_data);
         } else if dst_data.l3_epc_id <= 0 && src_data.l3_epc_id > 0 {
-            self.get_epc_by_peer(dst, src_data.l3_epc_id, &mut dst_data);
+            self.get_epc_by_peer(dst, src_data.l3_epc_id, dst_data);
         }
     }
 
     fn get_l3_by_wan(&self, src: IpAddr, dst: IpAddr, endpoint: &mut EndpointData) -> (bool, bool) {
-        let mut src_data = endpoint.src_info.lock().unwrap();
-        let mut dst_data = endpoint.dst_info.lock().unwrap();
+        let src_data = &mut endpoint.src_info;
+        let dst_data = &mut endpoint.dst_info;
 
         let mut found_src = false;
         let mut fount_dst = false;
@@ -427,7 +428,7 @@ impl Labeler {
                 found_src = true;
             } else {
                 // step 2: 查询DEEPFLOW添加的WAN监控网段(cidr)
-                found_src = self.set_epc_by_cidr(src, EPC_FROM_DEEPFLOW, &mut src_data);
+                found_src = self.set_epc_by_cidr(src, EPC_FROM_DEEPFLOW, src_data);
             }
         }
         if dst_data.l3_epc_id == 0 {
@@ -437,7 +438,7 @@ impl Labeler {
                 fount_dst = true;
             } else {
                 // step 2: 查询DEEPFLOW添加的WAN监控网段(cidr)
-                fount_dst = self.set_epc_by_cidr(dst, EPC_FROM_DEEPFLOW, &mut dst_data);
+                fount_dst = self.set_epc_by_cidr(dst, EPC_FROM_DEEPFLOW, dst_data);
             }
         }
         return (found_src, fount_dst);
@@ -450,8 +451,8 @@ impl Labeler {
         is_dst_wan: bool,
         endpoint: &mut EndpointData,
     ) {
-        let mut src_data = endpoint.src_info.lock().unwrap();
-        let mut dst_data = endpoint.dst_info.lock().unwrap();
+        let mut src_data = &mut endpoint.src_info;
+        let mut dst_data = &mut endpoint.dst_info;
 
         if !src_data.is_vip && src_data.l3_epc_id > 0 {
             if !is_src_wan {
@@ -479,8 +480,8 @@ impl Labeler {
     }
 
     fn modify_internet_epc(&self, endpoint: &mut EndpointData) {
-        let mut src_data = endpoint.src_info.lock().unwrap();
-        let mut dst_data = endpoint.dst_info.lock().unwrap();
+        let mut src_data = &mut endpoint.src_info;
+        let mut dst_data = &mut endpoint.dst_info;
 
         if src_data.l3_epc_id == 0 {
             src_data.l3_epc_id = EPC_FROM_INTERNET;
@@ -490,7 +491,7 @@ impl Labeler {
         }
     }
 
-    pub fn get_endpoint_data(&self, key: &LookupKey) -> Box<EndpointData> {
+    pub fn get_endpoint_data(&self, key: &LookupKey) -> EndpointData {
         // l2: mac查询
         // l3: l2epc+ip查询
         let (src_info, mut is_src_wan) = self.get_endpoint_info(
@@ -505,7 +506,7 @@ impl Labeler {
             key.l3_end_1,
             key.tunnel_id,
         );
-        let mut endpoint = Box::new(EndpointData::new(src_info, dst_info));
+        let mut endpoint = EndpointData::new(src_info, dst_info);
         // l3: 私有网络 VPC内部路由
         // 1) 本端IP + 对端EPC查询EPC-IP表
         // 2) 本端IP + 对端EPC查询CIDR表
@@ -768,7 +769,7 @@ mod tests {
             ..Default::default()
         };
 
-        labeler.update_peer_table(&vec![peer]);
+        labeler.update_peer_table(&vec![Rc::new(peer)]);
         labeler.update_epc_ip_table(&vec![Rc::new(interface1), Rc::new(interface2)]);
 
         let mut endpoint: EndpointInfo = Default::default();
@@ -910,15 +911,77 @@ mod tests {
 
         // 通过CIDR匹配到EPC_ID：10
         let endpoints = labeler.get_endpoint_data(&key);
-        assert_eq!(endpoints.src_info.lock().unwrap().l3_epc_id, 1);
-        assert_eq!(endpoints.dst_info.lock().unwrap().l3_epc_id, 10);
+        assert_eq!(endpoints.src_info.l3_epc_id, 1);
+        assert_eq!(endpoints.dst_info.l3_epc_id, 10);
 
         // 加入对等连接
-        labeler.update_peer_table(&vec![peer]);
+        labeler.update_peer_table(&vec![Rc::new(peer)]);
 
         // 加入对等连接后，对等连接优先级高于CIDR WAN
         let endpoints = labeler.get_endpoint_data(&key);
-        assert_eq!(endpoints.src_info.lock().unwrap().l3_epc_id, 1);
-        assert_eq!(endpoints.dst_info.lock().unwrap().l3_epc_id, 2);
+        assert_eq!(endpoints.src_info.l3_epc_id, 1);
+        assert_eq!(endpoints.dst_info.l3_epc_id, 2);
+    }
+    #[test]
+    fn test_modify_endpoint_date() {
+        let mut labeler: Labeler = Default::default();
+        let interface = PlatformData {
+            mac: 0x112233445566,
+            ips: vec![IpSubnet {
+                raw_ip: "192.168.10.100".parse().unwrap(),
+                ..Default::default()
+            }],
+            epc_id: 1,
+            ..Default::default()
+        };
+        let cidr = Cidr {
+            ip: IpNet::from_str("172.29.20.200/32").unwrap(),
+            epc_id: 1,
+            ..Default::default()
+        };
+        labeler.update_mac_table(&vec![Rc::new(interface)]);
+        labeler.update_cidr_table(&vec![Rc::new(cidr)]);
+        let mut endpoints: EndpointData = Default::default();
+        endpoints.src_info.l3_epc_id = 1;
+
+        let key: LookupKey = LookupKey {
+            src_mac: MacAddr::from_str("11:22:33:44:55:66").unwrap(),
+            src_ip: "192.168.10.100".parse().unwrap(),
+            dst_ip: "172.29.20.200".parse().unwrap(),
+            ..Default::default()
+        };
+        labeler.modify_endpoint_data(&mut endpoints, &key);
+        assert_eq!(endpoints.dst_info.l3_epc_id, 1);
+    }
+    #[test]
+    fn test_modify_internet_epc() {
+        let labeler: Labeler = Default::default();
+        let mut endpoints: EndpointData = Default::default();
+        labeler.modify_internet_epc(&mut endpoints);
+        assert_eq!(endpoints.dst_info.l3_epc_id, -2);
+        assert_eq!(endpoints.src_info.l3_epc_id, -2);
+    }
+
+    #[test]
+    fn test_get_vip() {
+        let mut labeler: Labeler = Default::default();
+        let cidr = Cidr {
+            ip: IpNet::from_str("172.29.20.200/32").unwrap(),
+            epc_id: 1,
+            is_vip: true,
+            ..Default::default()
+        };
+        labeler.update_cidr_table(&vec![Rc::new(cidr)]);
+
+        let mut endpoints: EndpointData = Default::default();
+        endpoints.dst_info.l3_epc_id = 1;
+        let key: LookupKey = LookupKey {
+            src_mac: MacAddr::from_str("11:22:33:44:55:66").unwrap(),
+            src_ip: "192.168.10.100".parse().unwrap(),
+            dst_ip: "172.29.20.200".parse().unwrap(),
+            ..Default::default()
+        };
+        labeler.get_vip(&key, false, false, &mut endpoints);
+        assert_eq!(endpoints.dst_info.is_vip, true);
     }
 }
