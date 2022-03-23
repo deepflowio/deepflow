@@ -8,4 +8,5 @@ const (
 	INT_ENUM      = "int_enum"      // 整型枚举
 	STRING_ENUM   = "string_enum"   // 字符串枚举
 	IP            = "ip"            // IP地址
+	INTERNET      = "internet"      // 广域网
 )

@@ -43,4 +43,6 @@ var ResourceTags = []*TagDescription{
 	NewTagDescription("tap_type_name", "tap_type_name", "tap_type_name", "采集点名称", RESOURCE_NAME),
 	NewTagDescription("vtap", "vtap", "vtap", "采集器", RESOURCE_ID),
 	NewTagDescription("vtap_name", "vtap_name", "vtap_name", "采集器名称", RESOURCE_NAME),
+
+	NewTagDescription("is_internet", "is_internet_0", "is_internet_1", "广域网", INTERNET),
 }

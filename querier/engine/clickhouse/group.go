@@ -5,7 +5,6 @@ import (
 	"metaflow/querier/engine/clickhouse/view"
 )
 
-// TODO: 按需修改并做抽象
 func GetGroup(name string) ([]Statement, error) {
 	var stmts []Statement
 	tag, err := tag.GetTag(name)

@@ -11,14 +11,15 @@ func GetTagGenerator(name string, alias string) ([]Statement, error) {
 	if err != nil {
 		return stmts, err
 	}
-	for index, tagGenerator := range tag.TagGenerator {
+	for index, tagGeneratorName := range tag.TagGeneratorName {
 		withCondition := []view.Node{}
-		if tagGenerator != "" {
-			withCondition = []view.Node{&view.With{Value: tagGenerator}}
+		if tag.TagGenerator[index] != "" {
+			withCondition = []view.Node{&view.With{Value: tag.TagGenerator[index]}}
 		}
-		stmts = append(stmts, &SelectTag{Value: tag.TagGeneratorName[index], Withs: withCondition})
+		if tagGeneratorName != "" {
+			stmts = append(stmts, &SelectTag{Value: tagGeneratorName, Withs: withCondition})
+		}
 	}
-
 	return stmts, nil
 }
 
