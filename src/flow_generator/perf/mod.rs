@@ -1,4 +1,5 @@
 mod dns;
+mod http;
 pub(crate) mod l7_rrt;
 mod mq;
 mod rpc;

@@ -309,12 +309,52 @@ impl From<DubboInfo> for flow_log::DubboInfo {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct HttpInfo {
+    pub stream_id: u32,
+    pub version: String,
+    pub trace_id: String,
+    pub span_id: String,
+
+    pub method: String,
+    pub path: String,
+    pub host: String,
+    pub client_ip: String,
+
+    pub req_content_length: Option<u64>,
+    pub resp_content_length: Option<u64>,
+}
+
+impl From<HttpInfo> for flow_log::HttpInfo {
+    fn from(f: HttpInfo) -> Self {
+        flow_log::HttpInfo {
+            stream_id: f.stream_id,
+            version: f.version,
+            method: f.method,
+            path: f.path,
+            host: f.host,
+            client_ip: f.client_ip,
+            trace_id: f.trace_id,
+            span_id: f.span_id,
+            req_content_length: match f.req_content_length {
+                Some(length) => length as i64,
+                _ => -1,
+            },
+            resp_content_length: match f.resp_content_length {
+                Some(length) => length as i64,
+                _ => -1,
+            },
+        }
+    }
+}
+
 pub enum AppProtoLogsInfo {
     Dns(DnsInfo),
     Mysql(MysqlInfo),
     Redis(RedisInfo),
     Kafka(KafkaInfo),
     Dubbo(DubboInfo),
+    Http(HttpInfo),
 }
 
 pub struct AppProtoLogsData {
@@ -339,6 +379,7 @@ impl AppProtoLogsData {
             AppProtoLogsInfo::Redis(t) => pb_proto_logs_data.redis = Some(t.into()),
             AppProtoLogsInfo::Kafka(t) => pb_proto_logs_data.kafka = Some(t.into()),
             AppProtoLogsInfo::Dubbo(t) => pb_proto_logs_data.dubbo = Some(t.into()),
+            AppProtoLogsInfo::Http(t) => pb_proto_logs_data.http = Some(t.into()),
         };
 
         pb_proto_logs_data
