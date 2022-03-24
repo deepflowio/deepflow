@@ -759,6 +759,12 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 		}
 		// 收到只含包头的空包丢弃
 		if baseHeader.FrameSize == datatype.MESSAGE_HEADER_LEN+datatype.FLOW_HEADER_LEN {
+			if err := ReadN(conn, flowHeaderBuffer); err != nil {
+				log.Warningf("TCP client(%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
+			} else if r.counter.Invalid == 0 {
+				log.Infof("TCP client(%s) connection read empty content packet", conn.RemoteAddr().String())
+			}
+			atomic.AddUint64(&r.counter.Invalid, 1)
 			continue
 		}
 		if r.handlers[baseHeader.Type] == nil {
