@@ -27,7 +27,7 @@ func GetTagDescriptions(db, table string) map[string][]interface{} {
 		switch table {
 		case "l4_flow_log":
 			for _, tag := range ResourceTags {
-				values = append(values, []interface{}{tag.Name, tag.ServerName, tag.ClientName, tag.DisplayName, tag.Type})
+				values = append(values, []interface{}{tag.Name, tag.ClientName, tag.ServerName, tag.DisplayName, tag.Type})
 			}
 		}
 	}

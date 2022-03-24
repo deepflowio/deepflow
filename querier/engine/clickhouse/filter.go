@@ -3,13 +3,13 @@ package clickhouse
 import (
 	"fmt"
 	"inet.af/netaddr"
+	"strconv"
 	"strings"
 
 	"github.com/xwb1989/sqlparser"
 
 	"metaflow/querier/engine/clickhouse/tag"
 	"metaflow/querier/engine/clickhouse/view"
-	"strconv"
 )
 
 type Where struct {
@@ -35,7 +35,7 @@ func GetWhere(name, value string) WhereStatement {
 }
 
 type WhereStatement interface {
-	Trans(sqlparser.Expr, *Where) (view.Node, error)
+	Trans(sqlparser.Expr, *Where, map[string]string) (view.Node, error)
 }
 
 type WhereTag struct {
@@ -48,21 +48,26 @@ var OperatorMap = map[string]string{
 	"not in": " AND ",
 }
 
-func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where) (view.Node, error) {
-
+func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string) (view.Node, error) {
 	op := expr.(*sqlparser.ComparisonExpr).Operator
-	tag, err := tag.GetTag(t.Tag)
-	if err != nil {
-		return nil, err
+	tagItem, ok := tag.GetTag(t.Tag)
+	if !ok {
+		preAsTag, ok := asTagMap[t.Tag]
+		if ok {
+			tagItem, ok = tag.GetTag(preAsTag)
+			if !ok {
+				filter := fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+				return &view.Expr{Value: filter}, nil
+			}
+		} else {
+			filter := fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+			return &view.Expr{Value: filter}, nil
+		}
 	}
-	filterSlice := []string{}
-	notNullFilter := tag.NotNullFilter
-	if notNullFilter != "" {
-		filterSlice = append(filterSlice, "("+notNullFilter+")")
-	}
-	whereFilter := tag.WhereTranslator
+	whereFilter := tagItem.WhereTranslator
 	if whereFilter != "" {
-		if t.Tag == "ip" || t.Tag == "ip_0" || t.Tag == "ip_1" {
+		switch t.Tag {
+		case "ip", "ip_0", "ip_1":
 			ipValues := strings.TrimLeft(t.Value, "(")
 			ipValues = strings.TrimRight(ipValues, ")")
 			ipSlice := strings.Split(ipValues, ",")
@@ -87,11 +92,11 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where) (view.Node, error) {
 			}
 			if len(ip4s) > 0 {
 				ip4sStr := strings.Join(ip4s, ",")
-				ip4WhereFilter = fmt.Sprintf(tag.WhereTranslator, "1", "4", op, "("+ip4sStr+")")
+				ip4WhereFilter = fmt.Sprintf(tagItem.WhereTranslator, "1", "4", op, "("+ip4sStr+")")
 			}
 			if len(ip6s) > 0 {
 				ip6sStr := strings.Join(ip6s, ",")
-				ip6WhereFilter = fmt.Sprintf(tag.WhereTranslator, "0", "6", op, "("+ip6sStr+")")
+				ip6WhereFilter = fmt.Sprintf(tagItem.WhereTranslator, "0", "6", op, "("+ip6sStr+")")
 			}
 			ipFilterSlice := []string{}
 			if ip4WhereFilter != "" {
@@ -101,21 +106,26 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where) (view.Node, error) {
 				ipFilterSlice = append(ipFilterSlice, ip6WhereFilter)
 			}
 			whereFilter = strings.Join(ipFilterSlice, OperatorMap[op])
-
-		} else {
-			whereFilter = fmt.Sprintf(tag.WhereTranslator, op, t.Value)
+		case "include_service":
+			isKeyService := "0"
+			if t.Value == "1" {
+				isKeyService = "1"
+			}
+			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, isKeyService)
+		default:
+			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
 		}
-		filterSlice = append(filterSlice, "("+whereFilter+")")
+	} else {
+		return &view.Expr{Value: "(1=1)"}, nil
 	}
-	filter := strings.Join(filterSlice, " AND ")
-	return &view.Expr{Value: filter}, nil
+	return &view.Expr{Value: "(" + whereFilter + ")"}, nil
 }
 
 type TimeTag struct {
 	Value string
 }
 
-func (t *TimeTag) Trans(expr sqlparser.Expr, w *Where) (view.Node, error) {
+func (t *TimeTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string) (view.Node, error) {
 	compareExpr := expr.(*sqlparser.ComparisonExpr)
 	time, err := strconv.ParseInt(t.Value, 10, 64)
 	if err != nil {
