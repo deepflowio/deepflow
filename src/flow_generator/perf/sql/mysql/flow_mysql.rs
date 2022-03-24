@@ -278,7 +278,7 @@ mod test {
 
     use super::*;
 
-    use crate::{common::enums::PacketDirection, utils::test::load_pcap};
+    use crate::{common::enums::PacketDirection, utils::test::Capture};
 
     const FILE_DIR: &str = "resources/test/flow_generator/mysql";
 
@@ -286,7 +286,8 @@ mod test {
         let rrt_cache = Rc::new(RefCell::new(L7RrtCache::new(100)));
         let mut perf_data = MysqlPerfData::new(rrt_cache);
 
-        let mut packets: Vec<MetaPacket> = load_pcap(Path::new(FILE_DIR).join(pcap), Some(1400));
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), Some(1400));
+        let mut packets = capture.as_meta_packets();
 
         let first_src_mac = packets[0].lookup_key.src_mac;
         for packet in packets.iter_mut() {

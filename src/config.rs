@@ -41,13 +41,13 @@ pub struct Config {
     #[serde(alias = "afpacket-blocks-enabled")]
     pub af_packet_blocks_enabled: bool,
     #[serde(alias = "afpacket-blocks")]
-    pub af_packet_blocks: u32,
+    pub af_packet_blocks: usize,
     pub enable_debug_stats: bool,
     pub analyzer_dedup_disabled: bool,
     pub default_tap_type: u32,
     pub debug_listen_port: u16,
     pub enable_qos_bypass: bool,
-    pub fast_path_map_size: u32,
+    pub fast_path_map_size: usize,
     pub first_path_level: u32,
     pub src_interfaces: Vec<String>,
     #[serde(with = "TapModeDef")]
@@ -57,19 +57,19 @@ pub struct Config {
     pub vtap_group_id_request: String,
     pub pcap: PcapConfig,
     pub flow: FlowGeneratorConfig,
-    pub flow_queue_size: u32,
-    pub quadruple_queue_size: u32,
-    pub analyzer_queue_size: u32,
+    pub flow_queue_size: usize,
+    pub quadruple_queue_size: usize,
+    pub analyzer_queue_size: usize,
     #[serde(rename = "ovs-dpdk-enable")]
     pub ovs_dpdk_enabled: bool,
     pub dpdk_pmd_core_id: u32,
     pub dpdk_ring_port: String,
     pub xflow_collector: XflowGeneratorConfig,
     pub vxlan_port: u16,
-    pub collector_sender_queue_size: u32,
-    pub collector_sender_queue_count: u32,
-    pub flow_sender_queue_size: u32,
-    pub flow_sender_queue_count: u32,
+    pub collector_sender_queue_size: usize,
+    pub collector_sender_queue_count: usize,
+    pub flow_sender_queue_size: usize,
+    pub flow_sender_queue_count: usize,
     #[serde(with = "humantime_serde")]
     pub second_flow_extra_delay: Duration,
     #[serde(with = "humantime_serde")]
@@ -80,6 +80,10 @@ pub struct Config {
     pub analyzer_ip: String,
     pub kubernetes_cluster_id: String,
     pub ingress_flavour: IngressFlavour,
+    pub grpc_buffer_size: usize,
+    #[serde(with = "humantime_serde")]
+    pub l7_log_session_aggr_timeout: Duration,
+    pub tap_mac_script: String,
 }
 
 impl Config {
@@ -212,6 +216,9 @@ impl Default for Config {
             analyzer_ip: "".into(),
             kubernetes_cluster_id: "".into(),
             ingress_flavour: IngressFlavour::Kubernetes,
+            grpc_buffer_size: 5,
+            l7_log_session_aggr_timeout: Duration::from_secs(5),
+            tap_mac_script: "".into(),
         }
     }
 }

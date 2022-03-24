@@ -10,6 +10,12 @@ pub enum OptTpacketVersion {
     TpacketVersion3,
 }
 
+impl Default for OptTpacketVersion {
+    fn default() -> Self {
+        Self::TpacketVersionHighestavailablet
+    }
+}
+
 impl OptTpacketVersion {
     fn invalid(&self) -> bool {
         if *self < OptTpacketVersion::TpacketVersionHighestavailablet
@@ -37,7 +43,6 @@ impl OptSocketType {
 #[derive(Clone, Debug)]
 pub struct Options {
     pub frame_size: u32,
-    pub frames_per_block: u32,
     pub block_size: u32,
     pub num_blocks: u32,
     pub add_vlan_header: bool,
@@ -52,7 +57,6 @@ impl Default for Options {
     fn default() -> Options {
         Options {
             frame_size: 4096,
-            frames_per_block: 128,
             block_size: 4096 * 128,
             num_blocks: 128,
             add_vlan_header: false,
@@ -88,6 +92,10 @@ impl Options {
             return Err(Error::InvalidOption("tpacket version is invalid."));
         }
         Ok(())
+    }
+
+    pub fn frames_per_block(&self) -> u32 {
+        self.block_size / self.frame_size
     }
 }
 

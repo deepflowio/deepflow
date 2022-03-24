@@ -257,11 +257,10 @@ impl Labeler {
                 continue;
             }
             for ip in &(interface.ips) {
-                let mut net_addr: u128 = 0;
-                match ip.raw_ip {
+                let net_addr = match ip.raw_ip {
                     IpAddr::V4(ipv4) => {
                         let ip_int = u32::from_be_bytes(ipv4.octets());
-                        net_addr = (ip_int & (0xffff_ffff << (32 - ip.netmask))) as u128;
+                        let net_addr = (ip_int & (0xffff_ffff << (32 - ip.netmask))) as u128;
 
                         let mut start = net_addr >> 16;
                         let mut end = start;
@@ -279,11 +278,11 @@ impl Labeler {
                             start += 1;
                         }
                         // IPv4-mapped IPv6 addresses are defined in [IETF RFC 4291 Section 2.5.5.2]
-                        net_addr |= 0xffff_0000_0000;
+                        net_addr | 0xffff_0000_0000
                     }
                     IpAddr::V6(ipv6) => {
-                        net_addr = u128::from_be_bytes(ipv6.octets())
-                            & 0xffffffffffffffff_ffffffffffffffff << (128 - ip.netmask);
+                        u128::from_be_bytes(ipv6.octets())
+                            & 0xffffffffffffffff_ffffffffffffffff << (128 - ip.netmask)
                     }
                 };
                 ip_table.insert(net_addr, Rc::clone(interface));

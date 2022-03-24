@@ -104,7 +104,7 @@ impl FlowMapKey {
                 port_dst: lookup_key.dst_port,
                 proto: lookup_key.proto,
             },
-            tunnel_info: if let Some(tunnel) = meta_packet.tunnel() {
+            tunnel_info: if let Some(tunnel) = meta_packet.tunnel {
                 (tunnel.tunnel_type, tunnel.tier)
             } else {
                 (TunnelType::default(), 0)
@@ -141,8 +141,8 @@ impl FlowMapKey {
             return MatchMac::None;
         }
 
-        let is_from_trident = o_flow_key.tap_type == TapType::Tor
-            && o_flow_key.tap_port.split_to_port_and_type().0 > 0;
+        let is_from_trident =
+            o_flow_key.tap_type == TapType::Tor && o_flow_key.tap_port.split_fields().0 > 0;
 
         if !self.config_ignore.0 && is_from_trident {
             if !other.lookup_key_enabled.0 && !other.lookup_key_enabled.1 {

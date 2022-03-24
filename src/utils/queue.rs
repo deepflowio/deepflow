@@ -28,7 +28,7 @@ pub struct Counter {
 }
 
 // fixed size MPSC overwrite queue implemented with ring buffer
-pub struct OverwriteQueue<T: Sized> {
+struct OverwriteQueue<T: Sized> {
     size: usize,
 
     buffer: *mut T,
@@ -232,7 +232,7 @@ impl<T> Drop for OverwriteQueue<T> {
     }
 }
 
-pub struct RefCounter<T> {
+struct RefCounter<T> {
     senders: AtomicUsize,
     sender_dropped: AtomicBool,
     receiver_dropped: AtomicBool,

@@ -7,6 +7,7 @@ pub mod perf;
 mod service_table;
 
 pub use flow_config::{FlowTimeout, TcpTimeout};
+pub use flow_map::{FlowMap, MetaAppProto};
 use flow_node::{FlowMapKey, FlowMapTimeKey, FlowNode};
 pub use flow_state::FlowState;
 

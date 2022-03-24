@@ -5,6 +5,8 @@ use std::{
     str::FromStr,
 };
 
+use bitflags::bitflags;
+
 mod error;
 pub use error::{Error, Result};
 
@@ -30,11 +32,54 @@ pub struct NeighborEntry {
     pub dest_mac_addr: MacAddr,
 }
 
-#[derive(Debug)]
+bitflags! {
+    #[derive(Default)]
+    pub struct LinkFlags: u32 {
+        const UP = 1 << 0;
+        const BROADCAST = 1 << 1;
+        const LOOPBACK = 1 << 3;
+        const POINT_TO_POINT = 1 << 4;
+        const MULTICAST = 1 << 12;
+    }
+}
+
+#[cfg(target_os = "linux")]
+use neli::consts::rtnl::{Iff, IffFlags};
+#[cfg(target_os = "linux")]
+impl From<&IffFlags> for LinkFlags {
+    fn from(flags: &IffFlags) -> Self {
+        let mut fs = Self::default();
+        if flags.contains(&Iff::Up) {
+            fs |= Self::UP;
+        }
+        if flags.contains(&Iff::Broadcast) {
+            fs |= Self::BROADCAST;
+        }
+        if flags.contains(&Iff::Loopback) {
+            fs |= Self::LOOPBACK;
+        }
+        if flags.contains(&Iff::Pointopoint) {
+            fs |= Self::POINT_TO_POINT;
+        }
+        if flags.contains(&Iff::Multicast) {
+            fs |= Self::MULTICAST;
+        }
+        fs
+    }
+}
+#[cfg(target_os = "linux")]
+impl From<u32> for LinkFlags {
+    fn from(flags: u32) -> Self {
+        Self::from_bits_truncate(flags)
+    }
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct Link {
     pub if_index: u32,
     pub mac_addr: MacAddr,
     pub name: String,
+    pub flags: LinkFlags,
     pub if_type: Option<String>,
     pub parent_index: Option<u32>,
 }
@@ -77,7 +122,7 @@ pub struct Route {
 pub const MAC_ADDR_ZERO: MacAddr = MacAddr([0, 0, 0, 0, 0, 0]);
 pub const MAC_ADDR_LEN: usize = 6;
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Default, Copy)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Default, Copy, Hash)]
 // slice is in bigendian
 pub struct MacAddr([u8; 6]);
 

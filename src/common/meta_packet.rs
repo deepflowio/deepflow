@@ -1,7 +1,6 @@
 use std::fmt;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr};
-use std::sync::Arc;
 use std::time::Duration;
 
 use pnet::packet::{
@@ -24,11 +23,11 @@ use crate::error;
 use crate::utils::net::{is_unicast_link_local, MacAddr};
 
 #[derive(Default)]
-pub struct MetaPacket {
+pub struct MetaPacket<'a> {
     // 主机序, 不因L2End1而颠倒, 端口会在查询策略时被修改
     pub lookup_key: LookupKey,
 
-    pub raw: Option<Arc<Vec<u8>>>,
+    pub raw: Option<&'a [u8]>,
     pub packet_len: usize,
     vlan_tag_size: usize,
     pub ttl: u8,
@@ -55,7 +54,7 @@ pub struct MetaPacket {
     npb_ignore_l4: bool, // 对于IP分片或IP Options不全的情况，分发时不对l4进行解析
     nd_reply_or_arp_request: bool, // NDP request or ARP request
 
-    tunnel: Option<Arc<TunnelInfo>>,
+    pub tunnel: Option<&'a TunnelInfo>,
 
     data_offset_ihl_or_fl4b: u8,
     next_header: u8, // ipv6 header中的nextHeader字段，用于包头压缩等
@@ -81,8 +80,8 @@ pub struct MetaPacket {
     pub source_ip: u32,
 }
 
-impl MetaPacket {
-    pub fn empty() -> MetaPacket {
+impl<'a> MetaPacket<'a> {
+    pub fn empty() -> MetaPacket<'a> {
         MetaPacket {
             offset_mac_0: FIELD_OFFSET_SA,
             offset_mac_1: FIELD_OFFSET_DA,
@@ -315,7 +314,7 @@ impl MetaPacket {
 
     pub fn update(
         &mut self,
-        packet: Arc<Vec<u8>>,
+        packet: &'a [u8],
         src_endpoint: bool,
         dst_endpoint: bool,
         timestamp: Duration,
@@ -406,7 +405,7 @@ impl MetaPacket {
                     *<&[u8; 4]>::try_from(&packet[spa_offset..spa_offset + IPV4_ADDR_LEN]).unwrap(),
                 );
                 self.lookup_key.dst_ip = IpAddr::from(
-                    *<&[u8; 4]>::try_from(&packet[tpa_offset..spa_offset + IPV4_ADDR_LEN]).unwrap(),
+                    *<&[u8; 4]>::try_from(&packet[tpa_offset..tpa_offset + IPV4_ADDR_LEN]).unwrap(),
                 );
                 self.nd_reply_or_arp_request =
                     read_u16_be(&packet[self.vlan_tag_size + ARP_OP_OFFSET..]) == arp::OP_REQUEST;
@@ -708,11 +707,6 @@ impl MetaPacket {
         Ok(())
     }
 
-    /// Get a reference to the meta packet's tunnel.
-    pub fn tunnel(&self) -> Option<&Arc<TunnelInfo>> {
-        self.tunnel.as_ref()
-    }
-
     /// Get the meta packet's l3 payload len.
     pub fn l3_payload_len(&self) -> usize {
         self.l3_payload_len
@@ -724,7 +718,7 @@ impl MetaPacket {
     }
 }
 
-impl fmt::Display for MetaPacket {
+impl<'a> fmt::Display for MetaPacket<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "\t\t{}\n", self.lookup_key)?;
         write!(f, "\t\tsource_ip: {}, packet_count: {}, packet_bytes: {}, tap_port: {}, packet_len: {}, payload_len: {}, vlan: {}, direction: {:?}\n",

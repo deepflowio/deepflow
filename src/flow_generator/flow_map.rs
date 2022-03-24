@@ -32,9 +32,8 @@ use crate::{
         tagged_flow::TaggedFlow,
         tap_port::TapPort,
     },
-    config::{Config, RuntimeConfig},
+    config::Config,
     proto::common::TridentType,
-    proto::trident,
     utils::hasher::Jenkins64Hasher,
     utils::net::MacAddr,
     utils::queue::{self, Receiver, Sender},
@@ -55,6 +54,13 @@ impl MetaAppProto {
     }
 }
 // END TODO
+
+#[derive(Default)]
+pub struct RuntimeConfig {
+    pub trident_type: TridentType,
+    pub l4_performance_enabled: bool,
+    pub l7_metrics_enabled: bool,
+}
 
 // not thread-safe
 pub struct FlowMap {
@@ -537,7 +543,7 @@ impl FlowMap {
                 tap_type: lookup_key.tap_type,
                 tap_port: meta_packet.tap_port,
             },
-            tunnel: if let Some(tunnel) = meta_packet.tunnel() {
+            tunnel: if let Some(tunnel) = meta_packet.tunnel {
                 TunnelField {
                     tx_ip0: tunnel.src,
                     tx_ip1: tunnel.dst,
@@ -703,7 +709,7 @@ impl FlowMap {
             flow_metrics_peer.first = pkt_timestamp;
         }
 
-        if let Some(tunnel) = meta_packet.tunnel() {
+        if let Some(tunnel) = meta_packet.tunnel {
             match meta_packet.direction {
                 PacketDirection::ClientToServer => {
                     flow.tunnel.tx_ip0 = tunnel.src;
@@ -1149,55 +1155,8 @@ pub fn _new_flow_map_and_receiver() -> (FlowMap, Receiver<TaggedFlow>) {
     let (app_proto_log_queue, _, _) = queue::bounded(256);
     let c = Config::load_from_file("config/trident.yaml").expect("failed loading config file");
     let rt_config = RuntimeConfig {
-        enabled: false,
-        max_cpus: 0,
-        max_memory: 0,
-        sync_interval: Duration::ZERO,
-        stats_interval: Duration::ZERO,
-        global_pps_threshold: 0,
-        tap_interface_regex: String::from(""),
-        host: String::from(""),
-        rsyslog_enabled: false,
-        output_vlan: 0,
-        mtu: 0,
-        npb_bps_threshold: 0,
-        collector_enabled: false,
-        l4_log_store_tap_types: vec![],
-        packet_header_enabled: false,
-        platform_enabled: false,
-        server_tx_bandwidth_threshold: 0,
-        bandwidth_probe_interval: Duration::ZERO,
-        npb_vlan_mode: trident::VlanMode::None,
-        npb_dedup_enabled: false,
-        if_mac_source: trident::IfMacSource::IfLibvirtXml,
-        vtap_flow_1s_enabled: false,
-        debug_enabled: false,
-        log_threshold: 0,
-        log_level: log::Level::Debug,
-        analyzer_ip: String::from(""),
-        max_escape: Duration::ZERO,
-        proxy_controller_ip: String::from(""),
-        vtap_id: 0,
-        collector_socket_type: trident::SocketType::Tcp,
-        compressor_socket_type: trident::SocketType::Tcp,
-        npb_socket_type: trident::SocketType::Tcp,
         trident_type: TridentType::TtHyperVCompute,
-        capture_packet_size: 0,
-        inactive_server_port_enabled: false,
-        libvirt_xml_path: String::from(""),
-        l7_log_packet_size: 0,
-        l4_log_collect_nps_threshold: 0,
-        l7_log_collect_nps_threshold: 0,
         l7_metrics_enabled: false,
-        l7_log_store_tap_types: vec![],
-        decap_type: vec![],
-        region_id: 0,
-        pod_cluster_id: 0,
-        log_retention: 0,
-        capture_socket_type: trident::CaptureSocketType::AfPacketV1,
-        process_threshold: 0,
-        thread_threshold: 0,
-        capture_bpf: String::from(""),
         l4_performance_enabled: false,
     };
 
@@ -1218,7 +1177,7 @@ pub fn _new_flow_map_and_receiver() -> (FlowMap, Receiver<TaggedFlow>) {
     (flow_map, output_queue_receiver)
 }
 
-pub fn _new_meta_packet() -> MetaPacket {
+pub fn _new_meta_packet<'a>() -> MetaPacket<'a> {
     let mut packet = MetaPacket::default();
     packet.lookup_key = LookupKey {
         timestamp: SystemTime::now()

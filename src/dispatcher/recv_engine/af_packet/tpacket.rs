@@ -1,4 +1,4 @@
-use std::{ffi::CString, io, time::Duration};
+use std::{ffi::CStr, io, time::Duration};
 
 use libc::{
     c_int, c_uint, c_void, getsockopt, mmap, munmap, off_t, poll, pollfd, size_t, sockaddr,
@@ -60,13 +60,16 @@ pub struct Tpacket {
     v3: Option<*mut header::V3Wrapper>,
 }
 
+// it's safe because ring points to mmap'ed buffer
+unsafe impl Send for Tpacket {}
+
 #[derive(Debug)]
 pub struct Packet<'a> {
     pub timestamp: Duration,
     pub if_index: isize,
     pub capture_length: isize,
 
-    pub data: &'a [u8],
+    pub data: &'a mut [u8],
 }
 
 impl Tpacket {
@@ -146,7 +149,7 @@ impl Tpacket {
             let mut req: header::TpacketReq = Default::default();
             req.tp_block_nr = self.opts.num_blocks;
             req.tp_block_size = self.opts.block_size;
-            req.tp_frame_nr = self.opts.frames_per_block * self.opts.num_blocks;
+            req.tp_frame_nr = self.opts.frames_per_block() * self.opts.num_blocks;
             req.tp_frame_size = self.opts.frame_size;
             self.raw_socket
                 .setsockopt(SOL_PACKET, PACKET_RX_RING, req)?;
@@ -156,7 +159,7 @@ impl Tpacket {
             req.tp_block_size = self.opts.block_size;
             req.tp_block_nr = self.opts.num_blocks;
             req.tp_frame_size = self.opts.frame_size;
-            req.tp_frame_nr = self.opts.frames_per_block * self.opts.num_blocks;
+            req.tp_frame_nr = self.opts.frames_per_block() * self.opts.num_blocks;
             req.tp_retire_blk_tov = self.opts.block_timeout / MILLI_SECONDS;
             self.raw_socket
                 .setsockopt(SOL_PACKET, PACKET_RX_RING, req)?;
@@ -190,7 +193,7 @@ impl Tpacket {
         match self.tp_version {
             options::OptTpacketVersion::TpacketVersion2 => {
                 // AF_PACKET 2
-                if self.offset >= self.opts.frames_per_block * self.opts.num_blocks {
+                if self.offset >= self.opts.frames_per_block() * self.opts.num_blocks {
                     self.offset = 0
                 }
 
@@ -204,7 +207,7 @@ impl Tpacket {
                     self.offset = 0;
                 }
                 let position: *mut u8 = (self.ring as usize
-                    + (self.opts.frame_size * self.offset * self.opts.frames_per_block) as usize)
+                    + (self.opts.frame_size * self.offset * self.opts.frames_per_block()) as usize)
                     as *mut u8;
                 return Box::from(header::V3Wrapper::from(position));
             }
@@ -276,7 +279,7 @@ impl Tpacket {
         return None;
     }
 
-    pub fn set_bpf(&self, syntax: CString) -> Result<()> {
+    pub fn set_bpf(&self, syntax: &CStr) -> Result<()> {
         let mut prog: bpf_program = bpf_program {
             bf_len: 0,
             bf_insns: std::ptr::null_mut(),

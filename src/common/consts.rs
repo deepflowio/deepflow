@@ -173,7 +173,7 @@ pub mod erspan {
     |             SGT               |P|    FT   |   Hw ID   |D|Gra|O|
     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     */
-    pub const GRE_PROTO_ERSPAN3: usize = 0x22eb;
+    pub const GRE_PROTO_ERSPAN_III: usize = 0x22eb;
     pub const GRE_PROTO_OFFSET: usize = 2;
     pub const GRE_KEY_OFFSET: usize = 4;
     pub const GRE_SEQUENCE_OFFSET: usize = 8; // 注意: 相对GRE头部开头位置的偏移量

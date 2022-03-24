@@ -1002,7 +1002,7 @@ struct MiniMetaPacket {
     packet_len: usize,
 }
 
-impl From<MiniMetaPacket> for MetaPacket {
+impl<'a> From<MiniMetaPacket> for MetaPacket<'_> {
     fn from(m: MiniMetaPacket) -> Self {
         let mut packet = MetaPacket::empty();
         packet.tcp_data = MetaPacketTcpHeader {
@@ -1168,7 +1168,7 @@ mod tests {
 
     use super::*;
 
-    use crate::utils::test::load_pcap;
+    use crate::utils::test::Capture;
 
     const FILE_DIR: &'static str = "resources/test/flow_generator";
 
@@ -1774,7 +1774,8 @@ mod tests {
         let mut output = String::new();
 
         let mut perf = TcpPerf::new(Arc::new(Counter::default()));
-        let packets: Vec<MetaPacket> = load_pcap(file, None);
+        let capture = Capture::load_pcap(file, None);
+        let packets = capture.as_meta_packets();
         assert!(
             packets.len() >= 2,
             "calculating flow perf requires 2 packets at least"
@@ -1839,7 +1840,8 @@ mod tests {
         let mut output = String::new();
 
         let mut perf = TcpPerf::new(Arc::new(Counter::default()));
-        let mut packets: Vec<MetaPacket> = load_pcap(file, None);
+        let capture = Capture::load_pcap(file, None);
+        let mut packets = capture.as_meta_packets();
         assert!(
             packets.len() >= 2,
             "calculating flow perf requires 2 packets at least"

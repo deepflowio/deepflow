@@ -10,6 +10,8 @@ pub enum Error {
     LinkNotFound(String),
     #[error("link not found index: {0}")]
     LinkNotFoundIndex(u32),
+    #[error("link regex invalid")]
+    LinkRegexInvalid(#[from] regex::Error),
     #[error("netlink error")]
     NetLinkError(#[from] neli::err::NlError),
     #[error("IO error")]

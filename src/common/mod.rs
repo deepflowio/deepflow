@@ -12,9 +12,14 @@ pub mod protocol_logs;
 mod tag;
 pub mod tagged_flow;
 pub mod tap_port;
-mod tap_types;
+pub mod tap_types;
 
 pub use consts::*;
+pub use meta_packet::MetaPacket;
+pub use platform_data::PlatformData;
+pub use tagged_flow::TaggedFlow;
+pub use tap_port::TapPort;
+pub use tap_types::TapTyper;
 
 use std::{
     fmt,

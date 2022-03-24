@@ -179,16 +179,14 @@ mod test {
 
     use super::*;
 
-    use crate::{
-        common::{enums::PacketDirection, meta_packet::MetaPacket},
-        utils::test::load_pcap,
-    };
+    use crate::{common::enums::PacketDirection, utils::test::Capture};
 
     const FILE_DIR: &str = "resources/test/flow_generator/mysql";
 
     fn run(name: &str) -> String {
         let pcap_file = Path::new(FILE_DIR).join(name);
-        let mut packets: Vec<MetaPacket> = load_pcap(pcap_file, Some(1400));
+        let capture = Capture::load_pcap(pcap_file, Some(1400));
+        let mut packets = capture.as_meta_packets();
         if packets.is_empty() {
             return "".to_string();
         }
