@@ -1,13 +1,15 @@
 use std::fmt;
 use std::net::Ipv4Addr;
 
+use num_enum::TryFromPrimitive;
+
 use super::consts::*;
 use super::enums::{EthernetType, IpProtocol};
 
 use crate::proto::trident::DecapType;
 use crate::utils::bytes;
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, TryFromPrimitive)]
 #[repr(u16)]
 pub enum TunnelType {
     None = DecapType::None as u16,
@@ -17,14 +19,13 @@ pub enum TunnelType {
     ErspanOrTeb = TunnelType::TencentGre as u16 + 1,
 }
 
-impl TryFrom<&DecapType> for TunnelType {
-    type Error = &'static str;
-    fn try_from(t: &DecapType) -> Result<TunnelType, Self::Error> {
+impl From<DecapType> for TunnelType {
+    fn from(t: DecapType) -> Self {
         match t {
-            DecapType::None => Ok(TunnelType::None),
-            DecapType::Vxlan => Ok(TunnelType::Vxlan),
-            DecapType::Ipip => Ok(TunnelType::Ipip),
-            DecapType::Tencent => Ok(TunnelType::TencentGre),
+            DecapType::None => TunnelType::None,
+            DecapType::Vxlan => TunnelType::Vxlan,
+            DecapType::Ipip => TunnelType::Ipip,
+            DecapType::Tencent => TunnelType::TencentGre,
         }
     }
 }
@@ -47,7 +48,7 @@ impl Default for TunnelType {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct TunnelTypeBitmap(u16);
 
 impl TunnelTypeBitmap {
@@ -355,7 +356,7 @@ impl TunnelInfo {
         &mut self,
         packet: &mut [u8],
         l2_len: usize,
-        tunnel_types: TunnelTypeBitmap,
+        tunnel_types: &TunnelTypeBitmap,
     ) -> usize {
         let l3_packet = &packet[l2_len..];
         let ip_header_size: usize = (l3_packet[IP_IHL_OFFSET] as usize & 0xf) << 2;
@@ -393,7 +394,7 @@ impl TunnelInfo {
         &mut self,
         packet: &mut [u8],
         l2_len: usize,
-        tunnel_types: TunnelTypeBitmap,
+        tunnel_types: &TunnelTypeBitmap,
     ) -> usize {
         if tunnel_types.is_empty() || self.tier == TUNNEL_TIER_LIMIT {
             return 0;
@@ -466,7 +467,7 @@ impl TunnelInfo {
         &mut self,
         packet: &mut [u8],
         l2_len: usize,
-        tunnel_types: TunnelTypeBitmap,
+        tunnel_types: &TunnelTypeBitmap,
     ) -> usize {
         if tunnel_types.is_empty() || self.tier == TUNNEL_TIER_LIMIT {
             return 0;
@@ -572,7 +573,7 @@ mod tests {
 
     use super::*;
 
-    use crate::utils::test::load_pcap;
+    use crate::utils::test::Capture;
 
     pub const PCAP_PATH_PREFIX: &str = "./resources/test/common";
 
@@ -609,15 +610,16 @@ mod tests {
             tier: 1,
             is_ipv6: false,
         };
-        let mut packets: Vec<Vec<u8>> = load_pcap(
+        let mut packets: Vec<Vec<u8>> = Capture::load_pcap(
             Path::new(PCAP_PATH_PREFIX).join("decapsulate_erspan1.pcap"),
             None,
-        );
+        )
+        .into();
         let packet = packets[0].as_mut_slice();
 
         let l2_len = 18;
         let mut actual = TunnelInfo::default();
-        let offset = actual.decapsulate(packet, l2_len, bitmap);
+        let offset = actual.decapsulate(packet, l2_len, &bitmap);
         let expected_offset = IPV4_HEADER_SIZE + GRE_HEADER_SIZE_DECAP;
 
         assert_eq!(offset, expected_offset);
@@ -625,7 +627,7 @@ mod tests {
 
         let packet = packets[1].as_mut_slice();
         let mut actual = TunnelInfo::default();
-        let offset = actual.decapsulate(packet, l2_len, bitmap);
+        let offset = actual.decapsulate(packet, l2_len, &bitmap);
 
         assert_eq!(offset, expected_offset);
         assert_eq!(actual, expected);
@@ -644,15 +646,16 @@ mod tests {
             tier: 1,
             is_ipv6: false,
         };
-        let mut packets: Vec<Vec<u8>> = load_pcap(
+        let mut packets: Vec<Vec<u8>> = Capture::load_pcap(
             Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"),
             None,
-        );
+        )
+        .into();
         let packet = packets[0].as_mut_slice();
 
         let l2_len = 14;
         let mut actual = TunnelInfo::default();
-        let offset = actual.decapsulate(packet, l2_len, bitmap);
+        let offset = actual.decapsulate(packet, l2_len, &bitmap);
         let expected_offset = 50 - l2_len;
 
         assert_eq!(offset, expected_offset);
@@ -660,7 +663,7 @@ mod tests {
 
         let packet = packets[1].as_mut_slice();
         let mut actual = TunnelInfo::default();
-        let offset = actual.decapsulate(packet, l2_len, bitmap);
+        let offset = actual.decapsulate(packet, l2_len, &bitmap);
 
         assert_eq!(offset, expected_offset);
         assert_eq!(actual, expected);
@@ -679,15 +682,16 @@ mod tests {
             tier: 1,
             is_ipv6: false,
         };
-        let mut packets: Vec<Vec<u8>> = load_pcap(
+        let mut packets: Vec<Vec<u8>> = Capture::load_pcap(
             Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"),
             None,
-        );
+        )
+        .into();
         let packet = packets[3].as_mut_slice();
 
         let l2_len = 14;
         let mut actual = TunnelInfo::default();
-        let offset = actual.decapsulate(packet, l2_len, bitmap);
+        let offset = actual.decapsulate(packet, l2_len, &bitmap);
         let expected_offset = 54 - l2_len;
 
         assert_eq!(offset, expected_offset);
@@ -707,15 +711,16 @@ mod tests {
             tier: 1,
             is_ipv6: false,
         };
-        let mut packets: Vec<Vec<u8>> = load_pcap(
+        let mut packets: Vec<Vec<u8>> = Capture::load_pcap(
             Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"),
             None,
-        );
+        )
+        .into();
         let packet = packets[2].as_mut_slice();
 
         let l2_len = 14;
         let mut actual = TunnelInfo::default();
-        let offset = actual.decapsulate(packet, l2_len, bitmap);
+        let offset = actual.decapsulate(packet, l2_len, &bitmap);
         let expected_offset = 50 - l2_len;
 
         assert_eq!(offset, expected_offset);
@@ -742,12 +747,12 @@ mod tests {
         ];
 
         let mut packets: Vec<Vec<u8>> =
-            load_pcap(Path::new(PCAP_PATH_PREFIX).join("tencent-gre.pcap"), None);
+            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("tencent-gre.pcap"), None).into();
         let packet = packets[0].as_mut_slice();
 
         let l2_len = 14;
         let mut actual = TunnelInfo::default();
-        let offset = actual.decapsulate(packet, l2_len, bitmap);
+        let offset = actual.decapsulate(packet, l2_len, &bitmap);
         let expected_offset = 18;
 
         let actual_overlay: [u8; 34] = packet
@@ -772,15 +777,16 @@ mod tests {
             tier: 1,
             is_ipv6: false,
         };
-        let mut packets: Vec<Vec<u8>> = load_pcap(
+        let mut packets: Vec<Vec<u8>> = Capture::load_pcap(
             Path::new(PCAP_PATH_PREFIX).join("vmware-gre-teb.pcap"),
             None,
-        );
+        )
+        .into();
         let packet = packets[2].as_mut_slice();
 
         let l2_len = 14;
         let mut actual = TunnelInfo::default();
-        let offset = actual.decapsulate(packet, l2_len, bitmap);
+        let offset = actual.decapsulate(packet, l2_len, &bitmap);
         let expected_offset = 28;
 
         assert_eq!(offset, expected_offset);
@@ -801,12 +807,12 @@ mod tests {
             is_ipv6: true,
         };
         let mut packets: Vec<Vec<u8>> =
-            load_pcap(Path::new(PCAP_PATH_PREFIX).join("ip6-vxlan.pcap"), None);
+            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("ip6-vxlan.pcap"), None).into();
         let packet = packets[0].as_mut_slice();
 
         let l2_len = 14;
         let mut actual = TunnelInfo::default();
-        let offset = actual.decapsulate_v6(packet, l2_len, bitmap);
+        let offset = actual.decapsulate_v6(packet, l2_len, &bitmap);
         let expected_offset = IPV6_HEADER_SIZE + UDP_HEADER_SIZE + VXLAN_HEADER_SIZE;
 
         assert_eq!(offset, expected_offset);
@@ -827,12 +833,12 @@ mod tests {
             is_ipv6: false,
         };
         let mut packets: Vec<Vec<u8>> =
-            load_pcap(Path::new(PCAP_PATH_PREFIX).join("ipip.pcap"), None);
+            Capture::load_pcap(Path::new(PCAP_PATH_PREFIX).join("ipip.pcap"), None).into();
         let packet = packets[0].as_mut_slice();
 
         let l2_len = 18;
         let mut actual = TunnelInfo::default();
-        let offset = actual.decapsulate(packet, l2_len, bitmap);
+        let offset = actual.decapsulate(packet, l2_len, &bitmap);
         let expected_offset = IPV4_HEADER_SIZE - l2_len;
 
         assert_eq!(offset, expected_offset);
@@ -844,16 +850,17 @@ mod tests {
         let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::Vxlan, TunnelType::ErspanOrTeb]);
         let mut actual_bitmap = TunnelTypeBitmap::new(&vec![TunnelType::None]);
 
-        let mut packets: Vec<Vec<u8>> = load_pcap(
+        let mut packets: Vec<Vec<u8>> = Capture::load_pcap(
             Path::new(PCAP_PATH_PREFIX).join("decapsulate_test.pcap"),
             None,
-        );
+        )
+        .into();
 
         let l2_len = 14;
 
         for packet in packets.iter_mut() {
             let actual = &mut TunnelInfo::default();
-            let _ = actual.decapsulate(packet, l2_len, bitmap);
+            let _ = actual.decapsulate(packet, l2_len, &bitmap);
             actual_bitmap.add(actual.tunnel_type);
         }
         assert!(actual_bitmap.has(TunnelType::Vxlan));

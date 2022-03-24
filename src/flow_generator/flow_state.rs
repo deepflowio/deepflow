@@ -693,13 +693,12 @@ mod tests {
     };
     use crate::common::enums::PacketDirection;
     use crate::common::flow::CloseType;
-    use crate::common::meta_packet::MetaPacket;
     use crate::common::tagged_flow::TaggedFlow;
     use crate::flow_generator::flow_map::_new_flow_map_and_receiver;
     use crate::flow_generator::flow_node::FlowNode;
     use crate::flow_generator::{FlowTimeout, TcpTimeout};
     use crate::flow_generator::{FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC, TIME_UNIT};
-    use crate::utils::test::load_pcap;
+    use crate::utils::test::Capture;
 
     const FILE_DIR: &'static str = "resources/test/flow_generator";
 
@@ -793,7 +792,8 @@ mod tests {
     fn state_machine_helper<P: AsRef<Path>>(pcap_file: P, expect_close_type: CloseType) {
         let (mut flow_map, output_queue_receiver) = _new_flow_map_and_receiver();
 
-        let packets: Vec<MetaPacket> = load_pcap(pcap_file, None);
+        let capture = Capture::load_pcap(pcap_file, None);
+        let packets = capture.as_meta_packets();
         let delta = packets.first().unwrap().lookup_key.timestamp;
         let mut last_timestamp = Duration::ZERO;
         for mut pkt in packets {

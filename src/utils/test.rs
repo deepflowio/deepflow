@@ -1,43 +1,47 @@
 use std::path::Path;
-use std::sync::Arc;
 use std::time::Duration;
 
-use pcap::{Capture, Packet};
+use pcap::{self, PacketHeader};
 
 use crate::common::meta_packet::MetaPacket;
 
-pub fn load_pcap<T: FromPacket, P: AsRef<Path>>(path: P, parse_len: Option<usize>) -> Vec<T> {
-    let mut packets: Vec<T> = vec![];
-    let mut capture = Capture::from_file(path).unwrap();
-    let len = parse_len.unwrap_or(128);
-    while let Ok(packet) = capture.next() {
-        packets.push(T::parse(&packet, len));
+pub struct Capture(Vec<(PacketHeader, Vec<u8>)>);
+
+impl Capture {
+    pub fn load_pcap<P: AsRef<Path>>(path: P, parse_len: Option<usize>) -> Self {
+        let parse_len = parse_len.unwrap_or(128);
+        let mut packets = vec![];
+        let mut capture = pcap::Capture::from_file(path).unwrap();
+        while let Ok(packet) = capture.next() {
+            packets.push((
+                packet.header.clone(),
+                Vec::from(&packet.data[..packet.data.len().min(parse_len)]),
+            ));
+        }
+        Self(packets)
     }
-    packets
-}
 
-pub trait FromPacket {
-    fn parse(p: &Packet, len: usize) -> Self;
-}
-
-impl FromPacket for MetaPacket {
-    fn parse(p: &Packet, len: usize) -> Self {
-        let mut meta = MetaPacket::empty();
-        meta.update(
-            Arc::new(p.data[..p.data.len().min(len)].to_vec()),
-            true,
-            true,
-            Duration::new(p.header.ts.tv_sec as u64, p.header.ts.tv_usec as u32 * 1000),
-            0,
-        )
-        .unwrap();
-        meta
+    pub fn as_meta_packets(&self) -> Vec<MetaPacket<'_>> {
+        self.0
+            .iter()
+            .map(|(h, p)| {
+                let mut meta = MetaPacket::empty();
+                meta.update(
+                    &p,
+                    true,
+                    true,
+                    Duration::new(h.ts.tv_sec as u64, h.ts.tv_usec as u32 * 1000),
+                    0,
+                )
+                .unwrap();
+                meta
+            })
+            .collect()
     }
 }
 
-impl FromPacket for Vec<u8> {
-    fn parse(packet: &Packet, len: usize) -> Self {
-        let packet_len = packet.data.len().min(len);
-        Vec::from(&packet.data[..packet_len])
+impl From<Capture> for Vec<Vec<u8>> {
+    fn from(c: Capture) -> Self {
+        c.0.into_iter().map(|(_, p)| p).collect()
     }
 }

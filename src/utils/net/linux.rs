@@ -5,6 +5,7 @@ use std::{
     time::Duration,
 };
 
+use log::warn;
 use neli::{
     consts::{nl::*, rtnl::*, socket::*},
     err::NlError::Nlmsgerr,
@@ -34,8 +35,9 @@ use pnet::{
         TransportReceiver, TransportSender,
     },
 };
+use regex::Regex;
 
-use super::{Addr, Link, MacAddr, NeighborEntry, Route, MAC_ADDR_ZERO};
+use super::{Addr, Link, LinkFlags, MacAddr, NeighborEntry, Route, MAC_ADDR_ZERO};
 use super::{Error, Result};
 
 const BUFFER_SIZE: usize = 512;
@@ -86,7 +88,11 @@ pub fn neighbor_lookup(mut dest_addr: IpAddr) -> Result<NeighborEntry> {
     };
 
     let NetworkInterface {
-        name, index, mac, ..
+        name,
+        index,
+        mac,
+        flags,
+        ..
     } = selected_interface;
 
     if mac.is_none() {
@@ -101,6 +107,7 @@ pub fn neighbor_lookup(mut dest_addr: IpAddr) -> Result<NeighborEntry> {
             if_index: index,
             mac_addr: MacAddr(mac.unwrap().octets()),
             name,
+            flags: flags.into(),
             if_type: None,
             parent_index: None,
         },
@@ -458,6 +465,7 @@ fn request_link_info(name: Option<&str>) -> Result<Vec<Link>> {
                     if_index: payload.ifi_index as u32,
                     name: if_name.unwrap_or_default(),
                     mac_addr: MacAddr(*mac),
+                    flags: (&payload.ifi_flags).into(),
                     if_type,
                     parent_index,
                 });
@@ -476,6 +484,34 @@ pub fn link_by_name<S: AsRef<str>>(name: S) -> Result<Link> {
             unreachable!()
         }
     })
+}
+
+pub fn links_by_name_regex<S: AsRef<str>>(regex: S) -> Result<Vec<Link>> {
+    let regex = regex.as_ref();
+    if regex == "" {
+        return Ok(vec![]);
+    }
+    let regex = if regex.ends_with('$') {
+        Regex::new(regex)
+    } else {
+        Regex::new(&format!("{}$", regex))
+    }?;
+    Ok(link_list()?
+        .into_iter()
+        .filter(|link| {
+            if !link.flags.contains(LinkFlags::LOOPBACK) {
+                // filter zero mac
+                if link.mac_addr == MAC_ADDR_ZERO {
+                    warn!(
+                        "link {} has invalid mac address {}",
+                        link.name, link.mac_addr
+                    );
+                    return false;
+                }
+            }
+            regex.is_match(&link.name)
+        })
+        .collect())
 }
 
 pub fn link_list() -> Result<Vec<Link>> {
@@ -655,6 +691,22 @@ mod tests {
         for link in links {
             assert_eq!(link.if_index, link_by_name(&link.name).unwrap().if_index);
         }
+    }
+
+    #[test]
+    fn get_link_by_regex() {
+        let links = links_by_name_regex("^lo").unwrap();
+        assert_eq!(&links[0].name, "lo");
+
+        for link in links_by_name_regex("^et.*").unwrap() {
+            assert!(link.name.starts_with("et"));
+        }
+
+        for link in links_by_name_regex("^tap.*").unwrap() {
+            assert!(link.name.starts_with("tap"));
+        }
+
+        assert!(links_by_name_regex("***").is_err());
     }
 
     #[test]

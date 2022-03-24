@@ -85,7 +85,3 @@ harness = false
 [[bench]]
 name = "labeler"
 harness = false
-
-[[example]]
-name = "capture"
-path = "src/dispatcher/recv_engine/af_packet/capture.rs"

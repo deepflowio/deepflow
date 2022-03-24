@@ -20,7 +20,7 @@ const DEFAULT_LIBVIRT_XML_PATH: &'static str = "/etc/libvirt/qemu";
 const REFRESH_INTERVAL: Duration = Duration::from_secs(60);
 
 #[derive(Debug)]
-pub struct LibVirtXmlExtractor {
+pub struct LibvirtXmlExtractor {
     path: Arc<Mutex<PathBuf>>,
     entries: Arc<RwLock<Vec<InterfaceEntry>>>,
     running: Arc<Mutex<bool>>,
@@ -28,7 +28,7 @@ pub struct LibVirtXmlExtractor {
     timer: Arc<Condvar>,
 }
 
-impl LibVirtXmlExtractor {
+impl LibvirtXmlExtractor {
     /// create new libvirtxmlextractor
     pub fn new() -> Self {
         Self {
@@ -67,7 +67,7 @@ impl LibVirtXmlExtractor {
 
         *self.thread.lock().unwrap() = Some(thread::spawn(move || loop {
             let (path_lock, entries) = (path.lock().unwrap(), Arc::clone(&entries));
-            LibVirtXmlExtractor::refresh(path_lock, entries);
+            LibvirtXmlExtractor::refresh(path_lock, entries);
 
             let guard = running.lock().unwrap();
             if !*guard {
@@ -281,7 +281,7 @@ mod tests {
     #[test]
     fn test_extract_xml() {
         if let Ok(entries) =
-            LibVirtXmlExtractor::extract_from("resources/test/platform/instance-00000054.xml")
+            LibvirtXmlExtractor::extract_from("resources/test/platform/instance-00000054.xml")
         {
             assert_eq!(2, entries.len());
         }
@@ -290,10 +290,10 @@ mod tests {
     #[test]
     fn test_libxml_extractor() {
         let entries =
-            LibVirtXmlExtractor::extract_from("resources/test/platform/instance-00000054.xml")
+            LibvirtXmlExtractor::extract_from("resources/test/platform/instance-00000054.xml")
                 .unwrap();
         let file_path = PathBuf::from("resources/test/platform");
-        let extractor = LibVirtXmlExtractor::new();
+        let extractor = LibvirtXmlExtractor::new();
         extractor.set_path(file_path);
         extractor.start();
         thread::sleep(Duration::from_secs(1));

@@ -11,12 +11,14 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time;
 
+use crate::common::PlatformData;
 use crate::config::RuntimeConfig;
+use crate::dispatcher::DispatcherListener;
 use crate::proto::trident;
 use crate::rpc::session::Session;
 use crate::utils::{
     self,
-    net::is_unicast_link_local,
+    net::{is_unicast_link_local, links_by_name_regex, MacAddr},
     stats::{Countable, Counter},
 };
 
@@ -64,6 +66,7 @@ pub struct Synchronizer {
     sync_interval: Duration,
 
     session: Arc<Session>,
+    dispatcher_listener: DispatcherListener,
 
     running: Arc<AtomicBool>,
 
@@ -80,6 +83,7 @@ impl Synchronizer {
         ctrl_mac: String,
         vtap_group_id_request: String,
         kubernetes_cluster_id: String,
+        dispatcher_listener: DispatcherListener,
     ) -> Synchronizer {
         Synchronizer {
             static_config: Arc::new(StaticConfig {
@@ -96,6 +100,7 @@ impl Synchronizer {
             status: Arc::new(RwLock::new(Status::default())),
             sync_interval: DEFAULT_SYNC_INTERVAL,
             session,
+            dispatcher_listener,
             running: Arc::new(AtomicBool::new(false)),
             rt: Runtime::new().unwrap(),
             threads: Mutex::new(Vec::new()),
@@ -190,8 +195,34 @@ impl Synchronizer {
         }
     }
 
-    fn on_config_change(_config: &RuntimeConfig) {
-        todo!()
+    fn on_config_change(_config: &RuntimeConfig) {}
+
+    fn trigger_dispatcher_listener(
+        listener: &DispatcherListener,
+        _: &trident::SyncResponse,
+        tap_mode: trident::TapMode,
+        rt_config: &RuntimeConfig,
+        _: &Vec<MacAddr>,
+        blacklist: &Vec<PlatformData>,
+    ) {
+        if tap_mode == trident::TapMode::Local {
+            let if_mac_source = rt_config.if_mac_source;
+            match links_by_name_regex(&rt_config.tap_interface_regex) {
+                Err(e) => warn!("get interfaces by name regex failed: {}", e),
+                Ok(links) if links.is_empty() => warn!(
+                    "tap-interface-regex({}) do not match any interface, in local mode",
+                    rt_config.tap_interface_regex
+                ),
+                Ok(links) => listener.on_tap_interface_change(
+                    &links,
+                    if_mac_source,
+                    rt_config.trident_type,
+                    blacklist,
+                ),
+            }
+        } else {
+            todo!()
+        }
     }
 
     fn on_response(
@@ -199,6 +230,7 @@ impl Synchronizer {
         mut resp: trident::SyncResponse,
         static_config: &Arc<StaticConfig>,
         status: &Arc<RwLock<Status>>,
+        dispatcher_listener: &mut DispatcherListener,
     ) {
         // TODO: reset escape timer
         // TODO: 把cleaner UpdatePcapDataRetention挪到别的地方
@@ -229,12 +261,25 @@ impl Synchronizer {
         }
         let runtime_config = runtime_config.unwrap();
         Self::on_config_change(&runtime_config);
+        dispatcher_listener.on_config_change(&runtime_config);
+
+        let blacklist = vec![];
+        if static_config.tap_mode == trident::TapMode::Local {
+            // TODO: generate blacklist
+        }
 
         // TODO: update platform, flow acls, groups, bridge forward
         // TODO: check trisolaris
         // TODO: segments
         // TODO: modify platform
-        // TODO: trigger listener
+        Self::trigger_dispatcher_listener(
+            &*dispatcher_listener,
+            &resp,
+            static_config.tap_mode,
+            &runtime_config,
+            &vec![],
+            &blacklist,
+        );
     }
 
     fn run_triggered_session(&self) {
@@ -242,6 +287,7 @@ impl Synchronizer {
         let static_config = self.static_config.clone();
         let status = self.status.clone();
         let running = self.running.clone();
+        let mut dispatcher_listener = self.dispatcher_listener.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             while running.load(Ordering::SeqCst) {
                 session.update_current_server().await;
@@ -290,6 +336,7 @@ impl Synchronizer {
                         message,
                         &static_config,
                         &status,
+                        &mut dispatcher_listener,
                     );
                 }
             }
@@ -303,6 +350,7 @@ impl Synchronizer {
         let status = self.status.clone();
         let sync_interval = self.sync_interval;
         let running = self.running.clone();
+        let mut dispatcher_listener = self.dispatcher_listener.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             let mut client = None;
             let version = session.get_version();
@@ -374,6 +422,7 @@ impl Synchronizer {
                     response.unwrap().into_inner(),
                     &static_config,
                     &status,
+                    &mut dispatcher_listener,
                 );
                 if status.read().new_revision.is_some() {
                     // TODO: upgrade

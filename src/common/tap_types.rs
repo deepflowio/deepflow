@@ -14,7 +14,7 @@ use super::{enums::TapType, XflowKey};
 
 const VLAN_MAX: u16 = 4096;
 
-struct TapTyper {
+pub struct TapTyper {
     packet: Arc<Mutex<[TapType; (VLAN_MAX + 1) as usize]>>,
     xflow: Arc<Mutex<HashMap<XflowKey, TapType>>>,
     //xflowmissed 没有删除操作，只有插入操作，这是业务要求(仅打印一次)，问过苑超说key不会一直增长，应该不会有内存泄漏问题
@@ -114,6 +114,12 @@ impl TapTyper {
 
         *self.packet.lock().unwrap() = packet;
         *self.xflow.lock().unwrap() = xflow;
+    }
+}
+
+impl Default for TapTyper {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

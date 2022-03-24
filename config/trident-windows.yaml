@@ -93,3 +93,13 @@ controller-ips:
 #triple:
 #  hash-slots-size: 65536
 #  capacity: 1048576
+## GRPC接收缓冲大小，单位为M，默认5M
+#grpc-buffer-size: 5
+## 通过该脚本获取采集接口对应的MAC地址，该选项需要如下条件才能生效：
+## 1. 采集器页面配置虚拟机MAC解析项为虚拟机XML
+## 2. tap-mode为0
+## 3. 接口名称和XML配置不冲突
+## 脚本输出格式如下：
+## tap2d283dfe,11:22:33:44:55:66
+## tap2d283223,aa:bb:cc:dd:ee:ff
+#tap-mac-script: ""

@@ -226,7 +226,7 @@ mod tests {
 
     use super::*;
 
-    use crate::utils::test::load_pcap;
+    use crate::utils::test::Capture;
 
     const FILE_DIR: &str = "resources/test/flow_generator/dubbo";
 
@@ -234,7 +234,8 @@ mod tests {
         let rrt_cache = Rc::new(RefCell::new(L7RrtCache::new(100)));
         let mut dubbo_perf_data = DubboPerfData::new(rrt_cache);
 
-        let mut packets: Vec<MetaPacket> = load_pcap(Path::new(FILE_DIR).join(pcap), None);
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), None);
+        let mut packets = capture.as_meta_packets();
         if packets.len() < 2 {
             return dubbo_perf_data;
         }

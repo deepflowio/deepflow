@@ -1,3 +1,4 @@
+use std::slice;
 use std::time::Duration;
 
 use libc::{c_uint, sockaddr_ll};
@@ -14,7 +15,7 @@ pub trait Header {
     fn get_status(&self) -> isize;
     fn clear_status(&mut self);
     fn get_time(&self) -> Duration;
-    fn get_data(&self) -> &[u8];
+    fn get_data(&self) -> &mut [u8];
     fn get_length(&self) -> isize;
     fn get_iface_index(&self) -> isize;
     fn next(&mut self) -> bool;
@@ -169,11 +170,11 @@ impl Header for *mut Tpacket2Hdr {
         }
     }
 
-    fn get_data(&self) -> &[u8] {
+    fn get_data(&self) -> &mut [u8] {
         unsafe {
             let ptr =
                 ((*self) as *const Tpacket2Hdr as *const u8 as usize) + (*(*self)).tp_mac as usize;
-            return core::slice::from_raw_parts(ptr as *const u8, (*(*self)).tp_snaplen as usize);
+            return slice::from_raw_parts_mut(ptr as *mut u8, (*(*self)).tp_snaplen as usize);
         }
     }
 
@@ -262,12 +263,12 @@ impl Header for V3Wrapper {
         }
     }
 
-    fn get_data(&self) -> &[u8] {
+    fn get_data(&self) -> &mut [u8] {
         unsafe {
             let ptr = self.v3_header as *const u8 as usize;
             let packet = ptr + (*self.v3_header).tp_mac as usize;
-            return core::slice::from_raw_parts(
-                packet as *const u8,
+            return slice::from_raw_parts_mut(
+                packet as *mut u8,
                 (*self.v3_header).tp_snaplen as usize,
             );
         }

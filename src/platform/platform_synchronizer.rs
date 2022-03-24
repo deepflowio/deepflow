@@ -19,8 +19,7 @@ use super::{
         check_read_link_ns, check_set_ns, ActivePoller, GenericPoller, InterfaceInfo,
         PassivePoller, Poller,
     },
-    libvirt_xml_extractor::LibVirtXmlExtractor,
-    InterfaceEntry, PollerType,
+    InterfaceEntry, LibvirtXmlExtractor, PollerType,
 };
 
 use crate::handler;
@@ -41,7 +40,7 @@ struct ProcessArgs {
     sniffer: Arc<sniffer_builder::Sniffer>,
     timer: Arc<Condvar>,
     poll_interval: Duration,
-    xml_extractor: Arc<LibVirtXmlExtractor>,
+    xml_extractor: Arc<LibvirtXmlExtractor>,
     platform_enabled: Arc<AtomicBool>,
     xml_path: Arc<Mutex<PathBuf>>,
     kubernetes_poller: Arc<GenericPoller>,
@@ -82,7 +81,7 @@ pub struct Synchronizer {
     thread: Mutex<Option<JoinHandle<()>>>,
     config: Arc<config::StaticConfig>,
     session: Arc<Session>,
-    xml_extractor: Arc<LibVirtXmlExtractor>,
+    xml_extractor: Arc<LibvirtXmlExtractor>,
     sniffer: Arc<sniffer_builder::Sniffer>,
 }
 
@@ -96,7 +95,7 @@ impl Synchronizer {
 
         config: Arc<config::StaticConfig>,
         session: Arc<Session>,
-        xml_extractor: Arc<LibVirtXmlExtractor>,
+        xml_extractor: Arc<LibvirtXmlExtractor>,
         sniffer: Arc<sniffer_builder::Sniffer>,
         mappings: Arc<mappings::Mappings>,
     ) -> Self {
