@@ -32,9 +32,8 @@ const (
 	PodID
 	MAC
 	PodClusterID
-	BusinessIDs
-	GroupIDs
-	ServiceID // 1<< 15 支持最大偏移到19
+	ServiceID
+	Resource // 1<< 14 支持最大偏移到19
 )
 
 const (
@@ -51,9 +50,8 @@ const (
 	PodIDPath
 	MACPath
 	PodClusterIDPath
-	BusinessIDsPath
-	GroupIDsPath
-	ServiceIDPath // 1<<35 支持最大偏移到39
+	ServiceIDPath
+	ResourcePath // 1<<34 支持最大偏移到39
 )
 
 const (
@@ -206,43 +204,51 @@ type Field struct {
 	//   - roze写入influxdb，作用类似_id，序列化为_tid
 	GlobalThreadID uint8
 
-	IP6          net.IP // FIXME: 合并IP6和IP
-	MAC          uint64
-	IP           uint32
-	L3EpcID      int16 // (8B)
-	L3DeviceID   uint32
-	L3DeviceType DeviceType
-	RegionID     uint16
-	SubnetID     uint16
-	HostID       uint16
-	PodNodeID    uint32
-	AZID         uint16
-	PodGroupID   uint32
-	PodNSID      uint16
-	PodID        uint32
-	PodClusterID uint16
-	BusinessIDs  []uint16
-	GroupIDs     []uint16
-	ServiceID    uint32
+	IP6             net.IP // FIXME: 合并IP6和IP
+	MAC             uint64
+	IP              uint32
+	L3EpcID         int16 // (8B)
+	L3DeviceID      uint32
+	L3DeviceType    DeviceType
+	RegionID        uint16
+	SubnetID        uint16
+	HostID          uint16
+	PodNodeID       uint32
+	AZID            uint16
+	PodGroupID      uint32
+	PodNSID         uint16
+	PodID           uint32
+	PodClusterID    uint16
+	ServiceID       uint32
+	ResourceGl0ID   uint32
+	ResourceGl0Type uint8
+	ResourceGl1ID   uint32
+	ResourceGl1Type uint8
+	ResourceGl2ID   uint32
+	ResourceGl2Type uint8
 
-	MAC1          uint64
-	IP61          net.IP // FIXME: 合并IP61和IP1
-	IP1           uint32
-	L3EpcID1      int16 // (8B)
-	L3DeviceID1   uint32
-	L3DeviceType1 DeviceType // (+1B=8B)
-	RegionID1     uint16
-	SubnetID1     uint16 // (8B)
-	HostID1       uint16
-	PodNodeID1    uint32
-	AZID1         uint16
-	PodGroupID1   uint32
-	PodNSID1      uint16
-	PodID1        uint32
-	PodClusterID1 uint16
-	BusinessIDs1  []uint16
-	GroupIDs1     []uint16
-	ServiceID1    uint32
+	MAC1             uint64
+	IP61             net.IP // FIXME: 合并IP61和IP1
+	IP1              uint32
+	L3EpcID1         int16 // (8B)
+	L3DeviceID1      uint32
+	L3DeviceType1    DeviceType // (+1B=8B)
+	RegionID1        uint16
+	SubnetID1        uint16 // (8B)
+	HostID1          uint16
+	PodNodeID1       uint32
+	AZID1            uint16
+	PodGroupID1      uint32
+	PodNSID1         uint16
+	PodID1           uint32
+	PodClusterID1    uint16
+	ServiceID1       uint32
+	ResourceGl0ID1   uint32
+	ResourceGl0Type1 uint8
+	ResourceGl1ID1   uint32
+	ResourceGl1Type1 uint8
+	ResourceGl2ID1   uint32
+	ResourceGl2Type1 uint8
 
 	ACLGID       uint16
 	Direction    DirectionEnum
@@ -395,8 +401,8 @@ func MetricsDBNameToID(name string) MetricsDBID {
 }
 
 const (
-	BaseCode     = AZID | HostID | IP | L3Device | L3EpcID | PodClusterID | PodGroupID | PodID | PodNodeID | PodNSID | RegionID | SubnetID | TAPType | VTAPID | BusinessIDs | GroupIDs | ServiceID
-	BasePathCode = AZIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | PodClusterIDPath | PodGroupIDPath | PodIDPath | PodNodeIDPath | PodNSIDPath | RegionIDPath | SubnetIDPath | TAPSide | TAPType | VTAPID | BusinessIDsPath | GroupIDsPath | ServiceIDPath
+	BaseCode     = AZID | HostID | IP | L3Device | L3EpcID | PodClusterID | PodGroupID | PodID | PodNodeID | PodNSID | RegionID | SubnetID | TAPType | VTAPID | ServiceID | Resource
+	BasePathCode = AZIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | PodClusterIDPath | PodGroupIDPath | PodIDPath | PodNodeIDPath | PodNSIDPath | RegionIDPath | SubnetIDPath | TAPSide | TAPType | VTAPID | ServiceIDPath | ResourcePath
 	BasePortCode = Protocol | ServerPort | IsKeyService
 )
 
@@ -507,16 +513,6 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], ",az_id_1=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.AZID1), 10))
 	}
-	if t.Code&BusinessIDs != 0 {
-		offset += copy(b[offset:], ",business_ids=")
-		offset += copy(b[offset:], marshalUint16s(t.BusinessIDs))
-	}
-	if t.Code&BusinessIDsPath != 0 {
-		offset += copy(b[offset:], ",business_ids_0=")
-		offset += copy(b[offset:], marshalUint16s(t.BusinessIDs))
-		offset += copy(b[offset:], ",business_ids_1=")
-		offset += copy(b[offset:], marshalUint16s(t.BusinessIDs1))
-	}
 
 	if t.Code&Direction != 0 {
 		if t.Direction.IsClientToServer() {
@@ -524,16 +520,6 @@ func (t *Tag) MarshalTo(b []byte) int {
 		} else if t.Direction.IsServerToClient() {
 			offset += copy(b[offset:], ",direction=s2c")
 		}
-	}
-	if t.Code&GroupIDs != 0 {
-		offset += copy(b[offset:], ",group_ids=")
-		offset += copy(b[offset:], marshalUint16s(t.GroupIDs))
-	}
-	if t.Code&GroupIDsPath != 0 {
-		offset += copy(b[offset:], ",group_ids_0=")
-		offset += copy(b[offset:], marshalUint16s(t.GroupIDs))
-		offset += copy(b[offset:], ",group_ids_1=")
-		offset += copy(b[offset:], marshalUint16s(t.GroupIDs1))
 	}
 	if t.Code&HostID != 0 {
 		offset += copy(b[offset:], ",host_id=")
@@ -699,6 +685,52 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.RegionID1), 10))
 	}
 
+	if t.Code&Resource != 0 {
+		offset += copy(b[offset:], ",resource_gl0_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl0ID), 10))
+		offset += copy(b[offset:], ",resource_gl0_type=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl0Type), 10))
+		offset += copy(b[offset:], ",resource_gl1_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl1ID), 10))
+		offset += copy(b[offset:], ",resource_gl1_type=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl1Type), 10))
+		offset += copy(b[offset:], ",resource_gl2_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl2ID), 10))
+		offset += copy(b[offset:], ",resource_gl2_type=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl2Type), 10))
+	}
+	if t.Code&ResourcePath != 0 {
+		offset += copy(b[offset:], ",resource_gl0_id_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl0ID), 10))
+		offset += copy(b[offset:], ",resource_gl0_id_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl0ID1), 10))
+
+		offset += copy(b[offset:], ",resource_gl0_type_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl0Type), 10))
+		offset += copy(b[offset:], ",resource_gl0_type_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl0Type1), 10))
+
+		offset += copy(b[offset:], ",resource_gl1_id_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl1ID), 10))
+		offset += copy(b[offset:], ",resource_gl1_id_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl1ID1), 10))
+
+		offset += copy(b[offset:], ",resource_gl1_type_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl1Type), 10))
+		offset += copy(b[offset:], ",resource_gl1_type_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl1Type1), 10))
+
+		offset += copy(b[offset:], ",resource_gl2_id_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl2ID), 10))
+		offset += copy(b[offset:], ",resource_gl2_id_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl2ID1), 10))
+
+		offset += copy(b[offset:], ",resource_gl2_type_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl2Type), 10))
+		offset += copy(b[offset:], ",resource_gl2_type_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl2Type1), 10))
+	}
+
 	if t.Code&ServerPort != 0 {
 		offset += copy(b[offset:], ",server_port=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ServerPort), 10))
@@ -806,24 +838,8 @@ func genTagColumns(code Code) []*ckdb.Column {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("az_id_1", ckdb.UInt16).SetComment("ip4/6_1对应的可用区ID"))
 	}
 
-	if code&BusinessIDs != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("business_ids", ckdb.ArrayUInt16).SetComment("ip对应的业务ID列表"))
-	}
-	if code&BusinessIDsPath != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("business_ids_0", ckdb.ArrayUInt16).SetComment("ip4/6_0对应的的业务ID列表"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("business_ids_1", ckdb.ArrayUInt16).SetComment("ip4/6_1对应的的业务ID列表"))
-	}
-
 	if code&Direction != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("direction", ckdb.LowCardinalityString).SetComment("统计量对应的流方向. c2s: ip为客户端, s2c: ip为服务端"))
-	}
-
-	if code&GroupIDs != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("group_ids", ckdb.ArrayUInt16).SetComment("ip对应的资源组ID列表"))
-	}
-	if code&GroupIDsPath != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("group_ids_0", ckdb.ArrayUInt16).SetComment("ip4/6_0对应的资源组ID列表"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("group_ids_1", ckdb.ArrayUInt16).SetComment("ip4/6_1对应的资源组ID列表"))
 	}
 
 	if code&HostID != 0 {
@@ -940,6 +956,31 @@ func genTagColumns(code Code) []*ckdb.Column {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("region_id_1", ckdb.UInt16).SetComment("ip4/6_1对应的云平台区域ID"))
 	}
 
+	if code&Resource != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl0_id", ckdb.UInt32).SetComment("ip对应的容器pod优先的资源ID, 取值优先级为pod_id -> pod_node_id -> l3_device_id"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl0_type", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl1_id", ckdb.UInt32).SetComment("ip对应的工作负载优先的资源ID, 取值优先级为pod_group_id -> pod_node_id -> l3_device_id"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl1_type", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl2_id", ckdb.UInt32).SetComment("ip对应的服务优先的资源ID, 取值优先级为service_id  -> pod_node_id -> l3_device_id"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl2_type", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
+	}
+	if code&ResourcePath != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl0_id_0", ckdb.UInt32).SetComment("ip0对应的容器pod优先的资源ID, 取值优先级为pod_id -> pod_node_id -> l3_device_id"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl0_type_0", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl1_id_0", ckdb.UInt32).SetComment("ip0对应的工作负载优先的资源ID, 取值优先级为pod_group_id -> pod_node_id -> l3_device_id"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl1_type_0", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl2_id_0", ckdb.UInt32).SetComment("ip0对应的服务优先的资源ID, 取值优先级为service_id  -> pod_node_id -> l3_device_id"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl2_type_0", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
+
+		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl0_id_1", ckdb.UInt32).SetComment("ip1对应的容器pod优先的资源ID, 取值优先级为pod_id -> pod_node_id -> l3_device_id"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl0_type_1", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl1_id_1", ckdb.UInt32).SetComment("ip1对应的工作负载优先的资源ID, 取值优先级为pod_group_id -> pod_node_id -> l3_device_id"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl1_type_1", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl2_id_1", ckdb.UInt32).SetComment("ip1对应的服务优先的资源ID, 取值优先级为service_id  -> pod_node_id -> l3_device_id"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl2_type_1", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
+
+	}
+
 	if code&ServiceID != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("service_id", ckdb.UInt32).SetComment("ip对应的服务ID"))
 	}
@@ -1013,20 +1054,6 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
 		}
 	}
 
-	if code&BusinessIDs != 0 {
-		if err := block.WriteArray(t.BusinessIDs); err != nil {
-			return err
-		}
-	}
-	if code&BusinessIDsPath != 0 {
-		if err := block.WriteArray(t.BusinessIDs); err != nil {
-			return err
-		}
-		if err := block.WriteArray(t.BusinessIDs1); err != nil {
-			return err
-		}
-	}
-
 	if code&Direction != 0 {
 		if t.Direction.IsClientToServer() {
 			if err := block.WriteString("c2s"); err != nil {
@@ -1036,20 +1063,6 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
 			if err := block.WriteString("s2c"); err != nil {
 				return err
 			}
-		}
-	}
-
-	if code&GroupIDs != 0 {
-		if err := block.WriteArray(t.GroupIDs); err != nil {
-			return err
-		}
-	}
-	if code&GroupIDsPath != 0 {
-		if err := block.WriteArray(t.GroupIDs); err != nil {
-			return err
-		}
-		if err := block.WriteArray(t.GroupIDs1); err != nil {
-			return err
 		}
 	}
 
@@ -1271,6 +1284,49 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
 			return err
 		}
 	}
+
+	if code&Resource != 0 || code&ResourcePath != 0 {
+		if err := block.WriteUInt32(t.ResourceGl0ID); err != nil {
+			return err
+		}
+		if err := block.WriteUInt8(t.ResourceGl0Type); err != nil {
+			return err
+		}
+		if err := block.WriteUInt32(t.ResourceGl1ID); err != nil {
+			return err
+		}
+		if err := block.WriteUInt8(t.ResourceGl1Type); err != nil {
+			return err
+		}
+		if err := block.WriteUInt32(t.ResourceGl2ID); err != nil {
+			return err
+		}
+		if err := block.WriteUInt8(t.ResourceGl2Type); err != nil {
+			return err
+		}
+	}
+
+	if code&ResourcePath != 0 {
+		if err := block.WriteUInt32(t.ResourceGl0ID1); err != nil {
+			return err
+		}
+		if err := block.WriteUInt8(t.ResourceGl0Type1); err != nil {
+			return err
+		}
+		if err := block.WriteUInt32(t.ResourceGl1ID1); err != nil {
+			return err
+		}
+		if err := block.WriteUInt8(t.ResourceGl1Type1); err != nil {
+			return err
+		}
+		if err := block.WriteUInt32(t.ResourceGl2ID1); err != nil {
+			return err
+		}
+		if err := block.WriteUInt8(t.ResourceGl2Type1); err != nil {
+			return err
+		}
+	}
+
 	if code&ServiceID != 0 {
 		if err := block.WriteUInt32(t.ServiceID); err != nil {
 			return err
