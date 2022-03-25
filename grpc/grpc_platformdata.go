@@ -95,11 +95,8 @@ type PlatformInfoTable struct {
 	pcapDataMountPath   string
 
 	versionGroups        uint64
-	groupLabeler         *GroupLabeler
 	serviceLabeler       *GroupLabeler
-	groupLabelerLogger   *logger.PrefixLogger
 	serviceLabelerLogger *logger.PrefixLogger
-	groupIDToBusiessID   []uint16
 	services             []api.GroupIDMap
 
 	*GrpcSession
@@ -236,7 +233,6 @@ func NewPlatformInfoTable(ips []net.IP, port int, moduleName string, pcapDataPat
 		moduleName:           moduleName,
 		runtimeEnv:           utils.GetRuntimeEnv(),
 		pcapDataMountPath:    utils.Mountpoint(pcapDataPath),
-		groupLabelerLogger:   logger.WrapWithPrefixLogger("groupLabeler", log),
 		serviceLabelerLogger: logger.WrapWithPrefixLogger("serviceLabeler", log),
 	}
 	runOnce := func() {
@@ -709,35 +705,6 @@ func lookup(host net.IP) (net.IP, error) {
 	return src, nil
 }
 
-func (t *PlatformInfoTable) groupIDsToBusnessIDs(groupIDs []uint16) []uint16 {
-	businessIDs := make([]uint16, 0, len(groupIDs))
-	for _, gid := range groupIDs {
-		if t.groupIDToBusiessID[gid] == 0 {
-			continue
-		}
-		businessIDs = append(businessIDs, t.groupIDToBusiessID[gid])
-	}
-	return dedup(businessIDs)
-}
-
-func (t *PlatformInfoTable) QueryGroupIDsAndBusinessIDs(l3EpcID int16, ipv4 uint32) ([]uint16, []uint16) {
-	if t.groupLabeler == nil {
-		return []uint16{}, []uint16{}
-	}
-	groupIDs := t.groupLabeler.Query(l3EpcID, ipv4, 0)
-
-	return groupIDs, t.groupIDsToBusnessIDs(groupIDs)
-}
-
-func (t *PlatformInfoTable) QueryIPv6GroupIDsAndBusinessIDs(l3EpcID int16, ipv6 net.IP) ([]uint16, []uint16) {
-	if t.groupLabeler == nil {
-		return []uint16{}, []uint16{}
-	}
-	groupIDs := t.groupLabeler.QueryIPv6(l3EpcID, ipv6, 0)
-
-	return groupIDs, t.groupIDsToBusnessIDs(groupIDs)
-}
-
 // is_key_service查询
 //   使用 epcid+ip+port 查询is_key_service
 // service_id 查询, 只支持查询pod_service类型的服务
@@ -778,37 +745,14 @@ func (t *PlatformInfoTable) QueryIPv6IsKeyServiceAndID(l3EpcID int16, ipv6 net.I
 	return len(serviceIdxs) > 0, 0
 }
 
-func (t *PlatformInfoTable) updateGroupIDsAndBusinessIDs(response *trident.SyncResponse) bool {
+func (t *PlatformInfoTable) updateServices(response *trident.SyncResponse) bool {
 	groupsData := trident.Groups{}
-	groupIDToBusiessID := make([]uint16, GROUPID_MAX)
 	if compressed := response.GetGroups(); compressed != nil {
 		if err := groupsData.Unmarshal(compressed); err != nil {
 			log.Warningf("unmarshal grpc compressed groups failed as %v", err)
 			return false
 		}
 	}
-
-	groups := make([]api.GroupIDMap, 0, len(groupsData.GetGroups()))
-	for _, group := range groupsData.GetGroups() {
-		if group.GetType() == trident.GroupType_ANONYMOUS {
-			continue
-		}
-		groupID := group.GetId()
-		if groupID > GROUPID_MAX {
-			continue
-		}
-		groups = append(groups, api.GroupIDMap{
-			L3EpcID:  int32(group.GetEpcId()),
-			GroupID:  uint16(groupID),
-			CIDRs:    group.GetIps(),
-			IPRanges: group.GetIpRanges(),
-		})
-		groupIDToBusiessID[uint16(groupID)] = uint16(group.GetBusinessId())
-		log.Debugf("group: %+v", group)
-	}
-	t.groupIDToBusiessID = groupIDToBusiessID
-	t.groupLabeler = NewGroupLabeler(t.groupLabelerLogger, groups)
-
 	services := make([]api.GroupIDMap, 0, len(groupsData.GetSvcs()))
 	serviceIndex := 0
 	for _, svc := range groupsData.GetSvcs() {
@@ -939,7 +883,7 @@ func (t *PlatformInfoTable) Reload() error {
 	newGroupsVersion := response.GetVersionGroups()
 	if newGroupsVersion != t.versionGroups {
 		log.Infof("Update rpc groups version %d -> %d ", t.versionGroups, newGroupsVersion)
-		if t.updateGroupIDsAndBusinessIDs(response) {
+		if t.updateServices(response) {
 			t.versionGroups = newGroupsVersion
 		}
 	}
