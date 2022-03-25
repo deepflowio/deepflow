@@ -1,8 +1,7 @@
 use std::{
     collections::HashMap,
-    ops::Deref,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
     },
     time::Duration,
@@ -21,8 +20,8 @@ use crate::{
     },
 };
 
-#[derive(Debug, Default, Clone, Copy)]
-struct NetMetric {
+#[derive(Default)]
+struct NetMetricArg {
     pub rx: u64,
     pub tx: u64,
     pub tx_bytes: u64,
@@ -31,27 +30,50 @@ struct NetMetric {
     pub drop_out: u64,
 }
 
+#[derive(Default)]
+struct NetMetric {
+    rx: AtomicU64,
+    tx: AtomicU64,
+    tx_bytes: AtomicU64,
+    rx_bytes: AtomicU64,
+    drop_in: AtomicU64,
+    drop_out: AtomicU64,
+}
+
 struct LinkStatusBroker {
     running: AtomicBool,
-    old: Mutex<NetMetric>,
-    new: Mutex<NetMetric>,
+    old: NetMetric,
+    new: NetMetric,
 }
 
 impl LinkStatusBroker {
     pub fn new() -> Self {
         Self {
             running: AtomicBool::new(true),
-            old: Mutex::new(NetMetric::default()),
-            new: Mutex::new(NetMetric::default()),
+            old: NetMetric::default(),
+            new: NetMetric::default(),
         }
     }
 
     pub fn close(&self) {
-        self.running.store(false, Ordering::SeqCst);
+        self.running.store(false, Ordering::Relaxed);
     }
 
-    pub fn update(&self, new_metric: NetMetric) {
-        *self.new.lock().unwrap() = new_metric;
+    pub fn update(&self, new_metric: NetMetricArg) {
+        let NetMetricArg {
+            rx,
+            tx,
+            tx_bytes,
+            rx_bytes,
+            drop_in,
+            drop_out,
+        } = new_metric;
+        self.new.rx.store(rx, Ordering::Relaxed);
+        self.new.tx.store(tx, Ordering::Relaxed);
+        self.new.rx_bytes.store(rx_bytes, Ordering::Relaxed);
+        self.new.tx_bytes.store(tx_bytes, Ordering::Relaxed);
+        self.new.drop_in.store(drop_in, Ordering::Relaxed);
+        self.new.drop_out.store(drop_out, Ordering::Relaxed);
     }
 }
 
@@ -62,45 +84,54 @@ impl Countable for LinkStatusBroker {
         }
 
         let mut metrics = vec![];
-        let new_guard = self.new.lock().unwrap();
-        let mut old_guard = self.old.lock().unwrap();
+        let new_rx = self.new.rx.load(Ordering::Relaxed);
+        let old_rx = self.old.rx.swap(new_rx, Ordering::Relaxed);
         metrics.push((
             "rx",
             CounterType::Counted,
-            CounterValue::Unsigned(new_guard.rx.overflowing_sub(old_guard.rx).0),
+            CounterValue::Unsigned(new_rx.overflowing_sub(old_rx).0),
         ));
+        let new_tx = self.new.tx.load(Ordering::Relaxed);
+        let old_tx = self.old.tx.swap(new_tx, Ordering::Relaxed);
         metrics.push((
             "tx",
             CounterType::Counted,
-            CounterValue::Unsigned(new_guard.tx.overflowing_sub(old_guard.tx).0),
+            CounterValue::Unsigned(new_tx.overflowing_sub(old_tx).0),
         ));
+        let new_tx_bytes = self.new.tx_bytes.load(Ordering::Relaxed);
+        let old_tx_bytes = self.old.tx_bytes.swap(new_tx_bytes, Ordering::Relaxed);
         metrics.push((
             "tx_bytes",
             CounterType::Counted,
-            CounterValue::Unsigned(new_guard.tx_bytes.overflowing_sub(old_guard.tx_bytes).0),
+            CounterValue::Unsigned(new_tx_bytes.overflowing_sub(old_tx_bytes).0),
         ));
+        let new_rx_bytes = self.new.rx_bytes.load(Ordering::Relaxed);
+        let old_rx_bytes = self.old.rx_bytes.swap(new_rx_bytes, Ordering::Relaxed);
         metrics.push((
             "rx_bytes",
             CounterType::Counted,
-            CounterValue::Unsigned(new_guard.rx_bytes.overflowing_sub(old_guard.rx_bytes).0),
+            CounterValue::Unsigned(new_rx_bytes.overflowing_sub(old_rx_bytes).0),
         ));
+        let new_drop_in = self.new.drop_in.load(Ordering::Relaxed);
+        let old_drop_in = self.old.drop_in.swap(new_drop_in, Ordering::Relaxed);
         metrics.push((
             "drop_in",
             CounterType::Counted,
-            CounterValue::Unsigned(new_guard.drop_in.overflowing_sub(old_guard.drop_in).0),
+            CounterValue::Unsigned(new_drop_in.overflowing_sub(old_drop_in).0),
         ));
+        let new_drop_out = self.new.drop_out.load(Ordering::Relaxed);
+        let old_drop_out = self.old.drop_out.swap(new_drop_out, Ordering::Relaxed);
         metrics.push((
             "drop_out",
             CounterType::Counted,
-            CounterValue::Unsigned(new_guard.drop_out.overflowing_sub(old_guard.drop_out).0),
+            CounterValue::Unsigned(new_drop_out.overflowing_sub(old_drop_out).0),
         ));
 
-        *old_guard = *new_guard.deref();
         metrics
     }
 
     fn closed(&self) -> bool {
-        !self.running.load(Ordering::SeqCst)
+        !self.running.load(Ordering::Relaxed)
     }
 }
 
@@ -142,27 +173,27 @@ impl SysStatusBroker {
         };
         Ok(Self {
             system,
-            running: AtomicBool::new(true),
             pid,
             core_count,
             create_time,
+            running: AtomicBool::new(false),
         })
     }
 
     pub fn close(&self) {
-        self.running.store(false, Ordering::SeqCst);
+        self.running.store(false, Ordering::Relaxed);
     }
 }
 
 impl Countable for SysStatusBroker {
     fn get_counters(&self) -> Vec<Counter> {
-        if !self.running.load(Ordering::SeqCst) {
+        if !self.running.load(Ordering::Relaxed) {
             return vec![];
         }
         let mut system_guard = self.system.lock().unwrap();
         // 只有在进程不存在的时候会返回false，基本不会报错
         if !system_guard.refresh_process_specifics(self.pid, ProcessRefreshKind::new().with_cpu()) {
-            self.running.store(false, Ordering::SeqCst);
+            self.running.store(false, Ordering::Relaxed);
             warn!("refresh process failed, system status monitor has stopped");
             return vec![];
         }
@@ -199,7 +230,7 @@ impl Countable for SysStatusBroker {
     }
 
     fn closed(&self) -> bool {
-        !self.running.load(Ordering::SeqCst)
+        !self.running.load(Ordering::Relaxed)
     }
 }
 
@@ -225,7 +256,7 @@ impl Monitor {
     }
 
     pub fn start(&self) {
-        if self.running.swap(true, Ordering::SeqCst) {
+        if self.running.swap(true, Ordering::Relaxed) {
             debug!("monitor has already started");
             return;
         }
@@ -288,7 +319,7 @@ impl Monitor {
             system_guard.refresh_networks_list();
             for (interface, net_data) in system_guard.networks() {
                 if let Some(broker) = link_map_guard.get(interface) {
-                    let metric = NetMetric {
+                    let metric = NetMetricArg {
                         rx: net_data.total_packets_received(),
                         tx: net_data.total_packets_transmitted(),
                         rx_bytes: net_data.total_received(),
@@ -308,7 +339,7 @@ impl Monitor {
     }
 
     pub fn stop(&self) {
-        if !self.running.swap(false, Ordering::SeqCst) {
+        if !self.running.swap(false, Ordering::Relaxed) {
             debug!("monitor has already stopped");
             return;
         }

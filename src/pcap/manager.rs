@@ -27,7 +27,7 @@ pub struct WorkerManager {
     max_file_period: Duration,
     base_directory: PathBuf,
     running: AtomicBool,
-    workers: Mutex<Vec<Arc<Worker>>>,
+    workers: Mutex<Vec<Worker>>,
     example_filepath: PathBuf,
     stats: Arc<Collector>,
 }
@@ -48,7 +48,7 @@ impl WorkerManager {
             .into_iter()
             .enumerate()
             .map(|(index, receiver)| {
-                Arc::new(Worker::new(
+                Worker::new(
                     index,
                     worker_max_concurrent_files,
                     max_file_size_mb << 20,
@@ -57,7 +57,7 @@ impl WorkerManager {
                     block_size_kb << 10,
                     receiver,
                     interval,
-                ))
+                )
             })
             .collect();
 
@@ -109,7 +109,7 @@ impl WorkerManager {
         for worker in self.workers.lock().unwrap().iter() {
             self.stats.register_countable(
                 "pcap",
-                worker.clone(),
+                worker.clone_counter(),
                 vec![StatsOption::Tag("index", worker.index.to_string())],
             );
             worker.start();

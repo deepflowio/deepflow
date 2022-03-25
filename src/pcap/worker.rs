@@ -1,10 +1,9 @@
 use std::{
     fs,
-    ops::Deref,
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, Mutex, MutexGuard,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc, Mutex,
     },
     thread::{self, JoinHandle},
     time::Duration,
@@ -21,22 +20,38 @@ use super::{
 use crate::utils::queue::{self, Error};
 use crate::utils::stats::{Countable, Counter, CounterType, CounterValue};
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Default)]
 pub struct WorkerCounter {
     // statsd:"file_creations
-    pub(super) file_creations: u64,
+    file_creations: AtomicU64,
     // statsd:"file_closes"
-    pub(super) file_closes: u64,
+    file_closes: AtomicU64,
     // statsd:"file_rejections"
-    pub(super) file_rejections: u64,
+    file_rejections: AtomicU64,
     // statsd:"file_creation_failures"
-    pub(super) file_creation_failures: u64,
+    file_creation_failures: AtomicU64,
     // statsd:"file_writing_failures"
-    pub(super) file_writing_failures: u64,
+    file_writing_failures: AtomicU64,
     // statsd:"written_count"
-    pub(super) written_count: u64,
+    written_count: AtomicU64,
     // statsd:"written_bytes"
-    pub(super) written_bytes: u64,
+    written_bytes: AtomicU64,
+    running: Arc<AtomicBool>,
+}
+
+impl WorkerCounter {
+    pub fn new(running: Arc<AtomicBool>) -> Self {
+        Self {
+            file_creations: AtomicU64::new(0),
+            file_closes: AtomicU64::new(0),
+            file_rejections: AtomicU64::new(0),
+            file_creation_failures: AtomicU64::new(0),
+            file_writing_failures: AtomicU64::new(0),
+            written_count: AtomicU64::new(0),
+            written_bytes: AtomicU64::new(0),
+            running,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -51,12 +66,12 @@ struct WorkerConfig {
 pub struct Worker {
     pub index: usize,
     config: WorkerConfig,
-    counter: Arc<Mutex<WorkerCounter>>,
+    counter: Arc<WorkerCounter>,
     writers: Arc<DashMap<u64, Writer>>,
     packet_receiver: Arc<queue::Receiver<PcapPacket>>,
     thread: Mutex<Option<JoinHandle<()>>>,
     interval: Duration,
-    running: AtomicBool,
+    running: Arc<AtomicBool>,
 }
 
 impl Worker {
@@ -70,6 +85,7 @@ impl Worker {
         packet_receiver: queue::Receiver<PcapPacket>,
         interval: Duration,
     ) -> Self {
+        let running = Arc::new(AtomicBool::new(false));
         Self {
             index,
             interval,
@@ -80,12 +96,16 @@ impl Worker {
                 base_directory,
                 writer_buffer_size,
             },
-            counter: Arc::new(Mutex::new(WorkerCounter::default())),
+            counter: Arc::new(WorkerCounter::new(running.clone())),
             writers: Arc::new(DashMap::new()),
             packet_receiver: Arc::new(packet_receiver),
             thread: Mutex::new(None),
-            running: AtomicBool::new(false),
+            running,
         }
+    }
+
+    pub fn clone_counter(&self) -> Arc<WorkerCounter> {
+        self.counter.clone()
     }
 
     pub fn start(&self) {
@@ -135,10 +155,9 @@ impl Worker {
             self.writers.len()
         );
 
-        let mut counter_guard = self.counter.lock().unwrap();
         for item in self.writers.iter() {
             let writer = self.writers.remove(item.key()).unwrap().1;
-            Self::finish_writer(writer, &mut counter_guard);
+            Self::finish_writer(writer, &self.counter);
         }
     }
 
@@ -146,13 +165,12 @@ impl Worker {
         now: Duration,
         writers: &Arc<DashMap<u64, Writer>>,
         config: &WorkerConfig,
-        counter: &Arc<Mutex<WorkerCounter>>,
+        counter: &WorkerCounter,
     ) {
-        let mut counter_guard = counter.lock().unwrap();
         for item in writers.iter() {
             if now - item.value().first_pkt_time > config.max_file_period {
                 let writer = writers.remove(item.key()).unwrap().1;
-                Self::finish_writer(writer, &mut counter_guard);
+                Self::finish_writer(writer, counter);
             }
         }
     }
@@ -161,7 +179,7 @@ impl Worker {
         (dispatcher_id as u64) << 32 | (acl_gid as u64) << 16 | u16::from(tap_type) as u64
     }
 
-    fn finish_writer(writer: Writer, worker_counter_guard: &mut MutexGuard<WorkerCounter>) {
+    fn finish_writer(writer: Writer, worker_counter: &WorkerCounter) {
         let (temp_filename, new_filename) = {
             let Writer {
                 temp_filename,
@@ -191,8 +209,12 @@ impl Worker {
                 new_filename.display()
             );
 
-            worker_counter_guard.written_count += counter.written_count;
-            worker_counter_guard.written_bytes += counter.written_bytes;
+            worker_counter
+                .written_count
+                .fetch_add(counter.written_count, Ordering::Relaxed);
+            worker_counter
+                .written_bytes
+                .fetch_add(counter.written_bytes, Ordering::Relaxed);
 
             (temp_filename, new_filename)
         };
@@ -204,7 +226,7 @@ impl Worker {
                 err
             );
         });
-        worker_counter_guard.file_closes += 1;
+        worker_counter.file_closes.fetch_add(1, Ordering::Relaxed);
     }
 
     fn should_close_file(pkt_timestamp: Duration, writer: &Writer, config: &WorkerConfig) -> bool {
@@ -225,7 +247,7 @@ impl Worker {
         meta_pkt: PcapPacket,
         writers: &Arc<DashMap<u64, Writer>>,
         config: &WorkerConfig,
-        counter: &Arc<Mutex<WorkerCounter>>,
+        counter: &WorkerCounter,
     ) {
         let tap_type = meta_pkt.tap_type;
         let acl_gid = meta_pkt.acl_gid;
@@ -237,8 +259,7 @@ impl Worker {
         if let Some(writer) = writers.get(&key) {
             if Self::should_close_file(pkt_timestamp, writer.value(), config) {
                 let writer = writers.remove(&key).unwrap().1;
-                let mut counter_guard = counter.lock().unwrap();
-                Self::finish_writer(writer, &mut counter_guard);
+                Self::finish_writer(writer, counter);
             }
         }
 
@@ -248,7 +269,7 @@ impl Worker {
                     "max concurrent file ({} files) exceeded",
                     config.max_concurrent_files
                 );
-                counter.lock().unwrap().file_rejections += 1;
+                counter.file_rejections.fetch_add(1, Ordering::Relaxed);
                 return;
             }
 
@@ -262,7 +283,7 @@ impl Worker {
                 pkt_timestamp,
             ) {
                 Ok(writer) => {
-                    counter.lock().unwrap().file_creations += 1;
+                    counter.file_creations.fetch_add(1, Ordering::Relaxed);
                     writers.insert(key, writer);
                 }
                 Err(err) => {
@@ -279,7 +300,9 @@ impl Worker {
                         .display(),
                         err
                     );
-                    counter.lock().unwrap().file_creation_failures += 1;
+                    counter
+                        .file_creation_failures
+                        .fetch_add(1, Ordering::Relaxed);
                     return;
                 }
             }
@@ -294,9 +317,12 @@ impl Worker {
                     written_count,
                 } = writer.get_and_reset_stats();
 
-                let mut counter_guard = counter.lock().unwrap();
-                counter_guard.written_count += written_count;
-                counter_guard.written_bytes += written_bytes;
+                counter
+                    .written_count
+                    .fetch_add(written_count, Ordering::Relaxed);
+                counter
+                    .written_bytes
+                    .fetch_add(written_bytes, Ordering::Relaxed);
             }
             Err(err) => {
                 warn!(
@@ -304,7 +330,9 @@ impl Worker {
                     writer.temp_filename.display(),
                     err
                 );
-                counter.lock().unwrap().file_writing_failures += 1;
+                counter
+                    .file_writing_failures
+                    .fetch_add(1, Ordering::Relaxed);
             }
         }
     }
@@ -319,57 +347,48 @@ mod rpc {
 }
 //END
 
-impl Countable for Worker {
+impl Countable for WorkerCounter {
     fn get_counters(&self) -> Vec<Counter> {
-        let WorkerCounter {
-            file_creations,
-            file_closes,
-            file_rejections,
-            file_creation_failures,
-            file_writing_failures,
-            written_count,
-            written_bytes,
-        } = *self.counter.lock().unwrap().deref();
         vec![
             (
                 "file_creations",
                 CounterType::Counted,
-                CounterValue::Unsigned(file_creations),
+                CounterValue::Unsigned(self.file_creations.load(Ordering::Relaxed)),
             ),
             (
                 "file_closes",
                 CounterType::Counted,
-                CounterValue::Unsigned(file_closes),
+                CounterValue::Unsigned(self.file_closes.load(Ordering::Relaxed)),
             ),
             (
                 "file_rejections",
                 CounterType::Counted,
-                CounterValue::Unsigned(file_rejections),
+                CounterValue::Unsigned(self.file_rejections.load(Ordering::Relaxed)),
             ),
             (
                 "file_creation_failures",
                 CounterType::Counted,
-                CounterValue::Unsigned(file_creation_failures),
+                CounterValue::Unsigned(self.file_creation_failures.load(Ordering::Relaxed)),
             ),
             (
                 "file_writing_failures",
                 CounterType::Counted,
-                CounterValue::Unsigned(file_writing_failures),
+                CounterValue::Unsigned(self.file_writing_failures.load(Ordering::Relaxed)),
             ),
             (
                 "written_count",
                 CounterType::Counted,
-                CounterValue::Unsigned(written_count),
+                CounterValue::Unsigned(self.written_count.load(Ordering::Relaxed)),
             ),
             (
                 "written_bytes",
                 CounterType::Counted,
-                CounterValue::Unsigned(written_bytes),
+                CounterValue::Unsigned(self.written_bytes.load(Ordering::Relaxed)),
             ),
         ]
     }
 
     fn closed(&self) -> bool {
-        !self.running.load(Ordering::SeqCst)
+        !self.running.load(Ordering::Relaxed)
     }
 }
