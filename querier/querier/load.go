@@ -68,13 +68,13 @@ func readFile(fileName string) ([][]interface{}, error) {
 	data := make([][]interface{}, 0)
 	for scanner.Scan() {
 		line := scanner.Text()
-		line = strings.ReplaceAll(line, " ", "")
+		line = strings.TrimSpace(line)
 		if line == "" || line[:1] == "#" {
 			continue
 		}
 		lineSlice := make([]interface{}, 0)
 		for _, split := range strings.Split(line, ",") {
-			lineSlice = append(lineSlice, split)
+			lineSlice = append(lineSlice, strings.TrimSpace(split))
 		}
 		data = append(data, lineSlice)
 	}
