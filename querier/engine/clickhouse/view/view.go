@@ -25,8 +25,9 @@ type Model struct {
 	Filters *Filters
 	From    *Tables
 	Groups  *Groups
+	Orders  *Orders
+	Limit   *Limit
 	//Havings Havings
-	//Order   Order
 	MetricLevelFlag int //Metric是否需要拆层的标识
 }
 
@@ -37,6 +38,8 @@ func NewModel() *Model {
 		Groups:  &Groups{},
 		From:    &Tables{},
 		Filters: &Filters{},
+		Orders:  &Orders{},
+		Limit:   &Limit{},
 	}
 }
 
@@ -133,6 +136,10 @@ func (v *View) trans() {
 			} else if node.Flag == NODE_FLAG_TRANS {
 				// 需要放入最外层的tag
 				tagsLevelOuter = append(tagsLevelOuter, tag)
+			} else if node.Flag == NODE_FLAG_METRIC_INNER {
+				tagsLevelInner = append(tagsLevelInner, tag)
+			} else if node.Flag == NODE_FLAG_METRIC_OUTER {
+				tagsLevelMetric = append(tagsLevelMetric, tag)
 			}
 		case Function:
 			flag := node.GetFlag()
@@ -150,9 +157,10 @@ func (v *View) trans() {
 		if group.Flag == GROUP_FLAG_DEFAULT {
 			groupsLevelInner = append(groupsLevelInner, group)
 			groupsLevelMetric = append(groupsLevelMetric, &Group{Value: group.Value})
-		} else if group.Flag == GROUP_FLAG_WITH_METRIC_OUTER {
-			groupsLevelInner = append(groupsLevelInner, &Group{Value: group.Value})
+		} else if group.Flag == GROUP_FLAG_METRIC_OUTER {
 			groupsLevelMetric = append(groupsLevelMetric, group)
+		} else if group.Flag == GROUP_FLAG_METRIC_INNTER {
+			groupsLevelInner = append(groupsLevelInner, group)
 		}
 	}
 	if v.Model.MetricLevelFlag == MODEL_METRIC_LEVEL_FLAG_UNLAY {
@@ -162,6 +170,8 @@ func (v *View) trans() {
 			Groups:  v.Model.Groups,
 			From:    v.Model.From,
 			Filters: v.Model.Filters,
+			Orders:  v.Model.Orders,
+			Limit:   v.Model.Limit,
 		}
 		v.SubViewLevels = append(v.SubViewLevels, &sv)
 	} else if v.Model.MetricLevelFlag == MODEL_METRIC_LEVEL_FLAG_LAYERED {
@@ -172,6 +182,8 @@ func (v *View) trans() {
 			Groups:  &Groups{groups: groupsLevelInner}, // group分层
 			From:    v.Model.From,                      // 查询表
 			Filters: v.Model.Filters,                   // 所有filter
+			Orders:  &Orders{},
+			Limit:   &Limit{},
 		}
 		v.SubViewLevels = append(v.SubViewLevels, &svInner)
 		// 计算层外层
@@ -180,6 +192,8 @@ func (v *View) trans() {
 			Groups:  &Groups{groups: groupsLevelMetric}, // group分层
 			From:    &Tables{},                          // 空table
 			Filters: &Filters{},                         // 空filter
+			Orders:  v.Model.Orders,
+			Limit:   v.Model.Limit,
 		}
 		v.SubViewLevels = append(v.SubViewLevels, &svMetric)
 	}
@@ -190,6 +204,8 @@ func (v *View) trans() {
 			Groups:  &Groups{},                   // 空group
 			From:    &Tables{},                   // 空table
 			Filters: &Filters{},                  //空filter
+			Orders:  &Orders{},
+			Limit:   &Limit{},
 		}
 		v.SubViewLevels = append(v.SubViewLevels, &svOuter)
 	}
@@ -200,8 +216,10 @@ type SubView struct {
 	Filters *Filters
 	From    *Tables
 	Groups  *Groups
+	Orders  *Orders
+	Limit   *Limit
 	//Havings Havings
-	//Order   Order
+
 }
 
 func (sv *SubView) GetWiths() []Node {
@@ -257,7 +275,7 @@ func (sv *SubView) WriteTo(buf *bytes.Buffer) {
 		sv.From.WriteTo(buf)
 	}
 	if !sv.Filters.IsNull() {
-		buf.WriteString(" WHERE ")
+		buf.WriteString(" PREWHERE ")
 		sv.Filters.WriteTo(buf)
 	}
 	if !sv.Groups.IsNull() {
@@ -265,6 +283,11 @@ func (sv *SubView) WriteTo(buf *bytes.Buffer) {
 		buf.WriteString(" GROUP BY ")
 		sv.Groups.WriteTo(buf)
 	}
+	if !sv.Orders.IsNull() {
+		buf.WriteString(" ORDER BY ")
+		sv.Orders.WriteTo(buf)
+	}
+	sv.Limit.WriteTo(buf)
 }
 
 type Node interface {

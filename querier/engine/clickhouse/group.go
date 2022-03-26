@@ -5,7 +5,10 @@ import (
 	"metaflow/querier/engine/clickhouse/view"
 )
 
-func GetGroup(name string) (Statement, error) {
+func GetGroup(name string, asTagMap map[string]string) (Statement, error) {
+	if asTagMap[name] == "time" {
+		return nil, nil
+	}
 	stmt := &GroupTag{Value: name}
 	return stmt, nil
 }

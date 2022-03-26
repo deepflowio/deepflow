@@ -1,8 +1,10 @@
 package view
 
 const (
-	NODE_FLAG_METRIC int = iota // 仅在计算层
-	NODE_FLAG_TRANS             // 仅在翻译层
+	NODE_FLAG_METRIC       int = iota // 仅在计算层
+	NODE_FLAG_TRANS                   // 仅在翻译层
+	NODE_FLAG_METRIC_INNER            // 仅在计算层内层
+	NODE_FLAG_METRIC_OUTER            // 仅在计算层外层
 )
 
 const (
@@ -11,8 +13,9 @@ const (
 )
 
 const (
-	GROUP_FLAG_DEFAULT           int = iota // GROUP专用FLAG，with仅放计算层内层
-	GROUP_FLAG_WITH_METRIC_OUTER            // GROUP专用FLAG，with仅放计算层外层
+	GROUP_FLAG_DEFAULT       int = iota // GROUP专用FLAG，计算层内外都携带group，with仅放计算层内层
+	GROUP_FLAG_METRIC_OUTER             // GROUP专用FLAG，仅计算层外层携带该group
+	GROUP_FLAG_METRIC_INNTER            // GROUP专用FLAG，仅计算层内层携带该group
 )
 
 const (

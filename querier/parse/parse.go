@@ -55,5 +55,21 @@ func (p *Parser) ParseSQL(sql string) error {
 			return groupErr
 		}
 	}
+
+	// OrderBy解析
+	if pStmt.OrderBy != nil {
+		orderErr := p.Engine.TransOrderBy(pStmt.OrderBy)
+		if orderErr != nil {
+			return orderErr
+		}
+	}
+
+	// Limit解析
+	if pStmt.Limit != nil {
+		limitErr := p.Engine.TransLimit(pStmt.Limit)
+		if limitErr != nil {
+			return limitErr
+		}
+	}
 	return nil
 }

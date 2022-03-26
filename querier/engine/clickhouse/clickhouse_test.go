@@ -24,11 +24,11 @@ var (
 		input  string
 		output string
 	}{{
-		input:  "select Sum(byte) as sum_byte from l4_flow_log",
-		output: "SELECT SUM(byte_tx+byte_rx) AS sum_byte FROM l4_flow_log",
+		input:  "select Sum(byte) as sum_byte, time(time, 120) as time_120 from l4_flow_log group by time_120 limit 10 offset 20",
+		output: "WITH toStartOfInterval(time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS time_120 SELECT SUM(byte_tx+byte_rx) AS sum_byte, time_120 FROM l4_flow_log GROUP BY time_120 LIMIT 20, 10",
 	}, {
-		input:  "select Sum(log_count) as sum_log_count from l4_flow_log",
-		output: "SELECT SUM(1) AS sum_log_count FROM l4_flow_log",
+		input:  "select Sum(log_count) as sum_log_count from l4_flow_log order by sum_log_count desc",
+		output: "SELECT SUM(1) AS sum_log_count FROM l4_flow_log ORDER BY sum_log_count desc",
 	}, {
 		input:  "select Uniq(ip_0) as uniq_ip_0 from l4_flow_log",
 		output: "SELECT uniqIf([toString(ip4_0), toString(subnet_id_0), toString(is_ipv4), toString(ip6_0)], NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))) AS uniq_ip_0 FROM l4_flow_log",
@@ -45,8 +45,8 @@ var (
 		input:  "select Stddev(byte_tx) as stddev_byte_tx from l4_flow_log",
 		output: "SELECT stddevPopStable(_sum_byte_tx) AS stddev_byte_tx FROM (SELECT SUM(byte_tx) AS _sum_byte_tx FROM l4_flow_log)",
 	}, {
-		input:  "select Max(byte_tx) as max_byte_tx from l4_flow_log",
-		output: "SELECT MAX(_sum_byte_tx) AS max_byte_tx FROM (SELECT SUM(byte_tx) AS _sum_byte_tx FROM l4_flow_log)",
+		input:  "select Max(byte_tx) as max_byte_tx from l4_flow_log order by max_byte_tx",
+		output: "SELECT MAX(_sum_byte_tx) AS max_byte_tx FROM (SELECT SUM(byte_tx) AS _sum_byte_tx FROM l4_flow_log) ORDER BY max_byte_tx asc",
 	}, {
 		input:  "select Spread(byte_tx) as spread_byte_tx from l4_flow_log",
 		output: "SELECT MAX(_sum_byte_tx) - MIN(_sum_byte_tx) AS spread_byte_tx FROM (SELECT SUM(byte_tx) AS _sum_byte_tx FROM l4_flow_log)",
@@ -68,6 +68,9 @@ var (
 	}, {
 		input:  "select Apdex(rtt, 100) as apdex_rtt_100 from l4_flow_log",
 		output: "WITH if(COUNT()>0, divide(Plus(SUM(if(_grouparray_rtt<=100,1,0)), SUM(if(100<_grouparray_rtt AND _grouparray_rtt<=100*4,0.5,0))), COUNT()), null) AS divide_0diveider_as_null_plus_apdex_satisfy__grouparray_rtt_100_apdex_toler__grouparray_rtt_100_count_ SELECT divide_0diveider_as_null_plus_apdex_satisfy__grouparray_rtt_100_apdex_toler__grouparray_rtt_100_count_ AS apdex_rtt_100 FROM (SELECT groupArrayIf(rtt, rtt != 0) AS _grouparray_rtt FROM l4_flow_log)",
+	}, {
+		input:  "select Max(byte) as max_byte, time(time,120) as time_120 from l4_flow_log group by time_120",
+		output: "WITH toStartOfInterval(_time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS time_120 SELECT MAX(_sum_byte_tx_plus_byte_rx) AS max_byte, time_120 FROM (WITH toStartOfInterval(time, toIntervalSecond(60)) AS _time SELECT SUM(byte_tx+byte_rx) AS _sum_byte_tx_plus_byte_rx, _time FROM l4_flow_log GROUP BY _time, time_120) GROUP BY time_120",
 	},
 	}
 )
@@ -147,13 +150,13 @@ func readFile(fileName string) ([][]interface{}, error) {
 	data := make([][]interface{}, 0)
 	for scanner.Scan() {
 		line := scanner.Text()
-		line = strings.ReplaceAll(line, " ", "")
+		line = strings.TrimSpace(line)
 		if line == "" || line[:1] == "#" {
 			continue
 		}
 		lineSlice := make([]interface{}, 0)
 		for _, split := range strings.Split(line, ",") {
-			lineSlice = append(lineSlice, split)
+			lineSlice = append(lineSlice, strings.TrimSpace(split))
 		}
 		data = append(data, lineSlice)
 	}

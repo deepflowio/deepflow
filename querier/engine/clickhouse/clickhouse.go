@@ -131,6 +131,10 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) (map[string]string, e
 			if ok {
 				asTagMap[as] = sqlparser.String(colName)
 			}
+			function, ok := item.Expr.(*sqlparser.FuncExpr)
+			if ok {
+				asTagMap[as] = sqlparser.String(function.Name)
+			}
 		}
 	}
 	return asTagMap, nil
@@ -171,6 +175,24 @@ func (e *CHEngine) TransGroupBy(groups sqlparser.GroupBy, asTagMap map[string]st
 	return nil
 }
 
+func (e *CHEngine) TransOrderBy(orders sqlparser.OrderBy) error {
+	for _, order := range orders {
+		err := e.parseOrderBy(order)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (e *CHEngine) TransLimit(limit *sqlparser.Limit) error {
+	e.Model.Limit.Limit = sqlparser.String(limit.Rowcount)
+	if limit.Offset != nil {
+		e.Model.Limit.Offset = sqlparser.String(limit.Offset)
+	}
+	return nil
+}
+
 // 原始sql转为clickhouse-sql
 func (e *CHEngine) ToSQLString() string {
 	for _, stmt := range e.Statements {
@@ -183,16 +205,27 @@ func (e *CHEngine) ToSQLString() string {
 	return chSql
 }
 
+func (e *CHEngine) parseOrderBy(order *sqlparser.Order) error {
+	e.Model.Orders.Append(
+		&view.Order{
+			SortBy:  sqlparser.String(order.Expr),
+			OrderBy: order.Direction,
+		},
+	)
+	return nil
+}
+
 // 解析GroupBy
 func (e *CHEngine) parseGroupBy(group sqlparser.Expr, asTagMap map[string]string) error {
 	//var args []string
 	switch expr := group.(type) {
 	// 普通字符串
 	case *sqlparser.ColName:
-		err := e.AddGroup(sqlparser.String(expr))
+		err := e.AddGroup(sqlparser.String(expr), asTagMap)
 		if err != nil {
 			return err
 		}
+		// TODO: 特殊处理塞进group的fromat中
 		whereStmt := Where{}
 		notNullExpr, ok := GetNotNullFilter(sqlparser.String(expr), asTagMap)
 		if !ok {
@@ -250,7 +283,8 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		if err != nil {
 			return err
 		}
-		if name == "mask" {
+		name = strings.ReplaceAll(name, "`", "")
+		if common.IsValueInSliceString(name, TAG_FUNCTIONS) {
 			err := e.AddTagFunction(name, args, as)
 			if err != nil {
 				return err
@@ -319,12 +353,14 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 	}
 }
 
-func (e *CHEngine) AddGroup(group string) error {
-	stmt, err := GetGroup(group)
+func (e *CHEngine) AddGroup(group string, asTagMap map[string]string) error {
+	stmt, err := GetGroup(group, asTagMap)
 	if err != nil {
 		return err
 	}
-	e.Statements = append(e.Statements, stmt)
+	if stmt != nil {
+		e.Statements = append(e.Statements, stmt)
+	}
 	return nil
 }
 

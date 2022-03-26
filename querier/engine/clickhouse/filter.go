@@ -27,7 +27,7 @@ func (w *Where) Format(m *view.Model) {
 
 func GetWhere(name, value string) WhereStatement {
 	switch name {
-	case "time":
+	case "`time`":
 		return &TimeTag{Value: value}
 	default:
 		return &WhereTag{Tag: name, Value: value}

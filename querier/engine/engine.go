@@ -9,6 +9,8 @@ type Engine interface {
 	TransFrom(sqlparser.TableExprs) error
 	TransGroupBy(sqlparser.GroupBy, map[string]string) error
 	TransWhere(*sqlparser.Where, map[string]string) error
+	TransOrderBy(sqlparser.OrderBy) error
+	TransLimit(*sqlparser.Limit) error
 	ToSQLString() string
 	Init()
 	ExecuteQuery(string) (map[string][]interface{}, error)
