@@ -10,7 +10,7 @@ import (
 	"metaflow/querier/common"
 	"metaflow/querier/engine/clickhouse/client"
 	"metaflow/querier/engine/clickhouse/metric"
-	"metaflow/querier/engine/clickhouse/tag/description"
+	tagdescription "metaflow/querier/engine/clickhouse/tag/description"
 	"metaflow/querier/engine/clickhouse/view"
 	"metaflow/querier/parse"
 )
@@ -89,12 +89,24 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, err
 			// TODO: 解析失败
 			return nil, true, nil
 		}
+	case "tag":
+		// show tag {tag} values from table
+		if len(sqlSplit) != 6 {
+			// TODO: 增加日志记录解析失败
+			return nil, true, nil
+		}
+		if strings.ToLower(sqlSplit[3]) == "values" {
+			values, err := tagdescription.GetTagValues(e.DB, table, sqlSplit[2])
+			return values, true, err
+		}
+		// TODO: 增加日志记录解析失败
+		return nil, true, nil
 	case "metrics":
 		metrics, err := metric.GetMetricDescriptions(e.DB, table)
 		return metrics, true, err
 	case "tags":
-		data := description.GetTagDescriptions(e.DB, table)
-		return data, true, nil
+		data, err := tagdescription.GetTagDescriptions(e.DB, table)
+		return data, true, err
 	case "tables":
 		return GetTables(e.DB), true, nil
 	case "databases":
@@ -412,10 +424,20 @@ func LoadDbDescriptions(dbDescriptions map[string]interface{}) {
 	if !ok {
 		return
 	}
-	for db, tables := range DB_TABLE_MAP {
-		for _, table := range tables {
-			loadMetrics := metric.LoadMetrics(db, table, dbData.(map[string]interface{}))
-			metric.MergeMetrics(db, table, loadMetrics)
+
+	dbDataMap := dbData.(map[string]interface{})
+	// 加载metric定义
+	if metricData, ok := dbDataMap["metric"]; ok {
+		for db, tables := range DB_TABLE_MAP {
+			for _, table := range tables {
+				loadMetrics := metric.LoadMetrics(db, table, metricData.(map[string]interface{}))
+				metric.MergeMetrics(db, table, loadMetrics)
+			}
 		}
 	}
+	// 加载tag定义及部分tag的enum取值
+	if tagData, ok := dbDataMap["tag"]; ok {
+		tagdescription.LoadTagDescriptions(tagData.(map[string]interface{}))
+	}
+
 }

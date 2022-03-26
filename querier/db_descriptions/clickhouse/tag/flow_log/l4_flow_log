@@ -1,0 +1,11 @@
+# Name              , ClientName           , ServerName            , DisplayName             , Type          , EnumFile           , Category    , Operators
+region              , region_0             , region_1              , 区域                    , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
+region_name         , region_name_0        , region_name_1         , 区域名称                , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
+resource_gl0_type   , resource_gl0_type_0  , resource_gl0_type_1   , 自动分组-全展开资源类型 , int_enum      , resource_gl0_type  , 知识图谱    , =/!=/IN/NOT IN
+resource_gl0        , resource_gl0_0       , resource_gl0_1        , 自动分组-全展开资源     , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
+resource_gl0_name   , resource_gl0_name_0  , resource_gl0_name_1   , 自动分组-全展开资源名称 , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
+mac                 , mac_0                , mac_1                 , MAC                     , string        ,                    , 链路层      , =/!=
+ip                  , ip_0                 , ip_1                  , IP地址                  , ip            ,                    , 网络层      , =/!=/IN/NOT IN
+protocol            , protocol             , protocol              , 协议                    , int_enum      , protocol           , 网络层      , =/!=/IN/NOT IN
+server_port         ,                      , server_port           , 服务端口                , int           ,                    , 传输层      , =/!=/>=/<=
+tap_side            , tap_side             , tap_side              , 路径统计位置            , string_enum   , tap_side           , 流信息      , =/!=/IN/NOT IN

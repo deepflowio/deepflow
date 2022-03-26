@@ -80,13 +80,8 @@ func GetMetricDescriptions(db string, table string) (map[string][]interface{}, e
 	}, nil
 }
 
-func LoadMetrics(db string, table string, dbDescriptions map[string]interface{}) (loadMetrics map[string]*Metric) {
-	metricData, ok := dbDescriptions["metric"]
-	if !ok {
-		// TODO
-		return nil
-	}
-	tableDate, ok := metricData.(map[string]interface{})[db]
+func LoadMetrics(db string, table string, dbDescription map[string]interface{}) (loadMetrics map[string]*Metric) {
+	tableDate, ok := dbDescription[db]
 	if !ok {
 		// TODO
 		return nil

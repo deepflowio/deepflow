@@ -15,6 +15,14 @@ import (
 				"flow_log": map[string]interface{}{
 					"l4_flow_log": [][]string
 				}
+			},
+			"tag": map[string]interface{}{
+				"flow_log": map[string]interface{}{
+					"l4_flow_log": [][]string
+				},
+				"enum": map[string]interface{}{
+					"protocol": [][]string
+				},
 			}
 		}
 	}
