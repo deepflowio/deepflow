@@ -30,7 +30,7 @@ pub use {
         TcpPerf as _TcpPerf, _benchmark_report, _benchmark_session_peer_seq_no_assert,
         _meta_flow_perf_update,
     },
-    flow_generator::perf::Counter as _Counter,
+    flow_generator::perf::FlowPerfCounter as _FlowPerfCounter,
     policy::cidr::Cidr as _Cidr,
     policy::labeler::Labeler as _Labeler,
     utils::net::MacAddr as _MacAddr,

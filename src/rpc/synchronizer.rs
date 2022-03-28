@@ -107,6 +107,10 @@ impl Synchronizer {
         }
     }
 
+    pub fn runtime_config(&self) -> RuntimeConfig {
+        todo!()
+    }
+
     fn generate_sync_request(
         static_config: &Arc<StaticConfig>,
         status: &Arc<RwLock<Status>>,

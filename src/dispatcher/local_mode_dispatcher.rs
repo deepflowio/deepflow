@@ -9,6 +9,7 @@ use regex::Regex;
 
 use super::base_dispatcher::{BaseDispatcher, BaseDispatcherListener};
 
+use crate::utils::stats::StatsOption;
 use crate::{
     common::{
         decapsulate::TunnelType,
@@ -16,7 +17,7 @@ use crate::{
         MetaPacket, PlatformData, TapPort, FIELD_OFFSET_ETH_TYPE, MAC_ADDR_LEN, VLAN_HEADER_SIZE,
     },
     config::RuntimeConfig,
-    flow_generator::FlowMap,
+    flow_generator::{FlowMap, FlowMapConfig, FlowTimeout, TcpTimeout},
     platform::LibvirtXmlExtractor,
     proto::{common::TridentType, trident::IfMacSource},
     utils::{
@@ -31,24 +32,62 @@ pub(super) struct LocalModeDispatcher {
 }
 
 impl LocalModeDispatcher {
-    pub(super) fn run(&mut self) {
+    pub(super) fn run(&mut self, rt_config: Arc<RuntimeConfig>) {
         let base = &mut self.base;
         info!("Start dispatcher {}", base.id);
         let mut prev_timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        // TODO: fix flow-map parameters
-        let mut flow_map = FlowMap::new(
-            42,
+
+        let flow_config = {
+            let flow = base.static_config.flow();
+            let flow_rt_config = base.flow_map_runtime_config.clone();
+
+            flow_rt_config
+                .l4_performance_enabled
+                .store(rt_config.l4_performance_enabled, Ordering::Relaxed);
+            flow_rt_config
+                .l7_metrics_enabled
+                .store(rt_config.l7_metrics_enabled, Ordering::Relaxed);
+            flow_rt_config
+                .l7_log_packet_size
+                .store(rt_config.l7_log_packet_size, Ordering::Relaxed);
+            flow_rt_config.app_proto_log_enabled.store(
+                !rt_config.l7_log_store_tap_types.is_empty(),
+                Ordering::Relaxed,
+            );
+
+            FlowMapConfig {
+                vtap_id: rt_config.vtap_id,
+                trident_type: rt_config.trident_type,
+                collector_enabled: rt_config.collector_enabled,
+                packet_delay: base.static_config.packet_delay,
+                flush_interval: flow.flush_interval,
+                ignore_l2_end: flow.ignore_l2_end,
+                ignore_tor_mac: flow.ignore_tor_mac,
+                flow_timeout: FlowTimeout::from(TcpTimeout {
+                    established: flow.established_timeout,
+                    closing_rst: flow.closing_rst_timeout,
+                    others: flow.others_timeout,
+                }),
+                runtime_config: flow_rt_config,
+            }
+        };
+
+        let (mut flow_map, flow_counter) = FlowMap::new(
             base.id as u32,
             base.flow_output_queue.clone(),
             |_, _| {},
-            false,
             base.log_output_queue.clone(),
             vec![],
             65536,
-            Default::default(),
-            Default::default(),
-            Default::default(),
+            flow_config,
         );
+
+        base.stats.register_countable(
+            "flow-perf",
+            flow_counter,
+            vec![StatsOption::Tag("id", format!("{}", base.id))],
+        );
+
         while !base.terminated.load(Ordering::Relaxed) {
             if base.reset_whitelist.swap(false, Ordering::Relaxed) {
                 base.tap_interface_whitelist.reset();
@@ -513,7 +552,7 @@ mod tests {
         let mut m = HashMap::new();
         LocalModeDispatcherListener::parse_tap_mac_script_output(&mut m, bs.as_bytes());
         assert_eq!(
-            m.get("abcdefg".into()),
+            m.get("abcdefg"),
             Some(&"11:22:33:44:55:66".parse().unwrap())
         );
     }

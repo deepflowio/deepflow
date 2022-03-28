@@ -27,7 +27,7 @@ pub struct Trident {
 
 impl Trident {
     pub fn new(config_path: &dyn AsRef<Path>, revision: String) -> Result<Trident> {
-        let config = Config::load_from_file(config_path)?;
+        let config = Arc::new(Config::load_from_file(config_path)?);
 
         let mut logger = Logger::try_with_str("info")?
             .format_for_files(colored_opt_format)
@@ -69,7 +69,7 @@ impl Trident {
                 af_packet_blocks: 128,
                 af_packet_version: OptTpacketVersion::TpacketVersionHighestavailablet,
                 tap_mode: config.tap_mode,
-                tap_mac_script: config.tap_mac_script,
+                tap_mac_script: config.tap_mac_script.clone(),
                 is_ipv6: ctrl_ip.is_ipv6(),
                 vxlan_port: config.vxlan_port,
                 controller_port: config.controller_port,
@@ -83,23 +83,25 @@ impl Trident {
             .libvirt_xml_extractor(libvirt_xml_extractor.clone())
             .flow_output_queue(flow_sender)
             .log_output_queue(log_sender)
-            .build(None)
+            .static_config(config.clone())
+            .stats_collector(stats_collector.clone())
+            .build()
             .unwrap();
 
         let session = Arc::new(Session::new(
             config.controller_port,
             config.controller_tls_port,
             DEFAULT_TIMEOUT,
-            config.controller_cert_file_prefix,
-            config.controller_ips,
+            config.controller_cert_file_prefix.clone(),
+            config.controller_ips.clone(),
         ));
         let synchronizer = Arc::new(Synchronizer::new(
             session.clone(),
             revision,
             ctrl_ip.to_string(),
             ctrl_mac.to_string(),
-            config.vtap_group_id_request,
-            config.kubernetes_cluster_id,
+            config.vtap_group_id_request.clone(),
+            config.kubernetes_cluster_id.clone(),
             dispatcher.listener(),
         ));
         stats_collector.register_countable("synchronizer", synchronizer.clone(), vec![]);
@@ -116,8 +118,10 @@ impl Trident {
         info!("==================== Launching YUNSHAN DeepFlow vTap (a.k.a. Trident) ====================");
         self.synchronizer.start();
         self.monitor.start();
+        let rt_config = Arc::new(self.synchronizer.runtime_config());
+
         for dispatcher in self.dispatchers.iter() {
-            dispatcher.start();
+            dispatcher.start(rt_config.clone());
         }
         self.libvirt_xml_extractor.start();
     }
