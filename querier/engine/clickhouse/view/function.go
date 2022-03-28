@@ -38,10 +38,10 @@ var FUNC_NAME_MAP map[string]string = map[string]string{
 	FUNCTION_PCTL_EXACT:  "quantileExact",
 	FUNCTION_STDDEV:      "stddevPopStable",
 	FUNCTION_GROUP_ARRAY: "groupArray",
-	FUNCTION_PLUS:        "Plus",
+	FUNCTION_PLUS:        "plus",
 	FUNCTION_DIV:         "Div",
-	FUNCTION_MINUS:       "MINUS",
-	FUNCTION_MULTIPLY:    "MULTIPLY",
+	FUNCTION_MINUS:       "minus",
+	FUNCTION_MULTIPLY:    "multiply",
 	FUNCTION_COUNT:       "COUNT",
 	FUNCTION_UNIQ:        "uniq",
 	FUNCTION_UNIQ_EXACT:  "uniqExact",
@@ -59,6 +59,8 @@ func GetFunc(name string) Function {
 		return &ApdexFunction{DefaultFunction: DefaultFunction{Name: name}}
 	case FUNCTION_DIV:
 		return &DivFunction{DefaultFunction: DefaultFunction{Name: name}}
+	case FUNCTION_MIN:
+		return &MinFunction{DefaultFunction: DefaultFunction{Name: name}}
 	default:
 		return &DefaultFunction{Name: name}
 	}
@@ -114,7 +116,15 @@ type DefaultFunction struct {
 	NodeBase
 }
 
-func (f *DefaultFunction) Init() {}
+func (f *DefaultFunction) Init() {
+	for _, field := range f.Fields {
+		switch function := field.(type) {
+		case Function:
+			function.SetTime(f.Time)
+			function.Init()
+		}
+	}
+}
 
 func (f *DefaultFunction) GetFlag() int {
 	return f.Flag
@@ -308,26 +318,45 @@ func (f *Field) GetDefaultAlias() string {
 
 type SpreadFunction struct {
 	DefaultFunction
+	minusFunction *DefaultFunction
+}
+
+func (f *SpreadFunction) Init() {
+	maxFunc := DefaultFunction{
+		Name:         FUNCTION_MAX,
+		Fields:       f.Fields,
+		IgnoreZero:   f.IgnoreZero,
+		Nest:         true,
+		IsGroupArray: f.IsGroupArray,
+	}
+	minFunc := MinFunction{
+		DefaultFunction: DefaultFunction{
+			Name:           FUNCTION_MIN,
+			Fields:         f.Fields,
+			IgnoreZero:     f.IgnoreZero,
+			Nest:           true,
+			FillNullAsZero: f.FillNullAsZero,
+			Time:           f.Time,
+			IsGroupArray:   f.IsGroupArray,
+		},
+	}
+	f.minusFunction = &DefaultFunction{
+		Name:   FUNCTION_MINUS,
+		Fields: []Node{&maxFunc, &minFunc},
+	}
 }
 
 func (f *SpreadFunction) WriteTo(buf *bytes.Buffer) {
-	maxFunc := DefaultFunction{
-		Name:       FUNCTION_MAX,
-		Fields:     f.Fields,
-		IgnoreZero: f.IgnoreZero,
-	}
-	minFunc := DefaultFunction{
-		Name:       FUNCTION_MIN,
-		Fields:     f.Fields,
-		IgnoreZero: f.IgnoreZero,
-	}
-	maxFunc.WriteTo(buf)
-	buf.WriteString(" - ")
-	minFunc.WriteTo(buf)
+	f.minusFunction.WriteTo(buf)
 	if f.Alias != "" {
 		buf.WriteString(" AS ")
 		buf.WriteString(f.Alias)
 	}
+}
+
+func (f *SpreadFunction) GetWiths() []Node {
+	f.Withs = append(f.Withs, f.minusFunction.GetWiths()...)
+	return f.Withs
 }
 
 type RspreadFunction struct {
@@ -337,23 +366,28 @@ type RspreadFunction struct {
 
 func (f *RspreadFunction) Init() {
 	maxFunc := DefaultFunction{
-		Name:       FUNCTION_MAX,
-		Fields:     f.Fields,
-		IgnoreZero: f.IgnoreZero,
-		Nest:       true,
+		Name:         FUNCTION_MAX,
+		Fields:       f.Fields,
+		IgnoreZero:   f.IgnoreZero,
+		Nest:         true,
+		IsGroupArray: f.IsGroupArray,
 	}
-	minFunc := DefaultFunction{
-		Name:       FUNCTION_MIN,
-		Fields:     f.Fields,
-		IgnoreZero: f.IgnoreZero,
-		Nest:       true,
+	minFunc := MinFunction{
+		DefaultFunction: DefaultFunction{
+			Name:           FUNCTION_MIN,
+			Fields:         f.Fields,
+			IgnoreZero:     f.IgnoreZero,
+			Nest:           true,
+			FillNullAsZero: f.FillNullAsZero,
+			Time:           f.Time,
+			IsGroupArray:   f.IsGroupArray,
+		},
 	}
 	f.divFunction = &DivFunction{
 		DivType: FUNCTION_DIV_TYPE_FILL_MINIMUM,
 		DefaultFunction: DefaultFunction{
-			Name:       FUNCTION_DIV,
-			Fields:     []Node{&maxFunc, &minFunc},
-			IgnoreZero: f.IgnoreZero,
+			Name:   FUNCTION_DIV,
+			Fields: []Node{&maxFunc, &minFunc},
 		},
 	}
 }
@@ -376,40 +410,98 @@ type ApdexFunction struct {
 }
 
 func (f *ApdexFunction) Init() {
-	// (sum(if(rtt<=arg,1,0))+sum(if(arg<rtt and rtt<=arg*4, 0.5, 0)))/count()
-	satisfy := fmt.Sprintf("if(%s<=%s,1,0)", f.Fields[0].ToString(), f.Args[0])
-	toler := fmt.Sprintf(
-		"if(%s<%s AND %s<=%s*4,0.5,0)",
-		f.Args[0], f.Fields[0].ToString(), f.Fields[0].ToString(), f.Args[0],
-	)
-	sumSatisfy := DefaultFunction{
-		Name:   FUNCTION_SUM,
-		Fields: []Node{&Field{Value: satisfy}},
-		Alias:  fmt.Sprintf("apdex_satisfy_%s_%s", f.Fields[0].ToString(), f.Args[0]),
-		Nest:   true,
+	if f.IsGroupArray {
+		// (count(arrayFilter(x -> (x <= arg), _grouparray_rtt)) + count(arrayFilter(x -> ((arg < x) AND (x <= (arg * 4))), _grouparray_rtt))/2) / countArray(_grouparray_rtt)
+		satisfy := fmt.Sprintf(
+			"arrayFilter(x -> (x <= %s AND 0 < x), %s)",
+			f.Args[0], f.Fields[0].ToString(),
+		)
+		toler := fmt.Sprintf(
+			"arrayFilter(x -> ((%s < x) AND (x <= (%s * 4))), %s)",
+			f.Args[0], f.Args[0], f.Fields[0].ToString(),
+		)
+		// count(arrayFilter(x -> (x <= arg), _grouparray_rtt))
+		countSatisfy := DefaultFunction{
+			Name:         FUNCTION_COUNT,
+			Fields:       []Node{&Field{Value: satisfy}},
+			Alias:        fmt.Sprintf("apdex_satisfy_%s_%s", f.Fields[0].ToString(), f.Args[0]),
+			Nest:         true,
+			IsGroupArray: true,
+		}
+		// count(arrayFilter(x -> ((arg < x) AND (x <= (arg * 4))), _grouparray_rtt))
+		countToler := DefaultFunction{
+			Name:         FUNCTION_COUNT,
+			Fields:       []Node{&Field{Value: toler}},
+			Nest:         true,
+			IsGroupArray: true,
+		}
+		// countToler / 2
+		divToler := DivFunction{
+			DefaultFunction: DefaultFunction{
+				Name:   FUNCTION_DIV,
+				Fields: []Node{&countToler, &Field{Value: "2"}},
+				Alias:  fmt.Sprintf("apdex_toler_%s_%s", f.Fields[0].ToString(), f.Args[0]),
+				Nest:   true,
+			},
+			DivType: FUNCTION_DIV_TYPE_DEFAULT,
+		}
+		plus := DefaultFunction{
+			Name:   FUNCTION_PLUS,
+			Fields: []Node{&countSatisfy, &divToler},
+			Nest:   true,
+		}
+		// countArray(arrayFilter(x -> (x != 0), _grouparray_rtt))
+		count := DefaultFunction{
+			Name:         FUNCTION_COUNT,
+			Fields:       []Node{&Field{Value: f.Fields[0].ToString()}},
+			IsGroupArray: true,
+			IgnoreZero:   true,
+		}
+		f.divFunction = &DivFunction{
+			DefaultFunction: DefaultFunction{
+				Name:   FUNCTION_DIV,
+				Fields: []Node{&plus, &count},
+			},
+			// count为0则结果为null
+			DivType: FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL,
+		}
+	} else {
+		// (sum(if(rtt<=arg,1,0))+sum(if(arg<rtt and rtt<=arg*4, 0.5, 0)))/count()
+		satisfy := fmt.Sprintf("if(%s<=%s,1,0)", f.Fields[0].ToString(), f.Args[0])
+		toler := fmt.Sprintf(
+			"if(%s<%s AND %s<=%s*4,0.5,0)",
+			f.Args[0], f.Fields[0].ToString(), f.Fields[0].ToString(), f.Args[0],
+		)
+		sumSatisfy := DefaultFunction{
+			Name:   FUNCTION_SUM,
+			Fields: []Node{&Field{Value: satisfy}},
+			Alias:  fmt.Sprintf("apdex_satisfy_%s_%s", f.Fields[0].ToString(), f.Args[0]),
+			Nest:   true,
+		}
+		sumToler := DefaultFunction{
+			Name:   FUNCTION_SUM,
+			Fields: []Node{&Field{Value: toler}},
+			Alias:  fmt.Sprintf("apdex_toler_%s_%s", f.Fields[0].ToString(), f.Args[0]),
+			Nest:   true,
+		}
+		plus := DefaultFunction{
+			Name:   FUNCTION_PLUS,
+			Fields: []Node{&sumSatisfy, &sumToler},
+			Nest:   true,
+		}
+		count := DefaultFunction{
+			Name: FUNCTION_COUNT,
+		}
+		f.divFunction = &DivFunction{
+			DefaultFunction: DefaultFunction{
+				Name:   FUNCTION_DIV,
+				Fields: []Node{&plus, &count},
+			},
+			// count为0则结果为null
+			DivType: FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL,
+		}
 	}
-	sumToler := DefaultFunction{
-		Name:   FUNCTION_SUM,
-		Fields: []Node{&Field{Value: toler}},
-		Alias:  fmt.Sprintf("apdex_toler_%s_%s", f.Fields[0].ToString(), f.Args[0]),
-		Nest:   true,
-	}
-	plus := DefaultFunction{
-		Name:   FUNCTION_PLUS,
-		Fields: []Node{&sumSatisfy, &sumToler},
-		Nest:   true,
-	}
-	count := DefaultFunction{
-		Name: FUNCTION_COUNT,
-	}
-	f.divFunction = &DivFunction{
-		DefaultFunction: DefaultFunction{
-			Name:   FUNCTION_DIV,
-			Fields: []Node{&plus, &count},
-		},
-		// count为0则结果为null
-		DivType: FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL,
-	}
+
 }
 
 func (f *ApdexFunction) WriteTo(buf *bytes.Buffer) {
@@ -451,7 +543,7 @@ func (f *DivFunction) WriteTo(buf *bytes.Buffer) {
 		buf.WriteString(f.Fields[0].(Function).GetDefaultAlias(true))
 		buf.WriteString(f.Fields[1].(Function).GetDefaultAlias(true))
 	}
-	if f.Alias != "" {
+	if !f.Nest && f.Alias != "" {
 		buf.WriteString(" AS ")
 		buf.WriteString(f.Alias)
 	}

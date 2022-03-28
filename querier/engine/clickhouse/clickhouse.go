@@ -153,7 +153,7 @@ func (e *CHEngine) TransWhere(node *sqlparser.Where) error {
 }
 
 func (e *CHEngine) TransHaving(node *sqlparser.Where) error {
-	// 生成where的statement
+	// 生成having的statement
 	havingStmt := Having{Where{}}
 	// 解析ast树并生成view.Node结构
 	expr, err := e.parseWhere(node.Expr, &havingStmt.Where)

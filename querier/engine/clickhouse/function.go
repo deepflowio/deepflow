@@ -190,7 +190,6 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 		outFunc.SetFields([]view.Node{&view.Field{Value: f.Metric.DBField}})
 	}
 	outFunc.SetFlag(view.METRIC_FLAG_OUTER)
-	outFunc.Init()
 	return outFunc
 }
 

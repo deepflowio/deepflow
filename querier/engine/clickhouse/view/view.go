@@ -150,6 +150,7 @@ func (v *View) trans() {
 		case Function:
 			flag := node.GetFlag()
 			node.SetTime(v.Model.Time)
+			node.Init()
 			if flag == METRIC_FLAG_INNER {
 				tagsLevelInner = append(tagsLevelInner, tag)
 			} else if flag == METRIC_FLAG_OUTER {
