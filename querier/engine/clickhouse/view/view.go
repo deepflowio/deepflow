@@ -25,6 +25,7 @@ type Model struct {
 	Filters *Filters
 	From    *Tables
 	Groups  *Groups
+	Havings *Filters
 	Orders  *Orders
 	Limit   *Limit
 	//Havings Havings
@@ -38,6 +39,7 @@ func NewModel() *Model {
 		Groups:  &Groups{},
 		From:    &Tables{},
 		Filters: &Filters{},
+		Havings: &Filters{},
 		Orders:  &Orders{},
 		Limit:   &Limit{},
 	}
@@ -49,6 +51,10 @@ func (m *Model) AddTag(n Node) {
 
 func (m *Model) AddFilter(f *Filters) {
 	m.Filters.Append(f)
+}
+
+func (m *Model) AddHaving(f *Filters) {
+	m.Havings.Append(f)
 }
 
 func (m *Model) AddTable(value string) {
@@ -170,6 +176,7 @@ func (v *View) trans() {
 			Groups:  v.Model.Groups,
 			From:    v.Model.From,
 			Filters: v.Model.Filters,
+			Havings: v.Model.Havings,
 			Orders:  v.Model.Orders,
 			Limit:   v.Model.Limit,
 		}
@@ -182,6 +189,7 @@ func (v *View) trans() {
 			Groups:  &Groups{groups: groupsLevelInner}, // group分层
 			From:    v.Model.From,                      // 查询表
 			Filters: v.Model.Filters,                   // 所有filter
+			Havings: &Filters{},
 			Orders:  &Orders{},
 			Limit:   &Limit{},
 		}
@@ -192,6 +200,7 @@ func (v *View) trans() {
 			Groups:  &Groups{groups: groupsLevelMetric}, // group分层
 			From:    &Tables{},                          // 空table
 			Filters: &Filters{},                         // 空filter
+			Havings: v.Model.Havings,
 			Orders:  v.Model.Orders,
 			Limit:   v.Model.Limit,
 		}
@@ -204,6 +213,7 @@ func (v *View) trans() {
 			Groups:  &Groups{},                   // 空group
 			From:    &Tables{},                   // 空table
 			Filters: &Filters{},                  //空filter
+			Havings: &Filters{},
 			Orders:  &Orders{},
 			Limit:   &Limit{},
 		}
@@ -218,8 +228,7 @@ type SubView struct {
 	Groups  *Groups
 	Orders  *Orders
 	Limit   *Limit
-	//Havings Havings
-
+	Havings *Filters
 }
 
 func (sv *SubView) GetWiths() []Node {
@@ -231,6 +240,9 @@ func (sv *SubView) GetWiths() []Node {
 		withs = append(withs, nodeWiths...)
 	}
 	if nodeWiths := sv.Groups.GetWiths(); nodeWiths != nil {
+		withs = append(withs, nodeWiths...)
+	}
+	if nodeWiths := sv.Havings.GetWiths(); nodeWiths != nil {
 		withs = append(withs, nodeWiths...)
 	}
 	return withs
@@ -282,6 +294,10 @@ func (sv *SubView) WriteTo(buf *bytes.Buffer) {
 		sv.Groups.groups = sv.removeDup(sv.Groups)
 		buf.WriteString(" GROUP BY ")
 		sv.Groups.WriteTo(buf)
+	}
+	if !sv.Havings.IsNull() {
+		buf.WriteString(" HAVING ")
+		sv.Havings.WriteTo(buf)
 	}
 	if !sv.Orders.IsNull() {
 		buf.WriteString(" ORDER BY ")

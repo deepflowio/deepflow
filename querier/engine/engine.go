@@ -5,10 +5,11 @@ import (
 )
 
 type Engine interface {
-	TransSelect(sqlparser.SelectExprs) (map[string]string, error)
+	TransSelect(sqlparser.SelectExprs) error
 	TransFrom(sqlparser.TableExprs) error
-	TransGroupBy(sqlparser.GroupBy, map[string]string) error
-	TransWhere(*sqlparser.Where, map[string]string) error
+	TransGroupBy(sqlparser.GroupBy) error
+	TransWhere(*sqlparser.Where) error
+	TransHaving(*sqlparser.Where) error
 	TransOrderBy(sqlparser.OrderBy) error
 	TransLimit(*sqlparser.Limit) error
 	ToSQLString() string

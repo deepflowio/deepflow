@@ -29,7 +29,7 @@ func (s *Filters) Append(f *Filters) {
 	if s.Expr == nil {
 		s.Expr = f.Expr
 	} else {
-		s.Expr = &BinaryExpr{Left: s.Expr, Right: f.Expr, Op: Operator{Type: AND}}
+		s.Expr = &BinaryExpr{Left: s.Expr, Right: f.Expr, Op: &Operator{Type: AND}}
 		if len(f.Withs) > 0 {
 			s.Withs = append(s.Withs, f.Withs...)
 		}
@@ -64,12 +64,11 @@ func (n *Nested) WriteTo(buf *bytes.Buffer) {
 	buf.WriteString(")")
 }
 
-// AND OR NOT
 type BinaryExpr struct {
 	NodeBase
 	Left  Node
 	Right Node
-	Op    Operator
+	Op    *Operator
 }
 
 func (n *BinaryExpr) ToString() string {
@@ -86,7 +85,7 @@ func (n *BinaryExpr) WriteTo(buf *bytes.Buffer) {
 
 type UnaryExpr struct {
 	NodeBase
-	Op   Operator
+	Op   *Operator
 	Expr Node
 }
 

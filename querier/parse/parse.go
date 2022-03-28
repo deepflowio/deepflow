@@ -31,10 +31,9 @@ func (p *Parser) ParseSQL(sql string) error {
 	}
 
 	// Select解析
-	var asTagMap map[string]string
 	var selectErr error
 	if pStmt.SelectExprs != nil {
-		asTagMap, selectErr = p.Engine.TransSelect(pStmt.SelectExprs)
+		selectErr = p.Engine.TransSelect(pStmt.SelectExprs)
 		if selectErr != nil {
 			return selectErr
 		}
@@ -42,7 +41,7 @@ func (p *Parser) ParseSQL(sql string) error {
 
 	// Where 解析
 	if pStmt.Where != nil {
-		whereErr := p.Engine.TransWhere(pStmt.Where, asTagMap)
+		whereErr := p.Engine.TransWhere(pStmt.Where)
 		if whereErr != nil {
 			return whereErr
 		}
@@ -50,9 +49,16 @@ func (p *Parser) ParseSQL(sql string) error {
 
 	// GroupBy解析
 	if pStmt.GroupBy != nil {
-		groupErr := p.Engine.TransGroupBy(pStmt.GroupBy, asTagMap)
+		groupErr := p.Engine.TransGroupBy(pStmt.GroupBy)
 		if groupErr != nil {
 			return groupErr
+		}
+	}
+
+	if pStmt.Having != nil {
+		havingErr := p.Engine.TransHaving(pStmt.Having)
+		if havingErr != nil {
+			return havingErr
 		}
 	}
 

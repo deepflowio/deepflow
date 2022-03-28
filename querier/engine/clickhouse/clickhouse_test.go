@@ -24,8 +24,8 @@ var (
 		input  string
 		output string
 	}{{
-		input:  "select Sum(byte) as sum_byte, time(time, 120) as time_120 from l4_flow_log group by time_120 limit 10 offset 20",
-		output: "WITH toStartOfInterval(time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS time_120 SELECT SUM(byte_tx+byte_rx) AS sum_byte, time_120 FROM l4_flow_log GROUP BY time_120 LIMIT 20, 10",
+		input:  "select Sum(byte) as sum_byte, time(time, 120) as time_120 from l4_flow_log group by time_120 having Sum(byte)>=0 limit 10 offset 20",
+		output: "WITH toStartOfInterval(time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS time_120 SELECT SUM(byte_tx+byte_rx) AS sum_byte, time_120 FROM l4_flow_log GROUP BY time_120 HAVING SUM(byte_tx+byte_rx) >= 0 LIMIT 20, 10",
 	}, {
 		input:  "select Sum(log_count) as sum_log_count from l4_flow_log order by sum_log_count desc",
 		output: "SELECT SUM(1) AS sum_log_count FROM l4_flow_log ORDER BY sum_log_count desc",
@@ -33,8 +33,8 @@ var (
 		input:  "select Uniq(ip_0) as uniq_ip_0 from l4_flow_log",
 		output: "SELECT uniqIf([toString(ip4_0), toString(subnet_id_0), toString(is_ipv4), toString(ip6_0)], NOT (((is_ipv4 = 1) OR (ip6_0 = toIPv6('::'))) AND ((is_ipv4 = 0) OR (ip4_0 = toIPv4('0.0.0.0'))))) AS uniq_ip_0 FROM l4_flow_log",
 	}, {
-		input:  "select Max(byte) as max_byte, Sum(log_count) as sum_log_count from l4_flow_log",
-		output: "SELECT MAX(_sum_byte_tx_plus_byte_rx) AS max_byte, SUM(_sum_1) AS sum_log_count FROM (SELECT SUM(byte_tx+byte_rx) AS _sum_byte_tx_plus_byte_rx, SUM(1) AS _sum_1 FROM l4_flow_log)",
+		input:  "select Max(byte) as max_byte, Sum(log_count) as sum_log_count from l4_flow_log having Sum(byte)>=0",
+		output: "SELECT MAX(_sum_byte_tx_plus_byte_rx) AS max_byte, SUM(_sum_1) AS sum_log_count FROM (SELECT SUM(byte_tx+byte_rx) AS _sum_byte_tx_plus_byte_rx, SUM(1) AS _sum_1 FROM l4_flow_log) HAVING SUM(_sum_byte_tx_plus_byte_rx) >= 0",
 	}, {
 		input:  "select (Max(byte_tx) + Min(byte_tx))/1 as max_byte_tx from l4_flow_log",
 		output: "SELECT divide(Plus(MAX(_sum_byte_tx), MIN(_sum_byte_tx)), 1) AS max_byte_tx FROM (SELECT SUM(byte_tx) AS _sum_byte_tx FROM l4_flow_log)",

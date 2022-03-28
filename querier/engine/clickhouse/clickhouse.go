@@ -26,6 +26,7 @@ type CHEngine struct {
 	Statements []Statement
 	DB         string
 	Table      string
+	asTagMap   map[string]string
 }
 
 func (e *CHEngine) ExecuteQuery(sql string) (map[string][]interface{}, error) {
@@ -117,37 +118,48 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, err
 	}
 }
 
-func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) (map[string]string, error) {
-	asTagMap := make(map[string]string)
+func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
+	e.asTagMap = make(map[string]string)
 	for _, tag := range tags {
 		err := e.parseSelect(tag)
 		if err != nil {
-			return asTagMap, err
+			return err
 		}
 		item, ok := tag.(*sqlparser.AliasedExpr)
 		if ok {
 			as := sqlparser.String(item.As)
 			colName, ok := item.Expr.(*sqlparser.ColName)
 			if ok {
-				asTagMap[as] = sqlparser.String(colName)
+				e.asTagMap[as] = sqlparser.String(colName)
 			}
 			function, ok := item.Expr.(*sqlparser.FuncExpr)
 			if ok {
-				asTagMap[as] = sqlparser.String(function.Name)
+				e.asTagMap[as] = sqlparser.String(function.Name)
 			}
 		}
 	}
-	return asTagMap, nil
+	return nil
 }
 
-func (e *CHEngine) TransWhere(node *sqlparser.Where, asTagMap map[string]string) error {
+func (e *CHEngine) TransWhere(node *sqlparser.Where) error {
 	// 生成where的statement
 	whereStmt := Where{time: e.Model.Time}
 	// 解析ast树并生成view.Node结构
-	expr, err := parseWhere(node.Expr, &whereStmt, asTagMap)
+	expr, err := e.parseWhere(node.Expr, &whereStmt)
 	filter := view.Filters{Expr: expr}
 	whereStmt.filter = &filter
 	e.Statements = append(e.Statements, &whereStmt)
+	return err
+}
+
+func (e *CHEngine) TransHaving(node *sqlparser.Where) error {
+	// 生成where的statement
+	havingStmt := Having{Where{}}
+	// 解析ast树并生成view.Node结构
+	expr, err := e.parseWhere(node.Expr, &havingStmt.Where)
+	filter := view.Filters{Expr: expr}
+	havingStmt.filter = &filter
+	e.Statements = append(e.Statements, &havingStmt)
 	return err
 }
 
@@ -165,9 +177,9 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 	return nil
 }
 
-func (e *CHEngine) TransGroupBy(groups sqlparser.GroupBy, asTagMap map[string]string) error {
+func (e *CHEngine) TransGroupBy(groups sqlparser.GroupBy) error {
 	for _, group := range groups {
-		err := e.parseGroupBy(group, asTagMap)
+		err := e.parseGroupBy(group)
 		if err != nil {
 			return err
 		}
@@ -216,18 +228,18 @@ func (e *CHEngine) parseOrderBy(order *sqlparser.Order) error {
 }
 
 // 解析GroupBy
-func (e *CHEngine) parseGroupBy(group sqlparser.Expr, asTagMap map[string]string) error {
+func (e *CHEngine) parseGroupBy(group sqlparser.Expr) error {
 	//var args []string
 	switch expr := group.(type) {
 	// 普通字符串
 	case *sqlparser.ColName:
-		err := e.AddGroup(sqlparser.String(expr), asTagMap)
+		err := e.AddGroup(sqlparser.String(expr))
 		if err != nil {
 			return err
 		}
 		// TODO: 特殊处理塞进group的fromat中
 		whereStmt := Where{}
-		notNullExpr, ok := GetNotNullFilter(sqlparser.String(expr), asTagMap)
+		notNullExpr, ok := GetNotNullFilter(sqlparser.String(expr), e.asTagMap)
 		if !ok {
 			return nil
 		}
@@ -353,8 +365,8 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 	}
 }
 
-func (e *CHEngine) AddGroup(group string, asTagMap map[string]string) error {
-	stmt, err := GetGroup(group, asTagMap)
+func (e *CHEngine) AddGroup(group string) error {
+	stmt, err := GetGroup(group, e.asTagMap)
 	if err != nil {
 		return err
 	}
@@ -404,48 +416,60 @@ func (e *CHEngine) SetLevelFlag(flag int) {
 	}
 }
 
-func parseWhere(node sqlparser.Expr, w *Where, asTagMap map[string]string) (view.Node, error) {
+func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where) (view.Node, error) {
 	switch node := node.(type) {
 	case *sqlparser.AndExpr:
-		left, err := parseWhere(node.Left, w, asTagMap)
+		left, err := e.parseWhere(node.Left, w)
 		if err != nil {
 			return left, err
 		}
-		right, err := parseWhere(node.Right, w, asTagMap)
+		right, err := e.parseWhere(node.Right, w)
 		if err != nil {
 			return right, err
 		}
 		op := view.Operator{Type: view.AND}
-		return &view.BinaryExpr{Left: left, Right: right, Op: op}, nil
+		return &view.BinaryExpr{Left: left, Right: right, Op: &op}, nil
 	case *sqlparser.OrExpr:
-		left, err := parseWhere(node.Left, w, asTagMap)
+		left, err := e.parseWhere(node.Left, w)
 		if err != nil {
 			return left, err
 		}
-		right, err := parseWhere(node.Right, w, asTagMap)
+		right, err := e.parseWhere(node.Right, w)
 		if err != nil {
 			return right, err
 		}
 		op := view.Operator{Type: view.OR}
-		return &view.BinaryExpr{Left: left, Right: right, Op: op}, nil
+		return &view.BinaryExpr{Left: left, Right: right, Op: &op}, nil
 	case *sqlparser.NotExpr:
-		expr, err := parseWhere(node.Expr, w, asTagMap)
+		expr, err := e.parseWhere(node.Expr, w)
 		if err != nil {
 			return expr, err
 		}
 		op := view.Operator{Type: view.NOT}
-		return &view.UnaryExpr{Op: op, Expr: expr}, nil
+		return &view.UnaryExpr{Op: &op, Expr: expr}, nil
 	case *sqlparser.ParenExpr: // 括号
-		expr, err := parseWhere(node.Expr, w, asTagMap)
+		expr, err := e.parseWhere(node.Expr, w)
 		if err != nil {
 			return expr, err
 		}
 		return &view.Nested{Expr: expr}, nil
 	case *sqlparser.ComparisonExpr:
-		whereTag := sqlparser.String(node.Left)
-		whereValue := sqlparser.String(node.Right)
-		stmt := GetWhere(whereTag, whereValue)
-		return stmt.Trans(node, w, asTagMap)
+		switch expr := node.Left.(type) {
+		case *sqlparser.ColName:
+			whereTag := sqlparser.String(node.Left)
+			whereValue := sqlparser.String(node.Right)
+			stmt := GetWhere(whereTag, whereValue)
+			return stmt.Trans(node, w, e.asTagMap)
+		case *sqlparser.FuncExpr, *sqlparser.BinaryExpr:
+			function, err := e.parseSelectBinaryExpr(expr)
+			if err != nil {
+				return nil, err
+			}
+			outfunc := function.Trans(e.Model)
+			stmt := &WhereFunction{Function: outfunc, Value: sqlparser.String(node.Right)}
+			return stmt.Trans(node, w, e.asTagMap)
+		}
+
 	}
 	return nil, nil
 }

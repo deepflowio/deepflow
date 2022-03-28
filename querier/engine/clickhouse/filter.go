@@ -20,8 +20,21 @@ type Where struct {
 
 func (w *Where) Format(m *view.Model) {
 	w.filter.Withs = w.withs
+	m.Time.TimeStart = w.time.TimeStart
+	m.Time.TimeEnd = w.time.TimeEnd
 	if !w.filter.IsNull() {
 		m.AddFilter(w.filter)
+	}
+}
+
+type Having struct {
+	Where
+}
+
+func (h *Having) Format(m *view.Model) {
+	h.filter.Withs = h.withs
+	if !h.filter.IsNull() {
+		m.AddHaving(h.filter)
 	}
 }
 
@@ -137,4 +150,20 @@ func (t *TimeTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]strin
 		w.time.AddTimeEnd(time)
 	}
 	return &view.Expr{Value: sqlparser.String(compareExpr)}, nil
+}
+
+type WhereFunction struct {
+	Function view.Node
+	Value    string
+}
+
+func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string) (view.Node, error) {
+	op, opType := view.GetOperator(expr.(*sqlparser.ComparisonExpr).Operator)
+	if opType == view.OPERATOER_UNKNOWN {
+		// TODO
+		return nil, nil
+	}
+	right := view.Expr{Value: f.Value}
+	w.withs = append(w.withs, f.Function.GetWiths()...)
+	return &view.BinaryExpr{Left: f.Function, Right: &right, Op: op}, nil
 }
