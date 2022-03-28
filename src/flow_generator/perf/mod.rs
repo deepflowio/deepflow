@@ -10,7 +10,7 @@ mod udp;
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, AtomicU64};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -22,6 +22,7 @@ use crate::common::{
     protocol_logs::AppProtoHead,
 };
 use crate::flow_generator::error::Result;
+use crate::utils::stats::{Countable, Counter, CounterType, CounterValue};
 
 use {
     dns::DNS_PORT, mq::KAFKA_PORT, rpc::DUBBO_PORT, sql::MYSQL_PORT, sql::REDIS_PORT, tcp::TcpPerf,
@@ -69,7 +70,6 @@ pub trait L4FlowPerf {
     fn copy_and_reset_data(&mut self, flow_reversed: bool) -> FlowPerfStats;
 }
 
-// pub fn new(rrt_cache: Rc<RefCell<L7RrtCache>>) -> Self
 #[enum_dispatch(L7FlowPerfTable)]
 pub trait L7FlowPerf {
     fn parse(&mut self, packet: &MetaPacket, flow_id: u64) -> Result<()>;
@@ -90,7 +90,7 @@ pub enum L7FlowPerfTable {
 }
 
 #[derive(Default)]
-pub struct Counter {
+pub struct FlowPerfCounter {
     closed: AtomicBool,
 
     // tcp stats
@@ -99,6 +99,36 @@ pub struct Counter {
 
     // L7 stats
     pub mismatched_response: AtomicU64,
+}
+
+impl Countable for FlowPerfCounter {
+    fn get_counters(&self) -> Vec<Counter> {
+        let ignored = self.ignored_packet_count.swap(0, Ordering::Relaxed);
+        let invalid = self.invalid_packet_count.swap(0, Ordering::Relaxed);
+        let mismatched = self.mismatched_response.swap(0, Ordering::Relaxed);
+
+        vec![
+            (
+                "ignore_packet_count",
+                CounterType::Counted,
+                CounterValue::Unsigned(ignored),
+            ),
+            (
+                "invalid_packet_count",
+                CounterType::Counted,
+                CounterValue::Unsigned(invalid),
+            ),
+            (
+                "l7_mismatch_response",
+                CounterType::Counted,
+                CounterValue::Unsigned(mismatched),
+            ),
+        ]
+    }
+
+    fn closed(&self) -> bool {
+        self.closed.load(Ordering::Relaxed)
+    }
 }
 
 pub struct FlowPerf {
@@ -111,7 +141,7 @@ impl FlowPerf {
         rrt_cache: Rc<RefCell<L7RrtCache>>,
         l4_proto: L4Protocol,
         l7_proto: L7Protocol,
-        counter: Arc<Counter>,
+        counter: Arc<FlowPerfCounter>,
     ) -> Option<Self> {
         let l4 = match l4_proto {
             L4Protocol::Tcp => L4FlowPerfTable::from(TcpPerf::new(counter)),

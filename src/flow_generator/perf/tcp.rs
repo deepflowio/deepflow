@@ -5,7 +5,7 @@ use std::time::Duration;
 use bitflags::bitflags;
 use log::debug;
 
-use super::{Counter, L4FlowPerf, ART_MAX};
+use super::{FlowPerfCounter, L4FlowPerf, ART_MAX};
 
 use crate::{
     common::{
@@ -544,12 +544,12 @@ impl PerfData {
 pub struct TcpPerf {
     ctrl_info: PerfControl,
     perf_data: PerfData,
-    counter: Arc<Counter>,
+    counter: Arc<FlowPerfCounter>,
     handshaking: bool,
 }
 
 impl TcpPerf {
-    pub fn new(counter: Arc<Counter>) -> Self {
+    pub fn new(counter: Arc<FlowPerfCounter>) -> Self {
         Self {
             ctrl_info: Default::default(),
             perf_data: Default::default(),
@@ -1533,7 +1533,7 @@ mod tests {
     // TODO: fix this test that checks nothing
     #[test]
     fn reestablish_fsm() {
-        let mut perf = TcpPerf::new(Arc::new(Counter::default()));
+        let mut perf = TcpPerf::new(Arc::new(FlowPerfCounter::default()));
 
         // 1SYN -> 2SYN/ACK -> 1ACK -> 1ACK/LEN>0 -> 2ACK -> 2ACK/LEN>0 -> 1ACK -> 1ACK/LEN>0
         // 1SYN
@@ -1641,7 +1641,7 @@ mod tests {
 
     #[test]
     fn preprocess() {
-        let perf = TcpPerf::new(Arc::new(Counter::default()));
+        let perf = TcpPerf::new(Arc::new(FlowPerfCounter::default()));
 
         let packet = MiniMetaPacket {
             data_offset: 5,
@@ -1681,7 +1681,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn meta_flow_perf_update() {
-        let mut perf = TcpPerf::new(Arc::new(Counter::default()));
+        let mut perf = TcpPerf::new(Arc::new(FlowPerfCounter::default()));
         _meta_flow_perf_update(&mut perf);
 
         let perf_data = PerfData {
@@ -1773,7 +1773,7 @@ mod tests {
     fn update_test_helper<P: AsRef<Path>>(file: P, check_seq_list: bool) -> String {
         let mut output = String::new();
 
-        let mut perf = TcpPerf::new(Arc::new(Counter::default()));
+        let mut perf = TcpPerf::new(Arc::new(FlowPerfCounter::default()));
         let capture = Capture::load_pcap(file, None);
         let packets = capture.as_meta_packets();
         assert!(
@@ -1839,7 +1839,7 @@ mod tests {
     ) -> String {
         let mut output = String::new();
 
-        let mut perf = TcpPerf::new(Arc::new(Counter::default()));
+        let mut perf = TcpPerf::new(Arc::new(FlowPerfCounter::default()));
         let capture = Capture::load_pcap(file, None);
         let mut packets = capture.as_meta_packets();
         assert!(

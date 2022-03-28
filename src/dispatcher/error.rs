@@ -9,6 +9,8 @@ pub enum Error {
     ConfigInvalid(String),
     #[error("packet parse failed: {0}")]
     PacketInvalid(String),
+    #[error("dispatcher stats collector: {0}")]
+    StatsCollector(&'static str),
 }
 
 impl<T: TryFromPrimitive> From<TryFromPrimitiveError<T>> for Error {

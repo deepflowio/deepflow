@@ -1,4 +1,10 @@
-use std::time::Duration;
+use std::{
+    sync::atomic::{AtomicBool, AtomicU32},
+    sync::Arc,
+    time::Duration,
+};
+
+use crate::proto::common::TridentType;
 
 pub const TIMEOUT_OTHERS: Duration = Duration::from_secs(5);
 pub const TIMEOUT_ESTABLISHED: Duration = Duration::from_secs(300);
@@ -70,4 +76,28 @@ impl FlowTimeout {
             .max(self.closed_fin)
             .max(self.single_direction);
     }
+}
+
+#[derive(Default)]
+pub struct FlowMapRuntimeConfig {
+    pub l7_metrics_enabled: AtomicBool,
+    pub l4_performance_enabled: AtomicBool,
+    pub app_proto_log_enabled: AtomicBool,
+    pub l7_log_packet_size: AtomicU32,
+}
+
+pub struct FlowMapStaticConfig {}
+
+pub struct FlowMapConfig {
+    pub vtap_id: u16,
+    pub trident_type: TridentType,
+    pub collector_enabled: bool,
+
+    pub packet_delay: Duration,
+    pub flush_interval: Duration,
+    pub flow_timeout: FlowTimeout,
+    pub ignore_tor_mac: bool,
+    pub ignore_l2_end: bool,
+
+    pub runtime_config: Arc<FlowMapRuntimeConfig>,
 }

@@ -16,6 +16,8 @@ use super::{
     BpfOptions, Options, PacketCounter, Pipeline,
 };
 
+use crate::config::Config;
+use crate::flow_generator::FlowMapRuntimeConfig;
 use crate::{
     common::{
         decapsulate::{TunnelInfo, TunnelType, TunnelTypeBitmap},
@@ -30,6 +32,7 @@ use crate::{
         bytes::read_u16_be,
         net::{self, get_route_src_ip, Link, MacAddr},
         queue::Sender,
+        stats::Collector,
         LeakyBucket,
     },
 };
@@ -48,6 +51,8 @@ pub(super) struct BaseDispatcher {
     pub(super) leaky_bucket: Arc<LeakyBucket>,
     pub(super) pipelines: Arc<Mutex<HashMap<u32, Arc<Mutex<Pipeline>>>>>,
     pub(super) tap_interfaces: Arc<Mutex<Vec<Link>>>,
+    pub(super) static_config: Arc<Config>,
+    pub(super) flow_map_runtime_config: Arc<FlowMapRuntimeConfig>,
     // TODO: add on config change for tunnel_type_bitmap
     pub(super) tunnel_type_bitmap: Arc<Mutex<TunnelTypeBitmap>>,
     pub(super) tunnel_info: TunnelInfo,
@@ -66,6 +71,7 @@ pub(super) struct BaseDispatcher {
 
     pub(super) counter: Arc<PacketCounter>,
     pub(super) terminated: Arc<AtomicBool>,
+    pub(super) stats: Arc<Collector>,
 }
 
 impl BaseDispatcher {
@@ -215,6 +221,7 @@ impl BaseDispatcher {
             pipelines: self.pipelines.clone(),
             tap_interfaces: self.tap_interfaces.clone(),
             need_update_ebpf: self.need_update_ebpf.clone(),
+            flow_map_config: self.flow_map_runtime_config.clone(),
             proxy_controller_ip: Ipv4Addr::UNSPECIFIED.into(),
             analyzer_ip: Ipv4Addr::UNSPECIFIED.into(),
         }
@@ -354,6 +361,7 @@ pub(super) struct BaseDispatcherListener {
     pub pipelines: Arc<Mutex<HashMap<u32, Arc<Mutex<Pipeline>>>>>,
     pub tap_interfaces: Arc<Mutex<Vec<Link>>>,
     pub need_update_ebpf: Arc<AtomicBool>,
+    pub flow_map_config: Arc<FlowMapRuntimeConfig>,
 
     proxy_controller_ip: IpAddr,
     analyzer_ip: IpAddr,
@@ -403,6 +411,20 @@ impl BaseDispatcherListener {
         debug!("PcapBpf: {}", bpf_syntax);
         self.bpf_options.lock().unwrap().bpf_syntax = bpf_syntax;
         self.need_update_ebpf.store(true, Ordering::Release);
+
+        // flowMap config update
+        self.flow_map_config
+            .l4_performance_enabled
+            .store(config.l4_performance_enabled, Ordering::Relaxed);
+        self.flow_map_config
+            .l7_metrics_enabled
+            .store(config.l7_metrics_enabled, Ordering::Relaxed);
+        self.flow_map_config
+            .l7_log_packet_size
+            .store(config.l7_log_packet_size, Ordering::Relaxed);
+        self.flow_map_config
+            .app_proto_log_enabled
+            .store(!config.l7_log_store_tap_types.is_empty(), Ordering::Relaxed);
     }
 
     pub(super) fn on_vm_change(&self, keys: &[u32], vm_macs: &[MacAddr]) {

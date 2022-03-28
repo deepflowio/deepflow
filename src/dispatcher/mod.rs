@@ -29,7 +29,7 @@ use recv_engine::{
 
 use crate::{
     common::{enums::TapType, PlatformData, TaggedFlow, TapTyper},
-    config::RuntimeConfig,
+    config::{Config, RuntimeConfig},
     flow_generator::MetaAppProto,
     handler::{PacketHandler, PacketHandlerBuilder},
     platform::LibvirtXmlExtractor,
@@ -40,7 +40,8 @@ use crate::{
     utils::{
         net::{Link, MacAddr},
         queue::Sender,
-        stats, LeakyBucket,
+        stats::{self, Collector},
+        LeakyBucket,
     },
 };
 
@@ -61,10 +62,10 @@ impl DispatcherFlavor {
         }
     }
 
-    fn run(&mut self) {
+    fn run(&mut self, rt_config: Arc<RuntimeConfig>) {
         match self {
             DispatcherFlavor::Analyzer(d) => d.run(),
-            DispatcherFlavor::Local(d) => d.run(),
+            DispatcherFlavor::Local(d) => d.run(rt_config),
             DispatcherFlavor::Mirror(d) => d.run(),
         }
     }
@@ -94,13 +95,13 @@ impl Dispatcher {
             .listener()
     }
 
-    pub fn start(&self) {
+    pub fn start(&self, rt_config: Arc<RuntimeConfig>) {
         if self.running.swap(true, Ordering::Relaxed) {
             return;
         }
         let mut flavor = self.flavor.lock().unwrap().take().unwrap();
         self.handle.lock().unwrap().replace(thread::spawn(move || {
-            flavor.run();
+            flavor.run(rt_config);
             flavor
         }));
     }
@@ -292,6 +293,8 @@ pub struct DispatcherBuilder {
     libvirt_xml_extractor: Option<Arc<LibvirtXmlExtractor>>,
     flow_output_queue: Option<Sender<TaggedFlow>>,
     log_output_queue: Option<Sender<MetaAppProto>>,
+    static_config: Option<Arc<Config>>,
+    stats_collector: Option<Arc<Collector>>,
 }
 
 impl DispatcherBuilder {
@@ -364,7 +367,17 @@ impl DispatcherBuilder {
         self
     }
 
-    pub fn build(mut self, stats: Option<&stats::Collector>) -> Result<Dispatcher> {
+    pub fn static_config(mut self, v: Arc<Config>) -> Self {
+        self.static_config = Some(v);
+        self
+    }
+
+    pub fn stats_collector(mut self, v: Arc<Collector>) -> Self {
+        self.stats_collector = Some(v);
+        self
+    }
+
+    pub fn build(mut self) -> Result<Dispatcher> {
         let options = self
             .options
             .ok_or(Error::ConfigIncomplete("no options".into()))?;
@@ -402,6 +415,13 @@ impl DispatcherBuilder {
         let id = self.id.ok_or(Error::ConfigIncomplete("no id".into()))?;
         let terminated = Arc::new(AtomicBool::new(false));
         let counter = Arc::new(PacketCounter::new(terminated.clone(), kernel_counter));
+        let static_config = self
+            .static_config
+            .ok_or(Error::ConfigIncomplete("no static config".into()))?;
+        let collector = self
+            .stats_collector
+            .ok_or(Error::StatsCollector("no stats collector"))?;
+
         let base = BaseDispatcher {
             engine,
 
@@ -459,14 +479,15 @@ impl DispatcherBuilder {
 
             counter: counter.clone(),
             terminated: terminated.clone(),
+            static_config,
+            stats: collector.clone(),
+            flow_map_runtime_config: Default::default(),
         };
-        if let Some(s) = stats {
-            s.register_countable(
-                "dispatcher",
-                counter,
-                vec![stats::StatsOption::Tag("id", base.id.to_string())],
-            );
-        }
+        collector.register_countable(
+            "dispatcher",
+            counter,
+            vec![stats::StatsOption::Tag("id", base.id.to_string())],
+        );
         let mut dispatcher = match tap_mode {
             TapMode::Local => {
                 let extractor = self
