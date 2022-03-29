@@ -1,5 +1,0 @@
-# Field              , DBField              , DisplayName             , Unit , Type       , Category                  , Description
-response_duration    , response_duration    , 响应时延                , 微秒 , delay      , @luyao 填写               ,
-request_length       , request_length       , 请求长度                , 字节 , counter    ,                           ,
-response_length      , response_length      , 响应长度                , 字节 , counter    ,                           ,
-sql_affected_rows    , sql_affected_rows    , SQL影响行数             , 行   , counter    ,                           ,

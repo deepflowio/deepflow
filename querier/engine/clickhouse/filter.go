@@ -39,8 +39,9 @@ func (h *Having) Format(m *view.Model) {
 }
 
 func GetWhere(name, value string) WhereStatement {
+	name = strings.ReplaceAll(name, "`", "")
 	switch name {
-	case "`time`":
+	case "time":
 		return &TimeTag{Value: value}
 	default:
 		return &WhereTag{Tag: name, Value: value}

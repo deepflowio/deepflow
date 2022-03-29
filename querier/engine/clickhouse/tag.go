@@ -154,7 +154,7 @@ func (t *Time) Format(m *view.Model) {
 	}
 	windows = strings.Join(w, ",")
 	var innerTimeField string
-	if m.MetricLevelFlag == view.MODEL_METRIC_LEVEL_FLAG_LAYERED {
+	if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED {
 		innerTimeField = "_" + t.TimeField
 		withValue := fmt.Sprintf(
 			"toStartOfInterval(%s, toIntervalSecond(%d))",
@@ -162,16 +162,18 @@ func (t *Time) Format(m *view.Model) {
 		)
 		withAlias := "_" + t.TimeField
 		withs := []view.Node{&view.With{Value: withValue, Alias: withAlias}}
-		m.AddTag(&view.Tag{Value: withAlias, Withs: withs, Flag: view.NODE_FLAG_METRIC_INNER})
-		m.AddGroup(&view.Group{Value: withAlias, Flag: view.GROUP_FLAG_METRIC_INNTER})
-	} else if m.MetricLevelFlag == view.MODEL_METRIC_LEVEL_FLAG_UNLAY {
+		m.AddTag(&view.Tag{Value: withAlias, Withs: withs, Flag: view.NODE_FLAG_METRICS_INNER})
+		m.AddGroup(&view.Group{Value: withAlias, Flag: view.GROUP_FLAG_METRICS_INNTER})
+	} else if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_UNLAY {
 		innerTimeField = t.TimeField
 	}
 	withValue := fmt.Sprintf(
 		"toStartOfInterval(%s, %s(%d)) + %s(arrayJoin([%s]) * %d)",
 		innerTimeField, toIntervalFunction, t.Interval, toIntervalFunction, windows, t.Interval,
 	)
-	withs := []view.Node{&view.With{Value: withValue, Alias: t.Alias}}
-	m.AddTag(&view.Tag{Value: t.Alias, Flag: view.NODE_FLAG_METRIC_OUTER, Withs: withs})
-	m.AddGroup(&view.Group{Value: t.Alias, Flag: view.GROUP_FLAG_METRIC_OUTER})
+	withAlias := "_" + t.Alias
+	withs := []view.Node{&view.With{Value: withValue, Alias: withAlias}}
+	tagField := fmt.Sprintf("toUnixTimestamp(%s)", withAlias)
+	m.AddTag(&view.Tag{Value: tagField, Alias: t.Alias, Flag: view.NODE_FLAG_METRICS_OUTER, Withs: withs})
+	m.AddGroup(&view.Group{Value: t.Alias, Flag: view.GROUP_FLAG_METRICS_OUTER})
 }

@@ -9,7 +9,7 @@ import (
 
 	"metaflow/querier/common"
 	"metaflow/querier/engine/clickhouse/client"
-	"metaflow/querier/engine/clickhouse/metric"
+	"metaflow/querier/engine/clickhouse/metrics"
 	tagdescription "metaflow/querier/engine/clickhouse/tag/description"
 	"metaflow/querier/engine/clickhouse/view"
 	"metaflow/querier/parse"
@@ -17,7 +17,7 @@ import (
 
 var log = logging.MustGetLogger("clickhouse")
 var DB_TABLE_MAP = map[string][]string{
-	"flow_log": []string{"l4_flow_log"},
+	"flow_log": []string{"l4_flow_log", "l7_flow_log"},
 }
 
 type CHEngine struct {
@@ -82,13 +82,13 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, err
 		}
 	}
 	switch strings.ToLower(sqlSplit[1]) {
-	case "metric":
+	case "metrics":
 		if strings.ToLower(sqlSplit[2]) == "functions" {
-			funcs, err := metric.GetFunctionDescriptions()
+			funcs, err := metrics.GetFunctionDescriptions()
 			return funcs, true, err
 		} else {
-			// TODO: 解析失败
-			return nil, true, nil
+			metrics, err := metrics.GetMetricsDescriptions(e.DB, table)
+			return metrics, true, err
 		}
 	case "tag":
 		// show tag {tag} values from table
@@ -102,9 +102,6 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, err
 		}
 		// TODO: 增加日志记录解析失败
 		return nil, true, nil
-	case "metrics":
-		metrics, err := metric.GetMetricDescriptions(e.DB, table)
-		return metrics, true, err
 	case "tags":
 		data, err := tagdescription.GetTagDescriptions(e.DB, table)
 		return data, true, err
@@ -411,8 +408,8 @@ func (e *CHEngine) AddTagFunction(name string, args []string, alias string) erro
 }
 
 func (e *CHEngine) SetLevelFlag(flag int) {
-	if flag > e.Model.MetricLevelFlag {
-		e.Model.MetricLevelFlag = flag
+	if flag > e.Model.MetricsLevelFlag {
+		e.Model.MetricsLevelFlag = flag
 	}
 }
 
@@ -487,11 +484,11 @@ func LoadDbDescriptions(dbDescriptions map[string]interface{}) {
 
 	dbDataMap := dbData.(map[string]interface{})
 	// 加载metric定义
-	if metricData, ok := dbDataMap["metric"]; ok {
+	if metricData, ok := dbDataMap["metrics"]; ok {
 		for db, tables := range DB_TABLE_MAP {
 			for _, table := range tables {
-				loadMetrics := metric.LoadMetrics(db, table, metricData.(map[string]interface{}))
-				metric.MergeMetrics(db, table, loadMetrics)
+				loadMetrics := metrics.LoadMetrics(db, table, metricData.(map[string]interface{}))
+				metrics.MergeMetrics(db, table, loadMetrics)
 			}
 		}
 	}

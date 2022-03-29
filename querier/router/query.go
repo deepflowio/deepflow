@@ -15,7 +15,7 @@ func executeQuery() gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		args := make(map[string]string)
 		// TODO: ip从配置文件里取
-		args["ip"] = "10.1.20.22"
+		args["ip"] = "10.1.4.2"
 		args["db"] = c.PostForm("db")
 		args["sql"] = c.PostForm("sql")
 		data, err := service.Execute(args)

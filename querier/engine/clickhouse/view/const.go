@@ -1,26 +1,26 @@
 package view
 
 const (
-	NODE_FLAG_METRIC       int = iota // 仅在计算层
-	NODE_FLAG_TRANS                   // 仅在翻译层
-	NODE_FLAG_METRIC_INNER            // 仅在计算层内层
-	NODE_FLAG_METRIC_OUTER            // 仅在计算层外层
+	NODE_FLAG_METRICS       int = iota // 仅在计算层
+	NODE_FLAG_TRANS                    // 仅在翻译层
+	NODE_FLAG_METRICS_INNER            // 仅在计算层内层
+	NODE_FLAG_METRICS_OUTER            // 仅在计算层外层
 )
 
 const (
-	METRIC_FLAG_INNER int = iota // METRIC专用FLAG，仅在计算层内层
-	METRIC_FLAG_OUTER            // METRIC专用FLAG，仅在计算层外层
+	METRICS_FLAG_INNER int = iota // METRICS专用FLAG，仅在计算层内层
+	METRICS_FLAG_OUTER            // METRICS专用FLAG，仅在计算层外层
 )
 
 const (
-	GROUP_FLAG_DEFAULT       int = iota // GROUP专用FLAG，计算层内外都携带group，with仅放计算层内层
-	GROUP_FLAG_METRIC_OUTER             // GROUP专用FLAG，仅计算层外层携带该group
-	GROUP_FLAG_METRIC_INNTER            // GROUP专用FLAG，仅计算层内层携带该group
+	GROUP_FLAG_DEFAULT        int = iota // GROUP专用FLAG，计算层内外都携带group，with仅放计算层内层
+	GROUP_FLAG_METRICS_OUTER             // GROUP专用FLAG，仅计算层外层携带该group
+	GROUP_FLAG_METRICS_INNTER            // GROUP专用FLAG，仅计算层内层携带该group
 )
 
 const (
-	MODEL_METRIC_LEVEL_FLAG_UNLAY   int = iota // 计算层不需要根据算子拆层
-	MODEL_METRIC_LEVEL_FLAG_LAYERED            // 计算层需要根据算子拆层
+	MODEL_METRICS_LEVEL_FLAG_UNLAY   int = iota // 计算层不需要根据算子拆层
+	MODEL_METRICS_LEVEL_FLAG_LAYERED            // 计算层需要根据算子拆层
 )
 
 // Div算子类型

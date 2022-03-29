@@ -29,7 +29,7 @@ type Model struct {
 	Orders  *Orders
 	Limit   *Limit
 	//Havings Havings
-	MetricLevelFlag int //Metric是否需要拆层的标识
+	MetricsLevelFlag int //Metrics是否需要拆层的标识
 }
 
 func NewModel() *Model {
@@ -127,34 +127,34 @@ func (v *View) ToString() string {
 
 func (v *View) trans() {
 	var tagsLevelInner []Node
-	var tagsLevelMetric []Node
+	var tagsLevelMetrics []Node
 	var tagsLevelOuter []Node
 	var groupsLevelInner []Node
-	var groupsLevelMetric []Node
+	var groupsLevelMetrics []Node
 	// 遍历tags，解析至分层结构中
 	for _, tag := range v.Model.Tags.tags {
 		switch node := tag.(type) {
 		case *Tag:
-			if node.Flag == NODE_FLAG_METRIC {
+			if node.Flag == NODE_FLAG_METRICS {
 				// Tag在最内层中只保留value 去掉alias
 				tagsLevelInner = append(tagsLevelInner, &Tag{Value: node.Value})
-				tagsLevelMetric = append(tagsLevelMetric, tag)
+				tagsLevelMetrics = append(tagsLevelMetrics, tag)
 			} else if node.Flag == NODE_FLAG_TRANS {
 				// 需要放入最外层的tag
 				tagsLevelOuter = append(tagsLevelOuter, tag)
-			} else if node.Flag == NODE_FLAG_METRIC_INNER {
+			} else if node.Flag == NODE_FLAG_METRICS_INNER {
 				tagsLevelInner = append(tagsLevelInner, tag)
-			} else if node.Flag == NODE_FLAG_METRIC_OUTER {
-				tagsLevelMetric = append(tagsLevelMetric, tag)
+			} else if node.Flag == NODE_FLAG_METRICS_OUTER {
+				tagsLevelMetrics = append(tagsLevelMetrics, tag)
 			}
 		case Function:
 			flag := node.GetFlag()
 			node.SetTime(v.Model.Time)
 			node.Init()
-			if flag == METRIC_FLAG_INNER {
+			if flag == METRICS_FLAG_INNER {
 				tagsLevelInner = append(tagsLevelInner, tag)
-			} else if flag == METRIC_FLAG_OUTER {
-				tagsLevelMetric = append(tagsLevelMetric, tag)
+			} else if flag == METRICS_FLAG_OUTER {
+				tagsLevelMetrics = append(tagsLevelMetrics, tag)
 			}
 		}
 	}
@@ -163,17 +163,17 @@ func (v *View) trans() {
 		group := node.(*Group)
 		if group.Flag == GROUP_FLAG_DEFAULT {
 			groupsLevelInner = append(groupsLevelInner, group)
-			groupsLevelMetric = append(groupsLevelMetric, &Group{Value: group.Value})
-		} else if group.Flag == GROUP_FLAG_METRIC_OUTER {
-			groupsLevelMetric = append(groupsLevelMetric, group)
-		} else if group.Flag == GROUP_FLAG_METRIC_INNTER {
+			groupsLevelMetrics = append(groupsLevelMetrics, &Group{Value: group.Value})
+		} else if group.Flag == GROUP_FLAG_METRICS_OUTER {
+			groupsLevelMetrics = append(groupsLevelMetrics, group)
+		} else if group.Flag == GROUP_FLAG_METRICS_INNTER {
 			groupsLevelInner = append(groupsLevelInner, group)
 		}
 	}
-	if v.Model.MetricLevelFlag == MODEL_METRIC_LEVEL_FLAG_UNLAY {
+	if v.Model.MetricsLevelFlag == MODEL_METRICS_LEVEL_FLAG_UNLAY {
 		// 计算层不拆层
 		sv := SubView{
-			Tags:    &Tags{tags: tagsLevelMetric},
+			Tags:    &Tags{tags: tagsLevelMetrics},
 			Groups:  v.Model.Groups,
 			From:    v.Model.From,
 			Filters: v.Model.Filters,
@@ -182,7 +182,7 @@ func (v *View) trans() {
 			Limit:   v.Model.Limit,
 		}
 		v.SubViewLevels = append(v.SubViewLevels, &sv)
-	} else if v.Model.MetricLevelFlag == MODEL_METRIC_LEVEL_FLAG_LAYERED {
+	} else if v.Model.MetricsLevelFlag == MODEL_METRICS_LEVEL_FLAG_LAYERED {
 		// 计算层需要拆层
 		// 计算层里层
 		svInner := SubView{
@@ -196,16 +196,16 @@ func (v *View) trans() {
 		}
 		v.SubViewLevels = append(v.SubViewLevels, &svInner)
 		// 计算层外层
-		svMetric := SubView{
-			Tags:    &Tags{tags: tagsLevelMetric},       // 计算层所有tag及外层算子
-			Groups:  &Groups{groups: groupsLevelMetric}, // group分层
-			From:    &Tables{},                          // 空table
-			Filters: &Filters{},                         // 空filter
+		svMetrics := SubView{
+			Tags:    &Tags{tags: tagsLevelMetrics},       // 计算层所有tag及外层算子
+			Groups:  &Groups{groups: groupsLevelMetrics}, // group分层
+			From:    &Tables{},                           // 空table
+			Filters: &Filters{},                          // 空filter
 			Havings: v.Model.Havings,
 			Orders:  v.Model.Orders,
 			Limit:   v.Model.Limit,
 		}
-		v.SubViewLevels = append(v.SubViewLevels, &svMetric)
+		v.SubViewLevels = append(v.SubViewLevels, &svMetrics)
 	}
 	if tagsLevelOuter != nil {
 		// 翻译层
