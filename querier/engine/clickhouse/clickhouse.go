@@ -383,6 +383,19 @@ func (e *CHEngine) AddTag(tag string, alias string) error {
 	if err != nil {
 		return err
 	}
+	if stmt != nil {
+		e.Statements = append(e.Statements, stmt)
+		return nil
+	}
+	stmt, err = GetMetricsTag(tag, alias, e.DB, e.Table)
+	if err != nil {
+		return err
+	}
+	if stmt != nil {
+		e.Statements = append(e.Statements, stmt)
+		return nil
+	}
+	stmt = GetDefaultTag(tag, alias)
 	e.Statements = append(e.Statements, stmt)
 	return nil
 }

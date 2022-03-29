@@ -24,6 +24,9 @@ var (
 		input  string
 		output string
 	}{{
+		input:  "select byte from l4_flow_log",
+		output: "SELECT byte_tx+byte_rx AS byte FROM l4_flow_log",
+	}, {
 		input:  "select Sum(byte) as sum_byte, time(time, 120) as time_120 from l4_flow_log group by time_120 having Sum(byte)>=0 limit 10 offset 20",
 		output: "WITH toStartOfInterval(time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS _time_120 SELECT SUM(byte_tx+byte_rx) AS sum_byte, toUnixTimestamp(_time_120) AS time_120 FROM l4_flow_log GROUP BY time_120 HAVING SUM(byte_tx+byte_rx) >= 0 LIMIT 20, 10",
 	}, {

@@ -41,12 +41,10 @@ func NewReplaceMetrics(dbField string, condition string) *Metrics {
 	}
 }
 
-func GetMetrics(field string, db string, table string) *Metrics {
+func GetMetrics(field string, db string, table string) (*Metrics, bool) {
 	allMetrics := GetMetricsByDBTable(db, table)
-	if metric, ok := allMetrics[field]; ok {
-		return metric
-	}
-	return nil
+	metric, ok := allMetrics[field]
+	return metric, ok
 }
 
 func GetMetricsByDBTable(db string, table string) map[string]*Metrics {

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"metaflow/querier/engine/clickhouse/metrics"
 	"metaflow/querier/engine/clickhouse/tag"
 	"metaflow/querier/engine/clickhouse/view"
 )
@@ -22,9 +23,7 @@ func GetTagTranslator(name string, alias string) (Statement, error) {
 	}
 	tag, ok := tag.GetTag(name)
 	if !ok {
-		if alias != "" {
-			withs = []view.Node{&view.With{Value: name, Alias: alias}}
-		}
+		return nil, nil
 	} else {
 		if tag.TagTranslator != "" {
 			withs = []view.Node{&view.With{Value: tag.TagTranslator, Alias: selectTag}}
@@ -32,6 +31,21 @@ func GetTagTranslator(name string, alias string) (Statement, error) {
 	}
 	stmt = &SelectTag{Value: selectTag, Withs: withs}
 	return stmt, nil
+}
+
+func GetMetricsTag(name string, alias string, db string, table string) (Statement, error) {
+	metricStruct, ok := metrics.GetMetrics(name, db, table)
+	if !ok {
+		return nil, nil
+	}
+	if alias == "" && metricStruct.DBField != name {
+		alias = name
+	}
+	return &SelectTag{Value: metricStruct.DBField, Alias: alias}, nil
+}
+
+func GetDefaultTag(name string, alias string) Statement {
+	return &SelectTag{Value: name, Alias: alias}
 }
 
 func GetTagFunctionTranslator(name string, args []string, alias string) (Statement, error) {

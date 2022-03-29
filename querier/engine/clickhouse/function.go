@@ -17,7 +17,10 @@ type Function interface {
 func GetAggFunc(name string, args []string, alias string, db string, table string) (Statement, int, error) {
 	var levelFlag int
 	field := args[0]
-	metricStruct := metrics.GetMetrics(field, db, table)
+	metricStruct, ok := metrics.GetMetrics(field, db, table)
+	if !ok {
+		return nil, 0, nil
+	}
 	// 判断算子是否支持单层
 	unlayFuns := metrics.METRICS_TYPE_UNLAY_FUNCTIONS[metricStruct.Type]
 	if common.IsValueInSliceString(name, unlayFuns) {
