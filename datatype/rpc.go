@@ -33,6 +33,7 @@ type DubboInfo struct {
 	ServiceName    string
 	ServiceVersion string
 	MethodName     string
+	TraceId        string
 
 	// resp
 	RespBodyLen int32
@@ -50,6 +51,7 @@ func (i *DubboInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType,
 		encoder.WriteString255(i.ServiceName)
 		encoder.WriteString255(i.ServiceVersion)
 		encoder.WriteString255(i.MethodName)
+		encoder.WriteString255(i.TraceId)
 	case MSG_T_RESPONSE:
 		encoder.WriteU32(uint32(i.RespBodyLen))
 	case MSG_T_SESSION:
@@ -58,6 +60,7 @@ func (i *DubboInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType,
 		encoder.WriteString255(i.ServiceName)
 		encoder.WriteString255(i.ServiceVersion)
 		encoder.WriteString255(i.MethodName)
+		encoder.WriteString255(i.TraceId)
 
 		encoder.WriteU32(uint32(i.RespBodyLen))
 	}
@@ -74,6 +77,7 @@ func (i *DubboInfo) WriteToPB(p *pb.DubboInfo, msgType LogMessageType) {
 		p.ServiceName = i.ServiceName
 		p.ServiceVersion = i.ServiceVersion
 		p.MethodName = i.MethodName
+		p.TraceId = i.TraceId
 		p.RespBodyLen = 0
 	case MSG_T_RESPONSE:
 		p.RespBodyLen = i.RespBodyLen
@@ -82,12 +86,14 @@ func (i *DubboInfo) WriteToPB(p *pb.DubboInfo, msgType LogMessageType) {
 		p.ServiceName = ""
 		p.ServiceVersion = ""
 		p.MethodName = ""
+		p.TraceId = ""
 	case MSG_T_SESSION:
 		p.ReqBodyLen = i.ReqBodyLen
 		p.DubboVersion = i.DubboVersion
 		p.ServiceName = i.ServiceName
 		p.ServiceVersion = i.ServiceVersion
 		p.MethodName = i.MethodName
+		p.TraceId = i.TraceId
 
 		p.RespBodyLen = i.RespBodyLen
 	}
@@ -105,6 +111,7 @@ func (i *DubboInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType,
 		i.ServiceName = decoder.ReadString255()
 		i.ServiceVersion = decoder.ReadString255()
 		i.MethodName = decoder.ReadString255()
+		i.TraceId = decoder.ReadString255()
 	case MSG_T_RESPONSE:
 		i.RespBodyLen = int32(decoder.ReadU32())
 	case MSG_T_SESSION:
@@ -113,6 +120,7 @@ func (i *DubboInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType,
 		i.ServiceName = decoder.ReadString255()
 		i.ServiceVersion = decoder.ReadString255()
 		i.MethodName = decoder.ReadString255()
+		i.TraceId = decoder.ReadString255()
 
 		i.RespBodyLen = int32(decoder.ReadU32())
 	}
