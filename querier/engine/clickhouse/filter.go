@@ -126,6 +126,12 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				isKeyService = "1"
 			}
 			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, isKeyService)
+		case "ip_version":
+			ipVersion := "0"
+			if t.Value == "4" {
+				ipVersion = "1"
+			}
+			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, ipVersion)
 		default:
 			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
 		}

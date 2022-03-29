@@ -32,81 +32,94 @@ func GenerateTagResoureMap() map[string]*Tag {
 		if resourceStr == "l3_epc" {
 			notExistID = "-2"
 		}
-		tagResourceMap[resourceStr] = NewTag(
-			resourceStr+"_id",
+		tagResourceMap[resourceStr+"_id"] = NewTag(
+			"",
 			resourceStr+"_id !="+notExistID,
-			resourceStr+"_id %s %s", // 第一个参数是操作符，第二个参数是过滤的值
+			"",
 		)
 		// 资源名称
-		tagResourceMap[resourceStr+"_name"] = NewTag(
+		tagResourceMap[resourceStr] = NewTag(
 			"dictGet(deepflow."+resourceStr+"_map, ('name'), (toUInt64("+resourceStr+"_id)))",
 			resourceStr+"_id != "+notExistID,
-			resourceStr+"_id IN (SELECT toUInt16(id) FROM deepflow."+resourceStr+"_map WHERE name %s %s",
+			"toUInt64("+resourceStr+"_id) IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE name %s %s)",
 		)
 		// 客户端资源ID
-		tagResourceMap[resourceStr+"_0"] = NewTag(
-			resourceStr+"_id_0",
+		tagResourceMap[resourceStr+"_id_0"] = NewTag(
+			"",
 			resourceStr+"_id_0 != "+notExistID,
-			resourceStr+"_id_0 %s %s",
+			"",
 		)
 		// 客户端资源名称
-		tagResourceMap[resourceStr+"_name_0"] = NewTag(
+		tagResourceMap[resourceStr+"_0"] = NewTag(
 			"dictGet(deepflow."+resourceStr+"_map, ('name'), (toUInt64("+resourceStr+"_id_0)))",
 			resourceStr+"_id_0 != "+notExistID,
-			resourceStr+"_id_0 IN (SELECT toUInt16(id) FROM deepflow."+resourceStr+"_map WHERE name %s %s",
+			"toUInt64("+resourceStr+"_id_0) IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE name %s %s)",
 		)
 		// 服务端资源ID
-		tagResourceMap[resourceStr+"_1"] = NewTag(
-			resourceStr+"_id_1",
+		tagResourceMap[resourceStr+"_id_1"] = NewTag(
+			"",
 			resourceStr+"_id_1 != "+notExistID,
-			resourceStr+"_id_1 %s %s",
+			"",
 		)
 		// 服务端资源名称
-		tagResourceMap[resourceStr+"_name_1"] = NewTag(
+		tagResourceMap[resourceStr+"_1"] = NewTag(
 			"dictGet(deepflow."+resourceStr+"_map, ('name'), (toUInt64("+resourceStr+"_id_1)))",
 			resourceStr+"_id_1 != "+notExistID,
-			resourceStr+"_id_1 IN (SELECT toUInt16(id) FROM deepflow."+resourceStr+"_map WHERE name %s %s",
+			"toUInt64("+resourceStr+"_id_1) IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE name %s %s)",
 		)
 	}
 	for resourceStr, deviceType := range DeviceMap {
 		deviceTypeStr := strconv.Itoa(deviceType)
 		// device资源ID
-		tagResourceMap[resourceStr] = NewTag(
+		tagResourceMap[resourceStr+"_id"] = NewTag(
 			"if(l3_device_type="+deviceTypeStr+",l3_device_id, 0)",
 			"l3_device_id != 0 AND l3_device_type = "+deviceTypeStr,
 			"l3_device_id %s %s",
 		)
 		// device资源名称
-		tagResourceMap[resourceStr+"_name"] = NewTag(
+		tagResourceMap[resourceStr] = NewTag(
 			"dictGet(deepflow.device_map, ('name'), (toUInt64("+deviceTypeStr+"),toUInt64(l3_device_id)))",
 			"l3_device_id != 0 AND l3_device_type = "+deviceTypeStr,
-			"l3_device_id IN (SELECT toUInt16(deviceid) FROM deepflow.device_map WHERE name %s %s",
+			"toUInt64(l3_device_id) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
 		)
 		// 客户端device资源ID
-		tagResourceMap[resourceStr+"_0"] = NewTag(
+		tagResourceMap[resourceStr+"_id_0"] = NewTag(
 			"if(l3_device_type_0="+deviceTypeStr+",l3_device_id_0, 0)",
 			"l3_device_id_0 != 0 AND l3_device_type_0 = "+deviceTypeStr,
 			"l3_device_id_0 %s %s",
 		)
 		// 客户端device资源名称
-		tagResourceMap[resourceStr+"_name_0"] = NewTag(
+		tagResourceMap[resourceStr+"_0"] = NewTag(
 			"dictGet(deepflow.device_map, ('name'), (toUInt64("+deviceTypeStr+"),toUInt64(l3_device_id_0)))",
 			"l3_device_id_0 != 0 AND l3_device_type_0 = "+deviceTypeStr,
-			"l3_device_id_0 IN (SELECT toUInt16(deviceid) FROM deepflow.device_map WHERE name %s %s",
+			"toUInt64(l3_device_id_0) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
 		)
 		// 服务端device资源ID
-		tagResourceMap[resourceStr+"_1"] = NewTag(
+		tagResourceMap[resourceStr+"_id_1"] = NewTag(
 			"if(l3_device_type_1="+deviceTypeStr+",l3_device_id_1, 0)",
 			"l3_device_id_1 != 0 AND l3_device_type_1 = "+deviceTypeStr,
 			"l3_device_id_1 %s %s",
 		)
 		// 服务端device资源名称
-		tagResourceMap[resourceStr+"_name_1"] = NewTag(
+		tagResourceMap[resourceStr] = NewTag(
 			"dictGet(deepflow.device_map, ('name'), (toUInt64("+deviceTypeStr+"),toUInt64(l3_device_id_1)))",
 			"l3_device_id_1 != 0 AND l3_device_type_1 = "+deviceTypeStr,
-			"l3_device_id_1 IN (SELECT toUInt16(deviceid) FROM deepflow.device_map WHERE name %s %s",
+			"toUInt64(l3_device_id_1) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
 		)
 	}
+
+	// 采集点ID
+	tagResourceMap["tap_type_id"] = NewTag(
+		"tap_type",
+		"",
+		"tap_type %s %s",
+	)
+	// 采集点
+	tagResourceMap["tap_type"] = NewTag(
+		"dictGet(deepflow.tap_type_map, ('name'), toUInt64(tap_type))",
+		"",
+		"toUInt64(tap_type) IN (SELECT value FROM deepflow.tap_type_map WHERE name %s %s)",
+	)
 
 	// IP
 	tagResourceMap["ip"] = NewTag(
