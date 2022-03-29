@@ -38,14 +38,52 @@ pod_name            , pod_name_0           , pod_name_1            , 容器POD�
 resource_gl0_type   , resource_gl0_type_0  , resource_gl0_type_1   , 自动分组-全展开资源类型       , int_enum      , resource_gl0_type  , 知识图谱    , =/!=/IN/NOT IN
 resource_gl0        , resource_gl0_0       , resource_gl0_1        , 自动分组-全展开资源           , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
 resource_gl0_name   , resource_gl0_name_0  , resource_gl0_name_1   , 自动分组-全展开资源名称       , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-resource_gl1_type   , resource_gl1_type_0  , resource_gl1_type_1   , 自动分组-工作负载聚合资源类型 , int_enum      , resource_gl0_type  , 知识图谱    , =/!=/IN/NOT IN
+resource_gl1_type   , resource_gl1_type_0  , resource_gl1_type_1   , 自动分组-工作负载聚合资源类型 , int_enum      , resource_gl1_type  , 知识图谱    , =/!=/IN/NOT IN
 resource_gl1        , resource_gl1_0       , resource_gl1_1        , 自动分组-工作负载聚合资源     , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
 resource_gl1_name   , resource_gl1_name_0  , resource_gl1_name_1   , 自动分组-工作负载聚合资源名称 , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-resource_gl2_type   , resource_gl2_type_0  , resource_gl2_type_1   , 自动分组-服务聚合资源类型     , int_enum      , resource_gl0_type  , 知识图谱    , =/!=/IN/NOT IN
+resource_gl2_type   , resource_gl2_type_0  , resource_gl2_type_1   , 自动分组-服务聚合资源类型     , int_enum      , resource_gl2_type  , 知识图谱    , =/!=/IN/NOT IN
 resource_gl2        , resource_gl2_0       , resource_gl2_1        , 自动分组-服务聚合资源         , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
 resource_gl2_name   , resource_gl2_name_0  , resource_gl2_name_1   , 自动分组-服务聚合资源名称     , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-mac                 , mac_0                , mac_1                 , MAC                           , string        ,                    , 链路层      , =/!=
+process_id          , process_id_0         , process_id_1          , 进程ID                        , int           ,                    , 知识图谱    , =/!=/>=/<=
+
 ip                  , ip_0                 , ip_1                  , IP地址                        , ip            ,                    , 网络层      , =/!=/IN/NOT IN
-protocol            , protocol             , protocol              , 协议                          , int_enum      , protocol           , 网络层      , =/!=/IN/NOT IN
+protocol            , protocol             , protocol              , 网络协议                      , int_enum      , l7_ip_protocol     , 网络层      , =/!=/IN/NOT IN
+tunnel_type         , tunnel_type          , tunnel_type           , 隧道类型                      , int_enum      , tunnel_type        , 网络层      , =/!=
+
+client_port         , client_port          ,                       , 客户端口                      , int           ,                    , 传输层      , =/!=/>=/<=
 server_port         ,                      , server_port           , 服务端口                      , int           ,                    , 传输层      , =/!=/>=/<=
+req_tcp_seq         , req_tcp_seq          ,                       , 请求TCP SEQ                   , int           ,                    , 传输层      , =/!=/>=/<=
+resp_tcp_seq        ,                      , resp_tcp_seq          , 响应TCP SEQ                   , int           ,                    , 传输层      , =/!=/>=/<=
+
+l7_protocol         , l7_protocol          , l7_protocol           , 网络协议                      , int_enum      , l7_protocol        , 应用层      , =/!=/IN/NOT IN
+version             , version              , version               , 协议版本                      , string        ,                    , 应用层      , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
+type                , type                 , type                  , 日志类型                      , int_enum      , l7_log_type        , 应用层      , =/!=/IN/NOT IN
+request_type        , request_type         ,                       , 请求类型                      , string        ,                    , 应用层      , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
+request_domain      , request_domain       ,                       , 请求域名                      , string        ,                    , 应用层      , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
+request_resource    , request_resource     ,                       , 请求资源                      , string        ,                    , 应用层      , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
+request_id          , request_id           ,                       , 请求ID                        , int           ,                    , 应用层      , =/!=/>=/<=
+response_status     ,                      , response_status       , 响应状态                      , int_enum      , l7_response_status , 应用层      , =/!=/IN/NOT IN
+response_code       ,                      , response_code         , 响应码                        , int           ,                    , 应用层      , =/!=/>=/<=
+response_exception  ,                      , response_exception    , 响应异常                      , string        ,                    , 应用层      , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
+response_result     ,                      , response_result       , 响应结果                      , string        ,                    , 应用层      , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
+http_proxy_client   , http_proxy_client    ,                       , HTTP代理客户端                , string        ,                    , 应用层      , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
+trace_id            , trace_id             , trace_id              , TraceID                       , string        ,                    , 应用层      , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
+span_id             , span_id              , span_id               , SpanID                        , string        ,                    , 应用层      , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
+x_request_id        , x_request_id         ,                       , XRequestID                    , string        ,                    , 应用层      , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
+syscall_trace_id_request  , syscall_trace_id_request  , syscall_trace_id_request  , SyscallTraceID-请求 , int      ,                    , 应用层      , =/!=/>=/<=
+syscall_trace_id_response , syscall_trace_id_response , syscall_trace_id_response , SyscallTraceID-应答 , int      ,                    , 应用层      , =/!=/>=/<=
+syscall_trace_id_session  , syscall_trace_id_session  , syscall_trace_id_session  , SyscallTraceID-会话 , int      ,                    , 应用层      , =/!=/>=/<=
+syscall_trace_id_thread   , syscall_trace_id_thread   , syscall_trace_id_thread   , SyscallTraceID-线程 , int      ,                    , 应用层      , =/!=/>=/<=
+
+flow_id             , flow_id              , flow_id               , 流日志ID                      , int           ,                    , 流信息      , =/!=/>=/<=
+tap_type            , tap_type             , tap_type              , 采集点                        , resource_id   ,                    , 流信息      , =/!=/IN/NOT IN
+tap_type_name       , tap_type_name        , tap_type_name         , 采集点名称                    , resource_name ,                    , 流信息      , =/!=/IN/NOT IN
+
+tap_port_type       , tap_port_type        , tap_port_type         , 采集位置类型                  , int_enum      , tap_port_type      , 流信息      , =/!=/IN/NOT IN
+tap_port_name       , tap_port_name        , tap_port_name         , 采集位置名称                  , string        ,                    , 流信息      , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
+tap_port            , tap_port             , tap_port              , 采集位置标识                  , string        ,                    , 流信息      , =/!=
+vtap_id             , vtap_id              , vtap_id               , 采集器                        , resource_id   ,                    , 流信息      , =/!=/IN/NOT IN
+vtap_name           , vtap_name            , vtap_name             , 采集器名称                    , resource_name ,                    , 流信息      , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
+start_time          , start_time           , start_time            , 开始时间                      , int           ,                    , 流信息      , =/!=/>=/<=
+end_time            , end_time             , end_time              , 结束时间                      , int           ,                    , 流信息      , =/!=/>=/<=
 tap_side            , tap_side             , tap_side              , 路径统计位置                  , string_enum   , tap_side           , 流信息      , =/!=/IN/NOT IN
