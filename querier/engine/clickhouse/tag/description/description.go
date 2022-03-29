@@ -12,6 +12,15 @@ var TAG_DESCRIPTIONS = map[string]map[string][]*TagDescription{
 	},
 }
 var TAG_ENUMS = map[string][]*TagEnum{}
+var tagTypeToOperators = map[string]string{
+	"resource":    "=/!=/IN/NOT IN/LIKE/NOT LIKE/REGEX/NOT REGEX",
+	"int":         "=/!=/IN/NOT IN/>=/<=",
+	"int_enum":    "=/!=/IN/NOT IN",
+	"string":      "=/!=/IN/NOT IN",
+	"string_enum": "=/!=/IN/NOT IN",
+	"ip":          "=/!=/IN/NOT IN",
+	"mac":         "=/!=/IN/NOT IN",
+}
 
 type TagDescription struct {
 	Name        string
@@ -21,12 +30,17 @@ type TagDescription struct {
 	Type        string
 	EnumFile    string
 	Category    string
+	Description string
 	Operators   string
 }
 
 func NewTagDescription(
-	name, clientName, serverName, displayName, tagType, enumFile, category, operators string,
+	name, clientName, serverName, displayName, tagType, enumFile, category, description string,
 ) *TagDescription {
+	operators, ok := tagTypeToOperators[tagType]
+	if !ok {
+		operators = "=/!="
+	}
 	return &TagDescription{
 		Name:        name,
 		ClientName:  clientName,
@@ -36,6 +50,7 @@ func NewTagDescription(
 		EnumFile:    enumFile,
 		Category:    category,
 		Operators:   operators,
+		Description: description,
 	}
 }
 
@@ -101,7 +116,8 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 
 	response := map[string][]interface{}{
 		"columns": []interface{}{
-			"name", "client_name", "server_name", "display_name", "type", "category", "operators",
+			"name", "client_name", "server_name", "display_name", "type", "category",
+			"operators", "description",
 		},
 		"values": []interface{}{},
 	}
@@ -110,7 +126,7 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 			response["values"],
 			[]interface{}{
 				tag.Name, tag.ClientName, tag.ServerName, tag.DisplayName, tag.Type,
-				tag.Category, tag.Operators,
+				tag.Category, tag.Operators, tag.Description,
 			},
 		)
 	}

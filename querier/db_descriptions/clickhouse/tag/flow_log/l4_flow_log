@@ -1,97 +1,72 @@
-# Name              , ClientName           , ServerName            , DisplayName                   , Type          , EnumFile           , Category    , Operators
-region              , region_0             , region_1              , 区域                          , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-region_name         , region_name_0        , region_name_1         , 区域名称                      , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-az                  , az_0                 , az_1                  , 可用区                        , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-az_name             , az_name_0            , az_name_1             , 可用区名称                    , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-host                , host_0               , host_1                , 宿主机                        , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-host_name           , host_name_0          , host_name_1           , 宿主机名称                    , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-vm                  , vm_0                 , vm_1                  , 云服务器                      , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-vm_name             , vm_name_0            , vm_name_1             , 云服务器名称                  , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-l3_epc              , l3_epc_0             , l3_epc_1              , VPC                           , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-l3_epc_name         , l3_epc_name_0        , l3_epc_name_1         , VPC名称                       , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-subnet              , subnet_0             , subnet_1              , 子网                          , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-subnet_name         , subnet_name_0        , subnet_name_1         , 子网名称                      , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-router              , router_0             , router_1              , 路由器                        , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-router_name         , router_name_0        , router_name_1         , 路由器名称                    , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-dhcp_port           , dhcp_port_0          , dhcp_port_1           , DHCP网关                      , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-dhcp_port_name      , dhcp_port_name_0     , dhcp_port_name_1      , DHCP网关名称                  , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-lb                  , lb_0                 , lb_1                  , 负载均衡器                    , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-lb_name             , lb_name_0            , lb_name_1             , 负载均衡器名称                , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-nat_gateway         , nat_gateway_0        , nat_gateway_1         , NAT网关                       , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-nat_gateway_name    , nat_gateway_name_0   , nat_gateway_name_1    , NAT网关名称                   , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-redis               , redis_0              , redis_1               , Redis                         , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-redis_name          , redis_name_0         , redis_name_1          , Redis名称                     , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-rds                 , rds_0                , rds_1                 , RDS                           , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-rds_name            , rds_name_0           , rds_name_1            , RDS名称                       , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-pod_cluster         , pod_cluster_0        , pod_cluster_1         , 容器集群                      , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-pod_cluster_name    , pod_cluster_name_0   , pod_cluster_name_1    , 容器集群名称                  , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-pod_ns              , pod_ns_0             , pod_ns_1              , 命令空间                      , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-pod_ns_name         , pod_ns_name_0        , pod_ns_name_1         , 容器空间名称                  , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-pod_node            , pod_node_0           , pod_node_1            , 容器节点                      , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-pod_node_name       , pod_node_name_0      , pod_node_name_1       , 容器节点名称                  , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-pod_service         , pod_service_0        , pod_service_1         , 容器服务                      , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-pod_service_name    , pod_service_name_0   , pod_service_name_1    , 容器服务名称                  , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-pod_group           , pod_group_0          , pod_group_1           , 工作负载                      , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-pod_group_name      , pod_group_name_0     , pod_group_name_1      , 工作负载名称                  , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-pod                 , pod_0                , pod_1                 , 容器POD                       , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-pod_name            , pod_name_0           , pod_name_1            , 容器POD名称                   , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-resource_gl0_type   , resource_gl0_type_0  , resource_gl0_type_1   , 自动分组-全展开资源类型       , int_enum      , resource_gl0_type  , 知识图谱    , =/!=/IN/NOT IN
-resource_gl0        , resource_gl0_0       , resource_gl0_1        , 自动分组-全展开资源           , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-resource_gl0_name   , resource_gl0_name_0  , resource_gl0_name_1   , 自动分组-全展开资源名称       , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-resource_gl1_type   , resource_gl1_type_0  , resource_gl1_type_1   , 自动分组-工作负载聚合资源类型 , int_enum      , resource_gl0_type  , 知识图谱    , =/!=/IN/NOT IN
-resource_gl1        , resource_gl1_0       , resource_gl1_1        , 自动分组-工作负载聚合资源     , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-resource_gl1_name   , resource_gl1_name_0  , resource_gl1_name_1   , 自动分组-工作负载聚合资源名称 , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-resource_gl2_type   , resource_gl2_type_0  , resource_gl2_type_1   , 自动分组-服务聚合资源类型     , int_enum      , resource_gl0_type  , 知识图谱    , =/!=/IN/NOT IN
-resource_gl2        , resource_gl2_0       , resource_gl2_1        , 自动分组-服务聚合资源         , resource_id   ,                    , 知识图谱    , =/!=/IN/NOT IN
-resource_gl2_name   , resource_gl2_name_0  , resource_gl2_name_1   , 自动分组-服务聚合资源名称     , resource_name ,                    , 知识图谱    , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
+# Name              , ClientName           , ServerName            , DisplayName                   , Type         , EnumFile           , Category    , Description
+region              , region_0             , region_1              , 区域                          , resource     ,                    , 知识图谱    ,
+az                  , az_0                 , az_1                  , 可用区                        , resource     ,                    , 知识图谱    ,
+host                , host_0               , host_1                , 宿主机                        , resource     ,                    , 知识图谱    ,
+vm                  , vm_0                 , vm_1                  , 云服务器                      , resource     ,                    , 知识图谱    ,
+l3_epc              , l3_epc_0             , l3_epc_1              , VPC                           , resource     ,                    , 知识图谱    ,
+subnet              , subnet_0             , subnet_1              , 子网                          , resource     ,                    , 知识图谱    ,
+router              , router_0             , router_1              , 路由器                        , resource     ,                    , 知识图谱    ,
+dhcp_port           , dhcp_port_0          , dhcp_port_1           , DHCP网关                      , resource     ,                    , 知识图谱    ,
+lb                  , lb_0                 , lb_1                  , 负载均衡器                    , resource     ,                    , 知识图谱    ,
+nat_gateway         , nat_gateway_0        , nat_gateway_1         , NAT网关                       , resource     ,                    , 知识图谱    ,
+redis               , redis_0              , redis_1               , Redis                         , resource     ,                    , 知识图谱    ,
+rds                 , rds_0                , rds_1                 , RDS                           , resource     ,                    , 知识图谱    ,
+pod_cluster         , pod_cluster_0        , pod_cluster_1         , 容器集群                      , resource     ,                    , 知识图谱    ,
+pod_ns              , pod_ns_0             , pod_ns_1              , 命令空间                      , resource     ,                    , 知识图谱    ,
+pod_node            , pod_node_0           , pod_node_1            , 容器节点                      , resource     ,                    , 知识图谱    ,
+pod_service         , pod_service_0        , pod_service_1         , 容器服务                      , resource     ,                    , 知识图谱    ,
+pod_group           , pod_group_0          , pod_group_1           , 工作负载                      , resource     ,                    , 知识图谱    ,
+pod                 , pod_0                , pod_1                 , 容器POD                       , resource     ,                    , 知识图谱    ,
+resource_gl0_type   , resource_gl0_type_0  , resource_gl0_type_1   , 自动分组-全展开资源类型       , int_enum     , resource_gl0_type  , 知识图谱    ,
+resource_gl0        , resource_gl0_0       , resource_gl0_1        , 自动分组-全展开资源           , resource     ,                    , 知识图谱    ,
+resource_gl1_type   , resource_gl1_type_0  , resource_gl1_type_1   , 自动分组-工作负载聚合资源类型 , int_enum     , resource_gl1_type  , 知识图谱    ,
+resource_gl1        , resource_gl1_0       , resource_gl1_1        , 自动分组-工作负载聚合资源     , resource     ,                    , 知识图谱    ,
+resource_gl2_type   , resource_gl2_type_0  , resource_gl2_type_1   , 自动分组-服务聚合资源类型     , int_enum     , resource_gl2_type  , 知识图谱    ,
+resource_gl2        , resource_gl2_0       , resource_gl2_1        , 自动分组-服务聚合资源         , resource     ,                    , 知识图谱    ,
 
-mac                 , mac_0                , mac_1                 , MAC                           , string        ,                    , 链路层      , =/!=
-eth_type            , eth_type             , eth_type              , 链路协议                      , int_enum      , eth_type           , 链路层      , =/!=/IN/NOT IN
-vlan                , vlan                 , vlan                  , VLAN                          , int           ,                    , 链路层      , =/!=
+mac                 , mac_0                , mac_1                 , MAC                           , mac          ,                    , 链路层      ,
+eth_type            , eth_type             , eth_type              , 链路协议                      , int_enum     , eth_type           , 链路层      ,
+vlan                , vlan                 , vlan                  , VLAN                          , int          ,                    , 链路层      ,
 
-ip                  , ip_0                 , ip_1                  , IP地址                        , ip            ,                    , 网络层      , =/!=/IN/NOT IN
+ip                  , ip_0                 , ip_1                  , IP地址                        , ip           ,                    , 网络层      ,
 
-is_ipv4             , is_ipv4              , is_ipv4               , IP类型                        , int_enum      , ip_type            , 网络层      , =/!=
-protocol            , protocol             , protocol              , 网络协议                      , int_enum      , protocol           , 网络层      , =/!=/IN/NOT IN
-tunnel_tier         , tunnel_tier          , tunnel_tier           , 隧道层数                      , int_enum      , tunnel_tier        , 网络层      , =/!=
-tunnel_type         , tunnel_type          , tunnel_type           , 隧道类型                      , int_enum      , tunnel_type        , 网络层      , =/!=
-tunnel_tx_id        , tunnel_tx_id         ,                       , 请求隧道ID                    , int           ,                    , 网络层      , =/!=
-tunnel_rx_id        ,                      , tunnel_rx_id          , 响应隧道ID                    , int           ,                    , 网络层      , =/!=
-tunnel_tx_ip_0      , tunnel_tx_ip_0       ,                       , 请求隧道源IP                  , ip            ,                    , 网络层      , =/!=
-tunnel_tx_ip_1      ,                      , tunnel_tx_ip_1        , 请求隧道目的IP                , ip            ,                    , 网络层      , =/!=
-tunnel_rx_ip_0      , tunnel_rx_ip_0       ,                       , 响应隧道源IP                  , ip            ,                    , 网络层      , =/!=
-tunnel_rx_ip_1      ,                      , tunnel_rx_ip_1        , 响应隧道目的IP                , ip            ,                    , 网络层      , =/!=
+is_ipv4             , is_ipv4              , is_ipv4               , IP类型                        , int_enum     , ip_type            , 网络层      ,
+protocol            , protocol             , protocol              , 网络协议                      , int_enum     , protocol           , 网络层      ,
+tunnel_tier         , tunnel_tier          , tunnel_tier           , 隧道层数                      , int_enum     , tunnel_tier        , 网络层      ,
+tunnel_type         , tunnel_type          , tunnel_type           , 隧道类型                      , int_enum     , tunnel_type        , 网络层      ,
+tunnel_tx_id        , tunnel_tx_id         ,                       , 请求隧道ID                    , int          ,                    , 网络层      ,
+tunnel_rx_id        ,                      , tunnel_rx_id          , 响应隧道ID                    , int          ,                    , 网络层      ,
+tunnel_tx_ip_0      , tunnel_tx_ip_0       ,                       , 请求隧道源IP                  , ip           ,                    , 网络层      ,
+tunnel_tx_ip_1      ,                      , tunnel_tx_ip_1        , 请求隧道目的IP                , ip           ,                    , 网络层      ,
+tunnel_rx_ip_0      , tunnel_rx_ip_0       ,                       , 响应隧道源IP                  , ip           ,                    , 网络层      ,
+tunnel_rx_ip_1      ,                      , tunnel_rx_ip_1        , 响应隧道目的IP                , ip           ,                    , 网络层      ,
 
-client_port         , client_port          ,                       , 客户端口                      , int           ,                    , 传输层      , =/!=/>=/<=
-server_port         ,                      , server_port           , 服务端口                      , int           ,                    , 传输层      , =/!=/>=/<=
+client_port         , client_port          ,                       , 客户端口                      , int          ,                    , 传输层      ,
+server_port         ,                      , server_port           , 服务端口                      , int          ,                    , 传输层      ,
 # 需要将int按位转化位标志位列表展示 @zhenyu
-tcp_flags_bit       , tcp_flags_bit_0      , tcp_flags_bit_1       , TCP标志位列表                 , int           ,                    , 传输层      , =/!=
-syn_seq             , syn_seq              ,                       , SYN SEQ                       , int           ,                    , 传输层      , =/!=
-syn_ack_seq         ,                      , syn_ack_seq           , SYN-ACK SEQ                   , int           ,                    , 传输层      , =/!=
-last_keepalive_seq  , last_keepalive_seq   , last_keepalive_seq    , 心跳SEQ                       , int           ,                    , 传输层      , =/!=
-last_keepalive_ack  , last_keepalive_ack   , last_keepalive_ack    , 心跳ACK                       , int           ,                    , 传输层      , =/!=
+tcp_flags_bit       , tcp_flags_bit_0      , tcp_flags_bit_1       , TCP标志位列表                 , int          ,                    , 传输层      ,
+syn_seq             , syn_seq              ,                       , SYN SEQ                       , int          ,                    , 传输层      ,
+syn_ack_seq         ,                      , syn_ack_seq           , SYN-ACK SEQ                   , int          ,                    , 传输层      ,
+last_keepalive_seq  , last_keepalive_seq   , last_keepalive_seq    , 心跳SEQ                       , int          ,                    , 传输层      ,
+last_keepalive_ack  , last_keepalive_ack   , last_keepalive_ack    , 心跳ACK                       , int          ,                    , 传输层      ,
 
-l7_protocol         , l7_protocol          , l7_protocol           , 应用协议                      , int_enum      , l7_protocol        , 应用层      , =/!=/IN/NOT IN
+l7_protocol         , l7_protocol          , l7_protocol           , 应用协议                      , int_enum     , l7_protocol        , 应用层      ,
 
-province            , province_0           , province_1            , 省份                          , string        ,                    , 广域网      , =/!=
+province            , province_0           , province_1            , 省份                          , string       ,                    , 广域网      ,
 
-close_type          , close_type           , close_type            , 流结束类型                    , int_enmu      , close_type         , 流信息      , =/!=/IN/NOT IN
-flow_source         , flow_source          , flow_source           , 流数据来源                    , int_enmu      , flow_source        , 流信息      , =/!=/IN/NOT IN
-flow_id             , flow_id              , flow_id               , 流日志ID                      , int           ,                    , 流信息      , =/!=/>=/<=
-tap_type            , tap_type             , tap_type              , 采集点                        , resource_id   ,                    , 流信息      , =/!=/IN/NOT IN
-tap_type_name       , tap_type_name        , tap_type_name         , 采集点名称                    , resource_name ,                    , 流信息      , =/!=/IN/NOT IN
-tap_port_name       , tap_port_name        , tap_port_name         , 采集位置名称                  , string        ,                    , 流信息      , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
-tap_port_type       , tap_port_type        , tap_port_type         , 采集位置类型                  , int_enum      , tap_port_type      , 流信息      , =/!=/IN/NOT IN
+close_type          , close_type           , close_type            , 流结束类型                    , int_enmu     , close_type         , 流信息      ,
+flow_source         , flow_source          , flow_source           , 流数据来源                    , int_enmu     , flow_source        , 流信息      ,
+flow_id             , flow_id              , flow_id               , 流日志ID                      , int          ,                    , 流信息      ,
+tap_type            , tap_type             , tap_type              , 采集点                        , resource     ,                    , 流信息      ,
 # 需要转化为xx:xx:xx:xx格式展示
-tap_port            , tap_port             , tap_port              , 采集位置标识                  , string        ,                    , 流信息      , =/!=
-vtap_id             , vtap_id              , vtap_id               , 采集器                        , resource_id   ,                    , 流信息      , =/!=/IN/NOT IN
-vtap_name           , vtap_name            , vtap_name             , 采集器名称                    , resource_name ,                    , 流信息      , =/!=/IN/NOT IN/REGEXP/NOT REGEXP
+tap_port            , tap_port             , tap_port              , 采集位置标识                  , string       ,                    , 流信息      ,
+tap_port_name       , tap_port_name        , tap_port_name         , 采集位置名称                  , string       ,                    , 流信息      ,
+tap_port_type       , tap_port_type        , tap_port_type         , 采集位置类型                  , int_enum     , tap_port_type      , 流信息      ,
+vtap                , vtap                 , vtap                  , 采集器                        , resource     ,                    , 流信息      ,
 
-tap_side            , tap_side             , tap_side              , 路径统计位置                  , string_enum   , tap_side           , 流信息      , =/!=/IN/NOT IN
-# 需增加支持bool类型 @songzhen
-l2_end              , l2_end_0             , l2_end_1              , 二层边界                      , bool          ,                    , 流信息      , =/!=
-l3_end              , l3_end_0             , l3_end_1              , 三层边界                      , bool          ,                    , 流信息      , =/!=
-start_time          , start_time           , start_time            , 开始时间                      , int           ,                    , 流信息      , =/!=/>=/<=
-end_time            , end_time             , end_time              , 结束时间                      , int           ,                    , 流信息      , =/!=/>=/<=
-# 单位微秒
-duration            , duration             , duration              , 流持续时间（微秒）            , int           ,                    , 流信息      , =/!=/>=/<=
+tap_side            , tap_side             , tap_side              , 路径统计位置                  , string_enum  , tap_side           , 流信息      ,
+l2_end              , l2_end_0             , l2_end_1              , 二层边界                      , bool         ,                    , 流信息      ,
+l3_end              , l3_end_0             , l3_end_1              , 三层边界                      , bool         ,                    , 流信息      ,
+start_time          , start_time           , start_time            , 开始时间                      , int          ,                    , 流信息      ,
+end_time            , end_time             , end_time              , 结束时间                      , int          ,                    , 流信息      ,
+duration            , duration             , duration              , 流持续时间                    , int          ,                    , 流信息      , 单位: 微妙
