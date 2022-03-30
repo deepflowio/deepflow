@@ -108,6 +108,29 @@ func GenerateTagResoureMap() map[string]*Tag {
 		)
 	}
 
+	for _, autoStr := range []string{"resource_gl0", "resource_gl1", "resource_gl2"} {
+		autoID := autoStr + "_id"
+		autoType := autoStr + "_type"
+		// 自动分组资源名称
+		tagResourceMap[autoStr] = NewTag(
+			"dictGet(deepflow.device_map, ('name'), (toUInt64("+autoType+"),toUInt64("+autoID+")))",
+			"",
+			"toUInt64("+autoID+") IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
+		)
+		// 自动分组客户端资源名称
+		tagResourceMap[autoStr+"_0"] = NewTag(
+			"dictGet(deepflow.device_map, ('name'), (toUInt64("+autoType+"_0),toUInt64("+autoID+"_0)))",
+			"",
+			"toUInt64("+autoID+"_0) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
+		)
+		// 自动分组服务端资源名称
+		tagResourceMap[autoStr+"_1"] = NewTag(
+			"dictGet(deepflow.device_map, ('name'), (toUInt64("+autoType+"_1),toUInt64("+autoID+"_1)))",
+			"",
+			"toUInt64("+autoID+"_1) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
+		)
+	}
+
 	// 采集点ID
 	tagResourceMap["tap_type_id"] = NewTag(
 		"tap_type",
