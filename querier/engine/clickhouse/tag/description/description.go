@@ -12,14 +12,14 @@ var TAG_DESCRIPTIONS = map[string]map[string][]*TagDescription{
 	},
 }
 var TAG_ENUMS = map[string][]*TagEnum{}
-var tagTypeToOperators = map[string]string{
-	"resource":    "=/!=/IN/NOT IN/LIKE/NOT LIKE/REGEX/NOT REGEX",
-	"int":         "=/!=/IN/NOT IN/>=/<=",
-	"int_enum":    "=/!=/IN/NOT IN",
-	"string":      "=/!=/IN/NOT IN",
-	"string_enum": "=/!=/IN/NOT IN",
-	"ip":          "=/!=/IN/NOT IN",
-	"mac":         "=/!=/IN/NOT IN",
+var tagTypeToOperators = map[string][]string{
+	"resource":    []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEX"},
+	"int":         []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
+	"int_enum":    []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
+	"string":      []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
+	"string_enum": []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
+	"ip":          []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
+	"mac":         []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
 }
 
 type TagDescription struct {
@@ -31,7 +31,7 @@ type TagDescription struct {
 	EnumFile    string
 	Category    string
 	Description string
-	Operators   string
+	Operators   []string
 }
 
 func NewTagDescription(
@@ -39,7 +39,7 @@ func NewTagDescription(
 ) *TagDescription {
 	operators, ok := tagTypeToOperators[tagType]
 	if !ok {
-		operators = "=/!="
+		operators = []string{"=", "!="}
 	}
 	return &TagDescription{
 		Name:        name,

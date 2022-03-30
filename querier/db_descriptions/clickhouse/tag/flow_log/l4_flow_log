@@ -1,4 +1,7 @@
 # Name              , ClientName           , ServerName            , DisplayName                   , Type         , EnumFile           , Category    , Description
+_id                 ,                      ,                       ,                               , id           ,                    ,             ,
+time                ,                      ,                       ,                               , time         ,                    ,             ,
+
 region              , region_0             , region_1              , 区域                          , resource     ,                    , 知识图谱    ,
 az                  , az_0                 , az_1                  , 可用区                        , resource     ,                    , 知识图谱    ,
 host                , host_0               , host_1                , 宿主机                        , resource     ,                    , 知识图谱    ,
