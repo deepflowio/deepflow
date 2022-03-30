@@ -1,6 +1,7 @@
 package clickhouse
 
 import (
+	"errors"
 	"fmt"
 	"inet.af/netaddr"
 	"strconv"
@@ -165,7 +166,7 @@ type WhereFunction struct {
 func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string) (view.Node, error) {
 	op, opType := view.GetOperator(expr.(*sqlparser.ComparisonExpr).Operator)
 	if opType == view.OPERATOER_UNKNOWN {
-		return nil, fmt.Errorf("opeartor: %s not support", expr.(*sqlparser.ComparisonExpr).Operator)
+		return nil, errors.New(fmt.Sprintf("opeartor: %s not support", expr.(*sqlparser.ComparisonExpr).Operator))
 	}
 	right := view.Expr{Value: f.Value}
 	w.withs = append(w.withs, f.Function.GetWiths()...)

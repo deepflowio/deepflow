@@ -36,7 +36,10 @@ func Load() error {
 	if err != nil {
 		return err
 	}
-	clickhouse.LoadDbDescriptions(dbDescriptions)
+	err = clickhouse.LoadDbDescriptions(dbDescriptions)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

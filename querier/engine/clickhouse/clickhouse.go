@@ -1,6 +1,7 @@
 package clickhouse
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -97,13 +98,13 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, err
 	case "tag":
 		// show tag {tag} values from table
 		if len(sqlSplit) != 6 {
-			return nil, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
+			return nil, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
 		}
 		if strings.ToLower(sqlSplit[3]) == "values" {
 			values, err := tagdescription.GetTagValues(e.DB, table, sqlSplit[2])
 			return values, true, err
 		}
-		return nil, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
+		return nil, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
 	case "tags":
 		data, err := tagdescription.GetTagDescriptions(e.DB, table)
 		return data, true, err
@@ -112,7 +113,7 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, err
 	case "databases":
 		return GetDatabases(), true, nil
 	}
-	return nil, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
+	return nil, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
 }
 
 func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
@@ -304,7 +305,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 				return err
 			}
 			if function == nil {
-				return fmt.Errorf("function: %s not support", sqlparser.String(expr))
+				return errors.New(fmt.Sprintf("function: %s not support", sqlparser.String(expr)))
 			}
 			// 通过metric判断view是否拆层
 			e.SetLevelFlag(levelFlag)
@@ -322,7 +323,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		e.Statements = append(e.Statements, binFunction)
 		return nil
 	default:
-		return fmt.Errorf("select: %s(%T) not support", sqlparser.String(expr), expr)
+		return errors.New(fmt.Sprintf("select: %s(%T) not support", sqlparser.String(expr), expr))
 	}
 	return nil
 }
@@ -361,7 +362,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 			return nil, err
 		}
 		if function == nil {
-			return nil, fmt.Errorf("function: %s not support", sqlparser.String(expr))
+			return nil, errors.New(fmt.Sprintf("function: %s not support", sqlparser.String(expr)))
 		}
 		// 通过metric判断view是否拆层
 		e.SetLevelFlag(levelFlag)
@@ -485,7 +486,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where) (view.Node, error) 
 		}
 
 	}
-	return nil, fmt.Errorf("parse where error: %s(%T)", sqlparser.String(node), node)
+	return nil, errors.New(fmt.Sprintf("parse where error: %s(%T)", sqlparser.String(node), node))
 }
 
 // 翻译单元,翻译结果写入view.Model
@@ -493,10 +494,10 @@ type Statement interface {
 	Format(*view.Model)
 }
 
-func LoadDbDescriptions(dbDescriptions map[string]interface{}) {
+func LoadDbDescriptions(dbDescriptions map[string]interface{}) error {
 	dbData, ok := dbDescriptions["clickhouse"]
 	if !ok {
-		return
+		return errors.New("clickhouse not in dbDescription")
 	}
 
 	dbDataMap := dbData.(map[string]interface{})
@@ -504,14 +505,27 @@ func LoadDbDescriptions(dbDescriptions map[string]interface{}) {
 	if metricData, ok := dbDataMap["metrics"]; ok {
 		for db, tables := range DB_TABLE_MAP {
 			for _, table := range tables {
-				loadMetrics := metrics.LoadMetrics(db, table, metricData.(map[string]interface{}))
-				metrics.MergeMetrics(db, table, loadMetrics)
+				loadMetrics, err := metrics.LoadMetrics(db, table, metricData.(map[string]interface{}))
+				if err != nil {
+					return err
+				}
+				err = metrics.MergeMetrics(db, table, loadMetrics)
+				if err != nil {
+					return err
+				}
 			}
 		}
+	} else {
+		return errors.New("clickhouse not has metrics")
 	}
 	// 加载tag定义及部分tag的enum取值
 	if tagData, ok := dbDataMap["tag"]; ok {
-		tagdescription.LoadTagDescriptions(tagData.(map[string]interface{}))
+		err := tagdescription.LoadTagDescriptions(tagData.(map[string]interface{}))
+		if err != nil {
+			return err
+		}
+	} else {
+		return errors.New("clickhouse not has tag")
 	}
-
+	return nil
 }

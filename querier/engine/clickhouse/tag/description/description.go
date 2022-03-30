@@ -66,22 +66,23 @@ func NewTagEnum(value, displayName interface{}) *TagEnum {
 	}
 }
 
-func LoadTagDescriptions(tagData map[string]interface{}) {
+func LoadTagDescriptions(tagData map[string]interface{}) error {
 	// 生成tag description
 	for db, tables := range TAG_DESCRIPTIONS {
 		tableData, ok := tagData[db]
 		if !ok {
-			// TODO 记录日志
-			continue
+			return errors.New(fmt.Sprintf("get tag failed! db: %s", db))
 		}
 		for table := range tables {
 			tableTagData, ok := tableData.(map[string]interface{})[table]
 			if !ok {
-				// TODO 记录日志
-				continue
+				return errors.New(fmt.Sprintf("get metrics failed! db:%s table:%s", db, table))
 			}
 			// 遍历文件内容进行赋值
 			for _, tag := range tableTagData.([][]interface{}) {
+				if len(tag) < 8 {
+					return errors.New(fmt.Sprintf("get metrics failed! db:%s table:%s, tag:%v", db, table, tag))
+				}
 				description := NewTagDescription(
 					tag[0].(string), tag[1].(string), tag[2].(string), tag[3].(string),
 					tag[4].(string), tag[5].(string), tag[6].(string), tag[7].(string),
@@ -101,7 +102,10 @@ func LoadTagDescriptions(tagData map[string]interface{}) {
 			}
 			TAG_ENUMS[tagName] = tagEnums
 		}
+	} else {
+		return errors.New("get tag enum failed! ")
 	}
+	return nil
 }
 
 func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {

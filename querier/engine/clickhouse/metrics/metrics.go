@@ -1,5 +1,10 @@
 package metrics
 
+import (
+	"errors"
+	"fmt"
+)
+
 const METRICS_OPERATOR_GTE = ">="
 const METRICS_OPERATOR_LTE = "<="
 
@@ -81,11 +86,10 @@ func GetMetricsDescriptions(db string, table string) (map[string][]interface{}, 
 	}, nil
 }
 
-func LoadMetrics(db string, table string, dbDescription map[string]interface{}) (loadMetrics map[string]*Metrics) {
+func LoadMetrics(db string, table string, dbDescription map[string]interface{}) (loadMetrics map[string]*Metrics, err error) {
 	tableDate, ok := dbDescription[db]
 	if !ok {
-		// TODO
-		return nil
+		return nil, errors.New(fmt.Sprintf("get metrics failed! db: %s", db))
 	}
 	if ok {
 		metricsData, ok := tableDate.(map[string]interface{})[table]
@@ -94,16 +98,24 @@ func LoadMetrics(db string, table string, dbDescription map[string]interface{}) 
 			for _, metrics := range metricsData.([][]interface{}) {
 				// metric类型替换成int
 				//metrics[3], ok = METRICS_TYPE_NAME_MAP[metrics[3].(string)]
-				metricType := METRICS_TYPE_NAME_MAP[metrics[4].(string)]
+				if len(metrics) < 6 {
+					return nil, errors.New(fmt.Sprintf("get metrics failed! db:%s table:%s metrics:%v", db, table, metrics))
+				}
+				metricType, ok := METRICS_TYPE_NAME_MAP[metrics[4].(string)]
+				if !ok {
+					return nil, errors.New(fmt.Sprintf("get metrics type failed! db:%s table:%s metrics:%v", db, table, metrics))
+				}
 				lm := NewMetrics(metrics[1].(string), metrics[2].(string), metrics[3].(string), metricType, metrics[5].(string), "")
 				loadMetrics[metrics[0].(string)] = lm
 			}
+		} else {
+			return nil, errors.New(fmt.Sprintf("get metrics failed! db:%s table:%s", db, table))
 		}
 	}
-	return loadMetrics
+	return loadMetrics, nil
 }
 
-func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) {
+func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) error {
 	var metrics map[string]*Metrics
 	var replaceMetrics map[string]*Metrics
 	switch db {
@@ -118,7 +130,7 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) {
 		}
 	}
 	if metrics == nil {
-		return
+		return errors.New(fmt.Sprintf("merge metrics failed! db:%s, table:%s", db, table))
 	}
 	for name, value := range loadMetrics {
 		if rm, ok := replaceMetrics[name]; ok && value.DBField == "" {
@@ -126,4 +138,5 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) {
 		}
 		metrics[name] = value
 	}
+	return nil
 }

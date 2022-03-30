@@ -68,8 +68,7 @@ func GetTagFunctionTranslator(name string, args []string, alias string) (Stateme
 			err := time.Trans()
 			return &time, err
 		default:
-			errMessage := fmt.Sprintf("get tag %s failed", name)
-			err := errors.New(errMessage)
+			err := errors.New(fmt.Sprintf("get tag %s failed", name))
 			return nil, err
 		}
 	}

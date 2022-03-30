@@ -31,7 +31,10 @@ func Start() {
 	log.Infof("querier config:\n%s", string(bytes))
 
 	// engine加载数据库tag/metric等信息
-	Load()
+	err := Load()
+	if err != nil {
+		log.Panic(err)
+	}
 	// 注册router
 	r := gin.Default()
 	router.QueryRouter(r)
