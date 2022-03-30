@@ -10,7 +10,7 @@ func Execute(args map[string]string) (resp map[string][]interface{}, err error) 
 	var engine engine.Engine
 	switch db {
 	case "clickhouse":
-		engine = &clickhouse.CHEngine{IP: args["ip"], DB: args["db"]}
+		engine = &clickhouse.CHEngine{DB: args["db"]}
 		engine.Init()
 	}
 	resp, err = engine.ExecuteQuery(args["sql"])

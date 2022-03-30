@@ -4,11 +4,16 @@ import (
 	"fmt"
 	_ "github.com/ClickHouse/clickhouse-go"
 	"github.com/jmoiron/sqlx"
+	logging "github.com/op/go-logging"
+	"math/rand"
+	"time"
 )
 
+var log = logging.MustGetLogger("clickhouse")
+
 type Client struct {
-	IP         string
-	Port       string
+	IPs        []string
+	Port       int
 	UserName   string
 	Password   string
 	connection *sqlx.DB
@@ -16,7 +21,9 @@ type Client struct {
 }
 
 func (c *Client) Init() error {
-	url := fmt.Sprintf("tcp://%s:%s?username=%s&password=%s", c.IP, c.Port, c.UserName, c.Password)
+	rand.Seed(time.Now().Unix())
+	randIndex := rand.Intn(len(c.IPs))
+	url := fmt.Sprintf("tcp://%s:%d?username=%s&password=%s", c.IPs[randIndex], c.Port, c.UserName, c.Password)
 	if c.DB != "" {
 		url = fmt.Sprintf("%s&database=%s", url, c.DB)
 	}
@@ -24,6 +31,7 @@ func (c *Client) Init() error {
 		"clickhouse", url,
 	)
 	if err != nil {
+		log.Errorf("connect clickhouse failed: %s, url: %s", err, url)
 		return err
 	}
 	c.connection = conn
@@ -33,7 +41,7 @@ func (c *Client) Init() error {
 func (c *Client) DoQuery(sql string) (map[string][]interface{}, error) {
 	rows, err := c.connection.Queryx(sql)
 	if err != nil {
-		// TODO: log
+		log.Errorf("query clickhouse Error: %s, sql: %s", err, sql)
 		return nil, err
 	}
 	columns, err := rows.ColumnTypes()

@@ -20,8 +20,6 @@ type Where struct {
 
 func (w *Where) Format(m *view.Model) {
 	w.filter.Withs = w.withs
-	m.Time.TimeStart = w.time.TimeStart
-	m.Time.TimeEnd = w.time.TimeEnd
 	if !w.filter.IsNull() {
 		m.AddFilter(w.filter)
 	}
@@ -167,8 +165,7 @@ type WhereFunction struct {
 func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string) (view.Node, error) {
 	op, opType := view.GetOperator(expr.(*sqlparser.ComparisonExpr).Operator)
 	if opType == view.OPERATOER_UNKNOWN {
-		// TODO
-		return nil, nil
+		return nil, fmt.Errorf("opeartor: %s not support", expr.(*sqlparser.ComparisonExpr).Operator)
 	}
 	right := view.Expr{Value: f.Value}
 	w.withs = append(w.withs, f.Function.GetWiths()...)

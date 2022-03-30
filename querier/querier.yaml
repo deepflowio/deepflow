@@ -1,0 +1,15 @@
+# logfile path
+log-file: /var/log/querier/querier.log
+# loglevel: "debug/info/warn/error"
+log-level: info
+# querier http listenport
+listen-port: 8086
+
+# clickhouse相关配置
+clickhouse:
+  database: deepflow
+  user: default
+  port: 9000
+  timeout: 60
+  ips:
+    - 127.0.0.1

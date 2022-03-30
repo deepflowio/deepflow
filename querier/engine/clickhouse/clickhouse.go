@@ -1,13 +1,14 @@
 package clickhouse
 
 import (
+	"fmt"
 	"strings"
 
-	"github.com/k0kubun/pp"
 	logging "github.com/op/go-logging"
 	"github.com/xwb1989/sqlparser"
 
 	"metaflow/querier/common"
+	"metaflow/querier/config"
 	"metaflow/querier/engine/clickhouse/client"
 	"metaflow/querier/engine/clickhouse/metrics"
 	tagdescription "metaflow/querier/engine/clickhouse/tag/description"
@@ -22,7 +23,6 @@ var DB_TABLE_MAP = map[string][]string{
 
 type CHEngine struct {
 	Model      *view.Model
-	IP         string
 	Statements []Statement
 	DB         string
 	Table      string
@@ -32,6 +32,7 @@ type CHEngine struct {
 func (e *CHEngine) ExecuteQuery(sql string) (map[string][]interface{}, error) {
 	// 解析show开头的sql
 	// show metrics/tags from <table_name> 例：show metrics/tags from l4_flow_log
+	log.Debugf("raw sql: %s", sql)
 	result, isShow, err := e.ParseShowSql(sql)
 	if isShow {
 		if err != nil {
@@ -43,25 +44,28 @@ func (e *CHEngine) ExecuteQuery(sql string) (map[string][]interface{}, error) {
 	parser := parse.Parser{Engine: e}
 	err = parser.ParseSQL(sql)
 	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
 	chSql := e.ToSQLString()
 	log.Debug(chSql)
-	pp.Println(chSql)
-	// TODO: 根据config写入
 	chClient := client.Client{
-		IP:       e.IP,
-		Port:     "9000",
-		UserName: "default",
-		Password: "",
+		IPs:      config.Cfg.Clickhouse.IPs,
+		Port:     config.Cfg.Clickhouse.Port,
+		UserName: config.Cfg.Clickhouse.User,
+		Password: config.Cfg.Clickhouse.Password,
 		DB:       e.DB,
 	}
 	err = chClient.Init()
 	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
 	rst, err := chClient.DoQuery(chSql)
-	pp.Println(rst)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
 	return rst, err
 }
 
@@ -93,15 +97,13 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, err
 	case "tag":
 		// show tag {tag} values from table
 		if len(sqlSplit) != 6 {
-			// TODO: 增加日志记录解析失败
-			return nil, true, nil
+			return nil, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
 		}
 		if strings.ToLower(sqlSplit[3]) == "values" {
 			values, err := tagdescription.GetTagValues(e.DB, table, sqlSplit[2])
 			return values, true, err
 		}
-		// TODO: 增加日志记录解析失败
-		return nil, true, nil
+		return nil, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
 	case "tags":
 		data, err := tagdescription.GetTagDescriptions(e.DB, table)
 		return data, true, err
@@ -109,10 +111,8 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, err
 		return GetTables(e.DB), true, nil
 	case "databases":
 		return GetDatabases(), true, nil
-	default:
-		// TODO: 解析失败
-		return nil, true, nil
 	}
+	return nil, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
 }
 
 func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
@@ -299,18 +299,30 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 				return err
 			}
 		} else {
-			err = e.AddFunction(name, args, as)
+			function, levelFlag, err := GetAggFunc(name, args, as, e.DB, e.Table)
+			if err != nil {
+				return err
+			}
+			if function == nil {
+				return fmt.Errorf("function: %s not support", sqlparser.String(expr))
+			}
+			// 通过metric判断view是否拆层
+			e.SetLevelFlag(levelFlag)
+			e.Statements = append(e.Statements, function)
+			return nil
 		}
-		return err
+		return nil
 	// field +=*/ field 运算符
 	case *sqlparser.BinaryExpr:
 		binFunction, err := e.parseSelectBinaryExpr(expr)
+		if err != nil {
+			return err
+		}
 		binFunction.SetAlias(as)
 		e.Statements = append(e.Statements, binFunction)
-		return err
-	default:
-		// TODO 报错
 		return nil
+	default:
+		return fmt.Errorf("select: %s(%T) not support", sqlparser.String(expr), expr)
 	}
 	return nil
 }
@@ -347,6 +359,9 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 		function, levelFlag, err := GetAggFunc(name, args, "", e.DB, e.Table)
 		if err != nil {
 			return nil, err
+		}
+		if function == nil {
+			return nil, fmt.Errorf("function: %s not support", sqlparser.String(expr))
 		}
 		// 通过metric判断view是否拆层
 		e.SetLevelFlag(levelFlag)
@@ -397,17 +412,6 @@ func (e *CHEngine) AddTag(tag string, alias string) error {
 	}
 	stmt = GetDefaultTag(tag, alias)
 	e.Statements = append(e.Statements, stmt)
-	return nil
-}
-
-func (e *CHEngine) AddFunction(name string, args []string, alias string) error {
-	function, levelFlag, err := GetAggFunc(name, args, alias, e.DB, e.Table)
-	if err != nil {
-		return err
-	}
-	// 通过metric判断view是否拆层
-	e.SetLevelFlag(levelFlag)
-	e.Statements = append(e.Statements, function)
 	return nil
 }
 
@@ -481,7 +485,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where) (view.Node, error) 
 		}
 
 	}
-	return nil, nil
+	return nil, fmt.Errorf("parse where error: %s(%T)", sqlparser.String(node), node)
 }
 
 // 翻译单元,翻译结果写入view.Model
