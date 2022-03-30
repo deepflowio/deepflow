@@ -14,22 +14,24 @@ import (
 type LogProtoType uint8
 
 const (
-	PROTO_UNKNOWN LogProtoType = iota
-	PROTO_HTTP
-	PROTO_DNS
-	PROTO_MYSQL
-	PROTO_REDIS
-	PROTO_DUBBO
-	PROTO_KAFKA
-	PROTO_OTHER
-	PROTO_MAX
+	PROTO_UNKNOWN LogProtoType = 0
+	PROTO_OTHER   LogProtoType = 1
+	PROTO_HTTP_1  LogProtoType = 20
+	PROTO_HTTP_2  LogProtoType = 21
+	PROTO_DUBBO   LogProtoType = 40
+	PROTO_MYSQL   LogProtoType = 60
+	PROTO_REDIS   LogProtoType = 80
+	PROTO_KAFKA   LogProtoType = 100
+	PROTO_DNS     LogProtoType = 120
 )
 
 func (t *LogProtoType) String() string {
 	formatted := ""
 	switch *t {
-	case PROTO_HTTP:
-		formatted = "HTTP"
+	case PROTO_HTTP_1:
+		formatted = "HTTPv1"
+	case PROTO_HTTP_2:
+		formatted = "HTTPv2"
 	case PROTO_DNS:
 		formatted = "DNS"
 	case PROTO_MYSQL:
@@ -224,7 +226,9 @@ func ReleaseAppProtoLogsData(d *AppProtoLogsData) {
 		return
 	}
 	switch d.Proto {
-	case PROTO_HTTP:
+	case PROTO_HTTP_2:
+		fallthrough
+	case PROTO_HTTP_1:
 		ReleaseHTTPInfo(d.Detail.(*HTTPInfo))
 	case PROTO_DNS:
 		ReleaseDNSInfo(d.Detail.(*DNSInfo))
@@ -325,7 +329,9 @@ func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
 	}
 	l.AppProtoLogsBaseInfo.WriteToPB(p.BaseInfo)
 	switch l.Proto {
-	case PROTO_HTTP:
+	case PROTO_HTTP_1:
+		fallthrough
+	case PROTO_HTTP_2:
 		if http, ok := l.Detail.(*HTTPInfo); ok {
 			if p.Http == nil {
 				p.Http = &pb.HTTPInfo{}
