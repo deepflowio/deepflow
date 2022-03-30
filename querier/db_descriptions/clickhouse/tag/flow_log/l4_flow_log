@@ -43,6 +43,11 @@ tunnel_tx_ip_0      , tunnel_tx_ip_0       ,                       , 请求隧�
 tunnel_tx_ip_1      ,                      , tunnel_tx_ip_1        , 请求隧道目的IP                , ip           ,                    , 网络层      ,
 tunnel_rx_ip_0      , tunnel_rx_ip_0       ,                       , 响应隧道源IP                  , ip           ,                    , 网络层      ,
 tunnel_rx_ip_1      ,                      , tunnel_rx_ip_1        , 响应隧道目的IP                , ip           ,                    , 网络层      ,
+tunnel_tx_mac_0      , tunnel_tx_mac_0       ,                     , 请求隧道源MAC                 , mac          ,                    , 网络层      ,
+tunnel_tx_mac_1      ,                      , tunnel_tx_mac_1      , 请求隧道目的MAC               , mac          ,                    , 网络层      ,
+tunnel_rx_mac_0      , tunnel_rx_mac_0       ,                     , 响应隧道源MAC                 , mac          ,                    , 网络层      ,
+tunnel_rx_mac_1      ,                      , tunnel_rx_mac_1      , 响应隧道目的MAC               , mac          ,                    , 网络层      ,
+
 
 client_port         , client_port          ,                       , 客户端口                      , int          ,                    , 传输层      ,
 server_port         ,                      , server_port           , 服务端口                      , int          ,                    , 传输层      ,
@@ -70,6 +75,7 @@ vtap                , vtap                 , vtap                  , 采集器  
 tap_side            , tap_side             , tap_side              , 路径统计位置                  , string_enum  , tap_side           , 流信息      ,
 l2_end              , l2_end_0             , l2_end_1              , 二层边界                      , bool         ,                    , 流信息      ,
 l3_end              , l3_end_0             , l3_end_1              , 三层边界                      , bool         ,                    , 流信息      ,
+is_new_flow         , is_new_flow          , is_new_flow           , 新建流                        , bool         ,                    , 流信息      ,
 start_time          , start_time           , start_time            , 开始时间                      , int          ,                    , 流信息      ,
 end_time            , end_time             , end_time              , 结束时间                      , int          ,                    , 流信息      ,
 duration            , duration             , duration              , 流持续时间                    , int          ,                    , 流信息      , 单位: 微妙

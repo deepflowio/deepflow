@@ -1,9 +1,10 @@
 # Value , DisplayName
 0       , 未知
-1       , HTTP
-2       , DNS
-3       , MySQL
-4       , Redis
-5       , Dubbo
-6       , Kafka
-7       , 其他
+1       , 其他
+20      , HTTP
+21      , HTTP2
+40      , Dubbo
+60      , MySQL
+80      , Redis
+100     , Kafka
+120     , DNS
