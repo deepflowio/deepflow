@@ -48,7 +48,7 @@ func GetWhere(name, value string) WhereStatement {
 }
 
 type WhereStatement interface {
-	Trans(sqlparser.Expr, *Where, map[string]string) (view.Node, error)
+	Trans(sqlparser.Expr, *Where, map[string]string, string, string) (view.Node, error)
 }
 
 type WhereTag struct {
@@ -61,19 +61,29 @@ var OperatorMap = map[string]string{
 	"not in": " AND ",
 }
 
-func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string) (view.Node, error) {
+func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string, db, table string) (view.Node, error) {
 	op := expr.(*sqlparser.ComparisonExpr).Operator
-	tagItem, ok := tag.GetTag(t.Tag)
+	tagItem, ok := tag.GetTag(t.Tag, db, table)
 	if !ok {
 		preAsTag, ok := asTagMap[t.Tag]
 		if ok {
-			tagItem, ok = tag.GetTag(preAsTag)
+			tagItem, ok = tag.GetTag(preAsTag, db, table)
 			if !ok {
-				filter := fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+				filter := ""
+				if strings.ToLower(op) == "regexp" {
+					filter = fmt.Sprintf("match(%s,%s)", t.Tag, t.Value)
+				} else {
+					filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+				}
 				return &view.Expr{Value: filter}, nil
 			}
 		} else {
-			filter := fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+			filter := ""
+			if strings.ToLower(op) == "regex" {
+				filter = fmt.Sprintf("match(%s,%s)", t.Tag, t.Value)
+			} else {
+				filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+			}
 			return &view.Expr{Value: filter}, nil
 		}
 	}
@@ -131,8 +141,17 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				ipVersion = "1"
 			}
 			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, ipVersion)
+		case "_id":
+			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, t.Value, t.Value)
 		default:
-			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
+			switch strings.ToLower(op) {
+			case "regexp":
+				whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value)
+			case "not regexp":
+				whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "NOT match", t.Value)
+			default:
+				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
+			}
 		}
 	} else {
 		return &view.Expr{Value: "(1=1)"}, nil
@@ -144,7 +163,7 @@ type TimeTag struct {
 	Value string
 }
 
-func (t *TimeTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string) (view.Node, error) {
+func (t *TimeTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string, db, table string) (view.Node, error) {
 	compareExpr := expr.(*sqlparser.ComparisonExpr)
 	time, err := strconv.ParseInt(t.Value, 10, 64)
 	if err != nil {
@@ -163,7 +182,7 @@ type WhereFunction struct {
 	Value    string
 }
 
-func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string) (view.Node, error) {
+func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string, db, table string) (view.Node, error) {
 	op, opType := view.GetOperator(expr.(*sqlparser.ComparisonExpr).Operator)
 	if opType == view.OPERATOER_UNKNOWN {
 		return nil, errors.New(fmt.Sprintf("opeartor: %s not support", expr.(*sqlparser.ComparisonExpr).Operator))

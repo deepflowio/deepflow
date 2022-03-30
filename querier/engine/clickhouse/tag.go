@@ -14,14 +14,14 @@ import (
 
 var TAG_FUNCTIONS = []string{"mask", "time"}
 
-func GetTagTranslator(name string, alias string) (Statement, error) {
+func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 	var stmt Statement
 	withs := []view.Node{}
 	selectTag := name
 	if alias != "" {
 		selectTag = alias
 	}
-	tag, ok := tag.GetTag(name)
+	tag, ok := tag.GetTag(name, db, table)
 	if !ok {
 		return nil, nil
 	} else {
@@ -48,8 +48,8 @@ func GetDefaultTag(name string, alias string) Statement {
 	return &SelectTag{Value: name, Alias: alias}
 }
 
-func GetTagFunctionTranslator(name string, args []string, alias string) (Statement, error) {
-	tag, ok := tag.GetTag("mask" + "_" + args[0])
+func GetTagFunctionTranslator(name string, args []string, alias, db, table string) (Statement, error) {
+	tag, ok := tag.GetTag("mask"+"_"+args[0], db, table)
 	if ok {
 		switch name {
 		case "mask":

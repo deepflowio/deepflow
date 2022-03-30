@@ -237,7 +237,7 @@ func (e *CHEngine) parseGroupBy(group sqlparser.Expr) error {
 		}
 		// TODO: 特殊处理塞进group的fromat中
 		whereStmt := Where{}
-		notNullExpr, ok := GetNotNullFilter(sqlparser.String(expr), e.asTagMap)
+		notNullExpr, ok := GetNotNullFilter(sqlparser.String(expr), e.asTagMap, e.DB, e.Table)
 		if !ok {
 			return nil
 		}
@@ -295,7 +295,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		}
 		name = strings.ReplaceAll(name, "`", "")
 		if common.IsValueInSliceString(name, TAG_FUNCTIONS) {
-			err := e.AddTagFunction(name, args, as)
+			err := e.AddTagFunction(name, args, as, e.DB, e.Table)
 			if err != nil {
 				return err
 			}
@@ -395,7 +395,7 @@ func (e *CHEngine) AddTable(table string) {
 }
 
 func (e *CHEngine) AddTag(tag string, alias string) error {
-	stmt, err := GetTagTranslator(tag, alias)
+	stmt, err := GetTagTranslator(tag, alias, e.DB, e.Table)
 	if err != nil {
 		return err
 	}
@@ -416,8 +416,8 @@ func (e *CHEngine) AddTag(tag string, alias string) error {
 	return nil
 }
 
-func (e *CHEngine) AddTagFunction(name string, args []string, alias string) error {
-	function, err := GetTagFunctionTranslator(name, args, alias)
+func (e *CHEngine) AddTagFunction(name string, args []string, alias, db, table string) error {
+	function, err := GetTagFunctionTranslator(name, args, alias, db, table)
 	if err != nil {
 		return err
 	}
@@ -474,7 +474,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where) (view.Node, error) 
 			whereTag := sqlparser.String(node.Left)
 			whereValue := sqlparser.String(node.Right)
 			stmt := GetWhere(whereTag, whereValue)
-			return stmt.Trans(node, w, e.asTagMap)
+			return stmt.Trans(node, w, e.asTagMap, e.DB, e.Table)
 		case *sqlparser.FuncExpr, *sqlparser.BinaryExpr:
 			function, err := e.parseSelectBinaryExpr(expr)
 			if err != nil {
@@ -482,7 +482,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where) (view.Node, error) 
 			}
 			outfunc := function.Trans(e.Model)
 			stmt := &WhereFunction{Function: outfunc, Value: sqlparser.String(node.Right)}
-			return stmt.Trans(node, w, e.asTagMap)
+			return stmt.Trans(node, w, e.asTagMap, e.DB, e.Table)
 		}
 
 	}
