@@ -49,7 +49,7 @@ response_code             ,                           , response_code           
 response_exception        ,                           , response_exception        , 响应异常                      , string        ,                    , 应用层      ,
 response_result           ,                           , response_result           , 响应结果                      , string        ,                    , 应用层      ,
 
-http_proxy_client         , http_proxy_client         ,                           , HTTP代理客户端                 , string        ,                    , 链路追踪      ,
+http_proxy_client         , http_proxy_client         ,                           , HTTP代理客户端                , string        ,                    , 链路追踪      ,
 trace_id                  , trace_id                  , trace_id                  , TraceID                       , string        ,                    , 链路追踪      ,
 span_id                   , span_id                   , span_id                   , SpanID                        , string        ,                    , 链路追踪      ,
 x_request_id              , x_request_id              ,                           , XRequestID                    , string        ,                    , 链路追踪      ,
