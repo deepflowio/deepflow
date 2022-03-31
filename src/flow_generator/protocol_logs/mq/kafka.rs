@@ -1,12 +1,12 @@
 use super::super::{
     consts::{KAFKA_REQ_HEADER_LEN, KAFKA_RESP_HEADER_LEN},
-    L7LogParse, LogMessageType,
+    AppProtoLogsInfo, L7LogParse, LogMessageType,
 };
 
-use crate::flow_generator::error::{Error, Result};
 use crate::proto::flow_log;
 use crate::{
     common::enums::{IpProtocol, PacketDirection},
+    flow_generator::error::{Error, Result},
     utils::bytes::{read_u16_be, read_u32_be},
 };
 
@@ -85,10 +85,9 @@ impl KafkaLog {
 }
 
 impl L7LogParse for KafkaLog {
-    type Item = KafkaInfo;
     fn parse(
         &mut self,
-        payload: impl AsRef<[u8]>,
+        payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
     ) -> Result<()> {
@@ -96,7 +95,6 @@ impl L7LogParse for KafkaLog {
             return Err(Error::InvalidIpProtocol);
         }
         self.reset_logs();
-        let payload = payload.as_ref();
         if payload.len() < KAFKA_RESP_HEADER_LEN {
             return Err(Error::KafkaLogParseFailed);
         }
@@ -106,8 +104,8 @@ impl L7LogParse for KafkaLog {
         }
     }
 
-    fn info(&self) -> Self::Item {
-        self.info.clone()
+    fn info(&self) -> AppProtoLogsInfo {
+        AppProtoLogsInfo::Kafka(self.info.clone())
     }
 }
 

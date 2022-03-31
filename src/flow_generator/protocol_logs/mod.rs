@@ -24,14 +24,14 @@ use std::{
 
 use prost::Message;
 
-use super::error::Result;
-
 use crate::{
     common::{
         enums::{IpProtocol, PacketDirection, TapType},
         flow::L7Protocol,
+        meta_packet::MetaPacket,
         tap_port::TapPort,
     },
+    flow_generator::error::Result,
     metric::document::TapSide,
     proto::flow_log,
     utils::net::MacAddr,
@@ -170,7 +170,8 @@ pub enum AppProtoLogsInfo {
     Redis(RedisInfo),
     Kafka(KafkaInfo),
     Dubbo(DubboInfo),
-    Http(HttpInfo),
+    HttpV1(HttpInfo),
+    HttpV2(HttpInfo),
 }
 
 impl AppProtoLogsInfo {
@@ -181,7 +182,8 @@ impl AppProtoLogsInfo {
             (Self::Redis(m), Self::Redis(o)) => m.merge(o),
             (Self::Kafka(m), Self::Kafka(o)) => m.merge(o),
             (Self::Dubbo(m), Self::Dubbo(o)) => m.merge(o),
-            (Self::Http(m), Self::Http(o)) => m.merge(o),
+            (Self::HttpV1(m), Self::HttpV1(o)) => m.merge(o),
+            (Self::HttpV2(m), Self::HttpV2(o)) => m.merge(o),
             _ => unreachable!(),
         }
     }
@@ -192,10 +194,11 @@ impl fmt::Display for AppProtoLogsInfo {
         match self {
             Self::Dns(l) => write!(f, "{:?}", l),
             Self::Mysql(l) => write!(f, "{:?}", l),
-            Self::Redis(l) => write!(f, "{:?}", l),
+            Self::Redis(l) => write!(f, "{}", l),
             Self::Dubbo(l) => write!(f, "{:?}", l),
             Self::Kafka(l) => write!(f, "{:?}", l),
-            Self::Http(l) => write!(f, "{:?}", l),
+            Self::HttpV1(l) => write!(f, "{:?}", l),
+            Self::HttpV2(l) => write!(f, "{:?}", l),
         }
     }
 }
@@ -237,7 +240,8 @@ impl AppProtoLogsData {
             AppProtoLogsInfo::Redis(t) => pb_proto_logs_data.redis = Some(t.into()),
             AppProtoLogsInfo::Kafka(t) => pb_proto_logs_data.kafka = Some(t.into()),
             AppProtoLogsInfo::Dubbo(t) => pb_proto_logs_data.dubbo = Some(t.into()),
-            AppProtoLogsInfo::Http(t) => pb_proto_logs_data.http = Some(t.into()),
+            AppProtoLogsInfo::HttpV1(t) => pb_proto_logs_data.http = Some(t.into()),
+            AppProtoLogsInfo::HttpV2(t) => pb_proto_logs_data.http = Some(t.into()),
         };
 
         pb_proto_logs_data
@@ -250,23 +254,80 @@ impl fmt::Display for AppProtoLogsBaseInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "start_time: {:?} end_time: {:?} flow_id: {} vtap_id: {} tap_type: {} tap_port: {} proto: {:?} msg_type: {:?} code: {} \
-            status: {:?} rrt: {} tap_side {:?} is_vip_interface_src {:?} is_vip_interface_dst {:?} mac_src: {} mac_dst: {} \
-            ip_src: {} ip_dst: {} proto: {:?} port_src: {} port_dst: {} l3_epc_id_src: {} l3_epc_id_dst: {} req_tcp_seq: {} resp_tcp_seq: {}",
-            self.start_time, self.end_time, self.flow_id, self.vtap_id, self.tap_type, self.tap_port, self.head.proto, self.head.msg_type, self.head.code,
-            self.head.status, self.head.rrt, self.tap_side, self.is_vip_interface_src, self.is_vip_interface_dst, self.mac_src, self.mac_dst,
-            self.ip_src, self.ip_dst, self.protocol, self.port_src, self.port_dst, self.l3_epc_id_src, self.l3_epc_id_dst, self.req_tcp_seq, self.resp_tcp_seq
+            "Timestamp: {:?} Vtap_id: {} Flow_id: {} TapType: {} TapPort: {} TapSide: {:?}\n \
+                \t{}_{}_{} -> {}_{}_{} Proto: {:?} Seq: {} -> {} VIP: {} -> {}\n \
+                \tL7Protocol: {:?} MsgType: {:?} Status: {:?} Code: {} Rrt: {}",
+            self.start_time,
+            self.vtap_id,
+            self.flow_id,
+            self.tap_type,
+            self.tap_port,
+            self.tap_side,
+            self.mac_src,
+            self.ip_src,
+            self.port_src,
+            self.mac_dst,
+            self.ip_dst,
+            self.port_dst,
+            self.protocol,
+            self.req_tcp_seq,
+            self.resp_tcp_seq,
+            self.is_vip_interface_src,
+            self.is_vip_interface_dst,
+            self.head.proto,
+            self.head.msg_type,
+            self.head.status,
+            self.head.code,
+            self.head.rrt
         )
     }
 }
 
-pub trait L7LogParse {
-    type Item: Clone;
+impl<'a> From<&Box<MetaPacket<'a>>> for AppProtoLogsBaseInfo {
+    fn from(packet: &Box<MetaPacket<'a>>) -> Self {
+        Self {
+            start_time: packet.lookup_key.timestamp,
+            end_time: packet.lookup_key.timestamp,
+            flow_id: packet.socket_id,
+            tap_port: packet.tap_port,
+            tap_type: TapType::Tor,
+            is_ipv6: packet.lookup_key.dst_ip.is_ipv6(),
+            tap_side: if packet.lookup_key.l2_end_0 {
+                TapSide::ClientProcess
+            } else {
+                TapSide::ServerProcess
+            },
+
+            mac_src: packet.lookup_key.src_mac,
+            mac_dst: packet.lookup_key.dst_mac,
+            ip_src: packet.lookup_key.src_ip,
+            ip_dst: packet.lookup_key.dst_ip,
+            port_src: packet.lookup_key.src_port,
+            port_dst: packet.lookup_key.dst_port,
+            protocol: packet.lookup_key.proto,
+
+            vtap_id: 0,
+            head: AppProtoHead {
+                msg_type: LogMessageType::Request,
+                status: L7ResponseStatus::Ok,
+                ..Default::default()
+            },
+            l3_epc_id_src: 0,
+            l3_epc_id_dst: 0,
+            req_tcp_seq: 0,
+            resp_tcp_seq: 0,
+            is_vip_interface_src: false,
+            is_vip_interface_dst: false,
+        }
+    }
+}
+
+pub trait L7LogParse: Send + Sync {
     fn parse(
         &mut self,
-        payload: impl AsRef<[u8]>,
+        payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
     ) -> Result<()>;
-    fn info(&self) -> Self::Item;
+    fn info(&self) -> AppProtoLogsInfo;
 }

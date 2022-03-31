@@ -5,6 +5,8 @@ mod common;
 mod config;
 pub mod debug;
 pub mod dispatcher;
+mod ebpf;
+mod ebpf_collector;
 mod error;
 mod flow_generator;
 mod handler;

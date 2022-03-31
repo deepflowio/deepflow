@@ -270,7 +270,7 @@ impl SessionQueue {
                 .fetch_add(1, Ordering::Relaxed)
                 == 0
             {
-                info!("l7 log {:?} (slot timestamp {:?}, start time: {:?}, rrt: {:?}) out of session aggregate window({:?}), will be sent without merge.", 
+                info!("l7 log {:?} (slot timestamp {:?}, start time: {:?}, rrt: {:?}) out of session aggregate window({:?}), will be sent without merge.",
                     item.base_info.head.proto,
                     Duration::from_secs(slot_time),
                     item.base_info.start_time,
@@ -372,7 +372,8 @@ impl SessionQueue {
         let request_id = match &item.special_info {
             AppProtoLogsInfo::Dns(d) => d.trans_id as u32,
             AppProtoLogsInfo::Dubbo(d) => d.serial_id as u32,
-            AppProtoLogsInfo::Http(h) => h.stream_id,
+            AppProtoLogsInfo::HttpV1(h) => h.stream_id,
+            AppProtoLogsInfo::HttpV2(h) => h.stream_id,
             AppProtoLogsInfo::Kafka(k) => k.correlation_id,
             _ => 0,
         };
@@ -591,7 +592,7 @@ impl AppProtoLogsParser {
                     app_proto.base_info.protocol,
                     app_proto.direction,
                 )?;
-                let special_info = AppProtoLogsInfo::Dns(app_logs.dns.info());
+                let special_info = app_logs.dns.info();
                 let base_info = app_proto.base_info;
                 AppProtoLogsData::new(base_info, special_info)
             }
@@ -601,7 +602,7 @@ impl AppProtoLogsParser {
                     app_proto.base_info.protocol,
                     app_proto.direction,
                 )?;
-                let special_info = AppProtoLogsInfo::Http(app_logs.http.info());
+                let special_info = app_logs.http.info();
                 let base_info = app_proto.base_info;
 
                 AppProtoLogsData::new(base_info, special_info)
@@ -612,7 +613,7 @@ impl AppProtoLogsParser {
                     app_proto.base_info.protocol,
                     app_proto.direction,
                 )?;
-                let special_info = AppProtoLogsInfo::Dubbo(app_logs.dubbo.info());
+                let special_info = app_logs.dubbo.info();
                 let base_info = app_proto.base_info;
 
                 AppProtoLogsData::new(base_info, special_info)
@@ -623,7 +624,7 @@ impl AppProtoLogsParser {
                     app_proto.base_info.protocol,
                     app_proto.direction,
                 )?;
-                let special_info = AppProtoLogsInfo::Kafka(app_logs.kafka.info());
+                let special_info = app_logs.kafka.info();
                 let base_info = app_proto.base_info;
 
                 AppProtoLogsData::new(base_info, special_info)
@@ -634,7 +635,7 @@ impl AppProtoLogsParser {
                     app_proto.base_info.protocol,
                     app_proto.direction,
                 )?;
-                let special_info = AppProtoLogsInfo::Redis(app_logs.redis.info());
+                let special_info = app_logs.redis.info();
                 let base_info = app_proto.base_info;
 
                 AppProtoLogsData::new(base_info, special_info)
@@ -645,7 +646,7 @@ impl AppProtoLogsParser {
                     app_proto.base_info.protocol,
                     app_proto.direction,
                 )?;
-                let special_info = AppProtoLogsInfo::Mysql(app_logs.mysql.info());
+                let special_info = app_logs.mysql.info();
                 let base_info = app_proto.base_info;
 
                 AppProtoLogsData::new(base_info, special_info)

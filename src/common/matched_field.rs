@@ -15,6 +15,7 @@ pub enum MatchedFlag {
     TapType,
 }
 
+#[derive(Debug)]
 pub enum MatchedField {
     V4(MatchedFieldv4),
     V6(MatchedFieldv6),

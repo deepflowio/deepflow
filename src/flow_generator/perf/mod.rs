@@ -15,13 +15,13 @@ use std::time::Duration;
 
 use enum_dispatch::enum_dispatch;
 
+use super::error::Result;
 use super::protocol_logs::AppProtoHead;
 
 use crate::common::{
     flow::{FlowPerfStats, L4Protocol, L7Protocol},
     meta_packet::MetaPacket,
 };
-use crate::flow_generator::error::Result;
 
 use {
     self::http::HttpPerfData,

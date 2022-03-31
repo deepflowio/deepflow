@@ -480,7 +480,7 @@ impl Default for L4Protocol {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 #[repr(u8)]
 pub enum L7Protocol {
     Unknown = 0,
@@ -498,6 +498,22 @@ pub enum L7Protocol {
 impl Default for L7Protocol {
     fn default() -> Self {
         L7Protocol::Unknown
+    }
+}
+
+impl From<u8> for L7Protocol {
+    fn from(v: u8) -> Self {
+        match v {
+            1 => L7Protocol::Other,
+            20 => L7Protocol::Http1,
+            21 => L7Protocol::Http2,
+            40 => L7Protocol::Dubbo,
+            60 => L7Protocol::Mysql,
+            80 => L7Protocol::Redis,
+            100 => L7Protocol::Kafka,
+            120 => L7Protocol::Dns,
+            _ => L7Protocol::Unknown,
+        }
     }
 }
 

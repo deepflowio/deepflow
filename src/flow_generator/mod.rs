@@ -11,7 +11,10 @@ pub use flow_config::{FlowMapConfig, FlowMapRuntimeConfig, FlowTimeout, TcpTimeo
 pub use flow_map::FlowMap;
 use flow_node::{FlowMapKey, FlowNode};
 pub use flow_state::FlowState;
-pub use protocol_logs::{AppProtoLogsData, AppProtoLogsParser, MetaAppProto};
+pub use protocol_logs::{
+    AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, AppProtoLogsParser, DnsLog, DubboLog,
+    HttpLog, KafkaLog, L7LogParse, MetaAppProto, MysqlLog, RedisLog,
+};
 
 use std::time::Duration;
 
