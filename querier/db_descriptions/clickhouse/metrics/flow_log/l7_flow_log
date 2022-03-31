@@ -15,7 +15,7 @@ tap_type             , tap_type             , 采集点                  , 个  
 vtap_id              , vtap_id              , 采集器                  , 个   , tag        , 其他属性   ,
 request_domain       , request_domain       , 请求域名                , 个   , tag        , 其他属性   ,
 version              , version              , 协议版本                , 个   , tag        , 其他属性   ,
-reuqest_resource     , reuqest_resource     , 请求资源                , 个   , tag        , 其他属性   ,
+request_resource     , request_resource     , 请求资源                , 个   , tag        , 其他属性   ,
 response_code        , response_code        , 响应码                  , 个   , tag        , 其他属性   ,
 server_port          , server_port          , 服务端口                , 个   , tag        , 其他属性   ,
 request_type         , request_type         , 请求类型                , 个   , tag        , 其他属性   ,

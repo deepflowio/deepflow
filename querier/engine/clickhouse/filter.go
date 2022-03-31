@@ -63,11 +63,11 @@ var OperatorMap = map[string]string{
 
 func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string, db, table string) (view.Node, error) {
 	op := expr.(*sqlparser.ComparisonExpr).Operator
-	tagItem, ok := tag.GetTag(t.Tag, db, table)
+	tagItem, ok := tag.GetTag(t.Tag, db, table, "default")
 	if !ok {
 		preAsTag, ok := asTagMap[t.Tag]
 		if ok {
-			tagItem, ok = tag.GetTag(preAsTag, db, table)
+			tagItem, ok = tag.GetTag(preAsTag, db, table, "default")
 			if !ok {
 				filter := ""
 				if strings.ToLower(op) == "regexp" {
@@ -129,12 +129,6 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				ipFilterSlice = append(ipFilterSlice, ip6WhereFilter)
 			}
 			whereFilter = strings.Join(ipFilterSlice, OperatorMap[op])
-		case "include_service":
-			isKeyService := "0"
-			if t.Value == "1" {
-				isKeyService = "1"
-			}
-			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, isKeyService)
 		case "ip_version":
 			ipVersion := "0"
 			if t.Value == "4" {
@@ -142,7 +136,12 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			}
 			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, ipVersion)
 		case "_id":
-			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, t.Value, t.Value)
+			valueStr := strings.Trim(t.Value, "'")
+			valueInt, err := strconv.Atoi(valueStr)
+			if err != nil {
+				return nil, err
+			}
+			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, valueInt, valueInt)
 		default:
 			switch strings.ToLower(op) {
 			case "regexp":

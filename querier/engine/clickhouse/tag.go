@@ -37,12 +37,14 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 	if alias != "" {
 		selectTag = alias
 	}
-	tag, ok := tag.GetTag(name, db, table)
+	tag, ok := tag.GetTag(name, db, table, "defualt")
 	if !ok {
 		return nil, nil
 	} else {
 		if tag.TagTranslator != "" {
 			withs = []view.Node{&view.With{Value: tag.TagTranslator, Alias: selectTag}}
+		} else if alias != "" {
+			withs = []view.Node{&view.With{Value: name, Alias: selectTag}}
 		}
 	}
 	stmt = &SelectTag{Value: selectTag, Withs: withs}
@@ -74,22 +76,10 @@ func GetTagFunction(name string, args []string, alias, db, table string) (Statem
 		err := time.Trans()
 		return &time, err
 	default:
-		// TODO
-		/* tag, ok := tag.GetTag("mask"+"_"+args[0], db, table)
-		if !ok {
-			return nil, errors.New(fmt.Sprintf("mask not support %s", args[0]))
-		}
-		mask := Mask{Args: args, Alias: alias}
-		err := mask.Trans(tag)
-		if err != nil {
-			return nil, err
-		}
-		return &mask, nil */
-		tagFunction := DefaultTagFunction{Name: name, Args: args}
-		err := tagFunction.Trans()
+		tagFunction := TagFunction{Name: name, Args: args, Alias: alias}
+		err := tagFunction.Trans(db, table)
 		return &tagFunction, err
 	}
-	return nil, nil
 }
 
 type SelectTag struct {
@@ -101,41 +91,6 @@ type SelectTag struct {
 
 func (t *SelectTag) Format(m *view.Model) {
 	m.AddTag(&view.Tag{Value: t.Value, Alias: t.Alias, Flag: t.Flag, Withs: t.Withs})
-}
-
-type Mask struct {
-	Alias string
-	Args  []string
-	Withs []view.Node
-}
-
-func (m *Mask) Trans(tag *tag.Tag) error {
-	if m.Alias == "" {
-		m.Alias = "mask"
-	}
-	maskInt, err := strconv.Atoi(m.Args[1])
-	if err != nil {
-		return err
-	}
-	var ip4MaskInt uint64
-	if maskInt >= 32 {
-		ip4MaskInt = 4294967295
-	} else {
-		ip4Mask := net.CIDRMask(maskInt, 32)
-		ip4MaskInt, err = strconv.ParseUint(ip4Mask.String(), 16, 64)
-		if err != nil {
-			log.Error(err)
-			return err
-		}
-	}
-	ip6Mask := net.CIDRMask(maskInt, 128)
-	value := fmt.Sprintf(tag.TagTranslator, ip4MaskInt, ip6Mask.String())
-	m.Withs = []view.Node{&view.With{Value: value, Alias: m.Alias}}
-	return nil
-}
-
-func (ma *Mask) Format(m *view.Model) {
-	m.AddTag(&view.Tag{Value: ma.Alias, Withs: ma.Withs})
 }
 
 type Time struct {
@@ -200,23 +155,47 @@ func (t *Time) Format(m *view.Model) {
 	m.AddGroup(&view.Group{Value: t.Alias, Flag: view.GROUP_FLAG_METRICS_OUTER})
 }
 
-type DefaultTagFunction struct {
+type TagFunction struct {
 	Name  string
 	Args  []string
 	Alias string
 	Withs []view.Node
 }
 
-func (f *DefaultTagFunction) Trans() error {
+func (f *TagFunction) Trans(db, table string) error {
+	tag, ok := tag.GetTag(f.Args[0], db, table, f.Name)
+	if !ok {
+		return nil
+	}
 	switch f.Name {
 	case TAG_FUNCTION_TOPK:
 		f.Name = fmt.Sprintf("topK(%s)", f.Args[1])
+	case TAG_FUNCTION_MASK:
+		if f.Alias == "" {
+			f.Alias = "mask"
+		}
+		maskInt, err := strconv.Atoi(f.Args[1])
+		if err != nil {
+			return err
+		}
+		var ip4MaskInt uint64
+		if maskInt >= 32 {
+			ip4MaskInt = 4294967295
+		} else {
+			ip4Mask := net.CIDRMask(maskInt, 32)
+			ip4MaskInt, err = strconv.ParseUint(ip4Mask.String(), 16, 64)
+			if err != nil {
+				log.Error(err)
+				return err
+			}
+		}
+		ip6Mask := net.CIDRMask(maskInt, 128)
+		value := fmt.Sprintf(tag.TagTranslator, ip4MaskInt, ip6Mask.String())
+		f.Withs = []view.Node{&view.With{Value: value, Alias: f.Alias}}
 	}
-	// TODO
-	// tag translator
 	return nil
 }
 
-func (f *DefaultTagFunction) Format(m *view.Model) {
+func (f *TagFunction) Format(m *view.Model) {
 	m.AddTag(&view.Tag{Value: f.Alias, Withs: f.Withs})
 }

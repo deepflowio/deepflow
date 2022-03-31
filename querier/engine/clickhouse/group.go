@@ -14,11 +14,11 @@ func GetGroup(name string, asTagMap map[string]string) (Statement, error) {
 }
 
 func GetNotNullFilter(name string, asTagMap map[string]string, db, table string) (view.Node, bool) {
-	tagItem, ok := tag.GetTag(name, db, table)
+	tagItem, ok := tag.GetTag(name, db, table, "default")
 	if !ok {
 		preAsTag, ok := asTagMap[name]
 		if ok {
-			tagItem, ok = tag.GetTag(preAsTag, db, table)
+			tagItem, ok = tag.GetTag(preAsTag, db, table, "default")
 			if !ok {
 				return &view.Expr{}, false
 			}

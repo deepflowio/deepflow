@@ -19,234 +19,299 @@ var DeviceMap = map[string]int{
 	"nat_gateway": common.VIF_DEVICE_TYPE_NAT_GATEWAY,
 }
 
-func GenerateTagResoureMap() map[string]*Tag {
-	tagResourceMap := make(map[string]*Tag)
+func GenerateTagResoureMap() map[string]map[string]*Tag {
+	tagResourceMap := make(map[string]map[string]*Tag)
 	for _, resourceStr := range []string{"region", "az", "pod_node", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet"} {
 		// 资源ID
 		notExistID := "0"
 		// 资源ID
-		tagResourceMap[resourceStr+"_id"] = NewTag(
-			"",
-			resourceStr+"_id !="+notExistID,
-			"",
-			"",
-		)
+		tagResourceMap[resourceStr+"_id"] = map[string]*Tag{
+			"default": NewTag(
+				"",
+				resourceStr+"_id !="+notExistID,
+				"",
+				"",
+			),
+		}
 		// 资源名称
-		tagResourceMap[resourceStr] = NewTag(
+		tagResourceMap[resourceStr] = map[string]*Tag{"default": NewTag(
 			"dictGet(deepflow."+resourceStr+"_map, ('name'), (toUInt64("+resourceStr+"_id)))",
 			resourceStr+"_id != "+notExistID,
 			"toUInt64("+resourceStr+"_id) IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE name %s %s)",
 			"toUInt64("+resourceStr+"_id) IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE %s(name,%s))",
-		)
+		)}
 		// 客户端资源ID
-		tagResourceMap[resourceStr+"_id_0"] = NewTag(
+		tagResourceMap[resourceStr+"_id_0"] = map[string]*Tag{"default": NewTag(
 			"",
 			resourceStr+"_id_0 != "+notExistID,
 			"",
 			"",
-		)
+		)}
 		// 客户端资源名称
-		tagResourceMap[resourceStr+"_0"] = NewTag(
+		tagResourceMap[resourceStr+"_0"] = map[string]*Tag{"default": NewTag(
 			"dictGet(deepflow."+resourceStr+"_map, ('name'), (toUInt64("+resourceStr+"_id_0)))",
 			resourceStr+"_id_0 != "+notExistID,
 			"toUInt64("+resourceStr+"_id_0) IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE name %s %s)",
 			"toUInt64("+resourceStr+"_id_0) IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE %s(name,%s))",
-		)
+		)}
 		// 服务端资源ID
-		tagResourceMap[resourceStr+"_id_1"] = NewTag(
+		tagResourceMap[resourceStr+"_id_1"] = map[string]*Tag{"default": NewTag(
 			"",
 			resourceStr+"_id_1 != "+notExistID,
 			"",
 			"",
-		)
+		)}
 		// 服务端资源名称
-		tagResourceMap[resourceStr+"_1"] = NewTag(
+		tagResourceMap[resourceStr+"_1"] = map[string]*Tag{"default": NewTag(
 			"dictGet(deepflow."+resourceStr+"_map, ('name'), (toUInt64("+resourceStr+"_id_1)))",
 			resourceStr+"_id_1 != "+notExistID,
 			"toUInt64("+resourceStr+"_id_1) IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE name %s %s)",
 			"toUInt64("+resourceStr+"_id_1) IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE %s(name,%s))",
-		)
+		)}
 	}
 
 	// VPC资源ID
-	tagResourceMap["vpc_id"] = NewTag(
-		"l3_epc_id",
-		"l3_epc_id != -2",
-		"",
-		"",
-	)
+	tagResourceMap["vpc_id"] = map[string]*Tag{
+		"default": NewTag(
+			"l3_epc_id",
+			"l3_epc_id != -2",
+			"",
+			"",
+		)}
 	// VPC资源名称
-	tagResourceMap["vpc"] = NewTag(
-		"dictGet(deepflow.l3_epc_map, ('name'), (toUInt64(l3_epc_id)))",
-		"l3_epc_id != -2",
-		"toUInt64(l3_epc_id) IN (SELECT id FROM deepflow.l3_epc_map WHERE name %s %s)",
-		"toUInt64(l3_epc_id) IN (SELECT id FROM deepflow.l3_epc_map WHERE %s(name,%s))",
-	)
+	tagResourceMap["vpc"] = map[string]*Tag{
+		"default": NewTag(
+			"dictGet(deepflow.l3_epc_map, ('name'), (toUInt64(l3_epc_id)))",
+			"l3_epc_id != -2",
+			"toUInt64(l3_epc_id) IN (SELECT id FROM deepflow.l3_epc_map WHERE name %s %s)",
+			"toUInt64(l3_epc_id) IN (SELECT id FROM deepflow.l3_epc_map WHERE %s(name,%s))",
+		)}
 	// VPC客户端资源ID
-	tagResourceMap["vpc_id_0"] = NewTag(
-		"l3_epc_id_0",
-		"l3_epc_id_0 != -2",
-		"",
-		"",
-	)
+	tagResourceMap["vpc_id_0"] = map[string]*Tag{
+		"default": NewTag(
+			"l3_epc_id_0",
+			"l3_epc_id_0 != -2",
+			"",
+			"",
+		)}
 	// VPC客户端资源名称
-	tagResourceMap["vpc_0"] = NewTag(
-		"dictGet(deepflow.l3_epc_map, ('name'), (toUInt64(l3_epc_id_0)))",
-		"l3_epc_id_0 != -2",
-		"toUInt64(l3_epc_id_0) IN (SELECT id FROM deepflow.l3_epc_map WHERE name %s %s)",
-		"toUInt64(l3_epc_id_0) IN (SELECT id FROM deepflow.l3_epc_map WHERE %s(name,%s))",
-	)
+	tagResourceMap["vpc_0"] = map[string]*Tag{
+		"default": NewTag(
+			"dictGet(deepflow.l3_epc_map, ('name'), (toUInt64(l3_epc_id_0)))",
+			"l3_epc_id_0 != -2",
+			"toUInt64(l3_epc_id_0) IN (SELECT id FROM deepflow.l3_epc_map WHERE name %s %s)",
+			"toUInt64(l3_epc_id_0) IN (SELECT id FROM deepflow.l3_epc_map WHERE %s(name,%s))",
+		)}
 	// VPC服务端资源ID
-	tagResourceMap["vpc_id_1"] = NewTag(
-		"l3_epc_id_1",
-		"l3_epc_id_1 != -2",
-		"",
-		"",
-	)
+	tagResourceMap["vpc_id_1"] = map[string]*Tag{
+		"default": NewTag(
+			"l3_epc_id_1",
+			"l3_epc_id_1 != -2",
+			"",
+			"",
+		)}
 	// VPC服务端资源名称
-	tagResourceMap["vpc_1"] = NewTag(
-		"dictGet(deepflow.l3_epc_map, ('name'), (toUInt64(l3_epc_id_1)))",
-		"l3_epc_id_1 != -2",
-		"toUInt64(l3_epc_id_1) IN (SELECT id FROM deepflow.l3_epc_map WHERE name %s %s)",
-		"toUInt64(l3_epc_id_1) IN (SELECT id FROM deepflow.l3_epc_map WHERE %s(name,%s))",
-	)
+	tagResourceMap["vpc_1"] = map[string]*Tag{
+		"default": NewTag(
+			"dictGet(deepflow.l3_epc_map, ('name'), (toUInt64(l3_epc_id_1)))",
+			"l3_epc_id_1 != -2",
+			"toUInt64(l3_epc_id_1) IN (SELECT id FROM deepflow.l3_epc_map WHERE name %s %s)",
+			"toUInt64(l3_epc_id_1) IN (SELECT id FROM deepflow.l3_epc_map WHERE %s(name,%s))",
+		)}
+
+	// 宿主机资源ID
+	tagResourceMap["host_id"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"host_id != 0",
+			"",
+			"",
+		)}
+	// 宿主机资源名称
+	tagResourceMap["host"] = map[string]*Tag{
+		"default": NewTag(
+			"dictGet(deepflow.device_map, ('name'), (toUInt64(6),toUInt64(host_id)))",
+			"host_id != 0",
+			"toUInt64(host_id) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
+			"toUInt64(host_id) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
+		)}
+	// 宿主机客户端资源ID
+	tagResourceMap["host_id_0"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"host_id_0 != 0",
+			"",
+			"",
+		)}
+	// 宿主机客户端资源名称
+	tagResourceMap["host_0"] = map[string]*Tag{
+		"default": NewTag(
+			"dictGet(deepflow.device_map, ('name'), (toUInt64(6),toUInt64(host_id_0)))",
+			"host_id_0 != 0",
+			"toUInt64(host_id_0) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
+			"toUInt64(host_id_0) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
+		)}
+	// 宿主机服务端资源ID
+	tagResourceMap["host_id_1"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"host_id_1 != 0",
+			"",
+			"",
+		)}
+	// 宿主机服务端资源名称
+	tagResourceMap["host_1"] = map[string]*Tag{
+		"default": NewTag(
+			"dictGet(deepflow.device_map, ('name'), (toUInt64(6),toUInt64(host_id_1)))",
+			"host_id_1 != 0",
+			"toUInt64(host_id_1) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
+			"toUInt64(host_id_1) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
+		)}
 
 	for resourceStr, deviceType := range DeviceMap {
 		deviceTypeStr := strconv.Itoa(deviceType)
 		// device资源ID
-		tagResourceMap[resourceStr+"_id"] = NewTag(
-			"if(l3_device_type="+deviceTypeStr+",l3_device_id, 0)",
-			"l3_device_id != 0 AND l3_device_type = "+deviceTypeStr,
-			"l3_device_id %s %s",
-			"",
-		)
+		tagResourceMap[resourceStr+"_id"] = map[string]*Tag{
+			"default": NewTag(
+				"if(l3_device_type="+deviceTypeStr+",l3_device_id, 0)",
+				"l3_device_id != 0 AND l3_device_type = "+deviceTypeStr,
+				"l3_device_id %s %s",
+				"",
+			)}
 		// device资源名称
-		tagResourceMap[resourceStr] = NewTag(
-			"dictGet(deepflow.device_map, ('name'), (toUInt64("+deviceTypeStr+"),toUInt64(l3_device_id)))",
-			"l3_device_id != 0 AND l3_device_type = "+deviceTypeStr,
-			"toUInt64(l3_device_id) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
-			"toUInt64(l3_device_id) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
-		)
+		tagResourceMap[resourceStr] = map[string]*Tag{
+			"default": NewTag(
+				"dictGet(deepflow.device_map, ('name'), (toUInt64("+deviceTypeStr+"),toUInt64(l3_device_id)))",
+				"l3_device_id != 0 AND l3_device_type = "+deviceTypeStr,
+				"toUInt64(l3_device_id) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
+				"toUInt64(l3_device_id) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
+			)}
 		// 客户端device资源ID
-		tagResourceMap[resourceStr+"_id_0"] = NewTag(
-			"if(l3_device_type_0="+deviceTypeStr+",l3_device_id_0, 0)",
-			"l3_device_id_0 != 0 AND l3_device_type_0 = "+deviceTypeStr,
-			"l3_device_id_0 %s %s",
-			"",
-		)
+		tagResourceMap[resourceStr+"_id_0"] = map[string]*Tag{
+			"default": NewTag(
+				"if(l3_device_type_0="+deviceTypeStr+",l3_device_id_0, 0)",
+				"l3_device_id_0 != 0 AND l3_device_type_0 = "+deviceTypeStr,
+				"l3_device_id_0 %s %s",
+				"",
+			)}
 		// 客户端device资源名称
-		tagResourceMap[resourceStr+"_0"] = NewTag(
-			"dictGet(deepflow.device_map, ('name'), (toUInt64("+deviceTypeStr+"),toUInt64(l3_device_id_0)))",
-			"l3_device_id_0 != 0 AND l3_device_type_0 = "+deviceTypeStr,
-			"toUInt64(l3_device_id_0) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
-			"toUInt64(l3_device_id_0) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
-		)
+		tagResourceMap[resourceStr+"_0"] = map[string]*Tag{
+			"default": NewTag(
+				"dictGet(deepflow.device_map, ('name'), (toUInt64("+deviceTypeStr+"),toUInt64(l3_device_id_0)))",
+				"l3_device_id_0 != 0 AND l3_device_type_0 = "+deviceTypeStr,
+				"toUInt64(l3_device_id_0) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
+				"toUInt64(l3_device_id_0) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
+			)}
 		// 服务端device资源ID
-		tagResourceMap[resourceStr+"_id_1"] = NewTag(
-			"if(l3_device_type_1="+deviceTypeStr+",l3_device_id_1, 0)",
-			"l3_device_id_1 != 0 AND l3_device_type_1 = "+deviceTypeStr,
-			"l3_device_id_1 %s %s",
-			"",
-		)
+		tagResourceMap[resourceStr+"_id_1"] = map[string]*Tag{
+			"default": NewTag(
+				"if(l3_device_type_1="+deviceTypeStr+",l3_device_id_1, 0)",
+				"l3_device_id_1 != 0 AND l3_device_type_1 = "+deviceTypeStr,
+				"l3_device_id_1 %s %s",
+				"",
+			)}
 		// 服务端device资源名称
-		tagResourceMap[resourceStr] = NewTag(
-			"dictGet(deepflow.device_map, ('name'), (toUInt64("+deviceTypeStr+"),toUInt64(l3_device_id_1)))",
-			"l3_device_id_1 != 0 AND l3_device_type_1 = "+deviceTypeStr,
-			"toUInt64(l3_device_id_1) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
-			"toUInt64(l3_device_id_1) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
-		)
+		tagResourceMap[resourceStr+"_1"] = map[string]*Tag{
+			"default": NewTag(
+				"dictGet(deepflow.device_map, ('name'), (toUInt64("+deviceTypeStr+"),toUInt64(l3_device_id_1)))",
+				"l3_device_id_1 != 0 AND l3_device_type_1 = "+deviceTypeStr,
+				"toUInt64(l3_device_id_1) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
+				"toUInt64(l3_device_id_1) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
+			)}
 	}
 
 	for _, autoStr := range []string{"resource_gl0", "resource_gl1", "resource_gl2"} {
 		autoID := autoStr + "_id"
 		autoType := autoStr + "_type"
 		// 自动分组资源名称
-		tagResourceMap[autoStr] = NewTag(
-			"dictGet(deepflow.device_map, ('name'), (toUInt64("+autoType+"),toUInt64("+autoID+")))",
-			"",
-			"toUInt64("+autoID+") IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
-			"toUInt64("+autoID+") IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
-		)
+		tagResourceMap[autoStr] = map[string]*Tag{
+			"default": NewTag(
+				"dictGet(deepflow.device_map, ('name'), (toUInt64("+autoType+"),toUInt64("+autoID+")))",
+				"",
+				"toUInt64("+autoID+") IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
+				"toUInt64("+autoID+") IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
+			)}
 		// 自动分组客户端资源名称
-		tagResourceMap[autoStr+"_0"] = NewTag(
-			"dictGet(deepflow.device_map, ('name'), (toUInt64("+autoType+"_0),toUInt64("+autoID+"_0)))",
-			"",
-			"toUInt64("+autoID+"_0) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
-			"toUInt64("+autoID+"_0) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
-		)
+		tagResourceMap[autoStr+"_0"] = map[string]*Tag{
+			"default": NewTag(
+				"dictGet(deepflow.device_map, ('name'), (toUInt64("+autoType+"_0),toUInt64("+autoID+"_0)))",
+				"",
+				"toUInt64("+autoID+"_0) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
+				"toUInt64("+autoID+"_0) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
+			)}
 		// 自动分组服务端资源名称
-		tagResourceMap[autoStr+"_1"] = NewTag(
-			"dictGet(deepflow.device_map, ('name'), (toUInt64("+autoType+"_1),toUInt64("+autoID+"_1)))",
-			"",
-			"toUInt64("+autoID+"_1) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
-			"toUInt64("+autoID+"_1) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
-		)
+		tagResourceMap[autoStr+"_1"] = map[string]*Tag{
+			"default": NewTag(
+				"dictGet(deepflow.device_map, ('name'), (toUInt64("+autoType+"_1),toUInt64("+autoID+"_1)))",
+				"",
+				"toUInt64("+autoID+"_1) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
+				"toUInt64("+autoID+"_1) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
+			)}
 	}
 
 	// IP
-	tagResourceMap["ip"] = NewTag(
-		"if(is_ipv4=1, IPv4NumToString(ip4), IPv6NumToString(ip6))",
-		"",
-		"is_ipv4=%s AND (ip%s %s %s)",
-		"",
-	)
+	tagResourceMap["ip"] = map[string]*Tag{
+		"default": NewTag(
+			"if(is_ipv4=1, IPv4NumToString(ip4), IPv6NumToString(ip6))",
+			"",
+			"is_ipv4=%s AND (ip%s %s %s)",
+			"",
+		), "mask": NewTag(
+			"if(is_ipv4, IPv4NumToString(bitAnd(ip4, %v)), IPv6NumToString(bitAnd(ip6, toFixedString(unhex('%s'), 16))))",
+			"",
+			"",
+			"",
+		)}
 	// 客户端IP
-	tagResourceMap["ip_0"] = NewTag(
-		"if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0))",
-		"",
-		"is_ipv4=%s AND (ip%s_0 %s %s)",
-		"",
-	)
+	tagResourceMap["ip_0"] = map[string]*Tag{
+		"default": NewTag(
+			"if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0))",
+			"",
+			"is_ipv4=%s AND (ip%s_0 %s %s)",
+			"",
+		), "mask": NewTag(
+			"if(is_ipv4, IPv4NumToString(bitAnd(ip4_0, %v)), IPv6NumToString(bitAnd(ip6_0, toFixedString(unhex('%s'), 16))))",
+			"",
+			"",
+			"",
+		)}
 	// 服务端IP
-	tagResourceMap["ip_1"] = NewTag(
-		"if(is_ipv4=1, IPv4NumToString(ip4_1), IPv6NumToString(ip6_1))",
-		"",
-		"is_ipv4=%s AND (ip%s_1 %s %s)",
-		"",
-	)
+	tagResourceMap["ip_1"] = map[string]*Tag{
+		"default": NewTag(
+			"if(is_ipv4=1, IPv4NumToString(ip4_1), IPv6NumToString(ip6_1))",
+			"",
+			"is_ipv4=%s AND (ip%s_1 %s %s)",
+			"",
+		), "mask": NewTag(
+			"if(is_ipv4, IPv4NumToString(bitAnd(ip4_1, %v)), IPv6NumToString(bitAnd(ip6_1, toFixedString(unhex('%s'), 16))))",
+			"",
+			"",
+			"",
+		)}
 
 	// 广域网
-	tagResourceMap["is_internet"] = NewTag(
-		"1",
-		"l3_epc_id=-2",
-		"",
-		"",
-	)
+	tagResourceMap["is_internet"] = map[string]*Tag{
+		"default": NewTag(
+			"1",
+			"l3_epc_id=-2",
+			"",
+			"",
+		)}
 	// 客户端广域网
-	tagResourceMap["is_internet_0"] = NewTag(
-		"1",
-		"l3_epc_id_0=-2",
-		"",
-		"",
-	)
+	tagResourceMap["is_internet_0"] = map[string]*Tag{
+		"default": NewTag(
+			"1",
+			"l3_epc_id_0=-2",
+			"",
+			"",
+		)}
 	// 服务端广域网
-	tagResourceMap["is_internet_1"] = NewTag(
-		"1",
-		"l3_epc_id_1=-2",
-		"",
-		"",
-	)
-
-	// 掩码
-	tagResourceMap["mask_ip"] = NewTag(
-		"if(is_ipv4, IPv4NumToString(bitAnd(ip4, %v)), IPv6NumToString(bitAnd(ip6, toFixedString(unhex('%s'), 16))))",
-		"",
-		"",
-		"",
-	)
-	// 客户端掩码
-	tagResourceMap["mask_ip_0"] = NewTag(
-		"if(is_ipv4, IPv4NumToString(bitAnd(ip4_0, %v)), IPv6NumToString(bitAnd(ip6_0, toFixedString(unhex('%s'), 16))))",
-		"",
-		"",
-		"",
-	)
-	// 服务端掩码
-	tagResourceMap["mask_ip_1"] = NewTag(
-		"if(is_ipv4, IPv4NumToString(bitAnd(ip4_1, %v)), IPv6NumToString(bitAnd(ip6_1, toFixedString(unhex('%s'), 16))))",
-		"",
-		"",
-		"",
-	)
+	tagResourceMap["is_internet_1"] = map[string]*Tag{
+		"default": NewTag(
+			"1",
+			"l3_epc_id_1=-2",
+			"",
+			"",
+		)}
 	return tagResourceMap
 }
