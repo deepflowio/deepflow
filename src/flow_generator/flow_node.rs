@@ -2,7 +2,6 @@ use std::{
     cmp::Ordering,
     hash::{Hash, Hasher},
     net::IpAddr,
-    rc::Rc,
     time::Duration,
 };
 
@@ -20,23 +19,9 @@ use crate::{
     proto::common::TridentType,
 };
 
-#[derive(PartialOrd, Ord, PartialEq, Eq, Clone, Default)]
-pub(super) struct FlowMapTimeKey {
-    pub current_time_in_unit: u64,
-    pub map_key: Rc<FlowMapKey>,
-}
-
-impl FlowMapTimeKey {
-    pub fn new(current_time_in_unit: u64, map_key: Rc<FlowMapKey>) -> Self {
-        Self {
-            current_time_in_unit,
-            map_key,
-        }
-    }
-}
-
 #[derive(PartialOrd, Debug, Default)]
 pub(super) struct FlowMapKey {
+    pub current_time_in_unit: u64,
     pub flow_key: FlowKey,
     pub eth_type: EthernetType,
     pub tunnel_info: (TunnelType, u8),
@@ -49,6 +34,10 @@ pub(super) struct FlowMapKey {
 
 impl Ord for FlowMapKey {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let time_unit_ordering = self.current_time_in_unit.cmp(&other.current_time_in_unit);
+        if time_unit_ordering != Ordering::Equal {
+            return time_unit_ordering;
+        }
         let eth_ordering = self.eth_type.cmp(&other.eth_type);
         if eth_ordering != Ordering::Equal {
             return eth_ordering;
@@ -84,6 +73,7 @@ enum MatchMac {
 
 impl FlowMapKey {
     pub fn new(
+        time_in_unit: u64,
         meta_packet: &MetaPacket,
         config_ignore: (bool, bool),
         trident_type: TridentType,
@@ -91,6 +81,7 @@ impl FlowMapKey {
         let lookup_key = &meta_packet.lookup_key;
 
         Self {
+            current_time_in_unit: time_in_unit,
             eth_type: lookup_key.eth_type,
             flow_key: FlowKey {
                 vtap_id: meta_packet.vlan,
@@ -176,6 +167,9 @@ impl FlowMapKey {
     }
 
     fn endpoint_match_with_direction(&self, other: &Self, direction: PacketDirection) -> bool {
+        if other.tunnel_info.0 == TunnelType::None {
+            return true;
+        }
         // 同一个TapPort上的流量，如果有隧道的话，当Port做发卡弯转发时，进出的内层流量完全一样
         // 此时需要额外比较L2End确定哪股是进入的哪股是出去的
         match direction {
@@ -380,6 +374,7 @@ mod tests {
     // src_ipv6addr =  fe80::88d3:f197:5843:f873 dst_ipv6addr = fe80::742a:d20d:8d45:56e6
     fn new_map_key(eth_type: EthernetType, src_addr: IpAddr, dst_addr: IpAddr) -> FlowMapKey {
         FlowMapKey {
+            current_time_in_unit: 0,
             flow_key: FlowKey {
                 tap_type: TapType::Isp(7),
                 tap_port: TapPort(2100),

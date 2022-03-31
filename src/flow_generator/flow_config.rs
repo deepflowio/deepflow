@@ -86,8 +86,6 @@ pub struct FlowMapRuntimeConfig {
     pub l7_log_packet_size: AtomicU32,
 }
 
-pub struct FlowMapStaticConfig {}
-
 pub struct FlowMapConfig {
     pub vtap_id: u16,
     pub trident_type: TridentType,
