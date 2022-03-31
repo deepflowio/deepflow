@@ -91,7 +91,9 @@ pub struct FlowMapRuntimeConfig {
 pub struct FlowMapConfig {
     pub vtap_id: u16,
     pub trident_type: TridentType,
+    pub cloud_gateway_traffic: bool,
     pub collector_enabled: bool,
+    pub tap_types: [bool; 256],
 
     pub packet_delay: Duration,
     pub flush_interval: Duration,

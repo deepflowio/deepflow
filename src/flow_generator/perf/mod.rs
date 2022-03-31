@@ -15,10 +15,11 @@ use std::time::Duration;
 
 use enum_dispatch::enum_dispatch;
 
+use super::protocol_logs::AppProtoHead;
+
 use crate::common::{
     flow::{FlowPerfStats, L4Protocol, L7Protocol},
     meta_packet::MetaPacket,
-    protocol_logs::AppProtoHead,
 };
 use crate::flow_generator::error::Result;
 
@@ -95,7 +96,7 @@ impl FlowPerf {
             L7Protocol::Mysql => L7FlowPerfTable::from(MysqlPerfData::new(rrt_cache.clone())),
             L7Protocol::Redis => L7FlowPerfTable::from(RedisPerfData::new(rrt_cache.clone())),
             L7Protocol::Http => L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone())),
-            _ => unreachable!(),
+            _ => return None,
         };
 
         Some(Self { l4, l7 })

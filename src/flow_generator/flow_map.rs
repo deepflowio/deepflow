@@ -9,13 +9,14 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use log::warn;
+use log::{debug, warn};
 
 use super::{
     error::Error,
     flow_config::FlowMapConfig,
     flow_state::{StateMachine, StateValue},
     perf::{get_l7_protocol, FlowPerf, FlowPerfCounter, L7RrtCache},
+    protocol_logs::MetaAppProto,
     service_table::{ServiceKey, ServiceTable},
     FlowMapKey, FlowMapRuntimeConfig, FlowNode, FlowState, FlowTimeout, TcpTimeout,
     COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC, L7_PROTOCOL_UNKNOWN_LIMIT,
@@ -31,7 +32,6 @@ use crate::{
         lookup_key::LookupKey,
         meta_packet::{MetaPacket, MetaPacketTcpHeader},
         policy::PolicyData,
-        protocol_logs::AppProtoHead,
         tagged_flow::TaggedFlow,
         tap_port::TapPort,
     },
@@ -41,22 +41,6 @@ use crate::{
     utils::net::MacAddr,
     utils::queue::{self, Receiver, Sender},
 };
-
-//TODO
-pub struct MetaAppProto;
-
-impl MetaAppProto {
-    pub fn new(
-        _node: &FlowNode,
-        _pkt: &MetaPacket,
-        _head: AppProtoHead,
-        _offset: u16,
-        _packet_size: u16,
-    ) -> Self {
-        MetaAppProto
-    }
-}
-// END TODO
 
 // not thread-safe
 pub struct FlowMap {
@@ -69,12 +53,11 @@ pub struct FlowMap {
     policy_getter: fn(&mut MetaPacket, u32),
     start_time: Duration,    // 时间桶中的最早时间
     start_time_in_unit: u64, // 时间桶中的最早时间，以TIME_SLOT_UNIT为单位
+
     output_queue: Sender<TaggedFlow>,
     out_log_queue: Sender<MetaAppProto>,
     output_buffer: Vec<TaggedFlow>,
     last_queue_flush: Duration,
-    l7_log_store_tap_types: Vec<bool>,
-    l7_log_packet_size: u32,
     config: FlowMapConfig,
     rrt_cache: Rc<RefCell<L7RrtCache>>,
     counter: Arc<FlowPerfCounter>,
@@ -86,14 +69,8 @@ impl FlowMap {
         output_queue: Sender<TaggedFlow>,
         policy_getter: fn(&mut MetaPacket, u32),
         app_proto_log_queue: Sender<MetaAppProto>,
-        l7_tap_types: Vec<TapType>,
-        l7_log_packet_size: u32,
         config: FlowMapConfig,
     ) -> (Self, Arc<FlowPerfCounter>) {
-        let mut l7_log_store_tap_types = vec![false; u16::from(TapType::Max) as usize];
-        for tap in l7_tap_types {
-            l7_log_store_tap_types[u16::from(tap) as usize] = true;
-        }
         let counter = Arc::new(FlowPerfCounter::default());
 
         (
@@ -114,8 +91,6 @@ impl FlowMap {
                 out_log_queue: app_proto_log_queue,
                 output_buffer: vec![],
                 last_queue_flush: Duration::ZERO,
-                l7_log_store_tap_types,
-                l7_log_packet_size,
                 config,
                 rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(L7_RRT_CACHE_CAPACITY))),
                 counter: counter.clone(),
@@ -228,7 +203,6 @@ impl FlowMap {
                 let pkt_timestamp = meta_packet.lookup_key.timestamp;
 
                 // 1. 输出上一个统计周期的统计信息
-
                 self.node_updated_aftercare(&mut node, pkt_timestamp, Some(&mut meta_packet));
 
                 // 2. 更新Flow状态，判断是否已结束
@@ -244,7 +218,6 @@ impl FlowMap {
             // 未找到Flow，需要插入新的节点
             None => {
                 let node = self.new_flow_node(meta_packet);
-
                 time_set.insert(pkt_key.clone());
                 node_map.insert(pkt_key, node);
             }
@@ -288,7 +261,9 @@ impl FlowMap {
 
         let flow_closed = self.update_tcp_flow(&mut meta_packet, &mut node);
         if self.config.collector_enabled {
-            self.collect_tcp_metric(&mut node, &meta_packet);
+            let direction = node.tagged_flow.flow.reversed
+                == (meta_packet.direction == PacketDirection::ServerToClient);
+            self.collect_metric(&mut node, &meta_packet, direction);
         }
         if flow_closed {
             time_set.remove(&pkt_key);
@@ -331,7 +306,7 @@ impl FlowMap {
         }
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
         if self.config.collector_enabled {
-            self.collect_udp_metric(&mut node, &meta_packet);
+            self.collect_metric(&mut node, &meta_packet, false);
         }
 
         node_map.insert(pkt_key, node);
@@ -498,7 +473,11 @@ impl FlowMap {
             .runtime_config
             .l7_metrics_enabled
             .load(Ordering::Relaxed)
-            || self.app_proto_log_enabled()
+            || self
+                .config
+                .runtime_config
+                .app_proto_log_enabled
+                .load(Ordering::Relaxed)
     }
 
     fn l4_metrics_enabled(&self) -> bool {
@@ -506,11 +485,6 @@ impl FlowMap {
             .runtime_config
             .l4_performance_enabled
             .load(Ordering::Relaxed)
-    }
-
-    fn app_proto_log_enabled(&self) -> bool {
-        // rpc.AppProtoLogEnabled = l7_log_store_tap_types.len() > 0
-        !self.l7_log_store_tap_types.is_empty()
     }
 
     fn init_flow(&mut self, meta_packet: &mut MetaPacket) -> FlowNode {
@@ -739,51 +713,52 @@ impl FlowMap {
         self.update_syn_or_syn_ack_seq(&mut node, &mut meta_packet);
 
         if self.config.collector_enabled {
-            self.collect_tcp_metric(&mut node, &meta_packet);
+            let direction = node.tagged_flow.flow.reversed
+                == (meta_packet.direction == PacketDirection::ServerToClient);
+            self.collect_metric(&mut node, &meta_packet, direction);
         }
         node
     }
 
-    fn collect_tcp_metric(&mut self, node: &mut FlowNode, meta_packet: &MetaPacket) {
+    fn collect_metric(
+        &mut self,
+        node: &mut FlowNode,
+        meta_packet: &MetaPacket,
+        is_first_packet_direction: bool,
+    ) {
         if let Some(perf) = node.meta_flow_perf.as_mut() {
-            let direction = node.tagged_flow.flow.reversed
-                == (meta_packet.direction == PacketDirection::ServerToClient);
             let flow_id = node.tagged_flow.flow.flow_id;
-            if let Err(Error::L7ReqNotFound(c)) = perf.parse(
+            match perf.parse(
                 &meta_packet,
-                direction,
+                is_first_packet_direction,
                 flow_id,
                 self.l4_metrics_enabled(),
                 self.l7_metrics_enabled(),
             ) {
-                self.counter
-                    .mismatched_response
-                    .fetch_add(c, Ordering::SeqCst);
+                Err(Error::L7ReqNotFound(c)) => {
+                    self.counter
+                        .mismatched_response
+                        .fetch_add(c, Ordering::Relaxed);
+                }
+                Err(e) => debug!("{}", e),
+                _ => (),
             }
         }
-        if self.app_proto_log_enabled() && meta_packet.packet_len > 0 {
-            self.write_to_app_proto_log(node, &meta_packet, self.l7_log_packet_size as u16);
-        }
-    }
-
-    fn collect_udp_metric(&mut self, node: &mut FlowNode, meta_packet: &MetaPacket) {
-        if let Some(perf) = node.meta_flow_perf.as_mut() {
-            let flow_id = node.tagged_flow.flow.flow_id;
-            if let Err(Error::L7ReqNotFound(c)) = perf.parse(
+        if self
+            .config
+            .runtime_config
+            .app_proto_log_enabled
+            .load(Ordering::Relaxed)
+            && meta_packet.packet_len > 0
+        {
+            self.write_to_app_proto_log(
+                node,
                 &meta_packet,
-                false,
-                flow_id,
-                self.l4_metrics_enabled(),
-                self.l7_metrics_enabled(),
-            ) {
-                self.counter
-                    .mismatched_response
-                    .fetch_add(c, Ordering::SeqCst);
-            }
-        }
-
-        if self.app_proto_log_enabled() && meta_packet.payload_len > 0 {
-            self.write_to_app_proto_log(node, &meta_packet, self.l7_log_packet_size as u16);
+                self.config
+                    .runtime_config
+                    .l7_log_packet_size
+                    .load(Ordering::Relaxed) as u16,
+            );
         }
     }
 
@@ -795,7 +770,7 @@ impl FlowMap {
         self.update_l4_direction(&mut meta_packet, &mut node, true);
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
         if self.config.collector_enabled {
-            self.collect_udp_metric(&mut node, &meta_packet);
+            self.collect_metric(&mut node, &meta_packet, false);
         }
         node
     }
@@ -834,8 +809,9 @@ impl FlowMap {
         // 流在未结束时应用日志会需要这个字段，为了避免重复计算，所以在流统计完成输出时赋值
         //
         // 目前仅虚拟流量会计算该统计位置
-        //TODO collect metric
-        //collector.SetTapSide(taggedFlow)
+        tagged_flow
+            .flow
+            .set_tap_side(self.config.trident_type, self.config.cloud_gateway_traffic);
 
         // 未知应用仅统计指标量数据，并且判断条件需要考虑流持续时间等，所以在流统计完成输出时赋值
         //
@@ -856,8 +832,6 @@ impl FlowMap {
                 stats.l7_protocol = L7Protocol::Other;
             }
         }
-        //TODO collector enabled 条件加上
-
         self.output_buffer.push(tagged_flow);
         if self.output_buffer.len() >= QUEUE_BATCH_SIZE {
             let flows = self.output_buffer.drain(..).collect::<Vec<_>>();
@@ -884,9 +858,10 @@ impl FlowMap {
             (timeout.as_nanos() / TIME_UNIT.as_nanos() * TIME_UNIT.as_nanos()) as u64,
         );
 
-        if self.config.collector_enabled
-            && (flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp)
-        {
+        if self.config.collector_enabled {
+            return;
+        }
+        if flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp {
             let l7_timeout_count = self
                 .rrt_cache
                 .borrow_mut()
@@ -921,10 +896,10 @@ impl FlowMap {
             self.update_flow_direction(node, meta_packet); // 每个流统计数据输出前矫正流方向
             node.tagged_flow.flow.close_type = CloseType::ForcedReport;
             let flow = &mut node.tagged_flow.flow;
-            if self.config.collector_enabled
-                && (flow.flow_key.proto == IpProtocol::Tcp
-                    || flow.flow_key.proto == IpProtocol::Udp)
-            {
+            if !self.config.collector_enabled {
+                return;
+            }
+            if flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp {
                 flow.flow_perf_stats = node.meta_flow_perf.as_mut().and_then(|perf| {
                     perf.copy_and_reset_perf_data(
                         flow.reversed,
@@ -945,15 +920,14 @@ impl FlowMap {
         pkt_size: u16,
     ) {
         let lookup_key = &meta_packet.lookup_key; //  trisolaris接口定义: 0(TAP_ANY)表示所有都需要
-        if !self.l7_log_store_tap_types[u16::from(TapType::Any) as usize]
-            && lookup_key.tap_type > TapType::Max
-            || !self.l7_log_store_tap_types[u16::from(lookup_key.tap_type) as usize]
+        if !self.config.tap_types[u16::from(TapType::Any) as usize]
+            && (lookup_key.tap_type > TapType::Max
+                || !self.config.tap_types[u16::from(lookup_key.tap_type) as usize])
         {
             return;
         }
 
-        let lookup_key = &meta_packet.lookup_key;
-        if lookup_key.proto != IpProtocol::Tcp || lookup_key.proto != IpProtocol::Udp {
+        if lookup_key.proto != IpProtocol::Tcp && lookup_key.proto != IpProtocol::Udp {
             return;
         }
         // 考虑性能，最好是l7 perf解析后，满足需要的包生成log
@@ -963,15 +937,19 @@ impl FlowMap {
             .and_then(|perf| perf.app_proto_head(self.l7_metrics_enabled()))
         {
             Some(v) => v,
-            None => {
-                return;
-            }
+            None => return,
         };
 
-        //TODO 链路追踪统计位置
-        let app_proto = MetaAppProto::new(node, meta_packet, head, offset, pkt_size);
-        if let Err(_) = self.out_log_queue.send(app_proto) {
-            warn!("flow-map push MetaAppProto to queue failed because queue have terminated");
+        node.tagged_flow
+            .flow
+            .set_tap_side(self.config.trident_type, self.config.cloud_gateway_traffic);
+
+        if let Some(app_proto) =
+            MetaAppProto::new(&node.tagged_flow, meta_packet, head, offset, pkt_size)
+        {
+            if let Err(_) = self.out_log_queue.send(app_proto) {
+                warn!("flow-map push MetaAppProto to queue failed because queue have terminated");
+            }
         }
     }
 
@@ -1157,9 +1135,11 @@ pub fn _new_flow_map_and_receiver() -> (FlowMap, Receiver<TaggedFlow>) {
     let config = FlowMapConfig {
         vtap_id: 7,
         trident_type: common::TridentType::TtProcess,
+        tap_types: [true; 256],
         collector_enabled: false,
         packet_delay: c.packet_delay,
         flush_interval: c.flow.flush_interval,
+        cloud_gateway_traffic: false,
         ignore_l2_end: false,
         ignore_tor_mac: false,
         flow_timeout: FlowTimeout::from(TcpTimeout {
@@ -1174,8 +1154,6 @@ pub fn _new_flow_map_and_receiver() -> (FlowMap, Receiver<TaggedFlow>) {
         output_queue_sender,
         policy_getter,
         app_proto_log_queue,
-        vec![],
-        256,
         config,
     );
 

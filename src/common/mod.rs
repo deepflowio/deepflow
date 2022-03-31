@@ -10,7 +10,6 @@ pub mod meta_packet;
 pub mod platform_data;
 pub mod policy;
 pub mod port_range;
-pub mod protocol_logs;
 mod tag;
 pub mod tagged_flow;
 pub mod tap_port;

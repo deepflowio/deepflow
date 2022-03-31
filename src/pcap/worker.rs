@@ -42,14 +42,8 @@ pub struct WorkerCounter {
 impl WorkerCounter {
     pub fn new(running: Arc<AtomicBool>) -> Self {
         Self {
-            file_creations: AtomicU64::new(0),
-            file_closes: AtomicU64::new(0),
-            file_rejections: AtomicU64::new(0),
-            file_creation_failures: AtomicU64::new(0),
-            file_writing_failures: AtomicU64::new(0),
-            written_count: AtomicU64::new(0),
-            written_bytes: AtomicU64::new(0),
             running,
+            ..Default::default()
         }
     }
 }

@@ -3,22 +3,22 @@ use std::fmt;
 use std::rc::Rc;
 use std::time::Duration;
 
-use super::decode::decode;
-
 use crate::{
     common::{
         enums::{IpProtocol, PacketDirection},
-        flow::{FlowPerfStats, L4Protocol, L7PerfStats, L7Protocol, TcpPerfStats},
+        flow::{FlowPerfStats, L7PerfStats, L7Protocol},
         meta_packet::MetaPacket,
-        protocol_logs::{AppProtoHead, L7ResponseStatus, LogMessageType},
     },
     flow_generator::{
         error::{Error, Result},
         perf::l7_rrt::L7RrtCache,
         perf::stats::PerfStats,
         perf::L7FlowPerf,
+        protocol_logs::{decode, AppProtoHead, L7ResponseStatus, LogMessageType},
     },
 };
+
+pub const PORT: u16 = 6379;
 
 pub struct RedisPerfData {
     pub stats: Option<PerfStats>,
@@ -61,24 +61,20 @@ impl fmt::Debug for RedisPerfData {
 impl L7FlowPerf for RedisPerfData {
     fn parse(&mut self, packet: &MetaPacket, flow_id: u64) -> Result<()> {
         if packet.lookup_key.proto != IpProtocol::Tcp {
-            return Err(Error::InvaildIpProtocol);
+            return Err(Error::InvalidIpProtocol);
         }
-        let payload = match packet.get_l4_payload() {
-            Some(t) => t,
-            None => return Err(Error::ZeroPayloadLen),
-        };
+        let payload = packet.get_l4_payload().ok_or(Error::ZeroPayloadLen)?;
+
         // 通过Redis请求判断是否为Redis协议
         if self.l7_proto == L7Protocol::Unknown
             && packet.direction == PacketDirection::ServerToClient
         {
-            return Err(Error::InvaildL7Protocol);
+            return Err(Error::RedisPerfParseFailed);
         }
         // Redis协议通过Redis请求来识别，对于请求报文格式严格检查，回应有分段的情况不会严格检查
         let (context, _, is_error_resp) =
-            match decode(payload, packet.direction == PacketDirection::ClientToServer) {
-                Some((c, l, e)) => (c, l, e),
-                None => return Err(Error::L7ParseFailed),
-            };
+            decode(payload, packet.direction == PacketDirection::ClientToServer)
+                .ok_or(Error::RedisPerfParseFailed)?;
         self.l7_proto = L7Protocol::Redis;
         self.has_log_data = true;
         if packet.direction == PacketDirection::ClientToServer {
@@ -102,7 +98,6 @@ impl L7FlowPerf for RedisPerfData {
         if let Some(stats) = self.stats.take() {
             FlowPerfStats {
                 l7_protocol: L7Protocol::Redis,
-                l4_protocol: L4Protocol::default(),
                 l7: L7PerfStats {
                     request_count: stats.req_count,
                     response_count: stats.resp_count,
@@ -113,7 +108,7 @@ impl L7FlowPerf for RedisPerfData {
                     err_server_count: stats.resp_err_count,
                     err_timeout: timeout_count,
                 },
-                tcp: TcpPerfStats::default(),
+                ..Default::default()
             }
         } else {
             FlowPerfStats::default()
@@ -126,11 +121,11 @@ impl L7FlowPerf for RedisPerfData {
         }
         self.has_log_data = false;
 
-        let rrt = if let Some(stats) = self.stats.as_ref() {
-            stats.rrt_last.as_micros() as u64
-        } else {
-            0
-        };
+        let rrt = self
+            .stats
+            .as_ref()
+            .map(|s| s.rrt_last.as_micros() as u64)
+            .unwrap_or_default();
         Some((
             AppProtoHead {
                 proto: self.l7_proto,
@@ -213,7 +208,7 @@ impl RedisPerfData {
         false
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.stats = None;
         self.l7_proto = L7Protocol::default();
         self.msg_type = LogMessageType::default();

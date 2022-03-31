@@ -3,23 +3,23 @@ use std::fmt;
 use std::rc::Rc;
 use std::time::Duration;
 
-use super::{KAFKA_REQ_HEADER_LEN, KAFKA_RESP_HEADER_LEN};
-
 use crate::{
     common::{
         enums::{IpProtocol, PacketDirection},
-        flow::{FlowPerfStats, L4Protocol, L7PerfStats, L7Protocol, TcpPerfStats},
+        flow::{FlowPerfStats, L7PerfStats, L7Protocol},
         meta_packet::MetaPacket,
-        protocol_logs::{AppProtoHead, L7ResponseStatus, LogMessageType},
     },
     flow_generator::{
         error::{Error, Result},
         perf::l7_rrt::L7RrtCache,
         perf::stats::PerfStats,
         perf::L7FlowPerf,
+        protocol_logs::{AppProtoHead, L7ResponseStatus, LogMessageType},
     },
     utils::bytes,
 };
+
+pub const PORT: u16 = 9092;
 
 const KAFKA_REMAIN: u32 = 4;
 const KAFKA_FETCH: i16 = 1;
@@ -28,7 +28,8 @@ const KAFKA_API_KEY_MASK_VALUE: u64 = 0x7fff000000000000;
 const KAFKA_API_KEY_OFFSET: usize = 48;
 const KAFKA_REQ_TIMESTAMP_MASK_VALUE: u64 = 0xffffffffffff;
 
-const UNEXPECTED_PROTOCOL: &str = "unexpected protocol";
+const KAFKA_REQ_HEADER_LEN: usize = 14;
+const KAFKA_RESP_HEADER_LEN: usize = 8;
 
 pub struct KafkaPerfData {
     stats: Option<PerfStats>,
@@ -82,13 +83,10 @@ impl fmt::Debug for KafkaPerfData {
 impl L7FlowPerf for KafkaPerfData {
     fn parse(&mut self, packet: &MetaPacket, flow_id: u64) -> Result<()> {
         if packet.lookup_key.proto != IpProtocol::Tcp {
-            return Err(Error::InvaildIpProtocol);
+            return Err(Error::InvalidIpProtocol);
         }
 
-        let payload = match packet.get_l4_payload() {
-            Some(p) => p,
-            None => return Err(Error::ZeroPayloadLen),
-        };
+        let payload = packet.get_l4_payload().ok_or(Error::ZeroPayloadLen)?;
 
         match packet.direction {
             PacketDirection::ClientToServer => {
@@ -115,7 +113,6 @@ impl L7FlowPerf for KafkaPerfData {
         if let Some(stats) = self.stats.take() {
             FlowPerfStats {
                 l7_protocol: L7Protocol::Kafka,
-                l4_protocol: L4Protocol::default(),
                 l7: L7PerfStats {
                     request_count: stats.req_count,
                     response_count: stats.resp_count,
@@ -126,7 +123,7 @@ impl L7FlowPerf for KafkaPerfData {
                     err_server_count: stats.resp_err_count,
                     err_timeout: timeout_count,
                 },
-                tcp: TcpPerfStats::default(),
+                ..Default::default()
             }
         } else {
             FlowPerfStats::default()
@@ -139,11 +136,11 @@ impl L7FlowPerf for KafkaPerfData {
         }
         self.has_log_data = false;
 
-        let rrt = if let Some(stats) = self.stats.as_ref() {
-            stats.rrt_last.as_micros() as u64
-        } else {
-            0
-        };
+        let rrt = self
+            .stats
+            .as_ref()
+            .map(|s| s.rrt_last.as_micros() as u64)
+            .unwrap_or_default();
 
         Some((
             AppProtoHead {
@@ -190,18 +187,18 @@ impl KafkaPerfData {
     //  MetadataRequest | ProduceRequest | FetchRequest | ListOffsetRequest |......
     fn parse_request_header(&mut self, payload: &[u8], payload_len: u16) -> Result<()> {
         if payload.len() < KAFKA_REQ_HEADER_LEN {
-            return Err(Error::L7ParseFailed);
+            return Err(Error::KafkaPerfParseFailed);
         }
 
         let message_size = bytes::read_u32_be(payload);
 
         if message_size + KAFKA_REMAIN != payload_len as u32 {
-            return Err(Error::L7ParseFailed);
+            return Err(Error::KafkaPerfParseFailed);
         }
         let client_id_len = bytes::read_u16_be(&payload[12..]) as usize;
 
         if payload.len() < KAFKA_REQ_HEADER_LEN + client_id_len {
-            return Err(Error::L7ParseFailed);
+            return Err(Error::KafkaPerfParseFailed);
         }
 
         self.api_key = bytes::read_u16_be(&payload[4..]);
@@ -219,12 +216,12 @@ impl KafkaPerfData {
     //  MetadataResponse | ProduceResponse | FetchResponse | ListOffsetResponse |......
     fn parse_response_header(&mut self, payload: &[u8], payload_len: u16) -> Result<()> {
         if payload.len() < KAFKA_RESP_HEADER_LEN {
-            return Err(Error::L7ParseFailed);
+            return Err(Error::KafkaPerfParseFailed);
         }
 
         let message_size = bytes::read_u32_be(payload);
         if message_size + KAFKA_REMAIN != payload_len as u32 {
-            return Err(Error::L7ParseFailed);
+            return Err(Error::KafkaPerfParseFailed);
         }
 
         self.correlation_id = bytes::read_u32_be(&payload[4..]);
@@ -303,7 +300,7 @@ impl KafkaPerfData {
         return false;
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.stats = None;
         self.correlation_id = 0;
         self.api_key = 0;

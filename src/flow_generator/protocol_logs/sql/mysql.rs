@@ -1,26 +1,64 @@
-use super::consts::*;
-use super::Header;
+use super::super::{
+    consts::*, AppProtoLogsData, AppProtoLogsInfo, L7LogParse, L7Protocol, LogMessageType,
+};
 
+use crate::flow_generator::error::{Error, Result};
+use crate::proto::flow_log;
 use crate::{
-    common::{
-        enums::{IpProtocol, PacketDirection},
-        flow::L7Protocol,
-        protocol_logs::{AppProtoLogsData, AppProtoLogsInfo, LogMessageType, MysqlInfo},
-    },
+    common::enums::{IpProtocol, PacketDirection},
     utils::bytes,
 };
 
+#[derive(Debug, Default, Clone)]
+pub struct MysqlInfo {
+    // Server Greeting
+    pub protocol_version: u8,
+    pub server_version: String,
+    pub server_thread_id: u32,
+    // request
+    pub command: u8,
+    pub context: String,
+    // response
+    pub response_code: u8,
+    pub error_code: u16,
+    pub affected_rows: u64,
+    pub error_message: String,
+}
+
+impl MysqlInfo {
+    pub fn merge(&mut self, other: Self) {
+        self.response_code = other.response_code;
+        self.affected_rows = other.affected_rows;
+        self.error_code = other.error_code;
+        self.error_message = other.error_message;
+    }
+}
+
+impl From<MysqlInfo> for flow_log::MysqlInfo {
+    fn from(f: MysqlInfo) -> Self {
+        flow_log::MysqlInfo {
+            protocol_version: f.protocol_version as u32,
+            server_version: f.server_version,
+            server_thread_id: f.server_thread_id,
+            command: f.command as u32,
+            context: f.context,
+            response_code: f.response_code as u32,
+            affected_rows: f.affected_rows,
+            error_code: f.error_code as u32,
+            error_message: f.error_message,
+        }
+    }
+}
+
 #[derive(Debug, Default)]
-struct MysqlLog {
-    pub info: MysqlInfo,
+pub struct MysqlLog {
+    info: MysqlInfo,
 
     l7_proto: L7Protocol,
     msg_type: LogMessageType,
 }
 
 impl MysqlLog {
-    fn request_none() {}
-
     fn request_string(&mut self, payload: &[u8]) {
         if payload.len() > 2 && payload[0] == 0 && payload[1] == 1 {
             // MYSQL 8.0.26返回字符串前有0x0、0x1，MYSQL 8.0.21版本没有这个问题
@@ -29,10 +67,6 @@ impl MysqlLog {
         } else {
             self.info.context = String::from_utf8_lossy(payload).into_owned();
         }
-    }
-
-    fn new() -> Self {
-        MysqlLog::default()
     }
 
     fn reset_logs(&mut self) {
@@ -48,10 +82,10 @@ impl MysqlLog {
         log_data.special_info = AppProtoLogsInfo::Mysql(self.info);
     }
 
-    fn greeting(&mut self, payload: &[u8]) -> bool {
+    fn greeting(&mut self, payload: &[u8]) -> Result<()> {
         let mut remain = payload.len();
         if remain < PROTOCOL_VERSION_LEN {
-            return false;
+            return Err(Error::MysqlLogParseFailed);
         }
         self.info.protocol_version = payload[PROTOCOL_VERSION_OFFSET];
         remain -= PROTOCOL_VERSION_LEN;
@@ -60,7 +94,7 @@ impl MysqlLog {
             .position(|&x| x == SERVER_VERSION_EOF)
             .unwrap_or_default();
         if server_version_pos <= 0 {
-            return false;
+            return Err(Error::MysqlLogParseFailed);
         }
         self.info.server_version = String::from_utf8_lossy(
             &payload[SERVER_VERSION_OFFSET..SERVER_VERSION_OFFSET + server_version_pos],
@@ -68,27 +102,27 @@ impl MysqlLog {
         .into_owned();
         remain -= server_version_pos as usize;
         if remain < THREAD_ID_LEN {
-            return false;
+            return Err(Error::MysqlLogParseFailed);
         }
         let thread_id_offset = THREAD_ID_OFFSET_B + server_version_pos + 1;
         self.info.server_thread_id = bytes::read_u32_le(&payload[thread_id_offset..]);
         self.l7_proto = L7Protocol::Mysql;
-        true
+        Ok(())
     }
 
-    fn request(&mut self, payload: &[u8]) -> bool {
+    fn request(&mut self, payload: &[u8]) -> Result<()> {
         if payload.len() < COMMAND_LEN {
-            return false;
+            return Err(Error::MysqlLogParseFailed);
         }
         self.info.command = payload[COMMAND_OFFSET];
         match self.info.command {
-            MYSQL_COMMAND_QUIT | MYSQL_COMMAND_SHOW_FIELD => true,
+            MYSQL_COMMAND_QUIT | MYSQL_COMMAND_SHOW_FIELD => (),
             MYSQL_COMMAND_USE_DATABASE | MYSQL_COMMAND_QUERY => {
                 self.request_string(&payload[COMMAND_OFFSET + COMMAND_LEN..]);
-                true
             }
-            _ => false,
+            _ => return Err(Error::MysqlLogParseFailed),
         }
+        Ok(())
     }
 
     fn decode_compress_int(payload: &[u8]) -> u64 {
@@ -112,10 +146,10 @@ impl MysqlLog {
         }
     }
 
-    fn response(&mut self, payload: &[u8]) -> bool {
+    fn response(&mut self, payload: &[u8]) -> Result<()> {
         let mut remain = payload.len();
         if remain < RESPONSE_CODE_LEN {
-            return false;
+            return Err(Error::MysqlLogParseFailed);
         }
         self.info.response_code = payload[RESPONSE_CODE_OFFSET];
         remain -= RESPONSE_CODE_LEN;
@@ -133,47 +167,120 @@ impl MysqlLog {
                     };
                 self.info.error_message =
                     String::from_utf8_lossy(&payload[error_message_offset..]).into_owned();
-                true
             }
             MYSQL_RESPONSE_CODE_OK => {
                 self.info.affected_rows =
                     MysqlLog::decode_compress_int(&payload[AFFECTED_ROWS_OFFSET..]);
-                true
             }
-            _ => true,
+            _ => (),
         }
+        Ok(())
     }
+}
 
-    fn parse(&mut self, payload: &[u8], proto: IpProtocol, direction: PacketDirection) -> bool {
+impl L7LogParse for MysqlLog {
+    type Item = MysqlInfo;
+    fn parse(
+        &mut self,
+        payload: impl AsRef<[u8]>,
+        proto: IpProtocol,
+        direction: PacketDirection,
+    ) -> Result<()> {
         if proto != IpProtocol::Tcp {
-            return false;
+            return Err(Error::InvalidIpProtocol);
         }
         self.reset_logs();
 
-        let mut header = Header::default();
+        let mut header = MysqlHeader::default();
+        let payload = payload.as_ref();
         let offset = header.decode(payload);
-        let msg_type = match header.check(direction, offset, payload, self.l7_proto) {
-            Some(t) => t,
-            None => return false,
-        };
+        let msg_type = header
+            .check(direction, offset, payload, self.l7_proto)
+            .ok_or(Error::MysqlLogParseFailed)?;
 
-        let has_log = match msg_type {
-            LogMessageType::Request => self.request(&payload[offset..]),
-            LogMessageType::Response => self.response(&payload[offset..]),
-            LogMessageType::Other => self.greeting(&payload[offset..]),
-            _ => false,
+        match msg_type {
+            LogMessageType::Request => self.request(&payload[offset..])?,
+            LogMessageType::Response => self.response(&payload[offset..])?,
+            LogMessageType::Other => self.greeting(&payload[offset..])?,
+            _ => return Err(Error::MysqlLogParseFailed),
         };
-        if has_log {
-            self.msg_type = msg_type;
-            true
-        } else {
-            false
+        self.msg_type = msg_type;
+
+        Ok(())
+    }
+
+    fn info(&self) -> Self::Item {
+        self.info.clone()
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct MysqlHeader {
+    length: u32,
+    number: u8,
+}
+
+impl MysqlHeader {
+    pub fn decode(&mut self, payload: &[u8]) -> usize {
+        if payload.len() < 5 {
+            return 0;
+        }
+        let len = bytes::read_u32_le(payload) & 0xffffff;
+        if payload[HEADER_LEN + RESPONSE_CODE_OFFSET] == MYSQL_RESPONSE_CODE_OK
+            || payload[HEADER_LEN + RESPONSE_CODE_OFFSET] == MYSQL_RESPONSE_CODE_ERR
+            || payload[HEADER_LEN + RESPONSE_CODE_OFFSET] == MYSQL_RESPONSE_CODE_EOF
+            || payload[NUMBER_OFFSET] == 0
+        {
+            self.length = len;
+            self.number = payload[NUMBER_OFFSET];
+            return HEADER_LEN;
+        }
+        let offset = len as usize + HEADER_LEN;
+        if offset > payload.len() {
+            return 0;
+        }
+        offset + self.decode(&payload[offset..])
+    }
+
+    pub fn check(
+        &self,
+        direction: PacketDirection,
+        offset: usize,
+        payload: &[u8],
+        l7_proto: L7Protocol,
+    ) -> Option<LogMessageType> {
+        if offset > payload.len() || self.length == 0 {
+            return None;
+        }
+        if self.number != 0 && l7_proto == L7Protocol::Unknown {
+            return None;
+        }
+
+        match direction {
+            PacketDirection::ServerToClient if self.number == 0 => {
+                let payload = &payload[offset..];
+                if payload.len() < PROTOCOL_VERSION_LEN {
+                    return None;
+                }
+                let protocol_version = payload[PROTOCOL_VERSION_OFFSET];
+                let index = payload[SERVER_VERSION_OFFSET..]
+                    .iter()
+                    .position(|&x| x == SERVER_VERSION_EOF)?;
+                if index != 0 && protocol_version == PROTOCOL_VERSION {
+                    Some(LogMessageType::Other)
+                } else {
+                    None
+                }
+            }
+            PacketDirection::ServerToClient => Some(LogMessageType::Response),
+            PacketDirection::ClientToServer if self.number == 0 => Some(LogMessageType::Request),
+            _ => None,
         }
     }
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::fs;
     use std::path::Path;
 
@@ -204,7 +311,7 @@ mod test {
                 Some(p) => p,
                 None => continue,
             };
-            mysql.parse(payload, packet.lookup_key.proto, packet.direction);
+            let _ = mysql.parse(payload, packet.lookup_key.proto, packet.direction);
             output.push_str(&format!("{:?}\r\n", mysql.info));
         }
         output

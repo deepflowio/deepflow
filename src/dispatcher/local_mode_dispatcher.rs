@@ -42,8 +42,6 @@ impl LocalModeDispatcher {
             base.flow_output_queue.clone(),
             |_, _| {},
             base.log_output_queue.clone(),
-            vec![],
-            65536,
             base.flow_map_config.clone(),
         );
 
