@@ -1,31 +1,56 @@
-use super::{KAFKA_REQ_HEADER_LEN, KAFKA_RESP_HEADER_LEN};
-
-use crate::{
-    common::{
-        enums::{IpProtocol, PacketDirection},
-        flow::L7Protocol,
-        protocol_logs::{KafkaInfo, LogMessageType},
-    },
-    error::{Error, Result},
-    utils::bytes,
+use super::super::{
+    consts::{KAFKA_REQ_HEADER_LEN, KAFKA_RESP_HEADER_LEN},
+    L7LogParse, LogMessageType,
 };
 
-const NO_KAFKA_LOG: &str = "no kafka log.";
+use crate::flow_generator::error::{Error, Result};
+use crate::proto::flow_log;
+use crate::{
+    common::enums::{IpProtocol, PacketDirection},
+    utils::bytes::{read_u16_be, read_u32_be},
+};
+
+#[derive(Debug, Default, Clone)]
+pub struct KafkaInfo {
+    pub correlation_id: u32,
+
+    // request
+    pub req_msg_size: i32,
+    pub api_version: u16,
+    pub api_key: u16,
+    pub client_id: String,
+
+    // reponse
+    pub resp_msg_size: i32,
+}
+
+impl KafkaInfo {
+    pub fn merge(&mut self, other: Self) {
+        self.resp_msg_size = other.resp_msg_size;
+    }
+}
+
+impl From<KafkaInfo> for flow_log::KafkaInfo {
+    fn from(f: KafkaInfo) -> Self {
+        flow_log::KafkaInfo {
+            correlation_id: f.correlation_id,
+            req_msg_size: f.req_msg_size,
+            api_version: f.api_version as u32,
+            api_key: f.api_key as u32,
+            client_id: f.client_id,
+            resp_msg_size: f.resp_msg_size,
+        }
+    }
+}
 
 #[derive(Debug, Default)]
-struct KafkaLog {
+pub struct KafkaLog {
     info: KafkaInfo,
-
-    l7_proto: L7Protocol,
     msg_type: LogMessageType,
 }
 
 impl KafkaLog {
-    fn new() -> Self {
-        KafkaLog::default()
-    }
-
-    pub fn reset_logs(&mut self) {
+    fn reset_logs(&mut self) {
         self.info.correlation_id = 0;
         self.info.req_msg_size = -1;
         self.info.api_version = 0;
@@ -34,62 +59,60 @@ impl KafkaLog {
         self.info.resp_msg_size = -1;
     }
 
-    fn get_log_data_special_info(self) {
-        self.info;
-    }
-
     fn request(&mut self, payload: &[u8]) -> Result<()> {
-        if payload.len() < KAFKA_REQ_HEADER_LEN {
-            return Err(Error::KafkaLogParse(NO_KAFKA_LOG.to_string()));
-        }
-
-        self.info.req_msg_size = bytes::read_u32_be(payload) as i32;
-        let client_id_len = bytes::read_u16_be(&payload[12..]) as usize;
+        self.info.req_msg_size = read_u32_be(payload) as i32;
+        let client_id_len = read_u16_be(&payload[12..]) as usize;
         if payload.len() < KAFKA_REQ_HEADER_LEN + client_id_len {
-            return Err(Error::KafkaLogParse(NO_KAFKA_LOG.to_string()));
+            return Err(Error::KafkaLogParseFailed);
         }
 
-        self.info.api_key = bytes::read_u16_be(&payload[4..]);
-        self.info.api_version = bytes::read_u16_be(&payload[6..]);
-        self.info.correlation_id = bytes::read_u32_be(&payload[8..]);
+        self.info.api_key = read_u16_be(&payload[4..]);
+        self.info.api_version = read_u16_be(&payload[6..]);
+        self.info.correlation_id = read_u32_be(&payload[8..]);
         self.info.client_id =
             String::from_utf8_lossy(&payload[14..14 + client_id_len]).into_owned();
         Ok(())
     }
 
     fn response(&mut self, payload: &[u8]) -> Result<()> {
-        if payload.len() < KAFKA_RESP_HEADER_LEN {
-            return Err(Error::KafkaLogParse(NO_KAFKA_LOG.to_string()));
-        }
-
-        self.info.resp_msg_size = bytes::read_u32_be(payload) as i32;
-        self.info.correlation_id = bytes::read_u32_be(&payload[4..]);
+        self.info.resp_msg_size = read_u32_be(payload) as i32;
+        self.info.correlation_id = read_u32_be(&payload[4..]);
 
         self.msg_type = LogMessageType::Response;
 
         Ok(())
     }
+}
 
+impl L7LogParse for KafkaLog {
+    type Item = KafkaInfo;
     fn parse(
         &mut self,
-        payload: &[u8],
+        payload: impl AsRef<[u8]>,
         proto: IpProtocol,
         direction: PacketDirection,
     ) -> Result<()> {
         if proto != IpProtocol::Tcp {
-            return Err(Error::KafkaLogParse(NO_KAFKA_LOG.to_string()));
+            return Err(Error::InvalidIpProtocol);
         }
-
         self.reset_logs();
+        let payload = payload.as_ref();
+        if payload.len() < KAFKA_RESP_HEADER_LEN {
+            return Err(Error::KafkaLogParseFailed);
+        }
         match direction {
             PacketDirection::ClientToServer => self.request(payload),
-            _ => self.response(payload),
+            PacketDirection::ServerToClient => self.response(payload),
         }
+    }
+
+    fn info(&self) -> Self::Item {
+        self.info.clone()
     }
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::fs;
     use std::path::Path;
 

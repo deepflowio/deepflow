@@ -3,23 +3,22 @@ use std::fmt;
 use std::rc::Rc;
 use std::time::Duration;
 
-use super::consts::*;
+use super::super::{
+    error::{Error, Result},
+    protocol_logs::{consts::*, AppProtoHead, L7ResponseStatus, LogMessageType},
+};
+use super::{stats::PerfStats, L7FlowPerf, L7RrtCache};
 
 use crate::{
     common::{
         enums::IpProtocol,
-        flow::{FlowPerfStats, L4Protocol, L7PerfStats, L7Protocol, TcpPerfStats},
+        flow::{FlowPerfStats, L7PerfStats, L7Protocol},
         meta_packet::MetaPacket,
-        protocol_logs::{AppProtoHead, L7ResponseStatus, LogMessageType},
     },
-    flow_generator::{
-        error::{Error, Result},
-        perf::l7_rrt::L7RrtCache,
-        perf::stats::PerfStats,
-        perf::L7FlowPerf,
-    },
-    utils::bytes,
+    utils::bytes::{read_u16_be, read_u16_le},
 };
+
+pub const DNS_PORT: u16 = 53;
 
 #[derive(Clone)]
 struct DnsSessionData {
@@ -67,7 +66,7 @@ impl fmt::Debug for DnsPerfData {
 impl L7FlowPerf for DnsPerfData {
     fn parse(&mut self, packet: &MetaPacket, flow_id: u64) -> Result<()> {
         if packet.lookup_key.proto != IpProtocol::Tcp {
-            return Err(Error::InvaildIpProtocol);
+            return Err(Error::InvalidIpProtocol);
         }
 
         let payload = packet.get_l4_payload().ok_or(Error::ZeroPayloadLen)?;
@@ -78,12 +77,12 @@ impl L7FlowPerf for DnsPerfData {
             }
             IpProtocol::Tcp => {
                 if payload.len() < DNS_TCP_PAYLOAD_OFFSET {
-                    return Err(Error::DnsPerfParseFailed);
+                    return Err(Error::DNSPerfParseFailed("dns payload length error"));
                 }
 
-                let size = bytes::read_u16_be(payload) as usize;
+                let size = read_u16_be(payload) as usize;
                 if size < payload[DNS_TCP_PAYLOAD_OFFSET..].len() {
-                    return Err(Error::DnsPerfParseFailed);
+                    return Err(Error::DNSPerfParseFailed("dns payload length error"));
                 }
                 self.decode_payload(
                     &payload[DNS_TCP_PAYLOAD_OFFSET..],
@@ -91,7 +90,7 @@ impl L7FlowPerf for DnsPerfData {
                     flow_id,
                 )?;
             }
-            _ => return Err(Error::DnsPerfParseFailed),
+            _ => return Err(Error::DNSPerfParseFailed("dns translation type error")),
         }
 
         self.session_data.l7_proto = L7Protocol::Dns;
@@ -108,7 +107,6 @@ impl L7FlowPerf for DnsPerfData {
         if let Some(stats) = self.perf_stats.take() {
             FlowPerfStats {
                 l7_protocol: L7Protocol::Dns,
-                l4_protocol: L4Protocol::default(),
                 l7: L7PerfStats {
                     request_count: stats.req_count,
                     response_count: stats.resp_count,
@@ -119,7 +117,7 @@ impl L7FlowPerf for DnsPerfData {
                     err_server_count: stats.resp_err_count,
                     err_timeout: timeout_count,
                 },
-                tcp: TcpPerfStats::default(),
+                ..Default::default()
             }
         } else {
             FlowPerfStats::default()
@@ -143,7 +141,7 @@ impl L7FlowPerf for DnsPerfData {
                 msg_type: self.session_data.msg_type,
                 status: self.session_data.status,
                 code: self.session_data.status_code as u16,
-                rrt: rrt,
+                rrt,
             },
             0,
         ))
@@ -159,7 +157,7 @@ impl DnsPerfData {
             has_log_data: false,
             l7_proto: L7Protocol::default(),
             msg_type: LogMessageType::default(),
-            rrt_cache: rrt_cache,
+            rrt_cache,
         };
         Self {
             perf_stats: None,
@@ -177,10 +175,9 @@ impl DnsPerfData {
 
     fn decode_payload(&mut self, payload: &[u8], timestamp: Duration, flow_id: u64) -> Result<()> {
         if payload.len() < DNS_HEADER_SIZE {
-            return Err(Error::DnsPerfParseFailed);
+            return Err(Error::DNSPerfParseFailed("protocol mismatch"));
         }
-        self.session_data.id =
-            u16::from_le_bytes(*<&[u8; 2]>::try_from(&payload[..DNS_HEADER_FLAGS_OFFSET]).unwrap());
+        self.session_data.id = read_u16_le(&payload[..DNS_HEADER_FLAGS_OFFSET]);
 
         let qr = payload[DNS_HEADER_FLAGS_OFFSET] & DNS_HEADER_QR_MASK;
         self.session_data.status_code =
@@ -219,15 +216,12 @@ impl DnsPerfData {
 
             perf_stats.rrt_last = Duration::ZERO;
 
-            let req_timestamp = match self
+            let req_timestamp = self
                 .session_data
                 .rrt_cache
                 .borrow_mut()
                 .get_and_remove_l7_req_time(flow_id, Some(self.session_data.id as u32))
-            {
-                Some(t) => t,
-                None => return Err(Error::L7ReqNotFound(1)),
-            };
+                .ok_or(Error::L7ReqNotFound(1))?;
 
             if timestamp < req_timestamp {
                 return Ok(());
@@ -243,7 +237,7 @@ impl DnsPerfData {
             return Ok(());
         }
 
-        return Err(Error::DnsPerfParseFailed);
+        return Err(Error::DNSPerfParseFailed("decode dns payload failed"));
     }
 }
 

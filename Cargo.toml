@@ -16,8 +16,7 @@ bytes = "0.5"
 bytesize = "1.1.0"
 cadence = "0.27.0"
 chrono = "0.4.19"
-cidr-utils = "0.5.6"
-clap = {version = "3.1.5", features = ["derive"] }
+clap = {version = "3.1.7", features = ["derive"] }
 crossbeam = "0.8.1"
 dashmap = "5.0.0"
 enum_dispatch = "0.3.7"
@@ -67,7 +66,6 @@ windows = {version = "0.30", features = ["Win32_Foundation", "Win32_System_Diagn
 criterion = "0.3.5"
 lru = "0.7.3"
 pcap = "0.9.1"
-rand = "0.8.5"
 tempfile = "3.2.0"
 uluru = "3.0.0"
 

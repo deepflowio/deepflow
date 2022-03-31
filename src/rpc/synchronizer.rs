@@ -130,10 +130,6 @@ impl Synchronizer {
         }
     }
 
-    pub fn runtime_config(&self) -> RuntimeConfig {
-        todo!()
-    }
-
     pub fn max_memory(&self) -> Arc<AtomicU64> {
         self.max_memory.clone()
     }
@@ -573,4 +569,43 @@ impl RuntimeEnvironment {
                 .into(),
         }
     }
+}
+
+// Span/Trace 共用一套TypeMap
+const TRACE_TYPE_MAP: [(&'static str, TraceType); 6] = [
+    ("", TraceType::Disabled),
+    ("x-b3-trace-id", TraceType::XB3),
+    ("x-b3-parentspanid", TraceType::XB3Span),
+    ("uber-trace-id", TraceType::Uber),
+    ("sw6", TraceType::Sw6),
+    ("sw8", TraceType::Sw8),
+];
+
+pub enum TraceType {
+    Disabled, // 业务表示关闭，trident也就沿用这个语义
+    XB3,
+    XB3Span,
+    Uber,
+    Sw6,
+    Sw8,
+}
+
+impl Default for TraceType {
+    fn default() -> Self {
+        Self::Disabled
+    }
+}
+
+#[derive(Default)]
+pub struct HttpConfig {
+    pub proxy_client_origin: String,
+    pub proxy_client_http_v2: String,
+    pub proxy_client_with_colon: String,
+    pub trace_id_origin: String,
+    pub trace_id_http_v2: String,
+    pub trace_id_with_colon: String,
+    pub trace_type: TraceType,
+    pub span_id_origin: String,
+    pub span_id_with_colon: String,
+    pub span_type: TraceType,
 }

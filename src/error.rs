@@ -28,26 +28,8 @@ pub enum Error {
     Ethtool(String),
     #[error("parse packet failed from: {0}")]
     ParsePacketFailed(String),
-    #[error("dns perf parse: {0}")]
-    DnsPerfParse(String),
-    #[error("dns log parse: {0}")]
-    DnsLogParse(String),
-    #[error("redis perf parse: {0}")]
-    RedisPerfParse(String),
-    #[error("redis log parse: {0}")]
-    RedisLogParse(String),
-    #[error("kafka perf parse: {0}")]
-    KafkaPerfParse(String),
-    #[error("no kafka log {0}")]
-    KafkaLogParse(String),
     #[error("invalid tpacket version: {0}")]
     InvalidTpVersion(isize),
-    #[error("dubbo parse: {0}")]
-    DubboParse(String),
-    #[error("dubbo perf parse: {0}")]
-    DubboPerfParse(String),
-    #[error("dubbo log parse: {0}")]
-    DubboLogParse(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

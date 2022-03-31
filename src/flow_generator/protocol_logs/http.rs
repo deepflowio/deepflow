@@ -1,54 +1,92 @@
 use bytes::Bytes;
 use httpbis::for_test::hpack;
 
-use super::{
-    check_http_method, consts::*, get_http_request_version, get_http_resp_info, Httpv2Headers,
-};
+use super::LogMessageType;
+use super::{consts::*, L7LogParse};
 
-use crate::{
-    common::{
-        enums::{IpProtocol, PacketDirection},
-        flow::L7Protocol,
-        protocol_logs::{HttpInfo, LogMessageType},
-    },
-    flow_generator::error::{Error, Result},
-};
+use crate::common::enums::{IpProtocol, PacketDirection};
+use crate::flow_generator::error::{Error, Result};
+use crate::proto::flow_log;
+use crate::utils::bytes::read_u32_be;
+
+#[derive(Debug, Default, Clone)]
+pub struct HttpInfo {
+    pub stream_id: u32,
+    pub version: String,
+    pub trace_id: String,
+    pub span_id: String,
+
+    pub method: String,
+    pub path: String,
+    pub host: String,
+    pub client_ip: String,
+
+    pub req_content_length: Option<u64>,
+    pub resp_content_length: Option<u64>,
+}
+
+impl HttpInfo {
+    pub fn merge(&mut self, other: Self) {
+        self.resp_content_length = other.resp_content_length;
+        if self.trace_id.is_empty() {
+            self.trace_id = other.trace_id;
+        }
+        if self.span_id.is_empty() {
+            self.span_id = other.span_id;
+        }
+    }
+}
+
+impl From<HttpInfo> for flow_log::HttpInfo {
+    fn from(f: HttpInfo) -> Self {
+        flow_log::HttpInfo {
+            stream_id: f.stream_id,
+            version: f.version,
+            method: f.method,
+            path: f.path,
+            host: f.host,
+            client_ip: f.client_ip,
+            trace_id: f.trace_id,
+            span_id: f.span_id,
+            req_content_length: match f.req_content_length {
+                Some(length) => length as i64,
+                _ => -1,
+            },
+            resp_content_length: match f.resp_content_length {
+                Some(length) => length as i64,
+                _ => -1,
+            },
+        }
+    }
+}
 
 #[derive(Debug, Default)]
 pub struct HttpLog {
     status_code: u16,
-    l7_proto: L7Protocol,
     msg_type: LogMessageType,
 
-    pub info: HttpInfo,
+    info: HttpInfo,
 }
 
 impl HttpLog {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn reset_logs(&mut self) {
+    fn reset_logs(&mut self) {
         self.info = HttpInfo::default();
     }
 
-    fn get_log_data_special_info(self) {
-        self.info;
-    }
-
-    pub fn parse_http_v1(&mut self, payload: &[u8], direction: PacketDirection) -> Result<()> {
-        let http_payload = std::str::from_utf8(payload).map_err(|_| Error::L7ParseFailed)?;
+    fn parse_http_v1(&mut self, payload: &[u8], direction: PacketDirection) -> Result<()> {
+        let http_payload =
+            std::str::from_utf8(payload).map_err(|_| Error::HttpHeaderParseFailed)?;
 
         let mut content_length: Option<u64> = None;
         if direction == PacketDirection::ServerToClient {
             if payload.len() < HTTP_RESP_MAX_LINE {
-                return Err(Error::L7ParseFailed);
+                return Err(Error::HttpHeaderParseFailed);
             }
         }
 
         let (line_info, body_info) = http_payload
             .split_once("\r\n")
-            .ok_or(Error::L7ParseFailed)?;
+            .ok_or(Error::HttpHeaderParseFailed)?;
 
         if direction == PacketDirection::ServerToClient {
             // HTTP响应行：HTTP/1.1 404 Not Found.
@@ -60,16 +98,20 @@ impl HttpLog {
             self.msg_type = LogMessageType::Request;
         } else {
             // HTTP请求行：GET /background.png HTTP/1.0
-            let (method, _) = line_info.split_once(' ').ok_or(Error::L7ParseFailed)?;
+            let (method, _) = line_info
+                .split_once(' ')
+                .ok_or(Error::HttpHeaderParseFailed)?;
             check_http_method(method)?;
             let first_space_index = method.len();
 
-            let (_, mut version) = line_info.rsplit_once(' ').ok_or(Error::L7ParseFailed)?;
+            let (_, mut version) = line_info
+                .rsplit_once(' ')
+                .ok_or(Error::HttpHeaderParseFailed)?;
             version = get_http_request_version(version)?;
 
             let last_space_index = line_info.len() - HTTP_V1_VERSION_LEN - 1;
             if last_space_index < first_space_index + 1 {
-                return Err(Error::L7ParseFailed);
+                return Err(Error::HttpHeaderParseFailed);
             }
 
             self.info.method = method.to_string();
@@ -105,7 +147,7 @@ impl HttpLog {
         Ok(())
     }
 
-    pub fn parse_http_v2(&mut self, payload: &[u8], direction: PacketDirection) -> Result<()> {
+    fn parse_http_v2(&mut self, payload: &[u8], direction: PacketDirection) -> Result<()> {
         let mut content_length: Option<u64> = None;
         let mut header_frame_parsed = false;
         let mut is_httpv2 = false;
@@ -211,45 +253,143 @@ impl HttpLog {
         if is_httpv2 {
             if direction == PacketDirection::ClientToServer {
                 if check_http_method(&self.info.method).is_err() {
-                    return Err(Error::L7ParseFailed);
+                    return Err(Error::HttpHeaderParseFailed);
                 }
                 self.info.req_content_length = content_length;
             } else {
                 if self.status_code < HTTP_STATUS_CODE_MIN
                     || self.status_code > HTTP_STATUS_CODE_MAX
                 {
-                    return Err(Error::L7ParseFailed);
+                    return Err(Error::HttpHeaderParseFailed);
                 }
                 self.info.resp_content_length = content_length;
             }
             self.info.version = "2".to_string();
             return Ok(());
         }
-        Err(Error::L7ParseFailed)
+        Err(Error::HttpHeaderParseFailed)
     }
+}
 
+impl L7LogParse for HttpLog {
+    type Item = HttpInfo;
     fn parse(
         &mut self,
-        payload: &[u8],
+        payload: impl AsRef<[u8]>,
         proto: IpProtocol,
         direction: PacketDirection,
     ) -> Result<()> {
         if proto != IpProtocol::Tcp {
-            return Err(Error::InvaildIpProtocol);
+            return Err(Error::InvalidIpProtocol);
         }
         self.reset_logs();
-        if self.parse_http_v1(payload, direction).is_ok() {
-            return Ok(());
-        }
-        if self.parse_http_v2(payload, direction).is_ok() {
-            return Ok(());
-        }
-        Err(Error::L7ParseFailed)
+        let payload = payload.as_ref();
+
+        self.parse_http_v1(payload, direction)
+            .or(self.parse_http_v2(payload, direction))
+    }
+
+    fn info(&self) -> Self::Item {
+        self.info.clone()
     }
 }
 
+#[derive(Debug, Default, PartialEq)]
+pub struct Httpv2Headers {
+    pub frame_length: u32,
+    pub frame_type: u8,
+    pub flags: u8,
+    pub stream_id: u32,
+}
+
+impl Httpv2Headers {
+    // HTTPv2帧头格式:https://tools.ietf.org/html/rfc7540#section-4.1
+    // +-----------------------------------------------+
+    // |                 Length (24)                   |
+    // +---------------+---------------+---------------+
+    // |   Type (8)    |   Flags (8)   |
+    // +-+-------------+---------------+-------------------------------+
+    // |R|                 Stream Identifier (31)                      |
+    // +=+=============================================================+
+    // |                   Frame Payload (0...)                      ...
+    // +---------------------------------------------------------------+
+    pub fn parse_headers_frame(&mut self, payload: &[u8]) -> Result<()> {
+        let frame_type = payload[3];
+        if frame_type < HTTPV2_FRAME_TYPE_MIN || frame_type > HTTPV2_FRAME_TYPE_MAX {
+            return Err(Error::HttpHeaderParseFailed);
+        }
+
+        self.frame_length = read_u32_be(&payload) >> 8;
+
+        self.frame_type = frame_type;
+        self.flags = payload[4];
+        self.stream_id = read_u32_be(&payload[5..]);
+        Ok(())
+    }
+}
+
+// 参考：https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
+pub fn check_http_method(method: &str) -> Result<()> {
+    match method {
+        "OPTIONS" | "GET" | "HEAD" | "POST" | "PUT" | "DELETE" | "TRACE" | "CONNECT" => Ok(()),
+        _ => Err(Error::HttpHeaderParseFailed),
+    }
+}
+
+// HTTP请求行：GET /background.png HTTP/1.0
+pub fn get_http_method(line_info: &[u8]) -> Result<(String, usize)> {
+    // 截取请求行第一个空格前，进行method匹配
+    if line_info.len() < HTTP_METHOD_AND_SPACE_MAX_OFFSET {
+        return Err(Error::HttpHeaderParseFailed);
+    }
+    let line_str = std::str::from_utf8(line_info).unwrap_or_default();
+    if let Some(space_index) = line_str.find(' ') {
+        let method = &line_str[..space_index];
+        check_http_method(method)?;
+        return Ok((method.to_string(), space_index));
+    }
+    Err(Error::HttpHeaderParseFailed)
+}
+
+pub fn get_http_request_version(version: &str) -> Result<&str> {
+    // 参考：https://baike.baidu.com/item/HTTP/243074?fr=aladdin#2
+    // HTTPv1版本只有1.0及1.1
+    match version {
+        HTTP_V1_0_VERSION => return Ok("1.0"),
+        HTTP_V1_1_VERSION => return Ok("1.1"),
+        _ => return Err(Error::HttpHeaderParseFailed),
+    }
+}
+
+pub fn get_http_resp_info(line_info: &str) -> Result<(String, u16)> {
+    if line_info.len() < HTTP_RESP_MIN_LEN {
+        return Err(Error::HttpHeaderParseFailed);
+    }
+    // HTTP响应行：HTTP/1.1 404 Not Found.
+    let mut params = line_info.split(' ');
+    // version解析
+    let version = match params.next().unwrap_or_default() {
+        HTTP_V1_0_VERSION => "1.0".to_string(),
+        HTTP_V1_1_VERSION => "1.1".to_string(),
+        _ => return Err(Error::HttpHeaderParseFailed),
+    };
+
+    // 响应码值校验
+    // 参考：https://baike.baidu.com/item/HTTP%E7%8A%B6%E6%80%81%E7%A0%81/5053660?fr=aladdin
+    let status_code = params
+        .next()
+        .unwrap_or_default()
+        .parse::<u16>()
+        .unwrap_or_default();
+
+    if status_code < HTTP_STATUS_CODE_MIN || status_code > HTTP_STATUS_CODE_MAX {
+        return Err(Error::HttpHeaderParseFailed);
+    }
+    Ok((version, status_code))
+}
+
 #[cfg(test)]
-mod test {
+mod tests {
     use std::fs;
     use std::path::Path;
 
@@ -281,6 +421,7 @@ mod test {
 
             let mut http = HttpLog::default();
             let _ = http.parse(payload, packet.lookup_key.proto, packet.direction);
+
             output.push_str(&format!("{:?}\r\n", http.info));
         }
         output
