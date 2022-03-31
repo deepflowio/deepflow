@@ -2,10 +2,10 @@ use super::super::{
     consts::*, AppProtoLogsData, AppProtoLogsInfo, L7LogParse, L7Protocol, LogMessageType,
 };
 
-use crate::flow_generator::error::{Error, Result};
 use crate::proto::flow_log;
 use crate::{
     common::enums::{IpProtocol, PacketDirection},
+    flow_generator::error::{Error, Result},
     utils::bytes,
 };
 
@@ -179,10 +179,9 @@ impl MysqlLog {
 }
 
 impl L7LogParse for MysqlLog {
-    type Item = MysqlInfo;
     fn parse(
         &mut self,
-        payload: impl AsRef<[u8]>,
+        payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
     ) -> Result<()> {
@@ -192,7 +191,6 @@ impl L7LogParse for MysqlLog {
         self.reset_logs();
 
         let mut header = MysqlHeader::default();
-        let payload = payload.as_ref();
         let offset = header.decode(payload);
         let msg_type = header
             .check(direction, offset, payload, self.l7_proto)
@@ -209,8 +207,8 @@ impl L7LogParse for MysqlLog {
         Ok(())
     }
 
-    fn info(&self) -> Self::Item {
-        self.info.clone()
+    fn info(&self) -> AppProtoLogsInfo {
+        AppProtoLogsInfo::Mysql(self.info.clone())
     }
 }
 

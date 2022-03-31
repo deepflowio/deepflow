@@ -1,6 +1,6 @@
 use std::fmt;
 use std::mem;
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -14,20 +14,23 @@ use super::{
     consts::*,
     decapsulate::TunnelInfo,
     endpoint::EndpointData,
-    enums::{EthernetType, HeaderType, IpProtocol, PacketDirection, TcpFlags},
+    enums::{EthernetType, HeaderType, IpProtocol, PacketDirection, TapType, TcpFlags},
+    flow::L7Protocol,
     lookup_key::LookupKey,
     policy::PolicyData,
     tap_port::TapPort,
 };
 
+use crate::ebpf::{CAP_LEN_MAX, SK_BPF_DATA, SOCK_DIR_RCV, SOCK_DIR_SND};
 use crate::error;
 use crate::utils::net::{is_unicast_link_local, MacAddr};
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct MetaPacket<'a> {
     // 主机序, 不因L2End1而颠倒, 端口会在查询策略时被修改
     pub lookup_key: LookupKey,
 
+    pub raw_from_ebpf: Box<[u8]>,
     pub raw: Option<&'a [u8]>,
     pub packet_len: usize,
     vlan_tag_size: usize,
@@ -79,6 +82,11 @@ pub struct MetaPacket<'a> {
     pub start_time: Duration,
     pub end_time: Duration,
     pub source_ip: u32,
+
+    // for ebpf
+    pub socket_id: u64,
+    pub process_id: u32,
+    pub l7_protocol: L7Protocol,
 }
 
 impl<'a> MetaPacket<'a> {
@@ -303,6 +311,10 @@ impl<'a> MetaPacket<'a> {
         if self.lookup_key.proto != IpProtocol::Tcp && self.lookup_key.proto != IpProtocol::Udp {
             return None;
         }
+        if self.tap_port.is_from(TapPort::FROM_EBPF) {
+            return self.raw;
+        }
+
         let packet_header_size =
             self.header_type.min_packet_size() + self.l2_l3_opt_size + self.l4_opt_size;
         if let Some(raw) = self.raw.as_ref() {
@@ -716,6 +728,54 @@ impl<'a> MetaPacket<'a> {
     /// Get the meta packet's l4 payload len.
     pub fn l4_payload_len(&self) -> usize {
         self.l4_payload_len
+    }
+
+    pub unsafe fn update_from_ebpf(&mut self, data: *mut SK_BPF_DATA) {
+        let src_ip: IpAddr;
+        let dst_ip: IpAddr;
+        if (*data).tuple.addr_len == 4 {
+            let addr: [u8; 4] = (*data).tuple.laddr[..4].try_into().unwrap();
+            src_ip = IpAddr::from(Ipv4Addr::from(addr));
+            let addr: [u8; 4] = (*data).tuple.raddr[..4].try_into().unwrap();
+            dst_ip = IpAddr::from(Ipv4Addr::from(addr));
+        } else {
+            src_ip = IpAddr::from(Ipv6Addr::from((*data).tuple.laddr));
+            dst_ip = IpAddr::from(Ipv6Addr::from((*data).tuple.raddr));
+        }
+
+        self.lookup_key = LookupKey {
+            timestamp: Duration::from_micros((*data).timestamp),
+            src_ip,
+            dst_ip,
+            src_port: (*data).tuple.lport,
+            dst_port: (*data).tuple.rport,
+            eth_type: if (*data).tuple.addr_len == 4 {
+                EthernetType::Ipv4
+            } else {
+                EthernetType::Ipv6
+            },
+            l2_end_0: (*data).direction == SOCK_DIR_SND,
+            l2_end_1: (*data).direction == SOCK_DIR_RCV,
+            proto: IpProtocol::try_from((*data).tuple.protocol).unwrap_or_default(),
+            tap_type: TapType::Tor,
+            ..Default::default()
+        };
+
+        let cap_len = CAP_LEN_MAX.min((*data).cap_len as usize);
+
+        self.raw_from_ebpf = Box::new([0u8; CAP_LEN_MAX]);
+        (*data)
+            .cap_data
+            .copy_to(self.raw_from_ebpf.as_mut_ptr() as *mut i8, cap_len);
+        self.packet_len = (*data).syscall_len as usize + 54; // 目前仅支持TCP
+        self.payload_len = (*data).cap_len as u16;
+        self.l4_payload_len = (*data).cap_len as usize;
+        self.tap_port = TapPort::from_ebpf((*data).process_id);
+        self.process_id = (*data).process_id;
+        self.socket_id = (*data).socket_id;
+        if !(*data).need_reconfirm {
+            self.l7_protocol = L7Protocol::from((*data).l7_protocal_hint as u8);
+        }
     }
 }
 

@@ -5,6 +5,9 @@ pub use libc::c_uchar; //u8
 pub use libc::c_uint;
 pub use std::ffi::{CStr, CString}; //u32
 
+// 最大长度
+pub const CAP_LEN_MAX: usize = 512;
+
 //方向
 #[allow(dead_code)]
 pub const SOCK_DIR_SND: u8 = 0;
@@ -64,18 +67,18 @@ pub struct tuple_t {
 #[derive(Debug, Copy, Clone)]
 pub struct SK_BPF_DATA {
     /* session info */
-    pub process_id: u32,       // 进程ID，对应内核tgid
-    pub thread_id: u32,        // 线程ID，对应内核pid
-                               // 如果process_id等于thread_id说明是一个进程，否则是一个线程
+    pub process_id: u32, // 进程ID，对应内核tgid
+    pub thread_id: u32,  // 线程ID，对应内核pid
+    // 如果process_id等于thread_id说明是一个进程，否则是一个线程
     pub process_name: [u8; 16usize], //进程名字，占用16bytes
 
     pub tuple: tuple_t,        // Socket五元组信息
-    pub socket_id: u64,        // Socket的唯一标识，从启动时的时钟开始自增1，可用此做hash key代替五元组。
+    pub socket_id: u64, // Socket的唯一标识，从启动时的时钟开始自增1，可用此做hash key代替五元组。
     pub l7_protocal_hint: u16, // 应用数据（cap_data）的协议，取值：SOCK_DATA_*（在上面定义）
-                               // 存在一定误判性（例如标识为A协议但实际上是未知协议，或标识为多种协议），上层应用应继续深入判断
-    pub msg_type: u8,          // 信息类型，值为MSG_REQUEST(1), MSG_RESPONSE(2), 需要应用层分析进一步确认。
+    // 存在一定误判性（例如标识为A协议但实际上是未知协议，或标识为多种协议），上层应用应继续深入判断
+    pub msg_type: u8, // 信息类型，值为MSG_REQUEST(1), MSG_RESPONSE(2), 需要应用层分析进一步确认。
     pub need_reconfirm: bool, // true: 表示eBPF程序对L7协议类型的判断并不确定需要上层重新核实。
-                              // false: 表示eBPF程序对L7协议类型的判断是有把握的不需要上层重新核实。
+    // false: 表示eBPF程序对L7协议类型的判断是有把握的不需要上层重新核实。
 
     /* trace info */
     pub tcp_seq: u64, // 收发cap_data数据时TCP协议栈将会用到的TCP SEQ，可用于关联eBPF DATA与网络中的TCP Packet
@@ -113,8 +116,8 @@ pub struct SK_BPF_DATA {
     pub syscall_trace_id_session: u64,
 
     /* data info */
-    pub timestamp: u64,        // cap_data获取的时间戳（从1970.1.1开始到数据捕获时的时间间隔，精度为微妙）
-    pub direction: u8,         // 数据的收发方向，值是 SOCK_DIR_SND/SOCK_DIR_RCV
+    pub timestamp: u64, // cap_data获取的时间戳（从1970.1.1开始到数据捕获时的时间间隔，精度为微妙）
+    pub direction: u8,  // 数据的收发方向，值是 SOCK_DIR_SND/SOCK_DIR_RCV
 
     /*
      * 说明：
@@ -125,7 +128,7 @@ pub struct SK_BPF_DATA {
      */
     pub syscall_len: u64,      // 本次系统调用读、写数据的总长度
     pub cap_len: u32,          // 返回的cap_data长度
-    pub cap_seq: u64,          // cap_data在Socket中的相对顺序号，在所在socket下从0开始自增，用于数据乱序排序
+    pub cap_seq: u64, // cap_data在Socket中的相对顺序号，在所在socket下从0开始自增，用于数据乱序排序
     pub cap_data: *mut c_char, // 内核送到用户空间的数据地址
 }
 
@@ -142,31 +145,31 @@ pub struct SK_TRACE_STATS {
     /*
      * eBPF统计
      */
-     pub perf_pages_count: u32,     // perf buffer内存占用的页数量
-     pub kern_lost: u64,            // perf buffer数据用户态程序来不及接收数据，造成的SockData丢失数量
-     pub kern_socket_map_max: u32,  // socket追踪的hash表项最大值
-     pub kern_socket_map_used: u32, // socket追踪的hash表项当前值
-     pub kern_trace_map_max: u32,  // 线程追踪会话的hash表项最大值
-     pub kern_trace_map_used: u32, // 线程追踪会话的hash表项当前值
-     pub socket_map_max_reclaim: u32, // socket map表项进行清理的最大阈值，
-                                      // 当前map的表项数量超过这个值进行map清理操作。
+    pub perf_pages_count: u32,       // perf buffer内存占用的页数量
+    pub kern_lost: u64, // perf buffer数据用户态程序来不及接收数据，造成的SockData丢失数量
+    pub kern_socket_map_max: u32, // socket追踪的hash表项最大值
+    pub kern_socket_map_used: u32, // socket追踪的hash表项当前值
+    pub kern_trace_map_max: u32, // 线程追踪会话的hash表项最大值
+    pub kern_trace_map_used: u32, // 线程追踪会话的hash表项当前值
+    pub socket_map_max_reclaim: u32, // socket map表项进行清理的最大阈值，
+    // 当前map的表项数量超过这个值进行map清理操作。
 
-     /*
-      * 数据处理统计
-      */
-     pub worker_num: u16,           // 处理数据的工作线程数量
-     pub queue_capacity: u32,       // 单队列容量
-     pub mem_alloc_fail_count: u64, // 内存申请（用于为burst-SockDatas申请一块内存）失败次数统计
-     pub user_enqueue_count: u64,   // 用户态程序收到内核传过来的入队列的SockData数量
-     pub user_dequeue_count: u64,   // 用户态程序处理的SockData数量
-     pub user_enqueue_lost: u64,    // 由于队列没有空闲空间使得入队列失败而造成的SockData丢失数量
-     pub queue_burst_count: u64,    // 通过burst方式进行入队列和出队列，这里统计burst（16个SockData）的次数。
+    /*
+     * 数据处理统计
+     */
+    pub worker_num: u16,           // 处理数据的工作线程数量
+    pub queue_capacity: u32,       // 单队列容量
+    pub mem_alloc_fail_count: u64, // 内存申请（用于为burst-SockDatas申请一块内存）失败次数统计
+    pub user_enqueue_count: u64,   // 用户态程序收到内核传过来的入队列的SockData数量
+    pub user_dequeue_count: u64,   // 用户态程序处理的SockData数量
+    pub user_enqueue_lost: u64,    // 由于队列没有空闲空间使得入队列失败而造成的SockData丢失数量
+    pub queue_burst_count: u64, // 通过burst方式进行入队列和出队列，这里统计burst（16个SockData）的次数。
 
-     /*
-      * tracer 当前状态
-      */
-     pub is_adapt_success: bool,  // 适配状态：内核适配成功为true，否则为false
-     pub tracer_state: u8         // 追踪器当前状态。值：TRACER_STOP，TRACER_ACTIVE
+    /*
+     * tracer 当前状态
+     */
+    pub is_adapt_success: bool, // 适配状态：内核适配成功为true，否则为false
+    pub tracer_state: u8,       // 追踪器当前状态。值：TRACER_STOP，TRACER_ACTIVE
 }
 
 extern "C" {
@@ -200,7 +203,7 @@ extern "C" {
         ring_size: c_uint,
         max_socket_entries: c_uint,
         max_thread_entries: c_uint,
-        socket_map_max_reclaim: c_uint
+        socket_map_max_reclaim: c_uint,
     ) -> c_int;
 
     // 停止tracer运行

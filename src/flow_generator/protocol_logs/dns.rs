@@ -1,4 +1,4 @@
-use super::{consts::*, L7LogParse, LogMessageType};
+use super::{consts::*, AppProtoLogsInfo, L7LogParse, LogMessageType};
 
 use crate::proto::flow_log;
 use crate::{
@@ -253,15 +253,13 @@ impl DnsLog {
 }
 
 impl L7LogParse for DnsLog {
-    type Item = DnsInfo;
     fn parse(
         &mut self,
-        payload: impl AsRef<[u8]>,
+        payload: &[u8],
         proto: IpProtocol,
         _direction: PacketDirection,
     ) -> Result<()> {
         self.reset_logs();
-        let payload = payload.as_ref();
         match proto {
             IpProtocol::Udp => self.decode_payload(payload),
             IpProtocol::Tcp => {
@@ -283,8 +281,8 @@ impl L7LogParse for DnsLog {
         }
     }
 
-    fn info(&self) -> Self::Item {
-        self.info.clone()
+    fn info(&self) -> AppProtoLogsInfo {
+        AppProtoLogsInfo::Dns(self.info.clone())
     }
 }
 

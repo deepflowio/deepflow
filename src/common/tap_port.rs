@@ -19,9 +19,14 @@ impl TapPort {
     pub const FROM_ID: u8 = 4;
     pub const FROM_NETFLOW: u8 = 5;
     pub const FROM_SFLOW: u8 = 6;
+    pub const FROM_EBPF: u8 = 7;
 
     const TUNNEL_TYPE_OFFSET: u64 = 32;
     const FROM_OFFSET: u64 = 60;
+
+    pub fn is_from(&self, w: u8) -> bool {
+        (self.0 >> Self::FROM_OFFSET) as u8 == w
+    }
 
     pub fn from_local_mac(tunnel_type: TunnelType, mac: u32) -> Self {
         Self(
@@ -65,6 +70,10 @@ impl TapPort {
                 | ((tunnel_type as u64) << Self::TUNNEL_TYPE_OFFSET)
                 | ((Self::FROM_ID as u64) << Self::FROM_OFFSET),
         )
+    }
+
+    pub fn from_ebpf(process_id: u32) -> Self {
+        Self(process_id as u64 | (Self::FROM_EBPF as u64) << Self::FROM_OFFSET)
     }
 
     pub fn split_fields(&self) -> (u32, u8, TunnelType) {
@@ -117,6 +126,9 @@ impl fmt::Display for TapPort {
             }
             TapPort::FROM_SFLOW => {
                 write!(f, "sFlow@{}", p)
+            }
+            TapPort::FROM_EBPF => {
+                write!(f, "eBPF@{}", p)
             }
             _ => panic!("Invalid tap_port type {}.", t),
         }

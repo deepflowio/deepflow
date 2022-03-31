@@ -10,6 +10,7 @@ use super::{
 
 use crate::utils::net::MacAddr;
 
+#[derive(Debug)]
 pub struct LookupKey {
     pub timestamp: Duration,
     pub src_mac: MacAddr,

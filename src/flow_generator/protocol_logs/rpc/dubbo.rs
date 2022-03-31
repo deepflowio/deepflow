@@ -1,4 +1,4 @@
-use super::super::{consts::*, L7LogParse, LogMessageType};
+use super::super::{consts::*, AppProtoLogsInfo, L7LogParse, LogMessageType};
 
 use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::flow_generator::error::{Error, Result};
@@ -139,10 +139,9 @@ impl DubboLog {
 }
 
 impl L7LogParse for DubboLog {
-    type Item = DubboInfo;
     fn parse(
         &mut self,
-        payload: impl AsRef<[u8]>,
+        payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
     ) -> Result<()> {
@@ -151,7 +150,6 @@ impl L7LogParse for DubboLog {
         }
 
         self.reset_logs();
-        let payload = payload.as_ref();
         let mut dubbo_header = DubboHeader::default();
         dubbo_header.parse_headers(payload)?;
 
@@ -166,8 +164,8 @@ impl L7LogParse for DubboLog {
         Ok(())
     }
 
-    fn info(&self) -> Self::Item {
-        self.info.clone()
+    fn info(&self) -> AppProtoLogsInfo {
+        AppProtoLogsInfo::Dubbo(self.info.clone())
     }
 }
 

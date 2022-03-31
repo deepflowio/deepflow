@@ -125,6 +125,8 @@ pub enum Direction {
     ServerGatewayHypervisorToClient = Direction::ServerToClient as u8 | SIDE_GATEWAY_HYPERVISOR, // 服务端网关宿主机
     ClientGatewayToServer = Direction::ClientToServer as u8 | SIDE_GATEWAY, // 客户端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
     ServerGatewayToClient = Direction::ServerToClient as u8 | SIDE_GATEWAY, // 服务端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
+    ClientProcessToServer = Direction::ClientToServer as u8 | SIDE_PROCESS, // 客户端进程
+    ServerProcessToClient = Direction::ServerToClient as u8 | SIDE_PROCESS, // 服务端进程
 }
 
 impl Default for Direction {
@@ -134,9 +136,10 @@ impl Default for Direction {
 }
 
 const SIDE_NODE: u8 = 1 << 3;
-const SIDE_HYPERVISOR: u8 = 1 << 4;
-const SIDE_GATEWAY_HYPERVISOR: u8 = 1 << 5;
-const SIDE_GATEWAY: u8 = 1 << 6;
+const SIDE_HYPERVISOR: u8 = 2 << 3;
+const SIDE_GATEWAY_HYPERVISOR: u8 = 3 << 3;
+const SIDE_GATEWAY: u8 = 4 << 3;
+const SIDE_PROCESS: u8 = 5 << 3;
 
 const MASK_CLIENT_SERVER: u8 = 0x7;
 const MASK_SIDE: u8 = 0xf8;
@@ -170,6 +173,8 @@ pub enum TapSide {
     ServerGatewayHypervisor = TapSide::Server as u8 | SIDE_GATEWAY_HYPERVISOR,
     ClientGateway = TapSide::Client as u8 | SIDE_GATEWAY,
     ServerGateway = TapSide::Server as u8 | SIDE_GATEWAY,
+    ClientProcess = TapSide::Client as u8 | SIDE_PROCESS,
+    ServerProcess = TapSide::Server as u8 | SIDE_PROCESS,
 }
 
 impl Default for TapSide {
@@ -192,6 +197,8 @@ impl From<Direction> for TapSide {
             Direction::ServerGatewayHypervisorToClient => TapSide::ServerGatewayHypervisor,
             Direction::ClientGatewayToServer => TapSide::ClientGateway,
             Direction::ServerGatewayToClient => TapSide::ServerGateway,
+            Direction::ClientProcessToServer => TapSide::ClientProcess,
+            Direction::ServerProcessToClient => TapSide::ServerProcess,
             Direction::None => TapSide::Rest,
         }
     }

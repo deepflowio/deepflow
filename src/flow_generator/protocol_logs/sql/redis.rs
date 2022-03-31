@@ -1,6 +1,6 @@
 use std::{fmt, str};
 
-use super::super::{L7LogParse, L7Protocol, LogMessageType};
+use super::super::{AppProtoLogsInfo, L7LogParse, L7Protocol, LogMessageType};
 
 use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::flow_generator::error::{Error, Result};
@@ -104,10 +104,9 @@ impl RedisLog {
 }
 
 impl L7LogParse for RedisLog {
-    type Item = RedisInfo;
     fn parse(
         &mut self,
-        payload: impl AsRef<[u8]>,
+        payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
     ) -> Result<()> {
@@ -116,7 +115,6 @@ impl L7LogParse for RedisLog {
         }
 
         self.reset();
-        let payload = payload.as_ref();
         let (context, _, error_response) =
             decode(payload, direction == PacketDirection::ClientToServer)
                 .ok_or(Error::RedisLogParseFailed)?;
@@ -127,8 +125,8 @@ impl L7LogParse for RedisLog {
         Ok(())
     }
 
-    fn info(&self) -> Self::Item {
-        self.info.clone()
+    fn info(&self) -> AppProtoLogsInfo {
+        AppProtoLogsInfo::Redis(self.info.clone())
     }
 }
 

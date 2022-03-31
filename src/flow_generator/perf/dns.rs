@@ -3,10 +3,7 @@ use std::fmt;
 use std::rc::Rc;
 use std::time::Duration;
 
-use super::super::{
-    error::{Error, Result},
-    protocol_logs::{consts::*, AppProtoHead, L7ResponseStatus, LogMessageType},
-};
+use super::super::protocol_logs::{consts::*, AppProtoHead, L7ResponseStatus, LogMessageType};
 use super::{stats::PerfStats, L7FlowPerf, L7RrtCache};
 
 use crate::{
@@ -15,6 +12,7 @@ use crate::{
         flow::{FlowPerfStats, L7PerfStats, L7Protocol},
         meta_packet::MetaPacket,
     },
+    flow_generator::error::{Error, Result},
     utils::bytes::{read_u16_be, read_u16_le},
 };
 

@@ -2,7 +2,7 @@ use bytes::Bytes;
 use httpbis::for_test::hpack;
 
 use super::LogMessageType;
-use super::{consts::*, L7LogParse};
+use super::{consts::*, AppProtoLogsInfo, L7LogParse};
 
 use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::flow_generator::error::{Error, Result};
@@ -272,10 +272,9 @@ impl HttpLog {
 }
 
 impl L7LogParse for HttpLog {
-    type Item = HttpInfo;
     fn parse(
         &mut self,
-        payload: impl AsRef<[u8]>,
+        payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
     ) -> Result<()> {
@@ -283,14 +282,16 @@ impl L7LogParse for HttpLog {
             return Err(Error::InvalidIpProtocol);
         }
         self.reset_logs();
-        let payload = payload.as_ref();
 
         self.parse_http_v1(payload, direction)
             .or(self.parse_http_v2(payload, direction))
     }
 
-    fn info(&self) -> Self::Item {
-        self.info.clone()
+    fn info(&self) -> AppProtoLogsInfo {
+        if self.info.version == "2" {
+            return AppProtoLogsInfo::HttpV2(self.info.clone());
+        }
+        AppProtoLogsInfo::HttpV1(self.info.clone())
     }
 }
 

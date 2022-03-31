@@ -243,7 +243,7 @@ impl fmt::Display for IfType {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum HeaderType {
     Invalid = 0,
