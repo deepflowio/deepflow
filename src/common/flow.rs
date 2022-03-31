@@ -596,7 +596,7 @@ impl From<FlowMetricsPeer> for flow_log::FlowMetricsPeer {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct Flow {
     pub flow_key: FlowKey,
     pub flow_metrics_peers: [FlowMetricsPeer; 2],

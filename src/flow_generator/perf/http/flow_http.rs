@@ -37,7 +37,7 @@ struct HttpSessionData {
     rrt_cache: Rc<RefCell<L7RrtCache>>,
 }
 
-struct HttpPerfData {
+pub struct HttpPerfData {
     perf_stats: Option<PerfStats>,
     session_data: HttpSessionData,
 }

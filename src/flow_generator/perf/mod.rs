@@ -1,6 +1,6 @@
 mod dns;
 mod http;
-pub(crate) mod l7_rrt;
+pub mod l7_rrt;
 mod mq;
 mod rpc;
 mod sql;
@@ -10,7 +10,6 @@ mod udp;
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -22,14 +21,19 @@ use crate::common::{
     protocol_logs::AppProtoHead,
 };
 use crate::flow_generator::error::Result;
-use crate::utils::stats::{Countable, Counter, CounterType, CounterValue};
 
 use {
-    dns::DNS_PORT, mq::KAFKA_PORT, rpc::DUBBO_PORT, sql::MYSQL_PORT, sql::REDIS_PORT, tcp::TcpPerf,
+    self::http::HttpPerfData,
+    dns::DNS_PORT,
+    mq::{KafkaPerfData, KAFKA_PORT},
+    rpc::{DubboPerfData, DUBBO_PORT},
+    sql::{MysqlPerfData, RedisPerfData, MYSQL_PORT, REDIS_PORT},
+    tcp::TcpPerf,
     udp::UdpPerf,
 };
 
 pub use l7_rrt::L7RrtCache;
+pub use stats::FlowPerfCounter;
 
 const ART_MAX: Duration = Duration::from_secs(30);
 
@@ -87,48 +91,11 @@ pub enum L4FlowPerfTable {
 #[enum_dispatch]
 pub enum L7FlowPerfTable {
     DNSPerfData,
-}
-
-#[derive(Default)]
-pub struct FlowPerfCounter {
-    closed: AtomicBool,
-
-    // tcp stats
-    pub ignored_packet_count: AtomicU64,
-    pub invalid_packet_count: AtomicU64,
-
-    // L7 stats
-    pub mismatched_response: AtomicU64,
-}
-
-impl Countable for FlowPerfCounter {
-    fn get_counters(&self) -> Vec<Counter> {
-        let ignored = self.ignored_packet_count.swap(0, Ordering::Relaxed);
-        let invalid = self.invalid_packet_count.swap(0, Ordering::Relaxed);
-        let mismatched = self.mismatched_response.swap(0, Ordering::Relaxed);
-
-        vec![
-            (
-                "ignore_packet_count",
-                CounterType::Counted,
-                CounterValue::Unsigned(ignored),
-            ),
-            (
-                "invalid_packet_count",
-                CounterType::Counted,
-                CounterValue::Unsigned(invalid),
-            ),
-            (
-                "l7_mismatch_response",
-                CounterType::Counted,
-                CounterValue::Unsigned(mismatched),
-            ),
-        ]
-    }
-
-    fn closed(&self) -> bool {
-        self.closed.load(Ordering::Relaxed)
-    }
+    KafkaPerfData,
+    RedisPerfData,
+    DubboPerfData,
+    MysqlPerfData,
+    HttpPerfData,
 }
 
 pub struct FlowPerf {
@@ -153,7 +120,12 @@ impl FlowPerf {
 
         let l7 = match l7_proto {
             L7Protocol::Dns => L7FlowPerfTable::from(DNSPerfData::new(rrt_cache.clone())),
-            _ => unimplemented!(),
+            L7Protocol::Dubbo => L7FlowPerfTable::from(DubboPerfData::new(rrt_cache.clone())),
+            L7Protocol::Kafka => L7FlowPerfTable::from(KafkaPerfData::new(rrt_cache.clone())),
+            L7Protocol::Mysql => L7FlowPerfTable::from(MysqlPerfData::new(rrt_cache.clone())),
+            L7Protocol::Redis => L7FlowPerfTable::from(RedisPerfData::new(rrt_cache.clone())),
+            L7Protocol::Http => L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone())),
+            _ => unreachable!(),
         };
 
         Some(Self { l4, l7 })

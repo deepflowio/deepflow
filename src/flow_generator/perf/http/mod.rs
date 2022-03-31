@@ -3,6 +3,7 @@ mod flow_http;
 mod flow_http_log;
 
 use consts::*;
+pub use flow_http::HttpPerfData;
 
 use crate::{
     flow_generator::error::{Error, Result},

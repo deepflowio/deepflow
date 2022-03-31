@@ -22,7 +22,7 @@ use crate::{
     utils::bytes,
 };
 
-struct MysqlPerfData {
+pub struct MysqlPerfData {
     pub stats: Option<PerfStats>,
 
     l7_proto: L7Protocol,

@@ -2,6 +2,7 @@ mod consts;
 mod flow_mysql;
 mod flow_mysql_log;
 
+pub use flow_mysql::MysqlPerfData;
 pub const PORT: u16 = 3306;
 
 use self::consts::*;

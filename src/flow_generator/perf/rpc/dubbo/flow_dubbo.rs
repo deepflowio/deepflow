@@ -31,7 +31,7 @@ struct DubboSessionData {
     rrt_cache: Rc<RefCell<L7RrtCache>>,
 }
 
-struct DubboPerfData {
+pub struct DubboPerfData {
     perf_stats: Option<PerfStats>,
     session_data: DubboSessionData,
 }

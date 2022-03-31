@@ -2,6 +2,8 @@ mod consts;
 mod flow_dubbo;
 mod flow_dubbo_log;
 
+pub use flow_dubbo::DubboPerfData;
+
 pub const PORT: u16 = 20880;
 
 use consts::*;

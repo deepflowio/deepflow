@@ -17,7 +17,7 @@ use super::{
     flow_state::{StateMachine, StateValue},
     perf::{get_l7_protocol, FlowPerf, FlowPerfCounter, L7RrtCache},
     service_table::{ServiceKey, ServiceTable},
-    FlowMapKey, FlowMapRuntimeConfig, FlowMapTimeKey, FlowNode, FlowState, FlowTimeout, TcpTimeout,
+    FlowMapKey, FlowMapRuntimeConfig, FlowNode, FlowState, FlowTimeout, TcpTimeout,
     COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC, L7_PROTOCOL_UNKNOWN_LIMIT,
     L7_RRT_CACHE_CAPACITY, QUEUE_BATCH_SIZE, SERVICE_TABLE_IPV4_CAPACITY,
     SERVICE_TABLE_IPV6_CAPACITY, STATISTICAL_INTERVAL, THREAD_FLOW_ID_MASK, TIMER_FLOW_ID_MASK,
@@ -60,7 +60,7 @@ impl MetaAppProto {
 // not thread-safe
 pub struct FlowMap {
     node_map: Option<HashMap<Rc<FlowMapKey>, FlowNode, Jenkins64Hasher>>,
-    time_set: Option<BTreeSet<FlowMapTimeKey>>,
+    time_set: Option<BTreeSet<Rc<FlowMapKey>>>,
     id: u32,
     state_machine_master: StateMachine,
     state_machine_slave: StateMachine,
@@ -149,40 +149,42 @@ impl FlowMap {
             }
         };
 
-        let start_time_key = FlowMapTimeKey {
+        let start_time_key = Rc::new(FlowMapKey {
             current_time_in_unit: self.start_time_in_unit,
             ..Default::default()
-        };
-        let next_time_key = FlowMapTimeKey {
+        });
+        let next_time_key = Rc::new(FlowMapKey {
             current_time_in_unit: next_start_time_in_unit,
             ..Default::default()
-        };
+        });
         let need_solve_keys = time_set
             .range(start_time_key..next_time_key)
             .map(|k| k.clone())
             .collect::<Vec<_>>();
 
         for time_key in need_solve_keys {
-            let node = node_map.get_mut(&time_key.map_key).unwrap();
+            let mut node = node_map.remove(&time_key).unwrap();
             let timeout = node.recent_time + node.timeout;
             if timestamp >= timeout {
                 // 超时Flow将被删除然后把统计信息发送队列下游
-                let removed_node = node_map.remove(&time_key.map_key).unwrap();
-                self.node_removed_aftercare(removed_node, timeout, None);
                 time_set.remove(&time_key);
+                self.node_removed_aftercare(node, timeout, None);
                 continue;
             }
             // 未超时Flow的统计信息发送到队列下游
-            self.node_updated_aftercare(node, timeout, None);
+            self.node_updated_aftercare(&mut node, timeout, None);
             // 若流统计信息已输出，将节点移动至最终超时的时间
             let updated_time_in_unit = if timeout > timestamp + TIME_MAX_INTERVAL {
                 ((timestamp + TIME_MAX_INTERVAL).as_nanos() / TIME_UNIT.as_nanos()) as u64
             } else {
                 (timeout.as_nanos() / TIME_UNIT.as_nanos()) as u64
             };
-            let mut time_key = time_set.take(&time_key).unwrap();
-            time_key.current_time_in_unit = updated_time_in_unit;
-            time_set.insert(time_key);
+            time_set.remove(&time_key);
+            let mut new_key = Rc::try_unwrap(time_key).unwrap();
+            new_key.current_time_in_unit = updated_time_in_unit;
+            let rc_new_key = Rc::new(new_key);
+            time_set.insert(rc_new_key.clone());
+            node_map.insert(rc_new_key, node);
         }
 
         self.node_map.replace(node_map);
@@ -194,17 +196,80 @@ impl FlowMap {
         true
     }
 
+    pub fn inject_meta_packet(&mut self, mut meta_packet: MetaPacket) {
+        if !self.inject_flush_ticker(meta_packet.lookup_key.timestamp) {
+            // 补充由于超时导致未查询策略，用于其它流程（如PCAP存储）
+            (self.policy_getter)(&mut meta_packet, self.id);
+            return;
+        }
+
+        let config_ignore = (self.config.ignore_l2_end, self.config.ignore_tor_mac);
+        let time_in_unit =
+            (meta_packet.lookup_key.timestamp.as_nanos() / TIME_UNIT.as_nanos()) as u64;
+        let pkt_key = Rc::new(FlowMapKey::new(
+            time_in_unit,
+            &meta_packet,
+            config_ignore,
+            self.config.trident_type,
+        ));
+
+        let (mut node_map, mut time_set) = match self.node_map.take().zip(self.time_set.take()) {
+            Some(pair) => pair,
+            None => {
+                warn!("cannot get node map or time set");
+                return;
+            }
+        };
+
+        match node_map.remove_entry(&pkt_key) {
+            // 找到Flow,更新
+            Some((key, mut node)) => {
+                let pkt_timestamp = meta_packet.lookup_key.timestamp;
+
+                // 1. 输出上一个统计周期的统计信息
+
+                self.node_updated_aftercare(&mut node, pkt_timestamp, Some(&mut meta_packet));
+
+                // 2. 更新Flow状态，判断是否已结束
+                match meta_packet.lookup_key.proto {
+                    IpProtocol::Tcp => {
+                        self.update_tcp_node(node, meta_packet, key, &mut time_set, &mut node_map)
+                    }
+                    IpProtocol::Udp => self.update_udp_node(node, meta_packet, key, &mut node_map),
+
+                    _ => self.update_other_node(node, meta_packet, key, &mut node_map),
+                };
+            }
+            // 未找到Flow，需要插入新的节点
+            None => {
+                let node = self.new_flow_node(meta_packet);
+
+                time_set.insert(pkt_key.clone());
+                node_map.insert(pkt_key, node);
+            }
+        }
+
+        self.node_map.replace(node_map);
+        self.time_set.replace(time_set);
+        // go实现只有插入node的时候，插入的节点数目大于ring buffer 的capacity 返回false,
+        // rust 版本用了std的hashmap自动处理扩容,也就没有返回false, 然后执行policy_getter
+    }
+
+    pub fn len(&self) -> usize {
+        self.node_map.as_ref().map(|m| m.len()).unwrap_or_default()
+    }
+
     fn update_tcp_node(
         &mut self,
         mut node: FlowNode,
         mut meta_packet: MetaPacket,
         pkt_key: Rc<FlowMapKey>,
-        time_set: &mut BTreeSet<FlowMapTimeKey>,
+        time_set: &mut BTreeSet<Rc<FlowMapKey>>,
         node_map: &mut HashMap<Rc<FlowMapKey>, FlowNode, Jenkins64Hasher>,
     ) {
         let lookup_key = &meta_packet.lookup_key;
         let node_flow_key = &node.tagged_flow.flow.flow_key;
-        let pkt_timestamp = lookup_key.timestamp;
+        let timestamp = lookup_key.timestamp;
         // update flow meta_packet direction for flow
         if lookup_key.src_ip == node_flow_key.ip_src
             && lookup_key.dst_ip == node_flow_key.ip_dst
@@ -225,9 +290,8 @@ impl FlowMap {
             self.collect_tcp_metric(&mut node, &meta_packet);
         }
         if flow_closed {
-            let time_in_unit = (pkt_timestamp.as_nanos() / TIME_UNIT.as_nanos()) as u64;
-            time_set.remove(&FlowMapTimeKey::new(time_in_unit, pkt_key));
-            self.node_removed_aftercare(node, pkt_timestamp, Some(&mut meta_packet));
+            time_set.remove(&pkt_key);
+            self.node_removed_aftercare(node, timestamp, Some(&mut meta_packet));
         } else {
             node_map.insert(pkt_key, node);
         }
@@ -305,66 +369,6 @@ impl FlowMap {
         }
 
         node_map.insert(pkt_key, node);
-    }
-
-    pub fn inject_meta_packet(&mut self, mut meta_packet: MetaPacket) {
-        if !self.inject_flush_ticker(meta_packet.lookup_key.timestamp) {
-            // 补充由于超时导致未查询策略，用于其它流程（如PCAP存储）
-            (self.policy_getter)(&mut meta_packet, self.id);
-            return;
-        }
-
-        let config_ignore = (self.config.ignore_l2_end, self.config.ignore_tor_mac);
-        let pkt_key = Rc::new(FlowMapKey::new(
-            &meta_packet,
-            config_ignore,
-            self.config.trident_type,
-        ));
-
-        let (mut node_map, mut time_set) = match self.node_map.take().zip(self.time_set.take()) {
-            Some(pair) => pair,
-            None => {
-                warn!("cannot get node map or time set");
-                return;
-            }
-        };
-
-        match node_map.remove_entry(&pkt_key) {
-            // 找到Flow,更新
-            Some((key, mut node)) => {
-                let pkt_timestamp = meta_packet.lookup_key.timestamp;
-
-                // 1. 输出上一个统计周期的统计信息
-                self.node_updated_aftercare(&mut node, pkt_timestamp, Some(&mut meta_packet));
-
-                // 2. 更新Flow状态，判断是否已结束
-                match meta_packet.lookup_key.proto {
-                    IpProtocol::Tcp => {
-                        self.update_tcp_node(node, meta_packet, key, &mut time_set, &mut node_map)
-                    }
-                    IpProtocol::Udp => self.update_udp_node(node, meta_packet, key, &mut node_map),
-
-                    _ => self.update_other_node(node, meta_packet, key, &mut node_map),
-                };
-            }
-            // 未找到Flow，需要插入新的节点
-            None => {
-                let time_in_unit =
-                    (meta_packet.lookup_key.timestamp.as_nanos() / TIME_UNIT.as_nanos()) as u64;
-                let node = self.new_flow_node(meta_packet);
-                time_set.insert(FlowMapTimeKey::new(time_in_unit, pkt_key.clone()));
-                node_map.insert(pkt_key, node);
-            }
-        }
-
-        self.node_map.replace(node_map);
-        self.time_set.replace(time_set);
-        // go实现只有插入node的时候，插入的节点数目大于ring buffer 的capacity 返回false,
-        // rust 版本用了std的hashmap自动处理扩容,也就没有返回false, 然后执行policy_getter
-    }
-
-    pub fn len(&self) -> usize {
-        self.node_map.as_ref().map(|m| m.len()).unwrap_or_default()
     }
 
     fn generate_flow_id(timestamp: Duration, thread_id: u32, total_flow: usize) -> u64 {
@@ -886,6 +890,7 @@ impl FlowMap {
                 .rrt_cache
                 .borrow_mut()
                 .get_and_remove_l7_req_timeout(flow.flow_id);
+            // 如果返回None，就清空掉flow_perf_stats
             flow.flow_perf_stats = node.meta_flow_perf.as_mut().and_then(|perf| {
                 perf.copy_and_reset_perf_data(
                     flow.reversed,
@@ -963,11 +968,8 @@ impl FlowMap {
         };
 
         //TODO 链路追踪统计位置
-
-        if let Err(_) =
-            self.out_log_queue
-                .send(MetaAppProto::new(node, meta_packet, head, offset, pkt_size))
-        {
+        let app_proto = MetaAppProto::new(node, meta_packet, head, offset, pkt_size);
+        if let Err(_) = self.out_log_queue.send(app_proto) {
             warn!("flow-map push MetaAppProto to queue failed because queue have terminated");
         }
     }
