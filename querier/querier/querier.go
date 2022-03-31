@@ -19,6 +19,7 @@ var configPath = flag.String("f", "/etc/querier.yaml", "specify config file loca
 type Controller struct{}
 
 func Start() {
+	flag.Parse()
 	// 加载配置文件
 	cfg := config.DefaultConfig()
 	config.Cfg = cfg

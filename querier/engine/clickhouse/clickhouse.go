@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"errors"
 	"fmt"
+	//"github.com/k0kubun/pp"
 	"strings"
 
 	logging "github.com/op/go-logging"
@@ -294,25 +295,25 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			return err
 		}
 		name = strings.ReplaceAll(name, "`", "")
-		if common.IsValueInSliceString(name, TAG_FUNCTIONS) {
-			err := e.AddTagFunction(name, args, as, e.DB, e.Table)
-			if err != nil {
-				return err
-			}
-		} else {
-			function, levelFlag, err := GetAggFunc(name, args, as, e.DB, e.Table)
-			if err != nil {
-				return err
-			}
-			if function == nil {
-				return errors.New(fmt.Sprintf("function: %s not support", sqlparser.String(expr)))
-			}
+		function, err := GetTagFunction(name, args, as, e.DB, e.Table)
+		if err != nil {
+			return err
+		}
+		if function != nil {
+			e.Statements = append(e.Statements, function)
+			return nil
+		}
+		function, levelFlag, err := GetAggFunc(name, args, as, e.DB, e.Table)
+		if err != nil {
+			return err
+		}
+		if function != nil {
 			// 通过metric判断view是否拆层
 			e.SetLevelFlag(levelFlag)
 			e.Statements = append(e.Statements, function)
 			return nil
 		}
-		return nil
+		return errors.New(fmt.Sprintf("function: %s not support", sqlparser.String(expr)))
 	// field +=*/ field 运算符
 	case *sqlparser.BinaryExpr:
 		binFunction, err := e.parseSelectBinaryExpr(expr)
@@ -413,15 +414,6 @@ func (e *CHEngine) AddTag(tag string, alias string) error {
 	}
 	stmt = GetDefaultTag(tag, alias)
 	e.Statements = append(e.Statements, stmt)
-	return nil
-}
-
-func (e *CHEngine) AddTagFunction(name string, args []string, alias, db, table string) error {
-	function, err := GetTagFunctionTranslator(name, args, alias, db, table)
-	if err != nil {
-		return err
-	}
-	e.Statements = append(e.Statements, function)
 	return nil
 }
 

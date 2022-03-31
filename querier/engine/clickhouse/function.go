@@ -143,7 +143,7 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 	case metrics.METRICS_TYPE_TAG:
 		innerAlias := fmt.Sprintf("_%s", f.Alias)
 		innerFunction := view.DefaultFunction{
-			Name:      f.Name,
+			Name:      view.FUNCTION_GROUP_ARRAY,
 			Fields:    []view.Node{&view.Field{Value: f.Metrics.DBField}},
 			Condition: f.Metrics.Condition,
 			Alias:     innerAlias,
@@ -176,7 +176,7 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 			// 比例类，null需要补成0
 			outFunc.SetFillNullAsZero(true)
 		case metrics.METRICS_TYPE_TAG:
-			outFunc = view.GetFunc(view.FUNCTION_SUM)
+			outFunc.SetIsGroupArray(true)
 		}
 		outFunc.SetFields([]view.Node{&view.Field{Value: innerAlias}})
 	} else if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_UNLAY {
@@ -198,7 +198,9 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 
 func (f *AggFunction) Format(m *view.Model) {
 	outFunc := f.Trans(m)
-	outFunc.(view.Function).SetAlias(f.Alias, false)
+	if f.Alias != "" {
+		outFunc.(view.Function).SetAlias(f.Alias, false)
+	}
 	m.AddTag(outFunc)
 }
 

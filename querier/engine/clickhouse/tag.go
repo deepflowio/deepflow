@@ -1,18 +1,34 @@
 package clickhouse
 
 import (
-	"errors"
+	//"errors"
 	"fmt"
 	"net"
 	"strconv"
 	"strings"
 
+	"metaflow/querier/common"
 	"metaflow/querier/engine/clickhouse/metrics"
 	"metaflow/querier/engine/clickhouse/tag"
 	"metaflow/querier/engine/clickhouse/view"
 )
 
-var TAG_FUNCTIONS = []string{"mask", "time"}
+const (
+	TAG_FUNCTION_MASK                       = "mask"
+	TAG_FUNCTION_TIME                       = "time"
+	TAG_FUNCTION_TO_UNIX_TIMESTAMP_64_MICRO = "toUnixTimestamp64Micro"
+	TAG_FUNCTION_TO_STRING                  = "toString"
+	TAG_FUNCTION_IF                         = "if"
+	TAG_FUNCTION_UNIQ                       = "uniq"
+	TAG_FUNCTION_ANY                        = "any"
+	TAG_FUNCTION_TOPK                       = "topK"
+)
+
+var TAG_FUNCTIONS = []string{
+	TAG_FUNCTION_MASK, TAG_FUNCTION_TIME, TAG_FUNCTION_TO_UNIX_TIMESTAMP_64_MICRO,
+	TAG_FUNCTION_TO_STRING, TAG_FUNCTION_IF, TAG_FUNCTION_UNIQ, TAG_FUNCTION_ANY,
+	TAG_FUNCTION_TOPK,
+}
 
 func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 	var stmt Statement
@@ -48,29 +64,30 @@ func GetDefaultTag(name string, alias string) Statement {
 	return &SelectTag{Value: name, Alias: alias}
 }
 
-func GetTagFunctionTranslator(name string, args []string, alias, db, table string) (Statement, error) {
-	tag, ok := tag.GetTag("mask"+"_"+args[0], db, table)
-	if ok {
-		switch name {
-		case "mask":
-			mask := Mask{Args: args, Alias: alias}
-			err := mask.Trans(tag)
-			if err != nil {
-				return nil, err
-			}
-			return &mask, nil
-		}
+func GetTagFunction(name string, args []string, alias, db, table string) (Statement, error) {
+	if !common.IsValueInSliceString(name, TAG_FUNCTIONS) {
+		return nil, nil
 	}
-	if !ok {
-		switch name {
-		case "time":
-			time := Time{Args: args, Alias: alias}
-			err := time.Trans()
-			return &time, err
-		default:
-			err := errors.New(fmt.Sprintf("get tag %s failed", name))
+	switch name {
+	case "time":
+		time := Time{Args: args, Alias: alias}
+		err := time.Trans()
+		return &time, err
+	default:
+		// TODO
+		/* tag, ok := tag.GetTag("mask"+"_"+args[0], db, table)
+		if !ok {
+			return nil, errors.New(fmt.Sprintf("mask not support %s", args[0]))
+		}
+		mask := Mask{Args: args, Alias: alias}
+		err := mask.Trans(tag)
+		if err != nil {
 			return nil, err
 		}
+		return &mask, nil */
+		tagFunction := DefaultTagFunction{Name: name, Args: args}
+		err := tagFunction.Trans()
+		return &tagFunction, err
 	}
 	return nil, nil
 }
@@ -84,10 +101,6 @@ type SelectTag struct {
 
 func (t *SelectTag) Format(m *view.Model) {
 	m.AddTag(&view.Tag{Value: t.Value, Alias: t.Alias, Flag: t.Flag, Withs: t.Withs})
-}
-
-type TagFunction interface {
-	Trans(string, []string, string) error
 }
 
 type Mask struct {
@@ -135,10 +148,6 @@ type Time struct {
 }
 
 func (t *Time) Trans() error {
-	if len(t.Args) < 2 {
-		// TODO: error
-		return nil
-	}
 	t.TimeField = strings.ReplaceAll(t.Args[0], "`", "")
 	interval, err := strconv.Atoi(t.Args[1])
 	t.Interval = interval
@@ -189,4 +198,25 @@ func (t *Time) Format(m *view.Model) {
 	tagField := fmt.Sprintf("toUnixTimestamp(%s)", withAlias)
 	m.AddTag(&view.Tag{Value: tagField, Alias: t.Alias, Flag: view.NODE_FLAG_METRICS_OUTER, Withs: withs})
 	m.AddGroup(&view.Group{Value: t.Alias, Flag: view.GROUP_FLAG_METRICS_OUTER})
+}
+
+type DefaultTagFunction struct {
+	Name  string
+	Args  []string
+	Alias string
+	Withs []view.Node
+}
+
+func (f *DefaultTagFunction) Trans() error {
+	switch f.Name {
+	case TAG_FUNCTION_TOPK:
+		f.Name = fmt.Sprintf("topK(%s)", f.Args[1])
+	}
+	// TODO
+	// tag translator
+	return nil
+}
+
+func (f *DefaultTagFunction) Format(m *view.Model) {
+	m.AddTag(&view.Tag{Value: f.Alias, Withs: f.Withs})
 }
