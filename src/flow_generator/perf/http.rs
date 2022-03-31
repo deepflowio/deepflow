@@ -6,22 +6,21 @@ use std::time::Duration;
 use bytes::Bytes;
 use httpbis::for_test::hpack;
 
-use super::{
-    check_http_method, consts::*, get_http_request_version, get_http_resp_info, Httpv2Headers,
-};
-
 use crate::{
     common::{
         enums::{IpProtocol, PacketDirection},
-        flow::{FlowPerfStats, L4Protocol, L7PerfStats, L7Protocol, TcpPerfStats},
+        flow::{FlowPerfStats, L7PerfStats, L7Protocol},
         meta_packet::MetaPacket,
-        protocol_logs::{AppProtoHead, L7ResponseStatus, LogMessageType},
     },
     flow_generator::{
         error::{Error, Result},
         perf::l7_rrt::L7RrtCache,
         perf::stats::PerfStats,
         perf::L7FlowPerf,
+        protocol_logs::{
+            check_http_method, consts::*, get_http_request_version, get_http_resp_info,
+            AppProtoHead, Httpv2Headers, L7ResponseStatus, LogMessageType,
+        },
     },
 };
 
@@ -71,13 +70,10 @@ impl fmt::Debug for HttpPerfData {
 impl L7FlowPerf for HttpPerfData {
     fn parse(&mut self, meta: &MetaPacket, flow_id: u64) -> Result<()> {
         if meta.lookup_key.proto != IpProtocol::Tcp {
-            return Err(Error::InvaildIpProtocol);
+            return Err(Error::InvalidIpProtocol);
         }
 
-        let payload = match meta.get_l4_payload() {
-            Some(t) => t,
-            None => return Err(Error::ZeroPayloadLen),
-        };
+        let payload = meta.get_l4_payload().ok_or(Error::ZeroPayloadLen)?;
 
         if self
             .parse_http_v1(payload, meta.lookup_key.timestamp, meta.direction, flow_id)
@@ -97,7 +93,7 @@ impl L7FlowPerf for HttpPerfData {
         }
 
         self.session_data.l7_proto = L7Protocol::Unknown;
-        Err(Error::InvaildL7Protocol)
+        Err(Error::HttpHeaderParseFailed)
     }
 
     fn data_updated(&self) -> bool {
@@ -108,7 +104,6 @@ impl L7FlowPerf for HttpPerfData {
         if let Some(stats) = self.perf_stats.take() {
             FlowPerfStats {
                 l7_protocol: L7Protocol::Http,
-                l4_protocol: L4Protocol::default(),
                 l7: L7PerfStats {
                     request_count: stats.req_count,
                     response_count: stats.resp_count,
@@ -119,7 +114,7 @@ impl L7FlowPerf for HttpPerfData {
                     err_server_count: stats.resp_err_count,
                     err_timeout: timeout_count,
                 },
-                tcp: TcpPerfStats::default(),
+                ..Default::default()
             }
         } else {
             FlowPerfStats::default()
@@ -132,18 +127,19 @@ impl L7FlowPerf for HttpPerfData {
         }
         self.session_data.has_log_data = false;
 
-        let rrt = if let Some(perf_stats) = self.perf_stats.as_ref() {
-            perf_stats.rrt_last.as_micros() as u64
-        } else {
-            0
-        };
+        let rrt = self
+            .perf_stats
+            .as_ref()
+            .map(|s| s.rrt_last.as_micros() as u64)
+            .unwrap_or_default();
+
         Some((
             AppProtoHead {
                 proto: self.session_data.l7_proto,
                 msg_type: self.session_data.msg_type,
                 status: self.session_data.status,
                 code: self.session_data.status_code,
-                rrt: rrt,
+                rrt,
             },
             0,
         ))
@@ -175,16 +171,16 @@ impl HttpPerfData {
         direction: PacketDirection,
         flow_id: u64,
     ) -> Result<()> {
-        let http_payload = std::str::from_utf8(payload).map_err(|_| Error::L7ParseFailed)?;
+        let http_payload =
+            std::str::from_utf8(payload).map_err(|_| Error::HttpHeaderParseFailed)?;
 
         let (line_info, _) = http_payload
             .split_once("\r\n")
-            .ok_or(Error::L7ParseFailed)?;
+            .ok_or(Error::HttpHeaderParseFailed)?;
 
         if direction == PacketDirection::ServerToClient {
             // HTTP响应行：HTTP/1.1 404 Not Found.
             let (_, status_code) = get_http_resp_info(line_info)?;
-
             self.session_data.msg_type = LogMessageType::Response;
 
             let perf_stats = self.perf_stats.get_or_insert(PerfStats::default());
@@ -213,7 +209,7 @@ impl HttpPerfData {
                 .get_and_remove_l7_req_time(flow_id, None)
             {
                 Some(t) => t,
-                None => return Err(Error::L7ParseFailed),
+                None => return Err(Error::HttpHeaderParseFailed),
             };
 
             if timestamp < req_timestamp {
@@ -229,10 +225,13 @@ impl HttpPerfData {
             perf_stats.rrt_count += 1;
         } else {
             // HTTP请求行：GET /background.png HTTP/1.0
-            let (method, _) = line_info.split_once(' ').ok_or(Error::L7ParseFailed)?;
+            let (method, _) = line_info
+                .split_once(' ')
+                .ok_or(Error::HttpHeaderParseFailed)?;
             check_http_method(method)?;
-
-            let (_, version) = line_info.rsplit_once(' ').ok_or(Error::L7ParseFailed)?;
+            let (_, version) = line_info
+                .rsplit_once(' ')
+                .ok_or(Error::HttpHeaderParseFailed)?;
             get_http_request_version(version)?;
 
             self.session_data.msg_type = LogMessageType::Request;
@@ -261,6 +260,9 @@ impl HttpPerfData {
     // |                           Padding (*)                       ...
     // +---------------------------------------------------------------+
     fn parse_headers_frame_payload(&mut self, payload: &[u8]) -> Result<u16> {
+        if payload.len() <= 5 {
+            return Err(Error::HttpHeaderParseFailed);
+        }
         let mut frame_payload = payload;
         if self.session_data.httpv2_headers.flags & FLAG_HEADERS_PADDED != 0 {
             frame_payload = &payload[1..];
@@ -343,17 +345,15 @@ impl HttpPerfData {
             }
             perf_stats.rrt_last = Duration::ZERO;
 
-            let req_timestamp = match self
+            let req_timestamp = self
                 .session_data
                 .rrt_cache
                 .borrow_mut()
                 .get_and_remove_l7_req_time(
                     flow_id,
                     Some(self.session_data.httpv2_headers.stream_id),
-                ) {
-                Some(t) => t,
-                None => return Err(Error::L7ParseFailed),
-            };
+                )
+                .ok_or(Error::HttpHeaderParseFailed)?;
 
             if timestamp < req_timestamp {
                 return Ok(());

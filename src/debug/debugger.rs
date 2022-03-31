@@ -75,11 +75,7 @@ impl Debugger {
         let controller_ips = self.controller_ips.clone();
         let vtap_id = self.vtap_id;
 
-        let beacon_interval = if self.udp_options.2.is_zero() {
-            BEACON_INTERVAL
-        } else {
-            self.udp_options.2
-        };
+        let beacon_interval = self.udp_options.2;
 
         let thread = thread::spawn(move || -> Result<()> {
             let sock = match addr {
@@ -171,10 +167,7 @@ impl Debugger {
 
 impl Debugger {
     /// 传入(read_timeout, bind地址), 构造上下文
-    pub fn new(
-        udp_options: (Option<Duration>, Option<SocketAddr>),
-        context: ConstructDebugCtx,
-    ) -> Self {
+    pub fn new(context: ConstructDebugCtx) -> Self {
         let debuggers = ModuleDebuggers {
             platform: PlatformDebugger::new(context.api_watcher, context.poller),
             rpc: RpcDebugger::new(context.session, context.static_config, context.status),
@@ -182,11 +175,7 @@ impl Debugger {
         };
 
         Self {
-            udp_options: (
-                udp_options.0.unwrap_or(SESSION_TIMEOUT),
-                udp_options.1,
-                Duration::ZERO,
-            ),
+            udp_options: (SESSION_TIMEOUT, None, BEACON_INTERVAL),
             thread: Mutex::new(None),
             running: Arc::new(AtomicBool::new(false)),
             debuggers: Arc::new(debuggers),
@@ -417,7 +406,7 @@ mod tests {
 
     use super::*;
 
-    fn new_default() -> ConstructDebugCtx {
+    fn new_default_debug_ctx() -> ConstructDebugCtx {
         let s = String::from("yunshan");
         let session = Arc::new(Session::new(
             20035,
@@ -451,18 +440,17 @@ mod tests {
 
     #[test]
     fn one_packet() {
-        let timeout = Some(Duration::from_secs(1));
+        let timeout = Duration::from_secs(1);
         let port = 34444 + random::<u16>() % 1000;
-        let ctx = new_default();
-        let mut server = Debugger::new(
-            (
-                timeout,
-                Some((IpAddr::from(LISTENED_IP.parse::<Ipv6Addr>().unwrap()), port).into()),
-            ),
-            ctx,
+        let ctx = new_default_debug_ctx();
+        let mut server = Debugger::new(ctx);
+        server.udp_options = (
+            timeout,
+            Some((IpAddr::from(LISTENED_IP.parse::<Ipv6Addr>().unwrap()), port).into()),
+            timeout,
         );
-        server.udp_options.2 = Duration::from_secs(1);
-        let client = Client::new(timeout, (LISTENED_IP, 0)).unwrap();
+        let client = Client::new(Some(timeout), (LISTENED_IP, 0)).unwrap();
+
         server.start();
         std::thread::sleep(Duration::from_secs(1));
         let mut buf = [0u8; 256];
@@ -484,18 +472,16 @@ mod tests {
 
     #[test]
     fn multi_packet() {
-        let timeout = Some(Duration::from_secs(1));
+        let timeout = Duration::from_secs(1);
         let port = 34444 + random::<u16>() % 1000;
-        let ctx = new_default();
-        let mut server = Debugger::new(
-            (
-                timeout,
-                Some((IpAddr::from(LISTENED_IP.parse::<Ipv6Addr>().unwrap()), port).into()),
-            ),
-            ctx,
+        let ctx = new_default_debug_ctx();
+        let mut server = Debugger::new(ctx);
+        server.udp_options = (
+            timeout,
+            Some((IpAddr::from(LISTENED_IP.parse::<Ipv6Addr>().unwrap()), port).into()),
+            timeout,
         );
-        server.udp_options.2 = Duration::from_secs(1);
-        let client = Client::new(timeout, (LISTENED_IP, 0)).unwrap();
+        let client = Client::new(Some(timeout), (LISTENED_IP, 0)).unwrap();
         server.start();
         std::thread::sleep(Duration::from_secs(1));
         let mut buf = [0u8; MAX_BUF_SIZE];
@@ -531,9 +517,10 @@ mod tests {
     #[test]
     #[ignore = "用于和trident-ctl调试"]
     fn list() {
-        let timeout = Some(Duration::from_secs(1));
-        let ctx = new_default();
-        let server = Debugger::new((timeout, None), ctx);
+        let timeout = Duration::from_secs(1);
+        let ctx = new_default_debug_ctx();
+        let mut server = Debugger::new(ctx);
+        server.udp_options = (timeout, None, Duration::ZERO);
         server.start();
         std::thread::sleep(Duration::from_secs(10000));
     }

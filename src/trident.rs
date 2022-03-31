@@ -353,28 +353,40 @@ impl Components {
         let libvirt_xml_extractor = Arc::new(LibvirtXmlExtractor::new());
         libvirt_xml_extractor.start();
 
-        let flow_config = &static_config.flow;
-        let flow_map_config = FlowMapConfig {
-            vtap_id: runtime_config.vtap_id,
-            trident_type: runtime_config.trident_type,
-            collector_enabled: runtime_config.collector_enabled,
-            packet_delay: static_config.packet_delay,
-            flush_interval: flow_config.flush_interval,
-            ignore_l2_end: flow_config.ignore_l2_end,
-            ignore_tor_mac: flow_config.ignore_tor_mac,
-            flow_timeout: FlowTimeout::from(TcpTimeout {
-                established: flow_config.established_timeout,
-                closing_rst: flow_config.closing_rst_timeout,
-                others: flow_config.others_timeout,
-            }),
-            runtime_config: Arc::new(FlowMapRuntimeConfig {
-                l7_metrics_enabled: AtomicBool::new(runtime_config.l7_metrics_enabled),
-                l4_performance_enabled: AtomicBool::new(runtime_config.l4_performance_enabled),
-                app_proto_log_enabled: AtomicBool::new(
-                    runtime_config.l7_log_store_tap_types.is_empty(),
-                ),
-                l7_log_packet_size: AtomicU32::new(runtime_config.l7_log_packet_size),
-            }),
+        let flow_map_config = {
+            let flow_config = &static_config.flow;
+
+            let mut l7_log_tap_types = [false; 256];
+            for &tap in runtime_config.l7_log_store_tap_types.iter() {
+                if tap < 256 {
+                    l7_log_tap_types[tap as usize] = true;
+                }
+            }
+
+            FlowMapConfig {
+                tap_types: l7_log_tap_types,
+                vtap_id: runtime_config.vtap_id,
+                trident_type: runtime_config.trident_type,
+                collector_enabled: runtime_config.collector_enabled,
+                packet_delay: static_config.packet_delay,
+                flush_interval: flow_config.flush_interval,
+                ignore_l2_end: flow_config.ignore_l2_end,
+                ignore_tor_mac: flow_config.ignore_tor_mac,
+                cloud_gateway_traffic: static_config.cloud_gateway_traffic,
+                flow_timeout: FlowTimeout::from(TcpTimeout {
+                    established: flow_config.established_timeout,
+                    closing_rst: flow_config.closing_rst_timeout,
+                    others: flow_config.others_timeout,
+                }),
+                runtime_config: Arc::new(FlowMapRuntimeConfig {
+                    l7_metrics_enabled: AtomicBool::new(runtime_config.l7_metrics_enabled),
+                    l4_performance_enabled: AtomicBool::new(runtime_config.l4_performance_enabled),
+                    app_proto_log_enabled: AtomicBool::new(
+                        runtime_config.l7_log_store_tap_types.is_empty(),
+                    ),
+                    l7_log_packet_size: AtomicU32::new(runtime_config.l7_log_packet_size),
+                }),
+            }
         };
 
         let tap_typer = Arc::new(TapTyper::new());
@@ -559,7 +571,7 @@ impl Components {
                 .map(|c| c.parse::<IpAddr>().unwrap())
                 .collect(),
         };
-        let debugger = Debugger::new((None, None), context);
+        let debugger = Debugger::new(context);
         debugger.start();
 
         let monitor = Monitor::new(stats_collector.clone())?;

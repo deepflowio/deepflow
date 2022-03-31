@@ -14,12 +14,14 @@ use super::{
     tap_port::TapPort,
 };
 
-use crate::flow_generator::FlowState;
 use crate::proto::flow_log;
 use crate::utils::net::MacAddr;
 use crate::{
     common::endpoint::EPC_FROM_INTERNET, metric::document::Direction, proto::common::TridentType,
 };
+use crate::{flow_generator::FlowState, metric::document::TapSide};
+
+const COUNTER_FLOW_ID_MASK: u64 = 0x00FFFFFF;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(u8)]
@@ -633,7 +635,7 @@ pub struct Flow {
     pub queue_hash: u8,
     pub is_new_flow: bool,
     pub reversed: bool,
-    pub tap_side: u8,
+    pub tap_side: TapSide,
 }
 
 impl Flow {
@@ -669,7 +671,7 @@ impl Flow {
     // 因此这里不包含对TcpPerfStats的反向。
     pub fn reverse(&mut self) {
         self.reversed = !self.reversed;
-        self.tap_side = 0;
+        self.tap_side = TapSide::Rest;
         self.tunnel.reverse();
         self.flow_key.reverse();
         self.flow_metrics_peers.swap(0, 1);
@@ -732,7 +734,7 @@ impl Flow {
         trident_type: TridentType,
         cloud_gateway_traffic: bool, // 从static config 获
     ) {
-        if self.tap_side != 0 || self.flow_key.tap_type != TapType::Tor {
+        if self.tap_side != TapSide::Rest || self.flow_key.tap_type != TapType::Tor {
             // 对TapType的判断只是为了让UT能过
             return;
         }
@@ -741,9 +743,9 @@ impl Flow {
             get_direction(&*self, trident_type, cloud_gateway_traffic);
 
         if src_tap_side != Direction::None && dst_tap_side == Direction::None {
-            self.tap_side = src_tap_side as u8;
+            self.tap_side = src_tap_side.into();
         } else if src_tap_side == Direction::None && dst_tap_side != Direction::None {
-            self.tap_side = dst_tap_side as u8;
+            self.tap_side = dst_tap_side.into();
         }
     }
 }
@@ -1195,4 +1197,10 @@ pub fn get_direction(
         dst_direct,
         is_extra_tracing_doc0 || is_extra_tracing_doc1,
     )
+}
+
+// 生成32位flowID,确保在1分钟内1个thread的flowID不重复
+pub fn get_uniq_flow_id_in_one_minute(flow_id: u64) -> u64 {
+    // flowID中时间低8位可保证1分钟内时间的唯一，counter可保证一秒内流的唯一性（假设fps < 2^24）
+    ((flow_id >> 32 & 0xff << 24) | (flow_id & COUNTER_FLOW_ID_MASK)) >> 32
 }

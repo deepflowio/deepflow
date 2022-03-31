@@ -1,47 +1,69 @@
-use super::consts::*;
+use super::{consts::*, L7LogParse, LogMessageType};
+
+use crate::proto::flow_log;
 use crate::{
     common::{
         enums::{IpProtocol, PacketDirection},
-        protocol_logs::{DnsInfo, LogMessageType},
         IPV4_ADDR_LEN, IPV6_ADDR_LEN,
     },
-    error::{Error, Result},
+    flow_generator::error::{Error, Result},
     utils::{bytes::read_u16_be, net::parse_ip_slice},
 };
 
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
+pub struct DnsInfo {
+    pub trans_id: u16,
+    pub query_type: u8,
+    pub query_name: String,
+    // 根据查询类型的不同而不同，如：
+    // A: ipv4/ipv6地址
+    // NS: name server
+    // SOA: primary name server
+    pub answers: String,
+}
+
+impl DnsInfo {
+    pub fn merge(&mut self, other: Self) {
+        self.answers = other.answers;
+    }
+}
+
+impl From<DnsInfo> for flow_log::DnsInfo {
+    fn from(f: DnsInfo) -> Self {
+        flow_log::DnsInfo {
+            trans_id: f.trans_id as u32,
+            query_type: f.query_type as u32,
+            query_name: f.query_name,
+            answers: f.answers,
+        }
+    }
+}
+
 #[derive(Debug, Default)]
-struct DnsLog {
+pub struct DnsLog {
     info: DnsInfo,
 
-    pub domain_type: u16,
+    domain_type: u16,
 
     msg_type: LogMessageType,
 }
 
 impl DnsLog {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn reset_logs(&mut self) {
+    fn reset_logs(&mut self) {
         self.info.trans_id = 0;
         self.info.query_type = 0;
         self.info.query_name = String::new();
         self.info.answers = String::new();
     }
 
-    fn get_log_data_special_info(self) {
-        self.info;
-    }
-
-    pub fn decode_name(&self, payload: &[u8], g_offset: usize) -> Result<(String, usize)> {
+    fn decode_name(&self, payload: &[u8], g_offset: usize) -> Result<(String, usize)> {
         let mut l_offset = g_offset;
         let mut index = g_offset;
         let mut buffer = String::new();
 
         if payload.len() <= l_offset {
             let err_msg = format!("payload too short: {}", payload.len());
-            return Err(Error::DnsLogParse(err_msg));
+            return Err(Error::DNSLogParseFailed(err_msg));
         }
 
         if payload[index] == DNS_NAME_TAIL {
@@ -51,16 +73,16 @@ impl DnsLog {
         while payload[index] != DNS_NAME_TAIL {
             if payload[index] == DNS_NAME_RESERVERD_40 || payload[index] == DNS_NAME_RESERVERD_80 {
                 let err_msg = format!("dns name label type error: {}", payload[index]);
-                return Err(Error::DnsLogParse(err_msg));
+                return Err(Error::DNSLogParseFailed(err_msg));
             } else if payload[index] == DNS_NAME_COMPRESS_POINTER {
                 if index + 2 > payload.len() {
                     let err_msg = format!("dns name invalid index: {}", index - 2);
-                    return Err(Error::DnsLogParse(err_msg));
+                    return Err(Error::DNSLogParseFailed(err_msg));
                 }
                 let index_ptr = read_u16_be(&payload[index..]) as usize & 0x3fff;
                 if index_ptr > payload.len() {
                     let err_msg = format!("dns name offset too large: {}", index_ptr);
-                    return Err(Error::DnsLogParse(err_msg));
+                    return Err(Error::DNSLogParseFailed(err_msg));
                 }
                 index = index_ptr;
             } else {
@@ -69,7 +91,7 @@ impl DnsLog {
                     || (size > g_offset && (size - g_offset) > DNS_NAME_MAX_SIZE)
                 {
                     let err_msg = format!("dns name invalid index: {}", size);
-                    return Err(Error::DnsLogParse(err_msg));
+                    return Err(Error::DNSLogParseFailed(err_msg));
                 }
 
                 if buffer.len() > 0 {
@@ -81,13 +103,13 @@ impl DnsLog {
                     }
                     Err(e) => {
                         let err_msg = format!("decode name error {}", e);
-                        return Err(Error::DnsLogParse(err_msg));
+                        return Err(Error::DNSLogParseFailed(err_msg));
                     }
                 }
                 index = size;
                 if index >= payload.len() {
                     let err_msg = format!("dns name invalid index: {}", index);
-                    return Err(Error::DnsLogParse(err_msg));
+                    return Err(Error::DNSLogParseFailed(err_msg));
                 }
 
                 if index > l_offset {
@@ -101,12 +123,12 @@ impl DnsLog {
         Ok((buffer, l_offset + 1))
     }
 
-    pub fn decode_question(&mut self, payload: &[u8], g_offset: usize) -> Result<usize> {
+    fn decode_question(&mut self, payload: &[u8], g_offset: usize) -> Result<usize> {
         let (name, offset) = self.decode_name(payload, g_offset)?;
         let qtype_size = payload[offset..].len();
         if qtype_size < QUESTION_CLASS_TYPE_SIZE {
             let err_msg = format!("question length error: {}", qtype_size);
-            return Err(Error::DnsLogParse(err_msg));
+            return Err(Error::DNSLogParseFailed(err_msg));
         }
 
         if self.info.query_name.len() > 0 {
@@ -121,18 +143,18 @@ impl DnsLog {
         Ok(offset + QUESTION_CLASS_TYPE_SIZE)
     }
 
-    pub fn decode_resource_record(&mut self, payload: &[u8], g_offset: usize) -> Result<usize> {
+    fn decode_resource_record(&mut self, payload: &[u8], g_offset: usize) -> Result<usize> {
         let (_, offset) = self.decode_name(payload, g_offset)?;
 
         if offset > payload.len() {
             let err_msg = format!("payload length error: {}", payload.len());
-            return Err(Error::DnsLogParse(err_msg));
+            return Err(Error::DNSLogParseFailed(err_msg));
         }
 
         let resource_len = payload[offset..].len();
         if resource_len < RR_RDATA_OFFSET {
             let err_msg = format!("resource record length error: {}", resource_len);
-            return Err(Error::DnsLogParse(err_msg));
+            return Err(Error::DNSLogParseFailed(err_msg));
         }
 
         self.domain_type = read_u16_be(&payload[offset..]);
@@ -144,12 +166,7 @@ impl DnsLog {
         Ok(offset + RR_RDATA_OFFSET + data_length)
     }
 
-    pub fn decode_rdata(
-        &mut self,
-        payload: &[u8],
-        g_offset: usize,
-        data_length: usize,
-    ) -> Result<()> {
+    fn decode_rdata(&mut self, payload: &[u8], g_offset: usize, data_length: usize) -> Result<()> {
         let answer_name_len = self.info.answers.len();
         if answer_name_len > 0
             && self.info.answers[answer_name_len - 1..] != DOMAIN_NAME_SPLIT.to_string()
@@ -166,13 +183,13 @@ impl DnsLog {
                 }
                 _ => {
                     let err_msg = format!("{} type invalid data {}", self.domain_type, data_length);
-                    return Err(Error::DnsLogParse(err_msg));
+                    return Err(Error::DNSLogParseFailed(err_msg));
                 }
             },
             DNS_TYPE_NS | DNS_TYPE_DNAME => {
                 if data_length > DNS_NAME_MAX_SIZE {
                     let err_msg = format!("{} type invalid data {}", self.domain_type, data_length);
-                    return Err(Error::DnsLogParse(err_msg));
+                    return Err(Error::DNSLogParseFailed(err_msg));
                 }
 
                 let (name, _) = self.decode_name(payload, g_offset)?;
@@ -181,7 +198,7 @@ impl DnsLog {
             DNS_TYPE_WKS => {
                 if data_length < DNS_TYPE_WKS_LENGTH {
                     let err_msg = format!("{} type invalid data {}", self.domain_type, data_length);
-                    return Err(Error::DnsLogParse(err_msg));
+                    return Err(Error::DNSLogParseFailed(err_msg));
                 }
                 if let Some(ipaddr) = parse_ip_slice(payload) {
                     self.info.answers.push_str(&ipaddr.to_string());
@@ -190,21 +207,21 @@ impl DnsLog {
             DNS_TYPE_PTR => {
                 if data_length != DNS_TYPE_PTR_LENGTH {
                     let err_msg = format!("{} type invalid data {}", self.domain_type, data_length);
-                    return Err(Error::DnsLogParse(err_msg));
+                    return Err(Error::DNSLogParseFailed(err_msg));
                 }
             }
             _ => {
                 let err_msg = format!("{} type invalid data {}", self.domain_type, data_length);
-                return Err(Error::DnsLogParse(err_msg));
+                return Err(Error::DNSLogParseFailed(err_msg));
             }
         }
         Ok(())
     }
 
-    pub fn decode_payload(&mut self, payload: &[u8]) -> Result<()> {
+    fn decode_payload(&mut self, payload: &[u8]) -> Result<()> {
         if payload.len() <= DNS_HEADER_SIZE {
             let err_msg = format!("dns payload length too short:{}", payload.len());
-            return Err(Error::DnsLogParse(err_msg));
+            return Err(Error::DNSLogParseFailed(err_msg));
         }
         self.info.trans_id = read_u16_be(&payload[..DNS_HEADER_FLAGS_OFFSET]);
         self.info.query_type = payload[DNS_HEADER_FLAGS_OFFSET] & 0x80;
@@ -233,38 +250,46 @@ impl DnsLog {
         }
         Ok(())
     }
+}
 
-    pub fn parse(
+impl L7LogParse for DnsLog {
+    type Item = DnsInfo;
+    fn parse(
         &mut self,
-        payload: &[u8],
+        payload: impl AsRef<[u8]>,
         proto: IpProtocol,
         _direction: PacketDirection,
     ) -> Result<()> {
         self.reset_logs();
+        let payload = payload.as_ref();
         match proto {
             IpProtocol::Udp => self.decode_payload(payload),
             IpProtocol::Tcp => {
                 if payload.len() <= DNS_TCP_PAYLOAD_OFFSET {
                     let err_msg = format!("dns payload length error:{}", payload.len());
-                    return Err(Error::DnsLogParse(err_msg));
+                    return Err(Error::DNSLogParseFailed(err_msg));
                 }
                 let size = read_u16_be(payload);
                 if (size as usize) < payload[DNS_TCP_PAYLOAD_OFFSET..].len() {
                     let err_msg = format!("dns payload length error:{}", size);
-                    return Err(Error::DnsLogParse(err_msg));
+                    return Err(Error::DNSLogParseFailed(err_msg));
                 }
                 self.decode_payload(&payload[DNS_TCP_PAYLOAD_OFFSET..])
             }
             _ => {
                 let err_msg = format!("dns payload length error:{}", payload.len());
-                return Err(Error::DnsLogParse(err_msg));
+                return Err(Error::DNSLogParseFailed(err_msg));
             }
         }
+    }
+
+    fn info(&self) -> Self::Item {
+        self.info.clone()
     }
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::fs;
     use std::path::Path;
 

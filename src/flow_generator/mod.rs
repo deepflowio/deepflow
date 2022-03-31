@@ -4,12 +4,14 @@ pub mod flow_map;
 mod flow_node;
 mod flow_state;
 pub mod perf;
+mod protocol_logs;
 mod service_table;
 
 pub use flow_config::{FlowMapConfig, FlowMapRuntimeConfig, FlowTimeout, TcpTimeout};
-pub use flow_map::{FlowMap, MetaAppProto};
+pub use flow_map::FlowMap;
 use flow_node::{FlowMapKey, FlowNode};
 pub use flow_state::FlowState;
+pub use protocol_logs::{AppProtoLogsData, AppProtoLogsParser, MetaAppProto};
 
 use std::time::Duration;
 

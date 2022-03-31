@@ -1,29 +1,60 @@
-use super::{consts::*, get_req_param_len, DubboHeader};
+use super::super::{consts::*, L7LogParse, LogMessageType};
 
-use crate::{
-    common::{
-        enums::{IpProtocol, PacketDirection},
-        flow::L7Protocol,
-        protocol_logs::{DubboInfo, LogMessageType},
-    },
-    flow_generator::error::{Error, Result},
-};
+use crate::common::enums::{IpProtocol, PacketDirection};
+use crate::flow_generator::error::{Error, Result};
+use crate::proto::flow_log;
+use crate::utils::bytes::{read_u32_be, read_u64_be};
+
+#[derive(Debug, Default, Clone)]
+pub struct DubboInfo {
+    // header
+    pub serial_id: u8,
+    pub data_type: u8,
+    pub request_id: i64,
+
+    // req
+    pub req_msg_size: i32,
+    pub dubbo_version: String,
+    pub service_name: String,
+    pub service_version: String,
+    pub method_name: String,
+
+    // resp
+    pub resp_msg_size: i32,
+}
+
+impl DubboInfo {
+    pub fn merge(&mut self, other: Self) {
+        self.resp_msg_size = other.resp_msg_size;
+    }
+}
+
+impl From<DubboInfo> for flow_log::DubboInfo {
+    fn from(f: DubboInfo) -> Self {
+        flow_log::DubboInfo {
+            serial_id: f.serial_id as u32,
+            r#type: f.data_type as u32,
+            id: f.request_id as u32,
+            req_body_len: f.req_msg_size,
+            version: f.dubbo_version,
+            service_name: f.service_name,
+            service_version: f.service_version,
+            method_name: f.method_name,
+            resp_body_len: f.resp_msg_size,
+        }
+    }
+}
 
 #[derive(Debug, Default)]
-struct DubboLog {
-    pub info: DubboInfo,
+pub struct DubboLog {
+    info: DubboInfo,
 
     status_code: u8,
-    l7_proto: L7Protocol,
     msg_type: LogMessageType,
 }
 
 impl DubboLog {
-    fn new() -> Self {
-        DubboLog::default()
-    }
-
-    pub fn reset_logs(&mut self) {
+    fn reset_logs(&mut self) {
         self.info.serial_id = 0;
         self.info.data_type = 0;
         self.info.request_id = 0;
@@ -33,10 +64,6 @@ impl DubboLog {
         self.info.service_version = String::new();
         self.info.method_name = String::new();
         self.info.resp_msg_size = -1;
-    }
-
-    fn get_log_data_special_info(self) {
-        self.info;
     }
 
     // 尽力而为的去解析Dubbo请求中Body各参数
@@ -109,18 +136,22 @@ impl DubboLog {
         self.info.request_id = dubbo_header.request_id;
         self.status_code = dubbo_header.status_code;
     }
+}
 
+impl L7LogParse for DubboLog {
+    type Item = DubboInfo;
     fn parse(
         &mut self,
-        payload: &[u8],
+        payload: impl AsRef<[u8]>,
         proto: IpProtocol,
         direction: PacketDirection,
     ) -> Result<()> {
         if proto != IpProtocol::Tcp {
-            return Err(Error::InvaildIpProtocol);
+            return Err(Error::InvalidIpProtocol);
         }
-        self.reset_logs();
 
+        self.reset_logs();
+        let payload = payload.as_ref();
         let mut dubbo_header = DubboHeader::default();
         dubbo_header.parse_headers(payload)?;
 
@@ -132,13 +163,64 @@ impl DubboLog {
                 self.response(&dubbo_header);
             }
         }
+        Ok(())
+    }
 
+    fn info(&self) -> Self::Item {
+        self.info.clone()
+    }
+}
+
+#[derive(Debug, Default, PartialEq)]
+pub struct DubboHeader {
+    // Dubbo Header
+    pub serial_id: u8,
+    pub data_type: u8,
+    pub status_code: u8,
+    pub data_length: i32,
+    pub request_id: i64,
+}
+
+impl DubboHeader {
+    // Dubbo协议https://dubbo.apache.org/zh/blog/2018/10/05/dubbo-%E5%8D%8F%E8%AE%AE%E8%AF%A6%E8%A7%A3/#dubbo-%E5%8D%8F%E8%AE%AE
+    // Dubbo协议帧
+    // +-----------------------------------------------+
+    // |       header           |       body           |
+    // +---------------+---------------+---------------+
+    // header格式
+    // +------------------------------------------------------------------------------------------------------------+
+    // | magic (16) | request and serialization flag (8) | response status (8) | request id (64) | body length (32) |
+    // +------------------------------------------------------------------------------------------------------------+
+    pub fn parse_headers(&mut self, payload: &[u8]) -> Result<()> {
+        if payload.len() < DUBBO_HEADER_LEN {
+            return Err(Error::DubboHeaderParseFailed);
+        }
+        if payload[0] != DUBBO_MAGIC_HIGH || payload[1] != DUBBO_MAGIC_LOW {
+            return Err(Error::DubboHeaderParseFailed);
+        }
+
+        self.serial_id = payload[2] & 0x1f;
+        self.data_type = payload[2] & 0x80;
+        self.status_code = payload[3];
+        self.request_id = read_u64_be(&payload[4..]) as i64;
+        self.data_length = read_u32_be(&payload[12..]) as i32;
         Ok(())
     }
 }
 
+// 参考开源代码解析：https://github.com/apache/dubbo-go-hessian2/blob/master/decode.go#L289
+pub fn get_req_param_len(tag: u8) -> Option<usize> {
+    if (tag == BC_STRING_CHUNK || tag == BC_STRING)
+        || (tag >= BC_STRING_DIRECT && tag <= STRING_DIRECT_MAX)
+        || (tag >= 0x30 && tag <= 0x33)
+    {
+        return Some(tag as usize);
+    }
+    None
+}
+
 #[cfg(test)]
-mod test {
+mod tests {
     use std::fs;
     use std::path::Path;
 

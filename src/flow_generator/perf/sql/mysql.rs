@@ -3,24 +3,23 @@ use std::fmt;
 use std::rc::Rc;
 use std::time::Duration;
 
-use super::consts::*;
-use super::Header;
-
 use crate::{
     common::{
         enums::IpProtocol,
-        flow::{FlowPerfStats, L4Protocol, L7PerfStats, L7Protocol, TcpPerfStats},
+        flow::{FlowPerfStats, L7PerfStats, L7Protocol},
         meta_packet::MetaPacket,
-        protocol_logs::{AppProtoHead, L7ResponseStatus, LogMessageType},
     },
     flow_generator::{
         error::{Error, Result},
         perf::l7_rrt::L7RrtCache,
         perf::stats::PerfStats,
         perf::L7FlowPerf,
+        protocol_logs::{consts::*, AppProtoHead, L7ResponseStatus, LogMessageType, MysqlHeader},
     },
     utils::bytes,
 };
+
+pub const PORT: u16 = 3306;
 
 pub struct MysqlPerfData {
     pub stats: Option<PerfStats>,
@@ -73,19 +72,16 @@ const CLIENT_ERROR_MAX: u16 = 2999;
 impl L7FlowPerf for MysqlPerfData {
     fn parse(&mut self, packet: &MetaPacket, flow_id: u64) -> Result<()> {
         if packet.lookup_key.proto != IpProtocol::Tcp {
-            return Err(Error::InvaildIpProtocol);
+            return Err(Error::InvalidIpProtocol);
         }
-        let payload = match packet.get_l4_payload() {
-            Some(p) => p,
-            None => return Err(Error::ZeroPayloadLen),
-        };
 
-        let mut header = Header::default();
+        let payload = packet.get_l4_payload().ok_or(Error::ZeroPayloadLen)?;
+
+        let mut header = MysqlHeader::default();
         let offset = header.decode(payload);
-        let msg_type = match header.check(packet.direction, offset, payload, self.l7_proto) {
-            Some(t) => t,
-            None => return Err(Error::L7ParseFailed),
-        };
+        let msg_type = header
+            .check(packet.direction, offset, payload, self.l7_proto)
+            .ok_or(Error::MysqlPerfParseFailed)?;
         match msg_type {
             LogMessageType::Request if self.l7_proto == L7Protocol::Mysql => {
                 self.parse_request(packet.lookup_key.timestamp, flow_id);
@@ -129,7 +125,6 @@ impl L7FlowPerf for MysqlPerfData {
         if let Some(stats) = self.stats.take() {
             FlowPerfStats {
                 l7_protocol: L7Protocol::Mysql,
-                l4_protocol: L4Protocol::default(),
                 l7: L7PerfStats {
                     request_count: stats.req_count,
                     response_count: stats.resp_count,
@@ -140,7 +135,7 @@ impl L7FlowPerf for MysqlPerfData {
                     err_server_count: stats.resp_err_count,
                     err_timeout: timeout_count,
                 },
-                tcp: TcpPerfStats::default(),
+                ..Default::default()
             }
         } else {
             FlowPerfStats::default()
@@ -153,11 +148,12 @@ impl L7FlowPerf for MysqlPerfData {
         }
         self.has_log_data = false;
 
-        let rrt = if let Some(stats) = self.stats.as_ref() {
-            stats.rrt_last.as_micros() as u64
-        } else {
-            0
-        };
+        let rrt = self
+            .stats
+            .as_ref()
+            .map(|s| s.rrt_last.as_micros() as u64)
+            .unwrap_or_default();
+
         Some((
             AppProtoHead {
                 proto: self.l7_proto,
@@ -261,7 +257,7 @@ impl MysqlPerfData {
         self.calc_response(timestamp, flow_id, error_code)
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.stats = None;
         self.l7_proto = L7Protocol::default();
         self.msg_type = LogMessageType::default();
