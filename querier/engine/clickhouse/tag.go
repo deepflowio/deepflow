@@ -37,7 +37,7 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 	if alias != "" {
 		selectTag = alias
 	}
-	tag, ok := tag.GetTag(name, db, table, "defualt")
+	tag, ok := tag.GetTag(name, db, table, "default")
 	if !ok {
 		return nil, nil
 	} else {
