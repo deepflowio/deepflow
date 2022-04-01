@@ -63,7 +63,7 @@ rtt                         , rtt                  ,最大TCP建连时延       
 rtt_client_max              , rtt_client_max       ,最大TCP建连客户端时延    , 微秒 , delay      , 传输层时延   ,
 rtt_server_max              , rtt_server_max       ,最大TCP建连服务端时延    , 微秒 , delay      , 传输层时延   ,
 srt_max                     , srt_max              ,最大TCP系统时延          , 微秒 , delay      , 传输层时延   ,
-art_max                     , art_max              ,最大应用时延             , 微秒 , delay      , 传输层时延   ,
+art_max                     , art_max              ,最大数据时延             , 微秒 , delay      , 传输层时延   ,
                               
 l7_request                  , l7_request           ,应用请求                 , 个   , counter    , 应用层性能   ,
 l7_response                 , l7_response          ,应用响应                 , 个   , counter    , 应用层性能   ,

@@ -290,19 +290,12 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		}
 	// func(field/tag)
 	case *sqlparser.FuncExpr:
+
 		name, args, err := e.parseFunction(expr)
 		if err != nil {
 			return err
 		}
 		name = strings.ReplaceAll(name, "`", "")
-		function, err := GetTagFunction(name, args, as, e.DB, e.Table)
-		if err != nil {
-			return err
-		}
-		if function != nil {
-			e.Statements = append(e.Statements, function)
-			return nil
-		}
 		function, levelFlag, err := GetAggFunc(name, args, as, e.DB, e.Table)
 		if err != nil {
 			return err
@@ -310,6 +303,14 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		if function != nil {
 			// 通过metric判断view是否拆层
 			e.SetLevelFlag(levelFlag)
+			e.Statements = append(e.Statements, function)
+			return nil
+		}
+		function, err = GetTagFunction(name, args, as, e.DB, e.Table)
+		if err != nil {
+			return err
+		}
+		if function != nil {
 			e.Statements = append(e.Statements, function)
 			return nil
 		}

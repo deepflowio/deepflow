@@ -21,6 +21,9 @@ func GetAggFunc(name string, args []string, alias string, db string, table strin
 	if !ok {
 		return nil, 0, nil
 	}
+	if _, ok := metrics.METRICS_FUNCTIONS[name]; !ok {
+		return nil, 0, nil
+	}
 	// 判断算子是否支持单层
 	unlayFuns := metrics.METRICS_TYPE_UNLAY_FUNCTIONS[metricStruct.Type]
 	if common.IsValueInSliceString(name, unlayFuns) {

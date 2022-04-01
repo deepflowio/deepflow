@@ -76,8 +76,15 @@ func GetTagFunction(name string, args []string, alias, db, table string) (Statem
 		err := time.Trans()
 		return &time, err
 	default:
+		tagDes, ok := tag.GetTag(args[0], db, table, name)
+		if !ok {
+			tagDes, ok = tag.GetTag(args[0], db, table, "default")
+			if !ok {
+				return nil, nil
+			}
+		}
 		tagFunction := TagFunction{Name: name, Args: args, Alias: alias}
-		err := tagFunction.Trans(db, table)
+		err := tagFunction.Trans(tagDes)
 		return &tagFunction, err
 	}
 }
@@ -162,11 +169,7 @@ type TagFunction struct {
 	Withs []view.Node
 }
 
-func (f *TagFunction) Trans(db, table string) error {
-	tag, ok := tag.GetTag(f.Args[0], db, table, f.Name)
-	if !ok {
-		return nil
-	}
+func (f *TagFunction) Trans(tag *tag.Tag) error {
 	switch f.Name {
 	case TAG_FUNCTION_TOPK:
 		f.Name = fmt.Sprintf("topK(%s)", f.Args[1])
@@ -192,10 +195,23 @@ func (f *TagFunction) Trans(db, table string) error {
 		ip6Mask := net.CIDRMask(maskInt, 128)
 		value := fmt.Sprintf(tag.TagTranslator, ip4MaskInt, ip6Mask.String())
 		f.Withs = []view.Node{&view.With{Value: value, Alias: f.Alias}}
+		return nil
 	}
+	var tagField string
+	if tag.TagTranslator == "" {
+		tagField = f.Args[0]
+	} else {
+		tagField = tag.TagTranslator
+	}
+	value := fmt.Sprintf("%s(%s)", f.Name, tagField)
+	f.Withs = []view.Node{&view.With{Value: value, Alias: f.Alias}}
 	return nil
 }
 
 func (f *TagFunction) Format(m *view.Model) {
 	m.AddTag(&view.Tag{Value: f.Alias, Withs: f.Withs})
+	// metric分层的情况下 function需加入metric外层group
+	if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED {
+		m.AddGroup(&view.Group{Value: f.Alias, Flag: view.GROUP_FLAG_METRICS_OUTER})
+	}
 }

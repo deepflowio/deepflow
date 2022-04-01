@@ -8,58 +8,58 @@ var DB_FIELD_NEW_FLOW = fmt.Sprintf(
 	"if(is_new_flow=%d,1,0)", FLOW_LOG_IS_NEW_FLOW,
 )
 var DB_FIELD_CLOSED_FLOW = fmt.Sprintf(
-	"if(closed_type!=%d,1,0)", FLOW_LOG_CLOSE_TYPE_FORCED_REPORT,
+	"if(close_type!=%d,1,0)", FLOW_LOG_CLOSE_TYPE_FORCED_REPORT,
 )
 var DB_FIELD_TCP_ESTABLISH_FAIL = fmt.Sprintf(
-	"if(closed_type in %s,1,0)", FLOW_LOG_CLOSE_TYPE_ESTABLISH_EXCEPTION,
+	"if(close_type in %s,1,0)", FLOW_LOG_CLOSE_TYPE_ESTABLISH_EXCEPTION,
 )
 var DB_FIELD_CLIENT_ESTABLISH_FAIL = fmt.Sprintf(
-	"if(closed_type in %s,1,0)", FLOW_LOG_CLOSE_TYPE_ESTABLISH_EXCEPTION_CLIENT,
+	"if(close_type in %s,1,0)", FLOW_LOG_CLOSE_TYPE_ESTABLISH_EXCEPTION_CLIENT,
 )
 var DB_FIELD_SERVER_ESTABLISH_FAIL = fmt.Sprintf(
-	"if(closed_type in %s,1,0)", FLOW_LOG_CLOSE_TYPE_ESTABLISH_EXCEPTION_SERVER,
+	"if(close_type in %s,1,0)", FLOW_LOG_CLOSE_TYPE_ESTABLISH_EXCEPTION_SERVER,
 )
 var DB_FIELD_TCP_TRANSFER_FAIL = fmt.Sprintf(
-	"if(closed_type in %s,1,0)", FLOW_LOG_CLOSE_TYPE_EXCEPTION,
+	"if(close_type in %s,1,0)", FLOW_LOG_CLOSE_TYPE_EXCEPTION,
 )
 var DB_FIELD_TCP_RST_FAIL = fmt.Sprintf(
-	"if(closed_type in %s,1,0)", FLOW_LOG_CLOSE_TYPE_RST,
+	"if(close_type in %s,1,0)", FLOW_LOG_CLOSE_TYPE_RST,
 )
 var DB_FIELD_CLIENT_SOURCE_PORT_REUSE = fmt.Sprintf(
-	"if(closed_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_CLIENT_PORT_REUSE,
+	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_CLIENT_PORT_REUSE,
 )
 var DB_FIELD_CLIENT_SYN_REPEAT = fmt.Sprintf(
-	"if(closed_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_CLIENT_SYN_REPEAT,
+	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_CLIENT_SYN_REPEAT,
 )
 var DB_FIELD_CLIENT_ESTABLISH_OTHER_RST = fmt.Sprintf(
-	"if(closed_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_CLIENT_ESTABLISH_RST,
+	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_CLIENT_ESTABLISH_RST,
 )
 var DB_FIELD_SERVER_RESET = fmt.Sprintf(
-	"if(closed_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_SERVER_RST,
+	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_SERVER_RST,
 )
 var DB_FIELD_SERVER_SYN_ACK_REPEAT = fmt.Sprintf(
-	"if(closed_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_SERVER_SYNACK_REPEAT,
+	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_SERVER_SYNACK_REPEAT,
 )
 var DB_FIELD_SERVER_ESTABLISH_OTHER_RST = fmt.Sprintf(
-	"if(closed_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_SERVER_ESTABLISH_RST,
+	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_SERVER_ESTABLISH_RST,
 )
 var DB_FIELD_CLIENT_RST_FLOW = fmt.Sprintf(
-	"if(closed_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_TCP_CLIENT_RST,
+	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_TCP_CLIENT_RST,
 )
 var DB_FIELD_SERVER_QUEUE_LACK = fmt.Sprintf(
-	"if(closed_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_SERVER_QUEUE_LACK,
+	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_SERVER_QUEUE_LACK,
 )
 var DB_FIELD_SERVER_RST_FLOW = fmt.Sprintf(
-	"if(closed_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_TCP_SERVER_RST,
+	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_TCP_SERVER_RST,
 )
 var DB_FIELD_CLIENT_HALF_CLOSE_FLOW = fmt.Sprintf(
-	"if(closed_type=%d,1,0", FLOW_LOG_CLOSE_TYPE_CLIENT_HALF_CLOSE,
+	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_CLIENT_HALF_CLOSE,
 )
 var DB_FIELD_SERVER_HALF_CLOSE_FLOW = fmt.Sprintf(
-	"if(closed_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_SERVER_HALF_CLOSE,
+	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_SERVER_HALF_CLOSE,
 )
 var DB_FIELD_TCP_TIMEOUT = fmt.Sprintf(
-	"if(closed_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_TIMEOUT,
+	"if(close_type=%d,1,0)", FLOW_LOG_CLOSE_TYPE_TIMEOUT,
 )
 
 var L4_FLOW_LOG_METRICS = map[string]*Metrics{}
@@ -118,7 +118,7 @@ var L4_FLOW_LOG_METRICS_REPLACE = map[string]*Metrics{
 	"rrt":        NewReplaceMetrics("rrt_sum/rrt_count", ""),
 
 	"l7_error":              NewReplaceMetrics("l7_client_error+l7_server_error", ""),
-	"l7_error_ratio":        NewReplaceMetrics("l7_request/l7_response", ""),
+	"l7_error_ratio":        NewReplaceMetrics("l7_error/l7_response", ""),
 	"l7_client_error_ratio": NewReplaceMetrics("l7_client_error/l7_response", ""),
 	"l7_server_error_ratio": NewReplaceMetrics("l7_server_error/l7_response", ""),
 
