@@ -237,7 +237,7 @@ var ColumnAdd610 = []*ColumnAdds{
 		Dbs:         []string{"vtap_flow_edge_port", "vtap_app_edge_port"},
 		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
 		ColumnNames: []string{"resource_gl0_type_0", "resource_gl1_type_0", "resource_gl2_type_0", "resource_gl0_type_1", "resource_gl1_type_1", "resource_gl2_type_1"},
-		ColumnType:  ckdb.UInt32,
+		ColumnType:  ckdb.UInt8,
 	},
 }
 
