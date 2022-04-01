@@ -14,6 +14,8 @@ import (
 )
 
 const (
+	TAG_FUNCTION_NODE_TYPE                  = "node_type"
+	TAG_FUNCTION_ICON_ID                    = "icon_id"
 	TAG_FUNCTION_MASK                       = "mask"
 	TAG_FUNCTION_TIME                       = "time"
 	TAG_FUNCTION_TO_UNIX_TIMESTAMP_64_MICRO = "toUnixTimestamp64Micro"
@@ -25,9 +27,9 @@ const (
 )
 
 var TAG_FUNCTIONS = []string{
-	TAG_FUNCTION_MASK, TAG_FUNCTION_TIME, TAG_FUNCTION_TO_UNIX_TIMESTAMP_64_MICRO,
-	TAG_FUNCTION_TO_STRING, TAG_FUNCTION_IF, TAG_FUNCTION_UNIQ, TAG_FUNCTION_ANY,
-	TAG_FUNCTION_TOPK,
+	TAG_FUNCTION_NODE_TYPE, TAG_FUNCTION_ICON_ID, TAG_FUNCTION_MASK, TAG_FUNCTION_TIME,
+	TAG_FUNCTION_TO_UNIX_TIMESTAMP_64_MICRO, TAG_FUNCTION_TO_STRING, TAG_FUNCTION_IF,
+	TAG_FUNCTION_UNIQ, TAG_FUNCTION_ANY, TAG_FUNCTION_TOPK,
 }
 
 func GetTagTranslator(name, alias, db, table string) (Statement, error) {
@@ -195,6 +197,9 @@ func (f *TagFunction) Trans(tag *tag.Tag) error {
 		ip6Mask := net.CIDRMask(maskInt, 128)
 		value := fmt.Sprintf(tag.TagTranslator, ip4MaskInt, ip6Mask.String())
 		f.Withs = []view.Node{&view.With{Value: value, Alias: f.Alias}}
+		return nil
+	case TAG_FUNCTION_NODE_TYPE, TAG_FUNCTION_ICON_ID:
+		f.Withs = []view.Node{&view.With{Value: tag.TagTranslator, Alias: f.Alias}}
 		return nil
 	}
 	var tagField string
