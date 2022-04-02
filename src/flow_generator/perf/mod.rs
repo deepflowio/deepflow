@@ -24,7 +24,7 @@ use crate::flow_generator::error::Result;
 
 use {
     self::http::HttpPerfData,
-    dns::DNS_PORT,
+    dns::{DnsPerfData, DNS_PORT},
     mq::{KafkaPerfData, KAFKA_PORT},
     rpc::{DubboPerfData, DUBBO_PORT},
     sql::{MysqlPerfData, RedisPerfData, MYSQL_PORT, REDIS_PORT},
@@ -36,36 +36,6 @@ pub use l7_rrt::L7RrtCache;
 pub use stats::FlowPerfCounter;
 
 const ART_MAX: Duration = Duration::from_secs(30);
-
-pub struct DNSPerfData {
-    rrt_cache: Rc<RefCell<L7RrtCache>>,
-}
-
-impl DNSPerfData {
-    pub fn new(rrt_cache: Rc<RefCell<L7RrtCache>>) -> Self {
-        Self { rrt_cache }
-    }
-}
-
-impl L7FlowPerf for DNSPerfData {
-    // rrt_cache 作为实现者一个字段，在构造实现者的时候传入,失败返回错误信息和missed_match_response_count
-    fn parse(&mut self, _: &MetaPacket, _: u64) -> Result<()> {
-        Ok(())
-    }
-
-    fn data_updated(&self) -> bool {
-        false
-    }
-
-    fn copy_and_reset_data(&mut self, _: u32) -> FlowPerfStats {
-        FlowPerfStats::default()
-    }
-
-    fn app_proto_head(&mut self) -> Option<(AppProtoHead, u16)> {
-        None
-    }
-}
-//END
 
 #[enum_dispatch(L4FlowPerfTable)]
 pub trait L4FlowPerf {
@@ -90,7 +60,7 @@ pub enum L4FlowPerfTable {
 
 #[enum_dispatch]
 pub enum L7FlowPerfTable {
-    DNSPerfData,
+    DnsPerfData,
     KafkaPerfData,
     RedisPerfData,
     DubboPerfData,
@@ -119,7 +89,7 @@ impl FlowPerf {
         };
 
         let l7 = match l7_proto {
-            L7Protocol::Dns => L7FlowPerfTable::from(DNSPerfData::new(rrt_cache.clone())),
+            L7Protocol::Dns => L7FlowPerfTable::from(DnsPerfData::new(rrt_cache.clone())),
             L7Protocol::Dubbo => L7FlowPerfTable::from(DubboPerfData::new(rrt_cache.clone())),
             L7Protocol::Kafka => L7FlowPerfTable::from(KafkaPerfData::new(rrt_cache.clone())),
             L7Protocol::Mysql => L7FlowPerfTable::from(MysqlPerfData::new(rrt_cache.clone())),
