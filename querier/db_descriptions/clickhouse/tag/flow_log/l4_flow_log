@@ -26,6 +26,7 @@ resource_gl1_type   , resource_gl1_type_0  , resource_gl1_type_1   , 自动分�
 resource_gl1        , resource_gl1_0       , resource_gl1_1        , 自动分组-工作负载聚合资源     , resource     ,                    , 知识图谱    ,
 resource_gl2_type   , resource_gl2_type_0  , resource_gl2_type_1   , 自动分组-服务聚合资源类型     , int_enum     , resource_gl2_type  , 知识图谱    ,
 resource_gl2        , resource_gl2_0       , resource_gl2_1        , 自动分组-服务聚合资源         , resource     ,                    , 知识图谱    ,
+is_internet         , is_internet_0        , is_internet_1         , Internet                    , internet     ,                    ,            ,
 
 mac                 , mac_0                , mac_1                 , MAC                           , mac          ,                    , 链路层      ,
 eth_type            , eth_type             , eth_type              , 链路协议                      , int_enum     , eth_type           , 链路层      ,

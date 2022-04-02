@@ -2,7 +2,6 @@ package tag
 
 import (
 	"strconv"
-	"strings"
 
 	"metaflow/querier/common"
 )
@@ -20,94 +19,99 @@ var DeviceMap = map[string]int{
 	"nat_gateway": common.VIF_DEVICE_TYPE_NAT_GATEWAY,
 }
 
+var AutoMap = map[string]int{
+	"vm":          common.VIF_DEVICE_TYPE_VM,
+	"router":      common.VIF_DEVICE_TYPE_VROUTER,
+	"host":        common.VIF_DEVICE_TYPE_HOST,
+	"dhcp_port":   common.VIF_DEVICE_TYPE_DHCP_PORT,
+	"pod_service": common.VIF_DEVICE_TYPE_POD_SERVICE,
+	"redis":       common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
+	"rds":         common.VIF_DEVICE_TYPE_RDS_INSTANCE,
+	"pod_node":    common.VIF_DEVICE_TYPE_POD_NODE,
+	"lb":          common.VIF_DEVICE_TYPE_LB,
+	"nat_gateway": common.VIF_DEVICE_TYPE_NAT_GATEWAY,
+}
+
+var AutoPodMap = map[string]int{
+	"pod": common.VIF_DEVICE_TYPE_POD,
+}
+
+var AutoPodGroupMap = map[string]int{
+	"pod_group": common.VIF_DEVICE_TYPE_POD_GROUP,
+}
+
+var AutoServiceMap = map[string]int{
+	"pod_group": common.VIF_DEVICE_TYPE_POD_GROUP,
+	"service":   common.VIF_DEVICE_TYPE_SERVICE,
+}
+
 func GenerateTagResoureMap() map[string]map[string]*Tag {
 	tagResourceMap := make(map[string]map[string]*Tag)
+	// 资源:区域，可用区，容器节点，命名空间，工作负载，容器POD，容器集群，子网
 	for _, resourceStr := range []string{"region", "az", "pod_node", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet"} {
-		// 资源ID
-		notExistID := "0"
-		// 资源ID
-		tagResourceMap[resourceStr+"_id"] = map[string]*Tag{
-			"default": NewTag(
-				"",
-				resourceStr+"_id !="+notExistID,
-				"",
-				"",
-			),
+		// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
+		for _, suffix := range []string{"", "_0", "_1"} {
+			resourceIDSuffix := resourceStr + "_id" + suffix
+			resourceNameSuffix := resourceStr + suffix
+			tagResourceMap[resourceIDSuffix] = map[string]*Tag{
+				"default": NewTag(
+					"",
+					resourceIDSuffix+"!=0",
+					"",
+					"",
+				),
+			}
+			tagResourceMap[resourceNameSuffix] = map[string]*Tag{
+				"default": NewTag(
+					"dictGet(deepflow."+resourceStr+"_map, ('name'), (toUInt64("+resourceIDSuffix+")))",
+					resourceStr+"_id !=0 ",
+					"toUInt64("+resourceIDSuffix+") IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE name %s %s)",
+					"toUInt64("+resourceIDSuffix+") IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE %s(name,%s))",
+				),
+				"node_type": NewTag(
+					"'"+resourceStr+"'",
+					"",
+					"",
+					"",
+				),
+				"icon_id": NewTag(
+					"dictGet(deepflow."+resourceStr+"_map, ('icon_id'), (toUInt64("+resourceIDSuffix+")))",
+					"",
+					"",
+					"",
+				),
+			}
 		}
-		// 资源名称
-		tagResourceMap[resourceStr] = map[string]*Tag{
+	}
+
+	// VPC资源
+	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
+	for _, suffix := range []string{"", "_0", "_1"} {
+		vpcIDSuffix := "vpc_id" + suffix
+		l3EPCIDSuffix := "l3_epc_id" + suffix
+		vpcNameSuffix := "vpc" + suffix
+		tagResourceMap[vpcIDSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"dictGet(deepflow."+resourceStr+"_map, ('name'), (toUInt64("+resourceStr+"_id)))",
-				resourceStr+"_id != "+notExistID,
-				"toUInt64("+resourceStr+"_id) IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE name %s %s)",
-				"toUInt64("+resourceStr+"_id) IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE %s(name,%s))",
-			),
-			"node_type": NewTag(
-				"'"+resourceStr+"'",
-				"",
-				"",
-				"",
-			),
-			"icon_id": NewTag(
-				"dictGet(deepflow."+resourceStr+"_map, ('icon_id'), (toUInt64("+resourceStr+"_id)))",
-				"",
-				"",
-				"",
-			),
-		}
-		// 客户端资源ID
-		tagResourceMap[resourceStr+"_id_0"] = map[string]*Tag{
-			"default": NewTag(
-				"",
-				resourceStr+"_id_0 != "+notExistID,
+				l3EPCIDSuffix,
+				l3EPCIDSuffix+"!=-2",
 				"",
 				"",
 			)}
-		// 客户端资源名称
-		tagResourceMap[resourceStr+"_0"] = map[string]*Tag{
+		tagResourceMap[vpcNameSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"dictGet(deepflow."+resourceStr+"_map, ('name'), (toUInt64("+resourceStr+"_id_0)))",
-				resourceStr+"_id_0 != "+notExistID,
-				"toUInt64("+resourceStr+"_id_0) IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE name %s %s)",
-				"toUInt64("+resourceStr+"_id_0) IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE %s(name,%s))",
+				"dictGet(deepflow.l3_epc_map, ('name'), (toUInt64("+l3EPCIDSuffix+")))",
+				l3EPCIDSuffix+"!=-2",
+				"toUInt64("+l3EPCIDSuffix+") IN (SELECT id FROM deepflow.l3_epc_map WHERE name %s %s)",
+				"toUInt64("+l3EPCIDSuffix+") IN (SELECT id FROM deepflow.l3_epc_map WHERE %s(name,%s))",
 			),
 			"node_type": NewTag(
-				"'"+resourceStr+"'",
+				"'vpc'",
 				"",
 				"",
 				"",
 			),
 			"icon_id": NewTag(
-				"dictGet(deepflow."+resourceStr+"_map, ('icon_id'), (toUInt64("+resourceStr+"_id_0)))",
-				"",
-				"",
-				"",
-			),
-		}
-		// 服务端资源ID
-		tagResourceMap[resourceStr+"_id_1"] = map[string]*Tag{
-			"default": NewTag(
-				"",
-				resourceStr+"_id_1 != "+notExistID,
-				"",
-				"",
-			)}
-		// 服务端资源名称
-		tagResourceMap[resourceStr+"_1"] = map[string]*Tag{
-			"default": NewTag(
-				"dictGet(deepflow."+resourceStr+"_map, ('name'), (toUInt64("+resourceStr+"_id_1)))",
-				resourceStr+"_id_1 != "+notExistID,
-				"toUInt64("+resourceStr+"_id_1) IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE name %s %s)",
-				"toUInt64("+resourceStr+"_id_1) IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE %s(name,%s))",
-			),
-			"node_type": NewTag(
-				"'"+resourceStr+"'",
-				"",
-				"",
-				"",
-			),
-			"icon_id": NewTag(
-				"dictGet(deepflow."+resourceStr+"_map, ('icon_id'), (toUInt64("+resourceStr+"_id_1)))",
+				"dictGet(deepflow.l3_epc_map, ('icon_id'), (toUInt64("+l3EPCIDSuffix+")))",
 				"",
 				"",
 				"",
@@ -115,266 +119,33 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		}
 	}
 
-	// VPC资源ID
-	tagResourceMap["vpc_id"] = map[string]*Tag{
-		"default": NewTag(
-			"l3_epc_id",
-			"l3_epc_id != -2",
-			"",
-			"",
-		)}
-	// VPC资源名称
-	tagResourceMap["vpc"] = map[string]*Tag{
-		"default": NewTag(
-			"dictGet(deepflow.l3_epc_map, ('name'), (toUInt64(l3_epc_id)))",
-			"l3_epc_id != -2",
-			"toUInt64(l3_epc_id) IN (SELECT id FROM deepflow.l3_epc_map WHERE name %s %s)",
-			"toUInt64(l3_epc_id) IN (SELECT id FROM deepflow.l3_epc_map WHERE %s(name,%s))",
-		),
-		"node_type": NewTag(
-			"'vpc'",
-			"",
-			"",
-			"",
-		),
-		"icon_id": NewTag(
-			"dictGet(deepflow.l3_epc_map, ('icon_id'), (toUInt64(l3_epc_id)))",
-			"",
-			"",
-			"",
-		),
-	}
-	// VPC客户端资源ID
-	tagResourceMap["vpc_id_0"] = map[string]*Tag{
-		"default": NewTag(
-			"l3_epc_id_0",
-			"l3_epc_id_0 != -2",
-			"",
-			"",
-		)}
-	// VPC客户端资源名称
-	tagResourceMap["vpc_0"] = map[string]*Tag{
-		"default": NewTag(
-			"dictGet(deepflow.l3_epc_map, ('name'), (toUInt64(l3_epc_id_0)))",
-			"l3_epc_id_0 != -2",
-			"toUInt64(l3_epc_id_0) IN (SELECT id FROM deepflow.l3_epc_map WHERE name %s %s)",
-			"toUInt64(l3_epc_id_0) IN (SELECT id FROM deepflow.l3_epc_map WHERE %s(name,%s))",
-		),
-		"node_type": NewTag(
-			"'vpc'",
-			"",
-			"",
-			"",
-		),
-		"icon_id": NewTag(
-			"dictGet(deepflow.l3_epc_map, ('icon_id'), (toUInt64(l3_epc_id_0)))",
-			"",
-			"",
-			"",
-		),
-	}
-	// VPC服务端资源ID
-	tagResourceMap["vpc_id_1"] = map[string]*Tag{
-		"default": NewTag(
-			"l3_epc_id_1",
-			"l3_epc_id_1 != -2",
-			"",
-			"",
-		)}
-	// VPC服务端资源名称
-	tagResourceMap["vpc_1"] = map[string]*Tag{
-		"default": NewTag(
-			"dictGet(deepflow.l3_epc_map, ('name'), (toUInt64(l3_epc_id_1)))",
-			"l3_epc_id_1 != -2",
-			"toUInt64(l3_epc_id_1) IN (SELECT id FROM deepflow.l3_epc_map WHERE name %s %s)",
-			"toUInt64(l3_epc_id_1) IN (SELECT id FROM deepflow.l3_epc_map WHERE %s(name,%s))",
-		),
-		"node_type": NewTag(
-			"'vpc'",
-			"",
-			"",
-			"",
-		),
-		"icon_id": NewTag(
-			"dictGet(deepflow.l3_epc_map, ('icon_id'), (toUInt64(l3_epc_id_1)))",
-			"",
-			"",
-			"",
-		),
-	}
-
-	// 宿主机资源ID
-	tagResourceMap["host_id"] = map[string]*Tag{
-		"default": NewTag(
-			"",
-			"host_id != 0",
-			"",
-			"",
-		)}
-	// 宿主机资源名称
-	tagResourceMap["host"] = map[string]*Tag{
-		"default": NewTag(
-			"dictGet(deepflow.device_map, ('name'), (toUInt64(6),toUInt64(host_id)))",
-			"host_id != 0",
-			"toUInt64(host_id) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
-			"toUInt64(host_id) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
-		),
-		"node_type": NewTag(
-			"'host'",
-			"",
-			"",
-			"",
-		),
-		"icon_id": NewTag(
-			"dictGet(deepflow.device_map, ('icon_id'), (toUInt64(host_id)))",
-			"",
-			"",
-			"",
-		),
-	}
-	// 宿主机客户端资源ID
-	tagResourceMap["host_id_0"] = map[string]*Tag{
-		"default": NewTag(
-			"",
-			"host_id_0 != 0",
-			"",
-			"",
-		)}
-	// 宿主机客户端资源名称
-	tagResourceMap["host_0"] = map[string]*Tag{
-		"default": NewTag(
-			"dictGet(deepflow.device_map, ('name'), (toUInt64(6),toUInt64(host_id_0)))",
-			"host_id_0 != 0",
-			"toUInt64(host_id_0) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
-			"toUInt64(host_id_0) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
-		),
-		"node_type": NewTag(
-			"'host'",
-			"",
-			"",
-			"",
-		),
-		"icon_id": NewTag(
-			"dictGet(deepflow.device_map, ('icon_id'), (toUInt64(host_id_0)))",
-			"",
-			"",
-			"",
-		),
-	}
-	// 宿主机服务端资源ID
-	tagResourceMap["host_id_1"] = map[string]*Tag{
-		"default": NewTag(
-			"",
-			"host_id_1 != 0",
-			"",
-			"",
-		)}
-	// 宿主机服务端资源名称
-	tagResourceMap["host_1"] = map[string]*Tag{
-		"default": NewTag(
-			"dictGet(deepflow.device_map, ('name'), (toUInt64(6),toUInt64(host_id_1)))",
-			"host_id_1 != 0",
-			"toUInt64(host_id_1) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
-			"toUInt64(host_id_1) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
-		),
-		"node_type": NewTag(
-			"'host'",
-			"",
-			"",
-			"",
-		),
-		"icon_id": NewTag(
-			"dictGet(deepflow.device_map, ('icon_id'), (toUInt64(host_id_1)))",
-			"",
-			"",
-			"",
-		),
-	}
-
-	for resourceStr, deviceType := range DeviceMap {
-		deviceTypeStr := strconv.Itoa(deviceType)
-		// device资源ID
-		tagResourceMap[resourceStr+"_id"] = map[string]*Tag{
+	// 宿主机
+	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
+	for _, suffix := range []string{"", "_0", "_1"} {
+		hostIDSuffix := "host_id" + suffix
+		hostNameSuffix := "host" + suffix
+		tagResourceMap[hostIDSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"if(l3_device_type="+deviceTypeStr+",l3_device_id, 0)",
-				"l3_device_id != 0 AND l3_device_type = "+deviceTypeStr,
-				"l3_device_id %s %s",
+				"",
+				hostIDSuffix+"!=0",
+				"",
 				"",
 			)}
-		// device资源名称
-		tagResourceMap[resourceStr] = map[string]*Tag{
+		tagResourceMap[hostNameSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"dictGet(deepflow.device_map, ('name'), (toUInt64("+deviceTypeStr+"),toUInt64(l3_device_id)))",
-				"l3_device_id != 0 AND l3_device_type = "+deviceTypeStr,
-				"toUInt64(l3_device_id) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
-				"toUInt64(l3_device_id) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
+				"dictGet(deepflow.device_map, ('name'), (toUInt64(6),toUInt64("+hostIDSuffix+")))",
+				hostIDSuffix+"!=0",
+				"toUInt64("+hostIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
+				"toUInt64("+hostIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
 			),
 			"node_type": NewTag(
-				"'"+resourceStr+"'",
+				"'host'",
 				"",
 				"",
 				"",
 			),
 			"icon_id": NewTag(
-				"dictGet(deepflow.device_map, ('icon_id'), (toUInt64("+deviceTypeStr+"),toUInt64(l3_device_id)))",
-				"",
-				"",
-				"",
-			),
-		}
-		// 客户端device资源ID
-		tagResourceMap[resourceStr+"_id_0"] = map[string]*Tag{
-			"default": NewTag(
-				"if(l3_device_type_0="+deviceTypeStr+",l3_device_id_0, 0)",
-				"l3_device_id_0 != 0 AND l3_device_type_0 = "+deviceTypeStr,
-				"l3_device_id_0 %s %s",
-				"",
-			)}
-		// 客户端device资源名称
-		tagResourceMap[resourceStr+"_0"] = map[string]*Tag{
-			"default": NewTag(
-				"dictGet(deepflow.device_map, ('name'), (toUInt64("+deviceTypeStr+"),toUInt64(l3_device_id_0)))",
-				"l3_device_id_0 != 0 AND l3_device_type_0 = "+deviceTypeStr,
-				"toUInt64(l3_device_id_0) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
-				"toUInt64(l3_device_id_0) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
-			),
-			"node_type": NewTag(
-				"'"+resourceStr+"'",
-				"",
-				"",
-				"",
-			),
-			"icon_id": NewTag(
-				"dictGet(deepflow.device_map, ('icon_id'), (toUInt64("+deviceTypeStr+"),toUInt64(l3_device_id_0)))",
-				"",
-				"",
-				"",
-			),
-		}
-		// 服务端device资源ID
-		tagResourceMap[resourceStr+"_id_1"] = map[string]*Tag{
-			"default": NewTag(
-				"if(l3_device_type_1="+deviceTypeStr+",l3_device_id_1, 0)",
-				"l3_device_id_1 != 0 AND l3_device_type_1 = "+deviceTypeStr,
-				"l3_device_id_1 %s %s",
-				"",
-			)}
-		// 服务端device资源名称
-		tagResourceMap[resourceStr+"_1"] = map[string]*Tag{
-			"default": NewTag(
-				"dictGet(deepflow.device_map, ('name'), (toUInt64("+deviceTypeStr+"),toUInt64(l3_device_id_1)))",
-				"l3_device_id_1 != 0 AND l3_device_type_1 = "+deviceTypeStr,
-				"toUInt64(l3_device_id_1) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
-				"toUInt64(l3_device_id_1) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
-			),
-			"node_type": NewTag(
-				"'"+resourceStr+"'",
-				"",
-				"",
-				"",
-			),
-			"icon_id": NewTag(
-				"dictGet(deepflow.device_map, ('icon_id'), (toUInt64("+deviceTypeStr+"),toUInt64(l3_device_id_1)))",
+				"dictGet(deepflow.device_map, ('icon_id'), (toUInt64("+hostIDSuffix+")))",
 				"",
 				"",
 				"",
@@ -382,201 +153,156 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		}
 	}
 
+	// device资源
+	for resourceStr, deviceTypeValue := range DeviceMap {
+		deviceTypeValueStr := strconv.Itoa(deviceTypeValue)
+		// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
+		for _, suffix := range []string{"", "_0", "_1"} {
+			deviceIDSuffix := "l3_device_id" + suffix
+			deviceTypeSuffix := "l3_device_type" + suffix
+			deviceNameSuffix := resourceStr + suffix
+			tagResourceMap[deviceIDSuffix] = map[string]*Tag{
+				"default": NewTag(
+					"if("+deviceTypeSuffix+"="+deviceTypeValueStr+","+deviceIDSuffix+", 0)",
+					deviceTypeSuffix+"!=0 AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
+					deviceTypeSuffix+" %s %s",
+					"",
+				)}
+			tagResourceMap[deviceNameSuffix] = map[string]*Tag{
+				"default": NewTag(
+					"dictGet(deepflow.device_map, ('name'), (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
+					deviceTypeSuffix+"!=0 AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
+					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
+					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
+				),
+				"node_type": NewTag(
+					"'"+resourceStr+"'",
+					"",
+					"",
+					"",
+				),
+				"icon_id": NewTag(
+					"dictGet(deepflow.device_map, ('icon_id'), (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
+					"",
+					"",
+					"",
+				),
+			}
+		}
+	}
+
+	// 自动分组
 	for _, autoStr := range []string{"resource_gl0", "resource_gl1", "resource_gl2"} {
-		autoID := autoStr + "_id"
-		autoType := autoStr + "_type"
-		autoTypeClient := autoStr + "_type_0"
-		autoTypeServer := autoStr + "_type_1"
-		nodeTypeStr := autoType + "=1,'vm'," + autoType + "=5,'router'," + autoType + "=6,'host'," +
-			autoType + "=9,'dhcp_port'," + autoType + "=10,'pod'," + autoType + "=11,'pod_service'," +
-			autoType + "=12,'redis'," + autoType + "=13,'rds'," + autoType + "=14,'pod_node'," +
-			autoType + "=15,'lb'," + autoType + "=16,'nat_gateway','ip')"
-		nodeTypeStrClient := strings.ReplaceAll(nodeTypeStr, autoType, autoTypeClient)
-		nodeTypeStrServer := strings.ReplaceAll(nodeTypeStr, autoType, autoTypeServer)
-		switch autoStr {
-		case "resource_gl0":
-			nodeTypeStr = "multiIf(" + nodeTypeStr
-			nodeTypeStrClient = "multiIf(" + nodeTypeStrClient
-			nodeTypeStrServer = "multiIf(" + nodeTypeStrServer
-		case "resource_gl1":
-			nodeTypeStr = "multiIf(" + autoType + "=101,'pod_group'," + nodeTypeStr
-			nodeTypeStrClient = "multiIf(" + autoTypeClient + "=101,'pod_group'," + nodeTypeStrClient
-			nodeTypeStrServer = "multiIf(" + autoTypeServer + "=101,'pod_group'," + nodeTypeStrServer
-		case "resource_gl2":
-			nodeTypeStr = "multiIf(" + autoType + "=101,'pod_group'," + autoType + "=102,'service'," + nodeTypeStr
-			nodeTypeStrClient = "multiIf(" + autoTypeClient + "=101,'pod_group'," + autoTypeClient + "=102,'service'," + nodeTypeStrClient
-			nodeTypeStrServer = "multiIf(" + autoTypeServer + "=101,'pod_group'," + autoTypeServer + "=102,'service'," + nodeTypeStrServer
-		}
-		// 自动分组资源名称
-		tagResourceMap[autoStr] = map[string]*Tag{
-			"default": NewTag(
-				"dictGet(deepflow.device_map, ('name'), (toUInt64("+autoType+"),toUInt64("+autoID+")))",
-				"",
-				"toUInt64("+autoID+") IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
-				"toUInt64("+autoID+") IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
-			),
-			"node_type": NewTag(
-				nodeTypeStr,
-				"",
-				"",
-				"",
-			),
-			"icon_id": NewTag(
-				"dictGet(deepflow.device_map, ('icon_id'), (toUInt64("+autoType+"),toUInt64("+autoID+")))",
-				"",
-				"",
-				"",
-			),
-		}
-		// 自动分组客户端资源名称
-		tagResourceMap[autoStr+"_0"] = map[string]*Tag{
-			"default": NewTag(
-				"dictGet(deepflow.device_map, ('name'), (toUInt64("+autoType+"_0),toUInt64("+autoID+"_0)))",
-				"",
-				"toUInt64("+autoID+"_0) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
-				"toUInt64("+autoID+"_0) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
-			),
-			"node_type": NewTag(
-				nodeTypeStrClient,
-				"",
-				"",
-				"",
-			),
-			"icon_id": NewTag(
-				"dictGet(deepflow.device_map, ('icon_id'), (toUInt64("+autoType+"_0),toUInt64("+autoID+"_0)))",
-				"",
-				"",
-				"",
-			),
-		}
-		// 自动分组服务端资源名称
-		tagResourceMap[autoStr+"_1"] = map[string]*Tag{
-			"default": NewTag(
-				"dictGet(deepflow.device_map, ('name'), (toUInt64("+autoType+"_1),toUInt64("+autoID+"_1)))",
-				"",
-				"toUInt64("+autoID+"_1) IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
-				"toUInt64("+autoID+"_1) IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
-			),
-			"node_type": NewTag(
-				nodeTypeStrServer,
-				"",
-				"",
-				"",
-			),
-			"icon_id": NewTag(
-				"dictGet(deepflow.device_map, ('icon_id'), (toUInt64("+autoType+"_1),toUInt64("+autoID+"_1)))",
-				"",
-				"",
-				"",
-			),
+		// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
+		for _, suffix := range []string{"", "_0", "_1"} {
+			autoIDSuffix := autoStr + "_id" + suffix
+			autoTypeSuffix := autoStr + "_type" + suffix
+			autoNameSuffix := autoStr + suffix
+			nodeTypeStrSuffix := ""
+			for nodeType, autoTypeValue := range AutoMap {
+				autoTypeValueStr := strconv.Itoa(autoTypeValue)
+				nodeTypeStrSuffix = nodeTypeStrSuffix + autoTypeSuffix + "=" + autoTypeValueStr + ",'" + nodeType + "',"
+			}
+			nodeTypeStrSuffix = nodeTypeStrSuffix + "'ip')"
+			switch autoStr {
+			case "resource_gl0":
+				for nodeType, autoTypeValue := range AutoPodMap {
+					autoTypeValueStr := strconv.Itoa(autoTypeValue)
+					nodeTypeStrSuffix = autoTypeSuffix + "=" + autoTypeValueStr + ",'" + nodeType + "'," + nodeTypeStrSuffix
+				}
+			case "resource_gl1":
+				for nodeType, autoTypeValue := range AutoPodGroupMap {
+					autoTypeValueStr := strconv.Itoa(autoTypeValue)
+					nodeTypeStrSuffix = autoTypeSuffix + "=" + autoTypeValueStr + ",'" + nodeType + "'," + nodeTypeStrSuffix
+				}
+			case "resource_gl2":
+				for nodeType, autoTypeValue := range AutoServiceMap {
+					autoTypeValueStr := strconv.Itoa(autoTypeValue)
+					nodeTypeStrSuffix = autoTypeSuffix + "=" + autoTypeValueStr + ",'" + nodeType + "'," + nodeTypeStrSuffix
+				}
+			}
+			nodeTypeStrSuffix = "multiIf(" + nodeTypeStrSuffix
+			tagResourceMap[autoNameSuffix] = map[string]*Tag{
+				"default": NewTag(
+					"dictGet(deepflow.device_map, ('name'), (toUInt64("+autoTypeSuffix+"),toUInt64("+autoIDSuffix+")))",
+					"",
+					"toUInt64("+autoIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
+					"toUInt64("+autoIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
+				),
+				"node_type": NewTag(
+					nodeTypeStrSuffix,
+					"",
+					"",
+					"",
+				),
+				"icon_id": NewTag(
+					"dictGet(deepflow.device_map, ('icon_id'), (toUInt64("+autoTypeSuffix+"),toUInt64("+autoIDSuffix+")))",
+					"",
+					"",
+					"",
+				),
+			}
 		}
 	}
 
 	// IP
-	ipNodeType := NewTag(
-		"'ip'",
-		"",
-		"",
-		"",
-	)
-	ipIconID := NewTag(
-		"dictGet(deepflow.device_map, ('icon_id'), (toUInt64(0),toUInt64(0)))",
-		"",
-		"",
-		"",
-	)
-	tagResourceMap["ip"] = map[string]*Tag{
-		"default": NewTag(
-			"if(is_ipv4=1, IPv4NumToString(ip4), IPv6NumToString(ip6))",
-			"",
-			"is_ipv4=%s AND (ip%s %s %s)",
-			"",
-		), "mask": NewTag(
-			"if(is_ipv4, IPv4NumToString(bitAnd(ip4, %v)), IPv6NumToString(bitAnd(ip6, toFixedString(unhex('%s'), 16))))",
-			"",
-			"",
-			"",
-		),
-		"node_type": ipNodeType,
-		"icon_id":   ipIconID,
-	}
-	// 客户端IP
-	tagResourceMap["ip_0"] = map[string]*Tag{
-		"default": NewTag(
-			"if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0))",
-			"",
-			"is_ipv4=%s AND (ip%s_0 %s %s)",
-			"",
-		), "mask": NewTag(
-			"if(is_ipv4, IPv4NumToString(bitAnd(ip4_0, %v)), IPv6NumToString(bitAnd(ip6_0, toFixedString(unhex('%s'), 16))))",
-			"",
-			"",
-			"",
-		),
-		"node_type": ipNodeType,
-		"icon_id":   ipIconID,
-	}
-	// 服务端IP
-	tagResourceMap["ip_1"] = map[string]*Tag{
-		"default": NewTag(
-			"if(is_ipv4=1, IPv4NumToString(ip4_1), IPv6NumToString(ip6_1))",
-			"",
-			"is_ipv4=%s AND (ip%s_1 %s %s)",
-			"",
-		), "mask": NewTag(
-			"if(is_ipv4, IPv4NumToString(bitAnd(ip4_1, %v)), IPv6NumToString(bitAnd(ip6_1, toFixedString(unhex('%s'), 16))))",
-			"",
-			"",
-			"",
-		),
-		"node_type": ipNodeType,
-		"icon_id":   ipIconID,
+	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
+	for _, suffix := range []string{"", "_0", "_1"} {
+		ipSuffix := "ip" + suffix
+		ip4Suffix := "ip4" + suffix
+		ip6Suffix := "ip6" + suffix
+		tagResourceMap[ipSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"if(is_ipv4=1, IPv4NumToString("+ip4Suffix+"), IPv6NumToString("+ip6Suffix+"))",
+				"",
+				"is_ipv4=%s AND (ip%s"+suffix+" %s %s)",
+				"",
+			), "mask": NewTag(
+				"if(is_ipv4, IPv4NumToString(bitAnd("+ip4Suffix+", %v)), IPv6NumToString(bitAnd("+ip6Suffix+", toFixedString(unhex('%s'), 16))))",
+				"",
+				"",
+				"",
+			),
+			"node_type": NewTag(
+				"'ip'",
+				"",
+				"",
+				"",
+			),
+			"icon_id": NewTag(
+				"dictGet(deepflow.device_map, ('icon_id'), (toUInt64(0),toUInt64(0)))",
+				"",
+				"",
+				"",
+			),
+		}
 	}
 
 	// 广域网
-	internetNodeType := NewTag(
-		"'internet'",
-		"",
-		"",
-		"",
-	)
-	internetIconID := NewTag(
-		"dictGet(deepflow.device_map, ('icon_id'), (toUInt64(63999),toUInt64(63999)))",
-		"",
-		"",
-		"",
-	)
-	tagResourceMap["is_internet"] = map[string]*Tag{
-		"default": NewTag(
-			"1",
-			"l3_epc_id=-2",
-			"",
-			"",
-		),
-		"node_type": internetNodeType,
-		"icon_id":   internetIconID,
-	}
-	// 客户端广域网
-	tagResourceMap["is_internet_0"] = map[string]*Tag{
-		"default": NewTag(
-			"1",
-			"l3_epc_id_0=-2",
-			"",
-			"",
-		),
-		"node_type": internetNodeType,
-		"icon_id":   internetIconID,
-	}
-	// 服务端广域网
-	tagResourceMap["is_internet_1"] = map[string]*Tag{
-		"default": NewTag(
-			"1",
-			"l3_epc_id_1=-2",
-			"",
-			"",
-		),
-		"node_type": internetNodeType,
-		"icon_id":   internetIconID,
+	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
+	for _, suffix := range []string{"", "_0", "_1"} {
+		isInternetSuffix := "is_internet" + suffix
+		l3EPCIDSuffix := "l3_epc_id" + suffix
+		tagResourceMap[isInternetSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"1",
+				l3EPCIDSuffix+"=-2",
+				"",
+				"",
+			),
+			"node_type": NewTag(
+				"'internet'",
+				"",
+				"",
+				"",
+			),
+			"icon_id": NewTag(
+				"dictGet(deepflow.device_map, ('icon_id'), (toUInt64(63999),toUInt64(63999)))",
+				"",
+				"",
+				"",
+			),
+		}
 	}
 	return tagResourceMap
 }

@@ -50,7 +50,7 @@ func (e *CHEngine) ExecuteQuery(sql string) (map[string][]interface{}, map[strin
 		return nil, nil, err
 	}
 	chSql := e.ToSQLString()
-	log.Debug(chSql)
+	log.Debugf("final sql: %s", chSql)
 	chClient := client.Client{
 		IPs:      config.Cfg.Clickhouse.IPs,
 		Port:     config.Cfg.Clickhouse.Port,
