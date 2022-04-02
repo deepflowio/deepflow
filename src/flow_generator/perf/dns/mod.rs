@@ -3,3 +3,5 @@ mod flow_dns;
 mod flow_dns_log;
 
 pub use consts::PORT as DNS_PORT;
+
+pub use flow_dns::DnsPerfData;

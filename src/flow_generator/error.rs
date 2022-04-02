@@ -10,6 +10,7 @@ pub enum Error {
     L7ParseFailed,
     DubboHeaderParseFailed,
     HttpHeaderParseFailed,
+    DnsPerfParseFailed,
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

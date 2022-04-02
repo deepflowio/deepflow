@@ -1,0 +1,4 @@
+DnsInfo { trans_id: 57315, query_type: 0, query_name: "guoyongxin.com", answers: "" }
+DnsInfo { trans_id: 57315, query_type: 1, query_name: "guoyongxin.com", answers: "" }
+DnsInfo { trans_id: 60628, query_type: 0, query_name: "yunshan.net.cn", answers: "" }
+DnsInfo { trans_id: 60628, query_type: 1, query_name: "yunshan.net.cn", answers: "" }
