@@ -35,7 +35,6 @@ var TAG_FUNCTIONS = []string{
 
 func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 	var stmt Statement
-	withs := []view.Node{}
 	selectTag := name
 	if alias != "" {
 		selectTag = alias
@@ -45,12 +44,13 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 		return nil, nil
 	} else {
 		if tag.TagTranslator != "" {
-			withs = []view.Node{&view.With{Value: tag.TagTranslator, Alias: selectTag}}
+			stmt = &SelectTag{Value: tag.TagTranslator, Alias: selectTag}
 		} else if alias != "" {
-			withs = []view.Node{&view.With{Value: name, Alias: selectTag}}
+			stmt = &SelectTag{Value: name, Alias: selectTag}
+		} else {
+			stmt = &SelectTag{Value: selectTag}
 		}
 	}
-	stmt = &SelectTag{Value: selectTag, Withs: withs}
 	return stmt, nil
 }
 
