@@ -538,6 +538,7 @@ type FlowInfo struct {
 	EndTime     uint64 `json:"end_time"`   // us
 	Duration    uint64 `json:"duration"`   // us
 	IsNewFlow   uint8  `json:"is_new_flow"`
+	Status      uint8  `json:"status"`
 }
 
 var FlowInfoColumns = []*ckdb.Column{
@@ -556,10 +557,10 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("l3_end_1", ckdb.UInt8).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 	ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
-	ckdb.NewColumn("time", ckdb.DateTime).SetComment("精度: 秒"),
-	ckdb.NewColumn("end_time_s", ckdb.DateTime).SetComment("精度: 秒"),
+	ckdb.NewColumn("time", ckdb.DateTime).SetComment("精度: 秒，等同end_time的秒精度"),
 	ckdb.NewColumn("duration", ckdb.UInt64).SetComment("单位: 微秒"),
 	ckdb.NewColumn("is_new_flow", ckdb.UInt8),
+	ckdb.NewColumn("status", ckdb.UInt8).SetComment("状态 0:正常, 1:异常 ,2:不存在，3:服务端异常, 4:客户端异常"),
 }
 
 func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
@@ -608,13 +609,13 @@ func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt32(uint32(f.EndTime / US_TO_S_DEVISOR)); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(uint32(f.EndTime / US_TO_S_DEVISOR)); err != nil {
-		return err
-	}
 	if err := block.WriteUInt64(f.Duration); err != nil {
 		return err
 	}
 	if err := block.WriteUInt8(f.IsNewFlow); err != nil {
+		return err
+	}
+	if err := block.WriteUInt8(f.Status); err != nil {
 		return err
 	}
 
@@ -1057,6 +1058,18 @@ func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.Plat
 		layers.IPProtocol(f.FlowKey.Proto))
 }
 
+func getStatus(t datatype.CloseType) uint8 {
+	if t == datatype.CloseTypeTCPFin || t == datatype.CloseTypeForcedReport {
+		return datatype.STATUS_OK
+	} else if t.IsClientError() {
+		return datatype.STATUS_CLIENT_ERROR
+	} else if t.IsServerError() {
+		return datatype.STATUS_SERVER_ERROR
+	} else {
+		return datatype.STATUS_NOT_EXIST
+	}
+}
+
 func (i *FlowInfo) Fill(f *pb.Flow) {
 	i.CloseType = uint16(f.CloseType)
 	i.FlowSource = uint16(f.FlowSource)
@@ -1075,6 +1088,7 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 	i.EndTime = f.EndTime / uint64(time.Microsecond)
 	i.Duration = f.Duration / uint64(time.Microsecond)
 	i.IsNewFlow = uint8(f.IsNewFlow)
+	i.Status = getStatus(datatype.CloseType(i.CloseType))
 }
 
 func (m *Metrics) Fill(f *pb.Flow) {

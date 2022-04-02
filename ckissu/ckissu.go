@@ -212,7 +212,7 @@ var ColumnAdd610 = []*ColumnAdds{
 	&ColumnAdds{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
-		ColumnNames: []string{"resource_gl0_type_0", "resource_gl1_type_0", "resource_gl2_type_0", "resource_gl0_type_1", "resource_gl1_type_1", "resource_gl2_type_1"},
+		ColumnNames: []string{"resource_gl0_type_0", "resource_gl1_type_0", "resource_gl2_type_0", "resource_gl0_type_1", "resource_gl1_type_1", "resource_gl2_type_1", "status"},
 		ColumnType:  ckdb.UInt8,
 	},
 	&ColumnAdds{
@@ -238,6 +238,13 @@ var ColumnAdd610 = []*ColumnAdds{
 		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
 		ColumnNames: []string{"resource_gl0_type_0", "resource_gl1_type_0", "resource_gl2_type_0", "resource_gl0_type_1", "resource_gl1_type_1", "resource_gl2_type_1"},
 		ColumnType:  ckdb.UInt8,
+	},
+
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: []string{"process_kname_0", "process_kname_1"},
+		ColumnType:  ckdb.String,
 	},
 }
 

@@ -48,6 +48,8 @@ type L7Base struct {
 	XRequestID             string
 	ProcessID0             uint32
 	ProcessID1             uint32
+	ProcessKName0          string
+	ProcessKName1          string
 	SyscallTraceIDThread   uint32
 	SyscallTraceIDSession  uint64
 	SyscallTraceIDRequest  uint64
@@ -89,6 +91,8 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("x_request_id", ckdb.String).SetComment("XRequestID"),
 		ckdb.NewColumn("process_id_0", ckdb.Int32).SetComment("客户端进程ID"),
 		ckdb.NewColumn("process_id_1", ckdb.Int32).SetComment("服务端进程ID"),
+		ckdb.NewColumn("process_kname_0", ckdb.String).SetComment("客户端进程名"),
+		ckdb.NewColumn("process_kname_1", ckdb.String).SetComment("服务端进程名"),
 		ckdb.NewColumn("syscall_trace_id_thread", ckdb.UInt32).SetComment("SyscallTraceID-线程"),
 		ckdb.NewColumn("syscall_trace_id_session", ckdb.UInt64).SetComment("SyscallTraceID-会话"),
 		ckdb.NewColumn("syscall_trace_id_request", ckdb.UInt64).SetComment("SyscallTraceID-请求"),
@@ -186,6 +190,12 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt32(f.ProcessID1); err != nil {
 		return err
 	}
+	if err := block.WriteString(f.ProcessKName0); err != nil {
+		return err
+	}
+	if err := block.WriteString(f.ProcessKName1); err != nil {
+		return err
+	}
 	if err := block.WriteUInt32(f.SyscallTraceIDThread); err != nil {
 		return err
 	}
@@ -244,7 +254,7 @@ func L7LoggerColumns() []*ckdb.Column {
 	l7Columns = append(l7Columns, ckdb.NewColumn("_id", ckdb.UInt64).SetCodec(ckdb.CodecDoubleDelta))
 	l7Columns = append(l7Columns, L7BaseColumns()...)
 	l7Columns = append(l7Columns,
-		ckdb.NewColumn("l7_protocol", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("0:未知 1:http, 2:dns, 3:mysql, 4:redis, 5:dubbo, 6:kafka, 7:其他"),
+		ckdb.NewColumn("l7_protocol", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("0:未知 1:其他, 20:http1, 21:http2, 40:dubbo, 60:mysql, 80:redis, 100:kafka, 120:dns"),
 		ckdb.NewColumn("version", ckdb.LowCardinalityString).SetComment("协议版本"),
 		ckdb.NewColumn("type", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("日志类型, 0:请求, 1:响应, 2:会话"),
 
@@ -456,6 +466,7 @@ func (h *L7Logger) fillDubbo(l *pb.AppProtoLogsData) {
 
 		h.ResponseException = GetDubboExceptionDesc(uint16(l.BaseInfo.Head.Code))
 	}
+	h.TraceId = info.TraceId
 
 	if info.ReqBodyLen != -1 && h.Type != uint8(datatype.MSG_T_RESPONSE) {
 		h.requestLength = uint64(info.ReqBodyLen)
@@ -516,7 +527,7 @@ func (h *L7Logger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 
 	h.ResponseDuration = l.BaseInfo.Head.RRT / uint64(time.Microsecond)
 	switch datatype.LogProtoType(l.BaseInfo.Head.Proto) {
-	case datatype.PROTO_HTTP:
+	case datatype.PROTO_HTTP_1, datatype.PROTO_HTTP_2:
 		h.fillHttp(l)
 	case datatype.PROTO_DNS:
 		h.fillDns(l)
@@ -596,6 +607,8 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.XRequestID = getRandomString()
 	b.ProcessID0 = uint32(r.Intn(100))
 	b.ProcessID1 = uint32(r.Intn(100))
+	b.ProcessKName0 = getRandomString()
+	b.ProcessKName1 = getRandomString()
 	b.SyscallTraceIDThread = uint32(r.Intn(100))
 	b.SyscallTraceIDSession = uint64(r.Intn(1000))
 	b.SyscallTraceIDRequest = uint64(r.Intn(1000))

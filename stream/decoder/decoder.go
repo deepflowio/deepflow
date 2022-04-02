@@ -21,7 +21,8 @@ import (
 var log = logging.MustGetLogger("stream.decoder")
 
 const (
-	BUFFER_SIZE = 1024
+	BUFFER_SIZE  = 1024
+	L7_PROTO_MAX = datatype.PROTO_DNS + 1
 )
 
 type Counter struct {
@@ -54,7 +55,7 @@ type Decoder struct {
 	throttler    *throttler.ThrottlingQueue
 	debugEnabled bool
 
-	l7Disableds [datatype.PROTO_MAX]bool
+	l7Disableds [L7_PROTO_MAX]bool
 	l7Disabled  bool
 	l4Disabled  bool
 
@@ -84,9 +85,10 @@ func NewDecoder(
 	}
 }
 
-func getL7Disables(flowLogConfig *config.FlowLogDisabled) [datatype.PROTO_MAX]bool {
-	l7Disableds := [datatype.PROTO_MAX]bool{}
-	l7Disableds[datatype.PROTO_HTTP] = flowLogConfig.Http
+func getL7Disables(flowLogConfig *config.FlowLogDisabled) [L7_PROTO_MAX]bool {
+	l7Disableds := [L7_PROTO_MAX]bool{}
+	l7Disableds[datatype.PROTO_HTTP_1] = flowLogConfig.Http
+	l7Disableds[datatype.PROTO_HTTP_2] = flowLogConfig.Http
 	l7Disableds[datatype.PROTO_DNS] = flowLogConfig.Dns
 	l7Disableds[datatype.PROTO_MYSQL] = flowLogConfig.Mysql
 	l7Disableds[datatype.PROTO_REDIS] = flowLogConfig.Redis
@@ -187,7 +189,7 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 
 	d.counter.L7Count++
 	drop := int64(0)
-	if proto.BaseInfo.Head.Proto < uint32(datatype.PROTO_MAX) &&
+	if proto.BaseInfo.Head.Proto < uint32(L7_PROTO_MAX) &&
 		d.l7Disableds[proto.BaseInfo.Head.Proto] {
 		drop = 1
 	} else {
@@ -200,7 +202,7 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 	proto.Release()
 
 	switch datatype.LogProtoType(proto.BaseInfo.Head.Proto) {
-	case datatype.PROTO_HTTP:
+	case datatype.PROTO_HTTP_1, datatype.PROTO_HTTP_2:
 		d.counter.L7HTTPCount++
 		d.counter.L7HTTPDropCount += drop
 	case datatype.PROTO_DNS:
