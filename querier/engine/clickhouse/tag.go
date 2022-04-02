@@ -1,7 +1,7 @@
 package clickhouse
 
 import (
-	//"errors"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -19,6 +19,7 @@ const (
 	TAG_FUNCTION_MASK                       = "mask"
 	TAG_FUNCTION_TIME                       = "time"
 	TAG_FUNCTION_TO_UNIX_TIMESTAMP_64_MICRO = "toUnixTimestamp64Micro"
+	TAG_FUNCTION_TO_UNIX_TIMESTAMP          = "toUnixTimestamp"
 	TAG_FUNCTION_TO_STRING                  = "toString"
 	TAG_FUNCTION_IF                         = "if"
 	TAG_FUNCTION_UNIQ                       = "uniq"
@@ -29,7 +30,7 @@ const (
 var TAG_FUNCTIONS = []string{
 	TAG_FUNCTION_NODE_TYPE, TAG_FUNCTION_ICON_ID, TAG_FUNCTION_MASK, TAG_FUNCTION_TIME,
 	TAG_FUNCTION_TO_UNIX_TIMESTAMP_64_MICRO, TAG_FUNCTION_TO_STRING, TAG_FUNCTION_IF,
-	TAG_FUNCTION_UNIQ, TAG_FUNCTION_ANY, TAG_FUNCTION_TOPK,
+	TAG_FUNCTION_UNIQ, TAG_FUNCTION_ANY, TAG_FUNCTION_TOPK, TAG_FUNCTION_TO_UNIX_TIMESTAMP,
 }
 
 func GetTagTranslator(name, alias, db, table string) (Statement, error) {
@@ -78,15 +79,8 @@ func GetTagFunction(name string, args []string, alias, db, table string) (Statem
 		err := time.Trans()
 		return &time, err
 	default:
-		tagDes, ok := tag.GetTag(args[0], db, table, name)
-		if !ok {
-			tagDes, ok = tag.GetTag(args[0], db, table, "default")
-			if !ok {
-				return nil, nil
-			}
-		}
 		tagFunction := TagFunction{Name: name, Args: args, Alias: alias}
-		err := tagFunction.Trans(tagDes)
+		err := tagFunction.Trans(db, table)
 		return &tagFunction, err
 	}
 }
@@ -171,11 +165,17 @@ type TagFunction struct {
 	Withs []view.Node
 }
 
-func (f *TagFunction) Trans(tag *tag.Tag) error {
+func (f *TagFunction) Trans(db, table string) error {
+	fields := f.Args
 	switch f.Name {
 	case TAG_FUNCTION_TOPK:
-		f.Name = fmt.Sprintf("topK(%s)", f.Args[1])
+		f.Name = fmt.Sprintf("topK(%s)", f.Args[len(f.Args)-1])
+		fields = fields[:len(f.Args)-1]
 	case TAG_FUNCTION_MASK:
+		tagDes, ok := tag.GetTag(f.Args[0], db, table, f.Name)
+		if !ok {
+			return errors.New(fmt.Sprintf("function mask not support %s", f.Args[0]))
+		}
 		if f.Alias == "" {
 			f.Alias = "mask"
 		}
@@ -195,21 +195,43 @@ func (f *TagFunction) Trans(tag *tag.Tag) error {
 			}
 		}
 		ip6Mask := net.CIDRMask(maskInt, 128)
-		value := fmt.Sprintf(tag.TagTranslator, ip4MaskInt, ip6Mask.String())
+		value := fmt.Sprintf(tagDes.TagTranslator, ip4MaskInt, ip6Mask.String())
 		f.Withs = []view.Node{&view.With{Value: value, Alias: f.Alias}}
 		return nil
 	case TAG_FUNCTION_NODE_TYPE, TAG_FUNCTION_ICON_ID:
-		f.Withs = []view.Node{&view.With{Value: tag.TagTranslator, Alias: f.Alias}}
+		tagDes, ok := tag.GetTag(f.Args[0], db, table, f.Name)
+		if !ok {
+			return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
+		}
+		f.Withs = []view.Node{&view.With{Value: tagDes.TagTranslator, Alias: f.Alias}}
 		return nil
+
 	}
-	var tagField string
-	if tag.TagTranslator == "" {
-		tagField = f.Args[0]
+	values := make([]string, len(fields))
+	for i, field := range fields {
+		var tagField string
+		tagDes, ok := tag.GetTag(field, db, table, f.Name)
+		if !ok {
+			// tag未定义function则走default
+			tagDes, ok = tag.GetTag(field, db, table, "default")
+			if ok {
+				tagField = tagDes.TagTranslator
+			}
+		} else {
+			tagField = tagDes.TagTranslator
+		}
+		if tagField == "" {
+			tagField = field
+		}
+		values[i] = tagField
+	}
+	var withValue string
+	if len(fields) > 1 {
+		withValue = fmt.Sprintf("%s([%s])", f.Name, strings.Join(values, ","))
 	} else {
-		tagField = tag.TagTranslator
+		withValue = fmt.Sprintf("%s(%s)", f.Name, values[0])
 	}
-	value := fmt.Sprintf("%s(%s)", f.Name, tagField)
-	f.Withs = []view.Node{&view.With{Value: value, Alias: f.Alias}}
+	f.Withs = []view.Node{&view.With{Value: withValue, Alias: f.Alias}}
 	return nil
 }
 
