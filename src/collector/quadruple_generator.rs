@@ -1022,7 +1022,7 @@ impl QuadrupleGenerator {
                             debug!("qg push tagged flows to l4_flow queue failed maybe queue have terminated");
                         }
                     }
-                    self.handle(Some(tagged_flow.clone()), tagged_flow.flow.flow_start_time);
+                    self.handle(Some(tagged_flow.clone()), tagged_flow.flow.flow_stat_time);
                 }
                 Err(Error::Timeout) => {
                     self.handle(None, rpc::get_timestamp());
