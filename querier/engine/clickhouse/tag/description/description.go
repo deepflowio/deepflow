@@ -13,7 +13,7 @@ var TAG_DESCRIPTIONS = map[string]map[string][]*TagDescription{
 }
 var TAG_ENUMS = map[string][]*TagEnum{}
 var tagTypeToOperators = map[string][]string{
-	"resource":    []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEX"},
+	"resource":    []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
 	"int":         []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
 	"int_enum":    []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
 	"string":      []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
@@ -68,6 +68,7 @@ func NewTagEnum(value, displayName interface{}) *TagEnum {
 
 func LoadTagDescriptions(tagData map[string]interface{}) error {
 	// 生成tag description
+	enumFileToTagName := make(map[string]string)
 	for db, tables := range TAG_DESCRIPTIONS {
 		tableData, ok := tagData[db]
 		if !ok {
@@ -83,11 +84,20 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				if len(tag) < 8 {
 					return errors.New(fmt.Sprintf("get metrics failed! db:%s table:%s, tag:%v", db, table, tag))
 				}
+				// 0 - Name
+				// 1 - ClientName
+				// 2 - ServerName
+				// 3 - DisplayName
+				// 4 - Type
+				// 5 - EnumFile
+				// 6 - Category
+				// 7 - Description
 				description := NewTagDescription(
 					tag[0].(string), tag[1].(string), tag[2].(string), tag[3].(string),
 					tag[4].(string), tag[5].(string), tag[6].(string), tag[7].(string),
 				)
 				TAG_DESCRIPTIONS[db][table] = append(TAG_DESCRIPTIONS[db][table], description)
+				enumFileToTagName[tag[5].(string)] = tag[0].(string)
 			}
 		}
 	}
@@ -95,12 +105,15 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 	// 生成tag enum值
 	tagEnumData, ok := tagData["enum"]
 	if ok {
-		for tagName, enumData := range tagEnumData.(map[string]interface{}) {
+		for tagEnumFile, enumData := range tagEnumData.(map[string]interface{}) {
 			tagEnums := []*TagEnum{}
 			for _, enumValue := range enumData.([][]interface{}) {
 				tagEnums = append(tagEnums, NewTagEnum(enumValue[0], enumValue[1]))
 			}
-			TAG_ENUMS[tagName] = tagEnums
+			// 根据tagEnumFile获取tagName
+			if tagName, ok := enumFileToTagName[tagEnumFile]; ok {
+				TAG_ENUMS[tagName] = tagEnums
+			}
 		}
 	} else {
 		return errors.New("get tag enum failed! ")
