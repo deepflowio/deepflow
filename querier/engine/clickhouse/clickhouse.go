@@ -31,23 +31,23 @@ type CHEngine struct {
 	asTagMap   map[string]string
 }
 
-func (e *CHEngine) ExecuteQuery(sql string) (map[string][]interface{}, error) {
+func (e *CHEngine) ExecuteQuery(sql string) (map[string][]interface{}, map[string]interface{}, error) {
 	// 解析show开头的sql
 	// show metrics/tags from <table_name> 例：show metrics/tags from l4_flow_log
 	log.Debugf("raw sql: %s", sql)
 	result, isShow, err := e.ParseShowSql(sql)
 	if isShow {
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return result, nil
+		return result, nil, nil
 	}
 
 	parser := parse.Parser{Engine: e}
 	err = parser.ParseSQL(sql)
 	if err != nil {
 		log.Error(err)
-		return nil, err
+		return nil, nil, err
 	}
 	chSql := e.ToSQLString()
 	log.Debug(chSql)
@@ -61,14 +61,16 @@ func (e *CHEngine) ExecuteQuery(sql string) (map[string][]interface{}, error) {
 	err = chClient.Init()
 	if err != nil {
 		log.Error(err)
-		return nil, err
+		return nil, nil, err
 	}
 	rst, err := chClient.DoQuery(chSql)
+	debug := chClient.Debug.Get()
 	if err != nil {
 		log.Error(err)
-		return nil, err
+		log.Error(chClient.Debug)
+		return nil, nil, err
 	}
-	return rst, err
+	return rst, debug, err
 }
 
 func (e *CHEngine) Init() {
@@ -168,7 +170,7 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 		case *sqlparser.AliasedTableExpr:
 			// 解析Table类型
 			table := sqlparser.String(from)
-			e.AddTable(table)
+			e.AddTable(e.DB + "." + table)
 			e.Table = table
 		}
 

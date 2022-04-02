@@ -5,7 +5,7 @@ import (
 	"metaflow/querier/engine/clickhouse"
 )
 
-func Execute(args map[string]string) (resp map[string][]interface{}, err error) {
+func Execute(args map[string]string) (result map[string][]interface{}, debug map[string]interface{}, err error) {
 	db := getDbBy()
 	var engine engine.Engine
 	switch db {
@@ -13,9 +13,9 @@ func Execute(args map[string]string) (resp map[string][]interface{}, err error) 
 		engine = &clickhouse.CHEngine{DB: args["db"]}
 		engine.Init()
 	}
-	resp, err = engine.ExecuteQuery(args["sql"])
+	result, debug, err = engine.ExecuteQuery(args["sql"])
 
-	return resp, err
+	return result, debug, err
 }
 
 func getDbBy() string {

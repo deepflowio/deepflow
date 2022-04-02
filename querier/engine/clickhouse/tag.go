@@ -205,7 +205,6 @@ func (f *TagFunction) Trans(db, table string) error {
 		}
 		f.Withs = []view.Node{&view.With{Value: tagDes.TagTranslator, Alias: f.Alias}}
 		return nil
-
 	}
 	values := make([]string, len(fields))
 	for i, field := range fields {

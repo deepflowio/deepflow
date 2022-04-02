@@ -12,14 +12,24 @@ type Response struct {
 	OptStatus   string      `json:"OPT_STATUS"`
 	Description string      `json:"DESCRIPTION"`
 	Result      interface{} `json:"result"`
+	Debug       interface{} `json:"debug"`
 }
 
-func HttpResponse(c *gin.Context, httpCode int, data interface{}, optStatus string, description string) {
-	c.JSON(httpCode, Response{
-		OptStatus:   optStatus,
-		Description: description,
-		Result:      data,
-	})
+func HttpResponse(c *gin.Context, httpCode int, data interface{}, debug interface{}, optStatus string, description string) {
+	if debug != nil {
+		c.JSON(httpCode, Response{
+			OptStatus:   optStatus,
+			Description: description,
+			Result:      data,
+			Debug:       debug,
+		})
+	} else {
+		c.JSON(httpCode, Response{
+			OptStatus:   optStatus,
+			Description: description,
+			Result:      data,
+		})
+	}
 }
 
 func BadRequestResponse(c *gin.Context, optStatus string, description string) {
@@ -29,15 +39,16 @@ func BadRequestResponse(c *gin.Context, optStatus string, description string) {
 	})
 }
 
-func InternalErrorResponse(c *gin.Context, data interface{}, optStatus string, description string) {
+func InternalErrorResponse(c *gin.Context, data interface{}, debug interface{}, optStatus string, description string) {
 	c.JSON(http.StatusInternalServerError, Response{
 		OptStatus:   optStatus,
 		Description: description,
 		Result:      data,
+		Debug:       debug,
 	})
 }
 
-func JsonResponse(c *gin.Context, data interface{}, err error) {
+func JsonResponse(c *gin.Context, data interface{}, debug interface{}, err error) {
 	if err != nil {
 		switch t := err.(type) {
 		case *service.ServiceError:
@@ -46,12 +57,12 @@ func JsonResponse(c *gin.Context, data interface{}, err error) {
 				common.SELECTED_RESOURCES_NUM_EXCEEDED:
 				BadRequestResponse(c, t.Status, t.Message)
 			case common.SERVER_ERROR:
-				InternalErrorResponse(c, data, t.Status, t.Message)
+				InternalErrorResponse(c, data, debug, t.Status, t.Message)
 			}
 		default:
-			InternalErrorResponse(c, data, common.FAIL, err.Error())
+			InternalErrorResponse(c, data, debug, common.FAIL, err.Error())
 		}
 	} else {
-		HttpResponse(c, 200, data, common.SUCCESS, "")
+		HttpResponse(c, 200, data, debug, common.SUCCESS, "")
 	}
 }

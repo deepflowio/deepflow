@@ -21,7 +21,6 @@ func TransType(typeName string, value interface{}) (interface{}, error) {
 		}
 		return value.(float64), nil
 	default:
-		// TODO: 报错
 		return value, nil
 	}
 }
