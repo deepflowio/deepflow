@@ -154,10 +154,13 @@ impl HttpLog {
                 for header in header_list.iter() {
                     match header.0.as_ref() {
                         b":method" => {
+                            self.msg_type = LogMessageType::Request;
                             self.info.method =
                                 String::from_utf8_lossy(header.1.as_ref()).into_owned()
                         }
                         b":status" => {
+                            self.msg_type = LogMessageType::Response;
+
                             self.status_code = std::str::from_utf8(header.1.as_ref())
                                 .unwrap_or_default()
                                 .parse::<u16>()

@@ -145,7 +145,7 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct DnsInfo {
     pub trans_id: u16,
-    pub query_type: u16,
+    pub query_type: u8,
     pub query_name: String,
     // 根据查询类型的不同而不同，如：
     // A: ipv4/ipv6地址
