@@ -6,7 +6,7 @@ region              , region_0             , region_1              , 区域     
 az                  , az_0                 , az_1                  , 可用区                        , resource     ,                    , 知识图谱    ,
 host                , host_0               , host_1                , 宿主机                        , resource     ,                    , 知识图谱    ,
 vm                  , vm_0                 , vm_1                  , 云服务器                      , resource     ,                    , 知识图谱    ,
-l3_epc              , l3_epc_0             , l3_epc_1              , VPC                           , resource     ,                    , 知识图谱    ,
+vpc                 , vpc                  , vpc                   , VPC                           , resource     ,                    , 知识图谱    ,
 subnet              , subnet_0             , subnet_1              , 子网                          , resource     ,                    , 知识图谱    ,
 router              , router_0             , router_1              , 路由器                        , resource     ,                    , 知识图谱    ,
 dhcp_port           , dhcp_port_0          , dhcp_port_1           , DHCP网关                      , resource     ,                    , 知识图谱    ,
