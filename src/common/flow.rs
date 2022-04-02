@@ -614,7 +614,7 @@ pub struct Flow {
     pub start_time: Duration,
     pub end_time: Duration,
     pub duration: Duration,
-    pub flow_start_time: Duration,
+    pub flow_stat_time: Duration,
 
     /* L2 */
     pub vlan: u16,
@@ -729,14 +729,14 @@ impl fmt::Display for Flow {
         write!(
             f,
             "flow_id:{} flow_source:{:?} tunnel:{} close_type:{:?} is_active_service:{} is_new_flow:{} queue_hash:{} \
-        syn_seq:{} synack_seq:{} last_keepalive_seq:{} last_keepalive_ack:{} flow_start_time:{:?} \
+        syn_seq:{} synack_seq:{} last_keepalive_seq:{} last_keepalive_ack:{} flow_stat_time:{:?} \
         \t start_time:{:?} end_time:{:?} duration:{:?} \
         \t vlan:{} eth_type:{:?} reversed:{} flow_key:{} \
         \n\t flow_metrics_peers_src:{:?} \
         \n\t flow_metrics_peers_dst:{:?} \
         \n\t flow_perf_stats:{:?}",
             self.flow_id, self.flow_source, self.tunnel, self.close_type, self.is_active_service, self.is_new_flow, self.queue_hash,
-            self.syn_seq, self.synack_seq, self.last_keepalive_seq, self.last_keepalive_ack, self.flow_start_time,
+            self.syn_seq, self.synack_seq, self.last_keepalive_seq, self.last_keepalive_ack, self.flow_stat_time,
             self.start_time, self.end_time, self.duration,
             self.vlan, self.eth_type, self.reversed, self.flow_key,
             self.flow_metrics_peers[0],
