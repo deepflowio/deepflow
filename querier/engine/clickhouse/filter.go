@@ -3,11 +3,13 @@ package clickhouse
 import (
 	"errors"
 	"fmt"
+	"github.com/xwb1989/sqlparser"
 	"inet.af/netaddr"
+	"net"
 	"strconv"
 	"strings"
 
-	"github.com/xwb1989/sqlparser"
+	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
 
 	"metaflow/querier/engine/clickhouse/tag"
 	"metaflow/querier/engine/clickhouse/view"
@@ -142,6 +144,14 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				return nil, err
 			}
 			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, valueInt, valueInt)
+		case "tap_port":
+			valueStr := strings.Trim(t.Value, "'")
+			mac, err := net.ParseMAC(valueStr)
+			if err != nil {
+				return nil, err
+			}
+			valueUInt64 := utils.Mac2Uint64(mac)
+			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, valueUInt64)
 		default:
 			switch strings.ToLower(op) {
 			case "regexp":

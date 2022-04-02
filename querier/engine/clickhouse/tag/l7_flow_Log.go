@@ -50,13 +50,20 @@ func GenerateL7TagMap() map[string]map[string]*Tag {
 			"_id %s %s AND time=toDateTime(bitShiftRight(%v, 32)) AND toStartOfHour(time)=toStartOfHour(toDateTime(bitShiftRight(%v, 32)))",
 			"",
 		)}
+	// 采集位置标识
+	l7TagMap["tap_port"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"tap_port %s %v",
+			"",
+		)}
 	// 采集位置名称
 	l7TagMap["tap_port_name"] = map[string]*Tag{
 		"default": NewTag(
 			"dictGet(deepflow.vtap_port_map, ('name'), (toUInt64(vtap_id),toUInt64(tap_port)))",
 			"",
-			// TODO whereTranslator
-			"",
+			"toUInt64(tap_port) IN (SELECT tap_port FROM deepflow.vtap_port_map WHERE name %s %s)",
 			"",
 		)}
 	// 采集器名称
