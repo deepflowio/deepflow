@@ -29,7 +29,6 @@ resource_gl2        , resource_gl2_0       , resource_gl2_1        , 自动分�
 
 mac                 , mac_0                , mac_1                 , MAC                           , mac          ,                    , 链路层      ,
 eth_type            , eth_type             , eth_type              , 链路协议                      , int_enum     , eth_type           , 链路层      ,
-vlan                , vlan                 , vlan                  , VLAN                          , int          ,                    , 链路层      ,
 
 ip                  , ip_0                 , ip_1                  , IP地址                        , ip           ,                    , 网络层      ,
 
