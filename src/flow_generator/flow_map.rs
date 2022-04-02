@@ -548,7 +548,7 @@ impl FlowMap {
             },
             flow_id: Self::generate_flow_id(lookup_key.timestamp, self.id, self.len()),
             start_time: lookup_key.timestamp,
-            flow_start_time: Duration::from_nanos(
+            flow_stat_time: Duration::from_nanos(
                 (lookup_key.timestamp.as_nanos() / TIME_UNIT.as_nanos() * TIME_UNIT.as_nanos())
                     as u64,
             ),
@@ -651,7 +651,7 @@ impl FlowMap {
         if !node.packet_in_tick {
             // FlowStatTime取整至统计时间的开始，只需要赋值一次，且使用包的时间戳
             node.packet_in_tick = true;
-            flow.flow_start_time = Duration::from_nanos(
+            flow.flow_stat_time = Duration::from_nanos(
                 (pkt_timestamp.as_nanos() / STATISTICAL_INTERVAL.as_nanos()
                     * STATISTICAL_INTERVAL.as_nanos()) as u64,
             );
@@ -880,7 +880,7 @@ impl FlowMap {
         let flow = &mut node.tagged_flow.flow;
         flow.update_close_type(node.flow_state);
         flow.end_time = timeout;
-        flow.flow_start_time = Duration::from_nanos(
+        flow.flow_stat_time = Duration::from_nanos(
             (timeout.as_nanos() / TIME_UNIT.as_nanos() * TIME_UNIT.as_nanos()) as u64,
         );
 
@@ -915,8 +915,8 @@ impl FlowMap {
     ) {
         let flow = &node.tagged_flow.flow;
         if node.packet_in_tick
-            && (timeout >= flow.flow_start_time + STATISTICAL_INTERVAL
-                || timeout < flow.flow_start_time)
+            && (timeout >= flow.flow_stat_time + STATISTICAL_INTERVAL
+                || timeout < flow.flow_stat_time)
         {
             self.update_flow_direction(node, meta_packet); // 每个流统计数据输出前矫正流方向
             node.tagged_flow.flow.close_type = CloseType::ForcedReport;

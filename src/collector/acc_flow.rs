@@ -138,7 +138,7 @@ impl U16Set {
     }
 
     pub fn clear(&mut self) {
-        self.0.truncate(0);
+        self.0.clear();
     }
 }
 

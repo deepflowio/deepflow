@@ -15,7 +15,10 @@ use flexi_logger::{
 use log::{info, warn};
 
 use crate::{
-    collector::{quadruple_generator::QuadrupleGeneratorThread, MetricsType},
+    collector::{
+        flow_aggr::FlowAggrThread, quadruple_generator::QuadrupleGeneratorThread, CollectorThread,
+        MetricsType,
+    },
     common::{
         enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, FREE_SPACE_REQUIREMENT,
     },
@@ -234,7 +237,7 @@ struct Components {
     tap_typer: Arc<TapTyper>,
     dispatchers: Vec<Dispatcher>,
     dispatcher_listeners: Vec<DispatcherListener>,
-    quadruple_generators: Vec<QuadrupleGeneratorThread>,
+    collectors: Vec<CollectorThread>,
     monitor: Monitor,
 }
 
@@ -344,7 +347,7 @@ impl Components {
         let dispatcher_num = static_config.src_interfaces.len().max(1);
         let mut dispatchers = vec![];
         let mut dispatcher_listeners = vec![];
-        let mut quadruple_generators = vec![];
+        let mut collectors = vec![];
 
         for i in 0..dispatcher_num {
             // TODO: create and start collector
@@ -414,7 +417,7 @@ impl Components {
             dispatchers.push(dispatcher);
             dispatcher_listeners.push(dispatcher_listener);
 
-            let mut quadruple_generator = Self::new_collector(
+            let mut collector = Self::new_collector(
                 i,
                 stats_collector,
                 static_config,
@@ -422,8 +425,8 @@ impl Components {
                 flow_receiver,
                 MetricsType::SECOND | MetricsType::MINUTE,
             );
-            quadruple_generator.start();
-            quadruple_generators.push(quadruple_generator);
+            collector.start();
+            collectors.push(collector);
         }
 
         // TODO: platform synchronizer
@@ -440,7 +443,7 @@ impl Components {
             tap_typer,
             dispatchers,
             dispatcher_listeners,
-            quadruple_generators,
+            collectors,
             monitor,
         })
     }
@@ -453,7 +456,7 @@ impl Components {
         runtime_config: &RuntimeConfig,
         flow_receiver: queue::Receiver<TaggedFlow>,
         metrics_type: MetricsType,
-    ) -> QuadrupleGeneratorThread {
+    ) -> CollectorThread {
         let (second_sender, second_receiver, counter) =
             queue::bounded(static_config.quadruple_queue_size);
         stats_collector.register_countable(
@@ -514,6 +517,30 @@ impl Components {
             vtap_flow_1s_enabled,
         );
 
+        let mut l4_flow_aggr = None;
+        if let Some(l4_flow_receiver) = l4_log_receiver {
+            let throttle = Arc::new(AtomicU64::new(runtime_config.l4_log_collect_nps_threshold));
+            let (l4_flow_aggr_sender, l4_flow_aggr_receiver, counter) =
+                queue::bounded(static_config.flow.aggr_queue_size as usize);
+            stats_collector.register_countable(
+                "2-second-flow-to-minute-aggrer",
+                Arc::new(counter),
+                vec![StatsOption::Tag("index", id.to_string())],
+            );
+            l4_flow_aggr = Some(FlowAggrThread::new(
+                id,                  // id
+                l4_flow_receiver,    // input
+                l4_flow_aggr_sender, // output
+                runtime_config.l4_log_store_tap_types.as_slice(),
+                throttle,
+            ));
+            thread::spawn(move || {
+                for flow in l4_flow_aggr_receiver {
+                    info!("l4_flow: {}", flow);
+                }
+            });
+        }
+
         thread::spawn(move || {
             for flow in second_receiver {
                 info!("second: {}", flow);
@@ -524,14 +551,8 @@ impl Components {
                 info!("minute: {}", flow);
             }
         });
-        if let Some(l4_flow_receiver) = l4_log_receiver {
-            thread::spawn(move || {
-                for flow in l4_flow_receiver {
-                    info!("l4_flow: {}", flow);
-                }
-            });
-        }
-        quadruple_generator
+
+        CollectorThread::new(quadruple_generator, l4_flow_aggr)
     }
 
     fn stop(mut self) {
@@ -543,7 +564,7 @@ impl Components {
         // TODO: platform synchronizer
 
         // TODO: collector
-        for q in self.quadruple_generators.iter_mut() {
+        for q in self.collectors.iter_mut() {
             q.stop();
         }
 
