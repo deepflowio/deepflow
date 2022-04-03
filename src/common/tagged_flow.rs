@@ -22,7 +22,7 @@ impl TaggedFlow {
         self.tag.reverse();
     }
 
-    fn encode(self, buf: &mut &mut [u8]) -> Result<usize, prost::EncodeError> {
+    pub fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         let pb_tagged_flow = flow_log::TaggedFlow {
             flow: Some(self.flow.into()),
         };
@@ -101,8 +101,8 @@ mod tests {
         tflow.flow.flow_perf_stats = Some(flow_perf_stats);
         tflow.flow.is_active_service = true;
 
-        let mut buf: Vec<u8> = vec![0; 200];
-        let encoded_len = tflow.encode(&mut buf.as_mut_slice()).unwrap();
+        let mut buf: Vec<u8> = vec![];
+        let encoded_len = tflow.encode(&mut buf).unwrap();
         let rlt: Result<flow_log::TaggedFlow, prost::DecodeError> =
             Message::decode(buf.as_slice().get(..encoded_len).unwrap());
 

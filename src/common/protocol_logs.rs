@@ -357,13 +357,26 @@ pub enum AppProtoLogsInfo {
     Http(HttpInfo),
 }
 
+impl fmt::Display for AppProtoLogsInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Dns(l) => write!(f, "{:?}", l),
+            Self::Mysql(l) => write!(f, "{:?}", l),
+            Self::Redis(l) => write!(f, "{:?}", l),
+            Self::Dubbo(l) => write!(f, "{:?}", l),
+            Self::Kafka(l) => write!(f, "{:?}", l),
+            Self::Http(l) => write!(f, "{:?}", l),
+        }
+    }
+}
+
 pub struct AppProtoLogsData {
     pub base_info: AppProtoLogsBaseInfo,
     pub special_info: AppProtoLogsInfo,
 }
 
 impl AppProtoLogsData {
-    pub fn encode(self, buf: &mut &mut [u8]) -> Result<usize, prost::EncodeError> {
+    pub fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         let mut pb_proto_logs_data = flow_log::AppProtoLogsData {
             base: Some(self.base_info.into()),
             http: None,
@@ -385,6 +398,13 @@ impl AppProtoLogsData {
         pb_proto_logs_data
             .encode(buf)
             .map(|_| pb_proto_logs_data.encoded_len())
+    }
+}
+
+impl fmt::Display for AppProtoLogsData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.base_info)?;
+        write!(f, "{}", self.special_info)
     }
 }
 
