@@ -19,7 +19,7 @@ func GenerateL4TagMap() map[string]map[string]*Tag {
 			"",
 		)}
 	// 采集点ID
-	l4TagMap["tap_type_value_id"] = map[string]*Tag{
+	l4TagMap["tap_id"] = map[string]*Tag{
 		"default": NewTag(
 			"tap_type",
 			"",
@@ -27,7 +27,7 @@ func GenerateL4TagMap() map[string]map[string]*Tag {
 			"",
 		)}
 	// 采集点
-	l4TagMap["tap_type_value"] = map[string]*Tag{
+	l4TagMap["tap"] = map[string]*Tag{
 		"default": NewTag(
 			"dictGet(deepflow.tap_type_map, ('name'), toUInt64(tap_type))",
 			"",
