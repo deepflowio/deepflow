@@ -2,6 +2,7 @@ use std::mem;
 use std::net::IpAddr;
 use std::path::Path;
 use std::process;
+use std::str::FromStr;
 use std::sync::{
     atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     Arc, Condvar, Mutex,
@@ -39,6 +40,7 @@ use crate::{
     platform::{ApiWatcher, LibvirtXmlExtractor, PlatformSynchronizer},
     proto::trident::TapMode,
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
+    sender::{uniform_sender::UniformSenderThread, SendItem},
     utils::{
         environment::{
             check, controller_ip_check, free_memory_checker, free_space_checker, kernel_check,
@@ -259,6 +261,7 @@ struct Components {
     dispatchers: Vec<Dispatcher>,
     dispatcher_listeners: Vec<DispatcherListener>,
     collectors: Vec<CollectorThread>,
+    l4_flow_uniform_sender: Option<UniformSenderThread>,
     monitor: Monitor,
     platform_synchronizer: PlatformSynchronizer,
     api_watcher: Arc<ApiWatcher>,
@@ -398,6 +401,31 @@ impl Components {
         let mut collectors = vec![];
         let mut doc_collectors = vec![];
 
+        let dst_ip = Arc::new(Mutex::new(
+            IpAddr::from_str(&runtime_config.analyzer_ip).unwrap(),
+        ));
+        info!("analyzer_ip: {}", *dst_ip.lock().unwrap());
+        let sender_id = 0usize;
+        let mut l4_flow_aggr_sender = None;
+        let mut l4_flow_uniform_sender = None;
+        if runtime_config.l4_log_store_tap_types.len() > 0 {
+            let (sender, l4_flow_aggr_receiver, counter) =
+                queue::bounded(static_config.flow.aggr_queue_size as usize);
+            stats_collector.register_countable(
+                "2-second-flow-to-minute-aggrer",
+                Arc::new(counter),
+                vec![StatsOption::Tag("index", sender_id.to_string())],
+            );
+            l4_flow_aggr_sender = Some(sender);
+            l4_flow_uniform_sender = Some(UniformSenderThread::new(
+                sender_id,
+                runtime_config.vtap_id,
+                l4_flow_aggr_receiver,
+                dst_ip,
+            ));
+            l4_flow_uniform_sender.as_mut().unwrap().start();
+        }
+
         for i in 0..dispatcher_num {
             // TODO: create and start collector
             let (flow_sender, flow_receiver, counter) =
@@ -473,6 +501,7 @@ impl Components {
                 static_config,
                 runtime_config,
                 flow_receiver,
+                l4_flow_aggr_sender.clone(),
                 MetricsType::SECOND | MetricsType::MINUTE,
                 config_handler
                     .collector
@@ -544,6 +573,7 @@ impl Components {
             dispatchers,
             dispatcher_listeners,
             collectors,
+            l4_flow_uniform_sender,
             monitor,
             platform_synchronizer,
             api_watcher,
@@ -559,6 +589,7 @@ impl Components {
         static_config: &Config,
         runtime_config: &RuntimeConfig,
         flow_receiver: queue::Receiver<TaggedFlow>,
+        l4_flow_aggr_sender: Option<queue::Sender<SendItem>>,
         metrics_type: MetricsType,
         inactive_server_port_enabled: Arc<AtomicBool>,
     ) -> (CollectorThread, Collector) {
@@ -578,7 +609,7 @@ impl Components {
         );
 
         let (mut l4_log_sender, mut l4_log_receiver) = (None, None);
-        if runtime_config.l4_log_store_tap_types.len() > 0 {
+        if l4_flow_aggr_sender.is_some() {
             let (l4_flow_sender, l4_flow_receiver, counter) =
                 queue::bounded(static_config.flow.aggr_queue_size as usize);
             stats_collector.register_countable(
@@ -623,27 +654,15 @@ impl Components {
         );
 
         let mut l4_flow_aggr = None;
-        if let Some(l4_flow_receiver) = l4_log_receiver {
+        if let Some(l4_log_receiver) = l4_log_receiver {
             let throttle = Arc::new(AtomicU64::new(runtime_config.l4_log_collect_nps_threshold));
-            let (l4_flow_aggr_sender, l4_flow_aggr_receiver, counter) =
-                queue::bounded(static_config.flow.aggr_queue_size as usize);
-            stats_collector.register_countable(
-                "2-second-flow-to-minute-aggrer",
-                Arc::new(counter),
-                vec![StatsOption::Tag("index", id.to_string())],
-            );
             l4_flow_aggr = Some(FlowAggrThread::new(
-                id,                  // id
-                l4_flow_receiver,    // input
-                l4_flow_aggr_sender, // output
+                id,                                   // id
+                l4_log_receiver,                      // input
+                l4_flow_aggr_sender.unwrap().clone(), // output
                 runtime_config.l4_log_store_tap_types.as_slice(),
                 throttle,
             ));
-            thread::spawn(move || {
-                for flow in l4_flow_aggr_receiver {
-                    info!("{:?}", flow);
-                }
-            });
         }
 
         let (collector, collector_receiver) = {
@@ -708,6 +727,10 @@ impl Components {
         }
         for c in self.doc_collectors.iter() {
             c.stop();
+        }
+
+        if let Some(l4_flow_uniform_sender) = self.l4_flow_uniform_sender.as_mut() {
+            l4_flow_uniform_sender.stop();
         }
 
         // TODO: app proto logs handler

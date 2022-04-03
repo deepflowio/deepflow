@@ -39,7 +39,7 @@ impl Document {
         self.meter.reverse()
     }
 
-    fn encode(self, buf: &mut &mut [u8]) -> Result<usize, prost::EncodeError> {
+    pub fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         let pb_doc: metric::Document = self.into();
         pb_doc.encode(buf).map(|_| pb_doc.encoded_len())
     }
@@ -339,8 +339,8 @@ mod tests {
             f.traffic.packet_tx = 1;
         }
 
-        let mut buf: Vec<u8> = vec![0; 100];
-        let encode_len = doc.encode(&mut buf.as_mut_slice()).unwrap();
+        let mut buf: Vec<u8> = vec![];
+        let encode_len = doc.encode(&mut buf).unwrap();
 
         let rlt: Result<metric::Document, prost::DecodeError> =
             Message::decode(buf.as_slice().get(..encode_len).unwrap());
