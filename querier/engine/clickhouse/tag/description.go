@@ -1,9 +1,18 @@
-package description
+package tag
 
 import (
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+
+	logging "github.com/op/go-logging"
+	"metaflow/querier/common"
+	"metaflow/querier/config"
+	"metaflow/querier/engine/clickhouse/client"
 )
+
+var log = logging.MustGetLogger("clickhouse.tag")
 
 var TAG_DESCRIPTIONS = map[string]map[string][]*TagDescription{
 	"flow_log": {
@@ -20,6 +29,17 @@ var tagTypeToOperators = map[string][]string{
 	"string_enum": []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
 	"ip":          []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
 	"mac":         []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
+}
+var TAG_RESOURCE_TYPE_DEVICE_MAP = map[string]int{
+	"vm":          VIF_DEVICE_TYPE_VM,
+	"router":      VIF_DEVICE_TYPE_VROUTER,
+	"dhcp_port":   VIF_DEVICE_TYPE_DHCP_PORT,
+	"pod_service": VIF_DEVICE_TYPE_POD_SERVICE,
+	"redis":       VIF_DEVICE_TYPE_REDIS_INSTANCE,
+	"rds":         VIF_DEVICE_TYPE_RDS_INSTANCE,
+	"lb":          VIF_DEVICE_TYPE_LB,
+	"nat_gateway": VIF_DEVICE_TYPE_NAT_GATEWAY,
+	"host":        VIF_DEVICE_TYPE_HOST,
 }
 
 type TagDescription struct {
@@ -153,9 +173,8 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 func GetTagValues(db, table, tag string) (map[string][]interface{}, error) {
 	tagValues, ok := TAG_ENUMS[tag]
 	if !ok {
-		return nil, errors.New(fmt.Sprintf("tag (%s) not found", tag))
+		return GetTagResourceValues(tag)
 	}
-
 	response := map[string][]interface{}{
 		"columns": []interface{}{"value", "display_name"},
 		"values":  []interface{}{},
@@ -166,4 +185,56 @@ func GetTagValues(db, table, tag string) (map[string][]interface{}, error) {
 		)
 	}
 	return response, nil
+}
+
+func GetTagResourceValues(tag string) (map[string][]interface{}, error) {
+	chClient := client.Client{
+		IPs:      config.Cfg.Clickhouse.IPs,
+		Port:     config.Cfg.Clickhouse.Port,
+		UserName: config.Cfg.Clickhouse.User,
+		Password: config.Cfg.Clickhouse.Password,
+		DB:       "deepflow",
+	}
+	err := chClient.Init()
+	if err != nil {
+		return nil, err
+	}
+	var sql string
+	deviceType, ok := TAG_RESOURCE_TYPE_DEVICE_MAP[tag]
+	if ok {
+		sql = fmt.Sprintf("SELECT deviceid AS value,name AS display_name FROM device_map WHERE devicetype=%d", deviceType)
+	} else if common.IsValueInSliceString(tag, TAG_RESOURCE_TYPE_DEFAULT) {
+		sql = fmt.Sprintf("SELECT id as value,name AS display_name FROM %s", tag+"_map")
+	} else if common.IsValueInSliceString(tag, TAG_RESOURCE_TYPE_AUTO) {
+		var autoDeviceTypes []string
+		for _, deviceType := range AutoMap {
+			autoDeviceTypes = append(autoDeviceTypes, strconv.Itoa(deviceType))
+		}
+		autoMap := map[string]map[string]int{
+			"resource_gl0": AutoPodMap,
+			"resource_gl1": AutoPodGroupMap,
+			"resource_gl2": AutoServiceMap,
+		}
+		for _, deviceType := range autoMap[tag] {
+			autoDeviceTypes = append(autoDeviceTypes, strconv.Itoa(deviceType))
+		}
+		sql = fmt.Sprintf(
+			"SELECT deviceid AS value,name AS display_name,devicetype AS device_type FROM device_map WHERE devicetype in (%s)",
+			strings.Join(autoDeviceTypes, ","),
+		)
+	} else if tag == "vpc" {
+		sql = "SELECT id as value,name AS display_name FROM l3_epc_map"
+	} else if tag == "ip" {
+		// TODO
+		return nil, nil
+	}
+	if sql == "" {
+		return nil, errors.New(fmt.Sprintf("tag (%s) not found", tag))
+	}
+	log.Debug(sql)
+	rst, err := chClient.DoQuery(sql)
+	if err != nil {
+		return nil, err
+	}
+	return rst, err
 }

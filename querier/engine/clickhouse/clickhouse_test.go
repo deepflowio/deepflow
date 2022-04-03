@@ -76,7 +76,7 @@ var (
 		output: "WITH if(COUNTArray(arrayFilter(x -> x!=0, _grouparray_rtt))>0, divide(plus(COUNTArray(arrayFilter(x -> (x <= 100 AND 0 < x), _grouparray_rtt)), divide(COUNTArray(arrayFilter(x -> ((100 < x) AND (x <= (100 * 4))), _grouparray_rtt)), 2)), COUNTArray(arrayFilter(x -> x!=0, _grouparray_rtt))), null) AS divide_0diveider_as_null_plus_apdex_satisfy__grouparray_rtt_100_apdex_toler__grouparray_rtt_100_count__grouparray_rtt SELECT divide_0diveider_as_null_plus_apdex_satisfy__grouparray_rtt_100_apdex_toler__grouparray_rtt_100_count__grouparray_rtt AS apdex_rtt_100 FROM (SELECT groupArrayIf(rtt, rtt != 0) AS _grouparray_rtt FROM flow_log.l4_flow_log)",
 	}, {
 		input:  "select Max(byte) as max_byte, time(time,120) as time_120 from l4_flow_log group by time_120",
-		output: "WITH toStartOfInterval(_time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS _time_120 SELECT MAX(_sum_byte_tx_plus_byte_rx) AS max_byte, toUnixTimestamp(_time_120) AS time_120 FROM (WITH toStartOfInterval(time, toIntervalSecond(60)) AS _time SELECT SUM(byte_tx+byte_rx) AS _sum_byte_tx_plus_byte_rx, _time FROM flow_log.l4_flow_log GROUP BY _time, time_120) GROUP BY time_120",
+		output: "WITH toStartOfInterval(_time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS _time_120 SELECT MAX(_sum_byte_tx_plus_byte_rx) AS max_byte, toUnixTimestamp(_time_120) AS time_120 FROM (WITH toStartOfInterval(time, toIntervalSecond(60)) AS _time SELECT SUM(byte_tx+byte_rx) AS _sum_byte_tx_plus_byte_rx, _time FROM flow_log.l4_flow_log GROUP BY _time) GROUP BY time_120",
 	},
 	}
 )

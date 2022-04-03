@@ -13,7 +13,7 @@ import (
 	"metaflow/querier/config"
 	"metaflow/querier/engine/clickhouse/client"
 	"metaflow/querier/engine/clickhouse/metrics"
-	tagdescription "metaflow/querier/engine/clickhouse/tag/description"
+	tagdescription "metaflow/querier/engine/clickhouse/tag"
 	"metaflow/querier/engine/clickhouse/view"
 	"metaflow/querier/parse"
 )
@@ -135,7 +135,7 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 			}
 			function, ok := item.Expr.(*sqlparser.FuncExpr)
 			if ok {
-				e.asTagMap[as] = sqlparser.String(function.Name)
+				e.asTagMap[as] = strings.Trim(sqlparser.String(function.Name), "`")
 			}
 		}
 	}
@@ -297,7 +297,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		if err != nil {
 			return err
 		}
-		name = strings.ReplaceAll(name, "`", "")
+		name = strings.Trim(name, "`")
 		function, levelFlag, err := GetAggFunc(name, args, as, e.DB, e.Table)
 		if err != nil {
 			return err

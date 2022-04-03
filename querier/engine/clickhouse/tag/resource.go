@@ -2,53 +2,24 @@ package tag
 
 import (
 	"strconv"
-
-	"metaflow/querier/common"
 )
 
 var TagResoureMap = GenerateTagResoureMap()
-
-var DeviceMap = map[string]int{
-	"vm":          common.VIF_DEVICE_TYPE_VM,
-	"router":      common.VIF_DEVICE_TYPE_VROUTER,
-	"dhcp_port":   common.VIF_DEVICE_TYPE_DHCP_PORT,
-	"pod_service": common.VIF_DEVICE_TYPE_POD_SERVICE,
-	"redis":       common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
-	"rds":         common.VIF_DEVICE_TYPE_RDS_INSTANCE,
-	"lb":          common.VIF_DEVICE_TYPE_LB,
-	"nat_gateway": common.VIF_DEVICE_TYPE_NAT_GATEWAY,
-}
-
-var AutoMap = map[string]int{
-	"vm":          common.VIF_DEVICE_TYPE_VM,
-	"router":      common.VIF_DEVICE_TYPE_VROUTER,
-	"host":        common.VIF_DEVICE_TYPE_HOST,
-	"dhcp_port":   common.VIF_DEVICE_TYPE_DHCP_PORT,
-	"pod_service": common.VIF_DEVICE_TYPE_POD_SERVICE,
-	"redis":       common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
-	"rds":         common.VIF_DEVICE_TYPE_RDS_INSTANCE,
-	"pod_node":    common.VIF_DEVICE_TYPE_POD_NODE,
-	"lb":          common.VIF_DEVICE_TYPE_LB,
-	"nat_gateway": common.VIF_DEVICE_TYPE_NAT_GATEWAY,
-}
-
-var AutoPodMap = map[string]int{
-	"pod": common.VIF_DEVICE_TYPE_POD,
-}
-
-var AutoPodGroupMap = map[string]int{
-	"pod_group": common.VIF_DEVICE_TYPE_POD_GROUP,
-}
-
-var AutoServiceMap = map[string]int{
-	"pod_group": common.VIF_DEVICE_TYPE_POD_GROUP,
-	"service":   common.VIF_DEVICE_TYPE_SERVICE,
+var DEVICE_MAP = map[string]int{
+	"vm":          VIF_DEVICE_TYPE_VM,
+	"router":      VIF_DEVICE_TYPE_VROUTER,
+	"dhcp_port":   VIF_DEVICE_TYPE_DHCP_PORT,
+	"pod_service": VIF_DEVICE_TYPE_POD_SERVICE,
+	"redis":       VIF_DEVICE_TYPE_REDIS_INSTANCE,
+	"rds":         VIF_DEVICE_TYPE_RDS_INSTANCE,
+	"lb":          VIF_DEVICE_TYPE_LB,
+	"nat_gateway": VIF_DEVICE_TYPE_NAT_GATEWAY,
 }
 
 func GenerateTagResoureMap() map[string]map[string]*Tag {
 	tagResourceMap := make(map[string]map[string]*Tag)
 	// 资源:区域，可用区，容器节点，命名空间，工作负载，容器POD，容器集群，子网
-	for _, resourceStr := range []string{"region", "az", "pod_node", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet"} {
+	for _, resourceStr := range TAG_RESOURCE_TYPE_DEFAULT {
 		// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
 		for _, suffix := range []string{"", "_0", "_1"} {
 			resourceIDSuffix := resourceStr + "_id" + suffix
@@ -154,7 +125,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	}
 
 	// device资源
-	for resourceStr, deviceTypeValue := range DeviceMap {
+	for resourceStr, deviceTypeValue := range DEVICE_MAP {
 		deviceTypeValueStr := strconv.Itoa(deviceTypeValue)
 		// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
 		for _, suffix := range []string{"", "_0", "_1"} {
@@ -192,7 +163,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	}
 
 	// 自动分组
-	for _, autoStr := range []string{"resource_gl0", "resource_gl1", "resource_gl2"} {
+	for _, autoStr := range TAG_RESOURCE_TYPE_AUTO {
 		// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
 		for _, suffix := range []string{"", "_0", "_1"} {
 			autoIDSuffix := autoStr + "_id" + suffix

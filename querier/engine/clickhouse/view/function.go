@@ -91,6 +91,8 @@ func FormatField(field string) string {
 	field = strings.ReplaceAll(field, "/", "_div_")
 	field = strings.ReplaceAll(field, "(", "_")
 	field = strings.ReplaceAll(field, ")", "_")
+	field = strings.ReplaceAll(field, "[", "_")
+	field = strings.ReplaceAll(field, "]", "_")
 	field = strings.ReplaceAll(field, ",", "_")
 	field = strings.ReplaceAll(field, " ", "_")
 	field = strings.ReplaceAll(field, "<", "_")

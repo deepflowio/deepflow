@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-var log = logging.MustGetLogger("clickhouse")
+var log = logging.MustGetLogger("clickhouse.client")
 
 type Client struct {
 	IPs        []string
