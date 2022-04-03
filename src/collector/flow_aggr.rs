@@ -14,6 +14,7 @@ use super::consts::*;
 use super::round_to_minute;
 
 use crate::common::{enums::TapType, flow::CloseType, tagged_flow::TaggedFlow};
+use crate::sender::SendItem;
 use crate::utils::{
     queue::{Error, Receiver, Sender},
     stats::{Countable, Counter, CounterType, CounterValue},
@@ -43,7 +44,7 @@ impl FlowAggrThread {
     pub fn new(
         id: usize,
         input: Receiver<Arc<TaggedFlow>>,
-        output: Sender<TaggedFlow>,
+        output: Sender<SendItem>,
         l4_log_store_tap_types: &[u32],
         throttle: Arc<AtomicU64>,
     ) -> Self {
@@ -94,7 +95,7 @@ pub struct FlowAggr {
 impl FlowAggr {
     pub fn new(
         input: Receiver<Arc<TaggedFlow>>,
-        output: Sender<TaggedFlow>,
+        output: Sender<SendItem>,
         l4_log_store_tap_types: &[u32],
         throttle: Arc<AtomicU64>,
         running: Arc<AtomicBool>,
@@ -268,10 +269,9 @@ struct ThrottlingQueue {
 
     last_flush_time: Duration,
     period_count: usize,
-    period_emit_count: usize,
-    output: Sender<TaggedFlow>,
+    output: Sender<SendItem>,
 
-    stashs: Vec<TaggedFlow>,
+    stashs: Vec<SendItem>,
 }
 
 impl ThrottlingQueue {
@@ -280,7 +280,7 @@ impl ThrottlingQueue {
     const MIN_L4_LOG_COLLECT_NPS_THRESHOLD: u64 = 100;
     const MAX_L4_LOG_COLLECT_NPS_THRESHOLD: u64 = 1000000;
 
-    pub fn new(output: Sender<TaggedFlow>, throttle: Arc<AtomicU64>) -> Self {
+    pub fn new(output: Sender<SendItem>, throttle: Arc<AtomicU64>) -> Self {
         let t: u64 = throttle.load(Ordering::Relaxed) * Self::THROTTLE_BUCKET;
         Self {
             new_throttle: throttle,
@@ -290,7 +290,6 @@ impl ThrottlingQueue {
 
             last_flush_time: Duration::ZERO,
             period_count: 0,
-            period_emit_count: 0,
 
             output,
             stashs: Vec::with_capacity(t as usize),
@@ -317,12 +316,12 @@ impl ThrottlingQueue {
 
         self.period_count += 1;
         if self.stashs.len() < self.throttle as usize {
-            self.stashs.push(f);
+            self.stashs.push(SendItem::L4FlowLog(f));
             true
         } else {
             let r = self.small_rng.gen_range(0..self.period_count);
             if r < self.throttle as usize {
-                self.stashs[r] = f;
+                self.stashs[r] = SendItem::L4FlowLog(f);
             }
             false
         }
