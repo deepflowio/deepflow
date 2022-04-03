@@ -5,6 +5,7 @@ import (
 	"metaflow/querier/common"
 	"metaflow/querier/engine/clickhouse/metrics"
 	"metaflow/querier/engine/clickhouse/view"
+	"strconv"
 	"strings"
 )
 
@@ -45,6 +46,14 @@ func GetBinaryFunc(name string, args []Function) (*BinaryFunction, error) {
 		Name:      name,
 		Functions: args,
 	}, nil
+}
+
+func GetFieldFunc(name string) (FieldFunction, error) {
+	switch name {
+	case "TimeRange":
+		return &TimeRangeField{}, nil
+	}
+	return nil, nil
 }
 
 func GetDefaultAlias(name string, args []string) string {
@@ -178,6 +187,7 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 		case metrics.METRICS_TYPE_PERCENTAGE:
 			// 比例类，null需要补成0
 			outFunc.SetFillNullAsZero(true)
+			outFunc.SetMath("*100")
 		case metrics.METRICS_TYPE_TAG:
 			outFunc.SetIsGroupArray(true)
 		}
@@ -218,3 +228,29 @@ func (f *Field) Trans(m *view.Model) view.Node {
 func (f *Field) Format(m *view.Model) {}
 
 func (f *Field) SetAlias(alias string) {}
+
+type FieldFunction interface {
+	Function
+}
+
+type TimeRangeField struct {
+	FieldFunction
+}
+
+func (f *TimeRangeField) Format(m *view.Model) {}
+
+func (f *TimeRangeField) Trans(m *view.Model) view.Node {
+	var interval int
+	if m.Time.Interval > 0 {
+		if m.Time.DatasourceInterval > m.Time.Interval {
+			interval = m.Time.DatasourceInterval
+		} else {
+			interval = m.Time.Interval
+		}
+	} else {
+		interval = int(m.Time.TimeEnd - m.Time.TimeStart)
+	}
+	return &view.Field{Value: strconv.Itoa(interval)}
+}
+
+func (f *TimeRangeField) SetAlias(alias string) {}

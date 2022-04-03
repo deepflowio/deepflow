@@ -79,6 +79,7 @@ type Function interface {
 	SetIsGroupArray(bool)
 	SetCondition(string)
 	SetTime(*Time)
+	SetMath(string)
 	GetFlag() int
 	GetName() string
 	Init()
@@ -115,6 +116,7 @@ type DefaultFunction struct {
 	IsGroupArray   bool // 是否针对list做聚合，例:SUMArray(rtt_max)
 	Nest           bool // 是否为内层嵌套算子
 	Time           *Time
+	Math           string
 	NodeBase
 }
 
@@ -218,7 +220,7 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 	}
 
 	buf.WriteString(")")
-
+	buf.WriteString(f.Math)
 	if !f.Nest && f.Alias != "" {
 		buf.WriteString(" AS ")
 		buf.WriteString(f.Alias)
@@ -296,6 +298,10 @@ func (f *DefaultFunction) SetCondition(condition string) {
 	f.Condition = condition
 }
 
+func (f *DefaultFunction) SetMath(math string) {
+	f.Math = math
+}
+
 type Field struct {
 	NodeBase
 	Value string
@@ -345,6 +351,7 @@ func (f *SpreadFunction) Init() {
 	f.minusFunction = &DefaultFunction{
 		Name:   FUNCTION_MINUS,
 		Fields: []Node{&maxFunc, &minFunc},
+		Math:   f.Math,
 	}
 }
 
@@ -390,6 +397,7 @@ func (f *RspreadFunction) Init() {
 		DefaultFunction: DefaultFunction{
 			Name:   FUNCTION_DIV,
 			Fields: []Node{&maxFunc, &minFunc},
+			Math:   f.Math,
 		},
 	}
 }
@@ -463,6 +471,7 @@ func (f *ApdexFunction) Init() {
 			DefaultFunction: DefaultFunction{
 				Name:   FUNCTION_DIV,
 				Fields: []Node{&plus, &count},
+				Math:   "*100",
 			},
 			// count为0则结果为null
 			DivType: FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL,
@@ -498,6 +507,7 @@ func (f *ApdexFunction) Init() {
 			DefaultFunction: DefaultFunction{
 				Name:   FUNCTION_DIV,
 				Fields: []Node{&plus, &count},
+				Math:   "*100",
 			},
 			// count为0则结果为null
 			DivType: FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL,
@@ -545,6 +555,7 @@ func (f *DivFunction) WriteTo(buf *bytes.Buffer) {
 		buf.WriteString(f.Fields[0].(Function).GetDefaultAlias(true))
 		buf.WriteString(f.Fields[1].(Function).GetDefaultAlias(true))
 	}
+	buf.WriteString(f.Math)
 	if !f.Nest && f.Alias != "" {
 		buf.WriteString(" AS ")
 		buf.WriteString(f.Alias)
@@ -590,6 +601,7 @@ func (f *MinFunction) WriteTo(buf *bytes.Buffer) {
 	} else {
 		buf.WriteString("min_fillnullaszero_")
 		f.Fields[0].WriteTo(buf)
+		buf.WriteString(f.Math)
 		if f.Alias != "" {
 			buf.WriteString(" AS ")
 			buf.WriteString(f.Alias)

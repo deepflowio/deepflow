@@ -376,6 +376,17 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 		return e.parseSelectBinaryExpr(expr.Expr)
 	case *sqlparser.SQLVal:
 		return &Field{Value: sqlparser.String(expr)}, nil
+	case *sqlparser.ColName:
+		field := sqlparser.String(expr)
+		fieldFunc, err := GetFieldFunc(field)
+		if err != nil {
+			return nil, err
+		}
+		if fieldFunc != nil {
+			return fieldFunc, nil
+		} else {
+			return nil, errors.New(fmt.Sprintf("Field: %s not support", field))
+		}
 	default:
 		// TODO: 报错
 		return nil, nil
