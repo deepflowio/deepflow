@@ -14,6 +14,7 @@ mod platform;
 mod policy;
 mod proto;
 mod rpc;
+mod sender;
 pub mod trident;
 mod utils;
 
