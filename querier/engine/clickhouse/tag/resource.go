@@ -134,17 +134,18 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		deviceTypeValueStr := strconv.Itoa(deviceTypeValue)
 		// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
 		for _, suffix := range []string{"", "_0", "_1"} {
+			resourceIDSuffix := resourceStr + "_id" + suffix
 			deviceIDSuffix := "l3_device_id" + suffix
 			deviceTypeSuffix := "l3_device_type" + suffix
-			deviceNameSuffix := resourceStr + suffix
-			tagResourceMap[deviceIDSuffix] = map[string]*Tag{
+			resourceNameSuffix := resourceStr + suffix
+			tagResourceMap[resourceIDSuffix] = map[string]*Tag{
 				"default": NewTag(
 					"if("+deviceTypeSuffix+"="+deviceTypeValueStr+","+deviceIDSuffix+", 0)",
 					deviceIDSuffix+"!=0 AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
 					deviceIDSuffix+" %s %s AND"+deviceTypeSuffix+"="+deviceTypeValueStr,
 					"",
 				)}
-			tagResourceMap[deviceNameSuffix] = map[string]*Tag{
+			tagResourceMap[resourceNameSuffix] = map[string]*Tag{
 				"default": NewTag(
 					"dictGet(deepflow.device_map, ('name'), (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
 					deviceIDSuffix+"!=0 AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
