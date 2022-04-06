@@ -2,12 +2,9 @@ package clickhouse
 
 import (
 	//"github.com/k0kubun/pp"
+	"metaflow/querier/common"
 	"metaflow/querier/parse"
 	//"metaflow/querier/querier"
-	"bufio"
-	"io/ioutil"
-	"os"
-	"strings"
 	"testing"
 )
 
@@ -27,8 +24,8 @@ var (
 		input:  "select byte from l4_flow_log",
 		output: "SELECT byte_tx+byte_rx AS byte FROM flow_log.l4_flow_log",
 	}, {
-		input:  "select Sum(byte) as sum_byte, time(time, 120) as time_120 from l4_flow_log group by time_120 having Sum(byte)>=0 limit 10 offset 20",
-		output: "WITH toStartOfInterval(time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS _time_120 SELECT SUM(byte_tx+byte_rx) AS sum_byte, toUnixTimestamp(_time_120) AS time_120 FROM flow_log.l4_flow_log GROUP BY time_120 HAVING SUM(byte_tx+byte_rx) >= 0 LIMIT 20, 10",
+		input:  "select Sum(byte)/Time_interval as sum_byte, time(time, 120) as time_120 from l4_flow_log group by time_120 having Sum(byte)>=0 limit 10 offset 20",
+		output: "WITH toStartOfInterval(time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS _time_120 SELECT toUnixTimestamp(_time_120) AS time_120, divide(SUM(byte_tx+byte_rx), 120) AS sum_byte FROM flow_log.l4_flow_log GROUP BY time_120 HAVING SUM(byte_tx+byte_rx) >= 0 LIMIT 20, 10",
 	}, {
 		input:  "select Sum(log_count) as sum_log_count from l4_flow_log order by sum_log_count desc",
 		output: "SELECT SUM(1) AS sum_log_count FROM flow_log.l4_flow_log ORDER BY sum_log_count desc",
@@ -73,10 +70,10 @@ var (
 		output: "SELECT divide(plus(MAX(_sum_byte_tx), AVGArray(arrayFilter(x -> x!=0, _grouparray_rtt))), minus(1, AVGArray(arrayFilter(x -> x!=0, _grouparray_rtt)))) AS avg_rtt FROM (SELECT SUM(byte_tx) AS _sum_byte_tx, groupArrayIf(rtt, rtt != 0) AS _grouparray_rtt FROM flow_log.l4_flow_log)",
 	}, {
 		input:  "select Apdex(rtt, 100) as apdex_rtt_100 from l4_flow_log",
-		output: "WITH if(COUNTArray(arrayFilter(x -> x!=0, _grouparray_rtt))>0, divide(plus(COUNTArray(arrayFilter(x -> (x <= 100 AND 0 < x), _grouparray_rtt)), divide(COUNTArray(arrayFilter(x -> ((100 < x) AND (x <= (100 * 4))), _grouparray_rtt)), 2)), COUNTArray(arrayFilter(x -> x!=0, _grouparray_rtt))), null) AS divide_0diveider_as_null_plus_apdex_satisfy__grouparray_rtt_100_apdex_toler__grouparray_rtt_100_count__grouparray_rtt SELECT divide_0diveider_as_null_plus_apdex_satisfy__grouparray_rtt_100_apdex_toler__grouparray_rtt_100_count__grouparray_rtt AS apdex_rtt_100 FROM (SELECT groupArrayIf(rtt, rtt != 0) AS _grouparray_rtt FROM flow_log.l4_flow_log)",
+		output: "WITH if(COUNTArray(arrayFilter(x -> x!=0, _grouparray_rtt))>0, divide(plus(COUNTArray(arrayFilter(x -> (x <= 100 AND 0 < x), _grouparray_rtt)), divide(COUNTArray(arrayFilter(x -> ((100 < x) AND (x <= (100 * 4))), _grouparray_rtt)), 2)), COUNTArray(arrayFilter(x -> x!=0, _grouparray_rtt))), null) AS divide_0diveider_as_null_plus_apdex_satisfy__grouparray_rtt_100_apdex_toler__grouparray_rtt_100_count__grouparray_rtt SELECT divide_0diveider_as_null_plus_apdex_satisfy__grouparray_rtt_100_apdex_toler__grouparray_rtt_100_count__grouparray_rtt*100 AS apdex_rtt_100 FROM (SELECT groupArrayIf(rtt, rtt != 0) AS _grouparray_rtt FROM flow_log.l4_flow_log)",
 	}, {
 		input:  "select Max(byte) as max_byte, time(time,120) as time_120 from l4_flow_log group by time_120",
-		output: "WITH toStartOfInterval(_time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS _time_120 SELECT MAX(_sum_byte_tx_plus_byte_rx) AS max_byte, toUnixTimestamp(_time_120) AS time_120 FROM (WITH toStartOfInterval(time, toIntervalSecond(60)) AS _time SELECT SUM(byte_tx+byte_rx) AS _sum_byte_tx_plus_byte_rx, _time FROM flow_log.l4_flow_log GROUP BY _time) GROUP BY time_120",
+		output: "WITH toStartOfInterval(_time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS _time_120 SELECT toUnixTimestamp(_time_120) AS time_120, MAX(_sum_byte_tx_plus_byte_rx) AS max_byte FROM (WITH toStartOfInterval(time, toIntervalSecond(60)) AS _time SELECT _time, SUM(byte_tx+byte_rx) AS _sum_byte_tx_plus_byte_rx FROM flow_log.l4_flow_log GROUP BY _time) GROUP BY time_120",
 	},
 	}
 )
@@ -111,60 +108,13 @@ func TestGetSql(t *testing.T) {
 
 func Load() error {
 	dir := "../../db_descriptions"
-	dbDescriptions := make(map[string]interface{})
-	err := readDir(dir, dbDescriptions)
+	dbDescriptions, err := common.LoadDbDescriptions(dir)
 	if err != nil {
 		return err
 	}
-	LoadDbDescriptions(dbDescriptions)
-	return nil
-}
-
-func readDir(dir string, desMap map[string]interface{}) error {
-	files, err := ioutil.ReadDir(dir)
+	err = LoadDbDescriptions(dbDescriptions)
 	if err != nil {
-		// TODO
 		return err
 	}
-	for _, fi := range files {
-		fileName := dir + "/" + fi.Name()
-		if fi.IsDir() {
-			dirMap := make(map[string]interface{})
-			desMap[fi.Name()] = dirMap
-			err := readDir(fileName, dirMap)
-			if err != nil {
-				return err
-			}
-		} else {
-			desMap[fi.Name()], err = readFile(fileName)
-			if err != nil {
-				return err
-			}
-		}
-	}
 	return nil
-}
-
-func readFile(fileName string) ([][]interface{}, error) {
-	file, err := os.Open(fileName)
-	if err != nil {
-		//TODO
-		return nil, err
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	data := make([][]interface{}, 0)
-	for scanner.Scan() {
-		line := scanner.Text()
-		line = strings.TrimSpace(line)
-		if line == "" || line[:1] == "#" {
-			continue
-		}
-		lineSlice := make([]interface{}, 0)
-		for _, split := range strings.Split(line, ",") {
-			lineSlice = append(lineSlice, strings.TrimSpace(split))
-		}
-		data = append(data, lineSlice)
-	}
-	return data, nil
 }

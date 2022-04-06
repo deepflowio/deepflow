@@ -49,9 +49,10 @@ func GetBinaryFunc(name string, args []Function) (*BinaryFunction, error) {
 }
 
 func GetFieldFunc(name string) (FieldFunction, error) {
-	switch name {
-	case "TimeRange":
-		return &TimeRangeField{}, nil
+
+	switch strings.ToLower(name) {
+	case "time_interval":
+		return &TimeIntervalField{}, nil
 	}
 	return nil, nil
 }
@@ -233,13 +234,13 @@ type FieldFunction interface {
 	Function
 }
 
-type TimeRangeField struct {
+type TimeIntervalField struct {
 	FieldFunction
 }
 
-func (f *TimeRangeField) Format(m *view.Model) {}
+func (f *TimeIntervalField) Format(m *view.Model) {}
 
-func (f *TimeRangeField) Trans(m *view.Model) view.Node {
+func (f *TimeIntervalField) Trans(m *view.Model) view.Node {
 	var interval int
 	if m.Time.Interval > 0 {
 		if m.Time.DatasourceInterval > m.Time.Interval {
@@ -253,4 +254,4 @@ func (f *TimeRangeField) Trans(m *view.Model) view.Node {
 	return &view.Field{Value: strconv.Itoa(interval)}
 }
 
-func (f *TimeRangeField) SetAlias(alias string) {}
+func (f *TimeIntervalField) SetAlias(alias string) {}

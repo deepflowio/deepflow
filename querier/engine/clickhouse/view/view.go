@@ -2,6 +2,7 @@ package view
 
 import (
 	"bytes"
+	"metaflow/querier/common"
 	"time"
 )
 
@@ -133,6 +134,8 @@ func (v *View) trans() {
 	var metricsLevelMetrics []Node
 	var groupsLevelInner []Node
 	var groupsLevelMetrics []Node
+	var tagsAliasInner []string
+	var groupsValueInner []string
 	// 遍历tags，解析至分层结构中
 	for _, tag := range v.Model.Tags.tags {
 		switch node := tag.(type) {
@@ -147,11 +150,13 @@ func (v *View) trans() {
 					metricTag.Value = node.Value
 				}
 				tagsLevelMetrics = append(tagsLevelMetrics, metricTag)
+				tagsAliasInner = append(tagsAliasInner, metricTag.Value)
 			} else if node.Flag == NODE_FLAG_TRANS {
 				// 需要放入最外层的tag
 				tagsLevelOuter = append(tagsLevelOuter, tag)
 			} else if node.Flag == NODE_FLAG_METRICS_INNER {
 				metricsLevelInner = append(metricsLevelInner, tag)
+				tagsAliasInner = append(tagsAliasInner, node.Alias)
 			} else if node.Flag == NODE_FLAG_METRICS_OUTER {
 				metricsLevelMetrics = append(metricsLevelMetrics, tag)
 			}
@@ -172,6 +177,7 @@ func (v *View) trans() {
 		if group.Flag == GROUP_FLAG_DEFAULT {
 			groupsLevelInner = append(groupsLevelInner, group)
 			groupsLevelMetrics = append(groupsLevelMetrics, &Group{Value: group.Value})
+			groupsValueInner = append(groupsValueInner, group.Value)
 		} else if group.Flag == GROUP_FLAG_METRICS_OUTER {
 			groupsLevelMetrics = append(groupsLevelMetrics, group)
 		} else if group.Flag == GROUP_FLAG_METRICS_INNTER {
@@ -192,6 +198,12 @@ func (v *View) trans() {
 		}
 		v.SubViewLevels = append(v.SubViewLevels, &sv)
 	} else if v.Model.MetricsLevelFlag == MODEL_METRICS_LEVEL_FLAG_LAYERED {
+		// 里层的select需要包含所有里层group
+		for _, group := range groupsValueInner {
+			if !common.IsValueInSliceString(group, tagsAliasInner) {
+				tagsLevelInner = append(tagsLevelInner, &Tag{Value: group})
+			}
+		}
 		// 计算层需要拆层
 		// 计算层里层
 		svInner := SubView{

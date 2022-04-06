@@ -38,6 +38,8 @@ server_establish_fail       ,                      , 建连-服务端失败次�
 tcp_establish_fail_ratio    ,                      , 建连-失败比例           , %    , percentage , 传输层异常   ,
 client_establish_fail_ratio ,                      , 建连-客户端失败比例     , %    , percentage , 传输层异常   ,
 server_establish_fail_ratio ,                      , 建连-服务端失败比例     , %    , percentage , 传输层异常   ,
+tcp_transfer_fail           ,                      , 传输-失败次数           , 次   , counter    , 传输层异常   ,
+tcp_transfer_fail_ratio     ,                      , 传输-失败比例           , %    , percentage , 传输层异常   ,       
 tcp_rst_fail                ,                      , 重置次数                , 连接 , counter    , 传输层异常   ,
 tcp_rst_fail_ratio          ,                      , 重置比例                , %    , percentage , 传输层异常   ,
 client_source_port_reuse    ,                      , 建连-客户端端口复用     , 连接 , counter    , 传输层异常   ,

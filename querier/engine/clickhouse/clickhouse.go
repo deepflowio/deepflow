@@ -12,6 +12,7 @@ import (
 	"metaflow/querier/common"
 	"metaflow/querier/config"
 	"metaflow/querier/engine/clickhouse/client"
+	chCommon "metaflow/querier/engine/clickhouse/common"
 	"metaflow/querier/engine/clickhouse/metrics"
 	tagdescription "metaflow/querier/engine/clickhouse/tag"
 	"metaflow/querier/engine/clickhouse/view"
@@ -19,9 +20,6 @@ import (
 )
 
 var log = logging.MustGetLogger("clickhouse")
-var DB_TABLE_MAP = map[string][]string{
-	"flow_log": []string{"l4_flow_log", "l7_flow_log"},
-}
 
 type CHEngine struct {
 	Model      *view.Model
@@ -315,6 +313,10 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			return err
 		}
 		if function != nil {
+			// time需要被最先解析
+			if name == "time" {
+				e.Statements = append([]Statement{function}, e.Statements...)
+			}
 			e.Statements = append(e.Statements, function)
 			return nil
 		}
@@ -511,7 +513,7 @@ func LoadDbDescriptions(dbDescriptions map[string]interface{}) error {
 	dbDataMap := dbData.(map[string]interface{})
 	// 加载metric定义
 	if metricData, ok := dbDataMap["metrics"]; ok {
-		for db, tables := range DB_TABLE_MAP {
+		for db, tables := range chCommon.DB_TABLE_MAP {
 			for _, table := range tables {
 				loadMetrics, err := metrics.LoadMetrics(db, table, metricData.(map[string]interface{}))
 				if err != nil {
