@@ -29,6 +29,9 @@ var tagTypeToOperators = map[string][]string{
 	"string_enum": []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
 	"ip":          []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
 	"mac":         []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
+	"id":          []string{"=", "!=", "IN", "NOT IN"},
+	"time":        []string{"=", "!=", ">=", "<="},
+	"default":     []string{"=", "!="},
 }
 var TAG_RESOURCE_TYPE_DEVICE_MAP = map[string]int{
 	"vm":          VIF_DEVICE_TYPE_VM,
@@ -59,7 +62,7 @@ func NewTagDescription(
 ) *TagDescription {
 	operators, ok := tagTypeToOperators[tagType]
 	if !ok {
-		operators = []string{"=", "!="}
+		operators, _ = tagTypeToOperators["default"]
 	}
 	return &TagDescription{
 		Name:        name,
@@ -89,6 +92,7 @@ func NewTagEnum(value, displayName interface{}) *TagEnum {
 func LoadTagDescriptions(tagData map[string]interface{}) error {
 	// 生成tag description
 	enumFileToTagName := make(map[string]string)
+	enumFileToTagType := make(map[string]string)
 	for db, tables := range TAG_DESCRIPTIONS {
 		tableData, ok := tagData[db]
 		if !ok {
@@ -118,6 +122,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				)
 				TAG_DESCRIPTIONS[db][table] = append(TAG_DESCRIPTIONS[db][table], description)
 				enumFileToTagName[tag[5].(string)] = tag[0].(string)
+				enumFileToTagType[tag[5].(string)] = tag[4].(string)
 			}
 		}
 	}
@@ -127,8 +132,17 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 	if ok {
 		for tagEnumFile, enumData := range tagEnumData.(map[string]interface{}) {
 			tagEnums := []*TagEnum{}
+			// 根据tagEnumFile获取tagTypeToOperators
+			tagType, _ := enumFileToTagType[tagEnumFile]
+
 			for _, enumValue := range enumData.([][]interface{}) {
-				tagEnums = append(tagEnums, NewTagEnum(enumValue[0], enumValue[1]))
+				// 如果是int/int_enum，则将value转为interface
+				if tagType == "int" || tagType == "int_enum" {
+					value, _ := strconv.Atoi(enumValue[0].(string))
+					tagEnums = append(tagEnums, NewTagEnum(value, enumValue[1]))
+				} else {
+					tagEnums = append(tagEnums, NewTagEnum(enumValue[0], enumValue[1]))
+				}
 			}
 			// 根据tagEnumFile获取tagName
 			if tagName, ok := enumFileToTagName[tagEnumFile]; ok {
