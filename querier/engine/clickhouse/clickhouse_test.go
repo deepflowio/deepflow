@@ -74,6 +74,18 @@ var (
 	}, {
 		input:  "select Max(byte) as max_byte, time(time,120) as time_120 from l4_flow_log group by time_120",
 		output: "WITH toStartOfInterval(_time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS _time_120 SELECT toUnixTimestamp(_time_120) AS time_120, MAX(_sum_byte_tx_plus_byte_rx) AS max_byte FROM (WITH toStartOfInterval(time, toIntervalSecond(60)) AS _time SELECT _time, SUM(byte_tx+byte_rx) AS _sum_byte_tx_plus_byte_rx FROM flow_log.l4_flow_log GROUP BY _time) GROUP BY time_120",
+	}, {
+		input:  "select Max(byte) as 'max_byte',region_0,vm_id_1 from l4_flow_log group by region_0,vm_id_1",
+		output: "SELECT region_0, vm_id_1, MAX(_sum_byte_tx_plus_byte_rx) AS max_byte FROM (SELECT dictGet(deepflow.region_map, ('name'), (toUInt64(region_id_0))) AS region_0, if(l3_device_type_1=1,l3_device_id_1, 0) AS vm_id_1, SUM(byte_tx+byte_rx) AS _sum_byte_tx_plus_byte_rx FROM flow_log.l4_flow_log PREWHERE (region_id_0!=0) AND (l3_device_id_1!=0 AND l3_device_type_1=1) GROUP BY region_0, vm_id_1) GROUP BY region_0, vm_id_1",
+	}, {
+		input:  "select resource_gl0_0,ip_0 from l7_flow_log group by resource_gl0_0,ip_0",
+		output: "SELECT dictGet(deepflow.device_map, ('name'), (toUInt64(resource_gl0_type_0),toUInt64(resource_gl0_id_0))) AS resource_gl0_0, if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS ip_0 FROM flow_log.l7_flow_log GROUP BY resource_gl0_0, ip_0",
+	}, {
+		input:  "select pod_service_0 from l7_flow_log where pod_service_0 !='xx' group by pod_service_0",
+		output: "SELECT dictGet(deepflow.device_map, ('name'), (toUInt64(11),toUInt64(l3_device_id_0))) AS pod_service_0 FROM flow_log.l7_flow_log PREWHERE ((if(is_ipv4=1,IPv4NumToString(ip4_0),IPv6NumToString(ip6_0)),toUInt64(l3_epc_id_0)) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE pod_service_name != 'xx')) AND (l3_device_id_0!=0 AND l3_device_type_0=11) GROUP BY pod_service_0",
+	}, {
+		input:  "select node_type(region_0) as 'node_type_0',mask(ip_0,33) as 'mask_ip_0' from l7_flow_log group by 'mask_ip_0','node_type_0'",
+		output: "WITH if(is_ipv4, IPv4NumToString(bitAnd(ip4_0, 4294967295)), IPv6NumToString(bitAnd(ip6_0, toFixedString(unhex('ffffffff800000000000000000000000'), 16)))) AS mask_ip_0 SELECT 'region' AS node_type_0, mask_ip_0 FROM flow_log.l7_flow_log",
 	},
 	}
 )
