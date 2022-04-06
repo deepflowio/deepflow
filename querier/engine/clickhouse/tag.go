@@ -163,6 +163,7 @@ type TagFunction struct {
 	Args  []string
 	Alias string
 	Withs []view.Node
+	Value string
 }
 
 func (f *TagFunction) Trans(db, table string) error {
@@ -198,7 +199,14 @@ func (f *TagFunction) Trans(db, table string) error {
 		value := fmt.Sprintf(tagDes.TagTranslator, ip4MaskInt, ip6Mask.String())
 		f.Withs = []view.Node{&view.With{Value: value, Alias: f.Alias}}
 		return nil
-	case TAG_FUNCTION_NODE_TYPE, TAG_FUNCTION_ICON_ID:
+	case TAG_FUNCTION_NODE_TYPE:
+		tagDes, ok := tag.GetTag(f.Args[0], db, table, f.Name)
+		if !ok {
+			return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
+		}
+		f.Value = tagDes.TagTranslator
+		return nil
+	case TAG_FUNCTION_ICON_ID:
 		tagDes, ok := tag.GetTag(f.Args[0], db, table, f.Name)
 		if !ok {
 			return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
@@ -235,7 +243,11 @@ func (f *TagFunction) Trans(db, table string) error {
 }
 
 func (f *TagFunction) Format(m *view.Model) {
-	m.AddTag(&view.Tag{Value: f.Alias, Withs: f.Withs})
+	if f.Value == "" {
+		m.AddTag(&view.Tag{Value: f.Alias, Withs: f.Withs})
+	} else {
+		m.AddTag(&view.Tag{Value: f.Value, Alias: f.Alias})
+	}
 	// metric分层的情况下 function需加入metric外层group
 	if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED {
 		m.AddGroup(&view.Group{Value: f.Alias, Flag: view.GROUP_FLAG_METRICS_OUTER})
