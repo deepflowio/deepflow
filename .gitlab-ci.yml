@@ -15,6 +15,7 @@ verify-x64:
     - cargo build --bin trident-ctl
     - cargo test
     - cargo fmt --all -- --check
+    - cargo clean
 
 package-x64:
   stage: package
@@ -24,6 +25,7 @@ package-x64:
   script:
     - cargo build --release
     - cargo build --release --bin trident-ctl
+    - cargo clean
   only:
     - master
     - /B_LC_RELEASE_.*/
