@@ -16,8 +16,6 @@ use super::{
     BpfOptions, Options, PacketCounter, Pipeline,
 };
 
-use crate::config::Config;
-use crate::flow_generator::FlowMapRuntimeConfig;
 use crate::{
     common::{
         decapsulate::{TunnelInfo, TunnelType, TunnelTypeBitmap},
@@ -26,7 +24,7 @@ use crate::{
         VLAN_ID_MASK,
     },
     config::RuntimeConfig,
-    flow_generator::MetaAppProto,
+    flow_generator::{FlowMapConfig, FlowMapRuntimeConfig, MetaAppProto},
     proto::trident::{IfMacSource, TapMode},
     utils::{
         bytes::read_u16_be,
@@ -51,8 +49,7 @@ pub(super) struct BaseDispatcher {
     pub(super) leaky_bucket: Arc<LeakyBucket>,
     pub(super) pipelines: Arc<Mutex<HashMap<u32, Arc<Mutex<Pipeline>>>>>,
     pub(super) tap_interfaces: Arc<Mutex<Vec<Link>>>,
-    pub(super) static_config: Arc<Config>,
-    pub(super) flow_map_runtime_config: Arc<FlowMapRuntimeConfig>,
+    pub(super) flow_map_config: FlowMapConfig,
     // TODO: add on config change for tunnel_type_bitmap
     pub(super) tunnel_type_bitmap: Arc<Mutex<TunnelTypeBitmap>>,
     pub(super) tunnel_info: TunnelInfo,
@@ -221,7 +218,7 @@ impl BaseDispatcher {
             pipelines: self.pipelines.clone(),
             tap_interfaces: self.tap_interfaces.clone(),
             need_update_ebpf: self.need_update_ebpf.clone(),
-            flow_map_config: self.flow_map_runtime_config.clone(),
+            flow_map_config: self.flow_map_config.runtime_config.clone(),
             proxy_controller_ip: Ipv4Addr::UNSPECIFIED.into(),
             analyzer_ip: Ipv4Addr::UNSPECIFIED.into(),
         }
