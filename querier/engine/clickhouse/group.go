@@ -5,12 +5,23 @@ import (
 	"metaflow/querier/engine/clickhouse/view"
 )
 
-func GetGroup(name string, asTagMap map[string]string) (Statement, error) {
+func GetGroup(name string, asTagMap map[string]string, db, table string) (Statement, error) {
 	if asTagMap[name] == "time" {
 		return nil, nil
 	}
-	stmt := &GroupTag{Value: name}
-	return stmt, nil
+	tag, ok := tag.GetTag(name, db, table, "default")
+	if ok {
+		if tag.TagTranslator != "" {
+			stmt := &GroupTag{Value: tag.TagTranslator, Alias: name}
+			return stmt, nil
+		} else {
+			stmt := &GroupTag{Value: name}
+			return stmt, nil
+		}
+	} else {
+		stmt := &GroupTag{Value: name}
+		return stmt, nil
+	}
 }
 
 func GetNotNullFilter(name string, asTagMap map[string]string, db, table string) (view.Node, bool) {
@@ -40,9 +51,14 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 
 type GroupTag struct {
 	Value string
+	Alias string
 	Withs []view.Node
 }
 
 func (g *GroupTag) Format(m *view.Model) {
-	m.AddGroup(&view.Group{Value: g.Value, Withs: g.Withs})
+	if len(g.Withs) == 0 {
+		m.AddGroup(&view.Group{Value: g.Value, Alias: g.Alias})
+	} else {
+		m.AddGroup(&view.Group{Value: g.Value, Withs: g.Withs})
+	}
 }

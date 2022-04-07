@@ -398,7 +398,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 }
 
 func (e *CHEngine) AddGroup(group string) error {
-	stmt, err := GetGroup(group, e.asTagMap)
+	stmt, err := GetGroup(group, e.asTagMap, e.DB, e.Table)
 	if err != nil {
 		return err
 	}
