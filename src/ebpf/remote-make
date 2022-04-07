@@ -1,0 +1,79 @@
+#!/bin/bash
+
+SCP="scp -4 -r \
+    -o VerifyHostKeyDNS=no \
+    -o StrictHostKeyChecking=no \
+    -o GSSAPIAuthentication=no \
+    -o UserKnownHostsFile=/dev/null \
+    -o LogLevel=ERROR"
+SSH="ssh -4 -a \
+    -o VerifyHostKeyDNS=no \
+    -o StrictHostKeyChecking=no \
+    -o GSSAPIAuthentication=no \
+    -o UserKnownHostsFile=/dev/null \
+    -o LogLevel=ERROR"
+
+usage()
+{
+    echo "Usage: $0 [ <compiler-ip> <compiler-root-passwd> ]"
+    echo "Tips:  $0 10.1.3.91 yunshan3302"
+}
+
+parse()
+{
+    if [[ $# -ne 0 ]] && [[ $# -ne 2 ]]; then
+        usage
+        exit 1
+    fi
+}
+
+file_grep()
+{
+    key=$1
+    file=$2
+    grep -w "$key" $file 2>/dev/null | awk -F':' '{print $2}' | grep -o '[^ ]*'
+}
+
+param_init()
+{
+    project=`file_grep Name: pkg/explorer.spec`
+    sys_ip=$1
+    : ${sys_ip:=`file_grep COMPILER_IP: .gitlab-ci.yml`}
+    sys_passwd=$2
+    : ${sys_passwd:=`file_grep COMPILER_PASSWD: .gitlab-ci.yml`}
+    SYS=root@$sys_ip
+    SSH_EXEC="sshpass -p $sys_passwd $SSH"
+    SCP_EXEC="sshpass -p $sys_passwd $SCP"
+    t=`date "+%Y%m%d-%H%M%S-%N"`
+    ROOT_DIR=/tmp/$project-$t
+}
+
+remote_make()
+{
+    check=`$SSH_EXEC $SYS pwd 2>/dev/null`
+    if [[ -z $check ]]; then
+        echo "ERROR: $SYS cannot be accessed"
+        exit 1
+    fi
+
+    $SSH_EXEC $SYS mkdir -p $ROOT_DIR
+    $SCP_EXEC -r * $SYS:$ROOT_DIR
+    $SSH_EXEC $SYS "cd $ROOT_DIR; make clean && make --no-print-directory && make tools --no-print-directory"
+    ret=$?
+    $SCP_EXEC -r $SYS:$ROOT_DIR/data .
+    $SCP_EXEC -r $SYS:$ROOT_DIR/*.a .
+    $SCP_EXEC -r $SYS:$ROOT_DIR/metaflow-ebpfctl .
+    touch ./.data_done
+    $SSH_EXEC $SYS rm -rf $ROOT_DIR
+    return $ret
+}
+
+main()
+{
+    parse $@
+    param_init $@
+    remote_make
+    exit $?
+}
+
+main $@
