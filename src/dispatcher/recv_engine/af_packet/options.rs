@@ -2,6 +2,8 @@ use page_size;
 
 use super::{Error, Result};
 
+use crate::proto::trident::CaptureSocketType;
+
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum OptTpacketVersion {
     TpacketVersionHighestavailablet = -1,
@@ -13,6 +15,17 @@ pub enum OptTpacketVersion {
 impl Default for OptTpacketVersion {
     fn default() -> Self {
         Self::TpacketVersionHighestavailablet
+    }
+}
+
+impl From<CaptureSocketType> for OptTpacketVersion {
+    fn from(t: CaptureSocketType) -> Self {
+        match t {
+            CaptureSocketType::Auto => Self::TpacketVersionHighestavailablet,
+            CaptureSocketType::AfPacketV1 => Self::TpacketVersion1,
+            CaptureSocketType::AfPacketV2 => Self::TpacketVersion2,
+            CaptureSocketType::AfPacketV3 => Self::TpacketVersion3,
+        }
     }
 }
 

@@ -1,8 +1,10 @@
 pub const DROPLET_PORT: u16 = 20033;
 
 pub const NORMAL_EXIT_WITH_RESTART: i32 = 3;
+pub const TRIDENT_MEMORY_LIMIT: u64 = 0;
 pub const TRIDENT_PROCESS_LIMIT: u32 = 10;
 pub const TRIDENT_THREAD_LIMIT: u32 = 100;
+pub const FREE_SPACE_REQUIREMENT: u64 = 100 << 20;
 
 #[cfg(target_os = "linux")]
 mod platform_consts {

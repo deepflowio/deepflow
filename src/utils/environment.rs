@@ -1,4 +1,14 @@
-use std::{net::IpAddr, path::Path, process::exit, thread, time::Duration};
+use std::{
+    net::IpAddr,
+    path::Path,
+    process::exit,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+    thread,
+    time::Duration,
+};
 
 use bytesize::ByteSize;
 use log::{error, warn};
@@ -9,6 +19,23 @@ use crate::error::{Error, Result};
 
 use super::net::get_link_enabled_features;
 use super::process::{get_memory_rss, get_process_num_by_name};
+
+pub type Checker = Box<dyn Fn() -> Result<()>>;
+
+pub fn check(f: Checker) {
+    let mut logged = false;
+    loop {
+        match f() {
+            Ok(_) => return,
+            Err(e) if !logged => {
+                warn!("{}", e);
+                logged = true;
+            }
+            _ => (),
+        }
+        thread::sleep(Duration::from_secs(10));
+    }
+}
 
 pub fn kernel_check() {
     if cfg!(target_os = "windows") {
@@ -83,6 +110,10 @@ pub fn free_memory_check(required: u64) -> Result<()> {
         })
 }
 
+pub fn free_memory_checker(required: Arc<AtomicU64>) -> Checker {
+    Box::new(move || free_memory_check(required.load(Ordering::Relaxed)))
+}
+
 pub fn free_space_check<P: AsRef<Path>>(path: P, required: u64) -> Result<()> {
     let mut system = System::new();
     system.refresh_disks_list();
@@ -118,12 +149,23 @@ pub fn free_space_check<P: AsRef<Path>>(path: P, required: u64) -> Result<()> {
     Ok(())
 }
 
-pub fn controller_ip_check(ips: &[IpAddr]) {
-    if ips.iter().all(|ip| ip.is_ipv4()) {
+pub fn free_space_checker<P: AsRef<Path>>(path: P, required: u64) -> Checker {
+    let path = path.as_ref().to_owned();
+    Box::new(move || free_space_check(&path, required))
+}
+
+pub fn controller_ip_check(ips: &[String]) {
+    if ips.iter().all(|ip| match ip.parse::<IpAddr>() {
+        Ok(ip) if ip.is_ipv4() => true,
+        _ => false,
+    }) {
         return;
     }
 
-    if ips.iter().all(|ip| ip.is_ipv6()) {
+    if ips.iter().all(|ip| match ip.parse::<IpAddr>() {
+        Ok(ip) if ip.is_ipv6() => true,
+        _ => false,
+    }) {
         return;
     }
 

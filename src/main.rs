@@ -53,8 +53,7 @@ fn wait_on_signals() {}
 fn main() -> Result<()> {
     let opts = Opts::parse();
     let version = format!("{}-{}", env!("REV_COUNT"), env!("REVISION"));
-    let t = trident::Trident::new(&Path::new(&opts.config_file), version)?;
-    t.start();
+    let mut t = trident::Trident::start(&Path::new(&opts.config_file), version)?;
     wait_on_signals();
     t.stop();
 
