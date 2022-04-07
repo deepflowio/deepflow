@@ -86,6 +86,7 @@ pub struct Config {
     #[serde(with = "humantime_serde")]
     pub l7_log_session_aggr_timeout: Duration,
     pub tap_mac_script: String,
+    pub cloud_gateway_traffic: bool,
 }
 
 impl Config {
@@ -217,6 +218,7 @@ impl Default for Config {
             grpc_buffer_size: 5,
             l7_log_session_aggr_timeout: Duration::from_secs(5),
             tap_mac_script: "".into(),
+            cloud_gateway_traffic: false,
         }
     }
 }

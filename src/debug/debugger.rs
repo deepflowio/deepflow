@@ -399,10 +399,11 @@ where
 mod tests {
     use std::net::{Ipv4Addr, Ipv6Addr};
 
+    use rand::random;
+
     use crate::config::IngressFlavour;
     use crate::platform::ActivePoller;
     use crate::{debug::Message, rpc::Session};
-    use rand::random;
 
     use super::*;
 
@@ -441,7 +442,7 @@ mod tests {
     #[test]
     fn one_packet() {
         let timeout = Some(Duration::from_secs(1));
-        let port = random();
+        let port = 34444 + random::<u16>() % 1000;
         let ctx = new_default();
         let server = Debugger::new(
             (
@@ -473,7 +474,7 @@ mod tests {
     #[test]
     fn multi_packet() {
         let timeout = Some(Duration::from_secs(1));
-        let port = random();
+        let port = 34444 + random::<u16>() % 1000;
         let ctx = new_default();
         let server = Debugger::new(
             (

@@ -37,7 +37,7 @@ use pnet::{
 };
 use regex::Regex;
 
-use super::{Addr, Link, LinkFlags, MacAddr, NeighborEntry, Route, MAC_ADDR_ZERO};
+use super::{Addr, Link, LinkFlags, MacAddr, NeighborEntry, Route};
 use super::{Error, Result};
 
 const BUFFER_SIZE: usize = 512;
@@ -501,7 +501,7 @@ pub fn links_by_name_regex<S: AsRef<str>>(regex: S) -> Result<Vec<Link>> {
         .filter(|link| {
             if !link.flags.contains(LinkFlags::LOOPBACK) {
                 // filter zero mac
-                if link.mac_addr == MAC_ADDR_ZERO {
+                if link.mac_addr == MacAddr::ZERO {
                     warn!(
                         "link {} has invalid mac address {}",
                         link.name, link.mac_addr
@@ -647,7 +647,7 @@ pub fn get_route_src_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
     let links = link_list()?;
     for link in links.iter() {
         if link.if_index == oif_index {
-            if link.mac_addr == MAC_ADDR_ZERO {
+            if link.mac_addr == MacAddr::ZERO {
                 // loopback，需要从ip地址找mac
                 break;
             }

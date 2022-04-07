@@ -120,7 +120,6 @@ pub struct Route {
     pub gateway: Option<IpAddr>,
 }
 
-pub const MAC_ADDR_ZERO: MacAddr = MacAddr([0, 0, 0, 0, 0, 0]);
 pub const MAC_ADDR_LEN: usize = 6;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Default, Copy, Serialize, Deserialize)]
@@ -128,6 +127,10 @@ pub const MAC_ADDR_LEN: usize = 6;
 pub struct MacAddr([u8; 6]);
 
 impl MacAddr {
+    pub const ZERO: MacAddr = MacAddr([0, 0, 0, 0, 0, 0]);
+
+    const BROADCAST: u64 = 0xffffffffffff;
+    const MULTICAST: u64 = 0x010000000000;
     pub fn octets(&self) -> [u8; 6] {
         self.0
     }
@@ -135,6 +138,11 @@ impl MacAddr {
     pub fn is_multicast(octets: &[u8]) -> bool {
         assert!(octets.len() > MAC_ADDR_LEN);
         octets[0] & 0x1 == 1
+    }
+
+    pub fn is_unicast(mac: MacAddr) -> bool {
+        let mac_num = u64::from(mac);
+        mac_num != Self::BROADCAST && mac_num & Self::MULTICAST != Self::MULTICAST
     }
 }
 

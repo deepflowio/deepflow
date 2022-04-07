@@ -1,7 +1,10 @@
 pub(crate) mod acc_flow;
+mod collector;
 mod consts;
 pub(crate) mod flow_aggr;
 pub(crate) mod quadruple_generator;
+
+pub use collector::Collector;
 
 use bitflags::bitflags;
 use std::time::Duration;
@@ -51,3 +54,8 @@ impl CollectorThread {
         }
     }
 }
+
+const RCV_TIMEOUT: Duration = Duration::from_secs(1);
+const QUEUE_BATCH_SIZE: usize = 1024;
+const FLOW_METRICS_PEER_SRC: usize = 0;
+const FLOW_METRICS_PEER_DST: usize = 1;
