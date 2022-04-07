@@ -76,6 +76,11 @@ impl TapPort {
                 .unwrap_or(TunnelType::None),
         )
     }
+
+    pub fn set_u16_into_reserved_bytes(&self, tap_type: u16) -> TapPort {
+        const RESERVED_OFFSET: u8 = 40;
+        TapPort(self.0 | (tap_type as u64) << RESERVED_OFFSET)
+    }
 }
 
 impl fmt::Display for TapPort {

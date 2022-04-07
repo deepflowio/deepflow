@@ -89,6 +89,12 @@ impl FlowMeter {
 
         // 时延, 性能, 异常, 负载统计量以客户端、服务端为视角，无需Reverse
     }
+
+    pub fn to_reversed(&self) -> Self {
+        let mut reversed = self.clone();
+        reversed.traffic.reverse();
+        reversed
+    }
 }
 
 impl From<FlowMeter> for metric::FlowMeter {
