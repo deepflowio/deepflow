@@ -8,7 +8,9 @@ use std::time::Duration;
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::common::enums::TapType;
+use crate::common::{
+    enums::TapType, TRIDENT_MEMORY_LIMIT, TRIDENT_PROCESS_LIMIT, TRIDENT_THREAD_LIMIT,
+};
 use crate::proto::{common, trident};
 
 #[cfg(unix)]
@@ -144,10 +146,6 @@ impl Config {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
         }
         Ok(c)
-    }
-
-    pub fn flow(&self) -> &FlowGeneratorConfig {
-        &self.flow
     }
 
     // resolve domain name (without port) to ip address
@@ -528,6 +526,63 @@ impl RuntimeConfig {
             )));
         }
         Ok(())
+    }
+}
+
+impl Default for RuntimeConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_cpus: 0,
+            max_memory: TRIDENT_MEMORY_LIMIT,
+            sync_interval: Duration::ZERO,
+            stats_interval: Duration::ZERO,
+            global_pps_threshold: 0,
+            tap_interface_regex: Default::default(),
+            host: Default::default(),
+            rsyslog_enabled: false,
+            output_vlan: 0,
+            mtu: 0,
+            npb_bps_threshold: 0,
+            collector_enabled: false,
+            l4_log_store_tap_types: Default::default(),
+            packet_header_enabled: false,
+            platform_enabled: false,
+            server_tx_bandwidth_threshold: 0,
+            bandwidth_probe_interval: Duration::ZERO,
+            npb_vlan_mode: trident::VlanMode::None,
+            npb_dedup_enabled: false,
+            if_mac_source: trident::IfMacSource::IfMac,
+            vtap_flow_1s_enabled: false,
+            debug_enabled: false,
+            log_threshold: 0,
+            log_level: log::Level::Info,
+            analyzer_ip: Default::default(),
+            max_escape: Duration::ZERO,
+            proxy_controller_ip: Default::default(),
+            vtap_id: 0,
+            collector_socket_type: trident::SocketType::Tcp,
+            compressor_socket_type: trident::SocketType::Tcp,
+            npb_socket_type: trident::SocketType::Tcp,
+            trident_type: common::TridentType::TtProcess,
+            capture_packet_size: 0,
+            inactive_server_port_enabled: false,
+            libvirt_xml_path: Default::default(),
+            l7_log_packet_size: 0,
+            l4_log_collect_nps_threshold: 0,
+            l7_log_collect_nps_threshold: 0,
+            l7_metrics_enabled: false,
+            l7_log_store_tap_types: Default::default(),
+            decap_type: Default::default(),
+            region_id: 0,
+            pod_cluster_id: 0,
+            log_retention: 0,
+            capture_socket_type: trident::CaptureSocketType::Auto,
+            process_threshold: TRIDENT_PROCESS_LIMIT,
+            thread_threshold: TRIDENT_THREAD_LIMIT,
+            capture_bpf: Default::default(),
+            l4_performance_enabled: false,
+        }
     }
 }
 

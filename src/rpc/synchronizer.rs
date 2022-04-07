@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 use std::net::IpAddr;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -14,8 +14,9 @@ use tokio::time;
 use crate::common::PlatformData;
 use crate::config::RuntimeConfig;
 use crate::dispatcher::DispatcherListener;
-use crate::proto::trident;
+use crate::proto::trident as tp;
 use crate::rpc::session::Session;
+use crate::trident::{self, TridentState};
 use crate::utils::{
     self,
     net::{is_unicast_link_local, links_by_name_regex, MacAddr},
@@ -29,7 +30,7 @@ pub struct StaticConfig {
     pub revision: String,
     pub boot_time: SystemTime,
 
-    pub tap_mode: trident::TapMode,
+    pub tap_mode: tp::TapMode,
     pub vtap_group_id_request: String,
     pub kubernetes_cluster_id: String,
     pub ctrl_mac: String,
@@ -78,47 +79,54 @@ pub struct Synchronizer {
     config: Arc<RwLock<Config>>,
     pub status: Arc<RwLock<Status>>,
 
+    trident_state: TridentState,
+
     sync_interval: Duration,
 
     session: Arc<Session>,
-    dispatcher_listener: DispatcherListener,
+    dispatcher_listener: Arc<Mutex<Option<DispatcherListener>>>,
 
     running: Arc<AtomicBool>,
 
     // threads
     rt: Runtime,
     threads: Mutex<Vec<JoinHandle<()>>>,
+
+    max_memory: Arc<AtomicU64>,
 }
 
 impl Synchronizer {
     pub fn new(
         session: Arc<Session>,
+        trident_state: TridentState,
         revision: String,
         ctrl_ip: String,
         ctrl_mac: String,
         vtap_group_id_request: String,
         kubernetes_cluster_id: String,
-        dispatcher_listener: DispatcherListener,
     ) -> Synchronizer {
         Synchronizer {
             static_config: Arc::new(StaticConfig {
                 revision,
                 boot_time: SystemTime::now(),
-                tap_mode: trident::TapMode::Local,
+                tap_mode: tp::TapMode::Local,
                 vtap_group_id_request,
                 kubernetes_cluster_id,
                 ctrl_mac,
                 ctrl_ip,
                 env: RuntimeEnvironment::new(),
             }),
-            config: Arc::new(RwLock::new(Config::default())),
-            status: Arc::new(RwLock::new(Status::default())),
+            trident_state,
+            config: Default::default(),
+            status: Default::default(),
             sync_interval: DEFAULT_SYNC_INTERVAL,
             session,
-            dispatcher_listener,
+            dispatcher_listener: Default::default(),
             running: Arc::new(AtomicBool::new(false)),
             rt: Runtime::new().unwrap(),
-            threads: Mutex::new(Vec::new()),
+            threads: Default::default(),
+
+            max_memory: Default::default(),
         }
     }
 
@@ -126,10 +134,14 @@ impl Synchronizer {
         todo!()
     }
 
+    pub fn max_memory(&self) -> Arc<AtomicU64> {
+        self.max_memory.clone()
+    }
+
     pub fn generate_sync_request(
         static_config: &Arc<StaticConfig>,
         status: &Arc<RwLock<Status>>,
-    ) -> trident::SyncRequest {
+    ) -> tp::SyncRequest {
         let status = status.read();
 
         let boot_time = static_config
@@ -150,13 +162,13 @@ impl Synchronizer {
             }
         }
 
-        trident::SyncRequest {
+        tp::SyncRequest {
             boot_time: Some(boot_time as u32),
             config_accepted: Some(status.config_accepted),
             version_platform_data: Some(status.version_platform_data),
             version_acls: Some(status.version_acls),
             version_groups: Some(status.version_groups),
-            state: Some(trident::State::Running.into()),
+            state: Some(tp::State::Running.into()),
             revision: Some(static_config.revision.clone()),
             exception: None, // TBD
             process_name: Some("trident".into()),
@@ -196,7 +208,7 @@ impl Synchronizer {
     }
 
     fn parse_upgrade(
-        resp: &trident::SyncResponse,
+        resp: &tp::SyncResponse,
         static_config: &Arc<StaticConfig>,
         status: &Arc<RwLock<Status>>,
     ) {
@@ -222,13 +234,13 @@ impl Synchronizer {
 
     fn trigger_dispatcher_listener(
         listener: &DispatcherListener,
-        _: &trident::SyncResponse,
-        tap_mode: trident::TapMode,
+        _: &tp::SyncResponse,
+        tap_mode: tp::TapMode,
         rt_config: &RuntimeConfig,
         _: &Vec<MacAddr>,
         blacklist: &Vec<PlatformData>,
     ) {
-        if tap_mode == trident::TapMode::Local {
+        if tap_mode == tp::TapMode::Local {
             let if_mac_source = rt_config.if_mac_source;
             match links_by_name_regex(&rt_config.tap_interface_regex) {
                 Err(e) => warn!("get interfaces by name regex failed: {}", e),
@@ -250,22 +262,24 @@ impl Synchronizer {
 
     fn on_response(
         remote: &str,
-        mut resp: trident::SyncResponse,
+        mut resp: tp::SyncResponse,
+        trident_state: &TridentState,
         static_config: &Arc<StaticConfig>,
         status: &Arc<RwLock<Status>>,
-        dispatcher_listener: &mut DispatcherListener,
+        dispatcher_listener: &Arc<Mutex<Option<DispatcherListener>>>,
+        max_memory: &Arc<AtomicU64>,
     ) {
         // TODO: reset escape timer
         // TODO: 把cleaner UpdatePcapDataRetention挪到别的地方
         Self::parse_upgrade(&resp, static_config, status);
 
         match resp.status() {
-            trident::Status::Failed => warn!(
+            tp::Status::Failed => warn!(
                 "trisolaris (ip: {}) responded with {:?}",
                 remote,
-                trident::Status::Failed
+                tp::Status::Failed
             ),
-            trident::Status::Heartbeat => return,
+            tp::Status::Heartbeat => return,
             _ => (),
         }
 
@@ -284,10 +298,16 @@ impl Synchronizer {
         }
         let runtime_config = runtime_config.unwrap();
         Self::on_config_change(&runtime_config);
-        dispatcher_listener.on_config_change(&runtime_config);
+
+        max_memory.store(runtime_config.max_memory, Ordering::Relaxed);
+
+        let mut dispatcher_listener = dispatcher_listener.lock();
+        if let Some(listener) = (*dispatcher_listener).as_mut() {
+            listener.on_config_change(&runtime_config);
+        }
 
         let blacklist = vec![];
-        if static_config.tap_mode == trident::TapMode::Local {
+        if static_config.tap_mode == tp::TapMode::Local {
             // TODO: generate blacklist
         }
 
@@ -295,22 +315,30 @@ impl Synchronizer {
         // TODO: check trisolaris
         // TODO: segments
         // TODO: modify platform
-        Self::trigger_dispatcher_listener(
-            &*dispatcher_listener,
-            &resp,
-            static_config.tap_mode,
-            &runtime_config,
-            &vec![],
-            &blacklist,
-        );
+        if let Some(listener) = &*dispatcher_listener {
+            Self::trigger_dispatcher_listener(
+                &listener,
+                &resp,
+                static_config.tap_mode,
+                &runtime_config,
+                &vec![],
+                &blacklist,
+            );
+        }
+
+        let (trident_state, cvar) = &**trident_state;
+        *trident_state.lock().unwrap() = trident::State::ConfigChanged(runtime_config);
+        cvar.notify_one();
     }
 
     fn run_triggered_session(&self) {
         let session = self.session.clone();
+        let trident_state = self.trident_state.clone();
         let static_config = self.static_config.clone();
         let status = self.status.clone();
         let running = self.running.clone();
-        let mut dispatcher_listener = self.dispatcher_listener.clone();
+        let dispatcher_listener = self.dispatcher_listener.clone();
+        let max_memory = self.max_memory.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             while running.load(Ordering::SeqCst) {
                 session.update_current_server().await;
@@ -320,8 +348,7 @@ impl Synchronizer {
                     time::sleep(Duration::new(1, 0)).await;
                     continue;
                 }
-                let mut client =
-                    trident::synchronizer_client::SynchronizerClient::new(client.unwrap());
+                let mut client = tp::synchronizer_client::SynchronizerClient::new(client.unwrap());
                 let version = session.get_version();
                 let response = client
                     .push(Synchronizer::generate_sync_request(&static_config, &status))
@@ -357,9 +384,11 @@ impl Synchronizer {
                     Self::on_response(
                         &session.get_current_server(),
                         message,
+                        &trident_state,
                         &static_config,
                         &status,
-                        &mut dispatcher_listener,
+                        &dispatcher_listener,
+                        &max_memory,
                     );
                 }
             }
@@ -368,12 +397,14 @@ impl Synchronizer {
 
     fn run(&self) {
         let session = self.session.clone();
+        let trident_state = self.trident_state.clone();
         let static_config = self.static_config.clone();
         let _config = self.config.clone();
         let status = self.status.clone();
         let sync_interval = self.sync_interval;
         let running = self.running.clone();
-        let mut dispatcher_listener = self.dispatcher_listener.clone();
+        let dispatcher_listener = self.dispatcher_listener.clone();
+        let max_memory = self.max_memory.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             let mut client = None;
             let version = session.get_version();
@@ -412,7 +443,7 @@ impl Synchronizer {
                         time::sleep(Duration::new(1, 0)).await;
                         continue;
                     }
-                    client = Some(trident::synchronizer_client::SynchronizerClient::new(
+                    client = Some(tp::synchronizer_client::SynchronizerClient::new(
                         inner_client.unwrap(),
                     ));
                 }
@@ -443,9 +474,11 @@ impl Synchronizer {
                 Self::on_response(
                     &session.get_current_server(),
                     response.unwrap().into_inner(),
+                    &trident_state,
                     &static_config,
                     &status,
-                    &mut dispatcher_listener,
+                    &dispatcher_listener,
+                    &max_memory,
                 );
                 if status.read().new_revision.is_some() {
                     // TODO: upgrade

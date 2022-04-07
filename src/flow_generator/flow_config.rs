@@ -26,6 +26,7 @@ impl Default for TcpTimeout {
     }
 }
 
+#[derive(Clone)]
 pub struct FlowTimeout {
     pub opening: Duration,
     pub established: Duration,
@@ -86,6 +87,7 @@ pub struct FlowMapRuntimeConfig {
     pub l7_log_packet_size: AtomicU32,
 }
 
+#[derive(Clone)]
 pub struct FlowMapConfig {
     pub vtap_id: u16,
     pub trident_type: TridentType,

@@ -1145,13 +1145,13 @@ pub fn _new_flow_map_and_receiver() -> (FlowMap, Receiver<TaggedFlow>) {
         trident_type: common::TridentType::TtProcess,
         collector_enabled: false,
         packet_delay: c.packet_delay,
-        flush_interval: c.flow().flush_interval,
+        flush_interval: c.flow.flush_interval,
         ignore_l2_end: false,
         ignore_tor_mac: false,
         flow_timeout: FlowTimeout::from(TcpTimeout {
-            established: c.flow().established_timeout,
-            closing_rst: c.flow().closing_rst_timeout,
-            others: c.flow().others_timeout,
+            established: c.flow.established_timeout,
+            closing_rst: c.flow.closing_rst_timeout,
+            others: c.flow.others_timeout,
         }),
         runtime_config: Arc::new(FlowMapRuntimeConfig::default()),
     };

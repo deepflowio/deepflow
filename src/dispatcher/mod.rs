@@ -29,8 +29,8 @@ use recv_engine::{
 
 use crate::{
     common::{enums::TapType, PlatformData, TaggedFlow, TapTyper},
-    config::{Config, RuntimeConfig},
-    flow_generator::MetaAppProto,
+    config::RuntimeConfig,
+    flow_generator::{FlowMapConfig, MetaAppProto},
     handler::{PacketHandler, PacketHandlerBuilder},
     platform::LibvirtXmlExtractor,
     proto::{
@@ -62,10 +62,10 @@ impl DispatcherFlavor {
         }
     }
 
-    fn run(&mut self, rt_config: Arc<RuntimeConfig>) {
+    fn run(&mut self) {
         match self {
             DispatcherFlavor::Analyzer(d) => d.run(),
-            DispatcherFlavor::Local(d) => d.run(rt_config),
+            DispatcherFlavor::Local(d) => d.run(),
             DispatcherFlavor::Mirror(d) => d.run(),
         }
     }
@@ -95,13 +95,13 @@ impl Dispatcher {
             .listener()
     }
 
-    pub fn start(&self, rt_config: Arc<RuntimeConfig>) {
+    pub fn start(&self) {
         if self.running.swap(true, Ordering::Relaxed) {
             return;
         }
         let mut flavor = self.flavor.lock().unwrap().take().unwrap();
         self.handle.lock().unwrap().replace(thread::spawn(move || {
-            flavor.run(rt_config);
+            flavor.run();
             flavor
         }));
     }
@@ -293,7 +293,7 @@ pub struct DispatcherBuilder {
     libvirt_xml_extractor: Option<Arc<LibvirtXmlExtractor>>,
     flow_output_queue: Option<Sender<TaggedFlow>>,
     log_output_queue: Option<Sender<MetaAppProto>>,
-    static_config: Option<Arc<Config>>,
+    flow_map_config: Option<FlowMapConfig>,
     stats_collector: Option<Arc<Collector>>,
 }
 
@@ -367,8 +367,8 @@ impl DispatcherBuilder {
         self
     }
 
-    pub fn static_config(mut self, v: Arc<Config>) -> Self {
-        self.static_config = Some(v);
+    pub fn flow_map_config(mut self, v: FlowMapConfig) -> Self {
+        self.flow_map_config = Some(v);
         self
     }
 
@@ -415,9 +415,6 @@ impl DispatcherBuilder {
         let id = self.id.ok_or(Error::ConfigIncomplete("no id".into()))?;
         let terminated = Arc::new(AtomicBool::new(false));
         let counter = Arc::new(PacketCounter::new(terminated.clone(), kernel_counter));
-        let static_config = self
-            .static_config
-            .ok_or(Error::ConfigIncomplete("no static config".into()))?;
         let collector = self
             .stats_collector
             .ok_or(Error::StatsCollector("no stats collector"))?;
@@ -479,9 +476,11 @@ impl DispatcherBuilder {
 
             counter: counter.clone(),
             terminated: terminated.clone(),
-            static_config,
+            flow_map_config: self
+                .flow_map_config
+                .take()
+                .ok_or(Error::ConfigIncomplete("no flow_map_config".into()))?,
             stats: collector.clone(),
-            flow_map_runtime_config: Default::default(),
         };
         collector.register_countable(
             "dispatcher",
