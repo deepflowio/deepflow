@@ -3,7 +3,7 @@ use std::net::IpAddr;
 use std::path::Path;
 use std::process;
 use std::sync::{
-    atomic::{AtomicBool, AtomicU32, AtomicU64},
+    atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     Arc, Condvar, Mutex,
 };
 use std::thread::{self, JoinHandle};
@@ -16,6 +16,7 @@ use flexi_logger::{
 use log::{info, warn};
 
 use crate::{
+    collector::Collector,
     collector::{
         flow_aggr::FlowAggrThread, quadruple_generator::QuadrupleGeneratorThread, CollectorThread,
         MetricsType,
@@ -130,8 +131,9 @@ impl Trident {
 
         let (state, cond) = &*state;
         let mut state_guard = state.lock().unwrap();
-        let mut running_config = RuntimeConfig::default();
         let mut components = None;
+        let mut config_handler = ConfigHandler::new(&synchronizer, ctrl_ip, ctrl_mac, config);
+
         loop {
             match &*state_guard {
                 State::Running => {
@@ -147,7 +149,7 @@ impl Trident {
 
             let new_config = new_state.unwrap_config();
             let restart_dispatcher =
-                Self::update_config(&config, &mut running_config, new_config, &mut components);
+                Self::update_config(&mut config_handler, new_config, &mut components);
 
             if restart_dispatcher {
                 if let Some(c) = components.take() {
@@ -155,15 +157,11 @@ impl Trident {
                     // TODO: reset fast path
                 }
             }
-            if running_config.enabled != components.is_some() {
-                if running_config.enabled {
+            if config_handler.runtime_config.enabled != components.is_some() {
+                if config_handler.runtime_config.enabled {
                     info!("Current Revision: {}", &revision);
                     match Components::start(
-                        &config,
-                        &running_config,
-                        &synchronizer.max_memory(),
-                        ctrl_ip,
-                        ctrl_mac,
+                        &config_handler,
                         &stats_collector,
                         &session,
                         &synchronizer,
@@ -182,18 +180,20 @@ impl Trident {
 
     // returns dispatcher need restart
     fn update_config(
-        static_config: &Config,
-        running_config: &mut RuntimeConfig,
+        config_handler: &mut ConfigHandler,
         new_config: RuntimeConfig,
         components: &mut Option<Components>,
     ) -> bool {
+        let static_config = &config_handler.static_config;
+        let runtime_config = &mut config_handler.runtime_config;
+
         let mut restart_dispatcher = false;
-        if running_config.enabled != new_config.enabled {
-            running_config.enabled = new_config.enabled;
+        if runtime_config.enabled != new_config.enabled {
+            runtime_config.enabled = new_config.enabled;
             info!("Enabled set to {}", new_config.enabled);
         }
-        if running_config.global_pps_threshold != new_config.global_pps_threshold {
-            running_config.global_pps_threshold = new_config.global_pps_threshold;
+        if runtime_config.global_pps_threshold != new_config.global_pps_threshold {
+            runtime_config.global_pps_threshold = new_config.global_pps_threshold;
             if let Some(components) = components.as_mut() {
                 match static_config.tap_mode {
                     TapMode::Analyzer => {
@@ -203,17 +203,29 @@ impl Trident {
                     _ => {
                         components
                             .rx_leaky_bucket
-                            .set_rate(Some(running_config.global_pps_threshold));
+                            .set_rate(Some(runtime_config.global_pps_threshold));
                         info!(
                             "Global pps threshold change to {}",
-                            running_config.global_pps_threshold
+                            runtime_config.global_pps_threshold
                         );
                     }
                 }
             }
         }
+
+        if runtime_config.inactive_server_port_enabled != new_config.inactive_server_port_enabled {
+            config_handler
+                .collector
+                .inactive_server_port_enabled
+                .store(new_config.inactive_server_port_enabled, Ordering::Relaxed);
+            info!(
+                "inactive_server_port_enabled set to {}",
+                new_config.inactive_server_port_enabled
+            );
+        }
+
         // TODO: update other configs and remove the next line
-        *running_config = new_config;
+        *runtime_config = new_config;
         restart_dispatcher
     }
 
@@ -249,19 +261,21 @@ struct Components {
     platform_synchronizer: PlatformSynchronizer,
     api_watcher: Arc<ApiWatcher>,
     debugger: Debugger,
+    doc_collectors: Vec<Collector>,
 }
 
 impl Components {
     fn start(
-        static_config: &Config,
-        runtime_config: &RuntimeConfig,
-        max_memory: &Arc<AtomicU64>,
-        ctrl_ip: IpAddr,
-        ctrl_mac: MacAddr,
+        config_handler: &ConfigHandler,
         stats_collector: &Arc<stats::Collector>,
         session: &Arc<Session>,
         synchronizer: &Arc<Synchronizer>,
     ) -> Result<Self> {
+        let static_config = &config_handler.static_config;
+        let runtime_config = &config_handler.runtime_config;
+        let ctrl_ip = config_handler.ctrl_ip;
+        let ctrl_mac = config_handler.ctrl_mac;
+
         info!("start dispatcher");
         trident_process_check();
         controller_ip_check(&static_config.controller_ips);
@@ -283,7 +297,9 @@ impl Components {
         match static_config.tap_mode {
             TapMode::Analyzer => todo!(),
             _ => {
-                check(free_memory_checker(max_memory.clone()));
+                check(free_memory_checker(
+                    config_handler.environment.max_memory.clone(),
+                ));
                 info!("Complete memory check");
 
                 // NPF服务检查
@@ -360,6 +376,7 @@ impl Components {
         let mut dispatchers = vec![];
         let mut dispatcher_listeners = vec![];
         let mut collectors = vec![];
+        let mut doc_collectors = vec![];
 
         for i in 0..dispatcher_num {
             // TODO: create and start collector
@@ -429,16 +446,21 @@ impl Components {
             dispatchers.push(dispatcher);
             dispatcher_listeners.push(dispatcher_listener);
 
-            let mut collector = Self::new_collector(
+            let (mut collector, c) = Self::new_collector(
                 i,
                 stats_collector,
                 static_config,
                 runtime_config,
                 flow_receiver,
                 MetricsType::SECOND | MetricsType::MINUTE,
+                config_handler
+                    .collector
+                    .inactive_server_port_enabled
+                    .clone(),
             );
             collector.start();
             collectors.push(collector);
+            doc_collectors.push(c);
         }
 
         let platform_synchronizer = PlatformSynchronizer::new(
@@ -505,10 +527,10 @@ impl Components {
             platform_synchronizer,
             api_watcher,
             debugger,
+            doc_collectors,
         })
     }
 
-    // TODO: collector...
     fn new_collector(
         id: usize,
         stats_collector: &Arc<stats::Collector>,
@@ -516,7 +538,8 @@ impl Components {
         runtime_config: &RuntimeConfig,
         flow_receiver: queue::Receiver<TaggedFlow>,
         metrics_type: MetricsType,
-    ) -> CollectorThread {
+        inactive_server_port_enabled: Arc<AtomicBool>,
+    ) -> (CollectorThread, Collector) {
         let (second_sender, second_receiver, counter) =
             queue::bounded(static_config.quadruple_queue_size);
         stats_collector.register_countable(
@@ -596,23 +619,56 @@ impl Components {
             ));
             thread::spawn(move || {
                 for flow in l4_flow_aggr_receiver {
-                    info!("l4_flow: {}", flow);
+                    info!("{:?}", flow);
                 }
             });
         }
 
+        let (collector, collector_receiver) = {
+            let (collector_sender, collector_receiver, handle) = queue::bounded(65535);
+            let (acc_flow_receiver, delay_seconds, name) = if metrics_type == MetricsType::SECOND {
+                (
+                    second_receiver,
+                    second_quadruple_tolerable_delay,
+                    "2-flow-with-meter-to-second-collector",
+                )
+            } else {
+                (
+                    minute_receiver,
+                    minute_quadruple_tolerable_delay,
+                    "2-flow-with-meter-to-minute-collector",
+                )
+            };
+            let collector = Collector::new(
+                id as u32,
+                acc_flow_receiver,
+                collector_sender,
+                metrics_type,
+                delay_seconds as u32,
+                runtime_config.vtap_id,
+                inactive_server_port_enabled,
+                static_config.cloud_gateway_traffic,
+                runtime_config.trident_type,
+                stats_collector,
+            );
+            stats_collector.register_countable(
+                name,
+                Arc::new(handle),
+                vec![StatsOption::Tag("index", id.to_string())],
+            );
+            (collector, collector_receiver)
+        };
+        collector.start();
         thread::spawn(move || {
-            for flow in second_receiver {
-                info!("second: {}", flow);
-            }
-        });
-        thread::spawn(move || {
-            for flow in minute_receiver {
-                info!("minute: {}", flow);
+            for flow in collector_receiver {
+                info!("doc: {:?}", flow);
             }
         });
 
-        CollectorThread::new(quadruple_generator, l4_flow_aggr)
+        (
+            CollectorThread::new(quadruple_generator, l4_flow_aggr),
+            collector,
+        )
     }
 
     fn stop(mut self) {
@@ -628,6 +684,9 @@ impl Components {
         for q in self.collectors.iter_mut() {
             q.stop();
         }
+        for c in self.doc_collectors.iter() {
+            c.stop();
+        }
 
         // TODO: app proto logs handler
 
@@ -635,5 +694,45 @@ impl Components {
 
         self.debugger.stop();
         self.monitor.stop();
+    }
+}
+
+struct CollectorConfig {
+    inactive_server_port_enabled: Arc<AtomicBool>,
+}
+
+struct EnvironmentConfig {
+    max_memory: Arc<AtomicU64>,
+}
+
+struct ConfigHandler {
+    static_config: Config,
+    runtime_config: RuntimeConfig,
+    ctrl_ip: IpAddr,
+    ctrl_mac: MacAddr,
+    // need update
+    collector: CollectorConfig,
+    environment: EnvironmentConfig,
+}
+
+impl ConfigHandler {
+    fn new(
+        synchronizer: &Synchronizer,
+        ctrl_ip: IpAddr,
+        ctrl_mac: MacAddr,
+        config: Config,
+    ) -> Self {
+        ConfigHandler {
+            static_config: config,
+            runtime_config: RuntimeConfig::default(),
+            ctrl_ip,
+            ctrl_mac,
+            collector: CollectorConfig {
+                inactive_server_port_enabled: Arc::new(AtomicBool::new(false)),
+            },
+            environment: EnvironmentConfig {
+                max_memory: synchronizer.max_memory(),
+            },
+        }
     }
 }

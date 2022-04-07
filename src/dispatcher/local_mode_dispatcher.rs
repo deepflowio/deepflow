@@ -22,7 +22,7 @@ use crate::{
     proto::{common::TridentType, trident::IfMacSource},
     utils::{
         bytes::read_u16_be,
-        net::{link_list, Link, MacAddr, MAC_ADDR_ZERO},
+        net::{link_list, Link, MacAddr},
     },
 };
 
@@ -165,8 +165,8 @@ impl LocalModeDispatcher {
                 }
             } else {
                 // 无隧道并且MAC地址都是0一定是loopback流量
-                if meta_packet.lookup_key.src_mac == MAC_ADDR_ZERO
-                    && meta_packet.lookup_key.dst_mac == MAC_ADDR_ZERO
+                if meta_packet.lookup_key.src_mac == MacAddr::ZERO
+                    && meta_packet.lookup_key.dst_mac == MacAddr::ZERO
                 {
                     meta_packet.lookup_key.src_mac = base.ctrl_mac;
                     meta_packet.lookup_key.dst_mac = base.ctrl_mac;
@@ -325,7 +325,7 @@ impl LocalModeDispatcherListener {
         match link_list() {
             Ok(links) => {
                 for link in links {
-                    if link.mac_addr != MAC_ADDR_ZERO && !result.contains_key(&link.if_index) {
+                    if link.mac_addr != MacAddr::ZERO && !result.contains_key(&link.if_index) {
                         result.insert(link.if_index, link.mac_addr);
                     }
                 }

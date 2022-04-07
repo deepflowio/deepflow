@@ -108,9 +108,10 @@ impl Default for Code {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Direction {
+    None,
     ClientToServer = 1 << 0,
     ServerToClient = 1 << 1,
     LocalToLocal = 1 << 2,
@@ -154,7 +155,7 @@ impl Direction {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum TapSide {
     Rest = 0,
@@ -191,11 +192,12 @@ impl From<Direction> for TapSide {
             Direction::ServerGatewayHypervisorToClient => TapSide::ServerGatewayHypervisor,
             Direction::ClientGatewayToServer => TapSide::ClientGateway,
             Direction::ServerGatewayToClient => TapSide::ServerGateway,
+            Direction::None => TapSide::Rest,
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum TagType {
     TunnelIpId = 4,
@@ -207,7 +209,7 @@ impl Default for TagType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Tagger {
     pub code: Code,
 
