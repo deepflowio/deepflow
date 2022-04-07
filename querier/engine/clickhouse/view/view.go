@@ -143,6 +143,7 @@ func (v *View) trans() {
 			if node.Flag == NODE_FLAG_METRICS {
 				// Tag在最内层中只保留value 去掉alias
 				tagsLevelInner = append(tagsLevelInner, tag)
+				// 外层tag
 				metricTag := &Tag{}
 				if node.Alias != "" {
 					metricTag.Value = node.Alias
@@ -176,8 +177,16 @@ func (v *View) trans() {
 		group := node.(*Group)
 		if group.Flag == GROUP_FLAG_DEFAULT {
 			groupsLevelInner = append(groupsLevelInner, group)
-			groupsLevelMetrics = append(groupsLevelMetrics, &Group{Value: group.Value})
-			groupsValueInner = append(groupsValueInner, group.Value)
+			// 外层group
+			metricGroup := &Group{}
+			if group.Alias != "" {
+				metricGroup.Value = group.Alias
+			} else {
+				metricGroup.Value = group.Value
+			}
+			groupsLevelMetrics = append(groupsLevelMetrics, metricGroup)
+			// 由于会出现字段在内层group中但不在内层tag中，但外层group也需要，因此内层tag会与group做并集
+			groupsValueInner = append(groupsValueInner, metricGroup.Value)
 		} else if group.Flag == GROUP_FLAG_METRICS_OUTER {
 			groupsLevelMetrics = append(groupsLevelMetrics, group)
 		} else if group.Flag == GROUP_FLAG_METRICS_INNTER {

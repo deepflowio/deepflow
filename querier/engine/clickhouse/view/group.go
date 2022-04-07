@@ -53,6 +53,7 @@ func (s *Groups) GetWiths() []Node {
 
 type Group struct {
 	Value string
+	Alias string
 	Flag  int
 	Withs []Node
 	NodeBase
@@ -66,6 +67,10 @@ func (n *Group) ToString() string {
 
 func (n *Group) WriteTo(buf *bytes.Buffer) {
 	buf.WriteString(n.Value)
+	if n.Alias != "" {
+		buf.WriteString(" AS ")
+		buf.WriteString(n.Alias)
+	}
 }
 
 func (n *Group) GetWiths() []Node {
