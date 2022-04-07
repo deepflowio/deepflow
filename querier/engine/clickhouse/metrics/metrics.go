@@ -17,9 +17,14 @@ type Metrics struct {
 	Type        int    // 指标量类型
 	Category    string // 类别
 	Condition   string // 聚合过滤
+	IsAgg       bool   // 是否为聚合指标量
 }
 
 func (m *Metrics) Replace(metrics *Metrics) {
+	// 如果DBField == ""，表示是querier聚合的指标量
+	if m.DBField == "" {
+		m.IsAgg = true
+	}
 	if metrics.DBField != "" {
 		m.DBField = metrics.DBField
 	}
@@ -72,12 +77,13 @@ func GetMetricsDescriptions(db string, table string) (map[string][]interface{}, 
 		return nil, nil
 	}
 	columns := []interface{}{
-		"name", "display_name", "unit", "type", "category", "operators",
+		"name", "is_agg", "display_name", "unit", "type", "category", "operators",
 	}
 	var values []interface{}
 	for field, metrics := range metrics {
 		values = append(values, []interface{}{
-			field, metrics.DisplayName, metrics.Unit, metrics.Type, metrics.Category, METRICS_OPERATORS,
+			field, metrics.IsAgg, metrics.DisplayName, metrics.Unit, metrics.Type,
+			metrics.Category, METRICS_OPERATORS,
 		})
 	}
 	return map[string][]interface{}{
