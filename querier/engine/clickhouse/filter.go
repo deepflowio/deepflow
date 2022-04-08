@@ -92,6 +92,14 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				ipVersion = "1"
 			}
 			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, ipVersion)
+		case "is_internet", "is_internet_0", "is_internet_1":
+			if (t.Value == "0" && op == "=") || (t.Value == "1" && op == "!=") {
+				newOP := "!="
+				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, newOP)
+			} else {
+				newOP := "="
+				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, newOP)
+			}
 		case "_id":
 			valueStr := strings.Trim(t.Value, "'")
 			valueInt, err := strconv.Atoi(valueStr)

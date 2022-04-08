@@ -264,7 +264,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"default": NewTag(
 				"1",
 				l3EPCIDSuffix+"=-2",
-				"",
+				l3EPCIDSuffix+" %s -2",
 				"",
 			),
 			"node_type": NewTag(
