@@ -106,6 +106,7 @@ struct conn_info_t {
 	__u16 skc_family;	/* PF_INET, PF_INET6... */
 	__u16 sk_type;		/* socket type (SOCK_STREAM, etc) */
 	__u8 skc_ipv6only;
+	bool need_reconfirm;  // socket l7协议类型是否需要再次确认。
 	void *sk;
 
 	// The protocol of traffic on the connection (HTTP, MySQL, etc.).
@@ -113,9 +114,11 @@ struct conn_info_t {
 	// MSG_UNKNOWN, MSG_REQUEST, MSG_RESPONSE
 	enum message_type message_type;
 
-	enum traffic_direction direction; /* T_INGRESS T_EGRESS ... */
+	enum traffic_direction direction; //T_INGRESS or T_EGRESS
+	enum endpoint_role role;
 	size_t prev_count;
 	char prev_buf[4];
+	__s32 correlation_id; // 目前用于kafka判断
 	enum traffic_direction prev_direction;
 	struct socket_info_t *socket_info_ptr; /* lookup __socket_info_map */
 };

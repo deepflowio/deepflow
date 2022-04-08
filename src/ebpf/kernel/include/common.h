@@ -12,7 +12,11 @@ enum message_type {
 	// 获取后两者合并，再进行判断。主要场景用于MySQL，Kafka
 	// 读数据的行为先读取4字节数据后再读取剩下的数据，要想进行
 	// 正确的协议判断需要合并这两部分数据才可以。
-	MSG_PRESTORE
+	MSG_PRESTORE,
+	// 对于l7的协议推断需要再确认逻辑。
+	MSG_RECONFIRM,
+	// 用于信息相关清理，一般用于socket信息清除
+	MSG_CLEAR
 };
 
 // 数据流方向

@@ -35,12 +35,12 @@ MAP_PERARRAY(members_offset, __u32, struct member_fields_offset, 1)
  *
  * 按照每秒钟处理 10,000,000 Requests (这是一个很大值，实际达不到)这样的一个速率，
  * 可以存储176年(如果从2022年开始)的数据而UID不会出现重复。
- * ((2^56 - 1) - sys_boot_time)/10/1000/1000/60/60/24/365 = 176 years 
+ * ((2^56 - 1) - sys_boot_time)/10/1000/1000/60/60/24/365 = 176 years
  */
 MAP_PERARRAY(trace_uid_map, __u32, struct trace_uid_t, 1)
 
 /*
- * 对各类map进行统计 
+ * 对各类map进行统计
  */
 MAP_PERARRAY(trace_stats_map, __u32, struct trace_stats, 1)
 
@@ -59,11 +59,37 @@ BPF_HASH(socket_info_map, __u64, struct socket_info_t)
 // Key is {tgid, pid}. value is trace_info_t
 BPF_HASH(trace_map, __u64, struct trace_info_t)
 
+static __inline void delete_socket_info(__u64 conn_key,
+					struct socket_info_t *socket_info_ptr)
+{
+	if (socket_info_ptr == NULL)
+		return;
+
+	__u32 k0 = 0;
+	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
+	if (trace_stats == NULL)
+		return;
+
+	/*
+	 * 当socket信息被清理同时，同样也要关联的清除trace_map中的此socket的记录
+	 */
+	__u64 trace_key = socket_info_ptr->trace_map_key;
+	if (trace_key) {
+		if (trace_map__lookup(&trace_key)) {
+			trace_map__delete(&trace_key);
+			trace_stats->trace_map_count--;
+		}
+	}
+
+	socket_info_map__delete(&conn_key);
+	trace_stats->socket_map_count--;
+}
+
 #include "include/protocol_inference.h"
 #define EVENT_BURST_NUM            16
 #define CONN_PERSIST_TIME_MAX_NS   100000000000ULL
 
-#ifndef BPF_USE_CORE 
+#ifndef BPF_USE_CORE
 static __inline unsigned int __retry_get_sock_flags(void *sk,
 						    int offset)
 {
@@ -84,7 +110,7 @@ static __inline void infer_sock_flags(void *sk,
 		unsigned int sk_protocol : 8;
 		unsigned int sk_type : 16;
 	};
- 
+
 	int sock_flags_offset_array[4] = {0x1f0, 0x1f8, 0x200, 0x210};
 	unsigned int flags = 0;
 	struct sock_flags_t *sk_flags = (struct sock_flags_t *)&flags;
@@ -122,7 +148,7 @@ static __inline void get_sock_flags(void *sk,
 		unsigned int sk_protocol : 8;
 		unsigned int sk_type : 16;
 	};
- 
+
 	unsigned int flags = 0;
 	struct sock_flags_t *sk_flags = (struct sock_flags_t *)&flags;
 	bpf_probe_read(&flags, sizeof(flags), (void *)sk +
@@ -164,7 +190,7 @@ struct skc_flags_t {
 		break;
 	case PF_INET6:
 		if (conn_info->skc_ipv6only == 0)
-			conn_info->skc_family = PF_INET; 
+			conn_info->skc_family = PF_INET;
 		break;
 	default:
 		return SOCK_CHECK_TYPE_ERROR;
@@ -175,14 +201,14 @@ struct skc_flags_t {
 	if (LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 6, 0))
 		bpf_core_read(&conn_info->sk_type, sizeof(conn_info->sk_type), &__sk->sk_type);
 	else
-		conn_info->sk_type = BPF_CORE_READ_BITFIELD_PROBED(__sk, sk_type); 
+		conn_info->sk_type = BPF_CORE_READ_BITFIELD_PROBED(__sk, sk_type);
 	
 #else
 	get_sock_flags(sk, offset, conn_info);
 #endif
 
 	if (conn_info->sk_type == SOCK_DGRAM) {
-		conn_info->tuple.l4_protocol = IPPROTO_UDP; 
+		conn_info->tuple.l4_protocol = IPPROTO_UDP;
 		return SOCK_CHECK_TYPE_UDP;
 	}
 
@@ -228,11 +254,13 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 	conn_info->prev_count = 0;
 	conn_info->direction = 0;
 	*((__u32 *) conn_info->prev_buf) = 0;
+	conn_info->need_reconfirm = false;
+	conn_info->correlation_id = -1; // 当前用于kafka协议推断
 
 	conn_info->sk = sk;
-        __u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->sk);
-        conn_info->socket_info_ptr =
-                        socket_info_map__lookup(&conn_key);
+	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->sk);
+	conn_info->socket_info_ptr =
+			socket_info_map__lookup(&conn_key);
 }
 
 static __inline bool get_socket_info(struct __socket_data *v,
@@ -244,7 +272,7 @@ static __inline bool get_socket_info(struct __socket_data *v,
 	 * 而去掉下面两个行linux5.13，Linux5.3版本（也可能有其他版本）的内核则会出现指令超限问题。
 	 * 目前的解决方案: 保留判断, 为linux5.2内核单独编译。
 	 */
-	 
+	
 	if (v == NULL || sk == NULL)
 		return false;
 
@@ -328,12 +356,12 @@ static __inline void infer_l7_class(struct conn_info_t* conn_info,
 
 #ifndef BPF_USE_CORE
 static __inline __u32 retry_get_write_seq(void *sk,
-                                          int offset,
+					  int offset,
 					  int snd_nxt_offset)
 {
 	/*
 	 * 判断依据
-	 * 
+	 *
 	 * (write_seq + 1) ==  snd_nxt && snd_nxt != 0 && write_seq != 0
 	 */
 	__u32 snd_nxt, write_seq;
@@ -350,7 +378,7 @@ static __inline __u32 retry_get_write_seq(void *sk,
 }
 
 static __inline __u32 retry_get_copied_seq(void *sk,
-                                           int offset)
+					   int offset)
 {
 	/*
 	 * 判断依据
@@ -364,9 +392,9 @@ static __inline __u32 retry_get_copied_seq(void *sk,
 	 *     u16	tcp_header_len;     -28
 	 *     ...
 	 *     u64	bytes_received;     -20
-         *     ...
- 	 *     u32	rcv_nxt;            -4
-	 *     u32	copied_seq;         0 
+	 *     ...
+	 *     u32	rcv_nxt;            -4
+	 *     u32	copied_seq;         0
 	 *     u32	rcv_wup;            +4
 	 *     u32      snd_nxt;	    +8
 	 *     ...
@@ -384,8 +412,8 @@ static __inline __u32 retry_get_copied_seq(void *sk,
 		return 0;
 
 	if ((copied_seq == rcv_nxt && rcv_wup == rcv_nxt)) {
-              return copied_seq;
-        }
+		return copied_seq;
+	}
 
 	return 0;
 }
@@ -416,10 +444,10 @@ static __inline void infer_tcp_seq_offset(void *sk,
 
 	/*
 	 * snd_nxt_offset 用于write_seq offset的判断。
- 	 *
-       	 *     u32      copied_seq;         0
-         *     u32      rcv_wup;            +4
-       	 *     u32      snd_nxt;            +8
+	 *
+	 *     u32      copied_seq;         0
+	 *     u32      rcv_wup;            +4
+	 *     u32      snd_nxt;            +8
 	 */
 	snd_nxt_offset = offset->tcp_sock__copied_seq_offset + 8;
 
@@ -522,18 +550,18 @@ static __inline void trace_process(const enum traffic_direction direction,
 	 *                  ①  -> |                  socket-b
 	 *                        - same thread ID -- |
 	 *                                            | ①  -> Egress
-	 *                        |                   | 
+	 *                        |                   |
 	 *                        |              <- ① |Ingress
 	 *                        |                 ... ...
-         *                        |
-         *                        |                  socket-c
-         *                        |                   | ①  -> Egress
+	 *                        |
+	 *                        |                  socket-c
+	 *                        |                   | ①  -> Egress
 	 *                        |                   |
 	 *                        |              <- ① |Ingress
 	 *                        |                   |
-         * trace end              |                 ... ...
+	 * trace end              |                 ... ...
 	 * Egress socket-a ①  <-- |
-	 * 
+	 *
 	 */
 
 	if (direction == T_INGRESS) {
@@ -599,6 +627,11 @@ static __inline void data_submit(struct pt_regs *ctx,
 	__u64 time_stemp = bpf_ktime_get_ns();
 	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->sk);
 
+	if (conn_info->message_type == MSG_CLEAR) {
+		delete_socket_info(conn_key, conn_info->socket_info_ptr);
+		return;
+	}
+
 	__u32 tcp_seq = 0;
 	__u64 coroutine_trace_id = 0, thread_trace_id = 0;
 
@@ -637,7 +670,8 @@ static __inline void data_submit(struct pt_regs *ctx,
 
 	__u8 trace_map_act = TRACE_MAP_ACT_NONE;
 
-	if (conn_info->message_type != MSG_PRESTORE)
+	if (conn_info->message_type != MSG_PRESTORE &&
+	    conn_info->message_type != MSG_RECONFIRM)
 		trace_process(direction, conn_key, pid_tgid, trace_info_ptr,
 			      trace_uid, trace_stats, &coroutine_trace_id,
 			      &thread_trace_id, &trace_map_act);
@@ -649,18 +683,20 @@ static __inline void data_submit(struct pt_regs *ctx,
 		sk_info.seq = 0;
 		sk_info.trace_map_key = 0;
 		*(__u32 *)sk_info.prev_data = 0;
-		sk_info.direction = 0;
+		sk_info.direction = conn_info->direction;
+		sk_info.role = ROLE_UNKNOW;
 		sk_info.prev_data_len = 0;
-		sk_info.update_time = time_stemp / NS_PER_SEC; 
+		sk_info.update_time = time_stemp / NS_PER_SEC;
+		sk_info.need_reconfirm = conn_info->need_reconfirm;
+		sk_info.correlation_id = conn_info->correlation_id;
+
 		/*
 		 * MSG_PRESTORE 目前只用于MySQL, Kafka协议推断
 		 */
 		if (conn_info->message_type == MSG_PRESTORE) {
-                        *(__u32 *)sk_info.prev_data = *(__u32 *)conn_info->prev_buf;
-                        sk_info.prev_data_len = 4;
-			sk_info.direction = conn_info->direction;
+			*(__u32 *)sk_info.prev_data = *(__u32 *)conn_info->prev_buf;
+			sk_info.prev_data_len = 4;
 		}
-
 
 		/*
 		 * 把'socket_info_map'和'trace_map'通过socket address关联起来，
@@ -671,13 +707,6 @@ static __inline void data_submit(struct pt_regs *ctx,
 
 		socket_info_map__update(&conn_key, &sk_info);
 		trace_stats->socket_map_count++;
-
-		/*
-		 * 对应预先存储数据的动作只建立socket_info_map项
-		 * 不会发送数据给用户态程序。
-		 */
-		if (conn_info->message_type == MSG_PRESTORE)
-			return;
 	} else { /* socket_info_ptr != NULL */
 		sk_info.uid = socket_info_ptr->uid;
 		sk_info.seq = ++socket_info_ptr->seq;
@@ -689,6 +718,14 @@ static __inline void data_submit(struct pt_regs *ctx,
 
 		socket_info_ptr->update_time = time_stemp / NS_PER_SEC;
 	}
+
+	/*
+	 * 对于预先存储数据或socket l7协议类型需要再次确认(适用于长链接)
+	 * 的动作只建立socket_info_map项不会发送数据给用户态程序。
+	 */
+	if (conn_info->message_type == MSG_PRESTORE ||
+	    conn_info->message_type == MSG_RECONFIRM)
+		return;
 
 	struct __socket_data_buffer *v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)
@@ -710,7 +747,7 @@ static __inline void data_submit(struct pt_regs *ctx,
 	v->socket_id = sk_info.uid;
 	v->data_seq = sk_info.seq;
 	v->tgid = tgid;
-	v->pid = (__u32) pid_tgid; 
+	v->pid = (__u32) pid_tgid;
 	v->timestamp = time_stemp / NS_PER_US;
 	v->direction = direction;
 	v->syscall_len = syscall_len;
@@ -1102,13 +1139,13 @@ KPROG(__sys_recvmmsg) (struct pt_regs* ctx) {
 	unsigned int vlen = (unsigned int)PT_REGS_PARM3(ctx);
 	
 	if (msgvec != NULL && vlen >= 1) {
-		int offset; 
+		int offset;
 		// Stash arguments.
 		struct data_args_t read_args = {};
 		read_args.source_fn = SYSCALL_FUNC_RECVMMSG;
 		read_args.fd = sockfd;
 
-		offset = offsetof(typeof(struct mmsghdr), msg_hdr) + 
+		offset = offsetof(typeof(struct mmsghdr), msg_hdr) +
 				offsetof(typeof(struct user_msghdr), msg_iov);
 
 		bpf_probe_read(&read_args.iov, sizeof(read_args.iov), (void *)msgvec + offset);
@@ -1221,23 +1258,8 @@ TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx *ctx) {
 	if (sock_addr) {
 		__u64 conn_key = gen_conn_key_id(bpf_get_current_pid_tgid() >> 32, sock_addr);
 		struct socket_info_t *socket_info_ptr = socket_info_map__lookup(&conn_key);
-		if (socket_info_ptr != NULL) {
-			struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
-			if (trace_stats == NULL)
-				return 0;
-			/*
-			 * 当socket信息被清理同时，同样也要关联的清除trace_map中的此socket的记录
-			 */
-			__u64 trace_key = socket_info_ptr->trace_map_key;
-			if (trace_key) {
-				if (trace_map__lookup(&trace_key)) {
-					trace_map__delete(&trace_key);
-					trace_stats->trace_map_count--;
-				}
-			}
-			socket_info_map__delete(&conn_key);
-			trace_stats->socket_map_count--;
-		}
+		if (socket_info_ptr != NULL)
+			delete_socket_info(conn_key, socket_info_ptr);
 	}
 
 	return 0;

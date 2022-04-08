@@ -93,7 +93,8 @@ static __inline int is_http_request(const char *data, int data_len)
 #define HTTPV2_FRAME_PROTO_SZ 	9
 #define HTTPV2_FRAME_TYPE_HEADERS 	0x1
 
-static __inline bool parse_http2_headers_frame(const char *buf_src, size_t count)
+static __inline bool parse_http2_headers_frame(const char *buf_src,
+					       size_t count)
 {
 #define LOOP_MAX 5
 	// fixed 9-octet header
@@ -447,17 +448,17 @@ static __inline enum message_type infer_redis_message(const char *buf,
  * |              |             | 1bit  | 1bit | 1bit  |      5bit      |                  |
  * | Magic High   |  Magic Low  |Req/Res| 2way | Event | Serializion ID |      status      |
  * -----------------------------------------------------------------------------------------
- * 
+ *
  * 32                                                                                      63
  * |-------------------------------------------------------------------------------------- |
  * 64                                Request ID (8 bytes)                                  95
  * |---------------------------------------------------------------------------------------|
- * 
+ *
  * 96                                                                                      127
  * |---------------------------------Body Length (4 bytes)---------------------------------|
- * 
+ *
  * | -------------------------------- Body (n bytes) --------------------------------------|
- * 
+ *
  * 16字节头 header
  * - Magic High & Magic Low (16 bits) 标识协议版本号，Dubbo 协议：0xdabb
  * - Req/Res (1 bit) 标识是请求或响应。请求： 1; 响应： 0。
@@ -477,7 +478,7 @@ static __inline enum message_type infer_redis_message(const char *buf,
  *     100 - SERVER_THREADPOOL_EXHAUSTED_ERROR
  * - Request ID (64 bits) 标识唯一请求。类型为long。
  * - Data Length (32 bits) 序列化后的内容长度（可变部分），按字节计数。int类型。
- * - Variable Part 
+ * - Variable Part
  *     被特定的序列化类型（由序列化 ID 标识）序列化后，每个部分都是一个 byte [] 或者 byte
  *     如果是请求包 ( Req/Res = 1)，则每个部分依次为：
  *         Dubbo version
@@ -539,28 +540,93 @@ static __inline enum message_type infer_dubbo_message(const char *buf,
 	return MSG_RESPONSE;
 }
 
-// Reference: https://kafka.apache.org/protocol.html#protocol_messages
-// Request Header v0 => request_api_key request_api_version correlation_id
-//     request_api_key => INT16
-//     request_api_version => INT16
-//     correlation_id => INT32
-// Response Header v0 => correlation_id 
-//  correlation_id => INT32
-static __inline enum message_type infer_kafka_request(const char *buf)
+/*
+ * Reference: https://kafka.apache.org/protocol.html#protocol_messages
+ * 1、长度：
+ * -----------------------------------------------------------------
+ * RequestOrResponse --> Size( RequestMessage | ResponseMessage )
+ *    Size --> int32
+ * -----------------------------------------------------------------
+ * 说明：解析时应先读取4字节的长度N，然后读取并解析后续的N字节请求/响应内容。
+ *
+ * 2、请求都具有以下格式：
+ * ------------------------------------------------------------------
+ * RequestMessage --> request_header request
+ *   request_header --> api_key api_version correlation_id client_id
+ *       api_key --> int16
+ *       api_version --> int16
+ *       correlation_id -->int32
+ *       client_id --> string
+ *   request --> MetadataRequest | ProduceRequest | FetchRequest | ...
+ * -------------------------------------------------------------------
+ * 说明：
+ * request_header：同类型的请求有不同的ID [0, 67]
+ * correlation_id：用户提供的整数，它将被服务器原封不动的传回给客户端,
+ *                 用于匹配客户端和服务器之间的请求和响应。
+ *
+ *
+ * 3、响应都具有以下格式：
+ * -------------------------------------------------------------------
+ * ResponseMessage --> response_header response
+ *   response_header --> correlation_id
+ *       correlation_id --> int32
+ *   response --> MetadataResponse | ProduceResponse | ...
+ * -------------------------------------------------------------------
+ * 说明：correlation_id 即请求中携带的correlation_id
+ *
+ * 下面信息依据kafka原文件./clients/src/main/resources/common/message/目录下各种Request.json
+ * ProduceRequest : apiKey 0, validVersions "0-9"
+ * FetchRequest : apiKey 1, validVersions "0-13"
+ * ListOffsetsRequest : apiKey 2, validVersions "0-7"
+ * MetadataRequest: apiKey 3, validVersions "0-12",
+ * HeartbeatRddequest: "apiKey": 12, "type": "request", "validVersions": "0-4"
+ */
+static __inline enum message_type infer_kafka_request(const char *buf,
+						      bool is_first,
+						      struct conn_info_t
+						      *conn_info)
 {
-	//TODO: 协议判断并不健壮，需要优化
-
-	static const int kNumAPIs = 62;
-	static const int kMaxAPIVersion = 12;
+#define RequestAPIKeyMax 67
+#define RequestAPIVerMax 13
+#define ProduceRequest 0
+#define FetchRequest   1
+#define ListOffsetsRequest 2
+#define MetadataRequest 3
+#define HeartbeatRequest 12
 
 	const __s16 request_api_key = __bpf_ntohs(*(__s16 *) buf);
-	if (request_api_key < 0 || request_api_key > kNumAPIs) {
-		return MSG_UNKNOWN;
-	}
-
 	const __s16 request_api_version = __bpf_ntohs(*(__s16 *) (buf + 2));
-	if (request_api_version < 0 || request_api_version > kMaxAPIVersion) {
+
+	if (request_api_key < 0 || request_api_key > RequestAPIKeyMax)
 		return MSG_UNKNOWN;
+
+	if (request_api_version < 0 || request_api_version > RequestAPIVerMax)
+		return MSG_UNKNOWN;
+
+	switch (request_api_key) {
+	case ProduceRequest:
+		if (request_api_version > 9)
+			return MSG_UNKNOWN;
+		break;
+	case FetchRequest:
+		if (request_api_version > 13)
+			return MSG_UNKNOWN;
+		break;
+	case ListOffsetsRequest:
+		if (request_api_version > 7)
+			return MSG_UNKNOWN;
+		break;
+	case MetadataRequest:
+		if (request_api_version > 12)
+			return MSG_UNKNOWN;
+		break;
+	case HeartbeatRequest:
+		if (request_api_version > 4)
+			return MSG_UNKNOWN;
+		break;
+	default:
+		if (is_first)
+			return MSG_UNKNOWN;
 	}
 
 	const __s32 correlation_id = __bpf_ntohl(*(__s32 *) (buf + 4));
@@ -568,7 +634,38 @@ static __inline enum message_type infer_kafka_request(const char *buf)
 		return MSG_UNKNOWN;
 	}
 
+	conn_info->correlation_id = (__u32) correlation_id;
+
 	return MSG_REQUEST;
+}
+
+static __inline bool kafka_data_check_len(size_t count,
+					  const char *buf,
+					  struct conn_info_t *conn_info,
+					  bool * use_prev_buf)
+{
+	*use_prev_buf = (conn_info->prev_count == 4)
+	    && ((size_t) __bpf_ntohl(*(__s32 *) conn_info->prev_buf) == count);
+
+	if (*use_prev_buf) {
+		count += 4;
+	}
+	// length(4 bytes) + api_key(2 bytes) + api_version(2 bytes) + correlation_id(4 bytes)
+	static const int min_req_len = 12;
+	if (count < min_req_len) {
+		return false;
+	}
+	// 总长度包含了length本身占用的4个字节
+	const __s32 message_size =
+	    *use_prev_buf ? count : __bpf_ntohl(*(__s32 *) buf) + 4;
+
+	// Enforcing count to be exactly message_size + 4 to mitigate misclassification.
+	// However, this will miss long messages broken into multiple reads.
+	if (message_size < 0 || count != (size_t) message_size) {
+		return false;
+	}
+
+	return true;
 }
 
 static __inline enum message_type infer_kafka_message(const char *buf,
@@ -576,51 +673,85 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 						      struct conn_info_t
 						      *conn_info)
 {
+	bool is_first = true, use_prev_buf;
+	if (!kafka_data_check_len(count, buf, conn_info, &use_prev_buf))
+		return MSG_UNKNOWN;
+
 	if (conn_info->socket_info_ptr) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_KAFKA)
 			return MSG_UNKNOWN;
-	}
 
-	bool use_prev_buf = (conn_info->prev_count == 4)
-	    && ((size_t) __bpf_ntohl(*(__s32 *) conn_info->prev_buf) == count);
+		conn_info->need_reconfirm =
+		    conn_info->socket_info_ptr->need_reconfirm;
 
-	if (use_prev_buf) {
-		count += 4;
-	}
-	// length(4 bytes) + api_key(2 bytes) + api_version(2 bytes) + correlation_id(4 bytes)
-	static const int kMinRequestLength = 12;
-	if (count < kMinRequestLength) {
-		return MSG_UNKNOWN;
-	}
-	// 总长度包含了length本身占用的4个字节
-	const __s32 message_size =
-	    use_prev_buf ? count : __bpf_ntohl(*(__s32 *) buf) + 4;
+		if (!conn_info->need_reconfirm) {
+			if ((conn_info->role == ROLE_CLIENT
+			     && conn_info->direction == T_EGRESS)
+			    || (conn_info->role == ROLE_SERVER
+				&& conn_info->direction == T_INGRESS)) {
+				return MSG_REQUEST;
+			}
 
-	// Enforcing count to be exactly message_size + 4 to mitigate misclassification.
-	// However, this will miss long messages broken into multiple reads.
-	if (message_size < 0 || count != (size_t) message_size) {
-		return MSG_UNKNOWN;
-	}
+			return MSG_RESPONSE;
+		}
+
+		conn_info->correlation_id =
+		    conn_info->socket_info_ptr->correlation_id;
+		conn_info->role = conn_info->socket_info_ptr->role;
+		is_first = false;
+	} else
+		conn_info->need_reconfirm = true;
 
 	const char *msg_buf = use_prev_buf ? buf : buf + 4;
-	if (infer_kafka_request(msg_buf) == MSG_REQUEST)
-		return MSG_REQUEST;
+	enum message_type msg_type =
+	    infer_kafka_request(msg_buf, is_first, conn_info);
+	if (msg_type == MSG_REQUEST) {
+		// 首次需要在socket_info_map新建socket
+		if (is_first) {
+			return MSG_RECONFIRM;
+		}
+
+		/*
+		 * socket_info_map已经存在并且需要确认（需要response的数据进一步），
+		 * 这里的request的数据直接丢弃。
+		 */
+		return MSG_UNKNOWN;
+	}
+	// 推断的第一个包必须是请求包，否则直接丢弃
+	if (is_first)
+		return MSG_UNKNOWN;
 
 	// is response ?
 	// Response Header v0 => correlation_id
 	//  correlation_id => INT32
 	const __s32 correlation_id = __bpf_ntohl(*(__s32 *) msg_buf);
-	if (correlation_id < 0) {
+	if (correlation_id < 0)
 		return MSG_UNKNOWN;
+
+	if (correlation_id == conn_info->correlation_id) {
+		// 完成确认
+		if (conn_info->socket_info_ptr) {
+			conn_info->socket_info_ptr->need_reconfirm = false;
+			// 角色确认
+			if (conn_info->direction == T_EGRESS)
+				conn_info->socket_info_ptr->role = ROLE_SERVER;
+			else
+				conn_info->socket_info_ptr->role = ROLE_CLIENT;
+		}
+	} else {
+		// 再次确认失败直接删除socket记录。
+		return MSG_CLEAR;
 	}
 
-	return MSG_RESPONSE;
+	// kafka长连接的形式存在，数据开始捕获从类型推断完成开始进行。
+	// 此处数据（用于确认协议类型）丢弃不要，避免发给用户产生混乱。
+	return MSG_UNKNOWN;
 }
 
 static __inline bool is_same_command(char *a, char *b)
 {
 	const int KERNEL_COMM_MAX = 16;
-	for (int idx = 0; idx < KERNEL_COMM_MAX; ++idx){
+	for (int idx = 0; idx < KERNEL_COMM_MAX; ++idx) {
 		if (a[idx] == '\0' && a[idx] == b[idx])
 			return true;
 
@@ -684,7 +815,7 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 
 	/*
 	 * 为了提高协议推断的准确率，做了一下处理：
-	 * 
+	 *
 	 * 数据一旦首次被推断成功，就会把推断的L7协议类型设置到socket上，这样
 	 * 凡是通过此socket读写的所有数据，协议类型就已经被确定了。
 	 * 协议推断程序可以快速判断是否要进行数据推断处理。
@@ -716,14 +847,30 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 	if (inferred_message.protocol != MSG_UNKNOWN)
 		return inferred_message;
 
+	if (count == 4) {
+		if (conn_info->socket_info_ptr) {
+			*(__u32 *) conn_info->socket_info_ptr->prev_data =
+			    *(__u32 *) infer_buf;
+			conn_info->socket_info_ptr->prev_data_len = 4;
+			conn_info->socket_info_ptr->direction =
+			    conn_info->direction;
+		} else {
+			*(__u32 *) conn_info->prev_buf = *(__u32 *) infer_buf;
+			conn_info->prev_count = 4;
+		}
+
+		inferred_message.type = MSG_PRESTORE;
+		return inferred_message;
+	}
 	// MySQL、Kafka推断需要之前的4字节数据
 	if (conn_info->socket_info_ptr) {
 		if (conn_info->socket_info_ptr->prev_data_len != 0) {
-			if (conn_info->direction != conn_info->socket_info_ptr->direction)
+			if (conn_info->direction !=
+			    conn_info->socket_info_ptr->direction)
 				return inferred_message;
 
 			*(__u32 *) conn_info->prev_buf =
-					*(__u32 *)conn_info->socket_info_ptr->prev_data;
+			    *(__u32 *) conn_info->socket_info_ptr->prev_data;
 			conn_info->prev_count = 4;
 
 			/*
@@ -731,26 +878,19 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 			 */
 			conn_info->socket_info_ptr->prev_data_len = 0;
 		}
-	} else {
-		if (count == 4) {
-			*(__u32 *) conn_info->prev_buf = *(__u32 *) infer_buf;
-			conn_info->prev_count = 4;
-			inferred_message.type = MSG_PRESTORE;
-			return inferred_message;
-		}
 	}
 
 	if ((inferred_message.type =
-	     infer_mysql_message(infer_buf, count, conn_info)) != MSG_UNKNOWN) {
+	     infer_http2_message(buf, count, conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_HTTP2;
+	} else if ((inferred_message.type =
+		    infer_mysql_message(infer_buf, count,
+					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_MYSQL;
 	} else if ((inferred_message.type =
 		    infer_kafka_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_KAFKA;
-	} else if ((inferred_message.type =
-		    infer_http2_message(buf, count,
-					conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_HTTP2;
 	}
 
 	return inferred_message;
