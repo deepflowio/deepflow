@@ -296,6 +296,10 @@ func getDatasourceInfo(connect *sql.DB, db, name string) (*DatasourceInfo, error
 	summableReg := regexp.MustCompile("`packet_tx__agg` AggregateFunction.([a-z]+)")
 	// 匹配 `rtt_sum__agg` AggregateFunction(avg, Float64), 中的 'avg' 为非可累加聚合的方法
 	unsummableReg := regexp.MustCompile("`rtt_sum__agg` AggregateFunction.([a-zA-Z]+)")
+	if strings.HasPrefix(db, "vtap_app") {
+		summableReg = regexp.MustCompile("`request__agg` AggregateFunction.([a-z]+)")
+		unsummableReg = regexp.MustCompile("`rrt_sum__agg` AggregateFunction.([a-zA-Z]+)")
+	}
 	// 匹配 toStartOfHour(time) AS time, 中的 'Hour' 为聚合时长
 	intervalReg := regexp.MustCompile("toStartOf([a-zA-Z]+)")
 	// 匹配 FROM vtap_flow.`1m_local` 中的'1m' 为原始数据源
