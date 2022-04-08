@@ -96,7 +96,7 @@ static __inline int is_http_request(const char *data, int data_len)
 static __inline bool parse_http2_headers_frame(const char *buf_src,
 					       size_t count)
 {
-#define LOOP_MAX 5
+#define LOOP_MAX 10
 	// fixed 9-octet header
 	if (count < HTTPV2_FRAME_PROTO_SZ)
 		return false;
@@ -104,27 +104,33 @@ static __inline bool parse_http2_headers_frame(const char *buf_src,
 	__u32 offset = 0;
 	__u8 type = 0, flags_unset = 0, reserve = 0, i;
 	__u8 buf[HTTPV2_FRAME_PROTO_SZ] = { 0 };
+	bool is_headers = false, is_valid_len = false;
 
 #pragma unroll
 	for (i = 0; i < LOOP_MAX; i++) {
+		if (offset == count) {
+			is_valid_len = true;
+			break;
+		}
+
 		if (offset + HTTPV2_FRAME_PROTO_SZ > count)
 			return false;
 
 		bpf_probe_read(buf, sizeof(buf), buf_src + offset);
+		offset += (__bpf_ntohl(*(__u32 *) buf) >> 8) +  
+			HTTPV2_FRAME_PROTO_SZ;
 		type = buf[3];
 		flags_unset = buf[4] & 0xd2;
 		reserve = buf[5] & 0x01;
-
-		if (type != HTTPV2_FRAME_TYPE_HEADERS) {
-			offset +=
-			    (__bpf_ntohl(*(__u32 *) buf) >> 8) +
-			    HTTPV2_FRAME_PROTO_SZ;
-		} else {
+		if (type == HTTPV2_FRAME_TYPE_HEADERS) {
 			if (flags_unset || reserve)
 				return false;
-			return true;
+			is_headers = true;
 		}
 	}
+
+	if (is_headers && is_valid_len)
+		return true;
 
 	return false;
 }
