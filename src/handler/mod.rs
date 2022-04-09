@@ -2,7 +2,9 @@ use std::net::IpAddr;
 use std::time::Duration;
 
 use crate::common::meta_packet::MetaPacket;
+use crate::pcap::PcapPacket;
 use crate::utils::net::MacAddr;
+use crate::utils::queue::Sender;
 
 pub struct IpInfo {
     pub mac: MacAddr,
@@ -22,7 +24,9 @@ pub struct LldpDuInfo {
     pub ttl: u32,
 }
 
-pub enum PacketHandler {}
+pub enum PacketHandler {
+    Pcap(Sender<PcapPacket>),
+}
 
 impl PacketHandler {
     pub fn handle(&mut self, _overlay_packet: &[u8], _meta_packet: &MetaPacket) {
@@ -30,10 +34,14 @@ impl PacketHandler {
     }
 }
 
-pub enum PacketHandlerBuilder {}
+pub enum PacketHandlerBuilder {
+    Pcap(Sender<PcapPacket>),
+}
 
 impl PacketHandlerBuilder {
     pub fn build_with(&self, _id: usize, _if_index: u32, _mac: MacAddr) -> PacketHandler {
-        todo!()
+        match self {
+            PacketHandlerBuilder::Pcap(s) => PacketHandler::Pcap(s.clone()),
+        }
     }
 }
