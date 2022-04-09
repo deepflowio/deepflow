@@ -23,7 +23,7 @@ use crate::{
     dispatcher::{
         self,
         recv_engine::{self, bpf},
-        BpfOptions, Dispatcher, DispatcherBuilder,
+        BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
     },
     flow_generator::{FlowMapConfig, FlowMapRuntimeConfig, FlowTimeout, TcpTimeout},
     monitor::Monitor,
@@ -35,7 +35,7 @@ use crate::{
             check, controller_ip_check, free_memory_checker, free_space_checker, kernel_check,
             trident_process_check,
         },
-        net::{get_route_src_ip, get_route_src_ip_and_mac, MacAddr},
+        net::{get_route_src_ip, get_route_src_ip_and_mac, links_by_name_regex, MacAddr},
         queue,
         stats::{self, StatsOption},
         LeakyBucket,
@@ -233,6 +233,7 @@ struct Components {
     libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
     tap_typer: Arc<TapTyper>,
     dispatchers: Vec<Dispatcher>,
+    dispatcher_listeners: Vec<DispatcherListener>,
     quadruple_generators: Vec<QuadrupleGeneratorThread>,
     monitor: Monitor,
 }
@@ -324,9 +325,25 @@ impl Components {
 
         let tap_typer = Arc::new(TapTyper::new());
 
+        let tap_interfaces = match links_by_name_regex(&runtime_config.tap_interface_regex) {
+            Err(e) => {
+                warn!("get interfaces by name regex failed: {}", e);
+                vec![]
+            }
+            Ok(links) if links.is_empty() => {
+                warn!(
+                    "tap-interface-regex({}) do not match any interface, in local mode",
+                    runtime_config.tap_interface_regex
+                );
+                vec![]
+            }
+            Ok(links) => links,
+        };
+
         // TODO: collector enabled
         let dispatcher_num = static_config.src_interfaces.len().max(1);
         let mut dispatchers = vec![];
+        let mut dispatcher_listeners = vec![];
         let mut quadruple_generators = vec![];
 
         for i in 0..dispatcher_num {
@@ -382,8 +399,20 @@ impl Components {
                 .stats_collector(stats_collector.clone())
                 .build()
                 .unwrap();
+
+            // TODO: 创建dispatcher的时候处理这些
+            let mut dispatcher_listener = dispatcher.listener();
+            dispatcher_listener.on_config_change(&runtime_config);
+            dispatcher_listener.on_tap_interface_change(
+                &tap_interfaces,
+                runtime_config.if_mac_source,
+                runtime_config.trident_type,
+                &vec![],
+            );
+
             dispatcher.start();
             dispatchers.push(dispatcher);
+            dispatcher_listeners.push(dispatcher_listener);
 
             let mut quadruple_generator = Self::new_collector(
                 i,
@@ -410,6 +439,7 @@ impl Components {
             libvirt_xml_extractor,
             tap_typer,
             dispatchers,
+            dispatcher_listeners,
             quadruple_generators,
             monitor,
         })
