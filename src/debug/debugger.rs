@@ -399,14 +399,15 @@ where
 mod tests {
     use std::net::{Ipv4Addr, Ipv6Addr};
 
+    use crate::config::IngressFlavour;
     use crate::platform::ActivePoller;
     use crate::{debug::Message, rpc::Session};
+    use rand::random;
 
     use super::*;
 
     fn new_default() -> ConstructDebugCtx {
         let s = String::from("yunshan");
-        let rt = tokio::runtime::Runtime::new().unwrap().handle().clone();
         let session = Arc::new(Session::new(
             20035,
             0,
@@ -422,9 +423,8 @@ mod tests {
             api_watcher: Arc::new(ApiWatcher::new(
                 Ipv4Addr::UNSPECIFIED.into(),
                 s,
-                false,
+                IngressFlavour::Kubernetes,
                 Duration::from_secs(1),
-                rt,
                 session.clone(),
             )),
             poller: Arc::new(GenericPoller::from(ActivePoller::new(Duration::from_secs(
@@ -441,7 +441,7 @@ mod tests {
     #[test]
     fn one_packet() {
         let timeout = Some(Duration::from_secs(1));
-        let port = 31223;
+        let port = random();
         let ctx = new_default();
         let server = Debugger::new(
             (
@@ -473,8 +473,7 @@ mod tests {
     #[test]
     fn multi_packet() {
         let timeout = Some(Duration::from_secs(1));
-        // UT是多线程跑，有可能出现port被占用的情况, 加1防止这种情况
-        let port = 31224;
+        let port = random();
         let ctx = new_default();
         let server = Debugger::new(
             (

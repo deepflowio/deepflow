@@ -13,10 +13,11 @@ use std::{
 use k8s_openapi::apimachinery::pkg::version::Info;
 use kube::Client;
 use log::{debug, info, warn};
-use tokio::{runtime::Handle, task::JoinHandle};
+use tokio::{runtime::Runtime, task::JoinHandle};
 
 use super::resource_watcher::{GenericResourceWatcher, Watcher};
 use crate::{
+    config::IngressFlavour,
     error::{Error, Result},
     platform::kubernetes::resource_watcher::ResourceWatcherFactory,
     proto::trident::{
@@ -49,7 +50,7 @@ const RESOURCES: [&str; 10] = [
 ];
 
 struct Context {
-    runtime: Handle,
+    runtime: Runtime,
     is_openshift_route: bool,
     interval: Duration,
     vtap_id: AtomicU32,
@@ -73,20 +74,19 @@ impl ApiWatcher {
     pub fn new(
         ctrl_ip: IpAddr,
         cluster_id: String,
-        is_openshift_route: bool,
+        ingress_flavour: IngressFlavour,
         interval: Duration,
-        runtime: Handle,
         session: Arc<Session>,
     ) -> Self {
         Self {
             context: Arc::new(Context {
                 ctrl_ip,
                 cluster_id,
-                is_openshift_route,
+                is_openshift_route: ingress_flavour == IngressFlavour::Openshift,
                 vtap_id: AtomicU32::new(0),
                 interval,
                 version: AtomicU64::new(0),
-                runtime,
+                runtime: Runtime::new().unwrap(),
             }),
             thread: Mutex::new(None),
             session,
@@ -176,7 +176,7 @@ impl ApiWatcher {
 
     async fn set_up(
         is_openshift_route: bool,
-        runtime: &Handle,
+        runtime: &Runtime,
         apiserver_version: &Arc<Mutex<Info>>,
         err_msgs: &Arc<Mutex<Vec<String>>>,
     ) -> Result<(HashMap<String, GenericResourceWatcher>, Vec<JoinHandle<()>>)> {
@@ -203,7 +203,8 @@ impl ApiWatcher {
                 let mut watchers = HashMap::new();
                 let mut ingress_groups = vec![];
 
-                let watcher_factory = ResourceWatcherFactory::new(client.clone(), runtime.clone());
+                let watcher_factory =
+                    ResourceWatcherFactory::new(client.clone(), runtime.handle().clone());
 
                 for group in api_groups.groups {
                     let version = match group
@@ -330,7 +331,8 @@ impl ApiWatcher {
                 err_msgs.lock().unwrap().push(err_msg);
 
                 let (mut watchers, mut task_handles) = (HashMap::new(), vec![]);
-                let watcher_factory = ResourceWatcherFactory::new(client.clone(), runtime.clone());
+                let watcher_factory =
+                    ResourceWatcherFactory::new(client.clone(), runtime.handle().clone());
                 for resource in RESOURCES {
                     if let Some(watcher) = watcher_factory.new_watcher(resource) {
                         if let Some(handle) = watcher.start() {
