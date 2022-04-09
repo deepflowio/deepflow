@@ -1037,13 +1037,13 @@ func (k *KnowledgeGraph) fill(
 		}
 	}
 
-	k.ResourceGl0ID0, k.ResourceGl0Type0 = common.GetResourceGl0(k.PodID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0)
-	k.ResourceGl1ID0, k.ResourceGl1Type0 = common.GetResourceGl1(k.PodGroupID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0)
-	k.ResourceGl2ID0, k.ResourceGl2Type0 = common.GetResourceGl2(k.ServiceID0, k.PodGroupID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0)
+	k.ResourceGl0ID0, k.ResourceGl0Type0 = common.GetResourceGl0(k.PodID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, int16(k.L3EpcID0))
+	k.ResourceGl1ID0, k.ResourceGl1Type0 = common.GetResourceGl1(k.PodGroupID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, int16(k.L3EpcID0))
+	k.ResourceGl2ID0, k.ResourceGl2Type0 = common.GetResourceGl2(k.ServiceID0, k.PodGroupID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, int16(k.L3EpcID0))
 
-	k.ResourceGl0ID1, k.ResourceGl0Type1 = common.GetResourceGl0(k.PodID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1)
-	k.ResourceGl1ID1, k.ResourceGl1Type1 = common.GetResourceGl1(k.PodGroupID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1)
-	k.ResourceGl2ID1, k.ResourceGl2Type1 = common.GetResourceGl2(k.ServiceID1, k.PodGroupID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1)
+	k.ResourceGl0ID1, k.ResourceGl0Type1 = common.GetResourceGl0(k.PodID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, int16(k.L3EpcID1))
+	k.ResourceGl1ID1, k.ResourceGl1Type1 = common.GetResourceGl1(k.PodGroupID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, int16(k.L3EpcID1))
+	k.ResourceGl2ID1, k.ResourceGl2Type1 = common.GetResourceGl2(k.ServiceID1, k.PodGroupID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, int16(k.L3EpcID1))
 }
 
 func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.PlatformInfoTable) {
