@@ -15,6 +15,8 @@ use flexi_logger::{
 };
 use log::{info, warn};
 
+use crate::handler::PacketHandlerBuilder;
+use crate::pcap::WorkerManager;
 use crate::{
     collector::Collector,
     collector::{
@@ -262,6 +264,7 @@ struct Components {
     api_watcher: Arc<ApiWatcher>,
     debugger: Debugger,
     doc_collectors: Vec<Collector>,
+    pcap_manager: WorkerManager,
 }
 
 impl Components {
@@ -321,6 +324,23 @@ impl Components {
             analyzer_source_ip: source_ip,
         }
         .build_pcap_syntax();
+
+        let pcap_config = &static_config.pcap;
+        let (pcap_sender, pcap_receiver, _) =
+            queue::bounded(static_config.pcap.queue_size as usize);
+
+        let pcap_manager = WorkerManager::new(
+            pcap_config.block_size_kb,
+            pcap_config.max_concurrent_files,
+            pcap_config.max_file_size_mb,
+            pcap_config.max_file_period,
+            &pcap_config.file_directory,
+            pcap_config.max_file_period,
+            vec![pcap_receiver],
+            stats_collector.clone(),
+        );
+        pcap_manager.start();
+
         let bpf_options = Arc::new(Mutex::new(BpfOptions { bpf_syntax }));
 
         let rx_leaky_bucket = Arc::new(LeakyBucket::new(match static_config.tap_mode {
@@ -413,6 +433,7 @@ impl Components {
                     vxlan_port: static_config.vxlan_port,
                     controller_port: static_config.controller_port,
                     controller_tls_port: static_config.controller_tls_port,
+                    handler_builders: vec![PacketHandlerBuilder::Pcap(pcap_sender.clone())],
                     ..Default::default()
                 }))
                 .bpf_options(bpf_options.clone())
@@ -528,6 +549,7 @@ impl Components {
             api_watcher,
             debugger,
             doc_collectors,
+            pcap_manager,
         })
     }
 
@@ -691,6 +713,7 @@ impl Components {
         // TODO: app proto logs handler
 
         self.libvirt_xml_extractor.stop();
+        self.pcap_manager.stop();
 
         self.debugger.stop();
         self.monitor.stop();

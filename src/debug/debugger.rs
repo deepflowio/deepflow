@@ -44,7 +44,7 @@ struct ModuleDebuggers {
 }
 
 pub struct Debugger {
-    udp_options: (Duration, Option<SocketAddr>),
+    udp_options: (Duration, Option<SocketAddr>, Duration),
     thread: Mutex<Option<JoinHandle<Result<()>>>>,
     running: Arc<AtomicBool>,
     debuggers: Arc<ModuleDebuggers>,
@@ -75,6 +75,12 @@ impl Debugger {
         let controller_ips = self.controller_ips.clone();
         let vtap_id = self.vtap_id;
 
+        let beacon_interval = if self.udp_options.2.is_zero() {
+            BEACON_INTERVAL
+        } else {
+            self.udp_options.2
+        };
+
         let thread = thread::spawn(move || -> Result<()> {
             let sock = match addr {
                 Some(a) => Arc::new(UdpSocket::bind(a)?),
@@ -103,7 +109,7 @@ impl Debugger {
                     for &ip in controller_ips.iter() {
                         sock_clone.send_to(serialized_beacon.as_slice(), (ip, BEACON_PORT))?;
                     }
-                    thread::sleep(BEACON_INTERVAL);
+                    thread::sleep(beacon_interval);
                 }
                 Ok(())
             });
@@ -176,7 +182,11 @@ impl Debugger {
         };
 
         Self {
-            udp_options: (udp_options.0.unwrap_or(SESSION_TIMEOUT), udp_options.1),
+            udp_options: (
+                udp_options.0.unwrap_or(SESSION_TIMEOUT),
+                udp_options.1,
+                Duration::ZERO,
+            ),
             thread: Mutex::new(None),
             running: Arc::new(AtomicBool::new(false)),
             debuggers: Arc::new(debuggers),
@@ -444,13 +454,14 @@ mod tests {
         let timeout = Some(Duration::from_secs(1));
         let port = 34444 + random::<u16>() % 1000;
         let ctx = new_default();
-        let server = Debugger::new(
+        let mut server = Debugger::new(
             (
                 timeout,
                 Some((IpAddr::from(LISTENED_IP.parse::<Ipv6Addr>().unwrap()), port).into()),
             ),
             ctx,
         );
+        server.udp_options.2 = Duration::from_secs(1);
         let client = Client::new(timeout, (LISTENED_IP, 0)).unwrap();
         server.start();
         std::thread::sleep(Duration::from_secs(1));
@@ -476,13 +487,14 @@ mod tests {
         let timeout = Some(Duration::from_secs(1));
         let port = 34444 + random::<u16>() % 1000;
         let ctx = new_default();
-        let server = Debugger::new(
+        let mut server = Debugger::new(
             (
                 timeout,
                 Some((IpAddr::from(LISTENED_IP.parse::<Ipv6Addr>().unwrap()), port).into()),
             ),
             ctx,
         );
+        server.udp_options.2 = Duration::from_secs(1);
         let client = Client::new(timeout, (LISTENED_IP, 0)).unwrap();
         server.start();
         std::thread::sleep(Duration::from_secs(1));
