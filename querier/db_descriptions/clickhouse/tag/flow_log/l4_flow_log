@@ -26,10 +26,9 @@ resource_gl1_type   , resource_gl1_type_0  , resource_gl1_type_1   , 自动分�
 resource_gl1        , resource_gl1_0       , resource_gl1_1        , 自动分组-工作负载聚合资源     , resource     ,                    , 知识图谱    ,
 resource_gl2_type   , resource_gl2_type_0  , resource_gl2_type_1   , 自动分组-服务聚合资源类型     , int_enum     , resource_gl2_type  , 知识图谱    ,
 resource_gl2        , resource_gl2_0       , resource_gl2_1        , 自动分组-服务聚合资源         , resource     ,                    , 知识图谱    ,
-is_internet         , is_internet_0        , is_internet_1         , Internet                      , internet     ,                    ,            ,
+is_internet         , is_internet_0        , is_internet_1         , Internet标志                  , internet     ,                    ,            ,
 
-mac_0               , mac_0                , mac_0                 , 客户端MAC                     , mac          ,                    , 链路层      ,
-mac_1               , mac_1                , mac_1                 , 服务端MAC                     , mac          ,                    , 链路层      ,
+mac                 , mac_0                , mac_1                 , MAC                           , mac          ,                    , 链路层      ,
 eth_type            , eth_type             , eth_type              , 链路协议                      , int_enum     , eth_type           , 链路层      ,
 
 ip                  , ip_0                 , ip_1                  , IP地址                        , ip           ,                    , 网络层      ,
@@ -53,8 +52,7 @@ tunnel_rx_mac_1     , tunnel_rx_mac_1      , tunnel_rx_mac_1       , 响应隧�
 client_port         , client_port          , client_port           , 客户端口                      , int          ,                    , 传输层      ,
 server_port         , server_port          , server_port           , 服务端口                      , int          ,                    , 传输层      ,
 # 需要将int按位转化位标志位列表展示 @zhenyu
-tcp_flags_bit_0     , tcp_flags_bit_0      , tcp_flags_bit_0       , 客户端TCP标志位列表           , int          ,                    , 传输层      ,
-tcp_flags_bit_1     , tcp_flags_bit_1      , tcp_flags_bit_1       , 服务端TCP标志位列表           , int          ,                    , 传输层      ,
+tcp_flags_bit       , tcp_flags_bit_0      , tcp_flags_bit_1       , TCP标志位列表                 , int          ,                    , 传输层      ,
 syn_seq             , syn_seq              , syn_seq               , SYN SEQ                       , int          ,                    , 传输层      ,
 syn_ack_seq         , syn_ack_seq          , syn_ack_seq           , SYN-ACK SEQ                   , int          ,                    , 传输层      ,
 last_keepalive_seq  , last_keepalive_seq   , last_keepalive_seq    , 心跳SEQ                       , int          ,                    , 传输层      ,
@@ -62,8 +60,7 @@ last_keepalive_ack  , last_keepalive_ack   , last_keepalive_ack    , 心跳ACK  
 
 l7_protocol         , l7_protocol          , l7_protocol           , 应用协议                      , int_enum     , l7_protocol        , 应用层      ,
 
-province_0          , province_0           , province_0            , 客户端省份                    , string       ,                    , 广域网      ,
-province_1          , province_1           , province_1            , 服务端省份                    , string       ,                    , 广域网      ,
+province            , province_0           , province_1            , 省份                          , string       ,                    , 广域网      ,
 
 close_type          , close_type           , close_type            , 流结束类型                    , int_enmu     , close_type         , 流信息      ,
 flow_source         , flow_source          , flow_source           , 流数据来源                    , int_enmu     , flow_source        , 流信息      ,
@@ -76,10 +73,8 @@ tap_port_type       , tap_port_type        , tap_port_type         , 采集位�
 vtap                , vtap                 , vtap                  , 采集器                        , resource     ,                    , 流信息      ,
 
 tap_side            , tap_side             , tap_side              , 路径统计位置                  , string_enum  , tap_side           , 流信息      ,
-l2_end_0            , l2_end_0             , l2_end_0              , 客户端二层边界                , bool         ,                    , 流信息      ,
-l2_end_1            , l2_end_1             , l2_end_1              , 服务端二层边界                , bool         ,                    , 流信息      ,
-l3_end_0            , l3_end_0             , l3_end_0              , 客户端三层边界                , bool         ,                    , 流信息      ,
-l3_end_1            , l3_end_1             , l3_end_1              , 服务端三层边界                , bool         ,                    , 流信息      ,
+l2_end              , l2_end_0             , l2_end_1              , 二层边界                      , bool         ,                    , 流信息      ,
+l3_end              , l3_end_0             , l3_end_1              , 三层边界                      , bool         ,                    , 流信息      ,
 is_new_flow         , is_new_flow          , is_new_flow           , 新建流                        , bool         ,                    , 流信息      ,
 start_time          , start_time           , start_time            , 开始时间                      , int          ,                    , 流信息      ,
 end_time            , end_time             , end_time              , 结束时间                      , int          ,                    , 流信息      ,
