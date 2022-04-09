@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	logging "github.com/op/go-logging"
+
 	"metaflow/querier/common"
 	"metaflow/querier/config"
 	"metaflow/querier/engine/clickhouse/client"
@@ -239,8 +240,7 @@ func GetTagResourceValues(tag string) (map[string][]interface{}, error) {
 	} else if tag == "vpc" {
 		sql = "SELECT id as value,name AS display_name FROM l3_epc_map"
 	} else if tag == "ip" {
-		// TODO
-		return nil, nil
+		sql = "SELECT ip as value,ip AS display_name FROM ip_relation_map"
 	}
 	if sql == "" {
 		return nil, errors.New(fmt.Sprintf("tag (%s) not found", tag))
