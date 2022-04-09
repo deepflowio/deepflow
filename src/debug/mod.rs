@@ -4,7 +4,7 @@ mod platform;
 mod queue;
 mod rpc;
 
-pub use debugger::Client;
+pub use debugger::{Client, ConstructDebugCtx, Debugger};
 pub use platform::PlatformMessage;
 pub use queue::{QueueDebugger, QueueMessage};
 pub use rpc::{ConfigResp, RpcMessage};

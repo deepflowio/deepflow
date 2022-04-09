@@ -359,7 +359,7 @@ impl Default for TripleMapConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "kebab-case")]
 pub enum KubernetesPollerType {
     Adaptive,
@@ -367,7 +367,7 @@ pub enum KubernetesPollerType {
     Passive,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum IngressFlavour {
     Kubernetes,

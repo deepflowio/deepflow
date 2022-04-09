@@ -7,6 +7,7 @@ use std::sync::{
     Arc, Condvar, Mutex,
 };
 use std::thread::{self, JoinHandle};
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use flexi_logger::{
@@ -20,9 +21,11 @@ use crate::{
         MetricsType,
     },
     common::{
-        enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, FREE_SPACE_REQUIREMENT,
+        enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, DEFAULT_LIBVIRT_XML_PATH,
+        FREE_SPACE_REQUIREMENT,
     },
     config::{Config, RuntimeConfig},
+    debug::{ConstructDebugCtx, Debugger},
     dispatcher::{
         self,
         recv_engine::{self, bpf},
@@ -30,7 +33,7 @@ use crate::{
     },
     flow_generator::{FlowMapConfig, FlowMapRuntimeConfig, FlowTimeout, TcpTimeout},
     monitor::Monitor,
-    platform::LibvirtXmlExtractor,
+    platform::{ApiWatcher, LibvirtXmlExtractor, PlatformSynchronizer},
     proto::trident::TapMode,
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     utils::{
@@ -44,6 +47,8 @@ use crate::{
         LeakyBucket,
     },
 };
+
+const MINUTE: Duration = Duration::from_secs(60);
 
 pub enum State {
     Running,
@@ -160,6 +165,8 @@ impl Trident {
                         ctrl_ip,
                         ctrl_mac,
                         &stats_collector,
+                        &session,
+                        &synchronizer,
                     ) {
                         Ok(c) => components = Some(c),
                         Err(e) => warn!("start dispatcher failed: {}", e),
@@ -239,6 +246,9 @@ struct Components {
     dispatcher_listeners: Vec<DispatcherListener>,
     collectors: Vec<CollectorThread>,
     monitor: Monitor,
+    platform_synchronizer: PlatformSynchronizer,
+    api_watcher: Arc<ApiWatcher>,
+    debugger: Debugger,
 }
 
 impl Components {
@@ -249,6 +259,8 @@ impl Components {
         ctrl_ip: IpAddr,
         ctrl_mac: MacAddr,
         stats_collector: &Arc<stats::Collector>,
+        session: &Arc<Session>,
+        synchronizer: &Arc<Synchronizer>,
     ) -> Result<Self> {
         info!("start dispatcher");
         trident_process_check();
@@ -429,9 +441,54 @@ impl Components {
             collectors.push(collector);
         }
 
-        // TODO: platform synchronizer
+        let platform_synchronizer = PlatformSynchronizer::new(
+            MINUTE,
+            static_config.kubernetes_poller_type,
+            static_config
+                .controller_ips
+                .first()
+                .unwrap()
+                .parse::<IpAddr>()
+                .unwrap(),
+            DEFAULT_LIBVIRT_XML_PATH,
+            static_config.kubernetes_cluster_id.clone(),
+            runtime_config.trident_type,
+            session.clone(),
+            libvirt_xml_extractor.clone(),
+        );
 
-        // TODO: kubernetes api watcher
+        platform_synchronizer.start();
+
+        let api_watcher = Arc::new(ApiWatcher::new(
+            static_config
+                .controller_ips
+                .first()
+                .unwrap()
+                .parse::<IpAddr>()
+                .unwrap(),
+            static_config.kubernetes_cluster_id.clone(),
+            static_config.ingress_flavour,
+            MINUTE,
+            session.clone(),
+        ));
+
+        api_watcher.start();
+
+        let context = ConstructDebugCtx {
+            vtap_id: runtime_config.vtap_id,
+            api_watcher: api_watcher.clone(),
+            poller: platform_synchronizer.clone_poller(),
+            session: session.clone(),
+            static_config: synchronizer.static_config.clone(),
+            status: synchronizer.status.clone(),
+            controller_ips: static_config
+                .controller_ips
+                .iter()
+                .map(|c| c.parse::<IpAddr>().unwrap())
+                .collect(),
+        };
+        let debugger = Debugger::new((None, None), context);
+        debugger.start();
 
         let monitor = Monitor::new(stats_collector.clone())?;
         monitor.start();
@@ -445,6 +502,9 @@ impl Components {
             dispatcher_listeners,
             collectors,
             monitor,
+            platform_synchronizer,
+            api_watcher,
+            debugger,
         })
     }
 
@@ -561,7 +621,8 @@ impl Components {
         for d in self.dispatchers.iter_mut() {
             d.stop();
         }
-        // TODO: platform synchronizer
+        self.platform_synchronizer.stop();
+        self.api_watcher.stop();
 
         // TODO: collector
         for q in self.collectors.iter_mut() {
@@ -572,8 +633,7 @@ impl Components {
 
         self.libvirt_xml_extractor.stop();
 
-        // TODO: kubernetes api watcher
-
+        self.debugger.stop();
         self.monitor.stop();
     }
 }
