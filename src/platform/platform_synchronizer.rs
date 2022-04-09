@@ -19,13 +19,16 @@ use super::{
         check_read_link_ns, check_set_ns, ActivePoller, GenericPoller, InterfaceInfo,
         PassivePoller, Poller,
     },
-    InterfaceEntry, LibvirtXmlExtractor, PollerType,
+    InterfaceEntry, LibvirtXmlExtractor,
 };
 
-use crate::handler;
-use crate::proto::trident::{self, GenesisSyncRequest, GenesisSyncResponse};
+use crate::proto::{
+    common::TridentType,
+    trident::{self, GenesisSyncRequest, GenesisSyncResponse},
+};
 use crate::rpc::Session;
 use crate::utils::command::*;
+use crate::{config::KubernetesPollerType, handler};
 
 const SHA1_DIGEST_LEN: usize = 20;
 
@@ -33,7 +36,7 @@ struct ProcessArgs {
     running: Arc<Mutex<bool>>,
     vtap_id: Arc<AtomicU32>,
     version: Arc<AtomicU64>,
-    config: Arc<config::StaticConfig>,
+    trident_type: TridentType,
     ctrl_ip: IpAddr,
     kubernetes_cluster_id: String,
     session: Arc<Session>,
@@ -67,7 +70,7 @@ struct HashArgs {
     xml_interfaces_hash: [u8; SHA1_DIGEST_LEN],
 }
 
-pub struct Synchronizer {
+pub struct PlatformSynchronizer {
     sync_interval: Duration,
     ctrl_ip: IpAddr,
     vtap_id: Arc<AtomicU32>,
@@ -79,25 +82,23 @@ pub struct Synchronizer {
     kubernetes_poller: Arc<GenericPoller>,
     xml_path: Arc<Mutex<PathBuf>>,
     thread: Mutex<Option<JoinHandle<()>>>,
-    config: Arc<config::StaticConfig>,
+    trident_type: TridentType,
     session: Arc<Session>,
     xml_extractor: Arc<LibvirtXmlExtractor>,
     sniffer: Arc<sniffer_builder::Sniffer>,
 }
 
-impl Synchronizer {
+impl PlatformSynchronizer {
     pub fn new<P: AsRef<Path>>(
         sync_interval: Duration,
-        poller_type: PollerType,
+        poller_type: KubernetesPollerType,
         ctrl_ip: IpAddr,
         xml_path: P,
         kubernetes_cluster_id: String,
+        trident_type: TridentType,
 
-        config: Arc<config::StaticConfig>,
         session: Arc<Session>,
         xml_extractor: Arc<LibvirtXmlExtractor>,
-        sniffer: Arc<sniffer_builder::Sniffer>,
-        mappings: Arc<mappings::Mappings>,
     ) -> Self {
         let (can_set_ns, can_read_link_ns) = (check_set_ns(), check_read_link_ns());
 
@@ -114,19 +115,21 @@ impl Synchronizer {
         }
 
         let poller = match poller_type {
-            PollerType::Adaptive => {
+            KubernetesPollerType::Adaptive => {
                 if can_set_ns && can_read_link_ns {
                     GenericPoller::from(ActivePoller::new(sync_interval))
                 } else {
                     GenericPoller::from(PassivePoller::new(sync_interval))
                 }
             }
-            PollerType::Active => GenericPoller::from(ActivePoller::new(sync_interval)),
-            PollerType::Passive => GenericPoller::from(PassivePoller::new(sync_interval)),
+            KubernetesPollerType::Active => GenericPoller::from(ActivePoller::new(sync_interval)),
+            KubernetesPollerType::Passive => GenericPoller::from(PassivePoller::new(sync_interval)),
         };
 
         let kubernetes_poller = Arc::new(poller);
+        let mappings = mappings::Mappings;
         mappings.set_kubernetes_poller(kubernetes_poller.clone());
+        let sniffer = Arc::new(sniffer_builder::Sniffer);
 
         Self {
             sync_interval,
@@ -140,7 +143,7 @@ impl Synchronizer {
             timer: Arc::new(Condvar::new()),
             xml_path: Arc::new(Mutex::new(xml_path.as_ref().to_path_buf())),
             thread: Mutex::new(None),
-            config,
+            trident_type,
             session,
             xml_extractor,
             sniffer,
@@ -171,11 +174,15 @@ impl Synchronizer {
         *self.xml_path.lock().unwrap() = xml_path;
     }
 
+    pub fn clone_poller(&self) -> Arc<GenericPoller> {
+        self.kubernetes_poller.clone()
+    }
+
     pub fn stop(&self) {
         let mut running_lock = self.running.lock().unwrap();
         if !*running_lock {
             let err = format!(
-                "Platform Synchronizer has already stopped with ctrl-ip:{} vtap-id:{}",
+                "PlatformSynchronizer has already stopped with ctrl-ip:{} vtap-id:{}",
                 self.ctrl_ip,
                 self.vtap_id.load(Ordering::SeqCst)
             );
@@ -197,7 +204,7 @@ impl Synchronizer {
         let mut running_guard = self.running.lock().unwrap();
         if *running_guard {
             let err = format!(
-                "Platform Synchronizer has already running with ctrl-ip:{} vtap-id:{}",
+                "PlatformSynchronizer has already running with ctrl-ip:{} vtap-id:{}",
                 self.ctrl_ip,
                 self.vtap_id.load(Ordering::SeqCst)
             );
@@ -218,7 +225,7 @@ impl Synchronizer {
             xml_path: self.xml_path.clone(),
             kubernetes_poller: self.kubernetes_poller.clone(),
             timer: self.timer.clone(),
-            config: self.config.clone(),
+            trident_type: self.trident_type,
             session: self.session.clone(),
             xml_extractor: self.xml_extractor.clone(),
             sniffer: self.sniffer.clone(),
@@ -227,7 +234,8 @@ impl Synchronizer {
         let handle = thread::spawn(move || Self::process(process_args));
         *self.thread.lock().unwrap() = Some(handle);
 
-        if self.config.is_tt_pod() {
+        if self.trident_type == TridentType::TtHostPod || self.trident_type == TridentType::TtVmPod
+        {
             self.kubernetes_poller.start();
         }
     }
@@ -537,10 +545,9 @@ impl Synchronizer {
             interfaces,
         };
 
-        let trident_type = process_args.config.get_trident_type();
         let msg = trident::GenesisSyncRequest {
             version: Some(version),
-            trident_type: Some(trident_type as i32),
+            trident_type: Some(process_args.trident_type as i32),
             platform_data: Some(platform_data),
             source_ip: Some(process_args.ctrl_ip.to_string()),
             vtap_id: Some(vtap_id),
@@ -588,10 +595,9 @@ impl Synchronizer {
             }
 
             if last_version == cur_version {
-                let trident_type = args.config.get_trident_type();
                 let msg = trident::GenesisSyncRequest {
                     version: Some(cur_version),
-                    trident_type: Some(trident_type as i32),
+                    trident_type: Some(args.trident_type as i32),
                     source_ip: Some(args.ctrl_ip.to_string()),
                     vtap_id: Some(cur_vtap_id),
                     kubernetes_cluster_id: Some(args.kubernetes_cluster_id.to_string()),
@@ -700,11 +706,11 @@ mod sniffer_builder {
 
     impl Sniffer {
         pub fn get_ip_records(&self) -> (Duration, Vec<IpInfo>) {
-            todo!()
+            (Duration::ZERO, vec![])
         }
 
         pub fn get_lldp_records(&self) -> Vec<LldpInfo> {
-            todo!()
+            vec![]
         }
     }
 }
@@ -714,9 +720,7 @@ mod mappings {
     use std::sync::Arc;
     pub struct Mappings;
     impl Mappings {
-        pub fn set_kubernetes_poller(&self, _poller: Arc<GenericPoller>) {
-            todo!()
-        }
+        pub fn set_kubernetes_poller(&self, _poller: Arc<GenericPoller>) {}
     }
 }
 //END
