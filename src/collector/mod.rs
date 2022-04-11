@@ -27,16 +27,22 @@ pub fn round_to_minute(t: Duration) -> Duration {
 pub struct CollectorThread {
     quadruple_generator: QuadrupleGeneratorThread,
     l4_flow_aggr: Option<FlowAggrThread>,
+    second_collector: Option<Collector>,
+    minute_collector: Option<Collector>,
 }
 
 impl CollectorThread {
     pub fn new(
         quadruple_generator: QuadrupleGeneratorThread,
         l4_flow_aggr: Option<FlowAggrThread>,
+        second_collector: Option<Collector>,
+        minute_collector: Option<Collector>,
     ) -> Self {
         Self {
             quadruple_generator,
             l4_flow_aggr,
+            second_collector,
+            minute_collector,
         }
     }
 
@@ -45,12 +51,24 @@ impl CollectorThread {
         if let Some(l4_flow_aggr) = self.l4_flow_aggr.as_mut() {
             l4_flow_aggr.start();
         }
+        if let Some(second_collector) = self.second_collector.as_mut() {
+            second_collector.start();
+        }
+        if let Some(minute_collector) = self.minute_collector.as_mut() {
+            minute_collector.start();
+        }
     }
 
     pub fn stop(&mut self) {
         self.quadruple_generator.start();
         if let Some(l4_flow_aggr) = self.l4_flow_aggr.as_mut() {
             l4_flow_aggr.stop();
+        }
+        if let Some(second_collector) = self.second_collector.as_mut() {
+            second_collector.stop();
+        }
+        if let Some(minute_collector) = self.minute_collector.as_mut() {
+            minute_collector.stop();
         }
     }
 }
