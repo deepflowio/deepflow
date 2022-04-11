@@ -221,7 +221,7 @@ func (e *CHEngine) ToSQLString() string {
 func (e *CHEngine) parseOrderBy(order *sqlparser.Order) error {
 	e.Model.Orders.Append(
 		&view.Order{
-			SortBy:  sqlparser.String(order.Expr),
+			SortBy:  strings.ReplaceAll(sqlparser.String(order.Expr), "'", "`"),
 			OrderBy: order.Direction,
 		},
 	)
