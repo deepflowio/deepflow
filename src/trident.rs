@@ -262,11 +262,11 @@ struct Components {
     dispatcher_listeners: Vec<DispatcherListener>,
     collectors: Vec<CollectorThread>,
     l4_flow_uniform_sender: Option<UniformSenderThread>,
+    metrics_uniform_sender: UniformSenderThread,
     monitor: Monitor,
     platform_synchronizer: PlatformSynchronizer,
     api_watcher: Arc<ApiWatcher>,
     debugger: Debugger,
-    doc_collectors: Vec<Collector>,
     pcap_manager: WorkerManager,
 }
 
@@ -411,7 +411,6 @@ impl Components {
         let mut dispatchers = vec![];
         let mut dispatcher_listeners = vec![];
         let mut collectors = vec![];
-        let mut doc_collectors = vec![];
 
         let dst_ip = Arc::new(Mutex::new(
             IpAddr::from_str(&runtime_config.analyzer_ip).unwrap(),
@@ -424,7 +423,7 @@ impl Components {
             let (sender, l4_flow_aggr_receiver, counter) =
                 queue::bounded(static_config.flow.aggr_queue_size as usize);
             stats_collector.register_countable(
-                "2-second-flow-to-minute-aggrer",
+                "3-flow-to-collector-sender",
                 Arc::new(counter),
                 vec![StatsOption::Tag("index", sender_id.to_string())],
             );
@@ -433,10 +432,22 @@ impl Components {
                 sender_id,
                 runtime_config.vtap_id,
                 l4_flow_aggr_receiver,
-                dst_ip,
+                dst_ip.clone(),
             ));
             l4_flow_uniform_sender.as_mut().unwrap().start();
         }
+
+        let sender_id = 1usize;
+        let (metrics_sender, metrics_receiver, counter) =
+            queue::bounded(static_config.collector_sender_queue_size);
+        stats_collector.register_countable(
+            "2-doc-to-collector-sender",
+            Arc::new(counter),
+            vec![StatsOption::Tag("index", sender_id.to_string())],
+        );
+        let mut metrics_uniform_sender =
+            UniformSenderThread::new(sender_id, runtime_config.vtap_id, metrics_receiver, dst_ip);
+        metrics_uniform_sender.start();
 
         for i in 0..dispatcher_num {
             // TODO: create and start collector
@@ -445,7 +456,7 @@ impl Components {
             stats_collector.register_countable(
                 "1-tagged-flow-to-quadruple-generator",
                 Arc::new(counter),
-                vec![],
+                vec![StatsOption::Tag("index", i.to_string())],
             );
 
             // TODO: create and start app proto logs
@@ -453,7 +464,7 @@ impl Components {
             stats_collector.register_countable(
                 "1-tagged-flow-to-app-protocol-logs",
                 Arc::new(counter),
-                vec![],
+                vec![StatsOption::Tag("index", i.to_string())],
             );
             thread::spawn(|| for _ in log_receiver {});
 
@@ -507,13 +518,14 @@ impl Components {
             dispatchers.push(dispatcher);
             dispatcher_listeners.push(dispatcher_listener);
 
-            let (mut collector, c) = Self::new_collector(
+            let mut collector = Self::new_collector(
                 i,
                 stats_collector,
                 static_config,
                 runtime_config,
                 flow_receiver,
                 l4_flow_aggr_sender.clone(),
+                metrics_sender.clone(),
                 MetricsType::SECOND | MetricsType::MINUTE,
                 config_handler
                     .collector
@@ -522,7 +534,6 @@ impl Components {
             );
             collector.start();
             collectors.push(collector);
-            doc_collectors.push(c);
         }
 
         let platform_synchronizer = PlatformSynchronizer::new(
@@ -586,11 +597,11 @@ impl Components {
             dispatcher_listeners,
             collectors,
             l4_flow_uniform_sender,
+            metrics_uniform_sender,
             monitor,
             platform_synchronizer,
             api_watcher,
             debugger,
-            doc_collectors,
             pcap_manager,
         })
     }
@@ -602,9 +613,10 @@ impl Components {
         runtime_config: &RuntimeConfig,
         flow_receiver: queue::Receiver<TaggedFlow>,
         l4_flow_aggr_sender: Option<queue::Sender<SendItem>>,
+        metrics_sender: queue::Sender<SendItem>,
         metrics_type: MetricsType,
         inactive_server_port_enabled: Arc<AtomicBool>,
-    ) -> (CollectorThread, Collector) {
+    ) -> CollectorThread {
         let (second_sender, second_receiver, counter) =
             queue::bounded(static_config.quadruple_queue_size);
         stats_collector.register_countable(
@@ -677,50 +689,41 @@ impl Components {
             ));
         }
 
-        let (collector, collector_receiver) = {
-            let (collector_sender, collector_receiver, handle) = queue::bounded(65535);
-            let (acc_flow_receiver, delay_seconds, name) = if metrics_type == MetricsType::SECOND {
-                (
-                    second_receiver,
-                    second_quadruple_tolerable_delay,
-                    "2-flow-with-meter-to-second-collector",
-                )
-            } else {
-                (
-                    minute_receiver,
-                    minute_quadruple_tolerable_delay,
-                    "2-flow-with-meter-to-minute-collector",
-                )
-            };
-            let collector = Collector::new(
+        let (mut second_collector, mut minute_collector) = (None, None);
+        if metrics_type.contains(MetricsType::SECOND) {
+            second_collector = Some(Collector::new(
                 id as u32,
-                acc_flow_receiver,
-                collector_sender,
-                metrics_type,
-                delay_seconds as u32,
+                second_receiver,
+                metrics_sender.clone(),
+                MetricsType::SECOND,
+                second_quadruple_tolerable_delay as u32,
+                runtime_config.vtap_id,
+                inactive_server_port_enabled.clone(),
+                static_config.cloud_gateway_traffic,
+                runtime_config.trident_type,
+                stats_collector,
+            ));
+        }
+        if metrics_type.contains(MetricsType::MINUTE) {
+            minute_collector = Some(Collector::new(
+                id as u32,
+                minute_receiver,
+                metrics_sender,
+                MetricsType::MINUTE,
+                minute_quadruple_tolerable_delay as u32,
                 runtime_config.vtap_id,
                 inactive_server_port_enabled,
                 static_config.cloud_gateway_traffic,
                 runtime_config.trident_type,
                 stats_collector,
-            );
-            stats_collector.register_countable(
-                name,
-                Arc::new(handle),
-                vec![StatsOption::Tag("index", id.to_string())],
-            );
-            (collector, collector_receiver)
-        };
-        collector.start();
-        thread::spawn(move || {
-            for flow in collector_receiver {
-                info!("doc: {:?}", flow);
-            }
-        });
+            ));
+        }
 
-        (
-            CollectorThread::new(quadruple_generator, l4_flow_aggr),
-            collector,
+        CollectorThread::new(
+            quadruple_generator,
+            l4_flow_aggr,
+            second_collector,
+            minute_collector,
         )
     }
 
@@ -737,13 +740,11 @@ impl Components {
         for q in self.collectors.iter_mut() {
             q.stop();
         }
-        for c in self.doc_collectors.iter() {
-            c.stop();
-        }
 
         if let Some(l4_flow_uniform_sender) = self.l4_flow_uniform_sender.as_mut() {
             l4_flow_uniform_sender.stop();
         }
+        self.metrics_uniform_sender.stop();
 
         // TODO: app proto logs handler
 

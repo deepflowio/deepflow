@@ -27,6 +27,7 @@ use crate::{
         meter::{FlowMeter, Meter, UsageMeter},
     },
     proto::common::TridentType,
+    sender::SendItem,
     utils::{
         hasher::Jenkins64Hasher,
         net::MacAddr,
@@ -253,7 +254,7 @@ impl StashKey {
 }
 
 struct Stash {
-    sender: Arc<Sender<Document>>,
+    sender: Arc<Sender<SendItem>>,
     counter: Arc<CollectorCounter>,
     start_time: Duration,
     slot_interval: u64,
@@ -267,7 +268,7 @@ struct Stash {
 impl Stash {
     fn new(
         ctx: Context,
-        sender: Arc<Sender<Document>>,
+        sender: Arc<Sender<SendItem>>,
         counter: Arc<CollectorCounter>,
         inactive_server_port_enabled: Arc<AtomicBool>,
     ) -> Self {
@@ -334,9 +335,7 @@ impl Stash {
         }
         let flow = &acc_flow.tagged_flow.flow;
 
-        if !flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].is_active_host
-            && !flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].is_active_host
-        {
+        if !acc_flow.is_active_host0 && !acc_flow.is_active_host1 {
             self.counter.drop_inactive.fetch_add(1, Ordering::Relaxed);
             return;
         }
@@ -397,11 +396,14 @@ impl Stash {
         directions: [Direction; 2],
         is_extra_tracing_doc: bool,
     ) {
-        let flow = &acc_flow.tagged_flow.flow;
         for ep in 0..2 {
-            let side = &flow.flow_metrics_peers[ep];
+            let is_active_host = if ep == 0 {
+                acc_flow.is_active_host0
+            } else {
+                acc_flow.is_active_host1
+            };
             // 单端统计量：不统计非活跃的一端（Internet/不回包的内网IP）；不统计链路追踪额外增加的doc
-            if side.is_active_host && !is_extra_tracing_doc {
+            if is_active_host && !is_extra_tracing_doc {
                 if ep == FLOW_METRICS_PEER_DST {
                     let reversed_meter = acc_flow.flow_meter.to_reversed();
                     self.fill_single_stats(acc_flow, reversed_meter, ep, directions[ep]);
@@ -442,10 +444,15 @@ impl Stash {
         let flow = &acc_flow.tagged_flow.flow;
         let flow_key = &flow.flow_key;
         let side = &flow.flow_metrics_peers[ep];
+        let is_active_host = if ep == 0 {
+            acc_flow.is_active_host0
+        } else {
+            acc_flow.is_active_host1
+        };
         let has_mac = side.is_vip_interface || direction == Direction::LocalToLocal;
         let is_ipv6 = flow.eth_type == EthernetType::Ipv6;
 
-        let ip = if !side.is_active_host {
+        let ip = if !is_active_host {
             if is_ipv6 {
                 Ipv6Addr::UNSPECIFIED.into()
             } else {
@@ -543,14 +550,14 @@ impl Stash {
                 }
             }
             // 本端IP为云外Internet地址或不活跃时置为0
-            if !src_ep.is_active_host {
+            if !acc_flow.is_active_host0 {
                 src_ip = if is_ipv6 {
                     Ipv6Addr::UNSPECIFIED.into()
                 } else {
                     Ipv4Addr::UNSPECIFIED.into()
                 };
             }
-            if !dst_ep.is_active_host {
+            if !acc_flow.is_active_host1 {
                 dst_ip = if is_ipv6 {
                     Ipv6Addr::UNSPECIFIED.into()
                 } else {
@@ -670,7 +677,7 @@ impl Stash {
             .map(|(_, mut doc)| {
                 doc.timestamp = self.start_time.as_secs() as u32;
                 doc.flags |= self.doc_flag;
-                doc
+                SendItem::Metrics(doc)
             })
             .collect::<Vec<_>>();
         let mut index = 0;
@@ -705,7 +712,7 @@ pub struct Collector {
     running: Arc<AtomicBool>,
     thread: Mutex<Option<JoinHandle<()>>>,
     receiver: Arc<Receiver<AccumulatedFlow>>,
-    sender: Arc<Sender<Document>>,
+    sender: Arc<Sender<SendItem>>,
     inactive_server_port_enabled: Arc<AtomicBool>,
 
     context: Context,
@@ -715,7 +722,7 @@ impl Collector {
     pub fn new(
         id: u32,
         receiver: Receiver<AccumulatedFlow>,
-        sender: Sender<Document>,
+        sender: Sender<SendItem>,
         metric_type: MetricsType,
         delay_seconds: u32,
         vtap_id: u16,
