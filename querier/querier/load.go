@@ -27,7 +27,7 @@ import (
 
 // 加载文件中的metrics及tags等内容
 func Load() error {
-	dir := "./db_descriptions"
+	dir := "/etc/db_descriptions"
 	dbDescriptions, err := common.LoadDbDescriptions(dir)
 	if err != nil {
 		return err
