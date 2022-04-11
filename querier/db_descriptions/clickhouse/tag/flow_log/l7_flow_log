@@ -39,7 +39,7 @@ server_port               , server_port               , server_port             
 req_tcp_seq               , req_tcp_seq               , resp_tcp_seq              , 请求TCP SEQ                   , int           ,                    , 传输层      ,
 resp_tcp_seq              , resp_tcp_seq              , resp_tcp_seq              , 响应TCP SEQ                   , int           ,                    , 传输层      ,
 
-l7_protocol               , l7_protocol               , l7_protocol               , 网络协议                      , int_enum      , l7_protocol        , 应用层      ,
+l7_protocol               , l7_protocol               , l7_protocol               , 应用协议                      , int_enum      , l7_protocol        , 应用层      ,
 version                   , version                   , version                   , 协议版本                      , string        ,                    , 应用层      ,
 type                      , type                      , type                      , 日志类型                      , int_enum      , l7_log_type        , 应用层      ,
 request_type              , request_type              , request_type              , 请求类型                      , string        ,                    , 应用层      ,
