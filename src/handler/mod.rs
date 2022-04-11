@@ -30,7 +30,7 @@ pub enum PacketHandler {
 
 impl PacketHandler {
     pub fn handle(&mut self, _overlay_packet: &[u8], _meta_packet: &MetaPacket) {
-        todo!()
+        // TODO
     }
 }
 
