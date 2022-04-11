@@ -22,7 +22,7 @@ type Metrics struct {
 
 func (m *Metrics) Replace(metrics *Metrics) {
 	// 如果DBField == ""，表示是querier聚合的指标量
-	if m.DBField == "" {
+	if m.DBField == "" || m.Type == METRICS_TYPE_TAG {
 		m.IsAgg = true
 	}
 	if metrics.DBField != "" {
