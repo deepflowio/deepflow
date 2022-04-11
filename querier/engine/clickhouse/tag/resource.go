@@ -142,7 +142,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"if("+deviceTypeSuffix+"="+deviceTypeValueStr+","+deviceIDSuffix+", 0)",
 					deviceIDSuffix+"!=0 AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
-					deviceIDSuffix+" %s %s AND"+deviceTypeSuffix+"="+deviceTypeValueStr,
+					deviceIDSuffix+" %s %s AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
 					"",
 				)}
 			tagResourceMap[resourceNameSuffix] = map[string]*Tag{

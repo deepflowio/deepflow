@@ -126,7 +126,8 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			}
 		}
 	} else {
-		return &view.Expr{Value: "(1=1)"}, nil
+		filter := fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+		return &view.Expr{Value: filter}, nil
 	}
 	return &view.Expr{Value: "(" + whereFilter + ")"}, nil
 }

@@ -102,8 +102,8 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, err
 			return nil, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
 		}
 		if strings.ToLower(sqlSplit[3]) == "values" {
-			tagParm := strings.TrimRight(sqlSplit[2], "_0")
-			tagParm = strings.TrimRight(tagParm, "_1")
+			tagParm := strings.TrimSuffix(sqlSplit[2], "_0")
+			tagParm = strings.TrimSuffix(tagParm, "_1")
 			values, err := tagdescription.GetTagValues(e.DB, table, tagParm)
 			return values, true, err
 		}
