@@ -13,7 +13,7 @@ func Execute(args map[string]string) (result map[string][]interface{}, debug map
 		engine = &clickhouse.CHEngine{DB: args["db"]}
 		engine.Init()
 	}
-	result, debug, err = engine.ExecuteQuery(args["sql"])
+	result, debug, err = engine.ExecuteQuery(args["sql"], args["query_uuid"])
 
 	return result, debug, err
 }

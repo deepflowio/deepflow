@@ -5,7 +5,6 @@ import (
 	_ "github.com/ClickHouse/clickhouse-go"
 	"github.com/jmoiron/sqlx"
 	//"github.com/k0kubun/pp"
-	"github.com/google/uuid"
 	logging "github.com/op/go-logging"
 	"math/rand"
 	"time"
@@ -23,14 +22,12 @@ type Client struct {
 	Debug      *Debug
 }
 
-func (c *Client) Init() error {
+func (c *Client) Init(query_uuid string) error {
 	if c.Debug == nil {
-		c.Debug = &Debug{}
+		c.Debug = &Debug{QueryUUID: query_uuid}
 	}
 	rand.Seed(time.Now().Unix())
 	randIndex := rand.Intn(len(c.IPs))
-	query_uuid := uuid.New()
-	c.Debug.QueryUUID = query_uuid.String()
 	c.Debug.IP = c.IPs[randIndex]
 	url := fmt.Sprintf("tcp://%s:%d?username=%s&password=%s&query_id=%s", c.IPs[randIndex], c.Port, c.UserName, c.Password, query_uuid)
 	if c.DB != "" {
@@ -40,7 +37,7 @@ func (c *Client) Init() error {
 		"clickhouse", url,
 	)
 	if err != nil {
-		log.Errorf("connect clickhouse failed: %s, url: %s", err, url)
+		log.Errorf("connect clickhouse failed: %s, url: %s, query_uuid: %s", err, url, query_uuid)
 		return err
 	}
 	c.connection = conn
@@ -54,7 +51,7 @@ func (c *Client) DoQuery(sql string) (map[string][]interface{}, error) {
 	c.Debug.Sql = sql
 	c.Debug.QueryTime = int64(queryTime)
 	if err != nil {
-		log.Errorf("query clickhouse Error: %s, sql: %s", err, sql)
+		log.Errorf("query clickhouse Error: %s, sql: %s, query_uuid: %s", err, sql, c.Debug.QueryUUID)
 		return nil, err
 	}
 	columns, err := rows.ColumnTypes()

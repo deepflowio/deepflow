@@ -3,13 +3,14 @@ package clickhouse
 import (
 	"metaflow/querier/engine/clickhouse/tag"
 	"metaflow/querier/engine/clickhouse/view"
+	"strings"
 )
 
 func GetGroup(name string, asTagMap map[string]string, db, table string) (Statement, error) {
 	if asTagMap[name] == "time" {
 		return nil, nil
 	}
-	tag, ok := tag.GetTag(name, db, table, "default")
+	tag, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
 	if ok {
 		if tag.TagTranslator != "" {
 			stmt := &GroupTag{Value: tag.TagTranslator, Alias: name}
@@ -25,7 +26,7 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) (Statem
 }
 
 func GetNotNullFilter(name string, asTagMap map[string]string, db, table string) (view.Node, bool) {
-	tagItem, ok := tag.GetTag(name, db, table, "default")
+	tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
 	if !ok {
 		preAsTag, ok := asTagMap[name]
 		if ok {

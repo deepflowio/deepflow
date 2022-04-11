@@ -29,10 +29,10 @@ type CHEngine struct {
 	asTagMap   map[string]string
 }
 
-func (e *CHEngine) ExecuteQuery(sql string) (map[string][]interface{}, map[string]interface{}, error) {
+func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]interface{}, map[string]interface{}, error) {
 	// 解析show开头的sql
 	// show metrics/tags from <table_name> 例：show metrics/tags from l4_flow_log
-	log.Debugf("raw sql: %s", sql)
+	log.Debugf("query_uuid: %s | raw sql: %s", query_uuid, sql)
 	result, isShow, err := e.ParseShowSql(sql)
 	if isShow {
 		if err != nil {
@@ -48,7 +48,7 @@ func (e *CHEngine) ExecuteQuery(sql string) (map[string][]interface{}, map[strin
 		return nil, nil, err
 	}
 	chSql := e.ToSQLString()
-	log.Debugf("final sql: %s", chSql)
+	log.Debugf("query_uuid: %s | trans sql: %s", query_uuid, chSql)
 	chClient := client.Client{
 		IPs:      config.Cfg.Clickhouse.IPs,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -56,7 +56,7 @@ func (e *CHEngine) ExecuteQuery(sql string) (map[string][]interface{}, map[strin
 		Password: config.Cfg.Clickhouse.Password,
 		DB:       e.DB,
 	}
-	err = chClient.Init()
+	err = chClient.Init(query_uuid)
 	if err != nil {
 		log.Error(err)
 		return nil, nil, err
@@ -128,7 +128,7 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 		}
 		item, ok := tag.(*sqlparser.AliasedExpr)
 		if ok {
-			as := sqlparser.String(item.As)
+			as := chCommon.ParseAlias(item.As)
 			colName, ok := item.Expr.(*sqlparser.ColName)
 			if ok {
 				e.asTagMap[as] = sqlparser.String(colName)
@@ -221,7 +221,7 @@ func (e *CHEngine) ToSQLString() string {
 func (e *CHEngine) parseOrderBy(order *sqlparser.Order) error {
 	e.Model.Orders.Append(
 		&view.Order{
-			SortBy:  strings.ReplaceAll(sqlparser.String(order.Expr), "'", "`"),
+			SortBy:  chCommon.ParseAlias(order.Expr),
 			OrderBy: order.Direction,
 		},
 	)
@@ -233,14 +233,15 @@ func (e *CHEngine) parseGroupBy(group sqlparser.Expr) error {
 	//var args []string
 	switch expr := group.(type) {
 	// 普通字符串
-	case *sqlparser.ColName:
-		err := e.AddGroup(sqlparser.String(expr))
+	case *sqlparser.ColName, *sqlparser.SQLVal:
+		groupTag := chCommon.ParseAlias(expr)
+		err := e.AddGroup(groupTag)
 		if err != nil {
 			return err
 		}
 		// TODO: 特殊处理塞进group的fromat中
 		whereStmt := Where{}
-		notNullExpr, ok := GetNotNullFilter(sqlparser.String(expr), e.asTagMap, e.DB, e.Table)
+		notNullExpr, ok := GetNotNullFilter(groupTag, e.asTagMap, e.DB, e.Table)
 		if !ok {
 			return nil
 		}
@@ -365,16 +366,28 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 		if err != nil {
 			return nil, err
 		}
-		function, levelFlag, err := GetAggFunc(name, args, "", e.DB, e.Table)
+		aggfunction, levelFlag, err := GetAggFunc(name, args, "", e.DB, e.Table)
 		if err != nil {
 			return nil, err
 		}
-		if function == nil {
-			return nil, errors.New(fmt.Sprintf("function: %s not support", sqlparser.String(expr)))
+		if aggfunction != nil {
+			// 通过metric判断view是否拆层
+			e.SetLevelFlag(levelFlag)
+			return aggfunction.(Function), nil
 		}
-		// 通过metric判断view是否拆层
-		e.SetLevelFlag(levelFlag)
-		return function.(Function), nil
+		tagfunction, err := GetTagFunction(name, args, "", e.DB, e.Table)
+		if err != nil {
+			return nil, err
+		}
+		if tagfunction != nil {
+			// time需要被最先解析
+			function, ok := tagfunction.(Function)
+			if !ok {
+				return nil, errors.New(fmt.Sprintf("tagfunction: %s not support in binary", sqlparser.String(expr)))
+			}
+			return function, nil
+		}
+		return nil, errors.New(fmt.Sprintf("function: %s not support in binary", sqlparser.String(expr)))
 	case *sqlparser.ParenExpr:
 		// 括号
 		return e.parseSelectBinaryExpr(expr.Expr)
@@ -480,8 +493,8 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where) (view.Node, error) 
 		return &view.Nested{Expr: expr}, nil
 	case *sqlparser.ComparisonExpr:
 		switch expr := node.Left.(type) {
-		case *sqlparser.ColName:
-			whereTag := sqlparser.String(node.Left)
+		case *sqlparser.ColName, *sqlparser.SQLVal:
+			whereTag := chCommon.ParseAlias(node.Left)
 			whereValue := sqlparser.String(node.Right)
 			stmt := GetWhere(whereTag, whereValue)
 			return stmt.Trans(node, w, e.asTagMap, e.DB, e.Table)

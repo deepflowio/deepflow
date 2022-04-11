@@ -210,7 +210,7 @@ func GetTagResourceValues(tag string) (map[string][]interface{}, error) {
 		Password: config.Cfg.Clickhouse.Password,
 		DB:       "deepflow",
 	}
-	err := chClient.Init()
+	err := chClient.Init("")
 	if err != nil {
 		return nil, err
 	}

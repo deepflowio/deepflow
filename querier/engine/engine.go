@@ -14,5 +14,5 @@ type Engine interface {
 	TransLimit(*sqlparser.Limit) error
 	ToSQLString() string
 	Init()
-	ExecuteQuery(string) (map[string][]interface{}, map[string]interface{}, error)
+	ExecuteQuery(string, string) (map[string][]interface{}, map[string]interface{}, error)
 }

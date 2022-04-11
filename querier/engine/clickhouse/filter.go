@@ -39,9 +39,8 @@ func (h *Having) Format(m *view.Model) {
 }
 
 func GetWhere(name, value string) WhereStatement {
-	name = strings.ReplaceAll(name, "`", "")
 	switch name {
-	case "time":
+	case "`time`":
 		return &TimeTag{Value: value}
 	default:
 		return &WhereTag{Tag: name, Value: value}
@@ -61,7 +60,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 	op := expr.(*sqlparser.ComparisonExpr).Operator
 	tagItem, ok := tag.GetTag(t.Tag, db, table, "default")
 	if !ok {
-		preAsTag, ok := asTagMap[t.Tag]
+		preAsTag, ok := asTagMap["`"+t.Tag+"`"]
 		if ok {
 			tagItem, ok = tag.GetTag(preAsTag, db, table, "default")
 			if !ok {
