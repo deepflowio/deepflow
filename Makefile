@@ -14,10 +14,10 @@ all: droplet droplet-ctl
 vendor:
 	go generate ./...
 	go mod tidy && go mod vendor
-	test -n "$(shell go list -e -f '{{.Dir}}' ${MESSAGE})"
-	test -n "$(shell go list -e -f '{{.Dir}}' ${DROPLET_LIBS})"
-	cp -r $(shell go list -e -f '{{.Dir}}' ${MESSAGE})/* vendor/${MESSAGE}/
-	cp -r $(shell go list -e -f '{{.Dir}}' ${DROPLET_LIBS})/* vendor/${DROPLET_LIBS}/
+	test -n "$$(go list -e -f '{{.Dir}}' ${MESSAGE})"
+	test -n "$$(go list -e -f '{{.Dir}}' ${DROPLET_LIBS})"
+	cp -r $$(go list -e -f '{{.Dir}}' ${MESSAGE})/* vendor/${MESSAGE}/
+	cp -r $$(go list -e -f '{{.Dir}}' ${DROPLET_LIBS})/* vendor/${DROPLET_LIBS}/
 	find vendor -type d -exec chmod +w {} \;
 	cd vendor/${MESSAGE} && go generate ./...
 	cd vendor/${DROPLET_LIBS} && go generate ./...
