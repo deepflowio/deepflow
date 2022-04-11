@@ -107,6 +107,7 @@ struct conn_info_t {
 	__u16 sk_type;		/* socket type (SOCK_STREAM, etc) */
 	__u8 skc_ipv6only;
 	bool need_reconfirm;  // socket l7协议类型是否需要再次确认。
+	__u32 fd;
 	void *sk;
 
 	// The protocol of traffic on the connection (HTTP, MySQL, etc.).
@@ -175,12 +176,10 @@ static __inline __u64 gen_conn_key_id(__u64 param_1, __u64 param_2)
 {
 	/*
 	 * key:
-	 *  - param_1 28bits as high bits.
-	 *  - param_2 36bits as low bits.
-	 *
-	 * 如果用进程号作为param_1, 那么这里囊括的进程号的范围是 [0 ~ 2^28 - 1]
+	 *  - param_1 low 32bits as key high bits.
+	 *  - param_2 low 32bits as key low bits.
 	 */
-	return ((param_1 >> 4) << 36) | (param_2 & 0xfffffffffULL);
+	return ((param_1 << 32) | (__u32)param_2);
 }
 
 #endif /* __BPF_SOCKET_TRACE_H__ */

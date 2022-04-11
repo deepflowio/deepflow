@@ -256,9 +256,10 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 	*((__u32 *) conn_info->prev_buf) = 0;
 	conn_info->need_reconfirm = false;
 	conn_info->correlation_id = -1; // 当前用于kafka协议推断
+	conn_info->fd = fd;
 
 	conn_info->sk = sk;
-	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->sk);
+	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->fd);
 	conn_info->socket_info_ptr =
 			socket_info_map__lookup(&conn_key);
 }
@@ -625,7 +626,7 @@ static __inline void data_submit(struct pt_regs *ctx,
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = (__u32) (pid_tgid >> 32);
 	__u64 time_stemp = bpf_ktime_get_ns();
-	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->sk);
+	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->fd);
 
 	if (conn_info->message_type == MSG_CLEAR) {
 		delete_socket_info(conn_key, conn_info->socket_info_ptr);
@@ -1256,7 +1257,7 @@ TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx *ctx) {
 
 	__u64 sock_addr = (__u64)get_socket_from_fd(fd, offset);
 	if (sock_addr) {
-		__u64 conn_key = gen_conn_key_id(bpf_get_current_pid_tgid() >> 32, sock_addr);
+		__u64 conn_key = gen_conn_key_id(bpf_get_current_pid_tgid() >> 32, (__u64)fd);
 		struct socket_info_t *socket_info_ptr = socket_info_map__lookup(&conn_key);
 		if (socket_info_ptr != NULL)
 			delete_socket_info(conn_key, socket_info_ptr);
