@@ -492,7 +492,7 @@ impl AppProtoLogsParser {
     pub fn new(
         input_queue: Receiver<MetaAppProto>,
         throttle: usize,
-        l7_log_session_timeout: usize,
+        l7_log_session_timeout: Duration,
         output_queue: DebugSender<AppProtoLogsData>,
         id: u32,
         http_config: Arc<Mutex<HttpConfig>>,
@@ -505,7 +505,7 @@ impl AppProtoLogsParser {
                 output_queue: Arc::new(output_queue),
                 id,
                 throttle: Arc::new(AtomicUsize::new(throttle * THROTTLE_BUCKET)),
-                window_size: l7_log_session_timeout / SLOT_WIDTH as usize,
+                window_size: (l7_log_session_timeout.as_secs() / SLOT_WIDTH) as usize,
                 running,
                 thread: Mutex::new(None),
                 counter: counter.clone(),

@@ -35,7 +35,9 @@ use crate::{
         recv_engine::{self, bpf},
         BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
     },
-    flow_generator::{FlowMapConfig, FlowMapRuntimeConfig, FlowTimeout, TcpTimeout},
+    flow_generator::{
+        AppProtoLogsParser, FlowMapConfig, FlowMapRuntimeConfig, FlowTimeout, TcpTimeout,
+    },
     monitor::Monitor,
     platform::{ApiWatcher, LibvirtXmlExtractor, PlatformSynchronizer},
     proto::trident::TapMode,
@@ -260,6 +262,7 @@ struct Components {
     tap_typer: Arc<TapTyper>,
     dispatchers: Vec<Dispatcher>,
     dispatcher_listeners: Vec<DispatcherListener>,
+    log_parsers: Vec<AppProtoLogsParser>,
     collectors: Vec<CollectorThread>,
     l4_flow_uniform_sender: Option<UniformSenderThread>,
     metrics_uniform_sender: UniformSenderThread,
@@ -318,15 +321,8 @@ impl Components {
 
         // TODO: collector enabled
         // TODO: packet handler builders
-        let bpf_syntax = bpf::Builder {
-            is_ipv6: ctrl_ip.is_ipv6(),
-            vxlan_port: static_config.vxlan_port,
-            controller_port: static_config.controller_port,
-            controller_tls_port: static_config.controller_tls_port,
-            proxy_controller_ip: runtime_config.proxy_controller_ip.parse()?,
-            analyzer_source_ip: source_ip,
-        }
-        .build_pcap_syntax();
+        let libvirt_xml_extractor = Arc::new(LibvirtXmlExtractor::new());
+        libvirt_xml_extractor.start();
 
         let pcap_config = &static_config.pcap;
         let (pcap_sender, pcap_receiver, _) =
@@ -344,14 +340,71 @@ impl Components {
         );
         pcap_manager.start();
 
+        let platform_synchronizer = PlatformSynchronizer::new(
+            MINUTE,
+            static_config.kubernetes_poller_type,
+            static_config
+                .controller_ips
+                .first()
+                .unwrap()
+                .parse::<IpAddr>()
+                .unwrap(),
+            DEFAULT_LIBVIRT_XML_PATH,
+            static_config.kubernetes_cluster_id.clone(),
+            runtime_config.trident_type,
+            session.clone(),
+            libvirt_xml_extractor.clone(),
+        );
+
+        platform_synchronizer.start();
+
+        let api_watcher = Arc::new(ApiWatcher::new(
+            static_config
+                .controller_ips
+                .first()
+                .unwrap()
+                .parse::<IpAddr>()
+                .unwrap(),
+            static_config.kubernetes_cluster_id.clone(),
+            static_config.ingress_flavour,
+            MINUTE,
+            session.clone(),
+        ));
+
+        api_watcher.start();
+
+        let context = ConstructDebugCtx {
+            vtap_id: runtime_config.vtap_id,
+            api_watcher: api_watcher.clone(),
+            poller: platform_synchronizer.clone_poller(),
+            session: session.clone(),
+            static_config: synchronizer.static_config.clone(),
+            status: synchronizer.status.clone(),
+            controller_ips: static_config
+                .controller_ips
+                .iter()
+                .map(|c| c.parse::<IpAddr>().unwrap())
+                .collect(),
+        };
+        let debugger = Debugger::new(context);
+        debugger.start();
+
+        let bpf_syntax = bpf::Builder {
+            is_ipv6: ctrl_ip.is_ipv6(),
+            vxlan_port: static_config.vxlan_port,
+            controller_port: static_config.controller_port,
+            controller_tls_port: static_config.controller_tls_port,
+            proxy_controller_ip: runtime_config.proxy_controller_ip.parse()?,
+            analyzer_source_ip: source_ip,
+        }
+        .build_pcap_syntax();
+
         let bpf_options = Arc::new(Mutex::new(BpfOptions { bpf_syntax }));
 
         let rx_leaky_bucket = Arc::new(LeakyBucket::new(match static_config.tap_mode {
             TapMode::Analyzer => None,
             _ => Some(runtime_config.global_pps_threshold),
         }));
-        let libvirt_xml_extractor = Arc::new(LibvirtXmlExtractor::new());
-        libvirt_xml_extractor.start();
 
         let flow_map_config = {
             let flow_config = &static_config.flow;
@@ -411,6 +464,8 @@ impl Components {
         let mut dispatchers = vec![];
         let mut dispatcher_listeners = vec![];
         let mut collectors = vec![];
+        let mut log_parsers = vec![];
+        let queue_debugger = debugger.clone_queue();
 
         let dst_ip = Arc::new(Mutex::new(
             IpAddr::from_str(&runtime_config.analyzer_ip).unwrap(),
@@ -466,7 +521,39 @@ impl Components {
                 Arc::new(counter),
                 vec![StatsOption::Tag("index", i.to_string())],
             );
-            thread::spawn(|| for _ in log_receiver {});
+
+            let (proto_log_sender, proto_log_receiver, counter) = queue::bounded_with_debug(
+                static_config.flow_sender_queue_size,
+                "3-protolog-to-collector-sender",
+                &queue_debugger,
+            );
+            stats_collector.register_countable(
+                "3-protolog-to-collector-sender",
+                Arc::new(counter),
+                vec![],
+            );
+
+            let (app_proto_log_parser, counter) = AppProtoLogsParser::new(
+                log_receiver,
+                runtime_config.l7_log_collect_nps_threshold as usize,
+                static_config.l7_log_session_aggr_timeout,
+                proto_log_sender,
+                i as u32,
+                synchronizer.clone_http_config(),
+            );
+            stats_collector.register_countable(
+                "l7_session_aggr",
+                counter,
+                vec![StatsOption::Tag("index", i.to_string())],
+            );
+            app_proto_log_parser.start();
+            log_parsers.push(app_proto_log_parser);
+
+            thread::spawn(move || {
+                for log in proto_log_receiver {
+                    info!("app proto {:?}", log);
+                }
+            });
 
             let dispatcher = DispatcherBuilder::new()
                 .id(i)
@@ -536,55 +623,6 @@ impl Components {
             collectors.push(collector);
         }
 
-        let platform_synchronizer = PlatformSynchronizer::new(
-            MINUTE,
-            static_config.kubernetes_poller_type,
-            static_config
-                .controller_ips
-                .first()
-                .unwrap()
-                .parse::<IpAddr>()
-                .unwrap(),
-            DEFAULT_LIBVIRT_XML_PATH,
-            static_config.kubernetes_cluster_id.clone(),
-            runtime_config.trident_type,
-            session.clone(),
-            libvirt_xml_extractor.clone(),
-        );
-
-        platform_synchronizer.start();
-
-        let api_watcher = Arc::new(ApiWatcher::new(
-            static_config
-                .controller_ips
-                .first()
-                .unwrap()
-                .parse::<IpAddr>()
-                .unwrap(),
-            static_config.kubernetes_cluster_id.clone(),
-            static_config.ingress_flavour,
-            MINUTE,
-            session.clone(),
-        ));
-
-        api_watcher.start();
-
-        let context = ConstructDebugCtx {
-            vtap_id: runtime_config.vtap_id,
-            api_watcher: api_watcher.clone(),
-            poller: platform_synchronizer.clone_poller(),
-            session: session.clone(),
-            static_config: synchronizer.static_config.clone(),
-            status: synchronizer.status.clone(),
-            controller_ips: static_config
-                .controller_ips
-                .iter()
-                .map(|c| c.parse::<IpAddr>().unwrap())
-                .collect(),
-        };
-        let debugger = Debugger::new(context);
-        debugger.start();
-
         let monitor = Monitor::new(stats_collector.clone())?;
         monitor.start();
 
@@ -603,6 +641,7 @@ impl Components {
             api_watcher,
             debugger,
             pcap_manager,
+            log_parsers,
         })
     }
 
@@ -739,6 +778,10 @@ impl Components {
         // TODO: collector
         for q in self.collectors.iter_mut() {
             q.stop();
+        }
+
+        for p in self.log_parsers.iter() {
+            p.stop();
         }
 
         if let Some(l4_flow_uniform_sender) = self.l4_flow_uniform_sender.as_mut() {
