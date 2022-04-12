@@ -484,14 +484,15 @@ impl Default for L4Protocol {
 #[repr(u8)]
 pub enum L7Protocol {
     Unknown = 0,
-    Http = 1,
-    Dns = 2,
-    Mysql = 3,
-    Redis = 4,
-    Dubbo = 5,
-    Kafka = 6,
-    Other = 7,
-    Max = 8,
+    Other = 1,
+    Http1 = 20,
+    Http2 = 21,
+    Dubbo = 40,
+    Mysql = 60,
+    Redis = 80,
+    Kafka = 100,
+    Dns = 120,
+    Max = 255,
 }
 
 impl Default for L7Protocol {
