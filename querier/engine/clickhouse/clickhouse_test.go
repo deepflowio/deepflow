@@ -82,13 +82,16 @@ var (
 		output: "SELECT dictGet(deepflow.device_map, ('name'), (toUInt64(resource_gl0_type_0),toUInt64(resource_gl0_id_0))) AS resource_gl0_0, if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS ip_0 FROM flow_log.l7_flow_log GROUP BY dictGet(deepflow.device_map, ('name'), (toUInt64(resource_gl0_type_0),toUInt64(resource_gl0_id_0))) AS `resource_gl0_0`, if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS `ip_0`",
 	}, {
 		input:  "select pod_service_0 from l7_flow_log where pod_service_0 !='xx' group by pod_service_0",
-		output: "SELECT dictGet(deepflow.device_map, ('name'), (toUInt64(11),toUInt64(l3_device_id_0))) AS pod_service_0 FROM flow_log.l7_flow_log PREWHERE `pod_service_0` != 'xx' AND (l3_device_id_0!=0 AND l3_device_type_0=11) GROUP BY dictGet(deepflow.device_map, ('name'), (toUInt64(11),toUInt64(l3_device_id_0))) AS `pod_service_0`",
+		output: "SELECT dictGet(deepflow.device_map, ('name'), (toUInt64(11),toUInt64(l3_device_id_0))) AS pod_service_0 FROM flow_log.l7_flow_log PREWHERE ((if(is_ipv4=1,IPv4NumToString(ip4_0),IPv6NumToString(ip6_0)),toUInt64(l3_epc_id_0)) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE pod_service_name != 'xx')) AND (l3_device_id_0!=0 AND l3_device_type_0=11) GROUP BY dictGet(deepflow.device_map, ('name'), (toUInt64(11),toUInt64(l3_device_id_0))) AS `pod_service_0`",
 	}, {
 		input:  "select node_type(region_0) as 'node_type_0',mask(ip_0,33) as 'mask_ip_0' from l7_flow_log group by 'mask_ip_0','node_type_0'",
 		output: "WITH if(is_ipv4, IPv4NumToString(bitAnd(ip4_0, 4294967295)), IPv6NumToString(bitAnd(ip6_0, toFixedString(unhex('ffffffff800000000000000000000000'), 16)))) AS mask_ip_0 SELECT 'region' AS node_type_0, mask_ip_0 FROM flow_log.l7_flow_log GROUP BY `mask_ip_0`, `node_type_0`",
 	}, {
 		input:  "select region_id_0 from l7_flow_log group by region_id_0,vm_id_1",
 		output: "SELECT region_id_0 FROM flow_log.l7_flow_log PREWHERE (region_id_0!=0) AND (l3_device_id_1!=0 AND l3_device_type_1=1) GROUP BY `region_id_0`, if(l3_device_type_1=1,l3_device_id_1, 0) AS `vm_id_1`",
+	}, {
+		input:  "SELECT ip_0 FROM l4_flow_log WHERE  ((is_internet_1=1) OR (is_internet_0=1)) GROUP BY ip_0 limit 1",
+		output: "SELECT if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS ip_0 FROM flow_log.l4_flow_log PREWHERE (((l3_epc_id_1 = -2)) OR ((l3_epc_id_0 = -2))) GROUP BY if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS `ip_0` LIMIT 1",
 	},
 	}
 )

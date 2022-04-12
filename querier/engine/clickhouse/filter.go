@@ -58,9 +58,9 @@ type WhereTag struct {
 
 func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string, db, table string) (view.Node, error) {
 	op := expr.(*sqlparser.ComparisonExpr).Operator
-	tagItem, ok := tag.GetTag(t.Tag, db, table, "default")
+	tagItem, ok := tag.GetTag(strings.Trim(t.Tag, "`"), db, table, "default")
 	if !ok {
-		preAsTag, ok := asTagMap["`"+t.Tag+"`"]
+		preAsTag, ok := asTagMap[t.Tag]
 		if ok {
 			tagItem, ok = tag.GetTag(preAsTag, db, table, "default")
 			if !ok {
@@ -84,7 +84,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 	}
 	whereFilter := tagItem.WhereTranslator
 	if whereFilter != "" {
-		switch t.Tag {
+		switch strings.Trim(t.Tag, "`") {
 		case "ip_version":
 			ipVersion := "0"
 			if t.Value == "4" {
