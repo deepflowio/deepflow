@@ -102,12 +102,12 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 		for table := range tables {
 			tableTagData, ok := tableData.(map[string]interface{})[table]
 			if !ok {
-				return errors.New(fmt.Sprintf("get metrics failed! db:%s table:%s", db, table))
+				return errors.New(fmt.Sprintf("get tag failed! db:%s table:%s", db, table))
 			}
 			// 遍历文件内容进行赋值
 			for _, tag := range tableTagData.([][]interface{}) {
 				if len(tag) < 8 {
-					return errors.New(fmt.Sprintf("get metrics failed! db:%s table:%s, tag:%v", db, table, tag))
+					return errors.New(fmt.Sprintf("get tag failed! db:%s table:%s, tag:%v", db, table, tag))
 				}
 				// 0 - Name
 				// 1 - ClientName
