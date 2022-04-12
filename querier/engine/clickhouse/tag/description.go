@@ -26,8 +26,8 @@ var tagTypeToOperators = map[string][]string{
 	"resource":    []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
 	"int":         []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
 	"int_enum":    []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
-	"string":      []string{"=", "!=", "IN", "NOT IN"},
-	"string_enum": []string{"=", "!=", "IN", "NOT IN"},
+	"string":      []string{"=", "!=", "IN", "NOT IN", "REGEXP", "NOT REGEXP"},
+	"string_enum": []string{"=", "!=", "IN", "NOT IN", "REGEXP", "NOT REGEXP"},
 	"ip":          []string{"=", "!=", "IN", "NOT IN"},
 	"mac":         []string{"=", "!=", "IN", "NOT IN"},
 	"id":          []string{"=", "!=", "IN", "NOT IN"},
@@ -204,7 +204,7 @@ func GetTagValues(db, table, tag string) (map[string][]interface{}, error) {
 
 func GetTagResourceValues(tag string) (map[string][]interface{}, error) {
 	chClient := client.Client{
-		IPs:      config.Cfg.Clickhouse.IPs,
+		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
 		UserName: config.Cfg.Clickhouse.User,
 		Password: config.Cfg.Clickhouse.Password,

@@ -62,8 +62,8 @@ l7_protocol         , l7_protocol          , l7_protocol           , 应用协�
 
 province            , province_0           , province_1            , 省份                          , string       ,                    , 广域网      ,
 
-close_type          , close_type           , close_type            , 流结束类型                    , int_enmu     , close_type         , 流信息      ,
-flow_source         , flow_source          , flow_source           , 流数据来源                    , int_enmu     , flow_source        , 流信息      ,
+close_type          , close_type           , close_type            , 流结束类型                    , int_enum     , close_type         , 流信息      ,
+flow_source         , flow_source          , flow_source           , 流数据来源                    , int_enum     , flow_source        , 流信息      ,
 flow_id             , flow_id              , flow_id               , 流日志ID                      , int          ,                    , 流信息      ,
 tap                 , tap                  , tap                   , 采集点                        , resource     ,                    , 流信息      ,
 # 需要转化为xx:xx:xx:xx格式展示

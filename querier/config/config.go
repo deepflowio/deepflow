@@ -14,17 +14,17 @@ var Cfg *Config
 type Config struct {
 	LogFile    string     `default:"/var/log/querier.log" yaml:"log-file"`
 	LogLevel   string     `default:"info" yaml:"log-level"`
-	ListenPort int        `default:"8086" yaml:"listen-port"`
+	ListenPort int        `default:"20416" yaml:"listen-port"`
 	Clickhouse Clickhouse `yaml:clickhouse`
 }
 
 type Clickhouse struct {
-	User           string   `default:"default" yaml:"user"`
-	Password       string   `default:"" yaml:"password"`
-	Port           int      `default:"9000" yaml:"port"`
-	Timeout        int      `default:"60" yaml:"timeout"`
-	ConnectTimeout int      `default:"2" yaml:"connect-timeout"`
-	IPs            []string `yaml:"ips,flow"`
+	User           string `default:"default" yaml:"user"`
+	Password       string `default:"" yaml:"password"`
+	Host           string `default:"querier" yaml:"host"`
+	Port           int    `default:"9000" yaml:"port"`
+	Timeout        int    `default:"60" yaml:"timeout"`
+	ConnectTimeout int    `default:"2" yaml:"connect-timeout"`
 }
 
 func (c *Config) Validate() error {

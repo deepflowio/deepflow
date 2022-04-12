@@ -6,14 +6,13 @@ import (
 	"github.com/jmoiron/sqlx"
 	//"github.com/k0kubun/pp"
 	logging "github.com/op/go-logging"
-	"math/rand"
 	"time"
 )
 
 var log = logging.MustGetLogger("clickhouse.client")
 
 type Client struct {
-	IPs        []string
+	Host       string
 	Port       int
 	UserName   string
 	Password   string
@@ -26,10 +25,8 @@ func (c *Client) Init(query_uuid string) error {
 	if c.Debug == nil {
 		c.Debug = &Debug{QueryUUID: query_uuid}
 	}
-	rand.Seed(time.Now().Unix())
-	randIndex := rand.Intn(len(c.IPs))
-	c.Debug.IP = c.IPs[randIndex]
-	url := fmt.Sprintf("tcp://%s:%d?username=%s&password=%s&query_id=%s", c.IPs[randIndex], c.Port, c.UserName, c.Password, query_uuid)
+	c.Debug.IP = c.Host
+	url := fmt.Sprintf("tcp://%s:%d?username=%s&password=%s&query_id=%s", c.Host, c.Port, c.UserName, c.Password, query_uuid)
 	if c.DB != "" {
 		url = fmt.Sprintf("%s&database=%s", url, c.DB)
 	}

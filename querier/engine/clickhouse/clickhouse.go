@@ -50,7 +50,7 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 	chSql := e.ToSQLString()
 	log.Debugf("query_uuid: %s | trans sql: %s", query_uuid, chSql)
 	chClient := client.Client{
-		IPs:      config.Cfg.Clickhouse.IPs,
+		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
 		UserName: config.Cfg.Clickhouse.User,
 		Password: config.Cfg.Clickhouse.Password,
