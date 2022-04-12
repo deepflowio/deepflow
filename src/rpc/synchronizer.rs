@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{self, Arc};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use log::{debug, info, warn};
@@ -86,6 +86,8 @@ pub struct Synchronizer {
     session: Arc<Session>,
     dispatcher_listener: Arc<Mutex<Option<DispatcherListener>>>,
 
+    http_config: Arc<sync::Mutex<HttpConfig>>,
+
     running: Arc<AtomicBool>,
 
     // threads
@@ -127,6 +129,7 @@ impl Synchronizer {
             threads: Default::default(),
 
             max_memory: Default::default(),
+            http_config: Arc::new(sync::Mutex::new(HttpConfig::default())),
         }
     }
 
@@ -201,6 +204,10 @@ impl Synchronizer {
 
     pub fn clone_session(&self) -> Arc<Session> {
         self.session.clone()
+    }
+
+    pub fn clone_http_config(&self) -> Arc<sync::Mutex<HttpConfig>> {
+        self.http_config.clone()
     }
 
     fn parse_upgrade(
