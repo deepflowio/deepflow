@@ -31,9 +31,9 @@ process_kname             , process_kname_0           , process_kname_1         
 is_internet               , is_internet_0             , is_internet_1             , Internet标志                  , internet      ,                    ,            ,
 
 ip                        , ip_0                      , ip_1                      , IP地址                        , ip            ,                    , 网络层      ,
-protocol                  , protocol                  , protocol                  , 网络协议                      , int_enum      , l7_ip_protocol     , 网络层      ,
 tunnel_type               , tunnel_type               , tunnel_type               , 隧道类型                      , int_enum      , tunnel_type        , 网络层      ,
 
+protocol                  , protocol                  , protocol                  , 网络协议                      , int_enum      , l7_ip_protocol     , 传输层      ,
 client_port               , client_port               , client_port               , 客户端口                      , int           ,                    , 传输层      ,
 server_port               , server_port               , server_port               , 服务端口                      , int           ,                    , 传输层      ,
 req_tcp_seq               , req_tcp_seq               , resp_tcp_seq              , 请求TCP SEQ                   , int           ,                    , 传输层      ,
