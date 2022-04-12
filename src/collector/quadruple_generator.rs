@@ -512,9 +512,14 @@ impl SubQuadGen {
         } else {
             let nat_real_ip0 = tagged_flow.flow.flow_metrics_peers[0].nat_real_ip;
             let nat_real_ip1 = tagged_flow.flow.flow_metrics_peers[1].nat_real_ip;
+            let l7_protocol = if let Some(p) = tagged_flow.flow.flow_perf_stats.as_ref() {
+                p.l7_protocol
+            } else {
+                L7Protocol::Unknown
+            };
             let acc_flow = AccumulatedFlow {
                 tagged_flow,
-                l7_protocol: L7Protocol::Unknown,
+                l7_protocol,
                 is_active_host0: true,
                 is_active_host1: true,
                 policy_ids: policy_ids.clone(),

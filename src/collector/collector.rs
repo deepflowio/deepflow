@@ -504,11 +504,7 @@ impl Stash {
 
                 code
             },
-            l7_protocol: if let Some(p) = flow.flow_perf_stats.as_ref() {
-                p.l7_protocol
-            } else {
-                L7Protocol::default()
-            },
+            l7_protocol: acc_flow.l7_protocol,
             ..Default::default()
         };
         if tagger.direction == Direction::ServerToClient
