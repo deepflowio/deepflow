@@ -22,7 +22,7 @@ type Metrics struct {
 
 func (m *Metrics) Replace(metrics *Metrics) {
 	// 如果DBField == ""，表示是querier聚合的指标量
-	if m.DBField == "" || m.Type == METRICS_TYPE_TAG {
+	if m.DBField == "" {
 		m.IsAgg = true
 	}
 	if metrics.DBField != "" {
@@ -139,8 +139,11 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		return errors.New(fmt.Sprintf("merge metrics failed! db:%s, table:%s", db, table))
 	}
 	for name, value := range loadMetrics {
-		if rm, ok := replaceMetrics[name]; ok &&
-			(value.DBField == "" || value.Type == METRICS_TYPE_TAG) {
+		// TAG类型指标量都属于聚合类型
+		if value.Type == METRICS_TYPE_TAG {
+			value.IsAgg = true
+		}
+		if rm, ok := replaceMetrics[name]; ok && value.DBField == "" {
 			value.Replace(rm)
 		}
 		metrics[name] = value
