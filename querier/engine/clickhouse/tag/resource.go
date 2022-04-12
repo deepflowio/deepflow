@@ -1,6 +1,7 @@
 package tag
 
 import (
+	"fmt"
 	"strconv"
 
 	"metaflow/querier/common"
@@ -36,7 +37,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			}
 			tagResourceMap[resourceNameSuffix] = map[string]*Tag{
 				"default": NewTag(
-					"dictGet(deepflow."+resourceStr+"_map, ('name'), (toUInt64("+resourceIDSuffix+")))",
+					"dictGet(deepflow."+resourceStr+"_map, 'name', (toUInt64("+resourceIDSuffix+")))",
 					resourceIDSuffix+"!=0",
 					"toUInt64("+resourceIDSuffix+") IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE name %s %s)",
 					"toUInt64("+resourceIDSuffix+") IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE %s(name,%s))",
@@ -48,7 +49,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"",
 				),
 				"icon_id": NewTag(
-					"dictGet(deepflow."+resourceStr+"_map, ('icon_id'), (toUInt64("+resourceIDSuffix+")))",
+					"dictGet(deepflow."+resourceStr+"_map, 'icon_id', (toUInt64("+resourceIDSuffix+")))",
 					"",
 					"",
 					"",
@@ -72,7 +73,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			)}
 		tagResourceMap[vpcNameSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"dictGet(deepflow.l3_epc_map, ('name'), (toUInt64("+l3EPCIDSuffix+")))",
+				"dictGet(deepflow.l3_epc_map, 'name', (toUInt64("+l3EPCIDSuffix+")))",
 				l3EPCIDSuffix+"!=-2",
 				"toUInt64("+l3EPCIDSuffix+") IN (SELECT id FROM deepflow.l3_epc_map WHERE name %s %s)",
 				"toUInt64("+l3EPCIDSuffix+") IN (SELECT id FROM deepflow.l3_epc_map WHERE %s(name,%s))",
@@ -84,7 +85,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"",
 			),
 			"icon_id": NewTag(
-				"dictGet(deepflow.l3_epc_map, ('icon_id'), (toUInt64("+l3EPCIDSuffix+")))",
+				"dictGet(deepflow.l3_epc_map, 'icon_id', (toUInt64("+l3EPCIDSuffix+")))",
 				"",
 				"",
 				"",
@@ -106,7 +107,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			)}
 		tagResourceMap[hostNameSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"dictGet(deepflow.device_map, ('name'), (toUInt64(6),toUInt64("+hostIDSuffix+")))",
+				"dictGet(deepflow.device_map, 'name', (toUInt64(6),toUInt64("+hostIDSuffix+")))",
 				hostIDSuffix+"!=0",
 				"toUInt64("+hostIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
 				"toUInt64("+hostIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
@@ -118,7 +119,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"",
 			),
 			"icon_id": NewTag(
-				"dictGet(deepflow.device_map, ('icon_id'), (toUInt64("+hostIDSuffix+")))",
+				"dictGet(deepflow.device_map, 'icon_id', (toUInt64("+hostIDSuffix+")))",
 				"",
 				"",
 				"",
@@ -147,7 +148,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				)}
 			tagResourceMap[resourceNameSuffix] = map[string]*Tag{
 				"default": NewTag(
-					"dictGet(deepflow.device_map, ('name'), (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
+					"dictGet(deepflow.device_map, 'name', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
 					deviceIDSuffix+"!=0 AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
 					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s) AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
 					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s)) AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
@@ -159,7 +160,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"",
 				),
 				"icon_id": NewTag(
-					"dictGet(deepflow.device_map, ('icon_id'), (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
+					"dictGet(deepflow.device_map, 'icon_id', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
 					"",
 					"",
 					"",
@@ -198,10 +199,14 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					nodeTypeStrSuffix = autoTypeSuffix + "=" + autoTypeValueStr + ",'" + nodeType + "'," + nodeTypeStrSuffix
 				}
 			}
+			internetIconDictGet := "dictGet(deepflow.device_map, 'icon_id', (toUInt64(63999),toUInt64(63999)))"
+			ipIconDictGet := "dictGet(deepflow.device_map, 'icon_id', (toUInt64(64000),toUInt64(64000)))"
+			autoIconDictGet := fmt.Sprintf("dictGet(deepflow.device_map, 'icon_id', (toUInt64(%s),toUInt64(%s)))", autoTypeSuffix, autoIDSuffix)
+			iconIDStrSuffix := fmt.Sprintf("multiIf(%s=%d,%s,%s=%d,%s,%s)", autoTypeSuffix, VIF_DEVICE_TYPE_INTERNET, internetIconDictGet, autoTypeSuffix, VIF_DEVICE_TYPE_IP, ipIconDictGet, autoIconDictGet)
 			nodeTypeStrSuffix = "multiIf(" + nodeTypeStrSuffix
 			tagResourceMap[autoNameSuffix] = map[string]*Tag{
 				"default": NewTag(
-					"dictGet(deepflow.device_map, ('name'), (toUInt64("+autoTypeSuffix+"),toUInt64("+autoIDSuffix+")))",
+					"dictGet(deepflow.device_map, 'name', (toUInt64("+autoTypeSuffix+"),toUInt64("+autoIDSuffix+")))",
 					"",
 					"toUInt64("+autoIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
 					"toUInt64("+autoIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
@@ -213,7 +218,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"",
 				),
 				"icon_id": NewTag(
-					"dictGet(deepflow.device_map, ('icon_id'), (toUInt64("+autoTypeSuffix+"),toUInt64("+autoIDSuffix+")))",
+					iconIDStrSuffix,
 					"",
 					"",
 					"",
@@ -247,7 +252,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"",
 			),
 			"icon_id": NewTag(
-				"dictGet(deepflow.device_map, ('icon_id'), (toUInt64(0),toUInt64(0)))",
+				"dictGet(deepflow.device_map, 'icon_id', (toUInt64(0),toUInt64(0)))",
 				"",
 				"",
 				"",
@@ -274,7 +279,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"",
 			),
 			"icon_id": NewTag(
-				"dictGet(deepflow.device_map, ('icon_id'), (toUInt64(63999),toUInt64(63999)))",
+				"dictGet(deepflow.device_map, 'icon_id', (toUInt64(63999),toUInt64(63999)))",
 				"",
 				"",
 				"",
@@ -301,7 +306,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				deviceIDSuffix := "l3_device_id" + suffix
 				deviceTypeSuffix := "l3_device_type" + suffix
 				idTagTranslator = "if(" + deviceTypeSuffix + "=" + deviceTypeValueStr + "," + deviceIDSuffix + ", 0)"
-				nameTagTranslator = "dictGet(deepflow.device_map, ('name'), (toUInt64(" + deviceTypeValueStr + "),toUInt64(" + deviceIDSuffix + ")))"
+				nameTagTranslator = "dictGet(deepflow.device_map, 'name', (toUInt64(" + deviceTypeValueStr + "),toUInt64(" + deviceIDSuffix + ")))"
 				notNullFilter = deviceIDSuffix + "!=0 AND " + deviceTypeSuffix + "=" + deviceTypeValueStr
 				tagResourceMap[relatedResourceNameSuffix] = map[string]*Tag{
 					"node_type": NewTag(
@@ -311,7 +316,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 						"",
 					),
 					"icon_id": NewTag(
-						"dictGet(deepflow.device_map, ('icon_id'), (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
+						"dictGet(deepflow.device_map, 'icon_id', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
 						"",
 						"",
 						"",

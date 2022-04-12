@@ -29,7 +29,7 @@ func GenerateL7TagMap() map[string]map[string]*Tag {
 	// 采集点
 	l7TagMap["tap"] = map[string]*Tag{
 		"default": NewTag(
-			"dictGet(deepflow.tap_type_map, ('name'), toUInt64(tap_type))",
+			"dictGet(deepflow.tap_type_map, 'name', toUInt64(tap_type))",
 			"",
 			"toUInt64(tap_type) IN (SELECT value FROM deepflow.tap_type_map WHERE name %s %s)",
 			"toUInt64(tap_type) IN (SELECT value FROM deepflow.tap_type_map WHERE %s(name,%s))",
@@ -61,7 +61,7 @@ func GenerateL7TagMap() map[string]map[string]*Tag {
 	// 采集位置名称
 	l7TagMap["tap_port_name"] = map[string]*Tag{
 		"default": NewTag(
-			"dictGet(deepflow.vtap_port_map, ('name'), (toUInt64(vtap_id),toUInt64(tap_port)))",
+			"dictGet(deepflow.vtap_port_map, 'name', (toUInt64(vtap_id),toUInt64(tap_port)))",
 			"",
 			"toUInt64(tap_port) IN (SELECT tap_port FROM deepflow.vtap_port_map WHERE name %s %s)",
 			"",
@@ -69,7 +69,7 @@ func GenerateL7TagMap() map[string]map[string]*Tag {
 	// 采集器名称
 	l7TagMap["vtap"] = map[string]*Tag{
 		"default": NewTag(
-			"dictGet(deepflow.vtap_map, ('name'), toUInt64(vtap_id))",
+			"dictGet(deepflow.vtap_map, 'name', toUInt64(vtap_id))",
 			"",
 			"",
 			"",

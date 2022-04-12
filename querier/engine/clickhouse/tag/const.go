@@ -7,6 +7,7 @@ var TAG_RESOURCE_TYPE_DEFAULT = []string{
 var TAG_RESOURCE_TYPE_AUTO = []string{"resource_gl0", "resource_gl1", "resource_gl2"}
 
 const (
+	VIF_DEVICE_TYPE_INTERNET       = 0
 	VIF_DEVICE_TYPE_VM             = 1
 	VIF_DEVICE_TYPE_VROUTER        = 5
 	VIF_DEVICE_TYPE_HOST           = 6
@@ -20,6 +21,7 @@ const (
 	VIF_DEVICE_TYPE_NAT_GATEWAY    = 16
 	VIF_DEVICE_TYPE_POD_GROUP      = 101
 	VIF_DEVICE_TYPE_SERVICE        = 102
+	VIF_DEVICE_TYPE_IP             = 255
 )
 
 var AutoMap = map[string]int{
@@ -33,6 +35,7 @@ var AutoMap = map[string]int{
 	"pod_node":    VIF_DEVICE_TYPE_POD_NODE,
 	"lb":          VIF_DEVICE_TYPE_LB,
 	"nat_gateway": VIF_DEVICE_TYPE_NAT_GATEWAY,
+	"internet":    VIF_DEVICE_TYPE_INTERNET,
 }
 
 var AutoPodMap = map[string]int{
