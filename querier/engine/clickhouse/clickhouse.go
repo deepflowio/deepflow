@@ -402,7 +402,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 		if fieldFunc != nil {
 			return fieldFunc, nil
 		} else {
-			return nil, errors.New(fmt.Sprintf("Field: %s not support", field))
+			return &Field{Value: sqlparser.String(expr)}, nil
 		}
 	default:
 		// TODO: 报错
