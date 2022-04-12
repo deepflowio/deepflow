@@ -95,7 +95,9 @@ impl FlowPerf {
             L7Protocol::Kafka => L7FlowPerfTable::from(KafkaPerfData::new(rrt_cache.clone())),
             L7Protocol::Mysql => L7FlowPerfTable::from(MysqlPerfData::new(rrt_cache.clone())),
             L7Protocol::Redis => L7FlowPerfTable::from(RedisPerfData::new(rrt_cache.clone())),
-            L7Protocol::Http => L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone())),
+            L7Protocol::Http1 | L7Protocol::Http2 => {
+                L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone()))
+            }
             _ => return None,
         };
 
@@ -183,5 +185,5 @@ pub fn get_l7_protocol(src_port: u16, dst_port: u16, l7_performance_enabled: boo
         return L7Protocol::Kafka;
     }
 
-    L7Protocol::Http
+    L7Protocol::Http1
 }

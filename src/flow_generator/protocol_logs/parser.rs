@@ -31,6 +31,7 @@ use crate::{
     },
     metric::document::TapSide,
     rpc::HttpConfig,
+    sender::SendItem,
     utils::{
         net::MacAddr,
         queue::{DebugSender, Error, Receiver},
@@ -192,20 +193,20 @@ struct SessionQueue {
     window_size: usize,
     time_window: Option<Vec<HashMap<u64, AppProtoLogsData>>>,
 
-    throttle_queue: Vec<AppProtoLogsData>,
+    throttle_queue: Vec<SendItem>,
     throttle: Arc<AtomicUsize>,
     throttle_period_count: u64,
     rng: SmallRng,
 
     counter: Arc<SessionAggrCounter>,
-    output_queue: Arc<DebugSender<AppProtoLogsData>>,
+    output_queue: Arc<DebugSender<SendItem>>,
 }
 
 impl SessionQueue {
     fn new(
         throttle: Arc<AtomicUsize>,
         counter: Arc<SessionAggrCounter>,
-        output_queue: Arc<DebugSender<AppProtoLogsData>>,
+        output_queue: Arc<DebugSender<SendItem>>,
         window_size: usize,
     ) -> Self {
         //l7_log_session_timeout 20s-300s ，window_size = 2-30，所以 SessionQueue.time_window 预分配内存
@@ -344,7 +345,10 @@ impl SessionQueue {
             self.counter
                 .cached
                 .fetch_sub(map.len() as u64, Ordering::Relaxed);
-            let v = map.into_values().collect();
+            let v = map
+                .into_values()
+                .map(|item| SendItem::L7FlowLog(item))
+                .collect();
             if let Err(Error::Terminated(..)) = self.output_queue.send_all(v) {
                 warn!("output queue terminated");
                 break;
@@ -393,7 +397,7 @@ impl SessionQueue {
             Duration::from_secs(self.aggregate_start_time.as_secs() + n as u64 * SLOT_WIDTH);
     }
 
-    fn send_helper(&mut self, item: AppProtoLogsData) {
+    fn send_helper(&mut self, item: SendItem) {
         self.throttle_period_count += 1;
 
         let throttle = self.throttle.load(Ordering::Relaxed);
@@ -429,7 +433,7 @@ impl SessionQueue {
             self.flush_throttle_queue();
         }
 
-        self.send_helper(item)
+        self.send_helper(SendItem::L7FlowLog(item));
     }
 
     fn send_all(&mut self, items: Vec<AppProtoLogsData>) {
@@ -444,7 +448,7 @@ impl SessionQueue {
             self.flush_throttle_queue();
         }
         for item in items {
-            self.send_helper(item)
+            self.send_helper(SendItem::L7FlowLog(item));
         }
     }
 
@@ -478,7 +482,7 @@ struct AppLogs {
 
 pub struct AppProtoLogsParser {
     input_queue: Arc<Receiver<MetaAppProto>>,
-    output_queue: Arc<DebugSender<AppProtoLogsData>>,
+    output_queue: Arc<DebugSender<SendItem>>,
     id: u32,
     window_size: usize,
     throttle: Arc<AtomicUsize>,
@@ -493,7 +497,7 @@ impl AppProtoLogsParser {
         input_queue: Receiver<MetaAppProto>,
         throttle: usize,
         l7_log_session_timeout: Duration,
-        output_queue: DebugSender<AppProtoLogsData>,
+        output_queue: DebugSender<SendItem>,
         id: u32,
         http_config: Arc<Mutex<HttpConfig>>,
     ) -> (Self, Arc<SessionAggrCounter>) {
@@ -591,7 +595,7 @@ impl AppProtoLogsParser {
                 let base_info = app_proto.base_info;
                 AppProtoLogsData::new(base_info, special_info)
             }
-            L7Protocol::Http => {
+            L7Protocol::Http1 | L7Protocol::Http2 => {
                 app_logs.http.parse(
                     app_proto.raw_proto_payload.as_slice(),
                     app_proto.base_info.protocol,

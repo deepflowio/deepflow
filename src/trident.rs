@@ -266,6 +266,7 @@ struct Components {
     collectors: Vec<CollectorThread>,
     l4_flow_uniform_sender: Option<UniformSenderThread>,
     metrics_uniform_sender: UniformSenderThread,
+    l7_flow_uniform_sender: UniformSenderThread,
     monitor: Monitor,
     platform_synchronizer: PlatformSynchronizer,
     api_watcher: Arc<ApiWatcher>,
@@ -500,12 +501,34 @@ impl Components {
             Arc::new(counter),
             vec![StatsOption::Tag("index", sender_id.to_string())],
         );
-        let mut metrics_uniform_sender =
-            UniformSenderThread::new(sender_id, runtime_config.vtap_id, metrics_receiver, dst_ip);
+        let mut metrics_uniform_sender = UniformSenderThread::new(
+            sender_id,
+            runtime_config.vtap_id,
+            metrics_receiver,
+            dst_ip.clone(),
+        );
         metrics_uniform_sender.start();
 
+        let sender_id = 2usize;
+        let (proto_log_sender, proto_log_receiver, counter) = queue::bounded_with_debug(
+            static_config.flow_sender_queue_size,
+            "3-protolog-to-collector-sender",
+            &queue_debugger,
+        );
+        stats_collector.register_countable(
+            "3-protolog-to-collector-sender",
+            Arc::new(counter),
+            vec![],
+        );
+        let mut l7_flow_uniform_sender = UniformSenderThread::new(
+            sender_id,
+            runtime_config.vtap_id,
+            proto_log_receiver,
+            dst_ip,
+        );
+        l7_flow_uniform_sender.start();
+
         for i in 0..dispatcher_num {
-            // TODO: create and start collector
             let (flow_sender, flow_receiver, counter) =
                 queue::bounded(static_config.flow_queue_size);
             stats_collector.register_countable(
@@ -514,7 +537,7 @@ impl Components {
                 vec![StatsOption::Tag("index", i.to_string())],
             );
 
-            // TODO: create and start app proto logs
+            // create and start app proto logs
             let (log_sender, log_receiver, counter) = queue::bounded(static_config.flow_queue_size);
             stats_collector.register_countable(
                 "1-tagged-flow-to-app-protocol-logs",
@@ -522,22 +545,11 @@ impl Components {
                 vec![StatsOption::Tag("index", i.to_string())],
             );
 
-            let (proto_log_sender, proto_log_receiver, counter) = queue::bounded_with_debug(
-                static_config.flow_sender_queue_size,
-                "3-protolog-to-collector-sender",
-                &queue_debugger,
-            );
-            stats_collector.register_countable(
-                "3-protolog-to-collector-sender",
-                Arc::new(counter),
-                vec![],
-            );
-
             let (app_proto_log_parser, counter) = AppProtoLogsParser::new(
                 log_receiver,
                 runtime_config.l7_log_collect_nps_threshold as usize,
                 static_config.l7_log_session_aggr_timeout,
-                proto_log_sender,
+                proto_log_sender.clone(),
                 i as u32,
                 synchronizer.clone_http_config(),
             );
@@ -548,12 +560,6 @@ impl Components {
             );
             app_proto_log_parser.start();
             log_parsers.push(app_proto_log_parser);
-
-            thread::spawn(move || {
-                for log in proto_log_receiver {
-                    info!("app proto {:?}", log);
-                }
-            });
 
             let dispatcher = DispatcherBuilder::new()
                 .id(i)
@@ -605,6 +611,7 @@ impl Components {
             dispatchers.push(dispatcher);
             dispatcher_listeners.push(dispatcher_listener);
 
+            // create and start collector
             let mut collector = Self::new_collector(
                 i,
                 stats_collector,
@@ -636,6 +643,7 @@ impl Components {
             collectors,
             l4_flow_uniform_sender,
             metrics_uniform_sender,
+            l7_flow_uniform_sender,
             monitor,
             platform_synchronizer,
             api_watcher,
@@ -788,6 +796,7 @@ impl Components {
             l4_flow_uniform_sender.stop();
         }
         self.metrics_uniform_sender.stop();
+        self.l7_flow_uniform_sender.stop();
 
         // TODO: app proto logs handler
 

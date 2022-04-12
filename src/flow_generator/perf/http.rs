@@ -80,7 +80,7 @@ impl L7FlowPerf for HttpPerfData {
             .is_ok()
         {
             self.session_data.has_log_data = true;
-            self.session_data.l7_proto = L7Protocol::Http;
+            self.session_data.l7_proto = L7Protocol::Http1;
             return Ok(());
         }
         if self
@@ -88,7 +88,7 @@ impl L7FlowPerf for HttpPerfData {
             .is_ok()
         {
             self.session_data.has_log_data = true;
-            self.session_data.l7_proto = L7Protocol::Http;
+            self.session_data.l7_proto = L7Protocol::Http2;
             return Ok(());
         }
 
@@ -103,7 +103,7 @@ impl L7FlowPerf for HttpPerfData {
     fn copy_and_reset_data(&mut self, timeout_count: u32) -> FlowPerfStats {
         if let Some(stats) = self.perf_stats.take() {
             FlowPerfStats {
-                l7_protocol: L7Protocol::Http,
+                l7_protocol: self.session_data.l7_proto,
                 l7: L7PerfStats {
                     request_count: stats.req_count,
                     response_count: stats.resp_count,
@@ -122,7 +122,10 @@ impl L7FlowPerf for HttpPerfData {
     }
 
     fn app_proto_head(&mut self) -> Option<(AppProtoHead, u16)> {
-        if self.session_data.l7_proto != L7Protocol::Http || !self.session_data.has_log_data {
+        if (self.session_data.l7_proto != L7Protocol::Http1
+            && self.session_data.l7_proto != L7Protocol::Http2)
+            || !self.session_data.has_log_data
+        {
             return None;
         }
         self.session_data.has_log_data = false;
@@ -431,7 +434,7 @@ mod tests {
                         rrt_sum: Duration::from_nanos(84051000),
                     }),
                     session_data: HttpSessionData {
-                        l7_proto: L7Protocol::Http,
+                        l7_proto: L7Protocol::Http1,
                         status_code: 200,
                         status: L7ResponseStatus::Ok,
                         has_log_data: true,
@@ -455,7 +458,7 @@ mod tests {
                         rrt_sum: Duration::from_nanos(2023000),
                     }),
                     session_data: HttpSessionData {
-                        l7_proto: L7Protocol::Http,
+                        l7_proto: L7Protocol::Http2,
                         status_code: 200,
                         status: L7ResponseStatus::Ok,
                         has_log_data: true,

@@ -53,9 +53,19 @@ impl SendItem {
 impl fmt::Display for SendItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::L4FlowLog(l) => write!(f, "{}", l),
-            Self::L7FlowLog(l) => write!(f, "{}", l),
-            Self::Metrics(l) => write!(f, "{:?}", l),
+            Self::L4FlowLog(l) => write!(f, "l4: {}", l),
+            Self::L7FlowLog(l) => write!(f, "l7: {}", l),
+            Self::Metrics(l) => write!(f, "metric: {:?}", l),
+        }
+    }
+}
+
+impl fmt::Debug for SendItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::L4FlowLog(l) => write!(f, "l4: {}", l),
+            Self::L7FlowLog(l) => write!(f, "l7: {}", l),
+            Self::Metrics(l) => write!(f, "metric: {:?}", l),
         }
     }
 }
