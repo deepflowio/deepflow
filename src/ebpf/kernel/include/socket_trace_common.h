@@ -16,7 +16,6 @@ struct __tuple_t {
 	__u16 num;
 };
 
-// size : 512 + 107
 struct __socket_data {
 	/* 进程/线程信息 */
 	__u32 pid;  // 表示线程号 如果'pid == tgid'表示一个进程, 否则是线程
@@ -41,7 +40,9 @@ struct __socket_data {
 
 	/* 追踪数据信息 */
 	__u64 timestamp;     // 数据捕获时间戳
-	__u8  direction;     // 数据的收发方向
+	__u8  direction: 1;  // bits[0]: 方向，值为T_EGRESS(0), T_INGRESS(1)
+	__u8  msg_type:  7;  // bits[1-7]: 信息类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
+
 	__u64 syscall_len;   // 本次系统调用读、写数据的总长度
 	__u64 data_seq;      // cap_data在Socket中的相对顺序号
 	__u16 data_type;     // HTTP, DNS, MySQL

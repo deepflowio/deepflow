@@ -99,6 +99,12 @@ pub const SOCK_DATA_KAFKA: u16 = 100;
 #[allow(dead_code)]
 pub const SOCK_DATA_DUBBO: u16 = 40;
 
+//消息类型
+#[allow(dead_code)]
+pub const MSG_REQUEST: u8 = 1;
+#[allow(dead_code)]
+pub const MSG_RESPONSE: u8 = 2;
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct tuple_t {
@@ -123,6 +129,7 @@ pub struct SK_BPF_DATA {
     pub socket_id: u64,        // Socket的唯一标识，从启动时的时钟开始自增1，可用此做hash key代替五元组。
     pub l7_protocal_hint: u16, // 应用数据（cap_data）的协议，取值：SOCK_DATA_*（在上面定义）
                                // 存在一定误判性（例如标识为A协议但实际上是未知协议，或标识为多种协议），上层应用应继续深入判断
+    pub msg_type: u8,          // 信息类型，值为MSG_REQUEST(1), MSG_RESPONSE(2), 需要应用层分析进一步确认。
     pub need_reconfirm: bool,  // true: 表示eBPF程序对L7协议类型的判断并不确定需要上层重新核实。
                                // false: 表示eBPF程序对L7协议类型的判断是有把握的不需要上层重新核实。
     /* trace info */

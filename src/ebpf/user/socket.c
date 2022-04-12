@@ -313,6 +313,7 @@ static inline bool need_proto_reconfirm(uint16_t l7_proto)
 	switch (l7_proto) {
 	case PROTO_KAFKA:
 	case PROTO_HTTP2:
+	case PROTO_MYSQL:
 		return true;
 	default:
 		return false;
@@ -413,6 +414,7 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		submit_data->syscall_trace_id_session = sd->thread_trace_id;
 		memcpy(submit_data->process_name,
 		       sd->comm, sizeof(submit_data->process_name));
+		submit_data->msg_type = sd->msg_type;
 
 		// 各种协议的统计
 		if (sd->data_type >= PROTO_NUM)

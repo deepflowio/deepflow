@@ -752,6 +752,7 @@ static __inline void data_submit(struct pt_regs *ctx,
 	v->timestamp = time_stemp / NS_PER_US;
 	v->direction = direction;
 	v->syscall_len = syscall_len;
+	v->msg_type = conn_info->message_type;
 	v->tcp_seq = 0;
 	if (conn_info->tuple.l4_protocol == IPPROTO_TCP)
 		v->tcp_seq = tcp_seq - syscall_len;
