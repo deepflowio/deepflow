@@ -276,8 +276,14 @@ impl From<Tagger> for metric::MiniTag {
             (IpAddr::V6(ip6), IpAddr::V6(ip61)) => (ip6.octets().to_vec(), ip61.octets().to_vec()),
             _ => panic!("ip, ip1 type mismatch"),
         };
+
+        let mut code = t.code;
+        if code.contains(Code::DIRECTION) && code.has_edge_tag() {
+            code.remove(Code::DIRECTION);
+            code.insert(Code::TAP_SIDE);
+        }
         metric::MiniTag {
-            code: t.code.bits(),
+            code: code.bits(),
             field: Some(metric::MiniField {
                 ip: ip_vec,
                 ip1: ip1_vec,
@@ -288,7 +294,7 @@ impl From<Tagger> for metric::MiniTag {
                 mac: t.mac.into(),
                 mac1: t.mac.into(),
                 direction: t.direction as u32,
-                tap_side: t.tap_side as u32,
+                tap_side: TapSide::from(t.direction) as u32,
                 protocol: t.protocol as u32,
                 acl_gid: t.acl_gid as u32,
                 server_port: t.server_port as u32,
