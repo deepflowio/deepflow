@@ -65,18 +65,24 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			tagItem, ok = tag.GetTag(preAsTag, db, table, "default")
 			if !ok {
 				filter := ""
-				if strings.ToLower(op) == "regexp" {
+				switch strings.ToLower(op) {
+				case "regexp":
 					filter = fmt.Sprintf("match(%s,%s)", t.Tag, t.Value)
-				} else {
+				case "not regexp":
+					filter = fmt.Sprintf("NOT match(%s,%s)", t.Tag, t.Value)
+				default:
 					filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
 				}
 				return &view.Expr{Value: filter}, nil
 			}
 		} else {
 			filter := ""
-			if strings.ToLower(op) == "regex" {
+			switch strings.ToLower(op) {
+			case "regexp":
 				filter = fmt.Sprintf("match(%s,%s)", t.Tag, t.Value)
-			} else {
+			case "not regexp":
+				filter = fmt.Sprintf("NOT match(%s,%s)", t.Tag, t.Value)
+			default:
 				filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
 			}
 			return &view.Expr{Value: filter}, nil
@@ -125,7 +131,15 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			}
 		}
 	} else {
-		filter := fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+		filter := ""
+		switch strings.ToLower(op) {
+		case "regexp":
+			filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value)
+		case "not regexp":
+			filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "NOT match", t.Value)
+		default:
+			filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+		}
 		return &view.Expr{Value: filter}, nil
 	}
 	return &view.Expr{Value: "(" + whereFilter + ")"}, nil
