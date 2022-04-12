@@ -12,7 +12,6 @@ use super::{bounded, Error, Receiver, Sender, StatsHandle};
 
 use crate::debug::{QueueDebugger, QUEUE_LEN};
 
-#[derive(Clone)]
 pub struct DebugSender<T> {
     debug: (Sender<String>, Arc<AtomicBool>),
     sender: Sender<T>,
@@ -42,6 +41,15 @@ impl<T: Debug> DebugSender<T> {
             }
         }
         self.sender.send_all(msgs)
+    }
+}
+
+impl<T> Clone for DebugSender<T> {
+    fn clone(&self) -> Self {
+        Self {
+            debug: self.debug.clone(),
+            sender: self.sender.clone(),
+        }
     }
 }
 

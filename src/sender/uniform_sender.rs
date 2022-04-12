@@ -306,7 +306,7 @@ impl UniformSender {
                 .recv(Some(Duration::from_secs(Self::QUEUE_READ_TIMEOUT)))
             {
                 Ok(send_item) => {
-                    info!("send itme: {}", send_item);
+                    info!("send item: {}", send_item);
                     self.encoder.cache_to_sender(send_item);
                     if self.encoder.buffer_len() > Encoder::BUFFER_LEN {
                         self.update_dst_ip();
