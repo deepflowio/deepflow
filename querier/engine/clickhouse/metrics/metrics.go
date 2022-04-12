@@ -139,7 +139,8 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		return errors.New(fmt.Sprintf("merge metrics failed! db:%s, table:%s", db, table))
 	}
 	for name, value := range loadMetrics {
-		if rm, ok := replaceMetrics[name]; ok && value.DBField == "" {
+		if rm, ok := replaceMetrics[name]; ok &&
+			(value.DBField == "" || value.Type == METRICS_TYPE_TAG) {
 			value.Replace(rm)
 		}
 		metrics[name] = value
