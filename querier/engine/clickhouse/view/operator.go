@@ -12,6 +12,8 @@ const (
 	NOT
 	GTE
 	LTE
+	EQ
+	NEQ
 )
 
 type Operator struct {
@@ -31,6 +33,10 @@ func (n *Operator) ToString() string {
 		return " >= "
 	case LTE:
 		return " <= "
+	case EQ:
+		return " = "
+	case NEQ:
+		return " != "
 	}
 	return ""
 }
@@ -54,6 +60,10 @@ func GetOperator(op string) (*Operator, int) {
 		opType = AND
 	case "or":
 		opType = OR
+	case "=":
+		opType = EQ
+	case "!=":
+		opType = NEQ
 	}
 	return &Operator{Type: opType}, opType
 }
