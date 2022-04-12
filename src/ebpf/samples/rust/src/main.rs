@@ -145,11 +145,12 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
         println!("+ --------------------------------- +");
         if sk_proto_safe(sd) == SOCK_DATA_HTTP1 {
             let data = sk_data_str_safe(sd);
-            println!("{} <{}> RECONFIRM {} DIR {} PID {} THREAD_ID {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} PROXY_TRACE 0x{:x} THREAD_TRACE 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}\n{}", 
+            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} PROXY_TRACE 0x{:x} THREAD_TRACE 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}\n{}", 
                      date_time((*sd).timestamp),
                      proto_tag,
                      (*sd).need_reconfirm,
                      (*sd).direction,
+                     (*sd).msg_type,
                      (*sd).process_id,
                      (*sd).thread_id,
 		     process_name_safe(sd),
@@ -165,11 +166,12 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      data);
         } else {
             let data: Vec<u8> = sk_data_bytes_safe(sd);
-            println!("{} <{}> RECONFIRM {} DIR {} PID {} THREAD_ID {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} PROXY_TRACE 0x{:x} THREAD_TRACE 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}",
+            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} PROXY_TRACE 0x{:x} THREAD_TRACE 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}",
                      date_time((*sd).timestamp),
                      proto_tag,
                      (*sd).need_reconfirm,
                      (*sd).direction,
+                     (*sd).msg_type,
                      (*sd).process_id,
                      (*sd).thread_id,
 		     process_name_safe(sd),
