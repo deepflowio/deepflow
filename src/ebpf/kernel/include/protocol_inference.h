@@ -89,32 +89,42 @@ static __inline int is_http_request(const char *data, int data_len)
 // +=+=============================================================+
 // |                   Frame Payload (0...)                      ...
 // +---------------------------------------------------------------+
-
-#define HTTPV2_FRAME_PROTO_SZ 	9
-#define HTTPV2_FRAME_TYPE_HEADERS 	0x1
-
-static __inline bool parse_http2_headers_frame(const char *buf_src,
-					       size_t count)
+// Frame Payload (0...)
+// request:
+//      1       :authority
+//      2       :method GET
+//      3       :method POST
+// others as response.
+static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
+							    size_t count)
 {
-#define LOOP_MAX 10
+#define HTTPV2_FRAME_PROTO_SZ           0x9
+#define HTTPV2_FRAME_READ_SZ            0xa
+#define HTTPV2_FRAME_TYPE_HEADERS       0x1
+#define HTTPV2_STATIC_TABLE_AUTH_IDX    0x1
+#define HTTPV2_STATIC_TABLE_GET_IDX     0x2
+#define HTTPV2_STATIC_TABLE_POST_IDX    0x3
+#define HTTPV2_LOOP_MAX 10
+
 	// fixed 9-octet header
 	if (count < HTTPV2_FRAME_PROTO_SZ)
-		return false;
+		return MSG_UNKNOWN;
 
 	__u32 offset = 0;
-	__u8 type = 0, flags_unset = 0, reserve = 0, i;
-	__u8 buf[HTTPV2_FRAME_PROTO_SZ] = { 0 };
-	bool is_headers = false, is_valid_len = false;
+	__u8 type = 0, flags_unset = 0, reserve = 0, static_table_idx, i;
+	__u8 msg_type = MSG_UNKNOWN;
+	__u8 buf[HTTPV2_FRAME_READ_SZ] = { 0 };
+	bool is_valid_len = false;
 
 #pragma unroll
-	for (i = 0; i < LOOP_MAX; i++) {
+	for (i = 0; i < HTTPV2_LOOP_MAX; i++) {
 		if (offset == count) {
 			is_valid_len = true;
 			break;
 		}
 
-		if (offset + HTTPV2_FRAME_PROTO_SZ > count)
-			return false;
+		if (offset + HTTPV2_FRAME_READ_SZ > count)
+			return MSG_UNKNOWN;
 
 		bpf_probe_read(buf, sizeof(buf), buf_src + offset);
 		offset += (__bpf_ntohl(*(__u32 *) buf) >> 8) +  
@@ -122,17 +132,23 @@ static __inline bool parse_http2_headers_frame(const char *buf_src,
 		type = buf[3];
 		flags_unset = buf[4] & 0xd2;
 		reserve = buf[5] & 0x01;
+		static_table_idx = buf[9] & 0x7f;
 		if (type == HTTPV2_FRAME_TYPE_HEADERS) {
 			if (flags_unset || reserve)
-				return false;
-			is_headers = true;
+				return MSG_UNKNOWN;
+			if (static_table_idx == HTTPV2_STATIC_TABLE_AUTH_IDX ||
+			    static_table_idx == HTTPV2_STATIC_TABLE_GET_IDX ||
+			    static_table_idx == HTTPV2_STATIC_TABLE_POST_IDX)
+				msg_type = MSG_REQUEST;
+			else
+				msg_type = MSG_RESPONSE;
 		}
 	}
 
-	if (is_headers && is_valid_len)
-		return true;
+	if (!is_valid_len)
+		msg_type = MSG_UNKNOWN;
 
-	return false;
+	return msg_type;
 }
 
 static __inline enum message_type infer_http2_message(const char *buf_src,
@@ -145,10 +161,7 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 			return MSG_UNKNOWN;
 	}
 
-	if (parse_http2_headers_frame(buf_src, count))
-		return MSG_REQUEST;
-
-	return MSG_UNKNOWN;
+	return parse_http2_headers_frame(buf_src, count);
 }
 
 static __inline enum message_type infer_http_message(const char *buf,
@@ -245,8 +258,6 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 			    || com == kComStmtClose) {
 				return MSG_REQUEST;
 			}
-
-			return MSG_REQUEST;
 		}
 	}
 
@@ -413,7 +424,7 @@ static __inline enum message_type infer_redis_message(const char *buf,
 
 	const char first_byte = buf[0];
 
-	if (			// 对于简单字符串，回复的第一个字节是“+”
+	if (	   // 对于简单字符串，回复的第一个字节是“+”
 		   first_byte != '+' &&
 		   // 对于错误，回复的第一个字节是“-”
 		   first_byte != '-' &&
