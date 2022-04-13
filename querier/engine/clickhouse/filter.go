@@ -59,6 +59,9 @@ type WhereTag struct {
 func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string, db, table string) (view.Node, error) {
 	op := expr.(*sqlparser.ComparisonExpr).Operator
 	tagItem, ok := tag.GetTag(strings.Trim(t.Tag, "`"), db, table, "default")
+	if strings.ToLower(op) == "like" || strings.ToLower(op) == "not like" {
+		t.Value = strings.ReplaceAll(t.Value, "*", "%")
+	}
 	if !ok {
 		preAsTag, ok := asTagMap[t.Tag]
 		if ok {
@@ -134,9 +137,9 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 		filter := ""
 		switch strings.ToLower(op) {
 		case "regexp":
-			filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value)
+			filter = fmt.Sprintf("match(%s,%s)", t.Tag, t.Value)
 		case "not regexp":
-			filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "NOT match", t.Value)
+			filter = fmt.Sprintf("NOT match(%s,%s)", t.Tag, t.Value)
 		default:
 			filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
 		}
