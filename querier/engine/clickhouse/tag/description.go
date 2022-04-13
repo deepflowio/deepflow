@@ -241,6 +241,10 @@ func GetTagResourceValues(tag string) (map[string][]interface{}, error) {
 		sql = "SELECT id as value,name AS display_name FROM l3_epc_map"
 	} else if tag == "ip" {
 		sql = "SELECT ip as value,ip AS display_name FROM ip_relation_map"
+	} else if tag == "tap" {
+		sql = "SELECT value, name AS display_name FROM tap_type_map"
+	} else if tag == "vtap" {
+		sql = "SELECT id as value, name AS display_name FROM vtap_map"
 	}
 	if sql == "" {
 		return nil, errors.New(fmt.Sprintf("tag (%s) not found", tag))
