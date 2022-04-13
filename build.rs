@@ -1,5 +1,7 @@
 use std::error::Error;
 use std::process::Command;
+extern crate dunce;
+use std::{env, path::PathBuf};
 
 fn generate_protobuf() -> Result<(), Box<dyn Error>> {
     tonic_build::configure()
@@ -36,8 +38,29 @@ fn set_build_info() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn set_build_libebpf() -> Result<(), Box<dyn Error>> {
+    Command::new("sh")
+        .arg("-c")
+        .arg("cd src/ebpf && ./remote-make 10.1.3.91 yunshan3302")
+        .output()
+        .expect("compile libebpf.a error!");
+    let library_name = "ebpf";
+    let root = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
+    let library_dir = dunce::canonicalize(root.join("src/ebpf/")).unwrap();
+    println!("cargo:rustc-link-lib=static={}", library_name);
+    println!(
+        "cargo:rustc-link-search=native={}",
+        env::join_paths(&[library_dir]).unwrap().to_str().unwrap()
+    );
+    println!("cargo:rustc-link-lib=dylib=pthread");
+    println!("cargo:rustc-link-lib=dylib=elf");
+    println!("cargo:rustc-link-lib=dylib=z");
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     generate_protobuf()?;
     set_build_info()?;
+    set_build_libebpf()?;
     Ok(())
 }

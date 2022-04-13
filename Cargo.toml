@@ -71,6 +71,7 @@ uluru = "3.0.0"
 
 [build-dependencies]
 tonic-build = "0.5.2"
+dunce = "0.1.1"
 
 [features]
 
