@@ -20,6 +20,7 @@ var DnsCommandString = []string{
 	14:  "MINFO",
 	15:  "MX",
 	16:  "TXT",
+	28:  "AAAA",
 	252: "AXFR",
 	253: "MAILB",
 	254: "MAILA",
@@ -28,6 +29,7 @@ var DnsCommandString = []string{
 
 func GetDNSQueryType(query uint8) string {
 	if (query >= 0 && query <= 16) ||
+		query == 28 ||
 		(query >= 252 && query <= 255) {
 		return DnsCommandString[query]
 	}
