@@ -23,16 +23,16 @@ struct EpcIpKey {
 #[derive(Default)]
 pub struct Labeler {
     // Interface表
-    mac_table: HashMap<u64, Rc<PlatformData>>,
-    epc_ip_table: HashMap<EpcIpKey, Rc<PlatformData>>,
+    mac_table: Box<HashMap<u64, Rc<PlatformData>>>,
+    epc_ip_table: Box<HashMap<EpcIpKey, Rc<PlatformData>>>,
     // Interface WAN IP表
-    ip_netmask_table: HashMap<u16, u32>, // 仅用于IPv4, IPv6的掩码目前仅支持128不用计算
-    ip_table: HashMap<u128, Rc<PlatformData>>,
+    ip_netmask_table: Box<HashMap<u16, u32>>, // 仅用于IPv4, IPv6的掩码目前仅支持128不用计算
+    ip_table: Box<HashMap<u128, Rc<PlatformData>>>,
     // 对等连接表
-    peer_table: HashMap<i32, Vec<i32>>,
+    peer_table: Box<HashMap<i32, Vec<i32>>>,
     // CIDR表
-    epc_cidr_table: HashMap<i32, Vec<Rc<Cidr>>>,
-    tunnel_cidr_table: HashMap<u32, Vec<Rc<Cidr>>>,
+    epc_cidr_table: Box<HashMap<i32, Vec<Rc<Cidr>>>>,
+    tunnel_cidr_table: Box<HashMap<u32, Vec<Rc<Cidr>>>>,
 }
 
 fn is_link_local(ip: IpAddr) -> bool {
@@ -51,8 +51,11 @@ fn is_unicast_mac(mac: u64) -> bool {
 }
 
 impl Labeler {
+    pub fn new() -> Box<Self> {
+        Box::new(Labeler::default())
+    }
     fn update_mac_table(&mut self, interfaces: &Vec<Rc<PlatformData>>) {
-        let mut mac_table: HashMap<u64, Rc<PlatformData>> = HashMap::new();
+        let mut mac_table = Box::new(HashMap::new());
 
         for interface in interfaces {
             let iface = Rc::clone(interface);
@@ -82,7 +85,7 @@ impl Labeler {
     }
 
     fn update_epc_ip_table(&mut self, interfaces: &Vec<Rc<PlatformData>>) {
-        let mut epc_ip_table = HashMap::new();
+        let mut epc_ip_table = Box::new(HashMap::new());
 
         for interface in interfaces {
             let mut epc_id = interface.epc_id;
@@ -131,7 +134,7 @@ impl Labeler {
                 .or_default()
                 .push(peer.local_epc);
         }
-        self.peer_table = peer_table;
+        self.peer_table = Box::new(peer_table);
     }
 
     fn get_epc_by_peer(&self, ip: IpAddr, epc_id: i32, endpoint: &mut EndpointInfo) {
@@ -185,8 +188,8 @@ impl Labeler {
             });
         }
 
-        self.tunnel_cidr_table = tunnel_table;
-        self.epc_cidr_table = epc_table;
+        self.tunnel_cidr_table = Box::new(tunnel_table);
+        self.epc_cidr_table = Box::new(epc_table);
     }
 
     // 函数通过EPC+IP查询对应的CIDR，获取EPC标记
@@ -248,8 +251,8 @@ impl Labeler {
     }
 
     fn update_ip_table(&mut self, interfaces: &Vec<Rc<PlatformData>>) {
-        let mut ip_netmask_table: HashMap<u16, u32> = HashMap::new();
-        let mut ip_table: HashMap<u128, Rc<PlatformData>> = HashMap::new();
+        let mut ip_netmask_table = Box::new(HashMap::new());
+        let mut ip_table = Box::new(HashMap::new());
         for interface in interfaces {
             if interface.if_type != IfType::WAN {
                 continue;
@@ -530,6 +533,47 @@ impl Labeler {
         // XXX: VIP查询是否使用WAN的逻辑中：
         // 1. EPC通过另一端EPC查询时统一按照LAN处理
         self.get_vip(key, is_src_wan, is_dst_wan, &mut endpoint);
+        self.modify_internet_epc(&mut endpoint);
+        return endpoint;
+    }
+
+    pub fn get_endpoint_data_by_epc(
+        &self,
+        src: IpAddr,
+        dst: IpAddr,
+        l3_epc_id_src: i32,
+        l3_epc_id_dst: i32,
+    ) -> EndpointData {
+        let src_info = EndpointInfo {
+            l3_epc_id: l3_epc_id_src,
+            ..Default::default()
+        };
+        let dst_info = EndpointInfo {
+            l3_epc_id: l3_epc_id_dst,
+            ..Default::default()
+        };
+        let mut endpoint = EndpointData::new(src_info, dst_info);
+        let key = &LookupKey {
+            src_ip: src,
+            dst_ip: dst,
+            ..Default::default()
+        };
+        // l3: 私有网络 VPC内部路由
+        // 1) 本端IP + 对端EPC查询EPC-IP表
+        // 2) 本端IP + 对端EPC查询CIDR表
+        self.modify_endpoint_data(&mut endpoint, key);
+        // l3: 对等连接查询, 以下两种查询
+        // 1) peer epc + ip查询对等连接表
+        // 2) peer epc + ip查询CIDR表
+        self.get_l3_by_peer(key.src_ip, key.dst_ip, &mut endpoint);
+        // l3: WAN查询，包括以下两种查询
+        // 1) ip查询平台数据WAN接口
+        // 2) ip查询DEEPFLOW添加的WAN监控网段(cidr)
+        let (found_src, found_dst) = self.get_l3_by_wan(key.src_ip, key.dst_ip, &mut endpoint);
+        if found_src || found_dst {
+            self.modify_endpoint_data(&mut endpoint, key);
+            self.get_l3_by_peer(key.src_ip, key.dst_ip, &mut endpoint);
+        }
         self.modify_internet_epc(&mut endpoint);
         return endpoint;
     }

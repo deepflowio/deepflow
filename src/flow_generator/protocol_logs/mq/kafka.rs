@@ -1,6 +1,6 @@
 use super::super::{
     consts::{KAFKA_REQ_HEADER_LEN, KAFKA_RESP_HEADER_LEN},
-    AppProtoLogsInfo, L7LogParse, LogMessageType,
+    AppProtoHead, AppProtoLogsInfo, L7LogParse, L7Protocol, L7ResponseStatus, LogMessageType,
 };
 
 use crate::proto::flow_log;
@@ -43,10 +43,12 @@ impl From<KafkaInfo> for flow_log::KafkaInfo {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct KafkaLog {
     info: KafkaInfo,
     msg_type: LogMessageType,
+    status: L7ResponseStatus,
+    status_code: u16,
 }
 
 impl KafkaLog {
@@ -59,28 +61,41 @@ impl KafkaLog {
         self.info.resp_msg_size = -1;
     }
 
-    fn request(&mut self, payload: &[u8]) -> Result<()> {
+    fn request(&mut self, payload: &[u8]) -> Result<AppProtoHead> {
         self.info.req_msg_size = read_u32_be(payload) as i32;
         let client_id_len = read_u16_be(&payload[12..]) as usize;
         if payload.len() < KAFKA_REQ_HEADER_LEN + client_id_len {
             return Err(Error::KafkaLogParseFailed);
         }
 
+        self.msg_type = LogMessageType::Request;
         self.info.api_key = read_u16_be(&payload[4..]);
         self.info.api_version = read_u16_be(&payload[6..]);
         self.info.correlation_id = read_u32_be(&payload[8..]);
         self.info.client_id =
             String::from_utf8_lossy(&payload[14..14 + client_id_len]).into_owned();
-        Ok(())
+
+        Ok(AppProtoHead {
+            proto: L7Protocol::Kafka,
+            msg_type: self.msg_type,
+            status: self.status,
+            code: self.status_code,
+            rrt: 0,
+        })
     }
 
-    fn response(&mut self, payload: &[u8]) -> Result<()> {
+    fn response(&mut self, payload: &[u8]) -> Result<AppProtoHead> {
         self.info.resp_msg_size = read_u32_be(payload) as i32;
         self.info.correlation_id = read_u32_be(&payload[4..]);
-
         self.msg_type = LogMessageType::Response;
 
-        Ok(())
+        Ok(AppProtoHead {
+            proto: L7Protocol::Kafka,
+            msg_type: self.msg_type,
+            status: L7ResponseStatus::Ok,
+            code: 0,
+            rrt: 0,
+        })
     }
 }
 
@@ -90,7 +105,7 @@ impl L7LogParse for KafkaLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-    ) -> Result<()> {
+    ) -> Result<AppProtoHead> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
