@@ -1,4 +1,7 @@
-use super::super::{consts::*, AppProtoLogsInfo, L7LogParse, LogMessageType};
+use super::super::{
+    consts::*, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7Protocol, L7ResponseStatus,
+    LogMessageType,
+};
 
 use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::flow_generator::error::{Error, Result};
@@ -45,10 +48,11 @@ impl From<DubboInfo> for flow_log::DubboInfo {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct DubboLog {
     info: DubboInfo,
 
+    status: L7ResponseStatus,
     status_code: u8,
     msg_type: LogMessageType,
 }
@@ -127,6 +131,22 @@ impl DubboLog {
         self.get_req_body_info(&payload[DUBBO_HEADER_LEN..]);
     }
 
+    fn set_status(&mut self, status_code: u8) {
+        self.status = match status_code {
+            20 => L7ResponseStatus::Ok,
+            30 => L7ResponseStatus::ClientError,
+            31 => L7ResponseStatus::ServerError,
+            40 => L7ResponseStatus::ClientError,
+            50 => L7ResponseStatus::ServerError,
+            60 => L7ResponseStatus::ServerError,
+            70 => L7ResponseStatus::ServerError,
+            80 => L7ResponseStatus::ServerError,
+            90 => L7ResponseStatus::ClientError,
+            100 => L7ResponseStatus::ServerError,
+            _ => L7ResponseStatus::Ok,
+        }
+    }
+
     fn response(&mut self, dubbo_header: &DubboHeader) {
         self.msg_type = LogMessageType::Response;
 
@@ -135,6 +155,7 @@ impl DubboLog {
         self.info.serial_id = dubbo_header.serial_id;
         self.info.request_id = dubbo_header.request_id;
         self.status_code = dubbo_header.status_code;
+        self.set_status(self.status_code);
     }
 }
 
@@ -144,7 +165,7 @@ impl L7LogParse for DubboLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-    ) -> Result<()> {
+    ) -> Result<AppProtoHead> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -161,7 +182,13 @@ impl L7LogParse for DubboLog {
                 self.response(&dubbo_header);
             }
         }
-        Ok(())
+        Ok(AppProtoHead {
+            proto: L7Protocol::Dubbo,
+            msg_type: self.msg_type,
+            status: self.status,
+            code: self.status_code as u16,
+            rrt: 0,
+        })
     }
 
     fn info(&self) -> AppProtoLogsInfo {

@@ -66,6 +66,8 @@ pub type DebugAccess = Access<DebugConfig>;
 
 pub type SynchronizerAccess = Access<SynchronizerConfig>;
 
+pub type EbpfAccess = Access<EbpfConfig>;
+
 #[derive(Clone, PartialEq, Eq)]
 pub struct CollectorConfig {
     pub enabled: bool,
@@ -272,6 +274,14 @@ pub struct SynchronizerConfig {
 }
 
 #[derive(Clone, Debug)]
+pub struct EbpfConfig {
+    pub vtap_id: u16,
+    pub epc_id: u32,
+    pub l7_log_session_timeout: Duration,
+    pub log_path: String,
+}
+
+#[derive(Clone, Debug)]
 pub struct NewRuntimeConfig {
     pub collector: CollectorConfig,
     pub environment: EnvironmentConfig,
@@ -287,6 +297,7 @@ pub struct NewRuntimeConfig {
     pub handler: HandlerConfig,
     pub log: LogConfig,
     pub synchronizer: SynchronizerConfig,
+    pub ebpf: EbpfConfig,
     pub global_pps_threshold: u64,
 }
 
@@ -429,6 +440,12 @@ impl Default for NewRuntimeConfig {
                 log_retention: 7,
                 rsyslog_enabled: false,
                 host,
+            },
+            ebpf: EbpfConfig {
+                vtap_id,
+                epc_id: 0,
+                l7_log_session_timeout: Duration::from_secs(120),
+                log_path: "".to_string(),
             },
         };
         conf.collector.l4_log_store_tap_types[u16::from(TapType::Isp(2)) as usize] = true;
@@ -655,6 +672,12 @@ impl ConfigHandler {
         )
     }
 
+    pub fn ebpf(&self) -> EbpfAccess {
+        Map::new(self.current_config.clone(), |config| -> &EbpfConfig {
+            &config.ebpf
+        })
+    }
+
     pub fn new_runtime_config(
         &self,
         conf: trident::Config,
@@ -852,6 +875,12 @@ impl ConfigHandler {
                 } else {
                     conf.host().to_string()
                 },
+            },
+            ebpf: EbpfConfig {
+                vtap_id: conf.vtap_id() as u16,
+                epc_id: conf.epc_id(),
+                l7_log_session_timeout: static_config.l7_log_session_aggr_timeout,
+                log_path: static_config.ebpf_log_file.clone(),
             },
         };
         config.validate()?;

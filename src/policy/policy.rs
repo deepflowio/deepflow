@@ -1,3 +1,4 @@
+use std::net::IpAddr;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -9,8 +10,8 @@ use crate::common::platform_data::PlatformData;
 use crate::common::policy::{Acl, Cidr, PeerConnection, PolicyData};
 
 pub struct Policy {
-    labeler: Labeler,
-    table: FirstPath,
+    labeler: Box<Labeler>,
+    table: Box<FirstPath>,
 
     queue_count: usize,
     first_hit: usize,
@@ -18,14 +19,14 @@ pub struct Policy {
 }
 
 impl Policy {
-    pub fn new(queue_count: usize, level: usize, map_size: usize, fast_disable: bool) -> Self {
-        Policy {
-            labeler: Default::default(),
+    pub fn new(queue_count: usize, level: usize, map_size: usize, fast_disable: bool) -> Box<Self> {
+        Box::new(Policy {
+            labeler: Labeler::new(),
             table: FirstPath::new(queue_count, level, map_size, fast_disable),
             queue_count,
             first_hit: 0,
             fast_hit: 0,
-        }
+        })
     }
 
     pub fn lookup_all_by_key(
@@ -39,6 +40,24 @@ impl Policy {
         self.first_hit += 1;
         let endpoints = self.labeler.get_endpoint_data(key);
         return self.table.first_get(key, endpoints);
+    }
+
+    pub fn lookup_all_by_epc(
+        &mut self,
+        src: IpAddr,
+        dst: IpAddr,
+        l3_epc_id_src: i32,
+        l3_epc_id_dst: i32,
+    ) -> i32 {
+        // TODO：可能也需要走fast提升性能
+        let endpoints =
+            self.labeler
+                .get_endpoint_data_by_epc(src, dst, l3_epc_id_src, l3_epc_id_dst);
+        if l3_epc_id_src > 0 {
+            endpoints.dst_info.l3_epc_id
+        } else {
+            endpoints.src_info.l3_epc_id
+        }
     }
 
     pub fn update_interfaces(&mut self, ifaces: &Vec<Rc<PlatformData>>) {
@@ -69,6 +88,42 @@ impl Policy {
 
     pub fn hit_status(&self) -> (usize, usize) {
         (self.first_hit, self.fast_hit)
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct PolicyGetter {
+    policy: *mut Policy,
+}
+
+unsafe impl Send for PolicyGetter {}
+unsafe impl Sync for PolicyGetter {}
+
+impl PolicyGetter {
+    fn policy(&self) -> &mut Policy {
+        unsafe { &mut *self.policy }
+    }
+    pub fn lookup_all_by_key(
+        &mut self,
+        key: &mut LookupKey,
+    ) -> Option<(Arc<PolicyData>, Arc<EndpointData>)> {
+        self.policy().lookup_all_by_key(key)
+    }
+    pub fn lookup_all_by_epc(
+        &mut self,
+        src: IpAddr,
+        dst: IpAddr,
+        l3_epc_id_src: i32,
+        l3_epc_id_dst: i32,
+    ) -> i32 {
+        self.policy()
+            .lookup_all_by_epc(src, dst, l3_epc_id_src, l3_epc_id_dst)
+    }
+}
+
+impl From<*mut Policy> for PolicyGetter {
+    fn from(policy: *mut Policy) -> Self {
+        PolicyGetter { policy }
     }
 }
 

@@ -86,6 +86,7 @@ pub struct Config {
     pub l7_log_session_aggr_timeout: Duration,
     pub tap_mac_script: String,
     pub cloud_gateway_traffic: bool,
+    pub ebpf_log_file: String,
 }
 
 impl Config {
@@ -224,6 +225,7 @@ impl Default for Config {
             l7_log_session_aggr_timeout: Duration::from_secs(120),
             tap_mac_script: "".into(),
             cloud_gateway_traffic: false,
+            ebpf_log_file: "".into(),
         }
     }
 }

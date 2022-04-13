@@ -1,9 +1,12 @@
-use super::{consts::*, AppProtoLogsInfo, L7LogParse, LogMessageType};
+use super::{
+    consts::*, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7ResponseStatus, LogMessageType,
+};
 
 use crate::proto::flow_log;
 use crate::{
     common::{
         enums::{IpProtocol, PacketDirection},
+        flow::L7Protocol,
         IPV4_ADDR_LEN, IPV6_ADDR_LEN,
     },
     flow_generator::error::{Error, Result},
@@ -39,13 +42,15 @@ impl From<DnsInfo> for flow_log::DnsInfo {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct DnsLog {
     info: DnsInfo,
 
     domain_type: u16,
 
     msg_type: LogMessageType,
+    status: L7ResponseStatus,
+    status_code: u8,
 }
 
 impl DnsLog {
@@ -218,14 +223,25 @@ impl DnsLog {
         Ok(())
     }
 
-    fn decode_payload(&mut self, payload: &[u8]) -> Result<()> {
+    fn set_status(&mut self, status_code: u8) {
+        if status_code == 0 {
+            self.status = L7ResponseStatus::Ok;
+        } else if status_code == 1 || status_code == 3 {
+            self.status = L7ResponseStatus::ClientError;
+        } else {
+            self.status = L7ResponseStatus::ServerError;
+        }
+    }
+
+    fn decode_payload(&mut self, payload: &[u8]) -> Result<AppProtoHead> {
         if payload.len() <= DNS_HEADER_SIZE {
             let err_msg = format!("dns payload length too short:{}", payload.len());
             return Err(Error::DNSLogParseFailed(err_msg));
         }
         self.info.trans_id = read_u16_be(&payload[..DNS_HEADER_FLAGS_OFFSET]);
         self.info.query_type = payload[DNS_HEADER_FLAGS_OFFSET] & 0x80;
-
+        self.status_code = payload[DNS_HEADER_FLAGS_OFFSET + 1] & 0xf;
+        self.set_status(self.status_code);
         let qd_count = read_u16_be(&payload[DNS_HEADER_QDCOUNT_OFFSET..]);
         let an_count = read_u16_be(&payload[DNS_HEADER_ANCOUNT_OFFSET..]);
         let ns_count = read_u16_be(&payload[DNS_HEADER_NSCOUNT_OFFSET..]);
@@ -248,7 +264,13 @@ impl DnsLog {
 
             self.msg_type = LogMessageType::Response;
         }
-        Ok(())
+        Ok(AppProtoHead {
+            proto: L7Protocol::Dns,
+            msg_type: self.msg_type,
+            status: self.status,
+            code: self.status_code as u16,
+            rrt: 0,
+        })
     }
 }
 
@@ -258,7 +280,7 @@ impl L7LogParse for DnsLog {
         payload: &[u8],
         proto: IpProtocol,
         _direction: PacketDirection,
-    ) -> Result<()> {
+    ) -> Result<AppProtoHead> {
         self.reset_logs();
         match proto {
             IpProtocol::Udp => self.decode_payload(payload),

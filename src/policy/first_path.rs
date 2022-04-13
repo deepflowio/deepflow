@@ -22,12 +22,12 @@ impl FirstPath {
         _level: usize,
         map_size: usize,
         fast_disable: bool,
-    ) -> FirstPath {
-        FirstPath {
+    ) -> Box<FirstPath> {
+        Box::new(FirstPath {
             fast: FastPath::new(queue_count, map_size),
             queue_count,
             fast_disable,
-        }
+        })
     }
 
     pub fn update_interfaces(&mut self, ifaces: &Vec<Rc<PlatformData>>) {

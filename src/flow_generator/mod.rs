@@ -7,13 +7,16 @@ pub mod perf;
 mod protocol_logs;
 mod service_table;
 
+pub use error::Result;
 pub use flow_config::{FlowMapConfig, FlowMapRuntimeConfig, FlowTimeout, TcpTimeout};
 pub use flow_map::FlowMap;
 use flow_node::{FlowMapKey, FlowNode};
 pub use flow_state::FlowState;
+pub use perf::L7RrtCache;
 pub use protocol_logs::{
-    AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, AppProtoLogsParser, DnsLog, DubboLog,
-    HttpLog, KafkaLog, L7LogParse, MetaAppProto, MysqlLog, RedisLog,
+    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, AppProtoLogsParser,
+    DnsLog, DubboLog, HttpLog, KafkaLog, L7LogParse, LogMessageType, MetaAppProto, MysqlLog,
+    RedisLog,
 };
 
 use std::time::Duration;

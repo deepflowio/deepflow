@@ -31,6 +31,7 @@ use crate::{
     dispatcher::{
         self, recv_engine::bpf, BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
     },
+    ebpf_collector::EbpfCollector,
     flow_generator::AppProtoLogsParser,
     monitor::Monitor,
     platform::{ApiWatcher, LibvirtXmlExtractor, PlatformSynchronizer},
@@ -237,6 +238,7 @@ pub struct Components {
     pub debugger: Debugger,
     pub pcap_manager: WorkerManager,
     pub guard: Guard,
+    pub ebpf_collector: EbpfCollector,
     pub running: AtomicBool,
 }
 
@@ -271,6 +273,7 @@ impl Components {
         }
         self.monitor.start();
         self.guard.start();
+        self.ebpf_collector.start();
         info!("Started components.");
     }
 
@@ -545,6 +548,7 @@ impl Components {
         let monitor = Monitor::new(stats_collector.clone())?;
 
         let guard = Guard::new(config_handler.environment());
+        let ebpf_collector = EbpfCollector::new(config_handler.ebpf(), proto_log_sender)?;
 
         Ok(Components {
             rx_leaky_bucket,
@@ -563,6 +567,7 @@ impl Components {
             pcap_manager,
             log_parsers,
             guard,
+            ebpf_collector,
             running: AtomicBool::new(false),
         })
     }
@@ -720,6 +725,7 @@ impl Components {
         self.debugger.stop();
         self.monitor.stop();
         self.guard.stop();
+        self.ebpf_collector.stop();
 
         info!("Stopped components.")
     }

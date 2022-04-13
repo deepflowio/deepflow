@@ -117,6 +117,14 @@ pub struct AppProtoLogsBaseInfo {
     /* First L7 TCP Seq */
     pub req_tcp_seq: u32,
     pub resp_tcp_seq: u32,
+    /* EBPF Info */
+    pub process_id_0: u32,
+    pub process_id_1: u32,
+    pub process_kname_0: String,
+    pub process_kname_1: String,
+    pub syscall_trace_id_request: u64,
+    pub syscall_trace_id_response: u64,
+    pub syscall_trace_id_thread: u32,
 
     pub protocol: IpProtocol,
     pub is_vip_interface_src: bool,
@@ -159,7 +167,29 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
             is_vip_interface_dst: f.is_vip_interface_dst as u32,
             req_tcp_seq: f.req_tcp_seq,
             resp_tcp_seq: f.resp_tcp_seq,
+            process_id_0: f.process_id_0,
+            process_id_1: f.process_id_1,
+            process_kname_0: f.process_kname_0,
+            process_kname_1: f.process_kname_1,
+            syscall_trace_id_request: f.syscall_trace_id_request,
+            syscall_trace_id_response: f.syscall_trace_id_response,
+            syscall_trace_id_thread: f.syscall_trace_id_thread,
         }
+    }
+}
+
+impl AppProtoLogsBaseInfo {
+    // 请求调用回应来合并
+    fn merge(&mut self, log: AppProtoLogsBaseInfo) {
+        if log.process_id_0 > 0 {
+            self.process_id_0 = log.process_id_0;
+        }
+        if log.process_id_1 > 0 {
+            self.process_id_1 = self.process_id_1;
+        }
+        self.end_time = log.end_time;
+        self.resp_tcp_seq = log.resp_tcp_seq;
+        self.head.msg_type = LogMessageType::Session;
     }
 }
 
@@ -175,6 +205,18 @@ pub enum AppProtoLogsInfo {
 }
 
 impl AppProtoLogsInfo {
+    fn session_id(&self) -> u32 {
+        match self {
+            AppProtoLogsInfo::Dns(t) => t.trans_id as u32,
+            AppProtoLogsInfo::Mysql(_t) => 0,
+            AppProtoLogsInfo::Redis(_t) => 0,
+            AppProtoLogsInfo::Kafka(t) => t.correlation_id,
+            AppProtoLogsInfo::Dubbo(t) => t.serial_id as u32,
+            AppProtoLogsInfo::HttpV1(t) => t.stream_id,
+            AppProtoLogsInfo::HttpV2(t) => t.stream_id,
+        }
+    }
+
     fn merge(&mut self, other: Self) {
         match (self, other) {
             (Self::Dns(m), Self::Dns(o)) => m.merge(o),
@@ -211,8 +253,8 @@ pub struct AppProtoLogsData {
 
 impl fmt::Display for AppProtoLogsData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.base_info)?;
-        write!(f, "{}", self.special_info)
+        write!(f, "{}\n", self.base_info)?;
+        write!(f, "\t{}", self.special_info)
     }
 }
 
@@ -248,6 +290,15 @@ impl AppProtoLogsData {
             .encode(buf)
             .map(|_| pb_proto_logs_data.encoded_len())
     }
+
+    pub fn flow_session_id(&self) -> u64 {
+        self.base_info.flow_id << 32 | self.special_info.session_id() as u64
+    }
+
+    pub fn session_merge(&mut self, log: AppProtoLogsData) {
+        self.base_info.merge(log.base_info);
+        self.special_info.merge(log.special_info);
+    }
 }
 
 impl fmt::Display for AppProtoLogsBaseInfo {
@@ -256,6 +307,7 @@ impl fmt::Display for AppProtoLogsBaseInfo {
             f,
             "Timestamp: {:?} Vtap_id: {} Flow_id: {} TapType: {} TapPort: {} TapSide: {:?}\n \
                 \t{}_{}_{} -> {}_{}_{} Proto: {:?} Seq: {} -> {} VIP: {} -> {}\n \
+                \tProcess: {}:{} -> {}:{} Trace-id: {} -> {} Thread: {}\n \
                 \tL7Protocol: {:?} MsgType: {:?} Status: {:?} Code: {} Rrt: {}",
             self.start_time,
             self.vtap_id,
@@ -274,6 +326,13 @@ impl fmt::Display for AppProtoLogsBaseInfo {
             self.resp_tcp_seq,
             self.is_vip_interface_src,
             self.is_vip_interface_dst,
+            self.process_kname_0,
+            self.process_id_0,
+            self.process_kname_1,
+            self.process_id_1,
+            self.syscall_trace_id_request,
+            self.syscall_trace_id_response,
+            self.syscall_trace_id_thread,
             self.head.proto,
             self.head.msg_type,
             self.head.status,
@@ -283,8 +342,10 @@ impl fmt::Display for AppProtoLogsBaseInfo {
     }
 }
 
-impl<'a> From<&Box<MetaPacket<'a>>> for AppProtoLogsBaseInfo {
-    fn from(packet: &Box<MetaPacket<'a>>) -> Self {
+impl<'a> From<&MetaPacket<'a>> for AppProtoLogsBaseInfo {
+    fn from(packet: &MetaPacket<'a>) -> Self {
+        let is_src =
+            packet.direction == PacketDirection::ClientToServer && packet.lookup_key.l2_end_0;
         Self {
             start_time: packet.lookup_key.timestamp,
             end_time: packet.lookup_key.timestamp,
@@ -306,6 +367,25 @@ impl<'a> From<&Box<MetaPacket<'a>>> for AppProtoLogsBaseInfo {
             port_dst: packet.lookup_key.dst_port,
             protocol: packet.lookup_key.proto,
 
+            process_id_0: if is_src { packet.process_id } else { 0 },
+            process_id_1: if !is_src { packet.process_id } else { 0 },
+            process_kname_0: if is_src {
+                packet.process_name.clone()
+            } else {
+                "".to_string()
+            },
+            process_kname_1: if !is_src {
+                packet.process_name.clone()
+            } else {
+                "".to_string()
+            },
+
+            syscall_trace_id_request: if is_src { packet.syscall_trace_id } else { 0 },
+            syscall_trace_id_response: if !is_src { packet.syscall_trace_id } else { 0 },
+            req_tcp_seq: if is_src { packet.tcp_data.seq } else { 0 },
+            resp_tcp_seq: if !is_src { packet.tcp_data.seq } else { 0 },
+            syscall_trace_id_thread: packet.thread_id,
+
             vtap_id: 0,
             head: AppProtoHead {
                 msg_type: LogMessageType::Request,
@@ -314,8 +394,6 @@ impl<'a> From<&Box<MetaPacket<'a>>> for AppProtoLogsBaseInfo {
             },
             l3_epc_id_src: 0,
             l3_epc_id_dst: 0,
-            req_tcp_seq: 0,
-            resp_tcp_seq: 0,
             is_vip_interface_src: false,
             is_vip_interface_dst: false,
         }
@@ -328,6 +406,6 @@ pub trait L7LogParse: Send + Sync {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-    ) -> Result<()>;
+    ) -> Result<AppProtoHead>;
     fn info(&self) -> AppProtoLogsInfo;
 }

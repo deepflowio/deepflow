@@ -1,61 +1,293 @@
-use log::debug;
 use std::collections::HashMap;
 use std::ffi::CString;
-use std::sync::{Arc, Mutex};
-use std::thread;
+use std::sync::Arc;
+use std::thread::{self, JoinHandle};
+use std::time::Duration;
+
+use arc_swap::access::Access;
+use log::{debug, info};
+use lru::LruCache;
 
 use super::{Error, Result};
-
 use crate::common::enums::PacketDirection;
 use crate::common::flow::L7Protocol;
 use crate::common::meta_packet::MetaPacket;
+use crate::config::handler::EbpfAccess;
 use crate::ebpf;
 use crate::flow_generator::{
-    AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, DnsLog, DubboLog, HttpLog, KafkaLog,
-    L7LogParse, MysqlLog, RedisLog,
+    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, DnsLog, DubboLog,
+    HttpLog, KafkaLog, L7LogParse, LogMessageType, MysqlLog, RedisLog, Result as LogResult,
 };
-use crate::utils::queue::{bounded, Receiver, Sender};
+use crate::policy::PolicyGetter;
+use crate::sender::SendItem;
+use crate::utils::queue::{bounded, DebugSender, Receiver, Sender};
 
 type LoggerItem = (L7Protocol, Box<dyn L7LogParse>);
 
-pub struct EbpfCollector {
-    receiver: Arc<Mutex<Receiver<Box<MetaPacket<'static>>>>>,
+struct SessionAggr {
+    maps: [Option<HashMap<u64, AppProtoLogsData>>; 16],
+    start_time: u64, // 秒级时间
+    cache_count: u64,
+    last_flush_time: u64, // 秒级时间
+    slot_count: u64,
 
-    output: Sender<Box<AppProtoLogsData>>,
+    output: DebugSender<SendItem>,
+}
+
+impl SessionAggr {
+    // 尽力而为的聚合默认120秒(AppProtoLogs.aggr*SLOT_WIDTH)内的请求和响应
+    const SLOT_WIDTH: u64 = 60; // 每个slot存60秒
+    const SLOT_CACHED_COUNT: u64 = 100000; // 每个slot平均缓存的FLOW数
+
+    pub fn new(l7_log_session_timeout: Duration, output: DebugSender<SendItem>) -> Self {
+        let solt_count = l7_log_session_timeout.as_secs() / Self::SLOT_WIDTH;
+        let slot_count = solt_count.min(16).max(1) as usize;
+        Self {
+            slot_count: slot_count as u64,
+            output,
+            start_time: 0,
+            cache_count: 0,
+            last_flush_time: 0,
+            maps: [
+                Some(HashMap::new()),
+                Some(HashMap::new()),
+                Some(HashMap::new()),
+                Some(HashMap::new()),
+                Some(HashMap::new()),
+                Some(HashMap::new()),
+                Some(HashMap::new()),
+                Some(HashMap::new()),
+                Some(HashMap::new()),
+                Some(HashMap::new()),
+                Some(HashMap::new()),
+                Some(HashMap::new()),
+                Some(HashMap::new()),
+                Some(HashMap::new()),
+                Some(HashMap::new()),
+                Some(HashMap::new()),
+            ],
+        }
+    }
+
+    fn send(&self, log: AppProtoLogsData) {
+        debug!("ebpf_collector out: {}", log);
+        let _ = self.output.send(SendItem::L7FlowLog(log));
+    }
+
+    fn flush(&mut self, count: u64) -> u64 {
+        let n = count.min(self.slot_count);
+        for i in 0..n as usize {
+            let mut map = self.maps[i].take().unwrap();
+            for (_, log) in map.drain() {
+                self.send(log);
+            }
+            self.maps[i].replace(map);
+        }
+
+        if n != self.slot_count {
+            for i in n..self.slot_count {
+                let temp_back = self.maps[i as usize].take().unwrap();
+                let temp_front = self.maps[(i - n) as usize].take().unwrap();
+                self.maps[(i - n) as usize].replace(temp_back);
+                self.maps[i as usize].replace(temp_front);
+            }
+        }
+        self.start_time += count * Self::SLOT_WIDTH;
+
+        self.slot_count - 1
+    }
+
+    fn slot_handle(&mut self, log: AppProtoLogsData, slot_index: usize, key: u64, ttl: usize) {
+        let map = self.maps[slot_index as usize].as_mut().unwrap();
+
+        match log.base_info.head.msg_type {
+            LogMessageType::Request => {
+                let value = map.get(&key);
+                if value.is_none() {
+                    // 防止缓存过多的log
+                    if self.cache_count >= self.slot_count * Self::SLOT_CACHED_COUNT {
+                        self.send(log);
+                        return;
+                    }
+
+                    map.insert(key, log);
+                    self.cache_count += 1;
+                    return;
+                }
+                // 对于HTTPV1, requestID总为0, 连续出现多个request时，response匹配最后一个request为session
+                let item = value.unwrap().clone();
+                map.insert(key, log);
+                self.send(item);
+            }
+            LogMessageType::Response => {
+                let item = map.get(&key);
+                if item.is_none() {
+                    if ttl > 0 && slot_index != 0 {
+                        // 相应和请求可能不在同一个时间槽里，这里继续查询小的时间槽
+                        self.slot_handle(log, slot_index - 1, key, ttl - 1);
+                    } else {
+                        self.send(log);
+                    }
+                    return;
+                }
+                let mut item = item.unwrap().clone();
+                map.remove(&key);
+
+                let rrt = log.base_info.start_time - item.base_info.start_time;
+                item.session_merge(log);
+                item.base_info.head.rrt = rrt.as_micros() as u64;
+                self.send(item);
+            }
+            _ => {}
+        }
+    }
+
+    fn handle(&mut self, log: AppProtoLogsData) {
+        let solt_time = log.base_info.start_time.as_secs();
+        if solt_time < self.start_time {
+            return;
+        }
+        if self.start_time == 0 {
+            self.start_time = solt_time / Self::SLOT_WIDTH * Self::SLOT_WIDTH;
+        }
+
+        let mut slot_index = (solt_time - self.start_time) / Self::SLOT_WIDTH;
+        if slot_index >= self.slot_count {
+            slot_index = self.flush(slot_index - self.slot_count);
+        }
+
+        let key = log.flow_session_id();
+        self.slot_handle(log, slot_index as usize, key, 1);
+    }
+}
+
+struct FlowItem {
+    last_policy: u64, // 秒级
+    other_l3_epc: i32,
+
+    parser: Box<dyn L7LogParse>,
+}
+
+impl FlowItem {
+    const POLICY_INTERVAL: u64 = 10;
+
+    fn parse(&mut self, packet: &MetaPacket) -> LogResult<AppProtoHead> {
+        self.parser.parse(
+            packet.raw_from_ebpf.as_ref(),
+            packet.lookup_key.proto,
+            packet.direction,
+        )
+    }
+
+    fn get_info(&mut self) -> AppProtoLogsInfo {
+        self.parser.info()
+    }
+
+    fn handle(
+        &mut self,
+        packet: &MetaPacket,
+        policy_getter: Option<PolicyGetter>,
+        local_epc: i32,
+        vtap_id: u16,
+    ) -> Option<AppProtoLogsData> {
+        // 策略查询
+        let key = &packet.lookup_key;
+        if policy_getter.is_some()
+            && key.timestamp.as_secs() > self.last_policy + Self::POLICY_INTERVAL
+        {
+            self.last_policy = key.timestamp.as_secs();
+            if key.l2_end_0 {
+                self.other_l3_epc = policy_getter
+                    .unwrap()
+                    .lookup_all_by_epc(key.src_ip, key.dst_ip, local_epc, 0);
+            } else {
+                self.other_l3_epc = policy_getter
+                    .unwrap()
+                    .lookup_all_by_epc(key.src_ip, key.dst_ip, 0, local_epc);
+            }
+        }
+
+        // 应用解析
+        if let Ok(head) = self.parse(packet) {
+            // 获取日志信息
+            let info = self.get_info();
+            let mut base = AppProtoLogsBaseInfo::from(packet);
+            base.head = head;
+            if packet.direction == PacketDirection::ClientToServer && key.l2_end_0 {
+                base.l3_epc_id_src = local_epc;
+                base.l3_epc_id_dst = self.other_l3_epc;
+            } else {
+                base.l3_epc_id_src = self.other_l3_epc;
+                base.l3_epc_id_dst = local_epc;
+            }
+            base.vtap_id = vtap_id;
+            let data = AppProtoLogsData {
+                base_info: base,
+                special_info: info,
+            };
+            return Some(data);
+        }
+        return None;
+    }
+}
+
+pub struct EbpfCollector {
+    receiver: Arc<Receiver<MetaPacket<'static>>>,
+
+    // 策略查询
+    policy_getter: Option<PolicyGetter>,
+
+    // GRPC配置
+    config: EbpfAccess,
+
+    thread_handle: Option<JoinHandle<()>>,
+
+    output: DebugSender<SendItem>,
 }
 
 static mut SWITCH: bool = false;
-static mut SENDER: Option<Sender<Box<MetaPacket>>> = None;
+static mut SENDER: Option<Sender<MetaPacket>> = None;
 
 impl EbpfCollector {
+    const FLOW_MAP_SIZE: usize = 1 << 14;
+
     extern "C" fn callback(sd: *mut ebpf::SK_BPF_DATA) {
         unsafe {
             if !SWITCH || SENDER.is_none() {
                 return;
             }
-            let mut packet = MetaPacket::empty();
-            packet.update_from_ebpf(sd);
-            let _ = SENDER.as_mut().unwrap().send(Box::new(packet));
+            debug!("ebpf collector in: {:?}", *sd);
+
+            if let Ok(packet) = MetaPacket::new_from_ebpf(sd) {
+                let _ = SENDER.as_mut().unwrap().send(packet);
+            }
         }
     }
 
-    pub fn new(output: Sender<Box<AppProtoLogsData>>, log_path: &str) -> Result<Self> {
+    pub fn new(config: EbpfAccess, output: DebugSender<SendItem>) -> Result<Self> {
         unsafe {
             SWITCH = false;
-
-            let log_file = CString::new(log_path.as_bytes())
-                .unwrap()
-                .as_c_str()
-                .as_ptr();
+            let log_file = &config.load().log_path;
+            let log_file = if !log_file.is_empty() {
+                CString::new(log_file.as_bytes())
+                    .unwrap()
+                    .as_c_str()
+                    .as_ptr()
+            } else {
+                std::ptr::null()
+            };
 
             if ebpf::bpf_tracer_init(log_file, false) != 0 {
                 return Err(Error::EbpfInitError);
             }
-            let (s, r, _) = bounded::<Box<MetaPacket>>(1024);
+            let (s, r, _) = bounded::<MetaPacket>(1024);
             SENDER = Some(s);
             let e = EbpfCollector {
-                receiver: Arc::new(Mutex::new(r)),
+                receiver: Arc::new(r),
                 output,
+                policy_getter: None,
+                config,
+                thread_handle: None,
             };
 
             if ebpf::running_socket_tracer(
@@ -72,6 +304,7 @@ impl EbpfCollector {
             }
 
             ebpf::bpf_tracer_finish();
+            info!("ebpf collector init.");
             return Ok(e);
         }
     }
@@ -80,87 +313,90 @@ impl EbpfCollector {
         unsafe { Ok(ebpf::socket_tracer_stats()) }
     }
 
+    // 配置完成后需要重启
+    pub fn set_policy_getter(&mut self, policy: PolicyGetter) {
+        self.policy_getter = Some(policy);
+    }
+
     pub fn start(&mut self) {
-        unsafe { SWITCH = true }
-        let receiver = Arc::clone(&self.receiver);
-        let output = self.output.clone();
-
-        thread::spawn(move || {
-            fn parse(
-                log_parser: &mut HashMap<L7Protocol, Box<dyn L7LogParse>>,
-                packet: &Box<MetaPacket>,
-            ) -> Result<L7Protocol> {
-                if let Some(parser) = log_parser.get_mut(&packet.l7_protocol) {
-                    if let Ok(_) = parser.parse(
-                        packet.raw_from_ebpf.as_ref(),
-                        packet.lookup_key.proto,
-                        PacketDirection::ClientToServer,
-                    ) {
-                        return Ok(packet.l7_protocol);
-                    }
-                    return Err(Error::EbpfL7ParseError);
-                }
-
-                for (k, v) in log_parser.iter_mut() {
-                    if let Ok(_) = v.parse(
-                        packet.raw_from_ebpf.as_ref(),
-                        packet.lookup_key.proto,
-                        PacketDirection::ClientToServer,
-                    ) {
-                        return Ok(*k);
-                    }
-                }
-
-                return Err(Error::EbpfL7ParseError);
+        unsafe {
+            if SWITCH {
+                return;
             }
+            SWITCH = true;
+        }
+        info!("ebpf collector starting...");
+        let receiver = self.receiver.clone();
+        let policy_getter = self.policy_getter;
+        let config = self.config.clone();
 
-            fn get_info(
-                log_parser: &mut HashMap<L7Protocol, Box<dyn L7LogParse>>,
-                l7_protocol: L7Protocol,
-            ) -> Result<AppProtoLogsInfo> {
-                if let Some(parser) = log_parser.get(&l7_protocol) {
-                    return Ok(parser.info());
-                }
-                return Err(Error::EbpfL7ParseError);
-            }
+        let mut aggr = SessionAggr::new(config.load().l7_log_session_timeout, self.output.clone());
+        let mut flow_map: LruCache<u64, FlowItem> = LruCache::new(Self::FLOW_MAP_SIZE);
 
-            let mut parser: HashMap<L7Protocol, Box<dyn L7LogParse>> = HashMap::new();
-            let receiver = receiver.lock().unwrap();
-            parser.insert(L7Protocol::Dns, Box::new(DnsLog::default()));
-            parser.insert(L7Protocol::Http1, Box::new(HttpLog::default()));
-            parser.insert(L7Protocol::Http2, Box::new(HttpLog::default()));
-            parser.insert(L7Protocol::Mysql, Box::new(MysqlLog::default()));
-            parser.insert(L7Protocol::Redis, Box::new(RedisLog::default()));
-            parser.insert(L7Protocol::Kafka, Box::new(KafkaLog::default()));
-            parser.insert(L7Protocol::Dubbo, Box::new(DubboLog::default()));
+        self.thread_handle = Some(thread::spawn(move || {
             while unsafe { SWITCH } {
                 let packet = receiver.recv(None);
                 if packet.is_err() {
                     continue;
                 }
                 let packet = packet.as_ref().unwrap();
+                if packet.l7_protocol == L7Protocol::Unknown {
+                    // 未知协议不处理
+                    continue;
+                }
+                // 流聚合
+                let mut flow_item = flow_map.get_mut(&packet.socket_id);
+                if flow_item.is_none() {
+                    flow_map.put(
+                        packet.socket_id,
+                        FlowItem {
+                            last_policy: packet.lookup_key.timestamp.as_secs(),
+                            parser: get_parser(packet.l7_protocol),
+                            other_l3_epc: 0,
+                        },
+                    );
+                    flow_item = flow_map.get_mut(&packet.socket_id);
+                }
+                let flow_item = flow_item.unwrap();
 
-                if let Ok(l7_protocol) = parse(&mut parser, packet) {
-                    if let Ok(info) = get_info(&mut parser, l7_protocol) {
-                        let base = AppProtoLogsBaseInfo::from(packet);
-                        let data = AppProtoLogsData {
-                            base_info: base,
-                            special_info: info,
-                        };
-
-                        debug!("ebpf app log: {}", data);
-                        let _ = output.send(Box::new(data));
-                    }
+                let config = config.load();
+                if let Some(data) =
+                    flow_item.handle(packet, policy_getter, config.epc_id as i32, config.vtap_id)
+                {
+                    // 应用日志聚合
+                    aggr.handle(data);
                 }
             }
-        });
+
+            fn get_parser(protocol: L7Protocol) -> Box<dyn L7LogParse> {
+                match protocol {
+                    L7Protocol::Dns => Box::from(DnsLog::default()),
+                    L7Protocol::Http1 => Box::from(HttpLog::default()),
+                    L7Protocol::Http2 => Box::from(HttpLog::default()),
+                    L7Protocol::Mysql => Box::from(MysqlLog::default()),
+                    L7Protocol::Redis => Box::from(RedisLog::default()),
+                    L7Protocol::Kafka => Box::from(KafkaLog::default()),
+                    L7Protocol::Dubbo => Box::from(DubboLog::default()),
+                    _ => panic!("get_parser unknown protocol."),
+                }
+            }
+        }));
     }
 
-    pub fn stop(&self) {
-        unsafe { SWITCH = false }
+    pub fn stop(&mut self) {
+        unsafe {
+            if !SWITCH {
+                return;
+            }
+            SWITCH = false;
+            ebpf::tracer_stop();
+            if let Some(handler) = self.thread_handle.take() {
+                let _ = handler.join();
+            }
+            info!("ebpf collector stopped.");
+        }
     }
 }
-
 #[cfg(test)]
 mod tests {
     #[test]

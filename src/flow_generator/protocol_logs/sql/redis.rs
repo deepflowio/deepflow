@@ -1,6 +1,8 @@
 use std::{fmt, str};
 
-use super::super::{AppProtoLogsInfo, L7LogParse, L7Protocol, LogMessageType};
+use super::super::{
+    AppProtoHead, AppProtoLogsInfo, L7LogParse, L7Protocol, L7ResponseStatus, LogMessageType,
+};
 
 use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::flow_generator::error::{Error, Result};
@@ -67,11 +69,12 @@ impl From<RedisInfo> for flow_log::RedisInfo {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct RedisLog {
     info: RedisInfo,
     l7_proto: L7Protocol,
     msg_type: LogMessageType,
+    status: L7ResponseStatus,
 }
 
 impl RedisLog {
@@ -94,9 +97,13 @@ impl RedisLog {
             return;
         }
 
+        self.status = L7ResponseStatus::Ok;
         match context[0] {
             b'+' => self.info.status = context,
-            b'-' if error_response => self.info.error = context,
+            b'-' if error_response => {
+                self.info.error = context;
+                self.status = L7ResponseStatus::ServerError;
+            }
             b'-' if !error_response => self.info.response = context,
             _ => self.info.response = context,
         }
@@ -109,7 +116,7 @@ impl L7LogParse for RedisLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-    ) -> Result<()> {
+    ) -> Result<AppProtoHead> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -122,7 +129,13 @@ impl L7LogParse for RedisLog {
             PacketDirection::ClientToServer => self.fill_request(context),
             PacketDirection::ServerToClient => self.fill_response(context, error_response),
         };
-        Ok(())
+        Ok(AppProtoHead {
+            proto: L7Protocol::Redis,
+            msg_type: self.msg_type,
+            status: self.status,
+            code: 0,
+            rrt: 0,
+        })
     }
 
     fn info(&self) -> AppProtoLogsInfo {
