@@ -40,7 +40,10 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 		}
 		return result, nil, nil
 	}
-
+	debug := &client.Debug{
+		IP:        config.Cfg.Clickhouse.Host,
+		QueryUUID: query_uuid,
+	}
 	parser := parse.Parser{Engine: e}
 	err = parser.ParseSQL(sql)
 	if err != nil {
@@ -48,6 +51,7 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 		return nil, nil, err
 	}
 	chSql := e.ToSQLString()
+	debug.Sql = chSql
 	log.Debugf("query_uuid: %s | trans sql: %s", query_uuid, chSql)
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
@@ -55,20 +59,19 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 		UserName: config.Cfg.Clickhouse.User,
 		Password: config.Cfg.Clickhouse.Password,
 		DB:       e.DB,
+		Debug:    debug,
 	}
 	err = chClient.Init(query_uuid)
 	if err != nil {
 		log.Error(err)
-		return nil, nil, err
+		return nil, debug.Get(), err
 	}
 	rst, err := chClient.DoQuery(chSql)
-	debug := chClient.Debug.Get()
 	if err != nil {
-		log.Error(err)
 		log.Error(chClient.Debug)
-		return nil, nil, err
+		return nil, debug.Get(), err
 	}
-	return rst, debug, err
+	return rst, debug.Get(), err
 }
 
 func (e *CHEngine) Init() {

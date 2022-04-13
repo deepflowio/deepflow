@@ -23,9 +23,11 @@ type Client struct {
 
 func (c *Client) Init(query_uuid string) error {
 	if c.Debug == nil {
-		c.Debug = &Debug{QueryUUID: query_uuid}
+		c.Debug = &Debug{
+			QueryUUID: query_uuid,
+			IP:        c.Host,
+		}
 	}
-	c.Debug.IP = c.Host
 	url := fmt.Sprintf("tcp://%s:%d?username=%s&password=%s&query_id=%s", c.Host, c.Port, c.UserName, c.Password, query_uuid)
 	if c.DB != "" {
 		url = fmt.Sprintf("%s&database=%s", url, c.DB)
@@ -49,10 +51,12 @@ func (c *Client) DoQuery(sql string) (map[string][]interface{}, error) {
 	c.Debug.QueryTime = int64(queryTime)
 	if err != nil {
 		log.Errorf("query clickhouse Error: %s, sql: %s, query_uuid: %s", err, sql, c.Debug.QueryUUID)
+		c.Debug.Error = fmt.Sprintf("%s", err)
 		return nil, err
 	}
 	columns, err := rows.ColumnTypes()
 	if err != nil {
+		c.Debug.Error = fmt.Sprintf("%s", err)
 		return nil, err
 	}
 	result := make(map[string][]interface{})
@@ -67,12 +71,14 @@ func (c *Client) DoQuery(sql string) (map[string][]interface{}, error) {
 	for rows.Next() {
 		row, err := rows.SliceScan()
 		if err != nil {
+			c.Debug.Error = fmt.Sprintf("%s", err)
 			return nil, err
 		}
 		var values []interface{}
 		for i, rawValue := range row {
 			value, err := TransType(columnTypes[i], rawValue)
 			if err != nil {
+				c.Debug.Error = fmt.Sprintf("%s", err)
 				return nil, err
 			}
 			//TODO: callback

@@ -9,6 +9,7 @@ type Debug struct {
 	Sql       string
 	QueryTime int64
 	QueryUUID string
+	Error     string
 }
 
 func (s *Debug) Get() map[string]interface{} {
@@ -17,11 +18,13 @@ func (s *Debug) Get() map[string]interface{} {
 		"sql":        s.Sql,
 		"query_time": fmt.Sprintf("%.9fs", float64(s.QueryTime)/1e9),
 		"query_uuid": s.QueryUUID,
+		"error":      s.Error,
 	}
 }
 
 func (s *Debug) String() string {
 	return fmt.Sprintf(
-		"| ip: %s | sql: %s | query_time: %.9fs | query_uuid: %s |", s.IP, s.Sql, float64(s.QueryTime)/1e9, s.QueryUUID,
+		"| ip: %s | sql: %s | query_time: %.9fs | query_uuid: %s | error: %s |",
+		s.IP, s.Sql, float64(s.QueryTime)/1e9, s.QueryUUID, s.Error,
 	)
 }

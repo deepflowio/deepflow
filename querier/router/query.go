@@ -23,7 +23,7 @@ func executeQuery() gin.HandlerFunc {
 		args["db"] = c.PostForm("db")
 		args["sql"] = c.PostForm("sql")
 		result, debug, err := service.Execute(args)
-		if args["debug"] != "true" {
+		if err == nil && args["debug"] != "true" {
 			debug = nil
 		}
 		JsonResponse(c, result, debug, err)
