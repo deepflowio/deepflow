@@ -43,16 +43,16 @@ parse/
           ],
           "values": [
               [
-                "vm",
-                "vm_0",
-                "vm_1",
+                "chost",
+                "chost_0",
+                "chost_1",
                 "云服务器",
                 "resource_id"
               ],
               [
-                "vm_name",
-                "vm_name_0",
-                "vm_name_1",
+                "chost_name",
+                "chost_name_0",
+                "chost_name_1",
                 "云服务器名称",
                 "resource_name"
               ]
@@ -140,7 +140,7 @@ parse/
 
 Tag字段特殊说明
 ---------------
-- 自动分组全展开字段
+- 自动分组-全展开字段
   ```
   resource_type_gl0
   resource_gl0 或 resource_name_gl0
@@ -234,14 +234,14 @@ clickhouse指标量及算子特殊处理：
           groupArrayIf(rtt_sum, rtt_sum != 0) AS _rtt_sum,
       FROM vtap_flow_port.`1m`
   )
-  
+
   ```
 
 - Percentage比例类及Quotient商值类
   - 内层使用sum(x)/sum(y)
   - 外层常规算子计算
   - Percentage比例类FillNullAsZero为true，会将null值作为0值处理
-  
+
   ```
 
   SELECT MAX(_div__sum_l7_request__sum_l7_response) AS max_l7_error_ratio

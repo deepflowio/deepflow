@@ -35,14 +35,14 @@ var tagTypeToOperators = map[string][]string{
 	"default":     []string{"=", "!="},
 }
 var TAG_RESOURCE_TYPE_DEVICE_MAP = map[string]int{
-	"vm":          VIF_DEVICE_TYPE_VM,
+	"chost":       VIF_DEVICE_TYPE_VM,
 	"router":      VIF_DEVICE_TYPE_VROUTER,
-	"dhcp_port":   VIF_DEVICE_TYPE_DHCP_PORT,
+	"dhcpgw":      VIF_DEVICE_TYPE_DHCP_PORT,
 	"pod_service": VIF_DEVICE_TYPE_POD_SERVICE,
 	"redis":       VIF_DEVICE_TYPE_REDIS_INSTANCE,
 	"rds":         VIF_DEVICE_TYPE_RDS_INSTANCE,
 	"lb":          VIF_DEVICE_TYPE_LB,
-	"nat_gateway": VIF_DEVICE_TYPE_NAT_GATEWAY,
+	"natgw":       VIF_DEVICE_TYPE_NAT_GATEWAY,
 	"host":        VIF_DEVICE_TYPE_HOST,
 }
 

@@ -25,16 +25,16 @@ const (
 )
 
 var AutoMap = map[string]int{
-	"vm":          VIF_DEVICE_TYPE_VM,
+	"chost":       VIF_DEVICE_TYPE_VM,
 	"router":      VIF_DEVICE_TYPE_VROUTER,
 	"host":        VIF_DEVICE_TYPE_HOST,
-	"dhcp_port":   VIF_DEVICE_TYPE_DHCP_PORT,
+	"dhcpgw":      VIF_DEVICE_TYPE_DHCP_PORT,
 	"pod_service": VIF_DEVICE_TYPE_POD_SERVICE,
 	"redis":       VIF_DEVICE_TYPE_REDIS_INSTANCE,
 	"rds":         VIF_DEVICE_TYPE_RDS_INSTANCE,
 	"pod_node":    VIF_DEVICE_TYPE_POD_NODE,
 	"lb":          VIF_DEVICE_TYPE_LB,
-	"nat_gateway": VIF_DEVICE_TYPE_NAT_GATEWAY,
+	"natgw":       VIF_DEVICE_TYPE_NAT_GATEWAY,
 	"internet":    VIF_DEVICE_TYPE_INTERNET,
 }
 

@@ -131,7 +131,7 @@ var L4_FLOW_LOG_METRICS_REPLACE = map[string]*Metrics{
 	"pod_group_0":   NewReplaceMetrics("pod_group_id_0", "NOT (pod_group_id_0 = 0)"),
 	"pod_0":         NewReplaceMetrics("pod_id_0", "NOT (pod_id_0 = 0)"),
 	"host_0":        NewReplaceMetrics("host_id_0", "NOT (host_id_0 = 0)"),
-	"vm_0":          NewReplaceMetrics("[l3_device_id_0, l3_device_type_0]", "(NOT (l3_device_id_0 = 0)) AND (l3_device_type_0 = 1)"),
+	"chost_0":       NewReplaceMetrics("[l3_device_id_0, l3_device_type_0]", "(NOT (l3_device_id_0 = 0)) AND (l3_device_type_0 = 1)"),
 	"region_0":      NewReplaceMetrics("region_id_0", "NOT (region_id_0 = 0)"),
 	"az_0":          NewReplaceMetrics("az_id_0", "NOT (az_id_0 = 0)"),
 	"vpc_1":         NewReplaceMetrics("l3_epc_id_1", "NOT (l3_epc_id_1 = -2)"),
@@ -143,7 +143,7 @@ var L4_FLOW_LOG_METRICS_REPLACE = map[string]*Metrics{
 	"pod_group_1":   NewReplaceMetrics("pod_group_id_1", "NOT (pod_group_id_1 = 0)"),
 	"pod_1":         NewReplaceMetrics("pod_id_1", "NOT (pod_id_1 = 0)"),
 	"host_1":        NewReplaceMetrics("host_id_1", "NOT (host_id_1 = 0)"),
-	"vm_1":          NewReplaceMetrics("[toString(l3_device_id_1), toString(l3_device_type_1)]", "(NOT (l3_device_id_1 = 0)) AND (l3_device_type_1 = 1)"),
+	"chost_1":       NewReplaceMetrics("[toString(l3_device_id_1), toString(l3_device_type_1)]", "(NOT (l3_device_id_1 = 0)) AND (l3_device_type_1 = 1)"),
 	"region_1":      NewReplaceMetrics("region_id_1", "NOT (region_id_1 = 0)"),
 	"az_1":          NewReplaceMetrics("az_id_1", "NOT (az_id_1 = 0)"),
 }

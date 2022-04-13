@@ -9,14 +9,14 @@ import (
 
 var TagResoureMap = GenerateTagResoureMap()
 var DEVICE_MAP = map[string]int{
-	"vm":          VIF_DEVICE_TYPE_VM,
+	"chost":       VIF_DEVICE_TYPE_VM,
 	"router":      VIF_DEVICE_TYPE_VROUTER,
-	"dhcp_port":   VIF_DEVICE_TYPE_DHCP_PORT,
+	"dhcpgw":      VIF_DEVICE_TYPE_DHCP_PORT,
 	"pod_service": VIF_DEVICE_TYPE_POD_SERVICE,
 	"redis":       VIF_DEVICE_TYPE_REDIS_INSTANCE,
 	"rds":         VIF_DEVICE_TYPE_RDS_INSTANCE,
 	"lb":          VIF_DEVICE_TYPE_LB,
-	"nat_gateway": VIF_DEVICE_TYPE_NAT_GATEWAY,
+	"natgw":       VIF_DEVICE_TYPE_NAT_GATEWAY,
 }
 
 func GenerateTagResoureMap() map[string]map[string]*Tag {
@@ -129,7 +129,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 
 	// device资源
 	for resourceStr, deviceTypeValue := range DEVICE_MAP {
-		if common.IsValueInSliceString(resourceStr, []string{"pod_service", "nat_gateway", "lb"}) {
+		if common.IsValueInSliceString(resourceStr, []string{"pod_service", "natgw", "lb"}) {
 			continue
 		}
 		deviceTypeValueStr := strconv.Itoa(deviceTypeValue)
@@ -288,7 +288,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	}
 
 	// 关联资源
-	for _, relatedResourceStr := range []string{"pod_service", "pod_ingress", "nat_gateway", "lb", "lb_listener"} {
+	for _, relatedResourceStr := range []string{"pod_service", "pod_ingress", "natgw", "lb", "lb_listener"} {
 		// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
 		for _, suffix := range []string{"", "_0", "_1"} {
 			relatedResourceID := relatedResourceStr + "_id"
@@ -301,7 +301,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			idTagTranslator := ""
 			nameTagTranslator := ""
 			notNullFilter := ""
-			if common.IsValueInSliceString(relatedResourceStr, []string{"pod_service", "nat_gateway", "lb"}) {
+			if common.IsValueInSliceString(relatedResourceStr, []string{"pod_service", "natgw", "lb"}) {
 				deviceTypeValueStr := strconv.Itoa(DEVICE_MAP[relatedResourceStr])
 				deviceIDSuffix := "l3_device_id" + suffix
 				deviceTypeSuffix := "l3_device_type" + suffix
