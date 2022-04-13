@@ -29,8 +29,8 @@ use recv_engine::{
 
 use crate::{
     common::{enums::TapType, PlatformData, TaggedFlow, TapTyper},
-    config::RuntimeConfig,
-    flow_generator::{FlowMapConfig, MetaAppProto},
+    config::{handler::FlowAccess, RuntimeConfig},
+    flow_generator::MetaAppProto,
     handler::{PacketHandler, PacketHandlerBuilder},
     platform::LibvirtXmlExtractor,
     proto::{
@@ -159,7 +159,7 @@ pub struct DpdkRingPortConf {
     pub port_name: String,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct BpfOptions {
     // bpf_instructions
     pub bpf_syntax: String,
@@ -293,8 +293,8 @@ pub struct DispatcherBuilder {
     libvirt_xml_extractor: Option<Arc<LibvirtXmlExtractor>>,
     flow_output_queue: Option<Sender<TaggedFlow>>,
     log_output_queue: Option<Sender<MetaAppProto>>,
-    flow_map_config: Option<FlowMapConfig>,
     stats_collector: Option<Arc<Collector>>,
+    flow_map_config: Option<FlowAccess>,
 }
 
 impl DispatcherBuilder {
@@ -367,13 +367,13 @@ impl DispatcherBuilder {
         self
     }
 
-    pub fn flow_map_config(mut self, v: FlowMapConfig) -> Self {
-        self.flow_map_config = Some(v);
+    pub fn stats_collector(mut self, v: Arc<Collector>) -> Self {
+        self.stats_collector = Some(v);
         self
     }
 
-    pub fn stats_collector(mut self, v: Arc<Collector>) -> Self {
-        self.stats_collector = Some(v);
+    pub fn flow_map_config(mut self, v: FlowAccess) -> Self {
+        self.flow_map_config = Some(v);
         self
     }
 
@@ -476,11 +476,11 @@ impl DispatcherBuilder {
 
             counter: counter.clone(),
             terminated: terminated.clone(),
+            stats: collector.clone(),
             flow_map_config: self
                 .flow_map_config
                 .take()
-                .ok_or(Error::ConfigIncomplete("no flow_map_config".into()))?,
-            stats: collector.clone(),
+                .ok_or(Error::ConfigIncomplete("no flow map config".into()))?,
         };
         collector.register_countable(
             "dispatcher",

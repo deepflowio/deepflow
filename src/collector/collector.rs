@@ -11,6 +11,7 @@ use std::{
     time::Duration,
 };
 
+use arc_swap::access::Access;
 use log::{debug, info, warn};
 
 use super::{
@@ -22,11 +23,12 @@ use crate::{
         enums::{EthernetType, IpProtocol},
         flow::{get_direction, Flow, FlowSource, L7Protocol},
     },
+    config::handler::CollectorAccess,
     metric::{
         document::{Code, Direction, Document, DocumentFlag, TagType, Tagger},
         meter::{FlowMeter, Meter, UsageMeter},
     },
-    proto::common::TridentType,
+    rpc::get_timestamp,
     sender::SendItem,
     utils::{
         hasher::Jenkins64Hasher,
@@ -260,18 +262,12 @@ struct Stash {
     slot_interval: u64,
     inner: HashMap<StashKey, Document, Jenkins64Hasher>,
     global_thread_id: u8,
-    inactive_server_port_enabled: Arc<AtomicBool>,
     doc_flag: DocumentFlag,
     context: Context,
 }
 
 impl Stash {
-    fn new(
-        ctx: Context,
-        sender: Sender<SendItem>,
-        counter: Arc<CollectorCounter>,
-        inactive_server_port_enabled: Arc<AtomicBool>,
-    ) -> Self {
+    fn new(ctx: Context, sender: Sender<SendItem>, counter: Arc<CollectorCounter>) -> Self {
         let (slot_interval, doc_flag) = match ctx.metric_type {
             MetricsType::SECOND => (1, DocumentFlag::PER_SECOND_METRICS),
             _ => (60, DocumentFlag::NONE),
@@ -281,7 +277,6 @@ impl Stash {
             sender,
             counter,
             start_time: Duration::ZERO,
-            inactive_server_port_enabled,
             global_thread_id: ctx.id as u8 + 1,
             slot_interval,
             inner: HashMap::with_hasher(Jenkins64Hasher::default()),
@@ -343,8 +338,8 @@ impl Stash {
         // 全景图统计
         let (src, dst, is_extra_tracing_doc) = get_direction(
             flow,
-            self.context.trident_type,
-            self.context.cloud_gateway_traffic,
+            self.context.config.load().trident_type,
+            self.context.config.load().cloud_gateway_traffic,
         );
         let directions = [src, dst];
 
@@ -372,7 +367,7 @@ impl Stash {
         }
 
         time_in_second = time_in_second / self.slot_interval * self.slot_interval;
-        let timestamp = rpc::get_timestamp();
+        let timestamp = get_timestamp();
 
         let start_time = self.start_time.as_secs();
         if time_in_second > start_time {
@@ -465,7 +460,7 @@ impl Stash {
         };
         let mut tagger = Tagger {
             global_thread_id: self.global_thread_id,
-            vtap_id: self.context.vtap_id,
+            vtap_id: self.context.config.load().vtap_id,
             mac: if !has_mac {
                 MacAddr::ZERO
             } else if ep == FLOW_METRICS_PEER_SRC {
@@ -483,7 +478,7 @@ impl Stash {
             server_port: if ep == 0
                 || Self::ignore_server_port(
                     flow,
-                    self.inactive_server_port_enabled.load(Ordering::Relaxed),
+                    self.context.config.load().inactive_server_port_enabled,
                 ) {
                 0
             } else {
@@ -581,7 +576,7 @@ impl Stash {
 
         let mut tagger = Tagger {
             global_thread_id: self.global_thread_id,
-            vtap_id: self.context.vtap_id,
+            vtap_id: self.context.config.load().vtap_id,
             mac: src_mac,
             mac1: dst_mac,
             ip: src_ip,
@@ -594,7 +589,7 @@ impl Stash {
             tap_type: flow_key.tap_type,
             server_port: if Self::ignore_server_port(
                 flow,
-                self.inactive_server_port_enabled.load(Ordering::Relaxed),
+                self.context.config.load().inactive_server_port_enabled,
             ) {
                 0
             } else {
@@ -692,15 +687,13 @@ impl Stash {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct Context {
     id: u32,
     name: &'static str,
     delay_seconds: u64,
     metric_type: MetricsType,
-    vtap_id: u16,
-    cloud_gateway_traffic: bool,
-    trident_type: TridentType,
+    config: CollectorAccess,
 }
 
 pub struct Collector {
@@ -709,7 +702,6 @@ pub struct Collector {
     thread: Mutex<Option<JoinHandle<()>>>,
     receiver: Arc<Receiver<AccumulatedFlow>>,
     sender: Sender<SendItem>,
-    inactive_server_port_enabled: Arc<AtomicBool>,
 
     context: Context,
 }
@@ -721,11 +713,8 @@ impl Collector {
         sender: Sender<SendItem>,
         metric_type: MetricsType,
         delay_seconds: u32,
-        vtap_id: u16,
-        inactive_server_port_enabled: Arc<AtomicBool>, // 从runtime config 获取
-        cloud_gateway_traffic: bool,                   // 从static config 获取
-        trident_type: TridentType,                     // 从runtime config 获取
         stats: &Arc<stats::Collector>,
+        config: CollectorAccess,
     ) -> Self {
         let delay_seconds = delay_seconds as u64;
         let name = match metric_type {
@@ -756,15 +745,12 @@ impl Collector {
             thread: Mutex::new(None),
             receiver: Arc::new(receiver),
             sender,
-            inactive_server_port_enabled,
             context: Context {
                 id,
                 name,
                 delay_seconds,
                 metric_type,
-                vtap_id,
-                cloud_gateway_traffic,
-                trident_type,
+                config,
             },
         }
     }
@@ -778,20 +764,20 @@ impl Collector {
         let counter = self.counter.clone();
         let receiver = self.receiver.clone();
         let sender = self.sender.clone();
-        let inactive_server_port_enabled = self.inactive_server_port_enabled.clone();
-        let ctx = self.context;
+        let ctx = self.context.clone();
 
         let thread = thread::spawn(move || {
-            let mut stash = Stash::new(ctx, sender, counter, inactive_server_port_enabled);
+            let mut stash = Stash::new(ctx, sender, counter);
             while running.load(Ordering::Relaxed) {
                 match receiver.recv_n(QUEUE_BATCH_SIZE, Some(RCV_TIMEOUT)) {
                     Ok(acc_flows) => {
                         for flow in acc_flows {
+                            info!("{}", flow);
                             let time_in_second = flow.tagged_flow.flow.start_time.as_secs();
                             stash.collect(flow, time_in_second);
                         }
                     }
-                    Err(Error::Timeout) => stash.flush(rpc::get_timestamp().as_secs()),
+                    Err(Error::Timeout) => stash.flush(get_timestamp().as_secs()),
                     Err(Error::Terminated(..)) => break,
                 }
             }
@@ -811,24 +797,7 @@ impl Collector {
         }
         info!("{} id=({}) stopped", self.context.name, self.context.id);
     }
-
-    /// Set the collector's inactive server port enabled.
-    pub fn set_inactive_server_port_enabled(&self, inactive_server_port_enabled: bool) {
-        self.inactive_server_port_enabled
-            .swap(inactive_server_port_enabled, Ordering::Relaxed);
-    }
 }
-
-//TODO 测试用的，等rpc模块完成就要去掉，调用真正的rpc
-mod rpc {
-    use std::time::{Duration, SystemTime};
-    pub fn get_timestamp() -> Duration {
-        SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-    }
-}
-//END
 
 #[cfg(test)]
 mod tests {

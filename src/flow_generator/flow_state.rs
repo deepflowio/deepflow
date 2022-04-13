@@ -665,18 +665,6 @@ impl StateMachine {
     }
 }
 
-//TODO 测试用的，等rpc模块完成就要去掉，调用真正的rpc
-mod rpc {
-    use std::time::Duration;
-    use std::time::SystemTime;
-    pub fn get_timestamp() -> Duration {
-        SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-    }
-}
-// END
-
 #[cfg(test)]
 mod tests {
     use std::convert::AsRef;
@@ -697,6 +685,7 @@ mod tests {
     use crate::flow_generator::flow_node::FlowNode;
     use crate::flow_generator::{FlowTimeout, TcpTimeout};
     use crate::flow_generator::{FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC, TIME_UNIT};
+    use crate::rpc::get_timestamp;
     use crate::utils::test::Capture;
 
     const FILE_DIR: &'static str = "resources/test/flow_generator";
@@ -823,7 +812,7 @@ mod tests {
                 },
             }));
 
-            pkt.lookup_key.timestamp = rpc::get_timestamp() + (pkt.lookup_key.timestamp - delta);
+            pkt.lookup_key.timestamp = get_timestamp() + (pkt.lookup_key.timestamp - delta);
             last_timestamp = pkt.lookup_key.timestamp;
             flow_map.inject_meta_packet(pkt);
         }

@@ -291,6 +291,7 @@ impl Synchronizer {
             warn!("invalid response from {} without config", remote);
             return;
         }
+        let new_config = config.clone();
         let runtime_config = config.unwrap().try_into();
         if let Err(e) = runtime_config {
             warn!(
@@ -330,7 +331,8 @@ impl Synchronizer {
         }
 
         let (trident_state, cvar) = &**trident_state;
-        *trident_state.lock().unwrap() = trident::State::ConfigChanged(runtime_config);
+        *trident_state.lock().unwrap() =
+            trident::State::ConfigChanged((runtime_config, new_config.unwrap()));
         cvar.notify_one();
     }
 

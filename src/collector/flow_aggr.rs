@@ -45,7 +45,7 @@ impl FlowAggrThread {
         id: usize,
         input: Receiver<Arc<TaggedFlow>>,
         output: Sender<SendItem>,
-        l4_log_store_tap_types: &[u32],
+        l4_log_store_tap_types: [bool; 256],
         throttle: Arc<AtomicU64>,
     ) -> Self {
         let running = Arc::new(AtomicBool::new(false));
@@ -96,14 +96,10 @@ impl FlowAggr {
     pub fn new(
         input: Receiver<Arc<TaggedFlow>>,
         output: Sender<SendItem>,
-        l4_log_store_tap_types: &[u32],
+        l4_log_store_tap_types: [bool; 256],
         throttle: Arc<AtomicU64>,
         running: Arc<AtomicBool>,
     ) -> Self {
-        let mut tap_types = [false; TAPTYPE_MAX];
-        for i in 0..l4_log_store_tap_types.len() {
-            tap_types[l4_log_store_tap_types[i] as usize] = true;
-        }
         let mut stashs = VecDeque::new();
         for _ in 0..MINUTE_SLOTS {
             stashs.push_front(HashMap::new())
@@ -117,7 +113,7 @@ impl FlowAggr {
                     - Duration::from_secs(SECONDS_IN_MINUTE),
             ),
             last_flush_time: Duration::ZERO,
-            l4_log_store_tap_types: tap_types,
+            l4_log_store_tap_types,
             running,
             counter: FlowAggrCounter::default(),
         }

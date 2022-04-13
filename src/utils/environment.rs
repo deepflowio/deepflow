@@ -1,14 +1,4 @@
-use std::{
-    net::IpAddr,
-    path::Path,
-    process::exit,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-    thread,
-    time::Duration,
-};
+use std::{net::IpAddr, path::Path, process::exit, thread, time::Duration};
 
 use bytesize::ByteSize;
 use log::{error, warn};
@@ -16,6 +6,7 @@ use sysinfo::{DiskExt, System, SystemExt};
 
 use crate::common::TRIDENT_PROCESS_LIMIT;
 use crate::error::{Error, Result};
+use crate::proto::common::TridentType;
 
 use super::net::get_link_enabled_features;
 use super::process::{get_memory_rss, get_process_num_by_name};
@@ -110,8 +101,8 @@ pub fn free_memory_check(required: u64) -> Result<()> {
         })
 }
 
-pub fn free_memory_checker(required: Arc<AtomicU64>) -> Checker {
-    Box::new(move || free_memory_check(required.load(Ordering::Relaxed)))
+pub fn free_memory_checker(required: u64) -> Checker {
+    Box::new(move || free_memory_check(required))
 }
 
 pub fn free_space_check<P: AsRef<Path>>(path: P, required: u64) -> Result<()> {
@@ -200,6 +191,10 @@ pub fn trident_process_check() {
             warn!("{}", e);
         }
     }
+}
+
+pub fn is_tt_pod(trident_type: TridentType) -> bool {
+    trident_type == TridentType::TtHostPod || trident_type == TridentType::TtVmPod
 }
 
 //TODO Windows 相关

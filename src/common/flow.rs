@@ -994,6 +994,15 @@ pub fn get_direction(
                             Direction::ServerNodeToClient,
                             add_tracing_doc,
                         );
+                    } else if tunnel_tier > 0 {
+                        // tunnelTier > 0：容器节点的出口做隧道封装
+                        // 例如：两个容器节点之间打隧道，隧道内层IP为tunl0接口的/32隧道专用IP
+                        // 但由于tunl0接口有时候没有MAC，不会被控制器记录，因此不会匹配isLocalIp的条件
+                        return (
+                            Direction::ClientNodeToServer,
+                            Direction::ServerNodeToClient,
+                            add_tracing_doc,
+                        );
                     }
                     // 其他情况
                     // 举例：在tun0接收到的、本地POD发送到容器节点外部的流量

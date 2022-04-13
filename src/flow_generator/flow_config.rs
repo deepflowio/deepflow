@@ -26,7 +26,7 @@ impl Default for TcpTimeout {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct FlowTimeout {
     pub opening: Duration,
     pub established: Duration,
