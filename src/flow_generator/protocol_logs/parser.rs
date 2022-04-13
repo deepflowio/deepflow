@@ -199,14 +199,14 @@ struct SessionQueue {
     rng: SmallRng,
 
     counter: Arc<SessionAggrCounter>,
-    output_queue: Arc<DebugSender<SendItem>>,
+    output_queue: DebugSender<SendItem>,
 }
 
 impl SessionQueue {
     fn new(
         throttle: Arc<AtomicUsize>,
         counter: Arc<SessionAggrCounter>,
-        output_queue: Arc<DebugSender<SendItem>>,
+        output_queue: DebugSender<SendItem>,
         window_size: usize,
     ) -> Self {
         //l7_log_session_timeout 20s-300s ，window_size = 2-30，所以 SessionQueue.time_window 预分配内存
@@ -483,7 +483,7 @@ struct AppLogs {
 
 pub struct AppProtoLogsParser {
     input_queue: Arc<Receiver<MetaAppProto>>,
-    output_queue: Arc<DebugSender<SendItem>>,
+    output_queue: DebugSender<SendItem>,
     id: u32,
     window_size: usize,
     throttle: Arc<AtomicUsize>,
@@ -507,7 +507,7 @@ impl AppProtoLogsParser {
         (
             Self {
                 input_queue: Arc::new(input_queue),
-                output_queue: Arc::new(output_queue),
+                output_queue,
                 id,
                 throttle: Arc::new(AtomicUsize::new(throttle * THROTTLE_BUCKET)),
                 window_size: (l7_log_session_timeout.as_secs() / SLOT_WIDTH) as usize,

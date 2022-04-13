@@ -254,7 +254,7 @@ impl StashKey {
 }
 
 struct Stash {
-    sender: Arc<Sender<SendItem>>,
+    sender: Sender<SendItem>,
     counter: Arc<CollectorCounter>,
     start_time: Duration,
     slot_interval: u64,
@@ -268,7 +268,7 @@ struct Stash {
 impl Stash {
     fn new(
         ctx: Context,
-        sender: Arc<Sender<SendItem>>,
+        sender: Sender<SendItem>,
         counter: Arc<CollectorCounter>,
         inactive_server_port_enabled: Arc<AtomicBool>,
     ) -> Self {
@@ -708,7 +708,7 @@ pub struct Collector {
     running: Arc<AtomicBool>,
     thread: Mutex<Option<JoinHandle<()>>>,
     receiver: Arc<Receiver<AccumulatedFlow>>,
-    sender: Arc<Sender<SendItem>>,
+    sender: Sender<SendItem>,
     inactive_server_port_enabled: Arc<AtomicBool>,
 
     context: Context,
@@ -755,7 +755,7 @@ impl Collector {
             running,
             thread: Mutex::new(None),
             receiver: Arc::new(receiver),
-            sender: Arc::new(sender),
+            sender,
             inactive_server_port_enabled,
             context: Context {
                 id,
