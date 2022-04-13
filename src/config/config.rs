@@ -1,4 +1,3 @@
-use std::convert::TryFrom;
 use std::fs;
 use std::io;
 use std::net::{IpAddr, ToSocketAddrs};
@@ -143,6 +142,12 @@ impl Config {
         if c.first_path_level < 1 || c.first_path_level > 16 {
             c.first_path_level = 8;
         }
+
+        // L7Log Session timeout must more than or equal 10s to keep window
+        if c.l7_log_session_aggr_timeout.as_secs() < 10 {
+            c.l7_log_session_aggr_timeout = Duration::from_secs(10);
+        }
+
         if let Err(e) = c.validate() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
         }
@@ -216,7 +221,7 @@ impl Default for Config {
             kubernetes_cluster_id: "".into(),
             ingress_flavour: IngressFlavour::Kubernetes,
             grpc_buffer_size: 5,
-            l7_log_session_aggr_timeout: Duration::from_secs(5),
+            l7_log_session_aggr_timeout: Duration::from_secs(120),
             tap_mac_script: "".into(),
             cloud_gateway_traffic: false,
         }
@@ -428,6 +433,8 @@ pub struct RuntimeConfig {
     pub thread_threshold: u32,
     pub capture_bpf: String,
     pub l4_performance_enabled: bool,
+    pub kubernetes_api_enabled: bool,
+    pub ntp_enabled: bool,
 }
 
 impl RuntimeConfig {
@@ -527,6 +534,21 @@ impl RuntimeConfig {
                 TapType::Max
             )));
         }
+
+        if self.collector_socket_type == trident::SocketType::RawUdp {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "invalid collector_socket_type {:?}",
+                self.collector_socket_type
+            )));
+        }
+
+        if self.npb_socket_type == trident::SocketType::Tcp {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "invalid npb_socket_type {:?}",
+                self.npb_socket_type
+            )));
+        }
+
         Ok(())
     }
 }
@@ -546,7 +568,7 @@ impl Default for RuntimeConfig {
             output_vlan: 0,
             mtu: 0,
             npb_bps_threshold: 0,
-            collector_enabled: false,
+            collector_enabled: true,
             l4_log_store_tap_types: Default::default(),
             packet_header_enabled: false,
             platform_enabled: false,
@@ -570,11 +592,11 @@ impl Default for RuntimeConfig {
             capture_packet_size: 0,
             inactive_server_port_enabled: false,
             libvirt_xml_path: Default::default(),
-            l7_log_packet_size: 0,
-            l4_log_collect_nps_threshold: 0,
-            l7_log_collect_nps_threshold: 0,
-            l7_metrics_enabled: false,
-            l7_log_store_tap_types: Default::default(),
+            l7_log_packet_size: 1024,
+            l4_log_collect_nps_threshold: 1024,
+            l7_log_collect_nps_threshold: 1024,
+            l7_metrics_enabled: true,
+            l7_log_store_tap_types: vec![0, 3],
             decap_type: Default::default(),
             region_id: 0,
             pod_cluster_id: 0,
@@ -583,7 +605,9 @@ impl Default for RuntimeConfig {
             process_threshold: TRIDENT_PROCESS_LIMIT,
             thread_threshold: TRIDENT_THREAD_LIMIT,
             capture_bpf: Default::default(),
-            l4_performance_enabled: false,
+            l4_performance_enabled: true,
+            kubernetes_api_enabled: false,
+            ntp_enabled: false,
         }
     }
 }
@@ -650,6 +674,8 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             thread_threshold: conf.thread_threshold(),
             capture_bpf: conf.capture_bpf.take().unwrap_or_default(),
             l4_performance_enabled: conf.l4_performance_enabled(),
+            kubernetes_api_enabled: conf.kubernetes_api_enabled(),
+            ntp_enabled: conf.ntp_enabled(),
         };
         rc.validate()
             .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err.to_string()))?;

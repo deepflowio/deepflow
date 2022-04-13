@@ -4,7 +4,7 @@ use super::{Error, Result};
 
 use crate::proto::trident::CaptureSocketType;
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd)]
 pub enum OptTpacketVersion {
     TpacketVersionHighestavailablet = -1,
     TpacketVersion1,

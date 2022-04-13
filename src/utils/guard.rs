@@ -1,41 +1,30 @@
 use std::{
     process::exit,
-    sync::{
-        atomic::{AtomicU32, AtomicU64, Ordering},
-        Arc, Condvar, Mutex,
-    },
+    sync::{Arc, Condvar, Mutex},
     thread::{self, JoinHandle},
     time::Duration,
 };
 
+use arc_swap::access::Access;
 use bytesize::ByteSize;
 use log::{error, info, warn};
 
 use super::process::{get_memory_rss, get_process_num, get_thread_num};
-use crate::common::{NORMAL_EXIT_WITH_RESTART, TRIDENT_PROCESS_LIMIT, TRIDENT_THREAD_LIMIT};
+use crate::common::NORMAL_EXIT_WITH_RESTART;
+use crate::config::handler::EnvironmentAccess;
 
 const CHECK_INTERVAL: Duration = Duration::from_secs(1);
 
 pub struct Guard {
-    limit: Arc<Limit>,
+    config: EnvironmentAccess,
     thread: Mutex<Option<JoinHandle<()>>>,
     running: Arc<(Mutex<bool>, Condvar)>,
 }
 
-struct Limit {
-    process: AtomicU32,
-    thread: AtomicU32,
-    memory: AtomicU64,
-}
-
 impl Guard {
-    pub fn new() -> Self {
+    pub fn new(config: EnvironmentAccess) -> Self {
         Self {
-            limit: Arc::new(Limit {
-                process: AtomicU32::new(TRIDENT_PROCESS_LIMIT),
-                thread: AtomicU32::new(TRIDENT_THREAD_LIMIT),
-                memory: AtomicU64::new(0),
-            }),
+            config,
             thread: Mutex::new(None),
             running: Arc::new((Mutex::new(false), Condvar::new())),
         }
@@ -51,11 +40,11 @@ impl Guard {
             *started = true;
         }
 
-        let limit = self.limit.clone();
+        let limit = self.config.clone();
         let running = self.running.clone();
         let thread = thread::spawn(move || {
             loop {
-                let memory_limit = limit.memory.load(Ordering::SeqCst);
+                let memory_limit = limit.load().max_memory;
                 if memory_limit != 0 {
                     match get_memory_rss() {
                         Ok(memory_usage) => {
@@ -76,7 +65,7 @@ impl Guard {
 
                 match get_process_num() {
                     Ok(process_num) => {
-                        let process_limit = limit.process.load(Ordering::SeqCst);
+                        let process_limit = limit.load().process_threshold;
                         if process_num > process_limit {
                             warn!(
                                 "the number of process exceeds the limit({} > {})",
@@ -96,7 +85,7 @@ impl Guard {
 
                 match get_thread_num() {
                     Ok(thread_num) => {
-                        let thread_limit = limit.thread.load(Ordering::SeqCst);
+                        let thread_limit = limit.load().thread_threshold;
                         if thread_num > thread_limit {
                             warn!(
                                 "the number of thread exceeds the limit({} > {})",
@@ -145,17 +134,5 @@ impl Guard {
         if let Some(thread) = self.thread.lock().unwrap().take() {
             let _ = thread.join();
         }
-    }
-
-    pub fn set_memory_limit(&self, memory_limit: u64) {
-        self.limit.memory.store(memory_limit, Ordering::SeqCst);
-    }
-
-    pub fn set_process_limit(&self, process_limit: u32) {
-        self.limit.process.store(process_limit, Ordering::SeqCst);
-    }
-
-    pub fn set_thread_limit(&self, thread_limit: u32) {
-        self.limit.process.store(thread_limit, Ordering::SeqCst);
     }
 }

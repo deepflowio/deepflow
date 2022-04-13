@@ -17,6 +17,7 @@ use super::{
     writer::{Writer, WriterCounter},
     PcapPacket, TapType,
 };
+use crate::rpc::get_timestamp;
 use crate::utils::queue::{self, Error};
 use crate::utils::stats::{Countable, Counter, CounterType, CounterValue};
 
@@ -121,11 +122,11 @@ impl Worker {
                     Self::write_pkt(pkt, &writers, &config, &counter);
                 }
                 Err(Error::Timeout) => {
-                    let now = rpc::get_timestamp();
+                    let now = get_timestamp();
                     Self::clean_timeout_file(now, &writers, &config, &counter);
                 }
                 Err(Error::Terminated(_, _)) => {
-                    let now = rpc::get_timestamp();
+                    let now = get_timestamp();
                     Self::clean_timeout_file(now, &writers, &config, &counter);
                     break;
                 }
@@ -331,15 +332,6 @@ impl Worker {
         }
     }
 }
-
-//TODO 测试用的，等rpc模块完成就要去掉，调用真正的rpc
-mod rpc {
-    use std::time::Duration;
-    pub fn get_timestamp() -> Duration {
-        Duration::from_millis(1634269448888)
-    }
-}
-//END
 
 impl Countable for WorkerCounter {
     fn get_counters(&self) -> Vec<Counter> {

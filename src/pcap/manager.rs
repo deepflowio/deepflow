@@ -9,23 +9,21 @@ use std::{
     time::Duration,
 };
 
+use arc_swap::access::Access;
 use log::{debug, error, info, warn};
 
 use super::{
     format_time, get_temp_filename, worker::Worker, PcapPacket, TapType, GLOBAL_HEADER_LEN,
     INCL_LEN_OFFSET, RECORD_HEADER_LEN, TS_SEC_OFFSET,
 };
+use crate::config::handler::PcapAccess;
 use crate::utils::{
     queue,
     stats::{Collector, StatsOption},
 };
 
 pub struct WorkerManager {
-    block_size_kb: u32,
-    max_concurrent_files: u32,
-    max_file_size_mb: u32,
-    max_file_period: Duration,
-    base_directory: PathBuf,
+    config: PcapAccess,
     running: AtomicBool,
     workers: Mutex<Vec<Worker>>,
     example_filepath: PathBuf,
@@ -33,17 +31,14 @@ pub struct WorkerManager {
 }
 
 impl WorkerManager {
-    pub fn new<P: AsRef<Path>>(
-        block_size_kb: u32,
-        max_concurrent_files: u32,
-        max_file_size_mb: u32,
-        max_file_period: Duration,
-        base_directory: P,
-        interval: Duration,
+    pub fn new(
+        config: PcapAccess,
         packet_receivers: Vec<queue::Receiver<PcapPacket>>,
         stats: Arc<Collector>,
     ) -> Self {
-        let worker_max_concurrent_files = max_concurrent_files / packet_receivers.len() as u32;
+        let config_guard = config.load();
+        let worker_max_concurrent_files =
+            config_guard.max_concurrent_files / packet_receivers.len() as u32;
         let workers = packet_receivers
             .into_iter()
             .enumerate()
@@ -51,12 +46,12 @@ impl WorkerManager {
                 Worker::new(
                     index,
                     worker_max_concurrent_files,
-                    max_file_size_mb << 20,
-                    max_file_period,
-                    base_directory.as_ref().to_path_buf(),
-                    block_size_kb << 10,
+                    config_guard.max_file_size_mb << 20,
+                    config_guard.max_file_period,
+                    config_guard.file_directory.clone(),
+                    config_guard.block_size_kb << 10,
                     receiver,
-                    interval,
+                    config_guard.max_file_period,
                 )
             })
             .collect();
@@ -71,11 +66,7 @@ impl WorkerManager {
         );
 
         Self {
-            block_size_kb,
-            max_concurrent_files,
-            max_file_size_mb,
-            max_file_period,
-            base_directory: base_directory.as_ref().to_path_buf(),
+            config,
             running: AtomicBool::new(false),
             workers: Mutex::new(workers),
             example_filepath,
@@ -84,23 +75,26 @@ impl WorkerManager {
     }
 
     pub fn start(&self) {
+        let conf_guard = self.config.load();
+        let base_directory = conf_guard.file_directory.as_path();
         if self.running.swap(true, Ordering::SeqCst) {
             debug!(
                 "WorkerManager has already running in path: {}",
-                self.base_directory.display()
+                base_directory.display()
             );
             return;
         }
 
-        if !self.base_directory.exists() {
-            fs::create_dir_all(self.base_directory.as_path()).unwrap_or_else(|err| {
+        if !base_directory.exists() {
+            fs::create_dir_all(base_directory).unwrap_or_else(|err| {
                 error!(
                     "failed to create base directory :{} {}",
-                    self.base_directory.display(),
+                    base_directory.display(),
                     err
                 )
             });
         }
+        drop(conf_guard);
 
         if let Err(err) = self.clean_temp_files() {
             warn!("failed to clean temp files: {}", err);
@@ -122,7 +116,7 @@ impl WorkerManager {
         if !self.running.swap(false, Ordering::SeqCst) {
             debug!(
                 "WorkerManager has already stopped in path: {}",
-                self.base_directory.display()
+                self.config.load().file_directory.display()
             );
             return;
         }
@@ -168,7 +162,11 @@ impl WorkerManager {
             .file_name()
             .and_then(|f| f.to_str())
             .unwrap_or_default();
-        visit_dirs(self.base_directory.as_path(), &mut files, example_filename)?;
+        visit_dirs(
+            self.config.load().file_directory.as_path(),
+            &mut files,
+            example_filename,
+        )?;
 
         let mut failed = false;
         // finish files gracefully

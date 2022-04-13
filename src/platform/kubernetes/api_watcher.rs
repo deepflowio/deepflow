@@ -1,15 +1,15 @@
 use std::{
     collections::HashMap,
-    net::IpAddr,
     ops::Deref,
     sync::{
-        atomic::{AtomicU32, AtomicU64, Ordering},
+        atomic::{AtomicU64, Ordering},
         Arc, Condvar, Mutex,
     },
     thread,
     time::Duration,
 };
 
+use arc_swap::access::Access;
 use k8s_openapi::apimachinery::pkg::version::Info;
 use kube::Client;
 use log::{debug, info, warn};
@@ -17,7 +17,7 @@ use tokio::{runtime::Runtime, task::JoinHandle};
 
 use super::resource_watcher::{GenericResourceWatcher, Watcher};
 use crate::{
-    config::IngressFlavour,
+    config::{handler::PlatformAccess, IngressFlavour},
     error::{Error, Result},
     platform::kubernetes::resource_watcher::ResourceWatcherFactory,
     proto::trident::{
@@ -50,13 +50,9 @@ const RESOURCES: [&str; 10] = [
 ];
 
 struct Context {
+    config: PlatformAccess,
     runtime: Runtime,
-    is_openshift_route: bool,
-    interval: Duration,
-    vtap_id: AtomicU32,
     version: AtomicU64,
-    cluster_id: String,
-    ctrl_ip: IpAddr,
 }
 
 pub struct ApiWatcher {
@@ -71,20 +67,10 @@ pub struct ApiWatcher {
 }
 
 impl ApiWatcher {
-    pub fn new(
-        ctrl_ip: IpAddr,
-        cluster_id: String,
-        ingress_flavour: IngressFlavour,
-        interval: Duration,
-        session: Arc<Session>,
-    ) -> Self {
+    pub fn new(config: PlatformAccess, session: Arc<Session>) -> Self {
         Self {
             context: Arc::new(Context {
-                ctrl_ip,
-                cluster_id,
-                is_openshift_route: ingress_flavour == IngressFlavour::Openshift,
-                vtap_id: AtomicU32::new(0),
-                interval,
+                config,
                 version: AtomicU64::new(0),
                 runtime: Runtime::new().unwrap(),
             }),
@@ -98,9 +84,11 @@ impl ApiWatcher {
         }
     }
 
+    /*
     pub fn set_vtap_id(&self, vtap_id: u32) {
         self.context.vtap_id.store(vtap_id, Ordering::SeqCst);
     }
+     */
 
     // 直接拿对应的entries
     pub fn get_watcher_entries(&self, resource_name: impl AsRef<str>) -> Option<Vec<String>> {
@@ -139,7 +127,7 @@ impl ApiWatcher {
     }
 
     pub fn start(&self) {
-        if self.context.cluster_id.is_empty() {
+        if self.context.config.load().kubernetes_cluster_id.is_empty() {
             info!("ApiWatcher failed to start because kubernetes-cluster-id is empty");
             return;
         }
@@ -363,15 +351,12 @@ impl ApiWatcher {
     fn process(
         context: &Arc<Context>,
         apiserver_version: &Arc<Mutex<Info>>,
-        ctrl_ip: &IpAddr,
         session: &Arc<Session>,
-        version: &AtomicU64,
         err_msgs: &Arc<Mutex<Vec<String>>>,
-        cluster_id: &str,
-        vtap_id: &AtomicU32,
         watcher_versions: &mut HashMap<String, u64>,
         resource_watchers: &Arc<Mutex<HashMap<String, GenericResourceWatcher>>>,
     ) {
+        let version = &context.version;
         // 将缓存的entry 上报，如果没有则跳过
         let mut has_update = false;
         {
@@ -408,21 +393,24 @@ impl ApiWatcher {
                 total_entries.append(&mut watcher.pb_entries());
             }
         }
-        let mut msg = KubernetesApiSyncRequest {
-            cluster_id: Some(cluster_id.to_string()),
-            version: pb_version,
-            vtap_id: Some(vtap_id.load(Ordering::SeqCst)),
-            source_ip: Some(ctrl_ip.to_string()),
-            error_msg: Some(
-                err_msgs
-                    .lock()
-                    .unwrap()
-                    .drain(..)
-                    .collect::<Vec<_>>()
-                    .as_slice()
-                    .join(";"),
-            ),
-            entries: total_entries,
+        let mut msg = {
+            let config_guard = context.config.load();
+            KubernetesApiSyncRequest {
+                cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
+                version: pb_version,
+                vtap_id: Some(config_guard.vtap_id as u32),
+                source_ip: Some(config_guard.ctrl_ip.to_string()),
+                error_msg: Some(
+                    err_msgs
+                        .lock()
+                        .unwrap()
+                        .drain(..)
+                        .collect::<Vec<_>>()
+                        .as_slice()
+                        .join(";"),
+                ),
+                entries: total_entries,
+            }
         };
 
         match context
@@ -510,7 +498,7 @@ impl ApiWatcher {
 
         let (resource_watchers, task_handles) = loop {
             match context.runtime.block_on(Self::set_up(
-                context.is_openshift_route,
+                context.config.load().ingress_flavour == IngressFlavour::Openshift,
                 &context.runtime,
                 &apiserver_version,
                 &err_msgs,
@@ -518,11 +506,12 @@ impl ApiWatcher {
                 Ok(r) => break r,
                 Err(e) => {
                     warn!("{}", e);
+                    let config_guard = context.config.load();
                     let msg = KubernetesApiSyncRequest {
-                        cluster_id: Some(context.cluster_id.to_string()),
+                        cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
                         version: Some(context.version.load(Ordering::SeqCst)),
-                        vtap_id: Some(context.vtap_id.load(Ordering::SeqCst)),
-                        source_ip: Some(context.ctrl_ip.to_string()),
+                        vtap_id: Some(config_guard.vtap_id as u32),
+                        source_ip: Some(config_guard.ctrl_ip.to_string()),
                         error_msg: Some(e.to_string()),
                         entries: vec![],
                     };
@@ -536,7 +525,7 @@ impl ApiWatcher {
             }
 
             // 等待下一次timeout
-            if Self::wait_timeout(&running, &timer, context.interval) {
+            if Self::wait_timeout(&running, &timer, context.config.load().sync_interval) {
                 info!("kubernetes api watcher stopping");
                 // tear down
                 *watchers.lock().unwrap() = HashMap::new();
@@ -553,17 +542,14 @@ impl ApiWatcher {
         *watchers.lock().unwrap() = resource_watchers;
         let resource_watchers = watchers.clone();
 
+        let sync_interval = context.config.load().sync_interval;
         // 等一等watcher，第一个tick再上报
-        while Self::wait_timeout(&running, &timer, context.interval) {
+        while Self::wait_timeout(&running, &timer, sync_interval) {
             Self::process(
                 &context,
                 &apiserver_version,
-                &context.ctrl_ip,
                 &session,
-                &context.version,
                 &err_msgs,
-                context.cluster_id.as_str(),
-                &context.vtap_id,
                 &mut watcher_versions,
                 &resource_watchers,
             );

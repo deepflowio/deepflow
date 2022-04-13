@@ -9,25 +9,27 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use arc_swap::{
+    access::{Access, Map},
+    ArcSwap,
+};
 use log::{debug, warn};
 
 use super::{
     error::Error,
-    flow_config::FlowMapConfig,
     flow_state::{StateMachine, StateValue},
     perf::{get_l7_protocol, FlowPerf, FlowPerfCounter, L7RrtCache},
     protocol_logs::MetaAppProto,
     service_table::{ServiceKey, ServiceTable},
-    FlowMapKey, FlowMapRuntimeConfig, FlowNode, FlowState, FlowTimeout, TcpTimeout,
-    COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC, L7_PROTOCOL_UNKNOWN_LIMIT,
-    L7_RRT_CACHE_CAPACITY, QUEUE_BATCH_SIZE, SERVICE_TABLE_IPV4_CAPACITY,
-    SERVICE_TABLE_IPV6_CAPACITY, STATISTICAL_INTERVAL, THREAD_FLOW_ID_MASK, TIMER_FLOW_ID_MASK,
-    TIME_MAX_INTERVAL, TIME_UNIT,
+    FlowMapKey, FlowNode, FlowState, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
+    FLOW_METRICS_PEER_SRC, L7_PROTOCOL_UNKNOWN_LIMIT, L7_RRT_CACHE_CAPACITY, QUEUE_BATCH_SIZE,
+    SERVICE_TABLE_IPV4_CAPACITY, SERVICE_TABLE_IPV6_CAPACITY, STATISTICAL_INTERVAL,
+    THREAD_FLOW_ID_MASK, TIMER_FLOW_ID_MASK, TIME_MAX_INTERVAL, TIME_UNIT,
 };
 use crate::{
     common::{
         endpoint::{EndpointData, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET},
-        enums::{EthernetType, IpProtocol, PacketDirection, TapType, TcpFlags},
+        enums::{EthernetType, HeaderType, IpProtocol, PacketDirection, TapType, TcpFlags},
         flow::{CloseType, Flow, FlowKey, FlowMetricsPeer, L4Protocol, L7Protocol, TunnelField},
         lookup_key::LookupKey,
         meta_packet::{MetaPacket, MetaPacketTcpHeader},
@@ -35,8 +37,7 @@ use crate::{
         tagged_flow::TaggedFlow,
         tap_port::TapPort,
     },
-    config::Config,
-    proto::common,
+    config::handler::{FlowAccess, FlowConfig, NewRuntimeConfig},
     rpc::get_timestamp,
     utils::hasher::Jenkins64Hasher,
     utils::net::MacAddr,
@@ -59,7 +60,7 @@ pub struct FlowMap {
     out_log_queue: Sender<MetaAppProto>,
     output_buffer: Vec<TaggedFlow>,
     last_queue_flush: Duration,
-    config: FlowMapConfig,
+    config: FlowAccess,
     rrt_cache: Rc<RefCell<L7RrtCache>>,
     counter: Arc<FlowPerfCounter>,
 }
@@ -70,7 +71,7 @@ impl FlowMap {
         output_queue: Sender<TaggedFlow>,
         policy_getter: fn(&mut MetaPacket, u32),
         app_proto_log_queue: Sender<MetaAppProto>,
-        config: FlowMapConfig,
+        config: FlowAccess,
     ) -> (Self, Arc<FlowPerfCounter>) {
         let counter = Arc::new(FlowPerfCounter::default());
 
@@ -79,8 +80,8 @@ impl FlowMap {
                 node_map: Some(HashMap::with_hasher(Jenkins64Hasher::default())),
                 time_set: Some(BTreeSet::new()),
                 id,
-                state_machine_master: StateMachine::new_master(&config.flow_timeout),
-                state_machine_slave: StateMachine::new_slave(&config.flow_timeout),
+                state_machine_master: StateMachine::new_master(&config.load().flow_timeout),
+                state_machine_slave: StateMachine::new_slave(&config.load().flow_timeout),
                 service_table: ServiceTable::new(
                     SERVICE_TABLE_IPV4_CAPACITY,
                     SERVICE_TABLE_IPV6_CAPACITY,
@@ -108,13 +109,13 @@ impl FlowMap {
         }
 
         // FlowMap 时间窗口无法推动
-        if timestamp - self.config.packet_delay - TIME_UNIT < self.start_time {
+        if timestamp - self.config.load().packet_delay - TIME_UNIT < self.start_time {
             return true;
         }
 
         // 根据包到达时间的容差调整
-        let next_start_time_in_unit =
-            ((timestamp - self.config.packet_delay).as_nanos() / TIME_UNIT.as_nanos()) as u64;
+        let next_start_time_in_unit = ((timestamp - self.config.load().packet_delay).as_nanos()
+            / TIME_UNIT.as_nanos()) as u64;
         self.start_time =
             Duration::from_nanos(next_start_time_in_unit * TIME_UNIT.as_nanos() as u64);
 
@@ -180,14 +181,17 @@ impl FlowMap {
             return;
         }
 
-        let config_ignore = (self.config.ignore_l2_end, self.config.ignore_tor_mac);
+        let config_ignore = (
+            self.config.load().ignore_l2_end,
+            self.config.load().ignore_tor_mac,
+        );
         let time_in_unit =
             (meta_packet.lookup_key.timestamp.as_nanos() / TIME_UNIT.as_nanos()) as u64;
         let pkt_key = Rc::new(FlowMapKey::new(
             time_in_unit,
             &meta_packet,
             config_ignore,
-            self.config.trident_type,
+            self.config.load().trident_type,
         ));
 
         let (mut node_map, mut time_set) = match self.node_map.take().zip(self.time_set.take()) {
@@ -261,7 +265,7 @@ impl FlowMap {
         }
 
         let flow_closed = self.update_tcp_flow(&mut meta_packet, &mut node);
-        if self.config.collector_enabled {
+        if self.config.load().collector_enabled {
             let direction = node.tagged_flow.flow.reversed
                 == (meta_packet.direction == PacketDirection::ServerToClient);
             self.collect_metric(&mut node, &meta_packet, direction);
@@ -303,10 +307,10 @@ impl FlowMap {
         if peers[FLOW_METRICS_PEER_SRC].packet_count > 0
             && peers[FLOW_METRICS_PEER_DST].packet_count > 0
         {
-            node.timeout = self.config.flow_timeout.closing;
+            node.timeout = self.config.load().flow_timeout.closing;
         }
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
-        if self.config.collector_enabled {
+        if self.config.load().collector_enabled {
             self.collect_metric(&mut node, &meta_packet, false);
         }
 
@@ -342,7 +346,7 @@ impl FlowMap {
         if peers[FLOW_METRICS_PEER_SRC].packet_count > 0
             && peers[FLOW_METRICS_PEER_DST].packet_count > 0
         {
-            node.timeout = self.config.flow_timeout.established_rst;
+            node.timeout = self.config.load().flow_timeout.established_rst;
         }
 
         node_map.insert(pkt_key, node);
@@ -358,7 +362,7 @@ impl FlowMap {
         let pkt_tcp_flags = meta_packet.tcp_data.flags;
         if pkt_tcp_flags.is_invalid() {
             // exception timeout
-            node.timeout = self.config.flow_timeout.exception;
+            node.timeout = self.config.load().flow_timeout.exception;
             node.flow_state = FlowState::Exception;
             return false;
         }
@@ -442,7 +446,7 @@ impl FlowMap {
             .get(node.flow_state, flags)
             .unwrap_or(&StateValue::new(
                 // exception timeout,
-                self.config.flow_timeout.exception,
+                self.config.load().flow_timeout.exception,
                 FlowState::Exception,
                 false,
             ));
@@ -461,7 +465,7 @@ impl FlowMap {
         let peer_dst = &flow.flow_metrics_peers[FLOW_METRICS_PEER_DST];
         if peer_src.total_packet_count == 0 || peer_dst.total_packet_count == 0 {
             //single direction timeout
-            node.timeout = self.config.flow_timeout.single_direction;
+            node.timeout = self.config.load().flow_timeout.single_direction;
         } else {
             node.timeout = timeout;
         }
@@ -470,22 +474,12 @@ impl FlowMap {
     }
 
     fn l7_metrics_enabled(&self) -> bool {
-        self.config
-            .runtime_config
-            .l7_metrics_enabled
-            .load(Ordering::Relaxed)
-            || self
-                .config
-                .runtime_config
-                .app_proto_log_enabled
-                .load(Ordering::Relaxed)
+        let guard = self.config.load();
+        guard.l7_metrics_enabled || guard.app_proto_log_enabled
     }
 
     fn l4_metrics_enabled(&self) -> bool {
-        self.config
-            .runtime_config
-            .l4_performance_enabled
-            .load(Ordering::Relaxed)
+        self.config.load().l4_performance_enabled
     }
 
     fn init_flow(&mut self, meta_packet: &mut MetaPacket) -> FlowNode {
@@ -495,7 +489,7 @@ impl FlowMap {
         let lookup_key = &meta_packet.lookup_key;
         let flow = Flow {
             flow_key: FlowKey {
-                vtap_id: self.config.vtap_id,
+                vtap_id: self.config.load().vtap_id,
                 mac_src: lookup_key.src_mac,
                 mac_dst: lookup_key.dst_mac,
                 ip_src: lookup_key.src_ip,
@@ -563,7 +557,7 @@ impl FlowMap {
             packet_in_tick: true,
             policy_in_tick,
             flow_state: FlowState::Raw,
-            meta_flow_perf: if self.config.collector_enabled {
+            meta_flow_perf: if self.config.load().collector_enabled {
                 FlowPerf::new(
                     self.rrt_cache.clone(),
                     L4Protocol::from(lookup_key.proto),
@@ -707,13 +701,13 @@ impl FlowMap {
         let pkt_tcp_flags = meta_packet.tcp_data.flags;
         if pkt_tcp_flags.is_invalid() {
             // exception timeout
-            node.timeout = self.config.flow_timeout.exception;
+            node.timeout = self.config.load().flow_timeout.exception;
             node.flow_state = FlowState::Exception;
         }
         self.update_flow_state_machine(&mut node, pkt_tcp_flags, meta_packet.direction);
         self.update_syn_or_syn_ack_seq(&mut node, &mut meta_packet);
 
-        if self.config.collector_enabled {
+        if self.config.load().collector_enabled {
             let direction = node.tagged_flow.flow.reversed
                 == (meta_packet.direction == PacketDirection::ServerToClient);
             self.collect_metric(&mut node, &meta_packet, direction);
@@ -745,20 +739,11 @@ impl FlowMap {
                 _ => (),
             }
         }
-        if self
-            .config
-            .runtime_config
-            .app_proto_log_enabled
-            .load(Ordering::Relaxed)
-            && meta_packet.packet_len > 0
-        {
+        if self.config.load().app_proto_log_enabled && meta_packet.packet_len > 0 {
             self.write_to_app_proto_log(
                 node,
                 &meta_packet,
-                self.config
-                    .runtime_config
-                    .l7_log_packet_size
-                    .load(Ordering::Relaxed) as u16,
+                self.config.load().l7_log_packet_size as u16,
             );
         }
     }
@@ -767,10 +752,10 @@ impl FlowMap {
         let mut node = self.init_flow(&mut meta_packet);
         node.flow_state = FlowState::Established;
         // opening timeout
-        node.timeout = self.config.flow_timeout.opening;
+        node.timeout = self.config.load().flow_timeout.opening;
         self.update_l4_direction(&mut meta_packet, &mut node, true);
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
-        if self.config.collector_enabled {
+        if self.config.load().collector_enabled {
             self.collect_metric(&mut node, &meta_packet, false);
         }
         node
@@ -780,7 +765,7 @@ impl FlowMap {
         let mut node = self.init_flow(&mut meta_packet);
         node.flow_state = FlowState::Established;
         // opening timeout
-        node.timeout = self.config.flow_timeout.opening;
+        node.timeout = self.config.load().flow_timeout.opening;
         node
     }
 
@@ -793,7 +778,7 @@ impl FlowMap {
     }
 
     fn flush_queue(&mut self, now: Duration) {
-        if now - self.last_queue_flush > self.config.flush_interval {
+        if now - self.last_queue_flush > self.config.load().flush_interval {
             if self.output_buffer.len() > 0 {
                 let flows = self.output_buffer.drain(..).collect::<Vec<_>>();
                 if let Err(_) = self.output_queue.send_all(flows) {
@@ -810,9 +795,10 @@ impl FlowMap {
         // 流在未结束时应用日志会需要这个字段，为了避免重复计算，所以在流统计完成输出时赋值
         //
         // 目前仅虚拟流量会计算该统计位置
-        tagged_flow
-            .flow
-            .set_tap_side(self.config.trident_type, self.config.cloud_gateway_traffic);
+        tagged_flow.flow.set_tap_side(
+            self.config.load().trident_type,
+            self.config.load().cloud_gateway_traffic,
+        );
 
         // 未知应用仅统计指标量数据，并且判断条件需要考虑流持续时间等，所以在流统计完成输出时赋值
         //
@@ -863,7 +849,7 @@ impl FlowMap {
                 as u64,
         );
 
-        if self.config.collector_enabled
+        if self.config.load().collector_enabled
             && (flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp)
         {
             let l7_timeout_count = self
@@ -899,7 +885,7 @@ impl FlowMap {
             self.update_flow_direction(node, meta_packet); // 每个流统计数据输出前矫正流方向
             node.tagged_flow.flow.close_type = CloseType::ForcedReport;
             let flow = &mut node.tagged_flow.flow;
-            if !self.config.collector_enabled {
+            if !self.config.load().collector_enabled {
                 return;
             }
             if flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp {
@@ -924,9 +910,9 @@ impl FlowMap {
         pkt_size: u16,
     ) {
         let lookup_key = &meta_packet.lookup_key; //  trisolaris接口定义: 0(TAP_ANY)表示所有都需要
-        if !self.config.tap_types[u16::from(TapType::Any) as usize]
+        if !self.config.load().l7_log_tap_types[u16::from(TapType::Any) as usize]
             && (lookup_key.tap_type > TapType::Max
-                || !self.config.tap_types[u16::from(lookup_key.tap_type) as usize])
+                || !self.config.load().l7_log_tap_types[u16::from(lookup_key.tap_type) as usize])
         {
             return;
         }
@@ -944,9 +930,10 @@ impl FlowMap {
             None => return,
         };
 
-        node.tagged_flow
-            .flow
-            .set_tap_side(self.config.trident_type, self.config.cloud_gateway_traffic);
+        node.tagged_flow.flow.set_tap_side(
+            self.config.load().trident_type,
+            self.config.load().cloud_gateway_traffic,
+        );
 
         if let Some(app_proto) =
             MetaAppProto::new(&node.tagged_flow, meta_packet, head, offset, pkt_size)
@@ -1124,32 +1111,15 @@ pub fn _new_flow_map_and_receiver() -> (FlowMap, Receiver<TaggedFlow>) {
     fn policy_getter(_pkt: &mut MetaPacket, _id: u32) {}
     let (output_queue_sender, output_queue_receiver, _) = queue::bounded(256);
     let (app_proto_log_queue, _, _) = queue::bounded(256);
-    let c =
-        Config::load_from_file("config/metaflow-agent.yaml").expect("failed loading config file");
-
-    let config = FlowMapConfig {
-        vtap_id: 7,
-        trident_type: common::TridentType::TtProcess,
-        tap_types: [true; 256],
-        collector_enabled: false,
-        packet_delay: c.packet_delay,
-        flush_interval: c.flow.flush_interval,
-        cloud_gateway_traffic: false,
-        ignore_l2_end: false,
-        ignore_tor_mac: false,
-        flow_timeout: FlowTimeout::from(TcpTimeout {
-            established: c.flow.established_timeout,
-            closing_rst: c.flow.closing_rst_timeout,
-            others: c.flow.others_timeout,
-        }),
-        runtime_config: Arc::new(FlowMapRuntimeConfig::default()),
-    };
+    let current_config = Arc::new(ArcSwap::from_pointee(NewRuntimeConfig::default()));
     let (flow_map, _counter) = FlowMap::new(
         0,
         output_queue_sender,
         policy_getter,
         app_proto_log_queue,
-        config,
+        Map::new(current_config.clone(), |config| -> &FlowConfig {
+            &config.flow
+        }),
     );
 
     (flow_map, output_queue_receiver)
@@ -1172,6 +1142,7 @@ pub fn _new_meta_packet<'a>() -> MetaPacket<'a> {
         tap_type: TapType::Isp(1),
         ..Default::default()
     };
+    packet.header_type = HeaderType::Ipv4Tcp;
     packet.tap_port = TapPort(65533);
     packet.packet_len = 128;
     packet.tcp_data = MetaPacketTcpHeader {
