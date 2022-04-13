@@ -3,7 +3,7 @@ use std::{
     collections::HashMap,
     mem::swap,
     sync::{
-        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
     },
     thread,
@@ -11,6 +11,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use arc_swap::access::Access;
 use log::{debug, info, warn};
 use rand::prelude::{Rng, SeedableRng, SmallRng};
 
@@ -24,6 +25,7 @@ use crate::{
         flow::{get_uniq_flow_id_in_one_minute, L7Protocol},
         MetaPacket, TaggedFlow,
     },
+    config::handler::LogParserAccess,
     flow_generator::{
         error::Result,
         protocol_logs::{HttpLog, L7LogParse},
@@ -194,35 +196,36 @@ struct SessionQueue {
     time_window: Option<Vec<HashMap<u64, AppProtoLogsData>>>,
 
     throttle_queue: Vec<SendItem>,
-    throttle: Arc<AtomicUsize>,
     throttle_period_count: u64,
     rng: SmallRng,
 
     counter: Arc<SessionAggrCounter>,
     output_queue: DebugSender<SendItem>,
+    config: LogParserAccess,
 }
 
 impl SessionQueue {
     fn new(
-        throttle: Arc<AtomicUsize>,
         counter: Arc<SessionAggrCounter>,
         output_queue: DebugSender<SendItem>,
-        window_size: usize,
+        config: LogParserAccess,
     ) -> Self {
         //l7_log_session_timeout 20s-300s ，window_size = 2-30，所以 SessionQueue.time_window 预分配内存
+        let window_size =
+            (config.load().l7_log_session_aggr_timeout.as_secs() / SLOT_WIDTH) as usize;
         let time_window = vec![HashMap::new(); window_size];
 
         Self {
             aggregate_start_time: Duration::ZERO,
             last_flush_time: Duration::ZERO,
-            window_size,
             time_window: Some(time_window),
+            config,
+            window_size,
 
             throttle_queue: vec![],
             rng: SmallRng::from_entropy(),
             throttle_period_count: 0,
 
-            throttle,
             counter,
             output_queue,
         }
@@ -401,7 +404,7 @@ impl SessionQueue {
     fn send_helper(&mut self, item: SendItem) {
         self.throttle_period_count += 1;
 
-        let throttle = self.throttle.load(Ordering::Relaxed);
+        let throttle = self.config.load().l7_log_collect_nps_threshold as usize;
         if self.throttle_queue.len() < throttle {
             self.throttle_queue.push(item);
         } else {
@@ -485,22 +488,22 @@ pub struct AppProtoLogsParser {
     input_queue: Arc<Receiver<MetaAppProto>>,
     output_queue: DebugSender<SendItem>,
     id: u32,
-    window_size: usize,
-    throttle: Arc<AtomicUsize>,
+    //  window_size: usize,
+    //  throttle: Arc<AtomicUsize>,
     running: Arc<AtomicBool>,
     thread: Mutex<Option<JoinHandle<()>>>,
     counter: Arc<SessionAggrCounter>,
     http_config: Arc<Mutex<HttpConfig>>,
+    config: LogParserAccess,
 }
 
 impl AppProtoLogsParser {
     pub fn new(
         input_queue: Receiver<MetaAppProto>,
-        throttle: usize,
-        l7_log_session_timeout: Duration,
         output_queue: DebugSender<SendItem>,
         id: u32,
         http_config: Arc<Mutex<HttpConfig>>,
+        config: LogParserAccess,
     ) -> (Self, Arc<SessionAggrCounter>) {
         let running = Arc::new(AtomicBool::new(false));
         let counter = Arc::new(SessionAggrCounter::new(running.clone()));
@@ -509,12 +512,13 @@ impl AppProtoLogsParser {
                 input_queue: Arc::new(input_queue),
                 output_queue,
                 id,
-                throttle: Arc::new(AtomicUsize::new(throttle * THROTTLE_BUCKET)),
-                window_size: (l7_log_session_timeout.as_secs() / SLOT_WIDTH) as usize,
+                //        throttle: Arc::new(AtomicUsize::new(throttle * THROTTLE_BUCKET)),
+                //        window_size: (l7_log_session_timeout.as_secs() / SLOT_WIDTH) as usize,
                 running,
                 thread: Mutex::new(None),
                 counter: counter.clone(),
                 http_config,
+                config,
             },
             counter,
         )
@@ -529,11 +533,11 @@ impl AppProtoLogsParser {
         let counter = self.counter.clone();
         let input_queue = self.input_queue.clone();
         let output_queue = self.output_queue.clone();
-        let throttle = self.throttle.clone();
-        let window_size = self.window_size;
+
+        let config = self.config.clone();
 
         let thread = thread::spawn(move || {
-            let mut session_queue = SessionQueue::new(throttle, counter, output_queue, window_size);
+            let mut session_queue = SessionQueue::new(counter, output_queue, config);
             let mut app_logs = AppLogs::default();
 
             while running.load(Ordering::Relaxed) {
@@ -571,10 +575,6 @@ impl AppProtoLogsParser {
             let _ = thread.join();
         }
         info!("app protocol logs parser (id={}) stopped", self.id);
-    }
-
-    pub fn set_throttle(&self, new_throttle: usize) {
-        self.throttle.store(new_throttle, Ordering::Relaxed);
     }
 
     fn parse_log(mut app_proto: MetaAppProto, app_logs: &mut AppLogs) -> Result<AppProtoLogsData> {

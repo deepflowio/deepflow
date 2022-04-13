@@ -48,7 +48,7 @@ impl Default for TunnelType {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct TunnelTypeBitmap(u16);
 
 impl TunnelTypeBitmap {

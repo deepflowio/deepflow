@@ -1,8 +1,7 @@
 use std::{
     net::IpAddr,
-    path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
+        atomic::{AtomicU64, Ordering},
         Arc, Condvar, Mutex,
     },
     thread,
@@ -10,6 +9,7 @@ use std::{
     time::Duration,
 };
 
+use arc_swap::access::Access;
 use log::{debug, info, warn};
 use ring::digest;
 use tokio::runtime::Runtime;
@@ -22,30 +22,25 @@ use super::{
     InterfaceEntry, LibvirtXmlExtractor,
 };
 
-use crate::proto::{
-    common::TridentType,
-    trident::{self, GenesisSyncRequest, GenesisSyncResponse},
-};
 use crate::rpc::Session;
 use crate::utils::command::*;
-use crate::{config::KubernetesPollerType, handler};
+use crate::{
+    config::{handler::PlatformAccess, KubernetesPollerType},
+    handler,
+    proto::trident::{self, GenesisSyncRequest, GenesisSyncResponse},
+    utils::environment::is_tt_pod,
+};
 
 const SHA1_DIGEST_LEN: usize = 20;
 
 struct ProcessArgs {
+    config: PlatformAccess,
     running: Arc<Mutex<bool>>,
-    vtap_id: Arc<AtomicU32>,
     version: Arc<AtomicU64>,
-    trident_type: TridentType,
-    ctrl_ip: IpAddr,
-    kubernetes_cluster_id: String,
     session: Arc<Session>,
     sniffer: Arc<sniffer_builder::Sniffer>,
     timer: Arc<Condvar>,
-    poll_interval: Duration,
     xml_extractor: Arc<LibvirtXmlExtractor>,
-    platform_enabled: Arc<AtomicBool>,
-    xml_path: Arc<Mutex<PathBuf>>,
     kubernetes_poller: Arc<GenericPoller>,
 }
 
@@ -71,32 +66,20 @@ struct HashArgs {
 }
 
 pub struct PlatformSynchronizer {
-    sync_interval: Duration,
-    ctrl_ip: IpAddr,
-    vtap_id: Arc<AtomicU32>,
-    kubernetes_cluster_id: String,
+    config: PlatformAccess,
     version: Arc<AtomicU64>,
-    platform_enabled: Arc<AtomicBool>,
     running: Arc<Mutex<bool>>,
     timer: Arc<Condvar>,
     kubernetes_poller: Arc<GenericPoller>,
-    xml_path: Arc<Mutex<PathBuf>>,
     thread: Mutex<Option<JoinHandle<()>>>,
-    trident_type: TridentType,
     session: Arc<Session>,
     xml_extractor: Arc<LibvirtXmlExtractor>,
     sniffer: Arc<sniffer_builder::Sniffer>,
 }
 
 impl PlatformSynchronizer {
-    pub fn new<P: AsRef<Path>>(
-        sync_interval: Duration,
-        poller_type: KubernetesPollerType,
-        ctrl_ip: IpAddr,
-        xml_path: P,
-        kubernetes_cluster_id: String,
-        trident_type: TridentType,
-
+    pub fn new(
+        config: PlatformAccess,
         session: Arc<Session>,
         xml_extractor: Arc<LibvirtXmlExtractor>,
     ) -> Self {
@@ -114,17 +97,23 @@ impl PlatformSynchronizer {
             );
         }
 
-        let poller = match poller_type {
+        let config_guard = config.load();
+        let poller = match config_guard.kubernetes_poller_type {
             KubernetesPollerType::Adaptive => {
                 if can_set_ns && can_read_link_ns {
-                    GenericPoller::from(ActivePoller::new(sync_interval))
+                    GenericPoller::from(ActivePoller::new(config_guard.sync_interval))
                 } else {
-                    GenericPoller::from(PassivePoller::new(sync_interval))
+                    GenericPoller::from(PassivePoller::new(config_guard.sync_interval))
                 }
             }
-            KubernetesPollerType::Active => GenericPoller::from(ActivePoller::new(sync_interval)),
-            KubernetesPollerType::Passive => GenericPoller::from(PassivePoller::new(sync_interval)),
+            KubernetesPollerType::Active => {
+                GenericPoller::from(ActivePoller::new(config_guard.sync_interval))
+            }
+            KubernetesPollerType::Passive => {
+                GenericPoller::from(PassivePoller::new(config_guard.sync_interval))
+            }
         };
+        drop(config_guard);
 
         let kubernetes_poller = Arc::new(poller);
         let mappings = mappings::Mappings;
@@ -132,30 +121,16 @@ impl PlatformSynchronizer {
         let sniffer = Arc::new(sniffer_builder::Sniffer);
 
         Self {
-            sync_interval,
-            ctrl_ip,
-            vtap_id: Arc::new(AtomicU32::new(0)),
-            kubernetes_cluster_id,
-            platform_enabled: Arc::new(AtomicBool::new(false)),
+            config,
             version: Arc::new(AtomicU64::new(0)),
             kubernetes_poller,
             running: Arc::new(Mutex::new(false)),
             timer: Arc::new(Condvar::new()),
-            xml_path: Arc::new(Mutex::new(xml_path.as_ref().to_path_buf())),
             thread: Mutex::new(None),
-            trident_type,
             session,
             xml_extractor,
             sniffer,
         }
-    }
-
-    pub fn set_vtap_id(&self, id: u32) {
-        self.vtap_id.store(id, Ordering::SeqCst);
-    }
-
-    pub fn set_platform_enabled(&self, enabled: bool) {
-        self.platform_enabled.store(enabled, Ordering::SeqCst);
     }
 
     pub fn start_kubernetes_poller(&self) {
@@ -170,10 +145,6 @@ impl PlatformSynchronizer {
         *self.running.lock().unwrap()
     }
 
-    pub fn set_xml_path(&self, xml_path: PathBuf) {
-        *self.xml_path.lock().unwrap() = xml_path;
-    }
-
     pub fn clone_poller(&self) -> Arc<GenericPoller> {
         self.kubernetes_poller.clone()
     }
@@ -181,10 +152,10 @@ impl PlatformSynchronizer {
     pub fn stop(&self) {
         let mut running_lock = self.running.lock().unwrap();
         if !*running_lock {
+            let config_guard = self.config.load();
             let err = format!(
                 "PlatformSynchronizer has already stopped with ctrl-ip:{} vtap-id:{}",
-                self.ctrl_ip,
-                self.vtap_id.load(Ordering::SeqCst)
+                config_guard.ctrl_ip, config_guard.vtap_id
             );
             debug!("{}", err);
             return;
@@ -203,10 +174,10 @@ impl PlatformSynchronizer {
     pub fn start(&self) {
         let mut running_guard = self.running.lock().unwrap();
         if *running_guard {
+            let config_guard = self.config.load();
             let err = format!(
                 "PlatformSynchronizer has already running with ctrl-ip:{} vtap-id:{}",
-                self.ctrl_ip,
-                self.vtap_id.load(Ordering::SeqCst)
+                config_guard.ctrl_ip, config_guard.vtap_id
             );
             debug!("{}", err);
             return;
@@ -215,17 +186,11 @@ impl PlatformSynchronizer {
         drop(running_guard);
 
         let process_args = ProcessArgs {
-            platform_enabled: self.platform_enabled.clone(),
+            config: self.config.clone(),
             running: self.running.clone(),
-            vtap_id: self.vtap_id.clone(),
             version: self.version.clone(),
-            ctrl_ip: self.ctrl_ip,
-            kubernetes_cluster_id: self.kubernetes_cluster_id.clone(),
-            poll_interval: self.sync_interval,
-            xml_path: self.xml_path.clone(),
             kubernetes_poller: self.kubernetes_poller.clone(),
             timer: self.timer.clone(),
-            trident_type: self.trident_type,
             session: self.session.clone(),
             xml_extractor: self.xml_extractor.clone(),
             sniffer: self.sniffer.clone(),
@@ -234,8 +199,7 @@ impl PlatformSynchronizer {
         let handle = thread::spawn(move || Self::process(process_args));
         *self.thread.lock().unwrap() = Some(handle);
 
-        if self.trident_type == TridentType::TtHostPod || self.trident_type == TridentType::TtVmPod
-        {
+        if is_tt_pod(self.config.load().trident_type) {
             self.kubernetes_poller.start();
         }
     }
@@ -249,7 +213,7 @@ impl PlatformSynchronizer {
         self_kubernetes_version: &mut u64,
         self_last_ip_update_timestamp: &mut Duration,
     ) {
-        let platform_enabled = process_args.platform_enabled.load(Ordering::SeqCst);
+        let platform_enabled = process_args.config.load().enabled;
 
         let mut changed = 0;
 
@@ -283,7 +247,7 @@ impl PlatformSynchronizer {
         let mut raw_vlan_config = None;
 
         if platform_enabled {
-            raw_all_vm_xml = get_all_vm_xml(process_args.xml_path.lock().unwrap().as_path())
+            raw_all_vm_xml = get_all_vm_xml(process_args.config.load().libvirt_xml_path.as_path())
                 .map_err(|err| debug!("get_all_vm_xml error:{}", err))
                 .ok();
 
@@ -454,11 +418,15 @@ impl PlatformSynchronizer {
         process_args: &ProcessArgs,
         self_interface_infos: &Vec<InterfaceInfo>,
         self_xml_interfaces: &Vec<InterfaceEntry>,
-        vtap_id: u32,
+        vtap_id: u16,
         version: u64,
         rt: &Runtime,
     ) -> Result<u64, tonic::Status> {
-        let platform_enabled = process_args.platform_enabled.load(Ordering::SeqCst);
+        let config_guard = process_args.config.load();
+        let trident_type = config_guard.trident_type;
+        let ctrl_ip = config_guard.ctrl_ip;
+        let platform_enabled = config_guard.enabled;
+        drop(config_guard);
 
         let (mut ips, mut lldp_infos) = (vec![], vec![]);
 
@@ -547,11 +515,13 @@ impl PlatformSynchronizer {
 
         let msg = trident::GenesisSyncRequest {
             version: Some(version),
-            trident_type: Some(process_args.trident_type as i32),
+            trident_type: Some(trident_type as i32),
             platform_data: Some(platform_data),
-            source_ip: Some(process_args.ctrl_ip.to_string()),
-            vtap_id: Some(vtap_id),
-            kubernetes_cluster_id: Some(process_args.kubernetes_cluster_id.to_string()),
+            source_ip: Some(ctrl_ip.to_string()),
+            vtap_id: Some(vtap_id as u32),
+            kubernetes_cluster_id: Some(
+                process_args.config.load().kubernetes_cluster_id.to_string(),
+            ),
             nat_ip: None,
         };
 
@@ -584,11 +554,17 @@ impl PlatformSynchronizer {
             );
 
             let cur_version = args.version.load(Ordering::SeqCst);
-            let cur_vtap_id = args.vtap_id.load(Ordering::SeqCst);
+
+            let config_guard = args.config.load();
+            let cur_vtap_id = config_guard.vtap_id;
+            let trident_type = config_guard.trident_type;
+            let ctrl_ip = config_guard.ctrl_ip;
+            let poll_interval = config_guard.sync_interval;
+            drop(config_guard);
 
             if cur_version == 0 {
                 // 避免信息同步先于信息采集
-                if Self::wait_timeout(&args.running, &args.timer, args.poll_interval) {
+                if Self::wait_timeout(&args.running, &args.timer, poll_interval) {
                     break;
                 }
                 continue;
@@ -597,10 +573,12 @@ impl PlatformSynchronizer {
             if last_version == cur_version {
                 let msg = trident::GenesisSyncRequest {
                     version: Some(cur_version),
-                    trident_type: Some(args.trident_type as i32),
-                    source_ip: Some(args.ctrl_ip.to_string()),
-                    vtap_id: Some(cur_vtap_id),
-                    kubernetes_cluster_id: Some(args.kubernetes_cluster_id.to_string()),
+                    trident_type: Some(trident_type as i32),
+                    source_ip: Some(ctrl_ip.to_string()),
+                    vtap_id: Some(cur_vtap_id as u32),
+                    kubernetes_cluster_id: Some(
+                        args.config.load().kubernetes_cluster_id.to_string(),
+                    ),
                     platform_data: None,
                     nat_ip: None,
                 };
@@ -610,7 +588,7 @@ impl PlatformSynchronizer {
                         let res = res.into_inner();
                         let remote_version = res.version();
                         if remote_version == cur_version {
-                            if Self::wait_timeout(&args.running, &args.timer, args.poll_interval) {
+                            if Self::wait_timeout(&args.running, &args.timer, poll_interval) {
                                 break;
                             }
                             continue;
@@ -622,7 +600,7 @@ impl PlatformSynchronizer {
                     }
                     Err(e) => {
                         warn!("send platform heartbeat failed: {}", e);
-                        if Self::wait_timeout(&args.running, &args.timer, args.poll_interval) {
+                        if Self::wait_timeout(&args.running, &args.timer, poll_interval) {
                             break;
                         }
                         continue;
@@ -644,14 +622,14 @@ impl PlatformSynchronizer {
                 Ok(version) => last_version = version,
                 Err(e) => {
                     warn!("send platform information failed: {}", e);
-                    if Self::wait_timeout(&args.running, &args.timer, args.poll_interval) {
+                    if Self::wait_timeout(&args.running, &args.timer, poll_interval) {
                         break;
                     }
                     continue;
                 }
             }
 
-            if Self::wait_timeout(&args.running, &args.timer, args.poll_interval) {
+            if Self::wait_timeout(&args.running, &args.timer, poll_interval) {
                 break;
             }
         }

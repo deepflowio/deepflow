@@ -1,10 +1,8 @@
 use std::mem;
-use std::net::IpAddr;
 use std::path::Path;
 use std::process;
-use std::str::FromStr;
 use std::sync::{
-    atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
     Arc, Condvar, Mutex,
 };
 use std::thread::{self, JoinHandle};
@@ -12,12 +10,13 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use flexi_logger::{
-    colored_opt_format, Age, Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming,
+    colored_opt_format, Age, Cleanup, Criterion, Duplicate, FileSpec, Logger, LoggerHandle, Naming,
 };
 use log::{info, warn};
 
 use crate::handler::PacketHandlerBuilder;
 use crate::pcap::WorkerManager;
+use crate::utils::guard::Guard;
 use crate::{
     collector::Collector,
     collector::{
@@ -25,22 +24,19 @@ use crate::{
         MetricsType,
     },
     common::{
-        enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, DEFAULT_LIBVIRT_XML_PATH,
-        FREE_SPACE_REQUIREMENT,
+        enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, FREE_SPACE_REQUIREMENT,
     },
-    config::{Config, RuntimeConfig},
+    config::{handler::ConfigHandler, Config, RuntimeConfig},
     debug::{ConstructDebugCtx, Debugger},
     dispatcher::{
         self,
         recv_engine::{self, bpf},
         BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
     },
-    flow_generator::{
-        AppProtoLogsParser, FlowMapConfig, FlowMapRuntimeConfig, FlowTimeout, TcpTimeout,
-    },
+    flow_generator::AppProtoLogsParser,
     monitor::Monitor,
     platform::{ApiWatcher, LibvirtXmlExtractor, PlatformSynchronizer},
-    proto::trident::TapMode,
+    proto::trident::{self, TapMode},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{uniform_sender::UniformSenderThread, SendItem},
     utils::{
@@ -48,7 +44,7 @@ use crate::{
             check, controller_ip_check, free_memory_checker, free_space_checker, kernel_check,
             trident_process_check,
         },
-        net::{get_route_src_ip, get_route_src_ip_and_mac, links_by_name_regex, MacAddr},
+        net::{get_route_src_ip_and_mac, links_by_name_regex},
         queue,
         stats::{self, StatsOption},
         LeakyBucket,
@@ -59,12 +55,12 @@ const MINUTE: Duration = Duration::from_secs(60);
 
 pub enum State {
     Running,
-    ConfigChanged(RuntimeConfig),
+    ConfigChanged((RuntimeConfig, trident::Config)),
     Terminated,
 }
 
 impl State {
-    fn unwrap_config(self) -> RuntimeConfig {
+    fn unwrap_config(self) -> (RuntimeConfig, trident::Config) {
         match self {
             Self::ConfigChanged(c) => c,
             _ => panic!("not config type"),
@@ -95,10 +91,11 @@ impl Trident {
         if nix::unistd::getppid().as_raw() != 1 {
             logger = logger.duplicate_to_stderr(Duplicate::All);
         }
-        logger.start()?;
+        let logger_handle = logger.start()?;
 
+        info!("static_config {:?}", config);
         let handle = Some(thread::spawn(move || {
-            if let Err(e) = Self::run(state_thread, config, revision) {
+            if let Err(e) = Self::run(state_thread, config, revision, logger_handle) {
                 warn!("trident exited: {}", e);
                 process::exit(1);
             }
@@ -107,7 +104,12 @@ impl Trident {
         Ok(Trident { state, handle })
     }
 
-    fn run(state: TridentState, config: Config, revision: String) -> Result<()> {
+    fn run(
+        state: TridentState,
+        config: Config,
+        revision: String,
+        logger_handle: LoggerHandle,
+    ) -> Result<()> {
         info!("========== MetaFlowAgent start! ==========");
 
         let (ctrl_ip, ctrl_mac) = get_route_src_ip_and_mac(&config.controller_ips[0].parse()?)
@@ -137,8 +139,8 @@ impl Trident {
 
         let (state, cond) = &*state;
         let mut state_guard = state.lock().unwrap();
-        let mut components = None;
-        let mut config_handler = ConfigHandler::new(&synchronizer, ctrl_ip, ctrl_mac, config);
+        let mut config_handler = ConfigHandler::new(config, ctrl_ip, ctrl_mac, logger_handle);
+        let mut components: Option<Components> = None;
 
         loop {
             match &*state_guard {
@@ -146,93 +148,65 @@ impl Trident {
                     state_guard = cond.wait(state_guard).unwrap();
                     continue;
                 }
-                State::Terminated => return Ok(()),
+                State::Terminated => {
+                    if let Some(mut component) = components {
+                        component.stop();
+                    }
+                    synchronizer.stop();
+                    return Ok(());
+                }
                 _ => (),
             }
             let mut new_state = State::Running;
             mem::swap(&mut new_state, &mut *state_guard);
             mem::drop(state_guard);
 
-            let new_config = new_state.unwrap_config();
-            let restart_dispatcher =
-                Self::update_config(&mut config_handler, new_config, &mut components);
-
-            if restart_dispatcher {
-                if let Some(c) = components.take() {
-                    c.stop();
-                    // TODO: reset fast path
+            let (new_config, new_pb_config) = new_state.unwrap_config();
+            let new_conf = match config_handler.new_runtime_config(new_pb_config) {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!("keep using previous runtime config, {}", e);
+                    if components.is_none() {
+                        let mut comp = Components::new(
+                            &config_handler,
+                            &new_config, //FIXME: 旧runtime config, 以后去掉
+                            &stats_collector,
+                            &session,
+                            &synchronizer,
+                        )?;
+                        comp.start();
+                        components.replace(comp);
+                    }
+                    state_guard = state.lock().unwrap();
+                    continue;
                 }
-            }
-            if config_handler.runtime_config.enabled != components.is_some() {
-                if config_handler.runtime_config.enabled {
-                    info!("Current Revision: {}", &revision);
-                    match Components::start(
+            };
+            info!("{:?}", new_conf);
+
+            let callbacks = config_handler.on_config(new_conf);
+            match components.as_mut() {
+                None => {
+                    let mut comp = Components::new(
                         &config_handler,
+                        &new_config,
                         &stats_collector,
                         &session,
                         &synchronizer,
-                    ) {
-                        Ok(c) => components = Some(c),
-                        Err(e) => warn!("start dispatcher failed: {}", e),
+                    )?;
+                    comp.start();
+                    for callback in callbacks {
+                        callback(&config_handler, &mut comp);
                     }
-                } else {
-                    components.take().unwrap().stop();
+                    components.replace(comp);
+                }
+                Some(components) => {
+                    for callback in callbacks {
+                        callback(&config_handler, components);
+                    }
                 }
             }
-
             state_guard = state.lock().unwrap();
         }
-    }
-
-    // returns dispatcher need restart
-    fn update_config(
-        config_handler: &mut ConfigHandler,
-        new_config: RuntimeConfig,
-        components: &mut Option<Components>,
-    ) -> bool {
-        let static_config = &config_handler.static_config;
-        let runtime_config = &mut config_handler.runtime_config;
-
-        let mut restart_dispatcher = false;
-        if runtime_config.enabled != new_config.enabled {
-            runtime_config.enabled = new_config.enabled;
-            info!("Enabled set to {}", new_config.enabled);
-        }
-        if runtime_config.global_pps_threshold != new_config.global_pps_threshold {
-            runtime_config.global_pps_threshold = new_config.global_pps_threshold;
-            if let Some(components) = components.as_mut() {
-                match static_config.tap_mode {
-                    TapMode::Analyzer => {
-                        components.rx_leaky_bucket.set_rate(None);
-                        info!("Global pps set unlimit when tap_mode=analyzer");
-                    }
-                    _ => {
-                        components
-                            .rx_leaky_bucket
-                            .set_rate(Some(runtime_config.global_pps_threshold));
-                        info!(
-                            "Global pps threshold change to {}",
-                            runtime_config.global_pps_threshold
-                        );
-                    }
-                }
-            }
-        }
-
-        if runtime_config.inactive_server_port_enabled != new_config.inactive_server_port_enabled {
-            config_handler
-                .collector
-                .inactive_server_port_enabled
-                .store(new_config.inactive_server_port_enabled, Ordering::Relaxed);
-            info!(
-                "inactive_server_port_enabled set to {}",
-                new_config.inactive_server_port_enabled
-            );
-        }
-
-        // TODO: update other configs and remove the next line
-        *runtime_config = new_config;
-        restart_dispatcher
     }
 
     pub fn stop(&mut self) {
@@ -246,7 +220,7 @@ impl Trident {
         self.handle.take().unwrap().join().unwrap();
     }
 
-    fn get_af_packet_blocks(config: &Config, mem_size: u64) -> usize {
+    pub fn get_af_packet_blocks(config: &Config, mem_size: u64) -> usize {
         if config.tap_mode == TapMode::Analyzer || config.af_packet_blocks_enabled {
             config.af_packet_blocks.max(8)
         } else {
@@ -255,38 +229,70 @@ impl Trident {
     }
 }
 
-struct Components {
-    source_ip: IpAddr,
-    rx_leaky_bucket: Arc<LeakyBucket>,
-    libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
-    tap_typer: Arc<TapTyper>,
-    dispatchers: Vec<Dispatcher>,
-    dispatcher_listeners: Vec<DispatcherListener>,
-    log_parsers: Vec<AppProtoLogsParser>,
-    collectors: Vec<CollectorThread>,
-    l4_flow_uniform_sender: Option<UniformSenderThread>,
-    metrics_uniform_sender: UniformSenderThread,
-    l7_flow_uniform_sender: UniformSenderThread,
-    monitor: Monitor,
-    platform_synchronizer: PlatformSynchronizer,
-    api_watcher: Arc<ApiWatcher>,
-    debugger: Debugger,
-    pcap_manager: WorkerManager,
+pub struct Components {
+    pub rx_leaky_bucket: Arc<LeakyBucket>,
+    pub libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
+    pub tap_typer: Arc<TapTyper>,
+    pub dispatchers: Vec<Dispatcher>,
+    pub dispatcher_listeners: Vec<DispatcherListener>,
+    pub log_parsers: Vec<AppProtoLogsParser>,
+    pub collectors: Vec<CollectorThread>,
+    pub l4_flow_uniform_sender: Option<UniformSenderThread>,
+    pub metrics_uniform_sender: UniformSenderThread,
+    pub l7_flow_uniform_sender: UniformSenderThread,
+    pub monitor: Monitor,
+    pub platform_synchronizer: PlatformSynchronizer,
+    pub api_watcher: Arc<ApiWatcher>,
+    pub debugger: Debugger,
+    pub pcap_manager: WorkerManager,
+    pub guard: Guard,
+    pub running: AtomicBool,
 }
 
 impl Components {
-    fn start(
+    pub fn start(&mut self) {
+        if self.running.swap(true, Ordering::Relaxed) {
+            return;
+        }
+        self.libvirt_xml_extractor.start();
+        self.pcap_manager.start();
+        self.platform_synchronizer.start();
+        self.api_watcher.start();
+        self.debugger.start();
+        self.metrics_uniform_sender.start();
+        self.l7_flow_uniform_sender.start();
+
+        if let Some(l4_sender) = self.l4_flow_uniform_sender.as_mut() {
+            l4_sender.start();
+        }
+
+        for dispatcher in self.dispatchers.iter() {
+            dispatcher.start();
+        }
+
+        for log_parser in self.log_parsers.iter() {
+            log_parser.start();
+        }
+
+        for collector in self.collectors.iter_mut() {
+            collector.start();
+        }
+        self.monitor.start();
+        self.guard.start();
+    }
+
+    fn new(
         config_handler: &ConfigHandler,
+        runtime_config: &RuntimeConfig,
         stats_collector: &Arc<stats::Collector>,
         session: &Arc<Session>,
         synchronizer: &Arc<Synchronizer>,
     ) -> Result<Self> {
         let static_config = &config_handler.static_config;
-        let runtime_config = &config_handler.runtime_config;
+        let candidate_config = &config_handler.candidate_config;
         let ctrl_ip = config_handler.ctrl_ip;
         let ctrl_mac = config_handler.ctrl_mac;
 
-        info!("start dispatcher");
         trident_process_check();
         controller_ip_check(&static_config.controller_ips);
         check(free_space_checker(
@@ -294,21 +300,11 @@ impl Components {
             FREE_SPACE_REQUIREMENT,
         ));
 
-        if !static_config.controller_ips.is_empty() && static_config.analyzer_ip != "" {
-            warn!("Static config controller-ips({}) and analyzer-ip({}) will replace proxy-controller-ip and analyzer-ip.",
-                static_config.controller_ips[0], static_config.analyzer_ip);
-        }
-        let analyzer_ip = runtime_config
-            .analyzer_ip
-            .parse()
-            .with_context(|| format!("parse analyzer_ip {} failed", runtime_config.analyzer_ip))?;
-        let source_ip = get_route_src_ip(&analyzer_ip)?;
-
         match static_config.tap_mode {
             TapMode::Analyzer => todo!(),
             _ => {
                 check(free_memory_checker(
-                    config_handler.environment.max_memory.clone(),
+                    config_handler.candidate_config.environment.max_memory,
                 ));
                 info!("Complete memory check");
 
@@ -323,129 +319,47 @@ impl Components {
         // TODO: collector enabled
         // TODO: packet handler builders
         let libvirt_xml_extractor = Arc::new(LibvirtXmlExtractor::new());
-        libvirt_xml_extractor.start();
 
-        let pcap_config = &static_config.pcap;
         let (pcap_sender, pcap_receiver, _) =
-            queue::bounded(static_config.pcap.queue_size as usize);
+            queue::bounded(config_handler.candidate_config.pcap.queue_size as usize);
 
         let pcap_manager = WorkerManager::new(
-            pcap_config.block_size_kb,
-            pcap_config.max_concurrent_files,
-            pcap_config.max_file_size_mb,
-            pcap_config.max_file_period,
-            &pcap_config.file_directory,
-            pcap_config.max_file_period,
+            config_handler.pcap(),
             vec![pcap_receiver],
             stats_collector.clone(),
         );
-        pcap_manager.start();
 
         let platform_synchronizer = PlatformSynchronizer::new(
-            MINUTE,
-            static_config.kubernetes_poller_type,
-            static_config
-                .controller_ips
-                .first()
-                .unwrap()
-                .parse::<IpAddr>()
-                .unwrap(),
-            DEFAULT_LIBVIRT_XML_PATH,
-            static_config.kubernetes_cluster_id.clone(),
-            runtime_config.trident_type,
+            config_handler.platform(),
             session.clone(),
             libvirt_xml_extractor.clone(),
         );
 
-        platform_synchronizer.start();
-
-        let api_watcher = Arc::new(ApiWatcher::new(
-            static_config
-                .controller_ips
-                .first()
-                .unwrap()
-                .parse::<IpAddr>()
-                .unwrap(),
-            static_config.kubernetes_cluster_id.clone(),
-            static_config.ingress_flavour,
-            MINUTE,
-            session.clone(),
-        ));
-
-        api_watcher.start();
+        let api_watcher = Arc::new(ApiWatcher::new(config_handler.platform(), session.clone()));
 
         let context = ConstructDebugCtx {
-            vtap_id: runtime_config.vtap_id,
             api_watcher: api_watcher.clone(),
             poller: platform_synchronizer.clone_poller(),
             session: session.clone(),
             static_config: synchronizer.static_config.clone(),
             status: synchronizer.status.clone(),
-            controller_ips: static_config
-                .controller_ips
-                .iter()
-                .map(|c| c.parse::<IpAddr>().unwrap())
-                .collect(),
+            config: config_handler.debug(),
         };
         let debugger = Debugger::new(context);
-        debugger.start();
-
-        let bpf_syntax = bpf::Builder {
-            is_ipv6: ctrl_ip.is_ipv6(),
-            vxlan_port: static_config.vxlan_port,
-            controller_port: static_config.controller_port,
-            controller_tls_port: static_config.controller_tls_port,
-            proxy_controller_ip: runtime_config.proxy_controller_ip.parse()?,
-            analyzer_source_ip: source_ip,
-        }
-        .build_pcap_syntax();
-
-        let bpf_options = Arc::new(Mutex::new(BpfOptions { bpf_syntax }));
 
         let rx_leaky_bucket = Arc::new(LeakyBucket::new(match static_config.tap_mode {
             TapMode::Analyzer => None,
-            _ => Some(runtime_config.global_pps_threshold),
+            _ => Some(config_handler.candidate_config.global_pps_threshold),
         }));
-
-        let flow_map_config = {
-            let flow_config = &static_config.flow;
-
-            let mut l7_log_tap_types = [false; 256];
-            for &tap in runtime_config.l7_log_store_tap_types.iter() {
-                if tap < 256 {
-                    l7_log_tap_types[tap as usize] = true;
-                }
-            }
-
-            FlowMapConfig {
-                tap_types: l7_log_tap_types,
-                vtap_id: runtime_config.vtap_id,
-                trident_type: runtime_config.trident_type,
-                collector_enabled: runtime_config.collector_enabled,
-                packet_delay: static_config.packet_delay,
-                flush_interval: flow_config.flush_interval,
-                ignore_l2_end: flow_config.ignore_l2_end,
-                ignore_tor_mac: flow_config.ignore_tor_mac,
-                cloud_gateway_traffic: static_config.cloud_gateway_traffic,
-                flow_timeout: FlowTimeout::from(TcpTimeout {
-                    established: flow_config.established_timeout,
-                    closing_rst: flow_config.closing_rst_timeout,
-                    others: flow_config.others_timeout,
-                }),
-                runtime_config: Arc::new(FlowMapRuntimeConfig {
-                    l7_metrics_enabled: AtomicBool::new(runtime_config.l7_metrics_enabled),
-                    l4_performance_enabled: AtomicBool::new(runtime_config.l4_performance_enabled),
-                    app_proto_log_enabled: AtomicBool::new(
-                        runtime_config.l7_log_store_tap_types.is_empty(),
-                    ),
-                    l7_log_packet_size: AtomicU32::new(runtime_config.l7_log_packet_size),
-                }),
-            }
-        };
 
         let tap_typer = Arc::new(TapTyper::new());
 
-        let tap_interfaces = match links_by_name_regex(&runtime_config.tap_interface_regex) {
+        let tap_interfaces = match links_by_name_regex(
+            &config_handler
+                .candidate_config
+                .dispatcher
+                .tap_interface_regex,
+        ) {
             Err(e) => {
                 warn!("get interfaces by name regex failed: {}", e);
                 vec![]
@@ -453,7 +367,10 @@ impl Components {
             Ok(links) if links.is_empty() => {
                 warn!(
                     "tap-interface-regex({}) do not match any interface, in local mode",
-                    runtime_config.tap_interface_regex
+                    config_handler
+                        .candidate_config
+                        .dispatcher
+                        .tap_interface_regex
                 );
                 vec![]
             }
@@ -468,14 +385,19 @@ impl Components {
         let mut log_parsers = vec![];
         let queue_debugger = debugger.clone_queue();
 
-        let dst_ip = Arc::new(Mutex::new(
-            IpAddr::from_str(&runtime_config.analyzer_ip).unwrap(),
-        ));
+        // Sender/Collector
+        let dst_ip = Arc::new(Mutex::new(config_handler.candidate_config.sender.dest_ip));
         info!("analyzer_ip: {}", *dst_ip.lock().unwrap());
         let sender_id = 0usize;
         let mut l4_flow_aggr_sender = None;
         let mut l4_flow_uniform_sender = None;
-        if runtime_config.l4_log_store_tap_types.len() > 0 {
+        if config_handler
+            .candidate_config
+            .collector
+            .l4_log_store_tap_types
+            .iter()
+            .any(|&t| t)
+        {
             let (sender, l4_flow_aggr_receiver, counter) =
                 queue::bounded(static_config.flow.aggr_queue_size as usize);
             stats_collector.register_countable(
@@ -486,11 +408,10 @@ impl Components {
             l4_flow_aggr_sender = Some(sender);
             l4_flow_uniform_sender = Some(UniformSenderThread::new(
                 sender_id,
-                runtime_config.vtap_id,
+                config_handler.candidate_config.sender.vtap_id,
                 l4_flow_aggr_receiver,
                 dst_ip.clone(),
             ));
-            l4_flow_uniform_sender.as_mut().unwrap().start();
         }
 
         let sender_id = 1usize;
@@ -501,13 +422,12 @@ impl Components {
             Arc::new(counter),
             vec![StatsOption::Tag("index", sender_id.to_string())],
         );
-        let mut metrics_uniform_sender = UniformSenderThread::new(
+        let metrics_uniform_sender = UniformSenderThread::new(
             sender_id,
-            runtime_config.vtap_id,
+            config_handler.candidate_config.sender.vtap_id,
             metrics_receiver,
             dst_ip.clone(),
         );
-        metrics_uniform_sender.start();
 
         let sender_id = 2usize;
         let (proto_log_sender, proto_log_receiver, counter) = queue::bounded_with_debug(
@@ -520,14 +440,25 @@ impl Components {
             Arc::new(counter),
             vec![],
         );
-        let mut l7_flow_uniform_sender = UniformSenderThread::new(
+        let l7_flow_uniform_sender = UniformSenderThread::new(
             sender_id,
-            runtime_config.vtap_id,
+            config_handler.candidate_config.sender.vtap_id,
             proto_log_receiver,
             dst_ip,
         );
-        l7_flow_uniform_sender.start();
 
+        // Dispatcher
+        let bpf_syntax = bpf::Builder {
+            is_ipv6: ctrl_ip.is_ipv6(),
+            vxlan_port: static_config.vxlan_port,
+            controller_port: static_config.controller_port,
+            controller_tls_port: static_config.controller_tls_port,
+            proxy_controller_ip: candidate_config.dispatcher.proxy_controller_ip,
+            analyzer_source_ip: candidate_config.dispatcher.source_ip,
+        }
+        .build_pcap_syntax();
+
+        let bpf_options = Arc::new(Mutex::new(BpfOptions { bpf_syntax }));
         for i in 0..dispatcher_num {
             let (flow_sender, flow_receiver, counter) =
                 queue::bounded(static_config.flow_queue_size);
@@ -547,18 +478,16 @@ impl Components {
 
             let (app_proto_log_parser, counter) = AppProtoLogsParser::new(
                 log_receiver,
-                runtime_config.l7_log_collect_nps_threshold as usize,
-                static_config.l7_log_session_aggr_timeout,
                 proto_log_sender.clone(),
                 i as u32,
                 synchronizer.clone_http_config(),
+                config_handler.log_parser(),
             );
             stats_collector.register_countable(
                 "l7_session_aggr",
                 counter,
                 vec![StatsOption::Tag("index", i.to_string())],
             );
-            app_proto_log_parser.start();
             log_parsers.push(app_proto_log_parser);
 
             let dispatcher = DispatcherBuilder::new()
@@ -566,11 +495,8 @@ impl Components {
                 .ctrl_mac(ctrl_mac)
                 .leaky_bucket(rx_leaky_bucket.clone())
                 .options(Arc::new(dispatcher::Options {
-                    af_packet_blocks: Trident::get_af_packet_blocks(
-                        &static_config,
-                        runtime_config.max_memory,
-                    ),
-                    af_packet_version: runtime_config.capture_socket_type.into(),
+                    af_packet_blocks: config_handler.candidate_config.dispatcher.af_packet_blocks,
+                    af_packet_version: config_handler.candidate_config.dispatcher.af_packet_version,
                     tap_mode: static_config.tap_mode,
                     tap_mac_script: static_config.tap_mac_script.clone(),
                     is_ipv6: ctrl_ip.is_ipv6(),
@@ -592,8 +518,8 @@ impl Components {
                 .libvirt_xml_extractor(libvirt_xml_extractor.clone())
                 .flow_output_queue(flow_sender)
                 .log_output_queue(log_sender)
-                .flow_map_config(flow_map_config.clone())
                 .stats_collector(stats_collector.clone())
+                .flow_map_config(config_handler.flow())
                 .build()
                 .unwrap();
 
@@ -602,39 +528,32 @@ impl Components {
             dispatcher_listener.on_config_change(&runtime_config);
             dispatcher_listener.on_tap_interface_change(
                 &tap_interfaces,
-                runtime_config.if_mac_source,
-                runtime_config.trident_type,
+                candidate_config.dispatcher.if_mac_source,
+                candidate_config.dispatcher.trident_type,
                 &vec![],
             );
 
-            dispatcher.start();
             dispatchers.push(dispatcher);
             dispatcher_listeners.push(dispatcher_listener);
 
             // create and start collector
-            let mut collector = Self::new_collector(
+            let collector = Self::new_collector(
                 i,
                 stats_collector,
-                static_config,
-                runtime_config,
                 flow_receiver,
                 l4_flow_aggr_sender.clone(),
                 metrics_sender.clone(),
                 MetricsType::SECOND | MetricsType::MINUTE,
-                config_handler
-                    .collector
-                    .inactive_server_port_enabled
-                    .clone(),
+                config_handler,
             );
-            collector.start();
             collectors.push(collector);
         }
 
         let monitor = Monitor::new(stats_collector.clone())?;
-        monitor.start();
+
+        let guard = Guard::new(config_handler.environment());
 
         Ok(Components {
-            source_ip,
             rx_leaky_bucket,
             libvirt_xml_extractor,
             tap_typer,
@@ -650,20 +569,22 @@ impl Components {
             debugger,
             pcap_manager,
             log_parsers,
+            guard,
+            running: AtomicBool::new(false),
         })
     }
 
     fn new_collector(
         id: usize,
         stats_collector: &Arc<stats::Collector>,
-        static_config: &Config,
-        runtime_config: &RuntimeConfig,
         flow_receiver: queue::Receiver<TaggedFlow>,
         l4_flow_aggr_sender: Option<queue::Sender<SendItem>>,
         metrics_sender: queue::Sender<SendItem>,
         metrics_type: MetricsType,
-        inactive_server_port_enabled: Arc<AtomicBool>,
+        config_handler: &ConfigHandler,
     ) -> CollectorThread {
+        let static_config = &config_handler.static_config;
+        let runtime_config = &config_handler.candidate_config;
         let (second_sender, second_receiver, counter) =
             queue::bounded(static_config.quadruple_queue_size);
         stats_collector.register_countable(
@@ -708,7 +629,9 @@ impl Components {
             + static_config.flow.flush_interval.as_secs()
             + 5;
 
-        let vtap_flow_1s_enabled = Arc::new(AtomicBool::new(runtime_config.vtap_flow_1s_enabled));
+        let vtap_flow_1s_enabled = Arc::new(AtomicBool::new(
+            runtime_config.collector.vtap_flow_1s_enabled,
+        ));
         let quadruple_generator = QuadrupleGeneratorThread::new(
             id,
             flow_receiver,
@@ -720,18 +643,20 @@ impl Components {
             second_quadruple_tolerable_delay,
             minute_quadruple_tolerable_delay,
             1 << 18, // possible_host_size
-            runtime_config.l7_metrics_enabled,
+            runtime_config.collector.l7_metrics_enabled,
             vtap_flow_1s_enabled,
         );
 
         let mut l4_flow_aggr = None;
         if let Some(l4_log_receiver) = l4_log_receiver {
-            let throttle = Arc::new(AtomicU64::new(runtime_config.l4_log_collect_nps_threshold));
+            let throttle = Arc::new(AtomicU64::new(
+                runtime_config.collector.l4_log_collect_nps_threshold,
+            ));
             l4_flow_aggr = Some(FlowAggrThread::new(
                 id,                                   // id
                 l4_log_receiver,                      // input
                 l4_flow_aggr_sender.unwrap().clone(), // output
-                runtime_config.l4_log_store_tap_types.as_slice(),
+                runtime_config.collector.l4_log_store_tap_types,
                 throttle,
             ));
         }
@@ -744,11 +669,8 @@ impl Components {
                 metrics_sender.clone(),
                 MetricsType::SECOND,
                 second_quadruple_tolerable_delay as u32,
-                runtime_config.vtap_id,
-                inactive_server_port_enabled.clone(),
-                static_config.cloud_gateway_traffic,
-                runtime_config.trident_type,
                 stats_collector,
+                config_handler.collector(),
             ));
         }
         if metrics_type.contains(MetricsType::MINUTE) {
@@ -758,11 +680,8 @@ impl Components {
                 metrics_sender,
                 MetricsType::MINUTE,
                 minute_quadruple_tolerable_delay as u32,
-                runtime_config.vtap_id,
-                inactive_server_port_enabled,
-                static_config.cloud_gateway_traffic,
-                runtime_config.trident_type,
                 stats_collector,
+                config_handler.collector(),
             ));
         }
 
@@ -774,8 +693,10 @@ impl Components {
         )
     }
 
-    fn stop(mut self) {
-        info!("stop dispatcher");
+    pub fn stop(&mut self) {
+        if !self.running.swap(false, Ordering::Relaxed) {
+            return;
+        }
 
         for d in self.dispatchers.iter_mut() {
             d.stop();
@@ -798,52 +719,11 @@ impl Components {
         self.metrics_uniform_sender.stop();
         self.l7_flow_uniform_sender.stop();
 
-        // TODO: app proto logs handler
-
         self.libvirt_xml_extractor.stop();
         self.pcap_manager.stop();
 
         self.debugger.stop();
         self.monitor.stop();
-    }
-}
-
-struct CollectorConfig {
-    inactive_server_port_enabled: Arc<AtomicBool>,
-}
-
-struct EnvironmentConfig {
-    max_memory: Arc<AtomicU64>,
-}
-
-struct ConfigHandler {
-    static_config: Config,
-    runtime_config: RuntimeConfig,
-    ctrl_ip: IpAddr,
-    ctrl_mac: MacAddr,
-    // need update
-    collector: CollectorConfig,
-    environment: EnvironmentConfig,
-}
-
-impl ConfigHandler {
-    fn new(
-        synchronizer: &Synchronizer,
-        ctrl_ip: IpAddr,
-        ctrl_mac: MacAddr,
-        config: Config,
-    ) -> Self {
-        ConfigHandler {
-            static_config: config,
-            runtime_config: RuntimeConfig::default(),
-            ctrl_ip,
-            ctrl_mac,
-            collector: CollectorConfig {
-                inactive_server_port_enabled: Arc::new(AtomicBool::new(false)),
-            },
-            environment: EnvironmentConfig {
-                max_memory: synchronizer.max_memory(),
-            },
-        }
+        self.guard.stop();
     }
 }

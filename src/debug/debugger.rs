@@ -1,7 +1,7 @@
 use std::{
     io::{self, ErrorKind},
     mem,
-    net::{IpAddr, SocketAddr, ToSocketAddrs, UdpSocket},
+    net::{SocketAddr, ToSocketAddrs, UdpSocket},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -11,6 +11,7 @@ use std::{
     time::Instant,
 };
 
+use arc_swap::access::Access;
 use log::{info, warn};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -24,6 +25,7 @@ use super::{
 };
 
 use crate::{
+    config::handler::DebugAccess,
     platform::{ApiWatcher, GenericPoller},
     rpc::{Session, StaticConfig, Status},
 };
@@ -48,18 +50,16 @@ pub struct Debugger {
     thread: Mutex<Option<JoinHandle<Result<()>>>>,
     running: Arc<AtomicBool>,
     debuggers: Arc<ModuleDebuggers>,
-    controller_ips: Vec<IpAddr>,
-    vtap_id: u16,
+    config: DebugAccess,
 }
 
 pub struct ConstructDebugCtx {
-    pub vtap_id: u16,
+    pub config: DebugAccess,
     pub api_watcher: Arc<ApiWatcher>,
     pub poller: Arc<GenericPoller>,
     pub session: Arc<Session>,
     pub static_config: Arc<StaticConfig>,
     pub status: Arc<RwLock<Status>>,
-    pub controller_ips: Vec<IpAddr>,
 }
 
 impl Debugger {
@@ -72,8 +72,7 @@ impl Debugger {
         let read_timeout = self.udp_options.0;
         let addr = self.udp_options.1;
         let debuggers = self.debuggers.clone();
-        let controller_ips = self.controller_ips.clone();
-        let vtap_id = self.vtap_id;
+        let config = self.config.clone();
 
         let beacon_interval = self.udp_options.2;
 
@@ -100,9 +99,13 @@ impl Debugger {
                             continue;
                         }
                     };
-                    let beacon = Beacon { vtap_id, hostname };
+
+                    let beacon = Beacon {
+                        vtap_id: config.load().vtap_id,
+                        hostname,
+                    };
                     let serialized_beacon = bincode::serialize(&beacon)?;
-                    for &ip in controller_ips.iter() {
+                    for &ip in config.load().controller_ips.iter() {
                         sock_clone.send_to(serialized_beacon.as_slice(), (ip, BEACON_PORT))?;
                     }
                     thread::sleep(beacon_interval);
@@ -179,8 +182,7 @@ impl Debugger {
             thread: Mutex::new(None),
             running: Arc::new(AtomicBool::new(false)),
             debuggers: Arc::new(debuggers),
-            vtap_id: context.vtap_id,
-            controller_ips: context.controller_ips,
+            config: context.config,
         }
     }
 
@@ -396,11 +398,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::net::{Ipv4Addr, Ipv6Addr};
+    use std::net::{IpAddr, Ipv6Addr};
 
+    use arc_swap::{access::Map, ArcSwap};
     use rand::random;
 
-    use crate::config::IngressFlavour;
+    use crate::config::handler::{DebugConfig, NewRuntimeConfig, PlatformConfig};
     use crate::platform::ActivePoller;
     use crate::{debug::Message, rpc::Session};
 
@@ -416,15 +419,16 @@ mod tests {
             vec![String::from("10.1.20.21")],
         ));
 
+        let current_config = Arc::new(ArcSwap::from_pointee(NewRuntimeConfig::default()));
+
         let static_config = Arc::new(StaticConfig::default());
         let status = Arc::new(RwLock::new(Status::default()));
 
         ConstructDebugCtx {
             api_watcher: Arc::new(ApiWatcher::new(
-                Ipv4Addr::UNSPECIFIED.into(),
-                s,
-                IngressFlavour::Kubernetes,
-                Duration::from_secs(1),
+                Map::new(current_config.clone(), |config| -> &PlatformConfig {
+                    &config.platform
+                }),
                 session.clone(),
             )),
             poller: Arc::new(GenericPoller::from(ActivePoller::new(Duration::from_secs(
@@ -433,8 +437,9 @@ mod tests {
             session,
             static_config,
             status,
-            vtap_id: 7,
-            controller_ips: vec![Ipv4Addr::new(10, 1, 20, 21).into()],
+            config: Map::new(current_config.clone(), |config| -> &DebugConfig {
+                &config.debug
+            }),
         }
     }
 
