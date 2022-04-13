@@ -2,9 +2,10 @@ use bytes::Bytes;
 use httpbis::for_test::hpack;
 
 use super::LogMessageType;
-use super::{consts::*, AppProtoLogsInfo, L7LogParse};
+use super::{consts::*, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7ResponseStatus};
 
 use crate::common::enums::{IpProtocol, PacketDirection};
+use crate::common::flow::L7Protocol;
 use crate::flow_generator::error::{Error, Result};
 use crate::proto::flow_log;
 use crate::utils::bytes::read_u32_be;
@@ -20,6 +21,7 @@ pub struct HttpInfo {
     pub path: String,
     pub host: String,
     pub client_ip: String,
+    pub x_request_id: String,
 
     pub req_content_length: Option<u64>,
     pub resp_content_length: Option<u64>,
@@ -56,14 +58,17 @@ impl From<HttpInfo> for flow_log::HttpInfo {
                 Some(length) => length as i64,
                 _ => -1,
             },
+            x_request_id: f.x_request_id,
         }
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct HttpLog {
     status_code: u16,
     msg_type: LogMessageType,
+    proto: L7Protocol,
+    status: L7ResponseStatus,
 
     info: HttpInfo,
 }
@@ -71,6 +76,22 @@ pub struct HttpLog {
 impl HttpLog {
     fn reset_logs(&mut self) {
         self.info = HttpInfo::default();
+    }
+
+    fn set_status(&mut self, status_code: u16) {
+        if status_code >= HTTP_STATUS_CLIENT_ERROR_MIN
+            && status_code <= HTTP_STATUS_CLIENT_ERROR_MAX
+        {
+            // http客户端请求存在错误
+            self.status = L7ResponseStatus::ClientError;
+        } else if status_code >= HTTP_STATUS_SERVER_ERROR_MIN
+            && status_code <= HTTP_STATUS_SERVER_ERROR_MAX
+        {
+            // http服务端响应存在错误
+            self.status = L7ResponseStatus::ServerError;
+        } else {
+            self.status = L7ResponseStatus::Ok;
+        }
     }
 
     fn parse_http_v1(&mut self, payload: &[u8], direction: PacketDirection) -> Result<()> {
@@ -96,6 +117,8 @@ impl HttpLog {
             self.status_code = status_code as u16;
 
             self.msg_type = LogMessageType::Request;
+
+            self.set_status(status_code);
         } else {
             // HTTP请求行：GET /background.png HTTP/1.0
             let (method, _) = line_info
@@ -132,6 +155,8 @@ impl HttpLog {
             } else if direction == PacketDirection::ClientToServer {
                 if body_line.starts_with("Host:") {
                     self.info.host = body_line[HTTP_HOST_OFFSET..].to_string();
+                } else if body_line.starts_with("X-request-id:") {
+                    self.info.x_request_id = body_line[16..].to_string();
                 }
             }
             // TODO:traceID计算，需要依赖rpc-config部分
@@ -143,7 +168,7 @@ impl HttpLog {
         } else {
             self.info.req_content_length = content_length;
         }
-
+        self.proto = L7Protocol::Http1;
         Ok(())
     }
 
@@ -209,7 +234,8 @@ impl HttpLog {
                             self.status_code = std::str::from_utf8(header.1.as_ref())
                                 .unwrap_or_default()
                                 .parse::<u16>()
-                                .unwrap_or_default()
+                                .unwrap_or_default();
+                            self.set_status(self.status_code);
                         }
                         b"host" | b":authority" => {
                             self.info.host = String::from_utf8_lossy(header.1.as_ref()).into_owned()
@@ -272,6 +298,7 @@ impl HttpLog {
                 self.info.resp_content_length = content_length;
             }
             self.info.version = "2".to_string();
+            self.proto = L7Protocol::Http2;
             return Ok(());
         }
         Err(Error::HttpHeaderParseFailed)
@@ -284,14 +311,22 @@ impl L7LogParse for HttpLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-    ) -> Result<()> {
+    ) -> Result<AppProtoHead> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
         self.reset_logs();
 
         self.parse_http_v1(payload, direction)
-            .or(self.parse_http_v2(payload, direction))
+            .or(self.parse_http_v2(payload, direction))?;
+
+        Ok(AppProtoHead {
+            proto: self.proto,
+            msg_type: self.msg_type,
+            status: self.status,
+            code: self.status_code,
+            rrt: 0,
+        })
     }
 
     fn info(&self) -> AppProtoLogsInfo {

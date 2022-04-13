@@ -1,5 +1,6 @@
 use super::super::{
-    consts::*, AppProtoLogsData, AppProtoLogsInfo, L7LogParse, L7Protocol, LogMessageType,
+    consts::*, AppProtoHead, AppProtoLogsData, AppProtoLogsInfo, L7LogParse, L7Protocol,
+    L7ResponseStatus, LogMessageType,
 };
 
 use crate::proto::flow_log;
@@ -50,12 +51,13 @@ impl From<MysqlInfo> for flow_log::MysqlInfo {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct MysqlLog {
     info: MysqlInfo,
 
     l7_proto: L7Protocol,
     msg_type: LogMessageType,
+    status: L7ResponseStatus,
 }
 
 impl MysqlLog {
@@ -146,6 +148,18 @@ impl MysqlLog {
         }
     }
 
+    fn set_status(&mut self, status_code: u16) {
+        if status_code != 0 {
+            if status_code >= 2000 && status_code <= 2999 {
+                self.status = L7ResponseStatus::ClientError;
+            } else {
+                self.status = L7ResponseStatus::ServerError;
+            }
+        } else {
+            self.status = L7ResponseStatus::Ok;
+        }
+    }
+
     fn response(&mut self, payload: &[u8]) -> Result<()> {
         let mut remain = payload.len();
         if remain < RESPONSE_CODE_LEN {
@@ -159,6 +173,7 @@ impl MysqlLog {
                     self.info.error_code = bytes::read_u16_le(&payload[ERROR_CODE_OFFSET..]);
                     remain -= ERROR_CODE_LEN;
                 }
+                self.set_status(self.info.error_code);
                 let error_message_offset =
                     if remain > SQL_STATE_LEN && payload[SQL_STATE_OFFSET] == SQL_STATE_MARKER {
                         SQL_STATE_OFFSET + SQL_STATE_LEN
@@ -184,7 +199,7 @@ impl L7LogParse for MysqlLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-    ) -> Result<()> {
+    ) -> Result<AppProtoHead> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -204,7 +219,13 @@ impl L7LogParse for MysqlLog {
         };
         self.msg_type = msg_type;
 
-        Ok(())
+        Ok(AppProtoHead {
+            proto: L7Protocol::Mysql,
+            msg_type,
+            status: self.status,
+            code: self.info.error_code,
+            rrt: 0,
+        })
     }
 
     fn info(&self) -> AppProtoLogsInfo {

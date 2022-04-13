@@ -1,3 +1,5 @@
+use std::error::Error;
+use std::ffi::CStr;
 use std::fmt;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -30,7 +32,7 @@ pub struct MetaPacket<'a> {
     // 主机序, 不因L2End1而颠倒, 端口会在查询策略时被修改
     pub lookup_key: LookupKey,
 
-    pub raw_from_ebpf: Box<[u8]>,
+    pub raw_from_ebpf: Vec<u8>,
     pub raw: Option<&'a [u8]>,
     pub packet_len: usize,
     vlan_tag_size: usize,
@@ -84,9 +86,13 @@ pub struct MetaPacket<'a> {
     pub source_ip: u32,
 
     // for ebpf
-    pub socket_id: u64,
-    pub process_id: u32,
     pub l7_protocol: L7Protocol,
+    pub socket_id: u64,
+
+    pub process_id: u32,
+    pub thread_id: u32,
+    pub syscall_trace_id: u64,
+    pub process_name: String,
 }
 
 impl<'a> MetaPacket<'a> {
@@ -730,52 +736,68 @@ impl<'a> MetaPacket<'a> {
         self.l4_payload_len
     }
 
-    pub unsafe fn update_from_ebpf(&mut self, data: *mut SK_BPF_DATA) {
-        let src_ip: IpAddr;
-        let dst_ip: IpAddr;
-        if (*data).tuple.addr_len == 4 {
-            let addr: [u8; 4] = (*data).tuple.laddr[..4].try_into().unwrap();
-            src_ip = IpAddr::from(Ipv4Addr::from(addr));
-            let addr: [u8; 4] = (*data).tuple.raddr[..4].try_into().unwrap();
-            dst_ip = IpAddr::from(Ipv4Addr::from(addr));
+    pub unsafe fn new_from_ebpf(data: *mut SK_BPF_DATA) -> Result<MetaPacket<'a>, Box<dyn Error>> {
+        let data = &mut (*data);
+        let (src_ip, dst_ip) = if data.tuple.addr_len == 4 {
+            (
+                {
+                    let addr: [u8; 4] = data.tuple.laddr[..4].try_into()?;
+                    IpAddr::from(Ipv4Addr::from(addr))
+                },
+                {
+                    let addr: [u8; 4] = data.tuple.raddr[..4].try_into()?;
+                    IpAddr::from(Ipv4Addr::from(addr))
+                },
+            )
         } else {
-            src_ip = IpAddr::from(Ipv6Addr::from((*data).tuple.laddr));
-            dst_ip = IpAddr::from(Ipv6Addr::from((*data).tuple.raddr));
-        }
+            (
+                IpAddr::from(Ipv6Addr::from(data.tuple.laddr)),
+                IpAddr::from(Ipv6Addr::from(data.tuple.raddr)),
+            )
+        };
 
-        self.lookup_key = LookupKey {
-            timestamp: Duration::from_micros((*data).timestamp),
+        let mut packet = MetaPacket::default();
+
+        packet.lookup_key = LookupKey {
+            timestamp: Duration::from_micros(data.timestamp),
             src_ip,
             dst_ip,
-            src_port: (*data).tuple.lport,
-            dst_port: (*data).tuple.rport,
-            eth_type: if (*data).tuple.addr_len == 4 {
+            src_port: data.tuple.lport,
+            dst_port: data.tuple.rport,
+            eth_type: if data.tuple.addr_len == 4 {
                 EthernetType::Ipv4
             } else {
                 EthernetType::Ipv6
             },
-            l2_end_0: (*data).direction == SOCK_DIR_SND,
-            l2_end_1: (*data).direction == SOCK_DIR_RCV,
-            proto: IpProtocol::try_from((*data).tuple.protocol).unwrap_or_default(),
+            l2_end_0: data.direction == SOCK_DIR_SND,
+            l2_end_1: data.direction == SOCK_DIR_RCV,
+            proto: IpProtocol::try_from(data.tuple.protocol)?,
             tap_type: TapType::Tor,
             ..Default::default()
         };
 
-        let cap_len = CAP_LEN_MAX.min((*data).cap_len as usize);
+        let cap_len = CAP_LEN_MAX.min(data.cap_len as usize);
 
-        self.raw_from_ebpf = Box::new([0u8; CAP_LEN_MAX]);
-        (*data)
-            .cap_data
-            .copy_to(self.raw_from_ebpf.as_mut_ptr() as *mut i8, cap_len);
-        self.packet_len = (*data).syscall_len as usize + 54; // 目前仅支持TCP
-        self.payload_len = (*data).cap_len as u16;
-        self.l4_payload_len = (*data).cap_len as usize;
-        self.tap_port = TapPort::from_ebpf((*data).process_id);
-        self.process_id = (*data).process_id;
-        self.socket_id = (*data).socket_id;
-        if !(*data).need_reconfirm {
-            self.l7_protocol = L7Protocol::from((*data).l7_protocal_hint as u8);
+        packet.raw_from_ebpf = vec![0u8; cap_len as usize];
+        data.cap_data
+            .copy_to_nonoverlapping(packet.raw_from_ebpf.as_mut_ptr() as *mut i8, cap_len);
+        packet.packet_len = data.syscall_len as usize + 54; // 目前仅支持TCP
+        packet.payload_len = data.cap_len as u16;
+        packet.l4_payload_len = data.cap_len as usize;
+        packet.tap_port = TapPort::from_ebpf(data.process_id);
+        packet.process_id = data.process_id;
+        packet.thread_id = data.thread_id;
+        packet.syscall_trace_id = data.syscall_trace_id_call;
+        packet.process_name = CStr::from_ptr(data.process_name.as_ptr() as *const i8)
+            .to_str()?
+            .to_string();
+        packet.socket_id = data.socket_id;
+        if !data.need_reconfirm {
+            packet.l7_protocol = L7Protocol::from(data.l7_protocal_hint as u8);
         }
+        packet.direction = PacketDirection::from(data.msg_type);
+        packet.tcp_data.seq = data.tcp_seq as u32;
+        return Ok(packet);
     }
 }
 
