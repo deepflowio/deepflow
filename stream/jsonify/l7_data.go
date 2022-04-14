@@ -2,7 +2,6 @@ package jsonify
 
 import (
 	"fmt"
-	"math/rand"
 	"net"
 	"strconv"
 	"time"
@@ -554,21 +553,6 @@ func (h *L7Logger) String() string {
 	return fmt.Sprintf("L7Log: %+v\n", *h)
 }
 
-var r = rand.New(rand.NewSource(time.Now().UnixNano()))
-
-func getRandomString() string {
-	bytes := []byte{'a', 'b', 'c', 'd', 'e', 'f'}
-	rint := r.Intn(len(bytes))
-	if rint == 0 {
-		return ""
-	}
-	result := make([]byte, 0, 6)
-	for i := 0; i < rint; i++ {
-		result = append(result, bytes[r.Intn(len(bytes))])
-	}
-	return string(result)
-}
-
 func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
 	l := log.BaseInfo
 	// 网络层
@@ -603,16 +587,7 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.StartTime = l.StartTime / uint64(time.Microsecond)
 	b.EndTime = l.EndTime / uint64(time.Microsecond)
 
-	// FIXME 先填充测试值
-	b.XRequestID = getRandomString()
-	b.ProcessID0 = uint32(r.Intn(100))
-	b.ProcessID1 = uint32(r.Intn(100))
-	b.ProcessKName0 = getRandomString()
-	b.ProcessKName1 = getRandomString()
-	b.SyscallTraceIDThread = uint32(r.Intn(100))
-	b.SyscallTraceIDSession = uint64(r.Intn(1000))
-	b.SyscallTraceIDRequest = uint64(r.Intn(1000))
-	b.SyscallTraceIDResponse = uint64(r.Intn(1000))
+	// FIXME 补充填充链路追踪数据
 }
 
 func (k *KnowledgeGraph) FillL7(l *pb.AppProtoLogsBaseInfo, platformData *grpc.PlatformInfoTable, protocol layers.IPProtocol) {

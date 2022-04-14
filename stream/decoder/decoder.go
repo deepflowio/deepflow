@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	logging "github.com/op/go-logging"
+	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
@@ -193,10 +194,33 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 		d.l7Disableds[proto.BaseInfo.Head.Proto] {
 		drop = 1
 	} else {
-		l := jsonify.ProtoLogToL7Logger(proto, d.shardID, d.platformData)
-		if !d.throttler.Send(l) {
-			d.counter.L7DropCount++
-			drop = 1
+		tapSide := zerodoc.TAPSideEnum(proto.BaseInfo.TapSide).String()
+		s := []interface{}{}
+		if tapSide == "c" {
+			l1 := jsonify.ProtoLogToL7Logger(proto, d.shardID, d.platformData)
+			l2 := jsonify.ProtoLogToL7Logger(proto, d.shardID, d.platformData)
+			l := l2.(*jsonify.L7Logger)
+			l.TapSide = "c-p"
+			l.ProcessID0 = l.PodID0
+			l.ProcessKName0 = strconv.Itoa(int(l.PodID0))
+			s = append(s, l1, l2)
+		} else if tapSide == "s" {
+			l1 := jsonify.ProtoLogToL7Logger(proto, d.shardID, d.platformData)
+			l2 := jsonify.ProtoLogToL7Logger(proto, d.shardID, d.platformData)
+			l := l2.(*jsonify.L7Logger)
+			l.TapSide = "s-p"
+			l.ProcessID0 = l.PodID1
+			l.ProcessKName0 = strconv.Itoa(int(l.PodID1))
+			s = append(s, l1, l2)
+		} else {
+			l := jsonify.ProtoLogToL7Logger(proto, d.shardID, d.platformData)
+			s = append(s, l)
+		}
+		for l := range s {
+			if !d.throttler.Send(l) {
+				d.counter.L7DropCount++
+				drop = 1
+			}
 		}
 	}
 	proto.Release()
