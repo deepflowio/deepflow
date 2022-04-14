@@ -8,7 +8,7 @@ static __inline int is_http_response(const char *data)
 {
 	return (data[0] == 'H' && data[1] == 'T' && data[2] == 'T'
 		&& data[3] == 'P' && data[4] == '/' && data[5] == '1'
-		&& data[6] == '.' && data[7] == '1' && data[8] == ' ');
+		&& data[6] == '.' && data[8] == ' ');
 }
 
 static __inline int is_http_request(const char *data, int data_len)
