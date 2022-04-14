@@ -715,7 +715,7 @@ impl Components {
             second_sender,
             minute_sender,
             l4_log_sender,
-            (static_config.flow.hash_slots << 8) as usize, // connection_lru_capacity
+            (static_config.flow.hash_slots << 3) as usize, // connection_lru_capacity
             metrics_type,
             second_quadruple_tolerable_delay,
             minute_quadruple_tolerable_delay,
