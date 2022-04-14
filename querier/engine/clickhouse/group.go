@@ -2,7 +2,6 @@ package clickhouse
 
 import (
 	"fmt"
-
 	"metaflow/querier/engine/clickhouse/tag"
 	"metaflow/querier/engine/clickhouse/view"
 	"strings"
@@ -13,7 +12,7 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Stat
 		return nil, nil
 	}
 	var stmts []Statement
-	tag, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
+	tag, ok := tag.GetTag(name, db, table, "default")
 	if ok {
 		for _, suffix := range []string{"", "_0", "_1"} {
 			ip4Suffix := "ip4" + suffix
@@ -50,7 +49,7 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Stat
 }
 
 func GetNotNullFilter(name string, asTagMap map[string]string, db, table string) (view.Node, bool) {
-	tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
+	tagItem, ok := tag.GetTag(name, db, table, "default")
 	if !ok {
 		preAsTag, ok := asTagMap[name]
 		if ok {

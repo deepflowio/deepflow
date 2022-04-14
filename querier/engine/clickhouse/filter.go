@@ -40,7 +40,7 @@ func (h *Having) Format(m *view.Model) {
 
 func GetWhere(name, value string) WhereStatement {
 	switch name {
-	case "`time`":
+	case "time":
 		return &TimeTag{Value: value}
 	default:
 		return &WhereTag{Tag: name, Value: value}
@@ -58,7 +58,7 @@ type WhereTag struct {
 
 func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string, db, table string) (view.Node, error) {
 	op := expr.(*sqlparser.ComparisonExpr).Operator
-	tagItem, ok := tag.GetTag(strings.Trim(t.Tag, "`"), db, table, "default")
+	tagItem, ok := tag.GetTag(t.Tag, db, table, "default")
 	if strings.ToLower(op) == "like" || strings.ToLower(op) == "not like" {
 		t.Value = strings.ReplaceAll(t.Value, "*", "%")
 	}
@@ -93,7 +93,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 	}
 	whereFilter := tagItem.WhereTranslator
 	if whereFilter != "" {
-		switch strings.Trim(t.Tag, "`") {
+		switch t.Tag {
 		case "ip_version":
 			ipVersion := "0"
 			if t.Value == "4" {
