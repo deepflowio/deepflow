@@ -15,13 +15,17 @@ import (
 
 var log = logging.MustGetLogger("clickhouse.tag")
 
-var TAG_DESCRIPTIONS = map[string]map[string][]*TagDescription{
+// [db][table][tag]*TagDescription
+var TAG_DESCRIPTIONS = map[string]map[string]map[string]*TagDescription{
 	"flow_log": {
-		"l4_flow_log": {},
-		"l7_flow_log": {},
+		"l4_flow_log": make(map[string]*TagDescription),
+		"l7_flow_log": make(map[string]*TagDescription),
 	},
 }
+
+// key=tagEnumFile
 var TAG_ENUMS = map[string][]*TagEnum{}
+
 var tagTypeToOperators = map[string][]string{
 	"resource":    []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
 	"int":         []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
@@ -92,7 +96,6 @@ func NewTagEnum(value, displayName interface{}) *TagEnum {
 
 func LoadTagDescriptions(tagData map[string]interface{}) error {
 	// 生成tag description
-	enumFileToTagName := make(map[string]string)
 	enumFileToTagType := make(map[string]string)
 	for db, tables := range TAG_DESCRIPTIONS {
 		tableData, ok := tagData[db]
@@ -121,8 +124,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 					tag[0].(string), tag[1].(string), tag[2].(string), tag[3].(string),
 					tag[4].(string), tag[5].(string), tag[6].(string), tag[7].(string),
 				)
-				TAG_DESCRIPTIONS[db][table] = append(TAG_DESCRIPTIONS[db][table], description)
-				enumFileToTagName[tag[5].(string)] = tag[0].(string)
+				TAG_DESCRIPTIONS[db][table][tag[0].(string)] = description
 				enumFileToTagType[tag[5].(string)] = tag[4].(string)
 			}
 		}
@@ -145,10 +147,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 					tagEnums = append(tagEnums, NewTagEnum(enumValue[0], enumValue[1]))
 				}
 			}
-			// 根据tagEnumFile获取tagName
-			if tagName, ok := enumFileToTagName[tagEnumFile]; ok {
-				TAG_ENUMS[tagName] = tagEnums
-			}
+			TAG_ENUMS[tagEnumFile] = tagEnums
 		}
 	} else {
 		return errors.New("get tag enum failed! ")
@@ -186,7 +185,13 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 }
 
 func GetTagValues(db, table, tag string) (map[string][]interface{}, error) {
-	tagValues, ok := TAG_ENUMS[tag]
+	// 获取tagEnumFile
+	tagDescription, ok := TAG_DESCRIPTIONS[db][table][tag]
+	if !ok {
+		return nil, errors.New(fmt.Sprintf("no tag in %s.%s", db, table))
+	}
+	// 根据tagEnumFile获取values
+	tagValues, ok := TAG_ENUMS[tagDescription.EnumFile]
 	if !ok {
 		return GetTagResourceValues(tag)
 	}
