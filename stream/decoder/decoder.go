@@ -216,7 +216,7 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 			l := jsonify.ProtoLogToL7Logger(proto, d.shardID, d.platformData)
 			s = append(s, l)
 		}
-		for l := range s {
+		for _, l := range s {
 			if !d.throttler.Send(l) {
 				d.counter.L7DropCount++
 				drop = 1
