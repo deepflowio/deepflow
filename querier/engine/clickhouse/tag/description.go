@@ -16,12 +16,13 @@ import (
 var log = logging.MustGetLogger("clickhouse.tag")
 
 // [db][table][tag]*TagDescription
-var TAG_DESCRIPTIONS = map[string]map[string]map[string]*TagDescription{
-	"flow_log": {
-		"l4_flow_log": make(map[string]*TagDescription),
-		"l7_flow_log": make(map[string]*TagDescription),
-	},
+type TagDescriptionKey struct {
+	DB      string
+	Table   string
+	TagName string
 }
+
+var TAG_DESCRIPTIONS = map[TagDescriptionKey]*TagDescription{}
 
 // key=tagEnumFile
 var TAG_ENUMS = map[string][]*TagEnum{}
@@ -97,20 +98,17 @@ func NewTagEnum(value, displayName interface{}) *TagEnum {
 func LoadTagDescriptions(tagData map[string]interface{}) error {
 	// 生成tag description
 	enumFileToTagType := make(map[string]string)
-	for db, tables := range TAG_DESCRIPTIONS {
-		tableData, ok := tagData[db]
-		if !ok {
-			return errors.New(fmt.Sprintf("get tag failed! db: %s", db))
+	for db, dbTagData := range tagData {
+		if db == "enum" {
+			continue
 		}
-		for table := range tables {
-			tableTagData, ok := tableData.(map[string]interface{})[table]
-			if !ok {
-				return errors.New(fmt.Sprintf("get tag failed! db:%s table:%s", db, table))
-			}
+		for table, tableTagData := range dbTagData.(map[string]interface{}) {
 			// 遍历文件内容进行赋值
 			for _, tag := range tableTagData.([][]interface{}) {
 				if len(tag) < 8 {
-					return errors.New(fmt.Sprintf("get tag failed! db:%s table:%s, tag:%v", db, table, tag))
+					return errors.New(
+						fmt.Sprintf("get tag failed! db:%s table:%s, tag:%v", db, table, tag),
+					)
 				}
 				// 0 - Name
 				// 1 - ClientName
@@ -124,7 +122,9 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 					tag[0].(string), tag[1].(string), tag[2].(string), tag[3].(string),
 					tag[4].(string), tag[5].(string), tag[6].(string), tag[7].(string),
 				)
-				TAG_DESCRIPTIONS[db][table][tag[0].(string)] = description
+				TAG_DESCRIPTIONS[TagDescriptionKey{
+					DB: db, Table: table, TagName: tag[0].(string),
+				}] = description
 				enumFileToTagType[tag[5].(string)] = tag[4].(string)
 			}
 		}
@@ -156,15 +156,6 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 }
 
 func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
-	dbTagDescriptions, ok := TAG_DESCRIPTIONS[db]
-	if !ok {
-		return nil, errors.New(fmt.Sprintf("no tag in %s.%s", db, table))
-	}
-	tableTagDescriptions, ok := dbTagDescriptions[table]
-	if !ok {
-		return nil, errors.New(fmt.Sprintf("no tag in %s.%s", db, table))
-	}
-
 	response := map[string][]interface{}{
 		"columns": []interface{}{
 			"name", "client_name", "server_name", "display_name", "type", "category",
@@ -172,7 +163,10 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 		},
 		"values": []interface{}{},
 	}
-	for _, tag := range tableTagDescriptions {
+	for key, tag := range TAG_DESCRIPTIONS {
+		if key.DB != db || key.Table != table {
+			continue
+		}
 		response["values"] = append(
 			response["values"],
 			[]interface{}{
@@ -186,9 +180,11 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 
 func GetTagValues(db, table, tag string) (map[string][]interface{}, error) {
 	// 获取tagEnumFile
-	tagDescription, ok := TAG_DESCRIPTIONS[db][table][tag]
+	tagDescription, ok := TAG_DESCRIPTIONS[TagDescriptionKey{
+		DB: db, Table: table, TagName: tag,
+	}]
 	if !ok {
-		return nil, errors.New(fmt.Sprintf("no tag in %s.%s", db, table))
+		return nil, errors.New(fmt.Sprintf("no tag %s in %s.%s", tag, db, table))
 	}
 	// 根据tagEnumFile获取values
 	tagValues, ok := TAG_ENUMS[tagDescription.EnumFile]
