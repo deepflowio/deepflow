@@ -494,6 +494,7 @@ func (h *L7Logger) fillKafka(l *pb.AppProtoLogsData) {
 	// 除fetch命令外，其他命令响应码不存在，状态也置为不存在
 	if h.responseCode == 0 && info.ApiKey != uint32(Fetch) {
 		h.ResponseStatus = uint8(datatype.STATUS_NOT_EXIST)
+		h.ResponseCode = nil
 	}
 
 	if h.ResponseStatus == datatype.STATUS_SERVER_ERROR ||
@@ -531,12 +532,22 @@ func (h *L7Logger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	case datatype.PROTO_DNS:
 		h.fillDns(l)
 	case datatype.PROTO_MYSQL:
+		// mysql 异常时有响应码
+		if h.ResponseStatus != datatype.STATUS_CLIENT_ERROR &&
+			h.ResponseStatus != datatype.STATUS_SERVER_ERROR {
+			h.ResponseCode = nil
+		}
 		h.fillMysql(l)
 	case datatype.PROTO_REDIS:
+		// redis 没有响应码
+		if h.responseCode == 0 {
+			h.ResponseCode = nil
+		}
 		h.fillRedis(l)
 	case datatype.PROTO_DUBBO:
 		h.fillDubbo(l)
 	case datatype.PROTO_KAFKA:
+		// 非fetch命令没有响应码
 		h.fillKafka(l)
 	}
 }
