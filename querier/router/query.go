@@ -2,8 +2,8 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
-	//"github.com/k0kubun/pp"
 	"github.com/google/uuid"
+	// "github.com/k0kubun/pp"
 	"metaflow/querier/service"
 )
 
@@ -22,6 +22,12 @@ func executeQuery() gin.HandlerFunc {
 		}
 		args["db"] = c.PostForm("db")
 		args["sql"] = c.PostForm("sql")
+		if args["sql"] == "" && args["db"] == "" {
+			json := make(map[string]interface{})
+			c.BindJSON(&json)
+			args["db"], _ = json["db"].(string)
+			args["sql"], _ = json["sql"].(string)
+		}
 		result, debug, err := service.Execute(args)
 		if err == nil && args["debug"] != "true" {
 			debug = nil
