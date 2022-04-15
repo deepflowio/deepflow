@@ -143,15 +143,15 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"if("+deviceTypeSuffix+"="+deviceTypeValueStr+","+deviceIDSuffix+", 0)",
 					deviceIDSuffix+"!=0 AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
-					deviceIDSuffix+" %s %s AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
+					deviceIDSuffix+" %s %s %s "+deviceTypeSuffix+"%s"+deviceTypeValueStr,
 					"",
 				)}
 			tagResourceMap[resourceNameSuffix] = map[string]*Tag{
 				"default": NewTag(
 					"dictGet(deepflow.device_map, 'name', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
 					deviceIDSuffix+"!=0 AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
-					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s) AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
-					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s)) AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
+					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s) %s "+deviceTypeSuffix+"%s"+deviceTypeValueStr,
+					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s)) %s "+deviceTypeSuffix+"%s"+deviceTypeValueStr,
 				),
 				"node_type": NewTag(
 					"'"+resourceStr+"'",
