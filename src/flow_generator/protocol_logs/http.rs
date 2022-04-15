@@ -247,6 +247,10 @@ impl HttpLog {
                 }
                 break;
             }
+
+            if httpv2_header.frame_length >= frame_payload.len() as u32 {
+                break;
+            }
             frame_payload = &frame_payload[httpv2_header.frame_length as usize..];
         }
 
