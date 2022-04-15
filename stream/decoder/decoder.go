@@ -209,8 +209,8 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 			l2 := jsonify.ProtoLogToL7Logger(proto, d.shardID, d.platformData)
 			l := l2.(*jsonify.L7Logger)
 			l.TapSide = "s-p"
-			l.ProcessID0 = l.PodID1
-			l.ProcessKName0 = strconv.Itoa(int(l.PodID1))
+			l.ProcessID1 = l.PodID1
+			l.ProcessKName1 = strconv.Itoa(int(l.PodID1))
 			s = append(s, l1, l2)
 		} else {
 			l := jsonify.ProtoLogToL7Logger(proto, d.shardID, d.platformData)
