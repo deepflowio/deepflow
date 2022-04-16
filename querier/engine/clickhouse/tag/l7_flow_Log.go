@@ -64,7 +64,7 @@ func GenerateL7TagMap() map[string]map[string]*Tag {
 			"dictGet(deepflow.vtap_port_map, 'name', (toUInt64(vtap_id),toUInt64(tap_port)))",
 			"",
 			"toUInt64(tap_port) IN (SELECT tap_port FROM deepflow.vtap_port_map WHERE name %s %s)",
-			"",
+			"toUInt64(tap_port) IN (SELECT tap_port FROM deepflow.vtap_port_map WHERE %s(name,%s))",
 		)}
 	return l7TagMap
 }

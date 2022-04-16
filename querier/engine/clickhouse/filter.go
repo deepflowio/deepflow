@@ -115,7 +115,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				return nil, err
 			}
 			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, valueInt, valueInt)
-		case "tap_port":
+		case "tap_port", "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1":
 			valueStr := strings.Trim(t.Value, "'")
 			mac, err := net.ParseMAC(valueStr)
 			if err != nil {
