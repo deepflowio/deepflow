@@ -61,6 +61,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	// VPC资源
 	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
 	for _, suffix := range []string{"", "_0", "_1"} {
+		// l3_epc
 		vpcIDSuffix := "vpc_id" + suffix
 		l3EPCIDSuffix := "l3_epc_id" + suffix
 		vpcNameSuffix := "vpc" + suffix
@@ -86,6 +87,37 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			),
 			"icon_id": NewTag(
 				"dictGet(deepflow.l3_epc_map, 'icon_id', (toUInt64("+l3EPCIDSuffix+")))",
+				"",
+				"",
+				"",
+			),
+		}
+		// l2_epc
+		l2VpcIDSuffix := "l2_vpc_id" + suffix
+		l2EPCIDSuffix := "epc_id" + suffix
+		l2VpcNameSuffix := "l2_vpc" + suffix
+		tagResourceMap[l2VpcIDSuffix] = map[string]*Tag{
+			"default": NewTag(
+				l2EPCIDSuffix,
+				l2EPCIDSuffix+"!=-2",
+				l2EPCIDSuffix+" %s %s",
+				"",
+			)}
+		tagResourceMap[l2VpcNameSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"dictGet(deepflow.l3_epc_map, 'name', (toUInt64("+l2EPCIDSuffix+")))",
+				l2EPCIDSuffix+"!=-2",
+				"toUInt64("+l2EPCIDSuffix+") IN (SELECT id FROM deepflow.l3_epc_map WHERE name %s %s)",
+				"toUInt64("+l2EPCIDSuffix+") IN (SELECT id FROM deepflow.l3_epc_map WHERE %s(name,%s))",
+			),
+			"node_type": NewTag(
+				"'l2_vpc'",
+				"",
+				"",
+				"",
+			),
+			"icon_id": NewTag(
+				"dictGet(deepflow.l3_epc_map, 'icon_id', (toUInt64("+l2EPCIDSuffix+")))",
 				"",
 				"",
 				"",
