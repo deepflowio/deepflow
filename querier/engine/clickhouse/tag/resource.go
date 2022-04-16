@@ -169,6 +169,15 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		}
 	}
 
+	// 采集器名称
+	tagResourceMap["vtap"] = map[string]*Tag{
+		"default": NewTag(
+			"dictGet(deepflow.vtap_map, 'name', toUInt64(vtap_id))",
+			"",
+			"toUInt64(vtap_id) IN (SELECT id FROM deepflow.vtap_map WHERE name %s %s)",
+			"toUInt64(vtap_id) IN (SELECT id FROM deepflow.vtap_map WHERE %s(name,%s))",
+		)}
+
 	// 自动分组
 	for _, autoStr := range TAG_RESOURCE_TYPE_AUTO {
 		// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
@@ -340,5 +349,17 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			}
 		}
 	}
+
+	// vtap对应资源
+	vtapResource := "'chost_id','chost_name','chost_icon_id','host_id','host_name','host_icon_id','pod_node_id','pod_node_name','pod_node_icon_id'"
+	gwDictGet := fmt.Sprintf("dictGet(deepflow.vtap_tap_port_info_map, (%s),(toUInt64(vtap_id),toUInt32(tap_port)))", vtapResource)
+	notGwDictGet := fmt.Sprintf("dictGet(deepflow.vtap_tap_port_info_map, (%s),(toUInt64(vtap_id),toUInt32(0)))", vtapResource)
+	tagResourceMap["resource_from_vtap"] = map[string]*Tag{
+		"default": NewTag(
+			fmt.Sprintf("if(tap_side in ('c-gw','s-gw'),%s,%s)", gwDictGet, notGwDictGet),
+			"",
+			"",
+			"",
+		)}
 	return tagResourceMap
 }

@@ -64,43 +64,35 @@ func GenerateL4TagMap() map[string]map[string]*Tag {
 			"dictGet(deepflow.vtap_port_map, 'name', (toUInt64(vtap_id),toUInt64(tap_port)))",
 			"",
 			"toUInt64(tap_port) IN (SELECT tap_port FROM deepflow.vtap_port_map WHERE name %s %s)",
-			"",
-		)}
-	// 采集器名称
-	l4TagMap["vtap"] = map[string]*Tag{
-		"default": NewTag(
-			"dictGet(deepflow.vtap_map, 'name', toUInt64(vtap_id))",
-			"",
-			"",
-			"",
+			"toUInt64(tap_port) IN (SELECT tap_port FROM deepflow.vtap_port_map WHERE %s(name,%s))",
 		)}
 	// Tunnel IP
 	l4TagMap["tunnel_tx_ip_0"] = map[string]*Tag{
 		"default": NewTag(
 			"if(tunnel_is_ipv4, IPv4NumToString(tunnel_tx_ip4_0), IPv6NumToString(tunnel_tx_ip6_0))",
 			"",
-			"",
+			"if(is_ipv4=1, IPv4NumToString(tunnel_tx_ip4_0), IPv6NumToString(tunnel_tx_ip6_0)) %s %s",
 			"",
 		)}
 	l4TagMap["tunnel_tx_ip_1"] = map[string]*Tag{
 		"default": NewTag(
 			"if(tunnel_is_ipv4, IPv4NumToString(tunnel_tx_ip4_1), IPv6NumToString(tunnel_tx_ip6_1))",
 			"",
-			"",
+			"if(is_ipv4=1, IPv4NumToString(tunnel_tx_ip4_1), IPv6NumToString(tunnel_tx_ip6_1)) %s %s",
 			"",
 		)}
 	l4TagMap["tunnel_rx_ip_0"] = map[string]*Tag{
 		"default": NewTag(
 			"if(tunnel_is_ipv4, IPv4NumToString(tunnel_rx_ip4_0), IPv6NumToString(tunnel_rx_ip6_0))",
 			"",
-			"",
+			"if(is_ipv4=1, IPv4NumToString(tunnel_rx_ip4_0), IPv6NumToString(tunnel_rx_ip6_0)) %s %s",
 			"",
 		)}
 	l4TagMap["tunnel_rx_ip_1"] = map[string]*Tag{
 		"default": NewTag(
 			"if(tunnel_is_ipv4, IPv4NumToString(tunnel_rx_ip4_1), IPv6NumToString(tunnel_rx_ip6_1))",
 			"",
-			"",
+			"if(is_ipv4=1, IPv4NumToString(tunnel_rx_ip4_1), IPv6NumToString(tunnel_rx_ip6_1)) %s %s",
 			"",
 		)}
 	return l4TagMap

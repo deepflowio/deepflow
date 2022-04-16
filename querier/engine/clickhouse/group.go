@@ -19,6 +19,7 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Stat
 			ip6Suffix := "ip6" + suffix
 			for _, resourceName := range []string{"resource_gl0", "resource_gl1", "resource_gl2"} {
 				resourceIDSuffix := resourceName + "_id" + suffix
+				resourceTypeSuffix := resourceName + "_type" + suffix
 				if strings.Trim(name, "`") == resourceName+suffix {
 					ipTag := fmt.Sprintf("multiIf(%s=0 and is_ipv4=1,IPv4NumToString(%s), %s=0 and is_ipv4=0,IPv6NumToString(%s),%s!=0 and is_ipv4=1,'0.0.0.0','::')", resourceIDSuffix, ip4Suffix, resourceIDSuffix, ip6Suffix, resourceIDSuffix)
 					subnetIDSuffix := "subnet_id" + suffix
@@ -27,10 +28,12 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Stat
 					subnetSelectStmt := &SelectTag{Value: subnetTag, Alias: subnetIDSuffix}
 					ipGroupStmt := &GroupTag{Value: "ip" + suffix}
 					subnetGroupStmt := &GroupTag{Value: subnetIDSuffix}
+					autoTypeGroupStmt := &GroupTag{Value: resourceTypeSuffix}
 					stmts = append(stmts, ipSelectStmt)
 					stmts = append(stmts, subnetSelectStmt)
 					stmts = append(stmts, ipGroupStmt)
 					stmts = append(stmts, subnetGroupStmt)
+					stmts = append(stmts, autoTypeGroupStmt)
 				}
 			}
 		}

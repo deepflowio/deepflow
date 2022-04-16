@@ -2,7 +2,7 @@ package client
 
 import (
 	"fmt"
-	_ "github.com/ClickHouse/clickhouse-go"
+	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/jmoiron/sqlx"
 	//"github.com/k0kubun/pp"
 	logging "github.com/op/go-logging"
