@@ -307,8 +307,10 @@ impl HttpPerfData {
                 if self.session_data.httpv2_headers.stream_id == 0 {
                     return Err(Error::HttpHeaderParseFailed);
                 }
-                frame_payload = &frame_payload[H2C_HEADER_SIZE..];
-                return self.parse_headers_frame_payload(frame_payload);
+                // TODO 调用第三库解析有时会导致panic, 先默认返回成功
+                return Ok(200);
+                // frame_payload = &frame_payload[H2C_HEADER_SIZE..];
+                // return self.parse_headers_frame_payload(frame_payload);
             }
             let offset = self.session_data.httpv2_headers.frame_length as usize + H2C_HEADER_SIZE;
             if frame_payload.len() <= offset {
