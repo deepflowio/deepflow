@@ -145,7 +145,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
         println!("+ --------------------------------- +");
         if sk_proto_safe(sd) == SOCK_DATA_HTTP1 {
             let data = sk_data_str_safe(sd);
-            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} PROXY_TRACE 0x{:x} THREAD_TRACE 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}\n{}", 
+            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}\n{}", 
                      date_time((*sd).timestamp),
                      proto_tag,
                      (*sd).need_reconfirm,
@@ -159,14 +159,13 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      (*sd).syscall_len,
                      (*sd).socket_id,
                      (*sd).syscall_trace_id_call,
-                     (*sd).syscall_trace_id_session,
                      (*sd).tcp_seq,
                      (*sd).cap_seq,
                      (*sd).timestamp,
                      data);
         } else {
             let data: Vec<u8> = sk_data_bytes_safe(sd);
-            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} PROXY_TRACE 0x{:x} THREAD_TRACE 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}",
+            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}",
                      date_time((*sd).timestamp),
                      proto_tag,
                      (*sd).need_reconfirm,
@@ -180,7 +179,6 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      (*sd).syscall_len,
                      (*sd).socket_id,
                      (*sd).syscall_trace_id_call,
-                     (*sd).syscall_trace_id_session,
                      (*sd).tcp_seq,
                      (*sd).cap_seq,
                      (*sd).timestamp);
@@ -215,7 +213,7 @@ fn main() {
             128,                    /* 内核共享内存占用的页框数量, 值为2的次幂。用于perf数据传递 */
             65536,                 /* 环形缓存队列大小，值为2的次幂。e.g: 2,4,8,16,32,64,128 */
             524288, /* 设置用于socket追踪的hash表项最大值，取决于实际场景中并发请求数量 */
-            524288, /* 设置用于线程追踪会话的hash表项最大值，SK_BPF_DATA结构的syscall_trace_id_session关联这个哈希表 */
+            524288, /* 设置用于线程/协程追踪会话的hash表项最大值。*/
 	    520000 /* socket map表项进行清理的最大阈值，当前map的表项数量超过这个值进行map清理操作 */
         ) != 0 {
             println!("running_socket_tracer() error.");

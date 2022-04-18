@@ -4,6 +4,11 @@
 #include "common.h"
 #include "socket_trace.h"
 
+static __inline bool is_socket_info_valid(struct socket_info_t *sk_info)
+{
+	return (sk_info != NULL && sk_info->uid != 0);
+}
+
 static __inline int is_http_response(const char *data)
 {
 	return (data[0] == 'H' && data[1] == 'T' && data[2] == 'T'
@@ -156,7 +161,7 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 						      struct conn_info_t
 						      *conn_info)
 {
-	if (conn_info->socket_info_ptr) {
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP2)
 			return MSG_UNKNOWN;
 	}
@@ -169,7 +174,7 @@ static __inline enum message_type infer_http_message(const char *buf,
 						     struct conn_info_t
 						     *conn_info)
 {
-	if (conn_info->socket_info_ptr) {
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP1)
 			return MSG_UNKNOWN;
 	}
@@ -213,7 +218,7 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 #define  kComStmtExecute 0x17
 #define  kComStmtClose   0x19
 
-	if (conn_info->socket_info_ptr) {
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_MYSQL)
 			return MSG_UNKNOWN;
 	}
@@ -238,7 +243,7 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 		if (count < 5 || len == 0)
 			return MSG_UNKNOWN;
 
-		if (conn_info->socket_info_ptr) {
+		if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 			if (seq == 0)
 				return MSG_REQUEST;
 			else if (seq == 1)
@@ -342,7 +347,7 @@ static __inline enum message_type infer_dns_message(const char *buf,
 						    struct conn_info_t
 						    *conn_info)
 {
-	if (conn_info->socket_info_ptr) {
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_DNS)
 			return MSG_UNKNOWN;
 	}
@@ -417,7 +422,7 @@ static __inline enum message_type infer_redis_message(const char *buf,
 						      struct conn_info_t
 						      *conn_info)
 {
-	if (conn_info->socket_info_ptr) {
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_REDIS)
 			return MSG_UNKNOWN;
 	}
@@ -530,7 +535,7 @@ static __inline enum message_type infer_dubbo_message(const char *buf,
 						      struct conn_info_t
 						      *conn_info)
 {
-	if (conn_info->socket_info_ptr) {
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_DUBBO)
 			return MSG_UNKNOWN;
 	}
@@ -694,7 +699,7 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 	if (!kafka_data_check_len(count, buf, conn_info, &use_prev_buf))
 		return MSG_UNKNOWN;
 
-	if (conn_info->socket_info_ptr) {
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_KAFKA)
 			return MSG_UNKNOWN;
 
@@ -747,7 +752,7 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 
 	if (correlation_id == conn_info->correlation_id) {
 		// 完成确认
-		if (conn_info->socket_info_ptr) {
+		if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 			conn_info->socket_info_ptr->need_reconfirm = false;
 			// 角色确认
 			if (conn_info->direction == T_EGRESS)
@@ -822,7 +827,7 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 		return inferred_message;
 
 	// 明确被判定了协议的socket不进入drop_msg_by_comm
-	if (!conn_info->socket_info_ptr) {
+	if (!is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (drop_msg_by_comm())
 			return inferred_message;
 	}
@@ -865,7 +870,7 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 		return inferred_message;
 
 	if (count == 4) {
-		if (conn_info->socket_info_ptr) {
+		if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 			*(__u32 *) conn_info->socket_info_ptr->prev_data =
 			    *(__u32 *) infer_buf;
 			conn_info->socket_info_ptr->prev_data_len = 4;
@@ -880,7 +885,7 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 		return inferred_message;
 	}
 	// MySQL、Kafka推断需要之前的4字节数据
-	if (conn_info->socket_info_ptr) {
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->prev_data_len != 0) {
 			if (conn_info->direction !=
 			    conn_info->socket_info_ptr->direction)
