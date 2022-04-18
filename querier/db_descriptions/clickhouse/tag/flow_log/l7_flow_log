@@ -60,7 +60,6 @@ span_id                   , span_id                   , span_id                 
 x_request_id              , x_request_id              , x_request_id              , XRequestID                    , string        ,                    , 链路追踪    ,
 syscall_trace_id_request  , syscall_trace_id_request  , syscall_trace_id_request  , SyscallTraceID-请求           , int           ,                    , 链路追踪    ,
 syscall_trace_id_response , syscall_trace_id_response , syscall_trace_id_response , SyscallTraceID-响应           , int           ,                    , 链路追踪    ,
-syscall_trace_id_session  , syscall_trace_id_session  , syscall_trace_id_session  , SyscallTraceID-会话           , int           ,                    , 链路追踪    ,
 syscall_trace_id_thread   , syscall_trace_id_thread   , syscall_trace_id_thread   , SyscallTraceID-线程           , int           ,                    , 链路追踪    ,
 
 flow_id                   , flow_id                   , flow_id                   , 流日志ID                      , int           ,                    , 流信息      ,
