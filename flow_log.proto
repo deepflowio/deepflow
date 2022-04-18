@@ -190,6 +190,15 @@ message AppProtoLogsBaseInfo {
 
     uint32 req_tcp_seq = 23;
     uint32 resp_tcp_seq = 24;
+
+    uint32 process_id_0 = 25;
+    uint32 process_id_1 = 26;
+    string process_kname_0 = 27;
+    string process_kname_1 = 28;
+    uint64 syscall_trace_id_request = 29;
+    uint64 syscall_trace_id_response = 30;
+    uint32 syscall_trace_id_thread = 31;
+    uint32 x_request_id = 32;
 }
 
 message AppProtoHead {
