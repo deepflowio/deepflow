@@ -218,9 +218,9 @@ func GetTagResourceValues(tag string) (map[string][]interface{}, error) {
 	var sql string
 	deviceType, ok := TAG_RESOURCE_TYPE_DEVICE_MAP[tag]
 	if ok {
-		sql = fmt.Sprintf("SELECT deviceid AS value,name AS display_name FROM device_map WHERE devicetype=%d", deviceType)
+		sql = fmt.Sprintf("SELECT deviceid AS value,name AS display_name FROM deepflow.device_map WHERE devicetype=%d", deviceType)
 	} else if common.IsValueInSliceString(tag, TAG_RESOURCE_TYPE_DEFAULT) {
-		sql = fmt.Sprintf("SELECT id as value,name AS display_name FROM %s", tag+"_map")
+		sql = fmt.Sprintf("SELECT id as value,name AS display_name FROM deepflow.%s", tag+"_map")
 	} else if common.IsValueInSliceString(tag, TAG_RESOURCE_TYPE_AUTO) {
 		var autoDeviceTypes []string
 		for _, deviceType := range AutoMap {
@@ -235,17 +235,17 @@ func GetTagResourceValues(tag string) (map[string][]interface{}, error) {
 			autoDeviceTypes = append(autoDeviceTypes, strconv.Itoa(deviceType))
 		}
 		sql = fmt.Sprintf(
-			"SELECT deviceid AS value,name AS display_name,devicetype AS device_type FROM device_map WHERE devicetype in (%s)",
+			"SELECT deviceid AS value,name AS display_name,devicetype AS device_type FROM deepflow.device_map WHERE devicetype in (%s)",
 			strings.Join(autoDeviceTypes, ","),
 		)
 	} else if tag == "vpc" {
-		sql = "SELECT id as value,name AS display_name FROM l3_epc_map"
+		sql = "SELECT id as value,name AS display_name FROM deepflow.l3_epc_map"
 	} else if tag == "ip" {
-		sql = "SELECT ip as value,ip AS display_name FROM ip_relation_map"
+		sql = "SELECT ip as value,ip AS display_name FROM deepflow.ip_relation_map"
 	} else if tag == "tap" {
-		sql = "SELECT value, name AS display_name FROM tap_type_map"
+		sql = "SELECT value, name AS display_name FROM deepflow.tap_type_map"
 	} else if tag == "vtap" {
-		sql = "SELECT id as value, name AS display_name FROM vtap_map"
+		sql = "SELECT id as value, name AS display_name FROM deepflow.vtap_map"
 	}
 	if sql == "" {
 		return nil, errors.New(fmt.Sprintf("tag (%s) not found", tag))
