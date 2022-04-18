@@ -261,6 +261,10 @@ func GetTagResourceValues(tag string) (map[string][]interface{}, error) {
 		sql = "SELECT value, name AS display_name FROM deepflow.tap_type_map"
 	} else if tag == "vtap" {
 		sql = "SELECT id as value, name AS display_name FROM deepflow.vtap_map"
+	} else if tag == "lb_listener" {
+		sql = "SELECT id as value, name AS display_name FROM deepflow.lb_listener_map"
+	} else if tag == "pod_ingress" {
+		sql = "SELECT id as value, name AS display_name FROM deepflow.pod_ingress_map"
 	}
 	if sql == "" {
 		return nil, errors.New(fmt.Sprintf("tag (%s) not found", tag))
