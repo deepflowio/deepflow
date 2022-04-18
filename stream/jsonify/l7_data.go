@@ -50,7 +50,6 @@ type L7Base struct {
 	ProcessKName0          string
 	ProcessKName1          string
 	SyscallTraceIDThread   uint32
-	SyscallTraceIDSession  uint64
 	SyscallTraceIDRequest  uint64
 	SyscallTraceIDResponse uint64
 }
@@ -93,7 +92,6 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("process_kname_0", ckdb.String).SetComment("客户端进程名"),
 		ckdb.NewColumn("process_kname_1", ckdb.String).SetComment("服务端进程名"),
 		ckdb.NewColumn("syscall_trace_id_thread", ckdb.UInt32).SetComment("SyscallTraceID-线程"),
-		ckdb.NewColumn("syscall_trace_id_session", ckdb.UInt64).SetComment("SyscallTraceID-会话"),
 		ckdb.NewColumn("syscall_trace_id_request", ckdb.UInt64).SetComment("SyscallTraceID-请求"),
 		ckdb.NewColumn("syscall_trace_id_response", ckdb.UInt64).SetComment("SyscallTraceID-响应"),
 	)
@@ -196,9 +194,6 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt32(f.SyscallTraceIDThread); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(f.SyscallTraceIDSession); err != nil {
 		return err
 	}
 	if err := block.WriteUInt64(f.SyscallTraceIDRequest); err != nil {
