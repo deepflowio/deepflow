@@ -96,7 +96,7 @@ tools:
 rust-sample:
 	$(call msg,Current-DIR,,$(CURR))
 	$(Q)rm -rf samples/rust/src/ebpf.rs
-	$(Q)cp samples/rust/src/ebpf.rs.sample samples/rust/src/ebpf.rs
+	$(Q)cp mod.rs samples/rust/src/ebpf.rs
 	$(Q)rm -rf samples/rust/target
 	$(Q)cd samples/rust/ && cargo build --release && cd ../../
 	$(call msg,RUST-SAMPLE,,samples/rust/target/release/rust_sample)

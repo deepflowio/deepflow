@@ -35,7 +35,6 @@ struct __socket_data {
 
 	/* 追踪信息 */
 	__u32 tcp_seq;
-	__u64 coroutine_trace_id;
 	__u64 thread_trace_id;
 
 	/* 追踪数据信息 */
@@ -62,7 +61,7 @@ struct __socket_data_buffer {
 
 struct trace_uid_t {
 	__u64 socket_id;       // 会话标识
-	__u64 coroutine_trace_id;  // 同一进程/线程的数据转发关联，用于代理，负载均衡
+	__u64 coroutine_trace_id;  // 同一协程的数据转发关联
 	__u64 thread_trace_id; // 同一进程/线程的数据转发关联，用于多事务流转场景
 };
 
@@ -86,20 +85,21 @@ struct socket_info_t {
 	bool need_reconfirm;    // l7协议推断是否需要再次确认。
 	__s32 correlation_id;   // 目前用于kafka协议推断。
 
+	__u32 peer_fd;		// 用于记录socket间数据转移的对端fd。
+
 	/*
 	 * 一旦有数据读/写就会更新这个时间，这个时间是从系统开机开始
 	 * 到更新时的间隔时间单位是秒。
 	 */
 	__u32 update_time;
 	__u32 prev_data_len;
-
-	__u64 uid;
-	__u64 trace_map_key; // related trace_map hash key
+	__u64 trace_id;
+	__u64 uid; // socket唯一标识ID
 } __attribute__((packed));
 
 struct trace_info_t {
-	__u64 conn_key;
-	__u64 coroutine_trace_id;
+	__u32 peer_fd;
 	__u64 thread_trace_id;
 };
+
 #endif /* BPF_SOCKET_TRACE_COMMON */

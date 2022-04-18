@@ -69,6 +69,7 @@ static void socket_tracer_set_probes(struct trace_probes_conf *tps)
 	tps_set_symbol(tps, "sys_enter_recvfrom");
 
 	// exit tracepoints
+	tps_set_symbol(tps, "sys_exit_socket");
 	tps_set_symbol(tps, "sys_exit_read");
 	tps_set_symbol(tps, "sys_exit_write");
 	tps_set_symbol(tps, "sys_exit_sendto");
@@ -410,8 +411,7 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		submit_data->syscall_len = sd->syscall_len;
 		submit_data->tcp_seq = sd->tcp_seq;
 		submit_data->cap_seq = sd->data_seq;
-		submit_data->syscall_trace_id_call = sd->coroutine_trace_id;
-		submit_data->syscall_trace_id_session = sd->thread_trace_id;
+		submit_data->syscall_trace_id_call = sd->thread_trace_id;
 		memcpy(submit_data->process_name,
 		       sd->comm, sizeof(submit_data->process_name));
 		submit_data->process_name[sizeof(submit_data->process_name) - 1] = '\0';
@@ -483,14 +483,10 @@ static void reclaim_socket_map(struct bpf_tracer *tracer, uint32_t timeout)
 	struct bpf_map *map =
 	    bpf_object__find_map_by_name(tracer->pobj, MAP_SOCKET_INFO_NAME);
 	int map_fd = bpf_map__fd(map);
-	struct bpf_map *trace_map =
-	    bpf_object__find_map_by_name(tracer->pobj, MAP_TRACE_NAME);
-	int trace_map_fd = bpf_map__fd(trace_map);
 
 	uint64_t conn_key, next_conn_key;
 	uint32_t sockets_reclaim_count = 0, trace_reclaim_count = 0;
 	struct socket_info_t value;
-	struct trace_info_t trace_value;
 	conn_key = 0;
 	uint32_t uptime = get_sys_uptime();
 
@@ -499,13 +495,6 @@ static void reclaim_socket_map(struct bpf_tracer *tracer, uint32_t timeout)
 			if (uptime - value.update_time > timeout) {
 				bpf_map_delete_elem(map_fd, &next_conn_key);
 				sockets_reclaim_count++;
-				if (bpf_map_lookup_elem
-				    (trace_map_fd, &value.trace_map_key,
-				     &trace_value) == 0) {
-					bpf_map_delete_elem(trace_map_fd,
-							    &next_conn_key);
-					trace_reclaim_count++;
-				}
 			}
 		}
 		conn_key = next_conn_key;
@@ -557,7 +546,7 @@ int running_socket_tracer(l7_handle_fn handle,
 			  uint32_t perf_pages_cnt,
 			  uint32_t queue_size,
 			  uint32_t max_socket_entries,
-			  uint32_t max_thread_entries,
+			  uint32_t max_trace_entries,
 			  uint32_t socket_map_max_reclaim)
 {
 	int ret;
@@ -615,10 +604,10 @@ int running_socket_tracer(l7_handle_fn handle,
 
 	conf_socket_map_max_reclaim = socket_map_max_reclaim;
 
-	if ((ret = maps_config(tracer, MAP_TRACE_NAME, max_thread_entries)))
+	if ((ret = maps_config(tracer, MAP_TRACE_NAME, max_trace_entries)))
 		return ret;
 
-	conf_max_trace_entries = max_thread_entries;
+	conf_max_trace_entries = max_trace_entries;
 
 	if (tracer_bpf_load(tracer))
 		return -EINVAL;
