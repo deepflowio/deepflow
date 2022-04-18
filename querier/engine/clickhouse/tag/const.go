@@ -1,11 +1,5 @@
 package tag
 
-var TAG_RESOURCE_TYPE_DEFAULT = []string{
-	"region", "az", "pod_node", "pod_ns",
-	"pod_group", "pod", "pod_cluster", "subnet",
-}
-var TAG_RESOURCE_TYPE_AUTO = []string{"resource_gl0", "resource_gl1", "resource_gl2"}
-
 const (
 	VIF_DEVICE_TYPE_INTERNET       = 0
 	VIF_DEVICE_TYPE_VM             = 1
@@ -23,6 +17,12 @@ const (
 	VIF_DEVICE_TYPE_SERVICE        = 102
 	VIF_DEVICE_TYPE_IP             = 255
 )
+
+var TAG_RESOURCE_TYPE_DEFAULT = []string{
+	"region", "az", "pod_node", "pod_ns",
+	"pod_group", "pod", "pod_cluster", "subnet",
+}
+var TAG_RESOURCE_TYPE_AUTO = []string{"resource_gl0", "resource_gl1", "resource_gl2"}
 
 var AutoMap = map[string]int{
 	"chost":       VIF_DEVICE_TYPE_VM,

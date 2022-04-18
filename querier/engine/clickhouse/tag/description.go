@@ -11,6 +11,7 @@ import (
 	"metaflow/querier/common"
 	"metaflow/querier/config"
 	"metaflow/querier/engine/clickhouse/client"
+	ckcommon "metaflow/querier/engine/clickhouse/common"
 )
 
 var log = logging.MustGetLogger("clickhouse.tag")
@@ -61,10 +62,12 @@ type TagDescription struct {
 	Category    string
 	Description string
 	Operators   []string
+	Permissions []bool
 }
 
 func NewTagDescription(
-	name, clientName, serverName, displayName, tagType, enumFile, category, description string,
+	name, clientName, serverName, displayName, tagType, enumFile, category string,
+	permissions []bool, description string,
 ) *TagDescription {
 	operators, ok := tagTypeToOperators[tagType]
 	if !ok {
@@ -79,6 +82,7 @@ func NewTagDescription(
 		EnumFile:    enumFile,
 		Category:    category,
 		Operators:   operators,
+		Permissions: permissions,
 		Description: description,
 	}
 }
@@ -105,7 +109,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 		for table, tableTagData := range dbTagData.(map[string]interface{}) {
 			// 遍历文件内容进行赋值
 			for _, tag := range tableTagData.([][]interface{}) {
-				if len(tag) < 8 {
+				if len(tag) < 9 {
 					return errors.New(
 						fmt.Sprintf("get tag failed! db:%s table:%s, tag:%v", db, table, tag),
 					)
@@ -117,10 +121,21 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				// 4 - Type
 				// 5 - EnumFile
 				// 6 - Category
-				// 7 - Description
+				// 7 - Permissions
+				// 8 - Description
+				permissions, err := ckcommon.ParsePermission(tag[7])
+				if err != nil {
+					return errors.New(
+						fmt.Sprintf(
+							"parse tag permission failed! db:%s table:%s, tag:%v, err:%s",
+							db, table, tag, err.Error(),
+						),
+					)
+				}
+
 				description := NewTagDescription(
 					tag[0].(string), tag[1].(string), tag[2].(string), tag[3].(string),
-					tag[4].(string), tag[5].(string), tag[6].(string), tag[7].(string),
+					tag[4].(string), tag[5].(string), tag[6].(string), permissions, tag[8].(string),
 				)
 				TAG_DESCRIPTIONS[TagDescriptionKey{
 					DB: db, Table: table, TagName: tag[0].(string),
@@ -159,7 +174,7 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 	response := map[string][]interface{}{
 		"columns": []interface{}{
 			"name", "client_name", "server_name", "display_name", "type", "category",
-			"operators", "description",
+			"operators", "permissions", "description",
 		},
 		"values": []interface{}{},
 	}
@@ -171,7 +186,7 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 			response["values"],
 			[]interface{}{
 				tag.Name, tag.ClientName, tag.ServerName, tag.DisplayName, tag.Type,
-				tag.Category, tag.Operators, tag.Description,
+				tag.Category, tag.Operators, tag.Permissions, tag.Description,
 			},
 		)
 	}

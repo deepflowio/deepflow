@@ -3,6 +3,8 @@ package metrics
 import (
 	"errors"
 	"fmt"
+
+	ckcommon "metaflow/querier/engine/clickhouse/common"
 )
 
 const METRICS_OPERATOR_GTE = ">="
@@ -18,6 +20,7 @@ type Metrics struct {
 	Category    string // 类别
 	Condition   string // 聚合过滤
 	IsAgg       bool   // 是否为聚合指标量
+	Permissions []bool // 指标量的权限控制
 }
 
 func (m *Metrics) Replace(metrics *Metrics) {
@@ -33,13 +36,17 @@ func (m *Metrics) Replace(metrics *Metrics) {
 	}
 }
 
-func NewMetrics(dbField string, displayname string, unit string, metricType int, category string, condition string) *Metrics {
+func NewMetrics(
+	dbField string, displayname string, unit string, metricType int, category string,
+	permissions []bool, condition string,
+) *Metrics {
 	return &Metrics{
 		DBField:     dbField,
 		DisplayName: displayname,
 		Unit:        unit,
 		Type:        metricType,
 		Category:    category,
+		Permissions: permissions,
 		Condition:   condition,
 	}
 }
@@ -77,13 +84,13 @@ func GetMetricsDescriptions(db string, table string) (map[string][]interface{}, 
 		return nil, nil
 	}
 	columns := []interface{}{
-		"name", "is_agg", "display_name", "unit", "type", "category", "operators",
+		"name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions",
 	}
 	var values []interface{}
 	for field, metrics := range metrics {
 		values = append(values, []interface{}{
 			field, metrics.IsAgg, metrics.DisplayName, metrics.Unit, metrics.Type,
-			metrics.Category, METRICS_OPERATORS,
+			metrics.Category, METRICS_OPERATORS, metrics.Permissions,
 		})
 	}
 	return map[string][]interface{}{
@@ -102,16 +109,21 @@ func LoadMetrics(db string, table string, dbDescription map[string]interface{}) 
 		if ok {
 			loadMetrics = make(map[string]*Metrics)
 			for _, metrics := range metricsData.([][]interface{}) {
-				// metric类型替换成int
-				//metrics[3], ok = METRICS_TYPE_NAME_MAP[metrics[3].(string)]
-				if len(metrics) < 6 {
+				if len(metrics) < 7 {
 					return nil, errors.New(fmt.Sprintf("get metrics failed! db:%s table:%s metrics:%v", db, table, metrics))
 				}
 				metricType, ok := METRICS_TYPE_NAME_MAP[metrics[4].(string)]
 				if !ok {
 					return nil, errors.New(fmt.Sprintf("get metrics type failed! db:%s table:%s metrics:%v", db, table, metrics))
 				}
-				lm := NewMetrics(metrics[1].(string), metrics[2].(string), metrics[3].(string), metricType, metrics[5].(string), "")
+				permissions, err := ckcommon.ParsePermission(metrics[6])
+				if err != nil {
+					return nil, errors.New(fmt.Sprintf("parse metrics permission failed! db:%s table:%s metrics:%v", db, table, metrics))
+				}
+				lm := NewMetrics(
+					metrics[1].(string), metrics[2].(string), metrics[3].(string), metricType,
+					metrics[5].(string), permissions, "",
+				)
 				loadMetrics[metrics[0].(string)] = lm
 			}
 		} else {

@@ -1,9 +1,11 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"github.com/xwb1989/sqlparser"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -17,4 +19,31 @@ func ParseAlias(node sqlparser.SQLNode) string {
 		}
 	}
 	return alias
+}
+
+// Permissions解析为数组
+// 最高十进制位：用户组A是否有权限，通常可用于代表管理员用户组
+// 第二个十进制位：用户组B是否有权限，通常可用于代表OnPrem租户用户组
+// 最低十进制位：用户组C是否有权限，通常可用于代表SaaS租户用户组
+func ParsePermission(permission interface{}) ([]bool, error) {
+	var permissions []bool
+	permissionInt, err := strconv.Atoi(permission.(string))
+	if err != nil {
+		return nil, err
+	}
+	for permissionInt > 0 {
+		if permissionInt%10 == 0 {
+			permissions = append([]bool{false}, permissions...)
+		} else {
+			permissions = append([]bool{true}, permissions...)
+		}
+		permissionInt = permissionInt / 10
+	}
+	// 如果描述文件中的十进制位数不对，则返回报错
+	if len(permissions) != PERMISSION_TYPE_NUM {
+		return nil, errors.New(
+			fmt.Sprintf("parse permission %v failed", permission),
+		)
+	}
+	return permissions, nil
 }
