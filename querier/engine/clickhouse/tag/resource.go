@@ -362,22 +362,38 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 						"",
 						"",
 					),
+					"default": NewTag(
+						nameTagTranslator,
+						notNullFilter,
+						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s)",
+						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s))",
+					),
 				}
-			}
-			tagResourceMap[relatedResourceIDSuffix] = map[string]*Tag{
-				"default": NewTag(
-					idTagTranslator,
-					notNullFilter,
-					"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceID+" %s %s)",
-					"",
-				)}
-			tagResourceMap[relatedResourceNameSuffix] = map[string]*Tag{
-				"default": NewTag(
-					nameTagTranslator,
-					notNullFilter,
-					"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s)",
-					"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s))",
-				),
+				tagResourceMap[relatedResourceIDSuffix] = map[string]*Tag{
+					"default": NewTag(
+						idTagTranslator,
+						notNullFilter,
+						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceID+" %s %s)",
+						"",
+					),
+				}
+			} else {
+				tagResourceMap[relatedResourceIDSuffix] = map[string]*Tag{
+					"default": NewTag(
+						"",
+						"",
+						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceID+" %s %s)",
+						"",
+					),
+				}
+				tagResourceMap[relatedResourceNameSuffix] = map[string]*Tag{
+					"default": NewTag(
+						"",
+						"",
+						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s)",
+						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s))",
+					),
+				}
 			}
 		}
 	}

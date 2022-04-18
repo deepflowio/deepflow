@@ -28,10 +28,7 @@ func (c *Client) Init(query_uuid string) error {
 			IP:        c.Host,
 		}
 	}
-	url := fmt.Sprintf("tcp://%s:%d?username=%s&password=%s&query_id=%s", c.Host, c.Port, c.UserName, c.Password, query_uuid)
-	if c.DB != "" {
-		url = fmt.Sprintf("%s&database=%s", url, c.DB)
-	}
+	url := fmt.Sprintf("clickhouse://%s:%s@%s:%d/%s?&query_id=%s", c.UserName, c.Password, c.Host, c.Port, c.DB, query_uuid)
 	conn, err := sqlx.Open(
 		"clickhouse", url,
 	)
