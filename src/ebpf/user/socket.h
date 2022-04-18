@@ -26,8 +26,6 @@ struct socket_bpf_data {
 	uint64_t tcp_seq;		   // 收发cap_data数据时TCP协议栈将会用到的TCP SEQ，可用于关联eBPF DATA与网络中的TCP Packet
 	uint64_t syscall_trace_id_call;    // 应用数据的追踪ID，若应用为协程，L7代理、应用层负载均衡等类型时，可利用此值追踪一个请求或响应
 					   // 同一份应用数据（cap_data可能不同）接收、发送的两份cap_data会标记上相同标识
-	uint64_t syscall_trace_id_session; // 应用数据的追踪ID，若应用使用多线程并发模式时，可利用此值追踪一个会话
-					   // 例如应用为了响应某个请求A而向其他应用发起的多个请求会标记上相同的标识，包括与这些请求关联的响应
 
 	/* data info */
 	uint64_t timestamp;	// cap_data获取的时间戳
@@ -46,8 +44,8 @@ struct socket_bpf_data {
  *                        造成的SockData丢失数量
  * @kern_socket_map_max:  socket追踪的hash表项最大值
  * @kern_socket_map_used: socket追踪的hash表项当前值
- * @kern_trace_map_max:  线程追踪会话的hash表项最大值
- * @kern_trace_map_used: 线程追踪会话的hash表项当前值
+ * @kern_trace_map_max:  线程/协程追踪会话的hash表项最大值
+ * @kern_trace_map_used: 线程/协程追踪会话的hash表项当前值
  *
  * 数据处理统计
  * 每一次系统调用向socket读/写数据，都会被eBPF获取，并把此次的
@@ -128,6 +126,6 @@ int running_socket_tracer(l7_handle_fn handle,
 			  uint32_t perf_pages_cnt,
 			  uint32_t queue_size,
 			  uint32_t max_socket_entries,
-			  uint32_t max_thread_entries,
+			  uint32_t max_trace_entries,
 			  uint32_t socket_map_max_reclaim);
 #endif /*_USER_SOCKET_H_*/

@@ -53,7 +53,7 @@ BPF_HASH(active_write_args_map, __u64, struct data_args_t)
 BPF_HASH(active_read_args_map, __u64, struct data_args_t)
 
 // socket_info_map, 这是个hash表，用于记录socket信息，
-// Key is {pid + sock address}. value is struct socket_info_t
+// Key is {pid + fd}. value is struct socket_info_t
 BPF_HASH(socket_info_map, __u64, struct socket_info_t)
 
 // Key is {tgid, pid}. value is trace_info_t
@@ -69,17 +69,6 @@ static __inline void delete_socket_info(__u64 conn_key,
 	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
 	if (trace_stats == NULL)
 		return;
-
-	/*
-	 * 当socket信息被清理同时，同样也要关联的清除trace_map中的此socket的记录
-	 */
-	__u64 trace_key = socket_info_ptr->trace_map_key;
-	if (trace_key) {
-		if (trace_map__lookup(&trace_key)) {
-			trace_map__delete(&trace_key);
-			trace_stats->trace_map_count--;
-		}
-	}
 
 	socket_info_map__delete(&conn_key);
 	trace_stats->socket_map_count--;
@@ -511,14 +500,12 @@ do { \
 #define TRACE_MAP_ACT_NEW   1
 #define TRACE_MAP_ACT_DEL   2
 
-static __inline void trace_process(const enum traffic_direction direction,
+static __inline void trace_process(struct conn_info_t* conn_info,
 				   __u64 conn_key, __u64 pid_tgid,
 				   struct trace_info_t *trace_info_ptr,
 				   struct trace_uid_t *trace_uid,
 				   struct trace_stats *trace_stats,
-				   __u64 *coroutine_trace_id,
-				   __u64 *thread_trace_id,
-				   __u8 *trace_map_act) {
+				   __u64 *thread_trace_id) {
 	/*
 	 * ==========================================
 	 * Coroutine-Trace-ID (Single Redirect Trace)
@@ -541,72 +528,29 @@ static __inline void trace_process(const enum traffic_direction direction,
 	 *                                           | ② -> trace end
 	 */
 
-	/*
-	 * ==========================================
-	 * Thread-Trace-ID (Multiple Redirect Trace)
-	 * ==========================================
-	 * trace start           socket-a             |
-	 * Ingress trace ID ①  -> |                   |
-	 *                  ①  -> |
-	 *                  ①  -> |                  socket-b
-	 *                        - same thread ID -- |
-	 *                                            | ①  -> Egress
-	 *                        |                   |
-	 *                        |              <- ① |Ingress
-	 *                        |                 ... ...
-	 *                        |
-	 *                        |                  socket-c
-	 *                        |                   | ①  -> Egress
-	 *                        |                   |
-	 *                        |              <- ① |Ingress
-	 *                        |                   |
-	 * trace end              |                 ... ...
-	 * Egress socket-a ①  <-- |
-	 *
-	 */
-
-	if (direction == T_INGRESS) {
-		if (trace_info_ptr) {
-			// coroutine_trace_id update always.
-			*coroutine_trace_id = trace_info_ptr->coroutine_trace_id =
-							++trace_uid->coroutine_trace_id;
-
-			// thread_trace_id confirm
-			if (trace_info_ptr->thread_trace_id != 0)
-				*thread_trace_id = trace_info_ptr->thread_trace_id;
-			else
-				*thread_trace_id = trace_info_ptr->thread_trace_id =
-							++trace_uid->thread_trace_id;
-		} else {
-			struct trace_info_t trace_info;
-			trace_info.conn_key = conn_key;
-			*coroutine_trace_id = trace_info.coroutine_trace_id =
-						++trace_uid->coroutine_trace_id;
-			
-			*thread_trace_id = trace_info.thread_trace_id =
-						++trace_uid->thread_trace_id;
-
-			trace_map__update(&pid_tgid, &trace_info);
+	if (conn_info->direction == T_INGRESS) {
+		struct trace_info_t trace_info;
+		*thread_trace_id = trace_info.thread_trace_id =
+					++trace_uid->thread_trace_id;
+		if (conn_info->message_type == MSG_REQUEST)
+			trace_info.peer_fd = conn_info->fd;
+		else
+			trace_info.peer_fd = 0;
+		trace_map__update(&pid_tgid, &trace_info);
+		if (!trace_info_ptr)
 			trace_stats->trace_map_count++;
-			*trace_map_act = TRACE_MAP_ACT_NEW;
-		}
 	} else { /* direction == T_EGRESS */
 		if (trace_info_ptr) {
-			*coroutine_trace_id = trace_info_ptr->coroutine_trace_id;
-			trace_info_ptr->coroutine_trace_id = 0;
 			*thread_trace_id = trace_info_ptr->thread_trace_id;
-			if (trace_info_ptr->conn_key == conn_key) {
-				trace_stats->trace_map_count--;
-				*trace_map_act = TRACE_MAP_ACT_DEL;
-				trace_map__delete(&pid_tgid);
-			}
+			trace_stats->trace_map_count--;
 		}
+
+		trace_map__delete(&pid_tgid);
 	}
 }
 
 static __inline void data_submit(struct pt_regs *ctx,
 				 struct conn_info_t* conn_info,
-				 const enum traffic_direction direction,
 				 const char *from,
 				 __u32 syscall_len,
 				 struct member_fields_offset *offset)
@@ -634,9 +578,9 @@ static __inline void data_submit(struct pt_regs *ctx,
 	}
 
 	__u32 tcp_seq = 0;
-	__u64 coroutine_trace_id = 0, thread_trace_id = 0;
+	__u64 thread_trace_id = 0;
 
-	if (direction == T_INGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
+	if (conn_info->direction == T_INGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
 #ifdef BPF_USE_CORE
 		struct tcp_sock *tp_sock = (struct tcp_sock *)conn_info->sk;
 		bpf_core_read(&tcp_seq, sizeof(tcp_seq),
@@ -645,7 +589,7 @@ static __inline void data_submit(struct pt_regs *ctx,
 		bpf_probe_read(&tcp_seq, sizeof(tcp_seq),
 			       conn_info->sk + offset->tcp_sock__copied_seq_offset);
 #endif
-	} else if (direction == T_EGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
+	} else if (conn_info->direction == T_EGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
 #ifdef BPF_USE_CORE
 		struct tcp_sock *tp_sock = (struct tcp_sock *)conn_info->sk;
 		bpf_core_read(&tcp_seq, sizeof(tcp_seq),
@@ -657,7 +601,7 @@ static __inline void data_submit(struct pt_regs *ctx,
 	}
 
 	__u32 k0 = 0;
-	struct socket_info_t sk_info;
+	struct socket_info_t sk_info = { 0 };
 	struct trace_uid_t *trace_uid = trace_uid_map__lookup(&k0);
 	if (trace_uid == NULL)
 		return;
@@ -669,24 +613,22 @@ static __inline void data_submit(struct pt_regs *ctx,
 	struct trace_info_t *trace_info_ptr =
 				trace_map__lookup(&pid_tgid);
 
-	__u8 trace_map_act = TRACE_MAP_ACT_NONE;
-
 	if (conn_info->message_type != MSG_PRESTORE &&
 	    conn_info->message_type != MSG_RECONFIRM)
-		trace_process(direction, conn_key, pid_tgid, trace_info_ptr,
-			      trace_uid, trace_stats, &coroutine_trace_id,
-			      &thread_trace_id, &trace_map_act);
+		trace_process(conn_info, conn_key, pid_tgid, trace_info_ptr,
+			      trace_uid, trace_stats, &thread_trace_id);
 
 	struct socket_info_t *socket_info_ptr = conn_info->socket_info_ptr;
-	if (socket_info_ptr == NULL) {
+	if (!is_socket_info_valid(socket_info_ptr)) {
+		if (socket_info_ptr && conn_info->direction == T_EGRESS) {
+			sk_info.peer_fd = socket_info_ptr->peer_fd;
+			thread_trace_id = socket_info_ptr->trace_id;
+		}
+
 		sk_info.uid = ++trace_uid->socket_id;
 		sk_info.l7_proto = conn_info->protocol;
-		sk_info.seq = 0;
-		sk_info.trace_map_key = 0;
-		*(__u32 *)sk_info.prev_data = 0;
 		sk_info.direction = conn_info->direction;
 		sk_info.role = ROLE_UNKNOW;
-		sk_info.prev_data_len = 0;
 		sk_info.update_time = time_stemp / NS_PER_SEC;
 		sk_info.need_reconfirm = conn_info->need_reconfirm;
 		sk_info.correlation_id = conn_info->correlation_id;
@@ -699,25 +641,26 @@ static __inline void data_submit(struct pt_regs *ctx,
 			sk_info.prev_data_len = 4;
 		}
 
-		/*
-		 * 把'socket_info_map'和'trace_map'通过socket address关联起来，
-		 * 这样可以在socket close的时候同时清理掉trace_map中的记录。
-		 */
-		if (trace_map_act == TRACE_MAP_ACT_NEW)
-			sk_info.trace_map_key = pid_tgid;
-
 		socket_info_map__update(&conn_key, &sk_info);
-		trace_stats->socket_map_count++;
+		if (socket_info_ptr == NULL)
+			trace_stats->socket_map_count++;
 	} else { /* socket_info_ptr != NULL */
 		sk_info.uid = socket_info_ptr->uid;
 		sk_info.seq = ++socket_info_ptr->seq;
-
-		if (trace_map_act == TRACE_MAP_ACT_NEW)
-			socket_info_ptr->trace_map_key = pid_tgid;
-		else if (trace_map_act == TRACE_MAP_ACT_DEL)
-			socket_info_ptr->trace_map_key = 0;
-
 		socket_info_ptr->update_time = time_stemp / NS_PER_SEC;
+		if (socket_info_ptr->peer_fd != 0 && conn_info->direction == T_INGRESS) {
+			__u64 peer_conn_key = gen_conn_key_id((__u64)tgid,
+							      (__u64)socket_info_ptr->peer_fd);
+			struct socket_info_t *peer_socket_info_ptr =
+							socket_info_map__lookup(&peer_conn_key);
+			if (is_socket_info_valid(peer_socket_info_ptr))
+				peer_socket_info_ptr->trace_id = thread_trace_id;
+		}
+
+		if (conn_info->direction == T_EGRESS && socket_info_ptr->trace_id != 0) {
+			thread_trace_id = socket_info_ptr->trace_id;
+			socket_info_ptr->trace_id = 0;
+		}
 	}
 
 	/*
@@ -750,14 +693,13 @@ static __inline void data_submit(struct pt_regs *ctx,
 	v->tgid = tgid;
 	v->pid = (__u32) pid_tgid;
 	v->timestamp = time_stemp / NS_PER_US;
-	v->direction = direction;
+	v->direction = conn_info->direction;
 	v->syscall_len = syscall_len;
 	v->msg_type = conn_info->message_type;
 	v->tcp_seq = 0;
 	if (conn_info->tuple.l4_protocol == IPPROTO_TCP)
 		v->tcp_seq = tcp_seq - syscall_len;
 
-	v->coroutine_trace_id = coroutine_trace_id;
 	v->thread_trace_id = thread_trace_id;
 	bpf_get_current_comm(v->comm, sizeof(v->comm));
 
@@ -871,7 +813,7 @@ static __inline void process_data(const bool vecs, struct pt_regs* ctx, __u64 id
 	}
 
 	if (conn_info->protocol != PROTO_UNKNOWN) {
-		data_submit(ctx, conn_info, direction, __data, (__u32)bytes_count, offset);
+		data_submit(ctx, conn_info, __data, (__u32)bytes_count, offset);
 	}
 }
 
@@ -1291,6 +1233,27 @@ KPROG(read_null) (struct pt_regs* ctx) {
 				v_buff->len = 0;				
 			}
 		}
+	}
+
+	return 0;
+}
+
+// /sys/kernel/debug/tracing/events/syscalls/sys_exit_socket/format
+TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
+	__u64 id = bpf_get_current_pid_tgid();
+	__u64 fd = (__u64)ctx->ret;
+	struct trace_info_t *trace = trace_map__lookup(&id);
+	if (trace && trace->peer_fd != 0 && trace->peer_fd != (__u32)fd) {
+		struct socket_info_t sk_info = { 0 };
+		sk_info.peer_fd = trace->peer_fd;
+		sk_info.trace_id = trace->thread_trace_id;	
+		__u64 conn_key = gen_conn_key_id(id >> 32, fd);
+		socket_info_map__update(&conn_key, &sk_info);
+		__u32 k0 = 0;
+		struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
+		if (trace_stats == NULL)
+			return 0;
+		trace_stats->socket_map_count++;
 	}
 
 	return 0;

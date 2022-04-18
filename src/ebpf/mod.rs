@@ -83,7 +83,7 @@ pub struct SK_BPF_DATA {
     /* trace info */
     pub tcp_seq: u64, // 收发cap_data数据时TCP协议栈将会用到的TCP SEQ，可用于关联eBPF DATA与网络中的TCP Packet
     /*
-     * 应用数据的追踪ID，应用于协程数据转发，L7代理、应用层负载均衡等场景。
+     * 应用数据的追踪ID，应用于数据转发，L7代理、应用层负载均衡等场景。
      * 值：
      *     从启动时的时钟开始自增1
      * 实现原理：
@@ -99,21 +99,6 @@ pub struct SK_BPF_DATA {
      *     请求/回应都有各自不同的syscall_trace_id_call。
      */
     pub syscall_trace_id_call: u64,
-    /*
-     * 应用数据的追踪ID，若应用使用多线程并发模式时，可利用此值追踪一个会话
-     * 例如应用为了响应某个请求A而向其他应用发起的多个请求会标记上相同的标识，包括与这些请求关联的响应
-     * 值：
-     *     从启动时的时钟开始自增1
-     * 实现原理：
-     *     当应用程序从socket读取数据（Ingress）时，会在hash中做记录
-     *       key: 线程ID/进程ID，
-     *       Value: UID（追踪的唯一标识ID）+ sock内存地址
-     *     在同一个线程ID/进程ID下可能经过多次数据在不同socket间转发，而当向socket写数据（Egress），
-     *     使用key（线程ID/进程ID）进行查询得到“UID（追踪的唯一标识ID）+ sock内存地址”，如果这时
-     *     查询到的“sock内存地址”与先前记录的“sock内存地址”相等，这样我们就关联了此线程/进程所有转发
-     *     的数据。
-     */
-    pub syscall_trace_id_session: u64,
 
     /* data info */
     pub timestamp: u64, // cap_data获取的时间戳（从1970.1.1开始到数据捕获时的时间间隔，精度为微妙）
@@ -149,8 +134,8 @@ pub struct SK_TRACE_STATS {
     pub kern_lost: u64, // perf buffer数据用户态程序来不及接收数据，造成的SockData丢失数量
     pub kern_socket_map_max: u32, // socket追踪的hash表项最大值
     pub kern_socket_map_used: u32, // socket追踪的hash表项当前值
-    pub kern_trace_map_max: u32, // 线程追踪会话的hash表项最大值
-    pub kern_trace_map_used: u32, // 线程追踪会话的hash表项当前值
+    pub kern_trace_map_max: u32, // 线程/协程追踪会话的hash表项最大值
+    pub kern_trace_map_used: u32, // 线程/协程追踪会话的hash表项当前值
     pub socket_map_max_reclaim: u32, // socket map表项进行清理的最大阈值，
     // 当前map的表项数量超过这个值进行map清理操作。
 
@@ -193,7 +178,7 @@ extern "C" {
     // perf_pages_cnt: 和内核共享内存占用的页框数量, 值为2的次幂。
     // ring_size: 环形缓存队列大小，值为2的次幂。
     // max_socket_entries: 设置用于socket追踪的hash表项最大值，取决于实际场景中并发请求数量。
-    // max_thread_entries: 设置用于线程追踪会话的hash表项最大值，SK_BPF_DATA结构的syscall_trace_id_session关联这个哈希表
+    // max_trace_entries: 设置用于线程/协程追踪会话的hash表项最大值。
     // socket_map_max_reclaim: socket map表项进行清理的最大阈值，当前map的表项数量超过这个值进行map清理操作。
     // 返回值：成功返回0，否则返回非0
     pub fn running_socket_tracer(
@@ -202,7 +187,7 @@ extern "C" {
         perf_pages_cnt: c_uint,
         ring_size: c_uint,
         max_socket_entries: c_uint,
-        max_thread_entries: c_uint,
+        max_trace_entries: c_uint,
         socket_map_max_reclaim: c_uint,
     ) -> c_int;
 
