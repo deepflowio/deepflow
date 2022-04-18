@@ -98,11 +98,11 @@ impl SessionPeer {
     }
 
     fn is_reply_packet(&self, p: &MetaPacket) -> bool {
-        p.tcp_data.ack == self.seq + self.payload_len
+        p.tcp_data.ack == self.seq.overflowing_add(self.payload_len).0
     }
 
     fn is_next_packet(&self, p: &MetaPacket) -> bool {
-        p.tcp_data.seq == self.seq + self.payload_len
+        p.tcp_data.seq == self.seq.overflowing_add(self.payload_len).0
     }
 
     // merge array[index+1] into array[index]
