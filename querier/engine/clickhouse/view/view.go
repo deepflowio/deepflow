@@ -72,6 +72,8 @@ type Time struct {
 	Interval           int
 	DatasourceInterval int
 	WindowSize         int
+	Fill               string
+	Alias              string
 }
 
 func (t *Time) AddTimeStart(timeStart int64) {
@@ -94,6 +96,14 @@ func (t *Time) AddWindowSize(windowSize int) {
 	t.WindowSize = windowSize
 }
 
+func (t *Time) AddFill(fill string) {
+	t.Fill = fill
+}
+
+func (t *Time) AddAlias(alias string) {
+	t.Alias = alias
+}
+
 func NewTime() *Time {
 	return &Time{
 		TimeEnd:            time.Now().Unix(),
@@ -108,8 +118,8 @@ type View struct {
 }
 
 // 使用model初始化view
-func NewView(m *Model) View {
-	return View{Model: m}
+func NewView(m *Model) *View {
+	return &View{Model: m}
 }
 
 func (v *View) ToString() string {
@@ -124,6 +134,13 @@ func (v *View) ToString() string {
 	//从最外层View开始拼接sql
 	v.SubViewLevels[len(v.SubViewLevels)-1].WriteTo(&buf)
 	return buf.String()
+}
+
+func (v *View) GetCallbacks() (callbacks []func(columns []interface{}, values []interface{}) []interface{}) {
+	if v.Model.Time.Interval > 0 && v.Model.Time.Fill != "" {
+		callbacks = append(callbacks, TimeFill(v.Model))
+	}
+	return callbacks
 }
 
 func (v *View) trans() {

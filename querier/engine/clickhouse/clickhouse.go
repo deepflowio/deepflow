@@ -27,6 +27,7 @@ type CHEngine struct {
 	DB         string
 	Table      string
 	asTagMap   map[string]string
+	View       *view.View
 }
 
 func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]interface{}, map[string]interface{}, error) {
@@ -50,7 +51,13 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 		log.Error(err)
 		return nil, nil, err
 	}
+	for _, stmt := range e.Statements {
+		stmt.Format(e.Model)
+	}
+	// 使用Model生成View
+	e.View = view.NewView(e.Model)
 	chSql := e.ToSQLString()
+	callbacks := e.View.GetCallbacks()
 	debug.Sql = chSql
 	log.Debugf("query_uuid: %s | trans sql: %s", query_uuid, chSql)
 	chClient := client.Client{
@@ -66,7 +73,7 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 		log.Error(err)
 		return nil, debug.Get(), err
 	}
-	rst, err := chClient.DoQuery(chSql)
+	rst, err := chClient.DoQuery(chSql, callbacks)
 	if err != nil {
 		log.Error(chClient.Debug)
 		return nil, debug.Get(), err
@@ -211,13 +218,15 @@ func (e *CHEngine) TransLimit(limit *sqlparser.Limit) error {
 
 // 原始sql转为clickhouse-sql
 func (e *CHEngine) ToSQLString() string {
-	for _, stmt := range e.Statements {
-		stmt.Format(e.Model)
+	if e.View == nil {
+		for _, stmt := range e.Statements {
+			stmt.Format(e.Model)
+		}
+		// 使用Model生成View
+		e.View = view.NewView(e.Model)
 	}
-	// 使用Model生成View
-	chView := view.NewView(e.Model)
 	// View生成clickhouse-sql
-	chSql := chView.ToString()
+	chSql := e.View.ToString()
 	return chSql
 }
 

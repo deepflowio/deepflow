@@ -10,6 +10,8 @@ func TransType(typeName string, value interface{}) (interface{}, error) {
 	switch typeName {
 	case "UInt64":
 		return int(value.(uint64)), nil
+	case "UInt32":
+		return int(value.(uint32)), nil
 	case "DateTime":
 		return value.(time.Time).String(), nil
 	case "IPv4", "IPv6":

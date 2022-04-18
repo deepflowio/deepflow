@@ -251,7 +251,7 @@ func GetTagResourceValues(tag string) (map[string][]interface{}, error) {
 		return nil, errors.New(fmt.Sprintf("tag (%s) not found", tag))
 	}
 	log.Debug(sql)
-	rst, err := chClient.DoQuery(sql)
+	rst, err := chClient.DoQuery(sql, nil)
 	if err != nil {
 		return nil, err
 	}

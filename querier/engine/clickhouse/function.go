@@ -307,6 +307,7 @@ type Time struct {
 	TimeField  string
 	Interval   int
 	WindowSize int
+	Fill       string
 }
 
 func (t *Time) Trans() error {
@@ -324,12 +325,17 @@ func (t *Time) Trans() error {
 	} else {
 		t.WindowSize = 1
 	}
+	if len(t.Args) > 3 {
+		t.Fill = t.Args[3]
+	}
 	return nil
 }
 
 func (t *Time) Format(m *view.Model) {
 	m.Time.Interval = t.Interval
 	m.Time.WindowSize = t.WindowSize
+	m.Time.Fill = t.Fill
+	m.Time.Alias = t.Alias
 	toIntervalFunction := "toIntervalSecond"
 	var windows string
 	w := make([]string, t.WindowSize)

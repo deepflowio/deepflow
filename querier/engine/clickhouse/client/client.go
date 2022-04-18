@@ -40,7 +40,7 @@ func (c *Client) Init(query_uuid string) error {
 	return nil
 }
 
-func (c *Client) DoQuery(sql string) (map[string][]interface{}, error) {
+func (c *Client) DoQuery(sql string, callbacks []func(columns []interface{}, values []interface{}) []interface{}) (map[string][]interface{}, error) {
 	start := time.Now()
 	rows, err := c.connection.Queryx(sql)
 	queryTime := time.Since(start)
@@ -65,23 +65,27 @@ func (c *Client) DoQuery(sql string) (map[string][]interface{}, error) {
 		columnTypes = append(columnTypes, column.DatabaseTypeName())
 	}
 	result["columns"] = columnNames
+	var values []interface{}
 	for rows.Next() {
 		row, err := rows.SliceScan()
 		if err != nil {
 			c.Debug.Error = fmt.Sprintf("%s", err)
 			return nil, err
 		}
-		var values []interface{}
+		var record []interface{}
 		for i, rawValue := range row {
 			value, err := TransType(columnTypes[i], rawValue)
 			if err != nil {
 				c.Debug.Error = fmt.Sprintf("%s", err)
 				return nil, err
 			}
-			//TODO: callback
-			values = append(values, value)
+			record = append(record, value)
 		}
-		result["values"] = append(result["values"], values)
+		values = append(values, record)
 	}
+	for _, callback := range callbacks {
+		values = callback(columnNames, values)
+	}
+	result["values"] = values
 	return result, nil
 }
