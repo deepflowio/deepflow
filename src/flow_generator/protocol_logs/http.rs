@@ -175,6 +175,9 @@ impl HttpLog {
 
                 let mut l_offset = 0;
                 if httpv2_header.flags & FLAG_HEADERS_PADDED != 0 {
+                    if httpv2_header.frame_length <= frame_payload[0] as u32 {
+                        break;
+                    }
                     httpv2_header.frame_length -= frame_payload[0] as u32;
                     l_offset += 1;
                 }
