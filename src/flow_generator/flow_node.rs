@@ -337,7 +337,7 @@ pub struct FlowNode {
 }
 
 impl FlowNode {
-    fn reset_flow_stat_info(&mut self) {
+    pub(super) fn reset_flow_stat_info(&mut self) {
         self.policy_in_tick = [false; 2];
         self.packet_in_tick = false;
         let flow = &mut self.tagged_flow.flow;

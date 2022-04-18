@@ -37,6 +37,7 @@ use crate::{
     },
     config::Config,
     proto::common,
+    rpc::get_timestamp,
     utils::hasher::Jenkins64Hasher,
     utils::net::MacAddr,
     utils::queue::{self, Receiver, Sender},
@@ -101,7 +102,7 @@ impl FlowMap {
 
     pub fn inject_flush_ticker(&mut self, mut timestamp: Duration) -> bool {
         if timestamp.is_zero() {
-            timestamp = rpc::get_timestamp();
+            timestamp = get_timestamp();
         } else if timestamp < self.start_time {
             return false;
         }
@@ -823,7 +824,10 @@ impl FlowMap {
         // 5. 流结束或流持续60秒以上
 
         let flow = &mut tagged_flow.flow;
-        if flow.flow_key.proto == IpProtocol::Tcp && flow.flow_perf_stats.is_some() {
+        if flow.flow_key.proto == IpProtocol::Tcp
+            && flow.flow_perf_stats.is_some()
+            && self.l7_metrics_enabled()
+        {
             let stats = flow.flow_perf_stats.as_mut().unwrap();
             if stats.l7_protocol == L7Protocol::Unknown
                 && (flow.close_type != CloseType::ForcedReport
@@ -855,13 +859,13 @@ impl FlowMap {
         flow.update_close_type(node.flow_state);
         flow.end_time = timeout;
         flow.flow_stat_time = Duration::from_nanos(
-            (timeout.as_nanos() / TIME_UNIT.as_nanos() * TIME_UNIT.as_nanos()) as u64,
+            (timeout.as_nanos() / STATISTICAL_INTERVAL.as_nanos() * STATISTICAL_INTERVAL.as_nanos())
+                as u64,
         );
 
-        if self.config.collector_enabled {
-            return;
-        }
-        if flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp {
+        if self.config.collector_enabled
+            && (flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp)
+        {
             let l7_timeout_count = self
                 .rrt_cache
                 .borrow_mut()
@@ -877,8 +881,7 @@ impl FlowMap {
             });
         }
 
-        let tagged_flow = node.tagged_flow;
-        self.push_to_flow_stats_queue(tagged_flow);
+        self.push_to_flow_stats_queue(node.tagged_flow);
     }
 
     // go 版本的copyAndOutput
@@ -908,6 +911,7 @@ impl FlowMap {
                         self.l7_metrics_enabled(),
                     )
                 });
+                node.reset_flow_stat_info();
             }
             self.push_to_flow_stats_queue(node.tagged_flow.clone());
         }
@@ -1098,16 +1102,6 @@ impl FlowMap {
             };
         }
         node.tagged_flow.tag.policy_data = node.policy_data_cache.clone();
-    }
-}
-
-//TODO 测试用的，等rpc模块完成就要去掉，调用真正的rpc
-mod rpc {
-    use std::time::{Duration, SystemTime};
-    pub fn get_timestamp() -> Duration {
-        SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
     }
 }
 
