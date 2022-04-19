@@ -1,5 +1,5 @@
-#ifndef __BPF_BPF_BASE_H__
-#define __BPF_BPF_BASE_H__
+#ifndef __BPF_BASE_H__
+#define __BPF_BASE_H__
 
 #include <linux/version.h>
 
@@ -197,4 +197,4 @@ static __inline unsigned int bpf_strlen(const char * s) {
 #endif
 //#define BPF_LEN_CAP(x, cap) (x < cap ? (x) : cap)
 
-#endif /* __BPF_BPF_BASE_H__ */
+#endif /* __BPF_BASE_H__ */

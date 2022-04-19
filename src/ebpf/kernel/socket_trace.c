@@ -500,7 +500,8 @@ do { \
 #define TRACE_MAP_ACT_NEW   1
 #define TRACE_MAP_ACT_DEL   2
 
-static __inline void trace_process(struct conn_info_t* conn_info,
+static __inline void trace_process(struct socket_info_t *socket_info_ptr,
+				   struct conn_info_t* conn_info,
 				   __u64 conn_key, __u64 pid_tgid,
 				   struct trace_info_t *trace_info_ptr,
 				   struct trace_uid_t *trace_uid,
@@ -529,13 +530,17 @@ static __inline void trace_process(struct conn_info_t* conn_info,
 	 */
 
 	if (conn_info->direction == T_INGRESS) {
-		struct trace_info_t trace_info;
+		struct trace_info_t trace_info = { 0 };
 		*thread_trace_id = trace_info.thread_trace_id =
 					++trace_uid->thread_trace_id;
 		if (conn_info->message_type == MSG_REQUEST)
 			trace_info.peer_fd = conn_info->fd;
-		else
-			trace_info.peer_fd = 0;
+		else if (conn_info->message_type == MSG_RESPONSE) {
+			if (is_socket_info_valid(socket_info_ptr) &&
+			    socket_info_ptr->peer_fd != 0)
+				trace_info.peer_fd = socket_info_ptr->peer_fd;
+		}
+
 		trace_map__update(&pid_tgid, &trace_info);
 		if (!trace_info_ptr)
 			trace_stats->trace_map_count++;
@@ -613,12 +618,12 @@ static __inline void data_submit(struct pt_regs *ctx,
 	struct trace_info_t *trace_info_ptr =
 				trace_map__lookup(&pid_tgid);
 
+	struct socket_info_t *socket_info_ptr = conn_info->socket_info_ptr;
 	if (conn_info->message_type != MSG_PRESTORE &&
 	    conn_info->message_type != MSG_RECONFIRM)
-		trace_process(conn_info, conn_key, pid_tgid, trace_info_ptr,
+		trace_process(socket_info_ptr, conn_info, conn_key, pid_tgid, trace_info_ptr,
 			      trace_uid, trace_stats, &thread_trace_id);
 
-	struct socket_info_t *socket_info_ptr = conn_info->socket_info_ptr;
 	if (!is_socket_info_valid(socket_info_ptr)) {
 		if (socket_info_ptr && conn_info->direction == T_EGRESS) {
 			sk_info.peer_fd = socket_info_ptr->peer_fd;
@@ -772,10 +777,6 @@ static __inline void process_data(const bool vecs, struct pt_regs* ctx, __u64 id
 
 	// TODO : 此处可以根据配置对进程号进行过滤
 
-	/*
-	 * socket fetch.
-	 *
-	 */
 	__u32 k0 = 0;
 	struct member_fields_offset *offset = members_offset__lookup(&k0);
 	if (!offset)
@@ -1242,6 +1243,14 @@ KPROG(read_null) (struct pt_regs* ctx) {
 TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	__u64 fd = (__u64)ctx->ret;
+	char comm[16];
+	bpf_get_current_comm(comm, sizeof(comm));
+
+	// 试用于nginx负载均衡场景
+	if (!(comm[0] == 'n' && comm[1] == 'g' && comm[2] == 'i' &&
+	      comm[3] == 'n' && comm[4] == 'x' && comm[5] == '\0'))
+		return 0;
+
 	struct trace_info_t *trace = trace_map__lookup(&id);
 	if (trace && trace->peer_fd != 0 && trace->peer_fd != (__u32)fd) {
 		struct socket_info_t sk_info = { 0 };
