@@ -15,7 +15,7 @@ use log::{debug, error, info, warn};
 use super::{
     format_time, get_temp_filename,
     writer::{Writer, WriterCounter},
-    PcapPacket, TapType,
+    Packet, PcapPacket, TapType,
 };
 use crate::rpc::get_timestamp;
 use crate::utils::queue::{self, Error};
@@ -118,14 +118,12 @@ impl Worker {
         // 上层Sender要关闭channel，才调用worker的stop方法
         let thread = thread::spawn(move || loop {
             match packet_receiver.recv(Some(interval)) {
-                Ok(pkt) => {
-                    Self::write_pkt(pkt, &writers, &config, &counter);
-                }
+                Ok(PcapPacket::Packet(pkt)) => Self::write_pkt(pkt, &writers, &config, &counter),
                 Err(Error::Timeout) => {
                     let now = get_timestamp();
                     Self::clean_timeout_file(now, &writers, &config, &counter);
                 }
-                Err(Error::Terminated(_, _)) => {
+                Err(Error::Terminated(_, _)) | Ok(PcapPacket::Terminated) => {
                     let now = get_timestamp();
                     Self::clean_timeout_file(now, &writers, &config, &counter);
                     break;
@@ -239,7 +237,7 @@ impl Worker {
     }
 
     fn write_pkt(
-        meta_pkt: PcapPacket,
+        meta_pkt: Packet,
         writers: &Arc<DashMap<u64, Writer>>,
         config: &WorkerConfig,
         counter: &WorkerCounter,

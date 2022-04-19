@@ -196,6 +196,8 @@ impl LocalModeDispatcher {
             }
             flow_map.inject_meta_packet(meta_packet);
         }
+
+        base.terminate_queue();
         info!("Stopped dispatcher {}", base.id);
     }
 
