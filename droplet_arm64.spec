@@ -27,7 +27,7 @@ mkdir -p $RPM_BUILD_ROOT/usr/sbin/
 cp %pwd/bin/droplet $RPM_BUILD_ROOT/usr/sbin/
 mkdir -p $RPM_BUILD_ROOT/usr/bin/
 cp %pwd/bin/droplet-ctl $RPM_BUILD_ROOT/usr/bin/
-go get github.com/go-delve/delve/cmd/dlv
+go install github.com/go-delve/delve/cmd/dlv@latest
 cp $(go env GOPATH)/bin/dlv $RPM_BUILD_ROOT/usr/bin/dlv.droplet
 mkdir -p $RPM_BUILD_ROOT/lib/systemd/system/
 cp %pwd/droplet.service $RPM_BUILD_ROOT/lib/systemd/system/
