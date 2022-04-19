@@ -108,7 +108,7 @@ impl Trident {
     }
 
     fn run(state: TridentState, config: Config, revision: String) -> Result<()> {
-        info!("========== Trident start! ==========");
+        info!("========== MetaFlowAgent start! ==========");
 
         let (ctrl_ip, ctrl_mac) = get_route_src_ip_and_mac(&config.controller_ips[0].parse()?)
             .context("failed getting control ip and mac")?;

@@ -8,7 +8,7 @@ use lru::LruCache;
 use rand::prelude::*;
 use uluru::LRUCache;
 
-use trident::_L7RrtCache as L7RrtCache;
+use metaflow_agent::_L7RrtCache as L7RrtCache;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct SmallStruct {

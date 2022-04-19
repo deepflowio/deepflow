@@ -9,7 +9,7 @@ use std::{
 use anyhow::{anyhow, Result};
 use clap::{ArgEnum, Parser, Subcommand};
 
-use trident::debug::{
+use metaflow_agent::debug::{
     Beacon, Client, Message, Module, PlatformMessage, QueueMessage, RpcMessage, MAX_BUF_SIZE,
     SESSION_TIMEOUT,
 };
@@ -20,14 +20,14 @@ const ERR_PORT_MSG: &str = "error: The following required arguments were not pro
     \t--port <PORT> required arguments were not provided";
 
 #[derive(Parser)]
-#[clap(name = "trident-ctl")]
+#[clap(name = "metaflow-agent-ctl")]
 struct Cmd {
     #[clap(subcommand)]
     command: ControllerCmd,
-    /// remote trident listening port
+    /// remote metaflow-agent listening port
     #[clap(short, long, parse(try_from_str))]
     port: Option<u16>,
-    /// remote trident host ip, ipv6 format is 'fe80::5054:ff:fe95:c839', ipv4 format is '127.0.0.1'
+    /// remote metaflow-agent host ip, ipv6 format is 'fe80::5054:ff:fe95:c839', ipv4 format is '127.0.0.1'
     #[clap(short, long, parse(try_from_str), default_value_t=IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))]
     address: IpAddr,
 }
@@ -41,29 +41,29 @@ enum ControllerCmd {
 }
 #[derive(Parser)]
 struct QueueCmd {
-    /// monitor module, eg: trident-ctl queue --on xxxx --duration 40
+    /// monitor module, eg: metaflow-agent-ctl queue --on xxxx --duration 40
     #[clap(long, validator = queue_name_validator, requires = "monitor")]
     on: Option<String>,
     /// monitor duration unit is second
     #[clap(long, group = "monitor")]
     duration: Option<u64>,
-    /// turn off monitor, eg: trident-ctl queue --off xxx
+    /// turn off monitor, eg: metaflow-agent-ctl queue --off xxx
     #[clap(long, validator = queue_name_validator)]
     off: Option<String>,
-    /// show queue list, eg: trident-ctl queue --show
+    /// show queue list, eg: metaflow-agent-ctl queue --show
     #[clap(long)]
     show: bool,
-    /// turn off all queue, eg: trident-ctl queue --clear
+    /// turn off all queue, eg: metaflow-agent-ctl queue --clear
     #[clap(long)]
     clear: bool,
 }
 
 #[derive(Parser)]
 struct PlatformCmd {
-    /// Get resources with k8s api, eg: trident-ctl platform --k8s_get node
+    /// Get resources with k8s api, eg: metaflow-agent-ctl platform --k8s_get node
     #[clap(short, long, arg_enum)]
     k8s_get: Option<Resource>,
-    /// Show k8s container mac to global interface index mappings, eg: trident-ctl platform --mac_mappings
+    /// Show k8s container mac to global interface index mappings, eg: metaflow-agent-ctl platform --mac_mappings
     #[clap(short, long)]
     mac_mappings: bool,
 }
@@ -131,7 +131,7 @@ impl fmt::Display for Resource {
 
 #[derive(Parser)]
 struct RpcCmd {
-    /// Get data from RPC, eg: trident-ctl rpc --get config
+    /// Get data from RPC, eg: metaflow-agent-ctl rpc --get config
     #[clap(long, arg_enum)]
     get: RpcData,
 }
@@ -179,8 +179,8 @@ impl Controller {
     }
 
     /*
-    $ trident-ctl list
-    trident-ctl listening udp port 20035 to find trident
+    $ metaflow-agent-ctl list
+    metaflow-agent-ctl listening udp port 20035 to find trident
 
     -----------------------------------------------------------------------------------------------------
     VTAP ID        HOSTNAME                     IP                                            PORT
@@ -421,7 +421,7 @@ impl Controller {
                     PlatformMessage::MacMappings(e) => {
                         match e {
                             /*
-                            $ trident-ctl -p 42700 platform --mac-mappings
+                            $ metaflow-agent-ctl -p 42700 platform --mac-mappings
                             Interface Index          MAC address
                             12                       01:02:03:04:05:06
                             13                       01:02:03:04:05:06
@@ -458,7 +458,7 @@ impl Controller {
                     match res {
                         PlatformMessage::Version(v) => {
                             /*
-                            $ trident-ctl -p 54911 platform --k8s-get version
+                            $ metaflow-agent-ctl -p 54911 platform --k8s-get version
                             k8s-api-watcher-version xxx
                             */
                             match v {
@@ -488,7 +488,7 @@ impl Controller {
                 match res {
                     PlatformMessage::WatcherRes(v) => {
                         /*
-                        $ trident-ctl -p 54911 platform --k8s-get node
+                        $ metaflow-agent-ctl -p 54911 platform --k8s-get node
                         nodes entries...
                         */
                         match v {

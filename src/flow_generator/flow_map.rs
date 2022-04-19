@@ -1124,7 +1124,8 @@ pub fn _new_flow_map_and_receiver() -> (FlowMap, Receiver<TaggedFlow>) {
     fn policy_getter(_pkt: &mut MetaPacket, _id: u32) {}
     let (output_queue_sender, output_queue_receiver, _) = queue::bounded(256);
     let (app_proto_log_queue, _, _) = queue::bounded(256);
-    let c = Config::load_from_file("config/trident.yaml").expect("failed loading config file");
+    let c =
+        Config::load_from_file("config/metaflow-agent.yaml").expect("failed loading config file");
 
     let config = FlowMapConfig {
         vtap_id: 7,
