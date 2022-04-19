@@ -95,6 +95,9 @@ var (
 	}, {
 		input:  "select Sum(byte) as '流量总量', region_0 as '区域' from l4_flow_log where 1=1 group by '区域' order by '流量总量' desc",
 		output: "SELECT dictGet(deepflow.region_map, 'name', (toUInt64(region_id_0))) AS `区域`, SUM(byte_tx+byte_rx) AS `流量总量` FROM flow_log.l4_flow_log PREWHERE 1 = 1 AND region_id_0!=0 GROUP BY `区域` ORDER BY `流量总量` desc",
+	}, {
+		input:  "select byte as '123' from l4_flow_log where 1=1 group by '123' order by '123' limit 1 ",
+		output: "SELECT byte_tx+byte_rx AS `123` FROM flow_log.l4_flow_log PREWHERE 1 = 1 GROUP BY `123` ORDER BY `123` asc LIMIT 1",
 	},
 	}
 )
