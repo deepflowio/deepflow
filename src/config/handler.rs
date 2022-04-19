@@ -958,7 +958,7 @@ impl ConfigHandler {
             }
 
             info!(
-                "dispatcher config change from {:?} to {:?}",
+                "dispatcher config change from {:#?} to {:#?}",
                 candidate_config.dispatcher, new_config.dispatcher
             );
             candidate_config.dispatcher = new_config.dispatcher;
@@ -982,7 +982,7 @@ impl ConfigHandler {
 
         if candidate_config.debug != new_config.debug {
             info!(
-                "debug config change from {:?} to {:?}",
+                "debug config change from {:#?} to {:#?}",
                 candidate_config.debug, new_config.debug
             );
             candidate_config.debug = new_config.debug;
@@ -1001,7 +1001,7 @@ impl ConfigHandler {
         if candidate_config.diagnose != new_config.diagnose {
             //TODO diagnose stuff
             info!(
-                "diagnose config change from {:?} to {:?}",
+                "diagnose config change from {:#?} to {:#?}",
                 candidate_config.diagnose, new_config.diagnose
             );
             candidate_config.diagnose = new_config.diagnose;
@@ -1057,7 +1057,7 @@ impl ConfigHandler {
                 restart_dispatcher = true;
             }
             info!(
-                "flow_generator config change from {:?} to {:?}",
+                "flow_generator config change from {:#?} to {:#?}",
                 candidate_config.flow, new_config.flow
             );
             candidate_config.flow = new_config.flow;
@@ -1076,7 +1076,7 @@ impl ConfigHandler {
                 }
             }
             info!(
-                "collector config change from {:?} to {:?}",
+                "collector config change from {:#?} to {:#?}",
                 candidate_config.collector, new_config.collector
             );
             candidate_config.collector = new_config.collector;
@@ -1084,7 +1084,7 @@ impl ConfigHandler {
 
         if candidate_config.platform != new_config.platform {
             info!(
-                "platform config change from {:?} to {:?}",
+                "platform config change from {:#?} to {:#?}",
                 candidate_config.platform, new_config.platform
             );
             candidate_config.platform = new_config.platform;
@@ -1126,7 +1126,7 @@ impl ConfigHandler {
                 }
             }
             info!(
-                "sender config change from {:?} to {:?}",
+                "sender config change from {:#?} to {:#?}",
                 candidate_config.sender, new_config.sender
             );
             candidate_config.sender = new_config.sender;
@@ -1139,7 +1139,7 @@ impl ConfigHandler {
                 }
             }
             info!(
-                "handler config change from {:?} to {:?}",
+                "handler config change from {:#?} to {:#?}",
                 candidate_config.handler, new_config.handler
             );
             candidate_config.handler = new_config.handler;
@@ -1147,7 +1147,7 @@ impl ConfigHandler {
 
         if candidate_config.log_parser != new_config.log_parser {
             info!(
-                "log_parser config change from {:?} to {:?}",
+                "log_parser config change from {:#?} to {:#?}",
                 candidate_config.log_parser, new_config.log_parser
             );
             candidate_config.log_parser = new_config.log_parser;
@@ -1155,7 +1155,7 @@ impl ConfigHandler {
 
         if candidate_config.synchronizer != new_config.synchronizer {
             info!(
-                "synchronizer config change from {:?} to {:?}",
+                "synchronizer config change from {:#?} to {:#?}",
                 candidate_config.synchronizer, new_config.synchronizer
             );
             candidate_config.synchronizer = new_config.synchronizer;
