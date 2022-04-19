@@ -60,7 +60,7 @@ impl CollectorThread {
     }
 
     pub fn stop(&mut self) {
-        self.quadruple_generator.start();
+        self.quadruple_generator.stop();
         if let Some(l4_flow_aggr) = self.l4_flow_aggr.as_mut() {
             l4_flow_aggr.stop();
         }

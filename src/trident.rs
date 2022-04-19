@@ -93,7 +93,7 @@ impl Trident {
         }
         let logger_handle = logger.start()?;
 
-        info!("static_config {:?}", config);
+        info!("static_config {:#?}", config);
         let handle = Some(thread::spawn(move || {
             if let Err(e) = Self::run(state_thread, config, revision, logger_handle) {
                 warn!("trident exited: {}", e);
@@ -181,7 +181,7 @@ impl Trident {
                     continue;
                 }
             };
-            info!("{:?}", new_conf);
+            info!("Update runtime config: {:#?}", new_conf);
 
             let callbacks = config_handler.on_config(new_conf);
             match components.as_mut() {
@@ -251,6 +251,7 @@ pub struct Components {
 
 impl Components {
     pub fn start(&mut self) {
+        info!("Staring components.");
         if self.running.swap(true, Ordering::Relaxed) {
             return;
         }
@@ -279,6 +280,7 @@ impl Components {
         }
         self.monitor.start();
         self.guard.start();
+        info!("Started components.");
     }
 
     fn new(
@@ -694,6 +696,8 @@ impl Components {
     }
 
     pub fn stop(&mut self) {
+        info!("Stopping components.");
+
         if !self.running.swap(false, Ordering::Relaxed) {
             return;
         }
@@ -725,5 +729,7 @@ impl Components {
         self.debugger.stop();
         self.monitor.stop();
         self.guard.stop();
+
+        info!("Stopped components.")
     }
 }

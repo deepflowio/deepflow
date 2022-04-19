@@ -191,7 +191,7 @@ impl Default for Config {
             enable_qos_bypass: false,
             fast_path_map_size: 0,
             first_path_level: 0,
-            src_interfaces: vec!["dummy0".into(), "dummy1".into()],
+            src_interfaces: vec![],
             tap_mode: trident::TapMode::Local,
             mirror_traffic_pcp: 0,
             controller_cert_file_prefix: "".into(),
