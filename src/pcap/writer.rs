@@ -10,7 +10,7 @@ use log::{debug, error};
 use crate::common::enums::{LinkType, TapType};
 
 use super::{
-    format_time, PcapPacket, PCAP_MAGIC, RECORD_HEADER_LEN, SNAP_LEN, VERSION_MAJOR, VERSION_MINOR,
+    format_time, Packet, PCAP_MAGIC, RECORD_HEADER_LEN, SNAP_LEN, VERSION_MAJOR, VERSION_MINOR,
 };
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -117,7 +117,7 @@ impl Writer {
         Ok(())
     }
 
-    pub fn write(&mut self, pkt: PcapPacket) -> Result<()> {
+    pub fn write(&mut self, pkt: Packet) -> Result<()> {
         let pkt_bytes = pkt.bytes();
         Self::write_record_header(
             &mut self.writer,

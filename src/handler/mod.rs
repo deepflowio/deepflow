@@ -44,4 +44,12 @@ impl PacketHandlerBuilder {
             PacketHandlerBuilder::Pcap(s) => PacketHandler::Pcap(s.clone()),
         }
     }
+
+    pub fn send_terminated(&self) {
+        match self {
+            PacketHandlerBuilder::Pcap(s) => {
+                let _ = s.send(PcapPacket::Terminated);
+            }
+        }
+    }
 }
