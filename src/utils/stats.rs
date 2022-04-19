@@ -287,7 +287,7 @@ impl Collector {
                         break;
                     }
 
-                    info!("collected: {:?}", batches);
+                    //info!("collected: {:?}", batches);
                     for batch in batches.into_iter() {
                         for client in statsd_clients.iter() {
                             if client.is_none() {

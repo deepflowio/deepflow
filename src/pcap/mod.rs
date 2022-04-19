@@ -26,7 +26,7 @@ const SNAP_LEN: u32 = 65535;
 const TIME_FORMAT: &str = "%y%m%d%H%M%S";
 
 #[derive(Debug)]
-pub struct PcapPacket {
+pub struct Packet {
     timestamp: Duration,
     tap_type: TapType,
     acl_gid: u16,
@@ -36,7 +36,12 @@ pub struct PcapPacket {
     raw_pkt: Vec<u8>,
 }
 
-impl PcapPacket {
+pub enum PcapPacket {
+    Packet(Packet),
+    Terminated,
+}
+
+impl Packet {
     pub fn bytes(&self) -> &[u8] {
         &self.raw_pkt
     }

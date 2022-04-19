@@ -223,6 +223,12 @@ impl BaseDispatcher {
             analyzer_ip: Ipv4Addr::UNSPECIFIED.into(),
         }
     }
+
+    pub fn terminate_queue(&self) {
+        for sender in self.options.handler_builders.iter() {
+            sender.send_terminated();
+        }
+    }
 }
 
 #[cfg(target_os = "linux")]

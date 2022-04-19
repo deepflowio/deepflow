@@ -29,9 +29,7 @@ use crate::{
     config::{handler::ConfigHandler, Config, RuntimeConfig},
     debug::{ConstructDebugCtx, Debugger},
     dispatcher::{
-        self,
-        recv_engine::{self, bpf},
-        BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
+        self, recv_engine::bpf, BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
     },
     flow_generator::AppProtoLogsParser,
     monitor::Monitor,
@@ -218,14 +216,6 @@ impl Trident {
         cond.notify_one();
         mem::drop(state_guard);
         self.handle.take().unwrap().join().unwrap();
-    }
-
-    pub fn get_af_packet_blocks(config: &Config, mem_size: u64) -> usize {
-        if config.tap_mode == TapMode::Analyzer || config.af_packet_blocks_enabled {
-            config.af_packet_blocks.max(8)
-        } else {
-            (mem_size as usize / recv_engine::DEFAULT_BLOCK_SIZE / 16).min(128)
-        }
     }
 }
 
