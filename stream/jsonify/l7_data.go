@@ -44,7 +44,6 @@ type L7Base struct {
 	StartTime   uint64 `json:"start_time"` // us
 	EndTime     uint64 `json:"end_time"`   // us
 
-	XRequestID             string
 	ProcessID0             uint32
 	ProcessID1             uint32
 	ProcessKName0          string
@@ -86,7 +85,6 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("time", ckdb.DateTime).SetComment("精度: 秒"),
 		ckdb.NewColumn("end_time_s", ckdb.DateTime).SetComment("精度: 秒"),
 
-		ckdb.NewColumn("x_request_id", ckdb.String).SetComment("XRequestID"),
 		ckdb.NewColumn("process_id_0", ckdb.Int32).SetComment("客户端进程ID"),
 		ckdb.NewColumn("process_id_1", ckdb.Int32).SetComment("服务端进程ID"),
 		ckdb.NewColumn("process_kname_0", ckdb.String).SetComment("客户端进程名"),
@@ -178,9 +176,6 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 
-	if err := block.WriteString(f.XRequestID); err != nil {
-		return err
-	}
 	if err := block.WriteUInt32(f.ProcessID0); err != nil {
 		return err
 	}
@@ -231,6 +226,7 @@ type L7Logger struct {
 	ResponseResult    string
 
 	HttpProxyClient string
+	XRequestId      string
 	TraceId         string
 	SpanId          string
 
@@ -263,6 +259,7 @@ func L7LoggerColumns() []*ckdb.Column {
 		ckdb.NewColumn("response_result", ckdb.String).SetComment("响应结果, DNS解析地址"),
 
 		ckdb.NewColumn("http_proxy_client", ckdb.String).SetComment("HTTP代理客户端"),
+		ckdb.NewColumn("x_request_id", ckdb.String).SetComment("XRequestID"),
 		ckdb.NewColumn("trace_id", ckdb.String).SetComment("TraceID"),
 		ckdb.NewColumn("span_id", ckdb.String).SetComment("SpanID"),
 
@@ -325,6 +322,9 @@ func (h *L7Logger) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteString(h.HttpProxyClient); err != nil {
 		return err
 	}
+	if err := block.WriteString(h.XRequestId); err != nil {
+		return err
+	}
 	if err := block.WriteString(h.TraceId); err != nil {
 		return err
 	}
@@ -364,6 +364,7 @@ func (h *L7Logger) fillHttp(l *pb.AppProtoLogsData) {
 	}
 
 	h.HttpProxyClient = info.ClientIP
+	h.XRequestId = info.XRequestId
 	h.TraceId = info.TraceID
 	h.SpanId = info.SpanID
 
@@ -594,6 +595,13 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.EndTime = l.EndTime / uint64(time.Microsecond)
 
 	// FIXME 补充填充链路追踪数据
+	b.ProcessID0 = l.ProcessId0
+	b.ProcessID1 = l.ProcessId1
+	b.ProcessKName0 = l.ProcessKname0
+	b.ProcessKName1 = l.ProcessKname1
+	b.SyscallTraceIDThread = l.SyscallTraceIdThread
+	b.SyscallTraceIDRequest = l.SyscallTraceIdRequest
+	b.SyscallTraceIDResponse = l.SyscallTraceIdResponse
 }
 
 func (k *KnowledgeGraph) FillL7(l *pb.AppProtoLogsBaseInfo, platformData *grpc.PlatformInfoTable, protocol layers.IPProtocol) {
