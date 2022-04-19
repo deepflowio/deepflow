@@ -378,7 +378,7 @@ func (h *L7Logger) fillHttp(l *pb.AppProtoLogsData) {
 		h.RequestLength = &h.requestLength
 	}
 
-	if info.RespContentLength != -1 || h.Type != uint8(datatype.MSG_T_REQUEST) {
+	if info.RespContentLength != -1 && h.Type != uint8(datatype.MSG_T_REQUEST) {
 		h.responseLength = uint64(info.RespContentLength)
 		h.ResponseLength = &h.responseLength
 	}
