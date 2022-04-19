@@ -190,6 +190,15 @@ message AppProtoLogsBaseInfo {
 
 	uint32 ReqTcpSeq = 23;
 	uint32 RespTcpSeq = 24;
+
+        uint32 ProcessId0 = 25;
+        uint32 ProcessId1 = 26;
+        string ProcessKname0 = 27;
+        string ProcessKname1 = 28;
+        uint64 SyscallTraceIdRequest = 29;
+        uint64 SyscallTraceIdResponse = 30;
+        uint32 SyscallTraceIdThread = 31;
+
 }
 
 message AppProtoHead {
@@ -212,6 +221,8 @@ message HTTPInfo {
 
 	int64  ReqContentLength = 10;
 	int64  RespContentLength = 11;
+
+	string XRequestId = 12;
 }
 
 message DNSInfo {
