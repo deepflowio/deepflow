@@ -5,11 +5,11 @@ use std::time::Instant;
 use criterion::*;
 use ipnet::IpNet;
 
-use trident::_Cidr as Cidr;
-use trident::_Labeler as Labeler;
-use trident::_LookupKey as LookupKey;
-use trident::_MacAddr as MacAddr;
-use trident::{_IpSubnet as IpSubnet, _PlatformData as PlatformData};
+use metaflow_agent::_Cidr as Cidr;
+use metaflow_agent::_Labeler as Labeler;
+use metaflow_agent::_LookupKey as LookupKey;
+use metaflow_agent::_MacAddr as MacAddr;
+use metaflow_agent::{_IpSubnet as IpSubnet, _PlatformData as PlatformData};
 
 fn bench_labeler(c: &mut Criterion) {
     c.bench_function("labeler", |b| {

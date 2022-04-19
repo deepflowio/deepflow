@@ -12,7 +12,7 @@ verify-x64:
 
   script:
     - cargo build
-    - cargo build --bin trident-ctl
+    - cargo build --bin metaflow-agent-ctl
     - cargo test
     - cargo fmt --all -- --check
     - cargo clean
@@ -24,7 +24,7 @@ package-x64:
 
   script:
     - cargo build --release
-    - cargo build --release --bin trident-ctl
+    - cargo build --release --bin metaflow-agent-ctl
     - cargo clean
   only:
     - master
