@@ -321,16 +321,16 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			e.Statements = append(e.Statements, function)
 			return nil
 		}
-		function, err = GetTagFunction(name, args, as, e.DB, e.Table)
+		tagFunctions, err := GetTagFunction(name, args, as, e.DB, e.Table)
 		if err != nil {
 			return err
 		}
-		if function != nil {
+		if len(tagFunctions) != 0 {
 			// time需要被最先解析
 			if name == "time" {
-				e.Statements = append([]Statement{function}, e.Statements...)
+				e.Statements = append(tagFunctions, e.Statements...)
 			}
-			e.Statements = append(e.Statements, function)
+			e.Statements = append(e.Statements, tagFunctions...)
 			return nil
 		}
 		return errors.New(fmt.Sprintf("function: %s not support", sqlparser.String(expr)))
@@ -387,17 +387,20 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 			e.SetLevelFlag(levelFlag)
 			return aggfunction.(Function), nil
 		}
-		tagfunction, err := GetTagFunction(name, args, "", e.DB, e.Table)
+		tagFunctions, err := GetTagFunction(name, args, "", e.DB, e.Table)
 		if err != nil {
 			return nil, err
 		}
-		if tagfunction != nil {
+		if len(tagFunctions) != 0 {
 			// time需要被最先解析
-			function, ok := tagfunction.(Function)
-			if !ok {
-				return nil, errors.New(fmt.Sprintf("tagfunction: %s not support in binary", sqlparser.String(expr)))
+			for _, tagFunction := range tagFunctions {
+				function, ok := tagFunction.(Function)
+				if !ok {
+					return nil, errors.New(fmt.Sprintf("tagfunction: %s not support in binary", sqlparser.String(expr)))
+				}
+				return function, nil
 			}
-			return function, nil
+
 		}
 		return nil, errors.New(fmt.Sprintf("function: %s not support in binary", sqlparser.String(expr)))
 	case *sqlparser.ParenExpr:

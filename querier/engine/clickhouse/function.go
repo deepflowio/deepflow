@@ -38,7 +38,7 @@ type Function interface {
 	SetAlias(alias string)
 }
 
-func GetTagFunction(name string, args []string, alias, db, table string) (Statement, error) {
+func GetTagFunction(name string, args []string, alias, db, table string) ([]Statement, error) {
 	if !common.IsValueInSliceString(name, TAG_FUNCTIONS) {
 		return nil, nil
 	}
@@ -46,11 +46,25 @@ func GetTagFunction(name string, args []string, alias, db, table string) (Statem
 	case "time":
 		time := Time{Args: args, Alias: alias}
 		err := time.Trans()
-		return &time, err
+		return []Statement{&time}, err
+	case "icon_id":
+		tagFunction := TagFunction{Name: name, Args: args, Alias: alias, DB: db, Table: table}
+		err := tagFunction.Check()
+		for resourceStr, _ := range tag.DEVICE_MAP {
+			// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
+			for _, suffix := range []string{"", "_0", "_1"} {
+				resourceNameSuffix := resourceStr + suffix
+				if args[0] == resourceNameSuffix {
+					groupStmt := &GroupTag{Value: alias}
+					return []Statement{&tagFunction, groupStmt}, err
+				}
+			}
+		}
+		return []Statement{&tagFunction}, err
 	default:
 		tagFunction := TagFunction{Name: name, Args: args, Alias: alias, DB: db, Table: table}
 		err := tagFunction.Check()
-		return &tagFunction, err
+		return []Statement{&tagFunction}, err
 	}
 }
 
