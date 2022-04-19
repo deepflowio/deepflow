@@ -28,6 +28,7 @@ func (s *Filters) Append(f *Filters) {
 	}
 	if s.Expr == nil {
 		s.Expr = f.Expr
+		s.Withs = f.Withs
 	} else {
 		s.Expr = &BinaryExpr{Left: s.Expr, Right: f.Expr, Op: &Operator{Type: AND}}
 		if len(f.Withs) > 0 {

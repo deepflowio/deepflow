@@ -39,8 +39,8 @@ var (
 		input:  "select (Max(byte_tx) + Sum(byte_tx))/1 as max_byte_tx from l4_flow_log",
 		output: "SELECT divide(plus(MAX(_sum_byte_tx), SUM(_sum_byte_tx)), 1) AS max_byte_tx FROM (SELECT SUM(byte_tx) AS _sum_byte_tx FROM flow_log.l4_flow_log)",
 	}, {
-		input:  "select Avg(byte_tx) as avg_byte_tx from l4_flow_log",
-		output: "SELECT AVG(_sum_byte_tx) AS avg_byte_tx FROM (SELECT SUM(byte_tx) AS _sum_byte_tx FROM flow_log.l4_flow_log)",
+		input:  "select Avg(byte_tx) as avg_byte_tx from l4_flow_log where `time`>=60 and `time`<=180 having Spread(byte_tx)>=0",
+		output: "WITH if(count(_sum_byte_tx)=3, min(_sum_byte_tx), 0) AS min_fillnullaszero__sum_byte_tx SELECT AVG(_sum_byte_tx) AS avg_byte_tx FROM (SELECT SUM(byte_tx) AS _sum_byte_tx FROM flow_log.l4_flow_log PREWHERE `time` >= 60 AND `time` <= 180) HAVING minus(MAX(_sum_byte_tx), min_fillnullaszero__sum_byte_tx) >= 0",
 	}, {
 		input:  "select Stddev(byte_tx) as stddev_byte_tx from l4_flow_log",
 		output: "SELECT stddevPopStable(_sum_byte_tx) AS stddev_byte_tx FROM (SELECT SUM(byte_tx) AS _sum_byte_tx FROM flow_log.l4_flow_log)",
