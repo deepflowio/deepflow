@@ -400,7 +400,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	}
 
 	// vtap对应资源
-	vtapResource := "'device_type','device_id','device_name','icon_id'"
+	vtapResource := "'device_type','device_id','device_name','icon_id','host_id','host_name'"
 	gwDictGet := fmt.Sprintf("dictGet(deepflow.vtap_port_map, (%s),(toUInt64(vtap_id),toUInt32(tap_port)))", vtapResource)
 	tagResourceMap["resource_from_vtap"] = map[string]*Tag{
 		"default": NewTag(
