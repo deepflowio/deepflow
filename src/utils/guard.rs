@@ -61,7 +61,7 @@ impl Guard {
                         Ok(memory_usage) => {
                             if memory_usage >= memory_limit {
                                 warn!(
-                                    "memory usage over memory limit, current={}, memory_limit={}, trident restart...", 
+                                    "memory usage over memory limit, current={}, memory_limit={}, metaflow-agent restart...", 
                                     ByteSize::b(memory_usage).to_string_as(true), ByteSize::b(memory_limit).to_string_as(true)
                                 );
                                 thread::sleep(Duration::from_secs(1));
@@ -83,7 +83,7 @@ impl Guard {
                                 process_num, process_limit
                             );
                             if process_num > process_limit * 2 {
-                                error!("the number of process exceeds the limit by 2 times, trident restart...");
+                                error!("the number of process exceeds the limit by 2 times, metaflow-agent restart...");
                                 thread::sleep(Duration::from_secs(1));
                                 exit(NORMAL_EXIT_WITH_RESTART);
                             }

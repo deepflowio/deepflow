@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use criterion::*;
 
-use trident::{_LeakyBucket as LeakyBucket, _queue_bounded as queue_bounded};
+use metaflow_agent::{_LeakyBucket as LeakyBucket, _queue_bounded as queue_bounded};
 
 fn queue(c: &mut Criterion) {
     c.bench_function("queue_send", |b| {

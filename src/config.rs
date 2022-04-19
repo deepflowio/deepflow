@@ -14,9 +14,9 @@ use crate::common::{
 use crate::proto::{common, trident};
 
 #[cfg(unix)]
-const DEFAULT_LOG_FILE: &str = "/var/log/trident/trident.log";
+const DEFAULT_LOG_FILE: &str = "/var/log/metaflow-agent/metaflow-agent.log";
 #[cfg(windows)]
-const DEFAULT_LOG_FILE: &str = "C:\\Deepflow\\trident\\log\\trident.log";
+const DEFAULT_LOG_FILE: &str = "C:\\Deepflow\\metaflow-agent\\log\\metaflow-agent.log";
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
@@ -450,7 +450,7 @@ impl RuntimeConfig {
         }
 
         // 虽然RFC 791里最低MTU是68，但是此时compressor会崩溃，
-        // 所以MTU最低限定到200以确保trident能够成功运行
+        // 所以MTU最低限定到200以确保metaflow-agent能够成功运行
         if self.mtu < 200 {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "MTU({}) specified smaller than 200",
@@ -664,7 +664,8 @@ mod tests {
     #[test]
     fn read_yaml_file() {
         // TODO: improve test cases
-        let c = Config::load_from_file("config/trident.yaml").expect("failed loading config file");
+        let c = Config::load_from_file("config/metaflow-agent.yaml")
+            .expect("failed loading config file");
         assert_eq!(c.controller_ips.len(), 1);
         assert_eq!(&c.controller_ips[0], "127.0.0.1");
     }

@@ -1,8 +1,8 @@
 [package]
-name = "trident"
+name = "metaflow-agent"
 version = "0.1.0"
 edition = "2021"
-default-run = "trident"
+default-run = "metaflow-agent"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

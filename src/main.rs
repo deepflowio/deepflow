@@ -5,13 +5,13 @@ use clap::Parser;
 use signal_hook::consts::TERM_SIGNALS;
 use signal_hook::iterator::Signals;
 
-use ::trident::*;
+use ::metaflow_agent::*;
 
 #[derive(Parser)]
 #[clap(version=concat!(env!("REV_COUNT"), "-", env!("REVISION"), " ", env!("COMMIT_DATE"), "\n", env!("RUSTC_VERSION")))]
 struct Opts {
     /// Specify config file location
-    #[clap(short = 'f', long, default_value = "/etc/trident.yaml")]
+    #[clap(short = 'f', long, default_value = "/etc/metaflow-agent.yaml")]
     config_file: String,
 
     /// Display the version
