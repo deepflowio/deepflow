@@ -394,10 +394,11 @@ type HTTPInfo struct {
 	TraceID  string
 	SpanID   string
 
-	Method   string
-	Path     string
-	Host     string
-	ClientIP string
+	Method     string
+	Path       string
+	Host       string
+	ClientIP   string
+	XRequestId string
 
 	ReqContentLength  int64
 	RespContentLength int64
@@ -415,6 +416,7 @@ func (h *HTTPInfo) WriteToPB(p *pb.HTTPInfo, msgType LogMessageType) {
 		p.Path = h.Path
 		p.Host = h.Host
 		p.ClientIP = h.ClientIP
+		p.XRequestId = h.XRequestId
 		p.ReqContentLength = h.ReqContentLength
 		p.RespContentLength = 0
 	case MSG_T_RESPONSE:
@@ -423,12 +425,14 @@ func (h *HTTPInfo) WriteToPB(p *pb.HTTPInfo, msgType LogMessageType) {
 		p.Path = ""
 		p.Host = ""
 		p.ClientIP = ""
+		p.XRequestId = h.XRequestId
 		p.ReqContentLength = 0
 	case MSG_T_SESSION:
 		p.Method = h.Method
 		p.Path = h.Path
 		p.Host = h.Host
 		p.ClientIP = h.ClientIP
+		p.XRequestId = h.XRequestId
 		p.ReqContentLength = h.ReqContentLength
 
 		p.RespContentLength = h.RespContentLength
@@ -442,6 +446,9 @@ func (h *HTTPInfo) String() string {
 func (h *HTTPInfo) Merge(r interface{}) {
 	if http, ok := r.(*HTTPInfo); ok {
 		h.RespContentLength = http.RespContentLength
+		if h.XRequestId == "" {
+			h.XRequestId = http.XRequestId
+		}
 		if h.TraceID == "" {
 			h.TraceID = http.TraceID
 		}
