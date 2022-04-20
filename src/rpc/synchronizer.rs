@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{self, Arc};
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use log::{debug, info, warn};
@@ -86,8 +86,6 @@ pub struct Synchronizer {
     session: Arc<Session>,
     dispatcher_listener: Arc<Mutex<Option<DispatcherListener>>>,
 
-    http_config: Arc<sync::Mutex<HttpConfig>>,
-
     running: Arc<AtomicBool>,
 
     // threads
@@ -129,7 +127,6 @@ impl Synchronizer {
             threads: Default::default(),
 
             max_memory: Default::default(),
-            http_config: Arc::new(sync::Mutex::new(HttpConfig::default())),
         }
     }
 
@@ -204,10 +201,6 @@ impl Synchronizer {
 
     pub fn clone_session(&self) -> Arc<Session> {
         self.session.clone()
-    }
-
-    pub fn clone_http_config(&self) -> Arc<sync::Mutex<HttpConfig>> {
-        self.http_config.clone()
     }
 
     fn parse_upgrade(
@@ -578,43 +571,4 @@ impl RuntimeEnvironment {
                 .into(),
         }
     }
-}
-
-// Span/Trace 共用一套TypeMap
-const TRACE_TYPE_MAP: [(&'static str, TraceType); 6] = [
-    ("", TraceType::Disabled),
-    ("x-b3-trace-id", TraceType::XB3),
-    ("x-b3-parentspanid", TraceType::XB3Span),
-    ("uber-trace-id", TraceType::Uber),
-    ("sw6", TraceType::Sw6),
-    ("sw8", TraceType::Sw8),
-];
-
-pub enum TraceType {
-    Disabled, // 业务表示关闭，trident也就沿用这个语义
-    XB3,
-    XB3Span,
-    Uber,
-    Sw6,
-    Sw8,
-}
-
-impl Default for TraceType {
-    fn default() -> Self {
-        Self::Disabled
-    }
-}
-
-#[derive(Default)]
-pub struct HttpConfig {
-    pub proxy_client_origin: String,
-    pub proxy_client_http_v2: String,
-    pub proxy_client_with_colon: String,
-    pub trace_id_origin: String,
-    pub trace_id_http_v2: String,
-    pub trace_id_with_colon: String,
-    pub trace_type: TraceType,
-    pub span_id_origin: String,
-    pub span_id_with_colon: String,
-    pub span_type: TraceType,
 }

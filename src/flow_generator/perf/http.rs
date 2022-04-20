@@ -1,7 +1,7 @@
 use std::cell::RefCell;
-use std::fmt;
 use std::rc::Rc;
 use std::time::Duration;
+use std::{fmt, str};
 
 use bytes::Bytes;
 use httpbis::for_test::hpack;
@@ -294,9 +294,23 @@ impl HttpPerfData {
         Err(Error::HttpHeaderParseFailed)
     }
 
+    fn has_magic(payload: &[u8]) -> bool {
+        if payload.len() < HTTPV2_MAGIC_LENGTH {
+            return false;
+        }
+        if let Ok(payload_str) = str::from_utf8(&payload[..HTTPV2_MAGIC_PREFIX.len()]) {
+            payload_str.starts_with(HTTPV2_MAGIC_PREFIX)
+        } else {
+            false
+        }
+    }
+
     fn parse_frame(&mut self, payload: &[u8]) -> Result<u16> {
         let mut frame_payload = payload;
         while frame_payload.len() > H2C_HEADER_SIZE {
+            if Self::has_magic(frame_payload) {
+                frame_payload = &frame_payload[HTTPV2_MAGIC_LENGTH..];
+            }
             self.session_data
                 .httpv2_headers
                 .parse_headers_frame(frame_payload)?;

@@ -473,7 +473,6 @@ impl Components {
                 log_receiver,
                 proto_log_sender.clone(),
                 i as u32,
-                synchronizer.clone_http_config(),
                 config_handler.log_parser(),
             );
             stats_collector.register_countable(
