@@ -6,28 +6,25 @@ import (
 	"metaflow/querier/engine/clickhouse/view"
 )
 
-func GetTagTranslator(name, alias, db, table string) ([]Statement, error) {
-	var stmts []Statement
+func GetTagTranslator(name, alias, db, table string) (Statement, error) {
+	var stmt Statement
 	selectTag := name
 	if alias != "" {
 		selectTag = alias
 	}
 	tag, ok := tag.GetTag(name, db, table, "default")
 	if !ok {
-		return stmts, nil
+		return stmt, nil
 	} else {
 		if tag.TagTranslator != "" {
-			stmt := &SelectTag{Value: tag.TagTranslator, Alias: selectTag}
-			stmts = append(stmts, stmt)
+			stmt = &SelectTag{Value: tag.TagTranslator, Alias: selectTag}
 		} else if alias != "" {
-			stmt := &SelectTag{Value: name, Alias: selectTag}
-			stmts = append(stmts, stmt)
+			stmt = &SelectTag{Value: name, Alias: selectTag}
 		} else {
-			stmt := &SelectTag{Value: selectTag}
-			stmts = append(stmts, stmt)
+			stmt = &SelectTag{Value: selectTag}
 		}
 	}
-	return stmts, nil
+	return stmt, nil
 }
 
 func GetMetricsTag(name string, alias string, db string, table string) (Statement, error) {

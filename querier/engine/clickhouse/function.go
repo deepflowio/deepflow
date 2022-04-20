@@ -38,7 +38,7 @@ type Function interface {
 	SetAlias(alias string)
 }
 
-func GetTagFunction(name string, args []string, alias, db, table string) ([]Statement, error) {
+func GetTagFunction(name string, args []string, alias, db, table string) (Statement, error) {
 	if !common.IsValueInSliceString(name, TAG_FUNCTIONS) {
 		return nil, nil
 	}
@@ -46,25 +46,11 @@ func GetTagFunction(name string, args []string, alias, db, table string) ([]Stat
 	case "time":
 		time := Time{Args: args, Alias: alias}
 		err := time.Trans()
-		return []Statement{&time}, err
-	case "icon_id":
-		tagFunction := TagFunction{Name: name, Args: args, Alias: alias, DB: db, Table: table}
-		err := tagFunction.Check()
-		for resourceStr, _ := range tag.DEVICE_MAP {
-			// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
-			for _, suffix := range []string{"", "_0", "_1"} {
-				resourceNameSuffix := resourceStr + suffix
-				if args[0] == resourceNameSuffix {
-					groupStmt := &GroupTag{Value: alias}
-					return []Statement{&tagFunction, groupStmt}, err
-				}
-			}
-		}
-		return []Statement{&tagFunction}, err
+		return &time, err
 	default:
 		tagFunction := TagFunction{Name: name, Args: args, Alias: alias, DB: db, Table: table}
 		err := tagFunction.Check()
-		return []Statement{&tagFunction}, err
+		return &tagFunction, err
 	}
 }
 
@@ -508,5 +494,16 @@ func (f *TagFunction) Format(m *view.Model) {
 	// metric分层的情况下 function需加入metric外层group
 	if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED {
 		m.AddGroup(&view.Group{Value: f.Alias, Flag: view.GROUP_FLAG_METRICS_OUTER})
+	}
+	if f.Name == "icon_id" {
+		for resourceStr, _ := range tag.DEVICE_MAP {
+			// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
+			for _, suffix := range []string{"", "_0", "_1"} {
+				resourceNameSuffix := resourceStr + suffix
+				if f.Args[0] == resourceNameSuffix {
+					m.AddGroup(&view.Group{Value: f.Alias})
+				}
+			}
+		}
 	}
 }

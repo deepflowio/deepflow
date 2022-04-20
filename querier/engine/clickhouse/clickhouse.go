@@ -321,16 +321,16 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			e.Statements = append(e.Statements, function)
 			return nil
 		}
-		tagFunctions, err := GetTagFunction(name, args, as, e.DB, e.Table)
+		tagFunction, err := GetTagFunction(name, args, as, e.DB, e.Table)
 		if err != nil {
 			return err
 		}
-		if len(tagFunctions) != 0 {
+		if tagFunction != nil {
 			// time需要被最先解析
 			if name == "time" {
-				e.Statements = append(tagFunctions, e.Statements...)
+				e.Statements = append([]Statement{tagFunction}, e.Statements...)
 			}
-			e.Statements = append(e.Statements, tagFunctions...)
+			e.Statements = append(e.Statements, tagFunction)
 			return nil
 		}
 		return errors.New(fmt.Sprintf("function: %s not support", sqlparser.String(expr)))
@@ -387,20 +387,17 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 			e.SetLevelFlag(levelFlag)
 			return aggfunction.(Function), nil
 		}
-		tagFunctions, err := GetTagFunction(name, args, "", e.DB, e.Table)
+		tagFunction, err := GetTagFunction(name, args, "", e.DB, e.Table)
 		if err != nil {
 			return nil, err
 		}
-		if len(tagFunctions) != 0 {
+		if tagFunction != nil {
 			// time需要被最先解析
-			for _, tagFunction := range tagFunctions {
-				function, ok := tagFunction.(Function)
-				if !ok {
-					return nil, errors.New(fmt.Sprintf("tagfunction: %s not support in binary", sqlparser.String(expr)))
-				}
-				return function, nil
+			function, ok := tagFunction.(Function)
+			if !ok {
+				return nil, errors.New(fmt.Sprintf("tagfunction: %s not support in binary", sqlparser.String(expr)))
 			}
-
+			return function, nil
 		}
 		return nil, errors.New(fmt.Sprintf("function: %s not support in binary", sqlparser.String(expr)))
 	case *sqlparser.ParenExpr:
@@ -426,12 +423,12 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 }
 
 func (e *CHEngine) AddGroup(group string) error {
-	stmts, err := GetGroup(group, e.asTagMap, e.DB, e.Table)
+	stmt, err := GetGroup(group, e.asTagMap, e.DB, e.Table)
 	if err != nil {
 		return err
 	}
-	if len(stmts) != 0 {
-		e.Statements = append(e.Statements, stmts...)
+	if stmt != nil {
+		e.Statements = append(e.Statements, stmt)
 	}
 	return nil
 }
@@ -442,15 +439,15 @@ func (e *CHEngine) AddTable(table string) {
 }
 
 func (e *CHEngine) AddTag(tag string, alias string) error {
-	stmts, err := GetTagTranslator(tag, alias, e.DB, e.Table)
+	stmt, err := GetTagTranslator(tag, alias, e.DB, e.Table)
 	if err != nil {
 		return err
 	}
-	if len(stmts) != 0 {
-		e.Statements = append(e.Statements, stmts...)
+	if stmt != nil {
+		e.Statements = append(e.Statements, stmt)
 		return nil
 	}
-	stmt, err := GetMetricsTag(tag, alias, e.DB, e.Table)
+	stmt, err = GetMetricsTag(tag, alias, e.DB, e.Table)
 	if err != nil {
 		return err
 	}

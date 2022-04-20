@@ -3,6 +3,7 @@ package view
 import (
 	"bytes"
 	"metaflow/querier/common"
+	"strings"
 	"time"
 )
 
@@ -335,7 +336,11 @@ func (sv *SubView) WriteTo(buf *bytes.Buffer) {
 		sv.From.WriteTo(buf)
 	}
 	if !sv.Filters.IsNull() {
-		buf.WriteString(" PREWHERE ")
+		if strings.HasPrefix(sv.From.ToString(), "deepflow") {
+			buf.WriteString(" WHERE ")
+		} else {
+			buf.WriteString(" PREWHERE ")
+		}
 		sv.Filters.WriteTo(buf)
 	}
 	if !sv.Groups.IsNull() {
