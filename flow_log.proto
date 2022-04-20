@@ -242,6 +242,8 @@ message DubboInfo {
 
     int32 req_body_len = 9;
     int32 resp_body_len = 10;
+
+    string trace_id = 11;
 }
 
 message KafkaInfo{
