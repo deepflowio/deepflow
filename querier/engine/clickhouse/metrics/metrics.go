@@ -13,6 +13,7 @@ const METRICS_OPERATOR_LTE = "<="
 var METRICS_OPERATORS = []string{METRICS_OPERATOR_GTE, METRICS_OPERATOR_LTE}
 
 type Metrics struct {
+	Index       int    // 索引
 	DBField     string // 数据库字段
 	DisplayName string // 描述
 	Unit        string // 单位
@@ -37,10 +38,11 @@ func (m *Metrics) Replace(metrics *Metrics) {
 }
 
 func NewMetrics(
-	dbField string, displayname string, unit string, metricType int, category string,
+	index int, dbField string, displayname string, unit string, metricType int, category string,
 	permissions []bool, condition string,
 ) *Metrics {
 	return &Metrics{
+		Index:       index,
 		DBField:     dbField,
 		DisplayName: displayname,
 		Unit:        unit,
@@ -86,12 +88,12 @@ func GetMetricsDescriptions(db string, table string) (map[string][]interface{}, 
 	columns := []interface{}{
 		"name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions",
 	}
-	var values []interface{}
+	values := make([]interface{}, len(metrics))
 	for field, metrics := range metrics {
-		values = append(values, []interface{}{
+		values[metrics.Index] = []interface{}{
 			field, metrics.IsAgg, metrics.DisplayName, metrics.Unit, metrics.Type,
 			metrics.Category, METRICS_OPERATORS, metrics.Permissions,
-		})
+		}
 	}
 	return map[string][]interface{}{
 		"columns": columns,
@@ -108,7 +110,7 @@ func LoadMetrics(db string, table string, dbDescription map[string]interface{}) 
 		metricsData, ok := tableDate.(map[string]interface{})[table]
 		if ok {
 			loadMetrics = make(map[string]*Metrics)
-			for _, metrics := range metricsData.([][]interface{}) {
+			for i, metrics := range metricsData.([][]interface{}) {
 				if len(metrics) < 7 {
 					return nil, errors.New(fmt.Sprintf("get metrics failed! db:%s table:%s metrics:%v", db, table, metrics))
 				}
@@ -121,7 +123,7 @@ func LoadMetrics(db string, table string, dbDescription map[string]interface{}) 
 					return nil, errors.New(fmt.Sprintf("parse metrics permission failed! db:%s table:%s metrics:%v", db, table, metrics))
 				}
 				lm := NewMetrics(
-					metrics[1].(string), metrics[2].(string), metrics[3].(string), metricType,
+					i, metrics[1].(string), metrics[2].(string), metrics[3].(string), metricType,
 					metrics[5].(string), permissions, "",
 				)
 				loadMetrics[metrics[0].(string)] = lm
