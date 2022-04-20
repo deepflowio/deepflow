@@ -7,7 +7,7 @@ use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use thread::JoinHandle;
 
-use log::{debug, info};
+use log::{debug, info, warn};
 use rand::prelude::{Rng, SeedableRng, SmallRng};
 
 use super::consts::*;
@@ -34,7 +34,11 @@ struct FlowAggrCounter {
 
 pub struct FlowAggrThread {
     id: usize,
-    flow_aggr: Option<FlowAggr>,
+    input: Arc<Receiver<Arc<TaggedFlow>>>,
+    output: Sender<SendItem>,
+    l4_log_store_tap_types: [bool; 256],
+    throttle: Arc<AtomicU64>,
+
     thread_handle: Option<JoinHandle<()>>,
 
     running: Arc<AtomicBool>,
@@ -51,35 +55,45 @@ impl FlowAggrThread {
         let running = Arc::new(AtomicBool::new(false));
         Self {
             id,
-            flow_aggr: Some(FlowAggr::new(
-                input,
-                output,
-                l4_log_store_tap_types,
-                throttle,
-                running.clone(),
-            )),
+            input: Arc::new(input),
+            output: output.clone(),
+            l4_log_store_tap_types: l4_log_store_tap_types,
+            throttle: throttle.clone(),
             thread_handle: None,
             running,
         }
     }
 
     pub fn start(&mut self) {
-        let mut flow_aggr = self.flow_aggr.take().unwrap();
-        info!("starting l4 flow aggr id: {}", self.id);
-        self.running.store(true, Ordering::Relaxed);
+        if self.running.swap(true, Ordering::Relaxed) {
+            warn!("l4 flow aggr id: {} already started, do nothing.", self.id);
+            return;
+        }
+
+        let mut flow_aggr = FlowAggr::new(
+            self.input.clone(),
+            self.output.clone(),
+            self.l4_log_store_tap_types,
+            self.throttle.clone(),
+            self.running.clone(),
+        );
         self.thread_handle = Some(thread::spawn(move || flow_aggr.run()));
+        info!("l4 flow aggr id: {} started", self.id);
     }
 
     pub fn stop(&mut self) {
+        if !self.running.swap(false, Ordering::Relaxed) {
+            warn!("l4 flow aggr id: {} already stopped, do nothing.", self.id);
+            return;
+        }
         info!("stoping l4 flow aggr: {}", self.id);
-        self.running.store(false, Ordering::Relaxed);
         let _ = self.thread_handle.take().unwrap().join();
         info!("stopped l4 flow aggr: {}", self.id);
     }
 }
 
 pub struct FlowAggr {
-    input: Receiver<Arc<TaggedFlow>>,
+    input: Arc<Receiver<Arc<TaggedFlow>>>,
     output: ThrottlingQueue,
     slot_start_time: Duration,
     stashs: VecDeque<HashMap<u64, TaggedFlow>>,
@@ -94,7 +108,7 @@ pub struct FlowAggr {
 
 impl FlowAggr {
     pub fn new(
-        input: Receiver<Arc<TaggedFlow>>,
+        input: Arc<Receiver<Arc<TaggedFlow>>>,
         output: Sender<SendItem>,
         l4_log_store_tap_types: [bool; 256],
         throttle: Arc<AtomicU64>,
