@@ -32,7 +32,6 @@ use crate::{
         FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC,
     },
     metric::document::TapSide,
-    rpc::HttpConfig,
     sender::SendItem,
     utils::{
         net::MacAddr,
@@ -491,6 +490,16 @@ struct AppLogs {
     kafka: KafkaLog,
 }
 
+impl AppLogs {
+    pub fn new(config: &LogParserAccess) -> Self {
+        Self {
+            http: HttpLog::new(config),
+            dubbo: DubboLog::new(config),
+            ..Default::default()
+        }
+    }
+}
+
 pub struct AppProtoLogsParser {
     input_queue: Arc<Receiver<MetaAppProto>>,
     output_queue: DebugSender<SendItem>,
@@ -500,7 +509,7 @@ pub struct AppProtoLogsParser {
     running: Arc<AtomicBool>,
     thread: Mutex<Option<JoinHandle<()>>>,
     counter: Arc<SessionAggrCounter>,
-    http_config: Arc<Mutex<HttpConfig>>,
+    l7_log_dynamic_is_updated: Arc<AtomicBool>,
     config: LogParserAccess,
 }
 
@@ -509,7 +518,6 @@ impl AppProtoLogsParser {
         input_queue: Receiver<MetaAppProto>,
         output_queue: DebugSender<SendItem>,
         id: u32,
-        http_config: Arc<Mutex<HttpConfig>>,
         config: LogParserAccess,
     ) -> (Self, Arc<SessionAggrCounter>) {
         let running = Arc::new(AtomicBool::new(false));
@@ -524,11 +532,27 @@ impl AppProtoLogsParser {
                 running,
                 thread: Mutex::new(None),
                 counter: counter.clone(),
-                http_config,
+                l7_log_dynamic_is_updated: Arc::new(AtomicBool::new(false)),
                 config,
             },
             counter,
         )
+    }
+
+    pub fn l7_log_dynamic_config_updated(&self) {
+        self.l7_log_dynamic_is_updated
+            .store(true, Ordering::Relaxed);
+    }
+
+    fn update_l7_log_dynamic_config(
+        l7_log_dynamic_is_updated: Arc<AtomicBool>,
+        config: &LogParserAccess,
+        app_logs: &mut AppLogs,
+    ) {
+        if l7_log_dynamic_is_updated.swap(false, Ordering::Relaxed) {
+            app_logs.http.update_config(config);
+            app_logs.dubbo.update_config(config);
+        }
     }
 
     pub fn start(&self) {
@@ -542,14 +566,20 @@ impl AppProtoLogsParser {
         let output_queue = self.output_queue.clone();
 
         let config = self.config.clone();
+        let l7_log_dynamic_is_updated = self.l7_log_dynamic_is_updated.clone();
 
         let thread = thread::spawn(move || {
-            let mut session_queue = SessionQueue::new(counter, output_queue, config);
-            let mut app_logs = AppLogs::default();
+            let mut session_queue = SessionQueue::new(counter, output_queue, config.clone());
+            let mut app_logs = AppLogs::new(&config);
 
             while running.load(Ordering::Relaxed) {
                 match input_queue.recv_n(QUEUE_BATCH_SIZE, Some(RCV_TIMEOUT)) {
                     Ok(app_protos) => {
+                        Self::update_l7_log_dynamic_config(
+                            l7_log_dynamic_is_updated.clone(),
+                            &config,
+                            &mut app_logs,
+                        );
                         for app_proto in app_protos {
                             let proto_log = match Self::parse_log(app_proto, &mut app_logs) {
                                 Ok(a) => a,
@@ -663,5 +693,4 @@ impl AppProtoLogsParser {
 
         Ok(proto_log)
     }
-    //TODO set_http_config
 }

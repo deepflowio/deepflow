@@ -232,6 +232,7 @@ impl fmt::Debug for FlowConfig {
 pub struct LogParserConfig {
     pub l7_log_collect_nps_threshold: u64,
     pub l7_log_session_aggr_timeout: Duration,
+    pub l7_log_dynamic: L7LogDynamicConfig,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -279,6 +280,54 @@ pub struct EbpfConfig {
     pub epc_id: u32,
     pub l7_log_session_timeout: Duration,
     pub log_path: String,
+}
+
+// Span/Trace 共用一套TypeMap
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum TraceType {
+    Disabled, // 业务表示关闭
+    XB3,
+    XB3Span,
+    Uber,
+    Sw6,
+    Sw8,
+}
+
+impl From<&str> for TraceType {
+    fn from(t: &str) -> TraceType {
+        match t {
+            "x-b3-trace-id" => TraceType::XB3,
+            "x-b3-parentspanid" => TraceType::XB3Span,
+            "uber-trace-id" => TraceType::Uber,
+            "sw6" => TraceType::Sw6,
+            "sw8" => TraceType::Sw8,
+            _ => TraceType::Disabled,
+        }
+    }
+}
+
+impl Default for TraceType {
+    fn default() -> Self {
+        Self::Disabled
+    }
+}
+
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
+pub struct L7LogDynamicConfig {
+    pub proxy_client_origin: String,
+    pub proxy_client_lower: String,
+    pub proxy_client_with_colon: String,
+    pub x_request_id_origin: String,
+    pub x_request_id_lower: String,
+    pub x_request_id_with_colon: String,
+    pub trace_id_origin: String,
+    pub trace_id_lower: String,
+    pub trace_id_with_colon: String,
+    pub trace_type: TraceType,
+    pub span_id_origin: String,
+    pub span_id_lower: String,
+    pub span_id_with_colon: String,
+    pub span_type: TraceType,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -428,6 +477,7 @@ impl Default for NewRuntimeConfig {
             log_parser: LogParserConfig {
                 l7_log_collect_nps_threshold: 1024,
                 l7_log_session_aggr_timeout: Duration::from_secs(120),
+                l7_log_dynamic: L7LogDynamicConfig::default(),
             },
             debug: DebugConfig {
                 vtap_id,
@@ -848,6 +898,25 @@ impl ConfigHandler {
             log_parser: LogParserConfig {
                 l7_log_collect_nps_threshold: conf.l7_log_collect_nps_threshold(),
                 l7_log_session_aggr_timeout: static_config.l7_log_session_aggr_timeout,
+                l7_log_dynamic: L7LogDynamicConfig {
+                    proxy_client_origin: conf.http_log_proxy_client().to_string(),
+                    proxy_client_lower: conf.http_log_proxy_client().to_string().to_lowercase(),
+                    proxy_client_with_colon: format!("{}:", conf.http_log_proxy_client()),
+
+                    x_request_id_origin: conf.http_log_x_request_id().to_string(),
+                    x_request_id_lower: conf.http_log_x_request_id().to_string().to_lowercase(),
+                    x_request_id_with_colon: format!("{}:", conf.http_log_x_request_id()),
+
+                    trace_id_origin: conf.http_log_trace_id().to_string(),
+                    trace_id_lower: conf.http_log_trace_id().to_string().to_lowercase(),
+                    trace_id_with_colon: format!("{}:", conf.http_log_trace_id()),
+                    trace_type: conf.http_log_trace_id().into(),
+
+                    span_id_origin: conf.http_log_span_id().to_string(),
+                    span_id_lower: conf.http_log_span_id().to_string().to_lowercase(),
+                    span_id_with_colon: format!("{}:", conf.http_log_span_id()),
+                    span_type: conf.http_log_span_id().into(),
+                },
             },
             debug: DebugConfig {
                 vtap_id: conf.vtap_id() as u16,
@@ -1179,6 +1248,20 @@ impl ConfigHandler {
                 "log_parser config change from {:#?} to {:#?}",
                 candidate_config.log_parser, new_config.log_parser
             );
+
+            if candidate_config.log_parser.l7_log_dynamic != new_config.log_parser.l7_log_dynamic {
+                info!(
+                    "l7 log dynamic config change from {:#?} to {:#?}",
+                    candidate_config.log_parser.l7_log_dynamic,
+                    new_config.log_parser.l7_log_dynamic
+                );
+                fn l7_log_dynamic_callback(_: &ConfigHandler, components: &mut Components) {
+                    for log_parser in components.log_parsers.iter().as_ref() {
+                        log_parser.l7_log_dynamic_config_updated();
+                    }
+                }
+                callbacks.push(l7_log_dynamic_callback);
+            }
             candidate_config.log_parser = new_config.log_parser;
         }
 
