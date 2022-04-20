@@ -128,42 +128,13 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			case "regexp":
 				whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value)
 			case "not regexp":
-				whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "NOT match", t.Value)
+				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value) + ")"
+			case "not like":
+				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "like", t.Value) + ")"
+			case "!=":
+				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value) + ")"
 			default:
 				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
-			}
-			// 可直接查询的device
-			for _, tagVlue := range []string{"chost", "router", "dhcpgw", "redis", "rds"} {
-				// id
-				for _, idSuffix := range []string{"_id", "_id_0", "_id_1"} {
-					if strings.Trim(t.Tag, "`") == tagVlue+idSuffix {
-						if strings.Contains(strings.ToLower(op), "not") || strings.ToLower(op) == "!=" {
-							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, "OR", "!=")
-						} else {
-							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, "AND", "=")
-						}
-					}
-				}
-				// name
-				for _, nameSuffix := range []string{"", "_0", "_1"} {
-					if strings.Trim(t.Tag, "`") == tagVlue+nameSuffix {
-						if strings.Contains(strings.ToLower(op), "not") || strings.ToLower(op) == "!=" {
-							switch strings.ToLower(op) {
-							case "not regexp":
-								whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "NOT match", t.Value, "OR", "!=")
-							default:
-								whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, "OR", "!=")
-							}
-						} else {
-							switch strings.ToLower(op) {
-							case "regexp":
-								whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, "AND", "=")
-							default:
-								whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, "AND", "=")
-							}
-						}
-					}
-				}
 			}
 		}
 	} else {
