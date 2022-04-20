@@ -23,6 +23,7 @@ type TagDescriptionKey struct {
 	TagName string
 }
 
+var TAG_DESCRIPTION_KEYS = []TagDescriptionKey{}
 var TAG_DESCRIPTIONS = map[TagDescriptionKey]*TagDescription{}
 
 // key=tagEnumFile
@@ -133,13 +134,13 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 					)
 				}
 
+				key := TagDescriptionKey{DB: db, Table: table, TagName: tag[0].(string)}
+				TAG_DESCRIPTION_KEYS = append(TAG_DESCRIPTION_KEYS, key)
 				description := NewTagDescription(
 					tag[0].(string), tag[1].(string), tag[2].(string), tag[3].(string),
 					tag[4].(string), tag[5].(string), tag[6].(string), permissions, tag[8].(string),
 				)
-				TAG_DESCRIPTIONS[TagDescriptionKey{
-					DB: db, Table: table, TagName: tag[0].(string),
-				}] = description
+				TAG_DESCRIPTIONS[key] = description
 				enumFileToTagType[tag[5].(string)] = tag[4].(string)
 			}
 		}
@@ -178,10 +179,11 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 		},
 		"values": []interface{}{},
 	}
-	for key, tag := range TAG_DESCRIPTIONS {
+	for _, key := range TAG_DESCRIPTION_KEYS {
 		if key.DB != db || key.Table != table {
 			continue
 		}
+		tag, _ := TAG_DESCRIPTIONS[key]
 		response["values"] = append(
 			response["values"],
 			[]interface{}{
