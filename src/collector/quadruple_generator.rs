@@ -8,7 +8,7 @@ use std::thread;
 use std::time::Duration;
 use thread::JoinHandle;
 
-use log::{debug, info};
+use log::{debug, info, warn};
 use lru::LruCache;
 
 use super::acc_flow::{AccumulatedFlow, U16Set};
@@ -544,7 +544,18 @@ impl SubQuadGen {
 
 pub struct QuadrupleGeneratorThread {
     id: usize,
-    quadruple_generator: Option<QuadrupleGenerator>,
+    input: Arc<Receiver<TaggedFlow>>,
+    second_output: Sender<AccumulatedFlow>,
+    minute_output: Sender<AccumulatedFlow>,
+    flow_output: Option<Sender<Arc<TaggedFlow>>>,
+    connection_lru_capacity: usize,
+    metrics_type: MetricsType,
+    second_delay_seconds: u64,
+    minute_delay_seconds: u64,
+    possible_host_size: usize,
+    l7_metrics_enabled: bool,
+    vtap_flow_1s_enabled: Arc<AtomicBool>,
+
     thread_handle: Option<JoinHandle<()>>,
 
     running: Arc<AtomicBool>,
@@ -568,36 +579,59 @@ impl QuadrupleGeneratorThread {
         let running = Arc::new(AtomicBool::new(false));
         Self {
             id,
-            quadruple_generator: Some(QuadrupleGenerator::new(
-                id,
-                input,
-                second_output,
-                minute_output,
-                flow_output,
-                connection_lru_capacity,
-                metrics_type,
-                second_delay_seconds,
-                minute_delay_seconds,
-                possible_host_size,
-                l7_metrics_enabled,
-                vtap_flow_1s_enabled,
-                running.clone(),
-            )),
+            input: Arc::new(input),
+            second_output: second_output.clone(),
+            minute_output: minute_output.clone(),
+            flow_output: flow_output.clone(),
+            connection_lru_capacity,
+            metrics_type,
+            second_delay_seconds,
+            minute_delay_seconds,
+            possible_host_size,
+            l7_metrics_enabled,
+            vtap_flow_1s_enabled: vtap_flow_1s_enabled.clone(),
             thread_handle: None,
             running,
         }
     }
 
     pub fn start(&mut self) {
-        let mut quadruple_generator = self.quadruple_generator.take().unwrap();
-        info!("starting quadruple generator id: {}", self.id);
-        self.running.store(true, Ordering::Relaxed);
+        if self.running.swap(true, Ordering::Relaxed) {
+            warn!(
+                "quadruple generator id: {} already started, do nothing.",
+                self.id
+            );
+            return;
+        }
+
+        let mut quadruple_generator = QuadrupleGenerator::new(
+            self.id,
+            self.input.clone(),
+            self.second_output.clone(),
+            self.minute_output.clone(),
+            self.flow_output.clone(),
+            self.connection_lru_capacity,
+            self.metrics_type,
+            self.second_delay_seconds,
+            self.minute_delay_seconds,
+            self.possible_host_size,
+            self.l7_metrics_enabled,
+            self.vtap_flow_1s_enabled.clone(),
+            self.running.clone(),
+        );
         self.thread_handle = Some(thread::spawn(move || quadruple_generator.handler_routine()));
+        info!("quadruple generator id: {} started", self.id);
     }
 
     pub fn stop(&mut self) {
+        if !self.running.swap(false, Ordering::Relaxed) {
+            warn!(
+                "quadruple generator id: {} already stopped, do nothing.",
+                self.id
+            );
+            return;
+        }
         info!("stoping quadruple generator: {}", self.id);
-        self.running.store(false, Ordering::Relaxed);
         let _ = self.thread_handle.take().unwrap().join();
         info!("stopped quadruple generator: {}", self.id);
     }
@@ -605,7 +639,7 @@ impl QuadrupleGeneratorThread {
 
 pub struct QuadrupleGenerator {
     id: usize,
-    input: Receiver<TaggedFlow>,
+    input: Arc<Receiver<TaggedFlow>>,
     name: String,
 
     second_quad_gen: Option<SubQuadGen>,
@@ -627,7 +661,7 @@ pub struct QuadrupleGenerator {
 impl QuadrupleGenerator {
     pub fn new(
         id: usize,
-        input: Receiver<TaggedFlow>,
+        input: Arc<Receiver<TaggedFlow>>,
         second_output: Sender<AccumulatedFlow>,
         minute_output: Sender<AccumulatedFlow>,
         flow_output: Option<Sender<Arc<TaggedFlow>>>,

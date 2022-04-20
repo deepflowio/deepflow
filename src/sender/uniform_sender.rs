@@ -136,7 +136,10 @@ impl Encoder {
 
 pub struct UniformSenderThread {
     id: usize,
-    uniform_sender: Option<UniformSender>,
+    vtap_id: u16,
+    input: Arc<Receiver<SendItem>>,
+    dst_ip: Arc<Mutex<IpAddr>>,
+
     thread_handle: Option<JoinHandle<()>>,
 
     running: Arc<AtomicBool>,
@@ -152,37 +155,52 @@ impl UniformSenderThread {
         let running = Arc::new(AtomicBool::new(false));
         Self {
             id,
-            uniform_sender: Some(UniformSender::new(
-                id,
-                vtap_id,
-                input,
-                dst_ip,
-                running.clone(),
-            )),
+            vtap_id,
+            input: Arc::new(input),
+            dst_ip: dst_ip.clone(),
             thread_handle: None,
             running,
         }
     }
 
     pub fn start(&mut self) {
-        let mut uniform_sender = self.uniform_sender.take().unwrap();
-        info!("starting uniform sender: {}", self.id);
-        self.running.store(true, Ordering::Relaxed);
+        if self.running.swap(true, Ordering::Relaxed) {
+            warn!(
+                "uniform sender id: {} already started, do nothing.",
+                self.id
+            );
+            return;
+        }
+
+        let mut uniform_sender = UniformSender::new(
+            self.id,
+            self.vtap_id,
+            self.input.clone(),
+            self.dst_ip.clone(),
+            self.running.clone(),
+        );
         self.thread_handle = Some(thread::spawn(move || uniform_sender.process()));
+        info!("uniform sender id: {} started", self.id);
     }
 
     pub fn stop(&mut self) {
-        info!("stoping uniform sender: {}", self.id);
-        self.running.store(false, Ordering::Relaxed);
+        if !self.running.swap(false, Ordering::Relaxed) {
+            warn!(
+                "uniform sender id: {} already stopped, do nothing.",
+                self.id
+            );
+            return;
+        }
+        info!("stoping uniform sender id: {}", self.id);
         let _ = self.thread_handle.take().unwrap().join();
-        info!("stopped uniform sender: {}", self.id);
+        info!("stopped uniform sender id: {}", self.id);
     }
 }
 
 pub struct UniformSender {
     id: usize,
 
-    input: Receiver<SendItem>,
+    input: Arc<Receiver<SendItem>>,
     counter: SenderCounter,
 
     tcp_stream: Option<TcpStream>,
@@ -204,7 +222,7 @@ impl UniformSender {
     pub fn new(
         id: usize,
         vtap_id: u16,
-        input: Receiver<SendItem>,
+        input: Arc<Receiver<SendItem>>,
         dst_ip: Arc<Mutex<IpAddr>>,
         running: Arc<AtomicBool>,
     ) -> Self {
