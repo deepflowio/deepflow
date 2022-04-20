@@ -22,29 +22,35 @@ import (
 			NewView.ToString() string 生成df-clickhouse-sql
 */
 type Model struct {
-	Time    *Time
-	Tags    *Tags
-	Filters *Filters
-	From    *Tables
-	Groups  *Groups
-	Havings *Filters
-	Orders  *Orders
-	Limit   *Limit
+	Time      *Time
+	Tags      *Tags
+	Filters   *Filters
+	From      *Tables
+	Groups    *Groups
+	Havings   *Filters
+	Orders    *Orders
+	Limit     *Limit
+	Callbacks []func(columns []interface{}, values []interface{}) []interface{}
 	//Havings Havings
 	MetricsLevelFlag int //Metrics是否需要拆层的标识
 }
 
 func NewModel() *Model {
 	return &Model{
-		Time:    NewTime(),
-		Tags:    &Tags{},
-		Groups:  &Groups{},
-		From:    &Tables{},
-		Filters: &Filters{},
-		Havings: &Filters{},
-		Orders:  &Orders{},
-		Limit:   &Limit{},
+		Time:      NewTime(),
+		Tags:      &Tags{},
+		Groups:    &Groups{},
+		From:      &Tables{},
+		Filters:   &Filters{},
+		Havings:   &Filters{},
+		Orders:    &Orders{},
+		Limit:     &Limit{},
+		Callbacks: []func(columns []interface{}, values []interface{}) []interface{}{},
 	}
+}
+
+func (m *Model) AddCallback(f func(columns []interface{}, values []interface{}) []interface{}) {
+	m.Callbacks = append(m.Callbacks, f)
 }
 
 func (m *Model) AddTag(n Node) {
@@ -138,10 +144,7 @@ func (v *View) ToString() string {
 }
 
 func (v *View) GetCallbacks() (callbacks []func(columns []interface{}, values []interface{}) []interface{}) {
-	if v.Model.Time.Interval > 0 && v.Model.Time.Fill != "" {
-		callbacks = append(callbacks, TimeFill(v.Model))
-	}
-	return callbacks
+	return v.Model.Callbacks
 }
 
 func (v *View) trans() {

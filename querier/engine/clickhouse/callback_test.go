@@ -1,22 +1,23 @@
-package view
+package clickhouse
 
 import (
 	//"github.com/k0kubun/pp"
 	//"metaflow/querier/common"
 	//"metaflow/querier/parse"
 	//"metaflow/querier/querier"
+	"metaflow/querier/engine/clickhouse/view"
 	"reflect"
 	"testing"
 )
 
 func TestTimeFill(t *testing.T) {
-	m := NewModel()
+	m := view.NewModel()
 	m.Time.TimeStart = 1645089282
 	m.Time.TimeEnd = 1645175682
 	m.Time.Fill = "0"
 	m.Time.Interval = 21600
 	m.Time.Alias = "time"
-	callback := TimeFill(m)
+	callback := TimeFill([]interface{}{m})
 	columns := []interface{}{
 		"time",
 		"field_0",

@@ -1,12 +1,23 @@
-package view
+package clickhouse
 
 import (
+	"metaflow/querier/engine/clickhouse/view"
 	"strconv"
 )
 
-func TimeFill(m *Model) func(columns []interface{}, values []interface{}) (newValues []interface{}) {
+type Callback struct {
+	Args     []interface{}
+	Function func([]interface{}) func(columns []interface{}, values []interface{}) []interface{}
+}
+
+func (c *Callback) Format(m *view.Model) {
+	m.AddCallback(c.Function(c.Args))
+}
+
+func TimeFill(args []interface{}) func(columns []interface{}, values []interface{}) (newValues []interface{}) {
 	// group by time时的补点
 	return func(columns []interface{}, values []interface{}) (newValues []interface{}) {
+		m := args[0].(*view.Model)
 		var timeFieldIndex int
 		// 取出time字段对应的下标
 		for i, column := range columns {
@@ -21,7 +32,7 @@ func TimeFill(m *Model) func(columns []interface{}, values []interface{}) (newVa
 		// 获取排序
 		orderby := "asc"
 		for _, node := range m.Orders.Orders {
-			order := node.(*Order)
+			order := node.(*view.Order)
 			if order.SortBy == m.Time.Alias {
 				orderby = order.OrderBy
 				break

@@ -368,6 +368,9 @@ func (t *Time) Format(m *view.Model) {
 	tagField := fmt.Sprintf("toUnixTimestamp(%s)", withAlias)
 	m.AddTag(&view.Tag{Value: tagField, Alias: t.Alias, Flag: view.NODE_FLAG_METRICS_OUTER, Withs: withs})
 	m.AddGroup(&view.Group{Value: t.Alias, Flag: view.GROUP_FLAG_METRICS_OUTER})
+	if m.Time.Fill != "" && m.Time.Interval > 0 {
+		m.AddCallback(TimeFill([]interface{}{m}))
+	}
 }
 
 type TagFunction struct {
