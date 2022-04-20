@@ -39,6 +39,8 @@ enum Exception {
     PROCESS_THRESHOLD_EXCEEDED = 1024;
     INVALID_LOCAL_CONFIG_FILE  = 2048;
     TOO_MANY_POLICIES          = 4096;
+    FREE_MEM_EXCEEDED          = 8129;
+    LOG_FILE_EXCEEDED          = 16384;
 }
 
 message CommunicationVtap {
@@ -226,6 +228,9 @@ message Config {
     repeated uint32 l7_log_store_tap_types = 403;
     optional bool   l4_performance_enabled = 404 [default = true];
     optional bool   l7_metrics_enabled     = 405 [default = true];
+
+    optional uint32 sys_free_memory_limit = 501 [default = 30];
+    optional uint32 log_file_size  = 502 [default = 1000];
 }
 
 message Segment { // e.g. single LAN area
