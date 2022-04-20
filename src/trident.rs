@@ -216,6 +216,7 @@ impl Trident {
         cond.notify_one();
         mem::drop(state_guard);
         self.handle.take().unwrap().join().unwrap();
+        info!("Gracefully stopped");
     }
 }
 
