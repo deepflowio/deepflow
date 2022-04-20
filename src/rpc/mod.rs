@@ -3,7 +3,7 @@ mod session;
 mod synchronizer;
 
 pub(crate) use session::{Session, DEFAULT_TIMEOUT};
-pub(crate) use synchronizer::{HttpConfig, StaticConfig, Status, Synchronizer};
+pub(crate) use synchronizer::{StaticConfig, Status, Synchronizer};
 
 // todo 用synchronizer ntp 获取timestamp
 use std::time::{Duration, SystemTime};

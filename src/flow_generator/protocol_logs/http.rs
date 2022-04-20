@@ -1,11 +1,16 @@
+use std::str;
+
+use arc_swap::access::Access;
 use bytes::Bytes;
 use httpbis::for_test::hpack;
+use log::info;
 
 use super::LogMessageType;
 use super::{consts::*, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7ResponseStatus};
 
 use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::common::flow::L7Protocol;
+use crate::config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType};
 use crate::flow_generator::error::{Error, Result};
 use crate::proto::flow_log;
 use crate::utils::bytes::read_u32_be;
@@ -71,9 +76,28 @@ pub struct HttpLog {
     status: L7ResponseStatus,
 
     info: HttpInfo,
+    l7_log_dynamic_config: L7LogDynamicConfig,
 }
 
 impl HttpLog {
+    const TRACE_ID: u8 = 0;
+    const SPAN_ID: u8 = 1;
+
+    pub fn new(config: &LogParserAccess) -> Self {
+        Self {
+            l7_log_dynamic_config: config.load().l7_log_dynamic.clone(),
+            ..Default::default()
+        }
+    }
+
+    pub fn update_config(&mut self, config: &LogParserAccess) {
+        self.l7_log_dynamic_config = config.load().l7_log_dynamic.clone();
+        info!(
+            "http log update l7 log dynamic config to {:#?}",
+            self.l7_log_dynamic_config
+        );
+    }
+
     fn reset_logs(&mut self) {
         self.info = HttpInfo::default();
     }
@@ -152,14 +176,55 @@ impl HttpLog {
                         .parse::<u64>()
                         .unwrap_or_default(),
                 );
+            } else if !self.l7_log_dynamic_config.trace_id_origin.is_empty()
+                && body_line.starts_with(&self.l7_log_dynamic_config.trace_id_with_colon)
+            {
+                if let Some(id) = Self::decode_id(
+                    &body_line[self.l7_log_dynamic_config.trace_id_with_colon.len()..],
+                    self.l7_log_dynamic_config.trace_type,
+                    Self::TRACE_ID,
+                ) {
+                    self.info.trace_id = id;
+                }
+                // 存在配置相同字段的情况，如“sw8”
+                if self.l7_log_dynamic_config.trace_id_origin
+                    == self.l7_log_dynamic_config.span_id_origin
+                {
+                    if let Some(id) = Self::decode_id(
+                        &body_line[self.l7_log_dynamic_config.span_id_with_colon.len()..],
+                        self.l7_log_dynamic_config.span_type,
+                        Self::SPAN_ID,
+                    ) {
+                        self.info.span_id = id;
+                    }
+                }
+            } else if !self.l7_log_dynamic_config.span_id_origin.is_empty()
+                && body_line.starts_with(&self.l7_log_dynamic_config.span_id_with_colon)
+            {
+                if let Some(id) = Self::decode_id(
+                    &body_line[self.l7_log_dynamic_config.span_id_with_colon.len()..],
+                    self.l7_log_dynamic_config.span_type,
+                    Self::SPAN_ID,
+                ) {
+                    self.info.span_id = id;
+                }
+            } else if !self.l7_log_dynamic_config.x_request_id_origin.is_empty()
+                && body_line.starts_with(&self.l7_log_dynamic_config.x_request_id_with_colon)
+            {
+                self.info.x_request_id = body_line
+                    [self.l7_log_dynamic_config.x_request_id_with_colon.len()..]
+                    .to_string();
             } else if direction == PacketDirection::ClientToServer {
                 if body_line.starts_with("Host:") {
                     self.info.host = body_line[HTTP_HOST_OFFSET..].to_string();
-                } else if body_line.starts_with("X-request-id:") {
-                    self.info.x_request_id = body_line[16..].to_string();
+                } else if !self.l7_log_dynamic_config.proxy_client_origin.is_empty()
+                    && body_line.starts_with(&self.l7_log_dynamic_config.proxy_client_with_colon)
+                {
+                    self.info.client_ip = body_line
+                        [self.l7_log_dynamic_config.proxy_client_with_colon.len()..]
+                        .to_string();
                 }
             }
-            // TODO:traceID计算，需要依赖rpc-config部分
         }
 
         // 当解析完所有Header仍未找到Content-Length，则认为该字段值为0
@@ -172,6 +237,17 @@ impl HttpLog {
         Ok(())
     }
 
+    fn has_magic(payload: &[u8]) -> bool {
+        if payload.len() < HTTPV2_MAGIC_LENGTH {
+            return false;
+        }
+        if let Ok(payload_str) = str::from_utf8(&payload[..HTTPV2_MAGIC_PREFIX.len()]) {
+            payload_str.starts_with(HTTPV2_MAGIC_PREFIX)
+        } else {
+            false
+        }
+    }
+
     fn parse_http_v2(&mut self, payload: &[u8], direction: PacketDirection) -> Result<()> {
         let mut content_length: Option<u64> = None;
         let mut header_frame_parsed = false;
@@ -180,6 +256,9 @@ impl HttpLog {
         let mut httpv2_header = Httpv2Headers::default();
 
         while frame_payload.len() > HTTPV2_FRAME_HEADER_LENGTH {
+            if Self::has_magic(frame_payload) {
+                frame_payload = &frame_payload[HTTPV2_MAGIC_LENGTH..];
+            }
             if httpv2_header.parse_headers_frame(frame_payload).is_err() {
                 // 当已经解析了Headers帧(该Headers帧未携带“Content-Length”)且发现该报文被截断时，无法进行后续解析，ContentLength为None
                 if header_frame_parsed {
@@ -231,7 +310,7 @@ impl HttpLog {
                         b":status" => {
                             self.msg_type = LogMessageType::Response;
 
-                            self.status_code = std::str::from_utf8(header.1.as_ref())
+                            self.status_code = str::from_utf8(header.1.as_ref())
                                 .unwrap_or_default()
                                 .parse::<u16>()
                                 .unwrap_or_default();
@@ -245,13 +324,58 @@ impl HttpLog {
                         }
                         b"content-length" => {
                             content_length = Some(
-                                std::str::from_utf8(header.1.as_ref())
+                                str::from_utf8(header.1.as_ref())
                                     .unwrap_or_default()
                                     .parse::<u64>()
                                     .unwrap_or_default(),
                             )
                         }
                         _ => {}
+                    }
+
+                    if !self.l7_log_dynamic_config.trace_id_origin.is_empty()
+                        && header.0 == self.l7_log_dynamic_config.trace_id_lower.as_bytes()
+                    {
+                        if let Some(id) = Self::decode_id(
+                            &String::from_utf8_lossy(header.1.as_ref()),
+                            self.l7_log_dynamic_config.trace_type,
+                            Self::TRACE_ID,
+                        ) {
+                            self.info.trace_id = id;
+                        }
+                        // 存在配置相同字段的情况，如“sw8”
+                        if self.l7_log_dynamic_config.trace_id_origin
+                            == self.l7_log_dynamic_config.span_id_origin
+                        {
+                            if let Some(id) = Self::decode_id(
+                                &String::from_utf8_lossy(header.1.as_ref()),
+                                self.l7_log_dynamic_config.span_type,
+                                Self::SPAN_ID,
+                            ) {
+                                self.info.span_id = id;
+                            }
+                        }
+                    } else if !self.l7_log_dynamic_config.span_id_origin.is_empty()
+                        && header.0 == self.l7_log_dynamic_config.span_id_lower.as_bytes()
+                    {
+                        if let Some(id) = Self::decode_id(
+                            &String::from_utf8_lossy(header.1.as_ref()),
+                            self.l7_log_dynamic_config.span_type,
+                            Self::SPAN_ID,
+                        ) {
+                            self.info.span_id = id;
+                        }
+                    } else if !self.l7_log_dynamic_config.x_request_id_origin.is_empty()
+                        && header.0 == self.l7_log_dynamic_config.x_request_id_lower.as_bytes()
+                    {
+                        self.info.x_request_id =
+                            String::from_utf8_lossy(header.1.as_ref()).into_owned();
+                    } else if direction == PacketDirection::ClientToServer
+                        && !self.l7_log_dynamic_config.proxy_client_origin.is_empty()
+                        && header.0 == self.l7_log_dynamic_config.proxy_client_lower.as_bytes()
+                    {
+                        self.info.client_ip =
+                            String::from_utf8_lossy(header.1.as_ref()).into_owned();
                     }
                 }
                 header_frame_parsed = true;
@@ -297,11 +421,58 @@ impl HttpLog {
                 }
                 self.info.resp_content_length = content_length;
             }
-            self.info.version = "2".to_string();
+            self.info.version = String::from("2");
             self.proto = L7Protocol::Http2;
             return Ok(());
         }
         Err(Error::HttpHeaderParseFailed)
+    }
+
+    // uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
+    // 使用':'分隔，第一个字段为TRACEID，第三个字段为SPANID
+    fn decode_uber_id(value: &str, id_type: u8) -> Option<String> {
+        let segs = value.split(":");
+        let mut i = 0;
+        for seg in segs {
+            if id_type == Self::TRACE_ID && i == 0 {
+                return Some(seg.to_string());
+            }
+            if id_type == Self::SPAN_ID && i == 2 {
+                return Some(seg.to_string());
+            }
+
+            i += 1;
+        }
+        None
+    }
+
+    // sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
+    // sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
+    // sw6和sw8的value全部使用'-'分隔，TRACEID前为SAMPLE字段取值范围仅有0或1
+    // 提取`TRACEID`展示为HTTP日志中的`TraceID`字段
+    // 提取`SEGMENTID-SPANID`展示为HTTP日志中的`SpanID`字段
+    fn decode_skywalking_id(value: &str, id_type: u8) -> Option<String> {
+        let segs = value.split("-");
+        let mut i = 0;
+        for seg in segs {
+            if id_type == Self::TRACE_ID && i == 1 {
+                return Some(seg.to_string());
+            }
+            if id_type == Self::SPAN_ID && i == 3 {
+                return Some(seg.to_string());
+            }
+
+            i += 1;
+        }
+        None
+    }
+
+    fn decode_id(payload: &str, trace_type: TraceType, id_type: u8) -> Option<String> {
+        match trace_type {
+            TraceType::Disabled | TraceType::XB3 | TraceType::XB3Span => Some(payload.to_string()),
+            TraceType::Uber => Self::decode_uber_id(payload, id_type),
+            TraceType::Sw6 | TraceType::Sw8 => Self::decode_skywalking_id(payload, id_type),
+        }
     }
 }
 
@@ -374,7 +545,9 @@ impl Httpv2Headers {
 // 参考：https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
 pub fn check_http_method(method: &str) -> Result<()> {
     match method {
-        "OPTIONS" | "GET" | "HEAD" | "POST" | "PUT" | "DELETE" | "TRACE" | "CONNECT" => Ok(()),
+        "OPTIONS" | "GET" | "HEAD" | "POST" | "PUT" | "DELETE" | "TRACE" | "CONNECT" | "PATCH" => {
+            Ok(())
+        }
         _ => Err(Error::HttpHeaderParseFailed),
     }
 }
@@ -385,7 +558,7 @@ pub fn get_http_method(line_info: &[u8]) -> Result<(String, usize)> {
     if line_info.len() < HTTP_METHOD_AND_SPACE_MAX_OFFSET {
         return Err(Error::HttpHeaderParseFailed);
     }
-    let line_str = std::str::from_utf8(line_info).unwrap_or_default();
+    let line_str = str::from_utf8(line_info).unwrap_or_default();
     if let Some(space_index) = line_str.find(' ') {
         let method = &line_str[..space_index];
         check_http_method(method)?;

@@ -22,6 +22,8 @@ pub const HTTP_HOST_OFFSET: usize = 6;
 pub const HTTP_CONTENT_LENGTH_OFFSET: usize = 16;
 
 pub const HTTPV2_FRAME_HEADER_LENGTH: usize = 9;
+pub const HTTPV2_MAGIC_LENGTH: usize = 24;
+pub const HTTPV2_MAGIC_PREFIX: &str = "PRI * HTTP";
 
 pub const HTTPV2_FRAME_DATA_TYPE: u8 = 0x00;
 pub const HTTPV2_FRAME_HEADERS_TYPE: u8 = 0x01;

@@ -1,12 +1,20 @@
+use std::str;
+
+use arc_swap::access::Access;
+use log::info;
+
 use super::super::{
     consts::*, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7Protocol, L7ResponseStatus,
     LogMessageType,
 };
 
 use crate::common::enums::{IpProtocol, PacketDirection};
+use crate::config::handler::{L7LogDynamicConfig, LogParserAccess};
 use crate::flow_generator::error::{Error, Result};
 use crate::proto::flow_log;
 use crate::utils::bytes::{read_u32_be, read_u64_be};
+
+const TRACE_ID_MSG_LEN: usize = 50;
 
 #[derive(Debug, Default, Clone)]
 pub struct DubboInfo {
@@ -21,6 +29,7 @@ pub struct DubboInfo {
     pub service_name: String,
     pub service_version: String,
     pub method_name: String,
+    pub trace_id: String,
 
     // resp
     pub resp_msg_size: i32,
@@ -43,8 +52,8 @@ impl From<DubboInfo> for flow_log::DubboInfo {
             service_name: f.service_name,
             service_version: f.service_version,
             method_name: f.method_name,
+            trace_id: f.trace_id,
             resp_body_len: f.resp_msg_size,
-            trace_id: Default::default(),
         }
     }
 }
@@ -56,9 +65,26 @@ pub struct DubboLog {
     status: L7ResponseStatus,
     status_code: u8,
     msg_type: LogMessageType,
+
+    l7_log_dynamic_config: L7LogDynamicConfig,
 }
 
 impl DubboLog {
+    pub fn new(config: &LogParserAccess) -> Self {
+        Self {
+            l7_log_dynamic_config: config.load().l7_log_dynamic.clone(),
+            ..Default::default()
+        }
+    }
+
+    pub fn update_config(&mut self, config: &LogParserAccess) {
+        self.l7_log_dynamic_config = config.load().l7_log_dynamic.clone();
+        info!(
+            "dubbo log update l7 log dynamic config to {:#?}",
+            self.l7_log_dynamic_config
+        );
+    }
+
     fn reset_logs(&mut self) {
         self.info.serial_id = 0;
         self.info.data_type = 0;
@@ -118,6 +144,20 @@ impl DubboLog {
             para_tag = payload[para_index];
             para_index += 1;
             n += 1;
+        }
+        // Dubbo的其余的参数字段位于Dubbo-Attachment，没有通用确定的分隔符，无法做确切截取，现仅截取TRACE_ID_MSG_LEN(50)长度作为Dubbo的TraceId
+        if self.l7_log_dynamic_config.trace_id_origin.is_empty() {
+            return;
+        }
+        if let Ok(payload_str) = str::from_utf8(&payload) {
+            if let Some(index) = payload_str.find(&self.l7_log_dynamic_config.trace_id_origin) {
+                let trace_id_prefix_len = self.l7_log_dynamic_config.trace_id_origin.len();
+                let trace_id_end_index = index + trace_id_prefix_len + TRACE_ID_MSG_LEN + 1;
+                if payload_str.len() >= trace_id_end_index {
+                    self.info.trace_id =
+                        payload_str[index + trace_id_prefix_len..trace_id_end_index].to_string();
+                }
+            }
         }
     }
 
