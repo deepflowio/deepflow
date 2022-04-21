@@ -70,7 +70,7 @@ flow_source         , flow_source          , flow_source           , 流数据�
 flow_id             , flow_id              , flow_id               , 流日志ID                      , int          ,                    , 流信息      , 111        ,
 tap                 , tap                  , tap                   , 采集点                        , resource     ,                    , 流信息      , 111        ,
 # 需要转化为xx:xx:xx:xx格式展示
-tap_port            , tap_port             , tap_port              , 采集位置标识                  , string       ,                    , 流信息      , 111        ,
+tap_port            , tap_port             , tap_port              , 采集位置标识                  , mac          ,                    , 流信息      , 111        ,
 tap_port_name       , tap_port_name        , tap_port_name         , 采集位置名称                  , string       ,                    , 流信息      , 111        ,
 tap_port_type       , tap_port_type        , tap_port_type         , 采集位置类型                  , int_enum     , tap_port_type      , 流信息      , 111        ,
 vtap                , vtap                 , vtap                  , 采集器                        , resource     ,                    , 流信息      , 111        ,

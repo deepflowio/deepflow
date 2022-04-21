@@ -67,7 +67,7 @@ tap                       , tap                       , tap                     
 
 tap_port_type             , tap_port_type             , tap_port_type             , 采集位置类型           , int_enum      , tap_port_type      , 流信息      , 111        ,
 tap_port_name             , tap_port_name             , tap_port_name             , 采集位置名称           , string        ,                    , 流信息      , 111        ,
-tap_port                  , tap_port                  , tap_port                  , 采集位置标识           , string        ,                    , 流信息      , 111        ,
+tap_port                  , tap_port                  , tap_port                  , 采集位置标识           , mac           ,                    , 流信息      , 111        ,
 vtap                      , vtap                      , vtap                      , 采集器                 , resource      ,                    , 流信息      , 111        ,
 start_time                , start_time                , start_time                , 开始时间               , int           ,                    , 流信息      , 111        ,
 end_time                  , end_time                  , end_time                  , 结束时间               , int           ,                    , 流信息      , 111        ,
