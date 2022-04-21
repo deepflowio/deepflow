@@ -721,7 +721,6 @@ impl Components {
 
         self.libvirt_xml_extractor.stop();
         self.pcap_manager.stop();
-
         self.debugger.stop();
         self.monitor.stop();
         self.guard.stop();
