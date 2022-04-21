@@ -13,9 +13,9 @@
 #define MSG_SZ 2048
 
 // 日志文件地址
-FILE *log_stream;
+extern FILE *log_stream;
 // 日志是否输出到标准输出
-bool log_to_stdout;
+extern bool log_to_stdout;
 
 enum
 {

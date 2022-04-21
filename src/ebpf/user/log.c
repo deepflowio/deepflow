@@ -11,6 +11,9 @@
 #include <time.h>
 #include "log.h"
 
+FILE *log_stream;
+bool log_to_stdout;
+
 void os_panic(void) __attribute__ ((weak));
 
 void os_panic(void)
