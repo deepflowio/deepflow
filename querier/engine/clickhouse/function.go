@@ -479,7 +479,11 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 	}
 	var withValue string
 	if len(fields) > 1 {
-		withValue = fmt.Sprintf("%s([%s])", f.Name, strings.Join(values, ","))
+		if f.Name == "if" {
+			withValue = fmt.Sprintf("%s(%s)", f.Name, strings.Join(values, ","))
+		} else {
+			withValue = fmt.Sprintf("%s([%s])", f.Name, strings.Join(values, ","))
+		}
 	} else {
 		withValue = fmt.Sprintf("%s(%s)", f.Name, values[0])
 	}
