@@ -14,3 +14,7 @@ src/ebpf/libebpf.a
 src/ebpf/metaflow-ebpfctl
 
 Cargo.lock
+
+*.o
+*.elf
+*.objdump
