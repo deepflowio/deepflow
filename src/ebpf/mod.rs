@@ -4,6 +4,8 @@ pub use libc::c_int;
 pub use libc::c_uchar; //u8
 pub use libc::c_uint;
 pub use std::ffi::{CStr, CString}; //u32
+use std::fmt;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 // 最大长度
 pub const CAP_LEN_MAX: usize = 512;
@@ -115,6 +117,56 @@ pub struct SK_BPF_DATA {
     pub cap_len: u32,          // 返回的cap_data长度
     pub cap_seq: u64, // cap_data在Socket中的相对顺序号，在所在socket下从0开始自增，用于数据乱序排序
     pub cap_data: *mut c_char, // 内核送到用户空间的数据地址
+}
+
+impl fmt::Display for SK_BPF_DATA {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (local_ip, remote_ip) = if self.tuple.addr_len == 4 {
+            (
+                {
+                    let addr: [u8; 4] = self.tuple.laddr[..4].try_into().unwrap();
+                    IpAddr::from(Ipv4Addr::from(addr))
+                },
+                {
+                    let addr: [u8; 4] = self.tuple.raddr[..4].try_into().unwrap();
+                    IpAddr::from(Ipv4Addr::from(addr))
+                },
+            )
+        } else {
+            (
+                IpAddr::from(Ipv6Addr::from(self.tuple.laddr)),
+                IpAddr::from(Ipv6Addr::from(self.tuple.raddr)),
+            )
+        };
+        let (src_ip, dst_ip) = if self.direction == SOCK_DIR_SND {
+            (local_ip, remote_ip)
+        } else {
+            (remote_ip, local_ip)
+        };
+        let (port_src, port_dst) = if self.direction == SOCK_DIR_SND {
+            (self.tuple.lport, self.tuple.rport)
+        } else {
+            (self.tuple.rport, self.tuple.lport)
+        };
+
+        write!(
+            f,
+            "Timestamp: {} Socket: {} Process: {} Thread: {} MsgType: {} Direction: {} \n \
+                \t{}_{} -> {}_{} Seq: {} L7: {}",
+            self.timestamp,
+            self.socket_id,
+            self.process_id,
+            self.thread_id,
+            self.msg_type,
+            self.direction,
+            src_ip,
+            port_src,
+            dst_ip,
+            port_dst,
+            self.tcp_seq,
+            self.l7_protocal_hint
+        )
+    }
 }
 
 #[repr(C)]

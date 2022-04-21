@@ -140,7 +140,7 @@ impl HttpLog {
             self.info.version = version;
             self.status_code = status_code as u16;
 
-            self.msg_type = LogMessageType::Request;
+            self.msg_type = LogMessageType::Response;
 
             self.set_status(status_code);
         } else {
@@ -165,7 +165,7 @@ impl HttpLog {
             self.info.path = line_info[first_space_index + 1..last_space_index].to_string();
             self.info.version = version.to_string();
 
-            self.msg_type = LogMessageType::Response;
+            self.msg_type = LogMessageType::Request;
         }
 
         let body_lines = body_info.split("\r\n");

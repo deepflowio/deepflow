@@ -26,7 +26,10 @@ use std::{
     fmt,
     hash::{Hash, Hasher},
     net::Ipv4Addr,
+    sync::Arc,
 };
+
+use policy::{Cidr, IpGroupData, PeerConnection};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct XflowKey {
@@ -45,4 +48,15 @@ impl fmt::Display for XflowKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "source_ip:{}, interface_index:{}", self.ip, self.tap_idx)
     }
+}
+
+pub trait FlowAclListener: Send + Sync {
+    fn flow_acl_change(
+        &mut self,
+        ip_groups: &Vec<Arc<IpGroupData>>,
+        platform_data: &Vec<Arc<PlatformData>>,
+        peers: &Vec<Arc<PeerConnection>>,
+        cidrs: &Vec<Arc<Cidr>>,
+    );
+    fn id(&self) -> usize;
 }

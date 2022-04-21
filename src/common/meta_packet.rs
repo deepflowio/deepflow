@@ -738,7 +738,7 @@ impl<'a> MetaPacket<'a> {
 
     pub unsafe fn new_from_ebpf(data: *mut SK_BPF_DATA) -> Result<MetaPacket<'a>, Box<dyn Error>> {
         let data = &mut (*data);
-        let (src_ip, dst_ip) = if data.tuple.addr_len == 4 {
+        let (local_ip, remote_ip) = if data.tuple.addr_len == 4 {
             (
                 {
                     let addr: [u8; 4] = data.tuple.laddr[..4].try_into()?;
@@ -756,14 +756,25 @@ impl<'a> MetaPacket<'a> {
             )
         };
 
+        let (src_port, dst_port) = if data.direction == SOCK_DIR_SND {
+            (data.tuple.lport, data.tuple.rport)
+        } else {
+            (data.tuple.rport, data.tuple.lport)
+        };
+        let (src_ip, dst_ip) = if data.direction == SOCK_DIR_SND {
+            (local_ip, remote_ip)
+        } else {
+            (remote_ip, local_ip)
+        };
+
         let mut packet = MetaPacket::default();
 
         packet.lookup_key = LookupKey {
             timestamp: Duration::from_micros(data.timestamp),
             src_ip,
             dst_ip,
-            src_port: data.tuple.lport,
-            dst_port: data.tuple.rport,
+            src_port,
+            dst_port,
             eth_type: if data.tuple.addr_len == 4 {
                 EthernetType::Ipv4
             } else {

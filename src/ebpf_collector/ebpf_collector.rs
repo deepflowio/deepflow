@@ -5,11 +5,10 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use arc_swap::access::Access;
-use log::{debug, info};
+use log::{debug, info, warn};
 use lru::LruCache;
 
 use super::{Error, Result};
-use crate::common::enums::PacketDirection;
 use crate::common::flow::L7Protocol;
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::EbpfAccess;
@@ -133,7 +132,11 @@ impl SessionAggr {
                 let mut item = item.unwrap().clone();
                 map.remove(&key);
 
-                let rrt = log.base_info.start_time - item.base_info.start_time;
+                let rrt = if log.base_info.start_time > item.base_info.start_time {
+                    log.base_info.start_time - item.base_info.start_time
+                } else {
+                    Duration::ZERO
+                };
                 item.session_merge(log);
                 item.base_info.head.rrt = rrt.as_micros() as u64;
                 self.send(item);
@@ -153,7 +156,7 @@ impl SessionAggr {
 
         let mut slot_index = (solt_time - self.start_time) / Self::SLOT_WIDTH;
         if slot_index >= self.slot_count {
-            slot_index = self.flush(slot_index - self.slot_count);
+            slot_index = self.flush(slot_index - self.slot_count + 1);
         }
 
         let key = log.flow_session_id();
@@ -186,24 +189,20 @@ impl FlowItem {
     fn handle(
         &mut self,
         packet: &MetaPacket,
-        policy_getter: Option<PolicyGetter>,
+        mut policy_getter: PolicyGetter,
         local_epc: i32,
         vtap_id: u16,
     ) -> Option<AppProtoLogsData> {
         // 策略查询
         let key = &packet.lookup_key;
-        if policy_getter.is_some()
-            && key.timestamp.as_secs() > self.last_policy + Self::POLICY_INTERVAL
-        {
+        if key.timestamp.as_secs() > self.last_policy + Self::POLICY_INTERVAL {
             self.last_policy = key.timestamp.as_secs();
             if key.l2_end_0 {
-                self.other_l3_epc = policy_getter
-                    .unwrap()
-                    .lookup_all_by_epc(key.src_ip, key.dst_ip, local_epc, 0);
+                self.other_l3_epc =
+                    policy_getter.lookup_all_by_epc(key.src_ip, key.dst_ip, local_epc, 0);
             } else {
-                self.other_l3_epc = policy_getter
-                    .unwrap()
-                    .lookup_all_by_epc(key.src_ip, key.dst_ip, 0, local_epc);
+                self.other_l3_epc =
+                    policy_getter.lookup_all_by_epc(key.src_ip, key.dst_ip, 0, local_epc);
             }
         }
 
@@ -211,21 +210,17 @@ impl FlowItem {
         if let Ok(head) = self.parse(packet) {
             // 获取日志信息
             let info = self.get_info();
-            let mut base = AppProtoLogsBaseInfo::from(packet);
-            base.head = head;
-            if packet.direction == PacketDirection::ClientToServer && key.l2_end_0 {
-                base.l3_epc_id_src = local_epc;
-                base.l3_epc_id_dst = self.other_l3_epc;
-            } else {
-                base.l3_epc_id_src = self.other_l3_epc;
-                base.l3_epc_id_dst = local_epc;
-            }
-            base.vtap_id = vtap_id;
-            let data = AppProtoLogsData {
+            let base = AppProtoLogsBaseInfo::from_ebpf(
+                &packet,
+                head,
+                vtap_id,
+                local_epc,
+                self.other_l3_epc,
+            );
+            return Some(AppProtoLogsData {
                 base_info: base,
                 special_info: info,
-            };
-            return Some(data);
+            });
         }
         return None;
     }
@@ -235,7 +230,7 @@ pub struct EbpfCollector {
     receiver: Arc<Receiver<MetaPacket<'static>>>,
 
     // 策略查询
-    policy_getter: Option<PolicyGetter>,
+    policy_getter: PolicyGetter,
 
     // GRPC配置
     config: EbpfAccess,
@@ -256,15 +251,22 @@ impl EbpfCollector {
             if !SWITCH || SENDER.is_none() {
                 return;
             }
-            debug!("ebpf collector in: {:?}", *sd);
+            debug!("ebpf collector in:\n{}", *sd);
 
-            if let Ok(packet) = MetaPacket::new_from_ebpf(sd) {
-                let _ = SENDER.as_mut().unwrap().send(packet);
+            let packet = MetaPacket::new_from_ebpf(sd);
+            if packet.is_err() {
+                warn!("meta packet parse from ebpf error: {}", packet.unwrap_err());
+                return;
             }
+            let _ = SENDER.as_mut().unwrap().send(packet.unwrap());
         }
     }
 
-    pub fn new(config: EbpfAccess, output: DebugSender<SendItem>) -> Result<Self> {
+    pub fn new(
+        config: EbpfAccess,
+        policy_getter: PolicyGetter,
+        output: DebugSender<SendItem>,
+    ) -> Result<Self> {
         unsafe {
             SWITCH = false;
             let log_file = &config.load().log_path;
@@ -285,7 +287,7 @@ impl EbpfCollector {
             let e = EbpfCollector {
                 receiver: Arc::new(r),
                 output,
-                policy_getter: None,
+                policy_getter,
                 config,
                 thread_handle: None,
             };
@@ -313,19 +315,14 @@ impl EbpfCollector {
         unsafe { Ok(ebpf::socket_tracer_stats()) }
     }
 
-    // 配置完成后需要重启
-    pub fn set_policy_getter(&mut self, policy: PolicyGetter) {
-        self.policy_getter = Some(policy);
-    }
-
     pub fn start(&mut self) {
         unsafe {
             if SWITCH {
+                info!("ebpf collector started");
                 return;
             }
             SWITCH = true;
         }
-        info!("ebpf collector starting...");
         let receiver = self.receiver.clone();
         let policy_getter = self.policy_getter;
         let config = self.config.clone();
@@ -335,7 +332,7 @@ impl EbpfCollector {
 
         self.thread_handle = Some(thread::spawn(move || {
             while unsafe { SWITCH } {
-                let packet = receiver.recv(None);
+                let packet = receiver.recv(Some(Duration::from_millis(1)));
                 if packet.is_err() {
                     continue;
                 }
@@ -350,7 +347,7 @@ impl EbpfCollector {
                     flow_map.put(
                         packet.socket_id,
                         FlowItem {
-                            last_policy: packet.lookup_key.timestamp.as_secs(),
+                            last_policy: 0,
                             parser: get_parser(packet.l7_protocol),
                             other_l3_epc: 0,
                         },
@@ -364,6 +361,7 @@ impl EbpfCollector {
                     flow_item.handle(packet, policy_getter, config.epc_id as i32, config.vtap_id)
                 {
                     // 应用日志聚合
+                    debug!("\n{}", data);
                     aggr.handle(data);
                 }
             }
@@ -381,20 +379,24 @@ impl EbpfCollector {
                 }
             }
         }));
+        debug!("ebpf collector starting ebpf-kernel.");
+        unsafe { ebpf::tracer_start() };
+        info!("ebpf collector started");
     }
 
     pub fn stop(&mut self) {
         unsafe {
             if !SWITCH {
+                info!("ebpf collector stopped.");
                 return;
             }
             SWITCH = false;
-
-            ebpf::tracer_stop();
+            info!("ebpf collector stopping thread.");
             if let Some(handler) = self.thread_handle.take() {
-                handler.thread().unpark();
                 let _ = handler.join();
             }
+            info!("ebpf collector stopping ebpf-kernel.");
+            ebpf::tracer_stop();
             info!("ebpf collector stopped.");
         }
     }

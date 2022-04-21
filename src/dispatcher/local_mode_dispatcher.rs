@@ -40,7 +40,7 @@ impl LocalModeDispatcher {
         let (mut flow_map, flow_counter) = FlowMap::new(
             base.id as u32,
             base.flow_output_queue.clone(),
-            |_, _| {},
+            base.policy_getter,
             base.log_output_queue.clone(),
             base.flow_map_config.clone(),
         );

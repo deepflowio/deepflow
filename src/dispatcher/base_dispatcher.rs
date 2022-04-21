@@ -25,6 +25,7 @@ use crate::{
     },
     config::{handler::FlowAccess, RuntimeConfig},
     flow_generator::MetaAppProto,
+    policy::PolicyGetter,
     proto::trident::{IfMacSource, TapMode},
     utils::{
         bytes::read_u16_be,
@@ -70,6 +71,8 @@ pub(super) struct BaseDispatcher {
     pub(super) counter: Arc<PacketCounter>,
     pub(super) terminated: Arc<AtomicBool>,
     pub(super) stats: Arc<Collector>,
+
+    pub(super) policy_getter: PolicyGetter,
 }
 
 impl BaseDispatcher {

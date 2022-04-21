@@ -35,6 +35,7 @@ use crate::{
     flow_generator::AppProtoLogsParser,
     monitor::Monitor,
     platform::{ApiWatcher, LibvirtXmlExtractor, PlatformSynchronizer},
+    policy::{Policy, PolicyGetter},
     proto::trident::{self, TapMode},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{uniform_sender::UniformSenderThread, SendItem},
@@ -124,6 +125,14 @@ impl Trident {
             config.controller_cert_file_prefix.clone(),
             config.controller_ips.clone(),
         ));
+        // 目前仅支持local-mod + ebpf-collector，ebpf-collector不适用fast, 所以队列数为1
+        let (policy_setter, policy_getter) = Policy::new(
+            1,
+            config.first_path_level as usize,
+            config.fast_path_map_size,
+            false,
+        );
+
         let synchronizer = Arc::new(Synchronizer::new(
             session.clone(),
             state.clone(),
@@ -132,6 +141,7 @@ impl Trident {
             ctrl_mac.to_string(),
             config.vtap_group_id_request.clone(),
             config.kubernetes_cluster_id.clone(),
+            policy_setter,
         ));
         stats_collector.register_countable("synchronizer", synchronizer.clone(), vec![]);
         synchronizer.start();
@@ -166,6 +176,7 @@ impl Trident {
                             &stats_collector,
                             &session,
                             &synchronizer,
+                            policy_getter,
                         )?;
                         comp.start();
                         components.replace(comp);
@@ -188,6 +199,7 @@ impl Trident {
                         &stats_collector,
                         &session,
                         &synchronizer,
+                        policy_getter,
                     )?;
                     comp.start();
                     for callback in callbacks {
@@ -280,6 +292,7 @@ impl Components {
         stats_collector: &Arc<stats::Collector>,
         session: &Arc<Session>,
         synchronizer: &Arc<Synchronizer>,
+        policy_getter: PolicyGetter,
     ) -> Result<Self> {
         let static_config = &config_handler.static_config;
         let candidate_config = &config_handler.candidate_config;
@@ -512,6 +525,7 @@ impl Components {
                 .log_output_queue(log_sender)
                 .stats_collector(stats_collector.clone())
                 .flow_map_config(config_handler.flow())
+                .policy_getter(policy_getter)
                 .build()
                 .unwrap();
 
@@ -544,7 +558,9 @@ impl Components {
         let monitor = Monitor::new(stats_collector.clone())?;
 
         let guard = Guard::new(config_handler.environment());
-        let ebpf_collector = EbpfCollector::new(config_handler.ebpf(), proto_log_sender)?;
+
+        let ebpf_collector =
+            EbpfCollector::new(config_handler.ebpf(), policy_getter, proto_log_sender)?;
 
         Ok(Components {
             rx_leaky_bucket,

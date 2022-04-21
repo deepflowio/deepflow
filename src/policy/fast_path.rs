@@ -2,17 +2,15 @@ use arr_macro::arr;
 use log::debug;
 use std::cmp::max;
 use std::net::IpAddr;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use ipnet::{IpNet, Ipv4Net};
 use lru::LruCache;
 
-use super::ip_group::IpGroup;
 use crate::common::endpoint::{EndpointData, EndpointStore};
 use crate::common::lookup_key::LookupKey;
 use crate::common::platform_data::PlatformData as Interface;
-use crate::common::policy::{Acl, Cidr, NpbAction, PolicyData};
+use crate::common::policy::{Acl, Cidr, IpGroupData, NpbAction, PolicyData};
 use crate::common::port_range::{PortRange, PortRangeList};
 
 const MAX_QUEUE_COUNT: usize = 16;
@@ -30,13 +28,13 @@ struct PolicyTableItem {
 }
 
 pub struct FastPath {
-    mask_from_interface: Box<[u32; u16::MAX as usize + 1]>,
-    mask_from_ipgroup: Box<[u32; u16::MAX as usize + 1]>,
-    mask_from_cidr: Box<[u32; u16::MAX as usize + 1]>,
+    mask_from_interface: Vec<u32>,
+    mask_from_ipgroup: Vec<u32>,
+    mask_from_cidr: Vec<u32>,
 
-    netmask_table: Box<[u32; u16::MAX as usize + 1]>,
+    netmask_table: Vec<u32>,
 
-    interest_table: Box<[PortRange; u16::MAX as usize + 1]>,
+    interest_table: Vec<PortRange>,
     policy_table: Box<[Option<TableLruCache>; MAX_FAST_PATH]>,
     policy_table_flush_flags: [bool; MAX_QUEUE_COUNT + 1],
 
@@ -51,16 +49,12 @@ impl FastPath {
     // 策略相关等内容更新后必须执行该函数以清空策略表
     pub fn flush(&mut self) {
         self.generate_mask_table();
-        for i in 0..self.queue_count as usize {
-            self.policy_table_flush_flags[i] = true;
-        }
+        self.policy_table_flush_flags = [true; MAX_QUEUE_COUNT + 1];
         self.policy_count = 0;
     }
 
-    pub fn generate_mask_from_interface(&mut self, interfaces: &Vec<Rc<Interface>>) {
-        for i in 0..u16::MAX as usize + 1 {
-            self.mask_from_interface[i] = 0;
-        }
+    pub fn generate_mask_from_interface(&mut self, interfaces: &Vec<Arc<Interface>>) {
+        self.mask_from_interface = [0; u16::MAX as usize + 1].to_vec();
         let mask_table = &mut self.mask_from_interface;
 
         for iface in interfaces {
@@ -92,7 +86,7 @@ impl FastPath {
         }
     }
 
-    fn cidr_to_mask(addr: &Ipv4Net, epc_id: u32, table: &mut [u32; u16::MAX as usize + 1]) {
+    fn cidr_to_mask(addr: &Ipv4Net, epc_id: u32, table: &mut Vec<u32>) {
         let ipv4 = u32::from(addr.network());
         let mask_len = addr.prefix_len();
         if ipv4 == 0 && epc_id == 0 && mask_len == 0 {
@@ -114,11 +108,9 @@ impl FastPath {
         }
     }
 
-    pub fn generate_mask_table_from_group(&mut self, groups: &Vec<Rc<IpGroup>>) {
+    pub fn generate_mask_table_from_group(&mut self, groups: &Vec<Arc<IpGroupData>>) {
+        self.mask_from_ipgroup = [0; u16::MAX as usize + 1].to_vec();
         let mask_table = &mut self.mask_from_ipgroup;
-        for i in 0..mask_table.len() {
-            mask_table[i] = 0;
-        }
 
         for group in groups {
             for ip in &group.ips {
@@ -134,11 +126,9 @@ impl FastPath {
         }
     }
 
-    pub fn generate_mask_table_from_cidr(&mut self, cidrs: &Vec<Rc<Cidr>>) {
+    pub fn generate_mask_table_from_cidr(&mut self, cidrs: &Vec<Arc<Cidr>>) {
+        self.mask_from_cidr = [0; u16::MAX as usize + 1].to_vec();
         let mask_table = &mut self.mask_from_cidr;
-        for i in 0..mask_table.len() {
-            mask_table[i] = 0;
-        }
 
         for cidr in cidrs {
             match cidr.ip {
@@ -202,7 +192,7 @@ impl FastPath {
         return (src_key, dst_key);
     }
 
-    pub fn generate_interest_table(&mut self, acls: &Vec<Rc<Acl>>) {
+    pub fn generate_interest_table(&mut self, acls: &Vec<Arc<Acl>>) {
         let mut list = Vec::new();
         let interest_table = &mut self.interest_table;
 
@@ -346,7 +336,7 @@ impl FastPath {
         if let Some(item) = table.get(&key) {
             if let Some(policy) = &item.protocol_table[packet.proto as usize] {
                 return Some((
-                    policy.clone(),
+                    Arc::clone(policy),
                     item.store.get(
                         packet.l2_end_0,
                         packet.l2_end_1,
@@ -359,35 +349,38 @@ impl FastPath {
         return None;
     }
 
-    pub fn new(queue_count: usize, map_size: usize) -> Box<Self> {
+    pub fn new(queue_count: usize, map_size: usize) -> Self {
         assert!(
             queue_count <= MAX_QUEUE_COUNT,
             "Fastpath queue count over limit."
         );
-        Box::new(FastPath {
+        FastPath {
             map_size,
             queue_count,
 
-            mask_from_interface: Box::new([0; u16::MAX as usize + 1]),
-            mask_from_ipgroup: Box::new([0; u16::MAX as usize + 1]),
-            mask_from_cidr: Box::new([0; u16::MAX as usize + 1]),
+            mask_from_interface: std::iter::repeat(0).take(u16::MAX as usize + 1).collect(),
+            mask_from_ipgroup: std::iter::repeat(0).take(u16::MAX as usize + 1).collect(),
+            mask_from_cidr: std::iter::repeat(0).take(u16::MAX as usize + 1).collect(),
 
-            netmask_table: Box::new([0; u16::MAX as usize + 1]),
+            netmask_table: std::iter::repeat(0).take(u16::MAX as usize + 1).collect(),
 
-            interest_table: Box::new([PortRange::new(0, 0); u16::MAX as usize + 1]),
+            interest_table: std::iter::repeat(PortRange::new(0, 0))
+                .take(u16::MAX as usize + 1)
+                .collect(),
             policy_table: Box::new(arr![None; 4352]),
 
             policy_table_flush_flags: [false; MAX_QUEUE_COUNT + 1],
 
             // 统计计数
             policy_count: 0,
-        })
+        }
     }
 }
 
 #[cfg(test)]
 mod test {
     use std::net::{IpAddr, Ipv4Addr};
+    use std::sync::Arc;
 
     use super::*;
     use crate::common::platform_data::{IpSubnet, PlatformData};
@@ -401,7 +394,7 @@ mod test {
             dst_port_ranges: vec![PortRange::new(5, 11)],
             ..Default::default()
         };
-        table.generate_interest_table(&vec![Rc::new(acl)]);
+        table.generate_interest_table(&vec![Arc::new(acl)]);
 
         // 1-4 -> 1  5->10 -> 5 11->11 other->12
         let mut key = LookupKey {
@@ -431,7 +424,7 @@ mod test {
             dst_port_ranges: vec![PortRange::new(13, 65535)],
             ..Default::default()
         };
-        table.generate_interest_table(&vec![Rc::new(acl)]);
+        table.generate_interest_table(&vec![Arc::new(acl)]);
 
         // 0-10 -> 0  13->65535 -> 13 other->11
         let mut key = LookupKey {
@@ -461,7 +454,7 @@ mod test {
             dst_port_ranges: vec![PortRange::new(13, 65535)],
             ..Default::default()
         };
-        table.generate_interest_table(&vec![Rc::new(acl)]);
+        table.generate_interest_table(&vec![Arc::new(acl)]);
 
         // 5-10 -> 5  13->65535 -> 13 other->11
         let mut key = LookupKey {
@@ -491,7 +484,7 @@ mod test {
             dst_port_ranges: vec![PortRange::new(100, 300), PortRange::new(500, 600)],
             ..Default::default()
         };
-        table.generate_interest_table(&vec![Rc::new(acl)]);
+        table.generate_interest_table(&vec![Arc::new(acl)]);
 
         // other->11
         let mut key = LookupKey {
@@ -560,7 +553,7 @@ mod test {
             ..Default::default()
         };
 
-        table.generate_mask_from_interface(&vec![Rc::new(interface.clone())]);
+        table.generate_mask_from_interface(&vec![Arc::new(interface.clone())]);
         for i in 0xc0a8..0xc0ac {
             assert_eq!(table.mask_from_interface[i], 0xfffc0000);
         }
@@ -573,7 +566,7 @@ mod test {
             }],
             ..Default::default()
         };
-        table.generate_mask_from_interface(&vec![Rc::new(interface), Rc::new(interface1)]);
+        table.generate_mask_from_interface(&vec![Arc::new(interface), Arc::new(interface1)]);
         assert_eq!(table.mask_from_interface[0xc0a8], 0xfffffe00);
         for i in 0xc0a9..0xc0ac {
             assert_eq!(table.mask_from_interface[i], 0xfffc0000);
@@ -587,7 +580,7 @@ mod test {
             ip: "192.168.10.100/13".parse::<IpNet>().unwrap(),
             ..Default::default()
         };
-        table.generate_mask_table_from_cidr(&vec![Rc::new(cidr.clone())]);
+        table.generate_mask_table_from_cidr(&vec![Arc::new(cidr.clone())]);
         for i in 0xc0a8..0xc0b0 {
             assert_eq!(table.mask_from_cidr[i], 0xfff80000);
         }
@@ -596,7 +589,7 @@ mod test {
             ip: "192.168.10.100/25".parse::<IpNet>().unwrap(),
             ..Default::default()
         };
-        table.generate_mask_table_from_cidr(&vec![Rc::new(cidr), Rc::new(cidr1)]);
+        table.generate_mask_table_from_cidr(&vec![Arc::new(cidr), Arc::new(cidr1)]);
         assert_eq!(table.mask_from_cidr[0xc0a8], 0xffffff80);
         for i in 0xc0a9..0xc0b0 {
             assert_eq!(table.mask_from_cidr[i], 0xfff80000);
@@ -607,21 +600,21 @@ mod test {
     fn test_mask_table_from_ip_group() {
         let mut table = FastPath::new(1, 1024);
 
-        let group = IpGroup {
+        let group = IpGroupData {
             ips: vec!["192.168.10.100/13".parse::<IpNet>().unwrap()],
             ..Default::default()
         };
 
-        table.generate_mask_table_from_group(&vec![Rc::new(group.clone())]);
+        table.generate_mask_table_from_group(&vec![Arc::new(group.clone())]);
         for i in 0xc0a8..0xc0b0 {
             assert_eq!(table.mask_from_ipgroup[i], 0xfff80000);
         }
 
-        let group1 = IpGroup {
+        let group1 = IpGroupData {
             ips: vec!["192.168.10.100/25".parse::<IpNet>().unwrap()],
             ..Default::default()
         };
-        table.generate_mask_table_from_group(&vec![Rc::new(group), Rc::new(group1)]);
+        table.generate_mask_table_from_group(&vec![Arc::new(group), Arc::new(group1)]);
         assert_eq!(table.mask_from_ipgroup[0xc0a8], 0xffffff80);
         for i in 0xc0a9..0xc0b0 {
             assert_eq!(table.mask_from_ipgroup[i], 0xfff80000);

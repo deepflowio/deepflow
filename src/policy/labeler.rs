@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
-use std::rc::Rc;
+use std::sync::Arc;
 
 use super::bit::count_trailing_zeros32;
 
@@ -23,16 +23,16 @@ struct EpcIpKey {
 #[derive(Default)]
 pub struct Labeler {
     // Interface表
-    mac_table: Box<HashMap<u64, Rc<PlatformData>>>,
-    epc_ip_table: Box<HashMap<EpcIpKey, Rc<PlatformData>>>,
+    mac_table: Box<HashMap<u64, Arc<PlatformData>>>,
+    epc_ip_table: Box<HashMap<EpcIpKey, Arc<PlatformData>>>,
     // Interface WAN IP表
     ip_netmask_table: Box<HashMap<u16, u32>>, // 仅用于IPv4, IPv6的掩码目前仅支持128不用计算
-    ip_table: Box<HashMap<u128, Rc<PlatformData>>>,
+    ip_table: Box<HashMap<u128, Arc<PlatformData>>>,
     // 对等连接表
     peer_table: Box<HashMap<i32, Vec<i32>>>,
     // CIDR表
-    epc_cidr_table: Box<HashMap<i32, Vec<Rc<Cidr>>>>,
-    tunnel_cidr_table: Box<HashMap<u32, Vec<Rc<Cidr>>>>,
+    epc_cidr_table: Box<HashMap<i32, Vec<Arc<Cidr>>>>,
+    tunnel_cidr_table: Box<HashMap<u32, Vec<Arc<Cidr>>>>,
 }
 
 fn is_link_local(ip: IpAddr) -> bool {
@@ -51,14 +51,11 @@ fn is_unicast_mac(mac: u64) -> bool {
 }
 
 impl Labeler {
-    pub fn new() -> Box<Self> {
-        Box::new(Labeler::default())
-    }
-    fn update_mac_table(&mut self, interfaces: &Vec<Rc<PlatformData>>) {
+    fn update_mac_table(&mut self, interfaces: &Vec<Arc<PlatformData>>) {
         let mut mac_table = Box::new(HashMap::new());
 
         for interface in interfaces {
-            let iface = Rc::clone(interface);
+            let iface = Arc::clone(interface);
             if iface.skip_mac {
                 continue;
             }
@@ -80,11 +77,11 @@ impl Labeler {
         return Ipv4Addr::UNSPECIFIED.into();
     }
 
-    fn get_interface_by_mac(&self, mac: u64) -> Option<&Rc<PlatformData>> {
+    fn get_interface_by_mac(&self, mac: u64) -> Option<&Arc<PlatformData>> {
         self.mac_table.get(&mac)
     }
 
-    fn update_epc_ip_table(&mut self, interfaces: &Vec<Rc<PlatformData>>) {
+    fn update_epc_ip_table(&mut self, interfaces: &Vec<Arc<PlatformData>>) {
         let mut epc_ip_table = Box::new(HashMap::new());
 
         for interface in interfaces {
@@ -102,14 +99,14 @@ impl Labeler {
                         },
                         epc_id,
                     },
-                    Rc::clone(interface),
+                    Arc::clone(interface),
                 );
             }
         }
         self.epc_ip_table = epc_ip_table;
     }
 
-    fn get_interface_by_epc_ip(&self, ip: IpAddr, epc_id: i32) -> Option<&Rc<PlatformData>> {
+    fn get_interface_by_epc_ip(&self, ip: IpAddr, epc_id: i32) -> Option<&Arc<PlatformData>> {
         match ip {
             IpAddr::V4(ip) => self.epc_ip_table.get(&EpcIpKey {
                 ip: u32::from_be_bytes(ip.octets()) as u128,
@@ -122,7 +119,7 @@ impl Labeler {
         }
     }
 
-    pub fn update_peer_table(&mut self, peers: &Vec<Rc<PeerConnection>>) {
+    pub fn update_peer_table(&mut self, peers: &Vec<Arc<PeerConnection>>) {
         let mut peer_table: HashMap<i32, Vec<i32>> = HashMap::new();
         for peer in peers {
             peer_table
@@ -154,9 +151,9 @@ impl Labeler {
         }
     }
 
-    pub fn update_cidr_table(&mut self, cidrs: &Vec<Rc<Cidr>>) {
-        let mut epc_table: HashMap<i32, Vec<Rc<Cidr>>> = HashMap::new();
-        let mut tunnel_table: HashMap<u32, Vec<Rc<Cidr>>> = HashMap::new();
+    pub fn update_cidr_table(&mut self, cidrs: &Vec<Arc<Cidr>>) {
+        let mut epc_table: HashMap<i32, Vec<Arc<Cidr>>> = HashMap::new();
+        let mut tunnel_table: HashMap<u32, Vec<Arc<Cidr>>> = HashMap::new();
 
         for item in cidrs {
             let mut epc_id = item.epc_id;
@@ -164,26 +161,26 @@ impl Labeler {
                 epc_id = EPC_FROM_DEEPFLOW;
             }
 
-            epc_table.entry(epc_id).or_default().push(Rc::clone(item));
+            epc_table.entry(epc_id).or_default().push(Arc::clone(item));
             if item.tunnel_id > 0 {
                 tunnel_table
                     .entry(item.tunnel_id)
                     .or_default()
-                    .push(Rc::clone(item));
+                    .push(Arc::clone(item));
             }
         }
         // 排序使用降序是为了CIDR的最长前缀匹配
         for (_k, v) in &mut epc_table {
             v.sort_by(|a, b| {
                 b.netmask_len()
-                    .partial_cmp(&Rc::clone(a).netmask_len())
+                    .partial_cmp(&Arc::clone(a).netmask_len())
                     .unwrap()
             });
         }
         for (_k, v) in &mut tunnel_table {
             v.sort_by(|a, b| {
                 b.netmask_len()
-                    .partial_cmp(&Rc::clone(a).netmask_len())
+                    .partial_cmp(&Arc::clone(a).netmask_len())
                     .unwrap()
             });
         }
@@ -250,7 +247,7 @@ impl Labeler {
         return false;
     }
 
-    fn update_ip_table(&mut self, interfaces: &Vec<Rc<PlatformData>>) {
+    fn update_ip_table(&mut self, interfaces: &Vec<Arc<PlatformData>>) {
         let mut ip_netmask_table = Box::new(HashMap::new());
         let mut ip_table = Box::new(HashMap::new());
         for interface in interfaces {
@@ -286,14 +283,14 @@ impl Labeler {
                             & 0xffffffffffffffff_ffffffffffffffff << (128 - ip.netmask)
                     }
                 };
-                ip_table.insert(net_addr, Rc::clone(interface));
+                ip_table.insert(net_addr, Arc::clone(interface));
             }
         }
         self.ip_netmask_table = ip_netmask_table;
         self.ip_table = ip_table;
     }
 
-    fn get_interface_by_ip(&self, ip: IpAddr) -> Option<&Rc<PlatformData>> {
+    fn get_interface_by_ip(&self, ip: IpAddr) -> Option<&Arc<PlatformData>> {
         match ip {
             IpAddr::V4(ipv4) => {
                 let ip_int = u32::from_be_bytes(ipv4.octets());
@@ -317,7 +314,7 @@ impl Labeler {
         }
     }
 
-    pub fn update_interface_table(&mut self, interfaces: &Vec<Rc<PlatformData>>) {
+    pub fn update_interface_table(&mut self, interfaces: &Vec<Arc<PlatformData>>) {
         self.update_mac_table(interfaces);
         self.update_epc_ip_table(interfaces);
         self.update_ip_table(interfaces);
@@ -382,7 +379,10 @@ impl Labeler {
         let mut src_data = &mut endpoint.src_info;
         let mut dst_data = &mut endpoint.dst_info;
         if dst_data.l3_epc_id == 0 && src_data.l3_epc_id > 0 {
-            if !is_unicast_mac(u64::from(key.dst_mac)) {
+            if !is_unicast_mac(u64::from(key.dst_mac))
+                || key.dst_ip.is_loopback()
+                || key.dst_ip.is_multicast()
+            {
                 dst_data.l3_epc_id = src_data.l3_epc_id;
                 dst_data.l2_epc_id = src_data.l2_epc_id;
                 dst_data.is_device = true;
@@ -397,7 +397,13 @@ impl Labeler {
             }
         }
         if src_data.l3_epc_id == 0 && dst_data.l3_epc_id > 0 {
-            if let Some(interface) = self.get_interface_by_epc_ip(key.src_ip, dst_data.l3_epc_id) {
+            if key.src_ip.is_loopback() {
+                src_data.l3_epc_id = dst_data.l3_epc_id;
+                src_data.l2_epc_id = dst_data.l2_epc_id;
+                src_data.is_device = true;
+            } else if let Some(interface) =
+                self.get_interface_by_epc_ip(key.src_ip, dst_data.l3_epc_id)
+            {
                 // 本端IP + 对端EPC查询EPC-IP表
                 src_data.set_l3_data(interface);
             } else {
@@ -546,10 +552,13 @@ impl Labeler {
     ) -> EndpointData {
         let src_info = EndpointInfo {
             l3_epc_id: l3_epc_id_src,
+            l2_end: true,
+            l3_end: l3_epc_id_src > 0,
             ..Default::default()
         };
         let dst_info = EndpointInfo {
             l3_epc_id: l3_epc_id_dst,
+            l3_end: l3_epc_id_dst > 0,
             ..Default::default()
         };
         let mut endpoint = EndpointData::new(src_info, dst_info);
@@ -610,7 +619,7 @@ mod tests {
             epc_id: 1,
             ..Default::default()
         };
-        labeler.update_mac_table(&vec![Rc::new(interface)]);
+        labeler.update_mac_table(&vec![Arc::new(interface)]);
 
         let ret = labeler.get_interface_by_mac(0x112233445566);
         assert_eq!(ret.is_some(), true);
@@ -645,7 +654,7 @@ mod tests {
             ..Default::default()
         };
 
-        labeler.update_epc_ip_table(&vec![Rc::new(interface1), Rc::new(interface2)]);
+        labeler.update_epc_ip_table(&vec![Arc::new(interface1), Arc::new(interface2)]);
 
         let ret = labeler.get_interface_by_epc_ip("192.168.10.100".parse().unwrap(), 1);
         assert_eq!(ret.is_some(), true);
@@ -681,7 +690,7 @@ mod tests {
             ..Default::default()
         };
 
-        labeler.update_ip_table(&vec![Rc::new(interface1), Rc::new(interface2)]);
+        labeler.update_ip_table(&vec![Arc::new(interface1), Arc::new(interface2)]);
 
         let ret = labeler.get_interface_by_ip("192.168.10.100".parse().unwrap());
         assert_eq!(ret.is_some(), true);
@@ -712,7 +721,7 @@ mod tests {
             ..Default::default()
         };
 
-        labeler.update_ip_table(&vec![Rc::new(interface1), Rc::new(interface2)]);
+        labeler.update_ip_table(&vec![Arc::new(interface1), Arc::new(interface2)]);
 
         let ret = labeler.get_interface_by_ip("192.168.10.100".parse().unwrap());
         assert_eq!(ret.is_some(), true);
@@ -743,7 +752,7 @@ mod tests {
             ..Default::default()
         };
 
-        labeler.update_ip_table(&vec![Rc::new(interface1), Rc::new(interface2)]);
+        labeler.update_ip_table(&vec![Arc::new(interface1), Arc::new(interface2)]);
 
         let ret = labeler.get_interface_by_ip("192.1.10.100".parse().unwrap());
         assert_eq!(ret.is_some(), true);
@@ -778,7 +787,7 @@ mod tests {
             ..Default::default()
         };
 
-        labeler.update_ip_table(&vec![Rc::new(interface1), Rc::new(interface2)]);
+        labeler.update_ip_table(&vec![Arc::new(interface1), Arc::new(interface2)]);
 
         let ret = labeler.get_interface_by_ip("2200:3300:4400::10".parse().unwrap());
         assert_eq!(ret.is_some(), true);
@@ -813,8 +822,8 @@ mod tests {
             ..Default::default()
         };
 
-        labeler.update_peer_table(&vec![Rc::new(peer)]);
-        labeler.update_epc_ip_table(&vec![Rc::new(interface1), Rc::new(interface2)]);
+        labeler.update_peer_table(&vec![Arc::new(peer)]);
+        labeler.update_epc_ip_table(&vec![Arc::new(interface1), Arc::new(interface2)]);
 
         let mut endpoint: EndpointInfo = Default::default();
 
@@ -839,7 +848,7 @@ mod tests {
             is_vip: true,
             ..Default::default()
         };
-        let cidrs = vec![Rc::new(cidr1), Rc::new(cidr2)];
+        let cidrs = vec![Arc::new(cidr1), Arc::new(cidr2)];
         let mut endpoint: EndpointInfo = Default::default();
 
         labeler.update_cidr_table(&cidrs);
@@ -860,7 +869,7 @@ mod tests {
 
         let mut endpoint: EndpointInfo = Default::default();
 
-        labeler.update_cidr_table(&vec![Rc::new(cidr1)]);
+        labeler.update_cidr_table(&vec![Arc::new(cidr1)]);
         labeler.set_epc_by_cidr("192.168.10.100".parse().unwrap(), 10, &mut endpoint);
         assert_eq!(endpoint.l3_epc_id, 0);
 
@@ -884,7 +893,7 @@ mod tests {
 
         let mut endpoint: EndpointInfo = Default::default();
 
-        labeler.update_cidr_table(&vec![Rc::new(cidr1)]);
+        labeler.update_cidr_table(&vec![Arc::new(cidr1)]);
 
         labeler.set_epc_vip_by_tunnel("192.168.10.100".parse().unwrap(), 10, &mut endpoint);
         assert_eq!(endpoint.l3_epc_id, 10);
@@ -902,7 +911,7 @@ mod tests {
 
         let mut endpoint: EndpointInfo = Default::default();
 
-        labeler.update_cidr_table(&vec![Rc::new(cidr1)]);
+        labeler.update_cidr_table(&vec![Arc::new(cidr1)]);
 
         labeler.set_vip_by_cidr("192.168.10.100".parse().unwrap(), 10, &mut endpoint);
         assert_eq!(endpoint.is_vip, true);
@@ -940,11 +949,11 @@ mod tests {
             cidr_type: CidrType::Wan,
             ..Default::default()
         };
-        let list = vec![Rc::new(interface1), Rc::new(interface2)];
+        let list = vec![Arc::new(interface1), Arc::new(interface2)];
 
         labeler.update_mac_table(&list);
         labeler.update_epc_ip_table(&list);
-        labeler.update_cidr_table(&vec![Rc::new(cidr1)]);
+        labeler.update_cidr_table(&vec![Arc::new(cidr1)]);
 
         let key: LookupKey = LookupKey {
             src_mac: MacAddr::from_str("11:22:33:44:55:66").unwrap(),
@@ -959,7 +968,7 @@ mod tests {
         assert_eq!(endpoints.dst_info.l3_epc_id, 10);
 
         // 加入对等连接
-        labeler.update_peer_table(&vec![Rc::new(peer)]);
+        labeler.update_peer_table(&vec![Arc::new(peer)]);
 
         // 加入对等连接后，对等连接优先级高于CIDR WAN
         let endpoints = labeler.get_endpoint_data(&key);
@@ -983,8 +992,8 @@ mod tests {
             epc_id: 1,
             ..Default::default()
         };
-        labeler.update_mac_table(&vec![Rc::new(interface)]);
-        labeler.update_cidr_table(&vec![Rc::new(cidr)]);
+        labeler.update_mac_table(&vec![Arc::new(interface)]);
+        labeler.update_cidr_table(&vec![Arc::new(cidr)]);
         let mut endpoints: EndpointData = Default::default();
         endpoints.src_info.l3_epc_id = 1;
 
@@ -1015,7 +1024,7 @@ mod tests {
             is_vip: true,
             ..Default::default()
         };
-        labeler.update_cidr_table(&vec![Rc::new(cidr)]);
+        labeler.update_cidr_table(&vec![Arc::new(cidr)]);
 
         let mut endpoints: EndpointData = Default::default();
         endpoints.dst_info.l3_epc_id = 1;
