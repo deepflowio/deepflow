@@ -44,6 +44,7 @@ impl From<DubboInfo> for flow_log::DubboInfo {
             service_version: f.service_version,
             method_name: f.method_name,
             resp_body_len: f.resp_msg_size,
+            trace_id: Default::default(),
         }
     }
 }
