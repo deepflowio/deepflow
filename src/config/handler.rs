@@ -143,7 +143,7 @@ pub struct PlatformConfig {
     pub epc_id: u32,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Eq)]
 pub struct HandlerConfig {
     pub compressor_socket_type: SocketType,
     pub npb_dedup_enabled: bool,
@@ -273,7 +273,7 @@ pub struct SynchronizerConfig {
     pub output_vlan: u16,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EbpfConfig {
     pub vtap_id: u16,
     pub epc_id: u32,
@@ -281,7 +281,7 @@ pub struct EbpfConfig {
     pub log_path: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NewRuntimeConfig {
     pub collector: CollectorConfig,
     pub environment: EnvironmentConfig,
@@ -405,7 +405,7 @@ impl Default for NewRuntimeConfig {
             },
             flow: {
                 FlowConfig {
-                    vtap_id: vtap_id,
+                    vtap_id,
                     trident_type,
                     cloud_gateway_traffic: false,
                     collector_enabled: true,
