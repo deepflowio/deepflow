@@ -1,6 +1,7 @@
 package clickhouse
 
 import (
+	"metaflow/querier/common"
 	"metaflow/querier/engine/clickhouse/metrics"
 	"metaflow/querier/engine/clickhouse/tag"
 	"metaflow/querier/engine/clickhouse/view"
@@ -51,4 +52,11 @@ type SelectTag struct {
 
 func (t *SelectTag) Format(m *view.Model) {
 	m.AddTag(&view.Tag{Value: t.Value, Alias: t.Alias, Flag: t.Flag, Withs: t.Withs})
+	if common.IsValueInSliceString(t.Value, []string{"tap_port", "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1"}) {
+		alias := t.Value
+		if t.Alias != "" {
+			alias = t.Alias
+		}
+		m.AddCallback(MacTranslate([]interface{}{t.Value, alias}))
+	}
 }

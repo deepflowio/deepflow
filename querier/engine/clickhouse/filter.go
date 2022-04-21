@@ -68,6 +68,45 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			tagItem, ok = tag.GetTag(preAsTag, db, table, "default")
 			if !ok {
 				filter := ""
+				switch preAsTag {
+				case "tap_port", "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1":
+					valueStr := strings.Trim(t.Value, "'")
+					if preAsTag == "tap_port" {
+						valueStr = "00:00:" + valueStr
+					}
+					mac, err := net.ParseMAC(valueStr)
+					if err != nil {
+						return nil, err
+					}
+					valueUInt64 := utils.Mac2Uint64(mac)
+					filter = fmt.Sprintf("%s %s %v", t.Tag, op, valueUInt64)
+				default:
+					switch strings.ToLower(op) {
+					case "regexp":
+						filter = fmt.Sprintf("match(%s,%s)", t.Tag, t.Value)
+					case "not regexp":
+						filter = fmt.Sprintf("NOT match(%s,%s)", t.Tag, t.Value)
+					default:
+						filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+					}
+				}
+				return &view.Expr{Value: filter}, nil
+			}
+		} else {
+			filter := ""
+			switch t.Tag {
+			case "tap_port", "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1":
+				valueStr := strings.Trim(t.Value, "'")
+				if t.Tag == "tap_port" {
+					valueStr = "00:00:" + valueStr
+				}
+				mac, err := net.ParseMAC(valueStr)
+				if err != nil {
+					return nil, err
+				}
+				valueUInt64 := utils.Mac2Uint64(mac)
+				filter = fmt.Sprintf("%s %s %v", t.Tag, op, valueUInt64)
+			default:
 				switch strings.ToLower(op) {
 				case "regexp":
 					filter = fmt.Sprintf("match(%s,%s)", t.Tag, t.Value)
@@ -76,17 +115,6 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				default:
 					filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
 				}
-				return &view.Expr{Value: filter}, nil
-			}
-		} else {
-			filter := ""
-			switch strings.ToLower(op) {
-			case "regexp":
-				filter = fmt.Sprintf("match(%s,%s)", t.Tag, t.Value)
-			case "not regexp":
-				filter = fmt.Sprintf("NOT match(%s,%s)", t.Tag, t.Value)
-			default:
-				filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
 			}
 			return &view.Expr{Value: filter}, nil
 		}
@@ -115,14 +143,6 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				return nil, err
 			}
 			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, valueInt, valueInt)
-		case "tap_port", "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1":
-			valueStr := strings.Trim(t.Value, "'")
-			mac, err := net.ParseMAC(valueStr)
-			if err != nil {
-				return nil, err
-			}
-			valueUInt64 := utils.Mac2Uint64(mac)
-			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, valueUInt64)
 		default:
 			switch strings.ToLower(op) {
 			case "regexp":

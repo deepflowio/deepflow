@@ -1,8 +1,12 @@
 package clickhouse
 
 import (
-	"metaflow/querier/engine/clickhouse/view"
 	"strconv"
+	"strings"
+
+	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+
+	"metaflow/querier/engine/clickhouse/view"
 )
 
 type Callback struct {
@@ -70,6 +74,34 @@ func TimeFill(args []interface{}) func(columns []interface{}, values []interface
 				newValue[timeFieldIndex] = timestamp
 				newValues[i] = newValue
 			}
+		}
+		return newValues
+	}
+}
+
+func MacTranslate(args []interface{}) func(columns []interface{}, values []interface{}) (newValues []interface{}) {
+	return func(columns []interface{}, values []interface{}) (newValues []interface{}) {
+		newValues = make([]interface{}, len(values))
+		var macIndex int
+		for i, column := range columns {
+			if column.(string) == args[1].(string) {
+				macIndex = i
+				break
+			}
+		}
+		for i, value := range values {
+			newValues[i] = value
+		}
+		for i, newValue := range newValues {
+			newValueSlice := newValue.([]interface{})
+			for range newValueSlice {
+				newMac := utils.Uint64ToMac(uint64(newValueSlice[macIndex].(int))).String()
+				if args[0].(string) == "tap_port" {
+					newMac = strings.TrimPrefix(newMac, "00:00:")
+				}
+				newValueSlice[macIndex] = newMac
+			}
+			newValues[i] = newValueSlice
 		}
 		return newValues
 	}
