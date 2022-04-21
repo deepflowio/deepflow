@@ -389,8 +389,10 @@ impl EbpfCollector {
                 return;
             }
             SWITCH = false;
+
             ebpf::tracer_stop();
             if let Some(handler) = self.thread_handle.take() {
+                handler.thread().unpark();
                 let _ = handler.join();
             }
             info!("ebpf collector stopped.");
