@@ -2,7 +2,7 @@
 _id                 ,                      ,                       ,                               , id           ,                    ,             , 111        ,
 time                ,                      ,                       ,                               , time         ,                    ,             , 111        ,
 
-region              , region_0             , region_1              , 区域                          , resource     ,                    , 知识图谱    , 100        ,
+region              , region_0             , region_1              , 区域                          , resource     ,                    , 知识图谱    , 110        ,
 az                  , az_0                 , az_1                  , 可用区                        , resource     ,                    , 知识图谱    , 110        ,
 host                , host_0               , host_1                , 宿主机                        , resource     ,                    , 知识图谱    , 100        ,
 chost               , chost_0              , chost_1               , 云服务器                      , resource     ,                    , 知识图谱    , 111        ,
@@ -68,7 +68,7 @@ province            , province_0           , province_1            , 省份     
 close_type          , close_type           , close_type            , 流结束类型                    , int_enum     , close_type         , 流信息      , 111        ,
 flow_source         , flow_source          , flow_source           , 流数据来源                    , int_enum     , flow_source        , 流信息      , 111        ,
 flow_id             , flow_id              , flow_id               , 流日志ID                      , int          ,                    , 流信息      , 111        ,
-tap                 , tap                  , tap                   , 采集点                        , resource     ,                    , 流信息      , 111        ,
+tap                 , tap                  , tap                   , 采集点                        , resource     ,                    , 流信息      , 110        ,
 # 需要转化为xx:xx:xx:xx格式展示
 tap_port            , tap_port             , tap_port              , 采集位置标识                  , mac          ,                    , 流信息      , 111        ,
 tap_port_name       , tap_port_name        , tap_port_name         , 采集位置名称                  , string       ,                    , 流信息      , 111        ,
