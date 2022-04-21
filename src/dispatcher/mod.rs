@@ -33,6 +33,7 @@ use crate::{
     flow_generator::MetaAppProto,
     handler::{PacketHandler, PacketHandlerBuilder},
     platform::LibvirtXmlExtractor,
+    policy::PolicyGetter,
     proto::{
         common::TridentType,
         trident::{IfMacSource, TapMode},
@@ -296,6 +297,7 @@ pub struct DispatcherBuilder {
     log_output_queue: Option<Sender<MetaAppProto>>,
     stats_collector: Option<Arc<Collector>>,
     flow_map_config: Option<FlowAccess>,
+    policy_getter: Option<PolicyGetter>,
 }
 
 impl DispatcherBuilder {
@@ -375,6 +377,11 @@ impl DispatcherBuilder {
 
     pub fn flow_map_config(mut self, v: FlowAccess) -> Self {
         self.flow_map_config = Some(v);
+        self
+    }
+
+    pub fn policy_getter(mut self, v: PolicyGetter) -> Self {
+        self.policy_getter = Some(v);
         self
     }
 
@@ -482,6 +489,9 @@ impl DispatcherBuilder {
                 .flow_map_config
                 .take()
                 .ok_or(Error::ConfigIncomplete("no flow map config".into()))?,
+            policy_getter: self
+                .policy_getter
+                .ok_or(Error::ConfigIncomplete("no policy".into()))?,
         };
         collector.register_countable(
             "dispatcher",

@@ -285,18 +285,15 @@ impl From<trident::GroupType> for GroupType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct IpGroupData {
-    pub id: u32,
-    pub epc_id: i32,
-    pub group_type: GroupType,
+    pub epc_id: u32,
     pub ips: Vec<IpNet>,
-    pub vm_ids: Vec<u32>,
 }
 
-impl TryFrom<trident::Group> for IpGroupData {
+impl TryFrom<&trident::Group> for IpGroupData {
     type Error = Error;
-    fn try_from(g: trident::Group) -> Result<Self, Self::Error> {
+    fn try_from(g: &trident::Group) -> Result<Self, Self::Error> {
         if g.ips.is_empty() && g.ip_ranges.is_empty() {
             return Err(Error::ParseIpGroupData(format!(
                 "IpGroup({:?}) is invalid, ips and ip-range is none",
@@ -334,11 +331,8 @@ impl TryFrom<trident::Group> for IpGroupData {
         }
 
         Ok(IpGroupData {
-            id: g.id() & 0xffff,
-            epc_id: (g.epc_id() & 0xffff) as i32,
-            group_type: g.r#type().into(),
+            epc_id: (g.epc_id() & 0xffff) as u32,
             ips,
-            vm_ids: vec![],
         })
     }
 }
@@ -643,9 +637,9 @@ impl From<trident::CidrType> for CidrType {
     }
 }
 
-impl TryFrom<trident::Cidr> for Cidr {
+impl TryFrom<&trident::Cidr> for Cidr {
     type Error = Error;
-    fn try_from(c: trident::Cidr) -> Result<Self, Self::Error> {
+    fn try_from(c: &trident::Cidr) -> Result<Self, Self::Error> {
         if c.prefix.is_none() {
             return Err(Error::ParseCidr(format!("Cidr({:?}) is invalid", &c)));
         }
@@ -700,8 +694,8 @@ pub struct PeerConnection {
     pub remote_epc: i32,
 }
 
-impl From<trident::PeerConnection> for PeerConnection {
-    fn from(p: trident::PeerConnection) -> Self {
+impl From<&trident::PeerConnection> for PeerConnection {
+    fn from(p: &trident::PeerConnection) -> Self {
         Self {
             id: p.id(),
             local_epc: (p.local_epc_id() & 0xffff) as i32,

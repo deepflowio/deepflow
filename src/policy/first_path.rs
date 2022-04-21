@@ -1,16 +1,13 @@
-use std::rc::Rc;
 use std::sync::Arc;
 
-//use super::acl::Acl;
 use super::fast_path::FastPath;
-use super::ip_group::IpGroup;
 use crate::common::endpoint::EndpointData;
 use crate::common::lookup_key::LookupKey;
 use crate::common::platform_data::PlatformData;
-use crate::common::policy::{Acl, Cidr, PolicyData};
+use crate::common::policy::{Acl, Cidr, IpGroupData, PolicyData};
 
 pub struct FirstPath {
-    fast: Box<FastPath>,
+    fast: FastPath,
 
     fast_disable: bool,
     queue_count: usize,
@@ -22,28 +19,28 @@ impl FirstPath {
         _level: usize,
         map_size: usize,
         fast_disable: bool,
-    ) -> Box<FirstPath> {
-        Box::new(FirstPath {
+    ) -> FirstPath {
+        FirstPath {
             fast: FastPath::new(queue_count, map_size),
             queue_count,
             fast_disable,
-        })
+        }
     }
 
-    pub fn update_interfaces(&mut self, ifaces: &Vec<Rc<PlatformData>>) {
+    pub fn update_interfaces(&mut self, ifaces: &Vec<Arc<PlatformData>>) {
         self.fast.generate_mask_from_interface(ifaces);
     }
 
-    pub fn update_ip_group(&mut self, groups: &Vec<Rc<IpGroup>>) {
+    pub fn update_ip_group(&mut self, groups: &Vec<Arc<IpGroupData>>) {
         // TODO: first group id map
         self.fast.generate_mask_table_from_group(groups);
     }
 
-    pub fn update_cidr(&mut self, cidrs: &Vec<Rc<Cidr>>) {
+    pub fn update_cidr(&mut self, cidrs: &Vec<Arc<Cidr>>) {
         self.fast.generate_mask_table_from_cidr(cidrs);
     }
 
-    pub fn update_acl(&mut self, acls: &Vec<Rc<Acl>>, _check: bool) {
+    pub fn update_acl(&mut self, acls: &Vec<Arc<Acl>>, _check: bool) {
         // TODO: first
 
         // fast

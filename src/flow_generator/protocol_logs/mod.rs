@@ -18,6 +18,7 @@ pub use sql::{decode, MysqlHeader, MysqlInfo, MysqlLog, RedisInfo, RedisLog};
 
 use std::{
     fmt,
+    mem::swap,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     time::Duration,
 };
@@ -66,6 +67,15 @@ pub enum LogMessageType {
 impl Default for LogMessageType {
     fn default() -> Self {
         LogMessageType::Other
+    }
+}
+
+impl From<PacketDirection> for LogMessageType {
+    fn from(d: PacketDirection) -> LogMessageType {
+        match d {
+            PacketDirection::ClientToServer => LogMessageType::Request,
+            PacketDirection::ServerToClient => LogMessageType::Response,
+        }
     }
 }
 
@@ -179,17 +189,106 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
 }
 
 impl AppProtoLogsBaseInfo {
+    pub fn from_ebpf(
+        packet: &MetaPacket,
+        head: AppProtoHead,
+        vtap_id: u16,
+        local_epc: i32,
+        remote_epc: i32,
+    ) -> Self {
+        let is_src = packet.lookup_key.l2_end_0;
+        let mut info = Self {
+            start_time: packet.lookup_key.timestamp,
+            end_time: packet.lookup_key.timestamp,
+            flow_id: packet.socket_id,
+            tap_port: packet.tap_port,
+            tap_type: TapType::Tor,
+            is_ipv6: packet.lookup_key.dst_ip.is_ipv6(),
+            tap_side: if is_src {
+                TapSide::ClientProcess
+            } else {
+                TapSide::ServerProcess
+            },
+
+            mac_src: packet.lookup_key.src_mac,
+            mac_dst: packet.lookup_key.dst_mac,
+            ip_src: packet.lookup_key.src_ip,
+            ip_dst: packet.lookup_key.dst_ip,
+            port_src: packet.lookup_key.src_port,
+            port_dst: packet.lookup_key.dst_port,
+            protocol: packet.lookup_key.proto,
+
+            process_id_0: if is_src { packet.process_id } else { 0 },
+            process_id_1: if !is_src { packet.process_id } else { 0 },
+            process_kname_0: if is_src {
+                packet.process_name.clone()
+            } else {
+                "".to_string()
+            },
+            process_kname_1: if !is_src {
+                packet.process_name.clone()
+            } else {
+                "".to_string()
+            },
+
+            syscall_trace_id_request: if packet.direction == PacketDirection::ClientToServer {
+                packet.syscall_trace_id
+            } else {
+                0
+            },
+            syscall_trace_id_response: if packet.direction == PacketDirection::ServerToClient {
+                packet.syscall_trace_id
+            } else {
+                0
+            },
+            req_tcp_seq: if packet.direction == PacketDirection::ClientToServer {
+                packet.tcp_data.seq
+            } else {
+                0
+            },
+            resp_tcp_seq: if packet.direction == PacketDirection::ServerToClient {
+                packet.tcp_data.seq
+            } else {
+                0
+            },
+            syscall_trace_id_thread: packet.thread_id,
+
+            vtap_id,
+            head,
+            l3_epc_id_src: if is_src { local_epc } else { remote_epc },
+            l3_epc_id_dst: if is_src { remote_epc } else { local_epc },
+            is_vip_interface_src: false,
+            is_vip_interface_dst: false,
+        };
+        if packet.direction == PacketDirection::ServerToClient {
+            swap(&mut info.mac_src, &mut info.mac_dst);
+            swap(&mut info.ip_src, &mut info.ip_dst);
+            swap(&mut info.l3_epc_id_src, &mut info.l3_epc_id_dst);
+            swap(&mut info.port_src, &mut info.port_dst);
+            swap(&mut info.process_id_0, &mut info.process_id_1);
+            swap(&mut info.process_kname_0, &mut info.process_kname_1);
+            info.tap_side = if info.tap_side == TapSide::ClientProcess {
+                TapSide::ServerProcess
+            } else {
+                TapSide::ClientProcess
+            };
+        }
+
+        info
+    }
     // 请求调用回应来合并
     fn merge(&mut self, log: AppProtoLogsBaseInfo) {
         if log.process_id_0 > 0 {
             self.process_id_0 = log.process_id_0;
         }
         if log.process_id_1 > 0 {
-            self.process_id_1 = self.process_id_1;
+            self.process_id_1 = log.process_id_1;
         }
         self.end_time = log.end_time;
         self.resp_tcp_seq = log.resp_tcp_seq;
+        self.syscall_trace_id_response = log.syscall_trace_id_response;
         self.head.msg_type = LogMessageType::Session;
+        self.head.code = log.head.code;
     }
 }
 
@@ -306,7 +405,7 @@ impl fmt::Display for AppProtoLogsBaseInfo {
         write!(
             f,
             "Timestamp: {:?} Vtap_id: {} Flow_id: {} TapType: {} TapPort: {} TapSide: {:?}\n \
-                \t{}_{}_{} -> {}_{}_{} Proto: {:?} Seq: {} -> {} VIP: {} -> {}\n \
+                \t{}_{}_{} -> {}_{}_{} Proto: {:?} Seq: {} -> {} VIP: {} -> {} EPC: {} -> {}\n \
                 \tProcess: {}:{} -> {}:{} Trace-id: {} -> {} Thread: {}\n \
                 \tL7Protocol: {:?} MsgType: {:?} Status: {:?} Code: {} Rrt: {}",
             self.start_time,
@@ -326,6 +425,8 @@ impl fmt::Display for AppProtoLogsBaseInfo {
             self.resp_tcp_seq,
             self.is_vip_interface_src,
             self.is_vip_interface_dst,
+            self.l3_epc_id_src,
+            self.l3_epc_id_dst,
             self.process_kname_0,
             self.process_id_0,
             self.process_kname_1,
@@ -339,64 +440,6 @@ impl fmt::Display for AppProtoLogsBaseInfo {
             self.head.code,
             self.head.rrt
         )
-    }
-}
-
-impl<'a> From<&MetaPacket<'a>> for AppProtoLogsBaseInfo {
-    fn from(packet: &MetaPacket<'a>) -> Self {
-        let is_src =
-            packet.direction == PacketDirection::ClientToServer && packet.lookup_key.l2_end_0;
-        Self {
-            start_time: packet.lookup_key.timestamp,
-            end_time: packet.lookup_key.timestamp,
-            flow_id: packet.socket_id,
-            tap_port: packet.tap_port,
-            tap_type: TapType::Tor,
-            is_ipv6: packet.lookup_key.dst_ip.is_ipv6(),
-            tap_side: if packet.lookup_key.l2_end_0 {
-                TapSide::ClientProcess
-            } else {
-                TapSide::ServerProcess
-            },
-
-            mac_src: packet.lookup_key.src_mac,
-            mac_dst: packet.lookup_key.dst_mac,
-            ip_src: packet.lookup_key.src_ip,
-            ip_dst: packet.lookup_key.dst_ip,
-            port_src: packet.lookup_key.src_port,
-            port_dst: packet.lookup_key.dst_port,
-            protocol: packet.lookup_key.proto,
-
-            process_id_0: if is_src { packet.process_id } else { 0 },
-            process_id_1: if !is_src { packet.process_id } else { 0 },
-            process_kname_0: if is_src {
-                packet.process_name.clone()
-            } else {
-                "".to_string()
-            },
-            process_kname_1: if !is_src {
-                packet.process_name.clone()
-            } else {
-                "".to_string()
-            },
-
-            syscall_trace_id_request: if is_src { packet.syscall_trace_id } else { 0 },
-            syscall_trace_id_response: if !is_src { packet.syscall_trace_id } else { 0 },
-            req_tcp_seq: if is_src { packet.tcp_data.seq } else { 0 },
-            resp_tcp_seq: if !is_src { packet.tcp_data.seq } else { 0 },
-            syscall_trace_id_thread: packet.thread_id,
-
-            vtap_id: 0,
-            head: AppProtoHead {
-                msg_type: LogMessageType::Request,
-                status: L7ResponseStatus::Ok,
-                ..Default::default()
-            },
-            l3_epc_id_src: 0,
-            l3_epc_id_dst: 0,
-            is_vip_interface_src: false,
-            is_vip_interface_dst: false,
-        }
     }
 }
 

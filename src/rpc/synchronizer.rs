@@ -1,24 +1,30 @@
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::net::IpAddr;
+use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{self, Arc};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use log::{debug, info, warn};
 use parking_lot::{Mutex, RwLock, RwLockUpgradableReadGuard};
+use prost::Message;
 use sysinfo::{System, SystemExt};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time;
 
-use crate::common::PlatformData;
+use crate::common::policy::{Cidr, IpGroupData, PeerConnection};
+use crate::common::{FlowAclListener, PlatformData as VInterface};
 use crate::config::RuntimeConfig;
 use crate::dispatcher::DispatcherListener;
-use crate::proto::trident as tp;
+use crate::policy::PolicySetter;
+use crate::proto::trident::{self as tp, TapMode};
 use crate::rpc::session::Session;
 use crate::trident::{self, TridentState};
 use crate::utils::{
     self,
+    environment::{is_tt_pod, is_tt_process},
     net::{is_unicast_link_local, links_by_name_regex, MacAddr},
     stats::{Countable, Counter},
 };
@@ -69,9 +75,218 @@ pub struct Status {
     pub synced: bool,
     pub new_revision: Option<String>,
 
+    // GRPC数据
     pub version_platform_data: u64,
     pub version_acls: u64,
     pub version_groups: u64,
+
+    pub interfaces: Vec<Arc<VInterface>>,
+    pub peers: Vec<Arc<PeerConnection>>,
+    pub cidrs: Vec<Arc<Cidr>>,
+    pub ip_groups: Vec<Arc<IpGroupData>>,
+}
+
+impl Status {
+    fn update_platform_data(
+        &mut self,
+        version: u64,
+        interfaces: Vec<Arc<VInterface>>,
+        peers: Vec<Arc<PeerConnection>>,
+        cidrs: Vec<Arc<Cidr>>,
+    ) {
+        info!(
+            "Update PlatformData version {} to {}.",
+            self.version_platform_data, version
+        );
+
+        self.version_platform_data = version;
+        self.interfaces = interfaces;
+        self.cidrs = cidrs;
+        self.peers = peers;
+    }
+
+    fn update_ip_groups(&mut self, version: u64, ip_groups: Vec<Arc<IpGroupData>>) {
+        info!(
+            "Update IpGroups version {} to {}.",
+            self.version_groups, version
+        );
+
+        self.version_groups = version;
+        self.ip_groups = ip_groups;
+    }
+
+    fn update_flow_acl(&mut self, version: u64) {
+        info!(
+            "Update FlowAcls version {} to {}.",
+            self.version_acls, version
+        );
+
+        self.version_acls = version;
+
+        // TODO: add acl
+    }
+
+    fn get_platform_data(&mut self, resp: &tp::SyncResponse) -> bool {
+        let current_version = self.version_platform_data;
+        let version = resp.version_platform_data.unwrap();
+        debug!(
+            "get grpc PlatformData version: {} vs current version: {}.",
+            version, current_version
+        );
+        if version == 0 {
+            debug!("platform data in preparation.");
+            return false;
+        }
+        if version == current_version {
+            debug!("platform data same version.");
+            return false;
+        }
+
+        if let Some(platform_compressed) = &resp.platform_data {
+            let platform = tp::PlatformData::decode(platform_compressed.as_slice());
+            if platform.is_ok() {
+                let platform = platform.unwrap();
+                let mut interfaces = Vec::new();
+                let mut peers = Vec::new();
+                let mut cidrs = Vec::new();
+                for item in &platform.interfaces {
+                    let result = VInterface::try_from(item);
+                    if result.is_ok() {
+                        interfaces.push(Arc::new(result.unwrap()));
+                    } else {
+                        warn!("{:?}: {}", item, result.unwrap_err());
+                    }
+                }
+                for item in &platform.peer_connections {
+                    peers.push(Arc::new(PeerConnection::from(item)));
+                }
+                for item in &platform.cidrs {
+                    let result = Cidr::try_from(item);
+                    if result.is_ok() {
+                        cidrs.push(Arc::new(result.unwrap()));
+                    } else {
+                        warn!("{:?}: {}", item, result.unwrap_err());
+                    }
+                }
+
+                self.update_platform_data(version, interfaces, peers, cidrs);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    fn modify_platform(
+        &mut self,
+        tap_mode: TapMode,
+        macs: &Vec<MacAddr>,
+        config: &RuntimeConfig,
+    ) -> Vec<VInterface> {
+        let mut black_list = Vec::new();
+        if tap_mode == TapMode::Analyzer {
+            return black_list;
+        }
+        let mut local_mac_map = HashMap::new();
+        for mac in macs {
+            let _ = local_mac_map.insert(u64::from(*mac), true);
+        }
+        let region_id = config.region_id;
+        let pod_cluster_id = config.pod_cluster_id;
+        let mut vinterfaces = Vec::new();
+        for i in &self.interfaces {
+            let mut viface = (*(i.clone())).clone();
+            if !is_tt_pod(config.trident_type) {
+                viface.skip_mac = viface.region_id != region_id;
+            } else {
+                let mut is_tap_interface = viface.pod_cluster_id == pod_cluster_id;
+                is_tap_interface = is_tap_interface
+                    || (viface.region_id == region_id
+                        && viface.device_type != (tp::DeviceType::Pod as u8));
+                viface.skip_mac = !is_tap_interface;
+            }
+
+            // vm为k8s node场景，k8s node流量由k8s内的采集器来采集，不在这里采集避免采集重复的流量
+            if viface.skip_tap_interface
+                && is_tt_process(config.trident_type)
+                && viface.region_id == region_id
+            {
+                black_list.push(viface.clone());
+            }
+            if let Some(v) = local_mac_map.get(&viface.mac) {
+                viface.is_local = *v;
+            }
+            vinterfaces.push(Arc::new(viface));
+        }
+
+        self.interfaces = vinterfaces;
+        // TODO：bridge fdb
+        return black_list;
+    }
+
+    fn get_flow_acls(&mut self, resp: &tp::SyncResponse) -> bool {
+        let version = resp.version_platform_data.unwrap();
+        debug!(
+            "get grpc FlowAcls version: {} vs current version: {}.",
+            version, self.version_acls
+        );
+        if version == 0 {
+            debug!("FlowAcls data in preparation.");
+            return false;
+        }
+        if version == self.version_acls {
+            debug!("FlowAcls data same version.");
+            return false;
+        }
+
+        if let Some(acls_commpressed) = &resp.flow_acls {
+            let acls = tp::FlowAcls::decode(acls_commpressed.as_slice());
+            if acls.is_ok() {
+                // TODO: acl parse
+                self.update_flow_acl(version);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    fn get_ip_groups(&mut self, resp: &tp::SyncResponse) -> bool {
+        let version = resp.version_groups.unwrap();
+        debug!(
+            "get grpc Groups version: {} vs current version: {}.",
+            version, self.version_groups
+        );
+        if version == 0 {
+            debug!("Groups data in preparation.");
+            return false;
+        }
+        if self.version_groups == version {
+            debug!("Groups data same version.");
+            return false;
+        }
+
+        if let Some(groups_compressed) = &resp.groups {
+            let groups = tp::Groups::decode(groups_compressed.as_slice());
+            if groups.is_ok() {
+                let groups = groups.unwrap();
+                let mut ip_groups = Vec::new();
+                for item in &groups.groups {
+                    let result = IpGroupData::try_from(item);
+                    if result.is_ok() {
+                        ip_groups.push(Arc::new(result.unwrap()));
+                    } else {
+                        warn!("{:?}: {}", item, result.unwrap_err());
+                    }
+                }
+                self.update_ip_groups(version, ip_groups);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    fn trigger_flow_acl(&self, listener: &mut Box<dyn FlowAclListener>) {
+        listener.flow_acl_change(&self.ip_groups, &self.interfaces, &self.peers, &self.cidrs);
+    }
 }
 
 pub struct Synchronizer {
@@ -85,6 +300,8 @@ pub struct Synchronizer {
 
     session: Arc<Session>,
     dispatcher_listener: Arc<Mutex<Option<DispatcherListener>>>,
+    // 策略模块和NPB带宽检测会用到
+    flow_acl_listener: Arc<sync::Mutex<Vec<Box<dyn FlowAclListener>>>>,
 
     running: Arc<AtomicBool>,
 
@@ -104,6 +321,7 @@ impl Synchronizer {
         ctrl_mac: String,
         vtap_group_id_request: String,
         kubernetes_cluster_id: String,
+        policy_setter: PolicySetter,
     ) -> Synchronizer {
         Synchronizer {
             static_config: Arc::new(StaticConfig {
@@ -125,9 +343,20 @@ impl Synchronizer {
             running: Arc::new(AtomicBool::new(false)),
             rt: Runtime::new().unwrap(),
             threads: Default::default(),
+            flow_acl_listener: Arc::new(sync::Mutex::new(vec![Box::new(policy_setter)])),
 
             max_memory: Default::default(),
         }
+    }
+
+    pub fn add_flow_acl_listener(&mut self, module: Box<dyn FlowAclListener>) {
+        let mut listeners = self.flow_acl_listener.lock().unwrap();
+        for item in listeners.iter() {
+            if item.id() == module.id() {
+                return;
+            }
+        }
+        listeners.push(module);
     }
 
     pub fn max_memory(&self) -> Arc<AtomicU64> {
@@ -234,7 +463,7 @@ impl Synchronizer {
         tap_mode: tp::TapMode,
         rt_config: &RuntimeConfig,
         _: &Vec<MacAddr>,
-        blacklist: &Vec<PlatformData>,
+        blacklist: &Vec<VInterface>,
     ) {
         if tap_mode == tp::TapMode::Local {
             let if_mac_source = rt_config.if_mac_source;
@@ -256,6 +485,37 @@ impl Synchronizer {
         }
     }
 
+    fn parse_segment(
+        tap_mode: tp::TapMode,
+        resp: &tp::SyncResponse,
+    ) -> (Vec<tp::Segment>, Vec<MacAddr>) {
+        let segments = if tap_mode == tp::TapMode::Analyzer {
+            resp.remote_segments.clone()
+        } else {
+            resp.local_segments.clone()
+        };
+
+        if segments.len() == 0 && tap_mode != tp::TapMode::Local {
+            warn!("Segment is empty, in {:?} mode.", tap_mode);
+        }
+        let mut macs = Vec::new();
+        for segment in &segments {
+            for mac_str in &segment.mac {
+                let mac = MacAddr::from_str(mac_str.as_str());
+                if mac.is_err() {
+                    warn!(
+                        "Malformed VM mac {}, response rejected: {}",
+                        mac_str,
+                        mac.unwrap_err()
+                    );
+                    continue;
+                }
+                macs.push(mac.unwrap());
+            }
+        }
+        return (segments, macs);
+    }
+
     fn on_response(
         remote: &str,
         mut resp: tp::SyncResponse,
@@ -263,6 +523,7 @@ impl Synchronizer {
         static_config: &Arc<StaticConfig>,
         status: &Arc<RwLock<Status>>,
         dispatcher_listener: &Arc<Mutex<Option<DispatcherListener>>>,
+        flow_acl_listener: &Arc<sync::Mutex<Vec<Box<dyn FlowAclListener>>>>,
         max_memory: &Arc<AtomicU64>,
     ) {
         // TODO: reset escape timer
@@ -303,12 +564,37 @@ impl Synchronizer {
             listener.on_config_change(&runtime_config);
         }
 
-        let blacklist = vec![];
-        if static_config.tap_mode == tp::TapMode::Local {
-            // TODO: generate blacklist
+        let mut blacklist = vec![];
+        let (_segments, macs) = Self::parse_segment(static_config.tap_mode, &resp);
+
+        let mut status = status.write();
+        let updated_platform = status.get_platform_data(&resp);
+        if updated_platform {
+            blacklist = status.modify_platform(static_config.tap_mode, &macs, &runtime_config);
+        }
+        let mut updated = status.get_ip_groups(&resp) || updated_platform;
+        updated = status.get_flow_acls(&resp) || updated;
+        if updated {
+            // 更新策略相关
+            let last = SystemTime::now();
+            info!("Grpc version ip-groups: {}, interfaces, peer-connections and cidrs: {}, flow-acls: {}",
+            status.version_groups, status.version_platform_data, status.version_acls);
+            for listener in flow_acl_listener.lock().unwrap().iter_mut() {
+                status.trigger_flow_acl(listener);
+            }
+            let now = SystemTime::now();
+            info!("Grpc finish update cost {:?} on {} listener, {} ip-groups, {} interfaces, {} peer-connections, {} cidrs, {} flow-acls",
+                now.duration_since(last).unwrap_or(Duration::from_secs(0)),
+                flow_acl_listener.lock().unwrap().len(),
+                status.ip_groups.len(),
+                status.interfaces.len(),
+                status.peers.len(),
+                status.cidrs.len(),
+                0,
+            );
         }
 
-        // TODO: update platform, flow acls, groups, bridge forward
+        // TODO: bridge forward
         // TODO: check trisolaris
         // TODO: segments
         // TODO: modify platform
@@ -318,7 +604,7 @@ impl Synchronizer {
                 &resp,
                 static_config.tap_mode,
                 &runtime_config,
-                &vec![],
+                &macs,
                 &blacklist,
             );
         }
@@ -337,6 +623,7 @@ impl Synchronizer {
         let running = self.running.clone();
         let dispatcher_listener = self.dispatcher_listener.clone();
         let max_memory = self.max_memory.clone();
+        let flow_acl_listener = self.flow_acl_listener.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             while running.load(Ordering::SeqCst) {
                 session.update_current_server().await;
@@ -386,6 +673,7 @@ impl Synchronizer {
                         &static_config,
                         &status,
                         &dispatcher_listener,
+                        &flow_acl_listener,
                         &max_memory,
                     );
                 }
@@ -402,6 +690,7 @@ impl Synchronizer {
         let sync_interval = self.sync_interval;
         let running = self.running.clone();
         let dispatcher_listener = self.dispatcher_listener.clone();
+        let flow_acl_listener = self.flow_acl_listener.clone();
         let max_memory = self.max_memory.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             let mut client = None;
@@ -476,6 +765,7 @@ impl Synchronizer {
                     &static_config,
                     &status,
                     &dispatcher_listener,
+                    &flow_acl_listener,
                     &max_memory,
                 );
                 if status.read().new_revision.is_some() {

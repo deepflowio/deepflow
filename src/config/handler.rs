@@ -1273,6 +1273,14 @@ impl ConfigHandler {
             candidate_config.synchronizer = new_config.synchronizer;
         }
 
+        if candidate_config.ebpf != new_config.ebpf {
+            info!(
+                "ebpf config change from {:#?} to {:#?}",
+                candidate_config.ebpf, new_config.ebpf
+            );
+            candidate_config.ebpf = new_config.ebpf;
+        }
+
         // deploy updated config
         self.current_config
             .store(Arc::new(candidate_config.clone()));
