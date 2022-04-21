@@ -197,4 +197,8 @@ pub fn is_tt_pod(trident_type: TridentType) -> bool {
     trident_type == TridentType::TtHostPod || trident_type == TridentType::TtVmPod
 }
 
+pub fn is_tt_process(trident_type: TridentType) -> bool {
+    trident_type == TridentType::TtProcess
+}
+
 //TODO Windows 相关

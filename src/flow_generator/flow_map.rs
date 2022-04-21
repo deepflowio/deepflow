@@ -38,6 +38,7 @@ use crate::{
         tap_port::TapPort,
     },
     config::handler::{FlowAccess, FlowConfig, NewRuntimeConfig},
+    policy::{Policy, PolicyGetter},
     rpc::get_timestamp,
     utils::hasher::Jenkins64Hasher,
     utils::net::MacAddr,
@@ -52,7 +53,7 @@ pub struct FlowMap {
     state_machine_master: StateMachine,
     state_machine_slave: StateMachine,
     service_table: ServiceTable,
-    policy_getter: fn(&mut MetaPacket, u32),
+    policy_getter: PolicyGetter,
     start_time: Duration,    // 时间桶中的最早时间
     start_time_in_unit: u64, // 时间桶中的最早时间，以TIME_SLOT_UNIT为单位
 
@@ -69,7 +70,7 @@ impl FlowMap {
     pub fn new(
         id: u32,
         output_queue: Sender<TaggedFlow>,
-        policy_getter: fn(&mut MetaPacket, u32),
+        policy_getter: PolicyGetter,
         app_proto_log_queue: Sender<MetaAppProto>,
         config: FlowAccess,
     ) -> (Self, Arc<FlowPerfCounter>) {
@@ -177,7 +178,7 @@ impl FlowMap {
     pub fn inject_meta_packet(&mut self, mut meta_packet: MetaPacket) {
         if !self.inject_flush_ticker(meta_packet.lookup_key.timestamp) {
             // 补充由于超时导致未查询策略，用于其它流程（如PCAP存储）
-            (self.policy_getter)(&mut meta_packet, self.id);
+            (self.policy_getter).lookup(&mut meta_packet, self.id as usize);
             return;
         }
 
@@ -603,7 +604,7 @@ impl FlowMap {
             },
         };
         // 标签
-        (self.policy_getter)(meta_packet, self.id);
+        (self.policy_getter).lookup(meta_packet, self.id as usize);
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
         node
     }
@@ -628,7 +629,7 @@ impl FlowMap {
 
         if !node.policy_in_tick[meta_packet.direction as usize] {
             node.policy_in_tick[meta_packet.direction as usize] = true;
-            (self.policy_getter)(meta_packet, self.id);
+            (self.policy_getter).lookup(meta_packet, self.id as usize);
             self.update_endpoint_and_policy_data(node, meta_packet);
         } else {
             // copy endpoint and policy data
@@ -689,7 +690,7 @@ impl FlowMap {
         }
         // 这里需要查询策略，建立ARP表
         if meta_packet.is_ndp_response() {
-            (self.policy_getter)(meta_packet, self.id);
+            (self.policy_getter).lookup(meta_packet, self.id as usize);
         }
     }
 
@@ -1108,7 +1109,8 @@ pub fn _reverse_meta_packet(packet: &mut MetaPacket) {
 }
 
 pub fn _new_flow_map_and_receiver() -> (FlowMap, Receiver<TaggedFlow>) {
-    fn policy_getter(_pkt: &mut MetaPacket, _id: u32) {}
+    let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, false);
+    policy_getter.disable();
     let (output_queue_sender, output_queue_receiver, _) = queue::bounded(256);
     let (app_proto_log_queue, _, _) = queue::bounded(256);
     let current_config = Arc::new(ArcSwap::from_pointee(NewRuntimeConfig::default()));

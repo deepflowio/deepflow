@@ -189,9 +189,10 @@ impl EndpointStore {
         l3_end_0: bool,
         l3_end_1: bool,
     ) -> Arc<EndpointData> {
-        return self.datas[L3L2End::from((l2_end_0, l3_end_0)) as usize]
-            [L3L2End::from((l2_end_1, l3_end_1)) as usize]
-            .clone();
+        return Arc::clone(
+            &self.datas[L3L2End::from((l2_end_0, l3_end_0)) as usize]
+                [L3L2End::from((l2_end_1, l3_end_1)) as usize],
+        );
     }
 }
 

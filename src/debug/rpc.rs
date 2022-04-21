@@ -174,7 +174,7 @@ impl RpcDebugger {
         let cidrs = platform_data
             .cidrs
             .into_iter()
-            .filter_map(|c| c.try_into().ok())
+            .filter_map(|c| (&c).try_into().ok())
             .map(|c: Cidr| format!("{:?}", c));
 
         fn truncate_fn(res: &mut Vec<Message<RpcMessage>>, s: String) {
@@ -220,13 +220,13 @@ impl RpcDebugger {
         let datas = platform_data
             .interfaces
             .into_iter()
-            .filter_map(|p| p.try_into().ok())
+            .filter_map(|p| (&p).try_into().ok())
             .map(|p: PlatformData| format!("{:?}", p));
 
         let peers = platform_data
             .peer_connections
             .into_iter()
-            .map(Into::into)
+            .map(|p| PeerConnection::from(&p))
             .map(|p: PeerConnection| format!("{:?}", p));
 
         let iter = datas.chain(peers);
@@ -274,7 +274,7 @@ impl RpcDebugger {
         let groups = groups
             .groups
             .into_iter()
-            .filter_map(|g| g.try_into().ok())
+            .filter_map(|g| (&g).try_into().ok())
             .map(|i: IpGroupData| format!("{:?}", i));
 
         fn truncate_fn(res: &mut Vec<Message<RpcMessage>>, s: String) {

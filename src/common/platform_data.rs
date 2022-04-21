@@ -81,10 +81,10 @@ impl Default for PlatformData {
     }
 }
 
-impl TryFrom<trident::Interface> for PlatformData {
+impl TryFrom<&trident::Interface> for PlatformData {
     type Error = Error;
 
-    fn try_from(p: trident::Interface) -> Result<Self, Self::Error> {
+    fn try_from(p: &trident::Interface) -> Result<Self, Self::Error> {
         let mut ips = vec![];
         for ip_res in p.ip_resources.iter() {
             let ip = ip_res.ip().parse::<IpAddr>().map_err(|e| {
