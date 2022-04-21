@@ -2,10 +2,7 @@ use std::{
     io::{self, ErrorKind},
     mem,
     net::{SocketAddr, ToSocketAddrs, UdpSocket},
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
-    },
+    sync::{Arc, Condvar, Mutex},
     thread::{self, JoinHandle},
     time::Duration,
     time::Instant,
@@ -48,7 +45,7 @@ struct ModuleDebuggers {
 pub struct Debugger {
     udp_options: (Duration, Option<SocketAddr>, Duration),
     thread: Mutex<Option<JoinHandle<Result<()>>>>,
-    running: Arc<AtomicBool>,
+    running: Arc<(Mutex<bool>, Condvar)>,
     debuggers: Arc<ModuleDebuggers>,
     config: DebugAccess,
 }
@@ -64,8 +61,13 @@ pub struct ConstructDebugCtx {
 
 impl Debugger {
     pub fn start(&self) {
-        if self.running.swap(true, Ordering::SeqCst) {
-            return;
+        {
+            let (started, _) = &*self.running;
+            let mut started = started.lock().unwrap();
+            if *started {
+                return;
+            }
+            *started = true;
         }
 
         let running = self.running.clone();
@@ -85,7 +87,7 @@ impl Debugger {
             let sock_clone = sock.clone();
             let running_clone = running.clone();
             let beacon_handle = thread::spawn(move || -> Result<()> {
-                while running_clone.load(Ordering::SeqCst) {
+                loop {
                     let hostname = match hostname::get() {
                         Ok(hostname) => match hostname.into_string() {
                             Ok(s) => s,
@@ -108,16 +110,25 @@ impl Debugger {
                     for &ip in config.load().controller_ips.iter() {
                         sock_clone.send_to(serialized_beacon.as_slice(), (ip, BEACON_PORT))?;
                     }
-                    thread::sleep(beacon_interval);
+
+                    let (running, timer) = &*running_clone;
+                    let mut running = running.lock().unwrap();
+                    if !*running {
+                        break;
+                    }
+                    running = timer.wait_timeout(running, beacon_interval).unwrap().0;
+                    if !*running {
+                        break;
+                    }
                 }
                 Ok(())
             });
 
-            'SERVER: while running.load(Ordering::SeqCst) {
+            'SERVER: loop {
                 let mut buf = [0u8; SER_BUF_SIZE];
                 let mut addr = None;
                 let (mut len, mut count, mut need_num) = (0, 0, 0);
-                while running.load(Ordering::SeqCst) {
+                while *running.0.lock().unwrap() {
                     let start = Instant::now();
                     match sock.recv_from(&mut buf[len..]) {
                         Ok((n, a)) => {
@@ -153,6 +164,9 @@ impl Debugger {
                         }
                     };
                 }
+                if !*running.0.lock().unwrap() {
+                    break;
+                }
                 if addr.is_none() || len == 0 {
                     continue;
                 }
@@ -180,7 +194,7 @@ impl Debugger {
         Self {
             udp_options: (SESSION_TIMEOUT, None, BEACON_INTERVAL),
             thread: Mutex::new(None),
-            running: Arc::new(AtomicBool::new(false)),
+            running: Arc::new((Mutex::new(false), Condvar::new())),
             debuggers: Arc::new(debuggers),
             config: context.config,
         }
@@ -191,9 +205,15 @@ impl Debugger {
     }
 
     pub fn stop(&self) {
-        if !self.running.swap(false, Ordering::SeqCst) {
-            return;
+        let (stopped, timer) = &*self.running;
+        {
+            let mut stopped = stopped.lock().unwrap();
+            if !*stopped {
+                return;
+            }
+            *stopped = false;
         }
+        timer.notify_one();
 
         if let Some(t) = self.thread.lock().unwrap().take() {
             match t.join() {

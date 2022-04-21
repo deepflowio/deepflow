@@ -99,6 +99,7 @@ impl Dispatcher {
         if self.running.swap(true, Ordering::Relaxed) {
             return;
         }
+        self.terminated.store(false, Ordering::Relaxed);
         let mut flavor = self.flavor.lock().unwrap().take().unwrap();
         self.handle.lock().unwrap().replace(thread::spawn(move || {
             flavor.run();

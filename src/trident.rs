@@ -147,13 +147,7 @@ impl Trident {
                     state_guard = cond.wait(state_guard).unwrap();
                     continue;
                 }
-                State::Terminated => {
-                    if let Some(mut component) = components {
-                        component.stop();
-                    }
-                    synchronizer.stop();
-                    return Ok(());
-                }
+                State::Terminated => return Ok(()),
                 _ => (),
             }
             let mut new_state = State::Running;
@@ -180,7 +174,10 @@ impl Trident {
                     continue;
                 }
             };
-            info!("Update runtime config: {:#?}", new_conf);
+
+            if new_conf != config_handler.candidate_config {
+                info!("Update runtime config: {:#?}", new_conf);
+            }
 
             let callbacks = config_handler.on_config(new_conf);
             match components.as_mut() {
