@@ -45,6 +45,7 @@ EBPF_CLAGS ?= -I. -Ivmlinux -Iinclude -D__BPF_TRACING__ -D GROUP_LEADER_OFFSET_O
 		-Wno-unknown-warning-option \
 		-fno-color-diagnostics \
 		-fno-unwind-tables \
+		-fno-stack-protector \
 		-fno-asynchronous-unwind-tables -g -O2 $(FINAL_TARGET)
 	$(Q)$(LLVM_OBJDUMP) --source --debug-vars --line-numbers --symbol-description $@ > ${@:.elf=.objdump} 
 	$(Q)$(LLVM_STRIP) -g $@ # strip useless DWARF info
