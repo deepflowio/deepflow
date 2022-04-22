@@ -94,14 +94,18 @@ func MacTranslate(args []interface{}) func(columns []interface{}, values []inter
 		}
 		for i, newValue := range newValues {
 			newValueSlice := newValue.([]interface{})
-			for range newValueSlice {
-				newMac := utils.Uint64ToMac(uint64(newValueSlice[macIndex].(int))).String()
-				if args[0].(string) == "tap_port" {
-					newMac = strings.TrimPrefix(newMac, "00:00:")
+			switch newValueSlice[macIndex].(type) {
+			case int:
+				mac := newValueSlice[macIndex].(int)
+				for range newValueSlice {
+					newMac := utils.Uint64ToMac(uint64(mac)).String()
+					if args[0].(string) == "tap_port" {
+						newMac = strings.TrimPrefix(newMac, "00:00:")
+					}
+					newValueSlice[macIndex] = newMac
 				}
-				newValueSlice[macIndex] = newMac
+				newValues[i] = newValueSlice
 			}
-			newValues[i] = newValueSlice
 		}
 		return newValues
 	}
