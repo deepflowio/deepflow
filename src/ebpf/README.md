@@ -250,6 +250,9 @@ extern "C" {
     // 启动 tracer运行
     // 返回值：成功返回0，否则返回非0
     pub fn tracer_start() -> c_int;
+
+    // 注意：eBPF tracer初始化加载运行后进行内核适配，
+    // 适配完成后马上进入stop状态，需调用tracer_start()才开始工作。
 }
 ```
 - 在samples/rust/src/lib.rs中添加
@@ -321,7 +324,7 @@ Options:
 ```bash
 ./metaflow-ebpfctl tracer show
 Tracer         socket-tracer
-Bpf File       /usr/share/metaflow-ebpf/data/socket-trace/linux-4.19/socket_trace.elf
+Bpf File       /usr/share/metaflow-agent//linux-common/socket_trace.elf
 Workers        4 # 标识有几个线程处理
 Events Lost    0 # 事件丢失标识应用没有来得及接收而丢失的事件数量。
 

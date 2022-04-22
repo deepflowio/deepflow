@@ -85,7 +85,7 @@ enum tracer_state {
 // use for inference struct offset.
 #define OFFSET_INFER_SERVER_PORT 54583
 
-#define ELF_PATH_PREFIX  "/usr/share/metaflow-ebpf/data/"
+#define ELF_PATH_PREFIX  "/usr/share/metaflow-agent/"
 
 static inline unsigned int
 min_log2 (unsigned int x)
