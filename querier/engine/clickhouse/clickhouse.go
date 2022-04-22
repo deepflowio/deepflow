@@ -327,6 +327,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		if tagFunction != nil {
 			// time需要被最先解析
 			if name == "time" {
+				tagFunction.(*Time).Trans(e.Model)
 				e.Statements = append([]Statement{tagFunction}, e.Statements...)
 			}
 			e.Statements = append(e.Statements, tagFunction)
@@ -391,7 +392,6 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 			return nil, err
 		}
 		if tagFunction != nil {
-			// time需要被最先解析
 			function, ok := tagFunction.(Function)
 			if !ok {
 				return nil, errors.New(fmt.Sprintf("tagfunction: %s not support in binary", sqlparser.String(expr)))

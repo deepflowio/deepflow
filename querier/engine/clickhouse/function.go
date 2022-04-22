@@ -45,8 +45,7 @@ func GetTagFunction(name string, args []string, alias, db, table string) (Statem
 	switch name {
 	case "time":
 		time := Time{Args: args, Alias: alias}
-		err := time.Trans()
-		return &time, err
+		return &time, nil
 	default:
 		tagFunction := TagFunction{Name: name, Args: args, Alias: alias, DB: db, Table: table}
 		err := tagFunction.Check()
@@ -312,7 +311,7 @@ type Time struct {
 	Fill       string
 }
 
-func (t *Time) Trans() error {
+func (t *Time) Trans(m *view.Model) error {
 	t.TimeField = strings.ReplaceAll(t.Args[0], "`", "")
 	interval, err := strconv.Atoi(t.Args[1])
 	t.Interval = interval
@@ -330,14 +329,14 @@ func (t *Time) Trans() error {
 	if len(t.Args) > 3 {
 		t.Fill = t.Args[3]
 	}
-	return nil
-}
-
-func (t *Time) Format(m *view.Model) {
 	m.Time.Interval = t.Interval
 	m.Time.WindowSize = t.WindowSize
 	m.Time.Fill = t.Fill
 	m.Time.Alias = t.Alias
+	return nil
+}
+
+func (t *Time) Format(m *view.Model) {
 	toIntervalFunction := "toIntervalSecond"
 	var windows string
 	w := make([]string, t.WindowSize)
