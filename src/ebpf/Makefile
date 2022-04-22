@@ -12,9 +12,9 @@ STATIC_OBJDIR := $(OBJDIR)/staticobjs
 
 define compile_socket_trace_elf
 	@echo "  COMPILE ELF kernel version $(1)"
-	@mkdir -p data/socket-trace/linux-$(strip $1)
+	@mkdir -p data/linux-$(strip $1)
 	@cd kernel && make clean --no-print-directory && make socket_trace.elf $(2) --no-print-directory && cd ../
-	@cp kernel/socket_trace.elf data/socket-trace/linux-$(strip $1)/
+	@cp kernel/socket_trace.elf data/linux-$(strip $1)/
 endef
 
 CLANG_VER := $(shell /usr/local/llvm-clang/bin/clang --version | grep "version" | awk '{print $$3}')
@@ -66,7 +66,6 @@ $(ELFFILES):
 	@rm -rf data
 	$(call compile_socket_trace_elf, common)
 	$(call compile_socket_trace_elf, 5.2, LINUX_VER_5_2=1)
-	$(call compile_socket_trace_elf, core, CORE=1)
 	@touch $(ELFFILES)
 
 $(STATIC_OBJDIR) $(SHARED_OBJDIR):
@@ -85,9 +84,9 @@ $(LIBTRACE): $(STATIC_OBJS)
 build: $(ELFFILES) $(LIBTRACE)
 
 install:
-	rm -rf /usr/share/metaflow-ebpf
-	mkdir -p /usr/share/metaflow-ebpf
-	cp data /usr/share/metaflow-ebpf/ -raf
+	rm -rf /usr/share/metaflow-agent
+	mkdir -p /usr/share/metaflow-agent
+	cp data/* /usr/share/metaflow-agent/ -raf
 
 tools:
 	$(call msg,TOOLS,metaflow-ebpfctl)

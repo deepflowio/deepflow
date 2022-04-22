@@ -560,19 +560,15 @@ int running_socket_tracer(l7_handle_fn handle,
 		return -EINVAL;
 	}
 
-	if (is_core_kernel())
+	if (major == 5 && minor == 2)
 		snprintf(bpf_path, TRACER_PATH_LEN,
-			 "%s%s/linux-%s/%s", ELF_PATH_PREFIX, "CORE",
-			 TRACER_NAME, bpf_file_name);
-	else if (major == 5 && minor == 2)
-		snprintf(bpf_path, TRACER_PATH_LEN,
-			 "%s%s/linux-%d.%d/%s", ELF_PATH_PREFIX,
-			 TRACER_NAME, major, minor, bpf_file_name);
+			 "%s/linux-%d.%d/%s", ELF_PATH_PREFIX,
+			 major, minor, bpf_file_name);
 
 	else
 		snprintf(bpf_path, TRACER_PATH_LEN,
-			 "%s%s/linux-common/%s", ELF_PATH_PREFIX,
-			 TRACER_NAME, bpf_file_name);
+			 "%s/linux-common/%s", ELF_PATH_PREFIX,
+			 bpf_file_name);
 
 	struct trace_probes_conf *tps =
 	    malloc(sizeof(struct trace_probes_conf));
