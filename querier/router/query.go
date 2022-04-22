@@ -4,8 +4,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	// "github.com/k0kubun/pp"
+	logging "github.com/op/go-logging"
 	"metaflow/querier/service"
 )
+
+var log = logging.MustGetLogger("router")
 
 func QueryRouter(e *gin.Engine) {
 	e.POST("/v1/query/", executeQuery())
@@ -13,6 +16,12 @@ func QueryRouter(e *gin.Engine) {
 
 func executeQuery() gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
+		defer func() {
+			err := recover()
+			if err != nil {
+				log.Error(err)
+			}
+		}()
 		args := make(map[string]string)
 		args["debug"] = c.Query("debug")
 		args["query_uuid"] = c.Query("query_uuid")
