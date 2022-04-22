@@ -16,6 +16,8 @@
 #include <time.h>
 #include <string.h>
 #include <inttypes.h>
+#include <linux/sysinfo.h> /* for struct sysinfo */
+#include <sys/sysinfo.h>
 #include "common.h"
 #include "log.h"
 
@@ -95,16 +97,11 @@ int get_cpus_count(void)
 // 系统启动到现在的时间（以秒为单位）
 uint32_t get_sys_uptime(void)
 {
-	float uptime = 0, free_time;
-	char uptime_str[128];
-	if (fetch_command_value("cat /proc/uptime",
-				uptime_str, sizeof(uptime_str)) != 0)
+	struct sysinfo s_info = { 0 };
+	if (sysinfo(&s_info) != 0)
 		return 0;
 
-	if (sscanf(uptime_str, "%f %f", &uptime, &free_time) != 1)
-		return 0;
-
-	return (uint32_t) uptime;
+	return (uint32_t)s_info.uptime;
 }
 
 uint64_t fetch_sys_boot_secs(void)
