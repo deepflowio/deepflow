@@ -206,7 +206,7 @@ func GetTagValues(db, table, tag string) (map[string][]interface{}, error) {
 	// 根据tagEnumFile获取values
 	tagValues, ok := TAG_ENUMS[tagDescription.EnumFile]
 	if !ok {
-		return GetTagResourceValues(tag)
+		return map[string][]interface{}{}, nil
 	}
 	response := map[string][]interface{}{
 		"columns": []interface{}{"value", "display_name"},
