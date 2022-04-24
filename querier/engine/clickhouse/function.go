@@ -224,9 +224,11 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 		case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE:
 			// 计数类和油标类，null需要补成0
 			outFunc.SetFillNullAsZero(true)
-		case metrics.METRICS_TYPE_DELAY, metrics.METRICS_TYPE_QUOTIENT:
+		case metrics.METRICS_TYPE_DELAY:
 			// 时延类和商值类，忽略0值
 			outFunc.SetIsGroupArray(true)
+			outFunc.SetIgnoreZero(true)
+		case metrics.METRICS_TYPE_QUOTIENT:
 			outFunc.SetIgnoreZero(true)
 		case metrics.METRICS_TYPE_PERCENTAGE:
 			// 比例类，null需要补成0
