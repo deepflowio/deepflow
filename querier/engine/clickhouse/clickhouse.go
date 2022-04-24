@@ -329,8 +329,9 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			if name == "time" {
 				tagFunction.(*Time).Trans(e.Model)
 				e.Statements = append([]Statement{tagFunction}, e.Statements...)
+			} else {
+				e.Statements = append(e.Statements, tagFunction)
 			}
-			e.Statements = append(e.Statements, tagFunction)
 			return nil
 		}
 		return errors.New(fmt.Sprintf("function: %s not support", sqlparser.String(expr)))
