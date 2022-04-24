@@ -67,7 +67,9 @@ impl LibvirtXmlExtractor {
 
         *self.thread.lock().unwrap() = Some(thread::spawn(move || loop {
             let (path_lock, entries) = (path.lock().unwrap(), Arc::clone(&entries));
-            LibvirtXmlExtractor::refresh(path_lock, entries);
+            if path_lock.exists() {
+                LibvirtXmlExtractor::refresh(path_lock, entries);
+            }
 
             let guard = running.lock().unwrap();
             if !*guard {
@@ -102,7 +104,9 @@ impl LibvirtXmlExtractor {
     }
     /// set libvirt xml file extract path
     pub fn set_path(&self, path: PathBuf) {
-        *self.path.lock().unwrap() = path;
+        if path.exists() {
+            *self.path.lock().unwrap() = path;
+        }
     }
 
     fn extract_interfaces(document: &Document) -> Result<Vec<InterfaceEntry>> {
