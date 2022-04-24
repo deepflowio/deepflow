@@ -206,7 +206,7 @@ func GetTagValues(db, table, tag string) (map[string][]interface{}, error) {
 	// 根据tagEnumFile获取values
 	tagValues, ok := TAG_ENUMS[tagDescription.EnumFile]
 	if !ok {
-		return map[string][]interface{}{}, nil
+		return GetTagResourceValues(tag)
 	}
 	response := map[string][]interface{}{
 		"columns": []interface{}{"value", "display_name"},
@@ -269,7 +269,7 @@ func GetTagResourceValues(tag string) (map[string][]interface{}, error) {
 		sql = "SELECT id as value, name AS display_name FROM deepflow.pod_ingress_map"
 	}
 	if sql == "" {
-		return nil, errors.New(fmt.Sprintf("tag (%s) not found", tag))
+		return map[string][]interface{}{}, nil
 	}
 	log.Debug(sql)
 	rst, err := chClient.DoQuery(sql, nil)
