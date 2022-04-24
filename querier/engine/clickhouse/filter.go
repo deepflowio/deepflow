@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/xwb1989/sqlparser"
+	"inet.af/netaddr"
 	"net"
 	"strconv"
 	"strings"
@@ -59,12 +60,14 @@ type WhereTag struct {
 func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string, db, table string) (view.Node, error) {
 	op := expr.(*sqlparser.ComparisonExpr).Operator
 	tagItem, ok := tag.GetTag(t.Tag, db, table, "default")
+	whereTag := t.Tag
 	if strings.ToLower(op) == "like" || strings.ToLower(op) == "not like" {
 		t.Value = strings.ReplaceAll(t.Value, "*", "%")
 	}
 	if !ok {
 		preAsTag, ok := asTagMap[t.Tag]
 		if ok {
+			whereTag = preAsTag
 			tagItem, ok = tag.GetTag(preAsTag, db, table, "default")
 			if !ok {
 				filter := ""
@@ -121,7 +124,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 	}
 	whereFilter := tagItem.WhereTranslator
 	if whereFilter != "" {
-		switch t.Tag {
+		switch whereTag {
 		case "ip_version":
 			ipVersion := "0"
 			if t.Value == "4" {
@@ -143,6 +146,67 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				return nil, err
 			}
 			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, valueInt, valueInt)
+		case "ip", "ip_0", "ip_1", "tunnel_tx_ip_0", "tunnel_tx_ip_1", "tunnel_rx_ip_0", "tunnel_rx_ip_1":
+			equalFilter := ""
+			ipValues := strings.TrimLeft(t.Value, "(")
+			ipValues = strings.TrimRight(ipValues, ")")
+			ipSlice := strings.Split(ipValues, ",")
+			ipsFilter := ""
+			cidrIPs := []string{}
+			cidrFilters := []string{}
+			ips := []string{}
+			for _, ipValue := range ipSlice {
+				ipValue = strings.Trim(ipValue, " ")
+				if strings.Contains(ipValue, "/") {
+					cidrIPs = append(cidrIPs, ipValue)
+				} else {
+					ips = append(ips, ipValue)
+				}
+			}
+			for _, cidrIP := range cidrIPs {
+				cidrIP = strings.Trim(cidrIP, "'")
+				cidr, err := netaddr.ParseIPPrefix(cidrIP)
+				if err != nil {
+					return nil, err
+				}
+				minIP := "'" + cidr.Masked().Range().From().String() + "'"
+				maxIP := "'" + cidr.Masked().Range().To().String() + "'"
+				cidrFilter := "(" + fmt.Sprintf(tagItem.WhereTranslator, ">=", minIP) + " AND " + fmt.Sprintf(tagItem.WhereTranslator, "<=", maxIP) + ")"
+				cidrFilters = append(cidrFilters, cidrFilter)
+			}
+			cidrFilterStr := ""
+			if len(cidrFilters) != 0 {
+				cidrFilterStr = "(" + strings.Join(cidrFilters, " OR ") + ")"
+			}
+			if len(ips) != 0 {
+				ipsStr := strings.Join(ips, ",")
+				equalOP := ""
+				if strings.ToLower(op) == "in" || strings.ToLower(op) == "not in" {
+					ipsStr = "(" + ipsStr + ")"
+					equalOP = "in"
+				} else {
+					equalOP = "="
+				}
+				ipsFilter = "(" + fmt.Sprintf(tagItem.WhereTranslator, equalOP, ipsStr) + ")"
+			}
+			finalFilters := []string{}
+			if cidrFilterStr != "" {
+				finalFilters = append(finalFilters, cidrFilterStr)
+			}
+			if ipsFilter != "" {
+				finalFilters = append(finalFilters, ipsFilter)
+			}
+			equalFilter = "(" + strings.Join(finalFilters, " OR ") + ")"
+
+			switch strings.ToLower(op) {
+			case "not in":
+				whereFilter = "not(" + equalFilter + ")"
+			case "!=":
+				whereFilter = "not(" + equalFilter + ")"
+			default:
+				whereFilter = equalFilter
+			}
+
 		default:
 			switch strings.ToLower(op) {
 			case "regexp":
@@ -151,6 +215,8 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value) + ")"
 			case "not like":
 				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "like", t.Value) + ")"
+			case "not in":
+				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value) + ")"
 			case "!=":
 				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value) + ")"
 			default:
