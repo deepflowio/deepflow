@@ -11,16 +11,14 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/logger"
 	"metaflow/querier/config"
 	"metaflow/querier/router"
-	"os"
 	"runtime"
 	"time"
 )
 
 var log = logging.MustGetLogger("querier")
 var configPath = flag.String("f", "/etc/querier.yaml", "specify config file location")
-var format = logging.MustStringFormatter(
-	`%{time:2006-01-02 15:04:05.000} [%{level:.4s}] [%{module}] %{shortfile} %{message}`,
-)
+
+type Controller struct{}
 
 func Start() {
 	flag.Parse()
@@ -28,19 +26,9 @@ func Start() {
 	cfg := config.DefaultConfig()
 	config.Cfg = cfg
 	cfg.Load(*configPath)
-	if os.Getppid() != 1 {
-		logger.EnableStdoutLog()
-	}
-	logFormat := logging.AddModuleLevel(
-		logging.NewBackendFormatter(
-			logging.NewLogBackend(os.Stderr, "", 0),
-			format,
-		),
-	)
 	logger.EnableFileLog(cfg.LogFile)
 	logLevel, _ := logging.LogLevel(cfg.LogLevel)
 	logging.SetLevel(logLevel, "")
-	logging.SetBackend(logFormat)
 	bytes, _ := yaml.Marshal(cfg)
 	log.Info("============================== Launching YUNSHAN DeepFlow Querier ==============================")
 	log.Infof("querier config:\n%s", string(bytes))
