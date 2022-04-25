@@ -7,6 +7,10 @@
 #define OFFSET_READY		1
 #define OFFSET_NO_READY    	0
 
+#define FIXED_EXTRA_LEN		8
+#define NS_PER_US		1000ULL
+#define NS_PER_SEC		1000000000ULL
+
 /***********************************************************
  * map definitions
  ***********************************************************/
@@ -506,7 +510,8 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 				   struct trace_info_t *trace_info_ptr,
 				   struct trace_uid_t *trace_uid,
 				   struct trace_stats *trace_stats,
-				   __u64 *thread_trace_id) {
+				   __u64 *thread_trace_id,
+				   __u64 time_stemp) {
 	/*
 	 * ==========================================
 	 * Coroutine-Trace-ID (Single Redirect Trace)
@@ -540,7 +545,7 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			    socket_info_ptr->peer_fd != 0)
 				trace_info.peer_fd = socket_info_ptr->peer_fd;
 		}
-
+		trace_info.update_time = time_stemp / NS_PER_SEC;
 		trace_map__update(&pid_tgid, &trace_info);
 		if (!trace_info_ptr)
 			trace_stats->trace_map_count++;
@@ -560,10 +565,6 @@ static __inline void data_submit(struct pt_regs *ctx,
 				 __u32 syscall_len,
 				 struct member_fields_offset *offset)
 {
-#define FIXED_EXTRA_LEN 8
-#define NS_PER_US	1000
-#define NS_PER_SEC	1000000000ULL
-
 	if (conn_info == NULL) {
 		return;
 	}
@@ -622,7 +623,7 @@ static __inline void data_submit(struct pt_regs *ctx,
 	if (conn_info->message_type != MSG_PRESTORE &&
 	    conn_info->message_type != MSG_RECONFIRM)
 		trace_process(socket_info_ptr, conn_info, conn_key, pid_tgid, trace_info_ptr,
-			      trace_uid, trace_stats, &thread_trace_id);
+			      trace_uid, trace_stats, &thread_trace_id, time_stemp);
 
 	if (!is_socket_info_valid(socket_info_ptr)) {
 		if (socket_info_ptr && conn_info->direction == T_EGRESS) {
@@ -1211,14 +1212,12 @@ TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx *ctx) {
 }
 
 KPROG(read_null) (struct pt_regs* ctx) {
-#define NANO_PER_US 	1000ULL
-#define NANO_PER_SEC 	1000000000ULL
 	int k0 = 0;
 	struct __socket_data_buffer *v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (v_buff) {
 		if (v_buff->events_num > 0) {
 			struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
-			if ((bpf_ktime_get_ns() - v->timestamp * NANO_PER_US) > NANO_PER_SEC) {
+			if ((bpf_ktime_get_ns() - v->timestamp * NS_PER_US) > NS_PER_SEC) {
 				__u32 buf_size = (v_buff->len + FIXED_EXTRA_LEN) & (sizeof(*v_buff) - 1);
 				if (buf_size >= sizeof(*v_buff))
 					bpf_perf_event_output(ctx, &NAME(socket_data),
