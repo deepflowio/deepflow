@@ -258,6 +258,7 @@ impl HttpLog {
         while frame_payload.len() > HTTPV2_FRAME_HEADER_LENGTH {
             if Self::has_magic(frame_payload) {
                 frame_payload = &frame_payload[HTTPV2_MAGIC_LENGTH..];
+                continue;
             }
             if httpv2_header.parse_headers_frame(frame_payload).is_err() {
                 // 当已经解析了Headers帧(该Headers帧未携带“Content-Length”)且发现该报文被截断时，无法进行后续解析，ContentLength为None
