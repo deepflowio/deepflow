@@ -1,0 +1,96 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: metaflow-agent
+  namespace: yunshan-metaflow
+data:
+  metaflow-agent.yaml: |-
+    controller-ips:
+    - 10.1.4.1
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: metaflow-agent
+  namespace: yunshan-metaflow
+spec:
+  selector:
+    matchLabels:
+      app: metaflow-agent
+  template:
+    metadata:
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/metaflow-agent: unconfined
+      name: metaflow-agent
+      namespace: yunshan-metaflow
+      labels:
+        app: metaflow-agent
+    spec:
+      hostNetwork: true
+      hostPID: true
+      containers:
+        - name: metaflow-agent
+          image: docker.nexus.yunshan.net/metaflow-agent:latest
+          imagePullPolicy: Always
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: sys-kernel-debug
+              mountPath: /sys/kernel/debug
+            - name: metaflow-agent-conf
+              mountPath: /etc/metaflow-agent
+            - name: logs
+              mountPath: /var/log/metaflow-agent/
+              subPath: ""
+      volumes:
+        - name: sys-kernel-debug
+          hostPath:
+            path: /sys/kernel/debug
+        - name: metaflow-agent-conf
+          configMap:
+            name: metaflow-agent
+        - name: logs
+          hostPath:
+            type: DirectoryOrCreate
+            path: /var/log/metaflow-agent
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: metaflow-agent-role
+rules:
+- apiGroups: [""]
+  resources:
+  - nodes
+  - namespaces
+  - configmaps
+  - services
+  - pods
+  - replicationcontrollers
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources:
+  - daemonsets
+  - deployments
+  - replicasets
+  - statefulsets
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["extensions", "networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["route.openshift.io"]
+  resources: ["routes"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metaflow-agent-view-binding
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: yunshan-metaflow
+roleRef:
+  kind: ClusterRole
+  name: metaflow-agent-role
+  apiGroup: rbac.authorization.k8s.io

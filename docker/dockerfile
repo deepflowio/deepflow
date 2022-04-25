@@ -11,13 +11,20 @@ RUN apk upgrade --update \
 
 # 修改root密码为root
 RUN chmod 600 /etc/passwd; \
+    echo "metaflow:x:1000:1000::/home/metaflow:/bin/bash" >> /etc/passwd; \
     echo "root:root" | chpasswd; \
     chmod 000 /etc/passwd
 
 RUN mkdir -p /lib64 /usr/share/metaflow-agent
-COPY require /lib64
-COPY metaflow-ebpfctl /bin/
 COPY data /usr/share/metaflow-agent
+COPY require /lib64
+COPY metaflow-agent /bin/
+COPY metaflow-agent-ctl /bin/
+COPY metaflow-ebpfctl /bin/
 
 # 普通用户获取su命令权限
 RUN chmod 4755 /bin/busybox
+
+USER root
+
+CMD /bin/metaflow-agent -f /etc/metaflow-agent/metaflow-agent.yaml
