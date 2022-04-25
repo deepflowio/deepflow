@@ -310,6 +310,7 @@ impl HttpPerfData {
         while frame_payload.len() > H2C_HEADER_SIZE {
             if Self::has_magic(frame_payload) {
                 frame_payload = &frame_payload[HTTPV2_MAGIC_LENGTH..];
+                continue;
             }
             self.session_data
                 .httpv2_headers
