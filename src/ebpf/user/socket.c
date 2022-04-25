@@ -24,8 +24,12 @@
 extern volatile int worker_delay;
 #endif
 
-// 在map回收时，对每条socket信息超过10秒没有收发动作就回收掉
+// 在socket map回收时，对每条socket信息超过10秒没有收发动作就回收掉
 #define SOCKET_RECLAIM_TIMEOUT_DEF  10
+// 在trace map回收时，对每条trace信息超过10秒没有发生匹配动作就回收掉
+#define TRACE_RECLAIM_TIMEOUT_DEF   10
+static uint64_t socket_map_reclaim_count; // socket map回收数量统计
+static uint64_t trace_map_reclaim_count;  // trace map回收数量统计
 
 extern int sys_cpus_count;
 static int infer_socktrace_fd;
@@ -478,6 +482,32 @@ static void reader_lost_cb(void *t, uint64_t lost)
 	atomic64_add(&tracer->lost, lost);
 }
 
+static void reclaim_trace_map(struct bpf_tracer *tracer, uint32_t timeout)
+{
+	struct bpf_map *map =
+	    bpf_object__find_map_by_name(tracer->pobj, MAP_TRACE_NAME);
+	int map_fd = bpf_map__fd(map);
+
+	uint64_t trace_key = 0, next_trace_key;
+	uint32_t reclaim_count = 0;
+	struct trace_info_t value;
+	uint32_t uptime = get_sys_uptime();
+
+	while (bpf_map_get_next_key(map_fd, &trace_key, &next_trace_key) == 0) {
+		if (bpf_map_lookup_elem(map_fd, &next_trace_key, &value) == 0) {
+			if (uptime - value.update_time > timeout) {
+				bpf_map_delete_elem(map_fd, &next_trace_key);
+				reclaim_count++;
+			}
+		}
+
+		trace_key = next_trace_key;
+	}
+
+	trace_map_reclaim_count += reclaim_count;
+	ebpf_info("[%s] trace map reclaim_count :%u\n", __func__, reclaim_count);
+}
+
 static void reclaim_socket_map(struct bpf_tracer *tracer, uint32_t timeout)
 {
 	struct bpf_map *map =
@@ -485,7 +515,7 @@ static void reclaim_socket_map(struct bpf_tracer *tracer, uint32_t timeout)
 	int map_fd = bpf_map__fd(map);
 
 	uint64_t conn_key, next_conn_key;
-	uint32_t sockets_reclaim_count = 0, trace_reclaim_count = 0;
+	uint32_t sockets_reclaim_count = 0;
 	struct socket_info_t value;
 	conn_key = 0;
 	uint32_t uptime = get_sys_uptime();
@@ -500,8 +530,8 @@ static void reclaim_socket_map(struct bpf_tracer *tracer, uint32_t timeout)
 		conn_key = next_conn_key;
 	}
 
-	ebpf_info("[%s] sockets_reclaim_count :%u, trace_reclaim_count:%u \n",
-		  __func__, sockets_reclaim_count, trace_reclaim_count);
+	socket_map_reclaim_count += sockets_reclaim_count;
+	ebpf_info("[%s] sockets_reclaim_count :%u\n", __func__, sockets_reclaim_count);
 }
 
 static int check_map_exceeded(void)
@@ -510,16 +540,34 @@ static int check_map_exceeded(void)
 	if (t == NULL)
 		return -1;
 
-	uint32_t kern_socket_map_used = 0;
+	uint64_t kern_socket_map_used = 0, kern_trace_map_used = 0;
 
 	struct trace_stats stats_total;
 
 	if (bpf_stats_map_collect(t, &stats_total)) {
 		kern_socket_map_used = stats_total.socket_map_count;
+		kern_trace_map_used = stats_total.trace_map_count;
 	}
 
-	if (kern_socket_map_used >= conf_socket_map_max_reclaim)
+	// 校准map的统计数量
+	kern_socket_map_used -= socket_map_reclaim_count;
+	kern_trace_map_used -= trace_map_reclaim_count;
+
+	if (kern_socket_map_used >= conf_socket_map_max_reclaim) {
+		ebpf_info("Current socket map used %u exceed"
+			  " conf_socket_map_max_reclaim %u,reclaim map\n",
+			  kern_socket_map_used, conf_socket_map_max_reclaim);
 		reclaim_socket_map(t, SOCKET_RECLAIM_TIMEOUT_DEF);
+	}
+
+	if (kern_trace_map_used >=
+	    (uint64_t)(conf_max_trace_entries * RECLAIM_TRACE_MAP_SCALE)) {
+		ebpf_info("Current trace map used %u exceed"
+			  " reclaim_map_max %u,reclaim map\n",
+			  kern_trace_map_used,
+			  (uint32_t)(conf_max_trace_entries * RECLAIM_TRACE_MAP_SCALE));
+		reclaim_trace_map(t, TRACE_RECLAIM_TIMEOUT_DEF);
+	}
 
 	return 0;
 }
