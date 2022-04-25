@@ -28,6 +28,7 @@
 #include <asm/unistd.h>
 #include <errno.h>
 #include <linux/bpf.h>
+#include <sys/utsname.h>
 #include "bpf.h"
 #include "libbpf.h"
 #include "libbpf_internal.h"
@@ -65,7 +66,14 @@ static inline int sys_bpf(enum bpf_cmd cmd, union bpf_attr *attr,
 	return syscall(__NR_bpf, cmd, attr, size);
 }
 
-static inline int sys_bpf_prog_load(union bpf_attr *attr, unsigned int size)
+static void kernel_version(unsigned *x, unsigned *y, unsigned *z)
+{
+	struct utsname utsname;
+	uname(&utsname);
+	sscanf(utsname.release, "%d.%d.%d", x, y, z);
+}
+
+static inline int __sys_bpf_prog_load(union bpf_attr *attr, unsigned int size)
 {
 	int retries = 5;
 	int fd;
@@ -73,6 +81,28 @@ static inline int sys_bpf_prog_load(union bpf_attr *attr, unsigned int size)
 	do {
 		fd = sys_bpf(BPF_PROG_LOAD, attr, size);
 	} while (fd < 0 && errno == EAGAIN && retries-- > 0);
+
+	return fd;
+}
+
+static inline int sys_bpf_prog_load(union bpf_attr *attr, unsigned int size)
+{
+	int retries = 1000;
+	int fd = __sys_bpf_prog_load(attr, size);
+	if (fd == -1) {
+		unsigned x, y, z;
+		x = y = z = 0;
+		kernel_version(&x, &y, &z);
+		printf("[%s] linux %d.%d.%d\n", __func__, x, y, z);
+		for (z = 0; z < retries; z++) {
+			attr->kern_version = (x << 16) + (y << 8) + z;
+			fd = __sys_bpf_prog_load(attr, size);
+			if (fd > 0) {
+				printf("Actual Kernel Version %d.%d.%d\n", x, y, z);
+				return fd;
+			}
+		}
+	}
 
 	return fd;
 }
