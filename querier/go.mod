@@ -9,7 +9,7 @@ require (
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
-	gitlab.yunshan.net/yunshan/droplet-libs v0.0.0-20220222063538-5301c28e0d4c
+	gitlab.yunshan.net/yunshan/droplet-libs v0.0.0-20220425101441-1a3f17e5cf72
 	gopkg.in/yaml.v2 v2.2.8
 	inet.af/netaddr v0.0.0-20211027220019-c74959edd3b6
 )
