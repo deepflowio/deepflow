@@ -16,7 +16,7 @@ pub const HTTP_STATUS_CLIENT_ERROR_MIN: u16 = 400;
 pub const HTTP_STATUS_CLIENT_ERROR_MAX: u16 = 499;
 pub const HTTP_STATUS_SERVER_ERROR_MIN: u16 = 500;
 pub const HTTP_STATUS_SERVER_ERROR_MAX: u16 = 600;
-pub const HTTP_RESP_MIN_LEN: usize = 15; // 响应行："HTTP/1.1 200 OK"
+pub const HTTP_RESP_MIN_LEN: usize = 13; // 响应行："HTTP/1.1 200 "
 
 pub const HTTP_HOST_OFFSET: usize = 6;
 pub const HTTP_CONTENT_LENGTH_OFFSET: usize = 16;
