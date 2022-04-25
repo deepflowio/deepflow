@@ -98,6 +98,7 @@ struct socket_info_t {
 } __attribute__((packed));
 
 struct trace_info_t {
+	__u32 update_time;
 	__u32 peer_fd;
 	__u64 thread_trace_id;
 };
