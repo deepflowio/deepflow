@@ -104,7 +104,7 @@ static __inline void infer_sock_flags(void *sk,
 		unsigned int sk_type : 16;
 	};
 
-	int sock_flags_offset_array[4] = {0x1f0, 0x1f8, 0x200, 0x210};
+	int sock_flags_offset_array[5] = {0x1f0, 0x1f8, 0x200, 0x210, 0x218};
 	unsigned int flags = 0;
 	struct sock_flags_t *sk_flags = (struct sock_flags_t *)&flags;
 	int i;
