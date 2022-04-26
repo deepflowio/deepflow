@@ -151,6 +151,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			ipValues := strings.TrimLeft(t.Value, "(")
 			ipValues = strings.TrimRight(ipValues, ")")
 			ipSlice := strings.Split(ipValues, ",")
+			ipOp := strings.ToLower(op)
 			ipsFilter := ""
 			cidrIPs := []string{}
 			cidrFilters := []string{}
@@ -171,7 +172,14 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				}
 				minIP := "'" + cidr.Masked().Range().From().String() + "'"
 				maxIP := "'" + cidr.Masked().Range().To().String() + "'"
-				cidrFilter := "(" + fmt.Sprintf(tagItem.WhereTranslator, ">=", minIP) + " AND " + fmt.Sprintf(tagItem.WhereTranslator, "<=", maxIP) + ")"
+				cidrFilter := ""
+				if ipOp == ">=" {
+					cidrFilter = fmt.Sprintf(tagItem.WhereTranslator, ipOp, maxIP)
+				} else if ipOp == "<=" {
+					cidrFilter = fmt.Sprintf(tagItem.WhereTranslator, ipOp, minIP)
+				} else {
+					cidrFilter = "(" + fmt.Sprintf(tagItem.WhereTranslator, ">=", minIP) + " AND " + fmt.Sprintf(tagItem.WhereTranslator, "<=", maxIP) + ")"
+				}
 				cidrFilters = append(cidrFilters, cidrFilter)
 			}
 			cidrFilterStr := ""
@@ -179,15 +187,23 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				cidrFilterStr = "(" + strings.Join(cidrFilters, " OR ") + ")"
 			}
 			if len(ips) != 0 {
-				ipsStr := strings.Join(ips, ",")
-				equalOP := ""
-				if strings.ToLower(op) == "in" || strings.ToLower(op) == "not in" {
-					ipsStr = "(" + ipsStr + ")"
-					equalOP = "in"
+				if ipOp == ">=" || ipOp == "<=" {
+					ipFilters := []string{}
+					for _, ip := range ips {
+						ipFilters = append(ipFilters, fmt.Sprintf(tagItem.WhereTranslator, ipOp, ip))
+					}
+					ipsFilter = "(" + strings.Join(ipFilters, " OR ") + ")"
 				} else {
-					equalOP = "="
+					ipsStr := strings.Join(ips, ",")
+					equalOP := ""
+					if ipOp == "in" || ipOp == "not in" {
+						ipsStr = "(" + ipsStr + ")"
+						equalOP = "in"
+					} else {
+						equalOP = "="
+					}
+					ipsFilter = "(" + fmt.Sprintf(tagItem.WhereTranslator, equalOP, ipsStr) + ")"
 				}
-				ipsFilter = "(" + fmt.Sprintf(tagItem.WhereTranslator, equalOP, ipsStr) + ")"
 			}
 			finalFilters := []string{}
 			if cidrFilterStr != "" {
@@ -197,8 +213,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				finalFilters = append(finalFilters, ipsFilter)
 			}
 			equalFilter = "(" + strings.Join(finalFilters, " OR ") + ")"
-
-			switch strings.ToLower(op) {
+			switch ipOp {
 			case "not in":
 				whereFilter = "not(" + equalFilter + ")"
 			case "!=":

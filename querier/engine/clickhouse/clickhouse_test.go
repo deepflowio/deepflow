@@ -98,6 +98,9 @@ var (
 	}, {
 		input:  "select byte as '123' from l4_flow_log where 1=1 group by '123' order by '123' limit 1 ",
 		output: "SELECT byte_tx+byte_rx AS `123` FROM flow_log.l4_flow_log PREWHERE 1 = 1 GROUP BY `123` ORDER BY `123` asc LIMIT 1",
+	}, {
+		input:  "select byte from l4_flow_log where ip>=('1.1.1.1/24','2.2.2.2') and ip<='2.2.2.2/24'",
+		output: "SELECT byte_tx+byte_rx AS byte FROM flow_log.l4_flow_log PREWHERE (((if(is_ipv4=1, IPv4NumToString(ip4), IPv6NumToString(ip6)) >= '1.1.1.255') OR (if(is_ipv4=1, IPv4NumToString(ip4), IPv6NumToString(ip6)) >= '2.2.2.2'))) AND (((if(is_ipv4=1, IPv4NumToString(ip4), IPv6NumToString(ip6)) <= '2.2.2.0')))",
 	},
 	}
 )
