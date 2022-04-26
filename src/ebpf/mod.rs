@@ -148,24 +148,31 @@ impl fmt::Display for SK_BPF_DATA {
         } else {
             (self.tuple.rport, self.tuple.lport)
         };
+        unsafe {
+            let process_name = CStr::from_ptr(self.process_name.as_ptr() as *const i8)
+                .to_str()
+                .unwrap();
 
-        write!(
-            f,
-            "Timestamp: {} Socket: {} Process: {} Thread: {} MsgType: {} Direction: {} \n \
-                \t{}_{} -> {}_{} Seq: {} L7: {}",
-            self.timestamp,
-            self.socket_id,
-            self.process_id,
-            self.thread_id,
-            self.msg_type,
-            self.direction,
-            src_ip,
-            port_src,
-            dst_ip,
-            port_dst,
-            self.tcp_seq,
-            self.l7_protocal_hint
-        )
+            write!(
+                f,
+                "Timestamp: {} Socket: {} Process: {}:{} Thread: {} MsgType: {} Direction: {} \n \
+                \t{}_{} -> {}_{} Seq: {} Trace-ID: {} L7: {} ",
+                self.timestamp,
+                self.socket_id,
+                process_name,
+                self.process_id,
+                self.thread_id,
+                self.msg_type,
+                self.direction,
+                src_ip,
+                port_src,
+                dst_ip,
+                port_dst,
+                self.tcp_seq,
+                self.syscall_trace_id_call,
+                self.l7_protocal_hint
+            )
+        }
     }
 }
 
