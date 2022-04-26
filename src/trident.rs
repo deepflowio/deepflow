@@ -393,7 +393,7 @@ impl Components {
 
         // Sender/Collector
         let dst_ip = Arc::new(Mutex::new(config_handler.candidate_config.sender.dest_ip));
-        info!("analyzer_ip: {}", *dst_ip.lock().unwrap());
+        info!("analyzer ip: {}", *dst_ip.lock().unwrap());
         let sender_id = 0usize;
         let mut l4_flow_aggr_sender = None;
         let mut l4_flow_uniform_sender = None;
