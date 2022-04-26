@@ -1287,8 +1287,10 @@ impl ConfigHandler {
 
         if restart_dispatcher {
             fn dispatcher_callback(_: &ConfigHandler, components: &mut Components) {
+                info!("Restarting components");
                 components.stop();
                 components.start();
+                info!("Restarted components");
             }
             callbacks.push(dispatcher_callback);
         }
