@@ -544,7 +544,7 @@ impl ApiWatcher {
 
         let sync_interval = context.config.load().sync_interval;
         // 等一等watcher，第一个tick再上报
-        while Self::wait_timeout(&running, &timer, sync_interval) {
+        while !Self::wait_timeout(&running, &timer, sync_interval) {
             Self::process(
                 &context,
                 &apiserver_version,
