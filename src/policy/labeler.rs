@@ -382,6 +382,7 @@ impl Labeler {
             if !is_unicast_mac(u64::from(key.dst_mac))
                 || key.dst_ip.is_loopback()
                 || key.dst_ip.is_multicast()
+                || key.src_ip == key.dst_ip
             {
                 dst_data.l3_epc_id = src_data.l3_epc_id;
                 dst_data.l2_epc_id = src_data.l2_epc_id;
@@ -397,7 +398,7 @@ impl Labeler {
             }
         }
         if src_data.l3_epc_id == 0 && dst_data.l3_epc_id > 0 {
-            if key.src_ip.is_loopback() {
+            if key.src_ip.is_loopback() || key.src_ip == key.dst_ip {
                 src_data.l3_epc_id = dst_data.l3_epc_id;
                 src_data.l2_epc_id = dst_data.l2_epc_id;
                 src_data.is_device = true;
