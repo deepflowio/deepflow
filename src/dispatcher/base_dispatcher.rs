@@ -25,6 +25,7 @@ use crate::{
     },
     config::{handler::FlowAccess, RuntimeConfig},
     flow_generator::MetaAppProto,
+    platform::GenericPoller,
     policy::PolicyGetter,
     proto::trident::{IfMacSource, TapMode},
     utils::{
@@ -71,6 +72,7 @@ pub(super) struct BaseDispatcher {
     pub(super) counter: Arc<PacketCounter>,
     pub(super) terminated: Arc<AtomicBool>,
     pub(super) stats: Arc<Collector>,
+    pub(super) platform_poller: Arc<GenericPoller>,
 
     pub(super) policy_getter: PolicyGetter,
 }
@@ -222,6 +224,7 @@ impl BaseDispatcher {
             pipelines: self.pipelines.clone(),
             tap_interfaces: self.tap_interfaces.clone(),
             need_update_ebpf: self.need_update_ebpf.clone(),
+            platform_poller: self.platform_poller.clone(),
             proxy_controller_ip: Ipv4Addr::UNSPECIFIED.into(),
             analyzer_ip: Ipv4Addr::UNSPECIFIED.into(),
         }
@@ -367,6 +370,7 @@ pub(super) struct BaseDispatcherListener {
     pub pipelines: Arc<Mutex<HashMap<u32, Arc<Mutex<Pipeline>>>>>,
     pub tap_interfaces: Arc<Mutex<Vec<Link>>>,
     pub need_update_ebpf: Arc<AtomicBool>,
+    pub platform_poller: Arc<GenericPoller>,
 
     proxy_controller_ip: IpAddr,
     analyzer_ip: IpAddr,

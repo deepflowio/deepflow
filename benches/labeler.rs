@@ -1,5 +1,5 @@
-use std::rc::Rc;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::Instant;
 
 use criterion::*;
@@ -15,9 +15,8 @@ fn bench_labeler(c: &mut Criterion) {
     c.bench_function("labeler", |b| {
         b.iter_custom(|iters| {
             let mut labeler: Labeler = Default::default();
-            let mut cidr_list: Vec<Rc<Cidr>> = Vec::new();
-            let mut iface_list: Vec<Rc<PlatformData>> = Vec::new();
-
+            let mut cidr_list: Vec<Arc<Cidr>> = Vec::new();
+            let mut iface_list: Vec<Arc<PlatformData>> = Vec::new();
             let interface: PlatformData = PlatformData {
                 mac: 0x112233445566,
                 ips: vec![IpSubnet {
@@ -27,7 +26,7 @@ fn bench_labeler(c: &mut Criterion) {
                 epc_id: 10,
                 ..Default::default()
             };
-            iface_list.push(Rc::new(interface));
+            iface_list.push(Arc::new(interface));
 
             for i in 0..100 {
                 let ip = "192.168.".to_string().as_str().to_owned()
@@ -41,7 +40,7 @@ fn bench_labeler(c: &mut Criterion) {
                     ..Default::default()
                 };
 
-                cidr_list.push(Rc::new(cidr));
+                cidr_list.push(Arc::new(cidr));
             }
             labeler.update_cidr_table(&cidr_list);
             labeler.update_interface_table(&iface_list);

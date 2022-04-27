@@ -772,7 +772,6 @@ impl Collector {
                 match receiver.recv_n(QUEUE_BATCH_SIZE, Some(RCV_TIMEOUT)) {
                     Ok(acc_flows) => {
                         for flow in acc_flows {
-                            debug!("{}", flow);
                             let time_in_second = flow.tagged_flow.flow.start_time.as_secs();
                             stash.collect(flow, time_in_second);
                         }

@@ -528,6 +528,7 @@ impl Components {
                 .stats_collector(stats_collector.clone())
                 .flow_map_config(config_handler.flow())
                 .policy_getter(policy_getter)
+                .platform_poller(platform_synchronizer.clone_poller())
                 .build()
                 .unwrap();
 
