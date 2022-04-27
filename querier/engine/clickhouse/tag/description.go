@@ -255,7 +255,7 @@ func GetTagResourceValues(tag string) (map[string][]interface{}, error) {
 			"SELECT deviceid AS value,name AS display_name,devicetype AS device_type FROM deepflow.device_map WHERE devicetype in (%s)",
 			strings.Join(autoDeviceTypes, ","),
 		)
-	} else if tag == "vpc" {
+	} else if tag == "vpc" || tag == "l2_vpc" {
 		sql = "SELECT id as value,name AS display_name FROM deepflow.l3_epc_map"
 	} else if tag == "ip" {
 		sql = "SELECT ip as value,ip AS display_name FROM deepflow.ip_relation_map"
