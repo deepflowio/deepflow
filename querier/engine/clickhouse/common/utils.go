@@ -59,3 +59,11 @@ func ParsePermission(permission interface{}) ([]bool, error) {
 	}
 	return permissions, nil
 }
+
+func IPFilterStringToHex(ip string) string {
+	if strings.Contains(ip, ":") {
+		return fmt.Sprintf("hex(toIPv6(%s))", ip)
+	} else {
+		return fmt.Sprintf("hex(toIPv4(%s))", ip)
+	}
+}

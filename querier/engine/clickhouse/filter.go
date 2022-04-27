@@ -11,6 +11,7 @@ import (
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
 
+	"metaflow/querier/engine/clickhouse/common"
 	"metaflow/querier/engine/clickhouse/tag"
 	"metaflow/querier/engine/clickhouse/view"
 )
@@ -161,7 +162,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				if strings.Contains(ipValue, "/") {
 					cidrIPs = append(cidrIPs, ipValue)
 				} else {
-					ips = append(ips, ipValue)
+					ips = append(ips, common.IPFilterStringToHex(ipValue))
 				}
 			}
 			for _, cidrIP := range cidrIPs {
@@ -170,8 +171,8 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				if err != nil {
 					return nil, err
 				}
-				minIP := "'" + cidr.Masked().Range().From().String() + "'"
-				maxIP := "'" + cidr.Masked().Range().To().String() + "'"
+				minIP := common.IPFilterStringToHex("'" + cidr.Masked().Range().From().String() + "'")
+				maxIP := common.IPFilterStringToHex("'" + cidr.Masked().Range().To().String() + "'")
 				cidrFilter := ""
 				if ipOp == ">=" {
 					cidrFilter = fmt.Sprintf(tagItem.WhereTranslator, ipOp, maxIP)
