@@ -25,7 +25,7 @@ pub fn round_to_minute(t: Duration) -> Duration {
 }
 
 pub struct CollectorThread {
-    quadruple_generator: QuadrupleGeneratorThread,
+    pub quadruple_generator: QuadrupleGeneratorThread,
     l4_flow_aggr: Option<FlowAggrThread>,
     second_collector: Option<Collector>,
     minute_collector: Option<Collector>,

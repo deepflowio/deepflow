@@ -6,6 +6,8 @@ use std::sync::{
 };
 use std::thread;
 use std::time::Duration;
+
+use arc_swap::access::Access;
 use thread::JoinHandle;
 
 use log::{debug, info, warn};
@@ -21,6 +23,7 @@ use crate::common::{
     flow::{CloseType, FlowMetricsPeer, FlowSource, L7Protocol},
     tagged_flow::TaggedFlow,
 };
+use crate::config::handler::CollectorAccess;
 use crate::metric::meter::{
     AppAnomaly, AppLatency, AppMeter, AppTraffic, FlowMeter, Latency, Performance, Traffic,
 };
@@ -553,12 +556,13 @@ pub struct QuadrupleGeneratorThread {
     second_delay_seconds: u64,
     minute_delay_seconds: u64,
     possible_host_size: usize,
-    l7_metrics_enabled: bool,
+    l7_metrics_enabled: Arc<AtomicBool>,
     vtap_flow_1s_enabled: Arc<AtomicBool>,
 
     thread_handle: Option<JoinHandle<()>>,
 
     running: Arc<AtomicBool>,
+    config: CollectorAccess,
 }
 
 impl QuadrupleGeneratorThread {
@@ -574,7 +578,8 @@ impl QuadrupleGeneratorThread {
         minute_delay_seconds: u64,
         possible_host_size: usize,
         l7_metrics_enabled: bool,
-        vtap_flow_1s_enabled: Arc<AtomicBool>,
+        vtap_flow_1s_enabled: bool,
+        config: CollectorAccess,
     ) -> Self {
         let running = Arc::new(AtomicBool::new(false));
         Self {
@@ -588,10 +593,26 @@ impl QuadrupleGeneratorThread {
             second_delay_seconds,
             minute_delay_seconds,
             possible_host_size,
-            l7_metrics_enabled,
-            vtap_flow_1s_enabled: vtap_flow_1s_enabled.clone(),
+            l7_metrics_enabled: Arc::new(AtomicBool::new(l7_metrics_enabled)),
+            vtap_flow_1s_enabled: Arc::new(AtomicBool::new(vtap_flow_1s_enabled)),
             thread_handle: None,
             running,
+            config,
+        }
+    }
+
+    pub fn update_config(&self) {
+        let l7_metrics_enabled = self.config.load().l7_metrics_enabled;
+        let vtap_flow_1s_enabled = self.config.load().vtap_flow_1s_enabled;
+        if self.l7_metrics_enabled.load(Ordering::Relaxed) != l7_metrics_enabled {
+            info!("update l7_metrics_enabled to {}", l7_metrics_enabled);
+            self.l7_metrics_enabled
+                .store(l7_metrics_enabled, Ordering::Relaxed);
+        }
+        if self.vtap_flow_1s_enabled.load(Ordering::Relaxed) != vtap_flow_1s_enabled {
+            info!("update vtap_flow_1s_enabled to {}", vtap_flow_1s_enabled);
+            self.vtap_flow_1s_enabled
+                .store(vtap_flow_1s_enabled, Ordering::Relaxed);
         }
     }
 
@@ -615,7 +636,7 @@ impl QuadrupleGeneratorThread {
             self.second_delay_seconds,
             self.minute_delay_seconds,
             self.possible_host_size,
-            self.l7_metrics_enabled,
+            self.l7_metrics_enabled.clone(),
             self.vtap_flow_1s_enabled.clone(),
             self.running.clone(),
         );
@@ -652,7 +673,7 @@ pub struct QuadrupleGenerator {
     app_meter: Option<AppMeter>,
     output_flow: Option<Sender<Arc<TaggedFlow>>>,
 
-    l7_metrics_enabled: bool,
+    l7_metrics_enabled: Arc<AtomicBool>,
     vtap_flow_1s_enabled: Arc<AtomicBool>,
 
     running: Arc<AtomicBool>,
@@ -671,11 +692,11 @@ impl QuadrupleGenerator {
         minute_delay_seconds: u64,
         possible_host_size: usize,
         // traffic_setter: TrafficSetter,
-        l7_metrics_enabled: bool,
+        l7_metrics_enabled: Arc<AtomicBool>,
         vtap_flow_1s_enabled: Arc<AtomicBool>,
         running: Arc<AtomicBool>,
     ) -> Self {
-        info!("new quadruple_generator id: {}, second_delay: {}, minute_delay: {}, l7_metrics_enabled: {}, vtap_flow_1s_enabled: {}", id, second_delay_seconds, minute_delay_seconds, l7_metrics_enabled, vtap_flow_1s_enabled.load(Ordering::Relaxed));
+        info!("new quadruple_generator id: {}, second_delay: {}, minute_delay: {}, l7_metrics_enabled: {}, vtap_flow_1s_enabled: {}", id, second_delay_seconds, minute_delay_seconds, l7_metrics_enabled.load(Ordering::Relaxed), vtap_flow_1s_enabled.load(Ordering::Relaxed));
         if minute_delay_seconds < SECONDS_IN_MINUTE || minute_delay_seconds >= SECONDS_IN_MINUTE * 2
         {
             panic!("minute_delay_seconds须在[60, 120)秒内")
@@ -760,7 +781,7 @@ impl QuadrupleGenerator {
             key: QgKey::V6([0; IPV6_LRU_KEY_SIZE]),
             policy_ids: [U16Set::new(), U16Set::new()],
             flow_meter: FlowMeter::default(),
-            app_meter: if l7_metrics_enabled {
+            app_meter: if l7_metrics_enabled.load(Ordering::Relaxed) {
                 Some(AppMeter::default())
             } else {
                 None
