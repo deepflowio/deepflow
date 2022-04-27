@@ -3,8 +3,8 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use ipnet::{IpNet, Ipv4Net};
-use lru::LruCache;
 use log::debug;
+use lru::LruCache;
 
 use crate::common::endpoint::{EndpointData, EndpointStore};
 use crate::common::lookup_key::LookupKey;
