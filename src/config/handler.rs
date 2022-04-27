@@ -1173,6 +1173,14 @@ impl ConfigHandler {
                     restart_dispatcher = true;
                 }
             }
+
+            fn quadruple_generator_callback(_: &ConfigHandler, components: &mut Components) {
+                for collector in components.collectors.iter().as_ref() {
+                    collector.quadruple_generator.update_config();
+                }
+            }
+            callbacks.push(quadruple_generator_callback);
+
             info!(
                 "collector config change from {:#?} to {:#?}",
                 candidate_config.collector, new_config.collector
