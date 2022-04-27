@@ -32,7 +32,7 @@ use crate::{
     config::{handler::FlowAccess, RuntimeConfig},
     flow_generator::MetaAppProto,
     handler::{PacketHandler, PacketHandlerBuilder},
-    platform::LibvirtXmlExtractor,
+    platform::{GenericPoller, LibvirtXmlExtractor},
     policy::PolicyGetter,
     proto::{
         common::TridentType,
@@ -298,6 +298,7 @@ pub struct DispatcherBuilder {
     stats_collector: Option<Arc<Collector>>,
     flow_map_config: Option<FlowAccess>,
     policy_getter: Option<PolicyGetter>,
+    platform_poller: Option<Arc<GenericPoller>>,
 }
 
 impl DispatcherBuilder {
@@ -382,6 +383,11 @@ impl DispatcherBuilder {
 
     pub fn policy_getter(mut self, v: PolicyGetter) -> Self {
         self.policy_getter = Some(v);
+        self
+    }
+
+    pub fn platform_poller(mut self, v: Arc<GenericPoller>) -> Self {
+        self.platform_poller = Some(v);
         self
     }
 
@@ -492,6 +498,10 @@ impl DispatcherBuilder {
             policy_getter: self
                 .policy_getter
                 .ok_or(Error::ConfigIncomplete("no policy".into()))?,
+            platform_poller: self
+                .platform_poller
+                .take()
+                .ok_or(Error::ConfigIncomplete("no platform poller".into()))?,
         };
         collector.register_countable(
             "dispatcher",

@@ -18,7 +18,7 @@ use crate::{
     },
     config::RuntimeConfig,
     flow_generator::FlowMap,
-    platform::LibvirtXmlExtractor,
+    platform::{GenericPoller, LibvirtXmlExtractor, Poller},
     proto::{common::TridentType, trident::IfMacSource},
     utils::{
         bytes::read_u16_be,
@@ -278,7 +278,7 @@ impl LocalModeDispatcherListener {
         tap_mac_script: &str,
     ) -> Vec<MacAddr> {
         let mut macs = vec![];
-        let index_to_mac_map = Self::get_if_index_to_inner_mac_map();
+        let index_to_mac_map = Self::get_if_index_to_inner_mac_map(&self.base.platform_poller);
         let name_to_mac_map = self.get_if_name_to_mac_map(tap_mac_script);
 
         for iface in interfaces.iter() {
@@ -317,10 +317,14 @@ impl LocalModeDispatcherListener {
         macs
     }
 
-    fn get_if_index_to_inner_mac_map() -> HashMap<u32, MacAddr> {
+    fn get_if_index_to_inner_mac_map(poller: &GenericPoller) -> HashMap<u32, MacAddr> {
         let mut result = HashMap::new();
 
-        // TODO: sniffer entries from platform.GetMacEntries()
+        if let Some(entries) = poller.get_interface_info() {
+            for entry in entries {
+                result.insert(entry.tap_idx, entry.mac);
+            }
+        }
 
         match link_list() {
             Ok(links) => {
