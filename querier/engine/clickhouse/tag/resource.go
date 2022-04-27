@@ -343,10 +343,10 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			idTagTranslator := ""
 			nameTagTranslator := ""
 			notNullFilter := ""
-			if common.IsValueInSliceString(relatedResourceStr, []string{"pod_service", "natgw", "lb"}) {
-				deviceTypeValueStr := strconv.Itoa(DEVICE_MAP[relatedResourceStr])
-				deviceIDSuffix := "l3_device_id" + suffix
-				deviceTypeSuffix := "l3_device_type" + suffix
+			deviceIDSuffix := "l3_device_id" + suffix
+			deviceTypeSuffix := "l3_device_type" + suffix
+			deviceTypeValueStr := strconv.Itoa(DEVICE_MAP[relatedResourceStr])
+			if common.IsValueInSliceString(relatedResourceStr, []string{"natgw", "lb"}) {
 				idTagTranslator = "if(" + deviceTypeSuffix + "=" + deviceTypeValueStr + "," + deviceIDSuffix + ", 0)"
 				nameTagTranslator = "dictGet(deepflow.device_map, 'name', (toUInt64(" + deviceTypeValueStr + "),toUInt64(" + deviceIDSuffix + ")))"
 				notNullFilter = deviceIDSuffix + "!=0 AND " + deviceTypeSuffix + "=" + deviceTypeValueStr
@@ -376,6 +376,57 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 						notNullFilter,
 						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceID+" %s %s)",
 						"",
+					),
+				}
+			} else if relatedResourceStr == "pod_service" {
+				idTagTranslator = "if(" + deviceTypeSuffix + "=" + deviceTypeValueStr + "," + deviceIDSuffix + ", 0)"
+				nameTagTranslator = "dictGet(deepflow.device_map, 'name', (toUInt64(" + deviceTypeValueStr + "),toUInt64(" + deviceIDSuffix + ")))"
+				notNullFilter = deviceIDSuffix + "!=0 AND " + deviceTypeSuffix + "=" + deviceTypeValueStr
+				tagResourceMap[relatedResourceNameSuffix] = map[string]*Tag{
+					"node_type": NewTag(
+						"'"+relatedResourceStr+"'",
+						"",
+						"",
+						"",
+					),
+					"icon_id": NewTag(
+						"dictGet(deepflow.device_map, 'icon_id', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
+						"",
+						"",
+						"",
+					),
+					"default": NewTag(
+						nameTagTranslator,
+						notNullFilter,
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s)) OR ("+deviceTypeSuffix+"="+deviceTypeValueStr+")",
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s))) OR ("+deviceTypeSuffix+"="+deviceTypeValueStr+")",
+					),
+				}
+				tagResourceMap[relatedResourceIDSuffix] = map[string]*Tag{
+					"default": NewTag(
+						idTagTranslator,
+						notNullFilter,
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceID+" %s %s)) OR ("+deviceTypeSuffix+"="+deviceTypeValueStr+")",
+						"",
+					),
+				}
+			} else if relatedResourceStr == "pod_ingress" {
+				// pod_ingress关联资源包含pod_service
+				deviceTypeValueStr = strconv.Itoa(VIF_DEVICE_TYPE_POD_SERVICE)
+				tagResourceMap[relatedResourceIDSuffix] = map[string]*Tag{
+					"default": NewTag(
+						"",
+						"",
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceID+" %s %s)) OR (toUInt64("+deviceIDSuffix+") IN (SELECT pod_service_id from deepflow.ip_relation_map WHERE "+relatedResourceID+" %s %s) AND "+deviceTypeSuffix+"="+deviceTypeValueStr+")",
+						"",
+					),
+				}
+				tagResourceMap[relatedResourceNameSuffix] = map[string]*Tag{
+					"default": NewTag(
+						"",
+						"",
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s)) OR (toUInt64("+deviceIDSuffix+") IN (SELECT pod_service_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s) AND "+deviceTypeSuffix+"="+deviceTypeValueStr+")",
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s))) OR (toUInt64("+deviceIDSuffix+") IN (SELECT pod_service_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s)) AND "+deviceTypeSuffix+"="+deviceTypeValueStr+")",
 					),
 				}
 			} else {
