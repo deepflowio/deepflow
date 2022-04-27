@@ -639,9 +639,6 @@ impl Components {
             + static_config.flow.flush_interval.as_secs()
             + 5;
 
-        let vtap_flow_1s_enabled = Arc::new(AtomicBool::new(
-            runtime_config.collector.vtap_flow_1s_enabled,
-        ));
         let quadruple_generator = QuadrupleGeneratorThread::new(
             id,
             flow_receiver,
@@ -654,7 +651,8 @@ impl Components {
             minute_quadruple_tolerable_delay,
             1 << 18, // possible_host_size
             runtime_config.collector.l7_metrics_enabled,
-            vtap_flow_1s_enabled,
+            runtime_config.collector.vtap_flow_1s_enabled,
+            config_handler.collector(),
         );
 
         let mut l4_flow_aggr = None;
