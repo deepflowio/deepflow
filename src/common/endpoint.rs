@@ -160,7 +160,7 @@ impl From<L3L2End> for (bool, bool) {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct EndpointStore {
     datas: [[Arc<EndpointData>; L3L2End::Max as usize]; L3L2End::Max as usize],
 }

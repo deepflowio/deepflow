@@ -1,11 +1,10 @@
-use arr_macro::arr;
-use log::debug;
 use std::cmp::max;
 use std::net::IpAddr;
 use std::sync::Arc;
 
 use ipnet::{IpNet, Ipv4Net};
 use lru::LruCache;
+use log::debug;
 
 use crate::common::endpoint::{EndpointData, EndpointStore};
 use crate::common::lookup_key::LookupKey;
@@ -21,7 +20,7 @@ const MAX_FAST_PATH: usize = MAX_TAP_TYPE * (MAX_QUEUE_COUNT + 1);
 
 type TableLruCache = LruCache<u128, PolicyTableItem>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct PolicyTableItem {
     store: EndpointStore,
     protocol_table: [Option<Arc<PolicyData>>; MAX_ACL_PROTOCOL + 1],
@@ -35,7 +34,7 @@ pub struct FastPath {
     netmask_table: Vec<u32>,
 
     interest_table: Vec<PortRange>,
-    policy_table: Box<[Option<TableLruCache>; MAX_FAST_PATH]>,
+    policy_table: Vec<Option<TableLruCache>>,
     policy_table_flush_flags: [bool; MAX_QUEUE_COUNT + 1],
 
     map_size: usize,
@@ -367,7 +366,13 @@ impl FastPath {
             interest_table: std::iter::repeat(PortRange::new(0, 0))
                 .take(u16::MAX as usize + 1)
                 .collect(),
-            policy_table: Box::new(arr![None; 4352]),
+            policy_table: {
+                let mut table = Vec::new();
+                for _i in 0..MAX_FAST_PATH {
+                    table.push(None);
+                }
+                table
+            },
 
             policy_table_flush_flags: [false; MAX_QUEUE_COUNT + 1],
 
