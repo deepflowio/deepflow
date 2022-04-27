@@ -100,6 +100,7 @@ const (
 	HypervisorSide
 	GatewayHypervisorSide
 	GatewaySide
+	ProcessSide
 )
 
 type DirectionEnum uint8
@@ -123,6 +124,8 @@ const (
 	ServerGatewayHypervisorToClient = ServerToClient | DirectionEnum(GatewayHypervisorSide) // 服务端网关宿主机
 	ClientGatewayToServer           = ClientToServer | DirectionEnum(GatewaySide)           // 客户端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
 	ServerGatewayToClient           = ServerToClient | DirectionEnum(GatewaySide)           // 服务端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
+	ClientProcessToServer           = ClientToServer | DirectionEnum(ProcessSide)           // 客户端进程
+	ServerProcessToClient           = ServerToClient | DirectionEnum(ProcessSide)           // 服务端进程
 )
 
 func (d DirectionEnum) IsClientToServer() bool {
@@ -151,6 +154,8 @@ const (
 	ServerGatewayHypervisor = Server | TAPSideEnum(GatewayHypervisorSide)
 	ClientGateway           = Client | TAPSideEnum(GatewaySide)
 	ServerGateway           = Server | TAPSideEnum(GatewaySide)
+	ClientProcess           = Client | TAPSideEnum(ProcessSide)
+	ServerProcess           = Server | TAPSideEnum(ProcessSide)
 	Rest                    = 0
 )
 
@@ -167,6 +172,8 @@ var TAPSideEnumsString = []string{
 	ServerGatewayHypervisor: "s-gw-hv",
 	ClientGateway:           "c-gw",
 	ServerGateway:           "s-gw",
+	ClientProcess:           "c-p",
+	ServerProcess:           "s-p",
 }
 
 func (s TAPSideEnum) String() string {
