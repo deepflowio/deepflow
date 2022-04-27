@@ -247,7 +247,7 @@ pub struct Components {
     pub debugger: Debugger,
     pub pcap_manager: WorkerManager,
     pub guard: Guard,
-    pub ebpf_collector: EbpfCollector,
+    pub ebpf_collector: Option<EbpfCollector>,
     pub running: AtomicBool,
 }
 
@@ -282,7 +282,9 @@ impl Components {
         }
         self.monitor.start();
         self.guard.start();
-        self.ebpf_collector.start();
+        if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
+            ebpf_collector.start();
+        }
         info!("Started components.");
     }
 
@@ -560,7 +562,7 @@ impl Components {
         let guard = Guard::new(config_handler.environment());
 
         let ebpf_collector =
-            EbpfCollector::new(config_handler.ebpf(), policy_getter, proto_log_sender)?;
+            EbpfCollector::new(config_handler.ebpf(), policy_getter, proto_log_sender).ok();
 
         Ok(Components {
             rx_leaky_bucket,
@@ -734,7 +736,9 @@ impl Components {
         self.debugger.stop();
         self.monitor.stop();
         self.guard.stop();
-        self.ebpf_collector.stop();
+        if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
+            ebpf_collector.stop();
+        }
 
         info!("Stopped components.")
     }
