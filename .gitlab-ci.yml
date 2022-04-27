@@ -54,11 +54,6 @@ binary-x64:
     - cp src/ebpf/metaflow-ebpfctl .
     - ls
     - cargo clean
-  only:
-    - master
-    - /B_LC_RELEASE_.*/
-    - /feature-.*/
-    - deploy
   artifacts:
       paths:
         - metaflow-agent
@@ -91,4 +86,3 @@ build_image:
     - master
     - /B_LC_RELEASE_.*/
     - /feature-.*/
-    - deploy

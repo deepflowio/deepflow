@@ -525,7 +525,7 @@ impl ApiWatcher {
             }
 
             // 等待下一次timeout
-            if Self::wait_timeout(&running, &timer, context.config.load().sync_interval) {
+            if Self::ready_stop(&running, &timer, context.config.load().sync_interval) {
                 info!("kubernetes api watcher stopping");
                 // tear down
                 *watchers.lock().unwrap() = HashMap::new();
@@ -544,7 +544,7 @@ impl ApiWatcher {
 
         let sync_interval = context.config.load().sync_interval;
         // 等一等watcher，第一个tick再上报
-        while !Self::wait_timeout(&running, &timer, sync_interval) {
+        while !Self::ready_stop(&running, &timer, sync_interval) {
             Self::process(
                 &context,
                 &apiserver_version,
@@ -563,7 +563,7 @@ impl ApiWatcher {
         *watchers.lock().unwrap() = HashMap::new();
     }
 
-    fn wait_timeout(running: &Arc<Mutex<bool>>, timer: &Arc<Condvar>, interval: Duration) -> bool {
+    fn ready_stop(running: &Arc<Mutex<bool>>, timer: &Arc<Condvar>, interval: Duration) -> bool {
         let guard = running.lock().unwrap();
         if !*guard {
             return true;
