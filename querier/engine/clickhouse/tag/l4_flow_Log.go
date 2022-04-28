@@ -63,28 +63,28 @@ func GenerateL4TagMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"if(tunnel_is_ipv4, IPv4NumToString(tunnel_tx_ip4_0), IPv6NumToString(tunnel_tx_ip6_0))",
 			"",
-			"if(is_ipv4=1, IPv4NumToString(tunnel_tx_ip4_0), IPv6NumToString(tunnel_tx_ip6_0)) %s %s",
+			"if(is_ipv4=1, hex(tunnel_tx_ip4_0), hex(tunnel_tx_ip6_0)) %s %s",
 			"",
 		)}
 	l4TagMap["tunnel_tx_ip_1"] = map[string]*Tag{
 		"default": NewTag(
 			"if(tunnel_is_ipv4, IPv4NumToString(tunnel_tx_ip4_1), IPv6NumToString(tunnel_tx_ip6_1))",
 			"",
-			"if(is_ipv4=1, IPv4NumToString(tunnel_tx_ip4_1), IPv6NumToString(tunnel_tx_ip6_1)) %s %s",
+			"if(is_ipv4=1, hex(tunnel_tx_ip4_1), hex(tunnel_tx_ip6_1)) %s %s",
 			"",
 		)}
 	l4TagMap["tunnel_rx_ip_0"] = map[string]*Tag{
 		"default": NewTag(
 			"if(tunnel_is_ipv4, IPv4NumToString(tunnel_rx_ip4_0), IPv6NumToString(tunnel_rx_ip6_0))",
 			"",
-			"if(is_ipv4=1, IPv4NumToString(tunnel_rx_ip4_0), IPv6NumToString(tunnel_rx_ip6_0)) %s %s",
+			"if(is_ipv4=1, hex(tunnel_rx_ip4_0), hex(tunnel_rx_ip6_0)) %s %s",
 			"",
 		)}
 	l4TagMap["tunnel_rx_ip_1"] = map[string]*Tag{
 		"default": NewTag(
 			"if(tunnel_is_ipv4, IPv4NumToString(tunnel_rx_ip4_1), IPv6NumToString(tunnel_rx_ip6_1))",
 			"",
-			"if(is_ipv4=1, IPv4NumToString(tunnel_rx_ip4_1), IPv6NumToString(tunnel_rx_ip6_1)) %s %s",
+			"if(is_ipv4=1, hex(tunnel_rx_ip4_1), hex(tunnel_rx_ip6_1)) %s %s",
 			"",
 		)}
 	return l4TagMap
