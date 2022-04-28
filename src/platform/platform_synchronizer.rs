@@ -155,7 +155,7 @@ impl PlatformSynchronizer {
             let config_guard = self.config.load();
             let err = format!(
                 "PlatformSynchronizer has already stopped with ctrl-ip:{} vtap-id:{}",
-                config_guard.ctrl_ip, config_guard.vtap_id
+                config_guard.source_ip, config_guard.vtap_id
             );
             debug!("{}", err);
             return;
@@ -177,7 +177,7 @@ impl PlatformSynchronizer {
             let config_guard = self.config.load();
             let err = format!(
                 "PlatformSynchronizer has already running with ctrl-ip:{} vtap-id:{}",
-                config_guard.ctrl_ip, config_guard.vtap_id
+                config_guard.source_ip, config_guard.vtap_id
             );
             debug!("{}", err);
             return;
@@ -424,7 +424,7 @@ impl PlatformSynchronizer {
     ) -> Result<u64, tonic::Status> {
         let config_guard = process_args.config.load();
         let trident_type = config_guard.trident_type;
-        let ctrl_ip = config_guard.ctrl_ip;
+        let ctrl_ip = config_guard.source_ip;
         let platform_enabled = config_guard.enabled;
         drop(config_guard);
 
@@ -558,7 +558,7 @@ impl PlatformSynchronizer {
             let config_guard = args.config.load();
             let cur_vtap_id = config_guard.vtap_id;
             let trident_type = config_guard.trident_type;
-            let ctrl_ip = config_guard.ctrl_ip;
+            let ctrl_ip = config_guard.source_ip;
             let poll_interval = config_guard.sync_interval;
             drop(config_guard);
 

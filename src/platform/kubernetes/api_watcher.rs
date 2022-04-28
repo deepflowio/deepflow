@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    io::prelude::*,
     ops::Deref,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -10,6 +11,8 @@ use std::{
 };
 
 use arc_swap::access::Access;
+use flate2::write::ZlibEncoder;
+use flate2::Compression;
 use k8s_openapi::apimachinery::pkg::version::Info;
 use kube::Client;
 use log::{debug, info, warn};
@@ -49,6 +52,25 @@ const RESOURCES: [&str; 10] = [
     "ingresses",
 ];
 
+/*
+    PB_RESOURCES 和 PB_INGRESS 用于打包发送k8s信息填写的资源类型，控制器根据类型作为key进行存储, 因为Route/Ingress 可以用Ingress一起表示，
+    所以所有Ingress统一用*v1.Ingress。go里可以通过类型反射获取，然后控制器约定为key，rust还没好的方法获取，所以先手动填写，以后更新
+*/
+const PB_RESOURCES: [&str; 10] = [
+    "*v1.Node",
+    "*v1.Namespace",
+    "*v1.Service",
+    "*v1.Deployment",
+    "*v1.Pod",
+    "*v1.StatefulSet",
+    "*v1.DaemonSet",
+    "*v1.ReplicationController",
+    "*v1.ReplicaSet",
+    "*v1.Ingress",
+];
+const PB_INGRESS: &str = "*v1.Ingress";
+const PB_VERSION_INFO: &str = "*version.Info";
+
 struct Context {
     config: PlatformAccess,
     runtime: Runtime,
@@ -83,12 +105,6 @@ impl ApiWatcher {
             watchers: Arc::new(Mutex::new(HashMap::new())),
         }
     }
-
-    /*
-    pub fn set_vtap_id(&self, vtap_id: u32) {
-        self.context.vtap_id.store(vtap_id, Ordering::SeqCst);
-    }
-     */
 
     // 直接拿对应的entries
     pub fn get_watcher_entries(&self, resource_name: impl AsRef<str>) -> Option<Vec<String>> {
@@ -129,6 +145,10 @@ impl ApiWatcher {
     pub fn start(&self) {
         if self.context.config.load().kubernetes_cluster_id.is_empty() {
             info!("ApiWatcher failed to start because kubernetes-cluster-id is empty");
+            return;
+        }
+
+        if !self.context.config.load().kubernetes_api_enabled {
             return;
         }
 
@@ -186,14 +206,43 @@ impl ApiWatcher {
             }
         }
 
+        let api_version = client
+            .list_core_api_versions()
+            .await
+            .map_err(|e| Error::KubernetesApiWatcher(format!("{}", e)))?;
+
+        let (mut watchers, mut task_handles) = (HashMap::new(), vec![]);
+        let watcher_factory = ResourceWatcherFactory::new(client.clone(), runtime.handle().clone());
+        let mut ingress_groups = vec![];
+        for version in api_version.versions {
+            let core_resources = client
+                .list_core_api_resources(&version)
+                .await
+                .map_err(|e| Error::KubernetesApiWatcher(format!("{}", e)))?;
+            debug!("start to get api resources from {}", version);
+            for api_resource in core_resources.resources {
+                let resource_name = api_resource.name;
+                if !RESOURCES.iter().any(|&r| r == resource_name) {
+                    continue;
+                }
+                info!(
+                    "found {} api in group core/{}",
+                    resource_name.as_str(),
+                    version
+                );
+                if resource_name != RESOURCES[RESOURCES.len() - 1] {
+                    let index = RESOURCES.iter().position(|&r| r == resource_name).unwrap();
+                    if let Some(watcher) =
+                        watcher_factory.new_watcher(RESOURCES[index], PB_RESOURCES[index])
+                    {
+                        watchers.insert(resource_name, watcher);
+                    }
+                }
+            }
+        }
+
         match client.list_api_groups().await {
             Ok(api_groups) => {
-                let mut watchers = HashMap::new();
-                let mut ingress_groups = vec![];
-
-                let watcher_factory =
-                    ResourceWatcherFactory::new(client.clone(), runtime.handle().clone());
-
                 for group in api_groups.groups {
                     let version = match group
                         .preferred_version
@@ -232,22 +281,18 @@ impl ApiWatcher {
                         if !RESOURCES.iter().any(|&r| r == resource_name) {
                             continue;
                         }
-                        if version.group_version.as_str().contains('/') {
-                            info!(
-                                "found {} api in group {}",
-                                resource_name.as_str(),
-                                version.group_version.as_str()
-                            );
-                        } else {
-                            info!(
-                                "found {} api in group core/{}",
-                                resource_name.as_str(),
-                                version.group_version.as_str()
-                            );
-                        }
+
+                        info!(
+                            "found {} api in group {}",
+                            resource_name.as_str(),
+                            version.group_version.as_str()
+                        );
+
                         if resource_name != RESOURCES[RESOURCES.len() - 1] {
                             let index = RESOURCES.iter().position(|&r| r == resource_name).unwrap();
-                            if let Some(watcher) = watcher_factory.new_watcher(RESOURCES[index]) {
+                            if let Some(watcher) =
+                                watcher_factory.new_watcher(RESOURCES[index], PB_RESOURCES[index])
+                            {
                                 watchers.insert(resource_name, watcher);
                             }
                             continue;
@@ -256,22 +301,22 @@ impl ApiWatcher {
                     }
                 }
                 let ingress_watcher = if is_openshift_route {
-                    watcher_factory.new_watcher("routes")
+                    watcher_factory.new_watcher("routes", PB_INGRESS)
                 } else if ingress_groups
                     .iter()
                     .any(|g| g.as_str() == "networking.k8s.io/v1")
                 {
-                    watcher_factory.new_watcher("v1ingresses")
+                    watcher_factory.new_watcher("v1ingresses", PB_INGRESS)
                 } else if ingress_groups
                     .iter()
                     .any(|g| g.as_str() == "networking.k8s.io/v1beta1")
                 {
-                    watcher_factory.new_watcher("v1beta1ingresses")
+                    watcher_factory.new_watcher("v1beta1ingresses", PB_INGRESS)
                 } else if ingress_groups
                     .iter()
                     .any(|g| g.as_str() == "extensions/v1beta1")
                 {
-                    watcher_factory.new_watcher("extv1beta1ingresses")
+                    watcher_factory.new_watcher("extv1beta1ingresses", PB_INGRESS)
                 } else {
                     None
                 };
@@ -303,7 +348,6 @@ impl ApiWatcher {
                     }
                 }
 
-                let mut task_handles = vec![];
                 for watcher in watchers.values() {
                     if let Some(handle) = watcher.start() {
                         task_handles.push(handle);
@@ -318,11 +362,13 @@ impl ApiWatcher {
                 warn!("{}", err_msg);
                 err_msgs.lock().unwrap().push(err_msg);
 
-                let (mut watchers, mut task_handles) = (HashMap::new(), vec![]);
-                let watcher_factory =
-                    ResourceWatcherFactory::new(client.clone(), runtime.handle().clone());
-                for resource in RESOURCES {
-                    if let Some(watcher) = watcher_factory.new_watcher(resource) {
+                for (index, &resource) in RESOURCES.iter().enumerate() {
+                    if watchers.contains_key(resource) {
+                        continue;
+                    }
+                    if let Some(watcher) =
+                        watcher_factory.new_watcher(resource, PB_RESOURCES[index])
+                    {
                         if let Some(handle) = watcher.start() {
                             task_handles.push(handle);
                         }
@@ -331,9 +377,9 @@ impl ApiWatcher {
                 }
 
                 let ingress_watcher = if is_openshift_route {
-                    watcher_factory.new_watcher("routes")
+                    watcher_factory.new_watcher("routes", PB_INGRESS)
                 } else {
-                    watcher_factory.new_watcher("v1ingresses")
+                    watcher_factory.new_watcher("v1ingresses", PB_INGRESS)
                 };
 
                 if let Some(watcher) = ingress_watcher {
@@ -355,6 +401,7 @@ impl ApiWatcher {
         err_msgs: &Arc<Mutex<Vec<String>>>,
         watcher_versions: &mut HashMap<String, u64>,
         resource_watchers: &Arc<Mutex<HashMap<String, GenericResourceWatcher>>>,
+        encoder: &mut ZlibEncoder<Vec<u8>>,
     ) {
         let version = &context.version;
         // 将缓存的entry 上报，如果没有则跳过
@@ -362,11 +409,11 @@ impl ApiWatcher {
         {
             let mut err_msgs_guard = err_msgs.lock().unwrap();
             let resource_watchers_guard = resource_watchers.lock().unwrap();
-            for (resource, version) in watcher_versions.iter_mut() {
+            for (resource, watcher_version) in watcher_versions.iter_mut() {
                 if let Some(watcher) = resource_watchers_guard.get(resource) {
                     let new_version = watcher.version();
-                    if new_version != *version {
-                        *version = new_version;
+                    if new_version != *watcher_version {
+                        *watcher_version = new_version;
                         has_update = true;
                     }
 
@@ -378,19 +425,23 @@ impl ApiWatcher {
         }
 
         let mut total_entries = vec![];
-        let mut pb_version = None;
+        let mut pb_version = Some(version.load(Ordering::SeqCst));
         if has_update {
             version.fetch_add(1, Ordering::SeqCst);
             info!("version updated to {}", version.load(Ordering::SeqCst));
             pb_version = Some(version.load(Ordering::SeqCst));
             if let Some(i) =
-                Self::parse_apiserver_version(apiserver_version.lock().unwrap().deref())
+                Self::parse_apiserver_version(encoder, apiserver_version.lock().unwrap().deref())
             {
                 total_entries.push(i);
             }
             let resource_watchers_guard = resource_watchers.lock().unwrap();
             for watcher in resource_watchers_guard.values() {
-                total_entries.append(&mut watcher.pb_entries());
+                total_entries.append(&mut Self::pb_entries(
+                    encoder,
+                    watcher.entries(),
+                    watcher.kind(),
+                ));
             }
         }
         let mut msg = {
@@ -399,7 +450,7 @@ impl ApiWatcher {
                 cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
                 version: pb_version,
                 vtap_id: Some(config_guard.vtap_id as u32),
-                source_ip: Some(config_guard.ctrl_ip.to_string()),
+                source_ip: Some(config_guard.source_ip.to_string()),
                 error_msg: Some(
                     err_msgs
                         .lock()
@@ -440,12 +491,18 @@ impl ApiWatcher {
         // 发送一次全量
         let mut total_entries = vec![];
 
-        if let Some(i) = Self::parse_apiserver_version(apiserver_version.lock().unwrap().deref()) {
+        if let Some(i) =
+            Self::parse_apiserver_version(encoder, apiserver_version.lock().unwrap().deref())
+        {
             total_entries.push(i);
         }
         let resource_watchers_guard = resource_watchers.lock().unwrap();
         for watcher in resource_watchers_guard.values() {
-            total_entries.append(&mut watcher.pb_entries());
+            total_entries.append(&mut Self::pb_entries(
+                encoder,
+                watcher.entries(),
+                watcher.kind(),
+            ));
         }
         drop(resource_watchers_guard);
 
@@ -471,18 +528,44 @@ impl ApiWatcher {
             .ok_or(tonic::Status::not_found("rpc client not connected"))?;
 
         let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
+
         client.kubernetes_api_sync(req).await
     }
 
-    fn parse_apiserver_version(info: &Info) -> Option<KubernetesApiInfo> {
+    fn parse_apiserver_version(
+        encoder: &mut ZlibEncoder<Vec<u8>>,
+        info: &Info,
+    ) -> Option<KubernetesApiInfo> {
         serde_json::to_string(info)
             .ok()
             .map(|info| KubernetesApiInfo {
                 //FIXME：没找到好方法拿到 Info 的 type,先写死
-                r#type: Some("Info".to_string()),
-                compressed_info: Some(info.into_bytes()),
+                r#type: Some(PB_VERSION_INFO.to_string()),
+                compressed_info: {
+                    encoder.write_all(info.as_bytes()).unwrap();
+                    encoder.reset(vec![]).ok()
+                },
+
                 info: None,
             })
+    }
+
+    fn pb_entries(
+        encoder: &mut ZlibEncoder<Vec<u8>>,
+        entries: Vec<String>,
+        kind: String,
+    ) -> Vec<KubernetesApiInfo> {
+        entries
+            .into_iter()
+            .map(|entry| KubernetesApiInfo {
+                r#type: Some(kind.clone()),
+                compressed_info: {
+                    encoder.write_all(entry.as_bytes()).unwrap();
+                    encoder.reset(vec![]).ok()
+                },
+                info: None,
+            })
+            .collect::<Vec<_>>()
     }
 
     fn run(
@@ -511,7 +594,7 @@ impl ApiWatcher {
                         cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
                         version: Some(context.version.load(Ordering::SeqCst)),
                         vtap_id: Some(config_guard.vtap_id as u32),
-                        source_ip: Some(config_guard.ctrl_ip.to_string()),
+                        source_ip: Some(config_guard.source_ip.to_string()),
                         error_msg: Some(e.to_string()),
                         entries: vec![],
                     };
@@ -543,6 +626,7 @@ impl ApiWatcher {
         let resource_watchers = watchers.clone();
 
         let sync_interval = context.config.load().sync_interval;
+        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
         // 等一等watcher，第一个tick再上报
         while !Self::ready_stop(&running, &timer, sync_interval) {
             Self::process(
@@ -552,6 +636,7 @@ impl ApiWatcher {
                 &err_msgs,
                 &mut watcher_versions,
                 &resource_watchers,
+                &mut encoder,
             );
         }
         info!("kubernetes api watcher stopping");
