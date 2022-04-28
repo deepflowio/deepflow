@@ -15,7 +15,7 @@ const COMPRESSOR_PORT: u16 = 20033;
 const SEQUENCE_OFFSET: usize = 8;
 const RCV_TIMEOUT: Duration = Duration::from_secs(1);
 const ERR_INTERVAL: Duration = Duration::from_secs(30);
-const FLOW_LOG_VERSION: u32 = 20220118;
+const FLOW_LOG_VERSION: u32 = 20220128;
 const METRICS_VERSION: u32 = 20220117;
 
 pub enum SendItem {
