@@ -394,8 +394,10 @@ impl Components {
         let queue_debugger = debugger.clone_queue();
 
         // Sender/Collector
-        let dst_ip = Arc::new(Mutex::new(config_handler.candidate_config.sender.dest_ip));
-        info!("analyzer ip: {}", *dst_ip.lock().unwrap());
+        info!(
+            "static analyzer ip: {} actual analyzer ip {}",
+            static_config.analyzer_ip, candidate_config.sender.dest_ip
+        );
         let sender_id = 0usize;
         let mut l4_flow_aggr_sender = None;
         let mut l4_flow_uniform_sender = None;
@@ -416,9 +418,8 @@ impl Components {
             l4_flow_aggr_sender = Some(sender);
             l4_flow_uniform_sender = Some(UniformSenderThread::new(
                 sender_id,
-                config_handler.candidate_config.sender.vtap_id,
                 l4_flow_aggr_receiver,
-                dst_ip.clone(),
+                config_handler.sender(),
             ));
         }
 
@@ -430,12 +431,8 @@ impl Components {
             Arc::new(counter),
             vec![StatsOption::Tag("index", sender_id.to_string())],
         );
-        let metrics_uniform_sender = UniformSenderThread::new(
-            sender_id,
-            config_handler.candidate_config.sender.vtap_id,
-            metrics_receiver,
-            dst_ip.clone(),
-        );
+        let metrics_uniform_sender =
+            UniformSenderThread::new(sender_id, metrics_receiver, config_handler.sender());
 
         let sender_id = 2usize;
         let (proto_log_sender, proto_log_receiver, counter) = queue::bounded_with_debug(
@@ -448,12 +445,8 @@ impl Components {
             Arc::new(counter),
             vec![],
         );
-        let l7_flow_uniform_sender = UniformSenderThread::new(
-            sender_id,
-            config_handler.candidate_config.sender.vtap_id,
-            proto_log_receiver,
-            dst_ip,
-        );
+        let l7_flow_uniform_sender =
+            UniformSenderThread::new(sender_id, proto_log_receiver, config_handler.sender());
 
         // Dispatcher
         let bpf_syntax = bpf::Builder {
