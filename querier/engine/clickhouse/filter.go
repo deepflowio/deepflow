@@ -222,7 +222,19 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			default:
 				whereFilter = equalFilter
 			}
-		case "pod_ingress_id", "pod_ingress_id_0", "pod_ingress_id_1", "pod_ingress", "pod_ingress_0", "pod_ingress_1":
+		case "pod_service_id", "pod_service_id_0", "pod_service_id_1":
+			switch strings.ToLower(op) {
+			case "not like":
+				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "like", t.Value) + ")"
+			case "not in":
+				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value) + ")"
+			case "!=":
+				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value) + ")"
+			default:
+				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
+			}
+
+		case "pod_ingress_id", "pod_ingress_id_0", "pod_ingress_id_1", "pod_ingress", "pod_ingress_0", "pod_ingress_1", "pod_service", "pod_service_0", "pod_service_1":
 			switch strings.ToLower(op) {
 			case "regexp":
 				whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, "match", t.Value)

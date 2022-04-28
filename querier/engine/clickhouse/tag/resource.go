@@ -398,15 +398,15 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						nameTagTranslator,
 						notNullFilter,
-						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s)) OR ("+deviceTypeSuffix+"="+deviceTypeValueStr+")",
-						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s))) OR ("+deviceTypeSuffix+"="+deviceTypeValueStr+")",
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s)) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s))",
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s))) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s)))",
 					),
 				}
 				tagResourceMap[relatedResourceIDSuffix] = map[string]*Tag{
 					"default": NewTag(
 						idTagTranslator,
 						notNullFilter,
-						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceID+" %s %s)) OR ("+deviceTypeSuffix+"="+deviceTypeValueStr+")",
+						"service_id"+suffix+" %s %s",
 						"",
 					),
 				}
@@ -417,7 +417,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"",
 						"",
-						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceID+" %s %s)) OR (toUInt64("+deviceIDSuffix+") IN (SELECT pod_service_id from deepflow.ip_relation_map WHERE "+relatedResourceID+" %s %s) AND "+deviceTypeSuffix+"="+deviceTypeValueStr+")",
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceID+" %s %s)) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id from deepflow.ip_relation_map WHERE "+relatedResourceID+" %s %s))",
 						"",
 					),
 				}
@@ -425,8 +425,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"",
 						"",
-						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s)) OR (toUInt64("+deviceIDSuffix+") IN (SELECT pod_service_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s) AND "+deviceTypeSuffix+"="+deviceTypeValueStr+")",
-						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s))) OR (toUInt64("+deviceIDSuffix+") IN (SELECT pod_service_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s)) AND "+deviceTypeSuffix+"="+deviceTypeValueStr+")",
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s)) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s))",
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s))) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s)))",
 					),
 				}
 			} else {
