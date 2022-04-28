@@ -34,17 +34,23 @@ use tokio::{
     time::{self, Instant},
 };
 
-use crate::proto::trident::KubernetesApiInfo;
-
 const LIST_INTERVAL: Duration = Duration::from_secs(600);
 const REFRESH_INTERVAL: Duration = Duration::from_secs(3600);
+const MAX_EVENT_COUNT: u16 = 1024;
+
+#[derive(Default)]
+struct EventCounter {
+    applied: u16,
+    deleted: u16,
+    restarted: u16,
+}
 
 #[enum_dispatch]
 pub trait Watcher {
     fn start(&self) -> Option<JoinHandle<()>>;
     fn error(&self) -> Option<String>;
     fn entries(&self) -> Vec<String>;
-    fn pb_entries(&self) -> Vec<KubernetesApiInfo>;
+    fn kind(&self) -> String;
     fn version(&self) -> u64;
 }
 
@@ -115,17 +121,8 @@ where
         self.err_msg.lock().unwrap().take()
     }
 
-    fn pb_entries(&self) -> Vec<KubernetesApiInfo> {
-        self.entries
-            .lock()
-            .unwrap()
-            .values()
-            .map(|entry| KubernetesApiInfo {
-                r#type: Some(self.kind.to_string()),
-                compressed_info: Some(Vec::from(entry.as_bytes())),
-                info: None,
-            })
-            .collect::<Vec<_>>()
+    fn kind(&self) -> String {
+        self.kind.to_string()
     }
 
     fn entries(&self) -> Vec<String> {
@@ -162,6 +159,8 @@ where
         kind: &'static str,
         err_msg: Arc<Mutex<Option<String>>>,
     ) {
+        Self::get_list_entry(&entries, &version, kind, &api, &err_msg).await;
+
         let ticker = time::sleep(LIST_INTERVAL);
         tokio::pin!(ticker);
 
@@ -169,6 +168,8 @@ where
 
         let mut last_update = SystemTime::now();
         let mut last_refresh = SystemTime::now();
+
+        let mut event_counter = EventCounter::default();
 
         loop {
             // 当 `select!` 执行的时候， 多个通道有待处理的消息，只有一个通道有一个值弹出。所有其他通道保持不变，
@@ -184,6 +185,7 @@ where
                         &version,
                         kind,
                         &err_msg,
+                        &mut event_counter
                     );
                 }
                 _ = &mut ticker => {
@@ -212,6 +214,11 @@ where
     ) {
         match api.list(&ListParams::default()).await {
             Ok(object_list) => {
+                info!(
+                    "k8s {} watcher list entry.len={}",
+                    kind,
+                    object_list.items.len()
+                );
                 // 检查内存和List API查询结果是否一致
                 let entries_lock = entries.lock().unwrap();
                 if object_list.items.len() == entries_lock.len() {
@@ -273,15 +280,18 @@ where
         version: &Arc<AtomicU64>,
         kind: &'static str,
         err_msg: &Arc<Mutex<Option<String>>>,
+        event_counter: &mut EventCounter,
     ) {
         match maybe_event {
             Ok(Some(event)) => {
                 match event {
                     Event::Applied(object) => {
+                        event_counter.applied += 1;
                         Self::insert_object(object, entries, version, kind);
                     }
                     Event::Deleted(object) => {
                         if let Some(uid) = object.meta().uid.as_ref() {
+                            event_counter.deleted += 1;
                             // 只有删除时检查是否需要更新版本号，其余消息直接更新map内容
                             if entries.lock().unwrap().remove(uid).is_some() {
                                 version.fetch_add(1, Ordering::SeqCst);
@@ -292,9 +302,29 @@ where
                     // restarted 存储的是某个key对应的object在重启过程中不同状态
                     Event::Restarted(mut objects) => {
                         if let Some(object) = objects.pop() {
+                            event_counter.restarted += 1;
                             Self::insert_object(object, entries, version, kind);
                         }
                     }
+                }
+                if event_counter.applied >= MAX_EVENT_COUNT {
+                    info!(
+                        "k8s {} watcher has {} applied events",
+                        kind, event_counter.applied
+                    );
+                    event_counter.applied = 0;
+                } else if event_counter.deleted >= MAX_EVENT_COUNT {
+                    info!(
+                        "k8s {}  watcher has {} deleted events",
+                        kind, event_counter.deleted
+                    );
+                    event_counter.deleted = 0;
+                } else if event_counter.restarted >= MAX_EVENT_COUNT {
+                    info!(
+                        "k8s {}  watcher has {} restarted events",
+                        kind, event_counter.restarted
+                    );
+                    event_counter.restarted = 0;
                 }
                 *last_update = SystemTime::now();
             }
@@ -328,15 +358,18 @@ where
     }
 
     fn insert_object(
-        mut object: K,
+        object: K,
         entries: &Arc<Mutex<HashMap<String, String>>>,
         version: &Arc<AtomicU64>,
         kind: &str,
     ) {
-        if let Some(uid) = object.meta_mut().uid.take() {
+        if let Some(uid) = object.meta().uid.as_ref() {
             match serde_json::to_string(&object) {
                 Ok(serialized_object) => {
-                    entries.lock().unwrap().insert(uid, serialized_object);
+                    entries
+                        .lock()
+                        .unwrap()
+                        .insert(uid.clone(), serialized_object);
                     version.fetch_add(1, Ordering::SeqCst);
                 }
                 Err(e) => debug!(
@@ -357,77 +390,70 @@ impl ResourceWatcherFactory {
     pub fn new(client: Client, runtime: Handle) -> Self {
         Self { client, runtime }
     }
-    pub fn new_watcher(&self, resource: &'static str) -> Option<GenericResourceWatcher> {
+
+    pub fn new_watcher(
+        &self,
+        resource: &'static str,
+        kind: &'static str,
+    ) -> Option<GenericResourceWatcher> {
         match resource {
             "nodes" => Some(GenericResourceWatcher::Node(ResourceWatcher::new(
                 Api::all(self.client.clone()),
-                resource,
+                kind,
                 self.runtime.clone(),
             ))),
             "namespaces" => Some(GenericResourceWatcher::Namespace(ResourceWatcher::new(
                 Api::all(self.client.clone()),
-                resource,
+                kind,
                 self.runtime.clone(),
             ))),
             "services" => Some(GenericResourceWatcher::Service(ResourceWatcher::new(
                 Api::all(self.client.clone()),
-                resource,
+                kind,
                 self.runtime.clone(),
             ))),
             "deployments" => Some(GenericResourceWatcher::Deployment(ResourceWatcher::new(
                 Api::all(self.client.clone()),
-                resource,
+                kind,
                 self.runtime.clone(),
             ))),
             "pods" => Some(GenericResourceWatcher::Pod(ResourceWatcher::new(
                 Api::all(self.client.clone()),
-                resource,
+                kind,
                 self.runtime.clone(),
             ))),
             "statefulsets" => Some(GenericResourceWatcher::StatefulSet(ResourceWatcher::new(
                 Api::all(self.client.clone()),
-                resource,
+                kind,
                 self.runtime.clone(),
             ))),
             "daemonsets" => Some(GenericResourceWatcher::DaemonSet(ResourceWatcher::new(
                 Api::<DaemonSet>::all(self.client.clone()),
-                resource,
+                kind,
                 self.runtime.clone(),
             ))),
             "replicationcontrollers" => Some(GenericResourceWatcher::ReplicationController(
-                ResourceWatcher::new(
-                    Api::all(self.client.clone()),
-                    resource,
-                    self.runtime.clone(),
-                ),
+                ResourceWatcher::new(Api::all(self.client.clone()), kind, self.runtime.clone()),
             )),
             "replicasets" => Some(GenericResourceWatcher::ReplicaSet(ResourceWatcher::new(
                 Api::all(self.client.clone()),
-                resource,
+                kind,
                 self.runtime.clone(),
             ))),
             "v1ingresses" => Some(GenericResourceWatcher::V1Ingress(ResourceWatcher::new(
                 Api::all(self.client.clone()),
-                resource,
+                kind,
                 self.runtime.clone(),
             ))),
             "v1beta1ingresses" => Some(GenericResourceWatcher::V1beta1Ingress(
-                ResourceWatcher::new(
-                    Api::all(self.client.clone()),
-                    resource,
-                    self.runtime.clone(),
-                ),
+                ResourceWatcher::new(Api::all(self.client.clone()), kind, self.runtime.clone()),
             )),
             "extv1beta1ingresses" => Some(GenericResourceWatcher::ExtV1beta1Ingress(
-                ResourceWatcher::new(
-                    Api::all(self.client.clone()),
-                    resource,
-                    self.runtime.clone(),
-                ),
+                ResourceWatcher::new(Api::all(self.client.clone()), kind, self.runtime.clone()),
             )),
             "routes" => Some(GenericResourceWatcher::Route(ResourceWatcher::new(
                 Api::all(self.client.clone()),
-                resource,
+                kind,
                 self.runtime.clone(),
             ))),
             _ => None,

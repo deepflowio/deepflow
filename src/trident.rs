@@ -82,7 +82,7 @@ impl Trident {
 
         let config = Config::load_from_file(config_path)?;
 
-        let mut logger = Logger::try_with_str("info")?
+        let mut logger = Logger::try_with_str(config.log_level.as_str().to_lowercase())?
             .format_for_files(colored_opt_format)
             .log_to_file(FileSpec::try_from(&config.log_file)?)
             .rotate(Criterion::Age(Age::Day), Naming::Timestamps, Cleanup::Never)
@@ -133,14 +133,16 @@ impl Trident {
             false,
         );
 
+        let mut config_handler = ConfigHandler::new(config, ctrl_ip, ctrl_mac, logger_handle);
+
         let synchronizer = Arc::new(Synchronizer::new(
             session.clone(),
             state.clone(),
             revision.clone(),
             ctrl_ip.to_string(),
             ctrl_mac.to_string(),
-            config.vtap_group_id_request.clone(),
-            config.kubernetes_cluster_id.clone(),
+            config_handler.static_config.vtap_group_id_request.clone(),
+            config_handler.static_config.kubernetes_cluster_id.clone(),
             policy_setter,
         ));
         stats_collector.register_countable("synchronizer", synchronizer.clone(), vec![]);
@@ -148,7 +150,6 @@ impl Trident {
 
         let (state, cond) = &*state;
         let mut state_guard = state.lock().unwrap();
-        let mut config_handler = ConfigHandler::new(config, ctrl_ip, ctrl_mac, logger_handle);
         let mut components: Option<Components> = None;
 
         loop {
@@ -185,10 +186,6 @@ impl Trident {
                     continue;
                 }
             };
-
-            if new_conf != config_handler.candidate_config {
-                info!("Update runtime config: {:#?}", new_conf);
-            }
 
             let callbacks = config_handler.on_config(new_conf);
             match components.as_mut() {
@@ -252,7 +249,7 @@ pub struct Components {
 }
 
 impl Components {
-    pub fn start(&mut self) {
+    fn start(&mut self) {
         info!("Staring components.");
         if self.running.swap(true, Ordering::Relaxed) {
             return;
@@ -326,7 +323,13 @@ impl Components {
 
         // TODO: collector enabled
         // TODO: packet handler builders
+
         let libvirt_xml_extractor = Arc::new(LibvirtXmlExtractor::new());
+        let platform_synchronizer = PlatformSynchronizer::new(
+            config_handler.platform(),
+            session.clone(),
+            libvirt_xml_extractor.clone(),
+        );
 
         let (pcap_sender, pcap_receiver, _) =
             queue::bounded(config_handler.candidate_config.pcap.queue_size as usize);
@@ -335,12 +338,6 @@ impl Components {
             config_handler.pcap(),
             vec![pcap_receiver],
             stats_collector.clone(),
-        );
-
-        let platform_synchronizer = PlatformSynchronizer::new(
-            config_handler.platform(),
-            session.clone(),
-            libvirt_xml_extractor.clone(),
         );
 
         let api_watcher = Arc::new(ApiWatcher::new(config_handler.platform(), session.clone()));
@@ -697,7 +694,7 @@ impl Components {
         )
     }
 
-    pub fn stop(&mut self) {
+    fn stop(&mut self) {
         info!("Stopping components.");
 
         if !self.running.swap(false, Ordering::Relaxed) {
