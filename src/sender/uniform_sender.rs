@@ -2,15 +2,17 @@ use std::io::{ErrorKind, Write};
 use std::net::{IpAddr, Shutdown, TcpStream};
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
-    Arc, Mutex,
+    Arc,
 };
 use std::thread;
 use std::time::Duration;
+
+use arc_swap::access::Access;
+use log::{debug, info, warn};
 use thread::JoinHandle;
 
-use log::{debug, info, warn};
-
 use super::{SendItem, SendMessageType};
+use crate::config::handler::SenderAccess;
 use crate::utils::{
     queue::{Error, Receiver},
     stats::{Countable, Counter, CounterType, CounterValue},
@@ -136,9 +138,8 @@ impl Encoder {
 
 pub struct UniformSenderThread {
     id: usize,
-    vtap_id: u16,
     input: Arc<Receiver<SendItem>>,
-    dst_ip: Arc<Mutex<IpAddr>>,
+    config: SenderAccess,
 
     thread_handle: Option<JoinHandle<()>>,
 
@@ -146,18 +147,12 @@ pub struct UniformSenderThread {
 }
 
 impl UniformSenderThread {
-    pub fn new(
-        id: usize,
-        vtap_id: u16,
-        input: Receiver<SendItem>,
-        dst_ip: Arc<Mutex<IpAddr>>,
-    ) -> Self {
+    pub fn new(id: usize, input: Receiver<SendItem>, config: SenderAccess) -> Self {
         let running = Arc::new(AtomicBool::new(false));
         Self {
             id,
-            vtap_id,
             input: Arc::new(input),
-            dst_ip: dst_ip.clone(),
+            config,
             thread_handle: None,
             running,
         }
@@ -174,9 +169,8 @@ impl UniformSenderThread {
 
         let mut uniform_sender = UniformSender::new(
             self.id,
-            self.vtap_id,
             self.input.clone(),
-            self.dst_ip.clone(),
+            self.config.clone(),
             self.running.clone(),
         );
         self.thread_handle = Some(thread::spawn(move || uniform_sender.process()));
@@ -207,8 +201,8 @@ pub struct UniformSender {
     encoder: Encoder,
     last_flush: Duration,
 
-    dst_ip_new: Arc<Mutex<IpAddr>>,
     dst_ip: IpAddr,
+    config: SenderAccess,
     reconnect: bool,
 
     running: Arc<AtomicBool>,
@@ -221,19 +215,18 @@ impl UniformSender {
 
     pub fn new(
         id: usize,
-        vtap_id: u16,
         input: Arc<Receiver<SendItem>>,
-        dst_ip: Arc<Mutex<IpAddr>>,
+        config: SenderAccess,
         running: Arc<AtomicBool>,
     ) -> Self {
         Self {
             id,
             input,
             counter: SenderCounter::default(),
-            encoder: Encoder::new(0, SendMessageType::TaggedFlow, vtap_id),
+            encoder: Encoder::new(0, SendMessageType::TaggedFlow, config.load().vtap_id),
             last_flush: Duration::ZERO,
-            dst_ip_new: dst_ip.clone(),
-            dst_ip: *dst_ip.lock().unwrap(),
+            dst_ip: config.load().dest_ip,
+            config,
             tcp_stream: None,
             reconnect: false,
             running,
@@ -241,9 +234,14 @@ impl UniformSender {
     }
 
     fn update_dst_ip(&mut self) {
-        if self.dst_ip != *self.dst_ip_new.lock().unwrap() {
+        if self.dst_ip != self.config.load().dest_ip {
+            info!(
+                "update dst ip from {} to {}",
+                self.dst_ip,
+                self.config.load().dest_ip
+            );
             self.reconnect = true;
-            self.dst_ip = *self.dst_ip_new.lock().unwrap();
+            self.dst_ip = self.config.load().dest_ip;
         }
     }
 
