@@ -523,7 +523,7 @@ impl Synchronizer {
         static_config: &Arc<StaticConfig>,
         status: &Arc<RwLock<Status>>,
         dispatcher_listener: &Arc<Mutex<Option<DispatcherListener>>>,
-        flow_acl_listener: &Arc<sync::Mutex<Vec<Box<dyn FlowAclListener>>>>,
+        _flow_acl_listener: &Arc<sync::Mutex<Vec<Box<dyn FlowAclListener>>>>,
         max_memory: &Arc<AtomicU64>,
     ) {
         // TODO: reset escape timer
@@ -564,9 +564,10 @@ impl Synchronizer {
             listener.on_config_change(&runtime_config);
         }
 
-        let mut blacklist = vec![];
+        let mut _blacklist = vec![];
         let (_segments, macs) = Self::parse_segment(static_config.tap_mode, &resp);
 
+        /* 这段代码在容器环境下会死锁
         let mut status = status.write();
         let updated_platform = status.get_platform_data(&resp);
         if updated_platform {
@@ -593,6 +594,7 @@ impl Synchronizer {
                 0,
             );
         }
+         */
 
         // TODO: bridge forward
         // TODO: check trisolaris
@@ -605,7 +607,7 @@ impl Synchronizer {
                 static_config.tap_mode,
                 &runtime_config,
                 &macs,
-                &blacklist,
+                &_blacklist,
             );
         }
 

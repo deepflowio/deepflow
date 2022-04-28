@@ -139,8 +139,9 @@ pub struct PlatformConfig {
     pub enabled: bool,
     pub ingress_flavour: IngressFlavour,
     pub trident_type: TridentType,
-    pub ctrl_ip: IpAddr,
+    pub source_ip: IpAddr,
     pub epc_id: u32,
+    pub kubernetes_api_enabled: bool,
 }
 
 #[derive(Clone, PartialEq, Debug, Eq)]
@@ -449,8 +450,9 @@ impl Default for NewRuntimeConfig {
                 enabled: false,
                 ingress_flavour: IngressFlavour::Kubernetes,
                 trident_type,
-                ctrl_ip: default_ip,
+                source_ip: default_ip,
                 epc_id: 0,
+                kubernetes_api_enabled: false,
             },
             flow: {
                 FlowConfig {
@@ -793,7 +795,7 @@ impl ConfigHandler {
                 if_mac_source: conf.if_mac_source(),
                 analyzer_ip: dest_ip,
                 proxy_controller_ip: if conf.proxy_controller_ip().is_empty() {
-                    candidate_config.dispatcher.proxy_controller_ip
+                    static_config.controller_ips[0].parse::<IpAddr>().unwrap()
                 } else {
                     conf.proxy_controller_ip()
                         .parse()
@@ -857,8 +859,9 @@ impl ConfigHandler {
                 enabled: conf.platform_enabled(),
                 ingress_flavour: static_config.ingress_flavour,
                 trident_type: conf.trident_type(),
-                ctrl_ip: static_config.controller_ips[0].parse().unwrap(),
+                source_ip: self.ctrl_ip,
                 epc_id: conf.epc_id(),
+                kubernetes_api_enabled: conf.kubernetes_api_enabled(),
             },
             flow: {
                 let flow_config = &self.static_config.flow;
@@ -1075,6 +1078,7 @@ impl ConfigHandler {
                     Err(e) => warn!("failed to set log_level: {}", e),
                 }
             }
+            candidate_config.log = new_config.log;
             //TODO Rsyslog stuff
         }
 
@@ -1119,8 +1123,12 @@ impl ConfigHandler {
                     candidate_config.environment.max_memory = 0;
                 }
             }
+            info!(
+                "environment config change from {:#?} to {:#?}",
+                candidate_config.environment, new_config.environment
+            );
 
-            //TODO CHANGE process stuff
+            candidate_config.environment = new_config.environment;
         }
 
         if candidate_config.global_pps_threshold != new_config.global_pps_threshold {
@@ -1189,16 +1197,28 @@ impl ConfigHandler {
         }
 
         if candidate_config.platform != new_config.platform {
-            info!(
-                "platform config change from {:#?} to {:#?}",
-                candidate_config.platform, new_config.platform
-            );
+            if candidate_config.platform.enabled != new_config.platform.enabled {
+                info!("Platform enabled set to {}", new_config.platform.enabled);
+            }
+            if candidate_config.platform.kubernetes_api_enabled
+                != new_config.platform.kubernetes_api_enabled
+            {
+                info!(
+                    "Kubernetes API enabled set to {}",
+                    new_config.platform.kubernetes_api_enabled
+                );
+            }
             candidate_config.platform = new_config.platform;
             fn platform_callback(handler: &ConfigHandler, components: &mut Components) {
                 if is_tt_pod(handler.candidate_config.platform.trident_type) {
                     components.platform_synchronizer.start_kubernetes_poller();
                 } else {
                     components.platform_synchronizer.stop_kubernetes_poller();
+                }
+                if handler.candidate_config.platform.kubernetes_api_enabled {
+                    components.api_watcher.start();
+                } else {
+                    components.api_watcher.stop();
                 }
             }
             callbacks.push(platform_callback);
@@ -1297,27 +1317,21 @@ impl ConfigHandler {
             candidate_config.stats = new_config.stats;
         }
 
-        if candidate_config.log != new_config.log {
-            info!(
-                "log config change from {:#?} to {:#?}",
-                candidate_config.log, new_config.log
-            );
-            candidate_config.log = new_config.log;
+        if restart_dispatcher {
+            fn dispatcher_callback(_: &ConfigHandler, components: &mut Components) {
+                for dispatcher in components.dispatchers.iter() {
+                    dispatcher.stop();
+                }
+                for dispatcher in components.dispatchers.iter() {
+                    dispatcher.start();
+                }
+            }
+            callbacks.push(dispatcher_callback);
         }
 
         // deploy updated config
         self.current_config
             .store(Arc::new(candidate_config.clone()));
-
-        if restart_dispatcher {
-            fn dispatcher_callback(_: &ConfigHandler, components: &mut Components) {
-                info!("Restarting components");
-                components.stop();
-                components.start();
-                info!("Restarted components");
-            }
-            callbacks.push(dispatcher_callback);
-        }
 
         callbacks
     }
