@@ -155,7 +155,7 @@ func (e *CHEngine) TransWhere(node *sqlparser.Where) error {
 	// 生成where的statement
 	whereStmt := Where{time: e.Model.Time}
 	// 解析ast树并生成view.Node结构
-	expr, err := e.parseWhere(node.Expr, &whereStmt)
+	expr, err := e.parseWhere(node.Expr, &whereStmt, false)
 	filter := view.Filters{Expr: expr}
 	whereStmt.filter = &filter
 	e.Statements = append(e.Statements, &whereStmt)
@@ -166,7 +166,12 @@ func (e *CHEngine) TransHaving(node *sqlparser.Where) error {
 	// 生成having的statement
 	havingStmt := Having{Where{}}
 	// 解析ast树并生成view.Node结构
-	expr, err := e.parseWhere(node.Expr, &havingStmt.Where)
+	// having中的metric需要在trans之前确定是否分层，所以需要提前遍历
+	_, err := e.parseWhere(node.Expr, &havingStmt.Where, true)
+	if err != nil {
+		return err
+	}
+	expr, err := e.parseWhere(node.Expr, &havingStmt.Where, false)
 	filter := view.Filters{Expr: expr}
 	havingStmt.filter = &filter
 	e.Statements = append(e.Statements, &havingStmt)
@@ -466,39 +471,39 @@ func (e *CHEngine) SetLevelFlag(flag int) {
 	}
 }
 
-func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where) (view.Node, error) {
+func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view.Node, error) {
 	switch node := node.(type) {
 	case *sqlparser.AndExpr:
-		left, err := e.parseWhere(node.Left, w)
+		left, err := e.parseWhere(node.Left, w, isCheck)
 		if err != nil {
 			return left, err
 		}
-		right, err := e.parseWhere(node.Right, w)
+		right, err := e.parseWhere(node.Right, w, isCheck)
 		if err != nil {
 			return right, err
 		}
 		op := view.Operator{Type: view.AND}
 		return &view.BinaryExpr{Left: left, Right: right, Op: &op}, nil
 	case *sqlparser.OrExpr:
-		left, err := e.parseWhere(node.Left, w)
+		left, err := e.parseWhere(node.Left, w, isCheck)
 		if err != nil {
 			return left, err
 		}
-		right, err := e.parseWhere(node.Right, w)
+		right, err := e.parseWhere(node.Right, w, isCheck)
 		if err != nil {
 			return right, err
 		}
 		op := view.Operator{Type: view.OR}
 		return &view.BinaryExpr{Left: left, Right: right, Op: &op}, nil
 	case *sqlparser.NotExpr:
-		expr, err := e.parseWhere(node.Expr, w)
+		expr, err := e.parseWhere(node.Expr, w, isCheck)
 		if err != nil {
 			return expr, err
 		}
 		op := view.Operator{Type: view.NOT}
 		return &view.UnaryExpr{Op: &op, Expr: expr}, nil
 	case *sqlparser.ParenExpr: // 括号
-		expr, err := e.parseWhere(node.Expr, w)
+		expr, err := e.parseWhere(node.Expr, w, isCheck)
 		if err != nil {
 			return expr, err
 		}
@@ -514,6 +519,9 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where) (view.Node, error) 
 			function, err := e.parseSelectBinaryExpr(expr)
 			if err != nil {
 				return nil, err
+			}
+			if isCheck {
+				return nil, nil
 			}
 			outfunc := function.Trans(e.Model)
 			stmt := &WhereFunction{Function: outfunc, Value: sqlparser.String(node.Right)}
