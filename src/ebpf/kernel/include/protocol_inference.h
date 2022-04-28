@@ -180,8 +180,8 @@ static __inline enum message_type infer_http_message(const char *buf,
 	}
 	// HTTP/1.1 200 OK\r\n (HTTP response is 17 characters)
 	// GET x HTTP/1.1\r\n (HTTP response is 16 characters)
-
-	if (count < 16) {
+	// MAY be without "OK", ref:https://www.rfc-editor.org/rfc/rfc7231
+	if (count < 14) {
 		return MSG_UNKNOWN;
 	}
 
