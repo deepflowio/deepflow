@@ -1,6 +1,7 @@
 stages:
   - verify
   - package
+  - docker
 
 verify-x64:
   stage: verify
@@ -25,6 +26,21 @@ package-x64:
   artifacts:
     paths:
     - x86_64/droplet*.rpm
+  only:
+    - master
+    - /B_LC_RELEASE_.*/
+    - /feature-.*/
+
+
+docker-multi-platform:
+  stage: docker 
+  tags:
+    - docker
+  variables:
+    VERSION: "echo $${CI_COMMIT_REF_NAME//B_LC_RELEASE_} | tr '_' '.' | sed 's/master/latest/'"
+    RELEASE: "/usr/bin/git rev-list --count HEAD"
+  script:
+    - ~/build-deepflow droplet $(eval $VERSION)  $(pwd) 
   only:
     - master
     - /B_LC_RELEASE_.*/
