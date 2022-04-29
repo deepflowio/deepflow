@@ -1,7 +1,6 @@
 stages:
   - verify
   - package
-  - docker
 
 verify-x64:
   stage: verify
@@ -33,7 +32,7 @@ package-x64:
 
 
 docker-multi-platform:
-  stage: docker 
+  stage: package
   tags:
     - docker
   variables:
