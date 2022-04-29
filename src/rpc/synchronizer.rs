@@ -49,7 +49,7 @@ impl Default for StaticConfig {
     fn default() -> Self {
         Self {
             revision: Default::default(),
-            boot_time: SystemTime::UNIX_EPOCH,
+            boot_time: SystemTime::now(),
             tap_mode: Default::default(),
             vtap_group_id_request: Default::default(),
             kubernetes_cluster_id: Default::default(),
