@@ -3,7 +3,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use ipnet::{IpNet, Ipv4Net};
-use log::debug;
+use log::{debug, info};
 use lru::LruCache;
 
 use crate::common::endpoint::{EndpointData, EndpointStore};
@@ -229,6 +229,21 @@ impl FastPath {
     fn interest_table_map(&self, key: &mut LookupKey) {
         key.src_port = self.interest_table[key.src_port as usize].min();
         key.dst_port = self.interest_table[key.dst_port as usize].min();
+    }
+
+    pub fn update_map_size(&mut self, map_size: usize) {
+        if self.map_size == map_size {
+            return;
+        }
+        info!(
+            "fastpath map size change from {} to {}",
+            self.map_size, map_size
+        );
+        self.map_size = map_size;
+
+        for i in 0..self.queue_count {
+            self.policy_table_flush_flags[i] = true
+        }
     }
 
     fn table_flush_check(&mut self, key: &LookupKey) -> bool {

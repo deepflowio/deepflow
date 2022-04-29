@@ -244,7 +244,7 @@ pub struct Components {
     pub debugger: Debugger,
     pub pcap_manager: WorkerManager,
     pub guard: Guard,
-    pub ebpf_collector: Option<EbpfCollector>,
+    pub ebpf_collector: Option<Box<EbpfCollector>>,
     pub running: AtomicBool,
 }
 
@@ -554,6 +554,13 @@ impl Components {
 
         let ebpf_collector =
             EbpfCollector::new(config_handler.ebpf(), policy_getter, proto_log_sender).ok();
+        if let Some(collector) = &ebpf_collector {
+            stats_collector.register_countable(
+                "ebpf-collector",
+                Arc::new(collector.get_sync_counter()),
+                vec![],
+            );
+        }
 
         Ok(Components {
             rx_leaky_bucket,

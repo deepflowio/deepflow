@@ -391,7 +391,9 @@ impl AppProtoLogsData {
     }
 
     pub fn flow_session_id(&self) -> u64 {
-        self.base_info.flow_id << 32 | self.special_info.session_id() as u64
+        self.base_info.flow_id << 32
+            | (self.base_info.head.proto as u64) << 24
+            | self.special_info.session_id() as u64
     }
 
     pub fn session_merge(&mut self, log: AppProtoLogsData) {

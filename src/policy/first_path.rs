@@ -27,6 +27,10 @@ impl FirstPath {
         }
     }
 
+    pub fn update_map_size(&mut self, map_size: usize) {
+        self.fast.update_map_size(map_size)
+    }
+
     pub fn update_interfaces(&mut self, ifaces: &Vec<Arc<PlatformData>>) {
         self.fast.generate_mask_from_interface(ifaces);
     }
