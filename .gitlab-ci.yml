@@ -54,7 +54,6 @@ docker-x64:
     VERSION: "echo $${CI_COMMIT_REF_NAME//B_LC_RELEASE_} | tr '_' '.' | sed 's/master/latest/'"
     RELEASE: "/usr/bin/git rev-list --count HEAD"
   script:
-    - make
     - docker build -t docker-hosted.nexus.yunshan.net/droplet:$(eval $VERSION) ./
     - docker build -t docker-hosted.nexus.yunshan.net/droplet:$(eval $VERSION).$(eval $RELEASE) ./
     - docker push docker-hosted.nexus.yunshan.net/droplet:$(eval $VERSION)
