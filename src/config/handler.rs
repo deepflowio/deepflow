@@ -23,6 +23,7 @@ use crate::proto::trident::IfMacSource;
 use crate::{
     common::decapsulate::{TunnelType, TunnelTypeBitmap},
     dispatcher::recv_engine::{self, bpf, OptTpacketVersion},
+    ebpf::CAP_LEN_MAX,
     flow_generator::{FlowTimeout, TcpTimeout},
     proto::trident::{self, CaptureSocketType},
     proto::{
@@ -282,6 +283,7 @@ pub struct EbpfConfig {
     pub epc_id: u32,
     pub l7_log_session_timeout: Duration,
     pub log_path: String,
+    pub l7_log_packet_size: usize,
 }
 
 // Span/Trace 共用一套TypeMap
@@ -500,6 +502,7 @@ impl Default for NewRuntimeConfig {
                 epc_id: 0,
                 l7_log_session_timeout: Duration::from_secs(120),
                 log_path: "".to_string(),
+                l7_log_packet_size: CAP_LEN_MAX,
             },
         };
         conf.collector.l4_log_store_tap_types[u16::from(TapType::Isp(2)) as usize] = true;
@@ -956,6 +959,7 @@ impl ConfigHandler {
                 epc_id: conf.epc_id(),
                 l7_log_session_timeout: static_config.l7_log_session_aggr_timeout,
                 log_path: static_config.ebpf_log_file.clone(),
+                l7_log_packet_size: CAP_LEN_MAX.min(conf.l7_log_packet_size() as usize),
             },
         };
         config.validate()?;
