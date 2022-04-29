@@ -19,7 +19,10 @@ use crate::flow_generator::{
 };
 use crate::policy::PolicyGetter;
 use crate::sender::SendItem;
-use crate::utils::queue::{bounded, DebugSender, Receiver, Sender};
+use crate::utils::{
+    queue::{bounded, DebugSender, Receiver, Sender},
+    stats::{Countable, Counter, CounterType, CounterValue},
+};
 
 type LoggerItem = (L7Protocol, Box<dyn L7LogParse>);
 
@@ -226,6 +229,57 @@ impl FlowItem {
     }
 }
 
+pub struct EbpfCounter {
+    rx: u64,
+    tx: u64,
+    unknown_protocol: u64,
+}
+
+impl EbpfCounter {
+    fn reset(&mut self) {
+        self.rx = 0;
+        self.tx = 0;
+        self.unknown_protocol = 0;
+    }
+}
+
+pub struct SyncEbpfCounter {
+    counter: *mut EbpfCounter,
+}
+
+impl SyncEbpfCounter {
+    fn counter(&self) -> &mut EbpfCounter {
+        unsafe { &mut *self.counter }
+    }
+}
+
+unsafe impl Send for SyncEbpfCounter {}
+unsafe impl Sync for SyncEbpfCounter {}
+
+impl Countable for SyncEbpfCounter {
+    fn get_counters(&self) -> Vec<Counter> {
+        let (rx, tx, unknow) = (
+            self.counter().rx,
+            self.counter().tx,
+            self.counter().unknown_protocol,
+        );
+        self.counter().reset();
+        vec![
+            ("in", CounterType::Counted, CounterValue::Unsigned(rx)),
+            ("out", CounterType::Counted, CounterValue::Unsigned(tx)),
+            (
+                "unknown_protocol",
+                CounterType::Counted,
+                CounterValue::Unsigned(unknow),
+            ),
+        ]
+    }
+    // EbpfCollector不会重复创建，这里都是false
+    fn closed(&self) -> bool {
+        false
+    }
+}
+
 pub struct EbpfCollector {
     receiver: Arc<Receiver<MetaPacket<'static>>>,
 
@@ -238,10 +292,13 @@ pub struct EbpfCollector {
     thread_handle: Option<JoinHandle<()>>,
 
     output: DebugSender<SendItem>,
+
+    counter: EbpfCounter,
 }
 
 static mut SWITCH: bool = false;
 static mut SENDER: Option<Sender<MetaPacket>> = None;
+static mut CAPTURE_SIZE: usize = ebpf::CAP_LEN_MAX as usize;
 
 impl EbpfCollector {
     const FLOW_MAP_SIZE: usize = 1 << 14;
@@ -253,7 +310,7 @@ impl EbpfCollector {
             }
             debug!("ebpf collector in:\n{}", *sd);
 
-            let packet = MetaPacket::new_from_ebpf(sd);
+            let packet = MetaPacket::from_ebpf(sd, CAPTURE_SIZE);
             if packet.is_err() {
                 warn!("meta packet parse from ebpf error: {}", packet.unwrap_err());
                 return;
@@ -262,11 +319,23 @@ impl EbpfCollector {
         }
     }
 
+    fn update_capture_size(capture_size: usize) {
+        unsafe {
+            if CAPTURE_SIZE != capture_size {
+                info!(
+                    "ebpf collector capture size change from {} to {}.",
+                    CAPTURE_SIZE, capture_size
+                );
+                CAPTURE_SIZE = capture_size
+            }
+        }
+    }
+
     pub fn new(
         config: EbpfAccess,
         policy_getter: PolicyGetter,
         output: DebugSender<SendItem>,
-    ) -> Result<Self> {
+    ) -> Result<Box<Self>> {
         unsafe {
             SWITCH = false;
             let log_file = &config.load().log_path;
@@ -278,6 +347,7 @@ impl EbpfCollector {
             } else {
                 std::ptr::null()
             };
+            Self::update_capture_size(config.load().l7_log_packet_size);
 
             if ebpf::bpf_tracer_init(log_file, false) != 0 {
                 return Err(Error::EbpfInitError);
@@ -290,6 +360,11 @@ impl EbpfCollector {
                 policy_getter,
                 config,
                 thread_handle: None,
+                counter: EbpfCounter {
+                    rx: 0,
+                    tx: 0,
+                    unknown_protocol: 0,
+                },
             };
 
             if ebpf::running_socket_tracer(
@@ -307,7 +382,13 @@ impl EbpfCollector {
 
             ebpf::bpf_tracer_finish();
             info!("ebpf collector init.");
-            return Ok(e);
+            return Ok(Box::new(e));
+        }
+    }
+
+    pub fn get_sync_counter(&self) -> SyncEbpfCounter {
+        SyncEbpfCounter {
+            counter: &self.counter as *const EbpfCounter as *mut EbpfCounter,
         }
     }
 
@@ -329,6 +410,7 @@ impl EbpfCollector {
 
         let mut aggr = SessionAggr::new(config.load().l7_log_session_timeout, self.output.clone());
         let mut flow_map: LruCache<u64, FlowItem> = LruCache::new(Self::FLOW_MAP_SIZE);
+        let sync_counter = self.get_sync_counter();
 
         self.thread_handle = Some(thread::spawn(move || {
             while unsafe { SWITCH } {
@@ -336,8 +418,10 @@ impl EbpfCollector {
                 if packet.is_err() {
                     continue;
                 }
+                sync_counter.counter().rx += 1;
                 let packet = packet.as_ref().unwrap();
                 if packet.l7_protocol == L7Protocol::Unknown {
+                    sync_counter.counter().unknown_protocol += 1;
                     // 未知协议不处理
                     continue;
                 }
@@ -363,7 +447,9 @@ impl EbpfCollector {
                     // 应用日志聚合
                     debug!("\n{}", data);
                     aggr.handle(data);
+                    sync_counter.counter().tx += 1;
                 }
+                Self::update_capture_size(config.l7_log_packet_size);
             }
 
             fn get_parser(protocol: L7Protocol) -> Box<dyn L7LogParse> {

@@ -23,7 +23,7 @@ use super::{
     tap_port::TapPort,
 };
 
-use crate::ebpf::{CAP_LEN_MAX, SK_BPF_DATA, SOCK_DIR_RCV, SOCK_DIR_SND};
+use crate::ebpf::{SK_BPF_DATA, SOCK_DIR_RCV, SOCK_DIR_SND};
 use crate::error;
 use crate::utils::net::{is_unicast_link_local, MacAddr};
 
@@ -736,7 +736,10 @@ impl<'a> MetaPacket<'a> {
         self.l4_payload_len
     }
 
-    pub unsafe fn new_from_ebpf(data: *mut SK_BPF_DATA) -> Result<MetaPacket<'a>, Box<dyn Error>> {
+    pub unsafe fn from_ebpf(
+        data: *mut SK_BPF_DATA,
+        capture_size: usize,
+    ) -> Result<MetaPacket<'a>, Box<dyn Error>> {
         let data = &mut (*data);
         let (local_ip, remote_ip) = if data.tuple.addr_len == 4 {
             (
@@ -787,7 +790,7 @@ impl<'a> MetaPacket<'a> {
             ..Default::default()
         };
 
-        let cap_len = CAP_LEN_MAX.min(data.cap_len as usize);
+        let cap_len = capture_size.min(data.cap_len as usize);
 
         packet.raw_from_ebpf = vec![0u8; cap_len as usize];
         data.cap_data

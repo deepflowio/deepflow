@@ -254,8 +254,13 @@ impl PolicySetter {
     fn policy(&self) -> &mut Policy {
         unsafe { &mut *self.policy }
     }
+
+    pub fn update_map_size(&mut self, map_size: usize) {
+        self.policy().table.update_map_size(map_size);
+    }
+
     pub fn update_interfaces(&mut self, ifaces: &Vec<Arc<PlatformData>>) {
-        self.policy().update_interfaces(ifaces)
+        self.policy().update_interfaces(ifaces);
     }
 
     pub fn update_ip_group(&mut self, groups: &Vec<Arc<IpGroupData>>) {
