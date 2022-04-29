@@ -66,6 +66,7 @@ $(ELFFILES):
 	@rm -rf data
 	$(call compile_socket_trace_elf, common)
 	$(call compile_socket_trace_elf, 5.2, LINUX_VER_5_2=1)
+	$(call compile_socket_trace_elf, core, CORE=1)
 	@touch $(ELFFILES)
 
 $(STATIC_OBJDIR) $(SHARED_OBJDIR):

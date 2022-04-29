@@ -608,7 +608,11 @@ int running_socket_tracer(l7_handle_fn handle,
 		return -EINVAL;
 	}
 
-	if (major == 5 && minor == 2)
+	if (is_core_kernel())
+		snprintf(bpf_path, TRACER_PATH_LEN,
+			 "%s/linux-core/%s", ELF_PATH_PREFIX,
+			 bpf_file_name);
+	else if (major == 5 && minor == 2)
 		snprintf(bpf_path, TRACER_PATH_LEN,
 			 "%s/linux-%d.%d/%s", ELF_PATH_PREFIX,
 			 major, minor, bpf_file_name);
