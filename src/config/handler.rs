@@ -736,7 +736,7 @@ impl ConfigHandler {
         let static_config = &self.static_config;
 
         let dest_ip = if conf.analyzer_ip().is_empty() {
-            static_config.controller_ips[0].parse::<IpAddr>().unwrap()
+            static_config.analyzer_ip.parse::<IpAddr>().unwrap()
         } else {
             conf.analyzer_ip()
                 .parse::<IpAddr>()
