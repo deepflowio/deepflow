@@ -409,7 +409,7 @@ impl Components {
             .any(|&t| t)
         {
             let (sender, l4_flow_aggr_receiver, counter) =
-                queue::bounded(static_config.flow.aggr_queue_size as usize);
+                queue::bounded(static_config.flow_sender_queue_size as usize);
             stats_collector.register_countable(
                 "3-flow-to-collector-sender",
                 Arc::new(counter),
