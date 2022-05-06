@@ -1289,6 +1289,22 @@ impl ConfigHandler {
             candidate_config.ebpf = new_config.ebpf;
         }
 
+        if candidate_config.stats != new_config.stats {
+            info!(
+                "stats config change from {:#?} to {:#?}",
+                candidate_config.stats, new_config.stats
+            );
+            candidate_config.stats = new_config.stats;
+        }
+
+        if candidate_config.log != new_config.log {
+            info!(
+                "log config change from {:#?} to {:#?}",
+                candidate_config.log, new_config.log
+            );
+            candidate_config.log = new_config.log;
+        }
+
         // deploy updated config
         self.current_config
             .store(Arc::new(candidate_config.clone()));
