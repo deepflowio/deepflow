@@ -44,6 +44,10 @@ func TimeFill(args []interface{}) func(columns []interface{}, values []interface
 		}
 		// 补点后切片长度
 		intervalLength := (end-start)/m.Time.Interval + 1
+		if intervalLength < 1 {
+			log.Errorf("Callback Time Fill Error: intervalLength(%d) < 1", intervalLength)
+			return []interface{}{}
+		}
 		newValues = make([]interface{}, intervalLength)
 		// 将查询数据结果写入newValues切片
 		for _, value := range values {
