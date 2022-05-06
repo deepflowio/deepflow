@@ -332,6 +332,9 @@ func (t *Time) Trans(m *view.Model) error {
 		t.Fill = t.Args[3]
 	}
 	m.Time.Interval = t.Interval
+	if m.Time.Interval > 0 && m.Time.Interval < m.Time.DatasourceInterval {
+		m.Time.Interval = m.Time.DatasourceInterval
+	}
 	m.Time.WindowSize = t.WindowSize
 	m.Time.Fill = t.Fill
 	m.Time.Alias = t.Alias
@@ -362,7 +365,7 @@ func (t *Time) Format(m *view.Model) {
 	}
 	withValue := fmt.Sprintf(
 		"toStartOfInterval(%s, %s(%d)) + %s(arrayJoin([%s]) * %d)",
-		innerTimeField, toIntervalFunction, t.Interval, toIntervalFunction, windows, t.Interval,
+		innerTimeField, toIntervalFunction, m.Time.Interval, toIntervalFunction, windows, m.Time.Interval,
 	)
 	withAlias := "_" + t.Alias
 	withs := []view.Node{&view.With{Value: withValue, Alias: withAlias}}
