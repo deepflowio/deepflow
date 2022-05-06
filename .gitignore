@@ -20,3 +20,5 @@ Cargo.lock
 *.objdump
 src/ebpf/samples/rust/src/ebpf.rs
 src/ebpf/samples/rust/target/*
+
+.rpmbuild/
