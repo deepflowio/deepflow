@@ -41,6 +41,7 @@ package-x64:
     - x64
   script:
     - rpmbuild -bb metaflow-agent.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
+    - rpmbuild -bb metaflow-agent_docker.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
     - zip -r -q artifacts.zip x86_64/
     - curl -v --user 'admin:yunshan3302' --upload-file artifacts.zip http://nexus.yunshan.net/repository/platform/trident-rs/$CI_COMMIT_REF_NAME/x86_64/artifacts.zip
     - REV=$(git rev-list --count HEAD)
