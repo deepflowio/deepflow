@@ -169,7 +169,7 @@ controller-ips:
 ## GRPC接收缓冲大小，单位为M，默认5M
 #grpc-buffer-size: 5
 ## l7日志会话聚合的时间窗口应不小于20秒，不大于300秒. 单位为s，默认120s
-#l7-log-session-aggr-timeout: 120
+#l7-log-session-aggr-timeout: 120s
 ## 通过该脚本获取采集接口对应的MAC地址，该选项需要如下条件才能生效：
 ## 1. 采集器页面配置虚拟机MAC解析项为虚拟机XML
 ## 2. tap-mode为0
