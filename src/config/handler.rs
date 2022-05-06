@@ -890,7 +890,7 @@ impl ConfigHandler {
                     ignore_tor_mac: flow_config.ignore_tor_mac,
                     ignore_l2_end: flow_config.ignore_l2_end,
                     l7_metrics_enabled: conf.l7_metrics_enabled(),
-                    app_proto_log_enabled: conf.l7_log_store_tap_types.is_empty(),
+                    app_proto_log_enabled: !conf.l7_log_store_tap_types.is_empty(),
                     l4_performance_enabled: conf.l4_performance_enabled(),
                     l7_log_packet_size: conf.l7_log_packet_size(),
                 }
