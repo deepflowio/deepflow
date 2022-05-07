@@ -786,6 +786,8 @@ static __inline void process_data(const bool vecs, struct pt_regs* ctx, __u64 id
 #ifndef BPF_USE_CORE
 	if (unlikely(!offset->ready))
 		return;
+#else
+	offset->ready = 1;
 #endif
 	
 	void *sk = get_socket_from_fd(args->fd, offset);
