@@ -112,8 +112,7 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, err
 			return nil, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
 		}
 		if strings.ToLower(sqlSplit[3]) == "values" {
-			tagParm := sqlSplit[2]
-			values, err := tagdescription.GetTagValues(e.DB, table, tagParm)
+			values, err := tagdescription.GetTagValues(e.DB, table, sql)
 			return values, true, err
 		}
 		return nil, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))

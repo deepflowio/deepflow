@@ -8,7 +8,6 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"metaflow/querier/common"
 	"metaflow/querier/config"
 	"metaflow/querier/engine/clickhouse/client"
 	ckcommon "metaflow/querier/engine/clickhouse/common"
@@ -195,8 +194,10 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 	return response, nil
 }
 
-func GetTagValues(db, table, tag string) (map[string][]interface{}, error) {
+func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
 	// 获取tagEnumFile
+	sqlSplit := strings.Split(sql, " ")
+	tag := sqlSplit[2]
 	tagDescription, ok := TAG_DESCRIPTIONS[TagDescriptionKey{
 		DB: db, Table: table, TagName: tag,
 	}]
@@ -206,7 +207,7 @@ func GetTagValues(db, table, tag string) (map[string][]interface{}, error) {
 	// 根据tagEnumFile获取values
 	tagValues, ok := TAG_ENUMS[tagDescription.EnumFile]
 	if !ok {
-		return GetTagResourceValues(tag)
+		return GetTagResourceValues(sql)
 	}
 	response := map[string][]interface{}{
 		"columns": []interface{}{"value", "display_name"},
@@ -220,7 +221,7 @@ func GetTagValues(db, table, tag string) (map[string][]interface{}, error) {
 	return response, nil
 }
 
-func GetTagResourceValues(tag string) (map[string][]interface{}, error) {
+func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -228,47 +229,78 @@ func GetTagResourceValues(tag string) (map[string][]interface{}, error) {
 		Password: config.Cfg.Clickhouse.Password,
 		DB:       "deepflow",
 	}
+	sqlSplit := strings.Split(rawSql, " ")
+	tag := sqlSplit[2]
+	whereSql := strings.Split(rawSql, "WHERE")[1]
 	err := chClient.Init("")
 	if err != nil {
 		return nil, err
 	}
 	var sql string
-	deviceType, ok := TAG_RESOURCE_TYPE_DEVICE_MAP[tag]
-	if ok {
-		sql = fmt.Sprintf("SELECT deviceid AS value,name AS display_name FROM deepflow.device_map WHERE devicetype=%d", deviceType)
-	} else if common.IsValueInSliceString(tag, TAG_RESOURCE_TYPE_DEFAULT) {
-		sql = fmt.Sprintf("SELECT id as value,name AS display_name FROM deepflow.%s", tag+"_map")
-	} else if common.IsValueInSliceString(tag, TAG_RESOURCE_TYPE_AUTO) {
-		var autoDeviceTypes []string
-		for _, deviceType := range AutoMap {
-			autoDeviceTypes = append(autoDeviceTypes, strconv.Itoa(deviceType))
+	switch tag {
+	case "resource_gl0", "resource_gl1", "resource_gl2":
+		results := map[string][]interface{}{}
+		for resourceKey, resourceType := range AutoMap {
+			resourceId := resourceKey + "_id"
+			resourceName := resourceKey + "_name"
+			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type FROM ip_resource_map WHERE %s GROUP BY value, display_name ORDER BY value ASC", resourceId, resourceName, strconv.Itoa(resourceType), whereSql)
+			log.Debug(sql)
+			rst, err := chClient.DoQuery(sql, nil)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, value := range rst["values"] {
+				log.Debug(value)
+				results["values"] = append(results["values"], value)
+			}
 		}
 		autoMap := map[string]map[string]int{
 			"resource_gl0": AutoPodMap,
 			"resource_gl1": AutoPodGroupMap,
 			"resource_gl2": AutoServiceMap,
 		}
-		for _, deviceType := range autoMap[tag] {
-			autoDeviceTypes = append(autoDeviceTypes, strconv.Itoa(deviceType))
+		for resourceKey, resourceType := range autoMap[tag] {
+			resourceId := resourceKey + "_id"
+			resourceName := resourceKey + "_name"
+			if resourceKey == "service" {
+				resourceId = "pod_service_id"
+				resourceName = "pod_service_name"
+			}
+			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type FROM ip_resource_map WHERE %s GROUP BY value, display_name ORDER BY value ASC", resourceId, resourceName, strconv.Itoa(resourceType), whereSql)
+			log.Debug(sql)
+			rst, err := chClient.DoQuery(sql, nil)
+			if err != nil {
+				return nil, err
+			}
+			for _, value := range rst["values"] {
+				results["values"] = append(results["values"], value)
+			}
+			results["columns"] = rst["columns"]
 		}
-		sql = fmt.Sprintf(
-			"SELECT deviceid AS value,name AS display_name,devicetype AS device_type FROM deepflow.device_map WHERE devicetype in (%s)",
-			strings.Join(autoDeviceTypes, ","),
-		)
-	} else if tag == "vpc" || tag == "l2_vpc" {
-		sql = "SELECT id as value,name AS display_name FROM deepflow.l3_epc_map"
-	} else if tag == "ip" {
-		sql = "SELECT ip as value,ip AS display_name FROM deepflow.ip_relation_map"
-	} else if tag == "tap" {
-		sql = "SELECT value, name AS display_name FROM deepflow.tap_type_map"
-	} else if tag == "vtap" {
-		sql = "SELECT id as value, name AS display_name FROM deepflow.vtap_map"
-	} else if tag == "lb_listener" {
-		sql = "SELECT id as value, name AS display_name FROM deepflow.lb_listener_map"
-	} else if tag == "pod_ingress" {
-		sql = "SELECT id as value, name AS display_name FROM deepflow.pod_ingress_map"
+		return results, nil
 	}
-	if sql == "" {
+
+	switch tag {
+	case "chost", "router", "host", "dhcpgw", "pod_service", "redis", "rds", "lb", "natgw", "vpc", "ip", "l2_vpc", "lb_listener", "pod_ingress", "az", "region", "pod_cluster", "pod_ns", "pod_node", "pod_group", "pod", "subnet":
+		resourceId := tag + "_id"
+		resourceName := tag + "_name"
+		if tag == "l2_vpc" {
+			resourceId = "vpc_id"
+			resourceName = "vpc_name"
+		} else if tag == "ip" {
+			resourceId = "ip"
+			resourceName = "ip"
+		}
+		sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name FROM ip_resource_map WHERE %s GROUP BY value, display_name ORDER BY value ASC", resourceId, resourceName, whereSql)
+
+	case "tap":
+		sql = "SELECT value, name AS display_name FROM tap_type_map GROUP BY value, display_name ORDER BY value ASC"
+
+	case "vtap":
+		sql = "SELECT id AS value, name AS display_name FROM vtap_map GROUP BY value, display_name ORDER BY value ASC"
+
+	default:
 		return map[string][]interface{}{}, nil
 	}
 	log.Debug(sql)

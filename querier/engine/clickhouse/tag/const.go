@@ -35,7 +35,6 @@ var AutoMap = map[string]int{
 	"pod_node":    VIF_DEVICE_TYPE_POD_NODE,
 	"lb":          VIF_DEVICE_TYPE_LB,
 	"natgw":       VIF_DEVICE_TYPE_NAT_GATEWAY,
-	"internet":    VIF_DEVICE_TYPE_INTERNET,
 }
 
 var AutoPodMap = map[string]int{
