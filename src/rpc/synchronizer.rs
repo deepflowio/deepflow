@@ -25,7 +25,7 @@ use crate::trident::{self, TridentState};
 use crate::utils::{
     self,
     environment::{is_tt_pod, is_tt_process},
-    net::{is_unicast_link_local, links_by_name_regex, MacAddr},
+    net::{is_unicast_link_local, MacAddr},
     stats::{Countable, Counter},
 };
 
@@ -457,34 +457,6 @@ impl Synchronizer {
 
     fn on_config_change(_config: &RuntimeConfig) {}
 
-    fn trigger_dispatcher_listener(
-        listener: &DispatcherListener,
-        _: &tp::SyncResponse,
-        tap_mode: tp::TapMode,
-        rt_config: &RuntimeConfig,
-        _: &Vec<MacAddr>,
-        blacklist: &Vec<VInterface>,
-    ) {
-        if tap_mode == tp::TapMode::Local {
-            let if_mac_source = rt_config.if_mac_source;
-            match links_by_name_regex(&rt_config.tap_interface_regex) {
-                Err(e) => warn!("get interfaces by name regex failed: {}", e),
-                Ok(links) if links.is_empty() => warn!(
-                    "tap-interface-regex({}) do not match any interface, in local mode",
-                    rt_config.tap_interface_regex
-                ),
-                Ok(links) => listener.on_tap_interface_change(
-                    &links,
-                    if_mac_source,
-                    rt_config.trident_type,
-                    blacklist,
-                ),
-            }
-        } else {
-            todo!()
-        }
-    }
-
     fn parse_segment(
         tap_mode: tp::TapMode,
         resp: &tp::SyncResponse,
@@ -598,20 +570,9 @@ impl Synchronizer {
         // TODO: check trisolaris
         // TODO: segments
         // TODO: modify platform
-        if let Some(listener) = &*dispatcher_listener {
-            Self::trigger_dispatcher_listener(
-                &listener,
-                &resp,
-                static_config.tap_mode,
-                &runtime_config,
-                &macs,
-                &blacklist,
-            );
-        }
-
         let (trident_state, cvar) = &**trident_state;
         *trident_state.lock().unwrap() =
-            trident::State::ConfigChanged((runtime_config, new_config.unwrap()));
+            trident::State::ConfigChanged((runtime_config, new_config.unwrap(), blacklist));
         cvar.notify_one();
     }
 
