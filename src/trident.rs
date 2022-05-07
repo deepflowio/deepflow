@@ -24,9 +24,13 @@ use crate::{
         MetricsType,
     },
     common::{
-        enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, FREE_SPACE_REQUIREMENT,
+        enums::TapType, platform_data::PlatformData, tagged_flow::TaggedFlow, tap_types::TapTyper,
+        FREE_SPACE_REQUIREMENT,
     },
-    config::{handler::ConfigHandler, Config, RuntimeConfig},
+    config::{
+        handler::{ConfigHandler, DispatcherConfig},
+        Config, RuntimeConfig,
+    },
     debug::{ConstructDebugCtx, Debugger},
     dispatcher::{
         self, recv_engine::bpf, BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
@@ -55,12 +59,12 @@ const MINUTE: Duration = Duration::from_secs(60);
 
 pub enum State {
     Running,
-    ConfigChanged((RuntimeConfig, trident::Config)),
+    ConfigChanged((RuntimeConfig, trident::Config, Vec<PlatformData>)),
     Terminated,
 }
 
 impl State {
-    fn unwrap_config(self) -> (RuntimeConfig, trident::Config) {
+    fn unwrap_config(self) -> (RuntimeConfig, trident::Config, Vec<PlatformData>) {
         match self {
             Self::ConfigChanged(c) => c,
             _ => panic!("not config type"),
@@ -165,7 +169,7 @@ impl Trident {
             mem::swap(&mut new_state, &mut *state_guard);
             mem::drop(state_guard);
 
-            let (new_config, new_pb_config) = new_state.unwrap_config();
+            let (new_config, new_pb_config, blacklist) = new_state.unwrap_config();
             let new_conf = match config_handler.new_runtime_config(new_pb_config) {
                 Ok(c) => c,
                 Err(e) => {
@@ -202,9 +206,19 @@ impl Trident {
                     for callback in callbacks {
                         callback(&config_handler, &mut comp);
                     }
+                    dispatcher_listener_callback(
+                        &config_handler.candidate_config.dispatcher,
+                        &comp,
+                        blacklist,
+                    );
                     components.replace(comp);
                 }
                 Some(components) => {
+                    dispatcher_listener_callback(
+                        &config_handler.candidate_config.dispatcher,
+                        &components,
+                        blacklist,
+                    );
                     for callback in callbacks {
                         callback(&config_handler, components);
                     }
@@ -224,6 +238,33 @@ impl Trident {
         mem::drop(state_guard);
         self.handle.take().unwrap().join().unwrap();
         info!("Gracefully stopped");
+    }
+}
+
+fn dispatcher_listener_callback(
+    conf: &DispatcherConfig,
+    components: &Components,
+    blacklist: Vec<PlatformData>,
+) {
+    for listener in components.dispatcher_listeners.iter() {
+        if conf.tap_mode == TapMode::Local {
+            let if_mac_source = conf.if_mac_source;
+            match links_by_name_regex(&conf.tap_interface_regex) {
+                Err(e) => warn!("get interfaces by name regex failed: {}", e),
+                Ok(links) if links.is_empty() => warn!(
+                    "tap-interface-regex({}) do not match any interface, in local mode",
+                    conf.tap_interface_regex
+                ),
+                Ok(links) => listener.on_tap_interface_change(
+                    &links,
+                    if_mac_source,
+                    conf.trident_type,
+                    &blacklist,
+                ),
+            }
+        } else {
+            todo!()
+        }
     }
 }
 
