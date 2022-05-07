@@ -171,6 +171,7 @@ pub struct DispatcherConfig {
     pub max_memory: u64,
     pub af_packet_blocks: usize,
     pub af_packet_version: OptTpacketVersion,
+    pub tap_mode: TapMode,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -405,6 +406,7 @@ impl Default for NewRuntimeConfig {
                 max_memory: TRIDENT_MEMORY_LIMIT,
                 af_packet_blocks: 0,
                 af_packet_version: OptTpacketVersion::default(),
+                tap_mode: TapMode::default(),
             },
             sender: SenderConfig {
                 mtu: 1500,
@@ -813,6 +815,7 @@ impl ConfigHandler {
                     (conf.max_memory() as u64) << 24,
                 ),
                 af_packet_version: conf.capture_socket_type().into(),
+                tap_mode: static_config.tap_mode,
             },
             sender: SenderConfig {
                 mtu: conf.mtu(),
