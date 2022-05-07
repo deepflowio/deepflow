@@ -349,7 +349,7 @@ impl EbpfCollector {
             };
             Self::update_capture_size(config.load().l7_log_packet_size);
 
-            if ebpf::bpf_tracer_init(log_file, false) != 0 {
+            if ebpf::bpf_tracer_init(log_file, true) != 0 {
                 return Err(Error::EbpfInitError);
             }
             let (s, r, _) = bounded::<MetaPacket>(1024);
@@ -466,7 +466,12 @@ impl EbpfCollector {
             }
         }));
         debug!("ebpf collector starting ebpf-kernel.");
-        unsafe { ebpf::tracer_start() };
+        unsafe {
+            while ebpf::tracer_start() != 0 {
+                debug!("tracer_start() error, sleep 1s retry.");
+                std::thread::sleep(Duration::from_secs(1));
+            }
+        }
         info!("ebpf collector started");
     }
 
