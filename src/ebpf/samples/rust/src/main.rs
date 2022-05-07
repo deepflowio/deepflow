@@ -232,9 +232,9 @@ fn main() {
         print!("{:#?}\n", stats);
 	print!("start start ...\n");
         if tracer_start() != 0 {
-            println!("tracer_start error");
+            println!("tracer_start() error");
         }
-	print!("start start finish\n");
+	print!("tracer_start() finish\n");
         let stats = socket_tracer_stats();
         print!("{:#?}\n", stats);
     }
