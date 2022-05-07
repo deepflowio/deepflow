@@ -31,6 +31,7 @@ message Flow {
     // uint32 vlan = 10;  // 目前无需发送
     uint32 eth_type = 11;
 
+    uint32 has_perf_stats = 12;
     FlowPerfStats perf_stats = 13;
 
     uint32 close_type = 14;
