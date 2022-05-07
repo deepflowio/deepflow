@@ -646,7 +646,7 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             log_threshold: conf.log_threshold(),
             log_level: match conf.log_level().to_lowercase().as_str() {
                 "error" => log::Level::Error,
-                "warn" => log::Level::Warn,
+                "warn" | "warning" => log::Level::Warn,
                 "info" => log::Level::Info,
                 "debug" => log::Level::Debug,
                 "trace" => log::Level::Trace,
