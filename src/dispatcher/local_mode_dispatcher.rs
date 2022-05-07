@@ -321,15 +321,21 @@ impl LocalModeDispatcherListener {
         let mut result = HashMap::new();
 
         if let Some(entries) = poller.get_interface_info() {
+            debug!("Poller Mac:");
             for entry in entries {
+                debug!("\tif_index: {}, mac: {}", entry.tap_idx, entry.mac);
                 result.insert(entry.tap_idx, entry.mac);
             }
         }
 
         match link_list() {
             Ok(links) => {
+                if result.len() == 0 {
+                    debug!("Poller Mac:");
+                }
                 for link in links {
                     if link.mac_addr != MacAddr::ZERO && !result.contains_key(&link.if_index) {
+                        debug!("\tif_index: {}, mac: {}", link.if_index, link.mac_addr);
                         result.insert(link.if_index, link.mac_addr);
                     }
                 }
