@@ -350,6 +350,7 @@ impl EbpfCollector {
             Self::update_capture_size(config.load().l7_log_packet_size);
 
             if ebpf::bpf_tracer_init(log_file, true) != 0 {
+                info!("ebpf bpf_tracer_init error: {}", config.load().log_path);
                 return Err(Error::EbpfInitError);
             }
             let (s, r, _) = bounded::<MetaPacket>(1024);

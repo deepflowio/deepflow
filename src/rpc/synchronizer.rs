@@ -128,7 +128,7 @@ impl Status {
 
     fn get_platform_data(&mut self, resp: &tp::SyncResponse) -> bool {
         let current_version = self.version_platform_data;
-        let version = resp.version_platform_data.unwrap();
+        let version = resp.version_platform_data.unwrap_or(0);
         debug!(
             "get grpc PlatformData version: {} vs current version: {}.",
             version, current_version
@@ -224,7 +224,7 @@ impl Status {
     }
 
     fn get_flow_acls(&mut self, resp: &tp::SyncResponse) -> bool {
-        let version = resp.version_platform_data.unwrap();
+        let version = resp.version_platform_data.unwrap_or(0);
         debug!(
             "get grpc FlowAcls version: {} vs current version: {}.",
             version, self.version_acls
@@ -250,7 +250,7 @@ impl Status {
     }
 
     fn get_ip_groups(&mut self, resp: &tp::SyncResponse) -> bool {
-        let version = resp.version_groups.unwrap();
+        let version = resp.version_groups.unwrap_or(0);
         debug!(
             "get grpc Groups version: {} vs current version: {}.",
             version, self.version_groups
