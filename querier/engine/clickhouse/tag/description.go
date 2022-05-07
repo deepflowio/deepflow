@@ -251,7 +251,6 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 			}
 
 			for _, value := range rst["values"] {
-				log.Debug(value)
 				results["values"] = append(results["values"], value)
 			}
 		}
