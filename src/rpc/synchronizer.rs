@@ -713,8 +713,8 @@ impl Synchronizer {
                     info!(
                         "TapMode: {:?}, CtrlMac: {}, CtrlIp: {}, Hostname: {}",
                         static_config.tap_mode,
-                        static_config.ctrl_ip,
                         static_config.ctrl_mac,
+                        static_config.ctrl_ip,
                         status.hostname,
                     )
                 }
