@@ -251,6 +251,7 @@ pub struct DebugConfig {
     pub vtap_id: u16,
     pub enabled: bool,
     pub controller_ips: Vec<IpAddr>,
+    pub listen_port: u16,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -485,6 +486,7 @@ impl Default for NewRuntimeConfig {
                 vtap_id,
                 enabled: false,
                 controller_ips: vec![],
+                listen_port: 0,
             },
             log: LogConfig {
                 log_level: Level::Info,
@@ -929,6 +931,7 @@ impl ConfigHandler {
                     .iter()
                     .map(|c| c.parse::<IpAddr>().unwrap())
                     .collect(),
+                listen_port: static_config.debug_listen_port,
             },
             log: LogConfig {
                 log_level: match conf.log_level().to_lowercase().as_str() {
