@@ -807,6 +807,7 @@ impl From<Flow> for flow_log::Flow {
             end_time: f.end_time.as_nanos() as u64,
             duration: f.duration.as_nanos() as u64,
             eth_type: f.eth_type as u32,
+            has_perf_stats: f.flow_perf_stats.is_some() as u32,
             perf_stats: {
                 if f.flow_perf_stats.is_none() {
                     None
