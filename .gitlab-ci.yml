@@ -16,8 +16,8 @@ verify-x64:
     - rust
   script:
     - id
-    - cargo build
-    - cargo build --bin metaflow-agent-ctl
+    - cargo build --release
+    - cargo build --release --bin metaflow-agent-ctl
     - cargo test
     - cargo fmt --all -- --check
     # - cargo clean
