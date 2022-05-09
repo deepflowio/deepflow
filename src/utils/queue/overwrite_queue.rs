@@ -151,11 +151,9 @@ impl<T> OverwriteQueue<T> {
             loop {
                 guard = match timeout {
                     Some(d) => {
-                        if d > now.elapsed() {
-                            self.notify
-                                .wait_timeout(guard, d - now.elapsed())
-                                .unwrap()
-                                .0
+                        let elapsed = now.elapsed();
+                        if d > elapsed {
+                            self.notify.wait_timeout(guard, d - elapsed).unwrap().0
                         } else {
                             return Err(Error::Timeout);
                         }
