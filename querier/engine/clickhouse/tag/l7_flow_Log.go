@@ -58,5 +58,21 @@ func GenerateL7TagMap() map[string]map[string]*Tag {
 			"toUInt64(tap_port) IN (SELECT tap_port FROM deepflow.vtap_port_map WHERE name %s %s)",
 			"toUInt64(tap_port) IN (SELECT tap_port FROM deepflow.vtap_port_map WHERE %s(name,%s))",
 		)}
+	// 开始时间
+	l7TagMap["start_time"] = map[string]*Tag{
+		"toString": NewTag(
+			"toString(start_time)",
+			"",
+			"",
+			"",
+		)}
+	// 结束时间
+	l7TagMap["end_time"] = map[string]*Tag{
+		"toString": NewTag(
+			"toString(end_time)",
+			"",
+			"",
+			"",
+		)}
 	return l7TagMap
 }

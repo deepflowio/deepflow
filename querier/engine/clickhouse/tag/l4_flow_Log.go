@@ -87,5 +87,21 @@ func GenerateL4TagMap() map[string]map[string]*Tag {
 			"if(is_ipv4=1, hex(tunnel_rx_ip4_1), hex(tunnel_rx_ip6_1)) %s %s",
 			"",
 		)}
+	// 开始时间
+	l4TagMap["start_time"] = map[string]*Tag{
+		"toString": NewTag(
+			"toString(start_time)",
+			"",
+			"",
+			"",
+		)}
+	// 结束时间
+	l4TagMap["end_time"] = map[string]*Tag{
+		"toString": NewTag(
+			"toString(end_time)",
+			"",
+			"",
+			"",
+		)}
 	return l4TagMap
 }

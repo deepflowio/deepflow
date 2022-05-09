@@ -462,6 +462,12 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 		tagDes, _ := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
 		f.Withs = []view.Node{&view.With{Value: tagDes.TagTranslator, Alias: f.Alias}}
 		return f.getViewNode()
+	case TAG_FUNCTION_TO_STRING:
+		if common.IsValueInSliceString(f.Args[0], []string{"start_time", "end_time"}) {
+			tagDes, _ := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
+			f.Value = tagDes.TagTranslator
+			return f.getViewNode()
+		}
 	}
 	values := make([]string, len(fields))
 	for i, field := range fields {
