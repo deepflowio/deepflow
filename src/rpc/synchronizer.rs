@@ -438,7 +438,7 @@ impl Synchronizer {
         status: &Arc<RwLock<Status>>,
     ) {
         match &resp.revision {
-            Some(revision) if revision != &static_config.revision => {
+            Some(revision) if revision != "" && revision != &static_config.revision => {
                 if let Some(url) = &resp.self_update_url {
                     if url.trim().to_lowercase() != "grpc" {
                         warn!("error upgrade method, onlly support grpc: {}", url);
