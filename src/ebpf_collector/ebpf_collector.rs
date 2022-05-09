@@ -99,7 +99,7 @@ impl SessionAggr {
         self.slot_count - 1
     }
 
-    fn slot_handle(&mut self, log: AppProtoLogsData, slot_index: usize, key: u64, ttl: usize) {
+    fn slot_handle(&mut self, mut log: AppProtoLogsData, slot_index: usize, key: u64, ttl: usize) {
         let map = self.maps[slot_index as usize].as_mut().unwrap();
 
         match log.base_info.head.msg_type {
@@ -116,10 +116,18 @@ impl SessionAggr {
                     self.cache_count += 1;
                     return;
                 }
-                // 对于HTTPV1, requestID总为0, 连续出现多个request时，response匹配最后一个request为session
                 let item = value.unwrap().clone();
-                map.insert(key, log);
-                self.send(item);
+                // 若乱序，已存在响应，并且seq相邻，则可以匹配为会话，则聚合响应发送
+                if item.base_info.head.msg_type == LogMessageType::Response
+                    && log.base_info.cap_seq + 1 == item.base_info.cap_seq
+                {
+                    log.session_merge(item);
+                    self.send(log);
+                } else {
+                    // 对于HTTPV1, requestID总为0, 连续出现多个request时，response匹配最后一个request为session
+                    map.insert(key, log);
+                    self.send(item);
+                }
             }
             LogMessageType::Response => {
                 let item = map.get(&key);
@@ -128,7 +136,10 @@ impl SessionAggr {
                         // 相应和请求可能不在同一个时间槽里，这里继续查询小的时间槽
                         self.slot_handle(log, slot_index - 1, key, ttl - 1);
                     } else {
-                        self.send(log);
+                        // ebpf的数据存在乱序，回应比请求先到的情况
+                        map.insert(key, log);
+                        self.cache_count += 1;
+                        return;
                     }
                     return;
                 }
@@ -140,9 +151,15 @@ impl SessionAggr {
                 } else {
                     Duration::ZERO
                 };
-                item.session_merge(log);
-                item.base_info.head.rrt = rrt.as_micros() as u64;
-                self.send(item);
+                // 若乱序导致map中的也是响应, 则发送响应,继续缓存新的响应
+                if item.base_info.head.msg_type == LogMessageType::Response {
+                    map.insert(key, log);
+                    self.send(item);
+                } else {
+                    item.session_merge(log);
+                    item.base_info.head.rrt = rrt.as_micros() as u64;
+                    self.send(item);
+                }
             }
             _ => {}
         }
