@@ -40,7 +40,7 @@ var (
 		output: "SELECT divide(plus(MAX(_sum_byte_tx), SUM(_sum_byte_tx)), 1) AS max_byte_tx FROM (SELECT SUM(byte_tx) AS _sum_byte_tx FROM flow_log.l4_flow_log)",
 	}, {
 		input:  "select Avg(byte_tx) as avg_byte_tx from l4_flow_log where `time`>=60 and `time`<=180 having Spread(byte_tx)>=0",
-		output: "WITH if(count(_sum_byte_tx)=3, min(_sum_byte_tx), 0) AS min_fillnullaszero__sum_byte_tx SELECT AVG(_sum_byte_tx) AS avg_byte_tx FROM (SELECT SUM(byte_tx) AS _sum_byte_tx FROM flow_log.l4_flow_log PREWHERE `time` >= 60 AND `time` <= 180) HAVING minus(MAX(_sum_byte_tx), min_fillnullaszero__sum_byte_tx) >= 0",
+		output: "WITH if(count(_sum_byte_tx)=121, min(_sum_byte_tx), 0) AS min_fillnullaszero__sum_byte_tx SELECT AVG(_sum_byte_tx) AS avg_byte_tx FROM (SELECT SUM(byte_tx) AS _sum_byte_tx FROM flow_log.l4_flow_log PREWHERE `time` >= 60 AND `time` <= 180) HAVING minus(MAX(_sum_byte_tx), min_fillnullaszero__sum_byte_tx) >= 0",
 	}, {
 		input:  "select Stddev(byte_tx) as stddev_byte_tx from l4_flow_log",
 		output: "SELECT stddevPopStable(_sum_byte_tx) AS stddev_byte_tx FROM (SELECT SUM(byte_tx) AS _sum_byte_tx FROM flow_log.l4_flow_log)",
@@ -49,10 +49,10 @@ var (
 		output: "SELECT MAX(_sum_byte_tx) AS max_byte_tx FROM (SELECT SUM(byte_tx) AS _sum_byte_tx FROM flow_log.l4_flow_log) ORDER BY max_byte_tx asc",
 	}, {
 		input:  "select Spread(byte_tx) as spread_byte_tx from l4_flow_log where `time`>=60 and `time`<=180",
-		output: "WITH if(count(_sum_byte_tx)=3, min(_sum_byte_tx), 0) AS min_fillnullaszero__sum_byte_tx SELECT minus(MAX(_sum_byte_tx), min_fillnullaszero__sum_byte_tx) AS spread_byte_tx FROM (SELECT SUM(byte_tx) AS _sum_byte_tx FROM flow_log.l4_flow_log PREWHERE `time` >= 60 AND `time` <= 180)",
+		output: "WITH if(count(_sum_byte_tx)=121, min(_sum_byte_tx), 0) AS min_fillnullaszero__sum_byte_tx SELECT minus(MAX(_sum_byte_tx), min_fillnullaszero__sum_byte_tx) AS spread_byte_tx FROM (SELECT SUM(byte_tx) AS _sum_byte_tx FROM flow_log.l4_flow_log PREWHERE `time` >= 60 AND `time` <= 180)",
 	}, {
 		input:  "select Rspread(byte_tx) as rspread_byte_tx from l4_flow_log where `time`>=60 and `time`<=180",
-		output: "WITH if(count(_sum_byte_tx)=3, min(_sum_byte_tx), 0) AS min_fillnullaszero__sum_byte_tx SELECT divide(MAX(_sum_byte_tx)+1e-15, min_fillnullaszero__sum_byte_tx+1e-15) AS rspread_byte_tx FROM (SELECT SUM(byte_tx) AS _sum_byte_tx FROM flow_log.l4_flow_log PREWHERE `time` >= 60 AND `time` <= 180)",
+		output: "WITH if(count(_sum_byte_tx)=121, min(_sum_byte_tx), 0) AS min_fillnullaszero__sum_byte_tx SELECT divide(MAX(_sum_byte_tx)+1e-15, min_fillnullaszero__sum_byte_tx+1e-15) AS rspread_byte_tx FROM (SELECT SUM(byte_tx) AS _sum_byte_tx FROM flow_log.l4_flow_log PREWHERE `time` >= 60 AND `time` <= 180)",
 	}, {
 		input:  "select Rspread(rtt) as rspread_rtt from l4_flow_log ",
 		output: "SELECT divide(MAXArray(arrayFilter(x -> x!=0, _grouparray_rtt))+1e-15, MINArray(arrayFilter(x -> x!=0, _grouparray_rtt))+1e-15) AS rspread_rtt FROM (SELECT groupArrayIf(rtt, rtt != 0) AS _grouparray_rtt FROM flow_log.l4_flow_log)",
@@ -73,7 +73,7 @@ var (
 		output: "WITH if(COUNTArray(arrayFilter(x -> x!=0, _grouparray_rtt))>0, divide(plus(COUNTArray(arrayFilter(x -> (x <= 100 AND 0 < x), _grouparray_rtt)), divide(COUNTArray(arrayFilter(x -> ((100 < x) AND (x <= (100 * 4))), _grouparray_rtt)), 2)), COUNTArray(arrayFilter(x -> x!=0, _grouparray_rtt))), null) AS divide_0diveider_as_null_plus_apdex_satisfy__grouparray_rtt_100_apdex_toler__grouparray_rtt_100_count__grouparray_rtt SELECT divide_0diveider_as_null_plus_apdex_satisfy__grouparray_rtt_100_apdex_toler__grouparray_rtt_100_count__grouparray_rtt*100 AS apdex_rtt_100 FROM (SELECT groupArrayIf(rtt, rtt != 0) AS _grouparray_rtt FROM flow_log.l4_flow_log)",
 	}, {
 		input:  "select Max(byte) as max_byte, time(time,120) as time_120 from l4_flow_log group by time_120 having Min(byte)>=0",
-		output: "WITH toStartOfInterval(_time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS _time_120, if(count(_sum_byte_tx_plus_byte_rx)=2, min(_sum_byte_tx_plus_byte_rx), 0) AS min_fillnullaszero__sum_byte_tx_plus_byte_rx SELECT toUnixTimestamp(_time_120) AS time_120, MAX(_sum_byte_tx_plus_byte_rx) AS max_byte FROM (WITH toStartOfInterval(time, toIntervalSecond(60)) AS _time SELECT SUM(byte_tx+byte_rx) AS _sum_byte_tx_plus_byte_rx, _time FROM flow_log.l4_flow_log GROUP BY _time) GROUP BY time_120 HAVING min_fillnullaszero__sum_byte_tx_plus_byte_rx >= 0",
+		output: "WITH toStartOfInterval(_time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS _time_120, if(count(_sum_byte_tx_plus_byte_rx)=120, min(_sum_byte_tx_plus_byte_rx), 0) AS min_fillnullaszero__sum_byte_tx_plus_byte_rx SELECT toUnixTimestamp(_time_120) AS time_120, MAX(_sum_byte_tx_plus_byte_rx) AS max_byte FROM (WITH toStartOfInterval(time, toIntervalSecond(1)) AS _time SELECT SUM(byte_tx+byte_rx) AS _sum_byte_tx_plus_byte_rx, _time FROM flow_log.l4_flow_log GROUP BY _time) GROUP BY time_120 HAVING min_fillnullaszero__sum_byte_tx_plus_byte_rx >= 0",
 	}, {
 		input:  "select Max(byte) as 'max_byte',region_0,chost_id_1 from l4_flow_log group by region_0,chost_id_1",
 		output: "SELECT region_0, chost_id_1, MAX(_sum_byte_tx_plus_byte_rx) AS max_byte FROM (SELECT dictGet(deepflow.region_map, 'name', (toUInt64(region_id_0))) AS region_0, if(l3_device_type_1=1,l3_device_id_1, 0) AS chost_id_1, SUM(byte_tx+byte_rx) AS _sum_byte_tx_plus_byte_rx FROM flow_log.l4_flow_log PREWHERE (region_id_0!=0) AND (l3_device_id_1!=0 AND l3_device_type_1=1) GROUP BY dictGet(deepflow.region_map, 'name', (toUInt64(region_id_0))) AS region_0, if(l3_device_type_1=1,l3_device_id_1, 0) AS chost_id_1) GROUP BY region_0, chost_id_1",

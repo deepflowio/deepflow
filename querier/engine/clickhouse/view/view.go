@@ -114,7 +114,7 @@ func (t *Time) AddAlias(alias string) {
 func NewTime() *Time {
 	return &Time{
 		TimeEnd:            time.Now().Unix(),
-		DatasourceInterval: 60,
+		DatasourceInterval: 1,
 		WindowSize:         1,
 	}
 }
