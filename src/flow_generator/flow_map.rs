@@ -1113,7 +1113,10 @@ pub fn _new_flow_map_and_receiver() -> (FlowMap, Receiver<TaggedFlow>) {
     policy_getter.disable();
     let (output_queue_sender, output_queue_receiver, _) = queue::bounded(256);
     let (app_proto_log_queue, _, _) = queue::bounded(256);
-    let current_config = Arc::new(ArcSwap::from_pointee(NewRuntimeConfig::default()));
+    let mut config = NewRuntimeConfig::default();
+    // Any
+    config.flow.l7_log_tap_types[0] = true;
+    let current_config = Arc::new(ArcSwap::from_pointee(config));
     let (flow_map, _counter) = FlowMap::new(
         0,
         output_queue_sender,
