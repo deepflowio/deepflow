@@ -126,7 +126,7 @@ impl L7FlowPerf for DubboPerfData {
                 msg_type: self.session_data.msg_type,
                 status: self.session_data.status,
                 code: self.session_data.dubbo_header.status_code as u16,
-                rrt: rrt,
+                rrt,
             },
             0,
         ))
