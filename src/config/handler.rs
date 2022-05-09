@@ -1218,6 +1218,10 @@ impl ConfigHandler {
                     new_config.platform.kubernetes_api_enabled
                 );
             }
+            info!(
+                "platform config change from {:#?} to {:#?}",
+                candidate_config.platform, new_config.platform
+            );
             candidate_config.platform = new_config.platform;
             fn platform_callback(handler: &ConfigHandler, components: &mut Components) {
                 if is_tt_pod(handler.candidate_config.platform.trident_type) {
