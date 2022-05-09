@@ -20,7 +20,6 @@ Autoreq: 0
 Deepflow MetaFlow Agent
 
 %prep
-(cd %pwd; cargo clean && cargo build --release && cargo build --release --bin metaflow-agent-ctl)
 mkdir -p $RPM_BUILD_ROOT/usr/sbin/
 cp %pwd/target/release/metaflow-agent $RPM_BUILD_ROOT/usr/sbin/
 cp %pwd/target/release/metaflow-agent-ctl $RPM_BUILD_ROOT/usr/sbin/
