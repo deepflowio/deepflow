@@ -593,8 +593,13 @@ impl Components {
 
         let guard = Guard::new(config_handler.environment());
 
-        let ebpf_collector =
-            EbpfCollector::new(config_handler.ebpf(), policy_getter, proto_log_sender).ok();
+        let ebpf_collector = EbpfCollector::new(
+            config_handler.ebpf(),
+            config_handler.log_parser(),
+            policy_getter,
+            proto_log_sender,
+        )
+        .ok();
         if let Some(collector) = &ebpf_collector {
             stats_collector.register_countable(
                 "ebpf-collector",

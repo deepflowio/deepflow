@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 use std::ffi::CString;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -11,7 +14,7 @@ use lru::LruCache;
 use super::{Error, Result};
 use crate::common::flow::L7Protocol;
 use crate::common::meta_packet::MetaPacket;
-use crate::config::handler::{EbpfAccess, L7LogDynamicConfig, TraceType};
+use crate::config::handler::{EbpfAccess, LogParserAccess};
 use crate::ebpf;
 use crate::flow_generator::{
     AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, DnsLog, DubboLog,
@@ -305,6 +308,8 @@ pub struct EbpfCollector {
 
     // GRPC配置
     config: EbpfAccess,
+    log_parser_config: LogParserAccess,
+    l7_log_dynamic_is_updated: Arc<AtomicBool>,
 
     thread_handle: Option<JoinHandle<()>>,
 
@@ -332,8 +337,16 @@ impl EbpfCollector {
                 warn!("meta packet parse from ebpf error: {}", packet.unwrap_err());
                 return;
             }
-            let _ = SENDER.as_mut().unwrap().send(packet.unwrap());
+            if let Err(e) = SENDER.as_mut().unwrap().send(packet.unwrap()) {
+                warn!("meta packet send ebpf error: {:?}", e);
+            }
         }
+    }
+
+    pub fn l7_log_dynamic_config_updated(&mut self) {
+        debug!("ebpf l7 log config updated.");
+        self.l7_log_dynamic_is_updated
+            .store(true, Ordering::Relaxed);
     }
 
     fn update_capture_size(capture_size: usize) {
@@ -350,6 +363,7 @@ impl EbpfCollector {
 
     pub fn new(
         config: EbpfAccess,
+        log_parser_config: LogParserAccess,
         policy_getter: PolicyGetter,
         output: DebugSender<SendItem>,
     ) -> Result<Box<Self>> {
@@ -377,7 +391,9 @@ impl EbpfCollector {
                 output,
                 policy_getter,
                 config,
+                log_parser_config,
                 thread_handle: None,
+                l7_log_dynamic_is_updated: Arc::new(AtomicBool::new(false)),
                 counter: EbpfCounter {
                     rx: 0,
                     tx: 0,
@@ -425,6 +441,8 @@ impl EbpfCollector {
         let receiver = self.receiver.clone();
         let policy_getter = self.policy_getter;
         let config = self.config.clone();
+        let log_parser_config = self.log_parser_config.clone();
+        let l7_log_dynamic_is_updated = self.l7_log_dynamic_is_updated.clone();
 
         let mut aggr = SessionAggr::new(config.load().l7_log_session_timeout, self.output.clone());
         let mut flow_map: LruCache<u64, FlowItem> = LruCache::new(Self::FLOW_MAP_SIZE);
@@ -436,6 +454,11 @@ impl EbpfCollector {
                 if packet.is_err() {
                     continue;
                 }
+
+                if l7_log_dynamic_is_updated.swap(false, Ordering::Relaxed) {
+                    flow_map.clear();
+                }
+
                 sync_counter.counter().rx += 1;
                 let packet = packet.as_ref().unwrap();
                 if packet.l7_protocol == L7Protocol::Unknown {
@@ -450,7 +473,7 @@ impl EbpfCollector {
                         packet.socket_id,
                         FlowItem {
                             last_policy: 0,
-                            parser: get_parser(packet.l7_protocol),
+                            parser: get_parser(packet.l7_protocol, &log_parser_config),
                             other_l3_epc: 0,
                         },
                     );
@@ -470,34 +493,18 @@ impl EbpfCollector {
                 Self::update_capture_size(config.l7_log_packet_size);
             }
 
-            fn get_parser(protocol: L7Protocol) -> Box<dyn L7LogParse> {
+            fn get_parser(
+                protocol: L7Protocol,
+                log_parser_config: &LogParserAccess,
+            ) -> Box<dyn L7LogParse> {
                 match protocol {
                     L7Protocol::Dns => Box::from(DnsLog::default()),
-                    L7Protocol::Http1 => {
-                        let mut parser = HttpLog::default();
-                        parser.l7_log_dynamic_config = L7LogDynamicConfig {
-                            proxy_client_origin: "X-Forwarded-For".to_string(),
-                            proxy_client_lower: "x-forwarded-for".to_string(),
-                            proxy_client_with_colon: "X-Forwarded-For:".to_string(),
-                            x_request_id_origin: "x-request-id".to_string(),
-                            x_request_id_lower: "x-request-id".to_string(),
-                            x_request_id_with_colon: "x-request-id:".to_string(),
-                            trace_id_origin: "x-b3-traceid".to_string(),
-                            trace_id_lower: "x-b3-traceid".to_string(),
-                            trace_id_with_colon: "x-b3-traceid:".to_string(),
-                            trace_type: TraceType::Disabled,
-                            span_id_origin: "x-b3-spanid".to_string(),
-                            span_id_lower: "x-b3-spanid".to_string(),
-                            span_id_with_colon: "x-b3-spanid:".to_string(),
-                            span_type: TraceType::Disabled,
-                        };
-                        Box::from(parser)
-                    }
-                    L7Protocol::Http2 => Box::from(HttpLog::default()),
+                    L7Protocol::Http1 => Box::from(HttpLog::new(log_parser_config)),
+                    L7Protocol::Http2 => Box::from(HttpLog::new(log_parser_config)),
                     L7Protocol::Mysql => Box::from(MysqlLog::default()),
                     L7Protocol::Redis => Box::from(RedisLog::default()),
                     L7Protocol::Kafka => Box::from(KafkaLog::default()),
-                    L7Protocol::Dubbo => Box::from(DubboLog::default()),
+                    L7Protocol::Dubbo => Box::from(DubboLog::new(log_parser_config)),
                     _ => panic!("get_parser unknown protocol."),
                 }
             }
