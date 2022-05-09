@@ -11,7 +11,7 @@ use lru::LruCache;
 use super::{Error, Result};
 use crate::common::flow::L7Protocol;
 use crate::common::meta_packet::MetaPacket;
-use crate::config::handler::EbpfAccess;
+use crate::config::handler::{EbpfAccess, L7LogDynamicConfig, TraceType};
 use crate::ebpf;
 use crate::flow_generator::{
     AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, DnsLog, DubboLog,
@@ -456,7 +456,26 @@ impl EbpfCollector {
             fn get_parser(protocol: L7Protocol) -> Box<dyn L7LogParse> {
                 match protocol {
                     L7Protocol::Dns => Box::from(DnsLog::default()),
-                    L7Protocol::Http1 => Box::from(HttpLog::default()),
+                    L7Protocol::Http1 => {
+                        let mut parser = HttpLog::default();
+                        parser.l7_log_dynamic_config = L7LogDynamicConfig {
+                            proxy_client_origin: "X-Forwarded-For".to_string(),
+                            proxy_client_lower: "x-forwarded-for".to_string(),
+                            proxy_client_with_colon: "X-Forwarded-For:".to_string(),
+                            x_request_id_origin: "x-request-id".to_string(),
+                            x_request_id_lower: "x-request-id".to_string(),
+                            x_request_id_with_colon: "x-request-id:".to_string(),
+                            trace_id_origin: "x-b3-traceid".to_string(),
+                            trace_id_lower: "x-b3-traceid".to_string(),
+                            trace_id_with_colon: "x-b3-traceid:".to_string(),
+                            trace_type: TraceType::Disabled,
+                            span_id_origin: "x-b3-spanid".to_string(),
+                            span_id_lower: "x-b3-spanid".to_string(),
+                            span_id_with_colon: "x-b3-spanid:".to_string(),
+                            span_type: TraceType::Disabled,
+                        };
+                        Box::from(parser)
+                    }
                     L7Protocol::Http2 => Box::from(HttpLog::default()),
                     L7Protocol::Mysql => Box::from(MysqlLog::default()),
                     L7Protocol::Redis => Box::from(RedisLog::default()),

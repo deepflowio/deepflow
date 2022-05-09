@@ -76,7 +76,8 @@ pub struct HttpLog {
     status: L7ResponseStatus,
 
     info: HttpInfo,
-    l7_log_dynamic_config: L7LogDynamicConfig,
+    // TODO: remove pub
+    pub l7_log_dynamic_config: L7LogDynamicConfig,
 }
 
 impl HttpLog {
