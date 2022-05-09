@@ -41,7 +41,7 @@ fn set_build_info() -> Result<(), Box<dyn Error>> {
 fn set_build_libebpf() -> Result<(), Box<dyn Error>> {
     Command::new("sh")
         .arg("-c")
-        .arg("cd src/ebpf && ./remote-make 10.1.3.91 metaflow")
+        .arg("cd src/ebpf && make clean && make --no-print-directory && make tools --no-print-directory")
         .output()
         .expect("compile libebpf.a error!");
     let library_name = "ebpf";
