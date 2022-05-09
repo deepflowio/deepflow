@@ -88,6 +88,7 @@ pub struct MetaPacket<'a> {
     // for ebpf
     pub l7_protocol: L7Protocol,
     pub socket_id: u64,
+    pub cap_seq: u64,
 
     pub process_id: u32,
     pub thread_id: u32,
@@ -799,6 +800,7 @@ impl<'a> MetaPacket<'a> {
         packet.payload_len = data.cap_len as u16;
         packet.l4_payload_len = data.cap_len as usize;
         packet.tap_port = TapPort::from_ebpf(data.process_id);
+        packet.cap_seq = data.cap_seq;
         packet.process_id = data.process_id;
         packet.thread_id = data.thread_id;
         packet.syscall_trace_id = data.syscall_trace_id_call;

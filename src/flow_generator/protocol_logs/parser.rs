@@ -101,6 +101,7 @@ impl MetaAppProto {
             l3_epc_id_dst: 0,
             req_tcp_seq: 0,
             resp_tcp_seq: 0,
+            cap_seq: 0,
             process_id_0: 0,
             process_id_1: 0,
             process_kname_0: "".to_string(),
