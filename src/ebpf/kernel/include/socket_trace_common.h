@@ -46,13 +46,17 @@ struct __socket_data {
 	__u64 data_seq;      // cap_data在Socket中的相对顺序号
 	__u16 data_type;     // HTTP, DNS, MySQL
 	__u16 data_len;      // 数据长度
-	char data[1024];
+	char data[512];
 } __attribute__((packed));
 
+/*
+ * 整个结构大小为2^14（2的次幂），目的是用（2^n - 1）与数据
+ * 长度作位与操作使eBPF程序进行安全的bpf_perf_event_output()操作。
+ */
 struct __socket_data_buffer {
 	__u32 events_num;
 	__u32 len; // data部分长度
-	char data[sizeof(struct __socket_data) * 16];
+	char data[16376]; // 16376 + len(4bytes) + events_num(4bytes) = 2^14 = 16384
 };
 
 struct trace_uid_t {
