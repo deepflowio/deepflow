@@ -128,6 +128,7 @@ pub struct AppProtoLogsBaseInfo {
     pub req_tcp_seq: u32,
     pub resp_tcp_seq: u32,
     /* EBPF Info */
+    pub cap_seq: u64,
     pub process_id_0: u32,
     pub process_id_1: u32,
     pub process_kname_0: String,
@@ -218,6 +219,7 @@ impl AppProtoLogsBaseInfo {
             port_dst: packet.lookup_key.dst_port,
             protocol: packet.lookup_key.proto,
 
+            cap_seq: packet.cap_seq,
             process_id_0: if is_src { packet.process_id } else { 0 },
             process_id_1: if !is_src { packet.process_id } else { 0 },
             process_kname_0: if is_src {
@@ -280,10 +282,13 @@ impl AppProtoLogsBaseInfo {
     fn merge(&mut self, log: AppProtoLogsBaseInfo) {
         if log.process_id_0 > 0 {
             self.process_id_0 = log.process_id_0;
+            self.process_kname_0 = log.process_kname_0;
         }
         if log.process_id_1 > 0 {
             self.process_id_1 = log.process_id_1;
+            self.process_kname_1 = log.process_kname_1;
         }
+
         self.end_time = log.end_time;
         self.resp_tcp_seq = log.resp_tcp_seq;
         self.syscall_trace_id_response = log.syscall_trace_id_response;
