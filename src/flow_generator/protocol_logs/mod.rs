@@ -294,6 +294,8 @@ impl AppProtoLogsBaseInfo {
         self.syscall_trace_id_response = log.syscall_trace_id_response;
         self.head.msg_type = LogMessageType::Session;
         self.head.code = log.head.code;
+        self.head.status = log.head.status;
+        self.head.rrt = log.head.rrt;
     }
 }
 
