@@ -38,6 +38,8 @@ use crate::{
     utils::net::MacAddr,
 };
 
+const NANOS_PER_MICRO: u64 = 1000;
+
 #[derive(Debug, PartialEq, Copy, Clone)]
 #[repr(u8)]
 pub enum L7ResponseStatus {
@@ -95,7 +97,7 @@ impl From<AppProtoHead> for flow_log::AppProtoHead {
             msg_type: f.msg_type as u32,
             status: f.status as u32,
             code: f.code as u32,
-            rrt: f.rrt,
+            rrt: f.rrt * NANOS_PER_MICRO,
         }
     }
 }
