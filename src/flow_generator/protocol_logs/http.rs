@@ -119,24 +119,30 @@ impl HttpLog {
         }
     }
 
-    fn parse_http_v1(&mut self, payload: &[u8], direction: PacketDirection) -> Result<()> {
-        let http_payload =
-            std::str::from_utf8(payload).map_err(|_| Error::HttpHeaderParseFailed)?;
-
-        let mut content_length: Option<u64> = None;
-        if direction == PacketDirection::ServerToClient {
-            if payload.len() < HTTP_RESP_MAX_LINE {
-                return Err(Error::HttpHeaderParseFailed);
+    fn parse_lines(payload: &[u8]) -> Vec<String> {
+        let mut lines = Vec::new();
+        let mut line = String::new();
+        for i in 0..payload.len() {
+            let ch = payload[i] as char;
+            if i > 2 && ch == '\n' && payload[i - 1] as char == '\r' {
+                lines.push(line.clone());
+                line.clear();
+            } else if ch != '\r' {
+                line.push(ch);
             }
         }
+        return lines;
+    }
 
-        let (line_info, body_info) = http_payload
-            .split_once("\r\n")
-            .ok_or(Error::HttpHeaderParseFailed)?;
+    fn parse_http_v1(&mut self, payload: &[u8], direction: PacketDirection) -> Result<()> {
+        let lines = Self::parse_lines(payload);
+        if lines.len() == 0 {
+            return Err(Error::HttpHeaderParseFailed);
+        }
 
         if direction == PacketDirection::ServerToClient {
             // HTTP响应行：HTTP/1.1 404 Not Found.
-            let (version, status_code) = get_http_resp_info(line_info)?;
+            let (version, status_code) = get_http_resp_info(lines[0].as_str())?;
 
             self.info.version = version;
             self.status_code = status_code as u16;
@@ -146,31 +152,20 @@ impl HttpLog {
             self.set_status(status_code);
         } else {
             // HTTP请求行：GET /background.png HTTP/1.0
-            let (method, _) = line_info
-                .split_once(' ')
-                .ok_or(Error::HttpHeaderParseFailed)?;
-            check_http_method(method)?;
-            let first_space_index = method.len();
-
-            let (_, mut version) = line_info
-                .rsplit_once(' ')
-                .ok_or(Error::HttpHeaderParseFailed)?;
-            version = get_http_request_version(version)?;
-
-            let last_space_index = line_info.len() - HTTP_V1_VERSION_LEN - 1;
-            if last_space_index < first_space_index + 1 {
+            let contexts: Vec<&str> = lines[0].as_str().split(" ").collect();
+            if contexts.len() != 3 {
                 return Err(Error::HttpHeaderParseFailed);
             }
 
-            self.info.method = method.to_string();
-            self.info.path = line_info[first_space_index + 1..last_space_index].to_string();
-            self.info.version = version.to_string();
+            self.info.method = contexts[0].to_string();
+            self.info.path = contexts[1].to_string();
+            self.info.version = get_http_request_version(contexts[2])?.to_string();
 
             self.msg_type = LogMessageType::Request;
         }
 
-        let body_lines = body_info.split("\r\n");
-        for body_line in body_lines {
+        let mut content_length: Option<u64> = None;
+        for body_line in &lines[1..] {
             if body_line.starts_with("Content-Length:") {
                 content_length = Some(
                     body_line[HTTP_CONTENT_LENGTH_OFFSET..]
@@ -185,7 +180,7 @@ impl HttpLog {
                     self.l7_log_dynamic_config.trace_type,
                     Self::TRACE_ID,
                 ) {
-                    self.info.trace_id = id;
+                    self.info.trace_id = id.clone();
                 }
                 // 存在配置相同字段的情况，如“sw8”
                 if self.l7_log_dynamic_config.trace_id_origin
@@ -196,7 +191,7 @@ impl HttpLog {
                         self.l7_log_dynamic_config.span_type,
                         Self::SPAN_ID,
                     ) {
-                        self.info.span_id = id;
+                        self.info.span_id = id.clone();
                     }
                 }
             } else if !self.l7_log_dynamic_config.span_id_origin.is_empty()
@@ -454,18 +449,15 @@ impl HttpLog {
     // 提取`TRACEID`展示为HTTP日志中的`TraceID`字段
     // 提取`SEGMENTID-SPANID`展示为HTTP日志中的`SpanID`字段
     fn decode_skywalking_id(value: &str, id_type: u8) -> Option<String> {
-        let segs = value.split("-");
-        let mut i = 0;
-        for seg in segs {
-            if id_type == Self::TRACE_ID && i == 1 {
-                return Some(seg.to_string());
-            }
-            if id_type == Self::SPAN_ID && i == 3 {
-                return Some(seg.to_string());
-            }
+        let segs: Vec<&str> = value.split("-").collect();
 
-            i += 1;
+        if id_type == Self::TRACE_ID && segs.len() > 2 {
+            return Some(segs[1].to_string());
         }
+        if id_type == Self::SPAN_ID && segs.len() > 4 {
+            return Some(segs[2..4].join("-"));
+        }
+
         None
     }
 
@@ -618,7 +610,7 @@ mod tests {
     const FILE_DIR: &str = "resources/test/flow_generator/http";
 
     fn run(name: &str) -> String {
-        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name), None);
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name), Some(1500));
         let mut packets = capture.as_meta_packets();
         if packets.is_empty() {
             return "".to_string();
@@ -638,6 +630,22 @@ mod tests {
             };
 
             let mut http = HttpLog::default();
+            http.l7_log_dynamic_config = L7LogDynamicConfig {
+                proxy_client_origin: "".to_string(),
+                proxy_client_lower: "".to_string(),
+                proxy_client_with_colon: "".to_string(),
+                x_request_id_origin: "".to_string(),
+                x_request_id_lower: "".to_string(),
+                x_request_id_with_colon: "".to_string(),
+                trace_id_origin: "sw8".to_string(),
+                trace_id_lower: "sw8".to_string(),
+                trace_id_with_colon: "sw8:".to_string(),
+                trace_type: TraceType::Sw8,
+                span_id_origin: "sw8".to_string(),
+                span_id_lower: "sw8".to_string(),
+                span_id_with_colon: "sw8:".to_string(),
+                span_type: TraceType::Sw8,
+            };
             let _ = http.parse(payload, packet.lookup_key.proto, packet.direction);
 
             output.push_str(&format!("{:?}\r\n", http.info));
@@ -649,6 +657,7 @@ mod tests {
     fn check() {
         let files = vec![
             ("httpv1.pcap", "httpv1.result"),
+            ("sw8.pcap", "sw8.result"),
             //("h2c_ascii.pcap", "h2c_ascii.result"),
         ];
         for item in files.iter() {
