@@ -28,11 +28,7 @@ use log::{debug, info, warn};
 use openshift_openapi::api::route::v1::Route;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
-use tokio::{
-    runtime::Handle,
-    task::JoinHandle,
-    time::{self, Instant},
-};
+use tokio::{runtime::Handle, task::JoinHandle, time};
 
 const LIST_INTERVAL: Duration = Duration::from_secs(600);
 const REFRESH_INTERVAL: Duration = Duration::from_secs(3600);
@@ -161,8 +157,7 @@ where
     ) {
         Self::get_list_entry(&entries, &version, kind, &api, &err_msg).await;
 
-        let ticker = time::sleep(LIST_INTERVAL);
-        tokio::pin!(ticker);
+        let mut ticker = time::interval(LIST_INTERVAL);
 
         let mut stream = runtime::watcher(api.clone(), ListParams::default()).boxed();
 
@@ -188,7 +183,7 @@ where
                         &mut event_counter
                     );
                 }
-                _ = &mut ticker => {
+                _ = ticker.tick() => {
                     if last_update.elapsed().unwrap() < LIST_INTERVAL
                         && last_refresh.elapsed().unwrap() < REFRESH_INTERVAL
                     {
@@ -199,7 +194,6 @@ where
                     last_refresh = SystemTime::now();
 
                     Self::get_list_entry(&entries, &version, kind, &api, &err_msg).await;
-                    ticker.as_mut().reset(Instant::now() + LIST_INTERVAL);
                 }
             }
         }
@@ -315,13 +309,13 @@ where
                     event_counter.applied = 0;
                 } else if event_counter.deleted >= MAX_EVENT_COUNT {
                     info!(
-                        "k8s {}  watcher has {} deleted events",
+                        "k8s {} watcher has {} deleted events",
                         kind, event_counter.deleted
                     );
                     event_counter.deleted = 0;
                 } else if event_counter.restarted >= MAX_EVENT_COUNT {
                     info!(
-                        "k8s {}  watcher has {} restarted events",
+                        "k8s {} watcher has {} restarted events",
                         kind, event_counter.restarted
                     );
                     event_counter.restarted = 0;

@@ -15,11 +15,11 @@ verify-x64:
   tags:
     - rust
   script:
-    - id
+    - cargo check
+    - cargo fmt --all -- --check
     - cargo build --release
     - cargo build --release --bin metaflow-agent-ctl
     - cargo test
-    - cargo fmt --all -- --check
     # - cargo clean
   # artifacts:
   #     paths:
