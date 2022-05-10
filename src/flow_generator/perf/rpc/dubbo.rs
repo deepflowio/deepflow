@@ -141,7 +141,7 @@ impl DubboPerfData {
             has_log_data: false,
             l7_proto: L7Protocol::default(),
             msg_type: LogMessageType::default(),
-            rrt_cache: rrt_cache,
+            rrt_cache,
         };
         Self {
             perf_stats: None,
@@ -168,7 +168,7 @@ impl DubboPerfData {
         let perf_stats = self.perf_stats.get_or_insert(PerfStats::default());
         perf_stats.resp_count += 1;
 
-        match self.session_data.dubbo_header.status_code {
+        self.session_data.status = match self.session_data.dubbo_header.status_code {
             OK => L7ResponseStatus::Ok,
             CLIENT_TIMEOUT | BAD_REQUEST | CLIENT_ERROR => {
                 perf_stats.req_err_count += 1;
