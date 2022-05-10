@@ -167,6 +167,21 @@ impl HttpPerfData {
         }
     }
 
+    fn parse_lines(payload: &[u8]) -> Vec<String> {
+        let mut lines = Vec::new();
+        let mut line = String::new();
+        for i in 0..payload.len() {
+            let ch = payload[i] as char;
+            if i > 2 && ch == '\n' && payload[i - 1] as char == '\r' {
+                lines.push(line.clone());
+                line.clear();
+            } else if ch != '\r' {
+                line.push(ch);
+            }
+        }
+        return lines;
+    }
+
     fn parse_http_v1(
         &mut self,
         payload: &[u8],
@@ -174,12 +189,12 @@ impl HttpPerfData {
         direction: PacketDirection,
         flow_id: u64,
     ) -> Result<()> {
-        let http_payload =
-            std::str::from_utf8(payload).map_err(|_| Error::HttpHeaderParseFailed)?;
+        let lines = Self::parse_lines(payload);
+        if lines.len() == 0 {
+            return Err(Error::HttpHeaderParseFailed);
+        }
 
-        let (line_info, _) = http_payload
-            .split_once("\r\n")
-            .ok_or(Error::HttpHeaderParseFailed)?;
+        let line_info = lines[0].as_str();
 
         if direction == PacketDirection::ServerToClient {
             // HTTP响应行：HTTP/1.1 404 Not Found.
@@ -228,14 +243,12 @@ impl HttpPerfData {
             perf_stats.rrt_count += 1;
         } else {
             // HTTP请求行：GET /background.png HTTP/1.0
-            let (method, _) = line_info
-                .split_once(' ')
-                .ok_or(Error::HttpHeaderParseFailed)?;
-            check_http_method(method)?;
-            let (_, version) = line_info
-                .rsplit_once(' ')
-                .ok_or(Error::HttpHeaderParseFailed)?;
-            get_http_request_version(version)?;
+            let context: Vec<&str> = line_info.split(" ").collect();
+            if context.len() != 3 {
+                return Err(Error::HttpHeaderParseFailed);
+            }
+            check_http_method(context[0])?;
+            get_http_request_version(context[2])?;
 
             self.session_data.msg_type = LogMessageType::Request;
 
