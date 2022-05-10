@@ -202,6 +202,7 @@ impl FlowMap {
                 return;
             }
         };
+        let total_flow = node_map.len();
 
         match node_map.remove_entry(&pkt_key) {
             // 找到Flow,更新
@@ -223,7 +224,7 @@ impl FlowMap {
             }
             // 未找到Flow，需要插入新的节点
             None => {
-                let node = self.new_flow_node(meta_packet);
+                let node = self.new_flow_node(meta_packet, total_flow);
                 time_set.insert(pkt_key.clone());
                 node_map.insert(pkt_key, node);
             }
@@ -233,10 +234,6 @@ impl FlowMap {
         self.time_set.replace(time_set);
         // go实现只有插入node的时候，插入的节点数目大于ring buffer 的capacity 返回false,
         // rust 版本用了std的hashmap自动处理扩容,也就没有返回false, 然后执行policy_getter
-    }
-
-    pub fn len(&self) -> usize {
-        self.node_map.as_ref().map(|m| m.len()).unwrap_or_default()
     }
 
     fn update_tcp_node(
@@ -483,7 +480,7 @@ impl FlowMap {
         self.config.load().l4_performance_enabled
     }
 
-    fn init_flow(&mut self, meta_packet: &mut MetaPacket) -> FlowNode {
+    fn init_flow(&mut self, meta_packet: &mut MetaPacket, total_flow: usize) -> FlowNode {
         meta_packet.direction = PacketDirection::ClientToServer;
 
         let mut tagged_flow = TaggedFlow::default();
@@ -516,7 +513,7 @@ impl FlowMap {
             } else {
                 TunnelField::default()
             },
-            flow_id: Self::generate_flow_id(lookup_key.timestamp, self.id, self.len()),
+            flow_id: Self::generate_flow_id(lookup_key.timestamp, self.id, total_flow),
             start_time: lookup_key.timestamp,
             flow_stat_time: Duration::from_nanos(
                 (lookup_key.timestamp.as_nanos() / TIME_UNIT.as_nanos() * TIME_UNIT.as_nanos())
@@ -694,8 +691,8 @@ impl FlowMap {
         }
     }
 
-    fn new_tcp_node(&mut self, mut meta_packet: MetaPacket) -> FlowNode {
-        let mut node = self.init_flow(&mut meta_packet);
+    fn new_tcp_node(&mut self, mut meta_packet: MetaPacket, total_flow: usize) -> FlowNode {
+        let mut node = self.init_flow(&mut meta_packet, total_flow);
         self.update_l4_direction(&mut meta_packet, &mut node, true);
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
 
@@ -749,8 +746,8 @@ impl FlowMap {
         }
     }
 
-    fn new_udp_node(&mut self, mut meta_packet: MetaPacket) -> FlowNode {
-        let mut node = self.init_flow(&mut meta_packet);
+    fn new_udp_node(&mut self, mut meta_packet: MetaPacket, total_flow: usize) -> FlowNode {
+        let mut node = self.init_flow(&mut meta_packet, total_flow);
         node.flow_state = FlowState::Established;
         // opening timeout
         node.timeout = self.config.load().flow_timeout.opening;
@@ -762,19 +759,19 @@ impl FlowMap {
         node
     }
 
-    fn new_other_node(&mut self, mut meta_packet: MetaPacket) -> FlowNode {
-        let mut node = self.init_flow(&mut meta_packet);
+    fn new_other_node(&mut self, mut meta_packet: MetaPacket, total_flow: usize) -> FlowNode {
+        let mut node = self.init_flow(&mut meta_packet, total_flow);
         node.flow_state = FlowState::Established;
         // opening timeout
         node.timeout = self.config.load().flow_timeout.opening;
         node
     }
 
-    fn new_flow_node(&mut self, meta_packet: MetaPacket) -> FlowNode {
+    fn new_flow_node(&mut self, meta_packet: MetaPacket, total_flow: usize) -> FlowNode {
         match meta_packet.lookup_key.proto {
-            IpProtocol::Tcp => self.new_tcp_node(meta_packet),
-            IpProtocol::Udp => self.new_udp_node(meta_packet),
-            _ => self.new_other_node(meta_packet),
+            IpProtocol::Tcp => self.new_tcp_node(meta_packet, total_flow),
+            IpProtocol::Udp => self.new_udp_node(meta_packet, total_flow),
+            _ => self.new_other_node(meta_packet, total_flow),
         }
     }
 
@@ -1339,7 +1336,12 @@ mod tests {
         packet1.direction = PacketDirection::ServerToClient;
         packet1.policy_data.replace(Arc::new(policy_data1));
 
-        let mut node = flow_map.init_flow(&mut packet0);
+        let total_flow = flow_map
+            .node_map
+            .as_ref()
+            .map(|map| map.len())
+            .unwrap_or_default();
+        let mut node = flow_map.init_flow(&mut packet0, total_flow);
         node.policy_in_tick.fill(false);
         flow_map.update_flow(&mut node, &mut packet1);
 
@@ -1372,7 +1374,12 @@ mod tests {
 
         if let Ok(tagged_flow) = output_queue_receiver.recv(Some(TIME_UNIT)) {
             assert_eq!(tagged_flow.flow.close_type, CloseType::ForcedReport);
-            assert_eq!(flow_map.len(), 1);
+            let total_flow = flow_map
+                .node_map
+                .as_ref()
+                .map(|map| map.len())
+                .unwrap_or_default();
+            assert_eq!(total_flow, 1);
         }
     }
 
@@ -1464,7 +1471,12 @@ mod tests {
 
         let mut packet0 = _new_meta_packet();
         // test handshake
-        let mut node = flow_map.init_flow(&mut packet0);
+        let total_flow = flow_map
+            .node_map
+            .as_ref()
+            .map(|map| map.len())
+            .unwrap_or_default();
+        let mut node = flow_map.init_flow(&mut packet0, total_flow);
         let peer_src = &mut node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC];
         peer_src.tcp_flags = TcpFlags::SYN;
         flow_map.update_flow_state_machine(
