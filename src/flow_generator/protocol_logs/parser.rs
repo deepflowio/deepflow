@@ -326,12 +326,12 @@ impl SessionQueue {
             }
             LogMessageType::Response => {
                 // response, 需要找到request并merge
-                if let Some(request) = map.remove(&key) {
+                if let Some(mut request) = map.remove(&key) {
                     if request.base_info.head.proto == item.base_info.head.proto {
                         self.counter.cached.fetch_sub(1, Ordering::Relaxed);
                         self.counter.merge.fetch_add(1, Ordering::Relaxed);
-                        let merged_item = Self::session_merge(request, item);
-                        self.send(merged_item);
+                        request.session_merge(item);
+                        self.send(request);
                     } else {
                         map.insert(key, request);
                         self.send(item);
@@ -365,17 +365,6 @@ impl SessionQueue {
             }
         }
         self.time_window.replace(time_window);
-    }
-
-    fn session_merge(
-        mut proto_log: AppProtoLogsData,
-        other_proto_log: AppProtoLogsData,
-    ) -> AppProtoLogsData {
-        proto_log.base_info.end_time = other_proto_log.base_info.end_time;
-        proto_log.base_info.resp_tcp_seq = other_proto_log.base_info.resp_tcp_seq;
-        proto_log.base_info.head.msg_type = LogMessageType::Session;
-        proto_log.special_info.merge(other_proto_log.special_info);
-        proto_log
     }
 
     fn calc_key(item: &AppProtoLogsData) -> u64 {
