@@ -190,9 +190,9 @@ impl ServerIp {
             }
             return true;
         }
-        if let Some(new_ip) = self.get_proxy_ip() {
-            if !self.proxied {
-                // 请求controller成功，改为请求proxy
+        if !self.proxied {
+            // 请求controller成功，改为请求proxy
+            if let Some(new_ip) = self.get_proxy_ip() {
                 info!(
                     "rpc IP changed to proxy {} from controller {}",
                     new_ip, self.current_ip
@@ -200,7 +200,14 @@ impl ServerIp {
                 self.current_ip = new_ip.into();
                 self.proxied = true;
                 true
-            } else if self.proxied && new_ip.ne(&self.current_ip) {
+            } else {
+                info!("rpc IP not changed, proxy unavailable");
+                false
+            }
+        } else {
+            // 这里proxy_ip一定有
+            let new_ip = self.get_proxy_ip().unwrap();
+            if new_ip.ne(&self.current_ip) {
                 // proxy改变
                 info!(
                     "rpc IP changed to proxy {} from proxy {}",
@@ -211,9 +218,6 @@ impl ServerIp {
             } else {
                 false
             }
-        } else {
-            info!("rpc IP not changed, proxy unavailable");
-            false
         }
     }
 }
