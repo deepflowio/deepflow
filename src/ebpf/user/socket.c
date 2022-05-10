@@ -311,19 +311,11 @@ static struct tracer_sockopts socktrace_sockopts = {
 	.get = socktrace_sockopt_get,
 };
 
+// TODO : 标记上层是否需要重新确认协议准确性
+// 目前上层没有实现协议再次确认的功能,对需要重新确认的包直接丢弃,这里临时设置数据包不需要重新确认
+// 上层实现重新确认功能后再使用
 static inline bool need_proto_reconfirm(uint16_t l7_proto)
 {
-	// TODO : 还需要进一步的测试确认各协议的判断准确率
-
-	switch (l7_proto) {
-	case PROTO_KAFKA:
-	case PROTO_HTTP2:
-	case PROTO_MYSQL:
-		return true;
-	default:
-		return false;
-	}
-
 	return false;
 }
 
