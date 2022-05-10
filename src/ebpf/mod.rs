@@ -8,7 +8,7 @@ use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 // 最大长度
-pub const CAP_LEN_MAX: usize = 512;
+pub const CAP_LEN_MAX: usize = 1024;
 
 //方向
 #[allow(dead_code)]
