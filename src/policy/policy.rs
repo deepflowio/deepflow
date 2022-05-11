@@ -87,8 +87,8 @@ impl Policy {
             packet.policy_data = Some(policy);
             packet.endpoint_data = Some(endpoints);
             debug!(
-                "\n{}\n\t{:?}\n\t{:?}\n",
-                key, packet.policy_data, packet.endpoint_data
+                "\n{} {}\n\t{:?}\n\t{:?}\n",
+                key, packet.tap_port, packet.policy_data, packet.endpoint_data
             );
         }
         key.src_port = src_port;
