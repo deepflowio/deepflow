@@ -338,7 +338,8 @@ static __inline void infer_l7_class(struct conn_info_t* conn_info,
 
 	// 推断应用协议
 	struct protocol_message_t inferred_protocol = infer_protocol(buf, count, conn_info, sk_type);
-	if (inferred_protocol.protocol == PROTO_UNKNOWN) {
+	if (inferred_protocol.protocol == PROTO_UNKNOWN &&
+	    inferred_protocol.type == MSG_UNKNOWN) {
 		conn_info->protocol = PROTO_UNKNOWN;
 		return;
 	}
@@ -644,6 +645,7 @@ static __inline void data_submit(struct pt_regs *ctx,
 		if (conn_info->message_type == MSG_PRESTORE) {
 			*(__u32 *)sk_info.prev_data = *(__u32 *)conn_info->prev_buf;
 			sk_info.prev_data_len = 4;
+			sk_info.uid = 0;
 		}
 
 		socket_info_map__update(&conn_key, &sk_info);
@@ -817,7 +819,7 @@ static __inline void process_data(const bool vecs, struct pt_regs* ctx, __u64 id
 		__data = iov_cpy.iov_base;
 	}
 
-	if (conn_info->protocol != PROTO_UNKNOWN) {
+	if (conn_info->protocol != PROTO_UNKNOWN || conn_info->message_type != MSG_UNKNOWN) {
 		data_submit(ctx, conn_info, __data, (__u32)bytes_count, offset);
 	}
 }
