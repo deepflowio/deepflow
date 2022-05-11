@@ -39,6 +39,7 @@ use crate::{
     },
     config::handler::{FlowAccess, FlowConfig, NewRuntimeConfig},
     policy::{Policy, PolicyGetter},
+    proto::common::TridentType,
     rpc::get_timestamp,
     utils::hasher::Jenkins64Hasher,
     utils::net::MacAddr,
@@ -1113,6 +1114,7 @@ pub fn _new_flow_map_and_receiver() -> (FlowMap, Receiver<TaggedFlow>) {
     let mut config = NewRuntimeConfig::default();
     // Any
     config.flow.l7_log_tap_types[0] = true;
+    config.flow.trident_type = TridentType::TtProcess;
     let current_config = Arc::new(ArcSwap::from_pointee(config));
     let (flow_map, _counter) = FlowMap::new(
         0,

@@ -749,10 +749,9 @@ impl Flow {
     pub fn set_tap_side(
         &mut self,
         trident_type: TridentType,
-        cloud_gateway_traffic: bool, // 从static config 获
+        cloud_gateway_traffic: bool, // 从static config 获取
     ) {
-        if self.tap_side != TapSide::Rest || self.flow_key.tap_type != TapType::Tor {
-            // 对TapType的判断只是为了让UT能过
+        if self.tap_side != TapSide::Rest {
             return;
         }
         // 链路追踪统计位置
