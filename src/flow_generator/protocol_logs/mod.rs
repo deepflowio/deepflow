@@ -399,10 +399,15 @@ impl AppProtoLogsData {
             .map(|_| pb_proto_logs_data.encoded_len())
     }
 
-    pub fn flow_session_id(&self) -> u64 {
+    pub fn ebpf_flow_session_id(&self) -> u64 {
+        let mut cap_seq = self.base_info.cap_seq;
+        if self.base_info.head.msg_type == LogMessageType::Request {
+            cap_seq += 1;
+        };
         self.base_info.flow_id << 32
-            | (self.base_info.head.proto as u64) << 24
-            | self.special_info.session_id() as u64
+            | (self.base_info.head.proto as u64) << 28
+            | ((self.special_info.session_id() as u64) & 0xffff << 12)
+            | (cap_seq & 0xfff)
     }
 
     pub fn session_merge(&mut self, log: AppProtoLogsData) {
