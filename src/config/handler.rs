@@ -143,6 +143,7 @@ pub struct PlatformConfig {
     pub source_ip: IpAddr,
     pub epc_id: u32,
     pub kubernetes_api_enabled: bool,
+    pub namespace: Option<String>,
 }
 
 #[derive(Clone, PartialEq, Debug, Eq)]
@@ -458,6 +459,7 @@ impl Default for NewRuntimeConfig {
                 source_ip: default_ip,
                 epc_id: 0,
                 kubernetes_api_enabled: false,
+                namespace: None,
             },
             flow: {
                 FlowConfig {
@@ -870,6 +872,11 @@ impl ConfigHandler {
                 source_ip: self.ctrl_ip,
                 epc_id: conf.epc_id(),
                 kubernetes_api_enabled: conf.kubernetes_api_enabled(),
+                namespace: if static_config.kubernetes_namespace.is_empty() {
+                    None
+                } else {
+                    Some(static_config.kubernetes_namespace.clone())
+                },
             },
             flow: {
                 let flow_config = &self.static_config.flow;
