@@ -42,7 +42,7 @@ struct SessionAggr {
 impl SessionAggr {
     // 尽力而为的聚合默认120秒(AppProtoLogs.aggr*SLOT_WIDTH)内的请求和响应
     const SLOT_WIDTH: u64 = 60; // 每个slot存60秒
-    const SLOT_CACHED_COUNT: u64 = 100000; // 每个slot平均缓存的FLOW数
+    const SLOT_CACHED_COUNT: u64 = 300000; // 每个slot平均缓存的FLOW数
 
     pub fn new(l7_log_session_timeout: Duration, output: DebugSender<SendItem>) -> Self {
         let solt_count = l7_log_session_timeout.as_secs() / Self::SLOT_WIDTH;
@@ -103,28 +103,34 @@ impl SessionAggr {
     }
 
     fn slot_handle(&mut self, mut log: AppProtoLogsData, slot_index: usize, key: u64, ttl: usize) {
-        let map = self.maps[slot_index as usize].as_mut().unwrap();
+        let mut map = self.maps[slot_index as usize].take().unwrap();
 
         match log.base_info.head.msg_type {
             LogMessageType::Request => {
-                let value = map.get(&key);
+                let value = map.remove(&key);
                 if value.is_none() {
                     // 防止缓存过多的log
                     if self.cache_count >= self.slot_count * Self::SLOT_CACHED_COUNT {
                         self.send(log);
+                        self.maps[slot_index as usize].replace(map);
                         return;
                     }
 
                     map.insert(key, log);
                     self.cache_count += 1;
+                    self.maps[slot_index as usize].replace(map);
                     return;
                 }
-                let item = value.unwrap().clone();
-                // 若乱序，已存在响应，并且seq相邻，则可以匹配为会话，则聚合响应发送
-                if item.base_info.head.msg_type == LogMessageType::Response
-                    && log.base_info.cap_seq + 1 == item.base_info.cap_seq
-                {
+                let item = value.unwrap();
+                // 若乱序，已存在响应，则可以匹配为会话，则聚合响应发送
+                if item.base_info.head.msg_type == LogMessageType::Response {
+                    let rrt = if item.base_info.start_time > log.base_info.start_time {
+                        item.base_info.start_time - log.base_info.start_time
+                    } else {
+                        Duration::ZERO
+                    };
                     log.session_merge(item);
+                    log.base_info.head.rrt = rrt.as_micros() as u64;
                     self.send(log);
                 } else {
                     // 对于HTTPV1, requestID总为0, 连续出现多个request时，response匹配最后一个request为session
@@ -133,21 +139,31 @@ impl SessionAggr {
                 }
             }
             LogMessageType::Response => {
-                let item = map.get(&key);
+                let mut item = map.remove(&key);
                 if item.is_none() {
                     if ttl > 0 && slot_index != 0 {
-                        // 相应和请求可能不在同一个时间槽里，这里继续查询小的时间槽
-                        self.slot_handle(log, slot_index - 1, key, ttl - 1);
+                        // 响应和请求时间差长的话，不在同一个时间槽里,或者此时请求还未到达，这里继续查询小的时间槽
+                        let mut pre_map = self.maps[slot_index - 1 as usize].take();
+                        let pre_map_mut = pre_map.as_mut().unwrap();
+                        item = pre_map_mut.remove(&key);
+                        if item.is_none() {
+                            self.maps[slot_index - 1 as usize].replace(pre_map.unwrap());
+                            // ebpf的数据存在乱序，回应比请求先到的情况
+                            map.insert(key, log);
+                            self.cache_count += 1;
+                            self.maps[slot_index as usize].replace(map);
+                            return;
+                        }
+                        self.maps[slot_index - 1 as usize].replace(pre_map.unwrap());
                     } else {
                         // ebpf的数据存在乱序，回应比请求先到的情况
                         map.insert(key, log);
                         self.cache_count += 1;
+                        self.maps[slot_index as usize].replace(map);
                         return;
                     }
-                    return;
                 }
-                let mut item = item.unwrap().clone();
-                map.remove(&key);
+                let mut item = item.unwrap();
 
                 let rrt = if log.base_info.start_time > item.base_info.start_time {
                     log.base_info.start_time - item.base_info.start_time
@@ -166,11 +182,13 @@ impl SessionAggr {
             }
             _ => {}
         }
+        self.maps[slot_index as usize].replace(map);
     }
 
     fn handle(&mut self, log: AppProtoLogsData) {
         let solt_time = log.base_info.start_time.as_secs();
         if solt_time < self.start_time {
+            self.send(log);
             return;
         }
         if self.start_time == 0 {
@@ -182,7 +200,7 @@ impl SessionAggr {
             slot_index = self.flush(slot_index - self.slot_count + 1);
         }
 
-        let key = log.flow_session_id();
+        let key = log.ebpf_flow_session_id();
         self.slot_handle(log, slot_index as usize, key, 1);
     }
 }
