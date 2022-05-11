@@ -290,8 +290,7 @@ impl AppProtoLogsBaseInfo {
             self.process_id_1 = log.process_id_1;
             self.process_kname_1 = log.process_kname_1;
         }
-
-        self.end_time = log.end_time;
+        self.end_time = log.end_time.max(self.start_time);
         self.resp_tcp_seq = log.resp_tcp_seq;
         self.syscall_trace_id_response = log.syscall_trace_id_response;
         self.head.msg_type = LogMessageType::Session;
@@ -406,8 +405,8 @@ impl AppProtoLogsData {
         };
         self.base_info.flow_id << 32
             | (self.base_info.head.proto as u64) << 28
-            | ((self.special_info.session_id() as u64) & 0xffff << 12)
-            | (cap_seq & 0xfff)
+            | ((self.special_info.session_id() as u64) & 0xfff << 16)
+            | (cap_seq & 0xffff)
     }
 
     pub fn session_merge(&mut self, log: AppProtoLogsData) {
