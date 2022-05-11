@@ -124,6 +124,7 @@ impl MysqlLog {
             }
             _ => return Err(Error::MysqlLogParseFailed),
         }
+        self.l7_proto = L7Protocol::Mysql;
         Ok(())
     }
 
