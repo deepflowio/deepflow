@@ -111,7 +111,7 @@ impl LocalModeDispatcher {
                 // src mac
                 (true, false)
             } else if pipeline.vm_mac.octets()[2..] == packet.data[2..MAC_ADDR_LEN]
-                && MacAddr::is_multicast(packet.data)
+                || MacAddr::is_multicast(packet.data)
             {
                 // dst mac
                 (false, true)
