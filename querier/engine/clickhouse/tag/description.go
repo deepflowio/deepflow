@@ -231,7 +231,16 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 	}
 	sqlSplit := strings.Split(rawSql, " ")
 	tag := sqlSplit[2]
-	whereSql := strings.Split(rawSql, "WHERE")[1]
+	var whereSql string
+	if strings.Contains(rawSql, "WHERE") {
+		whereSql = strings.Split(rawSql, "WHERE")[1]
+	} else {
+		if tag == "ip" {
+			whereSql = "value!=''"
+		} else {
+			whereSql = "value!=0"
+		}
+	}
 	err := chClient.Init("")
 	if err != nil {
 		return nil, err
