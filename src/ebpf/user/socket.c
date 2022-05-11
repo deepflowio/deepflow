@@ -321,7 +321,6 @@ static inline bool need_proto_reconfirm(uint16_t l7_proto)
 
 static void reader_raw_cb(void *t, void *raw, int raw_size)
 {
-#define FIXED_EXTRA_LEN 8	// __socket_data_buffer结构中events_num，len占用的字节数
 	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
 	struct __socket_data_buffer *buf = (struct __socket_data_buffer *)raw;
 
@@ -383,6 +382,8 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 
 	data_buf_ptr = socket_data_buff;
 
+	int64_t real_time = gettime(CLOCK_REALTIME, TIME_TYPE_NAN) / 1000;
+
 	for (i = 0; i < buf->events_num; i++) {
 		sd = (struct __socket_data *)&buf->data[start];
 		len = sd->data_len;
@@ -394,7 +395,7 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		submit_data = data_buf_ptr;
 
 		submit_data->socket_id = sd->socket_id;
-		submit_data->timestamp = sys_base_time + sd->timestamp;
+		submit_data->timestamp = real_time - (buf->timestamp - sd->timestamp);
 		submit_data->tuple = sd->tuple;
 		submit_data->direction = sd->direction;
 		submit_data->l7_protocal_hint = sd->data_type;
