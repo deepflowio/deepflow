@@ -885,21 +885,20 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 		return inferred_message;
 	}
 	// MySQL、Kafka推断需要之前的4字节数据
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
-		if (conn_info->socket_info_ptr->prev_data_len != 0) {
-			if (conn_info->direction !=
-			    conn_info->socket_info_ptr->direction)
-				return inferred_message;
+	if (conn_info->socket_info_ptr != NULL && 
+	    conn_info->socket_info_ptr->prev_data_len != 0) {
+		if (conn_info->direction !=
+		    conn_info->socket_info_ptr->direction)
+			return inferred_message;
 
-			*(__u32 *) conn_info->prev_buf =
-			    *(__u32 *) conn_info->socket_info_ptr->prev_data;
-			conn_info->prev_count = 4;
+		*(__u32 *) conn_info->prev_buf =
+		    *(__u32 *) conn_info->socket_info_ptr->prev_data;
+		conn_info->prev_count = 4;
 
-			/*
-			 * 上次存储的数据清忽略掉
-			 */
-			conn_info->socket_info_ptr->prev_data_len = 0;
-		}
+		/*
+		 * 上次存储的数据清忽略掉
+		 */
+		conn_info->socket_info_ptr->prev_data_len = 0;
 	}
 
 	if ((inferred_message.type =
