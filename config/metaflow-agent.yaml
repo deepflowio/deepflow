@@ -3,6 +3,8 @@ controller-ips:
   - 127.0.0.1
 ## kubernetes-cluster-id，在对接kubernetes/openshift时需要配置
 # kubernetes-cluster-id:
+## kubernetes-namespace，当只有一个K8s命名空间权限时，填写此值
+# kubernetes-namespace:
 ## ingress的类型，填写为kubernetes or openshift，默认kubernetes
 # ingress-flavour: kubernetes
 ## controller listen port

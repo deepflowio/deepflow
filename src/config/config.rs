@@ -87,6 +87,7 @@ pub struct Config {
     pub tap_mac_script: String,
     pub cloud_gateway_traffic: bool,
     pub ebpf_log_file: String,
+    pub kubernetes_namespace: String,
 }
 
 impl Config {
@@ -226,6 +227,7 @@ impl Default for Config {
             tap_mac_script: "".into(),
             cloud_gateway_traffic: false,
             ebpf_log_file: "".into(),
+            kubernetes_namespace: "".into(),
         }
     }
 }

@@ -389,8 +389,10 @@ impl ResourceWatcherFactory {
         &self,
         resource: &'static str,
         kind: &'static str,
+        namespace: Option<&str>,
     ) -> Option<GenericResourceWatcher> {
         match resource {
+            // 特定namespace不支持Node/Namespace资源
             "nodes" => Some(GenericResourceWatcher::Node(ResourceWatcher::new(
                 Api::all(self.client.clone()),
                 kind,
@@ -402,51 +404,96 @@ impl ResourceWatcherFactory {
                 self.runtime.clone(),
             ))),
             "services" => Some(GenericResourceWatcher::Service(ResourceWatcher::new(
-                Api::all(self.client.clone()),
+                match namespace {
+                    Some(namespace) => Api::namespaced(self.client.clone(), namespace),
+                    None => Api::all(self.client.clone()),
+                },
                 kind,
                 self.runtime.clone(),
             ))),
             "deployments" => Some(GenericResourceWatcher::Deployment(ResourceWatcher::new(
-                Api::all(self.client.clone()),
+                match namespace {
+                    Some(namespace) => Api::namespaced(self.client.clone(), namespace),
+                    None => Api::all(self.client.clone()),
+                },
                 kind,
                 self.runtime.clone(),
             ))),
             "pods" => Some(GenericResourceWatcher::Pod(ResourceWatcher::new(
-                Api::all(self.client.clone()),
+                match namespace {
+                    Some(namespace) => Api::namespaced(self.client.clone(), namespace),
+                    None => Api::all(self.client.clone()),
+                },
                 kind,
                 self.runtime.clone(),
             ))),
             "statefulsets" => Some(GenericResourceWatcher::StatefulSet(ResourceWatcher::new(
-                Api::all(self.client.clone()),
+                match namespace {
+                    Some(namespace) => Api::namespaced(self.client.clone(), namespace),
+                    None => Api::all(self.client.clone()),
+                },
                 kind,
                 self.runtime.clone(),
             ))),
             "daemonsets" => Some(GenericResourceWatcher::DaemonSet(ResourceWatcher::new(
-                Api::<DaemonSet>::all(self.client.clone()),
+                match namespace {
+                    Some(namespace) => Api::namespaced(self.client.clone(), namespace),
+                    None => Api::all(self.client.clone()),
+                },
                 kind,
                 self.runtime.clone(),
             ))),
             "replicationcontrollers" => Some(GenericResourceWatcher::ReplicationController(
-                ResourceWatcher::new(Api::all(self.client.clone()), kind, self.runtime.clone()),
+                ResourceWatcher::new(
+                    match namespace {
+                        Some(namespace) => Api::namespaced(self.client.clone(), namespace),
+                        None => Api::all(self.client.clone()),
+                    },
+                    kind,
+                    self.runtime.clone(),
+                ),
             )),
             "replicasets" => Some(GenericResourceWatcher::ReplicaSet(ResourceWatcher::new(
-                Api::all(self.client.clone()),
+                match namespace {
+                    Some(namespace) => Api::namespaced(self.client.clone(), namespace),
+                    None => Api::all(self.client.clone()),
+                },
                 kind,
                 self.runtime.clone(),
             ))),
             "v1ingresses" => Some(GenericResourceWatcher::V1Ingress(ResourceWatcher::new(
-                Api::all(self.client.clone()),
+                match namespace {
+                    Some(namespace) => Api::namespaced(self.client.clone(), namespace),
+                    None => Api::all(self.client.clone()),
+                },
                 kind,
                 self.runtime.clone(),
             ))),
             "v1beta1ingresses" => Some(GenericResourceWatcher::V1beta1Ingress(
-                ResourceWatcher::new(Api::all(self.client.clone()), kind, self.runtime.clone()),
+                ResourceWatcher::new(
+                    match namespace {
+                        Some(namespace) => Api::namespaced(self.client.clone(), namespace),
+                        None => Api::all(self.client.clone()),
+                    },
+                    kind,
+                    self.runtime.clone(),
+                ),
             )),
             "extv1beta1ingresses" => Some(GenericResourceWatcher::ExtV1beta1Ingress(
-                ResourceWatcher::new(Api::all(self.client.clone()), kind, self.runtime.clone()),
+                ResourceWatcher::new(
+                    match namespace {
+                        Some(namespace) => Api::namespaced(self.client.clone(), namespace),
+                        None => Api::all(self.client.clone()),
+                    },
+                    kind,
+                    self.runtime.clone(),
+                ),
             )),
             "routes" => Some(GenericResourceWatcher::Route(ResourceWatcher::new(
-                Api::all(self.client.clone()),
+                match namespace {
+                    Some(namespace) => Api::namespaced(self.client.clone(), namespace),
+                    None => Api::all(self.client.clone()),
+                },
                 kind,
                 self.runtime.clone(),
             ))),
