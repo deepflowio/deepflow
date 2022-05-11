@@ -312,15 +312,13 @@ pub enum AppProtoLogsInfo {
 }
 
 impl AppProtoLogsInfo {
-    fn session_id(&self) -> u32 {
+    fn session_id(&self) -> Option<u32> {
         match self {
-            AppProtoLogsInfo::Dns(t) => t.trans_id as u32,
-            AppProtoLogsInfo::Mysql(_t) => 0,
-            AppProtoLogsInfo::Redis(_t) => 0,
-            AppProtoLogsInfo::Kafka(t) => t.correlation_id,
-            AppProtoLogsInfo::Dubbo(t) => t.serial_id as u32,
-            AppProtoLogsInfo::HttpV1(t) => t.stream_id,
-            AppProtoLogsInfo::HttpV2(t) => t.stream_id,
+            AppProtoLogsInfo::Dns(t) => Some(t.trans_id as u32),
+            AppProtoLogsInfo::Kafka(t) => Some(t.correlation_id),
+            AppProtoLogsInfo::Dubbo(t) => Some(t.serial_id as u32),
+            AppProtoLogsInfo::HttpV2(t) => Some(t.stream_id),
+            _ => None,
         }
     }
 
@@ -399,14 +397,19 @@ impl AppProtoLogsData {
     }
 
     pub fn ebpf_flow_session_id(&self) -> u64 {
-        let mut cap_seq = self.base_info.cap_seq;
-        if self.base_info.head.msg_type == LogMessageType::Request {
-            cap_seq += 1;
-        };
-        self.base_info.flow_id << 32
-            | (self.base_info.head.proto as u64) << 28
-            | ((self.special_info.session_id() as u64) & 0xfff << 16)
-            | (cap_seq & 0xffff)
+        if let Some(session_id) = self.special_info.session_id() {
+            self.base_info.flow_id << 32
+                | (self.base_info.head.proto as u64) << 24
+                | ((session_id as u64) & 0xffffff)
+        } else {
+            let mut cap_seq = self.base_info.cap_seq;
+            if self.base_info.head.msg_type == LogMessageType::Request {
+                cap_seq += 1;
+            };
+            self.base_info.flow_id << 32
+                | ((self.base_info.head.proto as u64) << 24)
+                | (cap_seq & 0xffffff)
+        }
     }
 
     pub fn session_merge(&mut self, log: AppProtoLogsData) {
