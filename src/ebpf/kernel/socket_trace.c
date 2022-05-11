@@ -7,7 +7,6 @@
 #define OFFSET_READY		1
 #define OFFSET_NO_READY    	0
 
-#define FIXED_EXTRA_LEN		8
 #define NS_PER_US		1000ULL
 #define NS_PER_SEC		1000000000ULL
 
@@ -747,7 +746,9 @@ static __inline void data_submit(struct pt_regs *ctx,
 	v_buff->events_num++;
 
 	if (v_buff->events_num == EVENT_BURST_NUM) {
-		__u32 buf_size = (v_buff->len + FIXED_EXTRA_LEN) & (sizeof(*v_buff) - 1);
+		__u32 buf_size = (v_buff->len + offsetof(typeof(struct __socket_data_buffer), data))
+				 & (sizeof(*v_buff) - 1);
+		v_buff->timestamp = bpf_ktime_get_ns() / 1000;
 		if (buf_size >= sizeof(*v_buff))
 			bpf_perf_event_output(ctx, &NAME(socket_data),
 					      BPF_F_CURRENT_CPU, v_buff,
@@ -1220,7 +1221,10 @@ KPROG(read_null) (struct pt_regs* ctx) {
 		if (v_buff->events_num > 0) {
 			struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
 			if ((bpf_ktime_get_ns() - v->timestamp * NS_PER_US) > NS_PER_SEC) {
-				__u32 buf_size = (v_buff->len + FIXED_EXTRA_LEN) & (sizeof(*v_buff) - 1);
+				__u32 buf_size = (v_buff->len +
+						  offsetof(typeof(struct __socket_data_buffer), data))
+						 & (sizeof(*v_buff) - 1);
+				v_buff->timestamp = bpf_ktime_get_ns() / 1000;
 				if (buf_size >= sizeof(*v_buff))
 					bpf_perf_event_output(ctx, &NAME(socket_data),
 							      BPF_F_CURRENT_CPU, v_buff,
