@@ -596,7 +596,7 @@ impl Components {
         let guard = Guard::new(config_handler.environment());
 
         let ebpf_collector = EbpfCollector::new(
-            config_handler.ebpf(),
+            &config_handler.candidate_config.ebpf,
             config_handler.log_parser(),
             policy_getter,
             proto_log_sender,
