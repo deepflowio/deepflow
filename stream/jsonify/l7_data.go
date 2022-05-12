@@ -48,9 +48,12 @@ type L7Base struct {
 	ProcessID1             uint32
 	ProcessKName0          string
 	ProcessKName1          string
-	SyscallTraceIDThread   uint32
 	SyscallTraceIDRequest  uint64
 	SyscallTraceIDResponse uint64
+	SyscallTraceIDThread0  uint32
+	SyscallTraceIDThread1  uint32
+	SyscallCapSeq0         uint32
+	SyscallCapSeq1         uint32
 }
 
 func L7BaseColumns() []*ckdb.Column {
@@ -89,9 +92,12 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("process_id_1", ckdb.Int32).SetComment("服务端进程ID"),
 		ckdb.NewColumn("process_kname_0", ckdb.String).SetComment("客户端进程名"),
 		ckdb.NewColumn("process_kname_1", ckdb.String).SetComment("服务端进程名"),
-		ckdb.NewColumn("syscall_trace_id_thread", ckdb.UInt32).SetComment("SyscallTraceID-线程"),
 		ckdb.NewColumn("syscall_trace_id_request", ckdb.UInt64).SetComment("SyscallTraceID-请求"),
 		ckdb.NewColumn("syscall_trace_id_response", ckdb.UInt64).SetComment("SyscallTraceID-响应"),
+		ckdb.NewColumn("syscall_trace_id_thread_0", ckdb.UInt32).SetComment("SyscallTraceID-线程0"),
+		ckdb.NewColumn("syscall_trace_id_thread_1", ckdb.UInt32).SetComment("SyscallTraceID-线程1"),
+		ckdb.NewColumn("syscall_cap_seq_0", ckdb.UInt32).SetComment("Syscall-序列0"),
+		ckdb.NewColumn("syscall_cap_seq_1", ckdb.UInt32).SetComment("Syscall-序列1"),
 	)
 
 	return columns
@@ -188,13 +194,22 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteString(f.ProcessKName1); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(f.SyscallTraceIDThread); err != nil {
-		return err
-	}
 	if err := block.WriteUInt64(f.SyscallTraceIDRequest); err != nil {
 		return err
 	}
 	if err := block.WriteUInt64(f.SyscallTraceIDResponse); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(f.SyscallTraceIDThread0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(f.SyscallTraceIDThread1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(f.SyscallCapSeq0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(f.SyscallCapSeq1); err != nil {
 		return err
 	}
 
@@ -596,9 +611,12 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.ProcessID1 = l.ProcessId1
 	b.ProcessKName0 = l.ProcessKname0
 	b.ProcessKName1 = l.ProcessKname1
-	b.SyscallTraceIDThread = l.SyscallTraceIdThread
 	b.SyscallTraceIDRequest = l.SyscallTraceIdRequest
 	b.SyscallTraceIDResponse = l.SyscallTraceIdResponse
+	b.SyscallTraceIDThread0 = l.SyscallTraceIdThread0
+	b.SyscallTraceIDThread1 = l.SyscallTraceIdThread1
+	b.SyscallCapSeq0 = l.SyscallCapSeq0
+	b.SyscallCapSeq1 = l.SyscallCapSeq1
 }
 
 func (k *KnowledgeGraph) FillL7(l *pb.AppProtoLogsBaseInfo, platformData *grpc.PlatformInfoTable, protocol layers.IPProtocol) {

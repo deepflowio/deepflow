@@ -246,6 +246,12 @@ var ColumnAdd610 = []*ColumnAdds{
 		ColumnNames: []string{"process_kname_0", "process_kname_1"},
 		ColumnType:  ckdb.String,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: []string{"syscall_trace_id_thread_0", "syscall_trace_id_thread_1", "syscall_cap_seq_0", "syscall_cap_seq_1"},
+		ColumnType:  ckdb.UInt32,
+	},
 }
 
 func getTables(connect *sql.DB, db string) ([]string, error) {
