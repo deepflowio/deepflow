@@ -94,7 +94,8 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("process_kname_1", ckdb.String).SetComment("服务端进程名"),
 		ckdb.NewColumn("syscall_trace_id_request", ckdb.UInt64).SetComment("SyscallTraceID-请求"),
 		ckdb.NewColumn("syscall_trace_id_response", ckdb.UInt64).SetComment("SyscallTraceID-响应"),
-		ckdb.NewColumn("syscall_trace_id_thread_0", ckdb.UInt32).SetComment("SyscallTraceID-线程0"),
+		// FIXME 修改名称为syscall_trace_id_thread_0
+		ckdb.NewColumn("syscall_trace_id_thread", ckdb.UInt32).SetComment("SyscallTraceID-线程"),
 		ckdb.NewColumn("syscall_trace_id_thread_1", ckdb.UInt32).SetComment("SyscallTraceID-线程1"),
 		ckdb.NewColumn("syscall_cap_seq_0", ckdb.UInt32).SetComment("Syscall-序列0"),
 		ckdb.NewColumn("syscall_cap_seq_1", ckdb.UInt32).SetComment("Syscall-序列1"),
