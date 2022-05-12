@@ -59,8 +59,8 @@ impl AccumulatedFlow {
             .zip(tagged_flow.flow.flow_perf_stats.as_ref())
         {
             if self_stats.l7_protocol == L7Protocol::Unknown
-                || self_stats.l7_protocol == L7Protocol::Other
-                    && flow_stats.l7_protocol != L7Protocol::Unknown
+                || (self_stats.l7_protocol == L7Protocol::Other
+                    && flow_stats.l7_protocol != L7Protocol::Unknown)
             {
                 self.l7_protocol = flow_stats.l7_protocol;
                 if let Some((self_meter, other_meter)) = self.app_meter.as_mut().zip(app_meter) {
