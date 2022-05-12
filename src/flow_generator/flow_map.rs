@@ -896,9 +896,9 @@ impl FlowMap {
                         self.l7_metrics_enabled(),
                     )
                 });
-                node.reset_flow_stat_info();
             }
             self.push_to_flow_stats_queue(node.tagged_flow.clone());
+            node.reset_flow_stat_info();
         }
     }
 
