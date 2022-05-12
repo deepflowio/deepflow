@@ -101,14 +101,16 @@ impl MetaAppProto {
             l3_epc_id_dst: 0,
             req_tcp_seq: 0,
             resp_tcp_seq: 0,
-            cap_seq: 0,
             process_id_0: 0,
             process_id_1: 0,
             process_kname_0: "".to_string(),
             process_kname_1: "".to_string(),
             syscall_trace_id_request: 0,
             syscall_trace_id_response: 0,
-            syscall_trace_id_thread: 0,
+            syscall_trace_id_thread_0: 0,
+            syscall_trace_id_thread_1: 0,
+            syscall_cap_seq_0: 0,
+            syscall_cap_seq_1: 0,
         };
         if flow.flow.tap_side == TapSide::Local {
             base_info.mac_src = flow.flow.flow_key.mac_src;
