@@ -1,20 +1,15 @@
 use std::collections::HashMap;
 use std::ffi::CString;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use arc_swap::access::Access;
 use log::{debug, info, warn};
 use lru::LruCache;
 
 use super::{Error, Result};
 use crate::common::flow::L7Protocol;
 use crate::common::meta_packet::MetaPacket;
-use crate::config::handler::{EbpfAccess, LogParserAccess};
+use crate::config::handler::{EbpfConfig, LogParserAccess};
 use crate::ebpf;
 use crate::flow_generator::{
     AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, DnsLog, DubboLog,
@@ -210,7 +205,7 @@ impl SessionAggr {
 
 struct FlowItem {
     last_policy: u64, // 秒级
-    other_l3_epc: i32,
+    remote_epc: i32,
 
     parser: Box<dyn L7LogParse>,
 }
@@ -242,10 +237,10 @@ impl FlowItem {
         if key.timestamp.as_secs() > self.last_policy + Self::POLICY_INTERVAL {
             self.last_policy = key.timestamp.as_secs();
             if key.l2_end_0 {
-                self.other_l3_epc =
+                self.remote_epc =
                     policy_getter.lookup_all_by_epc(key.src_ip, key.dst_ip, local_epc, 0);
             } else {
-                self.other_l3_epc =
+                self.remote_epc =
                     policy_getter.lookup_all_by_epc(key.src_ip, key.dst_ip, 0, local_epc);
             }
         }
@@ -254,13 +249,8 @@ impl FlowItem {
         if let Ok(head) = self.parse(packet) {
             // 获取日志信息
             let info = self.get_info();
-            let base = AppProtoLogsBaseInfo::from_ebpf(
-                &packet,
-                head,
-                vtap_id,
-                local_epc,
-                self.other_l3_epc,
-            );
+            let base =
+                AppProtoLogsBaseInfo::from_ebpf(&packet, head, vtap_id, local_epc, self.remote_epc);
             return Some(AppProtoLogsData {
                 base_info: base,
                 special_info: info,
@@ -305,13 +295,99 @@ impl Countable for SyncEbpfCounter {
             self.counter().unknown_protocol,
         );
         self.counter().reset();
+
+        let ebpf_counter = unsafe { ebpf::socket_tracer_stats() };
+
         vec![
-            ("in", CounterType::Counted, CounterValue::Unsigned(rx)),
-            ("out", CounterType::Counted, CounterValue::Unsigned(tx)),
             (
-                "unknown_protocol",
+                "collector_in",
+                CounterType::Counted,
+                CounterValue::Unsigned(rx),
+            ),
+            (
+                "collector_out",
+                CounterType::Counted,
+                CounterValue::Unsigned(tx),
+            ),
+            (
+                "collector_unknown_protocol",
                 CounterType::Counted,
                 CounterValue::Unsigned(unknow),
+            ),
+            (
+                "perf_pages_count",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.perf_pages_count as u64),
+            ),
+            (
+                "kern_lost",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.kern_lost),
+            ),
+            (
+                "kern_socket_map_max",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.kern_socket_map_max as u64),
+            ),
+            (
+                "kern_socket_map_used",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.kern_socket_map_used as u64),
+            ),
+            (
+                "kern_trace_map_max",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.kern_trace_map_max as u64),
+            ),
+            (
+                "kern_trace_map_used",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.kern_trace_map_used as u64),
+            ),
+            (
+                "socket_map_max_reclaim",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.socket_map_max_reclaim as u64),
+            ),
+            (
+                "worker_num",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.worker_num as u64),
+            ),
+            (
+                "queue_capacity",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.queue_capacity as u64),
+            ),
+            (
+                "user_enqueue_count",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.user_enqueue_count),
+            ),
+            (
+                "user_dequeue_count",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.user_dequeue_count),
+            ),
+            (
+                "user_enqueue_lost",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.user_enqueue_lost),
+            ),
+            (
+                "queue_burst_count",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.queue_burst_count),
+            ),
+            (
+                "is_adapt_success",
+                CounterType::Counted,
+                CounterValue::Unsigned(if ebpf_counter.is_adapt_success { 1 } else { 0 }),
+            ),
+            (
+                "tracer_state",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.tracer_state as u64),
             ),
         ]
     }
@@ -321,20 +397,129 @@ impl Countable for SyncEbpfCounter {
     }
 }
 
-pub struct EbpfCollector {
-    receiver: Arc<Receiver<MetaPacket<'static>>>,
+struct EbpfRunner {
+    receiver: Receiver<MetaPacket<'static>>,
 
     // 策略查询
     policy_getter: PolicyGetter,
 
     // GRPC配置
-    config: EbpfAccess,
     log_parser_config: LogParserAccess,
-    l7_log_dynamic_is_updated: Arc<AtomicBool>,
+    l7_log_dynamic_is_updated: bool,
 
-    thread_handle: Option<JoinHandle<()>>,
+    config: EbpfConfig,
 
     output: DebugSender<SendItem>,
+}
+
+impl EbpfRunner {
+    const FLOW_MAP_SIZE: usize = 1 << 14;
+
+    fn get_parser(
+        protocol: L7Protocol,
+        log_parser_config: &LogParserAccess,
+    ) -> Box<dyn L7LogParse> {
+        match protocol {
+            L7Protocol::Dns => Box::from(DnsLog::default()),
+            L7Protocol::Http1 => Box::from(HttpLog::new(log_parser_config)),
+            L7Protocol::Http2 => Box::from(HttpLog::new(log_parser_config)),
+            L7Protocol::Mysql => Box::from(MysqlLog::default()),
+            L7Protocol::Redis => Box::from(RedisLog::default()),
+            L7Protocol::Kafka => Box::from(KafkaLog::default()),
+            L7Protocol::Dubbo => Box::from(DubboLog::new(log_parser_config)),
+            _ => panic!("get_parser unknown protocol."),
+        }
+    }
+
+    fn on_config_change(&mut self, config: &EbpfConfig) {
+        info!(
+            "ebpf collector config change from {:#?} to {:#?}.",
+            self.config, config
+        );
+        self.config = config.clone();
+        unsafe { CAPTURE_SIZE = config.l7_log_packet_size }
+    }
+
+    fn l7_log_dynamic_config_updated(&mut self) {
+        debug!("ebpf l7 log config updated.");
+        self.l7_log_dynamic_is_updated = true;
+    }
+
+    fn run(&mut self, sync_counter: SyncEbpfCounter) {
+        let mut aggr = SessionAggr::new(self.config.l7_log_session_timeout, self.output.clone());
+        let mut flow_map: LruCache<u64, FlowItem> = LruCache::new(Self::FLOW_MAP_SIZE);
+
+        while unsafe { SWITCH } {
+            let packet = self.receiver.recv(Some(Duration::from_millis(1)));
+            if packet.is_err() {
+                continue;
+            }
+
+            // 应用解析配置发生变更清空数据
+            if self.l7_log_dynamic_is_updated {
+                flow_map.clear();
+                self.l7_log_dynamic_is_updated = false;
+            }
+
+            sync_counter.counter().rx += 1;
+            let packet = packet.as_ref().unwrap();
+            if packet.l7_protocol == L7Protocol::Unknown {
+                sync_counter.counter().unknown_protocol += 1;
+                // 未知协议不处理
+                continue;
+            }
+
+            let key = packet.socket_id << 56 | packet.l7_protocol as u64;
+
+            // 流聚合
+            let mut flow_item = flow_map.get_mut(&key);
+            if flow_item.is_none() {
+                flow_map.put(
+                    key,
+                    FlowItem {
+                        last_policy: 0,
+                        parser: Self::get_parser(packet.l7_protocol, &self.log_parser_config),
+                        remote_epc: 0,
+                    },
+                );
+                flow_item = flow_map.get_mut(&key);
+            }
+
+            flow_item.and_then(|flow_item| {
+                // 应用解析
+                if let Some(data) = flow_item.handle(
+                    packet,
+                    self.policy_getter,
+                    self.config.epc_id as i32,
+                    self.config.vtap_id,
+                ) {
+                    // 应用日志聚合
+                    debug!("\n{}", data);
+                    aggr.handle(data);
+                    sync_counter.counter().tx += 1;
+                }
+                Some(())
+            });
+        }
+    }
+}
+
+struct SyncEbpfRunner {
+    runner: *mut EbpfRunner,
+}
+
+unsafe impl Sync for SyncEbpfRunner {}
+unsafe impl Send for SyncEbpfRunner {}
+
+impl SyncEbpfRunner {
+    fn runner(&self) -> &mut EbpfRunner {
+        unsafe { &mut *self.runner }
+    }
+}
+
+pub struct EbpfCollector {
+    thread_runner: EbpfRunner,
+    thread_handle: Option<JoinHandle<()>>,
 
     counter: EbpfCounter,
 }
@@ -344,9 +529,7 @@ static mut SENDER: Option<Sender<MetaPacket>> = None;
 static mut CAPTURE_SIZE: usize = ebpf::CAP_LEN_MAX as usize;
 
 impl EbpfCollector {
-    const FLOW_MAP_SIZE: usize = 1 << 14;
-
-    extern "C" fn callback(sd: *mut ebpf::SK_BPF_DATA) {
+    extern "C" fn ebpf_callback(sd: *mut ebpf::SK_BPF_DATA) {
         unsafe {
             if !SWITCH || SENDER.is_none() {
                 return;
@@ -364,33 +547,10 @@ impl EbpfCollector {
         }
     }
 
-    pub fn l7_log_dynamic_config_updated(&mut self) {
-        debug!("ebpf l7 log config updated.");
-        self.l7_log_dynamic_is_updated
-            .store(true, Ordering::Relaxed);
-    }
-
-    fn update_capture_size(capture_size: usize) {
+    fn ebpf_init(config: &EbpfConfig, sender: Sender<MetaPacket<'static>>) -> Result<()> {
+        // ebpf内核模块初始化
         unsafe {
-            if CAPTURE_SIZE != capture_size {
-                info!(
-                    "ebpf collector capture size change from {} to {}.",
-                    CAPTURE_SIZE, capture_size
-                );
-                CAPTURE_SIZE = capture_size
-            }
-        }
-    }
-
-    pub fn new(
-        config: EbpfAccess,
-        log_parser_config: LogParserAccess,
-        policy_getter: PolicyGetter,
-        output: DebugSender<SendItem>,
-    ) -> Result<Box<Self>> {
-        unsafe {
-            SWITCH = false;
-            let log_file = &config.load().log_path;
+            let log_file = config.log_path.clone();
             let log_file = if !log_file.is_empty() {
                 CString::new(log_file.as_bytes())
                     .unwrap()
@@ -399,34 +559,17 @@ impl EbpfCollector {
             } else {
                 std::ptr::null()
             };
-            Self::update_capture_size(config.load().l7_log_packet_size);
 
             if ebpf::bpf_tracer_init(log_file, true) != 0 {
-                info!("ebpf bpf_tracer_init error: {}", config.load().log_path);
+                info!("ebpf bpf_tracer_init error: {}", config.log_path);
                 return Err(Error::EbpfInitError);
             }
-            let (s, r, _) = bounded::<MetaPacket>(1024);
-            SENDER = Some(s);
-            let e = EbpfCollector {
-                receiver: Arc::new(r),
-                output,
-                policy_getter,
-                config,
-                log_parser_config,
-                thread_handle: None,
-                l7_log_dynamic_is_updated: Arc::new(AtomicBool::new(false)),
-                counter: EbpfCounter {
-                    rx: 0,
-                    tx: 0,
-                    unknown_protocol: 0,
-                },
-            };
 
             if ebpf::running_socket_tracer(
-                Self::callback, /* 回调接口 rust -> C */
-                1,              /* 工作线程数，是指用户态有多少线程参与数据处理 */
-                128,            /* 内核共享内存占用的页框数量, 值为2的次幂。用于perf数据传递 */
-                65536,          /* 环形缓存队列大小，值为2的次幂。e.g: 2,4,8,16,32,64,128 */
+                Self::ebpf_callback, /* 回调接口 rust -> C */
+                1,                   /* 工作线程数，是指用户态有多少线程参与数据处理 */
+                128,                 /* 内核共享内存占用的页框数量, 值为2的次幂。用于perf数据传递 */
+                65536,               /* 环形缓存队列大小，值为2的次幂。e.g: 2,4,8,16,32,64,128 */
                 524288, /* 设置用于socket追踪的hash表项最大值，取决于实际场景中并发请求数量 */
                 524288, /* 设置用于线程追踪会话的hash表项最大值，SK_BPF_DATA结构的syscall_trace_id_session关联这个哈希表 */
                 520000, /* socket map表项进行清理的最大阈值，当前map的表项数量超过这个值进行map清理操作 */
@@ -434,11 +577,65 @@ impl EbpfCollector {
             {
                 return Err(Error::EbpfRunningError);
             }
-
             ebpf::bpf_tracer_finish();
-            info!("ebpf collector init.");
-            return Ok(Box::new(e));
         }
+        // ebpf和ebpf collector通信配置初始化
+        unsafe {
+            SWITCH = false;
+            SENDER = Some(sender);
+            CAPTURE_SIZE = config.l7_log_packet_size;
+        }
+
+        Ok(())
+    }
+
+    fn ebpf_start() {
+        debug!("ebpf collector starting ebpf-kernel.");
+        unsafe {
+            while ebpf::tracer_start() != 0 {
+                debug!("tracer_start() error, sleep 1s retry.");
+                std::thread::sleep(Duration::from_secs(1));
+            }
+        }
+    }
+
+    fn ebpf_stop() {
+        info!("ebpf collector stopping ebpf-kernel.");
+        unsafe {
+            ebpf::tracer_stop();
+        }
+    }
+
+    pub fn new(
+        config: &EbpfConfig,
+        log_parser_config: LogParserAccess,
+        policy_getter: PolicyGetter,
+        output: DebugSender<SendItem>,
+    ) -> Result<Box<Self>> {
+        let (sender, receiver, _) = bounded::<MetaPacket>(1024);
+
+        Self::ebpf_init(config, sender)?;
+        info!("ebpf collector init.");
+        return Ok(Box::new(EbpfCollector {
+            thread_runner: EbpfRunner {
+                receiver,
+                policy_getter,
+                config: config.clone(),
+                log_parser_config,
+                output,
+                l7_log_dynamic_is_updated: false,
+            },
+            thread_handle: None,
+            counter: EbpfCounter {
+                rx: 0,
+                tx: 0,
+                unknown_protocol: 0,
+            },
+        }));
+    }
+
+    pub fn l7_log_dynamic_config_updated(&mut self) {
+        self.thread_runner.l7_log_dynamic_config_updated();
     }
 
     pub fn get_sync_counter(&self) -> SyncEbpfCounter {
@@ -447,8 +644,14 @@ impl EbpfCollector {
         }
     }
 
-    pub fn get_ebpf_stats(&self) -> Result<ebpf::SK_TRACE_STATS> {
-        unsafe { Ok(ebpf::socket_tracer_stats()) }
+    fn get_sync_runner(&self) -> SyncEbpfRunner {
+        SyncEbpfRunner {
+            runner: &self.thread_runner as *const EbpfRunner as *mut EbpfRunner,
+        }
+    }
+
+    pub fn on_config_change(&mut self, config: &EbpfConfig) {
+        self.thread_runner.on_config_change(config);
     }
 
     pub fn start(&mut self) {
@@ -459,84 +662,15 @@ impl EbpfCollector {
             }
             SWITCH = true;
         }
-        let receiver = self.receiver.clone();
-        let policy_getter = self.policy_getter;
-        let config = self.config.clone();
-        let log_parser_config = self.log_parser_config.clone();
-        let l7_log_dynamic_is_updated = self.l7_log_dynamic_is_updated.clone();
 
-        let mut aggr = SessionAggr::new(config.load().l7_log_session_timeout, self.output.clone());
-        let mut flow_map: LruCache<u64, FlowItem> = LruCache::new(Self::FLOW_MAP_SIZE);
+        let sync_runner = self.get_sync_runner();
         let sync_counter = self.get_sync_counter();
-
         self.thread_handle = Some(thread::spawn(move || {
-            while unsafe { SWITCH } {
-                let packet = receiver.recv(Some(Duration::from_millis(1)));
-                if packet.is_err() {
-                    continue;
-                }
-
-                if l7_log_dynamic_is_updated.swap(false, Ordering::Relaxed) {
-                    flow_map.clear();
-                }
-
-                sync_counter.counter().rx += 1;
-                let packet = packet.as_ref().unwrap();
-                if packet.l7_protocol == L7Protocol::Unknown {
-                    sync_counter.counter().unknown_protocol += 1;
-                    // 未知协议不处理
-                    continue;
-                }
-                // 流聚合
-                let mut flow_item = flow_map.get_mut(&packet.socket_id);
-                if flow_item.is_none() {
-                    flow_map.put(
-                        packet.socket_id,
-                        FlowItem {
-                            last_policy: 0,
-                            parser: get_parser(packet.l7_protocol, &log_parser_config),
-                            other_l3_epc: 0,
-                        },
-                    );
-                    flow_item = flow_map.get_mut(&packet.socket_id);
-                }
-                let flow_item = flow_item.unwrap();
-
-                let config = config.load();
-                if let Some(data) =
-                    flow_item.handle(packet, policy_getter, config.epc_id as i32, config.vtap_id)
-                {
-                    // 应用日志聚合
-                    debug!("\n{}", data);
-                    aggr.handle(data);
-                    sync_counter.counter().tx += 1;
-                }
-                Self::update_capture_size(config.l7_log_packet_size);
-            }
-
-            fn get_parser(
-                protocol: L7Protocol,
-                log_parser_config: &LogParserAccess,
-            ) -> Box<dyn L7LogParse> {
-                match protocol {
-                    L7Protocol::Dns => Box::from(DnsLog::default()),
-                    L7Protocol::Http1 => Box::from(HttpLog::new(log_parser_config)),
-                    L7Protocol::Http2 => Box::from(HttpLog::new(log_parser_config)),
-                    L7Protocol::Mysql => Box::from(MysqlLog::default()),
-                    L7Protocol::Redis => Box::from(RedisLog::default()),
-                    L7Protocol::Kafka => Box::from(KafkaLog::default()),
-                    L7Protocol::Dubbo => Box::from(DubboLog::new(log_parser_config)),
-                    _ => panic!("get_parser unknown protocol."),
-                }
-            }
+            sync_runner.runner().run(sync_counter)
         }));
+
         debug!("ebpf collector starting ebpf-kernel.");
-        unsafe {
-            while ebpf::tracer_start() != 0 {
-                debug!("tracer_start() error, sleep 1s retry.");
-                std::thread::sleep(Duration::from_secs(1));
-            }
-        }
+        Self::ebpf_start();
         info!("ebpf collector started");
     }
 
@@ -547,14 +681,15 @@ impl EbpfCollector {
                 return;
             }
             SWITCH = false;
-            info!("ebpf collector stopping thread.");
-            if let Some(handler) = self.thread_handle.take() {
-                let _ = handler.join();
-            }
-            info!("ebpf collector stopping ebpf-kernel.");
-            ebpf::tracer_stop();
-            info!("ebpf collector stopped.");
         }
+
+        info!("ebpf collector stopping thread.");
+        if let Some(handler) = self.thread_handle.take() {
+            let _ = handler.join();
+        }
+
+        Self::ebpf_stop();
+        info!("ebpf collector stopped.");
     }
 }
 #[cfg(test)]
