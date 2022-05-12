@@ -281,11 +281,13 @@ pub struct SynchronizerConfig {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EbpfConfig {
+    // 动态配置
     pub vtap_id: u16,
     pub epc_id: u32,
+    pub l7_log_packet_size: usize,
+    // 静态配置
     pub l7_log_session_timeout: Duration,
     pub log_path: String,
-    pub l7_log_packet_size: usize,
 }
 
 // Span/Trace 共用一套TypeMap
@@ -1331,6 +1333,14 @@ impl ConfigHandler {
                 candidate_config.ebpf, new_config.ebpf
             );
             candidate_config.ebpf = new_config.ebpf;
+
+            fn ebpf_callback(handler: &ConfigHandler, components: &mut Components) {
+                if let Some(ebpf_collector) = components.ebpf_collector.as_mut() {
+                    ebpf_collector.on_config_change(&handler.candidate_config.ebpf);
+                }
+            }
+
+            callbacks.push(ebpf_callback);
         }
 
         if candidate_config.stats != new_config.stats {
