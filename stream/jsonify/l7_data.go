@@ -477,9 +477,6 @@ func (h *L7Logger) fillKafka(l *pb.AppProtoLogsData) {
 		return
 	}
 	info := l.Kafka
-	if info.ApiVersion != 0 {
-		h.Version = strconv.Itoa(int(info.ApiVersion))
-	}
 	if h.Type != uint8(datatype.MSG_T_RESPONSE) {
 		h.RequestType = KafkaCommand(info.ApiKey).String()
 	}
