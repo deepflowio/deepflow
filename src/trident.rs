@@ -145,6 +145,8 @@ impl Trident {
             revision.clone(),
             ctrl_ip.to_string(),
             ctrl_mac.to_string(),
+            config_handler.static_config.controller_ips[0].clone(),
+            config_handler.static_config.analyzer_ip.clone(),
             config_handler.static_config.vtap_group_id_request.clone(),
             config_handler.static_config.kubernetes_cluster_id.clone(),
             policy_setter,

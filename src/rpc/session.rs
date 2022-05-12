@@ -91,7 +91,11 @@ impl Session {
         self.server_ip.write().set_request_failed(failed);
     }
 
-    pub fn set_proxy_server(&self, ip: &str) {
+    pub fn get_proxy_server(&self) -> Option<String> {
+        self.server_ip.read().get_proxy_ip()
+    }
+
+    pub fn set_proxy_server(&self, ip: String) {
         self.server_ip.write().set_proxy_ip(ip);
     }
 }
@@ -131,16 +135,16 @@ impl ServerIp {
         self.current_ip.clone()
     }
 
-    fn set_current_ip(&mut self, ip: &str) {
-        self.current_ip = ip.into();
+    fn set_current_ip(&mut self, ip: String) {
+        self.current_ip = ip;
     }
 
-    fn get_proxy_ip(&self) -> Option<&str> {
-        self.proxy_ip.as_ref().map(|x| x.as_str())
+    fn get_proxy_ip(&self) -> Option<String> {
+        self.proxy_ip.clone()
     }
 
-    fn set_proxy_ip(&mut self, ip: &str) {
-        self.proxy_ip = Some(ip.into());
+    fn set_proxy_ip(&mut self, ip: String) {
+        self.proxy_ip = Some(ip);
     }
 
     fn get_request_failed(&self) -> bool {
@@ -151,9 +155,9 @@ impl ServerIp {
         self.request_failed = failed;
     }
 
-    fn get_current_controller_ip(&self) -> &str {
+    fn get_current_controller_ip(&self) -> String {
         // controller_ips一定不为空
-        &self.controller_ips[self.this_controller]
+        self.controller_ips[self.this_controller].clone()
     }
 
     fn next_controller_ip(&mut self) {

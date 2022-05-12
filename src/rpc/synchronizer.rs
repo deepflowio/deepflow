@@ -41,6 +41,8 @@ pub struct StaticConfig {
     pub kubernetes_cluster_id: String,
     pub ctrl_mac: String,
     pub ctrl_ip: String,
+    pub controller_ip: String,
+    pub analyzer_ip: String,
 
     pub env: RuntimeEnvironment,
 }
@@ -55,6 +57,8 @@ impl Default for StaticConfig {
             kubernetes_cluster_id: Default::default(),
             ctrl_ip: Default::default(),
             ctrl_mac: Default::default(),
+            controller_ip: Default::default(),
+            analyzer_ip: Default::default(),
             env: Default::default(),
         }
     }
@@ -74,6 +78,9 @@ pub struct Status {
     pub config_accepted: bool,
     pub synced: bool,
     pub new_revision: Option<String>,
+
+    pub proxy_ip: String,
+    pub sync_interval: Duration,
 
     // GRPC数据
     pub version_platform_data: u64,
@@ -296,8 +303,6 @@ pub struct Synchronizer {
 
     trident_state: TridentState,
 
-    sync_interval: Duration,
-
     session: Arc<Session>,
     dispatcher_listener: Arc<Mutex<Option<DispatcherListener>>>,
     // 策略模块和NPB带宽检测会用到
@@ -319,6 +324,8 @@ impl Synchronizer {
         revision: String,
         ctrl_ip: String,
         ctrl_mac: String,
+        controller_ip: String,
+        analyzer_ip: String,
         vtap_group_id_request: String,
         kubernetes_cluster_id: String,
         policy_setter: PolicySetter,
@@ -332,12 +339,13 @@ impl Synchronizer {
                 kubernetes_cluster_id,
                 ctrl_mac,
                 ctrl_ip,
+                controller_ip,
+                analyzer_ip,
                 env: RuntimeEnvironment::new(),
             }),
             trident_state,
             config: Default::default(),
             status: Default::default(),
-            sync_interval: DEFAULT_SYNC_INTERVAL,
             session,
             dispatcher_listener: Default::default(),
             running: Arc::new(AtomicBool::new(false)),
@@ -455,8 +463,6 @@ impl Synchronizer {
         }
     }
 
-    fn on_config_change(_config: &RuntimeConfig) {}
-
     fn parse_segment(
         tap_mode: tp::TapMode,
         resp: &tp::SyncResponse,
@@ -518,7 +524,7 @@ impl Synchronizer {
             return;
         }
         let new_config = config.clone();
-        let runtime_config = config.unwrap().try_into();
+        let runtime_config: Result<RuntimeConfig, _> = config.unwrap().try_into();
         if let Err(e) = runtime_config {
             warn!(
                 "invalid response from {} with invalid config: {}",
@@ -526,8 +532,12 @@ impl Synchronizer {
             );
             return;
         }
-        let runtime_config = runtime_config.unwrap();
-        Self::on_config_change(&runtime_config);
+        let mut runtime_config = runtime_config.unwrap();
+        if static_config.analyzer_ip != "" {
+            // 配置文件配置analyzer-ip后，会使用配置文件中的controller-ips和analyzer-ip替换配置器下发的proxy-controller-ip和analyzer-ip
+            runtime_config.proxy_controller_ip = static_config.controller_ip.clone();
+            runtime_config.analyzer_ip = static_config.analyzer_ip.clone();
+        }
 
         max_memory.store(runtime_config.max_memory, Ordering::Relaxed);
 
@@ -540,6 +550,8 @@ impl Synchronizer {
         let (_segments, macs) = Self::parse_segment(static_config.tap_mode, &resp);
 
         let mut status = status.write();
+        status.proxy_ip = runtime_config.proxy_controller_ip.clone();
+        status.sync_interval = runtime_config.sync_interval;
         let updated_platform = status.get_platform_data(&resp);
         if updated_platform {
             blacklist = status.modify_platform(static_config.tap_mode, &macs, &runtime_config);
@@ -648,7 +660,7 @@ impl Synchronizer {
         let static_config = self.static_config.clone();
         let _config = self.config.clone();
         let status = self.status.clone();
-        let sync_interval = self.sync_interval;
+        let mut sync_interval = DEFAULT_SYNC_INTERVAL;
         let running = self.running.clone();
         let dispatcher_listener = self.dispatcher_listener.clone();
         let flow_acl_listener = self.flow_acl_listener.clone();
@@ -729,8 +741,27 @@ impl Synchronizer {
                     &flow_acl_listener,
                     &max_memory,
                 );
-                if status.read().new_revision.is_some() {
+                let (new_revision, proxy_ip, new_sync_interval) = {
+                    let status = status.read();
+                    (
+                        status.new_revision.clone(),
+                        status.proxy_ip.clone(),
+                        status.sync_interval,
+                    )
+                };
+                if new_revision.is_some() {
                     // TODO: upgrade
+                }
+                match session.get_proxy_server() {
+                    Some(ip) if &ip == &proxy_ip => (),
+                    _ => {
+                        info!("proxy_controller_ip update to {}", proxy_ip);
+                        session.set_proxy_server(proxy_ip);
+                    }
+                }
+                if sync_interval != new_sync_interval {
+                    sync_interval = new_sync_interval;
+                    info!("sync interval set to {:?}", sync_interval);
                 }
 
                 time::sleep(sync_interval).await;
