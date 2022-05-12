@@ -87,7 +87,7 @@ impl Trident {
         let config = Config::load_from_file(config_path)?;
 
         let mut logger = Logger::try_with_str(config.log_level.as_str().to_lowercase())?
-            .format_for_files(colored_opt_format)
+            .format(colored_opt_format)
             .log_to_file(FileSpec::try_from(&config.log_file)?)
             .rotate(Criterion::Age(Age::Day), Naming::Timestamps, Cleanup::Never)
             .create_symlink(&config.log_file)
