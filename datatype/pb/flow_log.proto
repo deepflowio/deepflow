@@ -197,8 +197,10 @@ message AppProtoLogsBaseInfo {
         string ProcessKname1 = 28;
         uint64 SyscallTraceIdRequest = 29;
         uint64 SyscallTraceIdResponse = 30;
-        uint32 SyscallTraceIdThread = 31;
-
+        uint32 SyscallTraceIdThread0= 31;
+        uint32 SyscallTraceIdThread1= 32;
+        uint32 SyscallCapSeq0 = 33;
+        uint32 SyscallCapSeq1 = 34;
 }
 
 message AppProtoHead {
